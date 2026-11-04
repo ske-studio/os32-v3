@@ -16,10 +16,16 @@
 #define TEST_DL 123456U
 #define VGA_WIDTH 640U
 #define VGA_HEIGHT 480U
-#define VGA_BYTES (VGA_WIDTH*VGA_HEIGHT)
+/* cpp: nouveau c03c1a1 dispnv04/crtc.c:869-883 (depth/format),
+ * :889-895 (pixel displacement and cpp). Geometry: OS32 X1/N4. */
+#define INDEX8_CPP (8U/8U)
+#define RGB565_CPP (16U/8U)
+#define XRGB8888_CPP (32U/8U)
+#define VGA_BYTES (VGA_WIDTH*VGA_HEIGHT*INDEX8_CPP)
+#define CURSOR_BYTES GF4_CURSOR_BYTES /* crtc.c:938-975; A0 storage size. */
 #define XGA_WIDTH 1024U
 #define XGA_HEIGHT 768U
-#define XGA32_BYTES (XGA_WIDTH*XGA_HEIGHT*4U)
+#define XGA32_BYTES (XGA_WIDTH*XGA_HEIGHT*XRGB8888_CPP)
 #define TRACE_CAP 128U /* Placement/loans perform no I/O; catch any added waits. */
 static struct gf4_host host;
 static struct gf4_state state;
@@ -30,15 +36,29 @@ static struct gf3_service *service;
 static struct gf_vram_reservation_node external;
 static struct gf4_saved saved;
 static struct gf2_chan wrong_channel;
+/* These are fixture mode IDs, not hardware register values. Timing is
+ * VESA VGA/XGA input data; expectations use the fixture dimensions/pitch. */
 static const struct gf4_mode vga={.id=1,
     .t={25175,640,656,752,800,480,490,492,525,GF4_NEG_H|GF4_NEG_V},
     .fmt=GF3_INDEX8,.pitch=VGA_WIDTH};
 static const struct gf4_mode xga32={.id=2,
     .t={65000,1024,1048,1184,1344,768,771,777,806,GF4_NEG_H|GF4_NEG_V},
-    .fmt=GF3_XRGB8888,.pitch=XGA_WIDTH*4U};
+    .fmt=GF3_XRGB8888,.pitch=XGA_WIDTH*XRGB8888_CPP};
 static const struct gf4_mode vga16={.id=3,
     .t={25175,640,656,752,800,480,490,492,525,GF4_NEG_H|GF4_NEG_V},
-    .fmt=GF3_RGB565,.pitch=VGA_WIDTH*2U};
+    .fmt=GF3_RGB565,.pitch=VGA_WIDTH*RGB565_CPP};
+/* Resident lifecycle boundary, not a replacement for an F3 API. scan.c
+ * must never invoke START/STOP/RECOVER while only changing a value loan. */
+static i32 unexpected_lifecycle(void *owner,u32 dl)
+{
+    (void)owner; (void)dl;
+    assert(false);
+    return GF3_ESTATE;
+}
+static const struct gf3_service_owner owner_table={
+    .owner=&host.ctx,.start=unexpected_lifecycle,
+    .stop=unexpected_lifecycle,.recover=unexpected_lifecycle
+};
 static void same(const struct gf3_surface *a,const struct gf3_surface *b)
 {
     assert(a->off==b->off && a->bytes==b->bytes && a->pitch==b->pitch);
@@ -66,15 +86,19 @@ static void init(void)
     host.ctx.accepting=false;
     assert(!gf3_service_bind(&production,&slot));
     service=gf3_service_get(&production.chan); assert(service);
+    assert(!gf3_service_owner_bind(service,&owner_table));
+    assert(service->owner==&owner_table);
     gf_hook_ctx_bind(&production.accel); gf_hook_scan_bind(false,0);
-    state.nmodes=3; state.modes[0]=vga; state.modes[1]=xga32; state.modes[2]=vga16;
+    const struct gf4_mode modes[]={vga,xga32,vga16};
+    state.nmodes=sizeof(modes)/sizeof(modes[0]);
+    for (u32 i=0;i<state.nmodes;i++) state.modes[i]=modes[i];
     state.head[0].mode=vga; state.head[0].enabled=true;
     assert(!gf4_scan_reserve_initial(&host.ctx,TEST_DL));
     assert(state.head[0].front.off==0 && state.head[0].front.bytes==VGA_BYTES);
     assert(host.ctx.test.value.bytes==VGA_BYTES);
     for (u8 h=0;h<GF4_HEADS;h++) {
         assert(!(host.ctx.cursor[h].value.off&(MEM_PAGE_SIZE-1U)));
-        assert(host.ctx.cursor[h].value.bytes==64U*64U*4U); /* crtc.c:938-975. */
+        assert(host.ctx.cursor[h].value.bytes==CURSOR_BYTES); /* crtc.c:938-975. */
         live(&host.ctx.cursor[h]);
     }
 }
@@ -96,7 +120,7 @@ static void loans_and_holds(void)
     struct gf3_surface pair[2];
     assert(!gf4_scan_prepare(&host.ctx,0,xga32.id,pair,TEST_DL));
     assert(pair[0].bytes==XGA32_BYTES && pair[1].bytes==XGA32_BYTES);
-    assert(pair[0].pitch==XGA_WIDTH*4U && pair[0].fmt==GF3_XRGB8888);
+    assert(pair[0].pitch==XGA_WIDTH*XRGB8888_CPP && pair[0].fmt==GF3_XRGB8888);
     assert(pair[0].off>=VGA_BYTES && pair[1].off>=pair[0].off+XGA32_BYTES);
     struct gf3_surface old=state.head[0].front;
     saved.head[0]=state.head[0]; host.ctx.diagnostic_saved=&saved;
@@ -140,7 +164,7 @@ static void loans_and_holds(void)
     same(&service->scan,&pair[0]);
     state.head[1].enabled=false;
     assert(!gf4_scan_prepare(&host.ctx,0,vga16.id,pair,TEST_DL));
-    assert(pair[0].bytes==VGA_BYTES*2U && pair[0].pitch==VGA_WIDTH*2U);
+    assert(pair[0].bytes==VGA_BYTES*RGB565_CPP && pair[0].pitch==VGA_WIDTH*RGB565_CPP);
     state.head[0].mode=vga16;
     host.ctx.saved_closed=true;
     struct video_fb before,after; u32 bw,bh,aw,ah;
@@ -151,6 +175,68 @@ static void loans_and_holds(void)
     assert(before.phys==after.phys && before.bytes==after.bytes &&
         before.pitch==after.pitch && before.format==after.format && bw==aw && bh==ah);
     host.ctx.saved_closed=false; state.head[0].front=pair[0];
+}
+/* X1: use the real C1 notification while state.head.front is still old.
+ * HAL format encodings belong to C1: require distinct INDEX8/16/32 formats
+ * without guessing new GFX_FMT values that are not in the frozen headers. */
+static void published_changes(void)
+{
+    struct video_fb previous,fb;
+    u32 w,h;
+    struct gf3_surface seed={.off=external.value.off,.bytes=VGA_BYTES,
+        .pitch=vga.pitch,.width=vga.t.hd,.height=vga.t.vd,.fmt=vga.fmt,
+        .reservation_id=external.value.reservation_id,.generation=external.value.generation};
+    /* Establish INDEX8 metadata from a live caller-owned display range. */
+    gf_hook_scan_changed(0,&seed,vga.id);
+    geforce_backend_framebuffer_info(&previous,&w,&h);
+    host.ctx.accepting=true;
+    const struct gf4_mode *modes[]={&vga16,&xga32};
+    for (u32 i=0;i<sizeof(modes)/sizeof(modes[0]);i++) {
+        const struct gf4_mode *m=modes[i];
+        struct gf3_surface pair[2],front=state.head[0].front;
+        if (m->id!=state.head[0].mode.id) {
+            assert(!gf4_scan_prepare(&host.ctx,0,m->id,pair,TEST_DL));
+            front=pair[0];
+        }
+        struct gf3_surface old=state.head[0].front;
+        state.head[0].mode=*m;
+        /* Seed a live INDEX8 hook: a missing notification must leave it
+         * observably open. Fully clipped calls perform no drawing or I/O. */
+        gf_hook_scan_bind(true,&seed);
+        assert(!geforce_fill_rect(seed.width,0,1,1,0));
+        assert(!gf4_scan_changed(&host.ctx,0,&front));
+        same(&service->scan,&front); same(&state.head[0].front,&old);
+        geforce_backend_framebuffer_info(&fb,&w,&h);
+        assert(fb.phys==production.chan.bar1.base+front.off);
+        assert(fb.bytes==front.bytes && fb.pitch==m->pitch);
+        assert(w==m->t.hd && h==m->t.vd && fb.format!=previous.format);
+        assert(geforce_fill_rect(seed.width,0,1,1,0)==OS32_ERR_NOSYS);
+        assert(geforce_blit(0,0,0,0,0,0)==OS32_ERR_NOSYS);
+        previous=fb; state.head[0].front=front; /* B7 commit after notice. */
+    }
+    host.ctx.accepting=false; gf_hook_scan_bind(false,0);
+}
+static void same_reservation_flip(void)
+{
+    struct gf4_head_image original=state.head[0];
+    /* Two VGA16 images fit within the existing caller-owned XGA32 node.
+     * crtc.c:889-891: same pinned BO, distinct framebuffer displacement. */
+    u32 bytes=vga16.pitch*vga16.t.vd;
+    assert(bytes<=external.value.bytes/2U);
+    struct gf3_surface first={.off=external.value.off,.bytes=bytes,
+        .pitch=vga16.pitch,.width=vga16.t.hd,.height=vga16.t.vd,.fmt=vga16.fmt,
+        .reservation_id=external.value.reservation_id,.generation=external.value.generation};
+    struct gf3_surface second=first; second.off+=bytes;
+    state.head[0].mode=vga16; state.head[0].front=first;
+    state.head[0].back=(struct gf3_surface){0};
+    assert(!gf4_scan_changed(&host.ctx,0,&second));
+    same(&service->scan,&second); same(&state.head[0].back,&first);
+    same(&state.head[0].front,&first); live(&external);
+    state.head[0].front=second; /* B7 commits; repeat notice is a no-op. */
+    assert(!gf4_scan_changed(&host.ctx,0,&second));
+    same(&state.head[0].back,&first);
+    state.head[0]=original;
+    assert(!gf4_scan_changed(&host.ctx,0,&original.front));
 }
 static void release_and_capacity(void)
 {
@@ -170,7 +256,7 @@ static void release_and_capacity(void)
     production.chan.state=GF2_RUN; state.head[0].mode=vga;
     /* Exactly enough for the rounded boot display plus two cursor images.
      * Test capacity alone is nonfatal; geometry/IDs still stay resident. */
-    production.chan.B=((VGA_BYTES+MEM_PAGE_SIZE-1U)&~(MEM_PAGE_SIZE-1U))+2U*(64U*64U*4U);
+    production.chan.B=((VGA_BYTES+MEM_PAGE_SIZE-1U)&~(MEM_PAGE_SIZE-1U))+GF4_HEADS*CURSOR_BYTES;
     assert(!gf4_scan_reserve_initial(&host.ctx,TEST_DL));
     assert(host.ctx.last_rc==GF2_ENOSPC && !host.ctx.test.value.owner);
     assert(!gf4_scan_changed(&host.ctx,0,&state.head[0].front));
@@ -188,7 +274,8 @@ static void release_and_capacity(void)
 }
 void _start(void)
 {
-    init(); prepare_rollback(); loans_and_holds(); release_and_capacity();
-    assert(host.nevents==0); /* No clocks, waits, MMIO or publication in scan. */
+    init(); prepare_rollback(); loans_and_holds();
+    published_changes(); same_reservation_flip(); release_and_capacity();
+    assert(host.nevents==0); /* No clocks, waits or MMIO in scan/metadata updates. */
     gf2_host_exit(0);
 }

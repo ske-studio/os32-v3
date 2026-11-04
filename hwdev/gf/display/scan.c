@@ -247,7 +247,10 @@ i32 gf4_scan_changed(void *owner,u8 head,const struct gf3_surface *front)
     }
     /* B7 still owns old front and pending here. Never release either face.
      * crtc.c:1074-1087 commits only after the completion notification. */
-    if (!scan_names(front,&(struct gf_vram_reservation){
+    /* A reservation may contain multiple scan images: crtc.c:889-891
+     * adds the per-image displacement to the pinned BO base. */
+    if (front->off!=image[head].front.off ||
+        !scan_names(front,&(struct gf_vram_reservation){
             .reservation_id=image[head].front.reservation_id,
             .generation=image[head].front.generation})) image[head].back=image[head].front;
     for (u8 bank=0;bank<2;bank++) {
