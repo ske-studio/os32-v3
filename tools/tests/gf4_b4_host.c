@@ -336,7 +336,14 @@ static void formula_and_range(void)
     assert(state.min_v_hz==1 && state.max_v_hz==2 && state.min_h_khz==3);
     empty_base(); limits(0); b[RANGE+5]=201; seal();
     assert(gf4_edid_modes(b,0,&state)==GF4_EEDID && !state.base_valid);
-    empty_base(); std_code(1024,1,61); accepted_base();
+    /* E-EDID Appendix B 1.3/1.4: no range descriptor is required. */
+    for(u32 revision=2;revision<=4;revision++) {
+        empty_base(); b[EDID_REVISION]=(u8)revision;
+        std_code(1024,1,61); accepted_base();
+        assert(state.ntiming==1 && !state.range_valid && !state.last_rc);
+        equal(&state.timing[0],revision>=4 ? &cvt61 : &gtf61);
+    }
+    empty_base(); b[EDID_REVISION]=1; std_code(1024,1,61); accepted_base();
     assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED);
     empty_base(); limits(RANGE_LIMITS_ONLY); std_code(1024,1,61); accepted_base();
     assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED);
@@ -348,29 +355,81 @@ static void formula_and_range(void)
     empty_base(); limits(0); b[EDID_REVISION]=2; std_code(640,0,60); accepted_base();
     assert(state.ntiming==1 && state.timing[0].vd==640);
 }
+/* CEA-861-E tables 2/3/4 (pp16-27): each named VIC row supplies
+ * pixel kHz, H active/front/sync/back, V active/front/sync/back, polarity.
+ * https://source.netsyms.com/skylarmt/glenwing.github.io_withhdmi/raw/commit/30782ab3ada02d7b1d86d6752171bbd8d7245bb6/docs/CEA-861-E.pdf
+ * Table 3 lists interlaced vertical intervals in field lines; the
+ * half-line in each field total is discarded for integer CRTC totals.
+ * These porch/sync inputs are independent of the product's edge table;
+ * MIT cross-reference is drm_edid.c:642-987 (per-VIC locations below).
+ * Omitted entries require pixel repetition, absent from gf4_timing.
+ * Array indices name the table's VIC, including aspect-ratio aliases. */
+#define VIC_ROW(k,ha,hf,hw,hb,va,vf,vw,vb,f) \
+    {k,ha,(ha)+(hf),(ha)+(hf)+(hw),(ha)+(hf)+(hw)+(hb), \
+     va,(va)+(vf),(va)+(vf)+(vw),(va)+(vf)+(vw)+(vb),f}
+#define NEG_SYNC (GF4_NEG_H|GF4_NEG_V)
+static const struct gf4_timing vic_expected[LAST_VIC+1]={
+ [1]=VIC_ROW(25175,640,16,96,48,480,10,2,33,NEG_SYNC), /* drm_edid.c:642 */
+ [2]=VIC_ROW(27000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:647 */
+ [3]=VIC_ROW(27000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:652 */
+ [4]=VIC_ROW(74250,1280,110,40,220,720,5,5,20,0), /* drm_edid.c:657 */
+ [5]=VIC_ROW(74250,1920,88,44,148,540,2,5,15,GF4_INTERLACE), /* drm_edid.c:662 */
+ [10]=VIC_ROW(54000,2880,76,248,228,240,4,3,15,NEG_SYNC|GF4_INTERLACE), /* drm_edid.c:692 */
+ [11]=VIC_ROW(54000,2880,76,248,228,240,4,3,15,NEG_SYNC|GF4_INTERLACE), /* drm_edid.c:698 */
+ [12]=VIC_ROW(54000,2880,76,248,228,240,4,3,15,NEG_SYNC), /* drm_edid.c:704 */
+ [13]=VIC_ROW(54000,2880,76,248,228,240,4,3,15,NEG_SYNC), /* drm_edid.c:709 */
+ [14]=VIC_ROW(54000,1440,32,124,120,480,9,6,30,NEG_SYNC), /* drm_edid.c:714 */
+ [15]=VIC_ROW(54000,1440,32,124,120,480,9,6,30,NEG_SYNC), /* drm_edid.c:719 */
+ [16]=VIC_ROW(148500,1920,88,44,148,1080,4,5,36,0), /* drm_edid.c:724 */
+ [17]=VIC_ROW(27000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:729 */
+ [18]=VIC_ROW(27000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:734 */
+ [19]=VIC_ROW(74250,1280,440,40,220,720,5,5,20,0), /* drm_edid.c:739 */
+ [20]=VIC_ROW(74250,1920,528,44,148,540,2,5,15,GF4_INTERLACE), /* drm_edid.c:744 */
+ [25]=VIC_ROW(54000,2880,48,252,276,288,2,3,19,NEG_SYNC|GF4_INTERLACE), /* drm_edid.c:774 */
+ [26]=VIC_ROW(54000,2880,48,252,276,288,2,3,19,NEG_SYNC|GF4_INTERLACE), /* drm_edid.c:780 */
+ [27]=VIC_ROW(54000,2880,48,252,276,288,2,3,19,NEG_SYNC), /* drm_edid.c:786 */
+ [28]=VIC_ROW(54000,2880,48,252,276,288,2,3,19,NEG_SYNC), /* drm_edid.c:791 */
+ [29]=VIC_ROW(54000,1440,24,128,136,576,5,5,39,NEG_SYNC), /* drm_edid.c:796 */
+ [30]=VIC_ROW(54000,1440,24,128,136,576,5,5,39,NEG_SYNC), /* drm_edid.c:801 */
+ [31]=VIC_ROW(148500,1920,528,44,148,1080,4,5,36,0), /* drm_edid.c:806 */
+ [32]=VIC_ROW(74250,1920,638,44,148,1080,4,5,36,0), /* drm_edid.c:811 */
+ [33]=VIC_ROW(74250,1920,528,44,148,1080,4,5,36,0), /* drm_edid.c:816 */
+ [34]=VIC_ROW(74250,1920,88,44,148,1080,4,5,36,0), /* drm_edid.c:821 */
+ [35]=VIC_ROW(108000,2880,64,248,240,480,9,6,30,NEG_SYNC), /* drm_edid.c:826 */
+ [36]=VIC_ROW(108000,2880,64,248,240,480,9,6,30,NEG_SYNC), /* drm_edid.c:831 */
+ [37]=VIC_ROW(108000,2880,48,256,272,576,5,5,39,NEG_SYNC), /* drm_edid.c:836 */
+ [38]=VIC_ROW(108000,2880,48,256,272,576,5,5,39,NEG_SYNC), /* drm_edid.c:841 */
+ [39]=VIC_ROW(72000,1920,32,168,184,540,23,5,57,GF4_NEG_V|GF4_INTERLACE), /* drm_edid.c:846 */
+ [40]=VIC_ROW(148500,1920,528,44,148,540,2,5,15,GF4_INTERLACE), /* drm_edid.c:852 */
+ [41]=VIC_ROW(148500,1280,440,40,220,720,5,5,20,0), /* drm_edid.c:858 */
+ [42]=VIC_ROW(54000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:863 */
+ [43]=VIC_ROW(54000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:868 */
+ [46]=VIC_ROW(148500,1920,88,44,148,540,2,5,15,GF4_INTERLACE), /* drm_edid.c:885 */
+ [47]=VIC_ROW(148500,1280,110,40,220,720,5,5,20,0), /* drm_edid.c:891 */
+ [48]=VIC_ROW(54000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:896 */
+ [49]=VIC_ROW(54000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:901 */
+ [52]=VIC_ROW(108000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:918 */
+ [53]=VIC_ROW(108000,720,12,64,68,576,5,5,39,NEG_SYNC), /* drm_edid.c:923 */
+ [56]=VIC_ROW(108000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:939 */
+ [57]=VIC_ROW(108000,720,16,62,60,480,9,6,30,NEG_SYNC), /* drm_edid.c:945 */
+ [60]=VIC_ROW(59400,1280,1760,40,220,720,5,5,20,0), /* drm_edid.c:962 */
+ [61]=VIC_ROW(74250,1280,2420,40,220,720,5,5,20,0), /* drm_edid.c:967 */
+ [62]=VIC_ROW(74250,1280,1760,40,220,720,5,5,20,0), /* drm_edid.c:972 */
+ [63]=VIC_ROW(297000,1920,88,44,148,1080,4,5,36,0), /* drm_edid.c:977 */
+ [64]=VIC_ROW(297000,1920,528,44,148,1080,4,5,36,0), /* v6.12 drm_edid.c:1090 */
+};
+#undef NEG_SYNC
+#undef VIC_ROW
 static void vic_and_capacity(void)
 {
     for(u32 vic=1;vic<=LAST_VIC;vic++) {
         empty_base(); accepted_base(); cta_one(vic);
         assert(gf4_edid_modes(b,1,&state)==0);
-        /* CEA pixel repetition (DBLCLK), drm_edid.c:669-690,747-768,
-         * 879-900,934-955; frozen gf4_timing cannot express it. */
-        bool repeated=(vic>=6 && vic<=9) || (vic>=21 && vic<=24) ||
-            vic==44 || vic==45 || vic==50 || vic==51 ||
-            vic==54 || vic==55 || vic==58 || vic==59;
-        if(repeated) assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED);
+        if(!vic_expected[vic].khz)
+            assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED);
         else {
             assert(state.ntiming==1 && !state.last_rc);
-            assert(state.timing[0].khz && state.timing[0].hd<state.timing[0].ht &&
-                   state.timing[0].vd<state.timing[0].vt);
-            if(vic==VIC_720P60) equal(&state.timing[0],&hd720);
-            if(vic==VIC_1080I60) equal(&state.timing[0],&hd1080i);
-            if(vic==VIC_1080P60)
-                assert(state.timing[0].khz==148500 && state.timing[0].ht==2200 &&
-                       state.timing[0].vt==1125 && !state.timing[0].flags);
-            if(vic==LAST_VIC)
-                assert(state.timing[0].khz==297000 && state.timing[0].ht==2640 &&
-                       state.timing[0].ve==1089 && state.timing[0].vt==1125);
+            equal(&state.timing[0],&vic_expected[vic]);
         }
     }
     empty_base(); accepted_base(); cta_one(127);

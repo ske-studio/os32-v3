@@ -422,13 +422,17 @@ static void standard(struct gf4_edid_state *s,const u8 *p,const u8 *r,u32 revisi
         }
         if(!rb) break;
     }
-    /* Preserve the inherited policy: no guessing without explicit limits. */
-    if(revision<2 || !r || !s->range_valid || r[10]==RANGE_ONLY) {
+    /* E-EDID A2 Appendix B 1.3/1.4: absent range descriptors still
+     * require CVT for 1.4 and default GTF for legacy 1.2/1.3. */
+    if(revision<2 || (r && (!s->range_valid || r[10]==RANGE_ONLY))) {
         s->last_rc=GF4_EUNSUPPORTED; return;
     }
     struct gf4_timing t;
     bool ok;
-    if(r[10]==CVT) {
+    if(!r) {
+        ok=revision>=4 ? cvt(w,h,hz,&t) :
+            gtf(w,h,hz,GTF_M,GTF_C2,GTF_K,GTF_J2,&t);
+    } else if(r[10]==CVT) {
         u32 maxw=8U*(r[13]+256U*(r[12]&3U));
         if((r[11]>>4)!=1) {
             s->last_rc=GF4_EUNSUPPORTED; return;
