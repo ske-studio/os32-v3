@@ -36,7 +36,8 @@ static int test(void)
     f.off++; REQUIRE(gf4_format_calc(&m,&f,&out)==GF4_ERANGE);
     f.off--; m.pitch++; REQUIRE(gf4_format_calc(&m,&f,&out)==GF4_ERANGE);
     m.fmt=GF3_ARGB8888; REQUIRE(gf4_format_calc(&m,&f,&out)==GF4_EFORMAT);
-    m.t=rows[0].t; m.t.hs++; REQUIRE(gf4_timing_calc(&m,&out)==GF4_ERANGE);
+    m.t=rows[0].t; m.t.hs++; /* C:245-250 truncates, retaining the same encoded HS. */
+    REQUIRE(!gf4_timing_calc(&m,&out) && out.cr[4]==rows[0].hs);
     m.t=rows[0].t; m.t.vt=5000; REQUIRE(gf4_timing_calc(&m,&out)==GF4_ERANGE);
     m.t=rows[0].t; m.t.flags|=GF4_INTERLACE|GF4_DBLSCAN;
     REQUIRE(!gf4_timing_calc(&m,&out) && out.cr[0x39]==46 && (out.cr[9]&0x80) &&
