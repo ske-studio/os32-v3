@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **実装中 (2026-11-04)** — 計測 (M1) は止め、観測の像に切り替えた (ユーザー決定 11-04)。観測の 2 回目 (S4、可変 OUT の 8 枚、1 行の OUT 最大 28 本) は実機 Ra266 31k で 8 枚とも崩れなし・SPLO 全部 ok (記録 ~/os32-tmp/run/obs-s4/RESULT.md)。**ユーザーが方式を採用 (11-04、§0)、凍結しない** — 次は常用の経路への組み込みと、ユーザーが渡す差し替えの画像。現行の画像形式・再生・受入は [RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) と [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md) が正典。
+> 状態: **実装中 (2026-11-04)** — 計測 (M1) は止め、観測の像に切り替えた (ユーザー決定 11-04)。観測の 2 回目 (S4、可変 OUT の 8 枚、1 行の OUT 最大 28 本) は実機 Ra266 31k で 8 枚とも崩れなし・SPLO 全部 ok (記録 ~/os32-tmp/run/obs-s4/RESULT.md)。**ユーザーが方式を採用 (11-04、§0)、凍結しない** — 次は常用の経路への組み込みと、ユーザーが渡す差し替えの画像。現行の画像形式・再生・受入は [RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) と [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md) が正典。常用への組み込み (S5、enc2・B31、ユーザー決定 11-04「N7でマルチスレッド化してください」「ブートスプラッシュ側もN7で最適化してください。」・tick の遅れは補正しない) の確定設計は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
