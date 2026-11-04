@@ -19,7 +19,10 @@ INCLUDES=include_flags(ROOT)
 def component(name, flags=()):
     with tempfile.TemporaryDirectory(prefix='gf-hal-') as td:
         exe=Path(td)/'host'
-        subprocess.run(FLAGS+INCLUDES+list(flags)+[str(ROOT/'tools/tests'/f'{name}_host.c'),'-o',str(exe)],check=True)
+        sources = [ROOT/'tools/tests'/f'{name}_host.c']
+        if name == 'backend_geforce':
+            sources.append(ROOT/'tools/tests/gf_accel_unbound_stubs.c')
+        subprocess.run(FLAGS+INCLUDES+list(flags)+[*map(str, sources),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
         assert result.returncode==0,(name,result.returncode,result.stdout,result.stderr)
         print('PASS '+name,flush=True)
