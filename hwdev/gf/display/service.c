@@ -210,6 +210,9 @@ static void svc_feature5(struct gf4_ctx *c)
         if (length<SVC_MEMORY_PC_BYTES) { source=GF_SCRIPT_EIO; rc=GF5_EBIOS; }
         else pc=(u32)init->rom[table]|(u32)init->rom[table+1]<<8;
     }
+    if (!rc && pc>=init->rom_size && pc) {
+        source=GF_SCRIPT_EIO; rc=GF5_EBIOS;
+    }
     if (!rc && pc) {
         source=g->links.alloc(g->links.owner,sizeof(*memory),&allocation);
         if (source) rc=gf5_rc_map(source);
@@ -220,8 +223,11 @@ static void svc_feature5(struct gf4_ctx *c)
         }
     }
     if (!rc) {
-        source=gf5_rom_acquire(g,init->rom,init->rom_size,memory);
-        rc=gf5_rc_map(source);
+        /* acquire maps its public return but retains the original allocator
+         * failure in source_rc. Do not replace that with the mapped value
+         * when recording this optional F5 failure (PM decisions 8 and 22). */
+        rc=gf5_rom_acquire(g,init->rom,init->rom_size,memory);
+        if (rc) source=g->source_rc;
     }
     if (allocation) g->links.free(g->links.owner,allocation);
     if (rc) { g->last_rc=rc; g->source_rc=source; }
