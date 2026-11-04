@@ -51,7 +51,9 @@ void v86_gcap_note_emul_out(u16 p, int s, u32 v) { (void)p; (void)s; (void)v; ca
 void v86_gcap_detach(void) { calls++; }
 void v86_gcap_release(void) { calls++; }
 /* HW access must also stay dormant during init. */
+#ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real kdebug/hwb_access.c */
 i32 hwb_access(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
+#endif
 i32 kpeek_call(u32 op, void *buf, u32 size) { (void)op; (void)buf; (void)size; calls++; return 0; }
 /* T3 entry adapters must remain dormant during module init. Each dependency
  * counts an unexpected call; no hardware callback is executed by this test. */

@@ -5,6 +5,7 @@
 #undef irq_restore
 /* Reuse the init fixture's external stubs; execute the real dispatcher below. */
 #define _start unused_init_start
+#define HWB_ACCESS_REAL
 #include "kdebug_init_host.c"
 #undef _start
 #include "hwb_fake.h"
