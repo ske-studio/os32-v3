@@ -97,15 +97,19 @@ void _start(void) {
 '''
 
 
+VER_INFO_SLOT = 254  # sys_ver_info's fixed KAPI slot (v79)
+
+
 def generated_layout(runner):
     data = json.loads((ROOT/'sdk/kapi.json').read_text())
-    assert data['version'] == 79 and len(data['api']) == 255
-    assert data['api'][-1] == dict(name='sys_ver_info', ret='int',
+    # sys_ver_info is slot 254 from v79; later versions only append slots.
+    assert data['version'] >= 79 and len(data['api']) >= 255
+    assert data['api'][VER_INFO_SLOT] == dict(name='sys_ver_info', ret='int',
         args=['void *out', 'u32 size'], out=[dict(arg='out', len='size')],
         target='kapi_sys_ver_info')
     # Frozen v78 prefix, including approved group A/D internal targets/bodies: reordered slots,
     # changed signatures and unexpected implementation routes must also fail.
-    assert hashlib.sha256(json.dumps(data['api'][:-1], sort_keys=True).encode()).hexdigest() == \
+    assert hashlib.sha256(json.dumps(data['api'][:VER_INFO_SLOT], sort_keys=True).encode()).hexdigest() == \
         '6e8ac5b63eeda8ecdc22676cd86e0859772cab314370f60dfceafc7dc5f7ac19'
     with tempfile.TemporaryDirectory(prefix='ver-api-gen-') as directory:
         tmp = Path(directory)
@@ -125,7 +129,7 @@ def generated_layout(runner):
     lines += ['STATIC_ASSERT(__builtin_offsetof(KernelAPI, sbrk_heap_limit) == 0x4b8, heap_off);',
               'STATIC_ASSERT(__builtin_offsetof(KernelAPI, shm_base) == 0x4bc, shm_off);',
               'STATIC_ASSERT(sizeof(KernelAPI) == 0x4c0, table_size);',
-              'STATIC_ASSERT(OS32X_MIN_API == 79 && KAPI_VERSION == 79, api_version);']
+              'STATIC_ASSERT(OS32X_MIN_API == %d && KAPI_VERSION == %d, api_version);' % (data['version'], data['version'])]
     print('PASS ver API: regeneration exact; frozen 254-slot v78 prefix')
     return '\n'.join(lines)
 

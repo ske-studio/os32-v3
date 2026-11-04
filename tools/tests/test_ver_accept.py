@@ -110,7 +110,8 @@ def accept(report, cui):
 
 def min_api(runner):
     version = json.loads((ROOT / 'sdk/kapi.json').read_text())['version']
-    assert version == 79 and header.OS32X_MIN_API == version
+    # The VER_INFO gate was introduced at v79; later versions keep the same rule.
+    assert version >= 79 and header.OS32X_MIN_API == version
     # Real header generation raises low app.conf requests without editing them.
     for requested in (0, 63, 78, version, version + 1):
         blob = header.build_header(0, 0, 1, 0, 0, requested, header.OS32X_APP_LOAD_ADDR,
@@ -129,12 +130,12 @@ static int newer(u32 requested, u32 KAPI_VERSION) {
     return GUARD;
 }
 void _start(void) {
-    CHECK(newer(79, 78)); CHECK(!newer(78, 79)); CHECK(!newer(79, 79));
+    CHECK(newer(NEW, OLD)); CHECK(!newer(OLD, NEW)); CHECK(!newer(NEW, NEW));
     die(0);
 }
-'''.replace('GUARD', guard[1])
+'''.replace('GUARD', guard[1]).replace('NEW', str(version)).replace('OLD', str(version - 1))
     assert execute(fixture, runner).returncode == 0
-    print('PASS effective min_api=79; v78 rejects new / v79 accepts old API requirement')
+    print('PASS effective min_api=%d; v%d rejects new / v%d accepts old API requirement' % (version, version - 1, version))
 
 
 def main():
