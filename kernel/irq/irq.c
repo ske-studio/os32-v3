@@ -14,6 +14,9 @@
 #include "../../include/platform_irq.h"
 #include "io.h"
 #include "kprintf.h"
+#ifdef PCM_E4_DIAG
+#include "pcm_e4_diag.h"
+#endif
 
 /* isr_handlers.c。EOI は送らない診断だけの関数 (票 §1-1 の 5)。 */
 extern void isr_unexpected_report(u32 irq);
@@ -128,7 +131,13 @@ void irq_dispatch(unsigned int irq)
     idx = irq_dyn_index(irq);
     if (idx >= 0) {
         ln = &irq_lines[idx];
+#ifdef PCM_E4_DIAG
+        pcm_e4_dispatch_enter(irq);
+#endif
         handled = irq_dispatch_line(ln, irq);
+#ifdef PCM_E4_DIAG
+        pcm_e4_dispatch_leave(irq);
+#endif
         if (irq_storm_step(ln, (unsigned int)tick_count, handled)) {
             ln->storm_masked = 1;
             irq_disable(irq);
