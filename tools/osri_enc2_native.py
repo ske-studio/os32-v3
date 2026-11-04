@@ -22,7 +22,9 @@ def _u32(values):
     return np.asarray(values, dtype='<u4').tobytes()
 
 
-def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_path=None):
+def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_path=None, threads=None):
+    if threads is not None and (not isinstance(threads, int) or threads < 1):
+        raise ValueError('threads must be a positive integer')
     pixels = np.asarray(pixels)
     if (pixels.ndim != 3 or pixels.shape[2] != 3 or
             not 1 <= pixels.shape[0] <= 400 or not 1 <= pixels.shape[1] <= 640 or
@@ -43,6 +45,8 @@ def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_p
         command = [str(binary), str(request), str(response)]
         if trace_path is not None:
             command.append(str(trace_path))
+        if threads is not None:
+            command.extend(['--threads', str(threads)])
         subprocess.run(command, check=True)
         result = response.read_bytes()
     if result[:12] != struct.pack('<3I', 0x52324345, 1, mode):
@@ -50,7 +54,7 @@ def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_p
     return result[12:]
 
 
-def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None, *, trace_path=None):
+def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None, *, trace_path=None, threads=None):
     pixels = np.asarray(pixels, dtype=np.int32)
     colors, roots, stats = prepared if prepared is not None else prepare(pixels, cfg)
     stats = dict(stats)
@@ -66,7 +70,7 @@ def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None, *, trace
     for y in range(height):
         q = codes(candidates[y]) if y in candidates else []
         payload += _u32([len(q)]) + _u32(q)
-    response = _run(0, pixels, budget, cfg, payload, trace_path=trace_path)
+    response = _run(0, pixels, budget, cfg, payload, trace_path=trace_path, threads=threads)
     offset = 0
 
     def take(fmt):
@@ -99,3 +103,37 @@ def quantize(pixels, palettes, orders, cfg=Config(), *, timed=True, dither=True)
         payload += _u32([len(order), *order])
     result = _run(1, pixels, 47, cfg, payload, timed=timed, dither=dither)
     return np.frombuffer(result, dtype=np.uint8).reshape(np.shape(pixels)[:2]).copy()
+
+
+def encode_image(source, output, *, threads=None):
+    """Convert one image to the usual enc2 B=31 OSRI, including black padding."""
+    from img2osri import resize_image
+    from osri_enc2_pack import pack
+
+    start = time.perf_counter()
+    pixels = np.asarray(resize_image(source), dtype=np.int32)
+    palettes, orders, stats = plan(pixels, 31, threads=threads)
+    indices = quantize(pixels, palettes, orders)
+    data = pack(palettes, orders, indices, 31)
+    Path(output).write_bytes(data)
+    return dict(stats, seconds=time.perf_counter() - start,
+                CRC=f'{struct.unpack_from("<I", data, 48)[0]:08x}')
+
+
+def main():
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description='Convert one image to enc2 B=31 OSRI')
+    parser.add_argument('input')
+    parser.add_argument('output')
+    parser.add_argument('--threads', type=int, default=None,
+                        help='worker count (default: logical CPUs; 1: serial)')
+    args = parser.parse_args()
+    if args.threads is not None and args.threads < 1:
+        parser.error('--threads must be positive')
+    print(json.dumps(encode_image(args.input, args.output, threads=args.threads)), flush=True)
+
+
+if __name__ == '__main__':
+    main()

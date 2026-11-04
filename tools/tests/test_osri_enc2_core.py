@@ -5,7 +5,9 @@ CHECK = dict(name='osri-enc2-core', tier=1, needs=['make:osri-enc2-core'], budge
                      'tools/osri_enc2_plan.py', 'tools/osri_enc2_master.py',
                      'tools/osri_enc2_tree.py', 'tools/osri_enc2_row.py',
                      'tools/osri_enc2_order.py', 'tools/osri_enc2_timing.py',
-                     'tools/osri_enc2_dither.py', 'tools/osri_enc2_pack.py'])
+                     'tools/osri_enc2_dither.py', 'tools/osri_enc2_pack.py',
+                     'tools/img2osri.py', 'tools/osri_enc2_compare.py',
+                     'tools/osri_enc2_decode.py', 'tools/osri_enc2_metrics.py'])
 
 import argparse
 from dataclasses import replace
@@ -23,7 +25,11 @@ from osri_enc2_row import RowSearch
 from osri_enc2_plan import prepare, plan, objective
 from osri_enc2_dither import quantize
 from osri_enc2_pack import pack
-from osri_enc2_native import plan as c_plan, quantize as c_quantize
+from osri_enc2_native import plan as native_plan, quantize as c_quantize
+
+
+def c_plan(*args, **kwargs):
+    return native_plan(*args, threads=1, **kwargs)
 
 
 def check():
@@ -44,6 +50,14 @@ def check():
         assert py_s['j_trace'] == c_s['j_trace'], ('J', budget)
         assert py_s['visits'] == c_s['visits'], ('visits', budget)
         assert py_s['evaluations'] == c_s['evaluations'], ('cache', budget)
+        for threads in (2, 4, 16):
+            mp, mo, ms = native_plan(pixels, budget, cfg, prepared, threads=threads)
+            assert np.array_equal(c_p, mp) and c_o == mo, ('parallel palette/order', budget, threads)
+            for key in ('j_trace', 'visits', 'evaluations'):
+                assert c_s[key] == ms[key], ('parallel', key, budget, threads)
+            assert np.array_equal(c_quantize(pixels, c_p, c_o, cfg),
+                                  c_quantize(pixels, mp, mo, cfg))
+
         assert all(a >= b for a, b in zip(c_s['j_trace'], c_s['j_trace'][1:]))
         assert all(allowed(a, b, budget) for a, b in zip(c_p, c_p[1:]))
         for timed in (False, True):
@@ -146,10 +160,33 @@ def check():
         a, ao, _ = plan(source, 0, config, prepared)
         b, bo, _ = c_plan(source, 0, config, prepared)
         assert np.array_equal(a, b) and ao == bo
+    # Exercise the public one-file CLI, including transparent black composition,
+    # 640x400 padding, the fixed B=31 contract and empty parallel batches.
+    with tempfile.TemporaryDirectory(prefix='enc2-cli-test-') as name:
+        from PIL import Image
+        directory = Path(name)
+        source = directory / 'transparent.png'
+        Image.new('RGBA', (1, 1), (255, 0, 0, 0)).save(source)
+        expected = pack(np.zeros((400, 16, 3), dtype=np.int32), [()] * 400,
+                        np.zeros((400, 640), dtype=np.uint8), 31)
+        for threads in (1, 4):
+            output = directory / f'output-{threads}.osri'
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/osri_enc2_native.py'),
+                                     str(source), str(output), '--threads', str(threads)],
+                                    capture_output=True, text=True)
+            assert result.returncode == 0, result.stderr
+            assert output.read_bytes() == expected
+        invalid = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/osri_enc2_native.py'),
+                                  str(source), str(output), '--threads', '0'],
+                                 capture_output=True, text=True)
+        assert invalid.returncode and '--threads must be positive' in invalid.stderr
     print('enc2 C/Python: GREEN', flush=True)
 
 
 MUTATIONS = [
+    ('completion-order', 'int result_index=i;', 'int result_index=batch->ids[pool.completed];'),
+    ('drop-candidate', 'pool_run(n,candidate_job,&batch);',
+     'pool_run(n-1,candidate_job,&batch),memset(&values[ids[n-1]],0,sizeof(*values));'),
     ('component-out', 'return components + (slots ? slots-1 : 0);', 'return slots;'),
     ('next-delta', 'value.score+=SPILL_WEIGHT*(next-s->next_ideal);', 'value.score+=0*(next-s->next_ideal);'),
     ('partial-mask', '(mask&(1<<c))?candidates[i]:current', 'candidates[i]'),
@@ -206,13 +243,32 @@ int main(void) {
     assert(result.q[0]==0x222);
     for(int i=1;i<SLOTS;i++) assert(!result.q[i]);
     search_free(s);free(im->pixels);free(im);
+    /* Check every result, even a candidate which cannot win the search. */
+    pool_init(4);
+    im=allocate(sizeof(*im));im->cfg=(Config){.h=1,.w=8,.budget=47};
+    im->pixels=allocate(8*3);
+    for(int x=0;x<8;x++) for(int c=0;c<3;c++) im->pixels[3*x+c]=(x*47+c*71)%256;
+    Palette base={{0}};s=search_new(im,0,NULL,NULL,empty,NULL,empty);
+    Neighbors nb;neighbors(s,&base,&nb);
+    Proposal prop[64];Value values[64];
+    for(int i=0;i<64;i++) prop[i]=(Proposal){.q=i+1};
+    evaluate_candidates(s,&base,0,prop,64,&nb,values);
+    for(int i=0;i<64;i++) {
+        Palette trial=base;trial.q[0]=prop[i].q;
+        Value expected=evaluate_raw(s,&trial,NULL,NULL);
+        assert(values[i].valid==expected.valid && values[i].score==expected.score);
+        assert(!order_cmp(&values[i].order,&expected.order));
+        assert(!order_cmp(&values[i].next,&expected.next));
+    }
+    assert(im->evaluations==64);
+    search_free(s);free(im->pixels);free(im);pool_free();
     return 0;
 }
 '''
 
 
 def compile_core(source, binary):
-    subprocess.run(['gcc', '-std=c11', '-O3', '-Wall', '-Wextra', '-Werror', '-Wvla',
+    subprocess.run(['gcc', '-std=c11', '-O3', '-Wall', '-Wextra', '-Werror', '-Wvla', '-pthread',
                     str(source), '-o', str(binary)], check=True)
 
 

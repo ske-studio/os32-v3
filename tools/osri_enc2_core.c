@@ -1,4 +1,4 @@
-/* Host-only enc2-r3-supplement1 integer oracle port. C11, no libraries.
+/* Host-only enc2-r3-supplement1 integer oracle port. C11 with POSIX threads.
  * File protocol is versioned, little endian; Python owns PNG, A/B and OSRI.
  * Physical palette slots, candidate ties and finite search limits match S1.
  */
@@ -8,6 +8,8 @@
 #include <string.h>
 #include <time.h>
 #include <limits.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #define SLOTS 16
 #define COLORS 4096
@@ -55,6 +57,66 @@ typedef struct { int64_t base, table[SLOTS][65]; int count[SLOTS]; Order changed
 
 static void fail(const char *s) { fprintf(stderr, "enc2 core: %s\n", s); exit(1); }
 static void *allocate(size_t n) { void *p = calloc(1, n); if (!p) fail("allocation"); return p; }
+/* A batch publishes immutable inputs. Workers own their evaluation scratch;
+ * only the caller changes the search cache, after the entire batch joins. */
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t ready, finished;
+    pthread_t *workers;
+    int count, generation, stop, pending, next, total, completed;
+    void (*job)(void *, int);
+    void *context;
+} Pool;
+static Pool pool = {.mutex=PTHREAD_MUTEX_INITIALIZER,
+    .ready=PTHREAD_COND_INITIALIZER, .finished=PTHREAD_COND_INITIALIZER};
+static void pool_work(void) {
+    for(;;) {
+        pthread_mutex_lock(&pool.mutex);
+        int first=pool.next;pool.next+=4;
+        pthread_mutex_unlock(&pool.mutex);
+        if(first>=pool.total) break;
+        int end=first+4;if(end>pool.total) end=pool.total;
+        for(int i=first;i<end;i++) pool.job(pool.context,i);
+    }
+}
+static void *pool_worker(void *unused) {
+    (void)unused;int generation=0;
+    pthread_mutex_lock(&pool.mutex);
+    for(;;) {
+        while(!pool.stop && generation==pool.generation) pthread_cond_wait(&pool.ready,&pool.mutex);
+        if(pool.stop) break;
+        generation=pool.generation;
+        pthread_mutex_unlock(&pool.mutex);
+        pool_work();
+        pthread_mutex_lock(&pool.mutex);
+        if(!--pool.pending) pthread_cond_signal(&pool.finished);
+    }
+    pthread_mutex_unlock(&pool.mutex);return NULL;
+}
+static void pool_init(int threads) {
+    pool.count=threads-1;
+    if(!pool.count) return;
+    pool.workers=allocate((size_t)pool.count*sizeof(pthread_t));
+    for(int i=0;i<pool.count;i++)
+        if(pthread_create(&pool.workers[i],NULL,pool_worker,NULL)) fail("create worker");
+}
+static void pool_run(int n,void (*job)(void *,int),void *context) {
+    pthread_mutex_lock(&pool.mutex);
+    pool.total=n;pool.next=0;pool.completed=0;pool.job=job;pool.context=context;
+    pool.pending=pool.count;pool.generation++;
+    pthread_cond_broadcast(&pool.ready);
+    pthread_mutex_unlock(&pool.mutex);
+    pool_work();
+    pthread_mutex_lock(&pool.mutex);
+    while(pool.pending) pthread_cond_wait(&pool.finished,&pool.mutex);
+    pthread_mutex_unlock(&pool.mutex);
+}
+static void pool_free(void) {
+    pthread_mutex_lock(&pool.mutex);pool.stop=1;
+    pthread_cond_broadcast(&pool.ready);pthread_mutex_unlock(&pool.mutex);
+    for(int i=0;i<pool.count;i++) if(pthread_join(pool.workers[i],NULL)) fail("join worker");
+    free(pool.workers);
+}
 static uint32_t read32(FILE *f) {
     uint8_t b[4]; if (fread(b, 1, 4, f) != 4) fail("truncated input");
     return (uint32_t)b[0] | (uint32_t)b[1]<<8 | (uint32_t)b[2]<<16 | (uint32_t)b[3]<<24;
@@ -229,10 +291,7 @@ static Search *search_new(Image *im,int y,const Palette *old,const Palette *foll
     return s;
 }
 static void search_free(Search *s) {free(s->cache);free(s);}
-static Value evaluate(Search *s,const Palette *p,const int32_t *minima,const int *indices) {
-    uint64_t h=hash_palette(p);Entry *entry=cache_entry(s,p,h);
-    if(entry->hash) return entry->v;
-    s->im->evaluations++;
+static Value evaluate_raw(Search *s,const Palette *p,const int32_t *minima,const int *indices) {
     Value value={0}; Config *cfg=&s->im->cfg;
     if((s->old && out_count(s->old,p)>cfg->budget) || (s->following && out_count(p,s->following)>cfg->budget)) goto save;
     int ids[MAX_W]; int64_t f=0,ideal=0;
@@ -258,9 +317,19 @@ static Value evaluate(Search *s,const Palette *p,const int32_t *minima,const int
     }
     value.valid=1;
 save:
-    if((s->used+1)*10>s->capacity*7) cache_grow(s);
-    entry=cache_entry(s,p,h);entry->hash=h;entry->p=*p;entry->v=value;s->used++;
     return value;
+}
+static void cache_save(Search *s,const Palette *p,Value value) {
+    uint64_t h=hash_palette(p);
+    if(cache_entry(s,p,h)->hash) return;
+    if((s->used+1)*10>s->capacity*7) cache_grow(s);
+    Entry *entry=cache_entry(s,p,h);entry->hash=h;entry->p=*p;entry->v=value;s->used++;
+    s->im->evaluations++;
+}
+static Value evaluate(Search *s,const Palette *p,const int32_t *minima,const int *indices) {
+    Entry *entry=cache_entry(s,p,hash_palette(p));
+    if(entry->hash) return entry->v;
+    Value value=evaluate_raw(s,p,minima,indices);cache_save(s,p,value);return value;
 }
 static void neighbors(Search *s,const Palette *p,Neighbors *n) {
     for(int t=0;t<s->t;t++) {
@@ -272,13 +341,13 @@ static void neighbors(Search *s,const Palette *p,Neighbors *n) {
         n->nearest[t]=ai;n->first[t]=a;n->second[t]=b;n->second_id[t]=bi;
     }
 }
-static Value evaluate_slot(Search *s,const Palette *p,int slot,uint16_t q,const Neighbors *n,Palette *trial) {
+static Value evaluate_slot_raw(Search *s,const Palette *p,int slot,uint16_t q,const Neighbors *n,Palette *trial) {
     *trial=*p;trial->q[slot]=q;
     /* Invalid palettes and cached palettes do not need another pixel scan. */
     uint64_t h=hash_palette(trial);Entry *e=cache_entry(s,trial,h);
     if(e->hash) return e->v;
     if((s->old && out_count(s->old,trial)>s->im->cfg.budget) ||
-       (s->following && out_count(trial,s->following)>s->im->cfg.budget)) return evaluate(s,trial,NULL,NULL);
+       (s->following && out_count(trial,s->following)>s->im->cfg.budget)) return evaluate_raw(s,trial,NULL,NULL);
     int32_t minima[MAX_T];int indices[MAX_W];
     const int32_t *r=s->comp[0][channel(q,0)],*g=s->comp[1][channel(q,1)],*b=s->comp[2][channel(q,2)];
     for(int t=0;t<s->t;t++) {
@@ -288,9 +357,50 @@ static Value evaluate_slot(Search *s,const Palette *p,int slot,uint16_t q,const 
         minima[t]=candidate<without?candidate:without;
         if(t<s->im->cfg.w) indices[t]=(candidate<without || (candidate==without && slot<other))?slot:other;
     }
-    return evaluate(s,trial,minima,indices);
+    return evaluate_raw(s,trial,minima,indices);
 }
 typedef struct {uint16_t q;int64_t cost;} Proposal;
+static Value evaluate_slot(Search *s,const Palette *p,int slot,uint16_t q,const Neighbors *n,Palette *trial) {
+    Value value=evaluate_slot_raw(s,p,slot,q,n,trial);
+    cache_save(s,trial,value);return value;
+}
+typedef struct {
+    Search *s;const Palette *p;int slot;const Proposal *prop;const Neighbors *nb;
+    Value *values;const int *ids;
+} Batch;
+static void candidate_job(void *context,int job) {
+    Batch *batch=context;int i=batch->ids[job];Palette trial;
+    Value value=evaluate_slot_raw(batch->s,batch->p,batch->slot,batch->prop[i].q,batch->nb,&trial);
+    pthread_mutex_lock(&pool.mutex);
+    int result_index=i; /* Keep candidate identity, regardless of completion order. */
+    batch->values[result_index]=value;pool.completed++;
+    pthread_mutex_unlock(&pool.mutex);
+}
+static void evaluate_candidates(Search *s,const Palette *p,int slot,const Proposal *prop,
+                                int np,const Neighbors *nb,Value *values) {
+    int ids[COLORS],n=0;
+    /* Cache hits and invalid candidates are cheap. Keep them on the caller;
+     * only pixel scans merit waking the pool. No cache is changed here. */
+    for(int i=0;i<np;i++) {
+        Palette trial=*p;trial.q[slot]=prop[i].q;
+        Entry *entry=cache_entry(s,&trial,hash_palette(&trial));
+        if(entry->hash) values[i]=entry->v;
+        else if((s->old && out_count(s->old,&trial)>s->im->cfg.budget) ||
+                (s->following && out_count(&trial,s->following)>s->im->cfg.budget))
+            values[i]=evaluate_raw(s,&trial,NULL,NULL);
+        else ids[n++]=i;
+    }
+    Batch batch={s,p,slot,prop,nb,values,ids};
+    if(n>=8) pool_run(n,candidate_job,&batch);
+    else for(int job=0;job<n;job++) {
+        int i=ids[job];Palette trial;
+        values[i]=evaluate_slot_raw(s,p,slot,prop[i].q,nb,&trial);
+    }
+    /* Publish cache entries in exactly the original proposal order. */
+    for(int i=0;i<np;i++) {
+        Palette trial=*p;trial.q[slot]=prop[i].q;cache_save(s,&trial,values[i]);
+    }
+}
 static int proposal_cmp(const void *a,const void *b) {
     const Proposal *x=a,*y=b;
     if(x->cost!=y->cost) return x->cost<y->cost?-1:1;
@@ -378,8 +488,12 @@ static Palette lloyd(Search *s,Palette p,const int *movable,int nm) {
             Proposal prop[COLORS];int np=proposals(p.q[slot],candidates,s->im->nm+1,prop,n,sums);
             Palette best=p;Value current=evaluate(s,&p,NULL,NULL),bv=current;
             Neighbors nb;neighbors(s,&p,&nb);
+            Value values[COLORS];
+            if(pool.count) evaluate_candidates(s,&p,slot,prop,np,&nb,values);
             for(int i=0;i<np;i++) {
-                Palette trial;Value v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
+                Palette trial;Value v;
+                if(pool.count) {trial=p;trial.q[slot]=prop[i].q;v=values[i];}
+                else v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
                 if(v.valid && v.score<current.score && key_less(s,&trial,v,&best,bv)) {best=trial;bv=v;}
             }
             if(!same(&best,&p)) {trace_state(s,"lloyd",iteration,slot,&p,&best,np,0,0);p=best;changed=1;}
@@ -399,8 +513,12 @@ static int search(Search *s,const Palette *seed,int initial,Palette *result) {
         int total=0,valid=0,up=0;
         for(int slot=0;slot<SLOTS;slot++) {
             Proposal prop[COLORS];int np=proposals(p.q[slot],s->im->candidates[s->y],s->im->nc[s->y],prop,0,NULL);
+            Value values[COLORS];
+            if(pool.count) evaluate_candidates(s,&p,slot,prop,np,&nb,values);
             for(int i=0;i<np;i++) {
-                Palette trial;Value v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
+                Palette trial;Value v;
+                if(pool.count) {trial=p;trial.q[slot]=prop[i].q;v=values[i];}
+                else v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
                 if(s->im->diagnostic) {
                     total++;valid+=v.valid;
                     up+=v.valid && out_count(s->old,&trial)>out_count(s->old,&p);
@@ -547,7 +665,14 @@ static void quantize(Image *im,FILE *out) {
     }
 }
 int main(int argc,char **argv) {
-    if(argc!=3 && argc!=4) fail("usage: osri-enc2-core INPUT OUTPUT [TRACE_JSONL]");
+    long logical=sysconf(_SC_NPROCESSORS_ONLN);
+    int threads=logical>0 && logical<=INT_MAX?(int)logical:1;
+    if(argc>=3 && !strcmp(argv[argc-2],"--threads")) {
+        char *end;long requested=strtol(argv[argc-1],&end,10);
+        if(!*argv[argc-1] || *end || requested<1 || requested>INT_MAX) fail("threads must be a positive integer");
+        threads=(int)requested;argc-=2;
+    }
+    if(argc!=3 && argc!=4) fail("usage: osri-enc2-core INPUT OUTPUT [TRACE_JSONL] [--threads N]");
     FILE *in=fopen(argv[1],"rb");if(!in) fail("open input");
     if(read32(in)!=UINT32_C(0x43324345) || read32(in)!=1) fail("protocol version");
     uint32_t mode=read32(in);if(mode>1) fail("mode");
@@ -579,7 +704,7 @@ int main(int argc,char **argv) {
     fclose(in);
     FILE *out=fopen(argv[2],"wb");if(!out) fail("open output");
     write32(out,UINT32_C(0x52324345));write32(out,1);write32(out,mode);
-    if(mode) quantize(im,out);else plan(im,out);
+    if(mode) quantize(im,out);else {pool_init(threads);plan(im,out);pool_free();}
     if(fclose(out)) fail("close output");
     if(im->diagnostic && fclose(im->diagnostic)) fail("close diagnostic");
     free(im->pixels);free(im->visits);free(im);return 0;
