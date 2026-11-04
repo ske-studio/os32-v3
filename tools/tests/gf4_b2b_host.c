@@ -22,6 +22,18 @@
 #define ROM_HEADER 4U
 #define ROM_ENTRY 35U
 #define ROM_COUNT 4U
+/* Independent ROM field offsets: nvkm/subdev/bios/pll.c:168, 303-327. */
+#define ORACLE_ROM_REG 0U
+#define ORACLE_ROM_VCO1_MIN_FREQ 4U
+#define ORACLE_ROM_VCO1_MAX_FREQ 6U
+#define ORACLE_ROM_VCO1_MIN_INPUT 12U
+#define ORACLE_ROM_VCO1_MAX_INPUT 16U
+#define ORACLE_ROM_VCO1_MIN_N 20U
+#define ORACLE_ROM_VCO1_MAX_N 21U
+#define ORACLE_ROM_VCO1_MIN_M 22U
+#define ORACLE_ROM_VCO1_MAX_M 23U
+#define ORACLE_ROM_MAX_P 29U
+#define ORACLE_ROM_REFCLK 31U
 static u8 rom[ROM_HEADER + ROM_ENTRY * ROM_COUNT];
 static void put(u32 at, u32 value, u32 bytes)
 {
@@ -30,11 +42,12 @@ static void put(u32 at, u32 value, u32 bytes)
 static void entry(u32 index, u32 key, u32 max_p)
 {
     u32 at = ROM_HEADER + index * ROM_ENTRY;
-    put(at, key, 4); put(at + 4, 100, 2); put(at + 6, 500, 2);
-    put(at + 12, 27, 2); put(at + 16, 27, 2);
-    put(at + 20, 1, 1); put(at + 21, 255, 1);
-    put(at + 22, 1, 1); put(at + 23, 1, 1);
-    put(at + 29, max_p, 1); put(at + 31, 27000, 4);
+    put(at + ORACLE_ROM_REG, key, 4);
+    put(at + ORACLE_ROM_VCO1_MIN_FREQ, 100, 2); put(at + ORACLE_ROM_VCO1_MAX_FREQ, 500, 2);
+    put(at + ORACLE_ROM_VCO1_MIN_INPUT, 27, 2); put(at + ORACLE_ROM_VCO1_MAX_INPUT, 27, 2);
+    put(at + ORACLE_ROM_VCO1_MIN_N, 1, 1); put(at + ORACLE_ROM_VCO1_MAX_N, 255, 1);
+    put(at + ORACLE_ROM_VCO1_MIN_M, 1, 1); put(at + ORACLE_ROM_VCO1_MAX_M, 1, 1);
+    put(at + ORACLE_ROM_MAX_P, max_p, 1); put(at + ORACLE_ROM_REFCLK, 27000, 4);
 }
 static void sequence_test(u32 head, bool single)
 {
@@ -74,7 +87,7 @@ void _start(void)
     entry(0, 0, 3); entry(1, ORACLE_A, 4); entry(2, ORACLE_B, 5); entry(3, 0, 6);
     assert(gfinit_pll_parse(rom, sizeof(rom), 0, ORACLE_A, &l) == 0 && l.max_p == 4);
     assert(gfinit_pll_parse(rom, sizeof(rom), 0, ORACLE_B, &l) == 0 && l.max_p == 5);
-    put(ROM_HEADER + 2 * ROM_ENTRY, 0, 4);
+    put(ROM_HEADER + 2 * ROM_ENTRY + ORACLE_ROM_REG, 0, 4);
     assert(gfinit_pll_parse(rom, sizeof(rom), 0, ORACLE_B, &l) == 0 && l.max_p == 3);
     sequence_test(0, true); sequence_test(0, false);
     sequence_test(1, true); sequence_test(1, false);
