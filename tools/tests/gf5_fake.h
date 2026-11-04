@@ -247,7 +247,12 @@ static inline i32 gf5_host_display_restore(void *owner,const struct gf5_image *i
         if (s->version!=GF4_SAVED_VERSION || s->size!=sizeof(*s)) e->rc=GF4_EINVAL;
         else {
             gf2_host_memcpy(h->display.state->head,s->head,sizeof(s->head));
-            gf2_host_memcpy(h->display.ctx.hold,s->hold,sizeof(s->hold));
+            /* display/save.c:267,328: cancel pending flips on restore. */
+            for (u8 head=0;head<GF4_HEADS;++head) {
+                if (s->hold[head].pending)
+                    h->display.state->head[head].front=s->hold[head].old_front;
+                h->display.ctx.hold[head]=(struct gf4_flip_hold){0};
+            }
             h->display.base.f.wanted_fifo=s->wanted_fifo;
             h->display.base.f.wanted_graph=s->wanted_graph;
             h->display.base.f.wanted_heads=s->wanted_heads;
@@ -674,7 +679,12 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *saved,u32 dl)
     e->p[0]=c; e->p[1]=saved; e->a[0]=dl;
     if (!e->rc) {
         gf2_host_memcpy(h->display.state->head,saved->head,sizeof(saved->head));
-        gf2_host_memcpy(c->hold,saved->hold,sizeof(saved->hold));
+        /* display/save.c:267,328: cancel pending flips on restore. */
+        for (u8 head=0;head<GF4_HEADS;++head) {
+            if (saved->hold[head].pending)
+                h->display.state->head[head].front=saved->hold[head].old_front;
+            c->hold[head]=(struct gf4_flip_hold){0};
+        }
         h->display.base.f.wanted_fifo=saved->wanted_fifo;
         h->display.base.f.wanted_graph=saved->wanted_graph;
         h->display.base.f.wanted_heads=saved->wanted_heads;
