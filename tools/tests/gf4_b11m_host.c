@@ -10,6 +10,16 @@
 /* nvreg.h:114-127,347-422, hw.h:70-96; dac.c:41-52. */
 #define T_STRIDE 0x2000U
 #define T_CR 0x6013d4U
+/* nvreg.h:82,129-133,248; crtc.c:334-337,579-582. */
+#define T_SR 0x0c03c4U
+#define T_PIXEL 0x28U
+#define T_SLAVED (1U<<7)
+#define T_CLOCK 1U
+#define T_CLKDIV2 (1U<<3)
+#define T_CLOCK_BASE 0x21U
+/* tvmodesnv17.c:483-491: Composite on sensed pin 4. */
+#define T_COMPOSITE_MUX (2U|0x010000U)
+#define T_COMPOSITE_ENC7 0x10U
 #define T_OWNER 0x44U
 #define T_TG 0x680848U
 #define T_DAC 0x68052cU
@@ -50,14 +60,20 @@ static struct gfinit_mode input;
 static struct gf4_tv_state payload;
 static u8 sensed_pins;
 static bool sample_phase;
+static u32 expected_clock;
 /* Norm IDs: tvnv17.h:56-70. 6/8 are low-definition encoder, 7/9/10/11 CTV. */
 static const u32 ctv_norms[]={7,9,10,11};
 static const struct gf4_timing ctv_inputs[]={
     {27000,640,672,680,858,400,410,414,525,0},
     {27000,640,672,680,864,480,485,489,625,0},
     {74250,800,840,848,1650,600,605,610,750,0},
-    {74250,1280,1320,1408,2200,720,724,728,1125,GF4_INTERLACE}
+    {74250,1280,1320,1408,2200,720/2,724/2,728/2,1125/2,GF4_INTERLACE}
 };
+/* tvmodesnv17.c:202-213: native 1080i, normalized to CRTC fields. */
+static const struct gf4_timing full1080i={
+    74250,1920,1961,2049,2200,1080/2,1084/2,1088/2,1125/2,GF4_INTERLACE
+};
+#define T_FULL1080I COUNT(ctv_norms)
 /* tvnv17.c:540-574, tvmodesnv17.c:541-589. 1080i forces overscan=100.
  * E.g. 720p margins=min((1280-800)/2,1280/20)=64 and 36;
  * scale values floor(800*2048/1152)=1422, floor(600*2048/648)&~3=1896. */
@@ -65,20 +81,23 @@ static const u32 golden_h[][7]={
     {719,857,722,734,742,36,683},
     {719,863,722,729,737,36,683},
     {1279,1649,1296,1348,1356,64,1215},
-    {1919,2199,1952,1960,2048,320,1599}
+    {1919,2199,1952,1960,2048,320,1599},
+    {1919,2199,1952,1960,2048,0,1919} /* native: no horizontal margin. */
 };
 static const u32 golden_v[][7]={
     {479,524,479,489,493,24,455},
     {575,624,575,580,584,28,547},
     {719,749,719,724,729,36,683},
-    {1079,1124,1079,1083,1087,180,899}
+    {1079,1124,1079,1083,1087,180,899},
+    {1079,1124,1079,1083,1087,0,1079} /* native: no vertical margin. */
 };
 /* Values independently evaluated by integer arithmetic from the modelines. */
 static const u32 golden_scale[]={
     (1U<<28)|(1896U<<16)|(1U<<12)|2022U,
     (1U<<28)|(1888U<<16)|(1U<<12)|2022U,
     (1U<<28)|(1896U<<16)|(1U<<12)|1422U,
-    (1U<<28)|(2048U<<16)|(1U<<12)|2048U
+    (1U<<28)|(2048U<<16)|(1U<<12)|2048U,
+    (1U<<28)|(2048U<<16)|(1U<<12)|2048U /* unity, tvmodesnv17.c:567-569. */
 };
 static u32 get(u32 off)
 {
@@ -110,6 +129,11 @@ static void setup(u8 head,u8 or_mask,u32 norm,bool changing)
     host.ctx.tv_pin_mask=4; host.ctx.tv_subconnector=1; /* tv.c local Composite. */
     route=(struct gf4_route){.head=head,.head_mask=3,.type=GF4_TV,.or_mask=or_mask,.tv_norm=norm};
     input=(struct gfinit_mode){.fp_control=T_OLD_TG}; input.cr[0x33]=0xff;
+    input.cr[T_PIXEL]=(16U+1U)/8U; /* crtc.c:579: RGB565 depth. */
+    input.sr[T_CLOCK]=T_CLOCK_BASE;
+    expected_clock=T_CLOCK_BASE;
+    host.cr[head^1U][T_PIXEL]=T_ENC_MARKER;
+    host.sr[head^1U][T_CLOCK]=T_ENC_MARKER;
     state.head[head].enabled=state.next[head].enabled=true;
     state.head[head].route=state.next[head].route=route;
     state.head[head].fp_on=state.next[head].fp_on=T_CTV_ON;
@@ -165,6 +189,8 @@ static int golden_load(i32 ctv_index,u32 mux,u32 enc7)
     u32 dac=(T_OLD_DAC&~0x30U)|1U|T_CURIE|(ctv ? 0x20U : 0x10U);
     if (ctv) dac=(dac&~0x100U)|(route.head ? 0x100U : 0);
     w(T_DAC+o,dac);
+    index_w(T_CR+d,T_PIXEL,input.cr[T_PIXEL]|T_SLAVED);
+    index_w(T_SR+d,T_CLOCK,expected_clock);
     index_w(T_CR+d,0x33U,0xc4U|(ctv ? (route.head ? 1U : 9U) : 0));
     index_w(T_CR+d,0x53U,0x40U); index_w(T_CR+d,0x54U,0);
     w(0x680630U+d,2); w(0x680700U+d,1); w(0x6808c0U+d,0);
@@ -199,7 +225,8 @@ static int golden_load(i32 ctv_index,u32 mux,u32 enc7)
         if (e->op==D_WRITE) {
             REQUIRE(e->a[0]==0 && e->a[1]==expected[n].off && e->a[3]==expected[n].value);
             REQUIRE(e->a[2]==((expected[n].off==T_CR || expected[n].off==T_CR+1U ||
-                    expected[n].off==T_CR+d || expected[n].off==T_CR+d+1U) ? 1U : 4U));
+                    expected[n].off==T_CR+d || expected[n].off==T_CR+d+1U ||
+                    expected[n].off==T_SR+d || expected[n].off==T_SR+d+1U) ? 1U : 4U));
         } else REQUIRE(e->a[0]==expected[n].value);
         ++n;
     }
@@ -207,6 +234,12 @@ static int golden_load(i32 ctv_index,u32 mux,u32 enc7)
     REQUIRE(get(T_TG+(route.head^1U)*T_STRIDE)==T_OTHER);
     REQUIRE(host.cr[0][T_OWNER]==T_OLD_OWNER);
     REQUIRE(state.work[route.head].head==route.head);
+    REQUIRE(host.cr[route.head][T_PIXEL]==(input.cr[T_PIXEL]|T_SLAVED));
+    REQUIRE(state.work[route.head].cr[T_PIXEL]==(input.cr[T_PIXEL]|T_SLAVED));
+    REQUIRE(host.sr[route.head][T_CLOCK]==expected_clock);
+    REQUIRE(state.work[route.head].sr[T_CLOCK]==expected_clock);
+    REQUIRE(host.cr[route.head^1U][T_PIXEL]==T_ENC_MARKER);
+    REQUIRE(host.sr[route.head^1U][T_CLOCK]==T_ENC_MARKER);
     REQUIRE(state.tv[route.head].ptv[0]==((ptv&~1U)|(ctv ? 0 : 1U)));
     if (ctv) {
         REQUIRE(!gf2_host_memcmp(state.work[route.head].fp_horiz,golden_h[ctv_index],sizeof(golden_h[0])));
@@ -234,6 +267,37 @@ static int loads(void)
         setup(0,1,0,false); host.ctx.tv_pin_mask=pins[i]; host.ctx.tv_subconnector=sub[i];
         REQUIRE(!gf4_tv_load(&host.ctx,&route,&input,T_DEADLINE));
         REQUIRE(!golden_load(-1,mux[i],enc7[i]));
+    }
+    return 0;
+}
+static int tv_mode_bits(void)
+{
+    /* crtc.c:579-582: depth byte must survive TV slaving at each depth. */
+    const u32 depths[]={8,16,24}; /* RGB8888 has depth=24, not storage bpp=32. */
+    /* tvmodesnv17.c:439-454: first three request CLKDIV2; 640x480
+     * supplies a control with a stale incoming divider to clear. */
+    const struct gf4_timing modes[]={
+        {0,320,344,392,560,2*200,2*200,2*202,2*220,GF4_DBLSCAN|GF4_NEG_H|GF4_NEG_V},
+        {0,320,344,392,560,2*240,2*240,2*246,2*263,GF4_DBLSCAN|GF4_NEG_H|GF4_NEG_V},
+        {0,400,432,496,640,2*300,2*300,2*303,2*314,GF4_DBLSCAN},
+        {0,640,672,768,880,480,480,492,525,GF4_NEG_H|GF4_NEG_V}
+    };
+    for (u8 head=0;head<GF4_HEADS;++head)
+        for (u32 depth=0;depth<COUNT(depths);++depth)
+            for (u32 i=0;i<COUNT(modes);++i) {
+                setup(head,1,0,head!=0);
+                input.cr[T_PIXEL]=(depths[depth]+1U)/8U;
+                input.sr[T_CLOCK]=T_CLOCK_BASE|T_CLKDIV2;
+                state.head[head].mode.t=state.next[head].mode.t=modes[i];
+                expected_clock=T_CLOCK_BASE|((modes[i].flags&GF4_DBLSCAN) ? T_CLKDIV2 : 0);
+                REQUIRE(!gf4_tv_load(&host.ctx,&route,&input,T_DEADLINE));
+                REQUIRE(!golden_load(-1,T_COMPOSITE_MUX,T_COMPOSITE_ENC7));
+            }
+    for (u8 head=0;head<GF4_HEADS;++head) {
+        setup(head,1,ctv_norms[COUNT(ctv_norms)-1U],head!=0);
+        state.head[head].mode.t=state.next[head].mode.t=full1080i;
+        REQUIRE(!gf4_tv_load(&host.ctx,&route,&input,T_DEADLINE));
+        REQUIRE(!golden_load(T_FULL1080I,T_COMPOSITE_MUX,T_COMPOSITE_ENC7));
     }
     return 0;
 }
@@ -455,6 +519,7 @@ static int boundary(void)
 static int test(void)
 {
     int rc=loads();
+    if (!rc) rc=tv_mode_bits();
     if (!rc) rc=load_failures();
     if (!rc) rc=dpms();
     if (!rc) rc=senses();

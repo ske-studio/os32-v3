@@ -105,6 +105,12 @@
 /* dispnv04/nvreg.h:114-127,248,290,347-422; hw.h:70-96. */
 #define TV_STRIDE 0x2000U
 #define TV_CR 0x6013d4U
+/* nvreg.h:82,129-133,248; crtc.c:334-337,579-582. */
+#define TV_SR 0x0c03c4U
+#define TV_PIXEL 0x28U
+#define TV_SLAVED (1U<<7)
+#define TV_CLOCK 1U
+#define TV_CLKDIV2 (1U<<3)
 #define TV_OWNER 0x44U
 #define TV_RPC1 0x1aU
 #define TV_POWER2 0x1588U
@@ -362,20 +368,29 @@ static const struct gf4_timing tv_ctv_output[]={
     {74250,1280,1349,1357,1650,720,725,730,750,0},
     {74250,1920,1961,2049,2200,1080,1084,1088,1125,GF4_INTERLACE}
 };
+/* tvmodesnv17.c:439-451, vertical sizes after generator DBLSCAN. */
+static const struct { u16 hd,vd; } tv_clkdiv_modes[]={
+    {320,2U*200U},{320,2U*240U},{400,2U*300U}
+};
 static i32 tv_fp_calc(u32 norm,const struct gf4_timing *in,struct gfinit_mode *m)
 {
     u32 n=norm==TV_HD480P ? 0 : norm==TV_HD576P ? 1 : norm==TV_HD720P ? 2 : 3;
     const struct gf4_timing *out=&tv_ctv_output[n];
-    if (!in->hd || !in->vd || in->hd>out->hd || in->vd>out->vd) return GF4_ERANGE;
+    /* B4 normalizes CRTC fields once. Restore full-frame display height
+     * for tvmodesnv17.c:549-569, which uses mode, not crtc_vdisplay. */
+    u32 vd=in->vd;
+    if (in->flags&GF4_INTERLACE) vd*=2U;
+    if (in->flags&GF4_DBLSCAN) vd/=2U;
+    if (!in->hd || !vd || in->hd>out->hd || vd>out->vd) return GF4_ERANGE;
     /* tvmodesnv17.c:553-566: overscan=50 => interpolation midpoint;
      * interlace forces 100 => full margins. */
-    u32 hm=(out->hd-in->hd)/2U,vm=(out->vd-in->vd)/2U;
+    u32 hm=(out->hd-in->hd)/2U,vm=(out->vd-vd)/2U;
     if (!(out->flags&GF4_INTERLACE)) {
         if (hm>out->hd/20U) hm=out->hd/20U;
         if (vm>out->vd/20U) vm=out->vd/20U;
     }
     u32 hr=in->hd*0x800U/(out->hd-2U*hm);
-    u32 vr=(in->vd*0x800U/(out->vd-2U*vm))&~3U;
+    u32 vr=(vd*0x800U/(out->vd-2U*vm))&~3U;
     i32 hcrtc=((i32)out->hd-600)/40-1;
     if (hcrtc<1) hcrtc=1;
     const u32 h[]={out->hd-1U,out->ht-1U,out->hd+(u32)hcrtc,
@@ -481,6 +496,17 @@ i32 gf4_tv_load(struct gf4_ctx *ctx,const struct gf4_route *r,
     struct gfinit_mode work=*mode;
     bool ctv=tv_ctv(r->tv_norm);
     work.head=r->head;
+    /* crtc.c:579-582: preserve pixel depth and enable TV slaving. */
+    work.cr[TV_PIXEL]|=TV_SLAVED;
+    /* tvmodesnv17.c:439-451: only the three LD doublescan modelines
+     * request CLKDIV2. Their vertical sizes here are CRTC-normalized. */
+    const struct gf4_timing *t=&image->mode.t;
+    bool clkdiv2=false;
+    if (!ctv && (t->flags&GF4_DBLSCAN))
+        for (u32 i=0;i<sizeof(tv_clkdiv_modes)/sizeof(tv_clkdiv_modes[0]);++i)
+            if (t->hd==tv_clkdiv_modes[i].hd && t->vd==tv_clkdiv_modes[i].vd)
+                clkdiv2=true;
+    work.sr[TV_CLOCK]=(work.sr[TV_CLOCK]&~TV_CLKDIV2)|(clkdiv2 ? TV_CLKDIV2 : 0);
     work.cr[0x33]&=~0x3bU; /* dfp.c:110-111: remove old FP route. */
     work.cr[0x53]=0x40; work.cr[0x54]=0; /* tvnv17.c:476-480. */
     work.ramdac630=2; work.tv_setup=1; work.ramdac8c0=0;
@@ -510,6 +536,8 @@ i32 gf4_tv_load(struct gf4_ctx *ctx,const struct gf4_route *r,
         }
         rc=tv_write(io,TV_DACCLK+o,4,work.dacclk);
     }
+    if (!rc) rc=tv_index(io,TV_CR+d,TV_PIXEL,work.cr[TV_PIXEL]);
+    if (!rc) rc=tv_index(io,TV_SR+d,TV_CLOCK,work.sr[TV_CLOCK]);
     if (!rc) rc=tv_index(io,TV_CR+d,0x33U,work.cr[0x33]);
     if (!rc) rc=tv_index(io,TV_CR+d,0x53U,work.cr[0x53]);
     if (!rc) rc=tv_index(io,TV_CR+d,0x54U,work.cr[0x54]);
