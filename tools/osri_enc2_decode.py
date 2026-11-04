@@ -1,10 +1,11 @@
 """Independent host decoder/validator. Does not relax the guest loader contract."""
+from osri_profile import OSRI_COMPARE_OUT_LIMIT
 import struct
 import zlib
 import numpy as np
 
 
-def decode(data, budget=47):
+def decode(data, budget=OSRI_COMPARE_OUT_LIMIT):
     if len(data) < 128096:
         raise ValueError('truncated OSRI')
     h = struct.unpack_from('<4sHHHHBBHIIIIIIHHHHIIII', data)
@@ -43,7 +44,7 @@ def decode(data, budget=47):
             changed_components += sum((q[slot] >> s & 15) != (color >> s & 15) for s in (8, 4, 0))
             q[slot] = color
         cost = changed_components + max(0, len(rows[y]) - 1)
-        if cost > min(budget, 47):
+        if cost > min(budget, OSRI_COMPARE_OUT_LIMIT):
             raise ValueError('OUT budget')
         if y:
             outs.append(cost)

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Convert a picture to OSRI v2 with the PL-B palette planner."""
+"""Convert one picture to OSRI v2 (default: enc2, shared OUT budget)."""
 import argparse
 import struct
 import zlib
+
+from osri_profile import OSRI_DEFAULT_OUT_BUDGET
+from osri_enc2_spec import BUDGETS
 
 import numpy as np
 from PIL import Image, __version__ as pillow_version
@@ -258,23 +261,33 @@ def main():
     parser.add_argument('--mode', choices=['PL-B'], default='PL-B')
     parser.add_argument('--hblank-outs', type=int, choices=[5, 6])
     parser.add_argument('--obs-colors', type=int, choices=range(1, PALETTE_COLORS + 1))
-    parser.add_argument('--encoder', choices=['pl-b', 'enc2'], default='pl-b')
-    parser.add_argument('--obs-outs', type=int, choices=[15, 23, 31, 47])
+    parser.add_argument('--encoder', choices=['pl-b', 'enc2'])
+    parser.add_argument('--outs', type=int, choices=BUDGETS)
+    parser.add_argument('--obs-outs', type=int, choices=BUDGETS)
+    parser.add_argument('--threads', type=int,
+                        help='worker count (default: logical CPUs; 1: serial)')
     parser.add_argument('--band', type=int, choices=[1, 2, 4], default=1)
     parser.add_argument('--dither', choices=['fs'], default='fs')
     args = parser.parse_args()
+    if args.outs is not None and args.obs_outs is not None:
+        parser.error('--outs and --obs-outs cannot be combined')
+    if args.threads is not None and args.threads < 1:
+        parser.error('--threads must be positive')
+    if args.encoder is None:
+        args.encoder = ('pl-b' if args.hblank_outs is not None or args.obs_colors is not None
+                        else 'enc2')
     if args.encoder == 'enc2':
-        if (args.obs_outs is None or args.hblank_outs is not None or
-                args.obs_colors is not None or args.band != 1):
-            parser.error('enc2 requires --obs-outs and --band 1; incompatible with --hblank-outs/--obs-colors')
-        from osri_enc2_compare import encode
-        data = encode(resize_image(args.input), args.obs_outs)
-        with open(args.output, 'wb') as stream:
-            stream.write(data)
-        print(f'encoder=enc2 bytes={len(data)} crc32={struct.unpack_from("<I", data, 48)[0]:08x}')
+        if args.hblank_outs is not None or args.obs_colors is not None or args.band != 1:
+            parser.error('enc2 requires --band 1; cannot use --hblank-outs/--obs-colors')
+        from osri_enc2_native import encode_image
+        budget = args.outs if args.outs is not None else args.obs_outs
+        if budget is None:
+            budget = OSRI_DEFAULT_OUT_BUDGET
+        stats = encode_image(args.input, args.output, budget=budget, threads=args.threads)
+        print(f'encoder=enc2 B={budget} crc32={stats["CRC"]}')
         return
-    if args.obs_outs is not None:
-        parser.error('--obs-outs requires --encoder enc2')
+    if args.outs is not None or args.obs_outs is not None or args.threads is not None:
+        parser.error('--outs/--obs-outs/--threads require --encoder enc2')
     if args.obs_colors is not None and (args.hblank_outs is not None or args.band != 1):
         parser.error('--obs-colors requires --band 1 and cannot use --hblank-outs')
     if args.hblank_outs is None:

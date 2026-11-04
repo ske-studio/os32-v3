@@ -1,6 +1,6 @@
 """S1 integer oracle, timing/prefix, two-sided planning and v2 round trips."""
 CHECK = dict(name='osri-enc2', tier=1, needs=['make:osri-enc2-core'], budget=90,
-             covers=['tools/osri_enc2_spec.py', 'tools/osri_enc2_master.py',
+             covers=['gfx/osri_profile.h', 'tools/osri_profile.py', 'tools/osri_enc2_spec.py', 'tools/osri_enc2_master.py',
                      'tools/osri_enc2_tree.py', 'tools/osri_enc2_row.py',
                      'tools/osri_enc2_plan.py', 'tools/osri_enc2_order.py',
                      'tools/osri_enc2_native.py',
@@ -333,7 +333,8 @@ def check_pack_metrics():
 
 
 def check_cli():
-    for options in (['--encoder', 'enc2'], ['--obs-outs', '15'],
+    for options in (['--encoder', 'pl-b', '--outs', '15'],
+                    ['--outs', '31', '--obs-outs', '31'],
                     ['--encoder', 'enc2', '--obs-outs', '47', '--hblank-outs', '5'],
                     ['--encoder', 'enc2', '--obs-outs', '15', '--obs-colors', '1'],
                     ['--encoder', 'enc2', '--obs-outs', '23', '--band', '2']):
@@ -376,11 +377,15 @@ def main():
     check()
     if args.mutate:
         with tempfile.TemporaryDirectory() as td:
-            tools = Path(td)
+            tools = Path(td) / 'tools'
+            tools.mkdir()
             for path in (ROOT / 'tools').glob('osri_enc2_*.py'):
                 shutil.copy(path, tools / path.name)
             # The unchanged baseline import used by the comparison driver.
             shutil.copy(ROOT / 'tools/img2osri.py', tools / 'img2osri.py')
+            shutil.copy(ROOT / 'tools/osri_profile.py', tools / 'osri_profile.py')
+            (tools.parent / 'gfx').mkdir()
+            shutil.copy(ROOT / 'gfx/osri_profile.h', tools.parent / 'gfx/osri_profile.h')
             for name, module, old, new in MUTATIONS:
                 path = tools / f'osri_enc2_{module}.py'
                 source = path.read_text()
