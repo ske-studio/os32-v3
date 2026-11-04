@@ -204,6 +204,7 @@ struct gf_display_owner {
     int (*foundation_stop)(struct gf_display_context *);
     struct gf2_chan *(*command_get)(struct gf_display_context *, struct gf_foundation **);
 };
+struct gf4_ctx;
 struct gf_display_context {
     struct gf_io io;
     const struct gf_display_owner *owner;
@@ -227,6 +228,9 @@ struct gf_display_context {
     u32 section, ordinal, target, pll_gate;
     bool pll_gate_valid, fp_on;
     int last_rc;
+    /* Layer 4 (GF_FEAT4 addendum 2026-11-04): C2-service binds this to the
+     * gf4_ctx; the legacy blank/palette entries delegate through it. */
+    struct gf4_ctx *display4;
 };
 /* Connect via a thin void* adapter to gf_load_io.row; section/wait retain
  * gf_load_io's existing signatures and ms/fp_only semantics. gf_load_state
