@@ -1,8 +1,9 @@
-/* GF_FEAT4_DESIGN final 2026-11-04 addendum, A3 wire/session/case0..2.
+/* GF_FEAT4_DESIGN final 2026-11-04 addendum, A3 wire/session/case0..4.
  * OS32's staged camera protocol has no nouveau equivalent. Hardware work
  * stays behind the borrowed module ops; C2 owns all scan reservations. */
 #include "gf_display_test.h"
 #include "../hwdev/gf/display/api.h"
+#include "../hwdev/gf/gf1_test.h"
 #include "../drivers/video/geforce/geforce_module.h"
 #include "../lib/serial_diag.h"
 #include "../lib/crc32_core.inc"
@@ -25,6 +26,8 @@ static struct {
     struct gf4_saved saved;
     struct display_request request;
     u32 step, mode, crc;
+    struct gf3_surface scan[2];
+    u32 scan_crc[2];
     bool valid, running, prepared;
 } display_session;
 
@@ -269,10 +272,20 @@ static i32 display_discard(u8 head, u32 dl)
     if (!o || !o->ctx || !o->scan_discard) return GF4_ESTATE;
     return o->scan_discard(o->ctx, head, dl);
 }
-/* No MMIO here. force_m2mf uses F3's synchronous per-fragment fence/wait,
- * so every upload/readback is drained before reuse and before set_mode.
+/* Pattern 0 is the mode card. Patterns 1/2 are numbered flip cards;
+ * the 3x5 glyphs below encode decimal 1 and 2, with opposite diagonals. */
+static u32 display_flip_color(u32 x, u32 y, u32 w, u32 h, u32 pattern)
+{
+    static const u8 glyph[2][5] = {{2,6,2,2,7}, {7,1,7,4,7}};
+    u32 gx = x * 9U / w, gy = y * 9U / h;
+    if (gx >= 3U && gx < 6U && gy >= 2U && gy < 7U)
+        return (glyph[pattern - 1U][gy - 2U] & (4U >> (gx - 3U))) ? 7U : 0U;
+    u32 diagonal = pattern == 1U ? x + y : x + h - 1U - y;
+    return diagonal % DISPLAY_GRID == 0 ? 7U : pattern == 1U ? 1U : 4U;
+}
+/* No MMIO here. F3 force_m2mf drains each fragment before reuse/set_mode.
  * MIT model: nouveau_exa.c:242-288,305-371, via accel_transfer.c:85-116. */
-static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc)
+static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc, u32 pattern)
 {
     u32 cpp;
     if (s->fmt == GF3_INDEX8) cpp = 1;
@@ -288,6 +301,7 @@ static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc)
             for (u32 j = 0; j < w; ++j) {
                 u32 color = ((x + j) % DISPLAY_GRID == 0 || y % DISPLAY_GRID == 0)
                     ? DISPLAY_COLORS - 1U : (x + j) * DISPLAY_COLORS / s->width;
+                if (pattern) color = display_flip_color(x + j, y, s->width, s->height, pattern);
                 const u8 *rgb = &display_palette[color * 3U];
                 u32 pixel = cpp == 1 ? color : cpp == 2 ?
                     ((u32)(rgb[0] >> 3) << 11) | ((u32)(rgb[1] >> 2) << 5) |
@@ -334,8 +348,15 @@ static i32 display_image(const struct display_request *q, u32 index, u32 dl)
     display_session.prepared = true; /* A failed prepare may retain nodes. */
     rc = o->scan_prepare(o->ctx, q->head, m.id, scan, dl);
     if (rc) return rc;
-    rc = display_draw(&scan[0], dl, &display_session.crc);
+    display_session.scan[0] = scan[0]; display_session.scan[1] = scan[1];
+    rc = display_draw(&scan[0], dl, &display_session.crc,
+                      q->test == DISPLAY_FLIP ? 1U : 0U);
     if (rc) return rc;
+    display_session.scan_crc[0] = display_session.crc;
+    if (q->test == DISPLAY_FLIP) {
+        rc = display_draw(&scan[1], dl, &display_session.scan_crc[1], 2U);
+        if (rc) return rc;
+    }
     o = geforce_display_ops();
     if (!o || !o->ctx || !o->set_mode) return GF4_ESTATE;
     rc = o->set_mode(o->ctx, &route, m.id, &scan[0], dl);
@@ -344,11 +365,125 @@ static i32 display_image(const struct display_request *q, u32 index, u32 dl)
     if (!o || !o->ctx || !o->palette_set) return GF4_ESTATE;
     return o->palette_set(o->ctx, q->head, 0, DISPLAY_COLORS, display_palette);
 }
+/* Cursor card: two image sizes, four corners, negative position, hide,
+ * show, then a new mode. CPU input remains PM; B6 alone applies alpha+1.
+ * MIT nouveau dispnv04/crtc.c:938-1015, cursor.c:21-28,39-62. */
+#define DISPLAY_CURSOR_SIDE 64U
+#define DISPLAY_CURSOR_SMALL 32U
+/* Ordered camera steps from the A3 card; geometry choices are diagnostic. */
+enum display_cursor_stage {
+    CURSOR_SMALL, CURSOR_LARGE, CURSOR_TOP_LEFT, CURSOR_TOP_RIGHT,
+    CURSOR_BOTTOM_LEFT, CURSOR_BOTTOM_RIGHT, CURSOR_NEGATIVE,
+    CURSOR_HIDE, CURSOR_SHOW, CURSOR_MODE, DISPLAY_CURSOR_STEPS
+};
+#define DISPLAY_CURSOR_HOT_X 3
+#define DISPLAY_CURSOR_HOT_Y 5
+#define DISPLAY_CURSOR_NEGATIVE_POS (-8)
+#define DISPLAY_FLIP_REPEATS 16U
+static u32 display_cursor_pixels[GF4_CURSOR_BYTES / sizeof(u32)];
+static i32 display_cursor_step(const struct display_request *q, u32 step, u32 dl)
+{
+    const struct gf4_test_ops *o;
+    i32 rc;
+    if (step <= CURSOR_LARGE || step == CURSOR_MODE) {
+        u32 side = step == CURSOR_SMALL ? DISPLAY_CURSOR_SMALL : DISPLAY_CURSOR_SIDE;
+        static const u8 alpha[] = {0,1,254,255};
+        for (u32 y = 0; y < side; ++y)
+            for (u32 x = 0; x < side; ++x) {
+                bool arrow = (y < side * 3U / 4U && x <= y / 2U) ||
+                    (y >= side / 2U && x >= side / 4U && x < side / 2U);
+                u32 a = arrow ? alpha[y % (sizeof(alpha) / sizeof(alpha[0]))] : 0U;
+                display_cursor_pixels[y * side + x] =
+                    (a << 24) | (a << 16) | ((a / 2U) << 8);
+            }
+        struct gf4_cursor image = {.argb_pm=display_cursor_pixels,
+            .bytes=side*side*sizeof(u32), .pitch=side*sizeof(u32), .w=side,.h=side,
+            .hot_x=DISPLAY_CURSOR_HOT_X,.hot_y=DISPLAY_CURSOR_HOT_Y};
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->cursor_image) return GF4_ESTATE;
+        rc = o->cursor_image(o->ctx, q->head, &image, dl);
+        if (rc) return rc;
+        display_session.crc = crc32_core_final(crc32_core_update(
+            CRC32_INIT, display_cursor_pixels, image.bytes));
+    }
+    if (step == CURSOR_HIDE || step == CURSOR_SHOW) {
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->cursor_show) return GF4_ESTATE;
+        return o->cursor_show(o->ctx, q->head, step == CURSOR_SHOW);
+    }
+    const struct gf3_surface *s = &display_session.scan[0];
+    i32 x = (i32)s->width / 2, y = (i32)s->height / 2;
+    if (step >= CURSOR_TOP_LEFT && step <= CURSOR_BOTTOM_RIGHT) {
+        x = (step == CURSOR_TOP_RIGHT || step == CURSOR_BOTTOM_RIGHT) ? (i32)s->width - 1 : 0;
+        y = step >= CURSOR_BOTTOM_LEFT ? (i32)s->height - 1 : 0;
+    } else if (step == CURSOR_NEGATIVE) {
+        x = DISPLAY_CURSOR_NEGATIVE_POS; y = DISPLAY_CURSOR_NEGATIVE_POS; }
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->cursor_move) return GF4_ESTATE;
+    rc = o->cursor_move(o->ctx, q->head, x, y);
+    if (rc) return rc;
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->cursor_show) return GF4_ESTATE;
+    return o->cursor_show(o->ctx, q->head, true);
+}
+/* Each async submission is explicitly completed through vblank_wait before
+ * reusing either descriptor. B7 verifies base and C2 owns both reservations.
+ * MIT nouveau dispnv04/crtc.c:1074-1087,1136-1217; OS32 uses F1 counters. */
+static i32 display_flip_step(const struct display_request *q, u32 step, u32 dl)
+{
+    for (u32 i = 0; i < DISPLAY_FLIP_REPEATS; ++i) {
+        u32 target = (i + 1U) & 1U, seen;
+        const struct gf4_test_ops *o = geforce_display_ops();
+        if (!o || !o->ctx || !o->ctx->ch || !o->ctx->ch->f) return GF4_ESTATE;
+        const struct gf1_test_ops *f = geforce_foundation_ops();
+        if (!f || !f->production || !f->call || f->production != o->ctx->ch->f)
+            return GF4_ESTATE;
+        const struct gf1_test_request snap = {sizeof(snap), GF1T_SNAPSHOT, 0};
+        struct gf1_test_reply reply;
+        i32 rc = f->call(f->production, &snap, &reply);
+        if (rc) return rc;
+        u32 after = reply.stats.vblank[q->head];
+        seen = after;
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
+        rc = o->flip(o->ctx, q->head, &display_session.scan[target], step == 0, dl);
+        if (!rc) {
+            o = geforce_display_ops();
+            if (!o || !o->ctx || !o->vblank_wait) rc = GF4_ESTATE;
+            else {
+                u32 observed;
+                rc = o->vblank_wait(o->ctx, q->head, after, dl, &observed);
+                if (!rc) seen = observed;
+            }
+        }
+        /* base is B7/C2's verified, committed front, never a requested off. */
+        o = geforce_display_ops();
+        if (!rc && (!o || !o->ctx || !o->ctx->state ||
+            o->ctx->state->head[q->head].front.off != display_session.scan[target].off))
+            rc = GF4_ESTATE;
+        if (!serial_gate_active()) {
+            serial_puts_polled("GF4 FLIP"); display_number(" step=", step);
+            display_number(" head=", q->head);
+            display_number(" frame=", i); display_number(" sync=", step == 0);
+            display_number(" after=", after);
+            /* On failure report the last observed counter, not an invented one. */
+            display_number(" counter=", seen);
+            if (o && o->ctx && o->ctx->state)
+                display_number(" base=", o->ctx->state->head[q->head].front.off);
+            serial_puts_polled(" rc="); serial_diag_i32(rc); serial_puts_polled("\r\n");
+        }
+        if (rc) return rc;
+        display_session.crc = display_session.scan_crc[target];
+    }
+    return 0;
+}
 static i32 display_step(const struct display_request *q)
 {
     u32 step = display_session.step;
     if (q->phase) {
         u32 n = sizeof(display_power) / sizeof(display_power[0]);
+        if (q->test == DISPLAY_CURSOR) n = DISPLAY_CURSOR_STEPS;
+        if (q->test == DISPLAY_FLIP) n = 2U;
         if (q->test == DISPLAY_MODE) {
             struct gf4_mode ignored;
             i32 rc = display_mode_at(q->connector, 0, &ignored, &n);
@@ -357,7 +492,8 @@ static i32 display_step(const struct display_request *q)
         if (step + 1U >= n) return display_restore(true);
         ++step;
         /* Restore first, then discard only now-unused diagnostic surfaces. */
-        if (q->test == DISPLAY_MODE) {
+        if (q->test == DISPLAY_MODE ||
+            (q->test == DISPLAY_CURSOR && step == CURSOR_MODE)) {
             i32 rc = display_restore(false);
             if (rc) return rc;
         }
@@ -368,14 +504,15 @@ static i32 display_step(const struct display_request *q)
     i32 rc = display_deadline(o->ctx, &dl);
     if (rc) return rc;
     display_session.step = step;
-    if (q->test == DISPLAY_MODE || !q->phase) {
+    bool cursor_mode = q->test == DISPLAY_CURSOR && step == CURSOR_MODE;
+    if (q->test == DISPLAY_MODE || !q->phase || cursor_mode) {
         display_session.mode = display_session.crc = 0;
         if (q->phase) {
             rc = display_discard(q->head, dl);
             if (rc) return rc;
             display_session.prepared = false;
         }
-        rc = display_image(q, q->test == DISPLAY_MODE ? step : 0, dl);
+        rc = display_image(q, q->test == DISPLAY_MODE ? step : cursor_mode ? 1U : 0U, dl);
         if (rc) return rc;
     }
     if (q->test == DISPLAY_DPMS) {
@@ -385,6 +522,9 @@ static i32 display_step(const struct display_request *q)
         rc = o->dpms_set(o->ctx, q->head, display_power[step], dl);
         if (rc) return rc;
     }
+    if (q->test == DISPLAY_CURSOR) rc = display_cursor_step(q, step, dl);
+    if (q->test == DISPLAY_FLIP) rc = display_flip_step(q, step, dl);
+    if (rc) return rc;
     display_record(q, "READY", step, display_session.mode, display_session.crc, 0);
     return 0;
 }
@@ -397,8 +537,8 @@ i32 gf_display_test(u32 session)
     if (rc) return rc;
     if (q.test == DISPLAY_RESTORE) return display_restore(true);
     if (q.test == DISPLAY_ENUM) return q.phase ? GF4_EINVAL : display_enumerate(&q);
-    /* Later A3 cards implement case3..7; never start a snapshot for them. */
-    if (q.test > DISPLAY_DPMS) {
+    /* Later A3 cards implement case5..7; never start a snapshot for them. */
+    if (q.test > DISPLAY_FLIP) {
         display_record(&q, "SKIP", 0, 0, 0, GF4_EUNSUPPORTED);
         return GF4_EUNSUPPORTED;
     }
