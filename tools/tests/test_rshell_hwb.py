@@ -98,8 +98,12 @@ MUTATIONS = [
 def main():
     exercise(load(SRC))
     print('SUMMARY PASS', flush=True)
-    if '--mutate' not in sys.argv:
-        return 0
+    if '--mutate' in sys.argv:
+        return mutate()
+    return 0
+
+
+def mutate():
     original = SRC.read_text()
     with tempfile.TemporaryDirectory() as tmp:
         for name, filename, before, after, case in MUTATIONS:

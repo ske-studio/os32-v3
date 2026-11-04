@@ -33,6 +33,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    hwb_host.verify('tools/tests/hwb_log_host.c')
     if args.mutate:
         raise SystemExit(hwb_host.mutations('tools/tests/hwb_log_host.c', MUTATIONS))
-    hwb_host.verify('tools/tests/hwb_log_host.c')

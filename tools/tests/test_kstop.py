@@ -391,7 +391,8 @@ def run(overrides=None):
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
     transition = read('exec/appslot_transition.inc').replace(
         '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
-    code = PRE + constants + read('exec/appslot.c').replace(
+    hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
+    code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + '\n'.join(function(ex,n) for n in (
         'ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')

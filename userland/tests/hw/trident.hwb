@@ -1,0 +1,142 @@
+# Sources: trident_driver-1.4.0.c:694-775; trident_regs.h:302-325
+# vgaHW.c:398-409,418-421,474-488,574-604,723-730
+# Copyright 1991-1999 by The XFree86 Project, Inc.
+# Copyright 1990,91 by Thomas Roell, Dinkelscherben, Germany.
+# vgaHW.c license: xorg-server-21.1.13 COPYING:54-76
+# Copyright (C) 1994-2003 The XFree86 Project, Inc.  All Rights Reserved.
+# Copyright (C) Colin Harrison 2005-2008
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FIT-
+# NESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+# XFREE86 PROJECT BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+# AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Except as contained in this notice, the name of the XFree86 Project shall not
+# be used in advertising or otherwise to promote the sale, use or other dealings
+# in this Software without prior written authorization from the XFree86 Project.
+# Copyright 1992-2003 by Alan Hourihane, North Wales, UK.
+# 
+# Permission to use, copy, modify, distribute, and sell this software and its
+# documentation for any purpose is hereby granted without fee, provided that
+# the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation, and that the name of Alan Hourihane not be used in
+# advertising or publicity pertaining to distribution of the software without
+# specific, written prior permission.  Alan Hourihane makes no representations
+# about the suitability of this software for any purpose.  It is provided
+# "as is" without express or implied warranty.
+# 
+# ALAN HOURIHANE DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+# EVENT SHALL ALAN HOURIHANE BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+# DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+# TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+# 
+ device d = bdf 0:8.0
+ window v = bar d 1
+ if mode == 1 goto enable
+ if mode == 2 goto disable
+ mmiowrite8 v + 0x3C4 0x09
+ mmioread8 v + 0x3C5 -> chip
+ print "SR09" chip
+ end
+ label enable
+ iowrite8 port 0x68 0x0E
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8F
+ iowrite8 port 0x6A 0x06
+ call protect_on
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t & 0xDF) << 8)
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t | 4) << 8)
+ let mask = 0xFF
+ let bits = 6
+ call dac
+ let bits = 8
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | ((t & 0xFC) << 8)
+ let bits = 1
+ call dac
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t & 0xEF) << 8)
+ call protect_off
+ iowrite8 port 0xFAC 2
+ end
+ label disable
+ iowrite8 port 0xFAC 0
+ call protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t | 0x10) << 8)
+ let bits = 0
+ let mask = 0xFE
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | (((t & 0xFC) | 1) << 8)
+ let mask = 0xFD
+ call dac
+ let mask = 0xCF
+ call dac
+ let mask = 0xF7
+ call dac
+ let mask = 0xFB
+ call dac
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t & 0xFB) << 8)
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t | 0x20) << 8)
+ call protect_off
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8E
+ iowrite8 port 0x6A 0x06
+ iowrite8 port 0x68 0x0F
+ end
+ label dac
+ mmiowrite8 v + 0x83C8 4
+ mmioread8 v + 0x83C6 -> t
+ mmiowrite8 v + 0x83C8 4
+ mmiowrite8 v + 0x83C6 (t & mask) | bits
+ return
+ label protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 1
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq | 0x20
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0
+ return
+ label protect_off
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq & 0xDF
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 3
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x20
+ return

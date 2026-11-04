@@ -1,0 +1,4 @@
+mmioread8 phys 0xA0000 -> initial
+let target = (initial ^ 1) & 1
+poll 8 phys 0xA0000 1 target 10000000 1000 -> x
+end
