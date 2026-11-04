@@ -33,6 +33,10 @@
 #include "../internal.h"
 #include "../accel_service.h"
 #include "../production.h"
+#include "../../../drivers/video/geforce/geforce_module.h"
+
+/* C2-service owns the address; C4/kernel owns the borrowed state/helpers. */
+static struct gf4_ctx svc_production_ctx;
 
 static i32 svc_owner_start(void *,u32);
 static i32 svc_owner_stop(void *,u32);
@@ -44,6 +48,9 @@ static struct gf3_service_owner svc_owner={
 
 const struct gf3_service_owner *gf4_service_owner_table(void)
 {
+    /* C3 lends this table before service_init; F3 requires a non-NULL
+     * owner already then. Preserve a context installed by the bind API. */
+    if (!svc_owner.owner) svc_owner.owner=&svc_production_ctx;
     return &svc_owner;
 }
 
@@ -143,6 +150,39 @@ i32 gf4_service_bind(struct gf4_ctx *c,struct gf_display_context *legacy,
     legacy->display4=c;
     svc_owner.owner=c;
     return 0;
+}
+
+/* Final C-group declaration / links-exec addendum (2026-11-04).
+ * dispnv04/disp.c:247-294 creates the display objects before connecting
+ * their dependencies. This resident ctx/module-loan adapter is OS32-only:
+ * no ROM acquisition, register access, start or slot publication here. */
+i32 gf4_service_init(struct gf_production *p,struct gf_display_context *legacy)
+{
+    if (!p || !legacy || legacy!=&p->display || !geforce_context ||
+        !geforce_context->display_data || !geforce_context->display_state)
+        return GF4_EINVAL;
+    struct gf4_links *links=gf4_links_table();
+    const struct gf4_exec_ops *exec=gf4_exec_table();
+    if (!links || !exec || !links->admission || !links->i2c_port ||
+        !links->failed || !links->scan_changed) return GF4_EINVAL;
+    /* Reinitialization must never erase reservation nodes or a saved loan.
+     * The module lends the same objects for the entire binding lifetime. */
+    if ((svc_owner.owner && svc_owner.owner!=&svc_production_ctx) ||
+        (legacy->display4 && legacy->display4!=&svc_production_ctx)) return GF4_ESTATE;
+    if (svc_production_ctx.legacy) {
+        if (svc_production_ctx.legacy!=legacy || svc_production_ctx.ch!=&p->chan ||
+            svc_production_ctx.accel!=&p->accel || svc_production_ctx.links!=links || svc_production_ctx.exec!=exec ||
+            svc_production_ctx.data!=geforce_context->display_data ||
+            svc_production_ctx.state!=geforce_context->display_state) return GF4_ESTATE;
+        return gf4_service_bind(&svc_production_ctx,legacy,links);
+    }
+    svc_production_ctx=(struct gf4_ctx){
+        .ch=&p->chan,.accel=&p->accel,
+        .state=geforce_context->display_state,.data=geforce_context->display_data,
+        .links=links,.exec=exec
+    };
+    links->owner=&svc_production_ctx;
+    return gf4_service_bind(&svc_production_ctx,legacy,links);
 }
 
 /* Values only, before release. No ROM/span/init/program survives the loan.
