@@ -1,6 +1,29 @@
+/*
+ * Copyright 2012 Nouveau Community
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Authors: Martin Peres
+ */
 /* GF_FEAT5_DESIGN final A2/C4 contract and PM decision 16.
- * OS32 diagnostic protocol, independently written: no register programming
- * or nouveau code is copied here. Hardware sequences remain in module ops.
+ * ROM metadata follows nouveau bios/perf.c:30-77 and vmap.c:29-53.
+ * Hardware sequences remain in module ops.
  * Never retain a module callback/table across a call. Only caller-owned
  * image/plan data and owner identity tokens survive a diagnostic command. */
 #include "gf5_test.h"
@@ -11,6 +34,9 @@
 #include "gfinit_decode.h"
 #include "../drivers/video/geforce/geforce_module.h"
 #include "../lib/serial_diag.h"
+#define GF_ROM_BIT_ONLY
+#include "../hwdev/gf/rom.inc"
+#undef GF_ROM_BIT_ONLY
 
 static struct {
     u32 arg[GF5_WIRE_OPERANDS];
@@ -97,6 +123,125 @@ static i32 diagnostic_wait(u32 us, i32 *source, bool *local)
     }
     return poll(local);
 }
+/* ROM field layouts: nouveau c03c1a1 nvkm/subdev/bios/perf.c:30-77,
+ * vmap.c:29-53; BMP signature: bios/base.c:181-182. BIT directory bounds
+ * are shared with the existing ROM decoder through gf_rom_bit_entry. */
+enum {
+    INFO_LE16_BYTES = 2, INFO_LE32_BYTES = 4,
+    INFO_BIT_P_V1 = 1, INFO_BIT_P_V2 = 2,
+    INFO_P_PERF = 0, INFO_P_VMAP = 0x20,
+    INFO_BMP_VERSION = 6, INFO_BMP_PERF_VERSION = 0x25,
+    INFO_BMP_PERF = 0x94,
+    INFO_TABLE_HEADER_BYTES = 4, INFO_PERF_BIT_HEADER_BYTES = 6,
+    INFO_TABLE_VERSION = 0, INFO_TABLE_HEADER = 1,
+    INFO_PERF_COUNT = 2, INFO_PERF_LENGTH = 3,
+    INFO_PERF_SUBCOUNT = 4, INFO_PERF_SUBSIZE = 5,
+    INFO_PERF_V20 = 0x20, INFO_PERF_V40 = 0x40,
+    INFO_VMAP_V10 = 0x10, INFO_VMAP_V20 = 0x20,
+    INFO_VMAP_LENGTH = 2, INFO_VMAP_COUNT = 3
+};
+static bool rom_span(const struct gf5_rom_view *rom, u32 off, u32 bytes)
+{
+    return rom->bytes && off <= rom->size && bytes <= rom->size - off;
+}
+/* Callers check the complete field before reading. */
+static u32 rom_le(const struct gf5_rom_view *rom, u32 off, u32 bytes)
+{
+    u32 value = 0;
+    for (u32 i = 0; i < bytes; ++i)
+        value |= (u32)rom->bytes[off + i] << (i * BITS_PER_BYTE);
+    return value;
+}
+static i32 table_record(const struct gf5_rom_view *rom, const char *table,
+                        u32 off, bool bmp, bool vmap)
+{
+    u32 version = 0;
+    i32 rc = 0;
+    if (off) {
+        if (!rom_span(rom, off, 1)) rc = GF5_EBIOS;
+        else {
+            u32 version_off = bmp ? INFO_TABLE_HEADER : INFO_TABLE_VERSION;
+            if (!rom_span(rom, off, version_off + 1U)) rc = GF5_EBIOS;
+            else {
+                version = rom->bytes[off + version_off];
+                bool known = bmp || (vmap ?
+                    version == INFO_VMAP_V10 || version == INFO_VMAP_V20 :
+                    version >= INFO_PERF_V20 && version <= INFO_PERF_V40);
+                if (!known) rc = GF5_ENOTSUP;
+                else {
+                    u32 minimum = vmap || bmp ? INFO_TABLE_HEADER_BYTES :
+                                                           INFO_PERF_BIT_HEADER_BYTES;
+                    if (!rom_span(rom, off, minimum)) rc = GF5_EBIOS;
+                    else {
+                        const u8 *t = rom->bytes + off;
+                        u32 head = t[bmp ? INFO_TABLE_VERSION : INFO_TABLE_HEADER];
+                        u32 count = t[vmap ? INFO_VMAP_COUNT : INFO_PERF_COUNT];
+                        u32 stride = t[vmap ? INFO_VMAP_LENGTH : INFO_PERF_LENGTH];
+                        if (!vmap && !bmp) {
+                            /* v40 reorders count/length/subsize (perf.c:43-48). */
+                            if (version == INFO_PERF_V40) {
+                                count = t[INFO_PERF_SUBSIZE];
+                                stride = t[INFO_PERF_COUNT] +
+                                    (u32)t[INFO_PERF_SUBCOUNT] * t[INFO_PERF_LENGTH];
+                            } else stride += (u32)t[INFO_PERF_SUBCOUNT] *
+                                                                     t[INFO_PERF_SUBSIZE];
+                        }
+                        if (head < minimum || (count && !stride) ||
+                            !rom_span(rom, off, head + count * stride)) rc = GF5_EBIOS;
+                    }
+                }
+            }
+        }
+    }
+    if (!serial_gate_active()) {
+        serial_puts_polled("GF5 DATA stage=info table="); serial_puts_polled(table);
+        number(" offset=", off); number(" version=", version);
+        /* Unknown or corrupt tables are present, never labelled absent. */
+        number(" absent=", off == 0); number(" bmp=", bmp);
+        signed_number(" rc=", rc); serial_puts_polled("\r\n");
+    }
+    return rc;
+}
+static i32 rom_records(const struct gf5_rom_view *rom)
+{
+    if (!rom->bytes) return GF5_ENOTSUP; /* PM decision 8: disabled view. */
+    u32 data = 0, length = 0, perf = 0, vmap = 0;
+    u8 version = 0;
+    bool bmp = false;
+    int found = gf_rom_bit_entry(rom->bytes, rom->size, 'P',
+                                 &data, &length, &version);
+    if (found < 0) return GF5_EBIOS;
+    if (!found && (version == INFO_BIT_P_V1 || version == INFO_BIT_P_V2)) {
+        if (length < INFO_P_PERF + INFO_LE32_BYTES) return GF5_EBIOS;
+        perf = rom_le(rom, data + INFO_P_PERF, INFO_LE32_BYTES);
+        if (version == INFO_BIT_P_V2) {
+            if (length < INFO_P_VMAP + INFO_LE32_BYTES) return GF5_EBIOS;
+            vmap = rom_le(rom, data + INFO_P_VMAP, INFO_LE32_BYTES);
+        }
+    } else if (!found) return GF5_ENOTSUP;
+    /* perf.c:60-77: BMP is the fallback when BIT P has no perf pointer. */
+    if (!perf) {
+        static const u8 signature[] = {0xff, 0x7f, 'N', 'V', 0};
+        for (u32 off = 0; rom_span(rom, off, sizeof(signature)); ++off) {
+            u32 i = 0;
+            while (i < sizeof(signature) && rom->bytes[off + i] == signature[i]) ++i;
+            if (i != sizeof(signature)) continue;
+            if (!rom_span(rom, off, INFO_BMP_VERSION + 1U)) return GF5_EBIOS;
+            if (rom->bytes[off + INFO_BMP_VERSION] >= INFO_BMP_PERF_VERSION) {
+                if (!rom_span(rom, off, INFO_BMP_PERF + INFO_LE16_BYTES)) return GF5_EBIOS;
+                perf = rom_le(rom, off + INFO_BMP_PERF, INFO_LE16_BYTES);
+                bmp = perf != 0;
+            }
+            break;
+        }
+    }
+    i32 perf_rc = table_record(rom, "perf", perf, bmp, false);
+    i32 vmap_rc = table_record(rom, "vmap", vmap, false, true);
+    if (perf_rc == GF5_EBIOS || vmap_rc == GF5_EBIOS) return GF5_EBIOS;
+    /* Unsupported versions are logged; perf_count/get owns entry support.
+     * vmap absence is normal and must not hide the performance entries. */
+    return 0;
+}
 static i32 info(bool *local)
 {
     const struct gf5_test_ops *o = geforce_feature5_ops();
@@ -116,6 +261,8 @@ static i32 info(bool *local)
         number(" image_held=", diagnostic.image != NULL);
         serial_puts_polled("\r\n");
     }
+    i32 rc = rom_records(&o->ctx->rom);
+    if (rc) { *local = true; return rc; }
     /* Enumerate the complete ROM performance table, not only the selected
      * state. Every get rereads the accessor after the preceding call. */
     o = geforce_feature5_ops();
@@ -123,7 +270,7 @@ static i32 info(bool *local)
         *local = true; return GF5_ENOTSUP;
     }
     u32 count;
-    i32 rc = o->perf_count(o->ctx, &count);
+    rc = o->perf_count(o->ctx, &count);
     if (rc) return rc;
     for (u32 i = 0; i < count; ++i) {
         struct gf5_perf_entry entry;
