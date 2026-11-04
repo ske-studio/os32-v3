@@ -76,6 +76,18 @@ class CacheTests(unittest.TestCase):
                     self.assertEqual(r.returncode, 0)
                 self.assertEqual(count(), before + 1)
 
+    def test_command_spelling(self):
+        root = pathlib.Path('/w/one')
+        other = pathlib.Path('/w/two')
+        def key(r, args, cwd):
+            return host32.cache_command([a.replace('<r>', str(r)) for a in args], r, cwd)
+        inputs = ['gcc', '-I<r>/inc', '<r>/a.c', '<r>/lib.a']
+        self.assertEqual(key(root, inputs, root), key(other, inputs, other))
+        rpath = ['gcc', '<r>/a.c', '-Wl,-rpath,<r>/lib']
+        self.assertNotEqual(key(root, rpath, root), key(other, rpath, other))
+        debug = ['gcc', '-g', '-c', 'a.c']
+        self.assertNotEqual(key(root, debug, root), key(other, debug, other))
+
     def test_limits(self):
         with tempfile.TemporaryDirectory() as td:
             cache = pathlib.Path(td)
@@ -91,8 +103,9 @@ class CacheTests(unittest.TestCase):
 def mutations():
     source = pathlib.Path(host32.__file__).read_text()
     changes = [
-        ("command = command.replace(str(root), '<root>')", "command = command"),
-        ("if not any(arg.startswith('-g') for arg in preprocess):", "if True:"),
+        ("return arg.replace(str(root), '<root>')", "return arg"),
+        ("return ' '.join(preprocess) + ' cwd=' + str(cwd)", "pass"),
+        ("if arg.startswith(SPELLED_PREFIXES):", "if False:"),
         ("except OSError:\n            cache = local", "except OSError:\n            raise"),
         ("r'/[^/\\s]+(?=/|\\s|$)'", "r'/[^/\\s]+/'"),
     ]

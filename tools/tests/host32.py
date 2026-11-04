@@ -149,11 +149,20 @@ def run(args, *, runner=None, **kwargs):
 RUN_TIMEOUT = 120
 
 
-def cache_command(preprocess, root):
-    command = ' '.join(preprocess)
-    if not any(arg.startswith('-g') for arg in preprocess):
-        command = command.replace(str(root), '<root>')
-    return command
+# Paths are shared across worktrees only where their bytes reach the key (the
+# preprocessed text, hashed .o/.a). Linker, library-path and macro arguments, and with
+# -g the cwd recorded in DWARF, stay as given.
+SPELLED_PREFIXES = ('-Wl,', '-Xlinker', '-L', '-D')
+
+
+def cache_command(preprocess, root, cwd):
+    if any(arg.startswith('-g') for arg in preprocess):
+        return ' '.join(preprocess) + ' cwd=' + str(cwd)
+    def shared(arg):
+        if arg.startswith(SPELLED_PREFIXES):
+            return arg
+        return arg.replace(str(root), '<root>')
+    return ' '.join(map(shared, preprocess))
 
 
 def fixture_cache(root):
@@ -212,7 +221,7 @@ def build(args, **kwargs):
     def stable(value):
         return re.sub(tmp_prefix, '<tmp>', value)
     digest = hashlib.sha256(pre.stdout)
-    digest.update(stable(cache_command(preprocess, root)).encode())
+    digest.update(stable(cache_command(preprocess, root, cwd)).encode())
     digest.update(repr('-c' in args).encode())
     compiler = pathlib.Path(shutil.which(args[0]) or args[0]).resolve()
     stamp = compiler.stat()
