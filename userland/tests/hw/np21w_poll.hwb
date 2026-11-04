@@ -1,4 +1,5 @@
-mmioread8 phys 0xA0000 -> initial
+# Last word of the PC-98 text VRAM character area (A0000h-A1FFFh), outside the 80x25 screen: the console never rewrites it (PM decision P11).
+mmioread8 phys 0xA1FFE -> initial
 let target = (initial ^ 1) & 1
-poll 8 phys 0xA0000 1 target 10000000 1000 -> x
+poll 8 phys 0xA1FFE 1 target 10000000 1000 -> x
 end

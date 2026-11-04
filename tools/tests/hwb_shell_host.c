@@ -3,6 +3,8 @@
 #include "userland/shell/shell.h"
 #include "pci_dev_contract.h"
 #include "hwb_shell_scripts.h"
+/* userland/tests/hw/np21w_tvram.hwb・np21w_poll.hwb が触る TVRAM の番地 (文字の領域の末尾、PM 決定 P11)。 */
+#define TVRAM_SPARE 0xA1FFEUL
 
 int strcmp(const char *a, const char *b)
 {
@@ -221,7 +223,7 @@ static void scripts(void)
             const char *arg = mode == 1 ? "mode=1" : mode == 2 ? "mode=2" : 0;
             CHECK(command("run", script->name, arg) == expected && !live);
             if (hwbf_equal(script->name, "np21w_gdc.hwb")) CHECK(*hwbf_byte(&bus, HW_IO, 0x68) == 0x0F);
-            if (hwbf_equal(script->name, "np21w_tvram.hwb")) CHECK(*hwbf_byte(&bus, HW_PHYS, 0xA0000) == 0);
+            if (hwbf_equal(script->name, "np21w_tvram.hwb")) CHECK(*hwbf_byte(&bus, HW_PHYS, TVRAM_SPARE) == 0);
             if (hwbf_equal(script->name, "trident.hwb")) {
                 CHECK(scalar("mode") == mode);
                 if (mode) CHECK(*hwbf_byte(&bus, HW_IO, 0xFAC) == (mode == 1 ? 2 : 0));
