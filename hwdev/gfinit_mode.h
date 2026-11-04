@@ -111,9 +111,14 @@ enum gfinit_mode_cr_index {
 #define GF_MODE_TEST_CONTROL 0x00100000U
 #define GF_MODE_GR_INDEXED 0x40U
 #define GF_MODE_GR_MAP 0x05U
-struct gfinit_mode_saved {
+/* nouveau dispnv04/disp.h:23-81: per-head CRTC and shared clocks. */
+struct gfinit_mode_head_saved {
     u8 cr1c, cr33, cr3c, cr4b, cr52;
-    u32 gpio_ext, crtc850, sel_clk;
+    u32 gpio_ext, crtc850;
+};
+struct gfinit_mode_saved {
+    struct gfinit_mode_head_saved head[2];
+    u32 pllsel, sel_clk;
 };
 struct gfinit_mode_timing {
     u32 hd, hs, he, ht, hbs, hbe, vd, vs, ve, vt, vbs, vbe;
@@ -129,6 +134,11 @@ struct gfinit_mode {
     struct gfinit_pll_limits limits;
     struct gfinit_pll_solution pll;
     struct gfinit_pll_sequence sequence;
+    /* nouveau dispnv04/disp.h:48-64, per-head FP and TV registers. */
+    u8 head;
+    u32 fp_horiz[7], fp_vert[7], dither, dither_regs[6], fp_debug[3], fp_margin;
+    u32 tv_vtotal, tv_vskew, tv_vsync_delay, tv_htotal, tv_hskew;
+    u32 tv_hsync_delay, tv_hsync_delay2;
 };
 /* Pure state calculation; caller supplies VIDEO limits and pre-Q captures.
  * Does not read hardware or bind/execute a recover plan. */

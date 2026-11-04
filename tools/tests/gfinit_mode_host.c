@@ -63,8 +63,8 @@ static void dump(u32 variant)
         {400000,1000000,25000,200000,4,40,1,4}, 6, 0, 27000
     };
     struct gfinit_mode_saved saved = {0};
-    if (variant) saved = (struct gfinit_mode_saved){0xff,0xff,0x5a,0x12,0xfe,
-        0x12345678,0x87654321,0xabcdef01};
+    if (variant) saved = (struct gfinit_mode_saved){.head[0]={.cr1c=0xff,.cr33=0xff,.cr3c=0x5a,.cr4b=0x12,.cr52=0xfe,
+        .gpio_ext=0x12345678,.crtc850=0x87654321},.sel_clk=0xabcdef01};
     struct gfinit_pll_limits before = limits;
     CHECK(gfinit_mode_calc(&limits, &saved, &mode) == 0);
     CHECK(limits.vco2.max_freq == before.vco2.max_freq);

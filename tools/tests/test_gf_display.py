@@ -14,15 +14,34 @@ ROOT = Path(__file__).resolve().parents[2]
 BASE = '13bc5619'
 
 
-def previous_calc():
+def previous_calc(tmp):
     def source(name):
         return subprocess.check_output(['git', 'show', f'{BASE}:{name}'], cwd=ROOT, text=True)
+    header = source('hwdev/gfinit_mode.h').replace(
+        '../kdebug/gfinit_pll.h', str(ROOT / 'kdebug/gfinit_pll.h'))
+    (tmp / 'hwdev').mkdir()
+    (tmp / 'hwdev/gfinit_mode.h').write_text(header)
     text = source('kdebug/gfinit_mode.c').split('void gfinit_mode_palette')[0]
     for name in ('output', 'pll_program'):
         text = text.replace(f'#include "gfinit_mode/{name}.inc"', source(f'kdebug/gfinit_mode/{name}.inc'))
-    return text.replace('../hwdev/gfinit_mode.h', str(ROOT / 'hwdev/gfinit_mode.h')).replace(
-        'gfinit_mode_calc', 'gf_previous_calc').replace('mode_bit', 'previous_mode_bit').replace(
-        'mode_dcb_head_a_or0', 'previous_mode_dcb_head_a_or0')
+    text = text.replace('../hwdev/gfinit_mode.h', str(tmp / 'hwdev/gfinit_mode.h'))
+    text = text.replace('gfinit_mode_calc', 'gf_previous_calc')
+    text += r"""
+/* Scalar bridge keeps the base and current structure definitions in separate TUs. */
+int gf_previous_bridge(const struct gfinit_pll_limits *limits, u8 cr1c, u8 cr33,
+                       u8 cr3c, u8 cr4b, u8 cr52, u32 gpio, u32 crtc,
+                       u32 sel_clk, void *out, u32 *bytes)
+{
+    struct gfinit_mode_saved saved = { .cr1c=cr1c, .cr33=cr33, .cr3c=cr3c,
+        .cr4b=cr4b, .cr52=cr52, .gpio_ext=gpio, .crtc850=crtc, .sel_clk=sel_clk };
+    struct gfinit_mode mode = {0};
+    int rc = gf_previous_calc(limits, &saved, &mode);
+    for (u32 i=0; i<sizeof(mode); i++) ((u8 *)out)[i]=((const u8 *)&mode)[i];
+    *bytes=sizeof(mode);
+    return rc;
+}
+"""
+    (tmp / 'gf_previous_calc.c').write_text(text)
 
 
 def check_rows(text):
@@ -82,7 +101,7 @@ def check_rows(text):
 def main(override=None):
     with tempfile.TemporaryDirectory(prefix='gf-display-') as tmp:
         tmp = Path(tmp)
-        (tmp / 'gf_previous_calc.inc').write_text(previous_calc())
+        previous_calc(tmp)
         exe = tmp / 'host'
         cmd = [s.replace('gfinit_plan_c_host.c', 'gf_display_host.c')
                for s in test_gfinit_plan_c.command(exe)]
@@ -92,7 +111,7 @@ def main(override=None):
         if override:
             rel, replacement = override
             sources = [replacement if p == ROOT / rel else p for p in sources]
-        cmd += ['-I'+str(ROOT), '-I'+str(tmp), *map(str, sources)]
+        cmd += ['-I'+str(ROOT), '-I'+str(tmp), str(tmp / 'gf_previous_calc.c'), *map(str, sources)]
         subprocess.run(cmd, cwd=ROOT, check=True)
         result = host32.run([str(exe)], cwd=ROOT, timeout=180, capture_output=True, text=True)
         if result.returncode:

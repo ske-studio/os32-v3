@@ -27,18 +27,18 @@
 #include "calc.h"
 void gf_mode_extended(const struct gfinit_mode_saved *saved, struct gfinit_mode *o)
 {
-    o->cr[GF_MODE_CR_ENH] = saved->cr1c & ~GF_MODE_ENH_CLEAR;
-    o->cr[GF_MODE_CR_LCD] = saved->cr33 & ~GF_MODE_LCD_CLEAR;
+    o->cr[GF_MODE_CR_ENH] = saved->head[0].cr1c & ~GF_MODE_ENH_CLEAR;
+    o->cr[GF_MODE_CR_LCD] = saved->head[0].cr33 & ~GF_MODE_LCD_CLEAR;
     o->cr[GF_MODE_CR_SCRATCH3] = GF_MODE_ANALOG_SCRATCH;
-    o->cr[GF_MODE_CR_SCRATCH4] = saved->cr3c;
-    o->cr[GF_MODE_CR_SCRATCH4B] = saved->cr4b | GF_MODE_HEAD_A_SCRATCH;
-    o->cr[GF_MODE_CR_LATENCY] = (saved->cr52 + GF_MODE_LATENCY_ADD) & GF_MODE_BYTE_MASK;
+    o->cr[GF_MODE_CR_SCRATCH4] = saved->head[0].cr3c;
+    o->cr[GF_MODE_CR_SCRATCH4B] = saved->head[0].cr4b | GF_MODE_HEAD_A_SCRATCH;
+    o->cr[GF_MODE_CR_LATENCY] = (saved->head[0].cr52 + GF_MODE_LATENCY_ADD) & GF_MODE_BYTE_MASK;
     o->cr[GF_MODE_CR_9F] = 1;
     o->cr[GF_MODE_CR_85] = GF_MODE_BYTE_MASK;
     o->cr[GF_MODE_CR_86] = 1;
     o->engine_ctrl = GF_MODE_ENGINE_I2C;
     o->crtc830 = GF_MODE_HEIGHT - 3;
     o->crtc834 = GF_MODE_HEIGHT - 1;
-    o->gpio_ext = saved->gpio_ext;
-    o->crtc850 = saved->crtc850;
+    o->gpio_ext = saved->head[0].gpio_ext;
+    o->crtc850 = saved->head[0].crtc850;
 }

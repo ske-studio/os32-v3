@@ -1,7 +1,8 @@
 /* Real C plan is the write oracle. Bus/owner are fake; no physical I/O. */
 #define GF_C_ENTRY previous_c_tests
 #include "gfinit_plan_c_host.c"
-#include "gf_previous_calc.inc" /* generated from the immutable P3 base */
+/* Base implementation and header are compiled in a separate translation unit. */
+int gf_previous_bridge(const struct gfinit_pll_limits *,u8,u8,u8,u8,u8,u32,u32,u32,void *,u32 *);
 #include "../../hwdev/gf/command.h"
 /* Display-only owner leaves command_get NULL; never accept a command call. */
 int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
@@ -172,12 +173,16 @@ static void calc_equivalence(void)
         struct gfinit_pll_limits limits=l;
         if(n%3==1) limits.vco1.max_freq=40000;
         if(n%3==2) limits.ref=0;
-        struct gfinit_mode a,b;
-        int old=gf_previous_calc(&limits,&s,&a),now=gfinit_mode_calc(&limits,&s,&b);
+        struct gfinit_mode a={0},b; u32 base_bytes;
+        int old=gf_previous_bridge(&limits,s.head[0].cr1c,s.head[0].cr33,
+            s.head[0].cr3c,s.head[0].cr4b,s.head[0].cr52,s.head[0].gpio_ext,
+            s.head[0].crtc850,s.sel_clk,&a,&base_bytes);
+        int now=gfinit_mode_calc(&limits,&s,&b);
         CHECK(old==now);
-        for(u32 i=0;i<sizeof(a);i++) CHECK(((u8 *)&a)[i]==((u8 *)&b)[i]);
+        CHECK(base_bytes<=sizeof(a));
+        for(u32 i=0;i<base_bytes;i++) CHECK(((u8 *)&a)[i]==((u8 *)&b)[i]);
     }
-    output("PASS calc: 512 seeded saved states, single/two-stage and failed solve, entire structure\n");
+    output("PASS calc: 512 seeded saved states, single/two-stage and failed solve, base structure\n");
 }
 static void row_comparison(u32 variant,bool fp)
 {
@@ -186,7 +191,7 @@ static void row_comparison(u32 variant,bool fp)
     output("adapter variant=");val(variant);val(fp);output("\n");
     sim_reset();sim_compare=true;
     struct gfinit_mode_saved s={0};
-    if (variant) s=(struct gfinit_mode_saved){255,255,0x5a,0x12,0xfe,0x12345678,0x87654321,0xabcdef01};
+    if (variant) s=(struct gfinit_mode_saved){.head[0]={.cr1c=255,.cr33=255,.cr3c=0x5a,.cr4b=0x12,.cr52=0xfe,.gpio_ext=0x12345678,.crtc850=0x87654321},.sel_clk=0xabcdef01};
     CHECK(!gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&display.limits));
     CHECK(!gfinit_mode_calc(&display.limits,&s,&display.mode));
     for(u32 i=0;i<256;i++) gfinit_mode_palette(i,&display.palette[i*3]);
