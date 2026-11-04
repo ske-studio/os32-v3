@@ -287,6 +287,7 @@ static int gfx_select_and_init_backend(int legacy200)
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
             if (g_backend == &gfx_backend_geforce && !pc98_route_safe()) return -1;
+            kprintf(KLOG_ATTR, "[gfx] backend=%s init failed -> pc98\n", g_backend->name);
             gfx_select_mode(&gfx_backend_pc98, legacy200);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);

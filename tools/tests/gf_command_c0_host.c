@@ -18,6 +18,7 @@ static void irq_restore(unsigned saved)
 #ifndef GF2_COMMAND_SOURCE
 #define GF2_COMMAND_SOURCE "../../hwdev/gf/command.c"
 #endif
+#include "gf_startlog_host.h"
 #include GF2_COMMAND_SOURCE
 
 enum c0_event {
@@ -28,6 +29,8 @@ enum c0_event {
 };
 static struct { enum c0_event kind; u32 value; } c0_trace[256];
 static unsigned c0_count, c0_pos, c0_heads;
+static enum c0_event c0_fail_event;
+static int c0_fail_rc;
 static struct gf_foundation c0_f;
 static struct gf2_chan c0_ch;
 static u32 c0_ring[GF2_PUSH_WORDS], c0_now, c0_reference;
@@ -92,15 +95,18 @@ int gf_irq_enable(struct gf_foundation *f, bool fifo, bool graph, unsigned heads
     assert(heads == c0_heads);
     if (fifo) assert(c0_ch.seen.fifo == f->stats.fifo &&
                      c0_ch.seen.graph == f->stats.graph);
+    if (fifo && c0_fail_event == C0_IRQ_ON) return c0_fail_rc;
     f->wanted_fifo = fifo; f->wanted_graph = graph; f->wanted_heads = heads;
     c0_log(fifo ? C0_IRQ_ON : C0_IRQ_OFF, heads);
     return GF1_OK;
 }
 int gf2_fb_init(struct gf2_chan *ch)
-{ assert(ch == &c0_ch); c0_log(C0_FB, 0); return GF2_OK; }
+{ if (c0_fail_event == C0_FB) return c0_fail_rc;
+    assert(ch == &c0_ch); c0_log(C0_FB, 0); return GF2_OK; }
 int gf2_map_vram(struct gf2_chan *ch, u32 off, u32 bytes, volatile u32 **out)
 {
     assert(ch == &c0_ch && off == ch->B && bytes == GF2_PUSH_BYTES && !ch->mapped);
+    if (c0_fail_event == C0_MAP) return c0_fail_rc;
     ch->mapped = ch->vram_reserved = true; *out = c0_ring;
     c0_log(C0_MAP, 0); return GF2_OK;
 }
@@ -113,6 +119,7 @@ int gf2_unmap_vram(struct gf2_chan *ch)
 int gf2_dma_get(struct gf2_chan *ch)
 {
     assert(ch == &c0_ch && !ch->staging_live);
+    if (c0_fail_event == C0_DMA_GET) return c0_fail_rc;
     ch->staging = (struct gf2_dma_buf){0x12345000U, GF2_STAGING_BYTES, c0_ring};
     ch->staging_live = true; c0_log(C0_DMA_GET, 0); return GF2_OK;
 }
@@ -130,6 +137,7 @@ int gf2_dma_new(struct gf2_chan *ch, u32 handle, u16 class_id,
                 u8 target, u8 access, u32 start, u32 limit, struct gf2_object *obj)
 {
     assert(ch == &c0_ch && ch->state == GF2_INIT && access == GF2_DMA_ACCESS_RW);
+    if (c0_fail_event == C0_DMA_NEW) return c0_fail_rc;
     if (handle == GF2_HANDLE_PUSH_DMA) {
         assert(class_id == GF2_DMA_FROM_MEMORY && obj == &ch->push_dma);
     } else {
@@ -146,12 +154,15 @@ int gf2_dma_new(struct gf2_chan *ch, u32 handle, u16 class_id,
     return GF2_OK;
 }
 int gf2_fifo_init(struct gf2_chan *ch)
-{ assert(ch == &c0_ch); c0_log(C0_FIFO_INIT, 0); return GF2_OK; }
+{ if (c0_fail_event == C0_FIFO_INIT) return c0_fail_rc;
+    assert(ch == &c0_ch); c0_log(C0_FIFO_INIT, 0); return GF2_OK; }
 int gf2_gr_init(struct gf2_chan *ch)
-{ assert(ch == &c0_ch); c0_link(&ch->grctx); c0_log(C0_GR_INIT, 0); return GF2_OK; }
+{ if (c0_fail_event == C0_GR_INIT) return c0_fail_rc;
+    assert(ch == &c0_ch); c0_link(&ch->grctx); c0_log(C0_GR_INIT, 0); return GF2_OK; }
 int gf2_fifo_start(struct gf2_chan *ch)
 {
     assert(ch == &c0_ch && ch->state == GF2_INIT);
+    if (c0_fail_event == C0_FIFO_START) return c0_fail_rc;
     c0_log(C0_FIFO_START, 0); return GF2_OK;
 }
 void gf2_fifo_stop(struct gf2_chan *ch)
@@ -167,6 +178,7 @@ int gf2_push_reference(struct gf2_chan *ch, u32 seq, u32 deadline)
         assert(ch->free == ch->max - ch->cur);
         for (unsigned i = 0; i < GF2_PUSH_SKIPS; ++i) assert(ch->va[i] == 0);
     }
+    if (c0_fail_event == C0_REFERENCE) return c0_fail_rc;
     c0_deadline = deadline; c0_emitted = seq;
     assert(deadline == c0_now + GF2_TIMEOUT_US);
     c0_log(C0_REFERENCE, ch->state); return c0_emit_rc;
@@ -233,6 +245,7 @@ static void c0_fresh(unsigned heads)
         .imem = {.vram_bytes = 0x04000000U, .reserved = 0x200000U}};
     c0_f.imem.used = &c0_f.imem.ramfc;
     c0_ch = (struct gf2_chan){0}; /* heads deliberately not provided by caller */
+    c0_fail_event = C0_GATE; c0_fail_rc = GF2_EIO; startlog_clear();
     c0_heads = heads; c0_now = c0_reference = 0;
     c0_emit_rc = c0_engine_rc = c0_f1_stop_rc = 0;
     c0_complete = true; c0_engine_done = c0_f1_done = false;
@@ -285,6 +298,7 @@ static void c0_released(void)
 static void c0_running(void)
 {
     assert(gf2_start(&c0_ch, &c0_f) == GF2_OK);
+    assert(startlog_equal(""));
     assert(c0_ch.state == GF2_RUN && c0_ch.epoch == 1 && c0_ch.seq == 1);
     c0_expect_start(); c0_expect(C0_KICK, GF2_INIT);
     c0_expect(C0_READ_REFERENCE, GF2_INIT); c0_done(); c0_clear_trace();
@@ -369,8 +383,31 @@ static void c0_recover_old_epoch(void)
     assert(gf2_fence_wait(&c0_ch, current, c0_now + GF2_TIMEOUT_US) == GF2_OK);
     c0_expect(C0_READ_REFERENCE, GF2_RUN); c0_done();
 }
+static void c0_start_logs(void)
+{
+    static const struct { enum c0_event event; const char *line; } failures[] = {
+#define FAILURE(event, stage) {event, "[gf2] start fail stage=" stage " rc=-204\n"}
+        FAILURE(C0_FB, "fb_init"), FAILURE(C0_MAP, "map_vram"),
+        FAILURE(C0_DMA_NEW, "dma_new"), FAILURE(C0_DMA_GET, "dma_get"),
+        FAILURE(C0_FIFO_INIT, "fifo_init"), FAILURE(C0_GR_INIT, "gr_init"),
+        FAILURE(C0_FIFO_START, "fifo_start"), FAILURE(C0_IRQ_ON, "command_irq"),
+        FAILURE(C0_REFERENCE, "reference_test")
+#undef FAILURE
+    };
+    _Static_assert(GF2_EIO == -204, "update output oracle for GF2_EIO");
+    for (unsigned i = 0; i < sizeof(failures) / sizeof(failures[0]); i++) {
+        c0_fresh(1); c0_fail_event = failures[i].event;
+        assert(gf2_start(&c0_ch, &c0_f) == GF2_EIO);
+        assert(startlog_equal(failures[i].line));
+        c0_released();
+    }
+    c0_fresh(1); c0_fail_event = C0_DMA_GET; c0_fail_rc = GF2_ENOSPC;
+    assert(gf2_start(&c0_ch, &c0_f) == GF2_OK);
+    assert(startlog_equal(""));
+}
 void _start(void)
 {
+    c0_start_logs();
     c0_stop_order(); c0_initial_reference_failure(); c0_f1_stop_failure();
     c0_engine_stop_failure(); c0_recover_old_epoch();
     gf2_host_exit(0);
