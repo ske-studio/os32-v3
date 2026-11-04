@@ -1,6 +1,7 @@
 /* [HW3] nouveau dispnv04/hw.c:110-124, hw.h:243-253, crtc.c:721.
  * Head A is fixed by the GF display design; modeset owns DPMS separately. */
 #include "access.h"
+#include "api.h"
 
 #define GF_SEQ_INDEX_PORT 0x0c03c4U
 #define GF_SEQ_DATA_PORT  (GF_SEQ_INDEX_PORT + 1U)
@@ -16,6 +17,16 @@ int gf_display_blank(struct gf_display_context *ctx, int blank)
     u32 seq;
 
     if (!ctx || (blank != 0 && blank != 1)) return OS32_ERR_INVAL;
+    #ifdef GF_PRODUCTION_MODULE
+    if (ctx->display4) {
+        u32 now;
+        if (!ctx->io.timing.clock_us || ctx->io.timing.clock_us(ctx->io.opaque, &now))
+            return GF2_EIO;
+        int rc = gf4_blank_set(ctx->display4, 0, (bool)blank, now + GF3_TIMEOUT_US);
+        if (!rc) ctx->blank = (bool)blank;
+        return rc;
+    }
+    #endif
     if (ctx->blank == (bool)blank) return 0;
     /* Shared access record keeps the failing target and bus rc. */
     if (gf_display_write(ctx, GF_SEQ_INDEX_PORT, GF_SEQ_WIDTH, GF_SEQ_CLOCK_INDEX) ||
