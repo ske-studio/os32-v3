@@ -20,6 +20,8 @@ BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/tests
 userland/tests/trim_back.elf userland/tests/trim_front.elf: PROGRAM_FLAGS += -Isdk/allocator
 userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_adapter.h
 
+userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
+
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
