@@ -251,19 +251,34 @@ static void suspended_records(void)
 }
 static void begin_records(void)
 {
-    HWB_TEST("begin-before-bar");
-    /* Stop at each config read, and at the resolved MMIO operation. */
+    HWB_TEST("bar-log-address"); setup();
+    struct hwbf_pci *pci = hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+    /* Design §4 example: BAR base 0x20400000 plus VGA offset 0x3C4. */
+    pci->config[0x13] = 0x20; pci->config[0x12] = 0x40;
+    CHECK(run("device d = bdf 7:13.2\nmmiowrite8 bar d 0 + 0x3C4 9\npoll 8 bar d 0 + 0x3C4 255 9 10 1 -> x") == HWB_OK);
+    CHECK(contains(f.lines[2], "phase=begin op=mmiowrite8 target=d addr=0x204003C4"));
+    CHECK(contains(f.lines[3], "phase=end op=mmiowrite8 addr=0x204003C4"));
+    CHECK(contains(f.lines[4], "phase=begin op=poll target=d addr=0x204003C4"));
+    CHECK(contains(f.lines[5], "phase=end op=poll addr=0x204003C4 val=0x09 reads=1"));
+    u32 begin = U32_MAX;
+    for (u32 n = 0; n < f.event_count; n++) {
+        if (f.events[n].kind == HWBF_LINE && contains(f.lines[f.events[n].a], "phase=begin op=mmiowrite8")) begin = n;
+        if (f.events[n].kind == HWBF_ACCESS && f.events[n].req.space == HW_PHYS &&
+            f.events[n].req.action == HW_WRITE) CHECK(begin < n);
+    }
+    CHECK(begin != U32_MAX);
+    /* Fail each config read, then the resolved MMIO read: no following write. */
     for (u32 fail = 1; fail <= 3; fail++) {
-        setup(); hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+        setup(); pci = hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+        pci->config[0x13] = 0x20; pci->config[0x12] = 0x40;
         f.access_fail_at = fail;
-        CHECK(run("device d = bdf 7:13.2\nmmioread8 bar d 0 + 0 -> x\niowrite8 port 3 3") == HWB_IO);
-        u32 begin = U32_MAX;
-        for (u32 n = 0; n < f.event_count; n++) {
-            if (f.events[n].kind == HWBF_LINE && contains(f.lines[f.events[n].a], "op=mmioread8") &&
-                contains(f.lines[f.events[n].a], "phase=begin")) begin = n;
-            if (f.events[n].kind == HWBF_ACCESS) CHECK(begin < n);
-        }
-        CHECK(begin != U32_MAX && f.accesses == fail && s.writes == 0);
+        CHECK(run("device d = bdf 7:13.2\nmmioread8 bar d 0 + 0x3C4 -> x\niowrite8 port 3 3") == HWB_IO);
+        CHECK(contains(f.lines[2], "seq=2 line=2 phase=begin op=mmioread8 target=d"));
+        CHECK(contains(f.lines[3], "seq=2 line=2 phase=end op=mmioread8"));
+        CHECK(contains(f.lines[3], "rc=IO"));
+        CHECK(contains(f.lines[2], fail < 3 ? "addr=UNRESOLVED" : "addr=0x204003C4"));
+        CHECK(contains(f.lines[3], fail < 3 ? "addr=UNRESOLVED" : "addr=0x204003C4"));
+        CHECK(f.accesses == fail && s.writes == 0 && count_access(HW_IO, HW_WRITE) == 0);
     }
     HWB_TEST("wait-begin-duration"); setup(); f.clock_fail_at = 1;
     CHECK(run("wait us 10") == HWB_IO);

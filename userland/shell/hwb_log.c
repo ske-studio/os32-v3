@@ -88,9 +88,10 @@ static void address(struct logbuf *b, const struct hwb_log_record *r, int target
 {
     if (target && r->target) { str(b, " target=");
         for (u32 i = 0; i < HWB_LINE_BYTES && r->target[i]; i++) ch(b, r->target[i]); }
-    if (r->space == HW_PCI) { str(b, " bdf="); dec(b, HW_BDF_BUS(r->bdf)); ch(b, ':'); dec(b, HW_BDF_DEV(r->bdf)); ch(b, '.'); dec(b, HW_BDF_FN(r->bdf)); }
+    if (r->space == HW_PCI && r->bdf != U32_MAX) { str(b, " bdf="); dec(b, HW_BDF_BUS(r->bdf)); ch(b, ':'); dec(b, HW_BDF_DEV(r->bdf)); ch(b, '.'); dec(b, HW_BDF_FN(r->bdf)); }
     str(b, " addr=");
-    hex(b, r->addr, 1);
+    if (r->bdf == U32_MAX) str(b, "UNRESOLVED");
+    else hex(b, r->addr, 1);
     str(b, " val="); hex(b, r->value, r->width * 2U <= 8U ? r->width * 2U : 1U);
 }
 static void suffix(struct logbuf *b, enum hwb_rc rc) { str(b, " rc="); str(b, hwb_rc_name(rc)); }
@@ -110,7 +111,9 @@ void hwb_log_end(const struct hwb_backend *backend, const struct hwb_log_record 
 }
 void hwb_log_poll(const struct hwb_backend *backend, const struct hwb_log_record *r, const struct hwb_poll_result *result)
 {
-    struct logbuf b; prefix(&b, r, "end"); str(&b, " val="); hex(&b, result->value, 1);
+    struct logbuf b; prefix(&b, r, "end");
+    struct hwb_log_record final = *r; final.value = result->value;
+    address(&b, &final, 0);
     str(&b, " reads="); dec(&b, result->reads); str(&b, " elapsed_us="); elapsed(&b, result->elapsed_lo, result->elapsed_hi);
     suffix(&b, r->rc); emit(backend, &b);
 }
