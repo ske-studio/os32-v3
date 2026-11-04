@@ -154,6 +154,13 @@ static void base_and_errors(void)
     setup(); b[EDID_INPUT]=0; accepted_base(); assert(!state.digital);
     setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0; accepted_base();
     assert(state.preferred==NO_PREFERRED);
+    setup(); b[EDID_REVISION]=3; accepted_base();
+    assert(state.preferred==0); /* EDID 1.3 honors the preferred bit. */
+    setup(); b[EDID_FEATURES]=0; accepted_base();
+    assert(state.preferred==0); /* EDID 1.4 always prefers the first DTD. */
+    empty_base(); vga(DTD+DESC_BYTES); accepted_base();
+    assert(state.ntiming==1 && state.preferred==NO_PREFERRED && state.dtd_seen==1);
+    /* A descriptor in the first slot does not promote a later base DTD. */
     setup(); vga(DTD+DESC_BYTES); accepted_base();
     assert(state.ntiming==1 && state.preferred==0 && state.dtd_seen==2); /* duplicate DTD */
     /* block0 restarts a previous parse and clears the sticky diagnostic. */
@@ -161,59 +168,61 @@ static void base_and_errors(void)
     setup(); accepted_base();
     assert(!state.truncated && !state.last_rc && state.ntiming==1 && state.dtd_seen==1);
 }
-/* CEA-861-D table 27 byte 3: native count covers the original DTD
- * sequence, starting in base EDID. Unsupported and duplicate DTDs still
- * occupy positions; monitor descriptors and SVDs do not. */
-static void native_dtd_order(void)
+/* PM B4 decision: CTA native counts never set preference. The original
+ * DTD sequence still counts unsupported and duplicate entries, across
+ * blocks; monitor descriptors and SVDs do not occupy positions. */
+static void dtd_order_and_preference(void)
 {
-    /* A later CTA count can identify a nonpreferred legacy base DTD. */
+    /* A later CTA count cannot promote a nonpreferred legacy base DTD. */
     setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0; accepted_base();
     assert(state.preferred==NO_PREFERRED);
     cta_one(0); b[2]=4; b[3]=1; seal();
-    assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==0);
+    assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==NO_PREFERRED &&
+           state.dtd_seen==1);
     equal(&state.timing[0],&vga_dtd);
-    /* Unsupported base DTD consumes the only native position. */
+    /* Unsupported base DTD is counted without promoting the extension. */
     setup(); b[DTD+17]=0; accepted_base();
     assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED && state.dtd_seen==1);
     cta_one(0); b[2]=4; b[3]=1; vga(4); seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
            state.preferred==NO_PREFERRED && state.dtd_seen==2);
     equal(&state.timing[0],&vga_dtd);
-    /* Unsupported native CTA DTD cannot confer priority on its successor. */
+    /* Unsupported CTA DTD is counted without promoting its successor. */
     empty_base(); accepted_base();
     cta_one(0); b[2]=4; b[3]=1; vga(4); b[4+17]=0;
     vga(4+DESC_BYTES); seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
            state.preferred==NO_PREFERRED && state.last_rc==GF4_EUNSUPPORTED &&
            state.dtd_seen==2);
-    /* Native count is zero in the first extension, then one in the next:
-     * an unsupported first DTD still consumes the only native position. */
+    /* Changing native counts across extensions has no effect on priority. */
     empty_base(); accepted_base();
     cta_one(0); b[2]=4; vga(4); b[4+17]=0; seal();
     assert(gf4_edid_modes(b,1,&state)==0 && !state.ntiming && state.dtd_seen==1);
     cta_one(0); b[2]=4; b[3]=1; vga(4); seal();
     assert(gf4_edid_modes(b,2,&state)==0 && state.ntiming==1 &&
            state.preferred==NO_PREFERRED && state.dtd_seen==2);
-    /* The second extension's native count refers back to the first DTD,
-     * rather than starting at the second extension's distinct timing. */
+    /* A later native count cannot promote a previous extension's DTD.
+     * Distinct DTDs are appended in their original order. */
     empty_base(); accepted_base(); cta_one(0); b[2]=4; vga(4); seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==NO_PREFERRED);
     b[3]=1; b[4]++; seal();
-    assert(gf4_edid_modes(b,2,&state)==0 && state.ntiming==2 && state.preferred==0);
+    assert(gf4_edid_modes(b,2,&state)==0 && state.ntiming==2 &&
+           state.preferred==NO_PREFERRED && state.dtd_seen==2);
     equal(&state.timing[0],&vga_dtd);
     assert(state.timing[1].khz==vga_dtd.khz+10);
-    /* Deduplication must not collapse original DTD positions. */
+    /* Unsupported duplicate DTDs each contribute to the serial count. */
     setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0;
     b[DTD+17]=0; vga(DTD+DESC_BYTES); b[DTD+DESC_BYTES+17]=0;
     accepted_base();
     cta_one(0); b[2]=4; b[3]=2; vga(4); seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
-           state.preferred==NO_PREFERRED);
+           state.preferred==NO_PREFERRED && state.dtd_seen==3);
     /* A duplicate supported DTD likewise consumes a position. */
     setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0;
     vga(DTD+DESC_BYTES); accepted_base();
     cta_one(0); b[2]=4; b[3]=3; vga(4); b[4]++; seal();
-    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==2 && state.preferred==0);
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==2 &&
+           state.preferred==NO_PREFERRED && state.dtd_seen==3);
     equal(&state.timing[0],&vga_dtd);
 }
 static void extensions(void)
@@ -257,10 +266,23 @@ static void extensions(void)
     setup(); accepted_base(); before=state; cta_one(VIC_720P60); b[1]=4; seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.last_rc==GF4_EUNSUPPORTED);
     unchanged_timings();
-    /* Empty DBC with valid DTDs, native priority with no base preference. */
+    /* An extension DTD is not preferred, even with a native count. */
     empty_base(); accepted_base(); cta_one(0); b[2]=4; b[3]=1; vga(4); seal();
-    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 && state.preferred==0);
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
+           state.preferred==NO_PREFERRED && state.dtd_seen==1);
     equal(&state.timing[0],&vga_dtd);
+    /* Multiple extension DTDs retain their source order, regardless of native count. */
+    empty_base(); accepted_base(); cta_one(0); b[2]=4; b[3]=2;
+    vga(4); b[4]++; vga(4+DESC_BYTES); seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==2 &&
+           state.preferred==NO_PREFERRED && state.dtd_seen==2);
+    assert(state.timing[0].khz==vga_dtd.khz+10);
+    equal(&state.timing[1],&vga_dtd);
+    /* Native SVDs also leave preference unset when there is no base DTD. */
+    empty_base(); accepted_base(); cta_one(VIC_720P60|CTA_NATIVE);
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
+           state.preferred==NO_PREFERRED && !state.dtd_seen);
+    equal(&state.timing[0],&hd720);
     setup(); accepted_base(); before=state; state.size--;
     cta_one(VIC_720P60); assert(gf4_edid_modes(b,1,&state)==GF4_ESTATE);
     assert(state.next_block==1); unchanged_timings();
@@ -504,7 +526,7 @@ static void vic_and_capacity(void)
         if(previous==GF4_TIMINGS && state.truncated) saw_full=true;
     }
     assert(saw_full && state.ntiming==GF4_TIMINGS && state.truncated);
-    /* A late preferred timing replaces the last nonpreferred entry only.
+    /* Native SVDs cannot replace entries in a full table or set preference.
      * Full table is a value fixture, not a private parser entry point. */
     setup(); accepted_base();
     for(u32 i=state.ntiming;i<GF4_TIMINGS;i++) {
@@ -518,16 +540,16 @@ static void vic_and_capacity(void)
     for(u32 i=0;i<GF4_TIMINGS;i++) {
         state.timing[i]=vga_dtd; state.timing[i].khz+=i;
     }
-    cta_one(VIC_720P60|CTA_NATIVE);
+    before=state; cta_one(VIC_720P60|CTA_NATIVE);
     assert(gf4_edid_modes(b,1,&state)==0 && state.truncated &&
-           state.preferred==GF4_TIMINGS-1);
-    equal(&state.timing[GF4_TIMINGS-1],&hd720);
+           state.preferred==NO_PREFERRED);
+    for(u32 i=0;i<GF4_TIMINGS;i++) equal(&state.timing[i],&before.timing[i]);
     before=state; cta_one(VIC_720P60|CTA_NATIVE);
     assert(gf4_edid_modes(b,2,&state)==0); unchanged_timings();
 }
 void _start(void)
 {
-    base_and_errors(); extensions(); native_dtd_order(); interlace_and_sync();
+    base_and_errors(); extensions(); dtd_order_and_preference(); interlace_and_sync();
     dmt_and_established(); formula_and_range(); vic_and_capacity();
     gf2_host_exit(0);
 }

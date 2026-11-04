@@ -496,8 +496,8 @@ static i32 base(struct gf4_edid_state *s,const u8 *p)
         }
     }
     for(u32 i=54;i<126;i+=EDID_DTD) {
-        /* CEA-861-D table 27: native rank includes every original DTD,
-         * including unsupported sync formats and duplicate timings. */
+        /* Count original DTDs, including unsupported and duplicate timings.
+         * PM B4 decision: only the first base DTD can be preferred. */
         if(p[i] || p[i+1]) s->dtd_seen++;
         if(dtd(p+i,&t)==1) add(s,&t,i==54 && ((p[24]&2) || p[19]>=4));
         /* Additional standard timings are the same 2-byte format. */
@@ -532,17 +532,16 @@ static i32 cta(struct gf4_edid_state *s,const u8 *p)
         if(tag==2) for(u32 j=0;j<n;j++) {
             u32 vic=p[i+j]&127U;
             if(vic && vic<COUNT(cea) && cea[vic].khz)
-                add_table(s,&cea[vic],(p[i+j]&128U)!=0);
+                add_table(s,&cea[vic],false);
             else s->last_rc=GF4_EUNSUPPORTED;
         }
         i+=n;
     }
-    u32 native=p[3]&15U;
     for(u32 i=end;i+EDID_DTD<=127;i+=EDID_DTD) {
         i32 rc=dtd(p+i,&t);
-        u32 number=s->dtd_seen;
         if(p[i] || p[i+1]) s->dtd_seen++;
-        if(rc==1) add(s,&t,number<native);
+        /* DRM rule: extension DTDs retain order without preference. */
+        if(rc==1) add(s,&t,false);
         else if(rc<0) s->last_rc=rc;
     }
     return 0;
