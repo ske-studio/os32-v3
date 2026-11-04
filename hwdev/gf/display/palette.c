@@ -1,6 +1,7 @@
 /* Palette load: MIT nouveau c03c1a1 dispnv04/hw.c:795-810,
  * dispnv04/crtc.c:778. Partial updates select their own starting index. */
 #include "access.h"
+#include "api.h"
 #include "../../gfinit_mode.h"
 
 int gf_display_palette(struct gf_display_context *ctx, u32 first, u32 count,
@@ -9,6 +10,20 @@ int gf_display_palette(struct gf_display_context *ctx, u32 first, u32 count,
     if (!ctx || !rgb || first >= VIDEO_PALETTE_ENTRIES || !count ||
         count > VIDEO_PALETTE_ENTRIES - first)
         return OS32_ERR_INVAL;
+
+    #ifdef GF_PRODUCTION_MODULE
+    if (ctx->display4) {
+        struct gf4_ctx *display = ctx->display4;
+        int rc = gf4_palette_set(display, 0, first, count, rgb);
+        if (display->state) {
+            const struct gf4_head_image *head = display->changing ?
+                &display->state->next[0] : &display->state->head[0];
+            for (u32 i = 0; i < VIDEO_PALETTE_BYTES; ++i)
+                ctx->palette[i] = head->palette[i];
+        }
+        return rc;
+    }
+    #endif
 
     u32 start = first * VIDEO_RGB_COMPONENTS;
     u32 bytes = count * VIDEO_RGB_COMPONENTS;
