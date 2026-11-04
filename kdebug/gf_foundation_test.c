@@ -62,6 +62,7 @@ static int actual(struct gf1_observer *o, struct gf1_phase *p)
     if (o->production) {
         struct gf_production *owner = (void *)((u8 *)o->f -
                                       offsetof(struct gf_production, foundation));
+        if (!owner->prepared || !owner->display.io.read) return GF1_EINVAL;
         p->command = pci_cfg_read16(RECOVER_GF_BUS, RECOVER_GF_DEV,
                                     RECOVER_GF_FN, RECOVER_COMMAND);
         p->command_valid = true;

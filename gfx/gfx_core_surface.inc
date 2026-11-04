@@ -221,8 +221,10 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     }
     (void)ledger_surface_create(&system_tvram, 0);
     /* GF and PEGC are mutually exclusive boot candidates. */
-    if (g_backend_pref == GFX_PREF_GEFORCE && geforce_boot_reserve)
-        (void)geforce_boot_reserve();
+    if (g_backend_pref == GFX_PREF_GEFORCE && geforce_boot_reserve) {
+        if (!geforce_boot_reserve())
+            kprintf(KLOG_ATTR, "[gfx] geforce boot_reserve failed\n");
+    }
     /* 6. */
     ledger_arena_freeze();
     kprintf(KLOG_ATTR, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,

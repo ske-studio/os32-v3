@@ -1,6 +1,7 @@
 /* Boot-only reservation, before ledger freeze. No display/device writes. */
 #include "geforce_module.h"
 #include "gf_production.h"
+#include "kprintf.h"
 #include "../../../hwdev/gf/production.h"
 #include "../../../hwdev/gf/vram_layout.h"
 #include "../../../mm/pgalloc.h"
@@ -21,9 +22,15 @@ STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
  * permanent reservations and the existing 75 display PTEs remain unchanged. */
 static struct gf_production_resources boot_resources;
 static struct geforce_platform platform;
+static int reserve_fail(const char *stage)
+{
+    kprintf(KLOG_ATTR, "[geforce] boot_reserve fail stage=%s\n", stage);
+    return 0;
+}
 static int reserve(void)
 {
-    if (!gf_production_selected() || gf_production_identify(&boot_resources)) return 0;
+    if (!gf_production_selected()) return reserve_fail("selection");
+    if (gf_production_identify(&boot_resources)) return reserve_fail("identify");
     struct ledger_span spans[RECOVER_BAR_COUNT];
     u32 ids[RECOVER_BAR_COUNT];
     for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i) {
@@ -38,42 +45,39 @@ static int reserve(void)
             .revision=boot_resources.identity.revision,
             .bar=i, .width_basis=LEDGER_WB_DATASHEET
         };
-        if (!ledger_resource_add(&r, &ids[i])) return 0;
+        if (!ledger_resource_add(&r, &ids[i])) return reserve_fail("resource");
         spans[i] = (struct ledger_span){first, end, LEDGER_SPAN_MMIO, ids[i]};
     }
-    if (!ledger_reserve_set(LEDGER_OWNER_GFX, spans, RECOVER_BAR_COUNT)) return 0;
+    if (!ledger_reserve_set(LEDGER_OWNER_GFX, spans, RECOVER_BAR_COUNT))
+        return reserve_fail("reserve");
     for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i) {
         const struct recover_bar_extent *b = &boot_resources.bars[i];
         u32 first = b->base / PAGE_SIZE;
         u32 pages = i == GF_MODE_REGISTER_BAR ? b->length / PAGE_SIZE :
                     i == GF_MODE_VRAM_BAR ? PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES) / PAGE_SIZE : 0;
-        if (pages && (paging_map_phys(b->base, b->base, pages, PAGE_RW | PTE_PCD) ||
-                      !ledger_resource_set_map(ids[i], first, first + pages))) return 0;
+        if (pages && paging_map_phys(b->base, b->base, pages, PAGE_RW | PTE_PCD))
+            return reserve_fail("bar-map");
+        if (pages && !ledger_resource_set_map(ids[i], first, first + pages))
+            return reserve_fail("bar-ledger-map");
     }
     /* Precreate shared PTs before any live AS. Keep access closed until B5 map. */
     const struct recover_bar_extent *instmem = &boot_resources.bars[GF_BOOT_INSTMEM_BAR];
     u32 bytes = instmem->length < GF_BOOT_INSTMEM_MAX_BYTES ?
                 instmem->length : GF_BOOT_INSTMEM_MAX_BYTES;
-    if (paging_map_phys(instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
-        paging_set_not_present(instmem->base, instmem->base + bytes - 1)) return 0;
-    volatile u8 *bar0 = P2V_IO(boot_resources.bars[GF_MODE_REGISTER_BAR].base);
-    u32 v = gf_vram_bytes(*(volatile u32 *)(bar0 + GF_VRAM_SIZE_REG));
-    u32 r = gf_instmem_reserved(*(volatile u32 *)(bar0 + GF_VS_REG));
+    if (paging_map_phys(instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD))
+        return reserve_fail("instmem-map");
+    if (paging_set_not_present(instmem->base, instmem->base + bytes - 1))
+        return reserve_fail("instmem-close");
+    /* PFB is not initialized on a cold card. Prepare the whole BAR1 tail;
+     * devinit and command start determine V, R and B later. */
     const struct recover_bar_extent *vram = &boot_resources.bars[GF_MODE_VRAM_BAR];
-    if (v < r + GF2_PUSH_BYTES || v > vram->length) return 0;
-    u32 push = gf_push_base(v - r);
     u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);
-    if (push < display_end) return 0;
-    u32 push_phys = vram->base + push;
-    if (paging_map_phys(push_phys, push_phys, GF2_PUSH_BYTES / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
-        paging_set_not_present(push_phys, push_phys + GF2_PUSH_BYTES - 1)) return 0;
-    /* Layer 3 reservations may occupy any VRAM below B. Leave DISPLAY open,
-     * and precreate the rest before live address spaces inherit the PTs. */
     u32 view_phys = vram->base + display_end;
-    u32 view_bytes = push - display_end;
-    if (view_bytes &&
-        (paging_map_phys(view_phys, view_phys, view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
-         paging_set_not_present(view_phys, view_phys + view_bytes - 1))) return 0;
+    u32 view_bytes = vram->length - display_end;
+    if (paging_map_phys(view_phys, view_phys, view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD))
+        return reserve_fail("vram-map");
+    if (paging_set_not_present(view_phys, view_phys + view_bytes - 1))
+        return reserve_fail("vram-close");
     platform.bar0_phys = boot_resources.bars[GF_MODE_REGISTER_BAR].base;
     platform.display_phys = boot_resources.bars[GF_MODE_VRAM_BAR].base;
     platform.resources = &boot_resources;

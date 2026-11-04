@@ -26,20 +26,18 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
     *context->display_restore_out=0;
     *context->feature5_out=0;
     struct geforce_platform *p = context->platform;
-    if (p && p->resources) {
-        if (gf_production_prepare(&production, p->resources, route98, 0)) return -1;
-        p->device = &production.video;
-        p->identify = identify;
-        p->pc98_safe = safe;
-        p->point = gf_production_point;
-        p->opaque = &production;
-        p->stop = stop;
-    }
-    if (p) {
-        geforce_backend_bind(p->device, p->identify, p->bar0_phys, p->point, p->opaque);
-        geforce_backend_stop_bind(p->stop);
-        geforce_backend_wc_bind(p->wc_start);
-    }
+    if (!p || !p->resources) return -1;
+    if (gf_production_prepare(&production, p->resources, route98, 0)) return -1;
+    if (!production.prepared) return -1;
+    p->device = &production.video;
+    p->identify = identify;
+    p->pc98_safe = safe;
+    p->point = gf_production_point;
+    p->opaque = &production;
+    p->stop = stop;
+    geforce_backend_bind(p->device, p->identify, p->bar0_phys, p->point, p->opaque);
+    geforce_backend_stop_bind(p->stop);
+    geforce_backend_wc_bind(p->wc_start);
     *out = geforce_backend_ops;
     gf1_module_ops.production=&production.foundation;
     gf2_test_bind_production(&production.foundation,&production.chan);

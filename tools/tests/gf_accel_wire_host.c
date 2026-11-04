@@ -26,7 +26,7 @@ int gf_present_rect(const u8 *src, u32 sp, volatile u8 *dst, u32 dp,
   (void)x;(void)y;(void)w;(void)h;(void)point;(void)owner; __builtin_trap(); }
 int gf_production_prepare(struct gf_production *p, const struct gf_production_resources *r,
                           int (*route)(void *), void *o)
-{ (void)p;(void)r;(void)route;(void)o; __builtin_trap(); }
+{ (void)r;(void)route;(void)o;p->prepared=true;return 0; }
 int gf_production_identity(struct gf_production *p) { (void)p; __builtin_trap(); }
 int gf_production_decode_safe(struct gf_production *p) { (void)p; __builtin_trap(); }
 int gf_production_quiesce(struct gf_production *p) { (void)p; __builtin_trap(); }
@@ -85,7 +85,9 @@ void _start(void)
 
     GfxBackend backend;
     const struct gf1_test_ops *foundation_slot = 0;
-    GeforceModuleContext context = {.backend = &backend, .accel_out = &cint_slot,
+    struct gf_production_resources boot_resources={0};
+    struct geforce_platform platform={.resources=&boot_resources};
+    GeforceModuleContext context = {.platform=&platform, .backend = &backend, .accel_out = &cint_slot,
         .foundation_out = &foundation_slot};
     assert(!gf_ownerless_module_init(&backend, &context));
     cint_service = gf3_service_get(&cint_prod.chan);

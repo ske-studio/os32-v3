@@ -42,13 +42,22 @@ def component(name, flags=(), mutation=None):
         if mutation: print('RED backend startlog runtime rc=20', flush=True)
         print('PASS '+name,flush=True)
 
-def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mutation=None, diagnostic=False, vram_bytes=0x8000000, vs_mask=0x700, no_vram_pt=False):
+def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mutation=None, diagnostic=False, vram_bytes=0x8000000, vs_mask=0x700, no_vram_pt=False, fail_boot=False):
     fixture=(ROOT/'tools/tests/gfx_kernel_fb_host.c').read_text().replace('return id == 2 ? &slot : 0;', 'return id == 2 || id == APP_ID_SHELL ? &slot : 0;')
     fixture=fixture.replace('void gui_display_failed(void) {}', '')
-    fixture=fixture.replace('void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }', r'''static unsigned fallback_logs;
+    fixture=fixture.replace('void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }', r'''static int log_is(const char *a,const char *b)
+{ while (*a && *a==*b) { a++;b++; } return *a==*b; }
+static unsigned fallback_logs, reserve_fail_logs, reserve_stage_logs;
 void __cdecl kprintf(u8 a,const char *f,...)
 {
     (void)a; host_kprintf_count++;
+    if (log_is(f,"[gfx] geforce boot_reserve failed\n")) reserve_fail_logs++;
+    if (log_is(f,"[geforce] boot_reserve fail stage=%s\n")) {
+        __builtin_va_list stage_args; __builtin_va_start(stage_args,f);
+        const char *stage = __builtin_va_arg(stage_args,const char *);
+        if (log_is(stage,"identify")) reserve_stage_logs++;
+        __builtin_va_end(stage_args);
+    }
     const char *expected = "[gfx] backend=%s init failed -> pc98\n";
     unsigned i = 0;
     while (f[i] && f[i] == expected[i]) i++;
@@ -69,8 +78,8 @@ void __cdecl kprintf(u8 a,const char *f,...)
     CHECK(gfx_geforce_pref(2)==GFX_PREF_GEFORCE && gfx_geforce_pref(-1)==GFX_PREF_GEFORCE);
     map_host(0x10000,0xff0000); map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
     map_host(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES);
-    *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=TEST_VRAM_BYTES;
-    *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=TEST_VS_MASK;
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=0;
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=0;
     boot();
     gfx_set_backend_pref(GFX_PREF_GEFORCE); gfx_boot_reserve();
     const struct ledger_surface *client=ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_CLIENT);
@@ -151,12 +160,23 @@ void __cdecl kprintf(u8 a,const char *f,...)
     }
     SAY("PASS GF core lifecycle/reservation/fallback"); die(0);
 ''')
+    if fail_boot:
+        fixture=replace_function(fixture,'static void run(void)',r"""
+        map_host(0x10000,0xff0000);
+        boot(); host_gf_identify_fail=1;
+        gfx_set_backend_pref(GFX_PREF_GEFORCE); gfx_boot_reserve();
+        CHECK(reserve_fail_logs==1 && reserve_stage_logs==1);
+        CHECK(!geforce_platform_get()->resources);
+        CHECK(!geforce_boot_reserve());
+        CHECK(reserve_fail_logs==1 && reserve_stage_logs==2);
+        SAY("PASS reserve failure rc and stage/caller logs"); die(0);
+        """)
     if diagnostic:
         fixture=replace_function(fixture,'static void run(void)',r"""
         map_host(0x10000,0xff0000); map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
         map_host(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES);
-        *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=TEST_VRAM_BYTES;
-        *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=TEST_VS_MASK;
+        *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=0;
+        *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=0;
         boot(); foundation_selection_test(); die(0);
         """)
     fixture=f'#define EXPECT_VRAM_PT {0 if no_vram_pt else 1}\n#define TEST_VRAM_BYTES {vram_bytes}U\n#define TEST_VS_MASK {vs_mask}U\n#define BAR2_BYTES {bar2_bytes}U\n#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
@@ -169,14 +189,18 @@ void __cdecl kprintf(u8 a,const char *f,...)
                             'GF_TEST_BAR2,GF_TEST_BAR2,BAR2_BYTES,1')
         platform=(ROOT/'drivers/video/geforce/geforce_platform.c').read_text()
         if no_vram_pt:
-            start=platform.index("    u32 push_phys =")
+            start=platform.index("    u32 view_phys =")
             end=platform.index("    platform.bar0_phys =", start)
             platform=platform[:start]+platform[end:]
-        if mutation:
+        if mutation and mutation != "reserve-drop":
             old,new={
-                'push-no-pt': ('GF2_PUSH_BYTES / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
+                'cold-pfb': ('u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);',
+                    'u32 v=gf_vram_bytes(*(volatile u32 *)P2V_IO(boot_resources.bars[0].base+GF_VRAM_SIZE_REG));\n'
+                    '    if (!v) return reserve_fail("pfb");\n'
+                    '    u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);'),
+                'push-no-pt': ('view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '(view_bytes - GF2_PUSH_BYTES) / PAGE_SIZE, PAGE_RW | PTE_PCD)'),
                 'view-no-pt': ('view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
-                'gui-boot-reserve': ('if (!gf_production_selected() || gf_production_identify(&boot_resources)) return 0;', 'if (gf_production_identify(&boot_resources)) return 0;'),
+                'gui-boot-reserve': ('if (!gf_production_selected()) return reserve_fail("selection");', 'if (0) return reserve_fail("selection");'),
                 'instmem-no-pt': ('instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'instmem->base, instmem->base, 0, PAGE_RW | PTE_PCD)'),
                 'instmem-open': ('paging_set_not_present(instmem->base, instmem->base + bytes - 1)', '0'),
                 'instmem-short': ('instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'instmem->base, instmem->base, bytes / PAGE_SIZE - 1, PAGE_RW | PTE_PCD)'),
@@ -205,7 +229,10 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
 {(void)c;(void)cp;(void)d;(void)dp;(void)b;(void)x;(void)y;(void)w;(void)h;(void)p;(void)v;return 0;}
 ''')
         sources.append(transfer)
-    result=run_case(None,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
+    caller_mutation = ('reserve-drop',
+        'if (!geforce_boot_reserve())\n            kprintf(KLOG_ATTR, "[gfx] geforce boot_reserve failed\\n");',
+        '(void)geforce_boot_reserve();', '') if mutation == 'reserve-drop' else None
+    result=run_case(caller_mutation,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
         ('gfx/gfx_core.c','static void _gfx_common_init(int plane_sz)\n{',
          'static void _gfx_common_init(int plane_sz)\n{\n    extern int host_planar_inits; host_planar_inits++;')])
     assert result.returncode==(1 if mutation else 0),(init_fail,unsafe,missing,mutation,result.returncode,result.stdout,result.stderr)
@@ -637,6 +664,8 @@ def main():
         for mutation in ('detach-irq', 'detach-tick', 'abort-slot', 'getter-registration', 'start-slot-clear', 'detach-slot-clear', 'abort-slot-clear', 'fill-text-check', 'blit-text-check'): module_registration(mutation)
         for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb','push-no-pt','view-no-pt'):
             core(mutation=mutation)
+        core(mutation='cold-pfb')
+        core(fail_boot=True,mutation='reserve-drop')
         core(bar2_bytes=0x400000,mutation='instmem-overrun')
         core(diagnostic=True,mutation='gui-boot-reserve')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
@@ -653,6 +682,7 @@ def main():
     component('backend_geforce', ('-DOS32_GEFORCE_MODULE',))
     component('backend_geforce', ('-DGF_ACCEPT_MODE=0',))
     for args in ((0,0,0,0),(0,0,0,1),(1,0,0,0),(1,1,0,0),(0,0,1,0)): core(*args)
+    core(fail_boot=True)
     core(no_vram_pt=True)
     core(bar2_bytes=0x400000)
     core(vram_bytes=0x10000000, vs_mask=0)

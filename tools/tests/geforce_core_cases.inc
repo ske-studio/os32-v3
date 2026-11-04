@@ -48,10 +48,12 @@ static struct video_device device_gf={&display_gf,&gf_video_ops};
 #include "../../hwdev/gf/production.h"
 static int host_gf_selected=1;
 static u32 host_gf_probes;
+static int host_gf_identify_fail;
 int gf_production_selected(void) { return host_gf_selected; }
 int gf_production_identify(struct gf_production_resources *r)
 {
     host_gf_probes++;
+    if (host_gf_identify_fail) return -1;
     *r=(struct gf_production_resources){0};
     r->identity.device=RECOVER_GF_DEVICE;
     r->bars[0]=(struct recover_bar_extent){GF_TEST_BAR0,GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES,1};
@@ -134,13 +136,13 @@ static void prepared_vram_test(void)
         return;
     }
     /* Check every closed PTE, including both ends of the push aperture. */
-    for (u32 off=display_end;off<push+GF2_PUSH_BYTES;off+=PAGE_SIZE) {
+    for (u32 off=display_end;off<GF_PRODUCTION_BAR1_BYTES;off+=PAGE_SIZE) {
         u32 va=GF_TEST_DISPLAY+off;
         CHECK(paging_pte_raw(va)==(va|PTE_RW|PTE_PCD));
         u32 pde=((u32 *)P2V(space.pd_phys))[va/MEM_DEVICE_APERTURE_PDE_SIZE];
         CHECK((pde&PTE_FRAME_MASK)==paging_registered_pt(va) && (pde&PTE_PRESENT));
     }
-    CHECK(!paging_pte_raw(GF_TEST_DISPLAY+push+GF2_PUSH_BYTES));
+    CHECK(!paging_pte_raw(GF_TEST_DISPLAY+GF_PRODUCTION_BAR1_BYTES));
     volatile u32 *va;
     CHECK(!gf2_map_vram(&vram_channel,push,GF2_PUSH_BYTES,&va));
     CHECK((paging_pte_raw(GF_TEST_DISPLAY+push)&(PTE_PRESENT|PTE_RW|PTE_USER|PTE_PCD))==

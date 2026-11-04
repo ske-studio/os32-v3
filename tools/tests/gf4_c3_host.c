@@ -29,12 +29,13 @@ void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { bound_foundation=f;bound_chan=ch; }
 static void production_bind(void)
 { CHECK(bound_foundation==&production.foundation && bound_chan==&production.chan); }
-static struct geforce_platform fixture_platform;
+static struct gf_production_resources fixture_resources;
+static struct geforce_platform fixture_platform={.resources=&fixture_resources};
 struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
 void geforce_backend_wc_bind(int (*start)(void)) { (void)start; }
 void geforce_backend_stop_bind(int (*stop)(void)) { (void)stop; }
 int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *b,
-                         int (*r)(void *),void *o) { (void)p;(void)b;(void)r;(void)o;return -1; }
+                         int (*r)(void *),void *o) { (void)b;(void)r;(void)o;p->prepared=true;return 0; }
 int gf_production_identity(struct gf_production *p) { (void)p;return -1; }
 int gf_production_decode_safe(struct gf_production *p) { (void)p;return -1; }
 int gf_production_quiesce(struct gf_production *p) { (void)p;return -1; }
