@@ -77,7 +77,7 @@ static int commit(struct gf4_ctx *c, u8 head, const struct gf3_surface *s)
     return 0;
 }
 
-int gf4_flip_complete(struct gf4_ctx *c, u8 head, u32 dl)
+i32 gf4_flip_complete(struct gf4_ctx *c, u8 head, u32 dl)
 {
     int rc = valid(c, head);
     struct gf4_flip_hold *h;

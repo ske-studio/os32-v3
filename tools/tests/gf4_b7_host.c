@@ -15,6 +15,9 @@ static struct gf4_state state;
 static struct gf4_host_event events[CAP];
 static struct gf3_host_reg regs[16];
 static struct gf3_surface next = {.off=NEW_OFF};
+static const struct gf4_host_read retrace_high[] = {
+    {0,STATUS,1,RETRACE_HIGH}
+};
 static unsigned advance;
 static void observe(struct gf4_host *host, const struct gf4_host_event *e)
 {
@@ -77,7 +80,7 @@ void _start(void)
     reset();
     h.ctx.epoch++; assert(gf4_vblank_wait(&h.ctx,0,0,DEADLINE,&seen)==GF4_ESTATE);
     reset();
-    advance=1; gf4_host_reg_byte_set(&h,0,STATUS,RETRACE_HIGH);
+    advance=1; gf4_host_reads(&h,retrace_high,sizeof(retrace_high)/sizeof(retrace_high[0]));
     assert(gf4_flip(&h.ctx,0,&next,true,DEADLINE)==0);
     assert(!h.ctx.hold[0].pending && state.head[0].front.off==NEW_OFF);
     reset();
@@ -129,7 +132,7 @@ void _start(void)
     reset();
     assert(gf4_vblank_wait(&h.ctx,0,0,DEADLINE,&seen)==GF4_ETIME && seen==99);
     reset();
-    advance=1; gf4_host_reg_byte_set(&h,0,STATUS,RETRACE_HIGH);
+    advance=1; gf4_host_reads(&h,retrace_high,sizeof(retrace_high)/sizeof(retrace_high[0]));
     assert(gf4_flip(&h.ctx,0,&next,true,DEADLINE)==0);
     for (u32 i=0;i<h.nevents;++i) {
         if (events[i].op==D_READ && events[i].a[1]==STATUS) {
