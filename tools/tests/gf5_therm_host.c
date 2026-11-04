@@ -39,9 +39,15 @@
 #define T_PWM9 0x15f4U
 #define T_DIV9 0x15f8U
 #define T_ENABLE 0x80000000U
+#define T_SETTLE 20000U /* nv40.c:52-69 OLD_STYLE sensor setup. */
+#define T_NATIVE_WAIT_MAX 1000U /* native.c:68, GF_INIT_WAIT_CHUNK_US (PM22). */
+#define T_POINTS_PER_STEP 3U /* therm/fan.c:61-70. */
+#define T_US_PER_MS 1000U /* therm/fan.c:90, ms -> microseconds. */
+#define T_PWM_FIELDS 0x7fff7fffU /* therm/nv40.c:110-117. */
+#define T_FULL 100U /* therm/fan.c:37, percentage scale. */
 #define T_POLL 1000000ULL /* base.c:151; temp.c:197. */
 #define T_BUMP 500000ULL /* fan.c:189-190, milliseconds -> us. */
-#define T_SLOW 2000000ULL
+#define T_SLOW 2000000ULL /* therm/fan.c:193-194, ms -> us. */
 #define T_PERIOD 100000ULL /* fantog.c:111. */
 /* Arbitrary non-overlapping ROM layout, not hardware addresses. */
 enum { R_BIT=0x20,R_P=0x80,R_THERM=0x100,R_PERF=0x300,R_FAN=0x340,R_SIZE=0x400 };
@@ -54,6 +60,7 @@ static struct gf3_host_reg regs[16];
 static u8 rom[R_SIZE],arena[4096] __attribute__((aligned(GF5_HOST_ALLOC_ALIGN)));
 static u8 gpio_line;
 static bool gpio_on;
+static i32 gpio_source; /* Emulate B4 classified public GPIO failures. */
 static u32 down_count,pause_count;
 static bool down_active,pause_active;
 
@@ -69,8 +76,11 @@ static void entry(u8 type,u32 value)
  * changes the test's physical line, independently from fan_saved fields. */
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
 {
-    (void)host;
-    if (e->rc) return;
+    if (e->rc) {
+        if (gpio_source && (e->op==F5_GPIO_FIND || e->op==F5_GPIO_GET || e->op==F5_GPIO_SET))
+            host->ctx.source_rc=gpio_source;
+        return;
+    }
     if (e->op==F5_GPIO_FIND) {
         assert(e->a[0]==0x09U);
         *(u8 *)e->p[1]=gpio_line;
@@ -93,7 +103,7 @@ static void reset(void)
     h.events=events; h.cevents=COUNT(events);
     h.display.events=devents; h.display.cevents=COUNT(devents);
     h.display.base.regs=regs; h.display.base.cregs=COUNT(regs);
-    h.observe=observe; gpio_line=2; gpio_on=false;
+    h.observe=observe; gpio_line=2; gpio_on=false; gpio_source=0;
     h.ctx.deadline=0x12345678U; /* Fan operations must leave this untouched. */
     gf5_host_arena(&h,arena,sizeof(arena));
     gf2_host_memset(rom,0,sizeof(rom));
@@ -146,10 +156,13 @@ static void test_temperature(void)
     struct gf5_thermal t={0};
     assert(!gf5_therm_read(&h.ctx,&t));
     assert(t.raw==59 && t.calibrated && t.milli_c==85000);
-    assert(h.now==20000 && devents[0].op==D_WRITE && devents[0].a[1]==T_ADC && devents[0].a[3]==0xff);
+    assert(h.now==T_SETTLE && devents[0].op==D_WRITE && devents[0].a[1]==T_ADC && devents[0].a[3]==0xff);
     u32 settle=0;
-    for (u32 i=0;i<h.display.nevents;++i) if (devents[i].op==D_SLEEP) settle+=devents[i].a[0];
-    assert(settle==20000 && h.ctx.fan.sensor_setup==0xff);
+    for (u32 i=0;i<h.display.nevents;++i) if (devents[i].op==D_SLEEP) {
+        assert(devents[i].a[0] && devents[i].a[0]<=T_NATIVE_WAIT_MAX);
+        settle+=devents[i].a[0];
+    }
+    assert(settle==T_SETTLE && h.ctx.fan.sensor_setup==0xff);
     gf5_host_trace_clear(&h);
     assert(!gf5_therm_read(&h.ctx,&t));
     assert(h.display.nevents==2 && devents[0].op==D_WRITE && devents[1].op==D_READ);
@@ -413,7 +426,7 @@ static void test_sensor(void)
     bool was=h.ctx.fan.active[3]; h.now=h.ctx.next_sensor;
     gf5_fan_tick(&h.ctx,h.now);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-41 && !h.ctx.fan.sensor_poll && !h.ctx.next_sensor);
-    assert(h.ctx.fan.active[3]==was && h.display.nevents==2);
+    assert(h.ctx.fan.active[3]==was && devents[1].rc==-41);
     /* A fanless board must still notify registered emergency consumers. */
     reset(); ready(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP);
     gf3_host_set(&h.display.base,0,T_RAW,106); gf5_fan_tick(&h.ctx,h.now);
@@ -462,9 +475,165 @@ static void test_toggle_and_wrap(void)
     assert(!gpio_on && !h.ctx.next_toggle && !h.ctx.fan.duty);
     no_forbidden();
 }
+/* A bad temperature read must not gate independent step/toggle alarms.
+ * base.c:128-151, fan.c:61-93, fantog.c:39-62 have separate workers. */
+static void test_independent_alarms(void)
+{
+    reset(); ready();
+    h.ctx.fan.kind=GF5_FAN_OTHER;
+    assert(!gf5_fan_cstate(&h.ctx,80,0));
+    h.ctx.fan.kind=GF5_FAN_LINEAR; h.ctx.fan.sensor_poll=false;
+    for (u32 i=0;i<2;++i) {
+        h.now=h.ctx.next_step; h.ctx.next_auto=h.now;
+        u32 before=h.ctx.fan.duty;
+        gf5_host_trace_clear(&h);
+        gf4_host_fail_at(&h.display,D_READ,1,-61);
+        gf5_fan_tick(&h.ctx,h.now);
+        /* fan.c:61-70: each due step increases by three points. */
+        assert(h.ctx.fan.duty==before+T_POINTS_PER_STEP && h.ctx.next_step>h.now);
+        assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-61);
+    }
+    reset(); ready(); h.ctx.fan.method=GF5_FAN_TOGGLE;
+    h.ctx.fan.min_duty=h.ctx.fan.max_duty=T_FULL/2;
+    assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL));
+    h.ctx.fan.sensor_poll=false;
+    h.now=h.ctx.next_toggle; gf5_fan_tick(&h.ctx,h.now); assert(!gpio_on);
+    h.ctx.fan.mode=GF5_FAN_AUTO; h.ctx.fan.kind=GF5_FAN_LINEAR;
+    for (u32 i=0;i<2;++i) {
+        h.now=h.ctx.next_toggle; h.ctx.next_auto=h.now;
+        bool was=gpio_on;
+        gf5_host_trace_clear(&h);
+        gf4_host_fail_at(&h.display,D_READ,1,-62);
+        gf5_fan_tick(&h.ctx,h.now);
+        assert(gpio_on!=was && h.calls[F5_GPIO_SET]==1);
+        assert(h.ctx.next_toggle==h.now+T_PERIOD/2);
+        assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-62);
+    }
+    /* Preserve the first error even when a later GPIO boundary also fails. */
+    h.now=h.ctx.next_toggle; h.ctx.next_auto=h.now;
+    gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,1,-62);
+    gpio_source=-63; gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
+    gf5_fan_tick(&h.ctx,h.now);
+    assert(h.ctx.source_rc==-62 && h.ctx.last_rc==GF5_EIO && !h.calls[F5_GPIO_SET]);
+}
+static void test_boost_auto(void)
+{
+    reset(); ready(); h.ctx.fan.kind=GF5_FAN_OTHER;
+    assert(!gf5_fan_cstate(&h.ctx,60,0));
+    assert(h.ctx.fan.mode==GF5_FAN_AUTO && h.ctx.fan.cstate);
+    gf3_host_set(&h.display.base,0,T_RAW,h.ctx.fan.threshold[0]);
+    gf5_host_trace_clear(&h); gf5_fan_tick(&h.ctx,h.now);
+    /* temp.c:95-100 + base.c:208: immediate full duty survives same AUTO. */
+    assert(h.ctx.fan.target==T_FULL && h.ctx.fan.duty==T_FULL);
+    assert(!h.ctx.next_auto && !h.ctx.next_step && h.ctx.fan.mode==GF5_FAN_AUTO);
+    assert(h.ctx.fan.cstate==60 && h.ctx.fan.active[0]);
+    no_forbidden();
+}
+static void test_gpio_source(void)
+{
+    const enum gf5_host_op op[]={F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET};
+    for (u32 i=0;i<COUNT(op);++i) {
+        reset(); ready(); u32 duty=123;
+        if (op[i]==F5_GPIO_GET) gf3_host_set(&h.display.base,0,T_PWM2,0);
+        if (op[i]==F5_GPIO_SET) {
+            h.ctx.fan.method=GF5_FAN_TOGGLE;
+            h.ctx.fan.min_duty=h.ctx.fan.max_duty=T_FULL/2;
+        }
+        /* Raw -5 overlaps a lower-layer timeout enum. B4's published
+         * EIO must survive, independently of that original source value. */
+        gpio_source=-5;
+        gf5_host_fail_at(&h,op[i],1,GF5_EIO);
+        i32 rc=op[i]==F5_GPIO_SET ? gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL) :
+                                  gf5_fan_get(&h.ctx,&duty);
+        assert(rc==GF5_EIO && h.ctx.source_rc==gpio_source);
+        assert(h.calls[op[i]]==1 && events[h.nevents-1].op==op[i]);
+        if (op[i]!=F5_GPIO_SET) assert(duty==123 && !h.calls[F5_GPIO_SET]);
+        assert(h.ctx.rom.bytes==rom && !h.ctx.image && !h.live_allocs);
+    }
+}
+static void test_resume(void)
+{
+    for (u32 mode=GF5_FAN_NONE;mode<=GF5_FAN_AUTO;++mode) {
+        reset(); entry(0x24,(4U<<12)|(50U<<4)|3U); ready();
+        struct gf5_fan_trip *owned=h.ctx.fan.trip;
+        struct gf5_fan_trip copy=*owned;
+        struct gf5_fan_saved saved=h.ctx.fan;
+        saved.trip=&copy; saved.mode=mode; saved.duty=T_FULL/2;
+        saved.kind=GF5_FAN_OTHER; saved.cstate=80; saved.active[0]=true;
+        owned->temp=0; h.ctx.fan.offset_constant=99;
+        h.ctx.next_sensor=h.ctx.next_auto=h.ctx.next_step=h.ctx.next_toggle=1;
+        h.now=1ULL<<32;
+        gf5_host_trace_clear(&h);
+        assert(!gf5_therm_resume(&h.ctx,&saved));
+        u64 now=h.now;
+        assert(now==(1ULL<<32)+T_SETTLE && h.ctx.next_sensor==now+T_POLL);
+        assert(devents[0].op==D_WRITE && devents[0].a[1]==T_ADC);
+        u32 settle=0,first_fan=h.display.nevents;
+        for (u32 i=0;i<h.display.nevents;++i) {
+            if (devents[i].op==D_SLEEP) {
+                assert(devents[i].a[0] && devents[i].a[0]<=T_NATIVE_WAIT_MAX);
+                settle+=devents[i].a[0];
+            }
+            if (first_fan==h.display.nevents && devents[i].op==D_WRITE &&
+                devents[i].a[1]==T_PWM2) first_fan=i;
+        }
+        assert(settle==T_SETTLE && h.ctx.fan.mode==saved.mode);
+        assert(h.ctx.fan.trip==owned && owned->temp==copy.temp && owned->hyst==copy.hyst && owned->duty==copy.duty);
+        assert(h.ctx.fan.offset_constant==saved.offset_constant && h.ctx.fan.active[0]);
+        assert(!h.calls[F5_ALLOC] && !h.calls[F5_FREE] && h.live_allocs==1);
+        assert(saved.trip==&copy && saved.duty==T_FULL/2 && saved.mode==mode);
+        if (mode==GF5_FAN_NONE) {
+            assert(first_fan==h.display.nevents && !h.ctx.next_step && !h.ctx.next_toggle && !h.ctx.next_auto);
+        } else {
+            /* divisor100, 50% inverted => high word50, low word100.
+             * nv40.c:110-117; restore duty precedes AUTO's 3 point step. */
+            assert(first_fan<h.display.nevents);
+            assert((devents[first_fan].a[3]&T_PWM_FIELDS)==((T_FULL/2)<<16|T_FULL));
+            if (mode==GF5_FAN_AUTO) {
+                assert(h.ctx.fan.duty==saved.duty+T_POINTS_PER_STEP && h.ctx.fan.target==saved.cstate);
+                assert(h.ctx.next_step==now+(u64)saved.bump_ms*T_US_PER_MS);
+            } else assert(h.ctx.fan.duty==saved.duty && !h.ctx.next_step);
+        }
+        no_forbidden();
+    }
+    /* Toggle restoration re-arms a fractional duty against the new clock. */
+    reset(); ready();
+    struct gf5_fan_saved saved=h.ctx.fan;
+    saved.mode=GF5_FAN_MANUAL; saved.method=GF5_FAN_TOGGLE; saved.duty=T_FULL/2;
+    assert(!gf5_therm_resume(&h.ctx,&saved));
+    assert(gpio_on && h.ctx.next_toggle==h.now+T_PERIOD/2);
+    /* Reject mismatched trip counts before setup, retaining ownership. */
+    reset(); entry(0x24,(50U<<4)|3U); ready(); saved=h.ctx.fan;
+    struct gf5_fan_trip *owned=h.ctx.fan.trip;
+    ++saved.ntrip;
+    assert(gf5_therm_resume(&h.ctx,&saved)==GF5_ESTATE);
+    assert(!h.display.nevents && h.ctx.fan.trip==owned && h.live_allocs==1 && !h.calls[F5_FREE]);
+    assert(gf5_therm_resume(&h.ctx,0)==GF5_EINVAL && !h.display.nevents);
+    assert(gf5_therm_resume(0,&saved)==GF5_EINVAL);
+    /* Fail each setup boundary, clock, and first fan write. No later
+     * boundary may execute; allocations and borrowed ROM stay resident. */
+    const struct { u32 op,nth; bool clock; } failures[]={
+        {D_WRITE,1,false},{D_SLEEP,1,false},{D_READ,1,false},
+        {F5_CLOCK64,1,true},{D_WRITE,2,false} /* ADC write then fan write. */
+    };
+    for (u32 i=0;i<COUNT(failures);++i) {
+        reset(); entry(0x24,(50U<<4)|3U); ready(); saved=h.ctx.fan;
+        saved.mode=GF5_FAN_MANUAL; saved.duty=T_FULL/2;
+        owned=h.ctx.fan.trip;
+        if (failures[i].clock) gf5_host_fail_at(&h,F5_CLOCK64,failures[i].nth,-81);
+        else gf4_host_fail_at(&h.display,failures[i].op,failures[i].nth,-81);
+        assert(gf5_therm_resume(&h.ctx,&saved)==GF5_EIO && h.ctx.source_rc==-81);
+        if (failures[i].clock) assert(events[h.nevents-1].op==F5_CLOCK64 && !h.calls[F5_GPIO_FIND]);
+        else assert(devents[h.display.nevents-1].rc==-81 && !h.calls[F5_GPIO_SET]);
+        assert(h.ctx.fan.trip==owned && h.live_allocs==1 && !h.calls[F5_ALLOC] && !h.calls[F5_FREE]);
+        assert(h.ctx.rom.bytes==rom && !h.ctx.image && h.ctx.phase==GF5_RUN);
+        no_forbidden();
+    }
+}
 void _start(void)
 {
     test_temperature(); test_policy(); test_pwm(); test_failures();
     test_auto(); test_sensor(); test_toggle_and_wrap();
+    test_independent_alarms(); test_boost_auto(); test_gpio_source(); test_resume();
     gf2_host_exit(0);
 }

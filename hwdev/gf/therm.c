@@ -62,9 +62,14 @@
 
 enum { TH_BOOST, TH_DOWN, TH_CRITICAL, TH_SHUTDOWN };
 
+/* GPIO public calls already classify rc and retain the raw source.
+ * Other boundaries return raw rc; only this public exit maps them. */
 static i32 th_exit(struct gf5 *g,i32 rc)
 {
-    if (g) { g->source_rc=rc; g->last_rc=gf5_rc_map(rc); }
+    if (g) {
+        if (!rc || !g->source_rc) g->source_rc=rc;
+        g->last_rc=gf5_rc_map(rc);
+    }
     return g ? g->last_rc : GF5_EINVAL;
 }
 static i32 th_check(struct gf5 *g)
@@ -268,14 +273,11 @@ fail:
     if (f->trip) { g->links.free(g->links.owner,f->trip); f->trip=0; }
     return rc;
 }
-static i32 th_init(struct gf5 *g)
+/* therm/nv40.c:52-69 OLD_STYLE; production waits must stay below the
+ * native GF_INIT_WAIT_CHUNK_US ceiling (PM22). GF2's ceiling is tighter. */
+static i32 th_setup(struct gf5 *g)
 {
-    if (g->fan.sensor_setup) return 0;
-    struct gf5_fan_saved f;
-    i32 rc=th_policy(g,&f);
-    if (rc) return rc;
-    /* therm/nv40.c:52-69 OLD_STYLE. Short foreground waits, no IRQ lock. */
-    rc=th_write(g,TH_ADC,TH_OLD_SETUP);
+    i32 rc=th_write(g,TH_ADC,TH_OLD_SETUP);
     struct gf_io *io=&g->ch->f->io;
     for (u32 left=TH_SETTLE_US;!rc && left;) {
         u32 chunk=left>GF2_WAIT_MAX_US ? GF2_WAIT_MAX_US : left;
@@ -283,6 +285,15 @@ static i32 th_init(struct gf5 *g)
     }
     u32 raw;
     if (!rc) rc=th_read(g,TH_RAW,&raw);
+    return rc;
+}
+static i32 th_init(struct gf5 *g)
+{
+    if (g->fan.sensor_setup) return 0;
+    struct gf5_fan_saved f;
+    i32 rc=th_policy(g,&f);
+    if (rc) return rc;
+    rc=th_setup(g);
     if (rc) {
         if (f.trip) g->links.free(g->links.owner,f.trip);
         return rc;
@@ -313,6 +324,7 @@ static i32 th_temperature(struct gf5 *g,struct gf5_thermal *out)
 }
 i32 gf5_therm_read(struct gf5 *g,struct gf5_thermal *out)
 {
+    if (g) g->source_rc=0;
     i32 rc=th_check(g);
     if (!rc && !out) rc=GF5_EINVAL;
     if (!rc) rc=th_temperature(g,out);
@@ -328,6 +340,7 @@ static i32 th_fan_prepare(struct gf5 *g)
     struct gf5_fan_saved *f=&g->fan;
     if (f->gpio_line!=U8_MAX) return f->method ? 0 : GF5_ENOTSUP;
     u8 line,log[2];
+    g->source_rc=0;
     rc=gf5_gpio_find(g,TH_FAN_TAG,&line,log);
     if (rc) return rc;
     f->gpio_line=line; f->gpio_log[0]=log[0]; f->gpio_log[1]=log[1];
@@ -360,12 +373,14 @@ static i32 th_get(struct gf5 *g,u32 *percent)
         return 0;
     }
     bool on;
+    g->source_rc=0;
     rc=gf5_gpio_get(g,f->gpio_line,f->gpio_log,&on);
     if (!rc) *percent=on ? TH_PERCENT : 0;
     return rc;
 }
 i32 gf5_fan_get(struct gf5 *g,u32 *percent)
 {
+    if (g) g->source_rc=0;
     i32 rc=th_check(g);
     if (!rc && !percent) rc=GF5_EINVAL;
     if (!rc) rc=th_fan_prepare(g);
@@ -376,9 +391,12 @@ static i32 th_toggle(struct gf5 *g,u32 percent,u64 now)
 {
     struct gf5_fan_saved *f=&g->fan;
     bool on;
-    i32 rc=gf5_gpio_get(g,f->gpio_line,f->gpio_log,&on);
+    i32 rc;
+    g->source_rc=0;
+    rc=gf5_gpio_get(g,f->gpio_line,f->gpio_log,&on);
     if (rc) return rc;
     on=!on;
+    g->source_rc=0;
     rc=gf5_gpio_set(g,f->gpio_line,f->gpio_log,on);
     if (rc) return rc;
     f->toggle_on=on; f->duty=percent;
@@ -428,7 +446,9 @@ static i32 th_update(struct gf5 *g,u32 target,bool immediate,u64 now)
     target=th_clamp(f,target); f->target=target;
     u32 duty;
     rc=th_get(g,&duty);
-    if (rc) duty=target; /* therm/fan.c:59-74 readback unavailable. */
+    if (rc) { /* therm/fan.c:59-74 readback unavailable. */
+        g->source_rc=0; duty=target;
+    }
     if (duty==target && !rc) {
         g->next_step=0;
         /* NONE cancels our foreground toggle alarm. Re-entering control
@@ -494,12 +514,13 @@ static i32 th_mode(struct gf5 *g,enum gf5_fan_mode mode,u64 now)
         return th_auto(g,now);
     }
     u32 duty;
-    if (th_get(g,&duty)) duty=TH_PERCENT;
+    if (th_get(g,&duty)) { g->source_rc=0; duty=TH_PERCENT; }
     f->mode=mode; g->next_auto=g->next_step=0;
     return th_update(g,duty,true,now);
 }
 i32 gf5_fan_mode_set(struct gf5 *g,enum gf5_fan_mode mode)
 {
+    if (g) g->source_rc=0;
     i32 rc=th_check(g); u64 now;
     if (!rc && (unsigned)mode>GF5_FAN_AUTO) rc=GF5_EINVAL;
     if (!rc) rc=th_init(g);
@@ -509,6 +530,7 @@ i32 gf5_fan_mode_set(struct gf5 *g,enum gf5_fan_mode mode)
 }
 i32 gf5_fan_cstate(struct gf5 *g,u8 percent,i32 dir)
 {
+    if (g) g->source_rc=0;
     i32 rc=th_check(g); u64 now;
     if (!rc && percent>TH_PERCENT) rc=GF5_EINVAL;
     if (!rc) rc=th_init(g);
@@ -542,7 +564,8 @@ static i32 th_sensor(struct gf5 *g,u64 now)
             rc=th_update(g,TH_PERCENT,true,now);
             if (rc==GF5_ENOTSUP) { fan_rc=rc; continue; }
             if (rc) return rc;
-            if (i==TH_BOOST) {
+            /* therm/base.c:208: setting the current AUTO mode is a no-op. */
+            if (i==TH_BOOST && f->mode!=GF5_FAN_AUTO) {
                 rc=th_mode(g,GF5_FAN_AUTO,now);
                 if (rc) return rc;
             }
@@ -555,22 +578,63 @@ static i32 th_sensor(struct gf5 *g,u64 now)
 }
 void gf5_fan_tick(struct gf5 *g,u64 now)
 {
+    if (g) g->source_rc=0;
     i32 rc=th_check(g);
     if (!rc) rc=th_init(g);
     if (rc) { (void)th_exit(g,rc); return; }
-    if (g->fan.sensor_poll && (!g->next_sensor || now>=g->next_sensor)) rc=th_sensor(g,now);
-    if (!rc && g->fan.mode==GF5_FAN_AUTO && (!g->next_auto || now>=g->next_auto)) {
-        /* OTHER+cstate has no periodic AUTO alarm. Its explicit updates
-         * run through cstate/mode, not through every foreground poll. */
-        if (g->fan.kind!=GF5_FAN_OTHER || !g->fan.cstate) rc=th_auto(g,now);
+    i32 first=0,source=0;
+    if (g->fan.sensor_poll && (!g->next_sensor || now>=g->next_sensor))
+        first=th_sensor(g,now);
+    if (first) source=g->source_rc ? g->source_rc : first;
+    g->source_rc=0;
+    if (g->fan.mode==GF5_FAN_AUTO && (!g->next_auto || now>=g->next_auto)) {
+        /* OTHER+cstate has no periodic AUTO alarm. */
+        if (g->fan.kind!=GF5_FAN_OTHER || !g->fan.cstate) {
+            rc=th_auto(g,now);
+            if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; }
+            g->source_rc=0;
+        }
     }
-    if (!rc && g->fan.mode!=GF5_FAN_NONE && g->next_step && now>=g->next_step) {
+    if (g->fan.mode!=GF5_FAN_NONE && g->next_step && now>=g->next_step) {
         g->next_step=0;
         rc=th_update(g,g->fan.target,false,now);
+        if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; }
+        g->source_rc=0;
     }
-    if (!rc && g->fan.mode!=GF5_FAN_NONE && g->next_toggle && now>=g->next_toggle) {
+    if (g->fan.mode!=GF5_FAN_NONE && g->next_toggle && now>=g->next_toggle) {
         g->next_toggle=0;
         rc=th_toggle(g,g->fan.duty,now);
+        if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; }
+        g->source_rc=0;
     }
-    (void)th_exit(g,rc);
+    g->source_rc=source;
+    (void)th_exit(g,first);
+}
+/* PM18; therm/base.c:376-394: sensor setup, saved duty, mode, alarms.
+ * The live trip allocation belongs to g; restoring never replaces it. */
+i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
+{
+    if (g) g->source_rc=0;
+    i32 rc=th_check(g);
+    if (!rc && (!saved || (unsigned)saved->mode>GF5_FAN_AUTO)) rc=GF5_EINVAL;
+    if (!rc && (saved->ntrip!=g->fan.ntrip ||
+                (saved->ntrip && (!saved->trip || !g->fan.trip)))) rc=GF5_ESTATE;
+    if (!rc) rc=th_setup(g);
+    if (rc) return th_exit(g,rc);
+    struct gf5_fan_trip *trip=g->fan.trip;
+    enum gf5_fan_mode mode=saved->mode;
+    g->fan=*saved;
+    g->fan.trip=trip;
+    for (u32 i=0;i<g->fan.ntrip;++i) trip[i]=saved->trip[i];
+    g->fan.sensor_setup=TH_OLD_SETUP;
+    g->next_auto=g->next_step=g->next_sensor=g->next_toggle=0;
+    u64 now;
+    rc=th_now(g,&now);
+    if (!rc && mode!=GF5_FAN_NONE) {
+        rc=th_fan_prepare(g);
+        if (!rc) rc=th_set(g,th_clamp(&g->fan,g->fan.duty),now);
+    }
+    if (!rc) rc=th_mode(g,mode,now);
+    if (!rc && g->fan.sensor_poll) g->next_sensor=now+TH_POLL_US;
+    return th_exit(g,rc);
 }
