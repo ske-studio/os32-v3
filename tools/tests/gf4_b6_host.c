@@ -36,17 +36,45 @@ static u32 reg(u32 off)
     for (u32 b=0;b<PIXEL_BYTES;++b) value|=gf4_host_reg_byte(&h,0,off+b)<<(b*8U);
     return value;
 }
+static void visibility_trace(u32 ctl,u32 pos)
+{
+    /* MIT nouveau c03c1a1 dispnv04/hw.h:341-349,372-385:
+     * CR31 update must precede the POS read and same-value write. */
+    enum { ADDR1=0x31, BYTE=sizeof(u8), WORD=sizeof(u32) };
+    const struct { enum gf4_host_op op; u32 off,width,value; } expected[]={
+        {D_WRITE,GF4_HOST_CR,BYTE,ADDR1},
+        {D_READ,GF4_HOST_CR+BYTE,BYTE,0},
+        {D_WRITE,GF4_HOST_CR,BYTE,ADDR1},
+        {D_WRITE,GF4_HOST_CR+BYTE,BYTE,ctl},
+        {D_READ,POS,WORD,0},
+        {D_WRITE,POS,WORD,pos},
+    };
+    assert(h.nevents==sizeof(expected)/sizeof(expected[0]));
+    for (u32 i=0;i<h.nevents;++i) {
+        const struct gf4_host_event *e=&events[i];
+        assert(e->op==expected[i].op && !e->rc);
+        assert(e->a[0]==GF_MODE_REGISTER_BAR && e->a[1]==expected[i].off);
+        assert(e->a[2]==expected[i].width);
+        if (e->op==D_WRITE) assert(e->a[3]==expected[i].value);
+    }
+}
 static void visibility(void)
 {
+    /* nvreg.h:261-264: address bits 7:2, dblscan bit 1, enable bit 0;
+     * cursor.c:21-28: signed y=-2, x=-1 packed in the two 16-bit halves. */
+    enum { PRESERVED_CTL=0xae, ENABLE=1, SAVED_POS=0xfffeffffU };
     setup();
     state.head[0].cursor_valid=true; state.head[0].cursor_visible=true;
-    h.cr[0][0x31]=0xae; /* Preserve address/double-scan bits. */
-    gf3_host_set(&h.base,0,POS,0xfffeffff);
+    h.cr[0][0x31]=PRESERVED_CTL;
+    gf3_host_set(&h.base,0,POS,SAVED_POS);
     assert(!gf4_cursor_apply(&h.ctx,0,false));
-    assert(state.head[0].cursor_visible && h.cr[0][0x31]==0xae);
-    assert(reg(POS)==0xfffeffff);
+    visibility_trace(PRESERVED_CTL,SAVED_POS);
+    assert(state.head[0].cursor_visible && h.cr[0][0x31]==PRESERVED_CTL);
+    assert(reg(POS)==SAVED_POS);
+    gf4_host_trace_clear(&h);
     assert(!gf4_cursor_apply(&h.ctx,0,true));
-    assert(h.cr[0][0x31]==0xaf);
+    visibility_trace(PRESERVED_CTL|ENABLE,SAVED_POS);
+    assert(h.cr[0][0x31]==(PRESERVED_CTL|ENABLE));
     state.head[0].blank=true;
     gf4_host_trace_clear(&h);
     assert(gf4_cursor_apply(&h.ctx,0,true)==GF4_ESTATE && !h.nevents);
