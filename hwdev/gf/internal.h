@@ -252,7 +252,10 @@ int gf_display_checks(struct gf_display_context *);
 int gf_display_stop(void *);
 /* X3: foundation cleanup/local restore/quiesce rows only. No F3/F2 stop,
  * delegation, waits or reservation release. NULL: OS32_ERR_INVAL; preserve
- * the original cleanup error, success 0. C2-service-stop owns this helper. */
+ * the original cleanup error, success 0. Leaves engaged and display4 intact;
+ * the caller clears engaged after cleanup succeeds, F2 is OFF and close
+ * succeeds, then releases its reservations (including the F4 service path).
+ * C2-service-stop owns this helper. */
 i32 gf_display_quiesce(struct gf_display_context *c);
 extern const struct video_ops gf_video_ops;
 #endif
