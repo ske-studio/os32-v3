@@ -4,7 +4,10 @@
  * Storage is borrowed: base.regs contains aligned little-endian words;
  * base.reservations/base.vram supply live keys and their CPU image.
  * All observations use events; install events/cevents before the first I/O.
- * GF4_HOST_UNIT=14 exports helpers/callbacks, but no dependency symbols. */
+ * GF4_HOST_UNIT=14 exports helpers/callbacks, but no dependency symbols.
+ * X1-X4: UNIT 14 links real service/V0 and replaces the boundary links
+ * below for publication/ownership integration. Never stub the new service
+ * APIs there or add failure events for objects_init/suspend/restart. */
 #ifndef TOOLS_TESTS_GF4_DISPLAY_FAKE_H
 #define TOOLS_TESTS_GF4_DISPLAY_FAKE_H
 #if defined(GF3_HOST_UNIT) && GF3_HOST_UNIT != 12
@@ -69,6 +72,10 @@ struct gf4_host {
     struct gf4_links links; struct gf4_i2c_port port;
     struct gf4_edid_state tv_modes; i32 port_rc;
     u32 applied_write_nth; i32 applied_write_rc;
+    /* Observed C2 value loan/scan hook, never reservation ownership. Keeps
+     * the full format/geometry/key, including 16/32bit surfaces (X1). */
+    struct gf3_surface borrowed_scan;
+    bool scan_hook_open;
 };
 static struct gf4_host *gf4_host_current;
 static inline struct gf4_host_event *gf4_host_begin(struct gf4_host *h,enum gf4_host_op op)
@@ -323,7 +330,21 @@ static inline i32 gf4_host_admission(void *owner,bool open)
     struct gf4_host *h=owner; assert(h);
     struct gf4_host_event *e=gf4_host_begin(h,D_ADMISSION);
     e->p[0]=owner; e->a[0]=open;
-    if (!e->rc) h->ctx.accepting=open;
+    if (!e->rc && open && h->ctx.saved_closed && !h->ctx.diagnostic_saved)
+        e->rc=GF4_ESTATE;
+    if (!e->rc) {
+        if (open) {
+            /* C0 publishes before committing next to head. No product
+             * validation here: D_ADMISSION is the seeded boundary result. */
+            const struct gf4_head_image *image=h->ctx.changing ?
+                h->state->next : h->state->head;
+            h->borrowed_scan=image[0].enabled ? image[0].front : (struct gf3_surface){0};
+            h->scan_hook_open=image[0].enabled;
+        } else h->scan_hook_open=false;
+        h->ctx.accepting=open;
+    }
+    /* X2: closing publication never closes windows, clears ready, releases
+     * reservations or erases the borrowed surface value. */
     return gf4_host_end(h,e);
 }
 static inline i32 gf4_host_failed(void *owner,i32 cause,u32 dl)
@@ -331,8 +352,12 @@ static inline i32 gf4_host_failed(void *owner,i32 cause,u32 dl)
     struct gf4_host *h=owner; assert(h);
     struct gf4_host_event *e=gf4_host_begin(h,D_FAILED);
     e->p[0]=owner; e->a[0]=(u32)cause; e->a[1]=dl;
-    if (!e->rc) { h->ctx.accepting=false; h->ctx.reusable=false; }
-    /* No reservation or window is released by this notification oracle. */
+    h->ctx.accepting=false; h->ctx.reusable=false; h->scan_hook_open=false;
+    /* X3: return the operation's cause; a seeded stop/cleanup error goes
+     * to recovery_rc. Otherwise preserve C0's recorded rollback error.
+     * Real stopping/release is exercised in UNIT 14. */
+    if (e->rc) h->ctx.recovery_rc=e->rc;
+    e->rc=cause;
     return gf4_host_end(h,e);
 }
 static inline i32 gf4_host_scan_changed(void *owner,u8 head,const struct gf3_surface *front)
@@ -340,8 +365,11 @@ static inline i32 gf4_host_scan_changed(void *owner,u8 head,const struct gf3_sur
     struct gf4_host *h=owner; assert(h && front && head<GF4_HEADS);
     struct gf4_host_event *e=gf4_host_begin(h,D_SCAN_CHANGED);
     e->p[0]=owner; e->p[1]=front; e->a[0]=head;
-    /* B7 commits front/hold after this adapter succeeds; observe represents
-     * the C2 HAL descriptor/hook. The oracle never releases either face. */
+    /* X1: notification carries the candidate while state.head is still old.
+     * Head B cannot change head A's loan; failure keeps the previous loan.
+     * Closed admission stays closed. B7 alone commits front/hold afterwards;
+     * neither face is released here. observe sees the resulting metadata. */
+    if (!e->rc && head==0) h->borrowed_scan=*front;
     return gf4_host_end(h,e);
 }
 static inline i32 gf4_host_external_dpms(void *owner,const struct gf4_route *route,

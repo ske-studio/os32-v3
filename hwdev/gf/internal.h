@@ -229,7 +229,9 @@ struct gf_display_context {
     bool pll_gate_valid, fp_on;
     int last_rc;
     /* Layer 4 (GF_FEAT4 addendum 2026-11-04): C2-service binds this to the
-     * gf4_ctx; the legacy blank/palette entries delegate through it. */
+     * gf4_ctx; the legacy blank/palette entries delegate through it.
+     * X3/N1: retain through complete video stop until module exit; normal
+     * video start/stop dispatch solely on this loan. */
     struct gf4_ctx *display4;
 };
 /* Connect via a thin void* adapter to gf_load_io.row; section/wait retain
@@ -248,5 +250,9 @@ int gf_display_modeset(struct gf_display_context *);
 int gf_display_baseline(struct gf_display_context *);
 int gf_display_checks(struct gf_display_context *);
 int gf_display_stop(void *);
+/* X3: foundation cleanup/local restore/quiesce rows only. No F3/F2 stop,
+ * delegation, waits or reservation release. NULL: OS32_ERR_INVAL; preserve
+ * the original cleanup error, success 0. C2-service-stop owns this helper. */
+i32 gf_display_quiesce(struct gf_display_context *c);
 extern const struct video_ops gf_video_ops;
 #endif

@@ -72,6 +72,10 @@ struct gf4_ctx {
     /* B11-MMIO (tv.c) owns: TV load-detect result, nouveau dispnv04/tvnv17.h:73-87
      * pin_mask/subconnector; valid cleared by service start (PM 2026-11-04). */
     u8 tv_pin_mask,tv_subconnector; bool tv_sense_valid;
+    /* X2/N2/N3: C2-recover owns the value copy shared by recover and
+     * diagnostic STOP->START. Capture head/hold/IRQ before suspend changes
+     * DPMS; never use state.rollback or overwrite diagnostic_saved. */
+    struct gf4_saved hold_saved;
 };
 int gf4_modes(struct gf4_ctx *,u8,const struct gf4_mode **,u32 *);
 int gf4_set_mode(struct gf4_ctx *,const struct gf4_route *,u32,const struct gf3_surface *,u32);
@@ -119,6 +123,15 @@ i32 gf4_scan_discard(struct gf4_ctx *,u8 head,u32 dl);
 i32 gf4_service_bind(struct gf4_ctx *,struct gf_display_context *,const struct gf4_links *);
 i32 gf4_service_start(struct gf4_ctx *,u32 dl);
 i32 gf4_service_stop(struct gf4_ctx *,u32 dl);
+/* X2: suspend keeps reservations, state, snapshots and reciprocal loans;
+ * close/fini(dl)/F2 stop/OFF precede invalidate and foundation cleanup.
+ * Restart remains unpublished through objects_init and retained-surface
+ * match/rebind; it changes neither saved_closed nor diagnostic_saved.
+ * Required NULL/missing links: EINVAL; invalid state: ESTATE; changing:
+ * EBUSY. Preserve lower rc, including OFF with a negative stop rc.
+ * X4: pass the original dl; existing lower F2 deadlines stay unchanged. */
+i32 gf4_service_suspend(struct gf4_ctx *,u32 dl);
+i32 gf4_service_restart(struct gf4_ctx *,u32 dl);
 i32 gf4_service_recover(struct gf4_ctx *,u32 dl);
 i32 gf4_diagnostic_save(struct gf4_ctx *,struct gf4_saved *,u32 dl);
 i32 gf4_diagnostic_restore(struct gf4_ctx *,const struct gf4_saved *,u32 dl);
