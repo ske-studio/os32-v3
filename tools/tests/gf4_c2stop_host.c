@@ -237,7 +237,7 @@ static void normal_clock_dispatch(void)
         assert(!gf2_host_memcmp(&scan,&cint_service->scan_node.value,sizeof(scan)));
         cint_closed();
         if (results[i]) {
-            assert(cint_prod.display.engaged);
+            assert(cint_prod.display.engaged && !cint_prod.display.stop_ok);
             assert(cint_prod.display.last_rc==results[i]);
             /* Retry with a fresh entry deadline, retaining the same loans. */
             cint_restore_rc=0; cint_restore_seen=false;
