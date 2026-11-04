@@ -631,8 +631,10 @@ i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
     u64 now;
     rc=th_now(g,&now);
     if (!rc && mode!=GF5_FAN_NONE) {
+        /* Toggle preparation seeds duty; retain the saved restore value. */
+        u32 duty=g->fan.duty;
         rc=th_fan_prepare(g);
-        if (!rc) rc=th_set(g,th_clamp(&g->fan,g->fan.duty),now);
+        if (!rc) rc=th_set(g,th_clamp(&g->fan,duty),now);
     }
     if (!rc) rc=th_mode(g,mode,now);
     if (!rc && g->fan.sensor_poll) g->next_sensor=now+TH_POLL_US;

@@ -600,7 +600,9 @@ static void test_resume(void)
     reset(); ready();
     struct gf5_fan_saved saved=h.ctx.fan;
     saved.mode=GF5_FAN_MANUAL; saved.method=GF5_FAN_TOGGLE; saved.duty=T_FULL/2;
+    assert(saved.gpio_line==U8_MAX); /* Exercise GPIO resolution in prepare. */
     assert(!gf5_therm_resume(&h.ctx,&saved));
+    assert(h.ctx.fan.duty==saved.duty && h.ctx.fan.mode==saved.mode);
     assert(gpio_on && h.ctx.next_toggle==h.now+T_PERIOD/2);
     /* Reject mismatched trip counts before setup, retaining ownership. */
     reset(); entry(0x24,(50U<<4)|3U); ready(); saved=h.ctx.fan;
