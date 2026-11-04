@@ -95,6 +95,20 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('x87-park-save', 'exec_source.inc',
+     '    x87_save(&a->x87_state);', '    (void)0;',
+     'FAIL x87 first park saves slot'),
+    ('x87-resume-save', 'exec_source.inc',
+     '    x87_save(&x87_parent[x87_depth]);\n    x87_restore(&a->x87_state);',
+     '    (void)0;\n    x87_restore(&a->x87_state);',
+     'FAIL x87 resume and park exchange slot and parent'),
+    ('x87-resume-slot-restore', 'exec_source.inc',
+     '    x87_restore(&a->x87_state);', '    (void)0;',
+     'FAIL x87 resume and park exchange slot and parent'),
+    ('x87-resume-parent-restore', 'exec_source.inc',
+     '        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason == EXEC_LJ_PARK)',
+     '        (void)0;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason == EXEC_LJ_PARK)',
+     'FAIL x87 resume and park exchange slot and parent'),
     ('IMECUI-toggle-omitted', 'ime_cui_process.inc',
      '        ime_toggle();', '        (void)0;',
      'FAIL IMECUI ShiftSpace turns ON through each reader'),
