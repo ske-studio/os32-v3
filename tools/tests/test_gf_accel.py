@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
-    covers=['hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+    covers=['include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
             'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
@@ -46,6 +46,9 @@ COMPONENTS = {
     'b9': 'hwdev/gf/accel_scale.c',
     'b10': 'drivers/video/geforce/gf_present_m2mf.c',
     'v0': 'hwdev/gf/vram_view.c',
+    'c0': 'drivers/video/geforce/gf_hook.c',
+    'c1': 'hwdev/gf/service.c',
+    'c2': 'hwdev/gf/display/quiesce.c',
 }
 
 # Reports gf3-b*/report*.md, gf3-v0/report.md (B0 fix1 supersedes old anchors).
@@ -289,8 +292,106 @@ MUTATIONS = {
         ('v0-unmap-extent', 'hwdev/gf/vram_view.c',
          'view->map_base, view->map_bytes',
          'view->va, view->bytes', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-close-required', 'hwdev/gf/vram_view.c',
+         'view->mapped || !view->close ||',
+         'view->mapped ||', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-close-preserved', 'hwdev/gf/vram_view.c',
+         '.close = view->close',
+         '.close = 0', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-close-owner-preserved', 'hwdev/gf/vram_view.c',
+         '.close_owner = view->close_owner',
+         '.close_owner = 0', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-close-traverse', 'hwdev/gf/vram_view.c',
+         'struct gf_vram_view *next = view->next;',
+         'struct gf_vram_view *next = 0;', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-close-error', 'hwdev/gf/vram_view.c',
+         'if (rc < 0) return rc;',
+         'if (rc > 0) return rc;', 'tools/tests/gf_accel_v0_host.c'),
+    ],
+    'c0': [
+        ('fill-clip', 'drivers/video/geforce/gf_hook.c',
+         'hook_scan.width, hook_scan.height))',
+         'hook_scan.width-1, hook_scan.height))', 'tools/tests/gf_accel_c0_host.c'),
+        ('copy-source-right', 'drivers/video/geforce/gf_hook.c',
+         'w = hook_scan.width - (u32)sx;',
+         'w = hook_scan.width - (u32)sx - 1;', 'tools/tests/gf_accel_c0_host.c'),
+        ('copy-source-bottom', 'drivers/video/geforce/gf_hook.c',
+         'h = hook_scan.height - (u32)sy;',
+         'h = hook_scan.height - (u32)sy - 1;', 'tools/tests/gf_accel_c0_host.c'),
+        ('negative-blit', 'drivers/video/geforce/gf_hook.c',
+         'return OS32_ERR_INVAL;',
+         'return 0;', 'tools/tests/gf_accel_c0_host.c'),
+        ('deadline', 'drivers/video/geforce/gf_hook.c',
+         '*dl = now + GF3_TIMEOUT_US;',
+         '*dl = now;', 'tools/tests/gf_accel_c0_host.c'),
+        ('admission', 'drivers/video/geforce/gf_hook.c',
+         'hook_active = active && scan;',
+         'hook_active = ((void)active, scan != NULL);', 'tools/tests/gf_accel_c0_host.c'),
+        ('mask', 'drivers/video/geforce/gf_hook.c',
+         '#define GF_HOOK_FULL_MASK 0xffU',
+         '#define GF_HOOK_FULL_MASK 0x0fU', 'tools/tests/gf_accel_c0_host.c'),
+        ('fill-rc', 'drivers/video/geforce/gf_hook.c',
+         'return rc ? OS32_ERR_IO : 0;\n}\n\nint geforce_blit',
+         'return rc ? 0 : 0;\n}\n\nint geforce_blit', 'tools/tests/gf_accel_c0_host.c'),
+    ],
+    'c1': [
+        ('close-slot', 'hwdev/gf/service.c',
+         '*s->slot = 0;\n    gf_hook_scan_bind(false, 0);',
+         'gf_hook_scan_bind(false, 0);', 'tools/tests/gf_accel_c1_host.c'),
+        ('diagnostic-release', 'hwdev/gf/service.c',
+         'else if (!first) first = GF2_ESTOP;\n    return service_result(s, first);',
+         'else if (!first) first = GF2_ESTOP;\n    if (!first) first = gf3_service_release(s);\n    return service_result(s, first);', 'tools/tests/gf_accel_c1_host.c'),
+        ('recover-old-keys', 'hwdev/gf/service.c',
+         'rc = gf3_service_release(s);\n    if (rc) return service_result(s, rc);\n    return service_publish(s, dl);',
+         'rc = 0;\n    if (rc) return service_result(s, rc);\n    return service_publish(s, dl);', 'tools/tests/gf_accel_c1_host.c'),
+        ('inst-unlink', 'hwdev/gf/instmem.c',
+         'if (*link) { *link = obj->next; obj->next = 0; }',
+         'if (*link) { (void)obj; }', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-scan-offset', 'hwdev/gf/service.c',
+         'u32 off = s->scan_phys - ch->bar1.base;',
+         'u32 off = s->scan_phys + ch->bar1.base;', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-page-alignment', 'hwdev/gf/service.c',
+         'u32 mask = MEM_PAGE_SIZE - 1U;',
+         'u32 mask = 63U;', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-pitch-alignment', 'hwdev/gf/service.c',
+         '#define GF3_TEST_PITCH_ALIGN 64U',
+         '#define GF3_TEST_PITCH_ALIGN 32U', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-height-cap', 'hwdev/gf/service.c',
+         'if (height > s->scan_height) height = s->scan_height;',
+         'if (height < s->scan_height) height = s->scan_height;', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-stop-off', 'hwdev/gf/service.c',
+         'if (p->chan.state == GF2_OFF) gf3_service_invalidate(s);',
+         'if (p->chan.state != GF2_OFF) gf3_service_invalidate(s);', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-recover-identity', 'hwdev/gf/service.c',
+         'rc = gf3_service_release(s);',
+         'rc = 0;', 'tools/tests/gf_accel_c1_host.c'),
+        ('c1-deadline', 'hwdev/gf/service.c',
+         'i32 rc = gf3_init(&p->accel, &p->chan, dl);',
+         'i32 rc = gf3_init(&p->accel, &p->chan, dl + 1U);', 'tools/tests/gf_accel_c1_host.c'),
+    ],
+    'c2': [
+        ('close-failure', 'hwdev/gf/display/quiesce.c',
+         'if (!revoked) goto fail;',
+         'if (false) goto fail;', 'tools/tests/gf_accel_c2_host.c'),
+        ('release-gate', 'hwdev/gf/display/quiesce.c',
+         'if (!rc && s && closed && ch->state==GF2_OFF) {',
+         'if (s && closed && ch->state==GF2_OFF) {', 'tools/tests/gf_accel_c2_host.c'),
+        ('engaged-retry', 'hwdev/gf/display/quiesce.c',
+         'if (!rc && closed && (!ch || ch->state==GF2_OFF)) c->engaged=false;',
+         'if (closed && (!ch || ch->state==GF2_OFF)) c->engaged=false;', 'tools/tests/gf_accel_c2_host.c'),
+        ('invalidate-before-off', 'hwdev/gf/display/quiesce.c',
+         'if (s && ch->state==GF2_OFF) gf3_service_invalidate(s);',
+         'if (s) gf3_service_invalidate(s);', 'tools/tests/gf_accel_c2_host.c'),
+        ('failed-view-drop', 'hwdev/gf/vram_view.c',
+         'view->map_ops->unmap(view->map_owner, view->map_base, view->map_bytes))',
+         '(view->map_ops->unmap(view->map_owner, view->map_base, view->map_bytes), false))', 'tools/tests/gf_accel_c2_host.c'),
+        ('fini-fault', 'hwdev/gf/service.c',
+         'if (!p->accel.ready || p->chan.state != GF2_RUN || p->chan.fault.latched ||\n        p->accel.epoch != p->chan.epoch) return 0;',
+         'if (!p->accel.ready) return 0;', 'tools/tests/gf_accel_c2_host.c'),
     ],
 }
+
+
 
 
 def require(condition, message):
@@ -299,6 +400,31 @@ def require(condition, message):
 
 
 def component_build(host, source, directory, original_parent):
+    component = host.stem.removeprefix('gf_accel_').removesuffix('_host')
+    if component in ('c1', 'c2'):
+        # Preserve relative includes for real F1/F2/F3 integration and mutations.
+        tree = directory/'tree'
+        if not tree.exists():
+            (tree/'tools/tests').mkdir(parents=True, exist_ok=True)
+            for rel in ('hwdev/gf', 'drivers/video/geforce', 'include'):
+                shutil.copytree(ROOT/rel, tree/rel)
+            # Unchanged neighboring headers keep their original locations.
+            for parent in ('', 'hwdev', 'drivers', 'drivers/video'):
+                target_parent = tree/parent
+                for entry in (ROOT/parent).iterdir():
+                    target = target_parent/entry.name
+                    if not entry.name.startswith('.') and not target.exists():
+                        target.symlink_to(entry, target_is_directory=entry.is_dir())
+            (tree/'tools/tests').mkdir(parents=True, exist_ok=True)
+            for pattern in ('gf_accel*.[ch]', 'gf_command_runtime_host.h'):
+                for fixture in (ROOT/'tools/tests').glob(pattern):
+                    shutil.copy2(fixture, tree/'tools/tests'/fixture.name)
+        exe = directory/'host'
+        subprocess.run(FLAGS + ['-Werror=vla', '-ffunction-sections', '-fdata-sections',
+                       '-Wl,--gc-sections', *include_flags(ROOT), '-I'+str(tree), '-I'+str(ROOT),
+                       str(tree/'tools/tests'/host.name), str(tree/'hwdev/gf/accel_copy.c'),
+                       '-o', str(exe)], cwd=ROOT, check=True)
+        return exe
     exe = directory/'host'
     # check=True: compilation/link errors are suite failures, never runtime RED.
     subprocess.run(FLAGS + ['-Werror=vla', *include_flags(ROOT), '-I'+str(ROOT),
@@ -332,9 +458,9 @@ def component_hosts(selected, mutate):
         if mutate:
             original = source.read_text()
             for name, product, old, new, red_host in MUTATIONS[component]:
-                require(product == COMPONENTS[component] and ROOT/red_host == host,
+                require((component in ('c1', 'c2') or product == COMPONENTS[component]) and ROOT/red_host == host,
                         f'{component}-{name}: inconsistent registration')
-                require(old != new and original.count(old) == 1,
+                require(old != new and (ROOT/product).read_text().count(old) == 1,
                         f'{component}-{name}: anchor must be unique and change source')
     with tempfile.TemporaryDirectory(prefix='gf-accel-') as temporary:
         for component in selected:
@@ -344,22 +470,26 @@ def component_hosts(selected, mutate):
             directory.mkdir()
             exe = component_build(host, source, directory, source.parent)
             component_execute(exe, runners, component+' control', True)
-            if not mutate:
-                continue
-            original = source.read_text()
-            # Preserve include spelling: -iquote supplies the original parent,
-            # while root-relative includes still use the normal include paths.
-            mutant = directory/source.name
-            for name, product, old, new, red_host in MUTATIONS[component]:
-                label = component+'-'+name
-                mutant.write_text(original.replace(old, new, 1))
-                try:
-                    exe = component_build(host, mutant, directory, source.parent)
-                    component_execute(exe, runners, label, False)
-                finally:
-                    mutant.write_text(original)
-                    exe = component_build(host, mutant, directory, source.parent)
-                    component_execute(exe, runners, label+' restored', True)
+            if mutate:
+                original = source.read_text()
+                # Preserve include spelling: -iquote supplies the original parent,
+                # while root-relative includes still use the normal include paths.
+                mutant = directory/source.name
+                for name, product, old, new, red_host in MUTATIONS[component]:
+                    label = component+'-'+name
+                    target = directory/'tree'/product if component in ('c1', 'c2') else mutant
+                    if component in ('c1', 'c2'):
+                        require(target.resolve().is_relative_to((directory/'tree').resolve()),
+                                label+': mutation must stay in the copied product tree')
+                    product_original = (ROOT/product).read_text()
+                    target.write_text(product_original.replace(old, new, 1))
+                    try:
+                        exe = component_build(host, mutant, directory, source.parent)
+                        component_execute(exe, runners, label, False)
+                    finally:
+                        target.write_text(product_original)
+                        exe = component_build(host, mutant, directory, source.parent)
+                        component_execute(exe, runners, label+' restored', True)
 
 
 def consumer(source=None):
@@ -670,7 +800,16 @@ def main():
                         help='run one component, or only the existing acceptance tests')
     args = parser.parse_args()
     if args.component != 'acceptance':
-        component_hosts((args.component,) if args.component else tuple(COMPONENTS), args.mutate)
+        failures = []
+        for component in ((args.component,) if args.component else tuple(COMPONENTS)):
+            try:
+                component_hosts((component,), args.mutate)
+            except (RuntimeError, subprocess.CalledProcessError) as error:
+                print(f'{component}: ERROR {error}', flush=True)
+                failures.append(component)
+        if failures:
+            print('FAILED components: ' + ', '.join(failures), flush=True)
+            return 1
     if args.component is None or args.component == 'acceptance':
         return acceptance_main()
     return 0

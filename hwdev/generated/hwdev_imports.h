@@ -1,6 +1,6 @@
 #include "hwdev_contract.h"
 #include "kernel/module/module_image.h"
-static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0};
+static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0};
 static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0x92f2e639U, 1, 1},
     {0xa2272b76U, 1, 1},
@@ -42,6 +42,8 @@ static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0xb47093a7U, 1, 1},
     {0xa26afb55U, 1, 1},
     {0x3de73f21U, 1, 1},
+    {0x4dc22420U, 1, 1},
+    {0x5da6d33cU, 1, 1},
 };
 static const struct module_symbol_contract hwdev_export_contracts[] = {
     {0xce92964bU, 1, 0},
@@ -87,4 +89,6 @@ static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {
     slots[37] = (u32)(uptr)geforce_foundation_ops;
     slots[38] = (u32)(uptr)serial_puts_polled;
     slots[39] = (u32)(uptr)sys_time_now;
+    slots[40] = (u32)(uptr)geforce_accel_ops;
+    slots[41] = (u32)(uptr)gfx_present;
 }

@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 2674670876,
+  "module_abi_gen": 3382500634,
   "imports": [
     {
       "name": "trial_begin",
@@ -238,6 +238,18 @@
     {
       "name": "sys_time_now",
       "index": 39,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "geforce_accel_ops",
+      "index": 40,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "gfx_present",
+      "index": 41,
       "kind": 1,
       "type_ver": 1
     }

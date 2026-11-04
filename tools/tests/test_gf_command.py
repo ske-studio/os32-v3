@@ -1,7 +1,7 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
 CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=90.0,
     covers=['build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
-            'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
+            'kdebug/gf_accel_test.h', 'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
             'kdebug/gf_command_wire.h', 'kdebug/recover.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
             'include/io.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
@@ -85,7 +85,8 @@ MUTATIONS = {
     't2a2-bind': [('t2a2-production-bind',
       'gf2_test_bind_production(&production.foundation,&production.chan);',
       '(void)0;')],
-    't2b': [('reference-count',
+    't2b': [('gf3-dispatch', 'gf_accel_test(q.session)', 'gf_accel_test(0)'),
+     ('reference-count',
       '#define GF2_REFERENCE_COUNT 100000U',
       '#define GF2_REFERENCE_COUNT 1000U'),
      ('get-put-completion',

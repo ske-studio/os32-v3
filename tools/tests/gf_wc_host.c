@@ -101,6 +101,9 @@ int gf_production_quiesce(struct gf_production *p)
 { (void)p;CHECK(!lease.active || restore_fail);quiesces++;started=0;return 0; }
 int gf_production_point(void *p) { (void)p;return identity ? 0 : -1; }
 int pc98_route_select_98(void) { return 0; }
+#include "../../hwdev/gf/accel.h"
+void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
+{ CHECK(!active && !scan); }
 #include "../../drivers/video/geforce/geforce_body.c"
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)

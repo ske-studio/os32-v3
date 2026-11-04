@@ -740,8 +740,14 @@ static void cint_recover_failures(void)
             cint_prod.foundation.imem.aperture_bytes = CINT_IMEM_BYTES;
         } else assert(cint_service->scan.reservation_id == old_id);
         cint_map_fail = -1; cint_pci_fail_at = 0; cint_trace_clear();
-        /* Failure after new F2 exists is cleaned by real C2, not a fake sink. */
-        cint_stop_display();
+        /* Real F2 preserves EFAULT when it reaches OFF from FAULT
+         * (command.c:gf2_stop); C2 must retain that first error while
+         * completing display cleanup and releasing every reservation. */
+        if (cint_prod.chan.state == GF2_FAULT) {
+            assert(gf_display_stop(&cint_prod.display) == -1);
+            assert(cint_prod.display.last_rc == GF2_EFAULT);
+            cint_no_resources();
+        } else cint_stop_display();
     }
 }
 static void cint_recover_without_display(void)

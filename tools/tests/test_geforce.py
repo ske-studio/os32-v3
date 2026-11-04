@@ -1,6 +1,6 @@
 """P5 HAL, real P3 start state machine, real ledger/selection and byte routing."""
 CHECK = dict(name='geforce-host', tier=1,
-    covers=['hwdev/gf/foundation.h', 'hwdev/gf/gf2_test.h', 'drivers/video/geforce/geforce_tick.h', 'tools/tests/gf_wc_recovery_host.inc', 'exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'drivers/video/geforce/gf_wc.c', 'arch/x86/kernel/mtrr_wc.h', 'tools/tests/gf_wc_host.c', 'tools/tests/geforce_core_cases.inc', 'tools/tests/paging_source.py', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/pc98/pc98_route.c', 'drivers/video/pc98/pc98_route.h', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/geforce_body.c', 'lib/pc98_cell.h', 'gfx/gfx_core.c', 'include/gfx_hal.h', 'include/video_service.h', 'init/kernel.c', 'mm/pgalloc.h', 'hwdev/gf/service.c', 'hwdev/gf/display/modes.c', 'tools/tests/backend_geforce_host.c', 'tools/tests/gf_present_host.c', 'tools/tests/pc98_route_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/serial_diag_host.h', 'build/geforce-module.mk', 'build/geforce-module.ld', 'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py', 'tools/module_schema.py', 'build/core.yaml', 'build/kernel.mk', 'Makefile', 'tools/tests/geforce_module_host.c', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/mkmod.py', 'build/out/geforce.mod', 'build/out/geforce/*', 'build/out/kernel.elf', 'build/out/vmkernel.lz4', 'include/gfx_format.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/palette.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'lib/serial_diag.h', 'gfx/gfx_internal.h', 'tools/tests/gfx_reinit_host.c', 'tools/tests/test_gfx_reinit.py', 'lib/utf8.c', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'tools/run_host_group.py', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'platform/pc98/boot_names.c', 'hwdev/gf/internal.h', 'hwdev/gfinit_mode.h', 'drivers/base/dev.c', 'fs/vfs.c', 'sdk/kapi.json', 'drivers/video/geforce/geforce_platform.c', 'kernel/gui.c', 'kernel/gui.h', 'kernel/console/console.c', 'platform/pc98/console.c', 'platform/pc98/display.c', 'tools/tests/dep_dir_d_console_grid_host.c', 'tools/tests/test_dep_dir_d_console.py', 'hwdev/gf/production.h', 'include/gf_production.h', 'mm/memory_boot.c', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/fixtures/dep_dir_d/*', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def'],
+    covers=['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_accel_host.h', 'tools/tests/gf_command_runtime_host.h', 'hwdev/gf/accel.h', 'hwdev/gf/vram_view.h', 'hwdev/gf/accel_service.h', 'hwdev/gf/foundation.h', 'hwdev/gf/gf2_test.h', 'drivers/video/geforce/geforce_tick.h', 'tools/tests/gf_wc_recovery_host.inc', 'exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'drivers/video/geforce/gf_wc.c', 'arch/x86/kernel/mtrr_wc.h', 'tools/tests/gf_wc_host.c', 'tools/tests/geforce_core_cases.inc', 'tools/tests/paging_source.py', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/pc98/pc98_route.c', 'drivers/video/pc98/pc98_route.h', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/geforce_body.c', 'lib/pc98_cell.h', 'gfx/gfx_core.c', 'include/gfx_hal.h', 'include/video_service.h', 'init/kernel.c', 'mm/pgalloc.h', 'hwdev/gf/service.c', 'hwdev/gf/display/modes.c', 'tools/tests/backend_geforce_host.c', 'tools/tests/gf_present_host.c', 'tools/tests/pc98_route_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/serial_diag_host.h', 'build/geforce-module.mk', 'build/geforce-module.ld', 'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py', 'tools/module_schema.py', 'build/core.yaml', 'build/kernel.mk', 'Makefile', 'tools/tests/geforce_module_host.c', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/mkmod.py', 'build/out/geforce.mod', 'build/out/geforce/*', 'build/out/kernel.elf', 'build/out/vmkernel.lz4', 'include/gfx_format.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/palette.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'lib/serial_diag.h', 'gfx/gfx_internal.h', 'tools/tests/gfx_reinit_host.c', 'tools/tests/test_gfx_reinit.py', 'lib/utf8.c', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'tools/run_host_group.py', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'platform/pc98/boot_names.c', 'hwdev/gf/internal.h', 'hwdev/gfinit_mode.h', 'drivers/base/dev.c', 'fs/vfs.c', 'sdk/kapi.json', 'drivers/video/geforce/geforce_platform.c', 'kernel/gui.c', 'kernel/gui.h', 'kernel/console/console.c', 'platform/pc98/console.c', 'platform/pc98/display.c', 'tools/tests/dep_dir_d_console_grid_host.c', 'tools/tests/test_dep_dir_d_console.py', 'hwdev/gf/production.h', 'include/gf_production.h', 'mm/memory_boot.c', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/fixtures/dep_dir_d/*', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=60.0)
 
 from kernel_includes import include_flags
@@ -15,10 +15,10 @@ FLAGS=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror'
        '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie']
 INCLUDES=include_flags(ROOT)
 
-def component(name):
+def component(name, flags=()):
     with tempfile.TemporaryDirectory(prefix='gf-hal-') as td:
         exe=Path(td)/'host'
-        subprocess.run(FLAGS+INCLUDES+[str(ROOT/'tools/tests'/f'{name}_host.c'),'-o',str(exe)],check=True)
+        subprocess.run(FLAGS+INCLUDES+list(flags)+[str(ROOT/'tools/tests'/f'{name}_host.c'),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
         assert result.returncode==0,(name,result.returncode,result.stdout,result.stderr)
         print('PASS '+name,flush=True)
@@ -145,7 +145,7 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
         start=source.index('int geforce_boot_reserve(void)')
         end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
-        for rel in ('drivers/video/geforce/backend_geforce.c','hwdev/gf/service.c','hwdev/gf/display/modes.c'):
+        for rel in ('drivers/video/geforce/backend_geforce.c','tools/tests/gf_accel_unbound_stubs.c','hwdev/gf/service.c','hwdev/gf/display/modes.c'):
             sources.append(ROOT/rel)
         # Transfer is tested separately; this fixture tests the HAL's boundary.
         transfer=tmp/'transfer.c'
@@ -265,6 +265,12 @@ def module_registration(mutation=None):
             source=ROOT/'drivers/video/geforce/geforce_module.c'
             text=source.read_text()
             old,new={
+                'getter-registration': ('return registered ? accel_slot : 0;', 'return accel_slot;'),
+                'start-slot-clear': ('failed:\n    accel_slot=0;', 'failed:\n    (void)accel_slot;'),
+                'detach-slot-clear': ('/* Close admission even when the module must retain its resources. */\n    accel_slot=0;', '/* Close admission even when the module must retain its resources. */\n    (void)accel_slot;'),
+                'abort-slot-clear': ('int geforce_module_abort(void)\n{\n    accel_slot=0;', 'int geforce_module_abort(void)\n{\n    (void)accel_slot;'),
+                'fill-text-check': ('candidate.fill_rect && !module_text_contains', 'false && !module_text_contains'),
+                'blit-text-check': ('candidate.blit && !module_text_contains', 'false && !module_text_contains'),
                 'detach-irq': ('owner->foundation.registered ||', 'false ||'),
                 'detach-tick': ('if (geforce_tick_bind(0,0)) return 0;', 'if (false) return 0;'),
                 'abort-slot': ('if (registered) return MODULE_ISOLATED;', 'foundation_slot=0;accel_slot=0;'),
@@ -292,7 +298,7 @@ def module_registration(mutation=None):
                 print('MUTATE runtime RED: '+mutation,flush=True)
                 return
             assert result.returncode==0,(mode,result.returncode,result.stdout,result.stderr)
-    print('PASS GF registration: missing stub, NULL acceleration, prepare required, lifetime pin',flush=True)
+    print('PASS GF registration: missing stub, layer 3 hook validation, prepare required, lifetime pin',flush=True)
 
 def present_trace(mutation=None, byte=False):
     source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
@@ -535,7 +541,7 @@ def wc_recovery(path, bios=0, old=False, mutation=None):
             '\n'.join(function(exc,n) for n in names))
         backend=tmp/'backend.c'
         backend.write_text(read('drivers/video/geforce/backend_geforce.c').replace('"../../../gfx/', '"gfx/'))
-        sources.extend([backend,ROOT/'hwdev/gf/service.c',ROOT/'hwdev/gf/display/modes.c'])
+        sources.extend([backend, ROOT/'tools/tests/gf_accel_unbound_stubs.c', ROOT/'hwdev/gf/service.c', ROOT/'hwdev/gf/display/modes.c'])
         asm=tmp/'setjmp.o'
         subprocess.run(['nasm','-f','elf32',str(ROOT/'arch/x86/kernel/setjmp.asm'),'-o',str(asm)],cwd=ROOT,check=True)
         sources.append(asm)
@@ -564,7 +570,7 @@ def main():
     present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
     present_trace(byte=True)
     if '--mutate' in sys.argv:
-        for mutation in ('detach-irq','detach-tick','abort-slot'): module_registration(mutation)
+        for mutation in ('detach-irq', 'detach-tick', 'abort-slot', 'getter-registration', 'start-slot-clear', 'detach-slot-clear', 'abort-slot-clear', 'fill-text-check', 'blit-text-check'): module_registration(mutation)
         for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb'):
             core(mutation=mutation)
         core(bar2_bytes=0x400000,mutation='instmem-overrun')
@@ -580,6 +586,8 @@ def main():
     product()
     module_registration()
     for name in ('gf_present','backend_geforce','pc98_route'): component(name)
+    component('backend_geforce', ('-DOS32_GEFORCE_MODULE',))
+    component('backend_geforce', ('-DGF_ACCEPT_MODE=0',))
     for args in ((0,0,0,0),(0,0,0,1),(1,0,0,0),(1,1,0,0),(0,0,1,0)): core(*args)
     core(bar2_bytes=0x400000)
     core(diagnostic=True)

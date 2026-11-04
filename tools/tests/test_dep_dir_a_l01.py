@@ -91,6 +91,10 @@ def generations(folder, fixture):
                          else f'build/out/{name}/{name}_imports.json')
         metadata = json.loads((ROOT / metadata_path).read_text())
         rows = [{k: v for k, v in e.items() if k != 'source'} for e in metadata['imports']]
+        # Review pin includes GF3's appended getter/present contracts. To refresh:
+        # hash json.dumps([{k:v for k,v in e.items() if k != 'source'}
+        #                 for e in metadata['imports']], sort_keys=True).encode()
+        # with SHA256 after reviewing .def/generated import changes.
         assert hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest() == fixture['imports_sha256'][name]
         old = fixture['old_generations'][name]
         current = metadata['module_abi_gen']
