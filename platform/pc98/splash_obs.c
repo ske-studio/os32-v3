@@ -4,6 +4,7 @@
 #include "gfx_osri.h"
 #include "splash_raster_image.h"
 #include "kmalloc.h"
+#include "kstring.h"
 #include "palette.h"
 #include "serial_diag.h"
 #include "serial.h"
@@ -119,7 +120,7 @@ void platform_splash_observe(void)
             else if (rc == PL_FRAME_DROP) drops++;
             else { status = "no_sync"; break; }
         }
-        if (!frames && drops) status = "drop";
+        if (!kstrcmp(status, "ok") && !frames && drops) status = "drop";
         obs_black();
 done:
         if (plan) kfree(plan);

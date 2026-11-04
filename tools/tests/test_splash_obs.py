@@ -7,7 +7,7 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'platform/pc98/splash.c', 'platform/pc98/splash_image.c', 'init/boot_splash.c',
             'include/platform_splash.h', 'tools/tests/splash_obs_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h',
+            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
             'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
     needs=[], budget=60.0)
 
@@ -62,6 +62,8 @@ MUTATIONS = (
     ('omit image release', OWNER, 'if (image) kfree(image);', '(void)image;'),
     ('drop extends duration', OWNER, 'round < rounds; round++', 'frames < rounds; round++'),
     ('duration rounding', OWNER, '(duration + period - 1) / period', 'duration / period'),
+    ('drop hides no_sync', OWNER, '!kstrcmp(status, "ok") && !frames && drops',
+     '!frames && drops'),
     ('omit UART init', OWNER, '    serial_init(SYS_SERIAL_BAUD);', '    (void)SYS_SERIAL_BAUD;'),
     ('invisible label', OWNER, '#define SPLASH_OBS_LABEL_ATTR TATTR_WHITE',
      '#define SPLASH_OBS_LABEL_ATTR 0x07u'),
@@ -126,10 +128,10 @@ def normal_sections():
 
     FIX1 intentionally adds the preview to R1. Only its new helper and its
     prepare/frame hooks may differ; every other normal section stays exact.
-    Runtime tests separately exercise those three changed functions.
+    Runtime tests separately exercise the preview and its replay hooks.
     """
     preview_sections = {'.text.pl_preview', '.text.preview_vsync',
-                        '.text.preview_rounds', '.text.pl_prepare', '.text.pl_frame'}
+                        '.text.preview_rounds', '.text.preview', '.text.pl_prepare', '.text.pl_frame'}
     with tempfile.TemporaryDirectory(prefix='splash-normal-') as td:
         work = Path(td)
         cc = compiler()

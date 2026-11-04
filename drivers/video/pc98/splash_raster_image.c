@@ -507,14 +507,23 @@ static u32 preview_rounds(const struct SplashRaster *s)
     return (u32)((duration + period - 1) / period);
 }
 
-static int preview_vsync(int high)
+static int preview_vsync(int high, const struct PlProfile *p, PlTime deadline)
 {
+    /* R1 retains its boot deadline and calibrated open-wait limits.
+     * OBS has no clock budget and keeps its finite-poll wait below. */
+    if (p) {
+        PlTime now, before, after;
+        if (now_us(&now)) return -1;
+        return open_status(p, GDC_STAT_VSYNC, high,
+                           earlier(now + SPLASH_RASTER_SYNC_TIMEOUT_US, deadline),
+                           &before, &after);
+    }
     for (u32 i = 0; i < PL_PREVIEW_POLL_LIMIT; i++)
         if (!!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC) == high) return 0;
     return -1;
 }
 
-int pl_preview(struct SplashRaster *s)
+static int preview(struct SplashRaster *s, const struct PlProfile *p, PlTime deadline)
 {
     if (!s || !s->checked || !s->dynamic_ok || !_irq_enabled() ||
         !s->line_num_us || !s->line_den ||
@@ -522,11 +531,16 @@ int pl_preview(struct SplashRaster *s)
     palette_init();
     /* Align once, then count full periods: a partially elapsed first
      * VBLANK must not shorten the requested one-second preview. */
-    if (preview_vsync(0) || preview_vsync(1)) return -1;
+    if (preview_vsync(0, p, deadline) || preview_vsync(1, p, deadline)) return -1;
     u32 rounds = preview_rounds(s);
     for (u32 round = 0; round < rounds; round++)
-        if (preview_vsync(0) || preview_vsync(1)) return -1;
+        if (preview_vsync(0, p, deadline) || preview_vsync(1, p, deadline)) return -1;
     return 0;
+}
+
+int pl_preview(struct SplashRaster *s)
+{
+    return preview(s, NULL, 0);
 }
 
 int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
@@ -556,11 +570,12 @@ int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
                       p->extra[PL_CEXIT].time.max +
                       p->extra[PL_COMMON_EXIT].time.max, den);
     if (image->count && !pl_context.previewed) {
-        PlTime preview = ((PlTime)(preview_rounds(s) + 1u) * s->total_lines *
+        PlTime preview_us = ((PlTime)(preview_rounds(s) + 1u) * s->total_lines *
                           s->line_num_us + s->line_den - 1u) / s->line_den;
-        if (now >= deadline_us || preview + reserve > deadline_us - now)
+        if (now >= deadline_us || preview_us + reserve > deadline_us - now)
             return finish(s, image, 0, PL_FRAME_DEADLINE);
-        if (pl_preview(s)) return finish(s, image, 0, PL_FRAME_NO_SYNC);
+        if (preview(s, p, deadline_us - reserve))
+            return finish(s, image, 0, PL_FRAME_NO_SYNC);
         pl_context.previewed = 1;
         if (now_us(&now)) return finish(s, image, 0, PL_FRAME_NO_SYNC);
     }

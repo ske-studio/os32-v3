@@ -61,8 +61,9 @@ MUTATIONS = (
 
 IMAGE_SOURCE = 'drivers/video/pc98/splash_raster_image.c'
 PREVIEW_MUTATIONS = (
-    ('omit R1 preview', 'if (pl_preview(s)) return finish(s, image, 0, PL_FRAME_NO_SYNC);',
-     'if (0) return finish(s, image, 0, PL_FRAME_NO_SYNC);'),
+    ('R1 preview ignores deadline', '    if (p) {', '    if (0 && p) {'),
+    ('omit R1 preview', 'if (preview(s, p, deadline_us - reserve))',
+     'if (0)'),
     ('repeat R1 preview', '    pl_context.previewed = 1;', '    pl_context.previewed = 0;'),
 )
 

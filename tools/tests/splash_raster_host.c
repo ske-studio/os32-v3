@@ -37,7 +37,7 @@ static void finish(int code)
 #define SCAN_DEN 100u
 struct HostScanInput {
     u32 h, blank, in_cost, branch_cost, out_cost, clock_cost, cli_clock_cost;
-    unsigned long long irq_at, irq_cost, delay_at, delay_cost, lost_h, early_h;
+    unsigned long long irq_at, irq_cost, delay_at, delay_cost, lost_h, early_h, lost_v;
 };
 static struct HostScan {
     int enabled, sampling, clock_seen, settle_error, sample_error;
@@ -397,7 +397,8 @@ static unsigned int scan_status(void)
     unsigned long long period = (unsigned long long)total * scan.input.h;
     unsigned long long phase = scan.time % period;
     unsigned int status = 0;
-    if (!missing_v && phase < (unsigned long long)high_lines * scan.input.h)
+    if (!missing_v && (!scan.input.lost_v || scan.time < scan.input.lost_v) &&
+        phase < (unsigned long long)high_lines * scan.input.h)
         status |= GDC_STAT_VSYNC;
     int high = (phase + 2 * SCAN_DEN) % scan.input.h >= scan.input.h - scan.input.blank;
     if (scan.input.lost_h && scan.time >= scan.input.lost_h &&
@@ -708,6 +709,20 @@ static void image_preview(void)
         before = preview_defaults;
         REQUIRE(pl_frame(pc98_splash_raster_state(), &image, &plan, 500000) == PL_FRAME_DEADLINE);
         REQUIRE(preview_defaults == before && !writes);
+        /* Stop VSYNC after real preview cycles, both far from and near
+         * the absolute boot deadline. No raster OUT may follow failure. */
+        for (u32 near = 0; near < 2; near++) {
+            image_fixture(mode, vs); image_make();
+            REQUIRE(!pl_prepare(&image, 5, &plan));
+            unsigned long long stop = near ? 1000000 : 500000;
+            unsigned long long deadline = near ? 1120000 : 3000000;
+            scan.input.lost_v = stop * SCAN_DEN;
+            REQUIRE(pl_frame(pc98_splash_raster_state(), &image, &plan, deadline)
+                    == PL_FRAME_NO_SYNC);
+            REQUIRE(scan.time >= scan.input.lost_v && scan.time <= deadline * SCAN_DEN);
+            REQUIRE(scan.time <= (stop + SPLASH_RASTER_SYNC_TIMEOUT_US) * SCAN_DEN);
+            REQUIRE(!pl_context.previewed && !writes && irq_on);
+        }
     }
 }
 

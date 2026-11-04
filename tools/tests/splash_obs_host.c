@@ -25,7 +25,7 @@ static struct OsriImage image;
 static struct PlObsPlan plan;
 static u32 stamp, reads, writes, out_cost, vs_lines, fall_at, cli_at, restores;
 static int irq_on, freeze, no_h, no_v_after_f, stuck_v, force_v_at, delay_cli;
-static u32 preview_at, preview_pending, uart_inits;
+static u32 preview_at, preview_pending, uart_inits, stop_v_at;
 static struct { u32 port, value, time, open; } output[HOST_WRITES];
 
 static unsigned int inp(unsigned int port)
@@ -37,7 +37,8 @@ static unsigned int inp(unsigned int port)
     if (!freeze && (phase < vs_lines * HOST_H ||
         (stuck_v && stamp >= state.total_lines * HOST_H) ||
         (force_v_at && stamp >= (u32)force_v_at))) status |= GDC_STAT_VSYNC;
-    if (no_v_after_f && stamp >= fall_at) status &= ~GDC_STAT_VSYNC;
+    if ((no_v_after_f && stamp >= fall_at) || (stop_v_at && stamp >= stop_v_at))
+        status &= ~GDC_STAT_VSYNC;
     if (!no_h && phase % HOST_H >= HOST_H - 20u) status |= GDC_STAT_HBLANK;
     return status;
 }
@@ -89,7 +90,7 @@ static void setup(int mode, int vs)
     state.active0_lines = vs ? state.vbp_lines : 0;
     vs_lines = vs ? state.vs_lines : state.total_lines - 400;
     fall_at = (state.total_lines + vs_lines) * HOST_H;
-    stamp = reads = writes = restores = cli_at = preview_pending = 0; out_cost = 0;
+    stamp = reads = writes = restores = cli_at = preview_pending = stop_v_at = 0; out_cost = 0;
     irq_on = 1; freeze = no_h = no_v_after_f = stuck_v = force_v_at = delay_cli = 0;
 }
 static u16 rgb(u32 index) { return (u16)(index * 0x111u); }
@@ -238,7 +239,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
     REQUIRE(active_n >= 1 && active_n <= 16);
     REQUIRE(label[0] == 'N' && label[1] == '=' &&
             label[2] == (char)('0'+active_n/10) && label[3] == (char)('0'+active_n%10));
-    return (scenario == 1 && active_n == 1) || (scenario == 3 && active_n != 16) ? -1 : 0;
+    return (scenario == 1 && active_n == 1) || (scenario >= 3 && active_n != 16) ? -1 : 0;
 }
 int vfs_open(const char *path, int flags)
 {
@@ -257,6 +258,11 @@ int vfs_read_fd(int fd, void *dst, u32 n)
     if (n > file_bytes-file_pos) n = file_bytes-file_pos;
     for (u32 i = 0; i < n; i++) ((u8 *)dst)[i] = file[file_pos++];
     return n;
+}
+int kstrcmp(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return (u8)*a - (u8)*b;
 }
 void *kmalloc(u32 size)
 {
@@ -290,7 +296,9 @@ void gfx_present_nosync(void)
     REQUIRE(pixels[0] == 1 && pixels[32000] == 2 && pixels[64000] == 3 && pixels[96000] == 4);
     commits++; stamp=reads=writes=preview_pending=0;
     freeze = scenario == 1 && active_n == 5;
-    out_cost = scenario == 3 ? 8 : 0;
+    out_cost = scenario >= 3 ? 8 : 0;
+    /* One aligned preview period, then a dropped frame and no next V. */
+    stop_v_at = scenario == 4 ? 3 * state.total_lines * HOST_H + HOST_H : 0;
 }
 void palette_set(int index, u8 r, u8 g, u8 b)
 { REQUIRE(irq_on && index >= 0 && index < 16 && !r && !g && !b); blacks++; }
@@ -402,6 +410,14 @@ static void test_owner(void)
     boot_splash();
     REQUIRE(allocs == 2 && frees == 2 && commits == 1);
     REQUIRE(contains("n=16 end status=drop frames=0 drop=1"));
+    scenario=4; setup(1, 0);
+    /* Two rounds: drop must be followed by a failed new VBLANK wait. */
+    state.line_num_us=2500000; state.line_den=state.total_lines;
+    allocs=frees=opens=closes=commits=blacks=log_pos=0;
+    image_busy=plan_busy=0;
+    boot_splash();
+    REQUIRE(allocs == 2 && frees == 2 && commits == 1 && irq_on);
+    REQUIRE(contains("n=16 end status=no_sync frames=0 drop=1"));
 }
 static void test_loader(void)
 {
