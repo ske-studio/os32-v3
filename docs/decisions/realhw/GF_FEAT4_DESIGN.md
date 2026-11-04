@@ -407,3 +407,6 @@ F5のF3待ちは機能結合4段＋共有登録1段＝5段。F4と合計 **11段
 ### 確定の補い (2026-11-04、claude-opus-5-5 の第 3 回、PM が反映)
 - P3-a: timing.flags (NEG_H 等) と TIMINGS=32 は data.h に置く (gf4_timing と gf4_edid_state.timing[32] が data.h にあり、edid.c は data.h だけでコンパイルする)。
 - P3-b: 「ctv 重複除去前の保守値」の注記は、r3 で重複していた分 (304B) を gfinit_mode の work[2] から外した、と読む。数字は最終の sizeof で確定する。
+
+## 追記 (2026-11-04、A1 の欠け — IRQ の snapshot の失敗の注入、PM 決定)
+- `gf_irq_snapshot` は実物で `void`、出力を必ず写す (hwdev/gf/irq.c:233-238)。試験の土台の失敗の注入は実物の契約に合わせる (先回りの点検の決まり) ので、`D_SNAPSHOT` は `gf4_host_fail_at` の対象から外す。土台の snapshot は常に出力を写し、rc を持たない。snapshot の中身を変えて試したい場合は、注入ではなく偽の IRQ の状態 (counter・pending) を先に設定して表す。実物に無い失敗を作らない。
