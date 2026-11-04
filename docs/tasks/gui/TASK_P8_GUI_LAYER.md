@@ -19,6 +19,6 @@
 | D | host 試験 (`pcm_stream_host`・`input_queue_tests`) と変異、NP21/W・実機の受入 | 未着手 |
 
 - 入口: 段 A (PCM の口を固定してから)。PCM module の対の版一致を要求する。
-- PM 決定 (確定の節): `pcm_cs4231.c`・`pcm_module.*`・`pcm_body.c` は P8 の段 A を先に取り込み、[PCM の合成器](../v3/TASK_SYNTH_OPNA.md) の段 E はその後に末尾へ足す。合成器の finish/abort も同じ内部停止・drain の経路を使う。
+- PM 決定 (確定の節): `pcm_cs4231.c`・`pcm_module.*`・`pcm_body.c` は P8 の段 A を先に取り込み、PCM の合成器 (票 TASK_SYNTH_OPNA) の段 E はその後に末尾へ足す。合成器の finish/abort も同じ内部停止・drain の経路を使う。
 - WM のマウスキー (`kbdnav.rs`) は変更しない。microUI の接続は実装しない。
 - 実装時は `docs/design/<ソースパス>.md` へ機能別に分割する。
