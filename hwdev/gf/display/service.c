@@ -30,6 +30,7 @@
  * OS32 substitutes resident reservation nodes and borrowed dispatch slots
  * for DRM BOs. No hardware register/method is introduced in this adapter. */
 #include "api.h"
+#include "../../../include/kprintf.h"
 #include "../internal.h"
 #include "../accel_service.h"
 #include "../production.h"
@@ -236,9 +237,10 @@ static void svc_feature5(struct gf4_ctx *c)
 /* F4 keeps values only; F5 copies the full ROM and prepared M separately.
  * BMP signature: nvkm/subdev/bios/base.c:180-182. Limits: existing parser,
  * nvkm/subdev/bios/pll.c:162-175 (first entry fallback), :301-331. */
-static i32 svc_rom(struct gf4_ctx *c)
+static i32 svc_rom(struct gf4_ctx *c,const char **stage)
 {
     struct gf_display_context *l=c->legacy;
+    *stage="rom_acquire";
     i32 rc=l->owner->acquire(l);
     if (!rc && (!l->init || !l->program || !l->init->rom)) rc=GF4_EINVAL;
     if (!rc) {
@@ -250,15 +252,17 @@ static i32 svc_rom(struct gf4_ctx *c)
             while (j<sizeof(signature) && rom[i+j]==signature[j]) ++j;
             if (j==sizeof(signature)) { bmp=i; break; }
         }
+        *stage="dcb_parse";
         rc=gf4_dcb_parse(rom,size,bmp,&c->dcb);
         for (u8 h=0;!rc && h<GF4_HEADS;++h) {
+            *stage="pll_parse";
             rc=gfinit_pll_parse(rom,size,GF_INIT_PLL_TABLE,
                                h ? GF_PLL_VIDEO_B : GF_PLL_VIDEO,&c->limits[h]);
             c->limits_valid[h]=!rc;
             if (rc) rc=GF4_EPLL;
         }
-        if (!rc) rc=gf_init_run(l->init,l->program);
-        if (!rc) rc=gf_display_baseline(l);
+        if (!rc) { *stage="devinit"; rc=gf_init_run(l->init,l->program); }
+        if (!rc) { *stage="baseline"; rc=gf_display_baseline(l); }
         if (!rc) svc_feature5(c);
     }
     /* acquire may have allocated scratch even when it returns an error. */
@@ -284,10 +288,11 @@ static struct gf3_surface svc_surface(const struct gf_vram_reservation_node *n,
 /* §3 keeps the existing VGA INDEX8 default even if EDID prefers another
  * timing. Initial mode loading uses the closed low-level restore path;
  * unlike set_mode it does not require a temporarily published service. */
-static i32 svc_initial(struct gf4_ctx *c,u32 dl)
+static i32 svc_initial(struct gf4_ctx *c,u32 dl,const char **stage)
 {
     const struct gf4_route *route=0;
     const struct gf4_mode *mode=0;
+    *stage="initial_mode";
     for (u32 i=0;i<c->nroutes;++i) {
         const struct gf4_route *r=&c->routes[i];
         if (r->type==GF4_ANALOG && !r->location && (r->head_mask&1U) && r->or_mask==1U) {
@@ -323,56 +328,82 @@ static i32 svc_initial(struct gf4_ctx *c,u32 dl)
     v->front=svc_surface(&c->scan[0][0],mode);
     v->back=svc_surface(&c->scan[0][1],mode);
     struct gf3_surface test=svc_surface(&c->test,mode);
+    *stage="surfaces";
     i32 rc=gf3_service_surfaces(gf3_service_get(c->ch),&v->front,
                                c->test.value.owner ? &test : 0);
-    if (!rc) rc=gf4_display_restore(c,initial,dl);
+    if (!rc) rc=gf4_display_restore_stage(c,initial,dl,stage);
     return rc;
+}
+
+/* Log before stop: F2 OFF and zero status fields seen afterwards describe
+ * cleanup, not evidence that the channel never reached RUN. */
+static i32 svc_start_failure(struct gf4_ctx *c,const char *stage,i32 rc)
+{
+    kprintf(KLOG_ATTR,"[gf4] start fail stage=%s rc=%d\n",stage,rc);
+    return svc_result(c,rc);
 }
 
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
+    const char *stage="service_check";
     struct gf3_service *s=0;
     i32 rc=svc_check(c,&s);
-    if (rc) return svc_result(c,rc);
+    if (rc) return svc_start_failure(c,stage,rc);
     struct gf_display_context *l=c->legacy;
     struct gf_foundation *f=&s->production->foundation;
     if (!c->data || !c->exec || !f->io.read || !f->io.write ||
         !f->io.timing.clock_us || !f->io.timing.wait_us ||
         !l->owner->acquire || !l->owner->release ||
-        !l->owner->validate || !l->owner->foundation_start) return svc_result(c,GF4_EINVAL);
+        !l->owner->validate || !l->owner->foundation_start)
+        return svc_start_failure(c,"service_ops",GF4_EINVAL);
     if (c->ready || c->accel->ready || c->saved_closed || c->diagnostic_saved ||
         l->engaged || !c->reusable || !l->reusable ||
-        (c->ch->state!=GF2_OFF && c->ch->state!=GF2_RUN)) return svc_result(c,GF4_ESTATE);
+        (c->ch->state!=GF2_OFF && c->ch->state!=GF2_RUN))
+        return svc_start_failure(c,"service_state",GF4_ESTATE);
     c->deadline=dl; c->accepting=false; c->tv_sense_valid=false;
+    stage="admission_close";
     rc=c->links->admission(c->links->owner,false);
-    if (rc) return svc_result(c,rc);
+    if (rc) return svc_start_failure(c,stage,rc);
     l->engaged=true; l->stop_ok=false;
-    if (c->ch->state==GF2_OFF) rc=gf_master_enable(f);
-    if (!rc) rc=l->initialized ? l->owner->validate(l) : svc_rom(c);
-    if (!rc && c->ch->state==GF2_OFF) rc=l->owner->foundation_start(l);
-    if (!rc && c->ch->state==GF2_OFF) rc=gf2_start(c->ch,f);
-    if (!rc && (c->ch->state!=GF2_RUN || !c->ch->epoch || c->ch->fault.latched)) rc=GF4_ESTATE;
+    if (c->ch->state==GF2_OFF) {
+        stage="master_enable"; rc=gf_master_enable(f);
+    }
+    if (!rc) {
+        stage="rom_validate";
+        rc=l->initialized ? l->owner->validate(l) : svc_rom(c,&stage);
+    }
+    if (!rc && c->ch->state==GF2_OFF) {
+        stage="foundation_start"; rc=l->owner->foundation_start(l);
+    }
+    if (!rc && c->ch->state==GF2_OFF) {
+        stage="channel_start"; rc=gf2_start(c->ch,f);
+    }
+    if (!rc) {
+        stage="channel_state";
+        if (c->ch->state!=GF2_RUN || !c->ch->epoch || c->ch->fault.latched) rc=GF4_ESTATE;
+    }
     if (!rc) {
         c->epoch=c->ch->epoch;
-        rc=gf4_scan_reserve_initial(c,dl);
+        stage="scan_reserve"; rc=gf4_scan_reserve_initial(c,dl);
     }
-    if (!rc) rc=gf3_service_objects_init(s,dl);
+    if (!rc) { stage="objects_init"; rc=gf3_service_objects_init(s,dl); }
     if (!rc) {
         c->ready=true;
-        rc=gf4_detect(c,dl);
+        stage="detect"; rc=gf4_detect(c,dl);
     }
     i32 reason=c->last_rc; /* DDC fallback can succeed with a diagnostic. */
-    if (!rc) rc=svc_initial(c,dl);
+    if (!rc) rc=svc_initial(c,dl,&stage);
     if (!rc) {
         c->saved_closed=false;
         l->mode=c->state->committed[0];
-        rc=c->links->admission(c->links->owner,true);
+        stage="admission_open"; rc=c->links->admission(c->links->owner,true);
     }
     if (!rc) {
         c->accepting=true; l->active=true; l->stop_ok=false;
         (void)svc_result(c,reason);
         return 0;
     }
+    (void)svc_start_failure(c,stage,rc);
     /* The failed start is never public; cleanup errors are separately kept.
      * Keep both loans through any partial cleanup, including OFF failures. */
     c->recovery_rc=gf4_service_stop(c,dl);
