@@ -1740,6 +1740,116 @@ offset	struct gf2_test_request.op	4
 member_size	struct gf2_test_request.op	4
 offset	struct gf2_test_request.size	0
 member_size	struct gf2_test_request.size	4
+size	struct gf3_ctx	7512
+align	struct gf3_ctx	4
+offset	struct gf3_ctx.ch	0
+member_size	struct gf3_ctx.ch	4
+offset	struct gf3_ctx.epoch	332
+member_size	struct gf3_ctx.epoch	4
+offset	struct gf3_ctx.last_rc	336
+member_size	struct gf3_ctx.last_rc	4
+offset	struct gf3_ctx.notify	304
+member_size	struct gf3_ctx.notify	24
+offset	struct gf3_ctx.notify_off	328
+member_size	struct gf3_ctx.notify_off	4
+offset	struct gf3_ctx.notify_storage	292
+member_size	struct gf3_ctx.notify_storage	12
+offset	struct gf3_ctx.obj	4
+member_size	struct gf3_ctx.obj	288
+offset	struct gf3_ctx.ready	340
+member_size	struct gf3_ctx.ready	1
+offset	struct gf3_ctx.scratch	344
+member_size	struct gf3_ctx.scratch	7168
+size	struct gf3_format	28
+align	struct gf3_format	4
+offset	struct gf3_format.cpp	0
+member_size	struct gf3_format.cpp	4
+offset	struct gf3_format.gdi	12
+member_size	struct gf3_format.gdi	4
+offset	struct gf3_format.ifc	20
+member_size	struct gf3_format.ifc	4
+offset	struct gf3_format.pat	16
+member_size	struct gf3_format.pat	4
+offset	struct gf3_format.sf	4
+member_size	struct gf3_format.sf	4
+offset	struct gf3_format.sf_gdi	8
+member_size	struct gf3_format.sf_gdi	4
+offset	struct gf3_format.sifm	24
+member_size	struct gf3_format.sifm	4
+size	struct gf3_ram	12
+align	struct gf3_ram	4
+offset	struct gf3_ram.bytes	4
+member_size	struct gf3_ram.bytes	4
+offset	struct gf3_ram.pitch	8
+member_size	struct gf3_ram.pitch	4
+offset	struct gf3_ram.ptr	0
+member_size	struct gf3_ram.ptr	4
+size	struct gf3_rect	16
+align	struct gf3_rect	4
+offset	struct gf3_rect.h	12
+member_size	struct gf3_rect.h	4
+offset	struct gf3_rect.w	8
+member_size	struct gf3_rect.w	4
+offset	struct gf3_rect.x	0
+member_size	struct gf3_rect.x	4
+offset	struct gf3_rect.y	4
+member_size	struct gf3_rect.y	4
+size	struct gf3_span	20
+align	struct gf3_span	4
+offset	struct gf3_span.bytes	16
+member_size	struct gf3_span.bytes	4
+offset	struct gf3_span.off	0
+member_size	struct gf3_span.off	4
+offset	struct gf3_span.pitch	8
+member_size	struct gf3_span.pitch	4
+offset	struct gf3_span.rowbytes	4
+member_size	struct gf3_span.rowbytes	4
+offset	struct gf3_span.rows	12
+member_size	struct gf3_span.rows	4
+size	struct gf3_surface	32
+align	struct gf3_surface	4
+offset	struct gf3_surface.bytes	4
+member_size	struct gf3_surface.bytes	4
+offset	struct gf3_surface.fmt	20
+member_size	struct gf3_surface.fmt	4
+offset	struct gf3_surface.generation	28
+member_size	struct gf3_surface.generation	4
+offset	struct gf3_surface.height	16
+member_size	struct gf3_surface.height	4
+offset	struct gf3_surface.off	0
+member_size	struct gf3_surface.off	4
+offset	struct gf3_surface.pitch	8
+member_size	struct gf3_surface.pitch	4
+offset	struct gf3_surface.reservation_id	24
+member_size	struct gf3_surface.reservation_id	4
+offset	struct gf3_surface.width	12
+member_size	struct gf3_surface.width	4
+size	struct gf3_test_ops	48
+align	struct gf3_test_ops	4
+offset	struct gf3_test_ops.copy	12
+member_size	struct gf3_test_ops.copy	4
+offset	struct gf3_test_ops.ctx	0
+member_size	struct gf3_test_ops.ctx	4
+offset	struct gf3_test_ops.download	28
+member_size	struct gf3_test_ops.download	4
+offset	struct gf3_test_ops.fill	8
+member_size	struct gf3_test_ops.fill	4
+offset	struct gf3_test_ops.ifc	20
+member_size	struct gf3_test_ops.ifc	4
+offset	struct gf3_test_ops.map	40
+member_size	struct gf3_test_ops.map	4
+offset	struct gf3_test_ops.mono	16
+member_size	struct gf3_test_ops.mono	4
+offset	struct gf3_test_ops.present_m2mf	36
+member_size	struct gf3_test_ops.present_m2mf	4
+offset	struct gf3_test_ops.scale	32
+member_size	struct gf3_test_ops.scale	4
+offset	struct gf3_test_ops.test_surface	4
+member_size	struct gf3_test_ops.test_surface	4
+offset	struct gf3_test_ops.unmap	44
+member_size	struct gf3_test_ops.unmap	4
+offset	struct gf3_test_ops.upload	24
+member_size	struct gf3_test_ops.upload	4
 size	struct gf_display_context	1732
 align	struct gf_display_context	4
 offset	struct gf_display_context.active	250
@@ -2030,8 +2140,10 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	3104
+size	struct gf_production	10616
 align	struct gf_production	4
+offset	struct gf_production.accel	3096
+member_size	struct gf_production.accel	7512
 offset	struct gf_production.acquiring	1755
 member_size	struct gf_production.acquiring	1
 offset	struct gf_production.attempted	1753
@@ -2046,9 +2158,9 @@ offset	struct gf_production.indexes	1776
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	1872
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	3096
+offset	struct gf_production.map_ops	10608
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	3100
+offset	struct gf_production.map_owner	10612
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1752
 member_size	struct gf_production.prepared	1
@@ -2124,6 +2236,58 @@ offset	struct gf_stage_state.s0_ok	6
 member_size	struct gf_stage_state.s0_ok	1
 offset	struct gf_stage_state.values	212
 member_size	struct gf_stage_state.values	40
+size	struct gf_vram_registry	12
+align	struct gf_vram_registry	4
+offset	struct gf_vram_registry.ch	0
+member_size	struct gf_vram_registry.ch	4
+offset	struct gf_vram_registry.head	4
+member_size	struct gf_vram_registry.head	4
+offset	struct gf_vram_registry.next_id	8
+member_size	struct gf_vram_registry.next_id	4
+size	struct gf_vram_reservation	20
+align	struct gf_vram_reservation	4
+offset	struct gf_vram_reservation.bytes	8
+member_size	struct gf_vram_reservation.bytes	4
+offset	struct gf_vram_reservation.generation	16
+member_size	struct gf_vram_reservation.generation	4
+offset	struct gf_vram_reservation.off	4
+member_size	struct gf_vram_reservation.off	4
+offset	struct gf_vram_reservation.owner	0
+member_size	struct gf_vram_reservation.owner	4
+offset	struct gf_vram_reservation.reservation_id	12
+member_size	struct gf_vram_reservation.reservation_id	4
+size	struct gf_vram_reservation_node	24
+align	struct gf_vram_reservation_node	4
+offset	struct gf_vram_reservation_node.next	20
+member_size	struct gf_vram_reservation_node.next	4
+offset	struct gf_vram_reservation_node.value	0
+member_size	struct gf_vram_reservation_node.value	20
+size	struct gf_vram_view	60
+align	struct gf_vram_view	4
+offset	struct gf_vram_view.bytes	28
+member_size	struct gf_vram_view.bytes	4
+offset	struct gf_vram_view.ch	44
+member_size	struct gf_vram_view.ch	4
+offset	struct gf_vram_view.close	56
+member_size	struct gf_vram_view.close	4
+offset	struct gf_vram_view.close_owner	52
+member_size	struct gf_vram_view.close_owner	4
+offset	struct gf_vram_view.extent	0
+member_size	struct gf_vram_view.extent	16
+offset	struct gf_vram_view.map_base	20
+member_size	struct gf_vram_view.map_base	4
+offset	struct gf_vram_view.map_bytes	24
+member_size	struct gf_vram_view.map_bytes	4
+offset	struct gf_vram_view.map_ops	36
+member_size	struct gf_vram_view.map_ops	4
+offset	struct gf_vram_view.map_owner	40
+member_size	struct gf_vram_view.map_owner	4
+offset	struct gf_vram_view.mapped	32
+member_size	struct gf_vram_view.mapped	1
+offset	struct gf_vram_view.next	48
+member_size	struct gf_vram_view.next	4
+offset	struct gf_vram_view.va	16
+member_size	struct gf_vram_view.va	4
 size	struct gfinit_bus	92
 align	struct gfinit_bus	4
 offset	struct gfinit_bus.bars	76
@@ -3774,6 +3938,45 @@ enum	GF2_START	1
 enum	GF2_STATUS	0
 enum	GF2_STOP	3
 enum	GF2_VBLANK	8
+enum	GF3_ACCEL	9
+enum	GF3_ARGB8888	3
+enum	GF3_EFORMAT	4294966994
+enum	GF3_EINVAL	4294966995
+enum	GF3_ERANGE	4294966993
+enum	GF3_ESTATE	4294966992
+enum	GF3_EUNSUPPORTED	4294966991
+enum	GF3_INDEX8	0
+enum	GF3_OBJECT_COUNT	12
+enum	GF3_OBJ_BETA1	2
+enum	GF3_OBJ_BETA4	3
+enum	GF3_OBJ_BLIT	7
+enum	GF3_OBJ_CLIP	9
+enum	GF3_OBJ_GDI	6
+enum	GF3_OBJ_IFC	11
+enum	GF3_OBJ_M2MF	10
+enum	GF3_OBJ_NULL	0
+enum	GF3_OBJ_PATTERN	4
+enum	GF3_OBJ_ROP	5
+enum	GF3_OBJ_SIFM	8
+enum	GF3_OBJ_SURFACE2D	1
+enum	GF3_OK	0
+enum	GF3_RGB565	1
+enum	GF3_SUBC_BLIT	4
+enum	GF3_SUBC_GDI	3
+enum	GF3_SUBC_IFC	5
+enum	GF3_SUBC_M2MF	1
+enum	GF3_SUBC_MISC	6
+enum	GF3_SUBC_REFERENCE	0
+enum	GF3_SUBC_SURFACE2D	2
+enum	GF3_USE_2D	1
+enum	GF3_USE_BYTES	0
+enum	GF3_USE_GDI	2
+enum	GF3_USE_IFC	3
+enum	GF3_USE_SIFM_SRC	4
+enum	GF3_UYVY	6
+enum	GF3_XRGB8888	2
+enum	GF3_Y8	4
+enum	GF3_YUY2	5
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5

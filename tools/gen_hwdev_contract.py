@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
 OUT = ROOT / 'hwdev/generated'
+# docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 16 kernel imports.
+HWDEV_IMPORT_SLOTS = 26 + 16
 
 
 def normalize(text):
@@ -37,7 +39,7 @@ def slots():
             raise SystemExit('kernel declaration index mismatch')
         result.append(dict(e, index=int(index), group='kernel'))
     result.sort(key=lambda e: e['index'])
-    if [e['index'] for e in result] != list(range(40)):
+    if [e['index'] for e in result] != list(range(HWDEV_IMPORT_SLOTS)):
         raise SystemExit('HWDEV slot order/count')
     defined = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
     keys = ('index', 'symbol', 'source', 'kind', 'group')

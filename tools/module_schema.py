@@ -185,7 +185,8 @@ COMPONENTS = (
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          stop_allowed=0, ops_version=4, ops_slots=1,
-         image_max=131072, mem_max=131072, load_span_max=163840,
+         # GF_FEAT3_DESIGN combined F3/F4/F5 budget: 160/160/208 KiB.
+         image_max=160 * 1024, mem_max=160 * 1024, load_span_max=208 * 1024,
          reloc_max=8192, export_max=1,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',
          ops_symbol='geforce_module_ops', ops_names=('initialize',)),

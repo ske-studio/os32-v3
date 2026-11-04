@@ -41,8 +41,14 @@ int gf_production_quiesce(struct gf_production *p)
 { CHECK(!lease.active);return gf_display_stop(p->video.context); }
 int gf_production_point(void *p) { (void)p;return identity_ok ? 0 : -1; }
 int pc98_route_select_98(void) { return pc98_route_to_98(); }
+/* The parent fixture aliases its AppSlot as slot. */
+#undef slot
+#include "gf_accel_no_bind.h"
+#define slot host_slots[2]
+#define gf3_service_bind gf3_host_no_bind
 #define geforce_backend_ops gfx_backend_geforce
 #include "geforce_body.inc"
+#undef gf3_service_bind
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }

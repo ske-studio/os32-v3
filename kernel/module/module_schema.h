@@ -256,11 +256,11 @@ enum module_field {
         .stop_allowed = 0U, \
         .ops_version = 4U, \
         .ops_slots = 1U, \
-        .image_max = 131072U, \
-        .mem_max = 131072U, \
+        .image_max = 163840U, \
+        .mem_max = 163840U, \
         .reloc_max = 8192U, \
         .export_max = 1U, \
-        .load_span_max = 163840U, \
+        .load_span_max = 212992U, \
     }, \
 }
 

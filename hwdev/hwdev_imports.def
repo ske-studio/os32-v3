@@ -279,6 +279,20 @@
       "source": "include/sys.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "index": 40,
+      "symbol": "geforce_accel_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "group": "kernel"
+    },
+    {
+      "index": 41,
+      "symbol": "gfx_present",
+      "source": "gfx/gfx.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }
