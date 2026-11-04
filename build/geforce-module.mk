@@ -5,13 +5,15 @@ GEFORCE_DEF_SOURCES := hwdev/gf/command.h hwdev/gf/gf1_test.h hwdev/gf/gf2_test.
 $(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 
-GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o geforce_import_slots.o geforce_import_stubs.o)
+GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o gf_hook.o gf_present_m2mf.o geforce_import_slots.o geforce_import_stubs.o)
 GEFORCE_INC := $(INC_KERNEL) -I. -I$(GEFORCE_OUT)
 $(GEFORCE_OUT)/geforce_body.o: drivers/video/geforce/geforce_body.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/backend_geforce.o: drivers/video/geforce/backend_geforce.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
+$(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_present_m2mf.o: $(GEFORCE_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)
@@ -35,7 +37,7 @@ $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(GEFORCE_OUT)/geforce_kexports.o
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: $(GEFORCE_GEN)
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: private CFLAGS_BASE += -I$(GEFORCE_OUT)
 
-# mkmod enforces the GEFORCE policy: image <= 128 KiB and imports <= 32.
+# mkmod enforces GF_FEAT3_DESIGN combined budgets from module_schema.py.
 define pack_geforce
 	python3 tools/mkmod.py --module-id 12 --elf $(GEFORCE_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef

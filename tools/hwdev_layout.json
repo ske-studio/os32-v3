@@ -939,6 +939,68 @@
       "op",
       "size"
     ],
+    "struct gf3_ctx": [
+      "ch",
+      "epoch",
+      "last_rc",
+      "notify",
+      "notify_off",
+      "notify_storage",
+      "obj",
+      "ready",
+      "scratch"
+    ],
+    "struct gf3_format": [
+      "cpp",
+      "gdi",
+      "ifc",
+      "pat",
+      "sf",
+      "sf_gdi",
+      "sifm"
+    ],
+    "struct gf3_ram": [
+      "bytes",
+      "pitch",
+      "ptr"
+    ],
+    "struct gf3_rect": [
+      "h",
+      "w",
+      "x",
+      "y"
+    ],
+    "struct gf3_span": [
+      "bytes",
+      "off",
+      "pitch",
+      "rowbytes",
+      "rows"
+    ],
+    "struct gf3_surface": [
+      "bytes",
+      "fmt",
+      "generation",
+      "height",
+      "off",
+      "pitch",
+      "reservation_id",
+      "width"
+    ],
+    "struct gf3_test_ops": [
+      "copy",
+      "ctx",
+      "download",
+      "fill",
+      "ifc",
+      "map",
+      "mono",
+      "present_m2mf",
+      "scale",
+      "test_surface",
+      "unmap",
+      "upload"
+    ],
     "struct gf_display_context": [
       "active",
       "bar0_map",
@@ -1102,6 +1164,7 @@
       "run"
     ],
     "struct gf_production": [
+      "accel",
       "acquiring",
       "attempted",
       "chan",
@@ -1153,6 +1216,36 @@
       "rom_size",
       "s0_ok",
       "values"
+    ],
+    "struct gf_vram_registry": [
+      "ch",
+      "head",
+      "next_id"
+    ],
+    "struct gf_vram_reservation": [
+      "bytes",
+      "generation",
+      "off",
+      "owner",
+      "reservation_id"
+    ],
+    "struct gf_vram_reservation_node": [
+      "next",
+      "value"
+    ],
+    "struct gf_vram_view": [
+      "bytes",
+      "ch",
+      "close",
+      "close_owner",
+      "extent",
+      "map_base",
+      "map_bytes",
+      "map_ops",
+      "map_owner",
+      "mapped",
+      "next",
+      "va"
     ],
     "struct gfinit_bus": [
       "bars",
@@ -2095,6 +2188,45 @@
     "GF2_STATUS",
     "GF2_STOP",
     "GF2_VBLANK",
+    "GF3_ACCEL",
+    "GF3_ARGB8888",
+    "GF3_EFORMAT",
+    "GF3_EINVAL",
+    "GF3_ERANGE",
+    "GF3_ESTATE",
+    "GF3_EUNSUPPORTED",
+    "GF3_INDEX8",
+    "GF3_OBJECT_COUNT",
+    "GF3_OBJ_BETA1",
+    "GF3_OBJ_BETA4",
+    "GF3_OBJ_BLIT",
+    "GF3_OBJ_CLIP",
+    "GF3_OBJ_GDI",
+    "GF3_OBJ_IFC",
+    "GF3_OBJ_M2MF",
+    "GF3_OBJ_NULL",
+    "GF3_OBJ_PATTERN",
+    "GF3_OBJ_ROP",
+    "GF3_OBJ_SIFM",
+    "GF3_OBJ_SURFACE2D",
+    "GF3_OK",
+    "GF3_RGB565",
+    "GF3_SUBC_BLIT",
+    "GF3_SUBC_GDI",
+    "GF3_SUBC_IFC",
+    "GF3_SUBC_M2MF",
+    "GF3_SUBC_MISC",
+    "GF3_SUBC_REFERENCE",
+    "GF3_SUBC_SURFACE2D",
+    "GF3_USE_2D",
+    "GF3_USE_BYTES",
+    "GF3_USE_GDI",
+    "GF3_USE_IFC",
+    "GF3_USE_SIFM_SRC",
+    "GF3_UYVY",
+    "GF3_XRGB8888",
+    "GF3_Y8",
+    "GF3_YUY2",
     "GF_C_AR",
     "GF_C_AR_GATE",
     "GF_C_BRANCH",

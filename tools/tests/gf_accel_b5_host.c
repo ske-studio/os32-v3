@@ -131,7 +131,11 @@ static void errors(void)
     reset(); bits.bytes=4*bits.pitch+2; no_submit(GF3_ERANGE);
     reset(); bits.pitch=2; no_submit(GF3_ERANGE);
     reset(); bits.ptr=0; no_submit(GF3_EINVAL);
-    reset(); surface.fmt=GF3_YUY2; no_submit(GF3_EFORMAT);
+    /* Keep geometry valid so this isolates unsupported GDI format. */
+    reset(); surface.fmt=GF3_YUY2;
+    surface.pitch=surface.width*gf3_host_cpp(surface.fmt);
+    surface.bytes=surface.pitch*surface.height;
+    reservation.value.bytes=surface.bytes; no_submit(GF3_EFORMAT);
     reset(); surface.generation++; no_submit(GF3_ESTATE);
     reset(); rect.x=640; no_submit(GF3_ERANGE);
     reset(); host.ctx.ready=false; no_submit(GF3_ESTATE);

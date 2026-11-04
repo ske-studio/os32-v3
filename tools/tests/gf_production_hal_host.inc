@@ -1,8 +1,11 @@
 /* P5 module adapter + real P4 owner/transport/runner, with fake ports/copy. */
 #include "drivers/video/geforce/geforce_module.h"
 #include "gfx/palette.h"
+#include "gf_accel_no_bind.h"
+#define gf3_service_bind gf3_host_no_bind
 #define production prod
 #include "drivers/video/geforce/geforce_body.c"
+#undef gf3_service_bind
 #undef production
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)

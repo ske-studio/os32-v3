@@ -501,10 +501,10 @@ static u32 filtered(enum gf3_fmt fmt, u32 fx, u32 fy, bool bilinear)
     u32 samples[4] = {rgba(fmt,x,y), rgba(fmt,x1,y), rgba(fmt,x,y1), rgba(fmt,x1,y1)};
     u32 value = 0;
     for (u32 b = 0; b < 4U; b++) {
-        u64 top = (u64)((samples[0] >> (8U*b)) & 255U) * (TEST_FRAC_ONE - wx) +
-                  (u64)((samples[1] >> (8U*b)) & 255U) * wx;
-        u64 bottom = (u64)((samples[2] >> (8U*b)) & 255U) * (TEST_FRAC_ONE - wx) +
-                     (u64)((samples[3] >> (8U*b)) & 255U) * wx;
+        unsigned long long top = (unsigned long long)((samples[0] >> (8U*b)) & 255U) * (TEST_FRAC_ONE - wx) +
+                  (unsigned long long)((samples[1] >> (8U*b)) & 255U) * wx;
+        unsigned long long bottom = (unsigned long long)((samples[2] >> (8U*b)) & 255U) * (TEST_FRAC_ONE - wx) +
+                     (unsigned long long)((samples[3] >> (8U*b)) & 255U) * wx;
         value |= (u32)((top * (TEST_FRAC_ONE - wy) + bottom * wy) >>
                       (2U * TEST_FRAC_BITS)) << (8U * b);
     }

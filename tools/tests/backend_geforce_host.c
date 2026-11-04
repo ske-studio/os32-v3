@@ -3,6 +3,8 @@
 #include "palette.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "hwdev/gf/accel.h"
+void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
+{ if (active || scan) __builtin_trap(); }
 static int hook_fill_calls, hook_blit_calls;
 static int hook_args[6];
 int geforce_fill_rect(int x, int y, int w, int h, u8 color)

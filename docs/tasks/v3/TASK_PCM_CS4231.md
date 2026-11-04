@@ -253,7 +253,7 @@ close / reclaim が各状態から 1 度だけ解放すること)。
 | E1 | 合格: 実装・ホスト記録 (アーカイブ: `docs/archive/v3/TASK_PCM_CS4231_RESULTS.md`) |
 | E2 | 合格: `np21w-trial-pcm-sndboard64.ini`、`pcm_test nodev` の対照 (§3 の受入条件) |
 | E3 | 合格 (採取できた範囲): `pcm_test` / `pcm_test short`、当時の観測は下記。**未実施**: 200ms 書込み停止、開始直後/close直前の採取、ミュートの別確認、8KBコピー時間 |
-| E4 | 未: 共有 IRQ の偽装置 hook は未実装 |
+| E4 | 合格 (2026-11-04): 診断の像 `make kernel-pcm-e4-diag` (Image CRC cda63788、7720e20c) を NP21/W `np21w-trial-pcm-sndboard64.ini` で起動し `pcm_test e4` が 5/5 PASS (pcm・fake・both・second・tick、leftover=0)。証明の範囲はソフトウェアの共有 — 電気的な共有は実機の 82557 で。証拠 `~/os32-tmp/evidence/2026-11-04/pcm-e4/` |
 | E5 | 未: 当時は再生中の CTRL+STOP 注入を実施できなかった。後続の回収試験を当時の合格にはしない |
 | E6 | 部分: Ra266 の検出・初期化。後続の音切れは [持越し台帳 R7-2、H-4(b)(c)](../DEFERRED_TESTS.md) を参照 |
 

@@ -22,6 +22,11 @@ from mkmod import pair_crc
 from module_schema import HEADER_FIELDS
 
 
+# GF3 appends two function imports after the reviewed S6 prefix.
+REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
+                             'geforce_accel_ops', 'gfx_present')
+REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
+
 class ImportsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -212,7 +217,7 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 310)
+        self.assertEqual(len(self.entries), gen.STAGES['S5'] + len(REVIEWED_S6_KINDS))
         self.assertEqual([e['name'] for e in self.entries[221:234]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
@@ -220,8 +225,8 @@ class ImportsTests(unittest.TestCase):
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
         self.assertEqual(gen.STAGES['S4'], 234)
         self.assertEqual(gen.STAGES['S5'], 264)
-        self.assertEqual(gen.STAGES['S6'], 310)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * 2)
+        self.assertEqual(gen.STAGES['S6'], gen.STAGES['S5'] + len(REVIEWED_S6_KINDS))
+        self.assertEqual(gen.STAGE_KINDS['S6'], REVIEWED_S6_KINDS)
         self.assertEqual([(e['stage'], e['name']) for e in self.entries[234:264]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
@@ -375,7 +380,7 @@ class ImportsTests(unittest.TestCase):
             'kdi_get_kbd_inject_drop_count',
             'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count',
             'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
-            'kdi_ptr___kernel_resident_end', 'gf_production_selected', 'geforce_foundation_ops'])
+            'kdi_ptr___kernel_resident_end', *REVIEWED_S6_FUNCTION_TAIL])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
         module = gen.symbols(nm, [ROOT / 'build/out/kdebug/kdebug.elf'], False)

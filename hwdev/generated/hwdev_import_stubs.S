@@ -201,4 +201,14 @@ serial_puts_polled:
 sys_time_now:
     jmp *hwdev_import_slots+156
 .size sys_time_now, .-sys_time_now
+.globl geforce_accel_ops
+.type geforce_accel_ops, @function
+geforce_accel_ops:
+    jmp *hwdev_import_slots+160
+.size geforce_accel_ops, .-geforce_accel_ops
+.globl gfx_present
+.type gfx_present, @function
+gfx_present:
+    jmp *hwdev_import_slots+164
+.size gfx_present, .-gfx_present
 .section .note.GNU-stack,"",@progbits

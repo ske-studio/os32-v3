@@ -182,16 +182,20 @@ static int call(struct gf_foundation *f, const struct gf2_test_request *q,
     /* Revocation forbids every hardware operation, including fault capture
      * and stop/recover. The lease owner retains resources for its cleanup. */
     if (f->revoked) return reply->rc = GF2_EFAULT;
+    struct gf3_service *service = gf3_service_get(ch);
+    if (ch == production_ch && !service &&
+        (q->op == GF2T_START || q->op == GF2T_STOP || q->op == GF2T_RECOVER))
+        return reply->rc = GF3_ESTATE;
     /* X3: production lifecycle belongs to F4 when an owner is bound.
      * The diagnostic channel keeps its independent F2 lifecycle. */
-    struct gf3_service *service=ch==production_ch ? gf3_service_get(ch) : 0;
-    const struct gf3_service_owner *owner=service ? service->owner : 0;
+    const struct gf3_service_owner *owner =
+        ch == production_ch && service ? service->owner : 0;
     switch (q->op) {
     case GF2T_START:
-        if (owner) rc=owner->start(owner->owner,q->deadline_us);
+        if (owner) rc = owner->start(owner->owner, q->deadline_us);
         else {
-            rc=gf2_start(ch,f);
-            if (!rc && service) rc=gf3_service_start(service,q->deadline_us);
+            rc = gf2_start(ch, f);
+            if (!rc && service) rc = gf3_service_start(service, q->deadline_us);
         }
         break;
     case GF2T_REFERENCE:
@@ -202,13 +206,13 @@ static int call(struct gf_foundation *f, const struct gf2_test_request *q,
         if (ch->state != GF2_OFF && f->running) rc = gf2_fault_check(ch);
         break;
     case GF2T_STOP:
-        rc=owner ? owner->stop(owner->owner,q->deadline_us) :
-           service ? gf3_service_stop(service) : gf2_stop(ch);
+        rc = owner ? owner->stop(owner->owner, q->deadline_us) :
+             service ? gf3_service_stop(service) : gf2_stop(ch);
         break;
     case GF2T_RECOVER:
-        rc=owner ? owner->recover(owner->owner,q->deadline_us) :
-           service ? gf3_service_recover(service,q->deadline_us) :
-           ch->f==f ? gf2_recover(ch) : GF2_ESTATE;
+        rc = owner ? owner->recover(owner->owner, q->deadline_us) :
+             ch->f != f ? GF2_ESTATE :
+             service ? gf3_service_recover(service, q->deadline_us) : gf2_recover(ch);
         break;
     case GF2T_BAD_HANDLE:
     case GF2T_BAD_METHOD: rc = bad_command(ch, q->op, q->deadline_us); break;

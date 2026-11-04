@@ -37,7 +37,7 @@ static void finish(int code)
 #define SCAN_DEN 100u
 struct HostScanInput {
     u32 h, blank, in_cost, branch_cost, out_cost, clock_cost, cli_clock_cost;
-    unsigned long long irq_at, irq_cost, delay_at, delay_cost, lost_h, early_h;
+    unsigned long long irq_at, irq_cost, delay_at, delay_cost, lost_h, early_h, lost_v;
 };
 static struct HostScan {
     int enabled, sampling, clock_seen, settle_error, sample_error;
@@ -139,10 +139,24 @@ static void outp(unsigned int port, unsigned int value)
 #define finish pl_host_finish
 #define PL_PROFILES_CONST
 #define now_us pl_host_now_us
+#define palette_init pl_host_palette_init
+void pl_host_palette_init(void);
 #include "../../drivers/video/pc98/splash_raster_image.c"
 #undef now_us
+#undef palette_init
 #undef PL_PROFILES_CONST
 #undef finish
+
+static u32 preview_defaults;
+void pl_host_palette_init(void) { REQUIRE(irq_on); preview_defaults++; }
+
+/* These fixtures target the already previewed continuous replay. */
+static int replay_frame(struct SplashRaster *s, const struct OsriImage *im,
+                        const struct PlPlan *p, unsigned long long deadline)
+{
+    pl_context.previewed = 1;
+    return pl_frame(s, im, p, deadline);
+}
 
 static void setup(int mode, int vs_only)
 {
@@ -348,7 +362,7 @@ static void fixed_palette(void)
  * their last effective OUT timestamps, even when the player drops a row. */
 static void scan_step(unsigned long long delta)
 {
-    REQUIRE(++calls < 4000000);
+    REQUIRE(++calls < 8000000);
     unsigned long long end = scan.time + delta;
     if (irq_on && scan.input.irq_cost && end >= scan.irq_at) {
         end += scan.input.irq_cost;
@@ -383,7 +397,8 @@ static unsigned int scan_status(void)
     unsigned long long period = (unsigned long long)total * scan.input.h;
     unsigned long long phase = scan.time % period;
     unsigned int status = 0;
-    if (!missing_v && phase < (unsigned long long)high_lines * scan.input.h)
+    if (!missing_v && (!scan.input.lost_v || scan.time < scan.input.lost_v) &&
+        phase < (unsigned long long)high_lines * scan.input.h)
         status |= GDC_STAT_VSYNC;
     int high = (phase + 2 * SCAN_DEN) % scan.input.h >= scan.input.h - scan.input.blank;
     if (scan.input.lost_h && scan.time >= scan.input.lost_h &&
@@ -671,9 +686,50 @@ static void image_plan(void)
     REQUIRE(covered == 0x3f);
 }
 
+static void image_preview(void)
+{
+    for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) {
+        image_fixture(mode, vs); image_make();
+        struct SplashRaster *s = pc98_splash_raster_state();
+        REQUIRE(!pl_prepare(&image, 5, &plan));
+        unsigned long long start = scan.time;
+        u32 before = preview_defaults;
+        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(preview_defaults == before+1 && pl_context.previewed);
+        REQUIRE(scan.time - start >= 1000000ULL * SCAN_DEN);
+        REQUIRE(writes > 64 && irq_on);
+        for (u32 i = 0; i < writes; i++)
+            REQUIRE(scan.out_at[i] >= start + 1000000ULL * SCAN_DEN);
+        /* Successive frames keep replaying without another preview. */
+        scan.samples = scan.settles = 0;
+        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(preview_defaults == before+1);
+        image_fixture(mode, vs); image_make();
+        REQUIRE(!pl_prepare(&image, 5, &plan));
+        before = preview_defaults;
+        REQUIRE(pl_frame(pc98_splash_raster_state(), &image, &plan, 500000) == PL_FRAME_DEADLINE);
+        REQUIRE(preview_defaults == before && !writes);
+        /* Stop VSYNC after real preview cycles, both far from and near
+         * the absolute boot deadline. No raster OUT may follow failure. */
+        for (u32 near = 0; near < 2; near++) {
+            image_fixture(mode, vs); image_make();
+            REQUIRE(!pl_prepare(&image, 5, &plan));
+            unsigned long long stop = near ? 1000000 : 500000;
+            unsigned long long deadline = near ? 1120000 : 3000000;
+            scan.input.lost_v = stop * SCAN_DEN;
+            REQUIRE(pl_frame(pc98_splash_raster_state(), &image, &plan, deadline)
+                    == PL_FRAME_NO_SYNC);
+            REQUIRE(scan.time >= scan.input.lost_v && scan.time <= deadline * SCAN_DEN);
+            REQUIRE(scan.time <= (stop + SPLASH_RASTER_SYNC_TIMEOUT_US) * SCAN_DEN);
+            REQUIRE(!pl_context.previewed && !writes && irq_on);
+        }
+    }
+}
+
 static void image_replay(void)
 {
     product_profiles();
+    image_preview();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) {
         image_fixture(mode, vs); image_make();
         struct SplashRaster *s = pc98_splash_raster_state();
@@ -685,7 +741,7 @@ static void image_replay(void)
             (unsigned long long)(high_lines + s->active0_lines) * scan.input.h;
         for (u32 frame = 0; frame < 300; frame++, visible += period) {
             image_arm(visible);
-            int rc = pl_frame(s, &image, &plan, 10000000);
+            int rc = replay_frame(s, &image, &plan, 10000000);
             REQUIRE(rc == PL_FRAME_OK);
             REQUIRE(s->frame == frame + 1 && !s->dropped && !s->late && !s->unapplied);
             image_observe(s, 1);
@@ -741,7 +797,7 @@ static void image_faults(void)
         unsigned long long lost = visible + 123 * scan.input.h - 8 * SCAN_DEN;
         scan.input.lost_h = lost;
         image_arm(visible);
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
         u32 unapplied = 0;
         for (u32 i = 0; i < image.count; i++) if (image.event[i].line >= 123) unapplied++;
         REQUIRE(s->dropped == 1 && s->late == unapplied && s->unapplied == unapplied);
@@ -752,7 +808,7 @@ static void image_faults(void)
         image_observe(s, 0);
         scan.input.lost_h = 0;
         image_arm(visible + period);
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
         image_observe(s, 1);
         REQUIRE(s->dropped == 1 && s->late == unapplied && s->unapplied == unapplied);
         host_number("GREEN missing-H/drop/recovery mode/phase", mode * 2 + vs);
@@ -765,10 +821,10 @@ static void image_faults(void)
         visible = image_first_visible(s);
         scan.input.delay_at = visible - (unsigned long long)(vs ? s->active0_lines : high_lines) * scan.input.h + 500;
         scan.input.delay_cost = (unsigned long long)(vs ? s->active0_lines : high_lines) * scan.input.h;
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
         REQUIRE(writes > 0 && writes < 64 && irq_on && !scan.samples && s->dropped == 1);
         image_arm(visible + period);
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
         image_observe(s, 1);
         REQUIRE(s->dropped == 1 && s->unapplied == image.count);
 
@@ -777,7 +833,7 @@ static void image_faults(void)
         visible = image_first_visible(s);
         scan.input.early_h = visible + 123 * scan.input.h - 18 * SCAN_DEN;
         image_arm(visible);
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
         REQUIRE(s->dropped == 1 && s->late == unapplied && s->unapplied == unapplied);
         for (u32 i = 64; i < writes; i++) if (write_port[i] != PAL_IDX_PORT)
             REQUIRE(scan.out_at[i] < scan.input.early_h);
@@ -791,7 +847,7 @@ static void image_faults(void)
         unsigned long long start = image_first_visible(state);
         scan.input.delay_at = start - scan.input.h - 8 * SCAN_DEN;
         scan.input.delay_cost = scan.input.h + 20 * SCAN_DEN;
-        REQUIRE(pl_frame(state, &image, &plan, 3000000) == PL_FRAME_DROP);
+        REQUIRE(replay_frame(state, &image, &plan, 3000000) == PL_FRAME_DROP);
         REQUIRE(writes == 64 && !scan.samples && irq_on && state->dropped == 1);
         REQUIRE(state->late == image.count && state->unapplied == image.count);
     }
@@ -800,37 +856,37 @@ static void image_faults(void)
     struct SplashRaster *s = pc98_splash_raster_state();
     REQUIRE(!pl_prepare(&image, 5, &plan));
     missing_h = 1;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_DROP);
     REQUIRE(writes == 64 && irq_on && s->dropped == 1 && s->late == image.count);
     REQUIRE(scan.scan_reads < 100 && scan.samples == 2 && scan.settles == 1);
 
     image_fixture(1, 1); image_make(); s = pc98_splash_raster_state();
     REQUIRE(!pl_prepare(&image, 5, &plan));
-    REQUIRE(pl_frame(s, &image, &plan, 1) == PL_FRAME_DEADLINE);
+    REQUIRE(replay_frame(s, &image, &plan, 1) == PL_FRAME_DEADLINE);
     REQUIRE(!writes && !s->frame && irq_on);
     missing_v = 1;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
     REQUIRE(scan.time <= 100002 * SCAN_DEN && !writes && irq_on);
 
     image_fixture(1, 1); image_make(); s = pc98_splash_raster_state();
     REQUIRE(!pl_prepare(&image, 5, &plan));
     frozen = missing_v = 1;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
     REQUIRE(calls < 2000000 && !writes && irq_on);
 
     image_fixture(0, 1); image_make(); s = pc98_splash_raster_state();
     REQUIRE(!pl_prepare(&image, 5, &plan));
     irq_on = 0;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
     REQUIRE(!irq_on && !writes);
     irq_on = 1; clock_error = 1;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_NO_SYNC);
     REQUIRE(!writes && irq_on);
 
     image_fixture(1, 1); image_make(); s = pc98_splash_raster_state();
     REQUIRE(!pl_prepare(&image, 5, &plan));
     backwards = 1;
-    REQUIRE(pl_frame(s, &image, &plan, 20000000) == PL_FRAME_NO_SYNC);
+    REQUIRE(replay_frame(s, &image, &plan, 20000000) == PL_FRAME_NO_SYNC);
     REQUIRE(!writes && irq_on);
 
     /* Settlement failure consumes the pair and preserves drop accounting,
@@ -841,7 +897,7 @@ static void image_faults(void)
     image_arm(visible);
     scan.settle_error = 1;
     scan.input.lost_h = visible + 123 * scan.input.h - 8 * SCAN_DEN;
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_DEADLINE);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_DEADLINE);
     REQUIRE(irq_on && scan.settles == 1 && s->dropped == 1 && s->late == s->unapplied);
 }
 
@@ -872,7 +928,7 @@ static void image_rejections(void)
     /* n=0 presents initial16 with IF open and never enters PIT protection. */
     image.count = 0;
     REQUIRE(!pl_prepare(&image, 5, &plan));
-    REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+    REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
     REQUIRE(writes == 64 && !protected_writes && !scan.samples && irq_on);
 }
 
@@ -929,7 +985,7 @@ static void image_burst(void)
         scan.time = phase;
         unsigned long long visible = image_first_visible(s);
         image_arm(visible);
-        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(replay_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
         REQUIRE(s->frame == phase + 1 && !s->dropped && !s->late && !s->unapplied);
         image_observe(s, 1);
 

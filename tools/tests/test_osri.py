@@ -1,8 +1,9 @@
 """OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
              covers=['gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
+                     'tools/osri_enc2_*.py',
                      'tools/raster_obs_assets.py', 'lib/le_internal.h',
-                     'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=[], budget=60)
+                     'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=60)
 
 import argparse
 import ctypes
@@ -95,6 +96,10 @@ static int test(void) {
  fixture(2,2,1); data[128106]=0; rehash(); if (run(0)>=0) return 24;
  fixture(2,1,1); put16(128100,data[64] | data[65]<<8); rehash(); if (run(0)>=0) return 25;
  fixture(3,0,1); if (run(0)>=0) return 26;
+ fixture(2,2,1); data[128098]=1; data[128106]=0;
+ put16(128100,(data[66] | data[67]<<8)^1);
+ put16(128108,(data[64] | data[65]<<8)^1);
+ rehash(); if (run(0)>=0) return 27;
  return 0;
 }
 void _start(void) { int rc=test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

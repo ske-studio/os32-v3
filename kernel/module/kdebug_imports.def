@@ -2514,6 +2514,24 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "index": 310,
+      "symbol": "geforce_accel_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
+    },
+    {
+      "index": 311,
+      "symbol": "gfx_present",
+      "source": "gfx/gfx.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

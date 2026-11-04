@@ -10,6 +10,9 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "kstring.h"
 #include "kprintf.h"
 #include "io.h"
+#ifdef PCM_E4_DIAG
+#include "pcm_e4_diag.h"
+#endif
 
 extern const u32 pcm_kexports[];
 extern const struct module_symbol_contract pcm_import_contracts[];
@@ -24,6 +27,9 @@ static unsigned int irq_line;
 void pcm_tick(void)
 {
     if (tick_target) tick_target();
+#ifdef PCM_E4_DIAG
+    pcm_e4_tick();
+#endif
 }
 
 int pcm_open(u32 rate)
@@ -79,7 +85,12 @@ int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsi
     unsigned int saved = irq_save();
     int rc = IRQ_ERR_BUSY;
     if (module_ref_acquire(pcm_handle, r->owner, MODULE_REF_IRQ, (u32)(uptr)fn)) {
+#ifdef PCM_E4_DIAG
+        pcm_e4_attach(fn);
+        rc = irq_register(irq, pcm_e4_irq, arg, flags);
+#else
         rc = irq_register(irq, fn, arg, flags);
+#endif
         if (rc) module_ref_release(pcm_handle, MODULE_REF_IRQ);
         else { irq_line = irq; irq_target = fn; }
     }
@@ -91,7 +102,11 @@ int pcm_module_irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 {
     if (arg || !irq_target || irq_line != irq || irq_target != fn) return IRQ_ERR_INVAL;
     unsigned int saved = irq_save();
+#ifdef PCM_E4_DIAG
+    int rc = irq_unregister(irq, pcm_e4_irq, arg);
+#else
     int rc = irq_unregister(irq, fn, arg);
+#endif
     if (!rc) {
         irq_target = 0;
         irq_line = 0;

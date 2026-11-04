@@ -1551,4 +1551,14 @@ gf_production_selected:
 geforce_foundation_ops:
     jmp *kdebug_import_slots+1236
 .size geforce_foundation_ops, .-geforce_foundation_ops
+.globl geforce_accel_ops
+.type geforce_accel_ops, @function
+geforce_accel_ops:
+    jmp *kdebug_import_slots+1240
+.size geforce_accel_ops, .-geforce_accel_ops
+.globl gfx_present
+.type gfx_present, @function
+gfx_present:
+    jmp *kdebug_import_slots+1244
+.size gfx_present, .-gfx_present
 .section .note.GNU-stack,"",@progbits

@@ -3,6 +3,7 @@ CHECK = dict(name='splash-raster-host', tier=1,
     covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
             'tools/tests/splash_raster_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'gfx/gfx_osri.h', 'gfx/gfx.h',
+            'drivers/video/pc98/splash_raster_image.h',
             'include/types.h', 'include/pc98.h', 'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
             'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=15.0)
@@ -58,12 +59,23 @@ MUTATIONS = (
 )
 
 
-def build(work, source):
-    for rel in (SOURCE, HARNESS):
+IMAGE_SOURCE = 'drivers/video/pc98/splash_raster_image.c'
+PREVIEW_MUTATIONS = (
+    ('R1 preview ignores deadline', '    if (p) {', '    if (0 && p) {'),
+    ('omit R1 preview', 'if (preview(s, p, deadline_us - reserve))',
+     'if (0)'),
+    ('repeat R1 preview', '    pl_context.previewed = 1;', '    pl_context.previewed = 0;'),
+)
+
+
+def build(work, source, image_source=None):
+    for rel in (SOURCE, HARNESS, IMAGE_SOURCE):
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         if rel == SOURCE:
             dest.write_text(source)
+        elif rel == IMAGE_SOURCE:
+            dest.write_text(image_source if image_source is not None else (ROOT / rel).read_text())
         else:
             shutil.copyfile(ROOT / rel, dest)
     cross_dir = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
@@ -77,9 +89,9 @@ def build(work, source):
     return exe
 
 
-def execute(source):
+def execute(source, image_source=None):
     with tempfile.TemporaryDirectory(prefix='splash-raster-') as td:
-        exe = build(Path(td), source)
+        exe = build(Path(td), source, image_source)
         completed = host32.run([str(exe)], runner='qemu', capture_output=True)
         if completed.returncode:
             print(completed.stderr.decode() if isinstance(completed.stderr, bytes) else completed.stderr, flush=True)
@@ -103,6 +115,12 @@ def main():
             assert source.count(old) == 1, f'ambiguous/missing anchor: {name}'
             changed = source.replace(old, new, 1)
             rc = execute(changed)
+            assert rc != 0, f'survived: {name}'
+            print(f'RED {name}: compiled, runtime rc={rc}', flush=True)
+        image_source = (ROOT / IMAGE_SOURCE).read_text()
+        for name, old, new in PREVIEW_MUTATIONS:
+            assert image_source.count(old) == 1, f'ambiguous/missing anchor: {name}'
+            rc = execute(source, image_source.replace(old, new, 1))
             assert rc != 0, f'survived: {name}'
             print(f'RED {name}: compiled, runtime rc={rc}', flush=True)
 

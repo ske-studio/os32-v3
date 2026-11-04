@@ -22,6 +22,7 @@
 #include "config.h"
 #include "splash_raster.h"
 
+#ifndef SPLASH_RASTER_OBS
 /* ======== 外部参照 ======== */
 extern volatile u32 tick_count;
 extern void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
@@ -274,3 +275,17 @@ cleanup:
     palette_init();
     tvram_clear();
 }
+#else
+void boot_splash(void)
+{
+    if (platform_splash_begin()) {
+        tvram_clear();
+        return;
+    }
+    platform_splash_observe();
+    platform_splash_clear_pages();
+    gfx_shutdown();
+    palette_init();
+    tvram_clear();
+}
+#endif

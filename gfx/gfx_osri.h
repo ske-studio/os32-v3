@@ -15,6 +15,13 @@
 #define OSRI_V1_MAX_EVENTS 200u
 #define OSRI_V2_MAX_EVENTS 1197u
 #define OSRI_V2_MAX_EVENTS_PER_LINE 3u
+#ifdef SPLASH_RASTER_OBS
+#define OBS_V2_MAX_EVENTS_PER_LINE OSRI_COLORS
+#define OBS_V2_MAX_EVENTS ((GFX_HEIGHT - 1u) * OBS_V2_MAX_EVENTS_PER_LINE)
+#define OSRI_IMAGE_EVENTS OBS_V2_MAX_EVENTS
+#else
+#define OSRI_IMAGE_EVENTS OSRI_V2_MAX_EVENTS
+#endif
 /* Compatibility limit for v1; image storage uses the v2 capacity. */
 #define OSRI_MAX_EVENTS OSRI_V1_MAX_EVENTS
 #define OSRI_COLORS 16u
@@ -32,9 +39,13 @@ struct OsriHeader {
 struct OsriEvent { u16 line; u8 index, reserved0; u16 rgb444, reserved1; };
 struct OsriImage {
     u16 pal[OSRI_COLORS], count, band, version;
-    struct OsriEvent event[OSRI_V2_MAX_EVENTS];
+    struct OsriEvent event[OSRI_IMAGE_EVENTS];
 };
+#ifdef SPLASH_RASTER_OBS
+STATIC_ASSERT(sizeof(struct OsriImage) == 51110, osri_obs_image_size);
+#else
 STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
+#endif
 STATIC_ASSERT(sizeof(struct OsriHeader) == OSRI_HEADER_BYTES, osri_header_size);
 STATIC_ASSERT(__builtin_offsetof(struct OsriHeader, file_crc32) == 48, osri_crc_offset);
 STATIC_ASSERT(sizeof(struct OsriEvent) == OSRI_EVENT_BYTES, osri_event_size);

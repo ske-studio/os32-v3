@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 3769453070,
+  "module_abi_gen": 1323484579,
   "stage": "S6",
-  "count": 310,
+  "count": 312,
   "imports": [
     {
       "stage": "S1",
@@ -4684,6 +4684,38 @@
       "type_ver": 1,
       "signature": "const struct gf1_test_ops *geforce_foundation_ops(void);",
       "source_declaration": "const struct gf1_test_ops *geforce_foundation_ops(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 310,
+      "symbol": "geforce_accel_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "geforce_accel_ops",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "const struct gf3_test_ops *geforce_accel_ops(void);",
+      "source_declaration": "const struct gf3_test_ops *geforce_accel_ops(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 311,
+      "symbol": "gfx_present",
+      "source": "gfx/gfx.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "gfx_present",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void gfx_present(void);",
+      "source_declaration": "void gfx_present(void);",
       "dtype": null,
       "array": false
     }

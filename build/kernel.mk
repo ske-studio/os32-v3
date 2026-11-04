@@ -50,8 +50,20 @@ C_KERNEL = \
     drivers/video/pc98/splash_raster_image.c
 
 ifeq ($(SPLASH_DIAG_BUILD),1)
+ifeq ($(SPLASH_OBS_BUILD),1)
+$(error SPLASH_DIAG_BUILD and SPLASH_OBS_BUILD are mutually exclusive)
+endif
 C_KERNEL += platform/pc98/splash_probe.c
 KERNEL_CFLAGS += -DSPLASH_RASTER_DIAG
+endif
+ifeq ($(SPLASH_OBS_BUILD),1)
+C_KERNEL += platform/pc98/splash_obs.c
+KERNEL_CFLAGS += -DSPLASH_RASTER_OBS
+endif
+
+ifeq ($(PCM_E4_DIAG_BUILD),1)
+C_KERNEL += drivers/sound/cs4231/pcm_e4_diag.c drivers/sound/cs4231/pcm_e4_guest.c
+KERNEL_CFLAGS += -DPCM_E4_DIAG
 endif
 
 C_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_KERNEL:.c=.o))
@@ -312,3 +324,16 @@ kernel-splash-diag:
 # Keep this diagnostic target confined to its image and matching modules.
 .PHONY: splash-diag-image
 splash-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
+
+# Observation has a separate type capacity, image, map and paired modules.
+.PHONY: kernel-splash-obs splash-obs-image
+kernel-splash-obs:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/splash-obs SPLASH_OBS_BUILD=1 splash-obs-image
+
+splash-obs-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
+
+# Match splash diagnostics: isolated objects/image and CRC-paired modules.
+.PHONY: kernel-pcm-e4-diag pcm-e4-diag-image
+kernel-pcm-e4-diag:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/pcm-e4-diag PCM_E4_DIAG_BUILD=1 pcm-e4-diag-image
+pcm-e4-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
