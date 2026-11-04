@@ -1,6 +1,6 @@
 """OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
-             covers=['gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
+             covers=['tools/osri_profile.py', 'gfx/osri_profile.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
                      'tools/osri_enc2_*.py',
                      'tools/raster_obs_assets.py', 'lib/le_internal.h',
                      'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=60)
@@ -22,6 +22,7 @@ from PIL import Image
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
 WRAPPER = r'''
 #include "gfx_osri.h"
 #include "gfx_hal.h"
@@ -58,9 +59,9 @@ static void fixture(unsigned int version, unsigned int n, unsigned int band) {
  put16(4, version); put16(44, band); length=128096+8*n;
  put32(16,length); put32(36,n);
  for (unsigned int i=0;i<n;i++) {
-  unsigned int off=128096+8*i, line=1+i/3, index=i%3;
+  unsigned int off=128096+8*i, line=1+i/16, index=i%16;
   put16(off,line); data[off+2]=index; data[off+3]=0;
-  put16(off+4, (data[64+2*index] | data[65+2*index]<<8) ^ (1+(i/3)%2));
+  put16(off+4, (data[64+2*index] | data[65+2*index]<<8) ^ (1+(i/16)%2));
   put16(off+6,0);
  }
  rehash();
@@ -82,24 +83,34 @@ static int test(void) {
  fixture(2,200,1); if (run(0)) return 11;
  fixture(2,201,1); if (run(0)) return 12;
  fixture(2,1197,1); if (run(0)) return 13;
- fixture(2,1198,1); if (run(0)>=0 || pos != 64) return 14;
+ fixture(2,1198,1); if (run(0)) return 14;
+ fixture(2,6384,1); if (run(0)) return 28;
+ fixture(2,6385,1); if (run(0)>=0 || pos != 64) return 29;
  fixture(1,200,1); if (run(0)) return 15;
  fixture(1,201,1); if (run(0)>=0) return 16;
  fixture(1,0,4); if (run(0)) return 17;
  fixture(1,0,1); if (run(0)>=0) return 18;
  fixture(1,4,1); put16(128096+24,1); data[128096+26]=3;
  put16(128096+28,(data[70] | data[71]<<8)^1); rehash(); if (run(0)) return 19;
- put16(4,2); rehash(); if (run(0)>=0) return 20;
+ put16(4,2); rehash(); if (run(0)) return 20;
  fixture(2,1,1); put16(128096,0); rehash(); if (run(0)>=0) return 21;
  put16(128096,400); rehash(); if (run(0)>=0) return 22;
  put16(128096,1); data[128098]=16; rehash(); if (run(0)>=0) return 23;
  fixture(2,2,1); data[128106]=0; rehash(); if (run(0)>=0) return 24;
- fixture(2,1,1); put16(128100,data[64] | data[65]<<8); rehash(); if (run(0)>=0) return 25;
+ fixture(2,1,1); put16(128100,data[64] | data[65]<<8); rehash(); if (run(0)) return 25;
  fixture(3,0,1); if (run(0)>=0) return 26;
  fixture(2,2,1); data[128098]=1; data[128106]=0;
  put16(128100,(data[66] | data[67]<<8)^1);
  put16(128108,(data[64] | data[65]<<8)^1);
- rehash(); if (run(0)>=0) return 27;
+ rehash(); if (run(0)) return 27;
+ for (unsigned int band=1;band<=4;band*=2) {
+  fixture(2,2,band); put16(128096,band); put16(128104,3*band);
+  rehash(); if (run(0)) return 30;
+  put16(128104,3*band+1); rehash(); if (band>1 && run(0)>=0) return 31;
+ }
+ fixture(1,2,1); data[128098]=1; data[128106]=0;
+ put16(128100,(data[66] | data[67]<<8)^1); put16(128108,(data[64] | data[65]<<8)^1);
+ rehash(); if (run(0)>=0) return 32;
  return 0;
 }
 void _start(void) { int rc=test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
@@ -116,7 +127,7 @@ def run_loader(td, data, expected):
     struct.pack_into('<I', data, 48, zlib.crc32(data))
     src = Path(os.environ.get('OSRI_TEST_SOURCE', ROOT / 'gfx/gfx_osri.c')).read_text()
     wrapper = td / 'wrap.c'; wrapper.write_text(WRAPPER)
-    blob = td / 'data.bin'; blob.write_bytes(data + b'X' + bytes(10000))
+    blob = td / 'data.bin'; blob.write_bytes(data + b'X' + bytes(8*6385))
     expected_blob = td / 'expected.bin'; expected_blob.write_bytes(expected)
     asm = td / 'data.S'; asm.write_text('.data\n.global data,expected_planes\ndata: .incbin "' + str(blob) + '"\nexpected_planes: .incbin "' + str(expected_blob) + '"\n')
     exe = td / 'test'
@@ -427,7 +438,7 @@ def main():
     args = parser.parse_args(); check()
     if args.mutate:
         mutations = [
-            ('v1-line-limit', 'gfx/gfx_osri.c', 'version == OSRI_VERSION_2 && line_count > OSRI_V2_MAX_EVENTS_PER_LINE', 'line_count > OSRI_V2_MAX_EVENTS_PER_LINE', 'OSRI_TEST_SOURCE'),
+            ('v2-same-color', 'gfx/gfx_osri.c', 'version != OSRI_VERSION_2 && current[ev->index]', '1 && current[ev->index]', 'OSRI_TEST_SOURCE'),
             ('v2-max-plus-one', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS + 1)', 'OSRI_TEST_SOURCE'),
             ('v2-count', 'gfx/gfx_osri.c', 'version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS', 'OSRI_V1_MAX_EVENTS', 'OSRI_TEST_SOURCE'),
             ('version', 'gfx/gfx_osri.c', '(version != OSRI_VERSION_1 && version != OSRI_VERSION_2)', '0', 'OSRI_TEST_SOURCE'),

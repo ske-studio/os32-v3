@@ -1,6 +1,6 @@
 # TASK_OSRI_VIEWER — .osri ビューアー (ユーザーアプリ)
 
-> 状態: **設計中 (2026-11-04)** — 設計は確定し、実装は GeForce の後で待つ。詳細設計は [OSRI_VIEWER_DESIGN](../../decisions/gui/OSRI_VIEWER_DESIGN.md)。段はまだ出さない。前提のラスタの常用の再生は [TASK_RASTER_SPLASH](TASK_RASTER_SPLASH.md) の S5。
+> 状態: **設計中 (2026-11-04)** — 設計は確定し、実装は GeForce の後で待つ。詳細設計は [OSRI_VIEWER_DESIGN](../../decisions/gui/OSRI_VIEWER_DESIGN.md)。段はまだ出さない。前提のラスタの常用の再生は票 TASK_RASTER_SPLASH の S5。
 
 ## 0. ユーザーの決定 (2026-11-04、原文)
 

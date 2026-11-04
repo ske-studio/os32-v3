@@ -95,7 +95,7 @@ int rc = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
 - 期待出力は同runの`out/enc2-b31.osri`、SHA256=`afc3ceb70e9b7dc35115f9cc27b56b41ac05ae8c9a8fabdc84aa4f39dd760bab`、CRC=`16769bea`、131888B/474件/実OUT最大25・総1181。B47出力と同一バイト列。
 - 新`tools/raster_splash_asset.py`はINPUT/OUTPUT必須、共通入口で一時生成→独立復号・全行OUT≤31検査→既存基準との全バイト照合→rename。不一致の由来を調査し、期待値を無条件更新しない。既存出力置換は明示指定、原画は不変。
 - manifestに原画SHA・確定生成器コミット・引数・threads・ライブラリ版・出力SHA/CRC/bytes/events/OUT最大総数を保存。資産は`assets/splash/splash.osri`と同ディレクトリのmanifest。OSはsidecarを読まない。
-- 生成は明示ホスト操作とし、通常makeで取得・再変換しない。HDD/CDの任意初回画像パッケージで`/boot/splash.osri`へ配置、既存ユーザー画像は保持、起動FD/MINIMALには追加しない。
+- 生成は明示ホスト操作とし、通常makeで取得・再変換しない。配布の画像 `/boot/splash.osri` は普通の /boot の配備の集合 (HDD の配備・hsync) に入れ、更新のたびに上書きする。起動は `/boot/user.osri` を先に探し、あればそれを、無ければ `/boot/splash.osri` を表示する (ユーザー決定 2026-11-04「user.osriがある場合そちらを優先」)。user.osri は配備に入れないので、ユーザーが置いた画像は更新で消えない。起動FD/MINIMALには追加しない。
 - 差替えは再生成・検査→時刻モデルpreview→常用対応カーネルを候補媒体へ先行配置→画像配置→NP21/W/実機受入→PMによる既存画像退避・差替え→像内読戻しSHA照合。B47実機良好の既報を常用A8完了の代用にしない。
 - ロールバックは退避.osriを復元。旧カーネルへ戻す場合は画像も旧受理範囲へ戻す。新ファイルの旧カーネルでの再生は保証せず、拒否時は内蔵ロゴへ戻す。
 
@@ -120,7 +120,7 @@ int rc = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
 | `drivers/video/pc98/splash_raster_image.*`、`kernel/time/ktime.*`・`time_splash_math.*` | 旧核/認定/専用時間処理削除、PlRow/preview保持、参照と登録を整理。 |
 | `platform/pc98/splash_image.c`・`splash_obs.c`、`include/platform_splash.h`、`init/boot_splash.c` | 常用所有・残時間・preview、OBS共通化、引数変更とtry_image_until削除、呼出結線。 |
 | +`tools/osri_profile.py`、enc2依存群、`tools/img2osri.py`、+`tools/raster_splash_asset.py` | 正典読取/比較47、受入済み並列入口、既定結線、1枚検査・manifest。 |
-| `build/kernel.mk`・`build/packages.yaml`、資産2ファイル、PL/ENC2正典・TASK_RASTER_SPLASH | PM直列で新.c/削除登録・任意パッケージ・FD除外・契約/段状態を更新。emit生成規則は追加しない。 |
+| `build/kernel.mk`・`build/packages.yaml`、資産2ファイル、PL/ENC2正典・TASK_RASTER_SPLASH | PM直列で新.c/削除登録・/boot の配備の集合への splash.osri の追加・FD除外・契約/段状態を更新。emit生成規則は追加しない。 |
 | `tools/tests/test_osri.py`・`splash_obs_host.c`・`test_splash_obs.py`・+`test_splash_v2.py` | 形式・共通I/O模型・OBS駆動・通常所有/時間/CLIを検査。 |
 | `tools/tests/splash_raster_host.c`と起動スクリプト/CHECK、`time_splash_math_host.c`と対応登録 | 旧核/認定/専用時間APIの試験・stub・mutation anchorを削除。有効なpreview/IF/同期/cleanup試験を共通核・通常所有試験へ移す。DIAG probe試験は残す。 |
 1機能1ファイル、同一ファイル/宣言/結線/登録/生成物は直列。大きい旧再生ファイルへ新機能を追記しない。

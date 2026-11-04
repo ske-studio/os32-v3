@@ -1,6 +1,8 @@
-"""OBS real-C scan/ownership tests, runtime mutants and normal code isolation."""
+"""OBS real-C scan/ownership tests, runtime mutants and shared normal/OBS code."""
 CHECK = dict(name='splash-obs-host', tier=1,
     covers=['drivers/video/pc98/splash_raster_image.c',
+            'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.c',
+            'drivers/video/pc98/splash_raster_play.h', 'gfx/osri_profile.h',
             'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
             'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'platform/pc98/splash_obs.c',
@@ -24,60 +26,48 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-NORMAL_BASE = '22685d9b'
-PLAYER = 'drivers/video/pc98/splash_raster_image.c'
+PLAYER = 'drivers/video/pc98/splash_raster_play.c'
+PLAN = 'drivers/video/pc98/splash_raster_plan.c'
+PREVIEW = 'drivers/video/pc98/splash_raster_image.c'
 OWNER = 'platform/pc98/splash_obs.c'
 HEADER = 'gfx/gfx_osri.h'
-SOURCES = [PLAYER, OWNER, HEADER, 'gfx/gfx_osri.c',
+SOURCES = [PLAYER, PLAN, PREVIEW, 'gfx/osri_profile.h',
+           'drivers/video/pc98/splash_raster_play.h', OWNER, HEADER, 'gfx/gfx_osri.c',
            'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
            'init/boot_splash.c', 'lib/le_internal.h', 'lib/crc32_core.inc',
            'tools/tests/splash_obs_host.c']
-NORMAL_UNITS = ['gfx/gfx_osri.c', PLAYER, 'init/boot_splash.c',
-                'drivers/video/pc98/splash_raster.c', 'platform/pc98/splash.c',
-                'platform/pc98/splash_image.c']
 MUTATIONS = (
-    ('prepare capacity', PLAYER, 'image->count > OBS_V2_MAX_EVENTS', 'image->count >= OBS_V2_MAX_EVENTS'),
-    ('row order', PLAYER, 'e->line != y || e->index', 'e->line > y || e->index'),
-    ('47 bound', PLAYER, '> PL_OBS_OUT_LIMIT) return -1;', '> PL_OBS_OUT_LIMIT + 1) return -1;'),
-    ('component G', PLAYER, 'if ((old & 0x0f0) != (rgb & 0x0f0)) {', 'if (1) {'),
-    ('component R', PLAYER, 'if ((old & 0xf00) != (rgb & 0xf00)) {', 'if (1) {'),
-    ('component B', PLAYER, 'if ((old & 0x00f) != (rgb & 0x00f)) {', 'if (1) {'),
-    ('carry colors', PLAYER, 'current[e->index] = rgb;', '(void)rgb;'),
-    ('max stats', PLAYER, 'plan->max_outs = r->count;', 'plan->max_outs = 0;'),
-    ('total stats', PLAYER, 'plan->total_outs += r->count;', 'plan->total_outs = r->count;'),
-    ('early selection', PLAYER, 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;\n        if (!(status & GDC_STAT_HBLANK)) {\n            if (!armed) {\n                armed = 1;\n                if (r->count) outp(PAL_IDX_PORT, r->first);', 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;\n        if (!(status & GDC_STAT_HBLANK)) {\n            if (!armed) {\n                armed = 1;\n                (void)r;'),
-    ('duplicate OBS', 'gfx/gfx_osri.c', 'if (seen & (1u << ev->index)) goto done;', 'if (0 && (seen & (1u << ev->index))) goto done;'),
-    ('6384 bound', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OBS_V2_MAX_EVENTS)',
-     'OSRI_V1_MAX_EVENTS : OBS_V2_MAX_EVENTS - 1)'),
-    ('next index', PLAYER, 'r->value[r->count++] = e->index;', 'r->value[r->count++] = 0;'),
-    ('low rearm', PLAYER, 'else if (armed) {\n            emit(r);',
-     'else {\n            emit(r);'),
-    ('missing CLI', PLAYER, 'unsigned int flags = irq_save();\n    int rc = PL_FRAME_DROP;',
-     'unsigned int flags = 1;\n    int rc = PL_FRAME_DROP;'),
-    ('visible IF open', PLAYER, 'int rc = PL_FRAME_DROP;\n    /* Protect F',
-     'int rc = PL_FRAME_DROP;\n    irq_restore(flags);\n    /* Protect F'),
-    ('missing restore', PLAYER, 'obs_done:\n    irq_restore(flags);', 'obs_done:\n    (void)flags;'),
-    ('B1 VSYNC drop', PLAYER, 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;',
-     'if (0 && (status & GDC_STAT_VSYNC)) return PL_FRAME_DROP;'),
-    ('double VBLANK', PLAYER, 'if (obs_vsync(0) || obs_vsync(1)) return PL_FRAME_NO_SYNC;',
-     'if (obs_vsync(0) || obs_vsync(1) || obs_vsync(0) || obs_vsync(1)) return PL_FRAME_NO_SYNC;'),
-    ('finite wait', PLAYER, 'i < PL_OBS_POLL_LIMIT; i++)\n        if (!!',
-     '1; i++)\n        if (!!'),
+    ('prepare capacity', PLAN, 'image->count > OSRI_IMAGE_EVENTS', 'image->count >= OSRI_IMAGE_EVENTS'),
+    ('row order', PLAN, 'e->line != y || e->line % image->band', 'e->line > y || e->line % image->band'),
+    ('31 bound', PLAN, 'r->count + outs + !!r->count > OSRI_DEFAULT_OUT_BUDGET ||\n                r->count + outs + !!r->count > sizeof(r->port)', 'r->count + outs + !!r->count > 47u'),
+    ('check too late', PLAN, 'r->count + outs + !!r->count > OSRI_DEFAULT_OUT_BUDGET ||\n                r->count + outs + !!r->count > sizeof(r->port)', 'r->count + 0u * outs > OSRI_DEFAULT_OUT_BUDGET'),
+    ('31 equality', PLAN, '> OSRI_DEFAULT_OUT_BUDGET ||', '>= OSRI_DEFAULT_OUT_BUDGET ||'),
+    ('component G', PLAN, 'if ((old & 0x0f0) != (rgb & 0x0f0)) {', 'if (1) {'),
+    ('component R', PLAN, 'if ((old & 0xf00) != (rgb & 0xf00)) {', 'if (1) {'),
+    ('component B', PLAN, 'if ((old & 0x00f) != (rgb & 0x00f)) {', 'if (1) {'),
+    ('carry colors', PLAN, 'current[e->index] = rgb;', '(void)rgb;'),
+    ('max stats', PLAN, 'plan->max_outs = r->count;', 'plan->max_outs = 0;'),
+    ('total stats', PLAN, 'plan->total_outs += r->count;', 'plan->total_outs = r->count;'),
+    ('early selection', PLAYER, 'if (r->count) outp(PAL_IDX_PORT, r->first);', '(void)r;'),
+    ('duplicate', 'gfx/gfx_osri.c', 'if (seen & (1u << ev->index)) goto done;', 'if (0 && (seen & (1u << ev->index))) goto done;'),
+    ('6384 bound', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS - 1)'),
+    ('next index', PLAN, 'r->value[r->count++] = e->index;', 'r->value[r->count++] = 0;'),
+    ('low rearm', PLAYER, 'else if (armed) {\n            emit(r);', 'else {\n            emit(r);'),
+    ('missing CLI', PLAYER, 'unsigned int flags = irq_save();', 'unsigned int flags = 1; (void)irq_save;'),
+    ('missing restore', PLAYER, 'play_done:\n    irq_restore(flags);', 'play_done:\n    (void)flags; (void)irq_restore;'),
+    ('VSYNC drop', PLAYER, 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;', 'if (0 && (status & GDC_STAT_VSYNC)) return PL_FRAME_DROP;'),
+    ('double VBLANK', PLAYER, 'if (play_vsync(0) || play_vsync(1)) return PL_FRAME_NO_SYNC;', 'if (play_vsync(0) || play_vsync(1) || play_vsync(0) || play_vsync(1)) return PL_FRAME_NO_SYNC;'),
+    ('finite wait', PLAYER, 'i < PL_PLAY_POLL_LIMIT; i++)\n        if (!!', '1; i++)\n        if (!!'),
     ('omit plan release', OWNER, 'if (plan) kfree(plan);', '(void)plan;'),
     ('omit image release', OWNER, 'if (image) kfree(image);', '(void)image;'),
     ('drop extends duration', OWNER, 'round < rounds; round++', 'frames < rounds; round++'),
     ('duration rounding', OWNER, '(duration + period - 1) / period', 'duration / period'),
-    ('drop hides no_sync', OWNER, '!kstrcmp(status, "ok") && !frames && drops',
-     '!frames && drops'),
+    ('drop hides no_sync', OWNER, '!kstrcmp(status, "ok") && !frames && drops', '!frames && drops'),
     ('omit UART init', OWNER, '    serial_init(SYS_SERIAL_BAUD);', '    (void)SYS_SERIAL_BAUD;'),
-    ('invisible label', OWNER, '#define SPLASH_OBS_LABEL_ATTR TATTR_WHITE',
-     '#define SPLASH_OBS_LABEL_ATTR 0x07u'),
-    ('preview shortened', PLAYER, 'round < rounds; round++)\n        if (preview_vsync',
-     'round + 1u < rounds; round++)\n        if (preview_vsync'),
-    ('OBS guard removed', HEADER,
-     '#ifdef SPLASH_RASTER_OBS\n#define OBS_V2_MAX_EVENTS_PER_LINE',
-     '#define SPLASH_RASTER_OBS 1\n#ifdef SPLASH_RASTER_OBS\n#define OBS_V2_MAX_EVENTS_PER_LINE'),
+    ('invisible label', OWNER, '#define SPLASH_OBS_LABEL_ATTR TATTR_WHITE', '#define SPLASH_OBS_LABEL_ATTR 0x07u'),
+    ('preview shortened', PREVIEW, 'round < rounds; round++)\n        if (preview_vsync', 'round + 1u < rounds; round++)\n        if (preview_vsync'),
 )
+
 
 
 def compiler():
@@ -140,12 +130,12 @@ def asset_fixtures(work, directory):
                 else:
                     first[y] = index
                 rows[y].extend(components)
-            assert len(rows[y]) <= 47
+            assert len(rows[y]) <= 31
         expected = bytearray()
         for y, row in enumerate(rows):
             expected += bytes([first[y], len(row)])
-            expected += bytes(port for port, value in row) + bytes(64-len(row))
-            expected += bytes(value for port, value in row) + bytes(64-len(row))
+            expected += bytes(port for port, value in row) + bytes(31-len(row))
+            expected += bytes(value for port, value in row) + bytes(31-len(row))
         maximum, total = max(map(len, rows)), sum(map(len, rows))
         expected += struct.pack('<II', maximum, total)
         fixture = work / f'asset{n}.bin'
@@ -161,7 +151,7 @@ static void check_asset(const u8 *data, u32 size) {
     for (u32 i=0; i<size; i++) file[i]=data[i];
     gfx_kernel_framebuffer(&fb);
     REQUIRE(!osri_load("asset", &fb, &image));
-    REQUIRE(!pl_obs_prepare(&image, &plan));
+    REQUIRE(!pl_v2_prepare(&image, &plan));
     for (u32 i=0; i<sizeof(plan); i++) REQUIRE(((u8 *)&plan)[i] == data[size+i]);
 }
 """
@@ -181,7 +171,7 @@ def execute(mutation=None, asset_dir=None):
         assets = asset_fixtures(work, asset_dir) if asset_dir else []
         normal = work / 'normal.c'
         normal.write_text('#include "gfx_osri.h"\n'
-            'void _start(void) { int rc = sizeof(struct OsriImage) != 9614;'
+            'void _start(void) { int rc = sizeof(struct OsriImage) != 51110;'
             '__asm__ volatile("int $0x80" : : "a"(1), "b"(rc));'
             '__builtin_unreachable(); }\n')
         exe = work / 'host'
@@ -200,43 +190,28 @@ def execute(mutation=None, asset_dir=None):
 
 
 def normal_sections():
-    """Compare normal code to the fixed pre-OBS base, including after commit.
-
-    FIX1 intentionally adds the preview to R1. Only its new helper and its
-    prepare/frame hooks may differ; every other normal section stays exact.
-    Runtime tests separately exercise the preview and its replay hooks.
-    """
-    preview_sections = {'.text.pl_preview', '.text.preview_vsync',
-                        '.text.preview_rounds', '.text.preview', '.text.pl_prepare', '.text.pl_frame'}
-    with tempfile.TemporaryDirectory(prefix='splash-normal-') as td:
+    """Both builds compile exactly the same preparation and scan columns."""
+    with tempfile.TemporaryDirectory(prefix='splash-shared-') as td:
         work = Path(td)
         cc = compiler()
-        objdump = str(Path(cc).with_name('i386-elf-objdump'))
         objcopy = str(Path(cc).with_name('i386-elf-objcopy'))
-        for rel in [*NORMAL_UNITS, HEADER, 'include/platform_splash.h',
-                    'drivers/video/pc98/splash_raster_image.h']:
-            dest = work / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(subprocess.check_output(['git', 'show', NORMAL_BASE + ':' + rel], cwd=ROOT))
-        for rel in NORMAL_UNITS:
-            sections = []
-            for index, source in enumerate((work / rel, ROOT / rel)):
-                obj = work / f'unit{index}.o'
-                subprocess.run([cc, *flags(work if index == 0 else ROOT),
-                                '-c', str(source), '-o', str(obj)], check=True)
-                listing = subprocess.check_output([objdump, '-h', str(obj)], text=True)
-                names = re.findall(r'^\s*\d+\s+(\.(?:text|rodata)[\w.]*)\s', listing, re.M)
-                data = {}
-                for name in names:
-                    blob = work / 'section.bin'
-                    subprocess.run([objcopy, '-O', 'binary', '--only-section=' + name,
-                                    str(obj), str(blob)], check=True)
-                    if rel != PLAYER or name not in preview_sections:
-                        data[name] = blob.read_bytes()
-                sections.append(data)
-            assert sections[0] == sections[1], f'normal code changed: {rel}'
-    print('GREEN normal .text/.rodata vs ' + NORMAL_BASE +
-          ' (six units; explicit R1 preview hooks excluded)', flush=True)
+        nm = str(Path(cc).with_name('i386-elf-nm'))
+        for rel in (PLAYER, PLAN):
+            blobs = []
+            for obs in (False, True):
+                obj = work / ('obs.o' if obs else 'normal.o')
+                subprocess.run([cc, *flags(ROOT), *(['-DSPLASH_RASTER_OBS'] if obs else []),
+                                '-c', str(ROOT / rel), '-o', str(obj)], check=True)
+                symbols = subprocess.check_output([nm, '-a', str(obj)], text=True)
+                assert not re.search(r'pl_emit(?:3[2-9]|4[0-7])\b|__(?:u?div|u?mod)di3', symbols)
+                blob = work / 'column.bin'
+                subprocess.run([objcopy, '-O', 'binary', str(obj), str(blob)], check=True)
+                blobs.append(blob.read_bytes())
+            assert blobs[0] == blobs[1], rel
+        obj = work / 'preview.o'
+        subprocess.run([cc, *flags(ROOT), '-c', str(ROOT / PREVIEW), '-o', str(obj)], check=True)
+        assert not re.search(r'__(?:u?div|u?mod)di3', subprocess.check_output([nm, '-u', str(obj)], text=True))
+    print('GREEN normal/OBS shared columns; emit 32..47 and 64-bit division helpers absent', flush=True)
 
 
 def main():
@@ -245,7 +220,7 @@ def main():
     parser.add_argument('--obs-dir', type=Path, help='also compare N01..N08 to independent I/O decode')
     args = parser.parse_args()
     assert execute(asset_dir=args.obs_dir) == 0, 'OBS baseline runtime failed'
-    print('GREEN variable OUTs, pi, 47/48 boundary, 6384 capacity, exact columns, both modes/phases, IF, '
+    print('GREEN variable OUTs, pi, 31/32 boundary, 6384 capacity, exact columns, both modes/phases, IF, '
           'VSYNC drop, finite waits, next frame, ownership, serial pairs and cleanup', flush=True)
     normal_sections()
     if args.mutate:

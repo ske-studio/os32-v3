@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import time
 import numpy as np
+from osri_profile import OSRI_DEFAULT_OUT_BUDGET, OSRI_COMPARE_OUT_LIMIT
 from osri_enc2_spec import Config, codes, components
 from osri_enc2_plan import prepare
 from osri_enc2_tree import row_candidates
@@ -30,8 +31,8 @@ def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_p
             not 1 <= pixels.shape[0] <= 400 or not 1 <= pixels.shape[1] <= 640 or
             np.any(pixels < 0) or np.any(pixels > 255)):
         raise ValueError('expected RGB8 image, at most 640x400')
-    if not 0 <= budget <= 47:
-        raise ValueError('OUT budget must be 0..47')
+    if not 0 <= budget <= OSRI_COMPARE_OUT_LIMIT:
+        raise ValueError(f'OUT budget must be 0..{OSRI_COMPARE_OUT_LIMIT}')
     binary = Path(os.environ.get('ENC2_CORE', ROOT / 'build/out/osri-enc2-core'))
     if not binary.is_file():
         raise FileNotFoundError(f'{binary}: run make osri-enc2-core first')
@@ -101,20 +102,20 @@ def quantize(pixels, palettes, orders, cfg=Config(), *, timed=True, dither=True)
     payload = _u32(codes(palettes))
     for order in orders:
         payload += _u32([len(order), *order])
-    result = _run(1, pixels, 47, cfg, payload, timed=timed, dither=dither)
+    result = _run(1, pixels, OSRI_COMPARE_OUT_LIMIT, cfg, payload, timed=timed, dither=dither)
     return np.frombuffer(result, dtype=np.uint8).reshape(np.shape(pixels)[:2]).copy()
 
 
-def encode_image(source, output, *, threads=None):
-    """Convert one image to the usual enc2 B=31 OSRI, including black padding."""
+def encode_image(source, output, *, budget=OSRI_DEFAULT_OUT_BUDGET, threads=None):
+    """Convert one image to enc2 OSRI with black padding and the shared budget."""
     from img2osri import resize_image
     from osri_enc2_pack import pack
 
     start = time.perf_counter()
     pixels = np.asarray(resize_image(source), dtype=np.int32)
-    palettes, orders, stats = plan(pixels, 31, threads=threads)
+    palettes, orders, stats = plan(pixels, budget, threads=threads)
     indices = quantize(pixels, palettes, orders)
-    data = pack(palettes, orders, indices, 31)
+    data = pack(palettes, orders, indices, budget)
     Path(output).write_bytes(data)
     return dict(stats, seconds=time.perf_counter() - start,
                 CRC=f'{struct.unpack_from("<I", data, 48)[0]:08x}')

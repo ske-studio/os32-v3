@@ -3,6 +3,7 @@
 No guest code consumes this module. RGB444 palettes are physical-slot ordered
 int32 arrays of shape (16, 3), containing component values 0..15.
 """
+from osri_profile import OSRI_DEFAULT_OUT_BUDGET, OSRI_COMPARE_OUT_LIMIT
 from dataclasses import dataclass
 import numpy as np
 
@@ -16,7 +17,7 @@ TREE_CANDIDATES = 16
 ROW_SEEDS = 2
 DIST_BLOCK = 4096
 PY_SLOW_SECONDS = 600
-BUDGETS = (15, 23, 31, 47)
+BUDGETS = (15, 23, OSRI_DEFAULT_OUT_BUDGET, OSRI_COMPARE_OUT_LIMIT)
 ROW_MOVES = 32
 ORDER_PASSES = 2
 HBLANK_NS, OUT_NS, LINE_NS = 5900, 650, 31800
@@ -75,7 +76,7 @@ def out_count(old, new):
 
 
 def allowed(old, new, budget):
-    return out_count(old, new) <= min(budget, 47)
+    return out_count(old, new) <= min(budget, OSRI_COMPARE_OUT_LIMIT)
 
 
 def partials(current, candidates):

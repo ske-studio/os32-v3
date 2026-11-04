@@ -9,9 +9,6 @@
 #ifndef __KTIME_H
 #define __KTIME_H
 
-struct TimeSplashSample;
-struct TimeSplashMathInput;
-
 /* Three failed snapshots exhaust one call; shared with the retained array. */
 #define TIME_RETRY_MAX 3
 
@@ -37,11 +34,5 @@ void time_test_feed_clear(void);
 /*  kselftest が 1 万回読みの後に表示する。実機での回数は W4 の記録項目。     */
 /*  型は u32 (`unsigned long`) — カーネル内だけで読む。                       */
 extern u32 ktime_clamp_count;
-
-/* Splash-only, called with IF=0. Sample at both ends, then settle exactly
- * once before restoring IF; failure must not guess or extend the deadline. */
-/* Returns 0 on success, -1 on failure. */
-int ktime_splash_sample(struct TimeSplashSample *sample);
-int ktime_splash_settle(const struct TimeSplashMathInput *input);
 
 #endif /* __KTIME_H */

@@ -62,7 +62,7 @@ void gfx_present_raster(GFX_RasterPalTable *table)
 }
 static struct SplashRaster splash_test_state = { .dynamic_ok = 1 };
 struct SplashRaster *pc98_splash_raster_state(void) { return &splash_test_state; }
-int platform_splash_try_image(const char *path, u32 end_tick)
+int platform_splash_try_image(const char *path, u32 *end_tick)
 { (void)path; (void)end_tick; return PLATFORM_SPLASH_FALLBACK; }
 void gfx_present_nosync(void) { finish(4); }
 int sys_time_now(u32 *lo, u32 *hi) { *lo = 0; *hi = 0; return -1; }
