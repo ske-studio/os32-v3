@@ -755,7 +755,26 @@ i32 gf4_heads_apply(struct gf4_ctx *ctx,u32 heads)
 }
 #endif
 /* Final addendum (a): C0-load and C0-tx are real together in UNIT 13.
- * Neither mode_load nor change_begin/end has a fixture definition. */
+ * Neither mode_load nor change_begin/end has a fixture definition there.
+ * UNIT 5 (B5's caller side) records the C0-tx boundary only (PM 2026-11-04):
+ * change_end returns an injected rc if set, else the operation rc. */
+#if GF4_HOST_UNIT == 5
+i32 gf4_change_begin(struct gf4_ctx *ctx,u32 dl)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_CHANGE_BEGIN);
+    e->p[0]=ctx; e->a[0]=dl;
+    return gf4_host_end(h,e);
+}
+i32 gf4_change_end(struct gf4_ctx *ctx,i32 operation_rc)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_CHANGE_END);
+    e->p[0]=ctx; e->a[0]=(u32)operation_rc;
+    if (!e->rc) e->rc=operation_rc;
+    return gf4_host_end(h,e);
+}
+#endif
 #if GF4_HOST_UNIT == 13
 i32 gf4_pllsel_calc(const struct gf4_head_image heads[GF4_HEADS],u32 *out)
 {
