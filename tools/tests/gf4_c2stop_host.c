@@ -9,7 +9,9 @@
 #include "../../include/io.h"
 #define irq_save() 0U
 #define irq_restore(flags) ((void)(flags))
+#ifndef GF_PRODUCTION_MODULE
 #define GF_PRODUCTION_MODULE
+#endif
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 #define GF3_CINT_C2
@@ -73,9 +75,9 @@ static void production_dispatch(void)
     assert(!gf3_service_close(cint_service));
     assert(!gf2_stop(&cint_prod.chan));
     gf3_service_invalidate(cint_service);
-    cint_prod.display.engaged=false;
-    assert(!gf3_service_owner_bind(cint_service,0));
+    /* The owner loan closes after real display cleanup and node release. */
     assert(!gf_display_stop(&cint_prod.display));
+    assert(!gf3_service_owner_bind(cint_service,0));
     cint_no_resources();
 }
 static void quiesce_retains_reservations(void)

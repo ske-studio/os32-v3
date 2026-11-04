@@ -528,5 +528,6 @@ GfxBackend gfx_backend_pegc = {
     pegc_modes,
     sizeof(pegc_modes) / sizeof(pegc_modes[0]),
     0,                        /* default_mode */
-    (const GfxMode *)0         /* selected_mode */
+    (const GfxMode *)0         /* selected_mode */,
+    .set_mode = 0             /* optional display hooks default to unavailable */
 };

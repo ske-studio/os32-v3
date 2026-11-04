@@ -147,8 +147,9 @@ static void wc_recovery_run(void)
     struct geforce_platform *p=geforce_platform_get();
     const struct gf3_test_ops *accel=0;
     const struct gf1_test_ops *foundation=0;
-    GeforceModuleContext ctx={&gfx_backend_geforce,&gfx_counters,&gfx_current_height,
-                             &gfx_flip_enabled,&gfx_display_page,p,&accel,&foundation};
+    GeforceModuleContext ctx={.backend=&gfx_backend_geforce,.counters=&gfx_counters,
+        .height=&gfx_current_height,.flip=&gfx_flip_enabled,.page=&gfx_display_page,
+        .platform=p,.accel_out=&accel,.foundation_out=&foundation};
     CHECK(!geforce_module_init(&gfx_backend_geforce,&ctx));
     wc_snapshot();
     bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;

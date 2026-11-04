@@ -37,7 +37,9 @@ static const struct gf4_restore_ops *management_slot;
 static GfxBackend backend;
 static GfxCounters counters;
 static int height,flip,page;
+static struct geforce_platform links_platform;
 static GeforceModuleContext module_context={
+    .platform=&links_platform,.display_state=&state,
     .backend=&backend,.counters=&counters,.height=&height,.flip=&flip,.page=&page,
     .accel_out=&accel_slot,.display_out=&normal_slot,
     .display_restore_out=&management_slot
@@ -107,6 +109,7 @@ static void init(void)
     production.chan.bar1=(struct recover_bar_extent){
         .base=0x30000000U,.length=LINKS_TEST_VRAM,.valid=true};
     host.base.ch.bar1=production.chan.bar1;
+    links_platform.display_phys=production.chan.bar1.base;
     host.base.vram=window_backing; host.base.vram_bytes=sizeof(window_backing);
     production.foundation.imem.vram_bytes=LINKS_TEST_VRAM;
     production.accel.ch=&production.chan; production.accel.ready=true;
@@ -121,7 +124,7 @@ static void init(void)
     host.ctx.links=links; host.ctx.exec=exec;
     assert(links==gf4_links_table() && exec==gf4_exec_table());
     assert(links->failed==gf4_service_failed && links->scan_changed==gf4_scan_changed);
-    assert(!exec->tmds_script); /* Deferred C2-links-b: no fake script. */
+    assert(exec->tmds_script); /* C2-links-b now supplies the real script callback. */
     state.nmodes=1; state.modes[0]=vga;
     state.head[0].mode=vga; state.head[0].enabled=true;
     assert(!gf4_scan_reserve_initial(&host.ctx,LINKS_TEST_DL));

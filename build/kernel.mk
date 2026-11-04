@@ -25,7 +25,7 @@ endif
 ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o)
 
 # === カーネル C ソース ===
-C_KERNEL = \
+C_KERNEL = kdebug/gf_display_test.c drivers/video/geforce/edid.c drivers/video/geforce/tv_data.c drivers/video/geforce/gf_display_data.c \
     kernel/time/time_splash_math.c \
     arch/x86/kernel/mtrr_wc.c \
     init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c platform/pc98/splash_image.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \

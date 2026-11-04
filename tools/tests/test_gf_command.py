@@ -13,7 +13,7 @@ CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/gefo
             'tools/tests/geforce_module_host.c',
             'drivers/video/geforce/geforce_body.c',
             'drivers/video/geforce/geforce_module.c', 'hwdev/gf/foundation_test.c',
-            'kdebug/gfinit.c', 'build/out/geforce/*'])
+            'kdebug/gfinit.c', 'build/out/geforce/*', 'tools/tests/test_gf_display.py', 'tools/tests/gf4_platform_host.c', 'drivers/video/geforce/*.c', 'drivers/video/geforce/*.h', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'tools/tests/gf_accel_unbound_stubs.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/gfinit_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'kdebug/gfinit_pll.h', 'include/memmap.h', 'kdebug/gfinit_exec.c', 'kdebug/gfinit_exec.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/gfinit_bus.c', 'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/kprintf.h', 'tools/tests/gfinit_resources_ra266.h', 'hwdev/owner.h', 'kdebug/gfinit.h', 'kdebug/gfinit_plan.h', 'kdebug/kpeek.h', 'kdebug/kpeek_allow.h', 'mm/pgalloc.h', 'mm/paging.h', 'mm/physmem.h', 'lib/kstring.h', 'arch/x86/kernel/idt.h', 'kernel/module/module.h', 'drivers/char/serial.h', 'include/bootinfo.h', 'include/sys.h', 'kdebug/generated/kdebug_import_macros.h', 'kdebug/generated/kdebug_imports.h', 'tools/tests/gfinit_owner_host.c', 'include/hwdev_private.h', 'kdebug/gfinit_wire.h', 'userland/shell/shell.h', 'userland/shell/cmd_sys.c', 'tools/tests/gfinit_output_host.h', 'include/console_attr.h', 'hwdev/hwdev_imports.def', 'kdebug/gfinit_plan.c', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_profile.c', 'tools/run_host_group.py', 'tools/tests/gfinit_romfile_host.c', 'tools/gfinit_rom_decode.py', 'include/port_service.h', 'include/console_output.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kernel/console/console_backend.h', 'kdebug/gfinit_mode.c', 'kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h', 'kdebug/recover_gf_c.h', 'hwdev/gfinit_mode.h', 'tools/tests/test_gfinit_plan_c.py', 'tools/tests/gfinit_plan_c_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_budget.py', 'tools/tests/gfinit_budget_host.c', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'hwdev/gf_load_state.h', 'tools/tests/test_gf_runner.py', 'tools/tests/gf_runner_host.c', 'hwdev/gf/internal.h', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/op/*.c', 'include/video_service.h', 'hwdev/gf/scripts.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/display/state.h', 'hwdev/gf/quiesce_rows.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/service.c', 'tools/tests/gf_display_host.c', 'tools/tests/gf_display_palette_host.c', 'tools/tests/gf_display_blank_host.c', 'tools/tests/gf_display_modes_host.c', 'include/gf_production.h', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/gf4_*_host.c', 'tools/tests/gf4_display_fake.h', 'tools/tests/gf_accel*.[ch]', 'tools/tests/gf_command_runtime_host.h', 'build/geforce-module.mk', 'build/hwdev.mk', 'build/kernel.mk', 'include/gfx_format.h', 'include/gfx_hal.h', 'kdebug/gf_display_test.c', 'kdebug/gf_display_test.h', 'tools/module_schema.py', 'kernel/module/module_schema.h', 'hwdev/gf/*.c', 'hwdev/gf/*.h', 'hwdev/gf/rom.inc', 'tools/prototypes/geforce_imports.def'])
 
 import argparse
 import os
@@ -219,21 +219,39 @@ def build(component, source, directory, flags):
 
 
 def build_integration(component, source, directory):
-    """Reuse the established owner/module oracles in a copied source tree."""
+    """Reuse the owner/module oracles with their real current dependencies."""
     exe = directory / 'host'
     if component == 't2b-owner':
         from test_gfinit_owner import command
-        cmd = command(exe)
+        commands = [command(exe)]
     else:
         from test_module_runtime import FLAGS, INCLUDES
-        cmd = ['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
-               '-Igfx', '-Ibuild/out/geforce', '-I' + str(ROOT / 'tools/tests'),
-               str(ROOT / 'tools/tests/geforce_module_host.c'),
-               *[str(ROOT / f) for f in ('kernel/module/module_runtime.c',
-                  'kernel/module/module_image.c', 'fs/vfs.c', 'drivers/base/dev.c')],
-               '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-o', str(exe)]
+        from test_gf_display import gf4_sources
+        flags = ['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
+                 '-I'+str(ROOT), '-Igfx', '-Ibuild/out/geforce',
+                 '-I'+str(ROOT/'tools/tests'), '-DGF_PRODUCTION_MODULE']
+        backend = directory/'real_backend.o'
+        aliases = ('geforce_backend_ops', 'geforce_backend_bind',
+                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind')
+        fixture = ROOT/'tools/tests/geforce_module_host.c'
+        sources = gf4_sources(ROOT, 'c3', fixture)
+        commands = [
+            [*flags, '-DOS32_GEFORCE_MODULE',
+             *['-D'+name+'=command_real_'+name for name in aliases],
+             '-c', str(ROOT/'drivers/video/geforce/backend_geforce.c'),
+             '-o', str(backend)],
+            [*flags, str(fixture), *[str(ROOT/f) for f in sources], str(backend),
+             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-o', str(exe)]]
     copied = Path(tempfile.mkdtemp(prefix='integration-', dir=directory))
-    mutpar.build_in_tree(ROOT, copied, {COMPONENTS[component]: source.read_text()}, [cmd])
+    if component == 't2b-owner':
+        mutpar.build_in_tree(ROOT, copied, {COMPONENTS[component]: source.read_text()}, commands)
+    else:
+        # Dependency discovery runs before compiling the preceding object.
+        dependencies = [commands[0], [arg for arg in commands[1] if arg != str(backend)]]
+        tree = mutpar.mutant_tree(ROOT, copied/'tree',
+            {COMPONENTS[component]: source.read_text()}, gcc_cmds=dependencies)
+        for cmd in commands:
+            subprocess.run(mutpar.rebase(cmd, ROOT, tree), cwd=tree, check=True)
     return exe
 
 

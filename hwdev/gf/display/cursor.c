@@ -32,6 +32,7 @@ void gf_mode_cursor(struct gfinit_mode *o)
     o->cursync = GF_MODE_CURSYNC;
 }
 
+#ifndef HWDEV_MODULE
 #include "api.h"
 /* PM integrates this typedef into types.h; no 64-bit division here. */
 typedef long long i64;
@@ -238,3 +239,5 @@ i32 gf4_cursor_close(void *owner,struct gf_vram_view *view)
     (void)view->va[0];
     return cursor_result(c,gf_vram_view_unmap(view));
 }
+
+#endif /* !HWDEV_MODULE: image APIs use production-owned VRAM views. */

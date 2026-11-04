@@ -2532,6 +2532,15 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "index": 312,
+      "symbol": "gf_display_test",
+      "source": "kdebug/gf_display_test.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

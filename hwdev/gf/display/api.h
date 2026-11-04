@@ -132,7 +132,7 @@ i32 gf4_scan_changed(void *owner,u8 head,const struct gf3_surface *front);
  * C3 passes it to gf3_service_owner_bind (X3, PM 2026-11-04). */
 struct gf3_service_owner;
 const struct gf3_service_owner *gf4_service_owner_table(void);
-/* C2-service owns one resident production ctx; C3 calls after owner_bind.
+/* C2-service owns one resident production ctx; C3 calls before owner_bind.
  * C2-links supplies its resident callback table to this initial binding. */
 i32 gf4_service_init(struct gf_production *,struct gf_display_context *legacy);
 /* C2-links owns the resident links and exec tables. gf4_service_init sets

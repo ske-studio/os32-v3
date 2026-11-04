@@ -118,6 +118,11 @@ static int links_last_rc(struct gf4_ctx *c)
 {
     return c ? c->last_rc : GF4_EINVAL;
 }
+/* Restore ops use i32; the normal test ops retain their int ABI. */
+static i32 links_restore_last_rc(struct gf4_ctx *c)
+{
+    return links_last_rc(c);
+}
 static i32 links_i2c_port(void *owner,u8 bus,struct gf4_i2c_port *out)
 {
     struct gf4_ctx *c=owner;
@@ -171,7 +176,7 @@ static i32 links_admission(void *owner,bool open)
         .display_save=gf4_diagnostic_save,.palette_set=gf4_palette_set,
         .scan_prepare=gf4_scan_prepare,.scan_discard=gf4_scan_discard
     };
-    restore_ops=(struct gf4_restore_ops){c,gf4_diagnostic_restore,links_last_rc,
+    restore_ops=(struct gf4_restore_ops){c,gf4_diagnostic_restore,links_restore_last_rc,
                                           gf4_display_saved_release};
     /* No waits or failing HW operations in this foreground publication
      * interval. F3 validates loans before it publishes its resident ops. */

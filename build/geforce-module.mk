@@ -37,7 +37,7 @@ $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(GEFORCE_OUT)/geforce_kexports.o
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: $(GEFORCE_GEN)
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: private CFLAGS_BASE += -I$(GEFORCE_OUT)
 
-# mkmod enforces GF_FEAT3_DESIGN combined budgets from module_schema.py.
+# mkmod enforces the GF_FEAT4_DESIGN C3 160/160/208 KiB budgets.
 define pack_geforce
 	python3 tools/mkmod.py --module-id 12 --elf $(GEFORCE_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef

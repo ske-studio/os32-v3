@@ -1,5 +1,5 @@
 /* libc-free C2-links-init; A1 UNIT14 has no product dependency stubs.
- * Link real decoder, PLL parser, runner, save/pll and all op/*.c.
+ * Link real decoder, PLL parser, runner, save/pll and all op translation units.
  * Independent oracle: nouveau c03c1a1 nvkm/subdev/bios/init.c:539-572
  * (bases),1093-1143 (bus order),400-407 (BIT I),1663-1682 (zero SUB).
  * Fixture addresses are synthetic ROM offsets, not device ROM contents. */

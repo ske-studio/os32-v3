@@ -998,6 +998,7 @@ static void outputs_failures(void)
                 outputs_reset();
                 for (u32 route = 0; route < host.ctx.nroutes; ++route)
                     assert(!gf_display_test(OUTPUT_WIRE | (route ? NEXT_PHASE : 0)));
+                u32 old_powers=powers, old_flips=flips;
                 fail_event = pair_ops[op]; failure_nth = head + 1U; failure_rc = skipped[e];
                 assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == skipped[e]);
                 assert(occurrences("SKIP") == 1 && occurrences("READY") == host.ctx.nroutes);
@@ -1006,12 +1007,14 @@ static void outputs_failures(void)
                 u32 held = display_session.prepared_heads, before = nevents;
                 u32 banks = 0, old_discards = discards;
                 for (u32 h = 0; h < GF4_HEADS; ++h) banks += (held >> h) & 1U;
-                assert(held && !powers && !flips);
+                /* A failed prepare may retain nodes for final discard.
+                 * Earlier single-route DPMS belongs to the preceding step. */
+                assert(held && powers==old_powers && flips==old_flips);
                 failure_nth = 0;
                 assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
                 assert(events[before] == SESSION_RESTORE && events[nevents-1U] == SESSION_RELEASE);
                 assert(nevents - before == banks + 2U); /* restore, banks, release */
-                assert(discards == old_discards + banks && !powers && !flips);
+                assert(discards == old_discards + banks && powers==old_powers && flips==old_flips);
                 assert(!display_session.valid && !display_session.prepared_heads &&
                        !host.ctx.diagnostic_saved && occurrences("READY") == host.ctx.nroutes);
             }

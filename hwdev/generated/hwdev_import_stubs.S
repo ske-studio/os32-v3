@@ -211,4 +211,9 @@ geforce_accel_ops:
 gfx_present:
     jmp *hwdev_import_slots+164
 .size gfx_present, .-gfx_present
+.globl gf_display_test
+.type gf_display_test, @function
+gf_display_test:
+    jmp *hwdev_import_slots+168
+.size gf_display_test, .-gf_display_test
 .section .note.GNU-stack,"",@progbits

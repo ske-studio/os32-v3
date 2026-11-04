@@ -16,10 +16,7 @@ static const struct gf3_test_ops accel_ops_a, accel_ops_b;
 struct gf1_test_ops gf1_module_ops;
 static struct gf_foundation *bound_foundation;
 static struct gf2_chan *bound_chan;
-/* This module-loader fixture models the service registration only. The
- * gf_accel_wire host runs the same body against real F1/F2/F3 lifecycle. */
-i32 gf3_service_bind(struct gf_production *p, const struct gf3_test_ops **slot)
-{ CHECK(p==&production && slot); return 0; }
+/* Link real F3/F4 registration; only the kernel/platform boundary is modeled. */
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { bound_foundation=f;bound_chan=ch; }
 static void production_bind(void)
@@ -101,6 +98,7 @@ void _start(void)
     kmemcpy(&exports[4].name_hash,file+164,4); exports[4].version=1;
     context.platform=&fixture_platform;
     fixture_platform.opaque=&production;
+    CHECK(!gf4_data_bind(&context.display_data,&context.display_state));
     CHECK(!geforce_accel_ops());
     start_failures();
     accel_slot=&accel_ops_a;
@@ -122,6 +120,7 @@ void _start(void)
     CHECK(!geforce_detach(0) && unbinds==1);
     CHECK(!accel_slot);
     unbind_fail=0;CHECK(geforce_detach(0) && unbinds==2);
+    CHECK(!gf4_data_bind(&context.display_data,&context.display_state));
     struct module_request q=request();
     q.lifecycle=(struct module_lifecycle){.start=geforce_start,.detach=geforce_detach};
     CHECK(!gfx_backend_geforce.probe());

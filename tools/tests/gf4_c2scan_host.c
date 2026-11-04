@@ -11,6 +11,7 @@
 #include "../../hwdev/gf/internal.h"
 #include "../../hwdev/gf/production.h"
 #include "../../hwdev/gf/accel_service.h"
+#include "../../drivers/video/geforce/geforce_module.h"
 
 #define TEST_VRAM (16U*1024U*1024U)
 #define TEST_DL 123456U
@@ -31,6 +32,11 @@ static struct gf4_host host;
 static struct gf4_state state;
 static struct gf4_host_event events[TRACE_CAP];
 static struct gf_production production;
+static GfxBackend scan_backend;
+static struct geforce_platform scan_platform;
+static int scan_height;
+static GeforceModuleContext scan_module={.backend=&scan_backend,.platform=&scan_platform,.height=&scan_height};
+const GeforceModuleContext *geforce_context=&scan_module;
 static const struct gf3_test_ops *slot;
 static struct gf3_service *service;
 static struct gf_vram_reservation_node external;
@@ -88,6 +94,8 @@ static void init(void)
     service=gf3_service_get(&production.chan); assert(service);
     assert(!gf3_service_owner_bind(service,&owner_table));
     assert(service->owner==&owner_table);
+    scan_platform.display_phys=production.chan.bar1.base;
+    scan_module.display_state=&state;
     gf_hook_ctx_bind(&production.accel); gf_hook_scan_bind(false,0);
     const struct gf4_mode modes[]={vga,xga32,vga16};
     state.nmodes=sizeof(modes)/sizeof(modes[0]);

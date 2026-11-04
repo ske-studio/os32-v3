@@ -1561,4 +1561,9 @@ geforce_accel_ops:
 gfx_present:
     jmp *kdebug_import_slots+1244
 .size gfx_present, .-gfx_present
+.globl gf_display_test
+.type gf_display_test, @function
+gf_display_test:
+    jmp *kdebug_import_slots+1248
+.size gf_display_test, .-gf_display_test
 .section .note.GNU-stack,"",@progbits

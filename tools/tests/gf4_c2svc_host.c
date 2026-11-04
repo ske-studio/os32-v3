@@ -34,7 +34,7 @@ static bool svc_display_reg(u32 off)
 {
     /* nvreg.h:60,82,129-153: VGA aliases plus PCRTC/PRAMDAC.
      * F2 registers still use C1's real reference consumer. */
-    return off==GF_PLL_GATE || off>=0x600000U ||
+    return off==GF_PLL_GATE || (off>=0x600000U && off<GF2_USER_BASE) ||
            (off>=0x0c0000U && off<0x0c4000U);
 }
 static int svc_read(void *owner,u32 bar,u32 off,u32 width,u32 *out)
@@ -195,6 +195,9 @@ static void svc_finish(void)
     gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
     gf4_host_trace_clear(&svc_host);
     gf2_host_memset(svc_host.fail_rc,0,sizeof(svc_host.fail_rc));
+    /* The test owns the simulated F5 closed-save loan. End that loan
+     * before requesting complete teardown, as the real F5 owner does. */
+    svc_ctx.saved_closed=false;
     (void)gf4_service_stop(&svc_ctx,cint_deadline());
     assert(!svc_slot && !svc_ctx.ready && !cint_prod.display.engaged);
     assert(cint_prod.display.display4==&svc_ctx && svc_ctx.legacy==&cint_prod.display);

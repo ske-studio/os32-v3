@@ -146,9 +146,9 @@ static bool timing_fits(const struct gf4_timing *t,const struct gf4_edid_state *
         (t->hd>>3)-1U>GF4_HFIELD_MAX || (t->ht>>3)-5U>GF4_HFIELD_MAX ||
         t->vd-1U>GF4_VFIELD_MAX || t->vs-1U>GF4_VFIELD_MAX ||
         ((t->vt-2U)|((t->flags&GF4_INTERLACE)?1U:0U))>GF4_VFIELD_MAX ||
-        ((t->ht>>3)-(t->hd>>3))>GF4_HBLANK_MAX ||
-        ((t->he>>3)-(t->hs>>3))>GF4_HSYNC_MAX ||
-        t->vt-t->vd>GF4_VBLANK_MAX || t->ve-t->vs>GF4_VSYNC_MAX ||
+        (u32)((t->ht>>3)-(t->hd>>3))>GF4_HBLANK_MAX ||
+        (u32)((t->he>>3)-(t->hs>>3))>GF4_HSYNC_MAX ||
+        (u32)(t->vt-t->vd)>GF4_VBLANK_MAX || (u32)(t->ve-t->vs)>GF4_VSYNC_MAX ||
         (t->flags & ~(GF4_NEG_H|GF4_NEG_V|GF4_INTERLACE|GF4_DBLSCAN))) return false;
     if (!e->range_valid) return true;
     u64 pixels=(u64)t->ht*t->vt, hz=(u64)t->khz*1000U;

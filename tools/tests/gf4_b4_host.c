@@ -176,7 +176,8 @@ static void dtd_order_and_preference(void)
     /* A later CTA count cannot promote a nonpreferred legacy base DTD. */
     setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0; accepted_base();
     assert(state.preferred==NO_PREFERRED);
-    cta_one(0); b[2]=4; b[3]=1; seal();
+    /* Empty CTA DTD area: remove the previous video-block header. */
+    cta_one(0); b[2]=4; b[3]=1; b[4]=b[5]=0; seal();
     assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==NO_PREFERRED &&
            state.dtd_seen==1);
     equal(&state.timing[0],&vga_dtd);

@@ -144,7 +144,7 @@ offset	GFX_Surface.planes	12
 member_size	GFX_Surface.planes	16
 offset	GFX_Surface.w	0
 member_size	GFX_Surface.w	4
-size	GeforceModuleContext	32
+size	GeforceModuleContext	52
 align	GeforceModuleContext	4
 offset	GeforceModuleContext.accel_out	24
 member_size	GeforceModuleContext.accel_out	4
@@ -152,6 +152,16 @@ offset	GeforceModuleContext.backend	0
 member_size	GeforceModuleContext.backend	4
 offset	GeforceModuleContext.counters	4
 member_size	GeforceModuleContext.counters	4
+offset	GeforceModuleContext.display_data	32
+member_size	GeforceModuleContext.display_data	4
+offset	GeforceModuleContext.display_out	40
+member_size	GeforceModuleContext.display_out	4
+offset	GeforceModuleContext.display_restore_out	48
+member_size	GeforceModuleContext.display_restore_out	4
+offset	GeforceModuleContext.display_state	36
+member_size	GeforceModuleContext.display_state	4
+offset	GeforceModuleContext.feature5_out	44
+member_size	GeforceModuleContext.feature5_out	4
 offset	GeforceModuleContext.flip	12
 member_size	GeforceModuleContext.flip	4
 offset	GeforceModuleContext.foundation_out	28
@@ -1178,7 +1188,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	76
+size	struct GfxBackend	108
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1190,12 +1200,22 @@ offset	struct GfxBackend.bb_size	56
 member_size	struct GfxBackend.bb_size	4
 offset	struct GfxBackend.blit	40
 member_size	struct GfxBackend.blit	4
+offset	struct GfxBackend.cursor_image	84
+member_size	struct GfxBackend.cursor_image	4
+offset	struct GfxBackend.cursor_move	88
+member_size	struct GfxBackend.cursor_move	4
+offset	struct GfxBackend.cursor_show	92
+member_size	struct GfxBackend.cursor_show	4
 offset	struct GfxBackend.default_mode	70
 member_size	struct GfxBackend.default_mode	2
+offset	struct GfxBackend.dpms	80
+member_size	struct GfxBackend.dpms	4
 offset	struct GfxBackend.enter	28
 member_size	struct GfxBackend.enter	4
 offset	struct GfxBackend.fill_rect	36
 member_size	struct GfxBackend.fill_rect	4
+offset	struct GfxBackend.gamma	104
+member_size	struct GfxBackend.gamma	4
 offset	struct GfxBackend.init	8
 member_size	struct GfxBackend.init	4
 offset	struct GfxBackend.leave	32
@@ -1206,6 +1226,8 @@ offset	struct GfxBackend.modes	64
 member_size	struct GfxBackend.modes	4
 offset	struct GfxBackend.name	0
 member_size	struct GfxBackend.name	4
+offset	struct GfxBackend.page_flip	100
+member_size	struct GfxBackend.page_flip	4
 offset	struct GfxBackend.prepare	60
 member_size	struct GfxBackend.prepare	4
 offset	struct GfxBackend.present_rect	20
@@ -1216,10 +1238,14 @@ offset	struct GfxBackend.query	12
 member_size	struct GfxBackend.query	4
 offset	struct GfxBackend.selected_mode	72
 member_size	struct GfxBackend.selected_mode	4
+offset	struct GfxBackend.set_mode	76
+member_size	struct GfxBackend.set_mode	4
 offset	struct GfxBackend.set_palette	24
 member_size	struct GfxBackend.set_palette	4
 offset	struct GfxBackend.shutdown	16
 member_size	struct GfxBackend.shutdown	4
+offset	struct GfxBackend.vsync	96
+member_size	struct GfxBackend.vsync	4
 size	struct GfxCounters	16
 align	struct GfxCounters	4
 offset	struct GfxCounters.commits	12
@@ -1230,6 +1256,22 @@ offset	struct GfxCounters.io_accesses	8
 member_size	struct GfxCounters.io_accesses	4
 offset	struct GfxCounters.present_bytes	0
 member_size	struct GfxCounters.present_bytes	4
+size	struct GfxCursorImage	28
+align	struct GfxCursorImage	4
+offset	struct GfxCursorImage.argb_pm	0
+member_size	struct GfxCursorImage.argb_pm	4
+offset	struct GfxCursorImage.bytes	4
+member_size	struct GfxCursorImage.bytes	4
+offset	struct GfxCursorImage.height	16
+member_size	struct GfxCursorImage.height	4
+offset	struct GfxCursorImage.hot_x	20
+member_size	struct GfxCursorImage.hot_x	4
+offset	struct GfxCursorImage.hot_y	24
+member_size	struct GfxCursorImage.hot_y	4
+offset	struct GfxCursorImage.pitch	8
+member_size	struct GfxCursorImage.pitch	4
+offset	struct GfxCursorImage.width	12
+member_size	struct GfxCursorImage.width	4
 size	struct GfxFormatDesc	6
 align	struct GfxFormatDesc	2
 offset	struct GfxFormatDesc.bits_per_plane	3
@@ -1258,6 +1300,22 @@ offset	struct GfxMode.reserved	7
 member_size	struct GfxMode.reserved	1
 offset	struct GfxMode.width	0
 member_size	struct GfxMode.width	2
+size	struct GfxScanout	28
+align	struct GfxScanout	4
+offset	struct GfxScanout.bytes	8
+member_size	struct GfxScanout.bytes	4
+offset	struct GfxScanout.format	24
+member_size	struct GfxScanout.format	4
+offset	struct GfxScanout.height	20
+member_size	struct GfxScanout.height	4
+offset	struct GfxScanout.offset	4
+member_size	struct GfxScanout.offset	4
+offset	struct GfxScanout.pitch	12
+member_size	struct GfxScanout.pitch	4
+offset	struct GfxScanout.reservation_id	0
+member_size	struct GfxScanout.reservation_id	4
+offset	struct GfxScanout.width	16
+member_size	struct GfxScanout.width	4
 size	struct addrspace	1228
 align	struct addrspace	4
 offset	struct addrspace.app_pde	8
@@ -1850,9 +1908,9 @@ offset	struct gf3_test_ops.unmap	44
 member_size	struct gf3_test_ops.unmap	4
 offset	struct gf3_test_ops.upload	24
 member_size	struct gf3_test_ops.upload	4
-size	struct gf_display_context	1732
+size	struct gf_display_context	1888
 align	struct gf_display_context	4
-offset	struct gf_display_context.active	250
+offset	struct gf_display_context.active	270
 member_size	struct gf_display_context.active	1
 offset	struct gf_display_context.bar0_map	128
 member_size	struct gf_display_context.bar0_map	4
@@ -1861,58 +1919,60 @@ member_size	struct gf_display_context.bar1_map	4
 offset	struct gf_display_context.bars	80
 member_size	struct gf_display_context.bars	48
 offset	struct gf_display_context.baseline	220
-member_size	struct gf_display_context.baseline	20
-offset	struct gf_display_context.baseline_c040	240
+member_size	struct gf_display_context.baseline	40
+offset	struct gf_display_context.baseline_c040	260
 member_size	struct gf_display_context.baseline_c040	4
-offset	struct gf_display_context.baseline_pmc	244
+offset	struct gf_display_context.baseline_pmc	264
 member_size	struct gf_display_context.baseline_pmc	4
-offset	struct gf_display_context.baseline_valid	249
+offset	struct gf_display_context.baseline_valid	269
 member_size	struct gf_display_context.baseline_valid	1
-offset	struct gf_display_context.blank	251
+offset	struct gf_display_context.blank	271
 member_size	struct gf_display_context.blank	1
-offset	struct gf_display_context.engaged	254
+offset	struct gf_display_context.display4	1884
+member_size	struct gf_display_context.display4	4
+offset	struct gf_display_context.engaged	274
 member_size	struct gf_display_context.engaged	1
-offset	struct gf_display_context.fp_on	1725
+offset	struct gf_display_context.fp_on	1877
 member_size	struct gf_display_context.fp_on	1
 offset	struct gf_display_context.identity	48
 member_size	struct gf_display_context.identity	32
 offset	struct gf_display_context.init	36
 member_size	struct gf_display_context.init	4
-offset	struct gf_display_context.initialized	248
+offset	struct gf_display_context.initialized	268
 member_size	struct gf_display_context.initialized	1
 offset	struct gf_display_context.io	0
 member_size	struct gf_display_context.io	32
-offset	struct gf_display_context.last_rc	1728
+offset	struct gf_display_context.last_rc	1880
 member_size	struct gf_display_context.last_rc	4
 offset	struct gf_display_context.limits	144
 member_size	struct gf_display_context.limits	76
 offset	struct gf_display_context.load_context	40
 member_size	struct gf_display_context.load_context	4
-offset	struct gf_display_context.mode	256
-member_size	struct gf_display_context.mode	684
-offset	struct gf_display_context.ordinal	1712
+offset	struct gf_display_context.mode	276
+member_size	struct gf_display_context.mode	816
+offset	struct gf_display_context.ordinal	1864
 member_size	struct gf_display_context.ordinal	4
 offset	struct gf_display_context.owner	32
 member_size	struct gf_display_context.owner	4
-offset	struct gf_display_context.palette	940
+offset	struct gf_display_context.palette	1092
 member_size	struct gf_display_context.palette	768
-offset	struct gf_display_context.pll_gate	1720
+offset	struct gf_display_context.pll_gate	1872
 member_size	struct gf_display_context.pll_gate	4
-offset	struct gf_display_context.pll_gate_valid	1724
+offset	struct gf_display_context.pll_gate_valid	1876
 member_size	struct gf_display_context.pll_gate_valid	1
 offset	struct gf_display_context.program	44
 member_size	struct gf_display_context.program	4
-offset	struct gf_display_context.reusable	253
+offset	struct gf_display_context.reusable	273
 member_size	struct gf_display_context.reusable	1
 offset	struct gf_display_context.rom_crc	136
 member_size	struct gf_display_context.rom_crc	4
 offset	struct gf_display_context.rom_size	140
 member_size	struct gf_display_context.rom_size	4
-offset	struct gf_display_context.section	1708
+offset	struct gf_display_context.section	1860
 member_size	struct gf_display_context.section	4
-offset	struct gf_display_context.stop_ok	252
+offset	struct gf_display_context.stop_ok	272
 member_size	struct gf_display_context.stop_ok	1
-offset	struct gf_display_context.target	1716
+offset	struct gf_display_context.target	1868
 member_size	struct gf_display_context.target	4
 size	struct gf_display_owner	24
 align	struct gf_display_owner	4
@@ -1988,12 +2048,16 @@ offset	struct gf_imem.vbios	12
 member_size	struct gf_imem.vbios	12
 offset	struct gf_imem.vram_bytes	0
 member_size	struct gf_imem.vram_bytes	4
-size	struct gf_init_context	740
+size	struct gf_init_context	748
 align	struct gf_init_context	4
 offset	struct gf_init_context.call	64
 member_size	struct gf_init_context.call	192
 offset	struct gf_init_context.calls	56
 member_size	struct gf_init_context.calls	4
+offset	struct gf_init_context.deadline	744
+member_size	struct gf_init_context.deadline	4
+offset	struct gf_init_context.display_script	741
+member_size	struct gf_init_context.display_script	1
 offset	struct gf_init_context.elapsed_us	364
 member_size	struct gf_init_context.elapsed_us	4
 offset	struct gf_init_context.fail_pc	368
@@ -2006,6 +2070,8 @@ offset	struct gf_init_context.last_rc	372
 member_size	struct gf_init_context.last_rc	4
 offset	struct gf_init_context.main_id	40
 member_size	struct gf_init_context.main_id	4
+offset	struct gf_init_context.or_mask	740
+member_size	struct gf_init_context.or_mask	1
 offset	struct gf_init_context.pc	44
 member_size	struct gf_init_context.pc	4
 offset	struct gf_init_context.repeat	256
@@ -2140,41 +2206,41 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	10616
+size	struct gf_production	10772
 align	struct gf_production	4
-offset	struct gf_production.accel	3096
+offset	struct gf_production.accel	3252
 member_size	struct gf_production.accel	7512
-offset	struct gf_production.acquiring	1755
+offset	struct gf_production.acquiring	1911
 member_size	struct gf_production.acquiring	1
-offset	struct gf_production.attempted	1753
+offset	struct gf_production.attempted	1909
 member_size	struct gf_production.attempted	1
-offset	struct gf_production.chan	2172
+offset	struct gf_production.chan	2328
 member_size	struct gf_production.chan	924
 offset	struct gf_production.display	0
-member_size	struct gf_production.display	1732
-offset	struct gf_production.foundation	1968
+member_size	struct gf_production.display	1888
+offset	struct gf_production.foundation	2124
 member_size	struct gf_production.foundation	204
-offset	struct gf_production.indexes	1776
+offset	struct gf_production.indexes	1932
 member_size	struct gf_production.indexes	96
-offset	struct gf_production.locks	1872
+offset	struct gf_production.locks	2028
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	10608
+offset	struct gf_production.map_ops	10764
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	10612
+offset	struct gf_production.map_owner	10768
 member_size	struct gf_production.map_owner	4
-offset	struct gf_production.prepared	1752
+offset	struct gf_production.prepared	1908
 member_size	struct gf_production.prepared	1
-offset	struct gf_production.reject	1756
+offset	struct gf_production.reject	1912
 member_size	struct gf_production.reject	20
-offset	struct gf_production.revoked	1754
+offset	struct gf_production.revoked	1910
 member_size	struct gf_production.revoked	1
-offset	struct gf_production.route98	1744
+offset	struct gf_production.route98	1900
 member_size	struct gf_production.route98	4
-offset	struct gf_production.route_opaque	1748
+offset	struct gf_production.route_opaque	1904
 member_size	struct gf_production.route_opaque	4
-offset	struct gf_production.scratch	1740
+offset	struct gf_production.scratch	1896
 member_size	struct gf_production.scratch	4
-offset	struct gf_production.video	1732
+offset	struct gf_production.video	1888
 member_size	struct gf_production.video	8
 size	struct gf_production_local	16
 align	struct gf_production_local	4
@@ -2194,13 +2260,13 @@ offset	struct gf_production_resources.identity	0
 member_size	struct gf_production_resources.identity	32
 offset	struct gf_production_resources.reject	80
 member_size	struct gf_production_resources.reject	20
-size	struct gf_production_scratch	141100
+size	struct gf_production_scratch	141108
 align	struct gf_production_scratch	4
 offset	struct gf_production_scratch.init	0
-member_size	struct gf_production_scratch.init	740
-offset	struct gf_production_scratch.program	740
+member_size	struct gf_production_scratch.init	748
+offset	struct gf_production_scratch.program	748
 member_size	struct gf_production_scratch.program	9288
-offset	struct gf_production_scratch.rom	10028
+offset	struct gf_production_scratch.rom	10036
 member_size	struct gf_production_scratch.rom	131072
 size	struct gf_script_span	16
 align	struct gf_script_span	4
@@ -2328,14 +2394,14 @@ offset	struct gfinit_decode.plan	0
 member_size	struct gfinit_decode.plan	64
 offset	struct gfinit_decode.program	173116
 member_size	struct gfinit_decode.program	9288
-size	struct gfinit_exec	784
+size	struct gfinit_exec	792
 align	struct gfinit_exec	4
-offset	struct gfinit_exec.executing	780
+offset	struct gfinit_exec.executing	788
 member_size	struct gfinit_exec.executing	1
-offset	struct gfinit_exec.fail_pc	772
+offset	struct gfinit_exec.fail_pc	780
 member_size	struct gfinit_exec.fail_pc	4
 offset	struct gfinit_exec.init	24
-member_size	struct gfinit_exec.init	740
+member_size	struct gfinit_exec.init	748
 offset	struct gfinit_exec.main_id	8
 member_size	struct gfinit_exec.main_id	4
 offset	struct gfinit_exec.opaque	16
@@ -2344,15 +2410,15 @@ offset	struct gfinit_exec.ops	12
 member_size	struct gfinit_exec.ops	4
 offset	struct gfinit_exec.program	20
 member_size	struct gfinit_exec.program	4
-offset	struct gfinit_exec.recover	764
+offset	struct gfinit_exec.recover	772
 member_size	struct gfinit_exec.recover	4
 offset	struct gfinit_exec.rom	0
 member_size	struct gfinit_exec.rom	4
 offset	struct gfinit_exec.rom_size	4
 member_size	struct gfinit_exec.rom_size	4
-offset	struct gfinit_exec.steps	768
+offset	struct gfinit_exec.steps	776
 member_size	struct gfinit_exec.steps	4
-offset	struct gfinit_exec.substep	776
+offset	struct gfinit_exec.substep	784
 member_size	struct gfinit_exec.substep	4
 size	struct gfinit_exec_frame	12
 align	struct gfinit_exec_frame	4
@@ -2394,7 +2460,7 @@ offset	struct gfinit_instruction.target	40
 member_size	struct gfinit_instruction.target	4
 offset	struct gfinit_instruction.value	44
 member_size	struct gfinit_instruction.value	4
-size	struct gfinit_mode	684
+size	struct gfinit_mode	816
 align	struct gfinit_mode	4
 offset	struct gfinit_mode.ar	222
 member_size	struct gfinit_mode.ar	21
@@ -2414,16 +2480,30 @@ offset	struct gfinit_mode.cursync	252
 member_size	struct gfinit_mode.cursync	4
 offset	struct gfinit_mode.dacclk	324
 member_size	struct gfinit_mode.dacclk	4
+offset	struct gfinit_mode.dither	744
+member_size	struct gfinit_mode.dither	4
+offset	struct gfinit_mode.dither_regs	748
+member_size	struct gfinit_mode.dither_regs	24
 offset	struct gfinit_mode.engine_ctrl	292
 member_size	struct gfinit_mode.engine_ctrl	4
 offset	struct gfinit_mode.fp_control	272
 member_size	struct gfinit_mode.fp_control	4
+offset	struct gfinit_mode.fp_debug	772
+member_size	struct gfinit_mode.fp_debug	12
+offset	struct gfinit_mode.fp_horiz	688
+member_size	struct gfinit_mode.fp_horiz	28
+offset	struct gfinit_mode.fp_margin	784
+member_size	struct gfinit_mode.fp_margin	4
+offset	struct gfinit_mode.fp_vert	716
+member_size	struct gfinit_mode.fp_vert	28
 offset	struct gfinit_mode.general	256
 member_size	struct gfinit_mode.general	4
 offset	struct gfinit_mode.gpio_ext	308
 member_size	struct gfinit_mode.gpio_ext	4
 offset	struct gfinit_mode.gr	213
 member_size	struct gfinit_mode.gr	9
+offset	struct gfinit_mode.head	684
+member_size	struct gfinit_mode.head	1
 offset	struct gfinit_mode.limits	336
 member_size	struct gfinit_mode.limits	76
 offset	struct gfinit_mode.misc	243
@@ -2458,25 +2538,45 @@ offset	struct gfinit_mode.test_control	328
 member_size	struct gfinit_mode.test_control	4
 offset	struct gfinit_mode.timing	0
 member_size	struct gfinit_mode.timing	48
+offset	struct gfinit_mode.tv_hskew	804
+member_size	struct gfinit_mode.tv_hskew	4
+offset	struct gfinit_mode.tv_hsync_delay	808
+member_size	struct gfinit_mode.tv_hsync_delay	4
+offset	struct gfinit_mode.tv_hsync_delay2	812
+member_size	struct gfinit_mode.tv_hsync_delay2	4
+offset	struct gfinit_mode.tv_htotal	800
+member_size	struct gfinit_mode.tv_htotal	4
 offset	struct gfinit_mode.tv_setup	268
 member_size	struct gfinit_mode.tv_setup	4
-size	struct gfinit_mode_saved	20
+offset	struct gfinit_mode.tv_vskew	792
+member_size	struct gfinit_mode.tv_vskew	4
+offset	struct gfinit_mode.tv_vsync_delay	796
+member_size	struct gfinit_mode.tv_vsync_delay	4
+offset	struct gfinit_mode.tv_vtotal	788
+member_size	struct gfinit_mode.tv_vtotal	4
+size	struct gfinit_mode_head_saved	16
+align	struct gfinit_mode_head_saved	4
+offset	struct gfinit_mode_head_saved.cr1c	0
+member_size	struct gfinit_mode_head_saved.cr1c	1
+offset	struct gfinit_mode_head_saved.cr33	1
+member_size	struct gfinit_mode_head_saved.cr33	1
+offset	struct gfinit_mode_head_saved.cr3c	2
+member_size	struct gfinit_mode_head_saved.cr3c	1
+offset	struct gfinit_mode_head_saved.cr4b	3
+member_size	struct gfinit_mode_head_saved.cr4b	1
+offset	struct gfinit_mode_head_saved.cr52	4
+member_size	struct gfinit_mode_head_saved.cr52	1
+offset	struct gfinit_mode_head_saved.crtc850	12
+member_size	struct gfinit_mode_head_saved.crtc850	4
+offset	struct gfinit_mode_head_saved.gpio_ext	8
+member_size	struct gfinit_mode_head_saved.gpio_ext	4
+size	struct gfinit_mode_saved	40
 align	struct gfinit_mode_saved	4
-offset	struct gfinit_mode_saved.cr1c	0
-member_size	struct gfinit_mode_saved.cr1c	1
-offset	struct gfinit_mode_saved.cr33	1
-member_size	struct gfinit_mode_saved.cr33	1
-offset	struct gfinit_mode_saved.cr3c	2
-member_size	struct gfinit_mode_saved.cr3c	1
-offset	struct gfinit_mode_saved.cr4b	3
-member_size	struct gfinit_mode_saved.cr4b	1
-offset	struct gfinit_mode_saved.cr52	4
-member_size	struct gfinit_mode_saved.cr52	1
-offset	struct gfinit_mode_saved.crtc850	12
-member_size	struct gfinit_mode_saved.crtc850	4
-offset	struct gfinit_mode_saved.gpio_ext	8
-member_size	struct gfinit_mode_saved.gpio_ext	4
-offset	struct gfinit_mode_saved.sel_clk	16
+offset	struct gfinit_mode_saved.head	0
+member_size	struct gfinit_mode_saved.head	32
+offset	struct gfinit_mode_saved.pllsel	32
+member_size	struct gfinit_mode_saved.pllsel	4
+offset	struct gfinit_mode_saved.sel_clk	36
 member_size	struct gfinit_mode_saved.sel_clk	4
 size	struct gfinit_mode_timing	48
 align	struct gfinit_mode_timing	4
@@ -3977,6 +4077,7 @@ enum	GF3_UYVY	6
 enum	GF3_XRGB8888	2
 enum	GF3_Y8	4
 enum	GF3_YUY2	5
+enum	GF4_DISPLAY	10
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5
@@ -4072,6 +4173,9 @@ enum	GF_MODE_CR_VD	18
 enum	GF_MODE_CR_VE	17
 enum	GF_MODE_CR_VS	16
 enum	GF_MODE_CR_VT	6
+enum	GF_SCRIPT_EIO	4294967295
+enum	GF_SCRIPT_ETIME	4294967291
+enum	GF_SCRIPT_OK	0
 enum	GF_VERIFY_CR	1
 enum	GF_VERIFY_MMIO	0
 enum	GF_VERIFY_SR	2

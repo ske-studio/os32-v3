@@ -56,7 +56,7 @@ static int tx_failed(struct gf4_ctx *c,int source,int recovery)
     (void)c->links->failed(c->links->owner,source,c->deadline);
     return c->last_rc=source;
 }
-int gf4_change_begin(struct gf4_ctx *c,u32 dl)
+i32 gf4_change_begin(struct gf4_ctx *c,u32 dl)
 {
     if (!c || !c->state || !c->ch || !c->ch->f || !c->links ||
         !c->links->admission || !c->links->failed) return GF4_EINVAL;
@@ -162,7 +162,7 @@ static int tx_restore(struct gf4_ctx *c)
     if (!rc && c->legacy) c->legacy->blank=s->rollback.head[0].blank;
     return rc;
 }
-int gf4_change_end(struct gf4_ctx *c,int operation_rc)
+i32 gf4_change_end(struct gf4_ctx *c,i32 operation_rc)
 {
     if (!c || !c->state || !c->changing) return GF4_ESTATE;
     struct gf4_state *s=c->state;

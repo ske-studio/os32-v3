@@ -1,6 +1,6 @@
 /* C2-links-b: A1 UNIT14, libc-free; real select/callback/runner/B10.
  * A2 links the real F4/F3/V0 dependencies of links.c plus runner.c,
- * save.c, pll.c, decoder/PLL helpers and op/*.c, GF_PRODUCTION_MODULE,
+ * save.c, pll.c, decoder/PLL helpers and op translation units, GF_PRODUCTION_MODULE,
  * -m32 -nostdlib with section GC. Do not separately compile links.c.
  * GF4_LINKS_SOURCE permits runtime mutants without changing this oracle.
  * Sources: MIT nouveau-v6.1 nouveau_bios.c:66-106,627-680,904-962;

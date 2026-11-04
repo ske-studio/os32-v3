@@ -148,5 +148,6 @@ GfxBackend gfx_backend_pc98 = {
     pc98_modes,
     sizeof(pc98_modes) / sizeof(pc98_modes[0]),
     PC98_MODE_400,           /* default_mode */
-    (const GfxMode *)0       /* selected_mode */
+    (const GfxMode *)0       /* selected_mode */,
+    .set_mode = 0             /* optional display hooks default to unavailable */
 };

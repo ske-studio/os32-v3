@@ -12,7 +12,9 @@ Layer 2 adds the command hooks/channel and GF2 diagnostic types, and appends
 sys_time_now at private index 39. The 2026-11-03 import ceiling removal drops
 that member from module_component_policy and shifts its following export/load-span
 fields. Layer 3 adds accel/VRAM types and production.accel, plus the
-accel getter and gfx_present imports at indices 40/41. These changes own the pins below.
+accel getter and gfx_present imports at indices 40/41. Layer 4 appends the kernel-owned gf_display_test at index 42 and adds
+Context v5, eight HAL hooks, display4, per-head mode/snapshot and script enums.
+These changes own the pins below.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -32,9 +34,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xb08dcefc
-REVIEWED_IMPORT_DECLARATIONS_SHA = 'b4f450fd3778df3d2c0e7e83817c1c37148d55ca87fe5f248df5a89be434afb5'
-REVIEWED_INVENTORY_SHA = 'd3e458e9915ac2c8bea09007e0d9cd74a011bd3b69d3a3840ea1270c636385ae'
+REVIEWED_LAYOUT_CRC = 0xec64387d
+REVIEWED_IMPORT_DECLARATIONS_SHA = 'd5ff637c2adc81fa1ac36fe345c563f53e6cf5476235e9e25ef32e839cc6dba0'
+REVIEWED_INVENTORY_SHA = '24a8ff1e5f59a4e0ff2b3b4f150e34b3e8978778d49f5fa30f89c14be8cb3d47'
 
 
 def import_declarations(root):

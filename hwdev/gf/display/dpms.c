@@ -89,7 +89,7 @@ int gf4_dpms_set(struct gf4_ctx *ctx,u8 head,enum gf4_dpms mode,u32 dl)
         rc=gf4_cursor_apply(ctx,head,true);
     return gf4_change_end(ctx,rc);
 }
-int gf4_blank_set(struct gf4_ctx *ctx,u8 head,bool blank,u32 dl)
+i32 gf4_blank_set(struct gf4_ctx *ctx,u8 head,bool blank,u32 dl)
 {
     int rc=dp_check(ctx,head);
     if (rc) return rc;

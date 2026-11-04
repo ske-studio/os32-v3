@@ -51,7 +51,7 @@ static bool display_address(u32 off)
     if (off==GF_IRQ_CRTC_STATUS || off==GF_IRQ_CRTC_ENABLE ||
         off==GF_IRQ_CRTC_STATUS+GF_IRQ_HEAD_STRIDE ||
         off==GF_IRQ_CRTC_ENABLE+GF_IRQ_HEAD_STRIDE) return false;
-    return off>=T_DISPLAY_BASE || (off>=T_VGA_BASE && off<T_VGA_END);
+    return (off>=T_DISPLAY_BASE && off<GF2_USER_BASE) || (off>=T_VGA_BASE && off<T_VGA_END);
 }
 static int display_read(void *owner,u32 bar,u32 off,u32 width,u32 *out)
 {
@@ -153,12 +153,6 @@ void geforce_display_failed(void)
     assert(!host.ctx.accepting);
     ++notifications;
 }
-static i32 diagnostic_start(void *c,u32 dl) { return gf4_service_restart(c,dl); }
-static i32 diagnostic_stop(void *c,u32 dl) { return gf4_service_suspend(c,dl); }
-static i32 diagnostic_recover(void *c,u32 dl) { return gf4_service_recover(c,dl); }
-static const struct gf3_service_owner service_owner={
-    &host.ctx,diagnostic_start,diagnostic_stop,diagnostic_recover
-};
 static i32 window_close(void *owner,struct gf_vram_view *v)
 {
     assert(owner==&host && !host.ctx.accepting && !cint_slot);
@@ -182,7 +176,7 @@ static void retained(void)
     }
     assert(host.ctx.legacy==&cint_prod.display && cint_prod.display.display4==&host.ctx);
 }
-static void setup(enum gf3_fmt fmt)
+static void recover_setup(enum gf3_fmt fmt)
 {
     cint_reset();
     gf2_host_memset(&state,0,sizeof(state));
@@ -240,8 +234,13 @@ static void setup(enum gf3_fmt fmt)
         {400000,1000000,25000,200000,4,40,1,4},6,0,27000};
     host.ctx.limits_valid[0]=true;
     deadline=GF3_TIMEOUT_US; host.ctx.deadline=deadline;
-    assert(!gf3_service_owner_bind(cint_service,&service_owner));
+    /* Complete stop is now owned by real C2-service. Borrow its real owner
+     * table as well as the F3 service, so final teardown is a valid call. */
+    host.ctx.ready=false; host.ctx.legacy=0; cint_prod.display.display4=0;
+    assert(!gf4_service_bind(&host.ctx,&cint_prod.display,&host.links));
+    assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
     assert(!gf3_service_objects_init(cint_service,deadline));
+    host.ctx.ready=true;
     struct gf3_surface test={.off=keys[3].off,.bytes=keys[3].bytes,
         .pitch=GF_MODE_WIDTH,.width=GF_MODE_WIDTH,.height=GF_MODE_HEIGHT,.fmt=GF3_INDEX8,
         .reservation_id=keys[3].reservation_id,.generation=keys[3].generation};
@@ -269,7 +268,7 @@ static void test_suspend_restart(void)
 {
     const enum gf3_fmt formats[]={GF3_INDEX8,GF3_RGB565,GF3_XRGB8888};
     for (u32 f=0;f<sizeof(formats)/sizeof(formats[0]);++f) {
-        setup(formats[f]);
+        recover_setup(formats[f]);
         u32 epoch=cint_prod.chan.epoch;
         host.ctx.saved_closed=true;
         assert(!gf4_service_suspend(&host.ctx,deadline));
@@ -297,7 +296,7 @@ static void test_suspend_restart(void)
 }
 static void test_close_and_stop_failures(void)
 {
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     struct gf_vram_view *v=&host.ctx.cursor_view[0];
     v->close=window_close; v->close_owner=&host;
     volatile u8 *va=NULL;
@@ -310,14 +309,14 @@ static void test_close_and_stop_failures(void)
     assert(!gf4_service_suspend(&host.ctx,deadline));
     assert(!v->mapped && close_calls==2); retained(); finish();
 
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     /* Real F2 stop cannot release when the push unmap fails. */
     cint_unmap_fail=CINT_MAP_PUSH;
     assert(gf4_service_suspend(&host.ctx,deadline)==GF2_ESTOP);
     assert(cint_prod.chan.state!=GF2_OFF && !cint_owner_stops && host.ctx.ready);
     retained(); cint_unmap_fail=-1; finish();
 
-    setup(GF3_INDEX8); fail_cleanup=true;
+    recover_setup(GF3_INDEX8); fail_cleanup=true;
     ++cint_prod.foundation.stats.fifo;
     assert(gf2_fault_check(&cint_prod.chan)==GF2_EFAULT);
     assert(gf4_service_recover(&host.ctx,deadline)==GF2_EFAULT);
@@ -327,7 +326,7 @@ static void test_close_and_stop_failures(void)
 static void test_fault_recover(void)
 {
     for (u32 saved=0;saved<3U;++saved) {
-        setup(GF3_XRGB8888);
+        recover_setup(GF3_XRGB8888);
         host.ctx.saved_closed=saved!=0;
         host.ctx.diagnostic_saved=saved==2 ? &diagnostic : NULL;
         gf2_host_memset(&diagnostic,T_DIAGNOSTIC_PATTERN,sizeof(diagnostic)); /* distinct saved-image sentinel */
@@ -356,19 +355,19 @@ static void test_fault_recover(void)
 }
 static void test_restore_and_publication_failure(void)
 {
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     gf4_host_fail_at(&host,D_SLEEP,1,T_FAILURE);
     assert(gf4_service_suspend(&host.ctx,deadline)==T_FAILURE);
     assert(host.ctx.last_rc==T_FAILURE && cint_prod.chan.state==GF2_OFF && !publish_calls);
     retained(); finish();
 
-    setup(GF3_INDEX8); fail_restore=true;
+    recover_setup(GF3_INDEX8); fail_restore=true;
     assert(gf4_service_recover(&host.ctx,deadline)==T_FAILURE);
     assert(host.ctx.ready && cint_prod.accel.ready && !host.ctx.accepting && !cint_slot);
     assert(host.ctx.recovery_rc==T_FAILURE && !publish_calls && host.ctx.saved_closed);
     retained(); finish();
 
-    setup(GF3_RGB565); fail_publish=true;
+    recover_setup(GF3_RGB565); fail_publish=true;
     assert(gf4_service_recover(&host.ctx,deadline)==T_FAILURE);
     assert(host.ctx.ready && cint_prod.accel.ready && !host.ctx.accepting && !cint_slot);
     assert(host.ctx.recovery_rc==T_FAILURE && publish_calls==1U);
@@ -376,7 +375,7 @@ static void test_restore_and_publication_failure(void)
 }
 static void test_restart_failure(void)
 {
-    setup(GF3_RGB565);
+    recover_setup(GF3_RGB565);
     assert(!gf4_service_suspend(&host.ctx,deadline));
     u32 epoch=cint_prod.chan.epoch;
     cint_map_fail=CINT_MAP_PUSH;
@@ -385,14 +384,14 @@ static void test_restart_failure(void)
     assert(cint_prod.chan.epoch==epoch+1U);
     retained(); cint_map_fail=-1; finish();
 
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     assert(!gf4_service_suspend(&host.ctx,deadline));
     ++host.ctx.hold_saved.head[0].front.generation;
     assert(gf4_service_restart(&host.ctx,deadline)==GF3_ESTATE);
     assert(!host.ctx.ready && cint_prod.accel.ready && !cint_slot && !publish_calls);
     retained(); finish();
 
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     assert(!gf4_service_suspend(&host.ctx,deadline));
     /* F2's initial reference may use its own timeout. The next F3 work
      * must still receive the expired original dl (X4), not a renewal. */
@@ -403,7 +402,7 @@ static void test_restart_failure(void)
 }
 static void test_restart_revoked(void)
 {
-    setup(GF3_INDEX8);
+    recover_setup(GF3_INDEX8);
     assert(!gf4_service_suspend(&host.ctx,deadline));
     gf_foundation_revoke(&cint_prod.foundation);
     trace_clear();
@@ -425,7 +424,7 @@ static void test_failed_and_arguments(void)
     assert(gf4_service_suspend(NULL,deadline)==GF4_EINVAL);
     assert(gf4_service_restart(NULL,deadline)==GF4_EINVAL);
     assert(gf4_service_recover(NULL,deadline)==GF4_EINVAL);
-    setup(GF3_INDEX8); host.ctx.changing=true;
+    recover_setup(GF3_INDEX8); host.ctx.changing=true;
     assert(gf4_service_suspend(&host.ctx,deadline)==GF4_EBUSY);
     assert(gf4_service_recover(&host.ctx,deadline)==GF4_EBUSY);
     assert(gf4_service_restart(&host.ctx,deadline)==GF4_EBUSY);

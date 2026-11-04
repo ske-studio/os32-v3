@@ -39,6 +39,7 @@
 #include "include/sys.h"
 #include "include/tvram.h"
 #include "kapi/kapi_db.h"
+#include "kdebug/gf_display_test.h"
 #include "kernel/console/display_restore.h"
 #include "kernel/console/unicode_file.h"
 #include "kernel/gui.h"
@@ -140,8 +141,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 312
-#define KDEBUG_ABI_GEN 0x4ee2c5a3u
+#define KDEBUG_IMPORT_COUNT 313
+#define KDEBUG_ABI_GEN 0x79baaaccu
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];
