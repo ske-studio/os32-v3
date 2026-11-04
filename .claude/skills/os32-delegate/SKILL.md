@@ -12,7 +12,7 @@ description: 段の実装 (または後片付け・ゲスト受入) を実装者
 ```bash
 cd /home/hight/os32-v3
 git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
-cp assets/fonts/ipaex*.ttf ~/wt/os32-v3/<名>/assets/fonts/   # 同意済みの IPAex (gitignore)。無いと font 系の検査が落ちる
+~/os32-tmp/bin/seed_fonts.sh ~/wt/os32-v3/<名>   # assets/fonts/ を全部 (IPAex・Inconsolata・JF-Dot、gitignore)。codex のサンドボックスはネットに出られず (DNS 不可)、無いと make all がフォントの取得で rc=2 (2026-11-04、gf4-fxc・fxd)
 ```
 
 - 触るファイルが重ならない段は並列で出す。重なるなら順に (先の段を取り込んでから次を作る)。
