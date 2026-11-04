@@ -4,6 +4,7 @@
 #include "pc98.h"
 #include "gfx_osri.h"
 #include "splash_raster_image.h"
+#include "splash_raster_play.h"
 #define IO_H
 
 static void finish(u32 line)
@@ -22,7 +23,7 @@ static void finish(u32 line)
 #define HOST_WRITES (64u + 4u * 399u * 16u)
 static struct SplashRaster state;
 static struct OsriImage image;
-static struct PlObsPlan plan;
+static struct { u32 before; struct PlV2Plan value; u32 after; } guarded_plan;
 static u32 stamp, reads, writes, out_cost, vs_lines, fall_at, cli_at, restores;
 static int irq_on, freeze, no_h, no_v_after_f, stuck_v, force_v_at, delay_cli;
 static u32 preview_at, preview_pending, uart_inits, stop_v_at;
@@ -69,17 +70,18 @@ static void irq_restore(unsigned int flags) { restores++; irq_on = flags; }
 #define now_us obs_host_now_us
 #define finish obs_host_image_finish
 #include "../../drivers/video/pc98/splash_raster_image.c"
+#include "../../drivers/video/pc98/splash_raster_plan.c"
+#include "../../drivers/video/pc98/splash_raster_play.c"
 #undef finish
 #undef now_us
 #include "../../gfx/gfx_osri.c"
 #include "../../platform/pc98/splash_obs.c"
 #include "../../init/boot_splash.c"
+#define plan guarded_plan.value
 
 struct SplashRaster *pc98_splash_raster_state(void) { return &state; }
 int sys_time_now(u32 *lo, u32 *hi)
 { (void)lo; (void)hi; REQUIRE(0); return -1; }
-int ktime_splash_sample(struct TimeSplashSample *s) { (void)s; REQUIRE(0); return -1; }
-int ktime_splash_settle(const struct TimeSplashMathInput *s) { (void)s; REQUIRE(0); return -1; }
 
 static void setup(int mode, int vs)
 {
@@ -106,13 +108,14 @@ static void make_image(u32 n)
 }
 static void test_prepare(void)
 {
+    guarded_plan.before=0x12345678u; guarded_plan.after=0x87654321u;
     for (u32 n = 1; n <= 16; n++) {
         make_image(n);
-        REQUIRE(!pl_obs_prepare(&image, &plan));
+        REQUIRE(!pl_v2_prepare(&image, &plan));
         REQUIRE(!plan.row[0].count);
         REQUIRE(plan.max_outs == 2*n-1 && plan.total_outs == 399*(2*n-1));
         for (u32 y = 1; y < 400; y++) {
-            struct PlObsRow *r = &plan.row[y];
+            struct PlV2Row *r = &plan.row[y];
             REQUIRE(r->count == 2*n-1 && r->first == 0);
             for (u32 j = 0, pos = 0; j < n; j++) {
                 if (j) { REQUIRE(r->port[pos] == PAL_IDX_PORT && r->value[pos] == j); pos++; }
@@ -120,13 +123,14 @@ static void test_prepare(void)
             }
         }
     }
-    REQUIRE(pl_obs_prepare(0, &plan)); REQUIRE(pl_obs_prepare(&image, 0));
-    image.count = OBS_V2_MAX_EVENTS+1; REQUIRE(pl_obs_prepare(&image, &plan));
-    make_image(1); image.version = 1; REQUIRE(pl_obs_prepare(&image, &plan));
-    image.version = 2; image.band = 2; REQUIRE(pl_obs_prepare(&image, &plan));
-    make_image(2); image.event[2].line = 0; REQUIRE(pl_obs_prepare(&image, &plan));
+    REQUIRE(pl_v2_prepare(0, &plan)); REQUIRE(pl_v2_prepare(&image, 0));
+    image.count = OSRI_IMAGE_EVENTS+1; REQUIRE(pl_v2_prepare(&image, &plan));
+    make_image(1); image.version = 1; image.count = 200; REQUIRE(!pl_v2_prepare(&image, &plan));
+    image.count = 201; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.version = 2; image.band = 2; REQUIRE(pl_v2_prepare(&image, &plan));
+    make_image(2); image.event[2].line = 0; REQUIRE(pl_v2_prepare(&image, &plan));
     make_image(2); image.event[1].index = image.event[0].index;
-    REQUIRE(pl_obs_prepare(&image, &plan));
+    REQUIRE(pl_v2_prepare(&image, &plan));
     /* File order is pi, with all seven component masks and empty rows.
      * Old colors carry across rows, including a same-color event. */
     image = (struct OsriImage){ .version=2, .band=1, .count=9 };
@@ -135,7 +139,7 @@ static void test_prepare(void)
             ((j+1) & 2 ? 0x020 : 0) | ((j+1) & 4 ? 0x003 : 0) };
     image.event[7]=(struct OsriEvent){ .line=4, .index=7, .rgb444=0x100 };
     image.event[8]=(struct OsriEvent){ .line=5, .index=7, .rgb444=0x123 };
-    REQUIRE(!pl_obs_prepare(&image, &plan));
+    REQUIRE(!pl_v2_prepare(&image, &plan));
     REQUIRE(!plan.row[1].count && !plan.row[3].count && !plan.row[4].count);
     REQUIRE(plan.row[2].first == 7 && plan.row[2].count == 18);
     u32 pos=0;
@@ -148,29 +152,72 @@ static void test_prepare(void)
     REQUIRE(pos == 18 && plan.row[5].count == 2 && plan.row[5].first == 7);
     REQUIRE(plan.row[5].port[0] == PAL_G_PORT && plan.row[5].port[1] == PAL_B_PORT);
     REQUIRE(plan.max_outs == 18 && plan.total_outs == 20);
-    /* 12 full colors: 47 H OUTs; a 13th G change: 49, or removing
-     * one component from the first twelve: exactly 48. */
+    /* B31 accepts sixteen single-component changes. The next component
+     * must be rejected before either row array can overflow. */
+    make_image(16); image.count=16;
+    REQUIRE(!pl_v2_prepare(&image, &plan) && plan.row[1].count == 31);
+    image.event[0].rgb444 ^= 0x100;
+    REQUIRE(pl_v2_prepare(&image, &plan)); /* 32 */
+    for (u32 j=0; j<16; j++) image.event[j].line=399;
+    plan.max_outs=0; plan.total_outs=0;
+    REQUIRE(pl_v2_prepare(&image, &plan) && !plan.max_outs && !plan.total_outs);
     image = (struct OsriImage){ .version=2, .band=1, .count=12 };
     for (u32 j=0; j<13; j++) image.event[j]=(struct OsriEvent){ .line=1, .index=j, .rgb444=0x123 };
-    REQUIRE(!pl_obs_prepare(&image, &plan) && plan.row[1].count == 47);
+    REQUIRE(pl_v2_prepare(&image, &plan)); /* 47 */
     image.count=13; image.event[12].rgb444=0x020; image.event[0].rgb444=0x120;
-    REQUIRE(pl_obs_prepare(&image, &plan)); /* 48 */
-    image.event[1].rgb444=0x120;
-    REQUIRE(!pl_obs_prepare(&image, &plan) && plan.row[1].count == 47);
-    image.count=0; REQUIRE(!pl_obs_prepare(&image, &plan) && !plan.total_outs);
-    image.count=1; image.event[0].line=400; REQUIRE(pl_obs_prepare(&image, &plan));
-    image.event[0].line=0; REQUIRE(pl_obs_prepare(&image, &plan));
-    image.event[0].line=1; image.event[0].index=16; REQUIRE(pl_obs_prepare(&image, &plan));
-    image.event[0].index=0; image.event[0].reserved1=1; REQUIRE(pl_obs_prepare(&image, &plan));
-    image.event[0].reserved1=0; image.event[0].rgb444=0x1000; REQUIRE(pl_obs_prepare(&image, &plan));
+    REQUIRE(pl_v2_prepare(&image, &plan)); /* 48 */
+    /* Same-color v2 records, including sixteen in a row, cost zero. */
+    make_image(16);
+    for (u32 j=0; j<image.count; j++) image.event[j].rgb444=rgb(image.event[j].index);
+    REQUIRE(!pl_v2_prepare(&image, &plan) && !plan.total_outs);
+    for (u32 y=0; y<400; y++) REQUIRE(!plan.row[y].first && !plan.row[y].count);
+    /* Generalize bands without skipping the empty rows between them. */
+    for (u32 band=2; band<=4; band*=2) {
+        image=(struct OsriImage){ .version=2, .band=band, .count=1 };
+        image.event[0]=(struct OsriEvent){ .line=band, .index=3, .rgb444=0x100 };
+        REQUIRE(!pl_v2_prepare(&image, &plan) && plan.total_outs==1);
+        for (u32 y=0; y<400; y++) REQUIRE(plan.row[y].count == (y==band));
+        image.event[0].line++;
+        REQUIRE(pl_v2_prepare(&image, &plan));
+    }
+    image.band=1;
+    /* v1 keeps its ordering/no-op contract, with no v2 per-row cap. */
+    image=(struct OsriImage){ .version=1, .band=1, .count=4 };
+    for (u32 j=0; j<4; j++) image.event[j]=(struct OsriEvent){ .line=1, .index=j, .rgb444=1 };
+    REQUIRE(!pl_v2_prepare(&image, &plan) && plan.row[1].count==7);
+    image.event[0].index=4; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.event[0].index=0; image.event[0].rgb444=0; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.version=2;
+    image.band=4;
+    image.count=0; REQUIRE(!pl_v2_prepare(&image, &plan) && !plan.total_outs);
+    image.band=1;
+    image.count=1; image.event[0].line=400; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.event[0].line=0; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.event[0].line=1; image.event[0].index=16; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.event[0].index=0; image.event[0].reserved1=1; REQUIRE(pl_v2_prepare(&image, &plan));
+    image.event[0].reserved1=0; image.event[0].rgb444=0x1000; REQUIRE(pl_v2_prepare(&image, &plan));
+    REQUIRE(guarded_plan.before==0x12345678u && guarded_plan.after==0x87654321u);
 }
 static void test_scan(void)
 {
+    for (u32 count=0; count<=31; count++) {
+        setup(1, 0); out_cost=1;
+        image=(struct OsriImage){ .version=2, .band=1, .count=(count+1)/2 };
+        for (u32 j=0; j<image.count; j++) image.event[j]=(struct OsriEvent){
+            .line=1, .index=j, .rgb444=(count && !(count&1) && !j) ? 0x120 : 0x010 };
+        REQUIRE(!pl_v2_prepare(&image, &plan) && plan.row[1].count==count);
+        REQUIRE(pl_v2_frame(&state, &image, &plan)==PL_FRAME_OK);
+        REQUIRE(writes==64+count+!!count && irq_on && restores==1);
+        for (u32 j=0; j<count; j++) {
+            REQUIRE(output[65+j].port==plan.row[1].port[j]);
+            REQUIRE(output[65+j].value==plan.row[1].value[j]);
+        }
+    }
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++)
     for (u32 n = 1; n <= 16; n++) {
         setup(mode, vs); out_cost = 1; make_image(n);
-        REQUIRE(!pl_obs_prepare(&image, &plan));
-        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(!pl_v2_prepare(&image, &plan));
+        REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_OK);
         REQUIRE(irq_on && restores == 1 && state.frame == 1 && !state.dropped);
         REQUIRE(writes == 64 + 399 * 2 * n);
         REQUIRE(cli_at >= state.total_lines * HOST_H && cli_at < fall_at);
@@ -195,7 +242,7 @@ static void test_scan(void)
         REQUIRE(stamp >= fall_at + (state.active0_lines+399)*HOST_H + 80);
         /* A continuation consumes the very next VBLANK, never two. */
         u32 previous = stamp; writes = reads = 0;
-        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_OK);
         REQUIRE(stamp - previous == state.total_lines * HOST_H);
     }
     /* Empty rows must still consume their H edge; pi starts with index 7. */
@@ -204,8 +251,8 @@ static void test_scan(void)
     image.event[0]=(struct OsriEvent){ .line=2, .index=7, .rgb444=0x020 };
     image.event[1]=(struct OsriEvent){ .line=2, .index=1, .rgb444=0x100 };
     image.event[2]=(struct OsriEvent){ .line=5, .index=7, .rgb444=0x023 };
-    REQUIRE(!pl_obs_prepare(&image, &plan));
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK && writes == 70);
+    REQUIRE(!pl_v2_prepare(&image, &plan));
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_OK && writes == 70);
     REQUIRE(output[64].port == PAL_IDX_PORT && output[64].value == 7);
     REQUIRE(output[64].time % HOST_H < 80);
     REQUIRE(output[65].port == PAL_G_PORT && output[65].value == 2);
@@ -216,32 +263,32 @@ static void test_scan(void)
     REQUIRE(output[68].time % HOST_H < 80);
     REQUIRE(output[69].port == PAL_B_PORT && output[69].value == 3);
     REQUIRE(output[69].time == fall_at+4*HOST_H+81);
-    setup(1, 0); make_image(16); REQUIRE(!pl_obs_prepare(&image, &plan));
+    setup(1, 0); make_image(16); REQUIRE(!pl_v2_prepare(&image, &plan));
     out_cost = 8;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_DROP);
     REQUIRE(irq_on && restores == 1 && state.dropped == 1 && !state.frame);
     REQUIRE(stamp < 3 * state.total_lines * HOST_H);
     /* B1: VSYNC must drop in both the high-wait and low-wait paths. */
     for (u32 extra = 0; extra <= 80; extra += 80) {
-        setup(1, 0); make_image(1); REQUIRE(!pl_obs_prepare(&image, &plan));
+        setup(1, 0); make_image(1); REQUIRE(!pl_v2_prepare(&image, &plan));
         force_v_at = fall_at + 10 * HOST_H + extra;
-        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+        REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_DROP);
         REQUIRE(irq_on && restores == 1 && stamp <= (u32)force_v_at + 1);
     }
     setup(1, 0); freeze = 1;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
     REQUIRE(irq_on && !restores && reads <= 1000001u);
     setup(1, 0); no_h = no_v_after_f = 1;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
     REQUIRE(irq_on && restores == 1);
     setup(1, 0); stuck_v = 1;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
     REQUIRE(irq_on && restores == 1);
     setup(1, 0); delay_cli = 1;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_DROP);
     REQUIRE(irq_on && restores == 1 && !writes);
     setup(1, 0); irq_on = 0;
-    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
     REQUIRE(!irq_on && !restores && !reads);
 }
 
@@ -406,8 +453,8 @@ static void test_preview(void)
         REQUIRE(stamp >= (rounds+1)*period && stamp <= (rounds+1)*period+2);
         /* The next call really switches to the initial and per-row palette. */
         reads = 0; make_image(2);
-        REQUIRE(!pl_obs_prepare(&image, &plan));
-        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(!pl_v2_prepare(&image, &plan));
+        REQUIRE(pl_v2_frame(&state, &image, &plan) == PL_FRAME_OK);
         REQUIRE(writes == 64+399*4 && irq_on);
     }
     setup(1, 0); freeze = 1;

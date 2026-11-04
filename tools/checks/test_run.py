@@ -364,9 +364,9 @@ class RunnerTest(unittest.TestCase):
 
     def test_build_source_lists_route_sources_and_artifacts(self):
         cases = (
-            ('build/kernel.mk', 'kernel/time/time_splash_math.c',
+            ('build/kernel.mk', 'drivers/video/pc98/splash_raster_plan.c',
              'C_KERNEL = \\\n    arch/x86/kernel/mtrr_wc.c\n',
-             'C_KERNEL = \\\n    kernel/time/time_splash_math.c \\\n    arch/x86/kernel/mtrr_wc.c\n'),
+             'C_KERNEL = \\\n    drivers/video/pc98/splash_raster_plan.c \\\n    arch/x86/kernel/mtrr_wc.c\n'),
             ('build/kernel.mk', 'drivers/video/pc98/splash_raster_image.c',
              'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c\n',
              'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c \\\n    drivers/video/pc98/splash_raster_image.c\n'),

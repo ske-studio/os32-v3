@@ -3,6 +3,7 @@
 #include "platform_splash.h"
 #include "gfx_osri.h"
 #include "splash_raster_image.h"
+#include "splash_raster_play.h"
 #include "kmalloc.h"
 #include "kstring.h"
 #include "palette.h"
@@ -80,7 +81,7 @@ void platform_splash_observe(void)
         char path[] = SPLASH_OBS_PATH;
         struct gfx_kernel_fb fb;
         struct OsriImage *image = NULL;
-        struct PlObsPlan *plan = NULL;
+        struct PlV2Plan *plan = NULL;
         OS32_Stat stat;
         u32 frames = 0, drops = 0;
         const char *status = "missing";
@@ -103,9 +104,8 @@ void platform_splash_observe(void)
         if (!image || !plan) goto done;
         status = "invalid";
         if (osri_load(path, &fb, image)) goto done;
-        if (image->version != OSRI_VERSION_2 || image->band != 1) goto done;
         status = "prepare";
-        if (pl_obs_prepare(image, plan)) goto done;
+        if (pl_v2_prepare(image, plan)) goto done;
         serial_puts_polled("SPLO n="); serial_diag_u32(n);
         serial_puts_polled(" out_max="); serial_diag_u32(plan->max_outs);
         serial_puts_polled(" out_total="); serial_diag_u32(plan->total_outs);
@@ -117,7 +117,7 @@ void platform_splash_observe(void)
         if (pl_preview(s)) { obs_black(); goto done; }
         status = "ok";
         for (u32 round = 0; round < rounds; round++) {
-            int rc = pl_obs_frame(s, image, plan);
+            int rc = pl_v2_frame(s, image, plan);
             if (rc == PL_FRAME_OK) frames++;
             else if (rc == PL_FRAME_DROP) drops++;
             else { status = "no_sync"; break; }
