@@ -7,6 +7,10 @@ static struct gf5_host h;
 static struct gf4_state state;
 static struct gf5_host_event events[128];
 static struct gf4_host_event io_events[128];
+/* Each slot has three registers in each of the FB and GR banks:
+ * nouveau nvkm/subdev/fb/nv44.c:30-46 and engine/gr/nv44.c:31-46. */
+enum { TILE_BANKS = 2, TILE_REGS_PER_BANK = 3 };
+static struct gf3_host_reg regs[GF5_TILE_COUNT * TILE_BANKS * TILE_REGS_PER_BANK];
 static struct gf_vram_reservation_node node;
 static int owner;
 /* nouveau nouveau_bo.c:178-188: base alignment and pitch*64 row rounding. */
@@ -23,6 +27,7 @@ static void setup(void)
     gf5_host_init(&h,&state);
     h.events=events; h.cevents=128;
     h.display.events=io_events; h.display.cevents=128;
+    h.display.base.regs=regs; h.display.base.cregs=sizeof(regs)/sizeof(regs[0]);
     h.ctx.deadline=1000;
     node=(struct gf_vram_reservation_node){.value={.owner=&owner,.off=0x10000,
         .bytes=0x60000,.reservation_id=1,.generation=2}};
