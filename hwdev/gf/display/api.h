@@ -69,6 +69,9 @@ struct gf4_ctx {
     bool changing,saved_closed; i32 recovery_rc; u32 next_mode_id;
     struct gf_vram_reservation_node scan_next[GF4_HEADS][2]; u8 scan_bank[GF4_HEADS];
     struct gf4_dcb_values dcb; const struct gf4_saved *diagnostic_saved;
+    /* B11-MMIO (tv.c) owns: TV load-detect result, nouveau dispnv04/tvnv17.h:73-87
+     * pin_mask/subconnector; valid cleared by service start (PM 2026-11-04). */
+    u8 tv_pin_mask,tv_subconnector; bool tv_sense_valid;
 };
 int gf4_modes(struct gf4_ctx *,u8,const struct gf4_mode **,u32 *);
 int gf4_set_mode(struct gf4_ctx *,const struct gf4_route *,u32,const struct gf3_surface *,u32);
@@ -96,6 +99,7 @@ i32 gf4_pll_calc(const struct gf4_mode *,const struct gf4_route *,const struct g
 i32 gf4_analog_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32);
 i32 gf4_tmds_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32);
 i32 gf4_tv_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32);
+i32 gf4_tv_sense(struct gf4_ctx *,const struct gf4_route *,u32 dl);
 i32 gf4_analog_dpms(struct gf4_ctx *,const struct gf4_route *,enum gf4_dpms,u32);
 i32 gf4_tmds_dpms(struct gf4_ctx *,const struct gf4_route *,enum gf4_dpms,u32);
 i32 gf4_tv_dpms(struct gf4_ctx *,const struct gf4_route *,enum gf4_dpms,u32);
