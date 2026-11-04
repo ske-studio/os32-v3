@@ -25,6 +25,7 @@
 #endif
 #include "gf4_display_fake.h"
 #include "../../hwdev/gf/feature5.h"
+#include "../../hwdev/gf/internal.h"
 #include "../../include/sys.h"
 #if GF5_HOST_UNIT == 9
 #include "../../mm/pgalloc.h"
@@ -43,7 +44,7 @@ enum gf5_host_op {
     F5_ADMIT,F5_DRAIN,F5_PAUSE,F5_RESUME,F5_STOP,F5_RESTART,F5_SAVE,F5_RESTORE,
     F5_SCRIPT,F5_ALLOC,F5_FREE,F5_COPY,F5_NEXT,F5_MATCH,F5_CLOCK64,
     F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET,F5_PERF,F5_VOLT,F5_FAN,F5_CALC,
-    F5_PROG,F5_RAM,F5_OP_COUNT
+    F5_PROG,F5_RAM,F5_POINT,F5_CLEANUP,F5_OP_COUNT
 };
 /* a[0] distinguishes same-family stub operations; remaining a[] and p[]
  * follow the public signature (ctx first). For CALC: p[1]=request,p[2]=out;
@@ -51,7 +52,7 @@ enum gf5_host_op {
 enum gf5_host_call {
     F5_CALL_READ,F5_CALL_CALC,F5_CALL_GET,F5_CALL_SET,F5_CALL_ID,
     F5_CALL_COUNT,F5_CALL_SELECT,F5_CALL_MODE,F5_CALL_CSTATE,F5_CALL_TICK,
-    F5_CALL_THERM,F5_CALL_PREPARE,F5_CALL_EXECUTE
+    F5_CALL_THERM,F5_CALL_PREPARE,F5_CALL_EXECUTE,F5_CALL_THERM_RESUME
 };
 struct gf5_host_event {
     enum gf5_host_op op; u32 nth,a[GF5_HOST_VALUE_ARGS];
@@ -101,6 +102,34 @@ static inline struct gf5_host *gf5_host_context(struct gf5 *g)
 static inline struct gf5_host *gf5_host_owner(void *owner)
 {
     return gf5_host_context(owner);
+}
+/* Script I/O borrows the F4 indexed MMIO and full shared clock. These
+ * callbacks use its opaque unchanged, so read/write/timing remain usable.
+ * POINT and CLEANUP have independent counts/injection via the usual API;
+ * p[0]=opaque, CLEANUP p[1]=ctx, a[0]=saved_count on entry. Successful fake
+ * cleanup consumes saves, failure retains them. No register replay here. */
+static inline int gf5_host_point(void *opaque)
+{
+    struct gf5_host *h=gf5_host_current; assert(h && opaque==&h->display);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_POINT);
+    e->p[0]=opaque;
+    assert(!e->rc || e->rc==GF_SCRIPT_EIO);
+    return gf5_host_end(h,e);
+}
+static inline int gf5_host_cleanup(void *opaque,struct gf_init_context *ctx)
+{
+    struct gf5_host *h=gf5_host_current; assert(h && opaque==&h->display && ctx);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_CLEANUP);
+    e->p[0]=opaque; e->p[1]=ctx; e->a[0]=ctx->saved_count;
+    assert(!e->rc || e->rc==GF_SCRIPT_EIO);
+    if (!e->rc) ctx->saved_count=0;
+    return gf5_host_end(h,e);
+}
+static inline void gf5_host_init_io(struct gf5_host *h,struct gf_init_context *ctx)
+{
+    assert(h && h==gf5_host_current && ctx);
+    ctx->io=h->display.base.f.io;
+    ctx->io.point=gf5_host_point; ctx->io.restore=gf5_host_cleanup;
 }
 struct gf5_host_allocation { u32 span,bytes,live,reserved; };
 static inline void gf5_host_arena(struct gf5_host *h,u8 *arena,u32 bytes)
@@ -468,6 +497,13 @@ i32 gf5_fan_cstate(struct gf5 *g,u8 percent,i32 dir)
 }
 #endif
 #if GF5_HOST_UNIT == 6
+i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_FAN);
+    e->p[0]=g; e->p[1]=saved; e->a[0]=F5_CALL_THERM_RESUME;
+    return gf5_host_end(h,e);
+}
 i32 gf5_fan_get(struct gf5 *g,u32 *percent)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -542,6 +578,24 @@ i32 gf5_tile_clear(struct gf5 *g,u32 slot)
 #endif
 #if GF5_HOST_UNIT == 9
 /* Real links calls these F2/F4 boundaries. No F5 adapter or rc_map stub. */
+i32 gf_init_script_execute(struct gf_init_context *ctx,
+                            const struct gf_init_program *program,u32 pc,
+                            u8 head,u8 or_mask,u32 dl)
+{
+    struct gf5_host *h=gf5_host_current; assert(h && ctx && program);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_SCRIPT);
+    e->p[0]=ctx; e->p[1]=program; e->a[0]=F5_CALL_EXECUTE;
+    e->a[1]=pc; e->a[2]=head; e->a[3]=or_mask; e->a[4]=dl;
+    assert(!e->rc || e->rc==GF_SCRIPT_EIO || e->rc==GF_SCRIPT_ETIME);
+    ctx->last_rc=e->rc;
+    /* The runner owns failure cleanup; the adapter owns success cleanup.
+     * Retain the original script rc even when cleanup itself fails. */
+    if (e->rc) {
+        assert(ctx->io.restore);
+        (void)ctx->io.restore(ctx->io.opaque,ctx);
+    }
+    return gf5_host_end(h,e);
+}
 int gf_vram_match(struct gf2_chan *ch,const void *owner,u32 id,u32 generation,
                   u32 off,u32 bytes,struct gf_vram_reservation *out)
 {
