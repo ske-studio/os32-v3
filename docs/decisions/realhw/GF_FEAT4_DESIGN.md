@@ -608,3 +608,115 @@ A1のD_WRITE注入は従来「書かずに失敗」に加え、宣言節のgf4_h
 - **A3 の case7 (寿命) は保存を使わない**: case7 は既存の enter → leave → 再 enter そのものを試験し、leave で予約が解放される既存の約束を変えない。そのため case7 だけは診断の保存 (diagnostic_save) をせず、通常の稼働から始めて、再 enter の後に mode が有効で表示が戻ったことを確かめて終わる。case8 (RESTORE) は case7 に対しては何もせず成功を返す。case1〜6 は従来どおり保存から始めて最後に復元する。
 - **TV の timing と B0・B1 の検査 (B11-data の欠け)**: nouveau は CRTC の水平の値を `>> 3` で切り捨てるだけで 8 の倍数を求めず、`vsync_start == vdisplay` も拒否しない (`dispnv04/crtc.c:245-256`)。B1 の `gf4_timing_calc` と B0 の `timing_fits` は、これに無い検査 (水平の 8 の倍数、vs > vd) を外して手本に合わせる (nouveau に無い守りは足さない)。TV の route の候補の可否は、VGA の検査でなく `nv17_tv_mode_valid` (`tvnv17.c:310-340`) の規則で B0 が判定する。B11-data の LD の PLL 90MHz の補正 (`tvnv17.c:360-363`) と CLKDIV2 (`crtc.c:334-335`) は、C0-load と B11-MMIO が反映する。
 - **B4 の優先の mode は DRM の規則 (PM 決定、レビューの往復 3 回で決着しなかった点)**: 優先の mode は基本ブロックの最初の DTD とする (EDID 1.3 は優先の bit が立つとき、1.4 は常に)。CEA 拡張の見出しの native の DTD の数は、優先の判定に使わない (手本の DRM の drm_edid.c も使わない — nouveau に無い規則は足さない)。拡張の DTD は元の順に足すだけで、優先にしない。`gf4_edid_state.dtd_seen` (19f8f911) は基本と拡張をまたぐ DTD の通し番号として残す。範囲の記述子が無い EDID 1.4 の標準 timing の CVT の生成と、VIC の表の全欄の照合は、レビューの指摘どおり直す。
+
+## 追記 (2026-11-04、層 3 の実物との照合 X1〜X4)
+
+設計追記。X1〜X4について旧記述より本追記を優先する。実装済みとは扱わない。F4/F5の既決機能・協調切替を維持し、新しい待ち・監視・lock・refcount・期限引数を既存下位APIへ足さない。
+照合: O=/home/hight/os32-v3、D=hwdev/gf/display、K=drivers/video/geforce。RECHECK.mdのO/serviceはhwdev/gf/service.c。Lはgf4-a0xからgit showで読んだwt/gf-l4（19f8f911）。N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau（c03c1a1）。
+対象根拠: O/hwdev/gf/{accel_service.h,service.c,command_test.c,command.c,fifo.c,vram_view.c}、D/quiesce.c、L/D/{save,transaction,modeset}.c。段カードと末尾PM決定を維持する。
+
+### X1 — 予約の所有と現行面
+
+正: F4結線後はctx.scan/scan_next/cursor/testが予約を所有する。F3 serviceのscan/testは値の写しで、nodeの所有権ではない。ctx.accelはproduction.accelの借用を続ける。
+追加宣言（hwdev/gf/accel_service.h、実装hwdev/gf/service.c、共有編集担当C2-service-f3）:
+```c
+i32 gf3_service_surfaces(struct gf3_service *s,
+                         const struct gf3_surface *scan,
+                         const struct gf3_surface *test);
+```
+scan/testのNULLはその借用なし。全非NULL面を既存gf3_surface_checkのGF3_USE_BYTESと台帳で検査してからs->scan/testへ一括コピーし、NULL分はゼロにする。surfaceのfmt/pitch/width/height/off/bytes/ID/generationを全て保持し、INDEX8へ作り直さない。登録nodeはコピーしない。
+必須sのNULLはGF3_EINVAL=-301、不正service/F4未接続/旧service所有node残存はGF3_ESTATE=-304。面の検査失敗は元のGF3/V0負値を返し、値と公開を変更しない。成功0。この口は予約・待ち・公開を行わず、F3 ready後に呼ぶ。C2が各面の所有者付きmatchと表示用format検査を先に行う。
+C3 initializeでF3 bind直後・最初のvideo_start前にowner_bindするため初回所有移管は不要。旧F3所有nodeが残っていればsurfacesはGF3_ESTATEとし、自動停止・移管しない。
+通常video startはF1/F2を開始し、C2-scanが新配置をctxの常駐nodeへreserve、下記objects_init→surfaces→既定表示/IRQ成功→最後に公開する。旧「F3 ready→台帳移管」はこの開始列へ置換し、F3を二重initしない。
+C2-scanはtestを640×480・GF3_INDEX8、pitch=align_up(640,GF3_TEST_PITCH_ALIGN)、bytes=pitch*480に固定し、表示/cursor予約後の頁整列空き範囲（off+bytes<=ch->B）へ置く。mode変更で拡大しない。旧「残りBまで全域」のservice_reserveをF4経路から呼ばない。試験面不足はGF2_ENOSPCを記録し表示が成立すれば続行、test=NULLでF3診断slotだけ閉じる。ID枯渇等をこの例外に含めない。
+C2-scanのscan_changed(owner,head,surface)はB7の確定候補を使う（通知時のstate.head.frontは旧面）。head0でsurfacesとC1の記述子/hookを更新、head1でhead0を変更しない。失敗時は旧借用とholdを保持する。外部所有面をreleaseしない。
+mode/rollback/restore後の公開ではC2-linksがchangingならstate.next、そうでなければstate.headを選ぶ。L/transaction.cのadmission(true)はcommit前なのでheadだけを読む実装は禁止。閉鎖中のscan_changedは値だけ更新し再公開しない。
+C1は選択面の形式・寸法・pitch・offsetをHALへ反映し、旧8bit hookを16/32bit面へ無条件bindしない。legacy presentの640×480 INDEX8限定は維持。C2-recoverは同一予約を保持して再結線し、初回geometryや旧service_reserveへ戻らない。
+F5 restartは再reserveを行わず、保持された面をobjects再生成後にsurfacesで結線する。手本はN/nouveau_bo.c:594–629のpin/unpinとdispnv04/crtc.c:838–903,1136–1217のscan/flip。常駐台帳・F3への値借用はOS32固有の置換。
+
+### X2 — objects再生成、公開、窓closeを分離
+
+正: F5 restartはnode/owner/ID/generation/offを保持し、最終RUNまでF3/F4描画slotとscan hookを閉じる。admission(false)は窓closeではない。
+追加宣言（accel_service.h、service.c、C2-service-f3）:
+```c
+i32 gf3_service_objects_init(struct gf3_service *s, u32 dl);
+i32 gf3_service_admission(struct gf3_service *s, bool open);
+```
+objects_initは既存startと同じRUN・fault・epoch・!ready・ch同一性を検査しgf3_initだけを呼ぶ。reserve/release・geometry取得・slot/hook公開をしない。必須NULL=-301、状態不正/ready済み=-304、下位負rcはそのまま、成功0。部分失敗のobjects/inst所有を保持し、F2 OFF確認前にinvalidateしない。
+admission(false)はslot=NULLとscan hook解除だけ、ready/窓/node/面値は保持。admission(true)はRUN・ready・epochと借用面を検査してctx/scan/opsを結線し最後にslotを書き込む。testなしならslotはNULL、scanなしならhookは閉じたまま成功。F4時のhookはC1の形式別adapterを使う。
+admissionの必須NULL=-301、状態/古い借用=-304（面検査の元rcは伝播）、成功0。検査失敗は公開しない。公開列に待ち・失敗可能なHW操作を入れず、ops.test_surfaceは常駐s->testを指す。C2-linksは全検査・metadata準備を先に済ませ、F3/F4公開を一つの前景区間で完了する。
+既存 `i32 gf3_service_close(struct gf3_service *s);` はadmission(false)→gf_vram_views_closeに分け直すだけで既存契約を保持。F3単体のstart/recoverは従来の予約→objects_init→admission(true)を組み、試験面不足時の表示継続も維持する。
+F4側の共用停止・再開口（D/api.h、D/recover.c、C2-recover）を次で凍結する:
+```c
+i32 gf4_service_suspend(struct gf4_ctx *c, u32 dl);
+i32 gf4_service_restart(struct gf4_ctx *c, u32 dl);
+```
+suspendは受付閉→F4前処理（pending収束/不能時hold保持、cursor hide、DPMS ON）→窓close→gf3_service_fini(s,dl)→gf2_stop→OFF確認→invalidate→legacy->owner->foundation_stop(legacy)を直接呼ぶ冪等foundation cleanup（局所restore/quiesce rowsは呼ばない）。予約・snapshot・state・相互借用を保持し、通常停止用の予約解放/初期表示への局所復元を行わない。F5は表示保存・画像退避後に呼ぶ。saved_closed時は保存済みの物理blank/hideを維持し、DPMS前処理から画面を再公開しない。
+restartは閉鎖のままBM先行→必要devinit→F1/F2開始→objects_init→保持面のmatch/surfacesまで。F4 epochを新ch.epochに合わせreadyを復元し、saved_closed/diagnostic_savedは変更しない。再開失敗でも予約と部分生成物を保持する。
+両口は必須NULL/必須結線欠落GF4_EINVAL=-401、不正状態GF4_ESTATE=-408、既存changing競合GF4_EBUSY=-411、下位負値は保存して伝播、成功0。OFFでない停止は元rcまたはGF2_ESTOP。suspend完了はF2 OFFを別途確認し、OFF＋旧fault負rcを成功に丸めない。
+F4 recoverはgf4_display_saveを呼ばず、受付閉でstate.head/holdとwanted IRQ値をgf4_savedへ値コピー（version/sizeを設定、node/窓はコピーしない）→suspend→restart→同一予約match→低水準display_restore/IRQ→最終公開。fault中はpendingのfence待ち・drainを省きholdを保持、finiも既存規約でfenceを省く。OFF確認後は旧fault由来のstop負rcを記録して復旧を続ける（suspend自体の負rcは丸めず、close/cleanup失敗・非OFFなら中断）。restoreが立てるsaved_closedは成功後recover自身が入口の値へ戻す。diagnostic_savedとその保存像を上書きせず、A3保存中も同じ値コピーで復旧し、入口のsaved_closed && diagnostic_saved==NULLなら復旧後も非公開、それ以外は最終admission(true)（A3の再公開はC2-saveの管理経路）とする。失敗時は閉鎖・予約保持。F5のlinks.stop/restartは上の2口へ型付きadapterで結線し、既存gf3_service_start/recoverを丸ごと呼ばない。F5の全extent列挙/画像転送は既決C2 adapterに残す。
+F5 C2は新hwdev/gf/feature5_links.cに `i32 gf5_link_stop(void *owner, u32 dl); i32 gf5_link_restart(void *owner, u32 dl); i32 gf5_link_admission(void *owner, bool open);` を所有しfeature5.hへ宣言、gf5_linksへbindする。ownerは常駐struct gf5の借用、NULLはGF5_EINVAL=-501、停止/再開はowner->displayへ上記口を委譲し下位負値を保持する。admissionは既決F5 phase/管理slot契約を適用してF4 links.admissionへ委譲する。
+C2-saveはL/save.cの低水準restoreが公開もsaved_closed解除もしないことを維持。F5は性能/thermal/tile→VRAM→F4 restore/IRQまで成功後だけsaved_closedを解除し全slot/scanを公開、失敗時は閉鎖/FAULTを保持する。
+C2-linksのF4 admission(false)にもF3 admission(false)を結線する（旧「F4 slotだけ」を訂正）。trueは既決のsaved_closed && diagnostic_saved==NULL中はGF4_ESTATE、診断の再公開はC2-save所有、F5の最終公開はF5統括だけが解除後に依頼する。F5 phaseはF4へ持ち込まない。
+C3は既存accel/foundation slotを保持してContext版5の通常/復元slotを貸す。変更/保存/復元の処理中は管理slotも閉じ、成功・失敗後の管理口はC2-save/F5の既決寿命に従って再公開する。通常slotが閉じているだけでmodule/予約を解放しない。
+手本はN/nvkm/engine/fifo/uchan.c:272–298のblock/unbindとbind/allow、N/nouveau_drm.c:944–1027の表示/objectsの停止再開順。OS32の明示objects再生成・予約ID・module slot公開には一対一のnouveau APIは無い。
+
+### X3 — production診断もF4所有者を通す
+
+正: productionのSTART/STOP/RECOVERをF4の予約保持経路へ、通常video開始/停止をF4の通常開始/停止へ接続する。診断専用chのF2直呼び、revoked時の既存拒否は維持する。
+追加宣言（accel_service.h、service.c、C2-service-f3）:
+```c
+struct gf3_service_owner {
+    void *owner;
+    i32 (*start)(void *owner, u32 dl);
+    i32 (*stop)(void *owner, u32 dl);
+    i32 (*recover)(void *owner, u32 dl);
+};
+i32 gf3_service_owner_bind(struct gf3_service *s,
+                           const struct gf3_service_owner *owner);
+/* struct gf3_service末尾: const struct gf3_service_owner *owner; */
+```
+C2-serviceが常駐tableとctxを所有し、C3 initializeで既存gf3_service_bind後・最初のvideo_start前にowner_bindする。owner.stopはgf4_service_suspendへ、owner.startはgf4_service_restart→保持表示の低水準restore/IRQ→最終admission(true)へ、owner.recoverはgf4_service_recoverへ委譲する。STOP前の論理head/hold/IRQ値を保持し、STARTで初期modeへ戻さない。restoreのsaved_closedは成功後に入口値へ戻し、既存保存中の非公開は維持する。gf4_service_start/stopは通常video入口専用。bindはs必須NULL=-301、不完全table=-301、別所有者への差替え/停止未完の解除=-304、同table再bindは無変更0。owner=NULLは完全停止・窓/予約返却後の解除だけ。tableは停止と再STARTを跨いでmodule終了まで借用し、legacy.display4解除と区別する。
+既存gf3_service_start/recoverはownerがあれば委譲し、無ければ従来単体列。期限なしgf3_service_stop(s)は単体専用とし、ownerありはGF3_ESTATEで無変更（期限生成・委譲しない）。F4 callbackはこの委譲口へ再帰せず、X2の下位口を呼ぶ。新しいF3 ctxや別の所有状態のコピーは作らない。
+C2-service-stopがcommand_test.cを共有編集し、production＋ownerありの3操作はownerの対応callbackへq->deadline_usを渡す（START前のgf2_startもF4側へ移す）。ownerなしは既存F3経路、診断chは既存F2経路。診断STARTは保持済みF4表示とOFFを前提にrestartし、未開始/ready済みはESTATE。通常video_startはgf3_service_startのowner分岐を通さずgf4_service_startを呼び、OFFならF1/F2から、既にRUNならそれを借りる。gf4_service_startは完全停止で解除したlegacy.display4/ctx.legacyを公開前に再結線し、失敗時もcleanup完了までは保持する。
+C2-service-stopはD/quiesce.cの旧gf_display_stopにdisplay4ありのF4 stop委譲を結線する。下位cleanupの共用口 `i32 gf_display_quiesce(struct gf_display_context *c);` を同ファイルで分離しinternal.hに宣言する（NULLは既存gf_display_stop同様OS32_ERR_INVAL、既存cleanup失敗の元rc、成功0）。これはfoundation cleanup/局所restore/quiesce rowsだけで、F3/F2停止・再委譲・待ち・予約releaseをしない。
+通常gf4_service_stopはF4前処理→close→fini(dl)→F2停止/OFF→invalidate→gf_display_quiesce→表示利用終了確認→C2-scan予約release。成功して解放できたnodeだけ返し、診断snapshot借用中の予約はC2-saveの契約どおり保持する。未完cleanupと借用を残す間は相互接続を解除しない。
+F3単体のgf_display_stopも同じ局所helperを利用して現行停止順/戻り値を維持する。C2-recoverのlinks.failedはこの通常停止へ入り元causeを返し、復旧rcを別保存、PC-98選択は既存backend責任。F5はreleaseする通常stopを使わずX2のsuspend/restartを使う。
+手本の停止順はN/nouveau_drm.c:944–988の表示停止→fence→object tree。production診断とmoduleの振分けtableはOS32固有で、nouveauに同じ口は無い。
+
+### X4 — 外側dlと既存下位期限の境界
+
+正: F4/F5の操作開始でdlを一度だけ決め、fence・F3 fini/init・表示変更・復旧へ同値を渡す。X4のための下位API追加/署名変更はしない。
+使用口は既存 `i32 gf3_service_fini(struct gf3_service *s, u32 dl);`、`int gf2_start(struct gf2_chan *ch, struct gf_foundation *f);`、`int gf2_stop(struct gf2_chan *ch);`、`int gf2_recover(struct gf2_chan *ch);`、`int gf2_fifo_pause(struct gf2_chan *ch);`、`void gf2_fifo_resume(struct gf2_chan *ch);`。
+例外はpause内部の2秒だけでなく、F2 start/stop内のreference_testが作るGF2_TIMEOUT_US（recover経由も同じ）。既存HW待ち上限も維持し、外側dlへ書戻さない。したがって操作全体の壁時計時間を外側dl以内と保証する意味ではない。F2から戻った後も元dlを使い、切れていれば次の期限付き処理は期限失敗となる。
+C2-service/C2-recoverは上位stop/suspendからgf3_service_stop(s)を呼ばずfini(s,dl)を直接使う。期限なしvideo_stop入口だけclock_us→now+GF3_TIMEOUT_USを一度作ってgf4_service_stopへ渡す。clock欠落/失敗はGF2_EIOを保存、fini fenceは出さず既存規約どおりF2停止cleanupを試みる。
+command_testのF4 STOPはqの期限を使用。F5 links.stop/restartはgf5.deadline由来のdlをそのまま渡す。fini失敗でもF2 stopを試み最初のrcを保存、close失敗かつ未revokedなら停止へ進まず所有保持。F1停止後のVBLANK待ちは禁止。
+F3単体stopの既存期限生成を保持。GF2_EIO/ETIME/ESTOP等の下位負値をGF4へ丸めない。resumeは既決のold_rc退避・last_rc/state/fault検査adapterのまま。手本N/nvkm/engine/fifo/nv04.c:212–254にpause/resume列はあるが、OS32の絶対dl・初期reference試験には同じ期限APIは無い。
+
+### 関数 → ファイル → 段 → A1 UNIT への追加・差替え行
+
+新宣言はA0追記として先に凍結し、実装の共有編集は下表の担当へ直列に渡す。C2-service-f3→C2-service-stop→C2-serviceの順に直列分割（各100〜200行を目安、超過時は同ファイル内を口単位で小分け）。C2-recover/scan/links、C3、C1も未発注段の契約追加。統合済みC2-save/C0は公開callback契約への結合確認を追加し、二重実装しない。
+
+| 関数（callbackも完全名） | ファイル | 段 | stub UNIT／結合 |
+|---|---|---|---|
+| gf3_service_surfaces / objects_init / admission / owner_bind、既存start/stop/recover/closeの分離 | hwdev/gf/service.c、accel_service.h | C2-service-f3（F3共有編集） | —、14で実service/V0結合 |
+| gf4_service_suspend / gf4_service_restart / gf4_service_recover / links.failed | D/recover.c、api.h | C2-recover | failedは5,13、他は—/14 |
+| gf4_service_start / stop / bind、owner.start/stop/recover adapter | D/service.c | C2-service | —/14 |
+| geforce_module_initのgf3_service_bind直後のgf3_service_owner_bind | K/geforce_body.c | C3（tableはC2-service所有） | —/14 |
+| gf_display_stop / gf_display_quiesce | D/quiesce.c、internal.h | C2-service-stop（共有編集） | —/14、F4無し既存試験も維持 |
+| gf_command_testのproduction START/STOP/RECOVER | hwdev/gf/command_test.c | C2-service-stop、C3は既定wire登録のみ | —/14、診断chの既存試験維持 |
+| links.scan_changed / gf4_scan_prepare / discard | D/scan.c | C2-scan | scan_changedは7、他は—/14 |
+| links.admission、全slot/scanの閉開 | D/links.c | C2-links、slot貸出しはC3 | admissionは5,13、実公開は14 |
+| gf4_display_restore / gf4_diagnostic_restoreの最終公開結線 | D/save.c | C2-save（統合済みへの結合） | —/14 |
+| HALのmode/flip metadataと形式別scan hook | K/backend_geforce.c、gf_hook.c | C1 | —/14 |
+| gf5_link_stop / gf5_link_restart / gf5_link_admission | hwdev/gf/feature5_links.c（新規、feature5.hに宣言） | F5 C2（F4境界統合後） | F5 UNIT6は既決links stub、実結合はF4 UNIT14 |
+
+A1はUNIT番号を増やさず、既存admission/scan_changed stubを本契約へ追随。UNIT14で実service/V0と結合し、F3単体開始・試験面不足、F4初回開始/16・32bit mode/flip、F5予約キー不変・restart途中非公開、診断STOP→STARTで予約/mode保持、BAD_METHOD→RECOVERとA3保存中RECOVER、video停止→再開始→停止、test固定容量、close/fini失敗・OFF＋負rc・期限据置を正常対照付きで確認する。新口だけの架空失敗eventは足さない。
+未決（ユーザー判断）: 0件。静的照合のみ。リポジトリ編集・ビルド・試験は未実施、実装後の結合/実機/容量検証は既存の受入に残す。
+反論: 0件。
+
+### 確定 (2026-11-04、Opus 第 2 回の条件付き承認、PM が反映)
+- N1 (P1) 通常の video の入口: `gf_start` (hwdev/gf/service.c:248-293) を C2-service-f3 の行に足す。F4 へ回すかの判定は **display4 の 1 つ**にする。display4 は module の終了まで保持し (C2-service の完全停止でも解除しない)、`gf_start` と `gf_display_stop` は、どちらも display4 があれば `gf4_service_start` / `gf4_service_stop` へ回す。`gf3_service_start` は owner があれば GF3_ESTATE を返す (`gf3_service_stop` と同じ扱い。呼び出し元は層 3 単体の構成だけになる)。
+- N2 (P2) 保持の置き場: `struct gf4_ctx` に常駐の `struct gf4_saved hold_saved` を 1 つ置き、recover の値の写しと診断の STOP→START の保持が共有する (同時に使う場面は無い、シングルタスク)。持ち主は C2-recover。`state.rollback` は使わない。宣言の追加は C2-recover の段で api.h に足す。
+- N3 (P3) suspend の前の値: STOP→START で戻す論理 head・DPMS・hold・IRQ は、suspend の前処理 (DPMS ON など) より前に `hold_saved` へ取る。
+- N4 (P3) test 面の pitch: `GF3_TEST_PITCH_ALIGN` は service.c の static なので D/scan.c から使わない。pitch=640 (64 の倍数) と直接書き、根拠を注記する。
