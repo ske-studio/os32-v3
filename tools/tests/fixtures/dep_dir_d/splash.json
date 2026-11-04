@@ -4,6 +4,6 @@
   "harness_sha256": "42d15e9b0d77b2ddba5113210d1075100795ad75e257801f68acb7a45d649503",
   "trace_sha256": "1c51cb997b2f4f5e2f626d8d0511a4bfa67f8027d02f0563ce036583ff3210bd",
   "inputs": "pref 0..3; framebuffer rc/format/each missing plane; retry and alternating buffers; all 16 clear colors; single/cross byte, clipped and empty rectangles; full palette/raster/cleanup order",
-  "harness_sha256_wire": "8a567934574f41cf09bbf58fb76d70ca919272b829f9df10853d22f97dbd4f97",
-  "harness_sha256_wire_note": "TASK_RASTER_SPLASH B1 (2026-11-01): trace は b400acb6 の旧 harness で採った。今の harness はこのハッシュ。harness を変えたらここと trace を見直す。"
+  "harness_sha256_wire": "fa1b1f1ab343675e41c8824731a96757d13f535d2bcc30a8627973bb7d4a894d",
+  "harness_sha256_wire_note": "TASK_RASTER_SPLASH B1 (2026-11-01): trace は b400acb6 の旧 harness で採った。今の harness はこのハッシュ。harness を変えたらここと trace を見直す。 S5B: end_tick 引数をポインタへ追随。stub は FALLBACK のまま、期待 trace は不変。"
 }
