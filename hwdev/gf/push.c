@@ -27,6 +27,7 @@
  * The lifecycle owner initializes the 32 NOPs and free=max-cur before use
  * (nouveau_chan.c:439-478); the ring and channel have one foreground owner. */
 #include "command.h"
+#include "wait_diag.h"
 
 #define PUSH_USER (GF2_USER_BASE + GF2_CHID * GF2_USER_STRIDE)
 
@@ -37,7 +38,18 @@ static int push_poll(struct gf2_chan *ch, u32 deadline)
     int rc = gf2_fault_check(ch);
     if (rc) return rc;
     if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-    return (i32)(now - deadline) >= 0 ? GF2_ETIME : GF2_OK;
+    if ((i32)(now - deadline) >= 0) {
+        if (gf_wait_timeout(io, "push_reserve", PUSH_USER + GF2_USER_GET,
+                            "valid_GET_and_free>=words", " get=", deadline, now)) {
+            /* PUT/free are software ring positions in words; last is raw GET. */
+            serial_puts_polled(" put="); serial_diag_u32(ch->put);
+            serial_puts_polled(" free="); serial_diag_u32(ch->free);
+            serial_puts_polled(" cur="); serial_diag_u32(ch->cur);
+            serial_puts_polled("\r\n");
+        }
+        return GF2_ETIME;
+    }
+    return GF2_OK;
 }
 
 static int push_wait(struct gf2_chan *ch)

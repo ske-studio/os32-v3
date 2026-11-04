@@ -17,6 +17,11 @@
 #error "Select one GF2_HOST_B0 through GF2_HOST_B9 fixture"
 #endif
 
+#if defined(GF2_HOST_B0) || defined(GF2_HOST_B1) || defined(GF2_HOST_B6)
+int serial_gate_active(void) { return 1; }
+void serial_puts_polled(const char *s) { (void)s; }
+#endif
+
 #if defined(GF2_HOST_B0)
 enum { GF2_HOST_REGS = 64, GF2_HOST_WRITES = 256,
        GF2_HOST_PRAMIN_BYTES = 0x400000 };

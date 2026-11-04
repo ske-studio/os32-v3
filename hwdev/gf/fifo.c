@@ -50,6 +50,7 @@
  * nvkm/subdev/fb/nv44.c; Ben Skeggs and Francisco Jerez.
  * OS32 sequencing: GF_FEAT2_DESIGN section 2 and B0 final addendum. */
 #include "command.h"
+#include "wait_diag.h"
 
 /* Component aliases of the design's NV40/NV44 register definitions. */
 enum {
@@ -217,7 +218,12 @@ int gf2_fifo_pause(struct gf2_chan *ch)
     for (;;) {
         TRY(gf2_fault_check(ch));
         if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-        if ((i32)(now - deadline) >= 0) return GF2_ETIME;
+        if ((i32)(now - deadline) >= 0) {
+            if (gf_wait_timeout(io, "fifo_hash_busy", CACHE_PULL0,
+                                "HASH_BUSY&00001000==0", " pull=", deadline, now))
+                serial_puts_polled("\r\n");
+            return GF2_ETIME;
+        }
         TRY(rd(ch, CACHE_PULL0, &pull));
         if (!(pull & HASH_BUSY)) break;
         u32 delay = deadline - now;
