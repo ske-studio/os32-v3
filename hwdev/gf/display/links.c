@@ -23,12 +23,82 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+/*
+ * Copyright 2005-2006 Erik Waling
+ * Copyright 2006 Stephane Marchesin
+ * Copyright 2007-2009 Stuart Bennett
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+ * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+#include "api.h"
+#define GF_ROM_BIT_ONLY
+#include "../rom.inc"
+#undef GF_ROM_BIT_ONLY
+
+/* MIT nouveau-v6.1 nouveau_bios.c:66-91,627-680,904-962.
+ * BIT T is a two-byte pointer; only the NV44 table version is supported.
+ * Offsets +7/+9 are deliberately never interpreted. */
+enum { LINKS_T_LENGTH=2U, LINKS_T_VERSION=0x11U,
+       LINKS_T_FIRST=11U, LINKS_T_SECOND=13U, LINKS_T_MIN=15U,
+       LINKS_CLOCK_ROW=4U, LINKS_CLOCK_UNIT=10U, LINKS_OR_MASK=0xfU, LINKS_OR_TABLES=7U };
+static u32 links_u16(const u8 *p) { return (u32)p[0]|(u32)p[1]<<8; }
+i32 gf4_tmds_script_select(const u8 *rom,u32 size,
+                           const struct gf4_route *r,u32 khz,u32 *pc)
+{
+    if (!rom || !r || !pc || r->head>=GF4_HEADS ||
+        !(r->head_mask&(1U<<r->head)) || r->type!=GF4_TMDS ||
+        !r->or_mask || (r->or_mask&~LINKS_OR_MASK)) return GF4_EINVAL;
+    if (r->location || r->ext_type) return GF4_EUNSUPPORTED;
+    /* ffs(OR)==4 has no comparison table in run_tmds_table:653-663. */
+    if (!(r->or_mask&LINKS_OR_TABLES)) return GF4_ENODEV;
+    u32 data,length; u8 version;
+    int found=gf_rom_bit_entry(rom,size,'T',&data,&length,&version);
+    if (found) return found<0 ? GF4_ERANGE : GF4_ENODEV;
+    (void)version; /* The TMDS table, rather than the BIT entry, is versioned. */
+    if (length!=LINKS_T_LENGTH) return GF4_EUNSUPPORTED;
+    u32 table=links_u16(rom+data);
+    if (!table) return GF4_ENODEV;
+    if (table>=size) return GF4_ERANGE;
+    if (rom[table]!=LINKS_T_VERSION) return GF4_EUNSUPPORTED;
+    if (LINKS_T_MIN>size-table) return GF4_ERANGE;
+    u32 offset=(r->or_mask&1U) ? LINKS_T_FIRST : LINKS_T_SECOND;
+    u32 row=links_u16(rom+table+offset);
+    if (!row) return GF4_ENODEV;
+    for (;;) {
+        if (row>size || LINKS_CLOCK_ROW>size-row) return GF4_ERANGE;
+        u32 threshold=links_u16(rom+row)*LINKS_CLOCK_UNIT;
+        if (khz>=threshold) {
+            u32 selected=links_u16(rom+row+2U);
+            if (!selected) return GF4_ENODEV;
+            if (selected>=size) return GF4_ERANGE;
+            *pc=selected;
+            return 0;
+        }
+        row+=LINKS_CLOCK_ROW;
+    }
+}
 /* C2-links-a, GF_FEAT4_DESIGN X1/X2. MIT nouveau c03c1a1:
  * nvkm/subdev/bios/i2c.c:64-76,120-155 (already parsed values),
  * nvkm/subdev/gpio/base.c:82-96 and gpio/nv10.c:55-88 (logical drive),
  * nvkm/engine/fifo/uchan.c:272-298 (block/allow).
  * Module slot publication and reservation loans are OS32 boundaries.
- * No ROM interpreter or TMDS script substitute belongs to this stage. */
+ * C2-links-b borrows the existing runner; no separate interpreter. */
 #ifdef GF_PRODUCTION_MODULE
 #include "api.h"
 #include "../accel_service.h"
@@ -168,12 +238,82 @@ static i32 links_tv_gpio(void *owner,bool on,u32 dl)
     }
     return 0;
 }
+/* nouveau-v6.1 nouveau_bios.c:93-106,673-677: raw CR44 head select,
+ * save only SEL_CLK binding bits. B10 owns bind and CR44 owner restoration;
+ * its script-before/khz>165000 policy is the approved nouveau difference. */
+enum { LINKS_SEL_CLK=0x680524U, LINKS_BINDING=0x50000U };
+static i32 links_script_deadline(struct gf_io *io,u32 dl)
+{
+    u32 now;
+    if (io->timing.clock_us(io->opaque,&now)) return -1;
+    return (i32)(now-dl)>=0 ? GF4_ETIME : 0;
+}
+static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u32 dl)
+{
+    const struct gf4_links *links=owner;
+    struct gf4_ctx *c=links ? links->owner : 0;
+    struct gf_display_context *l=c ? c->legacy : 0;
+    if (!l || !l->owner ||
+        !l->owner->acquire || !l->owner->release || !l->io.read ||
+        !l->io.write || !l->io.restore || !l->io.timing.clock_us) return links_result(c,GF4_EINVAL);
+    struct gf_io *io=&l->io;
+    i32 rc=links_script_deadline(io,dl);
+    if (rc) return links_result(c,rc);
+    /* acquire failure may already own partial scratch/index saves. */
+    int acquired=l->owner->acquire(l);
+    rc=links_script_deadline(io,dl);
+    if (acquired) rc=-1;
+    u32 pc=0,binding=0,value;
+    bool saved=false,ran=false;
+    if (!rc && (!l->init || !l->program)) rc=-1;
+    if (!rc) rc=gf4_tmds_script_select(l->init->rom,l->init->rom_size,route,khz,&pc);
+    if (!rc) {
+        if (io->read(io->opaque,GF_MODE_REGISTER_BAR,LINKS_SEL_CLK,4,&binding)) rc=-1;
+        else saved=true;
+    }
+    if (!rc) {
+        /* As in op/zm_cr.c, byte writes without gf_init_save: no runner
+         * transaction save. The existing bus still owns index/lock cleanup;
+         * foundation.io is a 32-bit-only transport, unsuitable for CR44. */
+        if (io->write(io->opaque,GF_MODE_REGISTER_BAR,
+                       RECOVER_PRMCIO+RECOVER_CRTC,1,RECOVER_CR44) ||
+            io->write(io->opaque,GF_MODE_REGISTER_BAR,
+                       RECOVER_PRMCIO+RECOVER_CRTC+1U,1,
+                       route->head ? RECOVER_CR44_HEAD1 : 0U)) rc=-1;
+    }
+    if (!rc) {
+        ran=true;
+        int run=gf_init_run_script(l->init,l->program,pc,route->head,route->or_mask,dl);
+        rc=run==GF_SCRIPT_ETIME ? GF4_ETIME : run ? -1 : 0;
+    }
+    /* Runner performs its own failure cleanup. All earlier failures and
+     * successful runs still need exactly one adapter/table cleanup. */
+    if (!ran || !rc) {
+        struct gf_init_context empty={.io=*io};
+        if (io->restore(io->opaque,l->init ? l->init : &empty)) {
+            c->reusable=l->reusable=false;
+            if (!rc) rc=-1;
+        }
+    }
+    if (saved) {
+        int cleanup=io->read(io->opaque,GF_MODE_REGISTER_BAR,LINKS_SEL_CLK,4,&value);
+        if (!cleanup) cleanup=io->write(io->opaque,GF_MODE_REGISTER_BAR,LINKS_SEL_CLK,4,
+                                        (value&~LINKS_BINDING)|(binding&LINKS_BINDING));
+        if (cleanup) {
+            c->reusable=l->reusable=false;
+            if (!rc) rc=-1;
+        }
+    }
+    if (!l->reusable) c->reusable=false;
+    l->owner->release(l);
+    return links_result(c,rc);
+}
 static struct gf4_links display_links={
     .i2c_port=links_i2c_port,.admission=links_admission,
     .failed=gf4_service_failed,.scan_changed=gf4_scan_changed
 };
 static const struct gf4_exec_ops display_exec={
-    /* tmds_script remains NULL until the C2-links-b interpreter contract. */
+    .tmds_script=links_tmds_script,
     .external_mode=links_external_mode,.external_dpms=links_external_dpms,
     .tv_gpio=links_tv_gpio,.owner=&display_links
 };
