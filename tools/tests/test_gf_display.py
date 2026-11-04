@@ -1690,6 +1690,11 @@ def gf4_sources(tree, case, fixture=None):
     sources = [str(p.relative_to(tree)) for p in display]
     sources += ['tools/tests/gf4_platform_host.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c',
                 'hwdev/gf_load_state.c']
+    # F4 startup now acquires F5 ROM, and module init publishes its service.
+    # Keep those contracts real; only kernel allocation/time is a host seam.
+    sources += ['hwdev/gf/'+n+'.c' for n in
+                ('feature5_service', 'feature5_rom', 'feature5_links',
+                 'perf', 'clock', 'ramclock', 'therm', 'volt', 'tile', 'state')]
     sources += ['drivers/video/geforce/'+n+'.c' for n in
                 ('edid', 'tv_data', 'gf_display_data')]
     sources += ['hwdev/gf/'+n+'.c' for n in

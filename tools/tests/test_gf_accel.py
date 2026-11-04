@@ -438,13 +438,16 @@ def component_build(host, source, directory, original_parent):
         subprocess.run(FLAGS + ['-Werror=vla', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', *include_flags(ROOT), '-I'+str(tree), '-I'+str(ROOT),
                        str(tree/'tools/tests'/host.name), str(tree/'hwdev/gf/accel_copy.c'),
+                       str(tree/'tools/tests/gf_accel_unbound_stubs.c'),
                        '-o', str(exe)], cwd=ROOT, check=True)
         return exe
     exe = directory/'host'
     # check=True: compilation/link errors are suite failures, never runtime RED.
     subprocess.run(FLAGS + ['-Werror=vla', *include_flags(ROOT), '-I'+str(ROOT),
                            '-iquote', str(original_parent),
-                           str(host), str(source), '-o', str(exe)],
+                           str(host), str(source),
+                           *([str(ROOT/'tools/tests/gf_accel_unbound_stubs.c')]
+                             if component == 'c0' else []), '-o', str(exe)],
                    cwd=ROOT, check=True)
     return exe
 
