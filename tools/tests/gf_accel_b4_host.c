@@ -11,6 +11,18 @@ static struct gf3_surface a = {0,64,16,16,4,GF3_INDEX8,1,1};
 static const struct gf3_surface *expected_src, *expected_dst;
 static struct gf3_surface saved_src, saved_dst;
 #define DL 1000U
+/* IMAGE_BLIT point-in method and its three words: nv04_exa.c:255-258. */
+#define BLIT_POINT_IN 0x0300U
+static const enum gf3_host_op submission[] = {
+    H_FAULT, H_SURFACE_CHECK, H_SURFACE_CHECK, H_SURFACE_CHECK,
+    H_SURFACE_CHECK, H_ROP, H_SURFACE_SET, H_EMIT, H_FENCE, H_WAIT
+};
+
+static void prefix(u32 count)
+{
+    assert(count <= sizeof(submission)/sizeof(submission[0]));
+    for (u32 i = 0; i < count; ++i) assert(events[i].op == submission[i]);
+}
 
 static void observe(struct gf3_host *host, const struct gf3_host_event *e)
 {
@@ -41,11 +53,22 @@ static void no_submit(void)
 static void packet(u32 in, u32 out, u32 size)
 {
     assert(h.calls[H_ROP] == 1 && h.calls[H_SURFACE_SET] == 1);
-    assert(h.npackets == 1 && h.nwords == 3);
-    assert(packets[0].subc == GF3_SUBC_BLIT && packets[0].method == 0x300);
-    assert(!packets[0].noninc && packets[0].count == 3 && packets[0].deadline == DL);
+    const u32 word_count = 3; /* nv04_exa.c:255-258: input, output, size */
+    const u32 submission_count = sizeof(submission)/sizeof(submission[0]);
+    assert(h.npackets == 1 && h.nwords == word_count);
+    assert(packets[0].subc == GF3_SUBC_BLIT && packets[0].method == BLIT_POINT_IN);
+    assert(!packets[0].noninc && packets[0].count == word_count && packets[0].deadline == DL);
     assert(words[0] == in && words[1] == out && words[2] == size);
     assert(h.calls[H_FENCE] == 1 && h.calls[H_WAIT] == 1);
+    /* WAIT's stub records its own fault and clock calls after the WAIT event. */
+    assert(h.nevents == submission_count + 2);
+    prefix(submission_count);
+    assert(events[submission_count].op == H_FAULT && events[submission_count+1].op == H_CLOCK);
+    const struct gf3_host_event *fence = &events[submission_count-2];
+    const struct gf3_host_event *wait = &events[submission_count-1];
+    assert(fence->p[0] == &h.ch && fence->a[0] == DL);
+    assert(wait->p[0] == &h.ch && wait->a[2] == DL);
+    assert(wait->a[0] == h.ch.epoch && wait->a[1] == h.ch.seq);
 }
 static void rejected(struct gf3_surface b, int rc)
 {
@@ -66,7 +89,7 @@ static void run(void)
     /* Explicit destination payloads: the eight neighbours and the origin. */
     static const u32 destinations[] = {0x00000003,0x00000004,0x00000005,
         0x00010003,0x00010004,0x00010005,0x00020003,0x00020004,0x00020005};
-    for (u32 i=0;i<9;i++) {
+    for (u32 i=0;i<sizeof(destinations)/sizeof(destinations[0]);i++) {
         clear(); u32 p=destinations[i];
         assert(copy(&a,&a,(struct gf3_rect){4,1,4,2},p&65535,p>>16)==0);
         packet(0x00010004,p,0x00020004);
@@ -91,12 +114,18 @@ static void run(void)
     clear(); assert(copy(&a,&a,(struct gf3_rect){0,0,0,1},0,0)==0); no_submit();
     clear(); assert(gf3_copy(&h.ctx,0,&a,(struct gf3_rect){0,0,0,1},0,0,3,255,DL)==GF3_EINVAL); no_submit();
     h.ctx.ready=false; clear(); assert(copy(&a,&a,(struct gf3_rect){0,0,0,1},0,0)==GF3_ESTATE); no_submit(); h.ctx.ready=true;
-    static const enum gf3_host_op fail[] = {H_SURFACE_CHECK,H_ROP,H_SURFACE_SET,H_EMIT,H_FENCE,H_WAIT};
-    for (u32 i=0;i<sizeof(fail)/sizeof(fail[0]);i++) {
-        clear(); gf3_host_fail_at(&h,fail[i],1,GF2_EIO);
+    for (u32 i=0;i<sizeof(submission)/sizeof(submission[0]);i++) {
+        enum gf3_host_op op = submission[i];
+        u32 nth = 1;
+        for (u32 j=0;j<i;j++) if (submission[j] == op) ++nth;
+        clear(); gf3_host_fail_at(&h,op,nth,GF2_EIO);
         assert(copy(&a,&a,(struct gf3_rect){0,0,2,1},1,0)==GF2_EIO);
         assert(h.ctx.last_rc==GF2_EIO);
-        gf3_host_fail_at(&h,fail[i],1,0);
+        assert(h.nevents == i+1); prefix(i+1);
+        assert(events[i].rc == GF2_EIO);
+        gf3_host_fail_at(&h,op,nth,0);
+        /* H_FAULT injection latches the channel; isolate the next case. */
+        h.ch.fault.latched=false; h.ch.state=GF2_RUN;
     }
 }
 void _start(void) { run(); gf2_host_exit(0); }
