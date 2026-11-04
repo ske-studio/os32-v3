@@ -1544,7 +1544,7 @@ GF4_MUTATIONS = [('a3',
   'quiesce-rows',
   'hwdev/gf/display/quiesce.c',
   'GF_QUIESCE_ROWS(GF_QUIESCE_WRITE)',
-  '(void)0;',
+  '(void)gf_stop_write;',
   'quiesce_row_failures'),
  ('c2stop',
   'clock-fini',
@@ -1612,6 +1612,19 @@ GF4_MUTATIONS = [('a3',
   'u32 at = table + header, found = 0;',
   'u32 at = table + header + len, found = 0;',
   'ROM B fallback')]
+
+# C2-save must observe the real C0 failure cleanup, including failures
+# after shared clock/index state has already changed.
+GF4_MUTATIONS += [
+    ('c2save', 'restore-gate-cleanup', 'hwdev/gf/display/modeset.c',
+     'if (rc && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
+     'if (false && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
+     'restore_failure_tail: shared PLL gate before CR44'),
+    ('c2save', 'restore-owner-cleanup', 'hwdev/gf/display/modeset.c',
+     'if (!cleanup) cleanup=ms_write(&l,MS_CR+1U,1,owner);',
+     'if (false && !cleanup) cleanup=ms_write(&l,MS_CR+1U,1,owner);',
+     'restore_failure_tail: CR44 owner restoration'),
+]
 
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.

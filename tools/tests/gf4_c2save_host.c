@@ -33,6 +33,8 @@ static u32 golden_count;
 #define T_SURFACE_BYTES ((T_SURFACE_PITCH * T_SURFACE_HEIGHT + MEM_PAGE_SIZE-1U) & ~(MEM_PAGE_SIZE-1U))
 #define T_FIRST_OFF (GF_MODE_VRAM_BYTES + MEM_PAGE_SIZE)
 /* Independent hardware oracle: crtc.c:198-233 and hw.h:238-240. */
+#define T_CR_OWNER 0x44U
+#define T_OWNER_B 3U
 #define T_RPC 0x1aU
 #define T_CR_MODE 0x17U
 #define T_SR_CLOCK 1U
@@ -61,6 +63,8 @@ static u32 golden_count;
 #define T_DAC_HEAD_B 0x100U
 /* crtc.c:91-102,153-162; nvreg.h:311-323. */
 #define T_PLLSEL 0x68050cU
+/* Distinct saved shared-clock bits, including both heads' gate fields. */
+#define T_PLL_GATE_SAVED 0xa50f0000U
 /* crtc.c:838-848; nvreg.h:153. */
 #define T_START 0x600800U
 #define T_PLLSEL_BOTH ((1U<<28)|(1U<<9)|(1U<<29)|(1U<<11)|(1U<<2))
@@ -128,6 +132,9 @@ static void setup(void)
     host.events=events; host.cevents=sizeof(events)/sizeof(events[0]);
     host.base.regs=regs; host.base.cregs=sizeof(regs)/sizeof(regs[0]);
     host.ctx.legacy=&legacy; legacy.display4=&host.ctx;
+    for (u32 b=0;b<sizeof(u32);++b)
+        gf4_host_reg_byte_set(&host,GF_MODE_REGISTER_BAR,GF_PLL_GATE+b,
+                             T_PLL_GATE_SAVED>>(b*BITS_PER_BYTE));
     host.ctx.routes=routes; host.ctx.nroutes=GF4_HEADS;
     state.version=GF4_STATE_VERSION; state.size=sizeof(state);
     host.base.f.wanted_fifo=host.base.f.wanted_graph=U32_MAX;
@@ -262,6 +269,38 @@ static void expect_write(u32 i,u32 off,u32 width,u32 value)
     assert(e->op==D_WRITE && !e->rc && e->a[0]==GF_MODE_REGISTER_BAR &&
            e->a[1]==off && e->a[2]==width && e->a[3]==value);
 }
+/* A failed C0 load restores its shared PLL gate and CR44 owner. The
+ * successful trace locates the fallible call inside each load; cleanup
+ * values/order come from hw.h:70-124 and the two-head fixture (B after blanking, A after head A's DPMS,
+ * the saved shared gate), independently of the successful output values. */
+static void restore_failure_tail(u32 failed)
+{
+    u32 tail=failed+1U,load_head=0;
+    for (u32 start=1;start<golden_count;++start) {
+        if (golden[start].op!=D_READ || golden[start].a[1]!=GF4_HOST_CR+1U ||
+            golden[start-1U].op!=D_WRITE || golden[start-1U].a[1]!=GF4_HOST_CR ||
+            golden[start-1U].a[3]!=T_CR_OWNER) continue;
+        u32 end=start+1U;
+        while (end<golden_count && !(golden[end].op==D_READ &&
+               (golden[end].a[1]==T_DACCLK ||
+                golden[end].a[1]==T_DACCLK+GF4_HOST_STRIDE))) ++end;
+        assert(end>=start+3U && end<golden_count);
+        /* The final two calls are CR44 selector/data cleanup. An error
+         * in that cleanup itself must also stop at the failing call. */
+        if (failed>start && failed<end-2U) {
+            bool gate_saved=false;
+            for (u32 i=start+1U;i<failed;++i)
+                if (golden[i].op==D_READ && golden[i].a[1]==GF_PLL_GATE)
+                    gate_saved=true;
+            if (gate_saved) expect_write(tail++,GF_PLL_GATE,4,T_PLL_GATE_SAVED);
+            expect_write(tail++,GF4_HOST_CR,1,T_CR_OWNER);
+            expect_write(tail++,GF4_HOST_CR+1U,1,load_head ? 0 : T_OWNER_B);
+            break;
+        }
+        ++load_head;
+    }
+    assert(host.nevents==tail);
+}
 /* Independent sequences, never replay a product-generated golden trace.
  * golden[] above is used only to enumerate fallible call positions. */
 static void restore_oracle(void)
@@ -372,7 +411,7 @@ static void test_restore(void)
         restore_setup(true);
         gf4_host_fail_at(&host,op,golden[i].nth,T_ERROR);
         assert(gf4_diagnostic_restore(&host.ctx,&saved,T_BUDGET)==T_ERROR);
-        assert(host.nevents==i+1U); retained();
+        restore_failure_tail(i); retained();
         assert(host.ctx.saved_closed && host.ctx.diagnostic_saved==&saved);
         /* Admission is last: its failure follows a complete HW/logical
          * commit; every earlier failure leaves the old logical image. */

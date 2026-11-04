@@ -132,7 +132,10 @@ static int owner_stop(struct gf_display_context *l)
     assert(!cint_slot && !host.ctx.accepting && !cint_prod.accel.ready);
     ++cint_owner_stops;
     if (expect_fault_stop) assert(cint_references==fault_references);
-    return fail_cleanup ? T_FAILURE : gf_foundation_stop(&cint_prod.foundation);
+    i32 rc=fail_cleanup ? T_FAILURE : gf_foundation_stop(&cint_prod.foundation);
+    /* The legacy owner records the detailed rc for local quiesce too. */
+    l->last_rc=rc;
+    return rc;
 }
 static int owner_validate(struct gf_display_context *l)
 {
@@ -260,7 +263,8 @@ static void finish(void)
     deadline=(u32)host.local_now+GF3_TIMEOUT_US; /* distinct cleanup operation */
     cint_expect_closed=true;
     /* Normal stop, not suspend, is the only path that may return nodes. */
-    (void)gf4_service_stop(&host.ctx,deadline);
+    i32 stop_rc=gf4_service_stop(&host.ctx,deadline);
+    assert(!stop_rc || stop_rc==GF2_EFAULT);
     assert(cint_prod.chan.state==GF2_OFF && !registry.head && !views);
     cint_no_resources();
 }
@@ -417,7 +421,14 @@ static void test_restart_revoked(void)
     assert(cint_prod.chan.epoch==epoch && cint_prod.chan.state==GF2_OFF);
     assert(!host.ctx.ready && !cint_prod.accel.ready && !cint_prod.foundation.bm);
     assert(!host.ctx.accepting && !cint_slot && !publish_calls);
-    retained(); finish();
+    retained();
+    /* Revocation ends this fixture's usable lease. Normal video stop must
+     * retain its nodes when hardware cleanup cannot be confirmed. Keep this
+     * terminal case last instead of resetting live ownership for another. */
+    assert(gf4_service_stop(&host.ctx,deadline)==GF1_EPCI);
+    assert(cint_prod.chan.state==GF2_OFF && !views && !cint_slot);
+    assert(!host.ctx.ready && !host.ctx.accepting);
+    retained();
 }
 static void test_failed_and_arguments(void)
 {
@@ -441,8 +452,8 @@ void _start(void)
     test_close_and_stop_failures();
     test_fault_recover();
     test_restart_failure();
-    test_restart_revoked();
     test_restore_and_publication_failure();
     test_failed_and_arguments();
+    test_restart_revoked();
     gf2_host_exit(0);
 }

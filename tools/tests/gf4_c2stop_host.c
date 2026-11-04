@@ -43,7 +43,9 @@ static i32 owner_recover(void *owner,u32 dl) { return owner_call(owner,dl,2); }
 static struct gf3_service_owner test_owner;
 static void production_dispatch(void)
 {
-    cint_reset();
+    /* Dispatch is exercised on the initialized F3 lower owner. Its scan
+     * stays pinned until local restoration and the explicit release. */
+    cint_reset(); cint_start();
     test_owner=(struct gf3_service_owner){cint_service,owner_start,owner_stop,owner_recover};
     assert(!gf3_service_owner_bind(cint_service,&test_owner));
     gf2_test_bind_production(&cint_prod.foundation,&cint_prod.chan);
