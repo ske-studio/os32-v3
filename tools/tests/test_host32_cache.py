@@ -85,6 +85,9 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(key(root, inputs, root), key(other, inputs, other))
         rpath = ['gcc', '<r>/a.c', '-Wl,-rpath,<r>/lib']
         self.assertNotEqual(key(root, rpath, root), key(other, rpath, other))
+        for split in (['-Xlinker', '-rpath', '-Xlinker', '<r>/lib'], ['-L', '<r>/lib']):
+            args = ['gcc', '<r>/a.c', *split]
+            self.assertNotEqual(key(root, args, root), key(other, args, other))
         debug = ['gcc', '-g', '-c', 'a.c']
         self.assertNotEqual(key(root, debug, root), key(other, debug, other))
 
@@ -103,9 +106,10 @@ class CacheTests(unittest.TestCase):
 def mutations():
     source = pathlib.Path(host32.__file__).read_text()
     changes = [
-        ("return arg.replace(str(root), '<root>')", "return arg"),
+        ("lambda arg: stable(\n        arg.replace(str(root), '<root>'))", "lambda arg: stable(arg)"),
         ("return ' '.join(preprocess) + ' cwd=' + str(cwd)", "pass"),
-        ("if arg.startswith(SPELLED_PREFIXES):", "if False:"),
+        ("arg if keep or arg.startswith(SPELLED_PREFIXES) else share(arg)", "share(arg)"),
+        ("keep = arg in SPELLED_NEXT", "keep = False"),
         ("except OSError:\n            cache = local", "except OSError:\n            raise"),
         ("r'/[^/\\s]+(?=/|\\s|$)'", "r'/[^/\\s]+/'"),
     ]
