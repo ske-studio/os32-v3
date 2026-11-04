@@ -28,7 +28,7 @@ gfinit_decode.oだけ末尾に-Osを付けるtarget-specific KERNEL_CFLAGSをbui
 
 ### kdebug
 
-gcap/math、NIC trace、selftest、CRT、main、peek/allow、window、recover/profile、
+gcap/math、NIC trace、selftest、CRT、main、peek、window、recover/profile、
 imports を同じ像へリンク。kexports は kernel 側
 
 ### cirrus-module

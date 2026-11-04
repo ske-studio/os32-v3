@@ -19,7 +19,6 @@
 #include "gfinit_resources.h"
 #include "recover_gf_expand.h"
 #include "kpeek.h"
-#include "kpeek_allow.h"
 #include "mm/pgalloc.h"
 #include "lib/kstring.h"
 #include "arch/x86/kernel/idt.h"
