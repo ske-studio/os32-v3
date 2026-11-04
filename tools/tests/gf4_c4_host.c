@@ -91,11 +91,16 @@ static void helpers(void)
      * Native 720p values: tvmodesnv17.c:178-229, tvnv17.c:251-292.
      * These independent facts exercise both real TV helper dispatches.
      */
-    enum { TV_HD720P = 10, TV_NORMS = 12 };
+    enum {
+        TV_HD720P = 10, TV_NORMS = 12,
+        TV_HD720P_KHZ = 74250, TV_HD720P_WIDTH = 1280,
+        TV_HD720P_HEIGHT = 720
+    };
     assert(data->tv_modes(TV_HD720P, &parsed) == GF4_OK);
     assert(parsed.base_valid && parsed.ntiming && parsed.preferred == 0);
     const struct gf4_timing *t = &parsed.timing[parsed.preferred];
-    assert(t->khz == 74250 && t->hd == 1280 && t->vd == 720);
+    assert(t->khz == TV_HD720P_KHZ && t->hd == TV_HD720P_WIDTH &&
+           t->vd == TV_HD720P_HEIGHT);
     assert(data->tv_state(TV_HD720P, t, &tv) == GF4_OK);
     assert(tv.version == GF4_TV_VERSION && tv.size == sizeof(tv));
     assert(tv.norm == TV_HD720P);
