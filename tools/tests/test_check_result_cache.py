@@ -19,11 +19,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--mutate', action='store_true')
 parser.add_argument('--tools', type=pathlib.Path, default=ROOT / 'tools')
+parser.add_argument('--case')
 ARGS = parser.parse_args() if __name__ == '__main__' else parser.parse_args([])
 sys.path.insert(0, str(ARGS.tools))
 import clang_ast as ast
 from clang_ast import result_cache as cache
 import check_c_dialect as cd
+import check_p2v as p2v
+import check_arch_asm as arch
 
 
 class CacheTests(unittest.TestCase):
@@ -210,6 +213,54 @@ class CacheTests(unittest.TestCase):
             with mock.patch.dict(os.environ, OS32_CHECK_CACHE='off'):
                 self.assertEqual(cd.check_internal_units([unit], self.root), updated)
 
+    def test_p2v_warm_exceptions_and_sets(self):
+        (self.root / 'kernel').mkdir()
+        (self.root / 'tools').mkdir()
+        source = self.root / 'kernel/unit.c'
+        source.write_text('#include "empty.h"\nvoid f(void) { int *p = (int *)0x1234; (void)p; }\n')
+        (self.root / 'kernel/empty.h').write_text('/* empty */\n')
+        allow = self.root / 'tools/check_p2v_allow.txt'
+        allow.write_text('kernel/empty.h:<file>:fixture\nkernel/empty.h:removed:fixture\n')
+        units = [dict(src='kernel/unit.c', argv=['-std=gnu11'])]
+        with mock.patch.object(ast, 'units', return_value=units), \
+                mock.patch.object(ast, 'parse', wraps=ast.parse) as parse:
+            full = p2v.audit(self.root)
+            self.assertTrue(any('physical-cast' in e for e in full[0]))
+            partial = p2v.audit(self.root, ['kernel/unit.c'])
+            self.assertIn('stale exception: kernel/empty.h:<file>', full[0])
+            self.assertNotIn('stale exception: kernel/empty.h:<file>', partial[0])
+            self.assertIn('stale exception: kernel/empty.h:removed', partial[0])
+            self.assertEqual(parse.call_count, 1)
+            allow.write_text('kernel/empty.h:<file>:fixture\nkernel/unit.c:f:fixture\n')
+            self.assertEqual(p2v.audit(self.root, ['kernel/unit.c'])[0], [])
+            self.assertEqual(parse.call_count, 1)
+            allow.write_text('kernel/unit.c:f:fixture\n')
+            self.assertEqual(p2v.audit(self.root)[0], [])
+            source.write_text('#include "empty.h"\nint value;\n')
+            self.assertIn('stale exception: kernel/unit.c:f', p2v.audit(self.root)[0])
+            self.assertEqual(parse.call_count, 2)
+            with mock.patch.dict(os.environ, OS32_CHECK_CACHE='off'):
+                self.assertEqual(p2v.audit(self.root), p2v.audit(self.root, ['kernel/unit.c']))
+
+    def test_arch_asm_warm(self):
+        (self.root / 'kernel').mkdir()
+        (self.root / 'kernel/unit.c').write_text('void f(void) { __asm__("cli"); }\n')
+        units = [dict(src='kernel/unit.c', argv=['-std=gnu11'])]
+        with mock.patch.object(ast, 'units', return_value=units), \
+                mock.patch.object(ast, 'parse', wraps=ast.parse) as parse, \
+                mock.patch.object(sys, 'argv', ['check_arch_asm', '--root', str(self.root)]), \
+                mock.patch('sys.stdout', new_callable=__import__('io').StringIO) as output:
+            self.assertTrue(arch.main())
+            first = output.getvalue()
+            output.seek(0); output.truncate()
+            self.assertTrue(arch.main())
+            self.assertEqual(output.getvalue(), first)
+            self.assertEqual(parse.call_count, 1)
+            with mock.patch.dict(os.environ, OS32_CHECK_CACHE='off'):
+                output.seek(0); output.truncate()
+                self.assertTrue(arch.main())
+                self.assertEqual(output.getvalue(), first)
+
 
 MUTATIONS = [
     ('dependency bytes', 'hashlib.sha256(p.read_bytes()).hexdigest())\n                   for p in sorted(paths',
@@ -230,7 +281,9 @@ MUTATIONS = [
 
 
 def main():
-    result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(CacheTests))
+    suite = (unittest.TestSuite([CacheTests(ARGS.case)]) if ARGS.case else
+             unittest.defaultTestLoader.loadTestsFromTestCase(CacheTests))
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful():
         return 1
     if ARGS.mutate:
@@ -241,7 +294,7 @@ def main():
                 tools = pathlib.Path(td) / 'tools'
                 shutil.copytree(ARGS.tools / 'clang_ast', tools / 'clang_ast',
                                 ignore=shutil.ignore_patterns('__pycache__'))
-                for filename in ('check_c_dialect.py', 'source_roots.py'):
+                for filename in ('check_c_dialect.py', 'check_p2v.py', 'check_arch_asm.py', 'source_roots.py'):
                     shutil.copy2(ARGS.tools / filename, tools / filename)
                 (tools / 'clang_ast/result_cache.py').write_text(text.replace(old, new))
                 r = subprocess.run([sys.executable, '-B', str(pathlib.Path(__file__).resolve()),
@@ -253,7 +306,27 @@ def main():
                 if not runtime_red:
                     print(r.stdout + r.stderr)
                     return 1
-        print('MUTATIONS %d/%d RED' % (len(MUTATIONS), len(MUTATIONS)))
+        for name, old, new in [
+                ('p2v scanned set', '            files.update(scanned)', '            files.update([])'),
+                ('p2v include set', '                files.update(includes)', '                files.update([])')]:
+            source = (ARGS.tools / 'check_p2v.py').read_text()
+            assert source.count(old) == 1, 'mutation anchor: ' + name
+            with tempfile.TemporaryDirectory(prefix='p2v_cache_mut_') as td:
+                tools = pathlib.Path(td) / 'tools'
+                shutil.copytree(ARGS.tools / 'clang_ast', tools / 'clang_ast',
+                                ignore=shutil.ignore_patterns('__pycache__'))
+                for filename in ('check_c_dialect.py', 'check_p2v.py', 'check_arch_asm.py', 'source_roots.py'):
+                    shutil.copy2(ARGS.tools / filename, tools / filename)
+                (tools / 'check_p2v.py').write_text(source.replace(old, new))
+                r = subprocess.run([sys.executable, '-B', str(pathlib.Path(__file__).resolve()),
+                                    '--tools', str(tools), '--case', 'test_p2v_warm_exceptions_and_sets'],
+                                   cwd=td, capture_output=True, text=True)
+                runtime_red = r.returncode == 1 and 'FAIL:' in r.stderr and 'ERROR:' not in r.stderr
+                print('MUTATION %s: %s' % (name, 'RED' if runtime_red else 'FAILED'), flush=True)
+                if not runtime_red:
+                    print(r.stdout + r.stderr)
+                    return 1
+        print('MUTATIONS %d/%d RED' % (len(MUTATIONS) + 2, len(MUTATIONS) + 2))
     return 0
 
 
