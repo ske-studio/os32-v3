@@ -59,7 +59,16 @@ static void op(struct logbuf *b, const struct hwb_log_record *r)
     if (r->op == HWB_READ || r->op == HWB_WRITE) {
         str(b, r->space == HW_PCI ? "pci" : r->space == HW_IO ? "io" : "mmio");
         str(b, r->op == HWB_READ ? "read" : "write"); dec(b, r->width * 8U);
-    } else if (r->op == HWB_POLL) str(b, "poll");
+    } else if (r->op == HWB_LET) str(b, "let");
+    else if (r->op == HWB_DEVICE_BDF || r->op == HWB_DEVICE_ID) str(b, "device");
+    else if (r->op == HWB_WINDOW_BAR) str(b, "window");
+    else if (r->op == HWB_LABEL) str(b, "label");
+    else if (r->op == HWB_GOTO) str(b, "goto");
+    else if (r->op == HWB_IF) str(b, "if");
+    else if (r->op == HWB_CALL) str(b, "call");
+    else if (r->op == HWB_RETURN) str(b, "return");
+    else if (r->op == HWB_END) str(b, "end");
+    else if (r->op == HWB_POLL) str(b, "poll");
     else if (r->op == HWB_WAIT) str(b, "wait");
     else if (r->op == HWB_PRINT) str(b, "print");
     else if (r->op == HWB_LOG) str(b, "log");

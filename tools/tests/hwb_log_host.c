@@ -35,8 +35,39 @@ void _start(void)
     CHECK(hwb_exit_status(HWB_OK)==0 && hwb_exit_status(HWB_ARG)==2 && hwb_exit_status(HWB_NOSYS)==3);
     CHECK(hwb_exit_status(HWB_WINDOW)==4 && hwb_exit_status(HWB_IO)==5 && hwb_exit_status(HWB_TIMEOUT)==124 && hwb_exit_status(HWB_ABORT)==130);
     CHECK(hwb_exit_status((enum hwb_rc)99)==5 && hwbf_equal(hwb_rc_name((enum hwb_rc)99),"IO"));
+    HWB_TEST("opcodes");
+    static const struct { enum hwb_opcode op; const char *begin; const char *end; } ops[] = {
+        {HWB_LET, "let", "let"}, {HWB_DEVICE_BDF, "device", "device"},
+        {HWB_DEVICE_ID, "device", "device"}, {HWB_WINDOW_BAR, "window", "window"},
+        {HWB_LABEL, "label", "label"}, {HWB_GOTO, "goto", "goto"},
+        {HWB_IF, "if", "if"}, {HWB_CALL, "call", "call"},
+        {HWB_RETURN, "return", "return"}, {HWB_END, "end", "end"}
+    };
+    hwbf_clear_trace(&fake); r.run=0; r.seq=0; r.line=0;
+    for (u32 i=0; i<sizeof(ops)/sizeof(ops[0]); i++) {
+        char expected[100]; u32 n=0;
+        const char *parts[] = {"HW run=0 seq=0 line=0 phase=begin op=", ops[i].begin, " rc=PENDING"};
+        for (u32 j=0; j<3; j++) for (const char *p=parts[j]; *p; p++) expected[n++]=*p;
+        expected[n]=0; r.op=ops[i].op; hwb_log_begin(&fake.backend,&r);
+        CHECK(hwbf_equal(fake.lines[2*i], expected));
+        n=0; parts[0]="HW run=0 seq=0 line=0 phase=end op="; parts[1]=ops[i].end; parts[2]=" rc=OK";
+        for (u32 j=0; j<3; j++) for (const char *p=parts[j]; *p; p++) expected[n++]=*p;
+        expected[n]=0; hwb_log_end(&fake.backend,&r);
+        CHECK(hwbf_equal(fake.lines[2*i+1], expected));
+    }
+    CHECK(fake.line_count == 2U * (sizeof(ops)/sizeof(ops[0])) && fake.event_count == fake.line_count);
     HWB_TEST("boundary");
-    struct logbuf b; b.n=0; for (u32 i=0; i<HWB_LOG_BYTES+10U; i++) ch(&b,'X'); emit(&fake.backend,&b);
-    CHECK(b.n == HWB_LOG_BYTES-1U && fake.lines[8][HWB_LOG_BYTES-1U]==0);
+    hwbf_clear_trace(&fake); r.op=HWB_LOG;
+    char input[HWB_LINE_BYTES], expected[HWB_LOG_BYTES]; u32 n=0;
+    const char *start="HW run=0 seq=0 line=0 phase=end op=log text=\"";
+    const char *end="\" rc=OK";
+    for (const char *p=start; *p; p++) expected[n++]=*p;
+    for (u32 i=0; i<HWB_LINE_BYTES; i++) {
+        input[i]='\n'; expected[n++]='\\'; expected[n++]='x'; expected[n++]='0'; expected[n++]='A';
+    }
+    for (const char *p=end; *p; p++) expected[n++]=*p;
+    expected[n]=0;
+    hwb_log_text(&fake.backend,&r,input,sizeof(input));
+    CHECK(fake.line_count == 1 && fake.event_count == 1 && hwbf_equal(fake.lines[0], expected));
     hwb_test_write("PASS hwb log\n"); hwb_test_exit(0);
 }
