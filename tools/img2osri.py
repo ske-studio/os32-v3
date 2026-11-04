@@ -258,9 +258,23 @@ def main():
     parser.add_argument('--mode', choices=['PL-B'], default='PL-B')
     parser.add_argument('--hblank-outs', type=int, choices=[5, 6])
     parser.add_argument('--obs-colors', type=int, choices=range(1, PALETTE_COLORS + 1))
+    parser.add_argument('--encoder', choices=['pl-b', 'enc2'], default='pl-b')
+    parser.add_argument('--obs-outs', type=int, choices=[15, 23, 31, 47])
     parser.add_argument('--band', type=int, choices=[1, 2, 4], default=1)
     parser.add_argument('--dither', choices=['fs'], default='fs')
     args = parser.parse_args()
+    if args.encoder == 'enc2':
+        if (args.obs_outs is None or args.hblank_outs is not None or
+                args.obs_colors is not None or args.band != 1):
+            parser.error('enc2 requires --obs-outs and --band 1; incompatible with --hblank-outs/--obs-colors')
+        from osri_enc2_compare import encode
+        data = encode(resize_image(args.input), args.obs_outs)
+        with open(args.output, 'wb') as stream:
+            stream.write(data)
+        print(f'encoder=enc2 bytes={len(data)} crc32={struct.unpack_from("<I", data, 48)[0]:08x}')
+        return
+    if args.obs_outs is not None:
+        parser.error('--obs-outs requires --encoder enc2')
     if args.obs_colors is not None and (args.hblank_outs is not None or args.band != 1):
         parser.error('--obs-colors requires --band 1 and cannot use --hblank-outs')
     if args.hblank_outs is None:
