@@ -119,3 +119,12 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 | GF-L4-Ra266-gamma | 未実施 | Ra266 0:13.0/0221 | identity・整数暗化・8bit palette帰還・LUT checksum | 担当/日付/serial/カメラ証跡は実施時記入 |
 | GF-L4-Ra266-outputs | 未実施 | Ra266 0:13.0/0221 | 端子写真・DCB・TMDS/TV/2head独立動作、不可時理由 | 担当/日付/serial/カメラ証跡は実施時記入 |
 | GF-L4-Ra266-lifecycle | 未実施 | Ra266 0:13.0/0221 | PC-98→GF→PC-98・失敗復元・停止順 | 担当/日付/serial/カメラ証跡は実施時記入 |
+
+## 7. GeForce 層5の受入
+
+[確定設計 §10](../decisions/realhw/GF_FEAT5_DESIGN.md) の未実施項目。
+
+| ID | 状態 | 対象・解除条件 |
+|---|---|---|
+| GF-L5-Ra266 | 未実施 | Ra266 0:13.0/0221 で ROM perf 間と boot 復帰、RAM CRC、温度/fan/VID、tile、save/restore 3 回を確認。担当・日付・serial ログを実施時に記入 |
+| GF-L5-ENOTSUP | 暫定 | 未実装 stub の ENOTSUP は受入保留。B3/B4/B5 の実列 host GREEN と実機結果で解除。ROM/GPIO 不在は根拠付きの機能不在に分類し、stub 完了に流用しない |
