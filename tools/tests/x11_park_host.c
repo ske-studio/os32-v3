@@ -13,6 +13,9 @@
     __asm__ volatile("int $0x80" : : "a"(1), "b"(1) : "memory"); \
     __builtin_unreachable(); } } while (0)
 
+static X87State x87_parent[APP_SLOT_COUNT];
+void x87_save(X87State *p) { (void)p; }
+void x87_restore(const X87State *p) { (void)p; }
 static int g_cur, g_cur_op_is_wait, ring3_in_syscall;
 static AppSlot *g_cur_app;
 static u32 *g_cur_frame, cr3, host_esp0;

@@ -36,6 +36,7 @@ static void die(int line) {
 }
 static int owner=1, cr3=1, gui=1, invokes, jumped, clears, injected;
 static u32 tick_count=100, saved_buf[KSETJMP_BUF_LEN];
+void x87_save(X87State *p) { (void)p; }
 static AppSlot *g_cur_app;
 static u32 *g_cur_frame;
 static int ring3_in_syscall, caller;
@@ -380,7 +381,7 @@ def run(overrides=None):
         return overrides.get(p, (ROOT / p).read_text())
     ex = exec_source(ROOT, read)
     resume = function(ex, 'exec_resume')
-    resume = resume[:resume.index('    volatile Ring3CallContext')] + '    return 0;\n}'
+    resume = resume[:resume.index('    volatile int x87_depth')] + '    return 0;\n}'
     # Preparation alone: the existing R1 harness exercises the real landing.
     resume = resume.replace('exec_resume(', 'prepare_resume(').replace('!a->as->pd_phys', '0')
     import re

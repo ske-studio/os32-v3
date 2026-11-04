@@ -1,3 +1,4 @@
+#include "x87.h"
 #include "v86_call.h"
 #include "font_guard.h"
 #include "v86_mem.h"
@@ -134,6 +135,7 @@ void exec_init(void) {
  * 外 (drivers/input/kbd.c, arch/x86/kernel/isr_handlers.c) は「> 0 ならプログラムが走って
  * いる」としてしか見ないので意味は変わらない。 */
 volatile int exec_nest_level = 0;
+static X87State x87_parent[APP_SLOT_COUNT];
 volatile int exec_exit_status = EXEC_SUCCESS;
 
 /* ------------------------------------------------------------------------ */
@@ -571,7 +573,9 @@ int exec_run(const char *cmdline)
     g_last_kind = EXEC_KIND_NONE;
     g_last_code = 0;
 
-    rc = exec_launch(cmdline, 0);
+    AppSlot *caller = appslot_get(appslot_cur());
+    rc = (exec_nest_level != 0 && caller && caller->gui)
+         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0);
 
     if (g_last_kind == EXEC_KIND_NONE) {
         g_last_kind = exec_map_launch_err(rc);

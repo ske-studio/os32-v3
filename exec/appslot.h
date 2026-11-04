@@ -23,6 +23,7 @@
 #define __APPSLOT_H
 
 #include "types.h"
+#include "x87.h"
 #include "paging.h"        /* struct addrspace (値で持つ。関数は呼ばない) */
 #include "ksetjmp.h"       /* KSETJMP_BUF_LEN */
 #include "../fs/vfs_stdin.h"
@@ -140,6 +141,7 @@ typedef struct {
     int trim_pending;         /* T2g: one pending request per slot */
     u32 trim_epoch;
     VfsStdinRead stdin_read;  /* sys_read progress across KBD park */
+    X87State x87_state;
 } AppSlot;
 
 extern u32 appslot_trim_epoch;

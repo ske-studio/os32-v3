@@ -5,6 +5,7 @@
  * test_font_guard.py checks the guard object has no x87 instruction. */
 #include "font_guard.h"
 #include "appslot.h"
+void x87_save(X87State *p) { (void)p; }
 #include "exec.h"
 #include "io.h"
 #include "pgalloc.h"

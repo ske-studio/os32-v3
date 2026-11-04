@@ -18,7 +18,7 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
         __asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));
         cr0_val &= ~((u32)(CR0_EM | CR0_TS));  /* EM(bit2) と TS(bit3) をクリア */
         __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
-        __asm__ volatile("fninit");
+        x87_probe();
     }
 
     /* 物理ページフレームアロケータ初期化 (paging_initの後) */
