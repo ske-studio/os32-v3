@@ -1,6 +1,8 @@
 #ifndef PLATFORM_SPLASH_H
 #define PLATFORM_SPLASH_H
 #include "types.h"
+#include "memmap.h"
+#define PLATFORM_SPLASH_TICKS (3u * PIT_HZ)
 /* Fixed platform entry points, synchronous boot foreground only.
  * begin returns 0 when drawing is possible; failure already shuts gfx down.
  * The framebuffer descriptor borrows gfx storage and is refreshed each begin.
@@ -12,9 +14,9 @@ void platform_splash_clear_pages(void);
 /* Internal boot foreground result; no public KAPI change. */
 enum { PLATFORM_SPLASH_DONE = 0, PLATFORM_SPLASH_FALLBACK = 1,
        PLATFORM_SPLASH_NO_SYNC = 2 };
-int platform_splash_try_image(const char *path, u32 end_tick);
-/* Absolute boot-entry deadline in microseconds, shared with logo/exit. */
-int platform_splash_try_image_until(const char *path, unsigned long long deadline_us);
+/* Input: boot-entry deadline. Output: current tick plus unconsumed ticks.
+ * Dynamic model time does not advance the global PIT clock. */
+int platform_splash_try_image(const char *path, u32 *end_tick);
 /* Clock-paced static/fixed display; failure means no usable clock. */
 int platform_splash_wait_frame(u32 end_tick);
 #ifdef SPLASH_RASTER_OBS

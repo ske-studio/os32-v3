@@ -14,11 +14,15 @@ int sys_time_now(u32 *lo, u32 *hi);
 #include "wire_data.h"
 #include "../../gfx/gfx_osri.c"
 #include "../../platform/pc98/splash.c"
+#include "../../drivers/video/pc98/splash_raster_plan.c"
+#include "../../drivers/video/pc98/splash_raster_play.c"
+#include "../../drivers/video/pc98/splash_raster_image.c"
 #include "../../platform/pc98/splash_image.c"
 #include "../../init/boot_splash.c"
 
 static u8 wire_pixels[OSRI_PIXELS_BYTES];
 static struct OsriImage wire_image;
+static struct PlV2Plan wire_plan;
 static int wire_pref, wire_saved_pref, wire_fault, wire_invalid_fb;
 static int wire_allocs, wire_frees, wire_opens, wire_closes, wire_logs;
 static int wire_commits, wire_rasters, wire_clears, wire_stops, wire_text;
@@ -52,8 +56,11 @@ int gfx_kernel_framebuffer(struct gfx_kernel_fb *fb)
 void *kmemset(void *dst, int c, u32 n)
 { u8 *p = dst; while (n--) *p++ = c; return dst; }
 void *kmalloc(u32 size)
-{ REQUIRE(size == sizeof(wire_image)); wire_allocs++; return wire_fault == 7 ? 0 : &wire_image; }
-void kfree(void *p) { REQUIRE(p == &wire_image); wire_frees++; }
+{ wire_allocs++;
+  if (wire_fault == 7) return 0;
+  if (size == sizeof(wire_plan)) return wire_fault == 13 ? 0 : &wire_plan;
+  REQUIRE(size == sizeof(wire_image)); return &wire_image; }
+void kfree(void *p) { REQUIRE(p == &wire_image || p == &wire_plan); wire_frees++; }
 int vfs_stat(const char *path, OS32_Stat *st)
 { REQUIRE(!kstrcmp(path, SYS_SPLASH_IMAGE)); (void)st; return wire_fault == 1 ? -1 : 0; }
 int vfs_open(const char *path, int flags)
@@ -96,9 +103,9 @@ void gfx_present_nosync(void)
         REQUIRE(wire_loaded && wire_pos == wire_size);
         REQUIRE(wire_pixels[0] == 0x81 && wire_pixels[GFX_PLANE_SZ] == 0x42 &&
                 wire_pixels[2*GFX_PLANE_SZ] == 0x24 && wire_pixels[3*GFX_PLANE_SZ] == 0x18);
-        if (wire_fault == 4) missing_v = 1;
+        if (wire_fault == 4 || wire_fault == 14) missing_v = 1;
     }
-    if (!raster.dynamic_ok || wire_fault == 4) wire_static = 1;
+    if (!raster.dynamic_ok || (wire_fault == 4 || wire_fault == 14)) wire_static = 1;
 }
 void gfx_present_raster(GFX_RasterPalTable *table)
 {
@@ -119,24 +126,26 @@ static void wire_setup(int fault)
     if (fault == 3) wire_size--;
     if (fault == 5) scale = 1011;
     if (fault == 6) { wire_file = wire_events; wire_size = sizeof(wire_events); }
+    if (fault == 12) { wire_file = wire_budget; wire_size = sizeof(wire_budget); }
+    if (fault >= 13) { wire_file = wire_dynamic; wire_size = sizeof(wire_dynamic); }
     if (fault == 9) { missing_v = 1; wire_static = 1; }
     if (fault == 10) { clock_error = 1; wire_static = 1; }
-    if (fault == 11) irq_on = 0;
+    if (fault == 11) { irq_on = 0; wire_static = 1; }
     kmemset(wire_pixels, 0xa5, sizeof(wire_pixels));
 }
 void _start(void)
 {
-    for (int pref = 0; pref < 4; pref++) for (int fault = 0; fault <= 11; fault++) {
+    for (int pref = 0; pref < 4; pref++) for (int fault = 0; fault <= 15; fault++) {
         wire_setup(fault); wire_pref = wire_saved_pref = pref;
         boot_splash();
         REQUIRE(wire_pref == pref && wire_stops == 1 && wire_clears == 1 && wire_text == 1);
         REQUIRE(!raster.checked && !raster.dynamic_ok);
-        REQUIRE(wire_closes == wire_opens && wire_frees == (wire_allocs && fault != 7));
+        REQUIRE(wire_closes == wire_opens && wire_frees == (fault == 7 || fault == 13 ? wire_allocs-1 : wire_allocs));
         REQUIRE(irq_on == (fault != 11));
-        if (fault == 1 || fault == 2 || fault == 3 || fault == 6 || fault == 7) {
+        if (fault == 1 || fault == 2 || fault == 3 || fault == 7 || fault == 12 || fault == 13) {
             REQUIRE(wire_logs == 1 && wire_rasters > 0);
             REQUIRE(wire_pixels[0] == 0xff && wire_pixels[GFX_PLANE_SZ] == 0);
-        } else if (fault == 4 || fault == 9 || fault == 10) {
+        } else if (fault == 4 || fault == 9 || fault == 10 || fault == 11 || fault == 14) {
             REQUIRE(wire_logs == 1 && !wire_rasters);
             REQUIRE(wire_commits <= 2 && calls < 4000000);
         } else {
@@ -144,8 +153,8 @@ void _start(void)
             REQUIRE(wire_commits == (fault == 8 ? 0 : 1));
             if (fault != 8) REQUIRE(wire_loaded);
         }
-        if (fault != 8 && fault != 10 && fault != 11) REQUIRE(tick_count >= BOOT_TIMEOUT);
-        if (fault != 8) REQUIRE(tick_count <= BOOT_TIMEOUT + 3);
+        if (fault != 8 && fault != 10 && fault != 11) REQUIRE(tick_count >= PLATFORM_SPLASH_TICKS - 2);
+        if (fault != 8) REQUIRE(tick_count <= PLATFORM_SPLASH_TICKS + 3);
     }
     wire_setup(0); wire_invalid_fb = 1;
     boot_splash();

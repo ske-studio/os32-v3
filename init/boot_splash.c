@@ -40,9 +40,6 @@ extern void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
 #define OUTLINE_PAD     2
 #define HL_WIDTH        3
 
-/* ======== タイムアウト ======== */
-#define BOOT_TIMEOUT    300     /* 100Hz x 3秒 */
-
 /* ======== グラデーション ======== */
 #define GRAD_STEPS      100
 
@@ -201,7 +198,7 @@ static void build_raster(GFX_RasterPalTable *tbl, int offset)
 void boot_splash(void)
 {
     int cx, i, grad_offset;
-    u32 end_tick = tick_count + BOOT_TIMEOUT;
+    u32 end_tick = tick_count + PLATFORM_SPLASH_TICKS;
     int static_logo = 0;
     GFX_RasterPalTable raster_table;
 
@@ -223,7 +220,7 @@ void boot_splash(void)
     platform_splash_probe();
     goto cleanup;
 #endif
-    int image_result = platform_splash_try_image(SYS_SPLASH_IMAGE, end_tick);
+    int image_result = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
     if (image_result == PLATFORM_SPLASH_DONE) goto cleanup;
     struct SplashRaster *state = pc98_splash_raster_state();
     static_logo = image_result == PLATFORM_SPLASH_NO_SYNC || !state->dynamic_ok;
