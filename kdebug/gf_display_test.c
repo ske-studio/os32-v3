@@ -211,11 +211,18 @@ static i32 display_enumerate(const struct display_request *q)
             if (o->ctx->routes[j].connector == item.connector) seen = true;
         if (seen) continue;
         u8 bus = U8_MAX;
-        for (u32 j = i; j < o->ctx->nroutes; ++j)
-            if (o->ctx->routes[j].connector == item.connector &&
-                o->ctx->routes[j].i2c_index != U8_MAX) {
-                bus = o->ctx->routes[j].i2c_index; break;
-            }
+        for (u32 j = i; j < nroutes; ++j) {
+            o = geforce_display_ops();
+            if (!o || !o->ctx || j >= o->ctx->nroutes) return GF4_ESTATE;
+            const struct gf4_route r = o->ctx->routes[j];
+            if (r.connector != item.connector || r.i2c_index == U8_MAX) continue;
+            const struct gf4_links *links = o->ctx->links;
+            if (!links || !links->i2c_port) return GF4_ESTATE;
+            struct gf4_i2c_port port;
+            i32 rc = links->i2c_port(links->owner, r.i2c_index, &port);
+            if (!rc) { bus = r.i2c_index; break; }
+            if (rc != GF4_ENODEV && rc != GF4_EUNSUPPORTED) return rc;
+        }
         u32 n = 0;
         for (u32 j = 0;; ++j) {
             struct gf4_mode m;
@@ -406,6 +413,16 @@ i32 gf_display_test(u32 session)
         display_record(&q, rc == GF4_ENODEV || rc == GF4_EUNSUPPORTED ||
                        rc == GF4_EPLL || rc == GF4_ERANGE ? "SKIP" : "ERROR",
                        display_session.step, display_session.mode, display_session.crc, rc);
+        if (q.test == DISPLAY_MODE && (rc == GF4_EPLL || rc == GF4_ERANGE)) {
+            /* The union mode table can reject just this head's candidate.
+             * Restore before allowing phase1 to advance past the SKIP. */
+            i32 restore_rc = display_restore(false);
+            if (restore_rc) {
+                display_record(&q, "ERROR", display_session.step,
+                               display_session.mode, display_session.crc, restore_rc);
+                return restore_rc;
+            }
+        }
     }
     return rc;
 }

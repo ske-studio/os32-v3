@@ -41,6 +41,13 @@ static enum gf4_dpms power_seen[sizeof(display_power) / sizeof(display_power[0])
 static enum session_event fail_event;
 static bool corrupt, revoke_after_upload, revoke_after_prepare, revoke_normal_after_prepare;
 static u32 failure_nth, failure_calls;
+static i32 failure_rc, first_port_rc;
+static bool fail_restore_after_set;
+static u32 port_reads;
+/* Fixture bus choices; the first is valid unless first_port_rc rejects it. */
+#define FIRST_DDC_BUS 3U
+#define NEXT_DDC_BUS (FIRST_DDC_BUS + 1U)
+static u8 expected_ddc_bus;
 
 const struct gf3_test_ops *geforce_accel_ops(void) { return accel_slot; }
 int serial_gate_active(void) { return 0; }
@@ -55,7 +62,7 @@ void serial_puts_polled(const char *s)
 static i32 case_event(enum session_event e)
 {
     assert(nevents < SESSION_EVENTS); events[nevents++] = e;
-    if (e == fail_event && ++failure_calls == failure_nth) return SESSION_FAILURE;
+    if (e == fail_event && ++failure_calls == failure_nth) return failure_rc;
     return 0;
 }
 static int modes_call(struct gf4_ctx *ctx, u8 connector,
@@ -124,7 +131,10 @@ static int set_call(struct gf4_ctx *ctx, const struct gf4_route *r, u32 id,
     assert(ctx == &host.ctx && r->connector == routes[0].connector && r->head == 1);
     assert(s->reservation_id == id && dl == SESSION_NOW + GF3_TIMEOUT_US);
     assert(uploads == downloads && uploads);
-    ++sets; return case_event(CASE_SET);
+    ++sets;
+    i32 rc = case_event(CASE_SET);
+    if (rc && fail_restore_after_set) restore_rc = SESSION_FAILURE;
+    return rc;
 }
 static i32 palette_call(struct gf4_ctx *ctx, u8 head, u32 first, u32 n, const u8 *rgb)
 {
@@ -143,13 +153,22 @@ static int dpms_call(struct gf4_ctx *ctx, u8 head, enum gf4_dpms power, u32 dl)
 }
 static int ddc_call(struct gf4_ctx *ctx, u8 bus, u8 block, u8 out[128], u32 dl)
 {
-    assert(ctx == &host.ctx && bus == 3 && block == ddcs);
+    assert(ctx == &host.ctx && bus == expected_ddc_bus && block == ddcs);
     assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
     ++ddcs;
     i32 rc = case_event(CASE_DDC);
     if (rc) return rc;
     gf2_host_memset(out, block, 128);
     if (!block) out[126] = 1; /* One extension: confirms traversal, not EDID parsing. */
+    return 0;
+}
+static i32 port_call(void *owner, u8 bus, struct gf4_i2c_port *out)
+{
+    assert(owner == &host && out);
+    ++port_reads;
+    if (bus == FIRST_DDC_BUS && first_port_rc) return first_port_rc;
+    assert(bus == FIRST_DDC_BUS || bus == NEXT_DDC_BUS);
+    *out = host.port;
     return 0;
 }
 
@@ -221,7 +240,7 @@ static void reset(void)
     accel_ops = (struct gf3_test_ops){.ctx=&host.base.ctx,
         .upload=upload_call, .download=download_call};
     accel_slot = &accel_ops;
-    routes[0] = (struct gf4_route){.connector=0xa5, .head_mask=2, .i2c_index=3};
+    routes[0] = (struct gf4_route){.connector=0xa5, .head_mask=2, .i2c_index=FIRST_DDC_BUS};
     routes[1] = routes[0];
     host.ctx.routes = routes; host.ctx.nroutes = 2;
     state.nmodes = 3;
@@ -242,6 +261,10 @@ static void reset(void)
     log_bytes = uploads = downloads = prepares = discards = sets = powers = ddcs = 0;
     output[0] = 0; fail_event = CASE_SET; failure_nth = failure_calls = 0;
     corrupt = revoke_after_upload = revoke_after_prepare = revoke_normal_after_prepare = false;
+    failure_rc = SESSION_FAILURE; first_port_rc = 0; port_reads = 0;
+    fail_restore_after_set = false;
+    expected_ddc_bus = FIRST_DDC_BUS;
+    host.links.i2c_port = port_call;
 }
 static struct display_request request(void)
 {
@@ -366,6 +389,13 @@ static void mode_steps(void)
     assert(image[IMAGE_WIDTH + 130] == 1 && image[IMAGE_WIDTH + 259] == 2);
     assert(image[IMAGE_WIDTH + 32] == 7 && image[130] == 7);
     assert(image[IMAGE_WIDTH + 33] == 0);
+    /* Independent spacing oracle: kdebug/gf_display_test.c:125-129 fixes
+     * 32px lines/eight bars. Halfway to the first line is black at y=1;
+     * changing only the product's spacing to 16 makes this pixel white. */
+    enum { EXPECTED_GRID_PIXELS = 32, EXPECTED_BAR_COUNT = 8 };
+    const u32 between_lines = EXPECTED_GRID_PIXELS / 2U;
+    assert(image[IMAGE_WIDTH + between_lines] ==
+           between_lines * EXPECTED_BAR_COUNT / IMAGE_WIDTH);
     assert(display_session.crc == image_crc(IMAGE_WIDTH * IMAGE_HEIGHT));
     u32 before = nevents;
     assert(gf_display_test(DPMS_WIRE) == GF4_EBUSY && nevents == before);
@@ -432,6 +462,64 @@ static void enumeration(void)
     reset(); assert(gf_display_test(3) == GF4_EUNSUPPORTED && !nevents);
     assert(gf2_host_strstr(output, "SKIP") && !display_session.valid);
 }
+static void enumeration_ports(void)
+{
+    static const i32 unavailable[] = { GF4_ENODEV, GF4_EUNSUPPORTED };
+    for (u32 i = 0; i < sizeof(unavailable) / sizeof(unavailable[0]); ++i) {
+        reset(); first_port_rc = unavailable[i];
+        routes[1].i2c_index = expected_ddc_bus = NEXT_DDC_BUS;
+        assert(!gf_display_test(0));
+        assert(port_reads == host.ctx.nroutes);
+        assert(ddcs == occurrences("GF4 DDC") && ddcs && !occurrences("SKIP"));
+        assert(!display_session.valid && !prepares && !sets && !powers);
+        reset(); first_port_rc = unavailable[i];
+        assert(gf_display_test(0) == GF4_ENODEV && !ddcs);
+        assert(port_reads == host.ctx.nroutes && !display_session.valid);
+    }
+    reset(); routes[0].i2c_index = U8_MAX;
+    assert(!gf_display_test(0) && port_reads == host.ctx.nroutes - 1U && ddcs);
+    reset(); routes[1].i2c_index = NEXT_DDC_BUS;
+    assert(!gf_display_test(0) && port_reads == 1U && ddcs);
+}
+static void skipped_modes(void)
+{
+    static const i32 unsupported[] = { GF4_EPLL, GF4_ERANGE };
+    for (u32 i = 0; i < sizeof(unsupported) / sizeof(unsupported[0]); ++i) {
+        reset(); fail_event = CASE_SET; failure_nth = 1; failure_rc = unsupported[i];
+        assert(gf_display_test(MODE_WIRE) == unsupported[i]);
+        assert(occurrences("SKIP") == 1U && !occurrences("READY"));
+        assert(events[nevents - 1U] == SESSION_RESTORE);
+        assert(display_session.valid && display_session.running &&
+               display_session.prepared && host.ctx.diagnostic_saved);
+        assert(!host.ctx.saved_closed && !discards);
+        const u32 skipped = display_session.step, before = nevents;
+        assert(!gf_display_test(MODE_WIRE | NEXT_PHASE));
+        assert(display_session.step == skipped + 1U &&
+               display_session.mode == state.modes[skipped + 1U].id);
+        static const enum session_event advance[] = {
+            SESSION_RESTORE, CASE_DISCARD, CASE_PREPARE
+        };
+        for (u32 j = 0; j < sizeof(advance) / sizeof(advance[0]); ++j)
+            assert(events[before + j] == advance[j]);
+        assert(occurrences("READY") == 1U && display_session.running);
+        while (display_session.valid) assert(!gf_display_test(MODE_WIRE | NEXT_PHASE));
+        assert(!host.ctx.diagnostic_saved && discards == state.nmodes);
+
+        reset(); state.nmodes = 1; fail_event = CASE_SET;
+        failure_nth = 1; failure_rc = unsupported[i];
+        assert(gf_display_test(MODE_WIRE) == unsupported[i]);
+        assert(!gf_display_test(MODE_WIRE | NEXT_PHASE));
+        assert(!display_session.valid && !host.ctx.diagnostic_saved && !occurrences("READY"));
+    }
+    reset(); fail_event = CASE_SET; failure_nth = 1; failure_rc = GF4_EPLL;
+    fail_restore_after_set = true;
+    assert(gf_display_test(MODE_WIRE) == SESSION_FAILURE);
+    assert(occurrences("SKIP") == 1U && occurrences("ERROR") == 1U);
+    assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
+    u32 before = nevents;
+    assert(gf_display_test(MODE_WIRE | NEXT_PHASE) == GF4_ESTATE && nevents == before);
+    restore_rc = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+}
 static void case_failures(void)
 {
     static const enum session_event failures[] = {
@@ -481,6 +569,7 @@ static void case_failures(void)
 void _start(void)
 {
     wire_and_admission(); start_failures(); restore_retries();
-    mode_steps(); dpms_steps(); enumeration(); case_failures();
+    mode_steps(); dpms_steps(); enumeration(); enumeration_ports();
+    skipped_modes(); case_failures();
     gf2_host_exit(0);
 }
