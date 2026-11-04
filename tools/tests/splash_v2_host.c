@@ -31,6 +31,9 @@ static int fail_alloc, bad_load, missing, over_budget, fixed_image, frame_result
 static u32 black_since_commit;
 static int stat_delay;
 
+int kstrcmp(const char *a, const char *b)
+{ while (*a && *a == *b) { a++; b++; } return (u8)*a - (u8)*b; }
+
 struct SplashRaster *pc98_splash_raster_state(void) { return &state; }
 int gfx_kernel_framebuffer(struct gfx_kernel_fb *fb) { (void)fb; return 0; }
 int vfs_stat(const char *path, OS32_Stat *st)
