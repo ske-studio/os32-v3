@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **実装中 (2026-11-04)** — 次は案 1 の計測整理、その後に実機 Ra266 の計測を継続する。現行の画像形式・再生・受入は [RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) が正典。実機の時間予算と見た目の受入は未確認。
+> 状態: **実装中 (2026-11-04)** — 計測 (M1) は止め、観測の像に切り替えた (ユーザー決定 11-04)。**観測の 2 回目 (S4、変更した成分だけを書く可変 OUT の 8 枚、1 行の OUT 最大 28 本) は実機 Ra266 31k で 8 枚とも崩れが見えず、SPLO は全部 status=ok drop=0** (2026-11-04 11:15、カメラで PM が判定、記録 ~/os32-tmp/run/obs-s4/RESULT.md)。ホストの比較では既存の貪欲 + 順の改善が enc2 より両指標で良い。凍結するかと常用の方式はユーザーが決める。現行の画像形式・再生・受入は [RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) と [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md) が正典。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
