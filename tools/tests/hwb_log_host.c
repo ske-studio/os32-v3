@@ -18,7 +18,7 @@ void _start(void)
     CHECK(hwbf_equal(fake.lines[2], "HW run=3 seq=2 line=8 phase=end op=pciread32 bdf=0:8.0 addr=0x10 val=0xFFFFFFFF rc=OK"));
     r.op=HWB_POLL; r.seq=3; struct hwb_poll_result p={5,7,1,1};
     hwb_log_poll(&fake.backend,&r,&p);
-    CHECK(hwbf_equal(fake.lines[3], "HW run=3 seq=3 line=8 phase=end op=poll val=0x5 reads=7 elapsed_us=0x100000001 rc=OK"));
+    CHECK(hwbf_equal(fake.lines[3], "HW run=3 seq=3 line=8 phase=end op=poll bdf=0:8.0 addr=0x10 val=0x00000005 reads=7 elapsed_us=0x100000001 rc=OK"));
     r.op=HWB_WAIT; r.seq=4; r.requested_us=10; r.elapsed_hi=0; r.elapsed_lo=11;
     hwb_log_end(&fake.backend,&r);
     CHECK(hwbf_equal(fake.lines[4], "HW run=3 seq=4 line=8 phase=end op=wait requested_us=10 elapsed_us=0xB rc=OK"));
@@ -31,6 +31,12 @@ void _start(void)
     hwb_log_finish(&s);
     CHECK(hwbf_equal(fake.lines[7], "HW run=3 op=end rc=OK lines=10 writes=1"));
     CHECK(fake.line_count == 8 && fake.event_count == 8);
+    HWB_TEST("unresolved");
+    r.op=HWB_READ; r.space=HW_PHYS; r.width=1; r.bdf=U32_MAX; r.rc=HWB_IO;
+    hwb_log_begin(&fake.backend,&r); hwb_log_end(&fake.backend,&r);
+    CHECK(hwbf_equal(fake.lines[8], "HW run=3 seq=6 line=8 phase=begin op=mmioread8 target=0:8.0/bar1+0x3C4 addr=UNRESOLVED val=0xFFFFFFFF rc=PENDING"));
+    CHECK(hwbf_equal(fake.lines[9], "HW run=3 seq=6 line=8 phase=end op=mmioread8 addr=UNRESOLVED val=0xFFFFFFFF rc=IO"));
+    r.rc=HWB_OK;
     HWB_TEST("exit");
     CHECK(hwb_exit_status(HWB_OK)==0 && hwb_exit_status(HWB_ARG)==2 && hwb_exit_status(HWB_NOSYS)==3);
     CHECK(hwb_exit_status(HWB_WINDOW)==4 && hwb_exit_status(HWB_IO)==5 && hwb_exit_status(HWB_TIMEOUT)==124 && hwb_exit_status(HWB_ABORT)==130);

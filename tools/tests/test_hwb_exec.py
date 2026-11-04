@@ -13,6 +13,9 @@ import hwb_host
 FIXTURE = 'tools/tests/hwb_exec_host.c'
 PRODUCT = 'userland/shell/hwb_exec.c'
 MUTATIONS = [
+    ('bar-log-offset', PRODUCT,
+     'hwb_log_begin(s->backend, &r);',
+     'struct hwb_log_record logical = r; if (i.address.kind == HWB_ADDR_BAR || i.address.kind == HWB_ADDR_WINDOW) logical.addr &= 0xFFFU; hwb_log_begin(s->backend, &logical);', 'bar-log-address'),
     ('unregistered-address', PRODUCT,
      'if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;',
      'if (addr == 0x34567000UL) return HWB_ARG;\n    if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;', 'fresh-addresses'),
