@@ -27,6 +27,7 @@ struct gf4_edid_state {
     u32 version,size,ntiming,preferred,extensions,next_block,min_v_hz,max_v_hz;
     u32 min_h_khz,max_h_khz,max_khz;
     bool base_valid,digital,range_valid,truncated; i32 last_rc;
+    u32 dtd_seen; /* DTDs seen so far across base+extensions (CEA-861 native rank), PM 2026-11-04 */
     struct gf4_timing timing[GF4_TIMINGS];
 };
 /* nouveau dispnv04/tvnv17.h:30-51; ctv: disp.h:69, tvmodesnv17.c:406-434. */
