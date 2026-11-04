@@ -33,7 +33,9 @@ struct gf3_service {
 };
 /* Required s/incomplete table: EINVAL; different owner or incomplete-stop
  * unbind: ESTATE. Same table is unchanged success. NULL owner unbinds only
- * after complete stop and return of all windows/reservations. */
+ * after complete stop and return of all windows/reservations. The empty
+ * registry proves windows returned: window owners retain reservations
+ * until unmap succeeds. Never closes windows as a side effect of unbind. */
 i32 gf3_service_owner_bind(struct gf3_service *s,
                            const struct gf3_service_owner *owner);
 /* F4 owns the nodes; these are value loans, copied atomically after BYTES
@@ -48,7 +50,9 @@ i32 gf3_service_surfaces(struct gf3_service *s,
 i32 gf3_service_objects_init(struct gf3_service *s, u32 dl);
 /* false closes slot/hook only, retaining ready, windows, nodes and loans.
  * true validates RUN/ready/epoch/loans then publishes without waits/HW I/O;
- * absent test keeps slot NULL, absent scan keeps hook closed. */
+ * absent test keeps slot NULL, absent scan keeps hook closed. With an F4
+ * owner, C1/C2-links owns the format-dependent scan hook publication; this
+ * entry publishes only the F3 ctx/test ops after validating both loans. */
 i32 gf3_service_admission(struct gf3_service *s, bool open);
 /* production/slot are borrowed; each node owns itself by address. The only
  * ctx is production->accel, never copied. Required NULL: GF3_EINVAL;
