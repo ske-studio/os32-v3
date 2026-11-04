@@ -142,7 +142,7 @@ MUTATIONS = [
     #         rshell も起動時の profile も道連れになる。
     ("abort_interactive", "userland/shell/main.c",
      "    if (g_exec_depth == 0) sh_refused_flag = 0;",
-     "    if (g_exec_depth == 0 && sh_refused_flag) return;\n"
+     "    if (g_exec_depth == 0 && sh_refused_flag) return SH_STATUS_USAGE;\n"
      "    if (g_exec_depth == 0) sh_refused_flag = 0;"),
     # 変異 6: 入れ子 source の断りを親へ伝えない版 (§2-1 の否定側)。
     ("source_not_propagated", "userland/shell/cmd_script.c",
@@ -383,27 +383,20 @@ MUTATIONS = [
      "                if (vi >= ENV_NAME_MAX - 1) break;"),
 
     # T10-a: 126 文字で読み取りを止める (残りが次の入力になる)
-    ("t10_stop_reading", "userland/shell/rshell.c",
-     "        while (ch >= 0 && ch != '\\n' && ch != '\\r') {\n"
-     "            if (rpos >= RSHELL_LINE_MAX - 2) overflow = 1;\n"
-     "            else rbuf[rpos++] = (char)ch;",
-     "        while (ch >= 0 && ch != '\\n' && ch != '\\r' &&\n"
-     "               rpos < RSHELL_LINE_MAX - 2) {\n"
-     "            rbuf[rpos++] = (char)ch;"),
-    # T10-b: 断ったときに EOT を返さない (票 §2-2 の blocker そのもの)
+    ("t10_stop_reading", "userland/shell/serial_watchdog.c",
+     "        l->overflow = 1;",
+     "        l->overflow = 1; return RSH_LINE_DONE;"),
+    # T10-b: overflow reply must still close after the shared line parser.
     ("t10_no_eot", "userland/shell/rshell.c",
+     "            /* 票 §2-3 の表: 断った行の `$?` は 2。 */\n"
      "            sh_status_set(SH_STATUS_USAGE);\n"
-     "            rshell_end_reply();\n"
-     "            continue;",
-     "            sh_status_set(SH_STATUS_USAGE);\n"
-     "            continue;"),
-    # T10-c: 抜け口 (ホストの `exit` / 行の途中の ESC) で EOT を返さない。
-    #        直す前の姿そのもの — /api/cmd が 15 秒待ってタイムアウトする。
+     "            rshell_end_reply();",
+     "            /* 票 §2-3 の表: 断った行の `$?` は 2。 */\n"
+     "            sh_status_set(SH_STATUS_USAGE);"),
+    # T10-c: line byte count now owns exit/ESC reply completion.
     ("t10_exit_no_eot", "userland/shell/rshell.c",
-     "    if (rpos > 0) rshell_end_reply();\n"
-     "\n"
-     "    g_api->rshell_set_active(0);",
-     "    g_api->rshell_set_active(0);"),
+     "    if (ln.bytes > 0) rshell_end_reply();",
+     "    if (0 && ln.bytes > 0) rshell_end_reply();"),
     # T10-d: rshell が断りの印を下ろさない。rshell は常に入れ子なので
     #        main.c の「いちばん外側だけ消す」が効かず、一度断ると以降の
     #        スクリプトが全部 1 行目で打ち切られる (2026-09-16 の退行)。

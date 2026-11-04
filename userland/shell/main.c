@@ -377,6 +377,25 @@ static int sh_has_redirect(int argc, char **argv)
 /* ======================================================================== */
 /*  コマンド実行エンジン (単一コマンド)                                       */
 /* ======================================================================== */
+/* HW-BASIC owns |, >>, quotes and comments in its instruction grammar.
+ * Meta commands still use the shell's ordinary argument parser for paths. */
+static const char *sh_hw_body(const char *cmd)
+{
+    while (*cmd == ' ' || *cmd == '\t') cmd++;
+    if (cmd[0] != 'h' || cmd[1] != 'w' || (cmd[2] != ' ' && cmd[2] != '\t')) return 0;
+    cmd += 2;
+    while (*cmd == ' ' || *cmd == '\t') cmd++;
+    return cmd;
+}
+static int sh_hw_meta(const char *body)
+{
+    static const char *const names[] = {"run", "load", "reset", "step", "continue", "abort"};
+    for (u32 i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+        u32 n = strlen(names[i]);
+        if (!strncmp(body, names[i], n) && (!body[n] || body[n] == ' ' || body[n] == '\t')) return 1;
+    }
+    return 0;
+}
 static int execute_single(const char *cmd)
 {
     static char tmp_buf[CMD_BUF_SIZE];
@@ -396,6 +415,12 @@ static int execute_single(const char *cmd)
     if (strlen(cmd) >= CMD_BUF_SIZE) {
         sh_refuse("sh: command", CMD_BUF_SIZE - 1);
         return SH_STATUS_USAGE;
+    }
+
+    const char *hw_body = sh_hw_body(cmd);
+    if (hw_body && !sh_hw_meta(hw_body)) {
+        char *hw_argv[] = {"hw", (char *)hw_body};
+        return shell_cmd_hw(2, hw_argv);
     }
 
     src = cmd;
@@ -442,7 +467,7 @@ static int execute_single(const char *cmd)
         }
 #endif
         /* リダイレクト演算子の解析・適用 */
-        argc = apply_redirects(argc, argv);
+        if (!str_eq(argv[0], "hw")) argc = apply_redirects(argc, argv);
         if (argc < 0) {
             /* 構文エラー / リダイレクト先が開けない — handler へ届かない
              * (票 §2-3 の表)。 */
@@ -610,7 +635,7 @@ static int execute_command_line(const char *cmd)
         while (*c) { if (*c == '|') { has_pipe = 1; break; } c++; }
     }
 
-    if (!has_pipe) {
+    if (!has_pipe || sh_hw_body(src)) {
         /* パイプなし: 単一コマンド実行 */
         status = execute_single(src);
         reset_all_redirects();

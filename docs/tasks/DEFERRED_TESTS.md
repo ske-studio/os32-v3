@@ -125,3 +125,9 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 |---|---|---|
 | GF-L5-Ra266 | 未実施 | Ra266 0:13.0/0221 で ROM perf 間と boot 復帰、RAM CRC、温度/fan/VID、tile、save/restore 3 回を確認。担当・日付・serial ログを実施時に記入 |
 | GF-L5-ENOTSUP | 暫定 | 未実装 stub の ENOTSUP は受入保留。B3/B4/B5 の実列 host GREEN と実機結果で解除。ROM/GPIO 不在は根拠付きの機能不在に分類し、stub 完了に流用しない |
+
+## HW-BASIC 実機受入
+
+| ID | 対象 | 手順 | 未実施理由 | 担当 | 解除条件 |
+|---|---|---|---|---|---|
+| HWB-REALHW | HW-BASIC 実機受入 (§7) | Ra266 で lspci/pcidump → SR09 → Enable → Disable と窓の連続 read、シリアルと映像往復・PTE/IF 復元を照合 | 実装段は host のみ、実機未実施 | HW-BASIC 機能 PM | 実機の記録と映像往復・連続 read の成功確認で解除 |

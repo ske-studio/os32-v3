@@ -17,6 +17,9 @@
 
 filesystem:
   files:
+    - host: "userland/tests/hw/*.hwb"
+      guest: /test/hw/
+      tags: [test]
     # --- シェル (カーネルは /shell をロードする: config.h SYS_SHELL_BIN) ---
     - host: userland/shell.bin
       guest: /sys/shell.bin
