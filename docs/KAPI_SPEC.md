@@ -378,6 +378,7 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | `ime_user_delete` (yomi/kanji) | T5a-1 / 同上 | B2 接続。各256Bを全コピー。yomi NULL/空=-1、kanji NULL/正常な空のみ同じ読みの全候補。copy失敗=-1、SQL=-2/-3、成功0 |
 | `ime_user_export` (path) | T5a-1 / 同上 | B2 接続。256B NUL、NULL/空/copy失敗=-1、拒否時create/truncate=0。SQL/I/O=-2〜-5、成功0 |
 | `font_source_open` (path) | T7b-b1 / `kernel/console/font_source.c` | B1 コピー済み。門 (CPL=3 の dispatch 中・caller owner 一致) の後に VFS_MAX_PATH の NUL を必須で写し、写せなければ kill + INVAL、拒否時 FD を開かない |
+| `gfx_osri_show` (path) | KAPI v80 / `kapi/kapi_osri.c` → `gfx/gfx_osri_view.c` | B1 コピー済み。VFS_MAX_PATH の NUL を 1 byte ずつ copy_caller_bytes で写し、帯の外・写せない USER は kill + INVAL、非終端・空は INVAL、拒否時はファイルを開かない |
 | `db_bind_text`, `host_open` | 長さ付き入力 (NUL 不要)、既存 DB/host facade | X-1 の NUL 群から除外。各 target の B1 range/copy 契約を維持 |
 
 T4b-8 の上記各群は host の境界・副作用前拒否・生ポインタ変異を検査する。ゲスト受入は PM が行う。入力上限と staging 寿命は [下記](#残る公開文字列の-cpl3-入力境界-t4b-8b)。FEP / ページ 0 を含む X-1 全体の閉鎖を意味しない。
