@@ -33,11 +33,11 @@ static void fixture(void)
 #define REG_MEM 0x4020U
 #define REG_MUX 0xc040U
 #define OLD_MUX 0xa5a5ffffU
-#define OLD_CORE 0x3ff8feffU
-#define OLD_SHADER 0x3ff80000U
 #define MUX_BITS 0x333U
 #define CORE_BITS 0xc0070100U
 #define SHADER_BITS 0xc007ffffU
+#define OLD_CORE (0x3ff8feffU | CORE_BITS)
+#define OLD_SHADER (0x3ff80000U | SHADER_BITS)
 #define SETTLE_US 5000U /* nouveau clk/nv40.c:193 */
 #define REF_KHZ 27000U /* nouveau clk/pllnv04.c:36; fixture reference */
 #define N1 20U
@@ -68,6 +68,8 @@ static void run(void)
     h.events=fe; h.cevents=8;
     set_reg(REG_MUX,OLD_MUX); set_reg(REG_CORE,OLD_CORE);
     set_reg(REG_SHADER,OLD_SHADER);
+    assert(OLD_CORE & CORE_BITS & ~p.nc);
+    assert(OLD_SHADER & SHADER_BITS & ~p.sc);
     assert(gf5_clock_prog(&h.ctx,&p)==0);
     assert(h.display.calls[D_WRITE]==5);
     write_event(1,REG_MUX,OLD_MUX&~MUX_BITS);
