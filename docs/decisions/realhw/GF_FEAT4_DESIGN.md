@@ -600,3 +600,6 @@ A1のD_WRITE注入は従来「書かずに失敗」に加え、宣言節のgf4_h
 - **B0 の route.max_khz**: DCB は encoder ごとの上限を持たない (nvkm/subdev/bios/dcb.c:121-193)。nouveau の TMDS も 165MHz を上限にせず dual link に切り替えるだけ (dispnv04/dfp.c:343-358)。だから D0 は max_khz=0 を書き、0 は「encoder 固有の上限なし」と読む。B0 の判定は PLL limits と data の limits.max_khz (data.h の limits) だけで行う。0 で候補を落とさない。
 - **B5 の旧入口の期限**: 旧 gf_display_blank(ctx, blank) は期限を持たないので、委譲の前に既存の型どおり `ctx->io.timing.clock_us` で now を取り、`now + GF3_TIMEOUT_US` を dl にする (hwdev/gf/service.c:280-284 と同じ)。clock が無いか失敗したら GF2_EIO を返し、委譲しない。ctx.deadline は流用しない。
 - **B5 の display4 の欄**: `struct gf_display_context` の末尾に `struct gf4_ctx *display4;` を足した (hwdev/gf/internal.h、wt/gf-l4)。結線は C2-service。
+- **B0 の色深度の枠**: 色深度ごとに VRAM と pitch で判定し、収まる色深度だけ公開する (§3)。先頭の timing の「3 色深度の必須枠」は、収まる色深度の分だけ確保する。どの色深度も収まらない timing は公開しない。ENOSPC は mode 表の容量が尽きたときだけ返す。connector どうしの枠の配分は、先頭 timing の枠を先に全 connector に確保してから残りを順に詰める。
+- **B7 の待ちの間の再入**: OS32 はシングルタスクで協調切替なので、fence 待ち・VBLANK 待ちの間に同じ head の flip が再入することは考えない。専用の状態は足さない。pending はカードどおり base を書く直前に立てる。
+- **止める欠けの範囲 (層 4 の残りの段に共通)**: 止めるのは、宣言・試験の土台への追加か、既存の状態の持ち主の変更が要る欠けだけ。そのほかの細かな判断は §3〜§9 と手本に沿って実装者が決め、報告の「実装者が決めたこと」に 1 行ずつ書く (レビューで確かめる)。
