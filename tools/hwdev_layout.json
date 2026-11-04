@@ -656,6 +656,7 @@
       "mode_count",
       "modes",
       "name",
+      "osri_show",
       "page_flip",
       "prepare",
       "present_rect",

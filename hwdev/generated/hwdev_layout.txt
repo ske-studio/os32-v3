@@ -1194,7 +1194,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	108
+size	struct GfxBackend	112
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1232,6 +1232,8 @@ offset	struct GfxBackend.modes	64
 member_size	struct GfxBackend.modes	4
 offset	struct GfxBackend.name	0
 member_size	struct GfxBackend.name	4
+offset	struct GfxBackend.osri_show	108
+member_size	struct GfxBackend.osri_show	4
 offset	struct GfxBackend.page_flip	100
 member_size	struct GfxBackend.page_flip	4
 offset	struct GfxBackend.prepare	60
