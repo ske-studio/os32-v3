@@ -419,3 +419,142 @@ PIT 24576/2457600秒=10msに対して採取は1tick未満；採取前の保留IR
 書換一覧（現物）：platform/pc98/splash_probe.c:467のlimit=(PROBE_HPERIODS+2)*Lを(PROBE_HPERIODS+6)*Lへ、407行のunchanged 66Hと477行の66H固定拒否コメントを70Hへ整合；479行cap・482行excess・498〜499行事後検査は共通limitに追従。校正32H／64Hとcountは変更不要。
 r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込みの比上限と反例の通過、P3のC+2q≤L条件を明記、書換一覧を70Hへ更新。
 
+## 追記 (2026-11-04、N=1〜16 色の観測の像 — 計測を止めて観測に切り替える)
+
+> 出所: ~/os32-tmp/run/raster-obs/DESIGN.r2.md (astra 起草 r1〜r2、Opus レビュー 2 回、確定の補いは PM)。ユーザー決定の原文は ~/os32-tmp/run/raster-splash/USER_DECISIONS.md の 2026-11-04 (「観測のための処理を一旦止める」「１６枚つくって。失敗は失敗で良い」「１行毎に１５色固定１色可変から１６色可変までを実測」「カメラで見ても理屈的には正しく観測できるはず」)。
+
+- A1: Nを毎行書き換える色数1〜16へ訂正し、専用エンコード・OBS限定16件/行・6384件・最大63 OUT列・容量を再設計。
+- A2: 写真によるPM判定へ変更し、判別不能は「未確認」、立会いの目視を受入条件から削除。
+- A3: 可視区間IF=0、VBLANKでIF=1、表示期間はVBLANK数で管理し、内側の時計検査とPIT精算を除去。
+- A4: ホストfloatは許容し、旧T1の整数化案と食い違い#4を撤回、常用の既定出力を保持。
+- A5: T=5秒・約240ms間隔のカメラ・60秒ごとの未保存画像回収・同一時計のシリアル時刻・TVRAMのN表示を採用。
+- A6: 420秒はノートへ依頼した記録長と訂正し、既定120秒の外部watchdogへ変更。
+- A7: 単独Nのコンパイル時選択を削除し、同じ像で/boot/obsに置くファイルだけを選択。
+- A8: OBSで使わないglyph表・static関数も通常経路と同じ条件コンパイル内へ囲む。
+- A9: 行あたり色数の境界比較と可視区間IFの変異試験を追加。
+
+## 追記 (2026-11-04、N=1〜16 の観測の像)
+- 設計のみ。リポジトリ編集・ビルド・資産生成・実機試験は行わない。以下のコードパスは `` 相対。
+- Nは「前行の16枠のうち当行で書き換える色の数」。残り16−N枠は保持し、可変の枠は行ごとに選ぶ。N=16は毎行全16枠を更新する。
+- 常用の案B・.osri v2・R1採否・予算表・M1/M2手順・公開KAPIは変更しない。PEGC/EGC不使用、カーネルは整数演算。観測像だけ、未認定列とはみ出しを失敗も含めて観測する。
+
+### 実物の確認（常用の制約3件と観測用の分岐）
+| # | file:line | 確認と対応 |
+|---|---|---|
+| 1 | `drivers/video/pc98/splash_raster.h:28`、`:29`; `splash_raster_image.h:8`; `splash_raster_image.c:80`、`:120`、`:133` | IMAGE_OUTS=5、DIAG_OUTS=6、PL_MAX_OUTS=6、表[2][2][2]とprofile/qualifiedの拒否。既存値はOUT数のまま、観測Nとは別物。OBS APIを追加する。 |
+| 2 | `gfx/gfx_osri.h:16`、`:17`、`:35`; `gfx/gfx_osri.c:47`、`:75`、`:79` | v2は総1197件、行3件、同値イベント拒否。OBSのみ総6384件、行16件、同値書込み許容へ分岐し、RAM配列も合わせる。 |
+| 3 | `tools/img2osri.py:56`、`:118`、`:180`; `platform/pc98/splash_image.c:31` | T1は成分差分+追加番号のOUT予算5/6、現画像入口はevent有りを拒否。専用CLIと観測入口を追加し、既存I1の結線完了を前提にしない。 |
+- 現T1は `--hblank-outs → convert → palette_history → optimize_row(budget)`。この引数の意味やchoicesを変えず、別の `--obs-colors N`（1..16、band=1限定、明示hblank-outsとの併用拒否）を追加する。
+- `splash_raster_image.c:258`以降は先頭番号を先行、以後の色ごとに番号OUTを発行する。`splash_raster.c:206`〜`:209`も番号→G→R→Bの明示OUT。自動増加を利用するコードはなく、観測でも仮定しない。
+- `build/kernel.mk:52`でDIAGのprobeを登録、`:308`が別BUILD_OUTの入口。`init/boot_splash.c:203`の通常3秒経路はOBSから呼ばない。`init/kernel.c:176`のroot mountは`:242`のboot_splashより先。
+- `splash_raster.c:13`の既存POLL_LIMIT=1000000を観測の待機上限にも使う設計とし、同値の私有定数を置く場合は由来を明記。`include/memmap.h:433`のPITは100Hz（レビュー照合）。
+- 状態票 `docs/tasks/gui/TASK_RASTER_SPLASH.md:3` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
+
+### ホスト：同じ人物原画から16枚
+- 原画の絶対パス・SHA256、T1のSHA、Pillow/NumPy版をmanifestへ固定。640×400への既存リサイズ・黒合成を共有し、各Nは原画から独立変換する。
+- 各行640pxをMEDIANCUTで16色抽出しRGB444化、RGB順・黒補完で16候補枠にする（重複色も枠として扱う）。行0はこの16枠を初期パレットとする。
+- 行1〜399は前行パレットを出発点に、未選択slot×未使用の当行候補枠について、置換後の当行640pxの最近色SSE減少量が最大の組を1つずつ採る。同点はslot小→RGB辞書順→候補枠番号小。N回で停止する。
+- 減少量が0以下でも残りの選択を行い、必ず異なるN枠を選ぶ。候補枠は1回だけ使用するのでN=16では抽出16枠全部になる。旧T1の成分混成探索・先読み・float計算は触らず、この探索だけ別関数にする。
+- 同値RGBの選択も書込み対象として記録する。自然画像には同じ色が続く行があり、実RGB差分が常にN色になる保証はできない。RGBを人工的に揺らさず、選択数=Nと実差分色数を分けて報告する。
+- これはN枠の書込み負荷を確実に試す契約。全選択枠へG/R/Bを3本ともOUTし、成分一致による省略をしない。N=16は16枠全部の再設定であり、16本OUTという意味ではない。
+- 履歴確定後の整数FS・最近色同点index順・4面128000Bの詰め方は既存を共有。イベントは各行N件をline/index順で保存し、1枚399N件。行0イベントは作らない。
+- `--obs-colors`なしでは既存の変換関数とバイト出力を維持する。常用5/6のCLI・計算・形式制約を広げない。
+- 出力は本作業ディレクトリの `assets/N01.osri`〜`N16.osri`、`Nxx.log`、`manifest.tsv`。媒体では `/boot/obs/N01.osri`〜`N16.osri`（8.3名）。
+- 専用駆動がN=1..16を順に実行し、成功した一時ファイルだけrename。失敗はN・理由・終了コードを記録して続行し、古い同名成果物を配備対象から除外する。
+```sh
+python3 tools/img2osri.py "$PORTRAIT" --mode PL-B --band 1 --obs-colors "$N" -o "$TMP_OUTPUT"
+# manifest: N, source_sha256, status, reason, bytes, events, written_colors,
+# actual_changed_colors_min/max, hblank_outs, total_outs, crc32, tool_sha, library_versions
+```
+
+### .osri と列準備の境界
+- v2の64Bヘッダー・32B初期パレット・128000B画素・8Bイベント・CRC・予約欄は据置。Nはファイル名から駆動が渡し、予約欄には埋めない。
+- `SPLASH_RASTER_OBS`時だけOBS_V2_MAX_EVENTS=399×16=6384、OBS_V2_MAX_PER_LINE=16を選ぶ。通常の1197/3、v1の200件、公開KAPIは据置。OBSのsizeof検査も51110Bへ条件分岐し、通常9614Bを維持。OBS型を使う翻訳単位は同じ専用BUILD_OUTで再コンパイルする。
+- ローダーはサイズ・CRC・line 1..399・index 0..15・整列・同一行同一index禁止・band・予約欄検査を保持する。同値許可はOBSのv2だけに限定する。
+- prepareはv2/band=1/N範囲を検査し、全399行がちょうどN件であることを要求。N未満もN超過も拒否し、別Nのファイルの取り違えを検出する。
+- 先頭番号1本は直前low中に先行し、HBLANK内はG/R/B、次色の番号/G/R/Bを連ねる。各行の全OUT=4N、H内=4N−1（3〜63）。配列容量64、count最大63、初期16色はVBLANKで64 OUT。
+```c
+#ifdef SPLASH_RASTER_OBS
+#define PL_OBS_MAX_OUTS 64u
+struct PlObsRow { u8 first, count, port[64], value[64]; }; /* 130B */
+struct PlObsPlan { struct PlObsRow row[400]; };           /* 52000B、row0は空 */
+int pl_obs_prepare(const struct OsriImage *, u8 colors, struct PlObsPlan *);
+int pl_obs_frame(struct SplashRaster *, const struct OsriImage *,
+                 const struct PlObsPlan *); /* VBLANK単位で1周、OK/drop/no_sync */
+#endif
+/* ホスト→v2→osri_load→prepare(N)→frame。認定表・PIT精算への呼出しなし。 */
+```
+
+### 観測像・同期・終了
+- `kernel-splash-obs`は `BUILD_OUT=$(BUILD_OUT)/splash-obs SPLASH_OBS_BUILD=1`で専用像・map・対応モジュールを作る。DIAGとの同時指定はmake error、OBSのみSPLASH_RASTER_OBSを定義する。
+- DIAGを定義せずM1のprobe・probe_before・大量診断RAMを含めない。モード/位相の8周期判別だけ初回に残す。認定表を真に偽装せず、独立OBS prepare/frameで表への依存を除く。
+- 再生入口の保存IFが0なら拒否。通常時はVBLANKでIRQを開放、可視開始前にCLIし400行の可視終端までIF=0を維持する。出口で保存IFを復元し、例外的な同期喪失時にも復元して中止する。
+- 初期16色は新VBLANK内で設定し、Fとactive0の既決位相で行原点を取る。必要な原点取得区間もCLIで保護し、IF=1を可視区間へ持ち込まない。初期設定後に原点を失ったフレームは捨てる。
+- 空行を含めlow→highを連続計数し、`active0+y`で列を実行。列と分岐先は辺の前に選択、count別展開0..63を使用。RGB展開・探索・serial・TVRAM・時計読取は可視ループの外。
+- 列のHBLANKはみ出しで打ち切らず、列後にlowを再捕捉する。Hを飛ばすほど長い列の行ずれは観測結果に含む。予算未認定なのでH欠落の完全検出を約束しない。次のVBLANKで原点と初期色を取り直す。
+- 待機は既存由来の有限poll上限のみ。上限到達はno_syncとして脱出する。tick_countや時計による内側の期限検査は置かず、PIT精算もせず、tickの遅れは観測像だけの既知の副作用とする。
+- `SPLASH_OBS_SECONDS=5u`、`SPLASH_OBS_US_PER_SECOND=1000000u`を定義。既存状態のtotal_lines/line_num_us/line_den（`splash_raster.c:170`〜`:182`）から目標周回数=ceil(T×1000000×line_den/(total_lines×line_num_us))を64bit整数で算出し、ゼロ/無効状態は拒否。実時間の証拠はノート時計を用いる。
+- 1周は新VBLANKを1回だけ数え、dropも期間に算入し、成功フレーム数は別集計。同期停止はpoll上限で脱出する。時計のずれやdropで無制限に表示を延長しない。
+- 駆動は1枚ずつload→prepare→全色黒→128000B転送1回→所定周回→黒→解放。TVRAM隅の `N=07` 等は `platform/pc98/splash_obs.c`が可視ループ外で更新する。
+- N=1..16を固定順で試す。ファイルなしはmissingで即skip、生成失敗理由はmanifestと突合する。同じ像で、置くファイルだけを選べば単独Nを試せる。単独選択のビルド定数は作らない。
+- 各Nに `SPLO n=7 start crc=... colors=7 houts=27` と `SPLO n=7 end status=... frames=... drop=...` を対で記録。失敗にもstart/endを出し、missing/invalid/colors_mismatch/no_sync等を区別する。
+- 走査中にはログを出さない。停止してendが出なければノートがwatchdogで記録する。最後は両ページ消去・gfx_shutdown・palette_init・tvram_clearを行いshellへ戻す。
+
+### 容量と時間
+| 対象 | 見積り・扱い |
+|---|---|
+| 1枚 | 128096+8×399N B。N1=131288B、N16=179168B。 |
+| 16枚 | ΣN=136より2483648B（約2.37MiB）。全16枚を最大サイズで予約しても2866688B（約2.74MiB）。ブロック端数・manifest込み資産枠3MiB。 |
+| RAM | OsriImage=38+8×6384=51110B、plan=52000B、計103110B。追加ヒープ枠128KiB、既存借用BB128000Bは別。巨大型をスタックに置かない。 |
+| カーネル | 画像埋込み0。OBSコード暫定枠64KiB（63 OUT展開を含む）、実装時にmap/圧縮後サイズを検証。圧縮像上限508KiBを守る。r1の現物サイズはOBS実測値に流用しない。 |
+| FD | 1.23/1.44MB級に16枚は入らず、既存空き64KiBには最小1枚も入らない。必要なら起動専用、資産は起動時rootから見えるHDDの/boot/obsへ。 |
+| HDD /boot | 追加で資産3MiB＋OBSカーネル最大508KiB＋対応モジュール実サイズ＋FS余白を確保。通常像とsplash.osriを上書きしない。 |
+| 1起動16枚（推奨） | 約16×5=80秒＋起動・読込/転送・終了。I/O時間は別であり厳密な80秒上限ではない。停止後の未観測Nは配置を替えて再起動。 |
+| N別16起動 | 同じ像で1枚だけ配置。各回約5秒＋起動、停止を隔離できるが起動/記録準備が16回。ユーザー許容済みの救済方式。 |
+- 420秒はprobeに合わせてPMがノートへ依頼した記録長で、リポジトリの待機定数ではない。probeを外した今回には引き継がない。
+- ノートのwatchdog既定は120秒（80＋起動等の余裕40）。shellで即終了し、120秒到達は停止/未完了として記録する。余裕調整時もカメラ保持約300秒未満にする。
+
+### 常用.textの隔離と実装の割当て
+- boot_splashはOBS入口と通常本文を#ifdef/#elseで分け、通常専用glyph表・static関数も同じ#ifndef内に含める。OBS新.cは専用buildだけ登録し、-Wallの未使用警告を残さない。
+- 常用の型上限・列・profile・qualified・フラグは不変。実装時に通常版の関係.oの.text/.rodataを変更前後でcmpし、最終像はbuild_id等の既知メタデータを区別して照合する。
+| 段 | 所有ファイル（1段＝1ファイル＝1実装者） | 変更・依存 |
+|---|---|---|
+| OT | `tools/img2osri.py` | OBS CLI/探索/書出し、旧経路保持。 |
+| OA | 新`tools/raster_obs_assets.py` | 16変換・失敗継続・manifest。OT後。 |
+| OFH | `gfx/gfx_osri.h` | OBS定数・配列上限。先行固定。 |
+| OF | `gfx/gfx_osri.c` | OBS限定上限/同値許可、通常検査維持。OFH後。 |
+| OH | `drivers/video/pc98/splash_raster_image.h` | OBS型/API。 |
+| OR | `drivers/video/pc98/splash_raster_image.c` | OBS列準備・IF/同期・再生。OF/OH後。 |
+| OPH | `include/platform_splash.h` | observe宣言。 |
+| OP | 新`platform/pc98/splash_obs.c` | N順駆動・周回数・所有/解放・serial・TVRAM。OR/OPH後。 |
+| OB | `build/kernel.mk` | PM専有、別BUILD_OUT・登録・フラグ・DIAG排他。 |
+| OI | `init/boot_splash.c` | 通常表/関数のガード・OBS結線。部品統合後に直列。 |
+| OTV | `tools/tests/test_osri.py` | OBS境界・独立復号・旧T1出力一致。 |
+| ORV | 新`tools/tests/splash_obs_host.c` | 実物CのI/O模型・IF・終了を検証。 |
+| OV | 新`tools/tests/test_splash_obs.py` | host試験/変異/.text照合を駆動。 |
+| OREG | `Makefile` | PM専有、試験登録。 |
+| OD | `docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md` | PMが追記反映。 |
+| OTS | `docs/tasks/gui/TASK_RASTER_SPLASH.md` | PMが観測と常用認定の状態を区別。 |
+- `docs/tasks/agents/PARALLEL_BRANCHES.md §2`に従い共有登録はPMの1ブランチだけ、生成物は統合後1回。配備・NP21/W・実機・結線は直列。本稿では実装者を起動しない。
+
+### 受入・記録・未決
+- host試験：全Nの399N件/各行N枠・保持枠不変・N16抽出枠一致・同値色・独立復号・CRC/整列/6384境界・通常3/1197維持・旧5/6バイト一致・先行番号と3〜63 OUT・IF/有限脱出・失敗継続/解放・通常.text不変を確認する。
+- 変異：行色数比較の等号/上下限、6384上限、番号OUT欠落、同値書込み省略、low再武装削除、可視中STI/CLI欠落、VBLANK二重計数、OBSガード除去を独立に入れ、対応試験が必ず失敗すること。
+- NP21/Wは31kで成功生成分がN順に表示され、全16枠のstart/endとshell復帰を確認。missing/拒否はskip、frames=0は表示成功と数えない。エミュレータの成功を実機時間の保証にしない。
+- 実機前にノートでカメラ回収を開始する。約240ms間隔（約5fps）、直近1501枚・約300秒保持、ミリ秒付き名のjpgを60秒ごとにapi/framesから未保存分すべてコピーする。
+- reboot直前からshellまでシリアルの各行にノート受信時刻（カメラと同じ時計）を付ける。終了時も回収し、reboot〜shellの写真に欠落がないか確認する。T=5秒で1つのNにつき約20枚。
+- PMが写真のN表示と時刻を突合し、ちらつき・崩れ・色を判定する。判別不能は「未確認（カメラで判別不能）」、撮影欠落は別理由で未確認。立会い目視は前提にしない。
+| N（01..16各1行） | 原画SHA/CRC | 書込色数/実差分min-max/H内OUT | start/end受信時刻・frames/drop/理由 | 写真の名前（最初/最後と枚数） | カメラでの判定（ちらつき/崩れ/色・総合） | 判定者 |
+|---|---|---|---|---|---|---|
+| 01 | … | 1/…/3 | … | … | 成功/失敗/skip/未確認＋理由 | PM |
+- 未決（ユーザー判断）：0件。推奨は同じOBS像・HDD上16枚・T=5秒、停止時だけ配置を絞って別起動。常用への採用は今回の対象外。
+- 反論：0件。
+
+### 確定の補い (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
+- B1: 可視の行のループは、行ごとの 0A0h の IN で bit5 (VSYNC) も見る (追加の IN なし)。可視の行の途中で VSYNC を見たら、その周を drop として打ち切り IF を戻す (N が大きく 1 行が 1H を超えても、1 周が 1 フレームを超えず IF=0 の区間と T が N によらず決まる)。drop の回数は SPLO の行に出し、観測の結果として記録する (失敗は失敗)。host 試験と変異を 1 行ずつ。
+- B2: watchdog = 16×T + 16×(1 枚の読込の上限) + 起動、かつ 300 秒 (カメラの保持) 未満。読込の上限は NP21/W の予行の SPLO の start〜end の時刻差で PM が確定する。
+- B3: 記録の表で「書込色数」と「実差分」を両方見る。
+
+## 追記 (2026-11-04、ホストのエンコーダーの作り直し)
+
+- 1 行ごとの 16 色の再最適化 (256 色のマスター・OUT の本数の予算・はみ出しの見た目の誤差・最後に誤差拡散) は [RASTER_SPLASH_ENC2_DESIGN](RASTER_SPLASH_ENC2_DESIGN.md)。

@@ -261,3 +261,149 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 共通の[合算予算](GF_FEAT3_DESIGN.md#合算予算)・[共有ファイルの衝突表と所有段](GF_FEAT3_DESIGN.md#共有ファイルの衝突表所有段)・[依存と並列発注](GF_FEAT3_DESIGN.md#依存と並列発注)はGF_FEAT3を正とする。
 
 F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する。宣言統合後のB0〜B12は異なるファイルならF3/F5 B群と並列にコーディングできる。B11はtv.c/tv_data.cの2段、B1等も1ファイルごとに分割する。C0/C1/C2とB6の実map・B7の実drain結合はF3を待つ。共有登録と結線は直列、試験コードは各Bで完成させ、実行は全実装後のPMの生成→まとめビルド→検査にまとめる。
+
+## 追記 (2026-11-04、層 4・5 の先回りの点検 — 層 3 への依存・宣言の段の中身)
+
+> 出所: ~/os32-tmp/run/gf45-pre/ADDENDUM.r3.md (astra 起草 r1〜r3、Opus レビュー 3 回で確定、補いは PM)。層 5 の分もここに置き、GF_FEAT5_DESIGN からリンクする。ユーザー指示「geforceの層４と層５は層３の完成を前提にしていますか？並列で設計できるのであればこれも並行で設計してください。」
+
+- N1: previous_calc用の基点ヘッダー分離をF4 A0が担当し、A2が登録を引き継ぐ。
+- N2: ctv[38]をgf4_tv_stateへ戻し、gfinit_modeから外してdata_ops経由で渡す。
+- N3: data.hをtiming・route・edid・tv・data_opsに限定し、modeとgf_display_data.cはapi.hに依存させる。
+- N4: 製品コードの64bit除算・剰余とlibgcc依存を禁止し、host除算helperは試験コード専用とする。
+
+## GF_FEAT4_DESIGN 末尾追記案 — 層3と並行する宣言・部品設計（2026-11-04）
+
+状態: r3提案。F3 A0・A1・A3の取り込み後（統合ブランチwt/gf-l3には取り込み済み）を着手前提とし、F3 A0凍結済みの `accel.h` / `vram_view.h` とF3末尾G1〜G3・N1を前提とする。層3全体の完成・実機受入はA0/Bの着手条件ではない。以下の宣言をレビュー・統合してから部品を出す。リポジトリ編集・生成・ビルド・試験実行はしていない。
+照合元: O=`/home/hight/os32-v3`、A0=`/home/hight/wt/os32-v3/gf3-a0`、A1=`/home/hight/wt/os32-v3/gf3-a1`、N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`。本節はF4へ、次節はF5へ写す。既存節のHW列・誤り値は維持し、下記は共有境界の補足／明示した食い違いの訂正。
+
+| F4段（元設計の段ID単位） | 層3への依存 | 今できること／完了を待つもの |
+|---|---|---|
+| A0、前倒しC3のABI宣言 | 宣言のみ: surface・窓・台帳、F3 production宣言 | F3 A0・A3取り込み後に着手可。F4保存型もここで凍結、feature5_outは不完全型でよい。production.hの変更順はF3 A3→F4 A0。 |
+| A1/A2/A3 | F3宣言＋本節のhost契約 | F4 A0およびF3 A1（gf_accel_host.h）取り込み後に骨格・試験コードを作れる。A1実装が未統合ならBは仕様に対して書き、勝手なstubを増やさない。 |
+| B0〜B5、B8〜B12 | 宣言のみ（F4内依存も宣言で代行） | F3部品群と同時にコード作成可。B1をtiming/format/fifo、B11をtv/tv_data等の1ファイル1段へ分割。 |
+| B6、B7 | コードは宣言のみ／実結合はF3 V0・B1・C1/C2 | cursorの実map・所有移管、flipの生存面＋F2 drain＋hook再bindの結合完了を待つ【2段】。F2 fence実装自体は既存。 |
+| C0/C1/C2 | F3 V0・B0/B1・C0/C1/C2の実装 | transaction、HAL/scan、production寿命の実結線を待つ【3段】。下書きは可。層3全描画機能の実機合格は不要。 |
+| C3の登録・結線／C4 | C3はF3 C3/C4/C5等の共有変更／C4は宣言のみ | C3は先行登録の取り込み後【1段】。C4 helper/stateコードはF4 B4/B11の宣言で先行可。 |
+| T（実機受入） | 層3の稼働する実装と必要な描画・fence・停止の実機確認 | F3全機能受入を一括の前提にしない。実機上で前提経路を確認してから各F4受入を行い、未確認をhost合格で代用しない。 |
+
+### A0で埋める共有宣言（G2）
+
+以下のフィールド一覧は記載順の完全定義、`T a,b` は同じ型の複数欄。整数の符号付き32bitはi32（s32禁止）、boolはstdbool.h。api.hはdata.h・accel.h・gfinit_mode.hをinclude、F5へのincludeは作らない。A0でdisplay/data.hにgf4_timing・gf4_route・gf4_edid_state・gf4_tv_state・gf4_data_opsとそれらの純データ定数だけを置き、types.h/stdbool.hだけに依存させる。gf4_rc/dpms/mode/cursorはapi.hに残す（gf4_modeのenum gf3_fmtにはaccel.hが必要）。edid.c・tv_data.cはdata.hだけでコンパイルでき、accel.h/command.hを取り込まない。gf_display_data.cはgf4_stateを定義するためapi.hをincludeする。下表の「同」はapi.hを指し、data.h所属は明記する。別ファイルに分ける宣言もA0の同一契約として先に凍結する。
+
+| ファイル／型・定数 | A0に書く定義・責任 |
+|---|---|
+| `hwdev/gf/display/api.h` 既決公開型・関数 | §2のgf4_rc/dpms/mode/cursor（timingはdata.hからinclude）、gf4_modes/set_mode/ddc_read/dpms_set/cursor_image/move/show/vblank_wait/flip/gamma/mode_calc/mode_load/test_opsをその型のまま収録。timing.flagsはNEG_H=1、NEG_V=2、INTERLACE=4、DBLSCAN=8。HEADS=2、TIMINGS=32、MODES=96、CURSOR_BYTES=16384、CURSOR_ALIGN=4096（HW最小は2048）。 |
+| `hwdev/gf/display/data.h` `gf4_route` | 既決u8 connector,head,type,or_mask,i2c_index,locationに、u8 head_mask,ext_type; bool dual_link; u32 max_khz,tv_normを追加。typeはDCB値のANALOG=0/TV=1/TMDS=2/LVDS=3。tv_normはN/dispnv04/tvnv17.h:56–70の12値順、非TVは0。DCB route配列はproductionが解析して貸し、未配線と未対応encoderを区別する。 |
+| `hwdev/gf/display/data.h` `gf4_edid_state` | u32 version,size,ntiming,preferred,extensions,next_block,min_v_hz,max_v_hz,min_h_khz,max_h_khz,max_khz; bool base_valid,digital,range_valid,truncated; i32 last_rc; struct gf4_timing timing[32]。version=1、preferredは添字／不在U32_MAX。B4が所有する逐次parserの値状態であり、MMIO・pointer・予約を持たない。 |
+| `hwdev/gf/display/data.h` `gf4_tv_state` | u32 version,size,norm; u8 enc[64]; u32 hfilter[4][7],hfilter2[4][7],vfilter[4][7],ptv[14],ctv[38]。ctvはTV規格表の値をkernelのtv_data.cで埋め、data_ops.tv_stateの出力としてmoduleへ渡す。gfinit_modeには重複保持しない。ptv順=200,204,208,20c,304,500,504,508,600,604,608,60c,610,614（hex）。version=1。N/dispnv04/tvnv17.h:30–54、tvmodesnv17.c:406–434。 |
+| `hwdev/gf/display/data.h` `gf4_data_ops` | u32 version,size; i32 (*edid_modes)(const u8 block[128],u32 block_no,struct gf4_edid_state *); i32 (*tv_state)(u32 norm,const struct gf4_timing *,struct gf4_tv_state *)。旧void *parser/stateをこの型へ置換しversion=1で固定。block0でparserを初期化、以後順次追加、失敗blockは既存正常timingを保持。TVは成功時だけ全出力確定。 |
+| 同 `gf4_head_image` | bool enabled,blank,cursor_visible,lut_dirty; struct gf4_mode mode; struct gf4_route route; struct gf3_surface front,back; struct gf_vram_reservation cursor; i32 x,y,hot_x,hot_y; u32 cursor_w,cursor_h,fp_on; enum gf4_dpms dpms; u8 palette[768]; u16 gamma[3][256]。CPU画像pointerは保存せずcursor予約内のGPU形式像をF5が退避。 |
+| 同 `gf4_flip_hold` / `gf4_saved` | hold={bool pending,base_written; struct gf3_surface old_front,new_front; u32 after;}。saved={u32 version,size,wanted_fifo,wanted_graph,wanted_heads; struct gf4_head_image head[2]; struct gf4_flip_hold hold[2];}。version=1。node/窓/opsを含まない値コピー。表示保存後もhold両面は所有者ctxに残す。 |
+| 同 `gf4_state`（kernel所有） | u32 version,size,nmodes; struct gf4_mode modes[96]; u8 mode_connector[96]; struct gf4_edid_state edid; struct gf4_head_image head[2]; struct gf4_tv_state tv[2]; struct gfinit_mode work[2]; struct gf4_saved rollback。version=1。mode列はconnector別に連続、1表合計32timing×3format、満杯時preferred優先。kernel RAM見積りは約17.2KiBへ訂正（ctv重複除去前の保守値、除去分304B、最終sizeofで確定）。rollbackのpalette/gammaは保持する。 |
+| 同 `gf4_ctx`（production所有・移動禁止） | struct gf2_chan *ch; struct gf3_ctx *accel; struct gf4_state *state; const struct gf4_data_ops *data; const struct gf4_exec_ops *exec; const struct gf4_route *routes; u32 nroutes,epoch,deadline; i32 last_rc; bool ready,accepting,reusable; struct gf_vram_reservation_node scan[2][2],cursor[2],test; struct gf_vram_view cursor_view[2]; struct gf4_flip_hold hold[2]。既存のboot表示mapはproductionから借用、窓として所有しない。 |
+| 同 ROM／外付けencoder結線 | `struct gf4_exec_ops { i32 (*tmds_script)(void *,const struct gf4_route *,u32 khz,u32 dl); i32 (*external_mode)(void *,const struct gf4_route *,const struct gf4_mode *,u32 dl); void *owner; };` C2がROM既存runner／既知encoderの実装を結線、B10はこの宣言でコーディング。analogでは呼ばず、未知encoderはEUNSUPPORTED。ROM借用寿命はF5の有無によらずdisplay停止までC2が保持する。 |
+| 同 F4→F5保存口（C2実装） | `i32 gf4_display_save(struct gf4_ctx *,struct gf4_saved *,u32 dl); i32 gf4_display_restore(struct gf4_ctx *,const struct gf4_saved *,u32 dl);` saveは受付閉・drain後に論理値保存→blank/IRQ抑止→全cursor_viewをunmap（予約保持）。unmap失敗は所有保持で返しF2停止へ進まない。restoreは受付閉のままcursor_viewを再mapしてから保存されたshowを再適用し、map失敗では公開しない。最終公開はF5統括だけ。F4単体停止も同じ寿命規約。 |
+| 同 部品間口（定義は各所有B/C） | `i32 gf4_surface_check(struct gf4_ctx *,const struct gf3_surface *,const struct gf4_mode *);` B0所有、BYTESのF3検査後に表示3format/pitch64B/開始4B/CR field幅を検査。`i32 gf4_route_check(struct gf4_ctx *,const struct gf4_route *);` B9所有。`i32 gf4_lut_load(struct gf4_ctx *,u8);` B8所有、palette/gammaが共用。`i32 gf4_heads_apply(struct gf4_ctx *,u32 heads);` B12所有、F1 wanted_headsとch->headsを一致させる。 |
+| 同 計算／encoder口 | `i32 gf4_timing_calc(const struct gf4_mode *,struct gfinit_mode *); i32 gf4_format_calc(const struct gf4_mode *,const struct gf3_surface *,struct gfinit_mode *); void gf4_fifo_calc(struct gfinit_mode *); i32 gf4_pll_calc(const struct gf4_mode *,const struct gf4_route *,const struct gfinit_mode_saved *,const struct gfinit_pll_limits *,struct gfinit_mode *);` 各B1/B2所有。B9/B10/B11は `i32 gf4_{analog,tmds,tv}_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32 dl)` と同形の `_dpms`（mode引数をenum gf4_dpmsへ置換）。 |
+| `hwdev/gfinit_mode.h`、`display/calc.h`、`kdebug/gfinit_*` | `gfinit_mode_head_saved={u8 cr1c,cr33,cr3c,cr4b,cr52; u32 gpio_ext,crtc850;}`、`gfinit_mode_saved={struct gfinit_mode_head_saved head[2]; u32 pllsel,sel_clk;}`へ置換。gfinit_modeにu8 head; u32 fp_horiz[7],fp_vert[7],dither,dither_regs[6],fp_debug[3],fp_margin,tv_vtotal,tv_vskew,tv_vsync_delay,tv_htotal,tv_hskew,tv_hsync_delay,tv_hsync_delay2を追加（N/dispnv04/disp.h:30–75）。rollbackの全体像はstate.work/rollbackと既存recover機構が持つ。旧診断gfinit_mode_calcはhead0既定modeのラッパー、旧gf_mode_*呼出しも既定ラッパーを保持し全fixtureを追随。 |
+| gfinit_mode追従の担当 | F4 A0: hwdev/gfinit_mode.h、hwdev/gf/display/{calc.h,state.h,baseline.c,extended.c,pll_program.c,calc.c}、hwdev/gf/internal.h、kdebug/gfinit_*（特にgfinit_plan_c.c:225）のhead別参照・offsetofを更新。tools/tests/{gf_display_host.c,gfinit_mode_host.c}の位置指定初期化を欄名指定へ変更。同じF4 A0がtools/tests/test_gf_display.pyのprevious_calcを修正し、基点の源とともに `git show 13bc5619:hwdev/gfinit_mode.h` で得たヘッダーを一時include木へ配置して基点TUだけに優先適用する（現行TUは現行ヘッダー）。A0のhead[2]変更と同時に取り込み、A2待ちにしない。A2はこの分離を維持して登録を引き継ぐ。PM登録段: tools/hwdev_layout.jsonの旧684/20と生成hwdev_contract.hのsizeof/offset契約を再生成・同期。旧定数を手で残さない。 |
+| `include/gfx_hal.h` / `geforce_module.h`・schema | §2のGfxCursorImage/GfxScanout・8hookを末尾に追加。GfxScanoutはID不再利用を使いctx内の同IDからgenerationを得る。Contextは既存accel_out/foundation_outを保持してdisplay_data/state/out,feature5_out追加、版4→5はF4 C3宣言担当だけ。F5で再変更しない。 |
+| `production.h` / `gf_display_data.c` | productionにはgf4_ctxのみ埋込み、state/helperはkernelが貸す。大きいmode/LUT/TV/rollbackをmoduleへ複製しない。C4がversion/size検査してbind、C2がready成功後公開。全backend追随と生成はPM統合段。 |
+
+### 所有・範囲の欠けを埋める（G3）
+
+| 問題／根拠 | 訂正と所有者・失敗契約 |
+|---|---|
+| cursorの2KiB整列とV0保持窓の頁境界が不一致 | F4 cursor予約は4KiB整列・16KiB（HW要求も満たす）。F4 C2がF3表示/試験利用を止め、窓解除・旧予約release後にctxのnodeへ移管。生存nodeをmemcpyしない。map失敗・unmap失敗・停止失敗では既存所有を保持。 |
+| HAL面IDにgenerationがない | A0/vram_view.hとF3末尾の既決どおり、F4 C1がctxの同IDのキーを取りowner付きmatch。off/bytesだけで最新予約を検索しない。B0はBYTES＋表示固有条件、B6はcursor入力のRAM範囲・座標減算をi64で検査してからi32/i16へ、B7は同modeと両面の生存を投入前に検査。 |
+| flipの「解放」と台帳の所有 | B7はholdを記録し新旧予約を借りるだけ、releaseしない。C2だけが次VBLANK確認／表示停止後に解放可能と判断。base書込みの失敗も投入不明ならbase_written=true相当で両面保持。sync=falseでも旧面は保持。保存中の未完了flipはholdへ値保存し、restoreで旧frontを確定してからholdを整理（未完了要求を再送しない）。 |
+| F1/F2 IRQ・epoch | mode変更ではF2 epochを増やさない。F4 epochはch->epochの照合値。B12はgf_irq_enableに現在FIFO/GR要求を残しhead集合を渡す。snapshot/ACKはF1のみ。F1停止後のVBLANK待ちなし。 |
+
+### A1 host土台の完全な受渡し規約（G1）
+
+| 共通API／F4追加 | 宣言と意味（tools/tests/gf4_display_fake.hが唯一の所有者（既存gf_display_host.cを土台名に使わない）） |
+|---|---|
+| F3から再利用できる範囲 | A1/gf_accel_host.h:7–11,63–103を確認。`GF3_HOST_UNIT=12`でincludeし、gf3_host_init/trace_clear/fail_at/ref_*と記録型だけ借りる。12は依存stubを一切定義しない。既存B0等の選択をF4に流用しない。gf_command_host.hとの同時includeなし。 |
+| 新型 | `enum gf4_host_op { D_READ,D_WRITE,D_CLOCK,D_SLEEP,D_SNAPSHOT,D_IRQ,D_FENCE,D_FENCE_WAIT,D_FAULT,D_MATCH,D_MAP,D_UNMAP,D_FORMAT,D_SURFACE,D_ROUTE,D_LUT,D_HEADS,D_EDID,D_TV,D_LOAD,D_SAVE,D_RESTORE,D_SCRIPT,D_EXTERNAL,D_DPMS,D_OP_COUNT }; struct gf4_host_event { enum gf4_host_op op; u32 nth,a[12]; const void *p[4]; i32 rc; }; struct gf4_host_read { u32 bar,off,width,value; };` |
+| fixture | `struct gf4_host { struct gf3_host base; u64 local_now; u64 *now; struct gf4_ctx ctx; struct gf4_state *state; struct gf4_host_event *events; u32 cevents,nevents,calls[D_OP_COUNT],fail_at[D_OP_COUNT]; i32 fail_rc[D_OP_COUNT]; const struct gf4_host_read *reads; u32 nreads,next_read; u8 cr[2][256],sr[2][256],gr[2][256],ar[2][32],lut[2][768],index[2][4]; u32 lut_pos[2]; bool ar_data[2]; struct gf_irq_stats irq; void (*observe)(struct gf4_host *,const struct gf4_host_event *); };` 大型状態・trace/read scriptは呼出側static領域を借りる。 |
+| helper一覧 | `void gf4_host_init(struct gf4_host *,struct gf4_state *); void gf4_host_trace_clear(struct gf4_host *); void gf4_host_fail_at(struct gf4_host *,enum gf4_host_op,u32 nth,i32 rc); void gf4_host_reads(struct gf4_host *,const struct gf4_host_read *,u32 n);` read/write/clock/waitのcallback型はgf_ioと完全一致、名前はgf4_host_read/write/clock/wait。gf3_host_init後にio callbackを差替え、opaqueをgf4_hostへ向け、now=&local_now（初期値0）とする。F4 A1がclock/waitの共通分岐を実装: clockは*nowのu32下位、waitは同じ*nowを既存wait規約どおり進め、base.nowも下位に同期。F5型を参照しない。 |
+| MMIO・I2C | width=1/2/4を記録、indexed SR/CR/GR・AR status読出しでのflipflop reset・DAC index/dataをモデル化。read scriptは該当readの番地/幅/順を照合して消費し、未該当はregister model。I2CはscriptでACK/NACK/stretch/segmentとsense bit2/3を供給し、drive bit4/5・bit0=1の全列を独立fixtureと照合（slave全体のemulator不要）。 |
+| 失敗・状態 | nth=1始まり、0は全回、rc=0解除。成功失敗とも引数/返却rcを記録しobserveは帰還前。trace_clearは記録数・callsだけ、失敗設定/VRAM/時刻を保持。バッファ不足・script不一致は常時有効assert→exit(1)、製品ENOSPCへ偽装しない。map/unmapはV0の変更なし／失敗時保持を模す。 |
+| 引数記録と対応名 | event.aは宣言順の非pointer引数（structは宣言順へ展開）、event.pはpointer順、余り0。構造体内容はobserveで即時照合。FENCE/WAIT=gf2_fence_emit/wait、SNAPSHOT/IRQ=gf_irq_snapshot/enable、MATCH/MAP/UNMAP=gf_vram_match/view_map/view_unmap、FORMAT/SURFACE=gf3_format_get/surface_check、ROUTE/LUT/HEADS=gf4_route_check/lut_load/heads_apply、EDID/TV=gf4_data_ops、SCRIPT/EXTERNAL=gf4_exec_ops。typed callbackのctx/ownerも記録する。 |
+| stub選択 | 必須GF4_HOST_UNIT=0..12（B番号）、13=C0、14=依存stubなし。製品TU自身の関数は定義しない。B0:FORMAT/SURFACE/MATCH/EDID、B1/B3/B4:外部依存なし＋io、B2:既存PLL parser/solver実物、B5:FENCE/WAIT/encoder DPMS、B6:MATCH/MAP/UNMAP、B7:FENCE/WAIT/FAULT＋gf4_surface_check＋SNAPSHOT、B8:ioのみ、B9〜B11:ROUTE/TV/SCRIPT/EXTERNAL（製品自身除外）、B12:IRQ/SNAPSHOT、C0:各Bの公開口。B1/B11のファイル分割は補助リンク一覧で選択し重複stubを禁止。全stubはapi.h/F1〜3の実宣言を使う。 |
+| oracle・登録 | B単独はgolden MMIO／呼出し順／所有遷移で合否判定。GPU画像の生成を仮定しない。packet/画像参照は必要な結合に限定。read script・EDID規格fixture・MIT列の出典と再生成法をrepoに置きCIはrefsを読まない。A2は既存tools/tests/test_gf_display.pyへの追記（CHECK名gf-display-host、BASE 13bc5619照合、previous_calcの基点ヘッダー分離はA0担当）で、層2caseとgf_display_{host,modes_host,blank_host,palette_host}.cを保持。B0/B5/B8がmodes.c/blank.c/palette.c変更に伴う既存試験追従を担当。A2が依存link/CHECK/変異登録を一元所有、-m32/-nostdlib・自前_start、heap/VLA/libcなし。 |
+
+| 64bit型・除算（F4/F5共通） | PMが統合段でinclude/types.hへtypedef unsigned long long u64; typedef long long i64;を1回追加。os32_kapi_shared.hは変更なし、hostdrvfs_proto.hの同一typedefはC11で許容。製品TUでは64bitの除算・剰余を書かず、PLL誤差0.5%等は範囲を確認した乗算比較で表現し、vmap符号付き式・cursor・tile計算もこの制約を守る。各Bが製品側の計算を所有し、hostの-m32/-nostdlibとlibgccをリンクしない.modの双方で__udivdi3/__divdi3等を要求しない。2026-11-04ユーザー決定に従いkernelもlibgccを前提にしない。F4 A1がF3 A1の1ff4e2d2（gf_accel_host.h）の64bit除算helperを試験コード専用として共通土台へ再利用し、F5 A1も同じ定義を使う（1リンク1定義）。host helperで製品側の依存を隠さず、A2/A3のリンク確認では製品TUの当該未解決symbolが無いことも確認する。 |
+
+F4のF3待ちは機能結合5段＋共有登録1段＝6段（上表）。A0/Bコード作成には0段。実機受入は別枠。PEGC/EGC、新たなIRQ callback・lock/refcount・nouveauに無い監視や能力bitは追加しない。
+
+## GF_FEAT5_DESIGN 末尾追記案 — 共有宣言・停止・snapshotの凍結（2026-11-04）
+
+前提はF3 A0（accel.h/vram_view.h＋G1〜G3）とF4 A0のgf4_saved。参照元O/A0/A1/Nは前節と同じパス。F5 A0はF4の保存型レビュー・統合後に凍結でき、F3の実装・実機完成は待たない。本案は内部宣言だけを補い、元設計のレジスタ列・性能切替順・スコープを拡張しない。
+
+| F5段 | 層3への依存 | 今できること／完了を待つもの |
+|---|---|---|
+| A0 | F3宣言＋F4保存型＋既存F2停止口 | F4 A0後に着手可。F4 feature5_outの前方宣言と合わせる。前景fanの呼出し箇所は下記PM決定済み。 |
+| A1/A2/A3、B0〜B6 | 宣言のみ | F5 A0後に全部品と試験コードを並行作成可。B3はB4のGPIO宣言、B6は下記の型付きlinksを使う。 |
+| B2/B5/B6の実結合 | F3受付閉・V0・objects・F2 drain/stopの実装 | RAM/tile停止と全extent退避・再生成の結合完了を待つ【3段】。B6表示復元はさらにF4 C2/C4。 |
+| C0/C1、C2-ROM/C2-service | 宣言のみ／共有ファイルは先行段取り込み | C0はB1と同じ所有者、C1はF4 A0後。ROM取得／poll部品本体は先行可、呼出し元の結線はC2。 |
+| C2／C3／C4 | C2はF3実装・F4 C2/C4、C3はF3→F4共有登録 | C2結線【1段】、C3登録【1段】を待つ。C4台本・dispatchコードは宣言で先行可、公開の実検証はC2後。 |
+| 実機受入 | F3の必要転送・停止・再生成の実機確認 | ROM perf間/boot復帰、CRC、save/restore等の前提経路を同じ実機受入で先に確認。層3の全描画受入を一括の開始条件にしない。 |
+
+### A0完全共有境界（G2、feature5.h）
+
+`feature5.h`は`display/api.h`をinclude。既決のrc/clock/plan/thermal/fan_mode/emergency_ops/vid_opsとclock_read/calc/prog,ram_prog,perf_select,therm_read,fan_mode_set/get/cstate/tick,volt_get/set,tile_set/clear,state_save/restore/freeは§2〜7の型を採用（署名中intはi32、unsigned slotはu32に表記統一）。以下を同じA0に追加・置換し、B間で局所宣言しない。
+
+| 型・関数／所有者 | 完全な欄・引数と契約 |
+|---|---|
+| `gf5_perf_entry` / `gf5_rom_view` | entry={struct gf5_clock clock; u8 voltage,fanspeed;}。view={const u8 *bytes; u32 size; const struct gf_init_program *memory_program; u16 memory_pc;}。programは既存内部型を再利用。ROM/span/programの動的所有はC2-ROM、viewは借用、scratch解放後も存続。 |
+| B0表列挙／B4共用GPIO | `i32 gf5_perf_count(struct gf5 *,u32 *); i32 gf5_perf_get(struct gf5 *,u32 index,struct gf5_perf_entry *); i32 gf5_gpio_find(struct gf5 *,u8 tag,u8 *line,u8 log[2]); i32 gf5_gpio_get(struct gf5 *,u8 line,const u8 log[2],bool *); i32 gf5_gpio_set(struct gf5 *,u8 line,const u8 log[2],bool); i32 gf5_volt_id(struct gf5 *,u8 id,u8 min_id,i32 condition);` gpioはB4だけが実装、戻りはgf5_rc、非存在ENOTSUP、破損EBIOS、I/O EIO。 |
+| `gf5_tile` | 既存u32 base,bytes,pitchにu32 reservation_id,generationを追加。配置の所有者が切上げ後全範囲をreserve済みで渡す。B5はID/世代付きmatch→base64KiB整列/pitch>0/64*pitch切上げをu64計算→範囲と他tile・表示/cursor非重複を検査。B5は予約を解放しない。空き昇順選択は `i32 gf5_tile_find(struct gf5 *,u32 *slot);`、clear成功は枠だけ無効化。 |
+| `gf5_fan_trip` / `gf5_fan_saved` | trip={i32 temp,hyst; u32 duty;}。saved={enum gf5_fan_mode mode; u32 kind,method,min_duty,max_duty,freq,divisor,target,cstate,duty,bump_ms,slow_ms; i32 last_trip,linear_min,linear_max; u32 ntrip; struct gf5_fan_trip *trip; i32 threshold[4],hyst[4]; bool active[4],sensor_poll,toggle_on; u8 gpio_line,gpio_log[2]; i32 slope_mult,slope_div,offset_num,offset_den,offset_constant; u32 sensor_setup;}。kind=TRIP/LINEAR/OTHER、method=NONE/PWM/TOGGLEを各0始まりで宣言、温度単位は℃。tripは動的配列でsnapshotが深くコピー、GPU pointerではない。 |
+| `gf5_extent` / `gf5_image` | extent={struct gf_vram_reservation key; u8 *host_copy;}。image={u32 version,bytes,nextent,saved_epoch; struct gf5_clock clock; u32 requested_uv; u8 vid; struct gf5_fan_saved fan; struct gf5_tile tile[12]; bool tile_live[12]; struct gf4_saved display; struct gf5_extent *extent; bool complete;}。version=1、bytesはmetadata/trip/extent/画像を含む確保量。keyのownerは同一性tokenのみ、node/next/map VA/staging/instmemは保存禁止。 |
+| `gf5_links`（既決5口を具体化） | `i32 (*drain_pause)(void *); i32 (*unpause)(void *); i32 (*display_save)(void *,struct gf5_image *); i32 (*display_restore)(void *,const struct gf5_image *); i32 (*memory_script)(void *,u16 pc); void *owner;` 保持。display adapterはimage.displayとF4保存口を対応。dlはgf5.deadlineを読む。 |
+| 同 linksへの必要な資源・結線口 | `i32 (*admission)(void *,bool open); i32 (*drain)(void *,u32 dl); i32 (*stop)(void *,u32 dl); i32 (*restart)(void *,u32 dl); i32 (*copy_extent)(void *,const struct gf_vram_reservation *,u8 *ram,bool to_vram); i32 (*alloc)(void *,u32 bytes,void **out); void (*free)(void *,void *); i32 (*clock64)(void *,u64 *);` 追加。alloc成功時だけ出力更新、freeは非NULLの成功確保に1回。stop/restart/copyはC2、malloc汎用dispatcherにしない。 |
+| `enum gf5_phase` / `struct gf5` | phase={GF5_RUN,GF5_SAVING,GF5_SAVED,GF5_RESTORING,GF5_FAULT}。gf5={struct gf2_chan *ch; struct gf3_ctx *accel; struct gf4_ctx *display; struct gf5_links links; struct gf5_rom_view rom; struct gf5_vid_ops vid; struct gf5_emergency_ops emergency; enum gf5_phase phase; u32 deadline; i32 last_rc,source_rc; bool accepting,busy; struct gf5_fan_saved fan; u64 next_auto,next_step,next_sensor,next_toggle; struct gf5_tile tile[12]; bool tile_live[12]; struct gf5_image *image;}。productionが所有、imageは借用。常駐1KiB目安に収まるか実測し、trip/ROMは動的RAMを別計上。 |
+| ROM／前景service宣言 | `i32 gf5_rom_acquire(struct gf5 *,const u8 *,u32,const struct gf_init_program *); void gf5_rom_release(struct gf5 *); i32 gf5_service_poll(struct gf5 *);` acquireは成功時に必要ROM/span/programを別所有、releaseは停止とsnapshot破棄後だけ。pollはclock64→fan_tick、busy/非RUNなら無処理、IRQから呼ばない。PM決定: drivers/video/geforce/backend_geforce.c:168のgeforce_presentとHAL hookの前景入口、およびkdebug/gf5_test.cの診断待ちから呼ぶ。kernel idle hookは新設せず、geforce_tick.c/IRQから呼ばない。描画・診断待ちが無い間はAUTOの見直しが止まる。 |
+| `gf5_test_ops` | struct gf5 *ctx; 上記の全公開操作とperf_count/get,tile_find,service_pollを `__typeof__(&gf5_関数名)` の同名（gf5_を除く）欄で列挙。`i32 (*last_rc)(struct gf5 *);` 追加。gf5_linksの内側やraw MMIOは公開しない。save時slotは閉じるため、診断側がimageを保持しrestore/freeだけを許す専用管理dispatchを再読する（次行）。 |
+| 診断slotの保存中の寿命 | feature5_outはmodule生存中の管理口。SAVING/RESTORING中はNULL、SAVEDで再公開しphase検査でrestore/free/last_rc以外をESTATEにする。FAIL後も資源を持つ間は管理口を保持し、再restore/破棄の受付可否をphaseで判断。unload前は必ずNULL、slotを跨ぐops pointer保持禁止。F3/F4描画slotは最終RUN成功までNULL。 |
+
+### 実物と食い違う所有・停止を修正する（G3）
+
+| 問題／照合元 | 凍結する責任と失敗時の動き |
+|---|---|
+| 本文§7の「同一offへ再予約」はF3確定追記と矛盾 | **予約保持へ訂正**。受付閉のままgf_vram_nextをcursor=0で列挙（1=item、0=end、負=失敗）、全生存予約を保存。node/owner/ID/generationはF4/F3/呼出元の同じ常駐位置で維持し、台帳を初期化し直さない。restoreはmatchで同一配置を確認し再reserveしない。変更された配置はESTATE、勝手に別offへ移さない。 |
+| extentの上限・重複・失敗snapshot | 生存予約は非重複なので1予約1extent。front/hold等が同予約を指しても別コピーにしない。合計はu64で溢れを検査して確保可能サイズへ、固定件数/8MiB上限なし。確保前はout保持、全確保後かつ破壊操作前に*outへ渡しgf5.imageも借用、以降失敗してもfreeしない。completeは全画像コピー成功後だけtrue。stop失敗でも完全像は保持、未完成像restoreはESTATE。 |
+| 既存75頁表示mapとV0 | copy_extentのC2 adapterがboot表示範囲をbar1_mapで借用、境界をまたぐ予約はそこで分割、残りはV0窓。off/lenの4B条件を予約内で満たす。F4新規面/試験/tileは4B倍数以上、未整列の保存要求は停止前ERANGE。CPU書込み排出→窓unmap、失敗時は予約・窓・adapter保持、停止へ進まない。push mapを借りない。 |
+| F2 fifo.c:204–238 | drain_pauseは受付閉→gf2_fence_emit/wait（gf5.deadline）→既存gf2_fifo_pause（独自2秒）→GR idle。pauseは途中失敗でもHWが閉じかけるので開いた扱いにしない。unpauseはold_rc=ch->last_rcを退避して0にし、void gf2_fifo_resume後のlast_rc/state/faultを検査。新しい誤りがあればそれを保持してi32で返し、無ければold_rcを戻してunpause自体は成功を返す（以前のF1/F2エラーをF3から見えなくしない）。失敗時FAULT・受付閉、resume失敗をF2自身がFAULT化すると仮定しない。 |
+| deadline／RAMだけ停止 | 外側の公開操作開始でu32絶対期限を一度設定しlinksが参照、入れ子のperf/restoreで更新しない。既存RAMの各HW待ち上限は維持、F2 pauseの期限口は追加しない。core/volt/fan単独はpauseなし、RAM/tile/save固有区間のみ閉じる。64bit fan時計はhi/lo由来、u32 wrapをゼロ拡張しない。 |
+| F2 dmaobj.c:42–46、command.c:60–72 | DMA生成失敗はhandle=0だがinst.sizeは残る。F3 objects再生成の失敗試験もこの形にし、sizeだけで二重解放しない。stop adapterは窓解除→F3 fini→F2 stop（F1停止含む）→冪等cleanup。F1停止後は待たず、F2 rcとstate/OFFを別々に確認、失敗時所有を保存。 |
+| restartの公開順／fence世代 | restartはBM先行→必要devinit→F1/F2→F3 objectsまで受付閉。性能/thermal/tile→VRAM→F4 restore→IRQ要求→全slot/scan hookを再bindして公開。F2 startがepochを進めるので二重加算しない。旧ticketは新epochの完了として通さず、未完了要求は再送しない。mode変更だけならepochは不変。 |
+| snapshot free | 呼出元が所有しgf5は借用。確定設計のfree契約に従い、FAULTを理由とするEBUSYや「唯一の復旧手段」判定は追加しない。free時は借用image参照を外し、所有するextent画像・trip・metadataを解放する。ROM/借用helperは最後のsnapshotとcleanupが終わるまで保持。 |
+
+### A1で共有するhost API（G1、tools/tests/gf5_fake.h）
+
+| 型・API／部品選択 | 実装すべき契約 |
+|---|---|
+| F3土台再利用の可否 | GF3_HOST_UNIT=12＋gf_accel_host.hのruntime/画像参照を再利用可。ただし32bit MMIOのみ・now=u32・MATCHのみでNEXT/RESERVE/MAPなし・F4保存型なし。F5全試験の完成した土台とは扱わない。F4 A1のindexed MMIO/read scriptは共用し、gf_command_host.hやF3 B0 stubを重ねない。 |
+| fixture/event | `enum gf5_host_op { F5_ADMIT,F5_DRAIN,F5_PAUSE,F5_RESUME,F5_STOP,F5_RESTART,F5_SAVE,F5_RESTORE,F5_SCRIPT,F5_ALLOC,F5_FREE,F5_COPY,F5_NEXT,F5_MATCH,F5_CLOCK64,F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET,F5_PERF,F5_VOLT,F5_FAN,F5_CALC,F5_PROG,F5_RAM,F5_OP_COUNT }; struct gf5_host_event { enum gf5_host_op op; u32 nth,a[12]; const void *p[4]; i32 rc; }; struct gf5_host { struct gf4_host display; struct gf5 ctx; u64 now; struct gf5_host_event *events; u32 cevents,nevents,calls[F5_OP_COUNT],fail_at[F5_OP_COUNT]; i32 fail_rc[F5_OP_COUNT]; u8 *arena; u32 arena_bytes,arena_used,live_allocs; void (*observe)(struct gf5_host *,const struct gf5_host_event *); };` |
+| helper全口 | `void gf5_host_init(struct gf5_host *,struct gf4_state *); void gf5_host_trace_clear(struct gf5_host *); void gf5_host_fail_at(struct gf5_host *,enum gf5_host_op,u32 nth,i32 rc); void gf5_host_arena(struct gf5_host *,u8 *,u32);` callbackはlinksと同型、各欄名にgf5_host_を付ける。initはfixture零化→共通io/links接続、借用buf/ROM/予約は試験が設定。trace/fail/observeはF4と同じ規約。 |
+| 時刻・資源・保存 | F5 A1のinitがF4初期化後にdisplay.now=&host->nowを設定するだけで、F4 A1所有のclock/waitが共有時刻を使用。clock64は同じnowの全幅。試験側static arena（8MiB超ケース含む）からalloc、freeを追跡し失敗注入、libc malloc禁止。map/unmap、NEXT/MATCH、COPYは実キーと借用VRAM像に作用。NEXT列挙中変更禁止・終端出力保持、COPYは成功時のみ像更新、stop/restartはepochとready/所有を実契約どおり変更。 |
+| UNIT別依存stub | 必須GF5_HOST_UNIT=0..6（B番号）、7=なし。F4共用はGF4_HOST_UNIT=14。B0:PERF表は製品実物、CALC/RAM/FAN/VOLT/PROGを偽装して統括列照合。B1:既存PLL parser/solver実物＋偽MMIO。B2:links PAUSE/RESUME/SCRIPT＋indexed MMIO。B3:GPIO_FIND/GET/SET・clock64、B4:ROM＋MMIO（GPIO/vmapは製品実物）。B5:MATCH/PAUSE/RESUME、B6:NEXT/MATCH/ALLOC/FREE/COPY/DRAIN/STOP/RESTART/SAVE/RESTORE＋性能復元の型付きstub。未選択外部定義は出さず各Bの局所stub禁止。 |
+| 試験と後続登録 | 全Bが正常対照・途中I/O失敗・所有保持・元rc・deadlineを観測。B2のself-refresh中CPUアクセス禁止、B5の予約外/他面侵入、B6の境界分割/確保失敗前停止なし/失敗像保持/古いepoch拒否を必須化。A3がCHECK/covers/link/一意anchor変異を集約。F4共通clock/wait・MMIO分岐の変更はF4 A1だけ、F5 A1は接続とF5専用stubだけ、host実行は全実装後のPM段。 |
+
+F5のF3待ちは機能結合4段＋共有登録1段＝5段。F4と合計 **11段**（元の段IDで数え、C2のファイル分割数・実機T・A0レビュー待ちは加算しない）。うち機能結合9段、共有登録直列2段。A0/Bのコーディングが層3全体の完成を待つ段は0。層3実機全項目合格を一括で待つ段も0。
+未決は **0件**、ユーザー判断は0件。本案の型・署名はレビュー対象であり確定済みとはしない。端子/ROM有無・tear・容量実測は既存の実装後検証であり未決数に含めない。PORT_FLOW §3/§5の共有編集者、像/動的RAM予算、宣言/include、libcなしhostの点検を上記に反映した。
+
+### ID 6 — GF_FEAT3合算予算への差替え（PM統合段で反映）
+| 区分 | r3の再計上（KiB、宣言のsizeofを正とする） |
+|---|---|
+| module mem | F3表の64＋(22〜28)＋(15〜24)＋20＋(0〜4)=121〜140を基準とし、F4 ctx等・F5常駐構造体の実測増減（libgccは含めない）を各内数へ差し替える。旧F4≤24/F5≤24やmem_max=160を固定条件にしない。PMが合算上側＋余裕でmem_maxとprefix込みload_span_maxを決定しschema/検査を同期する。 |
+| kernel所有・総RAM | F4 stateは10〜14から約17.2へ更新、kernel側増分は約3.2〜7.2。module memとF4 stateだけの合算は138.2〜157.2（ctv除去前の保守値）、さらに既存kernel helper/診断・動的ROM/trip/snapshotを別途加算。kernel所有stateをmodule BSSへ二重計上しない。 |
+| 動的snapshot | 旧metadata約2KiBを廃止。固定部はsizeof(gf5_image)（gf4_saved約5.1KiBを含む）で算定し、概算枠は旧2＋5.1≒7.1KiB。総量は固定部＋trip深いコピー＋nextent*sizeof(gf5_extent)＋全extent画像＋割当丸め。module mem外の動的RAMとしてGF_FEAT3の別台帳へ加算、実測で確定。 |
+
+反論: 0件。
+
+### 確定の補い (2026-11-04、claude-opus-5-5 の第 3 回、PM が反映)
+- P3-a: timing.flags (NEG_H 等) と TIMINGS=32 は data.h に置く (gf4_timing と gf4_edid_state.timing[32] が data.h にあり、edid.c は data.h だけでコンパイルする)。
+- P3-b: 「ctv 重複除去前の保守値」の注記は、r3 で重複していた分 (304B) を gfinit_mode の work[2] から外した、と読む。数字は最終の sizeof で確定する。

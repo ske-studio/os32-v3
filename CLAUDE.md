@@ -11,14 +11,14 @@
 **このリポジトリ os32-v3 が現行** (os32 の v2.x は戻り先、[VERSIONS](docs/decisions/VERSIONS.md) §2)。
 **カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
 
-実装者の完了条件は、触った像のビルド (`make kernel` か触った部品・ユーザーランド) + `make -k check-changed BASE=<基点> MUTATE=0` + 足した・触った試験を `--mutate` (目印一意・実行時 RED) + `tools/checks/run.py --lint` の rc=0 (ユーザー承認 2026-10-31・11-01)。**`make all` を自分からは打たない** — 段の取り込みで PM が `check_wt.sh` で 1 回、ゲストへはその成果物を配る (`check-changed` が準備で必要な分を組むのは止めない — 像の鮮度を見る検査がある、2026-11-01 に止めて 3 件落ちた)。変異込みの全体も PM が取り込みで 1 回。複数段の作業は ROLES §0 に従う。
+実装者の完了条件と PM の取り込み・節目の検査は [ROLES §0「検査」](docs/tasks/agents/ROLES.md) に従う。`make all` は PM が担当する。手本がある移植は [PORT_FLOW](docs/tasks/agents/PORT_FLOW.md) に従い、宣言・コーディングの段ではビルドしない。
 
 ## Build Commands
 
-ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-4。
+ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-1「ビルド手順」・§8-2「ビルドパイプライン」・§8-4「ホスト側イメージ生成ツール」(配備と「検査の 3 段」)。
 `make all` / `make kernel` / `make programs` でビルドする。
 `make check-<name>` / `check-changed` / `check` — 指定の検査 / 変更に当たる検査 (段は各検査の `CHECK` 宣言、`tools/checks/run.py`) / 全部を変異込み (節目に PM が 1 回)。
-PM の作業のスキル: **`os32-design-rally`** (設計の往復)・**`os32-delegate`** (実装の依頼)・**`os32-land`** (取り込み・検査・push)・**`os32-realhw-update`** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
+PM の作業のスキル: **[os32-design-rally](.claude/skills/os32-design-rally/SKILL.md)** (設計の往復)・**[os32-delegate](.claude/skills/os32-delegate/SKILL.md#2-実装の依頼の型)** (実装の依頼)・**[os32-land](.claude/skills/os32-land/SKILL.md#3-検査-専用の作業木バックグラウンド)** (取り込み・検査・push)・**[os32-realhw-update](.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く)** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
 KAPI 変更後は `make clean` → `make all` ([ABI])。
 `make deploy` は HostDrv、`make deploy-kernel` / `deploy-boot` は NP21/W 停止後 ([D1])。
 
@@ -39,7 +39,7 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 - **[V3]** リモート実行の curl タイムアウトは最低 15 秒、長時間は 60 秒以上。
 - **[V4]** 失敗・手順飛ばし・未確認をそのまま報告する。
 - **[D1]** NP21/W を停止してから NHD に配備する。
-- **[D2]** 不可逆な操作は事前に承認を得る。
+- **[D2]** 不可逆な操作は事前に承認を得る。NHD 配備・再作成、ini の一時変更、エミュレータ試験の承認済み範囲は正典 [D1]/[D2] を参照する。
 - **[D3]** 秘密情報の内容を出力しない。
 - **[D4]** `docs/archive/` はユーザーの指示があるときだけ参照し、作業の根拠にしない。
 
@@ -51,7 +51,7 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`) |
 | ビルド・配備・検証を選ぶ | [`docs/08_build.md`](docs/08_build.md) §8-4 |
-| KAPI の追加・変更 | スキル **`os32-kapi-add`**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
+| KAPI の追加・変更 | スキル **[os32-kapi-add](.claude/skills/os32-kapi-add/SKILL.md)**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
 | エミュレータ上の障害 / ini の変更 | スキル **`run-os32`** / **`os32-emu-config`** (ini は PM だけ) |
 | 実行モデル (CPL=3、資源回収) / 描画 | [`docs/09_exec.md`](docs/09_exec.md) / [`docs/05_drivers.md`](docs/05_drivers.md) §5-5 |
 

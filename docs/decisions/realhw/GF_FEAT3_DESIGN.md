@@ -430,3 +430,255 @@ struct gf3_surface {
 - N2: 試験面の範囲は、表示の予約の末尾の次の 4KiB 境界から、B 以下の最後の 4KiB 境界まで。
 - N3: F4 の段で、C1 の登録 (表示面・試験面) を F4 の ctx に移す (実行時の引き渡しはしない)。
 - N4: C0a が backend の framebuffer の情報を C1 へ渡す口の名前と型は、A0 で accel.h に宣言する (A0 の実装者が決め、報告に書く)。
+
+## 追記 (2026-11-04、第 1 波の欠け G1〜G3 — 試験の土台・面の形式の共有・M2MF の範囲)
+
+> 出所: ~/os32-tmp/run/gf3-gaps1/ADDENDUM.r2.md (astra 起草 r1〜r2、Opus レビュー 2 回、確定の補いは PM)。
+
+- P2-1: B0 担当による UNIT=0 移行・自作 stub 削除・observe への前提移植を明記。
+- P2-2: 単独描画製品の packet 照合と stub の画像参照を区別し、ゲスト期待像を T0 担当の所有とした。
+- P2-3: B8 の IFC 選択を ifc≠NONE と §7 の条件等で限定し、M2MF fallback 条件を表にも反映。
+- P3-4: RESUME の失敗注入は last_rc のみ更新し、FAULT 注入と分離。
+- P3-5: 失敗時出力を F1/F2 の実物に合わせ、DMA_NEW の inst.size 残存・handle=0 を明記。
+- P3-6: host ref_scale を RGB point/同色に限定し、bilinear/YUV 理想像を T0 側へ移管。
+
+## 追記 (2026-11-04、第 1 波の欠け)
+本追記は §12・§13 の分担を補う。A0 が accel.h の追加宣言を凍結し、A1 が host 契約を実装してから B 群を再開する。既存 ABI は削除しない（A1 の仮 API だけ下記へ統一）。シングルタスク・協調前景、一般 heap・ロック・追加 HW 監視なし。製品の失敗値は既存 GF3_EINVAL=-301/EFORMAT=-302/ERANGE=-303/ESTATE=-304/EUNSUPPORTED=-305 と F1/F2 の原値、成功は 0。
+参照略号は本文 §1 の X/N/V/E/A/F/M と同じ。行番号は保存済み手本を照合したもの。
+
+### G2 — format・面・RAM の共有境界（宣言 A0、実装 B1）
+`hwdev/gf/accel.h` に以下を追加する。表は B1 の static const 7 行のみ、呼出側への値コピーで所有を渡す。
+```c
+#define GF3_FMT_NONE 0U
+struct gf3_format { u32 cpp, sf, sf_gdi, gdi, pat, ifc, sifm; };
+enum gf3_surface_use { GF3_USE_BYTES, GF3_USE_2D, GF3_USE_GDI, GF3_USE_IFC, GF3_USE_SIFM_SRC };
+struct gf3_span { u32 off, rowbytes, pitch, rows, bytes; };
+int gf3_format_get(enum gf3_fmt fmt, struct gf3_format *out);
+int gf3_span_check(u32 off, u32 capacity, u32 pitch, u32 rowbytes, u32 rows, struct gf3_span *out);
+int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rect r, enum gf3_surface_use use, struct gf3_format *fmt, struct gf3_span *span);
+int gf3_ram_check(const struct gf3_ram *ram, u32 rowbytes, u32 rows, struct gf3_span *out);
+```
+- format_get: NULL out は EINVAL、不明 fmt は EFORMAT。§9 の cpp/SF通常/GDI用SF/GDI/PAT/IFC/SIFM を返す。非対応欄は NONE（実 format 値 0 は使わない）。YUY2/UYVY は cpp=2、sifm=5/6、残り NONE。Y8 の ifc=NONE。表を B2〜B10 に複製しない。B2 も format_get の cpp/pat を使い（結合依存 B1 を追加）、Y8 は8bitとして扱う。mask/alu制約は B2 の責任。
+- span_check: capacity は基底からの byte 数、off はその基底相対、bytes は最後の有効 byte までの包絡長 `(rows-1)*pitch+rowbytes`。pitch<rowbytes は ERANGE。off<=capacity、bytes<=capacity-off を減算/除算で検査し、溢れる積を先に作らない。rowbytes=0 または rows=0 は bytes=0（off<=capacity は要求）。NULL out は EINVAL、他の範囲不正は ERANGE、成功時だけ全出力を確定。
+- surface_check: NULL c/ch/s/fmt/span、不明 use は EINVAL。最初に既決 match(ch,NULL,ID,世代,off,bytes,&key) を行い原 rc を返す。次に format、width/height>0、pitch>=width*cpp、面全体の最終 byte<=s->bytes、矩形包含を検査。span.off は VRAM 絶対、rowbytes=r.w*cpp、rows=r.h、pitch=s->pitch。各乗加算・絶対末尾を桁溢れなく検査し、失敗時は両出力保持。ready/epoch/RUN/fault は各描画入口の責任（B0 の初期化検査と混ぜない）。
+- BYTES は全7形式可で 16bit field 制限なし。2D/GDI/IFC は該当 sf/sf_gdi/ifc が NONE なら EFORMAT、pitch と実際に pack する座標/寸法は <=65535。SIFM_SRC は sifm 必須、pitch/全面寸法の16bit制限、開始点の12.4制限、YUVの幅・r.x・r.w偶数を検査。一般の幅と pitch の整列制約は新設しない。IFC の高さ/行長/1792語制限は B6 が EUNSUPPORTED とする。
+- ram_check: NULL ram/out、非空転送の NULL ptr は EINVAL。span_check(0,ram->bytes,ram->pitch,rowbytes,rows,out) と同じ範囲検査、RAM の ptr は借用し変更しない。mono の rowbytes は ceil(w/8)、その他は w*cpp を呼出側が溢れなく計算する。成功以外は out 保持。
+- ゼロ矩形は各公開入口で必須ポインタ・状態を確認後に無投入 0、面や RAM に触れない。非空は全検査を最初の emit より前に済ませる。B1 surface_set は src/dst を全面検査し同 fmt を要求、gdi で sf_gdi/gdi を選ぶ。B3/B5 は GDI、B4 は 2D、B6 は IFC、B8 は BYTES、B9 は SIFM_SRC と 2D の組を使う。B8 は force_m2mf=false かつ format_get の ifc≠NONE かつ §7 の IFC 条件（RGB565/32bit、rowbytes>=4、h<=1024、align(rowbytes,8)/4<=1792）をすべて満たすときだけ IFC を選び、それ以外は M2MF を選ぶ。IFC の EUNSUPPORTED も M2MF へ fallback し、EFORMAT や他の失敗は伝播する（INDEX8/Y8 を IFC に渡さない）。B9 の出力 INDEX8 は明示 EFORMAT、clip/拡縮率/alias は各 B が既決条件で検査する。
+- 対応: A:254–276 の format 取得、E:97–129 の GDI alpha 例外、:180–200 の二面設定、:302–319 の IFC、X/nv04_xv_blit.c:68–93,99–117 の SIFM。BO/pixmap に分散した幾何と値取得を OS32 の byte 範囲付き面に集約するだけで、検査・表の重複を製品に増やさない。
+
+### G3 — raw M2MF は検査済み範囲を借りる内部口（B7/B8）
+`accel.h` の既存宣言は次のまま（追加の handle/capability 型・台帳探索口は作らない）。
+```c
+int gf3_m2mf(struct gf3_ctx *c, u32 in_handle, u32 out_handle, u32 in_off, u32 out_off, u32 in_pitch, u32 out_pitch, u32 rowbytes, u32 rows, u32 dl);
+```
+- B7 は状態/epoch/fault、handle が VRAM または PCI であること、双方の pitch>=rowbytes、全 rows の最終 byte を検査。VRAM 容量は min(ch->B,VRAM末尾instmem開始)、PCI は生存 staging.size（4096以下）。未知 handle は EINVAL、PCI staging 不在は GF2_ENOSPC=-202、範囲不正は ERANGE。span_check を利用するため B7 の結合依存に B1 を追加。rows>2047 は拒否せず分割。VRAM 同士の重なりは EUNSUPPORTED（包絡が交差する場合を含め copy を使う）。ゼロは上の無投入契約。
+- **予約の権限照合は呼出側**。B8 は surface_check(BYTES) と ram_check を全要求に先行させ、各片をその span 内から作る。B10 は B8 の upload(force=true) だけを呼ぶ。T0 は dispatch の upload/download/present を使い raw を公開しない。将来の内部 VRAM→VRAM 呼出側も両方の生存 surface を BYTES 検査してから raw を呼ぶ。範囲だけから予約を逆引きしてはならない。
+- 検査から最終 reference 完了まで予約・staging を保持する責任は呼出側、待ちから再入/予約解除しない。B7 は各 raw 呼出しの全投入後に reference emit/wait して同期完了、B8 は成功帰還後だけ次片の staging を再利用/CPU読出しする（追加の二重 fence 不要）。B7 が予約不存在を検出するという試験は置かず、古い ID/世代・他予約侵入は B1/B8 と結合試験で検出する。
+- 対応: E:394–410 の BO refn/validation を呼出側の予約確認に、:412–430 を B7 に分離。N/nouveau_bo.c:594–599,618–629 の固定配置寿命に相当。BO を受け取らない既存 raw ABI に推測認可を追加せず、協調前景の同一所有期間で保証する。手本の非同期 BO 待ちは §7 の同期 API に合わせる。
+
+### G1 — A1 が所有する host API の全一覧
+`tools/tests/gf_accel_host.h` は試験 TU だけに include。`GF3_HOST_UNIT` は B0〜B10 を 0〜10、C0 を 11、依存 stub 無しを 12 とする必須選択（範囲外/未定義は #error）。旧 GF3_HOST_COMMAND_STUBS と個別自作 stub は廃止。既存 B0 試験（tools/tests/gf_accel_b0_host.c:6）は A1 確定後に B0 担当が GF3_HOST_B0 を GF3_HOST_UNIT=0 に移行し、自作 stub 12 個を削除する。各呼出しの前提（pause 中・!ready・dl・align=16・zero=false）は該当 event の observe で照合する。製品 TU は1本、選択された製品の定義は絶対に stub しない。C1/C2/C4 の結合は 12 と F1/F2/各B実物を使う。
+以下が新しい完全定義・宣言。helper はヘッダー内 static inline、依存 stub だけ外部定義。大きな記憶域は試験の static 領域、画像/記録バッファは呼出側借用、heap/VLA/libc は使わない。
+```c
+enum gf3_host_op { H_EMIT, H_FENCE, H_WAIT, H_FAULT, H_PAUSE, H_RESUME, H_STOP, H_ALLOC, H_FREE, H_DMA_NEW, H_GR_NEW, H_DEL, H_MATCH, H_FORMAT, H_SPAN, H_SURFACE_CHECK, H_RAM_CHECK, H_SURFACE_SET, H_ROP, H_IFC, H_M2MF, H_UPLOAD, H_FILL, H_COPY, H_READ, H_WRITE, H_CLOCK, H_SLEEP, H_OP_COUNT };
+struct gf3_host_reg { u32 bar, off, value; };
+struct gf3_host_packet { u32 first, deadline; u16 method, count; u8 subc; bool noninc; };
+struct gf3_host_event { enum gf3_host_op op; u32 nth, a[12]; const void *p[4]; int rc; };
+struct gf3_host_image { u8 *ptr; u32 bytes, pitch, width, height; enum gf3_fmt fmt; };
+struct gf3_host {
+    struct gf_foundation f; struct gf2_chan ch; struct gf3_ctx ctx;
+    struct gf3_host_reg *regs, *writes; u32 cregs, cwrites, nregs, nwrites;
+    struct gf3_host_packet *packets; u32 cpackets, npackets; u32 *words; u32 cwords, nwords;
+    struct gf3_host_event *events; u32 cevents, nevents, calls[H_OP_COUNT], fail_at[H_OP_COUNT]; int fail_rc[H_OP_COUNT];
+    u8 staging[GF3_STAGING_BYTES]; u8 *vram; u32 vram_bytes, now, complete_after, waits;
+    struct gf_vram_reservation_node *reservations; bool paused; u32 live_objects, alloc_off;
+    void (*observe)(struct gf3_host *, const struct gf3_host_event *);
+};
+static inline void gf3_host_init(struct gf3_host *h);
+static inline void gf3_host_trace_clear(struct gf3_host *h);
+static inline void gf3_host_fail_at(struct gf3_host *h, enum gf3_host_op op, u32 nth, int rc);
+static inline void gf3_host_set(struct gf3_host *h, u32 bar, u32 off, u32 value);
+static inline int gf3_host_read(void *owner, u32 bar, u32 off, u32 width, u32 *out);
+static inline int gf3_host_write(void *owner, u32 bar, u32 off, u32 width, u32 value);
+static inline int gf3_host_clock(void *owner, u32 *now);
+static inline int gf3_host_wait(void *owner, u32 us);
+static inline u8 gf3_host_rop_byte(u8 rop, u8 pattern, u8 src, u8 dst);
+static inline void gf3_host_ref_fill(struct gf3_host_image *dst, struct gf3_rect r, u32 color, u32 mask, u8 rop);
+static inline void gf3_host_ref_copy(const struct gf3_host_image *before, struct gf3_host_image *dst, struct gf3_rect sr, u32 dx, u32 dy, u32 mask, u8 rop);
+static inline void gf3_host_ref_mono(struct gf3_host_image *dst, struct gf3_rect r, const struct gf3_ram *bits, u32 fg, u32 bg, struct gf3_rect clip);
+static inline void gf3_host_ref_ifc(struct gf3_host_image *dst, struct gf3_rect r, const struct gf3_ram *ram);
+static inline void gf3_host_ref_m2mf(const struct gf3_ram *src, u32 src_off, struct gf3_ram *dst, u32 dst_off, u32 rowbytes, u32 rows);
+static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct gf3_host_image *dst, struct gf3_rect sr, struct gf3_rect dr, struct gf3_rect clip, bool bilinear);
+```
+- init は全欄零化後 f.io と timing を上記 callback/owner=h に接続、ch.f、RUN/epoch=1、staging_live/va/size、既定 DMA handles、ctx.ch/ready/epoch/obj handles を設定。B0 は ctx を零化してから init を試す。試験は init 後、バッファ pointer/capacity、VRAM 配置（ch.B/f.imem/bar1）、予約リストを明示設定。vram[0] は VRAM off=0、staging[0] は PCI off=0。fixture の容量は製品制限ではない。
+- trace_clear は記録数/calls/waits だけを零化（状態/画像/失敗設定/時刻は保持）。fail_at は op の nth 回目だけ rc を返す設定、nth=0 は全回、rc=0 は解除。成功・失敗とも event を先に予約し、返却 rc と引数を記録、observe を帰還前に呼ぶ。配列満杯・不正な試験入力は常時有効 assert→gf2_host_fail→exit(1)、切捨てや製品 ENOSPC に偽装しない。
+- event.a は関数宣言順の非pointer引数（enum/bool/u8/u16もu32、rect/fenceは宣言順の欄へ展開）、event.p は宣言順のpointer引数。余りは0。struct入力の内容比較は observe 内で行い、pointerを後で逆参照しない。emit成功時だけ packets と words に payload を深くコピー（first は words 添字）、失敗 emit は event のみ。全呼出しで dl を記録する。
+- READ/WRITE は 32bit MMIO のみ、未設定 read=0、成功 write を writes と regs に保存。clock は now を返し、wait は成功時だけ now+=us/waits++。callback の注入 rc はそのまま返す。非空 stub の FENCE は epoch/++seq を発行、WAIT は fault→epoch→絶対期限→完了の順で検査し、complete_after 回の wait(1us) 後に成功（0=即時、U32_MAX=完了しない）。旧epochは GF2_EFAULT=-206、期限は GF2_ETIME=-205、clock/wait失敗は GF2_EIO=-204。GET==PUTを完了としない。
+- F2 stub は command.h、F1 stub は foundation.h、F3 stub は accel.h、MATCH は vram_view.h の**既存の完全な型**で定義する（別の stub 用製品 ABI は作らない）。PAUSE/RESUME は paused を変更、RESUME 注入失敗は void のため ch.last_rc にだけ保存し、FAULT には遷移させない（F2 fifo.c:232–238）、STOP 成功は OFF と資源解放、失敗は資源保持。FAULT 注入は fault.latched=true/state=FAULT/last_rc=rc を設定する。ALLOC は alloc_off（試験が設定した instmem aperture 相対）から通知領域を確保、NEW/DEL は出力 object と live_objects を更新し pause 中を assert。FREE は void で失敗注入不可。成功・注入失敗とも出力/所有は各製品 F1/F2 の実物の契約に合わせる。DMA_NEW の descriptor 書込み失敗は確保を解放して inst.size を残し handle=0、rc=GF2_EIO とする（F2 dmaobj.c:42–46）。
+- MATCH は h.reservations の生存値を ID/世代/owner/包含で照合（生産台帳実装には link しない）。FORMAT/SPAN/SURFACE_CHECK/RAM_CHECK は本追記の正常値と検査を独立に供給し、各 op に失敗注入可能。SURFACE_SET/ROP は引数を記録するだけで HW packet は合成しない。B1/B2 の packet 試験と、利用側の呼出し引数試験を混同しない。
+- IFC/M2MF/UPLOAD/FILL/COPY は typed 引数の記録・注入に加え、成功時だけ借用画像を CPU 参照で更新する同期 stub。IFC/M2MF は FENCE/WAIT stub を経てから更新、失敗時は更新しない。M2MF は handles により vram/staging を選択、B8 の pack/unpack と再利用順を observe で検査。製品 B7 にはこの M2MF stub は存在せず、packet/実 WAIT 呼出しを照合する。host は全 GPU の emulator を作らない。
+
+| 単独製品 | A1 が定義する依存 stub（H_接頭辞省略） | 使う参照/観測 |
+|---|---|---|
+| B0 objects | EMIT/FENCE/WAIT/FAULT/PAUSE/RESUME/STOP/ALLOC/FREE/DMA_NEW/GR_NEW/DEL | 全列・順序・所有・全段注入 |
+| B1 surface | EMIT/FAULT/MATCH | 7形式・生存面・範囲・SF/GDI列 |
+| B2 rop | EMIT/FAULT/FORMAT | rop_byte/ref_fill・全alu×mask |
+| B3 fill | EMIT/FENCE/WAIT/FAULT/FORMAT/SPAN/SURFACE_CHECK/RAM_CHECK/SURFACE_SET/ROP | packet の payload を独立の期待値と照合 |
+| B4 copy | 同 B3 | packet の payload を独立の期待値と照合・8方向 |
+| B5 mono | 同 B3（ROPを除く） | packet の payload を独立の期待値と照合・128語境界・clip |
+| B6 ifc | 同 B5 | packet の payload を独立の期待値と照合・padding・行再設定 |
+| B7 m2mf | EMIT/FENCE/WAIT/FAULT/SPAN | packet の payload を独立の期待値と照合・2047分割・期限・失敗 |
+| B8 transfer | FAULT/FORMAT/SPAN/SURFACE_CHECK/RAM_CHECK/IFC/M2MF/FENCE/WAIT | ref_ifc/ref_m2mf・staging・上記 force_m2mf/ifc≠NONE/§7 条件と EUNSUPPORTED の fallback |
+| B9 scale | 同 B5 | packet の payload を独立の期待値と照合・format/比率/point/filter列 |
+| B10 present | UPLOAD | 引数・force=true・失敗伝播 |
+| C0 hook | FILL/COPY | clip後引数・HAL rc・非active |
+- 対応表の EMIT=gf2_emit、FENCE/WAIT=gf2_fence_emit/wait、FAULT=gf2_fault_check、PAUSE/RESUME=gf2_fifo_pause/resume、STOP=gf2_stop、ALLOC/FREE=gf_inst_alloc/free、DMA_NEW/GR_NEW/DEL=gf2_dma_new/gr_object_new/object_del、MATCH=gf_vram_match、FORMAT=gf3_format_get、SPAN=gf3_span_check。残りの製品 stub は各 H_ 名を小文字にして gf3_ を付けた関数（SURFACE_CHECK 等も同じ）。MMIO/clock は全選択で利用可。未列挙の依存を各 B が勝手に増やさず A1 契約へ集約する。
+- ref_* は成功した依存 stub が更新する像と B8/B10/C0 の期待像のために使う。B3〜B7/B9 の単独製品は packet を出すだけで比較対象の製品画像を生成しないため、ref_* との画像比較を合否にしない。CPU参照は妥当な入力だけを受け、失敗は assert、製品 rc の代行はしない。各参照は製品 format/ROP/helper を呼ばない。fill/copy は little-endian 各byteに `(P<<2)|(S<<1)|D` を評価、before は書込み先と別の呼出側保存像。rop は試験の独立 NVROP 表から渡すので clear/invert/set の既決 mask 非依存を維持。32bit は copyのみ、XRGB の X は比較から除外。
+- mono は MSB-first/任意 RAM.pitch、clip∩r∩面、fg/bg のpacked色を展開。IFC は有効 w*cpp だけ各行へコピーし padding/矩形外を保存。M2MF は各行 rowbytes のみ、src/dst は非重複、off は各 RAM.ptr 相対。upload/download の期待像にも同じ byte参照を使い、分割算法は参照に再現しない。RAM末尾の読み越しは別の guard page/境界試験で検出する。
+- host の ref_scale は RGB の point と同色入力だけを扱い、bilinear=true は同色入力のみ許す。範囲外の入力は assert。point は du=floor(sw*2^20/dw)、dv同様、sr開始+i*du/2^20 の floor を採り、clip外を保存する。製品 B9 の合否は独立 packet 値で判定する。
+- T0 担当が §13 のゲスト実機試験用に CPU 期待像を自前で実装・所有する（host ヘッダーは呼ばない）。fill/copy/mono/IFC/M2MF は上記参照と同じ意味、bilinear/YUV の独立整数理想像は T0 側だけに置く: du=floor(sw*2^20/dw)、dv同様、位置は sr開始+i*du/2^20、point は floor、bilinear は周囲4点を20bit重みで補間し端を全面境界へclamp、clip外を保存。565 はbit反復で8bit展開、出力は上位bitへ量子化、Y8はR=G=B=Y、YUY2はY0/U/Y1/V、UYVYはU/Y0/V/Y1。YUV理想値はBT.601 limitedの整数式 C=Y-16,D=U-128,E=V-128、RGB=clamp((298C+409E+128)/256,(298C-100D-208E+128)/256,(298C+516D+128)/256)（負値はfloor）、alphaはARGB保持/他は255。
+- T0 の scale 理想像は HW 丸めの仕様を新規断定しない。bilinear/YUV は既知単色・端・理想像との差を T0 が記録して §13 の実機受入で判定する。未測定の色変換誤差を任意の大きな許容値で成功にしない。製品に浮動小数点/色変換 fallback を追加しない。
+- 手本対応: ROP は E:46–84 と X/nv_rop.h:303–318、copy は E:170–200,255–258、mono は F:105–124、IFC は E:312–374、M2MF は E:399–430 と X/nouveau_exa.c:256–281,341–365、SIFM は X/nv04_xv_blit.c:74–93,138–154。手本にはこの host API/CPU oracle はない。OS32 §13 の独立期待像・失敗試験のためだけに追加し、HWシミュレータや製品機能へ拡張しない。
+- 共通土台は gf_command_host.h の「製品1 TU＋選択式依存」方式と gf_command_runtime_host.h の assert/memcpy/memset/exit。前者は GF2_HOST_B* 専用なので同時 include せず、後者を直接 include。各試験が自前 _start、-m32/-nostdlib、kstring が必要なら既存 freestanding 実装を補助 link、64bit除算は整数helperかtoolchainのfreestanding libgcc（libcなし）。A2 は stub選択・補助link・covers を一元登録する。
+- C0a/C0b は既存 backend host fixture を維持、C1/C2 は生存予約→bind/publication、受付閉→窓解除→停止→release の結合、C4 は slot解除を実物で検証する。新たな製品 hook/dispatch/台帳APIは不要。B10/T0 は登録済み面を借りる。実装/試験コードを各所有段が完成させ、ビルド・変異実行は既定どおり PM 統合後。設計未決 0 件。
+
+### 確定の補い (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
+- N1: B8 が IFC を選ぶ条件の並び (G2) に「かつ rowbytes×h < 16KiB (§7:145、xf86-video-nouveau の nouveau_exa.c:320 の `w*h*cpp < 16*1024`)」を足す。G1 の表の B8 の行も同じ条件にそろえる。
+
+## 追記 (2026-11-04、B4 の欠け — 同じ VRAM を指す 2 面の copy)
+
+> 出所: ~/os32-tmp/run/gf3-gaps2/ADDENDUM.md (astra 起草、Opus レビュー 1 回で確定、補いは PM)。§5 の「正規化する」はこの追記で置き換える。
+
+## 追記 (2026-11-04、B4 の欠け — 同じ VRAM を指す 2 面の copy)
+
+本追記は §5 の「異なる descriptor の alias を正規化」を以下の限定規則に置換する。G2・A0 の検査/予約契約と ABI は変更しない。未決 0 件。
+
+### 手本と採用範囲
+- 略号 X/N/V は §1 と同じ。`X/nv04_exa.c:170–200` は両 pixmap の BO を取得し、それぞれの pitch と BO 相対 offset=0 を SURFACE に設定する。同一 pixmap なら off/pitch は共通になる。同じ BO というだけで異なる pitch が安全とは読まない。
+- `X/nv04_exa.c:255–258` は元の src/dst 座標と寸法をそのまま IMAGE_BLIT に渡す。PrepareCopy の dx/dy 方向引数は使わない。`:227–253` の別 pixmap 用 VBLANK 分割は alias 正規化の根拠ではなく、既決どおり採用しない。
+- `X/nouveau_exa.c:88–98,113–143` は BO 先頭への map と面ごとの BO/pitch 確保。`V/nv04_fbcon.c:32–47` も同一表示面の座標を直接渡す。これらに任意の部分面 offset 差を商/余りで座標へ直す処理はない。
+- `N/nouveau_bo.c:594–599,618–625` の固定配置の寿命に対応して、OS32 は生存予約を検査から reference 完了まで保持する。予約全体は幾何情報を持たないため、予約 off/bytes から親面を推測しない。
+
+### 判定と投入
+1. 必須ポインタ・ready/epoch/RUN/fault を既決どおり検査。w=0 または h=0 はその後、面を参照せず無投入成功。非空では以下を ROP を含む最初の emit より前に完了する。
+2. 元の src/dst を各々 `gf3_surface_check(...,GF3_USE_2D,...)` で全面および要求矩形について検査する。dst 矩形は `{dx,dy,sr.w,sr.h}`。両 fmt の一致を要求する。全面検査は G2 の surface_set が後から検出する不正を先に排除するために必要。
+3. 重なりとは「コピーする有効 byte」の共通部分があること。検査済み span ごとの行区間 `[span.off+i*pitch, span.off+i*pitch+rowbytes)` のいずれかが相手の行区間と交差する場合とする。descriptor.bytes や行間 padding の交差だけでは重なりとしない。
+4. 行先頭は単調増加する。src/dst の先頭行から、交差すれば重複、交差しなければ先に終わる側の行を進め、片側が尽きれば非重複とする（O(src.rows+dst.rows)、追加配列なし）。末尾加算は検査済み範囲内、最終行後の先頭は計算しない。
+5. 非重複なら、同一予約/異なる予約、同じ/異なる off/pitch を問わず、元の両 descriptor と座標のまま 1 矩形を投入する。
+6. 重複なら、両 descriptor の `reservation_id,generation,off,pitch,fmt` が全て等しい場合だけ許可する。別の構造体でもこの条件なら既に共通座標系であり、「正規化できる」はこの恒等変換だけを意味する。width/height/bytes の一致は不要だが、各々が手順 2 を満たすこと。
+7. 重複して手順 6 を満たさないものは `GF3_EUNSUPPORTED=-305`。off 差が 1 byte、1 行、複数行、cpp の倍数であるかを問わず off が異なれば拒否し、pitch 不一致も拒否する。差の除算・剰余、行折返し、行分割、一時面、CPU/M2MF への内部 fallback は追加しない。
+8. 許可時は元の src/dst を `gf3_surface_set(c,src,dst,false,dl)` に渡す。bytes/width/height/予約 ID/世代を一切合成・拡張しない。重複時の共通 off/pitch は元の値、座標も元の値。B1 の全面検査を迂回しない（`gf3-b1/hwdev/gf/accel_surface.c:86–101`）。
+9. §5 の ROP→SURFACE→BLIT:0300 の 3 語→reference emit/wait 1 回を維持する。上下左右/斜め/同位置も 1 矩形で、座標を右下へ移さず pitch を反転しない。dl は操作全体で不変、部分投入後の失敗は再送しない。
+- NULL は EINVAL=-301、fmt 不一致/2D 非対応は EFORMAT=-302、元の面/矩形/packed field/予約包含の不正は ERANGE=-303。古い ID/世代等は match の ESTATE=-304 を含め原 rc を返す。元の検査失敗を EUNSUPPORTED に置換しない。全 rc は既決どおり last_rc に保存する。
+- off=0 と off=1、pitch=16 の INDEX8 部分面が重なる例は EUNSUPPORTED。呼出側が共通の正規面 descriptor を既に所有する場合は、それを両引数に用い、部分位置を座標として渡す。B4 が予約から正規面を生成することはない。
+
+### B4 host 試験（記述例、ビルド/実行は PM 統合後）
+- 以下は生存予約 `[0,128)`、同一 ID/世代、INDEX8、bytes は全面の最後の有効 byte までを基本とする。拒否例は ROP/SURFACE_SET/EMIT/FENCE/WAIT が全て 0 回であることを照合する。
+- 正規化可能：別構造体 A=`{off=0,bytes=64,pitch=16,width=16,height=4}`、B=`{0,48,16,16,3}`。sr=(0,0,8,2)、dst=(1,1) は成功。SURFACE_SET に元の全欄を渡し、BLIT payload は `[0,0x00010001,0x00020008]`。同一面の 8 方向・同位置も独立期待値で照合する。
+- 正規化不能：A と B=`{1,63,16,15,4}`、sr=(0,0,8,2)、dst=(0,0) は EUNSUPPORTED。B=`{16,64,16,16,4}` と `{17,63,16,15,4}` でも同じ矩形で行をまたぐ重複を拒否する。B=`{0,56,20,16,3}` の異 pitch 重複も拒否する。
+- 非重複：A と B=`{1,63,16,15,4}`、sr=(0,0,1,2)、dst=(0,0) は行区間が接するだけなので成功（包絡は交差）。異 pitch の B=`{64,56,20,16,3}`、sr=(0,0,8,2)、dst=(0,0) も成功し、元の off/pitch を保持する。別の非重複予約でも成功する。
+- 境界：A の sr=(15,3,1,1)、dst=(14,3) は byte 63 までで成功、sr.x=16,w=1 は ERANGE。bytes=63 の A、pitch=65536、全面 height=65536 は小さな要求矩形でも ERANGE。古い世代は ESTATE、fmt 不一致は EFORMAT、ゼロ矩形は必須ポインタ/状態検査後に無投入成功。
+- B4 単独 host は G1 の SURFACE_SET/ROP stub の引数を observe 内で照合し、実 B4 の BLIT packet と fence/deadline/失敗伝播を検証する。stub は SF packet を生成しない。B1 結合で SF の両 offset/pitch と全面検査を確認し、実機の重なり結果は T0 がコピー前保存像から作る期待像と照合する。
+
+### 確定の補い (2026-11-04、claude-opus-5-5、PM が反映)
+- R1: rc の順は src の検査 → dst の検査 → fmt の一致で、最初の rc を返す (B1 の gf3_surface_set、accel_surface.c:91-97 と同じ順)。
+- R2: pitch=65536・height=65536 の例は span_check 経由の ERANGE。pitch の 16bit の上限は B1 の試験が持つ。
+- R3: 非重複の例の前提に、[128,256) の予約 (ID・世代は別) を足す。
+- R4: 同一面の 8 方向・同位置の例は、A で sr=(4,1,4,2)、dst を (3..5, 0..2) の 8 点と (4,1) とし、payload を列挙する。T0 には「重なる copy は同じ descriptor で」。
+
+## 追記 (2026-11-04、結線の段の欠け C1/C2/C4)
+
+> 出所: ~/os32-tmp/run/gf3-gaps3/ADDENDUM.md (astra 起草、Opus レビュー 1 回、確定の補い F1〜F7 は PM が反映 — 下の補いが本文より優先)。
+
+## 追記 (2026-11-04、結線の段の欠け C1/C2/C4)
+本追記は欠け 5 件を補う。シングルタスク・協調前景で直列実行し、待ちから描画・map・停止へ再入しない。heap、lock、refcount、追加 HW 監視は設けない。新しい整数戻り値は i32。凍結宣言は削除せず追加する。
+参照 N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`（c03c1a1）、O=`/home/hight/os32-v3`。以下の行番号は保存済み実物。
+
+### C1-2 / C2-1 — C1 の所有物と C2 の停止境界
+新内部ヘッダー `hwdev/gf/accel_service.h` は `accel.h` を include、`struct gf_production;` を前方宣言し、以下を宣言する（宣言担当 A0、実装 C1/service.c）。
+```c
+struct gf3_service {
+    struct gf_production *production;
+    const struct gf3_test_ops **slot;
+    struct gf_vram_reservation_node scan_node, test_node;
+    struct gf3_surface scan, test;
+    struct gf3_test_ops ops;
+};
+i32 gf3_service_bind(struct gf_production *p, const struct gf3_test_ops **slot);
+struct gf3_service *gf3_service_get(struct gf2_chan *ch);
+i32 gf3_service_start(struct gf3_service *s, u32 dl);
+i32 gf3_service_close(struct gf3_service *s);
+i32 gf3_service_fini(struct gf3_service *s, u32 dl);
+void gf3_service_invalidate(struct gf3_service *s);
+i32 gf3_service_release(struct gf3_service *s);
+i32 gf3_service_stop(struct gf3_service *s);
+i32 gf3_service_recover(struct gf3_service *s, u32 dl);
+```
+C1 は全欄零の static `struct gf3_service` を 1 個所有。production/slot は借用、node の owner は各 node 自身の番地。ctx は A3 の `production.accel` のみで複製しない。get は登録済み `&p->chan` と一致する時だけその service を返し、NULL/診断 ch/未 bind は NULL（誤りコードなし）。
+追加結線段 C1b は `drivers/video/geforce/geforce_body.c:37–40` で `gf3_service_bind(&production,context->accel_out)` を呼ぶ。bind は必要ポインタ NULL で GF3_EINVAL=-301、別 p/slot への再 bind は GF3_ESTATE=-304、同じ組は無変更 0。初回だけ両借用を保存して slot を NULL にする。登録失敗は module 初期化失敗へ伝播。
+start は未初期化 accel を対象とし、ready 済みは ESTATE。F2 RUN 後、台帳 init→既決 scan/test reserve→gf3_init→ctx/scan bind→slot=&s->ops。既存予約は失敗後の再試行用に保持し、同じ node を二重 reserve しない。surface は予約値から構築し、ops.ctx/test_surface は常駐所有物を指す。C0a の情報取得、試験面配置 N2、F4 の所有移動 N3 は既決どおり。
+close は slot=NULL→gf_hook_scan_bind(false,NULL)→全窓 close（下記）。受付を閉じるために fini より先に accel.ready を潰さない。借用 dispatch/ctx は呼出し間で保持禁止。fini は ready かつ ch が RUN・fault 未検出・epoch 一致の時だけ gf3_fini、それ以外は 0 で F2 停止へ渡す。
+invalidate は「旧 F2 の停止完了を確認済み」の内部口。旧 obj[12]/notify/notify_storage/notify_off/epoch を零化し ready=false、ch の借用と last_rc は保持。object_del/free を呼ばず、生存 inst node を零化しない。release は試験→表示の生存 node を gf_vram_release し各成功分の surface を零化、ID/世代の履歴は残す。未登録分は無操作。
+bind/get/invalidate 以外の service 口は NULL s で EINVAL、開始に必要な RUN/epoch/所有状態不成立は ESTATE、成功 0、下位 F1/F2/F3 の負 rc は原値。下位失敗を accel.last_rc に保存。invalidate の NULL は無操作。release の失敗は未解放分を保持し、再試行時は生存分だけ扱う。
+C2 は command_get 後 get(ch) し、NULL なら既存の停止列、非 NULL の時 close→fini→既存 gf2_stop→既存 foundation_stop/restore/quiesce 列を実行。close 失敗では F2/F1 停止へ進まず、予約・adapter・未解除窓を保持。fini 失敗でも F2 停止は試み、最初の rc を保存する。
+F2 停止完了は rc==0 だけでなく ch->state==GF2_OFF で判定（command.c:60–72,142–156 は fault rc を残して OFF にできる）。OFF 確認後だけ invalidate。F2 未停止なら予約を保持し、既存 revoked 時の外側 route00/decode-safe 処理は妨げない。
+表示の restore/quiesce まで成功して利用が終わった時だけ release。表示停止失敗では予約を保持。C2 の既存返値 0/-1 と最初の display.last_rc を維持し、engaged=false でも保持予約の後処理を飛ばさない。slot はすべての失敗で閉じたまま。start の途中失敗もこの停止列で巻き戻す。
+C1-2 の対応は N/nvkm/engine/fifo/uchan.c:272–298 の block/remove/unbind→bind/allow/insert、C2-1 は同列と `N/nvkm/engine/fifo/nv04.c:41–99` の stop/start。OS32 は単一所有者を既存 command_get の ch で検索し、production キャストや新 display callback は不要。node の解放は N/nouveau_bo.c:618–629 の unpin 相当で、TTM 所有を既決常駐予約に置換する。
+
+### C1-1 — production の停止・復旧入口
+追加結線段 C1t は `hwdev/gf/command_test.c:173–195` を所有。production 分岐の GF2T_STOP は service_stop、GF2T_RECOVER は service_recover、GF2T_START は F2 start 成功後 service_start へ結線。production で service 未 bind は GF3_ESTATE、診断 ch は従来の gf2_* を直接呼ぶ。revoked 拒否は維持する。
+service_stop は `gf_display_stop(&s->production->display)` を呼び、成功 0、失敗は保存した display.last_rc（無ければ GF2_ESTOP=-210）を返す。単なる F2 停止で表示予約を解放しない。通常 video_stop と診断 STOP は同じ C2 列へ入る。
+recover は close→gf2_stop→OFF 確認→gf2_recover→旧 gf3 記述子 invalidate→旧予約 release/再 reserve→gf3_init→scan 再 bind→slot 再公開。事前 gf2_stop は停止完了と再起動失敗を分けるためで、gf2_recover 内の stop は OFF のため無操作。新しい F2 API は足さない。
+事前 stop が OFF に達しなければ原 rc（無ければ ESTOP）で終了し全所有を保持。OFF なら過去の fault rc は復旧を妨げない。gf2_recover が失敗しても旧記述子は invalidate 可だが予約を保持し、再初期化・公開しない。新 F2 の残存資源は F2 が保持する。次の再試行も同列。
+gf2_recover 成功後だけ旧予約を更新して古い surface の ID/世代を失効させる。gf3_init/予約更新の途中失敗は上記停止列へ送り、未解放分を保持、最初の rc を返す。復旧後 start はこの更新済み予約を使う。通常 start は同じ初期化・公開 helper を共用する。
+service_start/recover の dl は操作全体の絶対期限。C1/C2 の通常呼出しは既存 clock_us の現在時刻+GF3_TIMEOUT_US、診断は q->deadline_us を渡し、更新しない。clock 失敗は GF2_EIO=-204、停止自体は F2 に渡せるが fini の新 fence は発行しない。
+対応: N/nvkm/engine/fifo/uchan.c:272–298、同 runl.c:68–82,115–128,132–141 の受付停止→回復→再開。runlist の回復は後代 GPU の例で NV44 の reset 手順として移植しない。OS32 は既決の明示同期 gf2_recover（O/hwdev/gf/command.c:159–169）を使い、workqueue・多 channel・自動再送を足さない。事前 stop は同関数の再起動失敗が ESTOP も返す実契約を区別するため。
+
+### C2-2 — 任意の呼出側窓を持ち主に閉じさせる
+A0 は `hwdev/gf/vram_view.h` の既存 struct 末尾に下記 4 欄だけ追加する。完全形（既存 map/unmap の引数と test_ops の型は不変）:
+```c
+struct gf_vram_view {
+    struct recover_bar_extent extent;
+    volatile u8 *va, *map_base;
+    u32 map_bytes, bytes;
+    bool mapped;
+    const struct gf_instmem_map_ops *map_ops;
+    void *map_owner;
+    struct gf2_chan *ch;
+    struct gf_vram_view *next;
+    void *close_owner;
+    i32 (*close)(void *owner, struct gf_vram_view *view);
+};
+i32 gf_vram_views_close(struct gf2_chan *ch);
+```
+V0 は成功 map 済み窓の static head を 1 個持つ（既決の単一 production 台帳に対応）。呼出側は零初期化後、map 前に close_owner/close を設定する。close は必須、close_owner は NULL 可。map 成功時だけ ch/next を記入して連結、map 失敗は追加前の全欄と out を保持。close 不在は既存不正入力 GF2_EMAP=-203。
+unmap 成功時だけリストから除去して従来どおり全欄零化、失敗は欄・連結を保持。再 map 前に callback を再設定する。view/callback/close_owner の記憶域は成功 unmap まで生存・移動不可。局所 view の unmap 失敗で帰還してはならず、T0 は再試行可能な static 窓を使う。
+views_close は ch の各窓の close(close_owner,view) を呼ぶ。callback は CPU 使用と posted write 排出を終え、gf_vram_view_unmap の rc を返し、成功時には所有者の借用 VA も捨てる。自分の窓だけを解除し、別窓の操作・新 map・再入はしない。反復は解除前に next を保存し、最初の負 rc で中断する。
+views_close は NULL ch に EINVAL、初期化済み台帳/ch 不一致に ESTATE、初期化前の空リストを含め空または全解除で 0、callback の負 rc をそのまま返す。既に閉じた窓は再試行時に呼ばない。失敗した窓・予約・adapter は保持。map は GPU 完了を待たない既存契約のまま、callback に GPU 待ちを追加しない。
+T0 は内部に `struct gf3_test_view { struct gf_vram_view view; __typeof__(&gf_vram_view_unmap) unmap; };` を static 所有し、map 直前に取得した ops->unmap を保存する。`static i32 gf3_test_view_close(void *owner, struct gf_vram_view *view);` は owner の同レコードから unmap(view) を呼び、成功時に保存ポインタを捨てる。slot 閉後も解除できるよう、この関数ポインタだけは窓の借用寿命まで保持可（module は既存契約どおり pinned）。表/ctx/面の保持許可ではない。
+V0 は map/unmap/列挙、T0 は試験窓 callback、F4 は cursor、F5 は一時窓 callback の唯一の所有者。F5 save の受付閉→持ち主による窓閉→コピー→再開も同口を使い、予約保持契約は変更しない。A0/V0/T0 と既存窓利用者の追随を C2 再開の前提にする。
+対応: N/nouveau_bo.c:669–689 の BO 内 kmap/kunmap。OS32 は任意の呼出側 view を受けるので、BO が持つ窓所有を intrusive list と持ち主 callback で表す。既存 map_owner は下位 mapper の所有者であり流用しない。固定件数表、heap、強制解除、TTM reserve lock は加えない。
+
+### C4-1 — kernel slot の取得
+A0 が `drivers/video/geforce/geforce_module.h` の既存前方宣言の直後に `const struct gf3_test_ops *geforce_accel_ops(void);` を追加し、C4 が同 .c に `const struct gf3_test_ops *geforce_accel_ops(void) { return registered ? accel_slot : 0; }` を実装する。未登録/未公開/停止/失敗は NULL、別の誤り値はない。
+slot は kernel の既存 static accel_slot、表は module/C1 が所有。T0 は各呼出し直前に取得し、NULL は利用不可、帰還後は表・ctx・面の借用を保持しない。C4 は load/start 失敗・abort 前に slot を NULL にし、detach 拒否でも再公開しない。既存 Context 欄と OPS_VERSION=4 は維持する。
+PM 登録段が `kernel/module/kdebug_imports.def` に symbol=geforce_accel_ops/source=drivers/video/geforce/geforce_module.h を既存 geforce_foundation_ops と同じ方式で追加し、生成物・import 試験を追随する。geforce 側 import は不要、HWDEV に未使用 import は足さない。C5 の header 確認 0 行はこの宣言追加のみ A0 に移す。版 4→5 と feature5_out 等は F4 C3 のまま。
+対応: N/nvkm/engine/fifo/uchan.c:276–297 の利用可否切替。nouveau に OS32 module slot ABI の対応物は無く、O/drivers/video/geforce/geforce_module.c:20–27 の foundation 取得口と同じ借用公開を用いる。
+未決: 0 件。実装の追加所有段は A0（宣言）、C1b（body）、C1t（command_test）、V0/T0（窓追随）、PM（登録）。各段は直列統合し、検証は通常停止・fault/OFF・ESTOP 保持・復旧各段失敗・窓解除失敗/再試行・診断 ch 分離・slot 再取得を結合試験で照合する。
+
+### 確定の補い (2026-11-04、claude-opus-5-5、PM が反映 — 本文と食い違えばこちら)
+- F1: `service_stop` は close → fini → gf2_stop → OFF の確認 → 記述子の invalidate までにし、予約は保持する。表示の停止 (`gf_display_stop`) と予約の release は C2 (video_stop・gf_failure) だけに残す (診断の GF2T_STOP が表示全体を止めないように、層 2 の command_test.c:193 と同じ)。
+- F2: recover の途中失敗 (gf3_init・予約の更新) は「slot を閉じたまま予約と ctx を保持して rc を返す」。片付けは次の C2 の停止が行う (fini は ready でないので飛ばし、gf2_stop が inst を全部解放する)。
+- F3: recover では scan の幾何 (pitch・width・height・phys) を残し、予約の ID と世代だけを付け替える。bind の時に取った幾何は `gf3_service` の欄に写して保持する (`geforce_backend_framebuffer_info` は video_start の中でしか使えない、accel.h:200-206)。
+- F4: recover の公開 (hook と slot) は display.engaged のときだけ。engaged でなければ F2 の復旧だけ (層 2 と同じ)。`!engaged` で入った停止の後処理は「ch が OFF のときだけ release」。
+- F5: V0 の map の成功は、呼出側が先に入れた close と close_owner を保持し、ch と next だけを足す (今の vram_view.c:147 の全欄の上書きを直す — V0 の段で)。
+- F6: 凍結の例外として、map の前提に close を足す (close が無ければ GF2_EMAP)。V0 の host 試験と既存の窓の利用者は追随する。
+- F7: revoked のときは窓の close の失敗を記録して先へ進む (quiesce.c:18-20 の「cleanup の行は全部試す」に合わせる)。
+
+## 追記 (2026-11-04、C1 の欠け — 試験面の幾何、PM 決定)
+- `gf3_service.test` (T0 が借りる試験面) の幾何は表示面に合わせる: `fmt` = 表示面の fmt、`width` = 表示面の width、`pitch` = 表示面の pitch (64B の整列を満たさないときは 64B に切り上げ)、`height` = min(表示面の height, floor(試験面の予約の bytes / pitch))。予約の範囲は結線の追記の N2 (表示の予約の末尾の次の 4KiB 境界から B 以下の最後の 4KiB 境界まで)。height が 0 なら GF2_ENOSPC で試験面を公開しない (表示は続ける)。根拠: T0 の比べ方 (§13) は表示面と同じ形式・幅の面への描画と読み戻しで、別の幾何は要らない。
+
+## 追記 (2026-11-04、T1 の欠け — T0 の入口と case、PM 決定)
+- T0 の公開の入口は `int gf_accel_test(u32 case_id)` (T0 の実装、kdebug/gf_accel_test.c)。case_id は 0 init / 1 fill / 2 copy / 3 mono / 4 ifc / 5 upload / 6 download / 7 scale / 8 present-m2mf / 9 all。宣言は T0 と同じ置き場のヘッダー (kdebug/gf_accel_test.h、T1 が足す) に置く。
+- 既存の GF の試験の入口 (kdebug/gf_command_test.c) に新しい case を 1 つ足す: `GF2_VBLANK` の次の番号を `GF3_ACCEL` とし、引数の 1 語を case_id として `gf_accel_test` へ dispatch する。追従する kdebug/gf_command_wire.h (case の番号)・kdebug/gfinit.c の上限の検査 (GF2_VBLANK まで → GF3_ACCEL まで)・shell の側の case の名前の表は、T1 の段が持つ (他の段は触らない)。
+- build/hwdev.mk の HWDEV_GF への gf_accel_test の登録は PM が統合の段で足す。

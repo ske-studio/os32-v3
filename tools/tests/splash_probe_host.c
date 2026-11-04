@@ -16,6 +16,13 @@ static u32 in_milli, scan_milli, poll_entry_us;
 static u32 pl_script, pl_reads, success_entry_cost, success_return_cost;
 static int success_scanning;
 static int capture_active(void);
+static int pl_fail_active(void);
+static unsigned long long probe_host_error_span(unsigned long long span, int seed);
+enum pl_error_fixture_kind {
+    PL_ERROR_NONE, PL_ERROR_ALIGN, PL_ERROR_SUCCESS, PL_ERROR_PHASE1,
+    PL_ERROR_JOINT_PHASE0, PL_ERROR_JOINT_PHASE1
+};
+static u32 pl_error_fixture;
 static u32 den, total, high_lines, raw_mode, wide_h;
 static int irq_on = 1, missing_h, frozen, backwards;
 static u32 initial_irq_us;
@@ -87,6 +94,7 @@ static unsigned int inp(unsigned int port)
          * The real predicate sees high, low, low, high in that order. */
         status = (++pl_reads % 4 == 1 || pl_reads % 4 == 0) ? GDC_STAT_HBLANK : 0;
     }
+    if (pl_fail_active()) status = 0;
     if (h_test && !irq_on) {
         if (!(if0_in_reads)) h_old = status;
         else {
@@ -175,6 +183,25 @@ static unsigned long long __attribute__((unused)) probe_host_pl_span(unsigned lo
 }
 #include "../../platform/pc98/splash_probe.c"
 #undef pc98_splash_raster_table
+static int pl_fail_active(void)
+{
+    if (pl_error_fixture >= PL_ERROR_JOINT_PHASE0) {
+        return probe_context.col == PROBE_CONTEXT_NONE && probe_context.n == 2 &&
+            probe_context.phase == pl_error_fixture - PL_ERROR_JOINT_PHASE0 && probe_context.kind == PROBE_PL_JOINT &&
+            probe_pl_joint[2].peak[pl_error_fixture - PL_ERROR_JOINT_PHASE0][PROBE_PL_JOINT].batches == 3;
+    }
+    if (probe_context.col != 4 || probe_context.phase != (pl_error_fixture == PL_ERROR_PHASE1 ? 1u : 0u) ||
+        probe_context.kind != PROBE_PL_TRANS) return 0;
+    return pl_error_fixture == PL_ERROR_ALIGN || pl_error_fixture == PL_ERROR_PHASE1 || (pl_error_fixture == PL_ERROR_SUCCESS && !irq_on);
+}
+static unsigned long long __attribute__((unused)) probe_host_error_span(unsigned long long span, int seed)
+{
+    if (pl_error_fixture != PL_ERROR_PHASE1 || probe_context.col != 4 || probe_context.phase != 0) return span;
+    if (seed) return span + (probe_context.kind == PROBE_PL_Q ? 4 : 0);
+    if (probe_context.kind == PROBE_PL_W || probe_context.kind == PROBE_PL_D ||
+        probe_context.kind == PROBE_PL_PREP) return span + 8;
+    return span;
+}
 static int capture_active(void) { return probe_hd.bursts != 0; }
 /* Supply measured calibration bounds to the real capture admission path.
  * All other cases still execute both product calibration passes. */
@@ -272,6 +299,7 @@ static int probe_frame_checked(struct SplashRaster *s, const GFX_RasterPalTable 
 }
 static void setup(int mode, int vs)
 {
+    pl_error_fixture = 0;
     probe_hd = (struct probe_hdiag){0};
     peak_fixture = peak_index = 0;
     pl_script = pl_reads = success_entry_cost = success_return_cost = success_scanning = 0;
@@ -282,7 +310,7 @@ static void setup(int mode, int vs)
     high_lines = vs ? (mode ? 2 : 8) : total - 400;
     raw_mode = mode; wide_h = 0;
     irq_on = 1; missing_h = frozen = backwards = 0;
-    calls = writes = probe_errors = 0; probe_previous = 0;
+    calls = writes = 0; probe_error_reset(); probe_previous = 0;
     probe_output_size = probe_presents = probe_rects = probe_rx_pos = 0;
     probe_bios_reads = probe_serial_baud = 0;
     probe_bios_snapshot[PEGC_BIOS_PRXCRT] = mode ? PEGC_BIOS_PRXCRT_31KHZ : 0;
@@ -552,9 +580,9 @@ static void pl_details(void)
     probe_pl_details_dump();
     REQUIRE(probe_contains("SPLR pl_q_part=1 n=5 den=3147 raw_max_num=12588 raw_max_count=1"));
     REQUIRE(probe_contains("clock_delta_max_num=-6294 clock_delta_max_count=1"));
-    REQUIRE(probe_contains("SPLR pl_joint_n=0 phase=0 den=3147"));
-    REQUIRE(probe_contains("SPLR pl_joint_n=6 phase=1 den=3147"));
-    REQUIRE(probe_contains("SPLR pl_joint_outer_n=6 phase=1 den=3147 raw_max_num=18882"));
+    REQUIRE(probe_contains("SPLR pl_joint_n=0 phase=0 scan_reason=0 den=3147"));
+    REQUIRE(probe_contains("SPLR pl_joint_n=6 phase=1 scan_reason=0 den=3147"));
+    REQUIRE(probe_contains("SPLR pl_joint_outer_n=6 phase=1 scan_reason=0 den=3147 raw_max_num=18882"));
     REQUIRE(probe_contains("polls_max_num=4 polls_max_count=64"));
     probe_pl_result[0].prep = 10; probe_pl_result[0].transition = 20;
     probe_pl_detail[0][3].upper.max = 24;
@@ -677,7 +705,7 @@ static void h_diagnostics(void)
     REQUIRE(probe_hd.reason == 8 && probe_hd.over == 1 && probe_hd.bursts == 1);
     REQUIRE(probe_hd.completed > 0 && probe_hd.max_us > 60 && irq_on);
     /* The former real-log count=18 no longer loses armed at each burst. */
-    slow_capture = 0; probe_errors = 0;
+    slow_capture = 0; probe_error_reset();
     probe_cost[PROBE_Q].upper_num_us = 37;
     probe_cost[PROBE_Q].upper_samples = 16;
     probe_cost[PROBE_C].upper_num_us = 10;
@@ -686,7 +714,7 @@ static void h_diagnostics(void)
     /* Large uncertainty must not buy a longer IF=0 region. */
     REQUIRE(!probe_hblank(s));
     REQUIRE(probe_hd.reason == 3 && probe_hd.budget_stage == 5 && !probe_hd.bursts && irq_on);
-    probe_errors = 0;
+    probe_error_reset();
     probe_cost[PROBE_C].upper_samples = 8;
     probe_cost[PROBE_C].upper_us = 2;
     REQUIRE(probe_hblank(s) == 64);
@@ -704,7 +732,7 @@ static void h_diagnostics(void)
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 2 && !probe_hd.bursts);
     probe_cost[PROBE_Q].upper_num_us = 73;
     probe_cost[PROBE_Q].upper_samples = 64;
-    missing_h = 0; probe_errors = 0;
+    missing_h = 0; probe_error_reset();
     probe_q_lower = 1;
     REQUIRE(probe_hblank(s) == 64); /* refine the coarse lower bound */
     probe_cost[PROBE_C].upper_num_us = 100000;
@@ -869,6 +897,82 @@ static void np_fast_poll(void)
     REQUIRE(probe_contains(" elapsed_us=0 scan_reason=2\n"));
     in_us = clock_cost_us = out_us = 1;
 }
+static void pl_phase_errors(void)
+{
+    for (u32 fixture = PL_ERROR_PHASE1; fixture <= PL_ERROR_JOINT_PHASE1; fixture++) {
+        setup(1, 0); in_us = clock_cost_us = out_us = 1;
+        pl_error_fixture = fixture;
+        platform_splash_probe();
+        REQUIRE(irq_on && probe_errors == 1 && !probe_fatal);
+        REQUIRE(probe_entry_count == PROBE_ENTRIES && probe_frames[PROBE_FRAMES-1].duration);
+        if (fixture == PL_ERROR_PHASE1) {
+            REQUIRE(probe_error_first.context.col == 4 && probe_error_first.context.phase == 1);
+            REQUIRE(probe_pl_columns[4].scan_reason == PROBE_SCAN_ERROR);
+            const struct probe_pl_result *r = &probe_pl_result[0];
+            long long w = 0, d = 0, prep = 0, transition = 0;
+            for (u32 i = 0; i < probe_pl_count; i++) {
+                const struct probe_pl_column *c = &probe_pl_columns[i];
+                if (c->n != 5 || i == 4) continue;
+                if (c->w > w) w = c->w;
+                if (c->d > d) d = c->d;
+                if (c->prep > prep) prep = c->prep;
+                for (u32 phase = 0; phase < 2; phase++)
+                    if ((long long)(2 * c->peak[phase][PROBE_PL_Q].seed) > transition)
+                        transition = 2 * c->peak[phase][PROBE_PL_Q].seed;
+            }
+            REQUIRE(probe_pl_columns[4].w > w && probe_pl_columns[4].d > d &&
+                    probe_pl_columns[4].prep > prep);
+            REQUIRE(r->budget.w.max == w && r->budget.d.max == d && r->prep == prep);
+            REQUIRE(r->transition == transition);
+            REQUIRE(probe_pl_columns[128].completed == PROBE_HPERIODS);
+        } else {
+            u32 phase = fixture - PL_ERROR_JOINT_PHASE0;
+            REQUIRE(probe_error_first.context.col == PROBE_CONTEXT_NONE);
+            REQUIRE(probe_error_first.context.n == 2 && probe_error_first.context.phase == phase);
+            REQUIRE(probe_pl_joint[2].peak[phase][PROBE_PL_JOINT].batches == 3);
+            REQUIRE(probe_pl_outside[2][phase].raw.batches == 3);
+            REQUIRE(probe_contains("SPLR pl_joint_n=1 phase=1 scan_reason=1"));
+            if (phase) REQUIRE(probe_contains("SPLR pl_joint_n=2 phase=0 scan_reason=1"));
+            REQUIRE(probe_contains(phase == 0 ? "SPLR pl_joint_n=2 phase=0 scan_reason=5" :
+                                               "SPLR pl_joint_n=2 phase=1 scan_reason=5"));
+            REQUIRE(probe_contains(phase == 0 ? "SPLR pl_joint_outer_n=2 phase=0 scan_reason=5" :
+                                               "SPLR pl_joint_outer_n=2 phase=1 scan_reason=5"));
+            REQUIRE(probe_contains("SPLR pl_joint_n=3 phase=0 scan_reason=6"));
+            REQUIRE(probe_contains("SPLR pl_joint_outer_n=6 phase=1 scan_reason=6"));
+            if (!phase) REQUIRE(probe_contains("SPLR pl_joint_n=2 phase=1 scan_reason=6"));
+            REQUIRE(probe_pl_joint[6].peak[1][PROBE_PL_JOINT].batches == PROBE_COST_BATCH);
+        }
+    }
+}
+static void pl_error_reasons(void)
+{
+    for (u32 fixture = 1; fixture <= 2; fixture++) {
+        setup(1, 0); in_us = clock_cost_us = out_us = 1;
+        pl_error_fixture = fixture;
+        platform_splash_probe();
+        REQUIRE(irq_on && probe_errors == 1 && !probe_fatal);
+        u32 reason = fixture == 1 ? PROBE_ERR_PL_ALIGN : PROBE_ERR_PL_SUCCESS;
+        REQUIRE(probe_error_first.reason == reason && probe_error_counts[reason] == 1);
+        REQUIRE(probe_error_first.context.col == 4 && probe_error_first.context.phase == 0);
+        REQUIRE(probe_error_first.context.n == 5 && probe_error_first.context.kind == PROBE_PL_TRANS);
+        REQUIRE(probe_error_first.value > 0);
+        REQUIRE(probe_contains(fixture == 1 ? "SPLR error_first reason=14 col=4 phase=0 n=5 kind=5 value=" :
+                                             "SPLR error_first reason=1 col=4 phase=0 n=5 kind=5 value="));
+        REQUIRE(probe_contains(fixture == 1 ? " reason_14=1" : " reason_1=1"));
+        REQUIRE(probe_pl_columns[4].scan_reason == PROBE_SCAN_ERROR);
+        REQUIRE(probe_pl_columns[5].scan_reason == PROBE_SCAN_AFTER_ERROR);
+        REQUIRE(probe_pl_columns[128].scan_reason == PROBE_SCAN_AFTER_ERROR);
+        REQUIRE(probe_pl_columns[128].completed == PROBE_HPERIODS);
+        REQUIRE(probe_pl_joint[6].peak[1][PROBE_PL_JOINT].batches == PROBE_COST_BATCH);
+        REQUIRE(!probe_pl_result[0].qualified && !probe_pl_result[1].qualified);
+        REQUIRE(probe_entry_count == PROBE_ENTRIES && probe_frames[PROBE_FRAMES-1].duration);
+    }
+    setup(1, 0); backwards = 1;
+    platform_splash_probe();
+    REQUIRE(probe_fatal && probe_error_counts[PROBE_ERR_CLOCK_BACKWARD]);
+    REQUIRE(!probe_pl_count && !probe_entry_count && !probe_frames[0].duration);
+    REQUIRE(probe_contains("SPLR error_first reason=3"));
+}
 void _start(void)
 {
     /* L1: a 5us clock must not turn the 31k 6.36us pulse into B_min=0. */
@@ -897,6 +1001,7 @@ void _start(void)
         }
     }
     in_us = clock_cost_us = out_us = 1;
+    pl_phase_errors(); pl_error_reasons();
     costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_limit_inputs(); h_diagnostics();
     realhw_precision(); np_fast_poll(); calibrated_width_error(); pl_batch_peaks(); pl_details();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {

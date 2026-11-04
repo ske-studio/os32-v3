@@ -11,7 +11,7 @@ R4: engine停止→IRQ登録解除→BM解除へ修正し、remove/suspendの根
 R5: PVIDEOのACKと未使用PTIMER/PBUS/PMPEGのmask/ACKを追加。
 R6: gf_stage_stateのCommand/PMCを所有stateの期待値で照合。
 R7: instmemをUCのBAR2直接アクセス、偽MMIOをmap_ops差替えと確定。
-R8: import現状20・見積28〜30・上限32と生成元の実装段を明記。
+R8: import現状20・見積28〜30と生成元の実装段を明記。
 R9: latencyは0ChのWORD書込でcache lineを保持し、停止時復元を削除。
 R10: PM判断に従い宣言だけの変更をA0に統合。
 
@@ -166,7 +166,7 @@ struct gf_instmem_map_ops {
 
 許可された資料には現在のFD空き量/kdebug.bin上限の数値がないので「収まる」とは断定しない。実装段で既存の像サイズ検査と実ビルド前後差を必須にし、上限は緩めない。今回ビルド/配備はしない。
 
-import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unregister・irq_save/restore・geforce_tick_bind・pci_cfg_read8・map系を加え28〜30を予算とし、`tools/module_schema.py:184–191`の上限32は維持。tick_registerは常駐adapterから直接呼ぶためmodule importには追加不要。生成した実数を受入で確定し、生成物は手編集しない。
+import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unregister・irq_save/restore・geforce_tick_bind・pci_cfg_read8・map系を加え28〜30を予算とし、importは生成契約と件数・各シンボルの完全一致で照合する。tick_registerは常駐adapterから直接呼ぶためmodule importには追加不要。生成した実数を受入で確定し、生成物は手編集しない。
 
 ## 7. ファイル別実装段（実装Cは1ファイル=1段=1実装者、宣言のみA0へ統合）
 下表の行ごとに担当を渡せる。同一帯は契約凍結後並列可。各段は半日、複雑な新規Cは1日。行数は増分概算。PM判断により宣言だけの変更はA0にまとめる。
@@ -197,7 +197,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 | D2 | docs/02_memory.md 変 | BAR2 PT予算の追記 | 8 / B5 |
 | T0 | tests/gf_foundation_test.c 新（既存host配置規則に合わせる） | 偽PCI/MMIO/IRQの順序検査 | 240 / B〜C群 |
 
-`build/geforce-module.mk:3–6,23–33`が`tools/gen_sqlite_imports.py:162–171`からimportsとgeforce_kexportsを生成する。`tools/module_schema.py:189`の32上限を検査し変更しない。back-endの描画関数表とGUIは変更不要。資源予約定数の追加が必要なら実定義元を1段追加。
+`build/geforce-module.mk:3–6,23–33`が`tools/gen_sqlite_imports.py:162–171`からimportsとgeforce_kexportsを生成する。生成契約との件数・各シンボルの完全一致を検査する。back-endの描画関数表とGUIは変更不要。資源予約定数の追加が必要なら実定義元を1段追加。
 診断ownerも新hookを満たすよう、その定義元を同様に1段追加。型だけ変えてNULL呼出しを残さない。1機能を複数の新規実装Cへ分散しない。
 
 ## 8. 受入→試験・変異、段の検査
@@ -208,7 +208,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 | 停止順 | host:tick unbind/mask→engine resetパルス/read→unregister→BM clear→unmap、各段失敗時の所有状態。実機:繰返し開始/終了と98復帰 | BM clearをengine停止より前へ→順序assert失敗 |
 | BM再開始 | host:initialized=trueの停止→再開始でもBM enableが先頭。実機:再開始後Command=0106h | startのBM enableを削除→再開始時BM=0を検出 |
 | tick回収 | host:PTIMER/PVIDEO残留・DEFERRED→tick→PMC再開、未知継続中のVBLANK回収、停止/unmap/detach後callbackなし。実機:再開始後もA増加 | tick回収末尾の140h=1を削除→再arm検査失敗 |
-| PMC検証/import | host:開始/停止後も段の検査が成功。生成import数<=32、常駐tickの配置/参照解除を確認 | :70を保存PMCとの比較へ戻す→停止後検証失敗 |
+| PMC検証/import | host:開始/停止後も段の検査が成功。生成import契約との完全一致、常駐tickの配置/参照解除を確認 | :70を保存PMCとの比較へ戻す→停止後検証失敗 |
 | instmem | host:vs=0..8、V不足、BAR2不足、整列/穴再利用/終端、固定4領域。実機:可変領域1頁へpattern/readback、表示CRC前後一致 | offにV-Rを足す→apertureアクセス範囲/固定配置試験失敗 |
 | IRQ/共有 | host:PMC0でNONE、FIFO/GR同時、W1C、未知/残留、他デバイスとの共有登録。実機:IRQ6登録成功と静穏 | PGRAPH enableを400140hへ→期待レジスタ列失敗 |
 | VBLANK | host:両head bit/無効head/wrap、snapshot。実機:表示中の固定観測時間でA増加、B不変、mask中停止、再enableで増加 | PCRTC ACKを省く→偽level IRQの残留検出 |
@@ -253,7 +253,7 @@ GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
 理由: 未完成の import/provider に依存せず、末尾の「B は host 単独検証、像への組込みは C10/C11」を維持できる。
 各 B の host 試験は当該 .c を直接組む。tools/checks/map.py の needs=['make:all'] は残し、check-changed の準備も通す。
 C10 の import 契約と B6 provider を揃え、C11 で除外を撤去し常駐 tick を配置する；層1を参照する C の接続変更はこの結線と一緒に検査する。
-C10 は下記 production map adapter の paging_map_phys・paging_set_not_present も import に含め、既存 paging_pte_raw を再利用し、32 枠上限を検査する。
+C10 は下記 production map adapter の paging_map_phys・paging_set_not_present も import に含め、既存 paging_pte_raw を再利用し、生成契約との完全一致を検査する。
 
 ### 欠け2 — resource・V・R と呼出し順
 resource の入口は既存 gf_production_identify → boot_resources → gf_production_prepare(boot) → p->display.bars（O/hwdev/gf/devinit.c:30–36）。
@@ -407,7 +407,7 @@ vblank は snapshot→1000ms待ち→snapshot を head A有効/両head無効/A�
 cycle は所有者の表示 stop/start 経由で STOP/RUN 実測 Command を採取、instmem は表示 CRC 前後一致も C9 で検査。
 serial は case/owner/観測ms/rc/期待値/実測値/flags/stats差分/比較bytes/不一致offset を完了時出力。未公開は unavailable、合格にしない。
 PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch/loader・export生成元・C9/serial結線を各Cファイル1段で出す。
-受入に失効直後IRQ割込み、stop再試行、診断work解放、slot解除、3→旧版拒否、import<=32を追加。正常停止の既存試験も維持する。
+受入に失効直後IRQ割込み、stop再試行、診断work解放、slot解除、3→旧版拒否を追加。正常停止の既存試験も維持する。
 
 ### 確定 (2026-11-02、Opus 第 4 回、PM が反映)
 - P2-a: 失効 (revoked) を見たら、foundation の停止は B5 の unmap (paging_set_not_present、CPU の PTE を落とすだけで BAR には書かない) を呼ぶ。旧 BAR2 の物理番地への PTE を Present のまま残さない。B1 の gf_inst_read32/write32 の API は変えない (unmap の後は呼ばれない — running=false の後なので)。
@@ -415,7 +415,7 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P2-c: 層 3 の確定設計の末尾にも同じ日付で 1 行足した (accel_out の欄と OPS_VERSION 3 はこの追記の §3 で確保済み、層 3 の C5 は 0 行)。
 - P3: identity が一致して BAR だけが変わった場合に config 経由で Command=0102h を書くか (手本 nouveau_drm.c:940 の pci_disable_device 相当) は、DMA を出す層 2 で決める。層 1 は書かない。
 - P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
-- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev (import 37/128)、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
+- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
 - 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
 - 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c:46-77・348-461、include/hwdev_private.h:15-22) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
 
@@ -500,7 +500,7 @@ cycle 全体を trial_step で包まない。区間ごとの trial_step を終�
 診断 STOP 区間は REC_VERIFIED のまま時計・ソフト snapshot・上記 PCI 読取りで測定する。初回 start の代わりに承認済み gfinit 手順を自動実行しない。
 CUI/rshell の要求は `gf1 status|instmem|vblank|cycle`（改行終端）、owner は自動選択。新しい汎用コマンドや承認方式は設けない。
 GUI RUN では shell.bin と gshell.bin は同時常駐せず（init/kernel.c:340）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
-本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c:186・200、userland/gshell/src/gserial.rs。~~hwdev.mod は hwdev/gf/devinit.c で import 済みなので import は増えない~~ — **訂正 (2026-11-03、PM の誤り、C9 の astra レビューの P2)**: devinit.c は geforce.mod の部品で、hwdev.mod の import (38 本、上限 128 — tools/module_schema.py:181) に serial_puts_polled は無い。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
+本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c:186・200、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
 根拠: gserial.rs の parse/enqueue/deliver、shell/main.c:112–118（共通表・rshellのみ除外）、userland/sh.inputs.json。GUI/GSERIAL は変更しない。CUI 復帰は gfx_shutdown 済み（gshell/src/lib.rs:678）なので STOP status のみ、cycle は上記 precheck で ng。
 応答は完了時 `GF1 case=<...> owner=production|diagnostic session=<n> phase=<...> ms=<実測> rc=<n> result=ok|ng|unavailable`。
 各 phase 行に `command_expected/actual pmc_expected/actual flags delta_entries/fifo/graph/vblankA/vblankB unknown bytes bad_off crc_before/after` を付ける。
