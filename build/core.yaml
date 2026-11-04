@@ -36,6 +36,11 @@ filesystem:
 
   # ファイルデプロイ定義
   files:
+    # Local image is optional; user.osri is never deployed.
+    - type: glob  # An exact pattern: no local image means no deployment entry.
+      host: assets/splash/splash.osri
+      guest: /boot/splash.osri
+      tags: [data]
     # --- カーネルイメージ (LZ4圧縮) ---
     - host: build/out/vmkernel.lz4
       guest: /boot/vmkernel.lz4

@@ -27,6 +27,8 @@ SOURCES = ['init/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash
            'gfx/gfx_osri.c', 'lib/le_internal.h',
            'lib/crc32_core.inc', 'tools/tests/splash_wire_host.c', 'tools/tests/splash_raster_host.c']
 MUTATIONS = (
+    ('omit user priority', 'platform/pc98/splash_image.c',
+     '!vfs_stat(SYS_SPLASH_USER_IMAGE, &stat)', '(0 && !vfs_stat(SYS_SPLASH_USER_IMAGE, &stat))'),
     ('omit release', 'platform/pc98/splash_image.c', 'if (image) kfree(image);', '(void)image;'),
     ('omit close', 'gfx/gfx_osri.c', 'vfs_close(fd);', '(void)fd;'),
     ('omit fixed commit', 'platform/pc98/splash_image.c', '    gfx_present_nosync();', '    (void)fb;'),
