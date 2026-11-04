@@ -27,7 +27,7 @@ static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pf
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
 static int prod_foundation_fail;
-static u32 prod_logs,prod_cfg_reads;
+static u32 prod_logs,prod_cfg_reads,prod_prepare_writes;
 void kprintf(u8 attr,const char *format,...)
 { (void)attr;(void)format;prod_logs++; }
 #define PROD_ROUTE 0xfacU
@@ -109,8 +109,9 @@ void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v)
 {(void)b;(void)d;(void)f;(void)o;(void)v;prod_other_cfg_writes++;}
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
-    CHECK(!b && d==13 && !f && o==4 && v==0x106);
-    prod_event(4);prod_cmd_writes++;
+    CHECK(!b && d==13 && !f && o==4);
+    if (!prod.prepared) prod_prepare_writes++;
+    else { CHECK(v==0x106);prod_event(4);prod_cmd_writes++; }
     prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
     return 0;
 }
@@ -147,6 +148,13 @@ int sys_time_now(u32 *lo,u32 *hi)
     if(++prod_clock_calls==prod_clock_fail)return -1;
     prod_now+=prod_clock_step;*lo=prod_now;*hi=0;return 0;
 }
+int gf_production_native_clock(void *,u32 *);
+int gf_production_native_wait(void *,u32);
+/* Check the opaque even though today's native clock does not dereference it. */
+int gf_production_clock(void *opaque,u32 *value)
+{ CHECK(opaque==&prod);return gf_production_native_clock(opaque,value); }
+int gf_production_wait(void *opaque,u32 us)
+{ CHECK(opaque==&prod);return gf_production_native_wait(opaque,us); }
 const struct gf_instmem_map_ops gf_production_instmem_map_ops={0};
 /* Keep the P4 transport oracle independent of command MMIO. C0/B hosts test
  * the real channel; this seam verifies the production owner's new wiring. */
@@ -225,6 +233,7 @@ static void prod_reset(void)
     kmemset(prod_vga,0,sizeof(prod_vga));kmemset(prod_index,0,sizeof(prod_index));
     prod_reg_count=prod_trace_count=prod_main_mask=0;
     prod_now=prod_clock_calls=prod_mmio_calls=prod_cmd_writes=prod_other_cfg_writes=prod_reads16=0;
+    prod_prepare_writes=prod_logs=0;
     prod_clock_step=1;prod_clock_fail=prod_live_pages=prod_alloc_fail=prod_map_fail=prod_ram_fail=0;
     prod_route_fail=prod_rom_changed=prod_mismatch=prod_fail_main=0;
     prod_fail_section=prod_deadline_section=RECOVER_NONE;
@@ -254,6 +263,7 @@ static void prod_reset(void)
     *prod_reg(0x1850)=*prod_reg(0x1854)=1;
     CHECK(!gf_production_identify(&prod_boot));
     CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
+    CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[13][0][1]==0x02b00102U);
     CHECK(!prod_cmd_writes && !prod_mmio_calls && !prod_route_calls);
     /* IRQ/tick adapter uses only its permanent map, never the guarded bus. */
     u32 words[2]={0,0},value,reads=prod_cfg_reads;
@@ -268,6 +278,46 @@ static void prod_reset(void)
     CHECK(prod.foundation.io.write(&prod.foundation,0,4,4,0)==-1 && words[1]==0x12345678);
     prod.foundation.revoked=false;
     prod.foundation.bar0=saved;
+}
+static void prod_prepare_cases(void)
+{
+    prod_reset();
+    struct gf_io *f=&prod.foundation.io,*d=&prod.display.io;
+    CHECK(f->timing.clock_us && f->timing.wait_us);
+    if (f->timing.clock_us && f->timing.wait_us) {
+        u32 a=0,b=0;
+        prod_clock_step=0;prod_now=12345;
+        CHECK(!f->timing.clock_us(f->opaque,&a) && !d->timing.clock_us(d->opaque,&b));
+        CHECK(a==12345 && b==a);
+        prod_clock_step=1;
+        CHECK(!f->timing.wait_us(f->opaque,7) && prod_now>=a+7);
+        a=prod_now;
+        CHECK(!d->timing.wait_us(d->opaque,7) && prod_now>=a+7);
+        prod_clock_fail=prod_clock_calls+1;
+        CHECK(f->timing.clock_us(f->opaque,&a)==-1);
+        prod_clock_fail=prod_clock_calls+1;
+        CHECK(f->timing.wait_us(f->opaque,1)==-1);
+    }
+    /* Independent raw PCI words: preserve I/O, Mem, other Command and Status
+     * bits, including combinations different from the usual 0106h. */
+    const u16 commands[]={0x0106,0x0147,0x0105,0x0104,0x0102,0x0143};
+    for(u32 i=0;i<sizeof(commands)/sizeof(commands[0]);i++) {
+        prod_reset();kmemset(&prod,0,sizeof(prod));
+        prod_cfg[13][0][1]=0x02b00000U|commands[i];
+        prod_prepare_writes=prod_logs=0;
+        CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
+        CHECK(prod_cfg[13][0][1]==(0x02b00000U|(commands[i]&~4U)));
+        CHECK(prod_prepare_writes==((commands[i]&4U)?1U:0U));
+        CHECK(prod_logs==prod_prepare_writes && !prod_cmd_writes && !prod_other_cfg_writes);
+        CHECK(!prod_mmio_calls && !prod_route_calls);
+    }
+    /* A failed BAR/mapping gate must not write even a valid Command word. */
+    prod_reset();kmemset(&prod,0,sizeof(prod));
+    prod_cfg[13][0][1]=0x02b00106U;prod_map_fail=1;
+    prod_prepare_writes=prod_logs=0;
+    CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
+    CHECK(!prod.prepared && !prod_prepare_writes && !prod_logs && prod_cfg[13][0][1]==0x02b00106U);
+    output("PASS production prepare: shared clock/wait and production opaque; BM-only WORD clear, no write if clear or invalid maps\n");
 }
 static int prod_start(void)
 {return video_start(&prod.video,1,prod_rgb);}
@@ -391,7 +441,10 @@ static void prod_cases(void)
     CHECK(!prod_start() && prod_cmd_writes==3);CHECK(!prod_return(&prod));
     output("PASS real startup/main/baseline/mode/CHECK, WORD Command RUN at N1, STOP on exit, no BAR writes, restart without devinit\n");
     prod_reset();prod_mismatch=1;prod_failure();CHECK(prod_cmd_writes==1 && !prod_a2_done);
-    prod_reset();prod_route_fail=1;prod_failure();CHECK(!prod_cmd_writes && !prod_mmio_calls);
+    /* STOP now matches at prepare: failure cleanup reaches PBUS/PMC writes
+     * even when routing/acquire failed before N1. No A2/devinit writes. */
+    prod_reset();prod_route_fail=1;prod_failure();
+    CHECK(!prod_cmd_writes && !prod_a2_writes && prod_stop_writes==3);
     prod_reset();prod_alloc_fail=1;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
     prod_reset();prod_rom[0]=0;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
     prod_reset();prod_rom_changed=1;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
@@ -452,7 +505,8 @@ static void prod_cases(void)
     CHECK(prod_boot.reject.reason && !kstrcmp(prod_boot.reject.reason,"rom_length") &&
           prod_boot.reject.dev==11 && !prod_boot.reject.fn &&
           prod_boot.reject.reg==PCI_CFG_ROM_ENDPOINT && prod_boot.reject.raw==prod_cfg[11][0][12]);
-    CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes && !prod_mmio_calls && prod_route_calls==1);
+    CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes &&
+          !prod_a2_writes && prod_stop_writes==3 && prod_route_calls==1);
     CHECK(prod.reject.reason && !kstrcmp(prod.reject.reason,"rom_length") && prod.reject.dev==11);
     CHECK(prod.display.section==GF_DISPLAY_INIT && prod.display.last_rc==-1 &&
           prod.display.target==((11U<<3)<<8 | PCI_CFG_ROM_ENDPOINT) && !prod.display.reusable);
@@ -509,6 +563,7 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+    prod_prepare_cases();
 #ifdef GF_HAL_TEST
     prod_hal_cases();
 #endif
