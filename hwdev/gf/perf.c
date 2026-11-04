@@ -162,6 +162,8 @@ i32 gf5_perf_get(struct gf5 *g,u32 index,struct gf5_perf_entry *out)
 /* service owns busy/phase admission checks and the outer absolute deadline.
  * Do not replace that deadline here: restore may nest performance work.
  * PM decision 15: clock_calc fills mc/mn too; RAM only programs the plan.
+ * PM decision 21: RAM owns its pause/unpause and admission preservation.
+ * In particular, nested restore must keep admission closed until publication.
  * Ordering: nouveau nvkm/subdev/clk/base.c:159-215,266-305; OS32 aborts
  * on intermediate error instead of following the reference's lower path. */
 i32 gf5_perf_select(struct gf5 *g,u8 index)
@@ -171,8 +173,6 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     struct gf5_plan plan={0};
     i32 rc=entry_read(g,index,&e), absent=0;
     if (rc) return finish(g,rc);
-    if (!g->links.drain_pause || !g->links.unpause || !g->links.admission)
-        return finish(g,GF5_EINVAL);
     g->source_rc=0;
     rc=gf5_clock_calc(g,&e.clock,&plan);
     if (rc) {
@@ -186,10 +186,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     if (gf5_rc_map(rc)==GF5_ENOTSUP) { absent=g->source_rc ? g->source_rc : rc; } \
     else if (rc) goto fault; \
 } while (0)
-    STEP(g->links.drain_pause(g->links.owner));
     STEP(gf5_ram_prog(g,&plan));
-    STEP(g->links.unpause(g->links.owner));
-    STEP(g->links.admission(g->links.owner,true));
     OPTIONAL(gf5_fan_cstate(g,e.fanspeed,+1));
     OPTIONAL(gf5_volt_id(g,e.voltage,e.voltage,+1));
     STEP(gf5_clock_prog(g,&plan));
@@ -204,7 +201,6 @@ fault: {
         i32 source=g->source_rc ? g->source_rc : rc;
         i32 mapped=gf5_rc_map(rc);
         g->phase=GF5_FAULT; g->accepting=false;
-        (void)g->links.admission(g->links.owner,false);
         g->source_rc=source; g->last_rc=mapped;
         return mapped;
     }
