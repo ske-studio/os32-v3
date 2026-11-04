@@ -38,7 +38,7 @@ C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid
     drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \
     drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/geforce/gf_wc.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
-    gfx/gfx_core.c gfx/gfx_osri.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
+    gfx/gfx_core.c gfx/gfx_osri.c gfx/gfx_osri_view.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
     fs/fat/fatfs/ff.c fs/fat/fatfs/diskio.c fs/fat/fatfs_vfs.c \
     fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c \
     exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
@@ -48,7 +48,7 @@ C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid
     drivers/video/pc98/splash_raster.c \
     drivers/video/pc98/splash_raster_image.c \
     drivers/video/pc98/splash_raster_plan.c \
-    drivers/video/pc98/splash_raster_play.c
+    drivers/video/pc98/splash_raster_play.c drivers/video/pc98/splash_raster_run.c
 
 ifeq ($(SPLASH_DIAG_BUILD),1)
 ifeq ($(SPLASH_OBS_BUILD),1)
