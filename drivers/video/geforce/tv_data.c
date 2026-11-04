@@ -281,9 +281,10 @@ static struct gf4_timing cvt(u32 w,u32 h,bool interlace)
     if (duty<20000U) duty=20000U;
     u32 hb=(w*duty/(100000U-duty))&~15U, ht=w+hb;
     u32 he=w+hb/2U;
-    /* xf86cvt.c:202-205: truncate the difference, then advance one
-     * character even if the difference is already character-aligned. */
-    u32 hs=((he*100U-ht*8U)/100U/8U+1U)*8U;
+    /* xf86cvt.c:202-205: divide the sync width before subtracting, then
+     * advance one character even if the start is already aligned. */
+    u32 hs=he-ht*8U/100U;
+    hs+=8U-hs%8U;
     u32 khz=quotient((u64)ht*1000000U,period)/250U*250U;
     u32 vt=lines+blank+3U;
     struct gf4_timing t={khz,w,hs,he,ht,h,h+3U,h+3U+vsync,

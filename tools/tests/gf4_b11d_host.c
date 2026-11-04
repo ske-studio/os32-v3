@@ -500,16 +500,27 @@ static void check_hd(const struct hd_row *r)
 static void check_cvt_inputs(void)
 {
     static const struct gf4_timing vga={23750,640,664,720,800,480,483,487,500,GF4_NEG_H};
+    /* 720x576 at 60Hz, xf86cvt.c:155-209,249-251: period=27.835us,
+     * HBlank=192, VSyncAndBackPorch=20; 5:4 VSync=7 (:137-138).
+     * At :202-205 integer sync width
+     * is floor(912*8/100)=72; start=816-72=744, then next cell=752.
+     * This distinguishes division before subtraction from after it. */
+    static const struct gf4_timing pal_cvt_60hz={32500,720,752,816,912,
+        576,579,586,599,GF4_NEG_H};
     static const struct gf4_timing xga_i={66750,1024,2080,2088,2200,384,542,544,562,
         GF4_NEG_H|GF4_INTERLACE};
     struct gf4_edid_state modes;
     assert(!gf4_tv_modes(HD720P,&modes));
-    bool found=false;
-    for (u32 i=0;i<modes.ntiming;++i)
+    bool found=false,found_pal=false;
+    for (u32 i=0;i<modes.ntiming;++i) {
         if (modes.timing[i].hd==640 && modes.timing[i].vd==480) {
             timing_equal(&modes.timing[i],&vga); found=true;
         }
-    assert(found);
+        if (modes.timing[i].hd==pal_cvt_60hz.hd && modes.timing[i].vd==pal_cvt_60hz.vd) {
+            timing_equal(&modes.timing[i],&pal_cvt_60hz); found_pal=true;
+        }
+    }
+    assert(found && found_pal);
     assert(!gf4_tv_modes(HD1080I,&modes)); found=false;
     for (u32 i=0;i<modes.ntiming;++i)
         if (modes.timing[i].hd==1024 && modes.timing[i].vd==384) {
