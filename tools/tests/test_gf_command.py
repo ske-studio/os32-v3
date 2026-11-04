@@ -1,6 +1,6 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
 CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=90.0,
-    covers=['build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
+    covers=['tools/tests/gf_startlog_host.h', 'build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
             'kdebug/gf_accel_test.h', 'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
             'kdebug/gf_command_wire.h', 'kdebug/recover.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
@@ -52,7 +52,7 @@ COMPONENTS = {
 # Each old string must occur once in the original product source. Keep these
 # independent of the oracle and fixture; mutate one product site per build.
 MUTATIONS = {
-    'c0': [('irq-close', 'command_irq(ch, false) ||', 'command_irq(ch, true) ||'),
+    'c0': [('start-log', '"[gf2] start fail stage=%s rc=%d\\n"', '"[gf2] wrong stage=%s rc=%d\\n"'), ('irq-close', 'command_irq(ch, false) ||', 'command_irq(ch, true) ||'),
      # Retain the parameter use so -Werror does not replace the runtime oracle.
      ('reset-success', 'return ch->last_rc = result;', '(void)result; return ch->last_rc = GF2_OK;'),
      ('early-staging-free',

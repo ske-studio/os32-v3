@@ -4,6 +4,7 @@
  * reference test and explicit recovery are OS32's contracts. */
 #include "command.h"
 #include "../../include/io.h"
+#include "../../include/kprintf.h"
 
 enum {
     COMMAND_CACHES = 0x2500, COMMAND_DMA_PUSH = 0x3220,
@@ -87,6 +88,7 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
     /* Caller lends BAR1 and mapping/DMA adapters through cleanup. */
     u32 available;
     int rc;
+    const char *stage = "command_irq";
     if (ch->state != GF2_OFF || !f->running) return GF2_ESTATE;
     ch->f = f;
     ch->heads = f->wanted_heads; /* Preserve F1's VBLANK request. */
@@ -101,9 +103,14 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
     ch->grctx = (struct gf_inst){0};
     for (unsigned i = 0; i < sizeof(ch->bitmap); i++) ch->bitmap[i] = 0;
     rc = command_irq(ch, false);
-    if (!rc) rc = close_gates(ch);
-    if (!rc) rc = gf2_fb_init(ch);
     if (rc) goto fail;
+    stage = "close_gates";
+    rc = close_gates(ch);
+    if (rc) goto fail;
+    stage = "fb_init";
+    rc = gf2_fb_init(ch);
+    if (rc) goto fail;
+    stage = "map_vram";
     available = f->imem.vram_bytes - f->imem.reserved;
     if (available < GF2_PUSH_BYTES) { rc = GF2_ENOSPC; goto fail; }
     ch->B = (available - GF2_PUSH_BYTES) & ~(GF2_PUSH_ALIGN - 1U);
@@ -115,6 +122,7 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
     ch->max = GF2_PUSH_MAX;
     while (ch->cur < GF2_PUSH_SKIPS) ch->va[ch->cur++] = 0;
     ch->free = ch->max - ch->cur;
+    stage = "dma_new";
     rc = gf2_dma_new(ch, GF2_HANDLE_PUSH_DMA, GF2_DMA_FROM_MEMORY,
                      GF2_DMA_TARGET_VRAM, GF2_DMA_ACCESS_RW, 0, available - 1U,
                      &ch->push_dma);
@@ -122,21 +130,35 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
                               GF2_DMA_TARGET_VRAM, GF2_DMA_ACCESS_RW,
                               0, available - 1U, &ch->vram_dma);
     if (rc) goto fail;
+    stage = "dma_get";
     rc = gf2_dma_get(ch);
-    if (!rc) rc = gf2_dma_new(ch, GF2_HANDLE_PCI_DMA, GF2_DMA_IN_MEMORY,
-                              GF2_DMA_TARGET_PCI, GF2_DMA_ACCESS_RW,
-                              ch->staging.pa, ch->staging.pa + ch->staging.size - 1U,
-                              &ch->pci_dma);
-    else if (rc == GF2_ENOSPC) rc = GF2_OK; /* VRAM remains available. */
-    if (!rc) rc = gf2_fifo_init(ch);
-    if (!rc) rc = gf2_gr_init(ch); /* includes RAMFC+38 bind */
-    if (!rc) rc = gf2_fifo_start(ch);
-    if (!rc) rc = command_irq(ch, true);
-    if (!rc) rc = reference_test(ch);
+    if (!rc) {
+        stage = "dma_new";
+        rc = gf2_dma_new(ch, GF2_HANDLE_PCI_DMA, GF2_DMA_IN_MEMORY,
+                         GF2_DMA_TARGET_PCI, GF2_DMA_ACCESS_RW,
+                         ch->staging.pa, ch->staging.pa + ch->staging.size - 1U,
+                         &ch->pci_dma);
+    } else if (rc == GF2_ENOSPC) rc = GF2_OK; /* VRAM remains available. */
+    if (rc) goto fail;
+    stage = "fifo_init";
+    rc = gf2_fifo_init(ch);
+    if (rc) goto fail;
+    stage = "gr_init";
+    rc = gf2_gr_init(ch); /* includes RAMFC+38 bind */
+    if (rc) goto fail;
+    stage = "fifo_start";
+    rc = gf2_fifo_start(ch);
+    if (rc) goto fail;
+    stage = "command_irq";
+    rc = command_irq(ch, true);
+    if (rc) goto fail;
+    stage = "reference_test";
+    rc = reference_test(ch);
     if (rc) goto fail;
     ch->state = GF2_RUN;
     return ch->last_rc = GF2_OK;
 fail:
+    kprintf(KLOG_ATTR, "[gf2] start fail stage=%s rc=%d\n", stage, rc);
     return command_stop(ch, rc);
 }
 

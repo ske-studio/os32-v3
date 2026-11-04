@@ -7,6 +7,11 @@
 #include "../../drivers/video/geforce/geforce_module.h"
 #include "../../mm/pgalloc.h"
 #include "../../include/sys.h"
+#include "../../include/kprintf.h"
+/* Output is asserted by the backend/command hosts; lifecycle hosts only
+ * provide the kernel printing dependency. */
+__attribute__((weak)) void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{ (void)attr; (void)fmt; }
 /* The display fixtures have no kernel page arena. F5 ROM acquisition may
  * fail before publishing its view (PM decision 8); F4 must still start.
  * Module fixtures supply their existing strong page allocator instead. */

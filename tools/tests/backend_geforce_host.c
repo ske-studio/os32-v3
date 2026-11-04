@@ -1,6 +1,8 @@
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "palette.h"
+#include "gf_startlog_host.h"
+static void close_display(void);
 #ifdef OS32_GEFORCE_MODULE
 #include "hwdev/gf/accel.h"
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
@@ -25,7 +27,7 @@ static int events[32], n, fail_step;
 static PaletteEntry colors[16];
 static u8 client[640 * 480];
 /* Synthetic nonzero address for testing framebuffer information propagation. */
-enum { FAKE_FB_PHYS = sizeof(client) };
+enum { FAKE_FB_PHYS = sizeof(client), FAIL_WC = 5, LOG_EPOCH = 7, LOG_SEQ = 9 };
 void pc98_console_set_safe(int safe) { (void)safe; }
 static int identify(void) { return 1; }
 static const PaletteEntry *fake_palette_get_all(void) { return colors; }
@@ -45,7 +47,7 @@ static int fake_present(const u8 *p, u32 pitch, volatile u8 *v, u32 vp, volatile
 static int fake_cell(void) { events[n++]=3; return fail_step==3; }
 static int fake_gf(void) { events[n++]=4; return fail_step==4; }
 static int fake_98(void) { events[n++]=6; return 0; }
-static int fake_stop(struct video_device *d) { (void)d; events[n++]=5; return 0; }
+static int fake_stop(struct video_device *d) { (void)d; events[n++]=5; close_display(); return 0; }
 static int fake_pal(struct video_device *d, u32 first, u32 count, const u8 *rgb) { (void)d; return first!=16 || count!=1 || rgb[0]!=255; }
 #define palette_get_all fake_palette_get_all
 #define palette_shadow_set fake_palette_shadow_set
@@ -60,10 +62,14 @@ static int fake_pal(struct video_device *d, u32 first, u32 count, const u8 *rgb)
 #define pc98_route_to_98 fake_98
 #include "../../drivers/video/geforce/backend_geforce.c"
 #ifdef OS32_GEFORCE_MODULE
+static struct gf2_chan log_chan;
+static struct gf4_ctx log_ctx;
+static struct gf4_test_ops log_ops;
+static const struct gf4_test_ops *log_dispatch;
 static GfxBackend module_backend;
 static int module_height, module_flip, module_page;
 static const GeforceModuleContext module_context = {
-    .backend=&module_backend, .height=&module_height,
+    .display_out=&log_dispatch, .backend=&module_backend, .height=&module_height,
     .flip=&module_flip, .page=&module_page
 };
 const GeforceModuleContext *geforce_context = &module_context;
@@ -87,6 +93,55 @@ int gf2_fence_wait(struct gf2_chan *ch,struct gf2_fence fence,u32 dl)
 #else
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 #endif
+static void close_display(void)
+{
+#ifdef OS32_GEFORCE_MODULE
+    log_dispatch = 0;
+    log_ctx.last_rc = 0;
+    log_chan.last_rc = 0;
+#endif
+}
+static int fake_wc(void) { return fail_step == FAIL_WC ? -1 : 0; }
+static int start_logs(struct video_device *d)
+{
+    static const char *const stages[] = {"video_start", "transfer", "cell", "route", "wc"};
+    geforce_backend_wc_bind(fake_wc);
+    for (unsigned detail = 0; detail < 4; detail++) {
+        for (unsigned i = 0; i < sizeof(stages) / sizeof(stages[0]); i++) {
+            n = failed = active = routed = 0;
+            fail_step = i + 1;
+            startlog_clear();
+#ifdef OS32_GEFORCE_MODULE
+            log_chan = (struct gf2_chan){.state=GF2_INIT, .epoch=LOG_EPOCH, .seq=LOG_SEQ, .last_rc=GF2_EIO};
+            log_ctx = (struct gf4_ctx){.last_rc=GF4_EFORMAT, .ch=detail == 2 ? 0 : &log_chan};
+            log_ops.ctx = &log_ctx;
+            log_dispatch = detail == 1 || detail == 2 ? &log_ops : 0;
+            struct gf_display_context video = {.display4 = &log_ctx};
+            d->context = detail == 3 ? &video : 0;
+#endif
+            geforce_backend_bind(d, identify, 0, 0, 0);
+            gfx_backend_geforce.init();
+            /* Compose the independent expected line with the fixture formatter. */
+            char actual[sizeof(startlog)];
+            for (unsigned j = 0; j < sizeof(startlog); j++) actual[j] = startlog[j];
+            startlog_clear();
+            kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s", fail_step == FAIL_WC ? -1 : 1, stages[i]);
+#ifdef OS32_GEFORCE_MODULE
+            if (detail == 1 || detail == 3)
+                kprintf(KLOG_ATTR, " last=%d gf2=%u/%u/%u ch_rc=%d\n", GF4_EFORMAT, GF2_INIT, (u32)LOG_EPOCH, (u32)LOG_SEQ, GF2_EIO);
+            else if (detail == 2)
+                kprintf(KLOG_ATTR, " last=%d gf2=na ch_rc=na\n", GF4_EFORMAT);
+            else
+#endif
+                kprintf(KLOG_ATTR, " last=na gf2=na ch_rc=na\n");
+            if (!startlog_equal(actual) || !failed || active || routed) return 20;
+            unsigned logs = startlog_len;
+            gfx_backend_geforce.init();
+            if (startlog_len != logs || gfx_backend_geforce.probe()) return 21;
+        }
+    }
+    return 0;
+}
 static int run(void)
 {
     struct video_device d = {0}; GFX_ScreenInfo info; u8 rgb[3]={15,0,0};
@@ -107,6 +162,7 @@ static int run(void)
     if (n || !gfx_backend_geforce.probe() || gfx_backend_geforce.query(&info) || info.flags || info.width!=640 || info.height!=480) return 1;
     gfx_backend_geforce.init();
     if (n!=4 || events[0]!=1 || events[1]!=2 || events[2]!=3 || events[3]!=4) return 2;
+    if (!startlog_equal("")) return 22;
     gfx_backend_geforce.enter(); if (n!=4) return 3;
     gfx_backend_geforce.set_palette(16,1,rgb); if (!gfx_backend_geforce.probe()) return 4;
     if (geforce_foundation_display(false)!=GF1_OK || active || routed) return 7;
@@ -116,6 +172,6 @@ static int run(void)
     n=0; fail_step=3;
     if (geforce_foundation_display(true)!=GF1_EIO) return 9;
     if (n!=5 || events[2]!=3 || events[3]!=5 || events[4]!=6 || gfx_backend_geforce.probe()) return 6;
-    return 0;
+    return start_logs(&d);
 }
 void _start(void) { int rc=run(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

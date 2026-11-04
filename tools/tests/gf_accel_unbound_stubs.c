@@ -5,6 +5,11 @@
  * fixture's explicit lower-layer model or real backend to take precedence. */
 #include "hwdev/gf/accel.h"
 #include "hwdev/gf/feature5.h"
+#include "kprintf.h"
+/* The start-failure hosts assert output; ownerless/link hosts borrow only
+ * the kernel printing dependency. */
+__attribute__((weak)) void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{ (void)attr; (void)fmt; }
 /* F3-only fixtures never bind the foreground F5 context. */
 __attribute__((weak)) i32 gf5_service_poll(struct gf5 *g)
 { (void)g; __builtin_trap(); }
