@@ -19,16 +19,19 @@ import hwb_host
 ROOT = hwb_host.ROOT
 FILES = CHECK['covers'][:7]
 MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
-              'iowrite8 port 0xFAC 0', 'enable-fac')]
+              'iowrite8 port 0xFAC 0', 'enable-fac'),
+             ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
+              'iowrite8 port 0x68 0x0E', 'gdc-restore')]
 
 
-def trial(mutate=False):
+def trial(mutation=None):
     sources = [(ROOT / p).read_text() for p in FILES]
-    if mutate:
-        _, _, old, new, _ = MUTATIONS[0]
-        if sources[0].count(old) != 1:
+    if mutation:
+        _, path, old, new, _ = mutation
+        index = FILES.index(path)
+        if sources[index].count(old) != 1:
             raise RuntimeError('mutation anchor is not unique')
-        sources[0] = sources[0].replace(old, new)
+        sources[index] = sources[index].replace(old, new)
     arrays = ',\n'.join(json.dumps(s, ensure_ascii=True) for s in sources)
     code = r'''#include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
@@ -65,7 +68,21 @@ void _start(void) {
     CHECK(hwb_eval(&state, last.value, &value) == HWB_OK);
     /* trident_driver-1.4.0.c:727: outb(0xFAC, 0x02). */
     CHECK(addr == 0xFAC && value == 2);
-    hwb_test_write("PASS scripts parse and enable FAC\n"); hwb_test_exit(0);
+    n = 0; while (scripts[1][n]) n++;
+    CHECK(hwb_parse(&p, scripts[1], n, &line) == HWB_OK);
+    HWB_TEST("gdc-restore");
+    found = 0;
+    for (u32 pc = 0; pc != HWB_NO_PC; pc = ins.next_pc) {
+        CHECK(hwb_parse_instruction(&p, pc, &ins) == HWB_OK);
+        if (ins.op == HWB_WRITE && ins.space == HW_IO) { last = ins; found = 1; }
+        if (ins.op == HWB_END) break;
+    }
+    CHECK(found && last.width == 1 && last.address.kind == HWB_ADDR_PORT);
+    CHECK(hwb_eval(&state, last.address.offset, &addr) == HWB_OK);
+    CHECK(hwb_eval(&state, last.value, &value) == HWB_OK);
+    /* HW_BASIC_DESIGN.md section 7: restore GDC display. */
+    CHECK(addr == 0x68 && value == 0x0F);
+    hwb_test_write("PASS scripts parse, enable FAC and restore GDC\n"); hwb_test_exit(0);
 }'''
     with tempfile.TemporaryDirectory(prefix='hwb-scripts-') as d:
         source = Path(d) / 'fixture.c'
@@ -74,10 +91,10 @@ void _start(void) {
         hwb_host.build(ROOT, source, exe)
         result = hwb_host.execute(exe)
         print(result.stdout, end='', flush=True)
-        if mutate:
-            if result.returncode != 1 or 'FAIL:enable-fac:' not in result.stdout:
+        if mutation:
+            if result.returncode != 1 or f'FAIL:{mutation[4]}:' not in result.stdout:
                 raise RuntimeError('mutation did not produce expected runtime RED')
-            print('enable-fac: RED runtime', flush=True)
+            print(f'{mutation[0]}: RED runtime', flush=True)
         elif result.returncode:
             raise RuntimeError('normal control failed')
         else:
@@ -88,7 +105,8 @@ void _start(void) {
 def main():
     trial()
     if '--mutate' in sys.argv:
-        trial(True)
+        for mutation in MUTATIONS:
+            trial(mutation)
     return 0
 
 
