@@ -331,7 +331,11 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     if (!off && !f->revoked) return svc_result(c,first);
     rc=gf_display_quiesce(l);
     if (rc && !first) first=rc;
-    if (!rc && off && closed && !l->engaged) {
+    if (!rc && off && closed) {
+        /* X3: quiesce leaves ownership flags intact. This caller confirms
+         * local cleanup, F2 OFF and closed windows before ending display use;
+         * a later release failure must not make cleanup pending again. */
+        l->engaged=false;
         rc=gf4_scan_release_all(c,dl);
         if (rc && !first) first=rc;
         if (!rc && !c->diagnostic_saved) {
