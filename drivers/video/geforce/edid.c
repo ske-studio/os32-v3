@@ -496,6 +496,9 @@ static i32 base(struct gf4_edid_state *s,const u8 *p)
         }
     }
     for(u32 i=54;i<126;i+=EDID_DTD) {
+        /* CEA-861-D table 27: native rank includes every original DTD,
+         * including unsupported sync formats and duplicate timings. */
+        if(p[i] || p[i+1]) s->dtd_seen++;
         if(dtd(p+i,&t)==1) add(s,&t,i==54 && ((p[24]&2) || p[19]>=4));
         /* Additional standard timings are the same 2-byte format. */
         if(!p[i] && !p[i+1] && !p[i+2] && p[i+3]==0xfa)
@@ -534,10 +537,12 @@ static i32 cta(struct gf4_edid_state *s,const u8 *p)
         }
         i+=n;
     }
-    u32 native=p[3]&15U, number=0;
+    u32 native=p[3]&15U;
     for(u32 i=end;i+EDID_DTD<=127;i+=EDID_DTD) {
         i32 rc=dtd(p+i,&t);
-        if(rc==1) { add(s,&t,number<native); number++; }
+        u32 number=s->dtd_seen;
+        if(p[i] || p[i+1]) s->dtd_seen++;
+        if(rc==1) add(s,&t,number<native);
         else if(rc<0) s->last_rc=rc;
     }
     return 0;
