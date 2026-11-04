@@ -23,6 +23,7 @@ static u16 text_attrs[TVRAM_COLS * TVRAM_ROWS];
 #include "../../gfx/gfx_osri.c"
 #include "../../gfx/gfx_osri_view.c"
 #include "../../drivers/video/pc98/backend_pc98.c"
+#include "../../drivers/video/pc98/backend_pc98_osri.c"
 #include "../../kapi/kapi_osri.c"
 
 volatile u32 tick_count;

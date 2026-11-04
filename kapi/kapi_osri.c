@@ -13,11 +13,10 @@ int kapi_osri_show(const char *path, u32 duration_ms)
     if (!duration_ms || duration_ms > GFX_OSRI_SHOW_MAX_MS) return OS32_ERR_INVAL;
     char *copy = kmalloc(VFS_MAX_PATH);
     if (!copy) return OS32_ERR_NOSPC;
-    u32 base = (u32)(uptr)path;
     int rc = OS32_ERR_INVAL;
     for (u32 i = 0; i < VFS_MAX_PATH; i++) {
-        if (i > ~(u32)0 - base ||
-            !copy_caller_bytes(&caller, (const void *)(uptr)(base + i), copy + i, 1)) {
+        /* copy_caller_bytes checks each 1-byte range against the caller band. */
+        if (!copy_caller_bytes(&caller, path + i, copy + i, 1)) {
             kfree(copy);
             if (caller.origin == CALLER_USER) ring3_fault_kill();
             return OS32_ERR_INVAL;
