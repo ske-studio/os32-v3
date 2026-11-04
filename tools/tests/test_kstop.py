@@ -158,6 +158,11 @@ static void dispatch_case(int inside) {
     CHECK(!appslot_stop_pending());
     CHECK(g_longjmp_reason==EXEC_LJ_PARK && !a->stop_wm_req && a->parked_from_stop);
     CHECK(a->state==APP_STATE_WAIT_POLL && a->frame[7]==0x89abcdef);
+    CHECK(appslot_stop_culprit()==2);
+    CHECK(appslot_stop_culprit()==2 && a->parked_from_stop);
+    res_owner_set(3);
+    CHECK(appslot_stop_culprit()==OS32_ERR_INVAL);
+    res_owner_set(APP_ID_SHELL);
     for(int i=0;i<APP_FRAME_WORDS;i++) CHECK(a->frame[i]==frame[i]);
     CHECK(!appslot_resume_check(2) && !appslot_kill_check(2));
     CHECK(appslot_resume_source(2)==APP_RESUME_SRC_KEEP);
@@ -166,7 +171,43 @@ static void dispatch_case(int inside) {
     // target != culprit: caller retains all state and will run again.
     appslot_resume_commit(2);
     CHECK(a->state==APP_STATE_RUNNING && !a->parked_from_stop && !a->stop_wm_req);
+    res_owner_set(APP_ID_SHELL);
+    CHECK(appslot_stop_culprit()==0);
     CHECK(appslot_get(3)->pages==30 && !appslot_get(3)->abort_req);
+}
+static void culprit_contract(void) {
+    /* Every application ID, including the upper bound; query is read-only. */
+    for (int id=APP_ID_MIN; id<=APP_ID_MAX; id++) {
+        setup();
+        AppSlot *a=appslot_at(id);
+        a->state=APP_STATE_RUNNING; a->gui=1; a->cpl3=1;
+        appslot_switch_to(id);
+        appslot_stop_request();
+        appslot_park_stop_commit();
+        CHECK(appslot_stop_culprit()==id);
+        CHECK(appslot_stop_culprit()==id && a->state==APP_STATE_WAIT_POLL);
+        CHECK(!appslot_kill_check(id));
+        appslot_reclaim(id); /* exec_kill uses this same reclaim path. */
+        CHECK(!a->parked_from_stop && appslot_stop_culprit()==0);
+    }
+    for (int origin=0; origin<2; origin++) {
+        setup();
+        if (origin) appslot_park_yield_commit();
+        else appslot_park_poll_commit();
+        CHECK(appslot_get(2)->state==APP_STATE_WAIT_POLL);
+        CHECK(appslot_stop_culprit()==0);
+    }
+    appslot_init();
+    AppSlot *a=appslot_at(APP_ID_MAX);
+    a->parked_from_stop=1; /* A mark in a different state is not a culprit. */
+    res_owner_set(APP_ID_SHELL);
+    CHECK(appslot_stop_culprit()==0);
+    a->state=APP_STATE_PARKED;
+    CHECK(appslot_stop_culprit()==0);
+    for (int id=APP_ID_MIN; id<=APP_ID_MAX; id++) {
+        res_owner_set(id);
+        CHECK(appslot_stop_culprit()==OS32_ERR_INVAL);
+    }
 }
 static void resume_marks(void) {
     /* Independent cases against appslot.c, never its boot selftest. */
@@ -280,6 +321,7 @@ static void park_contract(void) {
 static int test(void) {
     static struct addrspace as;
     (void)as;
+    culprit_contract();
     park_contract();
     dispatch_case(0); dispatch_case(1); dispatch_case(2);
     setup(); gui=0; ring3_abort_request(); CHECK(appslot_get(2)->abort_req && !appslot_get(2)->stop_wm_req);
@@ -416,6 +458,15 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
+ ('culprit-ignore-mark','exec/appslot_transition.inc',
+  'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
+  'a && a->state == APP_STATE_WAIT_POLL)'),
+ ('culprit-ignore-state','exec/appslot_transition.inc',
+  'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
+  'a && a->parked_from_stop)'),
+ ('culprit-ignore-owner','exec/appslot_transition.inc',
+  'int appslot_stop_culprit(void)\n{\n    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;',
+  'int appslot_stop_culprit(void)\n{'),
  ('lost-shell-request','exec/appslot_transition.inc','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
  ('ignore-shell-request','exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
