@@ -14,7 +14,7 @@ $(KCG_OUT)/kcg_import_slots.o $(KCG_OUT)/kcg_provider_types.o $(KCG_OUT)/kcg_kex
 $(KCG_OUT)/kcg_import_stubs.o: $(KCG_OUT)/kcg_import_stubs.S build/config.mk build/kcg-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(KCG_OUT)/kcg.elf: $(KCG_OBJS) build/kcg-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/kcg-module.ld -Map=$(KCG_OUT)/kcg.map $(KCG_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/kcg-module.ld -Map=$(KCG_OUT)/kcg.map $(KCG_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(KCG_OUT)/kcg_kexports.o

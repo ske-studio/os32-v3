@@ -14,7 +14,7 @@ $(FEP_OUT)/fep_import_slots.o $(FEP_OUT)/fep_provider_types.o $(FEP_OUT)/fep_kex
 $(FEP_OUT)/fep_import_stubs.o: $(FEP_OUT)/fep_import_stubs.S build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(FEP_OUT)/fep.elf: $(FEP_OBJS) build/fep-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/fep-module.ld -Map=$(FEP_OUT)/fep.map $(FEP_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/fep-module.ld -Map=$(FEP_OUT)/fep.map $(FEP_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(FEP_OUT)/fep_kexports.o

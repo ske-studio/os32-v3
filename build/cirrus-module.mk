@@ -18,7 +18,7 @@ $(CIRRUS_OUT)/cirrus_import_slots.o $(CIRRUS_OUT)/cirrus_provider_types.o $(CIRR
 $(CIRRUS_OUT)/cirrus_import_stubs.o: $(CIRRUS_OUT)/cirrus_import_stubs.S build/config.mk build/cirrus-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(CIRRUS_OUT)/cirrus.elf: $(CIRRUS_OBJS) build/cirrus-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/cirrus-module.ld -Map=$(CIRRUS_OUT)/cirrus.map $(CIRRUS_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/cirrus-module.ld -Map=$(CIRRUS_OUT)/cirrus.map $(CIRRUS_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(CIRRUS_OUT)/cirrus_kexports.o

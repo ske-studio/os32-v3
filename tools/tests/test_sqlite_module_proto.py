@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T4c-1: paired product SQLite controls, write-free rejection and mutants."""
 CHECK = dict(name='sqlite-module-proto-host', tier=1,
-    covers=['drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_romkana.c', 'kernel/ime/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/tvram.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_romkana.c', 'kernel/ime/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/tvram.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=['make:sqlite-module-proto'], budget=11.907954)
 
 import argparse
@@ -57,6 +57,8 @@ def relocation_suite(exe, runner):
 
 
 def real_suite(exe, directory, vmkernel, runner, packer=mkmod):
+    measurements = json.loads((directory / 'measurements.json').read_text())
+    assert measurements['libgcc_members'] == [], 'SQLite must use local division helpers'
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     metadata = json.loads((directory / 'sqlite_imports.json').read_text())
     elf = (directory / 'sqlite.elf').read_bytes()
@@ -512,10 +514,9 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         objects = [obj_path if name == 'os32_sqlite_vfs' else directory / (name + '.o')
                    for name in ('sqlite3', 'os32_sqlite_vfs', 'sqlite_module',
                                 'sqlite_import_slots', 'sqlite_import_stubs',
-                                'kstring', 'kstring_c', 'kmath')]
-        libgcc = subprocess.check_output([compiler, '-print-libgcc-file-name'], text=True).strip()
+                                'kstring', 'kstring_c', 'kmath', 'divdi3')]
         subprocess.run([compiler.with_name('i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
-                        '-T', ROOT / 'build/sqlite-module.ld', *objects, libgcc,
+                        '-T', ROOT / 'build/sqlite-module.ld', *objects,
                         '-o', elf_path], cwd=ROOT, check=True)
         spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
         body, _ = mkmod.build(elf_path.read_bytes(), metadata, vmkernel.read_bytes(),
@@ -537,7 +538,6 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             'host-fep-flags'], cwd=ROOT, text=True))
         compiler = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
         linker = compiler.with_name('i386-elf-ld')
-        libgcc = subprocess.check_output([compiler, '-print-libgcc-file-name'], text=True).strip()
         mutated_dir = folder / 'fep-body'
         mutated_dir.mkdir()
         body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_romkana',
@@ -561,7 +561,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             objects = [obj_path if stem == name else fep_directory / (stem + '.o')
                        for stem in body_objects]
             subprocess.run([linker, '-m', 'elf_i386', '--emit-relocs', '-T',
-                            ROOT / 'build/fep-module.ld', *objects, libgcc,
+                            ROOT / 'build/fep-module.ld', *objects,
                             '-o', elf_path], cwd=ROOT, check=True)
             elf_data = elf_path.read_bytes()
             parsed = mkmod.Elf(elf_data)
