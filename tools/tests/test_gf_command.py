@@ -86,6 +86,7 @@ MUTATIONS = {
       'gf2_test_bind_production(&production.foundation,&production.chan);',
       '(void)0;')],
     't2b': [('gf3-dispatch', 'gf_accel_test(q.session)', 'gf_accel_test(0)'),
+     ('gf4-dispatch', 'gf_display_test(q.session)', 'gf_display_test(1)'),
      ('reference-count',
       '#define GF2_REFERENCE_COUNT 100000U',
       '#define GF2_REFERENCE_COUNT 1000U'),

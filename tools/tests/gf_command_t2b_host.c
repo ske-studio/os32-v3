@@ -17,12 +17,21 @@ static char serial[32768];
 static unsigned serial_used;
 static u32 accel_case, accel_calls;
 static int accel_rc;
+static u32 display_session, display_calls;
+static i32 display_rc;
 
 int gf_accel_test(u32 case_id)
 {
     accel_case = case_id;
     accel_calls++;
     return accel_rc;
+}
+
+i32 gf_display_test(u32 session)
+{
+    display_session = session;
+    display_calls++;
+    return display_rc;
 }
 
 void serial_puts_polled(const char *s)
@@ -155,6 +164,8 @@ static void reset(void)
     serial[0] = 0;
     accel_case = accel_calls = 0;
     accel_rc = GF2_OK;
+    display_session = display_calls = 0;
+    display_rc = GF2_OK;
 }
 static int request(u32 test)
 {
@@ -248,10 +259,30 @@ static void t2b_accel_dispatch(void)
     assert(gf_command_test(&bad, &device, fake_row, &device) == GF2_EINVAL);
     assert(!accel_calls);
 }
+static void t2b_display_dispatch(void)
+{
+    /* GF4_DISPLAY is routed like GF3_ACCEL (kdebug/gf_command_test.c). */
+    const u32 sessions[] = {0, GF4_DISPLAY_SESSION_MAX};
+    const int results[] = {GF2_OK, GF2_EIO};
+    for (unsigned i = 0; i < sizeof(sessions) / sizeof(sessions[0]); i++) {
+        reset();
+        display_rc = results[i];
+        struct gf2_request q = {sizeof(q), GF4_DISPLAY, sessions[i], 0};
+        assert(gf_command_test(&q, 0, 0, 0) == results[i]);
+        assert(display_calls == 1 && display_session == sessions[i] && !accel_calls);
+        assert(q.rc == results[i] && q.session == 0);
+    }
+    reset();
+    struct gf2_request bad = {sizeof(bad), GF4_DISPLAY, 1, GF2_EIO};
+    assert(gf_command_test(&bad, &device, fake_row, &device) == GF2_EINVAL);
+    assert(!display_calls);
+}
+
 void _start(void)
 {
     t2b_reference_count();t2b_reference_stalled();t2b_wrap_required();
     t2b_recover_epoch();t2b_fault_recover();t2b_display_changed();
     t2b_deadline_wrap();t2b_fault_subchannel();t2b_accel_dispatch();
+    t2b_display_dispatch();
     gf2_host_exit(0);
 }
