@@ -356,42 +356,13 @@ def case_internal(cd):
               'vendor は規則免除でも解析失敗を飛ばさない (fail closed、変異REDには数えない)')
 
 
-def case_suite_cache_owner(cd):
-    """The cache is honoured only while its owning suite is alive."""
-    try:
-        cd.process_start(os.getpid())
-    except OSError:
-        print("  skip キャッシュの所有者 (/proc が無い — キャッシュは使われず全部を検査する)", flush=True)
-        return
-    old = os.environ.get('OS32_C_DIALECT_TEST_CACHE')
-    try:
-        with tempfile.TemporaryDirectory(prefix='c_dialect_owner_') as d:
-            os.environ['OS32_C_DIALECT_TEST_CACHE'] = d
-            check(cd._suite_cache() is None, "所有者の印の無いキャッシュは使わない")
-            me = os.getpid()
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d %s' % (me, cd.process_start(me)))
-            check(cd._suite_cache() == d, "生きている suite のキャッシュは使う")
-            dead = subprocess.Popen([sys.executable, "-c", "pass"])
-            dead.wait()
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d 1' % dead.pid)
-            check(cd._suite_cache() is None, "終わった suite のキャッシュ (残骸・手で指定) は使わない")
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d %d' % (me, int(cd.process_start(me)) + 1))
-            check(cd._suite_cache() is None, "使い回された pid (開始時刻が違う) のキャッシュは使わない")
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(me))
-            check(cd._suite_cache() is None, "開始時刻の無い印は使わない")
-    finally:
-        if old is None:
-            os.environ.pop('OS32_C_DIALECT_TEST_CACHE', None)
-        else:
-            os.environ['OS32_C_DIALECT_TEST_CACHE'] = old
-
-
 def case_internal_cache(cd):
     from unittest import mock
     with tempfile.TemporaryDirectory(prefix='c_dialect_cache_test_') as td:
         base = pathlib.Path(td)
         cache = base / 'cache'
         cache.mkdir()
+
         source = base / 'source'
         (source / 'kernel').mkdir(parents=True)
         (source / 'include').mkdir()
@@ -401,9 +372,10 @@ def case_internal_cache(cd):
                 'argv': ['-std=gnu11', '-ffreestanding', '-Iinclude', 'kernel/a.c']}
 
         def scan(root, u=unit):
-            return cd.check_internal_units([u], root, cache=cache)
+            return cd.check_internal_units([u], root)
 
-        with mock.patch.object(cd.ast, 'parse', wraps=cd.ast.parse) as parse:
+        with mock.patch.dict(os.environ, OS32_CHECK_CACHE=str(cache)), \
+                mock.patch.object(cd.ast, 'parse', wraps=cd.ast.parse) as parse:
             check(scan(source) == ([], 1), 'cache warmup scans the actual TU')
             calls = parse.call_count
             check(scan(source) == ([], 1) and parse.call_count == calls,
@@ -744,14 +716,13 @@ def main(argv):
     case_sdk(cd)
     case_internal(cd)
     case_internal_cache(cd)
-    case_suite_cache_owner(cd)
     case_build_coverage(cd)
     case_non_dependency_inputs(cd)
     sys.path.insert(0, str(ROOT / "tools/checks"))
     import run as checks_run
     if "--mutate" in argv or checks_run.dialect_variants_needed():
         warm = run_checker(ROOT)
-        check(warm.returncode == 0, 'unmodified tree warms the disposable internal cache: '
+        check(warm.returncode == 0, 'unmodified tree warms the isolated result cache: '
               + (warm.stdout + warm.stderr if warm.returncode else 'GREEN'))
         case_make_variants()
     else:
@@ -765,18 +736,10 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    # Cache only successful internal TU checks, for this one suite invocation.
-    # Every checker still reads its real make graph, flags, probes and SDK inputs.
     with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
-        sys.path.insert(0, str(ROOT / "tools"))
-        import check_c_dialect as owner  # noqa: E402
-        try:
-            pathlib.Path(cache, owner.SUITE_CACHE_OWNER).write_text(
-                '%d %s' % (os.getpid(), owner.process_start(os.getpid())))
-            os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
-        except OSError:
-            pass  # No /proc: run every translation unit without the cache.
+        os.environ['OS32_CHECK_CACHE'] = cache
         sys.exit(main(sys.argv[1:]))
+
 
 
 def run(ctx) -> int:
