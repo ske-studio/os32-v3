@@ -120,6 +120,14 @@ i32 gf4_palette_set(struct gf4_ctx *,u8 head,u32 first,u32 count,const u8 *rgb);
 i32 gf4_dac_set(struct gf4_ctx *,const struct gf4_route *,bool on);
 i32 gf4_scan_prepare(struct gf4_ctx *,u8 head,u32 mode_id,struct gf3_surface out[2],u32 dl);
 i32 gf4_scan_discard(struct gf4_ctx *,u8 head,u32 dl);
+/* C2-scan owns: first reservation of scan/cursor/test at service start, and
+ * return of every display reservation after the display stopped (X1/X3). */
+i32 gf4_scan_reserve_initial(struct gf4_ctx *,u32 dl);
+i32 gf4_scan_release_all(struct gf4_ctx *,u32 dl);
+/* C2-service owns: the resident owner table lent to F3 until module exit;
+ * C3 passes it to gf3_service_owner_bind (X3, PM 2026-11-04). */
+struct gf3_service_owner;
+const struct gf3_service_owner *gf4_service_owner_table(void);
 i32 gf4_service_bind(struct gf4_ctx *,struct gf_display_context *,const struct gf4_links *);
 i32 gf4_service_start(struct gf4_ctx *,u32 dl);
 i32 gf4_service_stop(struct gf4_ctx *,u32 dl);
