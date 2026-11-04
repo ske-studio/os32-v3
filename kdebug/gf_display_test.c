@@ -1,4 +1,4 @@
-/* GF_FEAT4_DESIGN final 2026-11-04 addendum, A3 wire/session/case0..4.
+/* GF_FEAT4_DESIGN final 2026-11-04 addendum, A3 wire/session/case0..7.
  * OS32's staged camera protocol has no nouveau equivalent. Hardware work
  * stays behind the borrowed module ops; C2 owns all scan reservations. */
 #include "gf_display_test.h"
@@ -28,7 +28,11 @@ static struct {
     u32 step, mode, crc;
     struct gf3_surface scan[2];
     u32 scan_crc[2];
-    bool valid, running, prepared;
+    u32 prepared_heads;
+    bool valid, running, prepared, lifecycle;
+    struct gf3_surface output_scan[GF4_HEADS][2];
+    u32 output_crc[GF4_HEADS][2];
+    struct display_request output_request[GF4_HEADS];
 } display_session;
 
 static inline i32 display_decode(u32 wire, struct display_request *out)
@@ -48,7 +52,8 @@ static inline i32 display_decode(u32 wire, struct display_request *out)
 static inline i32 display_admit(const struct display_request *q)
 {
     if (q->test == DISPLAY_RESTORE) return 0;
-    if (!display_session.valid) return q->phase ? GF4_ESTATE : 0;
+    if (!display_session.valid && !display_session.lifecycle)
+        return q->phase ? GF4_ESTATE : 0;
     const struct display_request *old = &display_session.request;
     if (!q->phase || q->test != old->test || q->connector != old->connector ||
         q->head != old->head) return GF4_EBUSY;
@@ -83,8 +88,12 @@ static inline i32 display_restore(bool finish)
     if (rc) return rc;
     if (finish) {
         if (display_session.prepared) {
-            rc = display_discard(display_session.request.head, dl);
-            if (rc) return rc;
+            for (u8 head = 0; head < GF4_HEADS; ++head) {
+                if (!(display_session.prepared_heads & (1U << head))) continue;
+                rc = display_discard(head, dl);
+                if (rc) return rc;
+                display_session.prepared_heads &= ~(1U << head);
+            }
             display_session.prepared = false;
         }
         o = geforce_display_restore_ops();
@@ -120,6 +129,7 @@ static inline i32 display_begin(const struct display_request *q)
     display_session.request = *q;
     display_session.step = display_session.mode = display_session.crc = 0;
     display_session.prepared = false;
+    display_session.prepared_heads = 0;
     display_session.valid = true;
     return display_restore(false);
 }
@@ -273,7 +283,9 @@ static i32 display_discard(u8 head, u32 dl)
     return o->scan_discard(o->ctx, head, dl);
 }
 /* Pattern 0 is the mode card. Patterns 1/2 are numbered flip cards;
- * the 3x5 glyphs below encode decimal 1 and 2, with opposite diagonals. */
+ * the 3x5 glyphs below encode decimal 1 and 2, with opposite diagonals.
+ * Pattern 3 is a horizontal grey ramp for the gamma camera steps. */
+enum display_pattern { DISPLAY_BARS, DISPLAY_NUMBER_ONE, DISPLAY_NUMBER_TWO, DISPLAY_GREY };
 static u32 display_flip_color(u32 x, u32 y, u32 w, u32 h, u32 pattern)
 {
     static const u8 glyph[2][5] = {{2,6,2,2,7}, {7,1,7,4,7}};
@@ -301,8 +313,14 @@ static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc, u32 patte
             for (u32 j = 0; j < w; ++j) {
                 u32 color = ((x + j) % DISPLAY_GRID == 0 || y % DISPLAY_GRID == 0)
                     ? DISPLAY_COLORS - 1U : (x + j) * DISPLAY_COLORS / s->width;
-                if (pattern) color = display_flip_color(x + j, y, s->width, s->height, pattern);
+                if (pattern == DISPLAY_NUMBER_ONE || pattern == DISPLAY_NUMBER_TWO)
+                    color = display_flip_color(x + j, y, s->width, s->height, pattern);
+                u8 shade[3];
                 const u8 *rgb = &display_palette[color * 3U];
+                if (pattern == DISPLAY_GREY) {
+                    shade[0] = shade[1] = shade[2] = (x + j) * U8_MAX / s->width;
+                    rgb = shade;
+                }
                 u32 pixel = cpp == 1 ? color : cpp == 2 ?
                     ((u32)(rgb[0] >> 3) << 11) | ((u32)(rgb[1] >> 2) << 5) |
                     (rgb[2] >> 3) : ((u32)rgb[0] << 16) | ((u32)rgb[1] << 8) | rgb[2];
@@ -331,7 +349,8 @@ static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc, u32 patte
     *crc = crc32_core_final(actual);
     return 0;
 }
-static i32 display_image(const struct display_request *q, u32 index, u32 dl)
+static i32 display_image(const struct display_request *q, u32 index, u32 dl,
+                         const struct gf4_route *selected)
 {
     struct gf4_mode m;
     struct gf4_route route;
@@ -341,20 +360,27 @@ static i32 display_image(const struct display_request *q, u32 index, u32 dl)
     if (rc) return rc;
     if (index >= n) return GF4_ENODEV;
     display_session.mode = m.id;
-    rc = display_route(q, &route);
-    if (rc) return rc;
+    if (selected) route = *selected;
+    else {
+        rc = display_route(q, &route);
+        if (rc) return rc;
+    }
     const struct gf4_test_ops *o = geforce_display_ops();
     if (!o || !o->ctx || !o->scan_prepare) return GF4_ESTATE;
     display_session.prepared = true; /* A failed prepare may retain nodes. */
+    display_session.prepared_heads |= 1U << q->head;
     rc = o->scan_prepare(o->ctx, q->head, m.id, scan, dl);
     if (rc) return rc;
     display_session.scan[0] = scan[0]; display_session.scan[1] = scan[1];
     rc = display_draw(&scan[0], dl, &display_session.crc,
-                      q->test == DISPLAY_FLIP ? 1U : 0U);
+                      q->test == DISPLAY_FLIP ? 1U :
+                      q->test == DISPLAY_OUTPUTS ? q->head + 1U :
+                      q->test == DISPLAY_GAMMA && m.fmt != GF3_INDEX8 ? DISPLAY_GREY : DISPLAY_BARS);
     if (rc) return rc;
     display_session.scan_crc[0] = display_session.crc;
-    if (q->test == DISPLAY_FLIP) {
-        rc = display_draw(&scan[1], dl, &display_session.scan_crc[1], 2U);
+    if (q->test == DISPLAY_FLIP || q->test == DISPLAY_OUTPUTS) {
+        rc = display_draw(&scan[1], dl, &display_session.scan_crc[1],
+                          q->test == DISPLAY_OUTPUTS ? 2U - q->head : 2U);
         if (rc) return rc;
     }
     o = geforce_display_ops();
@@ -511,8 +537,9 @@ static i32 display_step(const struct display_request *q)
             rc = display_discard(q->head, dl);
             if (rc) return rc;
             display_session.prepared = false;
+            display_session.prepared_heads &= ~(1U << q->head);
         }
-        rc = display_image(q, q->test == DISPLAY_MODE ? step : cursor_mode ? 1U : 0U, dl);
+        rc = display_image(q, q->test == DISPLAY_MODE ? step : cursor_mode ? 1U : 0U, dl, NULL);
         if (rc) return rc;
     }
     if (q->test == DISPLAY_DPMS) {
@@ -528,6 +555,259 @@ static i32 display_step(const struct display_request *q)
     display_record(q, "READY", step, display_session.mode, display_session.crc, 0);
     return 0;
 }
+/* The camera ramp is the integer curve specified by A3-case, independent
+ * of hardware LUT packing (MIT nouveau dispnv04/crtc.c:778-797,816-834). */
+#define DISPLAY_LUT_ENTRIES 256U
+#define DISPLAY_LUT_MAX (DISPLAY_LUT_ENTRIES - 1U)
+#define DISPLAY_LUT_SCALE 257U
+#define DISPLAY_GAMMA_STEPS 4U
+static u16 display_ramp[3][DISPLAY_LUT_ENTRIES];
+static i32 display_format_index(u8 connector, bool indexed, u32 *index)
+{
+    for (u32 i = 0;; ++i) {
+        struct gf4_mode m;
+        u32 n;
+        i32 rc = display_mode_at(connector, i, &m, &n);
+        if (rc) return rc;
+        if (i >= n) return GF4_EFORMAT;
+        if ((m.fmt == GF3_INDEX8) == indexed) { *index = i; return 0; }
+    }
+}
+/* The snapshot still owns its front. Only unused diagnostic banks are
+ * discarded, including both heads if the second prepare failed midway. */
+static i32 display_reset_images(u32 *dl)
+{
+    i32 rc = display_restore(false);
+    if (rc) return rc;
+    const struct gf4_test_ops *o = geforce_display_ops();
+    if (!o || !o->ctx) return GF4_ESTATE;
+    rc = display_deadline(o->ctx, dl);
+    if (rc) return rc;
+    for (u8 h = 0; h < GF4_HEADS; ++h) {
+        if (!(display_session.prepared_heads & (1U << h))) continue;
+        rc = display_discard(h, *dl);
+        if (rc) return rc;
+        display_session.prepared_heads &= ~(1U << h);
+    }
+    display_session.prepared = false;
+    return 0;
+}
+static i32 display_gamma_step(const struct display_request *q)
+{
+    u32 step = display_session.step + (q->phase ? 1U : 0U), dl;
+    if (step == DISPLAY_GAMMA_STEPS) return display_restore(true);
+    display_session.step = step;
+    i32 rc;
+    if (step == DISPLAY_GAMMA_STEPS - 1U) rc = display_reset_images(&dl);
+    else {
+        const struct gf4_test_ops *o = geforce_display_ops();
+        if (!o || !o->ctx) return GF4_ESTATE;
+        rc = display_deadline(o->ctx, &dl);
+    }
+    if (rc) return rc;
+    if (!step || step == DISPLAY_GAMMA_STEPS - 1U) {
+        u32 index;
+        rc = display_format_index(q->connector, step != 0, &index);
+        if (rc) return rc;
+        rc = display_image(q, index, dl, NULL);
+        if (rc) return rc;
+    }
+    if (step != DISPLAY_GAMMA_STEPS - 1U) {
+        for (u32 i = 0; i < DISPLAY_LUT_ENTRIES; ++i)
+            for (u32 c = 0; c < 3U; ++c)
+                display_ramp[c][i] = step == 1U ?
+                    i * i * DISPLAY_LUT_SCALE / DISPLAY_LUT_MAX : i * DISPLAY_LUT_SCALE;
+        const struct gf4_test_ops *o = geforce_display_ops();
+        if (!o || !o->ctx || !o->gamma) return GF4_ESTATE;
+        rc = o->gamma(o->ctx, q->head, display_ramp);
+        if (rc) return rc;
+    }
+    display_record(q, "READY", step, display_session.mode, display_session.crc, 0);
+    return 0;
+}
+static i32 display_output_route(u32 i, u8 head, struct gf4_route *route)
+{
+    const struct gf4_test_ops *o = geforce_display_ops();
+    if (!o || !o->ctx) return GF4_ESTATE;
+    if (i >= o->ctx->nroutes) return GF4_ENODEV;
+    *route = o->ctx->routes[i];
+    if (!(route->head_mask & (1U << head))) return GF4_ENODEV;
+    route->head = head;
+    return 0;
+}
+static i32 display_output_image(struct display_request *q,
+                                const struct gf4_route *r, u32 index, u32 dl)
+{
+    q->connector = r->connector; q->head = r->head;
+    i32 rc = display_image(q, index, dl, r);
+    if (rc) return rc;
+    for (u32 i = 0; i < 2U; ++i) {
+        display_session.output_scan[q->head][i] = display_session.scan[i];
+        display_session.output_crc[q->head][i] = display_session.scan_crc[i];
+    }
+    display_session.output_request[q->head] = *q;
+    return 0;
+}
+/* DCB route order is the diagnostic order. Pair only distinct connectors
+ * on independent internal ORs; set_mode owns PLL/encoder feasibility.
+ * MIT nouveau dispnv04/disp.c:247-294, dfp.c:68-90,204-278. */
+static i32 display_output_pair(struct gf4_route pair[GF4_HEADS], u32 n)
+{
+    for (u32 a = 0; a < n; ++a) {
+        i32 rc = display_output_route(a, 0, &pair[0]);
+        if (rc == GF4_ENODEV) continue;
+        if (rc) return rc;
+        for (u32 b = 0; b < n; ++b) {
+            rc = display_output_route(b, 1, &pair[1]);
+            if (rc == GF4_ENODEV) continue;
+            if (rc) return rc;
+            if (pair[0].connector == pair[1].connector) continue;
+            if (pair[0].location == pair[1].location &&
+                (pair[0].or_mask & pair[1].or_mask)) continue;
+            return 0;
+        }
+    }
+    return GF4_ENODEV;
+}
+static i32 display_outputs_step(const struct display_request *q)
+{
+    const struct gf4_test_ops *o = geforce_display_ops();
+    if (!o || !o->ctx) return GF4_ESTATE;
+    u32 n = o->ctx->nroutes, step = display_session.step + (q->phase ? 1U : 0U), dl;
+    if (step >= n + 3U) return display_restore(true);
+    display_session.step = step;
+    i32 rc = display_deadline(o->ctx, &dl);
+    if (rc) return rc;
+    struct display_request item = *q;
+    if (step <= n) {
+        if (q->phase) { rc = display_reset_images(&dl); if (rc) return rc; }
+        struct gf4_route pair[GF4_HEADS];
+        if (step < n) {
+            rc = display_output_route(step, q->head, &pair[0]);
+            if (rc == GF4_ENODEV)
+                rc = display_output_route(step, q->head ^ 1U, &pair[0]);
+            if (rc) return rc;
+            rc = display_output_image(&item, &pair[0], 0, dl);
+            if (rc) return rc;
+            o = geforce_display_ops();
+            if (!o || !o->ctx || !o->ctx->state) return GF4_ESTATE;
+            u8 other = item.head ^ 1U;
+            if (o->ctx->state->head[other].enabled) {
+                if (!o->dpms_set) return GF4_ESTATE;
+                rc = o->dpms_set(o->ctx, other, GF4_OFF, dl);
+            }
+            if (!rc) display_record(&item, "READY", step,
+                                   display_session.mode, display_session.crc, 0);
+            return rc;
+        }
+        rc = display_output_pair(pair, n);
+        if (rc) {
+            if (rc == GF4_ENODEV) display_session.step = n + 2U;
+            return rc;
+        }
+        for (u8 h = 0; h < GF4_HEADS; ++h) {
+            u32 index = 0;
+            if (h == 1U) {
+                struct gf4_mode ignored;
+                u32 count;
+                rc = display_mode_at(pair[h].connector, 1, &ignored, &count);
+                if (rc) return rc;
+                if (count > 1U) index = 1;
+            }
+            rc = display_output_image(&item, &pair[h], index, dl);
+            if (rc) return rc;
+        }
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->ctx->state) return GF4_ESTATE;
+        for (u8 h = 0; h < GF4_HEADS; ++h) {
+            const struct gf4_head_image *head = &o->ctx->state->head[h];
+            if (!head->enabled || head->front.off != display_session.output_scan[h][0].off)
+                return GF4_ESTATE;
+        }
+        for (u8 h = 0; h < GF4_HEADS; ++h)
+            display_record(&display_session.output_request[h], "READY", step,
+                           o->ctx->state->head[h].mode.id,
+                           display_session.output_crc[h][0], 0);
+        return 0;
+    }
+    /* Keep A visible while B powers off/on and flips its distinct card.
+     * DPMS and flip register work is delegated (crtc.c:175-233,1136-1217). */
+    item = display_session.output_request[1];
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->ctx->state || !o->dpms_set) return GF4_ESTATE;
+    const struct gf4_head_image *other = &o->ctx->state->head[0];
+    u32 other_mode = other->mode.id, other_front = other->front.off;
+    bool other_enabled = other->enabled;
+    enum gf4_dpms other_dpms = other->dpms;
+    rc = o->dpms_set(o->ctx, 1, step == n + 1U ? GF4_OFF : GF4_ON, dl);
+    if (rc) return rc;
+    if (step == n + 2U) {
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
+        rc = o->flip(o->ctx, 1, &display_session.output_scan[1][1], true, dl);
+        if (rc) return rc;
+    }
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->ctx->state) return GF4_ESTATE;
+    const struct gf4_head_image *a = &o->ctx->state->head[0];
+    const struct gf4_head_image *b = &o->ctx->state->head[1];
+    if (a->enabled != other_enabled || a->mode.id != other_mode ||
+        a->front.off != other_front || a->dpms != other_dpms ||
+        (step == n + 2U && b->front.off != display_session.output_scan[1][1].off))
+        return GF4_ESTATE;
+    display_record(&item, "READY", step, b->mode.id,
+                   display_session.output_crc[1][step == n + 2U], 0);
+    return 0;
+}
+/* Final PM decision: no snapshot crosses leave. Call the existing kernel
+ * backend table, never retain module callbacks/ctx across enter or leave.
+ * backend_geforce.c:198-209 owns routing and complete service stop. */
+static i32 display_lifecycle(const struct display_request *q)
+{
+    u32 step = q->phase ? display_session.step + 1U : 0U;
+    if (!q->phase) {
+        const struct gf4_test_ops *o = geforce_display_ops();
+        if (!o || !o->ctx || !o->ctx->ready || o->ctx->saved_closed) return GF4_ESTATE;
+        display_session.request = *q;
+        display_session.lifecycle = display_session.running = true;
+        display_session.mode = display_session.crc = 0;
+    }
+    display_session.step = step;
+    i32 rc = 0;
+    if (&gfx_backend_geforce == NULL) rc = GF4_ENODEV;
+    else if (step == 1U) {
+        if (!gfx_backend_geforce.leave) rc = GF4_EUNSUPPORTED;
+        else gfx_backend_geforce.leave();
+    } else {
+        if (!gfx_backend_geforce.enter) rc = GF4_EUNSUPPORTED;
+        else gfx_backend_geforce.enter();
+    }
+    const struct gf4_test_ops *o = geforce_display_ops();
+    if (!rc && step == 1U) {
+        if (o && o->ctx && o->ctx->ready) rc = GF4_ESTATE;
+    } else if (!rc) {
+        /* Existing enter selects the default head A, irrespective of the
+         * wire's head selector. A valid committed mode/front proves restart. */
+        if (!o || !o->ctx || !o->ctx->ready || !o->ctx->state) rc = GF4_ESTATE;
+        else {
+            const struct gf4_head_image *h = &o->ctx->state->head[0];
+            if (!h->enabled || !h->mode.id || !h->mode.t.hd || !h->mode.t.vd ||
+                !h->front.reservation_id || h->dpms != GF4_ON) rc = GF4_ESTATE;
+            else display_session.mode = h->mode.id;
+        }
+    }
+    if (rc) {
+        display_session.running = display_session.lifecycle = false;
+        display_record(q, rc == GF4_ENODEV || rc == GF4_EUNSUPPORTED ? "SKIP" : "ERROR",
+                       step, display_session.mode, 0, rc);
+    } else {
+        struct display_request item = *q; item.head = 0;
+        display_record(&item, "READY", step, display_session.mode, 0, 0);
+        if (step == 2U) display_session.lifecycle = display_session.running = false;
+    }
+    return rc;
+}
+
 i32 gf_display_test(u32 session)
 {
     struct display_request q;
@@ -537,23 +817,23 @@ i32 gf_display_test(u32 session)
     if (rc) return rc;
     if (q.test == DISPLAY_RESTORE) return display_restore(true);
     if (q.test == DISPLAY_ENUM) return q.phase ? GF4_EINVAL : display_enumerate(&q);
-    /* Later A3 cards implement case5..7; never start a snapshot for them. */
-    if (q.test > DISPLAY_FLIP) {
-        display_record(&q, "SKIP", 0, 0, 0, GF4_EUNSUPPORTED);
-        return GF4_EUNSUPPORTED;
-    }
+    if (q.test == DISPLAY_LIFECYCLE) return display_lifecycle(&q);
     if (!q.phase) {
         rc = display_begin(&q);
         if (rc) return rc;
     }
-    rc = display_step(&q);
+    rc = q.test == DISPLAY_GAMMA ? display_gamma_step(&q) :
+         q.test == DISPLAY_OUTPUTS ? display_outputs_step(&q) : display_step(&q);
     if (rc) {
         display_session.running = false;
         /* A connector's union table may be unusable on this route/head. */
         display_record(&q, rc == GF4_ENODEV || rc == GF4_EUNSUPPORTED ||
-                       rc == GF4_EPLL || rc == GF4_ERANGE ? "SKIP" : "ERROR",
+                       rc == GF4_EPLL || rc == GF4_ERANGE || rc == GF4_EFORMAT ||
+                       (q.test == DISPLAY_OUTPUTS && (rc == GF4_EBUSY || rc == GF4_ENOSPC)) ? "SKIP" : "ERROR",
                        display_session.step, display_session.mode, display_session.crc, rc);
-        if (q.test == DISPLAY_MODE && (rc == GF4_EPLL || rc == GF4_ERANGE)) {
+        if ((q.test == DISPLAY_MODE && (rc == GF4_EPLL || rc == GF4_ERANGE)) ||
+            (q.test == DISPLAY_OUTPUTS && (rc == GF4_ENODEV || rc == GF4_EUNSUPPORTED ||
+             rc == GF4_EPLL || rc == GF4_ERANGE || rc == GF4_EBUSY || rc == GF4_ENOSPC))) {
             /* The union mode table can reject just this head's candidate.
              * Restore before allowing phase1 to advance past the SKIP. */
             i32 restore_rc = display_restore(false);
