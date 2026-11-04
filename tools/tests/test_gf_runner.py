@@ -59,9 +59,51 @@ SCRIPT_MUTATIONS = [
 ]
 
 
+# name, product source, unique anchor, replacement, runtime RED case.
+SPLIT_MUTATIONS = [
+    ('split_prepare_executes', 'hwdev/gf/runner.c',
+     'if (init_point(ctx)) goto fail;\n    /* last_rc stays EIO',
+     'if (init_point(ctx) || init_execute(ctx, out)) goto fail;\n    /* last_rc stays EIO',
+     'split_cases: prepare has no I/O/steps/wait'),
+    ('split_execute_steps_reset', 'hwdev/gf/runner.c',
+     'if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'ctx->steps = 0; if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'split_cases: exhausted outer step budget'),
+    ('split_execute_wait_reset', 'hwdev/gf/runner.c',
+     'if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'ctx->wait_us = 0; if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'split_cases: accumulated wait budget'),
+    ('split_execute_elapsed_reset', 'hwdev/gf/runner.c',
+     'if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'ctx->elapsed_us = 0; if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'split_cases: clock failure preserves elapsed'),
+    ('split_execute_stale_state', 'hwdev/gf/runner.c',
+     'init_script_context(ctx, pc, head, or_mask, dl);\n    /* The owner supplies',
+     '(void)head; (void)or_mask; (void)dl;\n    /* The owner supplies',
+     'split_cases: stale calls/repeats/skip and head/OR/deadline'),
+    ('split_execute_redecode', 'hwdev/gf/runner.c',
+     'if (init_execute(ctx, program)) return init_script_failure(ctx);',
+     'if (gf_init_script_prepare(ctx, (struct gf_init_program *)program, pc, head, or_mask, dl) || '
+     'init_execute(ctx, program)) return init_script_failure(ctx);',
+     'split_cases: outer budget remains charged'),
+    ('split_wrapper_double_restore', 'hwdev/gf/runner.c',
+     'if (rc) return rc;\n    return gf_init_script_execute',
+     'if (rc) { (void)ctx->io.restore(ctx->io.opaque, ctx); return rc; }\n'
+     '    return gf_init_script_execute',
+     'split_cases: wrapper preparation failure restores once'),
+    ('split_cleanup_replaces_rc', 'hwdev/gf/runner.c',
+     'ctx->last_rc = rc;\n    return rc;',
+     '(void)rc; return ctx->last_rc;',
+     'split_cases: timeout survives failing cleanup'),
+]
+
+
 def mutation(item):
+    split = len(item) == 5
     script = len(item) == 4
-    if script:
+    if split:
+        name, path, old, new, _case = item
+    elif script:
         name, path, old, new = item
     else:
         name, old, new = item
@@ -73,7 +115,7 @@ def mutation(item):
         exe = Path(td) / 'host'
         try:
             tree = mutpar.build_in_tree(ROOT, td, {path: source.replace(old, new, 1) if old else source},
-                                       [command(exe, focused=not script, script=script)], capture_output=True)
+                                       [command(exe, focused=not (script or split), script=script)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': compile failed ' + str(exc.stderr), 1
         result = host32.run([str(exe)], cwd=tree, timeout=120, capture_output=True)
@@ -95,6 +137,8 @@ def main():
         errors = mutpar.run_with_control(mutation, MUTATIONS, ('control', '', ''))
         errors += mutpar.run_with_control(mutation, SCRIPT_MUTATIONS,
                                           ('script-control', 'hwdev/gf/runner.c', '', ''))
+        errors += mutpar.run_with_control(mutation, SPLIT_MUTATIONS,
+                                          ('split-control', 'hwdev/gf/runner.c', '', '', 'control'))
         return int(bool(errors))
     return 0
 

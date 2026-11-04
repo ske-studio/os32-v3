@@ -116,9 +116,10 @@ static void start_failures(void)
  * No body CRC needs recomputing for the read-only header allocation check. */
 #define C3_CONTEXT_VERSION 5U
 #define C3_OLD_CONTEXT_VERSION 4U
-#define C3_IMAGE_LIMIT (160U * 1024U)
-#define C3_MEM_LIMIT (160U * 1024U)
-#define C3_SPAN_LIMIT (208U * 1024U)
+/* PM decision 23: GEFORCE budgets, docs/08_build.md:202. */
+#define C3_IMAGE_LIMIT (256U * 1024U)
+#define C3_MEM_LIMIT (256U * 1024U)
+#define C3_SPAN_LIMIT (320U * 1024U)
 static void header_word(u8 *h, u32 word, u32 value)
 {
     for (u32 b=0; b<sizeof(value); b++)

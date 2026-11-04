@@ -4,6 +4,7 @@
 #include "foundation.h"
 #include "command.h"
 #include "accel.h"
+#include "feature5.h"
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN /* existing acquisition ceiling */
 #define GF_PRODUCTION_SUBSYS 0x127010fcU
 #define GF_PRODUCTION_BAR0_BYTES 0x01000000U
@@ -48,6 +49,8 @@ struct gf_production {
     struct gf2_chan chan;
     /* Layer 3 owns one immovable context for the production lifetime. */
     struct gf3_ctx accel;
+    /* Layer 5 borrows chan/accel/display4; owns ROM independently of scratch. */
+    struct gf5 feature5;
     /* Lend to foundation.map_ops/map_owner before start, including fake MMIO.
      * Keep both valid until stop/rollback has released the map; a failed stop
      * retains the loan. io.opaque remains the gf_io adapter's own context. */
