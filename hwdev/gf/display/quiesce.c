@@ -60,7 +60,7 @@ int gf_display_stop(void *v)
     int stop_rc=c->last_rc;
     if (stopped) {
         c->reusable=false;c->stop_ok=false;
-        if (c->engaged) {
+        if (c->engaged && !revoked) {
             if (first_rc) c->last_rc=first_rc;
             return -1;
         }
