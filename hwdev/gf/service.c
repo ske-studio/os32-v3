@@ -1,3 +1,24 @@
+/*
+ * Copyright 2021 Red Hat Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 /* GF video operations. Resource/ROM/A2 ownership is supplied by P4. */
 #include "internal.h"
 #include "command.h"
@@ -7,6 +28,7 @@
  * (nouveau_bo.c:594-599,618-629). No hardware methods are added here. */
 #include "accel_service.h"
 #include "production.h"
+#include "display/api.h"
 
 static struct gf3_service accel_service;
 /* GF_FEAT3_DESIGN N2 and C1 geometry addendum: page reservations, 64B pitch. */
@@ -40,6 +62,113 @@ struct gf3_service *gf3_service_get(struct gf2_chan *ch)
 {
     return accel_service.production && ch == &accel_service.production->chan ?
            &accel_service : 0;
+}
+
+/* X1-X3: OS32 value loans/dispatch replace BO pinning and channel
+ * block/bind/allow (nouveau_bo.c:594-629, nvkm/engine/fifo/uchan.c:272-298).
+ * No register writes or additional hardware policy belong to this layer. */
+i32 gf3_service_owner_bind(struct gf3_service *s,
+                           const struct gf3_service_owner *owner)
+{
+    i32 rc = service_check(s);
+    if (rc) return service_result(s, rc);
+    if (owner && (!owner->owner || !owner->start || !owner->stop || !owner->recover))
+        return service_result(s, GF3_EINVAL);
+    if (s->owner == owner) return 0;
+    if (owner && s->owner) return service_result(s, GF3_ESTATE);
+    if (!owner) {
+        struct gf_production *p = s->production;
+        if (p->chan.state != GF2_OFF || p->accel.ready || p->display.engaged ||
+            !p->display.stop_ok || s->scan_node.value.owner || s->test_node.value.owner ||
+            *s->slot) return service_result(s, GF3_ESTATE);
+        /* Registry init is idempotent, including a never-started service.
+         * A live window must retain its reservation until successful unmap;
+         * an empty registry therefore also proves all windows returned. */
+        rc = gf_vram_registry_init(&p->chan);
+        if (rc) return service_result(s, rc);
+        u32 cursor = 0;
+        struct gf_vram_reservation key;
+        rc = gf_vram_next(&p->chan, &cursor, &key);
+        if (rc) return service_result(s, rc < 0 ? rc : GF3_ESTATE);
+    }
+    s->owner = owner;
+    return 0;
+}
+
+static i32 service_loan_check(struct gf3_service *s, const struct gf3_surface *face)
+{
+    if (!face) return 0;
+    struct gf3_format fmt;
+    struct gf3_span span;
+    return gf3_surface_check(&s->production->accel, face,
+                            (struct gf3_rect){0, 0, face->width, face->height},
+                            GF3_USE_BYTES, &fmt, &span);
+}
+
+i32 gf3_service_surfaces(struct gf3_service *s,
+                         const struct gf3_surface *scan,
+                         const struct gf3_surface *test)
+{
+    i32 rc = service_check(s);
+    if (rc) return service_result(s, rc);
+    if (!s->owner || !s->production->accel.ready ||
+        s->scan_node.value.owner || s->test_node.value.owner)
+        return service_result(s, GF3_ESTATE);
+    rc = service_loan_check(s, scan);
+    if (!rc) rc = service_loan_check(s, test);
+    if (rc) return service_result(s, rc);
+    /* Snapshot both first: callers may pass the existing resident loans. */
+    struct gf3_surface next_scan = scan ? *scan : (struct gf3_surface){0};
+    struct gf3_surface next_test = test ? *test : (struct gf3_surface){0};
+    s->scan = next_scan;
+    s->test = next_test;
+    return 0;
+}
+
+i32 gf3_service_objects_init(struct gf3_service *s, u32 dl)
+{
+    i32 rc = service_check(s);
+    if (rc) return service_result(s, rc);
+    struct gf_production *p = s->production;
+    if (p->accel.ready || p->chan.state != GF2_RUN || !p->chan.epoch ||
+        !p->chan.f || p->chan.fault.latched ||
+        (p->accel.ch && p->accel.ch != &p->chan))
+        return service_result(s, GF3_ESTATE);
+    return service_result(s, gf3_init(&p->accel, &p->chan, dl));
+}
+
+i32 gf3_service_admission(struct gf3_service *s, bool open)
+{
+    i32 rc = service_check(s);
+    if (rc) return service_result(s, rc);
+    if (!open) {
+        *s->slot = 0;
+        gf_hook_scan_bind(false, 0);
+        return 0;
+    }
+    struct gf_production *p = s->production;
+    if (!p->accel.ready || p->chan.state != GF2_RUN || !p->chan.epoch ||
+        !p->chan.f || p->chan.fault.latched || p->accel.ch != &p->chan ||
+        p->accel.epoch != p->chan.epoch)
+        return service_result(s, GF3_ESTATE);
+    const struct gf3_surface *scan = s->scan.bytes || s->scan.reservation_id ? &s->scan : 0;
+    const struct gf3_surface *test = s->test.bytes || s->test.reservation_id ? &s->test : 0;
+    rc = service_loan_check(s, scan);
+    if (!rc) rc = service_loan_check(s, test);
+    if (rc) return service_result(s, rc);
+    gf_hook_ctx_bind(&p->accel);
+    /* F4's C1 adapter owns format-dependent scan publication. Do not
+     * overwrite it with the legacy INDEX8 hook on a 16/32bit scan. */
+    if (!s->owner || !scan) gf_hook_scan_bind(scan != 0, scan);
+    s->ops = (struct gf3_test_ops){
+        .ctx = &p->accel, .test_surface = &s->test,
+        .fill = gf3_fill, .copy = gf3_copy, .mono = gf3_mono,
+        .ifc = gf3_ifc, .upload = gf3_upload, .download = gf3_download,
+        .scale = gf3_scale, .present_m2mf = gf3_present_m2mf,
+        .map = gf_vram_view_map, .unmap = gf_vram_view_unmap
+    };
+    *s->slot = test ? &s->ops : 0;
+    return 0;
 }
 
 static struct gf3_surface service_surface(const struct gf_vram_reservation_node *n,
@@ -100,7 +229,6 @@ static i32 service_reserve(struct gf3_service *s, bool *no_test_capacity)
 
 static i32 service_publish(struct gf3_service *s, u32 dl)
 {
-    struct gf_production *p = s->production;
     bool no_test_capacity;
     i32 reserved = service_reserve(s, &no_test_capacity);
     /* No test capacity is nonfatal to display: initialize the scan hook,
@@ -108,21 +236,10 @@ static i32 service_publish(struct gf3_service *s, u32 dl)
      * exhaustion is a reservation failure: F2 keeps hook/slot closed. */
     if (reserved && (!no_test_capacity || !s->scan_node.value.owner ||
                      s->test_node.value.owner)) return service_result(s, reserved);
-    i32 rc = gf3_init(&p->accel, &p->chan, dl);
+    i32 rc = gf3_service_objects_init(s, dl);
     if (rc) return service_result(s, rc);
-    gf_hook_ctx_bind(&p->accel);
-    gf_hook_scan_bind(true, &s->scan);
-    if (!reserved) {
-        s->ops = (struct gf3_test_ops){
-            .ctx = &p->accel, .test_surface = &s->test,
-            .fill = gf3_fill, .copy = gf3_copy, .mono = gf3_mono,
-            .ifc = gf3_ifc, .upload = gf3_upload, .download = gf3_download,
-            .scale = gf3_scale, .present_m2mf = gf3_present_m2mf,
-            .map = gf_vram_view_map, .unmap = gf_vram_view_unmap
-        };
-        *s->slot = &s->ops;
-    }
-    return service_result(s, reserved);
+    rc = gf3_service_admission(s, true);
+    return service_result(s, rc ? rc : reserved);
 }
 
 i32 gf3_service_start(struct gf3_service *s, u32 dl)
@@ -130,6 +247,7 @@ i32 gf3_service_start(struct gf3_service *s, u32 dl)
     i32 rc = service_check(s);
     if (rc) return service_result(s, rc);
     struct gf_production *p = s->production;
+    if (s->owner) return service_result(s, GF3_ESTATE); /* N1: standalone only. */
     if (p->accel.ready || p->chan.state != GF2_RUN || !p->chan.epoch ||
         !p->chan.f || p->chan.fault.latched ||
         (p->accel.ch && p->accel.ch != &p->chan))
@@ -150,10 +268,8 @@ i32 gf3_service_start(struct gf3_service *s, u32 dl)
 
 i32 gf3_service_close(struct gf3_service *s)
 {
-    i32 rc = service_check(s);
+    i32 rc = gf3_service_admission(s, false);
     if (rc) return service_result(s, rc);
-    *s->slot = 0;
-    gf_hook_scan_bind(false, 0);
     return service_result(s, gf_vram_views_close(&s->production->chan));
 }
 
@@ -198,6 +314,9 @@ i32 gf3_service_release(struct gf3_service *s)
 
 i32 gf3_service_stop(struct gf3_service *s)
 {
+    i32 checked = service_check(s);
+    if (checked) return service_result(s, checked);
+    if (s->owner) return service_result(s, GF3_ESTATE); /* X3: no new deadline. */
     i32 first = gf3_service_close(s);
     if (service_check(s)) return first;
     struct gf_production *p = s->production;
@@ -218,6 +337,9 @@ i32 gf3_service_stop(struct gf3_service *s)
 
 i32 gf3_service_recover(struct gf3_service *s, u32 dl)
 {
+    i32 checked = service_check(s);
+    if (checked) return service_result(s, checked);
+    if (s->owner) return service_result(s, s->owner->recover(s->owner->owner, dl));
     i32 rc = gf3_service_close(s);
     if (service_check(s)) return rc;
     struct gf_production *p = s->production;
@@ -251,6 +373,19 @@ static int gf_start(void *v, u32 mode_id, const u8 *rgb)
     struct video_mode mode;
     if (!c || !rgb || gf_display_mode_info(c,0,&mode) || mode_id!=mode.id)
         return OS32_ERR_INVAL;
+    if (c->display4) {
+        u32 now;
+        if (!c->io.timing.clock_us || c->io.timing.clock_us(c->io.opaque,&now)) {
+            c->last_rc=GF2_EIO;
+            return GF2_EIO;
+        }
+        for (u32 i=0;i<VIDEO_PALETTE_BYTES;i++) c->palette[i]=rgb[i];
+        /* N1: ordinary video start uses only display4, including after a
+         * complete stop; owner is reserved for production diagnostics. */
+        int rc=gf4_service_start(c->display4,now+GF3_TIMEOUT_US);
+        c->last_rc=rc;
+        return rc;
+    }
     if (!c->reusable) return -1;
     if (c->bars[GF_MODE_VRAM_BAR].length<GF_MODE_VRAM_BYTES) return OS32_ERR_INVAL;
     for (u32 i=0;i<VIDEO_PALETTE_BYTES;i++) c->palette[i]=rgb[i];
