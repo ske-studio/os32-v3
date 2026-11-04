@@ -45,7 +45,7 @@ def recovery(tmp, function, runner, mutation=None):
     dispatch = function(exe, 'void __cdecl ring3_syscall_dispatch(')
     end = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     # Recovery probes enter the tail after a completed syscall, with no stdin replay.
-    stage('tails_source.c', 'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0;\n'
+    stage('tails_source.c', 'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int x87_depth=0;\n'
           + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
     stage('v86_source.c', read('kernel/v86/v86_mem.c').replace(
