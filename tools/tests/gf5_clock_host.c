@@ -32,6 +32,11 @@ static void fixture(void)
 #define REG_SHADER 0x4008U
 #define REG_MEM 0x4020U
 #define REG_MUX 0xc040U
+/* All distinct registers seeded or written by this fixture. */
+static const u32 fixture_regs[] = {
+    REG_CORE, REG_COEF, REG_SHADER, REG_MEM, REG_MEM + 4U, REG_MUX
+};
+static struct gf3_host_reg regs[sizeof(fixture_regs) / sizeof(fixture_regs[0])];
 #define OLD_MUX 0xa5a5ffffU
 #define MUX_BITS 0x333U
 #define CORE_BITS 0xc0070100U
@@ -64,6 +69,8 @@ static void run(void)
     struct gf5_plan p={.nc=ENABLE|SINGLE,.nn=(N1<<8)|M1,.sc=0,.mux=SHARED};
     struct gf5_clock c;
     gf5_host_init(&h,&state);
+    h.display.base.regs=regs;
+    h.display.base.cregs=sizeof(regs)/sizeof(regs[0]);
     h.display.events=de; h.display.cevents=64;
     h.events=fe; h.cevents=8;
     set_reg(REG_MUX,OLD_MUX); set_reg(REG_CORE,OLD_CORE);
