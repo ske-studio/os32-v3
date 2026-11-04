@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2042276556,
+  "module_abi_gen": 2120238464,
   "stage": "S6",
-  "count": 313,
+  "count": 314,
   "imports": [
     {
       "stage": "S1",
@@ -4732,6 +4732,22 @@
       "type_ver": 1,
       "signature": "i32 gf_display_test(u32 session);",
       "source_declaration": "i32 gf_display_test(u32 session);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 313,
+      "symbol": "gf5_test",
+      "source": "kdebug/gf5_test.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "gf5_test",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "i32 gf5_test(u32 session);",
+      "source_declaration": "i32 gf5_test(u32 session);",
       "dtype": null,
       "array": false
     }
