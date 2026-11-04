@@ -68,6 +68,10 @@ def inspect(text):
                 if op == 'print':
                     numeric += ['val']
             for key in numeric:
+                # P9: address resolution failures still emit begin/end records.
+                if key == 'addr' and fields[key] == 'UNRESOLVED' and (
+                        phase == 'begin' or (phase == 'end' and rc != 'OK')):
+                    continue
                 pattern = r'[0-9]+' if key in ('reads', 'requested_us') else r'0x[0-9a-fA-F]+'
                 if not re.fullmatch(pattern, fields[key]):
                     raise ValueError('invalid numeric field')

@@ -191,6 +191,17 @@ static void exit_codes(void)
     add("poll", "poll 8 phys 0xA0000 1 1 1000 100 -> x\nend\n");
     CHECK(command("run", "poll", 0) == 124 && !live);
 }
+static void unresolved(void)
+{
+    HWB_TEST("unresolved-address"); setup();
+    /* P9: missing scalar prevents all data accesses, including later writes. */
+    char *args[] = {"hw", "mmioread8", "phys", "missing", "->", "x"};
+    CHECK(shell_cmd_hw(6, args) == HWB_EXIT_ARG && !bus.accesses && !live);
+    add("missing-write", "mmiowrite8 phys missing 1\niowrite8 port 0x715 1\nend\n");
+    CHECK(command("run", "missing-write", 0) == HWB_EXIT_ARG && !bus.accesses && !live);
+    add("missing-poll", "poll 8 phys missing 1 1 1000 100 -> x\niowrite8 port 0x715 1\nend\n");
+    CHECK(command("run", "missing-poll", 0) == HWB_EXIT_ARG && !bus.accesses && !live);
+}
 static void scripts(void)
 {
     HWB_TEST("production-scripts");
@@ -220,6 +231,6 @@ static void scripts(void)
 }
 void _start(void)
 {
-    adapters(); lifetime(); exit_codes(); scripts();
+    adapters(); lifetime(); exit_codes(); unresolved(); scripts();
     hwb_test_write("SUMMARY PASS hwb shell\n"); hwb_test_exit(0);
 }

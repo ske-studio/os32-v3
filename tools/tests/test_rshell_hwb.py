@@ -117,7 +117,29 @@ def fields_exercise(mod):
                               ' ' + key + '=""' + extra + ' rc=OK\n' + TERM)[1])
 
 
+def unresolved_exercise(mod):
+    # P9 permits the sentinel only in the address of begin/failed end records.
+    for op in [space + action + width for space in ('pci', 'io', 'mmio')
+               for action in ('read', 'write') for width in ('8', '16', '32')] + ['poll']:
+        prefix = 'HW run=3 seq=1 line=1 phase='
+        begin = prefix + 'begin op=' + op + ' addr=UNRESOLVED val=0x00 rc=PENDING\n'
+        extra = ' reads=0 elapsed_us=0x0' if op == 'poll' else ''
+        for rc in mod.STATUS:
+            end = prefix + 'end op=' + op + ' addr=UNRESOLVED val=0x00' + extra + ' rc=' + rc + '\n'
+            terminal = TERM.replace('rc=OK', 'rc=' + rc)
+            check(bool(mod.inspect(begin + end + terminal)[1]) == (rc == 'OK'),
+                  op + ' unresolved ' + rc)
+            # A resolved end may follow an unresolved begin.
+            resolved = end.replace('addr=UNRESOLVED', 'addr=0xA0000')
+            check(not mod.inspect(begin + resolved + terminal)[1], op + ' resolved end')
+            for token in ('addr=missing', 'addr=unresolved', 'addr='):
+                check(mod.inspect((begin + end + terminal).replace('addr=UNRESOLVED', token))[1])
+            check(mod.inspect((begin + end + terminal).replace('val=0x00', 'val=UNRESOLVED'))[1])
+
+
 MUTATIONS = [
+    ('unresolved rejected', 'tools/rshell_hwb.py', "fields[key] == 'UNRESOLVED'", "fields[key] == 'disabled'", 'P9 failed address accepted'),
+    ('unresolved success', 'tools/rshell_hwb.py', "phase == 'end' and rc != 'OK'", "phase == 'end'", 'P9 success requires resolved address'),
     ('poll fields', 'tools/rshell_hwb.py', "elif op == 'poll':", "elif op == 'disabled-poll':", 'poll missing address/reads/elapsed'),
     ('wait fields', 'tools/rshell_hwb.py', "elif op == 'wait':", "elif op == 'disabled-wait':", 'wait missing request/elapsed'),
     ('text fields', 'tools/rshell_hwb.py', "rc == 'OK' and op in ('print', 'log'):", "rc == 'OK' and op in ():", 'print/log missing quoted text'),
@@ -130,6 +152,7 @@ MUTATIONS = [
 def main():
     exercise(load(SRC))
     fields_exercise(load(SRC))
+    unresolved_exercise(load(SRC))
     print('SUMMARY PASS', flush=True)
     if '--mutate' in sys.argv:
         return mutate()
@@ -160,5 +183,6 @@ if __name__ == '__main__':
     if '--child' in sys.argv:
         exercise(load(pathlib.Path(sys.argv[-1])))
         fields_exercise(load(pathlib.Path(sys.argv[-1])))
+        unresolved_exercise(load(pathlib.Path(sys.argv[-1])))
     else:
         sys.exit(main())
