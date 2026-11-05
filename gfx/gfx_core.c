@@ -2,6 +2,7 @@
 #include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
+#include "gfx_emergency.h"
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "con_sink.h"     /* con_sink_is_enabled — GUI 中かどうか (票 T8) */
@@ -85,6 +86,7 @@ void __attribute__((cold)) gfx_diag_first_present(u32 before)
  * 1 を返したものを使う (Cirrus → PEGC → 9801)。
  * 9801 の probe は常に 1 なので、末尾が必ず受け皿になる。 */
 static GfxBackend *const g_backend_list[] = {
+    &gfx_backend_trident, /* Explicit selection only. */
     &gfx_backend_geforce, /* Explicit selection only. */
     &gfx_backend_cirrus, /* Cirrus GD54xx アクセラレータ (H3)。ID 5Bh のみ */
     &gfx_backend_pegc,   /* 9821 PEGC 256 色 (H2)。9801 では probe が 0 */
@@ -105,7 +107,8 @@ static void gfx_bind_client(void);
 void gfx_set_backend_pref(int pref)
 {
     if (pref != GFX_PREF_PC98 && pref != GFX_PREF_PEGC &&
-        pref != GFX_PREF_CIRRUS && pref != GFX_PREF_GEFORCE)
+        pref != GFX_PREF_CIRRUS && pref != GFX_PREF_GEFORCE &&
+        pref != GFX_PREF_TRIDENT)
         pref = GFX_PREF_AUTO;
     g_backend_pref = pref;
 }
@@ -138,6 +141,7 @@ static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
     u32 backend = be == &gfx_backend_pc98 ? LEDGER_SF_PC98 :
                   be == &gfx_backend_pegc ? LEDGER_SF_PEGC :
                   be == &gfx_backend_cirrus ? LEDGER_SF_CIRRUS :
+                  be == &gfx_backend_trident ? LEDGER_SF_TRIDENT :
                   be == &gfx_backend_geforce ? LEDGER_SF_GEFORCE : 0;
     const struct ledger_surface *client = ledger_surface_find(backend, LEDGER_ROLE_CLIENT);
     GfxFormatDesc format;
@@ -193,8 +197,10 @@ static void gfx_select_backend(int legacy200)
         return;
     }
     if (g_backend_pref == GFX_PREF_PEGC ||
-        g_backend_pref == GFX_PREF_CIRRUS || g_backend_pref == GFX_PREF_GEFORCE) {
-        const GfxBackend *want = g_backend_pref == GFX_PREF_GEFORCE ? &gfx_backend_geforce : (g_backend_pref == GFX_PREF_CIRRUS)
+        g_backend_pref == GFX_PREF_CIRRUS || g_backend_pref == GFX_PREF_GEFORCE ||
+        g_backend_pref == GFX_PREF_TRIDENT) {
+        const GfxBackend *want = g_backend_pref == GFX_PREF_TRIDENT ? &gfx_backend_trident :
+                                g_backend_pref == GFX_PREF_GEFORCE ? &gfx_backend_geforce : (g_backend_pref == GFX_PREF_CIRRUS)
                                      ? &gfx_backend_cirrus
                                      : &gfx_backend_pegc;
         for (i = 0; i < n; i++) {
@@ -208,6 +214,12 @@ static void gfx_select_backend(int legacy200)
             }
             break;
         }
+        if (g_backend_pref == GFX_PREF_TRIDENT) {
+            GFX_ScreenInfo info;
+            int rc = want && want->query ? want->query(&info) : OS32_ERR_NOSYS;
+            if (!rc) rc = OS32_ERR_INVAL; /* probe/layout rejection */
+            kprintf(KLOG_ATTR, "[gfx] trident stage=select rc=%d -> pc98\n", rc);
+        }
         gfx_select_mode(&gfx_backend_pc98, legacy200);
         g_backend = &gfx_backend_pc98;
         return;
@@ -216,7 +228,8 @@ static void gfx_select_backend(int legacy200)
     for (i = 0; i < n; i++) {
         /* weak 宣言のバックエンド (未リンクなら 0) を飛ばす。
          * → include/gfx_hal.h の gfx_backend_pegc の注記 */
-        if (!g_backend_list[i] || g_backend_list[i] == &gfx_backend_geforce) continue;
+        if (!g_backend_list[i] || g_backend_list[i] == &gfx_backend_geforce ||
+            g_backend_list[i] == &gfx_backend_trident) continue;
         if (gfx_probe_backend(g_backend_list[i])) {
             if (!gfx_select_mode(g_backend_list[i], legacy200)) break;
             g_backend = g_backend_list[i];
@@ -281,12 +294,23 @@ static int gfx_select_and_init_backend(int legacy200)
     gfx_reinit_surfaces(0);
     gfx_select_backend(legacy200);
     gfx_reinit_surfaces(0);
-    if (g_backend == &gfx_backend_geforce) gfx_bind_client();
+    if (g_backend == &gfx_backend_geforce || g_backend == &gfx_backend_trident)
+        gfx_bind_client();
     if (g_backend && g_backend->init) {
         g_backend->init();
         /* init が失敗して probe が取り下げられた場合は 9801 へ落とす
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
+            if (g_backend == &gfx_backend_trident) {
+                GFX_ScreenInfo info;
+                int rc = g_backend->query ? g_backend->query(&info) : OS32_ERR_NOSYS;
+                int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, rc);
+                kprintf(KLOG_ATTR, "[gfx] trident stage=init rc=%d restore=%d\n", rc, restore_rc);
+                /* Trident's D:738 byte write 00 precedes Restore. Do not
+                 * substitute route_set(): it can omit a write and read back.
+                 * PC98_ROUTE_MASK=3 also rejects Trident's Enable value 02. */
+                if (restore_rc || (pc98_route_safe && !pc98_route_safe())) return -1;
+            }
             if (g_backend == &gfx_backend_geforce && !pc98_route_safe()) return -1;
             kprintf(KLOG_ATTR, "[gfx] backend=%s init failed -> pc98\n", g_backend->name);
             gfx_select_mode(&gfx_backend_pc98, legacy200);
@@ -297,7 +321,8 @@ static int gfx_select_and_init_backend(int legacy200)
         }
         return 1;
     }
-    return g_backend_pref != GFX_PREF_GEFORCE || !pc98_route_safe || pc98_route_safe() ? 0 : -1;
+    return (g_backend_pref != GFX_PREF_GEFORCE && g_backend_pref != GFX_PREF_TRIDENT) ||
+           !pc98_route_safe || pc98_route_safe() ? 0 : -1;
 }
 
 /* ======================================================================== */
@@ -326,6 +351,11 @@ void gfx_prepare_backend(void)
     if (g_backend->prepare) {
         g_backend->prepare();
         if (g_backend->probe && !g_backend->probe()) {
+            if (g_backend == &gfx_backend_trident) {
+                GFX_ScreenInfo info;
+                int rc = g_backend->query ? g_backend->query(&info) : OS32_ERR_NOSYS;
+                kprintf(KLOG_ATTR, "[gfx] trident stage=prepare rc=%d -> pc98\n", rc);
+            }
             gfx_select_mode(&gfx_backend_pc98, 0);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);

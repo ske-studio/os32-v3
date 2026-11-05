@@ -12,7 +12,7 @@ from test_gfx_kernel_fb import run_case, TARGET_SRCS as KERNEL_SRCS, ROOT
 
 # T2e e6 (contract: docs/KAPI_SPEC.md §4-10 v70); literal closure for the inventory.
 TARGET_SRCS = [
-    'gfx/gfx_core.c',
+    'gfx/gfx_core.c', 'gfx/gfx_emergency.c',
     'drivers/video/pc98/backend_pc98.c',
     'drivers/video/pc98/backend_pegc.c',
     'drivers/video/cirrus/backend_cirrus.c',
