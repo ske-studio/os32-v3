@@ -8,7 +8,7 @@
 
 - 作業木 `wt/t4b`、基点 `49b1ddb`。製品コード・ini・NHD は無変更。
 - 証拠: `/home/hight/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md`。
-- ログ: `/home/hight/os32-tmp/run/t4b/`。全試験は `check_slot.sh t4b` 経由。
+- ログ: `/home/hight/os32-tmp/run/t4b/`。全試験は直接実行。
 - HTTP 直接接続は `Connection refused`、Windows curl への fallback は
   `UtilBindVsockAnyPort: socket failed 1`。ゲスト命令・画面取得に至らず、NP21/W の受入は未確認。
 - 停止・起動・reset は未実行。PM が用意した crt31k.ini の起動状態を変更していないが、最終生存は未確認。
@@ -19,7 +19,7 @@
 ## 接続が復旧したら
 
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/t4b HOST32_RUNNERS=qemu`
-を明示し、試験は `/home/hight/os32-tmp/bin/check_slot.sh t4b <cmd>` 経由で実行。
+を明示し、試験は直接実行。
 `tools/np21w_mcp/np21w_client.py` の `post('/api/cmd', command, timeout=60)` を使う。
 `/api/cmd` と rshell_recover の COM1 読取りを並行させない。
 

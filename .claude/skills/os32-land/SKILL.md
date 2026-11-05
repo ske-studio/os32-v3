@@ -38,7 +38,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 | 段・小さな取り込み | 作業木の枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast: **全部の検査、変異なし**) が通るのを待つ |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた) | GitHub の workflow `full-check` (変異込みの全体、`gh workflow run full-check.yml -f ref=<枝か SHA>`)。毎晩 main に対しても自動で回る |
 
-- 手元の検査の枠 (`check_wt.sh`・`check_slot.sh`) は取り込みに使わない。CI を待つときは push した最後の SHA で (`gh run list --branch wt/<名> --commit <SHA>`)、待ちには上限を付ける。
+- 取り込みの検査は GitHub の CI。CI を待つときは push した最後の SHA で (`gh run list --branch wt/<名> --commit <SHA>`)、待ちには上限を付ける。
 - 並列の枝が先に main に入ったら、main を取り込んで push し直し、CI を通し直す。
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
