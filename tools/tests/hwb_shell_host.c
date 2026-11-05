@@ -259,7 +259,7 @@ static void scripts(void)
             /* §8 example BAR1, independent from shell address resolver. */
             struct hwbf_pci *p = hwbf_add_pci(&bus, HW_BDF(0,8,0), 0x1023, 0x9660);
             p->config[0x17] = 0x20; p->config[0x16] = 0x40; /* BAR1 0x20400000 */
-            if (hwbf_equal(script->name, "gf_regs.hwb")) {
+            if (hwbf_equal(script->name, "gf_regs.hwb") || hwbf_equal(script->name, "gf_palette.hwb")) {
                 /* Ra266 GeForce 0:13.0, BAR0 0x24000000 (RA266 §1-1). */
                 struct hwbf_pci *g = hwbf_add_pci(&bus, HW_BDF(0,13,0), 0x10de, 0x0221);
                 g->config[0x13] = 0x24;
