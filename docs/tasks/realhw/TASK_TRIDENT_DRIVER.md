@@ -2,7 +2,7 @@
 
 > 上位: [実機の計画](PLAN.md)
 
-> 状態: **設計中** — 設計票 v5 は **Codex 5 回目で Approve** (2026-09-29、§段 2-X の注記「Codex 5 回目の Approve に付いた注記」)。実装は未着手。(2026-09-29 の棚卸しで更新)
+> 状態: **設計中 (2026-11-05)** — 設計 v6 を確定 ([TRIDENT_V6_DESIGN](../../decisions/realhw/TRIDENT_V6_DESIGN.md): 段 2 = 640x480x8 のモード設定を HW-BASIC の `trident_mode.hwb` で実機に出す (段 2a で HW-BASIC に `mmiofill` を足す)、その後ドライバの段 3)。チップは SR09=0x10 の ProVidia 9682 (§2-1 の 11-05)。v5 (2026-09-29 Approve) の段 3〜5 の骨格は v6 が引き継ぐ。
 >
 > それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
@@ -105,6 +105,12 @@ PEGC の直しは完了し、両方を残す意味がある (§7 決裁 T1)。
 - `lspci -v 0:8.0`・`pcidump 0 8 0` は上の 2026-09-29 の値と 1 バイトも違わない (revision d3・Command 0002・BAR0〜2・ROM 0x21000000 無効・irq 0xff・capability なし)。
 - 読むだけの診断の版 (peek -m の許可リストの照合を外した版、ユーザー決定「ソースに追加しないと拒否する仕組みはやめましょう」) で BAR0 先頭 100h・BAR1 の 0000h〜00FFh・2000h〜20FFh・FF00h〜FFFFh・BAR2 先頭 100h を w4/w1 で読んだ。**すべて 00**、固まらない。
 - 読み: PCI の Memory Space Enable は立っているが、どの窓も 00 を返す。応答していない窓 (master abort なら普通は FFh) とも、VRAM が 0 で埋まっているだけとも決められない。チップの内部の窓の有効化 (資料に記述なし) が要る可能性がある。これ以上は書き込み (BAR の大きさの測り・I/O の有効化・VGA のレジスタの index の書き込み) が要る — §3-5 の段 2-X。
+
+**2026-11-05 の HW-BASIC の採取** (main a9819c78、`hw run /test/hw/trident.hwb`、X.Org xf86-video-trident 1.4.0 の PC98TRIDENT96xx Enable/Disable の転記、証拠はノートの `~/os32-tmp/evidence/2026-11-05/trident-hwb-a9819c78/` の t_a/t_b/t_c.log とカメラ):
+- **SR09 = 0x10 → ProVidia 9682** (§3 の判別表: 00h=9660・01h=9680・10h=9682・21h=9685)。読みは BAR1 (0x20400000) + 3C4h/3C5h の MMIO。**BAR1 の 3C0h〜3DFh は VGA レジスタとして応答する** (上の 11-04 の 00 の窓は別の範囲)。
+- mode=1 (Enable: 0x68=0E、0x6A=07/8F/06、CR23 2C→0C、CR29 04→04 (bit2 は既に 1)、GR23 00→00、SR01 20→20、0xFAC=02): 止まらずに通る (34 書き)。シリアル・`ver` は正常。**画面は 98 から黒に替わり、モニタ (NEC LCD172VXM) が約 6 秒 OSD (無信号の表示に見える) を出した** — 映像の経路の切り替えは効く。Trident の CRTC・クロックはこのスクリプトでは設定していないので、信号が無いのは手順どおり。DAC の 83C6h の index 4 は 0x0F で、6/8/1 の bit を足しても変わらない。
+- mode=2 (Disable: 0xFAC=00、SR01→30、DAC の index 4 0F→00、GR23→01、CR29→00、CR23→2C、0x6A=07/8E/06、0x68=0F): 98 の CUI に戻る。戻った直後に数文字の欠けと右側の白い点 3〜4 個 (カメラ)。Trident の出力の間にシリアルに出た行は 98 の画面には出ない。
+- 次: 表示を出すには CRTC・クロック (Trident の PLL) のモード設定が要る。設計 v5 はこの採取の前提で改訂する。
 
 **事実** (config の値そのもの):
 

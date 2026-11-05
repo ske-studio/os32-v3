@@ -1,6 +1,6 @@
 # TASK_HW_BASIC — ハードウェア調査の道具 HW-BASIC (汎用、許可リストなし)
 
-> 状態: **設計中 (2026-11-05)** — 設計は確定 ([HW_BASIC_DESIGN](../../decisions/realhw/HW_BASIC_DESIGN.md))、実装はこれから。メインストリーム (GeForce) でないので取り込みの検査は GitHub の CI。
+> 状態: **実装中 (2026-11-05)** — 設計 ([HW_BASIC_DESIGN](../../decisions/realhw/HW_BASIC_DESIGN.md)) どおりの実装は main (a9819c78、CI で取り込み)。実機 Ra266 で `hw run /test/hw/trident.hwb` の mode=0/1/2 を流し、止まらずに通った (結果は TASK_TRIDENT_DRIVER §2-1 の 11-05)。次の段: `mmiofill` の追加 (TRIDENT_V6_DESIGN の段 2a、wt/trident-2a で実装中)。
 
 ## 0. ユーザー決定 (原文)
 

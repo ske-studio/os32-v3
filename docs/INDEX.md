@@ -346,6 +346,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/network/PLAN.md](tasks/network/PLAN.md) | LGY-98 / NE2000 **ドライバ**計画 — M1〜M3 エミュレータ合格、既定で有効 (2026-09-14 決裁) |
 | [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | リンクプロトコル (ワイヤ v2) / Host Services 計画 |
 | [tasks/network/HOST_SERVICES_PLAN.md](tasks/network/HOST_SERVICES_PLAN.md) | Host Services 詳細計画 — N1〜N4 受入完了。N5 (実機 LAN) は実機の内蔵 82557 の票 ([TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) の L-B) に吸収。LGY-98 はエミュレータで回帰を取る経路として残る |
+| [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (設計中 2026-11-05) |
 | `docs/archive/network/TASK_N0.md` / `docs/archive/network/TASK_N1.md` / `docs/archive/network/TASK_N2.md` / `docs/archive/network/TASK_N3.md` / `docs/archive/network/TASK_N4.md` | 票 N0〜N4 (受入完了、2026-09-14〜15) — 設計 v5、KAPI v51 + libos32host、PRINT/CLIP、wget/lpr、ファイラ印刷と端末の貼り付け |
 
 ### 移植性

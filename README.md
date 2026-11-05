@@ -138,6 +138,13 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 - FD 起動 (2HD 1232KB / 1.44MB)、CD からの HDD インストール (`cdinst`)、HDD 起動、シリアル 115200 と SerialFS (HDD 起動のまま更新)、PCI 列挙
 - v3 で続ける実機の票 (82557 LAN、GeForce 6200、Trident、PEGC 480、1.44MB FD など) の索引は [docs/tasks/realhw/PLAN.md](docs/tasks/realhw/PLAN.md)、機体の構成は [docs/decisions/realhw/RA266.md](docs/decisions/realhw/RA266.md)
 
+### ホストとの LAN の接続 (推奨)
+
+OS32 とホスト (LAN 版 SerialFS・Host Services を動かす PC) のあいだの通信は**平文で、認証もありません** — OS32 はホストを無条件に信用します。
+そのため、**ホストに普段の LAN とは別の口 (USB の LAN アダプタなど) を用意し、PC-98 とクロスケーブルで 1 対 1 につなぐ**ことを推奨します。
+こうしておけば、PC-98 に届く通信はそのホストからのものだけになり、セキュリティの問題はホスト側 (ホストのプログラムを動かすユーザーの権限、公開するディレクトリ、書き込みの許可) の扱いに閉じます。
+開発の現状 (2026-11) はスイッチで普段の LAN とつないでいて、まだ分けていません。
+
 ## クイックスタート
 
 [INSTALL.md](INSTALL.md) を参照してください。

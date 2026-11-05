@@ -25,6 +25,7 @@
  * NV40 idle ignores SYNC_STALL and waits at most two seconds. The other
  * adapters below join existing OS32 F2/F4 ownership boundaries. */
 #include "feature5.h"
+#include "display/stage.h"
 #include "internal.h"
 #include "../../mm/pgalloc.h"
 #include "../../include/sys.h"
@@ -143,7 +144,9 @@ i32 gf5_link_display_restore(void *owner,const struct gf5_image *image)
 {
     struct gf5 *g=owner;
     if (!g || !g->display || !image) return links_result(g,GF5_EINVAL);
-    return links_result(g,gf4_display_restore(g->display,&image->display,g->deadline));
+    i32 rc=gf4_stage_deadline(g->display,&g->deadline);
+    if (!rc) rc=gf4_display_restore(g->display,&image->display,g->deadline);
+    return links_result(g,rc);
 }
 i32 gf5_link_stop(void *owner,u32 dl)
 {
@@ -155,7 +158,10 @@ i32 gf5_link_restart(void *owner,u32 dl)
 {
     struct gf5 *g=owner;
     if (!g || !g->display) return links_result(g,GF5_EINVAL);
-    return links_result(g,gf4_service_restart(g->display,dl));
+    i32 rc=gf4_service_restart(g->display,dl);
+    /* F5 performance restoration begins after devinit/F1/F2/F3 restart. */
+    if (!rc) rc=gf4_stage_deadline(g->display,&g->deadline);
+    return links_result(g,rc);
 }
 /* Retain failed transaction saves along with the adapter-owned index/lock
  * state. In particular no V0/list or cleanup loan points at stack storage. */
