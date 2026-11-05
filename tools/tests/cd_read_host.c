@@ -953,7 +953,7 @@ static int fixture_cd_read(Device *dev, int lba, int count, void *buf)
     return rc;
 }
 static Device g_cd0 = {.name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
-                       .sect_size = SEC, .blk_read = fixture_cd_read};
+                       .sect_size = SEC, .blk_read = fixture_cd_read, .blk_read_u32 = 0, .media_check = 0};
 
 /* Standalone CD tests have no open FDs; SQLite uses real vfs_fd.c. */
 #ifndef CD_HOST_REAL_FDS
@@ -2390,7 +2390,7 @@ static void t_iso_devices(void)
         /* Even a readable ISO image is outside the CD-only contract. */
         Device image = {.name = names[i], .type = DEV_BLOCK,
                         .bus_type = DEV_BUS_LOOP, .sect_size = SEC,
-                        .total_sects = g_media_a.secs, .blk_read = fixture_cd_read};
+                        .total_sects = g_media_a.secs, .blk_read = fixture_cd_read, .blk_read_u32 = 0, .media_check = 0};
         CHECK(!dev_register(&image));
         g_klog_n = 0; g_klog[0] = '\0';
         u32 reads = M.n_read10;
@@ -2402,10 +2402,10 @@ static void t_iso_devices(void)
     CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_FD, 0)));
     /* Unattached loop units, plus each independently missing geometry field. */
     Device empty[] = {
-        {.name = "lo0", .type = DEV_BLOCK}, {.name = "lo1", .type = DEV_BLOCK},
-        {.name = "lo2", .type = DEV_BLOCK}, {.name = "lo3", .type = DEV_BLOCK},
-        {.name = "cd1", .type = DEV_BLOCK, .total_sects = 100},
-        {.name = "cd2", .type = DEV_BLOCK, .sect_size = SEC}
+        {.name = "lo0", .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0}, {.name = "lo1", .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0},
+        {.name = "lo2", .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0}, {.name = "lo3", .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0},
+        {.name = "cd1", .type = DEV_BLOCK, .total_sects = 100, .blk_read_u32 = 0, .media_check = 0},
+        {.name = "cd2", .type = DEV_BLOCK, .sect_size = SEC, .blk_read_u32 = 0, .media_check = 0}
     };
     CHECK(!dev_unregister(&g_cd0));
     for (unsigned i = 0; i < sizeof(empty) / sizeof(empty[0]); i++)

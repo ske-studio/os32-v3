@@ -2,12 +2,13 @@
 #ifndef LAN_MODULE_H
 #define LAN_MODULE_H
 #include "lan_contract.h"
+#include "../../../net/nic.h"
 #include "pci_bind_contract.h"
 #include "sfs_lan.h"
 #include "../../../kernel/module/module_runtime.h"
 #include "../../../kernel/irq/irq.h"
 #include "../../../mm/dma_pool.h"
-#define LAN_MODULE_OPS_VERSION 1u
+#define LAN_MODULE_OPS_VERSION 2u
 typedef struct {
     int (*probe)(const struct pci_dev *dev);
     int (*send)(const void *buf, u32 len);
@@ -25,8 +26,10 @@ typedef struct {
     int (*lan_peer)(SfsLan *, const char *);
     void (*lan_reset)(SfsLan *);
     SfsIo io;
+    const struct NetAdapter *adapter;
+    int (*netcd_register)(const char *);
 } LanModuleApi;
-#define LAN_MODULE_API_SLOTS 20u
+#define LAN_MODULE_API_SLOTS 22u
 int lan_module_probe(const struct pci_dev *dev);
 const struct pci_driver *platform_lan_driver(void);
 int lan_module_load(void);

@@ -4,6 +4,8 @@
 Return the guest status when the record, echo, EOT and terminal rc agree;
 return 1 for incomplete/invalid transport or records, or an unknown status.
 The HW command is sent once only; even an incomplete response is saved.
+For LAN output to /host/logs/run.log, start tools/lanfs_host.py separately
+with --iface IFACE --root DIR --allow-write logs (repeatable, root-relative).
 """
 import re
 from pathlib import Path
@@ -145,7 +147,7 @@ def inspect_file(path):
 
 def run(args, send, baud=9600, out=print):
     del baud
-    # LAN uses an independently running lanfs_host (--allow-write).
+    # LAN uses an independently running lanfs_host (--allow-write logs).
     wrapped = args.line[:3] == ['sfs', 'run', 'hw']
     command = args.line[3:] if wrapped else args.line
     file_output = command[:2] in (['run', '-o'], ['load', '-o'])

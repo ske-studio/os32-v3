@@ -170,7 +170,7 @@ static int host_stat(void *ctx, const char *s, OS32_Stat *st) {
     if (kstrlen(s) > 8) return OS32_ERR_NOTFOUND;
     st->st_size = PAGE_SIZE; return 0;
 }
-static VfsOps host_ops = {.stat = host_stat};
+static VfsOps host_ops = {.stat = host_stat, .resource_check = 0, .resource_refresh = 0};
 /* Real ring3_str.c is independently tested; guard predicate is its real body. */
 #include "str_host_source.c"
 

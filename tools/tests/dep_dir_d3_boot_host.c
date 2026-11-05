@@ -75,13 +75,13 @@ static int fatfs_init(void) { event("fat;"); return failing == 2 ? -1 : VFS_OK; 
 static int hostdrvfs_init(void) { event("hostfs;"); return failing == 3 ? -1 : VFS_OK; }
 static int serialfs_init(void) { event("serialfs;"); return failing == 4 ? -1 : VFS_OK; }
 static Device children[] = {
-    {.name="fd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1},
-    {.name="hd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1},
-    {.name="cd0", .type=DEV_BLOCK, .sect_size=2048, .total_sects=1},
-    {.name="empty", .type=DEV_BLOCK},
-    {.name="char", .type=DEV_CHAR},
-    {.name="no-size", .type=DEV_BLOCK, .total_sects=1},
-    {.name="no-sects", .type=DEV_BLOCK, .sect_size=512},
+    {.name="fd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
+    {.name="hd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
+    {.name="cd0", .type=DEV_BLOCK, .sect_size=2048, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
+    {.name="empty", .type=DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0},
+    {.name="char", .type=DEV_CHAR, .blk_read_u32 = 0, .media_check = 0},
+    {.name="no-size", .type=DEV_BLOCK, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
+    {.name="no-sects", .type=DEV_BLOCK, .sect_size=512, .blk_read_u32 = 0, .media_check = 0},
 };
 int dev_get_names(const char **names, int max)
 {

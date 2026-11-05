@@ -57,6 +57,57 @@ def parse(packet):
     return fr[2]
 
 
+def check_cli_writes(host):
+    # Enter through main(): only the raw NIC and foreground loop are replaced.
+    with tempfile.TemporaryDirectory(prefix="lanfs-cli-") as tmp:
+        root = pathlib.Path(tmp)
+        (root / "logs").mkdir()
+        (root / "protected").write_bytes(b"original")
+        (root / "logs/link").symlink_to(root / "protected")
+
+        def exercise(port, server):
+            hello = sfs.encode(sfs.T_HELLO, 0, 0, struct.pack("<HHI", 1, 512, 123))
+            sid = parse(server.handle(packet(hello, BCAST))).sid
+            for seq, (path, expected) in enumerate(cases, 1):
+                wire_path = path.encode()
+                payload = (struct.pack("<IBB", 0, sfs.WF_TRUNC, len(wire_path)) +
+                           wire_path + b"written")
+                reply = parse(server.handle(packet(sfs.encode(sfs.T_WRITE, sid, seq, payload))))
+                status = struct.unpack_from("<i", reply.payload)[0]
+                if expected is None:
+                    assert status < 0, (path, status)
+                else:
+                    assert status == expected, (path, status, expected)
+            raise KeyboardInterrupt()
+
+        for options, cases in [
+                ([], [("/logs/default", sfs.ERR_ROFS)]),
+                (["--allow-write", "logs", "--allow-write", "single"],
+                 [("/logs/record", 7), ("/single", 7), ("/logs/link", None),
+                  ("/logs-other", sfs.ERR_ROFS), ("/protected", sfs.ERR_ROFS)])]:
+            with patch.object(sys, "argv", ["lanfs_host.py", "--iface", "fake0",
+                                           "--root", str(root), *options]), \
+                    patch.object(host, "NicPort") as nic, \
+                    patch.object(host, "link_status", return_value="fake link"), \
+                    patch.object(host, "serve", side_effect=exercise), \
+                    redirect_stderr(io.StringIO()):
+                nic.return_value.mac = HOST
+                assert host.main() == 0
+                nic.return_value.close.assert_called_once()
+        assert not (root / "logs/default").exists()
+        assert (root / "logs/record").read_bytes() == b"written"
+        assert (root / "single").read_bytes() == b"written"
+        assert not (root / "logs-other").exists()
+        assert (root / "protected").read_bytes() == b"original"
+        for bad in ("../escape", "logs/../protected", "logs/./record"):
+            with patch.object(sys, "argv", ["lanfs_host.py", "--iface", "fake0",
+                                           "--root", str(root), "--allow-write", bad]), \
+                    patch.object(host, "NicPort") as nic, redirect_stderr(io.StringIO()):
+                assert host.main() == 1
+                nic.assert_not_called()
+    print("PASS CLI allow-write repeated paths, containment, default ROFS and invalid paths", flush=True)
+
+
 class Rig:
     def __init__(self, lib, host, root):
         self.lib = lib
@@ -164,6 +215,7 @@ def run_suite(lib_path, py_path, root):
     for name in ("test_len", "test_ticks", "test_resends", "test_gates", "test_pending"):
         getattr(lib, name).restype = C.c_ulong
     host = load_host(py_path)
+    check_cli_writes(host)
     for cap in (1028, 512):
         rig = Rig(lib, host, root)
         rig.server.payload_cap = cap
@@ -530,6 +582,8 @@ def run_mutations(tmp, root):
          "(sfs.T_LOG, sfs.T_EXIT, sfs.T_DUMP)", "(sfs.T_LOG, sfs.T_EXIT)"),
         ("host_peer", "tools/lanfs_host.py",
          "if self.peer is not None and src != self.peer:", "if False:"),
+        ("cli_allow_write", "tools/lanfs_host.py",
+         "sfs.HostFS(args.root, allow_write=args.allow_write)", "sfs.HostFS(args.root)"),
         ("put_deadline", "fs/serialfs/sfs_lan.c",
          "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
          "0"),

@@ -125,8 +125,9 @@ static VfsOps drv_ops_positional = {
     0, 0, 0,
     0,
     0, 0, 0,
-    drv_stat
+    drv_stat,
     /* set_mtime は書かない = 0 */
+    .resource_check = 0, .resource_refresh = 0
 };
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop

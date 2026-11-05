@@ -67,7 +67,7 @@ def generation(folder):
     exe = build_validator(folder)
     contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
                     abi=current, pair=mkmod.pair_crc((ROOT / 'build/out/vmkernel.lz4').read_bytes()),
-                    ops=1, module_id=9, runner='qemu', exports=[(1, fnv('initialize'), 1)],
+                    ops=2, module_id=9, runner='qemu', exports=[(1, fnv('initialize'), 1)],
                     imports=[(fnv(e['name']), e['type_ver'], e['kind']) for e in metadata['imports']])
     image = (ROOT / 'build/out/lan.mod').read_bytes()
     result = validate(exe, image, **contract)
