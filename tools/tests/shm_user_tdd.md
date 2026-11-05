@@ -31,7 +31,7 @@ v86_mem.c を ILP32 で実行する。実 paging_addrspace_create で二つの P
 
 `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
 `PYTHONPATH=`、`HOST32_RUNNERS=qemu`。makeのstdinは`/dev/null`、
-`NP21W_DIR=/dev/null`。全体検査は`check_slot.sh e10a-coder`経由。
+`NP21W_DIR=/dev/null`。全体検査を直接実行。
 既存memmapの13変異の意図と、予算超過/空予約/固定PT/IFの対照は維持する。
 `test_memory_boot.py` は19件。`test_owner_reclaim.py` のpaging stubを専用口へ追随。
 実行ログは `/home/hight/os32-tmp/e10a-*.log`、全体結果は正典のe10a節へ追記する。
@@ -40,6 +40,6 @@ v86_mem.c を ILP32 で実行する。実 paging_addrspace_create で二つの P
 初回全体検査rc=2: surface bundleのexecコード抽出が撤去したSHMコメントに依存。
 検査終了後、抽出終端だけ次のフォントコメントへ追随し、既存UC変異は維持した。
 
-再検査: check_slot.sh e10a-coder経由、slot0、full選択、rc=0。
+再検査: 直接実行、full選択、rc=0。
 全体内でもSHM正常47条件と11/11変異、surface bundle 21/21変異が通過。
 検査中の票/ソース変更なし。最終結果の追記のみ検査終了後に行った。

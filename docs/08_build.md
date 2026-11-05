@@ -432,7 +432,7 @@ python3 tools/gen_memmap.py --manifest --check
 
 **誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
 
-段の取り込みは PM が `check_wt.sh` の `check-changed` (変異なし) で検査し、変異込みの全体は節目に 1 回回す ([ROLES §0「検査」](tasks/agents/ROLES.md))。
+段の取り込みは GitHub の CI で検査し、変異込みの全体は GitHub の `full-check` で回す ([ROLES §0「検査」](tasks/agents/ROLES.md))。
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
 基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
 merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。

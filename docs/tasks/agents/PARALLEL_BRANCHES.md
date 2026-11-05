@@ -25,7 +25,7 @@ GeForce・ラスタに限らず、機能の開発全般の決まり。手本が�
 
 ## 3. 検査と実機
 
-- **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check-fast` = 全部の検査、変異なし) が通ったら main に早送りする。手元の検査の枠 (`check_wt.sh`・`check_slot.sh`) は取り込みに使わない。
+- **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check-fast` = 全部の検査、変異なし) が通ったら main に早送りする。
 - **実装者**は触った像のビルドと、足した・触った試験 (`--mutate` を含む)・lint だけを回す。`check-changed` は回さない (CI の check-fast が全部を回す)。
 - **変異込みの全体検査**は GitHub の workflow `full-check` (手動の起動と、毎晩 main に対して、ユーザー決定 2026-11-05)。
 - **substream** (Ubuntu 24.04・gcc 13 の自前の runner) は CI に使わない (GitHub より 2.5〜4 倍遅い)。CI でだけ落ちる件の再現と、Host Services のホスト側の試験台に使う (ユーザー決定 2026-11-05)。

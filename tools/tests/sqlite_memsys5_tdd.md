@@ -4,7 +4,7 @@
 製品には結線しない。製品 SQLite・FEP・割当器・KAPI・配置定数の変更はない。
 
 `make check-sqlite-memsys5-host MUTATE=0 HOST32_RUNNERS=qemu`。
-検査は `~/os32-tmp/bin/check_slot.sh` を通す。
+検査は直接実行する。
 `CROSS_DIR` の i386-elf GCC / newlib で SQLite を GNU89、器具を GNU11 として
 コンパイルし、`host32` の明示 runner で ILP32 実行する。host の multilib は不要。
 SQLite の設定は製品の `os32_sqlite_config.h` をそのまま使う。

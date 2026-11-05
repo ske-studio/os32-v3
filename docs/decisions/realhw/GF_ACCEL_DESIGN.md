@@ -129,12 +129,11 @@ PM判断(2026-11-01): `GF_PRESENT_BYTE` は受入対象だけが定義し、既�
 
 作業木の環境(CROSS_DIR/TMPDIR/HOST32_RUNNERS)とビルド済みkernelを用意する。
 PMは同じソースで識別子(例 `f5468c6c-gfa-r2`)を固定し、各MODEについて次を実行する。
-ビルド/試験は check_slot.sh の枠を使う。自分から make all は実行しない。
+ビルド/試験は直接実行する。自分から make all は実行しない。
 
 ```sh
 MODE=byte-uc  # 次の2回は dword-uc / dword-wc
 GF_ACCEPT_ID=f5468c6c-gfa-r2 GF_ACCEPT_MODE="$MODE" \
-  /home/hight/os32-tmp/bin/check_slot.sh gfa-build \
   make -j4 geforce-accept gshell GEFORCE_ACCEPT="$MODE" GSHELL_FEATURES=gf_accel_accept
 ```
 
