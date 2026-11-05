@@ -67,7 +67,7 @@ int trident_capacity_plan(struct trident_device *d)
     u32 kib;
     int rc;
     if (!d || !d->res || !d->io) return TRI_E_INVAL;
-    if (!d->init_done || !d->armed || !d->pinned) return TRI_E_STATE;
+    if (!d->armed || !d->pinned) return TRI_E_STATE;
     /* Use the reference's current VGA IOBase; H:120 hardcodes color instead. */
     u16 base = d->cur_vga_base;
     rc = trident_indexed_read(d, base, 0x1F, &spr);

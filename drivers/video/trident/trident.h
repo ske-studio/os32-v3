@@ -249,7 +249,9 @@ int trident_pc98_init(struct trident_device *d);
 int trident_state_save(struct trident_device *d);
 extern const u8 trident_default_dac[TRI_DAC_BYTES];
 int trident_state_restore(struct trident_device *d);
-/* vram.c: plan reads SPR/CR C1 after Init; full table + unknown diagnostic.
+/* vram.c: plan reads SPR/CR C1 before Save/Init (PreInit D:2920-2969);
+ * pin/arm and boot MISC-selected cur_vga_base are required, not init_done.
+ * Full table + unknown diagnostic.
  * verify runs after Enable, before publication/leases. Uses scratch, records
  * continuous capacity and upper status; restores all probes in reverse order.
  * >= DISPLAY_BYTES succeeds, not a requirement for 2MiB or 4MiB. */
@@ -285,7 +287,7 @@ static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
     return (u8)(x >> (bits - 6));
 }
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
-/* lifecycle.c: ScreenInit=Save→Init→plan→Mode→Enable→verify→palette/client once;
+/* lifecycle.c: ScreenInit=plan→Save→Init→Mode→Enable→verify→palette/client once;
  * later init=Mode→Enable→palette/client, enter=Mode→Enable (active enter is no-op).
  * Palette defaults come from gfx/palette.c shadow.
  * leave=Restore→lock→Disable, close=Disable→Restore→lock only when active;

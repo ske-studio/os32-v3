@@ -29,6 +29,8 @@ PRODUCT = 'drivers/video/trident/vram.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTATIONS = (
+    ('M_PLAN_AFTER_INIT', 'if (!d->armed || !d->pinned) return TRI_E_STATE;',
+     'if (!d->init_done || !d->armed || !d->pinned) return TRI_E_STATE;'),
     ('M_SPR_CAP', 'case 0x0F: kib = 4096;', 'case 0x0F: kib = 2048;'),
     ('M_SPR_DEFAULT', 'default: kib = 1024; unknown = true;',
      'default: kib = 2048; unknown = true;'),

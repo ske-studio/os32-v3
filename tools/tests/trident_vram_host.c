@@ -95,7 +95,7 @@ static int spr_table(void)
         1024,512,6144,1024,8192,1024,10240,2048,
         12288,1024,14336,1024,16384,1024,20480,4096
     };
-    CHECK(!setup(false)); d.init_done = true;
+    CHECK(!setup(false)); /* PreInit: no PC98 Init yet. */
     for (u32 mono = 0; mono < 2; ++mono) {
         d.cur_vga_base = mono ? TRI_CR_MONO : TRI_CR_COLOR;
         f.regs[TRI_MISC_WRITE] = !mono;
@@ -227,7 +227,11 @@ static int invalid_inputs(void)
     CHECK(equal(trident_capacity_plan(0), (u32)TRI_E_INVAL));
     CHECK(equal(trident_vram_verify(0), (u32)TRI_E_INVAL));
     CHECK(!setup(false));
+    d.armed = false;
     CHECK(equal(trident_capacity_plan(&d), (u32)TRI_E_STATE));
+    d.armed = true; d.pinned = false;
+    CHECK(equal(trident_capacity_plan(&d), (u32)TRI_E_STATE));
+    d.pinned = true;
     CHECK(equal(trident_vram_verify(&d), (u32)TRI_E_STATE));
     CHECK(!f.operations);
     d.init_done = true;
