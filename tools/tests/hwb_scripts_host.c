@@ -13,6 +13,7 @@ static u32 fills, fill_ends, bytes, loglines, writes, points, fail_at, abort_at,
 static u32 enabled, disabled, clock_a, clock_b, pll_written, painted, alias_bus;
 static u32 capacity=7, cr_c1, ref_pal, pci_reads, io_count, dac_select, ext_dac, dac_writes;
 static u32 io_addr[10], io_value[10];
+static u32 init_addr[64], init_val[64], init_width[64], init_count, init_record, config_bit;
 static char fill_end[HWB_LOG_BYTES];
 static const char *input;
 static u32 length(const char *s) { u32 n=0; while(s[n]) n++; return n; }
@@ -65,6 +66,12 @@ static int bus(void *ctx, struct hw_req *r) {
         if(a==0x3C8) reads6=0;
         if(a==0x3C6) reads6++;
         return 0;
+    }
+    if(a==0x3C4 && val==1 && !init_count) init_record=1;
+    if(init_record) {
+        if(init_count<64) { init_addr[init_count]=a; init_val[init_count]=val;
+            init_width[init_count++]=r->width; }
+        if(a==0x3C0 && val==0x20) init_record=0;
     }
     for(u32 k=0;k<r->width;k++,a++,val>>=8) {
         u8 x=val;
@@ -120,6 +127,7 @@ static void reset(void) {
     ci=si=gi=ai=af=pal=hidden=reads6=hidden_ok=pal_done=0;
     fills=fill_ends=bytes=loglines=writes=points=fail_at=abort_at=tick=0;
     enabled=disabled=clock_a=clock_b=pll_written=painted=alias_bus=pci_reads=io_count=0;
+    init_count=init_record=0; sr[0x0C]=config_bit;
     fill_end[0]=0; dac_select=dac_writes=0; ext_dac=0x80;
     cr[0x29]=0xB3; cr[0x23]=0xAA; cr[0x2F]=0x81; cr[0x2A]=0x12;
     cr[0x39]=0xFF; gr[0x2F]=0x80; gr[0x0F]=0xA8; gr[0x23]=0xFE;
@@ -198,12 +206,40 @@ static void route(u32 mode) {
         CHECK(io_addr[k]==addr[j] && io_value[k]==val[j]);
     }
 }
+/* Driver 1.4.0 lines 625-671: writes from subsystem enable through MCLK.
+ * Each tuple is BAR1 offset, value, width; configuration branch is explicit. */
+static void init_trace(void) {
+    static const u32 common[][3]={{0x3C4,1,1},{0x3C4,0,1},{0x3C5,1,1},
+        {0x3C4,1,1},{0x3C5,0x20,1},{0x3C0,0,1},{0x3C2,0xC3,1},{0x3C4,0x0B,1},
+        {0x3C4,0x000B,2},{0x3C4,0x0E,1},{0x3C4,0x200E,2},{0x3C4,0x0C,1},
+        {0x3C4,0x0E,1}};
+    static const u32 low[][3]={{0x46E8,0x10,1},{0x102,1,1},{0x46E8,8,1}};
+    static const u32 high[][3]={{0x94,0,1},{0x102,1,1},{0x94,0x20,1},{0x3C3,1,1}};
+    static const u32 tail[][3]={{0x3C0,0x10,1},{0x3C0,0x41,1},
+        {0x3D4,0x11,1},{0x3D4,0x11,1},{0x3D5,0,1},
+        {0x3C4,0x0B,1},{0x3C4,0x0E,1},{0x3C4,0xA00E,2},
+        {0x3D4,0x3820,2},{0x3D4,0x2020,2},{0x3D4,0x0E30,2},
+        {0x3D4,0x0031,2},{0x3D4,0x0032,2},{0x3D4,0x213B,2},
+        {0x43C6,0xAF,1},{0x43C7,0,1},
+        {0x3C4,0x0B,1},{0x3C4,0x0E,1},{0x3C4,0x200E,2},
+        {0x3D4,0x11,1},{0x3D4,0x11,1},{0x3D5,0x80,1},
+        {0x3C4,1,1},{0x3C4,1,1},{0x3C5,0,1},
+        {0x3C4,0,1},{0x3C5,3,1},{0x3C0,0x20,1}};
+    u32 n=0;
+#define TRACE(tab) do { for(u32 j=0;j<sizeof(tab)/sizeof((tab)[0]);j++,n++) { \
+    CHECK(n<init_count && init_addr[n]==(tab)[j][0] && \
+          init_val[n]==(tab)[j][1] && init_width[n]==(tab)[j][2]); } } while(0)
+    TRACE(common); if(config_bit) { TRACE(high); } else { TRACE(low); }
+    TRACE(tail); CHECK(n==init_count);
+#undef TRACE
+}
 static void mode_tests(void) {
     HWB_TEST("mode");
-    for(u32 m=0;m<4;m++) for(ref_pal=0;ref_pal<2;ref_pal++) {
+    for(u32 m=0;m<4;m++) for(ref_pal=0;ref_pal<2;ref_pal++) for(config_bit=0;config_bit<=0x10;config_bit+=0x10) {
         reset(); CHECK(run(scripts[7],m)==HWB_OK);
         if(m==0) { CHECK(!enabled&&!disabled&&!fills); continue; }
         if(m==2) { CHECK(!enabled && disabled==1&&!fills); route(m); continue; }
+        HWB_TEST("pc98-init"); init_trace(); HWB_TEST("mode");
         CHECK(enabled==1 && disabled==1); timing(); pll(); route(m);
         CHECK(st.writes==writes);
         CHECK(cr[0x3A]==0 && cr[0x50]==0 && cr[0x21]==0x20);
@@ -231,6 +267,7 @@ static void mode_tests(void) {
             hwb_test_write("serial bytes="); while(n) {char c[2]={out[--n],0}; hwb_test_write(c);} hwb_test_write("\n");
         }
     }
+    config_bit=0;
     HWB_TEST("capacity");
     u32 sizes[]={1048576,524288,6291456,1048576,8388608,1048576,
         10485760,2097152,12582912,1048576,14680064,1048576,
