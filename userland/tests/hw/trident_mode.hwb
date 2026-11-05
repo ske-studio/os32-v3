@@ -1,0 +1,452 @@
+# Sources: trident_driver-1.4.0.c:694-775; trident_regs.h:302-325
+# vgaHW.c:398-409,418-421,474-488,574-604,723-730
+# Copyright 1991-1999 by The XFree86 Project, Inc.
+# Copyright 1990,91 by Thomas Roell, Dinkelscherben, Germany.
+# vgaHW.c license: xorg-server-21.1.13 COPYING:54-76
+# Copyright (C) 1994-2003 The XFree86 Project, Inc.  All Rights Reserved.
+# Copyright (C) Colin Harrison 2005-2008
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FIT-
+# NESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+# XFREE86 PROJECT BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+# AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Except as contained in this notice, the name of the XFree86 Project shall not
+# be used in advertising or otherwise to promote the sale, use or other dealings
+# in this Software without prior written authorization from the XFree86 Project.
+# Copyright 1992-2003 by Alan Hourihane, North Wales, UK.
+# 
+# Permission to use, copy, modify, distribute, and sell this software and its
+# documentation for any purpose is hereby granted without fee, provided that
+# the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation, and that the name of Alan Hourihane not be used in
+# advertising or publicity pertaining to distribution of the software without
+# specific, written prior permission.  Alan Hourihane makes no representations
+# about the suitability of this software for any purpose.  It is provided
+# "as is" without express or implied warranty.
+# 
+# ALAN HOURIHANE DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+# EVENT SHALL ALAN HOURIHANE BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+# DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+# TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+# 
+# 640x480x8 exploration; registers follow MIT implementation, not a chip manual.
+# Manufacturer: NEC LCD172VXM/192VXM manual p.20 (preset/sync).
+# https://www.sharp-nec-displays.com/support/webdl/dl_service/data/display_j/manual/manu_LCD172_192VXM_No01.pdf
+# Trident ProVidia 9682 datasheet unavailable; extended delivery is unverified.
+# Columns: 0 identify; 1 New Mode/PLL; 2 protect; 3 VGA; 4 hidden DAC;
+# 5 extended; 6 clock; 6a unprotect; 8 endpoint alias; 9 paint; 10/11 route.
+# Sources: trident_driver-1.4.0.c:1028-1047,1064,2294,2313,2384,2525-2529
+# trident_dac.c:256,572-576,631-658,673-678,781-810,871-907
+# trident_pll.c:42-55,60-135; trident_regs.h:27-28
+# vgaHW.c:845-872,1240-1286,1391-1468 (KGA_ENABLE_ON_ZERO).
+ device d = bdf 0:8.0
+ window v = bar d 1
+ window f = bar d 0
+ if mode == 2 goto restore
+ log "BDF=0:8.0"
+ pciread32 d 0 -> t
+ print "PCI-ID" t
+ pciread16 d 4 -> t
+ print "Command" t
+ pciread32 d 0x10 -> t
+ print "BAR0" t
+ pciread32 d 0x14 -> t
+ print "BAR1" t
+ mmiowrite8 v + 0x3C4 9
+ mmioread8 v + 0x3C5 -> chip
+ print "SR09" chip
+ mmiowrite8 v + 0x3D4 0x1F
+ mmioread8 v + 0x3D5 -> spr
+ print "SPR" spr
+ # trident_driver-1.4.0.c:2910-2944: SPR low nibble is a declaration.
+ let t = spr & 0x0F
+ let capacity = 0
+ if t == 1 goto cap_half
+ if t == 3 goto cap_one
+ if t == 7 goto cap_two
+ if t == 4 goto cap_eight
+ goto cap_ready
+ label cap_half
+ let capacity = 524288
+ goto cap_ready
+ label cap_one
+ let capacity = 1048576
+ goto cap_ready
+ label cap_two
+ let capacity = 2097152
+ goto cap_ready
+ label cap_eight
+ let capacity = 8388608
+ label cap_ready
+ print "SPR-declared-bytes" capacity
+ mmiowrite8 v + 0x3CE 6
+ mmioread8 v + 0x3CF -> gr6
+ print "GR06-original" gr6
+ mmiowrite8 v + 0x3D4 0x3A
+ mmioread8 v + 0x3D5 -> t
+ print "CR3A-original" t
+ if capacity == 0 goto finish
+ if mode == 0 goto finish
+ if mode == 1 goto setup
+ if mode == 3 goto setup
+ goto finish
+ label setup
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3D4 0xC0
+ mmioread8 v + 0x3D5 -> ref
+ let a = 0xE5
+ let b = 0x1E
+ if (ref & 0x80) == 0 goto pll_ready
+ let a = 0xA4
+ let b = 0x0E
+ label pll_ready
+ print "reference-select" ref
+ print "PLL-a" a
+ print "PLL-b" b
+ call protect_on
+ mmiowrite16 v + 0x3C4 0xC20E
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D5 t & 0x7F
+ # Column 3: blanked standard VGA restore.
+ mmiowrite8 v + 0x3C2 0xE3
+ mmiowrite16 v + 0x3C4 0x01 | ((0x21) << 8)
+ mmiowrite16 v + 0x3C4 0x02 | ((0x0F) << 8)
+ mmiowrite16 v + 0x3C4 0x03 | ((0x00) << 8)
+ mmiowrite16 v + 0x3C4 0x04 | ((0x0E) << 8)
+ mmiowrite16 v + 0x3D4 0x11 | ((0x2C) << 8)
+ mmiowrite16 v + 0x3D4 0x00 | ((0x5F) << 8)
+ mmiowrite16 v + 0x3D4 0x01 | ((0x4F) << 8)
+ mmiowrite16 v + 0x3D4 0x02 | ((0x4F) << 8)
+ mmiowrite16 v + 0x3D4 0x03 | ((0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x04 | ((0x52) << 8)
+ mmiowrite16 v + 0x3D4 0x05 | ((0x1E) << 8)
+ mmiowrite16 v + 0x3D4 0x06 | ((0x0B) << 8)
+ mmiowrite16 v + 0x3D4 0x07 | ((0x3E) << 8)
+ mmiowrite16 v + 0x3D4 0x08 | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x09 | ((0x40) << 8)
+ mmiowrite16 v + 0x3D4 0x0A | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0B | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0C | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0D | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0E | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0F | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x10 | ((0xEA) << 8)
+ mmiowrite16 v + 0x3D4 0x11 | ((0x2C) << 8)
+ mmiowrite16 v + 0x3D4 0x12 | ((0xDF) << 8)
+ mmiowrite16 v + 0x3D4 0x13 | ((0x50) << 8)
+ mmiowrite16 v + 0x3D4 0x14 | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x15 | ((0xDF) << 8)
+ mmiowrite16 v + 0x3D4 0x16 | ((0x0B) << 8)
+ mmiowrite16 v + 0x3D4 0x17 | ((0xC3) << 8)
+ mmiowrite16 v + 0x3D4 0x18 | ((0xFF) << 8)
+ mmiowrite16 v + 0x3CE 0x00 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x01 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x02 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x03 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x04 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x05 | ((0x40) << 8)
+ if mode == 3 goto keep_gr6
+ mmiowrite16 v + 0x3CE 0x06 | ((5) << 8)
+ goto gr6_ready
+ label keep_gr6
+ mmiowrite16 v + 0x3CE 0x06 | ((gr6) << 8)
+ label gr6_ready
+ mmiowrite16 v + 0x3CE 0x07 | ((0x0F) << 8)
+ mmiowrite16 v + 0x3CE 0x08 | ((0xFF) << 8)
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x00
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x01
+ mmiowrite8 v + 0x3C0 0x01
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x02
+ mmiowrite8 v + 0x3C0 0x02
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x03
+ mmiowrite8 v + 0x3C0 0x03
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x04
+ mmiowrite8 v + 0x3C0 0x04
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x05
+ mmiowrite8 v + 0x3C0 0x05
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x06
+ mmiowrite8 v + 0x3C0 0x06
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x07
+ mmiowrite8 v + 0x3C0 0x07
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x08
+ mmiowrite8 v + 0x3C0 0x08
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x09
+ mmiowrite8 v + 0x3C0 0x09
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0A
+ mmiowrite8 v + 0x3C0 0x0A
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0B
+ mmiowrite8 v + 0x3C0 0x0B
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0C
+ mmiowrite8 v + 0x3C0 0x0C
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0D
+ mmiowrite8 v + 0x3C0 0x0D
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0E
+ mmiowrite8 v + 0x3C0 0x0E
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0F
+ mmiowrite8 v + 0x3C0 0x0F
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x10
+ mmiowrite8 v + 0x3C0 0x41
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x11
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x12
+ mmiowrite8 v + 0x3C0 0x0F
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x13
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x14
+ mmiowrite8 v + 0x3C0 0x00
+ # Column 4: hidden command is separate from palette mask.
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0xC20E
+ mmioread8 v + 0x3C8 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmiowrite8 v + 0x3C6 0
+ mmioread8 v + 0x3C8 -> t
+ # Column 5: extended restore, zero-initialized CR3A/CR50.
+ log "PC98-Init omitted; CR3A=0; CR50=0"
+ mmiowrite16 v + 0x3D4 0x1E | ((0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x21 | ((0x20) << 8)
+ mmiowrite16 v + 0x3C4 0x0D | ((0x20) << 8)
+ mmiowrite16 v + 0x3D4 0x50 | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x27 | ((8) << 8)
+ mmiowrite16 v + 0x3D4 0x2B | ((0) << 8)
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t & 0xCF) << 8)
+ mmiowrite16 v + 0x3D4 0x36 | ((0) << 8)
+ mmiowrite8 v + 0x3D4 0x2F
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x2F | ((t | 0x10) << 8)
+ mmiowrite8 v + 0x3D4 0x2A
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x2A | ((t | 0x40) << 8)
+ mmiowrite16 v + 0x3D4 0x3A | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x38 | ((0) << 8)
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x39 | ((t & 0xF9) << 8)
+ mmiowrite16 v + 0x3D4 0x55 | ((0x1F) << 8)
+ mmiowrite8 v + 0x3CE 0x2F
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x2F | ((t | 4) << 8)
+ mmiowrite8 v + 0x3CE 0x0F
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x0F | (((t & 0xF0) | 2) << 8)
+ mmiowrite16 v + 0x3D4 0x13 | ((0x50) << 8)
+ # Column 6: old PLL, no MCLK or SR18/19 changes.
+ mmiowrite8 v + 0x43C8 a
+ mmiowrite8 v + 0x43C9 b
+ mmiowrite8 v + 0x3C2 0xEB
+ mmiowrite16 v + 0x3C4 0xC20E
+ call protect_off
+ # Column 8: restore saved endpoints on both successful/alias paths.
+ mmioread32 f + 0 -> first
+ mmioread32 f + 0x4AFFC -> last
+ let alias = 1
+ mmiowrite32 f + 0 0x12345678
+ mmiowrite32 f + 0x4AFFC 0x87654321
+ mmioread32 f + 0 -> t
+ if t != 0x12345678 goto endpoints_done
+ mmioread32 f + 0x4AFFC -> t
+ if t != 0x87654321 goto endpoints_done
+ mmiowrite32 f + 0 0x87654321
+ mmiowrite32 f + 0x4AFFC 0x12345678
+ mmioread32 f + 0 -> t
+ if t != 0x87654321 goto endpoints_done
+ mmioread32 f + 0x4AFFC -> t
+ if t != 0x12345678 goto endpoints_done
+ let alias = 0
+ label endpoints_done
+ mmiowrite32 f + 0 first
+ mmiowrite32 f + 0x4AFFC last
+ print "endpoint-alias" alias
+ if alias != 0 goto restore
+ # Column 9: RGB DAC 0..7, six-bit components.
+ mmiowrite8 v + 0x3C6 0xFF
+ mmiowrite8 v + 0x3C8 0
+ let color = 0
+ label palette
+ mmiowrite8 v + 0x3C9 ((color & 1) << 5) | ((color & 1) << 4) | ((color & 1) << 3) | ((color & 1) << 2) | ((color & 1) << 1) | (color & 1)
+ mmiowrite8 v + 0x3C9 ((color >> 1) & 1) << 5 | ((color >> 1) & 1) << 4 | ((color >> 1) & 1) << 3 | ((color >> 1) & 1) << 2 | ((color >> 1) & 1) << 1 | ((color >> 1) & 1)
+ mmiowrite8 v + 0x3C9 ((color >> 2) & 1) << 5 | ((color >> 2) & 1) << 4 | ((color >> 2) & 1) << 3 | ((color >> 2) & 1) << 2 | ((color >> 2) & 1) << 1 | ((color >> 2) & 1)
+ let color = color + 1
+ if color != 8 goto palette
+ let off = 0
+ let color = 0
+ label bands
+ let word = color | (color << 8) | (color << 16) | (color << 24)
+ let count = 10240
+ if color != 7 goto band_fill
+ let count = 5120
+ label band_fill
+ mmiofill32 f + off count word
+ let off = off + 40960
+ let color = color + 1
+ if color != 8 goto bands
+ mmiofill8 f + 0 640 7
+ mmiofill8 f + 306560 640 7
+ let off = 639
+ label edges
+ mmiofill8 f + off 2 7
+ let off = off + 640
+ if off != 307199 goto edges
+ # Asymmetric white marks: left 16x16 at (16,16), right 8x32 at (608,32).
+ let off = 10256
+ let row = 0
+ label left_mark
+ mmiofill8 f + off 16 7
+ let off = off + 640
+ let row = row + 1
+ if row != 16 goto left_mark
+ let off = 21088
+ let row = 0
+ label right_mark
+ mmiofill8 f + off 8 7
+ let off = off + 640
+ let row = row + 1
+ if row != 32 goto right_mark
+ mmioread8 f + 0 -> t
+ print "top-left" t
+ mmioread8 f + 10256 -> t
+ print "left-mark" t
+ mmioread8 f + 21088 -> t
+ print "right-mark" t
+ mmioread8 f + 307199 -> t
+ print "bottom-right" t
+ call enable
+ wait us 5000000
+ label restore
+ call disable
+ label finish
+ end
+
+ label enable
+ iowrite8 port 0x68 0x0E
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8F
+ iowrite8 port 0x6A 0x06
+ call protect_on
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t & 0xDF) << 8)
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t | 4) << 8)
+ let mask = 0xFF
+ let bits = 6
+ call dac
+ let bits = 8
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | ((t & 0xFC) << 8)
+ let bits = 1
+ call dac
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t & 0xEF) << 8)
+ call protect_off
+ iowrite8 port 0xFAC 2
+ return
+ label disable
+ iowrite8 port 0xFAC 0
+ call protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t | 0x10) << 8)
+ let bits = 0
+ let mask = 0xFE
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | (((t & 0xFC) | 1) << 8)
+ let mask = 0xFD
+ call dac
+ let mask = 0xCF
+ call dac
+ let mask = 0xF7
+ call dac
+ let mask = 0xFB
+ call dac
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t & 0xFB) << 8)
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t | 0x20) << 8)
+ call protect_off
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8E
+ iowrite8 port 0x6A 0x06
+ iowrite8 port 0x68 0x0F
+ return
+ label dac
+ mmiowrite8 v + 0x83C8 4
+ mmioread8 v + 0x83C6 -> t
+ mmiowrite8 v + 0x83C8 4
+ mmiowrite8 v + 0x83C6 (t & mask) | bits
+ return
+ label protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 1
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq | 0x20
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0
+ return
+ label protect_off
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq & 0xDF
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 3
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x20
+ return

@@ -17,6 +17,7 @@
 
 filesystem:
   files:
+    # Includes trident_mode.hwb (mode=0/1/2/3); disk/CD test payload only.
     - host: "userland/tests/hw/*.hwb"
       guest: /test/hw/
       type: glob

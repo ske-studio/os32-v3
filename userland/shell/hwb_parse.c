@@ -256,22 +256,25 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
     else {
         /* Match the full width-bearing command, rejecting all other suffixes. */
         int found = 0;
-        static const char *const bases[] = {"pciread", "pciwrite", "ioread", "iowrite", "mmioread", "mmiowrite"};
-        for (u32 b = 0; b < 6; b++) {
+        static const char *const bases[] = {"pciread", "pciwrite", "ioread", "iowrite", "mmioread", "mmiowrite", "mmiofill"};
+        for (u32 b = 0; b < 7; b++) {
             u32 n = cmd.begin, k = 0;
             while (bases[b][k] && n < cmd.end && p.s[n] == bases[b][k]) { n++; k++; }
             if (bases[b][k]) continue;
             struct hp w = {p.s, n, cmd.end, 0};
             u32 width = hp_width(&w);
             if (w.bad || w.p != w.end) continue;
-            found = 1; i->width = width; i->op = b & 1U ? HWB_WRITE : HWB_READ;
+            found = 1; i->width = width; i->op = b == 6 ? HWB_FILL : b & 1U ? HWB_WRITE : HWB_READ;
             i->space = b < 2 ? HW_PCI : b < 4 ? HW_IO : HW_PHYS;
             hp_address(&p, i, b < 2);
             if ((i->space == HW_PCI && i->address.kind != HWB_ADDR_PCI) ||
                 (i->space == HW_IO && i->address.kind != HWB_ADDR_PORT && i->address.kind != HWB_ADDR_BAR && i->address.kind != HWB_ADDR_WINDOW) ||
                 (i->space == HW_PHYS && i->address.kind != HWB_ADDR_PHYS && i->address.kind != HWB_ADDR_BAR && i->address.kind != HWB_ADDR_WINDOW)) p.bad = 1;
             if (i->op == HWB_READ) { hp_need(&p, "->"); i->name = hp_name(&p); }
-            else i->value = hp_operand(&p, 1);
+            else {
+                if (i->op == HWB_FILL) i->count = hp_operand(&p, 0);
+                i->value = hp_operand(&p, 1);
+            }
             break;
         }
         if (!found) p.bad = 1;

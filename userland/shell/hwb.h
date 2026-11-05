@@ -74,7 +74,7 @@ struct hwb_program {
 };
 enum hwb_opcode {
     HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
-    HWB_READ, HWB_WRITE, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
+    HWB_READ, HWB_WRITE, HWB_FILL, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
     HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END
 };
 enum hwb_address_kind { HWB_ADDR_PCI, HWB_ADDR_PORT, HWB_ADDR_PHYS,
@@ -86,7 +86,7 @@ struct hwb_address {
 };
 struct hwb_instruction {
     enum hwb_opcode op;
-    /* READ/WRITE: requested PCI/IO/PHYS from the command spelling, independent
+    /* READ/WRITE/FILL: requested PCI/IO/PHYS from the command spelling, independent
      * of address.kind. Exec uses it for dispatch and BAR type validation;
      * IO requires an I/O BAR, PHYS a memory BAR (also for window references).
      * POLL: PCI for pci, IO for port, PHYS for phys/bar/window. Otherwise 0.
@@ -95,11 +95,11 @@ struct hwb_instruction {
     u32 line, pc, next_pc, width; /* 1-based physical line; width in bytes */
     struct hwb_span name, text; /* destination/label and quoted text contents */
     struct hwb_address address;
-    /* LET/WRITE/WAIT/PRINT: value; IF: lhs/rhs and not_equal;
+    /* LET/WRITE/FILL/WAIT/PRINT: value; FILL: count; IF: lhs/rhs and not_equal;
      * DEVICE_BDF: bus/dev/fn; DEVICE_ID: vendor/device;
      * WINDOW_BAR: address.device/bar; POLL: mask/value/timeout/interval. */
     struct hwb_span value, lhs, rhs, bus, dev, fn, vendor, device;
-    struct hwb_span mask, timeout, interval;
+    struct hwb_span mask, timeout, interval, count;
     u32 not_equal;
 };
 enum hwb_value_kind { HWB_SCALAR, HWB_DEVICE, HWB_WINDOW_REF };
@@ -126,7 +126,7 @@ struct hwb_log_record {
     u32 space, width, bdf, addr, value;
     const char *target; /* resolved logical target, printable, valid for call */
     enum hwb_rc rc;
-    u32 requested_us, elapsed_lo, elapsed_hi;
+    u32 requested_us, elapsed_lo, elapsed_hi, count, done;
 };
 
 /* Validate all syntax/labels before effects. On failure *out is scratch/invalid,

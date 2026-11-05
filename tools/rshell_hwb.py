@@ -19,6 +19,7 @@ def add_arguments(parser):
 def inspect(text):
     """Return (terminal status, errors); identify an unfinished begin by seq/line."""
     errors, run, last, pending, terminal = [], None, None, None, None
+    pending_fill = None
     for row in text.splitlines():
         if not row.startswith('HW '):
             continue
@@ -51,6 +52,10 @@ def inspect(text):
             numeric = []
             if re.fullmatch(r'(?:pci|io|mmio)(?:read|write)(?:8|16|32)', op):
                 numeric += ['addr', 'val']
+            elif re.fullmatch(r'mmiofill(?:8|16|32)', op):
+                numeric += ['addr', 'val', 'count']
+                if phase == 'end':
+                    numeric += ['done']
             elif op == 'poll':
                 numeric += ['addr', 'val']  # poll-address: P9 includes final address
                 if phase == 'end':
@@ -72,9 +77,22 @@ def inspect(text):
                 if key == 'addr' and fields[key] == 'UNRESOLVED' and (
                         phase == 'begin' or (phase == 'end' and rc != 'OK')):
                     continue
-                pattern = r'[0-9]+' if key in ('reads', 'requested_us') else r'0x[0-9a-fA-F]+'
+                pattern = r'[0-9]+' if key in ('reads', 'requested_us', 'count', 'done') else r'0x[0-9a-fA-F]+'
                 if not re.fullmatch(pattern, fields[key]):
                     raise ValueError('invalid numeric field')
+            if re.fullmatch(r'mmiofill(?:8|16|32)', op):
+                count = int(fields['count'])
+                if count > 0xFFFFFFFF:
+                    raise ValueError('fill count overflow')
+                if phase == 'begin':
+                    pending_fill = (seq, fields['addr'], fields['val'], count)
+                else:
+                    done = int(fields['done'])
+                    if done > count or (rc == 'OK' and (count == 0 or done != count)):
+                        raise ValueError('invalid fill progress')
+                    if pending_fill != (seq, fields['addr'], fields['val'], count):
+                        raise ValueError('fill does not match begin')
+                    pending_fill = None
             if last is None and seq != 1:
                 errors.append('sequence gap or duplicate at %d' % seq)
             if phase == 'begin':

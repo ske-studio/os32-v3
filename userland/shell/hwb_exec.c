@@ -244,6 +244,16 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
             return HWB_ARG;
         return he_assign(s, i->name, HWB_WINDOW_REF, 0, (u32)slot, a);
     }
+    case HWB_FILL:
+        for (u32 n = 0; n < r->count; n++) {
+            rc = he_point(s, 0); if (rc) return rc;
+            a = r->value;
+            rc = he_access(s, HW_WRITE, i->space, i->width, 0,
+                           r->addr + n * i->width, &a);
+            if (rc) return rc;
+            r->done++; s->writes++;
+        }
+        return HWB_OK;
     case HWB_READ: case HWB_WRITE:
         /* P9: address resolution precedes begin; only data access follows it. */
         a = r->value;
@@ -350,14 +360,20 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     if (i.address.device.end > i.address.device.begin) {
         he_name(s, i.address.device, target); r.target = target;
     }
-    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_POLL) {
+    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_FILL || i.op == HWB_POLL) {
         rc = he_address(s, &i, &r);
         /* Wire BDFs use only 16 bits; this sentinel is local to logging. */
         if (rc) r.bdf = U32_MAX;
     }
-    if (!rc && i.op == HWB_WRITE) {
+    if (!rc && (i.op == HWB_WRITE || i.op == HWB_FILL)) {
         rc = hwb_eval(s, i.value, &r.value);
         if (!rc && !he_fits(r.value, i.width)) rc = HWB_ARG;
+    }
+    if (!rc && i.op == HWB_FILL) {
+        rc = hwb_eval(s, i.count, &r.count);
+        /* Last element start plus its final byte must fit before any write. */
+        if (!rc && (!r.count || r.count - 1U >
+            (U32_MAX - r.addr - (i.width - 1U)) / i.width)) rc = HWB_ARG;
     }
     if (!rc && (i.op == HWB_WAIT || i.op == HWB_POLL)) {
         rc = hwb_eval(s, i.op == HWB_POLL ? i.timeout : i.value, &r.requested_us);

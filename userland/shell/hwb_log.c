@@ -56,9 +56,9 @@ int hwb_exit_status(enum hwb_rc rc)
 }
 static void op(struct logbuf *b, const struct hwb_log_record *r)
 {
-    if (r->op == HWB_READ || r->op == HWB_WRITE) {
+    if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL) {
         str(b, r->space == HW_PCI ? "pci" : r->space == HW_IO ? "io" : "mmio");
-        str(b, r->op == HWB_READ ? "read" : "write"); dec(b, r->width * 8U);
+        str(b, r->op == HWB_READ ? "read" : r->op == HWB_FILL ? "fill" : "write"); dec(b, r->width * 8U);
     } else if (r->op == HWB_LET) str(b, "let");
     else if (r->op == HWB_DEVICE_BDF || r->op == HWB_DEVICE_ID) str(b, "device");
     else if (r->op == HWB_WINDOW_BAR) str(b, "window");
@@ -98,15 +98,17 @@ static void suffix(struct logbuf *b, enum hwb_rc rc) { str(b, " rc="); str(b, hw
 void hwb_log_begin(const struct hwb_backend *backend, const struct hwb_log_record *r)
 {
     struct logbuf b; prefix(&b, r, "begin");
-    if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_POLL) address(&b, r, 1);
+    if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL || r->op == HWB_POLL) address(&b, r, 1);
+    if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); }
     if (r->op == HWB_WAIT) { str(&b, " requested_us="); dec(&b, r->requested_us); }
     str(&b, " rc=PENDING"); emit(backend, &b);
 }
 void hwb_log_end(const struct hwb_backend *backend, const struct hwb_log_record *r)
 {
     struct logbuf b; prefix(&b, r, "end");
-    if (r->op == HWB_READ || r->op == HWB_WRITE) address(&b, r, 0);
+    if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL) address(&b, r, 0);
     if (r->op == HWB_WAIT) { str(&b, " requested_us="); dec(&b, r->requested_us); str(&b, " elapsed_us="); elapsed(&b, r->elapsed_lo, r->elapsed_hi); }
+    if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); str(&b, " done="); dec(&b, r->done); }
     suffix(&b, r->rc); emit(backend, &b);
 }
 void hwb_log_poll(const struct hwb_backend *backend, const struct hwb_log_record *r, const struct hwb_poll_result *result)

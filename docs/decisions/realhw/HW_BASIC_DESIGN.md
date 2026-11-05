@@ -57,6 +57,7 @@
 | `pcireadW d offset -> x` / `pciwriteW d offset expr` | 構成空間を幅どおりアクセス。offset 0..255、自然整列・末尾越境を確認。 |
 | `ioreadW port expr -> x` / `iowriteW port expr value` | 0..65535のI/O。BAR表記も可、幅による末尾越境を確認。 |
 | `mmioreadW address -> x` / `mmiowriteW address expr` | phys/bar/window指定、自然整列、末尾の32bit越境を確認。 |
+| `mmiofillW address count value` | phys/bar/windowへの連続書込み。countは要素数、ログはbegin/end各1行（末尾のmmiofill拡張を参照）。 |
 | `wait us expr` | 最低指定時間待つ。1回1..10,000,000us。精度はログに実際の経過を記録。 |
 | `poll W address mask value timeout_us interval_us -> x` | addressは`pci d offset`/port/phys/bar/window。即時1読、以後間隔待ち、`(x & mask)==value`で成功。 |
 | `print "tag" expr` / `log "text"` | 値/注釈。文字列中の制御文字はエスケープ。全操作の記録は常時有効。 |
@@ -273,3 +274,21 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - P9 (§4 の begin と BAR の解決の順、exec の段のレビュー): BAR の解決 (config の読み直し) は宛先の解決であり、データのアクセスの begin の前に行う。begin の addr は常に解決した物理番地 (port・config offset)。解決で失敗したときは、その命令の begin (target は論理の宛先、addr は未解決と分かる書き方) と end (rc) を出してから止まる — 開始の記録の無い停止を作らない。poll の最終の行にも解決した番地を出す。
 - P10 (§5 の shell の大きさ、wire の段の逸脱): shell.bin の text の増分は実測 +23,936 B (116,004 → 139,940 B) で、§5 の設計予算 12〜20 KiB を 3,456 B 超える。上限は MEM_SHELL_MAX_SIZE (include/memmap.h、675,840 B) で、text+BSS 483,528 B は内にある。物理の制約に当たらないので受け入れる (上限は物理の制約が無ければ広げてよい)。kdebug.bin は image 129,156 B / mem 143,360 B (上限 262,144 B)、kernel.bin +576 B。
 - P11 (§7 の NP21/W の TVRAM の行、NP21/W の受入で): TVRAM の先頭 (0xA0000) は記録の行の表示でコンソールが書き換えるので、write→read の照合に使えない (実測: 0x41 を書いた直後に 0x20)。TVRAM の試験と 10 秒の poll は、文字の領域の末尾の語 0xA1FFE (80x25 の外) を使う。§7 の「PCI 機構なし」は、この NP21/W では 0CF8h が値を保持する (機構 #1 の検出が通る) が装置は 0 件で、pciread32 0:0.0 は OK/全 1/終了値 0 (§3 の「機構ありで装置なし」) になる。NOSYS/終了値 3 の経路は host 試験で確かめる。
+
+## mmiofill 拡張（Trident 段2a）
+
+`mmiofillW address count value`（W=8/16/32）。address は既存の
+phys/bar/window、count は単一数値・変数・括弧式（1以上のu32）、value は
+行末までの幅内の式。count はバイト数でなく要素数。自然整列と最後の
+バイトまでの32bit越境を最初の書込み前に検査する。BAR解決は開始時1回。
+各要素の前にPOINTを確認し、既存WRITEで連続番地へ書く。失敗/中止で即停止、
+undo・再送・自動readback・装置別制限・BARサイズ推定は行わない。
+writes は成功した要素の数。ログはfill全体でbegin/endの1組:
+
+```text
+HW run=1 seq=1 line=1 phase=begin op=mmiofill16 addr=0x20000000 val=0x1234 count=3 rc=PENDING
+HW run=1 seq=1 line=1 phase=end op=mmiofill16 addr=0x20000000 val=0x1234 count=3 done=3 rc=OK
+```
+
+失敗位置はaddr+done×幅。end欠落は未完了。引数不正のendはdone=0、
+countの評価失敗はcount=0を記録する。

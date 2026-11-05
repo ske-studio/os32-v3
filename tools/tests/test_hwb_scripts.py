@@ -7,7 +7,9 @@ CHECK = dict(name='hwb-scripts-host', tier=1, budget=4.0, needs=[], covers=[
     'userland/shell/hwb.h', 'kdebug/hwb_wire.h', 'include/types.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'])
+    'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
+    'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
+    'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c'])
 import json
 import os
 from pathlib import Path
@@ -17,7 +19,11 @@ import tempfile
 import hwb_host
 
 ROOT = hwb_host.ROOT
-FILES = CHECK['covers'][:7]
+FILES = [
+    'userland/tests/hw/trident.hwb', 'userland/tests/hw/np21w_gdc.hwb',
+    'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
+    'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
+    'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb']
 MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
               'iowrite8 port 0xFAC 0', 'enable-fac'),
              ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
@@ -102,11 +108,73 @@ void _start(void) {
             print('GREEN host ILP32; i386-elf compile PASS', flush=True)
 
 
+
+MODE = 'userland/tests/hw/trident_mode.hwb'
+EXEC = 'userland/shell/hwb_exec.c'
+EXEC_MUTATIONS = [
+    ('fill-address', EXEC, 'r->addr + n * i->width, &a);', 'r->addr, &a);', 'fill-values'),
+    ('fill-count', EXEC, 'n < r->count; n++', 'n + 1U < r->count; n++', 'fill-values'),
+    ('fill-point', EXEC, 'rc = he_point(s, 0); if (rc) return rc;\n            a = r->value;', 'rc = HWB_OK; if (rc) return rc;\n            a = r->value;', 'fill-abort'),
+    ('fill-precheck', EXEC, 'r.count - 1U >', 'r.count - r.count >', 'fill-invalid'),
+    ('fill-log', 'userland/shell/hwb_log.c', 'str(&b, " done="); dec(&b, r->done);', 'str(&b, " lost="); dec(&b, r->done);', 'fill-values'),
+    ('mode-fac', MODE, 'iowrite8 port 0xFAC 0', 'iowrite8 port 0xFAC 2', 'mode'),
+    ('mode-cr03', MODE, '0x03 | ((0x80) << 8)', '0x03 | ((0x82) << 8)', 'mode'),
+    ('mode-cr05', MODE, '0x05 | ((0x1E) << 8)', '0x05 | ((0x9E) << 8)', 'mode'),
+    ('mode-cr3a', MODE, 'mmiowrite16 v + 0x3D4 0x3A | ((0) << 8)', 'log "CR3A omitted"', 'mode'),
+    ('mode-pitch', MODE, '0x13 | ((0x50) << 8)\n # Column 6', '0x13 | ((0x51) << 8)\n # Column 6', 'mode'),
+    ('mode-pll', MODE, 'mmiowrite8 v + 0x43C9 b', 'mmiowrite8 v + 0x43C9 a', 'mode'),
+    ('mode-ar', MODE, 'mmiowrite8 v + 0x3C0 0x41', 'mmiowrite8 v + 0x3C0 0x40', 'mode'),
+    ('mode-unprotect', MODE, 'call protect_off\n # Column 8', 'log "unprotect postponed"\n # Column 8', 'mode'),
+]
+
+
+def execution_trial(mutation=None):
+    fixture = (ROOT / 'tools/tests/hwb_scripts_host.c').read_text()
+    scripts = [(ROOT / p).read_text() for p in FILES]
+    products = {p: (ROOT / p).read_text() for p in [
+        'userland/shell/hwb_parse.c', EXEC, 'userland/shell/hwb_log.c']}
+    if mutation:
+        _, path, before, after, _ = mutation
+        original = (ROOT / path).read_text()
+        if original.count(before) != 1:
+            raise RuntimeError('mutation anchor is not unique: ' + mutation[0])
+        if path in FILES:
+            scripts[FILES.index(path)] = original.replace(before, after)
+        else:
+            products[path] = original.replace(before, after)
+    # Inline product TUs so mutations stay isolated and execute the real code.
+    for path, content in products.items():
+        fixture = fixture.replace('#include "' + path + '"', content.replace(
+            '#include "hwb.h"', '#include "userland/shell/hwb.h"'))
+    arrays = ',\n'.join(json.dumps(s, ensure_ascii=True) for s in scripts)
+    fixture = fixture.replace('/* SCRIPTS_DATA */',
+                              'static const char *scripts[] = {' + arrays + '};')
+    with tempfile.TemporaryDirectory(prefix='hwb-mode-') as d:
+        source = Path(d) / 'fixture.c'
+        source.write_text(fixture)
+        exe = Path(d) / 'host'
+        hwb_host.build(ROOT, source, exe)
+        result = hwb_host.execute(exe)
+        print(result.stdout, end='', flush=True)
+        if mutation:
+            if result.returncode != 1 or 'FAIL:' + mutation[4] + ':' not in result.stdout:
+                raise RuntimeError('mutation did not produce expected runtime RED: ' + mutation[0])
+            print(mutation[0] + ': RED runtime', flush=True)
+        elif result.returncode:
+            raise RuntimeError('execution control failed')
+        else:
+            hwb_host.build(ROOT, source, Path(d) / 'target.o', cross=True)
+            print('GREEN real executor mode/fill ILP32; i386-elf compile PASS', flush=True)
+
+
 def main():
     trial()
+    execution_trial()
     if '--mutate' in sys.argv:
         for mutation in MUTATIONS:
             trial(mutation)
+        for mutation in EXEC_MUTATIONS:
+            execution_trial(mutation)
     return 0
 
 

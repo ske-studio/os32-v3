@@ -91,6 +91,7 @@ def exercise(mod):
 def fields_exercise(mod):
     # Independently specified hwb_log.c wire spellings (HW design §§3-4/P9).
     operations = [
+        ('mmiofill32', 'addr=0x20000000 val=0x03030303 count=4', 'addr=0x20000000 val=0x03030303 count=4 done=4'),
         ('poll', 'addr=0xA0000 val=0x00', 'addr=0xA0000 val=0x01 reads=2 elapsed_us=0x100000002'),
         ('wait', 'requested_us=1000', 'requested_us=1000 elapsed_us=0x400'),
         ('print', '', 'tag="a\\x20b\\\\c\\\"d" val=0x12'),
@@ -110,6 +111,13 @@ def fields_exercise(mod):
                 key = token.split('=', 1)[0]
                 body = (first + last).replace(token, key + '=invalid')
                 check(mod.inspect(body + TERM)[1], op + ' invalid ' + key)
+    fill = ('HW run=3 seq=1 line=1 phase=begin op=mmiofill8 addr=0x20000000 val=0x07 count=4 rc=PENDING\n'
+            'HW run=3 seq=1 line=1 phase=end op=mmiofill8 addr=0x20000000 val=0x07 count=4 done=4 rc=OK\n')
+    for old, new in [('done=4', 'done=3'), ('done=4', 'done=5'),
+                     ('count=4', 'count=4294967296'), ('count=4', 'count=0')]:
+        check(mod.inspect(fill.replace(old, new) + TERM)[1], 'fill progress')
+    check(not mod.inspect(fill.replace('done=4 rc=OK', 'done=2 rc=IO') + TERM.replace('rc=OK', 'rc=IO'))[1])
+    check(mod.inspect(fill.replace('count=4 done=4', 'count=5 done=5') + TERM)[1])
     for op in ('print', 'log'):
         key = 'tag' if op == 'print' else 'text'
         extra = ' val=0x0' if op == 'print' else ''
@@ -138,6 +146,9 @@ def unresolved_exercise(mod):
 
 
 MUTATIONS = [
+    ('fill fields', 'tools/rshell_hwb.py', "elif re.fullmatch(r'mmiofill(?:8|16|32)', op):", "elif False:", 'fill count/done required'),
+    ('fill progress', 'tools/rshell_hwb.py', "done > count or (rc == 'OK' and (count == 0 or done != count))", "False", 'fill partial success'),
+    ('fill match', 'tools/rshell_hwb.py', "pending_fill != (seq, fields['addr'], fields['val'], count)", "False", 'fill begin/end agree'),
     ('unresolved rejected', 'tools/rshell_hwb.py', "fields[key] == 'UNRESOLVED'", "fields[key] == 'disabled'", 'P9 failed address accepted'),
     ('unresolved success', 'tools/rshell_hwb.py', "phase == 'end' and rc != 'OK'", "phase == 'end'", 'P9 success requires resolved address'),
     ('poll fields', 'tools/rshell_hwb.py', "elif op == 'poll':", "elif op == 'disabled-poll':", 'poll missing address/reads/elapsed'),
