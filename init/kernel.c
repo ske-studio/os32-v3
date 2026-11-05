@@ -61,6 +61,7 @@
 #include "../drivers/net/e82557/lan_module.h"
 #include "../drivers/video/cirrus/cirrus_module.h"
 #include "../drivers/video/geforce/geforce_module.h"
+#include "../drivers/video/trident/trident_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "../kernel/sqlite_engine.h"
@@ -252,6 +253,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* Register after boot preparation: GUI=0 must never probe/enable Cirrus. */
     cirrus_module_load();
     if (gfx_get_backend_pref() == GFX_PREF_GEFORCE) geforce_module_load();
+    if (gfx_get_backend_pref() == GFX_PREF_TRIDENT) trident_module_load();
     kaudit_post_probe();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_probe();
 

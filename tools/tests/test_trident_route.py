@@ -96,15 +96,11 @@ def build(work, source):
     return exe
 
 
-def run_exe(exe, runners, mutant=None):
+def run_exe(exe, runners, label='normal', expected_rc=0, prefix=b'GREEN route:'):
     for runner in runners:
         result = host32.run([str(exe)], runner=runner, capture_output=True)
-        if mutant is None:
-            assert result.returncode == 0 and result.stdout.startswith(b'GREEN route:'), result
-            print(f'PASS ({runner}): {result.stdout.decode().strip()}', flush=True)
-        else:
-            assert result.returncode == 1 and result.stdout.startswith(b'RED '), (mutant, result)
-            print(f'MUTATE RED {mutant} ({runner}): {result.stdout.decode().strip()}', flush=True)
+        assert result.returncode == expected_rc and result.stdout.startswith(prefix), (label, result)
+        print(f'{label} ({runner}): {result.stdout.decode().strip()}', flush=True)
 
 
 def main():
@@ -128,7 +124,7 @@ def main():
             for name, old, new in MUTATIONS:
                 assert original.count(old) == 1, (name, original.count(old))
                 source.write_text(original.replace(old, new))
-                run_exe(build(work, source), runners, name)
+                run_exe(build(work, source), runners, 'MUTATE RED ' + name, 1, b'RED ')
     return 0
 
 

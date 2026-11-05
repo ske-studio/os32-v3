@@ -281,7 +281,7 @@ def build(work, tree):
     return exe
 
 
-def surface_abi(work, compiler, mutate=False):
+def surface_abi(work, compiler, surface_id=5, expected_failure=False):
     # Preinclude the copied public header so the product TU uses that value.
     # This negative compile test is explicitly required by PACK.fix3 N1;
     # it is separate from the executable mutants below.
@@ -289,20 +289,18 @@ def surface_abi(work, compiler, mutate=False):
     original = (ROOT / 'sdk/include/os32/os32_surface.h').read_text()
     old = '#define OS32_SURFACE_TRIDENT 5'
     assert original.count(old) == 1
-    header.write_text(original.replace(old, '#define OS32_SURFACE_TRIDENT 6')
-                      if mutate else original)
+    header.write_text(original.replace(old, f'#define OS32_SURFACE_TRIDENT {surface_id}'))
     public = work / 'public.c'
     public.write_text(f'#include "{header}"\n')
-    if not mutate:
-        subprocess.run([compiler, '-m32', '-std=c89', '-pedantic-errors',
-                        '-fsyntax-only', str(public)], check=True)
+    subprocess.run([compiler, '-m32', '-std=c89', '-pedantic-errors',
+                    '-fsyntax-only', str(public)], check=True)
     src = work / 'surface_abi.c'
     src.write_text(f'#include "{header}"\n'
                    f'#include "{ROOT / "exec/surface_query.c"}"\n')
     result = subprocess.run([compiler, *FLAGS, '-I' + str(ROOT),
                              *include_flags(ROOT), '-fsyntax-only', str(src)],
                             capture_output=True, text=True)
-    if mutate:
+    if expected_failure:
         assert result.returncode != 0 and 'abi_surface_trident' in result.stderr, result
         print(f'MUTATE RED surface SDK/backend mismatch (compile assertion, {compiler})', flush=True)
     else:
@@ -320,7 +318,7 @@ def main():
         for compiler in ('gcc', str(cross)):
             surface_abi(work, compiler)
             if args.mutate:
-                surface_abi(work, compiler, mutate=True)
+                surface_abi(work, compiler, surface_id=6, expected_failure=True)
             for header in HEADERS:
                 src = work / 'standalone.c'
                 src.write_text(f'#include "{header}"\n')

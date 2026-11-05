@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "contracts": [
+    "drivers/video/trident/trident_module.h",
+    "drivers/video/trident/trident.h",
+    "include/gfx_hal.h",
+    "include/gfx_mode.h",
+    "gfx/palette.h"
+  ],
+  "imports": [
+    {
+      "symbol": "kmalloc",
+      "source": "mm/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kfree",
+      "source": "mm/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_get_all",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_shadow_set",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "serial_puts_polled",
+      "source": "lib/serial_diag.h",
+      "context": "normal,exception",
+      "irq": false
+    },
+    {
+      "symbol": "serial_gate_active",
+      "source": "lib/serial_diag.h",
+      "context": "normal,exception",
+      "irq": false
+    },
+    {
+      "symbol": "serial_puts",
+      "source": "drivers/char/serial.h",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

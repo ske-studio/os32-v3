@@ -257,7 +257,7 @@ SPR解釈はD:2919–2975を全行転記する（単位KiB、9682のmask=0F、�
 | 3d | tools/module_schema.py | 変更25 | 新規ID/ops契約、生成schemaの正典 |
 | 3d | tools/gen_sqlite_imports.py | 変更15 | trident import/export生成対象 |
 | 3d | include/config.h | 変更2 | SYS_TRIDENT_MOD=/boot/trident.mod |
-| 3d | build/packages.yaml | 変更10 | 任意graphics配備、BOOT/MINIMAL除外 |
+| 3d | build/core.yaml | 変更4 | 任意GUI配備 (tags: [gui])、BOOT/MINIMAL除外 |
 | 3c | init/kernel_gfx_config.inc | 変更8 | GFX=trident強制指定 |
 | 3c | userland/shell/cmd_sys.c | 変更10 | gfxmode選択名・状態表示 |
 | 3c | arch/x86/kernel/isr_handlers.c | 変更12 | :289一般例外と:393 #PFの両入口 |

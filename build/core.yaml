@@ -82,6 +82,10 @@ filesystem:
       guest: /boot/lan.mod
       tags: [core]
     # --- Paired Cirrus/WAB (also on FD) ---
+    # Optional forced Trident backend; gui only, outside BOOT/MINIMAL/FD.
+    - host: build/out/trident.mod
+      guest: /boot/trident.mod
+      tags: [gui]
     - host: build/out/cirrus.mod
       guest: /boot/cirrus.mod
       tags: [core]

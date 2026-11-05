@@ -36,6 +36,7 @@ C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid
     drivers/input/mouse.c drivers/input/mouse_bus.c drivers/input/mouse_seamless.c \
     drivers/net/ne2000/lgy98.c drivers/net/ne2000/ne2000.c drivers/net/ne2000/ne2000_ring.c \
     drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \
+    drivers/video/trident/trident_module.c drivers/video/trident/resources.c \
     drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/geforce/gf_wc.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
     gfx/gfx_core.c gfx/gfx_osri.c gfx/gfx_osri_view.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pc98_osri.c drivers/video/pc98/backend_pegc.c \
@@ -139,7 +140,7 @@ $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/
 deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
 
 # 像の CRC (pair) を埋める部品の一覧。T4c-1 で SQLite、T5 で起動時の部品を足す。
-KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod $(BUILD_OUT)/v86.mod $(BUILD_OUT)/lan.mod $(BUILD_OUT)/cirrus.mod $(BUILD_OUT)/hwdev.mod $(BUILD_OUT)/geforce.mod
+KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod $(BUILD_OUT)/v86.mod $(BUILD_OUT)/lan.mod $(BUILD_OUT)/cirrus.mod $(BUILD_OUT)/hwdev.mod $(BUILD_OUT)/geforce.mod $(BUILD_OUT)/trident.mod
 kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json $(KERNEL_PAIRED_MODULES)
 
 # === カーネルクリーン ===
@@ -286,7 +287,7 @@ $(KERNEL_OBJ_PREFIX)exec/%.o: private KERNEL_INCLUDES = $(INC_EXEC)
 $(KERNEL_OBJ_PREFIX)kapi/%.o: private KERNEL_INCLUDES = $(INC_KAPI)
 $(KERNEL_OBJ_PREFIX)lib/%.o: private KERNEL_INCLUDES = $(INC_LIB)
 $(addprefix $(KERNEL_OBJ_PREFIX),drivers/video/cirrus/backend_cirrus.o drivers/video/cirrus/cirrus_identify.o drivers/video/geforce/backend_geforce.o drivers/video/geforce/gf_present.o drivers/video/pc98/backend_pc98.o drivers/video/pc98/backend_pegc.o drivers/video/pc98/pc98_route.o): private KERNEL_INCLUDES = $(INC_GFX)
-CORE_KERNEL_INCLUDES = drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
+CORE_KERNEL_INCLUDES = drivers/video/trident/trident_module.o drivers/video/trident/resources.o drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
 $(addprefix $(KERNEL_OBJ_PREFIX),$(CORE_KERNEL_INCLUDES)): private KERNEL_INCLUDES = $(INC_KERNEL)
 
 $(KERNEL_OBJ_PREFIX)%.o: %.c
