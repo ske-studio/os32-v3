@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 0 contracts, NET_HOSTSVC_DESIGN §§2–5 (no hardware or libc).
+"""Stage 0 + declaration stage 2 contracts, NET_HOSTSVC_DESIGN §§2–5 (no hardware or libc).
 
 Expected wire numbers below are transcribed from the design, independently of
 product arithmetic. Compile headers separately with host/cross compilers, then
@@ -8,7 +8,22 @@ execute ILP32 layout checks. Mutations must compile and fail at runtime.
 CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
     covers=['net/nic.h', 'net/link.h', 'fs/serialfs/sfs_proto.h',
             'fs/serialfs/serialfs.h', 'tools/tests/kernel_includes.py',
-            'tools/tests/host32.py', 'build/config.mk'], budget=3)
+            'tools/tests/host32.py', 'build/config.mk',
+            'net/nic_rx.h',
+            'net/link_notify.h',
+            'net/host_mailbox.h',
+            'sdk/include/os32/os32_host_notice.h',
+            'fs/serialfs/sfs_client.h',
+            'fs/serialfs/sfs_block.h',
+            'drivers/base/dev.h',
+            'drivers/block/netcd.h',
+            'fs/vfs.h',
+            'fs/isofs/iso9660_media.h',
+            'drivers/net/e82557/lan_module.h',
+            'kapi/kapi_host_notice.h',
+            'tools/tests/hostsvc_fixture.h',
+            'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.py',
+            'tools/hostsvc_contracts.pyi'], budget=3)
 
 import argparse
 import os
@@ -22,8 +37,25 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADERS = ('net/nic.h', 'net/link.h', 'fs/serialfs/sfs_proto.h',
-           'fs/serialfs/serialfs.h')
+HEADERS = (
+    'net/nic.h',
+    'net/link.h',
+    'fs/serialfs/sfs_proto.h',
+    'fs/serialfs/serialfs.h',
+    'net/nic_rx.h',
+    'net/link_notify.h',
+    'net/host_mailbox.h',
+    'sdk/include/os32/os32_host_notice.h',
+    'fs/serialfs/sfs_client.h',
+    'fs/serialfs/sfs_block.h',
+    'drivers/base/dev.h',
+    'drivers/block/netcd.h',
+    'fs/vfs.h',
+    'fs/isofs/iso9660_media.h',
+    'drivers/net/e82557/lan_module.h',
+    'kapi/kapi_host_notice.h',
+    'tools/tests/hostsvc_fixture.h',
+)
 # §5: original 20-byte header, appended HELLO fields, independent notification.
 WIRE = {
     'LINK_OP_NOTIFY': 11, 'LINK_HDR_LEN': 20, 'LINK_OFF_OP': 0,
@@ -73,6 +105,19 @@ MUTATIONS = (
      'u32 generation, last_use, alive_seen;',
      'u32 last_use, generation, alive_seen;'),
 )
+MUTATIONS += (
+    ('notice-size', 'sdk/include/os32/os32_host_notice.h', 'data[236]', 'data[237]'),
+    ('notice-order', 'sdk/include/os32/os32_host_notice.h',
+     'serial, dropped, host_generation', 'dropped, serial, host_generation'),
+    ('reply-order', 'fs/serialfs/sfs_client.h', 'capacity, length', 'length, capacity'),
+    ('lan-slots', 'drivers/net/e82557/lan_module.h', 'API_SLOTS 22u', 'API_SLOTS 23u'),
+    ('lan-order', 'drivers/net/e82557/lan_module.h',
+     '    const struct NetAdapter *adapter;\n    int (*netcd_register)(const char *);',
+     '    int (*netcd_register)(const char *);\n    const struct NetAdapter *adapter;'),
+    ('device-order', 'drivers/base/dev.h',
+     '    int (*blk_read_u32)(Device *, u32 lba, int count, void *buf);\n    int (*media_check)(Device *, u32 *generation);',
+     '    int (*media_check)(Device *, u32 *generation);\n    int (*blk_read_u32)(Device *, u32 lba, int count, void *buf);'),
+)
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 
@@ -88,20 +133,96 @@ def source():
     checks += [(f'OFF(struct SfsPersistent, {field})',
                 f'sizeof(SfsClient) + {i * 4}')
                for i, field in enumerate(('generation', 'last_use', 'alive_seen'))]
+    checks += [('NET_NIC_AUTO', '0'), ('NET_NIC_E82557', '1'),
+               ('NET_NIC_LGY98', '2'), ('NET_RX_SFS', '1'), ('NET_RX_LINK', '2'),
+               ('NET_RX_SCAN_MAX', '8'), ('LAN_MODULE_OPS_VERSION', '2'),
+               ('LAN_MODULE_API_SLOTS', '22'), ('sizeof(LanModuleApi)', '88'),
+               ('sizeof(Device)', '72'), ('sizeof(VfsOps)', '104')]
+    layouts = {
+        'struct NetAdapter': (8, [('acquire', 0), ('release', 4)]),
+        'HostNotice': (256, [('serial', 0), ('dropped', 4), ('host_generation', 8),
+                            ('service', 12), ('kind', 14), ('length', 16),
+                            ('reserved', 18), ('data', 20)]),
+        'struct HostAlive': (12, [('host_generation', 0), ('observation', 4), ('valid', 8)]),
+        'struct SfsPersistentConfig': (12, [('io', 0), ('io_ctx', 4), ('lan_enabled', 8)]),
+        'struct SfsReply': (8, [('data', 0), ('capacity', 4), ('length', 6)]),
+        'struct SfsBlock': (24, [('sid', 0), ('handle', 4), ('size', 8), ('mtime', 16)]),
+        'struct NetCd': (32, [('handle', 0), ('media_gen', 4), ('last_use', 8),
+                              ('alive_seen', 12), ('size', 16), ('mtime', 24)]),
+    }
+    for typ, (size, fields) in layouts.items():
+        checks.append((f'sizeof({typ})', str(size)))
+        checks.extend((f'OFF({typ}, {field})', str(offset)) for field, offset in fields)
+    checks += [('OFF(LanModuleApi, io)', '60'), ('OFF(LanModuleApi, adapter)', '80'),
+               ('OFF(LanModuleApi, netcd_register)', '84'),
+               ('OFF(Device, blk_read_u32)', '64'), ('OFF(Device, media_check)', '68'),
+               ('OFF(VfsOps, resource_check)', '96'), ('OFF(VfsOps, resource_refresh)', '100')]
     # Compile-time checks concern types only; all layout checks execute below.
     signatures = {
         'net_bind': 'int (*)(const struct NetNicOps *)',
         'net_rx_take': 'int (*)(u16, void *, u32, u32 *)',
         'sfs_ensure_session': 'int (*)(u32)',
-        'sfs_request_deadline': 'int (*)(u8, const void *, u16, void *, u32)',
+        'sfs_request_deadline': 'int (*)(u8, const void *, u16, struct SfsReply *, u32)',
         'sfs_alive_observe': 'void (*)(u32)',
     }
+    signatures.update({'net_adapter_register': 'int (*)(enum NetNicId, const struct NetAdapter *)',
+     'net_start': 'int (*)(enum NetNicId, const u8 *)',
+     'net_unbind': 'void (*)(void)',
+     'net_tx': 'int (*)(const void *, u32)',
+     'net_mac': 'int (*)(u8 *)',
+     'net_rx_credit_bytes': 'u32 (*)(void)',
+     'net_rx_reset': 'void (*)(u16)',
+     'net_tick': 'void (*)(void)',
+     'net_rx_demux': 'void (*)(const struct NetNicOps *, const u8 *, const u8 *)',
+     'link_notify_session': 'void (*)(u16, u16, int, u32, u16)',
+     'link_notify_rx': 'void (*)(u32, const u8 *, u16)',
+     'link_notify_tick': 'void (*)(u32)',
+     'link_notify_reset': 'void (*)(void)',
+     'link_notify_control': 'int (*)(u8, u32, u16)',
+     'host_mailbox_init': 'int (*)(void)',
+     'host_mailbox_put': 'int (*)(u32, u16, u16, const void *, u16, int)',
+     'host_mailbox_stage': 'int (*)(u32, u32, HostNotice *)',
+     'host_mailbox_commit': 'void (*)(u32, u32)',
+     'host_alive_snapshot': 'void (*)(struct HostAlive *)',
+     'kapi_host_notice_read': 'int (*)(u32, u32, HostNotice *)',
+     'kapi_host_notice_serial': 'u32 (*)(void)',
+     'sfs_persistent_start': 'int (*)(const struct SfsPersistentConfig *)',
+     'sfs_persistent_client': 'const SfsClient *(*)(void)',
+     'sfs_persistent_generation': 'u32 (*)(void)',
+     'sfs_persistent_stale': 'void (*)(void)',
+     'sfs_persistent_enabled': 'int (*)(void)',
+     'sfs_persistent_scope_begin': 'int (*)(void)',
+     'sfs_persistent_scope_end': 'int (*)(int)',
+     'sfs_client_call_deadline': 'int (*)(SfsClient *, u8, const void *, u16, struct '
+                                 'SfsReply *, u32)',
+     'sfs_client_hello_deadline': 'int (*)(SfsClient *, u32, u32)',
+     'sfs_bopen': 'int (*)(const char *, u16, struct SfsBlock *, u32)',
+     'sfs_bread': 'int (*)(const struct SfsBlock *, u32, u16, void *, u32, u32)',
+     'sfs_bclose': 'int (*)(const struct SfsBlock *, u32)',
+     'netcd_register': 'int (*)(const char *)',
+     'netcd_read': 'int (*)(Device *, u32, int, void *)',
+     'netcd_media_check': 'int (*)(Device *, u32 *)',
+     'dev_media_check': 'int (*)(Device *, u32 *)',
+     'dev_register_cd': 'int (*)(Device *, int)',
+     'vfs_fd_stale_mount': 'void (*)(void *)',
+     'iso9660_resource_check': 'int (*)(void *, u32 *)',
+     'iso9660_resource_refresh': 'int (*)(void *)',
+     'iso9660_media_drop': 'void (*)(void *)',
+     'hs_reset': 'void (*)(u32)',
+     'hs_advance': 'void (*)(u32)',
+     'hs_set_if': 'void (*)(int)',
+     'hs_rx': 'int (*)(enum NetNicId, const void *, u32)',
+     'hs_tx_take': 'int (*)(void *, u32, u32 *)',
+     'hs_fail': 'void (*)(const char *, int)',
+     'hs_copyout_hook': 'void (*)(void (*)(void))'})
     text = ''.join(f'#include "{header}"\n' for header in HEADERS)
     text += '#define OFF(t, m) __builtin_offsetof(t, m)\n'
     for name, signature in signatures.items():
         text += (f'_Static_assert(__builtin_types_compatible_p(__typeof__(&{name}), '
                  f'{signature}), "{name}");\n')
-    text += '''static int equal(u32 a, u32 b) {
+    text += '''static int hook_called;
+static void hook(void) { hook_called++; }
+static int equal(u32 a, u32 b) {
     __asm__ volatile ("" : "+r"(a), "+r"(b));
     return a == b;
 }
@@ -109,7 +230,20 @@ static int test(void) {
 '''
     for i, (actual, expected) in enumerate(checks, 1):
         text += f'    if (!equal({actual}, {expected})) return {i};\n'
-    text += '''    return 0;
+    text += '''    int rc = 0;
+    hs_reset(0xFFFFFF00u); hs_advance(0x101u); if (!equal(hs_now(), 1)) return 240;
+    if (!hs_if()) return 241;
+    hs_set_if(0); if (hs_if()) return 242;
+    hs_fail("heap", -10);
+    if (hs_failure_take("copyout", &rc)) return 243;
+    if (!hs_failure_take("heap", &rc) || rc != -10) return 244;
+    if (hs_failure_take("heap", &rc)) return 245;
+    hs_copyout_hook(hook); hs_copyout_run_hook(); hs_copyout_run_hook();
+    if (!equal(hook_called, 1)) return 246;
+    hs_fail("nic.rx", -14); hs_copyout_hook(hook); hs_reset(0);
+    if (hs_failure_take("nic.rx", &rc) || hs_now() || !hs_if()) return 247;
+    hs_copyout_run_hook(); if (!equal(hook_called, 1)) return 248;
+    return 0;
 }
 void _start(void) {
     int rc = test();
@@ -127,7 +261,7 @@ def compile_and_run(work, tree):
     inc = ['-I' + str(tree), *include_flags(ROOT)]
     exe = work / 'contracts'
     subprocess.run(['gcc', *FLAGS, *inc, '-nostdlib', '-static', '-no-pie',
-                    str(src), '-o', str(exe)], check=True, cwd=ROOT)
+                    str(src), str(ROOT / 'tools/tests/hostsvc_fixture.c'), '-o', str(exe)], check=True, cwd=ROOT)
     result = host32.run([str(exe)], cwd=ROOT)
     if result.returncode > 0:
         index = result.returncode - 1
@@ -139,6 +273,34 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    from hostsvc_fixture import Fixture, UNITS, ethernet, notice
+    import ast
+    protocols = ast.parse((ROOT / 'tools/hostsvc_contracts.pyi').read_text())
+    methods = {node.name: {m.name for m in node.body if isinstance(m, ast.FunctionDef)}
+               for node in protocols.body if isinstance(node, ast.ClassDef)}
+    assert methods == {
+        'ServiceUnavailable': set(),
+        'ImageStore': {'__init__', 'open_session', 'close_session', 'dispatch'},
+        'Registry': {'__init__', 'register', 'resolve', 'list_bytes', 'dispatch'},
+        'Notify': {'__init__', 'session', 'reset', 'hello_extension', 'notify', 'ack', 'tick'},
+        'Proc': {'poll', 'output', 'stderr', 'kill', 'close'},
+    }
+    assert {n.name for n in protocols.body if isinstance(n, ast.FunctionDef)} == {
+        'clip_start', 'print_start'}
+    for unit in UNITS:
+        fixture = Fixture(unit)
+        assert not fixture.bound and not fixture.hello and not fixture.alive_valid
+        assert fixture.if_enabled and fixture.tick == 0 and not fixture.rx
+        fixture.reset(0xffffff00)
+        fixture.advance(2570)
+        assert fixture.tick == 1
+        frame = ethernet(notice(1, 2, 3, b'x'), bytes(6), b'123456')
+        fixture.inject(frame)
+        assert fixture.rx.popleft() == frame and fixture.take() == []
+        fixture.fail('drop', True)
+        assert fixture.failure_take('drop') is True
+        assert fixture.failure_take('drop') is None
+        fixture.close()
     cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
     with tempfile.TemporaryDirectory(prefix='hostsvc-contracts-') as tmp:
         work = Path(tmp)
@@ -149,6 +311,14 @@ def main():
                 subprocess.run([compiler, *FLAGS, '-I' + str(ROOT),
                                 *include_flags(ROOT), '-c', str(src),
                                 '-o', str(work / 'standalone.o')], check=True, cwd=ROOT)
+            src.write_text('#include "sdk/include/os32/os32_host_notice.h"\n')
+            subprocess.run([compiler, *FLAGS, '-std=c89', '-pedantic-errors',
+                            '-I' + str(ROOT), '-c', str(src),
+                            '-o', str(work / 'public.o')], check=True, cwd=ROOT)
+            subprocess.run([compiler, *FLAGS, '-I' + str(ROOT),
+                            *include_flags(ROOT), '-c',
+                            str(ROOT / 'tools/tests/hostsvc_fixture.c'),
+                            '-o', str(work / 'fixture.o')], check=True, cwd=ROOT)
             # Cross also compiles the complete fixture and signature assertions.
             src = work / 'types.c'
             src.write_text(source()[0])
@@ -163,13 +333,14 @@ def main():
         if args.mutate:
             for name, rel, old, new in MUTATIONS:
                 tree = work / name
-                # Copy headers so relative #includes remain inside the overlay.
-                shutil.copytree(ROOT / 'fs/serialfs', tree / 'fs/serialfs',
-                                ignore=shutil.ignore_patterns('*.c'))
-                shutil.copy2(ROOT / 'fs/vfs.h', tree / 'fs/vfs.h')
-                (tree / 'net').mkdir()
-                for header in ('net/nic.h', 'net/link.h'):
-                    shutil.copy2(ROOT / header, tree / header)
+                # Overlay all tracked headers plus new declarations: relative includes
+                # must stay within the same mutated tree.
+                tracked = subprocess.check_output(['git', 'ls-files', '*.h'], cwd=ROOT,
+                                                  text=True).splitlines()
+                for header in set(tracked) | set(HEADERS):
+                    target = tree / header
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(ROOT / header, target)
                 path = tree / rel
                 original = path.read_text()
                 if original.count(old) != 1:

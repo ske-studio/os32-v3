@@ -188,6 +188,11 @@ typedef struct {
      * FAT で `DB` と `db` が別名に見え、同じ実体の付け替え・削除をすり抜ける。 */
     u8 (*name_fold)(u8 c);
     const VfsSqliteOps *sqlite; /* optional; kernel internal, not KAPI */
+    /* Optional task-context media/session generation hooks. Keep mount/ctx
+     * shell alive; failed/changed check invalidates FDs permanently. Refresh
+     * only on the next path operation, rebuilding backend internals. */
+    int (*resource_check)(void *ctx, u32 *generation);
+    int (*resource_refresh)(void *ctx);
 } VfsOps;
 
 /* ---- VFS API ---- */
@@ -401,4 +406,6 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out);
 /* レガシー互換ラッパー */
 void vfs_sys_compat_shell_print(const char *s, u8 attr);
 
+/* Permanent stale mark, preserving ctx (unlike invalidate_mount). */
+void vfs_fd_stale_mount(void *ctx);
 #endif /* VFS_H */
