@@ -57,6 +57,7 @@
 #define TRIDENT_H
 #include <stdbool.h>
 #include "types.h"
+#include "memmap.h"
 
 #define TRI_PCI_VENDOR 0x1023u
 #define TRI_PCI_DEVICE 0x9660u
@@ -149,6 +150,9 @@ struct trident_io {
     int (*write16)(void *, enum trident_space, u32, u16);
     int (*write32)(void *, enum trident_space, u32, u32);
     int (*port8)(void *, u16, u8);
+    /* One LFB row span: aligned offset/source, count in dwords; validate the
+     * whole range before writing. No readback. Scalar write8 handles edges. */
+    int (*write_span32)(void *, u32 off, const u32 *src, u32 count);
 };
 struct trident_pci_info {
     u16 vendor, device, command;
@@ -176,12 +180,14 @@ struct trident_device {
     /* New device is entirely zero; regs_bind installs io without hardware I/O.
      * pin/arm must precede identify (even index selection writes hardware).
      * saved.valid commits only after a complete save and is never overwritten.
-     * init_done = complete PC98 Init; first_init_done = complete first init.
+     * lifecycle owns init_done (sets only after pc98_init returns success)
+     * and first_init_done (complete first init). pc98_init does not set it.
      * Both persist across leave/close, as do verified_bytes and the maps. */
     const struct trident_io *io;
     void *io_opaque;
-    u32 failed_step, display_owner;
-    u8 chip, spr, reference;
+    u32 failed_step, display_owner; /* arm-time diagnostic only, never a filter */
+    u8 chip, spr, reference; /* identify owns chip/reference; capacity_plan owns
+                             * spr, read after PC98 Init (S3 §§2,4). */
     bool pinned, declared_unknown;
     enum trident_upper upper;
     /* RAM loan for first VRAM verification only; lifecycle allocates/frees.
@@ -201,7 +207,9 @@ const struct trident_resources *trident_resources_get(void);
 int trident_resources_rollback(bool armed);
 /* regs.c: bind is write-free; these wrappers keep exact width and propagate rc.
  * AR/protect use vga_base (3B4/3D4); status port = vga_base+6.
- * indexed_write is one 16-bit OUTW, indexed_read selects with one OUTB. */
+ * indexed_write is one 16-bit OUTW, indexed_read selects with one OUTB.
+ * vgaHW operations (protect/CRTC lock and D:636/643) use two 8bit writes,
+ * never indexed_write. Base selection follows vgaHW.c:1786–1789,1021–1025. */
 int trident_regs_bind(struct trident_device *d);
 int trident_read8(struct trident_device *, enum trident_space, u32, u8 *);
 int trident_read16(struct trident_device *, enum trident_space, u32, u16 *);
@@ -216,13 +224,20 @@ int trident_ar_read(struct trident_device *, u16 vga_base, u8 index, u8 *);
 int trident_ar_write(struct trident_device *, u16 vga_base, u8 index, u8);
 int trident_hidden_dac_read(struct trident_device *, u8 *);
 int trident_hidden_dac_write(struct trident_device *, u8);
+/* H:493: 83C8=4, then read-modify-write 83C6. */
 int trident_ext_dac_update(struct trident_device *, u8 mask, u8 bits);
 int trident_protect(struct trident_device *, u16 vga_base, bool on);
 int trident_crtc_lock(struct trident_device *, u16 vga_base, bool lock);
-/* pc98_init.c: full D:616–692, including protect and SR0C alternate branch. */
+/* pc98_init.c: full D:616–692, including protect and SR0C alternate branch.
+ * Entry protect uses current MISC bit0 BEFORE MISC|=C3 (D:622–626); AR,
+ * unlock/lock and exit protect use color 3D4 AFTER it (D:650–656,688–690). */
 int trident_pc98_init(struct trident_device *d);
 /* state_save.c/default_dac.c/state_restore.c: 852 slots, nonprimary,
- * no font/text planes, default MCLK not saved, SR0E restore XOR 02. */
+ * no font/text planes, default MCLK not saved, SR0E restore XOR 02.
+ * Save selects base from MISC at save time (vgaHW.c:1021–1025). Restore
+ * entry protect/Trident uses current MISC; VGA Restore writes saved MISC
+ * then uses its base for AR/CRTC and exit protect (vgaHW.c:845–865;
+ * trident_dac.c:781–810, D:1111–1136). */
 int trident_state_save(struct trident_device *d);
 extern const u8 trident_default_dac[TRI_DAC_BYTES];
 int trident_state_restore(struct trident_device *d);
@@ -232,17 +247,23 @@ int trident_state_restore(struct trident_device *d);
  * >= DISPLAY_BYTES succeeds, not a requirement for 2MiB or 4MiB. */
 int trident_capacity_plan(struct trident_device *d);
 int trident_vram_verify(struct trident_device *d);
-/* mode_640.c excludes Enable; lifecycle calls it exactly once after ModeInit. */
+/* mode_640.c excludes Enable; lifecycle calls Enable once after ModeInit.
+ * Mode/route AR and protect use current MISC after Init MISC|=C3, hence
+ * color 3D4 (D:626,704–727,740–767; vgaHW.c:1786–1789).
+ * Route 0xFAC also belongs to pc98_route.c; their relationship is set in 3c. */
 int trident_mode_640(struct trident_device *d);
 int trident_route_enable(struct trident_device *d);
 int trident_route_disable(struct trident_device *d);
 /* RAM client is res->client/client_bytes, pitch TRI_PITCH. Present clips then
- * validates source/LFB ends and copies rows, with no VRAM readback. RGB input
- * is 8bit/component, converted to VGA 6bit; invalid palette interval is INVAL. */
+ * validates source/LFB ends and copies rows via write_span32 (write8 edges),
+ * with no VRAM readback. RGB input is KAPI 4bit/component:
+ * x = input & GFX_PALETTE_COMPONENT_MASK; DAC = (x << 2) | (x >> 2),
+ * as cirrus_pal6. Invalid palette interval is INVAL. */
 int trident_present(struct trident_device *, int x, int y, int w, int h);
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
-/* lifecycle.c: ScreenInit=Save→Init→plan→Mode→Enable→verify→client once;
- * later init=Mode→Enable→client, enter=Mode→Enable (active enter is no-op).
+/* lifecycle.c: ScreenInit=Save→Init→plan→Mode→Enable→verify→palette/client once;
+ * later init=Mode→Enable→palette/client, enter=Mode→Enable (active enter is no-op).
+ * Palette defaults come from gfx/palette.c shadow.
  * leave=Restore→lock→Disable, close=Disable→Restore→lock only when active;
  * close after leave and duplicate close touch no hardware. Never re-save.
  * Recovery tries both operations, keeps both rc, no allocation/log/tick/GE.
@@ -253,5 +274,6 @@ int trident_screen_init(struct trident_device *d);
 int trident_enter(struct trident_device *d);
 int trident_leave(struct trident_device *d);
 int trident_close(struct trident_device *d);
+/* restore98 touches hardware only while active (vtSema, D:3333). */
 int trident_restore98(void *opaque);
 #endif

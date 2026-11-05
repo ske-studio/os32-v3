@@ -9,6 +9,7 @@
 #define TRI_FAKE_PORT_SPACE 2u
 struct trident_fake_event {
     u32 space, offset, value;
+    u32 count; /* elements: 1 for scalar, dword count for one span event */
     u8 width;
     bool write;
     int rc;
@@ -25,6 +26,7 @@ struct trident_fake {
     u8 *vram;
     u32 storage_bytes, real_bytes;
     enum trident_upper upper;
+    bool block_after_restore; /* inferred failure mode, reset default off */
     bool pc98_initialized; /* false at reset, never inferred from ModeInit */
     /* Failure: one-based operation number; 0 disables. Failed access has no
      * side effect; returned rc is preserved. hole_start is an optional LFB
@@ -39,7 +41,10 @@ struct trident_fake {
     u8 last_port_value;
 };
 /* Observed defaults only: Command=0002, SR09=10, SPR=7F (FF variant via sr),
- * GR06=0C, 2MiB non-mirror, BAR0 decode 4MiB/BAR1 64KiB. Unobserved register
+ * GR06=0C, 2MiB non-mirror at sampled endpoints, BAR0 decode 4MiB/BAR1 64KiB.
+ * Inference: all blocked BAR0 addresses read FA7F3F6F/ignore writes; all upper
+ * 2MiB reads return FF and writes are ignored. Hardware sampled endpoints
+ * only; neither full-range behavior was measured. Unobserved register
  * initial values are zero placeholders, not claims about a cold machine;
  * individual state tests seed distinct boot values before Save. No ready,
  * arm, pin, valid save or init flags are installed by bind. RAM starts zero. */
@@ -58,5 +63,9 @@ void trident_fake_fail(struct trident_fake *, u32 operation, int rc);
  * first/count address captured trace; failed/truncated traces never qualify. */
 int trident_fake_accept_init(struct trident_fake *, u32 first,
                              const struct trident_fake_event *, u32 count);
+/* Host state/lifecycle tests call this AFTER independently checking Restore
+ * trace. Optional reblocking models an unmeasured reentry failure (S3 N2),
+ * not a claim that a particular register write causes it. */
+void trident_fake_restored(struct trident_fake *);
 extern const struct trident_io trident_fake_io;
 #endif

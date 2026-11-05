@@ -77,11 +77,15 @@ int trident_fake_accept_init(struct trident_fake *f, u32 first,
     for (u32 i = 0; i < count; ++i) {
         const struct trident_fake_event *a = &f->trace[first + i], *b = &expected[i];
         if (a->space != b->space || a->offset != b->offset || a->value != b->value ||
-            a->width != b->width || a->write != b->write || a->rc || b->rc)
+            a->count != b->count || a->width != b->width || a->write != b->write || a->rc || b->rc)
             return TRI_E_STATE;
     }
     f->pc98_initialized = true;
     return 0;
+}
+void trident_fake_restored(struct trident_fake *f)
+{
+    if (f->block_after_restore) f->pc98_initialized = false;
 }
 static u8 read_reg(struct trident_fake *f, u32 off)
 {
@@ -152,7 +156,7 @@ static void record(struct trident_fake *f, u32 space, u32 off, u32 v,
     if (!f->trace_capacity) return;
     if (f->trace_count == f->trace_capacity) { f->trace_overflow = true; return; }
     f->trace[f->trace_count++] = (struct trident_fake_event){
-        .space = space, .offset = off, .value = v, .width = width,
+        .space = space, .offset = off, .value = v, .width = width, .count = 1,
         .write = write, .rc = rc
     };
 }
@@ -227,7 +231,36 @@ static int port8(void *opaque, u16 port, u8 value)
     record(f, TRI_FAKE_PORT_SPACE, port, value, 1, true, rc);
     return rc;
 }
+/* One transfer operation/event for a whole row, not count callbacks. */
+static int write_span32(void *opaque, u32 off, const u32 *src, u32 count)
+{
+    struct trident_fake *f = opaque;
+    u32 limit = f->resources.mapped_bytes;
+    int rc = 0;
+    ++f->operations;
+    if (f->fail_at && f->operations == f->fail_at) rc = f->fail_rc;
+    else if (!src || !count || ((uptr)src & 3) || (off & 3) || off > limit ||
+             count > (limit - off) / 4 || off >= f->hole_start ||
+             count > (f->hole_start - off) / 4) rc = TRI_E_ACCESS;
+    if (!rc) {
+        for (u32 j = 0; j < count; ++j) {
+            for (u32 i = 0; i < 4; ++i) {
+                u32 at = off + j * 4 + i;
+                bool exists = at < f->real_bytes || f->upper == TRI_UPPER_MIRROR;
+                if (f->upper == TRI_UPPER_MIRROR) at %= f->real_bytes;
+                if (f->pc98_initialized && (f->cr_color[0x21] & 0x20) && exists)
+                    f->vram[at] = (u8)(src[j] >> (i * 8));
+            }
+        }
+    }
+    ++f->writes[2]; /* one span operation, elements are recorded in count */
+    u32 before = f->trace_count;
+    record(f, TRI_SPACE_LFB, off, !rc ? src[0] : 0, 4, true, rc);
+    if (f->trace_count > before) f->trace[before].count = count;
+    return rc;
+}
 const struct trident_io trident_fake_io = {
     .read8 = read8, .read16 = read16, .read32 = read32,
-    .write8 = write8, .write16 = write16, .write32 = write32, .port8 = port8
+    .write8 = write8, .write16 = write16, .write32 = write32, .port8 = port8,
+    .write_span32 = write_span32
 };

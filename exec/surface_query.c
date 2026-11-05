@@ -108,7 +108,7 @@ int surface_query_authorize(const struct surface_query_source *s,
         return OS32_ERR_INVAL;
     }
     if (s->role == LEDGER_ROLE_CLIENT || s->role == LEDGER_ROLE_DISPLAY) {
-        if (s->backend < LEDGER_SF_PC98 || s->backend > LEDGER_SF_GEFORCE)
+        if (s->backend < LEDGER_SF_PC98 || s->backend > LEDGER_SF_TRIDENT)
             return OS32_ERR_INVAL;
     } else if (s->backend) return OS32_ERR_INVAL;
     *out = c;

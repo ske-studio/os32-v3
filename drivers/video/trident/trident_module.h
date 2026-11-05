@@ -5,8 +5,8 @@
 #include "trident.h"
 #define TRIDENT_MODULE_OPS_VERSION 1u
 /* All loans (including backend, counters and scalar addresses) are kernel
- * resident. resources is immutable after publication. display_owner points
- * to the current exec display owner, distinct from DEVICE resource owner.
+ * resident. resources is immutable after publication. display_owner calls appslot_gfx_owner()
+ * for the current exec display owner, distinct from DEVICE resource owner.
  * Loader validates initialize/prepare/restore text and pins before arm.
  * prepare only inspects descriptors; it must not invoke Init or indexed I/O.
  * Optional GfxBackend slots remain NULL, including fill/blit/flip/vsync. */
@@ -16,7 +16,7 @@ typedef struct TridentModuleContext {
     const struct trident_resources *resources;
     int (*arm)(int (*restore)(void *), void *, u32 owner);
     int *height, *flip, *page;
-    const u32 *display_owner;
+    int (*display_owner)(void); /* current owner on every return, not arm owner */
 } TridentModuleContext;
 struct TridentModuleOps {
     u32 version;

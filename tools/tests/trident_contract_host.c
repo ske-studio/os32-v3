@@ -2,6 +2,7 @@
 #include "tools/tests/trident_device_fake.h"
 #include "drivers/video/trident/trident_module.h"
 #include "gfx/gfx_emergency.h"
+#include "mm/pgalloc.h"
 static struct trident_fake fake;
 static u8 storage[4194304];
 static struct trident_fake_event trace[32];
@@ -12,8 +13,19 @@ static int equal(u32 a, u32 b)
     return a == b;
 }
 #define REQUIRE(cond) do { if (!(cond)) return __LINE__; } while (0)
+static int current_owner = 11;
+static int display_owner(void) { return current_owner; }
 static int selftest(void)
 {
+    /* One arm at owner 11; next init transfers display to owner 22. The
+     * dispatcher must use the current callback, including child rejection. */
+    TridentModuleContext context = {.display_owner = display_owner};
+    REQUIRE(GFX_EMERGENCY_MATCHES_OWNER(11u, context.display_owner));
+    current_owner = 22;
+    REQUIRE(GFX_EMERGENCY_MATCHES_OWNER(22u, context.display_owner));
+    REQUIRE(!GFX_EMERGENCY_MATCHES_OWNER(11u, context.display_owner));
+    REQUIRE(!GFX_EMERGENCY_MATCHES_OWNER(23u, context.display_owner));
+    REQUIRE(GFX_EMERGENCY_MATCHES_OWNER(0u, context.display_owner));
     struct trident_fake *f = &fake;
     REQUIRE(!trident_fake_reset(f, storage, sizeof(storage), trace, 32));
     trident_fake_bind(f, &device);
@@ -44,7 +56,7 @@ static int selftest(void)
     /* Test oracle gate mechanics with one synthetic event; 3b supplies full
      * Init trace, independently from product. This is not Init acceptance. */
     static const struct trident_fake_event expected = {
-        .space = 0, .offset = 0x3C4, .value = 0x0B, .width = 1, .write = true
+        .space = 0, .offset = 0x3C4, .value = 0x0B, .count = 1, .width = 1, .write = true
     };
     trident_fake_trace_reset(f);
     REQUIRE(!io->write8(f, TRI_SPACE_REGS, 0x3C4, 0x0B));
@@ -56,6 +68,18 @@ static int selftest(void)
     REQUIRE(trident_fake_accept_init(f, 1, &expected, 1) == TRI_E_INVAL);
     REQUIRE(!trident_fake_accept_init(f, 0, &expected, 1));
     REQUIRE(!io->write32(f, TRI_SPACE_LFB, 0, 0x12345678));
+    REQUIRE(!io->read32(f, TRI_SPACE_LFB, 0, &word));
+    REQUIRE(equal(word, 0x12345678));
+    REQUIRE(!f->block_after_restore);
+    trident_fake_restored(f); /* default: retain access after Restore */
+    REQUIRE(f->pc98_initialized);
+    f->block_after_restore = true;
+    trident_fake_restored(f);
+    REQUIRE(!f->pc98_initialized);
+    REQUIRE(!io->write32(f, TRI_SPACE_LFB, 0, 0));
+    REQUIRE(!io->read32(f, TRI_SPACE_LFB, 0, &word));
+    REQUIRE(equal(word, 0xFA7F3F6F));
+    REQUIRE(!trident_fake_accept_init(f, 0, &expected, 1));
     REQUIRE(!io->read32(f, TRI_SPACE_LFB, 0, &word));
     REQUIRE(equal(word, 0x12345678));
     REQUIRE(!io->write32(f, TRI_SPACE_LFB, 307196, 0x87654321));
@@ -84,6 +108,32 @@ static int selftest(void)
     REQUIRE(io->write32(f, TRI_SPACE_LFB, 0, 0) == -73);
     REQUIRE(!io->read32(f, TRI_SPACE_LFB, 0, &word));
     REQUIRE(equal(word, 0x87654321));
+    /* A full row is one event/operation. Validate before all writes. */
+    static u32 row[160];
+    for (u32 i = 0; i < 160; ++i) row[i] = 0x12340000u + i;
+    f->trace_lfb = true;
+    trident_fake_trace_reset(f);
+    u32 operations = f->operations;
+    REQUIRE(!io->write_span32(f, 640, row, 160));
+    REQUIRE(equal(f->operations, operations + 1));
+    REQUIRE(equal(f->trace_count, 1) && equal(f->trace[0].count, 160));
+    REQUIRE(equal(f->trace[0].width, 4) && equal(f->trace[0].offset, 640));
+    REQUIRE(f->trace[0].write && !f->trace[0].rc);
+    for (u32 i = 0; i < 160; ++i) {
+        REQUIRE(!io->read32(f, TRI_SPACE_LFB, 640 + i * 4, &word));
+        REQUIRE(equal(word, row[i]));
+    }
+    trident_fake_trace_reset(f);
+    REQUIRE(io->write_span32(f, 4194300, row, 2) == TRI_E_ACCESS);
+    REQUIRE(!io->read32(f, TRI_SPACE_LFB, 4194300, &word));
+    REQUIRE(equal(word, 0x13579BDF));
+    REQUIRE(io->write_span32(f, 641, row, 160) == TRI_E_ACCESS);
+    REQUIRE(io->write_span32(f, 0, row, 0) == TRI_E_ACCESS);
+    trident_fake_fail(f, f->operations + 1, -75);
+    REQUIRE(io->write_span32(f, 640, row + 1, 159) == -75);
+    REQUIRE(!io->read32(f, TRI_SPACE_LFB, 640, &word));
+    REQUIRE(equal(word, row[0]));
+    f->trace_lfb = false;
     /* Access width and original address preserved in trace, including ports. */
     trident_fake_trace_reset(f);
     REQUIRE(!io->write16(f, TRI_SPACE_REGS, 0x3CE, 0x0506));

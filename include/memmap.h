@@ -367,6 +367,10 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_DEVICE_APERTURE_BASE 0xFE000000UL           /* 4GB - 32MB */
 #define MEM_DEVICE_APERTURE_END  MEM_PHYS_MMIO_TOP      /* exclusive */
 #define MEM_DEVICE_APERTURE_PDE_SIZE 0x00400000UL       /* PT 1 枚 = 4MB */
+/* Trident Ra266: identity device VA, supervisor/PCD; reserve physical decode
+ * first. These are not RAM or private lease VAs (S3 §3). */
+#define MEM_TRIDENT_LFB_VA     0x20000000UL
+#define MEM_TRIDENT_REGS_VA    0x20400000UL
 /* RAM として登録してよい上端 (D11、MEMMAP_V3)。0594h の申告はここで
  * 頭打ちにし、[MEM_PHYS_RAM_CEILING, 4GB) は RAM にしない (PCI の BAR や
  * デバイス窓の帯が載る。v3 のアプリ帯 0x80000000〜 は仮想なので物理とは

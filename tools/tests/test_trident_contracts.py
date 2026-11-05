@@ -11,6 +11,8 @@ CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=3,
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_contract_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
+            'include/memmap.h', 'mm/pgalloc.h', 'mm/paging.h',
+            'mm/physmem.h', 'exec/surface_limits.h', 'include/sys.h',
             'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h',
             'gfx/gfx.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_generations.h'])
@@ -31,10 +33,14 @@ EMERGENCY = 'gfx/gfx_emergency.h'
 FAKE_H = 'tools/tests/trident_device_fake.h'
 FAKE_C = 'tools/tests/trident_device_fake.c'
 HOST = 'tools/tests/trident_contract_host.c'
-HEADERS = (HEADER, MODULE, EMERGENCY, FAKE_H)
+MEMMAP = 'include/memmap.h'
+PGALLOC = 'mm/pgalloc.h'
+HEADERS = (HEADER, MODULE, EMERGENCY, FAKE_H, MEMMAP, PGALLOC)
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 CONSTANTS = {
+    'MEM_TRIDENT_LFB_VA': 0x20000000, 'MEM_TRIDENT_REGS_VA': 0x20400000,
+    'LEDGER_SF_TRIDENT': 5,
     'TRI_PCI_VENDOR': 0x1023, 'TRI_PCI_DEVICE': 0x9660, 'TRI_CHIP_9682': 0x10,
     'TRI_PCI_BUS': 0, 'TRI_PCI_SLOT': 8, 'TRI_PCI_FUNCTION': 0,
     'TRI_PCI_COMMAND': 2, 'TRI_BAR0_PHYS': 0x20000000, 'TRI_BAR1_PHYS': 0x20400000,
@@ -92,13 +98,13 @@ LAYOUTS = {
         leave_done=889, closed=890, io=892, io_opaque=896, failed_step=900,
         display_owner=904, chip=908, spr=909, reference=910, pinned=911,
         declared_unknown=912, upper=916, scratch=920, scratch_bytes=924)),
-    'struct trident_io': (28, dict(read8=0, read16=4, read32=8,
-        write8=12, write16=16, write32=20, port8=24)),
+    'struct trident_io': (32, dict(read8=0, read16=4, read32=8,
+        write8=12, write16=16, write32=20, port8=24, write_span32=28)),
     'TridentModuleContext': (32, dict(backend=0, counters=4, resources=8,
         arm=12, height=16, flip=20, page=24, display_owner=28)),
     'struct TridentModuleOps': (16, dict(version=0, initialize=4, prepare=8, restore=12)),
-    'struct trident_fake_event': (20, dict(space=0, offset=4, value=8,
-        width=12, write=13, rc=16)),
+    'struct trident_fake_event': (24, dict(space=0, offset=4, value=8, count=12,
+        width=16, write=17, rc=20)),
 }
 SIGNATURES = {
     'trident_pci_validate': 'int (*)(const struct trident_pci_info *)',
@@ -126,6 +132,7 @@ SIGNATURES = {
     'trident_fake_reset': 'int (*)(struct trident_fake *, u8 *, u32, struct trident_fake_event *, u32)',
     'trident_fake_bind': 'void (*)(struct trident_fake *, struct trident_device *)',
     'trident_fake_memory': 'int (*)(struct trident_fake *, u32, enum trident_upper)',
+    'trident_fake_restored': 'void (*)(struct trident_fake *)',
     'trident_fake_trace_reset': 'void (*)(struct trident_fake *)',
     'trident_fake_fail': 'void (*)(struct trident_fake *, u32, int)',
     'trident_fake_accept_init': 'int (*)(struct trident_fake *, u32, const struct trident_fake_event *, u32)',
@@ -149,7 +156,7 @@ TYPES = {
     '((struct trident_device *)0)->io': 'const struct trident_io *',
     '((struct trident_device *)0)->scratch': 'u32 *',
     '((struct trident_saved *)0)->valid': 'bool',
-    '((TridentModuleContext *)0)->display_owner': 'const u32 *',
+    '((TridentModuleContext *)0)->display_owner': 'int (*)(void)',
     '((TridentModuleContext *)0)->arm': 'int (*)(int (*)(void *), void *, u32)',
     '((struct TridentModuleOps *)0)->initialize': 'int (*)(GfxBackend *, const TridentModuleContext *)',
     '((struct TridentModuleOps *)0)->prepare': 'int (*)(void)',
@@ -158,6 +165,7 @@ TYPES = {
 for bits in (8, 16, 32):
     TYPES[f'((struct trident_io *)0)->read{bits}'] = f'int (*)(void *, enum trident_space, u32, u{bits} *)'
     TYPES[f'((struct trident_io *)0)->write{bits}'] = f'int (*)(void *, enum trident_space, u32, u{bits})'
+TYPES['((struct trident_io *)0)->write_span32'] = 'int (*)(void *, u32, const u32 *, u32)'
 TYPES['((struct trident_io *)0)->port8'] = 'int (*)(void *, u16, u8)'
 # Freeze scalar types too: equal offsets alone do not distinguish int/u32.
 for typ, members in {
@@ -193,6 +201,12 @@ for member in ('height', 'flip', 'page'):
     TYPES[f'((TridentModuleContext *)0)->{member}'] = 'int *'
 # Each anchor is unique. All mutants must compile, then fail during execution.
 MUTATIONS = (
+    ('current-owner', EMERGENCY, '(u32)(display_owner)()', '((void)(display_owner)(), 11u)'),
+    ('trident-backend-id', PGALLOC, 'LEDGER_SF_TRIDENT    5', 'LEDGER_SF_TRIDENT    4'),
+    ('trident-regs-va', MEMMAP, 'MEM_TRIDENT_REGS_VA    0x20400000UL', 'MEM_TRIDENT_REGS_VA    0x20401000UL'),
+    ('span-event', FAKE_C, 'f->trace[before].count = count;', 'f->trace[before].count = 1;'),
+    ('restore-reblock', FAKE_C, 'if (f->block_after_restore) f->pc98_initialized = false;',
+     'if (f->block_after_restore) f->pc98_initialized = true;'),
     ('save-size', HEADER, 'TRI_SAVED_BYTES 852u', 'TRI_SAVED_BYTES 853u'),
     ('last-save-slot', HEADER, 'TRI_SAVE_SR0D = 851', 'TRI_SAVE_SR0D = 850'),
     ('decode-width', HEADER, 'TRI_BAR0_DECODE_BYTES 0x00400000u', 'TRI_BAR0_DECODE_BYTES 0x00200000u'),
@@ -200,15 +214,15 @@ MUTATIONS = (
     ('resource-owner-order', HEADER, 'owner, bar0_rid, bar1_rid', 'bar0_rid, owner, bar1_rid'),
     ('context-order', MODULE, 'int *height, *flip, *page;', 'int *flip, *height, *page;'),
     ('error-code', HEADER, 'TRI_E_RESTORE = -7', 'TRI_E_RESTORE = -12'),
-    ('fake-ready', FAKE_C, 'f->pc98_initialized = false;', 'f->pc98_initialized = true;'),
+    ('fake-ready', FAKE_C, 'f->pc98_initialized = false;\n    f->resources', 'f->pc98_initialized = true;\n    f->resources'),
     ('fake-capacity', FAKE_C, 'f->real_bytes = TRI_FAKE_REAL_BYTES;', 'f->real_bytes = TRI_BAR0_DECODE_BYTES;'),
     ('fake-command', FAKE_C, '.command = TRI_PCI_COMMAND,', '.command = 3,'),
     ('fake-gr6', FAKE_C, 'f->gr[6] = 0x0C;', 'f->gr[6] = 5;'),
     ('fake-blocked', FAKE_C, '(u8)(TRI_FAKE_BLOCKED_WORD >>', '(u8)(0xFFFFFFFFu >>'),
-    ('fake-linear-only', FAKE_C, 'f->pc98_initialized && (f->cr_color[0x21] & 0x20)', '(f->cr_color[0x21] & 0x20)'),
+    ('fake-linear-only', FAKE_C, 'bool ready = f->pc98_initialized && (f->cr_color[0x21] & 0x20);', 'bool ready = (f->cr_color[0x21] & 0x20);'),
     ('fake-init-oracle', FAKE_C, 'a->width != b->width', 'a->width == 0'),
     ('fake-width', FAKE_C, '.value = v, .width = width,', '.value = v, .width = width == 2 ? 1 : width,'),
-    ('fake-failed-write', FAKE_C, 'rc = f->fail_rc;', 'rc = 0;'),
+    ('fake-failed-write', FAKE_C, 'rc = f->fail_rc;\n    else if ((space', 'rc = 0;\n    else if ((space'),
     ('fake-last-dac', FAKE_C, 'f->dac[f->dac_write % TRI_DAC_BYTES] = v & 0x3F;',
      'if (f->dac_write != 767) f->dac[f->dac_write % TRI_DAC_BYTES] = v & 0x3F;'),
 )
@@ -250,7 +264,7 @@ def build(work, tree):
     src = work / 'contracts.c'
     src.write_text(source())
     exe = work / 'contracts'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(tree), *include_flags(ROOT),
+    subprocess.run(['gcc', *FLAGS, '-I' + str(tree), '-I' + str(tree / 'include'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', str(src),
                     str(tree / FAKE_C), '-o', str(exe)], cwd=ROOT, check=True)
     return exe
@@ -284,7 +298,8 @@ def main():
             print(f'PASS constant/layout contracts and fake selftest ({runner})', flush=True)
         if args.mutate:
             tree = work / 'tree'
-            for path in (*HEADERS, FAKE_C, HOST):
+            for path in (*HEADERS, FAKE_C, HOST, 'exec/surface_limits.h',
+                         'mm/paging.h', 'mm/physmem.h'):
                 dest = tree / path
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / path, dest)
