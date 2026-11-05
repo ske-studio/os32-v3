@@ -16,8 +16,9 @@ PM は実機に直接つながっていない。実機のシリアル (/dev/ttyU
 1. **承認**: 実機での情報収集とカーネル更新は**許可済み** (ユーザー 2026-10-21)。条件は、同じ成果物で NP21/W を起動し
    **シリアル (rshell) で ver が返ること** — それでカーネルの正常動作は OK とみなす。画面はカメラで PM が判定してよい (§2、RA266 §3-1)。
    物理操作 (電源・FD・ケーブル)・音の確認・HDD の上書きや作り直し・配置の世代が変わる更新はユーザーに残す。
-2. **入れる版**: push 済みで **CI の build が成功した SHA** を選ぶ (`gh run list`)。文書だけのコミットには
-   build が走らないので、その前の build 成功の SHA を使う (コードは同じ)。
+2. **入れる版**: push 済みで **CI の `artifacts` ジョブが成功した SHA** を選ぶ (`ci_fetch.sh --sha <SHA> --dry-run`)。
+   取得条件・検査状態の表示は [08_build §8-6](../../../docs/08_build.md#8-6-github-actions-での本体ビルド) が正典。
+   文書だけのコミットには build が走らないので、その前の成果物がある SHA を使う (コードは同じ)。
    **実機の試験・調べの版** (作業木の診断ビルドなど) は push・CI を待たず、ビルドが通れば入れてよい (ユーザー決定 2026-10-28、
    [ROLES §0](../../../docs/tasks/agents/ROLES.md)「検査」の行: ビルド rc=0・既定の成果物が基点と同じ・直接の試験 `MUTATE=0` だけ。固まる危険は受け入れ、戻し方を依頼に書く)。
 3. **世代の照合** (`sdk/include/os32/os32_generations.h` を今の実機の版と比べる):
@@ -38,7 +39,7 @@ PM は実機に直接つながっていない。実機のシリアル (/dev/ttyU
 OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユーザー承認済み (<日付と言葉>)、PM セッションからの依頼です。
 世代: <memory_layout と KAPI の新旧、boot を先にする理由>。新しく配られるもの: <あれば>。
 手順 (シリアルで転送するときは `--fast 115200`、取りこぼしたら速度を下げる):
-1. ノートで git pull、`tools/ci_fetch.sh --sha <SHA>` (build がまだなら `gh run watch`)。lanfs_host を止め、
+1. ノートで git pull、`tools/ci_fetch.sh --sha <SHA> --wait` (artifacts の完成を待って取得、検査状態も確認)。lanfs_host を止め、
    新しい成果物の hostdrv を root にして起動し直す (peer は今の値)。
 2. `sfs run hsync -n boot` (計画だけ確認) → `sfs run hsync boot` → reboot → ver で Commit <SHA>。
 3. `sfs run hsync` (全体、/sys は既定で外れる) → `sfs run hsync sys` (常駐 shell・共有ライブラリ・フォント) → reboot → ver (Commit・Image CRC・services の行が SERVICES_READY)、
@@ -84,6 +85,8 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 
 - 文書だけのコミットの SHA を頼むと CI の成果物が無い (`ci_fetch.sh` が見つけられない)。
 - 全体同期を先にすると旧 hsync が 1 件も書かずに断る (KAPI が上がった版)。必ず boot が先。
+- **KAPI が上がる版の 1 回目の全体の hsync は、新しい hsync を /host から動かす**: `sfs run /host/sbin/hsync.bin [-n] [--fep-off]` (`sfs run hsync` はディスク上の旧い /sbin/hsync.bin を動かし、新しいオプションを知らない — 2026-11-05 の `--fep-off` で `unknown option`)。
+- 全体の hsync は `--fep-off` を付ける (開いている FEP の辞書 `/db/fep.db` を BUSY で置き換えられないため、ユーザー決定 2026-11-05)。DICT_META で学習データが別の DB に分かれるまでは、置き換えのたびに学習した語が消える。
 - 全体の `hsync` は `/sys` を既定で外す (`userland/system/hsync.c:45-48`)。shell のコマンドや共有ライブラリを変えた版で `hsync sys` を抜かすと、新しいカーネルに古い shell のまま動く (2026-10-24、route-test の Usage が出ないことで気づいた)。
 - シリアルで hsync するときは `rshell_serial.py --fast 115200 --serve-host …` を使う (ユーザー指示 2026-11-05、9600 の 1.2MB の boot に 20〜30 分かかった)。取りこぼし・化け・rc≠0 が出たら 57600 → 38400 → 9600 と下げ、通った速度を報告に書く。LAN が使えるなら LAN が先 (下の経路の優先度)。
 - ノートの os32-v3 が古いと `tools/` の約束が合わない。最初に git pull。

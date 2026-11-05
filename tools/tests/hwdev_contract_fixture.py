@@ -20,6 +20,9 @@ reachable through feature5.h (470 added lines; existing entries retained).
 The layout pin includes these declarations, not just the new import.
 FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diagnostics.
 These changes own the pins below.
+KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
+reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
+adds that member; refresh both pins with --snapshot after reviewing the diff.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -39,9 +42,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x7c828363
+REVIEWED_LAYOUT_CRC = 0x85d12b86
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '04d4de5dddb16d2aeb1408c9d3740e23b78ce9634162c15588af5b6d067f7abf'
+REVIEWED_INVENTORY_SHA = '83b772398629df91f4506ab42fcfbdbefdd859695b6d17479526ca4ed5f0b07f'
 
 
 def import_declarations(root):

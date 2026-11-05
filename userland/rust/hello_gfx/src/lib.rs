@@ -37,12 +37,12 @@ pub extern "C" fn main(
         gfx::gfx_clear(0);
 
         /* 背景装飾: カラーバー */
-        gfx::gfx_fill_rect(0, 0,   640, 60, 8);   /* 赤 */
-        gfx::gfx_fill_rect(0, 60,  640, 60, 10);  /* 黄 */
-        gfx::gfx_fill_rect(0, 120, 640, 60, 11);  /* 緑 */
-        gfx::gfx_fill_rect(0, 180, 640, 60, 12);  /* 水色 */
-        gfx::gfx_fill_rect(0, 240, 640, 60, 13);  /* 青 */
-        gfx::gfx_fill_rect(0, 300, 640, 100, 1);  /* 暗い青 */
+        gfx::gfx_fill_rect(0, 0,   640, 60, 8);   /* 黒 */
+        gfx::gfx_fill_rect(0, 60,  640, 60, 10);  /* 明赤 */
+        gfx::gfx_fill_rect(0, 120, 640, 60, 11);  /* 明紫 */
+        gfx::gfx_fill_rect(0, 180, 640, 60, 12);  /* 明緑 */
+        gfx::gfx_fill_rect(0, 240, 640, 60, 13);  /* 明水色 */
+        gfx::gfx_fill_rect(0, 300, 640, 100, 1);  /* 青 */
 
         /* 中央に黒背景の矩形パネル */
         gfx::gfx_fill_rect(120, 130, 400, 140, 0);

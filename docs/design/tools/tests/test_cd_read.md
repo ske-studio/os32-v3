@@ -4,7 +4,7 @@
 
 `python3 -B tools/tests/test_cd_read.py --target` は ASan/UBSan のホスト試験と
 製品ソースの i386-elf ビルドを行う。`--mutate` は各契約を壊す変異と対照を確認する。
-実行はリポジトリ共通の `check_slot.sh` を通す。
+試験は直接実行する。
 
 `TREE_FILES` は一時ツリーへ製品と試験の inc もコピーする。
 `CHECK.covers` に入力を宣言し、コンパイラの依存走査に inc が現れることと

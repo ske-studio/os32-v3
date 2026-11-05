@@ -1621,8 +1621,8 @@ GF4_MUTATIONS += [
      'if (false && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
      'restore_failure_tail: shared PLL gate before CR44'),
     ('c2save', 'restore-owner-cleanup', 'hwdev/gf/display/modeset.c',
-     'if (!cleanup) cleanup=ms_write(&l,MS_CR+1U,1,owner);',
-     'if (false && !cleanup) cleanup=ms_write(&l,MS_CR+1U,1,owner);',
+     'if (!cleanup) { l.at="owner_restore"; cleanup=ms_write(&l,MS_CR+1U,1,owner); }',
+     'if (false && !cleanup) { l.at="owner_restore"; cleanup=ms_write(&l,MS_CR+1U,1,owner); }',
      'restore_failure_tail: CR44 owner restoration'),
 ]
 

@@ -4,7 +4,7 @@
 Relocatable i386 probes are inspected, never executed (no ILP32 runner needed).
 """
 CHECK = dict(name='nano-inputs-host', tier=1,
-    covers=['sdk/allocator/**', '.github/workflows/build.yml', 'tools/check_nano_inputs.py', 'sdk/allocator/nano_inputs.json', 'sdk/allocator/nano.LICENSE', 'tools/ci/build_cross.sh', 'build/config.mk', 'build/programs.mk'],
+    covers=['sdk/allocator/**', '.github/workflows/build.yml', '.github/actions/build-setup/action.yml', 'tools/check_nano_inputs.py', 'sdk/allocator/nano_inputs.json', 'sdk/allocator/nano.LICENSE', 'tools/ci/build_cross.sh', 'build/config.mk', 'build/programs.mk'],
     needs=['make:all'], budget=5.981308)
 
 import copy
@@ -120,7 +120,7 @@ def cases(script):
         if mod.cache_key(ledger) == key:
             raise AssertionError("accepted mismatch: builder omitted from cache key")
     mod.BUILDER = original_builder
-    workflow = (ROOT / ".github/workflows/build.yml").read_text()
+    workflow = (ROOT / ".github/actions/build-setup/action.yml").read_text()
     assert "$(python3 tools/check_nano_inputs.py --cache-key)" in workflow
     assert "hashFiles('tools/ci/build_cross.sh'" not in workflow
     # Execute the real key step with a failing checker under Actions' bash -e.

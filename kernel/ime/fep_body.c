@@ -27,6 +27,7 @@ static const FepModuleApi api = {
     .getchar_kapi = ime_getchar_kapi,
     .getkey_kapi = ime_getkey_kapi,
     .dict_info = ime_dict_info_facade,
+    .dict_suspend = ime_dict_suspend,
     .boot_connections = ime_boot_connections,
 };
 

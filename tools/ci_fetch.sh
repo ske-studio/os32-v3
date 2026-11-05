@@ -5,10 +5,11 @@
 # artifact の API ダウンロードには認証が要る)。
 #
 # 使い方:
-#   tools/ci_fetch.sh [--branch main] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run]
-#     --branch  最新の成功した run をこのブランチから選ぶ (既定 main)
-#     --sha     このコミットの成功 run を選ぶ (短縮 SHA 可。--branch と併用すると両方で絞る)
+#   tools/ci_fetch.sh [--branch main] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run] [--wait]
+#     --branch  最新の run をこのブランチから選ぶ (既定 main)
+#     --sha     このコミットの run を選ぶ (短縮 SHA 可。--branch と併用すると両方で絞る)
 #     --dir     保存先の親 (既定 ./os32-ci)。中に artifact 名のディレクトリを作る
+#     --wait    artifacts ジョブが未完了なら 10 秒ごとに待つ (失敗なら終了)
 #     --dry-run 選んだ run と artifact を表示するだけでダウンロードしない
 #
 # 終了コード: 0 = 取得して sha256 一致、1 = 失敗 (該当 run 無し・照合不一致など)、
@@ -22,6 +23,7 @@ BRANCH_SET=0
 SHA=""
 DIR="./os32-ci"
 DRY=0
+WAIT=0
 
 usage() { awk 'NR>1 && !/^#/ {exit} NR>1 {sub(/^# ?/, ""); print}' "$0"; }
 
@@ -31,6 +33,7 @@ while [ $# -gt 0 ]; do
         --sha)     SHA="$2"; shift 2 ;;
         --dir)     DIR="$2"; shift 2 ;;
         --repo)    REPO="$2"; shift 2 ;;
+        --wait)    WAIT=1; shift ;;
         --dry-run) DRY=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ci_fetch.sh: 不明な引数: $1" >&2; usage >&2; exit 2 ;;
@@ -55,7 +58,7 @@ MSG
 fi
 
 # --- run を選ぶ ---
-args=(run list -R "$REPO" --workflow "$WORKFLOW" --status success
+args=(run list -R "$REPO" --workflow "$WORKFLOW"
       --json databaseId,headSha,headBranch,createdAt,displayTitle)
 if [ -n "$SHA" ]; then
     if [ "${#SHA}" -eq 40 ]; then
@@ -88,9 +91,35 @@ if runs:
 
 if [ -z "$RUN_ID" ]; then
     if [ -n "$SHA" ]; then what="commit $SHA"; else what="branch $BRANCH"; fi
-    echo "ci_fetch.sh: $REPO の $WORKFLOW に $what の成功した run が無い" >&2
+    echo "ci_fetch.sh: $REPO の $WORKFLOW に $what の run が無い" >&2
     exit 1
 fi
+
+# run 全体の成功は待たず、upload まで済んだ artifacts ジョブだけを取得条件にする。
+while true; do
+    JOBS="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100")"
+    read -r ART_STATE CHECK_STATE < <(printf '%s' "$JOBS" | python3 -c '
+import json, sys
+jobs = {j["name"]: j.get("conclusion") or j["status"] for j in json.load(sys.stdin)["jobs"]}
+print(jobs.get("artifacts", "queued"), jobs.get("check-fast", "queued"))')
+    if [ "$ART_STATE" = success ]; then
+        if [ "$CHECK_STATE" != success ]; then
+            echo "ci_fetch.sh: 検査は失敗 (または実行中): check-fast=$CHECK_STATE" >&2
+        fi
+        break
+    fi
+    case "$ART_STATE" in
+        queued|in_progress|waiting|pending|requested)
+            echo "ci_fetch.sh: artifacts のジョブを待っている (run $RUN_ID: $ART_STATE)" >&2
+            [ "$WAIT" = 1 ] || exit 1
+            sleep 10
+            ;;
+        *)
+            echo "ci_fetch.sh: artifacts のジョブが成功していない (run $RUN_ID: $ART_STATE)" >&2
+            exit 1
+            ;;
+    esac
+done
 
 # --- artifact 名 (os32-<ref>-<sha7>) を API で引く。-n で指定すると保存先直下に展開される ---
 ART="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \

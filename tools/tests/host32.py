@@ -149,13 +149,56 @@ def run(args, *, runner=None, **kwargs):
 RUN_TIMEOUT = 120
 
 
+# Paths are shared across worktrees and runs only where their bytes reach the key (the
+# preprocessed text, hashed .o/.a). Linker, library-path and macro arguments (also the
+# value after a bare -Xlinker / -L), and everything under -g (DWARF records paths and
+# the cwd), stay as given. share() rewrites the worktree root and per-run temp names.
+SPELLED_PREFIXES = ('-Wl,', '-Xlinker', '-L', '-D')
+SPELLED_NEXT = ('-Xlinker', '-L', '-D')
+
+
+def cache_command(preprocess, root, cwd, share=None):
+    if any(arg.startswith('-g') for arg in preprocess):
+        return ' '.join(preprocess) + ' cwd=' + str(cwd)
+    share = share or (lambda arg: arg.replace(str(root), '<root>'))
+    out, keep = [], False
+    for arg in preprocess:
+        out.append(arg if keep or arg.startswith(SPELLED_PREFIXES) else share(arg))
+        keep = arg in SPELLED_NEXT
+    return ' '.join(out)
+
+
+def fixture_cache(root):
+    import tempfile
+    local = root / 'build/out/host32-fixtures'
+    setting = os.environ.get('OS32_HOST32_CACHE', '')
+    if setting == 'off' or (not setting and os.environ.get('CI')):
+        cache = local
+    elif setting:
+        cache = pathlib.Path(setting)
+    else:
+        cache = pathlib.Path(os.environ.get('XDG_CACHE_HOME') or
+                             pathlib.Path.home() / '.cache') / 'os32/host32-fixtures'
+    if cache != local:
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            fd, probe = tempfile.mkstemp(dir=cache, prefix='.write-test-')
+            os.close(fd)
+            pathlib.Path(probe).unlink()
+            return cache, True
+        except OSError:
+            cache = local
+    cache.mkdir(parents=True, exist_ok=True)
+    return cache, False
+
+
 def build(args, **kwargs):
     """Reuse a compiled fixture across runners, keyed by preprocessed inputs.
 
     GCC still resolves every header on each call. Changed source, includes,
     compiler, flags or objects invalidate the cache; failed builds never enter
     it. flock protects publication, cache hits and pruning, not compilation.
-    Cache files are ordinary build artifacts under build/out, not leaked tmp.
+    Cache files are ordinary build artifacts, not leaked tmp.
     """
     import hashlib
     import fcntl
@@ -176,11 +219,13 @@ def build(args, **kwargs):
         return subprocess.run(args, **kwargs)
     root = pathlib.Path(__file__).resolve().parents[2]
     # Normalize only temporary directory names, retaining filenames and flags.
-    tmp_prefix = re.escape(tempfile.gettempdir()) + r'/[^/\s]+/'
+    # The per-run directory may end the argument (-I<tmp>/x) or continue (<tmp>/x/a.c).
+    tmp_prefix = re.escape(tempfile.gettempdir()) + r'/[^/\s]+(?=/|\s|$)'
     def stable(value):
-        return re.sub(tmp_prefix, '<tmp>/', value)
+        return re.sub(tmp_prefix, '<tmp>', value)
     digest = hashlib.sha256(pre.stdout)
-    digest.update(stable(' '.join(preprocess)).encode())
+    digest.update(cache_command(preprocess, root, cwd, lambda arg: stable(
+        arg.replace(str(root), '<root>'))).encode())
     digest.update(repr('-c' in args).encode())
     compiler = pathlib.Path(shutil.which(args[0]) or args[0]).resolve()
     stamp = compiler.stat()
@@ -190,12 +235,11 @@ def build(args, **kwargs):
         path = cwd / a
         if a.endswith(('.o', '.a')) and path.is_file():
             digest.update(path.read_bytes())
-    cache = root / 'build/out/host32-fixtures'
-    cache.mkdir(parents=True, exist_ok=True)
+    cache, external = fixture_cache(root)
     cached = cache / digest.hexdigest()
     with (cache / '.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        prune_fixtures(cache)
+        prune_fixtures(cache, external)
         if cached.exists():
             os.utime(cached, None)
             shutil.copy2(cached, output)
@@ -213,7 +257,7 @@ def build(args, **kwargs):
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 pending.replace(cached)
                 shutil.copy2(cached, output)
-                prune_fixtures(cache)
+                prune_fixtures(cache, external)
         return result
     finally:
         pending.unlink(missing_ok=True)
@@ -229,7 +273,7 @@ CACHE_ENTRIES = 1024
 PENDING_MAX_AGE = 3600
 
 
-def prune_fixtures(cache):
+def prune_fixtures(cache, external=False):
     entries = []
     cutoff = time.time() - PENDING_MAX_AGE
     for path in cache.iterdir():
@@ -250,7 +294,7 @@ def prune_fixtures(cache):
     total = sum(size for _, _, size in entries)
     count = len(entries)
     for _, path, size in sorted(entries):
-        if total <= CACHE_BYTES and count <= CACHE_ENTRIES:
+        if total <= (512 * 1024 * 1024 if external else CACHE_BYTES) and count <= (8192 if external else CACHE_ENTRIES):
             break
         path.unlink()
         total -= size

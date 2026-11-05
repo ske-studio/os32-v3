@@ -20,6 +20,8 @@ BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/tests
 userland/tests/trim_back.elf userland/tests/trim_front.elf: PROGRAM_FLAGS += -Isdk/allocator
 userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_adapter.h
 
+userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
+
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
@@ -552,7 +554,7 @@ userland/system/install.elf: userland/system/install_recover.inc
 userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) sdk/link/app.ld $(CRT0_OBJ)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
-userland/system/hsync.elf: userland/system/hsync_protect.inc
+userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
 userland/system/hsync.elf: lib/crc32_core.inc
 
 # === ELF → RAW → OS32X BIN 変換 ===

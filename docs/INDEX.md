@@ -127,7 +127,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [CONSTRAINTS.md](CONSTRAINTS.md) | **プロジェクト制約の正典** — C/ABI・ハードウェア・KernelAPI・検証・破壊的操作。CLAUDE.md は ここの規則行を ID で参照する (`make check` が照合) |
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
-| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v80 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 258) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
+| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v81 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 259) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — §0 は版数の対応表と fork の決定 ([decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2) への案内、v1.x GUI の記録、v3 以降の長期項目 |
@@ -384,6 +384,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
 | [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
+| [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |
 | `docs/archive/gui_v14/TASK_EDIT_GUI.md` | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
 | [../tools/tests/gui_review_20260910_tdd.md](../tools/tests/gui_review_20260910_tdd.md) / [gui_review3_20260910_tdd.md](../tools/tests/gui_review3_20260910_tdd.md) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
 

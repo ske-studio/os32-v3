@@ -116,9 +116,10 @@ def source():
                           ('boot_reserve_kb', 668), ('user_enabled', 672)]),
     }
     body = '#include "tools/tests/fep_store_fixture.h"\n#include "kernel/ime/fep_module.h"\n'
-    checks += [('FEP_MODULE_API_SLOTS', '22'), ('sizeof(FepModuleApi)', '88'),
-               ('__builtin_offsetof(FepModuleApi, boot_connections)', '84'),
-               ('FEP_MODULE_OPS_VERSION', '3')]
+    checks += [('FEP_MODULE_API_SLOTS', '23'), ('sizeof(FepModuleApi)', '92'),
+               ('__builtin_offsetof(FepModuleApi, dict_suspend)', '84'),
+               ('__builtin_offsetof(FepModuleApi, boot_connections)', '88'),
+               ('FEP_MODULE_OPS_VERSION', '4')]
     for name, sig in SIGNATURES.items():
         body += (f'_Static_assert(__builtin_types_compatible_p(__typeof__(&{name}), '
                  f'{sig}), "{name}");\n')
@@ -131,7 +132,8 @@ def source():
                                  'reserve_kb', 'cache_pages', 'entries'), 'u32'),
         'FepConn': dict.fromkeys(('db', 'exact', 'prefix', 'learn'), 'void *'),
         'IME_State': {'store': 'FepStore'},
-        'FepModuleApi': {'boot_connections': 'u32 (*)(void)'},
+        'FepModuleApi': {'dict_suspend': 'int (*)(int)',
+                         'boot_connections': 'u32 (*)(void)'},
         'FepStore': {'system': 'FepConn', 'user': 'FepConn', 'meta': 'FepMeta',
                      'boot_reserve_kb': 'u32', 'user_enabled': 'int'},
     }

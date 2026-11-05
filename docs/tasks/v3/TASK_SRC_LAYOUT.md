@@ -269,7 +269,7 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
 3. 今の `ifneq` 分岐 (別 BUILD_OUT) が `INC_KERNEL` 1 本で全 .o を組むことで、既定経路 (INC_DRIVERS/INC_FS/INC_GFX) と機械語が同じか。
    r1 が毎回この経路で組まれ起動試験も通っているので同じ見込みだが、.o 単位の比較はしていない。
 4. tools/tests のパス置換が機械置換で足りない形 (`ROOT / 'kernel' / 'x.c'` のような分割したパス、6 か所見つけた) の全数。
-5. Codex の sandbox・check_wt.sh の作業木で、移動後の初回ビルドに古い .d が残らないか (L0 を先にすれば消える見込み)。
+5. Codex の sandbox の作業木で、移動後の初回ビルドに古い .d が残らないか (L0 を先にすれば消える見込み)。
 6. 生成物 (kdebug/generated・hwdev/generated・lib/sqlite3/generated) を .def の変更から再生成したとき、パス以外の差が出ないか。
 
 要判断 (ユーザーか PM):
