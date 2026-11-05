@@ -20,6 +20,13 @@
 #define HSP_MAX_PATH 512          /* OS32_MAX_PATH (256) より広く取る */
 #endif
 #define HSP_MAX_DEPTH 32
+/* ime_store.h: FEP_USER_PATH/DIR/JOURNAL_SUFFIX; VFS path cap is 256.
+ * hsync does not depend on the kernel's private types. */
+#define HSP_FEP_PATH_CAP 256
+#define HSP_FEP_USER_PATH "/etc/fep_user.db"
+#define HSP_FEP_USER_DIR "/etc/"
+#define HSP_FEP_JOURNAL_SUFFIX "-journal"
+static char hsp_fep_user_path[HSP_FEP_PATH_CAP];
 
 /* 保護対象のベース名。末尾は番兵。
  *
@@ -157,6 +164,42 @@ static int hsp_normalize(const char *in, char *out, int cap)
     return 1;
 }
 
+/* Own a normalized /etc direct-child path. 1 = registered, 0 = invalid;
+ * callers must stop synchronization on 0 (including settings read errors).
+ * Keep the previous registration on failure. No old custom-path discovery. */
+int hsp_set_fep_user_path(const char *absolute_path)
+{
+    char norm[HSP_FEP_PATH_CAP];
+    int i;
+
+    if (!absolute_path || absolute_path[0] != '/') return 0;
+    if (!hsp_normalize(absolute_path, norm, (int)sizeof(norm))) return 0;
+    for (i = 0; HSP_FEP_USER_DIR[i]; i++)
+        if (hsp_lower((unsigned char)norm[i]) != HSP_FEP_USER_DIR[i]) return 0;
+    if (!norm[i]) return 0;
+    for (; norm[i]; i++)
+        if (norm[i] == '/') return 0;
+    /* SQLite must also be able to name the rollback journal, including NUL. */
+    if (i + (int)sizeof(HSP_FEP_JOURNAL_SUFFIX) > HSP_FEP_PATH_CAP) return 0;
+    for (i = 0; norm[i]; i++) hsp_fep_user_path[i] = norm[i];
+    hsp_fep_user_path[i] = '\0';
+    return 1;
+}
+
+/* All suffixes belong to learning data, including journals and temporary
+ * placement names. Settings names below retain their exact-match rule. */
+static int hsp_fep_prefix(const char *name, const char *base)
+{
+    if (!*base) return 0;
+    while (*base) {
+        if (hsp_lower((unsigned char)*name) != hsp_lower((unsigned char)*base))
+            return 0;
+        name++;
+        base++;
+    }
+    return 1;
+}
+
 /* ベース名 1 個が保護対象名かを大文字小文字を無視して見る。
  * `/etc` を列挙して実在名を拾うときの一致判定 (往復 1 の B5) — 小文字の表と
  * 突き合わせるだけでは `/etc/SETTINGS.DB` を取りこぼす。 */
@@ -165,6 +208,11 @@ static int hsp_is_protected_basename(const char *name)
     int i;
 
     if (!name) return 0;
+    if (hsp_fep_prefix(name, HSP_FEP_USER_PATH + sizeof(HSP_FEP_USER_DIR) - 1))
+        return 1;
+    if (hsp_fep_user_path[0] &&
+        hsp_fep_prefix(name, hsp_fep_user_path + sizeof(HSP_FEP_USER_DIR) - 1))
+        return 1;
     for (i = 0; hsp_protected_names[i]; i++)
         if (hsp_ieq(name, hsp_protected_names[i])) return 1;
     return 0;
