@@ -3,6 +3,7 @@
 CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3, covers=[
     'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
+    'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
@@ -40,6 +41,11 @@ MUTATIONS = (
     ('poll-count', 'if (!rc) received++;', 'if (!rc) received += 2;'),
     ('rx-credit', 'bound ? bound->rx_credit_bytes() : 0',
      'bound ? (bound->rx_credit_bytes(), 0) : 0'),
+    ('tick-error-domain', '                rc = OS32_ERR_BUSY;',
+     '                rc = TICK_ERR_BUSY;'),
+    ('tick-poll-reentry', 'int count = ticking ? 0 : poll_once_locked();',
+     'int count = poll_once_locked();'),
+    ('tick-recursion', 'if (bound && !ticking) {', 'if (bound) {'),
 )
 
 
@@ -83,7 +89,7 @@ def main():
                 if original.count(before) != 1:
                     raise RuntimeError(f'{name}: mutation anchor not unique')
                 rc = build_run(work, original.replace(before, after))
-                if rc <= 0:
+                if rc == 0:
                     raise RuntimeError(f'{name}: expected runtime RED, rc={rc}')
                 print(f'RED {name}: runtime rc={rc}', flush=True)
     return 0

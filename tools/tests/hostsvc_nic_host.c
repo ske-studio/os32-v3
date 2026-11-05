@@ -7,11 +7,14 @@
 #include "platform/pc98/tick_order.h"
 #include "os32_kapi_shared.h"
 #include "drivers/net/e82557/e82557_regs.h"
+#include "kprintf.h"
+#include <stdarg.h>
 
 #define REQUIRE(expr) do { if (!(expr)) return (__LINE__ % 250) + 1; } while (0)
 static int acquired, released, selected, acquire_rc, invalid_ops;
 static int polls, demuxes, links, inits, resets[3], bad_if, order, recurse;
 static int tick_rc, registrations;
+static int tick_logs, logged_tick_rc, poll_reentry, poll_reentry_rc;
 static tick_fn callback;
 static u8 seen_peer[6], seen_local[6];
 static int saw_peer;
@@ -37,12 +40,25 @@ unsigned int nic_test_irq_save(void)
 }
 void nic_test_irq_restore(unsigned int flags) { hs_set_if(flags); }
 static void check_cli(void) { if (hs_if()) bad_if++; }
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    static const char expected[] = "[nic] tick registration failed: %d\n";
+    va_list args;
+    check_cli();
+    if (attr != ATTR_YELLOW || !equal(fmt, expected, sizeof(expected))) bad_if++;
+    va_start(args, fmt);
+    logged_tick_rc = va_arg(args, int);
+    va_end(args);
+    tick_logs++;
+}
 int tick_register(unsigned int slot, tick_fn fn)
 {
     registrations++;
     check_cli();
     if (tick_rc) return tick_rc;
-    if (slot != PC98_TICK_LINK || (callback && callback != fn)) return -99;
+    if (slot >= TICK_SLOT_COUNT || !fn) return TICK_ERR_INVAL;
+    if (callback && callback != fn) return TICK_ERR_BUSY;
+    if (slot != PC98_TICK_LINK) bad_if++;
     callback = fn;
     return 0;
 }
@@ -140,6 +156,7 @@ void net_rx_demux(const struct NetNicOps *nic, const u8 local[6], const u8 peer[
 }
 void link_init(const u8 local[6])
 {
+    /* A2 fake does not register a tick; production ownership changes in A8. */
     check_cli(); inits++;
     if (!equal(local, mac_addr, 6)) bad_if++;
 }
@@ -148,6 +165,11 @@ void link_tick(void)
     check_cli(); links++;
     if (order != 2) bad_if++;
     order = 3;
+    if (poll_reentry) {
+        int old_polls = polls, old_demuxes = demuxes;
+        poll_reentry_rc = net_nic_poll_once();
+        if (polls != old_polls || demuxes != old_demuxes || hs_if()) bad_if++;
+    }
     if (recurse) net_tick();
 }
 static int test(void)
@@ -169,25 +191,31 @@ static int test(void)
     REQUIRE(net_adapter_register((enum NetNicId)-1, &hs_adapter) == OS32_ERR_INVAL);
     REQUIRE(net_adapter_register(NET_NIC_LGY98, 0) == OS32_ERR_INVAL);
     REQUIRE(net_adapter_register(NET_NIC_LGY98, &lgy_adapter) == 0);
-    tick_rc = -77;
-    REQUIRE(net_start(NET_NIC_AUTO, 0) == -77 && released == 1);
+    const int tick_errors[] = {TICK_ERR_CTX, TICK_ERR_INVAL, TICK_ERR_BUSY};
+    for (u32 i = 0; i < sizeof(tick_errors) / sizeof(tick_errors[0]); i++) {
+        tick_rc = tick_errors[i];
+        REQUIRE(net_start(NET_NIC_AUTO, 0) == OS32_ERR_BUSY);
+        REQUIRE(released == (int)i + 1 && !inits && !callback && hs_if());
+        REQUIRE(tick_logs == (int)i + 1 && logged_tick_rc == tick_rc);
+    }
     REQUIRE(net_tx(frame, sizeof(frame)) == OS32_ERR_HOSTDOWN); tick_rc = 0;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == 0 && selected == 2);
+    REQUIRE(registrations == 4 && callback == net_tick); /* No link_init registration. */
     REQUIRE(net_start(NET_NIC_E82557, 0) == OS32_ERR_BUSY);
     REQUIRE(net_bind(&ops) == OS32_ERR_BUSY);
     REQUIRE(net_mac(out) == 0 && equal(out, mac_addr, 6));
     REQUIRE(net_rx_credit_bytes() == 4096 && net_mac(0) == OS32_ERR_INVAL);
-    net_unbind(); REQUIRE(released == 2 && hs_if());
-    net_unbind(); REQUIRE(released == 2);
+    net_unbind(); REQUIRE(released == 4 && hs_if());
+    net_unbind(); REQUIRE(released == 4);
     REQUIRE(net_adapter_register(NET_NIC_E82557, &hs_adapter) == 0);
     REQUIRE(net_adapter_register(NET_NIC_E82557, &hs_adapter) == 0);
     REQUIRE(net_adapter_register(NET_NIC_E82557, &replacement) == OS32_ERR_BUSY);
     acquire_rc = OS32_ERR_AGAIN;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == OS32_ERR_AGAIN && selected == 1);
-    REQUIRE(released == 2); acquire_rc = 0;
+    REQUIRE(released == 4); acquire_rc = 0;
     invalid_ops = 1;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == OS32_ERR_INVAL);
-    REQUIRE(released == 3); invalid_ops = 0;
+    REQUIRE(released == 5); invalid_ops = 0;
     REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == 0 && selected == 1);
     REQUIRE(net_adapter_register(NET_NIC_E82557, &replacement) == OS32_ERR_BUSY);
     for (u32 i = 0; i < sizeof(frame); i++) frame[i] = (u8)(i + 1);
@@ -217,21 +245,23 @@ static int test(void)
     REQUIRE(net_rx_credit_bytes() == 4096 && !hs_if());
     REQUIRE(net_nic_poll_once() == 0 && !hs_if()); hs_set_if(1);
     old_links = links; old_polls = polls; recurse = 1;
+    poll_reentry = 1; poll_reentry_rc = -1;
     callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 1);
-    recurse = 0;
+    REQUIRE(poll_reentry_rc == 0 && !bad_if && hs_if());
+    recurse = 0; poll_reentry = 0;
     int sfs = resets[NET_RX_SFS], link = resets[NET_RX_LINK];
     net_unbind();
     REQUIRE(resets[NET_RX_SFS] == sfs + 1 && resets[NET_RX_LINK] == link + 1);
     old_polls = polls; old_links = links;
     callback(); REQUIRE(polls == old_polls && links == old_links);
-    REQUIRE(net_nic_poll_once() == 0 && released == 4);
+    REQUIRE(net_nic_poll_once() == 0 && released == 6);
     REQUIRE(net_start(NET_NIC_LGY98, 0) == 0 && selected == 2);
     REQUIRE(net_nic_poll_once() == 0 && !saw_peer);
-    net_unbind(); REQUIRE(released == 5);
+    net_unbind(); REQUIRE(released == 7);
     /* Direct binding borrows ops and must not release a module reference. */
     REQUIRE(net_bind(&ops) == 0);
-    net_unbind(); REQUIRE(released == 5);
-    REQUIRE(inits == 4 && acquired == 6 && registrations == 2);
+    net_unbind(); REQUIRE(released == 7);
+    REQUIRE(inits == 4 && acquired == 8 && registrations == 4);
     REQUIRE(rx_calls && demuxes && !bad_if && hs_if());
     return 0;
 }

@@ -3,6 +3,7 @@
 #include "nic_rx.h"
 #include "link.h"
 #include "io.h"
+#include "kprintf.h"
 #include "kernel/irq/tick.h"
 #include "platform/pc98/tick_order.h"
 #include "os32_kapi_shared.h"
@@ -38,7 +39,10 @@ int net_bind(const struct NetNicOps *ops)
         /* Register once; unbind leaves the resident callback gated by bound. */
         if (!tick_registered) {
             rc = tick_register(PC98_TICK_LINK, net_tick);
-            if (!rc) tick_registered = 1;
+            if (rc) {
+                kprintf(ATTR_YELLOW, "[nic] tick registration failed: %d\n", rc);
+                rc = OS32_ERR_BUSY;
+            } else tick_registered = 1;
         }
         if (!rc) {
             ops->mac(local_mac);
@@ -134,9 +138,9 @@ static int counted_rx(void *out, u32 cap, u32 *len)
     return rc;
 }
 
-int net_nic_poll_once(void)
+/* Caller holds IF=0; net_tick uses this while its reentry guard is set. */
+static int poll_once_locked(void)
 {
-    unsigned int flags = irq_save();
     int count = 0;
     if (bound) {
         struct NetNicOps ops = *bound;
@@ -146,6 +150,13 @@ int net_nic_poll_once(void)
         net_rx_demux(&ops, local_mac, fixed_peer ? peer_mac : 0);
         count = (int)received;
     }
+    return count;
+}
+
+int net_nic_poll_once(void)
+{
+    unsigned int flags = irq_save();
+    int count = ticking ? 0 : poll_once_locked();
     irq_restore(flags);
     return count;
 }
@@ -155,7 +166,7 @@ void net_tick(void)
     unsigned int flags = irq_save();
     if (bound && !ticking) {
         ticking = 1;
-        net_nic_poll_once();
+        poll_once_locked();
         link_tick();
         ticking = 0;
     }
