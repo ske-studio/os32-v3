@@ -30,6 +30,7 @@
  * OS32 substitutes resident reservation nodes and borrowed dispatch slots
  * for DRM BOs. No hardware register/method is introduced in this adapter. */
 #include "api.h"
+#include "stage.h"
 #include "../../../include/kprintf.h"
 #include "../internal.h"
 #include "../accel_service.h"
@@ -263,6 +264,10 @@ static i32 svc_rom(struct gf4_ctx *c,const char **stage)
         }
         if (!rc) { *stage="devinit"; rc=gf_init_run(l->init,l->program); }
         if (!rc) { *stage="baseline"; rc=gf_display_baseline(l); }
+        if (!rc) {
+            *stage="feature5_deadline";
+            rc=gf4_stage_deadline(c,&c->deadline);
+        }
         if (!rc) svc_feature5(c);
     }
     /* acquire may have allocated scratch even when it returns an error. */
@@ -386,13 +391,23 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         c->epoch=c->ch->epoch;
         stage="scan_reserve"; rc=gf4_scan_reserve_initial(c,dl);
     }
-    if (!rc) { stage="objects_init"; rc=gf3_service_objects_init(s,dl); }
+    if (!rc) {
+        stage="objects_init";
+        rc=gf4_stage_deadline(c,&dl);
+        if (!rc) rc=gf3_service_objects_init(s,dl);
+    }
     if (!rc) {
         c->ready=true;
-        stage="detect"; rc=gf4_detect(c,dl);
+        stage="detect";
+        rc=gf4_stage_deadline(c,&dl);
+        if (!rc) rc=gf4_detect(c,dl);
     }
     i32 reason=c->last_rc; /* DDC fallback can succeed with a diagnostic. */
-    if (!rc) rc=svc_initial(c,dl,&stage);
+    if (!rc) {
+        stage="initial_deadline";
+        rc=gf4_stage_deadline(c,&dl);
+        if (!rc) rc=svc_initial(c,dl,&stage);
+    }
     if (!rc) {
         c->saved_closed=false;
         l->mode=c->state->committed[0];
@@ -508,6 +523,7 @@ static i32 svc_owner_start(void *owner,u32 dl)
         return svc_result(c,GF4_ESTATE);
     bool saved_closed=c->saved_closed;
     rc=gf4_service_restart(c,dl);
+    if (!rc) rc=gf4_stage_deadline(c,&dl);
     if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);
     if (!rc) {
         c->saved_closed=saved_closed;

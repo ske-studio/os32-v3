@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **実装中 (2026-11-04)** — 層 1・2 は main、層 3 は main (c3e018a6)、層 4 は main (5a29f69c)。層 5 は機能 PM (サブエージェント) の試行として wt/gf-l5 で進行中 (ユーザー「試してみて」)。実機の受入 (Ra266、main 5a29f69c、2026-11-04) は入口で止まった: `gf2 status` は precheck rc=-201 (本番の foundation に時計・待ちが渡っていない、`hwdev/gf/devinit.c:104-105`)、`gf1 status` は rc=-107 (起動前から PCI Command 0106h = BusMaster)、`gf2 display 0` はシリアル・画面とも無出力。直しの段 wt/gf-prodtime が進行中で、実機の受入は取り込みを実機合格と数えず、その後に層 1 から。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **実装中 (2026-11-05)** — 層 1〜5 は main (層 3 c3e018a6、層 4 5a29f69c、層 5 23a19141)。実機 Ra266 の受入は入口の不具合を 1 つずつ直している (立会いなし、カメラ): 時計・待ちの未結線 (gf-prodtime)・PMC の期待値・黙った pc98 への落ち・live AS の PT (gf-bootpt)・devinit 前の PFB 読み、の後、67f1b3ca で `gf1 status`・`gf2 status` は rc=0、hello_gfx は `[gf4] start fail stage=objects_init rc=-205`。`[gf3] wait timeout site=push_reserve … now-dl≒2 秒、GET=PUT` から、devinit の前に作った 2 秒の期限を objects_init まで使い回していたと判明し、devinit より後の段は段の入口で期限を取り直す直しを ee6bfbbd で main (astra レビュー指摘 0)。実機での再試験 (hello_gfx) がノートで進行中。取り込みを実機合格と数えず、表示が出たら層 1 から受入。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 

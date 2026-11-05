@@ -183,11 +183,10 @@ void _start(void)
     log_fixture(); log_inject_stage="restore_check";
     assert(log_start()==GF4_ESTATE); assert(!log_inject_stage);
     log_expect("restore_check",GF4_ESTATE); svc_finish();
-    /* Real deadline failure, no substituted error return: seq 1 F2 success,
-     * seq 2 failed F3 drain, seq 3 F2 cleanup. OFF status does not read USER. */
+    /* A long pre-F3 stage no longer poisons objects_init or display restore. */
     log_fixture(); log_inject_stage="deadline_after_f2";
-    assert(log_start()==GF2_ETIME); log_expect("objects_init",GF2_ETIME);
-    assert(svc_ctx.ch->state==GF2_OFF && svc_ctx.ch->seq==3); svc_finish();
+    assert(!log_start()); assert(startlog_equal(""));
+    assert(svc_ctx.ready && svc_ctx.accepting && svc_state.head[0].enabled); svc_finish();
     log_fixture(); assert(!log_start()); assert(startlog_equal("")); svc_finish();
     gf2_host_exit(0);
 }

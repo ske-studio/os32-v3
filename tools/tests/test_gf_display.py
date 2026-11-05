@@ -1667,6 +1667,32 @@ GF4_MUTATIONS += [
      '*stage="mode_load";', '*stage="encoder_off";', 'nested restore failure stage'),
 ]
 
+# Lifecycle budgets: each mutant passes the original dl and must fail at runtime.
+GF4_MUTATIONS += [
+    ('c2svc', 'start-objects-old-dl', 'hwdev/gf/display/service.c',
+     'rc=gf4_stage_deadline(c,&dl);\n        if (!rc) rc=gf3_service_objects_init(s,dl);',
+     'rc=0;\n        if (!rc) rc=gf3_service_objects_init(s,dl);', 'test_slow_start'),
+    ('c2svc', 'start-detect-old-dl', 'hwdev/gf/display/service.c',
+     'rc=gf4_stage_deadline(c,&dl);\n        if (!rc) rc=gf4_detect(c,dl);',
+     'rc=0;\n        if (!rc) rc=gf4_detect(c,dl);', 'test_slow_start'),
+    ('c2svc', 'start-display-old-dl', 'hwdev/gf/display/service.c',
+     'rc=gf4_stage_deadline(c,&dl);\n        if (!rc) rc=svc_initial(c,dl,&stage);',
+     'rc=0;\n        if (!rc) rc=svc_initial(c,dl,&stage);', 'test_slow_start'),
+    ('c2rec', 'restart-objects-old-dl', 'hwdev/gf/display/recover.c',
+     'if (!rc) rc=gf4_stage_deadline(c,&dl);\n    if (!rc) rc=gf3_service_objects_init(s,dl);',
+     'if (!rc) rc=gf3_service_objects_init(s,dl);', 'test_stage_deadlines'),
+    ('c2rec', 'recover-display-old-dl', 'hwdev/gf/display/recover.c',
+     'if (!rc) rc=gf4_stage_deadline(c,&dl);\n    if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);',
+     'if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);', 'test_stage_deadlines'),
+    ('c2rec', 'owner-display-old-dl', 'hwdev/gf/display/service.c',
+     'if (!rc) rc=gf4_stage_deadline(c,&dl);\n    if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);',
+     'if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);', 'test_stage_deadlines'),
+    ('c2rec', 'stage-clock-error', 'hwdev/gf/display/stage.h',
+     'return GF2_EIO;', 'return 0;', 'test_stage_deadlines'),
+    ('c2rec', 'stage-state-deadline', 'hwdev/gf/display/stage.h',
+     'c->deadline=*dl=now+GF2_TIMEOUT_US;', '*dl=now+GF2_TIMEOUT_US;', 'test_stage_deadlines'),
+]
+
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
                  'c2scan', 'c2links', 'c2linkb', 'c2save', 'c3', 'c2linit', 'c2log')
 

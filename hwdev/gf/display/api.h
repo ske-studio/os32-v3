@@ -153,7 +153,9 @@ i32 gf4_service_stop(struct gf4_ctx *,u32 dl);
  * match/rebind; it changes neither saved_closed nor diagnostic_saved.
  * Required NULL/missing links: EINVAL; invalid state: ESTATE; changing:
  * EBUSY. Preserve lower rc, including OFF with a negative stop rc.
- * X4: pass the original dl; existing lower F2 deadlines stay unchanged. */
+ * Lifecycle init/detect/restore stages start with now+GF2_TIMEOUT_US;
+ * each stage keeps its absolute dl internally. Suspend/fini and existing
+ * lower F2 deadlines stay unchanged. */
 i32 gf4_service_suspend(struct gf4_ctx *,u32 dl);
 i32 gf4_service_restart(struct gf4_ctx *,u32 dl);
 i32 gf4_service_recover(struct gf4_ctx *,u32 dl);
