@@ -1,9 +1,11 @@
 /* Real video_start -> gf_start -> F4 -> F1/F2/F3/restore, libc-free.
  * C2svc supplies PCI/IRQ/DMA/ROM-owner seams. Dependency faults are one-shot
  * so teardown executes normally. No copy of the start composition is used. */
+#include <stdbool.h>
 #include "gf_startlog_host.h"
 enum { LOG_INJECT=-1701 };
 static const char *log_inject_stage;
+static bool log_cold_devinit;
 static int log_same(const char *a,const char *b)
 {
     if (!a || !b) return a==b;
@@ -104,10 +106,10 @@ static int log_wait(void *owner,u32 us)
 static struct gf_display_owner log_owner;
 static u8 log_palette[VIDEO_PALETTE_BYTES];
 static struct video_device log_device;
-static void log_fixture(void)
+static void log_fixture_state(bool cold)
 {
-    log_inject_stage=0;
-    svc_fixture();
+    log_inject_stage=0; log_cold_devinit=false;
+    svc_fixture_state(cold);
     log_after_pll=log_after_lut=false;
     cint_prod.foundation.io.timing.clock_us=log_clock;
     cint_prod.foundation.io.timing.wait_us=log_wait;
@@ -119,6 +121,10 @@ static void log_fixture(void)
     svc_links.admission=log_admission;
     log_device=(struct video_device){.ops=&gf_video_ops,.context=&cint_prod.display};
     startlog_clear();
+}
+static void log_fixture(void)
+{
+    log_fixture_state(false);
 }
 static int log_start(void)
 {
@@ -137,8 +143,38 @@ static void log_expect(const char *stage,int rc)
     assert(svc_ctx.last_rc==rc && cint_prod.display.last_rc==rc);
     startlog_clear();
 }
+/* Only devinit is simulated: its full fixed-ROM scripts belong to the
+ * runner suite. Baseline, F5 preparation, F1/F2 and the start composition
+ * are real. Complete objects_init and stop at detect, without inventing
+ * a ROM route or publishing a display. */
+static int log_point(void *owner)
+{
+    assert(owner==&cint_host);
+    return 0;
+}
+static void test_cold_start(void)
+{
+    log_fixture_state(true);
+    log_rom_fixture();
+    cint_prod.display.io.point=log_point;
+    log_init.io=cint_prod.display.io;
+    log_init.started_us=cint_host.now;
+    cint_prod.display.baseline_valid=false;
+    log_cold_devinit=true;
+    assert(svc_ctx.ch->state==GF2_OFF && !svc_ctx.ch->f);
+    assert(!cint_prod.foundation.running && !cint_prod.accel.ready);
+    log_inject_stage="detect";
+    assert(log_start()==LOG_INJECT);
+    assert(!log_inject_stage); /* F5 deadline, F2 and real objects_init completed. */
+    assert(svc_ctx.ch->f==&cint_prod.foundation);
+    assert(cint_prod.display.initialized && cint_prod.display.baseline_valid);
+    assert(svc_releases==1 && !svc_slot && !svc_ctx.accepting);
+    log_expect("detect",LOG_INJECT);
+    svc_finish();
+}
 void _start(void)
 {
+    test_cold_start();
     const char *stages[]={"admission_close","rom_validate","scan_reserve",
         "objects_init","detect","surfaces","restore_drain","restore_matches","mode_calc",
         "pllsel_calc","mode_deadline","encoder_off","mode_load","analog_load","lut_load","dpms",
