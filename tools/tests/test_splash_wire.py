@@ -2,6 +2,7 @@
 CHECK = dict(name='splash-wire-host', tier=1,
     covers=['init/boot_splash.c', 'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
             'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.c',
+            'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
             'drivers/video/pc98/splash_raster_play.h', 'drivers/video/pc98/splash_raster_image.h',
             'gfx/osri_profile.h', 'include/memmap.h', 'include/platform_splash.h', 'include/config.h', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h',
@@ -24,9 +25,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['init/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
            'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_plan.c',
            'drivers/video/pc98/splash_raster_play.c', 'drivers/video/pc98/splash_raster_image.c',
+           'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
            'gfx/gfx_osri.c', 'lib/le_internal.h',
            'lib/crc32_core.inc', 'tools/tests/splash_wire_host.c', 'tools/tests/splash_raster_host.c']
 MUTATIONS = (
+    ('image window', 'init/boot_splash.c', 'u32 end_tick = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;', 'u32 end_tick = start_tick + PLATFORM_SPLASH_TICKS;'),
+    ('logo window', 'init/boot_splash.c', 'u32 logo_end = start_tick + PLATFORM_SPLASH_TICKS;', 'u32 logo_end = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;'),
+    ('fallback clamp', 'init/boot_splash.c', 'else if ((i32)(end_tick - logo_end) > 0) end_tick = logo_end;', 'else if (0) end_tick = logo_end;'),
     ('omit user priority', 'platform/pc98/splash_image.c',
      '!vfs_stat(SYS_SPLASH_USER_IMAGE, &stat)', '(0 && !vfs_stat(SYS_SPLASH_USER_IMAGE, &stat))'),
     ('omit release', 'platform/pc98/splash_image.c', 'if (image) kfree(image);', '(void)image;'),
@@ -64,7 +69,8 @@ def execute(mutation=None):
                 assert source.count(old) == 1, mutation[0]
                 source = source.replace(old, new, 1)
             if rel == 'tools/tests/splash_raster_host.c':
-                source = source.replace('#include "types.h"', '#include "types.h"\nextern volatile u32 tick_count;')
+                source = source.replace('#include "types.h"', '#include "types.h"\n#include "platform_splash.h"\nextern volatile u32 tick_count;')
+                source = source.replace('calls > 4000000', 'calls > (PLATFORM_SPLASH_IMAGE_TICKS + PIT_HZ) * TICK_MS * 1000u')
                 source = source.replace('if (!frozen) clock_us++;', 'if (!frozen) clock_us++;\n    tick_count = clock_us / 10000;')
                 source = source.replace('static unsigned int inp(unsigned int port)\n{', 'static unsigned int inp(unsigned int port)\n{\n    advance();')
                 source = source.replace('#define HOST_WRITES 4096u', '#define HOST_WRITES 65536u')

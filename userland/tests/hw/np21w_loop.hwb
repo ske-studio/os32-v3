@@ -1,0 +1,2 @@
+label loop
+goto loop

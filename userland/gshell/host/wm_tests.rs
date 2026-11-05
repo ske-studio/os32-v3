@@ -4496,3 +4496,97 @@ fn geforce_fault_finishes_standalone_and_shutdown() {
     assert!(!wm::g().inited);
     session::clear();
 }
+
+// KAPI v80: the STOP-parked application wins over foreground and launch chain.
+#[test]
+fn k80_stop_culprit_priority() {
+    use crate::{mocks, multiapp};
+    for culprit in [2, 5] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let g = terminal_sh_child_chain(&shm);
+        focus_app(g, 3); // Foreground B differs from culprit A (2).
+        mocks::set_launch_child(2, 4);
+        mocks::set_launch_child(3, 0); // B is independent of A's chain.
+        assert_eq!(g.front_owner(), 3);
+        // Culprit 2 has child 4; 5 has no window and is not tracked.
+        *mocks::STOP_CULPRIT.lock().unwrap() = culprit;
+        assert_eq!(multiapp::abort_target(g), culprit);
+        assert!(multiapp::abort_targets_current(g, culprit));
+        assert!(!multiapp::abort_targets_current(g, 4));
+        mocks::set_kill_frees(&[culprit]);
+        g.abort_seen = true;
+        assert_eq!(crate::top_level_abort(g), culprit);
+        assert_eq!(mocks::kill_calls(), vec![culprit]);
+        let calls = mocks::STOP_CALLS.lock().unwrap().clone();
+        assert_eq!(&calls[calls.len()-3..], &["culprit", "clear", "kill"]);
+        assert!(mocks::resume_calls().is_empty());
+        g.inited = false;
+    }
+}
+
+#[test]
+fn k80_stop_culprit_replaces_reserved_target() {
+    use crate::{mocks, multiapp};
+    // Both handler branches reserve as an application owner (query denied).
+    for self_target in [false, true] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let g = terminal_sh_child_chain(&shm);
+        *mocks::STOP_CULPRIT.lock().unwrap() = -1;
+        if self_target { multiapp::reserve_abort_self(g, 4); }
+        else { multiapp::redirect_abort(g, 2); }
+        // Back in owner 1, a windowless, untracked STOP park is now visible.
+        *mocks::STOP_CULPRIT.lock().unwrap() = 5;
+        mocks::set_kill_frees(&[5]);
+        assert!(multiapp::resume_one(g));
+        assert_eq!(mocks::kill_calls(), vec![5]);
+        assert_eq!(mocks::abort_clear_calls(), 1);
+        assert!(!multiapp::pending_top_level_work());
+        assert!(multiapp::is_tracked(4));
+        assert!(mocks::resume_calls().is_empty());
+        let calls = mocks::STOP_CALLS.lock().unwrap().clone();
+        assert_eq!(&calls[calls.len()-3..], &["culprit", "clear", "kill"]);
+        g.inited = false;
+    }
+}
+
+#[test]
+fn k80_stop_without_culprit_keeps_chain_tail() {
+    use crate::{mocks, multiapp};
+    for reserved in [false, true] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let g = terminal_sh_child_chain(&shm);
+        mocks::set_kill_frees(&[4]);
+        if reserved {
+            multiapp::redirect_abort(g, 2);
+            assert!(multiapp::resume_one(g));
+        } else {
+            g.abort_seen = true;
+            assert_eq!(crate::top_level_abort(g), 4);
+        }
+        assert_eq!(mocks::kill_calls(), vec![4]);
+        assert_eq!(mocks::abort_clear_calls(), 1);
+        g.inited = false;
+    }
+}
+
+#[test]
+fn k80_stop_culprit_wins_over_fullscreen_owner() {
+    use crate::{fullscreen, mocks, multiapp};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let g = terminal_sh_child_chain(&shm);
+    mocks::set_screen_owner(3);
+    assert!(crate::after_exec(g));
+    assert_eq!(fullscreen::owner(), 3);
+    *mocks::STOP_CULPRIT.lock().unwrap() = 5;
+    multiapp::redirect_abort(g, 0);
+    mocks::set_kill_frees(&[5]);
+    assert!(multiapp::resume_one(g));
+    assert_eq!(mocks::kill_calls(), vec![5]);
+    assert_eq!(mocks::abort_clear_calls(), 1);
+    g.inited = false;
+    fullscreen::reset();
+}

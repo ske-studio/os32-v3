@@ -300,6 +300,13 @@
       "source": "kdebug/gf_display_test.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "index": 43,
+      "symbol": "gf5_test",
+      "source": "kdebug/gf5_test.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

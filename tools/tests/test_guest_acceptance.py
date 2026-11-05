@@ -17,7 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 # g1's trim fields and restartable stdin's buf/size/done/active follow the prefix.
-SLOT_BYTES = 204 + 6 * struct.calcsize('<I')
+SLOT_BYTES = 204 + 108 + 6 * struct.calcsize('<I')
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_guest_acceptance as ga
 import tvdump_recv as tv

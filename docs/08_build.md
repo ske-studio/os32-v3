@@ -199,7 +199,7 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 | LAN (9) | 65,536 / 65,536 / 81,920 | 2,048 / 1 | **由来不明** (値だけ — T5c-4 8d9c5db、同上) | 16,640 (25%) / 16,384 (25%) / 20,480 (25%)、表 343 (17%) / 1 |
 | CIRRUS (10) | 65,536 / 65,536 / 81,920 | 2,048 / 1 | **由来不明** (値だけ — T5c-5b a77b893、同上) | 9,624 (15%) / 8,192 (12%) / 12,288 (15%)、表 106 (5%) / 1 |
 | HWDEV (11) | 262,144 / 262,144 / 327,680 | 16,384 / 1 | **決定** (2026-11-04、GF 層 4 で実測 200,704 B、物理の制約が無いので PM が広げた。メモリは `pgalloc` から取り固定の帯を持たない、`kernel/module/module_runtime.c` の `pgalloc_alloc_phys` 呼出し)。reloc は実測 1,523 件が現上限内 | 148,336 (57%) / 200,704 (77%) / 208,896 (64%)、text 78,363 B・rodata 61,608 B・data 172 B・BSS 57,716 B、表 1,523 (9%) / 1 |
-| GEFORCE (12) | 163,840 / 163,840 / 212,992 | 8,192 / 1 | **決定** (2026-11-04、[GF_FEAT3 の合算予算](decisions/realhw/GF_FEAT3_DESIGN.md#合算予算)): F3≤28・F4≤24・F5≤24 KiB の mem 増分。像・mem 各160 KiB、load_span 208 KiB、動的頁取得の検査上限 | 層4統合木 (`9b856ac6` + 登録段、2026-11-04): 139,552 (85%) / 155,648 (95%) / 163,840 (76%)、prefix 8,192 B。通常/R1で同値。2026-11-04、本容量変更後のまとめビルド完了 |
+| GEFORCE (12) | 262,144 / 262,144 / 327,680 | 8,192 / 1 | **決定** (2026-11-04、GF 層 5 の統合で mem の終わりが 181,044 B になり 160 KiB を超えた。物理の制約が無いので HWDEV と同じに PM が広げた — メモリは `pgalloc` から取り固定の帯を持たない。層 5 の増分は text +26,279 B・rodata +248 B・BSS +1,588 B で、[GF_FEAT5 の予算](decisions/realhw/GF_FEAT5_DESIGN.md#8-大きさの見積もり) の 20〜24 KiB を超えた) | 層5統合木 (wt/gf-l5、2026-11-04): ファイル 166,156 B、text 143,046 B・rodata 14,552 B・data 364 B・BSS 23,080 B (mem の終わり 181,044 B、69%) |
 
 - export_max = 1 は全部品で **導出** (ops 1 口 `initialize` だけを export する、`ops_slots=1`)。KDEBUG の 64 は上の由来不明に含む。
 - load_span の上限が mem_max + 表最大の頁切上げより小さい部品がある (HWDEV: reloc を上限まで使うと prefix > 65,536 B)。load_span は別に検査するので読み込みは安全側に断る。
@@ -757,7 +757,7 @@ FD に旧フォントを手で置いても読まない。**install.bin (FD → H
 FD 上のパスはすべて 8.3 に収まること (mkfat12 は収まらない名前を黙って切り詰めるので、
 mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以外 FD にも入る** — 空きは 2026-09-25 に
 **2HD 359KB / 1221KB、1.44MB 568KB / 1424KB** (MINIMAL をレスキュー兼インストーラに絞った後。
-絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-10-21 (kdebug.bin を `fd.exclude` で外した後、a82714b) は **2HD 134KB、1.44MB 346KB**。2HD が先に尽きるので、MINIMAL に
+絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-11-05 (HW-BASIC がシェルに入って 2HD が下限ちょうどになり、`fd.exclude` に fm.mod・pcm.mod・fep.mod を足した後 — ユーザー決定) は **2HD 109KB、1.44MB 320KB**。`fd.exclude` は kdebug.bin・hwdev.mod・geforce.mod・fm.mod・pcm.mod・fep.mod (理由は build/packages.yaml の各行)。2HD が先に尽きるので、MINIMAL に
 足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB
 (`tools/tests/test_packages.py` の `FD_MIN_FREE_KB`、2HD と 1.44MB の両方) を切ると
 `make check-packages-host` が落ちる** — 溢れて `make all` が割れる前に、MINIMAL に足す物を

@@ -9,20 +9,20 @@
     "legacy-12296": "b3635a16ab146ec63bf88bf1575ed579807dc025cf5f93c8f543c6c5305b2934",
     "legacy-15360": "7518ea86d447d7d4838aed34bcba23daa888a6821833d5d2c14bc55e080574bf",
     "legacy-16384": "ca7a760f5bae20e549cae0ce644ad382d1954014f8027820b40ada63693867ba",
-    "bios-1": "dc92ff397c464a495a5f322437ffbcaa3f8975d9084894977b25e9c0e5bfcc71",
-    "bios-5": "b68e739c53b7c73a9b08d91da2865a8f7e0edafdbb8ffdcc34d064adcb332c17",
-    "bios-256": "a5a47dbf78a6a35262c1ace20d6158ea9bf0560094cda4197adf503f6c496cc3",
-    "bios-2032": "c51cd8e23295cdde7befde84bb25c8700335ad7bde207c694b8d7a4057fcc57a",
-    "bios-4000": "97225d158c0937675f46b56b4b6b7c7809069e9499662eb18d6d6c61c8af48b4",
+    "bios-1": "734e4eb9975949da0ac57605fd0070df918b682531348a12e5c3db9fb48b41e5",
+    "bios-5": "95851aaf07011d53ddb6b729b1225fe5aa876330bc100ef9c65c0238fda9347c",
+    "bios-256": "feda8b7f99d26f15424fb0382768b6f43905370da71953ee1dba45949e6d0530",
+    "bios-2032": "1fe1672a02bddd48ae5574cec898432cc7073038455d2e6e60aa3430a6a04916",
+    "bios-4000": "7a6f1e7a6753b0cca60adcb0e34b7d47149c0c5f1615e269d7f9c25087f0b6f9",
     "wrap-first": "b0b34d7264fe0b35b116e1916bb20939aadebe4c65eb34d29acb2b2ef1a4180b",
-    "wrap-later": "60375ffe9977959136deb225c800aeb6a393cb4cab46f116e86b773e81939b47",
+    "wrap-later": "827bd164aa1439d49fe2f209fb3b514ec8e06fdd091a7642cfd413beab35bc1f",
     "write-first": "0fd8b9afc96986265774341dfc2fe574ceba8f8338f34665ae97d021761cead4",
-    "write-short": "f196219afed0964f610684340c3300ebea544377a05717ff28965701734a0f79",
+    "write-short": "59021037ebc1823329a3a2101f6bdbe1ae0cd74531de27512669b64514c0fb89",
     "alias-first": "47aa62bf5278a269e55bd8bbcca9aa43f16993556969073c86b8228ff2f78c5f",
-    "alias-middle": "9881790df5e5bce5288f2c70219a00650fb6906fc3512e62ad53d6c1d6341b9b",
-    "repeat-zero": "8dab2502d25460bb6542fbd1dfe60fe4fe9188aa90e71f6d74431ecc488aeb88",
-    "high-no-fit": "fafbc30bab37dbbe2cc30995e16181bb73c744f9feefdfe0d7cb691c91da39e7",
-    "high-tight-fit": "798b24b6a1c685c967b3ca212cbb204e67723891b821728551cdc7b49c5b534d",
+    "alias-middle": "deb7a66e2999f05dc11ff57078a22e91be710b37714dcdd7ddf45e66a5278884",
+    "repeat-zero": "bc28374fb250af2d05fc4e922f9e5f84258524aa1499843612363f9fef2f1108",
+    "high-no-fit": "16e70e78548c36424f26cb8313466651e880b70eceeea5eb9168ac1d3d508877",
+    "high-tight-fit": "0a4862e21784326a7557c47c3a5683667f832f6857450de447989094b974b2ec",
     "huge-hint": "62e38005e1b7cbf30bd9c70fffd783089713ffc80e0362cd8894fa3b529855fa",
     "minimum-fail": "aabb970ead20618add031afc11558ff8e17f09f0fe65b2997bdfadb4b73203da",
     "dma-absent": "77e85875fbea73f02451791476049b299154a86b4bef0166682fe514efadb536"
@@ -277,5 +277,26 @@
     "source_sha256": {
       "include/gf_production.h": "0c185d69e6e5a4dae233c39e5dd209065d28a84084ab144a254c52a04f5c3069"
     }
+  },
+  "gf_push_workspace_update": {
+    "base_sha": "df383c605b3d7965d854a56110b33b838357c25c",
+    "reason": "Boot PTs for push and arbitrary layer-3 VRAM views: seven to seventy total (BAR0 4 + BAR2 2 + shared BAR1 64). All 24 prior traces matched a replay of the unmodified request base at seven pages. New expectations replay that same base with only GF_PRODUCTION_PT_PAGES changed to seventy; low-RAM traces remain unchanged.",
+    "previous_traces": {
+      "bios-1": "dc92ff397c464a495a5f322437ffbcaa3f8975d9084894977b25e9c0e5bfcc71",
+      "bios-5": "b68e739c53b7c73a9b08d91da2865a8f7e0edafdbb8ffdcc34d064adcb332c17",
+      "bios-256": "a5a47dbf78a6a35262c1ace20d6158ea9bf0560094cda4197adf503f6c496cc3",
+      "bios-2032": "c51cd8e23295cdde7befde84bb25c8700335ad7bde207c694b8d7a4057fcc57a",
+      "bios-4000": "97225d158c0937675f46b56b4b6b7c7809069e9499662eb18d6d6c61c8af48b4",
+      "wrap-later": "60375ffe9977959136deb225c800aeb6a393cb4cab46f116e86b773e81939b47",
+      "write-short": "f196219afed0964f610684340c3300ebea544377a05717ff28965701734a0f79",
+      "alias-middle": "9881790df5e5bce5288f2c70219a00650fb6906fc3512e62ad53d6c1d6341b9b",
+      "repeat-zero": "8dab2502d25460bb6542fbd1dfe60fe4fe9188aa90e71f6d74431ecc488aeb88",
+      "high-no-fit": "fafbc30bab37dbbe2cc30995e16181bb73c744f9feefdfe0d7cb691c91da39e7",
+      "high-tight-fit": "798b24b6a1c685c967b3ca212cbb204e67723891b821728551cdc7b49c5b534d"
+    },
+    "source_sha256": {
+      "include/gf_production.h": "3e31ba7b7183b591d6a837b91e97e0f17696032723404dbbc2c01e4759e8792e"
+    },
+    "evidence": "/home/hight/os32-tmp/run/gf-pushpt/workspace-fixtures.log"
   }
 }

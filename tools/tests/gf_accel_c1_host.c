@@ -295,8 +295,10 @@ int tick_register(unsigned slot, tick_fn fn)
     assert(slot == PC98_TICK_GF && fn == geforce_tick);
     return 0;
 }
+#ifndef GF_OBJWAIT_SERIAL
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
+#endif
 
 static int cint_map(void *owner, const struct recover_bar_extent *bar,
                     u32 bytes, volatile u8 **out)
@@ -444,7 +446,7 @@ static inline void cint_no_resources(void)
     for (unsigned i = 0; i < 2; ++i) assert(!cint_view[i].mapped && !cint_loan[i]);
     assert(cint_dma_allocs == cint_dma_frees);
 }
-static inline void cint_reset(void)
+static inline void cint_reset_cold(void)
 {
     /* Previous case must clean up via the product, never erase live lists.
      * Preserve registry/node ID history and the single service binding. */
@@ -492,6 +494,11 @@ static inline void cint_reset(void)
 #endif
     if (cint_service)
         cint_service->scan_pitch = cint_service->scan_width = cint_service->scan_height = cint_service->scan_phys = 0;
+    cint_trace_clear();
+}
+static inline void cint_reset(void)
+{
+    cint_reset_cold();
     assert(!gf_foundation_start(&cint_prod.foundation));
     assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
     assert(cint_prod.chan.state == GF2_RUN && cint_prod.chan.mapped && cint_dma_live);

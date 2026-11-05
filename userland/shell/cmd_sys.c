@@ -683,6 +683,7 @@ static const ShellCmd sys_cmds[] = {
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
     { "gfinit", shell_cmd_gfinit, "inspect <sid> | abort <sid> --allow-write", "Inspect GF ROM or release the session" },
     { "gf2", shell_cmd_gf2, "status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank", "Observe the current GeForce layer-2 owner" },
+    { "hw", shell_cmd_hw, "<instruction>|reset|run|load|step|continue|abort", "Run HW-BASIC hardware observations" },
     { "gf1", shell_cmd_gf1, "status|instmem|vblank|cycle", "Observe the current GeForce layer-1 owner" },
     { "recover", shell_cmd_recover, "status | now <session> | virtual begin <case> | virtual step|end <session>", "Show recovery state or recover the current session" },
     { "peek",   shell_cmd_peek, "[-k|-p|-m] [-w1|-w2|-w4] addr [len]", "Read memory via kdebug (hex, KDEBUG=1)" },

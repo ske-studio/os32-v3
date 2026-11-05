@@ -2,9 +2,29 @@
 
 > 後続: [TASK_I18N](TASK_I18N.md)
 
-> 状態: **計画 (2026-09-30)** — ユーザー指示 (2026-09-30「v3 の後半にコントロールパネルのようなものの設計を入れる」) で起票。**着手 (設計票の作成) は v3 後半** — P1 の T2〜T5a (settings.db の経路が乗る SQLite のモジュール化と接続の所有) と P8 GUI 層の後。ここは範囲・材料・設計で決めることの一覧だけで、画面や API はまだ決めていない。
+> 状態: **設計中 (2026-11-05)** — 設計は確定、実装はまだ出していない。以下の §1〜§6 は 2026-09-30 の起票時の材料 (計画)。確定した範囲・段は先頭の §0・§0-1 と決定の文書が正。
 >
 > 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: `docs/archive/v3/V3_PLAN_DRAFT.md` §3 P8、`settings/DESIGN` (設定の置き場の正典)、`TASK_KBD_NAV` §1-3 (「MouseKeys の速さは設定画面で決める」を先送りした行)。
+
+## 0. ユーザー決定 (原文、2026-11-05)
+
+- 「7 件とも推奨どおり (推奨)」。コントロールパネルに関する中身: (1) 日付と時刻・システム情報・マウスキー・ダブルクリックは初版から外し後に回す (2) FEP の取り分と辞書の設定も後に回す。
+- 設計を回す指示: 「実装はとりあえず良いですが、設計は回してください。」
+
+## 0-1. 詳細設計 (確定) の要約
+
+全文: [CONTROL_PANEL_DESIGN](../../decisions/gui/CONTROL_PANEL_DESIGN.md) (確定の節が本文より優先)。初版は 2 ページ・5 項目。
+
+| 段 | 中身 | 状態 |
+|---|---|---|
+| 前置き | `cfg` の writer 統合 (`bootcfg.c`) と短書込みの修正 (別段・別コミット) | 未着手 |
+| 1 | `cfg_rules.c` (既知キー検査、GUI と `cfg set` に限る) | 未着手 |
+| 2 | `userland/rust/cpanel/` (model・view・messages・store・boot・reload) | 未着手 |
+| 3 | gshell への反映要求 RELOAD (GUI op 67、引数なし、`cfg_reload.rs`)・Settings の入口を cpanel.bin へ | 未着手 |
+| 4 | host 試験 (`cpanel_model`・`cpanel_store_host`・`cfg_reload_tests`)・`check-cpanel-host`・NP21/W の打鍵受入 | 未着手 |
+
+- 入口: 前置きの段 (cpanel の受入と分離)。Apply の on_click で同期保存し、ABI/プロトコルの版は上げない。
+- PM 決定 (確定の節): RELOAD の op 番号は 67 (モーダル・セッションの予約帯)。
 
 ## 1. 目的
 

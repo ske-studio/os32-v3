@@ -28,8 +28,6 @@ enum gf2_state { GF2_OFF, GF2_INIT, GF2_RUN, GF2_DRAIN, GF2_FAULT };
 
 /* Section 3: bytes in VRAM, words in cur/put/free/max. Reserve dynamically
  * below V-R; no new fixed general-memory reservation in memmap.h. */
-#define GF2_PUSH_BYTES 0x10000U
-#define GF2_PUSH_ALIGN MEM_PAGE_SIZE
 #define GF2_PUSH_WORDS (GF2_PUSH_BYTES / sizeof(u32))
 #define GF2_PUSH_MAX (GF2_PUSH_WORDS - 2U)
 #define GF2_PUSH_SKIPS 32U

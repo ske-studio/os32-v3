@@ -5,6 +5,23 @@
 #include "../../drivers/pci/pci.h"
 #include "../../kernel/irq/irq.h"
 #include "../../drivers/video/geforce/geforce_module.h"
+#include "../../mm/pgalloc.h"
+#include "../../include/sys.h"
+#include "../../include/kprintf.h"
+/* Output is asserted by the backend/command hosts; lifecycle hosts only
+ * provide the kernel printing dependency. */
+__attribute__((weak)) void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{ (void)attr; (void)fmt; }
+/* The display fixtures have no kernel page arena. F5 ROM acquisition may
+ * fail before publishing its view (PM decision 8); F4 must still start.
+ * Module fixtures supply their existing strong page allocator instead. */
+__attribute__((weak)) u32 pgalloc_alloc_phys(u32 owner,int pages)
+{ (void)owner;(void)pages;return 0; }
+__attribute__((weak)) int pgalloc_free_n_owner(u32 owner,u32 pfn,int pages)
+{ (void)owner;(void)pfn;(void)pages;assert(0);return 0; }
+/* These fixtures do not dispatch a live F5 foreground operation. */
+__attribute__((weak)) int sys_time_now(u32 *lo,u32 *hi)
+{ (void)lo;(void)hi;assert(0);return -1; }
 __attribute__((weak)) void serial_puts_polled(const char *s) { (void)s; }
 __attribute__((weak)) int serial_gate_active(void) { return 0; }
 __attribute__((weak)) int irq_unregister(unsigned irq,irq_handler_fn fn,void *arg)

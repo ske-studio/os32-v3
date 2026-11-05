@@ -14,7 +14,15 @@ that member from module_component_policy and shifts its following export/load-sp
 fields. Layer 3 adds accel/VRAM types and production.accel, plus the
 accel getter and gfx_present imports at indices 40/41. Layer 4 appends the kernel-owned gf_display_test at index 42 and adds
 Context v5, eight HAL hooks, display4, per-head mode/snapshot and script enums.
+Layer 5 appends gf5_test at index 43. The reviewed e790c537 inventory
+adds the F5 shared types/enums, production.feature5 and F4 logical save types
+reachable through feature5.h (470 added lines; existing entries retained).
+The layout pin includes these declarations, not just the new import.
+FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diagnostics.
 These changes own the pins below.
+KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
+reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
+adds that member; refresh both pins with --snapshot after reviewing the diff.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -34,9 +42,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xec64387d
-REVIEWED_IMPORT_DECLARATIONS_SHA = 'd5ff637c2adc81fa1ac36fe345c563f53e6cf5476235e9e25ef32e839cc6dba0'
-REVIEWED_INVENTORY_SHA = '24a8ff1e5f59a4e0ff2b3b4f150e34b3e8978778d49f5fa30f89c14be8cb3d47'
+REVIEWED_LAYOUT_CRC = 0x85d12b86
+REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
+REVIEWED_INVENTORY_SHA = '83b772398629df91f4506ab42fcfbdbefdd859695b6d17479526ca4ed5f0b07f'
 
 
 def import_declarations(root):

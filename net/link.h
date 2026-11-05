@@ -38,6 +38,7 @@
 #define LINK_OP_WDATA       8       /* OS32 → Host: 要求本文 (rid, seq 1〜) */
 #define LINK_OP_STATUS      9       /* OS32 → Host: 結果の再提示 / 生存確認 */
 #define LINK_OP_RELEASE     10      /* OS32 → Host: ハンドルを閉じた通知 */
+#define LINK_OP_NOTIFY      11      /* Host → OS32: independent seq/ack, rid=0 */
 
 /* ---- ヘッダ (20B)。**構造体にしない** ---------------------------------- */
 /*  op u8 @0, flags u8 @1, epoch u16 @2, seq u32 @4, ack u32 @8,             */
@@ -60,14 +61,39 @@
 
 /* ---- HELLO の段階 (flags) ---------------------------------------------- */
 #define LINK_HS_SYN         0       /* OS32→Host  payload 0 */
-#define LINK_HS_SYNACK      1       /* Host→OS32  payload 6 (agent/req_sess/req_epoch) */
+#define LINK_HS_SYNACK      1       /* Host→OS32  payload 6/12 (legacy/extended) */
 #define LINK_HS_CONFIRM     2       /* OS32→Host  payload 0 */
-#define LINK_HS_ESTAB       3       /* Host→OS32  payload 2 (agent) */
+#define LINK_HS_ESTAB       3       /* Host→OS32  payload 2/8 (legacy/extended) */
+/* Keep legacy lengths for existing callers. Accept only legacy or extended
+ * response lengths; never read appended fields from a legacy response.
+ * SYN/CONFIRM remain empty. Legacy peers disable internal ALIVE until LIST. */
+#define LINK_HELLO_SA_EXT_LEN 12
+#define LINK_HELLO_ES_EXT_LEN 8
+#define LINK_HELLO_SA_HOST_GEN_OFF 6
+#define LINK_HELLO_SA_ALIVE_OFF 10
+#define LINK_HELLO_ES_HOST_GEN_OFF 2
+#define LINK_HELLO_ES_ALIVE_OFF 6
 #define LINK_HELLO_SA_LEN   6
 #define LINK_HELLO_ES_LEN   2
 #define LINK_HELLO_REQ_SESS_OFF 2
 #define LINK_HELLO_REQ_EPOCH_OFF 4
 #define LINK_RESPONSE_LENGTH_OFF 2
+
+/* NOTIFY payload, explicitly LE encoded (no structure casts).
+ * ACK/WINDOW use rid=0; duplicate seq is ACKed without re-enqueueing.
+ * Drop frames from old sessions/host generations. service 1..65534 is assigned
+ * by LIST per generation; 0 is unassigned, 65535 is read-all only. */
+#define LINK_NOTIFY_RID             0
+#define LINK_NOTIFY_HOST_GEN_OFF    0
+#define LINK_NOTIFY_SERVICE_OFF     4
+#define LINK_NOTIFY_KIND_OFF        6
+#define LINK_NOTIFY_LENGTH_OFF      8
+#define LINK_NOTIFY_RESERVED_OFF    10  /* u16, must be zero */
+#define LINK_NOTIFY_DATA_OFF        12
+#define LINK_NOTIFY_DATA_MAX        236
+#define LINK_NOTIFY_MAX_LEN         (LINK_NOTIFY_DATA_OFF + LINK_NOTIFY_DATA_MAX)
+#define LINK_NOTIFY_ALIVE_KIND      1
+#define LINK_NOTIFY_ALIVE_LEN       4   /* data: host_generation u32 LE */
 
 /* ---- flags bit0 -------------------------------------------------------- */
 #define LINK_F_CTRL         0x01    /* RESPONSE: 制御結果 (業務結果ではない) */

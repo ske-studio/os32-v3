@@ -33,6 +33,8 @@ const struct gf4_test_ops *geforce_display_ops(void)
 { return registered ? display_slot : 0; }
 const struct gf4_restore_ops *geforce_display_restore_ops(void)
 { return registered ? display_restore_slot : 0; }
+const struct gf5_test_ops *geforce_feature5_ops(void)
+{ return registered ? feature5_slot : 0; }
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};
 static GeforceModuleContext context = {

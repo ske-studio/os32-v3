@@ -1566,4 +1566,24 @@ gfx_present:
 gf_display_test:
     jmp *kdebug_import_slots+1248
 .size gf_display_test, .-gf_display_test
+.globl gf5_test
+.type gf5_test, @function
+gf5_test:
+    jmp *kdebug_import_slots+1252
+.size gf5_test, .-gf5_test
+.globl pci_hwb_read
+.type pci_hwb_read, @function
+pci_hwb_read:
+    jmp *kdebug_import_slots+1256
+.size pci_hwb_read, .-pci_hwb_read
+.globl pci_hwb_write
+.type pci_hwb_write, @function
+pci_hwb_write:
+    jmp *kdebug_import_slots+1260
+.size pci_hwb_write, .-pci_hwb_write
+.globl exec_hwb_abort_take
+.type exec_hwb_abort_take, @function
+exec_hwb_abort_take:
+    jmp *kdebug_import_slots+1264
+.size exec_hwb_abort_take, .-exec_hwb_abort_take
 .section .note.GNU-stack,"",@progbits

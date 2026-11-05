@@ -1,0 +1,89 @@
+# /test/hw/gf_regs.hwb - read-only dump of key GeForce 6200 (NV44A, Ra266 0:13.0) registers
+# Usage: run `hw run /test/hw/gf_regs.hwb` once before and once after hello_gfx.
+# Writes only the CRTC index (0x6013D4), the CR1F unlock/lock needed for extended CRs, and the SR index (0x0C03C4).
+# Register names follow nouveau c03c1a1 (MIT) drivers/gpu/drm/nouveau/dispnv04/nvreg.h:101-341
+# and OS32 hwdev/gf/command.h (GF2_USER_*).
+ device d = bdf 0:13.0
+ window v = bar d 0
+# PMC (nvreg.h:101-102)
+ mmioread32 v + 0x000000 -> r
+ print "PMC_BOOT_0" r
+ mmioread32 v + 0x000200 -> r
+ print "PMC_ENABLE" r
+ mmioread32 v + 0x000100 -> r
+ print "PMC_INTR_0" r
+ mmioread32 v + 0x000140 -> r
+ print "PMC_INTR_EN_0" r
+# PFB (memory configuration)
+ mmioread32 v + 0x100200 -> r
+ print "PFB_CFG0" r
+ mmioread32 v + 0x10020C -> r
+ print "PFB_CSTATUS" r
+# PFIFO and channel 0 USER (command.h GF2_USER_BASE 0xC00000, PUT +0x40, GET +0x44)
+ mmioread32 v + 0x002500 -> r
+ print "PFIFO_CACHES" r
+ mmioread32 v + 0x003250 -> r
+ print "PFIFO_CACHE1_PULL0" r
+ mmioread32 v + 0xC00040 -> r
+ print "USER0_PUT" r
+ mmioread32 v + 0xC00044 -> r
+ print "USER0_GET" r
+# PCRTC (nvreg.h:150-174)
+ mmioread32 v + 0x600100 -> r
+ print "PCRTC_INTR_0" r
+ mmioread32 v + 0x600800 -> r
+ print "PCRTC_START" r
+ mmioread32 v + 0x600804 -> r
+ print "PCRTC_CONFIG" r
+ mmioread32 v + 0x600860 -> r
+ print "PCRTC_ENGINE_CTRL" r
+# PRAMDAC PLLs and control (nvreg.h:306-341)
+ mmioread32 v + 0x680500 -> r
+ print "PRAMDAC_NVPLL" r
+ mmioread32 v + 0x680504 -> r
+ print "PRAMDAC_MPLL" r
+ mmioread32 v + 0x680508 -> r
+ print "PRAMDAC_VPLL" r
+ mmioread32 v + 0x68050C -> r
+ print "PRAMDAC_PLL_SELECT" r
+ mmioread32 v + 0x680520 -> r
+ print "PRAMDAC_VPLL2" r
+ mmioread32 v + 0x680578 -> r
+ print "PRAMDAC_VPLL_B" r
+ mmioread32 v + 0x680600 -> r
+ print "PRAMDAC_GENERAL_CONTROL" r
+# Output path checks for "drew but monitor shows 98" (2026-11-05): DAC clock select, DAC test, PBUS debug, SR01
+ mmioread32 v + 0x680524 -> r
+ print "PRAMDAC_SEL_CLK" r
+ mmioread32 v + 0x68052C -> r
+ print "PRAMDAC_DACCLK" r
+ mmioread32 v + 0x680608 -> r
+ print "PRAMDAC_TEST_CONTROL" r
+ mmioread32 v + 0x001850 -> r
+ print "REG_1850" r
+ mmioread32 v + 0x001854 -> r
+ print "REG_1854" r
+ mmiowrite8 v + 0x0C03C4 0x01
+ mmioread8 v + 0x0C03C5 -> r
+ print "SR01" r
+# PC-98 video route (drivers/video/pc98/pc98_route.c: 0FACh 01 = GeForce, 00 = 98)
+ ioread8 port 0xFAC -> r
+ print "PORT_FAC" r
+# CRTC (head 0, PRMCIO 0x6013D4/0x6013D5, nvreg.h:187); extended CRs open with CR1F=0x57 (nvreg.h:235-237)
+ mmiowrite8 v + 0x6013D4 0x1F
+ mmioread8 v + 0x6013D5 -> lock
+ print "CR1F_ORIGINAL" lock
+ mmiowrite8 v + 0x6013D5 0x57
+ let i = 0
+ label crloop
+ mmiowrite8 v + 0x6013D4 i
+ mmioread8 v + 0x6013D5 -> c
+ print "CR_INDEX_VALUE" (i << 8) | c
+ let i = i + 1
+ if i != 0xA0 goto crloop
+# Re-lock unless the original read was unlocked (3)
+ mmiowrite8 v + 0x6013D4 0x1F
+ if lock == 3 goto done
+ mmiowrite8 v + 0x6013D5 0x99
+ label done
+ end

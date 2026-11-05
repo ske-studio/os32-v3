@@ -53,7 +53,7 @@
 
 /* ======== キーバッファ ======== */
 #define KBD_BUF_SIZE  32
-#define KBD_TIMEOUT_TICKS 300   /* 入力待ちタイムアウト時間(ticks) */
+#define KBD_RSHELL_TIMEOUT_SEC 30  /* 遠隔セッションがキー待ちで止まらないための上限 */
 
 /* ======== 公開API ======== */
 void kbd_init(void);

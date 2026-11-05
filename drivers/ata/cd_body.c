@@ -12,8 +12,7 @@ static int cd_read(Device *self, int lba, int count, void *buf)
 
 static Device cd_device = {
     .name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
-    .sect_size = ATAPI_SECTOR_SIZE, .blk_read = cd_read
-};
+    .sect_size = ATAPI_SECTOR_SIZE, .blk_read = cd_read, .blk_read_u32 = 0, .media_check = 0};
 
 int cd_module_init(CdModuleApi *out)
 {

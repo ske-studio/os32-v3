@@ -15,6 +15,15 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('x87-launch-save', 'source',
+     '        x87_save(&x87_parent[x87_depth]);\n        x87_init();',
+     '        (void)0;\n        x87_init();'),
+    ('x87-launch-init', 'source',
+     '        x87_save(&x87_parent[x87_depth]);\n        x87_init();',
+     '        x87_save(&x87_parent[x87_depth]);\n        (void)0;'),
+    ('x87-before-image-abort', 'source',
+     'if (image_rc) return exec_launch_abort(launcher_id, id, image_rc);',
+     'if (image_rc) { x87_save(&x87_parent[x87_depth]); return exec_launch_abort(launcher_id, id, image_rc); }'),
     ('open-error-code', 'image', 'if (fd < 0) return EXEC_ERR_NOT_FOUND;',
      'if (fd < 0) return EXEC_ERR_INVALID;'),
     ('seek-close-missing', 'image', '        vfs_close(fd);', ''),

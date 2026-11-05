@@ -2541,6 +2541,42 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "index": 313,
+      "symbol": "gf5_test",
+      "source": "kdebug/gf5_test.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
+    },
+    {
+      "index": 314,
+      "symbol": "pci_hwb_read",
+      "source": "drivers/pci/pci_hwb.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false
+    },
+    {
+      "index": 315,
+      "symbol": "pci_hwb_write",
+      "source": "drivers/pci/pci_hwb.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false
+    },
+    {
+      "index": 316,
+      "symbol": "exec_hwb_abort_take",
+      "source": "exec/exec_hwb.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false
     }
   ]
 }

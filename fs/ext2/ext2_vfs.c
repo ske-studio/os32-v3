@@ -499,7 +499,9 @@ static VfsOps ext2_ops = {
     ext2_vfs_create_excl,       /* 票 H2。他の FS は埋めない = NOSYS */
     &ext2_ino_ops,              /* 票 TASK_VFS_FD_PATH。FD は inode で動く */
     0,                          /* name_fold なし = 名前はバイトで区別する */
-    &ext2_sqlite_ops
+    &ext2_sqlite_ops,
+    0, /* resource_check */
+    0  /* resource_refresh */
 };
 
 

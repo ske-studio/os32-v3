@@ -259,8 +259,12 @@
 #define KAPI_SLOT_FONT_SOURCE_CLOSE 252
 #define KAPI_SLOT_KDEBUG_CALL 253
 #define KAPI_SLOT_SYS_VER_INFO 254
+#define KAPI_SLOT_EXEC_STOP_CULPRIT 255
+#define KAPI_SLOT_IME_DICT_INFO 256
+#define KAPI_SLOT_GFX_OSRI_SHOW 257
+#define KAPI_SLOT_IME_DICT_SUSPEND 258
 
-#define KAPI_SLOT_COUNT 255
+#define KAPI_SLOT_COUNT 259
 #define KAPI_FUNC_CAPACITY 300
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x4B8\n\t.popsection")

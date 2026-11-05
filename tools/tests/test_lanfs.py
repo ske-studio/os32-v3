@@ -6,7 +6,7 @@ No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
 CHECK = dict(name='lanfs-host', tier=1,
-    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
+    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
     needs=[], budget=2.257142)
 
 import ctypes as C
@@ -19,6 +19,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import types
 from contextlib import redirect_stderr
 from unittest.mock import patch
 
@@ -55,6 +56,120 @@ def parse(packet):
     fr = sfs.try_frame(packet, 14, sfs.LAN_MAX_PAYLOAD)
     assert fr[0] == "frame", fr
     return fr[2]
+
+
+class FakeImage:
+    def __init__(self, images):
+        self.images = images
+        self.sessions = set()
+        self.calls = []
+
+    def open_session(self, sid):
+        self.sessions.add(sid)
+        self.calls.append(("open", sid))
+
+    def close_session(self, sid):
+        self.sessions.remove(sid)
+        self.calls.append(("close", sid))
+
+    def dispatch(self, sid, op, payload):
+        assert sid in self.sessions
+        self.calls.append(("dispatch", sid, op, payload))
+        return struct.pack("<i", -9) + bytes([op])
+
+
+def check_images(host, root):
+    fake_module = types.SimpleNamespace(ImageStore=FakeImage)
+    captured = []
+    def serve(port, lan):
+        captured.append(lan.image.images)
+        raise KeyboardInterrupt()
+    base = ["lanfs_host.py", "--iface", "fake0", "--root", str(root)]
+    with patch.dict(sys.modules, {"host_image": fake_module}), \
+            patch.object(host, "NicPort") as nic, \
+            patch.object(host, "link_status", return_value="fake"), \
+            patch.object(host, "serve", side_effect=serve), redirect_stderr(io.StringIO()):
+        nic.return_value.mac = HOST
+        with patch.object(sys, "argv", base + ["--image", "install=/a=b.iso", "--image", "other=/b.iso"]):
+            assert host.main() == 0
+        assert captured == [{"install": "/a=b.iso", "other": "/b.iso"}]
+        for bad in (["missing"], ["=path"], ["alias="], ["a=x", "a=y"]):
+            with patch.object(sys, "argv", base + sum((["--image", v] for v in bad), [])):
+                assert host.main() == 1
+
+    image = FakeImage({})
+    server = sfs.Server(sfs.HostFS(root))
+    lan = host.LanServer(HOST, server, image=image)
+    def hello(nonce):
+        return packet(sfs.encode(sfs.T_HELLO, 0, 0, struct.pack("<HHI", 1, 1028, nonce)), BCAST)
+    first = hello(1)
+    sid = parse(lan.handle(first)).sid
+    assert lan.handle(first) is not None and image.calls == [("open", sid)]
+    for seq, op in enumerate((0x30, 0x31, 0x32), 1):
+        wire = packet(sfs.encode(op, sid, seq, b"payload"))
+        reply = parse(lan.handle(wire))
+        assert reply.type == op | sfs.T_RESP and reply.payload == struct.pack("<i", -9) + bytes([op])
+        assert lan.handle(wire) == lan.handle(wire)
+        assert image.calls.count(("dispatch", sid, op, b"payload")) == 1
+    before = list(image.calls)
+    assert lan.handle(packet(sfs.encode(0x33, sid, 4, b""))) is not None
+    assert image.calls == before
+    second_sid = parse(lan.handle(hello(2))).sid
+    assert image.calls[-2:] == [("close", sid), ("open", second_sid)]
+    assert lan.handle(packet(sfs.encode(sfs.T_BYE, second_sid, 0))) is None
+    assert image.calls[-1] == ("close", second_sid) and not image.sessions
+    print("PASS image arguments, dispatch, replay, session lifecycle and unknown op", flush=True)
+
+
+def check_cli_writes(host):
+    # Enter through main(): only the raw NIC and foreground loop are replaced.
+    with tempfile.TemporaryDirectory(prefix="lanfs-cli-") as tmp:
+        root = pathlib.Path(tmp)
+        (root / "logs").mkdir()
+        (root / "protected").write_bytes(b"original")
+        (root / "logs/link").symlink_to(root / "protected")
+
+        def exercise(port, server):
+            hello = sfs.encode(sfs.T_HELLO, 0, 0, struct.pack("<HHI", 1, 512, 123))
+            sid = parse(server.handle(packet(hello, BCAST))).sid
+            for seq, (path, expected) in enumerate(cases, 1):
+                wire_path = path.encode()
+                payload = (struct.pack("<IBB", 0, sfs.WF_TRUNC, len(wire_path)) +
+                           wire_path + b"written")
+                reply = parse(server.handle(packet(sfs.encode(sfs.T_WRITE, sid, seq, payload))))
+                status = struct.unpack_from("<i", reply.payload)[0]
+                if expected is None:
+                    assert status < 0, (path, status)
+                else:
+                    assert status == expected, (path, status, expected)
+            raise KeyboardInterrupt()
+
+        for options, cases in [
+                ([], [("/logs/default", sfs.ERR_ROFS)]),
+                (["--allow-write", "logs", "--allow-write", "single"],
+                 [("/logs/record", 7), ("/single", 7), ("/logs/link", None),
+                  ("/logs-other", sfs.ERR_ROFS), ("/protected", sfs.ERR_ROFS)])]:
+            with patch.object(sys, "argv", ["lanfs_host.py", "--iface", "fake0",
+                                           "--root", str(root), *options]), \
+                    patch.object(host, "NicPort") as nic, \
+                    patch.object(host, "link_status", return_value="fake link"), \
+                    patch.object(host, "serve", side_effect=exercise), \
+                    redirect_stderr(io.StringIO()):
+                nic.return_value.mac = HOST
+                assert host.main() == 0
+                nic.return_value.close.assert_called_once()
+        assert not (root / "logs/default").exists()
+        assert (root / "logs/record").read_bytes() == b"written"
+        assert (root / "single").read_bytes() == b"written"
+        assert not (root / "logs-other").exists()
+        assert (root / "protected").read_bytes() == b"original"
+        for bad in ("../escape", "logs/../protected", "logs/./record"):
+            with patch.object(sys, "argv", ["lanfs_host.py", "--iface", "fake0",
+                                           "--root", str(root), "--allow-write", bad]), \
+                    patch.object(host, "NicPort") as nic, redirect_stderr(io.StringIO()):
+                assert host.main() == 1
+                nic.assert_not_called()
+    print("PASS CLI allow-write repeated paths, containment, default ROFS and invalid paths", flush=True)
 
 
 class Rig:
@@ -164,6 +279,9 @@ def run_suite(lib_path, py_path, root):
     for name in ("test_len", "test_ticks", "test_resends", "test_gates", "test_pending"):
         getattr(lib, name).restype = C.c_ulong
     host = load_host(py_path)
+    with patch.dict(sys.modules, {"host_image": types.SimpleNamespace(ImageStore=FakeImage)}):
+        check_cli_writes(host)
+    check_images(host, root)
     for cap in (1028, 512):
         rig = Rig(lib, host, root)
         rig.server.payload_cap = cap
@@ -530,6 +648,12 @@ def run_mutations(tmp, root):
          "(sfs.T_LOG, sfs.T_EXIT, sfs.T_DUMP)", "(sfs.T_LOG, sfs.T_EXIT)"),
         ("host_peer", "tools/lanfs_host.py",
          "if self.peer is not None and src != self.peer:", "if False:"),
+        ("cli_allow_write", "tools/lanfs_host.py",
+         "sfs.HostFS(args.root, allow_write=args.allow_write)", "sfs.HostFS(args.root)"),
+        ("image_dispatch", "tools/lanfs_host.py",
+         "fr.type in BLOCK_OPS", "False"),
+        ("image_close", "tools/lanfs_host.py",
+         "self.image.close_session(fr.sid)", "self.image.open_session(fr.sid)"),
         ("put_deadline", "fs/serialfs/sfs_lan.c",
          "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
          "0"),

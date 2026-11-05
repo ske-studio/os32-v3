@@ -15,7 +15,7 @@ tools/tests/cirrus_win_host.c が実物の drivers/video/cirrus/backend_cirrus.c
 make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='cirrus-win-host', tier=1,
-    covers=['include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    covers=['gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.55569)
 
 from kernel_includes import include_flags
@@ -50,6 +50,8 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("gray_step", MUT_TARGET, "GFX_PALETTE_GRAY_FIRST + b * GFX_PALETTE_GRAY_STEP",
+     "GFX_PALETTE_GRAY_FIRST + b * 2"),
     ("mode_pitch", MUT_TARGET,
      "CIRRUS_MODE_480, 0, CIRRUS_PITCH}",
      "CIRRUS_MODE_480, 0, CIRRUS_PITCH + 1}"),

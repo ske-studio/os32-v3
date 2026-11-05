@@ -1,4 +1,4 @@
-# KernelAPI v79 仕様書
+# KernelAPI v81 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **79** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 255・予約 45) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **81** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 259・予約 41) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -127,6 +127,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 | v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
+| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
+| v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -146,6 +148,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 使用中の loop イメージの unlink / 置き換え) を取り、ネットワークの開始点を **-18 以降**へ下げた。
 同じ票で既存の **-11 `STALE`** を VFS の FD にも使う (unlink・置き換え rename・umount で失効した FD の
 read / write / fstat / seek)。版数は据え置き。
+Host Services (2026-11-05) は **-18 `HOSTDOWN`** (ホストに届かない・応答が無い・NIC 未 bind) と **-19 `TIMEOUT`** (SDK host_call の全体期限) を取り、番号の追加だけなので KAPI 版数は据え置く。
 
 ### 生ディスク書込みの授権 (KAPI-DISK-AUTH)
 
@@ -292,7 +295,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 255〜299 (`kapi_reserved[45]`、v79 時点。v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 259〜299 (`kapi_reserved[41]`、v81 時点。v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -377,6 +380,7 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | `ime_user_delete` (yomi/kanji) | T5a-1 / 同上 | B2 接続。各256Bを全コピー。yomi NULL/空=-1、kanji NULL/正常な空のみ同じ読みの全候補。copy失敗=-1、SQL=-2/-3、成功0 |
 | `ime_user_export` (path) | T5a-1 / 同上 | B2 接続。256B NUL、NULL/空/copy失敗=-1、拒否時create/truncate=0。SQL/I/O=-2〜-5、成功0 |
 | `font_source_open` (path) | T7b-b1 / `kernel/console/font_source.c` | B1 コピー済み。門 (CPL=3 の dispatch 中・caller owner 一致) の後に VFS_MAX_PATH の NUL を必須で写し、写せなければ kill + INVAL、拒否時 FD を開かない |
+| `gfx_osri_show` (path) | KAPI v80 / `kapi/kapi_osri.c` → `gfx/gfx_osri_view.c` | B1 コピー済み。VFS_MAX_PATH の NUL を 1 byte ずつ copy_caller_bytes で写し、帯の外・写せない USER は kill + INVAL、非終端・空は INVAL、拒否時はファイルを開かない |
 | `db_bind_text`, `host_open` | 長さ付き入力 (NUL 不要)、既存 DB/host facade | X-1 の NUL 群から除外。各 target の B1 range/copy 契約を維持 |
 
 T4b-8 の上記各群は host の境界・副作用前拒否・生ポインタ変異を検査する。ゲスト受入は PM が行う。入力上限と staging 寿命は [下記](#残る公開文字列の-cpl3-入力境界-t4b-8b)。FEP / ページ 0 を含む X-1 全体の閉鎖を意味しない。
@@ -1698,9 +1702,27 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
   v79 に上がるため、この移行で app.conf は変更しない。旧ユーザーランドは
   新カーネルで動く。更新は boot を先に行う。
 
+### §4-16 v80 の 3 本 (exec_stop_culprit / ime_dict_info / gfx_osri_show)
+
+- `exec_stop_culprit` (slot 255 / 0x404、`i32(void)`): GUI の KAPI-loop の STOP で
+  `parked_from_stop` の WAIT_POLL に退避した張本人の ID (2〜5) を返す。居なければ 0、owner 1 (WM)
+  以外は `OS32_ERR_INVAL`。状態は動かさない。WM は CTRL+STOP の宛先を決める前にこれを引き、
+  0 でなければその ID を `exec_kill` する ([09_exec.md](09_exec.md)「GUI の KAPI-loop の STOP」)。
+  `exec_app_state` は STOP 由来の退避と通常の WAIT_POLL を同じ 4 で返すので区別に使えない。
+- `ime_dict_info` (slot 256 / 0x408): 選択中のシステム辞書のメタ情報 20 キー (`IME_DICT_INFO_*`) を
+  UTF-8 の文字列で `offset` から最大 `capacity - 1` byte 写す (NUL 込み、`IME_DICT_INFO_CAP` = 256 を
+  超える capacity は 256 として扱う)。戻り = 写した byte 数 (0 = 終わり) / `NOSYS` (FEP なし) /
+  `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE`。FEP 部品の ops slot 21 (`dict_info`、
+  `FEP_MODULE_OPS_VERSION` 2) へ渡す。正典は [DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md) の追記 (確定 A1〜A6)。
+- `gfx_osri_show` (slot 257 / 0x40C): `.osri` をカーネルが全画面で再生する同期の口。`gfx_init` の後に呼ぶ。
+  `duration_ms` は 1〜`GFX_OSRI_SHOW_MAX_MS` (動的画像の初期枠、Esc 以外のキーで締切を
+  max(今の締切, 今 + `GFX_OSRI_SHOW_EXTEND_MS`) へ延長、固定の画像は Esc まで)。戻り = 0 (枠の終わり) /
+  1 (Esc・CTRL+STOP) / `INVAL` / `NOTFOUND` / `IO` / `NOSPC` / `NOSYS` (非対応の表示経路) / `BUSY` / `AGAIN`。
+  正典は [OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) §3。ビューアーのアプリは GeForce の後。
+
 ### 予約スロット (v63〜)
 
-0x404〜0x4B4 (slot 255〜299、45 本、v79 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x414〜0x4B4 (slot 259〜299、41 本、v81 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2061,10 +2083,20 @@ app の終了・fault で残った lease は回収で閉じる (結線は T7b-b2
 
 ### §4-15 kdebug_call (v78)
 
+HW-BASIC は公開 KAPI を追加せず、この口の private `HW_OP` を使う。
+private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
+(末尾 314: `pci_hwb_read`、315: `pci_hwb_write`、316: `exec_hwb_abort_take`)。
+生成器で契約と ABI 指紋を再生成する。
+
+
 | オフセット | 名前 | 型 |
 |---|---|---|
 | 0x3FC | kdebug_call | `i32(u32 op, void *buf, u32 size)` |
 | 0x400 | sys_ver_info | `int(void *out, u32 size)` |
+| 0x404 | exec_stop_culprit | `i32(void)` |
+| 0x408 | ime_dict_info | `int(int key, int offset, char *out, int capacity)` |
+| 0x40C | gfx_osri_show | `int(const char *path, u32 duration_ms)` |
+| 0x410 | ime_dict_suspend | `int(int on)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

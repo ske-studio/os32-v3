@@ -32,7 +32,7 @@ static struct { u32 port, value, time, open; } output[HOST_WRITES];
 static unsigned int inp(unsigned int port)
 {
     REQUIRE(port == GDC_GFX_STAT);
-    REQUIRE(++reads < 4000000u); /* Includes a full one-second preview. */
+    REQUIRE(++reads < 4000u * SPLASH_RASTER_PREVIEW_MS); /* Includes the full preview. */
     u32 phase = stamp++ % (state.total_lines * HOST_H);
     u32 status = 0;
     if (!freeze && (phase < vs_lines * HOST_H ||
@@ -46,7 +46,7 @@ static unsigned int inp(unsigned int port)
 static void outp(unsigned int port, unsigned int value)
 {
     if (preview_pending) {
-        unsigned long long duration = (unsigned long long)1000000u * state.line_den;
+        unsigned long long duration = (unsigned long long)SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS * state.line_den;
         unsigned long long period = (unsigned long long)state.total_lines * state.line_num_us;
         u32 rounds = (u32)((duration + period - 1u) / period);
         REQUIRE(stamp - preview_at >= rounds * state.total_lines * HOST_H);
@@ -443,7 +443,7 @@ static void test_preview(void)
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) {
         setup(mode, vs);
         u32 period = state.total_lines * HOST_H;
-        unsigned long long duration = (unsigned long long)1000000u * state.line_den;
+        unsigned long long duration = (unsigned long long)SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS * state.line_den;
         unsigned long long physical_period = (unsigned long long)state.total_lines * state.line_num_us;
         u32 rounds = (u32)((duration + physical_period - 1) / physical_period);
         stamp = period / 2; /* A partial first frame does not count. */

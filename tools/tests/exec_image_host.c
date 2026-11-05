@@ -22,6 +22,11 @@ static void die(void)
 enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, READ_ERROR };
 static int failure, is_user, opened, closed, aborted, reads, maps, jump_ready;
 static int last_slot_id;
+static int x87_calls, x87_entry_depth, x87_init_after_save;
+static X87State *x87_saved;
+void x87_save(X87State *p) { x87_saved = p; x87_calls++; }
+void x87_restore(const X87State *p) { (void)p; x87_calls++; }
+void x87_init(void) { x87_init_after_save = x87_calls == 1; x87_calls++; }
 static u32 image_size, bss_size, copied;
 static char events[32];
 static u32 event_count;
@@ -146,7 +151,10 @@ void paging_load_cr3(u32 pd)
         CHECK(aborted == 1 && last_slot_id == 3 && !slots[2].as);
         return; /* real abort has torn down the child before restoring parent */
     }
-    if (argv_mode && pd == space.pd_phys) argv_done();
+    if (argv_mode && pd == space.pd_phys) {
+        if (x87_entry_depth) return;
+        argv_done();
+    }
     CHECK(pd == 1);
     /* The real exec_launch_abort switches to master before teardown. */
     if (jump_ready && !aborted) {
@@ -174,12 +182,17 @@ int paging_addrspace_create_lease(struct addrspace *as, u32 owner) { CHECK(as ==
 void appmem_init(struct addrspace *as, u32 b, u32 e, u32 h, u32 g) { (void)as; (void)b; (void)e; (void)h; (void)g; }
 int shlib_addrspace_attach(struct addrspace *as) { CHECK(as == &space); return 0; }
 int exec_setjmp(u32 *buf) { (void)buf; CHECK(!jump_ready); jump_ready = 1; event('J'); return 0; }
-void exec_heap_user_init(struct addrspace *as) { (void)as; CHECK(0); }
+void exec_heap_user_init(struct addrspace *as) { CHECK(x87_entry_depth && as == &space); }
+int kselftest_run_audit(const char *name) { (void)name; CHECK(x87_entry_depth); return 0; }
 void exec_heap_init_at(u32 base, u32 size) { (void)base; (void)size; if (argv_mode) argv_done(); CHECK(0); }
 void appslot_shell_commit(void) { CHECK(0); }
 void shell_service_retire(void) { CHECK(0); }
 void shell_service_publish(u32 base, u32 size) { (void)base; (void)size; CHECK(0); }
-void appslot_start_commit(int id, int gui, u32 pages) { (void)id; (void)gui; (void)pages; CHECK(0); }
+void appslot_start_commit(int id, int gui, u32 pages) {
+    (void)id; (void)gui; (void)pages;
+    CHECK(x87_entry_depth && x87_calls == 2 && x87_init_after_save && x87_saved == &x87_parent[x87_entry_depth]);
+    argv_done();
+}
 void appslot_mark_scheduled(int id, u32 tick) { (void)id; (void)tick; CHECK(0); }
 
 ShellService g_shell_service;
@@ -221,7 +234,7 @@ static void check_case(int user, int fault, u32 text)
 {
     is_user = user; failure = fault; image_size = text; bss_size = 33;
     opened = closed = aborted = reads = maps = jump_ready = 0;
-    copied = event_count = 0;
+    copied = event_count = x87_calls = 0;
     kmemset(events, 0, sizeof(events));
     kmemset(slots, 0, sizeof(slots));
     kmemset(backing, 0xA5, sizeof(backing));
@@ -245,7 +258,7 @@ static void check_case(int user, int fault, u32 text)
             __builtin_longjmp(escape, 1);
         }
         rc = exec_launch("/fixture", 0);
-        CHECK(fault != OK && aborted == 1);
+        CHECK(fault != OK && aborted == 1 && x87_calls == 0);
         CHECK(rc == (fault == OPEN_FAIL ? EXEC_ERR_NOT_FOUND : EXEC_ERR_INVALID));
     } else CHECK(fault == OK && !aborted && copied == text);
     const char *expected;
@@ -282,7 +295,7 @@ static void argv_case(int user, const char *command, const char *bytes,
 {
     argv_mode = 1; is_user = user; failure = OK; image_size = 1; bss_size = 33;
     opened = closed = aborted = reads = maps = jump_ready = 0;
-    copied = event_count = 0; stores = argv_tables = 0;
+    copied = event_count = x87_calls = 0; stores = argv_tables = 0;
     read_fail_at = read_fault; store_fail_at = store_fault;
     kmemset(slots, 0, sizeof(slots));
     kmemset(argv_backing, 0xA5, sizeof(argv_backing));
@@ -290,7 +303,7 @@ static void argv_case(int user, const char *command, const char *bytes,
     launcher_space.pd_phys = 17;
     slots[3].as = &launcher_space; slots[3].cpl3 = 1;
     slots[3].band_pdes = 1; slots[3].depth = 1;
-    kapi = &api; exec_nest_level = user; ring3_tramp_page = (u32)tramp;
+    kapi = &api; exec_nest_level = x87_entry_depth ? x87_entry_depth : user; ring3_tramp_page = (u32)tramp;
     api.shm_base = 0x12345000;
     u32 top = user ? MEM_APP_STACK_TOP : MEM_SHELL_STACK_TOP;
     u32 str = (top - kstrlen(command) - 1) & ~3u;
@@ -307,7 +320,7 @@ static void argv_case(int user, const char *command, const char *bytes,
     if (!__builtin_setjmp(escape)) {
         int rc = exec_launch(input, 0);
         CHECK(read_fault >= 0 || store_fault >= 0);
-        CHECK(rc == EXEC_ERR_INVALID && aborted == 1);
+        CHECK(rc == EXEC_ERR_INVALID && aborted == 1 && x87_calls == 0);
         CHECK(slots[user ? 2 : 1].as == 0);
         if (user) CHECK(g_cur_app == &slots[3]);
         if (read_fault >= 0 || (store_fault >= 0 && store_fault < (int)byte_count))
@@ -369,6 +382,9 @@ static void argv_cases(void)
     for (int at = 0; at <= 11; at++)
         argv_case(1, "/fixture ab", "/fixture\0ab", 12, 2, at, -1);
     argv_case(1, "/fixture \"a\\b\"", "/fixture\0ab", 12, 2, 12, -1);
+    for (x87_entry_depth = 1; x87_entry_depth <= 2; x87_entry_depth++)
+        argv_case(1, "/fixture", "/fixture", 9, 1, -1, -1);
+    x87_entry_depth = 0;
     say("PASS exec argv: 45 launches, quoting/escape/limits/pages, read/store errors, frame and abort\n");
 }
 void _start(void)

@@ -8,6 +8,7 @@
 
 #define GUI_FAULT_STREAK_MAX 3
 #include "serial_diag.h"
+#include "../arch/x86/kernel/x87.h"
 #include "../arch/x86/kernel/idt.h"
 #include "../arch/x86/kernel/tss.h"
 #include "../kernel/v86/v86.h"

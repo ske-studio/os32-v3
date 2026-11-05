@@ -23,6 +23,7 @@
 #define __APPSLOT_H
 
 #include "types.h"
+#include "x87.h"
 #include "paging.h"        /* struct addrspace (値で持つ。関数は呼ばない) */
 #include "ksetjmp.h"       /* KSETJMP_BUF_LEN */
 #include "../fs/vfs_stdin.h"
@@ -140,6 +141,7 @@ typedef struct {
     int trim_pending;         /* T2g: one pending request per slot */
     u32 trim_epoch;
     VfsStdinRead stdin_read;  /* sys_read progress across KBD park */
+    X87State x87_state;
 } AppSlot;
 
 extern u32 appslot_trim_epoch;
@@ -361,6 +363,10 @@ void appslot_mark_scheduled(int id, u32 now_tick);
  * (立てられるのは走っている 1 本だけなので) で、他の ID の状態は動かさない。
  * 戻り値: 0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 でない。 */
 int appslot_abort_clear(void);
+
+/* KAPI exec_stop_culprit の実体 (v80)。parked_from_stop で WAIT_POLL に
+ * 居る ID、無ければ 0、owner 1 以外は OS32_ERR_INVAL。 */
+int appslot_stop_culprit(void);
 
 /* KAPI exec_app_state の実体:
  *   0=空き / 1=走っている / 2=park 中 (OP_WAIT) / 3=kbd 待ち /

@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **実装中 (2026-11-04)** — 層 1・2 は main に取り込み済み。層 3〜5 は点検結果を確定設計に反映済みで、実装前。実機の受入は別途必要で、取り込みを実機合格とは数えない。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **実装中 (2026-11-05)** — 層 1〜5 は main (層 3 c3e018a6、層 4 5a29f69c、層 5 23a19141)。実機 Ra266 の受入は入口の不具合を 1 つずつ直している (立会いなし、カメラ): 時計・待ちの未結線 (gf-prodtime)・PMC の期待値・黙った pc98 への落ち・live AS の PT (gf-bootpt)・devinit 前の PFB 読み、の後、67f1b3ca で `gf1 status`・`gf2 status` は rc=0、hello_gfx は `[gf4] start fail stage=objects_init rc=-205`。`[gf3] wait timeout site=push_reserve … now-dl≒2 秒、GET=PUT` から、devinit の前に作った 2 秒の期限を objects_init まで使い回していたと判明し、devinit より後の段は段の入口で期限を取り直す直しを ee6bfbbd で main (astra レビュー指摘 0)。実機での再試験 (hello_gfx) がノートで進行中。取り込みを実機合格と数えず、表示が出たら層 1 から受入。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 
@@ -44,8 +44,14 @@
 
 | 段 | 中身 | 状態 |
 |---|---|---|
-| 1 | 土台 | main に取り込み済み。仕様・受入は [GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)。実機受入は別途必要 |
-| 2 | コマンドの投入 | main に取り込み済み。仕様・受入は [GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)。実機受入は別途必要 |
-| 3 | 2D と M2MF | 点検反映済み・実装前。層 2 に依存。仕様・受入は [GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md) |
-| 4 | 表示 | 点検反映済み・実装前。層 3 に依存。仕様・受入は [GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md) |
-| 5 | その他 | 点検反映済み・実装前。層 4 に依存。仕様・受入は [GF_FEAT5_DESIGN](../../decisions/realhw/GF_FEAT5_DESIGN.md) |
+| 1 | 土台 | main に取り込み済み。仕様・受入は [GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)。実機受入は wt/gf-prodtime の後 (初回は 2026-11-04 に `gf1 status` rc=-107 で止まった) |
+| 2 | コマンドの投入 | main に取り込み済み。仕様・受入は [GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)。実機受入は wt/gf-prodtime の後 (初回は 2026-11-04 に `gf2 status` rc=-201 で止まった) |
+| 3 | 2D と M2MF | main に取り込み済み (c3e018a6)。層 2 に依存。実機受入は層 1・2 の後。仕様・受入は [GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md) |
+| 4 | 表示 | main に取り込み済み (5a29f69c)。層 3 に依存。実機受入は [持越し台帳](../DEFERRED_TESTS.md) の GF-L4-Ra266-*。仕様・受入は [GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md) |
+| 5 | その他 | 機能 PM の試行で wt/gf-l5 に進行中 (ユーザー「試してみて」)。層 4 に依存。仕様・受入は [GF_FEAT5_DESIGN](../../decisions/realhw/GF_FEAT5_DESIGN.md) |
+
+### 実機の記録 (2026-11-04)
+
+- 本番のドライバが GeForce の画面への切り替えを実機で行ったことがあるか: ユーザー「いや、切り替えは行ったことがあります。ドキュメントに残しそびれているだけと思います。」(日付は不明、ユーザー談)。
+- main 5a29f69c での実機の受入は入口で止まった。`gf2 status` は precheck rc=-201 (本番の foundation の時計・待ちが未結線、`hwdev/gf/devinit.c:104-105`)、`gf1 status` は rc=-107 (起動前から Command 0106h = BusMaster を lspci で確認。OS32 は本番の start を一度もしていない)、`gf2 display 0` はシリアル・画面とも無出力。証拠はノートの `~/os32-tmp/evidence/2026-11-04/gf-accept-5a29f69c/`。
+- 直しは wt/gf-prodtime (sol) が進行中。取り込みの後に層 1 から実機の受入をやり直す (立会いなし、カメラ)。

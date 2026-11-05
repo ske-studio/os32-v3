@@ -1,0 +1,10 @@
+# Last word of the PC-98 text VRAM character area (A0000h-A1FFFh), outside the 80x25 screen: the console never rewrites it (PM decision P11).
+mmioread8 phys 0xA1FFE -> s
+mmiowrite8 phys 0xA1FFE 0x41
+mmioread8 phys 0xA1FFE -> x
+mmiowrite8 phys 0xA1FFE s
+if x != 0x41 goto failed
+end
+label failed
+let failure = 0 - 1
+end

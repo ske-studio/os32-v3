@@ -797,8 +797,9 @@ def case_install(plan, resolved):
         return
     fd_files = [(g, os.path.getsize(os.path.join(ROOT, h))) for g, h in files]
     exclude = {e['guest'] for e in fd.get('exclude') or []}
-    check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod', '/boot/geforce.mod'},
-          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod {sorted(exclude)}")
+    check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod', '/boot/geforce.mod',
+                      '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod'},
+          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod、fm.mod、pcm.mod、fep.mod {sorted(exclude)}")
     minimal = {g: os.path.getsize(h) for n, _, _, fs in resolved
                if n.startswith('minimal') for g, h in fs if g not in exclude}
     got = run_install_fdset(src, fd_files)

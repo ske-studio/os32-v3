@@ -13,7 +13,7 @@
 /* bar0 and display are already mapped device pointers. point is the caller's
  * non-reentrant identity/interruption check; it runs before every row, so a
  * one-row present is checked too and the final BAR0 drain follows a passed
- * check. A failed check returns -1 without touching either window again,
+ * check. A failed check returns its rc without touching either window again,
  * still accounting for the rows already written. */
 int gf_present_rect(const u8 *client, u32 client_pitch,
                     volatile u8 *display, u32 display_pitch,
@@ -29,8 +29,8 @@ int gf_present_rect(const u8 *client, u32 client_pitch,
     client += (u32)y * client_pitch + (u32)x;
     display += (u32)y * display_pitch + (u32)x;
     for (int row = 0; row < h; row++) {
-        if (point(opaque)) {
-            rc = -1;
+        rc = point(opaque);
+        if (rc) {
             break;
         }
         const u8 *s = client;

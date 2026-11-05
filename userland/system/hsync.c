@@ -1627,7 +1627,7 @@ static int replace_file(const char *src_path, const char *dst_path, u32 size,
             note = dst_exists
                 ? " (使用中で置き換えられなかった: 宛先は旧内容のまま。"
                   "開いている DB (FEP 辞書など) は閉じるまで置き換えない。"
-                  "再起動して FEP を有効にする前に hsync する)"
+                  "hsync --fep-off または再起動して FEP を有効にする前に hsync する)"
                 : " (使用中で作れなかった: 開いている DB のジャーナル名か"
                   "その祖先。DB を閉じてから hsync する)";
         }
@@ -2572,6 +2572,7 @@ static void usage(void)
                  HS_MANIFEST_PATH);
     api->kprintf(ATTR_WHITE, "      --force-kapi 配備物の KAPI 配置・版を確かめられなくても続ける\n");
     api->kprintf(ATTR_WHITE, "                  (既定は名札の kapi= がカーネルと違う/新しい/無いなら断る)\n");
+    api->kprintf(ATTR_WHITE, "      --fep-off   同期の間だけ FEP 辞書を閉じ、終了時に開き直す (-n は閉じない)\n");
     api->kprintf(ATTR_WHITE, "      --no-backup /boot/vmkernel.lz4 を置き換える前に vmkernel.old を作らない\n");
     api->kprintf(ATTR_WHITE, "      --root <根>  同期先の根を / から替える (マウントの根・FD でない ext2 だけ)\n");
     api->kprintf(ATTR_WHITE, "                  例: FD 起動で hsync --root /hd0 boot = /host/boot -> /hd0/boot\n");
@@ -2584,6 +2585,8 @@ static void usage(void)
     api->kprintf(ATTR_WHITE, "  置き換えは一時ファイル `%s<名前>` 経由。この接頭辞は hsync の予約\n",
                  HS_TEMP_PREFIX);
 }
+
+#include "hsync_fep.inc"
 
 int __cdecl main(int argc, char **argv, KernelAPI *_api)
 {
@@ -2614,6 +2617,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
     g_mtime_nosys = 0;
     g_force = 0;
     g_force_kapi = 0;
+    g_fep_off = 0;
     g_dry_run = 0;
     g_verbose = 0;
     g_verify = 0;
@@ -2645,6 +2649,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         if (a[0] == '-') {
             if (str_cmp(a, "-f") == 0 || str_cmp(a, "--force") == 0) {
                 g_force = 1;
+            } else if (str_cmp(a, "--fep-off") == 0) {
+                g_fep_off = 1;
             } else if (str_cmp(a, "--force-kapi") == 0) {
                 /* 票 TASK_KAPI_DATA_FIELDS: KAPI の門を明示して越える。
                  * `-f` とは別の旗 (短縮形も作らない)。 */
@@ -2937,6 +2943,11 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
                      "  (dry-run: 読み取りと比較だけ。mkdir・書き込み・sync・mtime はしない)\n");
     }
 
+    if (hsync_fep_begin() != 0) {
+        api->mem_free(file_buf);
+        return 1;
+    }
+
     /* 同期実行。明示 dir は**起点の型を先に確かめてから**始める (B3)。
      * 全体同期の起点 (/host -> /) はマウントの前提としてディレクトリ。
      * 始めなかった場合も下の集計行と終了コードはそのまま通る
@@ -2946,6 +2957,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
     }
 
     if (g_abort) {
+        hsync_fep_end();
         api->kprintf(ATTR_RED,
                      "\nAborted: 保護判定に必要な stat が失敗した\n");
         api->mem_free(file_buf);
@@ -2961,6 +2973,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
             g_errors++;
         }
     }
+
+    hsync_fep_end();
 
     /* 結果表示。失敗があれば頭を FAILED: にする (成功表示へ進めない) */
     api->kprintf(g_errors ? ATTR_RED : ATTR_WHITE,

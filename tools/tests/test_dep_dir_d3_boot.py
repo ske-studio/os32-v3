@@ -34,7 +34,7 @@ def kernel_order(kernel=None):
         'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
         'boot_platform_run(BOOT_CLOCK, &boot);', 'paging_init(mem_kb);',
         'paging_reclaim_conventional();', 'boot_platform_run(BOOT_FONT, &boot);',
-        '"fninit"', 'memory_boot_init(mem_kb)', 'shm_init();',
+        'x87_probe()', 'memory_boot_init(mem_kb)', 'shm_init();',
         'paging_boot_user_shared(exec_tramp_page_addr())', 'dma_pool_init();',
         'v86_module_load();', 'kdebug_load();', 'kdebug.ops.selftest_run();',
         'cd_module_load();',

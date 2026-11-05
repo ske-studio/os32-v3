@@ -1,0 +1,22 @@
+# /test/hw/gf_palette.hwb - read back the GeForce 6200 (NV44A, Ra266 0:13.0) head 0 DAC palette (256 x RGB)
+# Usage: run after hello_gfx (the GeForce backend keeps its palette after exit):
+#   hw run -o /host/logs/gf_palette.log /test/hw/gf_palette.hwb
+# Ports follow nouveau c03c1a1 (MIT) dispnv04/nvreg.h NV_PRMDIO (0x681000) + VGA DAC:
+#   0x3C6 pixel mask, 0x3C7 read index, 0x3C9 data (hwdev/gf/display/gamma.c:31-33 writes the same block).
+# Writes only the DAC read index. Each line prints (index << 24) | (R << 16) | (G << 8) | B.
+ device d = bdf 0:13.0
+ window v = bar d 0
+ mmioread8 v + 0x6813C6 -> m
+ print "DAC_MASK" m
+ mmioread32 v + 0x680600 -> g
+ print "PRAMDAC_GENERAL_CONTROL" g
+ mmiowrite8 v + 0x6813C7 0
+ let i = 0
+ label palloop
+ mmioread8 v + 0x6813C9 -> r
+ mmioread8 v + 0x6813C9 -> gr
+ mmioread8 v + 0x6813C9 -> b
+ print "PAL" (i << 24) | (r << 16) | (gr << 8) | b
+ let i = i + 1
+ if i != 256 goto palloop
+ end

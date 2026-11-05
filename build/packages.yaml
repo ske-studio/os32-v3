@@ -119,6 +119,12 @@ fd:
       reason: 2026-10-23 PM 決定。開発用で kdebug が RUNNING のときだけ読むため、kdebug.bin の無い起動 FD から除外。FD インストール後は実機の更新 (hsync boot) で入れる
     - guest: /boot/geforce.mod
       reason: 2026-11-03 ユーザー決定。GeForce 層 2 で 61KB に増え 2HD の空きが 64KB を割った。FD はレスキュー兼インストーラで 98 の表示で動く。FD インストール後は実機の更新 (hsync boot) で入れる
+    - guest: /boot/fm.mod
+      reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で 音は要らない。FD インストール後は実機の更新 (hsync boot) で入れる
+    - guest: /boot/pcm.mod
+      reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で 音は要らない。FD インストール後は実機の更新 (hsync boot) で入れる
+    - guest: /boot/fep.mod
+      reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で FEP を使わない。FD インストール後は実機の更新 (hsync boot) で入れる
   rename:
     - guest: /boot/vmkernel.lz4
       fd: /VMKRNL.LZ4

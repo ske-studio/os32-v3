@@ -109,8 +109,6 @@ static const GfxMode cirrus_modes[] = {
  * (v<<2)|(v>>2) で両端がぴったり合う (0→0, 15→63)。
  * PEGC (8bit DAC) の ×17 と同じ趣旨のスケーリング (票 H2c)。 */
 #define CIRRUS_PAL6_REPLICATE_SHIFT 2
-#define CIRRUS_GRAY_FIRST 2
-#define CIRRUS_GRAY_STEP 2
 #define CIRRUS_DAC_MAX 63
 #define CIRRUS_INIT_FILL_OPS 2
 
@@ -269,8 +267,9 @@ static void cirrus_palette_init(void)
         }
     }
     for (b = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP); i++, b++) {
-        u8 v = (u8)(CIRRUS_GRAY_FIRST + b * CIRRUS_GRAY_STEP);
-        if (v > CIRRUS_DAC_MAX) v = CIRRUS_DAC_MAX;
+        /* 8bit 値を 0..63 に正規化し、最近傍に丸める。 */
+        unsigned gray8 = GFX_PALETTE_GRAY_FIRST + b * GFX_PALETTE_GRAY_STEP;
+        u8 v = (u8)((gray8 * CIRRUS_DAC_MAX + 127) / 255);
         wab_cirrus_dac_set(s_glue, i, v, v, v);
     }
 }

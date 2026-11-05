@@ -30,7 +30,7 @@ static int preview(struct SplashRaster *s)
         s->total_lines <= SPLASH_RASTER_VISIBLE_LINES) return -1;
     palette_init();
     /* Align once, then count full periods: a partially elapsed first
-     * VBLANK must not shorten the requested one-second preview. */
+     * VBLANK must not shorten the requested preview. */
     if (preview_vsync(0) || preview_vsync(1)) return -1;
     u32 rounds = preview_rounds(s);
     for (u32 round = 0; round < rounds; round++)

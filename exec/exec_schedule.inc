@@ -226,17 +226,22 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         a->frame[APP_FRAME_EAX] = (u32)wait_ret;
     }
 
+    volatile int x87_depth = exec_nest_level;
     volatile Ring3CallContext caller_context;
     ring3_context_save(&caller_context);
     if (exec_setjmp(a->jmpbuf) != 0) {
         ring3_context_clear();
         /* park / 終了 / fault / kill で戻ってきた。ローカルは当てにしない。 */
         exec_pending_finish();
+        x87_restore(&x87_parent[x87_depth]);
         ring3_context_restore(&caller_context);
         _enable();
         if (g_longjmp_reason == EXEC_LJ_PARK) return g_longjmp_id;
         return 0;
     }
+
+    x87_save(&x87_parent[x87_depth]);
+    x87_restore(&a->x87_state);
 
 #ifdef OS32_R1_FIXTURE
     r1_fixture_resume((int)app_id);
@@ -325,6 +330,11 @@ i32 exec_app_state(i32 app_id)
 /*  (= 意図しない 1 本が死ぬ)。要求以外の状態は何も動かさない。              */
 /*  0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 以外。           */
 /* ======================================================================== */
+i32 exec_stop_culprit(void)
+{
+    return appslot_stop_culprit();
+}
+
 i32 exec_abort_clear(void)
 {
     if (font_guard_active) return OS32_ERR_BUSY;

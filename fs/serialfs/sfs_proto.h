@@ -92,8 +92,38 @@
 #define SFS_T_LOG          0x20    /* 片道 (ゲスト → ホスト): 溜めた出力の断片 */
 #define SFS_T_EXIT         0x21    /* 片道: code i32, dropped u32, flags u32 */
 #define SFS_T_DUMP         0x22    /* 片道 (LAN): kdebug peek。addr u32 + data、番号は通し番号 */
+#define SFS_T_BOPEN        0x30    /* alias UTF-8, no NUL; read-only handle */
+#define SFS_T_BREAD        0x31    /* handle u32, lba512 u32, count u16 */
+#define SFS_T_BCLOSE       0x32    /* handle u32 */
 #define SFS_T_RESP         0x80    /* 応答 = 要求の種別 | 0x80 */
 #define SFS_T_ERR          0xFF    /* 拒否 (未知のセッションなど)。status だけ */
+
+/* Block RPC wire layout: NET_HOSTSVC_DESIGN §4, all fields LE.
+ * Responses use op|SFS_T_RESP. Handles are valid only within their sid.
+ * Serialize explicitly with sfs_put/get helpers, never cast a structure.
+ * BOPEN identity is size + mtime_ns (each low/high u32), not a hash.
+ * BREAD success must contain exactly status + count*512 bytes; short EOF is IO.
+ * Error replies and BCLOSE replies contain status only. */
+#define SFS_BLOCK_ALIAS_MIN          1
+#define SFS_BLOCK_ALIAS_MAX          63
+#define SFS_BOPEN_STATUS_OFF         0
+#define SFS_BOPEN_HANDLE_OFF         4
+#define SFS_BOPEN_SIZE_LO_OFF        8
+#define SFS_BOPEN_SIZE_HI_OFF        12
+#define SFS_BOPEN_MTIME_LO_OFF       16
+#define SFS_BOPEN_MTIME_HI_OFF       20
+#define SFS_BOPEN_RSP_LEN            24
+#define SFS_BREAD_HANDLE_OFF         0
+#define SFS_BREAD_LBA_OFF            4
+#define SFS_BREAD_COUNT_OFF          8
+#define SFS_BREAD_REQ_LEN            10
+#define SFS_BREAD_COUNT_MIN          1
+#define SFS_BREAD_COUNT_MAX          2
+#define SFS_BREAD_DATA_OFF           SFS_STATUS_LEN
+#define SFS_BREAD_RSP_MAX            (SFS_STATUS_LEN + SFS_BREAD_COUNT_MAX * SFS_LOGICAL_BLOCK_SIZE)
+#define SFS_BCLOSE_HANDLE_OFF        0
+#define SFS_BCLOSE_REQ_LEN           4
+#define SFS_BCLOSE_RSP_LEN           SFS_STATUS_LEN
 
 /* path は「長さ u8 + バイト列 (NUL なし)」。`/` 始まりのルート相対。 */
 #define SFS_PATH_MAX       255

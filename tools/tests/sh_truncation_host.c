@@ -997,6 +997,7 @@ u32 save_crc32(const void *data, u32 len)
  * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
 int shell_cmd_peek(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 int shell_cmd_recover(int argc, char **argv) { (void)argc; (void)argv; return 0; }
+int shell_cmd_hw(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
@@ -2728,10 +2729,12 @@ static void case_rshell_line(void)
     /*  127 文字の行の 127 文字目以降を読み捨てていなければ、残りが次の
      *  コマンドとして実行される。次に正しい行を流して両方を見る。 */
     fresh();
-    rs_line("mk12 ", 'b', 122);          /* 127 文字 — 断られる */
+    /* Leave an executable suffix beyond the overflow byte. A parser which
+     * stops on the first overflow byte would run mk14 as the next command. */
+    key_push_str("mk12 "); key_push_run('b', 122); key_push_str("mk14\n");
     rs_line("mk13", 'c', 0);             /* 次の行 — 通る */
     cmd_rshell_resident(1, av);
-    check(!ran("mk12"), "23g 断った行は実行しない");
+    check(!ran("mk12") && !ran("mk14"), "23g 断った行と残りは実行しない");
     check(ran("mk13"), "23h 次の行は正常に動く");
     check(ser_count(0x04) == 3, "23i EOT は 起動 + 断り + 次の行 の 3 つ");
 

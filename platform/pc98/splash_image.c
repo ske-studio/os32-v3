@@ -4,6 +4,7 @@
 #include "gfx_osri.h"
 #include "splash_raster_image.h"
 #include "splash_raster_play.h"
+#include "splash_raster_run.h"
 #include "kmalloc.h"
 #include "palette.h"
 #include "kprintf.h"
@@ -20,22 +21,6 @@ static void image_black(void)
     for (u32 i = 0; i < OSRI_COLORS; i++) palette_set(i, 0, 0, 0);
 }
 
-/* Only the two existing 400-line profiles enter the rational deadline math.
- * With <=3s, <=300 frames and these profiles, every product fits in u64. */
-static int image_timing(const struct SplashRaster *s)
-{
-    static const u8 sync24[] = PEGC_GDC_MSYNC_400;
-    static const u8 sync31[] = PEGC_GDC_MSYNC_400_31K;
-    if (!s || !s->checked || !s->dynamic_ok || !_irq_enabled() ||
-        s->mode > SPLASH_RASTER_31K ||
-        s->line_num_us != SPLASH_RASTER_LINE_NUM_US) return -1;
-    const u8 *sync = s->mode == SPLASH_RASTER_31K ? sync31 : sync24;
-    u32 den = s->mode == SPLASH_RASTER_31K ? SPLASH_RASTER_31K_DEN : SPLASH_RASTER_24K_DEN;
-    u32 vs = (sync[2] >> 5) | ((sync[3] & 3) << 3);
-    u32 total = sync[6] + ((sync[7] & 3) << BITS_PER_BYTE) + sync[5] + vs + (sync[7] >> 2);
-    return s->line_den == den && s->total_lines == total ? 0 : -1;
-}
-
 static u32 image_elapsed(u32 start, u32 budget)
 {
     u32 elapsed = tick_count - start; /* unsigned subtraction handles wrap */
@@ -47,7 +32,7 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
     u32 start = tick_count;
     i32 left = (i32)(*end_tick - start);
     u32 budget = left > 0 ? (u32)left : 0;
-    if (budget > PLATFORM_SPLASH_TICKS) budget = PLATFORM_SPLASH_TICKS;
+    if (budget > PLATFORM_SPLASH_IMAGE_TICKS) budget = PLATFORM_SPLASH_IMAGE_TICKS;
     struct gfx_kernel_fb fb;
     struct SplashRaster *s = pc98_splash_raster_state();
     struct OsriImage *image = 0;
@@ -76,7 +61,7 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
     reason = "no sync";
     if (!_irq_enabled()) { rc = PLATFORM_SPLASH_NO_SYNC; goto done; }
     if (image->count) {
-        if (image_timing(s)) { rc = PLATFORM_SPLASH_NO_SYNC; goto done; }
+        if (pl_run_timing(s)) { rc = PLATFORM_SPLASH_NO_SYNC; goto done; }
         reason = "memory";
         plan = kmalloc(sizeof(*plan));
         if (!plan) goto done;
@@ -99,24 +84,19 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
         u32 prefix = play_start - start;
         if (prefix > budget) prefix = budget;
         u32 remaining_us = (budget - prefix) * SPLASH_IMAGE_TICK_US;
-        divisor = s->line_den;
-        unsigned long long period = (unsigned long long)s->total_lines * s->line_num_us;
-        unsigned long long consumed = 0;
-        u32 frames = 0, good = 0;
-        while (frames < PLATFORM_SPLASH_TICKS) {
-            unsigned long long elapsed = (unsigned long long)image_elapsed(play_start, budget) *
-                                         SPLASH_IMAGE_TICK_US * divisor;
-            unsigned long long used = elapsed > consumed ? elapsed : consumed;
-            if (used + period > (unsigned long long)remaining_us * divisor) break;
+        u32 play_limit_us = PLATFORM_SPLASH_IMAGE_PLAY_SECONDS * 1000u * SPLASH_RASTER_US_PER_MS;
+        if (remaining_us > play_limit_us) remaining_us = play_limit_us;
+        struct PlRun run;
+        pl_run_init(&run, s, play_start, remaining_us);
+        divisor = run.divisor;
+        while (pl_run_more(&run, tick_count)) {
             int frame = pl_v2_frame(s, image, plan);
             if (frame == PL_FRAME_NO_SYNC) goto play_done;
-            consumed += period; /* Both OK and DROP consume one period. */
-            frames++;
-            if (frame == PL_FRAME_OK) good++;
+            pl_run_charge(&run, frame);
         }
-        if (good || !frames) rc = PLATFORM_SPLASH_DONE;
+        if (run.good || !run.frames) rc = PLATFORM_SPLASH_DONE;
 play_done:
-        model = (unsigned long long)prefix * SPLASH_IMAGE_TICK_US * divisor + consumed;
+        model = (unsigned long long)prefix * SPLASH_IMAGE_TICK_US * divisor + run.consumed;
     } else {
         /* Fixed images keep the existing IRQ-open, clock-paced path. */
         if (pc98_splash_raster_frame(s, image)) goto done;
@@ -129,16 +109,15 @@ done:
     if (plan) kfree(plan);
     if (image) kfree(image);
     /* Round down by bounded multiplication comparison. Never restart the
-     * three-second window, double-charge model+tick, or compensate PIT. */
+     * image window, double-charge model+tick, or compensate PIT. */
     u32 now = tick_count;
     u32 ticks = now - start;
     if (ticks > budget) ticks = budget;
-    unsigned long long elapsed = (unsigned long long)ticks * SPLASH_IMAGE_TICK_US * divisor;
-    if (model > elapsed) elapsed = model;
-    unsigned long long limit = (unsigned long long)budget * SPLASH_IMAGE_TICK_US * divisor;
-    u32 rest = 0;
-    while (rest < budget && elapsed + (unsigned long long)(rest + 1u) *
-           SPLASH_IMAGE_TICK_US * divisor <= limit) rest++;
+    struct PlRun residual;
+    pl_run_init(&residual, 0, now - ticks, budget * SPLASH_IMAGE_TICK_US);
+    residual.divisor = divisor;
+    residual.consumed = model;
+    u32 rest = pl_run_remaining(&residual, now, SPLASH_IMAGE_TICK_US, budget);
     *end_tick = now + rest;
     if (rc != PLATFORM_SPLASH_DONE)
         kprintf(0x07, "[splash] %s: builtin logo\n", reason);

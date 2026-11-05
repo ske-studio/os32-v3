@@ -107,6 +107,8 @@ typedef struct {
 void ime_init(void);
 int ime_dict_boot(void);
 int ime_boot_abort(void);
+int ime_dict_suspend(int on);
+IME_State *ime_suspend_state(void);
 u32 ime_boot_bytes(void);
 int ime_dict_close(IME_Dict *dict);
 
@@ -143,6 +145,8 @@ int  ime_user_list_facade(const char *yomi_prefix, void *out, int max);
 int  ime_user_delete_facade(const char *yomi, const char *kanji);
 int  ime_user_export_facade(const char *path);
 int  ime_user_clear_facade(void);
+const IME_Dict *ime_current_dict(void);
+int  ime_dict_info_facade(int key, int offset, char *out, int capacity);
 
 /* ======================================================================== */
 /*  内部関数 (ime_romkana.c, ime_dict.c から公開)                            */

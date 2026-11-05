@@ -34,6 +34,13 @@ i32 gf_display_test(u32 session)
     return display_rc;
 }
 
+/* Layer 5 diagnostic dispatch target (kdebug/gf5_test.h); not exercised here. */
+i32 gf5_test(u32 session)
+{
+    (void)session;
+    return 0;
+}
+
 void serial_puts_polled(const char *s)
 {
     unsigned n = gf2_host_strlen(s);
