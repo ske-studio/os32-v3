@@ -16,3 +16,5 @@ GF_ACCEL S11: video_start 成功→wc_start→初回転送。wc_start=0 は UC �
 再 init の probe で稼働中の identity 不一致を発見した場合も、failed を立てて共通 stop を完了してから false を返す。HAL が PC98 へ選択を切り替える前に WC lease と MTRR を戻す。gfx_core と他の backend の選択処理は変更しない。
 
 初回のアプリ present 完了後に `[gf4] scanout` を 1 回記録する (active な init の再呼出しでは繰り返さず、停止後の init で再開)。`head=0`・`front`・`fb`・`expected_pitch` は HAL の描画先、`start`・`pitch`・`depth`・`config` は PCRTC/CR13/19/42/28 の読戻し。depth は格納ビット数 (8/16/32)、output は `gf4_route_type`、dpms は `gf4_dpms` の値。connector/or は DCB の選択、dac/test は OR A の DACCLK/TEST_CONTROL、sr1/cr17/cr1a は blank・CRTC enable・同期の読戻し。present は cpu または upload、bytes はこの present の成功転送量。非ゼロ front の upload も成功時に present_bytes/commits を数える。present の inactive/poll/transfer 失敗は停止前に段と rc を記録し、失敗した転送の後に追加の BAR 読取りは行わない。診断読取り失敗は rc を記録し、同じ init 内で繰り返さない。
+
+転送失敗の rc は CPU の point、upload、期限取得の戻り値を保持する。F5 の温度取得・監視初期化の失敗は温度監視だけを停止し、`[gf5] therm off rc=… reason=sensor|auto|init` を一度記録する。F5 poll / present の失敗にはしない (nouveau `nvkm/subdev/therm/temp.c:162–189`)。ファン制御と時計取得の失敗の扱いは従来どおり。

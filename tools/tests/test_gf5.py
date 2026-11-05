@@ -2,7 +2,7 @@
 CHECK = dict(name='gf5-host', tier=1, needs=[], budget=90.0,
              covers=['hwdev/gf/**', 'kdebug/gf5_test.c', 'kdebug/gfinit_pll.*',
                      'kdebug/gfinit_decode*', 'kdebug/gfinit_exec.c',
-                     'kdebug/recover.c', 'kdebug/recover_gf.c', 'tools/tests/gf5*',
+                     'kdebug/recover.c', 'kdebug/recover_gf.c', 'tools/tests/gf5*', 'tools/tests/gf_startlog_host.h', 'include/kprintf.h',
                      'tools/tests/test_gf5.py', 'tools/tests/test_gf_runner.py',
                      'tools/tests/gf_runner*', 'tools/tests/gf4_c2linit_host.c',
                      'tools/tests/gfinit_exec_host.c', 'tools/tests/gfinit_host.c',

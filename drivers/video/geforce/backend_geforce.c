@@ -136,8 +136,9 @@ static int display_deadline(struct gf4_ctx *c, u32 *dl)
 {
     u32 now;
     struct gf_io *io = &c->ch->f->io;
-    if (!io->timing.clock_us || io->timing.clock_us(io->opaque, &now))
-        return GF2_EIO;
+    if (!io->timing.clock_us) return GF2_EIO;
+    int rc = io->timing.clock_us(io->opaque, &now);
+    if (rc) return rc;
     *dl = now + GF3_TIMEOUT_US;
     return 0;
 }
@@ -504,7 +505,7 @@ static int geforce_transfer(int x, int y, int w, int h)
             geforce_context->counters->commits++;
         }
         ops->ctx->last_rc = rc;
-        return rc ? OS32_ERR_IO : 0;
+        return rc;
     }
 #endif
     return gf_present_rect(gfx_backend_geforce.bb_base, gfx_backend_geforce.bb_pitch,
