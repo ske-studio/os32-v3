@@ -1,6 +1,6 @@
 # /test/hw/hpt370_probe.hwb - probe the HighPoint HPT370 IDE controller (Ra266 0:12.0, 1103:0004 rev 03)
 # Reads PCI config 00-7F, both channels' status, bus-master status, and sends ATA IDENTIFY (0xEC)
-# only to devices that report DRDY. Writes: drive select (cmd+6) and the IDENTIFY command (cmd+7).
+# only to devices that report DRDY and latch SC/SN (+2/+3). Writes: drive select (cmd+6), SC/SN probe (cmd+2/+3), IDENTIFY (cmd+7).
 # Chip table and init registers: FreeBSD sys/dev/ata/chipsets/ata-highpoint.c:68-135 (BSD-2-Clause).
 # Register layout: ATA command block +0..+7, control block +2 (alt status), bus master +2/+0x0A.
 # IDENTIFY words printed: 27-46 model, 60-61 LBA28 sectors, 83 features (bit10 LBA48), 88 UDMA, 100-103 LBA48 sectors.
@@ -44,7 +44,17 @@
  print "ALT_STATUS" st
  if st == 0xFF goto skip
  if st == 0x7F goto skip
+ if st == 0x7E goto skip
  if (st & 0xC0) != 0x40 goto skip
+ # Presence: a device latches sector count/number (+2/+3); a floating bus does not.
+ iowrite8 port (cmd + 2) 0x55
+ iowrite8 port (cmd + 3) 0xAA
+ ioread8 port (cmd + 2) -> v
+ print "PRESENCE_SC" v
+ if v != 0x55 goto skip
+ ioread8 port (cmd + 3) -> v
+ print "PRESENCE_SN" v
+ if v != 0xAA goto skip
  iowrite8 port (cmd + 7) 0xEC
  poll 8 port (cmd + 7) 0x88 0x08 1000000 1000 -> st
  let w = 0
