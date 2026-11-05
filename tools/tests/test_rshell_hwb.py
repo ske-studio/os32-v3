@@ -145,7 +145,52 @@ def unresolved_exercise(mod):
             check(mod.inspect((begin + end + terminal).replace('val=0x00', 'val=UNRESOLVED'))[1])
 
 
+def file_exercise(mod):
+    with tempfile.TemporaryDirectory() as folder:
+        host = pathlib.Path(folder) / 'host.log'
+        capture = pathlib.Path(folder) / 'serial.log'
+        good = BEGIN + END + READ + TERM
+        summary = TERM.rstrip('\r\n') + ' log_rc=0\r\n'
+        parser = argparse.ArgumentParser()
+        mod.add_arguments(parser)
+        args = parser.parse_args(['--out', str(capture), '--', 'run', '-o',
+                                  '/host/host.log', '/test/a.hwb'])
+        args.timeout = 1
+        def attempt(body=summary, status=0):
+            sent = []
+            def send(line, timeout):
+                sent.append(line)
+                return (str(status) if line == 'echo $?' else body), None
+            rc = mod.run(args, send, out=lambda text: None)
+            check(capture.read_text() == body.replace('\r\n', '\n'))
+            check(sent.count('echo $?') <= 1)
+            check(len([line for line in sent if line != 'echo $?']) == 1)
+            return rc, sent
+        check(attempt()[0] == 0)  # summary alone suffices for completion
+        check(attempt(TERM)[0] == 1)  # -o requires logging status
+        check(attempt(summary.replace('log_rc=0', 'log_rc=-5'), 5)[0] == 5)
+        check(attempt(summary.replace('log_rc=0', 'log_rc=-5'), 0)[0] == 1)
+        check(attempt(summary.replace('rc=OK', 'rc=TIMEOUT'), 124)[0] == 124)
+        check(attempt(summary.replace('rc=OK', 'rc=ABORT').replace('log_rc=0', 'log_rc=-5'), 5)[0] == 5)
+        args.log_file = str(host)
+        check(attempt()[0] == 1)  # missing host file
+        host.write_text(good)
+        check(mod.inspect_file(host)[1:] == ('OK', []))
+        check(attempt()[0] == 0)
+        for broken in [BEGIN + TERM, BEGIN + END + READ,
+                       good.replace('seq=2', 'seq=3'), good + TERM,
+                       good.replace('run=3', 'run=4'), good.replace('lines=10', 'lines=9')]:
+            host.write_text(broken)
+            check(attempt()[0] == 1, 'invalid host file accepted')
+        host.write_text(good)
+        args.line = ['sfs', 'run', 'hw', *args.line]
+        rc, sent = attempt()
+        check(rc == 0 and sent[0] == 'sfs run hw run -o /host/host.log /test/a.hwb')
+
+
 MUTATIONS = [
+    ('file inspection', 'tools/rshell_hwb.py', "errors.extend('file: ' + item for item in file_errors)", "pass", 'missing file end'),
+    ('log status', 'tools/rshell_hwb.py', "expected = STATUS['IO']", "expected = STATUS.get(terminal)", 'log IO status'),
     ('fill fields', 'tools/rshell_hwb.py', "elif re.fullmatch(r'mmiofill(?:8|16|32)', op):", "elif False:", 'fill count/done required'),
     ('fill progress', 'tools/rshell_hwb.py', "done > count or (rc == 'OK' and (count == 0 or done != count))", "False", 'fill partial success'),
     ('fill match', 'tools/rshell_hwb.py', "pending_fill != (seq, fields['addr'], fields['val'], count)", "False", 'fill begin/end agree'),
@@ -164,6 +209,7 @@ def main():
     exercise(load(SRC))
     fields_exercise(load(SRC))
     unresolved_exercise(load(SRC))
+    file_exercise(load(SRC))
     print('SUMMARY PASS', flush=True)
     if '--mutate' in sys.argv:
         return mutate()
@@ -195,5 +241,6 @@ if __name__ == '__main__':
         exercise(load(pathlib.Path(sys.argv[-1])))
         fields_exercise(load(pathlib.Path(sys.argv[-1])))
         unresolved_exercise(load(pathlib.Path(sys.argv[-1])))
+        file_exercise(load(pathlib.Path(sys.argv[-1])))
     else:
         sys.exit(main())

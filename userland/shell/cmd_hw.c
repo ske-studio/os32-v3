@@ -9,6 +9,35 @@ static int hw_initialized;
 static int hw_unavailable;
 static struct hwb_program *hw_program;
 static char *hw_source;
+/* Amortize SFS RPC overhead across records. serialfs.c splits each write by
+ * negotiated payload minus path/header; 4 KiB is a buffer, not a log limit. */
+#define HWB_LOG_BATCH_BYTES 4096U
+static char hw_log_buffer[HWB_LOG_BATCH_BYTES];
+static u32 hw_log_used, hw_log_run;
+static int hw_log_active, hw_log_fd = -1, hw_log_rc;
+
+static void hw_log_error(int rc)
+{
+    if (hw_log_rc) return;
+    hw_log_rc = rc;
+    g_api->kprintf(ATTR_RED, "hw: log rc=%d\n", rc);
+}
+static void hw_log_flush(void)
+{
+    u32 done = 0;
+    while (!hw_log_rc && done < hw_log_used) {
+        int n = g_api->sys_write(hw_log_fd, hw_log_buffer + done, hw_log_used - done);
+        if (n <= 0) hw_log_error(n < 0 ? n : OS32_ERR_IO);
+        else done += (u32)n;
+    }
+    hw_log_used = 0;
+}
+static void hw_log_append(char c)
+{
+    if (hw_log_rc) return;
+    hw_log_buffer[hw_log_used++] = c;
+    if (hw_log_used == HWB_LOG_BATCH_BYTES) hw_log_flush();
+}
 
 static int hw_access(void *ctx, struct hw_req *req)
 {
@@ -35,7 +64,23 @@ static int hw_point(void *ctx, u32 *flag)
 static void hw_line(void *ctx, const char *line)
 {
     (void)ctx;
-    g_api->kprintf(ATTR_WHITE, "%s\n", line);
+    const char *p = line + 7; /* formatter prefix: "HW run=" */
+    u32 run = 0;
+    while (*p >= '0' && *p <= '9') run = run * 10U + (u32)(*p++ - '0');
+    if (!hw_log_active || run != hw_log_run) {
+        g_api->kprintf(ATTR_WHITE, "%s\n", line);
+        return;
+    }
+    /* Only the run terminal has op immediately after run (no seq/phase). */
+    int terminal = p[1] == 'o';
+    for (const char *q = line; *q; q++) hw_log_append(*q);
+    hw_log_append('\n');
+    if (terminal) {
+        hw_log_flush();
+        if (hw_log_fd >= 0) g_api->sys_close(hw_log_fd);
+        hw_log_fd = -1; hw_log_active = 0;
+        g_api->kprintf(ATTR_WHITE, "%s log_rc=%d\n", line, hw_log_rc);
+    }
 }
 static int hw_read_file(void *ctx, const char *path, char *buf, u32 cap, u32 *bytes)
 {
@@ -116,14 +161,23 @@ int shell_cmd_hw(int argc, char **argv)
     }
     if (!hw_initialized) { hwb_init(&hw_session, &hw_backend); hw_initialized = 1; }
     hw_unavailable = 0;
+    if (!hw_log_active) hw_log_rc = 0;
+    int log_output = hw_log_active;
     enum hwb_rc rc;
     if (str_eq(argv[1], "run") || str_eq(argv[1], "load")) {
         struct hwb_initial initial[HWB_VARIABLES];
         char names[HWB_VARIABLES][HWB_NAME_CHARS + 1U];
-        if (argc < 3 || (u32)(argc - 3) > HWB_VARIABLES) return HWB_EXIT_ARG;
-        for (int i = 3; i < argc; i++) {
-            initial[i - 3].name = names[i - 3];
-            if (hw_initial(argv[i], names[i - 3], &initial[i - 3].value)) return HWB_EXIT_ARG;
+        int path = 2;
+        const char *log_path = 0;
+        if (argc > 2 && str_eq(argv[2], "-o")) {
+            if (argc < 5) return HWB_EXIT_ARG;
+            log_path = argv[3]; path = 4;
+        }
+        int first = path + 1;
+        if (argc <= path || (u32)(argc - first) > HWB_VARIABLES) return HWB_EXIT_ARG;
+        for (int i = first; i < argc; i++) {
+            initial[i - first].name = names[i - first];
+            if (hw_initial(argv[i], names[i - first], &initial[i - first].value)) return HWB_EXIT_ARG;
         }
         struct hwb_program *program = g_api->mem_alloc(sizeof(*program));
         char *source = g_api->mem_alloc(HWB_FILE_BYTES);
@@ -132,14 +186,25 @@ int shell_cmd_hw(int argc, char **argv)
             if (source) g_api->mem_free(source);
             return HWB_EXIT_IO;
         }
-        rc = hwb_load(&hw_session, program, source, HWB_FILE_BYTES, argv[2], initial, argc - 3);
+        rc = hwb_load(&hw_session, program, source, HWB_FILE_BYTES, argv[path], initial, argc - first);
         if (rc) { g_api->mem_free(program); g_api->mem_free(source); }
         else {
             /* hwb_load has already stopped a replaced run and installed fresh. */
             if (hw_program) g_api->mem_free(hw_program);
             if (hw_source) g_api->mem_free(hw_source);
             hw_program = program; hw_source = source;
-            if (str_eq(argv[1], "run")) rc = hwb_continue(&hw_session);
+            hw_log_rc = 0;
+            if (log_path) {
+                log_output = 1;
+                hw_log_run = hw_session.run; hw_log_active = 1;
+                hw_log_rc = 0; hw_log_used = 0;
+                hw_log_fd = g_api->sys_open(log_path, KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
+                if (hw_log_fd < 0) {
+                    hw_log_error(hw_log_fd);
+                    hwb_abort(&hw_session);
+                }
+            }
+            if (!hw_log_rc && str_eq(argv[1], "run")) rc = hwb_continue(&hw_session);
         }
     } else if (str_eq(argv[1], "reset")) {
         if (argc != 2) return HWB_EXIT_ARG;
@@ -169,8 +234,9 @@ int shell_cmd_hw(int argc, char **argv)
         line[n] = 0;
         rc = hwb_command(&hw_session, line, n);
     }
+    if (hw_log_active) hw_log_flush();
     if (hw_session.stopped) hw_release();
-    if (hw_unavailable)
+    if (hw_unavailable && !log_output)
         g_api->kprintf(ATTR_RED, "hw: rejected rc=%d kdebug unavailable\n", OS32_ERR_NOSYS);
-    return hwb_exit_status(hw_unavailable ? HWB_NOSYS : rc);
+    return hw_log_rc ? HWB_EXIT_IO : hwb_exit_status(hw_unavailable ? HWB_NOSYS : rc);
 }

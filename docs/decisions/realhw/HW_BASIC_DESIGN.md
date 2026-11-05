@@ -8,7 +8,7 @@
 - R1: CUIシェル専用CTRL+STOP印と原子的読み消しをexec_abort.incに追加し、POINTで消費。
 - R2: action別wire表、BDF配置、数値status、PCI不在の戻り値を確定。
 - R3: HW_OPをREC_PAUSED判定より前で分岐。
-- R4: ログ1行をkprintfで1回出力し、既存シリアルミラーに任せる。
+- R4: 通常はログ1行をkprintfで1回出力し、既存シリアルミラーに任せる。run/loadの`-o <パス>`では全行をVFSファイルへまとめ書きし、画面・シリアルには終端とログI/O誤りだけ出す。
 - R5: NP21/WのTVRAM MMIO・PCI不在・終了値判定を追加。
 - R6: 許可表撤去に伴う2文書の書換えとgfinit.cのinclude撤去を段表へ追加。
 - R7: WAIT_SLICEを削除し、待ちはshellのsys_time_nowとsys_yieldへ移動。
@@ -115,7 +115,11 @@ HW run=3 op=end rc=OK lines=10 writes=1
 ```
 - 番地は解決した物理値、PCIはBDF+offset、I/Oはport。例の物理値は説明用であり固定しない。rcはOK/ARG/NOSYS/WINDOW/TIMEOUT/ABORT/IO。
 - beginを出してから操作し、endがない行で停止位置を特定。OKはCPUがアクセスを完了した意味で、装置受理の証明ではない。
-- IF復元後、整形済み1行を`kprintf("%s\n", line)`で1回だけ出す。画面とシリアルへの配送は既存ミラーに任せる。
+- IF復元後、整形済み1行をシェルの出力口へ渡す。`-o`なしは従来どおり`kprintf("%s\n", line)`で1回だけ出し、画面とシリアルへの配送は既存ミラーに任せる。
+- `hw run -o <パス> <台本> [name=value...]` / `hw load -o <パス> <台本> [name=value...]` はopen/write/closeのKAPI経由でVFSへ全行を書き、改行は通常と同じLF。ファイルは作成・切詰めし、総ログ量に独自上限を設けない。loadはstep/continue/abort・次の正常なloadによる置換まで同じ出力先を保持し、各コマンドの戻りと終端で残りをflush、終端でcloseする。失敗したloadは既存セッションを保つ。対話の独立runは従来のコンソール出力。
+- シェルのまとめ書き定数`HWB_LOG_BATCH_BYTES`は4096バイト。SFSは交渉済みpayloadからパス・ヘッダを引いた単位に分割するため、行ごとのRPCを避けるためのバッファであり配送単位・ログの上限ではない。短いwriteは残りを継続し、0・負値は失敗とする。
+- `-o`の画面・シリアル出力は`HW run=… op=end rc=… lines=… writes=… log_rc=0`の1行だけ。ファイルには従来と同じ終端行（log_rcなし）を含める。ログopen/write失敗は`hw: log rc=<負のKAPI rc>`を1回表示し、終端の`log_rc`にも記録、コマンド終了値はIO=5。`rc`は台本の結果のまま保持する。open失敗では台本を実行せずABORT終端を出す。write失敗では以降の記録を捨て、台本の実行結果とは区別してIOを返す。
+- 実機のLAN配送は`lanfs_host --allow-write`の下で`sfs run hw run -o /host/<パス> …`。`tools/rshell_serial.py hwb --out <シリアル記録> --log-file <ホスト上のログ> -- sfs run hw run -o /host/<パス> …`で終端1行と`echo $?`を照合し、任意の`--log-file`には同じrun/seq/終端検査とシリアル終端との一致検査を行う。`--log-file`なしはシリアル終端だけで完了を判定する。途中ファイルの完全性は保証せず、実行中の電源断では未flush分が失われ得る。
 - 配列への let/read/poll も命令ごとの begin/end は各1行。両方に `dest=save index=3` を追加し、let は `val=0x...`、read/poll は既存の val に値を記録する。範囲外も1組で ARG を記録する。
 - pollは開始と最終値/回数/経過だけを出す。ホスト採取はrun/seq/終端を検査して未完了を保存・報告、書込み再送なし。`tools/rshell_hwb.py`を別形式として追加。
 

@@ -26,6 +26,12 @@ static u8 heap[4][HWB_FILE_BYTES];
 static u32 allocated[4], live, alloc_calls, fail_alloc;
 static u32 open_file, file_offset, closes, read_fail, raw_nosys;
 static char large_file[HWB_FILE_BYTES + 1U];
+#define LOG_TEST_BYTES (HWB_LOG_BATCH_BYTES * 8U)
+static char log_file[LOG_TEST_BYTES], expected_log[LOG_TEST_BYTES];
+static u32 log_bytes, log_opens, log_closes, log_calls, log_short, log_fail, log_zero;
+static u32 log_open_fail, diagnostics, terminals;
+static int terminal_log_rc;
+
 static void *allocate(u32 bytes)
 {
     if (++alloc_calls == fail_alloc) return 0;
@@ -59,6 +65,15 @@ static i32 fake_yield(void) { hwbf_yield(&bus); return 0; }
 static void output(u8 attr, const char *fmt, ...)
 {
     (void)attr;
+    if (hwbf_equal(fmt, "hw: log rc=%d\n")) { diagnostics++; return; }
+    if (hwbf_equal(fmt, "%s log_rc=%d\n")) {
+        __builtin_va_list args; __builtin_va_start(args, fmt);
+        const char *line = __builtin_va_arg(args, const char *);
+        terminal_log_rc = __builtin_va_arg(args, int);
+        __builtin_va_end(args);
+        terminals++; hwbf_line(&bus, line);
+        return;
+    }
     if (!hwbf_equal(fmt, "%s\n")) return; /* unavailable diagnostic */
     __builtin_va_list args; __builtin_va_start(args, fmt);
     const char *line = __builtin_va_arg(args, const char *);
@@ -68,7 +83,13 @@ static void output(u8 attr, const char *fmt, ...)
 }
 static int file_open(const char *path, int flags)
 {
-    CHECK(flags == KAPI_O_RDONLY);
+    if (flags != KAPI_O_RDONLY) {
+        CHECK(hwbf_equal(path, "output"));
+        CHECK(flags == (KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC));
+        log_opens++;
+        if (log_open_fail) return OS32_ERR_IO;
+        log_bytes = 0; return 2;
+    }
     for (u32 i = 0; i < bus.file_count; i++) if (hwbf_equal(path, bus.files[i].name)) {
         open_file = i; file_offset = 0; return 1;
     }
@@ -85,7 +106,23 @@ static int file_read(int fd, void *out, u32 bytes)
     for (u32 i = 0; i < n; i++) ((char *)out)[i] = file->data[file_offset++];
     return n;
 }
-static void file_close(int fd) { CHECK(fd == 1); closes++; }
+static int file_write(int fd, const void *data, u32 bytes)
+{
+    CHECK(fd == 2 && bytes && bytes <= HWB_LOG_BATCH_BYTES);
+    log_calls++;
+    if (log_fail && log_calls == log_fail) return OS32_ERR_IO;
+    if (log_zero) return 0;
+    if (log_short && bytes > log_short) bytes = log_short;
+    CHECK(log_bytes + bytes < LOG_TEST_BYTES);
+    for (u32 i = 0; i < bytes; i++) log_file[log_bytes++] = ((const char *)data)[i];
+    log_file[log_bytes] = 0;
+    return (int)bytes;
+}
+static void file_close(int fd)
+{
+    if (fd == 2) { log_closes++; return; }
+    CHECK(fd == 1); closes++;
+}
 static int pci_count_fake(void) { return (int)bus.pci_count; }
 static int pci_get_fake(u32 index, void *out)
 {
@@ -101,12 +138,16 @@ static void setup(void)
     CHECK(!live);
     hwbf_init(&bus); hw_initialized = 0; hw_program = 0; hw_source = 0;
     alloc_calls = fail_alloc = closes = read_fail = raw_nosys = 0;
+    CHECK(!hw_log_active);
+    log_bytes = log_opens = log_closes = log_calls = log_short = log_fail = log_zero = 0;
+    log_open_fail = diagnostics = terminals = 0; terminal_log_rc = 0;
     bus.tick_us = 1000000U; /* coarse yielding clock; §3 wait may extend */
     api = (KernelAPI){0}; api.version = HWB_KAPI_MIN;
     api.kdebug_call = fake_kdebug; api.sys_time_now = fake_time;
     api.sys_yield = fake_yield; api.kprintf = output;
     api.mem_alloc = allocate; api.mem_free = release;
     api.sys_open = file_open; api.sys_read = file_read; api.sys_close = file_close;
+    api.sys_write = file_write;
     api.pci_count = pci_count_fake; api.pci_get = pci_get_fake;
 }
 static int command(const char *verb, const char *a, const char *b)
@@ -265,8 +306,81 @@ static void arrays(void)
     CHECK(command("continue", 0, 0) == 0 && !live && hw_session.array_values[0] == 19);
     CHECK(*hwbf_byte(&bus, HW_IO, 9) == 27);
 }
+static int logged(const char *verb, const char *path, const char *arg)
+{
+    char *args[] = {"hw", (char *)verb, "-o", "output", (char *)path, (char *)arg};
+    return shell_cmd_hw(arg ? 6 : 5, args);
+}
+static void logfile(void)
+{
+    HWB_TEST("log-file"); setup();
+    /* Long enough to cross several batches, without a total-log ceiling. */
+    const char *script = "let i = 0\nlabel loop\nlet i = i + 1\nif i != 30 goto loop\nend\n";
+    add("batch", script);
+    CHECK(command("run", "batch", 0) == 0);
+    u32 expected = 0;
+    for (u32 i = 0; i < bus.line_count; i++) {
+        for (const char *p = bus.lines[i]; *p; p++) {
+            CHECK(expected < LOG_TEST_BYTES); expected_log[expected++] = *p;
+        }
+        expected_log[expected++] = '\n';
+    }
+    CHECK(expected > 2U * HWB_LOG_BATCH_BYTES);
+    u32 first_run = hw_session.run;
+    hwbf_clear_trace(&bus);
+    CHECK(logged("run", "batch", 0) == 0 && !live);
+    CHECK(log_bytes == expected && bus.line_count == 1 && terminals == 1);
+    CHECK(log_opens == 1 && log_closes == 1 && log_calls ==
+          (expected + HWB_LOG_BATCH_BYTES - 1U) / HWB_LOG_BATCH_BYTES);
+    CHECK(!diagnostics && !terminal_log_rc);
+    CHECK(hw_session.run == first_run + 1U && hw_session.run < 10U);
+    /* Only run IDs differ; every other byte, including final newline, agrees. */
+    for (u32 i = 0; i < expected; i++) {
+        if (i >= 7 && expected_log[i - 1] == '=' && expected_log[i - 2] == 'n')
+            CHECK(log_file[i] == expected_log[i] + 1);
+        else CHECK(log_file[i] == expected_log[i]);
+    }
+    /* Feed real file records through the host collector too. */
+    hwb_test_write("FILE_BEGIN\n"); hwb_test_write(log_file); hwb_test_write("FILE_END\n");
+    setup(); add("small", "let x = mode\nend\n"); log_short = 7;
+    CHECK(logged("load", "small", "mode=42") == 0 && live == 2 && !log_closes);
+    CHECK(command("step", 0, 0) == 0 && scalar("x") == 42 && log_bytes && !bus.line_count);
+    CHECK(command("continue", 0, 0) == 0 && !live && log_closes == 1 && terminals == 1);
+    CHECK(log_calls > 2 && !diagnostics);
+    CHECK(logged("run", "small", 0) == 0 && log_opens == 2 && log_closes == 2);
+    setup(); add("small", "end\n"); log_open_fail = 1;
+    CHECK(logged("run", "small", 0) == 5 && !live && !bus.accesses);
+    CHECK(diagnostics == 1 && terminals == 1 && terminal_log_rc == OS32_ERR_IO && !log_closes);
+    setup(); add("small", "end\n"); log_fail = 1;
+    CHECK(logged("run", "small", 0) == 5 && !live && log_closes == 1);
+    CHECK(diagnostics == 1 && terminals == 1 && terminal_log_rc == OS32_ERR_IO);
+    setup(); add("batch", script); log_fail = 2;
+    CHECK(logged("run", "batch", 0) == 5 && !live && log_bytes == HWB_LOG_BATCH_BYTES);
+    CHECK(diagnostics == 1 && terminals == 1 && log_closes == 1 && bus.line_count == 1);
+    setup(); add("small", "end\n"); log_zero = 1;
+    CHECK(logged("run", "small", 0) == 5 && diagnostics == 1 && log_closes == 1);
+    setup(); add("bad", "ioread8 port missing -> x\nend\n");
+    CHECK(logged("run", "bad", 0) == 2 && !terminal_log_rc && terminals == 1 && log_bytes);
+    setup(); add("small", "end\n");
+    CHECK(logged("load", "small", 0) == 0);
+    CHECK(command("abort", 0, 0) == 130 && log_closes == 1 && terminals == 1);
+    setup(); add("small", "end\n");
+    CHECK(logged("load", "small", 0) == 0);
+    CHECK(command("run", "absent", 0) == 5 && hw_log_active && live == 2);
+    CHECK(command("run", "small", 0) == 0 && !hw_log_active && !live && log_closes == 1);
+    setup(); add("small", "let x = 1\nend\n");
+    CHECK(logged("load", "small", 0) == 0); log_fail = 1;
+    CHECK(command("step", 0, 0) == 5 && hw_log_active);
+    CHECK(command("run", "small", 0) == 0 && !hw_log_active && !live && log_closes == 1);
+    setup(); add("small", "end\n");
+    char *missing[] = {"hw", "run", "-o", "output"};
+    CHECK(shell_cmd_hw(3, missing) == 2 && !log_opens);
+    CHECK(shell_cmd_hw(4, missing) == 2 && !log_opens);
+    CHECK(logged("run", "small", "invalid=") == 2 && !log_opens);
+    CHECK(logged("run", "absent", 0) == 5 && !log_opens);
+}
 void _start(void)
 {
-    adapters(); lifetime(); arrays(); exit_codes(); unresolved(); scripts();
+    logfile(); adapters(); lifetime(); arrays(); exit_codes(); unresolved(); scripts();
     hwb_test_write("SUMMARY PASS hwb shell\n"); hwb_test_exit(0);
 }
