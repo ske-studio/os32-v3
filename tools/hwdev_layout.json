@@ -250,6 +250,7 @@
       "ide_write_sector",
       "ide_write_sectors",
       "ime_dict_info",
+      "ime_dict_suspend",
       "ime_feed_key",
       "ime_get_mode",
       "ime_getchar",

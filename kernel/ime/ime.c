@@ -45,6 +45,11 @@ extern void ring3_abort_check(void);
 
 static IME_State g_ime;
 
+IME_State *ime_suspend_state(void)
+{
+    return &g_ime;
+}
+
 const IME_Dict *ime_current_dict(void)
 {
     return &g_ime.dict;
