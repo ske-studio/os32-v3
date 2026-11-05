@@ -10,6 +10,7 @@ static FepTestFixture f;
 static FepTestReply script[SCRIPT_CAP];
 static u32 used;
 static int bad, row_type, row_bytes, available, flags_seen, writes;
+static int incomplete_warnings;
 static char row[OS32_MAX_PATH];
 static void add(enum FepTestOp op, int rc, const void *p, u32 n)
 {
@@ -27,7 +28,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
 {
     if (kstrcmp(path, f.store.user.path)) bad = 1;
     const FepTestReply *r = next(FEP_TEST_HEADER_READ);
-    st->st_mode = OS_S_IFREG; return r->rc;
+    st->st_mode = OS_S_IFREG; st->st_size = r->bytes; return r->rc;
 }
 int os32_sqlite_outer_group_acquire(int kind, int owner, Os32SqliteGroup *g)
 {
@@ -101,7 +102,16 @@ int os32_sqlite_outer_group_finish(const Os32SqliteGroup *g, int rc)
     if (rc != (int)r->bytes) bad = 1;
     fep_test_resident_finish(&f, r->rc != SQLITE_OK); return r->rc;
 }
-void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    if (!kstrcmp(fmt, "IME: %s is incomplete; delete it to recreate\r\n")) {
+        va_list ap; va_start(ap, fmt);
+        if (kstrcmp(va_arg(ap, const char *), f.store.user.path)) bad = 1;
+        va_end(ap);
+        incomplete_warnings++;
+    }
+}
 /* Only the product's %u and literal pragma formats are needed here. */
 char *os32_sqlite_snprintf(int cap, char *out, const char *fmt, ...)
 {
@@ -120,6 +130,7 @@ char *os32_sqlite_snprintf(int cap, char *out, const char *fmt, ...)
 static void setup(void)
 {
     fep_test_reset(&f); used = 0; bad = flags_seen = writes = 0; available = 1;
+    incomplete_warnings = 0;
     /* Inputs supplied by store-open after the real zero initialization. */
     kstrncpy(f.store.meta.dict_id, FEP_DICT_ID, sizeof(f.store.meta.dict_id));
     f.store.meta.pos_version = FEP_DICT_POS_VERSION;
@@ -129,7 +140,7 @@ static void setup(void)
 }
 static void opening(int create)
 {
-    add(FEP_TEST_HEADER_READ, create ? OS32_ERR_NOTFOUND : 0, 0, 0);
+    add(FEP_TEST_HEADER_READ, create ? OS32_ERR_NOTFOUND : 0, 0, create ? 0 : 8192);
     add(FEP_TEST_ACQUIRE, SQLITE_OK, 0, 0);
     add(FEP_TEST_OPEN, SQLITE_OK, (void *)1, 0);
     add(FEP_TEST_STALE, 0, 0, 0);
@@ -205,6 +216,24 @@ static void creation(int fail_stage)
     }
     if (fail_stage) exec_sql("ROLLBACK", SQLITE_OK);
 }
+/* A failed initial CREATE can leave an empty file after ROLLBACK. */
+static int empty_retry(void)
+{
+    setup(); opening(1); creation(2);
+    for (u32 i = 0; i < used; i++)
+        if (script[i].rc == SQLITE_IOERR) script[i].rc = SQLITE_FULL;
+    closing(0,0,0);
+    CHECK(!run(OS32_ERR_IO) && incomplete_warnings == 1);
+    /* Next boot sees the retained zero-byte file and retries creation. */
+    setup(); opening(0); script[0].bytes = 0; creation(2); closing(0,0,0);
+    CHECK(!run(OS32_ERR_IO) && incomplete_warnings == 1);
+    CHECK(flags_seen == (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE));
+    setup(); opening(0); script[0].bytes = 0; creation(0);
+    metadata(-1,0,0,0); schema(0); exec_sql("PRAGMA cache_size=8", SQLITE_OK);
+    CHECK(!run(0) && incomplete_warnings == 0);
+    CHECK(flags_seen == (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE));
+    return 0;
+}
 static int faults(void)
 {
     static FepTestReply baseline[SCRIPT_CAP];
@@ -238,6 +267,7 @@ static int faults(void)
 static int test(void)
 {
     CHECK(!faults());
+    CHECK(!empty_retry());
     CHECK(fep_user_open(0) == OS32_ERR_INVAL);
     fep_test_reset(&f); CHECK(!f.store.user_enabled && !f.store.user.db && !f.resident_live);
     const char *invalid[] = {"", "/etc/", "/db/u.db", "/etc/sub/u.db", "/etc//u.db",
@@ -249,9 +279,9 @@ static int test(void)
     setup(); f.store.user.isolated = 1; CHECK(!run(OS32_ERR_BUSY));
     setup(); available = 0; CHECK(!run(OS32_ERR_IO));
     setup(); add(FEP_TEST_HEADER_READ, OS32_ERR_IO, 0, 0); CHECK(!run(OS32_ERR_IO));
-    setup(); add(FEP_TEST_HEADER_READ, 0, 0, 0);
+    setup(); add(FEP_TEST_HEADER_READ, 0, 0, 8192);
     add(FEP_TEST_ACQUIRE, SQLITE_FULL, 0, 0); CHECK(!run(OS32_ERR_IO));
-    setup(); add(FEP_TEST_HEADER_READ, 0, 0, 0); add(FEP_TEST_ACQUIRE, 0, 0, 0);
+    setup(); add(FEP_TEST_HEADER_READ, 0, 0, 8192); add(FEP_TEST_ACQUIRE, 0, 0, 0);
     add(FEP_TEST_OPEN, SQLITE_READONLY, (void *)1, 0); closing(0,0,0);
     CHECK(!run(OS32_ERR_ROFS));
     setup(); opening(0); script[used-1].rc = 1; closing(0,0,0); CHECK(!run(OS32_ERR_STALE));
@@ -261,7 +291,7 @@ static int test(void)
         setup(); opening(0); page(1024); metadata(i,bad_values[i],SQLITE_TEXT,SQLITE_ROW);
         closing(0,0,0); CHECK(!run(OS32_ERR_INVAL) && writes == 0);
         setup(); opening(0); page(1024); metadata(i,0,SQLITE_TEXT,SQLITE_DONE);
-        closing(0,0,0); CHECK(!run(OS32_ERR_IO) && writes == 0);
+        closing(0,0,0); CHECK(!run(OS32_ERR_NOTFOUND) && writes == 0);
     }
     const char *numbers[] = {"1x", "-1", "4294967297", "", " 1"};
     for (u32 i = 0; i < sizeof(numbers)/sizeof(numbers[0]); i++) {

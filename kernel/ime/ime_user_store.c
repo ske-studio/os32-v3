@@ -58,7 +58,7 @@ static int user_text(const unsigned char *p, int n, const char *expected)
 
 static int user_created(const unsigned char *p, int n)
 {
-    /* UTC ISO 8601, as written by this creator and the host migrator. */
+    /* UTC ISO 8601, as written by this creator. */
     const char *shape = "0000-00-00T00:00:00Z";
     if (!p || n != (int)kstrlen(shape)) return 0;
     for (int i = 0; i < n; i++) {
@@ -83,7 +83,8 @@ static int user_meta(FepStore *s)
         if (rc != SQLITE_OK) { result = user_sql_error("meta bind", rc); break; }
         rc = sqlite3_step(stmt);
         if (rc != SQLITE_ROW) {
-            result = user_sql_error("meta missing/read", rc);
+            result = rc == SQLITE_DONE ? OS32_ERR_NOTFOUND :
+                user_sql_error("meta read", rc);
             break;
         }
         int valid = 0;
@@ -183,6 +184,7 @@ int fep_user_open(FepStore *s)
     int create = rc == OS32_ERR_NOTFOUND;
     if (rc && !create) return rc;
     if (!create && (st.st_mode & OS_S_IFMT) != OS_S_IFREG) return OS32_ERR_INVAL;
+    if (!rc && st.st_size == 0) create = 1;
     rc = os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &c->group);
     if (rc != SQLITE_OK) return user_sql_error("acquire", rc);
     rc = os32_sqlite_group_open(&c->group, c->path,
@@ -227,6 +229,8 @@ int fep_user_open(FepStore *s)
     }
     if (!result) { c->io_retried = 0; s->user_enabled = 1; return 0; }
     rc = fep_conn_close(c);
+    if (create)
+        kprintf(ATTR_RED, "IME: %s is incomplete; delete it to recreate\r\n", c->path);
     kprintf(ATTR_RED, "IME: learning disabled (rc=%d, close=%d)\r\n", result, rc);
     return rc ? rc : result;
 }

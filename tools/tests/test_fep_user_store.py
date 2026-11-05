@@ -46,8 +46,10 @@ MUTANTS = [
     ('mismatch-close', 'rc = fep_conn_close(c);', 'rc = result ? 0 : fep_conn_close(c);'),
     ('close-reason', 'return rc ? rc : result;', 'return result;'),
     ('user-enabled', 's->user_enabled = 1; return 0;', 's->user_enabled = 0; return 0;'),
-    ('meta-missing', 'result = user_sql_error("meta missing/read", rc);',
-     'result = OS32_ERR_INVAL;'),
+    ('meta-missing', 'rc == SQLITE_DONE ? OS32_ERR_NOTFOUND :',
+     'rc == SQLITE_DONE ? OS32_ERR_IO :'),
+    ('empty-retry', 'if (!rc && st.st_size == 0) create = 1;',
+     'if (!rc && st.st_size == 0) create = 0;'),
 ]
 
 
