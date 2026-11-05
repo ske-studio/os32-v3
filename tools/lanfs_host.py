@@ -24,15 +24,17 @@ ETH_HDR = 14
 ETH_MIN = 60
 BROADCAST = b"\xff" * 6
 MARK = b"\x05SF"
+BLOCK_OPS = (0x30, 0x31, 0x32)
 
 
 class LanServer:
     """Ethernet envelope and one-session duplicate tracking around Server."""
 
-    def __init__(self, mac, server, peer=None):
+    def __init__(self, mac, server, peer=None, image=None):
         self.mac = mac
         self.server = server
         self.peer = peer
+        self.image = image
         self.nonce = None
         self.hello_response = None
         self.high_seq = 0
@@ -62,7 +64,13 @@ class LanServer:
             if self.server.sid and src == self.peer and nonce == self.nonce:
                 response = self.hello_response
             else:
+                old_sid = self.server.sid
                 response = self.server.handle(fr)
+                if self.image is not None and old_sid != self.server.sid:
+                    if old_sid:
+                        self.image.close_session(old_sid)
+                    if self.server.sid:
+                        self.image.open_session(self.server.sid)
                 if response is None:
                     return None
                 self.peer, self.nonce = src, nonce
@@ -78,6 +86,8 @@ class LanServer:
                 response = self.server.handle(fr)
             elif fr.type == sfs.T_BYE:
                 self.server.handle(fr)
+                if self.image is not None:
+                    self.image.close_session(fr.sid)
                 self.nonce = self.hello_response = None
                 return None
             elif not 1 <= fr.seq <= 0xfffe:
@@ -88,7 +98,12 @@ class LanServer:
                     return None
                 response = self.last_response
             else:
-                response = self.server.handle(fr)
+                if self.image is not None and fr.type in BLOCK_OPS:
+                    payload = self.image.dispatch(fr.sid, fr.type, fr.payload)
+                    response = sfs.encode(fr.type | sfs.T_RESP, fr.sid, fr.seq, payload,
+                                          self.server.max_payload)
+                else:
+                    response = self.server.handle(fr)
                 self.high_seq = fr.seq
                 self.last_request, self.last_response = request, response
         if response is None:
@@ -159,17 +174,27 @@ def main():
     parser.add_argument("--root", required=True)
     parser.add_argument("--allow-write", action="append", default=[], metavar="PATH",
                         help="allow writes to this root-relative path and below (repeatable)")
+    parser.add_argument("--image", action="append", default=[], metavar="ALIAS=PATH",
+                        help="serve an image under this alias (repeatable)")
     parser.add_argument("--peer", type=peer_mac, metavar="MAC",
                         help="accept only this sender (default: first HELLO sender)")
     args = parser.parse_args()
     port = None
     try:
+        images = {}
+        for item in args.image:
+            alias, sep, path = item.partition("=")
+            if not sep or not alias or not path or alias in images:
+                raise ValueError("--image requires a unique ALIAS=PATH")
+            images[alias] = path
+        from host_image import ImageStore
+        image = ImageStore(images)
         fs = sfs.HostFS(args.root, allow_write=args.allow_write)
         print("lanfs: iface=%s %s" % (args.iface, link_status(args.iface)),
               file=sys.stderr, flush=True)
         port = NicPort(args.iface, ETHERTYPE)
         server = LanServer(port.mac, sfs.Server(fs, max_payload=sfs.LAN_MAX_PAYLOAD, log=lambda msg: print(
-            msg, file=sys.stderr, flush=True)), peer=args.peer)
+            msg, file=sys.stderr, flush=True)), peer=args.peer, image=image)
         print("lanfs: iface=%s mac=%s root=%s (%s)" % (
             args.iface, lan_bridge.mac_str(port.mac), args.root,
             "allow-write=%r" % args.allow_write if args.allow_write else "read only"),
