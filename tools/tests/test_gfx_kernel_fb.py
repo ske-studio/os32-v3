@@ -14,7 +14,7 @@ import tempfile
 import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['gfx/gfx_core.c',
+TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
                'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
                'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
@@ -155,7 +155,7 @@ static inline void io_wait_n(int n) {(void)n;}
             else:
                 dest = tmp/(pathlib.Path(path).stem+'.c');dest.write_text(body);sources.append(dest)
         fixture = 'unsigned int host_arch_if = 0x202U;\n#include "gfx_kernel_fb_host.c"\n'
-        (tmp/'fixture.c').write_text(fixture_body or fixture)
+        (tmp/'fixture.c').write_text('#include "gfx_emergency.h"\n' + (fixture_body or fixture))
         sources.append(tmp/'fixture.c')
         if stage is not None: stage(tmp, sources)
         flags=['gcc', *linker_flags(),'-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',

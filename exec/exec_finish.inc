@@ -1,4 +1,5 @@
 /* Application teardown, resource reclaim and exit landing. Included by exec.c. */
+#include "../gfx/gfx_emergency.h"
 /* ======================================================================== */
 /*  exec_teardown_app — CPL=3 アプリの物理とアドレス空間を返す (D1/D4)       */
 /*                                                                          */
@@ -213,6 +214,9 @@ static void exec_notify_owned(int id, int kind)
      * (正常終了 / kill / fault / CTRL+STOP のどれでも) ら WM へ返す。
      * WM は exec_start / exec_resume から戻った直後に gfx_screen_owner()
      * を見て、1 に戻っていれば復帰の描き直しに入る。 */
+    int restore_rc = gfx_return_emergency((u32)id, kind);
+    if (restore_rc)
+        kprintf(KLOG_ATTR, "[gfx] emergency owner=%d restore rc=%d\n", id, restore_rc);
     appslot_gfx_owner_exit(id);
 }
 

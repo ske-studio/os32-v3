@@ -176,6 +176,9 @@ void pegc_restore_text_sync(int hsync31) __attribute__((weak));
  * weak は backend を持たない host fixture のため維持する。 */
 extern GfxBackend gfx_backend_cirrus __attribute__((weak));
 extern GfxBackend gfx_backend_geforce __attribute__((weak));
+extern GfxBackend gfx_backend_trident __attribute__((weak));
+/* Config-only boot reservation; absent until the Trident core is linked. */
+int trident_boot_reserve(void) __attribute__((weak));
 
 
 /* ------------------------------------------------------------------------ */
@@ -190,6 +193,7 @@ extern GfxBackend gfx_backend_geforce __attribute__((weak));
 #define GFX_PREF_PC98   1   /* 9801 プレーン強制 (probe を行わない) */
 #define GFX_PREF_PEGC   2   /* PEGC 強制。probe が通らなければ 9801 へ落とす */
 #define GFX_PREF_GEFORCE 4
+#define GFX_PREF_TRIDENT 5   /* Explicit only; never part of auto probing. */
 #define GFX_PREF_CIRRUS 3   /* Cirrus 強制。probe が通らなければ 9801 へ落とす */
 
 /* The config reader supplies GUI's existing default (0). */

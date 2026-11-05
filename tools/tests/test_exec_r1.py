@@ -579,7 +579,7 @@ def run(source=None, irq=None):
             function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
-        (tmp / 't.c').write_text(code)
+        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nint appslot_gfx_owner(void) { return 2; }\n' + code)
         asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 's.asm'), '-o', str(tmp / 's.o')],
@@ -590,7 +590,7 @@ def run(source=None, irq=None):
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), '-o', str(tmp / 't')],
+                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
