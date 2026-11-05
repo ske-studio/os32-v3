@@ -8,6 +8,7 @@ that contract changes. Mutants must compile and return a runtime failure.
 CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=3,
     covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h',
             'tools/tests/fep_store_fixture.h', 'tools/tests/fep_store_fixture.c',
+            'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'kernel/ime/ime_dict_info.c',
             'lib/sqlite3/os32_sqlite_vfs.h'])
@@ -64,6 +65,7 @@ SIGNATURES = {
     'fep_conn_ready': 'int (*)(FepConn *)',
     'fep_store_close': 'int (*)(FepStore *)',
     'fep_store_live_connections': 'u32 (*)(const FepStore *)',
+    'ime_current_store': 'FepStore *(*)(void)',
     'ime_boot_connections': 'u32 (*)(void)',
     'fep_store_search': 'int (*)(FepStore *, const char *, IME_Result *, int)',
     'fep_store_learn': 'void (*)(FepStore *, const char *, const char *)',
@@ -104,6 +106,7 @@ def source():
     checks = [(name, str(value)) for name, value in VALUES.items()]
     checks += [('IME_DICT_INFO_' + name, str(i)) for i, name in enumerate(KEYS, 1)]
     layouts = {
+        'IME_State': (3620, [('store', 2924)]),
         'FepMeta': (92, [('format', 0), ('min_reader', 4), ('pos_version', 8),
                         ('reserve_kb', 12), ('cache_pages', 16), ('entries', 20),
                         ('dict_id', 24), ('variant', 88)]),
@@ -112,7 +115,10 @@ def source():
         'FepStore': (676, [('system', 0), ('user', 288), ('meta', 576),
                           ('boot_reserve_kb', 668), ('user_enabled', 672)]),
     }
-    body = '#include "tools/tests/fep_store_fixture.h"\n'
+    body = '#include "tools/tests/fep_store_fixture.h"\n#include "kernel/ime/fep_module.h"\n'
+    checks += [('FEP_MODULE_API_SLOTS', '22'), ('sizeof(FepModuleApi)', '88'),
+               ('__builtin_offsetof(FepModuleApi, boot_connections)', '84'),
+               ('FEP_MODULE_OPS_VERSION', '3')]
     for name, sig in SIGNATURES.items():
         body += (f'_Static_assert(__builtin_types_compatible_p(__typeof__(&{name}), '
                  f'{sig}), "{name}");\n')
@@ -124,6 +130,8 @@ def source():
         'FepMeta': dict.fromkeys(('format', 'min_reader', 'pos_version',
                                  'reserve_kb', 'cache_pages', 'entries'), 'u32'),
         'FepConn': dict.fromkeys(('db', 'exact', 'prefix', 'learn'), 'void *'),
+        'IME_State': {'store': 'FepStore'},
+        'FepModuleApi': {'boot_connections': 'u32 (*)(void)'},
         'FepStore': {'system': 'FepConn', 'user': 'FepConn', 'meta': 'FepMeta',
                      'boot_reserve_kb': 'u32', 'user_enabled': 'int'},
     }

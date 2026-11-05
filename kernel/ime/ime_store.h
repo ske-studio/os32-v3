@@ -5,7 +5,9 @@
 #ifndef OS32_IME_STORE_H
 #define OS32_IME_STORE_H
 
-#include "ime.h"
+#include "types.h"
+#include "os32_kapi_shared.h"
+#include "vfs.h"
 #include "../../lib/sqlite3/os32_sqlite_vfs.h"
 
 #define FEP_DICT_READER_VERSION 1u
@@ -49,6 +51,9 @@ typedef struct {
     u32 boot_reserve_kb;
     int user_enabled;
 } FepStore;
+
+/* Define store types before ime.h: IME_State owns a store by value. */
+#include "ime.h"
 
 /* New store calls: 0 success, negative OS32_ERR_*; never raw SQLite rc.
  * INVAL: arguments/header/meta incompatibility, IO: SQL/read/partial creation,

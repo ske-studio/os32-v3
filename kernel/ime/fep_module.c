@@ -72,6 +72,7 @@ static const FepModuleApi stub_api = {
     .user_delete = stub_delete, .user_export = stub_export,
     .user_clear = stub_clear, .owner_exit = stub_mode,
     .getchar_kapi = stub_getchar_kapi, .getkey_kapi = input_getkey_kapi,
+    .boot_connections = stub_bytes,
     .dict_info = stub_dict_info
 };
 static FepModuleApi candidate;
@@ -174,4 +175,10 @@ u32 ime_boot_bytes(void)
 {
     /* A failed close keeps the candidate body and its SQLite dependency. */
     return candidate_valid ? candidate.boot_bytes() : 0;
+}
+
+/* Boot accounting runs before services_public opens. */
+u32 ime_boot_connections(void)
+{
+    return candidate_valid ? candidate.boot_connections() : stub_api.boot_connections();
 }

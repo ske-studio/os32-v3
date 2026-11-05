@@ -1,6 +1,10 @@
 /* Paired POST_ROOT FEP body. Initialization stays private to services_boot. */
 #include "fep_module.h"
 
+/* I/J will count store.system + store.user. Until then the legacy dictionary
+ * owns the only RESIDENT connection; a failed close keeps db non-NULL. */
+u32 ime_boot_connections(void) { return ime_current_dict()->db ? 1u : 0u; }
+
 static const FepModuleApi api = {
     .boot_abort = ime_boot_abort,
     .boot_bytes = ime_boot_bytes,
@@ -23,6 +27,7 @@ static const FepModuleApi api = {
     .getchar_kapi = ime_getchar_kapi,
     .getkey_kapi = ime_getkey_kapi,
     .dict_info = ime_dict_info_facade,
+    .boot_connections = ime_boot_connections,
 };
 
 int fep_module_init(FepModuleApi *out)

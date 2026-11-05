@@ -540,7 +540,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         linker = compiler.with_name('i386-elf-ld')
         mutated_dir = folder / 'fep-body'
         mutated_dir.mkdir()
-        body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_romkana',
+        body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_conn', 'ime_dict_info', 'ime_romkana',
                         'ime_render_tvram', 'fep_import_slots', 'fep_import_stubs')
         spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
         original_offsets = (folder / 'fep_host_offsets.h').read_text()
