@@ -108,6 +108,8 @@ void ime_init(void);
 int ime_dict_boot(void);
 int ime_boot_abort(void);
 u32 ime_boot_bytes(void);
+/* DICT_META J: actual live RESIDENT groups; PM wires the paired ops later. */
+u32 ime_boot_connections(void);
 int ime_dict_close(IME_Dict *dict);
 
 /* FEP ON/OFF トグル (初回呼び出し時に辞書ロード) */
