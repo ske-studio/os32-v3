@@ -1646,7 +1646,8 @@ GF4_COMPONENTS = {
     'b11m': ['hwdev/gf/display/tv.c'],
     'b12': ['hwdev/gf/display/heads.c'],
     'd0': ['hwdev/gf/display/dcb.c'],
-    'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
+    'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c'],
+    'c0log': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
     'c4': ['drivers/video/geforce/'+n+'.c' for n in ('edid', 'tv_data', 'gf_display_data')],
     'a3': [],
 }
@@ -1665,6 +1666,37 @@ GF4_MUTATIONS += [
      'stage="objects_init";', 'stage="scan_reserve";', 'failed stage before cleanup'),
     ('c2log', 'start-mode-stage', 'hwdev/gf/display/save.c',
      '*stage="mode_load";', '*stage="encoder_off";', 'nested restore failure stage'),
+]
+
+# mode_load diagnostics and raw callback rc must survive real cleanup.
+GF4_MUTATIONS += [
+    ('c0log', 'load-line-prefix', 'hwdev/gf/display/modeset.c',
+     '[gf4] mode_load fail at=%s', '[gfX] mode_load fail at=%s', 'exact failure prefix'),
+    ('c0log', 'load-line-rc', 'hwdev/gf/display/modeset.c',
+     'l->value,rc,l->rc,gate_rc,owner_rc);', 'l->value,0,l->rc,gate_rc,owner_rc);', 'original rc printed'),
+    ('c0log', 'load-line-row', 'hwdev/gf/display/modeset.c',
+     'l->section,l->row,l->reg', 'l->section,0U,l->reg', 'exact initial row sentinel'),
+    ('c0log', 'load-section', 'hwdev/gf/display/modeset.c',
+     'l->section=section;', 'l->section=GF_LOAD_Q; (void)section;', 'section boundary'),
+    ('c0log', 'load-cleanup-snapshot', 'hwdev/gf/display/modeset.c',
+     'if (rc) return ms_failure(&failure,rc,gate_rc,cleanup);',
+     'if (rc) { (void)failure; return ms_failure(&l,rc,gate_rc,cleanup); }', 'pre-cleanup failure retained'),
+    ('c0log', 'load-success-line', 'hwdev/gf/display/modeset.c',
+     'ctx->state->work[head]=image;\n    return 0;',
+     'ctx->state->work[head]=image;\n    return ms_failure(&l,0,0,0);', 'successful load silent'),
+    ('c0log', 'load-section-rc', 'hwdev/gf_load_state.c',
+     'int rc=io->section(saved, GF_LOAD_Q);',
+     'int rc=io->section(saved, GF_LOAD_Q) ? -1 : 0;', 'raw section rc'),
+    ('c0log', 'load-later-section-rc', 'hwdev/gf_load_state.c',
+     'rc=io->section(saved,section);', 'rc=io->section(saved,section) ? -1 : 0;', 'later section rc'),
+    ('c0log', 'load-row-rc', 'hwdev/gf_load_state.c',
+     'rc=io->row(saved,mode,i);', 'rc=io->row(saved,mode,i) ? -1 : 0;', 'raw row rc'),
+    ('c0log', 'load-fp-wait-rc', 'hwdev/gf_load_state.c',
+     'rc=io->wait(saved,GF_LOAD_FP_WAIT_MS,true);',
+     'rc=io->wait(saved,GF_LOAD_FP_WAIT_MS,true) ? -1 : 0;', 'raw FP wait rc'),
+    ('c0log', 'load-dpms-wait-rc', 'hwdev/gf_load_state.c',
+     'rc=io->wait(saved,GF_LOAD_DPMS_WAIT_MS,false);',
+     'rc=io->wait(saved,GF_LOAD_DPMS_WAIT_MS,false) ? -1 : 0;', 'raw DPMS wait rc'),
 ]
 
 # A cold first start must not obtain its clock through the unopened channel.
@@ -1736,7 +1768,7 @@ def gf4_sources(tree, case, fixture=None):
                  'tmds', 'tv', 'modeset', 'transaction', 'timing', 'format', 'fifo',
                  'dpms', 'flip', 'palette')
         return ['hwdev/gf/display/'+n+'.c' for n in names]+[
-            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c']
+            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c']
     display = sorted((tree/'hwdev/gf/display').glob('*.c'))
     sources = [str(p.relative_to(tree)) for p in display]
     sources += ['tools/tests/gf4_platform_host.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c',
@@ -1792,7 +1824,7 @@ def gf4_case(tree, case, directory):
              '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
              '-D__KERNEL_BUILD__', *include_flags(tree), '-I'+str(tree),
              '-I'+str(ROOT/'build/out/geforce')]
-    if case in GF4_LIFECYCLE or case in ('b5', 'c0'):
+    if case in GF4_LIFECYCLE or case in ('b5', 'c0', 'c0log'):
         flags += ['-DGF_PRODUCTION_MODULE', '-DGF4_REAL_DISPLAY']
     if case in ('c2scan', 'c2links', 'c2linkb'):
         flags += ['-DOS32_GEFORCE_MODULE']

@@ -10,7 +10,8 @@ enum gf_load_boundary { GF_LOAD_ROW_P=2, GF_LOAD_ROW_SD=15,
     GF_LOAD_ROW_COMMIT=190, GF_LOAD_DPMS_OFF=5, GF_LOAD_DPMS_ON=200 };
 int gf_load_state(const struct gfinit_mode *mode, void *saved, const struct gf_load_io *io)
 {
-    if (io->section(saved, GF_LOAD_Q)) return -1;
+    int rc=io->section(saved, GF_LOAD_Q);
+    if (rc) return rc;
     for (u32 i=0; i<gf_mode_row_count; i++) {
         u32 section;
         switch (i) {
@@ -22,12 +23,20 @@ int gf_load_state(const struct gfinit_mode *mode, void *saved, const struct gf_l
         case GF_LOAD_ROW_COMMIT: section=GF_LOAD_COMMIT; break;
         default: section=GF_LOAD_Q; break;
         }
-        if (section!=GF_LOAD_Q && io->section(saved,section)) return -1;
-        if (io->row(saved,mode,i)) return -1;
-        if ((gf_mode_rows[i].flags & GF_LOAD_FP_ON) &&
-            io->wait(saved,GF_LOAD_FP_WAIT_MS,true)) return -1;
-        if ((i==GF_LOAD_DPMS_OFF || i==GF_LOAD_DPMS_ON) &&
-            io->wait(saved,GF_LOAD_DPMS_WAIT_MS,false)) return -1;
+        if (section!=GF_LOAD_Q) {
+            rc=io->section(saved,section);
+            if (rc) return rc;
+        }
+        rc=io->row(saved,mode,i);
+        if (rc) return rc;
+        if (gf_mode_rows[i].flags & GF_LOAD_FP_ON) {
+            rc=io->wait(saved,GF_LOAD_FP_WAIT_MS,true);
+            if (rc) return rc;
+        }
+        if (i==GF_LOAD_DPMS_OFF || i==GF_LOAD_DPMS_ON) {
+            rc=io->wait(saved,GF_LOAD_DPMS_WAIT_MS,false);
+            if (rc) return rc;
+        }
     }
     return 0;
 }

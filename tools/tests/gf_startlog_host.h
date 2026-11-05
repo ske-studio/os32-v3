@@ -22,6 +22,8 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     __builtin_va_start(args, fmt);
     while (*fmt) {
         if (*fmt++ != '%') { startlog_char(fmt[-1]); continue; }
+        unsigned width = 0;
+        while (*fmt >= '0' && *fmt <= '9') width = width * 10 + (*fmt++ - '0');
         char spec = *fmt++;
         if (spec == 's') {
             const char *s = __builtin_va_arg(args, const char *);
@@ -31,7 +33,13 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
             if (v < 0) startlog_char('-');
             startlog_uint(v < 0 ? 0U - (unsigned)v : (unsigned)v);
         } else if (spec == 'u') startlog_uint(__builtin_va_arg(args, unsigned));
-        else __builtin_trap();
+        else if (spec == 'x') {
+            unsigned v = __builtin_va_arg(args, unsigned);
+            char buf[8]; unsigned n = 0;
+            do { buf[n++] = "0123456789abcdef"[v & 15U]; v >>= 4; } while (v);
+            while (width > n) { startlog_char('0'); width--; }
+            while (n) startlog_char(buf[--n]);
+        } else __builtin_trap();
     }
     __builtin_va_end(args);
 }
