@@ -24,6 +24,22 @@
 VfsOps *serialfs_get_ops(void);
 int     serialfs_init(void);
 
+/* LAN resident lifetime (NET_HOSTSVC_DESIGN §3). Persistent code owns this
+ * client and mount generation; UART retains the shell-scoped lifetime below.
+ * sid renewal on idle/same-generation ALIVE does not invalidate existing FDs. */
+struct SfsPersistent {
+    SfsClient client;
+    u32 generation, last_use, alive_seen;
+};
+/* Absolute deadline for the whole operation (1000ms including HELLO/TX/retry).
+ * No sid / 30s idle / new ALIVE / seq>0xF000 requires HELLO.
+ * A timeout fails this request with HOSTDOWN; the next request tries again.
+ * A timed-out write must not be replayed under a new sid automatically. */
+int sfs_ensure_session(u32 deadline);
+int sfs_request_deadline(u8 op, const void *in, u16 n, void *out, u32 deadline);
+/* Non-consuming internal observation; only schedules reconnection. */
+void sfs_alive_observe(u32 host_generation);
+
 /* セッションが mount の口を開け閉めする。c = このセッションの受け手。
  * 開いているあいだだけ ops->mount が c を返す (それ以外は NULL)。 */
 void    serialfs_permit(SfsClient *c);
