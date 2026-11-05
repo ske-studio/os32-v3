@@ -43,10 +43,16 @@ MUTATIONS = [
     ('dry-run-closes', 'userland/system/hsync_fep.inc',
      '    if (!g_fep_off || g_dry_run) return 0;',
      '    if (!g_fep_off) return 0;', 'fep dry-run untouched'),
+    ('reopen-default-path', 'kernel/ime/ime_suspend.c',
+     'ime_dict_open(&ime->dict, saved_path)', 'ime_dict_open(&ime->dict, IME_DICT_PATH)',
+     'dictionary path preserved'),
+    ('stale-suspend', 'kernel/ime/ime_suspend.c',
+     '    if (suspended && ime->dict_loaded) suspended = 0;',
+     '    if (0) suspended = 0;', 'external reopen can suspend again'),
     ('mode-not-restored', 'kernel/ime/ime_suspend.c',
-     '    ime_set_mode(saved_mode);', '    ime_set_mode(IME_MODE_OFF);', 'restore mode'),
+     '    suspended = 0;\n    ime_set_mode(saved_mode);', '    suspended = 0;\n    ime_set_mode(IME_MODE_OFF);', 'restore mode'),
     ('reopen-error-ignored', 'kernel/ime/ime_suspend.c',
-     '    if (rc) {', '    if (rc && 0) {', 'reopen failure disabled'),
+     '    if (rc) {\n        kprintf', '    if (rc && 0) {\n        kprintf', 'reopen failure disabled'),
 ]
 
 def main():

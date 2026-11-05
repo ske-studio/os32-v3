@@ -127,8 +127,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 | v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
+| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
-| v80 | **実装中 (2026-11-05、wt/kapi-v80)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。

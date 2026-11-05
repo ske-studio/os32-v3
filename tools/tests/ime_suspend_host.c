@@ -3,12 +3,45 @@
 #include "kprintf.h"
 #include "fep_boundary_runtime.h"
 static IME_State state;
-static int closes, opens, close_rc, open_rc, warnings;
+static int closes, opens, close_rc, open_rc, warnings, close_isolates;
+static char closed_path[sizeof(state.dict.path)];
+static int reopened_same_path;
 IME_State *ime_suspend_state(void) { return &state; }
-void ime_set_mode(int mode) { state.mode = mode; }
-int ime_dict_close(IME_Dict *dict) { (void)dict; closes++; return close_rc; }
+void ime_set_mode(int mode)
+{
+    if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
+    if (mode != IME_MODE_OFF && !state.dict_loaded) {
+        if (ime_dict_open(&state.dict, IME_DICT_PATH)) {
+            warnings++;
+            return;
+        }
+        state.dict_loaded = 1;
+    }
+    state.mode = mode;
+}
+int ime_dict_close(IME_Dict *dict)
+{
+    closes++;
+    if (dict->isolated) return -1;
+    kstrncpy(closed_path, dict->path, sizeof(closed_path));
+    if (close_rc) {
+        if (close_isolates) dict->isolated = 1;
+        return close_rc;
+    }
+    dict->db = 0;
+    return 0;
+}
 int ime_dict_open(IME_Dict *dict, const char *path)
-{ (void)dict; if (strcmp(path, IME_DICT_PATH)) exit(2); opens++; return open_rc; }
+{
+    opens++;
+    if (dict->isolated || dict->db) return -1;
+    reopened_same_path = !kstrcmp(path, closed_path);
+    kmemset(dict, 0, sizeof(*dict));
+    kstrncpy(dict->path, path, sizeof(dict->path));
+    if (open_rc) return open_rc;
+    dict->db = dict; /* Any non-NULL connection represents a live DB. */
+    return 0;
+}
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { (void)attr; (void)fmt; warnings++; }
 #include "ime_suspend_source.inc"
@@ -18,13 +51,16 @@ int main(void)
 {
     require(!ime_dict_suspend(0) && !opens, "reopen without suspend");
     require(!ime_dict_suspend(1) && !closes, "unloaded no-op");
+    require(!ime_dict_open(&state.dict, "/db/fep_s.db"), "initial open");
+    opens = 0;
     state.dict_loaded = 1; state.mode = IME_MODE_KATAKANA;
     require(!ime_dict_suspend(1) && !state.dict_loaded && state.mode == IME_MODE_OFF && closes == 1, "close and OFF");
     require(!ime_dict_suspend(1) && closes == 1, "double close");
     require(!ime_dict_suspend(0) && state.dict_loaded && state.mode == IME_MODE_KATAKANA && opens == 1, "restore mode");
+    require(reopened_same_path && !kstrcmp(state.dict.path, "/db/fep_s.db"), "dictionary path preserved");
     require(!ime_dict_suspend(0) && opens == 1, "double reopen");
     close_rc = -3;
-    require(ime_dict_suspend(1) == -3 && state.dict_loaded, "close failure");
+    require(ime_dict_suspend(1) == -3 && state.dict_loaded && state.mode == IME_MODE_KATAKANA, "close failure restores mode");
     require(!ime_dict_suspend(0) && opens == 1, "failed close not suspended");
     close_rc = 0; state.mode = IME_MODE_HIRAGANA;
     require(!ime_dict_suspend(1), "second close");
@@ -34,6 +70,25 @@ int main(void)
     require(!ime_dict_suspend(0) && state.dict_loaded && state.mode == IME_MODE_HIRAGANA, "reopen retry");
     state.mode = IME_MODE_OFF;
     require(!ime_dict_suspend(1) && !ime_dict_suspend(0) && state.mode == IME_MODE_OFF, "loaded OFF restored");
+    /* A failed reopen may be followed by ime on (the production lazy open). */
+    ime_set_mode(IME_MODE_HIRAGANA);
+    require(!ime_dict_suspend(1), "close before external reopen");
+    open_rc = -4;
+    require(ime_dict_suspend(0) == -4 && !state.dict_loaded, "external reopen setup failure");
+    open_rc = 0;
+    ime_set_mode(IME_MODE_KATAKANA);
+    require(state.dict_loaded && state.dict.db && state.mode == IME_MODE_KATAKANA, "external lazy open");
+    int before_closes = closes;
+    require(!ime_dict_suspend(1) && !state.dict_loaded && !state.dict.db && closes == before_closes + 1, "external reopen can suspend again");
+    require(!ime_dict_suspend(0) && state.dict_loaded && state.mode == IME_MODE_KATAKANA && reopened_same_path, "external reopen restored");
+    require(!ime_dict_close(&state.dict), "switch dictionary close");
+    state.dict_loaded = 0;
+    require(!ime_dict_open(&state.dict, "/db/fep_l.db"), "switch dictionary open");
+    state.dict_loaded = 1;
+    require(!ime_dict_suspend(1) && !ime_dict_suspend(0) && reopened_same_path &&
+            !kstrcmp(state.dict.path, "/db/fep_l.db"), "large dictionary path preserved");
+    close_rc = -3; close_isolates = 1;
+    require(ime_dict_suspend(1) == -3 && state.dict.isolated && state.mode == IME_MODE_OFF, "isolated close stays OFF");
     puts("GREEN ime suspend");
     return 0;
 }
