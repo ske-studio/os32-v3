@@ -169,7 +169,7 @@ u32 host_notice_serial(void); /* GUI向け非消費の投入通番 */
 ## 7. KAPI の追加と誤りコード
 | 項目 | 契約 |
 |---|---|
-| HOSTDOWN | **-18案**。`KAPI_SPEC.md:136–149` で未予約。実装時に最新shared header/予約表を再確認。番号追加だけなら版上げ不要。 |
+| HOSTDOWN | **-18** (`OS32_ERR_HOSTDOWN`、TIMEOUT は -19、`sdk/include/os32/os32_kapi_shared.h`、段 A2 で追加)。番号の追加だけなので版上げなし。 |
 | TIMEOUT | host_call全体期限用。実装時にKAPI_SPECの誤り番号予約表でHOSTDOWN等と重複しない番号を確保しshared/SDKで共有。番号追加だけでは版上げ不要。 |
 | 新API | `host_notice_read(u32 generation, u32 service, HostNotice *out)` と `host_notice_serial(void)` の2本。v80予約(slot255〜257)の後、**v81/slot258〜259案**。着手時の末尾に調停し固定値先取りしない。 |
 | エラー | HOSTDOWN=リンク非UP/要求の無応答、STALE=-11=既存資源失効、AGAIN=-14=未完/空、ROFS=-15=ホスト拒否、IO=-1=壊れた応答/媒体I/O。 |
@@ -327,7 +327,7 @@ H=host単体、N=NP21/W、R=82557実機。各行は新規 `tools/tests/test_host
 
 ## NET_HOSTSVC_DESIGN 追記 r1 — 宣言の段2
 2026-11-05。作成: GPT-6 系 Codex（詳細モデル ID は実行環境から確認できない）。設計追記案、実装・実測・独立レビュー前。
-根拠: 段0 report.md の不足 #1〜#12、確定設計 §§2〜7・10・11、TASK_NET_HOSTSVC §0、PORT_FLOW §§3・4。本文の構造・wire・ユーザー決定を維持する。 以下の C 宣言は各記載ヘッダへ置く。内部は types.h の u8/u16/u32/i32、公開型は C89。負値は既存 OS32_ERR_*、HOSTDOWN/TIMEOUT の番号と KAPI slot は I で調停する。
+根拠: 段0 report.md の不足 #1〜#12、確定設計 §§2〜7・10・11、TASK_NET_HOSTSVC §0、PORT_FLOW §§3・4。本文の構造・wire・ユーザー決定を維持する。 以下の C 宣言は各記載ヘッダへ置く。内部は types.h の u8/u16/u32/i32、公開型は C89。負値は既存 OS32_ERR_* と HOSTDOWN=-18・TIMEOUT=-19 (段 A2 で確定)、KAPI slot は I で調停する。
 ## #1 NIC 選択・送信・解除（本文 §§2・6・10、使用 A2/A4〜A8/A10/I1）
 ```c
 /* net/nic.h: NetNicOps は段0のまま。id: AUTO=0, E82557=1, LGY98=2 */
@@ -513,3 +513,11 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 5. (P3) #3: link_notify_tick(now) は link_tick の末尾で A8 が呼ぶ。
 6. (P3) #6: 「sfs_lan_set_peer」は存在しない — lan.mod の facade の lan_peer(SfsLan *, const char *) (lan_module.h) を通す。
 7. (P3) #12: 偽物の hs_reset に開始 tick を引数で渡せるようにし、周回の直前 (0xFFFFFF00) から始める試験を 1 行足す。
+
+## 第 3 波 (A2〜A4・B2・B4・H1・H2) の取り込みで決めたこと (2026-11-05、Opus のレビュー、PM 決定)
+1. 誤り番号は `OS32_ERR_HOSTDOWN=-18`・`OS32_ERR_TIMEOUT=-19` (os32_kapi_shared.h の末尾、版上げなし)。
+2. A2: tick は常駐で一度だけ登録し、未 bind の間は net_tick の入口で何もしない (§10 の「tick 解除」はこの形で満たす)。tick の登録の失敗は OS32_ERR_BUSY に写す (元の値は kprintf)。
+3. A2・A3: 空の受信の補充は `net_nic_poll_once()` (A2) を 1 回。net_tick の実行中に呼ばれたら何もせず 0 を返す (net_tick 自身は内部の poll を直接呼ぶので、tick の受信は止まらない)。
+4. **A6/A8 への申し送り (Opus P2-1)**: 本番の `link_init` (net/link.c) は自分で `tick_register(PC98_TICK_LINK, link_tick)` を呼ぶ。net_bind が先に net_tick を同じ枠に登録するので、結線したら衝突して link が初期化されない (または net_bind が BUSY で失敗する)。A8 (か A6) で link_init から tick の登録を外す。A2 の試験の偽物 link_init は登録しない前提を REQUIRE で固定してある。
+5. H1: lanfs_host.py は H2 の host_image.ImageStore を起動時に読み込む (H1 と H2 は同時に入れた)。
+6. 送りの P3: B2 は順序の合った NOTIFY でも中身が不正なら ACK せずに捨てる (今の H3 はそうした通知を作らない — ホスト側の検査を緩めるときに見直す)。A3 の `net_rx_sfs_dropped`・`net_rx_link_dropped` の宣言は読み手ができる段 I で nic_rx.h に足す。
