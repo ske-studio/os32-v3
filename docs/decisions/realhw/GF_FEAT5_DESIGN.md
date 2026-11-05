@@ -342,7 +342,7 @@ void gf5_link_free(void *owner, void *allocation);
 i32 gf5_link_clock64(void *owner, u64 *us);
 ```
 - gf5_links実体とgf5_links_tableはC2-linksだけが所有する。C2-serviceはinitで返された表のowner=gを設定し、g->linksへ同じ型付き結線を設定する。
-- gf5_linksの同名欄（gf5_link_を除く）は上記関数ポインタ型とmemory_scriptを採用。NULL ownerはGF5_EINVAL。stop/restartは`gf4_service_suspend/restart(g->display,dl)`、display_save/restoreは`gf4_display_save/restore(g->display,&image->display,g->deadline)`へ委譲し下位rcを保持する。診断ops.display_saveを使わない（`D/save.c:131,338`）。
+- gf5_linksの同名欄（gf5_link_を除く）は上記関数ポインタ型とmemory_scriptを採用。NULL ownerはGF5_EINVAL。stop/restartは`gf4_service_suspend/restart(g->display,dl)`、display_save/restore は `gf4_display_save/restore(g->display,&image->display,g->deadline)` へ委譲し下位 rc を保持する。起動・再開の期限境界は GF_FEAT4_DESIGN X4 に従い、links.restart 成功後の性能復元、links.display_restore 入口でそれぞれ now+GF2_TIMEOUT_US を作り g->deadline と c->deadline を揃える。段内では絶対期限を延長せず、期限生成の時計失敗は GF2_EIO。診断ops.display_saveを使わない（`D/save.c:131,338`）。
 - B0〜B6の公開出口はC2-links所有のgf5_rc_mapへ集約する。GF1〜GF4とGF_SCRIPTの全定数を下表の1つのswitchで列挙し、範囲推測しない。同値のOKはcase 0を共有、GF5全列挙値はそのまま返す。source_rcは変換前の元値。prepareのGF_SCRIPT_EIOだけ呼出し段でGF5_EBIOSとし共通mapへ渡す（source_rc=-1を維持）。
 | 下位rc（同じ行は同じcase結果） | GF5への変換 |
 |---|---|

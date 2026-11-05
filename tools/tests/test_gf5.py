@@ -36,7 +36,13 @@ CASES = {
 # Tuple: name, product path, unique old text, new text, CASES key.
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Anchors checked at integration; runtime RED remains for PM verification.
-MUTATIONS = [('perf-mem-scale',
+MUTATIONS = [
+ ('links-restore-old-deadline', 'hwdev/gf/feature5_links.c',
+  'i32 rc=gf4_stage_deadline(g->display,&g->deadline);',
+  'i32 rc=0;', 'links'),
+ ('links-performance-old-deadline', 'hwdev/gf/feature5_links.c',
+  'if (!rc) rc=gf4_stage_deadline(g->display,&g->deadline);',
+  'if (!rc) rc=0;', 'links'),('perf-mem-scale',
   'hwdev/gf/perf.c',
   'PERF_NV4_MEMORY_SCALE=2000',
   'PERF_NV4_MEMORY_SCALE=1000',

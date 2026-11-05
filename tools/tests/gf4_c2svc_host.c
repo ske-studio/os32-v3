@@ -11,10 +11,13 @@
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 
+static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #ifndef GF4_SERVICE_SOURCE
 #define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
+#define gf4_detect svc_detect_budget
 #endif
 #include GF4_SERVICE_SOURCE
+#undef gf4_detect
 
 static struct gf4_host svc_host;
 static struct gf4_state svc_state;
@@ -27,6 +30,13 @@ static const struct gf4_test_ops *svc_slot;
 static i32 svc_open_rc,svc_close_rc,svc_restore_rc,svc_acquire_rc;
 static u32 svc_opens,svc_closes,svc_restores,svc_acquires,svc_releases;
 static u32 svc_cleanup_after_off;
+static bool svc_slow_validate,svc_spend_objects,svc_spend_detect;
+static i32 svc_detect_budget(struct gf4_ctx *c,u32 dl)
+{
+    i32 rc=gf4_detect(c,dl);
+    if (!rc && svc_spend_detect) cint_host.now=dl;
+    return rc;
+}
 /* Arbitrary injected negative values, deliberately outside F1-F4 enums. */
 enum { SVC_INJECT=-1701, SVC_OTHER=-1702 };
 
@@ -59,6 +69,11 @@ static void svc_observe(struct gf3_host *h,const struct gf3_host_event *e)
             GF_IRQ_CRTC_STATUS+GF_IRQ_HEAD_STRIDE,0x008100U,0x009100U,0x001100U,0x00b100U};
         for (u32 i=0;i<sizeof(status)/sizeof(status[0]);++i)
             if (e->a[1]==status[i]) gf3_host_set(h,0,status[i],0);
+    }
+    if (svc_spend_objects && !e->rc && e->op==H_READ &&
+        e->a[1]==GF2_USER_BASE+GF2_USER_REFERENCE &&
+        cint_prod.chan.state==GF2_RUN && cint_prod.accel.notify_storage.size) {
+        cint_host.now=svc_ctx.deadline; svc_spend_objects=false;
     }
     if (svc_slot) assert(svc_ctx.ready && svc_ctx.accepting && cint_prod.accel.ready);
 }
@@ -116,7 +131,9 @@ static int svc_foundation_stop(struct gf_display_context *l)
 }
 static int svc_validate(struct gf_display_context *l)
 {
-    assert(l==&cint_prod.display); return 0;
+    assert(l==&cint_prod.display);
+    if (svc_slow_validate) cint_host.now+=GF2_TIMEOUT_US;
+    return 0;
 }
 static int svc_acquire(struct gf_display_context *l)
 {
@@ -175,7 +192,7 @@ static void svc_fixture(void)
         .or_mask=1,.i2c_index=U8_MAX};
     svc_ctx.routes=svc_ctx.dcb.routes; svc_ctx.nroutes=svc_ctx.dcb.nroutes;
     svc_links=(struct gf4_links){svc_i2c,svc_admission,svc_failed,svc_changed,&svc_ctx};
-    svc_slot=0;
+    svc_slot=0; svc_slow_validate=svc_spend_objects=svc_spend_detect=false;
     svc_open_rc=svc_close_rc=svc_restore_rc=svc_acquire_rc=0;
     svc_opens=svc_closes=svc_restores=svc_acquires=svc_releases=svc_cleanup_after_off=0;
     assert(!gf4_service_bind(&svc_ctx,&cint_prod.display,&svc_links));
@@ -316,6 +333,15 @@ static void test_diagnostic_roundtrip(void)
     assert(!svc_slot && !svc_ctx.accepting && svc_ctx.saved_closed);
     svc_finish();
 }
+static void test_slow_start(void)
+{
+    svc_fixture(); svc_slow_validate=svc_spend_objects=svc_spend_detect=true;
+    u32 dl=cint_deadline();
+    assert(!gf4_service_start(&svc_ctx,dl));
+    assert(svc_ctx.accepting && svc_state.head[0].enabled);
+    assert((i32)(svc_ctx.deadline-dl)>=(i32)(3U*GF2_TIMEOUT_US));
+    svc_finish();
+}
 static void test_failed_start(void)
 {
     svc_fixture(); svc_open_rc=SVC_INJECT;
@@ -333,6 +359,6 @@ static void test_failed_start(void)
 void _start(void)
 {
     test_bind_and_start(); test_cleanup_failures();
-    test_diagnostic_roundtrip(); test_failed_start();
+    test_diagnostic_roundtrip(); test_slow_start(); test_failed_start();
     gf2_host_exit(0);
 }

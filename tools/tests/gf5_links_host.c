@@ -202,9 +202,12 @@ static void test_display(void)
     u32 epoch=h.ctx.ch->epoch;
     assert(gf5_link_restart(&h.ctx,4321U)==0 && h.ctx.ch->epoch==epoch+1U);
     assert(events[2].a[0]==4321U && !h.ctx.accepting);
+    assert(h.ctx.deadline==(u32)h.now+GF2_TIMEOUT_US);
+    assert(h.ctx.display->deadline==h.ctx.deadline);
     assert(gf5_link_display_restore(&h.ctx,&image)==0);
     assert(events[3].op==F5_RESTORE && events[3].p[1]==&image.display);
-    assert(events[3].a[0]==h.ctx.deadline && h.ctx.display->saved_closed);
+    assert(events[3].a[0]==(u32)h.now+GF2_TIMEOUT_US && h.ctx.display->saved_closed);
+    assert(h.ctx.display->deadline==events[3].a[0]);
     assert(gf5_link_admission(&h.ctx,true)==GF4_ESTATE && !h.ctx.accepting);
     fixture(); h.observe=off_with_error; h.ctx.image=&image;
     gf5_host_fail_at(&h,F5_STOP,1,GF2_ESTOP);
@@ -218,6 +221,23 @@ static void test_display(void)
     fixture(); gf5_host_fail_at(&h,F5_RESTART,1,GF1_EMAP);
     assert(gf5_link_restart(&h.ctx,777U)==GF1_EMAP); error_is(GF1_EMAP);
     assert(events[0].a[0]==777U && !h.calls[F5_RESTORE]);
+}
+static void test_restore_deadline(void)
+{
+    fixture(); h.now+=GF2_TIMEOUT_US;
+    assert(!gf5_link_display_restore(&h.ctx,&image));
+    assert(events[0].op==F5_RESTORE);
+    assert(events[0].a[0]==(u32)h.now+GF2_TIMEOUT_US);
+    assert(h.ctx.display->deadline==events[0].a[0]);
+    fixture();
+    gf4_host_fail_at(&h.display,D_CLOCK,1,-1701);
+    assert(gf5_link_display_restore(&h.ctx,&image)==GF2_EIO);
+    error_is(GF2_EIO); assert(!h.calls[F5_RESTORE]);
+    fixture();
+    assert(!gf5_link_stop(&h.ctx,h.ctx.deadline));
+    gf4_host_fail_at(&h.display,D_CLOCK,1,-1701);
+    assert(gf5_link_restart(&h.ctx,h.ctx.deadline)==GF2_EIO);
+    error_is(GF2_EIO); assert(h.calls[F5_RESTART]==1);
 }
 static void test_memory(void)
 {
@@ -318,6 +338,6 @@ static void test_copy(void)
 void _start(void)
 {
     test_map(); test_table_and_arguments(); test_pause(); test_idle();
-    test_display(); test_memory(); test_resources(); test_copy();
+    test_display(); test_restore_deadline(); test_memory(); test_resources(); test_copy();
     gf2_host_exit(0);
 }
