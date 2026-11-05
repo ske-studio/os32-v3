@@ -42,6 +42,10 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
+CI は配布物の `artifacts` と検査の `check-fast` を並列に実行する。取り方と合格条件の正典は
+[§8-6](#8-6-github-actions-での本体ビルド)。
+変異込みの全体検査は Actions の `full-check` → Run workflow (入力 `ref`、既定 `main`) で起動でき、毎日 03:00 JST にも `main` に対して実行する。
+
 ```
 === カーネルビルド ===
 boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
@@ -1090,8 +1094,10 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 ### §8-6 GitHub Actions での本体ビルド
 
 `.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
-FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の clone から core を完全ビルドし、`make check-fast`
-を回して、成果物を artifact に置く。静的ゲートの `check.yml` とは別 (変異込みの `make check` は回さない)。
+FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) は、`artifacts` と `check-fast` の
+2 ジョブを依存関係なしで並列に動かす。両方が同じ composite action で準備し、それぞれ core を完全ビルドする。
+`artifacts` は配布物を作って upload し、`check-fast` は `make check-fast` を回す。main へ入れる判定は
+両ジョブと静的ゲートの `check.yml` がすべて合格すること (変異込みの `make check` は回さない)。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
 (小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
@@ -1100,14 +1106,15 @@ FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の 
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `make -j$(nproc) all` → `make check-fast` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`)。最後の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する |
+| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast`: `make -j$(nproc) all` → `make check-fast` |
+| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。両ジョブとも `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
-| 上限 | `timeout-minutes: 150` |
+| 上限 | 両ジョブとも `timeout-minutes: 150` |
 
 **成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
 
@@ -1129,11 +1136,17 @@ os32 の `build.yml` にあった埋め込み commit id の照合、tag → Rele
 public repo でも artifact の API ダウンロードには認証が要る):
 
 ```bash
-tools/ci_fetch.sh                       # main の最新の成功 run (既定 --repo ske-studio/os32-v3)
+tools/ci_fetch.sh                       # main の最新 run (既定 --repo ske-studio/os32-v3)
 tools/ci_fetch.sh --branch wt/ci
 tools/ci_fetch.sh --sha 0a5247f         # そのコミットの run (短縮 SHA 可)
+tools/ci_fetch.sh --sha 0a5247f --wait  # artifacts が未完了なら待つ
 tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表示するだけ
 ```
+
+指定 SHA (短縮可) / ブランチの最新の `build.yml` run を、run 全体の status で絞らず選ぶ。
+その run の `artifacts` ジョブが成功していれば、検査の完了を待たず取得する。`check-fast` が失敗・実行中なら
+その旨を 1 行表示する (調べの版も取得できる)。`artifacts` が未完了なら待機中と表示して終了 1、
+`--wait` なら 10 秒ごとに待つ。`artifacts` が失敗・取消等なら取得せず終了 1。
 
 保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
 `SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。
