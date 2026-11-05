@@ -969,7 +969,9 @@ static VfsOps g_hostdrvfs_ops = {
     0,
     /* ホスト (Windows) の名前は大文字小文字を区別しない (BUSY / pinned の名前比較用) */
     hdrv_name_fold,
-    0 /* SQLite capability is not implied by filesystem permissions. */
+    0, /* SQLite capability is not implied by filesystem permissions. */
+    0, /* resource_check */
+    0  /* resource_refresh */
 };
 
 int hostdrvfs_init(void)

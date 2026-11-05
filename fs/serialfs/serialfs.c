@@ -388,7 +388,9 @@ static VfsOps g_serialfs_ops = {
     0,
     /* 名前はバイトで比べる (ホストは Ubuntu のノート = 大文字小文字を区別) */
     0,
-    0 /* External writers: no SQLite MAIN_DB capability. */
+    0, /* External writers: no SQLite MAIN_DB capability. */
+    0, /* resource_check */
+    0  /* resource_refresh */
 };
 
 VfsOps *serialfs_get_ops(void)

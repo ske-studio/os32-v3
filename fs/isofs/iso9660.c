@@ -694,5 +694,7 @@ VfsOps iso9660_ops = {
     0,
     /* iso_strcasecmp と同じ規則 (英字だけ区別しない) (BUSY / pinned の名前比較用) */
     iso_name_fold,
-    0 /* SQLite is supported only on ext2. */
+    0, /* SQLite is supported only on ext2. */
+    0, /* resource_check */
+    0  /* resource_refresh */
 };

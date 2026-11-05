@@ -71,7 +71,8 @@ static Device fdd0_dev = {
     fdd0_write_chs,         /* blk_write_chs */
     FDC_CYLINDERS,          /* cyls */
     FDC_HEADS,              /* heads */
-    FDC_SPT                 /* spt */
+    FDC_SPT,                /* spt */
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 static Device fdd1_dev = {
@@ -85,7 +86,8 @@ static Device fdd1_dev = {
     0, 0,                   /* ioctl, priv */
     fdd1_read_chs,
     fdd1_write_chs,
-    FDC_CYLINDERS, FDC_HEADS, FDC_SPT
+    FDC_CYLINDERS, FDC_HEADS, FDC_SPT,
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 /* ======================================================================== */
@@ -118,28 +120,32 @@ static Device hd0_dev = {
     "hd0", DEV_BLOCK, DEV_BUS_IDE, 0, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,   /* blk_read/write(LBA), chr, ioctl, priv */
     0, 0,                            /* blk_read_chs/write_chs = NULL */
-    0, 0, 0                          /* cyls/heads/spt: dev_register_hdd で設定 */
+    0, 0, 0,                         /* cyls/heads/spt: dev_register_hdd で設定 */
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 static Device hd1_dev = {
     "hd1", DEV_BLOCK, DEV_BUS_IDE, 1, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
-    0, 0, 0
+    0, 0, 0,
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 static Device hd2_dev = {
     "hd2", DEV_BLOCK, DEV_BUS_IDE, IDE_DRIVES_PER_BANK, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
-    0, 0, 0
+    0, 0, 0,
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 static Device hd3_dev = {
     "hd3", DEV_BLOCK, DEV_BUS_IDE, IDE_DRIVES_PER_BANK + 1, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
-    0, 0, 0
+    0, 0, 0,
+    0, 0                    /* blk_read_u32, media_check */
 };
 
 /* HDDを登録するユーティリティ (4ドライブ対応) */

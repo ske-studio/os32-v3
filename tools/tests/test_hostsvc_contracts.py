@@ -5,6 +5,11 @@ Expected wire numbers below are transcribed from the design, independently of
 product arithmetic. Compile headers separately with host/cross compilers, then
 execute ILP32 layout checks. Mutations must compile and fail at runtime.
 """
+INITIALIZER_UNITS = ('fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
+                     'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+                     'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
+                     'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c')
+
 CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
     covers=['net/nic.h', 'net/link.h', 'fs/serialfs/sfs_proto.h',
             'fs/serialfs/serialfs.h', 'tools/tests/kernel_includes.py',
@@ -23,7 +28,11 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'kapi/kapi_host_notice.h',
             'tools/tests/hostsvc_fixture.h',
             'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.py',
-            'tools/hostsvc_contracts.pyi'], budget=3)
+            'tools/hostsvc_contracts.pyi',
+            'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
+            'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+            'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
+            'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=3)
 
 import argparse
 import os
@@ -325,7 +334,11 @@ def main():
             subprocess.run([compiler, *FLAGS, '-I' + str(ROOT),
                             *include_flags(ROOT), '-c', str(src),
                             '-o', str(work / 'types.o')], check=True, cwd=ROOT)
-            print(f'PASS standalone headers and signatures ({compiler})', flush=True)
+            # Compile existing consumers too: appended fields must pass -Wextra.
+            subprocess.run([compiler, *FLAGS, '-Wno-address-of-packed-member',
+                            *include_flags(ROOT), '-fsyntax-only', *INITIALIZER_UNITS],
+                           check=True, cwd=ROOT)
+            print(f'PASS standalone headers, signatures and existing initializers ({compiler})', flush=True)
         if compile_and_run(work, ROOT) != 0:
             raise RuntimeError('normal control failed')
         print('PASS wire values and layouts (ILP32, runner=' + host32.selected_runner() + ')',

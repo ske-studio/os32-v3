@@ -16,7 +16,7 @@ static u32 live[MODULE_RECORD_CAP], mask[MODULE_RECORD_CAP];
 static u32 input[2], pos, fd_live, opens, closes, allocations, fail_at;
 static u32 starts, cleans, clean_order, returned, retired, fail_cleanup;
 static struct module_handle current;
-static Device device = {.name = "cd0", .type = DEV_BLOCK};
+static Device device = {.name = "cd0", .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0};
 static Device *cached_device;
 static int fs_context;
 static void finish(int code) __attribute__((noreturn));
@@ -37,7 +37,7 @@ static void *mount_fs(int dev)
 }
 static void unmount_fs(void *ctx) { CHECK(ctx == &fs_context); }
 void vfs_fd_invalidate_mount(void *ctx) { CHECK(ctx == &fs_context); }
-static VfsOps fs_ops = {.name = "fixture", .mount = mount_fs, .umount = unmount_fs};
+static VfsOps fs_ops = {.name = "fixture", .mount = mount_fs, .umount = unmount_fs, .resource_check = 0, .resource_refresh = 0};
 int kstrcmp(const char *a, const char *b)
 {
     while (*a && *a == *b) { a++; b++; }
