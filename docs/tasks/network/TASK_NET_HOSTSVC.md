@@ -1,6 +1,6 @@
 # TASK_NET_HOSTSVC — ネットワーク越しの Host Services (実機の /host・ネットワーク越しの CD・知らせのメールボックス・サービスの一覧)
 
-> 状態: **設計中 (2026-11-05)** — 要件はユーザーと PM で詰めた (下の §0)。設計の往復は astra 起草・Opus レビューで r3 (最後の回)、往復の版は `~/os32-tmp/run/net-hostsvc/` (DESIGN.r1〜r3・REVIEW.r1〜r2・USER_DECISIONS_r2/r3)。確定したら `docs/decisions/network/` に写し、ここに段の表を書く。
+> 状態: **設計中 (2026-11-05)** — 詳細設計を確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md)、astra 起草 r1→r3・Opus レビュー 3 回)。実装はまだ出していない。往復の版は `~/os32-tmp/run/net-hostsvc/`。
 > 上位: [V3_PLAN](../v3/V3_PLAN.md) §5 の「ネットワーク越しの CD・HostDrv の Host Services 経路」。土台: [HOST_SERVICES_PLAN](HOST_SERVICES_PLAN.md) (リンク層の Host Services、KAPI v51)、[TASK_LAN_82557](../realhw/TASK_LAN_82557.md) (82557・LAN 版 SerialFS、L-C・L-D2・L-E)。
 
 ## 0. ユーザー決定 (2026-11-05、要旨。原文は往復の置き場の USER_DECISIONS)
@@ -28,3 +28,17 @@
 - 標準時はホストに従う (OS32 にタイムゾーンの表を持たない)。
 - ホストが無くても手で合わせられる (年・月・日・時・分、秒は 0)。シェルの `date` に設定の形、後でコントロールパネルから同じ口。
 - いま RTC の時刻を書く口は無い (drivers/char/rtc.c は読みとモードの切り替えだけ)。
+
+## 2. 段 (確定設計 §10・§11 の要約)
+
+| 群 | 中身 | 像 |
+|---|---|---|
+| A (NIC 境界) | net/nic.h・nic.c・nic_rx.c (1 本の受信を SFS とリンクへ振り分け)、LGY・82557 の adapter、link.c・link_rx.inc・sfs_lan.c の付け替え | vmkernel (82557 の adapter と sfs_lan は lan.mod) |
+| B (知らせ) | link.h の NOTIFY・HELLO の伸長、link_notify.c、host_mailbox.c (64 通・ALIVE の世代)、KAPI の取り出し、gshell の出来事 | vmkernel・gshell |
+| C (常駐の /host) | serialfs_persistent.c ほか (sfs run の外でも mount、期限・HOSTDOWN・世代と STALE、seq 0xF000 で張り直し) | vmkernel |
+| D (仮想 CD) | sfs_proto.h の BOPEN/BREAD/BCLOSE、sfs_block.c・drivers/block/netcd.c (lan.mod)、iso9660 の媒体の一般化、vfs_fd の失効、cd_body.c の空き cdN | lan.mod・vmkernel・cd.mod |
+| H (ホスト) | lanfs_host.py・host_image.py・host_notify.py・host_linux.py (Ubuntu の CLIP/PRINT)・host_agent.py・lan_bridge.py | ホスト |
+| I (統合) | kapi.json と生成物・誤り番号 (HOSTDOWN・TIMEOUT)・起動の登録・fd_netcd_config.py (起動前の FD の /etc/netcd.cfg)・packages.yaml・install.c の fd_only | — |
+| S (SDK) | host_call.c・libos32host.c・os32api の host.rs (os32_host_*、LIST で名前から番号) | SDK |
+
+順序: 契約 (A1・B1・D1) → adapter と H 群を並列 → C・D の結線 → I ([ABI] の clean・all) → NP21/W → 82557 実機。試験は `tools/tests/test_hostsvc_<項目>.py` (nic・deadline・persistent・write・image・isocache・mailbox・gui・linux・bootcd・seq・alive・race・handles・list・sdk・abi)。
