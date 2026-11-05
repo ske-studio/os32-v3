@@ -313,7 +313,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     __builtin_va_end(ap);
 }
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
-{CHECK(bus==0 && dev<32 && fn<8 && reg<64);if(fn)resource_extra_reads++;return resource_cfg[dev][fn][reg/4];}
+{CHECK(bus==0 && dev<32 && fn<8 && reg<64);if(fn)resource_extra_reads++;return resource_cfg[dev&31U][fn&7U][(reg/4)&15U];}
 u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
 {return (u16)(pci_cfg_read32(bus,dev,fn,reg&~3U)>>((reg&2)*8));}
 static void resource_setup(void)
