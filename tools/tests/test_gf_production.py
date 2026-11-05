@@ -37,7 +37,16 @@ def main(override=None):
         subprocess.run(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
                         '-Dgf_production_clock=gf_production_native_clock',
                         '-Dgf_production_wait=gf_production_native_wait',
-                        '-c', str(ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
+                        '-c', str(override[1] if override and override[0]=='hwdev/gf/native.c' else ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
+        mode = Path(tmp) / 'mode.o'
+        gamma = Path(tmp) / 'gamma.o'
+        for name, obj in (('modeset', mode), ('gamma', gamma)):
+            source = ROOT / f'hwdev/gf/display/{name}.c'
+            if override and str(source.relative_to(ROOT)) == override[0]:
+                source = override[1]
+            subprocess.run(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
+                            '-Dgf_display_modeset=gf_unused_legacy_modeset',
+                            '-c', str(source), '-o', str(obj)], check=True)
         module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)])
@@ -56,19 +65,28 @@ def main(override=None):
         sources += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob('hwdev/gf/display/*.c'))
                     if p.stem not in f4_only]
         subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-                        *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), '-o', str(exe)], check=True)
+                        *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(mode), str(gamma), '-o', str(exe)], check=True)
         symbols = subprocess.check_output(['nm', '--defined-only', str(exe)], text=True)
         assert not any(name in symbols for name in (' recover_', ' kpeek_', ' trial_'))
         rc=host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
         if rc: return rc
         subprocess.run(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
-                        '-Wl,--gc-sections',*[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],str(native),str(backend),
+                        '-Wl,--gc-sections',*[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],str(native),str(mode),str(gamma),str(backend),
                         '-o',str(exe)],check=True)
         return host32.run([str(exe)],cwd=ROOT,timeout=180).returncode
 
 
 def mutations():
     rows = [
+        ('hwdev/gf/native.c', 'return sys_time_now(value,&hi);',
+         'return sys_time_now(value,&hi) ? -1 : 0;', 'native clock raw rc'),
+        ('hwdev/gf/native.c', 'int rc=gf_production_clock(opaque,&start);',
+         'int rc=gf_production_clock(opaque,&start) ? -1 : 0;', 'native wait start raw rc'),
+        ('hwdev/gf/native.c', 'rc=gf_production_clock(opaque,&now);',
+         'rc=gf_production_clock(opaque,&now) ? -1 : 0;', 'native wait poll raw rc'),
+        ('hwdev/gf/display/modeset.c',
+         'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
+         'u32 part=us;', 'mode_load native wait must be chunked'),
         ('hwdev/gf/devinit.c', 'p->foundation.expected_pmc=prepared_pmc;', '(void)prepared_pmc;', 'prepare PMC publication omitted'),
         ('hwdev/gf/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),
