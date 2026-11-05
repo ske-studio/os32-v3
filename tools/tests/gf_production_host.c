@@ -10,6 +10,7 @@
 #include "include/gf_production.h"
 #include "init/sysconfig.c"
 #include "gfinit_resources_ra266.h"
+#include "gf_foundation_width_host.h"
 
 struct prod_reg { u32 off,value; };
 static struct prod_reg prod_regs[4096];
@@ -277,6 +278,7 @@ static void prod_reset(void)
     CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[13][0][1]==0x02b00102U);
     CHECK(!prod_cmd_writes && prod_mmio_calls==1 && !prod_route_calls);
     CHECK(prod.foundation.expected_pmc==0x03010000U);
+    foundation_width_cases(&prod.foundation);
     /* IRQ/tick adapter uses only its permanent map, never the guarded bus. */
     u32 words[2]={0,0},value,reads=prod_cfg_reads;
     volatile u8 *saved=prod.foundation.bar0;

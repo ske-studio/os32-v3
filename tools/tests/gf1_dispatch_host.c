@@ -17,6 +17,9 @@ static void irq_restore(unsigned v) { CHECK(!host_if);host_if=v;restores++; }
 #define GF1_DISPATCH_SOURCE "../../hwdev/gf/foundation_test.c"
 #endif
 #include GF1_DISPATCH_SOURCE
+#ifdef GF_WIDTH_TRACE
+#include "gf_foundation_width_host.h"
+#endif
 const struct gf2_test_ops gf2_module_ops={0};
 static void command_link(void) { CHECK(gf1_module_ops.command==&gf2_module_ops); }
 static struct gf_foundation foundation;
@@ -101,6 +104,9 @@ static void prepare_cases(void)
     CHECK(foundation.bar0==(volatile u8 *)mmio && foundation.instmem_bar.base==bars[2].base);
     CHECK(foundation.map_ops==&gf_production_instmem_map_ops);
     CHECK(foundation.expected_command==RECOVER_COMMAND_STOP);
+#ifdef GF_WIDTH_TRACE
+    foundation_width_cases(&foundation);
+#endif
     mmio[3]=0x12345678;u32 v=0;
     CHECK(!foundation.io.read(foundation.io.opaque,0,12,4,&v) && v==mmio[3]);
     CHECK(!foundation.io.write(foundation.io.opaque,0,16,4,0x87654321) && mmio[4]==0x87654321);
