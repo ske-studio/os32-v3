@@ -9,7 +9,8 @@ CHECK = dict(name='hwb-scripts-host', tier=1, budget=4.0, needs=[], covers=[
     'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
-    'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c'])
+    'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c',
+    'userland/tests/hw/gf_regs.hwb'])
 import json
 import os
 from pathlib import Path
@@ -23,7 +24,8 @@ FILES = [
     'userland/tests/hw/trident.hwb', 'userland/tests/hw/np21w_gdc.hwb',
     'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
     'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
-    'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb']
+    'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb',
+    'userland/tests/hw/gf_regs.hwb']
 MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
               'iowrite8 port 0xFAC 0', 'enable-fac'),
              ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
