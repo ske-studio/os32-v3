@@ -83,6 +83,14 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/native.c',
+         'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
+         'u32 part=us;', 'native wait passed unsplit'),
+        ('hwdev/gf/native.c', '    while (us) {',
+         '    if (us>GF_INIT_WAIT_CHUNK_US) return -1;\n    while (us) {',
+         'native wait long request rejected'),
+        ('hwdev/gf/native.c', '        us-=part;',
+         '        us=0;', 'native wait total truncated'),
         ('hwdev/gf/native.c', 'return sys_time_now(value,&hi);',
          'return sys_time_now(value,&hi) ? -1 : 0;', 'native clock raw rc'),
         ('hwdev/gf/native.c', 'int rc=gf_production_clock(opaque,&start);',
@@ -91,7 +99,7 @@ def mutations():
          'rc=gf_production_clock(opaque,&now) ? -1 : 0;', 'native wait poll raw rc'),
         ('hwdev/gf/display/modeset.c',
          'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
-         'u32 part=us;', 'mode_load native wait must be chunked'),
+         'u32 part=us;', 'mode_load outer deadline interval'),
         ('hwdev/gf/devinit.c', 'p->foundation.expected_pmc=prepared_pmc;', '(void)prepared_pmc;', 'prepare PMC publication omitted'),
         ('hwdev/gf/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),

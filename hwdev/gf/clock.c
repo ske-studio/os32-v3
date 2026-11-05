@@ -149,11 +149,7 @@ i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *p)
     if (!rc) rc=io->write(io->opaque,0,CLK_COEF,4,p->nn);
     if (!rc) rc=mask(io,CLK_CORE,CLK_CORE_MASK,p->nc);
     if (!rc) rc=mask(io,CLK_SHADER,CLK_SHADER_MASK,p->sc);
-    for (u32 remaining=CLK_SETTLE_US; !rc && remaining; ) {
-        u32 chunk=remaining>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : remaining;
-        rc=io->timing.wait_us(io->opaque,chunk);
-        remaining-=chunk;
-    }
+    if (!rc) rc=io->timing.wait_us(io->opaque,CLK_SETTLE_US);
     if (!rc) rc=mask(io,CLK_MUX,CLK_MUX_MASK,p->mux);
     if (rc) return result(g,rc);
     return result(g,0);

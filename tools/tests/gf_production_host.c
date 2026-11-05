@@ -294,8 +294,56 @@ static void prod_reset(void)
     prod.foundation.bar0=saved;
 }
 /* Run F4 with the ops assembled by real prepare, including the native
- * bounded wait. Only the permanent BAR memory is RAM in this host. */
+ * chunked wait. Only the permanent BAR memory is RAM in this host. */
 static int prod_start(void);
+/* Enforce mode_load's outer deadline-check interval in this test only.
+ * Native accepts long requests; mode_load must still return to its deadline
+ * checks every 1000us, even when the timing adapter would accept more. */
+static int prod_bounded_wait(void *opaque,u32 us)
+{
+    CHECK(us<=GF_INIT_WAIT_CHUNK_US);
+    if (us>GF_INIT_WAIT_CHUNK_US) return -1;
+    return gf_production_wait(opaque,us);
+}
+static int prod_bounded_foundation_wait(void *opaque,u32 us)
+{
+    CHECK(opaque==&prod.foundation);
+    return prod_bounded_wait(&prod,us);
+}
+static void prod_wait_cases(void)
+{
+    prod_reset();
+    struct gf_io *ios[]={&prod.foundation.io,&prod.display.io};
+    /* One start read and one 1000us poll per full chunk. This distinguishes
+     * chunking from a single long busy wait, independently of elapsed time. */
+    const u32 requests[]={0,1,1000,1001,10000,50000,50001};
+    for (u32 io=0;io<2;io++) {
+        for (u32 n=0;n<sizeof(requests)/sizeof(requests[0]);n++) {
+            u32 us=requests[n],chunks=(us+999U)/1000U;
+            prod_clock_step=1000; prod_now=U32_MAX-1500U;
+            u32 began=prod_now,calls=prod_clock_calls;
+            CHECK(!ios[io]->timing.wait_us(ios[io]->opaque,us));
+            CHECK(prod_clock_calls-calls==2U*chunks);
+            CHECK(prod_now-began>=us && prod_now-began==2000U*chunks);
+        }
+        /* Exact elapsed lower bound with a 1us fake clock, including wrap. */
+        prod_clock_step=1; prod_now=U32_MAX-1500U;
+        u32 began=prod_now,calls=prod_clock_calls;
+        CHECK(!ios[io]->timing.wait_us(ios[io]->opaque,50000));
+        CHECK(prod_now-began==50050U && prod_clock_calls-calls==50050U);
+        /* All starts and polls of a 50ms call, including later chunks. */
+        prod_clock_step=1000; prod_clock_error=-1702;
+        for (u32 nth=1;nth<=100;nth++) {
+            calls=prod_clock_calls;
+            prod_clock_fail=calls+nth;
+            CHECK(ios[io]->timing.wait_us(ios[io]->opaque,50000)==prod_clock_error);
+            CHECK(prod_clock_calls==calls+nth);
+        }
+        prod_clock_fail=0; prod_clock_error=0; prod_clock_step=0;
+        CHECK(ios[io]->timing.wait_us(ios[io]->opaque,10000)==-1);
+    }
+    output("PASS prepare -> foundation/display native wait: 10/50ms chunks, total, remainder, zero, wrap, every clock rc, stopped clock\n");
+}
 /* dispnv04/hw.c:38-65: FP_TG_CONTROL enable predicate (dfp.c:93-110). */
 #define PROD_FP_CONTROL 0x680848U
 static void prod_modeload_cases(void)
@@ -323,6 +371,11 @@ static void prod_modeload_cases(void)
         CHECK(!gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline));
         CHECK(prod_now-started>=(fp ? 70000U : 20000U) && prod_logs==logs);
     }
+    /* Same mode load with a timing fake capped at 1000us: the outer split
+     * stays useful for per-chunk deadlines even after native accepts long waits. */
+    prod.foundation.io.timing.wait_us=prod_bounded_foundation_wait;
+    ctx.deadline=prod_now+GF2_TIMEOUT_US;
+    CHECK(!gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline));
     u32 logs=prod_logs;
     prod_clock_fail=prod_clock_calls+1;
     CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==-1 && prod_logs==logs+1);
@@ -586,7 +639,7 @@ static void prod_cases(void)
     prod_reset();prod_clock_step=0;
     CHECK(gf_production_wait(&prod,1)==-1); /* finite stopped-clock path */
     prod_clock_step=1;CHECK(!gf_production_wait(&prod,1000));
-    CHECK(gf_production_wait(&prod,1001)==-1);
+    CHECK(!gf_production_wait(&prod,1001));
     prod_reset();prod_now=U32_MAX-16;
     CHECK(!prod_start() && !prod_return(&prod));
     output("PASS finite wait, unavailable/frozen clock, elapsed wrap and baseline deadline\n");
@@ -631,6 +684,7 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+    prod_wait_cases();
     prod_modeload_cases();
     prod_prepare_cases();
 #ifdef GF_HAL_TEST

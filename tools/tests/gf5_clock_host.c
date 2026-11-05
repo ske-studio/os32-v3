@@ -85,7 +85,7 @@ static void run(void)
     write_event(6,REG_SHADER,(OLD_SHADER&~SHADER_BITS)|p.sc);
     u32 elapsed=0, index=7;
     while (index<h.display.nevents && de[index].op==D_SLEEP) {
-        assert(de[index].a[0] && de[index].a[0]<=GF_INIT_WAIT_CHUNK_US);
+        assert(de[index].a[0]==SETTLE_US);
         elapsed+=de[index++].a[0];
     }
     assert(elapsed==SETTLE_US && h.display.calls[D_SLEEP]==index-7);
@@ -98,9 +98,9 @@ static void run(void)
     assert(h.display.calls[D_WRITE]==2 && !h.display.calls[D_SLEEP]);
     gf4_host_fail_at(&h.display,D_WRITE,0,0);
     gf5_host_trace_clear(&h);
-    gf4_host_fail_at(&h.display,D_SLEEP,2,-1);
+    gf4_host_fail_at(&h.display,D_SLEEP,1,-1);
     assert(gf5_clock_prog(&h.ctx,&p)==GF5_EIO && h.ctx.source_rc==-1);
-    assert(h.display.calls[D_SLEEP]==2 && h.display.calls[D_WRITE]==4);
+    assert(h.display.calls[D_SLEEP]==1 && h.display.calls[D_WRITE]==4);
     gf4_host_fail_at(&h.display,D_SLEEP,0,0);
     gf5_host_trace_clear(&h);
     assert(gf5_clock_read(&h.ctx,&c)==GF5_ESTATE);
