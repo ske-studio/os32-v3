@@ -232,7 +232,7 @@ static int oracle(bool color,bool readable)
     REQUIRE(equal(s[845],0x5A) && equal(s[846],misc));
     REQUIRE(equal(s[847],0x46) && equal(s[848],0xB9));
     REQUIRE(equal(s[849],0) && equal(s[850],0) && equal(s[851],boot_sr[13]));
-    REQUIRE(device.saved.valid && equal(device.saved.vga_base,base));
+    REQUIRE(device.saved.valid && equal(device.saved.vga_base,base) && equal(device.cur_vga_base,base));
     REQUIRE(equal(diagnostics,readable ? 0 : 1));
     REQUIRE(equal(fake.sr[14],boot_sr[14]) && equal(fake.gr[6],12));
     if (readable) for (u32 i=0;i<768;++i) REQUIRE(equal(fake.dac[i],boot_dac[i]));

@@ -97,12 +97,12 @@ LAYOUTS = {
         bar0_rid=16, bar1_rid=20, decode_bytes=24, mapped_bytes=28,
         display_sid=32, client_sid=36, client_bytes=40, bar0_phys=44,
         bar1_phys=48, regs_bytes=52, pci=56, ready=76)),
-    'struct trident_device': (928, dict(res=0, saved=4, declared_bytes=860,
+    'struct trident_device': (932, dict(res=0, saved=4, declared_bytes=860,
         verified_bytes=864, step=868, last_rc=872, restore_rc=876, disable_rc=880,
         init_done=884, first_init_done=885, active=886, returning=887, armed=888,
         leave_done=889, closed=890, io=892, io_opaque=896, failed_step=900,
         display_owner=904, chip=908, spr=909, reference=910, pinned=911,
-        declared_unknown=912, upper=916, scratch=920, scratch_bytes=924)),
+        declared_unknown=912, upper=916, scratch=920, scratch_bytes=924, cur_vga_base=928)),
     'struct trident_io': (32, dict(read8=0, read16=4, read32=8,
         write8=12, write16=16, write32=20, port8=24, write_span32=28)),
     'TridentModuleContext': (32, dict(backend=0, counters=4, resources=8,
@@ -195,6 +195,7 @@ for member in ('bus', 'slot', 'function', 'revision'):
     TYPES[f'((struct trident_pci_info *)0)->{member}'] = 'u8'
 TYPES.update({
     '((struct trident_saved *)0)->vga_base': 'u16',
+    '((struct trident_device *)0)->cur_vga_base': 'u16',
     '((struct trident_resources *)0)->ready': 'bool',
     '((struct trident_resources *)0)->pci': 'struct trident_pci_info',
     '((struct trident_device *)0)->saved': 'struct trident_saved',
@@ -207,6 +208,8 @@ for member in ('height', 'flip', 'page'):
     TYPES[f'((TridentModuleContext *)0)->{member}'] = 'int *'
 # Each anchor is unique. All mutants must compile, then fail during execution.
 MUTATIONS = (
+    ('misc-decode', FAKE_C, 'if (inactive_vga(f, off)) return 0xFF;',
+     'if (false && inactive_vga(f, off)) return 0xFF;'),
     ('palette-fixed-width', HEADER, 'u32 bits = component_bits;',
      'u32 bits = 4; (void)component_bits;'),
     ('current-owner', EMERGENCY, '(u32)(display_owner)()', '((void)(display_owner)(), 11u)'),

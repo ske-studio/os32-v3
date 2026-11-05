@@ -46,7 +46,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  *
  */
-/* Fixed 640x480x8, 25.175MHz, non-Cyber/old PLL, PCI MMIO, NoAccel.
+/* Fixed 640x480x8, 25.175MHz, non-Cyber/old PLL, PCI MMIO (reference default !NoAccel register image).
  * Sources (MIT): trident_driver-1.4.0.c:940-1047;
  * trident_dac.c:235-278,572-576,631-749,781-810,871-907;
  * trident_pll.c:42-135; vgaHW.c:369-409,845-872,1219-1353,1391-1468.
@@ -55,14 +55,16 @@
  *
  * Differences from H:148-320, following the reference (PACK priority):
  * - Unlock precedes TridentInit; read mode inputs before Protect/Restore,
- *   including CR36 selection and SR20/SR12 reads, even when unused on 9682.
- * - Unlock/TridentInit/entry Protect retain Save's base; VGA Restore selects
+ *   including CR3A selection and SR20/SR12 reads, even when unused on 9682.
+ * - Unlock/TridentInit/entry Protect use the current base; VGA Restore selects
  *   color, which subsequent TridentRestore/exit Protect also use (H: 3D4).
  * - VGA SR/CR/GR writes are two OUTBs, SR01=01 and initial CR13=28;
  *   TridentRestore later writes CR13=50. H uses OUTWs, 21 and 50.
  * - VGA Restore brackets AR with enable/disablePalette (H omits these).
- * - CR36=00: 9682 is below CYBER9388, so TridentInit leaves this image
- *   slot zero (dac.c:673-678); H:295 writes 80 instead.
+ * - DRAMControl CR3A stays zero on 9682 (dac.c:673-678); GraphEngReg
+ *   CR36=80 with PCI/UseMMIO/!NoAccel (dac.c:694-700), matching H:295.
+ * - PACK item 2 differs from D:2504-2529 and pll.c:42-55,71: 9682
+ *   leaves frequency unset, so IsClearTV reads CR C0, as H:150-156 does.
  * Enable is split out to lifecycle, per the frozen contract (D:1043-1044).
  * PC-98 skips WAITFORVSYNC (D:948); no PLL wait or invented retry limit.
  */
@@ -110,18 +112,18 @@ int trident_mode_640(struct trident_device *d)
 {
     u8 ignored, misc_ext, interface, performance, addcol, misc_int, pci;
     if (!d) return TRI_E_INVAL;
-    u16 base = d->saved.vga_base;
+    u16 base = d->cur_vga_base;
 
     /* D:1004; TridentInit prepares its image before vgaHWProtect. */
     TRY(trident_crtc_lock(d, base, false));
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0B, &ignored));
     TRY(trident_indexed_read(d, TRI_GR_INDEX, 0x0F, &misc_ext));
-    /* PM: this stage owns reference, read only after PC98 Init, not probe. */
+    /* IsClearTV: 9682 has no fixed frequency (D:2504-2529; pll.c:42-55). */
     TRY(trident_indexed_read(d, base, 0xC0, &d->reference));
     const u8 *pll = mode_pll[(d->reference & 0x80) != 0];
     TRY(trident_indexed_read(d, base, 0x2A, &interface));
     TRY(trident_indexed_read(d, base, 0x2F, &performance));
-    TRY(trident_write8(d, TRI_SPACE_REGS, base, 0x36));
+    TRY(trident_write8(d, TRI_SPACE_REGS, base, 0x3A));
     TRY(trident_indexed_read(d, base, 0x29, &addcol));
     TRY(trident_indexed_read(d, TRI_GR_INDEX, 0x2F, &misc_int));
     TRY(trident_indexed_read(d, base, 0x39, &pci));
@@ -129,6 +131,7 @@ int trident_mode_640(struct trident_device *d)
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x12, &ignored));
 
     TRY(trident_protect(d, base, true));
+    d->cur_vga_base = TRI_CR_COLOR; /* vgaHW.c:850-855, before MISC write */
     TRY(trident_write8(d, TRI_SPACE_REGS, TRI_MISC_WRITE, MODE_MISC));
     for (u32 i = 0; i < COUNT(mode_sr); ++i)
         TRY(vga_write(d, TRI_SR_INDEX, i + 1, mode_sr[i]));
@@ -153,7 +156,7 @@ int trident_mode_640(struct trident_device *d)
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x27, 0x08));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2B, 0));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x29, addcol & 0xCF));
-    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x36, 0));
+    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x36, 0x80));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2F, performance | 0x10));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2A, interface | 0x40));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x3A, 0));

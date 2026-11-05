@@ -68,8 +68,8 @@ int trident_capacity_plan(struct trident_device *d)
     int rc;
     if (!d || !d->res || !d->io) return TRI_E_INVAL;
     if (!d->init_done || !d->armed || !d->pinned) return TRI_E_STATE;
-    /* Keep the reference's VGA IOBase; H:120 hardcodes color instead. */
-    u16 base = d->saved.vga_base;
+    /* Use the reference's current VGA IOBase; H:120 hardcodes color instead. */
+    u16 base = d->cur_vga_base;
     rc = trident_indexed_read(d, base, 0x1F, &spr);
     if (rc) return rc;
     bool unknown = false;
@@ -238,5 +238,6 @@ int trident_vram_verify(struct trident_device *d)
     if (!rc && d->verified_bytes < TRI_DISPLAY_BYTES)
         rc = access_rc ? access_rc : TRI_E_CAP_TOO_SMALL;
     diagnostic(d, rc, access_rc);
-    return rc;
+    /* Cleanup failure is diagnostic once the display prefix is verified. */
+    return d->verified_bytes >= TRI_DISPLAY_BYTES ? TRI_OK : rc;
 }

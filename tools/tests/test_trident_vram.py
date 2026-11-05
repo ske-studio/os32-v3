@@ -34,21 +34,20 @@ MUTATIONS = (
      'default: kib = 2048; unknown = true;'),
     ('M_SPR_MASK', 'switch (spr & 0x0F)', 'switch (spr & 0x07)'),
     ('M_SPR_EXT', 'case 0x10: kib = 28672;', 'case 0x10: kib = 24576;'),
-    ('M_SPR_BASE', 'u16 base = d->saved.vga_base;', 'u16 base = TRI_CR_COLOR;'),
+    ('M_SPR_BASE', 'u16 base = d->cur_vga_base;', 'u16 base = TRI_CR_COLOR;'),
     ('M_PROBE_INVERT', 'phase < 2 && !bad', 'phase < 1 && !bad'),
     ('M_PROBE_UNDO', 'saved[i]);', 'saved[i] ^ 1u);'),
     ('M_PROBE_TAGS', 'value != pattern(at)', '(value != pattern(at) && off < WORD_BYTES)'),
     ('M_LOWER_RECHECK', '!rc && end < limit && end', '!rc && end < limit && !end'),
     ('M_DECODE_BOUND', 'u32 limit = d->res->decode_bytes;',
      'u32 limit = TRI_BAR0_DECODE_BYTES;'),
-    ('M_REQUIRE_2M', 'd->verified_bytes < TRI_DISPLAY_BYTES',
-     'd->verified_bytes < TRI_BAR0_DECODE_BYTES / 2'),
+    ('M_REQUIRE_2M', 'd->verified_bytes >= TRI_DISPLAY_BYTES ? TRI_OK : rc',
+     'd->verified_bytes >= TRI_BAR0_DECODE_BYTES / 2 ? TRI_OK : (rc ? rc : TRI_E_CAP_TOO_SMALL)'),
     ('M_DECLARE_LIMIT', 'u32 limit = d->res->decode_bytes;',
      'u32 limit = d->declared_bytes;'),
     ('M_RESTORE_RC', 'return restored;', 'return 0;'),
-    ('M_UPPER_FATAL', 'rc = access_rc ? access_rc : TRI_E_CAP_TOO_SMALL;',
-     'rc = access_rc ? access_rc : TRI_E_CAP_TOO_SMALL;\n'
-     '    if (access_rc) rc = access_rc;'),
+    ('M_CLEANUP_FATAL', 'return d->verified_bytes >= TRI_DISPLAY_BYTES ? TRI_OK : rc;',
+     'return rc;'),
     ('M_LOG', 'diagnostic(d, rc, access_rc);',
      'if (rc) diagnostic(d, rc, access_rc);'),
 )
@@ -59,7 +58,7 @@ def init_fixture():
     macros = text[text.index('#define EVENT('):text.index('#define LENGTH(')]
     # Reset values, color base, alternate SR0C branch. Status 5A is seeded by
     # the harness solely to match the existing fixture's named status sample.
-    values = dict(misc=0, seq=0, old=0, ext=0, config=0, video=0,
+    values = dict(misc=1, seq=0, old=0, ext=0, config=0, video=0,
                   base=0x3D4, mono=0, cr11=0)
     return (macros + '\n' + ''.join(f'#define {k} {v}\n' for k, v in values.items())
             + 'static const struct trident_fake_event init_expected[] = {\n'

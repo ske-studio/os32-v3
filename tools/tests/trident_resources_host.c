@@ -188,13 +188,29 @@ static void run(void)
     if (mode == 6) config[8][0][4] |= 1;
     if (mode == 7) config[8][0][5] |= 4;
     if (mode == 8) config[fxp_slot][0][6] = 0x20300000; /* full 1MiB overlaps */
-    if (mode == 9) { /* Unknown enabled endpoint, retain the CSR boundary. */
+    if (mode == 9) { /* Unknown enabled endpoint outside Trident does not veto startup. */
         config[10][0][0] = 0x99998888;
         config[10][0][1] = 2;
         config[10][0][4] = 0x30000000;
     }
+    if (mode == 48 || mode == 50) {
+        config[10][0][0] = 0x77776666; config[10][0][1] = 2;
+        config[10][0][4] = mode == 48 ? 0x20001000 : 0x1ff00000;
+        if (mode == 50) ledger_resources[0] = (struct ledger_resource){
+            .raw_bar = 0x1ff00000, .decode_first = 0x1ff00, .decode_end = 0x20001,
+            .bdf = 0x50, .vendor = 0x6666, .device = 0x7777, .bus = LEDGER_BUS_PCI,
+            .bar = 0, .width_basis = LEDGER_WB_DATASHEET
+        };
+    }
+    if (mode >= 51 && mode <= 54) {
+        config[10][0][0] = 0x77776666; config[10][0][1] = 2;
+        config[10][0][4] = mode == 53 ? 0x20001004 : mode == 54 ? 8 : 0x30000004;
+        /* A 64bit upper dword is not another BAR. */
+        config[10][0][5] = mode == 52 ? 0x20000000 : 0;
+    }
+    if (mode == 49) config[fxp_slot][0][0] = U32_MAX; /* no 82557 required */
     if (mode == 25) config[8][0][6] = 0x20000000;
-    if (mode == 26) config[fxp_slot][0][4] = 0x20420008; /* lost 64KiB bound */
+    if (mode == 26) config[fxp_slot][0][4] = 0x20420008; /* CSR need not be adjacent */
     if (mode == 27) config[fxp_slot][0][12] = 1;
     if (mode == 28) config[8][0][12] = 1;
     if (mode == 29) {
@@ -239,7 +255,7 @@ static void run(void)
     }
     CHECK(!trident_resources_get());
     int rc = trident_boot_reserve();
-    if (mode == 0 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
+    if (mode == 0 || mode == 51 || mode == 52 || mode == 54 || mode == 49 || mode == 9 || mode == 26 || mode == 42 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
         CHECK(rc == 0);
         const struct trident_resources *r = trident_resources_get();
         CHECK(r && r->ready && r->owner == 8 && r->bar0_rid == 3 && r->bar1_rid == 4);

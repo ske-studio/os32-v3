@@ -37,7 +37,7 @@ MUTATIONS = (
     ('pll-pal', '{ 0xA4, 0x0E }', '{ 0xA4, 0x1E }'),
     ('reference-select', '(d->reference & 0x80) != 0', '(d->reference & 0x40) != 0'),
     ('reference-stale', '0xC0, &d->reference', '0xC1, &d->reference'),
-    ('save-base', 'u16 base = d->saved.vga_base;', 'u16 base = TRI_CR_COLOR;'),
+    ('current-base', 'u16 base = d->cur_vga_base;', 'u16 base = TRI_CR_COLOR;'),
     ('vga-width', 'return trident_write8(d, TRI_SPACE_REGS, port + 1, value);',
      'return trident_indexed_write(d, port, index, value);'),
     ('vga-last-cr', '0x0B, 0xC3, 0xFF', '0x0B, 0xC3, 0xFE'),
@@ -48,7 +48,9 @@ MUTATIONS = (
     ('ar-enable', 'palette_access(d, true)', 'palette_access(d, false)'),
     ('hidden-dac', 'trident_hidden_dac_write(d, 0)', 'trident_hidden_dac_write(d, 1)'),
     ('linear', '0x21, 0x20)', '0x21, 0x00)'),
-    ('dram-control', '0x36, 0)', '0x36, 0x80)'),
+    ('graph-engine', '0x36, 0x80)', '0x36, 0)'),
+    ('dram-control-select', 'base, 0x3A));', 'base, 0x36));'),
+    ('dram-control', '0x3A, 0)', '0x3A, 0x10)'),
     ('addcol-mask', 'addcol & 0xCF', 'addcol & 0xEF'),
     ('performance', 'performance | 0x10', 'performance & 0xEF'),
     ('interface', 'interface | 0x40', 'interface & 0xBF'),
@@ -92,7 +94,7 @@ def oracle(base, reference, seed):
     rd(base, 0xC0, reference)
     rd(base, 0x2A, cr(0x2A))
     rd(base, 0x2F, cr(0x2F))
-    w(base, 0x36)
+    w(base, 0x3A)
     rd(base, 0x29, cr(0x29))
     rd(0x3CE, 0x2F, gr(0x2F))
     rd(base, 0x39, cr(0x39))
@@ -134,7 +136,7 @@ def oracle(base, reference, seed):
     for p, i, v in (
         (0x3D4, 0x1E, 128), (0x3D4, 0x21, 32), (0x3C4, 13, 32),
         (0x3D4, 0x50, 0), (0x3D4, 0x27, 8), (0x3D4, 0x2B, 0),
-        (0x3D4, 0x29, cr(0x29) & 207), (0x3D4, 0x36, 0),
+        (0x3D4, 0x29, cr(0x29) & 207), (0x3D4, 0x36, 128),
         (0x3D4, 0x2F, cr(0x2F) | 16), (0x3D4, 0x2A, cr(0x2A) | 64),
         (0x3D4, 0x3A, 0), (0x3D4, 0x38, 0),
         (0x3D4, 0x39, (cr(0x39) & 249) | 6), (0x3D4, 0x55, 31),

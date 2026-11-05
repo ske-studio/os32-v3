@@ -141,7 +141,7 @@ int trident_protect(struct trident_device *d, u16 base, bool on)
 /* H:548-576 plus exit protect. */
 #define SUFFIX \
     R(0x3DA, 0x5A), B(0x3C0, 0x10), B(0x3C0, 0x41), \
-    B(base, 0x11), R(base + 1, cr11), B(base, 0x11), B(base + 1, cr11 & 0x7F), \
+    B(base, 0x11), R(base + 1, mono ? 0xFF : cr11), B(base, 0x11), B(base + 1, mono ? 0x7F : cr11 & 0x7F), \
     B(0x3C4, 0x0B), R(0x3C5, old), B(0x3C4, 0x0E), R(0x3C5, ext | 0x20), \
     W(0x3C4, 0x0E | ((ext | 0xA0) << 8)), \
     W(0x3D4, 0x3820), W(0x3D4, 0x2020), W(0x3D4, 0x0E30), \
@@ -149,9 +149,9 @@ int trident_protect(struct trident_device *d, u16 base, bool on)
     B(0x43C6, 0xAF), B(0x43C7, 0), \
     B(0x3C4, 0x0B), R(0x3C5, old), B(0x3C4, 0x0E), R(0x3C5, ext | 0xA0), \
     W(0x3C4, 0x0E | (((ext | 0x20) & 0x7F) << 8)), \
-    B(base, 0x11), R(base + 1, cr11 & 0x7F), B(base, 0x11), B(base + 1, cr11 | 0x80), \
+    B(base, 0x11), R(base + 1, mono ? 0xFF : cr11 & 0x7F), B(base, 0x11), B(base + 1, mono ? 0xFF : cr11 | 0x80), \
     B(0x3C4, 1), R(0x3C5, seq | 0x20), B(0x3C4, 1), B(0x3C5, seq & 0xDF), \
-    B(0x3C4, 0), B(0x3C5, 3), R(base + 6, mono ? 0xA5 : 0x5A), B(0x3C0, 0x20)
+    B(0x3C4, 0), B(0x3C5, 3), R(base + 6, mono ? 0xFF : 0x5A), B(0x3C0, 0x20)
 #define LENGTH(a) (sizeof(a) / sizeof((a)[0]))
 /* Capacity is derived from ALL fixture sections (both exclusive branches),
  * never from product trace length. Extra operations fail exact length checks. */
@@ -279,7 +279,7 @@ static int selftest(void)
             REQUIRE(!unchanged_lifecycle());
             REQUIRE(equal(device.saved.vga_base, mono ? 0x3B4 : 0x3D4));
             REQUIRE(equal(fake.cr_mono[0x11],
-                          (u8)((config ^ 0xD7) | (mono ? 0x80 : 0))));
+                          (u8)(config ^ 0xD7)));
             REQUIRE(equal(fake.cr_color[0x11],
                           (u8)((config ^ 0xB6) | (mono ? 0 : 0x80))));
             if (config == 0 || config == 0x10) REQUIRE(!check_gate(count));

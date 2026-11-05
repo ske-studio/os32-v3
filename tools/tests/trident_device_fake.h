@@ -16,6 +16,8 @@ struct trident_fake_event {
 };
 struct trident_fake {
     struct trident_resources resources;
+    /* Inferred VGA decode: MISC bit0 selects color(1)/mono(0); inactive
+     * index/data/status read FF, ignore writes and do not reset AR flip. */
     u8 regs[TRI_BAR1_DECODE_BYTES];
     u8 sr[256], cr_color[256], cr_mono[256], gr[256], ar[32];
     u8 sr_index, color_index, mono_index, gr_index, ar_index;

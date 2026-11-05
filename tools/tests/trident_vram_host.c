@@ -1,4 +1,4 @@
-/* libc-free VRAM acceptance; shared fake is unmodified. SPR expectations:
+/* libc-free VRAM acceptance; shared fake decodes VGA by MISC bit0. SPR expectations:
  * MIT trident_driver-1.4.0.c:2919-2975; memory cases: S3_DESIGN §§4,7.
  * Production regs/Init/Mode/Enable are linked, not reimplemented here.
  * Init gate oracle is reused from trident_pc98init_host.c (MIT notices there).
@@ -61,6 +61,8 @@ static int setup(bool initialize)
     trident_fake_bind(&f, &d);
     d.scratch = scratch; d.scratch_bytes = sizeof(scratch);
     d.saved.vga_base = TRI_CR_COLOR;
+    d.cur_vga_base = TRI_CR_COLOR;
+    f.regs[TRI_MISC_WRITE] = 1;
     d.pinned = d.armed = true;
     d.last_rc = -77;
     if (initialize) {
@@ -70,6 +72,7 @@ static int setup(bool initialize)
         CHECK(!trident_pc98_init(&d));
         CHECK(equal(f.trace_count, N(init_expected)));
         CHECK(!trident_fake_accept_init(&f, 0, init_expected, N(init_expected)));
+        d.saved.vga_base = TRI_CR_MONO; /* consumers must use current base */
         d.init_done = true; /* lifecycle's documented commit point */
         CHECK(!trident_capacity_plan(&d));
         CHECK(!trident_mode_640(&d));
@@ -94,7 +97,8 @@ static int spr_table(void)
     };
     CHECK(!setup(false)); d.init_done = true;
     for (u32 mono = 0; mono < 2; ++mono) {
-        d.saved.vga_base = mono ? TRI_CR_MONO : TRI_CR_COLOR;
+        d.cur_vga_base = mono ? TRI_CR_MONO : TRI_CR_COLOR;
+        f.regs[TRI_MISC_WRITE] = !mono;
         u8 *cr = mono ? f.cr_mono : f.cr_color;
         for (u32 spr = 0; spr < 256; ++spr) {
             cr[0x1F] = spr; cr[0xC1] = 0;
@@ -108,7 +112,7 @@ static int spr_table(void)
             for (u32 j = 0; j < f.trace_count; ++j) {
                 CHECK(equal(trace[j].width, 1));
                 CHECK(equal(trace[j].space, TRI_SPACE_REGS));
-                CHECK(equal(trace[j].offset, d.saved.vga_base + (j & 1)));
+                CHECK(equal(trace[j].offset, d.cur_vga_base + (j & 1)));
             }
         }
         cr[0x1F] = 0xFE;
@@ -162,6 +166,17 @@ static int memory_cases(void)
             CHECK(equal(lower_writes, 6)); /* full lower-range recheck */
         CHECK(maximum_write < cases[i].mapped);
     }
+    /* A final tag undo failure after >=300KiB is recorded, not fatal. */
+    CHECK(!setup(true));
+    f.resources.mapped_bytes = TRI_DISPLAY_BYTES;
+    CHECK(!trident_vram_verify(&d));
+    u32 final_read = f.operations;
+    CHECK(!setup(true));
+    f.resources.mapped_bytes = TRI_DISPLAY_BYTES;
+    trident_fake_fail(&f, final_read, -123);
+    CHECK(!trident_vram_verify(&d));
+    CHECK(equal(d.verified_bytes, TRI_DISPLAY_BYTES));
+    CHECK(contains("rc=-7") && contains("verified=307200") && !intact());
     /* Decode and mapping independently constrain the traversal. */
     CHECK(!setup(true)); f.resources.decode_bytes = TRI_DISPLAY_BYTES;
     CHECK(!trident_vram_verify(&d));

@@ -154,7 +154,7 @@ static void protect(bool on)
         w(0x3C4, 0); w(0x3C5, 3);
     }
     /* Distinct status values make a color/mono substitution observable. */
-    r(protect_base + 6, protect_base == 0x3B4 ? 0x39 : 0xD6);
+    r(protect_base + 6, protect_base == 0x3B4 ? 0xFF : 0xD6);
     w(0x3C0, on ? 0 : 0x20);
 }
 static void indexed(u32 port, u8 index, u8 old, u8 value)
@@ -202,7 +202,9 @@ static int setup(u32 seed, u16 base)
     /* Lifecycle's prerequisites only; fake init/VRAM gate remains cold.
      * Standalone Disable models mode=2, without Save/PC98 Init. */
     device.pinned = true; device.armed = true;
-    device.saved.vga_base = base;
+    device.saved.vga_base = base == TRI_CR_COLOR ? TRI_CR_MONO : TRI_CR_COLOR;
+    device.cur_vga_base = base;
+    fake.regs[TRI_MISC_WRITE] = 1; /* PC98 Init selects color hardware. */
     device.last_rc = -71; device.restore_rc = -72; device.disable_rc = -73;
     device.step = TRI_STEP_MODE; device.failed_step = TRI_STEP_SAVE;
     before = device;

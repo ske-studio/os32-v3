@@ -12,7 +12,9 @@ static int test(void)
 {
     if (trident_fake_reset(&fake, storage, sizeof(storage), trace, sizeof(trace)/sizeof(trace[0]))) return 1;
     trident_fake_bind(&fake, &dev);
-    dev.saved.vga_base = TRI_CR_COLOR;
+    dev.saved.vga_base = TRI_CR_MONO;
+    dev.cur_vga_base = TRI_CR_COLOR;
+    fake.regs[TRI_MISC_WRITE] = 1;
     for (u32 i = 0; i < TRI_DAC_BYTES; ++i) rgb[i] = (u8)(i * 13 + 7);
     if (trident_palette(&dev, 0, 256, rgb)) return 2;
     if (fake.trace_count != TRI_DAC_COLORS * 15 || fake.trace_overflow || fake.writes[1] || fake.writes[2]) return 3;
@@ -32,7 +34,8 @@ static int test(void)
     if (trident_palette(&dev, 255, 1, rgb) || fake.trace_count != 15 || trace[3].value != 255) return 7;
     trident_fake_trace_reset(&fake);
     if (trident_palette(&dev, -1, 1, rgb) != TRI_E_INVAL || trident_palette(&dev, 256, 1, rgb) != TRI_E_INVAL || trident_palette(&dev, 255, 2, rgb) != TRI_E_INVAL || trident_palette(&dev, 0, 0, rgb) != TRI_E_INVAL || trident_palette(&dev, 0, -1, rgb) != TRI_E_INVAL || trident_palette(&dev, 0, 1, 0) != TRI_E_INVAL || fake.trace_count) return 8;
-    dev.saved.vga_base = TRI_CR_MONO;
+    dev.cur_vga_base = TRI_CR_MONO;
+    fake.regs[TRI_MISC_WRITE] = 0;
     for (u32 op = 1; op <= 15; ++op) {
         trident_fake_trace_reset(&fake);
         trident_fake_fail(&fake, fake.operations + op, -77);

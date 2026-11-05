@@ -87,7 +87,7 @@ MUTATIONS = [
     ('revision-bound', PRODUCT, 'p->revision != TRI_RA266_REVISION', '0', 5),
     ('bar-type', PRODUCT, 'p->bar0 != MEM_TRIDENT_LFB_VA', '(p->bar0 & ~1u) != MEM_TRIDENT_LFB_VA', 6),
     ('full-overlap', PRODUCT, 'first < other_end && other_first < end', 'first == other_first && end == other_end', 8),
-    ('known-width', PRODUCT, 'if (end == first) return TRI_E_RESOURCE;', 'if (end == first) return 0;', 9),
+    ('unknown-not-veto', PRODUCT, 'if (end == first) end = first + 1;', 'if (end == first) return TRI_E_RESOURCE;', 9),
     ('ram-overlap', PRODUCT, 'if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))',
         'if (0 && pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 10),
     ('reserve-first', PRODUCT, 'if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))',
@@ -111,8 +111,6 @@ MUTATIONS = [
     ('no-reserve-repeat', PRODUCT, 'if (attempted) return boot_rc;', 'if (false && attempted) return boot_rc;', 0),
     ('client-clear', PRODUCT, 'kmemset(resources.client, 0, TRI_DISPLAY_BYTES);',
         'kmemset(resources.client, 0, 0);', 0),
-    ('layout-bound', PRODUCT, 'return csr_boundary ? 0 : TRI_E_RESOURCE;',
-        'return csr_boundary ? 0 : 0;', 26),
     ('bridge-prefetch', PRODUCT, 'rc = bridge_window(dev, fn, PCI_CFG_PREF_WINDOW);',
         'rc = 0;', 45),
     ('multifunction', PRODUCT, 'header & PCI_HDR_MULTIFUNCTION ? PCI_FN_COUNT : 1',
@@ -151,10 +149,10 @@ def main():
                        check=True, capture_output=True)
         exe = build(folder, ROOT / PRODUCT)
         for runner in runners:
-            for mode in range(48):
+            for mode in range(55):
                 result = execute(exe, mode, runner)
                 assert result.returncode == 0, (mode, result.returncode, result.stdout, result.stderr)
-            print(f'GREEN {runner}: 48 boot/rollback cases, real resource construction, cold common fake', flush=True)
+            print(f'GREEN {runner}: 55 boot/rollback cases, real resource construction, cold common fake', flush=True)
         if args.mutate:
             original = (ROOT / PRODUCT).read_text()
             for name, path, old, new, mode in MUTATIONS:

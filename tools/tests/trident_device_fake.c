@@ -87,8 +87,17 @@ void trident_fake_restored(struct trident_fake *f)
 {
     if (f->block_after_restore) f->pc98_initialized = false;
 }
+/* Inference from VGA MISC bit0 decode: inactive CRTC/status ports read FF
+ * and ignore writes. This has not been measured on the Ra266. */
+static bool inactive_vga(const struct trident_fake *f, u32 off)
+{
+    bool color = (f->regs[TRI_MISC_WRITE] & 1u) != 0;
+    u32 base = color ? TRI_CR_MONO : TRI_CR_COLOR;
+    return off == base || off == base + 1 || off == base + 6;
+}
 static u8 read_reg(struct trident_fake *f, u32 off)
 {
+    if (inactive_vga(f, off)) return 0xFF;
     switch (off) {
     case TRI_SR_INDEX + 1: return f->sr[f->sr_index];
     case TRI_CR_COLOR + 1: return f->cr_color[f->color_index];
@@ -116,6 +125,7 @@ static u8 read_reg(struct trident_fake *f, u32 off)
 }
 static void write_reg(struct trident_fake *f, u32 off, u8 v)
 {
+    if (inactive_vga(f, off)) return;
     switch (off) {
     case TRI_SR_INDEX: f->sr_index = v; break;
     case TRI_SR_INDEX + 1: f->sr[f->sr_index] = v; break;

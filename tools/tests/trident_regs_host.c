@@ -80,6 +80,7 @@ static int sequences(u16 cb)
     const u32 counts[] = {2,1,3,3,7,7,4,8,8,4,4};
     for (u32 which = 0; which < sizeof(counts)/sizeof(counts[0]); ++which) {
         CHECK(!reset());
+        f.regs[TRI_MISC_WRITE] = cb == TRI_CR_COLOR;
         CHECK(!invoke(which, cb));
         CHECK(equal(f.trace_count, counts[which]) && !f.trace_overflow);
         for (u32 i = 0; i < counts[which]; ++i) {
@@ -98,6 +99,7 @@ static int sequences(u16 cb)
          * The exact rc returns immediately; failed reads never publish output. */
         for (u32 fail = 1; fail <= counts[which]; ++fail) {
             CHECK(!reset());
+        f.regs[TRI_MISC_WRITE] = cb == TRI_CR_COLOR;
             trident_fake_fail(&f, fail, -73);
             CHECK(equal(invoke(which,cb), (u32)-73));
             CHECK(equal(f.operations,fail) && equal(f.trace_count,fail));

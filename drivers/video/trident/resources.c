@@ -45,8 +45,6 @@ static bool overlaps(u32 first, u32 end, u32 other_first, u32 other_end)
 static int other_bar(u32 bdf, u16 vendor, u16 device, u32 bar, u32 raw)
 {
     u32 first = (raw & PCI_BAR_MEM_ADDR_MASK) / PAGE_SIZE, end = first;
-    if ((raw & PCI_BAR_TYPE_MASK) != PCI_BAR_MEM_TYPE32 || !first)
-        return TRI_E_RESOURCE;
     if (vendor == PCI_VENDOR_INTEL && device == PCI_DEVICE_82557 &&
         (bar == 0 || bar == 2)) {
         u32 bytes = bar == 0 ? TRI_FXP_CSR_BYTES : TRI_FXP_FLASH_BYTES;
@@ -79,7 +77,9 @@ static int other_bar(u32 bdf, u16 vendor, u16 device, u32 bar, u32 raw)
                 break;
             }
         }
-        if (end == first) return TRI_E_RESOURCE;
+        /* An unmeasured BAR is not a startup veto. Its base still proves
+         * an overlap when it falls inside either Trident decode interval. */
+        if (end == first) end = first + 1;
     }
     if (end > PHYSMEM_MAX_PFN) return TRI_E_RESOURCE;
     for (u32 i = 0; i < TRI_BAR_COUNT; ++i)
@@ -112,7 +112,6 @@ static int bridge_window(u32 dev, u32 fn, u32 reg)
  * devices are covered by their bus-0 bridge's full forwarding windows. */
 static int validate_layout(void)
 {
-    bool csr_boundary = false;
     for (u32 dev = 0; dev < PCI_DEV_COUNT; ++dev) {
         if (pci_cfg_read16(0, dev, 0, PCI_CFG_VENDOR_ID) == PCI_VENDOR_NONE) continue;
         u8 header = pci_cfg_read8(0, dev, 0, PCI_CFG_HEADER_TYPE);
@@ -130,11 +129,15 @@ static int validate_layout(void)
             for (u32 b = 0; b < nb; ++b) {
                 u32 raw = pci_cfg_read32(0, dev, fn, PCI_CFG_BAR0 + b * PCI_CFG_BAR_STRIDE);
                 if (!raw || (raw & PCI_BAR_SPACE_IO)) continue;
-                int rc = other_bar((dev << 3) | fn, vendor, device, b, raw);
+                u32 bar = b;
+                if ((raw & PCI_BAR_MEM_TYPE) == PCI_BAR_MEM_TYPE64 && b + 1 < nb) {
+                    u32 high = pci_cfg_read32(0, dev, fn,
+                        PCI_CFG_BAR0 + (++b) * PCI_CFG_BAR_STRIDE);
+                    if (high) continue; /* entirely above Trident's 32-bit ranges */
+                }
+                int rc = other_bar((dev << 3) | fn, vendor, device, bar, raw);
                 if (rc) return rc;
-                if (vendor == PCI_VENDOR_INTEL && device == PCI_DEVICE_82557 && b == 0 &&
-                    (raw & PCI_BAR_MEM_ADDR_MASK) == MEM_TRIDENT_REGS_VA + TRI_BAR1_DECODE_BYTES)
-                    csr_boundary = true;
+
             }
             u32 rom = header == PCI_HDR_LAYOUT_BRIDGE ? PCI_CFG_ROM_BRIDGE : PCI_CFG_ROM_ENDPOINT;
             if (pci_cfg_read32(0, dev, fn, rom) & 1u)
@@ -147,7 +150,7 @@ static int validate_layout(void)
             }
         }
     }
-    return csr_boundary ? 0 : TRI_E_RESOURCE;
+    return 0;
 }
 
 const struct trident_resources *trident_resources_get(void)

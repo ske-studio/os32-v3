@@ -49,11 +49,9 @@
 /* PC-98 Enable/Disable: MIT X.Org trident_driver-1.4.0.c:694-775.
  * NEC LCD172VXM/192VXM manual p.20 is the sync reference; the 9682
  * register manual is unavailable (trident_mode.hwb:50-52).
- * Unlike the script's fixed 3D4 protect base (H:499-517) and the 3a
- * header note, retain Save's base for vgaHWProtect, as the reference does
- * (vgaHW.c:1021-1025,1786-1806). CR23/29 remain explicitly at 3D4.
- * PACK's reference-first rule takes precedence over that script difference.
- * Lifecycle owns pin/arm, saved base and error diagnostics; these primitives
+ * vgaHWProtect uses the current IOBase (vgaHW.c:850-855,1021-1025),
+ * which changes at VGA mode/state restore. CR23/29 stay explicitly at 3D4.
+ * Lifecycle owns pin/arm, saved state and error diagnostics; these primitives
  * return the first failing rc unchanged. No waits, retries or readback.
  * Coordination of 0FAC with pc98_route.c belongs to stage 3c.
  */
@@ -81,7 +79,7 @@ int trident_route_enable(struct trident_device *d)
     ROUTE_TRY(trident_port8(d, TRI_PORT_FF, 0x07));
     ROUTE_TRY(trident_port8(d, TRI_PORT_FF, 0x8F));
     ROUTE_TRY(trident_port8(d, TRI_PORT_FF, 0x06));
-    ROUTE_TRY(trident_protect(d, d->saved.vga_base, true));
+    ROUTE_TRY(trident_protect(d, d->cur_vga_base, true));
 
     /* D:706-727: every extended DAC update selects index 4 twice. */
     ROUTE_TRY(route_update(d, TRI_CR_COLOR, 0x23, 0xDF, 0x00));
@@ -91,7 +89,7 @@ int trident_route_enable(struct trident_device *d)
     ROUTE_TRY(route_update(d, TRI_GR_INDEX, 0x23, 0xFC, 0x00));
     ROUTE_TRY(trident_ext_dac_update(d, 0xFF, 0x01));
     ROUTE_TRY(route_update(d, TRI_SR_INDEX, 0x01, 0xEF, 0x00));
-    ROUTE_TRY(trident_protect(d, d->saved.vga_base, false));
+    ROUTE_TRY(trident_protect(d, d->cur_vga_base, false));
     return trident_port8(d, TRI_PORT_ROUTE, 0x02);
 }
 
@@ -100,7 +98,7 @@ int trident_route_disable(struct trident_device *d)
     if (!d) return TRI_E_INVAL;
     /* D:738-767: route back before touching VGA. */
     ROUTE_TRY(trident_port8(d, TRI_PORT_ROUTE, 0x00));
-    ROUTE_TRY(trident_protect(d, d->saved.vga_base, true));
+    ROUTE_TRY(trident_protect(d, d->cur_vga_base, true));
     ROUTE_TRY(route_update(d, TRI_SR_INDEX, 0x01, 0xFF, 0x10));
     ROUTE_TRY(trident_ext_dac_update(d, 0xFE, 0x00));
     ROUTE_TRY(route_update(d, TRI_GR_INDEX, 0x23, 0xFC, 0x01));
@@ -110,7 +108,7 @@ int trident_route_disable(struct trident_device *d)
     ROUTE_TRY(trident_ext_dac_update(d, 0xFB, 0x00));
     ROUTE_TRY(route_update(d, TRI_CR_COLOR, 0x29, 0xFB, 0x00));
     ROUTE_TRY(route_update(d, TRI_CR_COLOR, 0x23, 0xFF, 0x20));
-    ROUTE_TRY(trident_protect(d, d->saved.vga_base, false));
+    ROUTE_TRY(trident_protect(d, d->cur_vga_base, false));
 
     /* D:769-772: preserve the complete closing flip-flop sequence. */
     ROUTE_TRY(trident_port8(d, TRI_PORT_FF, 0x07));

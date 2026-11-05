@@ -56,6 +56,31 @@ static int selftest(void)
     REQUIRE(equal(f->resources.pci.bar0, 0x20000000));
     REQUIRE(equal(f->resources.pci.bar1, 0x20400000));
     REQUIRE(!f->pc98_initialized && !f->cr_color[0x21]);
+    /* VGA decode inference: only MISC bit0's bank responds, including
+     * index/data/status. Inactive writes must not change the bank or AR flip. */
+    for (u32 color = 0; color < 2; ++color) {
+        u16 active = color ? TRI_CR_COLOR : TRI_CR_MONO;
+        u16 inactive = color ? TRI_CR_MONO : TRI_CR_COLOR;
+        u8 value;
+        u8 old_index = color ? f->mono_index : f->color_index;
+        u8 old_data = color ? f->cr_mono[0x12] : f->cr_color[0x12];
+        REQUIRE(!device.io->write8(f, TRI_SPACE_REGS, TRI_MISC_WRITE, color));
+        REQUIRE(!device.io->write16(f, TRI_SPACE_REGS, active, 0x5A11));
+        REQUIRE(!device.io->write16(f, TRI_SPACE_REGS, inactive, 0xA512));
+        REQUIRE(equal(color ? f->mono_index : f->color_index, old_index));
+        REQUIRE(equal(color ? f->cr_mono[0x12] : f->cr_color[0x12], old_data));
+        REQUIRE(!device.io->read8(f, TRI_SPACE_REGS, active + 1, &value));
+        REQUIRE(equal(value, 0x5A));
+        REQUIRE(!device.io->read8(f, TRI_SPACE_REGS, inactive + 1, &value));
+        REQUIRE(equal(value, 0xFF));
+        REQUIRE(!device.io->read8(f, TRI_SPACE_REGS, inactive, &value));
+        REQUIRE(equal(value, 0xFF));
+        f->ar_data = true;
+        REQUIRE(!device.io->read8(f, TRI_SPACE_REGS, inactive + 6, &value));
+        REQUIRE(equal(value, 0xFF) && f->ar_data);
+        REQUIRE(!device.io->read8(f, TRI_SPACE_REGS, active + 6, &value));
+        REQUIRE(!f->ar_data);
+    }
     u32 word = 0;
     const struct trident_io *io = device.io;
     REQUIRE(!io->write32(f, TRI_SPACE_LFB, 0, 0x12345678));
@@ -164,12 +189,13 @@ static int selftest(void)
     REQUIRE(io->read8(f, TRI_SPACE_REGS, 0x3CF, &byte) == -74);
     REQUIRE(equal(byte, 0x55) && f->trace[4].rc == -74);
     /* Attribute flip-flop, mono/color CRTC and all DAC components. */
+    REQUIRE(!io->write8(f, TRI_SPACE_REGS, TRI_MISC_WRITE, 0));
     REQUIRE(!io->read8(f, TRI_SPACE_REGS, 0x3BA, &byte));
     REQUIRE(!io->write8(f, TRI_SPACE_REGS, 0x3C0, 0x10));
     REQUIRE(!io->write8(f, TRI_SPACE_REGS, 0x3C0, 0x41));
     REQUIRE(equal(f->ar[0x10], 0x41));
     REQUIRE(!io->write16(f, TRI_SPACE_REGS, 0x3B4, 0xAB11));
-    REQUIRE(equal(f->cr_mono[0x11], 0xAB) && !f->cr_color[0x11]);
+    REQUIRE(equal(f->cr_mono[0x11], 0xAB) && equal(f->cr_color[0x11], 0x5A));
     f->trace_capacity = 0; /* bulk palette doesn't need a trace buffer */
     REQUIRE(!io->write8(f, TRI_SPACE_REGS, 0x3C8, 0));
     for (u32 i = 0; i < 768; ++i)

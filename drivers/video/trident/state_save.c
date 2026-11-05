@@ -118,6 +118,7 @@ static int save_vga(struct trident_device *d)
     SAVE_TRY(read_reg(d, TRI_MISC_READ, &save[TRI_SAVE_MISC]));
     u16 base = (save[TRI_SAVE_MISC] & 1) ? TRI_CR_COLOR : TRI_CR_MONO;
     d->saved.vga_base = base;
+    d->cur_vga_base = base;
     for (u32 i = 0; i < 25; ++i)
         SAVE_TRY(trident_indexed_read(d, base, i, &save[TRI_SAVE_CR + i]));
     SAVE_TRY(palette_access(d, base, 0));

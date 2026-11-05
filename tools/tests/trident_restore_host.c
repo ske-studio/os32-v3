@@ -144,6 +144,7 @@ static int scenario(u32 current, u32 saved)
     copy(&seed, &fake, sizeof(seed));
     initial = device;
     REQUIRE(!trident_state_restore(&device));
+    REQUIRE(equal(device.cur_vga_base, saved ? TRI_CR_COLOR : TRI_CR_MONO));
     REQUIRE(!fake.trace_overflow);
     u32 count = fake.trace_count;
     REQUIRE(count == fake.operations);

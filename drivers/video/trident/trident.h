@@ -189,13 +189,17 @@ struct trident_device {
     void *io_opaque;
     u32 failed_step, display_owner; /* arm-time diagnostic only, never a filter */
     u8 chip, spr, reference; /* identify owns chip; capacity_plan owns spr;
-                             * mode_640 reads reference after PC98 Init (H:148-151). */
+                             * mode_640 reads reference after PC98 Init (IsClearTV). */
     bool pinned, declared_unknown;
     enum trident_upper upper;
     /* RAM loan for first VRAM verification only; lifecycle allocates/frees.
      * Emergency restoration never uses scratch or allocates. */
     u32 *scratch;
     u32 scratch_bytes;
+    /* vgaHW IOBase (index port): Save selects saved MISC; VGA mode restore
+     * selects color; state restore selects saved MISC again. PC98 Init
+     * deliberately retains Save's selection even after changing MISC. */
+    u16 cur_vga_base;
 };
 
 /* probe.c: config-only validation before arm; indexed identify after arm. */
@@ -251,9 +255,9 @@ int trident_state_restore(struct trident_device *d);
 int trident_capacity_plan(struct trident_device *d);
 int trident_vram_verify(struct trident_device *d);
 /* mode_640.c excludes Enable; lifecycle calls Enable once after ModeInit.
- * Mode/route AR and protect use 3D4 per the script (H:548–554).
- * The reference retains the Save-time base (vgaHW.c:1021; D:704–727,740–767);
- * boot MISC bit0=0 gives 3B4 there even after Init MISC|=C3.
+ * Mode entry and route protect use cur_vga_base (vgaHW IOBase).
+ * Mode VGA Restore switches it to color; state VGA Restore to saved MISC.
+ * PC98 Init retains Save's selection even after Init MISC|=C3.
  * Route 0xFAC also belongs to pc98_route.c; their relationship is set in 3c. */
 int trident_mode_640(struct trident_device *d);
 int trident_route_enable(struct trident_device *d);

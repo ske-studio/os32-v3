@@ -87,7 +87,9 @@ static int setup(const struct mode_case *c)
     f.regs[TRI_DAC_MASK] = 0xA5;
     f.regs[TRI_DAC_WRITE_INDEX] = 0x37;
     f.hidden_dac = 0x73;
-    d.saved.vga_base = c->base;
+    d.saved.vga_base = c->base == TRI_CR_COLOR ? TRI_CR_MONO : TRI_CR_COLOR;
+    d.cur_vga_base = c->base;
+    f.regs[TRI_MISC_WRITE] = c->base == TRI_CR_COLOR;
     d.saved.valid = true;
     d.reference = c->reference ^ 0x80; /* stale probe value must be replaced */
     d.last_rc = -77;
@@ -100,7 +102,7 @@ static int check_case(const struct mode_case *c)
     if (!equal(d.reference, c->reference) || !equal(f.trace_count, c->count) ||
         f.trace_overflow || !equal(d.last_rc, (u32)-77) || d.active ||
         d.init_done || d.first_init_done || f.pc98_initialized || f.port_writes ||
-        !d.saved.valid || !equal(d.saved.vga_base, c->base)) return 1;
+        !d.saved.valid || !equal(d.cur_vga_base, TRI_CR_COLOR)) return 1;
     for (u32 i = 0; i < c->count; ++i) {
         const struct trident_fake_event *a = &trace[i], *b = &c->events[i];
         if (!equal(a->space, b->space) || !equal(a->offset, b->offset) ||

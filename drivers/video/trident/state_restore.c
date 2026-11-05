@@ -118,6 +118,7 @@ int trident_state_restore(struct trident_device *d)
 
     /* vgaHWRestoreMode: saved MISC switches the VGA IOBase. */
     base = (s[TRI_SAVE_MISC] & 1u) ? TRI_CR_COLOR : TRI_CR_MONO;
+    d->cur_vga_base = base;
     TRY(trident_write8(d, TRI_SPACE_REGS, TRI_MISC_WRITE, s[TRI_SAVE_MISC]));
     for (u8 i = 1; i < 5; ++i)
         TRY(vga_write(d, TRI_SR_INDEX, i, s[TRI_SAVE_SR + i - 1u]));

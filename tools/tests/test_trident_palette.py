@@ -20,7 +20,7 @@ MUTATIONS = (
     ('mask', 'TRI_DAC_MASK, 0xFF', 'TRI_DAC_MASK, 0xFE'),
     ('index', '(u8)(first + i)', '(u8)(first + i + 1)'),
     ('conversion', 'trident_palette_dac6(*rgb++, GFX_PALETTE_COMPONENT_BITS)', '(*rgb++ & GFX_PALETTE_COMPONENT_MASK)'),
-    ('delay_base', 'return trident_read8(d, TRI_SPACE_REGS, d->saved.vga_base + 6, &status);', 'return trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6, &status);'),
+    ('delay_base', 'return trident_read8(d, TRI_SPACE_REGS, d->cur_vga_base + 6, &status);', 'return trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6, &status);'),
     ('delay_rc', 'if (rc) return rc;\n    return trident_read8', 'if (rc) return 0;\n    return trident_read8'),
 )
 
