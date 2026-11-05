@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 80,
+  "version": 81,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -1971,6 +1971,11 @@
       "args": ["const char *path", "u32 duration_ms"],
       "in": [{"arg": "path", "target": true}],
       "target": "kapi_osri_show"
+    },
+    {
+      "name": "ime_dict_suspend",
+      "ret": "int",
+      "args": ["int on"]
     }
   ]
 }

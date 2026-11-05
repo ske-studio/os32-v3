@@ -4,7 +4,7 @@ HostDrv同期コマンド
 
 ## SYNOPSIS
 
-`hsync [-f] [--verify] [-n] [-v] [--unsafe-overwrite] [--expect-build ID] [--force-kapi] [--no-backup] [--root 根] [dir]`
+`hsync [-f] [--verify] [-n] [-v] [--unsafe-overwrite] [--expect-build ID] [--force-kapi] [--fep-off] [--no-backup] [--root 根] [dir]`
 
 ## DESCRIPTION
 
@@ -129,6 +129,14 @@ rshell_serial.py --port <port> --sfs-lan --timeout 600 cmd sfs run hsync --root 
 新 FD は1行、旧 FD は2行とも再実行する。同期中は配備元を変更しない。
 同期は HDD にだけ書き、LAN 設定を済ませた FD の内容は変えない。
 シリアル制御と LAN 転送の両方を使い、raw socket 権限・シリアル速度は既存設定に従う。
+
+### FEP 辞書の停止中配備 (--fep-off)
+
+`--fep-off` を指定すると、同期の最初の書き込み前に FEP 辞書を閉じ、
+成功・失敗・中止時に開き直して元のモードに戻す。閉じる処理に失敗した場合は
+同期を始めない。再読込に失敗した場合は FEP を無効のままにして失敗を返す。
+`-n` では辞書を閉じない。このオプションの実行には KAPI v81 が必要。
+指定しない場合は今までどおり、開いている辞書の差し替えは BUSY で断る。
 
 ### 同一判定
 

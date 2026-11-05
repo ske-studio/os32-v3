@@ -552,7 +552,7 @@ userland/system/install.elf: userland/system/install_recover.inc
 userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) sdk/link/app.ld $(CRT0_OBJ)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
-userland/system/hsync.elf: userland/system/hsync_protect.inc
+userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
 userland/system/hsync.elf: lib/crc32_core.inc
 
 # === ELF → RAW → OS32X BIN 変換 ===
