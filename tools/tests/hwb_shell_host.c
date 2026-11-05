@@ -223,6 +223,15 @@ static void scripts(void)
                 struct hwbf_pci *g = hwbf_add_pci(&bus, HW_BDF(0,13,0), 0x10de, 0x0221);
                 g->config[0x13] = 0x24;
             }
+            if (hwbf_equal(script->name, "hpt370_probe.hwb")) {
+                /* Ra266 HighPoint 0:12.0 (RA266 §1-1): no drive attached, status reads 0. */
+                struct hwbf_pci *h = hwbf_add_pci(&bus, HW_BDF(0,12,0), 0x1103, 0x0004);
+                h->config[0x10] = 0x21; h->config[0x11] = 0x60; /* cmd0 0x6020 */
+                h->config[0x14] = 0x29; h->config[0x15] = 0x60; /* ctl0 0x6028 */
+                h->config[0x18] = 0x31; h->config[0x19] = 0x60; /* cmd1 0x6030 */
+                h->config[0x1C] = 0x2D; h->config[0x1D] = 0x60; /* ctl1 0x602c */
+                h->config[0x20] = 0x01; h->config[0x21] = 0xC0; /* bm 0xc000 */
+            }
             int expected = 0;
             if (hwbf_equal(script->name, "np21w_nopci.hwb")) { bus.mechanism = 0; expected = 3; }
             if (hwbf_equal(script->name, "np21w_poll.hwb")) expected = 124;
