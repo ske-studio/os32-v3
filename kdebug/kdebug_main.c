@@ -5,6 +5,7 @@
 #include "kernel/kselftest.h"
 #include "kernel/v86/v86_gcap.h"
 #include "kpeek.h"
+#include "hwb_wire.h"
 
 #include "recover.h"
 #include "recover_diag.h"
@@ -121,6 +122,7 @@ static int recovery_attach(void)
 }
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+    if (op == HW_OP) return hwb_access(buf, size);
     struct recover *r = recover_owner();
     if ((op >= GF_OP_INSPECT && op <= GF_OP_ABORT) || op == GF_OP_MODESET ||
         op == GF_OP_C_ONLY || op == GF_OP_FOUNDATION || op == GF_OP_COMMAND) {

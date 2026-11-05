@@ -14,7 +14,7 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 | V | docs/design/kdebug/gfinit_decode.md |
 | M / A / S | tools/accept/gf_main.md / tools/accept/gf_a4.md / tools/accept/gf_s8.md |
 | W / G | tools/rshell_recover.py / kdebug/gfinit.c |
-| B / K | tools/tests/gfinit_budget_host.c / kdebug/kpeek_allow.c |
+| B / K | tools/tests/gfinit_budget_host.c / kdebug/kpeek.c |
 
 
 ## 当日ユーザーがすること (PM がまとめた要約、2026-10-29)

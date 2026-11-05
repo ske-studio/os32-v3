@@ -65,7 +65,8 @@ def late_stop(mutate=False):
         tmp = pathlib.Path(directory)
         for name, body, slot_source, expected in variants:
             (tmp / 'late_stop_appslot.inc').write_text(slot_source)
-            (tmp / 'late_stop_exec.inc').write_text(body + '\n' + '\n'.join(
+            hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
+            (tmp / 'late_stop_exec.inc').write_text(hwb_flag + '\n' + body + '\n' + '\n'.join(
                 lifecycle.function(ex, n) for n in ('ring3_abort_request', 'ring3_abort_check')))
             exe = tmp / 'test'
             inc = (['-I' + str(root / p) for p in ('tools/tests/host_arch',)] + include_flags(root))

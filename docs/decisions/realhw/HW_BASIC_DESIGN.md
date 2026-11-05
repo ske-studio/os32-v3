@@ -260,3 +260,16 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - N2 (P3): Y を「include を外すだけ」に書き換えた。
 - N3 (P3、実装の段で直す): §7 の NP21/W の行は `device d = bdf 0:0.0` を置いてから `pciread32 d 0 -> x` と書く。
 - N4 (P3、実装の段で直す): F の段で exec/exec_abort.inc:46-47・appslot.c:408 の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
+
+## PM 決定 (2026-11-05、HW-BASIC の機能 PM、実装の前)
+- P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (drivers/pci/pci_hwb.h・exec/exec_hwb.h) と host 試験の土台 (tools/tests/hwb_fake.h・tools/tests/hwb_host.py)。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
+- P2 (試験の置き方): §6 の V (tools/tests/hwb_test.py 1 本) は、段ごとの `tools/tests/test_hwb_<部品>.py` (各自の CHECK と MUTATIONS) に分ける。共有の登録の衝突を避けるため (run.py の lint は 0 件に当たる covers の glob を missing input にする)。共通の組み立て・実行・変異は a0 の tools/tests/hwb_host.py。
+- P3 (N4 の appslot.c:408): 書き換えない。新しい印は exec_abort.inc の中だけにあり、appslot の状態は CUI で今までどおり 1 バイトも変わらないので、あのコメントは正しいまま。exec_abort.inc のコメントだけを書き換え、CUI で印以外が変わらないことは abort の host 試験で確かめる (wt/p6-close の exec/appslot との重なりも避ける)。
+- P4 (スクリプトの置き場): リポジトリの `userland/tests/hw/*.hwb` に置き、配備マニフェスト (userland/deploy.yaml、tags: [test]) でゲストの `/test/hw/` へ。§7 の NP21/W の試験のスクリプトも同じ所に置く。
+- P5 (vgaHWProtect の展開): 出典は X.Org xserver hw/xfree86/vgahw/vgaHW.c の vgaHWProtect (MIT、xorg-server-21.1.13、PM の手元 ~/os32-tmp/refs/xorg-vgahw/vgaHW.c:574)。trident の段で script 内の call に展開する。
+- P6 (検査): このブランチはメインストリームでない (PARALLEL_BRANCHES §3)。段の実装者は make all (check_slot.sh 経由) と自分の試験の直接の実行・--mutate・--lint だけ。check-changed は回さず、取り込みの検査は wt/hw-basic の GitHub の CI の緑で代える。
+- P7 (§4 の seq の初期値、rshell の段の欠け): seq は run ごとに 1 から始め、命令ごとに 1 ずつ増やす (begin と end は同じ seq)。ホストの採取は最初の seq が 1 でなければ先頭の欠けとして扱う。
+- P8 (vgaHW.c の許諾、trident の段の欠け): vgaHW.c の冒頭は著作権表示だけで、許諾文は xserver の COPYING の XFree86 Project の項 (xorg-server-21.1.13 の COPYING:54-76、X11 型の MIT 系) が当たる。trident.hwb の注記には vgaHW.c の著作権表示とその許諾文を置く ([HW3] の BSD/MIT の参照、GPL ではない)。
+- P9 (§4 の begin と BAR の解決の順、exec の段のレビュー): BAR の解決 (config の読み直し) は宛先の解決であり、データのアクセスの begin の前に行う。begin の addr は常に解決した物理番地 (port・config offset)。解決で失敗したときは、その命令の begin (target は論理の宛先、addr は未解決と分かる書き方) と end (rc) を出してから止まる — 開始の記録の無い停止を作らない。poll の最終の行にも解決した番地を出す。
+- P10 (§5 の shell の大きさ、wire の段の逸脱): shell.bin の text の増分は実測 +23,936 B (116,004 → 139,940 B) で、§5 の設計予算 12〜20 KiB を 3,456 B 超える。上限は MEM_SHELL_MAX_SIZE (include/memmap.h、675,840 B) で、text+BSS 483,528 B は内にある。物理の制約に当たらないので受け入れる (上限は物理の制約が無ければ広げてよい)。kdebug.bin は image 129,156 B / mem 143,360 B (上限 262,144 B)、kernel.bin +576 B。
+- P11 (§7 の NP21/W の TVRAM の行、NP21/W の受入で): TVRAM の先頭 (0xA0000) は記録の行の表示でコンソールが書き換えるので、write→read の照合に使えない (実測: 0x41 を書いた直後に 0x20)。TVRAM の試験と 10 秒の poll は、文字の領域の末尾の語 0xA1FFE (80x25 の外) を使う。§7 の「PCI 機構なし」は、この NP21/W では 0CF8h が値を保持する (機構 #1 の検出が通る) が装置は 0 件で、pciread32 0:0.0 は OK/全 1/終了値 0 (§3 の「機構ありで装置なし」) になる。NOSYS/終了値 3 の経路は host 試験で確かめる。
