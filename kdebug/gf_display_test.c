@@ -2,6 +2,8 @@
  * OS32's staged camera protocol has no nouveau equivalent. Hardware work
  * stays behind the borrowed module ops; C2 owns all scan reservations. */
 #include "gf_display_test.h"
+#include "gf_command_wire.h"
+#include "fs/fd_redirect.h"
 #include "../hwdev/gf/display/api.h"
 #include "../hwdev/gf/gf1_test.h"
 #include "../drivers/video/geforce/geforce_module.h"
@@ -823,19 +825,76 @@ static i32 display_lifecycle(const struct display_request *q)
     return rc;
 }
 
+/* The shell remains runnable while this owner holds the diagnostic display.
+ * App teardown funnels normal exit, CTRL+STOP and fault through owner_exit. */
+static int display_cui_owner;
+static void display_failure(const char *stage, i32 rc)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("GF4 ERROR stage="); serial_puts_polled(stage);
+    serial_puts_polled(" rc="); serial_diag_i32(rc); serial_puts_polled("\r\n");
+}
+static i32 display_cui(bool enter)
+{
+    i32 rc = 0;
+    const struct gf4_test_ops *o = geforce_display_ops();
+    if (enter) {
+        if (display_cui_owner || display_session.valid || (o && o->ctx && o->ctx->ready)) rc = GF4_EBUSY;
+        else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
+        else {
+            display_cui_owner = res_owner_get();
+            gfx_backend_geforce.enter();
+            o = geforce_display_ops();
+            if (!o || !o->ctx || !o->ctx->ready) {
+                gfx_backend_geforce.leave();
+                display_cui_owner = 0;
+                rc = GF4_ESTATE;
+            }
+        }
+    } else if (!display_cui_owner || display_cui_owner != res_owner_get()) rc = GF4_ESTATE;
+    else {
+        /* Complete a camera snapshot before the backend tears down its loans. */
+        rc = display_restore(true);
+        if (!rc) {
+            gfx_backend_geforce.leave();
+            o = geforce_display_ops();
+            if (o && o->ctx && o->ctx->ready) rc = GF4_ESTATE;
+            else {
+                display_cui_owner = 0;
+                display_session = (typeof(display_session)){0};
+            }
+        }
+    }
+    if (rc) display_failure(enter ? "enter" : "leave", rc);
+    return rc;
+}
+void gf_display_owner_exit(int id)
+{
+    if (!display_cui_owner || display_cui_owner != id) return;
+    /* A failing restore must not prevent routing back to 98 on owner death. */
+    i32 rc = display_restore(true);
+    if (rc) display_failure("owner_restore", rc);
+    if (gfx_backend_geforce.leave) gfx_backend_geforce.leave();
+    display_cui_owner = 0;
+    if (!rc) display_session = (typeof(display_session)){0};
+    else display_session.running = display_session.lifecycle = false;
+}
+
 i32 gf_display_test(u32 session)
 {
+    if (session == GF4_CUI_ENTER || session == GF4_CUI_LEAVE)
+        return display_cui(session == GF4_CUI_ENTER);
     struct display_request q;
     i32 rc = display_decode(session, &q);
     if (rc) return rc;
     rc = display_admit(&q);
-    if (rc) return rc;
+    if (rc) { display_failure("display_admit", rc); return rc; }
     if (q.test == DISPLAY_RESTORE) return display_restore(true);
     if (q.test == DISPLAY_ENUM) return q.phase ? GF4_EINVAL : display_enumerate(&q);
     if (q.test == DISPLAY_LIFECYCLE) return display_lifecycle(&q);
     if (!q.phase) {
         rc = display_begin(&q);
-        if (rc) return rc;
+        if (rc) { display_failure("display_begin", rc); return rc; }
     }
     rc = q.test == DISPLAY_GAMMA ? display_gamma_step(&q) :
          q.test == DISPLAY_OUTPUTS ? display_outputs_step(&q) : display_step(&q);

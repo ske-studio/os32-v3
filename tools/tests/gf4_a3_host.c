@@ -18,6 +18,9 @@ enum session_event { SESSION_SAVE, SESSION_RESTORE, SESSION_RELEASE,
 #define SESSION_EVENTS (GF4_MODES * 16U)
 #define SESSION_NOW 123U
 #define SESSION_FAILURE (-777)
+static bool forced_leave;
+static int current_owner = 2;
+int res_owner_get(void) { return current_owner; }
 static struct gf4_host host;
 static struct gf4_state state;
 static struct gf4_test_ops normal, replacement;
@@ -305,7 +308,7 @@ static void leave_call(void)
     ++leaves;
     i32 rc = case_event(CASE_LEAVE);
     if (rc || leave_failed) return;
-    assert(!host.ctx.diagnostic_saved && !display_session.valid);
+    if (!forced_leave) assert(!host.ctx.diagnostic_saved && !display_session.valid);
     normal_slot = NULL; host.ctx.ready = false;
     state.head[0].enabled = false;
 }
@@ -393,6 +396,8 @@ static i32 release_call(struct gf4_ctx *ctx, const struct gf4_saved *saved)
 }
 static void reset(void)
 {
+    display_cui_owner = 0; current_owner = 2; forced_leave = false;
+    gf2_host_memset(&state, 0, sizeof(state));
     gf4_host_init(&host, &state);
     output_fixture = revoke_gamma = enter_invalid = leave_failed = perturb_other = false;
     gammas = enters = leaves = 0;
@@ -1107,9 +1112,52 @@ static void lifecycle_steps(void)
     assert(occurrences("SKIP") == 1 && !occurrences("READY"));
 }
 
+static void cui_controls(void)
+{
+    reset(); host.ctx.ready = false; normal_slot = NULL;
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 1 && display_cui_owner == 2);
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && enters == 1);
+    current_owner = 3;
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
+    gf_display_owner_exit(3); assert(!leaves && display_cui_owner == 2);
+    current_owner = 2;
+    assert(!gf_display_test(MODE_WIRE) && display_session.valid);
+    assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 1 && !normal_slot);
+    assert(!display_cui_owner && !display_session.valid);
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && leaves == 1);
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2);
+    gf_display_owner_exit(2);
+    assert(leaves == 2 && !display_cui_owner && !host.ctx.ready);
+    gf_display_owner_exit(2); assert(leaves == 2);
+    reset(); host.ctx.ready = false; normal_slot = NULL;
+    fail_event = CASE_ENTER; failure_nth = 1;
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner && leaves == 1);
+    reset(); assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && !enters);
+    reset(); host.ctx.ready = false; normal_slot = NULL;
+    assert(!gf_display_test(GF4_CUI_ENTER)); leave_failed = true;
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && display_cui_owner == 2);
+    leave_failed = false; assert(!gf_display_test(GF4_CUI_LEAVE));
+    reset(); host.ctx.ready = false; normal_slot = NULL;
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(MODE_WIRE));
+    restore_rc = SESSION_FAILURE; forced_leave = true;
+    gf_display_owner_exit(2);
+    assert(!display_cui_owner && !host.ctx.ready && leaves == 1);
+    assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY);
+    restore_rc = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+    reset();
+    assert(gf_display_test(MODE_WIRE | NEXT_PHASE) == GF4_ESTATE);
+    assert(gf2_host_strstr(output, "GF4 ERROR stage=display_admit rc=-408"));
+    reset(); normal_slot = NULL;
+    assert(gf_display_test(MODE_WIRE) == GF4_ESTATE);
+    assert(gf2_host_strstr(output, "GF4 ERROR stage=display_begin rc=-408"));
+}
+
 void _start(void)
 {
-    wire_and_admission(); start_failures(); restore_retries();
+    cui_controls(); wire_and_admission(); start_failures(); restore_retries();
     mode_steps(); dpms_steps(); enumeration(); enumeration_ports();
     skipped_modes(); case_failures();
     cursor_steps(); flip_steps(); cursor_flip_failures();

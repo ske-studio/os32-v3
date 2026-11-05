@@ -273,9 +273,11 @@ int gf_foundation_test(struct gf1_request *q,struct gf_foundation *f,
     }
     q->session=core.token.session;q->rc=f?GF1_OK:GF1_EINVAL;return q->rc;
 }
+static u32 command_calls, command_test_id, command_session;
 int gf_command_test(struct gf2_request *q,struct gf_foundation *f,
                     int (*read_row)(void *,u32,u8 *),void *row_owner)
-{ (void)q;(void)f;(void)read_row;(void)row_owner;return GF2_OK; }
+{ command_calls++;command_test_id=q->test;command_session=q->session;
+  (void)f;(void)read_row;(void)row_owner;return GF2_OK; }
 
 static void t2b_clock_advances(void)
 {

@@ -308,8 +308,7 @@ int gf_command_test(struct gf2_request *request, struct gf_foundation *f,
                                  PCI_CFG_VENDOR_ID);
         if (o.device != RECOVER_GF_DEVICE) { rc = GF1_EPCI; goto rejected; }
     }
-    if (o.production && (q.test == GF2_BAD_HANDLE || q.test == GF2_BAD_METHOD))
-        goto rejected;
+    /* Explicit CUI fault tests use the same F4 owner recovery as STOP/START. */
     if (q.test == GF2_STATUS) rc = phase(&o, GF2T_SNAPSHOT, "status", session);
     else if (q.test == GF2_START) rc = phase(&o, GF2T_START, "start", session);
     else if (q.test == GF2_STOP) rc = phase(&o, GF2T_STOP, "stop", session);

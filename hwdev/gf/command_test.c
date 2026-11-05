@@ -21,6 +21,8 @@ static struct gf2_test_reply diagnostic_saved, production_saved;
  * this object; neither prepare nor a failed call may clear or move it. */
 static struct gf2_object test_object;
 static u32 test_object_epoch;
+static struct gf2_object production_test_object;
+static u32 production_test_object_epoch;
 
 void gf2_test_bind_production(struct gf_foundation *f, struct gf2_chan *ch)
 {
@@ -74,20 +76,22 @@ static int bad_command(struct gf2_chan *ch, enum gf2_test_op op, u32 deadline)
 {
     u32 handle = TEST_BAD_HANDLE, data = 0;
     int rc;
-    if (ch != &diagnostic || ch->state != GF2_RUN) return GF2_ESTATE;
+    if ((ch != &diagnostic && ch != production_ch) || ch->state != GF2_RUN) return GF2_ESTATE;
+    struct gf2_object *object = ch == production_ch ? &production_test_object : &test_object;
+    u32 *epoch = ch == production_ch ? &production_test_object_epoch : &test_object_epoch;
     rc = gf2_fault_check(ch);
     if (rc) return rc;
     if (op == GF2T_BAD_METHOD) {
         handle = TEST_METHOD_HANDLE;
-        if (!test_object.handle || test_object_epoch != ch->epoch) {
+        if (!object->handle || *epoch != ch->epoch) {
             /* Section 4: drain and pause before publishing a RAMHT entry. */
             rc = reference(ch, deadline);
             if (rc) return rc;
             rc = gf2_fifo_pause(ch);
             if (rc) return rc;
-            rc = gf2_gr_object_new(ch, handle, GF2_GR_M2MF, &test_object);
+            rc = gf2_gr_object_new(ch, handle, GF2_GR_M2MF, object);
             if (rc) return rc;
-            test_object_epoch = ch->epoch;
+            *epoch = ch->epoch;
             ch->last_rc = GF2_OK;
             gf2_fifo_resume(ch);
             if (ch->last_rc) return ch->last_rc;

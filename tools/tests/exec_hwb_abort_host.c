@@ -11,6 +11,8 @@ static void observed_restore(unsigned int flags);
 #undef irq_save
 #undef irq_restore
 #include "exec/appslot.c"
+#include "exec/ring3_str.c"
+volatile u32 kctx_irq_depth, kctx_exc_depth;
 
 volatile u32 tick_count;
 void fd_redirect_clear_state(FdRedirectState *state)
@@ -19,6 +21,12 @@ void fd_redirect_clear_state(FdRedirectState *state)
 }
 
 static int gui_mode, owner;
+static u32 display_returns;
+void gf_display_owner_exit(int id)
+{
+    CHECK(id == APP_ID_SHELL && _irq_enabled());
+    display_returns++;
+}
 static u32 saves, restores;
 static int inject_after_restore;
 static unsigned int observed_save(void)
@@ -81,6 +89,18 @@ static void test(void)
     same_slots(before);
 
     /* Independent expectations from §3/F and existing GUI STOP contract. */
+    HWB_TEST("display-return");
+    g_cui_display_abort_pending = 0; display_returns = 0;
+    exec_cui_display_abort(); CHECK(!display_returns);
+    ring3_abort_request(); CHECK(!display_returns);
+    kctx_irq_depth = 1;
+    (void)ring3_wait_pending(); CHECK(!display_returns);
+    kctx_irq_depth = 0;
+    (void)ring3_wait_pending(); CHECK(display_returns == 1);
+    exec_cui_display_abort(); CHECK(display_returns == 1);
+    take_check(1); take_check(0); /* independent HW stop request survives */
+    same_slots(before);
+
     HWB_TEST("legacy-routes");
     for (int mode = 0; mode <= 1; mode++) {
         for (int kind = 0; kind < 3; kind++) {

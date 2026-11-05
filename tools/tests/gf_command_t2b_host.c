@@ -145,7 +145,7 @@ static int fake_command(struct gf_foundation *f, const struct gf2_test_request *
     return rc;
 }
 static const struct gf2_test_ops commands = {.call = fake_command};
-static const struct gf1_test_ops foundations = {.call = fake_heads, .command = &commands};
+static struct gf1_test_ops foundations = {.call = fake_heads, .command = &commands};
 const struct gf1_test_ops *geforce_foundation_ops(void) { return &foundations; }
 static int fake_row(void *opaque, u32 y, u8 *row)
 {
@@ -155,6 +155,7 @@ static int fake_row(void *opaque, u32 y, u8 *row)
 }
 static void reset(void)
 {
+    foundations.production = NULL;
     device = (struct gf_foundation){0};
     device.io.opaque = &device;
     device.io.timing.clock_us = fake_clock;
@@ -178,7 +179,7 @@ static int request(u32 test)
 {
     struct gf2_request q = {sizeof(q), test, 0, 0};
     int rc = gf_command_test(&q, &device, fake_row, &device);
-    assert(q.rc == rc && q.session == trial.token.session);
+    assert(q.rc == rc && q.session == (foundations.production == &device ? 0U : trial.token.session));
     return rc;
 }
 static void t2b_reference_count(void)
@@ -211,7 +212,7 @@ static void t2b_fault_recover(void)
 {
     const u32 cases[] = {GF2_BAD_HANDLE, GF2_BAD_METHOD};
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        reset();
+        reset(); foundations.production = &device;
         assert(request(cases[i]) == GF2_OK);
         assert(recover_calls == 1 && reference_calls == 100000U && saved.epoch == 42);
         reset();no_fault = true;
