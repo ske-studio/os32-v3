@@ -393,7 +393,10 @@ static void c1_render_failures(void)
     cint_stall_reference=0;
     svc_finish();
 }
-void _start(void)
+#ifndef GF4_C1_ENTRY
+#define GF4_C1_ENTRY _start
+#endif
+void GF4_C1_ENTRY(void)
 {
     c1_start();
     c1_expect(&svc_state.head[0].front,GFX_FMT_PACKED8,C1_INDEX_BPP);
