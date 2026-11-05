@@ -58,6 +58,7 @@
 #include <stdbool.h>
 #include "types.h"
 #include "memmap.h"
+#include "gfx/palette.h"
 
 #define TRI_PCI_VENDOR 0x1023u
 #define TRI_PCI_DEVICE 0x9660u
@@ -66,8 +67,9 @@
 #define TRI_PCI_SLOT 8u
 #define TRI_PCI_FUNCTION 0u
 #define TRI_PCI_COMMAND 0x0002u
-#define TRI_BAR0_PHYS 0x20000000u
-#define TRI_BAR1_PHYS 0x20400000u
+/* Device windows are identity mapped; memmap.h owns their addresses. */
+#define TRI_BAR0_PHYS MEM_TRIDENT_LFB_VA
+#define TRI_BAR1_PHYS MEM_TRIDENT_REGS_VA
 #define TRI_BAR0_DECODE_BYTES 0x00400000u
 #define TRI_BAR1_DECODE_BYTES 0x00010000u
 #define TRI_REG_MAPPED_BYTES 0x00009000u /* covers 0..83C8, 9 pages */
@@ -229,8 +231,10 @@ int trident_ext_dac_update(struct trident_device *, u8 mask, u8 bits);
 int trident_protect(struct trident_device *, u16 vga_base, bool on);
 int trident_crtc_lock(struct trident_device *, u16 vga_base, bool lock);
 /* pc98_init.c: full D:616–692, including protect and SR0C alternate branch.
- * Entry protect uses current MISC bit0 BEFORE MISC|=C3 (D:622–626); AR,
- * unlock/lock and exit protect use color 3D4 AFTER it (D:650–656,688–690). */
+ * Entry protect uses current MISC bit0 BEFORE MISC|=C3 (D:622–626).
+ * AR and unlock/lock/exit protect use 3D4 per H:548–554. The reference
+ * retains the base selected at Save (vgaHW.c:1021; D:651,688–690), so
+ * boot MISC bit0=0 gives 3B4 there: an intentional script difference. */
 int trident_pc98_init(struct trident_device *d);
 /* state_save.c/default_dac.c/state_restore.c: 852 slots, nonprimary,
  * no font/text planes, default MCLK not saved, SR0E restore XOR 02.
@@ -248,8 +252,9 @@ int trident_state_restore(struct trident_device *d);
 int trident_capacity_plan(struct trident_device *d);
 int trident_vram_verify(struct trident_device *d);
 /* mode_640.c excludes Enable; lifecycle calls Enable once after ModeInit.
- * Mode/route AR and protect use current MISC after Init MISC|=C3, hence
- * color 3D4 (D:626,704–727,740–767; vgaHW.c:1786–1789).
+ * Mode/route AR and protect use 3D4 per the script (H:548–554).
+ * The reference retains the Save-time base (vgaHW.c:1021; D:704–727,740–767);
+ * boot MISC bit0=0 gives 3B4 there even after Init MISC|=C3.
  * Route 0xFAC also belongs to pc98_route.c; their relationship is set in 3c. */
 int trident_mode_640(struct trident_device *d);
 int trident_route_enable(struct trident_device *d);
@@ -266,6 +271,7 @@ int trident_present(struct trident_device *, int x, int y, int w, int h);
  * (W=4: x<<2 | x>>2), W=6 is unchanged, W>6 takes the high six (W=8: x>>2).
  * This pure contract helper performs no I/O; saved/default DAC register
  * images are already in DAC units and must not be converted again. */
+STATIC_ASSERT(GFX_PALETTE_COMPONENT_BITS >= 4 && GFX_PALETTE_COMPONENT_BITS <= 8, trident_palette_component_bits_range);
 static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
 {
     u32 bits = component_bits;

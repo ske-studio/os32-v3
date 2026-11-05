@@ -211,8 +211,8 @@
 #define PEGC_PALETTE_MAX       255   /* 各輝度の最大値 (16 色機は 15) */
 #define PEGC_PAL_KAPI_BITS     4     /* 現在の KAPI の成分幅 */
 #define PEGC_PAL_KAPI_MASK     0x0F  /* KAPI 側の輝度は 4bit (0〜15) */
-_Static_assert(PEGC_PAL_KAPI_MASK == (1u << PEGC_PAL_KAPI_BITS) - 1u,
-               "KAPI palette component bits/mask mismatch");
+STATIC_ASSERT(PEGC_PAL_KAPI_MASK == (1u << PEGC_PAL_KAPI_BITS) - 1u,
+              kapi_palette_component_bits_mask_match);
 #define PEGC_PAL_KAPI_SCALE    17    /* 4bit → 8bit の伸張係数 (15*17 = 255) */
 
 /* GUI がフォーカスアプリに貸せる範囲 (契約 G8)。0〜15 はシステム色として

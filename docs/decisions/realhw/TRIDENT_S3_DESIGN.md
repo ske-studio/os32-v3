@@ -40,6 +40,7 @@ PACK の実機成功・2MiB非ミラー確定を最新の事実とする。以�
 | F6 | T:113–114 は容量未確定・CRTC設定が次、V:98 は容量別試験待ち | 最新PACKは表示成功・実容量2MiB非ミラー。SPR=7F/FF→4MiB申告は採用容量にしない |
 | F7 | 指定HWDEV_CORE_API.mdは現行指定先にない。V:144のgfx_arm_emergencyは擬似API | archiveは未参照・根拠にしない。現行仕様の代替文書は未確認。mm/pgalloc.h:254–274,304とmm/paging.h:124の実APIへ接続する新設内部契約 |
 | F8 | HAL initはvoid (include/gfx_hal.h:56)、cirrus_module.c:38はprepare拒否 | prepareを検証するgeforce_module.c:95を手本に専用loader、rcを状態へ保持 |
+| F9 | H:548–554 は 0x3D4。手本の IOBase は GetIOBase (vgaHW.c:1786、D:1970)・SaveMode (:1021)・RestoreMode (:851) で決まり、pc98_init は選び直さない (D:651,688–690) | 台本どおり 0x3D4 を使う。手本は Save 時点の基点を保持するため、起動時 MISC bit0=0 なら 0x3B4 となる差を保持 |
 
 ## 2. 初期化の列
 
