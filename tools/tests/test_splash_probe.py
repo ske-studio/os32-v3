@@ -10,8 +10,8 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h', 'arch/x86/kernel/idt.h',
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[],
-    # CI measured 58.62 s for the fixed diagnostic workload; allow headroom.
-    budget=120.0)
+    # Reduced host workload measured 13.13 s locally; allow over 2x headroom.
+    budget=30.0)
 import argparse
 import os
 import re
@@ -263,9 +263,14 @@ def execute(mutation=None):
                     'static u32 probe_hcollect(u32 count, u32 completed)\n{\n    probe_hcollect_check();')
             dest.write_text(source)
         cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'); exe = work/'probe'
+        # Eight frames retain the nine edges used by classification; 32 H periods
+        # retain the calibrated cap boundary. 200000 polls cover fake frame waits,
+        # 64 clock samples suffice, and 4096 H samples cover the slowest fixture.
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
-            '-D__KERNEL_BUILD__', '-DSPLASH_RASTER_DIAG', *include_flags(ROOT),
+            '-D__KERNEL_BUILD__', '-DSPLASH_RASTER_DIAG',
+            '-DPROBE_FRAMES=8u', '-DPROBE_HPERIODS=32u', '-DPROBE_POLLS=200000u',
+            '-DPROBE_SAMPLES=64u', '-DPROBE_HSAMPLES=4096u', *include_flags(ROOT),
             '-I'+str(ROOT/'drivers/video/pc98'), str(work/'tools/tests/splash_probe_host.c'),
             '-lgcc', '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner='qemu', capture_output=True)
@@ -277,7 +282,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap, calibrated B error, per-column/phase/kind batch maximum frequency and distinct second, raw/corrected Q parts, physical low/high N0..6 body and disjoint outside spans, successful return/prep/next-wait linkage, ordered B periods', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 38H IF0 cap, calibrated B error, per-column/phase/kind batch maximum frequency and distinct second, raw/corrected Q parts, physical low/high N0..6 body and disjoint outside spans, successful return/prep/next-wait linkage, ordered B periods', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)

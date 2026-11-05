@@ -23,11 +23,21 @@
 #include "ktime.h"
 #include "config.h"
 
+#ifndef PROBE_FRAMES
 #define PROBE_FRAMES 32u
+#endif
+#ifndef PROBE_HPERIODS
 #define PROBE_HPERIODS 64u
+#endif
+#ifndef PROBE_POLLS
 #define PROBE_POLLS 1000000u
+#endif
+#ifndef PROBE_SAMPLES
 #define PROBE_SAMPLES 128u
+#endif
+#ifndef PROBE_HSAMPLES
 #define PROBE_HSAMPLES 8192u
+#endif
 #define PROBE_PL_COLUMNS 129u /* N5:42, N6:87; PL design M1 addendum. */
 #define PROBE_PL_MASKS 7u
 #define PROBE_PL_Q 0u
