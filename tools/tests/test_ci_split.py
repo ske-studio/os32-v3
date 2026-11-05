@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """CI job independence and early artifact downloads, without GitHub access."""
 CHECK = dict(name='ci-split-host', tier=0,
-             covers=['.github/workflows/build.yml', '.github/actions/build-setup/action.yml',
+             covers=['.github/workflows/build.yml', '.github/workflows/full-check.yml',
+                     '.github/actions/build-setup/action.yml',
                      'tools/ci_fetch.sh', 'tools/tests/test_ci_split.py'],
              needs=[], budget=3)
 
@@ -16,6 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/build.yml'
+FULL_CHECK = ROOT / '.github/workflows/full-check.yml'
 SETUP = ROOT / '.github/actions/build-setup/action.yml'
 FETCH = ROOT / 'tools/ci_fetch.sh'
 SHA = 'a' * 40
@@ -49,6 +51,34 @@ def workflow_cases(source):
     assert {s.get('name') for s in steps} >= {'Host dependencies',
         'Rust toolchain (rust-toolchain.toml)', 'Cache i386-elf toolchain',
         'Cache IPAex fonts', 'Fetch JF Dot Shinonome16 (verify cached font and license)'}
+
+
+def full_check_cases(source):
+    workflow = yaml.safe_load(source)
+    # PyYAML's YAML 1.1 loader reads the GitHub Actions key "on" as True.
+    triggers = workflow[True] if True in workflow else workflow['on']
+    assert set(triggers) == {'workflow_dispatch', 'schedule'}, 'full-check triggers'
+    assert triggers['workflow_dispatch']['inputs']['ref']['default'] == 'main'
+    assert triggers['schedule'] == [{'cron': '0 18 * * *'}]
+    assert workflow['concurrency'] == dict(group='full-check', **{'cancel-in-progress': False})
+    job, = workflow['jobs'].values()
+    assert job['runs-on'] == 'ubuntu-latest'
+    assert job['timeout-minutes'] == 330
+    steps = job['steps']
+    checkout = next(s for s in steps if s.get('uses') == 'actions/checkout@v4')
+    assert checkout['with']['ref'] == "${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}"
+    setup = next(i for i, s in enumerate(steps) if s.get('uses') == './.github/actions/build-setup')
+    build = next(i for i, s in enumerate(steps) if s.get('name') == 'Build core (make all)')
+    check = next(i for i, s in enumerate(steps) if s.get('name') == 'make check')
+    assert setup < build < check, 'prepare, build, then check'
+    assert ' all ' in steps[build]['run']
+    assert 'make check ' in steps[check]['run'] and 'MUTATE=1' in steps[check]['run'], 'full mutation check'
+    upload = next(s for s in steps if s.get('uses') == 'actions/upload-artifact@v4')
+    assert upload['if'] == 'always()' and upload['with']['retention-days'] == 14
+    collect = next(s for s in steps if s.get('name') == 'Collect check results')
+    assert collect['if'] == 'always()'
+    # Inspect workflow text only; this test does not read generated timing files.
+    assert 'check_times.tsv' in collect['run'] and 'failed-checks.txt' in collect['run']
 
 
 # This stub is the only gh reachable through PATH; reject unexpected calls.
@@ -132,17 +162,19 @@ def fetch_cases(script):
 def main():
     source = WORKFLOW.read_text()
     workflow_cases(source)
+    full_check_cases(FULL_CHECK.read_text())
     fetch_cases(FETCH)
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
             ('workflow', '  check-fast:\n', '  check-fast:\n    needs: artifacts\n', 'serialize jobs'),
             ('workflow', '    runs-on: ubuntu-latest', '    runs-on: [self-hosted, substream]', 'route to substream'),
+            ('full-check', 'MUTATE=1', 'MUTATE=0', 'disable full-check mutations'),
             ('fetch', 'if [ "$ART_STATE" = success ]; then', 'if [ "$ART_STATE" != success ]; then', 'invert artifact gate'),
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = source if kind == 'workflow' else FETCH.read_text()
+            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text()}[kind]
             # Runner occurs once per job; mutate only the check-fast job.
             if name == 'route to substream':
                 prefix, text = text.split('  check-fast:\n', 1)
@@ -157,12 +189,17 @@ def main():
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    workflow_cases(changed) if kind == 'workflow' else fetch_cases(script)
+                    if kind == 'workflow':
+                        workflow_cases(changed)
+                    elif kind == 'full-check':
+                        full_check_cases(changed)
+                    else:
+                        fetch_cases(script)
                 except AssertionError as exc:
                     print('MUTATION RED: ' + name + ': ' + str(exc).splitlines()[0])
                 else:
                     raise AssertionError('mutation survived: ' + name)
-        print('ci-split: 4 runtime RED / 0 survived / 0 ERROR')
+        print('ci-split: 5 runtime RED / 0 survived / 0 ERROR')
     return 0
 
 

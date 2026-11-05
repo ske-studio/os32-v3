@@ -1,0 +1,74 @@
+name: full-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to check
+        required: true
+        default: main
+        type: string
+  schedule:
+    # 毎日 03:00 JST。定期実行は main を検査する。
+    - cron: '0 18 * * *'
+
+concurrency:
+  group: full-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  full-check:
+    runs-on: ubuntu-latest
+    # WSL 実測は約40分 (2026-11-04)。初回の環境構築にも余裕を取り、
+    # GitHub の1ジョブ上限6時間より30分短い330分とする。
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/build-setup
+
+      - name: Build core (make all)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          make -j"$(nproc)" all CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+
+      - name: make check
+        env:
+          OS32_CLANG_CROSS_FREE: "0"
+          OS32_MUT_JOBS: "4"
+        run: |
+          set -euo pipefail
+          export PATH="$CROSS_DIR/bin:$PATH"
+          # -k で失敗した検査以外も継続し、全体の結果を残す。
+          make check -k -j4 MUTATE=1 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" 2>&1 | tee "$RUNNER_TEMP/full-check.log"
+
+      - name: Collect check results
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/full-check-results"
+          if [ -f build/out/check_times.tsv ]; then
+            cp build/out/check_times.tsv "$RUNNER_TEMP/full-check-results/"
+            # tools/check_time.py: 検査名、経過秒数、終了コード (ヘッダなし)。
+            awk -F '\t' '$3 != 0 { print $1 }' build/out/check_times.tsv > "$RUNNER_TEMP/full-check-results/failed-checks.txt"
+          else
+            echo 'check_times.tsv unavailable: checks did not produce timing results' > "$RUNNER_TEMP/full-check-results/failed-checks.txt"
+          fi
+          if [ -f "$RUNNER_TEMP/full-check.log" ]; then
+            cp "$RUNNER_TEMP/full-check.log" "$RUNNER_TEMP/full-check-results/"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-check-results
+          path: ${{ runner.temp }}/full-check-results/
+          retention-days: 14
+          if-no-files-found: error

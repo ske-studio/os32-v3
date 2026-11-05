@@ -44,6 +44,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 CI は配布物の `artifacts` と検査の `check-fast` を並列に実行する。取り方と合格条件の正典は
 [§8-6](#8-6-github-actions-での本体ビルド)。
+変異込みの全体検査は Actions の `full-check` → Run workflow (入力 `ref`、既定 `main`) で起動でき、毎日 03:00 JST にも `main` に対して実行する。
 
 ```
 === カーネルビルド ===
