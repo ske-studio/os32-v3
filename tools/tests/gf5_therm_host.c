@@ -466,14 +466,14 @@ static void test_toggle_and_wrap(void)
     gf5_host_fail_at(&h,F5_GPIO_GET,0,-51); gf5_host_trace_clear(&h);
     h.now=h.ctx.next_toggle;
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-51 && h.calls[F5_GPIO_SET]==1);
+    assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off && h.calls[F5_GPIO_SET]==1);
     assert(h.ctx.next_toggle==h.now+T_PERIOD/2);
     gf5_host_fail_at(&h,F5_GPIO_GET,0,0);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,-52); gf5_host_trace_clear(&h);
     h.ctx.fan_off=false; h.ctx.fan.mode=GF5_FAN_MANUAL;
     h.now=h.ctx.next_toggle; /* Retry the same worker with a SET failure. */
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-52 && !gpio_on && h.ctx.next_toggle==h.now+T_PERIOD/2);
+    assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off && !gpio_on && h.ctx.next_toggle==h.now+T_PERIOD/2);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,0);
     assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
     assert(!h.ctx.next_toggle);
@@ -530,14 +530,17 @@ static void test_independent_alarms(void)
     gf2_host_memset(h.display.fail_rc,0,sizeof(h.display.fail_rc));
     gpio_source=-63; gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.source_rc==-63 && h.ctx.last_rc==GF5_EIO && h.calls[F5_GPIO_SET]==1);
+    assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off && h.calls[F5_GPIO_SET]==1);
     /* A failed step stops itself, retaining AUTO and the sensor alarm. */
     reset(); ready();
     assert(!gf5_fan_cstate(&h.ctx,80,0));
     h.now=h.ctx.next_step; h.ctx.next_auto=h.now+T_POLL;
     gf3_host_set(&h.display.base,0,T_RAW,60);
     u32 before=h.ctx.fan.duty;
-    gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,3,-64);
+    /* A classified GPIO lookup error must retain its raw first source
+     * across the tick, independently of the public GF5_EIO value. */
+    h.ctx.fan.gpio_line=U8_MAX; gpio_source=-64;
+    gf5_host_trace_clear(&h); gf5_host_fail_at(&h,F5_GPIO_FIND,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
     assert(h.ctx.fan.duty==before && !h.ctx.next_step && h.ctx.fan_off);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-64);
@@ -554,7 +557,7 @@ static void test_independent_alarms(void)
     gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
     assert(!gpio_on && h.calls[F5_GPIO_SET]==1 && h.ctx.next_toggle==h.now+T_PERIOD/2 && h.ctx.fan_off);
-    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-65);
+    assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off);
 }
 static void test_boost_auto(void)
 {
@@ -664,7 +667,7 @@ static void test_toggle_retry(void)
         enum gf5_host_op op=get ? F5_GPIO_GET : F5_GPIO_SET;
         gf5_host_fail_at(&h,op,1,-89);
         h.now=h.ctx.next_toggle; gf5_fan_tick(&h.ctx,h.now);
-        assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-89);
+        assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off);
         assert(h.calls[F5_GPIO_SET]==1 && h.ctx.next_toggle==h.now+T_PERIOD/2);
         gf5_host_fail_at(&h,op,0,0);
         bool was=gpio_on;
@@ -685,6 +688,48 @@ static void test_resume_write_failure(void)
     assert(h.ctx.next_sensor==h.now+T_POLL && h.display.calls[D_WRITE]>2);
     assert(startlog_equal("[gf5] fan off rc=-88 reason=fan-pwm\n"));
 }
+/* fantog.c:85-89 and fan.c:76-98: errors still schedule both alarms. */
+static void test_toggle_step_failure(void)
+{
+    for (u32 failure=0;failure<3;++failure) {
+        reset(); ready(); h.ctx.fan.method=GF5_FAN_TOGGLE;
+        h.ctx.fan.gpio_line=2; h.ctx.fan.duty=T_FULL/2;
+        h.ctx.fan.kind=GF5_FAN_OTHER;
+        gf5_host_trace_clear(&h); startlog_clear();
+        if (!failure) gf4_host_fail_at(&h.display,D_WRITE,1,-90);
+        else gf5_host_fail_at(&h,failure==1 ? F5_GPIO_GET : F5_GPIO_SET,1,-90);
+        assert(!gf5_fan_cstate(&h.ctx,80,0));
+        assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off);
+        assert(h.ctx.fan.duty==T_FULL/2+T_POINTS_PER_STEP);
+        assert(h.ctx.next_step==h.now+T_BUMP && h.ctx.next_toggle>h.now);
+        assert(h.calls[F5_GPIO_GET]==1 && h.calls[F5_GPIO_SET]==1);
+        assert(startlog_equal(!failure ? "[gf5] fan off rc=-90 reason=fan-pwm\n" :
+               failure==1 ? "[gf5] fan off rc=-90 reason=fan-gpio-get\n" :
+                            "[gf5] fan off rc=-90 reason=fan-gpio-set\n"));
+    }
+}
+/* base.c:355-356,388-394: rejected AUTO keeps NONE and resumes sensors. */
+static void test_resume_temperature_failure(void)
+{
+    for (u32 absent=0;absent<2;++absent) {
+        reset(); ready();
+        struct gf5_fan_saved saved=h.ctx.fan;
+        saved.mode=GF5_FAN_AUTO; saved.duty=T_FULL/2;
+        if (absent) gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP);
+        gf5_host_trace_clear(&h); startlog_clear();
+        /* Setup reads RAW first; AUTO validation reads it second. */
+        gf4_host_fail_at(&h.display,D_READ,absent ? 2 : 4,-91);
+        assert(!gf5_therm_resume(&h.ctx,&saved));
+        assert(!h.ctx.last_rc && !h.ctx.source_rc && h.ctx.fan_off);
+        assert(h.ctx.fan.mode==GF5_FAN_NONE && !h.ctx.next_auto);
+        assert(h.ctx.next_sensor==h.now+T_POLL && h.ctx.fan.sensor_poll);
+        if (!absent) assert(startlog_equal("[gf5] fan off rc=-91 reason=therm\n"));
+        /* The public mode setter still reports the temperature error. */
+        gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,1,-92);
+        assert(gf5_fan_mode_set(&h.ctx,GF5_FAN_AUTO)==GF5_EIO);
+        assert(h.ctx.source_rc==-92 && h.ctx.fan.mode==GF5_FAN_NONE);
+    }
+}
 static void test_gpio_source(void)
 {
     const enum gf5_host_op op[]={F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET};
@@ -701,7 +746,8 @@ static void test_gpio_source(void)
         gf5_host_fail_at(&h,op[i],1,GF5_EIO);
         i32 rc=op[i]==F5_GPIO_SET ? gf5_fan_cstate(&h.ctx,T_FULL/2,0) :
                                   gf5_fan_get(&h.ctx,&duty);
-        assert(rc==GF5_EIO && h.ctx.source_rc==gpio_source);
+        if (op[i]==F5_GPIO_SET) assert(!rc && !h.ctx.source_rc && h.ctx.fan_off);
+        else assert(rc==GF5_EIO && h.ctx.source_rc==gpio_source);
         assert(h.calls[op[i]]==1 && events[h.nevents-1].op==op[i]);
         if (op[i]!=F5_GPIO_SET) assert(duty==123 && !h.calls[F5_GPIO_SET]);
         assert(h.ctx.rom.bytes==rom && !h.ctx.image && !h.live_allocs);
@@ -817,5 +863,6 @@ void _start(void)
     test_independent_alarms(); test_boost_auto(); test_gpio_source(); test_resume();
     test_fan_retry(); test_boost_mode_failure();
     test_boost_write_failure(); test_fanless_mode(); test_toggle_retry(); test_resume_write_failure();
+    test_toggle_step_failure(); test_resume_temperature_failure();
     gf2_host_exit(0);
 }

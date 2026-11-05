@@ -424,11 +424,12 @@ static i32 th_toggle(struct gf5 *g,u32 percent,u64 now)
     /* fantog.c:54-62: a failed get behaves as !negative == false;
      * still attempt the set and schedule the next transition. */
     i32 first=rc,source=g->source_rc ? g->source_rc : rc;
+    const char *reason=g->poll_source;
     on=rc ? false : !on;
     g->source_rc=0;
     g->poll_source="fan-gpio-set";
     rc=gf5_gpio_set(g,f->gpio_line,f->gpio_log,on);
-    if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; }
+    if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; reason=g->poll_source; }
     f->toggle_on=on; f->duty=percent;
     g->next_toggle=0;
     if (percent!=(on ? TH_PERCENT : 0)) {
@@ -437,7 +438,9 @@ static i32 th_toggle(struct gf5 *g,u32 percent,u64 now)
         g->next_toggle=now+delay;
     }
     g->source_rc=source;
-    return first;
+    if (first) { g->poll_source=reason; th_fan_off(g,first); }
+    g->source_rc=0;
+    return 0;
 }
 static i32 th_set(struct gf5 *g,u32 percent,u64 now)
 {
@@ -447,7 +450,9 @@ static i32 th_set(struct gf5 *g,u32 percent,u64 now)
     g->poll_source="fan-pwm";
     if (f->method==GF5_FAN_TOGGLE) {
         rc=th_mask(g,reg,TH_PWM_ENABLE,0);
-        return rc ? rc : th_toggle(g,percent,now);
+        /* fantog.c:85-89: pwm_ctrl and GPIO errors do not stop steps. */
+        if (rc) th_fan_off(g,rc);
+        return th_toggle(g,percent,now);
     }
     /* therm/fanpwm.c:64-81: nv40 has no pwm_clock, including freq>1
      * yielding divisor zero. Preserve that result, never invent a divisor. */
@@ -708,23 +713,25 @@ i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
     g->fan.sensor_setup=TH_OLD_SETUP;
     g->next_auto=g->next_step=g->next_sensor=g->next_toggle=0;
     u64 now;
-    bool no_fan=false;
     rc=th_now(g,&now);
     if (!rc && mode!=GF5_FAN_NONE) {
         /* Toggle preparation seeds duty; retain the saved restore value. */
         u32 duty=g->fan.duty;
         rc=th_fan_prepare(g);
-        if (rc==GF5_ENOTSUP) { no_fan=true; rc=0; }
+        if (rc==GF5_ENOTSUP) { rc=0; }
         else if (!rc) {
             rc=th_set(g,th_clamp(&g->fan,duty),now);
             /* base.c:383-386: restore mode even after a failed duty write. */
             if (rc) { th_fan_off(g,rc); rc=0; g->source_rc=0; }
         }
     }
-    if (!rc && !no_fan) rc=th_mode(g,mode,now);
-    if (!rc && no_fan && mode==GF5_FAN_AUTO &&
-        (g->fan.kind!=GF5_FAN_OTHER || !g->fan.cstate))
-        g->next_auto=now+TH_POLL_US;
+    if (!rc) {
+        /* base.c:355-356,388: fini left NONE; failed AUTO validation
+         * leaves it there, and init still proceeds to the sensor alarm. */
+        g->fan.mode=GF5_FAN_NONE;
+        rc=th_mode(g,mode,now);
+        if (rc) { th_fan_off(g,rc); rc=0; g->source_rc=0; }
+    }
     if (!rc && g->fan.sensor_poll) g->next_sensor=now+TH_POLL_US;
     return th_exit(g,rc);
 }
