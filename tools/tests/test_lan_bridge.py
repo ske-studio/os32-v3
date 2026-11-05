@@ -33,7 +33,7 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BRIDGE_SRC = ROOT / "tools/lan_bridge.py"
+BRIDGE_SRC = ROOT / "tools/lan_bridge.py", "tools/host_image.py"
 HOST_AGENT = ROOT / "tools/host_agent.py"
 
 LINK_ETHERTYPE = 0x88B5
