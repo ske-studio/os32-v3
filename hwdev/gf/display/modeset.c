@@ -190,7 +190,7 @@ static int ms_wait(void *owner,u32 ms,bool fp_only)
     if (!l->rc && ((i32)(now-l->ctx->deadline)>=0 || l->ctx->deadline-now<us)) {
         l->at="wait_budget"; l->rc=GF4_ETIME;
     }
-    /* native.c accepts at most 1ms per call; preserve the full 10/50ms. */
+    /* Keep deadline checks at 1ms intervals during the full 10/50ms. */
     while (!l->rc && us) {
         u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;
         l->at="wait_us";

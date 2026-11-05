@@ -99,6 +99,7 @@ static i32 links_idle(struct gf5 *g)
         if (!(status&~LINKS_GR_SYNC_STALL)) return 0;
         u32 delay=g->deadline-now;
         if (delay>limit-now) delay=limit-now;
+        /* Recheck GR status and deadlines every 1ms; not a wait API limit. */
         if (delay>GF_INIT_WAIT_CHUNK_US) delay=GF_INIT_WAIT_CHUNK_US;
         rc=io->timing.wait_us(io->opaque,delay);
         if (rc) return rc;

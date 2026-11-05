@@ -273,16 +273,12 @@ fail:
     if (f->trip) { g->links.free(g->links.owner,f->trip); f->trip=0; }
     return rc;
 }
-/* therm/nv40.c:52-69 OLD_STYLE; production waits must stay below the
- * native GF_INIT_WAIT_CHUNK_US ceiling (PM22). GF2's ceiling is tighter. */
+/* therm/nv40.c:52-69 OLD_STYLE; the timing adapter owns wait chunking. */
 static i32 th_setup(struct gf5 *g)
 {
     i32 rc=th_write(g,TH_ADC,TH_OLD_SETUP);
     struct gf_io *io=&g->ch->f->io;
-    for (u32 left=TH_SETTLE_US;!rc && left;) {
-        u32 chunk=left>GF2_WAIT_MAX_US ? GF2_WAIT_MAX_US : left;
-        rc=io->timing.wait_us(io->opaque,chunk); left-=chunk;
-    }
+    if (!rc) rc=io->timing.wait_us(io->opaque,TH_SETTLE_US);
     u32 raw;
     if (!rc) rc=th_read(g,TH_RAW,&raw);
     return rc;

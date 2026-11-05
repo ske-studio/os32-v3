@@ -67,15 +67,19 @@ int gf_production_clock(void *opaque, u32 *value)
 }
 int gf_production_wait(void *opaque, u32 us)
 {
-    u32 start,now;
-    if (!us) return 0;
-    if (us>GF_INIT_WAIT_CHUNK_US) return -1;
-    int rc=gf_production_clock(opaque,&start);
-    if (rc) return rc;
-    for (u32 i=0;i<GF_PRODUCTION_WAIT_POLLS;i++) {
-        rc=gf_production_clock(opaque,&now);
+    while (us) {
+        u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;
+        u32 start,now;
+        int rc=gf_production_clock(opaque,&start);
         if (rc) return rc;
-        if (now-start>=us) return 0;
+        u32 i;
+        for (i=0;i<GF_PRODUCTION_WAIT_POLLS;i++) {
+            rc=gf_production_clock(opaque,&now);
+            if (rc) return rc;
+            if (now-start>=part) break;
+        }
+        if (i==GF_PRODUCTION_WAIT_POLLS) return -1; /* finite if PIT stops */
+        us-=part;
     }
-    return -1; /* finite even if the PIT stops */
+    return 0;
 }

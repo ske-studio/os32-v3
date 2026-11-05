@@ -105,7 +105,7 @@ static i32 poll(bool *local)
 }
 /* Cooperative diagnostic wait: service_poll owns clock64 -> fan_tick.
  * Each timing loan is reacquired after poll/wait, never taken from a saved
- * ops pointer. The native wait contract limits each call to 1000 us. */
+ * ops pointer. Keep service polls at intervals of at most 1000 us. */
 static i32 diagnostic_wait(u32 us, i32 *source, bool *local)
 {
     while (us) {

@@ -40,7 +40,6 @@
 #define T_DIV9 0x15f8U
 #define T_ENABLE 0x80000000U
 #define T_SETTLE 20000U /* nv40.c:52-69 OLD_STYLE sensor setup. */
-#define T_NATIVE_WAIT_MAX 1000U /* native.c:68, GF_INIT_WAIT_CHUNK_US (PM22). */
 #define T_POINTS_PER_STEP 3U /* therm/fan.c:61-70. */
 #define T_US_PER_MS 1000U /* therm/fan.c:90, ms -> microseconds. */
 #define T_PWM_FIELDS 0x7fff7fffU /* therm/nv40.c:110-117. */
@@ -53,7 +52,7 @@
 enum { R_BIT=0x20,R_P=0x80,R_THERM=0x100,R_PERF=0x300,R_FAN=0x340,R_SIZE=0x400 };
 static struct gf5_host h;
 static struct gf4_state display_state;
-/* 20ms setup is split into <=50us waits, plus all control observations. */
+/* Sensor setup and subsequent fan control observations. */
 static struct gf4_host_event devents[1024];
 static struct gf5_host_event events[128];
 static struct gf3_host_reg regs[16];
@@ -159,7 +158,7 @@ static void test_temperature(void)
     assert(h.now==T_SETTLE && devents[0].op==D_WRITE && devents[0].a[1]==T_ADC && devents[0].a[3]==0xff);
     u32 settle=0;
     for (u32 i=0;i<h.display.nevents;++i) if (devents[i].op==D_SLEEP) {
-        assert(devents[i].a[0] && devents[i].a[0]<=T_NATIVE_WAIT_MAX);
+        assert(devents[i].a[0]==T_SETTLE);
         settle+=devents[i].a[0];
     }
     assert(settle==T_SETTLE && h.ctx.fan.sensor_setup==0xff);
@@ -221,9 +220,9 @@ static void test_policy(void)
     assert(gf5_therm_read(&h.ctx,&t)==GF5_ENOMEM && !h.display.nevents && !h.live_allocs);
     assert(!h.ctx.fan.trip && !h.ctx.fan.sensor_setup);
     reset(); entry(0x24,(50U<<4)|3U);
-    gf4_host_fail_at(&h.display,D_SLEEP,2,-19);
+    gf4_host_fail_at(&h.display,D_SLEEP,1,-19);
     assert(gf5_therm_read(&h.ctx,&t)==GF5_EIO && h.ctx.source_rc==-19);
-    assert(h.display.nevents==3 && !h.live_allocs && h.calls[F5_FREE]==1);
+    assert(h.display.nevents==2 && !h.live_allocs && h.calls[F5_FREE]==1);
     assert(!h.ctx.fan.trip && !h.ctx.fan.sensor_setup);
     /* New fan table entry0 wins over fallback thermal fan values. */
     reset(); put32(R_P+0x58,R_FAN);
@@ -571,7 +570,7 @@ static void test_resume(void)
         u32 settle=0,first_fan=h.display.nevents;
         for (u32 i=0;i<h.display.nevents;++i) {
             if (devents[i].op==D_SLEEP) {
-                assert(devents[i].a[0] && devents[i].a[0]<=T_NATIVE_WAIT_MAX);
+                assert(devents[i].a[0]==T_SETTLE);
                 settle+=devents[i].a[0];
             }
             if (first_fan==h.display.nevents && devents[i].op==D_WRITE &&
