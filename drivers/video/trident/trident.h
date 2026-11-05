@@ -189,7 +189,8 @@ struct trident_device {
     void *io_opaque;
     u32 failed_step, display_owner; /* arm-time diagnostic only, never a filter */
     u8 chip, spr, reference; /* identify owns chip; capacity_plan owns spr;
-                             * mode_640 reads reference after PC98 Init (IsClearTV). */
+                             * mode_640 caches IsClearTV on first ModeInit after PC98 Init:
+                             * 0=unset, 1=NTSC, 0x81=PAL; persists across reentry. */
     bool pinned, declared_unknown;
     enum trident_upper upper;
     /* RAM loan for first VRAM verification only; lifecycle allocates/frees.

@@ -154,7 +154,7 @@ static void protect(bool on)
         w(0x3C4, 0); w(0x3C5, 3);
     }
     /* Distinct status values make a color/mono substitution observable. */
-    r(protect_base + 6, protect_base == 0x3B4 ? 0xFF : 0xD6);
+    r(protect_base + 6, protect_base == 0x3B4 ? 0x39 : 0xD6);
     w(0x3C0, on ? 0 : 0x20);
 }
 static void indexed(u32 port, u8 index, u8 old, u8 value)
@@ -202,9 +202,10 @@ static int setup(u32 seed, u16 base)
     /* Lifecycle's prerequisites only; fake init/VRAM gate remains cold.
      * Standalone Disable models mode=2, without Save/PC98 Init. */
     device.pinned = true; device.armed = true;
-    device.saved.vga_base = base == TRI_CR_COLOR ? TRI_CR_MONO : TRI_CR_COLOR;
+    device.saved.vga_base = TRI_CR_MONO; /* Save(mono), then ModeInit/Restore. */
     device.cur_vga_base = base;
-    fake.regs[TRI_MISC_WRITE] = 1; /* PC98 Init selects color hardware. */
+    /* ModeInit leaves color; Restore before standalone Disable restores mono. */
+    fake.regs[TRI_MISC_WRITE] = base == TRI_CR_COLOR;
     device.last_rc = -71; device.restore_rc = -72; device.disable_rc = -73;
     device.step = TRI_STEP_MODE; device.failed_step = TRI_STEP_SAVE;
     before = device;
@@ -212,6 +213,7 @@ static int setup(u32 seed, u16 base)
     fake.sr[1] = seq = (u8)seed;
     fake.cr_color[0x23] = cr23 = (u8)(seed ^ 0xA5);
     fake.cr_color[0x29] = cr29 = (u8)(seed + 0x53);
+    if (base == TRI_CR_MONO) cr23 = cr29 = 0xFF; /* color is inactive */
     fake.gr[0x23] = gr23 = (u8)(255 - seed);
     fake.ext_dac[4] = dac = (u8)(seed ^ 0x96);
     fake.ext_dac[5] = 0x69; /* wrong extended index sentinel */
@@ -251,14 +253,15 @@ static int success(void)
         for (u32 seed = 0; seed < 256; ++seed) {
             /* mode=1 full cycle plus reentry; mode=2 Disable alone. */
             for (u32 standalone = 0; standalone < 2; ++standalone) {
+                if (mono && !standalone) continue; /* Enable follows color ModeInit. */
                 if (setup(seed, mono ? 0x3B4 : 0x3D4)) return 1;
                 for (u32 step = 0; step < (standalone ? 1u : 3u); ++step) {
                     bool enable = !standalone && step != 1;
                     oracle(enable);
                     if (invoke(enable)) return red("success rc");
                     if (trace_check(expected_count, 0)) return 1;
-                    if (!equal(fake.sr[1], seq) || !equal(fake.cr_color[0x23], cr23) ||
-                        !equal(fake.cr_color[0x29], cr29) || !equal(fake.gr[0x23], gr23) ||
+                    if (!equal(fake.sr[1], seq) || !equal(fake.cr_color[0x23], mono ? (u8)(seed ^ 0xA5) : cr23) ||
+                        !equal(fake.cr_color[0x29], mono ? (u8)(seed + 0x53) : cr29) || !equal(fake.gr[0x23], gr23) ||
                         !equal(fake.ext_dac[4], dac) || !equal(fake.sr[0], 3))
                         return red("final register values");
                 }
@@ -274,6 +277,7 @@ static int failures(void)
     for (u32 mono = 0; mono < 2; ++mono)
         for (u32 enable = 0; enable < 2; ++enable)
             for (u32 variant = 0; variant < 2; ++variant) {
+                if (mono && enable) continue;
                 u32 count;
                 int rc = variant ? -197 : -43;
                 if (setup(0xB7, mono ? 0x3B4 : 0x3D4)) return 1;

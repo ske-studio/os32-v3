@@ -64,7 +64,8 @@
  * - DRAMControl CR3A stays zero on 9682 (dac.c:673-678); GraphEngReg
  *   CR36=80 with PCI/UseMMIO/!NoAccel (dac.c:694-700), matching H:295.
  * - PACK item 2 differs from D:2504-2529 and pll.c:42-55,71: 9682
- *   leaves frequency unset, so IsClearTV reads CR C0, as H:150-156 does.
+ *   leaves frequency unset, so IsClearTV reads CR C0 on first ModeInit only
+ *   and caches PAL/NTSC; H:150-156 reads it on every mode change.
  * Enable is split out to lifecycle, per the frozen contract (D:1043-1044).
  * PC-98 skips WAITFORVSYNC (D:948); no PLL wait or invented retry limit.
  */
@@ -118,8 +119,12 @@ int trident_mode_640(struct trident_device *d)
     TRY(trident_crtc_lock(d, base, false));
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0B, &ignored));
     TRY(trident_indexed_read(d, TRI_GR_INDEX, 0x0F, &misc_ext));
-    /* IsClearTV: 9682 has no fixed frequency (D:2504-2529; pll.c:42-55). */
-    TRY(trident_indexed_read(d, base, 0xC0, &d->reference));
+    /* IsClearTV caches frequency, including NTSC (CR C0 bit7 clear).
+     * reference=0 is unset; bit0 marks a cached selection, bit7 is PAL. */
+    if (d->reference == 0) {
+        TRY(trident_indexed_read(d, base, 0xC0, &ignored));
+        d->reference = (ignored & 0x80) | 1;
+    }
     const u8 *pll = mode_pll[(d->reference & 0x80) != 0];
     TRY(trident_indexed_read(d, base, 0x2A, &interface));
     TRY(trident_indexed_read(d, base, 0x2F, &performance));

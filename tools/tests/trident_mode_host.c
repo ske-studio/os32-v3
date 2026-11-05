@@ -89,9 +89,9 @@ static int setup(const struct mode_case *c)
     f.hidden_dac = 0x73;
     d.saved.vga_base = c->base == TRI_CR_COLOR ? TRI_CR_MONO : TRI_CR_COLOR;
     d.cur_vga_base = c->base;
-    f.regs[TRI_MISC_WRITE] = c->base == TRI_CR_COLOR;
+    f.regs[TRI_MISC_WRITE] = c->misc;
     d.saved.valid = true;
-    d.reference = c->reference ^ 0x80; /* stale probe value must be replaced */
+    d.reference = 0; /* IsClearTV frequency is initially unset. */
     d.last_rc = -77;
     return 0;
 }
@@ -99,7 +99,7 @@ static int check_case(const struct mode_case *c)
 {
     TRY(setup(c));
     TRY(trident_mode_640(&d));
-    if (!equal(d.reference, c->reference) || !equal(f.trace_count, c->count) ||
+    if (!equal(d.reference, (c->reference & 0x80) | 1) || !equal(f.trace_count, c->count) ||
         f.trace_overflow || !equal(d.last_rc, (u32)-77) || d.active ||
         d.init_done || d.first_init_done || f.pc98_initialized || f.port_writes ||
         !d.saved.valid || !equal(d.cur_vga_base, TRI_CR_COLOR)) return 1;
@@ -109,6 +109,18 @@ static int check_case(const struct mode_case *c)
             !equal(a->value, b->value) || !equal(a->width, b->width) ||
             !equal(a->write, b->write) || !equal(a->count, 1) || a->rc) return 2;
     }
+    /* Reenter with the opposite C0 bit at the now-color base. IsClearTV
+     * must retain the first selection even when that selection was NTSC.
+     * Check both reference and actual clock writes; no C0 read is allowed. */
+    f.cr_color[0xC0] = c->reference ^ 0x80;
+    f.trace_count = 0;
+    TRY(trident_mode_640(&d));
+    if (!equal(d.reference, (c->reference & 0x80) | 1) ||
+        !equal(f.regs[TRI_PLL_LO], c->reference & 0x80 ? 0xA4 : 0xE5) ||
+        !equal(f.regs[TRI_PLL_HI], c->reference & 0x80 ? 0x0E : 0x1E)) return 4;
+    for (u32 i = 0; i < f.trace_count; ++i)
+        if (trace[i].write && trace[i].offset == TRI_CR_COLOR &&
+            trace[i].value == 0xC0) return 5;
     /* Every actual I/O, including exit Protect, must propagate its exact rc
      * and stop at that operation. This also covers helper failure returns. */
     for (u32 op = 1; c->seed == 0 && op <= c->count; ++op) {
