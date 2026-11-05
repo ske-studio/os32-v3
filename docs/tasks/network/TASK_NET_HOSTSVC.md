@@ -21,7 +21,7 @@
 | 別の設計へ | `os32.time` (下の §1)、`os32.conv.image` (資源ごとに返す形式を指定できる — 「リソースごとに送り返すデータの形式をリニアに変えれなければホストサービスとしてはあまり価値がない」)、`os32.audio` / `os32.midi` (PCM のストリームとファイルの 2 方式、タイムコードで同期)、`os32.screen` (優先度低め)。順番は time → conv.image → audio/midi → screen |
 | 危険 | 平文・認証なしで OS32 はホストを無条件に信用する。対策はしないが設計の末尾に「把握している危険」を残す。接続の推奨 (普段の LAN と分けた口からクロスケーブルで 1 対 1) は [README](../../../README.md) |
 
-## 1. os32.time の要件 (別の設計の往復で詰める)
+## 1. os32.time の要件 — 設計は確定 ([OS32_TIME_DESIGN](../../decisions/time/OS32_TIME_DESIGN.md)、2026-11-05、実装はまだ)
 
 - 起動時と、設定の周期で定期に時計合わせ。時計合わせのたびに RTC へ書く (電池の無い機械では残らない前提で運用)。
 - ホストと切れている間は RTC と tick で進める。ホストの復帰 (ALIVE の世代の変化) を受けたら、ほかの張り直しより先に時刻を合わせて RTC へ書く。
@@ -42,3 +42,5 @@
 | S (SDK) | host_call.c・libos32host.c・os32api の host.rs (os32_host_*、LIST で名前から番号) | SDK |
 
 順序: 契約 (A1・B1・D1) → adapter と H 群を並列 → C・D の結線 → I ([ABI] の clean・all) → NP21/W → 82557 実機。試験は `tools/tests/test_hostsvc_<項目>.py` (nic・deadline・persistent・write・image・isocache・mailbox・gui・linux・bootcd・seq・alive・race・handles・list・sdk・abi)。
+
+os32.time の PM 決定 (確定設計の REVIEW から): `sys_time`・`clock_read_date` は今までどおりローカル時刻 (ホストの標準時に従う壁時計) を epoch として返す (C の time()・SQLite・FAT の源)。UTC とずれは os32.time の中だけ。NP21/W は I/O の RTC の書き込みを捨てるので書き込みの受入は実機 — NP21/W のフォークに TIME SET を足す段は別。RTC の読みは今のパラレルのまま、Ra266 で年を確かめてから。

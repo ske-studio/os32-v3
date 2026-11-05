@@ -159,9 +159,10 @@ static const struct gf_display_owner svc_display_owner={
 static const struct gf4_data_ops svc_data={GF4_DATA_VERSION,sizeof(svc_data),
     gf4_edid_modes,gf4_tv_state_calc,gf4_tv_modes};
 
-static void svc_fixture(void)
+static void svc_fixture_state(bool cold)
 {
-    cint_reset(); /* real F1/F2 RUN, no F3 objects/reservations yet. */
+    if (cold) cint_reset_cold();
+    else cint_reset(); /* real F1/F2 RUN, no F3 objects/reservations yet. */
     gf2_host_memset(&svc_state,0,sizeof(svc_state));
     gf2_host_memset(&svc_ctx,0,sizeof(svc_ctx));
     gf4_host_init(&svc_host,&svc_state);
@@ -197,6 +198,10 @@ static void svc_fixture(void)
     svc_opens=svc_closes=svc_restores=svc_acquires=svc_releases=svc_cleanup_after_off=0;
     assert(!gf4_service_bind(&svc_ctx,&cint_prod.display,&svc_links));
     assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
+}
+static void svc_fixture(void)
+{
+    svc_fixture_state(false);
 }
 static void svc_keys_live(const struct gf3_surface *surface)
 {

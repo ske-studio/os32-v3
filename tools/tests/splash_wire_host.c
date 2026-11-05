@@ -79,7 +79,7 @@ void vfs_close(int fd) { REQUIRE(fd == 3); wire_closes++; }
 int vfs_read_fd(int fd, void *dst, u32 n)
 {
     REQUIRE(fd == 3);
-    if (wire_fault == 8) { clock_us = 4000000; tick_count = 400; }
+    if (wire_fault == 8) { tick_count = PLATFORM_SPLASH_IMAGE_TICKS + PIT_HZ; clock_us = tick_count * TICK_MS * 1000u; }
     if (n > 37) n = 37; /* Valid repeated short reads. */
     u8 *p = dst;
     u32 got = 0;
@@ -162,8 +162,9 @@ void _start(void)
             REQUIRE(wire_commits == (fault == 8 ? 0 : 1));
             if (fault != 8) REQUIRE(wire_loaded);
         }
-        if (fault != 8 && fault != 10 && fault != 11) REQUIRE(tick_count >= PLATFORM_SPLASH_TICKS - 2);
-        if (fault != 8) REQUIRE(tick_count <= PLATFORM_SPLASH_TICKS + 3);
+        u32 deadline = wire_logs ? PLATFORM_SPLASH_TICKS : PLATFORM_SPLASH_IMAGE_TICKS;
+        if (fault != 8 && fault != 10 && fault != 11) REQUIRE(tick_count >= deadline - 2);
+        if (fault != 8) REQUIRE(tick_count <= deadline + 3);
     }
     wire_user = 0; wire_setup(0); wire_invalid_fb = 1;
     boot_splash();

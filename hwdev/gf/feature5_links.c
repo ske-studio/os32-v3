@@ -144,7 +144,7 @@ i32 gf5_link_display_restore(void *owner,const struct gf5_image *image)
 {
     struct gf5 *g=owner;
     if (!g || !g->display || !image) return links_result(g,GF5_EINVAL);
-    i32 rc=gf4_stage_deadline(g->display,&g->deadline);
+    i32 rc=gf4_stage_deadline(g->display,g->ch ? g->ch->f : 0,&g->deadline);
     if (!rc) rc=gf4_display_restore(g->display,&image->display,g->deadline);
     return links_result(g,rc);
 }
@@ -160,7 +160,7 @@ i32 gf5_link_restart(void *owner,u32 dl)
     if (!g || !g->display) return links_result(g,GF5_EINVAL);
     i32 rc=gf4_service_restart(g->display,dl);
     /* F5 performance restoration begins after devinit/F1/F2/F3 restart. */
-    if (!rc) rc=gf4_stage_deadline(g->display,&g->deadline);
+    if (!rc) rc=gf4_stage_deadline(g->display,g->ch ? g->ch->f : 0,&g->deadline);
     return links_result(g,rc);
 }
 /* Retain failed transaction saves along with the adapter-owned index/lock

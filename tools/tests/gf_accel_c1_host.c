@@ -446,7 +446,7 @@ static inline void cint_no_resources(void)
     for (unsigned i = 0; i < 2; ++i) assert(!cint_view[i].mapped && !cint_loan[i]);
     assert(cint_dma_allocs == cint_dma_frees);
 }
-static inline void cint_reset(void)
+static inline void cint_reset_cold(void)
 {
     /* Previous case must clean up via the product, never erase live lists.
      * Preserve registry/node ID history and the single service binding. */
@@ -494,6 +494,11 @@ static inline void cint_reset(void)
 #endif
     if (cint_service)
         cint_service->scan_pitch = cint_service->scan_width = cint_service->scan_height = cint_service->scan_phys = 0;
+    cint_trace_clear();
+}
+static inline void cint_reset(void)
+{
+    cint_reset_cold();
     assert(!gf_foundation_start(&cint_prod.foundation));
     assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
     assert(cint_prod.chan.state == GF2_RUN && cint_prod.chan.mapped && cint_dma_live);

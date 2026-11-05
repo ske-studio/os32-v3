@@ -9,7 +9,9 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
             'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h', 'arch/x86/kernel/idt.h',
-            'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=20.0)
+            'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[],
+    # CI measured 58.62 s for the fixed diagnostic workload; allow headroom.
+    budget=120.0)
 import argparse
 import os
 import re

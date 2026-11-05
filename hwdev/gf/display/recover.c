@@ -299,7 +299,7 @@ i32 gf4_service_restart(struct gf4_ctx *c,u32 dl)
     }
     if (!rc) rc=gf2_start(c->ch,c->ch->f);
     /* devinit/F1/F2 each have their own bounded work. F3 starts now. */
-    if (!rc) rc=gf4_stage_deadline(c,&dl);
+    if (!rc) rc=gf4_stage_deadline(c,&s->production->foundation,&dl);
     if (!rc) rc=gf3_service_objects_init(s,dl);
     if (!rc) {
         c->epoch=c->ch->epoch; c->ready=true;
@@ -323,7 +323,7 @@ i32 gf4_service_recover(struct gf4_ctx *c,u32 dl)
     c->recovery_rc=rc;
     if (rc && !old_fault) return rec_result(c,rc);
     rc=gf4_service_restart(c,dl);
-    if (!rc) rc=gf4_stage_deadline(c,&dl);
+    if (!rc) rc=gf4_stage_deadline(c,&s->production->foundation,&dl);
     if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);
     if (!rc) {
         c->saved_closed=saved_closed;

@@ -238,7 +238,7 @@ static void svc_feature5(struct gf4_ctx *c)
 /* F4 keeps values only; F5 copies the full ROM and prepared M separately.
  * BMP signature: nvkm/subdev/bios/base.c:180-182. Limits: existing parser,
  * nvkm/subdev/bios/pll.c:162-175 (first entry fallback), :301-331. */
-static i32 svc_rom(struct gf4_ctx *c,const char **stage)
+static i32 svc_rom(struct gf4_ctx *c,struct gf_foundation *f,const char **stage)
 {
     struct gf_display_context *l=c->legacy;
     *stage="rom_acquire";
@@ -266,7 +266,7 @@ static i32 svc_rom(struct gf4_ctx *c,const char **stage)
         if (!rc) { *stage="baseline"; rc=gf_display_baseline(l); }
         if (!rc) {
             *stage="feature5_deadline";
-            rc=gf4_stage_deadline(c,&c->deadline);
+            rc=gf4_stage_deadline(c,f,&c->deadline);
         }
         if (!rc) svc_feature5(c);
     }
@@ -375,7 +375,7 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     }
     if (!rc) {
         stage="rom_validate";
-        rc=l->initialized ? l->owner->validate(l) : svc_rom(c,&stage);
+        rc=l->initialized ? l->owner->validate(l) : svc_rom(c,f,&stage);
     }
     if (!rc && c->ch->state==GF2_OFF) {
         stage="foundation_start"; rc=l->owner->foundation_start(l);
@@ -393,19 +393,19 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     }
     if (!rc) {
         stage="objects_init";
-        rc=gf4_stage_deadline(c,&dl);
+        rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf3_service_objects_init(s,dl);
     }
     if (!rc) {
         c->ready=true;
         stage="detect";
-        rc=gf4_stage_deadline(c,&dl);
+        rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf4_detect(c,dl);
     }
     i32 reason=c->last_rc; /* DDC fallback can succeed with a diagnostic. */
     if (!rc) {
         stage="initial_deadline";
-        rc=gf4_stage_deadline(c,&dl);
+        rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=svc_initial(c,dl,&stage);
     }
     if (!rc) {
@@ -523,7 +523,7 @@ static i32 svc_owner_start(void *owner,u32 dl)
         return svc_result(c,GF4_ESTATE);
     bool saved_closed=c->saved_closed;
     rc=gf4_service_restart(c,dl);
-    if (!rc) rc=gf4_stage_deadline(c,&dl);
+    if (!rc) rc=gf4_stage_deadline(c,&s->production->foundation,&dl);
     if (!rc) rc=gf4_display_restore(c,&c->hold_saved,dl);
     if (!rc) {
         c->saved_closed=saved_closed;

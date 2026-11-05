@@ -6,10 +6,10 @@
 #define HWDEV_GF_DISPLAY_STAGE_H
 #include "api.h"
 
-static inline i32 gf4_stage_deadline(struct gf4_ctx *c,u32 *dl)
+static inline i32 gf4_stage_deadline(struct gf4_ctx *c,struct gf_foundation *f,u32 *dl)
 {
-    if (!c || !c->ch || !c->ch->f) return GF4_EINVAL;
-    struct gf_io *io=&c->ch->f->io;
+    if (!c || !f) return GF4_EINVAL;
+    struct gf_io *io=&f->io;
     u32 now;
     if (!io->timing.clock_us || io->timing.clock_us(io->opaque,&now))
         return GF2_EIO;
