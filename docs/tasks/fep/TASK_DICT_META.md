@@ -20,7 +20,7 @@
 | M3 | 辞書のメタ情報 `mem_reserve_kb` が **FEP の SQLite 取り分** (起動時に優先確保) の出典。settings で上書き可。事前確保量を超える辞書への入れ替えは**再起動で再確保** | 同 D27、§4-6 |
 | M4 | **着手は v3 の後の方** — MEMMAP_V3 の T4 (SQLite モジュール化) と T5a (FEP モジュール化) の後。それまで FEP は今の `fep.db` (メタ無し、学習表同居) のまま動き、`mem_reserve_kb` は既定値 + settings だけ | ユーザー (同日)、V3_PLAN_DRAFT §3 P10 |
 | M5 | `license` / `attribution` は**必須項目** — 辞書はパブリックの `os32-v3` で配るので、元データ (IPADIC) の配布条件をファイル自身が運ぶ | PM (M1 の項目の中で必須に格上げ。理由は §2) |
-| M6 | **学習データの移行は二段** — fork 直後は既存データを保持した媒体で v3 のシステム一式だけ更新し (`fep.db` の `dict_user` を配備で消さない)、この票で旧 `dict_user` を `fep_user.db` へ移す (件数・内容の照合、再実行の二重加算防止、途中失敗の復旧、S/M/L の `dict_id` 対応)。`fep_user.db` は `hsync` の保護名に。v2.x の戻り先は旧データの写しも保持 (§3 末尾) | ユーザー (2026-09-30、Codex X8 の推奨を承認。MEMMAP_V3 §8-4) |
+| M6 | **旧い学習データは移さない** (ユーザー決定 2026-11-05「古い学習データは元のデータ変換側を変えたほうが良い。互換性の問題なら考えなくて良い」) — 新しい形の学習 DB (`fep_user.db`) は空から作り、辞書の形の変更は変換の側 (`tools/fep_to_sqlite.py`) で受ける。`fep_user.db` は `hsync` の保護名にする |
 
 ---
 
@@ -79,18 +79,11 @@
 |---|---|
 | **辞書の入れ替え・`hsync` で学習が消えない** | S/M/L の切り替え (`ime_switch_dict`) や辞書の更新配備を、学習を失わずに行える。学習は `/etc` に残る |
 | **システム辞書を読み取り専用で配れる** | `kind = system` の辞書は `SQLITE_OPEN_READONLY` で開く。書き込みが無いので ext2 の ROFS (`OS32_ERR_ROFS`) でも変換は動き、ジャーナルも作らない。`hsync` は辞書を「使用中の RW ファイル」として扱わなくてよくなる (差し替え規則は実装の段で確認) |
-| **不整合を検出できる** | 学習データ側の `meta` に **`dict_id` と `pos_table_version`** (と `format_version`) を記録し、開くときに辞書側と照合する。不一致なら学習の**使用を止めて警告** (消さない — `ime` コマンドで移行か破棄を選ばせる)。辞書に混ざっていた今は、この検出そのものができない |
+| **不整合を検出できる** | 学習データ側の `meta` に **`dict_id` と `pos_table_version`** (と `format_version`) を記録し、開くときに辞書側と照合する。不一致なら学習の**使用を止めて警告** (消さない — `ime` コマンドで破棄を選ばせる)。辞書に混ざっていた今は、この検出そのものができない |
 
 **学習 DB のスキーマ (案)**: `dict_user` は今の列のまま (`yomi, kanji, freq, last_ts`、PRIMARY KEY `(yomi, kanji)`) + `meta` 表 (`kind = user`、`dict_id`、`pos_table_version`、`format_version`、`created`)。無ければ FEP が作る (今の `CREATE TABLE IF NOT EXISTS` の経路を学習 DB 側へ移す)。
 
 **接続の数**: 辞書 1 本 (RO) + 学習 1 本 (RW) の **2 本**になる。SQLite の取り分 (`mem_reserve_kb`) は 2 本分で見積もる (MEMMAP_V3 §4-6 の既定値も、この票の着手時に 2 本分へ更新する)。
-
-**移行 (M6 — Codex X8、2026-09-30、ユーザー承認)**: v3 への移行でメモリの再配置がディスク上のデータ形式を変えることは無いが、**配備の上書きと、この票の辞書変更には明示の保存・移行が要る**。二段に分ける:
-
-1. **fork 直後 (この票の前)**: 既存データ (文書・`settings.db`・`fep.db` の `dict_user`) を**保持した媒体**で v3 のシステム一式だけを更新する。分離前の `/db/fep.db` を生成済み辞書で上書きすると同居する学習が消える — 使用中の BUSY 拒否 (`ime_dict.c:150-157`) は**停止中のホスト配備を守らない**。**S/M/L の実使用ファイル (`fep.db` / `fep_s.db` / `fep_l.db`) は `dict_user` を保持する形で配備する** (配備前に抽出して書き戻すか、配備対象から外す — 手順は fork の票で決める。V3_PLAN_DRAFT §5 C7)。新しい `settings.db` のマスタで上書きすることを「移行」と呼ばない (再配置だけならスキーマ移行は不要)。
-2. **この票**: 旧 `dict_user` (3 ファイルに散っている) から `fep_user.db` へ **`yomi / kanji / freq / last_ts` を保持して移す**。定義するもの: (a) **S/M/L 間の重複規則** — 同じ `(yomi, kanji)` が複数の辞書ファイルの学習にあるとき `freq` を足すか大きい方を取るか、`last_ts` は新しい方; (b) **`dict_id` の対応範囲** — `dict_id` に S/M/L の変種を含めて学習 DB に完全一致を要求すると、§5 の「S → L に切り替えても学習が残って使える」と衝突する。変種を除いた基底 ID (`ipadic-2.7.0`) で対応付けて `variant` を別に持つか、対応表を持つかを設計票で決める; (c) **再実行時の二重加算防止** (学習 DB の `meta` に移行済みの印と出所ファイルの `checksum`); (d) **途中失敗からの復旧** (旧表は移行の完了を確認するまで消さない、途中で落ちたら再実行で完了する)。
-3. **`fep_user.db` を `hsync` の保護名に**: 今の保護名の一覧は `settings.db*` だけ (`userland/system/hsync_protect.inc:34`)。配備マニフェストから外すだけでは、古い HostDrv 側のファイルからの同期を防げない。
-4. **v2.x の戻り先**は旧バイナリに加えて**旧データ (fork 時点の NHD / `fep.db` / `settings.db`) の写し**も保持する (V3_PLAN_DRAFT §5 C7)。
 
 ---
 
@@ -106,7 +99,6 @@
 | KAPI (`ime_user_*`、`ime_switch_dict`) | シグネチャは変えない ([ABI])。学習の宛先が変わるだけ。メタ情報を返す口 (`ime_dict_info` 等) を足すなら [ABI] 追記 |
 | `userland/deploy.yaml`、`hsync` | 学習 DB は配備対象にしない (`/etc` に残す)。システム辞書の RO 差し替えの規則 |
 | `userland/system/hsync_protect.inc` | **`fep_user.db*` (本体・journal・回復用) を保護名に足す** (M6。今は `settings.db*` だけ) |
-| 移行の手段 (`ime` コマンドの下位コマンドか、学習 DB が無いときの初回起動の自動移行 — 設計票で決める) | 旧 `dict_user` (S/M/L の 3 ファイル) → `fep_user.db`。件数・内容の照合、重複規則、`dict_id` の対応、移行済みの印、途中失敗の復旧 (M6、§3) |
 | settings (`settings.db`) | `fep.mem_reserve_kb`、`fep.user_dict_path` (上書き用) |
 | 文書 | 本票の §2・§3 に現行辞書仕様を反映 (実装前は計画として区別)。`FEP_STATUS.md` は快照のまま保持し、[`00_INDEX.md`](00_INDEX.md) の表に状態を反映 |
 
@@ -120,7 +112,6 @@
 - システム辞書を RO で開いた状態で ROFS (書き込み全拒否) を起こしても 1 語変換が通ること。
 - `ime` コマンドが `license` / `attribution` と `entry_count` を表示すること。
 - `mem_reserve_kb` を settings で上書きしたとき、起動時の確保量がその値になること。切り替え先の値が確保量を超えるとき、その場で確保せず再起動を促すこと (MEMMAP_V3 §4-6)。
-- **移行 (M6)**: 旧 `fep.db` / `fep_s.db` / `fep_l.db` の `dict_user` から移した学習の件数と内容 (`yomi / kanji / freq / last_ts`、重複規則どおりの合成) が一致すること。移行を 2 回実行しても `freq` が二重加算されないこと。途中で失敗させても旧表が残り、再実行で完了すること。S/M/L のどれで学習した語も `dict_id` の対応規則どおりに使えること。`hsync` が `fep_user.db` を上書きしないこと。
 
 ---
 
@@ -129,7 +120,6 @@
 - **v3 の後の方** (ユーザー 2026-09-30)。前提: MEMMAP_V3 の **T4** (SQLite のモジュール化 — `mem_reserve_kb` の既定値と `db_open` の上限はそこで入る) と **T5a** (FEP のモジュール化)。この票はその上に「辞書からの読み取り」と「学習の別ファイル化」を載せる。
 - 並べる先: `docs/archive/v3/V3_PLAN_DRAFT.md` §3 **P10 データ・設定層** (v3 後半)。
 - 関係する票: `FEP_BOUNDARY` (FEP の KAPI 境界)、`F2_OWNERSHIP` (接続単位の FD 所有 — 学習 DB の接続も同じ規則)、`04_DICT_QUALITY` (コスト式。`cost_scale` / `pos_table_version` の値を決めるのはそちら)。
-- **移行の前段 (Codex X8、2026-09-30)**: fork 直後の v3 一式への更新は**既存データを保持した媒体**で行い、`fep.db` の `dict_user` を配備で消さない (§3 の 1)。v2.x の戻り先は旧データの写しも保持。**排他 open (D29) の導入まで**の同一 DB の重複接続 (parked アプリ同士を含む) の扱いは MEMMAP_V3 §4-6 (T4 で明記)。
 - **後続 (U6 決定、ユーザー 2026-09-30、MEMMAP_V3 D29)**: F3b「同一 DB の排他 open」(S0_FOUNDATION の lock 表は作らず、親子 (exec の入れ子) が同じ DB を同時に開く経路を open で塞ぐ最小代案) は**この票の後**に P10 で行う — 辞書 RO 1 本 + 学習 RW 1 本になれば「辞書は RO 共有、学習は RW 単独」で排他 open と相性がよい。出典 `docs/archive/v3/U6_PENDING_REVIEW.md` §1-1。
 
 ---

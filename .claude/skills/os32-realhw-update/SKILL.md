@@ -85,6 +85,8 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 
 - 文書だけのコミットの SHA を頼むと CI の成果物が無い (`ci_fetch.sh` が見つけられない)。
 - 全体同期を先にすると旧 hsync が 1 件も書かずに断る (KAPI が上がった版)。必ず boot が先。
+- **KAPI が上がる版の 1 回目の全体の hsync は、新しい hsync を /host から動かす**: `sfs run /host/sbin/hsync.bin [-n] [--fep-off]` (`sfs run hsync` はディスク上の旧い /sbin/hsync.bin を動かし、新しいオプションを知らない — 2026-11-05 の `--fep-off` で `unknown option`)。
+- 全体の hsync は `--fep-off` を付ける (開いている FEP の辞書 `/db/fep.db` を BUSY で置き換えられないため、ユーザー決定 2026-11-05)。DICT_META で学習データが別の DB に分かれるまでは、置き換えのたびに学習した語が消える。
 - 全体の `hsync` は `/sys` を既定で外す (`userland/system/hsync.c:45-48`)。shell のコマンドや共有ライブラリを変えた版で `hsync sys` を抜かすと、新しいカーネルに古い shell のまま動く (2026-10-24、route-test の Usage が出ないことで気づいた)。
 - シリアルで hsync するときは `rshell_serial.py --fast 115200 --serve-host …` を使う (ユーザー指示 2026-11-05、9600 の 1.2MB の boot に 20〜30 分かかった)。取りこぼし・化け・rc≠0 が出たら 57600 → 38400 → 9600 と下げ、通った速度を報告に書く。LAN が使えるなら LAN が先 (下の経路の優先度)。
 - ノートの os32-v3 が古いと `tools/` の約束が合わない。最初に git pull。

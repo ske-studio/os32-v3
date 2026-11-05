@@ -107,6 +107,8 @@ typedef struct {
 void ime_init(void);
 int ime_dict_boot(void);
 int ime_boot_abort(void);
+int ime_dict_suspend(int on);
+IME_State *ime_suspend_state(void);
 u32 ime_boot_bytes(void);
 int ime_dict_close(IME_Dict *dict);
 

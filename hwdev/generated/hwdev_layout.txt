@@ -460,6 +460,8 @@ offset	KernelAPI.ide_write_sectors	268
 member_size	KernelAPI.ide_write_sectors	4
 offset	KernelAPI.ime_dict_info	1032
 member_size	KernelAPI.ime_dict_info	4
+offset	KernelAPI.ime_dict_suspend	1040
+member_size	KernelAPI.ime_dict_suspend	4
 offset	KernelAPI.ime_feed_key	720
 member_size	KernelAPI.ime_feed_key	4
 offset	KernelAPI.ime_get_mode	428
@@ -490,8 +492,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1040
-member_size	KernelAPI.kapi_reserved	168
+offset	KernelAPI.kapi_reserved	1044
+member_size	KernelAPI.kapi_reserved	164
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960

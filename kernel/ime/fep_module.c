@@ -1,6 +1,7 @@
 /* Resident FEP adapter. The implementation and its state live in fep.mod. */
 #include "fep_module.h"
 #include "fep_imports.h"
+#include "../../fs/fd_redirect.h"
 #include "../sqlite_engine.h"
 #include "bootinfo.h"
 #include "config.h"
@@ -36,6 +37,7 @@ static int stub_dict_info(int key, int offset, char *out, int capacity)
 static int stub_delete(const char *yomi, const char *kanji)
 { (void)yomi; (void)kanji; return OS32_ERR_NOSYS; }
 static int stub_export(const char *path) { (void)path; return OS32_ERR_NOSYS; }
+static int stub_suspend(int on) { (void)on; return 0; }
 static int stub_clear(void) { return OS32_ERR_NOSYS; }
 
 /* Match the IME OFF byte contract, including terminal injection and STOP's
@@ -72,7 +74,7 @@ static const FepModuleApi stub_api = {
     .user_delete = stub_delete, .user_export = stub_export,
     .user_clear = stub_clear, .owner_exit = stub_mode,
     .getchar_kapi = stub_getchar_kapi, .getkey_kapi = input_getkey_kapi,
-    .dict_info = stub_dict_info
+    .dict_info = stub_dict_info, .dict_suspend = stub_suspend
 };
 static FepModuleApi candidate;
 static struct module_handle fep_handle;
@@ -107,7 +109,23 @@ int ime_user_export_facade(const char *path) { return public_api()->user_export(
 int ime_user_clear_facade(void) { return public_api()->user_clear(); }
 int ime_dict_info_facade(int key, int offset, char *out, int capacity)
 { return public_api()->dict_info(key, offset, out, capacity); }
-void ime_owner_exit(int owner) { public_api()->owner_exit(owner); }
+static int suspend_owner;
+int ime_dict_suspend(int on)
+{
+    int rc = public_api()->dict_suspend(on);
+    if (!on) suspend_owner = 0;
+    else if (!rc) suspend_owner = res_owner_get();
+    return rc;
+}
+void ime_owner_exit(int owner)
+{
+    /* STOP/fault can leave hsync through a syscall without returning to main. */
+    if (owner > 0 && owner == suspend_owner) {
+        suspend_owner = 0;
+        (void)public_api()->dict_suspend(0); /* The body logs reopen failure. */
+    }
+    public_api()->owner_exit(owner);
+}
 
 static int fep_start(struct module_record *r, u32 entry, u32 *exports)
 {
