@@ -65,6 +65,10 @@ struct _Device {
     u16        cyls;          /* シリンダ数 */
     u16        heads;         /* ヘッド数 */
     u16        spt;           /* セクタ/トラック */
+    /* Optional: u32 LBA takes priority; old signed callback only in range.
+     * NULL media_check means fixed media, generation=0. task context only. */
+    int (*blk_read_u32)(Device *, u32 lba, int count, void *buf);
+    int (*media_check)(Device *, u32 *generation);
 };
 
 /* ======== 定数 ======== */
@@ -109,4 +113,8 @@ int dev_api_get_info(int idx, char *name, int name_max, int *type, u32 *total_se
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf);
 int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf);
 
+/* Registration owns Device/priv/name until unregister. preferred=-1 first
+ * free cdN, 0 requires cd0; FULL/EXIST leave registration unchanged. */
+int dev_media_check(Device *dev, u32 *generation);
+int dev_register_cd(Device *dev, int preferred);
 #endif /* DEV_H */

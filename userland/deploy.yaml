@@ -17,6 +17,11 @@
 
 filesystem:
   files:
+    # Includes trident_mode.hwb (mode=0/1/2/3); disk/CD test payload only.
+    - host: "userland/tests/hw/*.hwb"
+      guest: /test/hw/
+      type: glob
+      tags: [test]
     # --- シェル (カーネルは /shell をロードする: config.h SYS_SHELL_BIN) ---
     - host: userland/shell.bin
       guest: /sys/shell.bin
@@ -83,6 +88,12 @@ filesystem:
       guest: /usr/bin/
       tags: [test]
     - host: userland/tests/h3b.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/fp_stop.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/stop_loop.bin
       guest: /usr/bin/
       tags: [test]
     # --- T2g / GK-3 cooperative trim fixtures (interactive) ---

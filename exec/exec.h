@@ -105,6 +105,9 @@ i32 exec_app_state(i32 app_id);
 /* CTRL+STOP (IRQ1 が走っているアプリに立てた要求) を降ろす (KAPI v45、A1)。
  * 0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 以外。 */
 i32 exec_abort_clear(void);
+/* KAPI v80: GUI の KAPI-loop の STOP で WAIT_POLL に退避した張本人の ID
+ * (2〜5)、居なければ 0、owner 1 以外は OS32_ERR_INVAL。docs/09_exec.md。 */
+i32 exec_stop_culprit(void);
 int ring3_wait_pending(void);
 
 /* KAPI sys_getcwd の実体 (票 T9 §12 R1)。CPL=3 の呼び手には

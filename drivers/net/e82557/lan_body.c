@@ -10,7 +10,8 @@ int lan_module_init(LanModuleApi *out)
         .stat = e82557_stat, .tick = e82557_tick,
         .quiet = lan_module_quiet, .release = lan_module_release,
         .lan_init = sfs_lan_init, .lan_peer = sfs_lan_set_peer,
-        .lan_reset = sfs_lan_reset, .io = sfs_lan_io
+        .lan_reset = sfs_lan_reset, .io = sfs_lan_io,
+        .adapter = 0, .netcd_register = 0
     };
     return 0;
 }

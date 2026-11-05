@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 79,
+  "version": 81,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -66,7 +66,8 @@
     "extern int kapi_serial_diag(SerialDiag *out);",
     "extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);",
     "extern i32 kdebug_call(u32 op, void *buf, u32 size);",
-    "extern int kapi_sys_ver_info(void *out, u32 size);"
+    "extern int kapi_sys_ver_info(void *out, u32 size);",
+    "extern int kapi_osri_show(const char *path, u32 duration_ms);"
   ],
   "api": [
     {
@@ -1951,6 +1952,30 @@
       "args": ["void *out", "u32 size"],
       "out": [{"arg": "out", "len": "size"}],
       "target": "kapi_sys_ver_info"
+    },
+    {
+      "name": "exec_stop_culprit",
+      "ret": "i32",
+      "args": []
+    },
+    {
+      "name": "ime_dict_info",
+      "out": "target",
+      "ret": "int",
+      "args": ["int key", "int offset", "char *out", "int capacity"],
+      "target": "ime_dict_info_facade"
+    },
+    {
+      "name": "gfx_osri_show",
+      "ret": "int",
+      "args": ["const char *path", "u32 duration_ms"],
+      "in": [{"arg": "path", "target": true}],
+      "target": "kapi_osri_show"
+    },
+    {
+      "name": "ime_dict_suspend",
+      "ret": "int",
+      "args": ["int on"]
     }
   ]
 }

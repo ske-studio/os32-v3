@@ -60,6 +60,8 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | v3 T3以降の実装契約・分割・受入と後半接続 | T3 配置の契約は [02_memory §2-1](02_memory.md) (Unicode の組表ファイルは [KAPI_SPEC §4-13](KAPI_SPEC.md)、T3 の票は受入完了でアーカイブ `docs/archive/v3/TASK_T3_LAYOUT.md`)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (T3 は受入完了、T4〜T6b・T7 は受入完了・実機確認待ち。D決定の本文はMEMMAP_V3) | V3_PLAN / MEMMAP_V3 はリンクのみ |
 | 実機 Ra266 の機体構成・基準構成 (2026-10-15 のスナップショット) と実機の方針 (82557・PCI・Trident・1.44MB・しないこと) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) (2026-10-22 に realhw/PLAN の本文を節の番号のまま移した) | 実機の票の一覧は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (索引) |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
+| 実機 Ra266 の PCI の IDE カード HighPoint HPT370 (大きな HDD・UDMA・DVD マルチドライブ) | [tasks/realhw/TASK_HPT370.md](tasks/realhw/TASK_HPT370.md) (計画 — 調べの台本の段階) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §1-1 |
+| ハードウェア調査の道具 HW-BASIC (PCI・I/O・MMIO の読み書きとスクリプト、許可リストなし) | [tasks/realhw/TASK_HW_BASIC.md](tasks/realhw/TASK_HW_BASIC.md) (設計中 — 設計は確定、実装はこれから) |
 | 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (実装中 — 4a の S1〜S7 は main、次は S8 (実機の立会い)) | [tasks/realhw/GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) (VBIOS について分かっていることのまとめ) |
 | 実機試験を決まった状態 (安全な 98 の CUI) へ戻す処理 (realhw_recover: 状態機械・期限・98 画面復帰・`recover now`) | [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) (実装中 — T1〜T3 着地、T4a・T4b 合格、T5 の書込みなしは合格、残りは S8 と同じ立会いの回) | 確定設計は [recover.md](design/kdebug/recover.md) (段 4a の設計も同じ所)、[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) §5 |
 | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV、kdebug.bin の上限 92% への対処、IDE・USB・SATA など将来の装置の要件) | [tasks/realhw/TASK_HWDEV.md](tasks/realhw/TASK_HWDEV.md) (実装中 — M1〜M5・BARLEN・route-test は main、次は S8) | 構造・API・装置の要件は [hwdev_private.md](design/include/hwdev_private.md)・[hwdev_imports.md](design/hwdev/hwdev_imports.md)・[DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) (票の §5 から辿る)、[TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md)・[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) |
@@ -78,7 +80,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 ユーザーランドを除く冗長なコードの整理 (未使用の除去・kstring への統一・重複の抽出・大きいソースの分割、2026-10-29 ユーザー指示、GeForce の後) は [TASK_REDUNDANCY](tasks/v3/TASK_REDUNDANCY.md)。
 開発方針を軽くする段 (決まりの棚卸し・試験の 4 段・1 検査 1 ファイルのランナー、2026-10-30 ユーザー指示) は [TASK_POLICY_LIGHT](tasks/v3/TASK_POLICY_LIGHT.md)。
 設計書を 1 機能 1 ファイル・ソースと同じディレクトリ構造 (`docs/design/`) へ移す段 (2026-10-30 ユーザー指示「まとめて」) は [TASK_DESIGN_LAYOUT](tasks/v3/TASK_DESIGN_LAYOUT.md)。
-ブロックデバイス (IDE・FD・CD・ext2/FAT) の遅い所を資料と突き合わせて直す計画 (2026-10-31) は [TASK_BLOCKDEV_PERF](tasks/v3/TASK_BLOCKDEV_PERF.md)。
+ブロックデバイス (IDE・FD・CD・ext2/FAT) の遅い所を資料と突き合わせて直した記録 (受入完了 2026-11-04) は [TASK_BLOCKDEV_PERF](tasks/v3/TASK_BLOCKDEV_PERF.md)。
 カーネルのソース配置の整理 (Linux を手本に、init/・mm/・drivers/<種類>/・fs/<各FS>/、2026-10-30 ユーザー指示、L0〜L4 実施済み。現行の木は [08_build §8-3](08_build.md#8-3-ディレクトリ構造)、仮の境界と include の方針は別の分離計画で扱う) の票は [TASK_SRC_LAYOUT](tasks/v3/TASK_SRC_LAYOUT.md)。
 カーネルから具体ドライバへの依存を登録の口に寄せて外す段 (移植性、2026-10-26 ユーザー指示) は [TASK_DEP_DIR](tasks/v3/TASK_DEP_DIR.md)。
 
@@ -125,7 +127,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [CONSTRAINTS.md](CONSTRAINTS.md) | **プロジェクト制約の正典** — C/ABI・ハードウェア・KernelAPI・検証・破壊的操作。CLAUDE.md は ここの規則行を ID で参照する (`make check` が照合) |
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
-| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v79 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 255) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
+| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v81 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 259) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — §0 は版数の対応表と fork の決定 ([decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2) への案内、v1.x GUI の記録、v3 以降の長期項目 |
@@ -203,6 +205,8 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/gui/API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md) | GUI 契約の変更方針、色崩れの許容範囲、性能目標と測定方針。 |
 | [decisions/gui/DESIGN.md](decisions/gui/DESIGN.md) | GUI の採用方針、性能目標、対象装置と検証環境の構成。 |
 | [decisions/gui/GFX_MODES_DESIGN.md](decisions/gui/GFX_MODES_DESIGN.md) | 形式・モードの拡張範囲と配置変更の方針。 |
+| [decisions/gui/CONTROL_PANEL_DESIGN.md](decisions/gui/CONTROL_PANEL_DESIGN.md) | コントロールパネル (2 ページ・5 項目、同期保存、RELOAD) の確定設計。 |
+| [decisions/gui/P8_GUI_LAYER_DESIGN.md](decisions/gui/P8_GUI_LAYER_DESIGN.md) | P8 GUI 層 (PCM の公開 4 本・入力 event の所有と drop) の確定設計。 |
 | [decisions/realhw/BARLEN_DESIGN.md](decisions/realhw/BARLEN_DESIGN.md) | 基準構成と BAR 上限方式の信頼範囲・許可方針。 |
 | [decisions/realhw/DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) | 装置ごとに要る状態と復帰の要件。 |
 | [decisions/realhw/GF6200_4A_DESIGN.md](decisions/realhw/GF6200_4A_DESIGN.md) | GeForce 4a の範囲・書込み承認・立会いと復帰の方針。 |
@@ -211,6 +215,8 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md) | HWDEV の採用方式・境界と安全条件の維持。 |
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | Ra266 の機体構成・基準構成と実機の方針。 |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) | 復帰の保証範囲、配線・電源操作・書込み承認の方針。 |
+| [decisions/sound/SYNTH_OPNA_DESIGN.md](decisions/sound/SYNTH_OPNA_DESIGN.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) の確定設計。 |
+| [decisions/time/TICK_1KHZ_DESIGN.md](decisions/time/TICK_1KHZ_DESIGN.md) | 1kHz IRQ0 tick (物理 1kHz・論理 100Hz の二周期) の実測計画と切り替えの確定設計。 |
 
 ## タスク
 
@@ -244,7 +250,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | `docs/archive/realhw/TASK_PEGC480_REALHW.md` | Ra266 の PEGC 640x480 — **受入完了 (2026-09-30、実機目視合格)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせた。今の仕様は [05_drivers.md §5-5](05_drivers.md)、480 ラインの OSD の未採取は TASK_TRIDENT_DRIVER の段 0 |
 | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) | 内蔵 Trident (1023:9660) ドライバ **設計中** — 設計票 v5 が Codex 5 回目で Approve (2026-09-29)、実装は未着手。ユーザー決定「Cirrus はエミュレータ用、実機は Trident」 |
 | `docs/archive/realhw_v3/TASK_FDRECOV.md` | FD で起動して LAN で HDD 一式を復旧する経路と、hsync の配置の世代の門 **受入完了** (2026-10-17、NP21/W の受入 7 項に合格) |
-| [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中**。LAN 経由の hsync は達成。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-25.md) |
+| [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中 (2026-11-04)**。LAN 経由の hsync は達成し日常使い。残りは LB-4。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-25.md) |
 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) / [GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) | 増設の GeForce 6200 (NV44A、PCI 0:13.0) の観測と初期化 **実装中** — 段 0〜3 は観測済み (読み取りだけ)、段 4a は S1〜S7 が main、次は S8 (実機の立会い) / VBIOS について分かっていること (表・init script・命令・メモリと PLL・出力) **現行** |
 | [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) **実装中** — T1・T1b・T2・T3 は main、T4a・T4b は NP21/W で合格、T5 は書込みなしの部分が合格 (残りは S8 と同じ立会いの回)、T6・T7 (実機) は未。確定設計は [recover](design/kdebug/recover.md) と [GF 初期化](design/kdebug/gfinit.md) (票の §6 から辿る) |
 | [tasks/realhw/TASK_HWDEV.md](tasks/realhw/TASK_HWDEV.md) | 実機の調査・試行・復帰の核と装置ごとの部品 (`/boot/hwdev.mod`) **実装中** — M1〜M5・BARLEN・T4b・T5 の無書込み・route-test は main、次は S8 (2026-10-24)。GeForce 4a の S7 以降と戻す処理の T4b 以降の順序の正 |
@@ -287,11 +293,13 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/v3/RUST_VS_C11.md](tasks/v3/RUST_VS_C11.md) | **Rust にする部品と C11 に揃える部品 — 設計中・方針確定 (2026-09-30、U5 の調査票、決定は MEMMAP_V3 D36)** — C11 化 (T0) の範囲とコスト (小)、Rust の今の使われ方と道具 (nightly + build-std、`i686-os32-none.json` の既定 CPU は `generic`、os32api、`os32_lz4` のカーネルリンク実績、ビルド時間)、IRQ 文脈の制約、候補 24 件の比較表 (新規 / 既存 / 既に Rust)、推奨 (合成器と OpenType は Rust、カーネル核・FS・FEP・SDK・デコーダは C11)、混在の約束 (FFI・所有権・panic・x87・target JSON)、相対コスト、ユーザー決定 7 点 + (a)、**386 下限の守り方 (§7: `cpu=i386` でも LLVM は `bswap` / `cmpxchg` / `xadd` を出す — 回避実装 + 最終成果物の検査を必須に)**、Codex 事実確認の対応表 (§8) |
 | `docs/archive/v3/TASK_C11_MIGRATION.md` | **T0: C89 (gnu89) → C11 (gnu11) への移行 — 受入完了 (2026-09-30、main `f5bcb35`)** — 範囲は「言語モードと検査の移行」に限定 (本体・ブート・userland・SDK 実装は gnu11、公開 SDK ヘッダは C89 互換、SQLite 系は gnu89 の専用規則、全面書き換えなし)、前提文書の訂正 (§2: `kernel.mk:175` は SQLite 本体でない、`CFLAGS_SQLITE` の継承、`shm.c` は修正済み、`check_constraints.py` は言語検査をしていない)、作業の分類表 (§3)、C11 機能の採用範囲 (§4)、gnu89 → gnu11 の意味の差 (§5)、実施順序 1〜7 と検査 (§6)、受入 (§7)、ユーザー判断 3 点 (§8) は推奨どおり承認・[C1] は §9 の文面で改訂済み、`make check-c-dialect` を新設、A8 は Codex Approve・A9 は NP21/W で合格 |
 | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) | 結線の土台 (割り込みの動的登録 / 8237 / DMA プール / PCI の結線表 / µs 時計) **受入完了・実機確認待ち** (残: W7) |
-| [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入待ち** (E0〜E3 合格、残: E4・E5 は NP21/W、E6 は実機)。ini の SNDboard は [D2] |
+| [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入待ち** (E0〜E4 合格、残: E5 は NP21/W、E6 は実機の聴取)。ini の SNDboard は [D2] |
+| [tasks/v3/TASK_SYNTH_OPNA.md](tasks/v3/TASK_SYNTH_OPNA.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
+| [tasks/v3/TASK_TICK_1KHZ.md](tasks/v3/TASK_TICK_1KHZ.md) | P3 の 1kHz IRQ0 tick (実測 → 二周期への切り替え) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](tasks/vision/AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](tasks/vision/LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
-| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的・範囲・目標の 2 段は [V3_GOALS](decisions/V3_GOALS.md) へ移した (§1・§2 は案内だけ)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。進捗は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-25.md) を参照 |
+| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-11-04)** — 目的・範囲・目標の 2 段は [V3_GOALS](decisions/V3_GOALS.md) へ移した (§1・§2 は案内だけ)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。進捗は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-25.md) を参照 |
 
 ### シェル・配備 (hsync)
 
@@ -339,6 +347,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/network/PLAN.md](tasks/network/PLAN.md) | LGY-98 / NE2000 **ドライバ**計画 — M1〜M3 エミュレータ合格、既定で有効 (2026-09-14 決裁) |
 | [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | リンクプロトコル (ワイヤ v2) / Host Services 計画 |
 | [tasks/network/HOST_SERVICES_PLAN.md](tasks/network/HOST_SERVICES_PLAN.md) | Host Services 詳細計画 — N1〜N4 受入完了。N5 (実機 LAN) は実機の内蔵 82557 の票 ([TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) の L-B) に吸収。LGY-98 はエミュレータで回帰を取る経路として残る |
+| [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (設計中 2026-11-05) |
 | `docs/archive/network/TASK_N0.md` / `docs/archive/network/TASK_N1.md` / `docs/archive/network/TASK_N2.md` / `docs/archive/network/TASK_N3.md` / `docs/archive/network/TASK_N4.md` | 票 N0〜N4 (受入完了、2026-09-14〜15) — 設計 v5、KAPI v51 + libos32host、PRINT/CLIP、wget/lpr、ファイラ印刷と端末の貼り付け |
 
 ### 移植性
@@ -369,11 +378,13 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md) | **v1.3 計画と票の索引** (受入完了 2026-09-14) — K5b / K6 / K7 / T7〜T9、監査 (`AUDIT_2026-09-10.md`)、レビュー記録 (`archive/gui_v13_reviews/REVIEW_*.md`、完了記録) |
 | `docs/archive/gui_v13/TASK_K6C_A_terminal.md` / `docs/archive/gui_v13/TASK_T7_terminal_cmd.md` / `docs/archive/gui_v13_reviews/REVIEW_T5A_APP.md` | v1.3 の票のうち `PLAN.md` から直接辿れない 3 本 (端末アプリ、端末からの CUI 起動、T5a アプリのレビュー記録) |
 | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) | マウスなしで GUI を操作する (WM のショートカット + マウスキー、Windows 98 の割り当て) **受入完了・実機確認待ち** (K1・K2 合格、残: K3 実機) |
-| [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **計画 (2026-09-30)** — 範囲・候補項目・設計で決めること (Q1〜Q8) だけ。設計票の作成は v3 後半 (T4・T5a と P8 の後) |
+| [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
+| [tasks/gui/TASK_P8_GUI_LAYER.md](tasks/gui/TASK_P8_GUI_LAYER.md) | P8 GUI 層 (音のリングと入力) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
 | [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
+| [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |
 | `docs/archive/gui_v14/TASK_EDIT_GUI.md` | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
 | [../tools/tests/gui_review_20260910_tdd.md](../tools/tests/gui_review_20260910_tdd.md) / [gui_review3_20260910_tdd.md](../tools/tests/gui_review3_20260910_tdd.md) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
 

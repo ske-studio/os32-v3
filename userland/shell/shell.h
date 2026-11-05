@@ -179,6 +179,7 @@ void shell_cmd_sys_init(void);
 int shell_sfs_lan(int argc, char **argv);
 void shell_cmd_pci_init(void);   /* cmd_pci.c: lspci / pcidump */
 int  shell_cmd_gfinit(int argc, char **argv);
+int  shell_cmd_hw(int argc, char **argv);
 int  shell_cmd_gf1(int argc, char **argv);
 int  shell_cmd_gf2(int argc, char **argv);
 int  shell_cmd_recover(int argc, char **argv);

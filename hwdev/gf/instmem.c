@@ -1,10 +1,7 @@
 #include "foundation.h"
 
 /* nv40_instmem_oneinit, nvkm/subdev/instmem/nv40.c:158-206. */
-enum { VRAM_SIZE_REG = 0x10020c, VS_REG = 0x1540, PAGE_BYTES = 4096,
-       DISPLAY_BYTES = 307200, FIXED_END = 0x40000,
-       VS_CONTEXT_BYTES = 0x4980, BASE_CONTEXT_BYTES = 0x4000,
-       CONTEXT_COUNT = 32, RESERVE_BASE_BYTES = 0x100000,
+enum { DISPLAY_BYTES = 307200, FIXED_END = 0x40000,
        VBIOS_BYTES = 0x10000, RAMHT_BYTES = 0x8000,
        RAMRO_BYTES = 0x8000, RAMFC_BYTES = 0x20000 };
 
@@ -81,14 +78,12 @@ int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *obj, u32 off,
 
 int gf_instmem_init(struct gf_foundation *f)
 {
-    u32 v, mask, vs = 0, r;
+    u32 v, mask, r;
     int rc;
-    if (f->io.read(f->io.opaque, 0, VRAM_SIZE_REG, 4, &v) ||
-        f->io.read(f->io.opaque, 0, VS_REG, 4, &mask)) return GF1_EIO;
-    v &= 0xff000000U;
-    mask = (mask >> 8) & 0xff;
-    while (mask) { vs += mask & 1; mask >>= 1; }
-    r = ((VS_CONTEXT_BYTES * vs + BASE_CONTEXT_BYTES) * CONTEXT_COUNT + RESERVE_BASE_BYTES + PAGE_BYTES - 1) & ~(PAGE_BYTES - 1);
+    if (f->io.read(f->io.opaque, 0, GF_VRAM_SIZE_REG, 4, &v) ||
+        f->io.read(f->io.opaque, 0, GF_VS_REG, 4, &mask)) return GF1_EIO;
+    v = gf_vram_bytes(v);
+    r = gf_instmem_reserved(mask);
     if (v < r + DISPLAY_BYTES) return GF1_ENOSPC;
     f->imem.vram_bytes = v; f->imem.reserved = r;
     rc = gf_instmem_map(f, &f->instmem_bar, r);

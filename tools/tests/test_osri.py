@@ -444,7 +444,7 @@ def main():
             ('version', 'gfx/gfx_osri.c', '(version != OSRI_VERSION_1 && version != OSRI_VERSION_2)', '0', 'OSRI_TEST_SOURCE'),
             ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
             ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
-            ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
+            ('end', 'gfx/gfx_osri.c', 'tail != 0', '0', 'OSRI_TEST_SOURCE'),
             ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
             ('converter-crc', 'tools/img2osri.py', "struct.pack_into('<I', data, 48, crc)", 'pass', 'OSRI_CONVERTER_SOURCE'),
             ('converter-version', 'tools/img2osri.py', "b'OSRI', 2, 64, W, H", "b'OSRI', 1, 64, W, H", 'OSRI_CONVERTER_SOURCE'),

@@ -34,6 +34,8 @@ typedef struct {
 #define GFX_RGB_B 2
 #define GFX_PALETTE_COMPONENT_MASK PEGC_PAL_KAPI_MASK /* 正典は include/pegc.h */
 #define GFX_PALETTE_CUBE_LEVELS 6
+#define GFX_PALETTE_GRAY_FIRST 8
+#define GFX_PALETTE_GRAY_STEP 10
 
 
 /* パレット初期化 (デフォルト16色セット) */

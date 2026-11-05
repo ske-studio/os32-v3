@@ -323,8 +323,6 @@ static u8 pegc_pal8(u8 v)
     return (u8)((v & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE);
 }
 
-#define PEGC_GRAY_FIRST 8
-#define PEGC_GRAY_STEP 10
 #define COPY_WORD_SHIFT 2
 
 static void pegc_palette_init(void)
@@ -351,7 +349,7 @@ static void pegc_palette_init(void)
 
     /* 232-255: グレースケール 24 段 */
     for (b = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP); i++, b++) {
-        u8 v = (u8)(PEGC_GRAY_FIRST + b * PEGC_GRAY_STEP);
+        u8 v = (u8)(GFX_PALETTE_GRAY_FIRST + b * GFX_PALETTE_GRAY_STEP);
         pegc_write_palette(i, v, v, v);
     }
 }

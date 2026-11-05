@@ -253,13 +253,13 @@ static void c1_failures(void)
     /* Fail before rendering. Same confirmed descriptor and reservation survive. */
     gf3_host_fail_at(&cint_host,H_CLOCK,1,GF1_EIO);
     assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
-    assert(svc_ctx.last_rc==GF2_EIO && !svc_ctx.scan_next[0][0].value.owner);
+    assert(svc_ctx.last_rc==GF1_EIO && !svc_ctx.scan_next[0][0].value.owner);
     gf3_host_fail_at(&cint_host,H_CLOCK,0,0);
     c1_expect(&before,GFX_FMT_XRGB8888,C1_XRGB_BPP);
     /* Runtime rejection during render: newly reserved bank is discarded. */
     gf3_host_fail_at(&cint_host,H_CLOCK,2,GF1_EIO);
     assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
-    assert(svc_ctx.last_rc==GF2_EIO);
+    assert(svc_ctx.last_rc==GF1_EIO);
     const struct gf_vram_reservation_node *unused=svc_ctx.scan_bank[0] ?
         svc_ctx.scan[0] : svc_ctx.scan_next[0];
     assert(!unused[0].value.owner && !unused[1].value.owner);
@@ -393,7 +393,10 @@ static void c1_render_failures(void)
     cint_stall_reference=0;
     svc_finish();
 }
-void _start(void)
+#ifndef GF4_C1_ENTRY
+#define GF4_C1_ENTRY _start
+#endif
+void GF4_C1_ENTRY(void)
 {
     c1_start();
     c1_expect(&svc_state.head[0].front,GFX_FMT_PACKED8,C1_INDEX_BPP);

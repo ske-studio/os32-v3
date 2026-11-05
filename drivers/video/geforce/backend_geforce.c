@@ -26,12 +26,14 @@
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "memmap.h"
+#include "kprintf.h"
 #include "../../../gfx/palette.h"
 #include "../pc98/pc98_route.h"
 #include "hwdev/gf/foundation.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "geforce_module.h"
 #include "hwdev/gf/display/api.h"
+#include "hwdev/gf/feature5.h"
 #include "../../../gfx/gfx_internal.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
@@ -51,8 +53,6 @@ extern void geforce_display_failed(void) __attribute__((weak));
 #define GF_GXCOPY 3U /* xf86-video-nouveau nv04_exa.c:46-84 */
 #define GF_LEASE_FIRST 16
 #define GF_LEASE_COUNT (VIDEO_PALETTE_ENTRIES - GF_LEASE_FIRST)
-#define GF_GRAY_FIRST 8
-#define GF_GRAY_STEP 10
 #define GF_CUBE_STEP 51
 
 extern int pc98_route_to_gf(void);
@@ -70,8 +70,18 @@ static int (*identify_resources)(void);
 static struct video_fb framebuffer;
 #ifdef OS32_GEFORCE_MODULE
 static struct gf3_surface selected_front;
+static bool scanout_logged;
 static GfxMode selected_scan_mode;
 static GfxMode display_modes[GF4_MODES];
+/* Borrow the same resident owner as the hooks. Foreground only; never
+ * attach this to the IRQ/tick path (GF_FEAT5_DESIGN final C2 addendum).
+ * Nouveau c03c1a1 therm/base.c:361-370 uses work scheduling instead. */
+static struct gf5 *feature5;
+void geforce_backend_feature5_bind(struct gf5 *g) { feature5 = g; }
+static int feature5_poll(void)
+{
+    return feature5 ? gf5_service_poll(feature5) : 0;
+}
 #endif
 #ifdef OS32_GEFORCE_MODULE
 void geforce_backend_framebuffer_info(struct video_fb *out, u32 *width, u32 *height)
@@ -126,10 +136,71 @@ static int display_deadline(struct gf4_ctx *c, u32 *dl)
 {
     u32 now;
     struct gf_io *io = &c->ch->f->io;
-    if (!io->timing.clock_us || io->timing.clock_us(io->opaque, &now))
-        return GF2_EIO;
+    if (!io->timing.clock_us) return GF2_EIO;
+    int rc = io->timing.clock_us(io->opaque, &now);
+    if (rc) return rc;
     *dl = now + GF3_TIMEOUT_US;
     return 0;
+}
+/* Read the live head-0 scan, independently of selected_front. Register
+ * widths/fields: MIT nouveau c03c1a1 dispnv04/hw.h:119-140,353-372;
+ * crtc.c:175-233,869-903; dac.c:385-415. This HAL presents head 0 only.
+ * Keep the original I/O rc and restore CR44 even on a failed read. */
+#define SCAN_CR 0x6013d4U
+#define SCAN_SR 0x0c03c4U
+#define SCAN_START 0x600800U
+#define SCAN_CONFIG 0x600804U
+#define SCAN_DACCLK 0x68052cU
+#define SCAN_TEST 0x680608U
+static int scanout_index(struct gf_io *io, u32 port, u32 index, u32 *value)
+{
+    int rc = io->write(io->opaque, 0, port, 1, index);
+    return rc ? rc : io->read(io->opaque, 0, port + 1U, 1, value);
+}
+static void geforce_scanout_log(u32 bytes)
+{
+    if (scanout_logged) return;
+    scanout_logged = true;
+    const struct gf4_test_ops *ops = display_ops();
+    struct gf4_ctx *c = ops ? ops->ctx : 0;
+    if (!c || !c->ch || !c->ch->f) {
+        kprintf(KLOG_ATTR, "[gf4] scanout fail stage=context rc=%d\n", GF4_ESTATE);
+        return;
+    }
+    struct gf_io *io = &c->ch->f->io;
+    u32 owner, start=0, config=0, lo=0, hi=0, ext=0, pixel=0;
+    u32 sr=0, control=0, sync=0, dac=0, test=0;
+    int rc = scanout_index(io, SCAN_CR, 0x44U, &owner);
+    if (!rc) {
+        rc = io->write(io->opaque, 0, SCAN_CR + 1U, 1, 0);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_START, 4, &start);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_CONFIG, 4, &config);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH, &lo);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH_HI, &hi);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH11, &ext);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PIXEL, &pixel);
+        if (!rc) rc = scanout_index(io, SCAN_SR, 1, &sr);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_MODE, &control);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_RPC1, &sync);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_DACCLK, 4, &dac);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_TEST, 4, &test);
+        int restore = io->write(io->opaque, 0, SCAN_CR, 1, 0x44U);
+        if (!restore) restore = io->write(io->opaque, 0, SCAN_CR + 1U, 1, owner);
+        if (restore) kprintf(KLOG_ATTR, "[gf4] scanout fail stage=owner_restore rc=%d\n", restore);
+        if (!rc) rc = restore;
+    }
+    if (rc) {
+        kprintf(KLOG_ATTR, "[gf4] scanout fail stage=read rc=%d\n", rc);
+        return;
+    }
+    u32 pitch = (lo | ((hi >> 5) & 7U) << 8 | ((ext >> 6) & 1U) << 11) * 8U;
+    u32 depth = (pixel & 3U) == 3U ? 32U : (pixel & 3U) * 8U;
+    const struct gf4_head_image *h = &c->state->head[0];
+    kprintf(KLOG_ATTR, "[gf4] scanout head=0 start=%08x front=%08x pitch=%u depth=%u output=%u dpms=%u present=%s bytes=%u fb=%08x expected_pitch=%u config=%08x connector=%u or=%u dac=%08x test=%08x sr1=%02x cr17=%02x cr1a=%02x blank=%u\n",
+        start, selected_front.off, pitch, depth, h->route.type, h->dpms,
+        selected_front.off ? "upload" : "cpu", bytes,
+        framebuffer.phys - geforce_context->platform->display_phys, selected_front.pitch,
+        config, h->route.connector, h->route.or_mask, dac, test, sr, control, sync, h->blank);
 }
 static u8 display_format(enum gf3_fmt fmt)
 {
@@ -173,6 +244,8 @@ void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)
 }
 static int geforce_set_mode(u32 id)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     if (!ops || !ops->set_mode || !ops->scan_prepare || !ops->scan_discard)
         return OS32_ERR_NOSYS;
@@ -225,6 +298,8 @@ static int geforce_set_mode(u32 id)
 }
 static int geforce_dpms(u8 head, u32 state)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     if (!ops || !ops->dpms_set) return OS32_ERR_NOSYS;
     u32 dl;
@@ -234,6 +309,8 @@ static int geforce_dpms(u8 head, u32 state)
 }
 static int geforce_cursor_image(u8 head, const struct GfxCursorImage *image)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     if (!ops || !ops->cursor_image) return OS32_ERR_NOSYS;
     if (!image) return display_result(ops->ctx, GF4_EINVAL);
@@ -246,12 +323,16 @@ static int geforce_cursor_image(u8 head, const struct GfxCursorImage *image)
 }
 static int geforce_cursor_move(u8 head, i32 x, i32 y)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     return !ops || !ops->cursor_move ? OS32_ERR_NOSYS :
         display_result(ops->ctx, ops->cursor_move(ops->ctx, head, x, y));
 }
 static int geforce_cursor_show(u8 head, int show)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     if (!ops || !ops->cursor_show) return OS32_ERR_NOSYS;
     if (show != 0 && show != 1) return display_result(ops->ctx, GF4_EINVAL);
@@ -259,12 +340,16 @@ static int geforce_cursor_show(u8 head, int show)
 }
 static int geforce_vsync(u8 head, u32 after, u32 dl, u32 *seen)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     return !ops || !ops->vblank_wait ? OS32_ERR_NOSYS :
         display_result(ops->ctx, ops->vblank_wait(ops->ctx, head, after, dl, seen));
 }
 static int geforce_page_flip(u8 head, const struct GfxScanout *s, int sync, u32 dl)
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     if (!ops || !ops->flip) return OS32_ERR_NOSYS;
     struct gf4_ctx *c = ops->ctx;
@@ -293,6 +378,8 @@ static int geforce_page_flip(u8 head, const struct GfxScanout *s, int sync, u32 
 }
 static int geforce_gamma(u8 head, const u16 rgb[3][256])
 {
+    int poll = feature5_poll();
+    if (poll) return poll;
     const struct gf4_test_ops *ops = display_ops();
     return !ops || !ops->gamma ? OS32_ERR_NOSYS :
         display_result(ops->ctx, ops->gamma(ops->ctx, head, rgb));
@@ -331,7 +418,7 @@ static void geforce_palette_init(void)
                 initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_B] = b * GF_CUBE_STEP;
             }
     for (u32 gray = 0; i < VIDEO_PALETTE_ENTRIES; ++i, ++gray) {
-        u8 v = GF_GRAY_FIRST + gray * GF_GRAY_STEP;
+        u8 v = GFX_PALETTE_GRAY_FIRST + gray * GFX_PALETTE_GRAY_STEP;
         for (u32 c = 0; c < GFX_RGB_COMPONENTS; ++c)
             initial_palette[i * GFX_RGB_COMPONENTS + c] = v;
     }
@@ -355,6 +442,32 @@ static void geforce_fail(void)
     failed = 1;
     geforce_stop();
     if (geforce_display_failed) geforce_display_failed();
+}
+
+/* The video context retains its F4 loan even if start closed admission.
+ * Capture before geforce_fail can replace both layers' last_rc values. */
+static void geforce_start_fail(const char *stage, int rc)
+{
+#ifdef OS32_GEFORCE_MODULE
+    const struct gf4_test_ops *ops = display_ops();
+    struct gf_display_context *video = device ? device->context : 0;
+    struct gf4_ctx *ctx = video && video->display4 ? video->display4 : ops ? ops->ctx : 0;
+    struct gf2_chan *ch = ctx ? ctx->ch : 0;
+    if (ch) {
+        int last = ctx->last_rc, ch_rc = ch->last_rc;
+        unsigned state = ch->state;
+        u32 epoch = ch->epoch, seq = ch->seq;
+        kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s last=%d gf2=%u/%u/%u ch_rc=%d\n",
+                rc, stage, last, state, epoch, seq, ch_rc);
+    } else if (ctx) {
+        int last = ctx->last_rc;
+        kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s last=%d gf2=na ch_rc=na\n",
+                rc, stage, last);
+    } else
+#endif
+        kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s last=na gf2=na ch_rc=na\n",
+                rc, stage);
+    geforce_fail();
 }
 
 static int geforce_transfer(int x, int y, int w, int h)
@@ -387,8 +500,12 @@ static int geforce_transfer(int x, int y, int w, int h)
         int rc = display_deadline(ops->ctx, &dl);
         if (!rc) rc = gf3_upload(ops->ctx->accel, &selected_front,
             (struct gf3_rect){x, y, w, h}, &ram, false, dl);
+        if (!rc) {
+            geforce_context->counters->present_bytes += (u32)w * (u32)h;
+            geforce_context->counters->commits++;
+        }
         ops->ctx->last_rc = rc;
-        return rc ? OS32_ERR_IO : 0;
+        return rc;
     }
 #endif
     return gf_present_rect(gfx_backend_geforce.bb_base, gfx_backend_geforce.bb_pitch,
@@ -401,6 +518,9 @@ static void geforce_init(void)
     struct video_mode mode;
     if (!geforce_probe()) return;
     if (active) return; /* gfx_init -> gfx_init_200 preserves the current scan. */
+#ifdef OS32_GEFORCE_MODULE
+    scanout_logged = false;
+#endif
     if (video_mode_info(device, GF_MODE_INDEX, &mode) ||
         video_framebuffer(device, &framebuffer) || !gfx_backend_geforce.bb_base) {
         geforce_fail();
@@ -408,13 +528,16 @@ static void geforce_init(void)
     }
     geforce_palette_init();
     pc98_console_set_safe(0);
-    if (video_start(device, mode.id, initial_palette) ||
-        (start_wc && start_wc() < 0) ||
-        geforce_transfer(0, 0, GF_WIDTH, GF_HEIGHT) ||
-        pc98_route_cell_check() || pc98_route_to_gf()) {
-        geforce_fail();
-        return;
-    }
+    int rc = video_start(device, mode.id, initial_palette);
+    if (rc) { geforce_start_fail("video_start", rc); return; }
+    rc = start_wc ? start_wc() : 0;
+    if (rc < 0) { geforce_start_fail("wc", rc); return; }
+    rc = geforce_transfer(0, 0, GF_WIDTH, GF_HEIGHT);
+    if (rc) { geforce_start_fail("transfer", rc); return; }
+    rc = pc98_route_cell_check();
+    if (rc) { geforce_start_fail("cell", rc); return; }
+    rc = pc98_route_to_gf();
+    if (rc) { geforce_start_fail("route", rc); return; }
     active = routed = 1;
     gfx_flip_enabled = gfx_display_page = 0;
     gfx_current_height = GF_HEIGHT;
@@ -444,8 +567,36 @@ static int geforce_query(GFX_ScreenInfo *info)
 
 static void geforce_present(int x, int y, int w, int h)
 {
-    if (!active) return;
+    if (!active) {
+#ifdef OS32_GEFORCE_MODULE
+        if (!scanout_logged) {
+            scanout_logged = true;
+            kprintf(KLOG_ATTR, "[gf4] present fail stage=inactive rc=%d\n", GF4_ESTATE);
+        }
+#endif
+        return;
+    }
+#ifdef OS32_GEFORCE_MODULE
+    int poll = feature5_poll();
+    if (poll) {
+        kprintf(KLOG_ATTR, "[gf4] present fail stage=poll rc=%d source=%s source_rc=%d\n",
+                poll, feature5 && feature5->poll_source ? feature5->poll_source : "other",
+                feature5 ? feature5->source_rc : poll);
+        scanout_logged = true;
+        geforce_fail(); return;
+    }
+    u32 before = geforce_context->counters->present_bytes;
+#endif
     int rc = geforce_transfer(x, y, w, h);
+    if (rc) {
+        kprintf(KLOG_ATTR, "[gf4] present fail stage=transfer rc=%d\n", rc);
+#ifdef OS32_GEFORCE_MODULE
+        scanout_logged = true;
+#endif
+    }
+#ifdef OS32_GEFORCE_MODULE
+    if (!rc) geforce_scanout_log(geforce_context->counters->present_bytes - before);
+#endif
     if (rc && rc != OS32_ERR_INVAL) geforce_fail();
 }
 

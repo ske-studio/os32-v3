@@ -175,7 +175,20 @@ fn add_help(parent: WidgetId, text: &[u8]) -> libos32gui::GuiResult<()> {
 impl App for Demo {
     fn on_click(&mut self, _ui: &mut Ui, w: WidgetId) {
         if w == self.btn {
-            let _ = widget::set_text(self.lbl_ok, b"OK pressed!");
+            let rc = unsafe { (os32api::api().exec_run)(b"ver\0".as_ptr()) };
+            let mut buf = [0u8; 32];
+            let mut n = concat(&mut buf, b"exec_run: ", b"");
+            let mut value = rc.unsigned_abs();
+            if rc < 0 { buf[n] = b'-'; n += 1; }
+            let start = n;
+            loop {
+                buf[n] = b'0' + (value % 10) as u8;
+                n += 1;
+                value /= 10;
+                if value == 0 { break; }
+            }
+            buf[start..n].reverse();
+            let _ = widget::set_text(self.lbl_ok, &buf[..n]);
         }
     }
 

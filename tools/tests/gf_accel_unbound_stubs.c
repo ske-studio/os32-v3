@@ -4,6 +4,15 @@
  * gf_accel_c1/c2 hosts with real F1/F2/F3 products. Weak definitions allow a
  * fixture's explicit lower-layer model or real backend to take precedence. */
 #include "hwdev/gf/accel.h"
+#include "hwdev/gf/feature5.h"
+#include "kprintf.h"
+/* The start-failure hosts assert output; ownerless/link hosts borrow only
+ * the kernel printing dependency. */
+__attribute__((weak)) void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{ (void)attr; (void)fmt; }
+/* F3-only fixtures never bind the foreground F5 context. */
+__attribute__((weak)) i32 gf5_service_poll(struct gf5 *g)
+{ (void)g; __builtin_trap(); }
 __attribute__((weak)) int gf3_init(struct gf3_ctx * a0, struct gf2_chan * a1, u32 dl)
 { (void)a0;(void)a1;(void)dl; __builtin_trap(); }
 __attribute__((weak)) int gf3_fini(struct gf3_ctx * a0, u32 dl)

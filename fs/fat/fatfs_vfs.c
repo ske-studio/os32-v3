@@ -784,7 +784,9 @@ static VfsOps fatfs_ops = {
     0,
     /* 大文字小文字を区別しない (FatFs の短い名前の規則) */
     fat_name_fold,
-    0 /* SQLite capability is not implied by filesystem permissions. */
+    0, /* SQLite capability is not implied by filesystem permissions. */
+    0, /* resource_check */
+    0  /* resource_refresh */
 };
 
 

@@ -1,6 +1,6 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
-> 状態: **現行 (2026-10-25)** — 2026-10-24 に BUILDDEP-1・MCPPUT-1・CI-FLAKY-1・T4B-CD を閉鎖台帳へ、LGY98-L12 は保守外 (TASK_TEST_TIDY)。T7BB1-GUEST は閉鎖台帳へ (S3b の受入)。 — T5完了後の証拠照合。T4C1-CORE・T4C1-FD・T4B7-GUI・IMEDUP-1・E11-A2bは 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移した。未証拠の項目と実機の残件は下表に残す。
+> 状態: **現行 (2026-11-04)** — 2026-10-24 に BUILDDEP-1・MCPPUT-1・CI-FLAKY-1・T4B-CD を閉鎖台帳へ、LGY98-L12 は保守外 (TASK_TEST_TIDY)。T7BB1-GUEST は閉鎖台帳へ (S3b の受入)。 — T5完了後の証拠照合。T4C1-CORE・T4C1-FD・T4B7-GUI・IMEDUP-1・E11-A2bは 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移した。未証拠の項目と実機の残件は下表に残す。
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移す (**元の票がアーカイブ済みなら、証拠の所在は閉鎖台帳の行と、その作業をした今の票に書く** — アーカイブは書き換えない、ユーザー決定 2026-10-22)。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
@@ -20,18 +20,18 @@
 | T7着手時の残件照合 | T5A2-GUEST | RESIDENT学習の子終了後保持・Unicode7頁/guard込み実監査の未証拠分 |
 | T7着手時の残件照合 | T5B5-GUEST | 全体MINIMALでのCD読取と1.44MB FDからのcdinstは未証拠 |
 | T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h)、T7-V86CTX | — |
-| [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
+| [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | H-4 (b)(c) | — |
 | 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20 | 次にその道具・媒体を触る段 |
 | 実機の回 (T4T7-RH) | KSTK-DF・T4T7-RH・DEPDIR-D1-FD | NP21/Wの#DF受入済み。実機の#DF等、下表の残件をまとめて確認。DEPDIR-D1-FD = TASK_DEP_DIR の D1 の後に Ra266 で FD 起動 (IRQ11 を共通の入口に移した、NP21/W の 1232/1440 は D1c で PM)。D3 の後は Ra266 の FD/HDD 起動と `[ledger] pci raw=` が BAR の本数と一致すること (NP21/W に PCI は無い) | (DEPDIR-B-BEEP は 2026-10-27 に閉じた: ブザーの buz_on は呼び手が無く聴く手段が無い — shell の beep は FM の起動音、buz_off は rshell が毎回呼び Ra266 で通っている、書く値は host 試験で照合済み)。Ra266 の RTC が 2000-01-03 を返す件は本体の電池切れ (ユーザー 2026-10-27、OS32 の不具合ではない、変換は NP21/W で正しい)。
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
-| 記録 | R7-3、R7-4 | — |
+| 記録 | R7-4 | — |
 
 ## 2. 渡す — 後続の段
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
 | GF-DRIVER-P0 | `check-video-service-host` の GF/Trident・REPEAT/待ち/退避は P0 の fake 契約例。製品 runner・27命令・P3 PLL と実機の正常stop/途中失敗は未検証 | P0 は宣言と契約の段で製品実体が無い。NP21/W・実機は本依頼の対象外 | P2 で実体の結合試験、P3 で表示PLLの失敗/commit、P6 で実機受入（TASK_GF_DRIVER） |
-| GF-L2-Ra266 | GeForce 層 2 (コマンドの投入) の実機受入: Ra266 の 0:13.0/0221 で、T2 (`gf2`) の起動→投入→停止→再開、10 万 reference・wrap、fault→recover (BAD_HANDLE・BAD_METHOD、障害の出力は class・subc・method)、VBLANK の増加、表示の維持、PCI の往復 (層 3 の M2MF との結合) | 層 2 は 2026-11-03 にユーザー指示でコーディングを全部終えてからまとめて検査した (ホストの試験までは通す)。実機の試験は層 2 の取り込みの後 | 層 2 の取り込みの後、ノートのセッションに実機の受入を頼む (確定設計 GF_FEAT2_DESIGN §9・末尾の T2 の追記)。実施担当・日付・serial ログの所在を実施時に記入 |
+| GF-L2-Ra266 | GeForce 層 2 (コマンドの投入) の実機受入: Ra266 の 0:13.0/0221 で、T2 (`gf2`) の起動→投入→停止→再開、10 万 reference・wrap、fault→recover (BAD_HANDLE・BAD_METHOD、障害の出力は class・subc・method)、VBLANK の増加、表示の維持、PCI の往復 (層 3 の M2MF との結合) | 層 2 は 2026-11-03 にユーザー指示でコーディングを全部終えてからまとめて検査した (ホストの試験までは通す)。実機の試験は層 2 の取り込みの後 | 層 2 の取り込みの後、ノートのセッションに実機の受入を頼む (確定設計 GF_FEAT2_DESIGN §9・末尾の T2 の追記)。実施担当・日付・serial ログの所在を実施時に記入。**初回 (2026-11-04、Ra266、main 5a29f69c、証拠はノートの `~/os32-tmp/evidence/2026-11-04/gf-accept-5a29f69c/`)**: `gf2 status` は precheck rc=-201 (本番の foundation に時計・待ちが渡っていない、`hwdev/gf/devinit.c:104-105`)、`gf1 status` は rc=-107 (起動前から PCI Command 0106h = BusMaster)、`gf2 display 0` はシリアル・画面とも無出力。直しの段 wt/gf-prodtime が進行中で、再試験はその取り込みの後 |
 | GF2-B4-ORACLE | B4 の fixture と MIT nouveau c03c1a1 の ctxnv40.c/.h の直接の照合 (CI は fixture と製品を照合する) | 外部の手本のソースはリポジトリに置かない | `tools/tests/gf_command_b4*` か `hwdev/gf/grctx.c` を変えたとき、PM が `check_slot.sh` を通して `test_gf_command.py --component b4 --oracle <ctxnv40.c>` |
 | SLIM-S3C-GUEST | S3 (自己試験 5 本を kdebug へ) の KDEBUG OFF の起動 (skipped と常駐の監査)・両 FD の起動・道具の実読取り | 2026-10-25 に PM が 43984e35 の成果物で KDEBUG ON の起動・自己試験 (fail=0、pass 1823 → 1829、229/229)・ブートログの比べ・mem の監査を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s3/RESULT.md`)。OFF と FD は設定と媒体の差し替えが要る。基準は `~/os32-tmp/run/slim-s3/baseline/`、候補と同梱一覧は `s3f-evidence/` | 次に KDEBUG OFF か FD 起動の試験を回すときに PM が同じ経路を通す |
 | GFX-MODES-C480 | 票 TASK_GFX_MODES の Cirrus の受入 (guest_acceptance の gfx-modes-c480): **NP21/W で** GD5430 を有効にした構成で (実機 Ra266 に Cirrus は無い — 表示は Trident と GeForce 6200、RA266 §1-1)、対の kernel と cirrus.mod で 640×480/256 色・下端 479・HW fill/blit・小さい矩形の CPU 代替・終了と CTRL+STOP の後のリレーの戻りと再入場。別の周波数の構成での P480/P400 も | 構成の変更を段ごとに行わずまとめる (PM 決定 2026-10-26、確定設計 GFX_MODES_DESIGN の A10)。未実行は未合格 | v3 の最終段の構成別の関門で PM が採る |
@@ -40,15 +40,13 @@
 | REDUNDANCY-E-GUEST | E 群 a 段のゲスト受入の残り: E01a の GUI park/resume の `verify` (例外ベクタの外部証拠 — 今のカーネルに数える口が無い) と pf 以外の 5 モード。**済み**: MINIMAL (2026-10-31)・82557 (Ra266)・**E03a の ext2 format (2026-11-01、隔離 NHD に FD の `install` → ext2_format_range、書いて読む・cmp・e2fsck -fn clean、`~/os32-tmp/run/gui-accept/format/`)**・**E01a の park/resume の pf モード (2026-11-01、resume_pending=1・consumed=1・reclaim rc=0、`~/os32-tmp/run/gui-accept/h3/`)** | 2026-10-31 に NP21/W で main 06c1e230 の最小回帰 (ver・自己試験 1748/0・mem 残留 0・guest_tests 21/21)・raw_wait fm/db/log/fault と CUI の CTRL+STOP (kind=3)・v86 -t・recover status は PASS (`~/os32-tmp/run/e-group/guest-06c1e230/`)。ホストは test_hdd_stage1 (format の e2fsck)・sqlite_module_host (MINIMAL の巻き戻し)・test_h3_park_resume が見ている | format: 次のインストール媒体の受入 (隔離 NHD)、park/resume: 次の GUI の受入 |
 | GUI-IMETAB-STDIN | **2026-11-01 NP21/W (8498b96、証拠 `~/os32-tmp/run/gui-accept/`) で多くは PASS**: ime の Tab は CUI (候補一覧の有無とも、Tab の補完より先に候補が入る) と GUI (Run の入力ダイアログ、edit_gui で Tab の前に候補が本文へ入り a は未確定の「あ」) で PASS。exec の stdin は CUI の打鍵 (byte・line) とリダイレクト (byte・line・utf8) で PASS。**残り**: (1) GUI 端末で回す分 — v3 に GUI の端末アプリが無い (H-7)、(2) 入力欄が 2 つある GUI での「次の欄」— 今そういうアプリが無い、(3) **FEP ON の CUI の `read(0)` は FEP を通らない** (`--stdin-utf8` が `61 0a`) — `sys_read(0)` は `kbd_getchar_kapi` (`platform/pc98/d2_bind.c:21`) で、KAPI の getchar だけが `ime_getchar_kapi` を通る。今回の直しより前からの作り。stdin を FEP に通すかはユーザーの判断待ち | ホストの試験は直す前に RED・直した後に GREEN、Opus レビュー取り込み可。GUI 端末での手順が要る | 次の GUI の受入 |
 | SHELL-BS-UTF8 | **BS の直しは main afd4d2ec (2026-11-01、terra 実装・astra レビュー 2 回)、NP21/W の常駐シェルで PASS** (`echo 換字` → BS → x が `換x`、行の途中の BS、左右・HOME・DEL が 1 字ずつ、ASCII は前と同じ、`~/os32-tmp/run/gui-accept/bs-afd4d2e/`)。**残り**: 半角カナの後の BS (NP21/W で半角カナを入れる手段が無い — ホストの試験 sh-input-host が見ている)、確定直後に `[あ]` が消える表示 (前の版と比べる)、LEFT/HOME で通り過ぎた字が画面から消える前からの作り | 2026-11-01 の ime の再確認 (c5f4c2a、`~/os32-tmp/run/gui-accept/recheck-c5f4c2a/bs*.png`) で発見。今回の整理の前からの作り (ui.c は触っていない)。バグなので直してよい範囲 | 次の小さい直しの段 (BS で UTF-8 の 1 字の長さを数えて消す、`[あ]` は前の版と比べてから) |
-| SPLASH-24K-RH | ラスタパレット画像スプラッシュの 24kHz の実機での確認: ユーザーが Ra266 を GRPH+1 で 24.8kHz に切り替えて起動 (PEGC を切った 24kHz、実質 9801 の表示) → 09A8h の D0・8 周期の照合・副尺の模様・画像・内蔵ロゴ・終了を観察 → GRPH+2 で 31kHz に戻す | ユーザー「確かめは不確実でいいです。実機前で確認する時にでも」(2026-11-01)。24kHz の切り替えは物理の操作 (NEC Technical Databook p.160)。NP21/W の CUI は既定で 24.83kHz なので NP21/W では踏める | ユーザーの立会いの回 (T4T7-RH と同じ回) |
 | RASTER-KAPI-APPS | 公開 KAPI gfx_present_raster の意味の変化 (同じ行に複数件・2 行未満の間隔・昇順でない表は全体を拒否して静止、fallback は VSYNC で歩調を取らない) を apps/ のアプリで確かめる | TASK_RASTER_SPLASH の L0 (2026-11-01、Opus レビュー L0-2)。木の中の呼び手は boot_splash だけで通る | H-7 の再開のとき |
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
 | T3C2-GUI | T3c2 の 6 命令を GUI の端末から回す (sentinel・20 回・ネスト) と、H-5 の Ra266 64MB での同条件比較 | v3 に GUI の端末アプリが無い (H-7)、H-5 は実機の条件。CUI の 6 命令・CUI/GUI の往復・PT の監査は NP21/W で合格 (2026-10-17、`~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`) | GUI の端末は H-7 の再開時、H-5 はハードウェアの実機の回 (T4T7-RH と同じ回) **H-5 (2026-11-01、ee4f3f4、KDEBUG=1)**: `os32gui -t 30` の往復の後 kstack=4584・shell_stack=20436・resident_peak=131656・leftover=0。基準 3544 は KDEBUG=0 の値 (2026-10-16 h5_mem)、KDEBUG=1 の比較値は 4348 (2026-10-17 t3bR) — 同じ条件では +236 B、shell_stack・resident_peak は同じ。GUI の端末の分は H-7 |
 | T4C1-GUEST | T4c-1のゲスト項目のうち未照合: 欠落/混在拒否・対更新・KDEBUG ON/OFF・監査、注入/QUARANTINED | 通常DB 9/9・42/42とservices順/diff0、部品なしMINIMALはT4c-2受入記録あり (`~/os32-tmp/evidence/2026-10-18/t4c2_np21w/RESULT.md`)。項目別に突合し、T4全体の状態行だけで一括閉鎖しない | T7着手時点の残件: 注入/QUARANTINED・欠落/混在拒否・同/異世代更新/別root復旧・KDEBUG ON/OFFの項目別照合は証拠未確認。通常起動・MINIMAL・監査diff0は `~/os32-tmp/evidence/2026-10-19/t5_milestone_np21w/RESULT.md` で確認済み |
 | T4B-EXT2 | 実ゲストの同一DB排他 (親子/park/RESIDENT/別名) の証拠照合 | T4b-4/4cのhost成功やCD接続取消でゲスト完了にはしない | T7着手時点も親子/park/RESIDENT/別名の同一DB排他は未受入。`~/os32-tmp/evidence/2026-10-18/t4b_np21w/RESULT.md` §5はfixture無しで未実施、T5節目にも該当証拠なし |
 | T3D2-D15 | D15 (前景 1 本で起動 2 秒・入力→描画 100ms、P100/32MB) の判定。T3d2 の時間は NP21/W の参考値だけ (`~/os32-tmp/evidence/2026-10-18/t3d2_np21w/RESULT.md`) | エミュレータの時間は実機の時間ではない。票 T3d2 の取り決めで「未測定として台帳へ」 | 実機の回 (T4T7-RH と同じ回)、T7b の日本語の描画の計測と合わせて |
-| T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e の `v86 -g`/boot2/DOS、T7 の Ra266 の計測、T5-0b の kernel/engine 実guard→#DF task gate→シリアル/画面診断→停止 (resetなし)、通常例外/ESP0/V86と32KiB stack負荷回帰、T5c-2b の CS4231/A の実音と close・CTRL+STOP の後の DRQ/FIFO の停止と再 open、`-Os` 化の後の音切れ (R7-2 と比較)、T5c-3 の CUI での `v86 -t` の反復・DOS からの脱出で画面/音/キー入力が戻る・`v86 -g -t`・boot2・実機の BIOS の page0 が起動時に取った原本のまま DOS に渡る | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す。**2026-10-19 の回 (ed9aa37/def391c、`~/os32-tmp/evidence/2026-10-19/realhw_update/`・`realhw_visit/`)**: T5c-4 の 82557 は lan.mod の LAN 版 hsync で更新が通り合格、T5c-2b の実音は鳴る (ブツブツいう音は PCMCRACKLE-1)、T5c-3 の `v86 -t` OK、再生中の CTRL+STOP の後に再び鳴る (ユーザー確認)、GUI 可、FD 起動 SQLITE_ONLY。残り: L18 の初期表示・通常例外・V86 復元失敗の文字/属性面 (固定障害口移設後、未実施)、T5-0b の #DF (試験像)、`v86 -g -t` (KDEBUG=1 が要る)・DOS・boot2・page0、T7 の項目 **2026-11-01 の回 (ee4f3f4、ノートのセッション、証拠 ノートの `~/os32-tmp/evidence/2026-11-01/realhw-rest-a/`、カメラ 06:17:40〜06:21:52 のフレーム)**: L18 の起動表示と通常例外 (`crash.bin` → `#PF (CPL=3) … kill app`・leftover=0) は合格、db_test 9/9・db_v50_test 42/42・`v86 -t` ×3 OK、KDEBUG=1 で `[display] kcg=1 A9 … restored=14`・`[selftest] 157/157`・`os32gui -t 20/30` は GeForce で GUI が写り CUI に戻る (カメラ)、`v86 -g -t` OK (failbits 0000)、実 ROM の `v86 -g` OK・画面が BIOS の文字面に替わり戻る (カメラ)。`peek -p 0xE0000` は DENY (読めない)。**残り** (手順書 `~/os32-tmp/run/realhw-rest/PLAN.md`): 立会いの回 — T5-0b の #DF の試験像 (FD で起動、HDD に入れない)・DEPDIR-D1-FD・PCMCRACKLE-1 の聴取。v3 ではできない — V86 復元失敗の文字/属性面 (失敗を起こす口が無い)・boot2/DOS/page0 (DOS の像 dos5hd.nhd が 2026-09-10 に削除済み) |
-| PCMCRACKLE-1 | 実機 Ra266 (CS4231) で pcm_test の音にブツブツいう音が混じる (2026-10-19、ユーザー聴取) | ユーザー: 記録して対処は後回し。T4T7-RH の「-Os 化の後の音切れ (R7-2 と比較)」と同じものかは未確認 | PCM に触る次の段、または実機の回で R7-2 と比べてから |
+| T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e の `v86 -g`/boot2/DOS、T7 の Ra266 の計測、T5-0b の kernel/engine 実guard→#DF task gate→シリアル/画面診断→停止 (resetなし)、通常例外/ESP0/V86と32KiB stack負荷回帰、T5c-2b の CS4231/A の実音と close・CTRL+STOP の後の DRQ/FIFO の停止と再 open、T5c-3 の CUI での `v86 -t` の反復・DOS からの脱出で画面/音/キー入力が戻る・`v86 -g -t`・boot2・実機の BIOS の page0 が起動時に取った原本のまま DOS に渡る | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す。**2026-10-19 の回 (ed9aa37/def391c、`~/os32-tmp/evidence/2026-10-19/realhw_update/`・`realhw_visit/`)**: T5c-4 の 82557 は lan.mod の LAN 版 hsync で更新が通り合格、T5c-2b の実音は鳴る (ブツブツいう音は 2026-11-04 に pcm_test の右チャンネルの frame 番号の飛びと確定、ドライバの不具合ではない)、T5c-3 の `v86 -t` OK、再生中の CTRL+STOP の後に再び鳴る (ユーザー確認)、GUI 可、FD 起動 SQLITE_ONLY。残り: L18 の初期表示・通常例外・V86 復元失敗の文字/属性面 (固定障害口移設後、未実施)、T5-0b の #DF (試験像)、`v86 -g -t` (KDEBUG=1 が要る)・DOS・boot2・page0、T7 の項目 **2026-11-01 の回 (ee4f3f4、ノートのセッション、証拠 ノートの `~/os32-tmp/evidence/2026-11-01/realhw-rest-a/`、カメラ 06:17:40〜06:21:52 のフレーム)**: L18 の起動表示と通常例外 (`crash.bin` → `#PF (CPL=3) … kill app`・leftover=0) は合格、db_test 9/9・db_v50_test 42/42・`v86 -t` ×3 OK、KDEBUG=1 で `[display] kcg=1 A9 … restored=14`・`[selftest] 157/157`・`os32gui -t 20/30` は GeForce で GUI が写り CUI に戻る (カメラ)、`v86 -g -t` OK (failbits 0000)、実 ROM の `v86 -g` OK・画面が BIOS の文字面に替わり戻る (カメラ)。`peek -p 0xE0000` は DENY (読めない)。**残り** (手順書 `~/os32-tmp/run/realhw-rest/PLAN.md`): 立会いの回 — T5-0b の #DF の試験像 (FD で起動、HDD に入れない)・DEPDIR-D1-FD。v3 ではできない — V86 復元失敗の文字/属性面 (失敗を起こす口が無い)・boot2/DOS/page0 (DOS の像 dos5hd.nhd が 2026-09-10 に削除済み) |
 | NOFPU-1 | FPU の無い CPU (386 単体・486SX) で、起動中の SQLite (double) など既存の浮動小数点の利用が CR0.EM=0 のまま実行される (T7b-a2 の Opus レビュー R1、2026-10-19)。font は present の旗で KCG に落ちるが、それ以外の FP の利用者は判定していない | **font の部分は FONTPERF F5/F6 (2026-10-20) で解消** — 字形ラスタは整数だけになり x87 guard と NOSYS を撤去、gshell・libos32gui の x87 命令は objdump で 0 件。残るのは kernel の fninit と SQLite の double (kernel.elf の x87 命令 11 件)。以下は元の記述:  既存の挙動 (T7b-a2 の前から EM=0)。T7b の範囲外。対象機の Ra266 と P100 には FPU がある | FPU 無しの CPU を対象に入れるかの判断のとき (v3 の最終段のメモリ量・構成ごとの確認と合わせて) |
 | KSTK-DF | カーネル・SQLite engine のスタックがガード頁に当たると、#PF の例外フレームも NP 頁に書くので #DF → トリプルフォルト (リセット) になり、診断の 1 行が出ない。#DF を専用 TSS の task gate で受ければ止まる前に診断を出せる (T4c-1 の直しの astra レビュー P1) | T4c-1 以前の固定ガード・カーネルのスタックと同じ振る舞い (`arch/x86/kernel/isr_stub.asm:28`)。黙った破壊ではなく停止なので T4c-1 の範囲外 | NP21/W で受入 (2026-10-18、dcfe5b1: kernel/engine とも診断の 1 行を出して停止)。残りは実機の回 (T4T7-RH の T5-0b の項目) だけ。L18 の固定障害口移設後も、DF_GUARD_TEST=1/2 の各像で診断文字・属性面・停止後にリセットしないことを確認する (未実施)。NP21/Wの根拠は `~/os32-tmp/evidence/2026-10-18/t5-0b_np21w/RESULT.md` |
 | FEPLEARN-1 | 学習した語は `fep.db` の `dict_user` にあり、配備 (nhd_deploy sync) や FEP が閉じている間の hsync で `fep.db` を入れ替えると配布の状態に戻る (T5-0a の受入で観測) | T4 以前からの作り。FEP が開いている間の hsync は BUSY で置き換えを断る (`userland/system/hsync.c:1622`) ので普段の更新では起きない | 学習を別ファイルに分ける DICT_META の段で解消。実機で FD 復旧 (FDRECOV) をすると学習が消えることを手順書に書くのはその段まで保留 |
@@ -93,8 +91,6 @@
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
 | H-5 | 実機の残り: CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)。kernel stack の high-water は **10/16 に T3 の票 §0 の表へ転記して閉じた** (86ba40c で kstack=3,544 B、10/14 は 4,348 B)。UC 化で present が遅くならないことは閉じた | 構成持越し (実機) | CG 窓の WB と 68h の後始末は実機に読む口が無い (設計票 §8 (m) で公開の物理 read は作らない) → **読む道具が要る、T7 (V86 / 表示の段) へ渡す** |
-| R7-2 | 実機 Ra266 の PCM: pcm_test は under=0・rep=0・resync=0・close 0 で 5 秒鳴ったが、**不規則な音切れ**をユーザーが聞いた (カウンタに出ない欠け — DMA 境界・auto-init の折返し・CS4231 FIFO / XTAL2・IRQ の遅れが候補)。起動行は `[pcm] CS4231 v=101 irq 10 dma 1 fmt 0x5B` (NP21/W の 64MB + SNDboard=64 では v=100) | 実機の不具合 | TASK_PCM_CS4231 |
-| R7-3 | 実機 Ra266 の GUI で、KANA をオンにしてマウスキーでカーソルを動かすと、スピーカーからうっすら「ププププ」とクリック音のような音がする (ユーザー観測 2026-10-12、使用感に問題なし)。キーごとのビープ / ポート 37h・35h の操作 / PIT ch2 の扱いが候補 | 実機の事象 (記録) | — |
 | R7-4 | 実機 Ra266 の GUI で、起動の初めに画面中央に描かれたマウスカーソルが残る (ユーザー観測 2026-10-12)。**動かした後のカーソルは残像を出さない** — 残るのは起動時の最初の 1 回の描画だけ (初回の背景の保存より前に描いた、または最初の合成がカーソルの位置を描き直していない)。gshell の起動時の `cursor` の初期位置 (`lib.rs` の st.mouse_x/y = 画面中央) と、最初の合成・カーソルの保存/復元の順が候補。NP21/W では未観測 | 実機の事象 (記録) | — |
 | R7FIX2-1 | R7FIX2 段 1 の受入 (6) のうち、CTRL+ESC の後にカーネル側の `[gfx] px` 行 (n>n0) が a の bb/vr を新値で出すこと (GUI 中のシリアルを NP21/W で読めず未確認。gserial の px は変化を確認済み) | 試験の未実施 (道具) | 実機の段 2 の採取 (シリアルで読める) |
 
@@ -108,6 +104,7 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 ## 6. GeForce 層4の実機受入
 
 [確定設計 §12](../decisions/realhw/GF_FEAT4_DESIGN.md) の実機項目。ホスト検査の合格とは区別する。
+初回の実機 (2026-11-04、main 5a29f69c) は層 1・2 の入口 (`gf1`・`gf2 status`) で止まり、層 4 の項目へ進めなかった (GF-L2-Ra266 の行)。wt/gf-prodtime の取り込みの後に、層 1 から順に再試験する。
 
 | ID | 状態 | 構成 | 受入項目 | 証跡 |
 |---|---|---|---|---|
@@ -119,3 +116,18 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 | GF-L4-Ra266-gamma | 未実施 | Ra266 0:13.0/0221 | identity・整数暗化・8bit palette帰還・LUT checksum | 担当/日付/serial/カメラ証跡は実施時記入 |
 | GF-L4-Ra266-outputs | 未実施 | Ra266 0:13.0/0221 | 端子写真・DCB・TMDS/TV/2head独立動作、不可時理由 | 担当/日付/serial/カメラ証跡は実施時記入 |
 | GF-L4-Ra266-lifecycle | 未実施 | Ra266 0:13.0/0221 | PC-98→GF→PC-98・失敗復元・停止順 | 担当/日付/serial/カメラ証跡は実施時記入 |
+
+## 7. GeForce 層5の受入
+
+[確定設計 §10](../decisions/realhw/GF_FEAT5_DESIGN.md) の未実施項目。
+
+| ID | 状態 | 対象・解除条件 |
+|---|---|---|
+| GF-L5-Ra266 | 未実施 | Ra266 0:13.0/0221 で ROM perf 間と boot 復帰、RAM CRC、温度/fan/VID、tile、save/restore 3 回を確認。担当・日付・serial ログを実施時に記入 |
+| GF-L5-ENOTSUP | 暫定 | 未実装 stub の ENOTSUP は受入保留。B3/B4/B5 の実列 host GREEN と実機結果で解除。ROM/GPIO 不在は根拠付きの機能不在に分類し、stub 完了に流用しない |
+
+## HW-BASIC 実機受入
+
+| ID | 対象 | 手順 | 未実施理由 | 担当 | 解除条件 |
+|---|---|---|---|---|---|
+| HWB-REALHW | HW-BASIC 実機受入 (§7) | Ra266 で lspci/pcidump → SR09 → Enable → Disable と窓の連続 read、シリアルと映像往復・PTE/IF 復元を照合 | 実装段は host のみ、実機未実施 | HW-BASIC 機能 PM | 実機の記録と映像往復・連続 read の成功確認で解除 |

@@ -14,11 +14,12 @@ static struct raw_event new_trace[TRACE_MAX];
 static const struct raw_event *old_trace;
 static u32 raw_count, raw_index[6], fail_at, point_count, point_fail;
 static u32 restore_calls, adapter_cleanup, restore_fail_at, raw_calls;
+static u32 point_fail_raw_calls;
 static struct gf_init_context init;
 static struct gf_init_program program;
 static u32 observed[256], raw_vga[6][256], restored_entries, seed_mode;
 static u32 instruction_seen[256];
-static bool diagnostic_mode,a2_bad_decode;
+static bool diagnostic_mode,a2_bad_decode, split_restore_error;
 static u32 initial_value(u32 off,u32 width)
 {
     return seed_mode ? ((off * 0x10203U) ^ 0xa5a50f55U) & width_mask(width) : 0;
@@ -82,7 +83,9 @@ static int new_point(void *v)
 {
     (void)v;
     if(init.fail_pc<sizeof(rom))instruction_seen[rom[init.fail_pc]]++;
-    return ++point_count == point_fail ? -1 : 0;
+    if (++point_count != point_fail) return 0;
+    point_fail_raw_calls=raw_calls;
+    return -1;
 }
 static int raw_delay(void *v,u32 us)
 {
@@ -111,12 +114,14 @@ static int new_restore(void *v, struct gf_init_context *ctx)
         restored_entries++;
     }
     adapter_cleanup++;
+    if (split_restore_error) { ctx->last_rc=GF_SCRIPT_EIO; return -1; }
     return rc;
 }
 static void reset_raw(void)
 {
     raw_count = raw_calls = fail_at = restore_fail_at = point_count = point_fail = 0;
     restore_calls = adapter_cleanup = restored_entries = 0;
+    split_restore_error=false; point_fail_raw_calls=0;
     clock_value = clock_jump = wait_total = clock_fail = wait_fail = 0;
     for (u32 i = 0; i < profile.target_count; i++)
         values[i] = profile.targets[i].space==REC_PCI_CFG || zero_target(&profile.targets[i]) ? 0 :
@@ -499,6 +504,161 @@ static void save_cases(void)
     CHECK(gf_init_run(&init,&program)<0 && raw_count==0);
     output("save capacity/reverse restore/restore failures/RESET/runner exits PASS\n");
 }
+/* PM decision 19: extend this runner's real-save/restore fixture. */
+static struct gf_init_program split_frozen;
+static struct raw_event split_wrapper_trace[sizeof(split_trace)/sizeof(split_trace[0])];
+static void split_fixture(void)
+{
+    fixture(); new_context(); diagnostic_mode=false;
+    for(u32 i=0;i<sizeof(split_signature);i++)rom[SPLIT_BIT+i]=split_signature[i];
+    rom[SPLIT_BIT+8]=12; rom[SPLIT_BIT+9]=6; rom[SPLIT_BIT+10]=1;
+    rom[SPLIT_BIT+12]='I'; rom[SPLIT_BIT+13]=1;
+    put(SPLIT_BIT+14,12,2); put(SPLIT_BIT+16,SPLIT_I,2);
+    put(SPLIT_I,SPLIT_SUB_TABLE,2); put(SPLIT_I+4,SPLIT_MACRO_TABLE,2);
+    put(SPLIT_SUB_TABLE,SPLIT_SUB,2);
+    put(SPLIT_MACRO_TABLE,SPLIT_REG,4); put(SPLIT_MACRO_TABLE+4,SPLIT_VALUE,4);
+    for(u32 i=0;i<sizeof(split_main);i++)rom[SPLIT_MAIN+i]=split_main[i];
+    for(u32 i=0;i<sizeof(split_sub);i++) {
+        rom[SPLIT_SUB+i]=split_sub[i]; rom[SPLIT_DIRECT+i]=split_sub[i];
+    }
+    program=(struct gf_init_program){0};
+}
+static int split_prepare(void)
+{
+    return gf_init_script_prepare(&init,&program,SPLIT_MAIN,SPLIT_HEAD,SPLIT_OR,SPLIT_DL);
+}
+static int split_execute(const struct gf_init_program *p)
+{
+    return gf_init_script_execute(&init,p,SPLIT_MAIN,SPLIT_HEAD,SPLIT_OR,SPLIT_DL);
+}
+static void split_unchanged(void)
+{
+    const u8 *before=(const u8 *)&split_frozen, *after=(const u8 *)&program;
+    for(u32 i=0;i<sizeof(program);i++) {
+        __asm__ volatile("" : : : "memory");
+        CHECK(before[i]==after[i]);
+    }
+}
+static void split_effects(void)
+{
+    CHECK(raw_count==sizeof(split_trace)/sizeof(split_trace[0]));
+    for(u32 i=0;i<raw_count && i<sizeof(split_trace)/sizeof(split_trace[0]);i++)
+        CHECK(equal_event(&new_trace[i],&split_trace[i]));
+    CHECK(init.steps==SPLIT_STEPS && init.wait_us==SPLIT_WAIT);
+    CHECK(init.head==SPLIT_HEAD && init.or_mask==SPLIT_OR && !init.calls && !init.repeats);
+}
+static void split_cases(void)
+{
+    split_fixture();
+    init.started_us=7; clock_value=11;
+    init.steps=GF_INIT_SCHEDULE; init.wait_us=GF_INIT_WAIT_MAX;
+    init.elapsed_us=GF_INIT_EXEC_US; init.last_rc=GF_SCRIPT_ETIME;
+    init.calls=init.repeats=1; init.skip=true;
+    program.count=GF_INIT_INSNS;
+    CHECK(split_prepare()==0 && program.count==SPLIT_INSNS);
+    CHECK(!raw_count && !raw_calls && !wait_total && !restore_calls);
+    CHECK(!init.steps && !init.wait_us && init.elapsed_us==4 && init.started_us==7);
+    CHECK(init.pc==SPLIT_MAIN && init.head==SPLIT_HEAD && init.or_mask==SPLIT_OR &&
+          init.deadline==SPLIT_DL && init.display_script && init.last_rc==GF_SCRIPT_EIO);
+    CHECK(program.insns[0].end_repeat==SPLIT_MAIN+4);
+    u32 prepare_points=point_count;
+    split_frozen=program;
+    u32 rom_crc=crc32_core_update(CRC32_INIT,rom,sizeof(rom));
+    /* Execution reinitializes stale execution fields without decoding again. */
+    init.pc=RECOVER_NONE; init.head=0; init.or_mask=0; init.deadline=0;
+    init.calls=init.repeats=1; init.skip=true; init.display_script=false; init.fail_pc=0;
+    CHECK(split_execute(&program)==0 && init.last_rc==GF_SCRIPT_OK && !restore_calls);
+    split_effects(); split_unchanged();
+    CHECK(init.started_us==7 && init.elapsed_us==4+SPLIT_WAIT);
+    CHECK(crc32_core_update(CRC32_INIT,rom,sizeof(rom))==rom_crc);
+    u32 execute_points=point_count-prepare_points;
+    CHECK(new_restore(0,&init)==0 && restore_calls==1 && adapter_cleanup==1);
+    /* Wrapper and split calls have identical checkpoints and operand trace. */
+    split_fixture();
+    CHECK(gf_init_run_script(&init,&program,SPLIT_MAIN,SPLIT_HEAD,SPLIT_OR,SPLIT_DL)==0);
+    split_effects();
+    CHECK(point_count==prepare_points+execute_points && !restore_calls);
+    for(u32 i=0;i<raw_count && i<sizeof(split_wrapper_trace)/sizeof(split_wrapper_trace[0]);i++)
+        split_wrapper_trace[i]=new_trace[i];
+    split_fixture(); CHECK(split_prepare()==0); CHECK(split_execute(&program)==0);
+    for(u32 i=0;i<raw_count && i<sizeof(split_wrapper_trace)/sizeof(split_wrapper_trace[0]);i++)
+        CHECK(equal_event(&new_trace[i],&split_wrapper_trace[i]));
+    /* Later execution uses the retained const graph with a fresh owner budget. */
+    new_context(); init.started_us=100; clock_value=100;
+    init.steps=init.wait_us=init.elapsed_us=0; init.last_rc=GF_SCRIPT_EIO;
+    init.calls=init.repeats=1; init.skip=true;
+    CHECK(split_execute(&program)==0 && init.started_us==100 && !restore_calls);
+    split_effects(); split_unchanged();
+    /* Steps/waits consumed by the outer operation remain charged. */
+    split_fixture(); CHECK(split_prepare()==0); init.steps=GF_INIT_SCHEDULE;
+    split_restore_error=true;
+    CHECK(split_execute(&program)==GF_SCRIPT_ETIME && init.last_rc==GF_SCRIPT_ETIME);
+    CHECK(init.steps==GF_INIT_SCHEDULE && !raw_count && restore_calls==1);
+    split_fixture(); CHECK(split_prepare()==0); init.wait_us=GF_INIT_WAIT_MAX-SPLIT_WAIT+1;
+    CHECK(split_execute(&program)==GF_SCRIPT_ETIME && restore_calls==1);
+    CHECK(init.wait_us==GF_INIT_WAIT_MAX-SPLIT_WAIT+1 && !wait_total && raw_count==3);
+    /* A clock failure before the first checkpoint update exposes elapsed's
+     * continuity too, without relying on its subsequently recomputed value. */
+    split_fixture(); CHECK(split_prepare()==0); init.elapsed_us=23; clock_fail=1;
+    CHECK(split_execute(&program)==GF_SCRIPT_EIO && init.elapsed_us==23 && !raw_count);
+    CHECK(restore_calls==1);
+    split_fixture(); CHECK(split_prepare()==0); clock_value=SPLIT_DL;
+    split_restore_error=true;
+    CHECK(split_execute(&program)==GF_SCRIPT_ETIME && init.last_rc==GF_SCRIPT_ETIME);
+    CHECK(init.deadline==SPLIT_DL && !raw_count && restore_calls==1);
+    /* Each preparation checkpoint can fail, before any device operation. */
+    for(u32 n=1;n<=prepare_points;n++) {
+        split_fixture(); point_fail=n; split_restore_error=true;
+        CHECK(split_prepare()==GF_SCRIPT_EIO && init.last_rc==GF_SCRIPT_EIO);
+        CHECK(!raw_count && !raw_calls && !program.count && restore_calls==1 && point_count==n);
+    }
+    /* Failure at each execution checkpoint stops immediately, keeps the
+     * immutable program, and delegates cleanup exactly once. */
+    for(u32 n=1;n<=execute_points;n++) {
+        split_fixture(); CHECK(split_prepare()==0); split_frozen=program;
+        point_fail=point_count+n; split_restore_error=true;
+        CHECK(split_execute(&program)==GF_SCRIPT_EIO && init.last_rc==GF_SCRIPT_EIO);
+        CHECK(point_count==point_fail && raw_calls==point_fail_raw_calls &&
+              restore_calls==1 && adapter_cleanup==1);
+        split_unchanged();
+    }
+    for(u32 n=1;n<=5;n++) { /* three macros and the two indexed CR writes */
+        split_fixture(); CHECK(split_prepare()==0); split_frozen=program;
+        fail_at=n; split_restore_error=true;
+        CHECK(split_execute(&program)==GF_SCRIPT_EIO && raw_calls==n && restore_calls==1);
+        split_unchanged();
+    }
+    /* Invalid inputs never consume the owner's outstanding transaction. */
+    split_fixture(); init.saved_count=1;
+    CHECK(split_prepare()==GF_SCRIPT_EIO && split_execute(&program)==GF_SCRIPT_EIO);
+    CHECK(init.saved_count==1 && !restore_calls && !point_count);
+    init.saved_count=0;
+    CHECK(gf_init_script_prepare(&init,&program,0,0,0,SPLIT_DL)==GF_SCRIPT_EIO);
+    CHECK(gf_init_script_execute(&init,&program,0,0,0,SPLIT_DL)==GF_SCRIPT_EIO);
+    CHECK(gf_init_script_prepare(0,&program,SPLIT_MAIN,0,0,SPLIT_DL)==GF_SCRIPT_EIO);
+    CHECK(gf_init_script_execute(&init,0,SPLIT_MAIN,0,0,SPLIT_DL)==GF_SCRIPT_EIO);
+    CHECK(!restore_calls && !point_count);
+    /* Malformed reachable callee fails before even the valid main writes. */
+    split_fixture(); rom[SPLIT_DIRECT]=0xff;
+    CHECK(split_prepare()==GF_SCRIPT_EIO && !program.count && !raw_count && restore_calls==1);
+    split_fixture(); clock_value=SPLIT_DL; split_restore_error=true;
+    CHECK(split_prepare()==GF_SCRIPT_ETIME && init.last_rc==GF_SCRIPT_ETIME && restore_calls==1);
+    split_fixture(); rom[SPLIT_DIRECT]=0xff;
+    CHECK(gf_init_run_script(&init,&program,SPLIT_MAIN,SPLIT_HEAD,SPLIT_OR,SPLIT_DL)==GF_SCRIPT_EIO);
+    CHECK(!raw_count && restore_calls==1 && adapter_cleanup==1);
+    /* Interrupted RESET keeps the saved table if cleanup itself fails. */
+    const u8 reset[]={0x65,0,4,0,0,1,0,0,0,2,0,0,0,0x71};
+    for(u32 fail=0;fail<2;fail++) {
+        split_fixture();
+        for(u32 i=0;i<sizeof(reset);i++)rom[SPLIT_MAIN+i]=reset[i];
+        CHECK(split_prepare()==0); split_frozen=program;
+        wait_fail=1; restore_fail_at=fail?4:0;
+        CHECK(split_execute(&program)==GF_SCRIPT_EIO && restore_calls==1);
+        CHECK(init.saved_count==fail && raw_calls==4 && !wait_total);
+        CHECK(init.fail_pc==SPLIT_MAIN); split_unchanged();
+    }
+    output("split runner: prepare/const execute/budgets/cleanup/wrapper PASS\n");
+}
 void _start(void)
 {
     gf_fixture_init(); differential(false); differential(true);
@@ -507,7 +667,7 @@ void _start(void)
 #ifdef GF_RUNNER_TRACE_ONLY
     if (0)
 #endif
-    { control_cases(); head_cases(); wait_cases(); pll_case(); save_cases(); }
+    { control_cases(); head_cases(); wait_cases(); pll_case(); save_cases(); split_cases(); }
     output(failures?"GF runner FAIL\n":"GF runner PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));
     __builtin_unreachable();

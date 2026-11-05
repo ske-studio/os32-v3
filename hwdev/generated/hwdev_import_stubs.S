@@ -216,4 +216,9 @@ gfx_present:
 gf_display_test:
     jmp *hwdev_import_slots+168
 .size gf_display_test, .-gf_display_test
+.globl gf5_test
+.type gf5_test, @function
+gf5_test:
+    jmp *hwdev_import_slots+172
+.size gf5_test, .-gf5_test
 .section .note.GNU-stack,"",@progbits

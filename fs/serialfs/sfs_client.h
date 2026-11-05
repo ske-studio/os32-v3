@@ -80,4 +80,17 @@ int  sfs_client_oneway(SfsClient *c, u8 type, const u8 *payload, u16 len);
  * 待てない (IF=0) ときは読めるだけ捨てて 0。 */
 int  sfs_client_quiesce(SfsClient *c, u32 quiet_ms, u32 max_ms);
 
+/* fs/serialfs/sfs_client.h */
+struct SfsReply { void *data; u16 capacity, length; };
+int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n, struct SfsReply *out, u32 deadline);
+int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline);
+/* serialfs.hの既存 sfs_request_deadline(..., void *out, u32 deadline) のoutは struct SfsReply* */
+
+/* Required out: caller owns data/capacity; length starts 0. Success copies
+ * the whole response including wire status. NOSPC sets required length with
+ * no copy; malformed IO, no reply HOSTDOWN. 10ms clock, now+100 operation
+ * deadline, retry every 10 ticks; compare (i32)(now-deadline)>=0, differences
+ * below half-range. Pass the same deadline through ensure/HELLO/block RPC.
+ * Unknown sid reports STALE to persistent owner; do not replay writes under
+ * a new sid. Existing UART call/hello contracts remain unchanged. */
 #endif /* FS_SFS_CLIENT_H */

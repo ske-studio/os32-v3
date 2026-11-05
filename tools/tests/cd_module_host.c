@@ -41,9 +41,9 @@ void _start(void)
     char names[MAX_DEVICES][2];
     for (u32 i = 0; i < MAX_DEVICES; i++) {
         names[i][0] = 'A' + i; names[i][1] = 0;
-        devices[i] = (Device){.name = names[i], .type = DEV_BLOCK};
+        devices[i] = (Device){.name = names[i], .type = DEV_BLOCK, .blk_read_u32 = 0, .media_check = 0};
         if (i < VFS_MAX_FS) {
-            fillers[i] = (VfsOps){.name = names[i]};
+            fillers[i] = (VfsOps){.name = names[i], .resource_check = 0, .resource_refresh = 0};
             if (mode == 1) CHECK(!vfs_register_fs(&fillers[i]));
         }
         if (mode == 2) CHECK(!dev_register(&devices[i]));

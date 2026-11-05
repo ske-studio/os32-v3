@@ -35,6 +35,8 @@ MUTATIONS += [
      '        if (ring3_wait_pending()) ring3_abort_check();\n        serial_puts(".");'),
     ('extended log drops STOP', 7, '        serial_puts(".");',
      '        appslot_get(appslot_cur())->abort_req = 0;\n        serial_puts(".");'),
+    ('rshell counts wakeups', 4, '(u32)(tick_count - start_tick)', '(waits + 0 * start_tick)'),
+    ('rshell timeout 3 seconds', 4, 'KBD_RSHELL_TIMEOUT_SEC * PIT_HZ', '3 * PIT_HZ'),
     ('kbd char wait', 4, '            if (interruptible && ring3_wait_pending()) return -1;', ''),
     ('kbd key wait', 4, '    while (kbd_count == 0) {\n        if (interruptible && ring3_wait_pending()) return -1;', '    while (kbd_count == 0) {'),
     ('kbd gui wait', 4, '        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */', ''),

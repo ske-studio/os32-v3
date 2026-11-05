@@ -1,0 +1,115 @@
+# /test/hw/hpt370_probe.hwb - probe the HighPoint HPT370 IDE controller (Ra266 0:12.0, 1103:0004 rev 03)
+# Reads PCI config 00-7F, both channels' status, bus-master status, and sends ATA IDENTIFY (0xEC)
+# only to devices that report DRDY and latch SC/SN (+2/+3). Writes: drive select (cmd+6), SC/SN probe (cmd+2/+3), IDENTIFY (cmd+7).
+# Chip table and init registers: FreeBSD sys/dev/ata/chipsets/ata-highpoint.c:68-135 (BSD-2-Clause).
+# Register layout: ATA command block +0..+7, control block +2 (alt status), bus master +2/+0x0A.
+# IDENTIFY words printed: 27-46 model, 60-61 LBA28 sectors, 83 features (bit10 LBA48), 88 UDMA, 100-103 LBA48 sectors.
+ device d = id 1103:0004
+ let off = 0
+ label cfgloop
+ pciread32 d off -> v
+ print "CFG_OFFSET" off
+ print "CFG_VALUE" v
+ let off = off + 4
+ if off != 0x80 goto cfgloop
+ pciread32 d 0x10 -> v
+ let cmd0 = v & 0xFFFC
+ pciread32 d 0x14 -> v
+ let ctl0 = v & 0xFFFC
+ pciread32 d 0x18 -> v
+ let cmd1 = v & 0xFFFC
+ pciread32 d 0x1C -> v
+ let ctl1 = v & 0xFFFC
+ pciread32 d 0x20 -> v
+ let bm = v & 0xFFFC
+ ioread8 port (bm + 2) -> v
+ print "BM0_STATUS" v
+ ioread8 port (bm + 0x0A) -> v
+ print "BM1_STATUS" v
+# channel 0 master/slave, then channel 1 master/slave
+ let ch = 0
+ let sel = 0xA0
+ label next
+ let cmd = cmd0
+ let ctl = ctl0
+ if ch == 0 goto picked
+ let cmd = cmd1
+ let ctl = ctl1
+ label picked
+ iowrite8 port (cmd + 6) sel
+ wait us 2000
+ ioread8 port (ctl + 2) -> st
+ print "CHANNEL" ch
+ print "SELECT" sel
+ print "ALT_STATUS" st
+ if st == 0xFF goto skip
+ if st == 0x7F goto skip
+ if st == 0x7E goto skip
+ if (st & 0xC0) != 0x40 goto skip
+ # Presence: a device latches sector count/number (+2/+3); a floating bus does not.
+ iowrite8 port (cmd + 2) 0x55
+ iowrite8 port (cmd + 3) 0xAA
+ ioread8 port (cmd + 2) -> v
+ print "PRESENCE_SC" v
+ if v != 0x55 goto skip
+ ioread8 port (cmd + 3) -> v
+ print "PRESENCE_SN" v
+ if v != 0xAA goto skip
+ iowrite8 port (cmd + 7) 0xEC
+ poll 8 port (cmd + 7) 0x88 0x08 1000000 1000 -> st
+ let w = 0
+ let n = 27
+ let p = 0
+ call words
+ let n = 20
+ let p = 1
+ call words
+ let n = 13
+ let p = 0
+ call words
+ let n = 2
+ let p = 1
+ call words
+ let n = 21
+ let p = 0
+ call words
+ let n = 1
+ let p = 1
+ call words
+ let n = 4
+ let p = 0
+ call words
+ let n = 1
+ let p = 1
+ call words
+ let n = 11
+ let p = 0
+ call words
+ let n = 4
+ let p = 1
+ call words
+ let n = 152
+ let p = 0
+ call words
+ label skip
+ if sel == 0xB0 goto nextch
+ let sel = 0xB0
+ goto next
+ label nextch
+ if ch == 1 goto done
+ let ch = 1
+ let sel = 0xA0
+ goto next
+ label done
+ end
+# read n data words; print index/value when p is 1
+ label words
+ ioread16 port (cmd + 0) -> v
+ if p == 0 goto wskip
+ print "ID_WORD_INDEX" w
+ print "ID_WORD_VALUE" v
+ label wskip
+ let w = w + 1
+ let n = n - 1
+ if n != 0 goto words
+ return

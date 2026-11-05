@@ -27,6 +27,10 @@ static bool fail_cleanup,fail_close,fail_publish,fail_restore;
 static u32 close_calls,publish_calls,deadline,notifications;
 static bool expect_fault_stop;
 static u32 fault_references;
+static bool slow_restart,spend_objects_budget;
+static u32 stage_clocks;
+static enum { STAGE_NORMAL, OBJECTS_CLOCK_FAIL, OBJECTS_EXPIRE,
+              RESTORE_CLOCK_FAIL, RESTORE_EXPIRE, RESTORE_FENCE_EXPIRE } stage_fault;
 /* Hardware oracle, not values read from the product. crtc.c:198-233. */
 #define T_SCREEN_OFF 0x20U
 #define T_CLOCK 1U
@@ -78,6 +82,17 @@ static int display_local_restore(void *owner,struct gf_init_context *cleanup)
 static int display_clock(void *owner,u32 *now)
 {
     assert(owner==&host);
+    bool objects=cint_prod.chan.state==GF2_RUN && !cint_prod.accel.ready;
+    bool restore=cint_prod.accel.ready && host.ctx.ready;
+    if ((objects && (stage_fault==OBJECTS_CLOCK_FAIL || stage_fault==OBJECTS_EXPIRE)) ||
+        (restore && (stage_fault==RESTORE_CLOCK_FAIL || stage_fault==RESTORE_EXPIRE ||
+                     stage_fault==RESTORE_FENCE_EXPIRE))) {
+        ++stage_clocks;
+        if (stage_clocks==1 && (stage_fault==OBJECTS_CLOCK_FAIL || stage_fault==RESTORE_CLOCK_FAIL))
+            return T_FAILURE;
+        if (stage_clocks==(stage_fault==RESTORE_FENCE_EXPIRE ? 3U : 2U))
+            host.local_now+=GF2_TIMEOUT_US;
+    }
     i32 rc=gf4_host_clock(&host,now);
     if (!rc) cint_host.now=*now;
     return rc;
@@ -103,6 +118,15 @@ static void lower_observe(struct gf3_host *h,const struct gf3_host_event *e)
         for (u32 i=0;i<sizeof(status)/sizeof(status[0]);++i)
             if (e->a[1]==status[i]) gf3_host_set(h,0,status[i],0);
     }
+    /* Last F3 reference is observed just before init returns. Spending the
+     * remaining budget here models time passing before the next stage. */
+    if (spend_objects_budget && !e->rc && e->op==H_READ &&
+        e->a[1]==GF2_USER_BASE+GF2_USER_REFERENCE &&
+        cint_prod.chan.state==GF2_RUN && !host.ctx.ready &&
+        !cint_prod.accel.ready && cint_prod.accel.notify_storage.size) {
+        host.local_now=host.ctx.deadline; cint_host.now=(u32)host.local_now;
+        spend_objects_budget=false;
+    }
     if (cint_expect_closed) assert(!cint_slot && !host.ctx.accepting);
 }
 static i32 admission(void *owner,bool open)
@@ -122,6 +146,10 @@ static int owner_start(struct gf_display_context *l)
     assert(l==&cint_prod.display && !host.ctx.accepting && !cint_slot);
     assert(cint_prod.foundation.bm); /* master before device/object init */
     i32 rc=gf_foundation_start(&cint_prod.foundation);
+    /* Long pre-F3 stage (devinit/F1 equivalent), using the real restart. */
+    if (!rc && slow_restart) {
+        host.local_now+=GF2_TIMEOUT_US; cint_host.now=(u32)host.local_now;
+    }
     if (!rc && fail_restore)
         gf4_host_fail_at(&host,D_WRITE,host.calls[D_WRITE]+1U,T_FAILURE);
     return rc;
@@ -198,6 +226,7 @@ static void recover_setup(enum gf3_fmt fmt)
     cint_host.observe=lower_observe;
     fail_cleanup=fail_close=fail_publish=fail_restore=expect_fault_stop=false;
     notifications=0;
+    slow_restart=spend_objects_budget=false; stage_fault=STAGE_NORMAL; stage_clocks=0;
     state.version=GF4_STATE_VERSION; state.size=sizeof(state);
     route=(struct gf4_route){.head=0,.head_mask=1,.or_mask=1,.type=GF4_ANALOG};
     host.ctx.routes=&route; host.ctx.nroutes=1;
@@ -259,6 +288,7 @@ static void recover_setup(enum gf3_fmt fmt)
 static void finish(void)
 {
     fail_cleanup=fail_close=fail_publish=fail_restore=expect_fault_stop=false;
+    stage_fault=STAGE_NORMAL; slow_restart=spend_objects_budget=false;
     host.ctx.diagnostic_saved=NULL; host.ctx.saved_closed=false;
     deadline=(u32)host.local_now+GF3_TIMEOUT_US; /* distinct cleanup operation */
     cint_expect_closed=true;
@@ -353,7 +383,7 @@ static void test_fault_recover(void)
         assert(host.ctx.accepting==(saved!=1));
         assert(publish_calls==(saved==1 ? 0U : 1U));
         assert(!gf2_host_memcmp(&state.head[0].front,&original[0].front,sizeof(original[0].front)));
-        assert(host.ctx.deadline==deadline);
+        assert((i32)(host.ctx.deadline-deadline)>=0);
         retained(); finish();
     }
 }
@@ -397,11 +427,10 @@ static void test_restart_failure(void)
 
     recover_setup(GF3_INDEX8);
     assert(!gf4_service_suspend(&host.ctx,deadline));
-    /* F2's initial reference may use its own timeout. The next F3 work
-     * must still receive the expired original dl (X4), not a renewal. */
+    /* An expired entry deadline does not consume the new F3 stage. */
     host.local_now=deadline; cint_host.now=deadline;
-    assert(gf4_service_restart(&host.ctx,deadline)==GF2_ETIME);
-    assert(host.ctx.deadline==deadline && !host.ctx.ready && !cint_slot && !publish_calls);
+    assert(!gf4_service_restart(&host.ctx,deadline));
+    assert(host.ctx.deadline==deadline+GF2_TIMEOUT_US && host.ctx.ready && !cint_slot && !publish_calls);
     retained(); finish();
 }
 static void test_restart_revoked(void)
@@ -430,6 +459,36 @@ static void test_restart_revoked(void)
     assert(!host.ctx.ready && !host.ctx.accepting);
     retained();
 }
+static void test_stage_deadlines(void)
+{
+    /* Both recovery and the actual diagnostic owner table compose restart
+     * and restore. F1 consumes the entry budget; F3 consumes its own. */
+    for (u32 diagnostic_start=0;diagnostic_start<2;++diagnostic_start) {
+        recover_setup(GF3_INDEX8);
+        slow_restart=spend_objects_budget=true;
+        i32 rc;
+        if (diagnostic_start) {
+            const struct gf3_service_owner *o=gf4_service_owner_table();
+            assert(!o->stop(o->owner,deadline));
+            rc=o->start(o->owner,deadline);
+        } else rc=gf4_service_recover(&host.ctx,deadline);
+        assert(!rc && !spend_objects_budget);
+        assert(host.ctx.ready && host.ctx.accepting && cint_prod.accel.ready);
+        assert((i32)(host.ctx.deadline-deadline)>=(i32)(2U*GF2_TIMEOUT_US));
+        assert((i32)(host.ctx.deadline-(u32)host.local_now)>0);
+        retained(); finish();
+    }
+    const i32 expected[]={GF2_EIO,GF2_ETIME,GF2_EIO,GF4_ETIME,GF2_ETIME};
+    for (u32 fault=OBJECTS_CLOCK_FAIL;fault<=RESTORE_FENCE_EXPIRE;++fault) {
+        recover_setup(GF3_INDEX8);
+        assert(!gf4_service_suspend(&host.ctx,deadline));
+        stage_fault=fault; stage_clocks=0;
+        const struct gf3_service_owner *o=gf4_service_owner_table();
+        assert(o->start(o->owner,deadline)==expected[fault-1U]);
+        assert(!host.ctx.accepting && !publish_calls);
+        retained(); finish();
+    }
+}
 static void test_failed_and_arguments(void)
 {
     assert(gf4_service_suspend(NULL,deadline)==GF4_EINVAL);
@@ -448,6 +507,7 @@ static void test_failed_and_arguments(void)
 }
 void _start(void)
 {
+    test_stage_deadlines();
     test_suspend_restart();
     test_close_and_stop_failures();
     test_fault_recover();

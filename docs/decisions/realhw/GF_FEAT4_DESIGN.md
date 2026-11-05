@@ -687,11 +687,11 @@ F3単体のgf_display_stopも同じ局所helperを利用して現行停止順/�
 
 ### X4 — 外側dlと既存下位期限の境界
 
-正: F4/F5の操作開始でdlを一度だけ決め、fence・F3 fini/init・表示変更・復旧へ同値を渡す。X4のための下位API追加/署名変更はしない。
+正: 段の中では開始時の絶対 dl を fence・F3 fini/init・表示変更へ同値で渡し、待ちの周回で延長しない。起動・再開では devinit/F1/F2 の後の objects_init、初回 detect、その後の初期表示、restart 後の display_restore を独立した段とし、各段の入口で clock_us→now+GF2_TIMEOUT_US を作り直して c->deadline と揃える。devinit 後の F5 ROM/メモリスクリプト準備も新しい段の期限を使う。期限生成の時計欠落/失敗は GF2_EIO。下位APIの署名は変えない。
 使用口は既存 `i32 gf3_service_fini(struct gf3_service *s, u32 dl);`、`int gf2_start(struct gf2_chan *ch, struct gf_foundation *f);`、`int gf2_stop(struct gf2_chan *ch);`、`int gf2_recover(struct gf2_chan *ch);`、`int gf2_fifo_pause(struct gf2_chan *ch);`、`void gf2_fifo_resume(struct gf2_chan *ch);`。
-例外はpause内部の2秒だけでなく、F2 start/stop内のreference_testが作るGF2_TIMEOUT_US（recover経由も同じ）。既存HW待ち上限も維持し、外側dlへ書戻さない。したがって操作全体の壁時計時間を外側dl以内と保証する意味ではない。F2から戻った後も元dlを使い、切れていれば次の期限付き処理は期限失敗となる。
+例外はpause内部の2秒だけでなく、F2 start/stop内のreference_testが作るGF2_TIMEOUT_US（recover経由も同じ）。既存HW待ち上限も維持し、外側dlへ書戻さない。したがって操作全体の壁時計時間を外側dl以内と保証する意味ではない。F2 から戻った後の F3 初期化には、その開始時の新しい dl を渡す。段内の期限失敗は従来どおり返す。
 C2-service/C2-recoverは上位stop/suspendからgf3_service_stop(s)を呼ばずfini(s,dl)を直接使う。期限なしvideo_stop入口だけclock_us→now+GF3_TIMEOUT_USを一度作ってgf4_service_stopへ渡す。clock欠落/失敗はGF2_EIOを保存、fini fenceは出さず既存規約どおりF2停止cleanupを試みる。
-command_testのF4 STOPはqの期限を使用。F5 links.stop/restartはgf5.deadline由来のdlをそのまま渡す。fini失敗でもF2 stopを試み最初のrcを保存、close失敗かつ未revokedなら停止へ進まず所有保持。F1停止後のVBLANK待ちは禁止。
+command_testのF4 STOPはqの期限を使用。F5 links.stop/restart は gf5.deadline 由来の dl を入口へ渡す。restart 内の F3 初期化と、後の links.display_restore は独立した期限を取り、後者は F5 の性能変更・VRAM コピーの時間も持ち越さない。links.restart 完了後に続く F5 の性能復元も新しい g->deadline を取り、表示復元段では g->deadline と c->deadline を揃える。F5 の性能変更内部の絶対期限は維持する。fini失敗でもF2 stopを試み最初のrcを保存、close失敗かつ未revokedなら停止へ進まず所有保持。F1停止後のVBLANK待ちは禁止。
 F3単体stopの既存期限生成を保持。GF2_EIO/ETIME/ESTOP等の下位負値をGF4へ丸めない。resumeは既決のold_rc退避・last_rc/state/fault検査adapterのまま。手本N/nvkm/engine/fifo/nv04.c:212–254にpause/resume列はあるが、OS32の絶対dl・初期reference試験には同じ期限APIは無い。
 
 ### 関数 → ファイル → 段 → A1 UNIT への追加・差替え行
@@ -726,7 +726,7 @@ A1はUNIT番号を増やさず、既存admission/scan_changed stubを本契約�
   - HAL: §2 の `struct GfxCursorImage`・`struct GfxScanout` と 8 hook を `include/gfx_hal.h` の `GfxBackend` の末尾に足す (NULL は NOSYS)。
   - 形式の番号: 16/32bit の HAL の形式は公開 SDK (os32_kapi_shared.h・kapi.json) に足さず、カーネル専用の `include/gfx_format.h` に `GFX_FMT_RGB565 2`・`GFX_FMT_XRGB8888 3` を置く (今の GUI は使わないので KAPI と ABI の版は変えない)。SDK に出すときは同じ番号を使うと注記する。`GfxScanout.format` はこの番号。
   - Context の版 5: `geforce_module.h` の Context に display_data・display_state・display_out・feature5_out を末尾に足し、版を 4→5 (§310 の行)。`geforce_display_ops`・`geforce_display_restore_ops` の宣言も同じヘッダーに。
-  - production の ctx: C2-service (D/service.c) が常駐の `struct gf4_ctx` を 1 つ持ち、`i32 gf4_service_init(struct gf_production *, struct gf_display_context *legacy)` で ctx・legacy・links (C2-links の `const struct gf4_links *gf4_links_table(void)`) を結ぶ。C3 は module の initialize で `gf3_service_bind` の後にこれ (`gf4_service_init`) を呼び、その後で `gf3_service_owner_bind(…, gf4_service_owner_table())` を呼ぶ (owner の表の owner は gf4_service_init が入れるので、この順でないと bind が EINVAL になる — C3 のレビューの P1)。production.h には欄を足さない。
+  - production の ctx: C2-service (D/service.c) が常駐の `struct gf4_ctx` を 1 つ持ち、`i32 gf4_service_init(struct gf_production *, struct gf_display_context *legacy)` で ctx・legacy・links (C2-links の `const struct gf4_links *gf4_links_table(void)`) を結ぶ。C3 は module の initialize で `gf3_service_bind` の後にこれ (`gf4_service_init`) を呼び、その後で `gf3_service_owner_bind(…, gf4_service_owner_table())` を呼ぶ (owner 表の getter は owner 未設定なら常駐 ctx を補うため、逆順の bind が必ず EINVAL になるわけではない。この順は、初期化済みの ctx・links・exec へ結線するために守る — 層 5 の照合 D4)。production.h には欄を足さない。
 - **links と exec の表、初期の結線の順 (C2-links の欠け、PM 決定)**: C2-links (D/links.c) が常駐の `struct gf4_links` と `struct gf4_exec_ops` を持ち、`struct gf4_links *gf4_links_table(void)` と `const struct gf4_exec_ops *gf4_exec_table(void)` で渡す (wt/gf-l4 0a6d9b9b、A0z の const の宣言を書き換えた — 実装前)。`gf4_service_init` (C2-service) の順: 常駐 ctx を初期化 → ctx->links = gf4_links_table()、ctx->exec = gf4_exec_table() → links->owner = ctx → gf4_service_bind(ctx, legacy, links)。links.failed の実体は C2-recover の `gf4_service_failed(void *owner, i32 cause, u32 dl)` (宣言を足した)。
 
 ## 追記 — TMDS の script の実行の口（2026-11-04）

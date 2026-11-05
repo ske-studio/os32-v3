@@ -51,7 +51,7 @@ int platform_ext2_format(int drv, u32 sectors)
 { (void)drv; (void)sectors; reached++; return 7; }
 int platform_ext2_format_at(int drv, u32 start, u32 length)
 { (void)drv; (void)start; (void)length; reached++; return 7; }
-static Device disk = { .sect_size = 512 };
+static Device disk = { .sect_size = 512, .blk_read_u32 = 0, .media_check = 0};
 Device *dev_find(const char *name) { (void)name; return &disk; }
 int dev_blk_write_lba(Device *d, u32 lba, int count, const void *buf)
 { (void)d; (void)lba; (void)count; (void)buf; reached++; return 7; }

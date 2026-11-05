@@ -25,16 +25,18 @@ int ring3_call_from_user(void);
 #include "wait_source.inc"
 static void *jump[5];
 static void (*wait_hook)(void);
+static int rshell_wait_fixture;
 volatile u32 tick_count;
 static void host_wait(void)
 {
-    tick_count++;
+    if (!rshell_wait_fixture || (rshell_wait_fixture == 1 && (waits & 1)))
+        tick_count++;
     if (wait_hook) wait_hook();
     if (++waits == request_wait) {
         if (stop_on_wait) stop_requested = 1;
         else abort_requested = 1;
     }
-    if (waits > 400) { escaped = 2; __builtin_longjmp(jump, 1); }
+    if (waits > (rshell_wait_fixture ? 7000u : 400u)) { escaped = 2; __builtin_longjmp(jump, 1); }
 }
 int ring3_call_from_user(void) { return user; }
 void ring3_abort_check(void)
@@ -120,6 +122,10 @@ int con_sink_is_enabled(void) { return sink; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
 void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }
 void con_sink_push_cursor(int x, int y) { sink_x=x; sink_y=y; }
+static void rshell_serial_wake(void)
+{
+    if (waits == 3499) { ser_buf[0]='N'; ser_head=0; ser_count=1; }
+}
 static void serial_wake(void)
 {
     if (waits == 2) { ser_buf[0]='Z'; ser_head=0; ser_count=1; }
@@ -284,8 +290,13 @@ static int test_input(void)
     }
     input_wake=0; wait_hook=0; abort_requested=stop_requested=0;
     user=0; rshell_active=1; kbd_count=ser_count=0; waits=abort_checks=0;
-    CHECK(wrap_kbd_getchar()==' ' && waits==KBD_TIMEOUT_TICKS && !abort_checks,
-          "trusted rshell timeout");
+    tick_count=(u32)-1000; rshell_wait_fixture=1;
+    CHECK(wrap_kbd_getchar()==' ' && waits==6000 && tick_count==(u32)2000 && !abort_checks,
+          "trusted rshell timeout after 30 seconds across tick wrap");
+    rshell_wait_fixture=2; wait_hook=rshell_serial_wake; waits=0; tick_count=123;
+    CHECK(wrap_kbd_getchar()=='N' && waits==3500 && tick_count==123,
+          "non-tick wakeups do not trigger rshell timeout");
+    rshell_wait_fixture=0; wait_hook=0;
     ser_head=0; ser_count=1; ser_buf[0]='S'; waits=0;
     CHECK(wrap_kbd_getchar()=='S' && !waits, "trusted rshell serial input");
     rshell_active=0;

@@ -53,4 +53,6 @@ STATIC_ASSERT(sizeof(struct OsriEvent) == OSRI_EVENT_BYTES, osri_event_size);
 /* Plane capacity is guaranteed by gfx_mode_fits' ledger check at mode selection. */
 /* Returns 0 on success, -1 on failure. */
 int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *image);
+/* Internal detailed OS32_ERR_* classification; same validation as boot. */
+int osri_load_checked(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *image);
 #endif

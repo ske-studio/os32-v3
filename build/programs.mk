@@ -79,7 +79,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
-SHELL_DEPS = kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/block/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
+SHELL_DEPS = kdebug/hwb_wire.h userland/shell/hwb.h kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/block/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
@@ -554,7 +554,7 @@ userland/system/install.elf: userland/system/install_recover.inc
 userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) sdk/link/app.ld $(CRT0_OBJ)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
-userland/system/hsync.elf: userland/system/hsync_protect.inc
+userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
 userland/system/hsync.elf: lib/crc32_core.inc
 
 # === ELF → RAW → OS32X BIN 変換 ===

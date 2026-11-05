@@ -24,6 +24,22 @@
 VfsOps *serialfs_get_ops(void);
 int     serialfs_init(void);
 
+/* LAN resident lifetime (NET_HOSTSVC_DESIGN §3). Persistent code owns this
+ * client and mount generation; UART retains the shell-scoped lifetime below.
+ * sid renewal on idle/same-generation ALIVE does not invalidate existing FDs. */
+struct SfsPersistent {
+    SfsClient client;
+    u32 generation, last_use, alive_seen;
+};
+/* Absolute deadline for the whole operation (1000ms including HELLO/TX/retry).
+ * No sid / 30s idle / new ALIVE / seq>0xF000 requires HELLO.
+ * A timeout fails this request with HOSTDOWN; the next request tries again.
+ * A timed-out write must not be replayed under a new sid automatically. */
+int sfs_ensure_session(u32 deadline);
+int sfs_request_deadline(u8 op, const void *in, u16 n, struct SfsReply *out, u32 deadline);
+/* Non-consuming internal observation; only schedules reconnection. */
+void sfs_alive_observe(u32 host_generation);
+
 /* セッションが mount の口を開け閉めする。c = このセッションの受け手。
  * 開いているあいだだけ ops->mount が c を返す (それ以外は NULL)。 */
 void    serialfs_permit(SfsClient *c);
@@ -44,4 +60,14 @@ int     serialfs_session_end(int exit_code);
  * 0 = ペアの MAC を写した / -1 = ペアが無い (out は変えない)。 */
 int     sfs_lan_peer_mac(u8 *out);
 
+/* fs/serialfs/serialfs.h。SfsPersistentの段0配置は維持 */
+struct SfsPersistentConfig { const SfsIo *io; void *io_ctx; int lan_enabled; };
+int sfs_persistent_start(const struct SfsPersistentConfig *cfg);
+const SfsClient *sfs_persistent_client(void); u32 sfs_persistent_generation(void);
+void sfs_persistent_stale(void); /* C3が不明sid時に呼ぶ、C1が世代失効 */
+int sfs_persistent_enabled(void); int sfs_persistent_scope_begin(void); int sfs_persistent_scope_end(int exit_code);
+
+/* cfg is copied; io/ctx borrowed for boot lifetime. start publishes mount
+ * without HELLO; existing HostDrv returns BUSY. client is NULL before start,
+ * otherwise borrowed read-only. LAN scopes never BYE/unmount on exit. */
 #endif /* FS_SERIALFS_H */

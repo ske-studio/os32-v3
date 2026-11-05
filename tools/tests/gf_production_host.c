@@ -4,11 +4,13 @@
 #define GF_S2_ENTRY unused_decoder_tests
 #include "gfinit_host.c"
 #include "hwdev/gf/production.h"
+#include "hwdev/gf/display/api.h"
 #include "mm/pgalloc.h"
 #include "mm/paging.h"
 #include "include/gf_production.h"
 #include "init/sysconfig.c"
 #include "gfinit_resources_ra266.h"
+#include "gf_foundation_width_host.h"
 
 struct prod_reg { u32 off,value; };
 static struct prod_reg prod_regs[4096];
@@ -19,6 +21,7 @@ static struct gf_production_scratch prod_scratch __attribute__((aligned(PAGE_SIZ
 static u8 prod_rom[GF_ROM_MAX],prod_rgb[VIDEO_PALETTE_BYTES];
 static u32 prod_cfg[32][8][64];
 static u32 prod_now,prod_clock_step,prod_clock_fail,prod_clock_calls;
+static int prod_clock_error;
 static u32 prod_mmio_calls,prod_cmd_writes,prod_other_cfg_writes,prod_reads16,prod_live_pages;
 static u32 prod_alloc_fail,prod_map_fail,prod_ram_fail,prod_route_fail,prod_rom_changed;
 static u32 prod_mismatch,prod_fail_section,prod_fail_main,prod_fail_a2,prod_a2_writes;
@@ -26,8 +29,8 @@ static u32 prod_deadline_section;
 static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pfb;
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
-static int prod_foundation_fail;
-static u32 prod_logs,prod_cfg_reads;
+static int prod_foundation_fail,prod_prepare_read_fail;
+static u32 prod_logs,prod_cfg_reads,prod_prepare_writes;
 void kprintf(u8 attr,const char *format,...)
 { (void)attr;(void)format;prod_logs++; }
 #define PROD_ROUTE 0xfacU
@@ -54,6 +57,13 @@ int gf_production_mmio(struct gf_production *p,u32 bar,u32 off,u32 width,bool wr
 {
     CHECK(p==&prod && bar==0 && (width==1 || width==2 || width==4));
     CHECK(write || (off!=0x6013c0 && off!=0x6813c9));
+    if (!p->prepared) {
+        CHECK(!write && off==RECOVER_PMC_ENABLE && width==4);
+        CHECK(!(prod_cfg[13][0][1]&PCI_CMD_BUS_MASTER));
+        CHECK(p->display.bar0_map==(void *)P2V_IO(prod_boot.bars[0].base) &&
+              p->foundation.bar0==p->display.bar0_map);
+        if (prod_prepare_read_fail) return -1;
+    }
     prod_mmio_calls++;
     if(off>=KPEEK_NV_PROM_OFF && off-KPEEK_NV_PROM_OFF<GF_ROM_MAX) {
         CHECK(!write && (prod.display.initialized || prod_cmd_writes==1));
@@ -109,8 +119,9 @@ void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v)
 {(void)b;(void)d;(void)f;(void)o;(void)v;prod_other_cfg_writes++;}
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
-    CHECK(!b && d==13 && !f && o==4 && v==0x106);
-    prod_event(4);prod_cmd_writes++;
+    CHECK(!b && d==13 && !f && o==4);
+    if (!prod.prepared) prod_prepare_writes++;
+    else { CHECK(v==0x106);prod_event(4);prod_cmd_writes++; }
     prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
     return 0;
 }
@@ -144,9 +155,16 @@ int sys_time_now(u32 *lo,u32 *hi)
         prod_main_mask|=1U<<main;
         if(!prod_faulted && prod_fail_main==main+1) {prod_faulted=true;return -1;}
     }
-    if(++prod_clock_calls==prod_clock_fail)return -1;
+    if(++prod_clock_calls==prod_clock_fail)return prod_clock_error ? prod_clock_error : -1;
     prod_now+=prod_clock_step;*lo=prod_now;*hi=0;return 0;
 }
+int gf_production_native_clock(void *,u32 *);
+int gf_production_native_wait(void *,u32);
+/* Check the opaque even though today's native clock does not dereference it. */
+int gf_production_clock(void *opaque,u32 *value)
+{ CHECK(opaque==&prod);return gf_production_native_clock(opaque,value); }
+int gf_production_wait(void *opaque,u32 us)
+{ CHECK(opaque==&prod);return gf_production_native_wait(opaque,us); }
 const struct gf_instmem_map_ops gf_production_instmem_map_ops={0};
 /* Keep the P4 transport oracle independent of command MMIO. C0/B hosts test
  * the real channel; this seam verifies the production owner's new wiring. */
@@ -225,6 +243,8 @@ static void prod_reset(void)
     kmemset(prod_vga,0,sizeof(prod_vga));kmemset(prod_index,0,sizeof(prod_index));
     prod_reg_count=prod_trace_count=prod_main_mask=0;
     prod_now=prod_clock_calls=prod_mmio_calls=prod_cmd_writes=prod_other_cfg_writes=prod_reads16=0;
+    prod_prepare_writes=prod_logs=prod_prepare_read_fail=0;
+    prod_clock_error=0;
     prod_clock_step=1;prod_clock_fail=prod_live_pages=prod_alloc_fail=prod_map_fail=prod_ram_fail=0;
     prod_route_fail=prod_rom_changed=prod_mismatch=prod_fail_main=0;
     prod_fail_section=prod_deadline_section=RECOVER_NONE;
@@ -252,9 +272,13 @@ static void prod_reset(void)
     u8 sum=0;for(u32 i=0;i<65536;i++)sum+=prod_rom[i];prod_rom[65535]-=sum;
     prod_vga[0][0x11]=0x80;prod_index[0]=0x22;
     *prod_reg(0x1850)=*prod_reg(0x1854)=1;
+    *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U;
     CHECK(!gf_production_identify(&prod_boot));
     CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
-    CHECK(!prod_cmd_writes && !prod_mmio_calls && !prod_route_calls);
+    CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[13][0][1]==0x02b00102U);
+    CHECK(!prod_cmd_writes && prod_mmio_calls==1 && !prod_route_calls);
+    CHECK(prod.foundation.expected_pmc==0x03010000U);
+    foundation_width_cases(&prod.foundation);
     /* IRQ/tick adapter uses only its permanent map, never the guarded bus. */
     u32 words[2]={0,0},value,reads=prod_cfg_reads;
     volatile u8 *saved=prod.foundation.bar0;
@@ -268,6 +292,153 @@ static void prod_reset(void)
     CHECK(prod.foundation.io.write(&prod.foundation,0,4,4,0)==-1 && words[1]==0x12345678);
     prod.foundation.revoked=false;
     prod.foundation.bar0=saved;
+}
+/* Run F4 with the ops assembled by real prepare, including the native
+ * chunked wait. Only the permanent BAR memory is RAM in this host. */
+static int prod_start(void);
+/* Enforce mode_load's outer deadline-check interval in this test only.
+ * Native accepts long requests; mode_load must still return to its deadline
+ * checks every 1000us, even when the timing adapter would accept more. */
+static int prod_bounded_wait(void *opaque,u32 us)
+{
+    CHECK(us<=GF_INIT_WAIT_CHUNK_US);
+    if (us>GF_INIT_WAIT_CHUNK_US) return -1;
+    return gf_production_wait(opaque,us);
+}
+static int prod_bounded_foundation_wait(void *opaque,u32 us)
+{
+    CHECK(opaque==&prod.foundation);
+    return prod_bounded_wait(&prod,us);
+}
+static void prod_wait_cases(void)
+{
+    prod_reset();
+    struct gf_io *ios[]={&prod.foundation.io,&prod.display.io};
+    /* One start read and one 1000us poll per full chunk. This distinguishes
+     * chunking from a single long busy wait, independently of elapsed time. */
+    const u32 requests[]={0,1,1000,1001,10000,50000,50001};
+    for (u32 io=0;io<2;io++) {
+        for (u32 n=0;n<sizeof(requests)/sizeof(requests[0]);n++) {
+            u32 us=requests[n],chunks=(us+999U)/1000U;
+            prod_clock_step=1000; prod_now=U32_MAX-1500U;
+            u32 began=prod_now,calls=prod_clock_calls;
+            CHECK(!ios[io]->timing.wait_us(ios[io]->opaque,us));
+            CHECK(prod_clock_calls-calls==2U*chunks);
+            CHECK(prod_now-began>=us && prod_now-began==2000U*chunks);
+        }
+        /* Exact elapsed lower bound with a 1us fake clock, including wrap. */
+        prod_clock_step=1; prod_now=U32_MAX-1500U;
+        u32 began=prod_now,calls=prod_clock_calls;
+        CHECK(!ios[io]->timing.wait_us(ios[io]->opaque,50000));
+        CHECK(prod_now-began==50050U && prod_clock_calls-calls==50050U);
+        /* All starts and polls of a 50ms call, including later chunks. */
+        prod_clock_step=1000; prod_clock_error=-1702;
+        for (u32 nth=1;nth<=100;nth++) {
+            calls=prod_clock_calls;
+            prod_clock_fail=calls+nth;
+            CHECK(ios[io]->timing.wait_us(ios[io]->opaque,50000)==prod_clock_error);
+            CHECK(prod_clock_calls==calls+nth);
+        }
+        prod_clock_fail=0; prod_clock_error=0; prod_clock_step=0;
+        CHECK(ios[io]->timing.wait_us(ios[io]->opaque,10000)==-1);
+    }
+    output("PASS prepare -> foundation/display native wait: 10/50ms chunks, total, remainder, zero, wrap, every clock rc, stopped clock\n");
+}
+/* dispnv04/hw.c:38-65: FP_TG_CONTROL enable predicate (dfp.c:93-110). */
+#define PROD_FP_CONTROL 0x680848U
+static void prod_modeload_cases(void)
+{
+    static u8 bar[GF_PRODUCTION_BAR0_BYTES] __attribute__((aligned(4)));
+    static struct gf4_state state;
+    prod_reset();
+    CHECK(prod.chan.state==GF2_OFF && !prod.chan.f);
+    int rc=prod_start(); /* real owner start attaches the prepared foundation */
+    CHECK(!rc);
+    if (rc) return; /* failed prerequisite: do not run MMIO/waits on a cold device */
+    CHECK(prod.chan.f==&prod.foundation);
+    volatile u8 *saved=prod.foundation.bar0;
+    prod.foundation.bar0=bar;
+    state=(struct gf4_state){0};
+    state.next[0].enabled=true;
+    state.next[0].mode.fmt=GF3_INDEX8;
+    state.next[0].dpms=GF4_ON;
+    struct gf4_ctx ctx={.state=&state,.ch=&prod.chan,.ready=true,
+        .changing=true,.epoch=prod.chan.epoch,.deadline=prod_now+GF2_TIMEOUT_US};
+    for (u32 fp=0;fp<2;fp++) {
+        *(u32 *)(bar+PROD_FP_CONTROL)=fp ? GF_LOAD_FP_ON_MASK : 0;
+        u32 started=prod_now,logs=prod_logs;
+        ctx.deadline=prod_now+GF2_TIMEOUT_US;
+        CHECK(!gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline));
+        CHECK(prod_now-started>=(fp ? 70000U : 20000U) && prod_logs==logs);
+    }
+    /* Same mode load with a timing fake capped at 1000us: the outer split
+     * stays useful for per-chunk deadlines even after native accepts long waits. */
+    prod.foundation.io.timing.wait_us=prod_bounded_foundation_wait;
+    ctx.deadline=prod_now+GF2_TIMEOUT_US;
+    CHECK(!gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline));
+    u32 logs=prod_logs;
+    prod_clock_fail=prod_clock_calls+1;
+    CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==-1 && prod_logs==logs+1);
+    prod_clock_error=-1701;
+    /* Entry clock, ms_wait clock, native wait start clock and its first poll. */
+    for (u32 clock=1;clock<=4;clock++) {
+        prod_clock_fail=prod_clock_calls+clock;
+        CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==prod_clock_error);
+        CHECK(prod_logs==logs+1+clock);
+    }
+    prod_clock_error=0; prod_clock_fail=0; prod.foundation.revoked=true;
+    CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==-1 && prod_logs==logs+6);
+    prod.foundation.revoked=false;
+    prod.foundation.bar0=saved;
+    output("PASS mode_load: real prepare -> foundation timing -> native <=1ms waits, 20/70ms total, success silent\n");
+}
+static void prod_prepare_cases(void)
+{
+    prod_reset();
+    struct gf_io *f=&prod.foundation.io,*d=&prod.display.io;
+    CHECK(f->timing.clock_us && f->timing.wait_us);
+    if (f->timing.clock_us && f->timing.wait_us) {
+        u32 a=0,b=0;
+        prod_clock_step=0;prod_now=12345;
+        CHECK(!f->timing.clock_us(f->opaque,&a) && !d->timing.clock_us(d->opaque,&b));
+        CHECK(a==12345 && b==a);
+        prod_clock_step=1;
+        CHECK(!f->timing.wait_us(f->opaque,7) && prod_now>=a+7);
+        a=prod_now;
+        CHECK(!d->timing.wait_us(d->opaque,7) && prod_now>=a+7);
+        prod_clock_fail=prod_clock_calls+1;
+        CHECK(f->timing.clock_us(f->opaque,&a)==-1);
+        prod_clock_fail=prod_clock_calls+1;
+        CHECK(f->timing.wait_us(f->opaque,1)==-1);
+    }
+    /* Independent raw PCI words: preserve I/O, Mem, other Command and Status
+     * bits, including combinations different from the usual 0106h. */
+    const u16 commands[]={0x0106,0x0147,0x0105,0x0104,0x0102,0x0143};
+    for(u32 i=0;i<sizeof(commands)/sizeof(commands[0]);i++) {
+        prod_reset();kmemset(&prod,0,sizeof(prod));
+        prod_cfg[13][0][1]=0x02b00000U|commands[i];
+        prod_prepare_writes=prod_logs=prod_mmio_calls=0;
+        *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U+i;
+        CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
+        CHECK(prod_cfg[13][0][1]==(0x02b00000U|(commands[i]&~4U)));
+        CHECK(prod_prepare_writes==((commands[i]&4U)?1U:0U));
+        CHECK(prod_logs==prod_prepare_writes && !prod_cmd_writes && !prod_other_cfg_writes);
+        CHECK(prod_mmio_calls==1 && !prod_route_calls);
+        CHECK(prod.foundation.expected_pmc==0x03010000U+i);
+    }
+    prod_reset();kmemset(&prod,0,sizeof(prod));
+    prod_prepare_read_fail=1;
+    prod.foundation.expected_pmc=0x12345678U;
+    CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
+    CHECK(!prod.prepared && !prod.display.reusable && !prod_route_calls);
+    CHECK(prod.foundation.expected_pmc==0x12345678U);
+    /* A failed BAR/mapping gate must not write even a valid Command word. */
+    prod_reset();kmemset(&prod,0,sizeof(prod));
+    prod_cfg[13][0][1]=0x02b00106U;prod_map_fail=1;
+    prod_prepare_writes=prod_logs=0;
+    CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
+    CHECK(!prod.prepared && !prod_prepare_writes && !prod_logs && prod_cfg[13][0][1]==0x02b00106U);
+    output("PASS production prepare: shared clock/wait and production opaque; BM-only WORD clear, no write if clear or invalid maps; PMC readback before start, read failure rejects prepare\n");
 }
 static int prod_start(void)
 {return video_start(&prod.video,1,prod_rgb);}
@@ -391,7 +562,10 @@ static void prod_cases(void)
     CHECK(!prod_start() && prod_cmd_writes==3);CHECK(!prod_return(&prod));
     output("PASS real startup/main/baseline/mode/CHECK, WORD Command RUN at N1, STOP on exit, no BAR writes, restart without devinit\n");
     prod_reset();prod_mismatch=1;prod_failure();CHECK(prod_cmd_writes==1 && !prod_a2_done);
-    prod_reset();prod_route_fail=1;prod_failure();CHECK(!prod_cmd_writes && !prod_mmio_calls);
+    /* STOP now matches at prepare: failure cleanup reaches PBUS/PMC writes
+     * even when routing/acquire failed before N1. No A2/devinit writes. */
+    prod_reset();prod_route_fail=1;prod_failure();
+    CHECK(!prod_cmd_writes && !prod_a2_writes && prod_stop_writes==3);
     prod_reset();prod_alloc_fail=1;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
     prod_reset();prod_rom[0]=0;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
     prod_reset();prod_rom_changed=1;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
@@ -452,7 +626,8 @@ static void prod_cases(void)
     CHECK(prod_boot.reject.reason && !kstrcmp(prod_boot.reject.reason,"rom_length") &&
           prod_boot.reject.dev==11 && !prod_boot.reject.fn &&
           prod_boot.reject.reg==PCI_CFG_ROM_ENDPOINT && prod_boot.reject.raw==prod_cfg[11][0][12]);
-    CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes && !prod_mmio_calls && prod_route_calls==1);
+    CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes &&
+          !prod_a2_writes && prod_stop_writes==3 && prod_route_calls==1);
     CHECK(prod.reject.reason && !kstrcmp(prod.reject.reason,"rom_length") && prod.reject.dev==11);
     CHECK(prod.display.section==GF_DISPLAY_INIT && prod.display.last_rc==-1 &&
           prod.display.target==((11U<<3)<<8 | PCI_CFG_ROM_ENDPOINT) && !prod.display.reusable);
@@ -464,7 +639,7 @@ static void prod_cases(void)
     prod_reset();prod_clock_step=0;
     CHECK(gf_production_wait(&prod,1)==-1); /* finite stopped-clock path */
     prod_clock_step=1;CHECK(!gf_production_wait(&prod,1000));
-    CHECK(gf_production_wait(&prod,1001)==-1);
+    CHECK(!gf_production_wait(&prod,1001));
     prod_reset();prod_now=U32_MAX-16;
     CHECK(!prod_start() && !prod_return(&prod));
     output("PASS finite wait, unavailable/frozen clock, elapsed wrap and baseline deadline\n");
@@ -509,6 +684,9 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+    prod_wait_cases();
+    prod_modeload_cases();
+    prod_prepare_cases();
 #ifdef GF_HAL_TEST
     prod_hal_cases();
 #endif

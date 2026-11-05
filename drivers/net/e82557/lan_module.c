@@ -13,6 +13,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "kstring.h"
 #include "kprintf.h"
 #include "io.h"
+#include <stddef.h>
 
 extern const u32 lan_kexports[];
 extern const struct module_symbol_contract lan_import_contracts[];
@@ -172,9 +173,17 @@ static int lan_start_module(struct module_record *r, u32 entry, u32 *exports)
     u32 entries[LAN_MODULE_API_SLOTS];
     STATIC_ASSERT(sizeof(candidate) == sizeof(entries), lan_facade_size);
     kmemcpy(entries, &candidate, sizeof(entries));
-    for (u32 i = 0; i < LAN_MODULE_API_SLOTS; i++)
+    for (u32 i = 0; i < offsetof(LanModuleApi, adapter) / sizeof(entries[0]); i++)
         if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
+    /* Optional Host Services data lives in rodata, separately from text. */
+    u32 adapter = (u32)(uptr)candidate.adapter;
+    if (adapter && (adapter < r->ro || adapter - r->ro > r->ro_size ||
+                    sizeof(*candidate.adapter) > r->ro_size - (adapter - r->ro)))
+        return MODULE_INIT_FAILED;
+    if (candidate.netcd_register &&
+        !module_text_contains(r, (u32)(uptr)candidate.netcd_register))
+        return MODULE_INIT_FAILED;
     candidate_valid = 1;
     if (rc) return rc;
     const struct pci_driver *const drivers[] = {platform_lan_driver()};

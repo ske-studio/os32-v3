@@ -25,7 +25,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/net/e82557/lan_module.c'
 CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
-         'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info']
+         'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info',
+         'required-function-outside-text', 'required-function-null', 'optional-slots-valid',
+         'adapter-outside-rodata', 'netcd-outside-text']
 
 
 def product_image(folder):
@@ -36,6 +38,7 @@ def product_image(folder):
     kernel = (ROOT / 'build/out/vmkernel.lz4').read_bytes()
     sys.path.insert(0, str(ROOT / 'tools'))
     import mkmod
+    from module_schema import HEADER_FIELDS
     pair = mkmod.pair_crc(kernel)
     rebuilt, _ = mkmod.build((ROOT / 'build/out/lan/lan.elf').read_bytes(), metadata,
                              kernel, spec['version'], spec['generations']['memory_layout'],
@@ -64,7 +67,7 @@ def product_image(folder):
         assert name in core.symbols, name
     exe = build_validator(folder)
     contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
-                    abi=metadata['module_abi_gen'], pair=pair, ops=1, img_valid=1, module_id=9,
+                    abi=metadata['module_abi_gen'], pair=pair, ops=2, img_valid=1, module_id=9,
                     imports=[(fnv(e['name']), e['type_ver'], e['kind']) for e in metadata['imports']],
                     exports=[(1, fnv('initialize'), 1)])
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
@@ -73,7 +76,8 @@ def product_image(folder):
             assert result.returncode == bool(rc), result
             assert result.stdout == (b'GREEN\n' if not rc else f'RED {rc:02}\n'.encode()), result
         check(data, 0)
-        for field, value, rc in ((9, 0, 3), (31, pair ^ 1, 4), (8, 1, 3)):
+        for field, value, rc in ((9, 0, 3), (31, pair ^ 1, 4), (8, 1, 3),
+                                 (HEADER_FIELDS.index('OPS_VERSION'), 1, 6)):
             bad = bytearray(data)
             word(bad, field, value)
             check(crc(bad), rc)
@@ -107,7 +111,8 @@ def runtime_checks(folder, mutations=False):
     exe = folder / 'lan-module'
 
     def build(source):
-        subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
+        subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter',
+                        '-Wno-missing-field-initializers', *INCLUDES,
                         '-I' + str(ROOT / 'build/out/lan'),
                         '-DLAN_ADAPTER="' + str(source) + '"',
                         '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
@@ -131,6 +136,9 @@ def runtime_checks(folder, mutations=False):
     if mutations:
         source = SOURCE.read_text()
         for label, old, new in (
+            ('optional-null-rejected',
+             'i < offsetof(LanModuleApi, adapter) / sizeof(entries[0]);',
+             'i < LAN_MODULE_API_SLOTS;'),
             ('pci-fallback', '        pci_bind_all(NULL, 0);', '        /* omit fallback */'),
             ('pci-rebind', '    if (!pci_bound) {', '    if (1) {'),
             ('tick-detach',
