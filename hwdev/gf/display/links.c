@@ -278,8 +278,7 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
     }
     if (!rc) {
         /* As in op/zm_cr.c, byte writes without gf_init_save: no runner
-         * transaction save. The existing bus still owns index/lock cleanup;
-         * foundation.io is a 32-bit-only transport, unsuitable for CR44. */
+         * transaction save. The existing display bus owns index/lock cleanup. */
         if (io->write(io->opaque,GF_MODE_REGISTER_BAR,
                        RECOVER_PRMCIO+RECOVER_CRTC,1,RECOVER_CR44) ||
             io->write(io->opaque,GF_MODE_REGISTER_BAR,

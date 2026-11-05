@@ -34,17 +34,21 @@ static int same_resources(struct gf_production *p)
 static int foundation_read(void *opaque, u32 bar, u32 off, u32 width, u32 *value)
 {
     struct gf_foundation *f=opaque;
-    (void)bar;(void)width;
+    (void)bar;
     if (f->revoked) return -1;
-    *value=*(volatile u32 *)(f->bar0+off);
+    if (width==1) *value=*(volatile u8 *)(f->bar0+off);
+    else if (width==2) *value=*(volatile u16 *)(f->bar0+off);
+    else *value=*(volatile u32 *)(f->bar0+off);
     return 0;
 }
 static int foundation_write(void *opaque, u32 bar, u32 off, u32 width, u32 value)
 {
     struct gf_foundation *f=opaque;
-    (void)bar;(void)width;
+    (void)bar;
     if (f->revoked) return -1;
-    *(volatile u32 *)(f->bar0+off)=value;
+    if (width==1) *(volatile u8 *)(f->bar0+off)=(u8)value;
+    else if (width==2) *(volatile u16 *)(f->bar0+off)=(u16)value;
+    else *(volatile u32 *)(f->bar0+off)=value;
     return 0;
 }
 static struct gf_production *foundation_production(void *opaque)

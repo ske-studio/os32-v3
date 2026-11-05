@@ -10,7 +10,7 @@ CHECK = dict(name='gf1-dispatch-host', tier=1,
             'kdebug/gfinit_decode.h', 'include/types.h', 'include/memmap.h',
             'include/io.h', 'include/video_service.h', 'include/pci_dev_contract.h',
             'arch/x86/arch_io.h', 'tools/tests/gf1_dispatch_host.c',
-            'tools/tests/test_gf1_dispatch.py', 'tools/tests/host32.py',
+            'tools/tests/test_gf1_dispatch.py', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'], needs=[], budget=30.0)
 
 import os
@@ -38,7 +38,7 @@ def main():
         exe = td / 'host'
 
         def build(source):
-            subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie',
+            subprocess.run(['gcc', *flags, '-DGF_WIDTH_TRACE', '-fsanitize=kernel-address', '-nostdlib', '-static', '-no-pie',
                             '-DGF1_DISPATCH_SOURCE="' + str(source) + '"',
                             str(ROOT / 'tools/tests/gf1_dispatch_host.c'),
                             '-o', str(exe)], check=True)
@@ -47,17 +47,17 @@ def main():
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             result = host32.run([str(exe)], runner=runner)
             assert result.returncode == 0, (runner, result.returncode)
-            print('PASS CW prepare/lease/dispatch/page/HEADS/revoke (' + runner + ')', flush=True)
+            print('PASS CW prepare/lease/dispatch/page/HEADS/revoke; real MMIO byte/word/dword width/address/count (' + runner + ')', flush=True)
         if '--mutate' in sys.argv:
             original = SOURCE.read_text()
             mutants = [
                 ('f->io.read=diagnostic_read;f->io.write=diagnostic_write;',
                  'f->io.read=diagnostic_read;f->io.write=diagnostic_write;f->io.opaque=f;',
                  'lease opaque replaced'),
-                ('if (f->revoked) return -1;\n    *value=',
-                 'if (false) return -1;\n    *value=', 'revoked adapter read'),
-                ('if (f->revoked) return -1;\n    *(volatile',
-                 'if (false) return -1;\n    *(volatile', 'revoked adapter write'),
+                ('if (f->revoked) return -1;\n    if (width==1) *value=',
+                 'if (false) return -1;\n    if (width==1) *value=', 'revoked adapter read'),
+                ('if (f->revoked) return -1;\n    if (width==1) *(volatile',
+                 'if (false) return -1;\n    if (width==1) *(volatile', 'revoked adapter write'),
                 ('if (f->revoked && q->op!=GF1T_STOP',
                  'if (false && q->op!=GF1T_STOP', 'revoked mutable dispatch'),
                 ('unsigned flags=irq_save();', 'unsigned flags=0;', 'HEADS CLI removed'),
@@ -72,6 +72,11 @@ def main():
                 ('rc=f==gf1_module_ops.production ?', 'rc=true ?', 'diagnostic display dispatch'),
                 ('geforce_foundation_display(q->op==GF1T_DISPLAY_START)',
                  'geforce_foundation_display(q->op==GF1T_DISPLAY_STOP)', 'display direction swapped'),
+                ('if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=*(volatile u32 *)(f->bar0+off);', 'diagnostic u8 read widened'),
+                ('if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=(u8)*(volatile u32 *)(f->bar0+off);', 'diagnostic masked overread'),
+                ('if (width==1) *(volatile u8 *)(f->bar0+off)=(u8)value;', 'if (width==1) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'diagnostic u8 write widened'),
+                ('if (width==2) *value=*(volatile u16 *)(f->bar0+off);', 'if (width==2) *value=*(volatile u32 *)(f->bar0+off);', 'diagnostic u16 read widened'),
+                ('if (width==2) *(volatile u16 *)(f->bar0+off)=(u16)value;', 'if (width==2) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'diagnostic u16 write widened'),
             ]
             for old, new, label in mutants:
                 assert original.count(old) == 1, label
