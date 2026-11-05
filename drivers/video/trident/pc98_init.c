@@ -66,10 +66,8 @@ enum {
 int trident_pc98_init(struct trident_device *d)
 {
     u8 temp, config;
-    /* Protect before enabling color addressing. Do not use the saved base:
-     * trident.h specifies the current MISC here and script color thereafter. */
-    TRY(trident_read8(d, TRI_SPACE_REGS, TRI_MISC_READ, &temp));
-    TRY(trident_protect(d, (temp & 1) ? TRI_CR_COLOR : TRI_CR_MONO, true));
+    /* vgaHW keeps the IOBase selected at Save, even after MISC |= C3. */
+    TRY(trident_protect(d, d->saved.vga_base, true));
 
     /* D:624-632 / H:522-529: subsystem enable, old mode, configuration 1. */
     TRY(trident_read8(d, TRI_SPACE_REGS, TRI_MISC_READ, &temp));
@@ -96,9 +94,9 @@ int trident_pc98_init(struct trident_device *d)
         TRY(trident_write8(d, TRI_SPACE_REGS, TRI_CONFIG_ALT, 0x08));
     }
 
-    /* D:649-658 / H:548-559. AR and CRTC now use the script's color base. */
+    /* D:649-658 / H:548-559. explicit AR access stays color; vgaHW uses Save IOBase. */
     TRY(trident_ar_write(d, TRI_CR_COLOR, 0x10, 0x41));
-    TRY(trident_crtc_lock(d, TRI_CR_COLOR, false));
+    TRY(trident_crtc_lock(d, d->saved.vga_base, false));
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0B, &temp));
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0E, &temp));
     TRY(trident_indexed_write(d, TRI_SR_INDEX, 0x0E, temp | 0x80));
@@ -119,8 +117,8 @@ int trident_pc98_init(struct trident_device *d)
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0B, &temp));
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0E, &temp));
     TRY(trident_indexed_write(d, TRI_SR_INDEX, 0x0E, temp & 0x7F));
-    TRY(trident_crtc_lock(d, TRI_CR_COLOR, true));
-    TRY(trident_protect(d, TRI_CR_COLOR, false));
+    TRY(trident_crtc_lock(d, d->saved.vga_base, true));
+    TRY(trident_protect(d, d->saved.vga_base, false));
     return TRI_OK;
 }
 #undef TRY

@@ -231,10 +231,9 @@ int trident_ext_dac_update(struct trident_device *, u8 mask, u8 bits);
 int trident_protect(struct trident_device *, u16 vga_base, bool on);
 int trident_crtc_lock(struct trident_device *, u16 vga_base, bool lock);
 /* pc98_init.c: full D:616–692, including protect and SR0C alternate branch.
- * Entry protect uses current MISC bit0 BEFORE MISC|=C3 (D:622–626).
- * AR and unlock/lock/exit protect use 3D4 per H:548–554. The reference
- * retains the base selected at Save (vgaHW.c:1021; D:651,688–690), so
- * boot MISC bit0=0 gives 3B4 there: an intentional script difference. */
+ * Protect and unlock/lock use the Save-time base, as in the reference.
+ * The script fixes these at 3D4 (same when boot MISC bit0=1).
+ * Explicit AR and Trident CR accesses stay at 3D4. */
 int trident_pc98_init(struct trident_device *d);
 /* state_save.c/default_dac.c/state_restore.c: 852 slots, nonprimary,
  * no font/text planes, default MCLK not saved, SR0E restore XOR 02.

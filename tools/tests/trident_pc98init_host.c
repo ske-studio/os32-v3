@@ -50,8 +50,8 @@
  * License notices are retained in drivers/video/trident/pc98_init.c.
  * Recreate by transcribing each INB/OUTB/OUTW in order, expanding entry/exit
  * vgaHWProtect (vgaHW.c:474-488,574-604,1795-1806) and Unlock/Lock (:1795+).
- * The saved-base difference is intentional: trident.h selects current MISC
- * for entry protection, then H's 3D4 for AR/CRTC and exit protection.
+ * vgaHW protect/lock retain Save IOBase; explicit D:650 AR and Trident CR
+ * accesses remain color even when Save selected mono.
  * Expected events below never read product output or fake register state.
  */
 #include "tools/tests/trident_device_fake.h"
@@ -124,7 +124,7 @@ int trident_protect(struct trident_device *d, u16 base, bool on)
 #define W(off, val) EVENT(off, val, 2, true)
 /* H:522-534 plus entry protect, independent seed-dependent read values. */
 #define PREFIX \
-    R(0x3CC, misc), B(0x3C4, 1), R(0x3C5, seq), \
+    B(0x3C4, 1), R(0x3C5, seq), \
     B(0x3C4, 0), B(0x3C5, 1), B(0x3C4, 1), B(0x3C5, seq | 0x20), \
     R(base + 6, mono ? 0xA5 : 0x5A), B(0x3C0, 0), \
     R(0x3CC, misc), B(0x3C2, misc | 0xC3), \
@@ -141,7 +141,7 @@ int trident_protect(struct trident_device *d, u16 base, bool on)
 /* H:548-576 plus exit protect. */
 #define SUFFIX \
     R(0x3DA, 0x5A), B(0x3C0, 0x10), B(0x3C0, 0x41), \
-    B(0x3D4, 0x11), R(0x3D5, cr11), B(0x3D4, 0x11), B(0x3D5, cr11 & 0x7F), \
+    B(base, 0x11), R(base + 1, cr11), B(base, 0x11), B(base + 1, cr11 & 0x7F), \
     B(0x3C4, 0x0B), R(0x3C5, old), B(0x3C4, 0x0E), R(0x3C5, ext | 0x20), \
     W(0x3C4, 0x0E | ((ext | 0xA0) << 8)), \
     W(0x3D4, 0x3820), W(0x3D4, 0x2020), W(0x3D4, 0x0E30), \
@@ -149,9 +149,9 @@ int trident_protect(struct trident_device *d, u16 base, bool on)
     B(0x43C6, 0xAF), B(0x43C7, 0), \
     B(0x3C4, 0x0B), R(0x3C5, old), B(0x3C4, 0x0E), R(0x3C5, ext | 0xA0), \
     W(0x3C4, 0x0E | (((ext | 0x20) & 0x7F) << 8)), \
-    B(0x3D4, 0x11), R(0x3D5, cr11 & 0x7F), B(0x3D4, 0x11), B(0x3D5, cr11 | 0x80), \
+    B(base, 0x11), R(base + 1, cr11 & 0x7F), B(base, 0x11), B(base + 1, cr11 | 0x80), \
     B(0x3C4, 1), R(0x3C5, seq | 0x20), B(0x3C4, 1), B(0x3C5, seq & 0xDF), \
-    B(0x3C4, 0), B(0x3C5, 3), R(0x3DA, 0x5A), B(0x3C0, 0x20)
+    B(0x3C4, 0), B(0x3C5, 3), R(base + 6, mono ? 0xA5 : 0x5A), B(0x3C0, 0x20)
 #define LENGTH(a) (sizeof(a) / sizeof((a)[0]))
 /* Capacity is derived from ALL fixture sections (both exclusive branches),
  * never from product trace length. Extra operations fail exact length checks. */
@@ -191,7 +191,7 @@ static u32 oracle(u8 config, bool mono, u8 seed)
 {
     u8 misc = (seed & 0xFE) | !mono;
     u8 seq = seed ^ 0x37, old = seed ^ 0x6A, ext = seed ^ 0x45;
-    u8 video = seed ^ 0x72, cr11 = seed ^ 0xB6;
+    u8 video = seed ^ 0x72, cr11 = seed ^ (mono ? 0xD7 : 0xB6);
     u16 base = mono ? 0x3B4 : 0x3D4;
     const struct trident_fake_event prefix[] = { PREFIX };
     const struct trident_fake_event primary[] = { CONFIG_PRIMARY };
@@ -221,8 +221,8 @@ static int setup(u8 config, bool mono, u8 seed)
     fake.regs[0x3BA] = 0xA5;
     fake.cr_color[0x11] = seed ^ 0xB6;
     fake.cr_mono[0x11] = seed ^ 0xD7;
-    /* Deliberately opposite to current MISC: Init must not consult Save. */
-    device.saved.vga_base = mono ? 0x3D4 : 0x3B4;
+    /* Save precedes Init; later MISC |= C3 must not change this base. */
+    device.saved.vga_base = mono ? 0x3B4 : 0x3D4;
     device.last_rc = -91;
     device.step = TRI_STEP_SAVE;
     return 0;
@@ -277,7 +277,11 @@ static int selftest(void)
             REQUIRE(!trident_pc98_init(&device));
             REQUIRE(!compare(count));
             REQUIRE(!unchanged_lifecycle());
-            REQUIRE(equal(fake.cr_mono[0x11], (u8)(config ^ 0xD7)));
+            REQUIRE(equal(device.saved.vga_base, mono ? 0x3B4 : 0x3D4));
+            REQUIRE(equal(fake.cr_mono[0x11],
+                          (u8)((config ^ 0xD7) | (mono ? 0x80 : 0))));
+            REQUIRE(equal(fake.cr_color[0x11],
+                          (u8)((config ^ 0xB6) | (mono ? 0 : 0x80))));
             if (config == 0 || config == 0x10) REQUIRE(!check_gate(count));
         }
         for (u32 branch = 0; branch < 2; ++branch) {
