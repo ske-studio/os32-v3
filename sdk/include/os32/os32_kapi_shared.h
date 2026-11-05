@@ -694,6 +694,8 @@ typedef struct {
  * -18 以降へずらした (ネットワーク側は番号を 1 つも使っていない)。 */
 #define OS32_ERR_NAMETOOLONG -16 /* パスが長すぎる / 深すぎる (切り詰めずに断る) */
 #define OS32_ERR_BUSY      -17  /* 使用中 (開いている SQLite DB の rename、使用中の loop イメージ) */
+#define OS32_ERR_HOSTDOWN  -18  /* ホストに届かない・応答が無い・NIC 未 bind */
+#define OS32_ERR_TIMEOUT   -19  /* SDK host_call の全体期限 */
 
 /* ファイル種別 (OS32_FILE_TYPE_*) */
 #define OS32_FILE_TYPE_FILE 1

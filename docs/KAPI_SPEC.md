@@ -147,6 +147,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 使用中の loop イメージの unlink / 置き換え) を取り、ネットワークの開始点を **-18 以降**へ下げた。
 同じ票で既存の **-11 `STALE`** を VFS の FD にも使う (unlink・置き換え rename・umount で失効した FD の
 read / write / fstat / seek)。版数は据え置き。
+Host Services (2026-11-05) は **-18 `HOSTDOWN`** (ホストに届かない・応答が無い・NIC 未 bind) と **-19 `TIMEOUT`** (SDK host_call の全体期限) を取り、番号の追加だけなので KAPI 版数は据え置く。
 
 ### 生ディスク書込みの授権 (KAPI-DISK-AUTH)
 

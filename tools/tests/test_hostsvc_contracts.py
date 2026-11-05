@@ -169,6 +169,7 @@ def source():
     # Compile-time checks concern types only; all layout checks execute below.
     signatures = {
         'net_bind': 'int (*)(const struct NetNicOps *)',
+        'net_nic_poll_once': 'int (*)(void)',
         'net_rx_take': 'int (*)(u16, void *, u32, u32 *)',
         'sfs_ensure_session': 'int (*)(u32)',
         'sfs_request_deadline': 'int (*)(u8, const void *, u16, struct SfsReply *, u32)',
