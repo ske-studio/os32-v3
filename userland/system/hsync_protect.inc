@@ -16,6 +16,8 @@
  *  [C1] C89 / GNU89。宣言はブロック先頭、`//` コメント無し。
  * ======================================================================== */
 
+#include "os32/os32_kapi_shared.h"
+
 #ifndef HSP_MAX_PATH
 #define HSP_MAX_PATH 512          /* OS32_MAX_PATH (256) より広く取る */
 #endif
@@ -164,26 +166,26 @@ static int hsp_normalize(const char *in, char *out, int cap)
     return 1;
 }
 
-/* Own a normalized /etc direct-child path. 1 = registered, 0 = invalid;
- * callers must stop synchronization on 0 (including settings read errors).
+/* Own a normalized /etc direct-child path. 0 = success, OS32_ERR_INVAL = invalid;
+ * callers must stop synchronization on nonzero (including settings read errors).
  * Keep the previous registration on failure. No old custom-path discovery. */
 int hsp_set_fep_user_path(const char *absolute_path)
 {
     char norm[HSP_FEP_PATH_CAP];
     int i;
 
-    if (!absolute_path || absolute_path[0] != '/') return 0;
-    if (!hsp_normalize(absolute_path, norm, (int)sizeof(norm))) return 0;
+    if (!absolute_path || absolute_path[0] != '/') return OS32_ERR_INVAL;
+    if (!hsp_normalize(absolute_path, norm, (int)sizeof(norm))) return OS32_ERR_INVAL;
     for (i = 0; HSP_FEP_USER_DIR[i]; i++)
-        if (hsp_lower((unsigned char)norm[i]) != HSP_FEP_USER_DIR[i]) return 0;
-    if (!norm[i]) return 0;
+        if (hsp_lower((unsigned char)norm[i]) != HSP_FEP_USER_DIR[i]) return OS32_ERR_INVAL;
+    if (!norm[i]) return OS32_ERR_INVAL;
     for (; norm[i]; i++)
-        if (norm[i] == '/') return 0;
+        if (norm[i] == '/') return OS32_ERR_INVAL;
     /* SQLite must also be able to name the rollback journal, including NUL. */
-    if (i + (int)sizeof(HSP_FEP_JOURNAL_SUFFIX) > HSP_FEP_PATH_CAP) return 0;
+    if (i + (int)sizeof(HSP_FEP_JOURNAL_SUFFIX) > HSP_FEP_PATH_CAP) return OS32_ERR_INVAL;
     for (i = 0; norm[i]; i++) hsp_fep_user_path[i] = norm[i];
     hsp_fep_user_path[i] = '\0';
-    return 1;
+    return 0;
 }
 
 /* All suffixes belong to learning data, including journals and temporary

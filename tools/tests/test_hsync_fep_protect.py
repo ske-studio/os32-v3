@@ -18,16 +18,19 @@ PRODUCT = 'userland/system/hsync_protect.inc'
 SCAN = 'userland/system/hsync.c'
 # (name, file, unique old, new). Compilation must succeed; RED is runtime only.
 MUTANTS = [
+    ('setter-success', PRODUCT,
+     "hsp_fep_user_path[i] = '\\0';\n    return 0;",
+     "hsp_fep_user_path[i] = '\\0';\n    return 1;"),
     ('default-prefix', PRODUCT, 'if (hsp_fep_prefix(name, HSP_FEP_USER_PATH',
      'if (0 && hsp_fep_prefix(name, HSP_FEP_USER_PATH'),
     ('custom-prefix', PRODUCT, 'if (hsp_fep_user_path[0] &&',
      'if (0 && hsp_fep_user_path[0] &&'),
     ('suffix', PRODUCT, "    return 1;\n}\n\n/* ベース名", 
      "    return *name == '\\0';\n}\n\n/* ベース名"),
-    ('direct-child', PRODUCT, "if (norm[i] == '/') return 0;",
+    ('direct-child', PRODUCT, "if (norm[i] == '/') return OS32_ERR_INVAL;",
      "if (norm[i] == '/') break;"),
-    ('absolute', PRODUCT, "if (!absolute_path || absolute_path[0] != '/') return 0;",
-     'if (!absolute_path) return 0;'),
+    ('absolute', PRODUCT, "if (!absolute_path || absolute_path[0] != '/') return OS32_ERR_INVAL;",
+     'if (!absolute_path) return OS32_ERR_INVAL;'),
     ('journal-cap', PRODUCT,
      'i + (int)sizeof(HSP_FEP_JOURNAL_SUFFIX) > HSP_FEP_PATH_CAP',
      'i + (int)sizeof(HSP_FEP_JOURNAL_SUFFIX) > HSP_FEP_PATH_CAP + 1'),

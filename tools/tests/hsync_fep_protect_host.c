@@ -67,13 +67,13 @@ static int test(void)
     CHECK(HSP_FEP_PATH_CAP == OS32_MAX_PATH);
     CHECK(hsp_path_classify("/ETC/FEP_USER.DB/x") == 1); /* BSS, no setter */
     CHECK(scan_protected_entities() == 0 && g_prot_count == 0);
-    CHECK(hsp_set_fep_user_path("/etc/./sub/../Learn.DB") == 1);
+    CHECK(hsp_set_fep_user_path("/etc/./sub/../Learn.DB") == 0);
     CHECK(eq(hsp_fep_user_path, "/etc/Learn.DB"));
     str_ncpy(path, "/etc/owned.db", sizeof(path));
-    CHECK(hsp_set_fep_user_path(path) == 1);
+    CHECK(hsp_set_fep_user_path(path) == 0);
     path[5] = 'X';
     CHECK(hsp_path_classify("/etc/owned.db-journal") == 1);
-    CHECK(hsp_set_fep_user_path("/etc/Learn.DB") == 1);
+    CHECK(hsp_set_fep_user_path("/etc/Learn.DB") == 0);
     for (i = 0; suffix[i]; i++) {
         str_ncpy(path, "/etc/FEP_USER.DB", sizeof(path));
         str_ncat(path, suffix[i], sizeof(path));
@@ -94,7 +94,7 @@ static int test(void)
         const char *bad[] = {0, "", "etc/a", "/etc", "/etc/", "/etc/a/b",
             "/else/a", "/../etc/a", "/etc/a\\b"};
         for (i = 0; i < (int)(sizeof(bad) / sizeof(bad[0])); i++) {
-            CHECK(hsp_set_fep_user_path(bad[i]) == 0);
+            CHECK(hsp_set_fep_user_path(bad[i]) == OS32_ERR_INVAL);
             CHECK(hsp_path_classify("/etc/learn.db") == 1);
         }
     }
@@ -102,16 +102,16 @@ static int test(void)
     str_ncpy(path, "/etc/", sizeof(path));
     for (i = 5; i < 247; i++) path[i] = 'a';
     path[247] = 0;
-    CHECK(hsp_set_fep_user_path(path) == 1);
+    CHECK(hsp_set_fep_user_path(path) == 0);
     CHECK(hsp_path_classify(path) == 1);
     str_ncat(path, "-journal", sizeof(path));
     CHECK(hsp_path_classify(path) == 1);
     path[247] = 'a'; path[248] = 0;
-    CHECK(hsp_set_fep_user_path(path) == 0);
+    CHECK(hsp_set_fep_user_path(path) == OS32_ERR_INVAL);
     path[256] = 0;
     for (i = 248; i < 256; i++) path[i] = 'a';
-    CHECK(hsp_set_fep_user_path(path) == 0);
-    CHECK(hsp_set_fep_user_path("/etc/learn.db") == 1);
+    CHECK(hsp_set_fep_user_path(path) == OS32_ERR_INVAL);
+    CHECK(hsp_set_fep_user_path("/etc/learn.db") == 0);
     /* Existing 11 + default 3 + custom 3 = 17; then mixed-case/suffix names. */
     for (i = 0; hsp_protected_names[i]; i++)
         str_ncpy(names[i], hsp_protected_names[i], sizeof(names[i]));
