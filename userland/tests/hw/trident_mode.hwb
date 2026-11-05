@@ -138,6 +138,7 @@
  if mode == 0 goto finish
  if mode == 1 goto setup
  if mode == 3 goto setup
+ if mode == 4 goto setup
  goto finish
  label setup
  mmiowrite8 v + 0x3C4 0x0B
@@ -315,6 +316,11 @@
  mmiowrite8 v + 0x3C2 0xEB
  mmiowrite16 v + 0x3C4 0xC20E
  call protect_off
+ # mode=4: VRAM size / 2MB mirror probe on the linear window, no output switch.
+ if mode != 4 goto no_probe
+ call vram_probe
+ goto restore
+ label no_probe
  # Column 8: restore saved endpoints on both successful/alias paths.
  mmioread32 f + 0 -> first
  mmioread32 f + 0x4AFFC -> last
@@ -396,6 +402,30 @@
  label finish
  end
 
+ # Write distinct words at 0/1/2/3 MiB, read all back, then restore in reverse order.
+ # 4 MiB real: 11.. 22.. 33.. 44..; 2 MiB mirrored: 33.. 44.. 33.. 44..; 1 MiB: all 44..
+ label vram_probe
+ mmioread32 f + 0 -> s0
+ mmioread32 f + 0x100000 -> s1
+ mmioread32 f + 0x200000 -> s2
+ mmioread32 f + 0x300000 -> s3
+ mmiowrite32 f + 0 0x11111111
+ mmiowrite32 f + 0x100000 0x22222222
+ mmiowrite32 f + 0x200000 0x33333333
+ mmiowrite32 f + 0x300000 0x44444444
+ mmioread32 f + 0 -> t
+ print "VRAM-AT-0M" t
+ mmioread32 f + 0x100000 -> t
+ print "VRAM-AT-1M" t
+ mmioread32 f + 0x200000 -> t
+ print "VRAM-AT-2M" t
+ mmioread32 f + 0x300000 -> t
+ print "VRAM-AT-3M" t
+ mmiowrite32 f + 0x300000 s3
+ mmiowrite32 f + 0x200000 s2
+ mmiowrite32 f + 0x100000 s1
+ mmiowrite32 f + 0 s0
+ return
  label enable
  iowrite8 port 0x68 0x0E
  iowrite8 port 0x6A 0x07
