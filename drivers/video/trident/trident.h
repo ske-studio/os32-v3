@@ -256,10 +256,24 @@ int trident_route_enable(struct trident_device *d);
 int trident_route_disable(struct trident_device *d);
 /* RAM client is res->client/client_bytes, pitch TRI_PITCH. Present clips then
  * validates source/LFB ends and copies rows via write_span32 (write8 edges),
- * with no VRAM readback. RGB input is KAPI 4bit/component:
- * x = input & GFX_PALETTE_COMPONENT_MASK; DAC = (x << 2) | (x >> 2),
- * as cirrus_pal6. Invalid palette interval is INVAL. */
+ * with no VRAM readback. Invalid palette interval is INVAL. */
 int trident_present(struct trident_device *, int x, int y, int w, int h);
+/* HAL RGB components use GFX_PALETTE_COMPONENT_BITS (currently 4, up to 8
+ * per component for 32bit color), not a backend-fixed input width.
+ * palette.c and lifecycle's default palette MUST both call this shared
+ * conversion with GFX_PALETTE_COMPONENT_BITS. W is in [4,8]: mask to W bits;
+ * W < 6 replicates the high input bits into the remaining low DAC bits
+ * (W=4: x<<2 | x>>2), W=6 is unchanged, W>6 takes the high six (W=8: x>>2).
+ * This pure contract helper performs no I/O; saved/default DAC register
+ * images are already in DAC units and must not be converted again. */
+static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
+{
+    u32 bits = component_bits;
+    u32 x = component & ((1u << bits) - 1u);
+    if (bits < 6)
+        return (u8)((x << (6 - bits)) | (x >> (2 * bits - 6)));
+    return (u8)(x >> (bits - 6));
+}
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
 /* lifecycle.c: ScreenInit=Save→Init→plan→Mode→Enable→verify→palette/client once;
  * later init=Mode→Enable→palette/client, enter=Mode→Enable (active enter is no-op).

@@ -11,7 +11,8 @@ CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=3,
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_contract_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
-            'include/memmap.h', 'mm/pgalloc.h', 'mm/paging.h',
+            'include/memmap.h', 'include/pegc.h', 'gfx/palette.h',
+            'mm/pgalloc.h', 'mm/paging.h',
             'mm/physmem.h', 'exec/surface_limits.h', 'include/sys.h',
             'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h',
             'gfx/gfx.h', 'sdk/include/os32/os32_kapi_shared.h',
@@ -35,12 +36,15 @@ FAKE_C = 'tools/tests/trident_device_fake.c'
 HOST = 'tools/tests/trident_contract_host.c'
 MEMMAP = 'include/memmap.h'
 PGALLOC = 'mm/pgalloc.h'
-HEADERS = (HEADER, MODULE, EMERGENCY, FAKE_H, MEMMAP, PGALLOC)
+HEADERS = (HEADER, MODULE, EMERGENCY, FAKE_H, MEMMAP, PGALLOC,
+           'include/pegc.h', 'gfx/palette.h')
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 CONSTANTS = {
     'MEM_TRIDENT_LFB_VA': 0x20000000, 'MEM_TRIDENT_REGS_VA': 0x20400000,
     'LEDGER_SF_TRIDENT': 5,
+    'PEGC_PAL_KAPI_BITS': 4, 'GFX_PALETTE_COMPONENT_BITS': 4,
+    'GFX_PALETTE_COMPONENT_MASK': 15,
     'TRI_PCI_VENDOR': 0x1023, 'TRI_PCI_DEVICE': 0x9660, 'TRI_CHIP_9682': 0x10,
     'TRI_PCI_BUS': 0, 'TRI_PCI_SLOT': 8, 'TRI_PCI_FUNCTION': 0,
     'TRI_PCI_COMMAND': 2, 'TRI_BAR0_PHYS': 0x20000000, 'TRI_BAR1_PHYS': 0x20400000,
@@ -122,6 +126,7 @@ SIGNATURES = {
     'trident_protect': 'int (*)(struct trident_device *, u16, bool)',
     'trident_crtc_lock': 'int (*)(struct trident_device *, u16, bool)',
     'trident_present': 'int (*)(struct trident_device *, int, int, int, int)',
+    'trident_palette_dac6': 'u8 (*)(u8, u32)',
     'trident_palette': 'int (*)(struct trident_device *, int, int, const u8 *)',
     'trident_restore98': 'int (*)(void *)',
     'gfx_arm_emergency': 'int (*)(int (*)(void *), void *, u32)',
@@ -201,6 +206,8 @@ for member in ('height', 'flip', 'page'):
     TYPES[f'((TridentModuleContext *)0)->{member}'] = 'int *'
 # Each anchor is unique. All mutants must compile, then fail during execution.
 MUTATIONS = (
+    ('palette-fixed-width', HEADER, 'u32 bits = component_bits;',
+     'u32 bits = 4; (void)component_bits;'),
     ('current-owner', EMERGENCY, '(u32)(display_owner)()', '((void)(display_owner)(), 11u)'),
     ('trident-backend-id', PGALLOC, 'LEDGER_SF_TRIDENT    5', 'LEDGER_SF_TRIDENT    4'),
     ('trident-regs-va', MEMMAP, 'MEM_TRIDENT_REGS_VA    0x20400000UL', 'MEM_TRIDENT_REGS_VA    0x20401000UL'),

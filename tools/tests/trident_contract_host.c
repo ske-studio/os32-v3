@@ -3,6 +3,7 @@
 #include "drivers/video/trident/trident_module.h"
 #include "gfx/gfx_emergency.h"
 #include "mm/pgalloc.h"
+#include "gfx/palette.h"
 static struct trident_fake fake;
 static u8 storage[4194304];
 static struct trident_fake_event trace[32];
@@ -17,6 +18,18 @@ static int current_owner = 11;
 static int display_owner(void) { return current_owner; }
 static int selftest(void)
 {
+    /* Independent 4bit reference (all sixteen DAC levels), and hypothetical
+     * wider HAL inputs. equal() prevents optimization from removing checks. */
+    static const u8 dac4[] = {0,4,8,12,17,21,25,29,34,38,42,46,51,55,59,63};
+    for (u32 x = 0; x < 16; ++x)
+        REQUIRE(equal(trident_palette_dac6(x, GFX_PALETTE_COMPONENT_BITS), dac4[x]));
+    for (u32 x = 0; x < 256; ++x) {
+        REQUIRE(equal(trident_palette_dac6(x, 4), dac4[x & 15]));
+        REQUIRE(equal(trident_palette_dac6(x, 5), ((x & 31) * 2) + ((x & 31) / 16)));
+        REQUIRE(equal(trident_palette_dac6(x, 6), x & 63));
+        REQUIRE(equal(trident_palette_dac6(x, 7), (x & 127) / 2));
+        REQUIRE(equal(trident_palette_dac6(x, 8), x >> 2));
+    }
     /* One arm at owner 11; next init transfers display to owner 22. The
      * dispatcher must use the current callback, including child rejection. */
     TridentModuleContext context = {.display_owner = display_owner};
