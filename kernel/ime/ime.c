@@ -52,7 +52,18 @@ IME_State *ime_suspend_state(void)
 
 const IME_Dict *ime_current_dict(void)
 {
-    return &g_ime.dict;
+    /* Read-only compatibility view; the store retains connection ownership. */
+    static IME_Dict view;
+    const FepConn *conn = &g_ime.store.system;
+    view.db = conn->db;
+    view.group = conn->group;
+    view.isolated = conn->isolated;
+    view.exact_stmt = conn->exact;
+    view.prefix_stmt = conn->prefix;
+    view.learn_stmt = conn->learn;
+    kstrncpy(view.path, conn->path, sizeof(view.path));
+    view.io_retried = conn->io_retried;
+    return &view;
 }
 FepStore *ime_current_store(void) { return &g_ime.store; }
 
