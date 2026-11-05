@@ -141,7 +141,7 @@
  if mode == 4 goto setup
  goto finish
  label setup
- # ScreenInit enables MMIO before PC98 init: driver 3459-3479;
+ # PC-98 PCI skips MMIO enable: driver 519-521;
  # INB/OUTB/OUTW, including configuration ports, use BAR1: regs 302-325.
  call pc98_init
  mmiowrite8 v + 0x3C4 0x0B
@@ -157,11 +157,10 @@
  print "reference-select" ref
  print "PLL-a" a
  print "PLL-b" b
- call protect_on
- mmiowrite16 v + 0x3C4 0xC20E
  mmiowrite8 v + 0x3D4 0x11
  mmioread8 v + 0x3D5 -> t
  mmiowrite8 v + 0x3D5 t & 0x7F
+ call protect_on
  # Column 3: blanked standard VGA restore.
  mmiowrite8 v + 0x3C2 0xE3
  mmiowrite16 v + 0x3C4 0x01 | ((0x21) << 8)
@@ -292,7 +291,7 @@
  mmiowrite8 v + 0x3D4 0x29
  mmioread8 v + 0x3D5 -> t
  mmiowrite16 v + 0x3D4 0x29 | ((t & 0xCF) << 8)
- mmiowrite16 v + 0x3D4 0x36 | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x36 | ((0x80) << 8)
  mmiowrite8 v + 0x3D4 0x2F
  mmioread8 v + 0x3D5 -> t
  mmiowrite16 v + 0x3D4 0x2F | ((t | 0x10) << 8)
@@ -303,7 +302,7 @@
  mmiowrite16 v + 0x3D4 0x38 | ((0) << 8)
  mmiowrite8 v + 0x3D4 0x39
  mmioread8 v + 0x3D5 -> t
- mmiowrite16 v + 0x3D4 0x39 | ((t & 0xF9) << 8)
+ mmiowrite16 v + 0x3D4 0x39 | (((t & 0xF9) | 6) << 8)
  mmiowrite16 v + 0x3D4 0x55 | ((0x1F) << 8)
  mmiowrite8 v + 0x3CE 0x2F
  mmioread8 v + 0x3CF -> t
@@ -318,7 +317,8 @@
  mmiowrite8 v + 0x3C2 0xEB
  mmiowrite16 v + 0x3C4 0xC20E
  call protect_off
- # mode=4: VRAM size / 2MB mirror probe on the linear window, no output switch.
+ call enable
+ # mode=4: VRAM size / 2MB mirror probe on the linear window.
  if mode != 4 goto no_probe
  call vram_probe
  goto restore
@@ -397,7 +397,6 @@
  print "right-mark" t
  mmioread8 f + 307199 -> t
  print "bottom-right" t
- call enable
  wait us 5000000
  label restore
  call disable
@@ -517,7 +516,6 @@
 
  # PC98TRIDENT96xxInit: driver 616-692, vgaHW.c 1795-1806.
  label pc98_init
- call protect_on
  mmioread8 v + 0x3CC -> t
  mmiowrite8 v + 0x3C2 t | 0xC3
  mmiowrite8 v + 0x3C4 0x0B
@@ -573,5 +571,4 @@
  mmioread8 v + 0x3D5 -> t
  mmiowrite8 v + 0x3D4 0x11
  mmiowrite8 v + 0x3D5 t | 0x80
- call protect_off
  return

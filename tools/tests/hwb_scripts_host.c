@@ -31,12 +31,13 @@ static int bus(void *ctx, struct hw_req *r) {
         if(++writes==fail_at) { r->status=HW_IO_ERROR; return 0; }
     }
     if(r->space==HW_IO) {
+        if(r->addr==0x68 && r->value==0x0E) CHECK(sr[0]==3 && !(sr[1]&0x20));
         CHECK(io_count<10); io_addr[io_count]=r->addr; io_value[io_count++]=r->value;
         if(r->addr==0xFAC) {
             if(r->value==2) {
                 CHECK(cr[0x23]==0x8A && cr[0x29]==0x87 && gr[0x23]==0xFC);
                 CHECK(ext_dac==0x8F && dac_writes==3);
-                CHECK(painted && hidden_ok && pal_done && sr[0]==3 && !(sr[1]&0x20));
+                CHECK(hidden_ok && !painted && !pal_done && sr[0]==3 && !(sr[1]&0x20));
                 enabled++; CHECK(!disabled);
             } else { CHECK(r->value==0); disabled++; }
         }
@@ -47,9 +48,11 @@ static int bus(void *ctx, struct hw_req *r) {
         for(u32 k=0;k<r->width;k++) vram[r->addr+k]=r->value>>(8*k);
         return 0;
     }
-    if(r->addr < 0x20000000+sizeof(vram)) {
+    if(r->addr < 0x20400000) {
+        if(input==scripts[7]) CHECK(enabled==1);
         u32 off=r->addr-0x20000000;
         if(alias_bus) off=0;
+        if(off>=sizeof(vram)) off=0;
         if(r->action==HW_READ) {
             r->value=0; for(u32 k=0;k<r->width;k++) r->value|=(u32)vram[off+k]<<(8*k);
         } else {
@@ -67,11 +70,11 @@ static int bus(void *ctx, struct hw_req *r) {
         if(a==0x3C6) reads6++;
         return 0;
     }
-    if(a==0x3C4 && val==1 && !init_count) init_record=1;
+    if(a==0x3C2 && val==0xC3 && !init_count) init_record=1;
     if(init_record) {
         if(init_count<64) { init_addr[init_count]=a; init_val[init_count]=val;
             init_width[init_count++]=r->width; }
-        if(a==0x3C0 && val==0x20) init_record=0;
+        if(a==0x3D5 && val==0x80) init_record=0;
     }
     for(u32 k=0;k<r->width;k++,a++,val>>=8) {
         u8 x=val;
@@ -209,8 +212,7 @@ static void route(u32 mode) {
 /* Driver 1.4.0 lines 625-671: writes from subsystem enable through MCLK.
  * Each tuple is BAR1 offset, value, width; configuration branch is explicit. */
 static void init_trace(void) {
-    static const u32 common[][3]={{0x3C4,1,1},{0x3C4,0,1},{0x3C5,1,1},
-        {0x3C4,1,1},{0x3C5,0x20,1},{0x3C0,0,1},{0x3C2,0xC3,1},{0x3C4,0x0B,1},
+    static const u32 common[][3]={{0x3C2,0xC3,1},{0x3C4,0x0B,1},
         {0x3C4,0x000B,2},{0x3C4,0x0E,1},{0x3C4,0x200E,2},{0x3C4,0x0C,1},
         {0x3C4,0x0E,1}};
     static const u32 low[][3]={{0x46E8,0x10,1},{0x102,1,1},{0x46E8,8,1}};
@@ -222,9 +224,7 @@ static void init_trace(void) {
         {0x3D4,0x0031,2},{0x3D4,0x0032,2},{0x3D4,0x213B,2},
         {0x43C6,0xAF,1},{0x43C7,0,1},
         {0x3C4,0x0B,1},{0x3C4,0x0E,1},{0x3C4,0x200E,2},
-        {0x3D4,0x11,1},{0x3D4,0x11,1},{0x3D5,0x80,1},
-        {0x3C4,1,1},{0x3C4,1,1},{0x3C5,0,1},
-        {0x3C4,0,1},{0x3C5,3,1},{0x3C0,0x20,1}};
+        {0x3D4,0x11,1},{0x3D4,0x11,1},{0x3D5,0x80,1}};
     u32 n=0;
 #define TRACE(tab) do { for(u32 j=0;j<sizeof(tab)/sizeof((tab)[0]);j++,n++) { \
     CHECK(n<init_count && init_addr[n]==(tab)[j][0] && \
@@ -235,18 +235,20 @@ static void init_trace(void) {
 }
 static void mode_tests(void) {
     HWB_TEST("mode");
-    for(u32 m=0;m<4;m++) for(ref_pal=0;ref_pal<2;ref_pal++) for(config_bit=0;config_bit<=0x10;config_bit+=0x10) {
+    for(u32 m=0;m<=4;m++) for(ref_pal=0;ref_pal<2;ref_pal++) for(config_bit=0;config_bit<=0x10;config_bit+=0x10) {
         reset(); CHECK(run(scripts[7],m)==HWB_OK);
         if(m==0) { CHECK(!enabled&&!disabled&&!fills); continue; }
         if(m==2) { CHECK(!enabled && disabled==1&&!fills); route(m); continue; }
         HWB_TEST("pc98-init"); init_trace(); HWB_TEST("mode");
-        CHECK(enabled==1 && disabled==1); timing(); pll(); route(m);
+        CHECK(enabled==1 && disabled==1);
+        if(m==4) { CHECK(!fills); route(m); continue; }
+        timing(); pll(); route(m);
         CHECK(st.writes==writes);
         CHECK(cr[0x3A]==0 && cr[0x50]==0 && cr[0x21]==0x20);
         CHECK(gr[6]==(m==3?0x0C:5));
         CHECK(cr[0x1E]==0x80 && sr[0x0D]==0x20 && cr[0x27]==8 && cr[0x2B]==0);
-        CHECK(cr[0x29]==0x83 && cr[0x36]==0 && cr[0x2F]==0x91 && cr[0x2A]==0x52);
-        CHECK(cr[0x38]==0 && cr[0x39]==0xF9 && cr[0x55]==0x1F);
+        CHECK(cr[0x29]==0x83 && cr[0x36]==0x80 && cr[0x2F]==0x91 && cr[0x2A]==0x52);
+        CHECK(cr[0x38]==0 && cr[0x39]==0xFF && cr[0x55]==0x1F);
         CHECK(gr[0x2F]==0x84 && gr[0x0F]==0xA2 && gr[0x23]==0xFD);
         CHECK(sr[0]==3 && sr[1]==0x11 && sr[2]==15 && sr[3]==0 && sr[4]==14);
         CHECK(clock_a==(ref_pal?0xA4:0xE5) && clock_b==(ref_pal?0x0E:0x1E));
@@ -286,7 +288,7 @@ static void mode_tests(void) {
     CHECK(run(scripts[7],1)==HWB_OK); CHECK(enabled==1 && fills>0);
     capacity=7;
     HWB_TEST("alias"); reset(); alias_bus=1;
-    CHECK(run(scripts[7],1)==HWB_OK); CHECK(!enabled && disabled==1 && !fills);
+    CHECK(run(scripts[7],1)==HWB_OK); CHECK(enabled==1 && disabled==1 && !fills);
     for(u32 k=0;k<4;k++) CHECK(vram[k]==0);
 }
 void _start(void) {
