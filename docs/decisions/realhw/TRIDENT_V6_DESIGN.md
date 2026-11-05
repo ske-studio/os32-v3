@@ -9,7 +9,7 @@
 
 ## r1→r2 の変更
 - F1: 汎用 `mmiofillW address count value` を追加し、行単位の描画、HW-BASIC正典/実装、既存試験への追記を段2aに置く。
-- F2: 順6の直後に protect_off、パレット→作画→Enable とし、長い作業中の同期リセットを解除する。
+- F2: 順6の直後に protect_off → Enable、パレット→作画 とし、長い作業中の同期リセットを解除する。
 - F3: CR03=80h・CR05=1Eh に訂正し、試験期待値は KGA_ENABLE_ON_ZERO の式から求める。
 - F4: mode=0でGR06を採取し、段2bで元値維持/05hの冷間比較、§5にレガシー窓の重なりを追加する。
 - F5: 11-05の根拠をT:109–114へ訂正し、実物との食い違いを3件に修正する。
@@ -41,23 +41,24 @@
 | 順 | 手本・前提 | OS32 の命令列/値（左から順に実行） |
 |---|---|---|
 | 0 | `D:2525`, `D:2919–2975` SPR | BDF/ID/Command/BAR と SR09、GR06/CR3A の元値を記録（mode=0でも採取、mode=1でも変更前に保存）。CR1F&0F: 01=512KiB、02=6MiB、03=1MiB、04=8MiB、06=10MiB、07=2MiB、08=12MiB、0A=14MiB、0C=16MiB、0F=4MiB、その他=1MiB。0E は CR C1&11 が 00/01/10/11 の順に 20/24/28/32MiB。申告容量を隣接 BAR を越えて試さない |
+| 0a | `D:616–692,3459–3479`, `R:302–325`, `V:1795–1806` | mode=1/3/4 で PC98TRIDENT96xxInit を ModeInit より先に実行。サブシステム有効化、SR0C bit4 による設定ポート分岐、AR10、CR11 unlock、FIFO/latency、MCLK 80MHz、lockを手本の順に実施。PC-98 PCI では MMIO 有効化を飛ばす (`D:519–521`)。特殊ポートも BAR1 MMIO。分岐値を記録 |
 | 1 | `P:42–55` 基準発振、`A:256` New Mode | SR0B を選択して data read（New Mode）。CR C0 bit7 から NTSC/PAL の式を選ぶ。読値と計算済み PLL 値を記録。Ra266 の発振子の周波数を実測したとは扱わない |
-| 2 | `D:1028–1034`, `V:574–604` | `call protect_on`（S:123–132）。旧値を必要な変数に保存し、SR0E←C2h で拡張 unlock。CR11 bit7 を落とす |
+| 2 | `D:1028–1034`, `V:574–604` | CR11 bit7 を落としてから `call protect_on`（S:123–132）。旧値を必要な変数に保存する |
 | 3 | `V:845–872` 標準 VGA restore | 3C2←E3h、SR1..4←21,0F,00,0E（消画を保持するため SR1 の20hを追加）。CR11←下表値&7F、CR00..18 を下表順、GR00..08←00,00,00,00,00,40,05,0F,FF、AR00..0F←00..0F、AR10..14←41,00,0F,00,00。最後も消画状態を保つ。段2bの比較引数 `keepgr6=1` の回だけ GR06 は保存した元値を書き、既定値0では05hとする |
 | 4 | `A:781–791` DAC hidden command | SR0B 選択/read → SR0E←C2。3C8 read → 3C6 を4回 read → 3C6←00 → 3C8 read。通常の palette mask とは別の hidden command を 8bpp/non-MUX にする |
-| 5 | `A:793–810` 拡張 restore の順 | CR1E←80、CR21←20、SR0D←20、CR50←00、CR27←08、CR2B←00、CR29←旧値&CF、CR36←00、CR2F←旧値\|10、CR2A←旧値\|40、CR3A←00（下記注）、CR38←00、CR39←旧値&F9、CR55←1F、GR2F←旧値\|04、GR0F←(旧値&F0)\|02、CR13←50（640/8） |
-| 6 | `A:871–907`, `P:60–135` | 9682 は非3D・NewClockCode=false (`D:2384,2525`)。v+43C8←PLL a、v+43C9←PLL b、v+3C2←EB（E3 の ClockSelect bits を08へ）、SR0E←C2。SR18/19 や新 PLL の式は使わない。MCLK は触らない |
-| 6a | `D:1039–1040` | 順6の直後に `call protect_off`（SR00同期リセット解除・SR01消画解除）。以後のパレット/作画中はリセットしない。出力経路は98のまま |
+| 5 | `A:793–810` 拡張 restore の順 | CR1E←80、CR21←20、SR0D←20、CR50←00、CR27←08、CR2B←00、CR29←旧値&CF、CR36←80、CR2F←旧値\|10、CR2A←旧値\|40、CR3A←00（下記注）、CR38←00、CR39←(旧値&F9)\|06、CR55←1F、GR2F←旧値\|04、GR0F←(旧値&F0)\|02、CR13←50（640/8） |
+| 6 | `A:871–907`, `P:60–135` | 9682 は非3D・NewClockCode=false (`D:2384,2525`)。v+43C8←PLL a、v+43C9←PLL b、v+3C2←EB（E3 の ClockSelect bits を08へ）、SR0E←C2。SR18/19 や新 PLL の式は使わない。MCLK は順0aで80MHzに設定済み |
+| 6a | `D:1039–1040` | 順6の直後に `call protect_off`（SR00同期リセット解除・SR01消画解除）。直後に順10の Enable を呼び、以後の BAR0・パレット/作画中はリセットしない |
+| 6b | `D:1036–1047`, `S:57–83` | 順6aの直後に S と同じ Enable を call（68←0E、6A←07,8F,06、protect_on、CR23&DF、CR29\|04、拡張DAC、GR23&FC、SR1&EF、protect_off、FAC←02）。拡張DACは83C8←4/83C6 read/83C8←4/83C6 write を3回、値は旧値\|06、旧値\|08、旧値\|01 |
 | 7 | `D:2294,2313`, `A:649–658` | CR21=20 はリニア enable。BAR0=20000000 の bit20..25 は0、上位は PCI BAR が担当する候補。式は8bitへ明示縮小。高位 BAR での実際の応答は次の書込み試験で決める |
 | 8 | OS32 探索（手本に容量の alias 試験なし） | f+0 と f+4AFFC を保存 → 異なる32bitパターン → 両方読取 → 逆パターン → 両方読取 → 保存値を復元。等値判定は if != で保存値を戻す共通 label へ進み、その後 Disable。アクセス自体の失敗は即停止なので§3の単独復帰へ。まず必要な 307200B の端点だけ。未確認の全 BAR を埋めない |
 | 9 | palette は VGA DAC、`V:723–730` mask | 3C6←FF、3C8←00、3C9 に RGB の6bit値を順次書く。index 0..7 = 黒/赤/緑/黄/青/紫/水/白（各成分0または63）。f の 640×480、pitch640 に下記 mmiofill の行単位で色帯・四辺白枠・左右非対称マークを書き、代表点を読取 |
-| 10 | `D:1036–1047`, `S:57–83` | S と同じ Enable を call（68←0E、6A←07,8F,06、protect_on、CR23&DF、CR29\|04、拡張DAC、GR23&FC、SR1&EF、protect_off、FAC←02）。拡張DACは83C8←4/83C6 read/83C8←4/83C6 write を3回、値は旧値\|06、旧値\|08、旧値\|01 |
 | 11 | `S:85–115` | `wait us 5000000` → Disable。先頭 FAC←00、protect_on、SR1\|10、拡張DAC&FE、GR23←(旧値&FC)\|01、拡張DAC&FD/&CF/&F7/&FB、CR29&FB、CR23\|20、protect_off、6A←07,8E,06、68←0F。end と終了値を記録 |
 
-- `D:1064` の xnfcalloc で構造体はゼロ初期化される。`A:673–678,803` で9682に別値を設定しない CR3A も restore 値は00h。**CR3A/CR50とも手本どおり00hを書く**。CR3Aの変更前読値をログに残す。CR50=0 はカーソル無効、PCI Retry/Burst/GE は無効。
-- `D:616–691` の PC98TRIDENT96xxInit 全体は呼ばない。94h/102h/46E8h の旧バス設定、Xa7 用 FIFO/latency CR20/30/31/32/3B、MCLK=80MHz は Ra266 の前提でなく、今回の BAR 応答には不要だった。これらを必要とする証拠が出たら別列で調査する。Enable/Disable は `D:694–775` に沿う。
+- `D:1064` の xnfcalloc で構造体はゼロ初期化される。`A:673–678,803` で9682に別値を設定しない CR3A も restore 値は00h。**CR3A/CR50とも手本どおり00hを書く**。CR3Aの変更前読値をログに残す。CR50=0 はカーソル無効、PCI Retry/GE は無効。CR39 は既定の PCI Burst を有効にする (`A:709–721`, `D:2079`)。
+- `D:616–692` の PC98TRIDENT96xxInit を手本どおり ModeInit の前に呼ぶ。設定ポート、FIFO/latency と MCLK 80MHz も含む。Enable/Disable は `D:694–775` に沿う。
 - `D:1374–1389` は TGUI に TRIDENTClockSelect を使わないと明記。PLL のあと MiscOut の bits3:2=10b を選ぶ `A:634–640,899–901` が今回の ClockSelect。
-- CR21 の enable、43C8/43C9、83C8/83C6 の機能的配送は **探索対象**。3C0h 台の成功から一括して証明しない。PC98 Init の省略と CR3A の変更前読値/00h書込みも実機ログに残す。
+- CR21 の enable、43C8/43C9、83C8/83C6 の機能的配送は **探索対象**。3C0h 台の成功から一括して証明しない。PC98 Init の分岐と CR3A の変更前読値/00h書込みも実機ログに残す。
 
 640×480、25.175MHz 目標、H=(640,656,752,800)、V=(480,490,492,525)、負/負分離同期、non-interlace。blank は表示端〜total。以下は `V:1240–1286,1391–1468` の式（KGA補正込み）、CR13 は `A:572–576,631` の8bpp値で上書き。市販 VGA mode13h の表を流用しない。
 
@@ -154,7 +155,7 @@ trident_route_enable(&resident);
 |---|---|---|
 | 2a | docs/decisions/realhw/HW_BASIC_DESIGN.md、userland/shell/hwb.h・hwb_parse.c・hwb_exec.c・hwb_log.c | script作成前に汎用fillの文法/幅/回数/停止/ログを正典に追記して実装。既存tools/tests/test_hwb_scripts.pyへ実行器の偽bus試験を追加：8/16/32bitの連続値・終端、count=0/桁あふれ/不整列/幅外値は書込み0、途中失敗/中止の成功回数・後続停止、begin/endは1組 → 番地更新/回数/中止点/ログ集約を各別変異でRED |
 | 2a | userland/tests/hw/trident_mode.hwb、userland/deploy.yaml | 任意PCI窓で実行可能、全構文・上限・mode=2単独実行 → host偽busで本番script実行 / FAC=0を2へ変更して復帰traceがRED |
-| 2a | 既存 tools/tests/test_hwb_scripts.py（CHECKに新script/実行器/ログ等のinputsを追加し、script一覧をCHECKの先頭7件から分離） | 本番scriptを実行する偽busモデルを追加。CRTCはタイミングとKGA式から期待値を算出、総幅/pitch/PLL旧式/AR/hidden DAC/CR3A=00、順6→protect_off→palette→paint→Enable、fill画像/ログ量を検証 / CR03=80→82、CR05=1E→9E、protect_off後退、CR3A書込み削除、CR13/PLL/ARの変異を各別に実行しRED |
+| 2a | 既存 tools/tests/test_hwb_scripts.py（CHECKに新script/実行器/ログ等のinputsを追加し、script一覧をCHECKの先頭7件から分離） | 本番scriptを実行する偽busモデルを追加。CRTCはタイミングとKGA式から期待値を算出、総幅/pitch/PLL旧式/AR/hidden DAC/CR3A=00、順6→protect_off→Enable→BAR0→palette→paint、fill画像/ログ量を検証 / CR03=80→82、CR05=1E→9E、protect_off後退、CR3A書込み削除、CR13/PLL/ARの変異を各別に実行しRED |
 | 2b | 同script、T §2-1/§9、必要なら docs/tasks/DEFERRED_TESTS.md | 実機のテスト画→5秒→98、LFB/容量結果、乱れの記録。冷間と再起動の証拠。写真はhost testで代用不可。GR06の元値維持（mode=3: mode=1 と同じ列で順3 の GR06 だけ元値を書く）/05h（mode=1）を毎回冷間起動から比較し、GR06/CR3A元値・画・復帰後の乱れ・シリアル行の表示を記録。元値が05hなら同条件で差を判別不能と記録 |
 | 2c | userland/tests/hw/trident_vram.hwb、同manifest/test | BAR幅・SPR・aliasを区別、全保存値復元 → 偽VRAMのwrap/非応答モデル / alias判定と復元を別々に除去しRED |
 | 3a | 上記drivers/video/trident各ファイル、部品のbuild規則/manifest | 確定scriptとCのbus traceが一致、CPU present/palette → 描画端点・pitchの試験 / 最終行転送を削除 |

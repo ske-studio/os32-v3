@@ -128,8 +128,12 @@ EXEC_MUTATIONS = [
     ('mode-cr3a', MODE, 'mmiowrite16 v + 0x3D4 0x3A | ((0) << 8)', 'log "CR3A omitted"', 'mode'),
     ('mode-pitch', MODE, '0x13 | ((0x50) << 8)\n # Column 6', '0x13 | ((0x51) << 8)\n # Column 6', 'mode'),
     ('mode-pll', MODE, 'mmiowrite8 v + 0x43C9 b', 'mmiowrite8 v + 0x43C9 a', 'mode'),
-    ('mode-ar', MODE, 'mmiowrite8 v + 0x3C0 0x41', 'mmiowrite8 v + 0x3C0 0x40', 'mode'),
-    ('mode-unprotect', MODE, 'call protect_off\n # mode=4:', 'log "unprotect postponed"\n # mode=4:', 'mode'),
+    ('mode-ar', MODE, 'mmiowrite8 v + 0x3C0 0x41\n mmioread8 v + 0x3DA', 'mmiowrite8 v + 0x3C0 0x40\n mmioread8 v + 0x3DA', 'mode'),
+    ('pc98-skip', MODE, ' call pc98_init\n', ' log "skip init"\n', 'pc98-init'),
+    ('pc98-mclk', MODE, 'mmiowrite8 v + 0x43C6 0xAF', 'mmiowrite8 v + 0x43C6 0xAE', 'pc98-init'),
+    ('mode-enable-order', MODE, ' call enable\n # mode=4:', ' # mode=4:', 'mode'),
+    ('mode-cr39-burst', MODE, '((t & 0xF9) | 6)', '(t & 0xF9)', 'mode'),
+    ('mode-unprotect', MODE, 'call protect_off\n call enable\n # mode=4:', 'log "unprotect postponed"\n call enable\n # mode=4:', 'mode'),
 ]
 
 
@@ -145,6 +149,9 @@ def execution_trial(mutation=None):
             raise RuntimeError('mutation anchor is not unique: ' + mutation[0])
         if path in FILES:
             scripts[FILES.index(path)] = original.replace(before, after)
+            if mutation[0] == 'mode-enable-order':
+                scripts[FILES.index(path)] = scripts[FILES.index(path)].replace(
+                    ' wait us 5000000', ' call enable\n wait us 5000000', 1)
         else:
             products[path] = original.replace(before, after)
     # Inline product TUs so mutations stay isolated and execute the real code.

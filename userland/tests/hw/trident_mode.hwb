@@ -1,4 +1,4 @@
-# Sources: trident_driver-1.4.0.c:694-775; trident_regs.h:302-325
+# Sources: trident_driver-1.4.0.c:616-692,694-775; trident_regs.h:302-325
 # vgaHW.c:398-409,418-421,474-488,574-604,723-730
 # Copyright 1991-1999 by The XFree86 Project, Inc.
 # Copyright 1990,91 by Thomas Roell, Dinkelscherben, Germany.
@@ -141,6 +141,9 @@
  if mode == 4 goto setup
  goto finish
  label setup
+ # PC-98 PCI skips MMIO enable: driver 519-521;
+ # INB/OUTB/OUTW, including configuration ports, use BAR1: regs 302-325.
+ call pc98_init
  mmiowrite8 v + 0x3C4 0x0B
  mmioread8 v + 0x3C5 -> t
  mmiowrite8 v + 0x3D4 0xC0
@@ -154,11 +157,10 @@
  print "reference-select" ref
  print "PLL-a" a
  print "PLL-b" b
- call protect_on
- mmiowrite16 v + 0x3C4 0xC20E
  mmiowrite8 v + 0x3D4 0x11
  mmioread8 v + 0x3D5 -> t
  mmiowrite8 v + 0x3D5 t & 0x7F
+ call protect_on
  # Column 3: blanked standard VGA restore.
  mmiowrite8 v + 0x3C2 0xE3
  mmiowrite16 v + 0x3C4 0x01 | ((0x21) << 8)
@@ -280,7 +282,6 @@
  mmiowrite8 v + 0x3C6 0
  mmioread8 v + 0x3C8 -> t
  # Column 5: extended restore, zero-initialized CR3A/CR50.
- log "PC98-Init omitted; CR3A=0; CR50=0"
  mmiowrite16 v + 0x3D4 0x1E | ((0x80) << 8)
  mmiowrite16 v + 0x3D4 0x21 | ((0x20) << 8)
  mmiowrite16 v + 0x3C4 0x0D | ((0x20) << 8)
@@ -290,7 +291,7 @@
  mmiowrite8 v + 0x3D4 0x29
  mmioread8 v + 0x3D5 -> t
  mmiowrite16 v + 0x3D4 0x29 | ((t & 0xCF) << 8)
- mmiowrite16 v + 0x3D4 0x36 | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x36 | ((0x80) << 8)
  mmiowrite8 v + 0x3D4 0x2F
  mmioread8 v + 0x3D5 -> t
  mmiowrite16 v + 0x3D4 0x2F | ((t | 0x10) << 8)
@@ -301,7 +302,7 @@
  mmiowrite16 v + 0x3D4 0x38 | ((0) << 8)
  mmiowrite8 v + 0x3D4 0x39
  mmioread8 v + 0x3D5 -> t
- mmiowrite16 v + 0x3D4 0x39 | ((t & 0xF9) << 8)
+ mmiowrite16 v + 0x3D4 0x39 | (((t & 0xF9) | 6) << 8)
  mmiowrite16 v + 0x3D4 0x55 | ((0x1F) << 8)
  mmiowrite8 v + 0x3CE 0x2F
  mmioread8 v + 0x3CF -> t
@@ -310,13 +311,14 @@
  mmioread8 v + 0x3CF -> t
  mmiowrite16 v + 0x3CE 0x0F | (((t & 0xF0) | 2) << 8)
  mmiowrite16 v + 0x3D4 0x13 | ((0x50) << 8)
- # Column 6: old PLL, no MCLK or SR18/19 changes.
+ # Column 6: old PLL; MCLK was set by PC98 init, no SR18/19 changes.
  mmiowrite8 v + 0x43C8 a
  mmiowrite8 v + 0x43C9 b
  mmiowrite8 v + 0x3C2 0xEB
  mmiowrite16 v + 0x3C4 0xC20E
  call protect_off
- # mode=4: VRAM size / 2MB mirror probe on the linear window, no output switch.
+ call enable
+ # mode=4: VRAM size / 2MB mirror probe on the linear window.
  if mode != 4 goto no_probe
  call vram_probe
  goto restore
@@ -395,7 +397,6 @@
  print "right-mark" t
  mmioread8 f + 307199 -> t
  print "bottom-right" t
- call enable
  wait us 5000000
  label restore
  call disable
@@ -511,4 +512,63 @@
  mmiowrite8 v + 0x3C5 3
  mmioread8 v + 0x3DA -> flip
  mmiowrite8 v + 0x3C0 0x20
+ return
+
+ # PC98TRIDENT96xxInit: driver 616-692, vgaHW.c 1795-1806.
+ label pc98_init
+ mmioread8 v + 0x3CC -> t
+ mmiowrite8 v + 0x3C2 t | 0xC3
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0B | (t << 8)
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t | 0x20) << 8)
+ mmiowrite8 v + 0x3C4 0x0C
+ mmioread8 v + 0x3C5 -> flip
+ let flip = flip & 0x10
+ print "PC98-SR0C-bit4" flip
+ if flip == 0 goto pc98_config_alt
+ mmiowrite8 v + 0x3C4 0x0E
+ mmiowrite8 v + 0x94 0
+ mmiowrite8 v + 0x102 1
+ mmiowrite8 v + 0x94 0x20
+ mmioread8 v + 0x3C3 -> t
+ mmiowrite8 v + 0x3C3 t | 1
+ goto pc98_config_done
+ label pc98_config_alt
+ mmiowrite8 v + 0x3C4 0x0E
+ mmiowrite8 v + 0x46E8 0x10
+ mmiowrite8 v + 0x102 1
+ mmiowrite8 v + 0x46E8 8
+ label pc98_config_done
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x10
+ mmiowrite8 v + 0x3C0 0x41
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D4 0x11
+ mmiowrite8 v + 0x3D5 t & 0x7F
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t | 0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x3820
+ mmiowrite16 v + 0x3D4 0x2020
+ mmiowrite16 v + 0x3D4 0x0E30
+ mmiowrite16 v + 0x3D4 0x0031
+ mmiowrite16 v + 0x3D4 0x0032
+ mmiowrite16 v + 0x3D4 0x213B
+ mmiowrite8 v + 0x43C6 0xAF
+ mmiowrite8 v + 0x43C7 0
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t & 0x7F) << 8)
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D4 0x11
+ mmiowrite8 v + 0x3D5 t | 0x80
  return
