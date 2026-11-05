@@ -9,7 +9,8 @@ CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=3,
     covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h',
             'tools/tests/fep_store_fixture.h', 'tools/tests/fep_store_fixture.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk'])
+            'build/config.mk', 'kernel/ime/ime_dict_info.c',
+            'lib/sqlite3/os32_sqlite_vfs.h'])
 
 import argparse
 import os
@@ -34,6 +35,7 @@ VALUES = {
     'FEP_DICT_PAGE_SIZE': 1024, 'FEP_DICT_HEADER_SIZE': 100,
     'FEP_DICT_CACHE_PAGES': 16, 'FEP_USER_CACHE_PAGES': 8,
     'FEP_DICT_RESERVE_KB': 192, 'FEP_DICT_MIN_RESERVE_KB': 99,
+    'OS32_SQLITE_RESIDENT_GROUPS': 3,
     'IME_MAX_RESULTS': 32, 'IME_DICT_INFO_CAP': 256,
     'OS32_ERR_IO': -1, 'OS32_ERR_NOTFOUND': -2, 'OS32_ERR_INVAL': -9,
     'OS32_ERR_NOSYS': -10, 'OS32_ERR_STALE': -11, 'OS32_ERR_AGAIN': -14,
@@ -70,7 +72,6 @@ SIGNATURES = {
     'fep_store_user_export': 'int (*)(FepStore *, const char *)',
     'fep_store_user_clear': 'int (*)(FepStore *)',
     'fep_store_info': 'int (*)(FepStore *, int, int, char *, int)',
-    'ime_meta_read': 'int (*)(int, int, char *, int)',
     'hsp_set_fep_user_path': 'int (*)(const char *)',
     'fep_test_reset': 'void (*)(FepTestFixture *)',
     'fep_test_settings': 'int (*)(const FepTestFixture *, int *, int *, const char **)',
@@ -214,6 +215,9 @@ def build(work, tree, compiler, execute):
     for header in (HEADER, FIXTURE_H, 'kernel/ime/ime.h'):
         src.write_text(f'#include "{header}"\n#include "{header}"\n')
         subprocess.run([*cmd, '-c', str(src), '-o', str(work / 'header.o')], check=True)
+    src.write_text('#include "kernel/ime/ime_store.h"\n'
+                   '#include "kernel/ime/ime_dict_info.c"\n')
+    subprocess.run([*cmd, '-c', str(src), '-o', str(work / 'coinclude.o')], check=True)
     return 0
 
 

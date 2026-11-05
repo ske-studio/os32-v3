@@ -60,11 +60,15 @@ typedef struct {
  */
 int fep_meta_probe(const char *path, FepMeta *out);
 /* Core owns both results. Outputs copied only on success; AGAIN until saved.
- * Probe validates header before SQL and closes its temporary RO group before
+ * Probe uses OS32_SQLITE_RESIDENT (not EXEC), validates header before SQL,
+ * and closes its temporary RO group before
  * return. It neither changes the boot reservation nor loads FEP.
  */
 int fep_boot_config_get(FepMeta *out, u32 *reserve_kb);
-/* Same saved boot snapshot; default path if no setting, no settings re-open. */
+/* Same saved boot snapshot; default path if no setting, no settings re-open.
+ * Core only copies: no path validation. Capacity overflow returns OS32_ERR_INVAL;
+ * settings read failure returns its rc unchanged. Only fep_user_open (D) checks
+ * the normalized /etc direct-child restriction. */
 int fep_boot_user_path_get(char *out, u32 capacity);
 int fep_store_open(FepStore *s, const char *path, const char *user_path);
 int fep_store_switch(FepStore *s, const char *path);
@@ -77,7 +81,9 @@ int fep_user_open(FepStore *s);
  * retains user, reopens old path on failure, never grows boot_reserve_kb.
  */
 int fep_conn_close(FepConn *conn);
-int fep_conn_ready(FepConn *conn); /* I: per-connection stale/IO recovery. */
+/* A: 0 when usable; INVAL for NULL, AGAIN without db, BUSY if isolated,
+ * IO if engine/FD unavailable, STALE before any SQL. I owns reopen/recovery. */
+int fep_conn_ready(FepConn *conn);
 int fep_store_close(FepStore *s); /* Both connections; preserve isolation. */
 u32 fep_store_live_connections(const FepStore *s); /* Actual live groups, 0..2. */
 
@@ -91,12 +97,12 @@ int fep_store_user_delete(FepStore *s, const char *yomi, const char *kanji);
 int fep_store_user_export(FepStore *s, const char *path);
 int fep_store_user_clear(FepStore *s);
 
-/* C owns system-only metadata access; J binds ime_meta_read to g_ime's store.
+/* C owns system-only metadata access in ime_dict_info.c, including the
+ * ime_dict_info_facade and ime_current_dict() bindings to g_ime's store.
  * Same 20 keys, byte offsets/cap clamp and errors as IME_DICT_INFO_* in the
  * shared SDK header. No open/recover/yield; error leaves out untouched.
  */
 int fep_store_info(FepStore *s, int key, int offset, char *out, int capacity);
-int ime_meta_read(int key, int offset, char *out, int capacity);
 
 /* F owns this userland pure-function implementation in hsync_protect.inc.
  * Signature shared here for the contract test; hsync need not include the
