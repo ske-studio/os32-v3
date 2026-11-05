@@ -4,6 +4,7 @@
 #define GF_S2_ENTRY unused_decoder_tests
 #include "gfinit_host.c"
 #include "hwdev/gf/production.h"
+#include "hwdev/gf/display/api.h"
 #include "mm/pgalloc.h"
 #include "mm/paging.h"
 #include "include/gf_production.h"
@@ -20,6 +21,7 @@ static struct gf_production_scratch prod_scratch __attribute__((aligned(PAGE_SIZ
 static u8 prod_rom[GF_ROM_MAX],prod_rgb[VIDEO_PALETTE_BYTES];
 static u32 prod_cfg[32][8][64];
 static u32 prod_now,prod_clock_step,prod_clock_fail,prod_clock_calls;
+static int prod_clock_error;
 static u32 prod_mmio_calls,prod_cmd_writes,prod_other_cfg_writes,prod_reads16,prod_live_pages;
 static u32 prod_alloc_fail,prod_map_fail,prod_ram_fail,prod_route_fail,prod_rom_changed;
 static u32 prod_mismatch,prod_fail_section,prod_fail_main,prod_fail_a2,prod_a2_writes;
@@ -153,7 +155,7 @@ int sys_time_now(u32 *lo,u32 *hi)
         prod_main_mask|=1U<<main;
         if(!prod_faulted && prod_fail_main==main+1) {prod_faulted=true;return -1;}
     }
-    if(++prod_clock_calls==prod_clock_fail)return -1;
+    if(++prod_clock_calls==prod_clock_fail)return prod_clock_error ? prod_clock_error : -1;
     prod_now+=prod_clock_step;*lo=prod_now;*hi=0;return 0;
 }
 int gf_production_native_clock(void *,u32 *);
@@ -242,6 +244,7 @@ static void prod_reset(void)
     prod_reg_count=prod_trace_count=prod_main_mask=0;
     prod_now=prod_clock_calls=prod_mmio_calls=prod_cmd_writes=prod_other_cfg_writes=prod_reads16=0;
     prod_prepare_writes=prod_logs=prod_prepare_read_fail=0;
+    prod_clock_error=0;
     prod_clock_step=1;prod_clock_fail=prod_live_pages=prod_alloc_fail=prod_map_fail=prod_ram_fail=0;
     prod_route_fail=prod_rom_changed=prod_mismatch=prod_fail_main=0;
     prod_fail_section=prod_deadline_section=RECOVER_NONE;
@@ -289,6 +292,52 @@ static void prod_reset(void)
     CHECK(prod.foundation.io.write(&prod.foundation,0,4,4,0)==-1 && words[1]==0x12345678);
     prod.foundation.revoked=false;
     prod.foundation.bar0=saved;
+}
+/* Run F4 with the ops assembled by real prepare, including the native
+ * bounded wait. Only the permanent BAR memory is RAM in this host. */
+static int prod_start(void);
+/* dispnv04/hw.c:38-65: FP_TG_CONTROL enable predicate (dfp.c:93-110). */
+#define PROD_FP_CONTROL 0x680848U
+static void prod_modeload_cases(void)
+{
+    static u8 bar[GF_PRODUCTION_BAR0_BYTES] __attribute__((aligned(4)));
+    static struct gf4_state state;
+    prod_reset();
+    CHECK(prod.chan.state==GF2_OFF && !prod.chan.f);
+    int rc=prod_start(); /* real owner start attaches the prepared foundation */
+    CHECK(!rc);
+    if (rc) return; /* failed prerequisite: do not run MMIO/waits on a cold device */
+    CHECK(prod.chan.f==&prod.foundation);
+    volatile u8 *saved=prod.foundation.bar0;
+    prod.foundation.bar0=bar;
+    state=(struct gf4_state){0};
+    state.next[0].enabled=true;
+    state.next[0].mode.fmt=GF3_INDEX8;
+    state.next[0].dpms=GF4_ON;
+    struct gf4_ctx ctx={.state=&state,.ch=&prod.chan,.ready=true,
+        .changing=true,.epoch=prod.chan.epoch,.deadline=prod_now+GF2_TIMEOUT_US};
+    for (u32 fp=0;fp<2;fp++) {
+        *(u32 *)(bar+PROD_FP_CONTROL)=fp ? GF_LOAD_FP_ON_MASK : 0;
+        u32 started=prod_now,logs=prod_logs;
+        ctx.deadline=prod_now+GF2_TIMEOUT_US;
+        CHECK(!gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline));
+        CHECK(prod_now-started>=(fp ? 70000U : 20000U) && prod_logs==logs);
+    }
+    u32 logs=prod_logs;
+    prod_clock_fail=prod_clock_calls+1;
+    CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==-1 && prod_logs==logs+1);
+    prod_clock_error=-1701;
+    /* Entry clock, ms_wait clock, native wait start clock and its first poll. */
+    for (u32 clock=1;clock<=4;clock++) {
+        prod_clock_fail=prod_clock_calls+clock;
+        CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==prod_clock_error);
+        CHECK(prod_logs==logs+1+clock);
+    }
+    prod_clock_error=0; prod_clock_fail=0; prod.foundation.revoked=true;
+    CHECK(gf4_mode_load(&ctx,0,&prod.display.mode,ctx.deadline)==-1 && prod_logs==logs+6);
+    prod.foundation.revoked=false;
+    prod.foundation.bar0=saved;
+    output("PASS mode_load: real prepare -> foundation timing -> native <=1ms waits, 20/70ms total, success silent\n");
 }
 static void prod_prepare_cases(void)
 {
@@ -582,6 +631,7 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+    prod_modeload_cases();
     prod_prepare_cases();
 #ifdef GF_HAL_TEST
     prod_hal_cases();

@@ -63,15 +63,18 @@ int gf_production_clock(void *opaque, u32 *value)
 {
     (void)opaque;
     u32 hi;
-    return sys_time_now(value,&hi) ? -1 : 0;
+    return sys_time_now(value,&hi);
 }
 int gf_production_wait(void *opaque, u32 us)
 {
     u32 start,now;
     if (!us) return 0;
-    if (us>GF_INIT_WAIT_CHUNK_US || gf_production_clock(opaque,&start)) return -1;
+    if (us>GF_INIT_WAIT_CHUNK_US) return -1;
+    int rc=gf_production_clock(opaque,&start);
+    if (rc) return rc;
     for (u32 i=0;i<GF_PRODUCTION_WAIT_POLLS;i++) {
-        if (gf_production_clock(opaque,&now)) return -1;
+        rc=gf_production_clock(opaque,&now);
+        if (rc) return rc;
         if (now-start>=us) return 0;
     }
     return -1; /* finite even if the PIT stops */

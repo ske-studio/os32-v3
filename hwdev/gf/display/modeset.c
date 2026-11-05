@@ -56,6 +56,7 @@ int gf_display_modeset(struct gf_display_context *c)
 #ifdef GF_PRODUCTION_MODULE
 #include "api.h"
 #include "../foundation.h"
+#include "../../../include/kprintf.h"
 
 /* nouveau dispnv04/hw.h:70-124, hw.c:75-106,468-535,665-835.
  * Encoder-specific DACCLK/script/FP programming belongs to B9/B10/B11.
@@ -147,20 +148,34 @@ struct mode_load {
     bool fp_on,gate_valid;
     u32 gate;
     i32 rc;
+    const char *at;
+    u32 section,row,reg,value;
 };
+/* Capture before cleanup: successful gate/owner writes overwrite l.rc. */
+static int ms_failure(const struct mode_load *l,int rc,int gate_rc,int owner_rc)
+{
+    kprintf(KLOG_ATTR,"[gf4] mode_load fail at=%s sec=%u row=%u reg=%08x val=%08x rc=%d l.rc=%d gate_rc=%d owner_rc=%d\n",
+            l->at,l->section,l->row,l->reg,l->value,rc,l->rc,gate_rc,owner_rc);
+    return rc;
+}
 static int ms_read(struct mode_load *l,u32 off,u32 width,u32 *v)
 {
     struct gf_io *io=&l->ctx->ch->f->io;
+    l->reg=off; l->value=0;
+    if (l->row!=GF_LOAD_NO_INDEX) l->at="read";
     return l->rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,off,width,v);
 }
 static int ms_write(struct mode_load *l,u32 off,u32 width,u32 v)
 {
     struct gf_io *io=&l->ctx->ch->f->io;
+    l->reg=off; l->value=v;
+    if (l->row!=GF_LOAD_NO_INDEX) l->at="write";
     return l->rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,off,width,v);
 }
 static int ms_section(void *owner,u32 section)
 {
-    (void)owner; (void)section;
+    struct mode_load *l=owner;
+    l->section=section;
     return 0;
 }
 static int ms_wait(void *owner,u32 ms,bool fp_only)
@@ -169,11 +184,26 @@ static int ms_wait(void *owner,u32 ms,bool fp_only)
     struct gf_io *io=&l->ctx->ch->f->io;
     u32 now,us=ms*RECOVER_US_PER_MS;
     if (fp_only && !l->fp_on) return 0;
+    l->reg=0; l->value=us;
+    l->at="wait_clock_before";
     l->rc=io->timing.clock_us(io->opaque,&now);
-    if (!l->rc && ((i32)(now-l->ctx->deadline)>=0 || l->ctx->deadline-now<us)) l->rc=GF4_ETIME;
-    if (!l->rc) l->rc=io->timing.wait_us(io->opaque,us);
-    if (!l->rc) l->rc=io->timing.clock_us(io->opaque,&now);
-    if (!l->rc && (i32)(now-l->ctx->deadline)>=0) l->rc=GF4_ETIME;
+    if (!l->rc && ((i32)(now-l->ctx->deadline)>=0 || l->ctx->deadline-now<us)) {
+        l->at="wait_budget"; l->rc=GF4_ETIME;
+    }
+    /* native.c accepts at most 1ms per call; preserve the full 10/50ms. */
+    while (!l->rc && us) {
+        u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;
+        l->at="wait_us";
+        l->rc=io->timing.wait_us(io->opaque,part);
+        if (!l->rc) {
+            l->at="wait_clock_after";
+            l->rc=io->timing.clock_us(io->opaque,&now);
+        }
+        if (!l->rc && (i32)(now-l->ctx->deadline)>=0) {
+            l->at="wait_deadline"; l->rc=GF4_ETIME;
+        }
+        us-=part;
+    }
     return l->rc;
 }
 static int ms_row(void *owner,const struct gfinit_mode *m,u32 ordinal)
@@ -182,9 +212,13 @@ static int ms_row(void *owner,const struct gfinit_mode *m,u32 ordinal)
     const struct gf_mode_row *r=&gf_mode_rows[ordinal];
     const struct gf4_head_image *h=&l->ctx->state->next[l->head];
     u32 reg=r->reg,value=r->bits,old=0;
+    l->row=ordinal; l->reg=reg; l->value=value; l->at="row";
     /* dac.c:364-444: no hard-coded analog OR programming in the common load. */
     if (reg==MS_DACCLK || reg==MS_DACCLK_B || reg==MS_TEST) return 0;
-    if (r->kind==GF_C_DAC_MASK) return l->rc=gf4_lut_load(l->ctx,l->head);
+    if (r->kind==GF_C_DAC_MASK) {
+        l->at="lut_load"; l->reg=reg+l->head*MS_STRIDE;
+        return l->rc=gf4_lut_load(l->ctx,l->head);
+    }
     if (r->kind==GF_C_DAC_INDEX || r->kind==GF_C_DAC_DATA) return 0;
     /* Shared PLL registers have their own addresses, never head stride. */
     if (r->expr==GF_C_PLL) {
@@ -239,18 +273,21 @@ static int ms_row(void *owner,const struct gfinit_mode *m,u32 ordinal)
 }
 int gf4_mode_load(struct gf4_ctx *ctx,u8 head,const struct gfinit_mode *mode,u32 dl)
 {
+    struct mode_load l={.ctx=ctx,.head=head,.at="validate",
+        .section=GF_LOAD_NO_INDEX,.row=GF_LOAD_NO_INDEX};
     if (!ctx || !ctx->state || !ctx->ch || !ctx->ch->f || !mode || head>=GF4_HEADS || mode->head!=head)
-        return GF4_EINVAL;
-    if (!ctx->changing || ctx->deadline!=dl) return GF4_ESTATE;
+        return ms_failure(&l,GF4_EINVAL,0,0);
+    if (!ctx->changing || ctx->deadline!=dl) return ms_failure(&l,GF4_ESTATE,0,0);
     struct gf_io *io=&ctx->ch->f->io;
     u32 now,owner;
-    int rc=io->timing.clock_us(io->opaque,&now);
-    if (!rc && (i32)(now-dl)>=0) rc=GF4_ETIME;
-    if (rc) return rc;
-    struct mode_load l={.ctx=ctx,.head=head};
+    l.at="clock";
+    int rc=l.rc=io->timing.clock_us(io->opaque,&now);
+    if (!rc && (i32)(now-dl)>=0) { l.at="deadline"; rc=GF4_ETIME; }
+    if (rc) return ms_failure(&l,rc,0,0);
+    l.at="owner_index";
     rc=ms_write(&l,MS_CR,1,MS_OWNER);
-    if (!rc) rc=ms_read(&l,MS_CR+1U,1,&owner);
-    if (rc) return rc;
+    if (!rc) { l.at="owner_read"; rc=ms_read(&l,MS_CR+1U,1,&owner); }
+    if (rc) return ms_failure(&l,rc,0,0);
     /* cursor.c:39-62, crtc.c:510-516: preserve the reserved cursor offset;
      * the physical enable is restored only after the image is complete. */
     struct gfinit_mode image=*mode;
@@ -263,13 +300,16 @@ int gf4_mode_load(struct gf4_ctx *ctx,u8 head,const struct gfinit_mode *mode,u32
     }
     static const struct gf_load_io load={ms_section,ms_row,ms_wait};
     rc=gf_load_state(&image,&l,&load);
-    if (rc) rc=l.rc ? l.rc : rc;
+    struct mode_load failure=l;
     int gate_rc=0;
     if (rc && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);
+    l.row=GF_LOAD_NO_INDEX; l.at="owner_restore_index";
     int cleanup=ms_write(&l,MS_CR,1,MS_OWNER);
-    if (!cleanup) cleanup=ms_write(&l,MS_CR+1U,1,owner);
-    if (!rc && !cleanup) ctx->state->work[head]=image;
-    return rc ? rc : gate_rc ? gate_rc : cleanup;
+    if (!cleanup) { l.at="owner_restore"; cleanup=ms_write(&l,MS_CR+1U,1,owner); }
+    if (rc) return ms_failure(&failure,rc,gate_rc,cleanup);
+    if (cleanup) return ms_failure(&l,cleanup,gate_rc,cleanup);
+    ctx->state->work[head]=image;
+    return 0;
 }
 static int ms_encoder(struct gf4_ctx *ctx,const struct gf4_route *r,bool load,
                       const struct gfinit_mode *m,enum gf4_dpms dpms,u32 dl)
