@@ -1667,6 +1667,15 @@ static void case_seamless_exchange(void)
 void _start(void)
 {
     con_output_register(&capture_output);
+    world_reset();
+    pegc_palette_init();
+    for (int k = 0; k < 24; k++) {
+        int base = (232 + k) * 4;
+        CHECK(ev_port[base] == PAL_IDX_PORT && ev_val[base] == 232 + k);
+        CHECK(ev_port[base + 1] == PAL_G_PORT && ev_val[base + 1] == 8 + 10 * k);
+        CHECK(ev_port[base + 2] == PAL_R_PORT && ev_val[base + 2] == 8 + 10 * k);
+        CHECK(ev_port[base + 3] == PAL_B_PORT && ev_val[base + 3] == 8 + 10 * k);
+    }
     /* 資料の規則・記録の数値での検査を先に回す (変異がヘッダ由来の期待列では
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();
