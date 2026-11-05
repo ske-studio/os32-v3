@@ -53,7 +53,7 @@ static void expressions(void)
     HWB_TEST("variables");
     eval_case("missing", HWB_ARG, 0);
     state.var_count = 1;
-    state.vars[0] = (struct hwb_variable){"x", HWB_SCALAR, 7, 0, 0};
+    state.vars[0] = (struct hwb_variable){.name="x", .kind=HWB_SCALAR, .value=7};
     eval_case("x + 1", HWB_OK, 8);
     state.vars[0].kind = HWB_DEVICE;
     eval_case("x", HWB_ARG, 0);

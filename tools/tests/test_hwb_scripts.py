@@ -114,6 +114,16 @@ void _start(void) {
 MODE = 'userland/tests/hw/trident_mode.hwb'
 EXEC = 'userland/shell/hwb_exec.c'
 EXEC_MUTATIONS = [
+    ('state-save-order', MODE, ' call state_save\n # PC-98 PCI', ' # PC-98 PCI', 'state-save-restore'),
+    ('palette-fallback', MODE, ' let save[767] = 0', ' let save[767] = 1', 'palette-default'),
+
+    ('state-restore-omit', MODE, ' call state_restore\n', ' log "restore omitted"\n', 'state-save-restore'),
+    ('state-restore-order', MODE, ' mmiowrite8 v + 0x43C8 save[847]\n mmiowrite8 v + 0x43C9 save[848]',
+     ' mmiowrite8 v + 0x43C9 save[848]\n mmiowrite8 v + 0x43C8 save[847]', 'state-save-restore'),
+    ('state-save-omit', MODE, ' call state_save\n', ' log "save omitted"\n', 'mode'),
+
+    ('array-read-store', EXEC, 'if (element) { *element = a; return HWB_OK; }\n        return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);\n    case HWB_PRINT:',
+     'if (element) { *element = 0; return HWB_OK; }\n        return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);\n    case HWB_PRINT:', 'array-save-restore'),
     ('fill-address', EXEC, 'r->addr + n * i->width, &a);', 'r->addr, &a);', 'fill-values'),
     ('fill-count', EXEC, 'n < r->count; n++', 'n + 1U < r->count; n++', 'fill-values'),
     ('fill-point', EXEC, 'rc = he_point(s, 0); if (rc) return rc;\n            a = r->value;', 'rc = HWB_OK; if (rc) return rc;\n            a = r->value;', 'fill-abort'),
@@ -147,6 +157,9 @@ def execution_trial(mutation=None):
             raise RuntimeError('mutation anchor is not unique: ' + mutation[0])
         if path in FILES:
             scripts[FILES.index(path)] = original.replace(before, after)
+            if mutation[0] == 'state-save-order':
+                scripts[FILES.index(path)] = scripts[FILES.index(path)].replace(
+                    ' call pc98_init\n', ' call pc98_init\n call state_save\n', 1)
             if mutation[0] == 'mode-enable-order':
                 scripts[FILES.index(path)] = scripts[FILES.index(path)].replace(
                     ' wait us 5000000', ' call enable\n wait us 5000000', 1)

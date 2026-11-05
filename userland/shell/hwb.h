@@ -6,7 +6,8 @@
 #define SHELL_HWB_H
 #include "kdebug/hwb_wire.h"
 
-#define HWB_VARIABLES 32U
+#define HWB_VARIABLES 64U
+#define HWB_ARRAY_ELEMENTS 16384U
 #define HWB_NAME_CHARS 16U
 #define HWB_LINE_BYTES 256U
 #define HWB_FILE_BYTES (64U * 1024U)
@@ -73,7 +74,7 @@ struct hwb_program {
     struct hwb_label labels[HWB_LABELS];
 };
 enum hwb_opcode {
-    HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
+    HWB_DIM, HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
     HWB_READ, HWB_WRITE, HWB_FILL, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
     HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END
 };
@@ -93,6 +94,7 @@ struct hwb_instruction {
      * Exec never reparses the command spelling to recover this information. */
     enum hw_space space;
     u32 line, pc, next_pc, width; /* 1-based physical line; width in bytes */
+    struct hwb_span index; /* optional destination subscript expression */
     struct hwb_span name, text; /* destination/label and quoted text contents */
     struct hwb_address address;
     /* LET/WRITE/FILL/WAIT/PRINT: value; FILL: count; IF: lhs/rhs and not_equal;
@@ -102,18 +104,20 @@ struct hwb_instruction {
     struct hwb_span mask, timeout, interval, count;
     u32 not_equal;
 };
-enum hwb_value_kind { HWB_SCALAR, HWB_DEVICE, HWB_WINDOW_REF };
+enum hwb_value_kind { HWB_SCALAR, HWB_DEVICE, HWB_WINDOW_REF, HWB_ARRAY };
 struct hwb_variable {
     char name[HWB_NAME_CHARS + 1U];
     enum hwb_value_kind kind;
     u32 value; /* scalar or packed BDF; window uses device_slot/bar */
     u32 device_slot, bar;
+    u32 array_start, array_count;
 };
 struct hwb_initial { const char *name; u32 value; };
 struct hwb_state {
     const struct hwb_backend *backend;
     const struct hwb_program *program;
     struct hwb_variable vars[HWB_VARIABLES];
+    u32 array_used, array_values[HWB_ARRAY_ELEMENTS];
     u32 var_count, pc, call_stack[HWB_CALL_DEPTH], call_depth;
     u32 run, seq, writes, lines; /* writes counts successful writes only */
     enum hwb_rc rc;
@@ -126,6 +130,8 @@ struct hwb_log_record {
     u32 space, width, bdf, addr, value;
     const char *target; /* resolved logical target, printable, valid for call */
     enum hwb_rc rc;
+    const char *destination;
+    u32 indexed, index;
     u32 requested_us, elapsed_lo, elapsed_hi, count, done;
 };
 
@@ -180,6 +186,6 @@ void hwb_log_text(const struct hwb_backend *backend, const struct hwb_log_record
 /* §4 terminal: HW run=... op=end rc=... lines=... writes=... . */
 void hwb_log_finish(const struct hwb_state *state);
 
-STATIC_ASSERT(sizeof(struct hwb_state) <= 4096U, hwb_resident_budget);
+STATIC_ASSERT(sizeof(struct hwb_state) <= 72U * 1024U, hwb_resident_budget);
 STATIC_ASSERT(sizeof(struct hwb_program) <= 12U * 1024U, hwb_index_budget);
 #endif

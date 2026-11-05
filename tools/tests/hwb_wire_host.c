@@ -58,7 +58,7 @@ static void wire(void)
                 CHECK(HW_BDF_BUS(bdf) == bus && HW_BDF_DEV(bdf) == dev && HW_BDF_FN(bdf) == fn);
             }
     HWB_TEST("limits");
-    CHECK(HWB_VARIABLES == 32 && HWB_NAME_CHARS == 16 && HWB_LINE_BYTES == 256);
+    CHECK(HWB_VARIABLES == 64 && HWB_NAME_CHARS == 16 && HWB_LINE_BYTES == 256);
     CHECK(HWB_FILE_BYTES == 65536 && HWB_LABELS == 64 && HWB_CALL_DEPTH == 8);
     CHECK(HWB_US_MIN == 1 && HWB_US_MAX == 10000000 && HWB_ITERATIONS == 1000000);
     const int exits[] = {HWB_EXIT_OK,HWB_EXIT_ARG,HWB_EXIT_NOSYS,HWB_EXIT_WINDOW,

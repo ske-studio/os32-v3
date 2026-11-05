@@ -403,6 +403,79 @@ static void trident_modes(void)
         if (mode == 2) CHECK(fac == first);
     }
 }
+static enum hwb_rc command(const char *text)
+{
+    return hwb_command(&s, text, length(text));
+}
+static void arrays(void)
+{
+    HWB_TEST("array-values"); setup();
+    CHECK(run("dim save 1024\nlet save[0] = 0xFFFFFFFF\nlet save[1023] = save[0] - 1\n"
+              "let x = save[1] | save[1023]\nlet save[save[1]+2] = 7") == HWB_OK);
+    CHECK(scalar("x") == 0xFFFFFFFEU && s.array_values[2] == 7);
+    CHECK(contains(f.lines[3], "op=let dest=save index=0 val=0xFFFFFFFF rc=OK"));
+    CHECK(command("let save[3] = 9") == HWB_OK && s.array_values[3] == 9);
+    CHECK(command("let x = save[3]") == HWB_OK && scalar("x") == 9);
+    const struct hwb_program *old = s.program;
+    CHECK(load("let x = 1", (struct hwb_initial[]){{"bad!",1}}, 1) == HWB_ARG);
+    CHECK(s.program == old && s.array_values[3] == 9 && s.array_used == 1024);
+    hwb_reset(&s); CHECK(s.array_used == 0 && s.var_count == 0);
+    CHECK(command("dim save 4") == HWB_OK && s.array_values[3] == 0);
+
+    HWB_TEST("array-write-range"); setup();
+    CHECK(run("dim a 2\nlet a[1] = 17\nlet a[2] = 99\niowrite8 port 1 1") == HWB_ARG);
+    CHECK(s.array_values[1] == 17 && s.array_values[2] == 0 && s.writes == 0);
+    CHECK(command("ioread8 port 1 -> a[2]") == HWB_ARG && f.accesses == 0);
+    CHECK(command("poll 8 port 1 255 1 10 1 -> a[2]") == HWB_ARG && f.accesses == 0);
+    CHECK(command("let a[0-1] = 1") == HWB_ARG);
+    CHECK(command("let a[0xFFFFFFFF] = 1") == HWB_ARG);
+    CHECK(command("let x = 1") == HWB_OK);
+    CHECK(command("let x[0] = 1") == HWB_ARG && scalar("x") == 1);
+
+    HWB_TEST("array-read-range");
+    CHECK(command("let x = a[2]") == HWB_ARG && scalar("x") == 1);
+    CHECK(command("let x = a[0xFFFFFFFF]") == HWB_ARG && scalar("x") == 1);
+    CHECK(command("let x = a") == HWB_ARG);
+    CHECK(command("let x = x[0]") == HWB_ARG);
+
+    HWB_TEST("array-redim");
+    const char *bad[] = {"dim a 2", "dim x 2", "dim z 0", "let a = 1",
+        "device a = bdf 0:0.0", "dim missing", "dim z 1 2",
+        "let a[] = 1", "let a[0 = 1", "let a[0][1] = 1", "let x = a[0]1"};
+    for (u32 n=0; n<sizeof(bad)/sizeof(*bad); n++) CHECK(command(bad[n]) == HWB_ARG);
+
+    HWB_TEST("array-element-limit"); setup();
+    CHECK(run("dim a 8192\ndim b 8192\nlet b[8191] = 77\nlet x = a[8191] + b[8191]") == HWB_OK);
+    CHECK(s.array_used == 16384 && scalar("x") == 77);
+    CHECK(command("dim c 1") == HWB_ARG && s.array_used == 16384);
+    CHECK(run("dim a 16385") == HWB_ARG && s.array_used == 0);
+    CHECK(run("dim a 16384\nlet a[16383] = 4") == HWB_OK && s.array_values[16383] == 4);
+
+    HWB_TEST("array-name-limit"); setup();
+    CHECK(run("dim a 1") == HWB_OK); /* mode + a */
+    for (u32 n=0; n<62; n++) {
+        char text[] = "let v00 = 1";
+        text[5]='0'+n/10; text[6]='0'+n%10;
+        hwbf_clear_trace(&f); CHECK(command(text) == HWB_OK);
+    }
+    CHECK(s.var_count == 64);
+    hwbf_clear_trace(&f);
+    CHECK(command("let extra = 1") == HWB_ARG && s.var_count == 64);
+    CHECK(command("dim extra 1") == HWB_ARG && s.array_used == 1);
+    CHECK(command("let v00 = 2") == HWB_OK && scalar("v00") == 2);
+    CHECK(command("let a[0] = 3") == HWB_OK && s.array_values[0] == 3);
+
+    HWB_TEST("array-read-destinations"); setup();
+    hwbf_add_pci(&f, TEST_BDF, 0xABCD, 0x1234);
+    *hwbf_byte(&f, HW_IO, 9) = 7;
+    *hwbf_byte(&f, HW_PHYS, 16) = 8;
+    CHECK(run("dim a 4\ndevice d = bdf 7:13.2\npciread16 d 0 -> a[0]\n"
+              "ioread8 port 9 -> a[1]\nmmioread8 phys 16 -> a[2]\n"
+              "poll 8 port 9 255 7 10 1 -> a[a[2]-5]") == HWB_OK);
+    CHECK(s.array_values[0] == 0xABCD && s.array_values[1] == 7 &&
+          s.array_values[2] == 8 && s.array_values[3] == 7);
+    CHECK(contains(f.lines[5], "val=0xABCD dest=a index=0 rc=OK"));
+}
 void _start(void)
 {
     HWB_TEST("record-pairs"); setup();
@@ -410,7 +483,7 @@ void _start(void)
     CHECK(f.line_count == 5 && contains(f.lines[0], "phase=begin") &&
           contains(f.lines[1], "phase=end") && contains(f.lines[2], "seq=2 ") &&
           contains(f.lines[3], "phase=end"));
-    fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
+    arrays(); fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
     deadlines(); aborts(); sessions(); bars(); poll_aliases(); suspended_records(); begin_records(); ids(); trident_modes();
     hwb_test_write("PASS hwb-exec\n"); hwb_test_exit(0);
 }

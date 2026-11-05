@@ -19,11 +19,16 @@ import rshell_hwb
 
 FIXTURE = 'tools/tests/hwb_shell_host.c'
 MUTATIONS = [
+    ('log-to-serial', 'userland/shell/cmd_hw.c',
+     'if (!hw_log_active || run != hw_log_run)', 'if (1)', 'log-file'),
+    ('drop-file-terminal', 'userland/shell/cmd_hw.c',
+     "for (const char *q = line; *q; q++) hw_log_append(*q);",
+     "for (const char *q = line; !terminal && *q; q++) hw_log_append(*q);", 'log-file'),
     ('drop-initial', 'userland/shell/cmd_hw.c',
-     'argv[2], initial, argc - 3);', 'argv[2], initial, 0);', 'load-lifetime'),
+     'argv[path], initial, argc - first);', 'argv[path], initial, 0);', 'log-file'),
     ('drop-release', 'userland/shell/cmd_hw.c',
      'if (hw_session.stopped) hw_release();',
-     'if (hw_session.stopped && hw_session.rc == HWB_IO) hw_release();', 'adapters'),
+     'if (hw_session.stopped && hw_session.rc == HWB_IO) hw_release();', 'log-file'),
 ]
 
 
@@ -98,7 +103,11 @@ def main():
             raise AssertionError('shell control failed: ' + result.stderr)
         hwb_host.build(ROOT, FIXTURE, tmp / 'cross.o', cross=True, flags=flags)
         print('GREEN host ILP32, libc-free; i386-elf compile PASS', flush=True)
-        inspect_records(result.stdout)
+        before, file_records = result.stdout.split('FILE_BEGIN\n', 1)
+        file_records, after = file_records.split('FILE_END\n', 1)
+        if rshell_hwb.inspect(file_records)[1]:
+            raise AssertionError('invalid real file records')
+        inspect_records(before + after)
         if '--mutate' in sys.argv:
             return int(bool(hwb_host.mutations(FIXTURE, MUTATIONS, flags=flags)))
         return 0
