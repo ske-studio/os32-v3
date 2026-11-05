@@ -44,8 +44,18 @@
 - `hw load <path> [name=value...]` → `hw step`（1行）/ `hw continue` / `hw abort`。ファイル位置・変数を保持、abort は次の命令を実行しない。
 - ファイルの配置変更だけで手順を変えられる。行頭/末尾 `#` コメント、空行可、1行1命令、CRLF可。include・文字列展開・浮動小数点なし。
 - 行頭空白は無視。番地・offset・mask・timeout等の引数は単一数値/変数または括弧式、write値とletの右辺は行末までの式として区切る。
-- 整数は10進/0x、u32。変数32個・名前16字、行256バイト、ファイル64KiB、ラベル64個、call深さ8を初版資源上限とする。
-- `let x = expr`。式は括弧、`+ - & | ^ << >>`、通常の C の優先順位。加減の桁あふれ/負数と shift≥32 はエラー。ビット演算はu32。
+- 整数は10進/0x、u32。資源上限は次の表のとおり。名前数・配列要素数は物理の制約ではなく、調査用セッションのメモリ予算として決める。
+
+| 資源 | 上限 | 何で決めたか |
+|---|---|---|
+| 名前（スカラー・配列・device・window の合計、既定の mode を含む） | 64 個 | レジスタ帯は配列で保持し、索引・装置名・作業変数を置ける規模。物理制約ではない |
+| 配列の要素の合計 | 16384 個（u32、64KiB） | VGA パレット 768 要素と標準・拡張レジスタの保存に余裕を持ち、常駐メモリを限定。物理制約ではない |
+| 名前の長さ | 16 字 | 識別子格納の予算 |
+| 行 / ファイル | 256 バイト / 64KiB | 行ログ・ソース格納の予算 |
+| ラベル / call 深さ | 64 個 / 8 段 | 索引・呼出しスタックの予算 |
+
+- `dim save 1024` は u32 の1次元配列を0初期化する。要素数は式で指定し、1以上かつ残り要素予算内。同じ名前（別の型も含む）の再 dim は実行時 ARG。配列名をスカラー・device・window で上書きすることも ARG。reset と成功した run/load は配列を含めて変数を消す。
+- `let x = expr` / `let save[i] = expr`。式中の `save[expr]` は要素値。配列は0始まりで、未定義・型違い・添字の範囲外は実行時 ARG（代入・read/poll のアクセス前に検査、後続命令を止める）。式は括弧、`+ - & | ^ << >>`、通常の C の優先順位。加減の桁あふれ/負数と shift≥32 はエラー。ビット演算はu32。
 - `device d = bdf 0:8.0` または `device d = id 0x1023:0x9660`。BDF各成分は10進/0x、IDの成分は16進。IDは既存PCI列挙で検索し複数なら候補を出してBDF指定へ。
 - `window v = bar d 1` は BAR の参照を作る。`v + expr` は `bar d 1 + expr` の短縮。固定番地は `phys expr`。I/Oは `port expr`。
 - BAR は各アクセス時にconfigを再読して解決、サイズprobe・Commandの自動変更なし。番号0..5、header typeに応じた本数、種別・64bit対を復号。
@@ -54,6 +64,7 @@
 
 | 命令（W=8/16/32、末尾のWは幅bit数） | 意味 |
 |---|---|
+| `dim name count` / `let name[index] = expr` / `let x = expr` | 配列確保・要素またはスカラーへの代入。式から `name[index]` を読める。 |
 | `pcireadW d offset -> x` / `pciwriteW d offset expr` | 構成空間を幅どおりアクセス。offset 0..255、自然整列・末尾越境を確認。 |
 | `ioreadW port expr -> x` / `iowriteW port expr value` | 0..65535のI/O。BAR表記も可、幅による末尾越境を確認。 |
 | `mmioreadW address -> x` / `mmiowriteW address expr` | phys/bar/window指定、自然整列、末尾の32bit越境を確認。 |
@@ -64,6 +75,7 @@
 | `label name` / `goto name` / `if expr == expr goto name` | Init等の条件分岐・探索反復用に採用。`!=`も可。毎命令中止点を通る。 |
 | `call name` / `return` / `end` | スクリプト内の短い共通手順。再帰不要だが深さ上限で終了。 |
 
+- read/poll の行き先 `x` は `name[expr]` も可。添字は命令開始時に評価し、poll の最終値も同じ要素へ代入する。
 - 読んだ値を `let` で加工して書く通常のRMWだけを持つ。自動RMW/読み返しなし。幅を超える値は黙って切捨てずARG。
 - pollのmask/valueは幅内、valueはmask外ビット0、timeout 1..10,000,000、interval 1..timeout。最終値・回数・経過を返す。TIMEOUTは実行停止。
 - 各命令の失敗でその場停止、次命令へ進まず、再実行もしない。実行済み書込みは取り消さない。対話から次の操作を選べる。
@@ -104,12 +116,13 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - 番地は解決した物理値、PCIはBDF+offset、I/Oはport。例の物理値は説明用であり固定しない。rcはOK/ARG/NOSYS/WINDOW/TIMEOUT/ABORT/IO。
 - beginを出してから操作し、endがない行で停止位置を特定。OKはCPUがアクセスを完了した意味で、装置受理の証明ではない。
 - IF復元後、整形済み1行を`kprintf("%s\n", line)`で1回だけ出す。画面とシリアルへの配送は既存ミラーに任せる。
+- 配列への let/read/poll も命令ごとの begin/end は各1行。両方に `dest=save index=3` を追加し、let は `val=0x...`、read/poll は既存の val に値を記録する。範囲外も1組で ARG を記録する。
 - pollは開始と最終値/回数/経過だけを出す。ホスト採取はrun/seq/終端を検査して未完了を保存・報告、書込み再送なし。`tools/rshell_hwb.py`を別形式として追加。
 
 ## 5. 大きさ・配備の見積もり
 | 部品 | 初版増分の設計予算 / 制約 |
 |---|---|
-| shell像 | parser+実行+記録 12〜20KiB text、常駐状態≤4KiB、load時ソース64KiB＋索引≤12KiB（heap、終了時解放） |
+| shell像 | parser+実行+記録 12〜20KiB text、常駐状態≤72KiB（配列64KiBを含む。load・対話実行で全状態をスタックに複製しない）、load時ソース64KiB＋索引≤12KiB（heap、終了時解放） |
 | kdebug.bin | 汎用アクセス/待ち/中止 3〜6KiB text、BSS≤256B、許可表削除分は相殺。GeForce部品はリンクしない |
 | カーネル | 内部中止問い合わせ・PCIアクセス・import接続で≤2KiB見込み。公開ABI・ops表のslot数は不変 |
 | 上限の実物 | tools/module_schema.py:51–60: image/mem各262144B、load_span524288B。既存build/out/kdebug.binは約125.7KiB（鮮度未確認）、新像の実測値ではない |

@@ -34,16 +34,41 @@ static int he_slot(const struct hwb_state *s, struct hwb_span a)
     for (u32 n = 0; n < s->var_count; n++) if (he_equal(name, s->vars[n].name)) return (int)n;
     return -1;
 }
-static enum hwb_rc he_put(struct hwb_state *s, const char *name,
+static enum hwb_rc he_put_vars(struct hwb_variable *vars, u32 *count, const char *name,
                            enum hwb_value_kind kind, u32 value, u32 device, u32 bar)
 {
     u32 n = 0;
-    while (n < s->var_count && !he_equal(s->vars[n].name, name)) n++;
+    while (n < *count && !he_equal(vars[n].name, name)) n++;
     if (n == HWB_VARIABLES) return HWB_ARG;
-    if (n == s->var_count) s->var_count++;
-    struct hwb_variable *v = &s->vars[n];
+    if (n < *count && vars[n].kind == HWB_ARRAY) return HWB_ARG;
+    if (n == *count) (*count)++;
+    struct hwb_variable *v = &vars[n];
     u32 k = 0; do { v->name[k] = name[k]; } while (name[k++]);
     v->kind = kind; v->value = value; v->device_slot = device; v->bar = bar;
+    return HWB_OK;
+}
+static enum hwb_rc he_put(struct hwb_state *s, const char *name,
+                            enum hwb_value_kind kind, u32 value, u32 device, u32 bar)
+{
+    return he_put_vars(s->vars, &s->var_count, name, kind, value, device, bar);
+}
+/* Resolve the destination before data access; retain the selected element even
+ * when the read result changes a variable used by the subscript. */
+static enum hwb_rc he_destination(struct hwb_state *s, const struct hwb_instruction *i,
+                                  struct hwb_log_record *r, u32 **element)
+{
+    if (i->index.begin == i->index.end) {
+        int slot = he_slot(s, i->name);
+        if (slot < 0) return s->var_count == HWB_VARIABLES ? HWB_ARG : HWB_OK;
+        return s->vars[slot].kind == HWB_ARRAY ? HWB_ARG : HWB_OK;
+    }
+    r->indexed = 1;
+    if (hwb_eval(s, i->index, &r->index)) return HWB_ARG;
+    int slot = he_slot(s, i->name);
+    if (slot < 0 || s->vars[slot].kind != HWB_ARRAY) return HWB_ARG;
+    struct hwb_variable *v = &s->vars[slot];
+    if (r->index >= v->array_count) return HWB_ARG;
+    *element = &s->array_values[v->array_start + r->index];
     return HWB_OK;
 }
 static enum hwb_rc he_assign(struct hwb_state *s, struct hwb_span a,
@@ -203,13 +228,25 @@ static u32 he_literal(const struct hwb_state *s, struct hwb_span a, u32 base)
     return value;
 }
 static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction *i,
-                               struct hwb_log_record *r, u32 *next)
+                               struct hwb_log_record *r, u32 *next, u32 *element)
 {
     u32 a = 0, b = 0, c = 0;
     enum hwb_rc rc;
     switch (i->op) {
-    case HWB_LET:
+    case HWB_DIM: {
         rc = hwb_eval(s, i->value, &a); if (rc) return rc;
+        if (!a || a > HWB_ARRAY_ELEMENTS - s->array_used || he_slot(s, i->name) >= 0)
+            return HWB_ARG;
+        rc = he_assign(s, i->name, HWB_ARRAY, 0, 0, 0); if (rc) return rc;
+        struct hwb_variable *v = &s->vars[s->var_count - 1U];
+        v->array_start = s->array_used; v->array_count = a;
+        for (u32 n = 0; n < a; n++) s->array_values[s->array_used + n] = 0;
+        s->array_used += a; r->value = a;
+        return HWB_OK;
+    }
+    case HWB_LET:
+        a = r->value;
+        if (element) { *element = a; return HWB_OK; }
         return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);
     case HWB_DEVICE_BDF:
         a = he_literal(s, i->bus, 10); b = he_literal(s, i->dev, 10); c = he_literal(s, i->fn, 10);
@@ -262,6 +299,7 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
         if (rc) return rc;
         r->value = a;
         if (i->op == HWB_WRITE) { s->writes++; return HWB_OK; }
+        if (element) { *element = a; return HWB_OK; }
         return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);
     case HWB_PRINT:
         rc = hwb_eval(s, i->value, &a); if (rc) return rc;
@@ -303,7 +341,7 @@ void hwb_init(struct hwb_state *s, const struct hwb_backend *backend)
 void hwb_reset(struct hwb_state *s)
 {
     for (u32 n = 0; n < HWB_VARIABLES; n++) s->vars[n] = (struct hwb_variable){0};
-    s->var_count = 0;
+    s->var_count = 0; s->array_used = 0;
 }
 static u32 he_first(const struct hwb_program *g)
 {
@@ -318,8 +356,9 @@ enum hwb_rc hwb_load(struct hwb_state *s, struct hwb_program *g, char *source,
         g == s->program || (s->program && source == s->program->source)) return HWB_ARG;
     if (s->backend->read_file(s->backend->ctx, path, source, capacity, &bytes)) return HWB_IO;
     if (bytes > capacity || hwb_parse(g, source, bytes, &error_line)) return HWB_ARG;
-    struct hwb_state fresh; hwb_init(&fresh, s->backend);
-    he_put(&fresh, "mode", HWB_SCALAR, 0, 0, 0);
+    struct hwb_variable vars[HWB_VARIABLES] = {0};
+    u32 var_count = 0;
+    he_put_vars(vars, &var_count, "mode", HWB_SCALAR, 0, 0, 0);
     for (u32 n = 0; n < count; n++) {
         const char *name = initial[n].name;
         if (!name || !((*name >= 'a' && *name <= 'z') || (*name >= 'A' && *name <= 'Z') || *name == '_'))
@@ -330,12 +369,16 @@ enum hwb_rc hwb_load(struct hwb_state *s, struct hwb_program *g, char *source,
             if (k > HWB_NAME_CHARS || !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                 c == '_' || (c >= '0' && c <= '9'))) return HWB_ARG;
         }
-        if (he_put(&fresh, name, HWB_SCALAR, initial[n].value, 0, 0)) return HWB_ARG;
+        if (he_put_vars(vars, &var_count, name, HWB_SCALAR, initial[n].value, 0, 0)) return HWB_ARG;
     }
-    enum hwb_rc rc = he_point(&fresh, 1); if (rc) return rc;
+    enum hwb_rc rc = he_point(s, 1); if (rc) return rc;
     if (!s->stopped) he_stop(s, HWB_ABORT);
-    fresh.program = g; fresh.pc = he_first(g); fresh.run = ++he_run_serial; fresh.stopped = 0;
-    *s = fresh; return HWB_OK;
+    hwb_reset(s);
+    for (u32 n = 0; n < var_count; n++) s->vars[n] = vars[n];
+    s->var_count = var_count; s->program = g; s->pc = he_first(g);
+    s->run = ++he_run_serial; s->seq = s->lines = s->writes = s->call_depth = 0;
+    s->stopped = 0; s->rc = HWB_OK;
+    return HWB_OK;
 }
 enum hwb_rc hwb_run(struct hwb_state *s, struct hwb_program *g, char *source,
                       u32 capacity, const char *path, const struct hwb_initial *initial, u32 count)
@@ -356,12 +399,19 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     s->seq++; s->lines++;
     struct hwb_log_record r = {.run=s->run, .seq=s->seq, .line=i.line, .op=i.op,
                                .space=i.space, .width=i.width};
+    u32 *element = 0;
+    char destination[HWB_NAME_CHARS + 1U];
+    if (i.op == HWB_LET || i.op == HWB_READ || i.op == HWB_POLL) {
+        he_name(s, i.name, destination); r.destination = destination;
+        rc = he_destination(s, &i, &r, &element);
+    }
+    if (!rc && i.op == HWB_LET) rc = hwb_eval(s, i.value, &r.value);
     char target[HWB_NAME_CHARS + 1U];
     if (i.address.device.end > i.address.device.begin) {
         he_name(s, i.address.device, target); r.target = target;
     }
     if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_FILL || i.op == HWB_POLL) {
-        rc = he_address(s, &i, &r);
+        if (!rc) rc = he_address(s, &i, &r);
         /* Wire BDFs use only 16 bits; this sentinel is local to logging. */
         if (rc) r.bdf = U32_MAX;
     }
@@ -384,10 +434,12 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     struct hwb_poll_result poll = {0};
     if (!rc) {
         if (i.op == HWB_WAIT || i.op == HWB_POLL) rc = he_wait_poll(s, &i, &r, &poll);
-        else rc = he_execute(s, &i, &r, &next);
+        else rc = he_execute(s, &i, &r, &next, element);
     }
     if (i.op == HWB_POLL && poll.reads) {
-        enum hwb_rc assigned = he_assign(s, i.name, HWB_SCALAR, poll.value, 0, 0);
+        enum hwb_rc assigned = HWB_OK;
+        if (element) *element = poll.value;
+        else assigned = he_assign(s, i.name, HWB_SCALAR, poll.value, 0, 0);
         if (!rc) rc = assigned;
     }
     r.rc = rc;
@@ -413,14 +465,19 @@ enum hwb_rc hwb_command(struct hwb_state *s, const char *source, u32 bytes)
     u32 line;
     if (bytes > HWB_LINE_BYTES || hwb_parse(&command, source, bytes, &line) || command.instructions != 1U)
         return HWB_ARG;
-    struct hwb_state work = *s;
-    enum hwb_rc rc = he_point(&work, 1); if (rc) return rc;
-    work.program = &command; work.pc = he_first(&command); work.call_depth = 0;
-    work.run = ++he_run_serial; work.seq = work.lines = work.writes = 0; work.stopped = 0;
-    rc = hwb_step(&work);
-    if (!work.stopped) he_stop(&work, rc);
-    /* Only variables cross back; the loaded run retains its records and PC. */
-    for (u32 n = 0; n < HWB_VARIABLES; n++) s->vars[n] = work.vars[n];
-    s->var_count = work.var_count;
+    enum hwb_rc rc = he_point(s, 1); if (rc) return rc;
+    const struct hwb_program *program = s->program;
+    u32 pc = s->pc, depth = s->call_depth, run = s->run, seq = s->seq;
+    u32 lines = s->lines, writes = s->writes, stopped = s->stopped;
+    enum hwb_rc previous_rc = s->rc;
+    s->program = &command; s->pc = he_first(&command); s->call_depth = 0;
+    s->run = ++he_run_serial; s->seq = s->lines = s->writes = 0; s->stopped = 0;
+    rc = hwb_step(s);
+    if (!s->stopped) he_stop(s, rc);
+    /* Variables and arrays persist; the loaded run retains its records and PC.
+     * A single syntax-checked command cannot call a label, so its stack stays intact. */
+    s->program = program; s->pc = pc; s->call_depth = depth;
+    s->run = run; s->seq = seq; s->lines = lines; s->writes = writes;
+    s->stopped = stopped; s->rc = previous_rc;
     return rc;
 }

@@ -114,6 +114,8 @@ void _start(void) {
 MODE = 'userland/tests/hw/trident_mode.hwb'
 EXEC = 'userland/shell/hwb_exec.c'
 EXEC_MUTATIONS = [
+    ('array-read-store', EXEC, 'if (element) { *element = a; return HWB_OK; }\n        return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);\n    case HWB_PRINT:',
+     'if (element) { *element = 0; return HWB_OK; }\n        return he_assign(s, i->name, HWB_SCALAR, a, 0, 0);\n    case HWB_PRINT:', 'array-save-restore'),
     ('fill-address', EXEC, 'r->addr + n * i->width, &a);', 'r->addr, &a);', 'fill-values'),
     ('fill-count', EXEC, 'n < r->count; n++', 'n + 1U < r->count; n++', 'fill-values'),
     ('fill-point', EXEC, 'rc = he_point(s, 0); if (rc) return rc;\n            a = r->value;', 'rc = HWB_OK; if (rc) return rc;\n            a = r->value;', 'fill-abort'),
@@ -127,7 +129,7 @@ EXEC_MUTATIONS = [
     ('mode-pitch', MODE, '0x13 | ((0x50) << 8)\n # Column 6', '0x13 | ((0x51) << 8)\n # Column 6', 'mode'),
     ('mode-pll', MODE, 'mmiowrite8 v + 0x43C9 b', 'mmiowrite8 v + 0x43C9 a', 'mode'),
     ('mode-ar', MODE, 'mmiowrite8 v + 0x3C0 0x41', 'mmiowrite8 v + 0x3C0 0x40', 'mode'),
-    ('mode-unprotect', MODE, 'call protect_off\n # Column 8', 'log "unprotect postponed"\n # Column 8', 'mode'),
+    ('mode-unprotect', MODE, 'call protect_off\n # mode=4:', 'log "unprotect postponed"\n # mode=4:', 'mode'),
 ]
 
 

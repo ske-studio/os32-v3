@@ -247,8 +247,26 @@ static void scripts(void)
         }
     }
 }
+static void arrays(void)
+{
+    HWB_TEST("shell-arrays"); setup();
+    CHECK(command("dim", "save", "1024") == 0);
+    CHECK(command("let", "save[3]=0xA5", 0) == 0);
+    CHECK(command("print", "saved", "save[3]") == 0);
+    CHECK(command("ioread8", "port 9 -> save[4]", 0) == 0);
+    CHECK(command("let", "save[1024]=1", 0) == 2);
+    CHECK(command("dim", "save", "1") == 2);
+    CHECK(command("reset", 0, 0) == 0 && !hw_session.array_used);
+    CHECK(command("dim", "save", "4") == 0 && !hw_session.array_values[3]);
+    add("arrays", "dim a 4\nlet a[1] = 27\niowrite8 port 9 a[1]\nend");
+    CHECK(command("load", "arrays", 0) == 0 && live == 2);
+    CHECK(command("step", 0, 0) == 0 && hw_session.array_used == 4);
+    CHECK(command("let", "a[0]=19", 0) == 0);
+    CHECK(command("continue", 0, 0) == 0 && !live && hw_session.array_values[0] == 19);
+    CHECK(*hwbf_byte(&bus, HW_IO, 9) == 27);
+}
 void _start(void)
 {
-    adapters(); lifetime(); exit_codes(); unresolved(); scripts();
+    adapters(); lifetime(); arrays(); exit_codes(); unresolved(); scripts();
     hwb_test_write("SUMMARY PASS hwb shell\n"); hwb_test_exit(0);
 }

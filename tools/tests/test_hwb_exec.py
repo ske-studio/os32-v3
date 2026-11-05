@@ -13,6 +13,26 @@ import hwb_host
 FIXTURE = 'tools/tests/hwb_exec_host.c'
 PRODUCT = 'userland/shell/hwb_exec.c'
 MUTATIONS = [
+    ('array-log-index', 'userland/shell/hwb_log.c',
+     'str(b, " index="); dec(b, r->index);',
+     'str(b, " index="); dec(b, r->index + 1U);', 'array-values'),
+    ('array-write-range', PRODUCT,
+     'if (r->index >= v->array_count) return HWB_ARG;',
+     'if (0 && r->index >= v->array_count) return HWB_ARG;', 'array-write-range'),
+    ('array-read-range', 'userland/shell/hwb_parse.c',
+     'v->kind != HWB_ARRAY || index >= v->array_count',
+     'v->kind != HWB_ARRAY', 'array-read-range'),
+    ('array-elements-low', PRODUCT,
+     'a > HWB_ARRAY_ELEMENTS - s->array_used',
+     'a >= HWB_ARRAY_ELEMENTS - s->array_used', 'array-element-limit'),
+    ('array-elements-high', PRODUCT,
+     'a > HWB_ARRAY_ELEMENTS - s->array_used',
+     'a > HWB_ARRAY_ELEMENTS - s->array_used + 1U', 'array-element-limit'),
+    ('array-names-low', 'userland/shell/hwb.h',
+     '#define HWB_VARIABLES 64U', '#define HWB_VARIABLES 63U', 'array-name-limit'),
+    ('array-names-high', 'userland/shell/hwb.h',
+     '#define HWB_VARIABLES 64U', '#define HWB_VARIABLES 65U', 'array-name-limit'),
+
     ('bar-log-offset', PRODUCT,
      'hwb_log_begin(s->backend, &r);',
      'struct hwb_log_record logical = r; if (i.address.kind == HWB_ADDR_BAR || i.address.kind == HWB_ADDR_WINDOW) logical.addr &= 0xFFFU; hwb_log_begin(s->backend, &logical);', 'bar-log-address'),

@@ -82,9 +82,19 @@ static u32 hp_primary(struct hp *p, const struct hwb_state *state)
     }
     if (p->p < p->end && hp_first(p->s[p->p])) {
         struct hwb_span a = hp_name(p);
-        if (!state) return 0;
+        int indexed = hp_take(p, "[");
+        u32 index = 0;
+        if (indexed) { index = hp_expr(p, state, 0); hp_need(p, "]"); }
+        if (!state || p->bad) return 0;
         for (u32 i = 0; i < state->var_count && i < HWB_VARIABLES; i++) {
             if (hp_equal(p->s, a, state->vars[i].name)) {
+                if (indexed) {
+                    const struct hwb_variable *v = &state->vars[i];
+                    if (v->kind != HWB_ARRAY || index >= v->array_count) {
+                        p->bad = 1; return 0;
+                    }
+                    return state->array_values[v->array_start + index];
+                }
                 if (state->vars[i].kind != HWB_SCALAR) p->bad = 1;
                 return state->vars[i].value;
             }
@@ -134,7 +144,7 @@ static struct hwb_span hp_operand(struct hp *p, int whole)
     /* Adjacent primary operands ("1(2)", "(1)2") are not arguments.
      * Separators before the first operand may also be =, + or an opener. */
     if (p->p && p->p < p->end && !hp_space(p->s[p->p]) &&
-        (p->s[p->p-1] == ')' || p->s[p->p-1] == '"' || hp_first(p->s[p->p-1]) ||
+        (p->s[p->p-1] == ')' || p->s[p->p-1] == ']' || p->s[p->p-1] == '"' || hp_first(p->s[p->p-1]) ||
          (p->s[p->p-1] >= '0' && p->s[p->p-1] <= '9'))) p->bad = 1;
     hp_skip(p);
     struct hwb_span a = {p->p, p->p};
@@ -153,6 +163,15 @@ enum hwb_rc hwb_eval(const struct hwb_state *state, struct hwb_span expr, u32 *v
     hp_skip(&p);
     if (p.bad || p.p != p.end) return HWB_ARG;
     *value = v; return HWB_OK;
+}
+static void hp_destination(struct hp *p, struct hwb_instruction *i)
+{
+    i->name = hp_name(p);
+    if (hp_take(p, "[")) {
+        hp_skip(p); i->index.begin = p->p;
+        hp_expr(p, 0, 0); i->index.end = p->p;
+        hp_need(p, "]");
+    }
 }
 static struct hwb_span hp_text(struct hp *p)
 {
@@ -216,8 +235,10 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
     while (p.p < p.end && !hp_space(p.s[p.p])) p.p++;
     cmd.end = p.p;
 #define CMD(word) hp_equal(p.s, cmd, (word))
-    if (CMD("let")) {
-        i->op = HWB_LET; i->name = hp_name(&p); hp_need(&p, "="); i->value = hp_operand(&p, 1);
+    if (CMD("dim")) {
+        i->op = HWB_DIM; i->name = hp_name(&p); i->value = hp_operand(&p, 1);
+    } else if (CMD("let")) {
+        i->op = HWB_LET; hp_destination(&p, i); hp_need(&p, "="); i->value = hp_operand(&p, 1);
     } else if (CMD("device")) {
         i->name = hp_name(&p); hp_need(&p, "=");
         struct hwb_span kind = hp_name(&p);
@@ -241,7 +262,7 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
         if (i->address.kind == HWB_ADDR_PCI) i->space = HW_PCI;
         i->mask = hp_operand(&p, 0); i->value = hp_operand(&p, 0);
         i->timeout = hp_operand(&p, 0); i->interval = hp_operand(&p, 0);
-        hp_need(&p, "->"); i->name = hp_name(&p);
+        hp_need(&p, "->"); hp_destination(&p, i);
     } else if (CMD("print") || CMD("log")) {
         i->op = CMD("print") ? HWB_PRINT : HWB_LOG; i->text = hp_text(&p);
         if (i->op == HWB_PRINT) i->value = hp_operand(&p, 1);
@@ -270,7 +291,7 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
             if ((i->space == HW_PCI && i->address.kind != HWB_ADDR_PCI) ||
                 (i->space == HW_IO && i->address.kind != HWB_ADDR_PORT && i->address.kind != HWB_ADDR_BAR && i->address.kind != HWB_ADDR_WINDOW) ||
                 (i->space == HW_PHYS && i->address.kind != HWB_ADDR_PHYS && i->address.kind != HWB_ADDR_BAR && i->address.kind != HWB_ADDR_WINDOW)) p.bad = 1;
-            if (i->op == HWB_READ) { hp_need(&p, "->"); i->name = hp_name(&p); }
+            if (i->op == HWB_READ) { hp_need(&p, "->"); hp_destination(&p, i); }
             else {
                 if (i->op == HWB_FILL) i->count = hp_operand(&p, 0);
                 i->value = hp_operand(&p, 1);

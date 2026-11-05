@@ -252,9 +252,20 @@ static void mode_tests(void) {
     CHECK(run(scripts[7],1)==HWB_OK); CHECK(!enabled && disabled==1 && !fills);
     for(u32 k=0;k<4;k++) CHECK(vram[k]==0);
 }
+static void array_restore(void) {
+    HWB_TEST("array-save-restore"); reset(); sr[0]=3;
+    for (u32 k=0;k<8;k++) vram[k]=k*17+3;
+    CHECK(run("dim save 1024\nlet i = 0\nlabel save_loop\n"
+              "mmioread8 phys (0x20000000+i) -> save[i]\nlet i = i + 1\n"
+              "if i != 8 goto save_loop\nmmiofill8 phys 0x20000000 8 0\n"
+              "let i = 0\nlabel restore_loop\nmmiowrite8 phys (0x20000000+i) save[i]\n"
+              "let i = i + 1\nif i != 8 goto restore_loop\nend",0)==HWB_OK);
+    CHECK(st.writes==16);
+    for (u32 k=0;k<8;k++) CHECK(vram[k]==k*17+3);
+}
 void _start(void) {
     u32 err;
     HWB_TEST("syntax");
     for(u32 k=0;k<sizeof(scripts)/sizeof(*scripts);k++) CHECK(hwb_parse(&pg,scripts[k],length(scripts[k]),&err)==HWB_OK);
-    fill_tests(); mode_tests(); hwb_test_write("PASS fill and real mode script\n"); hwb_test_exit(0);
+    fill_tests(); array_restore(); mode_tests(); hwb_test_write("PASS fill and real mode script\n"); hwb_test_exit(0);
 }
