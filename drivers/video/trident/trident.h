@@ -188,8 +188,8 @@ struct trident_device {
     const struct trident_io *io;
     void *io_opaque;
     u32 failed_step, display_owner; /* arm-time diagnostic only, never a filter */
-    u8 chip, spr, reference; /* identify owns chip/reference; capacity_plan owns
-                             * spr, read after PC98 Init (S3 §§2,4). */
+    u8 chip, spr, reference; /* identify owns chip; capacity_plan owns spr;
+                             * mode_640 reads reference after PC98 Init (H:148-151). */
     bool pinned, declared_unknown;
     enum trident_upper upper;
     /* RAM loan for first VRAM verification only; lifecycle allocates/frees.
