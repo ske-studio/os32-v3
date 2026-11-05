@@ -21,7 +21,7 @@
  * PLL 0x21 (bios/pll.c), BIT P v2 thermal conversion (bios/therm.c).
  * No parsed route, PLL limit or F5 policy is injected into product state. */
 enum { S_ROM_BYTES=GF_INIT_PLL_TABLE+0x100, S_DCB=0x100, S_GPIO=0x140,
-       S_BIT=0x180, S_P=0x200, S_THERM=0x280 };
+       S_BIT=0x180, S_P=0x200, S_THERM=0x280, S_PERF=0x300 };
 static u8 scanlog_rom[S_ROM_BYTES];
 static struct gf_init_context scanlog_init_ctx;
 static struct gf_init_program scanlog_program;
@@ -82,6 +82,9 @@ static void scanlog_cold(void)
     scanlog_put(at+GF_PLL_ENT_MAX_P,7,1); scanlog_put(at+GF_PLL_ENT_BIAS_P,1,1);
     const u8 bit[]={0xff,0xb8,'B','I','T',0,0,0,12,6,1,0,'P',2,0x5c,0,0,2};
     gf2_host_memcpy(scanlog_rom+S_BIT,bit,sizeof(bit));
+    /* bios/perf.c:30-49: v0x20 header8, PWM divisor100 at+6. */
+    scanlog_put(S_P,S_PERF,4); scanlog_put(S_PERF,0x0820,2);
+    scanlog_put(S_PERF+6,100,2);
     scanlog_put(S_P+16,S_THERM,4); scanlog_put(S_THERM,0x06030410,4);
     const u8 tags[]={0,1,0x10,0x11,0x12,0x13};
     const u16 values[]={0,0,8,1,1,1};
@@ -163,6 +166,43 @@ static bool scanlog_contains(const char *s)
         if (!s[j]) return true;
     }
     return false;
+}
+static void scanlog_therm_recovery(bool auto_error)
+{
+    scanlog_init();
+    struct gf5 *g=&cint_prod.feature5;
+    gf3_host_set(&cint_host,0,0x15b4,0);
+    assert(!gf5_service_poll(g));
+    assert(g->fan.mode==GF5_FAN_AUTO && g->fan.target==0 && g->fan.duty==27);
+    if (auto_error) g->next_auto=0;
+    else cint_host.now=(u32)g->next_sensor;
+    c1_clear_trace(); startlog_clear();
+    gf3_host_fail_at(&cint_host,H_READ,auto_error ? 0 : 1,-903);
+    geforce_present(0,0,1,1);
+    assert(active && !g->fan.sensor_poll && !g->next_sensor);
+    assert(scanlog_contains(auto_error ? "[gf5] therm off rc=-903 reason=auto\n" :
+                                        "[gf5] therm off rc=-903 reason=sensor\n"));
+    assert(g->fan.mode==GF5_FAN_AUTO && g->next_auto>cint_host.now);
+    u32 low=g->fan.duty,auto_len=startlog_len;
+    gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
+    /* Synthetic calibration gives raw degrees: 90 => boost threshold90,
+     * hence max100%, with the reference's first ramp step of3 points. */
+    gf3_host_set(&cint_host,0,0x15b4,90);
+    cint_host.now=(u32)g->next_auto-1;
+    c1_clear_trace();
+    geforce_present(0,0,1,1);
+    assert(active && !cint_host.calls[H_READ] && g->fan.duty==low);
+    ++cint_host.now;
+    geforce_present(0,0,1,1);
+    assert(active && cint_host.calls[H_READ] && startlog_len==auto_len);
+    assert(g->fan.target==100);
+    assert(g->fan.duty==low+3 && !g->fan.sensor_poll);
+    /* Explicit AUTO must also update immediately despite the stopped monitor. */
+    assert(!gf5_fan_mode_set(g,GF5_FAN_NONE));
+    gf3_host_set(&cint_host,0,0x15b4,0);
+    assert(!gf5_fan_mode_set(g,GF5_FAN_AUTO));
+    assert(g->fan.target==0 && g->fan.duty==low && g->next_auto>cint_host.now);
+    scanlog_finish();
 }
 static void scanlog_present(void)
 {
@@ -266,33 +306,25 @@ void _start(void)
     geforce_backend_feature5_bind(0);
     scanlog_finish();
     /* AUTO has its own temperature read even when the threshold alarm is not due. */
-    scanlog_init();
-    assert(!gf5_service_poll(&cint_prod.feature5));
-    cint_prod.feature5.next_auto=0;
-    c1_clear_trace(); startlog_clear();
-    gf3_host_fail_at(&cint_host,H_READ,0,-903);
-    geforce_present(0,0,1,1);
-    assert(active && !cint_prod.feature5.fan.sensor_poll);
-    assert(scanlog_contains("[gf5] therm off rc=-903 reason=auto\n"));
-    assert(!cint_prod.feature5.next_auto && !cint_prod.feature5.next_sensor);
-    gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
-    c1_clear_trace();
-    u32 auto_len=startlog_len;
-    geforce_present(0,0,1,1);
-    assert(active && startlog_len==auto_len && !cint_host.calls[H_READ]);
-    scanlog_finish();
+    scanlog_therm_recovery(true);
+    scanlog_therm_recovery(false);
     scanlog_calibrated=false;
     scanlog_init(); startlog_clear();
     geforce_present(0,0,1,1);
     assert(active && !cint_prod.feature5.fan.sensor_poll);
-    assert(scanlog_contains("[gf5] therm off rc=-502 reason=sensor\n"));
+    assert(scanlog_contains("[gf5] therm off rc=-502 reason=sensor auto=unavailable (uncalibrated)\n"));
+    assert(cint_prod.feature5.fan.mode==GF5_FAN_NONE && !cint_prod.feature5.next_auto);
+    u32 duty;
+    assert(!gf5_fan_get(&cint_prod.feature5,&duty) && duty==30);
+    assert(gf5_fan_mode_set(&cint_prod.feature5,GF5_FAN_AUTO)==GF5_EINVAL);
+    assert(!gf5_fan_get(&cint_prod.feature5,&duty) && duty==30);
     u32 off_len=startlog_len;
     geforce_present(0,0,1,1); assert(startlog_len==off_len && active);
     scanlog_finish();
     /* F5 ROM allocation failure is optional: F4 remains usable. */
     scanlog_rom_fail=true; scanlog_init();
     startlog_clear(); geforce_present(0,0,1,1);
-    assert(active && scanlog_contains("[gf5] therm off rc=-502 reason=init\n"));
+    assert(active && scanlog_contains("[gf5] therm off rc=-502 reason=init auto=unavailable (uncalibrated)\n"));
     off_len=startlog_len;
     geforce_present(0,0,1,1); assert(startlog_len==off_len && active);
     scanlog_finish();

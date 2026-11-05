@@ -480,10 +480,14 @@ static i32 th_auto(struct gf5 *g,u64 now)
     g->next_auto=0;
     if (f->kind==GF5_FAN_OTHER && f->cstate) target=f->cstate;
     else {
-        if (f->sensor_setup==TH_SENSOR_OFF_SETUP) return 0;
+        /* base.c:153-154: AUTO keeps its own alarm after a sensor error. */
+        g->next_auto=now+TH_POLL_US;
         struct gf5_thermal t;
         i32 rc=th_temperature(g,&t);
-        if (rc) { th_monitor_off(g,rc,"auto"); return 0; }
+        if (rc) {
+            if (rc==GF5_ENOTSUP) { f->mode=GF5_FAN_NONE; g->next_auto=0; }
+            th_monitor_off(g,rc,"auto"); return 0;
+        }
         i32 temp=t.milli_c/(i32)TH_MILLI;
         if (f->kind==GF5_FAN_TRIP) {
             i32 chosen=-1;
@@ -496,7 +500,6 @@ static i32 th_auto(struct gf5 *g,u64 now)
             f->last_trip=chosen; target=chosen<0 ? 0 : f->trip[chosen].duty;
         } else target=th_linear(f,temp,f->kind==GF5_FAN_LINEAR ? f->linear_min : TH_FALLBACK_MIN,
                                f->kind==GF5_FAN_LINEAR ? f->linear_max : f->threshold[TH_BOOST]);
-        g->next_auto=now+TH_POLL_US;
     }
     return th_update(g,target,false,now);
 }
@@ -554,12 +557,12 @@ static void th_monitor_off(struct gf5 *g,i32 rc,const char *reason)
                g->fan.sensor_setup!=TH_SENSOR_OFF_SETUP;
     g->fan.sensor_poll=false;
     g->next_sensor=0;
-    g->next_auto=0;
     g->fan.sensor_setup=(!g->fan.sensor_setup || g->fan.sensor_setup==TH_OFF_SETUP) ?
                         TH_OFF_SETUP : TH_SENSOR_OFF_SETUP;
     if (first) {
-        kprintf(KLOG_ATTR,"[gf5] therm off rc=%d reason=%s\n",
-                g->source_rc ? g->source_rc : rc,reason);
+        kprintf(KLOG_ATTR,"[gf5] therm off rc=%d reason=%s%s\n",
+                g->source_rc ? g->source_rc : rc,reason,
+                rc==GF5_ENOTSUP ? " auto=unavailable (uncalibrated)" : "");
     }
     g->source_rc=0;
 }
