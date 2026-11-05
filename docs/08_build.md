@@ -462,6 +462,21 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
   先に確かめる。新しい変異試験もこの作りにする — 実物を書き換える試験は列に足さない
   (票 TASK_CHECK_MUT_PARALLEL (アーカイブ: `docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`) §5)。
 
+#### 検査のキャッシュ (作業木の外、2026-11-04)
+
+作業木を作り直しても同じ入力を調べ直さないよう、2 つのキャッシュを作業木の外に置く。どちらも消してよく、無い・壊れている・書けないときは全部調べる (結果は変わらない)。
+
+| キャッシュ | 対象 | 置き場 (既定) | 切り替え |
+|---|---|---|---|
+| 翻訳単位の結果 (`tools/clang_ast/result_cache.py`) | `check-c-dialect`・`check-p2v`・`check-arch-asm` とその host 試験の単位ごとの指摘 | `${XDG_CACHE_HOME:-~/.cache}/os32/checks/v1/<道具>/` | `OS32_CHECK_CACHE=<置き場>` / `off` |
+| host32 の固定物 (`tools/tests/host32.py` の `build()`) | `host32.build` で組む host 試験の実行物 | `${XDG_CACHE_HOME:-~/.cache}/os32/host32-fixtures/` (512 MiB / 8192 件で古い順に消す) | `OS32_HOST32_CACHE=<置き場>` / `off` (= 今までの `build/out/host32-fixtures/`) |
+
+- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く (毎回空の CI で鍵を作る手間を足さない)。
+- 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
+- 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
+- ccache は使わない: host 試験の大半が 1 回でコンパイルとリンクをする (`gcc src.c -o exe`、ccache の対象外) うえ、PATH の包みは clang_ast の cross newlib の探し方 (`i386-elf-gcc` の置き場から引く) を壊す (2026-11-04 の実測)。
+- 容量を見る・消す: `du -sh ~/.cache/os32/checks ~/.cache/os32/host32-fixtures`、消すときは各ディレクトリごと。
+
 <a id="kapi-v63-移行"></a>
 #### KAPI v63 への移行 (データ欄の固定配置、票 TASK_KAPI_DATA_FIELDS (アーカイブ: `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`))
 

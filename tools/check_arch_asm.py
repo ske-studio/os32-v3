@@ -7,6 +7,7 @@ import re
 import clang_ast as ast
 from clang_ast.asm import templates
 from clang_ast.build import select_units
+from clang_ast.result_cache import get_or_compute
 K = ast.K
 SCAN_DIRS = SCAN_ROOTS['arch_asm']
 ALLOW_RE = re.compile(r'^arch/[^/]+/arch_[A-Za-z0-9_]+\.h$')
@@ -64,7 +65,9 @@ def main():
                  if u['src'].split('/')[0] in SCAN_DIRS
                  and not u['src'].startswith('lib/sqlite3/')]
         for u in select_units(units, root, args.files):
-            hits.update(findings(ast.parse(u['src'],u['argv'],root),root))
+            def compute():
+                return findings(ast.parse(u['src'],u['argv'],root),root)
+            hits.update(map(tuple, get_or_compute('arch-asm', u['src'], u['argv'], root, compute)))
     except RuntimeError as e:
         errors.append('clang parse failure: ' + str(e))
     for rel,ln,mn in sorted(hits):
