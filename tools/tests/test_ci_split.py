@@ -29,8 +29,7 @@ def workflow_cases(source):
     for name, job in jobs.items():
         assert not job.get('needs'), 'jobs must run independently'
         runner = job['runs-on']
-        assert all(term in runner for term in ('github.event_name', "'push'",
-                   "'refs/heads/wt/'", 'self-hosted', 'substream', 'ubuntu-latest')), 'runner routing'
+        assert runner == 'ubuntu-latest', 'GitHub runner (substream not used, user decision 2026-11-05)'
         assert job['timeout-minutes'] == 150
         assert job['concurrency']['cancel-in-progress'] is True
         assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name, 'separate concurrency groups'
@@ -138,14 +137,14 @@ def main():
     if '--mutate' in sys.argv:
         mutations = [
             ('workflow', '  check-fast:\n', '  check-fast:\n    needs: artifacts\n', 'serialize jobs'),
-            ('workflow', '    runs-on: ${{', '    runs-on: ubuntu-latest # ${{', 'lose runner routing'),
+            ('workflow', '    runs-on: ubuntu-latest', '    runs-on: [self-hosted, substream]', 'route to substream'),
             ('fetch', 'if [ "$ART_STATE" = success ]; then', 'if [ "$ART_STATE" != success ]; then', 'invert artifact gate'),
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
             text = source if kind == 'workflow' else FETCH.read_text()
             # Runner occurs once per job; mutate only the check-fast job.
-            if name == 'lose runner routing':
+            if name == 'route to substream':
                 prefix, text = text.split('  check-fast:\n', 1)
                 assert text.count(old) == 1, name
                 changed = prefix + '  check-fast:\n' + text.replace(old, new)

@@ -33,8 +33,7 @@ permissions:
 
 jobs:
   artifacts:
-    # wt/** の push は substream (自前の runner、ユーザー承認 2026-11-05)。main と pull_request (fork を含む) は GitHub の runner のまま。
-    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/wt/') && fromJSON('["self-hosted", "substream"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 150
     concurrency:
       group: build-${{ github.ref }}-artifacts
@@ -151,8 +150,7 @@ jobs:
           if-no-files-found: error
 
   check-fast:
-    # wt/** の push は substream (自前の runner、ユーザー承認 2026-11-05)。main と pull_request (fork を含む) は GitHub の runner のまま。
-    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/wt/') && fromJSON('["self-hosted", "substream"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 150
     concurrency:
       group: build-${{ github.ref }}-check-fast
