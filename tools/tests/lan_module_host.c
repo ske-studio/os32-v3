@@ -20,7 +20,9 @@ const struct module_symbol_contract lan_export_contracts[] = {{0}};
 const struct bootinfo *bootinfo_get(void) { finish(2); }
 
 
-enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL };
+enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL,
+       BAD_FUNCTION, NULL_FUNCTION, OPTIONAL_VALID, BAD_ADAPTER, BAD_NETCD };
+static const struct NetAdapter body_adapter = {0};
 static u32 mode, ticks, probes, sends, gets, quiet_calls, release_calls;
 static u32 dma_live, dma_freed, irq_live, irq_calls, cleanup_order;
 static int probe_result;
@@ -57,6 +59,7 @@ int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 static int body_irq(unsigned int irq, void *arg)
 { CHECK(irq == 5 && !arg && irq_live); irq_calls++; return IRQ_HANDLED; }
 static void body_tick(void) { ticks++; }
+static int body_netcd_register(const char *path) { (void)path; return 0; }
 static int body_state(void) { return mode == QUARANTINE ? E82557_QUARANTINED : E82557_RUNNING; }
 static int body_send(const void *buf, u32 len)
 { CHECK(buf && len == 1 && dma_live); sends++; return 0; }
@@ -103,6 +106,17 @@ static int init_lan(LanModuleApi *out)
     out->probe = body_probe; out->tick = body_tick; out->state = body_state;
     out->quiet = body_quiet; out->release = body_release;
     out->send = body_send; out->io.get = body_get;
+    out->adapter = 0; out->netcd_register = 0;
+    struct module_record *r = module_record_get(lan_handle);
+    if (mode == BAD_FUNCTION || mode == NULL_FUNCTION)
+        out->io.can_wait = (int (*)(void *))(uptr)(mode == NULL_FUNCTION ? 0 : r->text + r->text_size);
+    if (mode == OPTIONAL_VALID) {
+        out->adapter = &body_adapter;
+        out->netcd_register = body_netcd_register;
+    }
+    if (mode == BAD_ADAPTER) out->adapter = (const struct NetAdapter *)(uptr)r->text;
+    if (mode == BAD_NETCD)
+        out->netcd_register = (int (*)(const char *))(uptr)(r->text + r->text_size);
     return mode == INIT_FAIL ? MODULE_INIT_FAILED : 0;
 }
 int pci_count(void) { return 2; }
@@ -194,7 +208,14 @@ void _start(void)
     r->init = (u32)(uptr)init_lan;
     r->text = (u32)(uptr)body_irq & ~(PAGE_SIZE - 1);
     r->text_size = 16 * PAGE_SIZE;
+    r->ro = (u32)(uptr)&body_adapter;
+    r->ro_size = sizeof(body_adapter);
     int rc = module_start(lan_handle);
+    if (mode == BAD_FUNCTION || mode == NULL_FUNCTION || mode == BAD_ADAPTER || mode == BAD_NETCD) {
+        CHECK(rc == MODULE_INIT_FAILED && !probes && !candidate_valid);
+        CHECK(!module_exports(lan_handle)); no_refs(r);
+        check_fallback(); finish(0);
+    }
     if (mode == INIT_FAIL) {
         CHECK(rc == MODULE_INIT_FAILED && !probes);
         check_fallback(); empty(); finish(0);
@@ -218,6 +239,7 @@ void _start(void)
         CHECK(quiet_calls == 1 && release_calls == 1); empty(); finish(0);
     }
     CHECK(!rc && module_exports(lan_handle));
+    CHECK(mode == OPTIONAL_VALID || (!candidate.adapter && !candidate.netcd_register));
     if (mode == DECLINE || mode == CLEAN_DECLINE) {
         CHECK(probe_result == PCI_PROBE_DECLINE);
         no_refs(r); CHECK(!dma_live && !irq_live);

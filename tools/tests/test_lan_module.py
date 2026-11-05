@@ -25,7 +25,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/net/e82557/lan_module.c'
 CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
-         'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info']
+         'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info',
+         'required-function-outside-text', 'required-function-null', 'optional-slots-valid',
+         'adapter-outside-rodata', 'netcd-outside-text']
 
 
 def product_image(folder):
@@ -134,6 +136,9 @@ def runtime_checks(folder, mutations=False):
     if mutations:
         source = SOURCE.read_text()
         for label, old, new in (
+            ('optional-null-rejected',
+             'i < offsetof(LanModuleApi, adapter) / sizeof(entries[0]);',
+             'i < LAN_MODULE_API_SLOTS;'),
             ('pci-fallback', '        pci_bind_all(NULL, 0);', '        /* omit fallback */'),
             ('pci-rebind', '    if (!pci_bound) {', '    if (1) {'),
             ('tick-detach',
