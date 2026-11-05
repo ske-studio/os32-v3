@@ -36,6 +36,7 @@ static void die(int line) {
 }
 static int owner=1, cr3=1, gui=1, invokes, jumped, clears, injected;
 static u32 tick_count=100, saved_buf[KSETJMP_BUF_LEN];
+void x87_save(X87State *p) { (void)p; }
 static AppSlot *g_cur_app;
 static u32 *g_cur_frame;
 static int ring3_in_syscall, caller;
@@ -157,6 +158,11 @@ static void dispatch_case(int inside) {
     CHECK(!appslot_stop_pending());
     CHECK(g_longjmp_reason==EXEC_LJ_PARK && !a->stop_wm_req && a->parked_from_stop);
     CHECK(a->state==APP_STATE_WAIT_POLL && a->frame[7]==0x89abcdef);
+    CHECK(appslot_stop_culprit()==2);
+    CHECK(appslot_stop_culprit()==2 && a->parked_from_stop);
+    res_owner_set(3);
+    CHECK(appslot_stop_culprit()==OS32_ERR_INVAL);
+    res_owner_set(APP_ID_SHELL);
     for(int i=0;i<APP_FRAME_WORDS;i++) CHECK(a->frame[i]==frame[i]);
     CHECK(!appslot_resume_check(2) && !appslot_kill_check(2));
     CHECK(appslot_resume_source(2)==APP_RESUME_SRC_KEEP);
@@ -165,7 +171,43 @@ static void dispatch_case(int inside) {
     // target != culprit: caller retains all state and will run again.
     appslot_resume_commit(2);
     CHECK(a->state==APP_STATE_RUNNING && !a->parked_from_stop && !a->stop_wm_req);
+    res_owner_set(APP_ID_SHELL);
+    CHECK(appslot_stop_culprit()==0);
     CHECK(appslot_get(3)->pages==30 && !appslot_get(3)->abort_req);
+}
+static void culprit_contract(void) {
+    /* Every application ID, including the upper bound; query is read-only. */
+    for (int id=APP_ID_MIN; id<=APP_ID_MAX; id++) {
+        setup();
+        AppSlot *a=appslot_at(id);
+        a->state=APP_STATE_RUNNING; a->gui=1; a->cpl3=1;
+        appslot_switch_to(id);
+        appslot_stop_request();
+        appslot_park_stop_commit();
+        CHECK(appslot_stop_culprit()==id);
+        CHECK(appslot_stop_culprit()==id && a->state==APP_STATE_WAIT_POLL);
+        CHECK(!appslot_kill_check(id));
+        appslot_reclaim(id); /* exec_kill uses this same reclaim path. */
+        CHECK(!a->parked_from_stop && appslot_stop_culprit()==0);
+    }
+    for (int origin=0; origin<2; origin++) {
+        setup();
+        if (origin) appslot_park_yield_commit();
+        else appslot_park_poll_commit();
+        CHECK(appslot_get(2)->state==APP_STATE_WAIT_POLL);
+        CHECK(appslot_stop_culprit()==0);
+    }
+    appslot_init();
+    AppSlot *a=appslot_at(APP_ID_MAX);
+    a->parked_from_stop=1; /* A mark in a different state is not a culprit. */
+    res_owner_set(APP_ID_SHELL);
+    CHECK(appslot_stop_culprit()==0);
+    a->state=APP_STATE_PARKED;
+    CHECK(appslot_stop_culprit()==0);
+    for (int id=APP_ID_MIN; id<=APP_ID_MAX; id++) {
+        res_owner_set(id);
+        CHECK(appslot_stop_culprit()==OS32_ERR_INVAL);
+    }
 }
 static void resume_marks(void) {
     /* Independent cases against appslot.c, never its boot selftest. */
@@ -279,6 +321,7 @@ static void park_contract(void) {
 static int test(void) {
     static struct addrspace as;
     (void)as;
+    culprit_contract();
     park_contract();
     dispatch_case(0); dispatch_case(1); dispatch_case(2);
     setup(); gui=0; ring3_abort_request(); CHECK(appslot_get(2)->abort_req && !appslot_get(2)->stop_wm_req);
@@ -380,7 +423,7 @@ def run(overrides=None):
         return overrides.get(p, (ROOT / p).read_text())
     ex = exec_source(ROOT, read)
     resume = function(ex, 'exec_resume')
-    resume = resume[:resume.index('    volatile Ring3CallContext')] + '    return 0;\n}'
+    resume = resume[:resume.index('    volatile int x87_depth')] + '    return 0;\n}'
     # Preparation alone: the existing R1 harness exercises the real landing.
     resume = resume.replace('exec_resume(', 'prepare_resume(').replace('!a->as->pd_phys', '0')
     import re
@@ -391,7 +434,8 @@ def run(overrides=None):
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
     transition = read('exec/appslot_transition.inc').replace(
         '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
-    code = PRE + constants + read('exec/appslot.c').replace(
+    hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
+    code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + '\n'.join(function(ex,n) for n in (
         'ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
@@ -415,6 +459,15 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
+ ('culprit-ignore-mark','exec/appslot_transition.inc',
+  'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
+  'a && a->state == APP_STATE_WAIT_POLL)'),
+ ('culprit-ignore-state','exec/appslot_transition.inc',
+  'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
+  'a && a->parked_from_stop)'),
+ ('culprit-ignore-owner','exec/appslot_transition.inc',
+  'int appslot_stop_culprit(void)\n{\n    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;',
+  'int appslot_stop_culprit(void)\n{'),
  ('lost-shell-request','exec/appslot_transition.inc','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
  ('ignore-shell-request','exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),

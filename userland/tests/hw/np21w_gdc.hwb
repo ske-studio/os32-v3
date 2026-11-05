@@ -1,0 +1,6 @@
+ioread8 port 0x60 -> s
+print "GDC" s
+iowrite8 port 0x68 0x0E
+wait us 1000000
+iowrite8 port 0x68 0x0F
+end

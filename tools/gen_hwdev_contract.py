@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
 OUT = ROOT / 'hwdev/generated'
-# docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 17 kernel imports.
-HWDEV_IMPORT_SLOTS = 26 + 17
+# docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 18 kernel imports.
+HWDEV_IMPORT_SLOTS = 26 + 18
 
 
 def normalize(text):

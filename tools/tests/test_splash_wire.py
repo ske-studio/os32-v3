@@ -2,6 +2,7 @@
 CHECK = dict(name='splash-wire-host', tier=1,
     covers=['init/boot_splash.c', 'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
             'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.c',
+            'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
             'drivers/video/pc98/splash_raster_play.h', 'drivers/video/pc98/splash_raster_image.h',
             'gfx/osri_profile.h', 'include/memmap.h', 'include/platform_splash.h', 'include/config.h', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h',
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['init/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
            'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_plan.c',
            'drivers/video/pc98/splash_raster_play.c', 'drivers/video/pc98/splash_raster_image.c',
+           'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
            'gfx/gfx_osri.c', 'lib/le_internal.h',
            'lib/crc32_core.inc', 'tools/tests/splash_wire_host.c', 'tools/tests/splash_raster_host.c']
 MUTATIONS = (

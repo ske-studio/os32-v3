@@ -11,9 +11,11 @@ struct PlV2Row {
 struct PlV2Plan { struct PlV2Row row[GFX_HEIGHT]; u32 max_outs, total_outs; };
 STATIC_ASSERT(sizeof(struct PlV2Row) == 64u, pl_v2_row_size);
 STATIC_ASSERT(sizeof(struct PlV2Plan) == 25608u, pl_v2_plan_size);
-enum { PL_FRAME_OK = 0, PL_FRAME_DROP = 1, PL_FRAME_NO_SYNC = -1 };
+enum { PL_FRAME_OK = 0, PL_FRAME_DROP = 1, PL_FRAME_NO_SYNC = -1, PL_FRAME_CANCEL = 2 };
 /* Borrowed image/plan; the owner allocates both on the heap. */
 int pl_v2_prepare(const struct OsriImage *image, struct PlV2Plan *plan);
 int pl_v2_frame(struct SplashRaster *state, const struct OsriImage *image,
                 const struct PlV2Plan *plan);
+int pl_v2_frame_poll(struct SplashRaster *state, const struct OsriImage *image,
+                     const struct PlV2Plan *plan, int (*poll)(void *), void *ctx);
 #endif

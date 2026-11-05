@@ -3,6 +3,7 @@ CHECK = dict(name='splash-v2-host', tier=1,
     covers=['platform/pc98/splash_image.c', 'include/platform_splash.h', 'init/boot_splash.c',
             'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.h',
             'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
+            'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
             'gfx/gfx_osri.h', 'gfx/osri_profile.h', 'gfx/gfx.h', 'gfx/palette.h',
             'include/memmap.h', 'include/pegc.h', 'include/pc98.h', 'include/types.h',
             'include/io.h', 'include/gfx_hal.h', 'include/config.h',
@@ -19,25 +20,28 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 OWNER = 'platform/pc98/splash_image.c'
-SOURCES = [OWNER, 'tools/tests/splash_v2_host.c', 'drivers/video/pc98/splash_raster_plan.c']
+SOURCES = [OWNER, 'tools/tests/splash_v2_host.c', 'drivers/video/pc98/splash_raster_plan.c',
+           'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h']
 MUTATIONS = (
-    ('reject dynamic', 'if (image->count) {', 'if (image->count) goto done;\n    if (image->count) {'),
-    ('omit plan free', 'if (plan) kfree(plan);', '(void)plan;'),
-    ('omit image free', 'if (image) kfree(image);', '(void)image;'),
-    ('omit prepare', 'if (pl_v2_prepare(image, plan)) goto done;', '(void)pl_v2_prepare;'),
-    ('omit preview', 'if (pl_preview(s)) goto done;', '(void)pl_preview;'),
-    ('preview shortage', 'SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS) goto done;', '1u) goto done;'),
-    ('omit preview charge', 'u32 prefix = play_start - start;', 'u32 prefix = 0;'),
-    ('omit drop charge', 'consumed += period;', 'if (frame == PL_FRAME_OK) consumed += period;'),
-    ('omit elapsed ticks', 'unsigned long long used = elapsed > consumed ? elapsed : consumed;', 'unsigned long long used = consumed; (void)elapsed;'),
-    ('double charge', 'unsigned long long used = elapsed > consumed ? elapsed : consumed;', 'unsigned long long used = elapsed + consumed;'),
-    ('all drop succeeds', 'if (good || !frames) rc = PLATFORM_SPLASH_DONE;', 'rc = PLATFORM_SPLASH_DONE; (void)good;'),
-    ('ignore no sync', 'if (frame == PL_FRAME_NO_SYNC) goto play_done;', 'if (0 && frame == PL_FRAME_NO_SYNC) goto play_done;'),
-    ('restart deadline', '*end_tick = now + rest;', '*end_tick = now + PLATFORM_SPLASH_TICKS; (void)rest;'),
-    ('omit model residual', 'if (model > elapsed) elapsed = model;', '(void)model;'),
-    ('round residual up', '(rest + 1u) *', '(rest + 0u) *'),
-    ('omit black cleanup', 'if (transferred) image_black();', '(void)transferred;'),
+    ('reject dynamic', OWNER, 'if (image->count) {', 'if (image->count) goto done;\n    if (image->count) {'),
+    ('omit plan free', OWNER, 'if (plan) kfree(plan);', '(void)plan;'),
+    ('omit image free', OWNER, 'if (image) kfree(image);', '(void)image;'),
+    ('omit prepare', OWNER, 'if (pl_v2_prepare(image, plan)) goto done;', '(void)pl_v2_prepare;'),
+    ('omit preview', OWNER, 'if (pl_preview(s)) goto done;', '(void)pl_preview;'),
+    ('preview shortage', OWNER, 'SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS) goto done;', '1u) goto done;'),
+    ('raster duration cap', OWNER, 'if (remaining_us > play_limit_us) remaining_us = play_limit_us;', '(void)play_limit_us;'),
+    ('omit preview charge', OWNER, 'u32 prefix = play_start - start;', 'u32 prefix = 0;'),
+    ('omit drop charge', 'drivers/video/pc98/splash_raster_run.c', 'r->consumed += r->period;', 'if (frame == PL_FRAME_OK) r->consumed += r->period;'),
+    ('omit elapsed ticks', 'drivers/video/pc98/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return r->consumed; (void)elapsed;'),
+    ('double charge', 'drivers/video/pc98/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return elapsed + r->consumed;'),
+    ('all drop succeeds', OWNER, 'if (run.good || !run.frames) rc = PLATFORM_SPLASH_DONE;', 'rc = PLATFORM_SPLASH_DONE;'),
+    ('ignore no sync', OWNER, 'if (frame == PL_FRAME_NO_SYNC) goto play_done;', 'if (0 && frame == PL_FRAME_NO_SYNC) goto play_done;'),
+    ('restart deadline', OWNER, '*end_tick = now + rest;', '*end_tick = now + PLATFORM_SPLASH_TICKS; (void)rest;'),
+    ('omit model residual', OWNER, 'residual.consumed = model;', '(void)model;'),
+    ('round residual up', 'drivers/video/pc98/splash_raster_run.c', 'used + (unsigned long long)mid * unit_us', 'used + (unsigned long long)(mid - 1u) * unit_us'),
+    ('omit black cleanup', OWNER, 'if (transferred) image_black();', '(void)transferred;'),
 )
+
 def compiler():
     return str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
 def flags(work):
@@ -51,8 +55,8 @@ def execute(mutation=None):
         for rel in SOURCES:
             dest=work/rel; dest.parent.mkdir(parents=True, exist_ok=True)
             text=(ROOT/rel).read_text()
-            if mutation and rel == OWNER:
-                name, old, new=mutation
+            if mutation and rel == mutation[1]:
+                name, _, old, new=mutation
                 assert text.count(old) == 1, name
                 text=text.replace(old,new,1)
             dest.write_text(text)

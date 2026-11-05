@@ -120,21 +120,9 @@ struct rec_tx_diag {                  /* 全て32bit、48 B。共有 recover に
 };
 ```
 
-### kpeek_allow.c
+### kpeek.c
 
-ソース: `kdebug/kpeek_allow.c`
-
-| DWORD（BAR0相対） | 非破壊読取りの根拠と許可 |
-| --- | --- |
-| 680508h | /home/hight/os32-tmp/run/gf-main0-fail/ref/nouveau/nvkm/subdev/devinit/nv04.c:205,207の保存読取り。係数定義/home/hight/os32-tmp/run/gf-main0-fail/ref/envytools/rnndb/display/nv3_pramdac.xml:10–14,41。HWDEV read_safe=1（kdebug/generated/recover_gf_tables.inc:739）、kpeek可。 |
-| 680578h | /home/hight/os32-tmp/run/gf-main0-fail/ref/nouveau/nvkm/subdev/devinit/nv04.c:206,208の保存読取り。/home/hight/os32-tmp/run/gf-main0-fail/ref/envytools/rnndb/display/nv3_pramdac.xml:26–29,88はNV31:NV34限定なのでNV44Aへの根拠はN。read_safe=1（同:740）、kpeek可。 |
-| 680580h | /home/hight/os32-tmp/run/gf-main0-fail/ref/nouveau/nvkm/subdev/devinit/nv04.c:220–224のNV41以降の保存読取り。read_safe=1（同:615）、kpeek可。 |
-| 00C040h | /home/hight/os32-tmp/run/gf-main0-fail/ref/nouveau/nvkm/subdev/devinit/nv04.c:257–259,272の保存→変更→復元。read_safe=1（同:612）、kpeek不可なので下記1行を追加。 |
-| 68050Ch | /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/dispnv04/hw.c:392–404の通常状態保存で読む（MIT）。/home/hight/os32-tmp/run/gf-main0-fail/ref/envytools/rnndb/display/nv3_pramdac.xml:59–80も源選択制御。既存kpeek PRAMDAC帯で可、HWDEV行は不要。 |
-
-これらは通常制御の保存読取りを非破壊性の根拠とする。NV44Aマニュアルによる保証ではなく、追加MMIO readによるposted write排出・時間差は残る。
-
-C040はkdebug/kpeek_allow.c:12–20に `NV_ROW(0x00c040U,4U,KPEEK_W4)` 相当を定数化して1行追加。PMC帯全体を広げない。
+`peek -m` は任意の物理番地を一時窓に読み取り専用で写像する。幅・整列・長さ・4MB 境界と番地の溢れを検査し、読み終えたら PTE を復元する。
 
 ### recover_gf_expand.h
 

@@ -60,11 +60,12 @@ extern int kapi_serial_diag(SerialDiag *out);
 extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 extern i32 kdebug_call(u32 op, void *buf, u32 size);
 extern int kapi_sys_ver_info(void *out, u32 size);
+extern int kapi_osri_show(const char *path, u32 duration_ms);
 
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[255];
+volatile u32 kapi_hits[258];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -325,6 +326,9 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     4,  /* font_source_close */
     12,  /* kdebug_call */
     8,  /* sys_ver_info */
+    0,  /* exec_stop_culprit */
+    16,  /* ime_dict_info */
+    8,  /* gfx_osri_show */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -585,6 +589,9 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* font_source_close */
     0x0000,  /* kdebug_call */
     0x0000,  /* sys_ver_info */
+    0x0000,  /* exec_stop_culprit */
+    0x0000,  /* ime_dict_info */
+    0x0000,  /* gfx_osri_show */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2469,5 +2476,23 @@ int __cdecl wrap_sys_ver_info(void *out, u32 size)
         ring3_fault_kill();   /* 戻らない */
     }
     return kapi_sys_ver_info(out, size);
+}
+
+i32 __cdecl wrap_exec_stop_culprit(void)
+{
+    KAPI_HIT(255);
+    return exec_stop_culprit();
+}
+
+int __cdecl wrap_ime_dict_info(int key, int offset, char *out, int capacity)
+{
+    KAPI_HIT(256);
+    return ime_dict_info_facade(key, offset, out, capacity);
+}
+
+int __cdecl wrap_gfx_osri_show(const char *path, u32 duration_ms)
+{
+    KAPI_HIT(257);
+    return kapi_osri_show(path, duration_ms);
 }
 

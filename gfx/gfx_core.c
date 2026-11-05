@@ -54,6 +54,7 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
+int gfx_is_started(void) { return gfx_started; }
 /* Boot binds PC98 before DISPLAY registration; selection validates thereafter. */
 static int gfx_mode_ready = 1;
 u32 gfx_init_gen;
@@ -287,6 +288,7 @@ static int gfx_select_and_init_backend(int legacy200)
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
             if (g_backend == &gfx_backend_geforce && !pc98_route_safe()) return -1;
+            kprintf(KLOG_ATTR, "[gfx] backend=%s init failed -> pc98\n", g_backend->name);
             gfx_select_mode(&gfx_backend_pc98, legacy200);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);

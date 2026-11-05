@@ -321,6 +321,9 @@ pub static KILLS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// `snd_focus(app_id)` の呼び出し列。
 pub static SND_FOCUS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// `exec_abort_clear()` が呼ばれた回数 (KAPI v45、決裁 A1)。
+pub static STOP_CULPRIT: Mutex<i32> = Mutex::new(0);
+/// STOP に関係する KAPI の順序。
+pub static STOP_CALLS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 pub static ABORT_CLEARS: AtomicUsize = AtomicUsize::new(0);
 /// `kbd_inject_pending()` が返す未読バイト数 (KAPI v47、票 K7 指摘 C)。
 pub static INJECTED: Mutex<Vec<u8>> = Mutex::new(Vec::new());
@@ -861,6 +864,7 @@ unsafe extern "C" fn exec_start(cmdline: *const u8) -> i32 {
     }
 }
 unsafe extern "C" fn exec_kill(app_id: i32) -> i32 {
+    lk(&STOP_CALLS).push("kill");
     lk(&KILLS).push(app_id);
     /* 実物の `exec_kill` は連鎖の子孫ごと畳む (票 T9 D8)。畳んだ結果
      * `exec_app_state` が `FREE` になる ID を試験が置く (既定は空)。 */
@@ -878,7 +882,12 @@ unsafe extern "C" fn snd_focus(app_id: i32) -> i32 {
  * ゲストでは `op_wait` の中から呼ぶと `OS32_ERR_INVAL`。ここは回数を数える
  * だけ — 「どこから呼んだか」はカーネル側の領分
  * (`tools/tests/multiapp_impl_host.c` ケース 20 が実物の AppSlot で検査済み)。 */
+unsafe extern "C" fn exec_stop_culprit() -> i32 {
+    lk(&STOP_CALLS).push("culprit");
+    *lk(&STOP_CULPRIT)
+}
 unsafe extern "C" fn exec_abort_clear() -> i32 {
+    lk(&STOP_CALLS).push("clear");
     ABORT_CLEARS.fetch_add(1, Ordering::SeqCst);
     0
 }
@@ -979,6 +988,7 @@ pub fn init() {
     a.exec_start = exec_start;
     a.exec_kill = exec_kill;
     a.exec_abort_clear = exec_abort_clear;
+    a.exec_stop_culprit = exec_stop_culprit;
     a.snd_focus = snd_focus;
     a.kbd_inject = kbd_inject;
     lk(&INJECTED).clear(); INJECT_CALLS.store(0, Ordering::SeqCst);
@@ -1016,6 +1026,8 @@ pub fn init() {
     lk(&KILLS).clear();
     lk(&SND_FOCUS).clear();
     ABORT_CLEARS.store(0, Ordering::SeqCst);
+    *lk(&STOP_CULPRIT) = 0;
+    lk(&STOP_CALLS).clear();
     KBD_PENDING.store(0, Ordering::SeqCst);
     INJECT_LIMIT.store(usize::MAX, Ordering::SeqCst);
     lk(&APP_STATE).clear();

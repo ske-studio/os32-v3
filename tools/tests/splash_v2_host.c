@@ -6,6 +6,7 @@
 #define IO_H
 static int irq_on = 1;
 static int _irq_enabled(void) { return irq_on; }
+#include "../../drivers/video/pc98/splash_raster_run.c"
 #include "../../platform/pc98/splash_image.c"
 #include "../../drivers/video/pc98/splash_raster_plan.c"
 
@@ -121,6 +122,12 @@ void _start(void)
         REQUIRE(frames == expected && previews == 1 && commits == 1 && allocs == 2);
         REQUIRE(tick_count == initial+prefix); /* No compensation of global PIT. */
         REQUIRE(end-tick_count < 2 && end-tick_count <= remaining);
+
+        /* A stalled PIT during preview must not extend raster playback. */
+        setup(mode); load_ticks=transfer_ticks=preview_ticks=0; end=PLATFORM_SPLASH_IMAGE_TICKS;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_DONE);
+        REQUIRE(frames == ((unsigned long long)PLATFORM_SPLASH_IMAGE_PLAY_SECONDS *
+                          1000000u * state.line_den) / p);
 
         setup(mode); frame_result=PL_FRAME_DROP; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == expected && previews == 1);

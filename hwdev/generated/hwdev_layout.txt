@@ -362,6 +362,8 @@ offset	KernelAPI.exec_run	164
 member_size	KernelAPI.exec_run	4
 offset	KernelAPI.exec_start	728
 member_size	KernelAPI.exec_start	4
+offset	KernelAPI.exec_stop_culprit	1028
+member_size	KernelAPI.exec_stop_culprit	4
 offset	KernelAPI.ext2_format	240
 member_size	KernelAPI.ext2_format	4
 offset	KernelAPI.ext2_format_at	928
@@ -402,6 +404,8 @@ offset	KernelAPI.gfx_init_200	12
 member_size	KernelAPI.gfx_init_200	4
 offset	KernelAPI.gfx_lease_palette	704
 member_size	KernelAPI.gfx_lease_palette	4
+offset	KernelAPI.gfx_osri_show	1036
+member_size	KernelAPI.gfx_osri_show	4
 offset	KernelAPI.gfx_present	20
 member_size	KernelAPI.gfx_present	4
 offset	KernelAPI.gfx_present_dirty	376
@@ -454,6 +458,8 @@ offset	KernelAPI.ide_write_sector	264
 member_size	KernelAPI.ide_write_sector	4
 offset	KernelAPI.ide_write_sectors	268
 member_size	KernelAPI.ide_write_sectors	4
+offset	KernelAPI.ime_dict_info	1032
+member_size	KernelAPI.ime_dict_info	4
 offset	KernelAPI.ime_feed_key	720
 member_size	KernelAPI.ime_feed_key	4
 offset	KernelAPI.ime_get_mode	428
@@ -484,8 +490,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1028
-member_size	KernelAPI.kapi_reserved	180
+offset	KernelAPI.kapi_reserved	1040
+member_size	KernelAPI.kapi_reserved	168
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1188,7 +1194,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	108
+size	struct GfxBackend	112
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1226,6 +1232,8 @@ offset	struct GfxBackend.modes	64
 member_size	struct GfxBackend.modes	4
 offset	struct GfxBackend.name	0
 member_size	struct GfxBackend.name	4
+offset	struct GfxBackend.osri_show	108
+member_size	struct GfxBackend.osri_show	4
 offset	struct GfxBackend.page_flip	100
 member_size	struct GfxBackend.page_flip	4
 offset	struct GfxBackend.prepare	60
@@ -1908,6 +1916,726 @@ offset	struct gf3_test_ops.unmap	44
 member_size	struct gf3_test_ops.unmap	4
 offset	struct gf3_test_ops.upload	24
 member_size	struct gf3_test_ops.upload	4
+size	struct gf4_ctx	6652
+align	struct gf4_ctx	4
+offset	struct gf4_ctx.accel	4
+member_size	struct gf4_ctx.accel	4
+offset	struct gf4_ctx.accepting	41
+member_size	struct gf4_ctx.accepting	1
+offset	struct gf4_ctx.ch	0
+member_size	struct gf4_ctx.ch	4
+offset	struct gf4_ctx.changing	646
+member_size	struct gf4_ctx.changing	1
+offset	struct gf4_ctx.cursor	140
+member_size	struct gf4_ctx.cursor	48
+offset	struct gf4_ctx.cursor_view	212
+member_size	struct gf4_ctx.cursor_view	120
+offset	struct gf4_ctx.data	12
+member_size	struct gf4_ctx.data	4
+offset	struct gf4_ctx.dcb	756
+member_size	struct gf4_ctx.dcb	748
+offset	struct gf4_ctx.deadline	32
+member_size	struct gf4_ctx.deadline	4
+offset	struct gf4_ctx.diagnostic_saved	1504
+member_size	struct gf4_ctx.diagnostic_saved	4
+offset	struct gf4_ctx.epoch	28
+member_size	struct gf4_ctx.epoch	4
+offset	struct gf4_ctx.exec	16
+member_size	struct gf4_ctx.exec	4
+offset	struct gf4_ctx.hold	332
+member_size	struct gf4_ctx.hold	152
+offset	struct gf4_ctx.hold_saved	1512
+member_size	struct gf4_ctx.hold_saved	5140
+offset	struct gf4_ctx.last_rc	36
+member_size	struct gf4_ctx.last_rc	4
+offset	struct gf4_ctx.legacy	488
+member_size	struct gf4_ctx.legacy	4
+offset	struct gf4_ctx.limits	492
+member_size	struct gf4_ctx.limits	152
+offset	struct gf4_ctx.limits_valid	644
+member_size	struct gf4_ctx.limits_valid	2
+offset	struct gf4_ctx.links	484
+member_size	struct gf4_ctx.links	4
+offset	struct gf4_ctx.next_mode_id	652
+member_size	struct gf4_ctx.next_mode_id	4
+offset	struct gf4_ctx.nroutes	24
+member_size	struct gf4_ctx.nroutes	4
+offset	struct gf4_ctx.ready	40
+member_size	struct gf4_ctx.ready	1
+offset	struct gf4_ctx.recovery_rc	648
+member_size	struct gf4_ctx.recovery_rc	4
+offset	struct gf4_ctx.reusable	42
+member_size	struct gf4_ctx.reusable	1
+offset	struct gf4_ctx.routes	20
+member_size	struct gf4_ctx.routes	4
+offset	struct gf4_ctx.saved_closed	647
+member_size	struct gf4_ctx.saved_closed	1
+offset	struct gf4_ctx.scan	44
+member_size	struct gf4_ctx.scan	96
+offset	struct gf4_ctx.scan_bank	752
+member_size	struct gf4_ctx.scan_bank	2
+offset	struct gf4_ctx.scan_next	656
+member_size	struct gf4_ctx.scan_next	96
+offset	struct gf4_ctx.state	8
+member_size	struct gf4_ctx.state	4
+offset	struct gf4_ctx.test	188
+member_size	struct gf4_ctx.test	24
+offset	struct gf4_ctx.tv_pin_mask	1508
+member_size	struct gf4_ctx.tv_pin_mask	1
+offset	struct gf4_ctx.tv_sense_valid	1510
+member_size	struct gf4_ctx.tv_sense_valid	1
+offset	struct gf4_ctx.tv_subconnector	1509
+member_size	struct gf4_ctx.tv_subconnector	1
+size	struct gf4_cursor	28
+align	struct gf4_cursor	4
+offset	struct gf4_cursor.argb_pm	0
+member_size	struct gf4_cursor.argb_pm	4
+offset	struct gf4_cursor.bytes	4
+member_size	struct gf4_cursor.bytes	4
+offset	struct gf4_cursor.h	16
+member_size	struct gf4_cursor.h	4
+offset	struct gf4_cursor.hot_x	20
+member_size	struct gf4_cursor.hot_x	4
+offset	struct gf4_cursor.hot_y	24
+member_size	struct gf4_cursor.hot_y	4
+offset	struct gf4_cursor.pitch	8
+member_size	struct gf4_cursor.pitch	4
+offset	struct gf4_cursor.w	12
+member_size	struct gf4_cursor.w	4
+size	struct gf4_data_ops	20
+align	struct gf4_data_ops	4
+offset	struct gf4_data_ops.edid_modes	8
+member_size	struct gf4_data_ops.edid_modes	4
+offset	struct gf4_data_ops.size	4
+member_size	struct gf4_data_ops.size	4
+offset	struct gf4_data_ops.tv_modes	16
+member_size	struct gf4_data_ops.tv_modes	4
+offset	struct gf4_data_ops.tv_state	12
+member_size	struct gf4_data_ops.tv_state	4
+offset	struct gf4_data_ops.version	0
+member_size	struct gf4_data_ops.version	4
+size	struct gf4_dcb_values	748
+align	struct gf4_dcb_values	4
+offset	struct gf4_dcb_values.i2c	644
+member_size	struct gf4_dcb_values.i2c	32
+offset	struct gf4_dcb_values.i2c_rc	676
+member_size	struct gf4_dcb_values.i2c_rc	64
+offset	struct gf4_dcb_values.nroutes	640
+member_size	struct gf4_dcb_values.nroutes	4
+offset	struct gf4_dcb_values.routes	0
+member_size	struct gf4_dcb_values.routes	640
+offset	struct gf4_dcb_values.tvdac	740
+member_size	struct gf4_dcb_values.tvdac	8
+size	struct gf4_edid_state	824
+align	struct gf4_edid_state	4
+offset	struct gf4_edid_state.base_valid	44
+member_size	struct gf4_edid_state.base_valid	1
+offset	struct gf4_edid_state.digital	45
+member_size	struct gf4_edid_state.digital	1
+offset	struct gf4_edid_state.dtd_seen	52
+member_size	struct gf4_edid_state.dtd_seen	4
+offset	struct gf4_edid_state.extensions	16
+member_size	struct gf4_edid_state.extensions	4
+offset	struct gf4_edid_state.last_rc	48
+member_size	struct gf4_edid_state.last_rc	4
+offset	struct gf4_edid_state.max_h_khz	36
+member_size	struct gf4_edid_state.max_h_khz	4
+offset	struct gf4_edid_state.max_khz	40
+member_size	struct gf4_edid_state.max_khz	4
+offset	struct gf4_edid_state.max_v_hz	28
+member_size	struct gf4_edid_state.max_v_hz	4
+offset	struct gf4_edid_state.min_h_khz	32
+member_size	struct gf4_edid_state.min_h_khz	4
+offset	struct gf4_edid_state.min_v_hz	24
+member_size	struct gf4_edid_state.min_v_hz	4
+offset	struct gf4_edid_state.next_block	20
+member_size	struct gf4_edid_state.next_block	4
+offset	struct gf4_edid_state.ntiming	8
+member_size	struct gf4_edid_state.ntiming	4
+offset	struct gf4_edid_state.preferred	12
+member_size	struct gf4_edid_state.preferred	4
+offset	struct gf4_edid_state.range_valid	46
+member_size	struct gf4_edid_state.range_valid	1
+offset	struct gf4_edid_state.size	4
+member_size	struct gf4_edid_state.size	4
+offset	struct gf4_edid_state.timing	56
+member_size	struct gf4_edid_state.timing	768
+offset	struct gf4_edid_state.truncated	47
+member_size	struct gf4_edid_state.truncated	1
+offset	struct gf4_edid_state.version	0
+member_size	struct gf4_edid_state.version	4
+size	struct gf4_exec_ops	20
+align	struct gf4_exec_ops	4
+offset	struct gf4_exec_ops.external_dpms	12
+member_size	struct gf4_exec_ops.external_dpms	4
+offset	struct gf4_exec_ops.external_mode	4
+member_size	struct gf4_exec_ops.external_mode	4
+offset	struct gf4_exec_ops.owner	8
+member_size	struct gf4_exec_ops.owner	4
+offset	struct gf4_exec_ops.tmds_script	0
+member_size	struct gf4_exec_ops.tmds_script	4
+offset	struct gf4_exec_ops.tv_gpio	16
+member_size	struct gf4_exec_ops.tv_gpio	4
+size	struct gf4_flip_hold	76
+align	struct gf4_flip_hold	4
+offset	struct gf4_flip_hold.after	68
+member_size	struct gf4_flip_hold.after	4
+offset	struct gf4_flip_hold.base_verified	72
+member_size	struct gf4_flip_hold.base_verified	1
+offset	struct gf4_flip_hold.base_written	1
+member_size	struct gf4_flip_hold.base_written	1
+offset	struct gf4_flip_hold.new_front	36
+member_size	struct gf4_flip_hold.new_front	32
+offset	struct gf4_flip_hold.old_front	4
+member_size	struct gf4_flip_hold.old_front	32
+offset	struct gf4_flip_hold.pending	0
+member_size	struct gf4_flip_hold.pending	1
+size	struct gf4_gpio_value	4
+align	struct gf4_gpio_value	1
+offset	struct gf4_gpio_value.line	1
+member_size	struct gf4_gpio_value.line	1
+offset	struct gf4_gpio_value.log	2
+member_size	struct gf4_gpio_value.log	2
+offset	struct gf4_gpio_value.present	0
+member_size	struct gf4_gpio_value.present	1
+size	struct gf4_head_image	2484
+align	struct gf4_head_image	4
+offset	struct gf4_head_image.back	92
+member_size	struct gf4_head_image.back	32
+offset	struct gf4_head_image.blank	1
+member_size	struct gf4_head_image.blank	1
+offset	struct gf4_head_image.cursor	124
+member_size	struct gf4_head_image.cursor	20
+offset	struct gf4_head_image.cursor_h	164
+member_size	struct gf4_head_image.cursor_h	4
+offset	struct gf4_head_image.cursor_valid	2480
+member_size	struct gf4_head_image.cursor_valid	1
+offset	struct gf4_head_image.cursor_visible	2
+member_size	struct gf4_head_image.cursor_visible	1
+offset	struct gf4_head_image.cursor_w	160
+member_size	struct gf4_head_image.cursor_w	4
+offset	struct gf4_head_image.dpms	172
+member_size	struct gf4_head_image.dpms	4
+offset	struct gf4_head_image.enabled	0
+member_size	struct gf4_head_image.enabled	1
+offset	struct gf4_head_image.fp_on	168
+member_size	struct gf4_head_image.fp_on	4
+offset	struct gf4_head_image.front	60
+member_size	struct gf4_head_image.front	32
+offset	struct gf4_head_image.gamma	944
+member_size	struct gf4_head_image.gamma	1536
+offset	struct gf4_head_image.hot_x	152
+member_size	struct gf4_head_image.hot_x	4
+offset	struct gf4_head_image.hot_y	156
+member_size	struct gf4_head_image.hot_y	4
+offset	struct gf4_head_image.lut_dirty	3
+member_size	struct gf4_head_image.lut_dirty	1
+offset	struct gf4_head_image.mode	4
+member_size	struct gf4_head_image.mode	36
+offset	struct gf4_head_image.palette	176
+member_size	struct gf4_head_image.palette	768
+offset	struct gf4_head_image.route	40
+member_size	struct gf4_head_image.route	20
+offset	struct gf4_head_image.x	144
+member_size	struct gf4_head_image.x	4
+offset	struct gf4_head_image.y	148
+member_size	struct gf4_head_image.y	4
+size	struct gf4_i2c_port	2
+align	struct gf4_i2c_port	1
+offset	struct gf4_i2c_port.drive	0
+member_size	struct gf4_i2c_port.drive	1
+offset	struct gf4_i2c_port.sense	1
+member_size	struct gf4_i2c_port.sense	1
+size	struct gf4_links	20
+align	struct gf4_links	4
+offset	struct gf4_links.admission	4
+member_size	struct gf4_links.admission	4
+offset	struct gf4_links.failed	8
+member_size	struct gf4_links.failed	4
+offset	struct gf4_links.i2c_port	0
+member_size	struct gf4_links.i2c_port	4
+offset	struct gf4_links.owner	16
+member_size	struct gf4_links.owner	4
+offset	struct gf4_links.scan_changed	12
+member_size	struct gf4_links.scan_changed	4
+size	struct gf4_mode	36
+align	struct gf4_mode	4
+offset	struct gf4_mode.fmt	28
+member_size	struct gf4_mode.fmt	4
+offset	struct gf4_mode.id	0
+member_size	struct gf4_mode.id	4
+offset	struct gf4_mode.pitch	32
+member_size	struct gf4_mode.pitch	4
+offset	struct gf4_mode.t	4
+member_size	struct gf4_mode.t	24
+size	struct gf4_restore_ops	16
+align	struct gf4_restore_ops	4
+offset	struct gf4_restore_ops.ctx	0
+member_size	struct gf4_restore_ops.ctx	4
+offset	struct gf4_restore_ops.last_rc	8
+member_size	struct gf4_restore_ops.last_rc	4
+offset	struct gf4_restore_ops.restore	4
+member_size	struct gf4_restore_ops.restore	4
+offset	struct gf4_restore_ops.saved_release	12
+member_size	struct gf4_restore_ops.saved_release	4
+size	struct gf4_route	20
+align	struct gf4_route	4
+offset	struct gf4_route.connector	0
+member_size	struct gf4_route.connector	1
+offset	struct gf4_route.dual_link	8
+member_size	struct gf4_route.dual_link	1
+offset	struct gf4_route.ext_type	7
+member_size	struct gf4_route.ext_type	1
+offset	struct gf4_route.head	1
+member_size	struct gf4_route.head	1
+offset	struct gf4_route.head_mask	6
+member_size	struct gf4_route.head_mask	1
+offset	struct gf4_route.i2c_index	4
+member_size	struct gf4_route.i2c_index	1
+offset	struct gf4_route.location	5
+member_size	struct gf4_route.location	1
+offset	struct gf4_route.max_khz	12
+member_size	struct gf4_route.max_khz	4
+offset	struct gf4_route.or_mask	3
+member_size	struct gf4_route.or_mask	1
+offset	struct gf4_route.tv_norm	16
+member_size	struct gf4_route.tv_norm	4
+offset	struct gf4_route.type	2
+member_size	struct gf4_route.type	1
+size	struct gf4_saved	5140
+align	struct gf4_saved	4
+offset	struct gf4_saved.head	20
+member_size	struct gf4_saved.head	4968
+offset	struct gf4_saved.hold	4988
+member_size	struct gf4_saved.hold	152
+offset	struct gf4_saved.size	4
+member_size	struct gf4_saved.size	4
+offset	struct gf4_saved.version	0
+member_size	struct gf4_saved.version	4
+offset	struct gf4_saved.wanted_fifo	8
+member_size	struct gf4_saved.wanted_fifo	4
+offset	struct gf4_saved.wanted_graph	12
+member_size	struct gf4_saved.wanted_graph	4
+offset	struct gf4_saved.wanted_heads	16
+member_size	struct gf4_saved.wanted_heads	4
+size	struct gf4_state	25208
+align	struct gf4_state	4
+offset	struct gf4_state.committed	22336
+member_size	struct gf4_state.committed	1632
+offset	struct gf4_state.edid	3564
+member_size	struct gf4_state.edid	824
+offset	struct gf4_state.head	4388
+member_size	struct gf4_state.head	4968
+offset	struct gf4_state.mode_connector	3468
+member_size	struct gf4_state.mode_connector	96
+offset	struct gf4_state.modes	12
+member_size	struct gf4_state.modes	3456
+offset	struct gf4_state.next	17368
+member_size	struct gf4_state.next	4968
+offset	struct gf4_state.nmodes	8
+member_size	struct gf4_state.nmodes	4
+offset	struct gf4_state.rollback	12228
+member_size	struct gf4_state.rollback	5140
+offset	struct gf4_state.rollback_tv	23968
+member_size	struct gf4_state.rollback_tv	1240
+offset	struct gf4_state.size	4
+member_size	struct gf4_state.size	4
+offset	struct gf4_state.tv	9356
+member_size	struct gf4_state.tv	1240
+offset	struct gf4_state.version	0
+member_size	struct gf4_state.version	4
+offset	struct gf4_state.work	10596
+member_size	struct gf4_state.work	1632
+size	struct gf4_test_ops	68
+align	struct gf4_test_ops	4
+offset	struct gf4_test_ops.ctx	0
+member_size	struct gf4_test_ops.ctx	4
+offset	struct gf4_test_ops.cursor_image	32
+member_size	struct gf4_test_ops.cursor_image	4
+offset	struct gf4_test_ops.cursor_move	36
+member_size	struct gf4_test_ops.cursor_move	4
+offset	struct gf4_test_ops.cursor_show	40
+member_size	struct gf4_test_ops.cursor_show	4
+offset	struct gf4_test_ops.ddc_read	8
+member_size	struct gf4_test_ops.ddc_read	4
+offset	struct gf4_test_ops.detect	24
+member_size	struct gf4_test_ops.detect	4
+offset	struct gf4_test_ops.display_save	52
+member_size	struct gf4_test_ops.display_save	4
+offset	struct gf4_test_ops.dpms_set	28
+member_size	struct gf4_test_ops.dpms_set	4
+offset	struct gf4_test_ops.flip	12
+member_size	struct gf4_test_ops.flip	4
+offset	struct gf4_test_ops.gamma	48
+member_size	struct gf4_test_ops.gamma	4
+offset	struct gf4_test_ops.last_rc	16
+member_size	struct gf4_test_ops.last_rc	4
+offset	struct gf4_test_ops.modes	20
+member_size	struct gf4_test_ops.modes	4
+offset	struct gf4_test_ops.palette_set	56
+member_size	struct gf4_test_ops.palette_set	4
+offset	struct gf4_test_ops.scan_discard	64
+member_size	struct gf4_test_ops.scan_discard	4
+offset	struct gf4_test_ops.scan_prepare	60
+member_size	struct gf4_test_ops.scan_prepare	4
+offset	struct gf4_test_ops.set_mode	4
+member_size	struct gf4_test_ops.set_mode	4
+offset	struct gf4_test_ops.vblank_wait	44
+member_size	struct gf4_test_ops.vblank_wait	4
+size	struct gf4_timing	24
+align	struct gf4_timing	4
+offset	struct gf4_timing.flags	20
+member_size	struct gf4_timing.flags	4
+offset	struct gf4_timing.hd	4
+member_size	struct gf4_timing.hd	2
+offset	struct gf4_timing.he	8
+member_size	struct gf4_timing.he	2
+offset	struct gf4_timing.hs	6
+member_size	struct gf4_timing.hs	2
+offset	struct gf4_timing.ht	10
+member_size	struct gf4_timing.ht	2
+offset	struct gf4_timing.khz	0
+member_size	struct gf4_timing.khz	4
+offset	struct gf4_timing.vd	12
+member_size	struct gf4_timing.vd	2
+offset	struct gf4_timing.ve	16
+member_size	struct gf4_timing.ve	2
+offset	struct gf4_timing.vs	14
+member_size	struct gf4_timing.vs	2
+offset	struct gf4_timing.vt	18
+member_size	struct gf4_timing.vt	2
+size	struct gf4_tv_state	620
+align	struct gf4_tv_state	4
+offset	struct gf4_tv_state.ctv	468
+member_size	struct gf4_tv_state.ctv	152
+offset	struct gf4_tv_state.enc	12
+member_size	struct gf4_tv_state.enc	64
+offset	struct gf4_tv_state.hfilter	76
+member_size	struct gf4_tv_state.hfilter	112
+offset	struct gf4_tv_state.hfilter2	188
+member_size	struct gf4_tv_state.hfilter2	112
+offset	struct gf4_tv_state.norm	8
+member_size	struct gf4_tv_state.norm	4
+offset	struct gf4_tv_state.ptv	412
+member_size	struct gf4_tv_state.ptv	56
+offset	struct gf4_tv_state.size	4
+member_size	struct gf4_tv_state.size	4
+offset	struct gf4_tv_state.version	0
+member_size	struct gf4_tv_state.version	4
+offset	struct gf4_tv_state.vfilter	300
+member_size	struct gf4_tv_state.vfilter	112
+size	struct gf5	552
+align	struct gf5	4
+offset	struct gf5.accel	4
+member_size	struct gf5.accel	4
+offset	struct gf5.accepting	124
+member_size	struct gf5.accepting	1
+offset	struct gf5.busy	125
+member_size	struct gf5.busy	1
+offset	struct gf5.ch	0
+member_size	struct gf5.ch	4
+offset	struct gf5.deadline	112
+member_size	struct gf5.deadline	4
+offset	struct gf5.display	8
+member_size	struct gf5.display	4
+offset	struct gf5.emergency	96
+member_size	struct gf5.emergency	12
+offset	struct gf5.fan	128
+member_size	struct gf5.fan	136
+offset	struct gf5.image	548
+member_size	struct gf5.image	4
+offset	struct gf5.last_rc	116
+member_size	struct gf5.last_rc	4
+offset	struct gf5.links	12
+member_size	struct gf5.links	56
+offset	struct gf5.next_auto	264
+member_size	struct gf5.next_auto	8
+offset	struct gf5.next_sensor	280
+member_size	struct gf5.next_sensor	8
+offset	struct gf5.next_step	272
+member_size	struct gf5.next_step	8
+offset	struct gf5.next_toggle	288
+member_size	struct gf5.next_toggle	8
+offset	struct gf5.phase	108
+member_size	struct gf5.phase	4
+offset	struct gf5.rom	68
+member_size	struct gf5.rom	16
+offset	struct gf5.source_rc	120
+member_size	struct gf5.source_rc	4
+offset	struct gf5.tile	296
+member_size	struct gf5.tile	240
+offset	struct gf5.tile_live	536
+member_size	struct gf5.tile_live	12
+offset	struct gf5.vid	84
+member_size	struct gf5.vid	12
+size	struct gf5_clock	12
+align	struct gf5_clock	4
+offset	struct gf5_clock.core_khz	0
+member_size	struct gf5_clock.core_khz	4
+offset	struct gf5_clock.mem_khz	8
+member_size	struct gf5_clock.mem_khz	4
+offset	struct gf5_clock.shader_khz	4
+member_size	struct gf5_clock.shader_khz	4
+size	struct gf5_emergency_ops	12
+align	struct gf5_emergency_ops	4
+offset	struct gf5_emergency_ops.downclock	0
+member_size	struct gf5_emergency_ops.downclock	4
+offset	struct gf5_emergency_ops.owner	8
+member_size	struct gf5_emergency_ops.owner	4
+offset	struct gf5_emergency_ops.pause	4
+member_size	struct gf5_emergency_ops.pause	4
+size	struct gf5_extent	24
+align	struct gf5_extent	4
+offset	struct gf5_extent.host_copy	20
+member_size	struct gf5_extent.host_copy	4
+offset	struct gf5_extent.key	0
+member_size	struct gf5_extent.key	20
+size	struct gf5_fan_saved	136
+align	struct gf5_fan_saved	4
+offset	struct gf5_fan_saved.active	100
+member_size	struct gf5_fan_saved.active	4
+offset	struct gf5_fan_saved.bump_ms	40
+member_size	struct gf5_fan_saved.bump_ms	4
+offset	struct gf5_fan_saved.cstate	32
+member_size	struct gf5_fan_saved.cstate	4
+offset	struct gf5_fan_saved.divisor	24
+member_size	struct gf5_fan_saved.divisor	4
+offset	struct gf5_fan_saved.duty	36
+member_size	struct gf5_fan_saved.duty	4
+offset	struct gf5_fan_saved.freq	20
+member_size	struct gf5_fan_saved.freq	4
+offset	struct gf5_fan_saved.gpio_line	106
+member_size	struct gf5_fan_saved.gpio_line	1
+offset	struct gf5_fan_saved.gpio_log	107
+member_size	struct gf5_fan_saved.gpio_log	2
+offset	struct gf5_fan_saved.hyst	84
+member_size	struct gf5_fan_saved.hyst	16
+offset	struct gf5_fan_saved.kind	4
+member_size	struct gf5_fan_saved.kind	4
+offset	struct gf5_fan_saved.last_trip	48
+member_size	struct gf5_fan_saved.last_trip	4
+offset	struct gf5_fan_saved.linear_max	56
+member_size	struct gf5_fan_saved.linear_max	4
+offset	struct gf5_fan_saved.linear_min	52
+member_size	struct gf5_fan_saved.linear_min	4
+offset	struct gf5_fan_saved.max_duty	16
+member_size	struct gf5_fan_saved.max_duty	4
+offset	struct gf5_fan_saved.method	8
+member_size	struct gf5_fan_saved.method	4
+offset	struct gf5_fan_saved.min_duty	12
+member_size	struct gf5_fan_saved.min_duty	4
+offset	struct gf5_fan_saved.mode	0
+member_size	struct gf5_fan_saved.mode	4
+offset	struct gf5_fan_saved.ntrip	60
+member_size	struct gf5_fan_saved.ntrip	4
+offset	struct gf5_fan_saved.offset_constant	128
+member_size	struct gf5_fan_saved.offset_constant	4
+offset	struct gf5_fan_saved.offset_den	124
+member_size	struct gf5_fan_saved.offset_den	4
+offset	struct gf5_fan_saved.offset_num	120
+member_size	struct gf5_fan_saved.offset_num	4
+offset	struct gf5_fan_saved.sensor_poll	104
+member_size	struct gf5_fan_saved.sensor_poll	1
+offset	struct gf5_fan_saved.sensor_setup	132
+member_size	struct gf5_fan_saved.sensor_setup	4
+offset	struct gf5_fan_saved.slope_div	116
+member_size	struct gf5_fan_saved.slope_div	4
+offset	struct gf5_fan_saved.slope_mult	112
+member_size	struct gf5_fan_saved.slope_mult	4
+offset	struct gf5_fan_saved.slow_ms	44
+member_size	struct gf5_fan_saved.slow_ms	4
+offset	struct gf5_fan_saved.target	28
+member_size	struct gf5_fan_saved.target	4
+offset	struct gf5_fan_saved.threshold	68
+member_size	struct gf5_fan_saved.threshold	16
+offset	struct gf5_fan_saved.toggle_on	105
+member_size	struct gf5_fan_saved.toggle_on	1
+offset	struct gf5_fan_saved.trip	64
+member_size	struct gf5_fan_saved.trip	4
+size	struct gf5_fan_trip	12
+align	struct gf5_fan_trip	4
+offset	struct gf5_fan_trip.duty	8
+member_size	struct gf5_fan_trip.duty	4
+offset	struct gf5_fan_trip.hyst	4
+member_size	struct gf5_fan_trip.hyst	4
+offset	struct gf5_fan_trip.temp	0
+member_size	struct gf5_fan_trip.temp	4
+size	struct gf5_image	5572
+align	struct gf5_image	4
+offset	struct gf5_image.bytes	4
+member_size	struct gf5_image.bytes	4
+offset	struct gf5_image.clock	16
+member_size	struct gf5_image.clock	12
+offset	struct gf5_image.complete	5568
+member_size	struct gf5_image.complete	1
+offset	struct gf5_image.display	424
+member_size	struct gf5_image.display	5140
+offset	struct gf5_image.extent	5564
+member_size	struct gf5_image.extent	4
+offset	struct gf5_image.fan	36
+member_size	struct gf5_image.fan	136
+offset	struct gf5_image.nextent	8
+member_size	struct gf5_image.nextent	4
+offset	struct gf5_image.requested_uv	28
+member_size	struct gf5_image.requested_uv	4
+offset	struct gf5_image.saved_epoch	12
+member_size	struct gf5_image.saved_epoch	4
+offset	struct gf5_image.tile	172
+member_size	struct gf5_image.tile	240
+offset	struct gf5_image.tile_live	412
+member_size	struct gf5_image.tile_live	12
+offset	struct gf5_image.version	0
+member_size	struct gf5_image.version	4
+offset	struct gf5_image.vid	32
+member_size	struct gf5_image.vid	1
+size	struct gf5_links	56
+align	struct gf5_links	4
+offset	struct gf5_links.admission	24
+member_size	struct gf5_links.admission	4
+offset	struct gf5_links.alloc	44
+member_size	struct gf5_links.alloc	4
+offset	struct gf5_links.clock64	52
+member_size	struct gf5_links.clock64	4
+offset	struct gf5_links.copy_extent	40
+member_size	struct gf5_links.copy_extent	4
+offset	struct gf5_links.display_restore	12
+member_size	struct gf5_links.display_restore	4
+offset	struct gf5_links.display_save	8
+member_size	struct gf5_links.display_save	4
+offset	struct gf5_links.drain	28
+member_size	struct gf5_links.drain	4
+offset	struct gf5_links.drain_pause	0
+member_size	struct gf5_links.drain_pause	4
+offset	struct gf5_links.free	48
+member_size	struct gf5_links.free	4
+offset	struct gf5_links.memory_script	16
+member_size	struct gf5_links.memory_script	4
+offset	struct gf5_links.owner	20
+member_size	struct gf5_links.owner	4
+offset	struct gf5_links.restart	36
+member_size	struct gf5_links.restart	4
+offset	struct gf5_links.stop	32
+member_size	struct gf5_links.stop	4
+offset	struct gf5_links.unpause	4
+member_size	struct gf5_links.unpause	4
+size	struct gf5_perf_entry	16
+align	struct gf5_perf_entry	4
+offset	struct gf5_perf_entry.clock	0
+member_size	struct gf5_perf_entry.clock	12
+offset	struct gf5_perf_entry.fanspeed	13
+member_size	struct gf5_perf_entry.fanspeed	1
+offset	struct gf5_perf_entry.voltage	12
+member_size	struct gf5_perf_entry.voltage	1
+size	struct gf5_plan	36
+align	struct gf5_plan	4
+offset	struct gf5_plan.actual	24
+member_size	struct gf5_plan.actual	12
+offset	struct gf5_plan.mc	16
+member_size	struct gf5_plan.mc	4
+offset	struct gf5_plan.mn	20
+member_size	struct gf5_plan.mn	4
+offset	struct gf5_plan.mux	12
+member_size	struct gf5_plan.mux	4
+offset	struct gf5_plan.nc	0
+member_size	struct gf5_plan.nc	4
+offset	struct gf5_plan.nn	4
+member_size	struct gf5_plan.nn	4
+offset	struct gf5_plan.sc	8
+member_size	struct gf5_plan.sc	4
+size	struct gf5_rom_view	16
+align	struct gf5_rom_view	4
+offset	struct gf5_rom_view.bytes	0
+member_size	struct gf5_rom_view.bytes	4
+offset	struct gf5_rom_view.memory_pc	12
+member_size	struct gf5_rom_view.memory_pc	4
+offset	struct gf5_rom_view.memory_program	8
+member_size	struct gf5_rom_view.memory_program	4
+offset	struct gf5_rom_view.size	4
+member_size	struct gf5_rom_view.size	4
+size	struct gf5_test_ops	108
+align	struct gf5_test_ops	4
+offset	struct gf5_test_ops.clock_calc	8
+member_size	struct gf5_test_ops.clock_calc	4
+offset	struct gf5_test_ops.clock_prog	12
+member_size	struct gf5_test_ops.clock_prog	4
+offset	struct gf5_test_ops.clock_read	4
+member_size	struct gf5_test_ops.clock_read	4
+offset	struct gf5_test_ops.ctx	0
+member_size	struct gf5_test_ops.ctx	4
+offset	struct gf5_test_ops.fan_cstate	44
+member_size	struct gf5_test_ops.fan_cstate	4
+offset	struct gf5_test_ops.fan_get	40
+member_size	struct gf5_test_ops.fan_get	4
+offset	struct gf5_test_ops.fan_mode_set	36
+member_size	struct gf5_test_ops.fan_mode_set	4
+offset	struct gf5_test_ops.fan_tick	48
+member_size	struct gf5_test_ops.fan_tick	4
+offset	struct gf5_test_ops.gpio_find	64
+member_size	struct gf5_test_ops.gpio_find	4
+offset	struct gf5_test_ops.gpio_get	68
+member_size	struct gf5_test_ops.gpio_get	4
+offset	struct gf5_test_ops.gpio_set	72
+member_size	struct gf5_test_ops.gpio_set	4
+offset	struct gf5_test_ops.last_rc	104
+member_size	struct gf5_test_ops.last_rc	4
+offset	struct gf5_test_ops.perf_count	20
+member_size	struct gf5_test_ops.perf_count	4
+offset	struct gf5_test_ops.perf_get	24
+member_size	struct gf5_test_ops.perf_get	4
+offset	struct gf5_test_ops.perf_select	28
+member_size	struct gf5_test_ops.perf_select	4
+offset	struct gf5_test_ops.ram_prog	16
+member_size	struct gf5_test_ops.ram_prog	4
+offset	struct gf5_test_ops.service_poll	100
+member_size	struct gf5_test_ops.service_poll	4
+offset	struct gf5_test_ops.state_free	96
+member_size	struct gf5_test_ops.state_free	4
+offset	struct gf5_test_ops.state_restore	92
+member_size	struct gf5_test_ops.state_restore	4
+offset	struct gf5_test_ops.state_save	88
+member_size	struct gf5_test_ops.state_save	4
+offset	struct gf5_test_ops.therm_read	32
+member_size	struct gf5_test_ops.therm_read	4
+offset	struct gf5_test_ops.tile_clear	84
+member_size	struct gf5_test_ops.tile_clear	4
+offset	struct gf5_test_ops.tile_find	76
+member_size	struct gf5_test_ops.tile_find	4
+offset	struct gf5_test_ops.tile_set	80
+member_size	struct gf5_test_ops.tile_set	4
+offset	struct gf5_test_ops.volt_get	52
+member_size	struct gf5_test_ops.volt_get	4
+offset	struct gf5_test_ops.volt_id	60
+member_size	struct gf5_test_ops.volt_id	4
+offset	struct gf5_test_ops.volt_set	56
+member_size	struct gf5_test_ops.volt_set	4
+size	struct gf5_thermal	12
+align	struct gf5_thermal	4
+offset	struct gf5_thermal.calibrated	8
+member_size	struct gf5_thermal.calibrated	1
+offset	struct gf5_thermal.milli_c	4
+member_size	struct gf5_thermal.milli_c	4
+offset	struct gf5_thermal.raw	0
+member_size	struct gf5_thermal.raw	4
+size	struct gf5_tile	20
+align	struct gf5_tile	4
+offset	struct gf5_tile.base	0
+member_size	struct gf5_tile.base	4
+offset	struct gf5_tile.bytes	4
+member_size	struct gf5_tile.bytes	4
+offset	struct gf5_tile.generation	16
+member_size	struct gf5_tile.generation	4
+offset	struct gf5_tile.pitch	8
+member_size	struct gf5_tile.pitch	4
+offset	struct gf5_tile.reservation_id	12
+member_size	struct gf5_tile.reservation_id	4
+size	struct gf5_vid_ops	12
+align	struct gf5_vid_ops	4
+offset	struct gf5_vid_ops.get	0
+member_size	struct gf5_vid_ops.get	4
+offset	struct gf5_vid_ops.owner	8
+member_size	struct gf5_vid_ops.owner	4
+offset	struct gf5_vid_ops.set	4
+member_size	struct gf5_vid_ops.set	4
 size	struct gf_display_context	1888
 align	struct gf_display_context	4
 offset	struct gf_display_context.active	270
@@ -2206,7 +2934,7 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	10772
+size	struct gf_production	11324
 align	struct gf_production	4
 offset	struct gf_production.accel	3252
 member_size	struct gf_production.accel	7512
@@ -2218,15 +2946,17 @@ offset	struct gf_production.chan	2328
 member_size	struct gf_production.chan	924
 offset	struct gf_production.display	0
 member_size	struct gf_production.display	1888
+offset	struct gf_production.feature5	10764
+member_size	struct gf_production.feature5	552
 offset	struct gf_production.foundation	2124
 member_size	struct gf_production.foundation	204
 offset	struct gf_production.indexes	1932
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	2028
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	10764
+offset	struct gf_production.map_ops	11316
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	10768
+offset	struct gf_production.map_owner	11320
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1908
 member_size	struct gf_production.prepared	1
@@ -4077,7 +4807,82 @@ enum	GF3_UYVY	6
 enum	GF3_XRGB8888	2
 enum	GF3_Y8	4
 enum	GF3_YUY2	5
+enum	GF4_ANALOG	0
 enum	GF4_DISPLAY	10
+enum	GF4_EBUSY	4294966885
+enum	GF4_EDDC	4294966891
+enum	GF4_EEDID	4294966890
+enum	GF4_EFORMAT	4294966893
+enum	GF4_EINVAL	4294966895
+enum	GF4_ENODEV	4294966884
+enum	GF4_ENOSPC	4294966889
+enum	GF4_EPLL	4294966892
+enum	GF4_ERANGE	4294966894
+enum	GF4_ESTATE	4294966888
+enum	GF4_ETIME	4294966887
+enum	GF4_EUNSUPPORTED	4294966886
+enum	GF4_LVDS	3
+enum	GF4_OFF	3
+enum	GF4_OK	0
+enum	GF4_ON	0
+enum	GF4_STANDBY	1
+enum	GF4_SUSPEND	2
+enum	GF4_TMDS	2
+enum	GF4_TV	1
+enum	GF5T_ARG_HI	2
+enum	GF5T_ARG_LO	1
+enum	GF5T_CLOCK_CALC	4
+enum	GF5T_CLOCK_PROG	5
+enum	GF5T_CLOCK_READ	3
+enum	GF5T_FAN_CSTATE	13
+enum	GF5T_FAN_GET	12
+enum	GF5T_FAN_MODE	11
+enum	GF5T_FREE	25
+enum	GF5T_GPIO_FIND	17
+enum	GF5T_GPIO_GET	18
+enum	GF5T_GPIO_SET	19
+enum	GF5T_INFO	0
+enum	GF5T_LAST_RC	28
+enum	GF5T_PERF_COUNT	7
+enum	GF5T_PERF_GET	8
+enum	GF5T_PERF_SELECT	9
+enum	GF5T_POLL	26
+enum	GF5T_RAM_PROG	6
+enum	GF5T_RESTORE	24
+enum	GF5T_SAVE	23
+enum	GF5T_THERM	10
+enum	GF5T_TILE_CLEAR	22
+enum	GF5T_TILE_FIND	20
+enum	GF5T_TILE_SET	21
+enum	GF5T_VOLT_GET	14
+enum	GF5T_VOLT_ID	16
+enum	GF5T_VOLT_SET	15
+enum	GF5T_WAIT	27
+enum	GF5_EBIOS	4294966793
+enum	GF5_EBUSY	4294966791
+enum	GF5_EINVAL	4294966795
+enum	GF5_EIO	4294966789
+enum	GF5_ENOMEM	4294966788
+enum	GF5_ENOTSUP	4294966794
+enum	GF5_ERANGE	4294966792
+enum	GF5_ESTATE	4294966787
+enum	GF5_ETIME	4294966790
+enum	GF5_FAN_AUTO	2
+enum	GF5_FAN_LINEAR	1
+enum	GF5_FAN_MANUAL	1
+enum	GF5_FAN_METHOD_NONE	0
+enum	GF5_FAN_NONE	0
+enum	GF5_FAN_OTHER	2
+enum	GF5_FAN_PWM	1
+enum	GF5_FAN_TOGGLE	2
+enum	GF5_FAN_TRIP	0
+enum	GF5_FAULT	4
+enum	GF5_FEATURE	11
+enum	GF5_OK	0
+enum	GF5_RESTORING	3
+enum	GF5_RUN	0
+enum	GF5_SAVED	2
+enum	GF5_SAVING	1
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5

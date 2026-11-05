@@ -31,6 +31,8 @@ static int stub_feed_key(int keydata) { return keydata; }
 static int stub_switch(int variant) { (void)variant; return OS32_ERR_NOSYS; }
 static int stub_list(const char *prefix, void *out, int max)
 { (void)prefix; (void)out; (void)max; return OS32_ERR_NOSYS; }
+static int stub_dict_info(int key, int offset, char *out, int capacity)
+{ (void)key; (void)offset; (void)out; (void)capacity; return OS32_ERR_NOSYS; }
 static int stub_delete(const char *yomi, const char *kanji)
 { (void)yomi; (void)kanji; return OS32_ERR_NOSYS; }
 static int stub_export(const char *path) { (void)path; return OS32_ERR_NOSYS; }
@@ -69,7 +71,8 @@ static const FepModuleApi stub_api = {
     .switch_dict = stub_switch, .user_list = stub_list,
     .user_delete = stub_delete, .user_export = stub_export,
     .user_clear = stub_clear, .owner_exit = stub_mode,
-    .getchar_kapi = stub_getchar_kapi, .getkey_kapi = input_getkey_kapi
+    .getchar_kapi = stub_getchar_kapi, .getkey_kapi = input_getkey_kapi,
+    .dict_info = stub_dict_info
 };
 static FepModuleApi candidate;
 static struct module_handle fep_handle;
@@ -102,6 +105,8 @@ int ime_user_delete_facade(const char *yomi, const char *kanji)
 { return public_api()->user_delete(yomi, kanji); }
 int ime_user_export_facade(const char *path) { return public_api()->user_export(path); }
 int ime_user_clear_facade(void) { return public_api()->user_clear(); }
+int ime_dict_info_facade(int key, int offset, char *out, int capacity)
+{ return public_api()->dict_info(key, offset, out, capacity); }
 void ime_owner_exit(int owner) { public_api()->owner_exit(owner); }
 
 static int fep_start(struct module_record *r, u32 entry, u32 *exports)

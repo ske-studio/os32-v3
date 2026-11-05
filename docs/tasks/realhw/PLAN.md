@@ -15,7 +15,7 @@
 | [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
 | [TASK_GF_DRIVER.md](TASK_GF_DRIVER.md) | GeForce 6200 の本番の画面ドライバ — 1 機能 1 ファイル + 抽象化の層 + HAL、計画 (2026-10-29) |
 | [TASK_GF_ACCEL.md](TASK_GF_ACCEL.md) | GeForce 6200 の画面の転送を速くする — 段 0 (dword の present + MTRR の WC)、足りなければ M2MF、設計確定 (2026-11-01) |
-| [TASK_GF_FEATURES.md](TASK_GF_FEATURES.md) | GeForce 6200 の機能を手本 nouveau と同じ範囲まで (土台・コマンド投入・2D・表示・その他、GUI へのつなぎ込みと 3D/Xv/MPEG は残タスク) — 設計中 (2026-11-02) |
+| [TASK_GF_FEATURES.md](TASK_GF_FEATURES.md) | GeForce 6200 の機能を手本 nouveau と同じ範囲まで (土台・コマンド投入・2D・表示・その他、GUI へのつなぎ込みと 3D/Xv/MPEG は残タスク) — 実装中 (2026-11-04、層 1〜4 は main、層 5 は試行中、実機の受入は wt/gf-prodtime の後) |
 | [TASK_GF_STAGES.md](TASK_GF_STAGES.md) | GeForce の実機の試験を段ごとの小さなバイナリ + 共通部分に分ける — 計画 (2026-10-29 の反省会) |
 | [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) |
 | [TASK_HWDEV.md](TASK_HWDEV.md) | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) |

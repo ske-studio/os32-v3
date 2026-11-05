@@ -1184,6 +1184,15 @@ void os32_resident_sbrk_stats(u32 out[3])
  * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
 int shell_cmd_peek(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 int shell_cmd_recover(int argc, char **argv) { (void)argc; (void)argv; return 0; }
+static char hw_received[CMD_BUF_SIZE];
+static int hw_received_argc;
+int shell_cmd_hw(int argc, char **argv)
+{
+    hw_received_argc = argc;
+    strncpy(hw_received, argc > 1 ? argv[1] : "", sizeof(hw_received) - 1);
+    hw_received[sizeof(hw_received) - 1] = 0;
+    return 124; /* prove status reaches execute_command */
+}
 int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
@@ -2298,6 +2307,20 @@ static void case_sfs_lan_cfg(void)
           "sfs lan refuses changes within child");
 }
 
+static void case_hw_grammar(void)
+{
+    fresh();
+    const char *body = "let x = (0x100 >> 2) | 1 # HW comment";
+    check(execute_command("hw let x = (0x100 >> 2) | 1 # HW comment") == 124,
+          "HW expression status forwarded");
+    check(hw_received_argc == 2 && str_eq(hw_received, body),
+          "HW owns shift, OR and comment grammar");
+    check(execute_command("hw log \"a | b\" ") == 124 &&
+          str_eq(hw_received, "log \"a | b\" "), "HW quotes retained");
+    check(execute_command("hw run /test/hw/a.hwb mode=1") == 124 && hw_received_argc == 4 &&
+          str_eq(hw_received, "run"), "HW run retains shell path argument parsing");
+}
+
 static void case_r2_real_table(void)
 {
     int n = 0;
@@ -2358,6 +2381,7 @@ void _start(void)
     sh_boot();
 
     case_r2_real_table();
+    case_hw_grammar();
     case_s1_exit_codes();
     case_s1b_fault_abort();
     case_s2_path_scan();

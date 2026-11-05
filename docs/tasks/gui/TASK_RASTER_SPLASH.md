@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **受入完了 (2026-11-04、ユーザー「ラスタの件はこれで締めてください」)** — 常用の可変 OUT (enc2・B31) と配布の画像の経路が main (S5a〜S5d、385a4589)。実機 Ra266 31k で `/boot/user.osri` (ネオン街、画面全体で 518 色) がカメラに映り、最初の約 1 秒のデフォルトパレットは演出 (ユーザー指定)。現行の正典は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)、画像形式は [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md)。.osri のビューアー (ユーザーアプリ) は別の票 TASK_OSRI_VIEWER で GeForce の後。
+> 状態: **受入完了 (2026-11-04、ユーザー「ラスタの件はこれで締めてください」)** — 常用の可変 OUT (enc2・B31) と配布の画像の経路が main (S5a〜S5d、385a4589)。実機 Ra266 31k で `/boot/user.osri` (ネオン街、画面全体で 518 色) がカメラに映り、最初の約 1 秒のデフォルトパレットは演出 (ユーザー指定)。24.8kHz の実機でもユーザー「24.8kHzでもバッチリでした。」。現行の正典は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)、画像形式は [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md)。.osri のビューアー (ユーザーアプリ) は別の票 TASK_OSRI_VIEWER で GeForce の後。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
@@ -23,3 +23,4 @@
 | 0 | 測定 + 既存のロゴのラスタを周期の定数と位置の待ちに (120µs を消す) | 実装中 — 形式と変換 (8a1eceed)・再生の核 (2d78b816)・L0 (87e9074f) は main。NP21/W: guest_tests 21/21、スプラッシュの commits 171 → 167 (−2.3%、±10% 内)。**起動のスプラッシュの見た目 (帯の位置・ロゴが下端まで) はユーザーがエミュレータで確かめる** (ユーザー 2026-11-01「エミュレータの起動は別でユーザーが確認します」)。後続の結線は段 1 を参照 |
 | 1 | 固定 16 色の画像の読み込み | 実装済み (main a107b52b、結線 C1・P0・P2・P1・B1・B2、Opus 取り込み可)。NP21/W: 画像なしで `[splash] missing: builtin logo`、`/boot/splash.osri` (試しの固定 16 色) を置くと戻る理由の行が出ず画像の経路、guest_tests 21/21・GUI 起動。**見た目はユーザーがエミュレータで確かめる** (NP21/W の本 NHD に試しの画像を置いたまま)。残り: 画像の配布 (D1・D2)、Ra266 の 31kHz |
 | S5 | 常用の可変 OUT・enc2/B31 の既定化・配布の画像 (S5a〜S5d) | 完了 — main 385a4589。実機 Ra266 31k で user.osri の表示をカメラで確認 (2026-11-04、証拠はノートの ~/os32-tmp/evidence/2026-11-04/neon-385a4589/) |
+| 表示時間 | デフォルトパレットとラスタの表示時間の変更 | 作業中 (wt/splash-time) — ユーザー「デフォルトパレットの時間を倍に。ラスタの時間を3倍にしたい。」 |

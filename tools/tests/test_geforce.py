@@ -1,6 +1,6 @@
 """P5 HAL, real P3 start state machine, real ledger/selection and byte routing."""
 CHECK = dict(name='geforce-host', tier=1,
-    covers=['tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_accel_host.h', 'tools/tests/gf_command_runtime_host.h', 'hwdev/gf/accel.h', 'hwdev/gf/vram_view.h', 'hwdev/gf/accel_service.h', 'hwdev/gf/foundation.h', 'hwdev/gf/gf2_test.h', 'drivers/video/geforce/geforce_tick.h', 'tools/tests/gf_wc_recovery_host.inc', 'exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'drivers/video/geforce/gf_wc.c', 'arch/x86/kernel/mtrr_wc.h', 'tools/tests/gf_wc_host.c', 'tools/tests/geforce_core_cases.inc', 'tools/tests/paging_source.py', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/pc98/pc98_route.c', 'drivers/video/pc98/pc98_route.h', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/geforce_body.c', 'lib/pc98_cell.h', 'gfx/gfx_core.c', 'include/gfx_hal.h', 'include/video_service.h', 'init/kernel.c', 'mm/pgalloc.h', 'hwdev/gf/service.c', 'hwdev/gf/display/modes.c', 'tools/tests/backend_geforce_host.c', 'tools/tests/gf_present_host.c', 'tools/tests/pc98_route_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/serial_diag_host.h', 'build/geforce-module.mk', 'build/geforce-module.ld', 'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py', 'tools/module_schema.py', 'build/core.yaml', 'build/kernel.mk', 'Makefile', 'tools/tests/geforce_module_host.c', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/mkmod.py', 'build/out/geforce.mod', 'build/out/geforce/*', 'build/out/kernel.elf', 'build/out/vmkernel.lz4', 'include/gfx_format.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/palette.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'lib/serial_diag.h', 'gfx/gfx_internal.h', 'tools/tests/gfx_reinit_host.c', 'tools/tests/test_gfx_reinit.py', 'lib/utf8.c', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'tools/run_host_group.py', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'platform/pc98/boot_names.c', 'hwdev/gf/internal.h', 'hwdev/gfinit_mode.h', 'drivers/base/dev.c', 'fs/vfs.c', 'sdk/kapi.json', 'drivers/video/geforce/geforce_platform.c', 'kernel/gui.c', 'kernel/gui.h', 'kernel/console/console.c', 'platform/pc98/console.c', 'platform/pc98/display.c', 'tools/tests/dep_dir_d_console_grid_host.c', 'tools/tests/test_dep_dir_d_console.py', 'hwdev/gf/production.h', 'include/gf_production.h', 'mm/memory_boot.c', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/fixtures/dep_dir_d/*', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/test_gf_display.py', 'tools/tests/gf4_platform_host.c', 'hwdev/gf/*.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c', 'drivers/video/geforce/edid.c', 'drivers/video/geforce/tv_data.c', 'drivers/video/geforce/gf_display_data.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/gfinit_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'kdebug/gfinit_pll.h', 'include/memmap.h', 'kdebug/gfinit_exec.c', 'kdebug/gfinit_exec.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/gfinit_bus.c', 'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/kprintf.h', 'tools/tests/gfinit_resources_ra266.h', 'hwdev/owner.h', 'kdebug/gfinit.c', 'kdebug/gfinit.h', 'kdebug/gfinit_plan.h', 'kdebug/kpeek.h', 'kdebug/kpeek_allow.h', 'mm/paging.h', 'mm/physmem.h', 'lib/kstring.h', 'arch/x86/kernel/idt.h', 'kernel/module/module.h', 'drivers/char/serial.h', 'include/bootinfo.h', 'include/sys.h', 'kdebug/generated/kdebug_import_macros.h', 'kdebug/generated/kdebug_imports.h', 'tools/tests/gfinit_owner_host.c', 'tools/tests/test_gfinit_owner.py', 'include/hwdev_private.h', 'kdebug/gfinit_wire.h', 'userland/shell/cmd_gfinit.c', 'userland/shell/shell.h', 'userland/shell/cmd_sys.c', 'build/programs.mk', 'tools/tests/gfinit_output_host.h', 'lib/kprintf.c', 'include/console_attr.h', 'kernel/module/kdebug_call.c', 'hwdev/hwdev_imports.def', 'kdebug/gfinit_plan.c', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_profile.c', 'tools/tests/gfinit_romfile_host.c', 'tools/gfinit_rom_decode.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kernel/console/console_backend.h', 'kdebug/gfinit_mode.c', 'kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h', 'kdebug/recover_gf_c.h', 'tools/tests/test_gfinit_plan_c.py', 'tools/tests/gfinit_plan_c_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_budget.py', 'tools/tests/gfinit_budget_host.c', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'hwdev/gf_load_state.h', 'tools/tests/test_gf_runner.py', 'tools/tests/gf_runner_host.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/scripts.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/display/state.h', 'hwdev/gf/quiesce_rows.h', 'tools/tests/gf_display_host.c', 'tools/tests/gf_display_palette_host.c', 'tools/tests/gf_display_blank_host.c', 'tools/tests/gf_display_modes_host.c', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/gf4_*_host.c', 'tools/tests/gf4_display_fake.h', 'tools/tests/gf_accel*.[ch]', 'drivers/video/geforce/*.c', 'drivers/video/geforce/*.h', 'build/hwdev.mk', 'kdebug/gf_display_test.c', 'kdebug/gf_display_test.h', 'kdebug/gf_command_wire.h', 'kernel/module/module_schema.h', 'hwdev/gf/rom.inc'],
+    covers=['hwdev/gf/vram_layout.h', 'tools/tests/test_geforce.py', 'tools/tests/gf_startlog_host.h', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_accel_host.h', 'tools/tests/gf_command_runtime_host.h', 'hwdev/gf/accel.h', 'hwdev/gf/vram_view.h', 'hwdev/gf/accel_service.h', 'hwdev/gf/foundation.h', 'hwdev/gf/gf2_test.h', 'drivers/video/geforce/geforce_tick.h', 'tools/tests/gf_wc_recovery_host.inc', 'exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'drivers/video/geforce/gf_wc.c', 'arch/x86/kernel/mtrr_wc.h', 'tools/tests/gf_wc_host.c', 'tools/tests/geforce_core_cases.inc', 'tools/tests/paging_source.py', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/pc98/pc98_route.c', 'drivers/video/pc98/pc98_route.h', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/geforce_body.c', 'lib/pc98_cell.h', 'gfx/gfx_core.c', 'include/gfx_hal.h', 'include/video_service.h', 'init/kernel.c', 'mm/pgalloc.h', 'hwdev/gf/service.c', 'hwdev/gf/display/modes.c', 'tools/tests/backend_geforce_host.c', 'tools/tests/gf_present_host.c', 'tools/tests/pc98_route_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/serial_diag_host.h', 'build/geforce-module.mk', 'build/geforce-module.ld', 'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py', 'tools/module_schema.py', 'build/core.yaml', 'build/kernel.mk', 'Makefile', 'tools/tests/geforce_module_host.c', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/mkmod.py', 'build/out/geforce.mod', 'build/out/geforce/*', 'build/out/kernel.elf', 'build/out/vmkernel.lz4', 'include/gfx_format.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/palette.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'lib/serial_diag.h', 'gfx/gfx_internal.h', 'tools/tests/gfx_reinit_host.c', 'tools/tests/test_gfx_reinit.py', 'lib/utf8.c', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'tools/run_host_group.py', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'platform/pc98/boot_names.c', 'hwdev/gf/internal.h', 'hwdev/gfinit_mode.h', 'drivers/base/dev.c', 'fs/vfs.c', 'sdk/kapi.json', 'drivers/video/geforce/geforce_platform.c', 'kernel/gui.c', 'kernel/gui.h', 'kernel/console/console.c', 'platform/pc98/console.c', 'platform/pc98/display.c', 'tools/tests/dep_dir_d_console_grid_host.c', 'tools/tests/test_dep_dir_d_console.py', 'hwdev/gf/production.h', 'include/gf_production.h', 'mm/memory_boot.c', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/fixtures/dep_dir_d/*', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/test_gf_display.py', 'tools/tests/gf4_platform_host.c', 'hwdev/gf/*.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c', 'drivers/video/geforce/edid.c', 'drivers/video/geforce/tv_data.c', 'drivers/video/geforce/gf_display_data.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/gfinit_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'kdebug/gfinit_pll.h', 'include/memmap.h', 'kdebug/gfinit_exec.c', 'kdebug/gfinit_exec.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/gfinit_bus.c', 'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/kprintf.h', 'tools/tests/gfinit_resources_ra266.h', 'hwdev/owner.h', 'kdebug/gfinit.c', 'kdebug/gfinit.h', 'kdebug/gfinit_plan.h', 'kdebug/kpeek.h', 'mm/paging.h', 'mm/physmem.h', 'lib/kstring.h', 'arch/x86/kernel/idt.h', 'kernel/module/module.h', 'drivers/char/serial.h', 'include/bootinfo.h', 'include/sys.h', 'kdebug/generated/kdebug_import_macros.h', 'kdebug/generated/kdebug_imports.h', 'tools/tests/gfinit_owner_host.c', 'tools/tests/test_gfinit_owner.py', 'include/hwdev_private.h', 'kdebug/gfinit_wire.h', 'userland/shell/cmd_gfinit.c', 'userland/shell/shell.h', 'userland/shell/cmd_sys.c', 'build/programs.mk', 'tools/tests/gfinit_output_host.h', 'lib/kprintf.c', 'include/console_attr.h', 'kernel/module/kdebug_call.c', 'hwdev/hwdev_imports.def', 'kdebug/gfinit_plan.c', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_profile.c', 'tools/tests/gfinit_romfile_host.c', 'tools/gfinit_rom_decode.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kernel/console/console_backend.h', 'kdebug/gfinit_mode.c', 'kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h', 'kdebug/recover_gf_c.h', 'tools/tests/test_gfinit_plan_c.py', 'tools/tests/gfinit_plan_c_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_budget.py', 'tools/tests/gfinit_budget_host.c', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'hwdev/gf_load_state.h', 'tools/tests/test_gf_runner.py', 'tools/tests/gf_runner_host.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/scripts.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/display/state.h', 'hwdev/gf/quiesce_rows.h', 'tools/tests/gf_display_host.c', 'tools/tests/gf_display_palette_host.c', 'tools/tests/gf_display_blank_host.c', 'tools/tests/gf_display_modes_host.c', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/gf4_*_host.c', 'tools/tests/gf4_display_fake.h', 'tools/tests/gf_accel*.[ch]', 'drivers/video/geforce/*.c', 'drivers/video/geforce/*.h', 'build/hwdev.mk', 'kdebug/gf_display_test.c', 'kdebug/gf_display_test.h', 'kdebug/gf_command_wire.h', 'kernel/module/module_schema.h', 'hwdev/gf/rom.inc', 'tools/rshell_hwb.py'],
     needs=['make:all'], budget=60.0)
 
 from kernel_includes import include_flags
@@ -16,17 +16,60 @@ FLAGS=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror'
        '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie']
 INCLUDES=include_flags(ROOT)
 
-def component(name, flags=()):
+def component(name, flags=(), mutation=None):
     with tempfile.TemporaryDirectory(prefix='gf-hal-') as td:
         exe=Path(td)/'host'
-        subprocess.run(FLAGS+INCLUDES+list(flags)+[str(ROOT/'tools/tests'/f'{name}_host.c'),'-o',str(exe)],check=True)
+        sources = [ROOT/'tools/tests'/f'{name}_host.c']
+        if name == 'backend_geforce' and mutation:
+            original = (ROOT/'drivers/video/geforce/backend_geforce.c').read_text()
+            old, new = mutation
+            assert original.count(old) == 1
+            original = original.replace(old, new, 1)
+            backend = Path(td)/'backend.c'
+            import re
+            original = re.sub(r'^#include "([^"]+)"', lambda m: '#include "'+str((ROOT/'drivers/video/geforce'/m[1]).resolve())+'"' if m[1].startswith('../') else m[0], original, flags=re.M)
+            backend.write_text(original)
+            fixture = (ROOT/'tools/tests/backend_geforce_host.c').read_text().replace('../../drivers/video/geforce/backend_geforce.c', str(backend))
+            fixture = fixture.replace('#include "gf_startlog_host.h"', '#include "'+str(ROOT/'tools/tests/gf_startlog_host.h')+'"')
+            host = Path(td)/'fixture.c'
+            host.write_text(fixture)
+            sources = [host]
+        if name == 'backend_geforce':
+            sources.append(ROOT/'tools/tests/gf_accel_unbound_stubs.c')
+        subprocess.run(FLAGS+INCLUDES+list(flags)+[*map(str, sources),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
-        assert result.returncode==0,(name,result.returncode,result.stdout,result.stderr)
+        assert result.returncode==(20 if mutation else 0),(name,result.returncode,result.stdout,result.stderr)
+        if mutation: print('RED backend startlog runtime rc=20', flush=True)
         print('PASS '+name,flush=True)
 
-def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mutation=None, diagnostic=False):
+def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mutation=None, diagnostic=False, vram_bytes=0x8000000, vs_mask=0x700, no_vram_pt=False, fail_boot=False):
     fixture=(ROOT/'tools/tests/gfx_kernel_fb_host.c').read_text().replace('return id == 2 ? &slot : 0;', 'return id == 2 || id == APP_ID_SHELL ? &slot : 0;')
     fixture=fixture.replace('void gui_display_failed(void) {}', '')
+    fixture=fixture.replace('void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }', r'''static int log_is(const char *a,const char *b)
+{ while (*a && *a==*b) { a++;b++; } return *a==*b; }
+static unsigned fallback_logs, reserve_fail_logs, reserve_stage_logs;
+void __cdecl kprintf(u8 a,const char *f,...)
+{
+    (void)a; host_kprintf_count++;
+    if (log_is(f,"[gfx] geforce boot_reserve failed\n")) reserve_fail_logs++;
+    if (log_is(f,"[geforce] boot_reserve fail stage=%s\n")) {
+        __builtin_va_list stage_args; __builtin_va_start(stage_args,f);
+        const char *stage = __builtin_va_arg(stage_args,const char *);
+        if (log_is(stage,"identify")) reserve_stage_logs++;
+        __builtin_va_end(stage_args);
+    }
+    const char *expected = "[gfx] backend=%s init failed -> pc98\n";
+    unsigned i = 0;
+    while (f[i] && f[i] == expected[i]) i++;
+    if (f[i] != expected[i]) return;
+    __builtin_va_list args; __builtin_va_start(args,f);
+    const char *name = __builtin_va_arg(args,const char *);
+    const char *wanted = "geforce";
+    i = 0; while (name[i] && name[i] == wanted[i]) i++;
+    if (name[i] == wanted[i]) fallback_logs++;
+    __builtin_va_end(args);
+}''')
+
     fixture=fixture.replace('static void run(void)\n{',
         '#include "geforce_core_cases.inc"\nstatic void run(void)\n{',1)
     fixture=replace_function(fixture,'static void run(void)',r'''
@@ -34,7 +77,11 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
     CHECK(gfx_geforce_pref(0)==GFX_PREF_GEFORCE);
     CHECK(gfx_geforce_pref(2)==GFX_PREF_GEFORCE && gfx_geforce_pref(-1)==GFX_PREF_GEFORCE);
     map_host(0x10000,0xff0000); map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
-    boot(); gfx_set_backend_pref(GFX_PREF_GEFORCE); gfx_boot_reserve();
+    map_host(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES);
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=0;
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=0;
+    boot();
+    gfx_set_backend_pref(GFX_PREF_GEFORCE); gfx_boot_reserve();
     const struct ledger_surface *client=ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_CLIENT);
     const struct ledger_surface *display=ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_DISPLAY);
     CHECK(client && display && client->backing==LEDGER_SB_RAM && display->backing==LEDGER_SB_MMIO);
@@ -50,7 +97,7 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
     CHECK(!(paging_pte_raw(GF_TEST_DISPLAY+MEM_GFX_BB8_SIZE)&PTE_PRESENT));
     /* Boot builds both instmem PTs, but leaves every aperture PTE closed. */
     const u32 instmem_bytes = BAR2_BYTES < 0x618000U ? BAR2_BYTES : 0x618000U;
-    CHECK(GF_PRODUCTION_PT_PAGES==7);
+    CHECK(GF_PRODUCTION_PT_PAGES==70);
     for (u32 off=0; off<instmem_bytes; off+=PAGE_SIZE) {
         CHECK(paging_registered_pt(GF_TEST_BAR2+off));
         CHECK(paging_pte_raw(GF_TEST_BAR2+off)==((GF_TEST_BAR2+off)|PTE_RW|PTE_PCD));
@@ -70,11 +117,13 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
     CHECK(!geforce_range_reserved(GF_TEST_BAR2,BAR2_BYTES));
     paging_addrspace_destroy(&space);
     CHECK(ledger_owner_retire(instmem_owner));
+    prepared_vram_test();
     CHECK(!acquires && !starts);
     if (!MISSING) geforce_backend_bind(&device_gf,identify_gf,0,point_gf,0);
     gfx_prepare_backend(); CHECK(!acquires && !starts);
     decode_safe=!UNSAFE; host_gui=GUI_FIRST;
     gfx_init();
+    CHECK(fallback_logs == (unsigned)(INIT_FAIL && !UNSAFE));
     if (INIT_FAIL || MISSING) {
         CHECK(acquires==(MISSING ? 0 : 1) && !starts);
         struct gfx_kernel_fb fb;
@@ -111,27 +160,52 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
     }
     SAY("PASS GF core lifecycle/reservation/fallback"); die(0);
 ''')
+    if fail_boot:
+        fixture=replace_function(fixture,'static void run(void)',r"""
+        map_host(0x10000,0xff0000);
+        boot(); host_gf_identify_fail=1;
+        gfx_set_backend_pref(GFX_PREF_GEFORCE); gfx_boot_reserve();
+        CHECK(reserve_fail_logs==1 && reserve_stage_logs==1);
+        CHECK(!geforce_platform_get()->resources);
+        CHECK(!geforce_boot_reserve());
+        CHECK(reserve_fail_logs==1 && reserve_stage_logs==2);
+        SAY("PASS reserve failure rc and stage/caller logs"); die(0);
+        """)
     if diagnostic:
         fixture=replace_function(fixture,'static void run(void)',r"""
         map_host(0x10000,0xff0000); map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
+        map_host(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES);
+        *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=0;
+        *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=0;
         boot(); foundation_selection_test(); die(0);
         """)
-    fixture=f'#define BAR2_BYTES {bar2_bytes}U\n#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
+    fixture=f'#define EXPECT_VRAM_PT {0 if no_vram_pt else 1}\n#define TEST_VRAM_BYTES {vram_bytes}U\n#define TEST_VS_MASK {vs_mask}U\n#define BAR2_BYTES {bar2_bytes}U\n#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
     def stage(tmp,sources):
         cases=(ROOT/'tools/tests/geforce_core_cases.inc').read_text()
-        # Match production BAR2 below the private AS bands.
+        # Match production BAR1/BAR2 below the private AS bands.
+        cases=cases.replace('#define GF_TEST_DISPLAY 0xd0000000U', '#define GF_TEST_DISPLAY 0x30000000U')
         cases=cases.replace('#define GF_TEST_BAR2 0xe1000000U', '#define GF_TEST_BAR2 0x25000000U')
         cases=cases.replace('GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1',
                             'GF_TEST_BAR2,GF_TEST_BAR2,BAR2_BYTES,1')
         platform=(ROOT/'drivers/video/geforce/geforce_platform.c').read_text()
-        if mutation:
+        if no_vram_pt:
+            start=platform.index("    u32 view_phys =")
+            end=platform.index("    platform.bar0_phys =", start)
+            platform=platform[:start]+platform[end:]
+        if mutation and mutation != "reserve-drop":
             old,new={
-                'gui-boot-reserve': ('if (!gf_production_selected() || gf_production_identify(&boot_resources)) return 0;', 'if (gf_production_identify(&boot_resources)) return 0;'),
-                'instmem-no-pt': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
+                'cold-pfb': ('u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);',
+                    'u32 v=gf_vram_bytes(*(volatile u32 *)P2V_IO(boot_resources.bars[0].base+GF_VRAM_SIZE_REG));\n'
+                    '    if (!v) return reserve_fail("pfb");\n'
+                    '    u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);'),
+                'push-no-pt': ('view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '(view_bytes - GF2_PUSH_BYTES) / PAGE_SIZE, PAGE_RW | PTE_PCD)'),
+                'view-no-pt': ('view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
+                'gui-boot-reserve': ('if (!gf_production_selected()) return reserve_fail("selection");', 'if (0) return reserve_fail("selection");'),
+                'instmem-no-pt': ('instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'instmem->base, instmem->base, 0, PAGE_RW | PTE_PCD)'),
                 'instmem-open': ('paging_set_not_present(instmem->base, instmem->base + bytes - 1)', '0'),
-                'instmem-short': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'bytes / PAGE_SIZE - 1, PAGE_RW | PTE_PCD)'),
+                'instmem-short': ('instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'instmem->base, instmem->base, bytes / PAGE_SIZE - 1, PAGE_RW | PTE_PCD)'),
                 'instmem-overrun': ('instmem->length : GF_BOOT_INSTMEM_MAX_BYTES;', 'GF_BOOT_INSTMEM_MAX_BYTES : GF_BOOT_INSTMEM_MAX_BYTES;'),
-                'instmem-wb': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'bytes / PAGE_SIZE, PAGE_RW)'),
+                'instmem-wb': ('instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW)'),
             }[mutation]
             assert platform.count(old)==1,(mutation,old)
             platform=platform.replace(old,new,1)
@@ -146,7 +220,7 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
         start=source.index('int geforce_boot_reserve(void)')
         end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
-        for rel in ('drivers/video/geforce/backend_geforce.c','tools/tests/gf_accel_unbound_stubs.c','hwdev/gf/service.c','hwdev/gf/accel_surface.c','hwdev/gf/display/modes.c'):
+        for rel in ('drivers/video/geforce/backend_geforce.c','tools/tests/gf_accel_unbound_stubs.c','hwdev/gf/service.c','hwdev/gf/accel_surface.c','hwdev/gf/display/modes.c','hwdev/gf/instmem_map.c','hwdev/gf/command_platform.c','hwdev/gf/vram_view.c'):
             sources.append(ROOT/rel)
         # Transfer is tested separately; this fixture tests the HAL's boundary.
         transfer=tmp/'transfer.c'
@@ -155,7 +229,10 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
 {(void)c;(void)cp;(void)d;(void)dp;(void)b;(void)x;(void)y;(void)w;(void)h;(void)p;(void)v;return 0;}
 ''')
         sources.append(transfer)
-    result=run_case(None,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
+    caller_mutation = ('reserve-drop',
+        'if (!geforce_boot_reserve())\n            kprintf(KLOG_ATTR, "[gfx] geforce boot_reserve failed\\n");',
+        '(void)geforce_boot_reserve();', '') if mutation == 'reserve-drop' else None
+    result=run_case(caller_mutation,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
         ('gfx/gfx_core.c','static void _gfx_common_init(int plane_sz)\n{',
          'static void _gfx_common_init(int plane_sz)\n{\n    extern int host_planar_inits; host_planar_inits++;')])
     assert result.returncode==(1 if mutation else 0),(init_fail,unsafe,missing,mutation,result.returncode,result.stdout,result.stderr)
@@ -475,7 +552,7 @@ def wc_lifecycle(mutation=None):
     targets={
         'wc-stop': ('body', 'int rc = p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = 0; (void)p;'),
         'wc-repeat': ('source', 'if (lease.active) return wc_result;', 'if (0) return wc_result;'),
-        'wc-start': ('backend', '(start_wc && start_wc() < 0) ||', '(0) ||'),
+        'wc-start': ('backend', 'rc = start_wc ? start_wc() : 0;', 'rc = 0;'),
         'wc-alias': ('source', 'no_alias(base) && bar0_uc', '(1) && bar0_uc'),
     }
     if mutation:
@@ -493,7 +570,7 @@ def wc_lifecycle(mutation=None):
         # Preserve product relative includes in the staged fixture/body.
         (tmp/'geforce_body.inc').write_text(ownerless_body(body, bind_f3=False))
         (tmp/'backend.inc').write_text(backend.replace('"../../../gfx/', '"gfx/'))
-        harness=(ROOT/'tools/tests/gf_wc_host.c').read_text()
+        harness='#include "'+str(ROOT/'tools/tests/gf_startlog_host.h')+'"\n'+(ROOT/'tools/tests/gf_wc_host.c').read_text()
         harness=harness.replace('"../../drivers/video/geforce/geforce_body.c"','"geforce_body.inc"')
         harness=harness.replace('"../../drivers/video/geforce/backend_geforce.c"','"backend.inc"')
         (tmp/'host.c').write_text(harness)
@@ -583,9 +660,12 @@ def main():
     present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
     present_trace(byte=True)
     if '--mutate' in sys.argv:
+        component('backend_geforce', ('-DOS32_GEFORCE_MODULE',), ('rc, stage, last, state, epoch, seq, ch_rc);', 'rc, stage, last, state, epoch, seq, 0); (void)ch_rc;'))
         for mutation in ('detach-irq', 'detach-tick', 'abort-slot', 'getter-registration', 'start-slot-clear', 'detach-slot-clear', 'abort-slot-clear', 'fill-text-check', 'blit-text-check'): module_registration(mutation)
-        for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb'):
+        for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb','push-no-pt','view-no-pt'):
             core(mutation=mutation)
+        core(mutation='cold-pfb')
+        core(fail_boot=True,mutation='reserve-drop')
         core(bar2_bytes=0x400000,mutation='instmem-overrun')
         core(diagnostic=True,mutation='gui-boot-reserve')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
@@ -602,7 +682,11 @@ def main():
     component('backend_geforce', ('-DOS32_GEFORCE_MODULE',))
     component('backend_geforce', ('-DGF_ACCEPT_MODE=0',))
     for args in ((0,0,0,0),(0,0,0,1),(1,0,0,0),(1,1,0,0),(0,0,1,0)): core(*args)
+    core(fail_boot=True)
+    core(no_vram_pt=True)
     core(bar2_bytes=0x400000)
+    core(vram_bytes=0x10000000, vs_mask=0)
+    core(vram_bytes=0x10000000, vs_mask=0xff00)
     core(diagnostic=True)
     return 0
 if __name__=='__main__': raise SystemExit(main())

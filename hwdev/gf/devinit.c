@@ -6,6 +6,7 @@
 #include "../../lib/serial_diag.h"
 #include "../../mm/pgalloc.h"
 #include "../../lib/kstring.h"
+#include "../../include/kprintf.h"
 #include "../../lib/crc32_core.inc"
 #include "rom.inc"
 static int same_resources(struct gf_production *p)
@@ -46,6 +47,15 @@ static int foundation_write(void *opaque, u32 bar, u32 off, u32 width, u32 value
     *(volatile u32 *)(f->bar0+off)=value;
     return 0;
 }
+static struct gf_production *foundation_production(void *opaque)
+{
+    return (struct gf_production *)((u8 *)opaque-
+        __builtin_offsetof(struct gf_production,foundation));
+}
+static int foundation_clock(void *opaque, u32 *value)
+{ return gf_production_clock(foundation_production(opaque),value); }
+static int foundation_wait(void *opaque, u32 us)
+{ return gf_production_wait(foundation_production(opaque),us); }
 static int foundation_result(struct gf_display_context *c, int rc)
 {
     if (rc && !serial_gate_active()) {
@@ -102,13 +112,28 @@ int gf_production_prepare(struct gf_production *p,
         {gf_production_clock,gf_production_wait},gf_production_point,gf_production_restore,0};
     p->display.owner=&gf_production_owner;
     p->foundation.io=(struct gf_io){.opaque=&p->foundation,
-        .read=foundation_read,.write=foundation_write};
+        .read=foundation_read,.write=foundation_write,
+        .timing={foundation_clock,foundation_wait}};
     p->foundation.expected_command=RECOVER_COMMAND_STOP;
     p->map_ops=&gf_production_instmem_map_ops;p->map_owner=p;
     p->video=(struct video_device){&p->display,&gf_video_ops};
     if (same_resources(p)) return -1;
+    /* nouveau nouveau_drm.c:881 enables master at probe; OS32 splits prepare
+     * from start, keeping BM off until N1 to preserve the STOP transport. */
+    u16 command=pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND);
+    if (command&PCI_CMD_BUS_MASTER) {
+        u16 stopped=command&~PCI_CMD_BUS_MASTER;
+        if (pci_cfg_write16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND,stopped)) return -1;
+        kprintf(KLOG_ATTR,"[gf1] command %04x->%04x before start\n",command,stopped);
+    }
     p->display.bar0_map=(void *)P2V_IO(p->display.bars[0].base);
     p->foundation.bar0=p->display.bar0_map;
+    /* As in gf_foundation_stop (foundation.c), nouveau has no expected_pmc;
+     * publish only the successful readback, here before the first start. */
+    u32 prepared_pmc;
+    if (gf_production_mmio(p,GF_MODE_REGISTER_BAR,RECOVER_PMC_ENABLE,
+                           sizeof(prepared_pmc),false,&prepared_pmc)) return -1;
+    p->foundation.expected_pmc=prepared_pmc;
     p->display.bar1_map=(void *)P2V_IO(p->display.bars[GF_MODE_VRAM_BAR].base);
     p->prepared=true;p->display.reusable=true;
     return 0;

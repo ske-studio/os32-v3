@@ -1,6 +1,6 @@
 """NV44 instance allocation and aperture access."""
 CHECK = dict(name='gf1-instmem-host', tier=1,
-             covers=['hwdev/gf/instmem.c', 'hwdev/gf/foundation.h',
+             covers=['hwdev/gf/vram_layout.h', 'hwdev/gf/instmem.c', 'hwdev/gf/foundation.h',
                      'hwdev/gf/internal.h', 'tools/tests/gf1_instmem_host.c',
                      'tools/tests/test_gf1_instmem.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py'], needs=[], budget=30.0)
@@ -17,7 +17,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gf1-instmem-') as td:
         exe = Path(td) / 'host'
         source = (ROOT / 'hwdev/gf/instmem.c').read_text()
-        def build(text):
+        layout = (ROOT / 'hwdev/gf/vram_layout.h').read_text()
+        def build(text, header=layout):
+            header = header.replace('"../../include/', '"' + str(ROOT / 'include') + '/')
+            (Path(td) / 'vram_layout.h').write_text(header)
+            text = '#include "vram_layout.h"\n' + text
             path = Path(td) / 'instmem.c'
             path.write_text(text.replace('#include "foundation.h"',
                 '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"'))
@@ -38,19 +42,23 @@ def main():
                 ('allow allocation beyond end', 'bytes > f->imem.aperture_bytes - pos', 'bytes > f->imem.aperture_bytes - pos + 4'),
                 ('reject last word', 'obj->size - off < 4', 'obj->size - off <= 4'),
                 ('allow access beyond end', 'obj->size - off < 4', 'obj->size - off == 1'),
-                ('wrong first BAR', 'f->io.opaque, 0, VRAM_SIZE_REG, 4', 'f->io.opaque, 1, VRAM_SIZE_REG, 4'),
-                ('wrong second BAR', 'f->io.opaque, 0, VS_REG, 4', 'f->io.opaque, 1, VS_REG, 4'),
-                ('wrong first width', 'f->io.opaque, 0, VRAM_SIZE_REG, 4', 'f->io.opaque, 0, VRAM_SIZE_REG, 2'),
-                ('wrong second width', 'f->io.opaque, 0, VS_REG, 4', 'f->io.opaque, 0, VS_REG, 2'),
-                ('wrong first register', 'VRAM_SIZE_REG = 0x10020c', 'VRAM_SIZE_REG = 0x100208'),
-                ('wrong second register', 'VS_REG = 0x1540', 'VS_REG = 0x1544'),
-                ('wrong register order', '0, VRAM_SIZE_REG, 4, &v', '0, VS_REG, 4, &v'),
-                ('reservation constant', 'VS_CONTEXT_BYTES = 0x4980', 'VS_CONTEXT_BYTES = 0x4981'),
+                ('wrong first BAR', 'f->io.opaque, 0, GF_VRAM_SIZE_REG, 4', 'f->io.opaque, 1, GF_VRAM_SIZE_REG, 4'),
+                ('wrong second BAR', 'f->io.opaque, 0, GF_VS_REG, 4', 'f->io.opaque, 1, GF_VS_REG, 4'),
+                ('wrong first width', 'f->io.opaque, 0, GF_VRAM_SIZE_REG, 4', 'f->io.opaque, 0, GF_VRAM_SIZE_REG, 2'),
+                ('wrong second width', 'f->io.opaque, 0, GF_VS_REG, 4', 'f->io.opaque, 0, GF_VS_REG, 2'),
+                ('wrong first register', 'GF_VRAM_SIZE_REG 0x10020cU', 'GF_VRAM_SIZE_REG 0x100208U'),
+                ('wrong second register', 'GF_VS_REG 0x1540U', 'GF_VS_REG 0x1544U'),
+                ('wrong register order', '0, GF_VRAM_SIZE_REG, 4, &v', '0, GF_VS_REG, 4, &v'),
+                ('reservation constant', 'GF_VS_CONTEXT_BYTES 0x4980U', 'GF_VS_CONTEXT_BYTES 0x4981U'),
                 ('fixed size constant', 'RAMHT_BYTES = 0x8000', 'RAMHT_BYTES = 0x8004'),
             ]
             for name, old, new in mutations:
-                assert source.count(old) == 1, name
-                build(source.replace(old, new, 1))
+                target = layout if old in layout else source
+                assert target.count(old) == 1, name
+                if target == layout:
+                    build(source, layout.replace(old, new, 1))
+                else:
+                    build(source.replace(old, new, 1))
                 assert host32.run([str(exe)], runner='qemu').returncode != 0, name
                 print('MUTATE RED ' + name, flush=True)
 

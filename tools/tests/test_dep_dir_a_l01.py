@@ -1,6 +1,7 @@
 """L01: fixed ABI/slots, shared DMA boundaries and regeneration dependencies.
 
-The fixture was captured from 466010d7, not from the code under test.
+The fixture was captured from 466010d7; the import review pin was refreshed
+for GF5's appended gf5_test contracts (see generations() for the recipe).
 --prepare only compiles copied mutation units; it never executes a mutant.
 """
 CHECK = dict(name='dep-dir-a-l01-host', tier=1,
@@ -91,7 +92,8 @@ def generations(folder, fixture):
                          else f'build/out/{name}/{name}_imports.json')
         metadata = json.loads((ROOT / metadata_path).read_text())
         rows = [{k: v for k, v in e.items() if k != 'source'} for e in metadata['imports']]
-        # Review pin includes GF3's appended getter/present contracts. To refresh:
+        # Review pin includes append-only HW-BASIC PCI read/write and abort contracts
+        # (HWDEV import 43 and the KDEBUG import). To refresh:
         # hash json.dumps([{k:v for k,v in e.items() if k != 'source'}
         #                 for e in metadata['imports']], sort_keys=True).encode()
         # with SHA256 after reviewing .def/generated import changes.

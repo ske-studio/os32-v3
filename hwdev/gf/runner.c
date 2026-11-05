@@ -199,45 +199,84 @@ static int init_script_column(struct gf_init_context *ctx, struct gf_init_progra
         pc += v->length;
     }
 }
-int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
-                       u32 pc, u8 head, u8 or_mask, u32 dl)
+/* Same entry contract for validation and execution. Invalid loans leave the
+ * owner's pending transaction untouched, including its saved table. */
+static bool init_script_entry(const struct gf_init_context *ctx, const void *work,
+                               u32 pc)
 {
-    /* Invalid entry never consumes an outstanding transaction. */
-    if (!ctx || !work || !ctx->rom || !ctx->io.read || !ctx->io.write ||
-        !ctx->io.point || !ctx->io.restore || !ctx->io.timing.clock_us ||
-        !ctx->io.timing.wait_us || !pc || pc >= ctx->rom_size || ctx->saved_count)
-        return GF_SCRIPT_EIO;
+    return ctx && work && ctx->rom && ctx->io.read && ctx->io.write &&
+           ctx->io.point && ctx->io.restore && ctx->io.timing.clock_us &&
+           ctx->io.timing.wait_us && pc && pc < ctx->rom_size && !ctx->saved_count;
+}
+static void init_script_context(struct gf_init_context *ctx, u32 pc,
+                                 u8 head, u8 or_mask, u32 dl)
+{
     ctx->display_script = true; ctx->deadline = dl; ctx->or_mask = or_mask;
     ctx->head = head; ctx->pc = pc;
-    ctx->calls = ctx->repeats = ctx->steps = ctx->wait_us = ctx->elapsed_us = 0;
-    ctx->skip = false; ctx->fail_pc = pc; ctx->last_rc = GF_SCRIPT_EIO;
-    work->count = 0;
+    ctx->calls = ctx->repeats = 0;
+    ctx->skip = false; ctx->fail_pc = pc;
+}
+static int init_script_failure(struct gf_init_context *ctx)
+{
+    int rc = ctx->last_rc;
+    /* Cleanup is unconditional and cannot replace the original reason. */
+    (void)ctx->io.restore(ctx->io.opaque, ctx);
+    ctx->last_rc = rc;
+    return rc;
+}
+/* BIT I lookup and SUB references: MIT nouveau bios/init.c:359-407,
+ * 1663-1682. The bounded graph decoder and repeat pairing are shared with
+ * run_script; preparation does not dispatch any GPU operation. */
+i32 gf_init_script_prepare(struct gf_init_context *ctx, struct gf_init_program *out,
+                            u32 pc, u8 head, u8 or_mask, u32 dl)
+{
+    if (!init_script_entry(ctx, out, pc)) return GF_SCRIPT_EIO;
+    init_script_context(ctx, pc, head, or_mask, dl);
+    ctx->steps = ctx->wait_us = ctx->elapsed_us = 0;
+    ctx->last_rc = GF_SCRIPT_EIO;
+    out->count = 0;
     u32 table, length;
     u8 version;
     if (init_point(ctx) ||
         gf_rom_bit_entry(ctx->rom, ctx->rom_size, 'I', &table, &length, &version) ||
         version != GF_INIT_BIT_VERSION || !table || length < GF_INIT_BIT_MIN_LENGTH ||
-        init_script_column(ctx, work, table, pc)) goto fail;
-    for (u32 i = 0; i < work->count; i++) {
-        const struct gfinit_instruction *v = &work->insns[i];
+        init_script_column(ctx, out, table, pc)) goto fail;
+    for (u32 i = 0; i < out->count; i++) {
+        const struct gfinit_instruction *v = &out->insns[i];
         if ((v->opcode == GF_INIT_SUB || v->opcode == GF_INIT_SUB_DIRECT) &&
             !(v->opcode == GF_INIT_SUB && !v->ref)) {
             ctx->fail_pc = v->pc;
             u32 target = v->ref;
             if (!target || target >= ctx->rom_size ||
-                init_script_column(ctx, work, table, target)) goto fail;
+                init_script_column(ctx, out, table, target)) goto fail;
         }
     }
-    if (init_point(ctx) || init_execute(ctx, work)) goto fail;
+    if (init_point(ctx)) goto fail;
+    /* last_rc stays EIO for the following execute in the same operation. */
+    return GF_SCRIPT_OK;
+fail:
+    out->count = 0; /* A partial graph is never published as executable. */
+    return init_script_failure(ctx);
+}
+i32 gf_init_script_execute(struct gf_init_context *ctx,
+                            const struct gf_init_program *program, u32 pc,
+                            u8 head, u8 or_mask, u32 dl)
+{
+    if (!init_script_entry(ctx, program, pc)) return GF_SCRIPT_EIO;
+    init_script_context(ctx, pc, head, or_mask, dl);
+    /* The owner supplies the matching immutable ROM/program and initializes
+     * budgets only for a later standalone operation (F5 design addendum).
+     * Execution model: nouveau bios/init.c:2304-2323 nvbios_exec. */
+    if (init_execute(ctx, program)) return init_script_failure(ctx);
     ctx->last_rc = GF_SCRIPT_OK;
     return GF_SCRIPT_OK;
-fail: {
-        int rc = ctx->last_rc;
-        /* Cleanup is unconditional and cannot replace the original reason. */
-        (void)ctx->io.restore(ctx->io.opaque, ctx);
-        ctx->last_rc = rc;
-        return rc;
-    }
+}
+int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
+                       u32 pc, u8 head, u8 or_mask, u32 dl)
+{
+    int rc = gf_init_script_prepare(ctx, work, pc, head, or_mask, dl);
+    if (rc) return rc;
+    return gf_init_script_execute(ctx, work, pc, head, or_mask, dl);
 }
 int gf_init_prepare(struct gf_init_context *ctx, struct gf_init_program *work)
 {

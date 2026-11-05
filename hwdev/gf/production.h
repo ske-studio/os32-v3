@@ -4,6 +4,7 @@
 #include "foundation.h"
 #include "command.h"
 #include "accel.h"
+#include "feature5.h"
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN /* existing acquisition ceiling */
 #define GF_PRODUCTION_SUBSYS 0x127010fcU
 #define GF_PRODUCTION_BAR0_BYTES 0x01000000U
@@ -48,6 +49,8 @@ struct gf_production {
     struct gf2_chan chan;
     /* Layer 3 owns one immovable context for the production lifetime. */
     struct gf3_ctx accel;
+    /* Layer 5 borrows chan/accel/display4; owns ROM independently of scratch. */
+    struct gf5 feature5;
     /* Lend to foundation.map_ops/map_owner before start, including fake MMIO.
      * Keep both valid until stop/rollback has released the map; a failed stop
      * retains the loan. io.opaque remains the gf_io adapter's own context. */
@@ -59,8 +62,9 @@ struct gf_production {
  * before freeze, and passes this snapshot to prepare. No BAR sizing/writes.
  * Ra266's GPU is on bus 0; other bridge forwarding windows are exclusions. */
 int gf_production_identify(struct gf_production_resources *out);
-/* Read-only, once per zero-initialized p. Checks snapshot, reservation and
- * mappings. Does NOT devinit. First video_start(&p->video,...) does that. */
+/* Once per zero-initialized p. Checks snapshot, reservation and mappings,
+ * then clears only PCI BusMaster until start. Does NOT devinit.
+ * First video_start(&p->video,...) does that. */
 int gf_production_prepare(struct gf_production *p,
                           const struct gf_production_resources *boot,
                           int (*route98)(void *), void *opaque);
