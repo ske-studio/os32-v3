@@ -27,9 +27,11 @@
 /* NV44A only. References below are MIT nouveau c03c1a1, nvkm/subdev/.
  * Foreground alarms replace workers; no IRQ, locks, shutdown or tachometer.
  * sensor_setup=0 means no policy/setup yet; 0xff is the saved OLD_STYLE
- * register value. The production gf5 owns the parsed trip allocation for
+ * register value; 0x100 marks unavailable setup, 0x1ff an initialized but stopped sensor.
+ * The production gf5 owns the parsed trip allocation for
  * its lifetime; snapshots borrow/copy it under the feature5.h contract. */
 #include "feature5.h"
+#include "../../include/kprintf.h"
 #define GF_ROM_BIT_ONLY
 #include "rom.inc"
 #undef GF_ROM_BIT_ONLY
@@ -38,6 +40,8 @@
 #define TH_ADC 0x0015b0U
 #define TH_RAW 0x0015b4U
 #define TH_OLD_SETUP 0xffU
+#define TH_OFF_SETUP 0x100U
+#define TH_SENSOR_OFF_SETUP 0x1ffU
 #define TH_SETTLE_US 20000U
 #define TH_PWM2 0x0010f0U
 #define TH_PWM9 0x0015f4U
@@ -285,7 +289,7 @@ static i32 th_setup(struct gf5 *g)
 }
 static i32 th_init(struct gf5 *g)
 {
-    if (g->fan.sensor_setup) return 0;
+    if (g->fan.sensor_setup && g->fan.sensor_setup!=TH_OFF_SETUP) return 0;
     struct gf5_fan_saved f;
     i32 rc=th_policy(g,&f);
     if (rc) return rc;
@@ -468,6 +472,7 @@ static u32 th_linear(struct gf5_fan_saved *f,i32 temp,i32 low,i32 high)
     if (temp>=high) return f->max_duty;
     return f->min_duty+(u32)(temp-low)*(f->max_duty-f->min_duty)/(u32)(high-low);
 }
+static void th_monitor_off(struct gf5 *,i32,const char *);
 static i32 th_auto(struct gf5 *g,u64 now)
 {
     struct gf5_fan_saved *f=&g->fan;
@@ -475,9 +480,14 @@ static i32 th_auto(struct gf5 *g,u64 now)
     g->next_auto=0;
     if (f->kind==GF5_FAN_OTHER && f->cstate) target=f->cstate;
     else {
+        /* base.c:153-154: AUTO keeps its own alarm after a sensor error. */
+        g->next_auto=now+TH_POLL_US;
         struct gf5_thermal t;
         i32 rc=th_temperature(g,&t);
-        if (rc) return rc;
+        if (rc) {
+            if (rc==GF5_ENOTSUP) { f->mode=GF5_FAN_NONE; g->next_auto=0; }
+            th_monitor_off(g,rc,"auto"); return 0;
+        }
         i32 temp=t.milli_c/(i32)TH_MILLI;
         if (f->kind==GF5_FAN_TRIP) {
             i32 chosen=-1;
@@ -490,7 +500,6 @@ static i32 th_auto(struct gf5 *g,u64 now)
             f->last_trip=chosen; target=chosen<0 ? 0 : f->trip[chosen].duty;
         } else target=th_linear(f,temp,f->kind==GF5_FAN_LINEAR ? f->linear_min : TH_FALLBACK_MIN,
                                f->kind==GF5_FAN_LINEAR ? f->linear_max : f->threshold[TH_BOOST]);
-        g->next_auto=now+TH_POLL_US;
     }
     return th_update(g,target,false,now);
 }
@@ -540,13 +549,30 @@ i32 gf5_fan_cstate(struct gf5 *g,u8 percent,i32 dir)
     }
     return th_exit(g,rc);
 }
+/* temp.c:162-189: failed temperature acquisition cancels its alarm only.
+ * Keep control-operation failures separate from this optional monitor. */
+static void th_monitor_off(struct gf5 *g,i32 rc,const char *reason)
+{
+    bool first=g->fan.sensor_setup!=TH_OFF_SETUP &&
+               g->fan.sensor_setup!=TH_SENSOR_OFF_SETUP;
+    g->fan.sensor_poll=false;
+    g->next_sensor=0;
+    g->fan.sensor_setup=(!g->fan.sensor_setup || g->fan.sensor_setup==TH_OFF_SETUP) ?
+                        TH_OFF_SETUP : TH_SENSOR_OFF_SETUP;
+    if (first) {
+        kprintf(KLOG_ATTR,"[gf5] therm off rc=%d reason=%s%s\n",
+                g->source_rc ? g->source_rc : rc,reason,
+                rc==GF5_ENOTSUP ? " auto=unavailable (uncalibrated)" : "");
+    }
+    g->source_rc=0;
+}
 /* therm/temp.c:81-209: one notification per hysteresis transition. */
 static i32 th_sensor(struct gf5 *g,u64 now)
 {
     struct gf5_fan_saved *f=&g->fan;
     struct gf5_thermal t;
     i32 rc=th_temperature(g,&t);
-    if (rc) { f->sensor_poll=false; g->next_sensor=0; return rc; }
+    if (rc) { th_monitor_off(g,rc,"sensor"); return 0; }
     g->next_sensor=now+TH_POLL_US;
     i32 fan_rc=0;
     i32 temp=t.milli_c/(i32)TH_MILLI;
@@ -576,7 +602,11 @@ void gf5_fan_tick(struct gf5 *g,u64 now)
 {
     if (g) g->source_rc=0;
     i32 rc=th_check(g);
-    if (!rc) rc=th_init(g);
+    if (!rc && g->fan.sensor_setup==TH_OFF_SETUP) return;
+    if (!rc) {
+        rc=th_init(g);
+        if (rc) { th_monitor_off(g,rc,"init"); (void)th_exit(g,0); return; }
+    }
     if (rc) { (void)th_exit(g,rc); return; }
     i32 first=0,source=0;
     if (g->fan.sensor_poll && (!g->next_sensor || now>=g->next_sensor))

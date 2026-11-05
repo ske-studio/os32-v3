@@ -394,7 +394,7 @@ def present_trace(mutation=None, byte=False):
     source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
     mutations={
         'bounds': ('while (n >= 4)', 'while (n > 0)'),
-        'point': ('if (point(opaque)) {', 'if (row == 0 && point(opaque)) {'),
+        'point': ('rc = point(opaque);', 'rc = row == 0 ? point(opaque) : 0;'),
     }
     if mutation:
         old,new=mutations[mutation]
@@ -415,7 +415,7 @@ static volatile u8 *start;
 static int pitch, left, top, width, height, errors, calls, fail, drains;
 static u32 regs[(GF_PRESENT_PFB_AMOUNT / 4) + 1];
 static void trace_drain(void) { if (calls != height || drains) errors++; drains++; }
-static int point(void *p) { (void)p; calls++; return calls == fail; }
+static int point(void *p) { (void)p; calls++; return calls == fail ? -911 : 0; }
 static void run(int sa, int da, int w, int clip, int failrow) {
     int sp = 653, dp = 657, x = clip ? -2 : (w == 640 ? 0 : 1), y = 1, h = 3;
     int marker = 0;
@@ -427,7 +427,7 @@ static void run(int sa, int da, int w, int clip, int failrow) {
     for (int r=0; r<height; r++) for (int c=0; c<width; c++)
         expected[da+(y+r)*dp+left+c]=src[sa+(y+r)*sp+left+c];
     int rc=gf_present_rect(src+sa,sp,dst+da,dp,(volatile u8 *)regs,x,y,w,h,point,&marker);
-    if (rc != (failrow ? -1 : 0) || calls != (failrow ? failrow : h) ||
+    if (rc != (failrow ? -911 : 0) || calls != (failrow ? failrow : h) ||
         gfx_counters.present_bytes != (u32)(width*height) || gfx_counters.commits != (u32)!failrow || drains != !failrow) errors++;
     for (int i=0; i<SIZE; i++) if (dst[i]!=expected[i]) errors++;
 }

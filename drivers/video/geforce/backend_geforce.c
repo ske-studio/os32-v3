@@ -70,6 +70,7 @@ static int (*identify_resources)(void);
 static struct video_fb framebuffer;
 #ifdef OS32_GEFORCE_MODULE
 static struct gf3_surface selected_front;
+static bool scanout_logged;
 static GfxMode selected_scan_mode;
 static GfxMode display_modes[GF4_MODES];
 /* Borrow the same resident owner as the hooks. Foreground only; never
@@ -135,10 +136,71 @@ static int display_deadline(struct gf4_ctx *c, u32 *dl)
 {
     u32 now;
     struct gf_io *io = &c->ch->f->io;
-    if (!io->timing.clock_us || io->timing.clock_us(io->opaque, &now))
-        return GF2_EIO;
+    if (!io->timing.clock_us) return GF2_EIO;
+    int rc = io->timing.clock_us(io->opaque, &now);
+    if (rc) return rc;
     *dl = now + GF3_TIMEOUT_US;
     return 0;
+}
+/* Read the live head-0 scan, independently of selected_front. Register
+ * widths/fields: MIT nouveau c03c1a1 dispnv04/hw.h:119-140,353-372;
+ * crtc.c:175-233,869-903; dac.c:385-415. This HAL presents head 0 only.
+ * Keep the original I/O rc and restore CR44 even on a failed read. */
+#define SCAN_CR 0x6013d4U
+#define SCAN_SR 0x0c03c4U
+#define SCAN_START 0x600800U
+#define SCAN_CONFIG 0x600804U
+#define SCAN_DACCLK 0x68052cU
+#define SCAN_TEST 0x680608U
+static int scanout_index(struct gf_io *io, u32 port, u32 index, u32 *value)
+{
+    int rc = io->write(io->opaque, 0, port, 1, index);
+    return rc ? rc : io->read(io->opaque, 0, port + 1U, 1, value);
+}
+static void geforce_scanout_log(u32 bytes)
+{
+    if (scanout_logged) return;
+    scanout_logged = true;
+    const struct gf4_test_ops *ops = display_ops();
+    struct gf4_ctx *c = ops ? ops->ctx : 0;
+    if (!c || !c->ch || !c->ch->f) {
+        kprintf(KLOG_ATTR, "[gf4] scanout fail stage=context rc=%d\n", GF4_ESTATE);
+        return;
+    }
+    struct gf_io *io = &c->ch->f->io;
+    u32 owner, start=0, config=0, lo=0, hi=0, ext=0, pixel=0;
+    u32 sr=0, control=0, sync=0, dac=0, test=0;
+    int rc = scanout_index(io, SCAN_CR, 0x44U, &owner);
+    if (!rc) {
+        rc = io->write(io->opaque, 0, SCAN_CR + 1U, 1, 0);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_START, 4, &start);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_CONFIG, 4, &config);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH, &lo);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH_HI, &hi);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PITCH11, &ext);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_PIXEL, &pixel);
+        if (!rc) rc = scanout_index(io, SCAN_SR, 1, &sr);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_MODE, &control);
+        if (!rc) rc = scanout_index(io, SCAN_CR, GF_MODE_CR_RPC1, &sync);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_DACCLK, 4, &dac);
+        if (!rc) rc = io->read(io->opaque, 0, SCAN_TEST, 4, &test);
+        int restore = io->write(io->opaque, 0, SCAN_CR, 1, 0x44U);
+        if (!restore) restore = io->write(io->opaque, 0, SCAN_CR + 1U, 1, owner);
+        if (restore) kprintf(KLOG_ATTR, "[gf4] scanout fail stage=owner_restore rc=%d\n", restore);
+        if (!rc) rc = restore;
+    }
+    if (rc) {
+        kprintf(KLOG_ATTR, "[gf4] scanout fail stage=read rc=%d\n", rc);
+        return;
+    }
+    u32 pitch = (lo | ((hi >> 5) & 7U) << 8 | ((ext >> 6) & 1U) << 11) * 8U;
+    u32 depth = (pixel & 3U) == 3U ? 32U : (pixel & 3U) * 8U;
+    const struct gf4_head_image *h = &c->state->head[0];
+    kprintf(KLOG_ATTR, "[gf4] scanout head=0 start=%08x front=%08x pitch=%u depth=%u output=%u dpms=%u present=%s bytes=%u fb=%08x expected_pitch=%u config=%08x connector=%u or=%u dac=%08x test=%08x sr1=%02x cr17=%02x cr1a=%02x blank=%u\n",
+        start, selected_front.off, pitch, depth, h->route.type, h->dpms,
+        selected_front.off ? "upload" : "cpu", bytes,
+        framebuffer.phys - geforce_context->platform->display_phys, selected_front.pitch,
+        config, h->route.connector, h->route.or_mask, dac, test, sr, control, sync, h->blank);
 }
 static u8 display_format(enum gf3_fmt fmt)
 {
@@ -438,8 +500,12 @@ static int geforce_transfer(int x, int y, int w, int h)
         int rc = display_deadline(ops->ctx, &dl);
         if (!rc) rc = gf3_upload(ops->ctx->accel, &selected_front,
             (struct gf3_rect){x, y, w, h}, &ram, false, dl);
+        if (!rc) {
+            geforce_context->counters->present_bytes += (u32)w * (u32)h;
+            geforce_context->counters->commits++;
+        }
         ops->ctx->last_rc = rc;
-        return rc ? OS32_ERR_IO : 0;
+        return rc;
     }
 #endif
     return gf_present_rect(gfx_backend_geforce.bb_base, gfx_backend_geforce.bb_pitch,
@@ -452,6 +518,9 @@ static void geforce_init(void)
     struct video_mode mode;
     if (!geforce_probe()) return;
     if (active) return; /* gfx_init -> gfx_init_200 preserves the current scan. */
+#ifdef OS32_GEFORCE_MODULE
+    scanout_logged = false;
+#endif
     if (video_mode_info(device, GF_MODE_INDEX, &mode) ||
         video_framebuffer(device, &framebuffer) || !gfx_backend_geforce.bb_base) {
         geforce_fail();
@@ -498,11 +567,34 @@ static int geforce_query(GFX_ScreenInfo *info)
 
 static void geforce_present(int x, int y, int w, int h)
 {
-    if (!active) return;
+    if (!active) {
 #ifdef OS32_GEFORCE_MODULE
-    if (feature5_poll()) { geforce_fail(); return; }
+        if (!scanout_logged) {
+            scanout_logged = true;
+            kprintf(KLOG_ATTR, "[gf4] present fail stage=inactive rc=%d\n", GF4_ESTATE);
+        }
+#endif
+        return;
+    }
+#ifdef OS32_GEFORCE_MODULE
+    int poll = feature5_poll();
+    if (poll) {
+        kprintf(KLOG_ATTR, "[gf4] present fail stage=poll rc=%d\n", poll);
+        scanout_logged = true;
+        geforce_fail(); return;
+    }
+    u32 before = geforce_context->counters->present_bytes;
 #endif
     int rc = geforce_transfer(x, y, w, h);
+    if (rc) {
+        kprintf(KLOG_ATTR, "[gf4] present fail stage=transfer rc=%d\n", rc);
+#ifdef OS32_GEFORCE_MODULE
+        scanout_logged = true;
+#endif
+    }
+#ifdef OS32_GEFORCE_MODULE
+    if (!rc) geforce_scanout_log(geforce_context->counters->present_bytes - before);
+#endif
     if (rc && rc != OS32_ERR_INVAL) geforce_fail();
 }
 
