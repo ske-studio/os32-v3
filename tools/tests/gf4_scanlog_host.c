@@ -343,6 +343,16 @@ void _start(void)
     u32 pwm_len=startlog_len;
     geforce_present(0,0,1,1);
     assert(active && startlog_len==pwm_len);
+    /* A failed step does not cancel AUTO; the production poll retries. */
+    struct gf5 *fan=&cint_prod.feature5;
+    assert(fan->fan.mode==GF5_FAN_AUTO && fan->next_auto>cint_host.now);
+    u32 failed_duty=fan->fan.duty;
+    cint_host.now=(u32)fan->next_auto;
+    geforce_present(0,0,1,1);
+    /* The service retains its previous diagnostic after successful work. */
+    assert(active && fan->last_rc==GF5_EIO && fan->source_rc==-904);
+    assert(fan->fan.duty!=failed_duty);
+    assert(fan->next_auto>cint_host.now && startlog_len==pwm_len);
     scanlog_finish();
     /* AUTO has its own temperature read even when the threshold alarm is not due. */
     scanlog_therm_recovery(true);
