@@ -137,7 +137,7 @@ int rc = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
 | A8 表示/時刻 | PMがNP21/W通常起動→約2秒preview→動的表示終了→shell、Ra266/31k写真/serial、画像なし/CRC破損ロゴを確認。ノートの外部時計とserial時刻差で§8の遅れを測る。24kは機会時に別記し、host合格を実機合格としない。 |
 S5a=形式/準備/共有再生・旧核撤去（A1–3）、S5b=常用所有/preview/期限結線（A4–5、U1に応じた条件は§8）、S5c=ホスト既定化（A6）、S5d=資産/配布/実機（A7–8）。
 S5cはS5aと独立だがenc2-mt受入コミット固定が関門。S5dは原画待ちなし、S5b/c受入後。S5aの型/読込/再生は一体受入し半更新を配備しない。各段の受入は10項未満。
-実装者は該当像ビルド・check-changed MUTATE=0・変更試験--mutate・CHECK lintをcheck_slot経由で実行。CHECK入力に正典ヘッダ/Python読取器/新旧変更ソースを登録し、旧anchorを更新。OBS「通常text不変」は共通列一致へ置換。PMが統合ビルド/媒体/ゲスト受入を行う。
+実装者は該当像ビルド・check-changed MUTATE=0・変更試験--mutate・CHECK lintを直接実行。CHECK入力に正典ヘッダ/Python読取器/新旧変更ソースを登録し、旧anchorを更新。OBS「通常text不変」は共通列一致へ置換。PMが統合ビルド/媒体/ゲスト受入を行う。
 
 ## 8. PIT の tick の遅れ (U1、ユーザー決定 2026-11-04「補正しない (推奨)」)
 補正しない。tick_count へフレームの推定値を足さず、遅れは許して受入の記録に数字を残す。

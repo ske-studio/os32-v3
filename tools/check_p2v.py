@@ -8,6 +8,7 @@ import pathlib
 import re
 import clang_ast as ast
 from clang_ast.build import dependency_files, select_units
+from clang_ast.result_cache import get_or_compute
 
 ROOT = ast.ROOT
 ROOTS = SCAN_ROOTS['p2v']
@@ -227,18 +228,23 @@ def audit(root, changed=None):
                  if any(u['src'].startswith(d + '/') for d in ROOTS)
                  and not EXCLUDED.intersection(pathlib.Path(u['src']).parts)]
         for u in select_units(units, root, changed):
-            if changed is not None:
-                files.add(u['src'])
-            tu = ast.parse(u['src'],u['argv'],root)
-            if changed is not None:
+            def compute():
+                tu = ast.parse(u['src'],u['argv'],root)
+                scanned, includes = set(), set()
                 for include in tu.get_includes():
                     try:
-                        files.add(pathlib.Path(include.include.name).relative_to(root).as_posix())
+                        includes.add(pathlib.Path(include.include.name).relative_to(root).as_posix())
                     except ValueError:
                         pass
-            # Collect exception-file coverage during the findings walk too.
-            hits, funcs = findings(tu,root,files)
-            functions.update(funcs)
+                hits, funcs = findings(tu,root,scanned)
+                return [hits, sorted(funcs), sorted(scanned, key=lambda x: x or ''), sorted(includes)]
+            hits, funcs, scanned, includes = get_or_compute(
+                'p2v', u['src'], u['argv'], root, compute)
+            files.update(scanned)
+            if changed is not None:
+                files.add(u['src'])
+                files.update(includes)
+            functions.update(map(tuple, funcs))
             for rel,ln,func,rule in hits:
                 if not any(rel.startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(rel).parts):
                     continue

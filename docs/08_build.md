@@ -42,6 +42,10 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
+CI は配布物の `artifacts` と検査の `check-fast` を並列に実行する。取り方と合格条件の正典は
+[§8-6](#8-6-github-actions-での本体ビルド)。
+変異込みの全体検査は Actions の `full-check` → Run workflow (入力 `ref`、既定 `main`) で起動でき、毎日 03:00 JST にも `main` に対して実行する。
+
 ```
 === カーネルビルド ===
 boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
@@ -432,7 +436,7 @@ python3 tools/gen_memmap.py --manifest --check
 
 **誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
 
-段の取り込みは PM が `check_wt.sh` の `check-changed` (変異なし) で検査し、変異込みの全体は節目に 1 回回す ([ROLES §0「検査」](tasks/agents/ROLES.md))。
+段の取り込みは GitHub の CI で検査し、変異込みの全体は GitHub の `full-check` で回す ([ROLES §0「検査」](tasks/agents/ROLES.md))。
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
 基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
 merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。
@@ -457,6 +461,21 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
   gcc -MM の依存は実体、残りは symlink) に当て、変異なしの写しが GREEN であること (`CONTROL`) を
   先に確かめる。新しい変異試験もこの作りにする — 実物を書き換える試験は列に足さない
   (票 TASK_CHECK_MUT_PARALLEL (アーカイブ: `docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`) §5)。
+
+#### 検査のキャッシュ (作業木の外、2026-11-04)
+
+作業木を作り直しても同じ入力を調べ直さないよう、2 つのキャッシュを作業木の外に置く。どちらも消してよく、無い・壊れている・書けないときは全部調べる (結果は変わらない)。
+
+| キャッシュ | 対象 | 置き場 (既定) | 切り替え |
+|---|---|---|---|
+| 翻訳単位の結果 (`tools/clang_ast/result_cache.py`) | `check-c-dialect`・`check-p2v`・`check-arch-asm` とその host 試験の単位ごとの指摘 | `${XDG_CACHE_HOME:-~/.cache}/os32/checks/v1/<道具>/` | `OS32_CHECK_CACHE=<置き場>` / `off` |
+| host32 の固定物 (`tools/tests/host32.py` の `build()`) | `host32.build` で組む host 試験の実行物 | `${XDG_CACHE_HOME:-~/.cache}/os32/host32-fixtures/` (512 MiB / 8192 件で古い順に消す) | `OS32_HOST32_CACHE=<置き場>` / `off` (= 今までの `build/out/host32-fixtures/`) |
+
+- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く (毎回空の CI で鍵を作る手間を足さない)。
+- 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
+- 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
+- ccache は使わない: host 試験の大半が 1 回でコンパイルとリンクをする (`gcc src.c -o exe`、ccache の対象外) うえ、PATH の包みは clang_ast の cross newlib の探し方 (`i386-elf-gcc` の置き場から引く) を壊す (2026-11-04 の実測)。
+- 容量を見る・消す: `du -sh ~/.cache/os32/checks ~/.cache/os32/host32-fixtures`、消すときは各ディレクトリごと。
 
 <a id="kapi-v63-移行"></a>
 #### KAPI v63 への移行 (データ欄の固定配置、票 TASK_KAPI_DATA_FIELDS (アーカイブ: `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`))
@@ -1090,8 +1109,10 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 ### §8-6 GitHub Actions での本体ビルド
 
 `.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
-FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の clone から core を完全ビルドし、`make check-fast`
-を回して、成果物を artifact に置く。静的ゲートの `check.yml` とは別 (変異込みの `make check` は回さない)。
+FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) は、`artifacts` と `check-fast` の
+2 ジョブを依存関係なしで並列に動かす。両方が同じ composite action で準備し、それぞれ core を完全ビルドする。
+`artifacts` は配布物を作って upload し、`check-fast` は `make check-fast` を回す。main へ入れる判定は
+両ジョブと静的ゲートの `check.yml` がすべて合格すること (変異込みの `make check` は回さない)。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
 (小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
@@ -1100,14 +1121,15 @@ FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の 
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `make -j$(nproc) all` → `make check-fast` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`)。最後の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する |
+| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast`: `make -j$(nproc) all` → `make check-fast` |
+| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。両ジョブとも `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
-| 上限 | `timeout-minutes: 150` |
+| 上限 | 両ジョブとも `timeout-minutes: 150` |
 
 **成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
 
@@ -1129,11 +1151,17 @@ os32 の `build.yml` にあった埋め込み commit id の照合、tag → Rele
 public repo でも artifact の API ダウンロードには認証が要る):
 
 ```bash
-tools/ci_fetch.sh                       # main の最新の成功 run (既定 --repo ske-studio/os32-v3)
+tools/ci_fetch.sh                       # main の最新 run (既定 --repo ske-studio/os32-v3)
 tools/ci_fetch.sh --branch wt/ci
 tools/ci_fetch.sh --sha 0a5247f         # そのコミットの run (短縮 SHA 可)
+tools/ci_fetch.sh --sha 0a5247f --wait  # artifacts が未完了なら待つ
 tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表示するだけ
 ```
+
+指定 SHA (短縮可) / ブランチの最新の `build.yml` run を、run 全体の status で絞らず選ぶ。
+その run の `artifacts` ジョブが成功していれば、検査の完了を待たず取得する。`check-fast` が失敗・実行中なら
+その旨を 1 行表示する (調べの版も取得できる)。`artifacts` が未完了なら待機中と表示して終了 1、
+`--wait` なら 10 秒ごとに待つ。`artifacts` が失敗・取消等なら取得せず終了 1。
 
 保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
 `SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。

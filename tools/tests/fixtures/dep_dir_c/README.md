@@ -14,7 +14,7 @@ sdk/include/os32 の内容は同一であることを採取時に `git diff` で
 2. CROSS_DIR、ディスク上の TMPDIR、HOST32_RUNNERS=qemu を設定する。
 3. inputs.json の各ケースについて、test_dep_dir_c_memory.py の
    `build(work, sample, source_root=base)` → `trace(exe)` → `validate(data)`
-   → `comparator_selftest(data)` を check_slot.sh l14a 経由で実行する。
+   → `comparator_selftest(data)` を直接実行する。
 4. 得た列を `gzip.compress(data, mtime=0)` で保存し、ハッシュを記録する。
    採取スクリプトは既存の期待列への上書きを拒否する。
 5. 通常の verifier で作業木と固定列を比較する。変更後の製品から再採取しない。

@@ -295,6 +295,9 @@ filesystem:
     - host: userland/tests/pcm_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/pcm_play.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- kout_test (票 TASK_KAPI_OUTPUT_GUARD 受入 G2/G4: 出力ポインタの
     #     書き込み可検査の CPL=3 受入。正常系 (スタック / ヒープ) が通ることと、
     #     NULL の意味が変わっていないことを代表 6 本で見る。

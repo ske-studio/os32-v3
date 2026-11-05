@@ -230,6 +230,45 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 void exec_heap_restore_state(u32 base, u32 size, u32 used) { (void)base; (void)size; (void)used; }
 int paging_set_not_present(u32 b, u32 e) { (void)b; (void)e; return 0; }
 
+/* exec_reclaim_resources and friends are unreachable from exec_launch, so
+ * gcc 15 drops them with --gc-sections, but gcc 13 keeps them and needs their
+ * callees at link time. Define the callees as never-called asm stubs (no
+ * signature, so no clash with the kernel prototypes) rather than rely on
+ * gc-sections. Reaching one at runtime would be a test bug: trap with ud2. */
+#define UNREACHABLE_STUB(name) __asm__(".text\n.globl " #name "\n" #name ":\nud2\n")
+UNREACHABLE_STUB(appslot_get);
+UNREACHABLE_STUB(appslot_gfx_owner_exit);
+UNREACHABLE_STUB(appslot_reclaim);
+UNREACHABLE_STUB(appslot_return_target);
+UNREACHABLE_STUB(appslot_switch_to);
+UNREACHABLE_STUB(caller_access_invalidate);
+UNREACHABLE_STUB(caller_access_leave);
+UNREACHABLE_STUB(con_sink_is_enabled);
+UNREACHABLE_STUB(con_sink_owner_exit);
+UNREACHABLE_STUB(con_sink_push_exit);
+UNREACHABLE_STUB(con_sink_reader_get);
+UNREACHABLE_STUB(db_cleanup_owned);
+UNREACHABLE_STUB(fd_redirect_reset_owned);
+UNREACHABLE_STUB(font_lease_close_owned);
+UNREACHABLE_STUB(gui_owner_exit);
+UNREACHABLE_STUB(host_owner_exit);
+UNREACHABLE_STUB(ime_owner_exit);
+UNREACHABLE_STUB(input_discard_stop);
+UNREACHABLE_STUB(kapi_strings_cleanup_owned);
+UNREACHABLE_STUB(kbd_inject_discard);
+UNREACHABLE_STUB(kbd_inject_owner_exit);
+UNREACHABLE_STUB(launch_child);
+UNREACHABLE_STUB(launch_owner_exit);
+UNREACHABLE_STUB(pcm_reclaim);
+UNREACHABLE_STUB(pipe_free_owned);
+UNREACHABLE_STUB(res_owner_set);
+UNREACHABLE_STUB(shm_free_owned);
+UNREACHABLE_STUB(snd_owner_exit);
+UNREACHABLE_STUB(tss_set_esp0);
+UNREACHABLE_STUB(v86_call_cleanup);
+UNREACHABLE_STUB(v86_session_end);
+UNREACHABLE_STUB(vfs_close_owned);
+
 static void check_case(int user, int fault, u32 text)
 {
     is_user = user; failure = fault; image_size = text; bss_size = 33;

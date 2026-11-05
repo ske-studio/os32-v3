@@ -96,7 +96,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 | **1 ファイル** | 深さ 3 の葉 1 つ (drivers/video/geforce/*.c、kernel/ime/*.c) | `make kernel` + **触った像** (userland/… を触ったらその像、R-5) | **covers に当たる検査とその前提** (静的検査も当たりだけ、変わった翻訳単位を `--files` で渡す) + `--lint` | なし | なし | 実装者、段ごと、3〜5 分 |
 | **2 機能** | 1 つの機能ディレクトリに閉じる (ヘッダ含む) | 増分 `make all` | covers に当たる検査とその前提 (静的検査も当たりの差分だけ) + `--lint` | なし (`MUTATE=0`) | 票に **host で見られない受入項目があれば段 3 へ上げる** (R-4) | PM の取り込み (レビュー後)、5〜10 分 |
 | **3 層** | 複数の機能・共有ヘッダ・層をまたぐ (include/・kapi/・mm/・exec/・lib/・platform/) | 増分 `make all` | covers に当たる検査とその前提 + `--lint` (tier 3 の無条件追加なし) | なし (`MUTATE=0`) | **最小回帰** (配備の照合・起動・kselftest・db_test、ROLES §4 (1)) + **変更箇所だけのゲスト受入** (票の host で見られない項目だけ、ROLES §4 (2) — R-4) | PM の取り込み (カーネル層の段)、15〜25 分 |
-| **4 全体** | build/・Makefile・sdk/kapi.json・配置の世代・ツールチェーン・ランナー自体、**または節目** (票の終わり・**通常版の実機配備の前**・リリース) | `make all` (KAPI・世代なら `make clean` 先) | 全部 (tier 4 を含む) = `make -k check` | 全部 | ゲストの約束を一通り (ROLES §4 (3)) + 実機 | PM、節目に 1 回、専用の作業木 (check_wt.sh)、60〜90 分 |
+| **4 全体** | build/・Makefile・sdk/kapi.json・配置の世代・ツールチェーン・ランナー自体、**または節目** (票の終わり・**通常版の実機配備の前**・リリース) | `make all` (KAPI・世代なら `make clean` 先) | 全部 (tier 4 を含む) = `make -k check` | 全部 | ゲストの約束を一通り (ROLES §4 (3)) + 実機 | GitHub の `full-check`、手動または毎晩 main |
 
 - 足した・触った試験の変異と節目の全体検査の担当・頻度は [ROLES §0「検査」](../agents/ROLES.md) に従う。
 - **段 0 (文書だけ)**: 文書の covers に当たる検査とその前提だけ。tier 0 の無条件追加なし。

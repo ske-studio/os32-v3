@@ -71,11 +71,11 @@ def generate(oracle):
         f' * SHA256 ctxnv40.c: {SOURCE_HASHES[".c"]}',
         f' * SHA256 ctxnv40.h: {SOURCE_HASHES[".h"]}',
         ' * Regenerate from the repository root (substitute the reference root):',
-        ' * HOST32_RUNNERS=qemu ~/os32-tmp/bin/check_slot.sh gf2-b4oracle '
+        ' * HOST32_RUNNERS=qemu '
         f'python3 -B tools/tests/gf_command_b4_fixture.py --oracle <nouveau>/{SOURCE_PATH}',
         ' * No OS32 output is read.',
         ' * Verify without writing: use test_gf_command.py --component b4 --oracle',
-        ' *   with the same source path, through check_slot.sh.',
+        ' *   with the same source path.',
         ' */', license_text, '',
         'enum {',
         f'    B4_PROGRAM_WORDS = {words}, B4_IMAGE_BYTES = {size},',

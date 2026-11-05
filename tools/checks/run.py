@@ -73,7 +73,6 @@ NOTEST = (
     ('sample/runner8.vbz', ()),
     ('sample/runner_hb.vbz', ()),
     ('tools/audit_cast_align.sh', ()),
-    ('tools/ci_fetch.sh', ()),
     ('tools/create_fat12_d88.sh', ()),
     ('tools/emu_agent/mcp_server.py', ()),
     ('tools/emu_agent/tasks/v86_dos.txt', ()),
