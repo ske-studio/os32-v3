@@ -466,14 +466,14 @@ static void test_toggle_and_wrap(void)
     gf5_host_fail_at(&h,F5_GPIO_GET,0,-51); gf5_host_trace_clear(&h);
     h.now=h.ctx.next_toggle;
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-51 && !h.calls[F5_GPIO_SET]);
-    assert(!h.ctx.next_toggle);
+    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-51 && h.calls[F5_GPIO_SET]==1);
+    assert(h.ctx.next_toggle==h.now+T_PERIOD/2);
     gf5_host_fail_at(&h,F5_GPIO_GET,0,0);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,-52); gf5_host_trace_clear(&h);
     h.ctx.fan_off=false; h.ctx.fan.mode=GF5_FAN_MANUAL;
-    h.ctx.next_toggle=h.now; /* A separately restarted worker for SET injection. */
+    h.now=h.ctx.next_toggle; /* Retry the same worker with a SET failure. */
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-52 && !gpio_on && !h.ctx.next_toggle);
+    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-52 && !gpio_on && h.ctx.next_toggle==h.now+T_PERIOD/2);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,0);
     assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
     assert(!h.ctx.next_toggle);
@@ -530,7 +530,7 @@ static void test_independent_alarms(void)
     gf2_host_memset(h.display.fail_rc,0,sizeof(h.display.fail_rc));
     gpio_source=-63; gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.source_rc==-63 && h.ctx.last_rc==GF5_EIO && !h.calls[F5_GPIO_SET]);
+    assert(h.ctx.source_rc==-63 && h.ctx.last_rc==GF5_EIO && h.calls[F5_GPIO_SET]==1);
     /* A failed step stops itself, retaining AUTO and the sensor alarm. */
     reset(); ready();
     assert(!gf5_fan_cstate(&h.ctx,80,0));
@@ -550,11 +550,10 @@ static void test_independent_alarms(void)
     h.now=h.ctx.next_toggle; h.ctx.fan.mode=GF5_FAN_AUTO;
     h.ctx.next_auto=h.now+T_POLL;
     gf3_host_set(&h.display.base,0,T_RAW,60);
-    bool was=gpio_on;
     gf5_host_trace_clear(&h); gpio_source=-65;
     gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(gpio_on==was && !h.calls[F5_GPIO_SET] && !h.ctx.next_toggle && h.ctx.fan_off);
+    assert(!gpio_on && h.calls[F5_GPIO_SET]==1 && h.ctx.next_toggle==h.now+T_PERIOD/2 && h.ctx.fan_off);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-65);
 }
 static void test_boost_auto(void)
@@ -623,6 +622,69 @@ static void test_boost_mode_failure(void)
     /* SHUTDOWN still reads the fan after the failed AUTO read. */
     assert(h.display.calls[D_READ]>5 && h.ctx.fan.duty==T_FULL);
 }
+/* temp.c:104-107: fan_set failure must still select AUTO. */
+static void test_boost_write_failure(void)
+{
+    for (u32 auto_fail=0;auto_fail<2;++auto_fail) {
+        reset(); ready();
+        assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL));
+        gf3_host_set(&h.display.base,0,T_RAW,h.ctx.fan.threshold[0]);
+        gf5_host_trace_clear(&h);
+        gf4_host_fail_at(&h.display,D_WRITE,2,-86); /* Sensor ADC, then PWM. */
+        /* Sensor, fan get, fan RMW, then mode's temperature validation. */
+        if (auto_fail) gf4_host_fail_at(&h.display,D_READ,4,-87);
+        gf5_fan_tick(&h.ctx,h.now);
+        assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-86);
+        assert(h.ctx.fan.mode==(auto_fail ? GF5_FAN_MANUAL : GF5_FAN_AUTO));
+        assert(h.ctx.next_auto==(auto_fail ? 0 : h.now+T_POLL));
+    }
+}
+/* base.c:181-208: fannil does not prevent either control mode. */
+static void test_fanless_mode(void)
+{
+    for (u32 mode=GF5_FAN_MANUAL;mode<=GF5_FAN_AUTO;++mode) {
+        reset(); ready();
+        assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+        gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP);
+        assert(!gf5_fan_mode_set(&h.ctx,mode));
+        assert(h.ctx.fan.mode==mode && h.ctx.fan_off);
+        assert(h.ctx.next_auto==(mode==GF5_FAN_AUTO ? h.now+T_POLL : 0));
+        assert(!h.calls[F5_GPIO_GET] && !h.calls[F5_GPIO_SET]);
+    }
+}
+/* fantog.c:54-62: both failures rearm; clearing the error recovers. */
+static void test_toggle_retry(void)
+{
+    for (u32 get=0;get<2;++get) {
+        reset(); ready(); h.ctx.fan.method=GF5_FAN_TOGGLE;
+        h.ctx.fan.min_duty=h.ctx.fan.max_duty=T_FULL/2;
+        assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL));
+        h.ctx.fan.sensor_poll=false;
+        gf5_host_trace_clear(&h);
+        enum gf5_host_op op=get ? F5_GPIO_GET : F5_GPIO_SET;
+        gf5_host_fail_at(&h,op,1,-89);
+        h.now=h.ctx.next_toggle; gf5_fan_tick(&h.ctx,h.now);
+        assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-89);
+        assert(h.calls[F5_GPIO_SET]==1 && h.ctx.next_toggle==h.now+T_PERIOD/2);
+        gf5_host_fail_at(&h,op,0,0);
+        bool was=gpio_on;
+        h.now=h.ctx.next_toggle; gf5_fan_tick(&h.ctx,h.now);
+        assert(h.ctx.last_rc==0 && gpio_on!=was && h.ctx.next_toggle==h.now+T_PERIOD/2);
+    }
+}
+/* base.c:383-386: a failed saved-duty write still restores AUTO. */
+static void test_resume_write_failure(void)
+{
+    reset(); ready(); startlog_clear();
+    struct gf5_fan_saved saved=h.ctx.fan;
+    saved.mode=GF5_FAN_AUTO; saved.duty=T_FULL/2;
+    gf5_host_trace_clear(&h);
+    gf4_host_fail_at(&h.display,D_WRITE,2,-88); /* ADC, saved duty. */
+    assert(!gf5_therm_resume(&h.ctx,&saved));
+    assert(h.ctx.fan.mode==GF5_FAN_AUTO && h.ctx.next_auto==h.now+T_POLL);
+    assert(h.ctx.next_sensor==h.now+T_POLL && h.display.calls[D_WRITE]>2);
+    assert(startlog_equal("[gf5] fan off rc=-88 reason=fan-pwm\n"));
+}
 static void test_gpio_source(void)
 {
     const enum gf5_host_op op[]={F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET};
@@ -637,7 +699,7 @@ static void test_gpio_source(void)
          * EIO must survive, independently of that original source value. */
         gpio_source=-5;
         gf5_host_fail_at(&h,op[i],1,GF5_EIO);
-        i32 rc=op[i]==F5_GPIO_SET ? gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL) :
+        i32 rc=op[i]==F5_GPIO_SET ? gf5_fan_cstate(&h.ctx,T_FULL/2,0) :
                                   gf5_fan_get(&h.ctx,&duty);
         assert(rc==GF5_EIO && h.ctx.source_rc==gpio_source);
         assert(h.calls[op[i]]==1 && events[h.nevents-1].op==op[i]);
@@ -728,11 +790,11 @@ static void test_resume(void)
     assert(!h.display.nevents && h.ctx.fan.trip==owned && h.live_allocs==1 && !h.calls[F5_FREE]);
     assert(gf5_therm_resume(&h.ctx,0)==GF5_EINVAL && !h.display.nevents);
     assert(gf5_therm_resume(0,&saved)==GF5_EINVAL);
-    /* Fail each setup boundary, clock, and first fan write. No later
+    /* Fail each setup boundary and clock. No later
      * boundary may execute; allocations and borrowed ROM stay resident. */
     const struct { u32 op,nth; bool clock; } failures[]={
         {D_WRITE,1,false},{D_SLEEP,1,false},{D_READ,1,false},
-        {F5_CLOCK64,1,true},{D_WRITE,2,false} /* ADC write then fan write. */
+        {F5_CLOCK64,1,true}
     };
     for (u32 i=0;i<COUNT(failures);++i) {
         reset(); entry(0x24,(50U<<4)|3U); ready(); saved=h.ctx.fan;
@@ -754,5 +816,6 @@ void _start(void)
     test_auto(); test_sensor(); test_toggle_and_wrap();
     test_independent_alarms(); test_boost_auto(); test_gpio_source(); test_resume();
     test_fan_retry(); test_boost_mode_failure();
+    test_boost_write_failure(); test_fanless_mode(); test_toggle_retry(); test_resume_write_failure();
     gf2_host_exit(0);
 }

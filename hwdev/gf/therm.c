@@ -421,12 +421,14 @@ static i32 th_toggle(struct gf5 *g,u32 percent,u64 now)
     g->source_rc=0;
     g->poll_source="fan-gpio-get";
     rc=gf5_gpio_get(g,f->gpio_line,f->gpio_log,&on);
-    if (rc) return rc;
-    on=!on;
+    /* fantog.c:54-62: a failed get behaves as !negative == false;
+     * still attempt the set and schedule the next transition. */
+    i32 first=rc,source=g->source_rc ? g->source_rc : rc;
+    on=rc ? false : !on;
     g->source_rc=0;
     g->poll_source="fan-gpio-set";
     rc=gf5_gpio_set(g,f->gpio_line,f->gpio_log,on);
-    if (rc) return rc;
+    if (!first && rc) { first=rc; source=g->source_rc ? g->source_rc : rc; }
     f->toggle_on=on; f->duty=percent;
     g->next_toggle=0;
     if (percent!=(on ? TH_PERCENT : 0)) {
@@ -434,7 +436,8 @@ static i32 th_toggle(struct gf5 *g,u32 percent,u64 now)
         if (!on) delay=TH_TOGGLE_US-delay;
         g->next_toggle=now+delay;
     }
-    return 0;
+    g->source_rc=source;
+    return first;
 }
 static i32 th_set(struct gf5 *g,u32 percent,u64 now)
 {
@@ -538,19 +541,26 @@ static i32 th_mode(struct gf5 *g,enum gf5_fan_mode mode,u64 now)
     if (mode==GF5_FAN_NONE) {
         f->mode=mode; g->next_auto=g->next_step=g->next_toggle=0; return 0;
     }
-    i32 rc=th_fan_prepare(g);
-    if (rc) return rc;
+    i32 rc;
     if (mode==GF5_FAN_AUTO) {
         struct gf5_thermal t;
         rc=th_temperature(g,&t);
         if (rc) return rc==GF5_ENOTSUP ? GF5_EINVAL : rc;
         f->mode=mode;
-        return th_auto(g,now);
+        rc=th_auto(g,now);
+    } else {
+        f->mode=mode; g->next_auto=g->next_step=0;
+        u32 duty;
+        rc=th_fan_prepare(g);
+        if (!rc) {
+            if (th_get(g,&duty)) { g->source_rc=0; duty=TH_PERCENT; }
+            rc=th_update(g,duty,true,now);
+        }
     }
-    u32 duty;
-    if (th_get(g,&duty)) { g->source_rc=0; duty=TH_PERCENT; }
-    f->mode=mode; g->next_auto=g->next_step=0;
-    return th_update(g,duty,true,now);
+    /* base.c:181-208: only temperature gates mode selection. The fan
+     * update is void there, even for fannil; retain its error in the log. */
+    if (rc) th_fan_off(g,rc);
+    return 0;
 }
 i32 gf5_fan_mode_set(struct gf5 *g,enum gf5_fan_mode mode)
 {
@@ -614,8 +624,10 @@ static i32 th_sensor(struct gf5 *g,u64 now)
         if ((i==TH_BOOST || i==TH_SHUTDOWN) && active) {
             rc=th_update(g,TH_PERCENT,true,now);
             /* therm/base.c:208: setting the current AUTO mode is a no-op. */
-            if (!rc && i==TH_BOOST && f->mode!=GF5_FAN_AUTO) {
+            if (i==TH_BOOST && f->mode!=GF5_FAN_AUTO) {
+                i32 first=rc,source=g->source_rc ? g->source_rc : rc;
                 rc=th_mode(g,GF5_FAN_AUTO,now);
+                if (first) { rc=first; g->source_rc=source; }
             }
             if (rc) {
                 if (!fan_rc) {
@@ -703,7 +715,11 @@ i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
         u32 duty=g->fan.duty;
         rc=th_fan_prepare(g);
         if (rc==GF5_ENOTSUP) { no_fan=true; rc=0; }
-        else if (!rc) rc=th_set(g,th_clamp(&g->fan,duty),now);
+        else if (!rc) {
+            rc=th_set(g,th_clamp(&g->fan,duty),now);
+            /* base.c:383-386: restore mode even after a failed duty write. */
+            if (rc) { th_fan_off(g,rc); rc=0; g->source_rc=0; }
+        }
     }
     if (!rc && !no_fan) rc=th_mode(g,mode,now);
     if (!rc && no_fan && mode==GF5_FAN_AUTO &&
