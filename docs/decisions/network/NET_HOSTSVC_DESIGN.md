@@ -320,3 +320,196 @@ H=host単体、N=NP21/W、R=82557実機。各行は新規 `tools/tests/test_host
 - R2 (P3): A4 は lgy98.c と同じく常にビルドし (build/kernel.mk:37、LGY98 は CFLAGS の定義だけ)、使うかは実行時に LGY が見つかったかで決める。I5 は登録の 1 行。§11 nic の「kernel-nolgy98 で…」は「LGY の無い機械で 82557 の lan.mod の輸入が解決する」と読む。
 - R3 (P3): agent は origin=sfs の名前 (os32.file・os32.iso9660) への要求に 501 を返す (§アプリの口 191 行)。
 - 未決はユーザー 1 件のまま: FD から外す物 (実測で 23KB を超えたときだけ尋ねる、推奨 fm.mod → pcm.mod)。
+
+## 段 0 (契約の宣言) の後の追記 (2026-11-05、astra 起草・Opus レビュー・PM 反映)
+
+段 0 (wt/hostsvc-contracts 5c79e7f0) で見つかった、並列の段に足りない宣言 12 件を埋める。
+
+## NET_HOSTSVC_DESIGN 追記 r1 — 宣言の段2
+2026-11-05。作成: GPT-6 系 Codex（詳細モデル ID は実行環境から確認できない）。設計追記案、実装・実測・独立レビュー前。
+根拠: 段0 report.md の不足 #1〜#12、確定設計 §§2〜7・10・11、TASK_NET_HOSTSVC §0、PORT_FLOW §§3・4。本文の構造・wire・ユーザー決定を維持する。 以下の C 宣言は各記載ヘッダへ置く。内部は types.h の u8/u16/u32/i32、公開型は C89。負値は既存 OS32_ERR_*、HOSTDOWN/TIMEOUT の番号と KAPI slot は I で調停する。
+## #1 NIC 選択・送信・解除（本文 §§2・6・10、使用 A2/A4〜A8/A10/I1）
+```c
+/* net/nic.h: NetNicOps は段0のまま。id: AUTO=0, E82557=1, LGY98=2 */
+enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98 };
+struct NetAdapter { int (*acquire)(const struct NetNicOps **out); void (*release)(void); };
+int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter);
+int net_start(enum NetNicId choice, const u8 peer[6]); void net_unbind(void);
+int net_tx(const void *frame, u32 len); int net_mac(u8 out[6]); u32 net_rx_credit_bytes(void);
+extern const struct NetAdapter net_lgy98_adapter, net_e82557_adapter;
+```
+A2 が選択・bound・peer・参照を所有。A6/A7 が検出済み adapter を登録（未検出は登録しない）、I1 が net_start。AUTO は82557優先、明示選択不在は NOSYS、acquire 失敗はその負値を返す。 acquire は task で A7 の session_acquire 後に A5 の静的 ops を返す（LGY は既存寿命）。A2 が net_bind・link_init・tick登録、失敗時 release。二重start/bindは BUSY。ops/adapter は解除まで生存。 unbind は利用者停止後 task で IF保存/cli→tick解除・bound解除・両queue破棄→IF復元→release。tickで参照操作しない。tx は Ethernet全体/FCSなし、0=受理、AGAIN=再試行、未bind=HOSTDOWN、待たない。
+## #2 共用RXと3バイト選別（本文 §2、使用 A2/A3/A8〜A10/H6）
+```c
+/* net/nic.h: protocol は EtherType ではなく以下の論理値 */
+enum NetRxProtocol { NET_RX_SFS = 1, NET_RX_LINK = 2 };
+void net_rx_reset(u16 protocol); void net_tick(void);
+/* 新 net/nic_rx.h: A2→A3、呼出し中 IF=0、ops は借用 */
+void net_rx_demux(const struct NetNicOps *ops, const u8 local[6], const u8 peer[6]);
+/* Ethernet検査後のpayload p,nに対する選別式 */
+/* n >= 3 && p[0] == 0x05 && p[1] == 0x53 && p[2] == 0x46 ? NET_RX_SFS : NET_RX_LINK */
+```
+A3 が各4×1514B queueを所有。net_rx_take はヘッダ14Bとpaddingを含むフレーム全体/FCSなしをコピー、0成功、空AGAIN、cap不足NOSPC（*lenに必要長、非消費）、未知protocol INVAL。空時だけpoll/demux一回、IF復元、link_tickは呼ばない。 demux はEtherType 0x88B5・Ethernet長・宛先（自MAC/既存broadcast）・固定peerを確認後に上式、各プロトコルが実payload長を検証する。EOF=5をSFS扱いしない。resetは指定queueだけ捨てる。 一回のrx呼出し予算は既存 SFS_LAN_RX_BUDGET=8 を共通定数 NET_RX_SCAN_MAX=8 に移す（両queue合計枠数、IRQ滞在を有限化）。満杯側の新着は捨て他方の走査を続け、残りは次tickへ。A2はpoll→demux→link_tick、回復tickを二重実行しない。
+## #3 NOTIFY と link の境界（本文 §§5・6、使用 A8/A9/B2/B3）
+```c
+/* 新 net/link_notify.h: sessionはsess/epochの組、時刻は10ms tick */
+void link_notify_session(u16 sess, u16 epoch, int extended, u32 generation, u16 alive_id);
+void link_notify_rx(u32 seq, const u8 *payload, u16 len); void link_notify_tick(u32 now);
+void link_notify_reset(void);
+int link_notify_control(u8 op, u32 ack, u16 window); /* A8がlink.cに定義、rid=0 */
+```
+A8/A9 が宛先/session検査とHELLO新旧長decodeを所有し、確立時session、切断時reset、検査済みNOTIFYをrxへ渡す。旧長はextended=0（拡張値無効）。B2が通知seq・累積ACK・WINDOW保留を所有、重複はACKだけ、受付順序が合う時だけ #4 put。
+control は既存static送信の薄い外部口（ACK/WINDOWだけ、WINDOW単位は通数、0/AGAIN/負）。B2はtickで再試行、通常要求のACK/WINDOWはA9に残す。session更新で通知系列だけ初期化、メールボックスの消去はホスト世代変更時だけ。
+## #4 公開型とmailboxの二段階消費（本文 §§5・7、使用 B3〜B5/I/S）
+```c
+/* 新 sdk/include/os32/os32_host_notice.h: この型だけを唯一の定義とする */
+typedef struct HostNotice { unsigned int serial, dropped, host_generation;
+ unsigned short service, kind, length, reserved; unsigned char data[236]; } HostNotice;
+/* 新 net/host_mailbox.h は上のヘッダをinclude */
+int host_mailbox_init(void); int host_mailbox_put(u32 generation, u16 service, u16 kind, const void *data, u16 len, int alive);
+int host_mailbox_stage(u32 generation, u32 service, HostNotice *kernel_out);
+void host_mailbox_commit(u32 generation, u32 serial);
+int host_notice_read(u32 generation, u32 service, HostNotice *out); u32 host_notice_serial(void);
+```
+B3がheapリング64枠・最新ALIVE枠・drop・通番を所有。initは起動時一回、確保失敗NOSYS、通信継続。putは同期copy、0/INVAL/NOSYS、aliveはB2がHELLOの番号・kind・長さ・data世代を照合して渡す。正常に受けた通知は保存不可でもACKする。
+B4はstage→copyout→成功時commit。stage/commitの各々がIF保存/復元、stageは非消費、commitは同じ世代/serialだけ削除。stageの戻り/検索条件は本文§5どおり。最新ALIVEも同じtoken規則。C89/ILP32で256Bと各offsetを契約試験する。sharedへのincludeと生成KAPI/Rust接続はI、型の複製は禁止。
+## #5 非消費 ALIVE snapshot（本文 §5、使用 B3/C1/D3/I）
+```c
+/* net/host_mailbox.h */
+struct HostAlive { u32 host_generation, observation; int valid; };
+void host_alive_snapshot(struct HostAlive *out);
+```
+B3が初期valid=0、受理したALIVEごとobservation++と世代を同じcli区間で更新し、snapshotも同一区間でcopy。アプリの消費・通知heap確保失敗・link再同期は観測を消さない。旧HELLO自体ではvalidを立てない。 C1は世代差だけでFD失効、観測差では再接続予約。D3は検査前snapshotを捕まえ、成功時そのobservationをalive_seenへ保存する。途中の新着を消さず、IRQからlan.modへ呼び戻さない。時刻合わせへの最初の引渡しは本文の別設計の結線を維持。
+## #6 常駐client・LAN scope（本文 §3、使用 C1/C2/C4/D2/D3/I1）
+```c
+/* fs/serialfs/serialfs.h。SfsPersistentの段0配置は維持 */
+struct SfsPersistentConfig { const SfsIo *io; void *io_ctx; int lan_enabled; };
+int sfs_persistent_start(const struct SfsPersistentConfig *cfg);
+const SfsClient *sfs_persistent_client(void); u32 sfs_persistent_generation(void);
+void sfs_persistent_stale(void); /* C3が不明sid時に呼ぶ、C1が世代失効 */
+int sfs_persistent_enabled(void); int sfs_persistent_scope_begin(void); int sfs_persistent_scope_end(int exit_code);
+```
+I1がLAN設定/peerを解析、A10のSfsLanを初期化し同じpeerをnet_startとsfs_lan_set_peerへ渡す。I1の起動結線がSfsLan/clock ctxの起動全体の寿命を保持（lan.mod参照はA2）。cfgはC1がcopy、io/ctxは借用。C1が唯一の共有client・mount世代を所有、startはHELLOなしでmount公開、既存HostDrvにはBUSY。
+clientは未起動NULL、それ以外は借用の読取り参照（sid/seq確認用）、変更/通信はensure/requestだけ。C2がモードを照合してscopeへ分岐、LAN scopeはbegin/endの対応だけを持ち、終了時BYE/unmountしない。UARTは現行経路。C4/D2/D3はclientを新設しない。
+## #7 応答と絶対期限（本文 §3、使用 C1/C3/C4/D2）
+```c
+/* fs/serialfs/sfs_client.h */
+struct SfsReply { void *data; u16 capacity, length; };
+int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n, struct SfsReply *out, u32 deadline);
+int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline);
+/* serialfs.hの既存 sfs_request_deadline(..., void *out, u32 deadline) のoutは struct SfsReply* */
+```
+outは必須、呼出側がdata/capacityを用意、開始時length=0。成功は0、statusを含む応答全体をcopyしlengthを返す（ホストの負statusもここではデータ）。不足はNOSPC・必要length・copyなし、不正応答IO、無応答HOSTDOWN。保存先は呼出側所有、次要求でも有効。C4/D2がstatus/正確な応答長をdecodeして写像する。
+時計はSfsIo.nowの10ms tick、入口now+100、再送間隔10、idle3000。周回比較は `(i32)(now-deadline)>=0`、期限差は半周未満。同一操作のensure/HELLO/BOPEN/BREADへ同じ期限を渡し取り直さない。
+C3が両deadline関数と公開request wrapperを実装、wrapperはC1のensureを呼ぶ。C1がHELLOを行う条件・nonce・sid更新・FD世代を所有、C3は同sid/seq再送を担当しLANをDEAD固定しない。不明sidはSTALEをC1へ報告して世代失効、writeを新sidで自動再実行しない。UART既存call/helloは維持。
+## #8 block RPC と netcd 所有（本文 §4、使用 D2/D3）
+```c
+/* 新 fs/serialfs/sfs_block.h */
+struct SfsBlock { u32 sid, handle, size[2], mtime[2]; };
+int sfs_bopen(const char *alias, u16 len, struct SfsBlock *out, u32 deadline);
+int sfs_bread(const struct SfsBlock *block, u32 lba, u16 count, void *out, u32 cap, u32 deadline);
+int sfs_bclose(const struct SfsBlock *block, u32 deadline);
+/* 新 drivers/block/netcd.h、dev.hとsfs_block.hをinclude */
+struct NetCd { u32 handle, media_gen, last_use, alive_seen; u32 size[2], mtime[2]; };
+int netcd_register(const char *alias); int netcd_read(Device *dev, u32 lba, int count, void *buf);
+int netcd_media_check(Device *dev, u32 *generation);
+```
+D2は無状態RPC、0/負、BREADはcount=1..2/cap>=count*512・statusと成功長一致必須。ensure後sidがblock.sidと異なれば古いhandleを送らずSTALE。D3はDevice.privの私有ctxにNetCd・aliasのcopy・SfsBlockを保持、再接続時BOPEN・同一性比較して更新する。countを2以下へ分割しても操作期限は一つ。registerは通信せずcd0を予約、既存ならEXIST。
+## #9 Device の u32 LBA と媒体境界（本文 §§4・7、使用 D3〜D5/D7/D8/I）
+```c
+/* drivers/base/dev.h: Device末尾へ追加（既存blk_readの型は変えない） */
+/* int (*blk_read_u32)(Device *, u32 lba, int count, void *buf); */
+/* int (*media_check)(Device *, u32 *generation); */
+int dev_media_check(Device *dev, u32 *generation);
+int dev_register_cd(Device *dev, int preferred); /* -1=最初の空きcdN、0=cd0必須 */
+```
+Iのdev.c段が既存dev_blk_read_lbaからblk_read_u32優先で呼ぶ。旧blk_readへは範囲がintに収まる時だけ渡し、それ以外INVAL（キャストで巻き戻さない）、CHS経路維持。netcdは新口のみ、writeはROFS。総セクタ数<=U32_MAX、rangeはcount<=total-lbaで検査する。
+D3がnetcdの二つのcallback、D7/D8がATAPIのmedia_check adapterを登録（世代をdev単位に返す）。NULLは非交換媒体としてgeneration=0/成功。Deviceとprivは登録側所有、登録解除まで存続、媒体checkはtaskでのみ待てる。共通登録は名前も保持、満杯FULL・名前重複EXIST。新配置・輸出入世代はIで一括整合。
+## #10 FD失効・ctx寿命・次のパス操作（本文 §§3・4、使用 C1/C4/D4〜D6/I）
+```c
+/* fs/vfs.h: VfsOps末尾へ任意hookを追加 */
+/* int (*resource_check)(void *ctx, u32 *generation); int (*resource_refresh)(void *ctx); */
+void vfs_fd_stale_mount(void *ctx); /* D6: ctxは外さず、各FDへ永久stale印 */
+/* 新 fs/isofs/iso9660_media.h */
+int iso9660_resource_check(void *ctx, u32 *generation); int iso9660_resource_refresh(void *ctx);
+void iso9660_media_drop(void *ctx);
+```
+C4/D4がresource_checkを提供、C1/Deviceの世代を照合して変更時stale_mountとcache全破棄・refresh待ちにする。D6はread/write/fstat/seek前にcheck（既存staleなら即STALE）、closeは通信せず解放。世代が巡ってもstale印は戻さない。check時のHOSTDOWN/STALEはそのまま返す。
+Iのvfs.c段が全パス操作のbackend呼出し前にcheck、変化を検出したその操作はSTALE、次操作だけrefresh。D4/D5がISOのcache前と読了後にもcheckし、失敗した読出しを成功扱いしない。C4のrefreshは新セッション準備、D4はPVD等の再構築。
+mount/ctxの外枠は維持しrefreshは内部だけ更新（名前空間をumount/mountし直さない）。FDはstale後に旧内部ポインタを参照しない。外枠の解放は本当のumount時だけ、既存invalidate_mountでctxを外す。VFS mount表はvfs.c、FD表はD6、内部cacheは各backendが所有。
+## #11 ホスト Python 境界（本文 §§4〜6・アプリの口、使用 H1〜H5/H7）
+```python
+## tools/hostsvc_contracts.pyi（各実装moduleがこのProtocolを満たす）
+from typing import Protocol, Mapping, Callable
+class ServiceUnavailable(Exception): ...
+class ImageStore(Protocol):
+ def __init__(self, images: Mapping[str, str]) -> None: ...
+ def open_session(self, sid: int) -> None: ...
+ def close_session(self, sid: int) -> None: ...
+ def dispatch(self, sid: int, op: int, payload: bytes) -> bytes: ... # status込み、op|0x80はH1
+class Registry(Protocol):
+ def __init__(self, generation: int) -> None: ...
+ def register(self, name: str, version: int, origin: str, handler: Callable | None) -> int: ...
+ def resolve(self, name: str) -> int: ...
+ def list_bytes(self) -> bytes: ...
+ def dispatch(self, line: str, data: bytes) -> tuple[int, bytes]: ... # status/body
+class Notify(Protocol):
+ def __init__(self, registry: Registry, generation: int) -> None: ...
+ def session(self, sess: int, epoch: int, now: float) -> None: ...
+ def reset(self) -> None: ...
+ def hello_extension(self) -> bytes: ...
+ def notify(self, name: str, kind: int, data: bytes) -> None: ...
+ def ack(self, sess: int, epoch: int, ack: int, window: int) -> None: ...
+ def tick(self, now: float) -> list[tuple[int, int, int, int, int, int, bytes]]: ... # op,flags,seq,ack,rid,window,payload
+class Proc(Protocol):
+ def poll(self) -> int | None: ...
+ def output(self) -> bytes: ...
+ def stderr(self) -> bytes: ...
+ def kill(self) -> None: ...
+ def close(self) -> None: ...
+def clip_start(action: str, data: bytes, backend: str) -> Proc: ...
+def print_start(data: bytes, printer: str | None, raw: bool) -> Proc: ...
+```
+H2がsid内FD/handleを所有、H1がHELLO切替/BYE時close_session・open_sessionを呼び、既存sid/seq重複cacheの内側でdispatch（BOPEN再送も一回だけ）。dispatchは未知sidのSTALEを含むwire statusを返す、長さ/範囲は§4。H3は起動時生成した非ゼロu32世代をH5から受け、HELLO末尾6B・ALIVE・64未ACK/窓4/100msを所有、nowはmonotonic秒。
+H5がsession/header/peerと送信を所有、CONFIRM時session、rid0 ACK/WINDOWをack、tick出力を既存build/sendへ。H3は世代内番号をRegistry.resolveで引く、session切替は旧送信系列を捨て最新ALIVEを予約。満杯は最古未送信廃棄・計数（未送信なしなら新着を落とす）、送信済seqを欠番にしない。
+H7のdispatchは未知404/stub501。H7が番号1..65534と有効名の登録簿を所有、重複は同idで後勝ち警告、範囲枯渇は明示エラー、未知名resolveはKeyError。H4は既存_RealProc互換、子processだけ所有。H5がjob_id/jobs/pending・PROCESSING/timeout/kill/closeを所有、H4は独自ジョブ表を作らない。依存欠如はServiceUnavailable（host_linuxで定義し同pyiで宣言）をH5が503に変換、argvのみ。登録の名前/出自は本文どおり、許可リスト拒否は加えない。
+## #12 共通試験土台（本文 §11・§10、使用 A〜D/H/I/S の試験段）
+```c
+/* 新 tools/tests/hostsvc_fixture.h: libcなしILP32、fixture側が全fake状態を所有 */
+void hs_reset(void); void hs_advance(u32 ticks); void hs_set_if(int enabled);
+int hs_rx(enum NetNicId nic, const void *frame, u32 len); int hs_tx_take(void *out, u32 cap, u32 *len);
+void hs_fail(const char *point, int rc); void hs_copyout_hook(void (*hook)(void));
+extern const struct NetAdapter hs_adapter; extern const SfsIo hs_sfs_io;
+```
+宣言の段2がfixture.h/.c・hostsvc_fixture.pyを実装してから部品を出す。Python土台は `Fixture(unit: str)`、`advance(ms: int)`、`inject(frame: bytes)`、`take() -> list[bytes]`、`fail(point: str, value: object)`、`close()`。UNITごとに本物の依存を選び、それ以外をstubへ、未実装の対象を成功stubで置換しない。
+hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、Pythonはdrop/duplicate/delay/proc_missing/proc_exit/image_replace。resetは未bind/IF=1/時刻0/未HELLO/ALIVE無効/空queue、全上限は本番と同じ。参照フレームは段0wire定数と出典§2/4/5から生成、時刻を進めるまで自然進行しない。
+| 段・試験 | UNIT（土台が提供する依存・観測） |
+|---|---|
+| A2/A3/A8〜A11、nic/deadline/handles | NIC: fake adapter・IF/clock・全Ethernet投入/送信、EOF=5とSFS MARKを区別 |
+| A4〜A7 | ADAPTER: 既存NE2K/E82557試験stub・acquire/release/byte credit、実HW試験はN/R |
+| B2/B3/B4、mailbox/alive/race/abi | NOTICE: link control記録・heap/copyout失敗・copyout中hook、stage token不消費 |
+| B5、gui | GUI: 現行GUI host土台に通知serial/pending注入、実配送はN |
+| C1〜C4、persistent/write/deadline/seq | SFS: 単一SfsIo・仮想応答/時計・実VFS、UART既存試験も維持 |
+| D2/D3、image/seq | BLOCK: SFS土台・size/mtime差・sid更新・BREAD短読 |
+| D4〜D8、isocache | MEDIA: 実Device/VFS/ISO・ATAPI/netcd fake、交換前後の参照ISO像 |
+| H1/H2、write/image | PY_IMAGE: 一時ファイル・実LanServer/HostFS/ImageStore・重複raw frame |
+| H3/H5/H6/H7、alive/list/handles | PY_LINK: 実Agent/bridge/Registry・メモリframe transport・仮想monotonic、socket不要 |
+| H4、linux | PY_PROC: Proc fakeと依存欠如、実CLIP/PRINT出力はR |
+| I1〜I5/I、bootcd/abi | WIRING: 本番起動関数でops/順序/輸入を検査、FD読戻しは実像、導入はN/R |
+| S1〜S4、sdk/list | SDK: fake KAPI/yieldと実LIST解決、C89/ILP32/Rust契約、CPL3はN |
+宣言段はtest_hostsvc_contracts.pyへ型/offset/相互includeとfixture自己試験を追加。各試験のCHECK.coversに実依存を宣言（現行ランナーにinputsキーはない）。本番結線試験とruntime RED変異は各段の受入へ残し、未結線単体だけで全体合格としない。
+## 宣言の段2で入れるヘッダの一覧
+改: net/nic.h、fs/serialfs/serialfs.h、fs/serialfs/sfs_client.h、drivers/base/dev.h、fs/vfs.h。新: net/nic_rx.h、net/link_notify.h、net/host_mailbox.h、sdk/include/os32/os32_host_notice.h、fs/serialfs/sfs_block.h、drivers/block/netcd.h、fs/isofs/iso9660_media.h、tools/tests/hostsvc_fixture.h。
+併せて hostsvc_contracts.pyi（Protocolを実クラスの契約として固定）、fixture.c/.py・参照像・契約試験を先に固定する。I担当のdev.c/vfs.c変更・輸出入台帳と生成入力は所有者を一本化、共有ヘッダは後続段が再定義しない。
+## 宣言の段2の後に並列に出せる段
+宣言/土台のレビュー統合後、異なるファイルの A2〜A8/A10/A11、B2〜B5、C1〜C4、D2〜D8、H1〜H4/H6/H7、S1/S2/S4 と対応試験を、上記契約を輸入して並列コーディング可。A9はA8と同翻訳単位なのでA8後、H5はH3/H4/H7後、I結線/生成は直列統合。A1/B1/C5/D1/S3の共有宣言は先行段へ吸収。部品の実装依存と実行受入の順序は本文§10/11を維持する。
+今回の12件の宣言は決定済み。本文§12の実測後FD除外判断は別件として維持。読み取り指定のためpreflight・build・試験・git操作は行っていない。
+
+## 確定 (2026-11-05、Opus のレビュー、PM が反映 — 本文と食い違う所はこの節を正とする)
+1. (P1) #1・#8: vmkernel はモジュールの記号とリンクできない (今の呼び方は LanModuleApi の関数の表だけ、drivers/net/e82557/lan_module.h、LAN_MODULE_API_SLOTS 20u)。宣言の段 2 のヘッダ一覧に drivers/net/e82557/lan_module.h を足し、LanModuleApi の末尾に `const struct NetAdapter *adapter` と `int (*netcd_register)(const char *)` の欄を足して LAN_MODULE_API_SLOTS と LAN_MODULE_OPS_VERSION を上げる。A7 (lan_module.c) と I1 (kernel_boot_memory.inc) はこの表を通して呼ぶ。本体を vmkernel へ複製しない。
+2. (P2) #4: カーネル側の実体は kapi_host_notice_read / kapi_host_notice_serial として B4 に置き、host_mailbox.h からは外す (kapi/kapi_host.c:30 の慣例)。
+3. (P2) #7: fs/serialfs/serialfs.h の sfs_request_deadline の out を `struct SfsReply *` に改め (sfs_client.h を include)、契約試験の関数の型も合わせる。
+4. (P2) #2・#1: peer が NULL なら demux は相手を見ず、各プロトコルが今の規則で確かめる (SFS は最初の HELLO の送り手に固定、自分宛てだけ — sfs_lan.c:42; link は agent の HELLO で相手を覚える)。broadcast を受けるのは link の HELLO だけ。
+5. (P3) #3: link_notify_tick(now) は link_tick の末尾で A8 が呼ぶ。
+6. (P3) #6: 「sfs_lan_set_peer」は存在しない — lan.mod の facade の lan_peer(SfsLan *, const char *) (lan_module.h) を通す。
+7. (P3) #12: 偽物の hs_reset に開始 tick を引数で渡せるようにし、周回の直前 (0xFFFFFF00) から始める試験を 1 行足す。

@@ -154,8 +154,10 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int w, int h, u32 p, u32 st)
     setup_w=w; setup_h=h; setup_pitch=p; return setup_rc;
 }
 void wab_cirrus_shutdown(WabGlue *g) { (void)g; }
+static u8 dac_values[256][3];
 void wab_cirrus_dac_set(WabGlue *g, int i, u8 r, u8 gg, u8 b)
-{ (void)g; CHECK(i >= 0 && i < 256 && r <= 63 && gg <= 63 && b <= 63); }
+{ (void)g; CHECK(i >= 0 && i < 256 && r <= 63 && gg <= 63 && b <= 63);
+  dac_values[i][0] = r; dac_values[i][1] = gg; dac_values[i][2] = b; }
 void wab_cirrus_set_fill_pattern(WabGlue *g, u32 o)
 { (void)g; CHECK(o == 0x96000); }
 int wab_cirrus_fill(WabGlue *g, u32 d, u32 p, int w, int h, u8 c)
@@ -439,6 +441,16 @@ static void mode_drawing(void)
 
 void _start(void)
 {
+    cirrus_palette_init();
+    for (int k = 0; k < 24; k++) {
+        int expected = 8 + 10 * k;
+        for (int c = 0; c < 3; c++) {
+            int value = dac_values[232 + k][c];
+            CHECK(value == (expected * 63 + 127) / 255);
+            int diff = (value * 255 + 31) / 63 - expected;
+            CHECK(diff >= -2 && diff <= 2);
+        }
+    }
     CHECK(sizeof(u32) == 4);
     bank_window_in_hole();
     output("PASS bank window in the 15-16MB hole (top 17408KB)\n");

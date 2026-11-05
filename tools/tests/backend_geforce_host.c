@@ -161,6 +161,9 @@ static int run(void)
     gfx_backend_geforce.prepare();
     if (n || !gfx_backend_geforce.probe() || gfx_backend_geforce.query(&info) || info.flags || info.width!=640 || info.height!=480) return 1;
     gfx_backend_geforce.init();
+    for (int k = 0; k < 24; k++)
+        for (int c = 0; c < 3; c++)
+            if (initial_palette[(232 + k) * 3 + c] != 8 + 10 * k) return 23;
     if (n!=4 || events[0]!=1 || events[1]!=2 || events[2]!=3 || events[3]!=4) return 2;
     if (!startlog_equal("")) return 22;
     gfx_backend_geforce.enter(); if (n!=4) return 3;

@@ -53,8 +53,6 @@ extern void geforce_display_failed(void) __attribute__((weak));
 #define GF_GXCOPY 3U /* xf86-video-nouveau nv04_exa.c:46-84 */
 #define GF_LEASE_FIRST 16
 #define GF_LEASE_COUNT (VIDEO_PALETTE_ENTRIES - GF_LEASE_FIRST)
-#define GF_GRAY_FIRST 8
-#define GF_GRAY_STEP 10
 #define GF_CUBE_STEP 51
 
 extern int pc98_route_to_gf(void);
@@ -358,7 +356,7 @@ static void geforce_palette_init(void)
                 initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_B] = b * GF_CUBE_STEP;
             }
     for (u32 gray = 0; i < VIDEO_PALETTE_ENTRIES; ++i, ++gray) {
-        u8 v = GF_GRAY_FIRST + gray * GF_GRAY_STEP;
+        u8 v = GFX_PALETTE_GRAY_FIRST + gray * GFX_PALETTE_GRAY_STEP;
         for (u32 c = 0; c < GFX_RGB_COMPONENTS; ++c)
             initial_palette[i * GFX_RGB_COMPONENTS + c] = v;
     }
