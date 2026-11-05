@@ -1131,6 +1131,14 @@ static void cui_controls(void)
     assert(leaves == 2 && !display_cui_owner && !host.ctx.ready);
     gf_display_owner_exit(2); assert(leaves == 2);
     reset(); host.ctx.ready = false; normal_slot = NULL;
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    /* hello_gfx exits through the backend while the shell owner survives. */
+    gfx_backend_geforce.leave();
+    normal_slot = &normal; /* Production keeps its published ops while idle. */
+    assert(!host.ctx.ready && display_cui_owner == 2);
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2 && display_cui_owner == 2);
+    assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 2);
+    reset(); host.ctx.ready = false; normal_slot = NULL;
     fail_event = CASE_ENTER; failure_nth = 1;
     assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner && leaves == 1);
     reset(); assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && !enters);

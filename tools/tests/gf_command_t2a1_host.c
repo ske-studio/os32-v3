@@ -54,12 +54,12 @@ static int read_reg(void *owner, u32 bar, u32 off, u32 width, u32 *out)
 }
 static int clock_us(void *owner, u32 *out)
 {
-    assert((owner == &diagnostic_f || owner == &production_f) && !((struct gf_foundation *)owner)->revoked);
+    assert(owner == &diagnostic_f && !diagnostic_f.revoked);
     *out = m.now; return 0;
 }
 static int wait_us(void *owner, u32 us)
 {
-    assert((owner == &diagnostic_f || owner == &production_f) && !((struct gf_foundation *)owner)->revoked);
+    assert(owner == &diagnostic_f && !diagnostic_f.revoked);
     assert(us >= 1 && us <= 50 && m.waits < 8);
     log_event(WAIT, us, 0); m.now += us; ++m.waits; return 0;
 }
@@ -86,7 +86,7 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
 }
 static void release_object(struct gf2_chan *ch)
 {
-    if (m.live) {
+    if (m.live && ch == diagnostic_ch) {
         assert(ch->f->imem.used == &object->inst);
         ch->f->imem.used = object->inst.next;
         object->inst.size = 0; /* C0 frees instances, retaining handle value. */
@@ -119,18 +119,18 @@ int gf2_fence_wait(struct gf2_chan *ch, struct gf2_fence fence, u32 deadline)
 }
 int gf2_fifo_pause(struct gf2_chan *ch)
 {
-    assert((ch == diagnostic_ch || ch == &production_ch) && !m.paused && nevents >= 2);
+    assert(ch == diagnostic_ch && !m.paused && nevents >= 2);
     expect(nevents - 1, FENCE_WAIT, m.deadline, 0);
     m.paused = true; log_event(PAUSE, 0, 0); return 0;
 }
 void gf2_fifo_resume(struct gf2_chan *ch)
-{ assert((ch == diagnostic_ch || ch == &production_ch) && m.paused); m.paused = false; log_event(RESUME, 0, 0); }
+{ assert(ch == diagnostic_ch && m.paused); m.paused = false; log_event(RESUME, 0, 0); }
 int gf2_gr_object_new(struct gf2_chan *ch, u32 handle, u16 class_id,
                       struct gf2_object *out)
 {
-    assert((ch == diagnostic_ch || ch == &production_ch) && m.paused && !m.live);
+    assert(ch == diagnostic_ch && m.paused && !m.live);
     assert(handle == 0x80000100U && class_id == 0x0039U);
-    assert(!object || !object->inst.size || object == out); object = out;
+    assert(!object || object == out); object = out;
     *out = (struct gf2_object){.handle = handle, .class_id = class_id,
         .inst = {.off = 0x40100, .size = 20, .next = ch->f->imem.used}};
     ch->f->imem.used = &out->inst; m.live = true; ++m.creates;
@@ -223,16 +223,17 @@ static void t2a1_recover_recreate(void)
 }
 static void t2a1_production_reject(void)
 {
+    fresh();
+    production_ch.state = GF2_RUN; production_ch.epoch = 27;
+    production_f.running = true;
+    struct gf2_chan before = production_ch;
+    gf2_test_bind_production(&production_f, &production_ch);
+    assert(!gf2_host_memcmp(&before, &production_ch, sizeof(before)));
+    assert(gf2_module_ops.prepare(&production_f, bars, RECOVER_BAR_COUNT) == GF2_EINVAL);
     for (enum gf2_test_op op = GF2T_BAD_HANDLE; op <= GF2T_BAD_METHOD; ++op) {
-        fresh();
-        production_ch.state = GF2_RUN; production_ch.epoch = 27 + op;
-        production_f.running = true;
-        assert(gf2_module_ops.prepare(&production_f, bars, RECOVER_BAR_COUNT) == GF2_EINVAL);
-        assert(invoke(&production_f, op) == GF2_EFAULT);
-        assert(reply.latched && reply.fault_epoch == production_ch.epoch);
-        assert(nevents == (op == GF2T_BAD_HANDLE ? 3U : 9U));
-        assert(m.creates == (op == GF2T_BAD_HANDLE ? 0U : 1U));
-        assert(!gf2_stop(&production_ch));
+        assert(invoke(&production_f, op) == GF2_ESTATE);
+        assert(!nevents && !m.faults && !m.creates);
+        assert(!gf2_host_memcmp(&before, &production_ch, sizeof(before)));
     }
 }
 static void t2a1_failed_stop_prepare(void)

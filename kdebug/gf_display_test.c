@@ -839,6 +839,8 @@ static i32 display_cui(bool enter)
     i32 rc = 0;
     const struct gf4_test_ops *o = geforce_display_ops();
     if (enter) {
+        /* A GUI app may have already left through the shared backend. */
+        if (display_cui_owner && o && o->ctx && !o->ctx->ready) display_cui_owner = 0;
         if (display_cui_owner || display_session.valid || (o && o->ctx && o->ctx->ready)) rc = GF4_EBUSY;
         else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
         else {

@@ -4,6 +4,7 @@ CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=20.0,
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
             'userland/shell/cmd_gf2.c', 'kdebug/gf_command_wire.h',
+            'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
             'exec/appslot.c', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h'])
 from pathlib import Path
 import subprocess
@@ -15,6 +16,9 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('feature-skip', 'userland/shell/cmd_gf2.c',
+     'if (q.test == GF5_FEATURE) {\n        int result',
+     'if (false) {\n        int result'),
     ('enter-wire', 'userland/shell/cmd_gf2.c',
      '? GF4_CUI_ENTER : GF4_CUI_LEAVE', '? GF4_CUI_LEAVE : GF4_CUI_ENTER'),
     ('feature-wire', 'userland/shell/cmd_gf2.c',

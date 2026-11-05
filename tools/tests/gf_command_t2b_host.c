@@ -213,6 +213,9 @@ static void t2b_fault_recover(void)
     const u32 cases[] = {GF2_BAD_HANDLE, GF2_BAD_METHOD};
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         reset(); foundations.production = &device;
+        assert(request(cases[i]) == GF2_EINVAL);
+        assert(!recover_calls && !reference_calls);
+        reset();
         assert(request(cases[i]) == GF2_OK);
         assert(recover_calls == 1 && reference_calls == 100000U && saved.epoch == 42);
         reset();no_fault = true;

@@ -55,10 +55,25 @@ void _start(void)
     display[2]="262144";assert(shell_cmd_gf2(3,display)==2);
     transport_rc=-123;assert(shell_cmd_gf2(2,enter)==1);
     transport_rc=0;reply_rc=-509;assert(shell_cmd_gf2(2,enter)==1);
+    char *feature[] = {"gf2", "feature", "therm"};
+    const i32 skipped[] = {GF5_ENOTSUP, 77, OS32_ERR_NOSYS};
+    for (u32 i=0; i<sizeof(skipped)/sizeof(*skipped); ++i) {
+        transport_rc=0; reply_rc=skipped[i];
+        assert(shell_cmd_gf2(3,feature)==77);
+        transport_rc=skipped[i]; reply_rc=0;
+        assert(shell_cmd_gf2(3,feature)==77);
+        assert(shell_cmd_gf2(2,enter)==1);
+    }
+    transport_rc=-123; reply_rc=77;
+    assert(shell_cmd_gf2(3,feature)==1);
+    transport_rc=0;reply_rc=GF5_EIO;
+    assert(shell_cmd_gf2(3,feature)==1);
     reply_rc=0;api.version=77;u32 before=calls;
+    assert(shell_cmd_gf2(3,feature)==77 && calls==before);
     assert(shell_cmd_gf2(2,enter)==1 && calls==before);
     api.version=78;api.kdebug_call=0;
     assert(shell_cmd_gf2(2,enter)==1 && calls==before);
+    assert(shell_cmd_gf2(3,feature)==77 && calls==before);
     __asm__ volatile("int $0x80"::"a"(1),"b"(0));
     __builtin_unreachable();
 }

@@ -1,6 +1,7 @@
 /* Shared CUI/GUI terminal entry for layer-2 serial acceptance. */
 #include "shell.h"
 #include "../../kdebug/gf_command_wire.h"
+#include "../../hwdev/gf/feature5.h"
 
 #define GF2_KAPI_MIN 78U
 
@@ -70,12 +71,16 @@ int shell_cmd_gf2(int argc, char **argv)
 dispatch:
     if (g_api->version < GF2_KAPI_MIN || !g_api->kdebug_call) {
         g_api->kprintf(ATTR_RED, "gf2: rejected rc=%d kdebug unavailable\n", OS32_ERR_NOSYS);
-        return 1;
+        return q.test == GF5_FEATURE ? 77 : 1;
     }
     q.size = sizeof(q);
     int rc = g_api->kdebug_call(GF_OP_COMMAND, &q, sizeof(q));
     if (rc || q.rc)
         g_api->kprintf(ATTR_RED, "gf2: failed test=%u rc=%d reply_rc=%d\n", q.test, rc, q.rc);
+    if (q.test == GF5_FEATURE) {
+        int result = rc ? rc : q.rc;
+        if (result == GF5_ENOTSUP || result == 77 || result == OS32_ERR_NOSYS) return 77;
+    }
     return rc || q.rc ? 1 : 0;
 usage:
     g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc> [operand halfword]\n");
