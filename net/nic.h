@@ -18,6 +18,8 @@ struct NetNicOps {
 
 /* Bind once at boot. Shared users must not drain the NIC directly. */
 int net_bind(const struct NetNicOps *ops);
+/* Poll/demux once with IF saved/cli. Unbound: 0; otherwise frames received. */
+int net_nic_poll_once(void);
 /* Separate fixed SFS/link queues (4 x 1514B each). Save IF/cli; if this queue
  * is empty poll/demux once; take a frame; restore IF. Never drive link here.
  * SFS reset discards only its own queue. */
