@@ -2,7 +2,7 @@
 
 > 上位: [実機の計画](PLAN.md)
 
-> 状態: **設計中** — 設計票 v5 は **Codex 5 回目で Approve** (2026-09-29、§段 2-X の注記「Codex 5 回目の Approve に付いた注記」)。実装は未着手。(2026-09-29 の棚卸しで更新)
+> 状態: **設計中 (2026-11-05)** — 設計 v6 を確定 ([TRIDENT_V6_DESIGN](../../decisions/realhw/TRIDENT_V6_DESIGN.md): 段 2 = 640x480x8 のモード設定を HW-BASIC の `trident_mode.hwb` で実機に出す (段 2a で HW-BASIC に `mmiofill` を足す)、その後ドライバの段 3)。チップは SR09=0x10 の ProVidia 9682 (§2-1 の 11-05)。v5 (2026-09-29 Approve) の段 3〜5 の骨格は v6 が引き継ぐ。
 >
 > それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
