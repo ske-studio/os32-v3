@@ -1,8 +1,8 @@
-# /test/hw/gf_regs.hwb — GeForce 6200 (NV44A, Ra266 0:13.0) の主なレジスタを読むだけ
-# 使い方: hello_gfx の前と後に `hw run /test/hw/gf_regs.hwb` を 1 回ずつ。
-# 書くのは CRTC の index (0x6013D4) と、拡張 CR を読むための CR1F の unlock/lock だけ。
-# 番地の名前は nouveau c03c1a1 (MIT) の drivers/gpu/drm/nouveau/dispnv04/nvreg.h:101-341 と
-# OS32 の hwdev/gf/command.h (GF2_USER_*) に合わせた。
+# /test/hw/gf_regs.hwb - read-only dump of key GeForce 6200 (NV44A, Ra266 0:13.0) registers
+# Usage: run `hw run /test/hw/gf_regs.hwb` once before and once after hello_gfx.
+# Writes only the CRTC index (0x6013D4) and the CR1F unlock/lock needed for extended CRs.
+# Register names follow nouveau c03c1a1 (MIT) drivers/gpu/drm/nouveau/dispnv04/nvreg.h:101-341
+# and OS32 hwdev/gf/command.h (GF2_USER_*).
  device d = bdf 0:13.0
  window v = bar d 0
 # PMC (nvreg.h:101-102)
@@ -14,12 +14,12 @@
  print "PMC_INTR_0" r
  mmioread32 v + 0x000140 -> r
  print "PMC_INTR_EN_0" r
-# PFB (メモリの構成)
+# PFB (memory configuration)
  mmioread32 v + 0x100200 -> r
  print "PFB_CFG0" r
  mmioread32 v + 0x10020C -> r
  print "PFB_CSTATUS" r
-# PFIFO と channel 0 の USER (command.h の GF2_USER_BASE 0xC00000、PUT +0x40、GET +0x44)
+# PFIFO and channel 0 USER (command.h GF2_USER_BASE 0xC00000, PUT +0x40, GET +0x44)
  mmioread32 v + 0x002500 -> r
  print "PFIFO_CACHES" r
  mmioread32 v + 0x003250 -> r
@@ -37,7 +37,7 @@
  print "PCRTC_CONFIG" r
  mmioread32 v + 0x600860 -> r
  print "PCRTC_ENGINE_CTRL" r
-# PRAMDAC の PLL と制御 (nvreg.h:306-341)
+# PRAMDAC PLLs and control (nvreg.h:306-341)
  mmioread32 v + 0x680500 -> r
  print "PRAMDAC_NVPLL" r
  mmioread32 v + 0x680504 -> r
@@ -52,7 +52,7 @@
  print "PRAMDAC_VPLL_B" r
  mmioread32 v + 0x680600 -> r
  print "PRAMDAC_GENERAL_CONTROL" r
-# CRTC (head 0、PRMCIO 0x6013D4/0x6013D5、nvreg.h:187)。拡張 CR は CR1F=0x57 で開く (nvreg.h:235-237)
+# CRTC (head 0, PRMCIO 0x6013D4/0x6013D5, nvreg.h:187); extended CRs open with CR1F=0x57 (nvreg.h:235-237)
  mmiowrite8 v + 0x6013D4 0x1F
  mmioread8 v + 0x6013D5 -> lock
  print "CR1F_ORIGINAL" lock
@@ -64,7 +64,7 @@
  print "CR_INDEX_VALUE" (i << 8) | c
  let i = i + 1
  if i != 0xA0 goto crloop
-# 元が unlock (3) でなければ lock に戻す
+# Re-lock unless the original read was unlocked (3)
  mmiowrite8 v + 0x6013D4 0x1F
  if lock == 3 goto done
  mmiowrite8 v + 0x6013D5 0x99
