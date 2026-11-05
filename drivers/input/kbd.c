@@ -63,7 +63,7 @@ extern int exec_park_kbd(void);
 extern int exec_park_poll(u32 now_tick);
 
 /* 外部: PIT の tick (arch/x86/kernel/idt.c、100Hz)。D8 の間引き「10ms に 1 回まで」を
- * 数えるのに読むだけ。drivers/ は -Ikernel を持たないので irq_enable と
+ * 数え、rshell のキー待ちの経過時間にも使う。drivers/ は -Ikernel を持たないので irq_enable と
  * 同じ流儀で extern 宣言する。 */
 extern volatile u32 tick_count;
 
@@ -737,17 +737,17 @@ static int kbd_getchar_wait(int interruptible)
 {
     u16 entry;
     u32 timeout_ticks;
+    u32 start_tick;
 
     /* GUI 中は注入リングだけを見る。CUI モード (kbd_gui_mode == 0) の経路は
      * rshell のタイムアウトは維持する (票 D6)。 */
     if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
-    /* rshellモード: KBD_TIMEOUT_TICKS タイムアウト (デフォルト300 ticks @ 100Hz) */
-    timeout_ticks = rshell_active ? KBD_TIMEOUT_TICKS : 0;
+    /* 遠隔セッションがキー待ちのアプリで止まらないための上限。 */
+    timeout_ticks = rshell_active ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ : 0;
+    start_tick = tick_count;
 
     {
-        u32 waited = 0;
-
         for (;;) {
             /* キーボードバッファ */
             if (kbd_count > 0) {
@@ -768,8 +768,7 @@ static int kbd_getchar_wait(int interruptible)
 
             /* rshellタイムアウト: スペースキーを自動返却 */
             if (timeout_ticks > 0) {
-                waited++;
-                if (waited >= timeout_ticks) return ' ';
+                if ((u32)(tick_count - start_tick) >= timeout_ticks) return ' ';
             }
         }
     }

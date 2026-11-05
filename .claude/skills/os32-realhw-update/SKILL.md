@@ -37,7 +37,7 @@ PM は実機に直接つながっていない。実機のシリアル (/dev/ttyU
 ```
 OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユーザー承認済み (<日付と言葉>)、PM セッションからの依頼です。
 世代: <memory_layout と KAPI の新旧、boot を先にする理由>。新しく配られるもの: <あれば>。
-手順 (運用は 9600 で sync してから、--fast は読み出しだけ):
+手順 (シリアルで転送するときは `--fast 115200`、取りこぼしたら速度を下げる):
 1. ノートで git pull、`tools/ci_fetch.sh --sha <SHA>` (build がまだなら `gh run watch`)。lanfs_host を止め、
    新しい成果物の hostdrv を root にして起動し直す (peer は今の値)。
 2. `sfs run hsync -n boot` (計画だけ確認) → `sfs run hsync boot` → reboot → ver で Commit <SHA>。
@@ -85,5 +85,5 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 - 文書だけのコミットの SHA を頼むと CI の成果物が無い (`ci_fetch.sh` が見つけられない)。
 - 全体同期を先にすると旧 hsync が 1 件も書かずに断る (KAPI が上がった版)。必ず boot が先。
 - 全体の `hsync` は `/sys` を既定で外す (`userland/system/hsync.c:45-48`)。shell のコマンドや共有ライブラリを変えた版で `hsync sys` を抜かすと、新しいカーネルに古い shell のまま動く (2026-10-24、route-test の Usage が出ないことで気づいた)。
-- `--fast` での sync は運用しない (取りこぼしの調査を増やさない)。読み出しだけ速くしてよい。
+- シリアルで hsync するときは `rshell_serial.py --fast 115200 --serve-host …` を使う (ユーザー指示 2026-11-05、9600 の 1.2MB の boot に 20〜30 分かかった)。取りこぼし・化け・rc≠0 が出たら 57600 → 38400 → 9600 と下げ、通った速度を報告に書く。LAN が使えるなら LAN が先 (下の経路の優先度)。
 - ノートの os32-v3 が古いと `tools/` の約束が合わない。最初に git pull。
