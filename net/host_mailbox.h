@@ -7,6 +7,8 @@
 int host_mailbox_init(void); int host_mailbox_put(u32 generation, u16 service, u16 kind, const void *data, u16 len, int alive);
 int host_mailbox_stage(u32 generation, u32 service, HostNotice *kernel_out);
 void host_mailbox_commit(u32 generation, u32 serial);
+/* Last inserted notification serial, non-consuming; 0 before any insertion. */
+u32 host_mailbox_latest_serial(void);
 /* net/host_mailbox.h */
 struct HostAlive { u32 host_generation, observation; int valid; };
 void host_alive_snapshot(struct HostAlive *out);

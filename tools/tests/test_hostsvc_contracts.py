@@ -192,6 +192,7 @@ def source():
      'host_mailbox_put': 'int (*)(u32, u16, u16, const void *, u16, int)',
      'host_mailbox_stage': 'int (*)(u32, u32, HostNotice *)',
      'host_mailbox_commit': 'void (*)(u32, u32)',
+     'host_mailbox_latest_serial': 'u32 (*)(void)',
      'host_alive_snapshot': 'void (*)(struct HostAlive *)',
      'kapi_host_notice_read': 'int (*)(u32, u32, HostNotice *)',
      'kapi_host_notice_serial': 'u32 (*)(void)',
