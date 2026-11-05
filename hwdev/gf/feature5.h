@@ -102,6 +102,8 @@ struct gf5 {
     struct gf5_vid_ops vid; struct gf5_emergency_ops emergency;
     enum gf5_phase phase; u32 deadline; i32 last_rc, source_rc;
     bool accepting, busy;
+    bool fan_off, poll_off;
+    const char *poll_source; /* Last foreground failure boundary, raw rc in source_rc. */
     struct gf5_fan_saved fan;
     u64 next_auto, next_step, next_sensor, next_toggle;
     struct gf5_tile tile[GF5_TILE_COUNT]; bool tile_live[GF5_TILE_COUNT];

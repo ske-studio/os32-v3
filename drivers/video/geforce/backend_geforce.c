@@ -579,7 +579,9 @@ static void geforce_present(int x, int y, int w, int h)
 #ifdef OS32_GEFORCE_MODULE
     int poll = feature5_poll();
     if (poll) {
-        kprintf(KLOG_ATTR, "[gf4] present fail stage=poll rc=%d\n", poll);
+        kprintf(KLOG_ATTR, "[gf4] present fail stage=poll rc=%d source=%s source_rc=%d\n",
+                poll, feature5 && feature5->poll_source ? feature5->poll_source : "other",
+                feature5 ? feature5->source_rc : poll);
         scanout_logged = true;
         geforce_fail(); return;
     }

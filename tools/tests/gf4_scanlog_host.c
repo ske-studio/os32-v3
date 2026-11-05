@@ -29,6 +29,8 @@ static struct gf_display_owner scanlog_owner;
 static const struct gf5_test_ops *scanlog_f5_ops;
 static bool scanlog_calibrated=true,scanlog_rom_fail;
 static u32 scanlog_devinit_calls;
+static bool scanlog_clock_error;
+static u32 scanlog_no_fan;
 int scanlog_devinit(struct gf_init_context *ctx,struct gf_init_program *work)
 {
     assert(ctx==&scanlog_init_ctx && work==&scanlog_program);
@@ -45,7 +47,8 @@ u32 pgalloc_alloc_phys(u32 owner,int pages)
 }
 int pgalloc_free_n_owner(u32 owner,u32 pfn,int pages)
 { (void)owner;(void)pfn;(void)pages; return 1; }
-int sys_time_now(u32 *lo,u32 *hi) { *lo=cint_host.now; *hi=0; return 0; }
+int sys_time_now(u32 *lo,u32 *hi)
+{ if (scanlog_clock_error) return -901; *lo=cint_host.now; *hi=0; return 0; }
 static void scanlog_put(u32 at,u32 v,u32 bytes)
 { for (u32 i=0;i<bytes;++i) scanlog_rom[at+i]=(u8)(v>>(8*i)); }
 static int scanlog_acquire(struct gf_display_context *l)
@@ -69,6 +72,8 @@ static void scanlog_cold(void)
     scanlog_put(S_DCB+12,0x010001f0,4); /* analog, no DDC, head A, OR A */
     scanlog_put(S_GPIO,0x010210,3);
     scanlog_put(S_GPIO+3,2|(9U<<5)|(1U<<13),2); /* fan: GPIO2, low0/high1 */
+    if (scanlog_no_fan==1) scanlog_put(S_DCB+10,0,2);
+    if (scanlog_no_fan==2) scanlog_put(S_GPIO+2,0,1);
     u32 at=GF_INIT_PLL_TABLE;
     scanlog_put(at,GF_PLL_TBL_VERSION,1);
     scanlog_put(at+GF_PLL_HDR_HEADER_LEN,GF_PLL_TBL_HDR_MIN,1);
@@ -125,8 +130,6 @@ static void scanlog_map(u32 addr,u32 bytes)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90),"b"(args) : "memory");
     assert(result==addr);
 }
-static i32 scanlog_clock_fail(void *owner,u64 *now)
-{ (void)owner;(void)now; return -901; }
 static struct video_device scanlog_device;
 static void scanlog_init(void)
 {
@@ -158,15 +161,17 @@ static void scanlog_finish(void)
     svc_finish();
     gf5_rom_release(&cint_prod.feature5);
 }
-static bool scanlog_contains(const char *s)
+static u32 scanlog_count(const char *s)
 {
+    u32 count=0;
     for (u32 i=0;startlog[i];++i) {
         u32 j=0;
         while (s[j] && startlog[i+j]==s[j]) ++j;
-        if (!s[j]) return true;
+        if (!s[j]) ++count;
     }
-    return false;
+    return count;
 }
+static bool scanlog_contains(const char *s) { return scanlog_count(s)!=0; }
 static void scanlog_therm_recovery(bool auto_error)
 {
     scanlog_init();
@@ -298,12 +303,46 @@ void _start(void)
     assert(!scanlog_contains("[gf4] scanout ") && !active && scanlog_failures==3);
     scanlog_finish();
     scanlog_init(); startlog_clear();
-    struct gf5 polling={.phase=GF5_RUN,.links={.clock64=scanlog_clock_fail}};
-    geforce_backend_feature5_bind(&polling);
+    /* Fail the kernel clock boundary through the production adapter. */
+    scanlog_clock_error=true;
     geforce_present(0,0,1,1);
-    assert(scanlog_contains("[gf4] present fail stage=poll rc="));
-    assert(!active && scanlog_failures==4 && polling.source_rc==-901);
-    geforce_backend_feature5_bind(0);
+    assert(active && scanlog_failures==3 && cint_prod.feature5.source_rc==-901);
+    assert(scanlog_count("[gf5] clock off rc=-901 reason=clock64\n")==1);
+    assert(scanlog_contains("[gf4] scanout "));
+    u32 clock_len=startlog_len;
+    geforce_present(0,0,1,1);
+    assert(active && startlog_len==clock_len);
+    scanlog_clock_error=false;
+    scanlog_finish();
+    /* No GPIO table, or a GPIO table without FAN: both are passive boards. */
+    for (u32 absent=0;absent<2;++absent) {
+        scanlog_no_fan=absent+1;
+        scanlog_init();
+        startlog_clear(); gfx_counters=(GfxCounters){0};
+        geforce_present(0,0,1,1);
+        assert(active && cint_prod.feature5.fan_off);
+        assert(scanlog_count("[gf5] fan off rc=-502 reason=no-fan\n")==1);
+        assert(scanlog_contains("[gf4] scanout ") && gfx_counters.present_bytes==1);
+        u32 fan_len=startlog_len;
+        cint_host.now+=1000000;
+        geforce_present(0,0,1,1);
+        assert(active && startlog_len==fan_len && gfx_counters.present_bytes==2);
+        scanlog_finish();
+    }
+    scanlog_no_fan=0;
+    /* A scheduled PWM ramp write fails; sensor monitoring remains live. */
+    scanlog_init();
+    assert(!gf5_service_poll(&cint_prod.feature5));
+    cint_host.now=(u32)cint_prod.feature5.next_step;
+    c1_clear_trace(); startlog_clear();
+    gf3_host_fail_at(&cint_host,H_WRITE,3,-904);
+    geforce_present(0,0,1,1);
+    assert(active && cint_prod.feature5.fan_off && cint_prod.feature5.fan.sensor_poll);
+    assert(scanlog_count("[gf5] fan off rc=-904 reason=fan-pwm\n")==1);
+    gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
+    u32 pwm_len=startlog_len;
+    geforce_present(0,0,1,1);
+    assert(active && startlog_len==pwm_len);
     scanlog_finish();
     /* AUTO has its own temperature read even when the threshold alarm is not due. */
     scanlog_therm_recovery(true);

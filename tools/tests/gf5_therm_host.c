@@ -460,7 +460,8 @@ static void test_toggle_and_wrap(void)
     assert(!h.ctx.next_toggle);
     gf5_host_fail_at(&h,F5_GPIO_GET,0,0);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,-52); gf5_host_trace_clear(&h);
-    h.ctx.next_toggle=h.now; /* A separate pending alarm for SET injection. */
+    h.ctx.fan_off=false; h.ctx.fan.mode=GF5_FAN_MANUAL;
+    h.ctx.next_toggle=h.now; /* A separately restarted worker for SET injection. */
     gf5_fan_tick(&h.ctx,h.now);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-52 && !gpio_on && !h.ctx.next_toggle);
     gf5_host_fail_at(&h,F5_GPIO_SET,0,0);
@@ -520,8 +521,8 @@ static void test_independent_alarms(void)
     gpio_source=-63; gf5_host_fail_at(&h,F5_GPIO_GET,1,GF5_EIO);
     gf5_fan_tick(&h.ctx,h.now);
     assert(h.ctx.source_rc==-63 && h.ctx.last_rc==GF5_EIO && !h.calls[F5_GPIO_SET]);
-    /* Fan-control errors remain independent too: a boost write failure must
-     * not cancel an already due PWM step or toggle. Preserve its raw rc. */
+    /* Fan-control failure cancels fan alarms, retaining the raw error and
+     * the independent threshold monitor. */
     reset(); ready();
     assert(!gf5_fan_cstate(&h.ctx,80,0));
     h.now=h.ctx.next_step; h.ctx.next_auto=h.now+T_POLL;
@@ -529,7 +530,7 @@ static void test_independent_alarms(void)
     u32 before=h.ctx.fan.duty;
     gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,3,-64);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.fan.duty==before+T_POINTS_PER_STEP && h.ctx.next_step>h.now);
+    assert(h.ctx.fan.duty==before && !h.ctx.next_step && h.ctx.fan_off);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-64);
 
     reset(); ready(); h.ctx.fan.method=GF5_FAN_TOGGLE;
@@ -542,7 +543,7 @@ static void test_independent_alarms(void)
     bool was=gpio_on;
     gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,2,-65);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(gpio_on!=was && h.calls[F5_GPIO_SET]==1 && h.ctx.next_toggle>h.now);
+    assert(gpio_on==was && !h.calls[F5_GPIO_SET] && !h.ctx.next_toggle && h.ctx.fan_off);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-65);
 }
 static void test_boost_auto(void)

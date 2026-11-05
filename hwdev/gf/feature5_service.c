@@ -2,6 +2,7 @@
  * GF_FEAT5_DESIGN, final C2-service and phase/slot contracts.  This is
  * OS32 lifecycle glue; it does not implement a hardware sequence. */
 #include "production.h"
+#include "../../include/kprintf.h"
 
 static struct gf5_test_ops service_ops;
 static const struct gf5_test_ops **service_slot;
@@ -54,15 +55,20 @@ i32 gf5_service_poll(struct gf5 *g)
 {
     u64 now;
     i32 rc, previous_rc, previous_source_rc;
+    const char *previous_source;
     if (!g) return GF5_EINVAL;
-    if (g->busy || g->phase!=GF5_RUN) return 0;
-    if (!g->links.clock64) return g->last_rc=GF5_EINVAL;
-    rc=g->links.clock64(g->links.owner,&now);
+    if (g->busy || g->phase!=GF5_RUN || g->poll_off) return 0;
+    rc=g->links.clock64 ? g->links.clock64(g->links.owner,&now) : GF5_EINVAL;
     if (rc) {
         g->source_rc=rc;
-        return g->last_rc=gf5_rc_map(rc);
+        g->last_rc=gf5_rc_map(rc);
+        g->poll_source="clock64";
+        g->poll_off=true;
+        kprintf(KLOG_ATTR,"[gf5] clock off rc=%d reason=clock64\n",rc);
+        return 0; /* clock failure is confined to the F5 worker. */
     }
     /* A successful tick must not erase an earlier diagnostic. */
+    previous_source=g->poll_source;
     previous_rc=g->last_rc;
     previous_source_rc=g->source_rc;
     g->last_rc=0;
@@ -71,8 +77,9 @@ i32 gf5_service_poll(struct gf5 *g)
     if (!rc) {
         g->last_rc=previous_rc;
         g->source_rc=previous_source_rc;
+        g->poll_source=previous_source;
     }
-    return rc;
+    return 0; /* F5 alarms never fail foreground rendering. */
 }
 
 static i32 service_poll(struct gf5 *g)
