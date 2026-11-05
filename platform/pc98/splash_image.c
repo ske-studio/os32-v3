@@ -32,7 +32,7 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
     u32 start = tick_count;
     i32 left = (i32)(*end_tick - start);
     u32 budget = left > 0 ? (u32)left : 0;
-    if (budget > PLATFORM_SPLASH_TICKS) budget = PLATFORM_SPLASH_TICKS;
+    if (budget > PLATFORM_SPLASH_IMAGE_TICKS) budget = PLATFORM_SPLASH_IMAGE_TICKS;
     struct gfx_kernel_fb fb;
     struct SplashRaster *s = pc98_splash_raster_state();
     struct OsriImage *image = 0;
@@ -84,6 +84,8 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
         u32 prefix = play_start - start;
         if (prefix > budget) prefix = budget;
         u32 remaining_us = (budget - prefix) * SPLASH_IMAGE_TICK_US;
+        u32 play_limit_us = PLATFORM_SPLASH_IMAGE_PLAY_SECONDS * 1000u * SPLASH_RASTER_US_PER_MS;
+        if (remaining_us > play_limit_us) remaining_us = play_limit_us;
         struct PlRun run;
         pl_run_init(&run, s, play_start, remaining_us);
         divisor = run.divisor;
@@ -107,7 +109,7 @@ done:
     if (plan) kfree(plan);
     if (image) kfree(image);
     /* Round down by bounded multiplication comparison. Never restart the
-     * three-second window, double-charge model+tick, or compensate PIT. */
+     * image window, double-charge model+tick, or compensate PIT. */
     u32 now = tick_count;
     u32 ticks = now - start;
     if (ticks > budget) ticks = budget;

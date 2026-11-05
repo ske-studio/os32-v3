@@ -29,6 +29,7 @@ MUTATIONS = (
     ('omit prepare', OWNER, 'if (pl_v2_prepare(image, plan)) goto done;', '(void)pl_v2_prepare;'),
     ('omit preview', OWNER, 'if (pl_preview(s)) goto done;', '(void)pl_preview;'),
     ('preview shortage', OWNER, 'SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS) goto done;', '1u) goto done;'),
+    ('raster duration cap', OWNER, 'if (remaining_us > play_limit_us) remaining_us = play_limit_us;', '(void)play_limit_us;'),
     ('omit preview charge', OWNER, 'u32 prefix = play_start - start;', 'u32 prefix = 0;'),
     ('omit drop charge', 'drivers/video/pc98/splash_raster_run.c', 'r->consumed += r->period;', 'if (frame == PL_FRAME_OK) r->consumed += r->period;'),
     ('omit elapsed ticks', 'drivers/video/pc98/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return r->consumed; (void)elapsed;'),
@@ -81,7 +82,7 @@ def no_division():
         link_source=link_source.replace('void _start(void)', 'void unused_vectors(void)')
         link_source=re.sub(r'#include "../../([^"\n]+)"',
                            lambda m: '#include "'+str(ROOT/m[1])+'"', link_source)
-        link_source += '\nvoid _start(void) { setup(1); u32 end=300; finish(run(&end)); }\n'
+        link_source += '\nvoid _start(void) { setup(1); u32 end=PLATFORM_SPLASH_IMAGE_TICKS; finish(run(&end)); }\n'
         source=work/'link.c'; source.write_text(link_source)
         exe=work/'owner-linked'
         subprocess.run([compiler(), *flags(work), '-ffunction-sections', '-fdata-sections',
