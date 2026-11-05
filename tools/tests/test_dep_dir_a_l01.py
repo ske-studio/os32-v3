@@ -2,6 +2,12 @@
 
 The fixture was captured from 466010d7; the import review pin was refreshed
 for GF5's appended gf5_test contracts (see generations() for the recipe).
+LAN's snapshot follows the hostsvc declaration stage 2 append-only extension.
+To refresh apis in fixtures/dep_dir_a/l01.json, review the header/design diff,
+strip /* comments */ from each typedef body and collapse whitespace for body;
+record ILP32 sizeof, offsetof for every member, and the header OPS_VERSION.
+Offsets are explicit because embedded structs (LAN's SfsIo) span multiple slots.
+Verify with this test and test_hostsvc_contracts.py; do not refresh old_generations.
 --prepare only compiles copied mutation units; it never executes a mutant.
 """
 CHECK = dict(name='dep-dir-a-l01-host', tier=1,
@@ -55,9 +61,10 @@ def abi(folder, fixture):
         assert ' '.join(re.sub(r'/\*.*?\*/', '', block, flags=re.S).split()) == api['body']
         probe += [f'#include "{name}_module.h"',
                   f'_Static_assert(sizeof({api["type"]}) == {api["size"]}, "size");',
-                  f'_Static_assert({name.upper()}_MODULE_OPS_VERSION == 1, "version");']
-        for slot, member in enumerate(api['members']):
-            probe += [f'_Static_assert(offsetof({api["type"]}, {member}) == {slot * 4}, "slot");']
+                  f'_Static_assert({name.upper()}_MODULE_OPS_VERSION == {api["ops_version"]}, "version");']
+        assert len(api['members']) == len(api['offsets'])
+        for member, offset in zip(api['members'], api['offsets']):
+            probe += [f'_Static_assert(offsetof({api["type"]}, {member}) == {offset}, "slot");']
     (folder / 'abi.c').write_text('\n'.join(probe))
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-Wall', '-Wextra', '-Werror',
                     '-D__KERNEL_BUILD__', '-fsyntax-only',
@@ -109,7 +116,7 @@ def generations(folder, fixture):
             exports = [(1, fnv('initialize'), 1)]
             image = (ROOT / f'build/out/{name}.mod').read_bytes()
         contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
-                        abi=current, pair=pair, ops=4 if name == 'kdebug' else 1,
+                        abi=current, pair=pair, ops=4 if name == 'kdebug' else fixture['apis'][name]['ops_version'],
                         module_id=module_id, runner='qemu', exports=exports,
                         imports=[(fnv(e['name']), e['type_ver'], e['kind']) for e in metadata['imports']])
         result = validate(exe, image, **contract)
