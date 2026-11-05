@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """LAN SerialFS: py-raw tools/lanfs_host.py --iface enp1s0 --root DIR.
 
-One foreground AF_PACKET loop, using the existing read-only HostFS/Server.
+One foreground AF_PACKET loop, using the existing HostFS/Server.
+Read only by default; --allow-write PATH permits a root-relative path and
+its descendants. Repeat the option to allow multiple paths.
 No bridge process, UART, outer ACK or extra sequence numbers are involved.
 SFS seq is LE16: at most 65,534 requests per session, without wrapping.
 Split larger transfers and start a new sfs run session after exhaustion.
@@ -155,24 +157,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iface", required=True)
     parser.add_argument("--root", required=True)
+    parser.add_argument("--allow-write", action="append", default=[], metavar="PATH",
+                        help="allow writes to this root-relative path and below (repeatable)")
     parser.add_argument("--peer", type=peer_mac, metavar="MAC",
                         help="accept only this sender (default: first HELLO sender)")
     args = parser.parse_args()
     port = None
     try:
-        fs = sfs.HostFS(args.root)
+        fs = sfs.HostFS(args.root, allow_write=args.allow_write)
         print("lanfs: iface=%s %s" % (args.iface, link_status(args.iface)),
               file=sys.stderr, flush=True)
         port = NicPort(args.iface, ETHERTYPE)
         server = LanServer(port.mac, sfs.Server(fs, max_payload=sfs.LAN_MAX_PAYLOAD, log=lambda msg: print(
             msg, file=sys.stderr, flush=True)), peer=args.peer)
-        print("lanfs: iface=%s mac=%s root=%s (read only)" % (
-            args.iface, lan_bridge.mac_str(port.mac), args.root),
+        print("lanfs: iface=%s mac=%s root=%s (%s)" % (
+            args.iface, lan_bridge.mac_str(port.mac), args.root,
+            "allow-write=%r" % args.allow_write if args.allow_write else "read only"),
             file=sys.stderr, flush=True)
         serve(port, server)
     except KeyboardInterrupt:
         return 0
-    except (OSError, lan_bridge.BridgeError) as exc:
+    except (OSError, ValueError, lan_bridge.BridgeError) as exc:
         print("lanfs: %s" % exc, file=sys.stderr)
         return 1
     finally:
