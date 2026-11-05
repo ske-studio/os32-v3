@@ -6,6 +6,7 @@ return 1 for incomplete/invalid transport or records, or an unknown status.
 The HW command is sent once only; even an incomplete response is saved.
 """
 import re
+from pathlib import Path
 
 STATUS = {'OK': 0, 'ARG': 2, 'NOSYS': 3, 'WINDOW': 4, 'IO': 5,
           'TIMEOUT': 124, 'ABORT': 130}
@@ -13,7 +14,8 @@ STATUS = {'OK': 0, 'ARG': 2, 'NOSYS': 3, 'WINDOW': 4, 'IO': 5,
 
 def add_arguments(parser):
     parser.add_argument('--out', required=True, help='save the complete received body')
-    parser.add_argument('line', nargs='+', help='hw command, without the hw prefix')
+    parser.add_argument('--log-file', help='inspect the host file written by hw run/load -o')
+    parser.add_argument('line', nargs='+', help='hw command without prefix, or sfs run hw ...; use -- before guest options')
 
 
 def inspect(text):
@@ -43,6 +45,8 @@ def inspect(text):
                     errors.append('duplicate terminal')
                 terminal = fields['rc']
                 int(fields['lines']); int(fields['writes'])
+                if 'log_rc' in fields:
+                    int(fields['log_rc'])
                 continue
             seq, line = int(fields['seq']), int(fields['line'])
             phase, op = fields['phase'], fields['op']
@@ -127,9 +131,25 @@ def inspect(text):
     return terminal, errors
 
 
+def terminal_row(text):
+    return next((row for row in text.splitlines()
+                 if row.startswith('HW ') and ' op=end ' in row and ' phase=' not in row), '')
+
+
+def inspect_file(path):
+    """Apply the same run/sequence/end checks to a LAN host log."""
+    text = Path(path).read_text(encoding='utf-8')
+    terminal, errors = inspect(text)
+    return text, terminal, errors
+
+
 def run(args, send, baud=9600, out=print):
     del baud
-    line = 'hw ' + ' '.join(args.line)
+    # LAN uses an independently running lanfs_host (--allow-write).
+    wrapped = args.line[:3] == ['sfs', 'run', 'hw']
+    command = args.line[3:] if wrapped else args.line
+    file_output = command[:2] in (['run', '-o'], ['load', '-o'])
+    line = ('' if wrapped else 'hw ') + ' '.join(args.line)
     if '\n' in line or '\r' in line:
         out('[hwb] command must be one line')
         return 2
@@ -139,6 +159,25 @@ def run(args, send, baud=9600, out=print):
     terminal, errors = inspect(text)
     if error:
         errors.append(error)
+    expected = STATUS.get(terminal)
+    if file_output:
+        match = re.search(r' log_rc=(-?[0-9]+)$', terminal_row(text))
+        if not match:
+            errors.append('missing log_rc')
+        elif int(match[1]):
+            expected = STATUS['IO']
+        host_file = getattr(args, 'log_file', None)
+        if host_file and match and not int(match[1]):
+            try:
+                saved, file_terminal, file_errors = inspect_file(host_file)
+                errors.extend('file: ' + item for item in file_errors)
+                if (file_terminal != terminal or terminal_row(saved) !=
+                        terminal_row(text).rsplit(' log_rc=', 1)[0]):
+                    errors.append('file/serial terminal mismatch')
+            except (OSError, UnicodeError) as exc:
+                errors.append('file: ' + str(exc))
+    elif getattr(args, 'log_file', None):
+        errors.append('--log-file requires run/load -o')
     if errors:
         for item in errors:
             out('[hwb] ' + item)
@@ -149,8 +188,8 @@ def run(args, send, baud=9600, out=print):
         return 1
     lines = [s.strip() for s in status_text.splitlines() if s.strip()]
     values = [s for s in lines if re.fullmatch(r'[0-9]+', s)]
-    if len(values) != 1 or int(values[0]) != STATUS[terminal]:
+    if len(values) != 1 or int(values[0]) != expected:
         out('[hwb] missing or inconsistent guest status')
         return 1
-    out('[hwb] complete rc=%s (%d)' % (terminal, STATUS[terminal]))
-    return STATUS[terminal]
+    out('[hwb] complete rc=%s (%d)' % (terminal, expected))
+    return expected

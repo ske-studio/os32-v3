@@ -59,7 +59,8 @@ static void op(struct logbuf *b, const struct hwb_log_record *r)
     if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL) {
         str(b, r->space == HW_PCI ? "pci" : r->space == HW_IO ? "io" : "mmio");
         str(b, r->op == HWB_READ ? "read" : r->op == HWB_FILL ? "fill" : "write"); dec(b, r->width * 8U);
-    } else if (r->op == HWB_LET) str(b, "let");
+    } else if (r->op == HWB_DIM) str(b, "dim");
+    else if (r->op == HWB_LET) str(b, "let");
     else if (r->op == HWB_DEVICE_BDF || r->op == HWB_DEVICE_ID) str(b, "device");
     else if (r->op == HWB_WINDOW_BAR) str(b, "window");
     else if (r->op == HWB_LABEL) str(b, "label");
@@ -95,12 +96,20 @@ static void address(struct logbuf *b, const struct hwb_log_record *r, int target
     str(b, " val="); hex(b, r->value, r->width * 2U <= 8U ? r->width * 2U : 1U);
 }
 static void suffix(struct logbuf *b, enum hwb_rc rc) { str(b, " rc="); str(b, hwb_rc_name(rc)); }
+static void destination(struct logbuf *b, const struct hwb_log_record *r)
+{
+    if (!r->destination || !r->indexed) return;
+    str(b, " dest="); str(b, r->destination);
+    str(b, " index="); dec(b, r->index);
+    if (r->op == HWB_LET) { str(b, " val="); hex(b, r->value, 1); }
+}
 void hwb_log_begin(const struct hwb_backend *backend, const struct hwb_log_record *r)
 {
     struct logbuf b; prefix(&b, r, "begin");
     if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL || r->op == HWB_POLL) address(&b, r, 1);
     if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); }
     if (r->op == HWB_WAIT) { str(&b, " requested_us="); dec(&b, r->requested_us); }
+    destination(&b, r);
     str(&b, " rc=PENDING"); emit(backend, &b);
 }
 void hwb_log_end(const struct hwb_backend *backend, const struct hwb_log_record *r)
@@ -109,6 +118,7 @@ void hwb_log_end(const struct hwb_backend *backend, const struct hwb_log_record 
     if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL) address(&b, r, 0);
     if (r->op == HWB_WAIT) { str(&b, " requested_us="); dec(&b, r->requested_us); str(&b, " elapsed_us="); elapsed(&b, r->elapsed_lo, r->elapsed_hi); }
     if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); str(&b, " done="); dec(&b, r->done); }
+    destination(&b, r);
     suffix(&b, r->rc); emit(backend, &b);
 }
 void hwb_log_poll(const struct hwb_backend *backend, const struct hwb_log_record *r, const struct hwb_poll_result *result)
@@ -117,6 +127,7 @@ void hwb_log_poll(const struct hwb_backend *backend, const struct hwb_log_record
     struct hwb_log_record final = *r; final.value = result->value;
     address(&b, &final, 0);
     str(&b, " reads="); dec(&b, result->reads); str(&b, " elapsed_us="); elapsed(&b, result->elapsed_lo, result->elapsed_hi);
+    destination(&b, r);
     suffix(&b, r->rc); emit(backend, &b);
 }
 void hwb_log_print(const struct hwb_backend *backend, const struct hwb_log_record *r, const char *tag, u32 bytes, u32 value)
