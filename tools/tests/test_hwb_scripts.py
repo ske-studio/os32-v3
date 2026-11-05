@@ -117,6 +117,7 @@ EXEC_MUTATIONS = [
     ('fill-point', EXEC, 'rc = he_point(s, 0); if (rc) return rc;\n            a = r->value;', 'rc = HWB_OK; if (rc) return rc;\n            a = r->value;', 'fill-abort'),
     ('fill-precheck', EXEC, 'r.count - 1U >', 'r.count - r.count >', 'fill-invalid'),
     ('fill-log', 'userland/shell/hwb_log.c', 'str(&b, " done="); dec(&b, r->done);', 'str(&b, " lost="); dec(&b, r->done);', 'fill-values'),
+    ('mode-cap-four', MODE, ' if t == 15 goto cap_four\n', '', 'capacity'),
     ('mode-fac', MODE, 'iowrite8 port 0xFAC 0', 'iowrite8 port 0xFAC 2', 'mode'),
     ('mode-cr03', MODE, '0x03 | ((0x80) << 8)', '0x03 | ((0x82) << 8)', 'mode'),
     ('mode-cr05', MODE, '0x05 | ((0x1E) << 8)', '0x05 | ((0x9E) << 8)', 'mode'),

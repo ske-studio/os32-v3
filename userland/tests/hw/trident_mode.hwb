@@ -75,25 +75,58 @@
  mmiowrite8 v + 0x3D4 0x1F
  mmioread8 v + 0x3D5 -> spr
  print "SPR" spr
- # trident_driver-1.4.0.c:2910-2944: SPR low nibble is a declaration.
+ # trident_driver-1.4.0.c:2919-2975: SPR low nibble is a declaration.
  let t = spr & 0x0F
- let capacity = 0
+ let capacity = 1048576
  if t == 1 goto cap_half
- if t == 3 goto cap_one
- if t == 7 goto cap_two
+ if t == 2 goto cap_six
  if t == 4 goto cap_eight
+ if t == 6 goto cap_ten
+ if t == 7 goto cap_two
+ if t == 8 goto cap_twelve
+ if t == 10 goto cap_fourteen
+ if t == 12 goto cap_sixteen
+ if t == 15 goto cap_four
+ if t == 14 goto cap_extended
  goto cap_ready
  label cap_half
  let capacity = 524288
  goto cap_ready
- label cap_one
- let capacity = 1048576
+ label cap_six
+ let capacity = 6291456
+ goto cap_ready
+ label cap_eight
+ let capacity = 8388608
+ goto cap_ready
+ label cap_ten
+ let capacity = 10485760
  goto cap_ready
  label cap_two
  let capacity = 2097152
  goto cap_ready
- label cap_eight
- let capacity = 8388608
+ label cap_twelve
+ let capacity = 12582912
+ goto cap_ready
+ label cap_fourteen
+ let capacity = 14680064
+ goto cap_ready
+ label cap_sixteen
+ let capacity = 16777216
+ goto cap_ready
+ label cap_four
+ let capacity = 4194304
+ goto cap_ready
+ label cap_extended
+ mmiowrite8 v + 0x3D4 0xC1
+ mmioread8 v + 0x3D5 -> t
+ let t = t & 0x11
+ let capacity = 20971520
+ if t == 0 goto cap_ready
+ let capacity = 25165824
+ if t == 1 goto cap_ready
+ let capacity = 29360128
+ if t == 0x10 goto cap_ready
+ let capacity = 33554432
  label cap_ready
  print "SPR-declared-bytes" capacity
  mmiowrite8 v + 0x3CE 6
@@ -102,7 +135,6 @@
  mmiowrite8 v + 0x3D4 0x3A
  mmioread8 v + 0x3D5 -> t
  print "CR3A-original" t
- if capacity == 0 goto finish
  if mode == 0 goto finish
  if mode == 1 goto setup
  if mode == 3 goto setup

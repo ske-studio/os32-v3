@@ -11,7 +11,7 @@ static u8 vram[307200], cr[256], sr[256], gr[256], ar[32], rgb[24];
 static u32 ci, si, gi, ai, af, pal, hidden, reads6, hidden_ok, pal_done;
 static u32 fills, fill_ends, bytes, loglines, writes, points, fail_at, abort_at, tick;
 static u32 enabled, disabled, clock_a, clock_b, pll_written, painted, alias_bus;
-static u32 capacity=7, ref_pal, pci_reads, io_count, dac_select, ext_dac, dac_writes;
+static u32 capacity=7, cr_c1, ref_pal, pci_reads, io_count, dac_select, ext_dac, dac_writes;
 static u32 io_addr[10], io_value[10];
 static char fill_end[HWB_LOG_BYTES];
 static const char *input;
@@ -124,7 +124,7 @@ static void reset(void) {
     cr[0x29]=0xB3; cr[0x23]=0xAA; cr[0x2F]=0x81; cr[0x2A]=0x12;
     cr[0x39]=0xFF; gr[0x2F]=0x80; gr[0x0F]=0xA8; gr[0x23]=0xFE;
     cr[0x3A]=0xAA; cr[0x50]=0xBB; gr[6]=0x0C;
-    sr[9]=0x10; cr[0x1F]=capacity; cr[0xC0]=ref_pal ? 0x80:0;
+    sr[9]=0x10; cr[0x1F]=capacity; cr[0xC1]=cr_c1; cr[0xC0]=ref_pal ? 0x80:0;
 }
 static void fill_tests(void) {
     HWB_TEST("fill-values"); reset();
@@ -232,16 +232,21 @@ static void mode_tests(void) {
         }
     }
     HWB_TEST("capacity");
-    u32 codes[]={1,3,7,4,0}, sizes[]={524288,1048576,2097152,8388608,0};
-    for(u32 k=0;k<5;k++) {
-        capacity=codes[k]; reset(); CHECK(run(scripts[7],0)==HWB_OK);
+    u32 sizes[]={1048576,524288,6291456,1048576,8388608,1048576,
+        10485760,2097152,12582912,1048576,14680064,1048576,
+        16777216,1048576,20971520,4194304};
+    u32 extended[]={20971520,25165824,29360128,33554432};
+    for(u32 k=0;k<16;k++) for(u32 j=0;j<(k==14?4U:1U);j++) {
+        capacity=0x70|k; cr_c1=0xEE | (j&1) | ((j&2)<<3);
+        reset(); CHECK(run(scripts[7],0)==HWB_OK);
         u32 found=0;
-        for(u32 j=0;j<st.var_count;j++) if(hwbf_equal(st.vars[j].name,"capacity")) {
-            CHECK(st.vars[j].value==sizes[k]); found=1;
+        for(u32 n=0;n<st.var_count;n++) if(hwbf_equal(st.vars[n].name,"capacity")) {
+            CHECK(st.vars[n].value==(k==14?extended[j]:sizes[k])); found=1;
         }
         CHECK(found && !enabled && !disabled && !fills);
     }
-    reset(); CHECK(run(scripts[7],1)==HWB_OK); CHECK(!enabled && !fills);
+    capacity=0x7F; cr_c1=0; reset();
+    CHECK(run(scripts[7],1)==HWB_OK); CHECK(enabled==1 && fills>0);
     capacity=7;
     HWB_TEST("alias"); reset(); alias_bus=1;
     CHECK(run(scripts[7],1)==HWB_OK); CHECK(!enabled && disabled==1 && !fills);
