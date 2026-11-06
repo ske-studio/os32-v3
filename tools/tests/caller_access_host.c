@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "appslot.h"
+#include <stdbool.h>
+/* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
+bool geforce_fg_due(u32 now) { (void)now; return false; }
+void geforce_foreground_poll(void) {}
+
 #include "v86.h"
 #include "os32_kapi_slots.h"
 #include "ring3_str.h"

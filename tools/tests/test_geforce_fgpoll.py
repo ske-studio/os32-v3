@@ -6,6 +6,7 @@ CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:all'], budget=5.0,
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
                      'gfx/gfx_internal.h', 'gfx/palette.h', 'mm/pgalloc.h',
                      'fs/vfs.h', 'exec/appslot.h', 'lib/serial_diag.h',
+                     'arch/x86/kernel/idt.h',
                      'kernel/module/*.h', 'lib/kstring.h',
                      'drivers/video/pc98/pc98_route.h',
                      'build/out/geforce/geforce_imports.h'])
@@ -24,6 +25,10 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/video/geforce/geforce_module.c'
 MUTATIONS = [
+    ('deadline-minimum', 'if (deadlines[i] && deadlines[i]<next)',
+     'if (0 && deadlines[i] && deadlines[i]<next)'),
+    ('deadline-pending', 'return heat_pending || !foreground_deadline_valid ||',
+     'return false || !foreground_deadline_valid ||'),
     ('heat-consume', '    heat_stop_consume();', '    if (0) heat_stop_consume();'),
     ('heat-latch', '    heat_bridge.latched=true;', '    heat_bridge.latched=false;'),
     ('heat-notify', '    geforce_display_failed();', '    if (0) geforce_display_failed();'),

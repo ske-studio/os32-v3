@@ -44,6 +44,10 @@ def landing(s, start, buf, name):
 
 PRE = r'''
 #include "types.h"
+#include <stdbool.h>
+/* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
+bool geforce_fg_due(u32 now) { (void)now; return false; }
+
 void geforce_foreground_poll(void) {}
 static u32 host_cr3;
 #include "font_guard_inactive.h"

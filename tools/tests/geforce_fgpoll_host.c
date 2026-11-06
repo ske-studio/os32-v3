@@ -16,6 +16,7 @@ static void finish(int rc)
 #define CHECK(x) do { __asm__ volatile("" : : : "memory"); \
     if (!(x)) finish(1); } while (0)
 
+volatile u32 tick_count;
 static bool safe_route=true;
 static u32 stops, notifications, aborts, syncs, serials;
 static int clear_rc=GF5_EBUSY;
@@ -66,8 +67,70 @@ static const struct gf5_test_ops first_ops={.ctx=&first,.service_poll=poll_first
 static const struct gf5_test_ops second_ops={.ctx=&second,.service_poll=poll_second};
 static const struct gf5_test_ops absent_poll={.ctx=&first};
 
+/* Absolute deadlines remain in F5, including above the low-32 clock wrap. */
+static u64 clock_now;
+static u32 clock_calls;
+static i32 clock_rc;
+static i32 clock64(void *owner,u64 *out)
+{
+    CHECK(owner==&second);
+    clock_calls++;
+    if (clock_rc) return clock_rc;
+    *out=clock_now;
+    return 0;
+}
+static void deadline_cases(void)
+{
+    CHECK(geforce_fg_due(0)); /* First syscall must reach foreground work. */
+    registered=1;
+    feature5_slot=&second_ops;
+    second.links.owner=&second;
+    second.links.clock64=clock64;
+    clock_now=0x100000000ULL;
+    tick_count=0xfffffffeU;
+    second.next_sensor=clock_now+1000000;
+    second.next_auto=clock_now+500000;
+    second.next_step=clock_now+200000;
+    second.next_toggle=clock_now+25000;
+    geforce_foreground_poll();
+    CHECK(second_calls==1 && clock_calls==1);
+    CHECK(!geforce_fg_due(0xfffffffeU) && !geforce_fg_due(0xffffffffU));
+    CHECK(geforce_fg_due(0) && geforce_fg_due(1));
+    CHECK(clock_calls==1); /* The query cannot call the module or its clock. */
+    /* Fan steps faster than a sensor second must not be throttled to 1Hz. */
+    second.next_toggle=0;
+    second.next_step=clock_now+5000;
+    geforce_foreground_poll();
+    CHECK(geforce_fg_due(tick_count));
+    second.next_step=clock_now; /* Overdue timers remain immediately due. */
+    geforce_foreground_poll();
+    CHECK(geforce_fg_due(tick_count));
+    second.next_step=0;
+    second.next_auto=0;
+    second.fan.sensor_poll=true;
+    second.next_sensor=0;
+    geforce_foreground_poll();
+    CHECK(geforce_fg_due(tick_count));
+    second.next_sensor=clock_now+1000000;
+    geforce_foreground_poll();
+    CHECK(!geforce_fg_due(tick_count) && geforce_fg_due(tick_count+100));
+    /* A missing slot (save/restore) or failed clock defers to the next point. */
+    feature5_slot=0;
+    geforce_foreground_poll();
+    CHECK(geforce_fg_due(tick_count));
+    feature5_slot=&second_ops;
+    clock_rc=GF5_EIO;
+    geforce_foreground_poll();
+    CHECK(geforce_fg_due(tick_count));
+    clock_rc=0;
+    second_calls=0;
+    registered=0;
+    foreground_deadline_valid=false;
+}
+
 void _start(void)
 {
+    deadline_cases();
     /* A populated slot is still unavailable before module registration. */
     feature5_slot=&first_ops;
     geforce_foreground_poll();
@@ -103,6 +166,8 @@ void _start(void)
     geforce_heat_stop_request(-11,110000,-22);
     geforce_heat_stop_request(-99,999,-99);
     CHECK(heat_bridge.latched && heat_pending && heat_reason==-11);
+    foreground_deadline_valid=true; foreground_next_tick=tick_count+100;
+    CHECK(geforce_fg_due(tick_count)); /* pending overrides a future deadline */
     CHECK(geforce_heat_latch_clear()==GF5_ESTATE);
     geforce_foreground_poll();
     CHECK(stops==1 && notifications==1 && aborts==1 && !heat_pending);

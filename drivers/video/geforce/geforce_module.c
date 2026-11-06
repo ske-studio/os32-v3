@@ -15,6 +15,8 @@
 #include "../../../exec/appslot.h"
 #include "serial_diag.h"
 #include "io.h"
+#include "idt.h"
+#include "time_units.h"
 #include "../../../hwdev/gf/display/api.h"
 
 extern const u32 geforce_kexports[];
@@ -43,6 +45,35 @@ const struct gf5_test_ops *geforce_feature5_ops(void)
  * Do not retain a module loan between calls or gate thermal work on drawing. */
 static bool foreground_poll_busy;
 static bool heat_pending;
+static bool foreground_deadline_valid;
+static u32 foreground_next_tick;
+bool geforce_fg_due(u32 now_tick)
+{
+    return heat_pending || !foreground_deadline_valid ||
+        (i32)(now_tick-foreground_next_tick)>=0;
+}
+/* F5 owns the absolute microsecond deadlines. Cache values only, never its
+ * context. Floor the delay using a tick sampled before clock64 so the cheap
+ * syscall gate may wake early but cannot postpone the shortest F5 deadline.
+ * Limit the cache to one second (also keeps division strictly 32-bit). */
+static void foreground_deadline_update(const struct gf5_test_ops *ops)
+{
+    foreground_deadline_valid=false;
+    if (!ops || !ops->ctx || !ops->ctx->links.clock64) return;
+    struct gf5 *g=ops->ctx;
+    u32 tick=tick_count;
+    u64 now, next;
+    if (g->busy || g->links.clock64(g->links.owner,&now)) return;
+    next=now+USEC_PER_SEC;
+    const u64 deadlines[]={g->next_sensor,g->next_auto,g->next_step,g->next_toggle};
+    for (u32 i=0;i<sizeof(deadlines)/sizeof(deadlines[0]);i++)
+        if (deadlines[i] && deadlines[i]<next) next=deadlines[i];
+    if ((g->fan.sensor_poll && !g->next_sensor) ||
+        (g->fan.mode==GF5_FAN_AUTO && !g->next_auto)) next=now;
+    u32 delay=next>now ? (u32)(next-now) : 0;
+    foreground_next_tick=tick+delay/(USEC_PER_SEC/PIT_HZ);
+    foreground_deadline_valid=true;
+}
 static i32 heat_reason, heat_milli_c, heat_source_rc;
 static struct geforce_heat_bridge heat_bridge={.request=geforce_heat_stop_request};
 void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
@@ -93,6 +124,7 @@ void geforce_foreground_poll(void)
     foreground_poll_busy=true;
     const struct gf5_test_ops *ops=geforce_feature5_ops();
     if (ops && ops->service_poll) (void)ops->service_poll(ops->ctx);
+    foreground_deadline_update(ops);
     /* The borrowed module context is no longer in use when stop runs. */
     heat_stop_consume();
     foreground_poll_busy=false;

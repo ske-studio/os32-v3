@@ -1,6 +1,11 @@
 #include "font_guard_inactive.h"
 /* Real paging/ledger/V86 and exec lifecycle slices; CPU and device edges only. */
 #include "types.h"
+#include <stdbool.h>
+/* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
+bool geforce_fg_due(u32 now) { (void)now; return false; }
+void geforce_foreground_poll(void) {}
+
 static u32 host_cr3;
 static int forbid_app_pd;
 static void check_cr3(u32 root);
