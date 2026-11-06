@@ -21,14 +21,21 @@
  *
  * Authors: Ben Skeggs
  */
-/* B2: freestanding UNIT2, link hwdev/gf/ramclock.c only.
+/* B2/U1: freestanding UNIT2, link hwdev/gf/ramclock.c.
  * Golden writes transcribed independently from MIT nouveau c03c1a1
  * nvkm/subdev/fb/ramnv40.c:78-175, default (NV4a) partition.
  * Recreate by following that function with both SR1=3, old mux=0xc123,
  * old ctrl=0x80000100, old coef=0x1401, mc=0x80210100, mn=0x1902.
- * The plan is an opaque B1 result; this test does not solve a PLL. */
+ * U1 also compiles the real clock/PLL below, so the guard is never a stub.
+ * Synthetic v0x21 limits fix N=25/M=2, P=1, bias=1 at 168750 kHz;
+ * recreate with bios/pll.c:301-333, clk/nv40.c:146-195 and
+ * fb/ramnv40.c:34-63 (MIT c03c1a1). No local oracle files are required. */
 #define GF5_HOST_UNIT 2
+#define GF5_HOST_REAL_CLOCK
 #include "gf5_fake.h"
+/* Keep U1 self-contained until U7 owns the shared source registration. */
+#include "../../hwdev/gf/clock.c"
+#include "../../kdebug/gfinit_pll.c"
 
 /* Register/command golden values: ramnv40.c:78-175. */
 #define STRIDE 0x2000U /* ramnv40.c:80 */
@@ -72,8 +79,14 @@ static struct gf4_host_event display_events[CAP];
 static struct gf3_host_reg regs[64];
 static struct gf4_host_read reads[80]; /* 2 * (initial + 33 probes + 3 edges). */
 static struct gf_init_program program;
-static u8 rom[M_PC+1U];
-static const struct gf5_plan plan = {.mc=NEW_CTRL,.mn=NEW_COEF};
+#define ROM_ENTRY 31U
+#define REQUEST_KHZ 168750U
+static u8 rom[GF_INIT_PLL_TABLE+4U+4U*ROM_ENTRY];
+static const struct gf5_clock request={REQUEST_KHZ,0,REQUEST_KHZ};
+static const struct gf5_plan plan = {
+    .nc=0x80010100U,.nn=NEW_COEF,.mux=0x333U,.mc=NEW_CTRL,.mn=NEW_COEF,
+    .actual={REQUEST_KHZ,REQUEST_KHZ,REQUEST_KHZ}
+};
 static u32 write_count, read_count, sleep_count, clock_count, self_depth, protected_heads;
 static bool timeout_jump;
 struct golden { u32 off,width,value; };
@@ -111,6 +124,8 @@ static u32 reg(u32 off)
 }
 static void observe_mmio(struct gf4_host *d,const struct gf4_host_event *e)
 {
+    /* Consumption precedes even the first snapshot read, including failure. */
+    assert(h.ctx.plan_guard.ram_used);
     if (e->op==D_WRITE && !e->rc && e->a[1]==SELF) self_depth=e->a[3];
     /* While self-refresh is enabled, only MMIO/time callbacks occur;
      * all CPU/GPU admission remains closed. Neither test nor product maps
@@ -138,6 +153,33 @@ static void add_read(u32 off,u32 value,u32 *n)
 {
     reads[(*n)++]=(struct gf4_host_read){0,off,4,value};
 }
+static void rom_word(u32 at,u32 value)
+{
+    rom[at]=(u8)value; rom[at+1]=(u8)(value>>8);
+}
+static void plan_fixture(void)
+{
+    rom[GF_INIT_PLL_TABLE]=0x21; rom[GF_INIT_PLL_TABLE+1]=4;
+    rom[GF_INIT_PLL_TABLE+2]=ROM_ENTRY; rom[GF_INIT_PLL_TABLE+3]=4;
+    for (u32 i=0;i<4;++i) {
+        u32 at=GF_INIT_PLL_TABLE+4U+i*ROM_ENTRY;
+        rom_word(at+GF_PLL_ENT_VCO1_MIN,200);
+        rom_word(at+GF_PLL_ENT_VCO1_MAX,500);
+        rom_word(at+GF_PLL_ENT_VCO1_INPUT_MIN,10);
+        rom_word(at+GF_PLL_ENT_VCO1_INPUT_MAX,20);
+        rom[at+GF_PLL_ENT_VCO1_N_MIN]=rom[at+GF_PLL_ENT_VCO1_N_MAX]=25;
+        rom[at+GF_PLL_ENT_VCO1_M_MIN]=rom[at+GF_PLL_ENT_VCO1_M_MAX]=2;
+        rom[at+GF_PLL_ENT_MAX_P]=3; rom[at+GF_PLL_ENT_BIAS_P]=1;
+    }
+    struct gf5_plan calculated;
+    assert(gf5_clock_calc(&h.ctx,&request,&calculated)==0);
+    assert(calculated.mc==NEW_CTRL && calculated.mn==NEW_COEF);
+    assert(calculated.nc==plan.nc && calculated.nn==plan.nn &&
+           calculated.sc==plan.sc && calculated.mux==plan.mux);
+    assert(calculated.actual.core_khz==REQUEST_KHZ &&
+           calculated.actual.shader_khz==REQUEST_KHZ &&
+           calculated.actual.mem_khz==REQUEST_KHZ);
+}
 /* active bits select moving heads; preblank selects already blank SR1s. */
 static void setup(u32 active,u32 preblank,bool script)
 {
@@ -148,6 +190,7 @@ static void setup(u32 active,u32 preblank,bool script)
     h.display.base.regs=regs; h.display.base.cregs=sizeof(regs)/sizeof(regs[0]);
     h.ctx.deadline=DEADLINE;
     h.ctx.rom=(struct gf5_rom_view){rom,sizeof(rom),script?&program:0,script?M_PC:0};
+    plan_fixture();
     h.display.sr[0][1]=SR_OLD|((preblank&1U)?BLANK:0);
     h.display.sr[1][1]=SR_OLD|((preblank&2U)?BLANK:0);
     gf3_host_set(&h.display.base,0,CTRL,OLD_CTRL);
@@ -249,8 +292,54 @@ static void normal(void)
     sleep_count=h.display.calls[D_SLEEP]; clock_count=h.display.calls[D_CLOCK];
     assert(h.display.sr[0][1]==SR_OLD && h.display.sr[1][1]==SR_OLD);
 }
+static void rejected(const struct gf5_plan *p,i32 rc)
+{
+    struct gf5_host_activity before=gf5_host_activity(&h);
+    bool used=h.ctx.plan_guard.ram_used;
+    bool core_used=h.ctx.plan_guard.core_used;
+    assert(gf5_ram_prog(&h.ctx,p)==rc);
+    struct gf5_host_activity after=gf5_host_activity(&h);
+    assert(after.reads==before.reads && after.writes==before.writes &&
+           after.pauses==before.pauses && after.resumes==before.resumes);
+    assert(h.ctx.plan_guard.ram_used==used && h.ctx.plan_guard.core_used==core_used);
+    assert(h.ctx.last_rc==rc && h.ctx.source_rc==rc);
+    assert(!h.calls[F5_SCRIPT] && !h.calls[F5_ADMIT]);
+}
+static void guard_cases(void)
+{
+    setup(3,0,true); h.ctx.plan_guard.valid=false;
+    rejected(&plan,GF5_ESTATE);
+    setup(3,0,true); ++h.display.base.ch.epoch;
+    rejected(&plan,GF5_ESTATE);
+    setup(3,0,true); ++h.ctx.rom_generation;
+    rejected(&plan,GF5_ESTATE);
+    setup(3,0,true);
+    struct gf5_plan changed=plan; changed.mc^=1U;
+    rejected(&changed,GF5_EINVAL);
+    changed=plan; changed.mn^=1U;
+    rejected(&changed,GF5_EINVAL);
+    /* Rejection must leave the original pair usable. */
+    assert(gf5_ram_prog(&h.ctx,&plan)==0);
+    assert(h.ctx.plan_guard.ram_used && !h.ctx.plan_guard.core_used);
+    gf5_host_trace_clear(&h);
+    rejected(&plan,GF5_ESTATE);
+    assert(gf5_clock_prog(&h.ctx,&plan)==0);
+    assert(h.ctx.plan_guard.ram_used && h.ctx.plan_guard.core_used);
+    /* A failed first snapshot consumes RAM too; RUN alone cannot retry it. */
+    setup(3,0,true);
+    gf4_host_fail_at(&h.display,D_READ,1,-78);
+    assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
+    assert(h.ctx.plan_guard.ram_used && !h.ctx.plan_guard.core_used);
+    gf4_host_fail_at(&h.display,D_READ,0,0);
+    gf5_host_trace_clear(&h);
+    rejected(&plan,GF5_ESTATE);
+    assert(gf5_clock_calc(&h.ctx,&request,&changed)==0);
+    assert(!h.ctx.plan_guard.ram_used && !h.ctx.plan_guard.core_used);
+    assert(gf5_ram_prog(&h.ctx,&changed)==0);
+}
 void _start(void)
 {
+    guard_cases();
     normal();
     /* Every successful-path I/O site can fail, including applied writes.
      * The first source rc survives every cleanup; no script is retried. */
