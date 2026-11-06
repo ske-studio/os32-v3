@@ -101,8 +101,9 @@ static void heat_stop_consume(void)
     if (!heat_pending) return;
     heat_pending=false;
     /* Monitoring outlives leave. Retain the latch/cause without touching
-     * the stopped backend or an app now using the 98 display. */
+     * the stopped device or an app now using the 98 display. */
     if (heat_bridge.active && !heat_bridge.active()) return;
+    bool recover_app=!heat_bridge.backend_active || heat_bridge.backend_active();
     int stop_rc=heat_bridge.stop ? heat_bridge.stop() : gf_production_return();
     if (!pc98_route_safe || !pc98_route_safe()) {
         int sync_rc=vfs_sync();
@@ -117,8 +118,10 @@ static void heat_stop_consume(void)
         for (;;) { _halt(); }
     }
     /* Stop and route precede GUI notification and CUI/running-app recovery. */
-    geforce_display_failed();
-    (void)appslot_abort_request();
+    if (recover_app) {
+        geforce_display_failed();
+        (void)appslot_abort_request();
+    }
     kprintf(KLOG_ATTR,"[geforce] heat stop reason=%d milli_c=%d source_rc=%d stop_rc=%d\n",
             heat_reason,heat_milli_c,heat_source_rc,stop_rc);
 }

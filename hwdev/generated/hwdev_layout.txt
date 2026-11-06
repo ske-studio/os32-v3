@@ -1502,10 +1502,12 @@ offset	struct bootinfo_wire_drive.rsvd	11
 member_size	struct bootinfo_wire_drive.rsvd	5
 offset	struct bootinfo_wire_drive.valid	1
 member_size	struct bootinfo_wire_drive.valid	1
-size	struct geforce_heat_bridge	20
+size	struct geforce_heat_bridge	24
 align	struct geforce_heat_bridge	4
 offset	struct geforce_heat_bridge.active	16
 member_size	struct geforce_heat_bridge.active	4
+offset	struct geforce_heat_bridge.backend_active	20
+member_size	struct geforce_heat_bridge.backend_active	4
 offset	struct geforce_heat_bridge.clear	12
 member_size	struct geforce_heat_bridge.clear	4
 offset	struct geforce_heat_bridge.latched	0

@@ -23,7 +23,8 @@ struct geforce_heat_bridge {
     void (*request)(i32 reason, i32 milli_c, i32 source_rc);
     int (*stop)(void);
     int (*clear)(void);
-    bool (*active)(void);
+    bool (*active)(void); /* Backend, production channel or engaged display. */
+    bool (*backend_active)(void); /* App recovery belongs only to gfx enter. */
 };
 const struct gf3_test_ops *geforce_accel_ops(void);
 const struct gf1_test_ops *geforce_foundation_ops(void);

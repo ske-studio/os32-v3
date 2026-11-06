@@ -122,6 +122,10 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+ ('serial-heat-active', 'drivers/video/geforce/backend_geforce.c',
+  'return active || (feature5 &&', 'return active || (false && feature5 &&', 'foreground'),
+ ('serial-heat-app-recovery', 'drivers/video/geforce/geforce_module.c',
+  'if (recover_app) {', 'if (recover_app || heat_bridge.latched) {', 'foreground'),
  ('inactive-heat-consume', 'drivers/video/geforce/geforce_module.c',
   'if (heat_bridge.active && !heat_bridge.active()) return;',
   'if (false) return;', 'foreground'),
@@ -789,6 +793,8 @@ def foreground_case(root, case, directory, edits):
             tree, 'scanlog', tree / 'tools/tests/gf5_foreground_host.c')
     ] if case in ('foreground', 'foreground-reboot') else [
         str(tree / 'kdebug/gf5_test.c'), str(tree / 'kdebug/gfinit_pll.c')]
+    if case in ('foreground', 'foreground-reboot'):
+        cmd[cmd.index('-o'):cmd.index('-o')] = [str(tree / 'hwdev/gf/command_test.c')]
     subprocess.run(cmd, cwd=tree, check=True)
     return host32.run([str(exe)], cwd=tree, timeout=120).returncode
 

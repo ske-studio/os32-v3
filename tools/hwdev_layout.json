@@ -809,6 +809,7 @@
     ],
     "struct geforce_heat_bridge": [
       "active",
+      "backend_active",
       "clear",
       "latched",
       "request",

@@ -39,6 +39,7 @@ static void u6_halt(void);
 #undef _disable
 #undef geforce_heat_stop_request
 
+#include "../../hwdev/gf/gf2_test.h"
 #include "../../exec/appslot.h"
 #include "../../exec/exec.h"
 #include "../../kernel/gui.h"
@@ -229,6 +230,50 @@ static void u6_downclock_stop(bool sensor_failure)
     }
     scanlog_finish();
 }
+/* Diagnostic-only allocation is outside these production dispatch cases. */
+const struct gf2_dma_ops *geforce_dma_ops(void) { assert(false); return 0; }
+/* Serial stop/start uses the production owner. Model the absence of a gfx
+ * client by clearing only HAL bookkeeping, leaving all device state real. */
+static void u6_serial_start(void)
+{
+    u6_setup();
+    gf2_test_bind_production(&cint_prod.foundation,&cint_prod.chan);
+    struct gf2_test_request q={sizeof(q),GF2T_STOP,cint_host.now+GF2_TIMEOUT_US};
+    struct gf2_test_reply reply;
+    assert(!gf2_module_ops.call(&cint_prod.foundation,&q,&reply));
+    active=routed=0;
+    q.op=GF2T_START;
+    q.deadline_us=cint_host.now+GF2_TIMEOUT_US;
+    assert(!gf2_module_ops.call(&cint_prod.foundation,&q,&reply));
+    assert(!active && !routed && cint_prod.chan.state==GF2_RUN);
+    assert(cint_prod.display.engaged && cint_prod.feature5.display->ready);
+    startlog_clear();
+}
+static void u6_serial_shutdown(void)
+{
+    u6_serial_start();
+    u6_sample(135); geforce_foreground_poll();
+    assert(cint_prod.chan.state==GF2_OFF && !cint_prod.display.engaged);
+    assert(!active && !routed && !scanlog_route && heat_bridge.latched && !heat_pending);
+    assert(heat_milli_c==135000 && heat_reason==GF5_ESTATE);
+    assert(scanlog_count("GF4 STATE stage=leave98 stop_rc=")==1);
+    assert(!u6_app.abort_req && !u6_notifications && !u6_aborts);
+    scanlog_finish();
+}
+static void u6_serial_critical(void)
+{
+    u6_serial_start();
+    struct gf5 *g=&cint_prod.feature5;
+    u6_drains=0; u6_drain=g->links.drain_pause;
+    g->links.drain_pause=u6_count_drain;
+    u6_sample(105); geforce_foreground_poll();
+    assert(u6_drains==1 && g->heat.critical_paused && !g->accepting);
+    assert(!active && !routed && g->display->ready && cint_prod.display.engaged);
+    assert(!heat_bridge.latched && !u6_app.abort_req);
+    u6_sample(99); geforce_foreground_poll();
+    assert(!g->heat.critical_paused && g->accepting);
+    scanlog_finish();
+}
 static void u6_hot_leave(void)
 {
     u6_setup();
@@ -339,6 +384,7 @@ void _start(void)
     scanlog_map(SCANLOG_BAR0,0x101000U);
     u6_critical();
     u6_downclock_stop(false); u6_downclock_stop(true);
+    u6_serial_shutdown(); u6_serial_critical();
     u6_hot_leave();
     u6_cooperative(); u6_fault_monitor(); u6_shutdown();
     u6_setup(); u6_safe=false;

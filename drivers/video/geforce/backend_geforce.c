@@ -82,6 +82,7 @@ static struct gf5 *feature5;
 static int geforce_heat_stop(void);
 static int geforce_heat_clear(void);
 static bool geforce_heat_active(void);
+static bool geforce_heat_backend_active(void);
 void geforce_backend_feature5_bind(struct gf5 *g)
 {
     feature5 = g;
@@ -89,6 +90,7 @@ void geforce_backend_feature5_bind(struct gf5 *g)
         geforce_context->heat->stop=geforce_heat_stop;
         geforce_context->heat->clear=geforce_heat_clear;
         geforce_context->heat->active=geforce_heat_active;
+        geforce_context->heat->backend_active=geforce_heat_backend_active;
     }
 }
 /* Module-local forwarding avoids an additional import or retained gf5 loan. */
@@ -468,6 +470,13 @@ static int geforce_stop(void)
 
 #ifdef OS32_GEFORCE_MODULE
 static bool geforce_heat_active(void)
+{
+    return active || (feature5 &&
+        ((feature5->ch && feature5->ch->state!=GF2_OFF) ||
+         (feature5->display && feature5->display->legacy &&
+          feature5->display->legacy->engaged)));
+}
+static bool geforce_heat_backend_active(void)
 {
     return active;
 }
