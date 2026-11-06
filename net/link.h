@@ -116,7 +116,7 @@
 #define LINK_RX_BUDGET      16      /* 1 tick で dispatch する上限フレーム数 */
 
 /* ---- 容量 -------------------------------------------------------------- */
-#define LINK_HANDLES        2       /* 同時ハンドル */
+#define LINK_HANDLES        8       /* 同時ハンドル */
 #define LINK_STREAM_BUF     8192    /* 本文リング 1 本 */
 #define LINK_DECL_MAX       65536   /* 宣言長の上限 (wseq が枯渇しない) */
 
@@ -157,6 +157,14 @@ void link_init(const u8 my_mac[ETH_ALEN]);
  * **プロトコルを進めるのはここだけ** — 受信 dispatch、再送、制御の送出、
  * HELLO / 再同期。KAPI からは呼ばない。反射モードでは呼ばれない。 */
 void link_tick(void);
+
+/* A8/A11 contract, IRQ0 with IF=0. After validated RESPONSE (including
+ * PROCESSING), advancing DATA or WDATA ACK: progress(slot). Duplicate frames
+ * and outbound STATUS must not refresh it. Call deadlines() after RX and before
+ * the existing retransmission timers. Expiry affects only this handle; the
+ * existing session RTO/PROBE policy remains owned by link.c. */
+void link_host_progress(i32 h);
+void link_host_deadlines(void);
 
 /* ---- KAPI v51 の実体 (ラッパーは kapi/kapi_host.c) ----------------------
  * どれも待たない。ポインタはすべて**カーネル領域**で、CPL=3 のポインタ検証と
