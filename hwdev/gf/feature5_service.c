@@ -8,21 +8,69 @@ static struct gf5_test_ops service_ops;
 static const struct gf5_test_ops **service_slot;
 static struct gf5 *service_ctx;
 
-static i32 service_check(struct gf5 *g, bool management)
+/* nouveau c03c1a1 therm/base.c:343-357 and clk/base.c:591-598:
+ * workers end before their device lifetime ends. OS32 also validates borrowed
+ * diagnostic ops at each call, since a caller may retain them after stop. */
+static i32 service_live(struct gf5 *g)
 {
     if (!g) return GF5_EINVAL;
     if (g!=service_ctx) return GF5_ESTATE;
-    if (g->phase==GF5_RUN ||
-        (management && (g->phase==GF5_SAVED || g->phase==GF5_FAULT)))
-        return 0;
-    g->last_rc=GF5_ESTATE;
-    return GF5_ESTATE;
+    if (g->busy || (service_slot && !*service_slot)) return GF5_EBUSY;
+    if (g->phase!=GF5_RUN || !g->accepting || !g->ch || !g->ch->f ||
+        g->ch->state!=GF2_RUN || g->ch->fault.latched || !g->ch->f->running ||
+        !g->display || g->display->ch!=g->ch ||
+        !g->display->ready || !g->display->accepting || g->display->changing ||
+        g->display->saved_closed || !g->ch->epoch ||
+        g->display->epoch!=g->ch->epoch)
+        return GF5_ESTATE;
+    return 0;
+}
+
+static i32 service_check(struct gf5 *g, bool management)
+{
+    i32 rc;
+    if (!g) return GF5_EINVAL;
+    if (g!=service_ctx) return GF5_ESTATE;
+    if (management) {
+        rc=(g->busy || (service_slot && !*service_slot)) ? GF5_EBUSY :
+           (g->phase==GF5_RUN || g->phase==GF5_SAVED || g->phase==GF5_FAULT) ?
+           0 : GF5_ESTATE;
+    } else rc=service_live(g);
+    if (rc) {
+        if (rc==GF5_ESTATE) gf5_plan_invalidate(g);
+        g->last_rc=rc;
+    }
+    return rc;
+}
+
+static void service_complete(struct gf5 *g)
+{
+    g->busy=false;
+    if (g->phase==GF5_FAULT) gf5_plan_invalidate(g);
+}
+
+/* Sensor setup normally happens on the first RUN poll. Once initialized,
+ * monitoring needs the MMIO lifetime and epoch, never drawing health. */
+static bool thermal_live(struct gf5 *g)
+{
+    if (!g || g!=service_ctx || (service_slot && !*service_slot) ||
+        !g->ch || !g->ch->f ||
+        g->ch->f->revoked || !g->ch->f->bar0 || !g->display ||
+        g->display->ch!=g->ch || !g->display->legacy ||
+        !g->display->legacy->bar0_map || !g->ch->epoch ||
+        g->display->epoch!=g->ch->epoch)
+        return false;
+    return g->fan.sensor_setup || !service_live(g);
 }
 
 #define SERVICE_OP(name, args, call) \
     static i32 service_##name args { \
         i32 rc=service_check(g,false); \
-        return rc ? rc : gf5_##name call; \
+        if (rc) return rc; \
+        g->busy=true; \
+        rc=gf5_##name call; \
+        service_complete(g); \
+        return rc; \
     }
 SERVICE_OP(clock_read,(struct gf5 *g,struct gf5_clock *v),(g,v))
 SERVICE_OP(clock_calc,(struct gf5 *g,const struct gf5_clock *v,struct gf5_plan *p),(g,v,p))
@@ -48,7 +96,10 @@ SERVICE_OP(tile_clear,(struct gf5 *g,u32 slot),(g,slot))
 
 static void service_fan_tick(struct gf5 *g,u64 now)
 {
-    if (!service_check(g,false)) gf5_fan_tick(g,now);
+    if (!thermal_live(g) || g->busy || g->poll_off) return;
+    g->busy=true;
+    gf5_fan_tick(g,now);
+    service_complete(g);
 }
 
 i32 gf5_service_poll(struct gf5 *g)
@@ -57,7 +108,8 @@ i32 gf5_service_poll(struct gf5 *g)
     i32 rc, previous_rc, previous_source_rc;
     const char *previous_source;
     if (!g) return GF5_EINVAL;
-    if (g->busy || g->phase!=GF5_RUN || g->poll_off) return 0;
+    if (g->busy || g->poll_off || !thermal_live(g)) return 0;
+    g->busy=true;
     rc=g->links.clock64 ? g->links.clock64(g->links.owner,&now) : GF5_EINVAL;
     if (rc) {
         g->source_rc=rc;
@@ -65,6 +117,7 @@ i32 gf5_service_poll(struct gf5 *g)
         g->poll_source="clock64";
         g->poll_off=true;
         kprintf(KLOG_ATTR,"[gf5] clock off rc=%d reason=clock64\n",rc);
+        service_complete(g);
         return 0; /* clock failure is confined to the F5 worker. */
     }
     /* A successful tick must not erase an earlier diagnostic. */
@@ -79,13 +132,13 @@ i32 gf5_service_poll(struct gf5 *g)
         g->source_rc=previous_source_rc;
         g->poll_source=previous_source;
     }
+    service_complete(g);
     return 0; /* F5 alarms never fail foreground rendering. */
 }
 
 static i32 service_poll(struct gf5 *g)
 {
-    i32 rc=service_check(g,false);
-    return rc ? rc : gf5_service_poll(g);
+    return gf5_service_poll(g);
 }
 
 static void service_publish(struct gf5 *g)
@@ -99,8 +152,10 @@ static i32 service_state_save(struct gf5 *g,struct gf5_image **out)
 {
     i32 rc=service_check(g,false);
     if (rc) return rc;
+    gf5_plan_invalidate(g);
     *service_slot=0;
     rc=gf5_state_save(g,out);
+    if (g->phase==GF5_FAULT) gf5_plan_invalidate(g);
     service_publish(g);
     return rc;
 }
@@ -109,15 +164,21 @@ static i32 service_state_restore(struct gf5 *g,const struct gf5_image *image)
 {
     i32 rc=service_check(g,true);
     if (rc) return rc;
+    gf5_plan_invalidate(g);
     *service_slot=0;
     rc=gf5_state_restore(g,image);
+    if (g->phase==GF5_FAULT) gf5_plan_invalidate(g);
     service_publish(g);
     return rc;
 }
 
 static void service_state_free(struct gf5 *g,struct gf5_image *image)
 {
-    if (!service_check(g,true)) gf5_state_free(g,image);
+    if (!service_check(g,true)) {
+        g->busy=true;
+        gf5_state_free(g,image);
+        service_complete(g);
+    }
 }
 
 static i32 service_last_rc(struct gf5 *g)
