@@ -1680,6 +1680,15 @@ GF4_MUTATIONS += [
      'test_stopped_cursor: F2 OFF must still hide the hardware cursor'),
 ]
 
+GF4_MUTATIONS += [
+    ('b7', 'completed-hold-clear', 'hwdev/gf/display/flip.c',
+     'c->hold[head] = (struct gf4_flip_hold){0};',
+     'c->hold[head].pending = false;', 'completed hold must contain no stale surface keys'),
+    ('c2scan', 'restored-spare-bank', 'hwdev/gf/display/scan.c',
+     'active=bank;', 'active=c->scan_bank[head];',
+     'restored_after_flip: discard diagnostic bank, preserve saved boot front'),
+]
+
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.
 GF4_COMPONENTS = {
