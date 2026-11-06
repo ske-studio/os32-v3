@@ -150,15 +150,15 @@ class ClangTest(unittest.TestCase):
                 if arg == '-include':
                     self.assertTrue(pathlib.Path(unit['argv'][i + 1]).is_file())
         sources = {u['src'] for u in units}
-        # Paired module inputs must exist before any real build, including P5.
+        # Paired module inputs must exist before any real build, including Trident.
         for unit in units:
-            if '/geforce/' in unit['src']:
+            if any('/' + name + '/' in unit['src'] for name in ('geforce', 'trident')):
                 source = pathlib.Path(unit['src'])
                 self.assertTrue(source.is_file(), source)
                 # dry_run's generated sources use its absolute temporary BUILD_OUT;
                 # driver inputs keep their repository-relative paths.
                 if source.is_absolute():
-                    self.assertTrue((source.parent / 'geforce_imports.h').is_file())
+                    self.assertTrue((source.parent / (source.parent.name + '_imports.h')).is_file())
         self.assertTrue({'init/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
                          'sdk/allocator/nano_adapter.c'} <= sources)
@@ -551,7 +551,9 @@ def main():
     if args.mutate:
         # Every mutant declares its coverage; GCC-only coverage follows the
         # same predicate and reason as test_review_gcc_branches.
-        cases = [('all modes', 'tools/check_p2v.py',
+        cases = [('all modes', 'tools/clang_ast/build.py',
+                  '"cirrus", "geforce", "trident"', '"cirrus", "geforce"'),
+                 ('all modes', 'tools/check_p2v.py',
                   'locations.append(first)', 'pass'),
                  ('all modes', 'tools/clang_ast/type_occurrences.cpp',
                   'if (array->getIndexTypeQualifiers().hasRestrict())', 'if (false)'),

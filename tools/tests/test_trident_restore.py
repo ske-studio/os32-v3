@@ -139,7 +139,7 @@ def check_trace(data):
     assert pos == len(data)
 
 
-def run(source, directory):
+def run_restore(source, directory):
     product = directory / 'state_restore.c'
     product.write_text(source)
     binary = directory / 'restore-host'
@@ -160,14 +160,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='trident-restore-') as tmp:
         directory = Path(tmp)
         with host32.control(args.mutate, None, ROOT):
-            result = run(source, directory)
+            result = run_restore(source, directory)
             assert result.returncode == 0, f'normal runtime rc={result.returncode}'
             check_trace(result.stdout)
             print('GREEN: four mono/color traces, all DAC components, every-access failures, inactive/invalid gates')
         if args.mutate:
             for name, old, new in MUTATIONS:
                 assert source.count(old) == 1, f'{name}: anchor must be unique'
-                result = run(source.replace(old, new), directory)
+                result = run_restore(source.replace(old, new), directory)
                 rejected = result.returncode != 0
                 if not rejected:
                     try:
@@ -180,3 +180,12 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    argv = ['python3', '-B', 'tools/tests/test_trident_restore.py']
+    if ctx.mutate:
+        argv.append('--mutate')
+    return subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
