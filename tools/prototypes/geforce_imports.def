@@ -205,6 +205,24 @@
       "source": "hwdev/gf/command.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "geforce_resource_lookup",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "paging_device_map",
+      "source": "mm/paging.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "paging_device_unmap",
+      "source": "mm/paging.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

@@ -18,6 +18,10 @@ from module_schema import COMPONENTS, HEADER_FIELDS
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = 'docs/design/hwdev/hwdev_imports.md'
+# M5 keeps these slots in the shared diagnostic contract. Their production
+# caller lives in GeForce, rather than the HWDEV diagnostic object inventory.
+GEFORCE_RETAINED_IMPORTS = frozenset((
+    'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap'))
 
 
 def require(ok, message):
@@ -69,6 +73,7 @@ def audit(out, cross):
     # The reviewed declaration list owns the private slot order, which differs
     # from kdebug index order. Reconcile it with both object users and the docs.
     private_kernel = [e for e in private if e['group'] == 'kernel']
+    kernel_names |= GEFORCE_RETAINED_IMPORTS
     require(len(kernel_names) == len(private_kernel), 'kernel import table count')
     require({e['symbol'] for e in private_kernel} == kernel_names,
             'private kernel import slots/symbols')
