@@ -32,6 +32,8 @@ MUTATIONS = (
     ('oneway-expired', 'if ((i32)(c->io->now(c->ctx) - deadline) >= 0) return OS32_ERR_TIMEOUT;', ''),
     ('deadline', 'if ((i32)(now - deadline) >= 0) {', 'if ((i32)(now - deadline) > 0) {'),
     ('retry', '#define SFS_LAN_RETRY_TICKS 10u', '#define SFS_LAN_RETRY_TICKS 11u'),
+    ('retry-after-tx', 'retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;',
+     'retry = now + SFS_LAN_RETRY_TICKS;'),
     ('seq-retry', 'if (sent) c->resends++;', 'if (sent) { c->resends++; c->seq++; }'),
     ('sticky-dead', 'if (rc) return rc;\n    if (f.type == SFS_T_ERR)',
      'if (rc) { c->dead = SFS_DEAD_FAILS; return rc; }\n    if (f.type == SFS_T_ERR)'),
