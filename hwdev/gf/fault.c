@@ -97,7 +97,15 @@ static int capture(struct gf2_chan *ch)
     rc |= rd(f, FAULT_DMA_DCOUNT, &fault->dma_dcount);
     rc |= rd(f, GF2_USER_BASE + GF2_CHID * GF2_USER_STRIDE + GF2_USER_REFERENCE,
              &fault->reference);
-    /* gr/nv40.c:241-246. gr_method retains trapped addr, including subc. */
+    /* F1 captured GR's trap before ACK, atomically with first status. */
+    if (fault->first.first.graph_latched) {
+        fault->gr_trap = fault->first.first.gr_trap;
+        fault->gr_method = fault->first.first.gr_method;
+        fault->gr_data = fault->first.first.gr_data;
+        fault->gr_class = fault->first.first.gr_class;
+        return rc;
+    }
+    /* FIFO-only faults have no GR trap latch. gr/nv40.c:241-246. */
     rc |= rd(f, FAULT_GRAPH_CTX, &fault->gr_trap);
     rc |= rd(f, FAULT_GRAPH_ADDR, &fault->gr_method);
     rc |= rd(f, FAULT_GRAPH_DATA, &fault->gr_data);
@@ -146,6 +154,13 @@ int gf2_fault_check(struct gf2_chan *ch)
     ch->fault.latched = true;
     ch->fault.epoch = ch->epoch;
     ch->fault.first = ch->fault.latest = now;
+    if (now.first.fifo_latched || now.first.graph_latched) {
+        ch->fault.first.pmc = now.first.pmc;
+        ch->fault.first.pfifo = now.first.pfifo;
+        ch->fault.first.pgraph = now.first.pgraph;
+        ch->fault.first.nsource = now.first.nsource;
+        ch->fault.first.nstatus = now.first.nstatus;
+    }
     int rc = capture(ch);
     /* F1 owns ACK/masks; its enable contract requires IRQ save/restore. */
     unsigned saved = irq_save();

@@ -14,10 +14,19 @@ struct gf_imem {
     u32 vram_bytes, reserved, aperture_bytes;
     struct gf_inst vbios, ramht, ramro, ramfc, *used;
 };
+/* Small pre-ACK record, one latch per engine observation period. */
+struct gf_irq_first {
+    u32 pmc, pfifo, pgraph, nsource, nstatus;
+    u32 gr_trap, gr_method, gr_data, gr_class;
+    bool fifo_latched, graph_latched;
+};
 /* Natural u32 wrap; vblank counts observations, not all elapsed frames. */
 struct gf_irq_stats {
     u32 entries, fifo, graph, vblank[2];
     u32 pmc, pfifo, pgraph, nsource, nstatus, unknown;
+    /* Survives clean polls and head changes. Re-enabling an engine clears
+     * that engine's latch; latest observations above retain their meaning. */
+    struct gf_irq_first first;
 };
 struct gf_instmem_map_ops;
 struct gf_foundation {
