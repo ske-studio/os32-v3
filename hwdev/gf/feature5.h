@@ -171,6 +171,7 @@ i32 gf5_perf_select(struct gf5 *, u8 index);
  * Shutdown wins; critical defers recovery. Temperatures are milli-Celsius. */
 i32 gf5_heat_step(struct gf5 *, const struct gf5_thermal *, u64 now);
 i32 gf5_therm_read(struct gf5 *, struct gf5_thermal *);
+i32 gf5_therm_monitor_restart(struct gf5 *);
 /* N/nvkm/subdev/therm/base.c:376–394: sensor setup, saved duty/mode,
  * then sensor/fan deadlines from clock64. Copy into the existing trip array;
  * ntrip mismatch is ESTATE. No allocation or trip ownership transfer. */

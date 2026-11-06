@@ -808,6 +808,7 @@
       "valid"
     ],
     "struct geforce_heat_bridge": [
+      "active",
       "clear",
       "latched",
       "request",

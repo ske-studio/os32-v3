@@ -81,12 +81,14 @@ static GfxMode display_modes[GF4_MODES];
 static struct gf5 *feature5;
 static int geforce_heat_stop(void);
 static int geforce_heat_clear(void);
+static bool geforce_heat_active(void);
 void geforce_backend_feature5_bind(struct gf5 *g)
 {
     feature5 = g;
     if (geforce_context->heat) {
         geforce_context->heat->stop=geforce_heat_stop;
         geforce_context->heat->clear=geforce_heat_clear;
+        geforce_context->heat->active=geforce_heat_active;
     }
 }
 /* Module-local forwarding avoids an additional import or retained gf5 loan. */
@@ -465,6 +467,10 @@ static int geforce_stop(void)
 }
 
 #ifdef OS32_GEFORCE_MODULE
+static bool geforce_heat_active(void)
+{
+    return active;
+}
 static int geforce_heat_stop(void)
 {
     /* Same backend closure as fail, without making cooling unrecoverable. */
@@ -485,6 +491,8 @@ static int geforce_heat_clear(void)
     if (rc) return rc;
     i64 cool=((i64)feature5->fan.threshold[1]-feature5->fan.hyst[1])*1000;
     if (!sample.calibrated || sample.milli_c>cool) return GF5_EBUSY;
+    rc=gf5_therm_monitor_restart(feature5);
+    if (rc) return rc;
     feature5->heat.stop_pending=false;
     return 0;
 }

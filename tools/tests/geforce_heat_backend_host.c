@@ -13,8 +13,8 @@ static void finish(int rc)
     __builtin_unreachable();
 }
 #define CHECK(x) do { if (!(x)) finish(1); } while (0)
-static int map_rc, identity_rc, read_rc;
-static u32 reads, requests;
+static int map_rc, identity_rc, read_rc, restart_rc;
+static u32 reads, requests, restarts;
 static i32 temperature=79999;
 int gf_production_identity(struct gf_production *p) { CHECK(p); return identity_rc; }
 int gf_production_mapped(struct gf_production *p) { CHECK(p); return map_rc; }
@@ -29,6 +29,12 @@ static void request(i32 reason,i32 milli_c,i32 source_rc)
     CHECK(reason==-1 && milli_c==120000 && source_rc==-2);
     test_heat.latched=true; requests++;
 }
+i32 gf5_therm_monitor_restart(struct gf5 *g)
+{
+    CHECK(g && !active && !routed);
+    restarts++;
+    return restart_rc;
+}
 void _start(void)
 {
     struct video_device d={0};
@@ -42,14 +48,16 @@ void _start(void)
     module_backend=geforce_backend_ops;
     geforce_backend_bind(&d,identify,0,0,0);
     geforce_backend_feature5_bind(&g);
-    CHECK(test_heat.stop && test_heat.clear);
+    CHECK(test_heat.stop && test_heat.clear && test_heat.active);
     module_backend.bb_base=client;
     CHECK(module_backend.probe());
     module_backend.init();
     CHECK(active && routed && !failed);
+    CHECK(test_heat.active());
     geforce_heat_stop_request(-1,120000,-2);
     CHECK(requests==1 && test_heat.latched);
     CHECK(!test_heat.stop() && !active && !routed && !failed);
+    CHECK(!test_heat.active());
     CHECK(events[n-2]==5 && events[n-1]==6);
     u32 before=n;
     /* A new ordinary app probes then initializes; both must stay closed. */
@@ -64,8 +72,13 @@ void _start(void)
     CHECK(test_heat.clear()==GF5_EIO && test_heat.latched);
     read_rc=0; temperature=80001;
     CHECK(test_heat.clear()==GF5_EBUSY && test_heat.latched);
+    CHECK(!restarts);
     temperature=80000;
+    restart_rc=GF5_EIO;
+    CHECK(test_heat.clear()==GF5_EIO && test_heat.latched && restarts==1);
+    restart_rc=0;
     CHECK(!test_heat.clear() && n==(int)before && !active && !routed);
+    CHECK(restarts==2);
     /* The resident owner clears only after this callback succeeds. */
     test_heat.latched=false;
     CHECK(module_backend.probe());

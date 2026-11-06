@@ -100,6 +100,9 @@ static void heat_stop_consume(void)
 {
     if (!heat_pending) return;
     heat_pending=false;
+    /* Monitoring outlives leave. Retain the latch/cause without touching
+     * the stopped backend or an app now using the 98 display. */
+    if (heat_bridge.active && !heat_bridge.active()) return;
     int stop_rc=heat_bridge.stop ? heat_bridge.stop() : gf_production_return();
     if (!pc98_route_safe || !pc98_route_safe()) {
         int sync_rc=vfs_sync();

@@ -122,6 +122,18 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+ ('inactive-heat-consume', 'drivers/video/geforce/geforce_module.c',
+  'if (heat_bridge.active && !heat_bridge.active()) return;',
+  'if (false) return;', 'foreground'),
+ ('sensor-reentry-rearm', 'drivers/video/geforce/backend_geforce.c',
+  'rc=gf5_therm_monitor_restart(feature5);',
+  'rc=0;', 'foreground'),
+ ('sensor-reentry-poll', 'hwdev/gf/therm.c',
+  'g->fan.sensor_poll=true;',
+  'g->fan.sensor_poll=false;', 'foreground'),
+ ('sensor-reentry-deadline', 'hwdev/gf/therm.c',
+  'g->fan.sensor_poll=true;\n        g->next_sensor=0;',
+  'g->fan.sensor_poll=true;\n        g->next_sensor=~(u64)0;', 'foreground'),
  ('tile-pitch-fixed-point', 'hwdev/gf/tile.c',
   'return pitch && !(pitch&(a-1U));', 'return pitch!=0;', 'tile'),
  ('tile-release-borrow', 'hwdev/gf/vram_view.c',

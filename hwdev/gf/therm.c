@@ -305,6 +305,20 @@ static i32 th_init(struct gf5 *g)
     g->fan=f;
     return 0;
 }
+/* Explicit cold reentry revives a monitor disabled by sensor loss, retaining
+ * its owned policy/trips and independent fan state. */
+i32 gf5_therm_monitor_restart(struct gf5 *g)
+{
+    if (g) g->source_rc=0;
+    i32 rc=th_check(g);
+    if (!rc) rc=th_setup(g);
+    if (!rc) {
+        g->fan.sensor_setup=TH_OLD_SETUP;
+        g->fan.sensor_poll=true;
+        g->next_sensor=0;
+    }
+    return th_exit(g,rc);
+}
 static i32 th_temperature(struct gf5 *g,struct gf5_thermal *out)
 {
     g->poll_source="therm";

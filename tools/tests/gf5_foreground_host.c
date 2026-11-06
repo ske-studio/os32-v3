@@ -77,6 +77,9 @@ static void u6_halt(void)
         assert(host_serial_find("reason=") && host_serial_find("milli_c=135000"));
         gf2_host_exit(0);
     }
+    /* Normal sys_halt may return in this host seam; an unexpected thermal
+     * halt must fail at runtime rather than spin in the product halt loop. */
+    assert(!foreground_poll_busy);
 }
 void platform_reset(void)
 {
@@ -208,6 +211,41 @@ static void u6_downclock_stop(bool sensor_failure)
     assert(heat_milli_c==96000 && heat_reason==GF5_EIO);
     assert(!active && !routed && !scanlog_route && !heat_pending);
     assert(heat_bridge.latched && u6_app.abort_req && !geforce_probe());
+    if (sensor_failure) {
+        u6_sample(92);
+        assert(!geforce_heat_latch_clear() && !heat_bridge.latched);
+        assert(g->fan.sensor_poll && !g->next_sensor && g->fan.sensor_setup==0xffU);
+        geforce_init();
+        assert(active && routed && scanlog_route);
+        u6_app.abort_req=0;
+        u6_sample(96);
+        u32 reads=cint_host.calls[H_READ];
+        geforce_foreground_poll();
+        assert(cint_host.calls[H_READ]>reads && g->next_sensor>cint_host.now);
+        struct gf5_clock clock;
+        assert(!scanlog_f5_ops->clock_read(g,&clock));
+        assert(g->heat.down_active && clock.core_khz==108000 && !heat_bridge.latched);
+        assert(!u6_app.abort_req && active && routed);
+    }
+    scanlog_finish();
+}
+static void u6_hot_leave(void)
+{
+    u6_setup();
+    struct gf5 *g=&cint_prod.feature5;
+    u6_sample(96);
+    assert(!geforce_stop());
+    assert(!active && !routed && g->fan.sensor_poll);
+    /* A different app is now running on 98. Thermal polling still runs. */
+    u6_safe=false;
+    startlog_clear();
+    geforce_foreground_poll();
+    assert(g->heat.stop_pending && heat_bridge.latched && !heat_pending);
+    assert(heat_reason==GF5_ESTATE && heat_milli_c==96000);
+    assert(!scanlog_count("GF4 STATE stage=leave98") && !scanlog_route);
+    assert(!u6_app.abort_req && !u6_notifications && !u6_aborts && !u6_syncs && !u6_halts);
+    assert(!geforce_probe());
+    u6_safe=true;
     scanlog_finish();
 }
 static void u6_cooperative(void)
@@ -301,6 +339,7 @@ void _start(void)
     scanlog_map(SCANLOG_BAR0,0x101000U);
     u6_critical();
     u6_downclock_stop(false); u6_downclock_stop(true);
+    u6_hot_leave();
     u6_cooperative(); u6_fault_monitor(); u6_shutdown();
     u6_setup(); u6_safe=false;
 #ifdef U6_REBOOT
