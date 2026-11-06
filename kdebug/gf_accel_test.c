@@ -41,7 +41,7 @@
 
 /* Test geometry and RAM budget, not hardware constants. A 64x48 32bpp
  * image and an 8KiB tail cover source/destination and different-pitch copy.
- * The tail fits 32 rows at 32*4+8 byte pitch, rounded to whole pages.
+ * The tail fits 32 rows at the 192-byte different-pitch copy stride.
  * The 4097-byte transfer cases cross the existing 4KiB staging boundary. */
 #define TEST_SIDE 64U
 #define TEST_HEIGHT 48U
@@ -52,6 +52,10 @@
 #define TEST_BYTE_HEIGHT (TEST_BYTES / TEST_BYTE_WIDTH)
 #define TEST_GUARD 16U
 #define TEST_GUARD_VALUE 0xa7U
+/* nouveau_exa.c:434-435: EXA surfaces have 64-byte pitch alignment.
+ * 3*64 differs from all source pitches (64/128/256), fits 32 pixels at
+ * every tested depth, and 32 rows fit the existing 8KiB tail. */
+#define TEST_COPY_DST_PITCH (3U * 64U)
 #define TEST_COPY_ALU 3U
 #define TEST_FULL_MASK 0xffffffffU
 #define TEST_FRAC_BITS 20U
@@ -307,11 +311,21 @@ static int copy_case(void)
         if (rc) return rc;
         d = s;
         if (direction == 10U)
-            rc = surface(o, &d, fmt, TEST_HALF, 32, 32, 32U * n + 8U);
-        if (!rc) rc = o->copy(o->ctx, &s, &d, sr, dx, dy, TEST_COPY_ALU, TEST_FULL_MASK, dl);
+            rc = surface(o, &d, fmt, TEST_HALF, 32, 32, TEST_COPY_DST_PITCH);
+        if (rc) return rc;
+        /* Record before submission: a fault must identify its own sample. */
+        serial_puts_polled("GF3 copy input");
+        number(" direction=", direction); number(" fmt=", fmt);
+        hex(" src_off=", s.off); hex(" dst_off=", d.off);
+        number(" src_pitch=", s.pitch); number(" dst_pitch=", d.pitch);
+        number(" sx=", sr.x); number(" sy=", sr.y);
+        number(" dx=", dx); number(" dy=", dy);
+        number(" w=", sr.w); number(" h=", sr.h);
+        serial_puts_polled("\r\n");
+        rc = o->copy(o->ctx, &s, &d, sr, dx, dy, TEST_COPY_ALU, TEST_FULL_MASK, dl);
         if (rc) return rc;
         u32 dst_off = direction == 10U ? TEST_HALF : 0;
-        u32 dst_pitch = direction == 10U ? 32U * n + 8U : pitch;
+        u32 dst_pitch = direction == 10U ? TEST_COPY_DST_PITCH : pitch;
         for (u32 y = 0; y < sr.h; y++)
         for (u32 b = 0; b < sr.w * n; b++)
             expected[dst_off + (dy + y) * dst_pitch + dx * n + b] =
