@@ -1,5 +1,5 @@
 """F0 resident foreground dispatch: direct product host and runtime mutants."""
-CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:all'], budget=5.0,
+CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=5.0,
              covers=['tools/tests/test_geforce_fgpoll.py',
                      'tools/tests/geforce_fgpoll_host.c', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',

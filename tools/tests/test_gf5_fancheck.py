@@ -1,5 +1,5 @@
 """V1 fan support classification and side-effect-free preflight."""
-CHECK = dict(name='gf5-fancheck', tier=1, needs=['make:all'], budget=20.0,
+CHECK = dict(name='gf5-fancheck', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=20.0,
              # Includes inputs reached through the shared test_gf5 runner.
              covers=[
                  'hwdev/gf/**',

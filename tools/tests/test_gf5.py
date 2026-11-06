@@ -1,5 +1,5 @@
 """Layer 5 component hosts and the existing runner trace acceptance suite."""
-CHECK = dict(name='gf5-host', tier=1, needs=['make:all'], budget=120.0,
+CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=120.0,
              covers=[
                  'drivers/base/dev.c',
                  'fs/vfs.c',
