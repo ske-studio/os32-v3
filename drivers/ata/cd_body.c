@@ -10,9 +10,16 @@ static int cd_read(Device *self, int lba, int count, void *buf)
     return atapi_read_sectors((u32)lba, (u32)count, buf);
 }
 
+static int cd_media_check(Device *self, u32 *generation)
+{
+    (void)self;
+    *generation = atapi_media_gen();
+    return 0;
+}
+
 static Device cd_device = {
     .name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
-    .sect_size = ATAPI_SECTOR_SIZE, .blk_read = cd_read, .blk_read_u32 = 0, .media_check = 0};
+    .sect_size = ATAPI_SECTOR_SIZE, .blk_read = cd_read, .blk_read_u32 = 0, .media_check = cd_media_check};
 
 int cd_module_init(CdModuleApi *out)
 {

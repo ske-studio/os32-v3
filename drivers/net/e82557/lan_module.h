@@ -33,6 +33,7 @@ typedef struct {
 int lan_module_probe(const struct pci_dev *dev);
 const struct pci_driver *platform_lan_driver(void);
 int lan_module_load(void);
+int lan_module_netcd_register(const char *alias);
 void lan_module_pci_bind_fallback(void);
 int lan_module_abort(void);
 int lan_module_session_acquire(void);

@@ -65,6 +65,8 @@ int vfs_resolve_path(const char *in, char *out, int size)
     kstrlcpy(out, in, (u32)size);
     return VFS_OK;
 }
+int vfs_resource_prepare(VfsOps *ops, void *ctx) { (void)ops; (void)ctx; return VFS_OK; }
+void vfs_resource_stale_mount(void *ctx) { (void)ctx; }
 VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 { kstrlcpy(out, path, (u32)size); *ctx = &mock_ctx; return &mock_ops; }
 int vfs_path_kind(const char *path) { return kind_rc; }

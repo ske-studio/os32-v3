@@ -38,7 +38,7 @@ static int cd_start(struct module_record *r, u32 entry, u32 *exports)
     fs_registered = 1;
     if (candidate.device) {
         if (!module_ref_acquire(cd_handle, r->owner, MODULE_REF_REGISTRATION, 0)) return MODULE_INIT_FAILED;
-        rc = dev_register(candidate.device);
+        rc = dev_register_cd(candidate.device, -1);
         if (rc) {
             module_ref_release(cd_handle, MODULE_REF_REGISTRATION);
             return rc;

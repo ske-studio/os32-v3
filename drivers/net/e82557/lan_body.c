@@ -1,4 +1,5 @@
 #include "lan_module.h"
+#include "drivers/block/netcd.h"
 #include "e82557.h" /* Device probe table; moved only in L02. */
 
 int lan_module_init(LanModuleApi *out)
@@ -11,7 +12,7 @@ int lan_module_init(LanModuleApi *out)
         .quiet = lan_module_quiet, .release = lan_module_release,
         .lan_init = sfs_lan_init, .lan_peer = sfs_lan_set_peer,
         .lan_reset = sfs_lan_reset, .io = sfs_lan_io,
-        .adapter = &net_e82557_adapter, .netcd_register = 0
+        .adapter = &net_e82557_adapter, .netcd_register = netcd_register
     };
     return 0;
 }

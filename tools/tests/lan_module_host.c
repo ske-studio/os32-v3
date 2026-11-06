@@ -26,7 +26,7 @@ int net_start(enum NetNicId id, const u8 peer[6])
 
 
 enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL,
-       BAD_FUNCTION, NULL_FUNCTION, OPTIONAL_VALID, BAD_ADAPTER, BAD_NETCD };
+       BAD_FUNCTION, NULL_FUNCTION, OPTIONAL_VALID, BAD_ADAPTER, BAD_NETCD, NETCD_PIN };
 static const struct NetAdapter body_adapter = {0};
 static u32 mode, ticks, probes, sends, gets, quiet_calls, release_calls;
 static u32 dma_live, dma_freed, irq_live, irq_calls, cleanup_order;
@@ -64,7 +64,9 @@ int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 static int body_irq(unsigned int irq, void *arg)
 { CHECK(irq == 5 && !arg && irq_live); irq_calls++; return IRQ_HANDLED; }
 static void body_tick(void) { ticks++; }
-static int body_netcd_register(const char *path) { (void)path; return 0; }
+static int netcd_result, netcd_calls;
+static int body_netcd_register(const char *path)
+{ CHECK(path && !kstrcmp(path, "install")); netcd_calls++; return netcd_result; }
 static int body_state(void) { return mode == QUARANTINE ? E82557_QUARANTINED : E82557_RUNNING; }
 static int body_send(const void *buf, u32 len)
 { CHECK(buf && len == 1 && dma_live); sends++; return 0; }
@@ -115,7 +117,7 @@ static int init_lan(LanModuleApi *out)
     struct module_record *r = module_record_get(lan_handle);
     if (mode == BAD_FUNCTION || mode == NULL_FUNCTION)
         out->io.can_wait = (int (*)(void *))(uptr)(mode == NULL_FUNCTION ? 0 : r->text + r->text_size);
-    if (mode == OPTIONAL_VALID) {
+    if (mode == OPTIONAL_VALID || mode == NETCD_PIN) {
         out->adapter = &body_adapter;
         out->netcd_register = body_netcd_register;
     }
@@ -244,7 +246,7 @@ void _start(void)
         CHECK(quiet_calls == 1 && release_calls == 1); empty(); finish(0);
     }
     CHECK(!rc && module_exports(lan_handle));
-    CHECK(mode == OPTIONAL_VALID || (!candidate.adapter && !candidate.netcd_register));
+    CHECK(mode == OPTIONAL_VALID || mode == NETCD_PIN || (!candidate.adapter && !candidate.netcd_register));
     if (mode == DECLINE || mode == CLEAN_DECLINE) {
         CHECK(probe_result == PCI_PROBE_DECLINE);
         no_refs(r); CHECK(!dma_live && !irq_live);
@@ -256,6 +258,20 @@ void _start(void)
     CHECK(e82557_driver.probe(&nic) == PCI_PROBE_DECLINE && probes == 1);
     CHECK(!e82557_send("x", 1) && sends == 1);
     CHECK(sfs_lan_io.get(&nic) == 42 && gets == 1);
+    if (mode == NETCD_PIN) {
+        netcd_result = OS32_ERR_EXIST;
+        CHECK(lan_module_netcd_register("install") == OS32_ERR_EXIST);
+        CHECK(r->registration_refs == 1 && netcd_calls == 1 && !netcd_registered);
+        netcd_result = 0;
+        CHECK(!lan_module_netcd_register("install"));
+        CHECK(r->registration_refs == 2 && netcd_calls == 2 && netcd_registered);
+        u32 held = returned;
+        CHECK(lan_module_abort() == MODULE_ISOLATED);
+        CHECK(r->state == MODULE_QUARANTINED && returned == held);
+        CHECK(r->registration_refs == 2 && !release_calls && !dma_freed);
+        CHECK(lan_module_netcd_register("install") == OS32_ERR_NOSYS);
+        finish(0);
+    }
     u32 before = returned;
     if (mode == ACTIVE) CHECK(lan_module_session_acquire() && r->active_refs == 1);
     rc = lan_module_abort();

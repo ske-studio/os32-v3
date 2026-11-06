@@ -13,6 +13,8 @@ int res_owner_get(void) { return 1; }
 u32 kstrlen(const char *s) { u32 n=0; while(s[n]) n++; return n; }
 char *kstrlcpy(char *d,const char *s,u32 n) { u32 i=0; if(n) { while(i+1<n && s[i]) { d[i]=s[i]; i++; } d[i]=0; } return d; }
 int vfs_resolve_path(const char *p,char *out,int n) { kstrlcpy(out,p,(u32)n); return 0; }
+int vfs_resource_prepare(VfsOps *o, void *c) { (void)o; (void)c; return 0; }
+void vfs_resource_stale_mount(void *c) { (void)c; }
 VfsOps *vfs_route(const char *p,char *out,int n,void **c) { kstrlcpy(out,p,(u32)n); *c=&ctx; return &ops; }
 int vfs_path_kind(const char *p) { (void)p; return VFS_KIND_FILE; }
 u32 vfs_path_dev(const char *p) { (void)p; return 1; }

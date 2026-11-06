@@ -45,6 +45,7 @@ int lan_module_release(void) { return 1; }
 #define e82557_send hw_send
 #define e82557_recv hw_recv
 #define e82557_rx_free hw_free
+int netcd_register(const char *alias) { (void)alias; return 0; }
 #include LAN_BODY_SOURCE
 #undef e82557_state
 #undef e82557_get_mac

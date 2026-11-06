@@ -87,13 +87,6 @@ void ide_multiple_reset_bank(int bank)
 
 /* ---- 実物 ---- */
 #include "../../drivers/ata/atapi.c"
-/* Stage I/D7 dispatch seam: model the physical Device generation here. */
-int dev_media_check(Device *dev, u32 *generation)
-{
-    if (dev->media_check) return dev->media_check(dev, generation);
-    *generation = dev->bus_type == DEV_BUS_ATAPI ? atapi_media_gen() : 0;
-    return 0;
-}
 void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 #include "../../fs/isofs/iso9660_media.c"
 #include "../../fs/isofs/iso9660.c"
@@ -962,7 +955,7 @@ static int fixture_cd_read(Device *dev, int lba, int count, void *buf)
     return rc;
 }
 static Device g_cd0 = {.name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
-                       .sect_size = SEC, .blk_read = fixture_cd_read, .blk_read_u32 = 0, .media_check = 0};
+                       .sect_size = SEC, .blk_read = fixture_cd_read, .blk_read_u32 = 0, .media_check = cd_media_check};
 
 /* Standalone CD tests have no open FDs; SQLite uses real vfs_fd.c. */
 #ifndef CD_HOST_REAL_FDS

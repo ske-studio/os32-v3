@@ -74,8 +74,8 @@ static char resolve_tmp[VFS_MAX_PATH * 2 + 1];
 
 /* Before discarding a component via . or .., reject an existing non-directory.
  * Otherwise /file/../other becomes /other before the FS can reject file.
- * Keep lexical normalization on any stat failure (e.g. removed media or
- * invalid names that disappear via ..). Route
+ * Preserve resource errors; keep lexical normalization for other stat failures
+ * (e.g. invalid names that disappear via ..). Route
  * directly: vfs_stat would recurse into this resolver and overwrite its tmp. */
 static int vfs_check_dot_prefix(const char **parts, const int *lengths, int count)
 {
@@ -93,7 +93,10 @@ static int vfs_check_dot_prefix(const char **parts, const int *lengths, int coun
     prefix[n] = '\0';
     ops = vfs_route(prefix, rel, sizeof(rel), &ctx);
     if (!ops || !ops->stat) return VFS_OK;
+    rc = vfs_resource_prepare(ops, ctx);
+    if (rc != VFS_OK) return rc;
     rc = ops->stat(ctx, rel, &st);
+    if (rc == OS32_ERR_HOSTDOWN || rc == VFS_ERR_STALE) return rc;
     if (rc != VFS_OK) return VFS_OK;
     if ((st.st_mode & OS_S_IFMT) != OS_S_IFDIR) return VFS_ERR_NOTDIR;
     return VFS_OK;
@@ -232,11 +235,52 @@ typedef struct {
     int dev_type;
     int dev_id;
     u32 generation;
+    int refresh_pending;
+    u32 resource_generation;
+    int resource_valid;
     char dev_name[VFS_MAX_DEVNAME];
 } MountPoint;
 
 static MountPoint mounts[VFS_MAX_FS];
 static u32 mount_generation;
+
+/* Backend/FD notifications retain the outer mount and schedule a later refresh. */
+void vfs_resource_stale_mount(void *ctx)
+{
+    for (int i = 0; i < VFS_MAX_FS; i++)
+        if (mounts[i].in_use && mounts[i].fs_ctx == ctx)
+            mounts[i].refresh_pending = 1;
+}
+
+int vfs_resource_prepare(VfsOps *ops, void *ctx)
+{
+    MountPoint *mnt = 0;
+    u32 generation;
+    int rc;
+    if (!ops->resource_check) return VFS_OK;
+    for (int i = 0; i < VFS_MAX_FS; i++)
+        if (mounts[i].in_use && mounts[i].fs_ctx == ctx && mounts[i].ops == ops) {
+            mnt = &mounts[i];
+            break;
+        }
+    if (!mnt) return VFS_ERR_NOMOUNT;
+    if (mnt->refresh_pending && ops->resource_refresh) {
+        rc = ops->resource_refresh(ctx);
+        if (rc != VFS_OK) return rc;
+        mnt->refresh_pending = 0;
+        mnt->resource_valid = 0;
+    }
+    rc = ops->resource_check(ctx, &generation);
+    if (rc == VFS_ERR_STALE) vfs_fd_stale_mount(ctx);
+    if (rc != VFS_OK) return rc;
+    if (mnt->resource_valid && generation != mnt->resource_generation) {
+        vfs_fd_stale_mount(ctx);
+        return VFS_ERR_STALE;
+    }
+    mnt->resource_generation = generation;
+    mnt->resource_valid = 1;
+    return VFS_OK;
+}
 
 int vfs_unregister_fs(VfsOps *ops)
 {
@@ -425,6 +469,8 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
         return VFS_ERR_NOSPC;
     }
 
+    mounts[slot].refresh_pending = 0;
+    mounts[slot].resource_valid = 0;
     mounts[slot].generation = ++mount_generation;
     mounts[slot].in_use = 1;
     kstrncpy(mounts[slot].prefix, prefix, VFS_MAX_PATH);
@@ -562,6 +608,8 @@ int vfs_ls(const char *path, vfs_dir_cb cb, void *ctx)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->list_dir) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     return ops->list_dir(fs_ctx, rel_path, cb, ctx);
 }
 
@@ -574,6 +622,8 @@ int vfs_read(const char *path, void *buf, u32 max_size)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->read_file) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     return ops->read_file(fs_ctx, rel_path, buf, max_size);
 }
 
@@ -586,6 +636,8 @@ int vfs_write(const char *path, const void *data, u32 size)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->write_file) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     if (vfs_rel_is_root(rel_path)) return VFS_ERR_ISDIR;
     return ops->write_file(fs_ctx, rel_path, data, size);
 }
@@ -621,6 +673,8 @@ int vfs_rm(const char *path)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->unlink) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     if (vfs_rel_is_root(rel_path)) return VFS_ERR_ISDIR;
 
     rc = vfs_target_ino(ops, fs_ctx, rel_path, &has_ino, &ino);
@@ -657,6 +711,12 @@ int vfs_rename(const char *oldpath, const char *newpath)
     new_ops = vfs_route(new_abs, new_rel, VFS_MAX_PATH, &new_ctx);
 
     if (!old_ops || !new_ops) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(old_ops, old_ctx);
+    if (rc != VFS_OK) return rc;
+    if (old_ctx != new_ctx) {
+        rc = vfs_resource_prepare(new_ops, new_ctx);
+        if (rc != VFS_OK) return rc;
+    }
 
     /* 異なるファイルシステム間の移動は許容しない */
     if (old_ops != new_ops || old_ctx != new_ctx) return VFS_ERR_INVAL;
@@ -703,6 +763,8 @@ int vfs_mkdir(const char *path)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->mkdir) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     /* マウント点 (= FS のルート) は必ず在る。POSIX の mkdir("/") と同じ EXIST。
      * 以前は FS へ "/" のまま渡り、ext2 が名前の無いディレクトリを作っていた
      * (票 TASK_EXT2_EMPTY_NAME: pkg 展開の ensure_parent_dirs が呼ぶ
@@ -724,6 +786,8 @@ int vfs_rmdir(const char *path)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops || !ops->rmdir) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     if (vfs_rel_is_root(rel_path)) return VFS_ERR_INVAL;   /* マウント中のルート */
     /* inode を持たない FS (FAT / HostDrv) の pinned FD はパスで動く。FS の
      * rmdir がファイルを消す実装 (FatFs の f_unlink) だと使用中の実体を
@@ -804,6 +868,8 @@ int vfs_stat(const char *path, OS32_Stat *buf)
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
 
     if (!ops) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     dev = vfs_dev_of_resolved(resolved);
     if (!ops->stat) {
         if (vfs_rel_is_root(rel_path)) {
@@ -814,6 +880,7 @@ int vfs_stat(const char *path, OS32_Stat *buf)
         return VFS_ERR_NOMOUNT;
     }
     rc = ops->stat(fs_ctx, rel_path, buf);
+    if (rc == VFS_ERR_STALE || rc == OS32_ERR_HOSTDOWN) return rc;
     if (rc != VFS_OK && vfs_rel_is_root(rel_path)) {
         vfs_synth_root_stat(buf);
         buf->st_dev = dev;
@@ -850,6 +917,8 @@ int vfs_set_mtime(const char *path, os_time_t mtime)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     if (!ops->set_mtime) return VFS_ERR_NOSYS;
     return ops->set_mtime(fs_ctx, rel_path, mtime);
 }
@@ -872,6 +941,8 @@ int vfs_path_kind(const char *path)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
 
     /* マウントルートは常にディレクトリ (FS ドライバに聞かない) */
     if (vfs_rel_is_root(rel_path)) return VFS_KIND_DIR;

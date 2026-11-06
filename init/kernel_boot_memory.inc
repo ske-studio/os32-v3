@@ -48,6 +48,18 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
 
     /* POST_ROOT: the loader needs root, paging and the page ledger. CD is
      * independent of services_boot, so MINIMAL/SQLITE_ONLY can read packages. */
+    char netcd_alias[64];
+    int netcd_boot = sysconfig_get_str(SYS_NETCD_CFG, "NETCD",
+                                      netcd_alias, sizeof(netcd_alias)) > 0;
+    if (netcd_boot) {
+        boot_platform_run(BOOT_PCI_RESOURCES, boot);
+        if (memory_boot_dma_available()) {
+            lan_module_load();
+        }
+        lan_module_pci_bind_fallback();
+        int rc = lan_module_netcd_register(netcd_alias);
+        kprintf(KLOG_ATTR, "[netcd] register rc=%d\n", rc);
+    }
     cd_module_load();
     /* Page owners exist now; failure retains the TVRAM CUI. */
     kcg_module_load();
@@ -58,12 +70,13 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
 
-    boot_platform_run(BOOT_PCI_RESOURCES, boot);
-
-    if (memory_boot_dma_available()) {
-        lan_module_load();
+    if (!netcd_boot) {
+        boot_platform_run(BOOT_PCI_RESOURCES, boot);
+        if (memory_boot_dma_available()) {
+            lan_module_load();
+        }
+        lan_module_pci_bind_fallback();
     }
-    lan_module_pci_bind_fallback();
 
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
      * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */

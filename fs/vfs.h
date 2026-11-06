@@ -408,4 +408,6 @@ void vfs_sys_compat_shell_print(const char *s, u8 attr);
 
 /* Permanent stale mark, preserving ctx (unlike invalidate_mount). */
 void vfs_fd_stale_mount(void *ctx);
+void vfs_resource_stale_mount(void *ctx);
+int vfs_resource_prepare(VfsOps *ops, void *ctx);
 #endif /* VFS_H */

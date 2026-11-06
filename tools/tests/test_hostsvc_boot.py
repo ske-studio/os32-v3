@@ -2,6 +2,9 @@
 """Production boot assembly starts exactly one shared NIC (ILP32/qemu)."""
 CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5, covers=[
     'drivers/net/e82557/lan_body.c',
+    'drivers/block/netcd.h',
+    'drivers/base/dev.h',
+    'fs/serialfs/sfs_block.h',
     'drivers/net/e82557/lan_module.c',
     'drivers/net/e82557/lan_module.h',
     'drivers/net/e82557/e82557.h',

@@ -61,7 +61,20 @@ OP_MUTATIONS = (
 )
 
 
-def build_run(work, source, operation=None):
+WIRING_MUTATIONS = (
+    ('u32-priority', 'drivers/base/dev.c', 'if (dev->blk_read_u32)', 'if (0 && dev->blk_read_u32)'),
+    ('signed-range', 'drivers/base/dev.c', 'if (lba > S32_MAX || (count && (u32)(count - 1) > S32_MAX - lba))', 'if (0)'),
+    ('media-dispatch', 'drivers/base/dev.c', 'if (dev->media_check) return dev->media_check(dev, generation);', 'if (0 && dev->media_check) return dev->media_check(dev, generation);'),
+    ('path-check', 'fs/vfs.c', 'rc = ops->resource_check(ctx, &generation);', 'generation = 0; rc = VFS_OK;'),
+    ('next-refresh', 'fs/vfs.c', 'if (mnt->refresh_pending && ops->resource_refresh)', 'if (0 && mnt->refresh_pending && ops->resource_refresh)'),
+    ('refresh-result', 'fs/vfs.c', 'rc = ops->resource_refresh(ctx);', '(void)ops->resource_refresh(ctx); rc = VFS_OK;'),
+    ('dot-error', 'fs/vfs.c', 'if (rc == OS32_ERR_HOSTDOWN || rc == VFS_ERR_STALE) return rc;', ''),
+    ('root-error', 'fs/vfs.c', 'if (rc == VFS_ERR_STALE || rc == OS32_ERR_HOSTDOWN) return rc;', ''),
+    ('fd-next-path', 'fs/vfs.c', 'mounts[i].refresh_pending = 1;', 'mounts[i].refresh_pending = 0;'),
+)
+
+
+def build_run(work, source, operation=None, wiring=None):
     tree = work / 'fs/isofs'
     tree.mkdir(parents=True, exist_ok=True)
     for name in ('iso9660.c', 'iso9660_dir_read.inc', 'iso9660_dir_record.inc'):
@@ -72,14 +85,24 @@ def build_run(work, source, operation=None):
                 raise RuntimeError(f'{operation[0]}: mutation anchor not unique')
             data = data.replace(before, after)
         (tree / name).write_text(data)
+    for rel in ('fs/vfs.c', 'drivers/base/dev.c'):
+        dest = work / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        data = (ROOT / rel).read_text()
+        if wiring and wiring[1] == rel:
+            _, _, before, after = wiring
+            if data.count(before) != 1:
+                raise RuntimeError(f'{wiring[0]}: mutation anchor not unique')
+            data = data.replace(before, after)
+        dest.write_text(data)
     harness = work / 'hostsvc_media_host.c'
     harness.write_text((ROOT / 'tools/tests/hostsvc_media_host.c').read_text())
     src = work / 'iso9660_media.c'
     src.write_text(source)
     exe = work / 'media-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
-                    *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
-                    str(src), str(ROOT / 'drivers/base/dev.c'), str(harness),
+                    *include_flags(ROOT), '-I' + str(ROOT / 'drivers/base'), '-nostdlib', '-static', '-no-pie',
+                    str(src), str(work / 'drivers/base/dev.c'), str(harness),
                     '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-o', str(exe)], check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
@@ -106,6 +129,11 @@ def main():
                 print(f'RED {name}: runtime rc={rc}', flush=True)
             for mutation in OP_MUTATIONS:
                 rc = build_run(work, original, mutation)
+                if rc <= 0:
+                    raise RuntimeError(f'{mutation[0]}: expected runtime RED, rc={rc}')
+                print(f'RED {mutation[0]}: runtime rc={rc}', flush=True)
+            for mutation in WIRING_MUTATIONS:
+                rc = build_run(work, original, wiring=mutation)
                 if rc <= 0:
                     raise RuntimeError(f'{mutation[0]}: expected runtime RED, rc={rc}')
                 print(f'RED {mutation[0]}: runtime rc={rc}', flush=True)

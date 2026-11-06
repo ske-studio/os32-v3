@@ -83,6 +83,18 @@
       "context": "normal",
       "irq": false,
       "source": "drivers/ata/ide.h"
+    },
+    {
+      "symbol": "dev_media_check",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/base/dev.h"
+    },
+    {
+      "symbol": "vfs_fd_stale_mount",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
     }
   ]
 }

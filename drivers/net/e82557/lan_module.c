@@ -22,6 +22,7 @@ static struct module_handle lan_handle;
 static LanModuleApi candidate;
 static int candidate_valid, quiet_done;
 static int pci_bound;
+static int netcd_registered;
 static void (*tick_target)(void);
 static irq_handler_fn irq_target;
 static unsigned int irq_line;
@@ -204,7 +205,7 @@ static int lan_quiesce(struct module_record *r)
 }
 static int lan_detach(struct module_record *r)
 {
-    if (!quiet_done || r->active_refs) return 0;
+    if (!quiet_done || r->active_refs || netcd_registered) return 0;
     lan_detach_tick();
     int rc = !irq_target || !lan_module_irq_unregister(irq_line, irq_target, 0);
     if (rc && r->registration_refs)
@@ -254,5 +255,18 @@ void lan_module_pci_bind_fallback(void)
         pci_bound = 1;
         pci_bind_all(NULL, 0);
     }
+}
+/* The registered Device holds body callbacks for the rest of boot. */
+int lan_module_netcd_register(const char *alias)
+{
+    struct module_record *r = module_record_get(lan_handle);
+    if (!module_exports(lan_handle) || !candidate.netcd_register)
+        return OS32_ERR_NOSYS;
+    if (!module_ref_acquire(lan_handle, r->owner, MODULE_REF_REGISTRATION, 0))
+        return OS32_ERR_BUSY;
+    int rc = candidate.netcd_register(alias);
+    if (rc) module_ref_release(lan_handle, MODULE_REF_REGISTRATION);
+    else netcd_registered = 1;
+    return rc;
 }
 int lan_module_abort(void) { return module_abort(lan_handle); }

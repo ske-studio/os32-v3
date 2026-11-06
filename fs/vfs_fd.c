@@ -199,6 +199,8 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops) return VFS_ERR_NOMOUNT;
+    rc = vfs_resource_prepare(ops, fs_ctx);
+    if (rc != VFS_OK) return rc;
     if (ops->resource_check) {
         rc = ops->resource_check(fs_ctx, &resource_generation);
         if (rc != VFS_OK) return rc;
@@ -684,6 +686,7 @@ void vfs_fd_invalidate_ino(void *fs_ctx, u32 ino)
 
 void vfs_fd_stale_mount(void *ctx)
 {
+    vfs_resource_stale_mount(ctx);
     int fd;
     if (!ctx) return;
     for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {

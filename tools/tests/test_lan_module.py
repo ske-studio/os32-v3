@@ -4,7 +4,7 @@ LB's real driver/PCI and SerialFS transport regressions remain separate checks.
 This suite establishes the owner lifetime across those callbacks, not NIC I/O.
 """
 CHECK = dict(name='lan-module-host', tier=1,
-    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/lan_module.c', 'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/lan_body.c', 'init/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'build/lan-module.ld', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_bind.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'kernel/module/module.h', 'include/sys.h', 'include/kprintf.h', 'kernel/module/kdebug_imports.def', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/lan_contract.h', 'include/dma_contract.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/lan_module.c', 'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/lan_body.c', 'drivers/block/netcd.h', 'init/kernel_boot_memory.inc', 'init/sysconfig.h', 'init/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'build/lan-module.ld', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_bind.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'kernel/module/module.h', 'include/sys.h', 'include/kprintf.h', 'kernel/module/kdebug_imports.def', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/lan_contract.h', 'include/dma_contract.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=4.424432)
 
 from kernel_boot_source import kernel_source
@@ -27,7 +27,7 @@ CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
          'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info',
          'required-function-outside-text', 'required-function-null', 'optional-slots-valid',
-         'adapter-outside-rodata', 'netcd-outside-text']
+         'adapter-outside-rodata', 'netcd-outside-text', 'netcd-registration-retains-body']
 
 
 def product_image(folder):
@@ -95,7 +95,11 @@ def boot_distribution():
     begin = kernel.index('services_stage = SERVICES_ROOT_READY;')
     end = kernel.index('services_boot();', begin)
     boot = kernel[begin:end]
-    assert kernel.count('lan_module_load();') == 1
+    assert kernel.count('lan_module_load();') == 2
+    early = kernel[kernel.index('if (netcd_boot) {'):kernel.index('cd_module_load();')]
+    assert early.index('BOOT_PCI_RESOURCES') < early.index('lan_module_load();')
+    assert early.index('lan_module_load();') < early.index('lan_module_netcd_register(netcd_alias)')
+    assert 'if (!netcd_boot)' in boot
     assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', boot)
     assert boot.index('lan_module_pci_bind_fallback();') > boot.index('lan_module_load();')
     assert 'services_boot_mode' not in boot and 'SYS_LAN_MOD' in (ROOT / 'include/config.h').read_text()
@@ -142,8 +146,12 @@ def runtime_checks(folder, mutations=False):
             ('pci-fallback', '        pci_bind_all(NULL, 0);', '        /* omit fallback */'),
             ('pci-rebind', '    if (!pci_bound) {', '    if (1) {'),
             ('tick-detach',
-             'if (!quiet_done || r->active_refs) return 0;\n    lan_detach_tick();',
-             'if (!quiet_done || r->active_refs) return 0;\n    /* omit tick detach */'),
+             'if (!quiet_done || r->active_refs || netcd_registered) return 0;\n    lan_detach_tick();',
+             'if (!quiet_done || r->active_refs || netcd_registered) return 0;\n    /* omit tick detach */'),
+            ('netcd-retention', 'if (!quiet_done || r->active_refs || netcd_registered) return 0;',
+             'if (!quiet_done || r->active_refs) return 0;'),
+            ('netcd-failure-ref', 'if (rc) module_ref_release(lan_handle, MODULE_REF_REGISTRATION);',
+             'if (rc) { /* omit failed registration release */ }'),
             ('irq-detach',
              'int rc = !irq_target || !lan_module_irq_unregister(irq_line, irq_target, 0);',
              'int rc = 1; /* omit IRQ detach */'),
@@ -152,7 +160,7 @@ def runtime_checks(folder, mutations=False):
             mutant = folder / (label + '.c')
             mutant.write_text(source.replace(old, new))
             build(mutant)
-            run([7, 8] if label == 'pci-fallback' else [0, 5], expected=1)
+            run([14] if label.startswith('netcd-') else [7, 8] if label == 'pci-fallback' else [0, 5], expected=1)
             print('MUTATE ' + label + ' RED (compiled, runtime assertions)', flush=True)
 
 

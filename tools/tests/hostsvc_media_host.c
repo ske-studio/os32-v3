@@ -1,12 +1,12 @@
 /* D4/D5 MEDIA: real ISO/VFS/Device, fake physical and network media.
- * dev_media_check is the #9 dispatch seam pending stage I. ISO operations use the real D5 hooks; VFS refresh is explicit until I. */
+ * Real Device dispatch and VFS refresh are connected by stage I. */
 #include "fs/isofs/iso9660.h"
 #include "fs/isofs/iso9660_media.h"
 #include "drivers/base/dev.h"
 #include "lib/kstring.h"
 #include "kmalloc.h"
 #include "endian_le.h"
-#define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
+#define REQUIRE(x) do { if (!(x)) return (__LINE__ % 250) + 1; } while (0)
 volatile u32 tick_count;
 static u8 heap[200000];
 static u32 used;
@@ -23,10 +23,8 @@ void kfree(void *p) { (void)p; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 static void *staled;
 static unsigned stale_calls;
-void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; }
+void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; vfs_resource_stale_mount(ctx); }
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
-/* I owns the real dispatch; only this unavailable symbol is supplied here. */
-int dev_media_check(Device *d, u32 *g) { if(d->media_check) return d->media_check(d,g); *g=0; return 0; }
 #include "fs/isofs/iso9660.c"
 #include "fs/vfs.c"
 #include "platform/pc98/boot_names.c"
@@ -163,6 +161,66 @@ static int operations(Iso9660Ctx *ctx)
     return 0;
 }
 
+static u32 dispatched_lba;
+static int u32_reads;
+static int read_u32(Device *dev, u32 lba, int count, void *buf)
+{
+    dispatched_lba = lba;
+    u32_reads++;
+    if (lba > S32_MAX) return 0;
+    return read_media(dev, (int)lba, count, buf);
+}
+
+static int wiring(Iso9660Ctx *ctx, Device *cd)
+{
+    u8 out[4];
+    OS32_Stat st;
+    Device wide = {.blk_read = read_media, .blk_read_u32 = read_u32};
+    int n = u32_reads;
+    REQUIRE(!dev_blk_read_lba(&wide, 0x80000000u, 1, out));
+    REQUIRE(u32_reads == n + 1 && dispatched_lba == 0x80000000u);
+    wide.blk_read_u32 = 0;
+    REQUIRE(dev_blk_read_lba(&wide, 0x80000000u, 1, out) == OS32_ERR_INVAL);
+    REQUIRE(dev_blk_read_lba(&wide, S32_MAX, 2, out) == OS32_ERR_INVAL);
+    REQUIRE(dev_media_check(0, &dispatched_lba) == OS32_ERR_INVAL);
+    REQUIRE(dev_media_check(cd, 0) == OS32_ERR_INVAL);
+    cd->blk_read_u32 = read_u32;
+    REQUIRE(vfs_read("/cd0/A.TXT", out, 4) == 4);
+    image ^= 1; gen++;
+    REQUIRE(vfs_read("/cd0/A.TXT", out, 4) == OS32_ERR_STALE);
+    REQUIRE(!ctx->block_size && mounts[0].fs_ctx == ctx);
+    REQUIRE(vfs_read("/cd0/A.TXT", out, 4) == 4 && out[0] == (image ? 'B' : 'A'));
+    image ^= 1; gen++;
+    REQUIRE(vfs_stat("/cd0", &st) == OS32_ERR_STALE);
+    failure = OS32_ERR_HOSTDOWN;
+    REQUIRE(vfs_stat("/cd0", &st) == OS32_ERR_HOSTDOWN);
+    REQUIRE(!ctx->block_size);
+    failure = 0;
+    REQUIRE(!vfs_stat("/cd0", &st) && ctx->block_size == ISO_SECTOR_SIZE);
+    fail_check = checks + 2;
+    REQUIRE(vfs_stat("/cd0", &st) == OS32_ERR_HOSTDOWN);
+    fail_check = 0;
+    fail_check = checks + 2;
+    REQUIRE(vfs_read("/cd0/./A.TXT", out, 4) == OS32_ERR_HOSTDOWN);
+    fail_check = 0;
+    image ^= 1; gen++;
+    REQUIRE(vfs_path_kind("/cd0") == OS32_ERR_STALE);
+    REQUIRE(vfs_path_kind("/cd0") == VFS_KIND_DIR);
+    /* A check from an existing FD/backend schedules the very next path. */
+    image ^= 1; gen++;
+    REQUIRE(iso9660_resource_check(ctx, 0) == OS32_ERR_STALE);
+    REQUIRE(vfs_read("/cd0/A.TXT", out, 4) == 4 && out[0] == (image ? 'B' : 'A'));
+    Device physical = {.type = DEV_BLOCK};
+    REQUIRE(!dev_register_cd(&physical, -1));
+    REQUIRE(!kstrcmp(physical.name, "cd1"));
+    Device duplicate = {.name = "unchanged"};
+    REQUIRE(dev_register_cd(&duplicate, 0) == OS32_ERR_EXIST);
+    REQUIRE(!kstrcmp(duplicate.name, "unchanged"));
+    REQUIRE(!dev_unregister(&physical));
+    cd->blk_read_u32 = 0;
+    return 0;
+}
+
 static int suite(void)
 {
     static Device cd={.name="cd0",.type=DEV_BLOCK,.bus_type=DEV_BUS_ATAPI,
@@ -203,8 +261,7 @@ static int suite(void)
     fail_check=0; swap_read=1;
     REQUIRE(iso9660_resource_refresh(ctx)==OS32_ERR_STALE && !ctx->block_size);
     REQUIRE(!iso9660_resource_refresh(ctx) && ctx->root_lba==20);
-    /* 512-byte netcd adapter: existing Device wrapper dispatches legacy read;
-     * u32 callback priority/high-LBA dispatch is stage I's acceptance. */
+    /* 512-byte media uses the common Device wrapper. */
     cd.bus_type=DEV_BUS_LOOP; cd.sect_size=512; cd.total_sects=SECTORS*4;
     REQUIRE(!iso9660_resource_refresh(ctx) && ctx->volume_size==SECTORS);
     REQUIRE(vfs_read("/cd0/A.TXT",out,4)==4 && out[0]=='A');
@@ -242,6 +299,7 @@ static int suite(void)
     REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_STALE);
     REQUIRE(!iso9660_resource_refresh(ctx));
     int rc=operations(ctx); if(rc) return rc;
+    rc=wiring(ctx,&cd); if(rc) return rc;
     REQUIRE(!dev_unregister(&cd)); REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_refresh(ctx)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_check(0,0)==VFS_ERR_NOMOUNT);

@@ -12,6 +12,7 @@
 /* ======================================================================== */
 
 #include "dev.h"
+#include "os32_kapi_shared.h"
 #include "../block/disk.h"
 #include "../ata/ide.h"
 #include "../block/fdc.h"   /* fdc_read_sector, fdc_write_sector */
@@ -189,9 +190,14 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
     if (!dev) return -1;
     if (!dev_span_ok(lba, count)) return -1;
 
-    /* LBA ネイティブデバイス (ATAPI CD) */
-    if (dev->blk_read)
+    if (dev->blk_read_u32)
+        return dev->blk_read_u32(dev, lba, count, buf);
+    /* Legacy callbacks must receive an entirely signed-int range. */
+    if (dev->blk_read) {
+        if (lba > S32_MAX || (count && (u32)(count - 1) > S32_MAX - lba))
+            return OS32_ERR_INVAL;
         return dev->blk_read(dev, (int)lba, count, buf);
+    }
 
     /* CHS デバイス: LBA → CHS 変換 */
     if (!dev->blk_read_chs || dev->spt == 0 || dev->heads == 0)
@@ -341,5 +347,36 @@ int dev_api_get_info(int idx, char *name, int name_max, int *type, u32 *total_se
     }
     if (type) *type = d->type;
     if (total_sects) *total_sects = d->total_sects;
+    return 0;
+}
+
+int dev_media_check(Device *dev, u32 *generation)
+{
+    if (!dev || !generation) return OS32_ERR_INVAL;
+    if (dev->media_check) return dev->media_check(dev, generation);
+    *generation = 0;
+    return 0;
+}
+
+/* Stable discovery names survive until unregister; callers retain Device. */
+int dev_register_cd(Device *dev, int preferred)
+{
+    static const char *const names[] = {
+        "cd0", "cd1", "cd2", "cd3", "cd4", "cd5", "cd6", "cd7",
+        "cd8", "cd9", "cd10", "cd11", "cd12", "cd13", "cd14", "cd15"
+    };
+    int index;
+    if (!dev || (preferred != -1 && preferred != 0)) return OS32_ERR_INVAL;
+    if (preferred == 0 && dev_find(names[0])) return OS32_ERR_EXIST;
+    if (dev_num >= MAX_DEVICES) return OS32_ERR_FULL;
+    for (index = 0; index < MAX_DEVICES; index++)
+        if (!dev_find(names[index])) break;
+    if (index == MAX_DEVICES) return OS32_ERR_FULL;
+    const char *old = dev->name;
+    dev->name = names[index];
+    if (dev_register(dev)) {
+        dev->name = old;
+        return OS32_ERR_EXIST;
+    }
     return 0;
 }

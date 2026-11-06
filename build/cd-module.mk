@@ -5,13 +5,15 @@ CD_DEF_SOURCES := drivers/ata/ide.h drivers/ata/cd_module.h drivers/base/dev.h f
 $(CD_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/cd_imports.def $(CD_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module cd --out-dir $(CD_OUT)
 
-CD_OBJS := $(addprefix $(CD_OUT)/,cd_body.o atapi.o iso9660.o cd_import_slots.o cd_import_stubs.o)
+CD_OBJS := $(addprefix $(CD_OUT)/,cd_body.o atapi.o iso9660.o iso9660_media.o cd_import_slots.o cd_import_stubs.o)
 CD_INC := $(INC_KERNEL) -I. -I$(CD_OUT)
 $(CD_OUT)/cd_body.o: drivers/ata/cd_body.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
 $(CD_OUT)/atapi.o: drivers/ata/atapi.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os $(CD_INC) -c $< -o $@
 $(CD_OUT)/iso9660.o: fs/isofs/iso9660.c $(CD_GEN) build/config.mk build/cd-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
+$(CD_OUT)/iso9660_media.o: fs/isofs/iso9660_media.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
 $(CD_OUT)/cd_import_slots.o $(CD_OUT)/cd_provider_types.o $(CD_OUT)/cd_kexports.o: $(CD_OUT)/%.o: $(CD_OUT)/%.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(CD_INC) -c $< -o $@

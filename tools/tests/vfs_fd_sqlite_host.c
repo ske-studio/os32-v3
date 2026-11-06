@@ -117,6 +117,8 @@ int vfs_resolve_path(const char *in, char *out, int size)
     out[o] = '\0';
     return VFS_OK;
 }
+int vfs_resource_prepare(VfsOps *ops, void *ctx) { (void)ops; (void)ctx; return VFS_OK; }
+void vfs_resource_stale_mount(void *ctx) { (void)ctx; }
 #ifndef VFS_FD_CUSTOM_ROUTE
 VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 { probes++; str_cpy(out, path, size); *ctx = &mock_ops; return &mock_ops; }
