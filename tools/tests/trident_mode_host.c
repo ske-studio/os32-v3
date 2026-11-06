@@ -100,8 +100,8 @@ static int check_case(const struct mode_case *c)
     TRY(setup(c));
     TRY(trident_mode_640(&d));
     if (!equal(d.reference, (c->reference & 0x80) | 1) || !equal(f.trace_count, c->count) ||
-        f.trace_overflow || !equal(d.last_rc, (u32)-77) || d.active ||
-        d.init_done || d.first_init_done || f.pc98_initialized || f.port_writes ||
+        f.trace_overflow || !equal(d.last_rc, (u32)-77) || !d.active ||
+        d.init_done || d.preinit_done || f.pc98_initialized || f.port_writes ||
         !d.saved.valid || !equal(d.cur_vga_base, TRI_CR_COLOR)) return 1;
     for (u32 i = 0; i < c->count; ++i) {
         const struct trident_fake_event *a = &trace[i], *b = &c->events[i];

@@ -367,7 +367,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_DEVICE_APERTURE_BASE 0xFE000000UL           /* 4GB - 32MB */
 #define MEM_DEVICE_APERTURE_END  MEM_PHYS_MMIO_TOP      /* exclusive */
 #define MEM_DEVICE_APERTURE_PDE_SIZE 0x00400000UL       /* PT 1 枚 = 4MB */
-/* Trident Ra266: identity device VA, supervisor/PCD; reserve physical decode
+/* Trident Ra266: fixed device VA, supervisor/PCD; reserve physical BAR decode
  * first. These are not RAM or private lease VAs (S3 §3). */
 #define MEM_TRIDENT_LFB_VA     0x20000000UL
 #define MEM_TRIDENT_REGS_VA    0x20400000UL

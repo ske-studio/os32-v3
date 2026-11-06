@@ -214,6 +214,8 @@ static int vga_write(struct trident_device *d, u16 port, u8 index, u8 v)
 int trident_protect(struct trident_device *d, u16 vga_base, bool on)
 {
     u8 seq, discard;
+    if (!d) return TRI_E_INVAL;
+    if (!d->active) return 0; /* V/vgaHW.c:580 vtSema */
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 1, &seq));
     if (on) {
         TRY(vga_write(d, TRI_SR_INDEX, 0, 1));

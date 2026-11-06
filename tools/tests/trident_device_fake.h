@@ -1,4 +1,4 @@
-/* libc-free host seam, TRIDENT_S3_DESIGN §7. No host-only product hooks. */
+/* libc-free host seam, TRIDENT_S3_DESIGN §5. No host-only product hooks. */
 #ifndef TRIDENT_DEVICE_FAKE_H
 #define TRIDENT_DEVICE_FAKE_H
 #include "drivers/video/trident/trident.h"

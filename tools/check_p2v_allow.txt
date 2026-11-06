@@ -72,3 +72,4 @@ exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 exte
 exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化
 exec/exec_heap.c:exec_heap_user_trim:全 arena の PTE/owner とブロック鎖の検証後に USER 仮想末尾を走査
 kdebug/kpeek.c:kpeek_load:計算した番地 (恒等の RAM、張ったばかりのデバイス窓の VA) を幅どおりに読む (TASK_KPEEK §2-4)
+drivers/video/trident/resources.c:trident_boot_reserve:memmap の固定 VA を paging_map_phys で BAR 実番地へ写像済み。物理番地からの変換ではない

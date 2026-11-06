@@ -49,7 +49,7 @@ def build(work, changed=None):
     from mutpar import build_in_tree
     exe=work/'module'
     sources=[DIR+n+'.c' for n in ('backend_trident','probe','regs','default_dac',
-        'state_save','state_restore','pc98_init','vram','mode_640','route_ra266','present','palette','lifecycle')]
+        'state_save','state_restore','pc98_init','vram','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
     cmd=['gcc',*FLAGS,'-I.','-I'+DIR,'-Ibuild/out/trident',
          *include_flags(ROOT),'-nostdlib','-static','-no-pie',
          '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','-o',str(exe)]
