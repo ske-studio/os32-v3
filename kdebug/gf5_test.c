@@ -307,7 +307,9 @@ i32 gf5_test(u32 session)
         diagnostic.planned = false;
         return finish(stage, 0, true);
     }
-    if ((session & ~GF5_WIRE_BYTE_MASK) || stage > GF5T_LAST_RC)
+    bool gpio = stage == GF5T_GPIO_GET || stage == GF5T_GPIO_SET;
+    u32 format = gpio ? GF5_WIRE_GPIO_TAG : 0;
+    if ((session & ~GF5_WIRE_BYTE_MASK) != format || stage > GF5T_LAST_RC)
         return finish(stage, GF5_EINVAL, true);
     const struct gf5_test_ops *o = geforce_feature5_ops();
     if (!o || !o->ctx) return finish(stage, GF5_ENOTSUP, true);
@@ -422,18 +424,37 @@ i32 gf5_test(u32 session)
     case GF5T_GPIO_GET:
     case GF5T_GPIO_SET: {
         bool value;
-        if (a[0] > U8_MAX || a[1] > U8_MAX || a[2] > U8_MAX ||
-            (stage == GF5T_GPIO_SET && a[3] > 1U)) {
+        if (a[0] > U8_MAX || (stage == GF5T_GPIO_SET && a[1] > 1U)) {
             rc = GF5_EINVAL; local = true; break;
         }
-        u8 log[2] = {a[1], a[2]};
-        if (stage == GF5T_GPIO_SET) { CALL(gpio_set, (u8)a[0], log, a[3] != 0); }
-        else {
-            CALL(gpio_get, (u8)a[0], log, &value);
-            if (!rc && !serial_gate_active()) {
-                serial_puts_polled("GF5 DATA stage=gpio_get"); number(" value=", value);
-                serial_puts_polled("\r\n");
-            }
+        u8 line, log[2];
+        o = geforce_feature5_ops();
+        if (!o || !o->ctx || !o->gpio_find) {
+            rc = GF5_ENOTSUP; local = true; break;
+        }
+        struct gf5 *owner = o->ctx;
+        /* nouveau gpio/base.c:80-109: resolve DCB on every get/set. */
+        rc = o->gpio_find(owner, (u8)a[0], &line, log);
+        if (rc) break;
+        /* Reacquire after the callback; resolved wiring belongs to owner. */
+        o = geforce_feature5_ops();
+        if (!o || o->ctx != owner) {
+            rc = GF5_ESTATE; local = true; break;
+        }
+        if (stage == GF5T_GPIO_SET) {
+            if (!o->gpio_set) { rc = GF5_ENOTSUP; local = true; }
+            else rc = o->gpio_set(owner, line, log, a[1] != 0);
+        } else {
+            if (!o->gpio_get) { rc = GF5_ENOTSUP; local = true; }
+            else rc = o->gpio_get(owner, line, log, &value);
+        }
+        if (!serial_gate_active()) {
+            serial_puts_polled(stage == GF5T_GPIO_SET ?
+                "GF5 DATA stage=gpio_set" : "GF5 DATA stage=gpio_get");
+            number(" tag=", a[0]); number(" line=", line);
+            number(" log0=", log[0]); number(" log1=", log[1]);
+            if (!rc) number(" value=", stage == GF5T_GPIO_SET ? a[1] : value);
+            serial_puts_polled("\r\n");
         }
         break;
     }
