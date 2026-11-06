@@ -215,18 +215,11 @@ int fep_user_open(FepStore *s)
         sqlite3_snprintf(sizeof(pragma), pragma, "PRAGMA cache_size=%u", FEP_USER_CACHE_PAGES);
         result = user_exec(db, pragma);
     }
-    /* VFS may downgrade an existing RW open to RO. Detect it without changing
-     * any learning rows, and only after metadata compatibility was established. */
-    if (!result && !create) {
-        result = user_exec(db, "BEGIN IMMEDIATE");
-        if (!result) {
-            result = user_exec(db, "COMMIT");
-            if (result) {
-                int rollback = user_exec(db, "ROLLBACK");
-                if (rollback) result = rollback;
-            }
-        }
-    }
+    /* An empty BEGIN/COMMIT can succeed after VFS downgrades RW to RO.
+     * A write statement checks writability even with no matching rows. Run
+     * only after compatibility validation; preserve all learning data. */
+    if (!result && !create)
+        result = user_exec(db, "UPDATE dict_user SET freq=freq WHERE 0");
     if (!result) { c->io_retried = 0; s->user_enabled = 1; return 0; }
     rc = fep_conn_close(c);
     if (create)

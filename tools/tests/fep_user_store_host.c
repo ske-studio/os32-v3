@@ -239,7 +239,7 @@ static int faults(void)
     static FepTestReply baseline[SCRIPT_CAP];
     setup(); opening(0); page(1024); metadata(-1,0,0,0); schema(0);
     exec_sql("PRAGMA cache_size=8", SQLITE_OK);
-    exec_sql("BEGIN IMMEDIATE", SQLITE_OK); exec_sql("COMMIT", SQLITE_OK);
+    exec_sql("UPDATE dict_user SET freq=freq WHERE 0", SQLITE_OK);
     u32 count = used;
     for (u32 i = 0; i < count; i++) baseline[i] = script[i];
     int active = 0;
@@ -258,8 +258,6 @@ static int faults(void)
         if (op != FEP_TEST_PREPARE && op != FEP_TEST_FINALIZE && active)
             add(FEP_TEST_FINALIZE, SQLITE_IOERR, 0, 0);
         if (op == FEP_TEST_FINALIZE) active = 0;
-        if (op == FEP_TEST_PREPARE && !kstrcmp(baseline[i].data, "COMMIT"))
-            exec_sql("ROLLBACK", SQLITE_OK);
         closing(0,0,0); CHECK(!run(OS32_ERR_IO));
     }
     return 0;
@@ -310,14 +308,14 @@ static int test(void)
     exec_sql("PRAGMA cache_size=8", SQLITE_NOMEM); closing(0,0,0); CHECK(!run(OS32_ERR_IO));
     setup(); opening(0); page(1024); metadata(-1,0,0,0); schema(0);
     exec_sql("PRAGMA cache_size=8", SQLITE_OK);
-    exec_sql("BEGIN IMMEDIATE", SQLITE_OK); exec_sql("COMMIT", SQLITE_OK); CHECK(!run(0));
-    CHECK(flags_seen == SQLITE_OPEN_READWRITE && writes == 3 && f.resident_live == 2);
+    exec_sql("UPDATE dict_user SET freq=freq WHERE 0", SQLITE_OK); CHECK(!run(0));
+    CHECK(flags_seen == SQLITE_OPEN_READWRITE && writes == 2 && f.resident_live == 2);
     setup(); opening(0); page(1024); metadata(-1,0,0,0); schema(0);
     exec_sql("PRAGMA cache_size=8", SQLITE_OK);
-    exec_sql("BEGIN IMMEDIATE", SQLITE_READONLY); closing(0,0,0); CHECK(!run(OS32_ERR_ROFS));
+    exec_sql("UPDATE dict_user SET freq=freq WHERE 0", SQLITE_READONLY); closing(0,0,0); CHECK(!run(OS32_ERR_ROFS));
     setup(); opening(0); page(1024); metadata(-1,0,0,0); schema(0);
-    exec_sql("PRAGMA cache_size=8", SQLITE_OK); exec_sql("BEGIN IMMEDIATE", SQLITE_OK);
-    exec_sql("COMMIT", SQLITE_IOERR); exec_sql("ROLLBACK", SQLITE_OK);
+    exec_sql("PRAGMA cache_size=8", SQLITE_OK);
+    exec_sql("UPDATE dict_user SET freq=freq WHERE 0", SQLITE_IOERR);
     closing(0,0,0); CHECK(!run(OS32_ERR_IO));
     for (int stage = 1; stage <= 4; stage++) {
         setup(); opening(1); creation(stage); closing(0,0,0);
