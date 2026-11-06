@@ -46,7 +46,7 @@ def literals(source):
         yield line, ''.join(parts)
 
 
-def collect(mutant=False):
+def collect(mutant=None):
     paths = sorted(set(ROOT.glob('userland/**/*.[ch]')) |
                    set(ROOT.glob('kernel/ime/ime_*.c')) |
                    {ROOT / 'kernel/sqlite_engine.c', ROOT / 'kapi/kapi_db.c'})
@@ -65,15 +65,26 @@ def collect(mutant=False):
                             lambda m: '\n' * m[0].count('\n'), source, flags=re.M | re.S)
             for name, value in reversed(list(definitions.items())):
                 source = re.sub(r'\b' + name + r'\b', lambda m: value, source)
-        if mutant and path == ROOT / 'userland/system/hsync.c':
+        if mutant == 'hsync' and path == ROOT / 'userland/system/hsync.c':
             assert source.count(ANCHOR) == 1
             source = source.replace(ANCHOR, 'length(CAST(tval AS BLOB))')
+        if mutant == 'fep-meta' and path == ROOT / 'userland/tests/fep_meta_test.c':
+            anchor = 'SELECT ival FROM settings'
+            assert source.count(anchor) == 1
+            source = source.replace(anchor, 'SELECT CAST(ival AS TEXT) FROM settings')
+        if mutant == 'fep-meta-value' and path == ROOT / 'userland/tests/fep_meta_test.c':
+            anchor = "SELECT value FROM meta WHERE key='%s'"
+            assert source.count(anchor) == 1
+            source = source.replace(anchor, "SELECT CAST(value AS TEXT) FROM meta WHERE key='%s'")
         for line, sql in literals(source):
             if START.match(sql):
                 if 'tests' in path.relative_to(ROOT).parts and sql.startswith('SELECT '):
                     # Diagnostic labels such as SELECT (3 rows) are not SQL.
                     if ' FROM ' not in sql and not re.match(r'^SELECT [1-9?]', sql):
                         continue
+                if path.name == 'fep_meta_test.c' and '%s' in sql:
+                    assert sql.endswith(" FROM meta WHERE key='%s'") and sql.count('%s') == 1, sql
+                    sql = sql.replace('%s', 'license')
                 # The only printf SQL templates in these product sources.
                 if sql.startswith('PRAGMA ') and '%' in sql:
                     assert re.fullmatch(r'PRAGMA (?:page_size|cache_size)=%u', sql), (path, line, sql)
@@ -86,7 +97,7 @@ def collect(mutant=False):
                 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_user_store.c',
                 'kapi/kapi_db.c', 'userland/tests/db_v50_test.c',
                 'userland/tests/db_test.c', 'userland/tests/dbq.c',
-                'userland/tests/raw_wait_test.c'}
+                'userland/tests/raw_wait_test.c', 'userland/tests/fep_meta_test.c'}
     assert required <= {p for p, _, _ in rows}
     return rows
 
@@ -174,9 +185,11 @@ def check_sql(engine, rows):
                 ddl = list(tables.values())
                 if path.endswith('/dbq.c'):
                     ddl = ['CREATE TABLE enemies(id,name,stage,kind,max_hp,atk,def,spd,mag,elements,exp,gold,class_id)']
+            if path.endswith('/fep_meta_test.c'):
+                ddl = [s for s in cfg_ddl if 'CREATE TABLE settings' in s] + ime_ddl
             for schema in ddl:
                 engine.prepare(db, schema, execute=True)
-            if '/ime_' in path or path == 'kernel/sqlite_engine.c':
+            if '/ime_' in path or path in ('kernel/sqlite_engine.c', 'userland/tests/fep_meta_test.c'):
                 engine.prepare(db, 'CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INTEGER,cost INTEGER)', execute=True)
             if not sql.startswith('CREATE '):
                 try:
@@ -256,13 +269,17 @@ def main():
         check_sql(engine, rows)
         check_settings(engine, work, args.settings_copy)
         if args.mutate:
-            try:
-                check_sql(engine, collect(True))
-            except AssertionError as err:
-                assert 'userland/system/hsync.c:' in str(err) and 'syntax error' in str(err), err
-                print('RED runtime hsync CAST: ' + str(err), flush=True)
-            else:
-                raise AssertionError('CAST mutant survived')
+            for mutant, path in [('hsync', 'userland/system/hsync.c'),
+                                 ('fep-meta', 'userland/tests/fep_meta_test.c'),
+                                 ('fep-meta-value', 'userland/tests/fep_meta_test.c')]:
+                try:
+                    check_sql(engine, collect(mutant))
+                except AssertionError as err:
+                    assert path + ':' in str(err) and 'syntax error' in str(err), err
+                    print('RED runtime ' + mutant + ' CAST: ' + str(err), flush=True)
+                else:
+                    raise AssertionError(mutant + ' CAST mutant survived')
+
 
 
 if __name__ == '__main__':

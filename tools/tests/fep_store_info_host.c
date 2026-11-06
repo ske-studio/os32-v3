@@ -138,6 +138,29 @@ static int test(void)
         } while (offset <= 768);
         check(offset == 768); joined[offset] = 0; check(!kstrcmp(joined, original));
     }
+    /* Final chunks around the 255-byte boundary; preserve COPYING's UTF-8
+     * division signs exactly, without copying the poisoned bytes after EOF. */
+    int sizes[] = {254, 255, 256, 509, 510, 511};
+    for (u32 i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+        int size = sizes[i];
+        for (int j = 0; j < size; j++) original[j] = 'a';
+        kmemcpy(original + size - 5, "÷÷\n", 5);
+        int offset = 0;
+        do {
+            script(6, SQLITE_OK);
+            for (u32 j = 0; j < sizeof(row); j++) row[j] = '!';
+            kmemcpy(row, original, size); length = size;
+            int n = call(12, offset, 256, 0);
+            int expected = size - offset > 255 ? 255 : size - offset;
+            check(n == expected);
+            if (n != expected) return 1;
+            for (int j = 0; j < n; j++) check(output[j + 1] == original[offset + j]);
+            check(output[n + 1] == 0 && output[n + 2] == '#');
+            offset += n;
+            if (!n) break;
+        } while (offset <= size);
+        check(offset == size);
+    }
     script(6, SQLITE_OK); length = 8;
     check(call(11, 0x7fffffff, 256, 0) == 0 && output[1] == 0);
     script(6, SQLITE_OK); length = 0; check(call(12, 0, 256, 0) == 0);

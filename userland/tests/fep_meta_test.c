@@ -100,20 +100,19 @@ static int metadata(void)
     int db = api->db_open_existing(SYSTEM_S, 0);
     if (db < 0) ok = 0;
     for (int key = 1; db >= 0 && key <= IME_DICT_INFO_KEY_MAX; key++) {
-        int offset = 0, size, same = length[key] > 0;
-        char expected[IME_DICT_INFO_CAP], sql[256];
-        do {
-            if (key == IME_DICT_INFO_STATUS)
-                snprintf(sql, sizeof(sql), "SELECT substr('meta',%d,255)", offset + 1);
-            else
-                snprintf(sql, sizeof(sql), "SELECT CAST(substr(CAST(value AS BLOB),%d,255) AS TEXT) FROM meta WHERE key='%s'", offset + 1, keys[key]);
-            if (!scalar(db, sql, expected, sizeof(expected))) { same = 0; break; }
-            size = (int)strlen(expected);
-            if (offset + size > length[key] ||
-                memcmp(text + start[key] + offset, expected, size)) { same = 0; break; }
-            offset += size;
-        } while (size);
-        same = same && offset == length[key];
+        int same = length[key] > 0;
+        static char expected[sizeof(text)];
+        char sql[256];
+        if (key == IME_DICT_INFO_STATUS)
+            strcpy(expected, "meta");
+        else {
+            snprintf(sql, sizeof(sql), "SELECT value FROM meta WHERE key='%s'", keys[key]);
+            if (!scalar(db, sql, expected, sizeof(expected))) same = 0;
+        }
+        /* Compare bytes in C: product SQLite omits CAST, and substr(TEXT)
+         * counts characters rather than the KAPI's byte offsets. */
+        same = same && (int)strlen(expected) == length[key] &&
+               !memcmp(text + start[key], expected, length[key]);
         check(keys[key], same);
         if (!same) ok = 0;
     }
@@ -167,7 +166,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
     if (!check("initial dictionary", n == 1 && original[0] && strchr("SML", original[0]))) goto done;
     if (!check("boot dictionary fixture", info_is(IME_DICT_INFO_MEM_RESERVE_KB, "192"))) goto done;
     if (!check("settings fixture (reboot required)",
-        read_value(SETTINGS, "SELECT CAST(ival AS TEXT) FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0", setting, sizeof(setting)) && atoi(setting) == TEST_RESERVE &&
+        read_value(SETTINGS, "SELECT ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0", setting, sizeof(setting)) && atoi(setting) == TEST_RESERVE &&
         read_value(SETTINGS, "SELECT tval FROM settings WHERE scope='system' AND key='fep_user_dict_path' AND type=1", setting, sizeof(setting)) && !strcmp(setting, USER_DB))) goto done;
     if (!check("select S", api->ime_switch_dict(0) == 0)) goto done;
     if (!check("metadata bytes and entry_count", metadata())) goto done;
