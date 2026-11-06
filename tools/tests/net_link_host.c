@@ -112,7 +112,6 @@ static int nic_busy = 0;
 static int nic_tx_allow = 1;            /* **1 tick 1 フレーム** */
 static u32 nic_ring_pages = 120;
 static u32 nic_queue_free = 30;
-static struct ne2k_stats nic_stats;
 
 /* TX 記録 (試験が中身を見る) */
 #define TXLOG 512
@@ -167,8 +166,6 @@ int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length)
     memcpy(frame, nic_rx[nic_rxh], n);
     *length = n;
     nic_rxh = (nic_rxh + 1) % NIC_Q;
-    nic_stats.rx_frames++;
-    nic_stats.rx_pages_total += 3;
     return NE2K_OK;
 }
 
@@ -184,7 +181,6 @@ u32 net_rx_credit_bytes(void)
     if (nic_queue_free * 6 < pages) pages = nic_queue_free * 6;
     return pages * 256;
 }
-static void ne2k_get_stats(struct ne2k_stats *s) { *s = nic_stats; }
 
 /* ======================================================================== */
 /*  贋タイマ + 贋 cli / sti                                                  */
@@ -425,7 +421,6 @@ static void reset_all(const char *name)
     nic_rxh = nic_rxt = 0;
     nic_up = 1; nic_busy = 0; nic_tx_allow = 1;
     nic_ring_pages = 120; nic_queue_free = 30;
-    memset(&nic_stats, 0, sizeof(nic_stats));
     txn = 0;
     tx_hook = 0;
     wire_pump_fn = 0;
@@ -1543,26 +1538,37 @@ static void selftest_reply(const u8 *f, unsigned int n)
     (void)n;
     if (h[LINK_OFF_OP] != LINK_OP_REQUEST) return;
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, rid, SCRIPT_SESS, 0, 0);
-    if (selftest_reply_mode == 1) {
-        resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
-        inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, rid,
+    if (selftest_reply_mode == 1 || selftest_reply_mode == 3) {
+        resp_pl(pl, selftest_reply_mode == 1 ? LINK_CTL_TOMBSTONE : 200, 0);
+        inject(LINK_OP_RESPONSE, selftest_reply_mode == 1 ? LINK_F_CTRL : 0,
+               script_epoch, 0, 0, rid,
                SCRIPT_SESS, pl, LINK_RESP_LEN);
     }
 }
 
 static void l0_failures_are_counted_once(void)
 {
-    for (int mode = 0; mode < 3; mode++) {
+    for (int mode = 0; mode < 4; mode++) {
         reset_all(cur_case);
         script_handshake(SCRIPT_SESS, 0);
         selftest_reply_mode = mode;
-        /* ACK のみ / TOMBSTONE / 完全無応答による再同期。 */
-        tx_hook = mode < 2 ? selftest_reply : 0;
+        /* ACK のみ / TOMBSTONE / 完全無応答 / 正常応答。
+         * 無応答は 100 tick で要求だけ失効し、再同期を待たない。 */
+        u32 start = tick_count;
+        tx_hook = mode == 2 ? 0 : selftest_reply;
         link_selftest(1);
-        check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
+        check(link_l0_ok == (mode == 3 ? 1u : 0u) &&
+              link_l0_fail == (mode == 3 ? 0u : 1u) &&
+              link_rt_fail == link_l0_fail,
               "L0 の失敗往復を 1 回だけ計上していない");
-        check(kprintf_last_color == ATTR_YELLOW, "L0 の失敗表示が黄色でない");
-        check(link_resyncs == (mode == 2 ? 1u : 0u), "L0 の失敗経路が違う");
+        check(kprintf_last_color == (mode == 3 ? KLOG_ATTR : ATTR_YELLOW),
+              "L0 の結果表示の色が違う");
+        check(link_resyncs == 0 && link_tombstones == (mode == 1 ? 1u : 0u),
+              "L0 の失敗経路が違う");
+        check(tick_count - start <= LINK_HOST_SILENCE_TICKS + 2,
+              "L0 が要求期限後も待っている");
+        check(link_h[0].state == LINK_H_FREE && irq_depth == 0,
+              "L0 がハンドル / IF を戻していない");
     }
 }
 
@@ -1573,14 +1579,17 @@ static void selftest_tombstone_at_deadline_restore(void)
     u8 pl[LINK_RESP_LEN];
     if ((i32)(selftest_deadline - tick_count) > 0) return;
     irq_restore_hook = 0;
-    check(link_h[0].state == LINK_H_SENT && link_h[0].req_acked,
-          "最終 status の IF 復元前に SENT / ACK 済みでなくなった");
+    check(link_h[0].state == LINK_H_STALE && link_h[0].req_acked &&
+          link_host_status(0, 0, 0, LINK_SELF_OWNER) ==
+              OS32_ERR_HOSTDOWN,
+          "期限の status の IF 復元前に HOSTDOWN になっていない");
     resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
     inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, link_h[0].rid,
            SCRIPT_SESS, pl, LINK_RESP_LEN);
     host_tick();
-    check(link_h[0].state == LINK_H_STALE && link_rt_fail == 1,
-          "IF 復元時の tick が TOMBSTONE を処理していない");
+    check(link_h[0].state == LINK_H_STALE && link_rt_fail == 0 &&
+          link_tombstones == 0,
+          "期限後の TOMBSTONE を処理 / 計上した");
 }
 
 static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
@@ -1588,11 +1597,11 @@ static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
     script_handshake(SCRIPT_SESS, 0);
     selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
     tx_hook = selftest_reply;
-    selftest_deadline = tick_count + LINK_PROBE_TICKS * 5;
+    selftest_deadline = tick_count + LINK_HOST_SILENCE_TICKS;
     irq_restore_hook = selftest_tombstone_at_deadline_restore;
     link_selftest(1);
-    check(!irq_restore_hook && link_tombstones == 1 && link_resyncs == 0,
-          "期限の IF 復元時に TOMBSTONE が届いていない");
+    check(!irq_restore_hook && link_tombstones == 0 && link_resyncs == 0,
+          "期限後の TOMBSTONE が無視されていない");
     check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
           "期限切れと TOMBSTONE が同じ失敗を二重計上した");
     check(link_h[0].state == LINK_H_FREE, "自己試験がハンドルを閉じていない");

@@ -13,6 +13,8 @@ SW キューの空きを超えないので、200 フレーム (ホスト側の�
   - NIC の drop が 0 (credit で溢れさせなかった = M4 の「溢れても復旧」と対になる)
   - ページ消費の実測が妥当
 を確認する。
+共用 NIC 層 (net_bind があるカーネル) はハードウェア統計を公開しないため、
+LGY 固有の drop / ページ実測だけを SKIP とする。従来の LGY 専用像の期待は保つ。
 """
 import json
 import re
@@ -66,11 +68,18 @@ def main():
     meas = u32("link_l1_meas_pages")
     nbytes = u32("link_l1_bytes")
 
-    rxdrop = struct.unpack("<I", mem(sym("ne2k_nic") + NIC_ST + ST_RX_DROPPED * 4, 4))[0]
+    # ne2k_nic の存在だけでは稼働中の NIC を特定できない (82557 と共存する)。
+    shared_nic = sym("net_bind") is not None
+    rxdrop = None if shared_nic else struct.unpack(
+        "<I", mem(sym("ne2k_nic") + NIC_ST + ST_RX_DROPPED * 4, 4))[0]
 
-    print("L1: recv=%d/%d ooo=%d done=%d windows=%d credit=%d..%d pages meas=%d.%02d pages/frame bytes=%d"
-          % (recv, COUNT, ooo, done, win, cmin, cmax, meas // 100, meas % 100, nbytes))
-    print("NIC rx_dropped=%d" % rxdrop)
+    measurement = "n/a" if shared_nic else "%d.%02d" % (meas // 100, meas % 100)
+    print("L1: recv=%d/%d ooo=%d done=%d windows=%d credit=%d..%d pages meas=%s pages/frame bytes=%d"
+          % (recv, COUNT, ooo, done, win, cmin, cmax, measurement, nbytes))
+    if shared_nic:
+        print("SKIP NIC rx_dropped / page consumption measured (shared NIC statistics unavailable)")
+    else:
+        print("NIC rx_dropped=%d" % rxdrop)
 
     # N3: 完了判定は recv == COUNT (= recv_bytes == length)。EOF は補助で、
     # 消失しても全フレーム届いていれば合格 — 情報行に格下げ (契約は本文完了)。
@@ -79,10 +88,13 @@ def main():
     checks = [
         ("%d/%d frames received in order" % (recv, COUNT), recv == COUNT),
         ("no out-of-order / gaps", ooo == 0),
-        ("NIC ring not overflowed (rx_dropped 0)", rxdrop == 0),
         ("credit was advertised and bounded (max < ring capacity ~119)", 0 < cmax < 119),
-        ("page consumption measured (1.5..3.5 pages/frame for 512B)", 150 <= meas <= 350),
     ]
+    if not shared_nic:
+        checks.extend([
+            ("NIC ring not overflowed (rx_dropped 0)", rxdrop == 0),
+            ("page consumption measured (1.5..3.5 pages/frame for 512B)", 150 <= meas <= 350),
+        ])
     for label, ok in checks:
         print("%-4s %s" % ("ok" if ok else "FAIL", label))
         fails += 0 if ok else 1

@@ -1,7 +1,7 @@
 /* リンク自己試験の待機処理と L0〜L3 の実行。link.c から取り込む。 */
 
 /* ======================================================================== */
-/*  自己試験 (LGY98_FLAG_LINKTEST)                                          */
+/*  自己試験 (共用 NIC)                                                    */
 /*                                                                          */
 /*  KAPI と同じ非同期 API の上に組み、待つのは **IF=1 の hlt** だけ。        */
 /*  状態機械を進めるのは link_tick (タイマ) で、ここからは呼ばない           */
@@ -102,13 +102,16 @@ void link_selftest(int rounds)
     for (i = 0; i < rounds; i++) {
         unsigned int f;
         u32 st = 0, ln = 0;
+        i32 rc;
         i32 h = link_wait_open(req, n, LINK_PROBE_TICKS * 2);
         if (h < 0) { link_rt_fail++; continue; }
         (void)link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5);
         /* 待機後の再確認・期限切れ計上・close を IRQ0 に対して不可分にする。
+         * HOSTDOWN は要求単位の期限切れで未計上。
          * STALE は再同期 / TOMBSTONE 側で計上済み。待機自体は IF=1。 */
         f = LINK_IRQ_SAVE();
-        if (link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)
+        rc = link_host_status(h, &st, &ln, LINK_SELF_OWNER);
+        if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)
             link_rt_fail++;
         link_host_close(h, LINK_SELF_OWNER);
         LINK_IRQ_RESTORE(f);
@@ -127,8 +130,6 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
     char req[48];
     unsigned int i;
     u32 st = 0, ln = 0, got;
-    u32 rxf0, pages0;
-    struct ne2k_stats sn;
     i32 h;
 
     if (!link_ready || link_state != LINK_S_UP) {
@@ -136,9 +137,6 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
         return;
     }
     link_counters_reset();
-    ne2k_get_stats(&sn);
-    rxf0 = sn.rx_frames;
-    pages0 = sn.rx_pages_total;
 
     i = 0;
     i += cstr("BULK ", req + i, (unsigned int)(sizeof(req) - i));
@@ -152,18 +150,13 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
     got = link_wait_read_all(h, LINK_PROBE_TICKS * 15, 0);
     link_host_close(h, LINK_SELF_OWNER);
 
-    ne2k_get_stats(&sn);
-    {
-        u32 df = sn.rx_frames - rxf0;
-        u32 dp = sn.rx_pages_total - pages0;
-        if (df) link_l1_meas_pages = (dp * 100) / df;
-    }
+    /* 共用 NIC はハードウェアのページ消費統計を公開しない。
+     * link_l1_meas_pages は reset 時の 0 のまま、表示は取得不可とする。 */
     kprintf((link_l1_recv == count && link_l1_ooo == 0) ? KLOG_ATTR : ATTR_YELLOW,
             "[link] L1 bulk: %d/%d frames, %dB, ooo %d, windows %d, "
-            "credit %d..%d pages, meas %d.%02d pages/frame\n",
+            "credit %d..%d pages, meas n/a\n",
             (int)link_l1_recv, (int)count, (int)got, (int)link_l1_ooo,
-            (int)link_l1_windows, (int)link_l1_min_credit, (int)link_l1_max_credit,
-            (int)(link_l1_meas_pages / 100), (int)(link_l1_meas_pages % 100));
+            (int)link_l1_windows, (int)link_l1_min_credit, (int)link_l1_max_credit);
 }
 
 void link_l2_stream(unsigned int total, unsigned int plen, unsigned int dropseq)
