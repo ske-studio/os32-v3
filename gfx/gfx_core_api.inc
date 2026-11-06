@@ -23,6 +23,7 @@ int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active)
     else if (g_backend == &gfx_backend_pegc) *kind = GFX_VER_PEGC;
     else if (g_backend == &gfx_backend_cirrus) *kind = GFX_VER_CIRRUS;
     else if (g_backend == &gfx_backend_geforce) *kind = GFX_VER_GEFORCE;
+    else if (g_backend == &gfx_backend_trident) *kind = GFX_VER_TRIDENT;
     *active = gfx_started != 0;
     *out = info;
     return 0;

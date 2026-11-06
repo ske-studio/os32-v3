@@ -106,6 +106,16 @@ static int transfer(struct gf3_ctx *c, const struct gf3_surface *s,
                         staging[j * bytes + b] = memory[(y + j) * cpu.pitch + x + b];
                 __sync_synchronize();
             }
+            /* A completed fragment ends its wait. Start a new budget for
+             * the next transfer, retaining the caller's first deadline. */
+            if (x || y) {
+                struct gf_io *io = &c->ch->f->io;
+                u32 now;
+                if (!io->timing.clock_us) return transfer_result(c, GF2_EIO);
+                rc = io->timing.clock_us(io->opaque, &now);
+                if (rc) return transfer_result(c, rc);
+                dl = now + GF3_TIMEOUT_US;
+            }
             u32 off = vr.off + y * vr.pitch + x;
             c->ch->staging_pending = true;
             if (upload)

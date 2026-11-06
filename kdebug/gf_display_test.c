@@ -73,6 +73,18 @@ static inline i32 display_deadline(struct gf4_ctx *ctx, u32 *dl)
     *dl = now + GF3_TIMEOUT_US;
     return 0;
 }
+/* Transfer fragments have their own budget, like nouveau's per-wait
+ * nvkm_msec (nvkm/engine/gr/nv04.c:1220), not the whole camera step. */
+static i32 display_transfer_deadline(struct gf3_ctx *c, u32 *dl)
+{
+    if (!c || !c->ch || !c->ch->f) return GF4_ESTATE;
+    struct gf_io *io = &c->ch->f->io;
+    u32 now;
+    if (!io->timing.clock_us) return GF4_ESTATE;
+    i32 rc = io->timing.clock_us(io->opaque, &now);
+    if (!rc) *dl = now + GF3_TIMEOUT_US;
+    return rc;
+}
 static i32 display_discard(u8 head, u32 dl);
 static inline i32 display_restore(bool finish)
 {
@@ -260,11 +272,15 @@ static i32 display_enumerate(const struct display_request *q)
         u32 blocks = 1, dl = 0;
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->ddc_read) return GF4_ESTATE;
-        /* One connector probe shares one absolute deadline across blocks. */
+        /* Each EDID block read gets its own transfer budget. */
         i32 probe_rc = bus == U8_MAX ? GF4_ENODEV : display_deadline(o->ctx, &dl);
         for (u32 block = 0; block < blocks; ++block) {
             i32 rc = probe_rc;
             if (!rc) {
+                o = geforce_display_ops();
+                if (!o || !o->ctx || !o->ddc_read) return GF4_ESTATE;
+                rc = display_deadline(o->ctx, &dl);
+                if (rc) return rc;
                 o = geforce_display_ops();
                 if (!o || !o->ctx || !o->ddc_read) return GF4_ESTATE;
                 rc = o->ddc_read(o->ctx, bus, (u8)block, display_row, dl);
@@ -282,6 +298,10 @@ static i32 display_enumerate(const struct display_request *q)
 static i32 display_discard(u8 head, u32 dl)
 {
     const struct gf4_test_ops *o = geforce_display_ops();
+    if (!o || !o->ctx || !o->scan_discard) return GF4_ESTATE;
+    i32 rc = display_deadline(o->ctx, &dl);
+    if (rc) return rc;
+    o = geforce_display_ops();
     if (!o || !o->ctx || !o->scan_discard) return GF4_ESTATE;
     return o->scan_discard(o->ctx, head, dl);
 }
@@ -335,7 +355,15 @@ static i32 display_draw(const struct gf3_surface *s, u32 dl, u32 *crc, u32 patte
             expected = crc32_core_update(expected, display_row, ram.bytes);
             const struct gf3_test_ops *a = geforce_accel_ops();
             if (!a || !a->ctx || !a->upload) return GF4_ESTATE;
-            i32 rc = a->upload(a->ctx, s, r, &ram, true, dl);
+            i32 rc = display_transfer_deadline(a->ctx, &dl);
+            if (rc) return rc;
+            a = geforce_accel_ops();
+            if (!a || !a->ctx || !a->upload) return GF4_ESTATE;
+            rc = a->upload(a->ctx, s, r, &ram, true, dl);
+            if (rc) return rc;
+            a = geforce_accel_ops();
+            if (!a || !a->ctx || !a->download) return GF4_ESTATE;
+            rc = display_transfer_deadline(a->ctx, &dl);
             if (rc) return rc;
             a = geforce_accel_ops();
             if (!a || !a->ctx || !a->download) return GF4_ESTATE;
@@ -372,6 +400,10 @@ static i32 display_image(const struct display_request *q, u32 index, u32 dl,
     if (!o || !o->ctx || !o->scan_prepare) return GF4_ESTATE;
     display_session.prepared = true; /* A failed prepare may retain nodes. */
     display_session.prepared_heads |= 1U << q->head;
+    rc = display_deadline(o->ctx, &dl);
+    if (rc) return rc;
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->scan_prepare) return GF4_ESTATE;
     rc = o->scan_prepare(o->ctx, q->head, m.id, scan, dl);
     if (rc) return rc;
     display_session.scan[0] = scan[0]; display_session.scan[1] = scan[1];
@@ -386,6 +418,10 @@ static i32 display_image(const struct display_request *q, u32 index, u32 dl,
                           q->test == DISPLAY_OUTPUTS ? 2U - q->head : 2U);
         if (rc) return rc;
     }
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->set_mode) return GF4_ESTATE;
+    rc = display_deadline(o->ctx, &dl);
+    if (rc) return rc;
     o = geforce_display_ops();
     if (!o || !o->ctx || !o->set_mode) return GF4_ESTATE;
     rc = o->set_mode(o->ctx, &route, m.id, &scan[0], dl);
@@ -428,6 +464,10 @@ static i32 display_cursor_step(const struct display_request *q, u32 step, u32 dl
         struct gf4_cursor image = {.argb_pm=display_cursor_pixels,
             .bytes=side*side*sizeof(u32), .pitch=side*sizeof(u32), .w=side,.h=side,
             .hot_x=DISPLAY_CURSOR_HOT_X,.hot_y=DISPLAY_CURSOR_HOT_Y};
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->cursor_image) return GF4_ESTATE;
+        rc = display_deadline(o->ctx, &dl);
+        if (rc) return rc;
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->cursor_image) return GF4_ESTATE;
         rc = o->cursor_image(o->ctx, q->head, &image, dl);
@@ -475,12 +515,20 @@ static i32 display_flip_step(const struct display_request *q, u32 step, u32 dl)
         seen = after;
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
+        rc = display_deadline(o->ctx, &dl);
+        if (rc) return rc;
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
         rc = o->flip(o->ctx, q->head, &display_session.scan[target], step == 0, dl);
         if (!rc) {
             o = geforce_display_ops();
             if (!o || !o->ctx || !o->vblank_wait) rc = GF4_ESTATE;
             else {
                 u32 observed;
+                rc = display_deadline(o->ctx, &dl);
+                if (rc) return rc;
+                o = geforce_display_ops();
+                if (!o || !o->ctx || !o->vblank_wait) return GF4_ESTATE;
                 rc = o->vblank_wait(o->ctx, q->head, after, dl, &observed);
                 if (!rc) seen = observed;
             }
@@ -549,6 +597,10 @@ static i32 display_step(const struct display_request *q)
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->dpms_set) return GF4_ESTATE;
         /* nouveau dispnv04/crtc.c:175-233: ON/STANDBY/SUSPEND/OFF. */
+        rc = display_deadline(o->ctx, &dl);
+        if (rc) return rc;
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->dpms_set) return GF4_ESTATE;
         rc = o->dpms_set(o->ctx, q->head, display_power[step], dl);
         if (rc) return rc;
     }
@@ -713,6 +765,10 @@ static i32 display_outputs_step(const struct display_request *q)
             u8 other = item.head ^ 1U;
             if (o->ctx->state->head[other].enabled) {
                 if (!o->dpms_set) return GF4_ESTATE;
+                rc = display_deadline(o->ctx, &dl);
+                if (rc) return rc;
+                o = geforce_display_ops();
+                if (!o || !o->ctx || !o->dpms_set) return GF4_ESTATE;
                 rc = o->dpms_set(o->ctx, other, GF4_OFF, dl);
             }
             if (!rc) display_record(&item, "READY", step,
@@ -756,9 +812,17 @@ static i32 display_outputs_step(const struct display_request *q)
     u32 other_mode = other->mode.id, other_front = other->front.off;
     bool other_enabled = other->enabled;
     enum gf4_dpms other_dpms = other->dpms;
+    rc = display_deadline(o->ctx, &dl);
+    if (rc) return rc;
+    o = geforce_display_ops();
+    if (!o || !o->ctx || !o->dpms_set) return GF4_ESTATE;
     rc = o->dpms_set(o->ctx, 1, step == n + 1U ? GF4_OFF : GF4_ON, dl);
     if (rc) return rc;
     if (step == n + 2U) {
+        o = geforce_display_ops();
+        if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
+        rc = display_deadline(o->ctx, &dl);
+        if (rc) return rc;
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->flip) return GF4_ESTATE;
         rc = o->flip(o->ctx, 1, &display_session.output_scan[1][1], true, dl);

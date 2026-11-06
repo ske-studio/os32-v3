@@ -101,7 +101,7 @@ i32 gf5_clock_read(struct gf5 *g,struct gf5_clock *out)
     if (!rc) rc=read_pll(io,CLK_MEM,false,&c.mem_khz);
     if (rc) return result(g,rc);
     *out=c;
-    return result(g,c.core_khz && c.shader_khz && c.mem_khz ? 0 : GF5_ESTATE);
+    return result(g,0); /* Zero is an absent source, nv40.c:82-115. */
 }
 static u32 coefficient(const struct gfinit_pll_solution *s)
 {

@@ -358,7 +358,11 @@ static void c1_render_failures(void)
         assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
         assert(cint_references==submitted && cint_reference!=cint_prod.chan.seq);
         assert(c1_failed_calls==1 && svc_ctx.last_rc==errors[n]);
-        assert(svc_ctx.deadline==dl && svc_ctx.recovery_rc);
+        /* service_stop refreshes stage budgets after a render timeout.
+         * Injected clock failure leaves the original deadline intact. */
+        assert(svc_ctx.deadline==(errors[n]==GF2_ETIME ?
+               cint_host.now+GF2_TIMEOUT_US : dl));
+        assert(svc_ctx.recovery_rc);
         assert(cint_prod.chan.state!=GF2_OFF && !c1_normal);
         assert(!svc_ctx.reusable && !svc_ctx.accepting);
         assert(svc_opens==opens && svc_ctx.scan_bank[0]==bank);

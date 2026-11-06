@@ -234,6 +234,8 @@ MUTATIONS = {
          '(void)0;', 'tools/tests/gf_accel_b7_host.c'),
     ],
     'b8': [
+        ('fragment-budget', 'hwdev/gf/accel_transfer.c',
+         'if (x || y) {', 'if (false) {', 'tools/tests/gf_accel_b8_host.c'),
         ('staging-reuse', 'hwdev/gf/accel_transfer.c',
          'if (c->ch->staging_pending) {',
          'if (false) {', 'tools/tests/gf_accel_b8_host.c'),

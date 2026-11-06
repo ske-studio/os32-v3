@@ -19,6 +19,7 @@ MUTATIONS = [
      'if (gfx_started) info.height = 480;', 'out.height == 200'),
     ('query-failure', 'if (rc) return rc;', 'if (rc) return 0;',
      'gfx_ver_state(&out, &kind, &active) == -7'),
+    ('trident-kind', '*kind = GFX_VER_TRIDENT;', '*kind = GFX_VER_UNKNOWN;', 'kind == ids[i]'),
     ('pegc-kind', '*kind = GFX_VER_PEGC;', '*kind = GFX_VER_PC98;', 'kind == ids[i]'),
 ]
 
@@ -45,6 +46,7 @@ GfxBackend gfx_backend_pc98 = BACKEND;
 GfxBackend gfx_backend_pegc = BACKEND;
 GfxBackend gfx_backend_cirrus = BACKEND;
 GfxBackend gfx_backend_geforce = BACKEND;
+GfxBackend gfx_backend_trident = BACKEND;
 #endif
 static GfxBackend other = BACKEND;
 const GfxBackend *g_backend;
@@ -64,12 +66,12 @@ void _start(void) {
     u32 kind, active;
     GfxBackend *backends[] = {&gfx_backend_pc98,
 #ifndef NO_OPTIONAL
-        &gfx_backend_pegc, &gfx_backend_cirrus, &gfx_backend_geforce,
+        &gfx_backend_pegc, &gfx_backend_cirrus, &gfx_backend_geforce, &gfx_backend_trident,
 #endif
         &other};
     u32 ids[] = {GFX_VER_PC98,
 #ifndef NO_OPTIONAL
-        GFX_VER_PEGC, GFX_VER_CIRRUS, GFX_VER_GEFORCE,
+        GFX_VER_PEGC, GFX_VER_CIRRUS, GFX_VER_GEFORCE, GFX_VER_TRIDENT,
 #endif
         GFX_VER_UNKNOWN};
     for (u32 i=0; i<sizeof(ids)/sizeof(ids[0]); ++i) {
@@ -80,7 +82,7 @@ void _start(void) {
         CHECK(out.lease_first == 32 && out.lease_count == 16 && queries == 1);
         gfx_started=1; gfx_current_height=200;
         CHECK(gfx_ver_state(&out, &kind, &active) == 0);
-        CHECK(active == 1); CHECK(out.height == 200); CHECK(queries == 2);
+        CHECK(active == 1); CHECK(kind == ids[i]); CHECK(out.height == 200); CHECK(queries == 2);
         gfx_current_height=480;
         CHECK(gfx_ver_state(&out, &kind, &active) == 0 && out.height == 480);
         gfx_started=0; g_backend->query(&out);

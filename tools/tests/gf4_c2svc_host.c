@@ -340,6 +340,18 @@ static void test_diagnostic_roundtrip(void)
     assert(!svc_slot && !svc_ctx.accepting && svc_ctx.saved_closed);
     svc_finish();
 }
+static void test_stopped_cursor(void)
+{
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    /* Simulate recovery having stopped the channel while cursor HW stays on. */
+    assert(!svc_admission(&svc_ctx,false));
+    svc_state.head[0].cursor_valid=true;
+    assert(!gf4_cursor_apply(&svc_ctx,0,true));
+    assert(!gf2_stop(svc_ctx.ch));
+    svc_ctx.ready=false;
+    svc_finish();
+    assert(!(svc_host.cr[0][0x31] & 1U));
+}
 static void test_slow_start(void)
 {
     svc_fixture(); svc_slow_validate=svc_spend_objects=svc_spend_detect=true;
@@ -366,6 +378,6 @@ static void test_failed_start(void)
 void _start(void)
 {
     test_bind_and_start(); test_cleanup_failures();
-    test_diagnostic_roundtrip(); test_slow_start(); test_failed_start();
+    test_diagnostic_roundtrip(); test_stopped_cursor(); test_slow_start(); test_failed_start();
     gf2_host_exit(0);
 }

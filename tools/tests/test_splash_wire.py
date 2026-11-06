@@ -73,6 +73,10 @@ def execute(mutation=None):
                 source = source.replace('calls > 4000000', 'calls > (PLATFORM_SPLASH_IMAGE_TICKS + PIT_HZ) * TICK_MS * 1000u')
                 source = source.replace('if (!frozen) clock_us++;', 'if (!frozen) clock_us++;\n    tick_count = clock_us / 10000;')
                 source = source.replace('static unsigned int inp(unsigned int port)\n{', 'static unsigned int inp(unsigned int port)\n{\n    advance();')
+                # Cancel the unit scale exactly; avoid a software 64-bit divide
+                # at every simulated status read in the common 1000/1000 case.
+                source = source.replace('clock_us * den * 1000 / scale',
+                    '(scale == 1000 ? clock_us * den : clock_us * den * 1000 / scale)')
                 source = source.replace('#define HOST_WRITES 4096u', '#define HOST_WRITES 65536u')
             dest.write_text(source)
         (work/'wire_data.h').write_text('\n'.join(

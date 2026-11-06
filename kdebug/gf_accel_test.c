@@ -511,7 +511,13 @@ static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
 }
 static u32 filtered(enum gf3_fmt fmt, u32 fx, u32 fy, bool bilinear)
 {
-    u32 x = fx >> TEST_FRAC_BITS, y = fy >> TEST_FRAC_BITS;
+    /* SIFM uses ORIGIN_CENTER (nv04_xv_blit.c:151-152). Point
+     * sampling selects the nearest center, not the preceding center.
+     * gf-accept4 fmt=4/trial=1 confirms that 2.5 selects row 3.
+     * Bilinear's ideal still interpolates between the adjacent centers. */
+    u32 point_bias = bilinear ? 0U : TEST_FRAC_ONE / 2U;
+    u32 x = (fx + point_bias) >> TEST_FRAC_BITS;
+    u32 y = (fy + point_bias) >> TEST_FRAC_BITS;
     if (x > 15U) x = 15U;
     if (y > 15U) y = 15U;
     if (!bilinear) return rgba(fmt, x, y);
@@ -594,7 +600,11 @@ static int scale_case(void)
         number(" scale_fmt=", fmt); number(" trial=", trial);
         number(" bilinear=", bilinear); number(" solid=", solid);
         serial_puts_polled("\r\n");
-        rc = compare(false, bilinear || fmt == GF3_YUY2 || fmt == GF3_UYVY);
+        /* RGB565 output also has an ideal, not exact, oracle: the SIFM
+         * setup selects DITHER while packing above uses truncation.
+         * Keep every difference fatal until hardware acceptance. */
+        rc = compare(false, bilinear || dst_fmt == GF3_RGB565 ||
+                     fmt == GF3_YUY2 || fmt == GF3_UYVY);
         if (rc && !first_rc) first_rc = rc;
         /* Numerical differences are observations; continue collecting all
          * formats/filters. Mapping/cleanup errors retain ownership and stop. */

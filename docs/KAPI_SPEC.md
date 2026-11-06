@@ -1588,6 +1588,8 @@ CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 `OS32_LeaseView` は token/base/bytes/planes[4] の **28B**、`OS32_LeaseResult` は count + 4 view の **116B**。
 物理番地・kernel ポインタ・cache 指定は公開しない。base/planes は呼び手の lease VA。
 公開 role/backend/access/format の `OS32_SURFACE_*` 定数は kernel と静的照合する。
+backend は PC98=1、PEGC=2、CIRRUS=3、GEFORCE=4、TRIDENT=5 (`OS32_SURFACE_TRIDENT`)。
+TRIDENT は番号だけの追加で構造体・スロットを変えないため、§3-2 の番号追加と同じく版数を据え置く。
 `OS32_PAGE_SIZE=4096`、`OS32_SHM_BLOCK_SIZE=16384` も kernel と静的照合する。
 
 - `surface_query`: 初期化済みの選択 backend の値 snapshot を返す。lease は増やさない。

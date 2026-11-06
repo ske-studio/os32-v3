@@ -67,6 +67,7 @@ STATIC_ASSERT(OS32_SURFACE_PC98 == LEDGER_SF_PC98, abi_surface_pc98);
 STATIC_ASSERT(OS32_SURFACE_PEGC == LEDGER_SF_PEGC, abi_surface_pegc);
 STATIC_ASSERT(OS32_SURFACE_CIRRUS == LEDGER_SF_CIRRUS, abi_surface_cirrus);
 STATIC_ASSERT(OS32_SURFACE_GEFORCE == LEDGER_SF_GEFORCE, abi_surface_geforce);
+STATIC_ASSERT(OS32_SURFACE_TRIDENT == LEDGER_SF_TRIDENT, abi_surface_trident);
 STATIC_ASSERT(OS32_SURFACE_TABLE == LEDGER_FMT_TABLE, abi_surface_table);
 STATIC_ASSERT(OS32_SURFACE_TEXT == LEDGER_FMT_TEXT, abi_surface_text);
 
@@ -108,7 +109,7 @@ int surface_query_authorize(const struct surface_query_source *s,
         return OS32_ERR_INVAL;
     }
     if (s->role == LEDGER_ROLE_CLIENT || s->role == LEDGER_ROLE_DISPLAY) {
-        if (s->backend < LEDGER_SF_PC98 || s->backend > LEDGER_SF_GEFORCE)
+        if (s->backend < LEDGER_SF_PC98 || s->backend > LEDGER_SF_TRIDENT)
             return OS32_ERR_INVAL;
     } else if (s->backend) return OS32_ERR_INVAL;
     *out = c;

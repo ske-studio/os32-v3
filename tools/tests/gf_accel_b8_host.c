@@ -22,14 +22,18 @@ static u8 vram[IMAGE_BYTES], memory[IMAGE_BYTES];
 static u8 expected_vram[IMAGE_BYTES], expected_ram[IMAGE_BYTES];
 static u8 wait_memory[IMAGE_BYTES], wait_staging[GF3_STAGING_BYTES];
 static bool uploading, pending;
+static u32 active_deadline, next_deadline, first_fragment;
 
 static void observe(struct gf3_host *h, const struct gf3_host_event *e)
 {
+    if (e->op == H_CLOCK && !h->dma_pending && h->calls[H_M2MF] > first_fragment)
+        next_deadline = h->now + GF3_TIMEOUT_US;
     if (e->op == H_SURFACE_CHECK) assert(e->a[4] == GF3_USE_BYTES);
     if (e->op == H_IFC || e->op == H_M2MF) {
         assert(h->calls[H_SURFACE_CHECK] == 1 && h->calls[H_RAM_CHECK] == 1);
         assert(e->p[0] == &h->ctx);
-        assert(e->a[e->op == H_IFC ? 4 : 8] == TEST_DEADLINE);
+        u32 expected = e->op == H_M2MF ? next_deadline : TEST_DEADLINE;
+        assert(e->a[e->op == H_IFC ? 4 : 8] == expected);
     }
     if (e->op == H_IFC) {
         assert(e->p[1] == &surface && e->p[2] == &ram);
@@ -37,14 +41,15 @@ static void observe(struct gf3_host *h, const struct gf3_host_event *e)
                e->a[2] == rect.w && e->a[3] == rect.h);
     }
     if (e->op == H_FENCE) {
-        assert(e->a[0] == TEST_DEADLINE);
+        active_deadline = next_deadline;
+        assert(e->a[0] == active_deadline);
         if (pending)
             assert(!gf2_host_memcmp(h->staging, wait_staging, sizeof(wait_staging)));
         pending = true;
         gf2_host_memcpy(wait_staging, h->staging, sizeof(wait_staging));
         gf2_host_memcpy(wait_memory, ram.ptr, ram.bytes);
     }
-    if (e->op == H_WAIT) assert(e->a[2] == TEST_DEADLINE);
+    if (e->op == H_WAIT) assert(e->a[2] == active_deadline);
     if (pending && (e->op == H_SLEEP || e->op == H_WAIT || e->op == H_M2MF || e->op == H_IFC)) {
         /* A retired download may change staging on successful recovery. */
         if (uploading) {
@@ -83,7 +88,7 @@ static void setup(enum gf3_fmt fmt, u32 width, u32 height, u32 pitch,
     gf2_host_memset(host.staging, 0xa7, sizeof(host.staging));
     gf2_host_memcpy(expected_vram, vram, sizeof(vram));
     gf2_host_memcpy(expected_ram, memory, sizeof(memory));
-    uploading = upload; pending = false;
+    uploading = upload; pending = false; active_deadline = TEST_DEADLINE;
     host.observe = observe;
     host.complete_after = 2; /* Exercise staging/CPU ownership during waits. */
 }
@@ -95,6 +100,7 @@ static void small(bool upload)
 
 static int run(bool force)
 {
+    next_deadline = TEST_DEADLINE; first_fragment = host.calls[H_M2MF];
     int rc = uploading ? gf3_upload(&host.ctx, &surface, rect, &ram, force, TEST_DEADLINE) :
         gf3_download(&host.ctx, &surface, rect, &ram, TEST_DEADLINE);
     assert(host.ctx.last_rc == rc);
@@ -294,12 +300,13 @@ static void failures(void)
         small(direction != 0); host.now = TEST_DEADLINE;
         assert(run(true) == GF2_ETIME); images();
 
-        /* The second staging batch expires against the original deadline,
-         * after a successful four-row batch; no renewed per-batch budget. */
+        /* The first batch completes just before its deadline. The next
+         * batch gets a full budget and finishes past that original deadline. */
         setup(GF3_INDEX8, 1024, 5, 1031, (struct gf3_rect){0, 0, 1024, 5}, 1033, direction != 0);
-        rect.h = 4; reference(); rect.h = 5;
+        reference();
         host.now = TEST_DEADLINE - 3U;
-        assert(run(true) == GF2_ETIME); images();
+        assert(!run(true)); images();
+        assert(host.now >= TEST_DEADLINE);
         assert(host.calls[H_M2MF] == 2 && host.calls[H_WAIT] == 2);
     }
     static const int ifc_errors[] = {GF3_EFORMAT, GF2_EFAULT, GF2_ETIME, GF2_EIO};

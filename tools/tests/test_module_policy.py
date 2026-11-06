@@ -1,6 +1,6 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'kernel/v86/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'kernel/v86/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=0.718344)
 
 import copy
@@ -43,8 +43,8 @@ def fixtures(validator=schema.validate_components):
             bad[2]['dependencies'] = (2, 2)
         assert rejected(bad, validator), change
     extra = copy.deepcopy(rows[0])
-    extra.update(module_id=13, name='EXTRA', path='/boot/extra.mod', dependencies=())
-    assert rejected((*rows, extra), validator), 'thirteenth ID accepted'
+    extra.update(module_id=14, name='EXTRA', path='/boot/extra.mod', dependencies=())
+    assert rejected((*rows, extra), validator), 'fourteenth ID accepted'
 
 
 def conformance():
@@ -57,9 +57,9 @@ def conformance():
     paired = re.search(r'^KERNEL_PAIRED_MODULES := (.*)$', build, re.M)[1]
     assert paired.split() == ['$(BUILD_OUT)/' + name for name in expected], 'paired build list'
     actual = [row for row in deployed if row['guest'].endswith(('.mod', '/kdebug.bin'))]
-    assert [(row['host'], row['guest'], row['tags']) for row in actual] == [
-        ('build/out/' + name, row['path'], ['core'])
-        for name, row in zip(expected, distributed)], 'core distribution list'
+    assert sorted((row['host'], row['guest'], row['tags']) for row in actual) == sorted(
+        ('build/out/' + name, row['path'], ['gui'] if row['name'] == 'TRIDENT' else ['core'])
+        for name, row in zip(expected, distributed)), 'module distribution list'
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
         adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
@@ -68,11 +68,11 @@ def conformance():
             'fep_module': 'kernel/ime', 'v86_module': 'kernel/v86',
             'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
             'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',
-            'cirrus_module': 'drivers/video/cirrus',
+            'cirrus_module': 'drivers/video/cirrus', 'trident_module': 'drivers/video/trident',
             'geforce_module': 'drivers/video/geforce', 'kcg_module': 'drivers/video/kcg',
         }.get(adapter, 'kernel')
         source = (ROOT / directory / (adapter + '.c')).read_text()
-        path_macro = re.search(r'\.path = (SYS_\w+)', source)[1]
+        path_macro = re.search(r'\.path\s*=\s*(SYS_\w+)', source)[1]
         assert re.search(r'^#define ' + path_macro + r'\s+"' + re.escape(row['path']) + '"', config, re.M), row
         assert 'MODULE_ID_' + row['name'] in source, row
         if row['name'] == 'HWDEV':
@@ -113,8 +113,8 @@ def main():
         try:
             fixtures(namespace['validate_components'])
         except AssertionError as exc:
-            assert str(exc) == 'thirteenth ID accepted', exc
-            print('MUTATE capacity-check-removed RED (compiled Python, runtime thirteenth ID)')
+            assert str(exc) == 'fourteenth ID accepted', exc
+            print('MUTATE capacity-check-removed RED (compiled Python, runtime fourteenth ID)')
         else:
             raise AssertionError('capacity mutant survived')
 

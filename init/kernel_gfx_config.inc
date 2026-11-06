@@ -7,6 +7,7 @@ static void kernel_gfx_config(void)
      * マウント済み)。
      *   GFX=pc98   9801 プレーン強制 (NP21/W でプレーン経路を回帰試験する)
      *   GFX=pegc   PEGC 強制 (probe が通らなければ 9801)
+     *   GFX=trident Trident 9682 強制 (auto 探索には入れない)
      *   GFX=cirrus Cirrus GD54xx 強制 (probe が通らなければ 9801、票 H3)
      *   未指定     auto = probe 順 (Cirrus → PEGC → 9801)
      * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
@@ -25,6 +26,8 @@ static void kernel_gfx_config(void)
             gfx_set_backend_pref(GFX_PREF_PEGC);
         } else if (kstrcmp(gfxmode, "geforce") == 0) {
             gfx_set_backend_pref(gfx_geforce_pref(sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0)));
+        } else if (kstrcmp(gfxmode, "trident") == 0) {
+            gfx_set_backend_pref(GFX_PREF_TRIDENT);
         } else if (kstrcmp(gfxmode, "cirrus") == 0) {
             gfx_set_backend_pref(GFX_PREF_CIRRUS);
         } else {
