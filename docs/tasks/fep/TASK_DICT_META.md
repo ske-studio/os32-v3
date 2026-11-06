@@ -1,132 +1,43 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 状態: **実装中 (2026-11-06)** — 段 A〜F・統合の直し 1・段 I・段 J と段 K (同じ枝で、変換・学習・ime user・辞書の切り替え・hsync の止めて戻すを store に付け替え) を main に入れた (0262abc2、CI 成功、Opus 承認)。次は段 L、申し送りは resume の予約量の照合 (K1) と辞書の無い起動の後の切り替えで学習を開く (K2) — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
+> 状態: **実装中 (2026-11-07)** — 段 A〜N は main。段 P はゲスト試験・文書の段。ゲスト受入は PM が行う。
+> 上位: [FEP の索引](00_INDEX.md)。契約・形式・実装分担・受入の正典は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) §2〜9 と末尾の確定事項。
 
-> 上位: [FEP の索引](00_INDEX.md)
-
-> 発行: PM (Claude Code `claude-fable-5-1`、2026-09-30) / 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) D27・D28) を記録した段。**着手は v3 の後の方** (`docs/archive/v3/V3_PLAN_DRAFT.md` §3 P10「v3 後半」)。設計票の往復・実装は未着手。
-> 出所: ユーザー「辞書のメタ情報と学習データを辞書と別ファイルに分ける — 採用。ただしすぐ取り掛からず v3 の後の方でよい」(2026-09-30、MEMMAP_V3 §11-3 の「ユーザー決定 (池の運用規則まわり)」7)。
-> 正典の関係: SQLite の予算と FEP の取り分 (`mem_reserve_kb` の使い道) は MEMMAP_V3 §4-6 (D27)。FEP のアーキテクチャの快照は `FEP_STATUS`、フェーズ別の設計は [`00_INDEX.md`](00_INDEX.md)。辞書の品質 (コスト式・頻度) は `04_DICT_QUALITY` の領分で、この票は**入れ物 (メタ情報と学習の置き場)** だけを扱う。
-> 本文の `file:line` は `feat/gui` 5d79e5dd の行。**数字は 2026-09-30 に手元の `assets/fep.db` を Python の `sqlite3` で照合した実測**。
-
----
-
-## 0. 決定 (ユーザー 2026-09-30)
+## 0. 決定
 
 | # | 決定 | 出所 |
 |---|---|---|
-| M1 | 辞書 (SQLite DB) に**メタ情報**を持たせる。項目は §2 の表 | MEMMAP_V3 D28 |
-| M2 | **学習データを辞書と別ファイルに分ける** (例 `/etc/fep_user.db`)。理由は §3 | 同 D28 |
-| M3 | 辞書のメタ情報 `mem_reserve_kb` が **FEP の SQLite 取り分** (起動時に優先確保) の出典。settings で上書き可。事前確保量を超える辞書への入れ替えは**再起動で再確保** | 同 D27、§4-6 |
-| M4 | **着手は v3 の後の方** — MEMMAP_V3 の T4 (SQLite モジュール化) と T5a (FEP モジュール化) の後。それまで FEP は今の `fep.db` (メタ無し、学習表同居) のまま動き、`mem_reserve_kb` は既定値 + settings だけ | ユーザー (同日)、V3_PLAN_DRAFT §3 P10 |
-| M5 | `license` / `attribution` は**必須項目** — 辞書はパブリックの `os32-v3` で配るので、元データ (IPADIC) の配布条件をファイル自身が運ぶ | PM (M1 の項目の中で必須に格上げ。理由は §2) |
-| M6 | **旧い学習データは移さない** (ユーザー決定 2026-11-05「古い学習データは元のデータ変換側を変えたほうが良い。互換性の問題なら考えなくて良い」) — 新しい形の学習 DB (`fep_user.db`) は空から作り、辞書の形の変更は変換の側 (`tools/fep_to_sqlite.py`) で受ける。`fep_user.db` は `hsync` の保護名にする |
+| M1 | 辞書に形式の版・ID・原文ライセンス等のメタ情報を持たせる | ユーザー 2026-09-30、確定設計 §2 |
+| M2 | 学習データをシステム辞書と別ファイル `/etc/fep_user.db` に分ける | 同日、確定設計 §3 |
+| M3 | `mem_reserve_kb` を起動時の FEP 予約量の出典とし、settings で上書き可。予約を超える切り替えは現辞書を残し、再起動で再確保 | MEMMAP_V3 D27 [^memory] |
+| M4 | SQLite・FEP モジュール化後に実装する | ユーザー 2026-09-30、実装着手は 2026-11-05 |
+| M5 | `license` / `attribution` は原文全文を辞書に収録し、`ime_dict_info` で分割取得する | 確定設計 §2・末尾の公開契約 |
+| M6 | 旧い学習データは移さず、新しい学習 DB は空から作る。`fep_user.db*` を hsync の保護名にする | ユーザー 2026-11-05、確定設計 §4 |
 
----
+[^memory]: 現行 [MEMMAP_V3 D27](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) は同ファイルの 30 行目。D28 と §4-6 は現行文書に無い。メタ情報・別ファイル化の契約は確定設計 §2・3、予約の具体的な手順は同 §5・6 を参照する。
 
-## 1. 現状の事実 (出典付き)
+## 1. 現行の契約
 
-| 事実 | 値 | 出典 |
-|---|---|---|
-| システム辞書のファイル | `assets/fep.db` 5,815,296B (M 版)。生成物で git には無い (`.gitignore:33-36` が `fep.db` / `fep_s.db` / `fep_l.db` / `fep.dic`)。`build/assets.mk:32-38` が `tools/fep_to_sqlite.py` で IPADIC の CSV から作る | `ls -l`、`.gitignore`、`build/assets.mk` |
-| 表 | **`dict` 表 1 つ** `(yomi TEXT, kanji TEXT, pos_id, cost INT)` + 索引 `idx_dict_yomi(yomi)`。**97,514 語**。メタ情報の表は無い | `sqlite_master`、`SELECT count(*)` (2026-09-30 実測) |
-| ページ / 版 | `page_size` **1024**、`PRAGMA user_version` **0** (未使用) | 同上。生成側は `PAGE_SIZE = 1024` (`tools/fep_to_sqlite.py:25,192`)、カーネル側は `SQLITE_DEFAULT_PAGE_SIZE 1024` (`lib/sqlite3/os32_sqlite_config.h:67`) |
-| 学習表 | **同じ `fep.db` の中**に、辞書を開くたび `CREATE TABLE IF NOT EXISTS dict_user (yomi, kanji, freq, last_ts, PRIMARY KEY (yomi, kanji))` + `idx_user_yomi` を作る。学習は UPSERT (`SQL_LEARN`)、列挙・削除・書き出し・全消去は `ime_user_list / delete / export / clear` | `kernel/ime/ime_dict.c:86-95` (作成)、`:51` (`SQL_LEARN`)、`:463-599` (`ime_user_*`) |
-| 辞書を開く形 | `sqlite3_open_v2(path, SQLITE_OPEN_READWRITE)` — 学習表を書くので**読み書き**で開く。FD は `vfs_fd_set_protect` で exec の一括クローズから守る | `kernel/ime/ime_dict.c:76,25-30,133` |
-| S / M / L | `tools/fep_to_sqlite.py` の `SIZE_DEFS` (`:33-38`): S = cost ≤ 800 (`fep_s.db`)、M = cost ≤ 1500 (`fep.db`、既定)、L = 無制限 (`fep_l.db`)。`--all` で 3 つ、`--size` で 1 つ。dict_raw → yomi+kanji で重複排除 (同点は pos_id 最小、再現性のため) → `dict` → `VACUUM` | `tools/fep_to_sqlite.py:33-38,192-236,244-270` |
-| 切り替え | `ime_switch_dict(variant)` が `/db/fep_s.db` / `/db/fep.db` / `/db/fep_l.db` を開き直す (`ime_dict_reopen`)。**開いている辞書の置き換えは VFS が BUSY で断る**ので、`hsync` は差し替えられない | `kernel/ime/ime.c:882-895`、`kernel/ime/ime_dict.c:150-157` |
-| 配備 | `assets/fep.db` → ゲスト `/db/fep.db` | `userland/deploy.yaml:311-312` |
-| SQLite の取り分 (今) | FEP 辞書が常駐した状態で 38,784B (`cfg_bench` の実測)。MEMSYS5 は全接続共有の 1 ヒープ (今 384KB → v3 で 512KB) | `settings/DESIGN` §6、`lib/sqlite3/os32_sqlite_vfs.c:34-39`、MEMMAP_V3 §4-6 |
-| `PRAGMA user_version` はカーネルの SQLite で**省かれている** | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` (`lib/sqlite3/os32_sqlite_config.h:56`) は `schema_version` だけでなく **`user_version` の PRAGMA も落とす** (`lib/sqlite3/sqlite3.c:144652-144658` の `#if !defined(SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS)` の内側) | `sqlite3.c` の PRAGMA 表 |
-| ライセンス文 | `assets/ipadic/` は CSV 13 本だけで、**IPADIC の配布条件の原文は本リポジトリに無い** | `ls assets/ipadic` (2026-09-30) |
+- システム辞書は RO、学習 DB は RW の 2 接続。切り替え時の probe 用に RESIDENT は 3 枠。
+- S/M/L は共通 ID の学習を使う。ID または品詞表の版が違えば学習を停止し、system の変換を続ける。
+- 設定のキーは scope=`system` の `fep_mem_reserve_kb` と `fep_user_dict_path`。学習の custom path は `/etc` 直下に限る。
+- 使用中のシステム辞書は差し替えない。非選択辞書の更新と切り替え、または `hsync --fep-off` による停止中更新を使う。
 
----
+## 2. 段 P のゲスト試験
 
-## 2. 辞書のメタ情報 — 項目・使い道・置き場
+`userland/tests/fep_meta_test.c` は実 SQLite と公開 KAPI で 20 キーの全 byte・語数、学習後の S→L→S、settings の予約境界、ID/品詞不一致時の学習停止と system 変換を検査する。各項目の PASS/FAIL と集計行・終了コードを返す。
 
-**置き場の分担**: **`PRAGMA user_version` (ヘッダの 4 バイト整数) には形式の版だけ**を置き、**残りは `meta` 表 (`key TEXT PRIMARY KEY, value TEXT`)** に置く。理由: 形式の版は「この FEP が開けるか」を**SQL を流す前**に決める値なので、スキーマに依らず読めるヘッダ値がよい (開けない版の辞書に `SELECT` を流さない)。それ以外は数も型もこれから増えるので表がよい。ただし §1 のとおりカーネルの SQLite は `user_version` の PRAGMA を省いているので、**実装時に `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` を外す**か、**ファイルヘッダのオフセット 60〜63 (ビッグエンディアン) を VFS 経由で直接読む**かを T4 (モジュール化でビルド設定を作り直す段) で決める。`page_size` はヘッダのオフセット 16〜17 にあり `PRAGMA page_size` でも読めるので、`meta` には**持たず照合だけ**する。
+PM は退避した試験用イメージに S/M/L と試験プログラムを配備し、空の専用学習 DB を使う。起動前に以下を設定し、再起動してから実行する。
 
-| 項目 | 型 | 使い道 | 置き場 |
-|---|---|---|---|
-| `format_version` | 整数 | この FEP が開ける形式か (スキーマ・列・索引の約束の版)。**小さければ開かない**、大きければ「知らない版」として開かない。`user_version` に置き、`meta` にも同じ値を写す (表だけ読んだ側の照合用) | `PRAGMA user_version` + `meta` |
-| `page_size` | 整数 | カーネルの `SQLITE_DEFAULT_PAGE_SIZE` と一致するかの照合 (違うと読める場合もあるがキャッシュの見積もりが狂う) | ヘッダ (`PRAGMA page_size`)。`meta` には持たない |
-| `min_fep_version` | 整数 (KAPI 版か FEP 自身の版) | 辞書が要求する FEP の最低版 (新しい列・コスト式を使う辞書を古い FEP に読ませない) | `meta` |
-| `dict_id` | 文字列 (例 `ipadic-2.7.0-M`) | **学習データとの対応付け** (§3)。同じ `dict_id` の辞書と学習だけを組にする | `meta` |
-| `kind` | `system` / `user` / `supplement` | システム辞書 (読み取り専用で配る) / 学習データ (書く) / 追加辞書 (人名・地名など、将来) の区別。FEP は `kind` を見て開き方 (RO / RW) を決める | `meta` |
-| `language` / `charset` | 文字列 (`ja` / `UTF-8`) | 将来の多言語・別の符号化の辞書を今の FEP が誤って開かないため | `meta` |
-| `variant` | `S` / `M` / `L` | `ime_switch_dict` の表示と、`mem_reserve_kb` の既定の見積もりの根拠 | `meta` |
-| `source` / `source_version` | 文字列 (`IPADIC` / `2.7.0`) | 出典。`04_DICT_QUALITY` の頻度データを重ねたときはここに列挙 | `meta` |
-| **`license` / `attribution`** | 文字列 (条項の要旨と著作権表示の全文、または同梱ファイルへの参照) | **必須**。辞書はパブリックの `os32-v3` で配るので、元データの配布条件 (IPADIC は著作権表示と条項の同梱を求める) をファイル自身が運ぶ。`ime` コマンドで表示できる形にする。原文は同梱済み ([THIRD_PARTY.md の IPADIC 行](../../../THIRD_PARTY.md))。`fep_to_sqlite.py` による `meta` への取り込みが残件 | `meta` |
-| `build_tool` / `build_date` | 文字列 | 生成した道具と日付 (`fep_to_sqlite.py` の版、ISO 8601)。再現性の確認 | `meta` |
-| `entry_count` | 整数 | `SELECT count(*)` を起動時に流さずに語数を表示・検査する (97,514 のような数を `ime` コマンドで出す) | `meta` |
-| `pos_table_version` | 整数 | `pos_id` の意味 (品詞表) の版。**学習データ側にも記録して不整合を検出** (§3)。品詞表を変えた辞書に古い学習を混ぜない | `meta` |
-| `cost_scale` | 整数または文字列 | `cost` の尺度 (IPADIC の生コストか正規化後か、上限値)。候補の並べ替えで辞書と学習の `freq` を合成するときの基準 | `meta` |
-| **`mem_reserve_kb`** | 整数 (KB) | **FEP の SQLite 取り分** (MEMMAP_V3 D27・§4-6)。起動時にこの量を MEMSYS5 から優先確保し、アプリの `db_open` は「プール − この分」で上限。settings (`fep.mem_reserve_kb`) で上書き。切り替え先の値が起動時の確保量を超えるときは再起動で再確保 | `meta` |
-| `cache_pages` | 整数 (ページ) | 辞書の接続に設定する `PRAGMA cache_size` の推奨値 (`mem_reserve_kb` の内訳。page_size × cache_pages ≤ mem_reserve_kb × 1024 をビルド時に検査) | `meta` |
-| `checksum` | 文字列 (`dict` 表の内容のハッシュ、または全ファイル) | 配備の照合 (`hsync --verify` の代わりに辞書だけ検査)、破損の検出。全ファイルのハッシュはファイル自身に書けないので**表の内容のハッシュ**にする | `meta` |
+```text
+cfg set system fep_mem_reserve_kb int 224
+cfg set system fep_user_dict_path text /etc/fep_meta_user.db
+```
 
-未指定の項目の既定値 (メタ情報の無い今の `fep.db` を v3 の途中で読むための救済) は**実装の段で決める**: `format_version` 0 = 「メタ無しの旧形式」として `dict` 表だけ読み、`mem_reserve_kb` は既定値 (MEMMAP_V3 §4-6)。
+試験は L の予約量と専用学習 DB の ID・品詞表の版を一時変更し、終了時に元へ戻す。中断した場合は退避イメージから戻す。試験後は元の settings を復元して再起動する。
 
----
+## 3. 受入の残件
 
-## 3. 学習データを辞書と別ファイルに分ける (M2)
-
-**今**: 学習表 `dict_user` は辞書と同じ `fep.db` に作られる (`ime_dict.c:86-95`)。辞書を差し替えると学習も消え、辞書を書き込み可能で開かなければならず、`hsync` は使用中の辞書を差し替えられない (`ime_dict.c:150-157`)。
-
-**決定**: 学習データは別ファイル (例 **`/etc/fep_user.db`**。パスは settings で上書き可) に置く。
-
-| 理由 | 効果 |
-|---|---|
-| **辞書の入れ替え・`hsync` で学習が消えない** | S/M/L の切り替え (`ime_switch_dict`) や辞書の更新配備を、学習を失わずに行える。学習は `/etc` に残る |
-| **システム辞書を読み取り専用で配れる** | `kind = system` の辞書は `SQLITE_OPEN_READONLY` で開く。書き込みが無いので ext2 の ROFS (`OS32_ERR_ROFS`) でも変換は動き、ジャーナルも作らない。`hsync` は辞書を「使用中の RW ファイル」として扱わなくてよくなる (差し替え規則は実装の段で確認) |
-| **不整合を検出できる** | 学習データ側の `meta` に **`dict_id` と `pos_table_version`** (と `format_version`) を記録し、開くときに辞書側と照合する。不一致なら学習の**使用を止めて警告** (消さない — `ime` コマンドで破棄を選ばせる)。辞書に混ざっていた今は、この検出そのものができない |
-
-**学習 DB のスキーマ (案)**: `dict_user` は今の列のまま (`yomi, kanji, freq, last_ts`、PRIMARY KEY `(yomi, kanji)`) + `meta` 表 (`kind = user`、`dict_id`、`pos_table_version`、`format_version`、`created`)。無ければ FEP が作る (今の `CREATE TABLE IF NOT EXISTS` の経路を学習 DB 側へ移す)。
-
-**接続の数**: 辞書 1 本 (RO) + 学習 1 本 (RW) の **2 本**になる。SQLite の取り分 (`mem_reserve_kb`) は 2 本分で見積もる (MEMMAP_V3 §4-6 の既定値も、この票の着手時に 2 本分へ更新する)。
-
----
-
-## 4. 影響範囲 (着手時に確定する)
-
-| 場所 | 変更 |
-|---|---|
-| `tools/fep_to_sqlite.py` | `meta` 表の書き込み (§2 の全項目)、`user_version` の設定、同梱済み原文からの `license` / `attribution` 取り込み、`checksum` の計算、`cache_pages` × page_size ≤ `mem_reserve_kb` の検査 |
-| `assets/ipadic/` | `COPYING` は同梱済み ([THIRD_PARTY.md の IPADIC 行](../../../THIRD_PARTY.md))。meta への取り込み元 |
-| `kernel/ime/ime_dict.c` | 開くとき: 形式の版の検査 (ヘッダ直読みか PRAGMA、§2)、`meta` の読み取り、辞書を RO で開く、学習 DB を別に開く (`dict_user` の作成をそちらへ)、`dict_id` / `pos_table_version` の照合。`SQL_LEARN` と `ime_user_*` の宛先を学習 DB へ |
-| `kernel/ime/ime.c` | `ime_switch_dict`: 切り替え先の `mem_reserve_kb` が起動時の確保量を超えるときは再起動を促す (D27) |
-| `lib/sqlite3/os32_sqlite_config.h` | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` を外すか、ヘッダ直読みで済ませるか (T4 で決める) |
-| KAPI (`ime_user_*`、`ime_switch_dict`) | シグネチャは変えない ([ABI])。学習の宛先が変わるだけ。メタ情報を返す口 (`ime_dict_info` 等) を足すなら [ABI] 追記 |
-| `userland/deploy.yaml`、`hsync` | 学習 DB は配備対象にしない (`/etc` に残す)。システム辞書の RO 差し替えの規則 |
-| `userland/system/hsync_protect.inc` | **`fep_user.db*` (本体・journal・回復用) を保護名に足す** (M6。今は `settings.db*` だけ) |
-| settings (`settings.db`) | `fep.mem_reserve_kb`、`fep.user_dict_path` (上書き用) |
-| 文書 | 本票の §2・§3 に現行辞書仕様を反映 (実装前は計画として区別)。`FEP_STATUS.md` は快照のまま保持し、[`00_INDEX.md`](00_INDEX.md) の表に状態を反映 |
-
----
-
-## 5. 受入 (案 — 設計票の段で確定)
-
-- メタ情報の無い今の `fep.db` を旧形式として開けること (`format_version` 0 の救済)。`format_version` が FEP より大きい辞書は開かず、理由を表示。
-- 学習 → 辞書を S → L に切り替え → 学習が残ること。辞書を `hsync` で差し替えても学習が残ること。
-- `dict_id` の違う学習 DB を置いたとき、学習の使用が止まり警告が出て、辞書の変換は動くこと。
-- システム辞書を RO で開いた状態で ROFS (書き込み全拒否) を起こしても 1 語変換が通ること。
-- `ime` コマンドが `license` / `attribution` と `entry_count` を表示すること。
-- `mem_reserve_kb` を settings で上書きしたとき、起動時の確保量がその値になること。切り替え先の値が確保量を超えるとき、その場で確保せず再起動を促すこと (MEMMAP_V3 §4-6)。
-
----
-
-## 6. 時期と依存
-
-- **v3 の後の方** (ユーザー 2026-09-30)。前提: MEMMAP_V3 の **T4** (SQLite のモジュール化 — `mem_reserve_kb` の既定値と `db_open` の上限はそこで入る) と **T5a** (FEP のモジュール化)。この票はその上に「辞書からの読み取り」と「学習の別ファイル化」を載せる。
-- 並べる先: `docs/archive/v3/V3_PLAN_DRAFT.md` §3 **P10 データ・設定層** (v3 後半)。
-- 関係する票: `FEP_BOUNDARY` (FEP の KAPI 境界)、`F2_OWNERSHIP` (接続単位の FD 所有 — 学習 DB の接続も同じ規則)、`04_DICT_QUALITY` (コスト式。`cost_scale` / `pos_table_version` の値を決めるのはそちら)。
-- **後続 (U6 決定、ユーザー 2026-09-30、MEMMAP_V3 D29)**: F3b「同一 DB の排他 open」(S0_FOUNDATION の lock 表は作らず、親子 (exec の入れ子) が同じ DB を同時に開く経路を open で塞ぐ最小代案) は**この票の後**に P10 で行う — 辞書 RO 1 本 + 学習 RW 1 本になれば「辞書は RO 共有、学習は RW 単独」で排他 open と相性がよい。出典 `docs/archive/v3/U6_PENDING_REVIEW.md` §1-1。
-
----
-
-## 7. 経緯
-
-| 日付 | 出来事 |
-|---|---|
-| 2026-09-30 | v3 のメモリマップの討論 (MEMMAP_V3 §11-3) の中で、FEP の SQLite 取り分の出典として「辞書のメタ情報 `mem_reserve_kb`」が出た → ユーザーが**メタ情報の項目と学習データの別ファイル化を採用、着手は v3 の後の方**と決定 (D27・D28)。この票を起こした (計画) |
-| 2026-09-30 | V3_PLAN_DRAFT §7-2 **X8** (データの互換) への Codex の回答をユーザーが承認 → **M6** (二段移行、`fep_user.db` の保護名、v2.x の戻り先は旧データの写しも) を §0・§3・§4・§5・§6 に追記。決定 M1〜M5 は変えない |
+- ゲスト未実行。登録と NP21/W での実行・観測は PM が担当する。
+- 配備・hsync・再起動後の学習 4 列保持と FDRECOV の消失条件は [FEPLEARN-1](../DEFERRED_TESTS.md) に残す。PM のゲスト受入後に閉じる。
+- 壊れたヘッダ等のゲストで作らない状態は `tools/tests/test_fep_meta.py`、ROFS・hsync 保護等は確定設計 §9 の受入で扱う。
