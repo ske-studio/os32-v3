@@ -8,12 +8,13 @@
 /* Core probe is a separately tested boundary. This fixture supplies the
  * already validated legacy identity; SQL/open/cache/schema remain real. */
 static int probe_error;
+static u32 probe_reserve_kb = FEP_DICT_RESERVE_KB;
 int fep_meta_probe(const char *path, FepMeta *out)
 {
     CHECK(path && path[0]);
     if (probe_error) return probe_error;
     *out = (FepMeta){ .pos_version = FEP_DICT_POS_VERSION,
-        .reserve_kb = FEP_DICT_RESERVE_KB, .cache_pages = FEP_DICT_CACHE_PAGES,
+        .reserve_kb = probe_reserve_kb, .cache_pages = FEP_DICT_CACHE_PAGES,
         .variant = 'M' };
     kstrncpy(out->dict_id, FEP_DICT_ID, sizeof(out->dict_id));
     return 0;
@@ -26,6 +27,8 @@ static int stage_i_step(sqlite3_stmt *stmt)
         return step_error;
     return sqlite3_step(stmt);
 }
+static void inject_merge_fault(sqlite3_stmt *stmt, int at)
+{ fail_cursor = stmt; fail_step_at = at; step_calls = 0; step_error = SQLITE_ERROR; }
 static struct { sqlite3_stmt *stmt; const char *p[2]; } borrowed[16];
 static int borrow_slot(sqlite3_stmt *stmt)
 {
@@ -68,6 +71,8 @@ int main(void)
     IME_UserEntry entries[4];
     CHECK(os32_sqlite_init() == SQLITE_OK);
     fixture_init();
+    store_merge_cases(inject_merge_fault);
+    step_error = SQLITE_IOERR;
     /* The shared admin helpers still serve J's active legacy facade. */
     static IME_Dict legacy;
     make_dict("/db/legacy.db", "旧");
@@ -86,8 +91,25 @@ int main(void)
             "INSERT INTO dict VALUES('かなか','前',10,800);"
             "INSERT INTO dict VALUES('かなかい','先',11,400);");
     CHECK(setup_close(db) == SQLITE_OK);
-    /* An explicit smaller settings reservation is not a switch. */
+    /* Boot supplies the accepted metadata even when settings reserve less. */
     s.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
+    CHECK(!fep_meta_probe(FEP_DICT_PATH_M, &s.meta));
+    CHECK(!fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH));
+    CHECK(!fep_store_close(&s));
+    CHECK(!fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH));
+    CHECK(!fep_store_close(&s));
+    /* A larger stopped-dictionary replacement must fail before either open. */
+    probe_reserve_kb = FEP_DICT_RESERVE_KB + 1;
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_AGAIN);
+    CHECK(!s.system.db && !s.user.db && !s.system.group.generation &&
+          !s.user.group.generation && !strcmp(s.system.path, FEP_DICT_PATH_M) &&
+          !strcmp(s.user.path, FEP_USER_PATH));
+    probe_error = OS32_ERR_IO;
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_IO);
+    probe_error = 0;
+    probe_reserve_kb = FEP_DICT_RESERVE_KB;
+    /* Zero means the boot reservation has not been published yet. */
+    s.boot_reserve_kb = 0;
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(s.user_enabled && fep_store_live_connections(&s) == 2);
     CHECK(sqlite3_exec(s.system.db, "DELETE FROM dict", 0, 0, 0) == SQLITE_READONLY);
@@ -207,6 +229,21 @@ int main(void)
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_INVAL);
     CHECK(fep_store_live_connections(&s) == 0);
     probe_error = 0;
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
+    /* Boot without a system must retain the custom path for a later switch,
+     * including the case where the core snapshot already has the same ID. */
+    CHECK(fep_store_close(&s) == 0);
+    static FepStore cold;
+    cold.meta = s.meta;
+    cold.boot_reserve_kb = FEP_DICT_RESERVE_KB;
+    CHECK(fep_store_open(&cold, "/db/missing.db", "/etc/later.db") != 0);
+    CHECK(!strcmp(cold.user.path, "/etc/later.db"));
+    CHECK(fep_store_switch(&cold, FEP_DICT_PATH_M) == 0);
+    CHECK(cold.user_enabled && cold.user.db && fep_store_live_connections(&cold) == 2);
+    fep_store_learn(&cold, "か", "後");
+    CHECK(fep_store_user_list(&cold, 0, entries, 4) == 1 &&
+          !strcmp(entries[0].kanji, "後"));
+    CHECK(fep_store_close(&cold) == 0);
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     /* Close both sides even if user has an unowned statement: quarantine is
      * retained, counted, and cannot be reset by another open. */

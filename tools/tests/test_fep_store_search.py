@@ -89,7 +89,12 @@ def main():
             if product.count(OLD) != 1:
                 raise RuntimeError('system retry anchor not unique')
             cases.append(('system-only-retry', product.replace(OLD, NEW), user_product,
-                          'hits(&s, out) == 3'))
+                          'fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3'))
+            old = 'if (i == 2) valid = user_text(p, n, s->meta.dict_id);'
+            if user_product.count(old) != 1:
+                raise RuntimeError('user identity anchor not unique')
+            cases.append(('user-identity', product, user_product.replace(old, 'if (i == 2) valid = 1;'),
+                          '!s.user_enabled && !s.user.db && fep_store_live_connections(&s) == 1'))
             old = 'result = user_exec(db, "UPDATE dict_user SET freq=freq WHERE 0");'
             if user_product.count(old) != 1:
                 raise RuntimeError('readonly probe anchor not unique')
@@ -100,6 +105,21 @@ def main():
                 raise RuntimeError('hot journal anchor not unique')
             cases.append(('hot-journal', product.replace(old, old.replace('if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0))', 'if (0)')), user_product,
                           'hits(&s, out) == 3 && !s.user_enabled && !s.user.db'))
+            old = 's->boot_reserve_kb && meta.reserve_kb > limit'
+            if product.count(old) != 1:
+                raise RuntimeError('open reservation anchor not unique')
+            cases.append(('resume-budget', product.replace(old, '0 && (' + old + ')'), user_product,
+                          'fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_AGAIN'))
+            old = 'u32 limit = s->boot_reserve_kb > s->meta.reserve_kb ?\n        s->boot_reserve_kb : s->meta.reserve_kb;'
+            if product.count(old) != 1:
+                raise RuntimeError('accepted metadata anchor not unique')
+            cases.append(('boot-budget', product.replace(old, 'u32 limit = s->boot_reserve_kb;'), user_product,
+                          '!fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH)'))
+            old = 'else if (!had_system && !s->user.db && s->user.path[0])'
+            if product.count(old) != 1:
+                raise RuntimeError('cold switch anchor not unique')
+            cases.append(('cold-switch-learning', product.replace(old, 'else if (0)'), user_product,
+                          'cold.user_enabled && cold.user.db'))
         for name, code, user_code, assertion in cases:
             (work / 'product.c').write_text(code)
             (work / 'user_product.c').write_text(user_code)

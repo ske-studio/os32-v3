@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ime_info.inc"
+
 static void print_usage(void)
 {
     printf("Usage:\n");
@@ -15,6 +17,7 @@ static void print_usage(void)
     printf("  ime on | off             Enable/Disable FEP\n");
     printf("  ime mode hira|kata       Switch input mode\n");
     printf("  ime dict s|m|l           Switch dictionary variant\n");
+    printf("  ime info                 Show dictionary metadata\n");
     printf("  ime user list [yomi]     List user dictionary entries\n");
     printf("  ime user delete <yomi> [kanji]  Delete user dictionary entry\n");
     printf("  ime user export [path]   Export user dictionary to CSV\n");
@@ -53,6 +56,10 @@ int main(int argc, char **argv, KernelAPI *api)
             printf("FEP: OFF\n");
         }
         return 0;
+    }
+
+    if (strcmp(argv[1], "info") == 0) {
+        return ime_info(api);
     }
 
     if (strcmp(argv[1], "on") == 0) {
