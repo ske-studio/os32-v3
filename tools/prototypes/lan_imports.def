@@ -217,6 +217,42 @@
       "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "sfs_ensure_session",
+      "source": "fs/serialfs/serialfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_persistent_client",
+      "source": "fs/serialfs/serialfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_persistent_stale",
+      "source": "fs/serialfs/serialfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_client_call_deadline",
+      "source": "fs/serialfs/sfs_client.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_put16",
+      "source": "fs/serialfs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_put32",
+      "source": "fs/serialfs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

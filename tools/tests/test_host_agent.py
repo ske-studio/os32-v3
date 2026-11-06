@@ -13,6 +13,8 @@ ListSink に差し替える。ネットワークにもエミュレータにも�
 """
 import base64
 import contextlib
+import importlib.util
+from unittest.mock import patch
 import os
 import pathlib
 import random
@@ -251,7 +253,7 @@ def r2_R1_hello_and_roundtrip():
     """R1: 非ゼロの agent 世代での HELLO → REQUEST → RESPONSE → 本文完了。"""
     a, o = up()
     sa, est = o.hello(sess=o.sess)
-    agent_gen, req_sess, req_epoch = struct.unpack("<HHH", sa["pl"])
+    agent_gen, req_sess, req_epoch = struct.unpack("<HHH", sa["pl"][:6])
     assert agent_gen == 0x4242 and agent_gen != 0, "agent 世代が載っていない"
     assert est["op"] == HA.OP_HELLO and est["flags"] == HA.HS_ESTAB
     assert a.established and a.sess == o.sess
@@ -505,12 +507,12 @@ def r4_R2_restart_does_not_fall_back_to_old_session():
     n = 0x5555
     out = o.send(HA.OP_HELLO, HA.HS_SYN, epoch=o.epoch + 1, seq=n, sess=old)
     sa_resync = out[0]
-    assert struct.unpack("<HHH", sa_resync["pl"])[1] == old, "req_sess の写しが無い"
+    assert struct.unpack("<HHH", sa_resync["pl"][:6])[1] == old, "req_sess の写しが無い"
     # そこへ OS32 が再起動し、同じ nonce で新セッションの SYN を出す
     o2 = FakeOS32(a)
     out = o2.send(HA.OP_HELLO, HA.HS_SYN, epoch=1, seq=n, sess=0)
     sa_new = out[0]
-    gen, req_sess, req_epoch = struct.unpack("<HHH", sa_new["pl"])
+    gen, req_sess, req_epoch = struct.unpack("<HHH", sa_new["pl"][:6])
     assert req_sess == 0 and req_epoch == 1, (req_sess, req_epoch)
     assert sa_new["sess"] != old, "再起動に旧 sess を割り当てた"
     # 遅延していた再同期用 SYN-ACK は req_sess = old なので再起動側は採用しない。
@@ -611,15 +613,15 @@ def paylen_mismatch_is_dropped():
 
 
 def hello_paylen_per_stage():
-    """HELLO は段階ごとに payload 長が決まっている (SYN 0 / SYN-ACK 6 /
-    CONFIRM 0 / ESTABLISHED 2)。違うものは捨てる。"""
+    """HELLO は段階ごとに payload 長が決まっている (SYN 0 / SYN-ACK 6/12 /
+    CONFIRM 0 / ESTABLISHED 2/8)。違うものは捨てる。"""
     a = new_agent()
     o = FakeOS32(a)
     assert o.send(HA.OP_HELLO, HA.HS_SYN, epoch=1, seq=1, sess=0,
                   payload=b"xx") == [], "SYN に payload を付けても通った"
     assert not a.established
     out = o.send(HA.OP_HELLO, HA.HS_SYN, epoch=1, seq=1, sess=0)
-    assert out and out[0]["len"] == 6, "SYN-ACK の payload が 6B でない"
+    assert out and out[0]["len"] == 12, "SYN-ACK の payload が 12B でない"
 
 
 def wdata_dedup_by_sess_rid_seq():
@@ -1533,7 +1535,170 @@ def n3fix_file_nul_byte_403():
         assert resp(only(out, HA.OP_RESPONSE)) == (False, 403, 0)
 
 
+def h5_hello_list_and_notify():
+    a = new_agent()
+    clock = [0.0]
+    a.now = lambda: clock[0]
+    o = FakeOS32(a)
+    sa, est = o.hello()
+    assert sa["len"] == 12 and est["len"] == 8
+    generation, alive = struct.unpack("<IH", sa["pl"][6:])
+    assert generation == a.host_generation != 0
+    assert est["pl"][2:] == sa["pl"][6:]
+    assert alive == a.registry.resolve("os32.alive")
+    for flags, sizes in ((HA.HS_SYN, (0,)), (HA.HS_CONFIRM, (0,)),
+                         (HA.HS_SYNACK, (6, 12)), (HA.HS_ESTAB, (2, 8))):
+        for size in range(14):
+            before = a.counts["dropped"]
+            if flags in (HA.HS_SYNACK, HA.HS_ESTAB):
+                o.send(HA.OP_HELLO, flags, payload=b"x" * size)
+                assert (a.counts["dropped"] == before) == (size in sizes)
+            assert a._paylen_ok(HA.OP_HELLO, flags, size) == (size in sizes)
+    o.send(HA.OP_REQUEST, rid=1, payload=b"LIST")
+    listing = read_body(o, 1)
+    assert listing.startswith(b"generation %d\n" % generation)
+    assert b"os32.alive 1 %d builtin\n" % alive in listing
+    assert o.pump() == []  # window がまだ無い
+    o.send(HA.OP_WINDOW, rid=0, payload=struct.pack("<H", 4))
+    notice = only(o.pump(), HA.OP_NOTIFY)
+    assert (notice["rid"], notice["seq"], notice["sess"], notice["epoch"]) == (0, 1, o.sess, o.epoch)
+    assert notice["pl"] == struct.pack("<IHHHHI", generation, alive, 1, 4, 0, generation)
+    # CONFIRM の重複で通知系列を巻き戻さない。
+    o.send(HA.OP_HELLO, HA.HS_CONFIRM, seq=o.nonce, ack=sa["ack"])
+    clock[0] = 0.11
+    assert only(o.pump(), HA.OP_NOTIFY)["seq"] == 1
+    o.send(HA.OP_ACK, rid=0, ack=1, sess=o.sess + 1)
+    clock[0] = 0.22
+    assert only(o.pump(), HA.OP_NOTIFY)["seq"] == 1
+    o.send(HA.OP_ACK, rid=0, ack=1)
+    a.notify("os32.clip", 7, b"changed")
+    notice = only(o.pump(), HA.OP_NOTIFY)
+    assert notice["seq"] == 2 and notice["pl"].endswith(b"changed")
+    assert a.high_water == 1
+    o.hello(epoch=2)
+    assert o.pump() == []  # 新セッションには窓を持ち越さない
+    o.send(HA.OP_WINDOW, rid=0, payload=struct.pack("<H", 4))
+    assert only(o.pump(), HA.OP_NOTIFY)["seq"] == 1
+    o.send(HA.OP_ACK, rid=0, ack=1)
+    clock[0] += 5
+    assert only(o.pump(), HA.OP_NOTIFY)["pl"] == struct.pack("<IHHHHI", generation, alive, 1, 4, 0, generation)
+
+
+def h5_named_services_and_linux_clip():
+    a, o = up(clip="wayland")
+    proc = FakeProc("日本語\r\n".encode())
+    proc.close = lambda: setattr(proc, "closed", True)
+    with patch.object(HA.host_linux, "clip_start", return_value=proc) as start:
+        o.send(HA.OP_REQUEST, rid=1, payload=b"os32.clip GET")
+        assert start.called and start.call_args.args == ("get", b"", "wayland")
+        assert resp(only(o.send(HA.OP_STATUS, rid=1), HA.OP_RESPONSE)) == (True, HA.CTL_PROCESSING, 0)
+        proc.step()
+        assert resp(only(o.pump(), HA.OP_RESPONSE)) == (False, 200, len("日本語\n".encode()))
+        assert read_body(o, 1) == "日本語\n".encode() and proc.closed
+    o.send(HA.OP_RELEASE, rid=1)
+    proc = FakeProc()
+    with patch.object(HA.host_linux, "clip_start", return_value=proc) as start:
+        o.send(HA.OP_REQUEST, rid=2, payload=b"os32.clip PUT 3")
+        o.send(HA.OP_WDATA, rid=2, seq=1, payload=b"a\r\n")
+        assert start.called and start.call_args.args == ("put", b"a\n", "wayland")
+        o.send(HA.OP_RELEASE, rid=2)
+        assert proc.killed
+    with patch.object(HA.host_linux, "clip_start", side_effect=HA.host_linux.ServiceUnavailable("missing")):
+        assert resp(only(o.send(HA.OP_REQUEST, rid=3, payload=b"CLIP GET"), HA.OP_RESPONSE))[1] == 503
+    o.send(HA.OP_RELEASE, rid=3)
+    a.registry.register("example", 1, "plugin", lambda line, data: (201, line.encode() + data))
+    assert resp(only(o.send(HA.OP_REQUEST, rid=4, payload=b"example RUN"), HA.OP_RESPONSE))[1] == 201
+    assert read_body(o, 4) == b"example RUN"
+    o.send(HA.OP_RELEASE, rid=4)
+    for rid, line, status in ((5, b"os32.udf OPEN", 501), (6, b"missing", 404),
+                               (7, b"os32.http GET /pattern/3", 200)):
+        assert resp(only(o.send(HA.OP_REQUEST, rid=rid, payload=line), HA.OP_RESPONSE))[1] == status
+        o.send(HA.OP_RELEASE, rid=rid)
+
+
+def h5_linux_print_lifecycle():
+    with tempfile.TemporaryDirectory(prefix="h5-print-") as directory, patch.object(HA.sys, "platform", "linux"):
+        for outcome in ("done", "error", "timeout", "release", "session", "missing"):
+            a, o = up(printer=True, state_dir=directory)
+            clock = [0.0]
+            a.now = lambda: clock[0]
+            proc = FakeProc(rc=1 if outcome == "error" else 0)
+            proc.close = lambda: setattr(proc, "closed", True)
+            job = int(open_job(o, 1, kind=b"raw").split()[1])
+            o.send(HA.OP_RELEASE, rid=1)
+            o.send(HA.OP_REQUEST, rid=2, payload=b"PRINT DATA %d 3" % job)
+            o.send(HA.OP_WDATA, rid=2, seq=1, payload=b"abc")
+            o.send(HA.OP_RELEASE, rid=2)
+            failure = HA.host_linux.ServiceUnavailable("no lp") if outcome == "missing" else None
+            with patch.object(HA.host_linux, "print_start", return_value=proc, side_effect=failure) as start:
+                out = o.send(HA.OP_REQUEST, rid=3, payload=b"os32.print CLOSE %d" % job)
+                assert start.called and start.call_args.args == (b"abc", None, True)
+                if outcome == "missing":
+                    assert resp(only(out, HA.OP_RESPONSE))[1] == 503
+                else:
+                    assert not [f for f in out if f["op"] == HA.OP_RESPONSE]
+                    clock[0] = 2.0
+                    assert resp(only(o.send(HA.OP_STATUS, rid=3), HA.OP_RESPONSE)) == (True, HA.CTL_PROCESSING, 0)
+                    assert not o.pump()
+                    o.send(HA.OP_REQUEST, rid=4, payload=b"PRINT STATUS %d" % job)
+                    assert read_body(o, 4) == b"queued"
+                    o.send(HA.OP_RELEASE, rid=4)
+                    assert resp(only(o.send(HA.OP_REQUEST, rid=5, payload=b"PRINT CLOSE %d" % job), HA.OP_RESPONSE))[1] == 409
+                    o.send(HA.OP_RELEASE, rid=5)
+                    if outcome in ("done", "error"):
+                        proc.step()
+                    elif outcome == "timeout":
+                        clock[0] = 5.0
+                    elif outcome == "release":
+                        o.send(HA.OP_RELEASE, rid=3)
+                    else:
+                        o.hello(epoch=2)
+                    out = o.pump()
+                    if outcome in ("done", "error", "timeout"):
+                        assert resp(only(out, HA.OP_RESPONSE))[1] == (200 if outcome == "done" else 503)
+                    else:
+                        assert out == [] and proc.killed
+                    if outcome in ("done", "error"):
+                        assert proc.closed
+                assert a.jobs[job]["state"] == ("done" if outcome == "done" else "error")
+                assert not a.pending
+
+
+def h5_mutations():
+    global HA
+    original = HA
+    mutations = [
+        ('+ self.notifier.hello_extension())\n        out.send', '+ b"")\n        out.send'),
+        ('self.notifier.ack(sess, epoch, ack, window)', 'pass'),
+        ('self.notifier.session(self.sess, self.epoch, self.now())', 'pass'),
+        ('elif line == "LIST" or "." in name:', 'elif line == "LIST" or "." in name:\n            self._answer(rid, ent, 404, b"", None, out)\n            return'),
+        ('proc = host_linux.print_start(data, None, job["kind"] == "raw")', 'raise host_linux.ServiceUnavailable("mutant")'),
+        ('proc = host_linux.clip_start("get", b"", b)', 'raise host_linux.ServiceUnavailable("mutant")'),
+    ]
+    source = (ROOT / "tools/host_agent.py").read_text()
+    with tempfile.TemporaryDirectory(prefix="h5-mutants-") as directory:
+        for index, (old, new) in enumerate(mutations):
+            assert source.count(old) == 1, (old, source.count(old))
+            path = pathlib.Path(directory) / "mutant.py"
+            path.write_text(source.replace(old, new))
+            spec = importlib.util.spec_from_file_location("host_agent_mutant", path)
+            HA = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(HA)
+            try:
+                for case in (h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
+                    case()
+            except AssertionError:
+                print("  RED h5 mutation %d" % index, flush=True)
+            else:
+                raise AssertionError("h5 mutation survived: " + old)
+            finally:
+                HA = original
+
+
 CASES = [
+    h5_hello_list_and_notify,
+    h5_named_services_and_linux_clip,
+    h5_linux_print_lifecycle,
     n3_get_async_processing_then_200,
     n3_get_async_404_not_502,
     n3_get_async_child_rc_nonzero_502,
@@ -1632,6 +1797,8 @@ def main():
         except Exception as e:                       # noqa: BLE001
             print("  ERROR %s: %r" % (c.__name__, e), flush=True)
             failed += 1
+    if "--mutate" in sys.argv and not failed:
+        h5_mutations()
     print("SUMMARY %d/%d PASS" % (len(cases) - failed, len(cases)), flush=True)
     return 1 if failed else 0
 

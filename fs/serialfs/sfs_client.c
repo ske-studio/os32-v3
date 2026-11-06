@@ -244,7 +244,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
             else
                 (void)c->io->put(c->ctx, c->tx, flen);
             sent = 1;
-            retry = now + SFS_LAN_RETRY_TICKS;
+            retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;
         }
         int b = c->io->get(c->ctx);
         if ((i32)(c->io->now(c->ctx) - deadline) >= 0) {

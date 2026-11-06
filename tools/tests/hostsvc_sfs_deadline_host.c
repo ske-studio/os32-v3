@@ -7,7 +7,7 @@ static SfsClient client;
 static u8 rx[SFS_BUFFER_FRAME], first[SFS_BUFFER_FRAME];
 static u32 pos, end, sends, first_len, stale, ensured, ensure_delay;
 static int mode, put_delay, get_delay;
-static u32 bounded_sends, passed_deadline;
+static u32 bounded_sends, passed_deadline, second_send;
 /* modes: 0 normal, 1 silence, 2 continuous stray, 3 unknown sid,
  * 4 short response, 5 delayed until resend, 6 wrong nonce, 7 bad version. */
 static int put(void *ctx, const u8 *buf, u32 n)
@@ -27,6 +27,7 @@ static int put(void *ctx, const u8 *buf, u32 n)
         if (first_len != n) __builtin_trap();
         for (u32 i = 0; i < n; i++) if (first[i] != buf[i]) __builtin_trap();
     }
+    if (sends == 1) second_send = hs_now();
     sends++;
     hs_advance(put_delay);
     int fail;
@@ -89,7 +90,7 @@ static void reset(u32 start)
     client.sid = 77;
     sends = pos = end = stale = ensured = ensure_delay = 0;
     mode = put_delay = get_delay = 0;
-    bounded_sends = passed_deadline = 0;
+    bounded_sends = passed_deadline = second_send = 0;
 }
 static int suite(void)
 {
@@ -127,6 +128,9 @@ static int suite(void)
     reset(0); mode = 5;
     REQUIRE(sfs_client_call_deadline(&client, SFS_T_WRITE, 0, 0, &reply, 100) == 0);
     REQUIRE(sends == 2 && hs_now() == 10 && client.seq == 1);
+    reset(0); mode = 5; put_delay = 50;
+    REQUIRE(sfs_client_call_deadline(&client, SFS_T_WRITE, 0, 0, &reply, 200) == 0);
+    REQUIRE(sends == 2 && second_send == 60 && hs_now() == 110);
     reset(0); mode = 3;
     REQUIRE(sfs_request_deadline(SFS_T_WRITE, 0, 0, &reply, 100) == OS32_ERR_STALE);
     REQUIRE(stale == 1 && sends == 1 && !client.sid && reply.length == 0);
