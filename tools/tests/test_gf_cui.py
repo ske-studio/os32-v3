@@ -30,7 +30,7 @@ MUTATIONS = [
      'if (gf_display_owner_exit) gf_display_owner_exit(id + 1);'),
 ]
 
-def run(root, directory):
+def run_case(root, directory):
     flags = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
              '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
              '-nostdlib', '-static', '-no-pie', *include_flags(root), '-I'+str(root)]
@@ -61,10 +61,19 @@ void _start(void) {
     subprocess.run([*flags, '-Wno-address', str(source), '-o', str(exe)], check=True)
     return host32.run([str(exe)], timeout=20, capture_output=True)
 
+def run(ctx) -> int:
+    """Check runner entry (tools/checks/run.py calls run(ctx))."""
+    import os
+    argv = ['python3', '-B', 'tools/tests/test_gf_cui.py']
+    if ctx.mutate:
+        argv.append('--mutate')
+    env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    return subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='gf-cui-') as td:
         directory = Path(td)
-        result = run(ROOT, directory)
+        result = run_case(ROOT, directory)
         assert result.returncode == 0, result.stderr
         print('PASS CUI parser / owner notification runtime GREEN', flush=True)
         if '--mutate' in sys.argv:
@@ -75,8 +84,8 @@ if __name__ == '__main__':
                     tree = mutpar.mutant_tree(ROOT, Path(mt)/'tree',
                         {rel: original.replace(old, new, 1)},
                         real=('tools/tests/gf_cui_shell_host.c', 'userland/shell/cmd_gf2.c'))
-                    red = run(tree, directory)
+                    red = run_case(tree, directory)
                     assert red.returncode != 0, name
                     print(f'PASS {name}: runtime RED', flush=True)
-            assert run(ROOT, directory).returncode == 0
+            assert run_case(ROOT, directory).returncode == 0
             print('PASS restored runtime GREEN', flush=True)
