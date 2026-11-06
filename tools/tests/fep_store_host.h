@@ -18,12 +18,14 @@
 #include "../../kernel/ime/ime_conn.c"
 #include "../../kernel/ime/ime_user_store.c"
 
+static u32 fep_host_probe_reserve_kb = FEP_DICT_RESERVE_KB;
+
 int fep_meta_probe(const char *path, FepMeta *out)
 {
     if (!path || !out) return OS32_ERR_INVAL;
     *out = (FepMeta){ .min_reader = FEP_DICT_READER_VERSION,
         .pos_version = FEP_DICT_POS_VERSION,
-        .reserve_kb = FEP_DICT_RESERVE_KB,
+        .reserve_kb = fep_host_probe_reserve_kb,
         .cache_pages = FEP_DICT_CACHE_PAGES };
     kstrncpy(out->dict_id, FEP_DICT_ID, sizeof(out->dict_id));
     return 0;

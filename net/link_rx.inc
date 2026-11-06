@@ -1,3 +1,5 @@
+#include "link_notify.h"
+
 /* 受信フレームの検査・応答処理と RX ポンプ。link.c から取り込む。 */
 
 /* ======================================================================== */
@@ -8,13 +10,15 @@ static int link_paylen_ok(u8 op, u8 flags, u16 plen)
     switch (op) {
     case LINK_OP_HELLO:
         if (flags == LINK_HS_SYN || flags == LINK_HS_CONFIRM) return plen == 0;
-        if (flags == LINK_HS_SYNACK) return plen == LINK_HELLO_SA_LEN;
-        if (flags == LINK_HS_ESTAB)  return plen == LINK_HELLO_ES_LEN;
+        if (flags == LINK_HS_SYNACK) return plen == LINK_HELLO_SA_LEN || plen == LINK_HELLO_SA_EXT_LEN;
+        if (flags == LINK_HS_ESTAB)  return plen == LINK_HELLO_ES_LEN || plen == LINK_HELLO_ES_EXT_LEN;
         return 0;
     case LINK_OP_REQUEST:
     case LINK_OP_WDATA:
     case LINK_OP_DATA:
         return plen >= 1 && plen <= LINK_MAX_PAYLOAD;
+    case LINK_OP_NOTIFY:
+        return plen >= LINK_NOTIFY_DATA_OFF && plen <= LINK_NOTIFY_MAX_LEN;
     case LINK_OP_RESPONSE: return plen == LINK_RESP_LEN;
     case LINK_OP_WINDOW:   return plen == LINK_WINDOW_LEN;
     case LINK_OP_ACK:
@@ -37,7 +41,7 @@ static struct link_handle *link_by_rid(u32 rid)
 }
 
 static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
-                          u16 sess, const u8 *pl)
+                          u16 sess, const u8 *pl, u16 plen)
 {
     if (flags == LINK_HS_SYNACK) {
         if (link_state != LINK_S_SYN) return;
@@ -61,6 +65,10 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
         if (ack != link_nonce) return;
         if (!mac_eq(src, link_peer_mac)) return;
         link_agent_gen = le_read16(pl);
+        int extended = plen == LINK_HELLO_ES_EXT_LEN;
+        link_notify_session(sess, epoch, extended,
+            extended ? le_read32(pl + LINK_HELLO_ES_HOST_GEN_OFF) : 0,
+            extended ? le_read16(pl + LINK_HELLO_ES_ALIVE_OFF) : 0);
         link_state = LINK_S_UP;
         link_hs_due = 0;
         link_hello_ok = 1;
@@ -74,6 +82,7 @@ static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
     u16 st = le_read16(pl);
     u32 ln = le_read32(pl + LINK_RESPONSE_LENGTH_OFF);
 
+    link_host_progress((i32)(e - link_h));
     e->last_rx_tick = tick_count;
     e->probes = 0;
     if (flags & LINK_F_CTRL) {
@@ -127,11 +136,15 @@ static void link_dispatch(const u8 *f, unsigned int flen)
 
     if (flen < LINK_ETH_HDR_LEN + LINK_HDR_LEN) { link_rx_dropped++; return; }
     if ((((u16)f[ETH_TYPE_OFF] << 8) | f[ETH_TYPE_OFF + 1]) != LINK_ETHERTYPE) { link_rx_dropped++; return; }
-    if (!mac_eq(f, link_my_mac) && !mac_eq(f, link_bcast)) { link_rx_dropped++; return; }
+
 
     h = f + LINK_ETH_HDR_LEN;
     op = h[LINK_OFF_OP];
     flags = h[LINK_OFF_FLAGS];
+    if (!mac_eq(f, link_my_mac) &&
+        !(op == LINK_OP_HELLO && mac_eq(f, link_bcast))) {
+        link_rx_dropped++; return;
+    }
     epoch = le_read16(h + LINK_OFF_EPOCH);
     seq = le_read32(h + LINK_OFF_SEQ);
     ack = le_read32(h + LINK_OFF_ACK);
@@ -146,7 +159,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     link_rx_frames++;
 
     if (op == LINK_OP_HELLO) {
-        link_on_hello(f + ETH_ALEN, flags, epoch, seq, ack, sess, pl);
+        link_on_hello(f + ETH_ALEN, flags, epoch, seq, ack, sess, pl, plen);
         return;
     }
     /* HELLO 以外は sess / epoch が控えと一致し、相手が peer のものだけ。 */
@@ -157,6 +170,11 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     }
 
     switch (op) {
+    case LINK_OP_NOTIFY:
+        if (rid != LINK_NOTIFY_RID) { link_rx_dropped++; break; }
+        link_notify_rx(seq, pl, plen);
+        break;
+
     case LINK_OP_ACK:
         if (flags & LINK_F_RELACK) {
             int i;
@@ -173,8 +191,12 @@ static void link_dispatch(const u8 *f, unsigned int flen)
         if (!e) { link_rx_dropped++; break; }
         e->last_rx_tick = tick_count;
         e->probes = 0;
-        if (!e->req_acked) { e->req_acked = 1; e->req_due = 0; e->retries = 0; }
+        if (!e->req_acked) {
+            link_host_progress((i32)(e - link_h)); /* REQUEST ACK advances */
+            e->req_acked = 1; e->req_due = 0; e->retries = 0;
+        }
         if (e->wlen && ack >= e->wseq) {
+            link_host_progress((i32)(e - link_h)); /* WDATA ACK advances */
             e->w_due = 0;
             e->wlen = 0;
             e->wseq++;
@@ -195,6 +217,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
         e->probes = 0;
         if (seq == e->ack_seq + 1) {
             if (plen <= link_stream_free()) {
+                link_host_progress((i32)(e - link_h)); /* New DATA accepted */
                 link_stream_push(pl, plen);
                 e->ack_seq = seq;
                 e->recv_bytes += plen;
@@ -231,8 +254,8 @@ static void link_rx_pump(void)
 {
     int n;
     for (n = 0; n < LINK_RX_BUDGET; n++) {
-        unsigned int len = 0;
-        if (ne2k_recv(link_rxbuf, sizeof(link_rxbuf), &len) != NE2K_OK) break;
+        u32 len = 0;
+        if (net_rx_take(NET_RX_LINK, link_rxbuf, sizeof(link_rxbuf), &len) != 0) break;
         link_dispatch(link_rxbuf, len);
     }
 }

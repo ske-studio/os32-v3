@@ -783,7 +783,13 @@ int fep_store_open(FepStore *s, const char *path, const char *user_path)
     FepMeta meta;
     int rc = fep_meta_probe(path, &meta);
     if (rc) return rc;
-    if (s->boot_reserve_kb && meta.reserve_kb > s->boot_reserve_kb) {
+    /* Settings may set the boot reservation below the dictionary request
+     * (DICT_META_DESIGN §6: settings → meta → 192 KiB). The dictionary
+     * accepted at boot (s->meta, kept across suspend) is not rejected again;
+     * only a larger replacement (hsync during suspend) needs a restart. */
+    u32 limit = s->boot_reserve_kb > s->meta.reserve_kb ?
+        s->boot_reserve_kb : s->meta.reserve_kb;
+    if (s->boot_reserve_kb && meta.reserve_kb > limit) {
         kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
         return OS32_ERR_AGAIN;
     }

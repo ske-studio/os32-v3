@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -17,7 +17,7 @@ OWNERS = {
     'drivers/sound/cs4231/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
     'drivers/net/ne2000/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
     'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
-    'net/link.c': ('LINK', 'link_tick', 'void link_init('),
+    'net/nic.c': ('LINK', 'net_tick', 'int net_bind('),
     'drivers/net/ne2000/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
     'drivers/video/geforce/geforce_tick.c': ('GF', 'geforce_tick', 'int geforce_tick_bind('),
 }
@@ -39,10 +39,11 @@ def wiring():
         registration = f'tick_register(PC98_TICK_{slot}, {fn})'
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
-        assert '_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT' in src
+        if rel != 'net/nic.c':
+            assert '_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT' in src
     for rel, boundary in [('drivers/net/ne2000/ne2000.c', 'kmemset(&nic'),
                           ('drivers/net/ne2000/lgy98.c', 'cfg.reg_base'),
-                          ('net/link.c', 'kmemcpy(link_my_mac'),
+                          ('net/nic.c', 'link_init(local_mac)'),
                           ('drivers/sound/fm/fm_module.c', 'if (fm_handle.generation)'),
                           ('drivers/sound/cs4231/pcm_module.c', 'if (pcm_handle.generation)'),
                           ('drivers/net/e82557/lan_module.c', 'if (lan_handle.generation)')]:
@@ -52,6 +53,7 @@ def wiring():
                               (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
         src = src[src.index(OWNERS[rel][2]):]
         assert src.index('tick_register(') < src.index(boundary), rel
+    assert 'tick_register' not in (ROOT / 'net/link.c').read_text()
     assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
     assert 'kernel/irq/tick.c' in (ROOT / 'build/kernel.mk').read_text()
     print('PASS timer fixture order, six resident owners plus GF slot (owner checked when present), platform boundary', flush=True)

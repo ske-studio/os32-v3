@@ -12,7 +12,7 @@
  *    - cli/sti: IF=0 中のタイマ延期と、復元直後の tick
  *    - 100Hz タイマ: host_tick() が唯一の駆動元 (link_tick を呼ぶのはここだけ)
  *    - ディスパッチャ: kapi_argptr の早期検査と ring3_ptr_ok の帯
- *  対向は **実 Agent** (tools/host_agent.py を --unix でサブプロセス起動) か、
+ *  対向は **実 Agent** (tools/host_agent.py を socketpair で子プロセスに結ぶ) か、
  *  フレームを手で組む台本 (欠落・重複・遅延・墓標の注入)。
  *
  *  ホスト 64bit + libc で走らせる (tools/tests/kapi_db_v50_host.c と同じ様式)。
@@ -51,6 +51,8 @@ typedef signed int     i32;
 #define __cdecl
 #endif
 
+#include "net/nic.h"
+
 /* ---- 贋 os32_kapi_shared.h ([C4] 共有定数のうちこの票が使う分だけ) ------ */
 #define OS32_KAPI_SHARED_H
 #define OS32_ERR_IO        -1
@@ -59,6 +61,7 @@ typedef signed int     i32;
 #define OS32_ERR_STALE     -11
 #define OS32_ERR_FULL      -13
 #define OS32_ERR_AGAIN     -14
+#define OS32_ERR_HOSTDOWN  -18
 
 /* ---- 贋 kstring.h / kprintf.h ----------------------------------------- */
 #define __KSTRING_H
@@ -92,14 +95,7 @@ static int kutoa_dec(u32 val, char *buf, int bufsz)
 #define NE2K_ERR_AGAIN     -5
 #define NE2K_STATE_OFF      0
 #define NE2K_STATE_RUNNING  1
-struct ne2k_stats { u32 rx_frames; u32 rx_pages_total; };
-static int  ne2k_send(const void *frame, unsigned int length);
-static int  ne2k_recv(void *frame, unsigned int capacity, unsigned int *length);
-static int  ne2k_state(void);
-static int  ne2k_is_busy(void);
-static unsigned int ne2k_rx_ring_free_pages(void);
-static unsigned int ne2k_rx_queue_free(void);
-static void ne2k_get_stats(struct ne2k_stats *s);
+int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length);
 
 /* ======================================================================== */
 /*  贋 NIC                                                                  */
@@ -114,7 +110,6 @@ static int nic_busy = 0;
 static int nic_tx_allow = 1;            /* **1 tick 1 フレーム** */
 static u32 nic_ring_pages = 120;
 static u32 nic_queue_free = 30;
-static struct ne2k_stats nic_stats;
 
 /* TX 記録 (試験が中身を見る) */
 #define TXLOG 512
@@ -140,10 +135,10 @@ static void nic_push_rx(const u8 *f, unsigned int n)
     nic_rxt = next;
 }
 
-static int ne2k_send(const void *frame, unsigned int length)
+int net_tx(const void *frame, u32 length)
 {
-    if (!nic_up) return NE2K_ERR_BUSY;
-    if (nic_tx_allow <= 0) return NE2K_ERR_BUSY;
+    if (!nic_up) return OS32_ERR_HOSTDOWN;
+    if (nic_tx_allow <= 0 || nic_busy) return OS32_ERR_AGAIN;
     nic_tx_allow--;
     if (txn < TXLOG) {
         memcpy(txlog[txn], frame, length > FRAME_CAP ? FRAME_CAP : length);
@@ -159,25 +154,31 @@ static int ne2k_send(const void *frame, unsigned int length)
     return NE2K_OK;
 }
 
-static int ne2k_recv(void *frame, unsigned int capacity, unsigned int *length)
+int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length)
 {
     unsigned int n;
-    if (nic_rxh == nic_rxt) return NE2K_ERR_AGAIN;
+    if (protocol != NET_RX_LINK) return OS32_ERR_INVAL;
+    if (nic_rxh == nic_rxt) return OS32_ERR_AGAIN;
     n = nic_rxlen[nic_rxh];
     if (n > capacity) n = capacity;
     memcpy(frame, nic_rx[nic_rxh], n);
     *length = n;
     nic_rxh = (nic_rxh + 1) % NIC_Q;
-    nic_stats.rx_frames++;
-    nic_stats.rx_pages_total += 3;
     return NE2K_OK;
 }
 
-static int ne2k_state(void) { return nic_up ? NE2K_STATE_RUNNING : NE2K_STATE_OFF; }
-static int ne2k_is_busy(void) { return nic_busy; }
-static unsigned int ne2k_rx_ring_free_pages(void) { return nic_ring_pages; }
-static unsigned int ne2k_rx_queue_free(void) { return nic_queue_free; }
-static void ne2k_get_stats(struct ne2k_stats *s) { *s = nic_stats; }
+int net_mac(u8 out[6])
+{
+    if (!nic_up) return OS32_ERR_HOSTDOWN;
+    memset(out, 0, 6);
+    return 0;
+}
+u32 net_rx_credit_bytes(void)
+{
+    u32 pages = nic_ring_pages;
+    if (nic_queue_free * 6 < pages) pages = nic_queue_free * 6;
+    return pages * 256;
+}
 
 /* ======================================================================== */
 /*  贋タイマ + 贋 cli / sti                                                  */
@@ -236,13 +237,6 @@ static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 /*  実物                                                                    */
 /* ======================================================================== */
 #define LINK_HOST_TEST 1
-#include "tick.h"
-static int tick_register_result;
-int tick_register(unsigned int slot, tick_fn fn)
-{
-    (void)slot; (void)fn;
-    return tick_register_result;
-}
 #ifndef LINK_SOURCE
 #define LINK_SOURCE "../../net/link.c"
 #endif
@@ -425,8 +419,6 @@ static void reset_all(const char *name)
     nic_rxh = nic_rxt = 0;
     nic_up = 1; nic_busy = 0; nic_tx_allow = 1;
     nic_ring_pages = 120; nic_queue_free = 30;
-    memset(&nic_stats, 0, sizeof(nic_stats));
-    tick_register_result = 0;
     txn = 0;
     tx_hook = 0;
     wire_pump_fn = 0;
@@ -452,11 +444,10 @@ static void resp_pl(u8 *pl, u16 status, u32 len)
 }
 
 /* ======================================================================== */
-/*  実 Agent (tools/host_agent.py を --unix でサブプロセス起動)              */
+/*  実 Agent (socketpair: bind/listen 権限を要しないローカル IPC)            */
 /* ======================================================================== */
 static pid_t agent_pid = -1;
 static int   agent_fd = -1;
-static char  agent_sock[128];
 static char  agent_state[128];
 static u8    wire_in[1 << 16];
 static size_t wire_inlen;
@@ -498,66 +489,68 @@ static void agent_stop(void);
 
 static int agent_start(void)
 {
-    struct sockaddr_un sa;
-    int i, fd;
+    int pair[2];
     const char *tmpdir = getenv("TMPDIR");
-    int child_status;
     pid_t parent_pid = getpid();
     if (!tmpdir || !*tmpdir) tmpdir = "/tmp";
-    /* sun_path is shorter than our buffer: fail rather than silently truncate. */
-    if (snprintf(agent_sock, sizeof(agent_sock), "%s/os32-n1-%d.sock", tmpdir,
-                 (int)getpid()) >= (int)sizeof(sa.sun_path) ||
-        snprintf(agent_state, sizeof(agent_state), "%s/os32-n1-%d.state", tmpdir,
+    if (snprintf(agent_state, sizeof(agent_state), "%s/os32-n1-%d.state", tmpdir,
                  (int)getpid()) >= (int)sizeof(agent_state)) {
-        fprintf(stderr, "agent_start: TMPDIR path is too long for UNIX sun_path (%zu bytes)\n",
-                sizeof(sa.sun_path));
-        agent_sock[0] = agent_state[0] = '\0';
+        fprintf(stderr, "agent_start: TMPDIR path is too long for agent state\n");
+        agent_state[0] = '\0';
         return -1;
     }
-    unlink(agent_sock);
     if (mkdir(agent_state, 0700) != 0 && errno != EEXIST) return -1;
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0) {
+        agent_stop();
+        return -1;
+    }
     agent_pid = fork();
     if (agent_pid == 0) {
+        char fd_arg[16];
+        close(pair[0]);
+        snprintf(fd_arg, sizeof(fd_arg), "%d", pair[1]);
         if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != parent_pid) _exit(127);
         int devnull = open("/dev/null", O_WRONLY);
-        if (devnull >= 0) { dup2(devnull, 1); dup2(devnull, 2); }
-        execlp("python3", "python3", "-B", "tools/host_agent.py",
-               "--unix", agent_sock, "--state-dir", agent_state,
+        if (devnull >= 0) { dup2(devnull, 1); close(devnull); }
+        /* Replace only transport setup. Real FrameStream, main loop and
+         * HostAgent handle every byte; no protocol or progress stub. */
+        execlp("python3", "python3", "-B", "-c",
+               "import os, sys\n"
+               "sys.path.insert(0, 'tools')\n"
+               "import host_agent\n"
+               "class Peer:\n"
+               "    def __init__(self, fd): self.fd = fd\n"
+               "    def fileno(self): return self.fd\n"
+               "    def recv(self, n): return os.read(self.fd, n)\n"
+               "    def sendall(self, data):\n"
+               "        while data:\n"
+               "            n = os.write(self.fd, data)\n"
+               "            if n <= 0: raise ConnectionError('short write')\n"
+               "            data = data[n:]\n"
+               "peer = Peer(int(sys.argv.pop(1)))\n"
+               "host_agent.open_stream = lambda args: host_agent.FrameStream(peer)\n"
+               "sys.exit(host_agent.main())\n",
+               fd_arg, "--once", "--state-dir", agent_state,
                "--agent-gen", "4660", "--quiet", "--offline", (char *)NULL);
         _exit(127);
     }
-    if (agent_pid < 0) { agent_stop(); return -1; }
-    memset(&sa, 0, sizeof(sa));
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, agent_sock, sizeof(sa.sun_path) - 1);
-    /* 60s (3000 * 20ms): Python startup competes with four make jobs and
-       mutation compilers. A dead child still fails immediately. */
-    for (i = 0; i < 3000; i++) {
-        if (waitpid(agent_pid, &child_status, WNOHANG) == agent_pid) {
-            agent_pid = -1;
-            agent_stop();
-            return -1;
-        }
-        fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        if (fd >= 0 && connect(fd, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
-            agent_fd = fd;
-            wire_inlen = 0;
-            tx_hook = agent_tx;
-            wire_pump_fn = agent_pump;
-            return 0;
-        }
-        if (fd >= 0) close(fd);
-        usleep(20000);
+    close(pair[1]);
+    if (agent_pid < 0) {
+        close(pair[0]);
+        agent_stop();
+        return -1;
     }
-    agent_stop();
-    return -1;
+    agent_fd = pair[0];
+    wire_inlen = 0;
+    tx_hook = agent_tx;
+    wire_pump_fn = agent_pump;
+    return 0;
 }
 
 static void agent_stop(void)
 {
     if (agent_fd >= 0) { close(agent_fd); agent_fd = -1; }
     if (agent_pid > 0) { kill(agent_pid, SIGTERM); while (waitpid(agent_pid, 0, 0) < 0 && errno == EINTR) {} agent_pid = -1; }
-    unlink(agent_sock);
     if (agent_state[0]) {
         char f[160];
         snprintf(f, sizeof(f), "%s/sess.txt", agent_state);
@@ -659,34 +652,31 @@ static void r2_R8_selftest_is_driven_only_by_the_timer(void)
     agent_stop();
 }
 
-/* R3: 転送 ACK 後の RESPONSE 消失 → T_probe の STATUS で再提示 (0 長も) */
-static void r2_R3_status_probe_repeats_lost_response(void)
+/* A8: RESPONSE absent for one second expires only this request. */
+static void r2_R3_lost_response_expires_without_probe(void)
 {
-    u8 pl[8];
-    i32 h;
-    u32 st = 99, ln = 99;
-    int s;
-
+    u8 pl[LINK_RESP_LEN];
     script_handshake(SCRIPT_SESS, 0);
-    h = link_host_open("PING", 4, host_owner);
-    check(h >= 0, "open が失敗した");
+    i32 h = link_host_open("PING", 4, host_owner);
+    check(h >= 0, "open failed");
     ticks(2);
-    check(tx_next(0, LINK_OP_REQUEST) >= 0, "REQUEST が出ない");
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
-    ticks(2);
-    /* RESPONSE は消えたことにして、T_probe を過ぎるまで回す */
-    tx_clear();
-    ticks(LINK_PROBE_TICKS + 3);
-    s = tx_next(0, LINK_OP_STATUS);
-    check(s >= 0, "T_probe を過ぎても STATUS が出ない");
-    check(s < 0 || tx_rid(s) == 1, "STATUS の rid が違う");
-    /* 0 長の成功応答を再提示 */
+    host_tick();                          /* ACK reception is peer progress. */
+    check(link_h[h].req_acked, "REQUEST ACK was not received");
+    ticks(LINK_HOST_SILENCE_TICKS - 1);
+    check(link_host_status(h, 0, 0, host_owner) == OS32_ERR_AGAIN,
+          "expired before 100 ticks");
+    host_tick();
+    check(link_host_status(h, 0, 0, host_owner) == OS32_ERR_HOSTDOWN,
+          "missing RESPONSE did not expire");
+    check(link_resyncs == 0 && tx_count(LINK_OP_STATUS) == 0,
+          "request expiry drove session resync/probe");
     resp_pl(pl, 200, 0);
-    inject(LINK_OP_RESPONSE, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, pl, LINK_RESP_LEN);
-    ticks(2);
-    check(link_host_status(h, &st, &ln, host_owner) == 0, "再提示を受け取れない");
-    check(st == 200 && ln == 0, "0 長の成功応答が拾えない");
-    link_host_close(h, host_owner);
+    inject(LINK_OP_RESPONSE, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, pl, sizeof(pl));
+    host_tick();
+    check(link_host_status(h, 0, 0, host_owner) == OS32_ERR_HOSTDOWN,
+          "late RESPONSE revived expired request");
+    check(link_host_close(h, host_owner) == 0, "expired close failed");
 }
 
 /* R4: A / B の close 順に関わらず RELEASE が正しい rid を載せる */
@@ -1054,40 +1044,31 @@ static void r4_hello_stage_losses(void)
     check(link_hello_ok == 1, "ESTABLISHED で確立しない");
 }
 
-/* R6: 2 ハンドル ACK 済みで Agent が黙る → STATUS 無応答 → 再同期 → STALE */
-static void r6_agent_silence_resyncs_and_stales_handles(void)
+/* A8: silence expires requests; a later session resync must not recount them. */
+static void r6_agent_silence_expires_then_resync_stales_handles(void)
 {
-    i32 a, b;
-
     script_handshake(SCRIPT_SESS, 0);
-    a = link_host_open("PING", 4, host_owner);
+    i32 a = link_host_open("PING", 4, host_owner);
+    i32 b = link_host_open("TIME", 4, host_owner);
+    ticks(LINK_HOST_SILENCE_TICKS);
+    check(link_resyncs == 0 && link_state == LINK_S_UP,
+          "request expiry changed session");
+    check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_HOSTDOWN &&
+          link_host_status(b, 0, 0, host_owner) == OS32_ERR_HOSTDOWN,
+          "silent requests did not return HOSTDOWN");
+    check(link_host_close(b, host_owner) == 0, "expired close failed");
     b = link_host_open("TIME", 4, host_owner);
-    ticks(4);
-    inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
-    inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 2, SCRIPT_SESS, 0, 0);
-    ticks(3);
-    check(link_resyncs == 0, "まだ再同期してはいけない");
-    /* Agent が黙ったまま T_probe × (k+1) 回 */
-    ticks(LINK_PROBE_TICKS * (LINK_PROBE_MAX + 2));
-    check(link_resyncs >= 1, "無応答でも再同期しない");
-    check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_STALE, "A が STALE でない");
-    check(link_host_status(b, 0, 0, host_owner) == OS32_ERR_STALE, "B が STALE でない");
-    check(tx_count(LINK_OP_STATUS) >= LINK_PROBE_MAX, "STATUS を出していない");
-    check(link_rt_fail == 2, "最初の再同期の失敗数が 2 でない");
-    check(link_host_close(b, host_owner) == 0, "B の close が通らない");
-    /* A は STALE のまま保持し、もう一枠で新しい要求を失敗させる。 */
+    check(b >= 0 && b != a, "new request could not use released slot");
     tx_clear();
+    /* Explicit legacy resync tests the separate session invalidation contract. */
+    link_resync();
     script_handshake(SCRIPT_SESS, link_syn_epoch);
-    b = link_host_open("TIME", 4, host_owner);
-    check(b >= 0 && b != a, "再確立後の空き枠を開けない");
-    ticks(LINK_RTO_TICKS * (LINK_TRIES + 2));
-    check(link_resyncs == 2, "2 回目の再同期が起きない");
-    check(link_rt_fail == 3, "STALE の A を再び失敗に数えた");
+    check(link_rt_fail == 1, "resync recounted an already terminal request");
     check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_STALE &&
           link_host_status(b, 0, 0, host_owner) == OS32_ERR_STALE,
-          "2 回目の再同期後に STALE が保たれない");
+          "session resync did not make old handles STALE");
     check(link_host_close(a, host_owner) == 0 && link_host_close(b, host_owner) == 0,
-          "STALE の close が通らない");
+          "STALE close failed");
 }
 
 /* CPL=0 経路 (ディスパッチャを通らない直呼び) の open / close */
@@ -1340,14 +1321,14 @@ static void handles_are_owner_private(void)
     check(link_host_close(h, host_owner) == 0, "持ち主が close できない");
 }
 
-/* 空き無し = FULL、NIC 無し = NOSYS、未確立 = STALE */
+/* 空き無し = FULL、NIC 停止・未確立 = HOSTDOWN */
 static void open_error_codes(void)
 {
     i32 a, b;
 
     /* 未確立 (HELLO 前) */
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_STALE,
-          "HELLO 前の open が STALE でない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_HOSTDOWN,
+          "HELLO 前の open が HOSTDOWN でない");
     script_handshake(SCRIPT_SESS, 0);
     check(link_host_open("", 0, host_owner) == OS32_ERR_INVAL, "0 長が INVAL でない");
     check(link_host_open("x", LINK_MAX_PAYLOAD + 1, host_owner) == OS32_ERR_INVAL,
@@ -1355,9 +1336,11 @@ static void open_error_codes(void)
     a = link_host_open("PING", 4, host_owner);
     b = link_host_open("TIME", 4, host_owner);
     check(a >= 0 && b >= 0, "2 本開けない");
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_FULL, "3 本目が FULL でない");
+    for (int i = 2; i < LINK_HANDLES; i++)
+        check(link_host_open("TIME", 4, host_owner) >= 0, "8 本開けない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_FULL, "9 本目が FULL でない");
     nic_up = 0;
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_NOSYS, "NIC 無しが NOSYS でない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_HOSTDOWN, "NIC 停止が HOSTDOWN でない");
     nic_up = 1;
     /* RELEASE が未 ACK の間、そのハンドルは AGAIN */
     ticks(3);
@@ -1502,6 +1485,11 @@ static void tx_rto_starts_at_nic_acceptance(void)
     i32 h = link_host_open("ECHO 6", 6, host_owner);
     check(h >= 0, "ECHO が開けない");
     check_pending_tx_rto(LINK_OP_REQUEST);
+    /* Each RTO scenario starts a fresh request within the independent 1s deadline. */
+    reset_all(cur_case);
+    script_handshake(SCRIPT_SESS, 0);
+    h = link_host_open("ECHO 6", 6, host_owner);
+    host_tick();
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
     host_tick();
     check(link_host_write(h, "abc", 3, host_owner) == 3, "WDATA を積めない");
@@ -1509,7 +1497,7 @@ static void tx_rto_starts_at_nic_acceptance(void)
     inject(LINK_OP_ACK, 0, script_epoch, 0, 1, 1, SCRIPT_SESS, 0, 0);
     host_tick();
     tx_clear();
-    ticks(LINK_RTO_TICKS * 2);
+    ticks(LINK_RTO_TICKS);
     check(tx_count(LINK_OP_WDATA) == 0, "ACK 後も WDATA を再送した");
     check(link_host_write(h, "def", 3, host_owner) == 3, "ACK 後に次の WDATA を積めない");
     check(link_host_close(h, host_owner) == 0, "close が失敗した");
@@ -1551,26 +1539,37 @@ static void selftest_reply(const u8 *f, unsigned int n)
     (void)n;
     if (h[LINK_OFF_OP] != LINK_OP_REQUEST) return;
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, rid, SCRIPT_SESS, 0, 0);
-    if (selftest_reply_mode == 1) {
-        resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
-        inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, rid,
+    if (selftest_reply_mode == 1 || selftest_reply_mode == 3) {
+        resp_pl(pl, selftest_reply_mode == 1 ? LINK_CTL_TOMBSTONE : 200, 0);
+        inject(LINK_OP_RESPONSE, selftest_reply_mode == 1 ? LINK_F_CTRL : 0,
+               script_epoch, 0, 0, rid,
                SCRIPT_SESS, pl, LINK_RESP_LEN);
     }
 }
 
 static void l0_failures_are_counted_once(void)
 {
-    for (int mode = 0; mode < 3; mode++) {
+    for (int mode = 0; mode < 4; mode++) {
         reset_all(cur_case);
         script_handshake(SCRIPT_SESS, 0);
         selftest_reply_mode = mode;
-        /* ACK のみ / TOMBSTONE / 完全無応答による再同期。 */
-        tx_hook = mode < 2 ? selftest_reply : 0;
+        /* ACK のみ / TOMBSTONE / 完全無応答 / 正常応答。
+         * 無応答は 100 tick で要求だけ失効し、再同期を待たない。 */
+        u32 start = tick_count;
+        tx_hook = mode == 2 ? 0 : selftest_reply;
         link_selftest(1);
-        check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
+        check(link_l0_ok == (mode == 3 ? 1u : 0u) &&
+              link_l0_fail == (mode == 3 ? 0u : 1u) &&
+              link_rt_fail == link_l0_fail,
               "L0 の失敗往復を 1 回だけ計上していない");
-        check(kprintf_last_color == ATTR_YELLOW, "L0 の失敗表示が黄色でない");
-        check(link_resyncs == (mode == 2 ? 1u : 0u), "L0 の失敗経路が違う");
+        check(kprintf_last_color == (mode == 3 ? KLOG_ATTR : ATTR_YELLOW),
+              "L0 の結果表示の色が違う");
+        check(link_resyncs == 0 && link_tombstones == (mode == 1 ? 1u : 0u),
+              "L0 の失敗経路が違う");
+        check(tick_count - start <= LINK_HOST_SILENCE_TICKS + 2,
+              "L0 が要求期限後も待っている");
+        check(link_h[0].state == LINK_H_FREE && irq_depth == 0,
+              "L0 がハンドル / IF を戻していない");
     }
 }
 
@@ -1581,14 +1580,17 @@ static void selftest_tombstone_at_deadline_restore(void)
     u8 pl[LINK_RESP_LEN];
     if ((i32)(selftest_deadline - tick_count) > 0) return;
     irq_restore_hook = 0;
-    check(link_h[0].state == LINK_H_SENT && link_h[0].req_acked,
-          "最終 status の IF 復元前に SENT / ACK 済みでなくなった");
+    check(link_h[0].state == LINK_H_STALE && link_h[0].req_acked &&
+          link_host_status(0, 0, 0, LINK_SELF_OWNER) ==
+              OS32_ERR_HOSTDOWN,
+          "期限の status の IF 復元前に HOSTDOWN になっていない");
     resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
     inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, link_h[0].rid,
            SCRIPT_SESS, pl, LINK_RESP_LEN);
     host_tick();
-    check(link_h[0].state == LINK_H_STALE && link_rt_fail == 1,
-          "IF 復元時の tick が TOMBSTONE を処理していない");
+    check(link_h[0].state == LINK_H_STALE && link_rt_fail == 0 &&
+          link_tombstones == 0,
+          "期限後の TOMBSTONE を処理 / 計上した");
 }
 
 static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
@@ -1596,11 +1598,12 @@ static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
     script_handshake(SCRIPT_SESS, 0);
     selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
     tx_hook = selftest_reply;
-    selftest_deadline = tick_count + LINK_PROBE_TICKS * 5;
+    /* REQUEST goes out on the next tick, ACK arrives one tick later. */
+    selftest_deadline = tick_count + 2 + LINK_HOST_SILENCE_TICKS;
     irq_restore_hook = selftest_tombstone_at_deadline_restore;
     link_selftest(1);
-    check(!irq_restore_hook && link_tombstones == 1 && link_resyncs == 0,
-          "期限の IF 復元時に TOMBSTONE が届いていない");
+    check(!irq_restore_hook && link_tombstones == 0 && link_resyncs == 0,
+          "期限後の TOMBSTONE が無視されていない");
     check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
           "期限切れと TOMBSTONE が同じ失敗を二重計上した");
     check(link_h[0].state == LINK_H_FREE, "自己試験がハンドルを閉じていない");
@@ -1743,7 +1746,7 @@ struct testcase { const char *name; void (*fn)(void); };
 static struct testcase cases[] = {
     { "r2_R1_agent_request_response_body",          r2_R1_agent_request_response_body },
     { "r2_R8_selftest_is_driven_only_by_the_timer", r2_R8_selftest_is_driven_only_by_the_timer },
-    { "r2_R3_status_probe_repeats_lost_response",   r2_R3_status_probe_repeats_lost_response },
+    { "r2_R3_lost_response_expires_without_probe",   r2_R3_lost_response_expires_without_probe },
     { "r2_R4_release_carries_the_right_rid",        r2_R4_release_carries_the_right_rid },
     { "r2_R9_alternating_tx_one_frame_per_tick",    r2_R9_alternating_tx_one_frame_per_tick },
     { "r2_R10_reflect_mode_does_not_run_link_tick", r2_R10_reflect_mode_does_not_run_link_tick },
@@ -1757,7 +1760,7 @@ static struct testcase cases[] = {
       r4_R4_resync_during_user_copy_keeps_the_return_value },
     { "r4_hello_stage_losses",                      r4_hello_stage_losses },
     { "r4_cpl0_open_close",                         r4_cpl0_open_close },
-    { "r6_agent_silence_resyncs_and_stales_handles", r6_agent_silence_resyncs_and_stales_handles },
+    { "r6_agent_silence_expires_then_resync_stales_handles", r6_agent_silence_expires_then_resync_stales_handles },
     { "wire_paylen_mismatch_is_dropped",            wire_paylen_mismatch_is_dropped },
     { "wire_stale_session_frames_are_dropped",      wire_stale_session_frames_are_dropped },
     { "irq_if0_defers_the_timer_then_runs_it",      irq_if0_defers_the_timer_then_runs_it },
@@ -1783,32 +1786,10 @@ static struct testcase cases[] = {
     { "n1fix2_scripted_inorder_over_64k",           n1fix2_scripted_inorder_over_64k }
 };
 
-static void registration_failure(void)
-{
-    reset_all("tick-registration-failure");
-    u8 saved_mac[ETH_ALEN];
-    memcpy(saved_mac, link_my_mac, sizeof(saved_mac));
-    u32 saved_nonce = link_nonce;
-    int saved_txn = txn;
-    int saved_state = link_state;
-    tick_register_result = TICK_ERR_BUSY;
-    link_init((const u8 *)"abcdef");
-    check(link_ready && link_state == saved_state && link_nonce == saved_nonce &&
-          txn == saved_txn && !memcmp(saved_mac, link_my_mac, sizeof(saved_mac)),
-          "failed tick registration changed live link state");
-    link_ready = 0;
-    link_init(my_mac);
-    check(!link_ready, "failed tick registration enabled link");
-    tick_register_result = 0;
-}
-
 int main(int argc, char **argv)
 {
     unsigned int i;
     int ran = 0, bad = 0;
-
-    registration_failure();
-    if (failures) return 1;
 
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         int want = (argc <= 1);
@@ -1826,3 +1807,10 @@ int main(int argc, char **argv)
     printf("SUMMARY %d/%d PASS\n", ran - bad, ran);
     return bad ? 1 : 0;
 }
+
+/* These legacy cases exercise request traffic; A9 core fixture uses real B2. */
+void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
+{ (void)s; (void)e; (void)x; (void)g; (void)a; }
+void link_notify_rx(u32 s, const u8 *p, u16 n) { (void)s; (void)p; (void)n; }
+void link_notify_reset(void) { }
+void link_notify_tick(u32 now) { (void)now; }
