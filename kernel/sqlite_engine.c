@@ -381,9 +381,25 @@ static int services_settings(int *reserve, int *present)
     boot_user_rc = 0;
     kstrncpy(boot_user_path, FEP_USER_PATH, sizeof(boot_user_path));
     int rc = os32_sqlite_outer_group_acquire(OS32_SQLITE_RESIDENT, 0, &group);
-    if (rc) { boot_user_rc = rc; return rc; }
+    if (rc) { boot_user_rc = OS32_ERR_IO; return rc; }
     rc = os32_sqlite_outer_group_open(&group, SYS_SETTINGS_DB, SQLITE_OPEN_READONLY, &db);
-    if (!rc && !os32_sqlite_prepare_v2(db,
+    int has_settings = 0;
+    if (rc) {
+        OS32_Stat st;
+        rc = vfs_stat(SYS_SETTINGS_DB, &st) == VFS_ERR_NOTFOUND ? 0 : OS32_ERR_IO;
+    } else {
+        rc = os32_sqlite_prepare_v2(db,
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'",
+            -1, &stmt, 0);
+        if (!rc) {
+            int step = os32_sqlite_step(stmt);
+            if (step == SQLITE_ROW) has_settings = 1;
+            else if (step != SQLITE_DONE) rc = OS32_ERR_IO;
+        }
+        if (os32_sqlite_finalize(stmt)) rc = OS32_ERR_IO;
+        stmt = 0;
+    }
+    if (!rc && has_settings && !os32_sqlite_prepare_v2(db,
             "SELECT ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0",
             -1, &stmt, 0) && os32_sqlite_step(stmt) == SQLITE_ROW) {
         int kb = os32_sqlite_column_int(stmt, 0);
@@ -397,10 +413,10 @@ static int services_settings(int *reserve, int *present)
         }
     }
     if (stmt) { (void)os32_sqlite_finalize(stmt); stmt = 0; }
-    if (!rc) rc = os32_sqlite_prepare_v2(db,
+    if (!rc && has_settings) rc = os32_sqlite_prepare_v2(db,
         "SELECT tval FROM settings WHERE scope='system' AND key='fep_user_dict_path' AND type=1",
         -1, &stmt, 0);
-    if (!rc) {
+    if (!rc && has_settings) {
         int step = os32_sqlite_step(stmt);
         if (step == SQLITE_ROW) {
             const char *text = (const char *)os32_sqlite_column_text(stmt, 0);
@@ -408,10 +424,10 @@ static int services_settings(int *reserve, int *present)
             if (!text || bytes < 0 || (u32)bytes >= sizeof(boot_user_path) ||
                 kstrlen(text) != (u32)bytes) rc = OS32_ERR_INVAL;
             else kmemcpy(boot_user_path, text, bytes + 1);
-        } else if (step != SQLITE_DONE) rc = step;
+        } else if (step != SQLITE_DONE) rc = OS32_ERR_IO;
     }
-    boot_user_rc = rc;
-    if (stmt) (void)os32_sqlite_finalize(stmt);
+    if (stmt && os32_sqlite_finalize(stmt)) rc = OS32_ERR_IO;
+    boot_user_rc = rc > 0 ? OS32_ERR_IO : rc;
     rc = os32_sqlite_outer_group_begin_close(&group);
     if (rc) return rc;
     rc = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ? SQLITE_BUSY

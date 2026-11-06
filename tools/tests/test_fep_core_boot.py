@@ -114,6 +114,10 @@ def build(folder, directory):
     return exe, command
 
 MUTATIONS = [
+    ('settings-absent-db', 'rc = vfs_stat(SYS_SETTINGS_DB, &st) == VFS_ERR_NOTFOUND ? 0 : OS32_ERR_IO;',
+     'rc = vfs_stat(SYS_SETTINGS_DB, &st) == VFS_ERR_NOTFOUND ? OS32_ERR_IO : OS32_ERR_IO;', 89),
+    ('settings-absent-table', 'if (step == SQLITE_ROW) has_settings = 1;\n            else if (step != SQLITE_DONE) rc = OS32_ERR_IO;',
+     'if (step == SQLITE_ROW) has_settings = 1;\n            else rc = OS32_ERR_IO;', 90),
     ('future-header', 'if (version > FEP_DICT_FORMAT_VERSION) return OS32_ERR_INVAL;',
      'if (version > FEP_DICT_FORMAT_VERSION) version = 1;', 66),
     ('header-magic', 'if (memcmp(header, "SQLite format 3", 16) ||',
@@ -130,7 +134,7 @@ MUTATIONS = [
      'os32_sqlite_outer_boot_check(1, reserve)', 85),
     ('probe-close', 'int close_rc = probe_close(&group, db, stmt);',
      'int close_rc = db ? 0 : probe_close(&group, db, stmt);', 61),
-    ('path-read-rc', '    boot_user_rc = rc;\n    if (stmt)', '    boot_user_rc = 0;\n    if (stmt)', 80),
+    ('path-read-rc', '    boot_user_rc = rc > 0 ? OS32_ERR_IO : rc;', '    boot_user_rc = 0;', 80),
 ]
 
 
@@ -149,7 +153,7 @@ def main():
             payload = struct.pack('<4I', mode, len(image), pair, 0) + image
             payload += struct.pack('<I', len(fep)) + fep
             return host32.run([str(exe)], input=payload, capture_output=True)
-        for mode in range(61, 89):
+        for mode in range(61, 93):
             if mode == 79:
                 continue
             result = run_case(mode)

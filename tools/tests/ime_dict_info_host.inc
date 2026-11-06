@@ -95,6 +95,8 @@ static void info_fault(const char *bad)
 static void metadata(void)
 {
     watched = NULL; info_test = 1;
+    require(!g_ime.store.system.db && g_ime.dict.db && ime_boot_connections() == 1,
+            "boot counts live legacy dictionary");
     require(stub_dict_info(IME_DICT_INFO_STATUS, 0, (char *)info_out, 256) == OS32_ERR_NOSYS &&
             stub_dict_info(0, -1, NULL, 0) == OS32_ERR_NOSYS, "metadata absent module stub");
     for (origin = CALLER_TRUSTED; origin <= CALLER_USER; origin++) {

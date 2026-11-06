@@ -200,6 +200,8 @@ static void input_paths(void)
 }
 int vfs_stat(const char *path, OS32_Stat *st)
 {
+    if (!kstrcmp(path, SYS_SETTINGS_DB))
+        return input[0] == 89 ? VFS_ERR_NOTFOUND : VFS_ERR_IO;
     if (!memcmp(path, "/db/fep.db", sizeof("/db/fep.db"))) {
         CHECK(services_stage == SERVICES_UNICODE && !opens && !fep_opens && !alloc_calls);
         dictionary_stats++;
@@ -676,11 +678,18 @@ int host_core_group_open(const Os32SqliteGroup *group, const char *path, int fla
         core_probes++;
         if (input[0] == 84) return SQLITE_IOERR;
     }
+    if (settings && input[0] == 89) return SQLITE_CANTOPEN;
     int rc = os32_sqlite_outer_group_open(group, ":memory:", SQLITE_OPEN_READWRITE, out);
     if (rc) return rc;
     if (settings) {
         CHECK(!core_headers && !services_public);
         if (input[0] < 61) { host_seed_settings(*out); return 0; }
+        if (input[0] == 90) return 0; /* absent table */
+        if (input[0] == 91) {
+            CHECK(!os32_sqlite_exec(*out, "CREATE TABLE settings(wrong TEXT)", 0, 0, 0));
+            return 0; /* present, unreadable schema */
+        }
+        if (input[0] == 92) return SQLITE_CANTOPEN; /* present but unreadable DB */
         CHECK(!os32_sqlite_exec(*out,
             "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER,tval TEXT)", 0, 0, 0));
         if (input[0] == 62 || input[0] == 63 || input[0] == 64 || input[0] == 83)
@@ -773,7 +782,7 @@ static void core_boot_transaction(void)
     services_boot();
     int good = input[0] == 61 || input[0] == 62 || input[0] == 63 ||
                input[0] == 65 || input[0] == 78 || input[0] == 80 || input[0] == 83 ||
-               input[0] == 85 || input[0] == 88;
+               input[0] == 85 || input[0] >= 88;
     CHECK(services_public == good);
     CHECK(core_headers == 1);
     CHECK(core_probes == !(input[0] >= 66 && input[0] <= 69));
@@ -805,12 +814,12 @@ static void core_boot_transaction(void)
                  (input[0] == 63 || input[0] == 78 || input[0] == 83) ? 99u : 208u));
     HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
     CHECK(budget->reserve == kb * 1024u);
-    if (input[0] == 80) {
-        CHECK(fep_boot_user_path_get(path, sizeof(path)) == SQLITE_IOERR);
+    if (input[0] == 80 || input[0] == 91 || input[0] == 92) {
+        CHECK(fep_boot_user_path_get(path, sizeof(path)) == OS32_ERR_IO);
         CHECK(!memcmp(path, "untouched", sizeof("untouched")));
     } else {
         CHECK(!fep_boot_user_path_get(path, sizeof(path)));
-        CHECK(!kstrcmp(path, input[0] == 88 ? FEP_USER_PATH : "unvalidated/../path"));
+        CHECK(!kstrcmp(path, (input[0] >= 88 && input[0] <= 90) ? FEP_USER_PATH : "unvalidated/../path"));
         path[0] = 'X';
         CHECK(fep_boot_user_path_get(path, 2) == OS32_ERR_INVAL && path[0] == 'X');
     }

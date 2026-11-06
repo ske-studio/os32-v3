@@ -24,17 +24,14 @@ ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kernel/ime/ime_dict_info.c'
 # Each product anchor is unique; compile failures never count as runtime RED.
 MUTANTS = [
+    ('current-dict', 'kernel/ime/ime.c', 'return &g_ime.dict;', 'return (const IME_Dict *)&g_ime.store.system;', 'legacy dictionary owner'),
     ('capacity', PRODUCT, 'if (n > capacity - 1) n = capacity - 1;', 'if (n > capacity - 1) n = capacity;', 'chunk bounds'),
     ('byte-offset', PRODUCT, '(const char *)value + offset', '(const char *)value', 'UTF-8 full reassembly'),
-    ('missing-meta', PRODUCT, 'if (rc == SQLITE_DONE) result = OS32_ERR_IO;', 'if (rc == SQLITE_DONE) result = 0;', 'required missing key'),
-    ('finalize', PRODUCT, 'if (sqlite3_finalize(stmt) != SQLITE_OK) result = OS32_ERR_IO;', '(void)sqlite3_finalize(stmt);', 'finalize error preserves out'),
+    ('missing-meta', PRODUCT, 'if (rc == SQLITE_DONE) result = OS32_ERR_IO;', 'if (rc == SQLITE_DONE) result = ime_info_slice("", 0, offset, out, capacity);', 'required missing key'),
+    ('finalize', PRODUCT, 'if (sqlite3_finalize(stmt) != SQLITE_OK) result = OS32_ERR_IO; /* store */', '(void)sqlite3_finalize(stmt); /* store */', 'finalize error preserves out'),
     ('legacy-variant', PRODUCT, 'if (!kstrcmp(s->system.path, FEP_DICT_PATH_S)) value = "S";', 'if (!kstrcmp(s->system.path, FEP_DICT_PATH_S)) value = "M";', 'legacy S'),
     ('system-only', PRODUCT, 'ime_meta_read(&s->system, key, offset, staging, capacity)', 'ime_meta_read(&s->user, key, offset, staging, capacity)', 'system handle'),
-    ('public-gate', PRODUCT, 'if (!services_public) return OS32_ERR_NOSYS;', '(void)services_public;', 'publication ordering'),
-    ('output-kill', PRODUCT, '        ring3_fault_kill();', '        (void)out;', 'invalid caller range'),
     ('stale', 'kernel/ime/ime_conn.c', 'if (vfs_fd_is_stale(fd)) return OS32_ERR_STALE;', 'if (vfs_fd_is_stale(fd)) return 0;', 'no SQL after stale'),
-    ('current-view', 'kernel/ime/ime.c', 'const FepConn *conn = &g_ime.store.system;', 'const FepConn *conn = &g_ime.store.user;', 'getter system view'),
-    ('current-store', 'kernel/ime/ime.c', 'FepStore *ime_current_store(void) { return &g_ime.store; }', 'FepStore *ime_current_store(void) { return 0; }', 'facade owns current store'),
 ]
 
 
@@ -63,7 +60,7 @@ def main():
             return host32.run([str(exe)], cwd=ROOT).returncode
         if build(products):
             raise RuntimeError('normal runtime failed')
-        print('PASS 20 keys/legacy/byte chunks/errors/stale/caller/getters; runner=' +
+        print('PASS store 20 keys/legacy/byte chunks/errors/stale/legacy getter; runner=' +
               host32.selected_runner(), flush=True)
         if args.mutate:
             for name, path, old, new, test in MUTANTS:

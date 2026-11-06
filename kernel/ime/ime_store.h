@@ -72,7 +72,7 @@ int fep_meta_probe(const char *path, FepMeta *out);
 int fep_boot_config_get(FepMeta *out, u32 *reserve_kb);
 /* Same saved boot snapshot; default path if no setting, no settings re-open.
  * Core only copies: no path validation. Capacity overflow returns OS32_ERR_INVAL;
- * settings read failure returns its rc unchanged. Only fep_user_open (D) checks
+ * missing DB/table/row uses the default; other read failures return OS32_ERR_IO. Only fep_user_open (D) checks
  * the normalized /etc direct-child restriction. */
 int fep_boot_user_path_get(char *out, u32 capacity);
 int fep_store_open(FepStore *s, const char *path, const char *user_path);
@@ -103,7 +103,7 @@ int fep_store_user_export(FepStore *s, const char *path);
 int fep_store_user_clear(FepStore *s);
 
 /* C owns system-only metadata access in ime_dict_info.c, including the
- * ime_dict_info_facade and ime_current_dict() bindings to g_ime's store.
+ * store reader. J will bind ime_dict_info_facade and ime_current_dict() to it.
  * Same 20 keys, byte offsets/cap clamp and errors as IME_DICT_INFO_* in the
  * shared SDK header. No open/recover/yield; error leaves out untouched.
  */

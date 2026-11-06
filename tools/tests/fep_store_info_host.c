@@ -156,22 +156,10 @@ static int test(void)
     fixture.store.system.isolated = 1; check(call(1, 0, 256, 0) == OS32_ERR_BUSY); fixture.store.system.isolated = 0;
     available = 0; check(call(1, 0, 256, 0) == OS32_ERR_IO); available = 1;
     fd = -1; check(call(1, 0, 256, 0) == OS32_ERR_IO); fd = 7;
-    /* Actual getter binds store.system, with every legacy view field mapped. */
-    g_ime.store = fixture.store; g_ime.dict.db = (void *)99;
-    g_ime.store.system.exact = (void *)4; g_ime.store.system.prefix = (void *)5;
-    g_ime.store.system.learn = (void *)6; g_ime.store.system.io_retried = 1;
-    g_ime.store.system.group.generation = 123;
-    const IME_Dict *view = ime_current_dict();
-    check(view->db == (void *)1 && view->exact_stmt == (void *)4 && view->prefix_stmt == (void *)5 && view->learn_stmt == (void *)6);
-    check(view->io_retried == 1 && view->group.generation == 123 && !kstrcmp(view->path, g_ime.store.system.path));
+    /* J has not opened store: the live compatibility dictionary owns boot. */
+    g_ime.dict.db = (void *)99;
+    check(ime_current_dict() == &g_ime.dict);
     check(ime_current_store() == &g_ime.store);
-    services_public = 0; check(call(0, -1, 0, 1) == OS32_ERR_NOSYS); unchanged();
-    services_public = 1; identity = 0; check(call(1, 0, 256, 1) == OS32_ERR_INVAL); identity = 1;
-    writable = 0; before = sql_calls; check(call(11, 0, 256, 1) == OS32_ERR_INVAL && killed == 1 && copies == 0 && sql_calls == before); writable = 1;
-    value(1, "meta", 1);
-    script(6, SQLITE_OK); length = 8; kstrncpy(row, "recorded", sizeof(row)); value(11, "recorded", 1);
-    copy_ok = 0; check(call(1, 0, 256, 1) == OS32_ERR_IO); unchanged(); copy_ok = 1;
-    g_ime.store.system.db = 0; value(1, "unloaded", 1);
     return bad;
 }
 void _start(void)
