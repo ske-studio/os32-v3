@@ -69,6 +69,28 @@ static int g_cfg_lan, g_cfg_reads, g_nic_state = E82557_RUNNING;
 static int g_module_available = 1, g_module_refs;
 static int g_module_acquires, g_module_releases, g_module_errors;
 static int g_nic_calls;
+static int g_resident, g_scope, g_scope_begins, g_scope_ends, g_scope_exit;
+static int g_scope_begin_error, g_scope_end_error;
+
+/* C1 owns pairing and errors; C2 only dispatches through serialfs.h. */
+int sfs_persistent_enabled(void) { return g_resident; }
+int sfs_persistent_scope_begin(void)
+{
+    g_scope_begins++;
+    if (g_scope_begin_error) return g_scope_begin_error;
+    if (g_scope) return OS32_ERR_BUSY;
+    g_scope = 1;
+    return 0;
+}
+int sfs_persistent_scope_end(int code)
+{
+    g_scope_ends++;
+    g_scope_exit = code;
+    if (g_scope_end_error) return g_scope_end_error;
+    if (!g_scope) return OS32_ERR_INVAL;
+    g_scope = 0;
+    return 0;
+}
 
 int lan_module_session_acquire(void)
 {
@@ -382,6 +404,8 @@ static int failed;
 
 static void reset(void)
 {
+    g_resident = g_scope = g_scope_begins = g_scope_ends = g_scope_exit = 0;
+    g_scope_begin_error = g_scope_end_error = 0;
     g_nonce_ctr = 0; /* native host u32 is unsigned long (64 bits here) */
     g_cfg_lan = g_cfg_reads = g_mount_fail = 0;
     g_module_available = 1;
@@ -608,6 +632,42 @@ static void end_not_quiet(void)
     CHECK(serial_gate_active() == 0);
 }
 
+static void resident_scope(void)
+{
+    u32 start;
+    int kout;
+
+    reset();
+    start = tick_count;
+    kout = g_kout_n;
+    g_resident = 1;
+    g_cfg_lan = 1;
+    strcpy(g_fstype, "serialfs");
+    g_owner = 2;
+    g_if = 0;
+    ser_initialized = 0;
+    CHECK(serialfs_session_end(0) == OS32_ERR_INVAL);
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(serialfs_session_begin() == OS32_ERR_BUSY);
+    CHECK(g_scope_begins == 2 && g_scope == 1);
+    CHECK(serialfs_session_end(-7) == 0);
+    CHECK(g_scope_exit == -7 && g_scope == 0 && g_scope_ends == 2);
+    CHECK(serialfs_session_end(0) == OS32_ERR_INVAL);
+    CHECK(serialfs_session_begin() == 0);
+    g_scope_end_error = OS32_ERR_IO;
+    CHECK(serialfs_session_end(12) == OS32_ERR_IO && g_scope_exit == 12);
+    g_scope_end_error = 0;
+    CHECK(serialfs_session_end(12) == 0);
+    g_scope_begin_error = OS32_ERR_HOSTDOWN;
+    CHECK(serialfs_session_begin() == OS32_ERR_HOSTDOWN);
+    CHECK(!g_scope && !g_active && !g_cli.sid);
+    CHECK(!g_mount_calls && !g_umount_calls && !g_permit_now);
+    CHECK(!strcmp(g_fstype, "serialfs"));
+    CHECK(!g_cfg_reads && !g_module_acquires && !g_module_releases && !g_nic_calls);
+    CHECK(!serial_gate_active() && !g_hello_n && !g_tx_n && !g_frames_n);
+    CHECK(g_kout_n == kout && tick_count == start);
+}
+
 static void lan_session(void)
 {
     int state;
@@ -768,6 +828,7 @@ int main(int argc, char **argv)
     else if (!strcmp(c, "hello_fail_flood")) hello_fail_flood();
     else if (!strcmp(c, "end_late_hold")) end_late_hold();
     else if (!strcmp(c, "end_not_quiet")) end_not_quiet();
+    else if (!strcmp(c, "resident_scope")) resident_scope();
     else if (!strcmp(c, "lan_session")) lan_session();
     else if (!strcmp(c, "lan_start")) lan_start();
     else if (!strcmp(c, "lan_lifetime")) lan_lifetime();
@@ -779,7 +840,7 @@ int main(int argc, char **argv)
     return failed ? 1 : 0;
 }
 
-/* C1 is a separate unit; these legacy UART/LAN tests never start residency. */
+/* C1 communication is a separate unit; the scope test above never does I/O. */
 int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
 const SfsClient *sfs_persistent_client(void) { return 0; }
 void sfs_persistent_stale(void) { }
