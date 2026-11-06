@@ -16,7 +16,7 @@
 #include "link.h"
 #include "nic.h"
 
-/* A9 RX / legacy selftests / A11 still use the LGY declarations. */
+/* A9 RX / legacy selftests still use the LGY declarations. */
 #include "ne2000.h"
 #include "kstring.h"
 #include "kprintf.h"

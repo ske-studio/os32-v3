@@ -57,7 +57,7 @@ MUTATIONS = (
     ('resync-counts-stale-again', 'link.c',
      'if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {',
      'if (e->state != LINK_H_FREE) {',
-     'r6_agent_silence_resyncs_and_stales_handles'),
+     'r6_agent_silence_expires_then_resync_stales_handles'),
     ('wdata-ack-keeps-pending-length', 'link_rx.inc',
      '            e->wlen = 0;\n            e->wseq++;',
      '            e->wseq++;', 'write_contract_declared_length'),
@@ -85,11 +85,13 @@ MUTATIONS = (
 )
 
 
-def check_mutations(tmp):
+def check_mutations(tmp, cases):
     """Mutate full product files in isolation; a compile failure is not RED."""
     originals = {path.name: path.read_text() for path in
                  (ROOT / 'net/link.c', *sorted((ROOT / 'net').glob('link_*.inc')))}
     for name, filename, old, new, case in MUTATIONS:
+        if cases and case not in cases:
+            continue
         assert originals[filename].count(old) == 1, (name, 'marker must be unique')
         with tempfile.TemporaryDirectory(prefix='net-link-mut-') as directory:
             mutated = pathlib.Path(directory)
@@ -160,8 +162,10 @@ def check_timer_calls_link_tick():
                      *sorted((ROOT / directory).glob("link_*.inc"))):
             if re.search(r"tick_register\s*\([^,]+,\s*link_tick\s*\)", path.read_text()):
                 registrations.append(path.relative_to(ROOT).as_posix())
-    assert registrations == ["net/link.c"], registrations
-    assert "tick_register(PC98_TICK_LINK, link_tick)" in (ROOT / "net/link.c").read_text()
+    assert registrations == [], registrations
+    nic = (ROOT / "net/nic.c").read_text()
+    assert "tick_register(PC98_TICK_LINK, net_tick)" in nic
+    assert "link_tick();" in nic
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"
     link = "\n".join(path.read_text(encoding="utf-8") for path in
@@ -172,7 +176,7 @@ def check_timer_calls_link_tick():
     lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
     assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
         "反射モードで link_init を止めていない"
-    print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
+    print("DRIVE SOURCE: net_tick owns registration and drives link_tick PASS", flush=True)
 
 
 def run_fixture(args, timeout=600, **kwargs):
@@ -223,5 +227,5 @@ if __name__ == "__main__":
         rc = run_fixture([exe, *cases])
         print("EXIT net_link_host=%d" % rc, flush=True)
         if rc == 0 and '--mutate' in sys.argv:
-            check_mutations(tmp)
+            check_mutations(tmp, cases)
         sys.exit(rc)

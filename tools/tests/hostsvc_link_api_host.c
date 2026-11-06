@@ -7,7 +7,7 @@ unsigned int link_test_irq_save(void) { unsigned int f = test_if; test_if = 0; r
 void link_test_irq_restore(unsigned int f) { test_if = f; }
 void link_test_idle(void) { }
 #include "net/link.c"
-int ne2k_state(void) { return NE2K_STATE_RUNNING; }
+int net_mac(u8 out[6]) { (void)out; return 0; }
 void *kmemcpy(void *dst, const void *src, u32 n)
 {
     u8 *d = dst; const u8 *s = src;

@@ -1,4 +1,4 @@
-/* A8 real link.c, ILP32 without libc. A9 RX and A11 NIC gate remain legacy. */
+/* A8 real link.c, ILP32 without libc. A9 RX remains legacy. */
 #define LINK_HOST_TEST
 #include "types.h"
 volatile u32 tick_count;
@@ -29,7 +29,13 @@ int net_tx(const void *frame, u32 n)
 }
 u32 net_rx_credit_bytes(void) { return credit_bytes; }
 /* No LGY TX/credit/busy stubs: any remaining core call fails to link. */
-int ne2k_state(void) { return NE2K_STATE_RUNNING; } /* A11-owned gate. */
+static int nic_bound = 1;
+int net_mac(u8 out[6])
+{
+    if (!nic_bound) return OS32_ERR_HOSTDOWN;
+    kmemcpy(out, link_my_mac, ETH_ALEN);
+    return 0;
+}
 int ne2k_recv(void *out, unsigned int cap, unsigned int *len)
 {
     (void)out; (void)cap; (void)len;
@@ -67,6 +73,9 @@ static int verify(void)
     link_hs_due = 0; link_state = LINK_S_UP; link_epoch = 3;
     link_hello_ok = 1;
     tick_count = U32_MAX - 49;
+    nic_bound = 0;
+    CHECK(link_host_open("TIME", 4, 1) == OS32_ERR_HOSTDOWN);
+    nic_bound = 1;
     CHECK(link_host_open("TIME", 4, 1) == 0);
     CHECK(link_host_open("TIME", 4, 1) == 1);
     /* Exhausted legacy RTO would resync unless expiry runs before timers. */
