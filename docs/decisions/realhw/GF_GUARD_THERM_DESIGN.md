@@ -70,12 +70,12 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 ## 5. 前景 alarm と停止経路
 
 - N/therm/temp.c:162–208 の初回＋1秒 alarm を、既存の前景協調点から `geforce_foreground_poll → gf5_service_poll → gf5_fan_tick` へ移す。描画、CUI キー待ち、sys_halt、yield/park、syscall 出口を通す。
-- 常駐側は再入防止と次回 tick の cache だけを持つ。期限の正本は F5。最短期限を切り捨てで tick へ写し、遅延分を連続測定して埋めない。借用中や SAVING/RESTORING の slot=NULL は次の協調点へ送る。
+- 常駐側は停止状態と次回 tick の cache を持つ。期限の正本は F5。最短期限を切り捨てで tick へ写し、遅延分を連続測定して埋めない。SAVING/RESTORING の slot=NULL は次の協調点へ送る。熱専用の再入・借用ガードは置かない。
 - clock64 の一時失敗は診断を残して今回だけ終了し、次の前景 alarm で再試行する。明示再入場の monitor_restart でも監視を再準備する。
-- 停止は `常駐 REQUESTED → module 借用を終えた poll 出口 → 共通 backend stop → 98 route` の一本。熱側で active/channel/display から独自の稼働条件を再構成して要求を捨てない。
+- 停止は `常駐 REQUESTED → 前景 poll 出口 → 共通 backend stop → 98 route` の一本。熱側で active/channel/display から独自の稼働条件を再構成して要求を捨てない。
 - backend stop は入口の routed を保持して active/routed を解消し、既存 display stop を通す。98 route（画面の復元）は入口で routed だった場合か、強制停止へ進んだ場合だけ行う。通常 leave 後の停止では98の画面を再初期化しない。下位が OFF かつ display stop 完了を確認済みなら、ハード停止を繰り返さず受付閉鎖・帰還・後処理を続ける。
 - stop 失敗では98への帰還より先に既存の `gf_foundation_stop` による下位停止を試す。それも失敗するか帰還先が安全でなければ、REQUESTED のまま vfs_sync、理由・温度・stop/sync rc の polled serial 出力、割込み禁止 halt。成功していない停止を STOPPED としない。
-- 停止と帰還を確認してから STOPPED とする。表示を使用中だった場合に描画状態を閉じ、その時の表示所有者の slot だけに abort_req を立てる。CUI は現在アプリ、GUI は既存の gfx owner を使い、別の実行中アプリや GUI 全体へ終了を要求しない。アプリ終了をハード停止の前に待たない。
+- 停止と帰還を確認してから STOPPED とする。今のアプリが GeForce を使用中なら描画状態を閉じ、今のアプリに abort_req を立てる。使用していなければ GPU だけを止め、98 の表示を保つ。GUI が動いていれば、表示所有者によらず既存の GUI_SESSION_SWITCH_CUI で CUI へ切り替える。アプリ終了を待たず、GUI=0 は永続化しない。CUI の復帰後に理由・温度を1行で表示する。
 - 再起動用 `gf_production_return` の経路は維持し、熱の halt 分岐を混ぜない。
 - 保証は期限後最初の協調点での実行。非協調の長い計算中の測定/停止までの上限時間や toggle の精密波形は保証しない。
 
@@ -118,13 +118,13 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 - feature5.h は常駐停止の値型・参照と共通 ceiling 判定、clock/ramclock/perf/state は同じ判定を使用する。
 - therm は測定・しきい値・fan・共通停止要求。perf は1段降速/復帰と decoded 読戻し照合。
 - feature5_service は既存寿命の門と pause 所有/解除再試行。geforce_module は常駐状態・協調点・停止消費。backend は通常と共通の停止口と明示再入場の準備。
-- gfx の表示停止時の状態閉鎖を、通常故障の GUI 全体への通知から分ける。熱停止は表示所有者だけを回収する。
+- gfx の表示停止時の状態閉鎖を、通常故障の GUI 全体への通知から分ける。熱停止は使用中の現在アプリを止め、GUI は既存の CUI 切替へ渡す。
 - KAPI/SDK と公開 plan の配置は変更しない。
 
 ## 9. 検証
 
 - kernel ビルドと、熱・U6・foreground・critical・backend・fancheck・perf・state・clock・gf-display の既存 host 試験を変異なしで通す。F1/N1/N2/M1 の既存ケースを維持する。
-- 直接 core/RAM の上限拒否、decoded 読戻し不一致、clock 再試行、critical 解除再試行、停止失敗の halt、表示所有者だけの回収、最初の停止理由の保持を実行時 assertion で検査する。
+- 直接 core/RAM の上限拒否、decoded 読戻し不一致、clock 再試行、critical 解除再試行、停止失敗の halt、現在アプリの停止と GUI の CUI 切替、最初の停止理由の保持を実行時 assertion で検査する。
 - 各追加検査に一意の変異を置く。正常 GREEN → 変異 runtime RED → 復元 GREEN。移動・削除した製品行に依存する既存変異も移す。コンパイル失敗は RED としない。
 - lint と diff の空白検査を実施。全体検査と実機の意図的過熱はこの段では行わない。実機の読み取り観測は §7。
 
@@ -136,7 +136,7 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 
 - 2026-11-07: 常駐 gf5_stop_state を正本にし、F5 は直接参照する。最初の理由/温度/rc を上書きしない。
 - 2026-11-07: 共通停止失敗では既存 foundation 停止を使う。下位停止も失敗した場合は REQUESTED を維持して帰還先無しと同じ halt に進む。
-- 2026-11-07: 熱停止の GUI 全体終了要求を除き、停止前に採った表示所有者の abort_req だけを立てる。通常の表示故障の通知経路は維持する。
+- 2026-11-07: 熱停止時の GUI は既存の CUI 切替を使う。Start → CUI mode と同じ後処理を通し、永続設定の書換えは省く。
 - 2026-11-07: critical の解除保留は同世代の次の有効測定で再試行し、新世代の HIGHER も再適用する。clock64 の一時失敗は次の alarm で再試行する。
 - 2026-11-07: 熱復帰の1段を prog の共通上限検査へ渡す間だけ許可し、失敗時は元の上限へ戻す。読戻しは calc.actual ではなく係数からの decoded と比較する。
 

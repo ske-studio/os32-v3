@@ -41,6 +41,7 @@ int geforce_foundation_display(bool start);
  * cache module ctx/ops. No IRQ calls. Consume pending heat stop at the common
  * exit while retaining reentry protection; backend stop owns active/routed. */
 void geforce_foreground_poll(void);
+void geforce_heat_notice(void);
 /* Resident tick/pending query only; no module callback or MMIO. */
 bool geforce_fg_due(u32 now_tick);
 /* Value-only stop request; do not retain any module pointers. The consumer

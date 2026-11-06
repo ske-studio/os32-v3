@@ -20,6 +20,7 @@
 #include "../../../hwdev/gf/display/api.h"
 #include "leave_log.h"
 #include "con_sink.h"
+#include "gui.h"
 
 extern const u32 geforce_kexports[];
 extern const struct module_symbol_contract geforce_import_contracts[], geforce_export_contracts[];
@@ -43,9 +44,8 @@ const struct gf4_restore_ops *geforce_display_restore_ops(void)
 { return registered ? display_restore_slot : 0; }
 const struct gf5_test_ops *geforce_feature5_ops(void)
 { return registered ? feature5_slot : 0; }
-/* Resident guard also covers service callbacks that reach a foreground wait.
- * Do not retain a module loan between calls or gate thermal work on drawing. */
-static bool foreground_poll_busy;
+/* Thermal work runs only at cooperative foreground points. */
+static bool heat_notice_pending;
 static struct geforce_heat_bridge heat_bridge={.request=geforce_heat_stop_request};
 static bool foreground_deadline_valid;
 static u32 foreground_next_tick;
@@ -65,7 +65,7 @@ static void foreground_deadline_update(const struct gf5_test_ops *ops)
     struct gf5 *g=ops->ctx;
     u32 tick=tick_count;
     u64 now, next;
-    if (g->busy || g->links.clock64(g->links.owner,&now)) return;
+    if (g->links.clock64(g->links.owner,&now)) return;
     next=now+USEC_PER_SEC;
     const u64 deadlines[]={g->next_sensor,g->next_auto,g->next_step,g->next_toggle};
     for (u32 i=0;i<sizeof(deadlines)/sizeof(deadlines[0]);i++)
@@ -86,21 +86,17 @@ void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
 int geforce_heat_latch_clear(void)
 {
     if (heat_bridge.stop_state.state==GF5_STOP_NORMAL) return 0;
-    if (foreground_poll_busy || heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !registered || !heat_bridge.clear)
+    if (heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !registered || !heat_bridge.clear)
         return GF5_ESTATE;
-    foreground_poll_busy=true;
     int rc=heat_bridge.clear();
     if (!rc) heat_bridge.stop_state=(struct gf5_stop_state){0};
-    foreground_poll_busy=false;
     return rc;
 }
 static void heat_stop_consume(void)
 {
     if (heat_bridge.stop_state.state!=GF5_STOP_REQUESTED) return;
-    /* Always use the common stop, including after leave. Only the current
-     * display owner may be reclaimed, after hardware and route are safe. */
+    /* Stop the GPU first. Recover the current app only if it uses GeForce. */
     bool recover_app=heat_bridge.backend_active && heat_bridge.backend_active();
-    int display_owner=con_sink_is_enabled() ? appslot_gfx_owner() : appslot_cur();
     int stop_rc=heat_bridge.stop ? heat_bridge.stop() : GF5_ESTATE;
     if (stop_rc || !pc98_route_safe || !pc98_route_safe()) {
         int sync_rc=vfs_sync();
@@ -115,25 +111,33 @@ static void heat_stop_consume(void)
         for (;;) { _halt(); }
     }
     heat_bridge.stop_state.state=GF5_STOPPED;
-    /* Stop and route precede display-owner recovery. */
+    /* Stop and route precede the existing GUI -> CUI handoff. */
     if (recover_app) {
         geforce_display_stopped();
-        AppSlot *app=display_owner>=APP_ID_SHELL ? appslot_get(display_owner) : 0;
+        AppSlot *app=appslot_get(appslot_cur());
         if (app && app->state!=APP_STATE_FREE) app->abort_req=1;
     }
-    kprintf(KLOG_ATTR,"[geforce] heat stop reason=%d milli_c=%d source_rc=%d stop_rc=%d\n",
-            heat_bridge.stop_state.reason,heat_bridge.stop_state.milli_c,heat_bridge.stop_state.source_rc,stop_rc);
+    if (con_sink_is_enabled()) gui_display_failed();
+    heat_notice_pending=true;
+    geforce_heat_notice();
 }
+/* GUI output is buffered and discarded on CUI return. Print once after the
+ * existing shell handoff has restored the text console. */
+void geforce_heat_notice(void)
+{
+    if (!heat_notice_pending || con_sink_is_enabled()) return;
+    heat_notice_pending=false;
+    kprintf(KLOG_ATTR,"[geforce] heat stop reason=%d milli_c=%d source_rc=%d\n",
+            heat_bridge.stop_state.reason,heat_bridge.stop_state.milli_c,heat_bridge.stop_state.source_rc);
+}
+
 void geforce_foreground_poll(void)
 {
-    if (foreground_poll_busy) return;
-    foreground_poll_busy=true;
     const struct gf5_test_ops *ops=geforce_feature5_ops();
     if (ops && ops->service_poll) (void)ops->service_poll(ops->ctx);
     foreground_deadline_update(ops);
-    /* The borrowed module context is no longer in use when stop runs. */
+    /* No module context is used after the common stop. */
     heat_stop_consume();
-    foreground_poll_busy=false;
 }
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};

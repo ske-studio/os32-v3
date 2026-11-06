@@ -63,14 +63,14 @@ static void service_complete(struct gf5 *g)
  * monitoring needs the MMIO lifetime and epoch, never drawing health. */
 static bool thermal_live(struct gf5 *g)
 {
-    if (!g || g!=service_ctx || (service_slot && !*service_slot) ||
+    if (!g || g!=service_ctx ||
         !g->ch || !g->ch->f ||
         g->ch->f->revoked || !g->ch->f->bar0 || !g->display ||
         g->display->ch!=g->ch || !g->display->legacy ||
         !g->display->legacy->bar0_map || !g->ch->epoch ||
         g->display->epoch!=g->ch->epoch)
         return false;
-    return g->fan.sensor_setup || !service_live(g);
+    return g->fan.sensor_setup || !service_ready(g);
 }
 
 static void service_heat_failure(struct gf5 *g,i32 rc)
@@ -164,10 +164,8 @@ SERVICE_OP(tile_clear,(struct gf5 *g,u32 slot),(g,slot))
 
 static void service_fan_tick(struct gf5 *g,u64 now)
 {
-    if (!thermal_live(g) || g->busy) return;
-    g->busy=true;
+    if (!thermal_live(g)) return;
     gf5_fan_tick(g,now);
-    service_complete(g);
 }
 
 i32 gf5_service_poll(struct gf5 *g)
@@ -176,8 +174,7 @@ i32 gf5_service_poll(struct gf5 *g)
     i32 rc, previous_rc, previous_source_rc;
     const char *previous_source;
     if (!g) return GF5_EINVAL;
-    if (g->busy || !thermal_live(g)) return 0;
-    g->busy=true;
+    if (!thermal_live(g)) return 0;
     rc=g->links.clock64 ? g->links.clock64(g->links.owner,&now) : GF5_EINVAL;
     if (rc) {
         g->source_rc=rc;
@@ -203,7 +200,7 @@ i32 gf5_service_poll(struct gf5 *g)
         g->poll_source=previous_source;
     }
 complete:
-    service_complete(g);
+    if (g->phase==GF5_FAULT) gf5_plan_invalidate(g);
     return 0; /* F5 alarms never fail foreground rendering. */
 }
 

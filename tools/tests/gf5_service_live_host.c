@@ -45,16 +45,12 @@ static void live_rejects(void)
     g->busy=true;
     c1_clear_trace();
     assert(scanlog_f5_ops->therm_read(g,&sample)==GF5_EBUSY);
-    assert(!scanlog_f5_ops->service_poll(g));
-    scanlog_f5_ops->fan_tick(g,cint_host.now);
     assert(!cint_host.calls[H_READ] && !cint_host.calls[H_WRITE]);
     g->busy=false;
     const struct gf5_test_ops *borrowed=scanlog_f5_ops;
     scanlog_f5_ops=0; /* save closes publication before its read-only capture. */
     assert(borrowed->therm_read(g,&sample)==GF5_EBUSY);
     assert(borrowed->state_restore(g,0)==GF5_EBUSY);
-    assert(!borrowed->service_poll(g));
-    borrowed->fan_tick(g,cint_host.now);
     assert(!cint_host.calls[H_READ] && !cint_host.calls[H_WRITE]);
     scanlog_f5_ops=borrowed;
     assert(!scanlog_f5_ops->therm_read(g,&sample));
@@ -136,7 +132,6 @@ static void live_observe(struct gf3_host *h,const struct gf3_host_event *e)
     struct gf5_thermal sample;
     u32 reads=h->calls[H_READ],writes=h->calls[H_WRITE];
     assert(scanlog_f5_ops->therm_read(g,&sample)==GF5_EBUSY);
-    assert(!scanlog_f5_ops->service_poll(g));
     assert(reads==h->calls[H_READ] && writes==h->calls[H_WRITE]);
     ++live_reentries;
     live_in_observe=false;

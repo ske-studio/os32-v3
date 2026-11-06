@@ -22,8 +22,8 @@ PRODUCT = 'hwdev/gf/feature5_service.c'
 MUTATIONS = [
     ('running', '!g->ch->f->running', 'false'),
     ('busy', 'if (g->busy || (service_slot && !*service_slot)) return GF5_EBUSY;', 'if (false) return GF5_EBUSY;'),
-    ('thermal-fault', 'return g->fan.sensor_setup || !service_live(g);',
-     'return !g->ch->fault.latched && (g->fan.sensor_setup || !service_live(g));'),
+    ('thermal-fault', 'return g->fan.sensor_setup || !service_ready(g);',
+     'return !g->ch->fault.latched && (g->fan.sensor_setup || !service_ready(g));'),
     ('window', '!g->display->legacy->bar0_map', 'false'),
     ('save-invalidate', 'gf5_plan_invalidate(g);\n    *service_slot=0;\n    rc=gf5_state_save(g,out);',
      '*service_slot=0;\n    rc=gf5_state_save(g,out);'),

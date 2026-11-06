@@ -61,7 +61,7 @@ int pc98_route_safe(void) { return u6_safe; }
 int gf_production_return(void) { return geforce_return(&c1_platform); }
 int vfs_sync(void)
 {
-    assert(!active && !routed && foreground_poll_busy);
+    assert(!active && !routed);
     ++u6_syncs;
     return -88;
 }
@@ -80,7 +80,7 @@ static void u6_halt(void)
     }
     /* Normal sys_halt may return in this host seam; an unexpected thermal
      * halt must fail at runtime rather than spin in the product halt loop. */
-    assert(!foreground_poll_busy);
+
 }
 void platform_reset(void)
 {
@@ -103,7 +103,7 @@ static void caller_access_leave(const int *previous) { u6_caller=!!*previous; }
 static void exec_cui_display_abort(void) {}
 static void ring3_abort_check(void)
 {
-    assert(!foreground_poll_busy && !cint_prod.feature5.busy);
+    assert(!cint_prod.feature5.busy);
     if (u6_app.abort_req) ++u6_aborts;
 }
 static void exec_park_stop(u32 *f) { (void)f; }
@@ -128,7 +128,7 @@ static i32 u6_session_request(u32 op,u32 action,int owner)
 }
 static void u6_setup(void)
 {
-    foreground_poll_busy=foreground_deadline_valid=false;
+    foreground_deadline_valid=false; heat_notice_pending=false;
     heat_bridge=(struct geforce_heat_bridge){.request=u6_resident_request};
     u6_notifications=u6_aborts=u6_syncs=u6_halts=0;
     u6_safe=true; u6_emergency_halt=false; u6_caller=u6_wm=false;
@@ -329,7 +329,7 @@ static void u6_cooperative(void)
         if (entry==2) assert(!exec_sys_yield());
         if (entry==3) { u32 frame[APP_FRAME_WORDS]={0}; g_cur_frame=frame;
                        assert(!exec_park_poll(tick_count)); }
-        assert(g->next_sensor>old && !g->busy && !foreground_poll_busy);
+        assert(g->next_sensor>old && !g->busy);
         u64 next=g->next_sensor;
         geforce_foreground_poll();
         assert(g->next_sensor==next);
@@ -338,11 +338,6 @@ static void u6_cooperative(void)
     cint_host.now+=5000000; startlog_clear();
     geforce_foreground_poll();
     assert(g->next_sensor==(u64)cint_host.now+GF5_SENSOR_INTERVAL_US);
-    /* Reentry cannot acquire the module loan or touch MMIO, even when due. */
-    cint_host.now=(u32)g->next_sensor;
-    u32 reads=cint_host.calls[H_READ];
-    foreground_poll_busy=true; geforce_foreground_poll();
-    assert(cint_host.calls[H_READ]==reads); foreground_poll_busy=false;
     /* IRQ0 may dispatch foundation work, but must not execute therm MMIO. */
     u64 deadline=g->next_sensor;
     cint_host.now=(u32)deadline;
@@ -388,9 +383,9 @@ static void u6_shutdown(void)
         u32 frame[APP_FRAME_WORDS]={0};
         u6_caller=true; ring3_in_syscall=1;
         u6_syscall_tail(frame);
-        assert(!u6_caller && !u6_wm && !foreground_poll_busy);
+        assert(!u6_caller && !u6_wm);
         assert(!active && !routed && !scanlog_route && (heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
-        assert(!u6_notifications && u6_aborts==1 && u6_app.abort_req);
+        assert(u6_notifications==gui && u6_aborts==1 && u6_app.abort_req);
         assert(!geforce_probe()); /* Another app's ordinary gfx start falls back. */
         geforce_init(); assert(!active && !routed);
         u6_sample(120);
@@ -416,8 +411,11 @@ void _start(void)
     scanlog_finish();
     u6_setup(); u6_gui=true; u6_app.gui=true; u6_display_owner=APP_ID_SHELL;
     u6_sample(135); geforce_foreground_poll();
-    assert(heat_bridge.stop_state.state==GF5_STOPPED && !u6_app.abort_req && u6_owner_app.abort_req);
-    assert(!u6_notifications); /* A different running GUI app is never reclaimed. */
+    assert(heat_bridge.stop_state.state==GF5_STOPPED && u6_app.abort_req && !u6_owner_app.abort_req);
+    assert(u6_notifications==1); /* Desktop and fullscreen use the same CUI action. */
+    assert(heat_notice_pending);
+    u6_gui=false; geforce_heat_notice();
+    assert(!heat_notice_pending);
     u6_resident_request(-999,1,-999);
     assert(heat_bridge.stop_state.reason==GF5_ESTATE && heat_bridge.stop_state.milli_c==135000);
     scanlog_finish(); u6_display_owner=APP_ID_MIN;
@@ -454,7 +452,7 @@ void _start(void)
 #[test]
 fn u6_heat_shutdown_recovers_gui_fullscreen() {
     use crate::{fullscreen, handler, mocks, multiapp, session, wm};
-    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
+    use os32api::gui::proto::{GUI_OP_SESSION_REQUEST, GUI_SESSION_SWITCH_CUI};
     mocks::init();
     session::clear();
     let shm = mocks::Shm::new();
@@ -462,10 +460,22 @@ fn u6_heat_shutdown_recovers_gui_fullscreen() {
     mocks::set_screen_owner(3);
     assert!(crate::after_exec(wm::g()));
     assert_eq!(fullscreen::owner(), 3);
-    // Targeted abort returns through the existing exec owner-exit notification.
-    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 3), 0);
-    assert_eq!(multiapp::live_count(), 1);
-    assert!(mocks::kill_calls().is_empty());
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_SESSION_REQUEST,
+        GUI_SESSION_SWITCH_CUI as u32, 1), 0);
+    assert!(wm::g().quit);
+    assert_eq!(session::pending_action(), GUI_SESSION_SWITCH_CUI);
+    // The current app has already been aborted at the syscall exit.
+    assert_eq!(handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_OWNER_EXIT, 3, 3), 0);
+    assert_eq!(session::pending_action(), GUI_SESSION_SWITCH_CUI);
     wm::g().inited = false;
+    mocks::init();
+    session::clear();
+    *wm::g() = wm::GuiState::NEW;
+    wm::g().inited = true;
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_SESSION_REQUEST,
+        GUI_SESSION_SWITCH_CUI as u32, 1), 0);
+    assert_eq!(crate::run_standalone(wm::g()), 0);
+    assert_eq!(*mocks::SWITCHES.lock().unwrap(), vec![b"/sys/shell.bin".to_vec()]);
+    session::clear();
 }
 U6_RUST_END */

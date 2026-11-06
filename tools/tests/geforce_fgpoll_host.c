@@ -23,9 +23,8 @@ static int clear_rc=GF5_EBUSY;
 static bool heat_backend_active(void) { return true; }
 static int stop_heat(void)
 {
-    CHECK(foreground_poll_busy && (heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
+    CHECK((heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
     stops++;
-    geforce_foreground_poll();
     return 0;
 }
 int gf_production_return(void) { return stop_heat(); }
@@ -33,6 +32,7 @@ int pc98_route_safe(void) { return safe_route; }
 int vfs_sync(void) { CHECK(stops==2 && !safe_route); syncs++; return -88; }
 void serial_puts_polled(const char *s) { CHECK(syncs==1 && s); serials++; }
 static AppSlot display_app;
+void gui_display_failed(void) { CHECK(0); }
 void geforce_display_stopped(void) { CHECK(stops==1); notifications++; }
 int con_sink_is_enabled(void) { return 0; }
 int appslot_cur(void) { return APP_ID_MIN; }
@@ -40,7 +40,7 @@ int appslot_gfx_owner(void) { return APP_ID_MIN; }
 AppSlot *appslot_get(int id) { CHECK(id==APP_ID_MIN); return &display_app; }
 int appslot_abort_request(void) { CHECK(notifications==1); aborts++; return 0; }
 void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; }
-static int clear_heat(void) { CHECK(foreground_poll_busy); return clear_rc; }
+static int clear_heat(void) { return clear_rc; }
 static void host_disable(void) { CHECK(syncs==1 && serials>5); }
 static void host_halt(void)
 {
@@ -49,18 +49,11 @@ static void host_halt(void)
     finish(0);
 }
 static struct gf5 first, second;
-static u32 first_calls, second_calls, depth;
-static bool recurse;
+static u32 first_calls, second_calls;
 static i32 poll_first(struct gf5 *g)
 {
     CHECK(g==&first);
     first_calls++;
-    /* Bound even a broken guard, so its mutant fails by assertion. */
-    if (recurse && !depth) {
-        depth++;
-        geforce_foreground_poll();
-        depth--;
-    }
     return GF5_ESTATE;
 }
 static i32 poll_second(struct gf5 *g)
@@ -149,9 +142,8 @@ void _start(void)
     geforce_foreground_poll();
     CHECK(!first_calls);
     feature5_slot=&first_ops;
-    recurse=true;
     geforce_foreground_poll();
-    CHECK(first_calls==1 && !depth);
+    CHECK(first_calls==1);
     /* Failed poll must release the guard for the next cooperative point. */
     geforce_foreground_poll();
     CHECK(first_calls==2);

@@ -4,7 +4,7 @@ CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:all'], budget=5.0,
                      'tools/tests/geforce_fgpoll_host.c', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
-                     'gfx/gfx_internal.h', 'gfx/palette.h', 'mm/pgalloc.h',
+                     'gfx/gfx_internal.h', 'kernel/gui.h', 'gfx/palette.h', 'mm/pgalloc.h',
                      'fs/vfs.h', 'exec/appslot.h', 'lib/serial_diag.h',
                      'arch/x86/kernel/idt.h',
                      'kernel/module/*.h', 'lib/kstring.h',
@@ -34,7 +34,6 @@ MUTATIONS = [
     ('heat-sync', 'int sync_rc=vfs_sync();', 'int sync_rc=0;'),
     ('heat-clear', 'if (!rc) heat_bridge.stop_state=(struct gf5_stop_state){0};', 'if (0) heat_bridge.stop_state=(struct gf5_stop_state){0};'),
     ('foreground-dispatch', 'if (ops && ops->service_poll)', 'if (0 && ops && ops->service_poll)'),
-    ('foreground-reentry', 'if (foreground_poll_busy) return;', 'if (0 && foreground_poll_busy) return;'),
 ]
 
 

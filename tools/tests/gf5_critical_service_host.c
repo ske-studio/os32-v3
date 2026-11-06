@@ -34,10 +34,7 @@ static void critical_setup(void)
 }
 static void critical_edge(struct gf5 *g,bool active)
 {
-    /* therm invokes the callback while the foreground worker owns busy. */
-    g->busy=true;
     g->emergency.pause(g->emergency.owner,active);
-    g->busy=false;
 }
 static void critical_roundtrip(void)
 {
