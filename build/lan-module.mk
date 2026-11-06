@@ -1,7 +1,7 @@
 # T5c-4: reuse T4 function imports, VA0 packing and paired distribution.
 LAN_OUT := $(BUILD_OUT)/lan
 LAN_GEN := $(addprefix $(LAN_OUT)/,lan_imports.h lan_imports.json lan_import_slots.c lan_import_stubs.S lan_provider_types.c lan_kexports.c)
-LAN_DEF_SOURCES := net/nic.h include/pci_dev_contract.h include/pci_bind_contract.h include/lan_contract.h drivers/net/e82557/lan_module.h drivers/net/e82557/e82557.h kernel/irq/irq.h mm/dma_pool.h fs/serialfs/sfs_lan.h fs/serialfs/sfs_proto.h fs/serialfs/sfs_client.h kernel/time/cpu_calibrate.h drivers/pci/pci.h drivers/pci/pci_decode.h drivers/pci/pci_bind.h init/sysconfig.h fs/vfs.h include/bootinfo.h lib/kstring.h include/kprintf.h
+LAN_DEF_SOURCES := net/nic.h include/pci_dev_contract.h include/pci_bind_contract.h include/lan_contract.h drivers/net/e82557/lan_module.h drivers/net/e82557/e82557.h kernel/irq/irq.h mm/dma_pool.h fs/serialfs/sfs_lan.h fs/serialfs/sfs_proto.h fs/serialfs/sfs_client.h fs/serialfs/serialfs.h kernel/time/cpu_calibrate.h drivers/pci/pci.h drivers/pci/pci_decode.h drivers/pci/pci_bind.h init/sysconfig.h fs/vfs.h include/bootinfo.h lib/kstring.h include/kprintf.h
 $(LAN_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/lan_imports.def $(LAN_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module lan --out-dir $(LAN_OUT)
 
