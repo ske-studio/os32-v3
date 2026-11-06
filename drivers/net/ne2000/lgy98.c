@@ -21,6 +21,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "io.h"
 #include "kstring.h"
 #include "link.h"
+#include "net/nic.h"
 
 #define LGY_MAC_HEX_DIGITS    2
 #define LGY_MAC_TEXT_STRIDE   (LGY_MAC_HEX_DIGITS + 1)
@@ -117,10 +118,15 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
         lgy98_reflect_on = 1;
         kprintf(KLOG_ATTR, "[lgy98] reflect mode (M2 test): rx frames are sent back with MACs swapped\n");
     }
-    /* 反射モードではリンク層を起こさない — RX キューの消費者は反射か
-     * リンク層のどちらか 1 つ (TASK_N0 §2a、往復 2 の R10)。link_init を
-     * 呼ばなければ link_tick は何もせず戻る。 */
-    if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);
+    /* link_init と PC98_TICK_LINK は net_bind が所有する。
+     * 反射モードは RX を専有するので共有 NIC として登録しない。 */
+    if (!(flags & LGY98_FLAG_REFLECT)) {
+        rc = net_adapter_register(NET_NIC_LGY98, &net_lgy98_adapter);
+        if (rc) {
+            kprintf(ATTR_YELLOW, "[lgy98] adapter registration failed rc=%d\n", rc);
+            return NE2K_ERR_IO;
+        }
+    }
     /* IRQ 駆動へ (票 TASK_HAL_WIRING §1-1)。空きの判定は PIC の IMR を覗く
      * irq_is_free() ではなく **irq_register の戻り** で行う — 共有登録では
      * 「マスクが開いている = 使用中」が成り立たない。

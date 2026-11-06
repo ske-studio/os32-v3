@@ -170,8 +170,12 @@ def check_timer_calls_link_tick():
     assert len(re.findall(r"\blink_tick\s*\(", link)) == 1, \
         "net/link.c / link_*.inc の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
     lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
-    assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
-        "反射モードで link_init を止めていない"
+    lgy = re.sub(r"/\*.*?\*/", "", lgy, flags=re.S)
+    assert not re.search(r"\blink_init\s*\(", lgy), \
+        "LGY が共有 NIC 所有者より先に link_init を呼んでいる"
+    assert re.search(r"if \(!\(flags & LGY98_FLAG_REFLECT\)\)\s*\{\s*"
+                     r"rc = net_adapter_register\(NET_NIC_LGY98, &net_lgy98_adapter\);", lgy), \
+        "反射モードを共有 NIC として登録している"
     print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
 
 
