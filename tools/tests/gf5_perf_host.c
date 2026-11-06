@@ -47,6 +47,44 @@ static const struct gf5_clock requested={
 };
 static bool saw_ram,saw_core,nested_restore;
 static i32 lower_source;
+static u32 selected_fan,selected_volt;
+static bool heat_fixture;
+static struct gf5_clock heat_current,heat_request;
+/* Independent synthetic PLL oracle, MIT nouveau clk/nv40.c:39-78:
+ * 27 MHz reference, M=1, P=0, bypass stage 2, N={4,5,6,7,8,12}.
+ * actual deliberately differs from decoded/readback: PM final P0 decision
+ * removed actual equality (including fixedgain2), leaving readback diagnostic. */
+static const struct { u32 khz,nn; } heat_pll[]={
+    {108000,0x0401},{135000,0x0501},{162000,0x0601},
+    {189000,0x0701},{216000,0x0801},{324000,0x0c01}
+};
+static void heat_observe(const struct gf5_host_event *e)
+{
+    assert(e->op==F5_CALC || e->op==F5_PROG);
+    if (e->op==F5_CALC && e->a[0]==F5_CALL_READ) {
+        *(struct gf5_clock *)e->p[1]=heat_current;
+    } else if (e->op==F5_CALC) {
+        const struct gf5_clock *c=e->p[1];
+        assert(c->mem_khz==400000);
+        u32 i;
+        for (i=0;i<sizeof(heat_pll)/sizeof(heat_pll[0]);++i)
+            if (heat_pll[i].khz==c->core_khz) break;
+        assert(i<sizeof(heat_pll)/sizeof(heat_pll[0]));
+        u32 shader;
+        for (shader=0;shader<sizeof(heat_pll)/sizeof(heat_pll[0]);++shader)
+            if (heat_pll[shader].khz==c->shader_khz) break;
+        assert(shader<sizeof(heat_pll)/sizeof(heat_pll[0]));
+        *(struct gf5_plan *)e->p[2]=(struct gf5_plan){
+            .nc=0x80000100,.nn=heat_pll[i].nn,
+            .sc=0x80000000|heat_pll[shader].nn,.mux=i==shader ? 0x33 : 0x23,
+            .actual={c->core_khz+1,c->shader_khz+1,c->mem_khz}};
+        heat_request=*c;
+    } else {
+        const struct gf5_plan *p=e->p[1];
+        assert(p->nc==0x80000100 && (p->mux==0x33 || p->mux==0x23));
+        heat_current=heat_request;
+    }
+}
 
 static void put16(u32 at,u32 value)
 {
@@ -62,7 +100,8 @@ static bool same_clock(struct gf5_clock a,struct gf5_clock b)
 }
 static bool same_entry(struct gf5_perf_entry a,struct gf5_perf_entry b)
 {
-    return same_clock(a.clock,b.clock) && a.voltage==b.voltage && a.fanspeed==b.fanspeed;
+    return same_clock(a.clock,b.clock) && a.voltage==b.voltage && a.fanspeed==b.fanspeed &&
+        a.pstate==b.pstate && a.bios_index==b.bios_index;
 }
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
 {
@@ -78,6 +117,7 @@ static void observe(struct gf5_host *host,const struct gf5_host_event *e)
         if (lower_source) h.ctx.source_rc=lower_source;
         return;
     }
+    if (heat_fixture) { heat_observe(e); return; }
     if (e->op==F5_CALC) {
         assert(e->a[0]==F5_CALL_CALC);
         const struct gf5_clock *request=e->p[1];
@@ -96,9 +136,9 @@ static void observe(struct gf5_host *host,const struct gf5_host_event *e)
         }
     }
     if (e->op==F5_FAN) {
-        assert(e->a[0]==F5_CALL_CSTATE && e->a[1]==FAN_BASE);
+        assert(e->a[0]==F5_CALL_CSTATE && e->a[1]==selected_fan);
         /* The fixture intentionally leaves policy updates to observation. */
-        if ((i32)e->a[2]>0) h.ctx.fan.cstate=FAN_BASE;
+        if ((i32)e->a[2]>0) h.ctx.fan.cstate=selected_fan;
     }
 }
 static void fresh(void)
@@ -127,7 +167,8 @@ static void fresh(void)
         put16(at+6,SHADER_MHZ+i*SHADER_STEP_MHZ); rom[at+8]=i ? (u8)CORE_OFFSET_MHZ : 0;
         put16(at+0x0b,MEM_MHZ+i*MEM_STEP_MHZ);
     }
-    saw_ram=saw_core=nested_restore=false; lower_source=0;
+    saw_ram=saw_core=nested_restore=heat_fixture=false; lower_source=0;
+    selected_fan=FAN_BASE; selected_volt=VOLT_BASE;
 }
 static void expect_get(u32 index,struct gf5_perf_entry expected)
 {
@@ -144,7 +185,7 @@ static void versions(void)
         expect_get(0,(struct gf5_perf_entry){requested,VOLT_BASE,FAN_BASE,0,0});
         expect_get(1,(struct gf5_perf_entry){{(SHADER_MHZ+SHADER_STEP_MHZ+CORE_OFFSET_MHZ)*KHZ_PER_MHZ,
             (SHADER_MHZ+SHADER_STEP_MHZ)*KHZ_PER_MHZ,
-            (MEM_MHZ+MEM_STEP_MHZ)*NV4_MEM_KHZ_PER_UNIT},VOLT_BASE+1,FAN_BASE+1,0,0});
+            (MEM_MHZ+MEM_STEP_MHZ)*NV4_MEM_KHZ_PER_UNIT},VOLT_BASE+1,FAN_BASE+1,0,1});
     }
     static const u8 newer[]={0x25,0x30,0x35};
     for (u32 i=0;i<sizeof(newer);++i) {
@@ -219,7 +260,7 @@ static void malformed(void)
 
 struct call { enum gf5_host_op op; i32 direction; };
 static const struct call golden[]={
-    {F5_CALC,0},{F5_RAM,0},
+    {F5_CALC,0},{F5_FAN_CHECK,0},{F5_VOLT_CHECK,0},{F5_RAM,0},
     {F5_FAN,1},{F5_VOLT,1},{F5_PROG,0},{F5_VOLT,-1},{F5_FAN,-1}
 };
 static void prefix(u32 count)
@@ -228,8 +269,10 @@ static void prefix(u32 count)
     for (u32 i=0;i<count;++i) {
         const struct gf5_host_event *e=&events[i];
         assert(e->op==golden[i].op && e->p[0]==&h.ctx);
+        if (e->op==F5_FAN_CHECK) assert(e->a[0]==selected_fan);
+        if (e->op==F5_VOLT_CHECK) assert(e->a[0]==selected_volt && e->a[1]==selected_volt);
         if (e->op==F5_VOLT) {
-            assert(e->a[0]==F5_CALL_ID && e->a[1]==VOLT_BASE && e->a[2]==VOLT_BASE &&
+            assert(e->a[0]==F5_CALL_ID && e->a[1]==selected_volt && e->a[2]==selected_volt &&
                 (i32)e->a[3]==golden[i].direction);
         }
         if (e->op==F5_FAN) assert((i32)e->a[2]==golden[i].direction);
@@ -272,8 +315,8 @@ static void selection(void)
         gf5_host_fail_at(&h,golden[i].op,nth,GF5_EIO);
         assert(gf5_perf_select(&h.ctx,0)==GF5_EIO); prefix(i+1);
         assert(h.nevents==i+1 && h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==GF5_EIO);
-        assert(h.ctx.phase==(!i ? phase : GF5_FAULT) &&
-            h.ctx.accepting==(!i && !nested_restore));
+        assert(h.ctx.phase==(i<3 ? phase : GF5_FAULT) &&
+            h.ctx.accepting==(i<3 && !nested_restore));
         assert(!h.calls[F5_PAUSE] && !h.calls[F5_RESUME] && !h.calls[F5_ADMIT] &&
             !h.display.base.paused && h.display.ctx.saved_closed==nested_restore);
         assert(h.ctx.image==&image && h.ctx.rom.bytes==rom &&
@@ -287,31 +330,237 @@ static void selection(void)
     fresh(); gf5_host_fail_at(&h,F5_RAM,1,GF2_ETIME);
     assert(gf5_perf_select(&h.ctx,0)==GF5_ETIME && h.ctx.source_rc==GF2_ETIME);
     assert(h.calls[F5_CALC]==1 && h.calls[F5_RAM]==1 &&
-        h.nevents==h.calls[F5_CALC]+h.calls[F5_RAM] && !h.calls[F5_ADMIT] &&
+        h.nevents==h.calls[F5_CALC]+h.calls[F5_RAM]+
+            h.calls[F5_FAN_CHECK]+h.calls[F5_VOLT_CHECK] && !h.calls[F5_ADMIT] &&
         h.ctx.last_rc==GF5_ETIME && h.ctx.phase==GF5_FAULT && !h.ctx.accepting);
     fresh(); lower_source=GF2_ETIME; gf5_host_fail_at(&h,F5_CALC,1,GF5_ETIME);
     assert(gf5_perf_select(&h.ctx,0)==GF5_ETIME && h.ctx.source_rc==GF2_ETIME &&
         h.ctx.last_rc==GF5_ETIME && h.nevents==1 && h.ctx.phase==GF5_RUN && h.ctx.accepting);
     fresh(); lower_source=GF2_EIO; gf5_host_fail_at(&h,F5_PROG,1,GF5_EIO);
     assert(gf5_perf_select(&h.ctx,0)==GF5_EIO && h.ctx.source_rc==GF2_EIO);
-    /* ENOTSUP is optional only at fan/voltage boundaries, with visible rc. */
-    fresh(); gf5_host_fail_at(&h,F5_FAN,0,GF5_ENOTSUP);
-    gf5_host_fail_at(&h,F5_VOLT,0,GF5_ENOTSUP);
+    /* nouveau clk/base.c:178-213: only confirmed absence is optional. */
+    fresh(); gf5_host_fail_at(&h,F5_FAN,0,GF5_ENODEV);
+    gf5_host_fail_at(&h,F5_VOLT,0,GF5_ENODEV);
+    gf5_host_fail_at(&h,F5_FAN_CHECK,0,GF5_ENODEV);
+    gf5_host_fail_at(&h,F5_VOLT_CHECK,0,GF5_ENODEV);
     assert(!gf5_perf_select(&h.ctx,0)); prefix(count);
-    assert(h.nevents==count && h.ctx.last_rc==GF5_ENOTSUP &&
-        h.ctx.source_rc==GF5_ENOTSUP && h.ctx.phase==GF5_RUN);
-    fresh(); gf5_host_fail_at(&h,F5_FAN,0,GF4_ENODEV);
-    assert(!gf5_perf_select(&h.ctx,0)); prefix(count);
-    assert(h.nevents==count && h.ctx.last_rc==GF5_ENOTSUP &&
-        h.ctx.source_rc==GF4_ENODEV && h.ctx.phase==GF5_RUN);
+    assert(h.nevents==count && h.ctx.last_rc==GF5_ENODEV &&
+        h.ctx.source_rc==GF5_ENODEV && h.ctx.phase==GF5_RUN);
+    static const enum gf5_host_op optional[]={F5_FAN_CHECK,F5_VOLT_CHECK,F5_FAN,F5_VOLT};
+    for (u32 i=0;i<sizeof(optional)/sizeof(optional[0]);++i) {
+        fresh(); gf5_host_fail_at(&h,optional[i],1,GF5_ENOTSUP);
+        assert(gf5_perf_select(&h.ctx,0)==GF5_ENOTSUP);
+        assert(h.ctx.last_rc==GF5_ENOTSUP && h.ctx.source_rc==GF5_ENOTSUP);
+        assert(h.ctx.phase==(i<2 ? GF5_RUN : GF5_FAULT));
+        assert(h.ctx.accepting==(i<2) && !h.calls[F5_PROG]);
+        if (i<2) assert(!h.calls[F5_RAM] && !h.calls[F5_FAN] && !h.calls[F5_VOLT]);
+    }
     fresh(); gf5_host_fail_at(&h,F5_RAM,1,GF5_ENOTSUP);
     assert(gf5_perf_select(&h.ctx,0)==GF5_ENOTSUP && !h.calls[F5_PROG] && h.ctx.phase==GF5_FAULT);
     fresh(); assert(gf5_perf_select(&h.ctx,ENTRY_COUNT)==GF5_EINVAL && !h.nevents);
     assert(gf5_perf_select(0,0)==GF5_EINVAL);
 }
+/* A13: all supported versions, disabled first/middle/last and all-ff.
+ * Raw pstate comes from bios/perf.c:98-101, exclusion clk/base.c:421-425.
+ * Disabled entries carry otherwise valid bytes so only pstate excludes them. */
+static void dense_entries(void)
+{
+    static const u8 versions[]={0x12,0x13,0x14,0x21,0x23,0x24,0x25,0x30,0x35};
+    enum { RAW_COUNT=5, DISABLED=0xff, VALID_PSTATE=0x10 };
+    for (u32 v=0;v<sizeof(versions);++v) for (u32 mask=0;mask<(1U<<RAW_COUNT);++mask) {
+        fresh();
+        bool old=versions[v]<0x20;
+        u32 header=old ? BMP_HEADER : PERF_HEAD;
+        u32 stride=old ? ENTRY_LEN : ENTRY_STRIDE;
+        if (old) {
+            put32(POWER_AT,0);
+            static const u8 bmp[]={0xff,0x7f,'N','V',0};
+            gf2_host_memcpy(rom+BMP_AT,bmp,sizeof(bmp));
+            rom[BMP_AT+6]=0x25; put16(BMP_AT+BMP_PTR,PERF_AT);
+            rom[PERF_AT]=BMP_HEADER; rom[PERF_AT+1]=versions[v];
+        } else rom[PERF_AT]=versions[v];
+        rom[PERF_AT+2]=RAW_COUNT; rom[PERF_AT+3]=ENTRY_LEN;
+        for (u32 i=0;i<RAW_COUNT;++i) {
+            u32 at=PERF_AT+header+i*stride;
+            gf2_host_memset(rom+at,0,stride);
+            rom[at]=(mask&(1U<<i)) ? DISABLED : VALID_PSTATE+i;
+            if (old) {
+                put32(at+1,OLD_CORE_UNITS); put32(at+5,OLD_MEM_UNITS);
+                rom[at+0x37]=FAN_BASE+i; rom[at+OLD_VOLT_OFFSET]=VOLT_BASE+i;
+            } else if (versions[v]<=0x24) {
+                rom[at+4]=FAN_BASE+i; rom[at+5]=VOLT_BASE+i;
+                put16(at+6,SHADER_MHZ); put16(at+0x0b,MEM_MHZ);
+            } else {
+                u32 fan=versions[v]==0x25 ? 4 : 6,core=versions[v]==0x25 ? 6 : 8;
+                rom[at+fan]=FAN_BASE+i; rom[at+fan+1]=VOLT_BASE+i;
+                put16(at+core,SHADER_MHZ); put16(at+0x0a,SHADER_MHZ);
+                put16(at+0x0c,MEM_MHZ*2);
+            }
+        }
+        u32 n=0,wanted=0;
+        for (u32 i=0;i<RAW_COUNT;++i) if (!(mask&(1U<<i))) ++wanted;
+        assert(!gf5_perf_count(&h.ctx,&n) && n==wanted);
+        u32 dense=0;
+        for (u32 raw=0;raw<RAW_COUNT;++raw) if (!(mask&(1U<<raw))) {
+            struct gf5_perf_entry e={.clock=requested,.voltage=VOLT_BASE+raw,.fanspeed=FAN_BASE+raw,
+                .pstate=VALID_PSTATE+raw,.bios_index=raw};
+            if (old) { e.clock.core_khz=OLD_CORE_UNITS*OLD_CORE_KHZ_PER_UNIT;
+                e.clock.shader_khz=0; e.clock.mem_khz=OLD_MEM_UNITS*OLD_MEM_KHZ_PER_UNIT; }
+            expect_get(dense++,e);
+        }
+        struct gf5_perf_entry keep={{1,2,3},4,5,6,7},e=keep;
+        assert(gf5_perf_get(&h.ctx,n,&e)==GF5_EINVAL && same_entry(e,keep));
+        assert(gf5_perf_select(&h.ctx,n)==GF5_EINVAL && !h.nevents);
+        /* Distinct fan/voltage tokens prove select uses the same dense
+         * index as get, including when raw zero is disabled. */
+        u32 raw=0;
+        if (!old) for (u32 i=0;i<n;++i) {
+            while (mask&(1U<<raw)) ++raw;
+            selected_fan=FAN_BASE+raw; selected_volt=VOLT_BASE+raw; ++raw;
+            gf5_host_trace_clear(&h); saw_ram=saw_core=false;
+            assert(!gf5_perf_select(&h.ctx,i));
+            prefix(sizeof(golden)/sizeof(golden[0]));
+        }
+    }
+}
+
+/* U3 calls once per valid sample. therm's sensor deadline and edge-to-level
+ * dispatch are U4's responsibility; no catch-up loop is simulated here. */
+enum { HEAT_DOWN=80, HEAT_HYST=5, HEAT_SHUTDOWN=110,
+       HEAT_HOT=80000, HEAT_COOL=74999, HEAT_EQUAL=75000 };
+static void heat_fresh(void)
+{
+    fresh(); heat_fixture=true;
+    h.ctx.fan.threshold[1]=HEAT_DOWN; h.ctx.fan.hyst[1]=HEAT_HYST;
+    h.ctx.fan.threshold[3]=HEAT_SHUTDOWN;
+    h.ctx.ch->f->running=true;
+    heat_current=(struct gf5_clock){216000,216000,400000};
+    /* Unsorted BIOS list includes a faster-than-entry state. No fan or
+     * voltage operation is allowed; BIOS memory values must be ignored. */
+    static const u16 mhz[]={324,135,189,108,162};
+    rom[PERF_AT]=0x25; rom[PERF_AT+2]=sizeof(mhz)/sizeof(mhz[0]);
+    for (u32 i=0;i<sizeof(mhz)/sizeof(mhz[0]);++i) {
+        u32 at=PERF_AT+PERF_HEAD+i*ENTRY_STRIDE;
+        gf2_host_memset(rom+at,0,ENTRY_STRIDE); rom[at]=i+1;
+        put16(at+6,mhz[i]); put16(at+0x0a,mhz[i]); put16(at+0x0c,777);
+    }
+}
+static i32 heat_sample(i32 milli_c,bool calibrated)
+{
+    gf5_host_trace_clear(&h);
+    gf5_host_time_set(&h,h.now+1000000U);
+    struct gf5_thermal t={.milli_c=milli_c,.calibrated=calibrated};
+    i32 rc=gf5_heat_step(&h.ctx,&t,h.now);
+    assert(!h.calls[F5_RAM] && !h.calls[F5_FAN] && !h.calls[F5_VOLT] &&
+        !h.calls[F5_PAUSE] && !h.calls[F5_RESUME] && !h.display.nevents);
+    return rc;
+}
+static void heat_at(u32 khz,u32 writes)
+{
+    assert(heat_current.core_khz==khz && heat_current.shader_khz==khz &&
+        heat_current.mem_khz==400000 && h.calls[F5_PROG]==writes);
+    assert(h.ctx.heat.ceiling.core_khz==khz && h.ctx.heat.ceiling.shader_khz==khz &&
+        h.ctx.heat.ceiling.mem_khz==400000 && !h.ctx.heat.stop_pending);
+}
+static void heat_steps(void)
+{
+    heat_fresh();
+    assert(!heat_sample(HEAT_COOL,true) && !h.nevents && !h.ctx.heat.down_active);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(189000,1);
+    assert(same_clock(h.ctx.heat.entry_clock,(struct gf5_clock){216000,216000,400000}));
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(162000,1);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(135000,1);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(108000,1);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(108000,0);
+    /* Two cool samples do nothing; equality breaks the sequence. */
+    for (u32 i=1;i<=2;++i) {
+        assert(!heat_sample(HEAT_COOL,true)); heat_at(108000,0);
+        assert(h.ctx.heat.cool_samples==i);
+    }
+    assert(!heat_sample(HEAT_EQUAL,true)); heat_at(108000,0);
+    assert(!h.ctx.heat.cool_samples);
+    for (u32 step=0;step<4;++step) {
+        u32 before=heat_current.core_khz;
+        for (u32 i=1;i<=3;++i) {
+            assert(!heat_sample(HEAT_COOL,true));
+            heat_at(i==3 ? before+27000 : before,i==3);
+            assert(h.ctx.heat.cool_samples==(i==3 ? 0 : i));
+        }
+    }
+    assert(!h.ctx.heat.down_active); /* 216 MHz, never BIOS 324 MHz. */
+    assert(!heat_sample(HEAT_COOL,true) && !h.nevents);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(189000,1);
+    /* Reheat after one recovery step immediately lowers again. */
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(162000,1);
+    for (u32 i=0;i<3;++i) assert(!heat_sample(HEAT_COOL,true));
+    heat_at(189000,1);
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(162000,1);
+    /* Critical owns pause; no recovery while it is held. */
+    h.ctx.heat.critical_paused=true;
+    for (u32 i=0;i<4;++i) assert(!heat_sample(HEAT_COOL,true) && !h.calls[F5_PROG]);
+    assert(!h.ctx.heat.cool_samples);
+    h.ctx.heat.critical_paused=false;
+    for (u32 i=0;i<2;++i) assert(!heat_sample(HEAT_COOL,true) && !h.calls[F5_PROG]);
+    assert(!heat_sample(HEAT_COOL,true)); heat_at(189000,1);
+    /* Invalid samples reset cooling and request protective stop. */
+    assert(!heat_sample(HEAT_COOL,true) && h.ctx.heat.cool_samples==1);
+    assert(heat_sample(HEAT_COOL,false)==GF5_EIO);
+    assert(!h.ctx.heat.cool_samples && h.ctx.heat.stop_pending && !h.calls[F5_PROG]);
+    heat_fresh();
+    assert(!heat_sample(HEAT_SHUTDOWN*1000,true) && !h.nevents && h.ctx.heat.stop_pending);
+    heat_fresh();
+    /* Disabled highest lower stage is skipped; no fan is needed. */
+    rom[PERF_AT+PERF_HEAD+2*ENTRY_STRIDE]=0xff;
+    h.ctx.fan_off=true;
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(162000,1);
+    /* A BIOS with no lower state holds the entry clock without rewriting. */
+    heat_fresh(); rom[PERF_AT+2]=1;
+    assert(!heat_sample(HEAT_HOT,true)); heat_at(216000,0);
+}
+static void heat_shader_order(void)
+{
+    heat_fresh();
+    /* Highest core first, then highest shader. A candidate that raises
+     * either domain is unreachable even if its other domain is lower. */
+    static const u16 core[]={324,189,189,189,162};
+    static const u16 shader[]={324,162,216,216,189};
+    for (u32 i=0;i<sizeof(core)/sizeof(core[0]);++i) {
+        u32 at=PERF_AT+PERF_HEAD+i*ENTRY_STRIDE;
+        put16(at+6,core[i]); put16(at+0x0a,shader[i]);
+    }
+    assert(!heat_sample(HEAT_HOT,true) && h.calls[F5_PROG]==1);
+    assert(same_clock(heat_current,(struct gf5_clock){189000,216000,400000}));
+    assert(!heat_sample(HEAT_HOT,true) && h.calls[F5_PROG]==1);
+    assert(same_clock(heat_current,(struct gf5_clock){189000,162000,400000}));
+    assert(!heat_sample(HEAT_HOT,true) && !h.calls[F5_PROG]);
+    assert(same_clock(heat_current,(struct gf5_clock){189000,162000,400000}));
+}
+static void heat_failures(void)
+{
+    static const struct { enum gf5_host_op op; u32 nth; } fail[]={
+        {F5_CALC,1}, /* current read */
+        {F5_CALC,2}, /* candidate calculation */
+        {F5_PROG,1}, /* core program */
+    };
+    for (u32 i=0;i<sizeof(fail)/sizeof(fail[0]);++i) {
+        heat_fresh(); gf5_host_fail_at(&h,fail[i].op,fail[i].nth,GF5_EIO);
+        assert(heat_sample(HEAT_HOT,true)==GF5_EIO);
+        assert(h.ctx.heat.stop_pending && h.ctx.heat.last_rc==GF5_EIO &&
+            h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==GF5_EIO);
+        assert(!h.calls[F5_PROG] || fail[i].op==F5_PROG);
+    }
+    heat_fresh(); h.ctx.phase=GF5_FAULT;
+    assert(heat_sample(HEAT_HOT,true)==GF5_ESTATE && !h.nevents && h.ctx.heat.stop_pending);
+    heat_fresh(); assert(!heat_sample(HEAT_HOT,true));
+    ++h.ctx.ch->epoch;
+    assert(heat_sample(HEAT_HOT,true)==GF5_ESTATE && !h.nevents && h.ctx.heat.stop_pending);
+    /* Direct perf requests over the active ceiling are side-effect free. */
+    heat_fresh(); assert(!heat_sample(HEAT_HOT,true)); gf5_host_trace_clear(&h);
+    assert(gf5_perf_select(&h.ctx,0)==GF5_EBUSY && !h.nevents);
+}
 void _start(void)
 {
-    versions(); malformed(); selection();
+    versions(); malformed(); selection(); dense_entries(); heat_steps(); heat_shader_order(); heat_failures();
     __asm__ volatile("int $0x80" : : "a"(1),"b"(0));
     __builtin_unreachable();
 }
