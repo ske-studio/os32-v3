@@ -74,6 +74,7 @@
  * C0 owns rollback; work is a candidate, head/next owns the last ON value. */
 #include "api.h"
 #include "../foundation.h"
+#include "timeout.h"
 
 /* nvreg.h:129-139,248,267,368-428; hw.h:70-96,109-124. */
 #define FP_BAR 0U
@@ -144,11 +145,11 @@ static i32 fp_index(struct gf_io *io,u32 port,u32 index,u32 value)
     i32 rc=fp_write(io,port,1,index);
     return rc ? rc : fp_write(io,port+1U,1,value);
 }
-static i32 fp_deadline(struct gf_io *io,u32 dl)
+static i32 fp_deadline(struct gf_io *io,u32 dl,u8 head,const char *stage)
 {
     u32 now;
     i32 rc=io->timing.clock_us(io->opaque,&now);
-    return rc ? rc : (i32)(now-dl)>=0 ? GF4_ETIME : GF4_OK;
+    return rc ? rc : (i32)(now-dl)>=0 ? gf4_timeout(stage,head,dl,now,0,0) : GF4_OK;
 }
 static i32 fp_check(struct gf4_ctx *ctx,const struct gf4_route *route)
 {
@@ -228,7 +229,7 @@ i32 gf4_tmds_load(struct gf4_ctx *ctx,const struct gf4_route *route,
         return GF4_ERANGE;
     struct gf_io *io=&ctx->ch->f->io;
     u32 owner,boot,sel,control,delta=route->head*FP_STRIDE;
-    rc=fp_deadline(io,dl);
+    rc=fp_deadline(io,dl,route->head,"tmds_load_deadline");
     if (!rc) rc=fp_write(io,FP_CR,1,FP_OWNER);
     if (!rc) rc=fp_read(io,FP_CR+1U,1,&owner);
     if (rc) return rc;
@@ -265,14 +266,14 @@ i32 gf4_tmds_load(struct gf4_ctx *ctx,const struct gf4_route *route,
         if (!rc) rc=fp_load(io,route->head,&result);
         /* dfp.c:446-480: C2 owns init-context head/output/deadline and ROM
          * acquire/script/release; do not retain its borrowed ROM here. */
-        if (!rc) rc=fp_deadline(io,dl);
+        if (!rc) rc=fp_deadline(io,dl,route->head,"tmds_before_script");
         if (!rc) rc=ctx->exec->tmds_script(ctx->exec->owner,route,t->khz,dl);
         if (!rc) rc=fp_read(io,FP_TG+delta,4,&control);
         u32 test=FP_TEST;
         if (route->or_mask&(FP_OR_C|FP_OR_D)) test+=FP_TEST_C_OFFSET;
         if (route->or_mask&(FP_OR_B|FP_OR_D)) test+=FP_TEST_B_OFFSET;
         if (!rc) rc=fp_write(io,test,4,FP_TEST_VALUE);
-        if (!rc) rc=fp_deadline(io,dl);
+        if (!rc) rc=fp_deadline(io,dl,route->head,"tmds_after_script");
         if (!rc) {
             /* Scripts may leave TG OFF: retain their other changes while
              * restoring this mode's sync polarity (dfp.c:113-128). */
@@ -307,7 +308,7 @@ i32 gf4_tmds_dpms(struct gf4_ctx *ctx,const struct gf4_route *route,
     struct gf_io *io=&ctx->ch->f->io;
     struct gf4_head_image *image=fp_image(ctx,route->head);
     u32 off=FP_TG+route->head*FP_STRIDE,value=image->fp_on;
-    rc=fp_deadline(io,dl);
+    rc=fp_deadline(io,dl,route->head,"tmds_dpms_deadline");
     if (!rc && dpms!=GF4_ON) {
         rc=fp_read(io,off,4,&value);
         value=(value&~FP_ON_BITS)|FP_OFF_BITS;

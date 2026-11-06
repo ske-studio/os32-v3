@@ -103,6 +103,7 @@ i32 gf4_tmds_script_select(const u8 *rom,u32 size,
 #include "api.h"
 #include "../accel_service.h"
 #include "../production.h"
+#include "timeout.h"
 #include "../../../drivers/video/geforce/geforce_module.h"
 
 static struct gf4_links display_links;
@@ -267,11 +268,11 @@ static i32 links_tv_gpio(void *owner,bool on,u32 dl)
  * save only SEL_CLK binding bits. B10 owns bind and CR44 owner restoration;
  * its script-before/khz>165000 policy is the approved nouveau difference. */
 enum { LINKS_SEL_CLK=0x680524U, LINKS_BINDING=0x50000U };
-static i32 links_script_deadline(struct gf_io *io,u32 dl)
+static i32 links_script_deadline(struct gf_io *io,u32 dl,u8 head,const char *stage)
 {
     u32 now;
     if (io->timing.clock_us(io->opaque,&now)) return -1;
-    return (i32)(now-dl)>=0 ? GF4_ETIME : 0;
+    return (i32)(now-dl)>=0 ? gf4_timeout(stage,head,dl,now,0,0) : 0;
 }
 static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u32 dl)
 {
@@ -282,11 +283,11 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
         !l->owner->acquire || !l->owner->release || !l->io.read ||
         !l->io.write || !l->io.restore || !l->io.timing.clock_us) return links_result(c,GF4_EINVAL);
     struct gf_io *io=&l->io;
-    i32 rc=links_script_deadline(io,dl);
+    i32 rc=links_script_deadline(io,dl,route->head,"script_before_acquire");
     if (rc) return links_result(c,rc);
     /* acquire failure may already own partial scratch/index saves. */
     int acquired=l->owner->acquire(l);
-    rc=links_script_deadline(io,dl);
+    rc=links_script_deadline(io,dl,route->head,"script_after_acquire");
     if (acquired) rc=-1;
     u32 pc=0,binding=0,value;
     bool saved=false,ran=false;
@@ -309,6 +310,14 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
         ran=true;
         int run=gf_init_run_script(l->init,l->program,pc,route->head,route->or_mask,dl);
         rc=run==GF_SCRIPT_ETIME ? GF4_ETIME : run ? -1 : 0;
+        if (run==GF_SCRIPT_ETIME) {
+            /* TIME/budget waits have no polled register (reg=0).
+             * Runner cleanup does not renew these rejecting clock samples. */
+            struct gf_init_context *tx=l->init;
+            kprintf(KLOG_ATTR,"GF4 ERROR stage=rom_script rc=-409 head=%u remain_us=%d reg=00000000 val=%08x pc=%08x elapsed_us=%u wait_us=%u\n",
+                    route->head,(i32)(dl-(tx->started_us+tx->elapsed_us)),
+                    tx->wait_us,tx->fail_pc,tx->elapsed_us,tx->wait_us);
+        }
     }
     /* Runner performs its own failure cleanup. All earlier failures and
      * successful runs still need exactly one adapter/table cleanup. */

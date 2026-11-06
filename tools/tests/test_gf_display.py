@@ -1704,7 +1704,7 @@ GF4_COMPONENTS = {
     'b7': ['hwdev/gf/display/flip.c'],
     'b8': ['hwdev/gf/display/gamma.c'],
     'b9': ['hwdev/gf/display/output.c'],
-    'b10': ['hwdev/gf/display/tmds.c'],
+    'b10': ['hwdev/gf/display/tmds.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b11d': ['drivers/video/geforce/tv_data.c'],
     'b11m': ['hwdev/gf/display/tv.c'],
     'b12': [],
@@ -1826,8 +1826,21 @@ GF4_MUTATIONS += [
      'present_bytes += (u32)w * (u32)h;', 'present_bytes += 0;', 'upload bytes'),
 ]
 
+GF4_MUTATIONS += [
+    ('c2linkb', 'script-timeout-line', 'hwdev/gf/display/links.c',
+     'if (run==GF_SCRIPT_ETIME) {', 'if (run==GF_SCRIPT_ETIME && false) {', 'ROM script timeout evidence'),
+    ('scanlog', 'leave-readback-call', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, route_rc);', 'if (route_rc) geforce_leave_log(leave_io, route_rc);', 'leave emits after route success'),
+    ('diag', 'timeout-head', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,0U,(i32)(dl-now)', 'timeout source head'),
+    ('diag', 'leave-pvideo-offset', 'drivers/video/geforce/leave_log.h',
+     '0x8704U,0x8140U,0x8920U', '0x8704U,0x8140U,0x8924U', 'independent PVIDEO values'),
+    ('c0log', 'timeout-remaining', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,head,0', 'remaining budget is original rejecting sample'),
+]
+
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
-                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'c3', 'c2linit', 'c2log', 'scanlog')
+                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'diag', 'c3', 'c2linit', 'c2log', 'scanlog')
 
 
 def gf4_tree(tree):
@@ -1856,12 +1869,12 @@ def gf4_sources(tree, case, fixture=None):
         return ['kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c',
                 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
                 *[str(p.relative_to(tree)) for p in sorted((tree/'hwdev/gf/op').glob('*.c'))]]
-    if case == 'c2save':
+    if case in ('c2save', 'diag'):
         names = ('save', 'modes', 'output', 'cursor', 'gamma', 'heads', 'pll_program',
                  'tmds', 'tv', 'modeset', 'transaction', 'timing', 'format', 'fifo',
                  'dpms', 'flip', 'palette')
         return ['hwdev/gf/display/'+n+'.c' for n in names]+[
-            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c']
+            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c']+([] if case=='diag' else ['tools/tests/gf4_modeload_print_host.c'])
     display = sorted((tree/'hwdev/gf/display').glob('*.c'))
     sources = [str(p.relative_to(tree)) for p in display]
     sources += ['tools/tests/gf4_platform_host.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c',

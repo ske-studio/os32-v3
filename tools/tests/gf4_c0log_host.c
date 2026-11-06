@@ -16,10 +16,11 @@ static u32 number(const char *key,u32 base)
 }
 static void one_line(int rc)
 {
-    assert(gf2_host_strstr(startlog,"[gf4] mode_load fail at=")==startlog);
+    const char *load=gf2_host_strstr(startlog,"[gf4] mode_load fail at=");
+    assert(load && (rc==GF4_ETIME || load==startlog));
     unsigned lines=0;
     for (unsigned i=0;i<startlog_len;i++) lines+=startlog[i]=='\n';
-    assert(lines==1 && startlog[startlog_len-1]=='\n');
+    assert(lines==(rc==GF4_ETIME ? 2U : 1U) && startlog[startlog_len-1]=='\n');
     assert((int)number(" rc=-",10)==-rc);
 }
 static int invoke(void)
@@ -89,6 +90,7 @@ static void focused(void)
     ready(false); host.local_now=T_DEADLINE-5000U;
     assert(invoke()==GF4_ETIME); one_line(GF4_ETIME);
     assert(gf2_host_strstr(startlog,"at=wait_budget sec=1 row=5 reg=00000000 val=00002710"));
+    assert(gf2_host_strstr(startlog,"GF4 ERROR stage=mode_wait_budget rc=-409 head=1 remain_us=5000 reg=00000000 val=00002710\n"));
     ready(false); host.observe=expire_wait;
     assert(invoke()==GF4_ETIME); one_line(GF4_ETIME);
     assert(gf2_host_strstr(startlog,"at=wait_deadline sec=1 row=5"));

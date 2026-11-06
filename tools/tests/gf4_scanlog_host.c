@@ -157,7 +157,9 @@ static void scanlog_finish(void)
     geforce_backend_feature5_bind(0);
     gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
     gf2_host_memset(svc_host.fail_rc,0,sizeof(svc_host.fail_rc));
+    startlog_clear();
     assert(!geforce_stop());
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 route_rc=0 read_rc=0 valid=00000fff"));
     svc_finish();
     gf5_rom_release(&cint_prod.feature5);
 }

@@ -8,6 +8,7 @@
  * ROM offsets below are synthetic. Expected PCs, base addresses and write
  * sequences are independently tabulated from those sources, not product
  * calculations. No reference checkout or libc is needed at runtime. */
+#include "gf_startlog_host.h"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 #include "../../hwdev/gf/production.h"
@@ -125,6 +126,7 @@ static void release(struct gf_display_context *l)
 static const struct gf_display_owner owner={.acquire=acquire,.release=release};
 static void fixture(void)
 {
+    startlog_clear();
     gf2_host_memset(&s,0,sizeof(s));
     gf2_host_memset(&script_work,0,sizeof(script_work));
     gf2_host_memset(rom,0,sizeof(rom));
@@ -297,6 +299,7 @@ static void binding_and_repeat(void)
 static void failures(void)
 {
     fixture(); assert(run(HIGH_KHZ,NOW)==GF4_ETIME && !loans && !h.calls[D_WRITE]);
+    assert(startlog_equal("GF4 ERROR stage=script_before_acquire rc=-409 head=1 remain_us=0 reg=00000000 val=00000000\n"));
     fixture(); assert(run(HIGH_KHZ,0)==GF4_ETIME && !loans);
     fixture(); fail_acquire=true;
     assert(run(HIGH_KHZ,DEADLINE)==-1 && loans==1 && !points && !h.calls[D_WRITE]);
@@ -335,6 +338,10 @@ static void failures(void)
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2); expire_clock=n;
         assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME);
+        if (n>2) {
+            assert(gf2_host_strstr(startlog,"GF4 ERROR stage=rom_script rc=-409 head=1 remain_us=0 reg=00000000"));
+            assert(gf2_host_strstr(startlog," pc="));
+        }
         /* On expiry the only later write is unconditional binding cleanup. */
         assert(h.calls[D_WRITE]==writes_at_expiry+(n>2 ? 1U : 0U));
     }
