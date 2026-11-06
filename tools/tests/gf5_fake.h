@@ -441,6 +441,7 @@ i32 gf5_gpio_set(struct gf5 *g,u8 line,const u8 log[2],bool value)
 }
 #endif
 #if GF5_HOST_UNIT == 0 || GF5_HOST_UNIT == 6
+#ifndef GF5_HOST_REAL_CLOCK
 i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *clock,struct gf5_plan *out)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -461,6 +462,7 @@ i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *plan)
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG); e->p[0]=g; e->p[1]=plan;
     return gf5_host_end(h,e);
 }
+#endif /* GF5_HOST_REAL_CLOCK: link clock.c for state/readback integration. */
 i32 gf5_ram_prog(struct gf5 *g,const struct gf5_plan *plan)
 {
     struct gf5_host *h=gf5_host_context(g);

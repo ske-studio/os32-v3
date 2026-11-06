@@ -12,6 +12,7 @@ CHECK = dict(name='gf5-host', tier=1, needs=[], budget=90.0,
                      'tools/tests/gf_accel_host.h', 'include/types.h'])
 
 from pathlib import Path
+import argparse
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CASES = {
     'perf': (0, ['hwdev/gf/perf.c']),
     'clock': (1, ['hwdev/gf/clock.c', 'kdebug/gfinit_pll.c']),
+    'clocksave': (6, ['hwdev/gf/clock.c', 'hwdev/gf/state.c', 'kdebug/gfinit_pll.c']),
     'ramclock': (2, ['hwdev/gf/ramclock.c']),
     'therm': (3, ['hwdev/gf/therm.c']),
     'volt': (4, ['hwdev/gf/volt.c']),
@@ -37,6 +39,10 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Anchors checked at integration; runtime RED remains for PM verification.
 MUTATIONS = [
+ ('clock-zero-is-absent', 'hwdev/gf/clock.c',
+  'return result(g,0); /* Zero is an absent source, nv40.c:82-115. */',
+  'return result(g,c.core_khz && c.shader_khz && c.mem_khz ? 0 : GF5_ESTATE);',
+  'clocksave'),
  ('therm-toggle-step-error', 'hwdev/gf/therm.c',
   'return th_toggle(g,percent,now);',
   'i32 toggle_rc=th_toggle(g,percent,now); return rc ? rc : toggle_rc;', 'therm'),
@@ -435,10 +441,17 @@ def run_case(tree, case, directory):
 
 def main():
     failures = 0
-    mutate = '--mutate' in sys.argv
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--case', action='append', choices=CASES)
+    parser.add_argument('--mutation', action='append', choices=[m[0] for m in MUTATIONS])
+    args = parser.parse_args()
+    mutate = args.mutate
     with tempfile.TemporaryDirectory(prefix='gf5-host-') as td:
         directory = Path(td)
         for case, (_, sources) in CASES.items():
+            if args.case and case not in args.case:
+                continue
             required = ['tools/tests/gf5_' + case + '_host.c', *sources]
             missing = [p for p in required if not (ROOT / p).is_file()]
             if missing:
@@ -457,7 +470,7 @@ def main():
                 continue
             print(f'PASS {case}: runtime GREEN', flush=True)
             for name, rel, old, new, target in (MUTATIONS if mutate else ()):
-                if target != case:
+                if target != case or (args.mutation and name not in args.mutation):
                     continue
                 original = (ROOT / rel).read_text()
                 if not old or old == new or original.count(old) != 1:
@@ -487,6 +500,8 @@ def main():
                 if restored:
                     print(f'FAIL {case}/{name}: restored control', flush=True)
                     failures += 1
+    if args.case:
+        return int(bool(failures))
     runner = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/tests/test_gf_runner.py'),
                              *(['--mutate'] if mutate else [])], cwd=ROOT)
     if runner.returncode:
