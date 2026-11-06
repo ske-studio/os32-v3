@@ -44,7 +44,7 @@ MUTATIONS = [
      '    if (!g_fep_off || g_dry_run) return 0;',
      '    if (!g_fep_off) return 0;', 'fep dry-run untouched'),
     ('reopen-default-path', 'kernel/ime/ime_suspend.c',
-     'ime_dict_open(&ime->dict, saved_path)', 'ime_dict_open(&ime->dict, IME_DICT_PATH)',
+     'fep_store_open(&ime->store, saved_path, saved_user_path)', 'fep_store_open(&ime->store, IME_DICT_PATH, saved_user_path)',
      'dictionary path preserved'),
     ('stale-suspend', 'kernel/ime/ime_suspend.c',
      '    if (suspended && ime->dict_loaded) suspended = 0;',

@@ -5,7 +5,8 @@
 
 static int suspended;
 static int saved_mode;
-static char saved_path[sizeof(((IME_Dict *)0)->path)];
+static char saved_path[OS32_MAX_PATH];
+static char saved_user_path[OS32_MAX_PATH];
 
 int ime_dict_suspend(int on)
 {
@@ -16,11 +17,13 @@ int ime_dict_suspend(int on)
     if (on) {
         if (suspended || !ime->dict_loaded) return 0;
         saved_mode = ime->mode;
-        kstrncpy(saved_path, ime->dict.path, sizeof(saved_path));
+        kstrncpy(saved_path, ime->store.system.path, sizeof(saved_path));
+        kstrncpy(saved_user_path, ime->store.user.path, sizeof(saved_user_path));
         ime_set_mode(IME_MODE_OFF);
-        rc = ime_dict_close(&ime->dict);
+        rc = fep_store_close(&ime->store);
         if (rc) {
-            if (!ime->dict.isolated) ime_set_mode(saved_mode);
+            ime->dict_loaded = ime->store.system.db != NULL && !ime->store.system.isolated;
+            if (ime->dict_loaded && !ime->store.user.isolated) ime_set_mode(saved_mode);
             return rc;
         }
         ime->dict_loaded = 0;
@@ -28,7 +31,7 @@ int ime_dict_suspend(int on)
         return 0;
     }
     if (!suspended) return 0;
-    rc = ime_dict_open(&ime->dict, saved_path);
+    rc = fep_store_open(&ime->store, saved_path, saved_user_path);
     if (rc) {
         kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");
         return rc;

@@ -50,11 +50,6 @@ IME_State *ime_suspend_state(void)
     return &g_ime;
 }
 
-const IME_Dict *ime_current_dict(void)
-{
-    /* J will transfer connection ownership to store. */
-    return &g_ime.dict;
-}
 FepStore *ime_current_store(void) { return &g_ime.store; }
 
 static int g_ime_reader_owner;
@@ -95,17 +90,24 @@ u32 ime_boot_bytes(void)
 int ime_dict_boot(void)
 {
     if (g_ime.dict_loaded) return 0;
-    if (services_boot_fault != SERVICES_FAULT_FEP_TEXT)
+    if (!g_cand_save_text && services_boot_fault != SERVICES_FAULT_FEP_TEXT)
         g_cand_save_text = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u16));
     if (!g_cand_save_text) return -1;
-    if (services_boot_fault != SERVICES_FAULT_FEP_ATTR)
+    if (!g_cand_save_attr && services_boot_fault != SERVICES_FAULT_FEP_ATTR)
         g_cand_save_attr = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u8));
     if (!g_cand_save_attr) return -1;
     if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
         services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
-    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0) return -1;
-    if (!g_ime.dict.learn_stmt)
-        kprintf(ATTR_RED, "IME: 学習不可 (learning unavailable), conversion enabled\r\n");
+    char user_path[OS32_MAX_PATH];
+    int rc = fep_boot_config_get(&g_ime.store.meta, &g_ime.store.boot_reserve_kb);
+    if (rc) return rc;
+    rc = fep_boot_user_path_get(user_path, sizeof(user_path));
+    if (rc) {
+        user_path[0] = 0; /* Invalid path disables learning, never guess a file. */
+        kprintf(ATTR_RED, "IME: learning path unavailable (rc=%d)\r\n", rc);
+    }
+    rc = fep_store_open(&g_ime.store, IME_DICT_PATH, user_path);
+    if (rc) return rc;
     g_ime.dict_loaded = 1;
     return 0;
 }
@@ -113,7 +115,7 @@ int ime_dict_boot(void)
 int ime_boot_abort(void)
 {
     g_ime.mode = IME_MODE_OFF;
-    if (ime_dict_close(&g_ime.dict)) return -1;
+    if (fep_store_close(&g_ime.store)) return -1;
     g_ime.dict_loaded = 0;
     if (g_cand_save_attr) kfree(g_cand_save_attr);
     if (g_cand_save_text) kfree(g_cand_save_text);
@@ -127,7 +129,7 @@ void ime_toggle(void)
     if (!services_public) return;
     if (g_ime.mode == IME_MODE_OFF) {
         if (!g_ime.dict_loaded) {
-            if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) == 0) {
+            if (ime_dict_boot() == 0) {
                 g_ime.dict_loaded = 1;
             } else {
                 kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");
@@ -168,10 +170,10 @@ void ime_set_mode(int mode)
     if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
 
     /* FEP ON 時は辞書を遅延オープンする (ime_toggle と同じ)。
-     * これを欠くと dict->db が NULL のまま ime_dict_search が常に
+     * これを欠くと store.system.db が NULL のまま fep_store_search が常に
      * 0 件を返し、変換がかな確定にフォールバックする。 */
     if (mode != IME_MODE_OFF && !g_ime.dict_loaded) {
-        if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) == 0) {
+        if (ime_dict_boot() == 0) {
             g_ime.dict_loaded = 1;
         } else {
             kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");

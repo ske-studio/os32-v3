@@ -2,7 +2,7 @@
 """FEP system metadata reader and caller boundary, freestanding ILP32."""
 CHECK = dict(name='fep-store-info', tier=1, needs=[], budget=5,
     covers=['kernel/ime/ime_dict_info.c', 'kernel/ime/ime.c',
-            'kernel/ime/ime_conn.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h',
+            'kernel/ime/ime_conn.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h',
             'tools/tests/fep_store_info_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kernel/ime/ime_dict_info.c'
 # Each product anchor is unique; compile failures never count as runtime RED.
 MUTANTS = [
-    ('current-dict', 'kernel/ime/ime.c', 'return &g_ime.dict;', 'return (const IME_Dict *)&g_ime.store.system;', 'legacy dictionary owner'),
+    ('current-store', 'kernel/ime/ime.c', 'return &g_ime.store;', 'return NULL;', 'store dictionary owner'),
     ('capacity', PRODUCT, 'if (n > capacity - 1) n = capacity - 1;', 'if (n > capacity - 1) n = capacity;', 'chunk bounds'),
     ('byte-offset', PRODUCT, '(const char *)value + offset', '(const char *)value', 'UTF-8 full reassembly'),
     ('missing-meta', PRODUCT, 'if (rc == SQLITE_DONE) result = OS32_ERR_IO;', 'if (rc == SQLITE_DONE) result = ime_info_slice("", 0, offset, out, capacity);', 'required missing key'),
@@ -46,7 +46,7 @@ def main():
         products = {p: (ROOT / p).read_text() for p in paths}
         def build(codes):
             main = codes['kernel/ime/ime.c']
-            getters = main[main.index('const IME_Dict *ime_current_dict(void)'):main.index('static int g_ime_reader_owner;')]
+            getters = main[main.index('FepStore *ime_current_store(void)'):main.index('static int g_ime_reader_owner;')]
             unit = work / 'info.c'
             code = src.replace('/* CURRENT_GETTERS */', getters)
             for marker, path in [('PRODUCT_INFO', PRODUCT), ('PRODUCT_CONN', 'kernel/ime/ime_conn.c')]:
@@ -60,7 +60,7 @@ def main():
             return host32.run([str(exe)], cwd=ROOT).returncode
         if build(products):
             raise RuntimeError('normal runtime failed')
-        print('PASS store 20 keys/legacy/byte chunks/errors/stale/legacy getter; runner=' +
+        print('PASS store 20 keys/legacy/byte chunks/errors/stale/typed getter; runner=' +
               host32.selected_runner(), flush=True)
         if args.mutate:
             for name, path, old, new, test in MUTANTS:

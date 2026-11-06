@@ -126,7 +126,7 @@ MUTATIONS = [
      'return (int)(u8)g_ime.commit_buf', 'return (int)g_ime.commit_buf',
      'FAIL IMECUI ShiftSpace turns OFF and returns first unsigned byte'),
     ('IMEDICT-stale-loaded', 'ime_dict_api.inc',
-     '    g_ime.dict_loaded = g_ime.dict.db != NULL;', '',
+     '    g_ime.dict_loaded = g_ime.store.system.db != NULL && !g_ime.store.system.isolated;', '',
      'FAIL IMEDICT ON retries dictionary after failed switch'),
     ('IMEBS-lost-n-wait', 'ime_convert.inc',
      '                g_ime.rk.n_wait = (kstrcmp(g_ime.rk.preedit, "n") == 0);',

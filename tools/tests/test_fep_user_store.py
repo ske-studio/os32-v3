@@ -2,7 +2,7 @@
 """Learning DB open/schema/meta fault injection, freestanding ILP32."""
 CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=8,
     covers=['kernel/ime/ime_user_store.c', 'kernel/ime/ime_conn.c',
-            'kernel/ime/ime_store.h', 'lib/sqlite3/os32_sqlite_outer.h',
+            'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_outer.h',
             'lib/sqlite3/os32_sqlite_vfs.h', 'lib/kstring_c.c',
             'tools/tests/fep_user_store_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',

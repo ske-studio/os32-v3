@@ -343,3 +343,6 @@ void _start(void)
     __asm__ volatile ("int $0x80" : : "a"(1), "b"(rc ? (rc % 254) + 1 : 0) : "memory");
     __builtin_unreachable();
 }
+
+enum services_stage services_stage = SERVICES_READY;
+volatile u32 services_boot_fault;

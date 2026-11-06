@@ -102,6 +102,9 @@ void kfree(void *p)
     CHECK(sqlite_module_ready());
     fep_frees++;
 }
+/* RAM connections have no disk FD; model only the imported stale boundary. */
+int host_fep_db_fd(void *db) { CHECK(db); return 7; }
+int vfs_fd_is_stale(int fd) { CHECK(fd == 7); return 0; }
 int host_fep_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 {
     CHECK(kind == OS32_SQLITE_RESIDENT && owner == 0);
@@ -109,7 +112,8 @@ int host_fep_group_acquire(int kind, int owner, Os32SqliteGroup *out)
         FepMeta meta;
         u32 reserve;
         CHECK(!fep_boot_config_get(&meta, &reserve));
-        CHECK(!os32_sqlite_outer_boot_check(0, reserve * 1024u));
+        u32 live = !!g_ime.store.system.group.generation + !!g_ime.store.user.group.generation;
+        CHECK(!os32_sqlite_outer_boot_check(live, reserve * 1024u));
     }
     return os32_sqlite_outer_group_acquire(kind, owner, out);
 }
@@ -122,8 +126,12 @@ int host_fep_group_open(const Os32SqliteGroup *group, const char *path, int flag
         CHECK(!fep_boot_config_get(&meta, &reserve) && reserve >= FEP_DICT_MIN_RESERVE_KB);
         CHECK(meta.variant == 'M');
     }
-    CHECK(!memcmp(path, "/db/fep.db", sizeof("/db/fep.db")));
-    int rc = os32_sqlite_outer_group_open(group, ":memory:", flags, out);
+    if (!kstrcmp(path, FEP_USER_PATH)) {
+        CHECK(flags == (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE));
+        return input[0] == 32 ? os32_sqlite_outer_group_open(group, ":memory:", flags, out) : SQLITE_CANTOPEN;
+    }
+    CHECK(!memcmp(path, "/db/fep.db", sizeof("/db/fep.db")) && flags == SQLITE_OPEN_READONLY);
+    int rc = os32_sqlite_outer_group_open(group, ":memory:", SQLITE_OPEN_READWRITE, out);
     if (rc) return rc;
     CHECK(!os32_sqlite_exec(*out,
         "CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INTEGER,cost INTEGER);"
@@ -134,8 +142,8 @@ int host_fep_prepare(sqlite3 *db, const char *sql, int n, sqlite3_stmt **out, co
 {
     /* Fail after exact prepare, or only learning prepare. These failures pass
      * through the real module's partial-init cleanup / learning fallback. */
-    if ((input[0] == 18 && !memcmp(sql, "SELECT kanji, pos_id, cost FROM (", 31) &&
-         g_ime.dict.exact_stmt) ||
+    if ((input[0] == 18 && !memcmp(sql, "SELECT kanji,pos_id,CASE", sizeof("SELECT kanji,pos_id,CASE") - 1) &&
+         g_ime.store.system.exact) ||
         (input[0] == 32 && !memcmp(sql, "INSERT INTO dict_user", 21)))
         return os32_sqlite_prepare_v2(db, "SELECT FROM", -1, out, tail);
     return os32_sqlite_prepare_v2(db, sql, n, out, tail);
@@ -158,6 +166,8 @@ void ring3_abort_check(void) { abort_checks++; }
 void serial_puts(const char *s) { (void)s; }
 int kstrcmp(const char *a, const char *b)
 { while (*a && *a == *b) { a++; b++; } return (u8)*a - (u8)*b; }
+int kstrncmp(const char *a, const char *b, u32 n)
+{ while (n && *a && *a == *b) { a++; b++; n--; } return n ? (u8)*a - (u8)*b : 0; }
 u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
 void tvram_set_scroll_reserve(int n) { (void)n; }
 static void input_paths(void)
@@ -200,6 +210,7 @@ static void input_paths(void)
 }
 int vfs_stat(const char *path, OS32_Stat *st)
 {
+    if (!kstrcmp(path, FEP_USER_PATH)) return OS32_ERR_NOTFOUND;
     if (!kstrcmp(path, SYS_SETTINGS_DB))
         return input[0] == 89 ? VFS_ERR_NOTFOUND : VFS_ERR_IO;
     if (!memcmp(path, "/db/fep.db", sizeof("/db/fep.db"))) {
@@ -470,7 +481,7 @@ void kprintf(u8 attr, const char *fmt, ...)
     }
     if (((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 53)) && services_stage != SERVICES_READY)
         CHECK(!services_public);
-    if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
+    if (input[0] == 32 && !memcmp(fmt, "IME: learning disabled", sizeof("IME: learning disabled") - 1)) learn_unavailable++;
     if (!memcmp(fmt, "[services] fep_mem_reserve_kb below minimum", sizeof("[services] fep_mem_reserve_kb below minimum") - 1)) {
         va_list args;
         va_start(args, fmt);
@@ -645,13 +656,13 @@ static int selected(void *arg, int n, char **values, char **names)
 void host_seed_settings(sqlite3 *db)
 {
     if (input[0] != 55 && input[0] != 19 && input[0] != 20 && (input[0] < 34 || input[0] > 36)) return;
-    CHECK(!os32_sqlite_exec(db, "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER)", 0, 0, 0));
+    CHECK(!os32_sqlite_exec(db, "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER,tval TEXT)", 0, 0, 0));
     CHECK(!os32_sqlite_exec(db, (input[0] == 19 || input[0] == 55) ?
-        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,224)" :
-        input[0] == 20 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128)" :
-        input[0] == 34 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,64)" :
-        input[0] == 35 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,99)" :
-                        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,98)", 0, 0, 0));
+        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,224,NULL)" :
+        input[0] == 20 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128,NULL)" :
+        input[0] == 34 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,64,NULL)" :
+        input[0] == 35 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,99,NULL)" :
+                        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,98,NULL)", 0, 0, 0));
 }
 /* Inject only after the real final check sees the unpublished, ready FEP. */
 int host_final_boot_check(int ready, int reserve)
@@ -660,7 +671,7 @@ int host_final_boot_check(int ready, int reserve)
     if (input[0] == 54) {
         CHECK(!rc && ready == 1 && !services_public);
         CHECK(services_stage == SERVICES_FEP_INTERNAL_READY);
-        CHECK(g_ime.dict_loaded && g_ime.dict.exact_stmt && fep_module_pages());
+        CHECK(g_ime.dict_loaded && g_ime.store.system.exact && fep_module_pages());
         ready_check_failed++;
         return SQLITE_ERROR;
     }
@@ -674,7 +685,7 @@ int host_core_group_open(const Os32SqliteGroup *group, const char *path, int fla
     CHECK(flags == SQLITE_OPEN_READONLY);
     int settings = !memcmp(path, SYS_SETTINGS_DB, sizeof(SYS_SETTINGS_DB));
     if (!settings) {
-        CHECK(core_headers > core_probes && !fep_opens);
+        CHECK(core_headers > core_probes);
         core_probes++;
         if (input[0] == 84) return SQLITE_IOERR;
     }
@@ -784,8 +795,8 @@ static void core_boot_transaction(void)
                input[0] == 65 || input[0] == 78 || input[0] == 80 || input[0] == 83 ||
                input[0] == 85 || input[0] >= 88;
     CHECK(services_public == good);
-    CHECK(core_headers == 1);
-    CHECK(core_probes == !(input[0] >= 66 && input[0] <= 69));
+    CHECK(core_headers == (fep_opens ? 2u : 1u));
+    CHECK(core_probes == (u32)(!(input[0] >= 66 && input[0] <= 69) + !!fep_opens));
     if (!good) {
         if (input[0] == 87) {
             CHECK(services_stage == SERVICES_MINIMAL_QUARANTINED && !fep_opens);
@@ -909,7 +920,7 @@ static void boot_transaction(void)
     if (ok) {
         CHECK(services_stage == SERVICES_READY && sqlite_module_ready());
         CHECK(learn_unavailable == (input[0] == 32));
-        CHECK((g_ime.dict.learn_stmt == 0) == (input[0] == 32));
+        CHECK(!g_ime.store.user_enabled && !g_ime.store.user.db);
         CHECK(reserve_clamped == (input[0] == 34 || input[0] == 36));
         HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
         unsigned expected_reserve = input[0] == 19 ? 224 * 1024 :
@@ -919,18 +930,20 @@ static void boot_transaction(void)
         CHECK(budget->reserve == expected_reserve);
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
         CHECK(ime_boot_connections() == 1);
-        const u8 *store_bytes = (const u8 *)&g_ime.store;
-        for (u32 i = 0; i < sizeof(g_ime.store); i++) CHECK(!store_bytes[i]);
+        CHECK(g_ime.store.system.db && g_ime.store.system.exact);
+        CHECK(g_ime.store.boot_reserve_kb == expected_reserve / 1024u);
+        CHECK(!kstrcmp(g_ime.store.meta.dict_id, FEP_DICT_ID));
+        CHECK(!kstrcmp(g_ime.store.user.path, FEP_USER_PATH));
         CHECK(module_records[1].state == MODULE_RUNNING && fep_module_pages());
         CHECK(module_records[1].dependency_count == 1 && module_records[1].dependencies[0].slot == 0);
         input_paths();
-        void *resident_db = g_ime.dict.db;
+        void *resident_db = g_ime.store.system.db;
         host_user = 1; host_key = 0x1e61;
         CHECK(ime_trygetkey() == 0x1e61);
         g_ime.kana_len = 1; g_ime.kana_buf[0] = 'a';
         ime_owner_exit(7);
         CHECK(!g_ime.kana_len && !g_ime.kana_buf[0]);
-        CHECK(g_ime.dict.db == resident_db && g_ime.dict.group.generation);
+        CHECK(g_ime.store.system.db == resident_db && g_ime.store.system.group.generation);
         host_user = 0;
         /* Real APP pressure must leave the reservation available to FEP. */
         Os32SqliteGroup group;
@@ -946,10 +959,10 @@ static void boot_transaction(void)
         CHECK(budget->live[0] + budget->live[2] <= 319488u -
               (budget->reserve - OS32_SQLITE_FEP_RESERVE));
         if (input[0] == 20) CHECK(budget->live[0] + budget->live[2] > 319488u);
-        CHECK(!os32_sqlite_bind_text(g_ime.dict.exact_stmt, 1, "nihon", -1, SQLITE_STATIC));
-        CHECK(os32_sqlite_step(g_ime.dict.exact_stmt) == SQLITE_ROW);
-        CHECK(os32_sqlite_column_int(g_ime.dict.exact_stmt, 1) == 42);
-        CHECK(!os32_sqlite_reset(g_ime.dict.exact_stmt));
+        CHECK(!os32_sqlite_bind_text(g_ime.store.system.exact, 1, "nihon", -1, SQLITE_STATIC));
+        CHECK(os32_sqlite_step(g_ime.store.system.exact) == SQLITE_ROW);
+        CHECK(os32_sqlite_column_int(g_ime.store.system.exact, 1) == 42);
+        CHECK(!os32_sqlite_reset(g_ime.store.system.exact));
         CHECK(!os32_sqlite_outer_group_begin_close(&group));
         CHECK(!os32_sqlite_close(db));
         CHECK(!os32_sqlite_outer_group_finish(&group, SQLITE_OK));
