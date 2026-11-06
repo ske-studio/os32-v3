@@ -24,6 +24,12 @@ ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTATIONS = (
+    ('absolute-tx', 'if ((i32)(deadline - limit) < 0) limit = deadline;',
+     '(void)deadline;'),
+    ('local-tx', 'limit = lan_now(ctx) + sfs_ms_ticks(SFS_LAN_PUT_MS);',
+     'limit = lan_now(ctx) + 200;'),
+    ('expired-tx', 'if ((i32)(lan_now(ctx) - limit) >= 0) return OS32_ERR_TIMEOUT;\n        r =',
+     'if ((i32)(lan_now(ctx) - limit) > 0) return OS32_ERR_TIMEOUT;\n        r ='),
     ('rx-other-queue', 'net_rx_take(NET_RX_SFS, lan->rx, sizeof(lan->rx), &n)',
      'net_rx_take(NET_RX_LINK, lan->rx, sizeof(lan->rx), &n)'),
     ('reset-other-queue', 'net_rx_reset(NET_RX_SFS);', 'net_rx_reset(NET_RX_LINK);'),

@@ -778,3 +778,8 @@ int main(int argc, char **argv)
     printf("%s: %s\n", c, failed ? "FAIL" : "ok");
     return failed ? 1 : 0;
 }
+
+/* C1 is a separate unit; these legacy UART/LAN tests never start residency. */
+int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
+const SfsClient *sfs_persistent_client(void) { return 0; }
+void sfs_persistent_stale(void) { }

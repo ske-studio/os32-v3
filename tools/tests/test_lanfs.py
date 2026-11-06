@@ -655,8 +655,8 @@ def run_mutations(tmp, root):
         ("image_close", "tools/lanfs_host.py",
          "self.image.close_session(fr.sid)", "self.image.open_session(fr.sid)"),
         ("put_deadline", "fs/serialfs/sfs_lan.c",
-         "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
-         "0"),
+         "for (;;) {\n        if ((i32)(lan_now(ctx) - limit) >= 0)",
+         "for (;;) {\n        if (0)"),
         ("uart_gate", "fs/serialfs/sfs_lan.c", "    (void)net_mac(lan->mac);",
          "    extern void serial_gate_set(int on);\n"
          "    serial_gate_set(1);\n    (void)net_mac(lan->mac);"),

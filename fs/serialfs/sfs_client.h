@@ -32,6 +32,11 @@ typedef struct {
     void (*idle)(void *ctx);
     /* 1 = 待てる (IF=1)。0 なら要求を出さずに IO */
     int  (*can_wait)(void *ctx);
+    /* 任意 (NULL 可、UART は NULL)。put と同じだが、送れるまでの待ちを絶対期限
+     * deadline (now と同じ 10ms tick、(i32)(now-deadline)>=0 で切れ) で打ち切る。
+     * 切れたら OS32_ERR_TIMEOUT。期限付きの要求・片道は、これが有れば put の代わりに使う
+     * (PM 決定 2026-11-07、C1・C3 の停止から。NET_HOSTSVC_DESIGN 「C1・C3 で決めたこと」)。 */
+    int  (*put_until)(void *ctx, const u8 *buf, u32 n, u32 deadline);
 } SfsIo;
 
 /* 線を死んだと見なした理由 (診断用) */
@@ -84,6 +89,8 @@ int  sfs_client_quiesce(SfsClient *c, u32 quiet_ms, u32 max_ms);
 struct SfsReply { void *data; u16 capacity, length; };
 int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n, struct SfsReply *out, u32 deadline);
 int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline);
+/* 片道 (BYE など) を期限つきで。0 / OS32_ERR_TIMEOUT / OS32_ERR_IO。io->put_until が無ければ put */
+int sfs_client_oneway_deadline(SfsClient *c, u8 type, const u8 *payload, u16 len, u32 deadline);
 /* serialfs.hの既存 sfs_request_deadline(..., void *out, u32 deadline) のoutは struct SfsReply* */
 
 /* Required out: caller owns data/capacity; length starts 0. Success copies
