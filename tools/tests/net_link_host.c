@@ -12,7 +12,7 @@
  *    - cli/sti: IF=0 中のタイマ延期と、復元直後の tick
  *    - 100Hz タイマ: host_tick() が唯一の駆動元 (link_tick を呼ぶのはここだけ)
  *    - ディスパッチャ: kapi_argptr の早期検査と ring3_ptr_ok の帯
- *  対向は **実 Agent** (tools/host_agent.py を --unix でサブプロセス起動) か、
+ *  対向は **実 Agent** (tools/host_agent.py を socketpair で子プロセスに結ぶ) か、
  *  フレームを手で組む台本 (欠落・重複・遅延・墓標の注入)。
  *
  *  ホスト 64bit + libc で走らせる (tools/tests/kapi_db_v50_host.c と同じ様式)。
@@ -95,9 +95,7 @@ static int kutoa_dec(u32 val, char *buf, int bufsz)
 #define NE2K_ERR_AGAIN     -5
 #define NE2K_STATE_OFF      0
 #define NE2K_STATE_RUNNING  1
-struct ne2k_stats { u32 rx_frames; u32 rx_pages_total; };
 int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length);
-static void ne2k_get_stats(struct ne2k_stats *s);
 
 /* ======================================================================== */
 /*  贋 NIC                                                                  */
@@ -446,11 +444,10 @@ static void resp_pl(u8 *pl, u16 status, u32 len)
 }
 
 /* ======================================================================== */
-/*  実 Agent (tools/host_agent.py を --unix でサブプロセス起動)              */
+/*  実 Agent (socketpair: bind/listen 権限を要しないローカル IPC)            */
 /* ======================================================================== */
 static pid_t agent_pid = -1;
 static int   agent_fd = -1;
-static char  agent_sock[128];
 static char  agent_state[128];
 static u8    wire_in[1 << 16];
 static size_t wire_inlen;
@@ -492,66 +489,68 @@ static void agent_stop(void);
 
 static int agent_start(void)
 {
-    struct sockaddr_un sa;
-    int i, fd;
+    int pair[2];
     const char *tmpdir = getenv("TMPDIR");
-    int child_status;
     pid_t parent_pid = getpid();
     if (!tmpdir || !*tmpdir) tmpdir = "/tmp";
-    /* sun_path is shorter than our buffer: fail rather than silently truncate. */
-    if (snprintf(agent_sock, sizeof(agent_sock), "%s/os32-n1-%d.sock", tmpdir,
-                 (int)getpid()) >= (int)sizeof(sa.sun_path) ||
-        snprintf(agent_state, sizeof(agent_state), "%s/os32-n1-%d.state", tmpdir,
+    if (snprintf(agent_state, sizeof(agent_state), "%s/os32-n1-%d.state", tmpdir,
                  (int)getpid()) >= (int)sizeof(agent_state)) {
-        fprintf(stderr, "agent_start: TMPDIR path is too long for UNIX sun_path (%zu bytes)\n",
-                sizeof(sa.sun_path));
-        agent_sock[0] = agent_state[0] = '\0';
+        fprintf(stderr, "agent_start: TMPDIR path is too long for agent state\n");
+        agent_state[0] = '\0';
         return -1;
     }
-    unlink(agent_sock);
     if (mkdir(agent_state, 0700) != 0 && errno != EEXIST) return -1;
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0) {
+        agent_stop();
+        return -1;
+    }
     agent_pid = fork();
     if (agent_pid == 0) {
+        char fd_arg[16];
+        close(pair[0]);
+        snprintf(fd_arg, sizeof(fd_arg), "%d", pair[1]);
         if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != parent_pid) _exit(127);
         int devnull = open("/dev/null", O_WRONLY);
-        if (devnull >= 0) { dup2(devnull, 1); dup2(devnull, 2); }
-        execlp("python3", "python3", "-B", "tools/host_agent.py",
-               "--unix", agent_sock, "--state-dir", agent_state,
+        if (devnull >= 0) { dup2(devnull, 1); close(devnull); }
+        /* Replace only transport setup. Real FrameStream, main loop and
+         * HostAgent handle every byte; no protocol or progress stub. */
+        execlp("python3", "python3", "-B", "-c",
+               "import os, sys\n"
+               "sys.path.insert(0, 'tools')\n"
+               "import host_agent\n"
+               "class Peer:\n"
+               "    def __init__(self, fd): self.fd = fd\n"
+               "    def fileno(self): return self.fd\n"
+               "    def recv(self, n): return os.read(self.fd, n)\n"
+               "    def sendall(self, data):\n"
+               "        while data:\n"
+               "            n = os.write(self.fd, data)\n"
+               "            if n <= 0: raise ConnectionError('short write')\n"
+               "            data = data[n:]\n"
+               "peer = Peer(int(sys.argv.pop(1)))\n"
+               "host_agent.open_stream = lambda args: host_agent.FrameStream(peer)\n"
+               "sys.exit(host_agent.main())\n",
+               fd_arg, "--once", "--state-dir", agent_state,
                "--agent-gen", "4660", "--quiet", "--offline", (char *)NULL);
         _exit(127);
     }
-    if (agent_pid < 0) { agent_stop(); return -1; }
-    memset(&sa, 0, sizeof(sa));
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, agent_sock, sizeof(sa.sun_path) - 1);
-    /* 60s (3000 * 20ms): Python startup competes with four make jobs and
-       mutation compilers. A dead child still fails immediately. */
-    for (i = 0; i < 3000; i++) {
-        if (waitpid(agent_pid, &child_status, WNOHANG) == agent_pid) {
-            agent_pid = -1;
-            agent_stop();
-            return -1;
-        }
-        fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        if (fd >= 0 && connect(fd, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
-            agent_fd = fd;
-            wire_inlen = 0;
-            tx_hook = agent_tx;
-            wire_pump_fn = agent_pump;
-            return 0;
-        }
-        if (fd >= 0) close(fd);
-        usleep(20000);
+    close(pair[1]);
+    if (agent_pid < 0) {
+        close(pair[0]);
+        agent_stop();
+        return -1;
     }
-    agent_stop();
-    return -1;
+    agent_fd = pair[0];
+    wire_inlen = 0;
+    tx_hook = agent_tx;
+    wire_pump_fn = agent_pump;
+    return 0;
 }
 
 static void agent_stop(void)
 {
     if (agent_fd >= 0) { close(agent_fd); agent_fd = -1; }
     if (agent_pid > 0) { kill(agent_pid, SIGTERM); while (waitpid(agent_pid, 0, 0) < 0 && errno == EINTR) {} agent_pid = -1; }
-    unlink(agent_sock);
     if (agent_state[0]) {
         char f[160];
         snprintf(f, sizeof(f), "%s/sess.txt", agent_state);
@@ -662,7 +661,9 @@ static void r2_R3_lost_response_expires_without_probe(void)
     check(h >= 0, "open failed");
     ticks(2);
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
-    ticks(LINK_HOST_SILENCE_TICKS - 3);
+    host_tick();                          /* ACK reception is peer progress. */
+    check(link_h[h].req_acked, "REQUEST ACK was not received");
+    ticks(LINK_HOST_SILENCE_TICKS - 1);
     check(link_host_status(h, 0, 0, host_owner) == OS32_ERR_AGAIN,
           "expired before 100 ticks");
     host_tick();
@@ -1597,7 +1598,8 @@ static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
     script_handshake(SCRIPT_SESS, 0);
     selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
     tx_hook = selftest_reply;
-    selftest_deadline = tick_count + LINK_HOST_SILENCE_TICKS;
+    /* REQUEST goes out on the next tick, ACK arrives one tick later. */
+    selftest_deadline = tick_count + 2 + LINK_HOST_SILENCE_TICKS;
     irq_restore_hook = selftest_tombstone_at_deadline_restore;
     link_selftest(1);
     check(!irq_restore_hook && link_tombstones == 0 && link_resyncs == 0,
