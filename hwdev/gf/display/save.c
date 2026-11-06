@@ -28,6 +28,8 @@
  * of DRM BOs. No reservation, window or dispatch table is copied/released. */
 #include "api.h"
 #include "../internal.h"
+#include "../accel_service.h"
+#include "../production.h"
 /* PM integrates i64 into types.h; no 64-bit division. */
 typedef long long i64;
 
@@ -401,4 +403,43 @@ i32 gf4_display_saved_release(struct gf4_ctx *c,const struct gf4_saved *s)
     if (c->diagnostic_saved!=s) return save_result(c,GF4_ESTATE);
     c->diagnostic_saved=NULL;
     return save_result(c,0);
+}
+
+/* MIT nouveau c03c1a1 dispnv04/disp.c:189-207 destroys the display image
+ * after stopping display use, even when restoring it failed. OS32's fallible
+ * releases keep their resident nodes and pending flag until a later retry. */
+i32 gf4_diagnostic_abandon(struct gf4_ctx *c,const struct gf4_saved *s)
+{
+    if (!c || !s || !c->ch || !c->legacy || !c->state) return GF4_EINVAL;
+    /* A released image is no longer borrowed or dereferenced. Only pending
+     * cleanup may continue without a diagnostic pointer; a completed or stale
+     * request must not release another session's reservations. */
+    if (c->diagnostic_saved!=s &&
+        (c->diagnostic_saved || !c->cleanup_pending)) return GF4_ESTATE;
+    if (c->legacy->engaged || c->ch->state!=GF2_OFF || c->ready)
+        return GF4_EBUSY;
+    if (c->changing) return GF4_EBUSY;
+    struct gf3_service *service=gf3_service_get(c->ch);
+    if (!service || !service->production ||
+        &service->production->display!=c->legacy ||
+        &service->production->chan!=c->ch) return GF4_ESTATE;
+    struct gf5 *g=&service->production->feature5;
+    if (g->busy || g->image || g->phase==GF5_SAVING ||
+        g->phase==GF5_SAVED || g->phase==GF5_RESTORING) return GF4_EBUSY;
+    i32 original=c->last_rc;
+    c->cleanup_pending=true;
+    i32 rc=gf5_tiles_retire(g);
+    if (!rc && c->diagnostic_saved) rc=gf4_display_saved_release(c,s);
+    if (!rc) {
+        c->saved_closed=false;
+        rc=gf4_scan_release_all(c,c->deadline);
+    }
+    if (!rc) {
+        gf4_service_cleanup_reset(c);
+        c->cleanup_pending=false;
+    }
+    /* Cleanup status is the return value; never overwrite the restore cause
+     * with saved_release's success or a subsequent release failure. */
+    c->last_rc=original;
+    return rc;
 }
