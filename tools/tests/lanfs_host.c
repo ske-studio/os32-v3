@@ -109,3 +109,5 @@ u32 test_trial(u32 baud) { return sfs_trial_ticks_limit(baud, client.max_payload
 int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
 const SfsClient *sfs_persistent_client(void) { return 0; }
 void sfs_persistent_stale(void) { }
+
+u32 sfs_persistent_generation(void) { return 0; }
