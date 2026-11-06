@@ -424,9 +424,9 @@ python3 tools/gen_memmap.py --manifest --check
 
 | ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|
-| `make check-fast` | 全検査を変異なし | 作業中 | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
-| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
-| `make check` | 全検査を変異込み | 節目に PM が 1 回 (`make -k check`、ROLES §0「検査」) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
+| `make check-fast` | 全検査を変異なし | GitHub の CI の build ジョブ (取り込みの検査)。手元では回さない | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
+| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 使わない (取り込みの検査は CI、実装者は触った試験だけ、PARALLEL_BRANCHES §3) | 選択集合に依存 |
+| `make check` | 全検査を変異込み | GitHub の workflow `full-check` (毎晩と手動、ROLES §0「検査」) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
 上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。

@@ -32,6 +32,7 @@ typedef struct {
 #define GFX_RGB_R 0
 #define GFX_RGB_G 1
 #define GFX_RGB_B 2
+#define GFX_PALETTE_COMPONENT_BITS PEGC_PAL_KAPI_BITS /* 正典は include/pegc.h */
 #define GFX_PALETTE_COMPONENT_MASK PEGC_PAL_KAPI_MASK /* 正典は include/pegc.h */
 #define GFX_PALETTE_CUBE_LEVELS 6
 #define GFX_PALETTE_GRAY_FIRST 8

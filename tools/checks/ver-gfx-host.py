@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-gfx-host', tier=1,
-    covers=['include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'gfx/gfx_core.c', 'tools/tests/test_ver_gfx.py', 'tools/tests/host32.py'],
+    covers=['include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'gfx/gfx_core.c', 'gfx/gfx_core_api.inc', 'tools/tests/test_ver_gfx.py', 'tools/tests/host32.py'],
     needs=[], budget=60.0)
 
 

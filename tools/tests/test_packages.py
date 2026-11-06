@@ -88,7 +88,7 @@ MINIMAL_SBIN = ['install', 'cdinst', 'hsync']
 MOVED_TO_NORMAL_CMDS = ['more', 'find', 'sort', 'head', 'tail', 'wc', 'tee', 'touch',
                         'sleep', 'diff', 'du', 'cal', 'man', 'sndctl']
 FONT_GUEST = '/sys/font/default.kcgfont'
-GUI_FILES = ['/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
+GUI_FILES = ['/boot/trident.mod', '/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
              '/usr/bin/filer.bin', '/usr/bin/edit_gui.bin', '/usr/bin/about.bin',
              # T7b-b3: GUI の標準 font set (取得物、userland/deploy.yaml)
              '/usr/share/fonts/JF-Dot-Shinonome16.ttf',

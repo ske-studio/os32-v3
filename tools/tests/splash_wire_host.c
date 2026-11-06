@@ -13,7 +13,9 @@ int sys_time_now(u32 *lo, u32 *hi);
 #include "kstring.h"
 #include "wire_data.h"
 #include "../../gfx/gfx_osri.c"
+#define platform_splash_wait_frame wire_wait_frame_real
 #include "../../platform/pc98/splash.c"
+#undef platform_splash_wait_frame
 #include "../../drivers/video/pc98/splash_raster_plan.c"
 #include "../../drivers/video/pc98/splash_raster_play.c"
 #include "../../drivers/video/pc98/splash_raster_image.c"
@@ -32,9 +34,22 @@ static int wire_user;
 static u32 wire_pos, wire_size;
 static const u8 *wire_file;
 volatile u32 tick_count;
+static int wire_pacing;
+
+int platform_splash_wait_frame(u32 end_tick)
+{
+    wire_pacing = 1;
+    int rc = wire_wait_frame_real(end_tick);
+    wire_pacing = 0;
+    return rc;
+}
 
 int sys_time_now(u32 *lo, u32 *hi)
 {
+    /* Only IRQ-open display pacing uses a coarse fake clock. Keep 1us steps
+     * for scan qualification, palette playback and all I/O; keep real 3s/8s
+     * deadlines and execute the actual wait, including its failure paths. */
+    if (wire_pacing && !frozen) clock_us += 999;
     int rc = raster_clock_now(lo, hi);
     tick_count = clock_us / 10000;
     return rc;

@@ -40,6 +40,9 @@ PACK の実機成功・2MiB非ミラー確定を最新の事実とする。以�
 | F6 | T:113–114 は容量未確定・CRTC設定が次、V:98 は容量別試験待ち | 最新PACKは表示成功・実容量2MiB非ミラー。SPR=7F/FF→4MiB申告は採用容量にしない |
 | F7 | 指定HWDEV_CORE_API.mdは現行指定先にない。V:144のgfx_arm_emergencyは擬似API | archiveは未参照・根拠にしない。現行仕様の代替文書は未確認。mm/pgalloc.h:254–274,304とmm/paging.h:124の実APIへ接続する新設内部契約 |
 | F8 | HAL initはvoid (include/gfx_hal.h:56)、cirrus_module.c:38はprepare拒否 | prepareを検証するgeforce_module.c:95を手本に専用loader、rcを状態へ保持 |
+| F9 | H:548–554 は 0x3D4。手本の IOBase は GetIOBase (vgaHW.c:1786、D:1970)・SaveMode (:1021)・RestoreMode (:851) で決まり、pc98_init は選び直さない (D:651,688–690) | protect と unlock/lock は手本の IOBase の切り替わりどおり、今の基点 cur_vga_base を使う（Save→保存値、ModeInit の VGA Restore→color、Restore→保存値）。台本は 0x3D4 固定（起動時 MISC bit0=1 なら同じ）。明示的な AR と Trident 固有 CR は 0x3D4 のまま |
+
+9682 は D:2504–2529 で frequency を設定せず、trident_pll.c:42–55,71 の IsClearTV が手本どおり 1 回目の ModeInit でだけ CR C0 bit7 を読み PAL/NTSC を選び、以後は d->reference に覚えた選択を使う。NTSC 固定という依頼の記述より手本を優先し、H:148–156 の選択を保つ。
 
 ## 2. 初期化の列
 
@@ -149,7 +152,7 @@ struct TridentModuleContext {
 
 - resources.cはcore側。`gfx_boot_reserve()` (gfx/gfx_core_surface.inc:149) → `trident_boot_reserve()` を `init/kernel.c:203` の準備境界で呼ぶ。master CR3/live AS=0を満たす。
 - PCI bindとactiveは分離。ID/SR09/BAR型/Command memory-enableを検証、decode幅の根拠とRAM・PEGC・82557等との全区間非重複を確認する。
-- BARには書かない（BARLEN_DESIGN.md:31）。同:25の基準Ra266の既知の上限BAR0=4MiB、BAR1=64KiBを予約・写像の根拠にし、VRAM実容量とは区別する。既存PCI資源の機種・配置条件に合わなければ理由付きfallback。pci_aperture.cは作らない。
+- BARには書かない（BARLEN_DESIGN.md:31）。同:25の基準Ra266の既知の上限BAR0=4MiB、BAR1=64KiBを予約・写像の根拠にし、VRAM実容量とは区別する。Trident BAR0/BAR1 と他装置の既知の全範囲の非重複だけを確認し、82557 CSR の隣接配置や未計測・台帳未登録 memory BAR の存在を起動条件にしない。長さ不明の BAR は基点だけを見る（先頭 1 ページとの照合）。基点が Trident 範囲内なら重複として拒否する。pci_aperture.cは作らない。
 - 既存APIの戻り規約が異なるのでresources.cで負rcへ正規化する。`ledger_resource_add`/`ledger_reserve_set`/`ledger_surface_create`は真成功、`paging_map_phys`は0成功。
 
 ```c
@@ -254,7 +257,7 @@ SPR解釈はD:2919–2975を全行転記する（単位KiB、9682のmask=0F、�
 | 3d | tools/module_schema.py | 変更25 | 新規ID/ops契約、生成schemaの正典 |
 | 3d | tools/gen_sqlite_imports.py | 変更15 | trident import/export生成対象 |
 | 3d | include/config.h | 変更2 | SYS_TRIDENT_MOD=/boot/trident.mod |
-| 3d | build/packages.yaml | 変更10 | 任意graphics配備、BOOT/MINIMAL除外 |
+| 3d | build/core.yaml | 変更4 | 任意GUI配備 (tags: [gui])、BOOT/MINIMAL除外 |
 | 3c | init/kernel_gfx_config.inc | 変更8 | GFX=trident強制指定 |
 | 3c | userland/shell/cmd_sys.c | 変更10 | gfxmode選択名・状態表示 |
 | 3c | arch/x86/kernel/isr_handlers.c | 変更12 | :289一般例外と:393 #PFの両入口 |

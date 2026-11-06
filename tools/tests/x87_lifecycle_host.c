@@ -122,6 +122,7 @@ NOTICE(host_owner_exit)
 NOTICE(con_sink_owner_exit)
 NOTICE(appslot_gfx_owner_exit)
 #undef NOTICE
+int gfx_return_emergency(u32 owner,int reason) { CHECK(owner>=1 && owner<=3 && reason==EXEC_KIND_EXITED); return 0; }
 void gui_owner_exit(int id,int kind) { CHECK(id>=1 && id<=3 && kind==EXEC_KIND_EXITED); cleanup_count++; }
 int con_sink_is_enabled(void) { return 0; }
 int con_sink_reader_get(void) { CHECK(0); return 0; }

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 
 from gen_kdebug_imports import declaration, abi_hash, fnv1a
+from module_schema import COMPONENTS
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFINITION = ROOT / 'tools/prototypes/sqlite_imports.def'
@@ -167,7 +168,9 @@ def generate_component_exports(out, entries, module):
     core += ['};', f'const struct module_symbol_contract {module}_import_contracts[] = {{']
     core += [f'    {{0x{fnv1a(e["name"].encode()):08x}u, 1, 1}},' for e in entries]
     core += ['};', f'const struct module_symbol_contract {module}_export_contracts[] = {{',
-             f'    {{0x{fnv1a(b"initialize"):08x}u, 1, 0}},', '};']
+             *[f'    {{0x{fnv1a(name.encode()):08x}u, 1, 0}},'
+               for name in next(row['ops_names'] for row in COMPONENTS
+                                if row['imports_symbol'] == f'{module}_import_slots')], '};']
     (out / f'{module}_kexports.c').write_text('\n'.join(core) + '\n')
 
 
@@ -175,7 +178,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
     parser.add_argument('--contracts-only', action='store_true')
-    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce'), default='sqlite')
+    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident'), default='sqlite')
     args = parser.parse_args()
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
     generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)

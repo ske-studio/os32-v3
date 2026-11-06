@@ -1,6 +1,7 @@
 #include "../../../kernel/sqlite_engine.h"
 #include "../../../kernel/console/font_guard.h"
 #include "../../../kernel/module/module_runtime.h"
+#include "../../../gfx/gfx_emergency.h"
 #ifdef OS32_R1_FIXTURE
 #include "../../../kernel/r1_fixture.h"
 #endif
@@ -322,6 +323,12 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     }
 
     /* 画面上部クリア */
+    int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, (int)vector);
+    if (restore_rc) {
+        sputs("[gfx] emergency exception restore rc=");
+        sput_hex32((u32)restore_rc); sputs("\n");
+    }
+    /* Exception recovery failure must not suppress TVRAM fault output. */
     {
         int r;
         for (r = 0; r < EXC_SCREEN_CLEAR_ROWS; r++) {
@@ -422,6 +429,12 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     }
 
     /* 画面上部をクリア (15行のみ — row 15以降のテスト出力を保持) */
+    int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, (int)error_code);
+    if (restore_rc) {
+        sputs("[gfx] emergency #PF restore rc=");
+        sput_hex32((u32)restore_rc); sputs("\n");
+    }
+    /* #PF recovery failure must not suppress TVRAM fault output. */
     {
         int r;
         for (r = 0; r < EXC_SCREEN_CLEAR_ROWS; r++) {

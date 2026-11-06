@@ -136,6 +136,7 @@ static u32 gfx_identify_candidates(void)
 {
     u32 m = 0;
     if (g_backend_pref == GFX_PREF_PC98 || g_backend_pref == GFX_PREF_GEFORCE ||
+        g_backend_pref == GFX_PREF_TRIDENT ||
         !(v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG] & PEGC_BIOS_ARCH_EXTGFX)) return 0;
     if (g_backend_pref != GFX_PREF_CIRRUS && pegc_identify && pegc_identify())
         m |= GFX_CAND_PEGC;
@@ -225,6 +226,10 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         if (!geforce_boot_reserve())
             kprintf(KLOG_ATTR, "[gfx] geforce boot_reserve failed\n");
     }
+    if (g_backend_pref == GFX_PREF_TRIDENT && trident_boot_reserve) {
+        int rc = trident_boot_reserve(); /* Trident uses 0-success, unlike GF. */
+        if (rc) kprintf(KLOG_ATTR, "[gfx] trident stage=boot_reserve rc=%d\n", rc);
+    }
     /* 6. */
     ledger_arena_freeze();
     kprintf(KLOG_ATTR, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,
@@ -238,6 +243,7 @@ u32 gfx_sf_backend(void)
     if (g_backend == &gfx_backend_pegc) return LEDGER_SF_PEGC;
     if (g_backend == &gfx_backend_cirrus) return LEDGER_SF_CIRRUS;
     if (g_backend == &gfx_backend_geforce) return LEDGER_SF_GEFORCE;
+    if (g_backend == &gfx_backend_trident) return LEDGER_SF_TRIDENT;
     return LEDGER_SF_PC98;
 }
 
