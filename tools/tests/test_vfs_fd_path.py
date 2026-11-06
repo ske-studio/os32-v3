@@ -322,7 +322,10 @@ IME_MUTANTS = [
      '    next = os32_sqlite_group_finish(&dict->group, rc);',
      '    next = SQLITE_OK;'),
     ("hot journal を見ずに開き直す",
+     # Target legacy dict_recover; store_recover has the same guard.
+     "    rc = vfs_stat(name, &st);\n"
      "    if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {",
+     "    rc = vfs_stat(name, &st);\n"
      "    if (0) {"),
     ("I/O エラーで何度でも開き直す",
      "    if (!stale && dict->io_retried) return 0;\n", ""),
