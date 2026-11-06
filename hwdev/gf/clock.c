@@ -189,7 +189,7 @@ i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *p)
         return result(g,GF5_EINVAL);
     i32 rc=gf5_plan_check(g,p,false);
     if (rc) return rc;
-    rc=gf5_plan_ceiling(g,p);
+    rc=gf5_plan_domain_ceiling(g,p,false);
     if (rc) return result(g,rc);
     /* nv40.c:186-195 uses private coefficients; consume before any MMIO. */
     g->plan_guard.core_used=true;

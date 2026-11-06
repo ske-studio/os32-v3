@@ -290,6 +290,18 @@ static void run(void)
     gf5_host_trace_clear(&h);
     assert(gf5_clock_prog(&h.ctx,&p)==GF5_EBUSY);
     assert(!h.display.nevents && !h.ctx.plan_guard.core_used);
+    /* Entry memory 269999 kHz lies below the fixture's 270000 kHz PLL
+     * grid point. A lower 135000 kHz core request still rounds its unused
+     * memory plan up to 270000; clock_prog must not reject that RAM half. */
+    assert(!gf5_clock_calc(&h.ctx,
+        &(struct gf5_clock){FIXTURE_KHZ/2U,0,FIXTURE_KHZ-1U},&p));
+    assert(p.actual.core_khz==FIXTURE_KHZ/2U && p.actual.mem_khz==FIXTURE_KHZ);
+    h.ctx.heat.ceiling=(struct gf5_clock){FIXTURE_KHZ,FIXTURE_KHZ,FIXTURE_KHZ-1};
+    set_reg(REG_MEM,ENABLE|SINGLE); set_reg(REG_MEM+4U,0x1402U);
+    assert(gf5_plan_domain_ceiling(&h.ctx,&p,true)==GF5_EBUSY);
+    assert(!gf5_clock_prog(&h.ctx,&p));
+    for (u32 i=0;i<h.display.base.nregs;++i)
+        if (regs[i].off==REG_MEM) assert(regs[i].value==(ENABLE|SINGLE));
     h.ctx.heat.down_active=false;
     guard_cases();
     readback_cases();

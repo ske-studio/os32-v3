@@ -122,6 +122,10 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+    ('leave-stop-no-redraw', 'drivers/video/geforce/backend_geforce.c', '(was_routed || forced_stop) ? pc98_route_to_98() : 0', '((void)was_routed, (void)forced_stop, pc98_route_to_98())', 'foreground'),
+    ('forced-stop-rebuild', 'drivers/video/geforce/backend_geforce.c', '        failed = 1;\n        rc=gf_foundation_stop', '        failed = 0;\n        rc=gf_foundation_stop', 'foreground'),
+    ('forced-stop-route', 'drivers/video/geforce/backend_geforce.c', '(was_routed || forced_stop) ? pc98_route_to_98() : 0', '(was_routed) ? pc98_route_to_98() : ((void)forced_stop,0)', 'foreground'),
+    ('core-ignore-ram-ceiling', 'hwdev/gf/clock.c', 'rc=gf5_plan_domain_ceiling(g,p,false);', 'rc=gf5_plan_ceiling(g,p);', 'clock'),
     ('serial-heat-app-recovery', 'drivers/video/geforce/geforce_module.c', 'if (recover_app) {', 'if (recover_app || heat_bridge.stop_state.state!=GF5_STOP_NORMAL) {', 'foreground'),
     ('sensor-reentry-rearm', 'drivers/video/geforce/backend_geforce.c', 'rc=gf5_therm_monitor_restart(feature5);', 'rc=0;', 'foreground'),
     ('sensor-reentry-poll', 'hwdev/gf/therm.c', 'g->fan.sensor_poll=true;', 'g->fan.sensor_poll=false;', 'foreground'),
@@ -280,7 +284,7 @@ MUTATIONS = [
     ('u4-failed-sample', 'hwdev/gf/therm.c', '(void)gf5_heat_step(g,0,0);', '(void)g;', 'therm'),
     ('foreground-poll', 'drivers/video/geforce/geforce_module.c', 'if (ops && ops->service_poll)', 'if (0 && ops && ops->service_poll)', 'foreground'),
     ('critical-drain', 'hwdev/gf/feature5_service.c', 'rc=g->links.drain_pause(g->links.owner);', 'rc=0;', 'foreground'),
-    ('shutdown-route', 'drivers/video/geforce/backend_geforce.c', 'int route_rc = pc98_route_to_98();', 'int route_rc = ((void)pc98_route_to_98, 0);', 'foreground'),
+    ('shutdown-route', 'drivers/video/geforce/backend_geforce.c', 'int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;', 'int route_rc = ((void)was_routed, (void)forced_stop, (void)pc98_route_to_98, 0);', 'foreground'),
     ('fault-monitor', 'hwdev/gf/feature5_service.c', 'if (!g || g!=service_ctx || (service_slot && !*service_slot) ||', 'if (!g || (g->ch && g->ch->fault.latched) || g!=service_ctx || (service_slot && !*service_slot) ||', 'foreground'),
     ('probe-latch', 'drivers/video/geforce/backend_geforce.c', 'if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;', 'if (false) ok=0;', 'foreground'),
     ('foreground-reentry', 'drivers/video/geforce/geforce_module.c', 'if (foreground_poll_busy) return;', 'if (0 && foreground_poll_busy) return;', 'foreground'),
@@ -288,8 +292,8 @@ MUTATIONS = [
     ('gpio-log', 'kdebug/gf5_test.c', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);\n        log[0] = 0; log[1] = 1;', 'foreground-gpio'),
     ('observation-read-error', 'kdebug/gf5_test.c', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);\n            if (status[i]) { status[i] = 0; value[i] = 0; }', 'foreground-observe'),
     ('heat-no-gui-session', 'gfx/gfx_core.c', 'void geforce_display_stopped(void)\n{\n    gfx_started = 0;', 'void geforce_display_stopped(void)\n{\n    if (con_sink_is_enabled()) gui_display_failed();\n    gfx_started = 0;', 'foreground'),
-    ('direct-core-ceiling', 'hwdev/gf/clock.c', 'rc=gf5_plan_ceiling(g,p);', 'rc=0;', 'clock'),
-    ('direct-ram-ceiling', 'hwdev/gf/ramclock.c', 'rc=gf5_plan_ceiling(g,plan);', 'rc=0;', 'ramclock'),
+    ('direct-core-ceiling', 'hwdev/gf/clock.c', 'rc=gf5_plan_domain_ceiling(g,p,false);', 'rc=0;', 'clock'),
+    ('direct-ram-ceiling', 'hwdev/gf/ramclock.c', 'rc=gf5_plan_domain_ceiling(g,plan,true);', 'rc=0;', 'ramclock'),
     ('heat-decoded-readback', 'hwdev/gf/perf.c', 'if (!rc && (current.core_khz!=decoded.core_khz ||', 'if (false && (current.core_khz!=decoded.core_khz ||', 'perf'),
     ('clock-retry', 'hwdev/gf/feature5_service.c', 'if (g->busy || !thermal_live(g)) return 0;', 'if (g->busy || g->last_rc || !thermal_live(g)) return 0;', 'foreground'),
     ('display-owner-only', 'drivers/video/geforce/geforce_module.c', 'con_sink_is_enabled() ? appslot_gfx_owner() : appslot_cur()', 'appslot_cur()', 'foreground'),

@@ -134,7 +134,7 @@ static void __attribute__((unused)) scanlog_heat_fixture(void)
 static PaletteEntry scanlog_colors[16];
 const PaletteEntry *palette_get_all(void) { return scanlog_colors; }
 void palette_shadow_set(int i,u8 r,u8 g,u8 b) { (void)i;(void)r;(void)g;(void)b; }
-static u32 scanlog_route;
+static u32 scanlog_route,scanlog_restore98_calls;
 void pc98_console_set_safe(int safe) { (void)safe; }
 int pc98_route_cell_check(void) { assert(!scanlog_route); return 0; }
 int pc98_route_to_gf(void) { scanlog_route=1; return 0; }
@@ -142,6 +142,7 @@ int pc98_route_to_98(void)
 {
     /* The diagnostic must finish before the real route restores/redraws 98. */
     assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc="));
+    ++scanlog_restore98_calls; /* Route seam includes display_restore_98. */
     scanlog_route=0; return 0;
 }
 static u32 scanlog_failures;

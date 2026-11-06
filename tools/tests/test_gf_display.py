@@ -1878,8 +1878,8 @@ GF4_MUTATIONS += [
 
 GF4_MUTATIONS += [
     ('scanlog', 'leave-after-redraw', 'drivers/video/geforce/backend_geforce.c',
-     'geforce_leave_log(leave_io, rc);\n#endif\n    int route_rc = pc98_route_to_98();',
-     'int route_rc = pc98_route_to_98();\n    geforce_leave_log(leave_io, rc);\n#endif',
+     'geforce_leave_log(leave_io, rc);\n#endif\n    int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;',
+     'int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;\n    geforce_leave_log(leave_io, rc);\n#endif',
      '98 route starts only after diagnostic completes'),
     ('c2linkb', 'script-timeout-line', 'hwdev/gf/display/links.c',
      'if (run==GF_SCRIPT_ETIME) {', 'if (run==GF_SCRIPT_ETIME && false) {', 'ROM script timeout evidence'),

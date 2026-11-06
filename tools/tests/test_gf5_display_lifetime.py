@@ -20,6 +20,7 @@ import test_gf_display as display
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'hwdev/gf/display/service.c'
 MUTATIONS = [
+    ('start-stop-latch', 'if (gf5_stopping(g)) return svc_start_failure(c,"thermal_stop",GF4_ESTATE);', 'if (false) return svc_start_failure(c,"thermal_stop",GF4_ESTATE);'),
     ('start-guard', 'gf5_plan_invalidate(g); /* Display start boundary, before admission/MMIO. */', '(void)g;'),
     ('stop-guard', 'gf5_plan_invalidate(g); /* Display stop boundary, including failed stop. */', '(void)g;'),
     ('heat-epoch', 'g->heat.epoch=c->epoch;', 'g->heat.epoch=0;'),

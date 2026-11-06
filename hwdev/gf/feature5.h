@@ -181,14 +181,15 @@ static inline bool gf5_above_ceiling(const struct gf5 *g,const struct gf5_clock 
          c->mem_khz>g->heat.ceiling.mem_khz);
 }
 /* MIT clk/nv40.c:39-78: decode both stages, never trust calc's actual. */
-static inline i32 gf5_plan_ceiling(const struct gf5 *g,const struct gf5_plan *p)
+static inline i32 gf5_plan_domain_ceiling(const struct gf5 *g,
+                                        const struct gf5_plan *p,bool ram)
 {
     if (!g->heat.down_active) return 0;
-    struct gf5_clock decoded={0};
+    struct gf5_clock decoded=g->heat.ceiling;
     const u32 control[2]={p->nc,p->mc}, coefficient[2]={p->nn,p->mn};
     u32 khz[2];
-    if ((p->mux&0x33U)!=0x33U) return GF5_ERANGE;
-    for (u32 i=0;i<2;++i) {
+    if (!ram && (p->mux&0x33U)!=0x33U) return GF5_ERANGE;
+    for (u32 i=ram ? 1U : 0U;i<(ram ? 2U : 1U);++i) {
         u32 c=control[i],v=coefficient[i],m=v&255U,n=(v>>8)&255U;
         if (!(c&0x80000000U) || !m || !n) return GF5_ERANGE;
         khz[i]=GF_PLL_REF*n/m;
@@ -199,8 +200,15 @@ static inline i32 gf5_plan_ceiling(const struct gf5 *g,const struct gf5_plan *p)
         }
         khz[i]>>=(c>>16)&7U;
     }
-    decoded.core_khz=decoded.shader_khz=khz[0]; decoded.mem_khz=khz[1];
+    if (ram) decoded.mem_khz=khz[1];
+    else decoded.core_khz=decoded.shader_khz=khz[0];
     return gf5_above_ceiling(g,&decoded) ? GF5_EBUSY : 0;
+}
+/* Full-plan callers program both domains; direct prog checks only its own. */
+static inline i32 gf5_plan_ceiling(const struct gf5 *g,const struct gf5_plan *p)
+{
+    i32 rc=gf5_plan_domain_ceiling(g,p,false);
+    return rc ? rc : gf5_plan_domain_ceiling(g,p,true);
 }
 i32 gf5_clock_read(struct gf5 *, struct gf5_clock *);
 i32 gf5_clock_calc(struct gf5 *, const struct gf5_clock *, struct gf5_plan *);

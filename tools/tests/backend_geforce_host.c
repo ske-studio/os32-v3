@@ -66,6 +66,13 @@ static struct gf2_chan log_chan;
 static struct gf4_ctx log_ctx;
 static struct gf4_test_ops log_ops;
 static const struct gf4_test_ops *log_dispatch;
+#ifndef GF_F0S_HOST
+/* Ownerless HAL fixture: thermal callbacks have no production lifetime. */
+int gf_foundation_stop(struct gf_foundation *f)
+{ (void)f; __builtin_trap(); }
+i32 gf5_therm_monitor_restart(struct gf5 *g)
+{ (void)g; __builtin_trap(); }
+#endif
 static GfxBackend module_backend;
 static int module_height, module_flip, module_page;
 #ifdef GF_F0S_HOST
@@ -193,7 +200,7 @@ static int run(void)
     if (n!=12 || events[4]!=5 || events[5]!=6 || events[6]!=1 || events[9]!=4 || events[10]!=5 || events[11]!=6) return 5;
     n=0; fail_step=3;
     if (geforce_foundation_display(true)!=GF1_EIO) return 9;
-    if (n!=5 || events[2]!=3 || events[3]!=5 || events[4]!=6 || gfx_backend_geforce.probe()) return 6;
+    if (n!=4 || events[2]!=3 || events[3]!=5 || gfx_backend_geforce.probe()) return 6;
     return start_logs(&d);
 }
 void _start(void) { int rc=run(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

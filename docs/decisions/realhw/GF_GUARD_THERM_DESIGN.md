@@ -73,7 +73,7 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 - 常駐側は再入防止と次回 tick の cache だけを持つ。期限の正本は F5。最短期限を切り捨てで tick へ写し、遅延分を連続測定して埋めない。借用中や SAVING/RESTORING の slot=NULL は次の協調点へ送る。
 - clock64 の一時失敗は診断を残して今回だけ終了し、次の前景 alarm で再試行する。明示再入場の monitor_restart でも監視を再準備する。
 - 停止は `常駐 REQUESTED → module 借用を終えた poll 出口 → 共通 backend stop → 98 route` の一本。熱側で active/channel/display から独自の稼働条件を再構成して要求を捨てない。
-- backend stop は active/routed を解消し、既存 display stop を通してから 98 へ戻す。下位が OFF かつ display stop 完了を確認済みなら、ハード停止を繰り返さず受付閉鎖・帰還・後処理を続ける。
+- backend stop は入口の routed を保持して active/routed を解消し、既存 display stop を通す。98 route（画面の復元）は入口で routed だった場合か、強制停止へ進んだ場合だけ行う。通常 leave 後の停止では98の画面を再初期化しない。下位が OFF かつ display stop 完了を確認済みなら、ハード停止を繰り返さず受付閉鎖・帰還・後処理を続ける。
 - stop 失敗では98への帰還より先に既存の `gf_foundation_stop` による下位停止を試す。それも失敗するか帰還先が安全でなければ、REQUESTED のまま vfs_sync、理由・温度・stop/sync rc の polled serial 出力、割込み禁止 halt。成功していない停止を STOPPED としない。
 - 停止と帰還を確認してから STOPPED とする。表示を使用中だった場合に描画状態を閉じ、その時の表示所有者の slot だけに abort_req を立てる。CUI は現在アプリ、GUI は既存の gfx owner を使い、別の実行中アプリや GUI 全体へ終了を要求しない。アプリ終了をハード停止の前に待たない。
 - 再起動用 `gf_production_return` の経路は維持し、熱の halt 分岐を混ぜない。
@@ -93,8 +93,8 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 | shutdown | 直ちに常駐 REQUESTED。アプリの終了・降速完了を待たない。下降イベントでは解除しない。 |
 | センサ喪失 | sensor alarm のみ解除。降速/pause 中の喪失は最初の下位 rc を共通停止へ記録する。独立 fan alarm は維持する。 |
 | 停止中の測温 | PLL を動かせない停止済み/保存中の装置では測温/fan を続ける。降速不能だけを新しい shutdown 理由にしない。 |
-| 外部操作 | clock/RAM/perf/state は共通の requested/decoded ceiling 検査を使う。直接 prog は MMIO/pause より前に検査し、保存像で新しい熱制限を上書きしない。 |
-| 明示再入場 | STOPPED は自動 probe を拒否。解除は gf2 enter または再起動だけ。gf2 enter の準備は MMIO 寿命を確認し新規測温、downclock−hyst 以下を確認して監視を再準備し、その後 NORMAL にする。pause 所有・冷却計数は持ち込まない。 |
+| 外部操作 | clock/RAM/perf/state は共通の requested/decoded ceiling 検査を使う。直接 prog は MMIO/pause より前に、clock は core/shader、RAM は mem の上限だけを検査し、保存像で新しい熱制限を上書きしない。 |
+| 明示再入場 | REQUESTED/STOPPED 中の表示 service start は副作用前に拒否する。STOPPED は自動 probe を拒否。解除は gf2 enter または再起動だけ。gf2 enter の準備は MMIO 寿命を確認し新規測温、downclock−hyst 以下を確認して監視を再準備し、その後 NORMAL にする。pause 所有・冷却計数は持ち込まない。 |
 
 ## 7. 次の実機の読み取り観測（gf-cui 欠け2）
 
@@ -139,3 +139,5 @@ i32 gf5_fan_check_cstate(struct gf5 *, u8 percent);  /* MMIO書込なし */
 - 2026-11-07: 熱停止の GUI 全体終了要求を除き、停止前に採った表示所有者の abort_req だけを立てる。通常の表示故障の通知経路は維持する。
 - 2026-11-07: critical の解除保留は同世代の次の有効測定で再試行し、新世代の HIGHER も再適用する。clock64 の一時失敗は次の alarm で再試行する。
 - 2026-11-07: 熱復帰の1段を prog の共通上限検査へ渡す間だけ許可し、失敗時は元の上限へ戻す。読戻しは calc.actual ではなく係数からの decoded と比較する。
+
+- 2026-11-07 (R5): display stop 失敗から foundation 強制停止へ進んだら、成功時も backend failed を立てる。下位停止だけでは ch/cleanup 所有の後処理は完了しないため、既存の寿命再構築経路へ渡す。

@@ -387,6 +387,8 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     struct gf3_service *s=0;
     i32 rc=svc_check(c,&s);
     if (rc) return svc_start_failure(c,stage,rc);
+    struct gf5 *g=&s->production->feature5;
+    if (gf5_stopping(g)) return svc_start_failure(c,"thermal_stop",GF4_ESTATE);
     struct gf_display_context *l=c->legacy;
     struct gf_foundation *f=&s->production->foundation;
     if (!c->data || !c->exec || !f->io.read || !f->io.write ||
@@ -400,7 +402,6 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         l->engaged || !c->reusable || !l->reusable ||
         (c->ch->state!=GF2_OFF && c->ch->state!=GF2_RUN))
         return svc_start_failure(c,"service_state",GF4_ESTATE);
-    struct gf5 *g=&s->production->feature5;
     gf5_plan_invalidate(g); /* Display start boundary, before admission/MMIO. */
     c->deadline=dl; c->accepting=false; c->tv_sense_valid=false;
     stage="admission_close";

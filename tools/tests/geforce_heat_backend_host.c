@@ -63,6 +63,10 @@ void _start(void)
     CHECK(!test_heat.stop() && !active && !routed && !failed);
     CHECK(!test_heat.backend_active());
     CHECK(events[n-2]==5 && events[n-1]==6);
+    int left=n;
+    startlog_clear();
+    CHECK(!test_heat.stop());
+    CHECK(n==left+1 && events[n-1]==5); /* No second display_restore_98. */
     u32 before=n;
     /* A new ordinary app probes then initializes; both must stay closed. */
     CHECK(!module_backend.probe());
@@ -89,9 +93,11 @@ void _start(void)
     module_backend.enter();
     CHECK(active && routed && !failed);
     geforce_backend_stop_bind(fail_stop);
+    startlog_clear();
     force_rc=-78;
     CHECK(test_heat.stop()==-78 && forced==1 && !active && !routed);
+    startlog_clear();
     force_rc=0;
-    CHECK(!test_heat.stop() && forced==2);
+    CHECK(!test_heat.stop() && forced==2 && failed);
     finish(0);
 }

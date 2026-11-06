@@ -21,7 +21,7 @@ static void lifetime_seed(struct gf5 *g)
 
 static void lifetime_preserved(struct gf5 *g)
 {
-    assert(g->heat.down_active && g->stop->state);
+    assert(g->heat.down_active);
     assert(g->heat.entry_clock.core_khz==300000 && g->heat.entry_clock.shader_khz==300000);
     assert(g->heat.entry_clock.mem_khz==200000 && g->heat.ceiling.core_khz==200000);
     assert(g->heat.ceiling.shader_khz==200000 && g->heat.ceiling.mem_khz==200000);
@@ -64,6 +64,17 @@ void _start(void)
     u32 old_epoch=g->heat.epoch;
     lifetime_preserved(g);
     lifetime_seed(g);
+    /* A diagnostic start cannot bypass either pending or consumed shutdown.
+     * Refusal must precede admission and device MMIO. */
+    for (u32 state=GF5_STOP_REQUESTED;state<=GF5_STOPPED;++state) {
+        g->stop->state=state;
+        u32 reads=cint_host.calls[H_READ],writes=cint_host.calls[H_WRITE];
+        assert(gf4_service_start(&svc_ctx,cint_deadline())==GF4_ESTATE);
+        assert(cint_host.calls[H_READ]==reads && cint_host.calls[H_WRITE]==writes);
+        assert(!svc_ctx.ready && !svc_ctx.accepting && !g->ch->f->running);
+        assert(g->stop->state==state && g->plan_guard.valid);
+    }
+    g->stop->state=GF5_STOP_NORMAL; /* Model explicit cooled reentry. */
     lifetime_starting=true; lifetime_seen=false;
     /* The boot clock is below the retained 200 MHz ceiling in this ROM. */
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));

@@ -450,6 +450,7 @@ static void geforce_palette_init(void)
 static int geforce_stop_common(bool force)
 {
     (void)force;
+    bool was_routed = routed, forced_stop = false;
 #ifdef OS32_GEFORCE_MODULE
     gf_hook_scan_bind(false, 0);
     struct gf_display_context *video = device ? device->context : 0;
@@ -458,14 +459,19 @@ static int geforce_stop_common(bool force)
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
 #ifdef OS32_GEFORCE_MODULE
-    if (force && rc && feature5 && feature5->ch && feature5->ch->f)
+    if (force && rc && feature5 && feature5->ch && feature5->ch->f) {
+        forced_stop = true;
+        /* Lower reset cannot finish the display/channel ownership cleanup.
+         * Rebuild that lifetime on the next enter, even if reset succeeds. */
+        failed = 1;
         rc=gf_foundation_stop(feature5->ch->f);
+    }
 #endif
     /* Sample stopped GF state before route_to_98 performs the final redraw. */
 #ifdef OS32_GEFORCE_MODULE
     geforce_leave_log(leave_io, rc);
 #endif
-    int route_rc = pc98_route_to_98();
+    int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;
     if (route_rc) rc = -1;
     active = routed = 0;
     if (rc) failed = 1;

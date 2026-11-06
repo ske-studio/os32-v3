@@ -246,7 +246,7 @@ static void u6_serial_start(void)
     struct gf2_test_request q={sizeof(q),GF2T_STOP,cint_host.now+GF2_TIMEOUT_US};
     struct gf2_test_reply reply;
     assert(!gf2_module_ops.call(&cint_prod.foundation,&q,&reply));
-    active=routed=0;
+    active=routed=scanlog_route=0;
     q.op=GF2T_START;
     q.deadline_us=cint_host.now+GF2_TIMEOUT_US;
     assert(!gf2_module_ops.call(&cint_prod.foundation,&q,&reply));
@@ -283,18 +283,38 @@ static void u6_hot_leave(void)
 {
     u6_setup();
     struct gf5 *g=&cint_prod.feature5;
-    u6_sample(96);
+    u6_sample(96); geforce_foreground_poll();
+    assert(g->heat.down_active);
     assert(!geforce_stop());
     assert(!active && !routed && g->fan.sensor_poll);
     /* A different app is now running on 98. Thermal polling still runs. */
     startlog_clear();
+    u32 restores=scanlog_restore98_calls;
     u6_sample(135); geforce_foreground_poll();
+    assert(scanlog_restore98_calls==restores);
     assert(g->stop->state==GF5_STOPPED);
     assert(heat_bridge.stop_state.reason==GF5_ESTATE && heat_bridge.stop_state.milli_c==135000);
     assert(scanlog_count("GF4 STATE stage=leave98")==1 && !scanlog_route);
     assert(!u6_app.abort_req && !u6_notifications && !u6_aborts && !u6_syncs && !u6_halts);
     assert(!geforce_probe());
     u6_safe=true;
+    scanlog_finish();
+}
+static void u6_forced_stop(void)
+{
+    u6_setup();
+    /* Serial display use: no HAL route, but failed display cleanup requires
+     * the foundation fallback and an unconditional return to 98. */
+    active=routed=scanlog_route=0;
+    u32 restores=scanlog_restore98_calls;
+    svc_close_rc=SVC_INJECT;
+    u6_resident_request(GF5_ESTATE,135000,0);
+    geforce_foreground_poll();
+    assert(heat_bridge.stop_state.state==GF5_STOPPED);
+    assert(!cint_prod.foundation.running && failed);
+    assert(scanlog_restore98_calls==restores+1);
+    assert(!geforce_probe() && !u6_app.abort_req);
+    svc_close_rc=0;
     scanlog_finish();
 }
 static void u6_cooperative(void)
@@ -404,7 +424,7 @@ void _start(void)
     u6_critical();
     u6_downclock_stop(false); u6_downclock_stop(true);
     u6_serial_shutdown(); u6_serial_critical();
-    u6_hot_leave();
+    u6_hot_leave(); u6_forced_stop();
     u6_cooperative(); u6_fault_monitor(); u6_shutdown();
     u6_setup();
 #ifdef U6_STOPFAIL

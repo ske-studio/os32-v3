@@ -22,7 +22,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('probe-latch', 'if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;', 'if (0) ok=0;'),
-    ('stop-route', 'int route_rc = pc98_route_to_98();', 'int route_rc = ((void)pc98_route_to_98, 0);'),
+    ('stop-route', 'int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;', 'int route_rc = ((void)was_routed, (void)forced_stop, (void)pc98_route_to_98, 0);'),
     ('stop-active', 'active = routed = 0;', 'active = routed = 1;'),
     ('cool-gate', 'sample.milli_c>cool', 'sample.milli_c>=cool'),
     ('force-stop', 'rc=gf_foundation_stop(feature5->ch->f);', 'rc=0;'),
