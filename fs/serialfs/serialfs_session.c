@@ -38,7 +38,9 @@
 #include "sysconfig.h"
 #include "config.h"
 
-/* SFS_LAN=1 selects the foreground 82557 transport at every begin. It shares
+/* Resident LAN uses C1's paired scopes before the UART/session guards below.
+ * It owns the client/mount lifetime; begin/end must not touch either here.
+ * Without residency, SFS_LAN=1 selects the foreground 82557 transport. It shares
  * the client/mount lifecycle below, but bypasses UART gate/hold/LOG/EXIT and
  * reports start, counters and exit directly through the serial console. */
 
@@ -221,6 +223,8 @@ int serialfs_session_begin(void)
     u32 mode = 0, baud = 0, fifo = 0;
     int rc;
 
+    if (sfs_persistent_enabled()) return sfs_persistent_scope_begin();
+
     /* 常駐シェルの `sfs run` だけ (sh.bin・外部プログラムは断る) */
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (g_active) return OS32_ERR_BUSY;
@@ -319,6 +323,8 @@ int sfs_lan_peer_mac(u8 *out)
 
 int serialfs_session_end(int exit_code)
 {
+    if (sfs_persistent_enabled()) return sfs_persistent_scope_end(exit_code);
+
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (!g_active) return OS32_ERR_INVAL;
     return sfs_finish(exit_code);

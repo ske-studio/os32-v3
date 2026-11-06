@@ -80,7 +80,8 @@ C_CASES = ["crc_and_frames", "timing_and_seq", "vfs_contract", "mount_permit",
 GATE_CASES = ["checked_tx", "gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
               "isr_counts"]
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
-                 "end_not_quiet", "lan_session", "lan_start", "lan_lifetime"]
+                 "end_not_quiet", "lan_session", "lan_start", "lan_lifetime",
+                 "resident_scope"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D_DEFAULT_SOURCE", "-D__cdecl=",
@@ -1542,6 +1543,18 @@ GATE_MUTATIONS = CHECKED_MUTATIONS + [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
+    ("fs/serialfs/serialfs_session.c",
+     r"    if \(sfs_persistent_enabled\(\)\) return sfs_persistent_scope_begin\(\);",
+     "    if (0) return sfs_persistent_scope_begin();", "LAN 常駐 scope の begin 分岐を外す"),
+    ("fs/serialfs/serialfs_session.c",
+     r"    if \(sfs_persistent_enabled\(\)\) return sfs_persistent_scope_end\(exit_code\);",
+     "    if (0) return sfs_persistent_scope_end(exit_code);", "LAN 常駐 scope の end 分岐を外す"),
+    ("fs/serialfs/serialfs_session.c",
+     r"return sfs_persistent_scope_begin\(\);",
+     "return sfs_persistent_scope_begin() == 0 ? 0 : OS32_ERR_IO;", "scope begin の誤りを潰す"),
+    ("fs/serialfs/serialfs_session.c",
+     r"return sfs_persistent_scope_end\(exit_code\);",
+     "return sfs_persistent_scope_end(0);", "scope end に終了値を渡さない"),
     ("fs/serialfs/serialfs_session.c",
      r'            kprintf\(KLOG_LEGACY_LIGHT_RED, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
      "", "lan.mod 不在の診断を消す"),
