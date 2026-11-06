@@ -30,7 +30,7 @@ const TridentModuleContext *trident_context;
 static int (*recovery_callback)(void *);
 static void *recovery_opaque;
 static u32 output_traces;
-static char serial_text[8192];
+static char serial_text[16384];
 static u32 serial_length;
 static void emit(const void *p, u32 n)
 {
@@ -77,6 +77,16 @@ static bool contains(const char *part)
         if (!part[j]) return true;
     }
     return false;
+}
+static u32 occurrences(const char *part)
+{
+    u32 total=0;
+    for (u32 i=0;i<serial_length;++i) {
+        u32 j=0;
+        while (part[j] && serial_text[i+j] && part[j]==serial_text[i+j]) ++j;
+        if (!part[j]) ++total;
+    }
+    return total;
 }
 void serial_puts(const char *s) { serial_puts_polled(s); }
 const PaletteEntry *palette_get_all(void) { return system_palette; }
@@ -216,6 +226,10 @@ static int start(void)
     CHECK(equal(device.verified_bytes,f.resources.mapped_bytes < TRI_FAKE_REAL_BYTES ? f.resources.mapped_bytes : TRI_FAKE_REAL_BYTES) && equal(device.declared_bytes,4194304));
     CHECK(allocs==1 && frees==1 && !device.scratch && !device.scratch_bytes && arms==1);
     CHECK(height==480 && !flip && !page);
+    CHECK(contains("[trident] diag regs gen=1 when=init SR0b="));
+    CHECK(occurrences("[trident] diag regs gen=1 when=init")==6);
+    CHECK(contains(" CR50=00") && contains(" CRbe="));
+    CHECK(contains(" XD00=") && contains(" XD57=") && f.ext_index==4);
     return 0;
 }
 /* init calls prepare again: preserve the already-installed shared fake seam
@@ -254,10 +268,12 @@ static int image(void)
     CHECK(contains("entry=1 CLIENT00019000=07 00 00 00 00 00 00 00"));
     CHECK(contains("entry=1 CLIENT00025940=04 04 04 04 04 04 04 04"));
     CHECK(contains("diag crc gen=1 bytes=307200 rc=0 client=54907c7b lfb=54907c7b"));
-    CHECK(contains("diag mismatch gen=1 offset=-1"));
+    CHECK(contains("diag mismatch gen=1 count=0 bytes=307200 rc=0"));
     CHECK(contains("diag sample gen=1 x=320 y=240 client=04 lfb=04 rc=0"));
     CHECK(contains("diag sample gen=1 x=340 y=260 client=04 lfb=04 rc=0"));
     CHECK(!registers_pending && register_entry==1);
+    CHECK(contains("[trident] diag regs gen=1 when=present SR0b="));
+    CHECK(occurrences("[trident] diag regs gen=1 when=present")==6);
     CHECK(!device.last_rc && equal(counters.present_bytes,307200) && counters.commits==1);
     for (u32 i=0;i<sizeof(client);++i) CHECK(equal(storage[i],client[i]));
     for (u32 i=0;i<16;++i) {
@@ -292,14 +308,14 @@ static int sequence(void)
         u32 second_order=norder;
         backend.init(); CHECK(device.active && !device.closed && !device.leave_done);
         ops=f.operations; backend.enter(); CHECK(equal(f.operations,ops));
-        CHECK(calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==1);
-        CHECK(norder==second_order+4 && order[second_order]==TRI_STEP_SAVE &&
+        CHECK(calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==2);
+        CHECK(norder==second_order+5 && order[second_order]==TRI_STEP_SAVE &&
               order[second_order+1]==TRI_STEP_PC98_INIT &&
-              order[second_order+2]==TRI_STEP_MODE && order[second_order+3]==TRI_STEP_ENABLE);
+              order[second_order+2]==TRI_STEP_MODE && order[second_order+3]==TRI_STEP_ENABLE && order[second_order+4]==TRI_STEP_VERIFY);
         CHECK(ends[TRI_STEP_SAVE]>starts[TRI_STEP_SAVE]+100 &&
               ends[TRI_STEP_SAVE]==starts[TRI_STEP_PC98_INIT] &&
               ends[TRI_STEP_PC98_INIT]==starts[TRI_STEP_MODE]);
-        CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_ENABLE]==2 && allocs==1 && frees==1);
+        CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_ENABLE]==2 && allocs==2 && frees==2);
         /* Real second ScreenInit must reload all 256 colors after boot DAC
          * restoration, then sample that reloaded image before present. */
         for (u32 i=0;i<16;++i) for (u32 c=0;c<3;++c)
@@ -348,7 +364,7 @@ static int sequence(void)
     /* A second ScreenInit while active still resets mode/palette/client. */
     backend.init(); CHECK(!device.last_rc && device.active && client[0]==0);
     CHECK(calls[TRI_STEP_MODE]==3 && calls[TRI_STEP_ENABLE]==3 &&
-        calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==1);
+        calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==2);
     return 0;
 }
 static int dac_observation(void)
@@ -488,9 +504,12 @@ static int diagnostic_observations(void)
     CHECK(contains("diag init stage=CLIENT rc=0 step=11"));
     registers_pending=false; /* test readback independently of register dump */
     serial_length=0; serial_text[0]=0;
-    client[17]=0x56; storage[17]=0xAB;
+    for (u32 i=0;i<5;++i) { client[17+i]=0x56; storage[17+i]=0xAB; }
     diag_after_present();
-    CHECK(contains("diag mismatch gen=1 offset=17 client=56 lfb=ab"));
+    CHECK(contains("diag mismatch gen=1 count=5 bytes=307200 rc=0"));
+    CHECK(contains("diag mismatch gen=1 n=0 offset=17 client=56 lfb=ab"));
+    CHECK(contains("diag mismatch gen=1 n=3 offset=20 client=56 lfb=ab"));
+    CHECK(!contains("diag mismatch gen=1 n=4"));
     u32 lines=logs;
     diag_after_present(); CHECK(logs==lines);
     device.verified_bytes=TRI_DISPLAY_BYTES-1;

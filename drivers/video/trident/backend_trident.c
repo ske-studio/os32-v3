@@ -15,12 +15,80 @@ static u32 register_entry;
 
 static bool present_diag_done, present_error_done;
 
+/* Post-mode snapshots only: SR0B data reads select New mode (MIT
+ * trident_dac.c:918-920); Mode/Enable have already selected that mode.
+ * Never enter Old mode (SR0B data write), unlock, or write register data.
+ * Cursor: CR40..50; overlay: CR80..97/BE (trident_video.c:225-250,
+ * 654-775). Keep selectors and diagnostic failures outside lifecycle state.
+ * Six rows at each boundary, at most sixteen register values per row. */
+static void diag_regs(const char *when)
+{
+    if (serial_gate_active()) return;
+    static const struct { u16 port; const char *bank; u8 first, last; } spans[] = {
+        {TRI_SR_INDEX, "SR", 0x0B, 0x0F},
+        {TRI_GR_INDEX, "GR", 0x0E, 0x0F},
+        {TRI_CR_COLOR, "CR", 0x0C, 0x0D},
+        {TRI_CR_COLOR, "CR", 0x1E, 0x2F},
+        {TRI_CR_COLOR, "CR", 0x38, 0x39},
+        {TRI_CR_COLOR, "CR", 0x40, 0x5F},
+        {TRI_CR_COLOR, "CR", 0x80, 0x97},
+        {TRI_CR_COLOR, "CR", 0xBE, 0xBE},
+        {TRI_EXT_DAC_INDEX, "XD", 0x00, 0x00},
+        {TRI_EXT_DAC_INDEX, "XD", 0x50, 0x57}
+    };
+    u8 values[96] = {0};
+    bool valid[96] = {0};
+    u32 count = 0;
+    int restore_rc = 0;
+    for (u32 span = 0; span < sizeof(spans) / sizeof(spans[0]); ++span) {
+        u8 selector = 0;
+        u16 port = spans[span].port;
+        /* Enable's final extended-DAC access selects 4 (route_ra266.c:90).
+         * Palette/present never change it. Restore that known selector;
+         * do not invent readback semantics for the write-only index port.
+         * 83C8=index / 83C6=data follows regs.c:200-206 and VIDEOOUT. */
+        bool ext = port == TRI_EXT_DAC_INDEX;
+        int saved = 0;
+        if (ext) selector = 4;
+        else saved = trident_read8(&device, TRI_SPACE_REGS, port, &selector);
+        for (u32 i = spans[span].first; i <= spans[span].last; ++i, ++count) {
+            if (saved) continue;
+            if (ext) {
+                int rc = trident_write8(&device, TRI_SPACE_REGS, port, i);
+                if (!rc) valid[count] = !trident_read8(&device, TRI_SPACE_REGS,
+                                                     TRI_EXT_DAC_DATA, &values[count]);
+            } else valid[count] = !trident_indexed_read(&device, port, i, &values[count]);
+        }
+        int rc = saved ? saved : trident_write8(&device, TRI_SPACE_REGS, port, selector);
+        if (rc && !restore_rc) restore_rc = rc;
+    }
+    count = 0;
+    for (u32 span = 0; span < sizeof(spans) / sizeof(spans[0]); ++span) {
+        for (u32 i = spans[span].first; i <= spans[span].last; ++i, ++count) {
+            if (!(count % 16)) {
+                serial_puts_polled("[trident] diag regs gen=");
+                serial_diag_u32(register_entry);
+                serial_puts_polled(" when="); serial_puts_polled(when);
+            }
+            serial_puts_polled(" "); serial_puts_polled(spans[span].bank);
+            serial_diag_hex(i, 2); serial_puts_polled("=");
+            if (valid[count]) serial_diag_hex(values[count], 2);
+            else serial_puts_polled("??");
+            if (count % 16 == 15) serial_puts_polled("\n");
+        }
+    }
+    /* The final short row also carries selector restoration failures. */
+    serial_puts_polled(" restore_rc="); serial_diag_i32(restore_rc);
+    serial_puts_polled("\n");
+}
+
 /* Use the same byte-access seam as present; never probe or write the LFB.
  * The full fixed surface is compared even if the first present is partial. */
 static void diag_after_present(void)
 {
     if (present_diag_done) return;
     present_diag_done = true;
+    diag_regs("present");
     const struct trident_resources *r = device.res;
     if (r->client_bytes < TRI_DISPLAY_BYTES || r->mapped_bytes < TRI_DISPLAY_BYTES ||
         r->decode_bytes < TRI_DISPLAY_BYTES || device.verified_bytes < TRI_DISPLAY_BYTES) {
@@ -28,8 +96,9 @@ static void diag_after_present(void)
         return;
     }
     u32 client_crc = CRC32_INIT, lfb_crc = CRC32_INIT;
-    u32 first = TRI_DISPLAY_BYTES, read_bytes = 0;
-    u8 first_client = 0, first_lfb = 0;
+    u32 mismatch_count = 0, read_bytes = 0;
+    u32 offsets[4] = {0};
+    u8 clients[4] = {0}, lfbs[4] = {0};
     int rc = 0;
     for (u32 off = 0; off < TRI_DISPLAY_BYTES; ++off) {
         u8 value, source = r->client[off];
@@ -38,17 +107,24 @@ static void diag_after_present(void)
         client_crc = crc32_core_update(client_crc, &source, 1);
         lfb_crc = crc32_core_update(lfb_crc, &value, 1);
         ++read_bytes;
-        if (first == TRI_DISPLAY_BYTES && source != value) {
-            first = off; first_client = source; first_lfb = value;
+        if (source != value) {
+            if (mismatch_count < 4) {
+                offsets[mismatch_count] = off;
+                clients[mismatch_count] = source;
+                lfbs[mismatch_count] = value;
+            }
+            ++mismatch_count;
         }
     }
     kprintf(KLOG_ATTR, "[trident] diag crc gen=%u bytes=%u rc=%d client=%08x lfb=%08x\n",
             register_entry, read_bytes, rc,
             crc32_core_final(client_crc), crc32_core_final(lfb_crc));
-    /* offset=-1 means no mismatch in the successfully read prefix. */
-    kprintf(KLOG_ATTR, "[trident] diag mismatch gen=%u offset=%d client=%02x lfb=%02x\n",
-            register_entry, first == TRI_DISPLAY_BYTES ? -1 : (int)first,
-            first_client, first_lfb);
+    /* Count covers read_bytes; rc distinguishes a partial scan. */
+    kprintf(KLOG_ATTR, "[trident] diag mismatch gen=%u count=%u bytes=%u rc=%d\n",
+            register_entry, mismatch_count, read_bytes, rc);
+    for (u32 i = 0; i < mismatch_count && i < 4; ++i)
+        kprintf(KLOG_ATTR, "[trident] diag mismatch gen=%u n=%u offset=%u client=%02x lfb=%02x\n",
+                register_entry, i, offsets[i], clients[i], lfbs[i]);
     /* Band interiors at x=32 avoid the text box; (340,260) is the
      * approximate white-rectangle center requested for the hardware trial. */
     static const u16 points[][2] = {
@@ -272,6 +348,7 @@ static void init(void)
     rc = trident_screen_init(&device);
     if (rc) { finish(device.failed_step, rc, true); return; }
     ++register_entry;
+    diag_regs("init");
     present_diag_done = present_error_done = false;
     kprintf(KLOG_ATTR, "[trident] diag buffer gen=%u bb=%08x client=%08x\n",
             register_entry, (u32)(uptr)trident_context->backend->bb_base,

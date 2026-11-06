@@ -2,7 +2,8 @@
  * 2920-2969,3333-3348,3471-3488; vgaHW.c:1786-1789.
  * PM 2026-11-06: PreInit capacity read precedes Save/PC98 Init, unlike the
  * original S3 contract. PM fix6: every HAL init is ScreenInit, so Save and
- * PC98 Init repeat (D:3472-3487); only VRAM measurement remains first-only.
+ * PC98 Init repeat (D:3472-3487); VRAM measurement normally remains
+ * first-only, with TRI_DIAG_VERIFY_EVERY_INIT overriding that for this trial.
  * 0xFAC is shared with pc98_route.c (mask 3): Trident owns values 2/0 while
  * active/returning. Keep Enable/Disable's unconditional OUTB and ordering;
  * route_set's conditional write/readback cannot replace this sequence.
@@ -120,7 +121,7 @@ int trident_screen_init(struct trident_device *d)
     d->init_done = true;
     int rc = mode_enable(d);
     if (rc) return rc;
-    if (!d->first_init_done) {
+    if (TRI_DIAG_VERIFY_EVERY_INIT || !d->first_init_done) {
         d->scratch = kmalloc(TRI_VRAM_SCRATCH_BYTES);
         if (!d->scratch) {
             diag_stage(d, "VERIFY", TRI_E_RESOURCE, false);

@@ -75,8 +75,8 @@ MUTATIONS = (
   'STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));',
   'if (d->init_done) STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));','PreInit capacity before Init'),
  ('M_INIT_DONE','lifecycle.c','d->init_done = true;','d->init_done = false;','verify requires successful Init'),
- ('M_REPROBE_ON_INIT','lifecycle.c','if (!d->first_init_done) {\n        d->scratch',
-  'if (d->first_init_done || !d->first_init_done) {\n        d->scratch','verify/alloc exactly once'),
+ ('M_SKIP_REVERIFY','lifecycle.c','if (TRI_DIAG_VERIFY_EVERY_INIT || !d->first_init_done) {',
+  'if (!d->first_init_done) {','diagnostic verifier runs on every init'),
  ('M_RESAVE_ON_ENTER','lifecycle.c','int rc = mode_enable(d);\n    if (!rc) d->step',
   'int rc = trident_state_save(d);\n    if (!rc) rc = mode_enable(d);\n    if (!rc) d->step','no Save call on EnterVT'),
  ('M_CLOSE_ORDER','lifecycle.c','first = disable(d);\n        second = restore_lock(d);',
@@ -262,6 +262,22 @@ def mode_oracle():
     w(0x3C0, 32)
     return out
 
+def diag_regs_trace(trace):
+    # Explicit requested ranges, independent of the product span table.
+    for port,first,last in [(0x3C4,11,15),(0x3CE,14,15),(0x3D4,12,13),
+                            (0x3D4,30,47),(0x3D4,56,57),(0x3D4,64,95),
+                            (0x3D4,128,151),(0x3D4,190,190)]:
+        selector=trace.access(False,1,port)
+        for index in range(first,last+1):
+            trace.access(True,1,port,index)
+            trace.access(False,1,port+1)
+        trace.access(True,1,port,selector)
+    for first,last in [(0,0),(0x50,0x57)]:
+        for index in range(first,last+1):
+            trace.access(True,1,0x83C8,index)
+            trace.access(False,1,0x83C6)
+        trace.access(True,1,0x83C8,4)
+
 def check_trace(data):
     event=struct.Struct('<IIIIBB2xi'); pos=0; stages=[]; env={}
     while pos<len(data):
@@ -290,6 +306,7 @@ def check_trace(data):
                 for port,value in [(0x3C6,255),(0x3C8,i),*((0x3C9,v) for v in color)]:
                     trace.access(True,1,port,value)
                     trace.access(False,1,0x3DA,0x5A); trace.access(False,1,0x3DA,0x5A)
+            diag_regs_trace(trace)
             trace.done()
         elif step==12:
             # Read-only diagnostic immediately before the first LFB write.
@@ -321,6 +338,7 @@ def check_trace(data):
             # Every LFB byte, including the final byte, must use write8.
             # Full H-equivalent bitmap is also checked in the C harness.
             for off in range(640*480): trace.access(True,1,off,space=1,count=1)
+            diag_regs_trace(trace)
             for off in range(640*480): trace.access(False,1,off,space=1,count=1)
             for x,y in [(0,0),(320,240),(32,30),(32,90),(32,150),
                         (32,210),(32,270),(32,350),(340,260)]:

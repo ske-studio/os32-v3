@@ -119,6 +119,11 @@ enum trident_save_slot {
     TRI_SAVE_CLOCK_MISC = 846, TRI_SAVE_PLL_LO = 847, TRI_SAVE_PLL_HI = 848,
     TRI_SAVE_MCLK_LO = 849, TRI_SAVE_MCLK_HI = 850, TRI_SAVE_SR0D = 851
 };
+/* Diagnostic trial: 1 repeats the nondestructive VRAM verification after
+ * Enable on every HAL init; 0 restores the first-init-only policy. */
+#ifndef TRI_DIAG_VERIFY_EVERY_INIT
+#define TRI_DIAG_VERIFY_EVERY_INIT 1
+#endif
 enum trident_rc {
     TRI_OK = 0, TRI_E_INVAL = -1, TRI_E_DEVICE = -2,
     TRI_E_RESOURCE = -3, TRI_E_MAP = -4, TRI_E_SURFACE = -5,
@@ -193,7 +198,7 @@ struct trident_device {
                              * 0=unset, 1=NTSC, 0x81=PAL; persists across reentry. */
     bool pinned, declared_unknown;
     enum trident_upper upper;
-    /* RAM loan for first VRAM verification only; lifecycle allocates/frees.
+    /* RAM loan for VRAM verification; lifecycle allocates/frees.
      * Emergency restoration never uses scratch or allocates. */
     u32 *scratch;
     u32 scratch_bytes;
@@ -288,7 +293,7 @@ static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
 }
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
 /* lifecycle.c: every ScreenInit=Save→Init→Mode→Enable→palette/client;
- * plan precedes Save and verify follows Enable only on the first init.
+ * plan precedes Save; verify follows Enable (every init in this trial).
  * enter=Mode→Enable (active enter is no-op).
  * Palette defaults come from gfx/palette.c shadow.
  * leave=Restore→lock→Disable, close=Disable→Restore→lock only when active;
