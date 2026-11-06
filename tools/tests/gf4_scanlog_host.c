@@ -321,7 +321,7 @@ void _start(void)
         startlog_clear(); gfx_counters=(GfxCounters){0};
         geforce_present(0,0,1,1);
         assert(active && cint_prod.feature5.fan_off);
-        assert(scanlog_count("[gf5] fan off rc=-502 reason=no-fan\n")==1);
+        assert(scanlog_count("[gf5] fan off rc=-510 reason=no-fan\n")==1);
         assert(scanlog_contains("[gf4] scanout ") && gfx_counters.present_bytes==1);
         u32 fan_len=startlog_len;
         cint_host.now+=1000000;
