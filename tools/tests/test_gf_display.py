@@ -1042,9 +1042,9 @@ GF4_MUTATIONS = [
  ('c2linit',
   'script_wait_budget_eio',
   'hwdev/gf/runner.c',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_EIO;',
   'tools/tests/gf4_c2linit_host.c:c2_deadlines'),
  ('c2linit',
@@ -1841,6 +1841,26 @@ GF4_MUTATIONS += [
      '0x8704U,0x8140U,0x8920U', '0x8704U,0x8140U,0x8924U', 'independent PVIDEO values'),
     ('c0log', 'timeout-remaining', 'hwdev/gf/display/timeout.h',
      'stage,head,(i32)(dl-now)', 'stage,head,0', 'remaining budget is original rejecting sample'),
+]
+
+GF4_MUTATIONS += [
+    ('c2linit', 'opcode-renewal-omitted', 'hwdev/gf/runner.c',
+     'if (ctx->opcode_timing &&\n            ctx->io.timing.clock_us',
+     'if (false && ctx->opcode_timing &&\n            ctx->io.timing.clock_us', 'many TIME instructions have independent budgets'),
+    ('c2linkb', 'acquisition-charged-to-script', 'hwdev/gf/display/links.c',
+     'rc=acquired ? -1 : 0;',
+     'rc=acquired ? -1 : links_script_deadline(io,dl,route->head,"script_after_acquire");',
+     'slow ROM loan must not expire opcode'),
+    ('b10', 'post-script-old-deadline', 'hwdev/gf/display/tmds.c',
+     'if (!rc) ctx->deadline=dl=now+GF2_TIMEOUT_US;',
+     'if (!rc) ctx->deadline=dl;', 'post-script MMIO has independent budget'),
+    ('c2stop', 'lower-stop-error-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (stopped) first_rc=stop_rc ? stop_rc : -1;',
+     'if (stopped) first_rc=0;', 'revoked stop error survives later scan restore error'),
+    ('c2stop', 'scan-origin-not-restored', 'hwdev/gf/display/quiesce.c',
+     'if (c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'if (false && c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'both scan origins restored even after lower-stop failure'),
 ]
 
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',

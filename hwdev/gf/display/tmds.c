@@ -268,6 +268,11 @@ i32 gf4_tmds_load(struct gf4_ctx *ctx,const struct gf4_route *route,
          * acquire/script/release; do not retain its borrowed ROM here. */
         if (!rc) rc=fp_deadline(io,dl,route->head,"tmds_before_script");
         if (!rc) rc=ctx->exec->tmds_script(ctx->exec->owner,route,t->khz,dl);
+        /* Post-script MMIO is a new operation; ROM wait time is not its
+         * budget. Keep the same 2s stall limit. */
+        u32 now;
+        if (!rc) rc=io->timing.clock_us(io->opaque,&now);
+        if (!rc) ctx->deadline=dl=now+GF2_TIMEOUT_US;
         if (!rc) rc=fp_read(io,FP_TG+delta,4,&control);
         u32 test=FP_TEST;
         if (route->or_mask&(FP_OR_C|FP_OR_D)) test+=FP_TEST_C_OFFSET;

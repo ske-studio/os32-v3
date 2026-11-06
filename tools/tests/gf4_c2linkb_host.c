@@ -75,7 +75,7 @@ static void code(u32 off,const u8 *data,u32 n)
 static void observe(struct gf4_host *host,const struct gf4_host_event *e)
 {
     if (e->op==D_CLOCK && e->nth==expire_clock) {
-        *(u32 *)e->p[1]=DEADLINE;
+        *(u32 *)e->p[1]=host->local_now+GF_INIT_OPCODE_US;
         writes_at_expiry=host->calls[D_WRITE];
     }
 }
@@ -304,7 +304,7 @@ static void failures(void)
     fixture(); fail_acquire=true;
     assert(run(HIGH_KHZ,DEADLINE)==-1 && loans==1 && !points && !h.calls[D_WRITE]);
     fixture(); expire_acquire=true;
-    assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME && loans==1 && !points && !h.calls[D_WRITE]);
+    assert(!run(HIGH_KHZ,DEADLINE) && loans==1 && points && h.calls[D_WRITE]);
     fixture(); rom[T_TABLE]=0x20; fail_restore=true;
     assert(run(HIGH_KHZ,DEADLINE)==GF4_EUNSUPPORTED && !points);
     assert(!h.ctx.reusable && !legacy.reusable);
@@ -339,11 +339,14 @@ static void failures(void)
         fixture(); put(CLOCK_B+2,PC_WAIT,2); expire_clock=n;
         assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME);
         if (n>2) {
-            assert(gf2_host_strstr(startlog,"GF4 ERROR stage=rom_script rc=-409 head=1 remain_us=0 reg=00000000"));
+            assert(gf2_host_strstr(startlog,"GF4 ERROR stage=rom_script rc=-409 head=1 remain_us="));
             assert(gf2_host_strstr(startlog," pc="));
         }
-        /* On expiry the only later write is unconditional binding cleanup. */
-        assert(h.calls[D_WRITE]==writes_at_expiry+(n>2 ? 1U : 0U));
+        /* Clock #2 establishes the new preparation origin. If that sample
+         * jumps into the future, the next clock rejects it after the raw
+         * owner pair; all other rejecting samples only allow cleanup. */
+        assert(h.calls[D_WRITE]==writes_at_expiry+
+               (n==2 ? OWNER_WRITES+CLEANUP_WRITES : n>2 ? 1U : 0U));
     }
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2);

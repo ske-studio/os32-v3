@@ -256,6 +256,38 @@ static void normal_clock_dispatch(void)
         cint_no_resources();
     }
 }
+static void scan_origins(void)
+{
+    for (u32 fail=0;fail<3U;fail++) {
+        cint_reset(); cint_start();
+        assert(!gf3_service_stop(cint_service));
+        cint_prod.display.baseline_valid=true;
+        cint_prod.display.baseline_start[0]=0x12000U;
+        cint_prod.display.baseline_start[1]=0x34000U;
+        gf3_host_set(&cint_host,0,0x600800U,0x9e000U);
+        gf3_host_set(&cint_host,0,0x602800U,0x7e000U);
+        cint_trace_clear();
+        /* First lower-stop write fails, as on the failing leave. */
+        if (fail) gf3_host_fail_at(&cint_host,H_WRITE,1,CINT_IO_FAILURE);
+        if (fail==2U) cint_prod.foundation.revoked=true;
+        int rc=gf_display_quiesce(&cint_prod.display);
+        assert((rc!=0)==(fail!=0));
+        if (fail==2U) assert(rc==GF1_EPCI);
+        u32 values[2]={0};
+        for (u32 i=0;i<cint_host.nevents;i++) {
+            const struct gf3_host_event *e=&cint_events[i];
+            if (e->op==H_WRITE && e->a[1]==0x600800U) values[0]=e->a[3];
+            if (e->op==H_WRITE && e->a[1]==0x602800U) values[1]=e->a[3];
+        }
+        assert(values[0]==0x12000U && values[1]==0x34000U);
+        if (fail) assert(cint_prod.display.engaged && cint_service->scan_node.value.owner);
+        gf3_host_fail_at(&cint_host,H_WRITE,0,0);
+        cint_prod.foundation.revoked=false;
+        cint_restore_seen=false;
+        assert(!gf_display_stop(&cint_prod.display));
+        cint_no_resources();
+    }
+}
 void _start(void)
 {
     assert(gf_display_quiesce(0)==OS32_ERR_INVAL);
@@ -265,5 +297,6 @@ void _start(void)
     quiesce_row_failures();
     failed_clock_cleanup();
     normal_clock_dispatch();
+    scan_origins();
     gf2_host_exit(0);
 }

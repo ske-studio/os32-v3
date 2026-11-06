@@ -23,6 +23,7 @@ S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
 outstanding transfer ownership. Existing sizes and member offsets stay fixed.
 IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
 These changes own the pins below.
+GF CUI fix12 adds per-opcode TMDS timing and two saved scan origins.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
 adds that member; refresh both pins with --snapshot after reviewing the diff.
@@ -45,9 +46,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x2552eaee
+REVIEWED_LAYOUT_CRC = 0x0ad7e60c
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '61bcba18d3b5ece287bee3f022439ee5be9dd8f9891ded6872a3fbd6c28efbb8'
+REVIEWED_INVENTORY_SHA = 'deb1479b8478447cb7b6fcdb956fda70a01f6aaebe7a5f6ab39a8317686217c7'
 
 
 def import_declarations(root):

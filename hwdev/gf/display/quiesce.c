@@ -23,6 +23,8 @@
  */
 
 #include "access.h"
+#include "state.h"
+#include "../../../include/kprintf.h"
 #include "../command.h"
 #include "../accel_service.h"
 #include "../quiesce_rows.h"
@@ -50,6 +52,23 @@ i32 gf_display_quiesce(struct gf_display_context *c)
     revoked=f && f->revoked;
     int stopped=c->owner->foundation_stop(c);
     int stop_rc=c->last_rc;
+    if (stopped) first_rc=stop_rc ? stop_rc : -1;
+    /* Restore both scan origins even when lower stop failed. Retain all
+     * reservations on error; MMIO still rejects a revoked hardware lease.
+     * MIT nouveau dispnv04/hw.c:772 (PCRTC_START restore). */
+    if (stopped)
+        kprintf(KLOG_ATTR,"GF4 ERROR stage=stop_foundation rc=%d target=%08x\n",
+                stop_rc ? stop_rc : -1,c->target);
+    u32 target=c->target;
+    if (c->baseline_valid) for (u32 h=0;h<2U;h++) {
+        u32 off=C_START+h*RECOVER_HEAD_STRIDE;
+        if (gf_display_write(c,off,4,c->baseline_start[h])) {
+            if (!first_rc) { first_rc=c->last_rc; target=off; }
+            rc=-1;
+            kprintf(KLOG_ATTR,"GF4 ERROR stage=stop_scan_restore rc=%d head=%u target=%08x\n",
+                    c->last_rc,h,off);
+        }
+    }
     if (stopped) {
         c->reusable=false;c->stop_ok=false;
         if (c->engaged && !revoked) {
@@ -58,8 +77,9 @@ i32 gf_display_quiesce(struct gf_display_context *c)
         }
     }
     struct gf_init_context cleanup={.io=c->io};
-    rc=c->io.restore(c->io.opaque,&cleanup);
-    u32 target=c->target;
+    int local_rc=c->io.restore(c->io.opaque,&cleanup);
+    if (!rc) rc=local_rc;
+    if (!rc) target=c->target;
     if (stopped && !first_rc) first_rc=stop_rc ? stop_rc : -1;
     if (rc && !first_rc) first_rc=rc;
     rc=(stopped || rc) ? -1 : 0;

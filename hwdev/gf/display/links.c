@@ -287,8 +287,13 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
     if (rc) return links_result(c,rc);
     /* acquire failure may already own partial scratch/index saves. */
     int acquired=l->owner->acquire(l);
-    rc=links_script_deadline(io,dl,route->head,"script_after_acquire");
-    if (acquired) rc=-1;
+    rc=acquired ? -1 : 0;
+    /* ROM acquisition has its own bounded runner/point checks (60s), not
+     * the caller's 2s display budget. Preparation and each opcode start now. */
+    if (!rc && l->init) {
+        l->init->opcode_timing=true;
+        rc=io->timing.clock_us(io->opaque,&l->init->opcode_started_us);
+    }
     u32 pc=0,binding=0,value;
     bool saved=false,ran=false;
     if (!rc && (!l->init || !l->program)) rc=-1;
@@ -315,7 +320,8 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
              * Runner cleanup does not renew these rejecting clock samples. */
             struct gf_init_context *tx=l->init;
             kprintf(KLOG_ATTR,"GF4 ERROR stage=rom_script rc=-409 head=%u remain_us=%d reg=00000000 val=%08x pc=%08x elapsed_us=%u wait_us=%u\n",
-                    route->head,(i32)(dl-(tx->started_us+tx->elapsed_us)),
+                    route->head,(i32)(tx->opcode_started_us+GF_INIT_OPCODE_US-
+                          (tx->started_us+tx->elapsed_us)),
                     tx->wait_us,tx->fail_pc,tx->elapsed_us,tx->wait_us);
         }
     }

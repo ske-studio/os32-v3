@@ -369,7 +369,7 @@ int gf4_set_mode(struct gf4_ctx *ctx,const struct gf4_route *route,u32 id,
     if (!rc) rc=ms_encoder(ctx,route,false,0,GF4_OFF,dl);
     if (!rc) rc=gf4_mode_load(ctx,head,&s->work[head],dl);
     if (!rc) rc=ms_encoder(ctx,route,true,&s->work[head],GF4_ON,dl);
-    if (!rc) rc=ms_encoder(ctx,route,false,0,h->dpms,dl);
+    if (!rc) rc=ms_encoder(ctx,route,false,0,h->dpms,ctx->deadline);
     if (!rc) rc=gf4_cursor_apply(ctx,head,h->cursor_visible && h->cursor_valid && !h->blank && h->dpms==GF4_ON);
     return gf4_change_end(ctx,rc);
 }

@@ -54,15 +54,16 @@ static int init_point(struct gf_init_context *ctx)
     } else if (ctx->io.point(ctx->io.opaque) ||
                ctx->io.timing.clock_us(ctx->io.opaque, &now)) return -1;
     ctx->elapsed_us = now - ctx->started_us;
-    if (ctx->elapsed_us >= GF_INIT_EXEC_US ||
-        (ctx->display_script && (i32)(now - ctx->deadline) >= 0)) {
+    if (ctx->opcode_timing ? now - ctx->opcode_started_us >= GF_INIT_OPCODE_US :
+        (ctx->elapsed_us >= GF_INIT_EXEC_US ||
+         (ctx->display_script && (i32)(now - ctx->deadline) >= 0))) {
         if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;
         return -1;
     }
     if (!ctx->display_script) return 0;
     int rc = ctx->io.point(ctx->io.opaque);
     /* Production point reads the clock again and updates elapsed_us. */
-    if (ctx->elapsed_us >= GF_INIT_EXEC_US) {
+    if (!ctx->opcode_timing && ctx->elapsed_us >= GF_INIT_EXEC_US) {
         ctx->last_rc = GF_SCRIPT_ETIME;
         return -1;
     }
@@ -70,7 +71,7 @@ static int init_point(struct gf_init_context *ctx)
 }
 int gf_init_wait(struct gf_init_context *ctx, u32 us)
 {
-    if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {
+    if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {
         if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;
         return -1;
     }
@@ -135,6 +136,11 @@ static int init_execute(struct gf_init_context *ctx, const struct gf_init_progra
             if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;
             return -1;
         }
+        /* nouveau bios/init.c:1777-1794: waits belong to the opcode.
+         * Keep graph/step limits, but do not charge earlier opcodes or ROM
+         * acquisition against this operation. Never renew inside a wait. */
+        if (ctx->opcode_timing &&
+            ctx->io.timing.clock_us(ctx->io.opaque,&ctx->opcode_started_us)) return -1;
         if (init_point(ctx)) return -1;
         ctx->steps++;
         const struct gfinit_instruction *v = 0;
