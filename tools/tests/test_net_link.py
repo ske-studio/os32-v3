@@ -47,12 +47,12 @@ TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (
     ('l0-timeout-not-counted', 'link_selftest.inc',
-     'if (link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)',
-     'if (0 && link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)',
+     'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
+     'if (rc == OS32_ERR_AGAIN)',
      'l0_failures_are_counted_once'),
     ('l0-stale-counted-twice', 'link_selftest.inc',
-     'link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN',
-     'link_host_status(h, &st, &ln, LINK_SELF_OWNER) < 0',
+     'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
+     'if (rc < 0)',
      'l0_failures_are_counted_once'),
     ('resync-counts-stale-again', 'link.c',
      'if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {',
