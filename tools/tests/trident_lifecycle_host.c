@@ -4,7 +4,6 @@
  */
 #include "trident_device_fake.h"
 #include "drivers/video/trident/trident_module.h"
-#include "lifecycle_expected.h"
 /* Include the real HAL boundary to inspect its private retained error state.
  * A separate cross compilation checks its production translation unit. */
 #include "backend_under_test.c"
@@ -112,10 +111,12 @@ int __real_trident_pc98_init(struct trident_device *);
 int __wrap_trident_pc98_init(struct trident_device *d)
 {
     u32 start=begin(d,TRI_STEP_PC98_INIT);
-    /* Save's boot values must survive Init's changes to AR10/CR11. */
-    if (!d->saved.valid || d->init_done || !d->declared_bytes ||
+    #include "lifecycle_expected.h"
+    /* First Save precedes Init; later ScreenInit saves the current mode. */
+    if (!d->saved.valid || !d->declared_bytes ||
+        (!d->first_init_done && (
         d->saved.value[TRI_SAVE_AR+0x10] != 0x14 ||
-        d->saved.value[TRI_SAVE_CR+0x11] != 0x12) oracle_error=1;
+        d->saved.value[TRI_SAVE_CR+0x11] != 0x12))) oracle_error=1;
     int rc=fail_step==TRI_STEP_PC98_INIT ? -73 : __real_trident_pc98_init(d);
     if (!rc) {
         const struct trident_fake_event *expected = mono ? init_mono : init_color;
@@ -261,9 +262,16 @@ static int sequence(void)
         CHECK(order[norder-3]==TRI_STEP_RESTORE && order[norder-2]==TRI_STEP_LOCK && order[norder-1]==TRI_STEP_DISABLE);
         ops=f.operations; backend.shutdown(); backend.shutdown();
         CHECK(equal(f.operations,ops) && device.closed);
+        u32 second_order=norder;
         backend.init(); CHECK(device.active && !device.closed && !device.leave_done);
         ops=f.operations; backend.enter(); CHECK(equal(f.operations,ops));
-        CHECK(calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_PC98_INIT]==1 && calls[TRI_STEP_VERIFY]==1);
+        CHECK(calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==1);
+        CHECK(norder==second_order+4 && order[second_order]==TRI_STEP_SAVE &&
+              order[second_order+1]==TRI_STEP_PC98_INIT &&
+              order[second_order+2]==TRI_STEP_MODE && order[second_order+3]==TRI_STEP_ENABLE);
+        CHECK(ends[TRI_STEP_SAVE]>starts[TRI_STEP_SAVE]+100 &&
+              ends[TRI_STEP_SAVE]==starts[TRI_STEP_PC98_INIT] &&
+              ends[TRI_STEP_PC98_INIT]==starts[TRI_STEP_MODE]);
         CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_ENABLE]==2 && allocs==1 && frees==1);
         /* Real second ScreenInit must reload all 256 colors after boot DAC
          * restoration, then sample that reloaded image before present. */
@@ -287,7 +295,7 @@ static int sequence(void)
         CHECK(contains("entry=2 CLIENT00025940=78 00 00 00 00 00 00 00"));
         CHECK(client[0]==0x12 && client[160*640]==0x34 &&
               client[168*640+172]==0x56 && client[240*640+320]==0x78);
-        for (u32 i=0;i<sizeof(saved);++i) CHECK(equal(((u8 *)&saved)[i],((u8 *)&device.saved)[i]));
+        for (u32 i=0;i<TRI_DAC_BYTES;++i) CHECK(equal(saved.value[i],device.saved.value[i]));
         backend.shutdown();
         CHECK(order[norder-3]==TRI_STEP_DISABLE && order[norder-2]==TRI_STEP_RESTORE && order[norder-1]==TRI_STEP_LOCK);
         CHECK(!device.active && !device.last_rc && device.closed && device.armed && device.pinned);
@@ -298,7 +306,7 @@ static int sequence(void)
     CALL(setup(false,false)); CALL(start()); backend.leave();
     client[0]=123; f.dac[0]=9;
     backend.enter(); CHECK(device.active && client[0]==123 && f.dac[0]==9);
-    CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_VERIFY]==1);
+    CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_PC98_INIT]==1 && calls[TRI_STEP_VERIFY]==1);
     CHECK(!contains("stage=registers")); /* not during Enable/client setup */
     u8 sr[256], cr[256], gr[256], ar[32];
     for (u32 i=0;i<256;++i) { sr[i]=f.sr[i]; cr[i]=f.cr_color[i]; gr[i]=f.gr[i]; }
@@ -313,7 +321,7 @@ static int sequence(void)
     /* A second ScreenInit while active still resets mode/palette/client. */
     backend.init(); CHECK(!device.last_rc && device.active && client[0]==0);
     CHECK(calls[TRI_STEP_MODE]==3 && calls[TRI_STEP_ENABLE]==3 &&
-        calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_PC98_INIT]==1 && calls[TRI_STEP_VERIFY]==1);
+        calls[TRI_STEP_SAVE]==2 && calls[TRI_STEP_PC98_INIT]==2 && calls[TRI_STEP_VERIFY]==1);
     return 0;
 }
 static int dac_observation(void)

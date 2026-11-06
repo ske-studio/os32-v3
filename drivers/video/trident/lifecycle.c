@@ -1,7 +1,8 @@
 /* MIT reference notices in trident.h. trident_driver-1.4.0.c:1201-1247,
  * 2920-2969,3333-3348,3471-3488; vgaHW.c:1786-1789.
  * PM 2026-11-06: PreInit capacity read precedes Save/PC98 Init, unlike the
- * original S3 contract. Reinit retains Save/Init/measurement (S3 §2/N2).
+ * original S3 contract. PM fix6: every HAL init is ScreenInit, so Save and
+ * PC98 Init repeat (D:3472-3487); only VRAM measurement remains first-only.
  * 0xFAC is shared with pc98_route.c (mask 3): Trident owns values 2/0 while
  * active/returning. Keep Enable/Disable's unconditional OUTB and ordering;
  * route_set's conditional write/readback cannot replace this sequence.
@@ -95,12 +96,13 @@ int trident_screen_init(struct trident_device *d)
         STAGE(TRI_STEP_CAPACITY_PLAN, trident_read8(d, TRI_SPACE_REGS, TRI_MISC_READ, &misc));
         d->cur_vga_base = (misc & 1u) ? TRI_CR_COLOR : TRI_CR_MONO;
         STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));
-        d->active = true; /* even a failed Save can require Disable */
-        d->closed = d->leave_done = false;
-        STAGE(TRI_STEP_SAVE, trident_state_save(d));
-        STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));
-        d->init_done = true;
     }
+    d->active = true; /* even a failed Save can require Disable */
+    d->closed = d->leave_done = false;
+    STAGE(TRI_STEP_SAVE, trident_state_save(d));
+    d->init_done = false;
+    STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));
+    d->init_done = true;
     int rc = mode_enable(d);
     if (rc) return rc;
     if (!d->first_init_done) {

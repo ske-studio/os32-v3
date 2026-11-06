@@ -46,6 +46,17 @@ PACK の実機成功・2MiB非ミラー確定を最新の事実とする。以�
 
 ## 2. 初期化の列
 
+**2026-11-06 fix6 の訂正 (以下の旧表・§7/N2 より優先)**:
+HAL の init は毎回 ScreenInit (D:3472–3487) に対応し、
+Save→PC98 Init→ModeInit→Enable→palette/client 準備を流す。
+識別・PreInit の SPR 計画と VRAM 全域の実測だけを初回限定にする。
+Save はモード・Trident レジスタを毎回保存し直す (D:1084–1104)。
+DAC 保存は vgaHW.c:1051–1140 の既存保存の扱いに従い再利用する。
+leave→enter は EnterVT (D:1201–1215) の ModeInit→Enable のまま。
+旧表の「Save/PC98 Init を繰り返さない」と §7 の同前提を撤回し、
+2 回目の HAL init の書き込み列にも PC98 Init があることをホスト試験で確認する。
+実機の 2 回目の表示改善は未確認。
+
 新規関数は `drivers/video/trident/` 以下。全写像・module pin・緊急arm後にindexedアクセスを行う。
 
 | HAL入口・呼出元 | 手本／OS32関数 | 前提・処理・結果 |

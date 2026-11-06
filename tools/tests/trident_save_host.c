@@ -250,12 +250,14 @@ static int selftest(void)
         int rc=oracle(color,readable); if (rc) return rc;
         REQUIRE(equal(device.last_rc,(u32)-123) && equal(device.failed_step,7));
         u32 count=fake.operations;
-        /* Simulate changed mode before a second call: saved boot AR10/CR11
-         * and all remaining bytes must remain immutable, with no access. */
+        /* vgaHW caches the palette, but each ScreenInit saves mode registers. */
         fake.ar[0x10]^=255; fake.cr_color[0x11]^=255; fake.cr_mono[0x11]^=255;
         struct trident_saved copy=device.saved;
-        REQUIRE(!trident_state_save(&device) && equal(fake.operations,count));
-        for (u32 i=0;i<852;++i) REQUIRE(equal(copy.value[i],device.saved.value[i]));
+        REQUIRE(!trident_state_save(&device) && fake.operations>count && device.saved.valid);
+        REQUIRE(equal(device.saved.value[TRI_SAVE_AR+0x10],fake.ar[0x10]));
+        REQUIRE(equal(device.saved.value[TRI_SAVE_CR+0x11],
+                      color ? fake.cr_color[0x11] : fake.cr_mono[0x11]));
+        for (u32 i=0;i<TRI_DAC_BYTES;++i) REQUIRE(equal(copy.value[i],device.saved.value[i]));
     }
     /* Each actual access can fail: preserve exact rc, do not commit valid. */
     REQUIRE(!seed(true,true)); REQUIRE(!trident_state_save(&device));

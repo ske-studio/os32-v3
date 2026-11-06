@@ -287,11 +287,12 @@ static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
     return (u8)(x >> (bits - 6));
 }
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
-/* lifecycle.c: ScreenInit=plan→Save→Init→Mode→Enable→verify→palette/client once;
- * later init=Mode→Enable→palette/client, enter=Mode→Enable (active enter is no-op).
+/* lifecycle.c: every ScreenInit=Save→Init→Mode→Enable→palette/client;
+ * plan precedes Save and verify follows Enable only on the first init.
+ * enter=Mode→Enable (active enter is no-op).
  * Palette defaults come from gfx/palette.c shadow.
  * leave=Restore→lock→Disable, close=Disable→Restore→lock only when active;
- * close after leave and duplicate close touch no hardware. Never re-save.
+ * close after leave and duplicate close touch no hardware. Enter never re-saves.
  * Recovery tries both operations, keeps both rc, no allocation/log/tick/GE.
  * A failed first init returns its recorded rc on later init; restore failure
  * prevents automatic reentry. returning guards recursive restoration.

@@ -164,11 +164,14 @@ static int save_trident(struct trident_device *d)
 int trident_state_save(struct trident_device *d)
 {
     if (!d) return TRI_E_INVAL;
-    if (d->saved.valid) return 0; /* Boot state lives for the module lifetime. */
+    /* vgaHWSaveColormap caches the palette; mode/Trident registers are
+     * saved on every ScreenInit (D:1084-1104,3472; vgaHW.c:1051-1140). */
+    bool palette_saved = d->saved.valid;
+    d->saved.valid = false;
     u8 misc;
     SAVE_TRY(read_reg(d, TRI_MISC_READ, &misc));
     u16 base = (misc & 1) ? TRI_CR_COLOR : TRI_CR_MONO;
-    SAVE_TRY(save_palette(d, base));
+    if (!palette_saved) SAVE_TRY(save_palette(d, base));
     SAVE_TRY(save_vga(d));
     SAVE_TRY(save_trident(d));
     d->saved.valid = true;

@@ -65,8 +65,12 @@ MUTATIONS = (
  ('M_REINIT_NOOP','lifecycle.c','if (d->returning) return TRI_E_BUSY;\n    if (!d->first_init_done) {',
   'if (d->returning) return TRI_E_BUSY;\n    if (d->active) return 0;\n    if (!d->first_init_done) {','active ScreenInit reapplies mode/palette/client'),
  ('M_SAVE_AFTER_INIT','lifecycle.c',
-  'STAGE(TRI_STEP_SAVE, trident_state_save(d));\n        STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));',
-  'STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));\n        STAGE(TRI_STEP_SAVE, trident_state_save(d));','boot Save must precede Init'),
+  'STAGE(TRI_STEP_SAVE, trident_state_save(d));\n    d->init_done = false;\n    STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));',
+  'STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));\n    d->init_done = false;\n    STAGE(TRI_STEP_SAVE, trident_state_save(d));','boot Save must precede Init'),
+ ('M_REINIT_SKIP_PC98','lifecycle.c',
+  'STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));',
+  'if (!d->first_init_done) STAGE(TRI_STEP_PC98_INIT, trident_pc98_init(d));',
+  'second ScreenInit includes full PC98 Init write trace'),
  ('M_PLAN_LATE','lifecycle.c',
   'STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));',
   'if (d->init_done) STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));','PreInit capacity before Init'),
@@ -108,10 +112,11 @@ def fixture():
     macros=s[s.index('#define EVENT('):s.index('#define LENGTH(')]
     out=macros+'\n'
     for mono in (0,1):
-        values=dict(misc=1-mono,seq=0,old=0,ext=0,config=0,video=0,
-                    base=0x3B4 if mono else 0x3D4,mono=mono,cr11=0x12)
+        values=dict(misc='f.regs[TRI_MISC_WRITE]',seq='f.sr[1]',
+                    old='f.sr[0x0B]',ext='f.sr[0x0E]',config='f.sr[0x0C]',video=0,
+                    base=0x3B4 if mono else 0x3D4,mono=mono,cr11='f.cr_mono[0x11]' if mono else 'f.cr_color[0x11]')
         out+=''.join(f'#define {k} {v}\n' for k,v in values.items())
-        out+=f'static const struct trident_fake_event init_{"mono" if mono else "color"}[] = {{PREFIX, CONFIG_ALTERNATE, SUFFIX}};\n'
+        out+=f'const struct trident_fake_event init_{"mono" if mono else "color"}[] = {{PREFIX, CONFIG_ALTERNATE, SUFFIX}};\n'
         out+=''.join(f'#undef {k}\n' for k in values)
     return out
 
