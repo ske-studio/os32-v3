@@ -631,6 +631,7 @@ int host_final_boot_check(int ready, int reserve)
 }
 static void boot_transaction(void)
 {
+    CHECK(!ime_boot_connections());
     services_stage = SERVICES_ROOT_READY;
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
@@ -647,6 +648,7 @@ static void boot_transaction(void)
         CHECK(opens == 1 && init_calls == 1 && !fep_opens && !fep_allocs);
         CHECK(services_stage == SERVICES_SQLITE_ONLY && sqlite_module_ready());
         CHECK(!fep_owned && !fep_module_pages() && !ime_boot_bytes());
+        CHECK(!ime_boot_connections());
         CHECK(module_records[1].state == MODULE_ABSENT);
         HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
         CHECK(budget->reserve == 0);
@@ -697,6 +699,9 @@ static void boot_transaction(void)
                                     OS32_SQLITE_FEP_RESERVE;
         CHECK(budget->reserve == expected_reserve);
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
+        CHECK(ime_boot_connections() == 1);
+        const u8 *store_bytes = (const u8 *)&g_ime.store;
+        for (u32 i = 0; i < sizeof(g_ime.store); i++) CHECK(!store_bytes[i]);
         CHECK(module_records[1].state == MODULE_RUNNING && fep_module_pages());
         CHECK(module_records[1].dependency_count == 1 && module_records[1].dependencies[0].slot == 0);
         input_paths();

@@ -43,6 +43,8 @@ typedef struct {
     u16  cost;          /* コスト (小さいほど優先) */
 } IME_Result;
 
+#include "ime_store.h"
+
 /* ======================================================================== */
 /*  辞書コンテキスト (SQLite ベース)                                         */
 /* ======================================================================== */
@@ -90,6 +92,7 @@ typedef struct {
     int         commit_len;     /* 確定文字列のバイト長 */
     /* 辞書 */
     IME_Dict    dict;
+    FepStore    store;          /* J wires open/close; zero until then. */
     int         dict_loaded;    /* 辞書ロード済みフラグ */
     /* 描画抽象化 & 候補リスト制御 */
     int         state;          /* IME_ST_xxx */
@@ -110,6 +113,8 @@ int ime_boot_abort(void);
 int ime_dict_suspend(int on);
 IME_State *ime_suspend_state(void);
 u32 ime_boot_bytes(void);
+/* Actual live RESIDENT connections, including private boot initialization. */
+u32 ime_boot_connections(void);
 int ime_dict_close(IME_Dict *dict);
 
 /* FEP ON/OFF トグル (初回呼び出し時に辞書ロード) */
@@ -146,6 +151,7 @@ int  ime_user_delete_facade(const char *yomi, const char *kanji);
 int  ime_user_export_facade(const char *path);
 int  ime_user_clear_facade(void);
 const IME_Dict *ime_current_dict(void);
+FepStore *ime_current_store(void);
 int  ime_dict_info_facade(int key, int offset, char *out, int capacity);
 
 /* ======================================================================== */
