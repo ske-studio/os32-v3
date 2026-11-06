@@ -7,6 +7,9 @@ unsigned int link_test_irq_save(void) { unsigned int f = test_if; test_if = 0; r
 void link_test_irq_restore(unsigned int f) { test_if = f; }
 void link_test_idle(void) { }
 #include "net/link.c"
+/* API-only fixture: B2 notification behavior is covered by link-core. */
+static int notify_resets;
+void link_notify_reset(void) { notify_resets++; }
 int net_mac(u8 out[6]) { (void)out; return 0; }
 void *kmemcpy(void *dst, const void *src, u32 n)
 {
@@ -53,6 +56,10 @@ static int verify(void)
     CHECK(link_host_status(1, 0, 0, 1) == OS32_ERR_HOSTDOWN);
     link_epoch++;
     CHECK(link_host_status(1, 0, 0, 1) == OS32_ERR_STALE);
+    /* RID exhaustion reaches the A9 reset seam through link_resync. */
+    link_next_rid = U32_MAX;
+    CHECK(link_host_open("TIME", 4, 1) == OS32_ERR_HOSTDOWN);
+    CHECK(notify_resets == 1 && link_resyncs == 1 && link_state == LINK_S_SYN);
     CHECK(test_if == 1);
     return 0;
 }
