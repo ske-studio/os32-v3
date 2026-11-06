@@ -141,6 +141,8 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/display/quiesce.c', '            c->target=target;\n            c->last_rc=stop_rc ? stop_rc : -1;',
+         '            c->last_rc=stop_rc ? stop_rc : -1;', 'lower stop target survives scan restore'),
         ('hwdev/gf/display/quiesce.c', 'if (c->engaged && !revoked) {', 'if (c->engaged && revoked) {', 'failed stop cleanup forbidden'),
         ('hwdev/gf/service.c', ' || c->owner->foundation_start(c)', '', 'start hook omitted'),
         ('hwdev/gf/display/quiesce.c', 'int stopped=c->owner->foundation_stop(c);', 'int stopped=0;', 'stop hook omitted'),
@@ -1042,9 +1044,9 @@ GF4_MUTATIONS = [
  ('c2linit',
   'script_wait_budget_eio',
   'hwdev/gf/runner.c',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_EIO;',
   'tools/tests/gf4_c2linit_host.c:c2_deadlines'),
  ('c2linit',
@@ -1683,6 +1685,15 @@ GF4_MUTATIONS += [
      'test_stopped_cursor: F2 OFF must still hide the hardware cursor'),
 ]
 
+GF4_MUTATIONS += [
+    ('b7', 'completed-hold-clear', 'hwdev/gf/display/flip.c',
+     'c->hold[head] = (struct gf4_flip_hold){0};',
+     'c->hold[head].pending = false;', 'completed hold must contain no stale surface keys'),
+    ('c2scan', 'restored-spare-bank', 'hwdev/gf/display/scan.c',
+     'active=bank;', 'active=c->scan_bank[head];',
+     'restored_after_flip: discard diagnostic bank, preserve saved boot front'),
+]
+
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.
 GF4_COMPONENTS = {
@@ -1698,7 +1709,7 @@ GF4_COMPONENTS = {
     'b7': ['hwdev/gf/display/flip.c'],
     'b8': ['hwdev/gf/display/gamma.c'],
     'b9': ['hwdev/gf/display/output.c'],
-    'b10': ['hwdev/gf/display/tmds.c'],
+    'b10': ['hwdev/gf/display/tmds.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b11d': ['drivers/video/geforce/tv_data.c'],
     'b11m': ['hwdev/gf/display/tv.c'],
     'b12': [],
@@ -1710,6 +1721,12 @@ GF4_COMPONENTS = {
 }
 # Start-line observations execute the real video entry and lifecycle.
 GF4_MUTATIONS += [
+    ('c0', 'rollback-old-deadline', 'hwdev/gf/display/transaction.c',
+     'int rc=gf4_stage_deadline(c,c->ch->f,&c->deadline);', 'int rc=0;',
+     'rollback gets a new budget after a timed-out mode load'),
+    ('c2save', 'restore-tmds-deadline', 'hwdev/gf/display/save.c',
+     'if (!rc) dl=c->deadline;', '(void)dl;',
+     'two TMDS heads restore with the post-script deadline'),
     ('c2log', 'start-line-prefix', 'hwdev/gf/display/service.c',
      '[gf4] start fail stage=%s rc=%d', '[gfX] start fail stage=%s rc=%d',
      'exactly one correctly formatted failure line'),
@@ -1852,8 +1869,48 @@ GF4_MUTATIONS += [
      'cui_controls retries only terminal cleanup'),
 ]
 
+GF4_MUTATIONS += [
+    ('scanlog', 'leave-after-redraw', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, rc);\n#endif\n    int route_rc = pc98_route_to_98();',
+     'int route_rc = pc98_route_to_98();\n    geforce_leave_log(leave_io, rc);\n#endif',
+     '98 route starts only after diagnostic completes'),
+    ('c2linkb', 'script-timeout-line', 'hwdev/gf/display/links.c',
+     'if (run==GF_SCRIPT_ETIME) {', 'if (run==GF_SCRIPT_ETIME && false) {', 'ROM script timeout evidence'),
+    ('scanlog', 'leave-readback-call', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, rc);', 'if (rc) geforce_leave_log(leave_io, rc);', 'leave emits after stop success'),
+    ('diag', 'timeout-head', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,0U,(i32)(dl-now)', 'timeout source head'),
+    ('diag', 'leave-pvideo-offset', 'drivers/video/geforce/leave_log.h',
+     '0x8704U,0x8140U,0x8920U', '0x8704U,0x8140U,0x8924U', 'independent PVIDEO values'),
+    ('c0log', 'timeout-remaining', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,head,0', 'remaining budget is original rejecting sample'),
+]
+
+GF4_MUTATIONS += [
+    ('c2linit', 'opcode-renewal-omitted', 'hwdev/gf/runner.c',
+     'if (ctx->opcode_timing &&\n            ctx->io.timing.clock_us',
+     'if (false && ctx->opcode_timing &&\n            ctx->io.timing.clock_us', 'many TIME instructions have independent budgets'),
+    ('c2linkb', 'acquisition-charged-to-script', 'hwdev/gf/display/links.c',
+     'rc=acquired ? -1 : 0;',
+     'rc=acquired ? -1 : links_script_deadline(io,dl,route->head,"script_after_acquire");',
+     'slow ROM loan must not expire opcode'),
+    ('b10', 'post-script-old-deadline', 'hwdev/gf/display/tmds.c',
+     'if (!rc) ctx->deadline=dl=now+GF2_TIMEOUT_US;',
+     'if (!rc) ctx->deadline=dl;', 'post-script MMIO has independent budget'),
+    ('c2stop', 'nonengaged-stop-target-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (!rc && !first_rc) target=c->target;',
+     'if (!rc) target=c->target;', 'completed stop retry retains lower target after successful restoration'),
+    ('c2stop', 'lower-stop-error-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (stopped) first_rc=stop_rc ? stop_rc : -1;',
+     'if (stopped) first_rc=0;', 'revoked stop error survives later scan restore error'),
+    ('c2stop', 'scan-origin-not-restored', 'hwdev/gf/display/quiesce.c',
+     'if (c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'if (false && c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'both scan origins restored even after lower-stop failure'),
+]
+
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
-                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'c3', 'c2linit', 'c2log', 'scanlog')
+                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'diag', 'c3', 'c2linit', 'c2log', 'scanlog')
 
 
 def gf4_tree(tree):
@@ -1882,12 +1939,12 @@ def gf4_sources(tree, case, fixture=None):
         return ['kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c',
                 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
                 *[str(p.relative_to(tree)) for p in sorted((tree/'hwdev/gf/op').glob('*.c'))]]
-    if case == 'c2save':
+    if case in ('c2save', 'diag'):
         names = ('save', 'modes', 'output', 'cursor', 'gamma', 'heads', 'pll_program',
                  'tmds', 'tv', 'modeset', 'transaction', 'timing', 'format', 'fifo',
                  'dpms', 'flip', 'palette')
         return ['hwdev/gf/display/'+n+'.c' for n in names]+[
-            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c']
+            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c']+([] if case=='diag' else ['tools/tests/gf4_modeload_print_host.c'])
     display = sorted((tree/'hwdev/gf/display').glob('*.c'))
     sources = [str(p.relative_to(tree)) for p in display]
     sources += ['tools/tests/gf4_platform_host.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c',

@@ -8,6 +8,7 @@
  * ROM offsets below are synthetic. Expected PCs, base addresses and write
  * sequences are independently tabulated from those sources, not product
  * calculations. No reference checkout or libc is needed at runtime. */
+#include "gf_startlog_host.h"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 #include "../../hwdev/gf/production.h"
@@ -56,6 +57,7 @@ static const struct gf4_exec_ops *ops;
 static u32 loans,returns,restores,points,tracked_owner_writes,runner_writes;
 static bool loaned,fail_acquire,fail_restore,expire_acquire;
 static u32 expire_clock,writes_at_expiry,events_at_acquire;
+static bool expiry_origin;
 static u32 steps_at_release,head_at_release,or_at_release,dl_at_release,pc_at_release;
 static GeforceModuleContext module_context;
 const GeforceModuleContext *geforce_context=&module_context;
@@ -74,7 +76,11 @@ static void code(u32 off,const u8 *data,u32 n)
 static void observe(struct gf4_host *host,const struct gf4_host_event *e)
 {
     if (e->op==D_CLOCK && e->nth==expire_clock) {
-        *(u32 *)e->p[1]=DEADLINE;
+        /* Keep the fake clock monotonic, including after an origin sample.
+         * A new opcode owns its full budget; a sample inside it may expire. */
+        host->local_now+=GF_INIT_OPCODE_US;
+        *(u32 *)e->p[1]=host->local_now;
+        expiry_origin=e->p[1]==&script_ctx.opcode_started_us;
         writes_at_expiry=host->calls[D_WRITE];
     }
 }
@@ -125,6 +131,7 @@ static void release(struct gf_display_context *l)
 static const struct gf_display_owner owner={.acquire=acquire,.release=release};
 static void fixture(void)
 {
+    startlog_clear();
     gf2_host_memset(&s,0,sizeof(s));
     gf2_host_memset(&script_work,0,sizeof(script_work));
     gf2_host_memset(rom,0,sizeof(rom));
@@ -134,6 +141,7 @@ static void fixture(void)
     loans=returns=restores=points=tracked_owner_writes=runner_writes=0;
     loaned=fail_acquire=fail_restore=expire_acquire=false;
     expire_clock=writes_at_expiry=events_at_acquire=0;
+    expiry_origin=false;
     steps_at_release=head_at_release=or_at_release=dl_at_release=pc_at_release=0;
     legacy=(struct gf_display_context){.initialized=true,.reusable=true,.owner=&owner,
         .io={.opaque=&h,.read=loan_read,.write=tracked_write,
@@ -297,11 +305,12 @@ static void binding_and_repeat(void)
 static void failures(void)
 {
     fixture(); assert(run(HIGH_KHZ,NOW)==GF4_ETIME && !loans && !h.calls[D_WRITE]);
+    assert(startlog_equal("GF4 ERROR stage=script_before_acquire rc=-409 head=1 remain_us=0 reg=00000000 val=00000000\n"));
     fixture(); assert(run(HIGH_KHZ,0)==GF4_ETIME && !loans);
     fixture(); fail_acquire=true;
     assert(run(HIGH_KHZ,DEADLINE)==-1 && loans==1 && !points && !h.calls[D_WRITE]);
     fixture(); expire_acquire=true;
-    assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME && loans==1 && !points && !h.calls[D_WRITE]);
+    assert(!run(HIGH_KHZ,DEADLINE) && loans==1 && points && h.calls[D_WRITE]);
     fixture(); rom[T_TABLE]=0x20; fail_restore=true;
     assert(run(HIGH_KHZ,DEADLINE)==GF4_EUNSUPPORTED && !points);
     assert(!h.ctx.reusable && !legacy.reusable);
@@ -334,14 +343,23 @@ static void failures(void)
     u32 clocks=h.calls[D_CLOCK];
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2); expire_clock=n;
-        assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME);
-        /* On expiry the only later write is unconditional binding cleanup. */
-        assert(h.calls[D_WRITE]==writes_at_expiry+(n>2 ? 1U : 0U));
+        i32 rc=run(HIGH_KHZ,DEADLINE);
+        assert(rc==(expiry_origin ? 0 : GF4_ETIME));
+        if (!expiry_origin && n>2) {
+            assert(gf2_host_strstr(startlog,"GF4 ERROR stage=rom_script rc=-409 head=1 remain_us="));
+            assert(gf2_host_strstr(startlog," pc="));
+        }
+        /* Preparation/opcode origins start a fresh operation. Rejection
+         * inside an operation permits only the binding cleanup write. */
+        assert(h.calls[D_WRITE]==(expiry_origin ? OWNER_WRITES+CLEANUP_WRITES :
+               writes_at_expiry+(n>2 ? CLEANUP_WRITES : 0U)));
     }
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2);
         gf4_host_fail_at(&h,D_CLOCK,n,INJECT);
-        assert(run(HIGH_KHZ,DEADLINE)==-1);
+        /* The post-acquire clock is called directly and preserves its rc;
+         * runner and pre-acquire clock failures retain their -1 contract. */
+        assert(run(HIGH_KHZ,DEADLINE)==(n==2 ? INJECT : -1));
         assert(h.calls[D_WRITE]==(n>2 ? OWNER_WRITES+CLEANUP_WRITES : 0U));
     }
 }

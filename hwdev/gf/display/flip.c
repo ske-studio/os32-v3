@@ -73,7 +73,7 @@ static int commit(struct gf4_ctx *c, u8 head, const struct gf3_surface *s)
     int rc = c->links->scan_changed(c->links->owner, head, s);
     if (rc) return rc;
     c->state->head[head].front = *s;
-    c->hold[head].pending = false;
+    c->hold[head] = (struct gf4_flip_hold){0};
     return 0;
 }
 

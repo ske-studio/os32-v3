@@ -457,6 +457,17 @@ static void prod_exit_order(void)
      * route afterwards. All three writes precede route and safe 98 redraw. */
     u32 last_route=0;
     for(u32 i=0;i<prod_trace_count;i++)if(prod_trace[i]==PROD_ROUTE)last_route=i;
+    /* Diagnostic CR reads use a byte selector write per head (MIT nouveau
+     * c03c1a1 dispnv04/hw.h:127-134). OS32 restores each selector afterwards.
+     * Only these four selector writes may separate quiesce from route. */
+    if (last_route && prod_trace[last_route-1]==0x6033d4) {
+        CHECK(last_route>=7);
+        if (last_route<7) return;
+        CHECK(prod_trace[last_route-4]==0x6013d4 &&
+              prod_trace[last_route-3]==0x6013d4 &&
+              prod_trace[last_route-2]==0x6033d4);
+        last_route-=4;
+    }
     CHECK(last_route>=3);
     CHECK(prod_trace[last_route-3]==0x1850 && prod_trace[last_route-2]==0x1854 && prod_trace[last_route-1]==0x140);
     CHECK(prod_trace[prod_trace_count-1]==PROD_REDRAW);

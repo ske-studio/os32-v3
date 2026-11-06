@@ -20,6 +20,8 @@ static u32 sim_check_reads,sim_check_mismatch,sim_restore_fail;
 static u32 sim_pll_write_fail,sim_pll_writes;
 static bool sim_compare,sim_trace;
 static u32 sim_starts,sim_stops,sim_start_fail,sim_stop_fail;
+static bool sim_stop_trace;
+static u32 sim_stop_writes,sim_stop_offsets[5],sim_stop_values[5];
 static struct gf_display_context display;
 static struct gf_init_context display_init;
 static struct gf_init_program display_program;
@@ -45,6 +47,14 @@ static int sim_io(bool write,u32 off,u32 width,u32 *v)
 {
     CHECK(width==1 || width==4 || width==2);
     CHECK(off!=0xfac && off<0x1000000);
+    if (write && sim_stop_trace) {
+        CHECK(sim_stop_writes<5);
+        if (sim_stop_writes<5) {
+            sim_stop_offsets[sim_stop_writes]=off;
+            sim_stop_values[sim_stop_writes]=*v;
+        }
+        sim_stop_writes++;
+    }
     sim_calls++;
     if (sim_calls==sim_fail || sim_calls==sim_second_fail) return -1;
     if (write && display.ordinal>=30 && display.ordinal<=34 &&
@@ -137,7 +147,11 @@ static int sim_foundation_stop(struct gf_display_context *c)
 {
     CHECK(c->section==GF_DISPLAY_STOP && !c->active && c->engaged);
     sim_stops++;
-    return sim_stop_fail ? -1 : 0;
+    if (sim_stop_fail) {
+        c->target=RECOVER_PBUS1854;c->last_rc=-733;
+        return -1;
+    }
+    return 0;
 }
 static const struct gf_display_owner sim_owner={
     .acquire=sim_acquire, .release=sim_release, .validate=sim_validate,
@@ -146,6 +160,7 @@ static const struct gf_display_owner sim_owner={
 static void sim_reset(void)
 {
     sim_starts=sim_stops=sim_start_fail=sim_stop_fail=0;
+    sim_stop_trace=false;sim_stop_writes=0;
     sim_count=sim_calls=sim_fail=sim_second_fail=sim_points=sim_point_fail=sim_time=0;
     sim_restores=sim_saved=sim_acquires=sim_releases=sim_validates=sim_waits=0;
     sim_wait_fail=sim_validate_fail=sim_acquire_fail=0;sim_compare=sim_trace=false;
@@ -281,13 +296,29 @@ static void service_cases(void)
     sim_reset();sim_acquire_fail=1;CHECK(video_start(&d,mode.id,sim_rgb)==-1 && sim_releases==1);
     sim_reset();CHECK(!video_start(&d,mode.id,sim_rgb));CHECK(!video_stop(&d));
     sim_validate_fail=1;CHECK(video_start(&d,mode.id,sim_rgb)==-1 && !display.reusable && sim_acquires==1);
-    /* Stop attempts all three writes even if cleanup or a quiesce write fails. */
-    for(u32 i=1;i<=3;i++) {
-        sim_reset();CHECK(!video_start(&d,mode.id,sim_rgb));sim_fail=sim_calls+i;
-        before=sim_calls;CHECK(video_stop(&d)==-1 && sim_calls==before+3 && !display.reusable);
+    /* GF_FEAT4_DESIGN §2 stops F1 before local restore and all PC-98 rows.
+     * MIT nouveau dispnv04/hw.c:661,772 saves/restores each PCRTC_START.
+     * These two head addresses plus the three PC-98 rows are an independent
+     * oracle, not a count measured from a successful product execution. */
+    const u32 stop_offsets[]={0x600800U,0x602800U,0x1850U,0x1854U,0x140U};
+    const u32 stop_values[]={0x12000U,0x34000U,0,0,0};
+    for(u32 i=0;i<5;i++) {
+        sim_reset();
+        *sim_register(stop_offsets[0])=stop_values[0];
+        *sim_register(stop_offsets[1])=stop_values[1];
+        CHECK(!video_start(&d,mode.id,sim_rgb));sim_fail=sim_calls+i+1;
+        before=sim_calls;sim_stop_trace=true;
+        CHECK(video_stop(&d)==-1 && sim_calls==before+5 && !display.reusable);
+        CHECK(display.engaged && !display.active && !display.stop_ok);
+        CHECK(display.section==GF_DISPLAY_STOP && display.target==stop_offsets[i] && display.last_rc==-1);
+        CHECK(sim_stop_writes==5);
+        for(u32 j=0;j<5;j++) {
+            CHECK(sim_stop_offsets[j]==stop_offsets[j] && sim_stop_values[j]==stop_values[j]);
+        }
+        /* A later successful write must not erase the first failed target. */
     }
     sim_reset();CHECK(!video_start(&d,mode.id,sim_rgb));sim_restore_fail=1;
-    before=sim_calls;CHECK(video_stop(&d)==-1 && sim_calls==before+3 && !display.reusable);
+    before=sim_calls;CHECK(video_stop(&d)==-1 && sim_calls==before+5 && !display.reusable);
     info=(struct video_info){1,1,1,1};
     CHECK(video_query(0,&info)==OS32_ERR_INVAL && !info.caps && !info.mode_count);
     CHECK(video_mode_info(0,0,&mode)==OS32_ERR_INVAL && !mode.width);
@@ -296,10 +327,17 @@ static void service_cases(void)
     CHECK(video_blank(0,0)==OS32_ERR_INVAL && video_stop(0)==OS32_ERR_INVAL && video_display_start(0,0)==OS32_ERR_INVAL);
     sim_reset();sim_start_fail=1;
     CHECK(video_start(&d,1,sim_rgb)==-1 && sim_starts==1 && sim_stops==1);
-    sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_stop_fail=1;
-    before=sim_calls;
-    CHECK(video_stop(&d)==-1 && display.engaged && !display.active && !display.reusable && !display.stop_ok && sim_calls==before);
-    sim_stop_fail=0;CHECK(!video_stop(&d) && !display.engaged && display.stop_ok && sim_stops==2);
+    /* Lower stop failure retains ownership and its raw rc/target even when
+     * scan restore succeeds, or either/both scan writes also fail. */
+    for(u32 fault=0;fault<4;fault++) {
+        sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_stop_fail=1;
+        before=sim_calls;
+        if (fault&1U) sim_fail=before+1;
+        if (fault&2U) sim_second_fail=before+2;
+        CHECK(video_stop(&d)==-1 && display.engaged && !display.active && !display.reusable && !display.stop_ok && sim_calls==before+2);
+        CHECK(display.section==GF_DISPLAY_STOP && display.target==RECOVER_PBUS1854 && display.last_rc==-733);
+        sim_stop_fail=0;CHECK(!video_stop(&d) && !display.engaged && display.stop_ok && sim_stops==2);
+    }
     output("PASS service: runner/baseline/load/check, restart, palette/blank/stop, all bus/point/wait failures\n");
 }
 static void record_cases(void)
@@ -314,7 +352,7 @@ static void record_cases(void)
     CHECK(display.target==RECOVER_PRMVIO+RECOVER_SEQ && display.section==GF_DISPLAY_BLANK && display.last_rc==-1);
     sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_fail=sim_calls+1;
     CHECK(video_stop(&d)==-1);
-    CHECK(display.target==RECOVER_PBUS1850 && display.section==GF_DISPLAY_STOP && display.last_rc==-1);
+    CHECK(display.target==0x600800U && display.section==GF_DISPLAY_STOP && display.last_rc==-1);
     sim_reset();CHECK(!video_start(&d,1,sim_rgb));CHECK(!video_stop(&d));
     u32 before=sim_calls;
     CHECK(!video_blank(&d,0) && sim_calls==before);

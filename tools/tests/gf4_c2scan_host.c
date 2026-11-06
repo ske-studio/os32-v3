@@ -280,9 +280,31 @@ static void release_and_capacity(void)
     assert(!gf4_scan_reserve_initial(&host.ctx,TEST_DL));
     live(&host.ctx.test);
 }
+/* Real case4: both flip phases finish, then restore the original front.
+ * The last flip selected bank1; restore does not call scan_changed. */
+static void restored_after_flip(void)
+{
+    struct gf4_head_image original=state.head[0];
+    struct gf3_surface pair[2];
+    saved=(struct gf4_saved){0}; saved.head[0]=original;
+    host.ctx.diagnostic_saved=&saved;
+    assert(!gf4_scan_prepare(&host.ctx,0,vga.id,pair,TEST_DL));
+    assert(!gf4_scan_changed(&host.ctx,0,&pair[1]));
+    state.head[0].front=pair[1]; /* Completed flip, pending is already clear. */
+    assert(host.ctx.scan_bank[0]==1);
+    state.head[0]=original; /* Successful diagnostic restore. */
+    assert(!gf4_scan_discard(&host.ctx,0,TEST_DL));
+    live(&host.ctx.scan[0][0]);
+    assert(!host.ctx.scan_next[0][0].value.owner && !host.ctx.scan_next[0][1].value.owner);
+    /* The next prepare also resolves the restored front, preserving the loan. */
+    assert(!gf4_scan_prepare(&host.ctx,0,vga.id,pair,TEST_DL));
+    assert(!gf4_scan_discard(&host.ctx,0,TEST_DL));
+    host.ctx.diagnostic_saved=0; host.ctx.scan_bank[0]=0;
+    assert(!gf3_service_surfaces(service,0,0));
+}
 void _start(void)
 {
-    init(); prepare_rollback(); loans_and_holds();
+    init(); restored_after_flip(); prepare_rollback(); loans_and_holds();
     published_changes(); same_reservation_flip(); release_and_capacity();
     assert(host.nevents==0); /* No clocks, waits or MMIO in scan/metadata updates. */
     gf2_host_exit(0);

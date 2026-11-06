@@ -105,7 +105,7 @@ int gf_production_point(void *v)
     struct gf_init_context *ctx=p->display.init;
     if (!ctx || gf_production_clock(p,&now)) return -1;
     ctx->elapsed_us=now-ctx->started_us;
-    return ctx->elapsed_us>=GF_INIT_EXEC_US ? -1 : 0;
+    return !ctx->opcode_timing && ctx->elapsed_us>=GF_INIT_EXEC_US ? -1 : 0;
 }
 int gf_production_decode_safe(struct gf_production *p)
 {

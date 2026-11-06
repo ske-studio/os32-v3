@@ -104,7 +104,7 @@ def mutations():
         ('hwdev/gf/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=RECOVER_COMMAND_STOP;', 'prepare other Command bits lost'),
-        ('hwdev/gf/runner.c', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (ctx->elapsed_us >= GF_INIT_EXEC_US)', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (0)', 'script point budget reported as EIO'),
+        ('hwdev/gf/runner.c', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (!ctx->opcode_timing && ctx->elapsed_us >= GF_INIT_EXEC_US)', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (0)', 'script point budget reported as EIO'),
         ('hwdev/gf/devinit.c', 'if (p->foundation.revoked) c->engaged=false;', '(void)c;', 'revoked cleanup exception omitted'),
         ('hwdev/gf/devinit.c', 'else *value=*(volatile u32 *)(f->bar0+off);', 'else *value=0;', 'resident MMIO read omitted'),
         ('hwdev/gf/devinit.c', 'else *(volatile u32 *)(f->bar0+off)=value;', 'else (void)value;', 'resident MMIO write omitted'),

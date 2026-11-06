@@ -285,7 +285,7 @@ static int golden(u32 model,u32 flags,bool dual,bool wide)
     }
     REQUIRE(n==nexpected && host.calls[D_SCRIPT]==1);
     /* dfp.c:461-470: re-read script-modified TG before TEST/ON. */
-    REQUIRE(events[script_at+1U].op==D_READ && events[script_at+1U].a[1]==T_TG+d);
+    REQUIRE(events[script_at+1U].op==D_CLOCK && events[script_at+2U].op==D_READ && events[script_at+2U].a[1]==T_TG+d);
     REQUIRE(get(T_TG+d)==final && get(T_TG+(route.head^1U)*T_STRIDE)==T_OTHER_FP);
     REQUIRE(get(T_SEL)==select && host.cr[0][T_OWNER]==T_OLD_OWNER);
     const struct gf4_head_image *image=host.ctx.changing ? state.next : state.head;
@@ -370,13 +370,10 @@ static int load_failures(void)
     REQUIRE(state.next[1].fp_on==T_OLD_ON && !state.work[1].fp_control);
     setup(1,T_OR_C,GF4_TMDS,true,0,0,modelines[0].khz,false,0);
     script_expire=true;
-    REQUIRE(gf4_tmds_load(&host.ctx,&route,&input,T_DEADLINE)==GF4_ETIME);
-    REQUIRE(host.cr[0][T_OWNER]==T_OLD_OWNER && state.next[1].fp_on==T_OLD_ON);
-    REQUIRE(!state.work[1].fp_control);
-    /* After script expiry no final ON write occurs; only owner cleanup. */
-    REQUIRE(events[host.nevents-3U].op==D_CLOCK);
-    REQUIRE(events[host.nevents-2U].a[1]==T_CR);
-    REQUIRE(events[host.nevents-1U].a[1]==T_CR+1U);
+    REQUIRE(!gf4_tmds_load(&host.ctx,&route,&input,T_DEADLINE));
+    REQUIRE(host.cr[0][T_OWNER]==T_OLD_OWNER);
+    REQUIRE(host.ctx.deadline==T_DEADLINE+GF2_TIMEOUT_US);
+    REQUIRE(state.work[1].fp_control);
     return 0;
 }
 static int dpms(void)

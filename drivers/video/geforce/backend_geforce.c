@@ -35,6 +35,7 @@
 #include "hwdev/gf/display/api.h"
 #include "hwdev/gf/feature5.h"
 #include "hwdev/gf/production.h"
+#include "leave_log.h"
 #include "../../../gfx/gfx_internal.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
@@ -447,10 +448,17 @@ static int geforce_stop(void)
 {
 #ifdef OS32_GEFORCE_MODULE
     gf_hook_scan_bind(false, 0);
+    struct gf_display_context *video = device ? device->context : 0;
+    struct gf_io *leave_io = video ? &video->io : 0;
 #endif
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
-    if (pc98_route_to_98()) rc = -1;
+    /* Sample stopped GF state before route_to_98 performs the final redraw. */
+#ifdef OS32_GEFORCE_MODULE
+    geforce_leave_log(leave_io, rc);
+#endif
+    int route_rc = pc98_route_to_98();
+    if (route_rc) rc = -1;
     active = routed = 0;
     if (rc) failed = 1;
     return rc;

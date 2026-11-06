@@ -6,7 +6,7 @@
 #define GF4_HOST_UNIT 13
 #include "gf4_display_fake.h"
 #include "../../hwdev/gf/internal.h"
-#define REQUIRE(x) do { __asm__ volatile ("" ::: "memory"); if (!(x)) return __LINE__; } while (0)
+#define REQUIRE(x) do { assert(x); } while (0)
 /* hw.h:70-124 / crtc.c:91-102: independent expected register addresses. */
 /* crtc.c:334-337: SR1 CLKDIV2 and character-clock bit. */
 #define T_SR_CLOCK 1U
@@ -327,7 +327,16 @@ static int saved_and_deadline(void)
     REQUIRE(gf4_mode_load(&host.ctx,T_HEAD_B,&state.work[T_HEAD_B],T_DEADLINE)==GF4_ETIME);
     REQUIRE(!host.calls[D_WRITE]);
     REQUIRE(gf4_change_end(&host.ctx,T_FAILURE)==T_FAILURE);
-    REQUIRE(!host.ctx.accepting && !host.ctx.reusable && host.ctx.recovery_rc==GF4_ETIME);
+    /* Rollback is a new operation (PACK.fix12), not the expired load's
+     * remaining time. It restores the old image and retains the source rc. */
+    REQUIRE(host.ctx.accepting && host.ctx.reusable && !host.ctx.recovery_rc);
+    REQUIRE(host.ctx.deadline==T_DEADLINE+GF2_TIMEOUT_US);
+    REQUIRE(state.head[T_HEAD_B].mode.id==T_OLD_ID && !host.calls[D_FAILED]);
+    setup();
+    REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
+    gf4_host_fail_at(&host,D_CLOCK,host.calls[D_CLOCK]+1U,T_FAILURE);
+    REQUIRE(gf4_change_end(&host.ctx,T_FAILURE)==T_FAILURE);
+    REQUIRE(!host.ctx.accepting && !host.ctx.reusable && host.ctx.recovery_rc==GF2_EIO);
     return 0;
 }
 void _start(void)

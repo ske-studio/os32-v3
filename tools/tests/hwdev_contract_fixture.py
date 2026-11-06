@@ -31,6 +31,7 @@ Guard D0 adds the private plan guard, ROM generation and live heat state,
 plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
 make all regenerates the contract after the reviewed inventory update.
 These changes own the pins below.
+GF CUI fix12 adds per-opcode TMDS timing and two saved scan origins.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
 adds that member; refresh both pins with --snapshot after reviewing the diff.
@@ -53,9 +54,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xec527748
+REVIEWED_LAYOUT_CRC = 0x7f9e46e0
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = 'd77885fcb6e3519913cc224f65fece75dbd2202a298ff73db9f31c7de4ceab57'
+REVIEWED_INVENTORY_SHA = '622c931620e2074f3570b086f50af2133f8dc2e834bbab4041aed6ad1d29a6d4'
 
 
 def import_declarations(root):

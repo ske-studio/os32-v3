@@ -9,6 +9,8 @@
 struct gf_init_context;
 /* One instruction/PLL transaction, at most one save per PLL destination. */
 #define GF_INIT_SAVE_MAX GF_PLL_WRITES_MAX
+/* OS32 stall limit per TMDS opcode, not a bound on the whole ROM script. */
+#define GF_INIT_OPCODE_US 2000000U
 struct gf_init_saved {
     u32 bar, offset, width, old;
     /* RECOVER_NONE for raw MMIO; otherwise select this byte index before
@@ -64,6 +66,9 @@ struct gf_init_context {
     /* Display script loan: raw DCB OR, independent head, absolute deadline. */
     u8 or_mask;
     bool display_script;
+    /* TMDS uses per-opcode timeouts; F5 retains its outer deadline. */
+    bool opcode_timing;
+    u32 opcode_started_us;
     u32 deadline;
 };
 /* P2 runner owns these implementations; runs never call timing.wait_us
@@ -242,6 +247,8 @@ struct gf_display_context {
     struct gfinit_pll_limits limits;
     struct gfinit_mode_saved baseline;
     u32 baseline_c040, baseline_pmc;
+    /* main4 scan origins, restored before returning to PC-98. */
+    u32 baseline_start[2];
     bool initialized, baseline_valid, active, blank, stop_ok, reusable, engaged;
     struct gfinit_mode mode;
     u8 palette[VIDEO_PALETTE_BYTES];

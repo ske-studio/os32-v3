@@ -138,7 +138,12 @@ static u32 scanlog_route;
 void pc98_console_set_safe(int safe) { (void)safe; }
 int pc98_route_cell_check(void) { assert(!scanlog_route); return 0; }
 int pc98_route_to_gf(void) { scanlog_route=1; return 0; }
-int pc98_route_to_98(void) { scanlog_route=0; return 0; }
+int pc98_route_to_98(void)
+{
+    /* The diagnostic must finish before the real route restores/redraws 98. */
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc="));
+    scanlog_route=0; return 0;
+}
 static u32 scanlog_failures;
 void geforce_display_failed(void) { scanlog_failures++; }
 static int scanlog_identify(void) { return 1; }
@@ -182,7 +187,9 @@ static void scanlog_finish(void)
     geforce_backend_feature5_bind(0);
     gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
     gf2_host_memset(svc_host.fail_rc,0,sizeof(svc_host.fail_rc));
+    startlog_clear();
     assert(!geforce_stop());
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc=0 read_rc=0 valid=00000fff"));
     svc_finish();
     gf5_rom_release(&cint_prod.feature5);
 }
