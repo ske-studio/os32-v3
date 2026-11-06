@@ -898,13 +898,42 @@ static void display_failure(const char *stage, i32 rc)
     serial_puts_polled("GF4 ERROR stage="); serial_puts_polled(stage);
     serial_puts_polled(" rc="); serial_diag_i32(rc); serial_puts_polled("\r\n");
 }
+/* Stop first, then borrow the current management slot for terminal cleanup.
+ * nouveau dispnv04/disp.c:189-207 ends the image lifetime after display use.
+ * Failed OS32 releases retain the session and owner for another leave. */
+static i32 display_cui_cleanup(void)
+{
+    display_session.running = display_session.lifecycle = false;
+    const struct gf4_restore_ops *m = geforce_display_restore_ops();
+    if (display_session.valid || (m && m->ctx && m->ctx->cleanup_pending)) {
+        if (!m || !m->ctx || !m->abandon) return GF4_ESTATE;
+        i32 rc = m->abandon(m->ctx, &display_session.saved);
+        if (rc) return rc;
+    } else {
+        const struct gf4_test_ops *o = geforce_display_ops();
+        if (o && o->ctx && o->ctx->ready) return GF4_ESTATE;
+    }
+    display_cui_owner = 0;
+    display_session = (typeof(display_session)){0};
+    return 0;
+}
+static i32 display_cui_restore(void)
+{
+    const struct gf4_restore_ops *m = geforce_display_restore_ops();
+    /* A stopped, partially released image has no restore path. Retry only
+     * terminal cleanup; saved_release may already have ended the borrow. */
+    if (m && m->ctx && !m->ctx->ready && m->ctx->cleanup_pending) return 0;
+    return display_restore(true);
+}
 static i32 display_cui(bool enter)
 {
     i32 rc = 0;
     const struct gf4_test_ops *o = geforce_display_ops();
     if (enter) {
         /* A GUI app may have already left through the shared backend. */
+        const struct gf4_restore_ops *m = geforce_display_restore_ops();
         if (display_cui_owner && !display_session.valid &&
+            (!m || !m->ctx || !m->ctx->cleanup_pending) &&
             (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;
         if (display_cui_owner || display_session.valid || (o && o->ctx && o->ctx->ready)) rc = GF4_EBUSY;
         else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
@@ -916,25 +945,21 @@ static i32 display_cui(bool enter)
             o = geforce_display_ops();
             if (!o || !o->ctx || !o->ctx->ready) {
                 gfx_shutdown();
-                display_cui_owner = 0;
+                i32 cleanup_rc = display_cui_cleanup();
+                if (cleanup_rc) display_failure("enter_cleanup", cleanup_rc);
                 rc = GF4_ESTATE;
             }
         }
     } else if (!display_cui_owner || display_cui_owner != res_owner_get()) rc = GF4_ESTATE;
     else {
         /* Complete a camera snapshot before the backend tears down its loans. */
-        rc = display_restore(true);
+        rc = display_cui_restore();
         /* Restore errors do not veto complete stop and the route back to 98.
-         * Preserve the original rc and any outstanding snapshot loan. */
+         * Keep restore and terminal cleanup results separate. */
         gfx_shutdown();
-        if (!rc) {
-            o = geforce_display_ops();
-            if (o && o->ctx && o->ctx->ready) rc = GF4_ESTATE;
-            else {
-                display_cui_owner = 0;
-                display_session = (typeof(display_session)){0};
-            }
-        }
+        i32 cleanup_rc = display_cui_cleanup();
+        if (cleanup_rc) display_failure("leave_cleanup", cleanup_rc);
+        if (!rc) rc = cleanup_rc;
     }
     if (rc) display_failure(enter ? "enter" : "leave", rc);
     return rc;
@@ -943,12 +968,11 @@ void gf_display_owner_exit(int id)
 {
     if (!display_cui_owner || display_cui_owner != id) return;
     /* A failing restore must not prevent routing back to 98 on owner death. */
-    i32 rc = display_restore(true);
+    i32 rc = display_cui_restore();
     if (rc) display_failure("owner_restore", rc);
     gfx_shutdown();
-    display_cui_owner = 0;
-    if (!rc) display_session = (typeof(display_session)){0};
-    else display_session.running = display_session.lifecycle = false;
+    i32 cleanup_rc = display_cui_cleanup();
+    if (cleanup_rc) display_failure("owner_cleanup", cleanup_rc);
 }
 
 i32 gf_display_test(u32 session)
