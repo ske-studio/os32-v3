@@ -94,6 +94,12 @@ static void down_cb(const VfsDirEntry *entry, void *raw)
     failure=OS32_ERR_HOSTDOWN;
 }
 
+static void ua_cb(const VfsDirEntry *entry, void *raw)
+{
+    list_cb(entry, raw);
+    gen++; /* UNIT ATTENTION observed by the post-callback media check. */
+}
+
 /* Exercise both pointer-returning directory helpers and all data read paths. */
 static int operations(Iso9660Ctx *ctx)
 {
@@ -330,6 +336,9 @@ static int suite(void)
     REQUIRE(!iso9660_resource_check(ctx,0) && caches_empty(ctx));
     REQUIRE(vfs_seek(fd,0,SEEK_SET)==0 && vfs_read_fd(fd,out,4)==4);
     REQUIRE(!vfs_fd_is_stale(fd) && stale_calls==old_stale);
+    listed=0;
+    REQUIRE(iso9660_ops.list_dir(ctx,"/",ua_cb,0)==VFS_ERR_IO);
+    REQUIRE(listed==1 && !vfs_fd_is_stale(fd) && stale_calls==old_stale);
     vfs_close(fd);
     for(int error=-1;error>=-4;error--) {
         read_failure=error;

@@ -40,6 +40,7 @@
 #include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
 #include "../drivers/ata/cd_module.h"
 #include "vfs.h"
+#include "../fs/serialfs/serialfs.h"
 
 
 #include "dev.h"
@@ -109,6 +110,7 @@ extern u32 sys_mem_kb;
 /* 起動段の補助は同じ翻訳単位の .inc に置く。 */
 static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot);
 static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot);
+static int boot_legacy_started;
 static void kernel_gfx_config(void);
 static inline void kernel_shell_loop(void);
 static inline void kernel_mount_children(const char *root_dev);
@@ -229,7 +231,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
     kprintf(KLOG_ATTR, "[BOOT] snd module rc=%d\n", snd_rc);
 
-    boot_platform_run(BOOT_NIC_LEGACY, &boot);
+    if (!boot_legacy_started) {
+        boot_platform_run(BOOT_NIC_LEGACY, &boot);
+    }
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);

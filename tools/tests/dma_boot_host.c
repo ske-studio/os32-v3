@@ -147,6 +147,8 @@ static int lan_module_netcd_register(const char *alias)
     CHECK(0);
     return -1;
 }
+/* Host services have their own compiled boot test; this fixture has no cfg. */
+static void kernel_boot_hostsvc(struct boot_context *boot) { (void)boot; }
 #include "kernel_dma_gate.c"
 int main(int argc, char **argv)
 {

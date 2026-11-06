@@ -1,3 +1,64 @@
+/* Borrowed by the resident client for the rest of boot, never stack storage. */
+static SfsLan boot_sfs_lan;
+
+static u32 boot_sfs_now(void *ctx)
+{
+    (void)ctx;
+    return tick_count;
+}
+
+static void boot_sfs_idle(void *ctx)
+{
+    (void)ctx;
+    _halt();
+}
+
+static int boot_sfs_can_wait(void *ctx)
+{
+    (void)ctx;
+    return _irq_enabled();
+}
+
+static const SfsIo boot_sfs_clock = {
+    .now = boot_sfs_now, .idle = boot_sfs_idle, .can_wait = boot_sfs_can_wait
+};
+
+static void kernel_boot_hostsvc(struct boot_context *boot)
+{
+    char peer[32]; /* Detect overlong MACs, as in serialfs_session.c. */
+    int enabled = sysconfig_get_int(SYS_NETCD_CFG, "SFS_LAN", 0) == 1;
+    int have_peer = sysconfig_get_str(SYS_NETCD_CFG, "SFS_LAN_PEER",
+                                     peer, sizeof(peer)) > 0;
+    if (!enabled && !have_peer) return;
+
+    /* Use lan.mod's existing MAC parser for both consumers. No HELLO here. */
+    if (!have_peer) peer[0] = '\0';
+    int rc = sfs_lan_set_peer(&boot_sfs_lan, peer);
+    if (rc) {
+        kprintf(KLOG_ATTR, "[hostsvc] invalid/unavailable SFS_LAN_PEER rc=%d\n", rc);
+        return;
+    }
+    /* Register LGY too before AUTO chooses. Without network configuration its
+     * original, later boot point remains unchanged. */
+    boot_platform_run(BOOT_NIC_LEGACY, boot);
+    boot_legacy_started = 1;
+    /* The existing loader starts AUTO without a peer. No users are published
+     * yet, so replace that binding before NETCD or /host can use it. */
+    net_unbind();
+    rc = net_start(NET_NIC_AUTO, have_peer ? boot_sfs_lan.peer : 0);
+    if (!rc && enabled) {
+        sfs_lan_init(&boot_sfs_lan, 0, &boot_sfs_clock, 0);
+        rc = sfs_lan_set_peer(&boot_sfs_lan, peer);
+        if (!rc) {
+            const struct SfsPersistentConfig cfg = {
+                .io = &sfs_lan_io, .io_ctx = &boot_sfs_lan, .lan_enabled = 1
+            };
+            rc = sfs_persistent_start(&cfg);
+        }
+    }
+    kprintf(KLOG_ATTR, "[hostsvc] start rc=%d\n", rc);
+}
+
 static void kernel_boot_lan(struct boot_context *boot)
 {
     boot_platform_run(BOOT_PCI_RESOURCES, boot);
@@ -5,6 +66,7 @@ static void kernel_boot_lan(struct boot_context *boot)
         lan_module_load();
     }
     lan_module_pci_bind_fallback();
+    kernel_boot_hostsvc(boot);
 }
 
 static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
