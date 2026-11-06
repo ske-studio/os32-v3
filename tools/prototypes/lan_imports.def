@@ -205,6 +205,18 @@
       "context": "normal",
       "irq": true,
       "declaration": "int net_mac(u8 out[6]);"
+    },
+    {
+      "symbol": "lan_module_session_acquire",
+      "source": "drivers/net/e82557/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_session_release",
+      "source": "drivers/net/e82557/lan_module.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }
