@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "../../include/types.h"
 #include "display/api.h"
+#include "stop_state.h"
 #include "../../kdebug/gfinit_pll.h"
 
 typedef unsigned long long u64;
@@ -36,13 +37,6 @@ struct gf5_plan_guard {
 struct gf5_perf_entry {
     struct gf5_clock clock;
     u8 voltage, fanspeed, pstate, bios_index;
-};
-/* Live protection state, never serialized in gf5_image or rolled back by
- * restore. The resident backend separately retains the shutdown latch. */
-enum gf5_stop_phase { GF5_STOP_NORMAL, GF5_STOP_REQUESTED, GF5_STOPPED };
-struct gf5_stop_state {
-    enum gf5_stop_phase state;
-    i32 reason, milli_c, source_rc;
 };
 struct gf5_heat_state {
     bool down_active, critical_paused;

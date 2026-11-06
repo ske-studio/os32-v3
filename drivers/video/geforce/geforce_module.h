@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "gfx_hal.h"
 #include "video_service.h"
-#include "../../../hwdev/gf/feature5.h"
+#include "../../../hwdev/gf/stop_state.h"
 #include "../../../kernel/module/module_runtime.h"
 #define GEFORCE_MODULE_OPS_VERSION 5u
 #define GEFORCE_WC_BYTES 0x80000U
