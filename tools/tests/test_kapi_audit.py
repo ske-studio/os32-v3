@@ -38,7 +38,7 @@ MUTATIONS += [
     ('rshell counts wakeups', 4, '(u32)(tick_count - start_tick)', '(waits + 0 * start_tick)'),
     ('rshell timeout 3 seconds', 4, 'KBD_RSHELL_TIMEOUT_SEC * PIT_HZ', '3 * PIT_HZ'),
     ('kbd char wait', 4, '            if (interruptible && ring3_wait_pending()) return -1;', ''),
-    ('kbd key wait', 4, '    while (kbd_count == 0) {\n        if (interruptible && ring3_wait_pending()) return -1;', '    while (kbd_count == 0) {'),
+    ('kbd key wait', 4, '    while (kbd_count == 0) {\n        kbd_foreground_poll();\n        if (interruptible && ring3_wait_pending()) return -1;', '    while (kbd_count == 0) {\n        kbd_foreground_poll();'),
     ('kbd gui wait', 4, '        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */', ''),
     ('ime char cleanup', 5, 'ime_getchar_kapi', 'cleanup'),
     ('ime key cleanup', 5, 'ime_getkey_kapi', 'cleanup'),
