@@ -840,7 +840,8 @@ static i32 display_cui(bool enter)
     const struct gf4_test_ops *o = geforce_display_ops();
     if (enter) {
         /* A GUI app may have already left through the shared backend. */
-        if (display_cui_owner && o && o->ctx && !o->ctx->ready) display_cui_owner = 0;
+        if (display_cui_owner && !display_session.valid &&
+            (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;
         if (display_cui_owner || display_session.valid || (o && o->ctx && o->ctx->ready)) rc = GF4_EBUSY;
         else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
         else {
@@ -859,8 +860,10 @@ static i32 display_cui(bool enter)
     else {
         /* Complete a camera snapshot before the backend tears down its loans. */
         rc = display_restore(true);
+        /* Restore errors do not veto complete stop and the route back to 98.
+         * Preserve the original rc and any outstanding snapshot loan. */
+        gfx_shutdown();
         if (!rc) {
-            gfx_shutdown();
             o = geforce_display_ops();
             if (o && o->ctx && o->ctx->ready) rc = GF4_ESTATE;
             else {

@@ -310,7 +310,7 @@ static void enter_call(void)
     }
     i32 rc = case_event(CASE_ENTER);
     if (rc) { normal_slot = NULL; return; }
-    normal_slot = &normal; host.ctx.ready = true;
+    normal_slot = &normal; management_slot = &management; host.ctx.ready = true;
     state.head[0].enabled = !enter_invalid; state.head[0].mode = state.modes[0];
     state.head[0].front.reservation_id = enters;
     state.head[0].dpms = GF4_ON;
@@ -321,7 +321,7 @@ static void leave_call(void)
     i32 rc = case_event(CASE_LEAVE);
     if (rc || leave_failed) return;
     if (!forced_leave) assert(!host.ctx.diagnostic_saved && !display_session.valid);
-    normal_slot = NULL; host.ctx.ready = false;
+    normal_slot = NULL; management_slot = NULL; host.ctx.ready = false;
     state.head[0].enabled = false;
 }
 GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
@@ -1145,7 +1145,8 @@ static void reset_cold_cui(void)
 {
     reset();
     host.ctx.ready = false;
-    /* Production publishes ops while idle; publishing does not bind CLIENT. */
+    /* Production idle/complete stop has neither display dispatch. */
+    normal_slot = NULL; management_slot = NULL;
     gfx_backend_geforce.bb_base = NULL;
     gfx_backend_geforce.selected_mode = NULL;
 }
@@ -1174,7 +1175,7 @@ static void cui_controls(void)
     assert(!gf_display_test(GF4_CUI_ENTER));
     /* hello_gfx shuts down the core while the shell owner survives. */
     gfx_shutdown();
-    normal_slot = &normal; /* Production keeps its published ops while idle. */
+    assert(!normal_slot); /* Full production stop closes the normal slot. */
     assert(!host.ctx.ready && display_cui_owner == 2);
     assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2 && display_cui_owner == 2);
     assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 2);
@@ -1196,13 +1197,22 @@ static void cui_controls(void)
     leave_failed = false; assert(!gf_display_test(GF4_CUI_LEAVE));
     reset_cold_cui();
     assert(!gf_display_test(GF4_CUI_ENTER));
+    restore_rc = SESSION_FAILURE;
+    assert(gf_display_test(MODE_WIRE) == SESSION_FAILURE && display_session.valid);
+    forced_leave = true;
+    assert(gf_display_test(GF4_CUI_LEAVE) == SESSION_FAILURE);
+    assert(leaves == 1 && core_shutdowns == 1 && !host.ctx.ready);
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
     assert(!gf_display_test(MODE_WIRE));
     restore_rc = SESSION_FAILURE; forced_leave = true;
     gf_display_owner_exit(2);
     assert(!display_cui_owner && !host.ctx.ready && leaves == 1);
     assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
     assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY);
-    restore_rc = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+    restore_rc = 0;
+    assert(gf_display_test(DISPLAY_RESTORE) == GF4_ESTATE);
+    assert(display_session.valid && host.ctx.diagnostic_saved);
     reset();
     assert(gf_display_test(MODE_WIRE | NEXT_PHASE) == GF4_ESTATE);
     assert(gf2_host_strstr(output, "GF4 ERROR stage=display_admit rc=-408"));

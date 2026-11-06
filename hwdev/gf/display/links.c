@@ -123,6 +123,26 @@ static i32 links_restore_last_rc(struct gf4_ctx *c)
 {
     return links_last_rc(c);
 }
+/* X2: calls close both slots while working. Republish only the management
+ * loan at the diagnostic boundary, including failures needing a retry. */
+static void links_diagnostic_publish(struct gf4_ctx *c)
+{
+    if (c && geforce_context && geforce_context->display_restore_out &&
+        (c->ready || c->diagnostic_saved))
+        *geforce_context->display_restore_out=&restore_ops;
+}
+static i32 links_diagnostic_save(struct gf4_ctx *c,struct gf4_saved *out,u32 dl)
+{
+    i32 rc=gf4_diagnostic_save(c,out,dl);
+    links_diagnostic_publish(c);
+    return rc;
+}
+static i32 links_diagnostic_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
+{
+    i32 rc=gf4_diagnostic_restore(c,s,dl);
+    links_diagnostic_publish(c);
+    return rc;
+}
 static i32 links_i2c_port(void *owner,u8 bus,struct gf4_i2c_port *out)
 {
     struct gf4_ctx *c=owner;
@@ -173,10 +193,10 @@ static i32 links_admission(void *owner,bool open)
         .dpms_set=gf4_dpms_set,.cursor_image=gf4_cursor_image,
         .cursor_move=gf4_cursor_move,.cursor_show=gf4_cursor_show,
         .vblank_wait=gf4_vblank_wait,.gamma=gf4_gamma,
-        .display_save=gf4_diagnostic_save,.palette_set=gf4_palette_set,
+        .display_save=links_diagnostic_save,.palette_set=gf4_palette_set,
         .scan_prepare=gf4_scan_prepare,.scan_discard=gf4_scan_discard
     };
-    restore_ops=(struct gf4_restore_ops){c,gf4_diagnostic_restore,links_restore_last_rc,
+    restore_ops=(struct gf4_restore_ops){c,links_diagnostic_restore,links_restore_last_rc,
                                           gf4_display_saved_release};
     /* No waits or failing HW operations in this foreground publication
      * interval. F3 validates loans before it publishes its resident ops. */

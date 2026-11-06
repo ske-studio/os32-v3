@@ -235,6 +235,7 @@ static void test_bind_and_start(void)
     assert(gf4_service_bind(&svc_ctx,&other,&svc_links)==GF4_ESTATE);
     assert(!other.display4 && cint_prod.display.display4==&svc_ctx);
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(cint_prod.feature5.accepting);
     assert(svc_ctx.accepting && svc_ctx.ready && svc_slot && svc_opens==1);
     assert(cint_prod.accel.ready && cint_slot && svc_state.head[0].enabled);
     assert(svc_state.head[0].mode.fmt==GF3_INDEX8);
@@ -247,6 +248,7 @@ static void test_bind_and_start(void)
     svc_keys_live(&svc_state.head[0].front);
     assert(gf4_service_start(&svc_ctx,cint_deadline())==GF4_ESTATE);
     svc_finish();
+    assert(!cint_prod.feature5.accepting);
     /* N1: both reciprocal loans and the table address survive full stop. */
     const struct gf3_service_owner *table=gf4_service_owner_table();
     u32 stopped_epoch=svc_ctx.ch->epoch;

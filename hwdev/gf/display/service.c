@@ -415,6 +415,8 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     }
     if (!rc) {
         c->accepting=true; l->active=true; l->stop_ok=false;
+        if (s->production->feature5.phase==GF5_RUN)
+            s->production->feature5.accepting=true;
         (void)svc_result(c,reason);
         return 0;
     }
@@ -433,6 +435,7 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     struct gf_display_context *l=c->legacy;
     struct gf_foundation *f=&s->production->foundation;
     c->deadline=dl; c->accepting=false; l->active=false;
+    s->production->feature5.accepting=false;
     first=c->links->admission(c->links->owner,false);
     /* nouveau_drm.c:955-988. All display waits precede F2/F1 stop. A held
      * flip that cannot converge retains both keys until display use ends. */
