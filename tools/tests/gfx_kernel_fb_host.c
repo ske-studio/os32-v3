@@ -31,6 +31,8 @@ static u32 checks;
 #include "surface_query.h"
 #include "appslot.h"
 #include "gf_production.h"
+#ifndef GF_RESERVATION_TEST
+/* GeForce integration supplies its real backend and routing fixture. */
 /* A successful leave keeps probe available, but selects the 98 output. */
 static int host_route_safe = 1, host_gf_leaves;
 int pc98_route_safe(void) { return host_route_safe; }
@@ -51,6 +53,7 @@ static void geforce_leave_check(void)
         if (safe) CHECK(gfx_current_height == GFX_HEIGHT);
     }
 }
+#endif
 #define CFG_KB 17408
 #ifndef HOST_ALT_WINDOW
 #define HOST_ALT_WINDOW 0

@@ -66,16 +66,19 @@ static inline void gf3_host_set(struct gf3_host *h, u32 bar, u32 off, u32 value)
 }
 static inline int gf3_host_read(void *owner, u32 bar, u32 off, u32 width, u32 *out)
 {
-    struct gf3_host *h = owner; assert(h && out && width == 4);
+    struct gf3_host *h = owner; assert(h && out && (width == 1 || width == 4));
     struct gf3_host_event *e = gf3_host_event_begin(h, H_READ);
     e->p[0] = owner; e->p[1] = out; e->a[0] = bar; e->a[1] = off; e->a[2] = width;
     if (!e->rc) { *out = 0; for (u32 i = 0; i < h->nregs; ++i)
         if (h->regs[i].bar == bar && h->regs[i].off == off) { *out = h->regs[i].value; break; } }
+    if (!e->rc && width == 1) *out &= 0xffU;
     return gf3_host_event_end(h, e);
 }
 static inline int gf3_host_write(void *owner, u32 bar, u32 off, u32 width, u32 value)
 {
-    struct gf3_host *h = owner; assert(h && width == 4);
+    /* Display cursor cleanup uses byte VGA ports as well as dword MMIO. */
+    struct gf3_host *h = owner; assert(h && (width == 1 || width == 4));
+    if (width == 1) value &= 0xffU;
     struct gf3_host_event *e = gf3_host_event_begin(h, H_WRITE);
     e->p[0] = owner; e->a[0] = bar; e->a[1] = off; e->a[2] = width; e->a[3] = value;
     if (!e->rc) { assert(h->writes && h->nwrites < h->cwrites);
