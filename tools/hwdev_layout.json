@@ -874,6 +874,7 @@
       "seq",
       "staging",
       "staging_live",
+      "staging_pending",
       "state",
       "va",
       "vram_dma",

@@ -22,6 +22,10 @@ struct gf3_host {
     struct gf3_host_event *events; u32 cevents, nevents, calls[H_OP_COUNT], fail_at[H_OP_COUNT]; int fail_rc[H_OP_COUNT];
     u8 staging[GF3_STAGING_BYTES]; u8 *vram; u32 vram_bytes, now, complete_after, waits;
     struct gf_vram_reservation_node *reservations; bool paused; u32 live_objects, alloc_off;
+    /* UNIT=8 retains submitted DMA across a failed fence, like hardware. */
+    bool dma_pending;
+    struct gf3_ram dma_src, dma_dst;
+    u32 dma_in, dma_out, dma_rowbytes, dma_rows;
     void (*observe)(struct gf3_host *, const struct gf3_host_event *);
 };
 /* Only one fixture is active in a host process. Some APIs have no owner. */
@@ -640,6 +644,13 @@ int gf2_fence_wait(struct gf2_chan *ch, struct gf2_fence fence, u32 deadline)
         if (n>=h->complete_after && h->complete_after!=U32_MAX) break;
         if (gf3_host_wait(h,1)) { e->rc=GF2_EIO; break; }
     }
+#if GF3_HOST_UNIT == 8
+    if (!e->rc && h->dma_pending) {
+        gf3_host_ref_m2mf(&h->dma_src, h->dma_in, &h->dma_dst,
+                          h->dma_out, h->dma_rowbytes, h->dma_rows);
+        h->dma_pending = false;
+    }
+#endif
     return gf3_host_event_end(h,e);
 }
 #endif
@@ -799,8 +810,12 @@ int gf3_m2mf(struct gf3_ctx *c, u32 in_handle, u32 out_handle, u32 in_off,
             assert(!gf3_host_span(out_off, dst.bytes, dst.pitch, rowbytes, rows, &out));
             assert(!gf3_host_overlap((u8 *)src.ptr+in_off, in.bytes,
                                      (u8 *)dst.ptr+out_off, out.bytes));
+            assert(!h->dma_pending);
+            h->dma_pending = true;
+            h->dma_src = src; h->dma_dst = dst;
+            h->dma_in = in_off; h->dma_out = out_off;
+            h->dma_rowbytes = rowbytes; h->dma_rows = rows;
             e->rc = gf3_host_sync(c, dl);
-            if (!e->rc) gf3_host_ref_m2mf(&src, in_off, &dst, out_off, rowbytes, rows);
         }
     }
     c->last_rc = e->rc;

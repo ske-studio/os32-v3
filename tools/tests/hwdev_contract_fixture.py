@@ -19,6 +19,8 @@ adds the F5 shared types/enums, production.feature5 and F4 logical save types
 reachable through feature5.h (470 added lines; existing entries retained).
 The layout pin includes these declarations, not just the new import.
 FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diagnostics.
+S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
+outstanding transfer ownership. Existing sizes and member offsets stay fixed.
 These changes own the pins below.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
@@ -42,9 +44,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x85d12b86
+REVIEWED_LAYOUT_CRC = 0x32ced82f
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '83b772398629df91f4506ab42fcfbdbefdd859695b6d17479526ca4ed5f0b07f'
+REVIEWED_INVENTORY_SHA = '3317b17bd481a976895e3bbb1a39349127d2b394ed6b735920eaf6b4318c63ce'
 
 
 def import_declarations(root):

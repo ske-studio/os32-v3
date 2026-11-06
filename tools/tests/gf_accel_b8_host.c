@@ -37,19 +37,24 @@ static void observe(struct gf3_host *h, const struct gf3_host_event *e)
                e->a[2] == rect.w && e->a[3] == rect.h);
     }
     if (e->op == H_FENCE) {
-        assert(!pending && e->a[0] == TEST_DEADLINE);
+        assert(e->a[0] == TEST_DEADLINE);
+        if (pending)
+            assert(!gf2_host_memcmp(h->staging, wait_staging, sizeof(wait_staging)));
         pending = true;
         gf2_host_memcpy(wait_staging, h->staging, sizeof(wait_staging));
         gf2_host_memcpy(wait_memory, ram.ptr, ram.bytes);
     }
     if (e->op == H_WAIT) assert(e->a[2] == TEST_DEADLINE);
     if (pending && (e->op == H_SLEEP || e->op == H_WAIT || e->op == H_M2MF || e->op == H_IFC)) {
-        if (uploading)
-            assert(!gf2_host_memcmp(h->staging, wait_staging, sizeof(wait_staging)));
-        else
+        /* A retired download may change staging on successful recovery. */
+        if (uploading) {
+            if (e->op != H_WAIT || e->rc)
+                assert(!gf2_host_memcmp(h->staging, wait_staging, sizeof(wait_staging)));
+        } else
             assert(!gf2_host_memcmp(ram.ptr, wait_memory, ram.bytes));
     }
-    if (e->op == H_M2MF || e->op == H_IFC) pending = false;
+    if ((e->op == H_WAIT && !e->rc) || e->op == H_M2MF || e->op == H_IFC)
+        pending = false;
 }
 
 static void setup(enum gf3_fmt fmt, u32 width, u32 height, u32 pitch,
@@ -306,6 +311,68 @@ static void failures(void)
     }
 }
 
+/* A04: timeout leaves RUN and submitted DMA alive. A second transfer
+ * must drain it before touching staging or submitting another fragment. */
+static void staging_retry(void)
+{
+    const int errors[] = {GF2_ETIME, GF2_EIO};
+    for (u32 direction = 0; direction < 2; ++direction) {
+        for (u32 retry = 0; retry < 2; ++retry) {
+            for (u32 error = 0; error < sizeof(errors) / sizeof(errors[0]); ++error) {
+                small(direction != 0);
+                gf3_host_fail_at(&host, H_WAIT, 1, errors[error]);
+                assert(run(true) == errors[error]);
+                assert(host.ch.state == GF2_RUN && host.dma_pending);
+                gf2_host_memcpy(wait_staging, host.staging, sizeof(wait_staging));
+                /* Make the next upload's contents differ from the first. */
+                for (u32 b = 0; b < ram.bytes; ++b) memory[b] ^= 0x5a;
+                uploading = retry != 0;
+                pending = false;
+                gf3_host_trace_clear(&host);
+                /* Failed re-drain must leave staging and CPU RAM untouched. */
+                host.now = TEST_DEADLINE;
+                host.fail_rc[H_WAIT] = 0;
+                gf2_host_memcpy(expected_ram, memory, sizeof(memory));
+                assert(run(true) == GF2_ETIME);
+                assert(!host.calls[H_M2MF] && host.dma_pending);
+                assert(!gf2_host_memcmp(host.staging, wait_staging, sizeof(wait_staging)));
+                assert(!gf2_host_memcmp(memory, expected_ram, sizeof(memory)));
+                /* A failed reference emission is also not completion. */
+                pending = false;
+                gf3_host_trace_clear(&host);
+                host.now = 0;
+                gf3_host_fail_at(&host, H_FENCE, 1, GF2_EIO);
+                assert(run(true) == GF2_EIO);
+                assert(!host.calls[H_M2MF] && host.dma_pending);
+                assert(!gf2_host_memcmp(host.staging, wait_staging, sizeof(wait_staging)));
+                /* Completion retires the old DMA before the new fragment. */
+                host.fail_rc[H_FENCE] = 0;
+                pending = false;
+                gf3_host_trace_clear(&host);
+                assert(!run(true));
+                assert(host.calls[H_FENCE] == 2 && host.calls[H_WAIT] == 2);
+                assert(host.calls[H_M2MF] == 1 && !host.dma_pending);
+                if (uploading) {
+                    u32 off = surface.off + rect.y * surface.pitch + rect.x;
+                    for (u32 y = 0; y < rect.h; ++y)
+                        assert(!gf2_host_memcmp(vram + off + y * surface.pitch,
+                                               memory + y * ram.pitch, rect.w));
+                } else {
+                    u32 off = surface.off + rect.y * surface.pitch + rect.x;
+                    for (u32 y = 0; y < rect.h; ++y)
+                        assert(!gf2_host_memcmp(memory + y * ram.pitch,
+                                               vram + off + y * surface.pitch, rect.w));
+                }
+                /* Normal following transfers add no recovery fence. */
+                pending = false;
+                gf3_host_trace_clear(&host);
+                assert(!run(true));
+                assert(host.calls[H_FENCE] == 1 && host.calls[H_WAIT] == 1);
+            }
+        }
+    }
+}
+
 /* Linux i386 old_mmap/mprotect: put the last valid RAM byte immediately
  * before a PROT_NONE page. No libc mapping wrapper or external allocator. */
 static void guard_boundary(void)
@@ -340,6 +407,6 @@ static void guard_boundary(void)
 
 void _start(void)
 {
-    splitting(); selection(); validation(); failures(); guard_boundary();
+    splitting(); selection(); validation(); failures(); staging_retry(); guard_boundary();
     gf2_host_exit(0);
 }
