@@ -1,5 +1,6 @@
 /* The single ver/About wording and order. Saved values only; no probes. */
 #include "ver_info.h"
+#include "gfx_hal.h"
 #include "config.h"
 #include "../arch/x86/kernel/idt.h"
 #include "module/module.h"
@@ -12,6 +13,7 @@
 #define VER_GFX_PEGC 2u
 #define VER_GFX_CIRRUS 3u
 #define VER_GFX_GEFORCE 4u
+#define VER_GFX_TRIDENT GFX_VER_TRIDENT
 #define VER_VERSION_MAX 20u
 #define VER_DEVICE (OS32_VER_DEVICE | OS32_VER_INDENT)
 #define VER_IDENTITY (OS32_VER_IDENTITY | OS32_VER_INDENT)
@@ -87,7 +89,8 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     const char *backend = s->gfx_kind == VER_GFX_PC98 ? "98" :
                           s->gfx_kind == VER_GFX_PEGC ? "PEGC" :
                           s->gfx_kind == VER_GFX_CIRRUS ? "Cirrus" :
-                          s->gfx_kind == VER_GFX_GEFORCE ? "GeForce" : NULL;
+                          s->gfx_kind == VER_GFX_GEFORCE ? "GeForce" :
+                          s->gfx_kind == VER_GFX_TRIDENT ? "Trident" : NULL;
     kmemset(out, 0, sizeof(*out));
     b = ver_line(out, OS32_VER_HEAD, "OS32");
     b.used = 0;

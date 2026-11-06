@@ -19,7 +19,7 @@ CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=120,
             'include/*.h', 'gfx/gfx_internal.h', 'gfx/gfx_emergency.h', 'gfx/palette.h',
             'build/trident-module.mk', 'build/trident-module.ld', 'build/kernel.mk',
             'build/config.mk', 'build/core.yaml', 'build/packages.yaml', 'Makefile',
-            'init/kernel.c', 'init/kernel_gfx_config.inc', 'userland/shell/cmd_sys.c',
+            'init/kernel.c', 'init/kernel_gfx_config.inc', 'platform/pc98/boot_names.c', 'userland/shell/cmd_sys.c',
             'sdk/kapi.json', 'sdk/include/os32/*.h',
             'build/out/trident/*', 'build/out/trident.mod',
             'build/out/vmkernel.lz4', 'build/out/kernel.elf'])
@@ -103,10 +103,47 @@ def product(work,runners):
         assert name in core.symbols,name
     print('GREEN paired product, three exports, relocation, ABI/PAIR rejection, core/body split',flush=True)
 
+def boot_order(work, runners):
+    # Execute the real boot call sequence with observers for module publication.
+    source=(ROOT/'init/kernel.c').read_text()
+    start=source.index('    if (kdebug.ops.crt_diag_bootlog)')
+    end=source.index('    kaudit_post_probe();', start)
+    fixture=r'''#include "gfx_hal.h"
+static int pref, loaded, prepared, bad;
+int gfx_get_backend_pref(void) { return pref; }
+static void trident_module_load(void) { ++loaded; }
+static void geforce_module_load(void) { }
+static void cirrus_module_load(void) { }
+void gfx_prepare_backend(void) {
+    ++prepared;
+    if (loaded != (pref == GFX_PREF_TRIDENT)) bad=1;
+}
+static struct { struct { void (*crt_diag_bootlog)(void); } ops; } kdebug;
+static void boot(void) {
+'''+source[start:end]+r'''}
+void _start(void) {
+    for (pref=GFX_PREF_AUTO; pref<=GFX_PREF_TRIDENT; ++pref) {
+        loaded=prepared=0; boot();
+        if (prepared != 1 || loaded != (pref == GFX_PREF_TRIDENT)) bad=1;
+    }
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(bad) : "memory");
+    __builtin_unreachable();
+}
+'''
+    path=work/'boot.c'; path.write_text(fixture); exe=work/'boot'
+    subprocess.run(['gcc',*FLAGS,*include_flags(ROOT),'-nostdlib','-static','-no-pie',
+                    str(path),'-o',str(exe)],check=True)
+    for runner in runners:
+        result=host32.run([str(exe)],runner=runner,capture_output=True)
+        assert result.returncode==0,result
+    print('GREEN boot loads Trident before backend preparation',flush=True)
+
+
 def main():
     runners=os.environ.get('HOST32_RUNNERS','qemu').split(); assert runners
     with tempfile.TemporaryDirectory(prefix='trident-module-') as td:
         work=Path(td)
+        boot_order(work,runners)
         product(work,runners)
         exe,tree=build(work/'normal'); execute(exe,runners)
         print('GREEN context/load/facade/pin/prepare/abort controls',flush=True)

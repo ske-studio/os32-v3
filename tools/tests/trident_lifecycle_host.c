@@ -260,7 +260,27 @@ static int failures(void)
         u32 ops=f.operations; backend.init(); backend.enter();
         CHECK(equal(f.operations,ops) && equal(device.last_rc,(u32)-73));
         if (stages[i]==TRI_STEP_PC98_INIT) CHECK(!device.init_done);
-        if (stages[i]==TRI_STEP_SAVE) CHECK(!calls[TRI_STEP_RESTORE] && calls[TRI_STEP_DISABLE]==1);
+        if (stages[i]==TRI_STEP_SAVE) {
+            CHECK(!device.saved.valid && !calls[TRI_STEP_RESTORE]);
+            CHECK(calls[TRI_STEP_DISABLE]==1 && calls[TRI_STEP_LOCK]==1);
+            CHECK(order[norder-2]==TRI_STEP_DISABLE && order[norder-1]==TRI_STEP_LOCK);
+            CHECK(f.cr_color[0x11] & 0x80);
+        }
+    }
+    /* Identify index/read + boot Misc + capacity index/read. Save then reads
+     * Misc, writes DAC mask/index, and reads the first two palette bytes
+     * (vgaHW.c:1016-1166; state_save.c's SaveColormap reference). */
+    enum { BEFORE_SAVE_ACCESSES = 2 + 1 + 2, SAVE_SECOND_DAC_READ = 1 + 2 + 2 };
+    /* Real Save fails after register accesses, with no valid snapshot. */
+    for (u32 m=0; m<2; ++m) {
+        CALL(setup(m,false)); f.resources.mapped_bytes=TRI_DISPLAY_BYTES;
+        trident_fake_fail(&f,BEFORE_SAVE_ACCESSES + SAVE_SECOND_DAC_READ,-98); backend.init();
+        CHECK(equal(device.last_rc,(u32)-98) && device.failed_step==TRI_STEP_SAVE);
+        CHECK(!device.saved.valid && !device.active && !calls[TRI_STEP_RESTORE]);
+        CHECK(calls[TRI_STEP_DISABLE]==1 && calls[TRI_STEP_LOCK]==1);
+        CHECK(order[norder-2]==TRI_STEP_DISABLE && order[norder-1]==TRI_STEP_LOCK);
+        CHECK((m ? f.cr_mono[0x11] : f.cr_color[0x11]) & 0x80);
+        CHECK(!oracle_error);
     }
     CALL(setup(false,false)); f.resources.mapped_bytes=TRI_DISPLAY_BYTES; fail_arm=1; backend.init();
     CHECK(equal(device.last_rc,(u32)-71) && !f.operations && !device.armed);

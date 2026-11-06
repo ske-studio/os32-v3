@@ -57,6 +57,8 @@ MUTATIONS = (
   'first = restore_lock(d);\n        second = disable(d);','CloseScreen order'),
  ('M_ACTIVE_EARLY','lifecycle.c','restore = trident_state_restore(d);',
   'd->active = false; restore = trident_state_restore(d);','Restore retains vtSema'),
+ ('M_UNSAVED_LOCK','lifecycle.c','int lock = trident_crtc_lock(d, d->cur_vga_base, true);',
+  'int lock = d->saved.valid ? trident_crtc_lock(d, d->cur_vga_base, true) : 0;','lock despite incomplete Save'),
  ('M_SKIP_LOCK','lifecycle.c','int lock = trident_crtc_lock(d, d->cur_vga_base, true);',
   'int lock = restore ? 0 : trident_crtc_lock(d, d->cur_vga_base, true);','lock despite restore failure'),
  ('M_SKIP_DISABLE','lifecycle.c','second = disable(d);','second = first ? 0 : disable(d);','Disable despite Restore failure'),

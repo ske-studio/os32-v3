@@ -141,12 +141,12 @@ static int restore_lock(struct trident_device *d)
         restore = trident_state_restore(d);
         if (restore) failed(d, TRI_STEP_RESTORE, restore);
         else d->step = TRI_STEP_RESTORE;
-        /* Attempt lock even after a partial Restore, using its current base. */
-        int lock = trident_crtc_lock(d, d->cur_vga_base, true);
-        if (lock) failed(d, TRI_STEP_LOCK, lock);
-        else d->step = TRI_STEP_LOCK;
-        if (!restore) restore = lock;
     }
+    /* CloseScreen locks under vtSema even when Save never completed (D:3348). */
+    int lock = trident_crtc_lock(d, d->cur_vga_base, true);
+    if (lock) failed(d, TRI_STEP_LOCK, lock);
+    else d->step = TRI_STEP_LOCK;
+    if (!restore) restore = lock;
     d->restore_rc = restore;
     return restore;
 }

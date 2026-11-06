@@ -216,6 +216,7 @@ int gfx_cirrus_probed(void);
 #define GFX_VER_PEGC    2
 #define GFX_VER_GEFORCE 4
 #define GFX_VER_CIRRUS  3
+#define GFX_VER_TRIDENT 5
 /* Saved query only: active height while started, selected GUI target otherwise.
  * No probe, mode switch or allocation. All outputs required (INVAL if NULL);
  * otherwise failure leaves zeros/UNKNOWN and returns NOSYS or the query error. */

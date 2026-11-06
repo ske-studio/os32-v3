@@ -181,6 +181,10 @@ void _start(void)
     line(7, "GFX: Cirrus 640x400x4 bpp; GUI target");
     s.gfx_kind = 4; formatted(16);
     line(7, "GFX: GeForce 640x400x4 bpp; GUI target");
+    baseline(); s.gfx_kind = GFX_VER_TRIDENT; formatted(16);
+    line(7, "GFX: Trident 640x480x8 bpp; active");
+    s.gfx_active = 0; formatted(16);
+    line(7, "GFX: Trident 640x480x8 bpp; GUI target");
     for (u32 part = 0; part < 3; part++) {
         baseline();
         if (part == 0) s.gfx.width = 0;
