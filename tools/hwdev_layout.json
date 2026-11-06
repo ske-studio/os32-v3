@@ -1271,6 +1271,7 @@
       "emergency",
       "fan",
       "fan_off",
+      "heat",
       "image",
       "last_rc",
       "links",
@@ -1279,9 +1280,11 @@
       "next_step",
       "next_toggle",
       "phase",
+      "plan_guard",
       "poll_off",
       "poll_source",
       "rom",
+      "rom_generation",
       "source_rc",
       "tile",
       "tile_live",
@@ -1338,6 +1341,16 @@
       "hyst",
       "temp"
     ],
+    "struct gf5_heat_state": [
+      "ceiling",
+      "cool_samples",
+      "critical_paused",
+      "down_active",
+      "entry_clock",
+      "epoch",
+      "last_rc",
+      "stop_pending"
+    ],
     "struct gf5_image": [
       "bytes",
       "clock",
@@ -1370,8 +1383,10 @@
       "unpause"
     ],
     "struct gf5_perf_entry": [
+      "bios_index",
       "clock",
       "fanspeed",
+      "pstate",
       "voltage"
     ],
     "struct gf5_plan": [
@@ -1382,6 +1397,15 @@
       "nc",
       "nn",
       "sc"
+    ],
+    "struct gf5_plan_guard": [
+      "canonical",
+      "core_used",
+      "epoch",
+      "ram_used",
+      "request",
+      "rom_generation",
+      "valid"
     ],
     "struct gf5_rom_view": [
       "bytes",
@@ -2750,6 +2774,7 @@
     "GF5_EBUSY",
     "GF5_EINVAL",
     "GF5_EIO",
+    "GF5_ENODEV",
     "GF5_ENOMEM",
     "GF5_ENOTSUP",
     "GF5_ERANGE",

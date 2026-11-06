@@ -141,10 +141,10 @@ static void versions(void)
     for (u32 i=0;i<sizeof(nv4_versions);++i) {
         fresh(); rom[PERF_AT]=nv4_versions[i];
         u32 n=0; assert(!gf5_perf_count(&h.ctx,&n) && n==ENTRY_COUNT);
-        expect_get(0,(struct gf5_perf_entry){requested,VOLT_BASE,FAN_BASE});
+        expect_get(0,(struct gf5_perf_entry){requested,VOLT_BASE,FAN_BASE,0,0});
         expect_get(1,(struct gf5_perf_entry){{(SHADER_MHZ+SHADER_STEP_MHZ+CORE_OFFSET_MHZ)*KHZ_PER_MHZ,
             (SHADER_MHZ+SHADER_STEP_MHZ)*KHZ_PER_MHZ,
-            (MEM_MHZ+MEM_STEP_MHZ)*NV4_MEM_KHZ_PER_UNIT},VOLT_BASE+1,FAN_BASE+1});
+            (MEM_MHZ+MEM_STEP_MHZ)*NV4_MEM_KHZ_PER_UNIT},VOLT_BASE+1,FAN_BASE+1,0,0});
     }
     static const u8 newer[]={0x25,0x30,0x35};
     for (u32 i=0;i<sizeof(newer);++i) {
@@ -155,7 +155,7 @@ static void versions(void)
         rom[at+fan]=NEW_FAN; rom[at+fan+1]=NEW_VOLT;
         put16(at+core,NEW_CORE_MHZ); put16(at+0x0a,NEW_SHADER_MHZ); put16(at+0x0c,NEW_MEM_MHZ);
         expect_get(0,(struct gf5_perf_entry){{NEW_CORE_MHZ*KHZ_PER_MHZ,NEW_SHADER_MHZ*KHZ_PER_MHZ,
-            NEW_MEM_MHZ*KHZ_PER_MHZ},NEW_VOLT,NEW_FAN});
+            NEW_MEM_MHZ*KHZ_PER_MHZ},NEW_VOLT,NEW_FAN,0,0});
     }
     static const u8 old[]={0x12,0x13,0x14};
     for (u32 i=0;i<sizeof(old);++i) {
@@ -170,10 +170,10 @@ static void versions(void)
         put32(at+1,OLD_CORE_UNITS); put32(at+5,OLD_MEM_UNITS);
         rom[at+0x37]=OLD_FAN; rom[at+OLD_VOLT_OFFSET]=OLD_VOLT;
         expect_get(0,(struct gf5_perf_entry){{OLD_CORE_UNITS*OLD_CORE_KHZ_PER_UNIT,0,
-            OLD_MEM_UNITS*OLD_MEM_KHZ_PER_UNIT},OLD_VOLT,OLD_FAN});
+            OLD_MEM_UNITS*OLD_MEM_KHZ_PER_UNIT},OLD_VOLT,OLD_FAN,0,0});
         rom[PERF_AT+3]=OLD_VOLT_OFFSET; /* Voltage is optional in these versions. */
         expect_get(0,(struct gf5_perf_entry){{OLD_CORE_UNITS*OLD_CORE_KHZ_PER_UNIT,0,
-            OLD_MEM_UNITS*OLD_MEM_KHZ_PER_UNIT},0,OLD_FAN});
+            OLD_MEM_UNITS*OLD_MEM_KHZ_PER_UNIT},0,OLD_FAN,0,0});
         put32(at+1,0xffffffffU);
         struct gf5_perf_entry e={0};
         assert(gf5_perf_get(&h.ctx,0,&e)==GF5_EBIOS && !e.clock.core_khz);
@@ -182,7 +182,7 @@ static void versions(void)
 static void malformed(void)
 {
     u32 n;
-    struct gf5_perf_entry keep={{1,2,3},4,5},e;
+    struct gf5_perf_entry keep={{1,2,3},4,5,0,0},e;
     fresh(); e=keep;
     assert(gf5_perf_get(&h.ctx,ENTRY_COUNT,&e)==GF5_EINVAL && same_entry(e,keep));
     assert(gf5_perf_count(0,&n)==GF5_EINVAL);

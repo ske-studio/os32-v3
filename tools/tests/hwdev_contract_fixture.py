@@ -22,6 +22,9 @@ FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diag
 S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
 outstanding transfer ownership. Existing sizes and member offsets stay fixed.
 IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
+Guard D0 adds the private plan guard, ROM generation and live heat state,
+plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
+make all regenerates the contract after the reviewed inventory update.
 These changes own the pins below.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
@@ -45,9 +48,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x2552eaee
+REVIEWED_LAYOUT_CRC = 0x1f0a7f82
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '61bcba18d3b5ece287bee3f022439ee5be9dd8f9891ded6872a3fbd6c28efbb8'
+REVIEWED_INVENTORY_SHA = 'b2d40400b75aa97bc0ce93d91c2ed80cbc78214e8c8476e2ed088812fa5beae5'
 
 
 def import_declarations(root):

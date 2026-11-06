@@ -27,6 +27,13 @@ const struct gf5_test_ops *geforce_feature5_ops(void);
 void geforce_backend_feature5_bind(struct gf5 *);
 void gf_hook_feature5_bind(struct gf5 *);
 int geforce_foundation_display(bool start);
+/* Resident foreground adapter: reread the F5 slot on every dispatch, never
+ * cache module ctx/ops. No IRQ calls. Consume pending heat stop at the common
+ * exit while retaining reentry protection; backend stop owns active/routed. */
+void geforce_foreground_poll(void);
+/* Value-only stop request; do not retain any module pointers. The consumer
+ * owns no-route sync/halt; geforce_return must retain its reboot semantics. */
+void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);
