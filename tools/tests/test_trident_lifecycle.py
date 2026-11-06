@@ -291,9 +291,9 @@ def check_trace(data):
             trace.access(True,1,0x3C0,selector)
             trace.access(False,1,0x3DA,0x5A)
             trace.access(False,1,0x3CC,0xEB)
-            # Row-span values carry the first dword; full H-equivalent bitmap
-            # and its last byte are checked independently in the C harness.
-            for row in range(480): trace.access(True,4,row*640,space=1,count=160)
+            # Every LFB byte, including the final byte, must use write8.
+            # Full H-equivalent bitmap is also checked in the C harness.
+            for off in range(640*480): trace.access(True,1,off,space=1,count=1)
             trace.done()
         elif step==15: script('disable',trace,env)
         elif step==13:

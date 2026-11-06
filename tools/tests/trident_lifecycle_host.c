@@ -15,7 +15,7 @@ static int equal(u32 a, u32 b)
 #define CALL(x) do { int result=(x); if (result) return result; } while (0)
 static struct trident_fake f;
 static u8 storage[TRI_BAR0_DECODE_BYTES], client[TRI_DISPLAY_BYTES];
-static struct trident_fake_event trace[16384];
+static struct trident_fake_event trace[TRI_DISPLAY_BYTES + 16384];
 static u32 scratch[TRI_VRAM_SCRATCH_BYTES / sizeof(u32)];
 static u32 calls[17], starts[17], ends[17], order[64], norder;
 static u32 fail_step, fail_restore, fail_disable, fail_lock, fail_arm, fail_alloc, fail_client;

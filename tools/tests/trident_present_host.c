@@ -2,11 +2,11 @@
 static struct trident_fake f;
 static struct trident_device d;
 static u8 vram[TRI_FAKE_REAL_BYTES], client[TRI_DISPLAY_BYTES + 4];
-static struct trident_fake_event trace[1024];
+static struct trident_fake_event trace[TRI_DISPLAY_BYTES];
 #define CHECK(c) do { if (!(c)) return __LINE__; } while (0)
 static int test(void)
 {
-    CHECK(!trident_fake_reset(&f, vram, sizeof(vram), trace, 1024));
+    CHECK(!trident_fake_reset(&f, vram, sizeof(vram), trace, TRI_DISPLAY_BYTES));
     trident_fake_bind(&f, &d);
     f.resources.client = client;
     f.resources.client_bytes = TRI_DISPLAY_BYTES;
@@ -16,9 +16,17 @@ static int test(void)
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) client[i] = (u8)(i * 17u + 1u);
     CHECK(!trident_present(&d, 0, 0, 640, 480));
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) CHECK(vram[i] == client[i]);
+#ifdef TEST_PRESENT_SPAN32
     CHECK(f.trace_count == 480 && !f.trace_overflow);
     for (u32 i = 0; i < 480; ++i)
         CHECK(f.trace[i].offset == i * 640 && f.trace[i].count == 160 && f.trace[i].width == 4);
+#else
+    CHECK(f.trace_count == TRI_DISPLAY_BYTES && !f.trace_overflow);
+    for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i)
+        CHECK(f.trace[i].space == TRI_SPACE_LFB && f.trace[i].write &&
+              f.trace[i].offset == i && f.trace[i].count == 1 &&
+              f.trace[i].width == 1 && f.trace[i].value == client[i] && !f.trace[i].rc);
+#endif
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) vram[i] = 0;
     trident_fake_trace_reset(&f);
     CHECK(!trident_present(&d, -2, 478, 7, 8));

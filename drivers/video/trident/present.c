@@ -4,12 +4,21 @@
  * trident.h). The OS32 row-transfer interface is specified in trident.h. */
 #include "trident.h"
 
+/* Trial for PC-98 Ra266 hardware (2026-11-06): matching mode readbacks
+ * still produced narrow, skewed bands with dword stores, while H's
+ * mmiofill8 displayed correctly. Address decoding by access width remains
+ * a hypothesis. Unlike X.Org trident_shadow.c:19-36 (memcpy) and :74-107
+ * (CARD32 stores for rotation), force write8 here. Set to 1 to restore the
+ * aligned span32 path; this choice does not change vram.c's dword probe. */
+#define TRI_PRESENT_USE_SPAN32 0
+
 int trident_present(struct trident_device *d, int x, int y, int w, int h)
 {
     const struct trident_resources *r;
     u32 end;
 
-    if (!d || !d->res || !d->io || !d->io->write8 || !d->io->write_span32)
+    if (!d || !d->res || !d->io || !d->io->write8 ||
+        (TRI_PRESENT_USE_SPAN32 && !d->io->write_span32))
         return TRI_E_INVAL;
     r = d->res;
     if (!r->client) return TRI_E_INVAL;
@@ -33,12 +42,12 @@ int trident_present(struct trident_device *d, int x, int y, int w, int h)
         u32 left = (u32)w;
         int rc;
         /* A span requires both source and destination to be aligned. */
-        while (left && ((off & 3u) || ((uptr)src & 3u))) {
+        while (TRI_PRESENT_USE_SPAN32 && left && ((off & 3u) || ((uptr)src & 3u))) {
             rc = d->io->write8(d->io_opaque, TRI_SPACE_LFB, off, *src);
             if (rc) return rc;
             ++off; ++src; --left;
         }
-        if (left >= 4u) {
+        if (TRI_PRESENT_USE_SPAN32 && left >= 4u) {
             u32 count = left / 4u;
             rc = d->io->write_span32(d->io_opaque, off, (const u32 *)src, count);
             if (rc) return rc;
