@@ -656,7 +656,7 @@ static i32 th_sensor(struct gf5 *g,u64 now)
         i64 limit=(i64)f->threshold[i]*TH_MILLI;
         i64 cool=((i64)f->threshold[i]-f->hyst[i])*TH_MILLI;
         if (!active && t.milli_c>=limit) active=true;
-        else if (active && t.milli_c<cool) active=false;
+        else if (active && t.milli_c<=cool) active=false;
         if (i==TH_BOOST) boost_rising=active && !f->active[i];
         if (i==TH_CRITICAL) critical_changed=active!=f->active[i];
         f->active[i]=active;
