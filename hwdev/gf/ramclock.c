@@ -169,6 +169,10 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
     io = &g->ch->f->io;
     if (!io->read || !io->write || !io->timing.clock_us || !io->timing.wait_us)
         return finish(g, GF5_EINVAL);
+    rc = gf5_plan_check(g, plan, true);
+    if (rc) return rc;
+    /* ramnv40.c:115-147 uses private coefficients; consume before any MMIO. */
+    g->plan_guard.ram_used = true;
     /* Snapshot before any destructive writes. B1 already calculated mc/mn. */
     rc = rd(io, RAM_CTRL, RAM_WORD, &ctrl);
     if (!rc) rc = rd(io, RAM_COEF, RAM_WORD, &coef);
