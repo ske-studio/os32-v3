@@ -68,6 +68,8 @@ def main():
         for header in ('stdio.h', 'stdlib.h', 'string.h'):
             (work / header).write_text('#include "fep_boundary_runtime.h"\n')
         harness = (ROOT / 'tools/tests/ime_dict_host.c').read_text()
+        # This fixture supplies its fault-injectable probe and user product below.
+        harness = harness.replace('#include "fep_store_host.h"', '')
         harness = harness.replace('#include "../../kernel/ime/ime_dict.c"',
             'static int stage_i_step(sqlite3_stmt *stmt);\n'
             'static int stage_i_bind_text(sqlite3_stmt *, int, const char *, int, sqlite3_destructor_type);\n'

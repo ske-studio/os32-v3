@@ -85,6 +85,7 @@ static int inj_read(void *ctx, const char *path, void *buf, u32 size, u32 offset
 }
 
 #include "../../kernel/ime/ime_dict.c"
+#include "fep_store_host.h"
 
 /* Fixture setup uses a separate EXEC group; default file opens are forbidden. */
 static Os32SqliteGroup setup_group;
