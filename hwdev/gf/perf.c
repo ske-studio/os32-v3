@@ -190,6 +190,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     if (!g) return GF5_EINVAL;
     struct gf5_perf_entry e;
     struct gf5_plan plan={0};
+    bool programming=false;
     i32 rc=entry_read(g,index,&e), absent=0;
     if (rc) return finish(g,rc);
     g->source_rc=0;
@@ -202,9 +203,14 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
 #define STEP(call) do { g->source_rc=0; rc=(call); if (rc) goto fault; } while (0)
 #define OPTIONAL(call) do { \
     g->source_rc=0; rc=(call); \
-    if (gf5_rc_map(rc)==GF5_ENOTSUP) { absent=g->source_rc ? g->source_rc : rc; } \
+    if (gf5_rc_map(rc)==GF5_ENODEV) { absent=g->source_rc ? g->source_rc : rc; } \
     else if (rc) goto fault; \
 } while (0)
+    /* clk/base.c:178-192 only tolerates a missing component. Resolve all
+     * support before RAM changes hardware; unsupported tables are errors. */
+    OPTIONAL(gf5_fan_check_cstate(g,e.fanspeed));
+    OPTIONAL(gf5_volt_check_id(g,e.voltage,e.voltage));
+    programming=true;
     STEP(gf5_ram_prog(g,&plan));
     OPTIONAL(gf5_fan_cstate(g,e.fanspeed,+1));
     OPTIONAL(gf5_volt_id(g,e.voltage,e.voltage,+1));
@@ -219,7 +225,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
 fault: {
         i32 source=g->source_rc ? g->source_rc : rc;
         i32 mapped=gf5_rc_map(rc);
-        g->phase=GF5_FAULT; g->accepting=false;
+        if (programming) { g->phase=GF5_FAULT; g->accepting=false; }
         g->source_rc=source; g->last_rc=mapped;
         return mapped;
     }
