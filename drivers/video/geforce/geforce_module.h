@@ -57,6 +57,9 @@ struct geforce_platform *geforce_platform_get(void);
 int geforce_boot_reserve(void) __attribute__((weak));
 int geforce_pc98_safe(void);
 int geforce_range_reserved(u32 base, u32 length);
+/* Resolve one fully containing boot-reserved BAR, 0/-1. Invalid/overflowing
+ * ranges and ambiguous matches fail without changing owner/rid outputs. */
+int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);
 void geforce_display_failed(void);
 typedef struct {
     GfxBackend *backend;
