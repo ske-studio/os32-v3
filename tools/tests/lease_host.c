@@ -280,9 +280,12 @@ void _start(void) {
     CHECK(!a.lease_pt_phys[1] && a.lease_pt_phys[0]);
     /* UC backing and mismatch with supervisor alias. */
     sf.first=MEM_LEASE_END/PAGE_SIZE; sf.npages=1; sf.backing=LEDGER_SB_MMIO; sf.cache=LEDGER_CACHE_UC;
-    ledger_resources[0].map_first=sf.first; ledger_resources[0].map_end=sf.first+1;
+    struct ledger_resource mmio = {.bus=LEDGER_BUS_FIXED,.width_basis=LEDGER_WB_GLUE_CONST,
+        .decode_first=sf.first,.decode_end=sf.first+1,.map_first=sf.first,.map_end=sf.first+1};
+    u32 rid;
+    CHECK(ledger_resource_add(&mmio,&rid));
     ledger_regions[ledger_region_count++]=(struct ledger_region){.first=sf.first,.end=sf.first+1,
-        .type=LEDGER_R_DEVICE,.owner=LEDGER_OWNER_GFX,.cache=LEDGER_CACHE_UC,.res_mask=1};
+        .type=LEDGER_R_DEVICE,.owner=LEDGER_OWNER_GFX,.cache=LEDGER_CACHE_UC,.res_mask=1U<<rid};
     CHECK(!paging_map_phys(MEM_LEASE_END,MEM_LEASE_END,1,PAGE_RW|PTE_PCD));
     CHECK(ledger_surface_create(&sf,&sid)); refs[0]=(struct surface_ref){sid,ledger_surfaces[sid].gen};
     CHECK(!lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,v));

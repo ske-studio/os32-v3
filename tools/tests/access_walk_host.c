@@ -312,11 +312,15 @@ static void host_start(void)
         {
             struct ledger_surface keep = *live;
             u32 mmio = MEM_DEVICE_APERTURE_BASE / PAGE_SIZE;
+            struct ledger_resource rec = {.bus = LEDGER_BUS_FIXED,
+                .width_basis = LEDGER_WB_GLUE_CONST,
+                .decode_first = mmio, .decode_end = mmio + 1,
+                .map_first = mmio, .map_end = mmio + 1};
+            u32 rid;
+            CHECK(ledger_resource_add(&rec, &rid));
             ledger_regions[ledger_region_count++] = (struct ledger_region){
                 .first = mmio, .end = mmio + 1, .type = LEDGER_R_DEVICE,
-                .owner = LEDGER_OWNER_GFX, .cache = LEDGER_CACHE_UC, .res_mask = 1};
-            ledger_resources[0].map_first = mmio;
-            ledger_resources[0].map_end = mmio + 1;
+                .owner = LEDGER_OWNER_GFX, .cache = LEDGER_CACHE_UC, .res_mask = 1U << rid};
             live->first = mmio; live->owner = LEDGER_OWNER_GFX;
             live->cache = LEDGER_CACHE_UC;
             lp[0] = mmio * PAGE_SIZE | PAGE_RW | PTE_USER | PTE_PCD;
