@@ -74,6 +74,9 @@ filesystem:
     - host: userland/tests/gfx200_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/fep_meta_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/gfx_demo200.bin
       guest: /usr/bin/
       tags: [test]
