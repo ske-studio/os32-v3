@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "gfx_hal.h"
 #include "video_service.h"
+#include "../../../hwdev/gf/feature5.h"
 #include "../../../kernel/module/module_runtime.h"
 #define GEFORCE_MODULE_OPS_VERSION 5u
 #define GEFORCE_WC_BYTES 0x80000U
@@ -19,11 +20,10 @@ struct gf5_test_ops;
 /* Resident storage; module callbacks are published for the pinned boot owner.
  * Requests carry values only. Clearing requires an explicit cold measurement. */
 struct geforce_heat_bridge {
-    bool latched;
+    struct gf5_stop_state stop_state;
     void (*request)(i32 reason, i32 milli_c, i32 source_rc);
     int (*stop)(void);
     int (*clear)(void);
-    bool (*active)(void); /* Backend, production channel or engaged display. */
     bool (*backend_active)(void); /* App recovery belongs only to gfx enter. */
 };
 const struct gf3_test_ops *geforce_accel_ops(void);
@@ -46,6 +46,7 @@ bool geforce_fg_due(u32 now_tick);
 /* Value-only stop request; do not retain any module pointers. The consumer
  * owns no-route sync/halt; geforce_return must retain its reboot semantics. */
 void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
+void geforce_display_stopped(void);
 int geforce_heat_latch_clear(void);
 struct geforce_platform {
     struct video_device *device;

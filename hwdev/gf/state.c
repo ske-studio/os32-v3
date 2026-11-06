@@ -77,41 +77,6 @@ static i32 state_cancel(struct gf5 *g, i32 rc, bool was_accepting)
 
 /* The live heat policy is not part of the image. In particular an image
  * captured before downclock must not raise any domain on resume (§6). */
-static bool state_above_ceiling(const struct gf5 *g, const struct gf5_clock *clock)
-{
-    return g->heat.down_active &&
-        (clock->core_khz>g->heat.ceiling.core_khz ||
-         (clock->shader_khz ? clock->shader_khz : clock->core_khz)>
-             g->heat.ceiling.shader_khz ||
-         clock->mem_khz>g->heat.ceiling.mem_khz);
-}
-
-/* clk/nv40.c:39-78: calc actual can describe only the first PLL stage.
- * Decode coefficients before programming, rather than trusting that value.
- * A canonical plan from clock_calc always selects the shared core source. */
-static i32 state_plan_ceiling(struct gf5 *g, const struct gf5_plan *plan)
-{
-    if (!g->heat.down_active) return 0;
-    struct gf5_clock decoded={0};
-    const u32 control[2]={plan->nc,plan->mc};
-    const u32 coefficient[2]={plan->nn,plan->mn};
-    u32 khz[2];
-    if ((plan->mux&0x33U)!=0x33U) return GF5_ERANGE;
-    for (u32 i=0;i<2;++i) {
-        u32 c=control[i], v=coefficient[i], m=v&255U, n=(v>>8)&255U;
-        if (!(c&0x80000000U) || !m || !n) return GF5_ERANGE;
-        khz[i]=GF_PLL_REF*n/m;
-        if ((c&0x40000100U)==0x40000000U) {
-            m=(v>>16)&255U; n=(v>>24)&255U;
-            if (!m || !n) return GF5_ERANGE;
-            khz[i]=khz[i]*n/m;
-        }
-        khz[i]>>=(c>>16)&7U;
-    }
-    decoded.core_khz=decoded.shader_khz=khz[0]; decoded.mem_khz=khz[1];
-    return state_above_ceiling(g,&decoded) ? GF5_EBUSY : 0;
-}
-
 /* All snapshot storage is one allocation: metadata, extent values, deep
  * trip values, then byte images. No serialized map/node/GPU pointers. */
 i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
@@ -120,7 +85,7 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
         return state_reject(g,GF5_EBUSY);
     if (g->phase!=GF5_RUN) return state_reject(g,GF5_ESTATE);
-    if (g->heat.critical_paused || g->heat.stop_pending)
+    if (g->heat.critical_paused || gf5_stopping(g))
         return state_reject(g,GF5_ESTATE);
     for (u32 i=0;i<GF5_TILE_COUNT;++i) {
         const struct gf5_tile_slot *s=&g->tile_slot[i];
@@ -216,7 +181,7 @@ static i32 state_performance(struct gf5 *g, const struct gf5_image *image)
     struct gf5_plan plan;
     u32 previous=0;
     i32 rc=gf5_clock_calc(g,&image->clock,&plan);
-    if (!rc) rc=state_plan_ceiling(g,&plan);
+    if (!rc) rc=gf5_plan_ceiling(g,&plan);
     if (!rc) rc=gf5_ram_prog(g,&plan);
     if (!rc) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
     if (!rc) rc=gf5_volt_get(g,&previous);
@@ -235,9 +200,9 @@ i32 gf5_state_restore(struct gf5 *g, const struct gf5_image *image)
         return state_reject(g,GF5_EBUSY);
     if (g->phase!=GF5_SAVED || g->image!=image || !image->complete ||
         image->version!=GF5_IMAGE_VERSION) return state_reject(g,GF5_ESTATE);
-    if (g->heat.critical_paused || g->heat.stop_pending)
+    if (g->heat.critical_paused || gf5_stopping(g))
         return state_reject(g,GF5_ESTATE);
-    if (state_above_ceiling(g,&image->clock)) return state_reject(g,GF5_EBUSY);
+    if (gf5_above_ceiling(g,&image->clock)) return state_reject(g,GF5_EBUSY);
     g->last_rc=g->source_rc=0;
     i32 rc=state_deadline(g);
     if (rc) return state_result(g,rc);

@@ -25,20 +25,16 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/video/geforce/geforce_module.c'
 MUTATIONS = [
-    ('deadline-minimum', 'if (deadlines[i] && deadlines[i]<next)',
-     'if (0 && deadlines[i] && deadlines[i]<next)'),
-    ('deadline-pending', 'return heat_pending || !foreground_deadline_valid ||',
-     'return false || !foreground_deadline_valid ||'),
+    ('deadline-minimum', 'if (deadlines[i] && deadlines[i]<next)', 'if (0 && deadlines[i] && deadlines[i]<next)'),
+    ('deadline-pending', 'return heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !foreground_deadline_valid ||', 'return false || !foreground_deadline_valid ||'),
     ('heat-consume', '    heat_stop_consume();', '    if (0) heat_stop_consume();'),
-    ('heat-latch', '    heat_bridge.latched=true;', '    heat_bridge.latched=false;'),
-    ('heat-notify', '        geforce_display_failed();', '        if (0) geforce_display_failed();'),
-    ('heat-abort', '        (void)appslot_abort_request();', '        if (0) (void)appslot_abort_request();'),
+    ('heat-latch', 'heat_bridge.stop_state=(struct gf5_stop_state){GF5_STOP_REQUESTED,reason,milli_c,source_rc};', 'heat_bridge.stop_state=(struct gf5_stop_state){GF5_STOP_NORMAL,reason,milli_c,source_rc};'),
+    ('heat-notify', '        geforce_display_stopped();', '        if (0) geforce_display_stopped();'),
+    ('heat-abort', 'if (app && app->state!=APP_STATE_FREE) app->abort_req=1;', 'if (false && app) app->abort_req=1;'),
     ('heat-sync', 'int sync_rc=vfs_sync();', 'int sync_rc=0;'),
-    ('heat-clear', 'if (!rc) heat_bridge.latched=false;', 'if (0) heat_bridge.latched=false;'),
-    ('foreground-dispatch', 'if (ops && ops->service_poll)',
-     'if (0 && ops && ops->service_poll)'),
-    ('foreground-reentry', 'if (foreground_poll_busy) return;',
-     'if (0 && foreground_poll_busy) return;'),
+    ('heat-clear', 'if (!rc) heat_bridge.stop_state=(struct gf5_stop_state){0};', 'if (0) heat_bridge.stop_state=(struct gf5_stop_state){0};'),
+    ('foreground-dispatch', 'if (ops && ops->service_poll)', 'if (0 && ops && ops->service_poll)'),
+    ('foreground-reentry', 'if (foreground_poll_busy) return;', 'if (0 && foreground_poll_busy) return;'),
 ]
 
 

@@ -62,6 +62,7 @@ struct gf5_host_event {
 struct gf5_host {
     struct gf4_host display;
     struct gf5 ctx; u64 now;
+    struct gf5_stop_state stop;
     struct gf5_host_event *events;
     u32 cevents,nevents,calls[F5_OP_COUNT],fail_at[F5_OP_COUNT];
     i32 fail_rc[F5_OP_COUNT];
@@ -399,7 +400,7 @@ static inline void gf5_host_init(struct gf5_host *h,struct gf4_state *state)
 {
     assert(h && state); gf2_host_memset(h,0,sizeof(*h));
     gf4_host_init(&h->display,state); h->display.now=&h->now;
-    gf5_host_current=h;
+    gf5_host_current=h; h->ctx.stop=&h->stop;
     h->ctx.ch=&h->display.base.ch; h->ctx.accel=&h->display.base.ctx;
     h->ctx.display=&h->display.ctx; h->ctx.phase=GF5_RUN; h->ctx.accepting=true;
     h->ctx.links=(struct gf5_links){

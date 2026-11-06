@@ -346,7 +346,7 @@ void GF4_SCANLOG_ENTRY(void)
     assert(scanlog_contains("[gf4] scanout "));
     u32 clock_len=startlog_len;
     geforce_present(0,0,1,1);
-    assert(active && startlog_len==clock_len);
+    assert(active && startlog_len>clock_len);
     scanlog_clock_error=false;
     scanlog_finish();
     /* No GPIO table, or a GPIO table without FAN: both are passive boards. */

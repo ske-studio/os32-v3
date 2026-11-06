@@ -18,7 +18,7 @@ static i32 service_ready(struct gf5 *g)
 {
     if (!g) return GF5_EINVAL;
     if (g!=service_ctx) return GF5_ESTATE;
-    if (g->phase!=GF5_RUN || g->heat.critical_paused || !g->accepting || !g->ch || !g->ch->f ||
+    if (g->phase!=GF5_RUN || gf5_stopping(g) || g->heat.critical_paused || !g->accepting || !g->ch || !g->ch->f ||
         g->ch->state!=GF2_RUN || g->ch->fault.latched || !g->ch->f->running ||
         !g->display || g->display->ch!=g->ch ||
         !g->display->ready || !g->display->accepting || g->display->changing ||
@@ -78,12 +78,11 @@ static void service_heat_failure(struct gf5 *g,i32 rc)
     /* Preserve the failing boundary even if closing admission also fails. */
     (void)g->links.admission(g->links.owner,false);
     g->accepting=false;
-    g->phase=GF5_FAULT;
     gf5_plan_invalidate(g);
-    g->source_rc=g->heat.source_rc=rc;
-    g->last_rc=g->heat.last_rc=gf5_rc_map(rc);
+    g->source_rc=rc;
+    g->last_rc=gf5_rc_map(rc);
     g->heat.cool_samples=0;
-    g->heat.stop_pending=true;
+    gf5_stop_request(g,g->last_rc,g->temperature,rc);
     g->poll_source="critical";
 }
 
@@ -120,7 +119,7 @@ static void service_heat_pause(void *owner,bool active)
     if (!g->heat.critical_paused || g->heat.epoch!=g->ch->epoch) return;
     /* Closed admission is ours; all other reasons for closure still win.
      * Do not resume a stopped FIFO or one now owned by save/restore. */
-    if (g->phase!=GF5_RUN || g->heat.stop_pending ||
+    if (g->phase!=GF5_RUN || gf5_stopping(g) ||
         g->ch->state!=GF2_RUN || g->ch->fault.latched || g->ch->f->running==false ||
         !g->display->ready || g->display->changing || g->display->saved_closed)
         return;
@@ -165,7 +164,7 @@ SERVICE_OP(tile_clear,(struct gf5 *g,u32 slot),(g,slot))
 
 static void service_fan_tick(struct gf5 *g,u64 now)
 {
-    if (!thermal_live(g) || g->busy || g->poll_off) return;
+    if (!thermal_live(g) || g->busy) return;
     g->busy=true;
     gf5_fan_tick(g,now);
     service_complete(g);
@@ -177,14 +176,13 @@ i32 gf5_service_poll(struct gf5 *g)
     i32 rc, previous_rc, previous_source_rc;
     const char *previous_source;
     if (!g) return GF5_EINVAL;
-    if (g->busy || g->poll_off || !thermal_live(g)) return 0;
+    if (g->busy || !thermal_live(g)) return 0;
     g->busy=true;
     rc=g->links.clock64 ? g->links.clock64(g->links.owner,&now) : GF5_EINVAL;
     if (rc) {
         g->source_rc=rc;
         g->last_rc=gf5_rc_map(rc);
         g->poll_source="clock64";
-        g->poll_off=true;
         kprintf(KLOG_ATTR,"[gf5] clock off rc=%d reason=clock64\n",rc);
         goto complete; /* clock failure is confined to the F5 worker. */
     }
@@ -193,7 +191,11 @@ i32 gf5_service_poll(struct gf5 *g)
     previous_rc=g->last_rc;
     previous_source_rc=g->source_rc;
     g->last_rc=0;
+    u64 previous_sensor=g->next_sensor;
     gf5_fan_tick(g,now);
+    if (g->next_sensor!=previous_sensor && g->fan.active[2] &&
+        !g->heat.critical_paused && !gf5_stopping(g))
+        service_heat_pause(g,true);
     rc=g->last_rc;
     if (!rc) {
         g->last_rc=previous_rc;
@@ -202,12 +204,6 @@ i32 gf5_service_poll(struct gf5 *g)
     }
 complete:
     service_complete(g);
-#ifdef GF_PRODUCTION_MODULE
-    /* Value handoff only; the resident poll stops after releasing this loan.
-     * All protective stops share the resident re-entry latch. */
-    if (g->heat.stop_pending)
-        geforce_heat_stop_request(g->heat.last_rc,g->heat.last_milli_c,g->heat.source_rc);
-#endif
     return 0; /* F5 alarms never fail foreground rendering. */
 }
 

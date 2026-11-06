@@ -283,6 +283,14 @@ static void run(void)
     gf5_host_trace_clear(&h);
     assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){FIXTURE_KHZ,OTHER_KHZ,FIXTURE_KHZ},&p)==GF5_EBIOS);
     assert(!h.display.calls[D_WRITE]);
+    fixture(); h.ctx.rom.bytes=rom; h.ctx.rom.size=sizeof(rom);
+    calculate(&p);
+    h.ctx.heat.down_active=true;
+    h.ctx.heat.ceiling=(struct gf5_clock){1,1,1};
+    gf5_host_trace_clear(&h);
+    assert(gf5_clock_prog(&h.ctx,&p)==GF5_EBUSY);
+    assert(!h.display.nevents && !h.ctx.plan_guard.core_used);
+    h.ctx.heat.down_active=false;
     guard_cases();
     readback_cases();
 }

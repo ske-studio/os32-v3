@@ -322,9 +322,7 @@ static void heat_equal(struct gf5_heat_state expected)
     const struct gf5_heat_state *live=&h.ctx.heat;
     assert(live->down_active==expected.down_active);
     assert(live->critical_paused==expected.critical_paused);
-    assert(live->stop_pending==expected.stop_pending);
     assert(live->cool_samples==expected.cool_samples && live->epoch==expected.epoch);
-    assert(live->last_rc==expected.last_rc);
     clock_equal(live->entry_clock,expected.entry_clock);
     clock_equal(live->ceiling,expected.ceiling);
 }
@@ -332,7 +330,7 @@ static struct gf5_heat_state live_heat(void)
 {
     return (struct gf5_heat_state){.down_active=true,.cool_samples=2,
         .epoch=h.display.base.ch.epoch,.entry_clock={400000,400000,250000},
-        .ceiling=captured_clock,.last_rc=GF5_EIO};
+        .ceiling=captured_clock};
 }
 static void heat_image_retained(struct gf5_image *image)
 {
@@ -392,7 +390,7 @@ static void heat_roundtrip(void)
          * old entry ceiling, cooling count, flags or diagnostic rc. */
         struct gf5_heat_state live=live_heat();
         live.entry_clock=(struct gf5_clock){350000,350000,220000};
-        live.cool_samples=1; live.last_rc=GF5_ERANGE;
+        live.cool_samples=1;
         if (higher) {
             ++live.ceiling.core_khz; ++live.ceiling.shader_khz; ++live.ceiling.mem_khz;
             /* Two-stage x2 then P=1: same decoded 270000/189000. */
@@ -449,14 +447,14 @@ static void heat_closed_operations(void)
 {
     for (u32 stop=0;stop<2;++stop) {
         reset(); struct gf5_heat_state live=live_heat();
-        live.critical_paused=!stop; live.stop_pending=stop;
+        live.critical_paused=!stop; h.ctx.stop->state=stop;
         h.ctx.heat=live;
         struct gf5_image *out=(void *)&display;
         assert(gf5_state_save(&h.ctx,&out)==GF5_ESTATE && out==(void *)&display);
         assert(!h.nevents && !h.live_allocs && !h.ctx.image && h.ctx.phase==GF5_RUN);
         heat_equal(live);
         reset(); struct gf5_image *image=save();
-        live.epoch=h.display.base.ch.epoch; h.ctx.heat=live; begin_restore();
+        live.epoch=h.display.base.ch.epoch; h.ctx.heat=live; h.ctx.stop->state=stop; begin_restore();
         assert(gf5_state_restore(&h.ctx,image)==GF5_ESTATE);
         assert(!h.nevents && h.ctx.phase==GF5_SAVED);
         heat_no_program(); heat_image_retained(image); heat_equal(live);

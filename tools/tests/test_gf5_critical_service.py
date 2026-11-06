@@ -23,9 +23,8 @@ MUTATIONS = [
     ('critical-drain', 'rc=g->links.drain_pause(g->links.owner);', 'rc=0;'),
     ('critical-resume', 'rc=g->links.unpause(g->links.owner);', 'rc=0;'),
     ('critical-owner', 'if (!live) return;', 'if (!live && false) return;'),
-    ('critical-saved', '!g->display->ready || g->display->changing || g->display->saved_closed)',
-     '!g->display->ready || g->display->changing)'),
-    ('critical-stop', 'g->heat.stop_pending=true;', 'g->heat.stop_pending=false;'),
+    ('critical-saved', '!g->display->ready || g->display->changing || g->display->saved_closed)', '!g->display->ready || g->display->changing)'),
+    ('critical-stop', 'gf5_stop_request(g,g->last_rc,g->temperature,rc);', '(void)g;'),
 ]
 
 

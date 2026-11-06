@@ -485,10 +485,15 @@ void gfx_shutdown(void)
     gfx_reinit_surfaces(1);
 }
 
-void geforce_display_failed(void)
+void geforce_display_stopped(void)
 {
     gfx_started = 0;
     gfx_reinit_surfaces(0);
+}
+
+void geforce_display_failed(void)
+{
+    geforce_display_stopped();
     /* Queue the WM's existing SessionAction; CPL0 never consumes abort_req. */
     if (con_sink_is_enabled()) gui_display_failed();
 }

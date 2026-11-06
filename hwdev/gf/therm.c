@@ -316,6 +316,7 @@ i32 gf5_therm_monitor_restart(struct gf5 *g)
         g->fan.sensor_setup=TH_OLD_SETUP;
         g->fan.sensor_poll=true;
         g->next_sensor=0;
+        g->poll_off=false;
     }
     return th_exit(g,rc);
 }
@@ -639,12 +640,9 @@ static void th_monitor_off(struct gf5 *g,i32 rc,const char *reason)
     bool first=g->fan.sensor_setup!=TH_OFF_SETUP &&
                g->fan.sensor_setup!=TH_SENSOR_OFF_SETUP;
     i32 source=g->source_rc ? g->source_rc : rc;
+    if (g->heat.down_active || g->heat.critical_paused)
+        gf5_stop_request(g,gf5_rc_map(source),g->temperature,source);
     (void)gf5_heat_step(g,0,0); /* Failed samples never count as cooling. */
-    if (g->heat.down_active || g->heat.critical_paused) {
-        g->heat.stop_pending=true;
-        g->heat.last_rc=gf5_rc_map(source);
-        g->heat.source_rc=source;
-    }
     g->fan.sensor_poll=false;
     g->next_sensor=0;
     g->fan.sensor_setup=(!g->fan.sensor_setup || g->fan.sensor_setup==TH_OFF_SETUP) ?
@@ -667,7 +665,7 @@ static i32 th_sensor(struct gf5 *g,u64 now)
         th_monitor_off(g,rc,"sensor");
         return 0;
     }
-    g->heat.last_milli_c=t.milli_c;
+    g->temperature=t.milli_c;
     g->next_sensor=now+GF5_SENSOR_INTERVAL_US;
     bool critical_changed=false,boost_rising=false;
     for (u32 i=0;i<GF5_THERM_THRESHOLDS;++i) {
@@ -683,11 +681,10 @@ static i32 th_sensor(struct gf5 *g,u64 now)
     /* Latch before pause/fan/PLL work, even when the first sample jumps
      * straight over all four thresholds. F0s consumes this at poll exit. */
     if (t.milli_c>=(i64)f->threshold[TH_SHUTDOWN]*TH_MILLI) {
-        g->heat.stop_pending=true;
+        gf5_stop_request(g,GF5_ESTATE,t.milli_c,g->source_rc);
         g->heat.cool_samples=0;
-        g->heat.last_rc=GF5_ESTATE;
-        g->heat.source_rc=g->source_rc;
-    } else if (critical_changed && g->emergency.pause)
+    } else if ((critical_changed ||
+                (!f->active[TH_CRITICAL] && g->heat.critical_paused)) && g->emergency.pause)
         g->emergency.pause(g->emergency.owner,f->active[TH_CRITICAL]);
     i32 heat_rc=gf5_heat_step(g,&t,now);
     i32 heat_source=g->source_rc ? g->source_rc : heat_rc;

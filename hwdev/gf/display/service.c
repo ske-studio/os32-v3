@@ -459,6 +459,12 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=svc_initial(c,dl,&stage);
     }
+    if (!rc && g->heat.down_active) {
+        struct gf5_clock current;
+        stage="heat_ceiling";
+        rc=gf5_clock_read(g,&current);
+        if (!rc && gf5_above_ceiling(g,&current)) rc=GF5_EBUSY;
+    }
     if (!rc) {
         c->saved_closed=false;
         l->mode=c->state->committed[0];
@@ -489,7 +495,6 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     struct gf5 *g=&s->production->feature5;
     g->accepting=false;
     gf5_plan_invalidate(g); /* Display stop boundary, including failed stop. */
-    c->cleanup_pending=true;
     /* R2-2: leave terminates the F5 snapshot even after failed save/restore.
      * free owns the single allocation; never copy or erase tile loan nodes. */
     if (g->image) gf5_state_free(g,g->image);
@@ -502,6 +507,11 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     }
     /* nouveau_drm.c:955-988. All display waits precede F2/F1 stop. A held
      * flip that cannot converge retains both keys until display use ends. */
+    if (c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending) {
+        gf4_service_cleanup_reset(c); /* End the management loan without MMIO. */
+        return svc_result(c,first);
+    }
+    c->cleanup_pending=true;
     bool running=c->ready && c->ch->state==GF2_RUN && !c->ch->fault.latched;
     for (u8 h=0;h<GF4_HEADS;++h) {
         i32 rc=0;

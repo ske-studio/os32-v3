@@ -276,9 +276,14 @@ static void normal_clock_dispatch(void)
         }
         assert(!cint_prod.display.engaged && cint_prod.display.stop_ok);
         if (!results[i]) {
-            /* service.c keeps its stop entry after a complete stop. A second
-             * stop can fail in F1's mask_sources while engaged is false.
-             * Only annotate the real lower failure's diagnostic target. */
+            /* Completed OFF stops close software loans without hardware writes. */
+            cint_trace_clear();
+            stop_deadline=cint_deadline();
+            assert(!gf_display_stop(&cint_prod.display));
+            assert(!cint_host.calls[H_WRITE] && cint_prod.display.stop_ok);
+            /* An invalidated completion proof still requires the real lower
+             * retry. Preserve its target even with engaged already false. */
+            cint_prod.display.stop_ok=false;
             struct gf_display_owner owner=cint_display_owner;
             owner.foundation_stop=scan_stop_record;
             cint_prod.display.owner=&owner;

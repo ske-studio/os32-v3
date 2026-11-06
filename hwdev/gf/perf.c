@@ -191,7 +191,7 @@ static bool heat_lower(const struct gf5_clock *a,const struct gf5_clock *b)
 }
 /* Decode the planned source as clock.c:read_pll/read_source does. In
  * particular fixedgain2 actual is NOT the frequency after both stages.
- * No comparison of readback against calc actual (PM final P0 decision). */
+ * Compare the programmed core/shader readback against this decoded value. */
 static i32 heat_decode(const struct gf5_plan *p,struct gf5_clock *c)
 {
     u32 m=p->nn&255U,n=(p->nn>>8)&255U;
@@ -230,10 +230,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     bool programming=false;
     i32 rc=entry_read(g,index,&e), absent=0;
     if (rc) return finish(g,rc);
-    if (g->heat.down_active &&
-        (e.clock.core_khz>g->heat.ceiling.core_khz ||
-         (e.clock.shader_khz ? e.clock.shader_khz : e.clock.core_khz)>g->heat.ceiling.shader_khz ||
-         e.clock.mem_khz>g->heat.ceiling.mem_khz))
+    if (gf5_above_ceiling(g,&e.clock))
         return finish(g,GF5_EBUSY);
     g->source_rc=0;
     rc=gf5_clock_calc(g,&e.clock,&plan);
@@ -242,12 +239,8 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
         if (!g->source_rc) g->source_rc=rc;
         return g->last_rc; /* No hardware change or FAULT on calc failure. */
     }
-    if (g->heat.down_active) {
-        struct gf5_clock decoded=e.clock;
-        rc=heat_decode(&plan,&decoded);
-        if (rc) return finish(g,rc);
-        if (!heat_le(&decoded,&g->heat.ceiling)) return finish(g,GF5_EBUSY);
-    }
+    rc=gf5_plan_ceiling(g,&plan);
+    if (rc) return finish(g,rc);
 #define STEP(call) do { g->source_rc=0; rc=(call); if (rc) goto fault; } while (0)
 #define OPTIONAL(call) do { \
     g->source_rc=0; rc=(call); \
@@ -322,10 +315,8 @@ static i32 heat_error(struct gf5 *g,i32 rc)
 {
     i32 raw_rc=g->source_rc ? g->source_rc : rc;
     g->heat.cool_samples=0;
-    g->heat.stop_pending=true;
-    g->heat.last_rc=gf5_rc_map(rc);
-    g->heat.source_rc=raw_rc;
-    g->last_rc=g->heat.last_rc; g->source_rc=raw_rc;
+    g->last_rc=gf5_rc_map(rc); g->source_rc=raw_rc;
+    gf5_stop_request(g,g->last_rc,g->temperature,raw_rc);
     return g->last_rc;
 }
 i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
@@ -341,10 +332,10 @@ i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
     const i64 down=(i64)g->fan.threshold[1]*1000;
     const i64 cool=((i64)g->fan.threshold[1]-g->fan.hyst[1])*1000;
     if (temp>=(i64)g->fan.threshold[3]*1000) {
-        g->heat.stop_pending=true; g->heat.cool_samples=0;
+        gf5_stop_request(g,GF5_ESTATE,sample->milli_c,0); g->heat.cool_samples=0;
         return finish(g,0); /* T1/F0s consume shutdown before any PLL work. */
     }
-    if (g->heat.stop_pending) return g->heat.last_rc;
+    if (gf5_stopping(g)) return g->stop->reason;
     if (!g->heat.down_active && temp<down) return finish(g,0);
     bool lowering=temp>=down;
     if (!lowering) {
@@ -356,7 +347,7 @@ i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
     } else g->heat.cool_samples=0;
     if (g->phase!=GF5_RUN || !g->ch || g->ch->state!=GF2_RUN ||
         g->ch->fault.latched || !g->ch->f || !g->ch->f->running)
-        return lowering ? heat_error(g,GF5_ESTATE) : finish(g,0);
+        return finish(g,0);
     if (g->heat.down_active && g->heat.epoch!=g->ch->epoch)
         return heat_error(g,GF5_ESTATE);
     struct gf5_clock current;
@@ -395,14 +386,19 @@ i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
         (lowering && !heat_lower(&decoded,&current)))) rc=GF5_ERANGE;
     if (rc) return heat_error(g,rc);
     if (!lowering && !heat_lower(&current,&decoded)) return finish(g,0);
+    struct gf5_clock old_ceiling=g->heat.ceiling;
+    /* Policy alone authorizes one recovery step, checked against entry above. */
+    g->heat.ceiling=decoded;
     rc=gf5_clock_prog(g,&plan); /* No RAM, voltage or fan change. */
+    g->heat.ceiling=old_ceiling;
     if (rc) return heat_error(g,rc);
-    rc=gf5_clock_read(g,&current); /* Record actual source, no actual equality test. */
+    rc=gf5_clock_read(g,&current);
+    if (!rc && (current.core_khz!=decoded.core_khz ||
+                current.shader_khz!=decoded.shader_khz)) rc=GF5_EIO;
     if (rc) return heat_error(g,rc);
     g->heat.ceiling=decoded;
     if (!lowering && request.core_khz==g->heat.entry_clock.core_khz &&
         request.shader_khz==g->heat.entry_clock.shader_khz)
         g->heat.down_active=false;
-    g->heat.last_rc=0;
     return finish(g,0);
 }

@@ -16,7 +16,7 @@ static void t1_observe(struct gf5_host *host,const struct gf5_host_event *e)
         if (t) { ++samples; sampled_temp=t->milli_c; }
         else ++failed_samples;
         sampled_time=((u64)e->a[1]<<32)|e->a[0];
-        shutdown_seen=host->ctx.heat.stop_pending;
+        shutdown_seen=host->ctx.stop->state;
     }
 }
 static void begin(void)
@@ -45,10 +45,10 @@ static void test_samples(void)
     sample(100); assert(pause_count==2 && !pause_active); /* equality releases: temp <= thr - hyst (nouveau therm/temp.c:150-153) */
     sample(99); assert(pause_count==2 && !pause_active);
     begin(); sample(135);
-    assert(shutdown_seen && h.ctx.heat.stop_pending && !pause_count);
+    assert(shutdown_seen && h.ctx.stop->state && !pause_count);
     assert(samples==1 && !down_count);
-    assert(h.ctx.heat.last_rc==GF5_ESTATE && h.ctx.heat.last_milli_c==135000 &&
-           !h.ctx.heat.source_rc);
+    assert(h.ctx.stop->reason==GF5_ESTATE && h.ctx.stop->milli_c==135000 &&
+           !h.ctx.stop->source_rc);
 }
 static void test_maximum(void)
 {
@@ -83,7 +83,7 @@ static void test_failures_t1(void)
     begin(); gf5_host_fail_at(&h,F5_GPIO_FIND,1,GF5_ENODEV);
     sample(96); sample(96);
     assert(samples==2 && h.ctx.fan.sensor_poll);
-    sample(135); assert(shutdown_seen && h.ctx.heat.stop_pending);
+    sample(135); assert(shutdown_seen && h.ctx.stop->state);
     begin(); gf4_host_fail_at(&h.display,D_WRITE,2,-81);
     sample(106); assert(samples==1 && pause_count==1);
     begin(); sample(96);
@@ -95,11 +95,11 @@ static void test_failures_t1(void)
     h.ctx.next_sensor=h.now+T_POLL; h.ctx.next_auto=0;
     gf4_host_fail_at(&h.display,D_READ,h.display.calls[D_READ]+1,-82);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(failed_samples==1 && h.ctx.heat.stop_pending);
+    assert(failed_samples==1 && h.ctx.stop->state);
     begin(); h.ctx.heat.critical_paused=true;
     gf4_host_fail_at(&h.display,D_READ,1,-82);
     sample(106);
-    assert(failed_samples==1 && h.ctx.heat.stop_pending && h.ctx.heat.last_rc==GF5_EIO);
+    assert(failed_samples==1 && h.ctx.stop->state && h.ctx.stop->reason==GF5_EIO);
 }
 void _start(void)
 {

@@ -26,6 +26,7 @@ static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #undef service_publish
 #undef service_check
 static const struct gf5_test_ops *guard_f5_slot;
+static struct gf5_stop_state guard_stop;
 
 static const struct gf4_test_ops *svc_slot;
 static struct gf4_state svc_state;
@@ -231,6 +232,8 @@ static void svc_fixture_state(bool cold)
     /* cint_reset simulates reboot and clears production storage. No live
      * loans survive it; recreate F5 through the same init as module startup. */
     service_ctx=NULL; service_slot=NULL;
+    guard_stop=(struct gf5_stop_state){0};
+    cint_prod.feature5.stop=&guard_stop;
     assert(!gf5_service_init(&cint_prod,&svc_ctx,&guard_f5_slot));
 }
 static void svc_fixture(void)

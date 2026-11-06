@@ -48,12 +48,13 @@ static const struct gf5_clock requested={
 static bool saw_ram,saw_core,nested_restore;
 static i32 lower_source;
 static u32 selected_fan,selected_volt;
-static bool heat_fixture;
+static bool heat_fixture,heat_ignore_write;
+static u32 heat_corrupt_domain;
 static struct gf5_clock heat_current,heat_request;
 /* Independent synthetic PLL oracle, MIT nouveau clk/nv40.c:39-78:
  * 27 MHz reference, M=1, P=0, bypass stage 2, N={4,5,6,7,8,12}.
  * actual deliberately differs from decoded/readback: PM final P0 decision
- * removed actual equality (including fixedgain2), leaving readback diagnostic. */
+ * removed actual equality (including fixedgain2); decoded equality is required. */
 static const struct { u32 khz,nn; } heat_pll[]={
     {108000,0x0401},{135000,0x0501},{162000,0x0601},
     {189000,0x0701},{216000,0x0801},{324000,0x0c01}
@@ -62,7 +63,11 @@ static void heat_observe(const struct gf5_host_event *e)
 {
     assert(e->op==F5_CALC || e->op==F5_PROG);
     if (e->op==F5_CALC && e->a[0]==F5_CALL_READ) {
-        *(struct gf5_clock *)e->p[1]=heat_current;
+        struct gf5_clock readback=heat_current;
+        if (h.calls[F5_PROG]) {
+            if (heat_corrupt_domain==1) ++readback.shader_khz;
+        }
+        *(struct gf5_clock *)e->p[1]=readback;
     } else if (e->op==F5_CALC) {
         const struct gf5_clock *c=e->p[1];
         assert(c->mem_khz==400000);
@@ -82,7 +87,7 @@ static void heat_observe(const struct gf5_host_event *e)
     } else {
         const struct gf5_plan *p=e->p[1];
         assert(p->nc==0x80000100 && (p->mux==0x33 || p->mux==0x23));
-        heat_current=heat_request;
+        if (!heat_ignore_write) heat_current=heat_request;
     }
 }
 
@@ -460,7 +465,7 @@ static void heat_at(u32 khz,u32 writes)
     assert(heat_current.core_khz==khz && heat_current.shader_khz==khz &&
         heat_current.mem_khz==400000 && h.calls[F5_PROG]==writes);
     assert(h.ctx.heat.ceiling.core_khz==khz && h.ctx.heat.ceiling.shader_khz==khz &&
-        h.ctx.heat.ceiling.mem_khz==400000 && !h.ctx.heat.stop_pending);
+        h.ctx.heat.ceiling.mem_khz==400000 && !h.ctx.stop->state);
 }
 static void heat_steps(void)
 {
@@ -505,9 +510,9 @@ static void heat_steps(void)
     /* Invalid samples reset cooling and request protective stop. */
     assert(!heat_sample(HEAT_COOL,true) && h.ctx.heat.cool_samples==1);
     assert(heat_sample(HEAT_COOL,false)==GF5_EIO);
-    assert(!h.ctx.heat.cool_samples && h.ctx.heat.stop_pending && !h.calls[F5_PROG]);
+    assert(!h.ctx.heat.cool_samples && h.ctx.stop->state && !h.calls[F5_PROG]);
     heat_fresh();
-    assert(!heat_sample(HEAT_SHUTDOWN*1000,true) && !h.nevents && h.ctx.heat.stop_pending);
+    assert(!heat_sample(HEAT_SHUTDOWN*1000,true) && !h.nevents && h.ctx.stop->state);
     heat_fresh();
     /* Disabled highest lower stage is skipped; no fan is needed. */
     rom[PERF_AT+PERF_HEAD+2*ENTRY_STRIDE]=0xff;
@@ -537,6 +542,16 @@ static void heat_shader_order(void)
 }
 static void heat_failures(void)
 {
+    heat_fresh(); heat_ignore_write=true;
+    assert(heat_sample(HEAT_HOT,true)==GF5_EIO);
+    assert(h.ctx.stop->state==GF5_STOP_REQUESTED && h.ctx.stop->reason==GF5_EIO);
+    assert(h.ctx.heat.ceiling.core_khz==216000); /* Failed prog cannot lower the recorded cap. */
+    heat_ignore_write=false;
+    for (u32 domain=1;domain<=1;++domain) {
+        heat_fresh(); heat_corrupt_domain=domain;
+        assert(heat_sample(HEAT_HOT,true)==GF5_EIO && h.ctx.stop->state==GF5_STOP_REQUESTED);
+    }
+    heat_corrupt_domain=0;
     static const struct { enum gf5_host_op op; u32 nth; } fail[]={
         {F5_CALC,1}, /* current read */
         {F5_CALC,2}, /* candidate calculation */
@@ -545,15 +560,15 @@ static void heat_failures(void)
     for (u32 i=0;i<sizeof(fail)/sizeof(fail[0]);++i) {
         heat_fresh(); gf5_host_fail_at(&h,fail[i].op,fail[i].nth,GF5_EIO);
         assert(heat_sample(HEAT_HOT,true)==GF5_EIO);
-        assert(h.ctx.heat.stop_pending && h.ctx.heat.last_rc==GF5_EIO &&
+        assert(h.ctx.stop->state && h.ctx.stop->reason==GF5_EIO &&
             h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==GF5_EIO);
         assert(!h.calls[F5_PROG] || fail[i].op==F5_PROG);
     }
     heat_fresh(); h.ctx.phase=GF5_FAULT;
-    assert(heat_sample(HEAT_HOT,true)==GF5_ESTATE && !h.nevents && h.ctx.heat.stop_pending);
+    assert(!heat_sample(HEAT_HOT,true) && !h.nevents && !h.ctx.stop->state);
     heat_fresh(); assert(!heat_sample(HEAT_HOT,true));
     ++h.ctx.ch->epoch;
-    assert(heat_sample(HEAT_HOT,true)==GF5_ESTATE && !h.nevents && h.ctx.heat.stop_pending);
+    assert(heat_sample(HEAT_HOT,true)==GF5_ESTATE && !h.nevents && h.ctx.stop->state);
     /* Direct perf requests over the active ceiling are side-effect free. */
     heat_fresh(); assert(!heat_sample(HEAT_HOT,true)); gf5_host_trace_clear(&h);
     assert(gf5_perf_select(&h.ctx,0)==GF5_EBUSY && !h.nevents);

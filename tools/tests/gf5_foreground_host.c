@@ -49,7 +49,7 @@ static bool u6_safe=true, u6_emergency_halt;
 static u32 u6_notifications,u6_aborts,u6_syncs,u6_halts,u6_resets;
 static bool u6_gui, u6_caller, u6_wm;
 static int ring3_in_syscall,font_guard_active;
-static AppSlot u6_app, *g_cur_app;
+static AppSlot u6_app, u6_owner_app, *g_cur_app;
 static u32 *g_cur_frame;
 volatile u32 ring3_park_reject_count;
 static GeforceModuleContext u6_module;
@@ -74,7 +74,7 @@ static void u6_halt(void)
     ++u6_halts;
     if (u6_emergency_halt) {
         assert(!active && !routed && !u6_notifications && !u6_aborts);
-        assert(u6_syncs==1 && heat_bridge.latched && !heat_pending);
+        assert(u6_syncs==1 && heat_bridge.stop_state.state==GF5_STOP_REQUESTED);
         assert(host_serial_find("reason=") && host_serial_find("milli_c=135000"));
         gf2_host_exit(0);
     }
@@ -89,8 +89,10 @@ void platform_reset(void)
     gf2_host_exit(0);
 }
 int con_sink_is_enabled(void) { return u6_gui; }
+static int u6_display_owner=APP_ID_MIN;
 int appslot_cur(void) { return APP_ID_MIN; }
-AppSlot *appslot_get(int id) { assert(id==APP_ID_MIN); return &u6_app; }
+int appslot_gfx_owner(void) { return u6_display_owner; }
+AppSlot *appslot_get(int id) { if (id==APP_ID_SHELL) return &u6_owner_app; assert(id==APP_ID_MIN); return &u6_app; }
 int appslot_park_poll_check(u32 tick) { (void)tick; return -1; }
 int appslot_park_yield_check(void) { return -1; }
 void appslot_park_poll_commit(void) { assert(false); }
@@ -126,11 +128,12 @@ static i32 u6_session_request(u32 op,u32 action,int owner)
 }
 static void u6_setup(void)
 {
-    foreground_poll_busy=heat_pending=foreground_deadline_valid=false;
+    foreground_poll_busy=foreground_deadline_valid=false;
     heat_bridge=(struct geforce_heat_bridge){.request=u6_resident_request};
     u6_notifications=u6_aborts=u6_syncs=u6_halts=0;
     u6_safe=true; u6_emergency_halt=false; u6_caller=u6_wm=false;
     u6_app=(AppSlot){.cpl3=1,.state=APP_STATE_RUNNING};
+    u6_owner_app=(AppSlot){.cpl3=1,.state=APP_STATE_RUNNING};
     g_cur_app=&u6_app; g_cur_frame=0; font_guard_active=0;
     u6_gui=false; kbd_gui_mode=false; g_gui_handler=u6_session_request;
     u6_module=c1_context; u6_module.heat=&heat_bridge;
@@ -168,7 +171,7 @@ static void u6_critical(void)
     g->links.drain_pause=u6_count_drain;
     u6_sample(105); geforce_foreground_poll();
     assert(u6_drains==1 && g->heat.critical_paused && !g->accepting);
-    assert(!g->heat.stop_pending);
+    assert(!g->stop->state);
     assert(active && routed && scanlog_route && g->display->ready);
     struct gf5_clock clock;
     assert(scanlog_f5_ops->clock_read(g,&clock)==GF5_ESTATE);
@@ -182,6 +185,8 @@ static void u6_critical(void)
     u6_sample(99); geforce_foreground_poll();
     assert(g->heat.critical_paused && !g->accepting);
     g->display->saved_closed=false;
+    u6_sample(99); geforce_foreground_poll();
+    assert(!g->heat.critical_paused && g->accepting);
     scanlog_finish();
 }
 /* Separate from the empty-table critical fixture: one reachable lower
@@ -201,20 +206,20 @@ static void u6_downclock_stop(bool sensor_failure)
         gf3_host_fail_at(&cint_host,H_WRITE,cint_host.calls[H_WRITE]+2,-881);
     geforce_foreground_poll();
     if (sensor_failure) {
-        assert(g->heat.down_active && !g->heat.stop_pending && active && routed);
+        assert(g->heat.down_active && !g->stop->state && active && routed);
         u6_sample(97);
         gf3_host_fail_at(&cint_host,H_READ,cint_host.calls[H_READ]+1,-882);
         geforce_foreground_poll();
         assert(!g->fan.sensor_poll);
     }
-    assert(g->heat.stop_pending && g->heat.last_rc==GF5_EIO);
-    assert(heat_source_rc==(sensor_failure ? -882 : -881));
-    assert(heat_milli_c==96000 && heat_reason==GF5_EIO);
-    assert(!active && !routed && !scanlog_route && !heat_pending);
-    assert(heat_bridge.latched && u6_app.abort_req && !geforce_probe());
+    assert(g->stop->state && g->stop->reason==GF5_EIO);
+    assert(heat_bridge.stop_state.source_rc==(sensor_failure ? -882 : -881));
+    assert(heat_bridge.stop_state.milli_c==96000 && heat_bridge.stop_state.reason==GF5_EIO);
+    assert(!active && !routed && !scanlog_route && !(heat_bridge.stop_state.state==GF5_STOP_REQUESTED));
+    assert((heat_bridge.stop_state.state!=GF5_STOP_NORMAL) && u6_app.abort_req && !geforce_probe());
     if (sensor_failure) {
         u6_sample(92);
-        assert(!geforce_heat_latch_clear() && !heat_bridge.latched);
+        assert(!geforce_heat_latch_clear() && !(heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
         assert(g->fan.sensor_poll && !g->next_sensor && g->fan.sensor_setup==0xffU);
         geforce_init();
         assert(active && routed && scanlog_route);
@@ -225,7 +230,7 @@ static void u6_downclock_stop(bool sensor_failure)
         assert(cint_host.calls[H_READ]>reads && g->next_sensor>cint_host.now);
         struct gf5_clock clock;
         assert(!scanlog_f5_ops->clock_read(g,&clock));
-        assert(g->heat.down_active && clock.core_khz==108000 && !heat_bridge.latched);
+        assert(g->heat.down_active && clock.core_khz==108000 && !(heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
         assert(!u6_app.abort_req && active && routed);
     }
     scanlog_finish();
@@ -254,8 +259,8 @@ static void u6_serial_shutdown(void)
     u6_serial_start();
     u6_sample(135); geforce_foreground_poll();
     assert(cint_prod.chan.state==GF2_OFF && !cint_prod.display.engaged);
-    assert(!active && !routed && !scanlog_route && heat_bridge.latched && !heat_pending);
-    assert(heat_milli_c==135000 && heat_reason==GF5_ESTATE);
+    assert(!active && !routed && !scanlog_route && (heat_bridge.stop_state.state!=GF5_STOP_NORMAL) && !(heat_bridge.stop_state.state==GF5_STOP_REQUESTED));
+    assert(heat_bridge.stop_state.milli_c==135000 && heat_bridge.stop_state.reason==GF5_ESTATE);
     assert(scanlog_count("GF4 STATE stage=leave98 stop_rc=")==1);
     assert(!u6_app.abort_req && !u6_notifications && !u6_aborts);
     scanlog_finish();
@@ -269,7 +274,7 @@ static void u6_serial_critical(void)
     u6_sample(105); geforce_foreground_poll();
     assert(u6_drains==1 && g->heat.critical_paused && !g->accepting);
     assert(!active && !routed && g->display->ready && cint_prod.display.engaged);
-    assert(!heat_bridge.latched && !u6_app.abort_req);
+    assert(!(heat_bridge.stop_state.state!=GF5_STOP_NORMAL) && !u6_app.abort_req);
     u6_sample(99); geforce_foreground_poll();
     assert(!g->heat.critical_paused && g->accepting);
     scanlog_finish();
@@ -282,12 +287,11 @@ static void u6_hot_leave(void)
     assert(!geforce_stop());
     assert(!active && !routed && g->fan.sensor_poll);
     /* A different app is now running on 98. Thermal polling still runs. */
-    u6_safe=false;
     startlog_clear();
-    geforce_foreground_poll();
-    assert(g->heat.stop_pending && heat_bridge.latched && !heat_pending);
-    assert(heat_reason==GF5_ESTATE && heat_milli_c==96000);
-    assert(!scanlog_count("GF4 STATE stage=leave98") && !scanlog_route);
+    u6_sample(135); geforce_foreground_poll();
+    assert(g->stop->state==GF5_STOPPED);
+    assert(heat_bridge.stop_state.reason==GF5_ESTATE && heat_bridge.stop_state.milli_c==135000);
+    assert(scanlog_count("GF4 STATE stage=leave98")==1 && !scanlog_route);
     assert(!u6_app.abort_req && !u6_notifications && !u6_aborts && !u6_syncs && !u6_halts);
     assert(!geforce_probe());
     u6_safe=true;
@@ -346,11 +350,11 @@ static void u6_fault_monitor(void)
         g->ch->f->bar0=0;
         u6_sample(135); reads=cint_host.calls[H_READ];
         geforce_foreground_poll();
-        assert(cint_host.calls[H_READ]==reads && !heat_bridge.latched);
+        assert(cint_host.calls[H_READ]==reads && !(heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
         g->ch->f->bar0=bar;
         u6_sample(135);
         geforce_foreground_poll();
-        assert(heat_bridge.latched && !active && !routed && !heat_pending);
+        assert((heat_bridge.stop_state.state!=GF5_STOP_NORMAL) && !active && !routed && !(heat_bridge.stop_state.state==GF5_STOP_REQUESTED));
         scanlog_finish();
     }
 }
@@ -365,15 +369,15 @@ static void u6_shutdown(void)
         u6_caller=true; ring3_in_syscall=1;
         u6_syscall_tail(frame);
         assert(!u6_caller && !u6_wm && !foreground_poll_busy);
-        assert(!active && !routed && !scanlog_route && heat_bridge.latched);
-        assert(u6_notifications==gui && u6_aborts==1 && u6_app.abort_req);
+        assert(!active && !routed && !scanlog_route && (heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
+        assert(!u6_notifications && u6_aborts==1 && u6_app.abort_req);
         assert(!geforce_probe()); /* Another app's ordinary gfx start falls back. */
         geforce_init(); assert(!active && !routed);
         u6_sample(120);
         int rc=geforce_heat_latch_clear();
-        assert(rc==GF5_EBUSY && heat_bridge.latched);
+        assert(rc==GF5_EBUSY && (heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
         u6_sample(92);
-        assert(!geforce_heat_latch_clear() && !heat_bridge.latched);
+        assert(!geforce_heat_latch_clear() && !(heat_bridge.stop_state.state!=GF5_STOP_NORMAL));
         assert(geforce_probe());
         scanlog_finish();
     }
@@ -382,12 +386,35 @@ void _start(void)
 {
     scanlog_map(CINT_FB_PHYS,GF_MODE_VRAM_BYTES);
     scanlog_map(SCANLOG_BAR0,0x101000U);
+    u6_setup();
+    struct gf5 *retry=&cint_prod.feature5;
+    u64 previous=retry->next_sensor;
+    scanlog_clock_error=true; geforce_foreground_poll();
+    assert(retry->next_sensor==previous && !retry->poll_off);
+    scanlog_clock_error=false; u6_sample(60); geforce_foreground_poll();
+    assert(retry->next_sensor>previous && !gf5_stopping(retry));
+    scanlog_finish();
+    u6_setup(); u6_gui=true; u6_app.gui=true; u6_display_owner=APP_ID_SHELL;
+    u6_sample(135); geforce_foreground_poll();
+    assert(heat_bridge.stop_state.state==GF5_STOPPED && !u6_app.abort_req && u6_owner_app.abort_req);
+    assert(!u6_notifications); /* A different running GUI app is never reclaimed. */
+    u6_resident_request(-999,1,-999);
+    assert(heat_bridge.stop_state.reason==GF5_ESTATE && heat_bridge.stop_state.milli_c==135000);
+    scanlog_finish(); u6_display_owner=APP_ID_MIN;
     u6_critical();
     u6_downclock_stop(false); u6_downclock_stop(true);
     u6_serial_shutdown(); u6_serial_critical();
     u6_hot_leave();
     u6_cooperative(); u6_fault_monitor(); u6_shutdown();
-    u6_setup(); u6_safe=false;
+    u6_setup();
+#ifdef U6_STOPFAIL
+    svc_close_rc=SVC_INJECT;
+    /* Both the ordinary close and the lower engine reset fail. Route is safe. */
+    u6_resident_request(GF5_ESTATE,135000,0);
+    gf3_host_fail_at(&cint_host,H_WRITE,0,-883);
+#else
+    u6_safe=false;
+#endif
 #ifdef U6_REBOOT
     /* R2-2: thermal no-route halt must not infect sys_reboot. */
     sys_reboot();
@@ -407,8 +434,7 @@ void _start(void)
 #[test]
 fn u6_heat_shutdown_recovers_gui_fullscreen() {
     use crate::{fullscreen, handler, mocks, multiapp, session, wm};
-    use os32api::gui::proto::{GUI_OP_OWNER_EXIT, GUI_OP_SESSION_REQUEST,
-                             GUI_SESSION_SWITCH_CUI};
+    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
     mocks::init();
     session::clear();
     let shm = mocks::Shm::new();
@@ -416,24 +442,10 @@ fn u6_heat_shutdown_recovers_gui_fullscreen() {
     mocks::set_screen_owner(3);
     assert!(crate::after_exec(wm::g()));
     assert_eq!(fullscreen::owner(), 3);
-    assert_eq!(handler::gshell_gui_handler(
-        GUI_OP_SESSION_REQUEST, GUI_SESSION_SWITCH_CUI as u32,
-        multiapp::APP_ID_SHELL), 0);
-    assert!(wm::g().quit);
-    assert!(!session::ready_to_run(wm::g()));
-    for _ in 0..session::QUIT_GRACE_CYCLES {
-        session::x3_cycle(wm::g());
-    }
-    assert!(multiapp::pending_top_level_work());
-    assert!(multiapp::resume_one(wm::g()));
-    assert!(multiapp::resume_one(wm::g()));
-    let killed = mocks::kill_calls();
-    assert!(killed.contains(&2) && killed.contains(&3), "{killed:?}");
-    assert_eq!(multiapp::live_count(), 0);
-    // The mock exec_kill records IDs; deliver the kernel's owner-exit callbacks.
-    handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 2);
-    handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 3);
-    assert!(session::ready_to_run(wm::g()));
+    // Targeted abort returns through the existing exec owner-exit notification.
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 3), 0);
+    assert_eq!(multiapp::live_count(), 1);
+    assert!(mocks::kill_calls().is_empty());
     wm::g().inited = false;
 }
 U6_RUST_END */

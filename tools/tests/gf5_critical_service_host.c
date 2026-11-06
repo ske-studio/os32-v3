@@ -86,13 +86,13 @@ static void critical_ownership(void)
         case 2: g->display->saved_closed=true; break;
         case 3: g->display->changing=true; break;
         case 4: g->ch->fault.latched=true; break;
-        case 5: g->heat.stop_pending=true; break;
+        case 5: g->stop->state=true; break;
         case 6: ++g->heat.epoch; break;
         }
         critical_edge(g,false);
         assert(!critical_resumes && !g->accepting && !c1_normal);
         g->phase=GF5_RUN; g->display->saved_closed=g->display->changing=false;
-        g->ch->fault.latched=g->heat.stop_pending=false;
+        g->ch->fault.latched=false; g->stop->state=GF5_STOP_NORMAL;
         g->heat.epoch=g->ch->epoch;
         critical_edge(g,false);
         assert(critical_resumes==1 && g->accepting);
@@ -121,8 +121,8 @@ static void critical_failures(void)
             critical_edge(g,false);
         }
         scanlog_clock_error=false; svc_open_rc=0;
-        assert(g->phase==GF5_FAULT && !g->accepting && g->heat.stop_pending);
-        assert(!c1_normal && !svc_slot && g->heat.last_rc==GF5_EIO);
+        assert(g->phase==GF5_RUN && !g->accepting && g->stop->state);
+        assert(!c1_normal && !svc_slot && g->stop->reason==GF5_EIO);
         assert(g->source_rc==(i==1 ? -901 : SVC_INJECT));
         /* Management survives and the same failure never retries resume. */
         assert(scanlog_f5_ops->last_rc(g)==GF5_EIO);
@@ -137,6 +137,19 @@ void _start(void)
 {
     scanlog_map(CINT_FB_PHYS,GF_MODE_VRAM_BYTES);
     scanlog_map(SCANLOG_BAR0,0x101000U);
+    critical_setup();
+    struct gf5 *g=&cint_prod.feature5;
+    gf3_host_set(&cint_host,0,0x15b4,105);
+    cint_host.now=(u32)g->next_sensor;
+    assert(!gf5_service_poll(g) && g->heat.critical_paused);
+    g->display->changing=true;
+    gf3_host_set(&cint_host,0,0x15b4,99);
+    cint_host.now=(u32)g->next_sensor;
+    assert(!gf5_service_poll(g) && g->heat.critical_paused && !g->fan.active[2]);
+    g->display->changing=false;
+    cint_host.now=(u32)g->next_sensor;
+    assert(!gf5_service_poll(g) && !g->heat.critical_paused && critical_resumes==1);
+    scanlog_finish();
     critical_roundtrip();
     critical_ownership();
     critical_failures();

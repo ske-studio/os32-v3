@@ -25,6 +25,7 @@ MUTATIONS = [
     ('heat-epoch', 'g->heat.epoch=c->epoch;', 'g->heat.epoch=0;'),
     ('heat-pause', 'g->heat.critical_paused=false;', 'g->heat.critical_paused=true;'),
     ('heat-cooling', 'g->heat.cool_samples=0;', 'g->heat.cool_samples=2;'),
+    ('heat-start-ceiling', 'if (!rc && gf5_above_ceiling(g,&current)) rc=GF5_EBUSY;', 'if (false && gf5_above_ceiling(g,&current)) rc=GF5_EBUSY;'),
 ]
 
 

@@ -10,21 +10,22 @@
 static void lifetime_seed(struct gf5 *g)
 {
     g->plan_guard.valid=true;
+    *g->stop=(struct gf5_stop_state){GF5_STOP_REQUESTED,-901,0,0};
     g->heat=(struct gf5_heat_state){
-        .down_active=true,.critical_paused=true,.stop_pending=true,
+        .down_active=true,.critical_paused=true,
         .cool_samples=2,.epoch=g->ch->epoch,
         .entry_clock={300000,300000,200000},
-        .ceiling={200000,200000,200000},.last_rc=-901
+        .ceiling={200000,200000,200000}
     };
 }
 
 static void lifetime_preserved(struct gf5 *g)
 {
-    assert(g->heat.down_active && g->heat.stop_pending);
+    assert(g->heat.down_active && g->stop->state);
     assert(g->heat.entry_clock.core_khz==300000 && g->heat.entry_clock.shader_khz==300000);
     assert(g->heat.entry_clock.mem_khz==200000 && g->heat.ceiling.core_khz==200000);
     assert(g->heat.ceiling.shader_khz==200000 && g->heat.ceiling.mem_khz==200000);
-    assert(g->heat.last_rc==-901);
+    assert(g->stop->reason==-901);
 }
 
 static bool lifetime_stopping,lifetime_starting,lifetime_seen;
@@ -45,7 +46,7 @@ void _start(void)
     scanlog_init();
     struct gf5 *g=&cint_prod.feature5;
     assert(g->heat.epoch==g->ch->epoch && g->heat.epoch);
-    assert(!g->heat.down_active && !g->heat.critical_paused && !g->heat.stop_pending);
+    assert(!g->heat.down_active && !g->heat.critical_paused && !g->stop->state);
     lifetime_seed(g);
     lifetime_old_observe=cint_host.observe;
     cint_host.observe=lifetime_observe;
@@ -64,6 +65,7 @@ void _start(void)
     lifetime_preserved(g);
     lifetime_seed(g);
     lifetime_starting=true; lifetime_seen=false;
+    /* The boot clock is below the retained 200 MHz ceiling in this ROM. */
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));
     lifetime_starting=false;
     assert(lifetime_seen && !g->plan_guard.valid);
@@ -72,6 +74,14 @@ void _start(void)
     lifetime_preserved(g);
     assert(g->accepting && svc_ctx.accepting);
     cint_host.observe=lifetime_old_observe;
+    scanlog_finish();
+    scanlog_init(); scanlog_heat_fixture();
+    g=&cint_prod.feature5;
+    assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
+    g->heat.down_active=true;
+    g->heat.ceiling=(struct gf5_clock){1,1,1};
+    assert(gf4_service_start(&svc_ctx,cint_deadline())==GF5_EBUSY);
+    assert(!g->accepting && !svc_ctx.accepting && !g->ch->f->running);
     scanlog_finish();
     gf2_host_exit(0);
 }

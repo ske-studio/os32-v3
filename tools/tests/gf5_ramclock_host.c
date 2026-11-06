@@ -435,5 +435,11 @@ void _start(void)
     for (u32 i=0;i<h.display.nevents;++i)
         assert(display_events[i].op!=D_WRITE || display_events[i].a[1]!=PRECHARGE);
     assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
+    setup(3,0,true);
+    h.ctx.heat.down_active=true;
+    h.ctx.heat.ceiling=(struct gf5_clock){1,1,1};
+    /* A valid decoded plan over the ceiling cannot pause or touch hardware. */
+    assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EBUSY);
+    assert(!h.calls[F5_PAUSE] && !h.display.nevents && !h.ctx.plan_guard.ram_used);
     gf2_host_exit(0);
 }

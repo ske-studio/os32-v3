@@ -808,12 +808,11 @@
       "valid"
     ],
     "struct geforce_heat_bridge": [
-      "active",
       "backend_active",
       "clear",
-      "latched",
       "request",
-      "stop"
+      "stop",
+      "stop_state"
     ],
     "struct geforce_platform": [
       "bar0_phys",
@@ -1297,6 +1296,8 @@
       "rom",
       "rom_generation",
       "source_rc",
+      "stop",
+      "temperature",
       "tile",
       "tile_live",
       "tile_slot",
@@ -1359,11 +1360,7 @@
       "critical_paused",
       "down_active",
       "entry_clock",
-      "epoch",
-      "last_milli_c",
-      "last_rc",
-      "source_rc",
-      "stop_pending"
+      "epoch"
     ],
     "struct gf5_image": [
       "bytes",
@@ -1427,6 +1424,12 @@
       "memory_pc",
       "memory_program",
       "size"
+    ],
+    "struct gf5_stop_state": [
+      "milli_c",
+      "reason",
+      "source_rc",
+      "state"
     ],
     "struct gf5_test_ops": [
       "clock_calc",
@@ -2844,6 +2847,9 @@
     "GF5_RUN",
     "GF5_SAVED",
     "GF5_SAVING",
+    "GF5_STOPPED",
+    "GF5_STOP_NORMAL",
+    "GF5_STOP_REQUESTED",
     "GF_BORROW_TILE",
     "GF_BORROW_VIEW",
     "GF_C_AR",

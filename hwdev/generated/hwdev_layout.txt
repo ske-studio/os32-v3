@@ -1502,20 +1502,18 @@ offset	struct bootinfo_wire_drive.rsvd	11
 member_size	struct bootinfo_wire_drive.rsvd	5
 offset	struct bootinfo_wire_drive.valid	1
 member_size	struct bootinfo_wire_drive.valid	1
-size	struct geforce_heat_bridge	24
+size	struct geforce_heat_bridge	32
 align	struct geforce_heat_bridge	4
-offset	struct geforce_heat_bridge.active	16
-member_size	struct geforce_heat_bridge.active	4
-offset	struct geforce_heat_bridge.backend_active	20
+offset	struct geforce_heat_bridge.backend_active	28
 member_size	struct geforce_heat_bridge.backend_active	4
-offset	struct geforce_heat_bridge.clear	12
+offset	struct geforce_heat_bridge.clear	24
 member_size	struct geforce_heat_bridge.clear	4
-offset	struct geforce_heat_bridge.latched	0
-member_size	struct geforce_heat_bridge.latched	1
-offset	struct geforce_heat_bridge.request	4
+offset	struct geforce_heat_bridge.request	16
 member_size	struct geforce_heat_bridge.request	4
-offset	struct geforce_heat_bridge.stop	8
+offset	struct geforce_heat_bridge.stop	20
 member_size	struct geforce_heat_bridge.stop	4
+offset	struct geforce_heat_bridge.stop_state	0
+member_size	struct geforce_heat_bridge.stop_state	16
 size	struct geforce_platform	52
 align	struct geforce_platform	4
 offset	struct geforce_platform.bar0_phys	24
@@ -2348,7 +2346,7 @@ offset	struct gf4_tv_state.version	0
 member_size	struct gf4_tv_state.version	4
 offset	struct gf4_tv_state.vfilter	300
 member_size	struct gf4_tv_state.vfilter	112
-size	struct gf5	1772
+size	struct gf5	1768
 align	struct gf5	4
 offset	struct gf5.accel	4
 member_size	struct gf5.accel	4
@@ -2369,7 +2367,7 @@ member_size	struct gf5.fan	136
 offset	struct gf5.fan_off	126
 member_size	struct gf5.fan_off	1
 offset	struct gf5.heat	1724
-member_size	struct gf5.heat	48
+member_size	struct gf5.heat	36
 offset	struct gf5.image	1656
 member_size	struct gf5.image	4
 offset	struct gf5.last_rc	116
@@ -2398,6 +2396,10 @@ offset	struct gf5.rom_generation	1720
 member_size	struct gf5.rom_generation	4
 offset	struct gf5.source_rc	120
 member_size	struct gf5.source_rc	4
+offset	struct gf5.stop	1760
+member_size	struct gf5.stop	4
+offset	struct gf5.temperature	1764
+member_size	struct gf5.temperature	4
 offset	struct gf5.tile	300
 member_size	struct gf5.tile	240
 offset	struct gf5.tile_live	540
@@ -2498,7 +2500,7 @@ offset	struct gf5_fan_trip.hyst	4
 member_size	struct gf5_fan_trip.hyst	4
 offset	struct gf5_fan_trip.temp	0
 member_size	struct gf5_fan_trip.temp	4
-size	struct gf5_heat_state	48
+size	struct gf5_heat_state	36
 align	struct gf5_heat_state	4
 offset	struct gf5_heat_state.ceiling	24
 member_size	struct gf5_heat_state.ceiling	12
@@ -2512,14 +2514,6 @@ offset	struct gf5_heat_state.entry_clock	12
 member_size	struct gf5_heat_state.entry_clock	12
 offset	struct gf5_heat_state.epoch	8
 member_size	struct gf5_heat_state.epoch	4
-offset	struct gf5_heat_state.last_milli_c	44
-member_size	struct gf5_heat_state.last_milli_c	4
-offset	struct gf5_heat_state.last_rc	36
-member_size	struct gf5_heat_state.last_rc	4
-offset	struct gf5_heat_state.source_rc	40
-member_size	struct gf5_heat_state.source_rc	4
-offset	struct gf5_heat_state.stop_pending	2
-member_size	struct gf5_heat_state.stop_pending	1
 size	struct gf5_image	5764
 align	struct gf5_image	4
 offset	struct gf5_image.bytes	4
@@ -2634,6 +2628,16 @@ offset	struct gf5_rom_view.memory_program	8
 member_size	struct gf5_rom_view.memory_program	4
 offset	struct gf5_rom_view.size	4
 member_size	struct gf5_rom_view.size	4
+size	struct gf5_stop_state	16
+align	struct gf5_stop_state	4
+offset	struct gf5_stop_state.milli_c	8
+member_size	struct gf5_stop_state.milli_c	4
+offset	struct gf5_stop_state.reason	4
+member_size	struct gf5_stop_state.reason	4
+offset	struct gf5_stop_state.source_rc	12
+member_size	struct gf5_stop_state.source_rc	4
+offset	struct gf5_stop_state.state	0
+member_size	struct gf5_stop_state.state	4
 size	struct gf5_test_ops	108
 align	struct gf5_test_ops	4
 offset	struct gf5_test_ops.clock_calc	8
@@ -3072,7 +3076,7 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	12712
+size	struct gf_production	12708
 align	struct gf_production	4
 offset	struct gf_production.accel	3420
 member_size	struct gf_production.accel	7512
@@ -3085,16 +3089,16 @@ member_size	struct gf_production.chan	1044
 offset	struct gf_production.display	0
 member_size	struct gf_production.display	1896
 offset	struct gf_production.feature5	10932
-member_size	struct gf_production.feature5	1772
+member_size	struct gf_production.feature5	1768
 offset	struct gf_production.foundation	2132
 member_size	struct gf_production.foundation	244
 offset	struct gf_production.indexes	1940
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	2036
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	12704
+offset	struct gf_production.map_ops	12700
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	12708
+offset	struct gf_production.map_owner	12704
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1916
 member_size	struct gf_production.prepared	1
@@ -5049,6 +5053,9 @@ enum	GF5_RESTORING	3
 enum	GF5_RUN	0
 enum	GF5_SAVED	2
 enum	GF5_SAVING	1
+enum	GF5_STOPPED	2
+enum	GF5_STOP_NORMAL	0
+enum	GF5_STOP_REQUESTED	1
 enum	GF_BORROW_TILE	1
 enum	GF_BORROW_VIEW	0
 enum	GF_C_AR	4

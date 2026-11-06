@@ -81,7 +81,6 @@ static GfxMode display_modes[GF4_MODES];
 static struct gf5 *feature5;
 static int geforce_heat_stop(void);
 static int geforce_heat_clear(void);
-static bool geforce_heat_active(void);
 static bool geforce_heat_backend_active(void);
 void geforce_backend_feature5_bind(struct gf5 *g)
 {
@@ -89,7 +88,7 @@ void geforce_backend_feature5_bind(struct gf5 *g)
     if (geforce_context->heat) {
         geforce_context->heat->stop=geforce_heat_stop;
         geforce_context->heat->clear=geforce_heat_clear;
-        geforce_context->heat->active=geforce_heat_active;
+        if (g) g->stop=&geforce_context->heat->stop_state;
         geforce_context->heat->backend_active=geforce_heat_backend_active;
     }
 }
@@ -413,7 +412,7 @@ static int geforce_probe(void)
 {
     int ok = !failed && device && identify_resources && identify_resources();
 #ifdef OS32_GEFORCE_MODULE
-    if (geforce_context->heat && geforce_context->heat->latched) ok=0;
+    if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;
 #endif
     /* Reinit may drop this backend immediately after a failed probe. */
     if (!ok && active) geforce_fail();
@@ -448,8 +447,9 @@ static void geforce_palette_init(void)
     }
 }
 
-static int geforce_stop(void)
+static int geforce_stop_common(bool force)
 {
+    (void)force;
 #ifdef OS32_GEFORCE_MODULE
     gf_hook_scan_bind(false, 0);
     struct gf_display_context *video = device ? device->context : 0;
@@ -457,6 +457,10 @@ static int geforce_stop(void)
 #endif
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
+#ifdef OS32_GEFORCE_MODULE
+    if (force && rc && feature5 && feature5->ch && feature5->ch->f)
+        rc=gf_foundation_stop(feature5->ch->f);
+#endif
     /* Sample stopped GF state before route_to_98 performs the final redraw. */
 #ifdef OS32_GEFORCE_MODULE
     geforce_leave_log(leave_io, rc);
@@ -468,14 +472,12 @@ static int geforce_stop(void)
     return rc;
 }
 
-#ifdef OS32_GEFORCE_MODULE
-static bool geforce_heat_active(void)
+static int geforce_stop(void)
 {
-    return active || (feature5 &&
-        ((feature5->ch && feature5->ch->state!=GF2_OFF) ||
-         (feature5->display && feature5->display->legacy &&
-          feature5->display->legacy->engaged)));
+    return geforce_stop_common(false);
 }
+
+#ifdef OS32_GEFORCE_MODULE
 static bool geforce_heat_backend_active(void)
 {
     return active;
@@ -483,7 +485,7 @@ static bool geforce_heat_backend_active(void)
 static int geforce_heat_stop(void)
 {
     /* Same backend closure as fail, without making cooling unrecoverable. */
-    return geforce_stop();
+    return geforce_stop_common(true);
 }
 static int geforce_heat_clear(void)
 {
@@ -502,7 +504,8 @@ static int geforce_heat_clear(void)
     if (!sample.calibrated || sample.milli_c>cool) return GF5_EBUSY;
     rc=gf5_therm_monitor_restart(feature5);
     if (rc) return rc;
-    feature5->heat.stop_pending=false;
+    feature5->heat.critical_paused=false;
+    feature5->heat.cool_samples=0;
     return 0;
 }
 #endif

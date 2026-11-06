@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "../../include/types.h"
 #include "display/api.h"
+#include "../../kdebug/gfinit_pll.h"
 
 typedef unsigned long long u64;
 typedef long long i64;
@@ -38,11 +39,15 @@ struct gf5_perf_entry {
 };
 /* Live protection state, never serialized in gf5_image or rolled back by
  * restore. The resident backend separately retains the shutdown latch. */
+enum gf5_stop_phase { GF5_STOP_NORMAL, GF5_STOP_REQUESTED, GF5_STOPPED };
+struct gf5_stop_state {
+    enum gf5_stop_phase state;
+    i32 reason, milli_c, source_rc;
+};
 struct gf5_heat_state {
-    bool down_active, critical_paused, stop_pending;
+    bool down_active, critical_paused;
     u32 cool_samples, epoch;
     struct gf5_clock entry_clock, ceiling;
-    i32 last_rc, source_rc, last_milli_c;
 };
 struct gf_init_program;
 /* C2-ROM owns full ROM and completed M program, independently of devinit
@@ -154,7 +159,49 @@ struct gf5 {
     struct gf5_plan_guard plan_guard;
     u32 rom_generation;
     struct gf5_heat_state heat;
+    struct gf5_stop_state *stop; /* Resident, never saved or reset by restart. */
+    i32 temperature; /* Latest sample, distinct from the first stop cause. */
 };
+static inline bool gf5_stopping(const struct gf5 *g)
+{
+    return g->stop && g->stop->state!=GF5_STOP_NORMAL;
+}
+static inline void gf5_stop_request(struct gf5 *g,i32 reason,i32 temperature,i32 source)
+{
+    if (!g->stop || gf5_stopping(g)) return;
+    *g->stop=(struct gf5_stop_state){GF5_STOP_REQUESTED,reason,temperature,source};
+    g->accepting=false;
+    g->plan_guard.valid=false;
+}
+static inline bool gf5_above_ceiling(const struct gf5 *g,const struct gf5_clock *c)
+{
+    return g->heat.down_active &&
+        (c->core_khz>g->heat.ceiling.core_khz ||
+         (c->shader_khz ? c->shader_khz : c->core_khz)>g->heat.ceiling.shader_khz ||
+         c->mem_khz>g->heat.ceiling.mem_khz);
+}
+/* MIT clk/nv40.c:39-78: decode both stages, never trust calc's actual. */
+static inline i32 gf5_plan_ceiling(const struct gf5 *g,const struct gf5_plan *p)
+{
+    if (!g->heat.down_active) return 0;
+    struct gf5_clock decoded={0};
+    const u32 control[2]={p->nc,p->mc}, coefficient[2]={p->nn,p->mn};
+    u32 khz[2];
+    if ((p->mux&0x33U)!=0x33U) return GF5_ERANGE;
+    for (u32 i=0;i<2;++i) {
+        u32 c=control[i],v=coefficient[i],m=v&255U,n=(v>>8)&255U;
+        if (!(c&0x80000000U) || !m || !n) return GF5_ERANGE;
+        khz[i]=GF_PLL_REF*n/m;
+        if ((c&0x40000100U)==0x40000000U) {
+            m=(v>>16)&255U; n=(v>>24)&255U;
+            if (!m || !n) return GF5_ERANGE;
+            khz[i]=khz[i]*n/m;
+        }
+        khz[i]>>=(c>>16)&7U;
+    }
+    decoded.core_khz=decoded.shader_khz=khz[0]; decoded.mem_khz=khz[1];
+    return gf5_above_ceiling(g,&decoded) ? GF5_EBUSY : 0;
+}
 i32 gf5_clock_read(struct gf5 *, struct gf5_clock *);
 i32 gf5_clock_calc(struct gf5 *, const struct gf5_clock *, struct gf5_plan *);
 i32 gf5_clock_prog(struct gf5 *, const struct gf5_plan *);
