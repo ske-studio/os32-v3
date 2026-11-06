@@ -118,7 +118,7 @@ static int metadata(void)
     }
     char count[32];
     if (db >= 0) {
-        if (!scalar(db, "SELECT count(*) FROM dict", count, sizeof(count)) ||
+        if (!scalar(db, "SELECT ''||count(*) FROM dict", count, sizeof(count)) ||
             strcmp(text + start[IME_DICT_INFO_ENTRY_COUNT], count)) ok = 0;
         if (api->db_close(db) != 0) ok = 0;
     }
@@ -166,7 +166,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
     if (!check("initial dictionary", n == 1 && original[0] && strchr("SML", original[0]))) goto done;
     if (!check("boot dictionary fixture", info_is(IME_DICT_INFO_MEM_RESERVE_KB, "192"))) goto done;
     if (!check("settings fixture (reboot required)",
-        read_value(SETTINGS, "SELECT ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0", setting, sizeof(setting)) && atoi(setting) == TEST_RESERVE &&
+        read_value(SETTINGS, "SELECT ''||ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0", setting, sizeof(setting)) && atoi(setting) == TEST_RESERVE &&
         read_value(SETTINGS, "SELECT tval FROM settings WHERE scope='system' AND key='fep_user_dict_path' AND type=1", setting, sizeof(setting)) && !strcmp(setting, USER_DB))) goto done;
     if (!check("select S", api->ime_switch_dict(0) == 0)) goto done;
     if (!check("metadata bytes and entry_count", metadata())) goto done;

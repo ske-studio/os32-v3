@@ -69,7 +69,7 @@ def collect(mutant=None):
             assert source.count(ANCHOR) == 1
             source = source.replace(ANCHOR, 'length(CAST(tval AS BLOB))')
         if mutant == 'fep-meta' and path == ROOT / 'userland/tests/fep_meta_test.c':
-            anchor = 'SELECT ival FROM settings'
+            anchor = "SELECT ''||ival FROM settings"
             assert source.count(anchor) == 1
             source = source.replace(anchor, 'SELECT CAST(ival AS TEXT) FROM settings')
         if mutant == 'fep-meta-value' and path == ROOT / 'userland/tests/fep_meta_test.c':
