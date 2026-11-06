@@ -1,6 +1,6 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
-CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=90.0,
-    covers=['tools/tests/gf_guard_fake.h', 'tools/tests/gf_startlog_host.h', 'build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
+CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h', 'make:build/out/kernel.elf'], budget=90.0,
+    covers=['drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'gfx/gfx_core.c', 'gfx/gfx_emergency.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'kernel/sys.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/paging_source.py', 'tools/tests/kernel_layout.py', 'tools/tests/serial_diag_host.h', 'tools/tests/host_arch/*.h', 'mm/paging.c', 'mm/paging_*.inc', 'mm/pgalloc.c', 'mm/pgalloc_*.inc', 'tools/tests/gf_guard_fake.h', 'tools/tests/gf_startlog_host.h', 'build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
             'kdebug/gf_accel_test.h', 'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
             'kdebug/gf_command_wire.h', 'kdebug/recover.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # A2 report: only the tested component is real; dependencies live in the
 # fixture header. B7/T2b include their product source and must not link it twice.
 COMPONENTS = {
+    'guard-mm': 'hwdev/gf/instmem_map.c',
     'c0': 'hwdev/gf/command.c',
     't2a2-link': 'hwdev/gf/foundation_test.c',
     't2a2-bind': 'drivers/video/geforce/geforce_body.c',
@@ -187,6 +188,63 @@ MUTATIONS = {
 }
 
 
+# H1 owns the combined A1-A3 oracle; H4/H5 retain the isolated BAR2 fixture.
+GUARD_MUTATIONS = [
+    ('dynamic-membership', 'mm/paging.c',
+     'ledger_resource_page_mapped(k, p)',
+     '(p >= ledger_resources[k].map_first && p < ledger_resources[k].map_end)',
+     'FAIL !paging_master_audit'),
+    ('decode-hull', 'mm/paging.c',
+     'ledger_resource_page_mapped(k, p)',
+     '(ledger_resource_page_mapped(k, p) || ((e & PTE_PRESENT) && p >= ledger_resources[k].decode_first && p < ledger_resources[k].decode_end))',
+     'FAIL paging_master_audit'),
+    ('failed-unmap-removes-registration', 'mm/paging_map.inc',
+     'if (device_map_preflight(owner, rid, first, end, unmap, &slot) != 0)\n'
+     '        return -1;',
+     'if (device_map_preflight(owner, rid, first, end, unmap, &slot) != 0) {\n'
+     '        if (unmap && !ledger_device_map_prepare(owner, rid, first, end, unmap, &slot))\n'
+     '            ledger_device_map_commit(slot, 0);\n'
+     '        return -1;\n    }',
+     'FAIL f.mapped'),
+]
+
+
+def guard_mm(runners, mutate):
+    """Use existing real boot/AS/lease scaffolding, with real GPU map adapters."""
+    from test_gfx_kernel_fb import run_case
+    def run(runner, mutation=None):
+        changes = []
+        if mutation:
+            _, path, old, new, _ = mutation
+            require((ROOT / path).read_text().count(old) == 1,
+                    mutation[0] + ': anchor must be unique')
+            # run_case expands paging's same-TU fragments before replacement.
+            changes = [('mm/paging.c' if path == 'mm/paging_map.inc' else path, old, new)]
+        def stage(tmp, sources):
+            platform = ROOT / 'drivers/video/geforce/geforce_platform.c'
+            body = re.sub(r'^#include "([^"]+)"',
+                          lambda m: '#include "' + str((platform.parent / m[1]).resolve()) + '"'
+                          if (platform.parent / m[1]).is_file() else m[0],
+                          platform.read_text(), flags=re.MULTILINE)
+            (tmp / 'guard_platform.c').write_text(body)
+            sources.extend([ROOT / 'hwdev/gf/instmem_map.c',
+                            ROOT / 'hwdev/gf/command_platform.c'])
+        result = run_case(None, runner, changes,
+                          '#include "gf_command_guard_host.c"\n', stage=stage)
+        print(result.stdout + result.stderr, end='', flush=True)
+        require(result.returncode == (1 if mutation else 0),
+                f'guard-mm: runner={runner} rc={result.returncode}')
+        if mutation:
+            require(mutation[4] in result.stdout, mutation[0] + ': wrong runtime failure')
+        print('guard-mm ' + (mutation[0] + ': runtime RED' if mutation else 'control: runtime GREEN'), flush=True)
+    for runner in runners:
+        run(runner)
+        if mutate:
+            for mutation in GUARD_MUTATIONS:
+                run(runner, mutation)
+                run(runner)
+
+
 def require(condition, message):
     if not condition:
         raise RuntimeError(message)
@@ -293,7 +351,10 @@ def main():
              '-Werror', '-Werror=vla', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-static', '-no-pie',
              *include_flags(ROOT), '-I' + str(ROOT)]
-    selected = (args.component,) if args.component else COMPONENTS
+    selected = (args.component,) if args.component else tuple(COMPONENTS)
+    if 'guard-mm' in selected:
+        guard_mm(runners, args.mutate)
+        selected = tuple(c for c in selected if c != 'guard-mm')
     if args.oracle:
         require('b4' in selected, '--oracle requires the B4 component')
         from gf_command_b4_fixture import FIXTURE, generate
