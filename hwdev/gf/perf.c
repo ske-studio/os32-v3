@@ -102,14 +102,27 @@ static i32 table_read(struct gf5 *g,struct perf_table *t)
     return GF5_OK;
 }
 
+/* clk/base.c:421-425: disabled pstates never enter the public list. */
+static bool entry_valid(const u8 *p)
+{
+    return p[0]!=0xff;
+}
+
 static i32 entry_read(struct gf5 *g,u32 index,struct gf5_perf_entry *out)
 {
     struct perf_table t;
     i32 rc=table_read(g,&t);
     if (rc) return rc;
-    if (index>=t.count) return GF5_EINVAL;
-    const u8 *p=g->rom.bytes+t.base+t.header+index*t.stride;
+    u32 bios_index=0, valid_index=0;
+    const u8 *p=g->rom.bytes+t.base+t.header;
+    for (;bios_index<t.count;++bios_index,p+=t.stride) {
+        if (!entry_valid(p)) continue;
+        if (valid_index==index) break;
+        ++valid_index;
+    }
+    if (bios_index==t.count) return GF5_EINVAL;
     struct gf5_perf_entry e={0};
+    e.pstate=p[0]; e.bios_index=(u8)bios_index;
     switch (t.version) {
     case 0x12: case 0x13: case 0x14:
         if (le32(p+1)>(u32)0xffffffffU/PERF_OLD_CORE_SCALE ||
@@ -150,7 +163,13 @@ i32 gf5_perf_count(struct gf5 *g,u32 *out)
     if (!g || !out) return finish(g,GF5_EINVAL);
     struct perf_table t;
     i32 rc=table_read(g,&t);
-    if (!rc) *out=t.count;
+    if (!rc) {
+        u32 count=0;
+        const u8 *p=g->rom.bytes+t.base+t.header;
+        for (u32 i=0;i<t.count;++i,p+=t.stride)
+            if (entry_valid(p)) ++count;
+        *out=count;
+    }
     return finish(g,rc);
 }
 i32 gf5_perf_get(struct gf5 *g,u32 index,struct gf5_perf_entry *out)
