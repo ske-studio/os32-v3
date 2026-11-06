@@ -25,7 +25,8 @@ from module_schema import HEADER_FIELDS
 # GF4 appends the kernel display diagnostic after the reviewed GF3 tail.
 REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
                              'geforce_accel_ops', 'gfx_present', 'gf_display_test',
-                             'gf5_test', 'pci_hwb_read', 'pci_hwb_write', 'exec_hwb_abort_take')
+                             'gf5_test', 'pci_hwb_read', 'pci_hwb_write', 'exec_hwb_abort_take',
+                             'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap')
 REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):
