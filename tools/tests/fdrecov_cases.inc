@@ -172,9 +172,9 @@ static void case_fdrecov(void)
     fdrecov_setup(0, 1);
     check(run2("--root", "/hd0") == 0 && g_errors == 0, "CRC 正常の対照");
 
-    /* DICT_META L: recovery must also read the destination learning path.
-     * Without DB access, stop before any writes; readable settings permit
-     * the existing whole-root LAN/shell recovery without a CREATE API. */
+    /* DICT_META L: unavailable settings warn and guard every /etc DB.
+     * Recovery dry-run continues without DB APIs; readable settings retain
+     * whole-root LAN/shell recovery without a CREATE API. */
     fdrecov_setup(1, 1);
     g_fake.vfs_devname = fdrecov_lan_devname;
     fs_add_file("/host/boot/lan.mod", (const u8 *)"paired lan", 10);
@@ -183,12 +183,13 @@ static void case_fdrecov(void)
     fs_add_dir("/hd0/boot");
     fs_add_file("/hd0/boot/lan.mod", (const u8 *)"old lan", 7);
     g_fake.db_open_existing = 0;
-    check(run2("--root", "/hd0") != 0 && wrote_nothing() &&
-          log_has("fep_user_dict_path unavailable or invalid"),
-          "FDRECOV: 設定読取不可は全書込み前に拒否する");
+    check(run3("--root", "/hd0", "-n") == 0 && wrote_nothing() &&
+          log_has("Warning: fep_user_dict_path stage=open rc=-10") &&
+          hsp_path_classify("/etc/unknown.DB-journal") == 1,
+          "FDRECOV: 設定読取不可は警告・全 DB 保護で dry-run を続ける");
     fixture_settings_init(&g_fake);
     check(g_fake.db_open == 0 && g_fake.db_open_existing != 0,
-          "FD 全体復旧は設定を既存 DB から読めることが必要");
+          "FD 全体復旧は CREATE API なしで設定を読める");
     {
         char *av[] = {"hsync", "--root", "/hd0", "--verify", "--no-backup", 0};
         int n;

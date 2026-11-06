@@ -48,12 +48,14 @@ static int fixture_db_prepare(int h, const char *sql)
     (void)h;
     fixture_settings_schema = strstr(sql, "sqlite_master") != 0;
     fixture_settings_step = 0;
-    return fixture_settings_fault == 2 ? -1 : 0;
+    return fixture_settings_fault == 2 ||
+        (fixture_settings_fault == 9 && !fixture_settings_schema) ? -1 : 0;
 }
 static int fixture_db_step(int h)
 {
     (void)h;
-    if (fixture_settings_fault == 3) return DB_STATUS_ERROR;
+    if (fixture_settings_fault == 3 ||
+        (fixture_settings_fault == 10 && !fixture_settings_schema)) return DB_STATUS_ERROR;
     if (fixture_settings_schema)
         return fixture_settings_fault != 8 && !fixture_settings_step++ ?
             DB_STATUS_ROW : DB_STATUS_DONE;

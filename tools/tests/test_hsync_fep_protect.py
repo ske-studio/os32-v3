@@ -18,6 +18,9 @@ PRODUCT = 'userland/system/hsync_protect.inc'
 SCAN = 'userland/system/hsync.c'
 # (name, file, unique old, new). Compilation must succeed; RED is runtime only.
 MUTANTS = [
+    ('all-db', PRODUCT, 'if (hsp_fep_all_db) {', 'if (0 && hsp_fep_all_db) {'),
+    ('all-db-case', PRODUCT, 'hsp_fep_prefix(name + i, ".db")',
+     'hsp_ieq(name + i, ".db")'),
     ('full-name', SCAN, 'g_prot_name[HS_MAX_PROT][OS32_MAX_PATH]',
      'g_prot_name[HS_MAX_PROT][64]'),
 
