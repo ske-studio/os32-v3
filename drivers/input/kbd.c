@@ -650,9 +650,13 @@ static int kbd_gui_trygetbyte(void)
     return (int)b;
 }
 
+#include "kbd_fgpoll.inc"
+
 int kbd_trygetchar(void)
 {
     u16 entry;
+
+    kbd_foreground_poll();
 
     /* GUI 中は注入リングだけを見る (cooked リングは GUI 中は空のまま)。
      * 空のときは票 T8 §7 D8 の **ポーリング型の協調 yield**: 前回の譲りから
@@ -749,6 +753,7 @@ static int kbd_getchar_wait(int interruptible)
 
     {
         for (;;) {
+            kbd_foreground_poll();
             /* キーボードバッファ */
             if (kbd_count > 0) {
                 RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count,
@@ -784,6 +789,7 @@ int kbd_getkey_wait(int interruptible)
     if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
     while (kbd_count == 0) {
+        kbd_foreground_poll();
         if (interruptible && ring3_wait_pending()) return -1;
         _halt();
     }
@@ -797,6 +803,8 @@ int kbd_getkey_wait(int interruptible)
 int kbd_trygetkey(void)
 {
     u16 entry;
+
+    kbd_foreground_poll();
 
     /* GUI 中は kbd_trygetchar と同型 (値か -1)。下位 8bit だけが意味を持ち、
      * スキャンコードは 0 (票 K7 D7 — 端末経由の打鍵にスキャンコードは無い)

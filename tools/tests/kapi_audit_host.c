@@ -5,6 +5,7 @@
 #include "fm.h"
 #include "os32_kapi_shared.h"
 int services_public = 1;
+void geforce_foreground_poll(void) { }
 volatile u32 services_boot_fault;
 static unsigned ports, waits, abort_checks, request_wait=3, opn_reg, last_key;
 static volatile int user, escaped;
