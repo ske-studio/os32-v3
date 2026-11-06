@@ -172,7 +172,7 @@ static void gpio_tables(void)
     assert(!gf5_gpio_find(&h.ctx,0x76,&line,log) && line==13 && log[0]==1 && log[1]==2);
     no_io();
     line=0xaa; log[0]=0xbb; log[1]=0xcc;
-    assert(gf5_gpio_find(&h.ctx,9,&line,log)==GF5_ENOTSUP);
+    assert(gf5_gpio_find(&h.ctx,9,&line,log)==GF5_ENODEV);
     assert(line==0xaa && log[0]==0xbb && log[1]==0xcc);
     rom[GPIO+4]=14;
     assert(gf5_gpio_find(&h.ctx,0x76,&line,log)==GF5_EINVAL); no_io();
@@ -274,13 +274,108 @@ static void vmap_absent_speedo(void)
         assert(gf5_volt_id(&h.ctx,100,0,0)==GF5_ENOTSUP); no_io();
     }
 }
+/* A07/V0: check the real parser/selector, with literal BIOS fixtures above.
+ * No helper here computes a voltage or substitutes for the product check.
+ * The only permitted context changes are the diagnostic return codes. */
+static void check_request(u8 id,u8 minimum,i32 expected)
+{
+    struct gf5 before;
+    gf2_host_memcpy(&before,&h.ctx,sizeof(before));
+    h.ctx.last_rc=GF5_EIO; h.ctx.source_rc=-1;
+    assert(gf5_volt_check_id(&h.ctx,id,minimum)==expected);
+    assert(h.ctx.last_rc==expected && h.ctx.source_rc==expected);
+    before.last_rc=expected; before.source_rc=expected;
+    assert(!gf2_host_memcmp(&before,&h.ctx,sizeof(before)));
+    struct gf5_host_activity activity=gf5_host_activity(&h);
+    assert(!activity.reads && !activity.writes && !activity.pauses && !activity.resumes);
+    no_io(); retained();
+}
+static void check_classification(void)
+{
+    static const u8 versions[]={0x12,0x20,0x30};
+    for (u32 i=0;i<sizeof(versions);++i) {
+        setup(versions[i]);
+        check_request(100,0,0);
+        check_request(100,110,0);
+        check_request(105,120,0); /* round up, with an available minimum */
+        check_request(121,0,GF5_ERANGE);
+        check_request(100,121,GF5_ERANGE); /* minimum must also be feasible */
+        check_request(0,0,GF5_ENOTSUP); /* zero id is not absence */
+    }
+    setup(0x30); h.ctx.rom.bytes=0;
+    assert(gf5_volt_check_id(&h.ctx,100,0)==GF5_ENOTSUP); no_io();
+    setup(0x30); rom[BIT+BIT_BYTES]='X'; /* decoded BIT, no P entry */
+    check_request(0,0,GF5_ENODEV);
+    setup(0x30); put(POWER+0x0c,0,4);
+    check_request(0,0,GF5_ENODEV);
+    check_request(100,0,GF5_ENODEV);
+    /* Missing DCB/GPIO pins reduce the VID mask, as volt/gpio.c:30-97
+     * does; a real voltage table still exists, so id=0 is unsupported. */
+    setup(0x30); put(0x36,0,2);
+    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    setup(0x30); put(DCB+10,0,2);
+    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    setup(0x30); rom[GPIO+2]=0;
+    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    setup(0x30); rom[VOLT]=0x40;
+    check_request(0,0,GF5_ENOTSUP);
+    setup(0x30); rom[BIT+BIT_BYTES+1]=3;
+    check_request(100,0,GF5_ENOTSUP);
+    setup(0x30); rom[DCB]=0x42;
+    check_request(100,0,GF5_ENOTSUP);
+    setup(0x30); rom[GPIO]=0x42;
+    check_request(100,0,GF5_ENOTSUP);
+    setup(0x30); rom[VOLT+1]=4;
+    check_request(0,0,GF5_EBIOS);
+    setup(0x30); rom[VOLT+3]=0;
+    check_request(100,0,GF5_ERANGE);
+    setup(0x30); rom[DCB+6]=0;
+    check_request(100,0,GF5_EBIOS);
+    setup(0x30); rom[GPIO+3]=3;
+    check_request(100,0,GF5_EBIOS);
+    setup(0x30); rom[GPIO+2]=1; /* known missing VID1 is optional */
+    check_request(110,0,0);
+    setup(0x30); gpio40(1,5,14,2,3); /* invalid wiring is not absent */
+    check_request(100,0,GF5_EINVAL);
+    setup(0x30); rom[BIT+BIT_BYTES+1]=1; put(POWER+0x10,VOLT,4);
+    check_request(100,0,0); /* P v1 has no vmap */
+    setup(0x30); put(BIT+BIT_BYTES+2,0x10,2);
+    check_request(100,0,0); /* short P v2 predates vmap */
+    assert(gf5_volt_check_id(0,100,0)==GF5_EINVAL);
+}
+static void check_vmap(void)
+{
+    static const u8 versions[]={0x10,0x20};
+    for (u32 v=0;v<sizeof(versions);++v) {
+        setup(0x30); put(POWER+0x20,VMAP,4);
+        rom[VMAP]=versions[v]; rom[VMAP+1]=VMAP_HEADER;
+        rom[VMAP+2]=versions[v]==0x10 ? 0x14 : 0x22; rom[VMAP+3]=1;
+        for (u32 mode=0;mode<4;++mode) {
+            rom[VMAP+VMAP_HEADER]=mode;
+            check_request(0,0,GF5_ENOTSUP);
+            check_request(100,0,GF5_ENOTSUP); /* even zero floor needs speedo */
+        }
+        rom[VMAP+3]=2;
+        check_request(100,1,GF5_ENOTSUP); /* nonzero floor needs speedo too */
+        check_request(100,110,0); /* both indices outside map: direct units */
+        rom[VMAP+3]=0;
+        check_request(100,0,0); /* no real zero entry: no extra floor */
+        rom[VMAP]=0x99;
+        check_request(100,110,GF5_ENOTSUP);
+        rom[VMAP]=versions[v]; rom[VMAP+2]=1;
+        check_request(100,110,GF5_EBIOS);
+        rom[VMAP+2]=versions[v]==0x10 ? 0x14 : 0x22;
+        rom[VMAP+3]=0xff; /* declared entries run past ROM */
+        check_request(100,110,GF5_EBIOS);
+    }
+}
 static void malformed(void)
 {
     setup(0x30); h.ctx.rom.bytes=0;
     u32 uv=0xfeed;
     assert(gf5_volt_get(&h.ctx,&uv)==GF5_ENOTSUP && uv==0xfeed); no_io();
     setup(0x30); put(POWER+0x0c,0,4);
-    assert(gf5_volt_set(&h.ctx,UV_LOW)==GF5_ENOTSUP); no_io();
+    assert(gf5_volt_set(&h.ctx,UV_LOW)==GF5_ENODEV); no_io();
     setup(0x30); rom[VOLT]=0x40;
     assert(gf5_volt_set(&h.ctx,UV_LOW)==GF5_ENOTSUP); no_io();
     setup(0x30); rom[VOLT+1]=4;
@@ -335,5 +430,6 @@ void _start(void)
 {
     voltage_versions(); gpio_golden(); gpio_tables(); all_vid_bits(); mask_and_unknown();
     id_selection(); vmap_absent_speedo(); malformed(); io_failure();
+    check_classification(); check_vmap();
     gf2_host_exit(0);
 }
