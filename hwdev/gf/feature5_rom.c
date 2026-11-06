@@ -23,6 +23,10 @@ i32 gf5_rom_acquire(struct gf5 *g, const u8 *rom, u32 size,
     void *bytes = 0, *copy = 0;
     i32 rc;
     if (!g) return GF5_EINVAL;
+    /* Invalidate before validation/allocation, including failed acquisitions.
+     * Unlike nouveau clk/base.c:195-198, callers retain public plan values. */
+    gf5_plan_invalidate(g); /* ROM acquire boundary */
+    ++g->rom_generation; /* acquire: wrap is safe with the guard invalid */
     if (!rom || !size || !g->links.alloc || !g->links.free)
         return rom_error(g, GF5_EINVAL, GF5_EINVAL);
     if (g->rom.bytes || g->rom.memory_program)
@@ -51,6 +55,9 @@ i32 gf5_rom_acquire(struct gf5 *g, const u8 *rom, u32 size,
 void gf5_rom_release(struct gf5 *g)
 {
     if (!g) return;
+    /* Do this before free callbacks, even for an already empty ROM. */
+    gf5_plan_invalidate(g); /* ROM release boundary */
+    ++g->rom_generation; /* release: never revive a guard on wrap */
     if (g->rom.memory_program)
         g->links.free(g->links.owner, (void *)g->rom.memory_program);
     if (g->rom.bytes) g->links.free(g->links.owner, (void *)g->rom.bytes);
