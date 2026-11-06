@@ -25,6 +25,9 @@ IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
 Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
 F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
 GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
+Guard D0 adds the private plan guard, ROM generation and live heat state,
+plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
+make all regenerates the contract after the reviewed inventory update.
 These changes own the pins below.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
@@ -48,9 +51,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xace60670
+REVIEWED_LAYOUT_CRC = 0x477e95fe
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '0eb72b9fecabb13cba5f568aa09127b056c297b5e58119c2cb98cd21a879da4f'
+REVIEWED_INVENTORY_SHA = '84c9635cc9d847cd8aec5c5814610c8dd9d2007012e547984bd326d9a4d22b00'
 
 
 def import_declarations(root):
