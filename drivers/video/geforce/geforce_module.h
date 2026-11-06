@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "gfx_hal.h"
 #include "video_service.h"
+#include "../../../hwdev/gf/stop_state.h"
 #include "../../../kernel/module/module_runtime.h"
 #define GEFORCE_MODULE_OPS_VERSION 5u
 #define GEFORCE_WC_BYTES 0x80000U
@@ -16,6 +17,15 @@ struct gf4_test_ops;
 struct gf4_restore_ops;
 struct gf5;
 struct gf5_test_ops;
+/* Resident storage; module callbacks are published for the pinned boot owner.
+ * Requests carry values only. Clearing requires an explicit cold measurement. */
+struct geforce_heat_bridge {
+    struct gf5_stop_state stop_state;
+    void (*request)(i32 reason, i32 milli_c, i32 source_rc);
+    int (*stop)(void);
+    int (*clear)(void);
+    bool (*backend_active)(void); /* App recovery belongs only to gfx enter. */
+};
 const struct gf3_test_ops *geforce_accel_ops(void);
 const struct gf1_test_ops *geforce_foundation_ops(void);
 /* Read the normal/restore slot on every call; do not retain across unload. */
@@ -27,6 +37,18 @@ const struct gf5_test_ops *geforce_feature5_ops(void);
 void geforce_backend_feature5_bind(struct gf5 *);
 void gf_hook_feature5_bind(struct gf5 *);
 int geforce_foundation_display(bool start);
+/* Resident foreground adapter: reread the F5 slot on every dispatch, never
+ * cache module ctx/ops. No IRQ calls. Consume pending heat stop at the common
+ * exit while retaining reentry protection; backend stop owns active/routed. */
+void geforce_foreground_poll(void);
+void geforce_heat_notice(void);
+/* Resident tick/pending query only; no module callback or MMIO. */
+bool geforce_fg_due(u32 now_tick);
+/* Value-only stop request; do not retain any module pointers. The consumer
+ * owns no-route sync/halt; geforce_return must retain its reboot semantics. */
+void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
+void geforce_display_stopped(void);
+int geforce_heat_latch_clear(void);
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);
@@ -50,6 +72,9 @@ struct geforce_platform *geforce_platform_get(void);
 int geforce_boot_reserve(void) __attribute__((weak));
 int geforce_pc98_safe(void);
 int geforce_range_reserved(u32 base, u32 length);
+/* Resolve one fully containing boot-reserved BAR, 0/-1. Invalid/overflowing
+ * ranges and ambiguous matches fail without changing owner/rid outputs. */
+int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);
 void geforce_display_failed(void);
 typedef struct {
     GfxBackend *backend;
@@ -68,6 +93,7 @@ typedef struct {
     const struct gf4_test_ops **display_out;
     const struct gf5_test_ops **feature5_out;
     const struct gf4_restore_ops **display_restore_out;
+    struct geforce_heat_bridge *heat;
 } GeforceModuleContext;
 extern const GeforceModuleContext *geforce_context;
 extern GfxBackend geforce_backend_ops;

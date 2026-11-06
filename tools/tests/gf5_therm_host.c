@@ -63,7 +63,10 @@ static u8 gpio_log0;
 static bool gpio_on;
 static i32 gpio_source; /* Emulate B4 classified public GPIO failures. */
 static u32 down_count,pause_count;
-static bool down_active,pause_active;
+static bool pause_active;
+static u32 heat_samples,heat_missing;
+static struct gf5_thermal heat_sample;
+static u64 heat_time;
 
 static void put16(u32 at,u32 value) { rom[at]=(u8)value; rom[at+1]=(u8)(value>>8); }
 static void put32(u32 at,u32 value) { put16(at,value); put16(at+2,value>>16); }
@@ -73,10 +76,21 @@ static void entry(u8 type,u32 value)
     assert(at+3U<=R_PERF);
     rom[at]=type; put16(at+1U,value); ++rom[R_THERM+3U];
 }
-/* Allowed fixture observer: successful GPIO stub output only. GPIO SET
+/* Fixture observer: copy borrowed heat samples during the call; seed only
+ * successful GPIO stub outputs. GPIO SET
  * changes the test's physical line, independently from fan_saved fields. */
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
 {
+    if (e->op==F5_HEAT) {
+        assert(e->p[0]==&host->ctx);
+        if (e->p[1]) {
+            ++heat_samples;
+            heat_sample=*(const struct gf5_thermal *)e->p[1];
+            heat_time=((u64)e->a[1]<<32)|e->a[0];
+            if (heat_sample.milli_c>=135000)
+                assert(host->ctx.stop->state && !host->ctx.heat.cool_samples);
+        } else ++heat_missing;
+    }
     if (e->rc) {
         if (gpio_source && (e->op==F5_GPIO_FIND || e->op==F5_GPIO_GET || e->op==F5_GPIO_SET))
             host->ctx.source_rc=gpio_source;
@@ -92,7 +106,7 @@ static void observe(struct gf5_host *host,const struct gf5_host_event *e)
 /* Actual registered emergency consumers, not replacement product APIs. */
 static void down(void *owner,bool active)
 {
-    assert(owner==&h); ++down_count; down_active=active;
+    assert(owner==&h); ++down_count; (void)active;
 }
 static void pause_gpu(void *owner,bool active)
 {
@@ -100,6 +114,7 @@ static void pause_gpu(void *owner,bool active)
 }
 static void reset(void)
 {
+    startlog_clear();
     gf5_host_init(&h,&display_state);
     h.events=events; h.cevents=COUNT(events);
     h.display.events=devents; h.display.cevents=COUNT(devents);
@@ -120,7 +135,9 @@ static void reset(void)
     gf3_host_set(&h.display.base,0,T_RAW,60);
     /* enabled, divisor100, inverted duty80 => physical duty20%. */
     gf3_host_set(&h.display.base,0,T_PWM2,T_ENABLE|0x00500064U);
-    down_count=pause_count=0; down_active=pause_active=false;
+    down_count=pause_count=heat_samples=heat_missing=0;
+    heat_sample=(struct gf5_thermal){0}; heat_time=0;
+    pause_active=false;
     h.ctx.emergency=(struct gf5_emergency_ops){down,pause_gpu,&h};
 }
 static void ready(void)
@@ -279,7 +296,8 @@ static void test_pwm(void)
     assert(h.display.calls[D_WRITE]==writes);
     ++h.now; gf5_fan_tick(&h.ctx,h.now);
     assert(reg_value(T_PWM2)==(T_ENABLE|0x004a0064U)); /*23->26*/
-    assert(!gf5_fan_cstate(&h.ctx,10,-1));
+    h.ctx.fan.kind=GF5_FAN_OTHER;
+    assert(!gf5_fan_cstate(&h.ctx,10,0));
     assert(reg_value(T_PWM2)==(T_ENABLE|0x004d0064U)); /*26->23*/
     assert(h.ctx.next_step==h.now+T_SLOW);
     assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
@@ -393,56 +411,183 @@ static void test_auto(void)
     gf3_host_set(&h.display.base,0,T_RAW,46);
     assert(!gf5_fan_cstate(&h.ctx,99,0)); assert(!h.ctx.fan.target && h.ctx.fan.last_trip==-1);
 }
+/* MIT temp.c:104-208 edges; OS32 §5/§6 passes every successful
+ * sample to heat_step, including cooling and unchanged active levels. */
+static void sensor_at(u64 now,u32 celsius)
+{
+    gf5_host_time_set(&h,now);
+    gf3_host_set(&h.display.base,0,T_RAW,celsius);
+    u32 samples=heat_samples;
+    gf5_fan_tick(&h.ctx,now);
+    assert(heat_samples==samples+1 && heat_time==now);
+    assert(heat_sample.calibrated && heat_sample.milli_c==(i32)celsius*1000);
+    assert(h.ctx.next_sensor==now+T_POLL);
+    assert(!down_count); /* The old edge-only consumer is never used. */
+}
 static void test_sensor(void)
 {
     reset(); ready();
-    /* Avoid unrelated AUTO/step I/O; thresholds still poll in NONE. */
     assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
-    gf3_host_set(&h.display.base,0,T_RAW,106);
-    gf5_fan_tick(&h.ctx,h.now);
+    sensor_at(h.now,106);
     assert(h.ctx.fan.active[0] && h.ctx.fan.active[1] && h.ctx.fan.active[2] && !h.ctx.fan.active[3]);
-    assert(down_count==1 && down_active && pause_count==1 && pause_active);
-    assert(h.ctx.next_sensor==h.now+T_POLL && h.ctx.fan.mode==GF5_FAN_AUTO);
-    /* fanboost issued immediate100% (inverted duty0) before AUTO. */
-    bool boosted=false;
-    for (u32 i=0;i<h.display.nevents;++i)
-        if (devents[i].op==D_WRITE && devents[i].a[1]==T_PWM2 && devents[i].a[3]==(T_ENABLE|100U)) boosted=true;
-    assert(boosted);
-    h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==1 && pause_count==1);
-    gf3_host_set(&h.display.base,0,T_RAW,101); h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(pause_count==1); /* critical105,hyst5:101 stays active. */
-    gf3_host_set(&h.display.base,0,T_RAW,100); h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(pause_count==2 && !pause_active);
-    gf3_host_set(&h.display.base,0,T_RAW,92); h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==2 && !down_active);
-    gf3_host_set(&h.display.base,0,T_RAW,87); h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(!h.ctx.fan.active[0]);
-    gf3_host_set(&h.display.base,0,T_RAW,135); h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.fan.active[3] && h.ctx.fan.target==100);
-    assert(reg_value(T_PWM2)==(T_ENABLE|100U));
+    assert(pause_count==1 && pause_active && h.ctx.fan.mode==GF5_FAN_AUTO);
+    assert(h.ctx.fan.target==100 && reg_value(T_PWM2)==(T_ENABLE|100U));
+    sensor_at(h.ctx.next_sensor,106);
+    assert(pause_count==1); /* Repeated hot sample still reaches heat_step. */
+    sensor_at(h.ctx.next_sensor,100); /* MIT temp.c:150-153: equal releases. */
+    assert(pause_count==2 && !pause_active && !h.ctx.fan.active[2]);
+    sensor_at(h.ctx.next_sensor,99);
+    assert(pause_count==2 && !pause_active && !h.ctx.fan.active[2]);
+    sensor_at(h.ctx.next_sensor,92); /* down95 - hyst3: equal releases. */
+    assert(!h.ctx.fan.active[1]);
+    sensor_at(h.ctx.next_sensor,91); assert(!h.ctx.fan.active[1]);
+    sensor_at(h.ctx.next_sensor,87); assert(!h.ctx.fan.active[0]);
+    sensor_at(h.ctx.next_sensor,86); assert(!h.ctx.fan.active[0]);
+    h.ctx.heat.cool_samples=2;
+    sensor_at(h.ctx.next_sensor,135);
+    assert(h.ctx.fan.active[3] && h.ctx.stop->state && !h.ctx.heat.cool_samples);
+    assert(pause_count==2); /* Shutdown bypasses critical pause. */
+    sensor_at(h.ctx.next_sensor,130); assert(!h.ctx.fan.active[3]);
+    sensor_at(h.ctx.next_sensor,129); assert(!h.ctx.fan.active[3]);
     no_forbidden();
-    /* Failed sensor read stops its alarm without failing the display poll. */
-    startlog_clear();
-    gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_READ,1,-41);
-    bool was=h.ctx.fan.active[3]; h.now=h.ctx.next_sensor;
-    gf5_fan_tick(&h.ctx,h.now);
-    assert(h.ctx.last_rc==0 && h.ctx.source_rc==0 && !h.ctx.fan.sensor_poll && !h.ctx.next_sensor);
-    assert(h.ctx.fan.active[3]==was && devents[1].rc==-41);
+    startlog_clear(); gf5_host_trace_clear(&h);
+    gf4_host_fail_at(&h.display,D_READ,1,-41);
+    u32 samples=heat_samples;
+    h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
+    assert(heat_samples==samples && heat_missing==1);
+    assert(!h.ctx.last_rc && !h.ctx.source_rc && !h.ctx.fan.sensor_poll && !h.ctx.next_sensor);
     assert(startlog_equal("[gf5] therm off rc=-41 reason=sensor\n"));
-    /* A fanless board must still notify registered emergency consumers. */
-    reset(); ready(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP);
-    gf3_host_set(&h.display.base,0,T_RAW,106); gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==1 && pause_count==1 && h.ctx.last_rc==GF5_ENOTSUP);
-    gf3_host_set(&h.display.base,0,T_RAW,87);
-    h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==2 && !down_active && pause_count==2 && !pause_active);
-    assert(!h.ctx.fan.active[0] && !h.ctx.fan.active[1] && !h.ctx.fan.active[2]);
-    gf3_host_set(&h.display.base,0,T_RAW,106);
-    h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==3 && down_active && pause_count==3 && pause_active);
-    assert(h.ctx.fan.active[0] && h.ctx.fan.active[1] && h.ctx.fan.active[2]);
-    assert(!h.calls[F5_GPIO_GET] && !h.calls[F5_GPIO_SET]);
+}
+/* The one-second sensor deadline is independent of the fan's shorter
+ * alarms (MIT temp.c:162-208 versus fan.c:76-98/fantog.c:39-62). */
+static void test_sensor_time(void)
+{
+    reset(); ready();
+    assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+    sensor_at((1ULL<<32)-T_POLL/2,60);
+    u64 due=h.ctx.next_sensor;
+    assert(due>(1ULL<<32));
+    gf5_host_trace_clear(&h);
+    gf5_fan_tick(&h.ctx,h.now); /* Still before the low-word wrap. */
+    assert(!h.calls[F5_HEAT] && !h.display.nevents);
+    gf5_host_time_set(&h,due-1); gf5_fan_tick(&h.ctx,h.now);
+    struct gf5_host_activity activity=gf5_host_activity(&h);
+    assert(!activity.reads && !activity.writes && !h.calls[F5_HEAT]);
+    sensor_at(due,60);
+    sensor_at(h.ctx.next_sensor+7*T_POLL,60); /* No catch-up burst. */
+    assert(heat_samples==3);
+    u32 reads=h.display.calls[D_READ],writes=h.display.calls[D_WRITE];
+    gf5_fan_tick(&h.ctx,h.now);
+    assert(heat_samples==3 && h.display.calls[D_READ]==reads && h.display.calls[D_WRITE]==writes);
+    no_forbidden();
+}
+/* Independent BIOS fixture: therm/temp.c:104-158 and bios/therm.c:107-133.
+ * All four values differ from defaults. The lower edge is inclusive,
+ * as in the reference (PACK gives the reference priority over §6). */
+static void test_rom_thresholds(void)
+{
+    const u8 tag[]={0x08,0x07,0x04,0x32};
+    const u32 limit[]={70,80,100,120},hyst[]={2,4,6,8};
+    for (u32 selected=0;selected<COUNT(tag);++selected) {
+        reset();
+        for (u32 i=0;i<COUNT(tag);++i) entry(tag[i],(limit[i]<<4)|hyst[i]);
+        ready(); assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+        for (u32 i=0;i<COUNT(tag);++i)
+            assert(h.ctx.fan.threshold[i]==(i32)limit[i] && h.ctx.fan.hyst[i]==(i32)hyst[i]);
+        sensor_at(h.now,limit[selected]-1);
+        assert(!h.ctx.fan.active[selected]);
+        u32 pauses=pause_count;
+        sensor_at(h.ctx.next_sensor,limit[selected]);
+        assert(h.ctx.fan.active[selected]);
+        if (selected==3) assert(h.ctx.stop->state && pause_count==pauses);
+        sensor_at(h.ctx.next_sensor,limit[selected]-hyst[selected]);
+        assert(!h.ctx.fan.active[selected]);
+        sensor_at(h.ctx.next_sensor,limit[selected]-hyst[selected]-1);
+        assert(!h.ctx.fan.active[selected]);
+        no_forbidden();
+    }
+}
+static void test_unknown_fan_temperature(void)
+{
+    reset(); put32(R_P+0x58,R_FAN); rom[R_FAN]=0x11;
+    const u8 tag[]={0x08,0x07,0x04,0x32};
+    const u32 limit[]={70,80,100,120},hyst[]={2,4,6,8};
+    for (u32 i=0;i<COUNT(tag);++i) entry(tag[i],(limit[i]<<4)|hyst[i]);
+    /* The therm fan trip remains the fallback for an unreadable fan table. */
+    entry(0x24,(50U<<4)|2U);
+    ready();
+    assert(h.ctx.fan.sensor_poll && h.ctx.fan.ntrip==1);
+    assert(gf5_fan_check_cstate(&h.ctx,50)==GF5_ENOTSUP);
+    for (u32 i=0;i<COUNT(tag);++i) {
+        assert(h.ctx.fan.threshold[i]==(i32)limit[i] && h.ctx.fan.hyst[i]==(i32)hyst[i]);
+        sensor_at(h.ctx.next_sensor,limit[i]);
+        assert(h.ctx.fan.active[i] && h.ctx.fan.sensor_poll);
+    }
+    assert(heat_samples==4 && pause_count==1 && h.ctx.stop->state);
+}
+static void test_fanless_heat(void)
+{
+    /* ENODEV is absence; ENOTSUP remains an unsupported existing fan.
+     * Neither fan result disables a working temperature sensor. */
+    const i32 failures[]={GF5_ENODEV,GF5_ENOTSUP,GF5_EIO};
+    for (u32 i=0;i<COUNT(failures);++i) {
+        reset(); ready();
+        gf5_host_fail_at(&h,F5_GPIO_FIND,0,failures[i]);
+        sensor_at(h.now,95);
+        assert(h.ctx.last_rc==failures[i] && h.ctx.fan_off);
+        assert(h.ctx.fan.sensor_poll && !h.ctx.stop->state);
+        sensor_at(h.ctx.next_sensor,95); /* Same hot level reaches perf again. */
+        sensor_at(h.ctx.next_sensor,105);
+        assert(pause_count==1 && pause_active);
+        sensor_at(h.ctx.next_sensor,135);
+        assert(h.ctx.stop->state && pause_count==1);
+        assert(!h.calls[F5_GPIO_GET] && !h.calls[F5_GPIO_SET]);
+        for (u32 j=0;j<h.display.nevents;++j)
+            if (devents[j].op==D_WRITE) assert(devents[j].a[1]==T_ADC);
+    }
+}
+static void test_boost_hold(void)
+{
+    reset(); entry(0x22,(85U<<8)|10U); ready();
+    sensor_at(h.now,90);
+    assert(h.ctx.fan.target==85 && h.ctx.fan.duty==85);
+    h.ctx.fan.kind=GF5_FAN_OTHER;
+    assert(!gf5_fan_cstate(&h.ctx,10,0));
+    assert(h.ctx.fan.target==85 && h.ctx.fan.duty==85);
+    assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL));
+    assert(h.ctx.fan.duty==85);
+    assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+    assert(h.ctx.fan.mode==GF5_FAN_MANUAL && h.ctx.fan.duty==85);
+    /* Maximum must be retried while active after a physical fan failure. */
+    gf3_host_set(&h.display.base,0,T_PWM2,T_ENABLE|0x00500064U);
+    gf5_host_trace_clear(&h); gf4_host_fail_at(&h.display,D_WRITE,2,-97);
+    sensor_at(h.ctx.next_sensor,95);
+    assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-97 && h.ctx.fan.sensor_poll);
+    gf4_host_fail_at(&h.display,D_WRITE,0,0);
+    gf3_host_set(&h.display.base,0,T_PWM2,T_ENABLE|0x00500064U);
+    sensor_at(h.ctx.next_sensor,95);
+    assert(h.ctx.fan.duty==85 && !h.ctx.last_rc && !h.ctx.stop->state);
+    sensor_at(h.ctx.next_sensor,87); assert(!h.ctx.fan.active[0]);
+    sensor_at(h.ctx.next_sensor,86); assert(!h.ctx.fan.active[0]);
+    assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+    assert(h.ctx.fan.mode==GF5_FAN_NONE);
+}
+static void test_heat_failure(void)
+{
+    reset(); ready(); gf5_host_fail_at(&h,F5_HEAT,1,GF5_EIO);
+    sensor_at(h.now,106);
+    assert(h.ctx.last_rc==GF5_EIO && h.ctx.fan.duty==100);
+    assert(pause_count==1 && h.ctx.fan.sensor_poll); /* Fan work still runs. */
+    for (u32 critical=0;critical<2;++critical) {
+        reset(); ready(); assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_NONE));
+        h.ctx.heat.down_active=!critical; h.ctx.heat.critical_paused=critical;
+        h.ctx.heat.cool_samples=2;
+        gf4_host_fail_at(&h.display,D_READ,1,-98);
+        gf5_fan_tick(&h.ctx,h.now);
+        assert(heat_missing==1 && !heat_samples && h.ctx.stop->state);
+        assert(h.ctx.stop->reason==GF5_EIO && !h.ctx.fan.sensor_poll && !h.ctx.next_sensor);
+        assert(!h.ctx.last_rc && !h.ctx.source_rc); /* Monitor error stays optional. */
+    }
 }
 static void test_toggle_and_wrap(void)
 {
@@ -596,7 +741,7 @@ static void test_fan_retry(void)
     gf5_host_trace_clear(&h); gf5_fan_tick(&h.ctx,h.now);
     assert(h.ctx.fan.target==T_FULL && h.ctx.fan.duty==T_FULL);
     assert(h.ctx.fan.active[0] && h.ctx.fan.active[3]);
-    assert(down_count==1 && pause_count==1 && h.ctx.last_rc==0);
+    assert(!down_count && !pause_count && h.ctx.stop->state && h.ctx.last_rc==0);
     gf3_host_set(&h.display.base,0,T_RAW,60);
     h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
     /* Isolate SHUTDOWN from BOOST on the next rising transition. */
@@ -618,12 +763,12 @@ static void test_boost_mode_failure(void)
     /* Sensor, PWM get, two PWM RMWs, then AUTO's temperature read. */
     gf4_host_fail_at(&h.display,D_READ,5,-83);
     gf5_fan_tick(&h.ctx,h.now);
-    assert(down_count==1 && down_active && pause_count==1 && pause_active);
+    assert(!down_count && !pause_count && h.ctx.stop->state);
     assert(h.ctx.fan.active[3] && h.ctx.next_sensor==h.now+T_POLL);
     assert(h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==-83 && h.ctx.fan_off);
     assert(h.ctx.fan.mode==GF5_FAN_NONE);
-    /* SHUTDOWN still reads the fan after the failed AUTO read. */
-    assert(h.display.calls[D_READ]>5 && h.ctx.fan.duty==T_FULL);
+    /* Shutdown is latched before the failed fan work. */
+    assert(h.calls[F5_HEAT]==1 && h.ctx.stop->state);
 }
 /* temp.c:104-107: fan_set failure must still select AUTO. */
 static void test_boost_write_failure(void)
@@ -781,7 +926,7 @@ static void test_resume(void)
         }
         assert(settle==T_SETTLE && h.ctx.fan.mode==saved.mode);
         assert(h.ctx.fan.trip==owned && owned->temp==copy.temp && owned->hyst==copy.hyst && owned->duty==copy.duty);
-        assert(h.ctx.fan.offset_constant==saved.offset_constant && h.ctx.fan.active[0]);
+        assert(h.ctx.fan.offset_constant==saved.offset_constant && !h.ctx.fan.active[0]);
         assert(!h.calls[F5_ALLOC] && !h.calls[F5_FREE] && h.live_allocs==1);
         assert(saved.trip==&copy && saved.duty==T_FULL/2 && saved.mode==mode);
         if (mode==GF5_FAN_NONE) {
@@ -826,7 +971,7 @@ static void test_resume(void)
             if (devents[i].op==D_WRITE) assert(devents[i].a[1]==T_ADC);
         gf3_host_set(&h.display.base,0,T_RAW,106);
         h.now=h.ctx.next_sensor; gf5_fan_tick(&h.ctx,h.now);
-        assert(down_count==1 && pause_count==1);
+        assert(!down_count && pause_count==1 && heat_samples==1);
     }
     /* Reject mismatched trip counts before setup, retaining ownership. */
     reset(); entry(0x24,(50U<<4)|3U); ready(); saved=h.ctx.fan;
@@ -860,6 +1005,8 @@ void _start(void)
 {
     test_temperature(); test_policy(); test_pwm(); test_failures();
     test_auto(); test_sensor(); test_toggle_and_wrap();
+    test_sensor_time(); test_rom_thresholds(); test_unknown_fan_temperature(); test_fanless_heat();
+    test_boost_hold(); test_heat_failure();
     test_independent_alarms(); test_boost_auto(); test_gpio_source(); test_resume();
     test_fan_retry(); test_boost_mode_failure();
     test_boost_write_failure(); test_fanless_mode(); test_toggle_retry(); test_resume_write_failure();

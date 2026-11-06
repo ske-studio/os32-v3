@@ -119,6 +119,72 @@ int paging_map_phys(u32 virt_addr, u32 phys_addr, u32 npages, u32 flags)
     return 0;
 }
 
+/* Device windows use only PTs already shared by master and application PDs.
+ * Never prepare_tables here: adding a PDE after AS creation would leave an
+ * older AS without the window. The private app/lease band is never shared. */
+static int device_map_preflight(u32 owner, u32 rid, u32 first, u32 end,
+                                int unmap, u32 *slot)
+{
+    u32 p, di, entry, root;
+    u32 pde_mask = PTE_FRAME_MASK | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT;
+    if (!pg_enabled || first >= end || end > PAGING_PFN_COUNT) return -1;
+    if (ledger_device_map_prepare(owner, rid, first, end, unmap, slot) != 0)
+        return -1;
+    root = paging_current_cr3();
+    if (!root) return -1;
+    for (di = first / PTE_COUNT; di <= (end - 1) / PTE_COUNT; di++) {
+        if ((di >= APP_BAND_PDE && di < (MEM_LEASE_END >> PDE_SHIFT)) ||
+            !page_tables[di]) return -1;
+        entry = V2P(page_tables[di]) | PAGE_RW;
+        if ((page_directory[di] & pde_mask) != entry ||
+            (((u32 *)P2V(root))[di] & pde_mask) != entry) return -1;
+    }
+    for (p = first; p < end; p++) { /* device PTE preflight */
+        entry = page_tables[p / PTE_COUNT][p % PTE_COUNT];
+        if (unmap) {
+            /* A/D are CPU-maintained; every other bit belongs to the map. */
+            if ((entry & ~(PTE_ACCESSED | PTE_DIRTY)) !=
+                ((p << PAGE_SHIFT) | PAGE_RW | PTE_PCD)) return -1;
+        } else {
+            if (entry & PTE_PRESENT) return -1;
+        }
+    }
+    return 0;
+}
+
+static int device_map_change(u32 owner, u32 rid, u32 first, u32 end, int unmap)
+{
+    struct ledger_device_map map = {owner, rid, first, end};
+    unsigned int flags;
+    u32 slot, p;
+    if (device_map_preflight(owner, rid, first, end, unmap, &slot) != 0)
+        return -1;
+    flags = irq_save();
+    /* Recheck everything after closing the IRQ boundary. No failure points,
+     * allocation, callback or yield may follow the first PTE write. */
+    if (device_map_preflight(owner, rid, first, end, unmap, &slot) != 0) {
+        irq_restore(flags);
+        return -1;
+    }
+    for (p = first; p < end; p++)
+        page_tables[p / PTE_COUNT][p % PTE_COUNT] =
+            unmap ? 0 : (p << PAGE_SHIFT) | PAGE_RW | PTE_PCD;
+    arch_mmu_flush_tlb();
+    ledger_device_map_commit(slot, unmap ? 0 : &map);
+    irq_restore(flags);
+    return 0;
+}
+
+int paging_device_map(u32 owner, u32 rid, u32 first, u32 end)
+{
+    return device_map_change(owner, rid, first, end, 0);
+}
+
+int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end)
+{
+    return device_map_change(owner, rid, first, end, 1);
+}
+
 /* 最初の AS より前、shm_init の後だけ。tramp は exec の静的 BSS。 */
 int paging_boot_user_shared(u32 tramp)
 {

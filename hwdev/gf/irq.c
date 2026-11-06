@@ -19,6 +19,13 @@
 #define GF_IRQ_GRAPH_ENABLE 0x40013cU
 #define GF_IRQ_GRAPH_NSOURCE 0x400108U
 #define GF_IRQ_GRAPH_NSTATUS 0x400104U
+#define GF_IRQ_GRAPH_CTX 0x40032cU
+#define GF_IRQ_GRAPH_ADDR 0x400704U
+#define GF_IRQ_GRAPH_DATA 0x400708U
+#define GF_IRQ_GRAPH_CLASS 0x400160U
+#define GF_IRQ_GRAPH_SUBC_MASK 7U
+#define GF_IRQ_GRAPH_SUBC_SHIFT 16U
+#define GF_IRQ_GRAPH_CLASS_MASK 0xffffU
 #define GF_IRQ_CRTC_STATUS 0x600100U
 #define GF_IRQ_CRTC_ENABLE 0x600140U
 #define GF_IRQ_HEAD_STRIDE RECOVER_HEAD_STRIDE
@@ -105,6 +112,17 @@ io_error:
  */
 int gf_irq_enable(struct gf_foundation *f, bool fifo, bool graph, unsigned heads)
 {
+    /* A new engine observation period, not a VBLANK-only mask change. */
+    if (fifo && !f->wanted_fifo) {
+        f->stats.first.fifo_latched = false;
+        f->stats.first.pfifo = 0;
+    }
+    if (graph && !f->wanted_graph) {
+        f->stats.first.graph_latched = false;
+        f->stats.first.pgraph = f->stats.first.nsource = f->stats.first.nstatus = 0;
+        f->stats.first.gr_trap = f->stats.first.gr_method = 0;
+        f->stats.first.gr_data = f->stats.first.gr_class = 0;
+    }
     f->wanted_fifo = fifo ? GF_IRQ_ALL : 0;
     f->wanted_graph = graph ? GF_IRQ_ALL : 0;
     f->wanted_heads = heads;
@@ -135,7 +153,14 @@ static int fifo_drain(struct gf_foundation *f, bool poll, u32 *left)
     if (rd(f, GF_IRQ_FIFO_STATUS, &status)) return -1;
     status &= mask;
     f->stats.pfifo = status;
-    if (status) f->stats.fifo++;
+    if (status) {
+        if (!f->stats.first.fifo_latched) {
+            if (!f->stats.first.graph_latched) f->stats.first.pmc = f->stats.pmc;
+            f->stats.first.pfifo = status;
+            f->stats.first.fifo_latched = true;
+        }
+        f->stats.fifo++;
+    }
     if (wr(f, GF_IRQ_FIFO_STATUS, status) ||
         rd(f, GF_IRQ_FIFO_STATUS, &residual)) return -1;
     residual &= poll ? f->wanted_fifo : mask;
@@ -148,13 +173,35 @@ static int fifo_drain(struct gf_foundation *f, bool poll, u32 *left)
  */
 static int graph_drain(struct gf_foundation *f, bool poll, u32 *left)
 {
-    u32 status, mask, residual;
+    u32 status, mask, residual, nsource, nstatus;
     if (rd(f, GF_IRQ_GRAPH_STATUS, &status) ||
-        rd(f, GF_IRQ_GRAPH_NSOURCE, &f->stats.nsource) ||
-        rd(f, GF_IRQ_GRAPH_NSTATUS, &f->stats.nstatus)) return -1;
+        rd(f, GF_IRQ_GRAPH_NSOURCE, &nsource) ||
+        rd(f, GF_IRQ_GRAPH_NSTATUS, &nstatus)) return -1;
     if (poll) status &= f->wanted_graph;
     f->stats.pgraph = status;
-    if (status) f->stats.graph++;
+    f->stats.nsource = nsource;
+    f->stats.nstatus = nstatus;
+    if (status) {
+        if (!f->stats.first.graph_latched) {
+            u32 trap, addr, data, class;
+            if (rd(f, GF_IRQ_GRAPH_CTX, &trap) ||
+                rd(f, GF_IRQ_GRAPH_ADDR, &addr) ||
+                rd(f, GF_IRQ_GRAPH_DATA, &data) ||
+                rd(f, GF_IRQ_GRAPH_CLASS +
+                   ((addr >> GF_IRQ_GRAPH_SUBC_SHIFT) & GF_IRQ_GRAPH_SUBC_MASK) *
+                   sizeof(u32), &class)) return -1;
+            if (!f->stats.first.fifo_latched) f->stats.first.pmc = f->stats.pmc;
+            f->stats.first.pgraph = status;
+            f->stats.first.nsource = nsource;
+            f->stats.first.nstatus = nstatus;
+            f->stats.first.gr_trap = trap;
+            f->stats.first.gr_method = addr;
+            f->stats.first.gr_data = data;
+            f->stats.first.gr_class = class & GF_IRQ_GRAPH_CLASS_MASK;
+            f->stats.first.graph_latched = true; /* publish only a complete trap */
+        }
+        f->stats.graph++;
+    }
     if (wr(f, GF_IRQ_GRAPH_STATUS, status) ||
         rd(f, GF_IRQ_GRAPH_STATUS, &residual)) return -1;
     if (poll) mask = f->wanted_graph;

@@ -21,11 +21,16 @@ int gf_mc_init(struct gf_foundation *f)
         io->write(io->opaque, GF_MC_BAR, RECOVER_PMC_ENABLE,
                   GF_MC_WIDTH, GF_MC_ENABLE_ALL))
         return GF1_EIO;
-    f->expected_pmc = GF_MC_ENABLE_ALL;
     if (io->write(io->opaque, GF_MC_BAR, GF_MC_LIMIT0, GF_MC_WIDTH, amount) ||
         io->write(io->opaque, GF_MC_BAR, GF_MC_LIMIT1, GF_MC_WIDTH, 0) ||
         io->write(io->opaque, GF_MC_BAR, GF_MC_LIMIT2, GF_MC_WIDTH, 0) ||
         io->write(io->opaque, GF_MC_BAR, GF_MC_LIMIT3, GF_MC_WIDTH, amount))
         return GF1_EIO;
+    /* The enable register can read back only implemented engine bits.
+     * As at foundation stop, publish a successful readback for status. */
+    u32 enabled;
+    if (io->read(io->opaque, GF_MC_BAR, RECOVER_PMC_ENABLE,
+                 GF_MC_WIDTH, &enabled)) return GF1_EIO;
+    f->expected_pmc = enabled;
     return GF1_OK;
 }

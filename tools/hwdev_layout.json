@@ -97,6 +97,7 @@
       "feature5_out",
       "flip",
       "foundation_out",
+      "heat",
       "height",
       "page",
       "platform"
@@ -806,6 +807,13 @@
       "rsvd",
       "valid"
     ],
+    "struct geforce_heat_bridge": [
+      "backend_active",
+      "clear",
+      "request",
+      "stop",
+      "stop_state"
+    ],
     "struct geforce_platform": [
       "bar0_phys",
       "device",
@@ -874,6 +882,7 @@
       "seq",
       "staging",
       "staging_live",
+      "staging_pending",
       "state",
       "va",
       "vram_dma",
@@ -1042,6 +1051,7 @@
       "accepting",
       "ch",
       "changing",
+      "cleanup_pending",
       "cursor",
       "cursor_view",
       "data",
@@ -1176,6 +1186,7 @@
       "t"
     ],
     "struct gf4_restore_ops": [
+      "abandon",
       "ctx",
       "last_rc",
       "restore",
@@ -1270,6 +1281,7 @@
       "emergency",
       "fan",
       "fan_off",
+      "heat",
       "image",
       "last_rc",
       "links",
@@ -1278,12 +1290,17 @@
       "next_step",
       "next_toggle",
       "phase",
+      "plan_guard",
       "poll_off",
       "poll_source",
       "rom",
+      "rom_generation",
       "source_rc",
+      "stop",
+      "temperature",
       "tile",
       "tile_live",
+      "tile_slot",
       "vid"
     ],
     "struct gf5_clock": [
@@ -1337,6 +1354,14 @@
       "hyst",
       "temp"
     ],
+    "struct gf5_heat_state": [
+      "ceiling",
+      "cool_samples",
+      "critical_paused",
+      "down_active",
+      "entry_clock",
+      "epoch"
+    ],
     "struct gf5_image": [
       "bytes",
       "clock",
@@ -1349,6 +1374,7 @@
       "saved_epoch",
       "tile",
       "tile_live",
+      "tile_saved",
       "version",
       "vid"
     ],
@@ -1369,8 +1395,10 @@
       "unpause"
     ],
     "struct gf5_perf_entry": [
+      "bios_index",
       "clock",
       "fanspeed",
+      "pstate",
       "voltage"
     ],
     "struct gf5_plan": [
@@ -1382,11 +1410,26 @@
       "nn",
       "sc"
     ],
+    "struct gf5_plan_guard": [
+      "canonical",
+      "core_used",
+      "epoch",
+      "ram_used",
+      "request",
+      "rom_generation",
+      "valid"
+    ],
     "struct gf5_rom_view": [
       "bytes",
       "memory_pc",
       "memory_program",
       "size"
+    ],
+    "struct gf5_stop_state": [
+      "milli_c",
+      "reason",
+      "source_rc",
+      "state"
     ],
     "struct gf5_test_ops": [
       "clock_calc",
@@ -1429,6 +1472,20 @@
       "pitch",
       "reservation_id"
     ],
+    "struct gf5_tile_saved": [
+      "raw_addr",
+      "raw_limit",
+      "raw_pitch",
+      "state"
+    ],
+    "struct gf5_tile_slot": [
+      "current",
+      "loan",
+      "raw_addr",
+      "raw_limit",
+      "raw_pitch",
+      "state"
+    ],
     "struct gf5_vid_ops": [
       "get",
       "owner",
@@ -1442,6 +1499,7 @@
       "baseline",
       "baseline_c040",
       "baseline_pmc",
+      "baseline_start",
       "baseline_valid",
       "blank",
       "display4",
@@ -1519,6 +1577,8 @@
       "io",
       "last_rc",
       "main_id",
+      "opcode_started_us",
+      "opcode_timing",
       "or_mask",
       "pc",
       "repeat",
@@ -1563,9 +1623,23 @@
       "trace",
       "write"
     ],
+    "struct gf_irq_first": [
+      "fifo_latched",
+      "gr_class",
+      "gr_data",
+      "gr_method",
+      "gr_trap",
+      "graph_latched",
+      "nsource",
+      "nstatus",
+      "pfifo",
+      "pgraph",
+      "pmc"
+    ],
     "struct gf_irq_stats": [
       "entries",
       "fifo",
+      "first",
       "graph",
       "nsource",
       "nstatus",
@@ -1652,7 +1726,15 @@
       "s0_ok",
       "values"
     ],
+    "struct gf_vram_borrow": [
+      "bytes",
+      "key",
+      "kind",
+      "next",
+      "off"
+    ],
     "struct gf_vram_registry": [
+      "borrows",
       "ch",
       "head",
       "next_id"
@@ -1669,6 +1751,7 @@
       "value"
     ],
     "struct gf_vram_view": [
+      "borrow",
       "bytes",
       "ch",
       "close",
@@ -1988,6 +2071,12 @@
       "sid",
       "slot",
       "token"
+    ],
+    "struct ledger_device_map": [
+      "end",
+      "first",
+      "owner",
+      "rid"
     ],
     "struct ledger_owner": [
       "alloc_irq",
@@ -2643,6 +2732,7 @@
     "GF2_VBLANK",
     "GF3_ACCEL",
     "GF3_ARGB8888",
+    "GF3_EBUSY",
     "GF3_EFORMAT",
     "GF3_EINVAL",
     "GF3_ERANGE",
@@ -2735,6 +2825,7 @@
     "GF5_EBUSY",
     "GF5_EINVAL",
     "GF5_EIO",
+    "GF5_ENODEV",
     "GF5_ENOMEM",
     "GF5_ENOTSUP",
     "GF5_ERANGE",
@@ -2756,6 +2847,11 @@
     "GF5_RUN",
     "GF5_SAVED",
     "GF5_SAVING",
+    "GF5_STOPPED",
+    "GF5_STOP_NORMAL",
+    "GF5_STOP_REQUESTED",
+    "GF_BORROW_TILE",
+    "GF_BORROW_VIEW",
     "GF_C_AR",
     "GF_C_AR_GATE",
     "GF_C_BRANCH",
@@ -2854,6 +2950,9 @@
     "GF_SCRIPT_EIO",
     "GF_SCRIPT_ETIME",
     "GF_SCRIPT_OK",
+    "GF_TILE_FREE",
+    "GF_TILE_OWNED",
+    "GF_TILE_UNKNOWN",
     "GF_VERIFY_CR",
     "GF_VERIFY_MMIO",
     "GF_VERIFY_SR",

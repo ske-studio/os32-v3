@@ -377,6 +377,24 @@ static void test_dblscan(void)
         restore_oracle();
     }
 }
+static void slow_script(struct gf4_host *h,const struct gf4_host_event *e)
+{
+    /* A sequence of bounded opcodes can exceed the outer display budget.
+     * nouveau bios/init.c:1777-1794,2304-2323; PACK.fix12. */
+    if (e->op==D_SCRIPT && !e->rc) h->local_now+=T_BUDGET;
+}
+static void test_slow_tmds_restore(void)
+{
+    restore_setup(true);
+    for (u8 h=0;h<GF4_HEADS;++h) {
+        saved.head[h].route.type=GF4_TMDS;
+        routes[h]=saved.head[h].route;
+    }
+    host.observe=slow_script;
+    assert(!gf4_diagnostic_restore(&host.ctx,&saved,T_BUDGET));
+    assert(host.calls[D_SCRIPT]==GF4_HEADS && host.local_now>GF4_HEADS*T_BUDGET);
+    assert(host.ctx.accepting && !host.ctx.saved_closed);
+}
 static void test_restore(void)
 {
     restore_setup(true);
@@ -491,5 +509,5 @@ static void test_invalid(void)
 }
 void _start(void)
 {
-    test_save(); test_restore(); test_dblscan(); test_invalid(); gf2_host_exit(0);
+    test_save(); test_restore(); test_dblscan(); test_slow_tmds_restore(); test_invalid(); gf2_host_exit(0);
 }

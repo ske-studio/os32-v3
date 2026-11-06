@@ -62,6 +62,21 @@ static bool scan_names(const struct gf3_surface *s,const struct gf_vram_reservat
     return s->bytes && s->reservation_id==v->reservation_id &&
         s->generation==v->generation;
 }
+/* A restore publishes its saved front directly, without a flip notification.
+ * Resolve the active bank from that front before choosing the spare bank.
+ * Pending/saved loans are still checked by scan_used before any release. */
+static struct gf_vram_reservation_node *scan_spare(struct gf4_ctx *c,u8 head)
+{
+    u8 active=c->scan_bank[head];
+    const struct gf3_surface *front=&c->state->head[head].front;
+    for (u8 bank=0;bank<2;bank++) {
+        struct gf_vram_reservation_node *nodes=scan_nodes(c,head,bank);
+        for (u8 i=0;i<2;i++)
+            if (nodes[i].value.owner && scan_names(front,&nodes[i].value))
+                active=bank;
+    }
+    return scan_nodes(c,head,active^1U);
+}
 static bool scan_image_uses(const struct gf4_head_image *h,
                             const struct gf4_flip_hold *hold,
                             const struct gf_vram_reservation *v)
@@ -132,7 +147,7 @@ i32 gf4_scan_discard(struct gf4_ctx *c,u8 head,u32 dl)
     i32 rc=scan_context(c);
     if (rc || head>=GF4_HEADS) return scan_result(c,GF4_EINVAL);
     if (c->changing || c->saved_closed) return scan_result(c,GF4_EBUSY);
-    struct gf_vram_reservation_node *nodes=scan_nodes(c,head,c->scan_bank[head]^1U);
+    struct gf_vram_reservation_node *nodes=scan_spare(c,head);
     for (u8 i=0;i<2;i++)
         if (nodes[i].value.owner && scan_used(c,&nodes[i].value))
             return scan_result(c,GF4_EBUSY);
@@ -152,7 +167,7 @@ i32 gf4_scan_prepare(struct gf4_ctx *c,u8 head,u32 mode_id,
     if (!m) return scan_result(c,GF4_EINVAL);
     if (!m->pitch || !m->t.hd || !m->t.vd || m->t.vd>U32_MAX/m->pitch)
         return scan_result(c,GF4_ERANGE);
-    struct gf_vram_reservation_node *nodes=scan_nodes(c,head,c->scan_bank[head]^1U);
+    struct gf_vram_reservation_node *nodes=scan_spare(c,head);
     for (u8 i=0;i<2;i++)
         if (nodes[i].value.owner && scan_used(c,&nodes[i].value)) return scan_result(c,GF4_ENOSPC);
     rc=gf4_scan_discard(c,head,dl);

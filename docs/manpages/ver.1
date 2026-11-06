@@ -18,6 +18,10 @@ OS32のバージョン番号、ハードウェア構成、KernelAPI バージョ
 - CPU、PIC、PIT、KBD、SER、SND、GFX の各ハードウェア情報
 - KernelAPI バージョン番号
 
+GFX の `active` は稼働中の backend、`GUI target` は次回の描画先を示す。
+`gf2 leave` 後の `GeForce ...; GUI target` は選択が残っていることを表す。
+このとき実際の表示出力は98へ戻っている。
+
 ## SEE ALSO
 
 date, uptime, mem

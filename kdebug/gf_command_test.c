@@ -341,7 +341,7 @@ int gf_command_test(struct gf2_request *request, struct gf_foundation *f,
         if (!rc) rc = phase(&o, GF2T_STOP, "stop", session);
         if (!rc) {
             o.previous_epoch = o.reply.epoch;
-            rc = phase(&o, GF2T_RECOVER, "restart", session);
+            rc = phase(&o, GF2T_START, "restart", session);
         }
         if (!rc) rc = phase(&o, GF2T_REFERENCE, "reference_after_restart", session);
         if (!rc) { rc = measure(&o, observe_vblank); emit(&o, "vblank", session, true); }

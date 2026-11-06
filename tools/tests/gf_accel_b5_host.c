@@ -104,7 +104,7 @@ static void geometry(void)
     }
     /* Exactly 128 words, then one byte beyond: repeated 0c00 increment packets. */
     for (u32 extra = 0; extra < 2; ++extra) {
-        reset(); surface.width=surface.pitch=5000; surface.bytes=5000*480;
+        reset(); surface.width=5000; surface.pitch=5056; surface.bytes=5056*480;
         reservation.value.bytes=surface.bytes;
         rect=(struct gf3_rect){0, 0, 4096+extra*8, 1};
         clipping=(struct gf3_rect){0, 0, 5000, 1}; bits.pitch=513;
@@ -161,7 +161,7 @@ static void errors(void)
         if (ops[i] != H_WAIT) assert(!host.calls[H_WAIT]);
     }
     for (u32 i = 1; i <= 5; ++i) {
-        reset(); surface.width=surface.pitch=5000; surface.bytes=5000*480;
+        reset(); surface.width=5000; surface.pitch=5056; surface.bytes=5056*480;
         reservation.value.bytes=surface.bytes; rect=clipping=(struct gf3_rect){0, 0, 4104, 1};
         bits.pitch=513; gf3_host_fail_at(&host, H_EMIT, i, GF2_EIO);
         assert(draw() == GF2_EIO && host.calls[H_EMIT] == i && host.npackets == i-1);

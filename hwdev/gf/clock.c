@@ -101,7 +101,7 @@ i32 gf5_clock_read(struct gf5 *g,struct gf5_clock *out)
     if (!rc) rc=read_pll(io,CLK_MEM,false,&c.mem_khz);
     if (rc) return result(g,rc);
     *out=c;
-    return result(g,c.core_khz && c.shader_khz && c.mem_khz ? 0 : GF5_ESTATE);
+    return result(g,0); /* Zero is an absent source, nv40.c:82-115. */
 }
 static u32 coefficient(const struct gfinit_pll_solution *s)
 {
@@ -109,43 +109,91 @@ static u32 coefficient(const struct gfinit_pll_solution *s)
     if (s->n2!=s->m2) v|=(s->n2<<24)|(s->m2<<16);
     return v;
 }
-static i32 solve(struct gf5 *g,u32 reg,u32 khz,bool disable_second,
-                 struct gfinit_pll_limits *l,struct gfinit_pll_solution *s)
+static i32 solve(const struct gf5 *g,u32 reg,u32 khz,bool disable_second,
+                 struct gfinit_pll_limits *l,struct gfinit_pll_solution *s,i32 *source)
 {
     int rc=gfinit_pll_parse(g->rom.bytes,g->rom.size,GF_INIT_PLL_TABLE,reg,l);
-    if (rc) return classified(g,rc,GF5_EBIOS);
+    if (rc) { *source=rc; return GF5_EBIOS; }
     if (disable_second && khz<l->vco1.max_freq) l->vco2.max_freq=0;
     rc=gfinit_pll_solve(l,khz,s);
-    return rc ? classified(g,rc,GF5_ERANGE) : 0;
+    if (rc) { *source=rc; return GF5_ERANGE; }
+    return 0;
 }
-i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *request,struct gf5_plan *out)
+/* No MMIO, guard or status changes: validation reuses the original request. */
+static i32 solve_plan(const struct gf5 *g,const struct gf5_clock *request,
+                      struct gf5_plan *out,i32 *source)
 {
     struct gfinit_pll_limits l; struct gfinit_pll_solution s; struct gf5_plan p={0}; i32 rc;
     if (!g || !request || !out || !request->core_khz || !request->mem_khz)
-        return result(g,GF5_EINVAL);
-    if (!g->rom.bytes) return result(g,GF5_ENOTSUP);
-    rc=solve(g,GF_PLL_CORE,request->core_khz,true,&l,&s);
+        return GF5_EINVAL;
+    if (!g->rom.bytes) return GF5_ENOTSUP;
+    rc=solve(g,GF_PLL_CORE,request->core_khz,true,&l,&s,source);
     if (rc) return rc;
     p.nc=CLK_ENABLE|(s.p<<16)|(s.n2==s.m2 ? CLK_SINGLE : CLK_DOUBLE);
     p.nn=coefficient(&s); p.actual.core_khz=s.actual;
     if (request->shader_khz && request->shader_khz!=request->core_khz) {
         /* v2x BIOS parser has no 004008 key (bios/pll.c:46-52,245). */
-        return result(g,GF5_EBIOS);
+        return GF5_EBIOS;
     }
     p.mux=CLK_SHARED; p.actual.shader_khz=p.actual.core_khz;
-    rc=solve(g,GF_PLL_MEMORY,request->mem_khz,false,&l,&s);
+    rc=solve(g,GF_PLL_MEMORY,request->mem_khz,false,&l,&s,source);
     if (rc) return rc;
     u32 bias=l.bias_p+s.p; if (bias>l.max_p) bias=l.max_p;
     p.mc=CLK_ENABLE|(s.p<<16)|(bias<<20)|(s.n2==s.m2 ? CLK_SINGLE : CLK_DOUBLE);
     p.mn=coefficient(&s); p.actual.mem_khz=s.actual;
-    *out=p; return result(g,0);
+    *out=p; return 0;
+}
+void gf5_plan_invalidate(struct gf5 *g)
+{
+    if (g) g->plan_guard.valid=false;
+}
+static bool same_plan(const struct gf5_plan *a,const struct gf5_plan *b)
+{
+    return a->nc==b->nc && a->nn==b->nn && a->sc==b->sc &&
+           a->mux==b->mux && a->mc==b->mc && a->mn==b->mn &&
+           a->actual.core_khz==b->actual.core_khz &&
+           a->actual.shader_khz==b->actual.shader_khz &&
+           a->actual.mem_khz==b->actual.mem_khz;
+}
+i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *request,struct gf5_plan *out)
+{
+    struct gf5_plan p; i32 source=0;
+    gf5_plan_invalidate(g);
+    if (!g || !g->ch) return result(g,GF5_EINVAL);
+    i32 rc=solve_plan(g,request,out ? &p : 0,&source);
+    if (rc) return classified(g,source ? source : rc,rc);
+    g->plan_guard=(struct gf5_plan_guard){.request=*request,.canonical=p,
+        .epoch=g->ch->epoch,.rom_generation=g->rom_generation,.valid=true};
+    *out=p;
+    return result(g,0);
+}
+i32 gf5_plan_check(struct gf5 *g,const struct gf5_plan *p,bool ram)
+{
+    struct gf5_plan recalculated; i32 source=0;
+    if (!g || !p) return result(g,GF5_EINVAL);
+    const struct gf5_plan_guard *guard=&g->plan_guard;
+    if (!g->ch || !guard->valid || guard->epoch!=g->ch->epoch ||
+        guard->rom_generation!=g->rom_generation ||
+        (ram ? guard->ram_used : guard->core_used))
+        return result(g,GF5_ESTATE);
+    i32 rc=solve_plan(g,&guard->request,&recalculated,&source);
+    if (rc) return classified(g,source ? source : rc,rc);
+    if (!same_plan(p,&guard->canonical) || !same_plan(p,&recalculated))
+        return result(g,GF5_EINVAL);
+    return result(g,0);
 }
 i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *p)
 {
     struct gf_io *io=clock_io(g);
     if (!io || !io->read || !io->write || !io->timing.wait_us || !p)
         return result(g,GF5_EINVAL);
-    int rc=mask(io,CLK_MUX,CLK_MUX_MASK,0);
+    i32 rc=gf5_plan_check(g,p,false);
+    if (rc) return rc;
+    rc=gf5_plan_domain_ceiling(g,p,false);
+    if (rc) return result(g,rc);
+    /* nv40.c:186-195 uses private coefficients; consume before any MMIO. */
+    g->plan_guard.core_used=true;
+    rc=mask(io,CLK_MUX,CLK_MUX_MASK,0);
     if (!rc) rc=io->write(io->opaque,0,CLK_COEF,4,p->nn);
     if (!rc) rc=mask(io,CLK_CORE,CLK_CORE_MASK,p->nc);
     if (!rc) rc=mask(io,CLK_SHADER,CLK_SHADER_MASK,p->sc);

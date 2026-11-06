@@ -30,8 +30,10 @@ static u8 c2_rom[C2_ROM_BYTES];
 static u32 c2_restores, c2_points, c2_point_fail, c2_expire_clock;
 static u32 c2_writes_at_expiry;
 static int c2_restore_error;
+static bool c2_stall_wait;
 static void c2_observe(struct gf4_host *h,const struct gf4_host_event *e)
 {
+    if (e->op==D_SLEEP && c2_stall_wait) h->local_now+=GF_INIT_OPCODE_US;
     if(e->op==D_CLOCK && e->nth==c2_expire_clock) {
         *(u32 *)e->p[1]=C2_DEADLINE;
         c2_writes_at_expiry=h->calls[D_WRITE];
@@ -67,6 +69,7 @@ static void c2_reset(void)
     c2_host.base.regs=c2_regs; c2_host.base.cregs=C2_REGS;
     c2_host.local_now=C2_NOW;
     c2_restores=c2_points=c2_point_fail=c2_expire_clock=0; c2_restore_error=0;
+    c2_stall_wait=false;
     c2_writes_at_expiry=0; c2_host.observe=c2_observe;
     c2_init=(struct gf_init_context){.rom=c2_rom,.rom_size=sizeof(c2_rom),
         .started_us=C2_NOW-1,
@@ -302,8 +305,28 @@ static void c2_deadlines(void)
     c2_reset(); c2_code(C2_MAIN,wait,sizeof(wait)); c2_point_fail=1;
     assert(c2_run(0,1,C2_DEADLINE)==-1 && c2_restores==1);
 }
+/* TMDS: many individually valid TIME opcodes may exceed both the caller
+ * deadline and the old cumulative wait/elapsed caps. F5 cases above retain
+ * their fixed outer deadline. */
+static void c2_opcode_budgets(void)
+{
+    c2_reset();
+    const u8 waits[]={0x33,100,0x74,0xff,0xff,0x36,0x71};
+    c2_code(C2_MAIN,waits,sizeof(waits));
+    c2_init.opcode_timing=true;
+    c2_init.opcode_started_us=C2_NOW;
+    c2_init.started_us=C2_NOW-GF_INIT_EXEC_US;
+    assert(!c2_run(1,4,C2_NOW+1000));
+    assert(c2_init.wait_us==100U*65535U && !c2_restores);
+    /* A stalled single operation is still rejected, with unconditional cleanup. */
+    c2_reset(); c2_code(C2_MAIN,waits,sizeof(waits));
+    c2_init.opcode_timing=true;
+    c2_init.opcode_started_us=C2_NOW;
+    c2_stall_wait=true;
+    assert(c2_run(1,4,C2_NOW+1000)==GF_SCRIPT_ETIME && c2_restores==1);
+}
 void _start(void)
 {
-    c2_tmds(); c2_controls(); c2_errors(); c2_deadlines();
+    c2_tmds(); c2_controls(); c2_errors(); c2_deadlines(); c2_opcode_budgets();
     gf2_host_exit(0);
 }

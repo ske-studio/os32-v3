@@ -122,6 +122,7 @@ void tvram_putchar_at(int x, int y, char ch, u8 attr)
 int gfx_cirrus_probed(void) { return probed; }
 void gfx_prepare_backend(void) { prepare_calls++; probed = 1; }
 void gfx_client_to_gshell(void) { client_calls++; }
+void geforce_heat_notice(void) {}
 
 static char serial_line[256];
 int serial_gate_active(void) { return 0; }

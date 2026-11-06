@@ -111,6 +111,7 @@ u32 pgalloc_arena_end(void);
 /* 表の大きさ (§3-1)。owner 番号は u8 で、64 本 = 番号 1〜63 (0 は空き)。 */
 #define LEDGER_MAX_OWNERS    64
 #define LEDGER_MAX_REGIONS   48
+#define LEDGER_MAX_DEVICE_MAPS 64U /* 64 x 16B = 1024B, fixed kernel table. */
 #define LEDGER_MAX_RESOURCES 16
 #define LEDGER_MAX_SURFACES  16
 #define LEDGER_NAME_LEN      8
@@ -177,6 +178,9 @@ struct ledger_resource {       /* 32B。u32 → u16 → u8 の順で詰め物な
 };
 /* 予約の要求 1 本。first / end は PFN 半開 (end = 1048576 で 4GiB 端)、
  * kind は LEDGER_SPAN_*、res はこの span の根拠の資源レコードの番号。 */
+/* Dynamic device windows: identity-mapped PFN half-open intervals.
+ * The existing 32B resource record continues to describe only static maps. */
+struct ledger_device_map { u32 owner, rid, first, end; };
 struct ledger_span { u32 first, end, kind, res; };
 /* Internal formats; the public format namespace is assigned in e11. */
 #define LEDGER_FMT_TABLE 2
@@ -252,6 +256,18 @@ int ledger_register_region(u32 type, u32 owner, u32 first, u32 end, u32 cache,
  * 断る。*rid に番号。1 = 成功。 */
 /* Publish a mapped PFN interval inside an existing decode; (0,0) clears it. */
 int ledger_resource_set_map(u32 rid, u32 first, u32 end);
+/* Static union dynamic membership, 1/0; invalid rid/PFN returns 0. */
+int ledger_resource_page_mapped(u32 rid, u32 pfn);
+/* Paging-internal transaction helpers. prepare validates device owner,
+ * reserved UC decode, static/dynamic overlap and capacity (map), or one
+ * exact owner/rid/interval match (unmap). 0 success/-1 failure, out unchanged
+ * on failure. Revalidate under saved IRQs before touching any PTE.
+ * commit cannot fail/allocate/callback/yield: use only the prepared slot in
+ * that same IRQ interval after all PTE writes and TLB flush. NULL removes.
+ * No generic map/unmap callback or failure injection inside commit. */
+int ledger_device_map_prepare(u32 owner, u32 rid, u32 first, u32 end,
+                              int unmap, u32 *slot);
+void ledger_device_map_commit(u32 slot, const struct ledger_device_map *map);
 int ledger_resource_add(const struct ledger_resource *rec, u32 *rid);
 /* ⑥-0 (pci_bind_all の直前): g_pci のメモリ BAR を width_basis = RAW で
  * 取り込む (採取値。予約権限にならない、B4)。載せた本数を返す。

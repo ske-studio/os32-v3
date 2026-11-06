@@ -89,7 +89,17 @@ $(KERNEL_OBJ_PREFIX)arch/x86/kernel/mtrr_wc.o: arch/x86/kernel/mtrr_wc.h
 # Test-only real guard injection: 0=off, 1=kernel, 2=SQLite engine.
 DF_GUARD_TEST ?= 0
 $(KERNEL_OBJ_PREFIX)arch/x86/kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
-$(KERNEL_OBJ_PREFIX)arch/x86/kernel/double_fault.o: .FORCE
+$(KERNEL_OBJ_PREFIX)arch/x86/kernel/double_fault.o: $(BUILD_OUT)/config/df-guard.flags
+
+# Detect command-line options without making unchanged objects newer than VK32.
+# Like build_id.c and memmap_layout.h, these files preserve mtime on equality.
+$(BUILD_OUT)/config/df-guard.flags: private BUILD_OPTION = $(CC) $(CFLAGS_BASE) DF_GUARD_TEST=$(DF_GUARD_TEST)
+$(BUILD_OUT)/config/lgy98.flags: private BUILD_OPTION = $(CC) $(CFLAGS_BASE)
+$(BUILD_OUT)/config/source-date.flags: private BUILD_OPTION = $(CC) $(CFLAGS_BASE) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)
+$(BUILD_OUT)/config/df-guard.flags $(BUILD_OUT)/config/lgy98.flags $(BUILD_OUT)/config/source-date.flags: .FORCE
+	@mkdir -p $(@D)
+	@printf '%s\n' '$(BUILD_OPTION)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 
 # Resident debug loader and validator: preserve the source-adjacent flags.
 $(addprefix $(KERNEL_OBJ_PREFIX),kernel/module/module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
@@ -240,7 +250,8 @@ $(R1_OBJ)/build_id.o: $(R1_OUT)/build_id.c
 	$(CC) $(CFLAGS_BASE) -DOS32_R1_FIXTURE -Iinclude -c $< -o $@
 
 $(R1_OBJ)/exec/exec.o $(R1_OBJ)/kapi/kapi_generated.o: kapi/kapi_generated.c
-$(R1_OBJ)/drivers/net/ne2000/lgy98.o $(R1_OBJ)/kapi/kapi_sys.o: .FORCE
+$(R1_OBJ)/drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
+$(R1_OBJ)/kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
 
 $(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	@mkdir -p $(@D)
@@ -300,7 +311,8 @@ $(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/in
 
 $(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
 $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c
-$(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
+$(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
+$(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string.h
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 

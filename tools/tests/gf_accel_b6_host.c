@@ -66,7 +66,7 @@ static void setup(enum gf3_fmt fmt, u32 w, u32 h, u32 pitch)
     u32 cpp = gf3_host_cpp(fmt);
     rect = (struct gf3_rect){3, 5, w, h};
     surface = (struct gf3_surface){
-        .off = 4096, .pitch = (w + rect.x) * cpp + 3U,
+        .off = 4096, .pitch = ((w + rect.x) * cpp + 63U) & ~63U,
         .width = w + rect.x, .height = h + rect.y, .fmt = fmt,
         .reservation_id = 9, .generation = 2
     };

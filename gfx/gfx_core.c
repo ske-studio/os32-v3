@@ -480,8 +480,7 @@ void gfx_shutdown(void)
     if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {
         gfx_current_height = GFX_HEIGHT;
         gfx_flip_enabled = gfx_display_page = 0;
-    }
-    if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {
+        /* The selected output is now 98 even while GeForce remains usable. */
         gfx_select_mode(&gfx_backend_pc98, 0);
         g_backend = &gfx_backend_pc98;
         gfx_bind_client();
@@ -489,10 +488,15 @@ void gfx_shutdown(void)
     gfx_reinit_surfaces(1);
 }
 
-void geforce_display_failed(void)
+void geforce_display_stopped(void)
 {
     gfx_started = 0;
     gfx_reinit_surfaces(0);
+}
+
+void geforce_display_failed(void)
+{
+    geforce_display_stopped();
     /* Queue the WM's existing SessionAction; CPL0 never consumes abort_req. */
     if (con_sink_is_enabled()) gui_display_failed();
 }

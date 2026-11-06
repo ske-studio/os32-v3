@@ -3,6 +3,7 @@
 #include "trident_device_fake.h"
 #include "gfx/gfx_emergency.h"
 #define run regression_run
+#define HOST_OWN_PC98_ROUTE 1
 #include "gfx_kernel_fb_host.c"
 #undef run
 extern int gfx_is_started(void);

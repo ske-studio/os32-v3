@@ -29,6 +29,7 @@
 #ifdef GF_PRODUCTION_MODULE
 #include "api.h"
 #include "../foundation.h"
+#include "stage.h"
 
 static int tx_admission(struct gf4_ctx *c,bool open)
 {
@@ -123,7 +124,8 @@ static int tx_encoder(struct gf4_ctx *c,const struct gf4_route *r,
 static int tx_restore(struct gf4_ctx *c)
 {
     struct gf4_state *s=c->state;
-    int rc=tx_admission(c,false);
+    int rc=gf4_stage_deadline(c,c->ch->f,&c->deadline);
+    if (!rc) rc=tx_admission(c,false);
     /* Shut down candidate encoders, including a head enabled by a failed start. */
     for (u8 i=0;!rc && i<GF4_HEADS;i++)
         if (s->next[i].enabled) rc=tx_encoder(c,&s->next[i].route,0,GF4_OFF);

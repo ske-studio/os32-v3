@@ -31,6 +31,31 @@ static u32 checks;
 #include "surface_query.h"
 #include "appslot.h"
 #include "gf_production.h"
+#ifndef GF_RESERVATION_TEST
+/* GeForce integration supplies its real backend and routing fixture. */
+/* A successful leave keeps probe available, but selects the 98 output. */
+static int host_route_safe = 1, host_gf_leaves;
+#ifndef HOST_OWN_PC98_ROUTE /* trident_core_host.c supplies its own route state */
+int pc98_route_safe(void) { return host_route_safe; }
+#endif
+static int host_gf_probe(void) { return 1; }
+static void host_gf_leave(void) { ++host_gf_leaves; }
+GfxBackend gfx_backend_geforce = {
+    .name="GeForce", .probe=host_gf_probe, .leave=host_gf_leave
+};
+static void geforce_leave_check(void)
+{
+    for (int safe=0; safe<2; ++safe) {
+        host_route_safe=safe; g_backend=&gfx_backend_geforce;
+        gfx_current_height=480;
+        gfx_shutdown();
+        CHECK(gfx_backend_geforce.probe());
+        CHECK(host_gf_leaves == safe+1);
+        CHECK(g_backend == (safe ? &gfx_backend_pc98 : &gfx_backend_geforce));
+        if (safe) CHECK(gfx_current_height == GFX_HEIGHT);
+    }
+}
+#endif
 #define CFG_KB 17408
 #ifndef HOST_ALT_WINDOW
 #define HOST_ALT_WINDOW 0
@@ -724,6 +749,7 @@ static void run(void)
     if (HOST_ALT_WINDOW) map_host(PEGC_LINEAR_ALT_BASE,PEGC_LINEAR_SIZE);
     boot();
     gfx_boot_reserve();
+    geforce_leave_check();
     const struct ledger_surface *planar = ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT);
     CHECK(planar && planar->backing == LEDGER_SB_RAM && planar->first >= MEM_POOL_BASE/PAGE_SIZE);
     CHECK(bb_b == (u8 *)P2V(planar->first * PAGE_SIZE));

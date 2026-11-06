@@ -19,7 +19,19 @@ adds the F5 shared types/enums, production.feature5 and F4 logical save types
 reachable through feature5.h (470 added lines; existing entries retained).
 The layout pin includes these declarations, not just the new import.
 FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diagnostics.
+S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
+outstanding transfer ownership. Existing sizes and member offsets stay fixed.
+IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
+M5 appends resource_lookup/device_map/device_unmap at indices 44-46;
+only the import declaration pin changes, not the layout/inventory pins.
+Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
+F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
+GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
+Guard D0 adds the private plan guard, ROM generation and live heat state,
+plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
+make all regenerates the contract after the reviewed inventory update.
 These changes own the pins below.
+GF CUI fix12 adds per-opcode TMDS timing and two saved scan origins.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
 adds that member; refresh both pins with --snapshot after reviewing the diff.
@@ -42,9 +54,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x85d12b86
-REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '83b772398629df91f4506ab42fcfbdbefdd859695b6d17479526ca4ed5f0b07f'
+REVIEWED_LAYOUT_CRC = 0xbf2f474e
+REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
+REVIEWED_INVENTORY_SHA = '4920103287ca5c382e71d9c3062ae9fb85c5fbca88b54c0cafb903deb06c6f9f'
 
 
 def import_declarations(root):

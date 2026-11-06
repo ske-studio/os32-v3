@@ -4,7 +4,7 @@ CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=10.0,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'kdebug/gf_foundation_test.c', 'kdebug/gf_foundation_test.h',
             'kdebug/gfinit_bus.h', 'kdebug/gf_stage_state.h', 'kdebug/recover*.h',
-            'hwdev/gf/*.h', 'hwdev/gf/display/*.h', 'hwdev/gfinit_mode.h',
+            'hwdev/gf/mc.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h', 'hwdev/gfinit_mode.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
             'lib/serial_diag.h', 'lib/crc32_core.inc', 'include/*.h', 'mm/*.h'])
 from pathlib import Path
@@ -23,12 +23,20 @@ def main(mutate=False):
         tmp = Path(td)
         source = ROOT/'kdebug/gf_foundation_test.c'
         original = source.read_text()
-        variants = [('control', original)]
+        mc_source = ROOT/'hwdev/gf/mc.c'
+        mc_original = mc_source.read_text()
+        variants = [('control', original, mc_original)]
         if mutate:
             old = 'if (!owner->prepared || !owner->display.io.read) return GF1_EINVAL;'
             assert original.count(old) == 1
-            variants.append(('missing readiness guard', original.replace(old, 'if (0) return GF1_EINVAL;')))
-        for name, body in variants:
+            variants.append(('missing readiness guard', original.replace(old, 'if (0) return GF1_EINVAL;'), mc_original))
+            old = 'f->expected_pmc = enabled;'
+            assert mc_original.count(old) == 1
+            variants.append(('MC write value retained', original, mc_original.replace(old, 'f->expected_pmc = GF_MC_ENABLE_ALL;')))
+        for name, body, mc_body in variants:
+            mc_body = re.sub(r'#include "([^"\n]+)"',
+                lambda m: '#include "'+str((mc_source.parent/m[1]).resolve())+'"', mc_body)
+            (tmp/'mc.c').write_text(mc_body)
             body = re.sub(r'#include "([^"\n]+)"',
                           lambda m: '#include "'+str((source.parent/m[1]).resolve())+'"', body)
             (tmp/'status.c').write_text(body)
@@ -38,7 +46,7 @@ def main(mutate=False):
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                             '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
-                            '-Wl,--gc-sections', *include_flags(ROOT), str(tmp/'host.c'),
+                            '-Wl,--gc-sections', *include_flags(ROOT), str(tmp/'host.c'), str(tmp/'mc.c'),
                             '-o', str(tmp/'host')], check=True)
             rc = host32.run([str(tmp/'host')], timeout=30).returncode
             assert (rc == 0 if name == 'control' else rc != 0), (name, rc)

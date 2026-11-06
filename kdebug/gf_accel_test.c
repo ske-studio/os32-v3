@@ -41,7 +41,7 @@
 
 /* Test geometry and RAM budget, not hardware constants. A 64x48 32bpp
  * image and an 8KiB tail cover source/destination and different-pitch copy.
- * The tail fits 32 rows at 32*4+8 byte pitch, rounded to whole pages.
+ * The tail fits 32 rows at the 192-byte different-pitch copy stride.
  * The 4097-byte transfer cases cross the existing 4KiB staging boundary. */
 #define TEST_SIDE 64U
 #define TEST_HEIGHT 48U
@@ -52,6 +52,12 @@
 #define TEST_BYTE_HEIGHT (TEST_BYTES / TEST_BYTE_WIDTH)
 #define TEST_GUARD 16U
 #define TEST_GUARD_VALUE 0xa7U
+/* nouveau_exa.c:434-435: EXA surfaces have 64-byte pitch alignment.
+ * 3*64 differs from all source pitches (64/128/256), fits 32 pixels at
+ * every tested depth, and 32 rows fit the existing 8KiB tail. */
+#define TEST_COPY_DST_PITCH (3U * 64U)
+/* nouveau_xv.c:929-942: all 16-pixel input formats fit a 64B row. */
+#define TEST_SCALE_SRC_PITCH 64U
 #define TEST_COPY_ALU 3U
 #define TEST_FULL_MASK 0xffffffffU
 #define TEST_FRAC_BITS 20U
@@ -176,6 +182,41 @@ static bool ignored(u32 i)
     return (i & 3U) == 3U &&
         (i < xrgb_first || (i >= TEST_HALF && i - TEST_HALF < xrgb_second));
 }
+/* PM acceptance 2026-11-06: cl0077.h specifies formats/FOH but not
+ * interpolation precision, rounding or the 565 dither matrix. Nouveau
+ * nv_accel_common.c:480-482 selects DITHER (as accel_objects.c:122 does)
+ * and nv04_xv_blit.c does not compare output pixels. Allow one output
+ * channel LSB for DITHER formats/FOH; keep point/solid 8-bit exact.
+ * Only the written clip is eligible: source, padding and guards stay exact.
+ * Expected pixels remain the independent integer ideal, never HW samples. */
+static bool scale_tolerant(enum gf3_fmt fmt, bool bilinear, bool solid)
+{
+    return fmt == GF3_RGB565 || (!solid &&
+           (bilinear || fmt == GF3_YUY2 || fmt == GF3_UYVY));
+}
+static enum gf3_fmt scale_compare_fmt;
+static struct gf3_rect scale_compare_clip;
+static u32 scale_compare_pitch;
+static bool scale_within_lsb(u32 i)
+{
+    if (i < TEST_HALF) return false;
+    u32 n = cpp(scale_compare_fmt), off = i - TEST_HALF;
+    u32 y = off / scale_compare_pitch, x = (off % scale_compare_pitch) / n;
+    const struct gf3_rect *c = &scale_compare_clip;
+    if (x < c->x || x >= c->x + c->w || y < c->y || y >= c->y + c->h)
+        return false;
+    u32 base = i - off % n;
+    u32 a = get_pixel(transfer + base, n), e = get_pixel(expected + base, n);
+    for (u32 b = 0; b < (n == 2U ? 3U : 4U); b++) {
+        u32 shift = n == 2U ? (b == 0U ? 0U : b == 1U ? 5U : 11U) : b * 8U;
+        u32 mask = n == 2U ? (b == 1U ? 63U : 31U) : 255U;
+        if (n == 4U && ignored(base + b)) continue;
+        u32 av = (a >> shift) & mask, ev = (e >> shift) & mask;
+        u32 d = av > ev ? av - ev : ev - av;
+        if (d > 1U) return false;
+    }
+    return true;
+}
 static int compare(bool download, bool ideal)
 {
     int rc;
@@ -202,13 +243,14 @@ static int compare(bool download, bool ideal)
         rc = gf3_test_view_close(&test_view, &test_view.view);
         if (rc) return rc; /* static record retains ownership for retry */
     }
-    u32 bad = 0, first = TEST_FULL_MASK, delta = 0, count = 0;
+    u32 bad = 0, first = TEST_FULL_MASK, delta = 0, count = 0, rejected = 0;
     for (u32 i = 0; i < TEST_BYTES; i++) {
         if (ignored(i)) { transfer[i] = expected[i]; continue; }
         count++;
         if (transfer[i] == expected[i]) continue;
         if (!bad) first = i;
         bad++;
+        if (!ideal || !scale_within_lsb(i)) rejected++;
         u32 d = transfer[i] > expected[i] ? transfer[i] - expected[i] : expected[i] - transfer[i];
         if (d > delta) delta = d;
     }
@@ -225,10 +267,10 @@ static int compare(bool download, bool ideal)
         number(" actual_byte=", transfer[first]);
     }
     hex(" crc_expected=", crc_expected); hex(" crc_actual=", crc_actual);
-    serial_puts_polled(ideal ? " comparison=ideal-observation\r\n" : " comparison=exact\r\n");
-    /* No guessed tolerance for bilinear/YUV. Differences require explicit
-     * hardware acceptance; report a failure while preserving the evidence. */
-    return bad ? GF2_EIO : 0;
+    number(" outside_tolerance=", rejected);
+    serial_puts_polled(ideal ? " comparison=channel-lsb1\r\n" : " comparison=exact\r\n");
+    /* Preserve raw byte differences/CRCs even when accepted. */
+    return rejected ? GF2_EIO : 0;
 }
 
 /* Independent NVROP truth tables, xf86-video-nouveau nv_rop.h:303-318.
@@ -307,11 +349,21 @@ static int copy_case(void)
         if (rc) return rc;
         d = s;
         if (direction == 10U)
-            rc = surface(o, &d, fmt, TEST_HALF, 32, 32, 32U * n + 8U);
-        if (!rc) rc = o->copy(o->ctx, &s, &d, sr, dx, dy, TEST_COPY_ALU, TEST_FULL_MASK, dl);
+            rc = surface(o, &d, fmt, TEST_HALF, 32, 32, TEST_COPY_DST_PITCH);
+        if (rc) return rc;
+        /* Record before submission: a fault must identify its own sample. */
+        serial_puts_polled("GF3 copy input");
+        number(" direction=", direction); number(" fmt=", fmt);
+        hex(" src_off=", s.off); hex(" dst_off=", d.off);
+        number(" src_pitch=", s.pitch); number(" dst_pitch=", d.pitch);
+        number(" sx=", sr.x); number(" sy=", sr.y);
+        number(" dx=", dx); number(" dy=", dy);
+        number(" w=", sr.w); number(" h=", sr.h);
+        serial_puts_polled("\r\n");
+        rc = o->copy(o->ctx, &s, &d, sr, dx, dy, TEST_COPY_ALU, TEST_FULL_MASK, dl);
         if (rc) return rc;
         u32 dst_off = direction == 10U ? TEST_HALF : 0;
-        u32 dst_pitch = direction == 10U ? 32U * n + 8U : pitch;
+        u32 dst_pitch = direction == 10U ? TEST_COPY_DST_PITCH : pitch;
         for (u32 y = 0; y < sr.h; y++)
         for (u32 b = 0; b < sr.w * n; b++)
             expected[dst_off + (dy + y) * dst_pitch + dx * n + b] =
@@ -357,8 +409,8 @@ static int mono_case(void)
     return 0;
 }
 /* RAM offsets include pitch padding and the trailing guard. Derive each
- * payload byte from the tightly packed seed, not the transfer's own data. */
-static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch)
+ * payload byte from the GPU seed at its own pitch, not the transfer's data. */
+static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch, u32 gpu_pitch)
 {
     u32 count = 0, bad = 0, first = TEST_FULL_MASK, delta = 0;
     u8 first_expected = 0, first_actual = 0;
@@ -366,7 +418,7 @@ static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch)
         u32 y = i / pitch, b = i % pitch;
         bool payload = y < rows && b < rowbytes;
         if (payload && !download) continue;
-        u8 want = payload ? expected[y * rowbytes + b] : TEST_GUARD_VALUE;
+        u8 want = payload ? expected[y * gpu_pitch + b] : TEST_GUARD_VALUE;
         u8 actual = transfer[i];
         count++;
         if (actual == want) continue;
@@ -401,6 +453,9 @@ static int transfer_case(enum gf3_case which)
         u32 n = cpp(fmt), w = widths[t], h = heights[t];
         u32 rowbytes = w * n, ram_pitch = rowbytes + 3U;
         u32 ram_bytes = (h - 1U) * ram_pitch + rowbytes;
+        /* Keep byte-transfer boundaries; only IFC-capable drawing surfaces
+         * use the EXA 64B pitch (nouveau_exa.c:435). */
+        u32 gpu_pitch = t < 5U ? rowbytes : (rowbytes + 63U) & ~63U;
         struct gf3_rect r = {0, 0, w, h};
         seed();
         int rc = bytes_transfer(false); if (rc) return rc;
@@ -414,7 +469,7 @@ static int transfer_case(enum gf3_case which)
         const struct gf3_test_ops *o = dispatch();
         struct gf3_surface s;
         if (!o) return GF3_ESTATE;
-        rc = surface(o, &s, fmt, 0, w, h, rowbytes);
+        rc = surface(o, &s, fmt, 0, w, h, gpu_pitch);
         if (rc) return rc;
         if (which == TEST_DOWNLOAD)
             rc = o->download ? o->download(o->ctx, &s, r, &ram, dl) : GF3_ESTATE;
@@ -439,12 +494,12 @@ static int transfer_case(enum gf3_case which)
         serial_puts_polled("\r\n");
         /* Record payload/padding/guard mismatches before returning, even
          * when this is the first transfer and no VRAM comparison has run. */
-        rc = compare_transfer(which == TEST_DOWNLOAD, rowbytes, h, ram_pitch);
+        rc = compare_transfer(which == TEST_DOWNLOAD, rowbytes, h, ram_pitch, gpu_pitch);
         if (rc) return rc;
         if (which != TEST_DOWNLOAD)
             for (u32 y = 0; y < h; y++)
             for (u32 b = 0; b < rowbytes; b++)
-                expected[y * rowbytes + b] = transfer[y * ram_pitch + b];
+                expected[y * gpu_pitch + b] = transfer[y * ram_pitch + b];
         /* Independent UC window first, then a separate download comparison:
          * a matching M2MF round trip alone never establishes correctness. */
         rc = compare(false, false); if (rc) return rc;
@@ -464,7 +519,7 @@ static u32 clamp8(i32 value)
  * BT.601 limited range. Packed result is R in bits 0..7, then G/B/A. */
 static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
 {
-    const u8 *p = before + y * 16U * cpp(fmt) + x * cpp(fmt);
+    const u8 *p = before + y * TEST_SCALE_SRC_PITCH + x * cpp(fmt);
     u32 r, g, b, a = 255;
     if (fmt == GF3_RGB565) {
         u32 v = get_pixel(p, 2);
@@ -472,7 +527,7 @@ static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
         r = (r << 3) | (r >> 2); g = (g << 2) | (g >> 4); b = (b << 3) | (b >> 2);
     } else if (fmt == GF3_Y8) r = g = b = *p;
     else if (fmt == GF3_YUY2 || fmt == GF3_UYVY) {
-        const u8 *pair = before + y * 32U + (x & ~1U) * 2U;
+        const u8 *pair = before + y * TEST_SCALE_SRC_PITCH + (x & ~1U) * 2U;
         i32 c, d, e;
         if (fmt == GF3_YUY2) {
             c = (i32)pair[(x & 1U) * 2U] - 16;
@@ -492,7 +547,13 @@ static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
 }
 static u32 filtered(enum gf3_fmt fmt, u32 fx, u32 fy, bool bilinear)
 {
-    u32 x = fx >> TEST_FRAC_BITS, y = fy >> TEST_FRAC_BITS;
+    /* SIFM uses ORIGIN_CENTER (nv04_xv_blit.c:151-152). Point
+     * sampling selects the nearest center, not the preceding center.
+     * gf-accept4 fmt=4/trial=1 confirms that 2.5 selects row 3.
+     * Bilinear's ideal still interpolates between the adjacent centers. */
+    u32 point_bias = bilinear ? 0U : TEST_FRAC_ONE / 2U;
+    u32 x = (fx + point_bias) >> TEST_FRAC_BITS;
+    u32 y = (fy + point_bias) >> TEST_FRAC_BITS;
     if (x > 15U) x = 15U;
     if (y > 15U) y = 15U;
     if (!bilinear) return rgba(fmt, x, y);
@@ -515,7 +576,7 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
     seed();
     for (u32 y = 0; y < 16U; y++)
     for (u32 x = 0; x < 16U; x++) {
-        u8 *p = expected + (y * 16U + x) * cpp(fmt);
+        u8 *p = expected + y * TEST_SCALE_SRC_PITCH + x * cpp(fmt);
         u32 r = solid ? 96U : x * 16U, g = solid ? 160U : y * 16U, b = solid ? 32U : (x ^ y) * 16U;
         if (fmt == GF3_RGB565)
             put_pixel(p, 2, ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
@@ -554,7 +615,7 @@ static int scale_case(void)
         const struct gf3_test_ops *o = dispatch();
         struct gf3_surface src, dst;
         if (!o || !o->scale) return GF3_ESTATE;
-        rc = surface(o, &src, fmt, 0, 16, 16, 16U * cpp(fmt));
+        rc = surface(o, &src, fmt, 0, 16, 16, TEST_SCALE_SRC_PITCH);
         if (!rc) rc = surface(o, &dst, dst_fmt, TEST_HALF, 32, 32, pitch);
         if (!rc) rc = o->scale(o->ctx, &src, &dst, sr, dr, clip, bilinear, dl);
         if (rc) return rc;
@@ -575,7 +636,10 @@ static int scale_case(void)
         number(" scale_fmt=", fmt); number(" trial=", trial);
         number(" bilinear=", bilinear); number(" solid=", solid);
         serial_puts_polled("\r\n");
-        rc = compare(false, bilinear || fmt == GF3_YUY2 || fmt == GF3_UYVY);
+        scale_compare_fmt = dst_fmt;
+        scale_compare_clip = clip;
+        scale_compare_pitch = pitch;
+        rc = compare(false, scale_tolerant(fmt, bilinear, solid));
         if (rc && !first_rc) first_rc = rc;
         /* Numerical differences are observations; continue collecting all
          * formats/filters. Mapping/cleanup errors retain ownership and stop. */

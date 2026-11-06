@@ -542,8 +542,11 @@ int appslot_gfx_claim(int gui_mode)
 
 int appslot_gfx_owner(void) { return g_gfx_owner; }
 
+/* Optional resident diagnostic display, absent from standalone appslot hosts. */
+extern void gf_display_owner_exit(int id) __attribute__((weak));
 void appslot_gfx_owner_exit(int id)
 {
+    if (gf_display_owner_exit) gf_display_owner_exit(id);
     if (g_gfx_owner == id) g_gfx_owner = GFX_OWNER_WM;
 }
 

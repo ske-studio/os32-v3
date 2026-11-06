@@ -45,7 +45,26 @@ static void foundation_selection_test(void)
     CHECK(observations==before && q.rc==GF1_EINVAL);
     CHECK(!gf_release_rom(owner));
 }
+static void command_selection_test(void)
+{
+    setup(); command_calls=0;
+    struct gf2_request q={sizeof(q),GF5_FEATURE,GF5T_THERM,0};
+    CHECK(!gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(command_calls==1 && command_test_id==GF5_FEATURE && command_session==GF5T_THERM);
+    q=(struct gf2_request){sizeof(q),GF4_DISPLAY,GF4_CUI_ENTER,0};
+    CHECK(!gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(command_calls==2 && command_test_id==GF4_DISPLAY && command_session==GF4_CUI_ENTER);
+    q=(struct gf2_request){sizeof(q),GF5_FEATURE,0xffff0101U,0};
+    CHECK(!gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(command_calls==3 && command_session==0xffff0101U);
+    q=(struct gf2_request){sizeof(q),GF5_FEATURE+1,0,0};
+    CHECK(gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0)==GF2_EINVAL);
+    CHECK(command_calls==3 && q.rc==GF2_EINVAL);
+    q=(struct gf2_request){sizeof(q),GF2_STATUS,1,0};
+    CHECK(gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0)==GF2_EINVAL);
+    CHECK(command_calls==3);
+}
 void _start(void)
 {
-    t2b_clock_advances();t2b_revoked_cleanup();
+    command_selection_test(); t2b_clock_advances();t2b_revoked_cleanup();
     foundation_selection_test();foundation_cleanup_test(); production_gate_test();vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

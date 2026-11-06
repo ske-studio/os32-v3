@@ -48,6 +48,10 @@ def main():
         if '--mutate' in sys.argv:
             original = SOURCE.read_text()
             mutants = [
+                ('if (!f->stats.first.fifo_latched) {', 'if (1) {',
+                 'first FIFO status overwritten'),
+                ('if (!f->stats.first.graph_latched) {', 'if (1) {',
+                 'first GR trap overwritten'),
                 ('if (wr(f, GF_IRQ_PMC_ENABLE, 1)) goto io_error; /* gf1 rearm anchor */',
                  '/* lost tick rearm */', 'tick PMC rearm removed'),
                 ('#define GF_IRQ_GRAPH_ENABLE 0x40013cU',

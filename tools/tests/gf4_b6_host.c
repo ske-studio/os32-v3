@@ -145,7 +145,7 @@ static void upload(void)
     static const u32 expected[]={0x00000000,0x02010101,0xff808080,0xffffffff};
     for (u32 i=0;i<sizeof(input)/sizeof(input[0]);++i) pixels[i]=input[i];
     /* Poison both padding regions: copying beyond 32 must be observable. */
-    pixels[SMALL]=0xff123456; pixels[SMALL*SIDE]=0xffabcdef;
+    pixels[SMALL]=0x00000001; pixels[SMALL*SIDE]=0x00010000;
     image.w=image.h=SMALL; image.hot_x=3; image.hot_y=5;
     state.head[0].x=2; state.head[0].y=3; state.head[0].cursor_visible=true;
     state.head[0].mode.t.flags=GF4_DBLSCAN; h.observe=observe_upload;
@@ -213,6 +213,34 @@ static void image_rejections(void)
     --state.head[0].cursor.generation; gf4_host_trace_clear(&h);
     assert(gf4_cursor_image(&h.ctx,0,&image,0)==GF4_ETIME);
     assert(!h.calls[D_MAP] && !h.calls[D_WRITE] && state.head[0].cursor_valid);
+}
+
+/* PM boundary from MIT nouveau c03c1a1 dispnv04/crtc.c:944-960:
+ * RGB may equal alpha before correction, but may never exceed it. */
+static void pm_rejections(void)
+{
+    static const u32 alphas[]={0,1,254};
+    static const u32 sizes[]={SMALL,SIDE};
+    for (u32 size=0;size<sizeof(sizes)/sizeof(sizes[0]);++size)
+        for (u32 a=0;a<sizeof(alphas)/sizeof(alphas[0]);++a)
+            for (u32 channel=0;channel<3;++channel)
+                for (u32 end=0;end<2;++end) {
+                    setup(); reserve_cursor(0);
+                    image.w=image.h=sizes[size];
+                    state.head[0].cursor_valid=true;
+                    state.head[0].cursor_visible=true;
+                    h.cr[0][0x31]=1;
+                    struct gf4_head_image saved=state.head[0];
+                    u32 index=end ? (image.h-1U)*SIDE+image.w-1U : 0;
+                    pixels[index]=(alphas[a]<<24)|((alphas[a]+1U)<<(channel*8U));
+                    assert(gf4_cursor_image(&h.ctx,0,&image,DEADLINE)==GF4_EFORMAT);
+                    assert(h.ctx.last_rc==GF4_EFORMAT && !h.nevents);
+                    assert(h.cr[0][0x31]==1 && !h.views && !h.ctx.cursor_view[0].mapped);
+                    for (u32 i=0;i<sizeof(saved);++i)
+                        assert(((const u8 *)&state.head[0])[i]==((const u8 *)&saved)[i]);
+                    for (u32 i=0;i<GF4_CURSOR_BYTES;++i)
+                        assert(vram[CURSOR_OFF+i]==0x5a);
+                }
 }
 
 static void failures(void)
@@ -295,6 +323,6 @@ static void close_lifetime(void)
 }
 void _start(void)
 {
-    visibility(); positions(); upload(); image_rejections(); failures(); close_lifetime();
+    visibility(); positions(); upload(); image_rejections(); pm_rejections(); failures(); close_lifetime();
     gf2_host_exit(0);
 }

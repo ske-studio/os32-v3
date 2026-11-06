@@ -75,6 +75,17 @@ static int transfer(struct gf3_ctx *c, const struct gf3_surface *s,
     }
     if (!c->ch->staging_live) return transfer_result(c, GF2_ENOSPC);
 
+    /* nouveau_exa.c:210-237 never reuses outstanding scratch. With one
+     * borrowed page, retire all earlier work before touching it again.
+     * A failed emit/wait proves no completion, even if RUN is unchanged. */
+    if (c->ch->staging_pending) {
+        struct gf2_fence fence;
+        rc = gf2_fence_emit(c->ch, &fence, dl);
+        if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
+        if (rc) return transfer_result(c, rc);
+        c->ch->staging_pending = false;
+    }
+
     u8 *staging = c->ch->staging.va;
     u8 *memory = ram->ptr;
     for (u32 y = 0; y < vr.rows;) {
@@ -95,7 +106,18 @@ static int transfer(struct gf3_ctx *c, const struct gf3_surface *s,
                         staging[j * bytes + b] = memory[(y + j) * cpu.pitch + x + b];
                 __sync_synchronize();
             }
+            /* A completed fragment ends its wait. Start a new budget for
+             * the next transfer, retaining the caller's first deadline. */
+            if (x || y) {
+                struct gf_io *io = &c->ch->f->io;
+                u32 now;
+                if (!io->timing.clock_us) return transfer_result(c, GF2_EIO);
+                rc = io->timing.clock_us(io->opaque, &now);
+                if (rc) return transfer_result(c, rc);
+                dl = now + GF3_TIMEOUT_US;
+            }
             u32 off = vr.off + y * vr.pitch + x;
+            c->ch->staging_pending = true;
             if (upload)
                 rc = gf3_m2mf(c, GF3_HANDLE_PCI_DMA, GF3_HANDLE_VRAM_DMA,
                               0, off, bytes, vr.pitch, bytes, rows, dl);
@@ -103,6 +125,7 @@ static int transfer(struct gf3_ctx *c, const struct gf3_surface *s,
                 rc = gf3_m2mf(c, GF3_HANDLE_VRAM_DMA, GF3_HANDLE_PCI_DMA,
                               off, 0, vr.pitch, bytes, bytes, rows, dl);
             if (rc) return transfer_result(c, rc);
+            c->ch->staging_pending = false;
             if (!upload) {
                 /* nouveau_exa.c:268-280: completion precedes CPU unpack. */
                 __sync_synchronize();

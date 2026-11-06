@@ -39,6 +39,26 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `peek` | `peek [-k\|-p\|-m] [-w1\|-w2\|-w4] [-l[<mac>]\|--lan] addr [len]` | kdebug 部品でメモリを読んで 16 進で出す (`KDEBUG=1` のときだけ、読むだけ、KAPI v78 `kdebug_call`)。番地空間・拒否は [kpeek.c](../kdebug/kpeek.c)、ホストの採取・照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭 |
 | `kbdstat` | `kbdstat [-w]` | キーボード 8251 の診断カウンタ (IRQ1 回数・空 IRQ・エラー・オーバーラン・起動時の 0043h・書いたコマンド語・直近のステータスとスキャンコード・いまの 0043h) を 1 行で。KAPI v62 `kbd_diag`。**`-w`** は受信 1 バイトごとの行 (`seq` / 生の `code` と make・break / 処理後の修飾) を ESC か 30 秒まで出し続ける (KAPI v67 `kbd_diag_log`、seq が飛べば `LOST` 行)。rshell から読める。読み方は [POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) |
 
+**GeForce の CUI 受入** (`cmd_gf1.c` / `cmd_gf2.c`、`kdebug_call`):
+
+`gf2 enter` で層4の lifecycle と同じバックエンドから入場し、シェルを続行する。
+表示出力は GeForce、テキストは98側のまま。`gf1`・`gf2` の試験後は `gf2 leave` で
+98へ戻す。二重入場・未入場や別 owner の退場は rc を返す。入場したシェルの終了・
+CTRL+STOP・fault は既存の owner 回収から退場する。
+`gf2 display <packed-session>` の事前拒否と開始失敗は `stage` / `rc` を記録する。
+
+層5は `gf2 feature <語>`。語は `info`、`clock-read` / `clock-calc` / `clock-prog`、
+`ram-prog`、`perf-count` / `perf-get` / `perf-select`、`therm`、
+`fan-mode` / `fan-get` / `fan-cstate`、`volt-get` / `volt-set` / `volt-id`、
+`gpio-find` / `gpio-get` / `gpio-set`、`tile-find` / `tile-set` / `tile-clear`、
+`save` / `restore` / `free`、`poll` / `wait` / `last-rc`。
+引数は既存の診断 operand 0〜7へ、`gf2 feature arg-lo <番号> <下位16bit>` と
+`gf2 feature arg-hi <番号> <上位16bit>` で十進数を設定する。各 operand の意味は
+[wire 定義](../kdebug/gf_command_wire.h)、受入条件は
+[層5設計 §10](decisions/realhw/GF_FEAT5_DESIGN.md#10-受入--試験と変異)を参照。
+例えば `gf2 enter` → `gf2 feature therm` → `gf2 feature save` →
+`gf2 feature restore` → `gf2 feature free` → `gf2 leave`。
+
 **PCI コマンド** (cmd_pci.c):
 
 実機 PC-9821Ra266 の内蔵 LAN (Intel 82557 = `8086:1229`) を見つけるための口

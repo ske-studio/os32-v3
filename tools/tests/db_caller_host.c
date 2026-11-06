@@ -4,6 +4,11 @@
 #define HOST_DB_CALLER_TEST
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
+#include <stdbool.h>
+/* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
+bool geforce_fg_due(u32 now) { (void)now; return false; }
+void geforce_foreground_poll(void) {}
+
 #undef used
 void *memcpy(void *d, const void *s, u32 n) { return kmemcpy(d, s, n); }
 #include "ring3_str.h"

@@ -32,6 +32,7 @@
 #include "../hwdev/gf/command.h"
 #include "../hwdev/gf/foundation.h"
 #include "gfinit_decode.h"
+#include "gfinit_pll.h"
 #include "../drivers/video/geforce/geforce_module.h"
 #include "../lib/serial_diag.h"
 #define GF_ROM_BIT_ONLY
@@ -242,10 +243,137 @@ static i32 rom_records(const struct gf5_rom_view *rom)
      * vmap absence is normal and must not hide the performance entries. */
     return 0;
 }
+/* Read-only observation, nouveau MIT c03c1a1 clk/nv40.c:39-114.
+ * No service/poll/clock_read call: those update the failure being diagnosed.
+ * Register offsets use the existing PLL definitions, always BAR0/32-bit. */
+static bool observation_window(const struct gf5 *g)
+{
+    return g->ch && g->ch->f && !g->ch->f->revoked &&
+        g->ch->f->bar0 && g->ch->f->io.read && g->display &&
+        g->display->ch == g->ch && g->display->legacy &&
+        g->display->legacy->bar0_map && g->ch->epoch &&
+        g->display->epoch == g->ch->epoch;
+}
+static u32 observation_pll(u32 ctrl, u32 coef, bool single)
+{
+    u32 n = (coef >> 8) & 255U, m = coef & 255U;
+    if (!(ctrl & GF_PLL_VIDEO_S2_ENABLE) || !m) return 0;
+    u32 khz = GF_PLL_REF * n / m;
+    if (!single && (ctrl & (0x40000000U | GF_PLL_CTRL_SINGLE)) == 0x40000000U) {
+        n = coef >> 24; m = (coef >> 16) & 255U;
+        if (!m) return 0;
+        khz = khz * n / m;
+    }
+    return khz >> ((ctrl & GF_PLL_CTRL_P_MASK) >> GF_PLL_CTRL_P_SHIFT);
+}
+static void observation(struct gf5 *g)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("GF5 DATA stage=observe");
+    number(" phase=", g->phase); number(" accepting=", g->accepting);
+    number(" busy=", g->busy); number(" poll_off=", g->poll_off);
+    number(" ch=", g->ch != NULL);
+    if (g->ch) {
+        number(" ch_state=", g->ch->state); number(" ch_epoch=", g->ch->epoch);
+        number(" fault=", g->ch->fault.latched); number(" f=", g->ch->f != NULL);
+        if (g->ch->f) number(" running=", g->ch->f->running);
+    }
+    number(" display=", g->display != NULL);
+    if (g->display) {
+        number(" ready=", g->display->ready); number(" display_epoch=", g->display->epoch);
+        number(" saved_closed=", g->display->saved_closed);
+    }
+    /* Only dereference the current owner's retained image. */
+    number(" image=", g->image != NULL);
+    if (g->image) number(" complete=", g->image->complete);
+    number(" diagnostic_image=", diagnostic.image != NULL);
+    number(" plan=", diagnostic.planned && diagnostic.plan_owner == g);
+    number(" plan_valid=", g->plan_guard.valid);
+    number(" plan_epoch=", g->plan_guard.epoch);
+    number(" plan_rom_generation=", g->plan_guard.rom_generation);
+    number(" rom_generation=", g->rom_generation);
+    number(" core_used=", g->plan_guard.core_used); number(" ram_used=", g->plan_guard.ram_used);
+    signed_number(" last_rc=", g->last_rc); signed_number(" source_rc=", g->source_rc);
+    serial_puts_polled(" boundary=");
+    serial_puts_polled(g->poll_source ? g->poll_source : "unknown");
+    serial_puts_polled("\r\n");
+    /* No cached temperature/time/current perf exists in the frozen schema.
+     * therm_read and fan_get can initialize/write hardware; never use them
+     * for a read-only capture, nor label the requested duty as measured. */
+    serial_puts_polled("GF5 DATA stage=thermal temperature=unknown sample_us=unknown current_index=unknown fan_actual=unknown");
+    number(" fan_mode=", g->fan.mode); number(" fan_target=", g->fan.target);
+    number(" fan_duty=", g->fan.duty); number(" sensor_setup=", g->fan.sensor_setup);
+    serial_puts_polled("\r\n");
+    /* therm.c: OLD_STYLE=ff; stopped but initialized=1ff; unavailable=100. */
+    for (u32 i = 0; i < GF5_THERM_THRESHOLDS; ++i) {
+        serial_puts_polled("GF5 DATA stage=threshold"); number(" index=", i);
+        if (g->fan.sensor_setup == 0xffU || g->fan.sensor_setup == 0x1ffU) {
+            signed_number(" celsius=", g->fan.threshold[i]);
+            signed_number(" hyst_celsius=", g->fan.hyst[i]);
+        } else serial_puts_polled(" celsius=unknown hyst_celsius=unknown");
+        serial_puts_polled(" baseline_delta=unknown\r\n");
+    }
+    static const u32 regs[] = { GF_PLL_GATE, GF_PLL_CORE - GF_PLL_CTRL_OFFSET,
+        GF_PLL_CORE, GF_PLL_CORE + GF_PLL_CTRL_OFFSET,
+        GF_PLL_MEMORY - GF_PLL_CTRL_OFFSET, GF_PLL_MEMORY };
+    u32 value[(sizeof(regs) / sizeof(regs[0]))] = {0};
+    i32 status[(sizeof(regs) / sizeof(regs[0]))];
+    for (u32 i = 0; i < (sizeof(regs) / sizeof(regs[0])); ++i) {
+        /* Every callback borrows the current slot; no saved module ops. */
+        const struct gf5_test_ops *o = geforce_feature5_ops();
+        bool readable = o && o->ctx == g && observation_window(o->ctx);
+        status[i] = GF5_ESTATE;
+        if (readable) {
+            struct gf_io *io = &o->ctx->ch->f->io;
+            status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);
+        }
+        serial_puts_polled("GF5 DATA stage=register"); number(" offset=", regs[i]);
+        if (!readable || status[i]) serial_puts_polled(" value=unreadable");
+        else number(" value=", value[i]);
+        signed_number(" rc=", status[i]); serial_puts_polled("\r\n");
+    }
+    for (u32 i = 1; i < (sizeof(regs) / sizeof(regs[0])); ++i) {
+        if (i == 2 || i == 5) continue;
+        bool single = i == 3;
+        if (status[i] || (!single && status[i + 1])) continue;
+        u32 c = value[i], v = single ? c : value[i + 1];
+        serial_puts_polled("GF5 DATA stage=pll"); number(" offset=", regs[i]);
+        number(" enable=", !!(c & GF_PLL_VIDEO_S2_ENABLE));
+        number(" double=", !!(c & 0x40000000U));
+        number(" single=", !!(c & GF_PLL_CTRL_SINGLE));
+        number(" m1=", v & 255U); number(" n1=", (v >> 8) & 255U);
+        number(" m2=", (v >> 16) & 255U); number(" n2=", v >> 24);
+        number(" p=", (c & GF_PLL_CTRL_P_MASK) >> GF_PLL_CTRL_P_SHIFT);
+        number(" khz=", observation_pll(c, v, single)); serial_puts_polled("\r\n");
+    }
+    for (u32 domain = 0; domain < 3; ++domain) {
+        serial_puts_polled("GF5 DATA stage=decode"); number(" domain=", domain);
+        if (domain != 2 && !status[0]) number(" mux_source=", (value[0] >> (domain * 4)) & 3U);
+        u32 src = domain == 2 ? 3U : (value[0] >> (domain * 4)) & 3U;
+        u32 ctrl = domain == 2 ? 4U : src == 2 ? 3U : 1U;
+        if (domain != 2 && status[0]) {
+            serial_puts_polled(" khz=unreadable");
+        } else if (src != 2 && src != 3) {
+            serial_puts_polled(" khz=0 reason=unknown_mux");
+        } else if (status[ctrl] || (src == 3 && status[ctrl + 1])) {
+            serial_puts_polled(" khz=unreadable");
+        } else {
+            u32 khz = src == 2 || src == 3 ? observation_pll(value[ctrl],
+                value[src == 2 ? ctrl : ctrl + 1], src == 2) : 0;
+            number(" khz=", khz);
+            if (!khz) serial_puts_polled(" reason=invalid_pll");
+        }
+        serial_puts_polled("\r\n");
+    }
+}
 static i32 info(bool *local)
 {
     const struct gf5_test_ops *o = geforce_feature5_ops();
     if (!o || !o->ctx) { *local = true; return GF5_ENOTSUP; }
+    struct gf5 *owner = o->ctx;
+    observation(owner);
+    o = geforce_feature5_ops();
+    if (!o || o->ctx != owner) { *local = true; return GF5_ESTATE; }
     if (!serial_gate_active()) {
         const struct gf5 *g = o->ctx;
         serial_puts_polled("GF5 DATA stage=info target=0:13.0/10de:0221");
@@ -263,11 +391,20 @@ static i32 info(bool *local)
     }
     i32 rc = rom_records(&o->ctx->rom);
     if (rc) { *local = true; return rc; }
-    /* Enumerate the complete ROM performance table, not only the selected
-     * state. Every get rereads the accessor after the preceding call. */
+    /* Enumerate the dense valid performance list, not raw BIOS positions.
+     * Every get rereads the accessor after the preceding call. */
     o = geforce_feature5_ops();
-    if (!o || !o->ctx || !o->perf_count) {
+    if (!o || o->ctx != owner || !o->perf_count) {
         *local = true; return GF5_ENOTSUP;
+    }
+    const struct gf5 *g = o->ctx;
+    if (g->phase != GF5_RUN || !g->accepting || g->busy || !g->ch ||
+        !g->ch->f || g->ch->state != GF2_RUN || g->ch->fault.latched ||
+        !g->ch->f->running || !g->display || !g->display->ready ||
+        !g->display->accepting || g->display->changing || g->display->saved_closed ||
+        g->display->ch != g->ch || !g->ch->epoch || g->display->epoch != g->ch->epoch) {
+        if (!serial_gate_active()) serial_puts_polled("GF5 DATA stage=perf entries=unknown boundary=service_live\r\n");
+        return 0;
     }
     u32 count;
     rc = o->perf_count(o->ctx, &count);
@@ -275,13 +412,14 @@ static i32 info(bool *local)
     for (u32 i = 0; i < count; ++i) {
         struct gf5_perf_entry entry;
         o = geforce_feature5_ops();
-        if (!o || !o->ctx || !o->perf_get) {
+        if (!o || o->ctx != owner || !o->perf_get) {
             *local = true; return GF5_ENOTSUP;
         }
         rc = o->perf_get(o->ctx, i, &entry);
         if (rc) return rc;
         if (!serial_gate_active()) {
             serial_puts_polled("GF5 DATA stage=perf"); number(" index=", i);
+            number(" bios_index=", entry.bios_index); number(" pstate=", entry.pstate);
             number(" voltage_id=", entry.voltage); number(" fanspeed=", entry.fanspeed);
             number(" core_khz=", entry.clock.core_khz);
             number(" shader_khz=", entry.clock.shader_khz);
@@ -307,15 +445,28 @@ i32 gf5_test(u32 session)
         diagnostic.planned = false;
         return finish(stage, 0, true);
     }
-    if ((session & ~GF5_WIRE_BYTE_MASK) || stage > GF5T_LAST_RC)
+    bool gpio = stage == GF5T_GPIO_GET || stage == GF5T_GPIO_SET;
+    u32 format = gpio ? GF5_WIRE_GPIO_TAG : 0;
+    if ((session & ~GF5_WIRE_BYTE_MASK) != format || stage > GF5T_LAST_RC)
         return finish(stage, GF5_EINVAL, true);
     const struct gf5_test_ops *o = geforce_feature5_ops();
     if (!o || !o->ctx) return finish(stage, GF5_ENOTSUP, true);
-    if (o->ctx->phase != GF5_RUN && stage != GF5T_RESTORE &&
-        stage != GF5T_FREE && stage != GF5T_LAST_RC)
+    if (o->ctx->phase != GF5_RUN && stage != GF5T_INFO && stage != GF5T_RESTORE &&
+        stage != GF5T_FREE && stage != GF5T_LAST_RC) {
+        if (!serial_gate_active()) serial_puts_polled("GF5 DATA boundary=phase\r\n");
         return finish(stage, GF5_ESTATE, true);
+    }
     switch (stage) {
-    case GF5T_INFO: rc = info(&local); break;
+    case GF5T_INFO: {
+        struct gf5 *owner = o->ctx;
+        i32 last = owner->last_rc, source = owner->source_rc;
+        rc = info(&local);
+        o = geforce_feature5_ops();
+        if (o && o->ctx == owner) {
+            o->ctx->last_rc = last; o->ctx->source_rc = source;
+        }
+        return result_record(stage, rc, last, source);
+    }
     case GF5T_CLOCK_READ: {
         struct gf5_clock clock;
         CALL(clock_read, &clock);
@@ -347,7 +498,15 @@ i32 gf5_test(u32 session)
     case GF5T_RAM_PROG:
         o = geforce_feature5_ops();
         if (!o || !o->ctx || !diagnostic.planned || o->ctx != diagnostic.plan_owner) {
+            if (!serial_gate_active()) serial_puts_polled("GF5 DATA stage=plan boundary=no_plan_or_owner\r\n");
             rc = GF5_ESTATE; local = true; break;
+        }
+        if (!serial_gate_active()) {
+            serial_puts_polled("GF5 DATA stage=plan boundary=module_guard");
+            number(" valid=", o->ctx->plan_guard.valid);
+            number(" epoch=", o->ctx->plan_guard.epoch);
+            number(" rom_generation=", o->ctx->plan_guard.rom_generation);
+            serial_puts_polled("\r\n");
         }
         if (stage == GF5T_CLOCK_PROG) { CALL(clock_prog, &diagnostic.plan); }
         else { CALL(ram_prog, &diagnostic.plan); }
@@ -376,6 +535,7 @@ i32 gf5_test(u32 session)
             clock_record("perf_get", &entry.clock);
             if (!serial_gate_active()) {
                 serial_puts_polled("GF5 DATA stage=perf_get"); number(" index=", a[0]);
+                number(" bios_index=", entry.bios_index); number(" pstate=", entry.pstate);
                 number(" voltage_id=", entry.voltage); number(" fanspeed=", entry.fanspeed);
                 serial_puts_polled("\r\n");
             }
@@ -422,18 +582,37 @@ i32 gf5_test(u32 session)
     case GF5T_GPIO_GET:
     case GF5T_GPIO_SET: {
         bool value;
-        if (a[0] > U8_MAX || a[1] > U8_MAX || a[2] > U8_MAX ||
-            (stage == GF5T_GPIO_SET && a[3] > 1U)) {
+        if (a[0] > U8_MAX || (stage == GF5T_GPIO_SET && a[1] > 1U)) {
             rc = GF5_EINVAL; local = true; break;
         }
-        u8 log[2] = {a[1], a[2]};
-        if (stage == GF5T_GPIO_SET) { CALL(gpio_set, (u8)a[0], log, a[3] != 0); }
-        else {
-            CALL(gpio_get, (u8)a[0], log, &value);
-            if (!rc && !serial_gate_active()) {
-                serial_puts_polled("GF5 DATA stage=gpio_get"); number(" value=", value);
-                serial_puts_polled("\r\n");
-            }
+        u8 line, log[2];
+        o = geforce_feature5_ops();
+        if (!o || !o->ctx || !o->gpio_find) {
+            rc = GF5_ENOTSUP; local = true; break;
+        }
+        struct gf5 *owner = o->ctx;
+        /* nouveau gpio/base.c:80-109: resolve DCB on every get/set. */
+        rc = o->gpio_find(owner, (u8)a[0], &line, log);
+        if (rc) break;
+        /* Reacquire after the callback; resolved wiring belongs to owner. */
+        o = geforce_feature5_ops();
+        if (!o || o->ctx != owner) {
+            rc = GF5_ESTATE; local = true; break;
+        }
+        if (stage == GF5T_GPIO_SET) {
+            if (!o->gpio_set) { rc = GF5_ENOTSUP; local = true; }
+            else rc = o->gpio_set(owner, line, log, a[1] != 0);
+        } else {
+            if (!o->gpio_get) { rc = GF5_ENOTSUP; local = true; }
+            else rc = o->gpio_get(owner, line, log, &value);
+        }
+        if (!serial_gate_active()) {
+            serial_puts_polled(stage == GF5T_GPIO_SET ?
+                "GF5 DATA stage=gpio_set" : "GF5 DATA stage=gpio_get");
+            number(" tag=", a[0]); number(" line=", line);
+            number(" log0=", log[0]); number(" log1=", log[1]);
+            if (!rc) number(" value=", stage == GF5T_GPIO_SET ? a[1] : value);
+            serial_puts_polled("\r\n");
         }
         break;
     }
@@ -461,6 +640,7 @@ i32 gf5_test(u32 session)
     case GF5T_FREE:
         o = geforce_feature5_ops();
         if (!o || !o->ctx || !diagnostic.image || o->ctx != diagnostic.image_owner) {
+            if (!serial_gate_active()) serial_puts_polled("GF5 DATA stage=image boundary=no_image_or_owner\r\n");
             rc = GF5_ESTATE; local = true; break;
         }
         if (stage == GF5T_RESTORE) {

@@ -1586,4 +1586,19 @@ pci_hwb_write:
 exec_hwb_abort_take:
     jmp *kdebug_import_slots+1264
 .size exec_hwb_abort_take, .-exec_hwb_abort_take
+.globl geforce_resource_lookup
+.type geforce_resource_lookup, @function
+geforce_resource_lookup:
+    jmp *kdebug_import_slots+1268
+.size geforce_resource_lookup, .-geforce_resource_lookup
+.globl paging_device_map
+.type paging_device_map, @function
+paging_device_map:
+    jmp *kdebug_import_slots+1272
+.size paging_device_map, .-paging_device_map
+.globl paging_device_unmap
+.type paging_device_unmap, @function
+paging_device_unmap:
+    jmp *kdebug_import_slots+1276
+.size paging_device_unmap, .-paging_device_unmap
 .section .note.GNU-stack,"",@progbits

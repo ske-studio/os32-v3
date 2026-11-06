@@ -11,11 +11,13 @@
 #include "gf4_c1_host.c"
 #undef GF4_C1_ENTRY
 #include "../../hwdev/gfinit_mode.h"
-#define service_check scanlog_f5_check
-#define service_publish scanlog_f5_publish
-#include "../../hwdev/gf/feature5_service.c"
-#undef service_check
-#undef service_publish
+/* gf4_c2svc_host.c already includes the real F5 service for this fixture. */
+
+/* Scanlog supplies synthetic PCI and host mmap, rather than kernel PTEs. */
+int gf_production_identity(struct gf_production *p)
+{ assert(p==&cint_prod); return p->revoked ? -1 : 0; }
+int gf_production_mapped(struct gf_production *p)
+{ assert(p==&cint_prod); return p->foundation.bar0 ? 0 : -1; }
 
 /* Synthetic ROM: DCB 3.0 analog A (bios/dcb.c:28-95,121-193),
  * PLL 0x21 (bios/pll.c), BIT P v2 thermal conversion (bios/therm.c).
@@ -26,7 +28,8 @@ static u8 scanlog_rom[S_ROM_BYTES];
 static struct gf_init_context scanlog_init_ctx;
 static struct gf_init_program scanlog_program;
 static struct gf_display_owner scanlog_owner;
-static const struct gf5_test_ops *scanlog_f5_ops;
+/* Share the publication slot initialized by svc_fixture_state, too. */
+#define scanlog_f5_ops guard_f5_slot
 static bool scanlog_calibrated=true,scanlog_rom_fail;
 static u32 scanlog_devinit_calls;
 static bool scanlog_clock_error;
@@ -109,14 +112,39 @@ static void scanlog_cold(void)
     scanlog_devinit_calls=0;
     assert(!svc_ctx.ch->f && !svc_ctx.nroutes && !svc_ctx.limits_valid[0]);
 }
+/* Thermal tests need a readable clock and a supported performance table. */
+static void __attribute__((unused)) scanlog_heat_fixture(void)
+{
+    /* bios/perf.c v0x21: supported empty table (header8, entry22),
+     * no lower pstate. The scanlog's v0x20 only supplies its fan divisor. */
+    scanlog_rom[S_PERF]=0x21;
+    scanlog_rom[S_PERF+3]=22;
+    gf5_rom_release(&cint_prod.feature5);
+    assert(!gf5_rom_acquire(&cint_prod.feature5,scanlog_rom,sizeof(scanlog_rom),0));
+    /* nv40.c:39-114: enabled PLL, 27MHz * 20 / 2, divide by 2;
+     * shared core/shader mux, memory's second stage multiplies by two. */
+    gf3_host_set(&svc_host.base,0,GF_PLL_GATE,0x23);
+    gf3_host_set(&cint_host,0,GF_PLL_GATE,0x23);
+    gf3_host_set(&cint_host,0,0x4000,0xc0010000);
+    gf3_host_set(&cint_host,0,0x4004,0x02011402);
+    gf3_host_set(&cint_host,0,0x4008,0x80011402);
+    gf3_host_set(&cint_host,0,0x4020,0xc0010000);
+    gf3_host_set(&cint_host,0,0x4024,0x02011402);
+}
 static PaletteEntry scanlog_colors[16];
 const PaletteEntry *palette_get_all(void) { return scanlog_colors; }
 void palette_shadow_set(int i,u8 r,u8 g,u8 b) { (void)i;(void)r;(void)g;(void)b; }
-static u32 scanlog_route;
+static u32 scanlog_route,scanlog_restore98_calls;
 void pc98_console_set_safe(int safe) { (void)safe; }
 int pc98_route_cell_check(void) { assert(!scanlog_route); return 0; }
 int pc98_route_to_gf(void) { scanlog_route=1; return 0; }
-int pc98_route_to_98(void) { scanlog_route=0; return 0; }
+int pc98_route_to_98(void)
+{
+    /* The diagnostic must finish before the real route restores/redraws 98. */
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc="));
+    ++scanlog_restore98_calls; /* Route seam includes display_restore_98. */
+    scanlog_route=0; return 0;
+}
 static u32 scanlog_failures;
 void geforce_display_failed(void) { scanlog_failures++; }
 static int scanlog_identify(void) { return 1; }
@@ -144,6 +172,9 @@ static void scanlog_init(void)
     scanlog_point_fail=false;
     scanlog_device=(struct video_device){.ops=&gf_video_ops,.context=&cint_prod.display};
     geforce_backend_bind(&scanlog_device,scanlog_identify,SCANLOG_BAR0,scanlog_point,&cint_host);
+    /* Host mapping seam corresponding to devinit.c's BAR0 loan. */
+    cint_prod.foundation.bar0=(volatile u8 *)(uptr)SCANLOG_BAR0;
+    cint_prod.display.bar0_map=(void *)(uptr)SCANLOG_BAR0;
     startlog_clear();
     geforce_init();
     assert(active && routed && !failed && scanlog_route && !scanout_logged);
@@ -157,7 +188,9 @@ static void scanlog_finish(void)
     geforce_backend_feature5_bind(0);
     gf2_host_memset(cint_host.fail_rc,0,sizeof(cint_host.fail_rc));
     gf2_host_memset(svc_host.fail_rc,0,sizeof(svc_host.fail_rc));
+    startlog_clear();
     assert(!geforce_stop());
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc=0 read_rc=0 valid=00000fff"));
     svc_finish();
     gf5_rom_release(&cint_prod.feature5);
 }
@@ -250,7 +283,10 @@ static void scanlog_present(void)
     geforce_present(0,0,640,400);
     assert(startlog_len==len && gfx_counters.present_bytes==2U*640U*400U);
 }
-void _start(void)
+#ifndef GF4_SCANLOG_ENTRY
+#define GF4_SCANLOG_ENTRY _start
+#endif
+void GF4_SCANLOG_ENTRY(void)
 {
     scanlog_map(CINT_FB_PHYS,GF_MODE_VRAM_BYTES);
     scanlog_map(SCANLOG_BAR0,0x101000U);
@@ -311,7 +347,7 @@ void _start(void)
     assert(scanlog_contains("[gf4] scanout "));
     u32 clock_len=startlog_len;
     geforce_present(0,0,1,1);
-    assert(active && startlog_len==clock_len);
+    assert(active && startlog_len>clock_len);
     scanlog_clock_error=false;
     scanlog_finish();
     /* No GPIO table, or a GPIO table without FAN: both are passive boards. */
@@ -321,7 +357,7 @@ void _start(void)
         startlog_clear(); gfx_counters=(GfxCounters){0};
         geforce_present(0,0,1,1);
         assert(active && cint_prod.feature5.fan_off);
-        assert(scanlog_count("[gf5] fan off rc=-502 reason=no-fan\n")==1);
+        assert(scanlog_count("[gf5] fan off rc=-510 reason=no-fan\n")==1);
         assert(scanlog_contains("[gf4] scanout ") && gfx_counters.present_bytes==1);
         u32 fan_len=startlog_len;
         cint_host.now+=1000000;

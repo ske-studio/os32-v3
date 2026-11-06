@@ -57,6 +57,7 @@ int gf_display_modeset(struct gf_display_context *c)
 #include "api.h"
 #include "../foundation.h"
 #include "../../../include/kprintf.h"
+#include "timeout.h"
 
 /* nouveau dispnv04/hw.h:70-124, hw.c:75-106,468-535,665-835.
  * Encoder-specific DACCLK/script/FP programming belongs to B9/B10/B11.
@@ -188,7 +189,7 @@ static int ms_wait(void *owner,u32 ms,bool fp_only)
     l->at="wait_clock_before";
     l->rc=io->timing.clock_us(io->opaque,&now);
     if (!l->rc && ((i32)(now-l->ctx->deadline)>=0 || l->ctx->deadline-now<us)) {
-        l->at="wait_budget"; l->rc=GF4_ETIME;
+        l->at="wait_budget"; l->rc=gf4_timeout("mode_wait_budget",l->head,l->ctx->deadline,now,0,us);
     }
     /* Keep deadline checks at 1ms intervals during the full 10/50ms. */
     while (!l->rc && us) {
@@ -200,7 +201,7 @@ static int ms_wait(void *owner,u32 ms,bool fp_only)
             l->rc=io->timing.clock_us(io->opaque,&now);
         }
         if (!l->rc && (i32)(now-l->ctx->deadline)>=0) {
-            l->at="wait_deadline"; l->rc=GF4_ETIME;
+            l->at="wait_deadline"; l->rc=gf4_timeout("mode_wait_deadline",l->head,l->ctx->deadline,now,0,us);
         }
         us-=part;
     }
@@ -282,7 +283,9 @@ int gf4_mode_load(struct gf4_ctx *ctx,u8 head,const struct gfinit_mode *mode,u32
     u32 now,owner;
     l.at="clock";
     int rc=l.rc=io->timing.clock_us(io->opaque,&now);
-    if (!rc && (i32)(now-dl)>=0) { l.at="deadline"; rc=GF4_ETIME; }
+    if (!rc && (i32)(now-dl)>=0) {
+        l.at="deadline"; rc=gf4_timeout("mode_load_deadline",head,dl,now,0,0);
+    }
     if (rc) return ms_failure(&l,rc,0,0);
     l.at="owner_index";
     rc=ms_write(&l,MS_CR,1,MS_OWNER);
@@ -366,7 +369,7 @@ int gf4_set_mode(struct gf4_ctx *ctx,const struct gf4_route *route,u32 id,
     if (!rc) rc=ms_encoder(ctx,route,false,0,GF4_OFF,dl);
     if (!rc) rc=gf4_mode_load(ctx,head,&s->work[head],dl);
     if (!rc) rc=ms_encoder(ctx,route,true,&s->work[head],GF4_ON,dl);
-    if (!rc) rc=ms_encoder(ctx,route,false,0,h->dpms,dl);
+    if (!rc) rc=ms_encoder(ctx,route,false,0,h->dpms,ctx->deadline);
     if (!rc) rc=gf4_cursor_apply(ctx,head,h->cursor_visible && h->cursor_valid && !h->blank && h->dpms==GF4_ON);
     return gf4_change_end(ctx,rc);
 }

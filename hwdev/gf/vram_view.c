@@ -18,6 +18,65 @@ static bool contains(const struct gf_vram_reservation *r, u32 off, u32 bytes)
            bytes <= r->bytes - (off - r->off);
 }
 
+static bool key_matches(const struct gf_vram_reservation *a,
+                        const struct gf_vram_reservation *b)
+{
+    return a->owner == b->owner && a->off == b->off && a->bytes == b->bytes &&
+           a->reservation_id == b->reservation_id && a->generation == b->generation;
+}
+
+static struct gf_vram_borrow **borrow_link(struct gf_vram_borrow *borrow)
+{
+    struct gf_vram_borrow **link = &registry.borrows;
+    while (*link && *link != borrow) link = &(*link)->next;
+    return link;
+}
+
+i32 gf_vram_borrow_get(struct gf2_chan *ch, struct gf_vram_borrow *borrow,
+                        const struct gf_vram_reservation *key, u32 off, u32 bytes,
+                        enum gf_vram_borrow_kind kind)
+{
+    if (!ch || !borrow || !key || !key->owner || !key->bytes || !bytes ||
+        (kind != GF_BORROW_VIEW && kind != GF_BORROW_TILE)) return GF3_EINVAL;
+    if (!registry_matches(ch)) return GF3_ESTATE;
+    if (*borrow_link(borrow)) return GF2_EEXIST;
+    struct gf_vram_reservation_node *n;
+    for (n = registry.head; n; n = n->next)
+        if (key_matches(&n->value, key)) break;
+    if (!n) return GF3_ESTATE;
+    if (!contains(&n->value, off, bytes)) return GF3_ERANGE;
+    *borrow = (struct gf_vram_borrow){
+        .key = n->value, .off = off, .bytes = bytes, .kind = kind,
+        .next = registry.borrows
+    };
+    registry.borrows = borrow;
+    return 0;
+}
+
+i32 gf_vram_borrow_put(struct gf2_chan *ch, struct gf_vram_borrow *borrow)
+{
+    if (!ch || !borrow) return GF3_EINVAL;
+    if (!registry_matches(ch)) return GF3_ESTATE;
+    struct gf_vram_borrow **link = borrow_link(borrow);
+    if (!*link) return GF3_ESTATE;
+    *link = borrow->next;
+    *borrow = (struct gf_vram_borrow){0};
+    return 0;
+}
+
+int gf_vram_borrow_overlaps(struct gf2_chan *ch, u32 off, u32 bytes,
+                            enum gf_vram_borrow_kind kind)
+{
+    if (!ch || !bytes || (kind != GF_BORROW_VIEW && kind != GF_BORROW_TILE))
+        return GF3_EINVAL;
+    if (!registry_matches(ch)) return GF3_ESTATE;
+    if (off > U32_MAX - bytes) return GF3_ERANGE;
+    for (struct gf_vram_borrow *b = registry.borrows; b; b = b->next)
+        if (b->kind == kind && off < b->off + b->bytes && b->off < off + bytes)
+            return 1;
+    return 0;
+}
+
 int gf_vram_registry_init(struct gf2_chan *ch)
 {
     if (!ch) return GF3_EINVAL;
@@ -70,6 +129,8 @@ int gf_vram_release(struct gf2_chan *ch, const struct gf_vram_reservation *key)
         if (v->owner != key->owner || v->off != key->off ||
             v->bytes != key->bytes || v->reservation_id != key->reservation_id ||
             v->generation != key->generation) continue;
+        for (struct gf_vram_borrow *b = registry.borrows; b; b = b->next)
+            if (key_matches(&b->key, v)) return GF3_EBUSY;
         *link = n->next;
         n->next = 0;
         n->value.owner = 0;
@@ -144,13 +205,21 @@ int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
     extent = ch->bar1;
     extent.base += start;
     extent.length = bytes;
-    if (ch->map_ops->map(ch->map_owner, &extent, bytes, &base)) return GF2_EMAP;
+    const struct gf_vram_borrow saved_borrow = view->borrow;
+    i32 rc = gf_vram_borrow_get(ch, &view->borrow, &n->value, off, len, GF_BORROW_VIEW);
+    if (rc) return rc;
+    if (ch->map_ops->map(ch->map_owner, &extent, bytes, &base)) {
+        gf_vram_borrow_put(ch, &view->borrow);
+        view->borrow = saved_borrow;
+        return GF2_EMAP;
+    }
     *view = (struct gf_vram_view){
         .extent = extent, .va = base + (off - start), .map_base = base,
         .map_bytes = bytes, .bytes = len, .mapped = true,
         .map_ops = ch->map_ops, .map_owner = ch->map_owner,
         .ch = ch, .next = views,
-        .close_owner = view->close_owner, .close = view->close
+        .close_owner = view->close_owner, .close = view->close,
+        .borrow = view->borrow
     };
     views = view;
     *out = view->va;
@@ -160,8 +229,12 @@ int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
 int gf_vram_view_unmap(struct gf_vram_view *view)
 {
     if (!view || !view->mapped || !view->map_ops || !view->map_ops->unmap ||
+        !registry_matches(view->ch) || !*borrow_link(&view->borrow) ||
         view->map_ops->unmap(view->map_owner, view->map_base, view->map_bytes))
         return GF2_EMAP;
+    /* Foreground only: membership checked before the lower unmap, and no
+     * registry mutation/reentry can intervene before this infallible put. */
+    gf_vram_borrow_put(view->ch, &view->borrow);
     for (struct gf_vram_view **link = &views; *link; link = &(*link)->next) {
         if (*link != view) continue;
         *link = view->next;

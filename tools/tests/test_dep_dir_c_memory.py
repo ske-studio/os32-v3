@@ -102,6 +102,11 @@ def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
     if mutation and mutation[1].endswith('.h'):
         path = work / mutation[1]
         path.write_text(replace_once(path.read_text(), mutation[2], mutation[3]))
+    # geforce_module.h (via kernel/sys.c) needs only the resident stop state.
+    for rel in ('hwdev/gf/stop_state.h',):
+        dest = work / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_root / rel, dest)
     for source in (ROOT / 'tools/tests/host_arch').glob('*.h'):
         dest = work / 'host_arch' / source.name
         dest.parent.mkdir(parents=True, exist_ok=True)

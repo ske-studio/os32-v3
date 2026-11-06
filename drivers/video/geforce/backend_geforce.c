@@ -34,6 +34,8 @@
 #include "geforce_module.h"
 #include "hwdev/gf/display/api.h"
 #include "hwdev/gf/feature5.h"
+#include "hwdev/gf/production.h"
+#include "leave_log.h"
 #include "../../../gfx/gfx_internal.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
@@ -77,7 +79,25 @@ static GfxMode display_modes[GF4_MODES];
  * attach this to the IRQ/tick path (GF_FEAT5_DESIGN final C2 addendum).
  * Nouveau c03c1a1 therm/base.c:361-370 uses work scheduling instead. */
 static struct gf5 *feature5;
-void geforce_backend_feature5_bind(struct gf5 *g) { feature5 = g; }
+static int geforce_heat_stop(void);
+static int geforce_heat_clear(void);
+static bool geforce_heat_backend_active(void);
+void geforce_backend_feature5_bind(struct gf5 *g)
+{
+    feature5 = g;
+    if (geforce_context->heat) {
+        geforce_context->heat->stop=geforce_heat_stop;
+        geforce_context->heat->clear=geforce_heat_clear;
+        if (g) g->stop=&geforce_context->heat->stop_state;
+        geforce_context->heat->backend_active=geforce_heat_backend_active;
+    }
+}
+/* Module-local forwarding avoids an additional import or retained gf5 loan. */
+void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
+{
+    if (geforce_context->heat && geforce_context->heat->request)
+        geforce_context->heat->request(reason,milli_c,source_rc);
+}
 static int feature5_poll(void)
 {
     return feature5 ? gf5_service_poll(feature5) : 0;
@@ -391,6 +411,9 @@ static void geforce_fail(void);
 static int geforce_probe(void)
 {
     int ok = !failed && device && identify_resources && identify_resources();
+#ifdef OS32_GEFORCE_MODULE
+    if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;
+#endif
     /* Reinit may drop this backend immediately after a failed probe. */
     if (!ok && active) geforce_fail();
     return ok;
@@ -424,18 +447,74 @@ static void geforce_palette_init(void)
     }
 }
 
-static int geforce_stop(void)
+static int geforce_stop_common(bool force)
 {
+    (void)force;
+    bool was_routed = routed, forced_stop = false;
 #ifdef OS32_GEFORCE_MODULE
     gf_hook_scan_bind(false, 0);
+    struct gf_display_context *video = device ? device->context : 0;
+    struct gf_io *leave_io = video ? &video->io : 0;
 #endif
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
-    if (pc98_route_to_98()) rc = -1;
+#ifdef OS32_GEFORCE_MODULE
+    if (force && rc && feature5 && feature5->ch && feature5->ch->f) {
+        forced_stop = true;
+        /* Lower reset cannot finish the display/channel ownership cleanup.
+         * Rebuild that lifetime on the next enter, even if reset succeeds. */
+        failed = 1;
+        rc=gf_foundation_stop(feature5->ch->f);
+    }
+#endif
+    /* Sample stopped GF state before route_to_98 performs the final redraw. */
+#ifdef OS32_GEFORCE_MODULE
+    geforce_leave_log(leave_io, rc);
+#endif
+    int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;
+    if (route_rc) rc = -1;
     active = routed = 0;
     if (rc) failed = 1;
     return rc;
 }
+
+static int geforce_stop(void)
+{
+    return geforce_stop_common(false);
+}
+
+#ifdef OS32_GEFORCE_MODULE
+static bool geforce_heat_backend_active(void)
+{
+    return active;
+}
+static int geforce_heat_stop(void)
+{
+    /* Same backend closure as fail, without making cooling unrecoverable. */
+    return geforce_stop_common(true);
+}
+static int geforce_heat_clear(void)
+{
+    const struct geforce_platform *p=geforce_context->platform;
+    struct gf_production *owner=p ? p->opaque : 0;
+    if (failed || !feature5 || !owner || !feature5->ch ||
+        !feature5->ch->f || feature5->ch->f->revoked ||
+        gf_production_identity(owner) || gf_production_mapped(owner))
+        return GF5_ESTATE;
+    /* Permanent BAR windows are checked before sensor setup/read. No start,
+     * admission, mode programming or routing to GF is allowed here. */
+    struct gf5_thermal sample;
+    int rc=gf5_therm_read(feature5,&sample);
+    if (rc) return rc;
+    i64 cool=((i64)feature5->fan.threshold[1]-feature5->fan.hyst[1])*1000;
+    if (!sample.calibrated || sample.milli_c>cool) return GF5_EBUSY;
+    rc=gf5_therm_monitor_restart(feature5);
+    if (rc) return rc;
+    feature5->heat.critical_paused=false;
+    feature5->heat.cool_samples=0;
+    return 0;
+}
+#endif
 
 static void geforce_fail(void)
 {

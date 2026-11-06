@@ -40,8 +40,7 @@ int ledger_surface_validate(const struct ledger_surface *sf)
                 const struct ledger_region *r = &ledger_regions[i];
                 for (i = 0; i < LEDGER_MAX_RESOURCES; i++)
                     if ((r->res_mask & (1U << i)) &&
-                        ledger_resources[i].map_first <= p &&
-                        p < ledger_resources[i].map_end) break;
+                        ledger_resource_page_mapped(i, p)) break;
                 if (i == LEDGER_MAX_RESOURCES) return 0;
             }
         }

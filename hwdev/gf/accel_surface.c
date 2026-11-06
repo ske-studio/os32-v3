@@ -6,6 +6,11 @@
 /* xf86-video-nouveau/src/nv04_exa.c:193-200: SF2D FORMAT method. */
 #define GF3_SF2D_FORMAT 0x0300U
 
+/* nouveau_exa.c:434-435; nouveau_xv.c:929-942 (linear NV4x).
+ * These are drawing contracts, independent of M2MF and scanout. */
+#define GF3_DRAW_PITCH_ALIGN 64U
+#define GF3_DRAW_BASE_ALIGN 256U
+
 static const struct gf3_format formats[] = {
     {1, 1, 1, 3, 3, 0, 0}, {2, 4, 4, 1, 1, 1, 7},
     {4, 6, 6, 3, 3, 4, 4}, {4, 10, 11, 3, 3, 4, 3},
@@ -57,7 +62,9 @@ int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s,
         (use == GF3_USE_IFC && !f.ifc) || (use == GF3_USE_SIFM_SRC && !f.sifm))
         return GF3_EFORMAT;
     if (use != GF3_USE_BYTES) {
-        if (s->pitch > U16_MAX) return GF3_ERANGE;
+        if (s->pitch > U16_MAX ||
+            (s->pitch & (GF3_DRAW_PITCH_ALIGN - 1U)) ||
+            (s->off & (GF3_DRAW_BASE_ALIGN - 1U))) return GF3_ERANGE;
         if (use == GF3_USE_SIFM_SRC) {
             if (s->width > U16_MAX || s->height > U16_MAX ||
                 r.x > (U16_MAX >> 4) || r.y > (U16_MAX >> 4)) return GF3_ERANGE;

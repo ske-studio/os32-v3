@@ -38,7 +38,7 @@ i32 gf5_rc_map(i32 rc)
     case 0: return GF5_OK;
     case GF5_EINVAL: case GF5_ENOTSUP: case GF5_EBIOS: case GF5_ERANGE:
     case GF5_EBUSY: case GF5_ETIME: case GF5_EIO: case GF5_ENOMEM:
-    case GF5_ESTATE: return rc;
+    case GF5_ESTATE: case GF5_ENODEV: return rc;
     case GF1_EINVAL: case GF2_EINVAL: case GF3_EINVAL: case GF4_EINVAL:
         return GF5_EINVAL;
     case GF1_ENOSPC: case GF2_ENOSPC: case GF4_ENOSPC: return GF5_ENOMEM;

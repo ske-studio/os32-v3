@@ -29,6 +29,8 @@ static const struct event { u32 kind, off, value; } expected[] = {
 
 static u32 event(u32 kind, u32 off)
 {
+    /* A GR latch skips all post-ACK GR reads in foreground capture. */
+    if (cursor == 14 && foundation.stats.first.graph_latched) cursor = 18;
     CHECK(cursor < EVENT_COUNT && expected[cursor].kind == kind);
     CHECK(expected[cursor].off == off);
     return expected[cursor++].value;
@@ -78,6 +80,17 @@ static void b7_fault_order(void)
 void _start(void)
 {
     b7_fault_order();
+    reset();
+    foundation.stats = (struct gf_irq_stats){.graph=1, .pgraph=0x80,
+        .nsource=0, .nstatus=0,
+        .first={.pmc=0x1000, .pgraph=0x80, .nsource=0x20, .nstatus=0x40,
+        .graph_latched=true, .gr_trap=0x111, .gr_method=0x50108,
+        .gr_data=0x12345678, .gr_class=0x62}};
+    CHECK(gf2_fault_check(&channel) == GF2_EFAULT && cursor == EVENT_COUNT);
+    CHECK(channel.fault.first.pmc == 0x1000 && !channel.fault.latest.pmc);
+    CHECK(channel.fault.first.pgraph == 0x80 && channel.fault.first.nsource == 0x20);
+    CHECK(channel.fault.gr_trap == 0x111 && channel.fault.gr_method == 0x50108);
+    CHECK(channel.fault.gr_data == 0x12345678 && channel.fault.gr_class == 0x62);
     reset(); foundation.stats.entries = 3; foundation.stats.vblank[0] = 4;
     CHECK(gf2_fault_check(&channel) == GF2_OK && !cursor && !channel.fault.latched);
     CHECK(channel.seen.vblank[0] == 4);

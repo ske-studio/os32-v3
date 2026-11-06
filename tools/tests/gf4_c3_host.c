@@ -37,6 +37,7 @@ void geforce_backend_stop_bind(int (*stop)(void)) { (void)stop; }
 int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *b,
                          int (*r)(void *),void *o) { (void)b;(void)r;(void)o;p->prepared=true;return 0; }
 int gf_production_identity(struct gf_production *p) { (void)p;return -1; }
+int gf_production_mapped(struct gf_production *p) { (void)p; __builtin_trap(); }
 int gf_production_decode_safe(struct gf_production *p) { (void)p;return -1; }
 int gf_production_quiesce(struct gf_production *p) { (void)p;return -1; }
 int gf_production_point(void *p) { (void)p;return -1; }

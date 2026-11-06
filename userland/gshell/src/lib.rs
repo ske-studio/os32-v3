@@ -222,23 +222,7 @@ fn run_standalone(st: &mut wm::GuiState) -> i32 {
         return 0;
     }
 
-    /* Display faults and the debug ESC finish at this existing CUI boundary.
-     * A display fault closes children via SessionAction before reaching here. */
-    cursor::hide(st);
-    st.inited = false;
-    font::close_all();
-    unsafe {
-        let a = os32api::api();
-        /* FEP の描画先を TVRAM 版へ戻す (レビュー #4 ①)。gshell が抜けると同じ
-         * 同じシェル帯に shell.bin が載るので、GFX 版の関数表を残すとカーネル FEP が
-         * 上書き済みコードへ間接 call する。gfx_shutdown より前に行う。 */
-        (a.ime_set_render)(core::ptr::null_mut());
-        (a.gfx_shutdown)();
-        (a.tvram_clear)();
-        gserial::cui_done(st);
-        (a.rshell_set_active)(1);
-        (a.sys_switch_shell)(CUI_SHELL.as_ptr());
-    }
+    switch_cui(st);
     0
 }
 
@@ -667,7 +651,8 @@ fn drain_launch_requests(st: &mut wm::GuiState) -> bool {
     did
 }
 
-/// CUI へ戻す (契約 S6 の 1〜6)。cfg 更新に失敗したら**切替を実行せず**
+/// CUI へ戻す (契約 S6 の 1〜6)。表示故障・熱停止 (quit) は永続化しない。
+/// cfg 更新に失敗したら**切替を実行せず**
 /// デスクトップへ戻し、エラーを表示する (永続設定と実 shell の不一致を作らない)。
 fn switch_cui(st: &mut wm::GuiState) -> bool {
     cursor::hide(st);
@@ -678,7 +663,7 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         (a.ime_set_render)(core::ptr::null_mut());
         (a.gfx_shutdown)();
     }
-    if !cfg_set_gui(b"0") {
+    if !st.quit && !cfg_set_gui(b"0") {
         /* 失敗: GFX を戻してデスクトップへ復帰し、action は捨てる。 */
         gfx::init();
         wm::read_screen_info(st);

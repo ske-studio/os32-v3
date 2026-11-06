@@ -28,6 +28,9 @@
  * of DRM BOs. No reservation, window or dispatch table is copied/released. */
 #include "api.h"
 #include "../internal.h"
+#include "../accel_service.h"
+#include "../production.h"
+#include "timeout.h"
 /* PM integrates i64 into types.h; no 64-bit division. */
 typedef long long i64;
 
@@ -72,13 +75,13 @@ static i32 save_check(struct gf4_ctx *c)
     if (!c->ready || c->epoch!=c->ch->epoch) return GF4_ESTATE;
     return c->changing ? GF4_EBUSY : 0;
 }
-static i32 save_time(struct gf4_ctx *c,u32 dl)
+static i32 save_time(struct gf4_ctx *c,u32 dl,u32 head,const char *stage)
 {
     struct gf_io *io=&c->ch->f->io;
     u32 now;
     if (!io->timing.clock_us) return GF4_EINVAL;
     i32 rc=io->timing.clock_us(io->opaque,&now);
-    return rc ? rc : (i32)(now-dl)>=0 ? GF4_ETIME : 0;
+    return rc ? rc : (i32)(now-dl)>=0 ? gf4_timeout(stage,head,dl,now,0,0) : 0;
 }
 static i32 save_write(struct gf4_ctx *c,u8 h,u32 off,u32 width,u32 value)
 {
@@ -122,7 +125,7 @@ static i32 save_close(struct gf4_ctx *c,u32 dl)
     c->accepting=false;
     i32 rc=c->links->admission(c->links->owner,false);
     struct gf2_fence fence;
-    if (!rc) rc=save_time(c,dl);
+    if (!rc) rc=save_time(c,dl,GF4_HEADS,"restore_drain_deadline");
     if (!rc) rc=gf2_fence_emit(c->ch,&fence,dl);
     if (!rc) rc=gf2_fence_wait(c->ch,fence,dl);
     if (!rc) rc=gf_vram_views_close(c->ch);
@@ -214,9 +217,10 @@ static i32 save_dpms(struct gf4_ctx *c,u8 h,const struct gf4_head_image *v,u32 d
                           ((v->blank || v->dpms!=GF4_ON) ? SAVE_SCREEN_OFF : 0));
     if (!rc) rc=save_index_read(c,h,SAVE_CR,SAVE_MODE,&mode);
     if (!rc) rc=io->timing.clock_us(io->opaque,&now);
-    if (!rc && ((i32)(now-dl)>=0 || dl-now<SAVE_SETTLE_US)) rc=GF4_ETIME;
+    if (!rc && ((i32)(now-dl)>=0 || dl-now<SAVE_SETTLE_US))
+        rc=gf4_timeout("restore_dpms_budget",h,dl,now,0,SAVE_SETTLE_US);
     if (!rc) rc=io->timing.wait_us(io->opaque,SAVE_SETTLE_US);
-    if (!rc) rc=save_time(c,dl);
+    if (!rc) rc=save_time(c,dl,h,"restore_dpms_deadline");
     if (!rc) rc=save_index(c,h,SAVE_CR,SAVE_MODE,
                           (mode&~SAVE_MODE_ON)|(v->dpms==GF4_OFF ? 0 : SAVE_MODE_ON));
     if (!rc) rc=save_index(c,h,SAVE_SR,SAVE_RESET,SAVE_RESET_END);
@@ -312,7 +316,7 @@ i32 gf4_display_restore_stage(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl
         struct gf4_head_image *v=&c->state->next[h];
         if (!v->enabled) continue;
         *stage="mode_deadline";
-        rc=save_time(c,dl);
+        rc=save_time(c,dl,h,"restore_mode_deadline");
         /* The saved route can differ from the currently selected route.
          * crtc.c:710-733 / dfp.c:245-278: prepare the target encoder too;
          * on retry it may already be on after a partial earlier restore. */
@@ -326,6 +330,9 @@ i32 gf4_display_restore_stage(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl
             case GF4_TV: *stage="tv_load"; rc=gf4_tv_load(c,&v->route,&c->state->work[h],dl); break;
             default: rc=GF4_EUNSUPPORTED; break;
             }
+            /* TMDS starts a new MMIO budget after its opcode-timed ROM
+             * script. DPMS and the next head must use that same deadline. */
+            if (!rc) dl=c->deadline;
         }
         if (!rc) { *stage="lut_load"; rc=gf4_lut_load(c,h); }
         if (!rc) { *stage="dpms"; rc=save_dpms(c,h,v,dl); }
@@ -401,4 +408,43 @@ i32 gf4_display_saved_release(struct gf4_ctx *c,const struct gf4_saved *s)
     if (c->diagnostic_saved!=s) return save_result(c,GF4_ESTATE);
     c->diagnostic_saved=NULL;
     return save_result(c,0);
+}
+
+/* MIT nouveau c03c1a1 dispnv04/disp.c:189-207 destroys the display image
+ * after stopping display use, even when restoring it failed. OS32's fallible
+ * releases keep their resident nodes and pending flag until a later retry. */
+i32 gf4_diagnostic_abandon(struct gf4_ctx *c,const struct gf4_saved *s)
+{
+    if (!c || !s || !c->ch || !c->legacy || !c->state) return GF4_EINVAL;
+    /* A released image is no longer borrowed or dereferenced. Only pending
+     * cleanup may continue without a diagnostic pointer; a completed or stale
+     * request must not release another session's reservations. */
+    if (c->diagnostic_saved!=s &&
+        (c->diagnostic_saved || !c->cleanup_pending)) return GF4_ESTATE;
+    if (c->legacy->engaged || c->ch->state!=GF2_OFF || c->ready)
+        return GF4_EBUSY;
+    if (c->changing) return GF4_EBUSY;
+    struct gf3_service *service=gf3_service_get(c->ch);
+    if (!service || !service->production ||
+        &service->production->display!=c->legacy ||
+        &service->production->chan!=c->ch) return GF4_ESTATE;
+    struct gf5 *g=&service->production->feature5;
+    if (g->busy || g->image || g->phase==GF5_SAVING ||
+        g->phase==GF5_SAVED || g->phase==GF5_RESTORING) return GF4_EBUSY;
+    i32 original=c->last_rc;
+    c->cleanup_pending=true;
+    i32 rc=gf5_tiles_retire(g);
+    if (!rc && c->diagnostic_saved) rc=gf4_display_saved_release(c,s);
+    if (!rc) {
+        c->saved_closed=false;
+        rc=gf4_scan_release_all(c,c->deadline);
+    }
+    if (!rc) {
+        gf4_service_cleanup_reset(c);
+        c->cleanup_pending=false;
+    }
+    /* Cleanup status is the return value; never overwrite the restore cause
+     * with saved_release's success or a subsequent release failure. */
+    c->last_rc=original;
+    return rc;
 }

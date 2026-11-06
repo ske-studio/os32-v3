@@ -44,7 +44,8 @@ enum gf5_host_op {
     F5_ADMIT,F5_DRAIN,F5_PAUSE,F5_RESUME,F5_STOP,F5_RESTART,F5_SAVE,F5_RESTORE,
     F5_SCRIPT,F5_ALLOC,F5_FREE,F5_COPY,F5_NEXT,F5_MATCH,F5_CLOCK64,
     F5_GPIO_FIND,F5_GPIO_GET,F5_GPIO_SET,F5_PERF,F5_VOLT,F5_FAN,F5_CALC,
-    F5_PROG,F5_RAM,F5_POINT,F5_CLEANUP,F5_OP_COUNT
+    F5_PROG,F5_RAM,F5_POINT,F5_CLEANUP,
+    F5_PLAN_CHECK,F5_PLAN_INVALIDATE,F5_VOLT_CHECK,F5_FAN_CHECK,F5_HEAT,F5_OP_COUNT
 };
 /* a[0] distinguishes same-family stub operations; remaining a[] and p[]
  * follow the public signature (ctx first). For CALC: p[1]=request,p[2]=out;
@@ -61,6 +62,7 @@ struct gf5_host_event {
 struct gf5_host {
     struct gf4_host display;
     struct gf5 ctx; u64 now;
+    struct gf5_stop_state stop;
     struct gf5_host_event *events;
     u32 cevents,nevents,calls[F5_OP_COUNT],fail_at[F5_OP_COUNT];
     i32 fail_rc[F5_OP_COUNT];
@@ -102,6 +104,34 @@ static inline struct gf5_host *gf5_host_context(struct gf5 *g)
 static inline struct gf5_host *gf5_host_owner(void *owner)
 {
     return gf5_host_context(owner);
+}
+/* Guard-wave observation API. Reuse the existing indexed MMIO and boundary
+ * counters, so failed attempts count too. Trace clear resets these counters,
+ * but leaves clock, guard, generation and injection unchanged. */
+struct gf5_host_activity { u32 reads, writes, pauses, resumes; };
+static inline struct gf5_host_activity gf5_host_activity(struct gf5_host *h)
+{
+    assert(h);
+    return (struct gf5_host_activity){h->display.calls[D_READ],
+        h->display.calls[D_WRITE],h->calls[F5_PAUSE],h->calls[F5_RESUME]};
+}
+/* Explicit unit-test seed only, never called by init or the calc stub.
+ * request/canonical are values, not a substitute implementation of solve. */
+static inline void gf5_host_plan_seed(struct gf5_host *h,
+    const struct gf5_clock *request,const struct gf5_plan *canonical,
+    u32 epoch,u32 rom_generation)
+{
+    assert(h && request && canonical);
+    h->ctx.rom_generation=rom_generation;
+    h->ctx.plan_guard=(struct gf5_plan_guard){.request=*request,
+        .canonical=*canonical,.epoch=epoch,.rom_generation=rom_generation,
+        .valid=true};
+}
+/* Absolute microseconds shared with F4 clock/waits. Tests may jump past a
+ * deadline; no sampling, catch-up, or product state changes occur here. */
+static inline void gf5_host_time_set(struct gf5_host *h,u64 now)
+{
+    assert(h); h->now=now;
 }
 /* Script I/O borrows the F4 indexed MMIO and full shared clock. These
  * callbacks use its opaque unchanged, so read/write/timing remain usable.
@@ -370,7 +400,7 @@ static inline void gf5_host_init(struct gf5_host *h,struct gf4_state *state)
 {
     assert(h && state); gf2_host_memset(h,0,sizeof(*h));
     gf4_host_init(&h->display,state); h->display.now=&h->now;
-    gf5_host_current=h;
+    gf5_host_current=h; h->ctx.stop=&h->stop;
     h->ctx.ch=&h->display.base.ch; h->ctx.accel=&h->display.base.ctx;
     h->ctx.display=&h->display.ctx; h->ctx.phase=GF5_RUN; h->ctx.accepting=true;
     h->ctx.links=(struct gf5_links){
@@ -383,6 +413,52 @@ static inline void gf5_host_init(struct gf5_host *h,struct gf4_state *state)
     };
 }
 
+/* New guard boundaries follow the existing UNIT split. UNIT1 owns real
+ * clock/guard code; UNIT7 links the production assembly. All other stubs
+ * expose arguments/rc to observe and fail_at without validating plans. */
+#if GF5_HOST_UNIT != 1 && GF5_HOST_UNIT != 7 && !defined(GF5_HOST_REAL_CLOCK)
+i32 gf5_plan_check(struct gf5 *g,const struct gf5_plan *plan,bool ram)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_PLAN_CHECK);
+    e->p[0]=g; e->p[1]=plan; e->a[0]=ram;
+    return gf5_host_end(h,e);
+}
+void gf5_plan_invalidate(struct gf5 *g)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_PLAN_INVALIDATE);
+    e->p[0]=g; e->rc=0;
+    g->plan_guard.valid=false;
+    (void)gf5_host_end(h,e);
+}
+#endif
+#if GF5_HOST_UNIT == 0 || GF5_HOST_UNIT == 6
+i32 gf5_volt_check_id(struct gf5 *g,u8 id,u8 min_id)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_VOLT_CHECK);
+    e->p[0]=g; e->a[0]=id; e->a[1]=min_id;
+    return gf5_host_end(h,e);
+}
+i32 gf5_fan_check_cstate(struct gf5 *g,u8 percent)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_FAN_CHECK);
+    e->p[0]=g; e->a[0]=percent;
+    return gf5_host_end(h,e);
+}
+#endif
+#if GF5_HOST_UNIT == 3
+i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_HEAT);
+    e->p[0]=g; e->p[1]=sample; e->a[0]=(u32)now; e->a[1]=(u32)(now>>32);
+    return gf5_host_end(h,e);
+}
+#endif
+
 /* Only dependency definitions below vary with UNIT. UNIT7 exports none. */
 #if GF5_HOST_UNIT <= 6 || GF5_HOST_UNIT == 8
 /* Boundary classification for isolated B/ROM tests; UNIT9 links the real
@@ -392,7 +468,7 @@ i32 gf5_rc_map(i32 rc)
     switch (rc) {
     case 0: case GF5_EINVAL: case GF5_ENOTSUP: case GF5_EBIOS:
     case GF5_ERANGE: case GF5_EBUSY: case GF5_ETIME: case GF5_EIO:
-    case GF5_ENOMEM: case GF5_ESTATE: return rc;
+    case GF5_ENOMEM: case GF5_ESTATE: case GF5_ENODEV: return rc;
     case GF1_EINVAL: case GF2_EINVAL: case GF3_EINVAL: case GF4_EINVAL: return GF5_EINVAL;
     case GF1_ENOSPC: case GF2_ENOSPC: case GF4_ENOSPC: return GF5_ENOMEM;
     case GF3_ERANGE: case GF4_ERANGE: return GF5_ERANGE;
@@ -404,14 +480,14 @@ i32 gf5_rc_map(i32 rc)
     }
 }
 #endif
-#if GF5_HOST_UNIT == 5 || GF5_HOST_UNIT == 6
+#if (GF5_HOST_UNIT == 5 || GF5_HOST_UNIT == 6) && !defined(GF5_HOST_REAL_VRAM)
 int gf_vram_match(struct gf2_chan *ch,const void *owner,u32 id,u32 generation,
                   u32 off,u32 bytes,struct gf_vram_reservation *out)
 {
     return gf5_host_match(gf5_host_current,ch,owner,id,generation,off,bytes,out);
 }
 #endif
-#if GF5_HOST_UNIT == 6
+#if GF5_HOST_UNIT == 6 && !defined(GF5_HOST_REAL_VRAM)
 int gf_vram_next(struct gf2_chan *ch,u32 *cursor,struct gf_vram_reservation *out)
 {
     return gf5_host_next(gf5_host_current,ch,cursor,out);
@@ -441,6 +517,7 @@ i32 gf5_gpio_set(struct gf5 *g,u8 line,const u8 log[2],bool value)
 }
 #endif
 #if GF5_HOST_UNIT == 0 || GF5_HOST_UNIT == 6
+#ifndef GF5_HOST_REAL_CLOCK
 i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *clock,struct gf5_plan *out)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -461,6 +538,7 @@ i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *plan)
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG); e->p[0]=g; e->p[1]=plan;
     return gf5_host_end(h,e);
 }
+#endif /* GF5_HOST_REAL_CLOCK: link clock.c for state/readback integration. */
 i32 gf5_ram_prog(struct gf5 *g,const struct gf5_plan *plan)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -554,6 +632,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     e->p[0]=g; e->a[0]=F5_CALL_SELECT; e->a[1]=index;
     return gf5_host_end(h,e);
 }
+#ifndef GF5_HOST_REAL_TILE
 i32 gf5_tile_find(struct gf5 *g,u32 *slot)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -566,6 +645,15 @@ i32 gf5_tile_set(struct gf5 *g,u32 slot,const struct gf5_tile *tile)
     struct gf5_host *h=gf5_host_context(g);
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG);
     e->p[0]=g; e->p[1]=tile; e->a[0]=F5_CALL_SET; e->a[1]=slot;
+    /* UNIT6 models a successful tile boundary, including its value state.
+     * H3's REAL_TILE fixture links tile.c and retains real loan nodes. */
+    if (!e->rc) {
+        g->tile[slot]=*tile; g->tile_live[slot]=true;
+        g->tile_slot[slot].state=GF_TILE_OWNED;
+        g->tile_slot[slot].raw_addr=tile->base|1U;
+        g->tile_slot[slot].raw_limit=tile->base+tile->bytes-1U;
+        g->tile_slot[slot].raw_pitch=tile->pitch;
+    }
     return gf5_host_end(h,e);
 }
 i32 gf5_tile_clear(struct gf5 *g,u32 slot)
@@ -573,8 +661,11 @@ i32 gf5_tile_clear(struct gf5 *g,u32 slot)
     struct gf5_host *h=gf5_host_context(g);
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG);
     e->p[0]=g; e->a[0]=F5_CALL_SET; e->a[1]=slot;
+    if (!e->rc) { g->tile_slot[slot]=(struct gf5_tile_slot){0};
+        g->tile_live[slot]=false; g->tile[slot]=(struct gf5_tile){0}; }
     return gf5_host_end(h,e);
 }
+#endif /* GF5_HOST_REAL_TILE */
 #endif
 #if GF5_HOST_UNIT == 9
 /* Real links calls these F2/F4 boundaries. No F5 adapter or rc_map stub. */

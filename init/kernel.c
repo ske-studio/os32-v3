@@ -406,6 +406,7 @@ static inline void kernel_shell_loop(void)
                     tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
             }
 
+            if (!is_gui) geforce_heat_notice();
             boot_diag_exec(cur_shell, 0, 0, 0);
             /* CUI の初期表示・profile の後、プロンプトの前に理由を出す。 */
             rc = exec_run(kcg_unavailable

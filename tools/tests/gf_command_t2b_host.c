@@ -2,6 +2,7 @@
  * No channel implementation is linked: acceptance must reject bad replies. */
 #include "gf_command_runtime_host.h"
 #include "../../include/io.h"
+#include "../../hwdev/gf/display/data.h"
 #define _irq_enabled() 1
 #ifndef GF2_T2B_SOURCE
 #define GF2_T2B_SOURCE "../../kdebug/gf_command_test.c"
@@ -11,7 +12,7 @@
 static struct gf_foundation device;
 static struct recover trial;
 static struct gf2_test_reply saved;
-static u32 now_us, last_clock, reference_calls, recover_calls;
+static u32 now_us, last_clock, reference_calls, recover_calls, start_calls;
 static bool stalled, no_wrap, same_epoch, no_fault, changed_display, deadline_wrapped;
 static char serial[32768];
 static unsigned serial_used;
@@ -109,6 +110,11 @@ static int fake_command(struct gf_foundation *f, const struct gf2_test_request *
     int rc = GF2_OK;
     switch (q->op) {
     case GF2T_START:
+        /* F4 service_start refuses an already ready service. */
+        if (saved.state != GF2_OFF) { rc = GF4_ESTATE; break; }
+        start_calls++;
+        saved.epoch++;
+        saved.reference = saved.seq;
         saved.state = GF2_RUN;
         break;
     case GF2T_REFERENCE:
@@ -124,6 +130,11 @@ static int fake_command(struct gf_foundation *f, const struct gf2_test_request *
         saved.state = GF2_OFF;
         break;
     case GF2T_RECOVER:
+        /* F4 service_recover requires a ready RUN/FAULT channel. */
+        if (saved.state != GF2_RUN && saved.state != GF2_FAULT) {
+            rc = GF4_ESTATE;
+            break;
+        }
         recover_calls++;
         if (!same_epoch) saved.epoch++;
         saved.state = GF2_RUN;
@@ -145,16 +156,17 @@ static int fake_command(struct gf_foundation *f, const struct gf2_test_request *
     return rc;
 }
 static const struct gf2_test_ops commands = {.call = fake_command};
-static const struct gf1_test_ops foundations = {.call = fake_heads, .command = &commands};
+static struct gf1_test_ops foundations = {.call = fake_heads, .command = &commands};
 const struct gf1_test_ops *geforce_foundation_ops(void) { return &foundations; }
 static int fake_row(void *opaque, u32 y, u8 *row)
 {
     assert(opaque == &device && y < GF_MODE_HEIGHT);
-    gf2_host_memset(row, changed_display && recover_calls ? 1 : 0, GF_MODE_WIDTH);
+    gf2_host_memset(row, changed_display && (start_calls || recover_calls) ? 1 : 0, GF_MODE_WIDTH);
     return 0;
 }
 static void reset(void)
 {
+    foundations.production = NULL;
     device = (struct gf_foundation){0};
     device.io.opaque = &device;
     device.io.timing.clock_us = fake_clock;
@@ -165,7 +177,7 @@ static void reset(void)
     trial.token.session = 19;
     saved = (struct gf2_test_reply){.state = GF2_RUN, .epoch = 41};
     now_us = 100;
-    last_clock = reference_calls = recover_calls = 0;
+    last_clock = reference_calls = recover_calls = start_calls = 0;
     stalled = no_wrap = same_epoch = no_fault = changed_display = deadline_wrapped = false;
     serial_used = 0;
     serial[0] = 0;
@@ -178,7 +190,7 @@ static int request(u32 test)
 {
     struct gf2_request q = {sizeof(q), test, 0, 0};
     int rc = gf_command_test(&q, &device, fake_row, &device);
-    assert(q.rc == rc && q.session == trial.token.session);
+    assert(q.rc == rc && q.session == (foundations.production == &device ? 0U : trial.token.session));
     return rc;
 }
 static void t2b_reference_count(void)
@@ -211,6 +223,9 @@ static void t2b_fault_recover(void)
 {
     const u32 cases[] = {GF2_BAD_HANDLE, GF2_BAD_METHOD};
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        reset(); foundations.production = &device;
+        assert(request(cases[i]) == GF2_EINVAL);
+        assert(!recover_calls && !reference_calls);
         reset();
         assert(request(cases[i]) == GF2_OK);
         assert(recover_calls == 1 && reference_calls == 100000U && saved.epoch == 42);
@@ -221,9 +236,22 @@ static void t2b_fault_recover(void)
 }
 static void t2b_display_changed(void)
 {
-    reset();
-    assert(request(GF2_CYCLE) == GF2_OK);
-    assert(reference_calls == 200000U && device.wanted_heads == 3U);
+    /* Cover both an entered/running service and a stopped service. */
+    const u32 states[] = {GF2_RUN, GF2_OFF};
+    for (unsigned production = 0; production < 2; production++) {
+        for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); i++) {
+            reset();
+            if (production) foundations.production = &device;
+            saved.state = states[i];
+            assert(request(GF2_CYCLE) == GF2_OK);
+            assert(reference_calls == 200000U && device.wanted_heads == 3U);
+            assert(start_calls == (states[i] == GF2_OFF ? 2U : 1U));
+            assert(!recover_calls && saved.state == GF2_RUN);
+            assert(saved.epoch == 41U + start_calls);
+            assert(gf2_host_strstr(serial, "GF2 phase=restart "));
+            assert(gf2_host_strstr(serial, "GF2 phase=display "));
+        }
+    }
     reset();changed_display = true;
     assert(request(GF2_CYCLE) == GF2_EIO);
     assert(gf2_host_strstr(serial, "GF2 phase=display "));
@@ -232,8 +260,17 @@ static void t2b_deadline_wrap(void)
 {
     /* observe() reads the clock before command_call(). Start half a timeout
      * before wrap so both reads precede it and the command deadline crosses it. */
-    reset();now_us = 0U - GF2_TIMEOUT_US / 2U;
+    reset();saved.state = GF2_OFF;now_us = 0U - GF2_TIMEOUT_US / 2U;
     assert(request(GF2_START) == GF2_OK && deadline_wrapped);
+}
+static void t2b_lifecycle_rejections(void)
+{
+    reset();foundations.production = &device;
+    assert(request(GF2_START) == GF4_ESTATE && !start_calls);
+    assert(request(GF2_STOP) == GF2_OK && saved.state == GF2_OFF);
+    assert(request(GF2_RECOVER) == GF4_ESTATE && !recover_calls);
+    assert(saved.state == GF2_OFF && saved.epoch == 41);
+    assert(request(GF2_START) == GF2_OK && start_calls == 1 && saved.epoch == 42);
 }
 static void t2b_fault_subchannel(void)
 {
@@ -290,6 +327,6 @@ void _start(void)
     t2b_reference_count();t2b_reference_stalled();t2b_wrap_required();
     t2b_recover_epoch();t2b_fault_recover();t2b_display_changed();
     t2b_deadline_wrap();t2b_fault_subchannel();t2b_accel_dispatch();
-    t2b_display_dispatch();
+    t2b_display_dispatch();t2b_lifecycle_rejections();
     gf2_host_exit(0);
 }

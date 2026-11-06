@@ -307,6 +307,27 @@
       "source": "kdebug/gf5_test.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "index": 44,
+      "symbol": "geforce_resource_lookup",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "group": "kernel"
+    },
+    {
+      "index": 45,
+      "symbol": "paging_device_map",
+      "source": "mm/paging.h",
+      "kind": "FUNC",
+      "group": "kernel"
+    },
+    {
+      "index": 46,
+      "symbol": "paging_device_unmap",
+      "source": "mm/paging.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

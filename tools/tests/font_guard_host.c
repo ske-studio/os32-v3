@@ -6,6 +6,7 @@
 #include "font_guard.h"
 #include "appslot.h"
 void x87_save(X87State *p) { (void)p; }
+void geforce_foreground_poll(void) {}
 #include "exec.h"
 #include "io.h"
 #include "pgalloc.h"

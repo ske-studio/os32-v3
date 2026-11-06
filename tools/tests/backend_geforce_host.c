@@ -66,9 +66,23 @@ static struct gf2_chan log_chan;
 static struct gf4_ctx log_ctx;
 static struct gf4_test_ops log_ops;
 static const struct gf4_test_ops *log_dispatch;
+#ifndef GF_F0S_HOST
+/* Ownerless HAL fixture: thermal callbacks have no production lifetime. */
+int gf_foundation_stop(struct gf_foundation *f)
+{ (void)f; __builtin_trap(); }
+i32 gf5_therm_monitor_restart(struct gf5 *g)
+{ (void)g; __builtin_trap(); }
+#endif
 static GfxBackend module_backend;
 static int module_height, module_flip, module_page;
+#ifdef GF_F0S_HOST
+static struct geforce_heat_bridge test_heat;
+static struct geforce_platform test_platform;
+#endif
 static const GeforceModuleContext module_context = {
+#ifdef GF_F0S_HOST
+    .heat=&test_heat, .platform=&test_platform,
+#endif
     .display_out=&log_dispatch, .backend=&module_backend, .height=&module_height,
     .flip=&module_flip, .page=&module_page
 };
@@ -124,6 +138,18 @@ static int start_logs(struct video_device *d)
             /* Compose the independent expected line with the fixture formatter. */
             char actual[sizeof(startlog)];
             for (unsigned j = 0; j < sizeof(startlog); j++) actual[j] = startlog[j];
+#ifdef OS32_GEFORCE_MODULE
+            /* Keep the start failure assertion exact while checking the added
+             * stop diagnostic independently. This fixture has no MMIO bus. */
+            unsigned end = 0;
+            while (actual[end] && actual[end] != '\n') end++;
+            if (!actual[end]) return 24;
+            unsigned diag = end + 1;
+            const char *prefix = "GF4 STATE stage=leave98 stop_rc=0 read_rc=-408 valid=00000000 ";
+            for (unsigned j = 0; prefix[j]; j++)
+                if (actual[diag + j] != prefix[j]) return 25;
+            actual[diag] = 0;
+#endif
             startlog_clear();
             kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s", fail_step == FAIL_WC ? -1 : 1, stages[i]);
 #ifdef OS32_GEFORCE_MODULE
@@ -174,7 +200,7 @@ static int run(void)
     if (n!=12 || events[4]!=5 || events[5]!=6 || events[6]!=1 || events[9]!=4 || events[10]!=5 || events[11]!=6) return 5;
     n=0; fail_step=3;
     if (geforce_foundation_display(true)!=GF1_EIO) return 9;
-    if (n!=5 || events[2]!=3 || events[3]!=5 || events[4]!=6 || gfx_backend_geforce.probe()) return 6;
+    if (n!=4 || events[2]!=3 || events[3]!=5 || gfx_backend_geforce.probe()) return 6;
     return start_logs(&d);
 }
 void _start(void) { int rc=run(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

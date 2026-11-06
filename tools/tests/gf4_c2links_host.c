@@ -134,6 +134,33 @@ static void init(void)
         .generation=host.ctx.test.value.generation};
     assert(!gf3_service_surfaces(service,&state.head[0].front,&test));
 }
+/* Consume the real reference packets emitted into the fixture's ring. */
+static u32 diagnostic_push[GF2_PUSH_WORDS];
+static void diagnostic_consume(struct gf4_host *h,const struct gf4_host_event *e)
+{
+    if (e->op!=D_WRITE || e->rc || e->a[1]!=GF2_USER_BASE+GF2_USER_PUT) return;
+    u32 end=(e->a[3]-production.chan.B)/sizeof(u32);
+    for (u32 i=production.chan.put;i<end;i+=2U) {
+        assert(diagnostic_push[i]==((1U<<18)|GF2_REFERENCE_METHOD));
+        gf3_host_set(&h->base,0,GF2_USER_BASE+GF2_USER_REFERENCE,diagnostic_push[i+1]);
+    }
+}
+static void test_diagnostic_management(void)
+{
+    production.chan.va=diagnostic_push;
+    production.chan.cur=production.chan.put=GF2_PUSH_SKIPS;
+    production.chan.max=GF2_PUSH_WORDS-2U;
+    production.chan.free=production.chan.max-production.chan.cur;
+    host.observe=diagnostic_consume;
+    assert(!links->admission(&host.ctx,true));
+    assert(!normal_slot->display_save(&host.ctx,&diagnostic,LINKS_TEST_DL));
+    assert(!normal_slot && management_slot && host.ctx.diagnostic_saved==&diagnostic);
+    /* A failed restore also leaves its management entry available for retry. */
+    gf4_host_trace_clear(&host);
+    gf4_host_fail_at(&host,D_WRITE,1,GF2_EIO);
+    assert(management_slot->restore(&host.ctx,&diagnostic,LINKS_TEST_DL)==GF2_EIO);
+    assert(!normal_slot && management_slot && host.ctx.diagnostic_saved==&diagnostic);
+}
 static void test_getters(void)
 {
     struct gf4_i2c_port out={0},sentinel={0};
@@ -168,8 +195,8 @@ static void test_admission(void)
     gf4_host_trace_clear(&host);
     assert(!links->admission(&host.ctx,true));
     assert(host.ctx.accepting && normal_slot && management_slot && accel_slot);
-    assert(normal_slot->ctx==&host.ctx && normal_slot->display_save==gf4_diagnostic_save);
-    assert(management_slot->ctx==&host.ctx && management_slot->restore==gf4_diagnostic_restore);
+    assert(normal_slot->ctx==&host.ctx && normal_slot->display_save);
+    assert(management_slot->ctx==&host.ctx && management_slot->restore);
     assert(management_slot->saved_release==gf4_display_saved_release);
     assert(accel_slot->ctx==&production.accel && accel_slot->test_surface==&service->test);
     same(&service->scan,&state.head[0].front);
@@ -317,5 +344,5 @@ static void test_gpio(void)
 }
 void _start(void)
 {
-    init(); test_getters(); test_admission(); test_gpio(); gf2_host_exit(0);
+    init(); test_getters(); test_admission(); test_gpio(); test_diagnostic_management(); gf2_host_exit(0);
 }

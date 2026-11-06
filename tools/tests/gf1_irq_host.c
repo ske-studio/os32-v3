@@ -25,6 +25,7 @@ struct reg { u32 off, value, sticky; };
 static struct reg regs[] = {
     {0x100,0,0}, {0x140,0,0}, {0x2100,0,0}, {0x2140,0,0},
     {0x400100,0,0}, {0x40013c,0,0}, {0x400104,0,0}, {0x400108,0,0},
+    {0x400160,0,0}, {0x40032c,0,0}, {0x400704,0,0}, {0x400708,0,0}, {0x400174,0,0},
     {0x600100,0,0}, {0x600140,0,0}, {0x602100,0,0}, {0x602140,0,0},
     {0x8100,0,0}, {0x8140,0,0}, {0x9100,0,0}, {0x9140,0,0},
     {0x1100,0,0}, {0x1140,0,0}, {0xb100,0,0}, {0xb140,0,0}
@@ -82,7 +83,12 @@ static int write_mmio(void *arg, u32 bar, u32 off, u32 width, u32 value)
         r->value &= ~value;
         r->value |= r->sticky;
         if (off == 0x2100) ack_fifo = value;
-        if (off == 0x400100) ack_graph = value;
+        if (off == 0x400100) {
+            ack_graph = value;
+            /* Trap registers may change after W1C; the saved trap must not. */
+            reg_at(0x40032c)->value = reg_at(0x400704)->value = 0;
+            reg_at(0x400708)->value = reg_at(0x400174)->value = 0;
+        }
         if (off == 0x600100) ack_head[0] = value;
         if (off == 0x602100) ack_head[1] = value;
     } else r->value = value;
@@ -177,6 +183,10 @@ static void dispatch(void)
     reg_at(0x2100)->value = 0x15; reg_at(0x2140)->value = 5;
     reg_at(0x400100)->value = 0x80;
     reg_at(0x400108)->value = 0x123; reg_at(0x400104)->value = 0x456;
+    reg_at(0x40032c)->value = 0x12345;
+    reg_at(0x400704)->value = 0x50104;
+    reg_at(0x400708)->value = 0xcafef00d;
+    reg_at(0x400174)->value = 0xdead004a;
     CHECK(irq() == IRQ_HANDLED);
     CHECK(f.stats.fifo == 1 && f.stats.graph == 1 && f.stats.pfifo == 5 && ack_fifo == 5);
     CHECK(reg_at(0x2100)->value == 0x10 && ack_graph == 0x80);
@@ -186,6 +196,24 @@ static void dispatch(void)
     aggregate_hidden = true; reg_at(0x400100)->value = 0x20;
     poll(); CHECK(!reg_at(0x2100)->value && !reg_at(0x400100)->value);
     CHECK(reg_at(0x2140)->value == ~0U && f.stats.graph == 2);
+    /* A clean poll must not erase the first fault before F2 observes it. */
+    poll();
+    CHECK(!f.stats.pfifo && !f.stats.pgraph);
+    CHECK(f.stats.first.pfifo == 5 && f.stats.first.pgraph == 0x80);
+    CHECK(f.stats.first.nsource == 0x123 && f.stats.first.nstatus == 0x456);
+    CHECK(f.stats.first.gr_trap == 0x12345 && f.stats.first.gr_method == 0x50104);
+    CHECK(f.stats.first.gr_data == 0xcafef00d && f.stats.first.gr_class == 0x4a);
+    CHECK(f.stats.first.pmc == 0x1100);
+    enable(true, true, 3); /* changing heads does not begin a new period */
+    CHECK(f.stats.first.pfifo == 5 && f.stats.first.pgraph == 0x80);
+    enable(false, false, 3); enable(true, true, 1);
+    CHECK(!f.stats.first.fifo_latched && !f.stats.first.graph_latched);
+    aggregate_hidden = false;
+    reg_at(0x2100)->value = 2; reg_at(0x400100)->value = 0x10;
+    reg_at(0x400704)->value = 0x50108; reg_at(0x400708)->value = 0xfeed;
+    CHECK(irq() == IRQ_HANDLED);
+    CHECK(f.stats.first.pfifo == 2 && f.stats.first.pgraph == 0x10);
+    CHECK(f.stats.first.gr_method == 0x50108 && f.stats.first.gr_data == 0xfeed);
     fault_off = 0x400108; poll(); CHECK(f.last_rc == GF1_EIO && !reg_at(0x140)->value);
 }
 static void vblank(void)

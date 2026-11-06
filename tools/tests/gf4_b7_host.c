@@ -47,6 +47,8 @@ void _start(void)
     ++h.irq.vblank[0];
     assert(gf4_flip_complete(&h.ctx,0,DEADLINE+500)==0);
     assert(!h.ctx.hold[0].pending && state.head[0].front.off==NEW_OFF);
+    assert(!h.ctx.hold[0].old_front.off && !h.ctx.hold[0].new_front.off &&
+           !h.ctx.hold[0].base_written && !h.ctx.hold[0].base_verified);
     reset();
     gf4_host_write_applied_error(&h,1,-77);
     assert(gf4_flip(&h.ctx,0,&next,false,DEADLINE)==-77);

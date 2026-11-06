@@ -1,6 +1,6 @@
 """P3 calc versus base source, executed rows versus C plan, real service faults."""
 CHECK = dict(name='gf-display-host', tier=1,
-    covers=['tools/tests/gf4_scanlog_host.c', 'tools/tests/gf4_startlog_service.h', 'tools/tests/gf4_scanlog_service.h', 'tools/tests/gf_startlog_host.h', 'tools/tests/gf_accel_unbound_stubs.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/gfinit_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'include/memmap.h', 'kdebug/gfinit_exec.c', 'kdebug/gfinit_exec.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/gfinit_bus.c', 'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/kprintf.h', 'tools/tests/gfinit_resources_ra266.h', 'hwdev/owner.h', 'kdebug/gfinit.c', 'kdebug/gfinit.h', 'kdebug/gfinit_plan.h', 'kdebug/kpeek.h', 'mm/pgalloc.h', 'mm/paging.h', 'mm/physmem.h', 'lib/kstring.h', 'arch/x86/kernel/idt.h', 'kernel/module/module.h', 'drivers/char/serial.h', 'include/bootinfo.h', 'include/sys.h', 'kdebug/generated/kdebug_import_macros.h', 'kdebug/generated/kdebug_imports.h', 'tools/tests/gfinit_owner_host.c', 'tools/tests/test_gfinit_owner.py', 'include/hwdev_private.h', 'kdebug/gfinit_wire.h', 'userland/shell/cmd_gfinit.c', 'userland/shell/shell.h', 'userland/shell/cmd_sys.c', 'build/programs.mk', 'tools/tests/gfinit_output_host.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'hwdev/hwdev_imports.def', 'kdebug/gfinit_plan.c', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_profile.c', 'tools/run_host_group.py', 'tools/tests/gfinit_romfile_host.c', 'tools/gfinit_rom_decode.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'kdebug/gfinit_mode.c', 'kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h', 'kdebug/recover_gf_c.h', 'hwdev/gfinit_mode.h', 'tools/tests/test_gfinit_plan_c.py', 'tools/tests/gfinit_plan_c_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_budget.py', 'tools/tests/gfinit_budget_host.c', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'tools/tests/test_gf_runner.py', 'tools/tests/gf_runner_host.c', 'hwdev/gf/internal.h', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/op/*.c', 'include/video_service.h', 'hwdev/gf/scripts.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/display/state.h', 'hwdev/gf/quiesce_rows.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/service.c', 'tools/tests/gf_display_host.c', 'tools/tests/gf_display_palette_host.c', 'tools/tests/gf_display_blank_host.c', 'tools/tests/gf_display_modes_host.c', 'include/gf_production.h', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/kernel_includes.py', 'tools/tests/gf4_*_host.c', 'tools/tests/gf4_display_fake.h', 'tools/tests/gf4_startlog_service.h', 'tools/tests/gf4_scanlog_service.h', 'tools/tests/gf_accel*.[ch]', 'tools/tests/gf_command_runtime_host.h', 'drivers/video/geforce/*.c', 'drivers/video/geforce/*.h', 'build/geforce-module.mk', 'build/hwdev.mk', 'build/kernel.mk', 'include/gfx_format.h', 'include/gfx_hal.h', 'kdebug/gf_display_test.c', 'kdebug/gf_display_test.h', 'kdebug/gf_command_wire.h', 'tools/module_schema.py', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_runtime_host.c', 'tools/tests/module_image_host.c', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'kernel/module/module_schema.h', 'fs/vfs.c', 'drivers/base/dev.c', 'hwdev/gf/*.c', 'hwdev/gf/*.h', 'hwdev/gf/rom.inc', 'tools/tests/gf4_platform_host.c', 'platform/pc98/boot_names.c', 'tools/prototypes/geforce_imports.def', 'tools/rshell_hwb.py'],
+    covers=['tools/tests/gf_guard_fake.h', 'tools/tests/host_arch/arch_io.h', 'fs/fd_redirect.h', 'include/redir_access.h','tools/tests/gf4_scanlog_host.c', 'tools/tests/gf4_startlog_service.h', 'tools/tests/gf4_scanlog_service.h', 'tools/tests/gf_startlog_host.h', 'tools/tests/gf_accel_unbound_stubs.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/gfinit_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'include/memmap.h', 'kdebug/gfinit_exec.c', 'kdebug/gfinit_exec.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/gfinit_bus.c', 'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/kprintf.h', 'tools/tests/gfinit_resources_ra266.h', 'hwdev/owner.h', 'kdebug/gfinit.c', 'kdebug/gfinit.h', 'kdebug/gfinit_plan.h', 'kdebug/kpeek.h', 'mm/pgalloc.h', 'mm/paging.h', 'mm/physmem.h', 'lib/kstring.h', 'arch/x86/kernel/idt.h', 'kernel/module/module.h', 'drivers/char/serial.h', 'include/bootinfo.h', 'include/sys.h', 'kdebug/generated/kdebug_import_macros.h', 'kdebug/generated/kdebug_imports.h', 'tools/tests/gfinit_owner_host.c', 'tools/tests/test_gfinit_owner.py', 'include/hwdev_private.h', 'kdebug/gfinit_wire.h', 'userland/shell/cmd_gfinit.c', 'userland/shell/shell.h', 'userland/shell/cmd_sys.c', 'build/programs.mk', 'tools/tests/gfinit_output_host.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'hwdev/hwdev_imports.def', 'kdebug/gfinit_plan.c', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_profile.c', 'tools/run_host_group.py', 'tools/tests/gfinit_romfile_host.c', 'tools/gfinit_rom_decode.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'kdebug/gfinit_mode.c', 'kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h', 'kdebug/recover_gf_c.h', 'hwdev/gfinit_mode.h', 'tools/tests/test_gfinit_plan_c.py', 'tools/tests/gfinit_plan_c_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_budget.py', 'tools/tests/gfinit_budget_host.c', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'tools/tests/test_gf_runner.py', 'tools/tests/gf_runner_host.c', 'hwdev/gf/internal.h', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/op/*.c', 'include/video_service.h', 'hwdev/gf/scripts.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/display/state.h', 'hwdev/gf/quiesce_rows.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/service.c', 'tools/tests/gf_display_host.c', 'tools/tests/gf_display_palette_host.c', 'tools/tests/gf_display_blank_host.c', 'tools/tests/gf_display_modes_host.c', 'include/gf_production.h', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/kernel_includes.py', 'tools/tests/gf4_*_host.c', 'tools/tests/gf4_display_fake.h', 'tools/tests/gf4_startlog_service.h', 'tools/tests/gf4_scanlog_service.h', 'tools/tests/gf_accel*.[ch]', 'tools/tests/gf_command_runtime_host.h', 'drivers/video/geforce/*.c', 'drivers/video/geforce/*.h', 'build/geforce-module.mk', 'build/hwdev.mk', 'build/kernel.mk', 'include/gfx_format.h', 'include/gfx_hal.h', 'kdebug/gf_display_test.c', 'kdebug/gf_display_test.h', 'kdebug/gf_command_wire.h', 'tools/module_schema.py', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_runtime_host.c', 'tools/tests/module_image_host.c', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'kernel/module/module_schema.h', 'fs/vfs.c', 'drivers/base/dev.c', 'hwdev/gf/*.c', 'hwdev/gf/*.h', 'hwdev/gf/rom.inc', 'tools/tests/gf4_platform_host.c', 'platform/pc98/boot_names.c', 'tools/prototypes/geforce_imports.def', 'tools/rshell_hwb.py'],
     needs=['make:build/out/geforce/geforce_imports.h'], budget=90.0)
 
 from pathlib import Path
@@ -141,6 +141,8 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/display/quiesce.c', '            c->target=target;\n            c->last_rc=stop_rc ? stop_rc : -1;',
+         '            c->last_rc=stop_rc ? stop_rc : -1;', 'lower stop target survives scan restore'),
         ('hwdev/gf/display/quiesce.c', 'if (c->engaged && !revoked) {', 'if (c->engaged && revoked) {', 'failed stop cleanup forbidden'),
         ('hwdev/gf/service.c', ' || c->owner->foundation_start(c)', '', 'start hook omitted'),
         ('hwdev/gf/display/quiesce.c', 'int stopped=c->owner->foundation_stop(c);', 'int stopped=0;', 'stop hook omitted'),
@@ -180,7 +182,40 @@ def run(ctx) -> int:
 
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
-GF4_MUTATIONS = [('a3',
+GF4_MUTATIONS = [
+ ('c2stop', 'off-stop-hardware-idempotent', 'hwdev/gf/display/service.c',
+  'if (c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
+  'if (false && c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
+  'completed OFF stop performs no hardware writes'),
+ ('c2svc', 'off-stop-software-cleanup', 'hwdev/gf/display/service.c',
+  'gf4_service_cleanup_reset(c); /* End the management loan without MMIO. */',
+  '(void)c;', 'repeated OFF stop clears only its management loan'),
+ ('c2links', 'diagnostic-management-return', 'hwdev/gf/display/links.c',
+  '*geforce_context->display_restore_out=&restore_ops;\n}',
+  '*geforce_context->display_restore_out=0;\n}', 'save/failed restore management retry'),
+ ('a3', 'leave-after-restore-error', 'kdebug/gf_display_test.c',
+  '        gfx_shutdown();\n        i32 cleanup_rc = display_cui_cleanup();',
+  '        if (!rc) gfx_shutdown();\n        i32 cleanup_rc = display_cui_cleanup();', 'failed begin then leave routes back'),
+ ('c2svc', 'feature5-start-admission', 'hwdev/gf/display/service.c',
+  's->production->feature5.accepting=true;',
+  's->production->feature5.accepting=false;', 'normal display start opens F5'),
+ ('a3', 'cui-core-entry', 'kdebug/gf_display_test.c',
+  '            gfx_init();', '            gfx_backend_geforce.enter();',
+  'cui_controls: cold core must bind CLIENT before backend enter'),
+ ('a3', 'cui-stale-owner', 'kdebug/gf_display_test.c',
+  'if (display_cui_owner && !display_session.valid &&\n            (!m || !m->ctx || !m->ctx->cleanup_pending) &&\n            (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;',
+  'if (false && m) display_cui_owner = 0;', 'cui_controls'),
+ ('a3', 'cui-enter', 'kdebug/gf_display_test.c',
+  'display_cui_owner = res_owner_get();', 'display_cui_owner = 0;', 'cui_controls'),
+ ('a3', 'cui-leave', 'kdebug/gf_display_test.c',
+  'return display_cui(session == GF4_CUI_ENTER);', 'return display_cui(true);', 'cui_controls'),
+ ('a3', 'cui-owner-exit', 'kdebug/gf_display_test.c',
+  'if (!display_cui_owner || display_cui_owner != id) return;', 'if (id) return;', 'cui_controls'),
+ ('a3', 'admit-record', 'kdebug/gf_display_test.c',
+  'display_failure("display_admit", rc);', 'display_failure("wrong", rc);', 'cui_controls'),
+ ('a3', 'begin-record', 'kdebug/gf_display_test.c',
+  'display_failure("display_begin", rc);', 'display_failure("wrong", rc);', 'cui_controls'),
+('a3',
   'session-reserved',
   'kdebug/gf_display_test.c',
   '(wire & ~DISPLAY_SESSION_MASK) ||',
@@ -762,6 +797,12 @@ GF4_MUTATIONS = [('a3',
   '((u32)(u16)px<<16)|(u16)py',
   'gf4_b6_host.c:positions'),
  ('b6',
+  'gf4-cursor-pm-input',
+  'hwdev/gf/display/cursor.c',
+  '(pixel&0xffU)>alpha) return GF4_EFORMAT;',
+  '(pixel&0xffU)>alpha) return cursor_position(s->x,s->y,im->hot_x,im->hot_y,pos);',
+  'gf4_b6_host.c:pm_rejections'),
+ ('b6',
   'gf4-cursor-alpha',
   'hwdev/gf/display/cursor.c',
   'alpha>0 && alpha<255',
@@ -1010,9 +1051,9 @@ GF4_MUTATIONS = [('a3',
  ('c2linit',
   'script_wait_budget_eio',
   'hwdev/gf/runner.c',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;',
-  'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+  'if (us > GF_INIT_WAIT_MAX - (ctx->opcode_timing ? 0 : ctx->wait_us)) {\n'
   '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_EIO;',
   'tools/tests/gf4_c2linit_host.c:c2_deadlines'),
  ('c2linit',
@@ -1565,6 +1606,18 @@ GF4_MUTATIONS = [('a3',
   'return (gf4_service_stop(c->display4,now+GF3_TIMEOUT_US),0);',
   'normal_clock_dispatch'),
  ('b12',
+  'IRQ保護',
+  'hwdev/gf/display/heads.c',
+  'unsigned saved = irq_save();',
+  'unsigned saved = irq_save(); irq_restore(saved);',
+  'IRQ callback observes IF clear'),
+ ('b12',
+  'IRQ復元',
+  'hwdev/gf/display/heads.c',
+  '    irq_restore(saved);',
+  '    (void)saved;',
+  'caller IF restored on success and failure'),
+ ('b12',
   'fifo保持',
   'hwdev/gf/display/heads.c',
   'f->wanted_fifo != 0',
@@ -1616,6 +1669,9 @@ GF4_MUTATIONS = [('a3',
 # C2-save must observe the real C0 failure cleanup, including failures
 # after shared clock/index state has already changed.
 GF4_MUTATIONS += [
+    ('a3', 'explicit-heat-clear', 'kdebug/gf_display_test.c',
+     'else if ((rc=geforce_heat_latch_clear())!=0)',
+     'else if ((rc=0)!=0)', 'explicit enter preserves a hot latch'),
     ('c2save', 'restore-gate-cleanup', 'hwdev/gf/display/modeset.c',
      'if (rc && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
      'if (false && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
@@ -1624,6 +1680,25 @@ GF4_MUTATIONS += [
      'if (!cleanup) { l.at="owner_restore"; cleanup=ms_write(&l,MS_CR+1U,1,owner); }',
      'if (false && !cleanup) { l.at="owner_restore"; cleanup=ms_write(&l,MS_CR+1U,1,owner); }',
      'restore_failure_tail: CR44 owner restoration'),
+]
+
+GF4_MUTATIONS += [
+    ('a3', 'fragment-budget', 'kdebug/gf_display_test.c',
+     'i32 rc = display_transfer_deadline(a->ctx, &dl);',
+     'i32 rc = 0;', 'operation_budgets: upload starts after earlier work'),
+    ('c2svc', 'stopped-cursor-hide', 'hwdev/gf/display/service.c',
+     'rc=gf4_cursor_apply(c,h,false);',
+     'rc=running ? gf4_cursor_apply(c,h,false) : 0;',
+     'test_stopped_cursor: F2 OFF must still hide the hardware cursor'),
+]
+
+GF4_MUTATIONS += [
+    ('b7', 'completed-hold-clear', 'hwdev/gf/display/flip.c',
+     'c->hold[head] = (struct gf4_flip_hold){0};',
+     'c->hold[head].pending = false;', 'completed hold must contain no stale surface keys'),
+    ('c2scan', 'restored-spare-bank', 'hwdev/gf/display/scan.c',
+     'active=bank;', 'active=c->scan_bank[head];',
+     'restored_after_flip: discard diagnostic bank, preserve saved boot front'),
 ]
 
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
@@ -1641,10 +1716,10 @@ GF4_COMPONENTS = {
     'b7': ['hwdev/gf/display/flip.c'],
     'b8': ['hwdev/gf/display/gamma.c'],
     'b9': ['hwdev/gf/display/output.c'],
-    'b10': ['hwdev/gf/display/tmds.c'],
+    'b10': ['hwdev/gf/display/tmds.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b11d': ['drivers/video/geforce/tv_data.c'],
     'b11m': ['hwdev/gf/display/tv.c'],
-    'b12': ['hwdev/gf/display/heads.c'],
+    'b12': [],
     'd0': ['hwdev/gf/display/dcb.c'],
     'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c'],
     'c0log': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
@@ -1653,6 +1728,12 @@ GF4_COMPONENTS = {
 }
 # Start-line observations execute the real video entry and lifecycle.
 GF4_MUTATIONS += [
+    ('c0', 'rollback-old-deadline', 'hwdev/gf/display/transaction.c',
+     'int rc=gf4_stage_deadline(c,c->ch->f,&c->deadline);', 'int rc=0;',
+     'rollback gets a new budget after a timed-out mode load'),
+    ('c2save', 'restore-tmds-deadline', 'hwdev/gf/display/save.c',
+     'if (!rc) dl=c->deadline;', '(void)dl;',
+     'two TMDS heads restore with the post-script deadline'),
     ('c2log', 'start-line-prefix', 'hwdev/gf/display/service.c',
      '[gf4] start fail stage=%s rc=%d', '[gfX] start fail stage=%s rc=%d',
      'exactly one correctly formatted failure line'),
@@ -1747,12 +1828,12 @@ GF4_MUTATIONS += [
      'return 0; /* F5 alarms never fail foreground rendering. */',
      'return rc; /* F5 alarms never fail foreground rendering. */', 'fan failure must not fail present'),
     ('scanlog', 'clock-failure-present', 'hwdev/gf/feature5_service.c',
-     'return 0; /* clock failure is confined to the F5 worker. */',
-     'return g->last_rc; /* clock failure is confined to the F5 worker. */', 'clock failure must not fail present'),
+     'goto complete; /* clock failure is confined to the F5 worker. */',
+     'if (g->source_rc) { g->busy=false; return g->last_rc; } goto complete; /* clock failure is confined to the F5 worker. */', 'clock failure must not fail present'),
     ('scanlog', 'fan-off-once', 'hwdev/gf/therm.c',
      'if (!g->fan_off)\n        kprintf', 'if (true)\n        kprintf', 'fanless logs exactly once even on first poll'),
     ('scanlog', 'clock-off-once', 'hwdev/gf/feature5_service.c',
-     'g->phase!=GF5_RUN || g->poll_off', 'g->phase!=GF5_RUN', 'clock logs once'),
+     'if (g->busy || !thermal_live(g)) return 0;', 'if (g->busy || g->last_rc || !thermal_live(g)) return 0;', 'clock retries after a temporary failure'),
     ('scanlog', 'scan-log-start', 'drivers/video/geforce/backend_geforce.c',
      'SCAN_START, 4, &start', 'SCAN_START, 4, &config', 'scanlog_present'),
     ('scanlog', 'scan-log-pitch', 'drivers/video/geforce/backend_geforce.c',
@@ -1763,8 +1844,80 @@ GF4_MUTATIONS += [
      'present_bytes += (u32)w * (u32)h;', 'present_bytes += 0;', 'upload bytes'),
 ]
 
+# H2: guard acceptance A8/A9/A10. Each replacement compiles and must fail
+# at runtime; source trees are private and restored after every mutant.
+GF4_MUTATIONS += [
+    ('c2svc','guard-engaged','hwdev/gf/display/save.c',
+     'c->legacy->engaged || c->ch->state!=GF2_OFF || c->ready',
+     'c->ch->state!=GF2_OFF || c->ready','test_terminal_guard quiesce failure'),
+    ('c2svc','guard-release-node','hwdev/gf/display/scan.c',
+     'rc=scan_drop(c,&c->test);',
+     'rc=scan_drop(c,&c->test); if (rc) c->test.value=(struct gf_vram_reservation){0};',
+     'test_terminal_guard retained test key after release failure'),
+    ('c2svc','guard-enter-pending','hwdev/gf/display/service.c',
+     'if (c->cleanup_pending)\n        return svc_start_failure',
+     'if (false)\n        return svc_start_failure','guard_pending reenter refusal'),
+    ('c2svc','guard-abandon-pointer','hwdev/gf/display/save.c',
+     'if (c->diagnostic_saved!=s &&', 'if (false &&',
+     'test_terminal_guard stale pointer refusal'),
+    ('c2svc','guard-restore-cause','hwdev/gf/display/save.c',
+     'c->last_rc=original;\n    return rc;', 'c->last_rc=original ? 0 : original;\n    return rc;',
+     'test_terminal_guard original restore rc'),
+    ('c2svc','guard-retire-stop','hwdev/gf/display/service.c',
+     'rc=gf5_tiles_retire(g);', 'rc=0;',
+     'test_stop_guard tile retirement failure and retry'),
+    ('a3','guard-abandon-owner','kdebug/gf_display_test.c',
+     'if (rc) return rc;\n    } else {\n        const struct gf4_test_ops *o',
+     'if (rc) rc=0;\n    } else {\n        const struct gf4_test_ops *o',
+     'cui_controls failed abandon retains owner/session'),
+    ('a3','guard-stopped-restore','kdebug/gf_display_test.c',
+     'if (m && m->ctx && !m->ctx->ready && m->ctx->cleanup_pending) return 0;',
+     'if (false && m && m->ctx && !m->ctx->ready && m->ctx->cleanup_pending) return 0;',
+     'cui_controls retries only terminal cleanup'),
+]
+
+GF4_MUTATIONS += [
+    ('scanlog', 'leave-after-redraw', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, rc);\n#endif\n    int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;',
+     'int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;\n    geforce_leave_log(leave_io, rc);\n#endif',
+     '98 route starts only after diagnostic completes'),
+    ('c2linkb', 'script-timeout-line', 'hwdev/gf/display/links.c',
+     'if (run==GF_SCRIPT_ETIME) {', 'if (run==GF_SCRIPT_ETIME && false) {', 'ROM script timeout evidence'),
+    ('scanlog', 'leave-readback-call', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, rc);', 'if (rc) geforce_leave_log(leave_io, rc);', 'leave emits after stop success'),
+    ('diag', 'timeout-head', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,0U,(i32)(dl-now)', 'timeout source head'),
+    ('diag', 'leave-pvideo-offset', 'drivers/video/geforce/leave_log.h',
+     '0x8704U,0x8140U,0x8920U', '0x8704U,0x8140U,0x8924U', 'independent PVIDEO values'),
+    ('c0log', 'timeout-remaining', 'hwdev/gf/display/timeout.h',
+     'stage,head,(i32)(dl-now)', 'stage,head,0', 'remaining budget is original rejecting sample'),
+]
+
+GF4_MUTATIONS += [
+    ('c2linit', 'opcode-renewal-omitted', 'hwdev/gf/runner.c',
+     'if (ctx->opcode_timing &&\n            ctx->io.timing.clock_us',
+     'if (false && ctx->opcode_timing &&\n            ctx->io.timing.clock_us', 'many TIME instructions have independent budgets'),
+    ('c2linkb', 'acquisition-charged-to-script', 'hwdev/gf/display/links.c',
+     'rc=acquired ? -1 : 0;',
+     'rc=acquired ? -1 : links_script_deadline(io,dl,route->head,"script_after_acquire");',
+     'slow ROM loan must not expire opcode'),
+    ('b10', 'post-script-old-deadline', 'hwdev/gf/display/tmds.c',
+     'if (!rc) ctx->deadline=dl=now+GF2_TIMEOUT_US;',
+     'if (!rc) ctx->deadline=dl;', 'post-script MMIO has independent budget'),
+    ('c2stop', 'nonengaged-stop-target-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (!rc && !first_rc) target=c->target;',
+     'if (!rc) target=c->target;', 'completed stop retry retains lower target after successful restoration'),
+    ('c2stop', 'lower-stop-error-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (stopped) first_rc=stop_rc ? stop_rc : -1;',
+     'if (stopped) first_rc=0;', 'revoked stop error survives later scan restore error'),
+    ('c2stop', 'scan-origin-not-restored', 'hwdev/gf/display/quiesce.c',
+     'if (c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'if (false && c->baseline_valid) for (u32 h=0;h<2U;h++) {',
+     'both scan origins restored even after lower-stop failure'),
+]
+
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
-                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'c3', 'c2linit', 'c2log', 'scanlog')
+                 'c2scan', 'c2links', 'c2linkb', 'c2save', 'diag', 'c3', 'c2linit', 'c2log', 'scanlog')
 
 
 def gf4_tree(tree):
@@ -1793,12 +1946,12 @@ def gf4_sources(tree, case, fixture=None):
         return ['kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c',
                 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
                 *[str(p.relative_to(tree)) for p in sorted((tree/'hwdev/gf/op').glob('*.c'))]]
-    if case == 'c2save':
+    if case in ('c2save', 'diag'):
         names = ('save', 'modes', 'output', 'cursor', 'gamma', 'heads', 'pll_program',
                  'tmds', 'tv', 'modeset', 'transaction', 'timing', 'format', 'fifo',
                  'dpms', 'flip', 'palette')
         return ['hwdev/gf/display/'+n+'.c' for n in names]+[
-            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c']
+            'kdebug/gfinit_pll.c', 'hwdev/gf_load_state.c']+([] if case=='diag' else ['tools/tests/gf4_modeload_print_host.c'])
     display = sorted((tree/'hwdev/gf/display').glob('*.c'))
     sources = [str(p.relative_to(tree)) for p in display]
     sources += ['tools/tests/gf4_platform_host.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_decode.c',
@@ -1856,15 +2009,19 @@ def gf4_case(tree, case, directory):
              '-I'+str(ROOT/'build/out/geforce')]
     if case in GF4_LIFECYCLE or case in ('b5', 'c0', 'c0log'):
         flags += ['-DGF_PRODUCTION_MODULE', '-DGF4_REAL_DISPLAY']
+    if case == 'c2svc':
+        flags += ['-DGF4_GUARD_LIFETIME']
     if case in ('c2scan', 'c2links', 'c2linkb'):
         flags += ['-DOS32_GEFORCE_MODULE']
+    if case == 'c2links' or case in GF4_LIFECYCLE:
+        flags[1:1] = ['-I'+str(tree/'tools/tests/host_arch')]
     sources = gf4_sources(tree, case)
     objects = []
     if case == 'c3':
         # Preserve C3's ABI table probes while linking C1's real metadata hook.
         obj = directory/'c3_backend.o'
         aliases = ['geforce_backend_ops', 'geforce_backend_bind',
-                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind']
+                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind', 'geforce_heat_stop_request']
         subprocess.run([*flags, '-DOS32_GEFORCE_MODULE',
                         *['-D'+name+'=c3_real_'+name for name in aliases],
                         '-c', str(tree/'drivers/video/geforce/backend_geforce.c'),

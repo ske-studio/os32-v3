@@ -46,6 +46,61 @@ static void reset_scans(void)
 {
     for (int i = 0; i < 2; i++) scan_total[i] = scan_interval[i] = scan_max[i] = 0;
 }
+/* GF lifetime design §2 / A1,A2: synthetic DISPLAY, BAR2, push and two
+ * separate views. Use real M1 registration and real PTEs; M2/production
+ * adapter transactions belong to H1/H4 and are not simulated here. */
+static void device_windows(void)
+{
+    const u32 first = MEM_MMIO_TOP_PT_BASE / PAGE_SIZE + 128;
+    const u32 end = first + 32;
+    const u32 offsets[] = {0, 4, 8, 16, 24};
+    struct ledger_resource rec = {
+        .decode_first = first, .decode_end = end,
+        .map_first = first, .map_end = first + 2,
+        .bus = LEDGER_BUS_PCI, .width_basis = LEDGER_WB_SIZING
+    };
+    u32 rid;
+    CHECK(ledger_resource_add(&rec, &rid));
+    struct ledger_span span = {first, end, LEDGER_SPAN_MMIO, rid};
+    CHECK(ledger_reserve_set(LEDGER_OWNER_GFX, &span, 1));
+    CHECK(paging_master_audit(exec_tramp_page_addr()) > 0); /* static missing */
+    for (u32 i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
+        u32 p = first + offsets[i], map_slot = LEDGER_MAX_DEVICE_MAPS;
+        unsigned int flags = irq_save();
+        if (i) CHECK(!ledger_device_map_prepare(LEDGER_OWNER_GFX, rid, p, p + 2, 0, &map_slot));
+        CHECK(!paging_map_phys(p * PAGE_SIZE, p * PAGE_SIZE, 2, PAGE_RW | PTE_PCD));
+        if (i) {
+            struct ledger_device_map m = {LEDGER_OWNER_GFX, rid, p, p + 2};
+            ledger_device_map_commit(map_slot, &m);
+        }
+        irq_restore(flags);
+        CHECK(!paging_master_audit(exec_tramp_page_addr()));
+    }
+    for (u32 p = first; p < end; p++) {
+        /* Expected membership comes from the explicit windows, independently
+         * of the product's ledger_resource_page_mapped query. */
+        int mapped = 0;
+        for (u32 i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++)
+            if (p == first + offsets[i] || p == first + offsets[i] + 1) mapped = 1;
+        u32 *entry = &page_tables[p / PTE_COUNT][p % PTE_COUNT], saved = *entry;
+        if (!mapped) {
+            CHECK(!(saved & PTE_PRESENT));
+            *entry = p * PAGE_SIZE | PAGE_RW | PTE_PCD;
+            CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        } else {
+            const u32 corrupt[] = {PTE_PRESENT, PTE_RW, PTE_USER, PTE_PCD, PTE_PWT, PAGE_SIZE};
+            for (u32 i = 0; i < sizeof(corrupt) / sizeof(corrupt[0]); i++) {
+                *entry = saved ^ corrupt[i];
+                CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+            }
+            *entry = saved | PTE_ACCESSED | PTE_DIRTY;
+            CHECK(!paging_master_audit(exec_tramp_page_addr()));
+        }
+        *entry = saved;
+        CHECK(!paging_master_audit(exec_tramp_page_addr()));
+    }
+    SAY("PASS exact static/dynamic device windows: holes/NP/USER/RW/cache/frame; A/D allowed");
+}
 static void run(void) __attribute__((used));
 static void run(void)
 {
@@ -79,6 +134,7 @@ static void run(void)
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
     CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
+    device_windows();
     u32 *pt = page_tables[TVRAM_CHAR_BASE >> 22];
     /* SQLite may land in low SLACK or in the high physical pool. Both boot
      * audits must expect NP and detect a guard silently made present. */

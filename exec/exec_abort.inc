@@ -3,6 +3,18 @@
 
 /* HW_BASIC_DESIGN §3/F: IRQ1 sets this only for the CUI shell. */
 static volatile u32 g_hwb_abort_pending = 0;
+/* CUI shell STOP does not kill the shell. Defer display return until the
+ * syscall has finished or reached a public wait; IRQ/device code only records. */
+static volatile u32 g_cui_display_abort_pending;
+static void exec_cui_display_abort(void)
+{
+    if (!g_cui_display_abort_pending || kctx_irq_depth || kctx_exc_depth) return;
+    unsigned int display_flags = irq_save();
+    u32 pending = g_cui_display_abort_pending;
+    g_cui_display_abort_pending = 0;
+    irq_restore(display_flags);
+    if (pending) appslot_gfx_owner_exit(APP_ID_SHELL);
+}
 
 u32 exec_hwb_abort_take(void)
 {
@@ -54,6 +66,7 @@ void ring3_abort_request(void)
 {
     if (!con_sink_is_enabled() && appslot_cur() == APP_ID_SHELL) {
         g_hwb_abort_pending = 1;
+        g_cui_display_abort_pending = 1;
         return;
     }
 
@@ -87,6 +100,7 @@ void exec_addrspace_abort(struct addrspace *as)
  * A gui=0 nested child cannot hand STOP to the WM at syscall exit. */
 int ring3_wait_pending(void)
 {
+    exec_cui_display_abort();
     AppSlot *a = appslot_get(appslot_cur());
     if (!ring3_call_from_user() || !a) return 0;
     return a->abort_req || (a->gui && a->cpl3 && appslot_stop_pending());

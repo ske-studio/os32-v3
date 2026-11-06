@@ -48,6 +48,8 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,
     hal_copies++;prod_event(0xc0f1);return 0;
 }
 void geforce_display_failed(void) { CHECK(!hal_route); }
+/* The leave diagnostic is tested by gf4_scanlog_host; this harness only needs the return order. */
+static void geforce_leave_log(struct gf_io *io,int stop_rc) { (void)io;(void)stop_rc; }
 #include "geforce_return.inc"
 /* Run the real boot adapter before module prepare. The paging double records
  * the full BAR1 tail; test_geforce exercises these calls with real PTs. */

@@ -103,6 +103,7 @@ i32 gf4_tmds_script_select(const u8 *rom,u32 size,
 #include "api.h"
 #include "../accel_service.h"
 #include "../production.h"
+#include "timeout.h"
 #include "../../../drivers/video/geforce/geforce_module.h"
 
 static struct gf4_links display_links;
@@ -122,6 +123,26 @@ static int links_last_rc(struct gf4_ctx *c)
 static i32 links_restore_last_rc(struct gf4_ctx *c)
 {
     return links_last_rc(c);
+}
+/* X2: calls close both slots while working. Republish only the management
+ * loan at the diagnostic boundary, including failures needing a retry. */
+static void links_diagnostic_publish(struct gf4_ctx *c)
+{
+    if (c && geforce_context && geforce_context->display_restore_out &&
+        (c->ready || c->diagnostic_saved))
+        *geforce_context->display_restore_out=&restore_ops;
+}
+static i32 links_diagnostic_save(struct gf4_ctx *c,struct gf4_saved *out,u32 dl)
+{
+    i32 rc=gf4_diagnostic_save(c,out,dl);
+    links_diagnostic_publish(c);
+    return rc;
+}
+static i32 links_diagnostic_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
+{
+    i32 rc=gf4_diagnostic_restore(c,s,dl);
+    links_diagnostic_publish(c);
+    return rc;
 }
 static i32 links_i2c_port(void *owner,u8 bus,struct gf4_i2c_port *out)
 {
@@ -173,11 +194,11 @@ static i32 links_admission(void *owner,bool open)
         .dpms_set=gf4_dpms_set,.cursor_image=gf4_cursor_image,
         .cursor_move=gf4_cursor_move,.cursor_show=gf4_cursor_show,
         .vblank_wait=gf4_vblank_wait,.gamma=gf4_gamma,
-        .display_save=gf4_diagnostic_save,.palette_set=gf4_palette_set,
+        .display_save=links_diagnostic_save,.palette_set=gf4_palette_set,
         .scan_prepare=gf4_scan_prepare,.scan_discard=gf4_scan_discard
     };
-    restore_ops=(struct gf4_restore_ops){c,gf4_diagnostic_restore,links_restore_last_rc,
-                                          gf4_display_saved_release};
+    restore_ops=(struct gf4_restore_ops){c,links_diagnostic_restore,links_restore_last_rc,
+                                          gf4_display_saved_release,0};
     /* No waits or failing HW operations in this foreground publication
      * interval. F3 validates loans before it publishes its resident ops. */
     rc=gf3_service_admission(s,true);
@@ -247,11 +268,11 @@ static i32 links_tv_gpio(void *owner,bool on,u32 dl)
  * save only SEL_CLK binding bits. B10 owns bind and CR44 owner restoration;
  * its script-before/khz>165000 policy is the approved nouveau difference. */
 enum { LINKS_SEL_CLK=0x680524U, LINKS_BINDING=0x50000U };
-static i32 links_script_deadline(struct gf_io *io,u32 dl)
+static i32 links_script_deadline(struct gf_io *io,u32 dl,u8 head,const char *stage)
 {
     u32 now;
     if (io->timing.clock_us(io->opaque,&now)) return -1;
-    return (i32)(now-dl)>=0 ? GF4_ETIME : 0;
+    return (i32)(now-dl)>=0 ? gf4_timeout(stage,head,dl,now,0,0) : 0;
 }
 static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u32 dl)
 {
@@ -262,12 +283,17 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
         !l->owner->acquire || !l->owner->release || !l->io.read ||
         !l->io.write || !l->io.restore || !l->io.timing.clock_us) return links_result(c,GF4_EINVAL);
     struct gf_io *io=&l->io;
-    i32 rc=links_script_deadline(io,dl);
+    i32 rc=links_script_deadline(io,dl,route->head,"script_before_acquire");
     if (rc) return links_result(c,rc);
     /* acquire failure may already own partial scratch/index saves. */
     int acquired=l->owner->acquire(l);
-    rc=links_script_deadline(io,dl);
-    if (acquired) rc=-1;
+    rc=acquired ? -1 : 0;
+    /* ROM acquisition has its own bounded runner/point checks (60s), not
+     * the caller's 2s display budget. Preparation and each opcode start now. */
+    if (!rc && l->init) {
+        l->init->opcode_timing=true;
+        rc=io->timing.clock_us(io->opaque,&l->init->opcode_started_us);
+    }
     u32 pc=0,binding=0,value;
     bool saved=false,ran=false;
     if (!rc && (!l->init || !l->program)) rc=-1;
@@ -289,6 +315,15 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
         ran=true;
         int run=gf_init_run_script(l->init,l->program,pc,route->head,route->or_mask,dl);
         rc=run==GF_SCRIPT_ETIME ? GF4_ETIME : run ? -1 : 0;
+        if (run==GF_SCRIPT_ETIME) {
+            /* TIME/budget waits have no polled register (reg=0).
+             * Runner cleanup does not renew these rejecting clock samples. */
+            struct gf_init_context *tx=l->init;
+            kprintf(KLOG_ATTR,"GF4 ERROR stage=rom_script rc=-409 head=%u remain_us=%d reg=00000000 val=%08x pc=%08x elapsed_us=%u wait_us=%u\n",
+                    route->head,(i32)(tx->opcode_started_us+GF_INIT_OPCODE_US-
+                          (tx->started_us+tx->elapsed_us)),
+                    tx->wait_us,tx->fail_pc,tx->elapsed_us,tx->wait_us);
+        }
     }
     /* Runner performs its own failure cleanup. All earlier failures and
      * successful runs still need exactly one adapter/table cleanup. */

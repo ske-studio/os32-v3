@@ -1,3 +1,4 @@
+#include "../drivers/video/geforce/geforce_module.h"
 /* Ring3 syscall dispatch and completed-syscall STOP parking. Included by exec.c. */
 /* ======================================================================== */
 /*  ring3_syscall_dispatch — CPL=3 からの int 0x80 ディスパッチャ (v2 M2d)   */
@@ -88,6 +89,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     if (g_cur_app) g_cur_app->last_kernel_tick = tick_count;
 
     /* --- CTRL+STOP の要求があればここで畳む (契約 T6) --- */
+    exec_cui_display_abort();
     ring3_abort_check();        /* 要求があれば longjmp して戻らない */
 
     /* --- GUI 入力ポンプ (票 K2-1、契約 T6 / T8 の X4) ---
@@ -156,6 +158,12 @@ syscall_complete:
     caller_access_leave(&prev_caller);
     ring3_in_syscall = prev_in_syscall;
     g_cur_frame = prev_frame;
+
+    exec_cui_display_abort();
+
+    /* Resident deadline/pending check only; F5 work runs at a due foreground
+     * point after caller restoration and before the resulting abort check. */
+    if (geforce_fg_due(tick_count)) geforce_foreground_poll();
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();

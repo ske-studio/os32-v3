@@ -548,11 +548,10 @@ int paging_master_audit(u32 tramp)
             for (u32 ri = 0; ri < ledger_region_count; ri++) {
                 const struct ledger_region *r = &ledger_regions[ri];
                 if (r->type != LEDGER_R_DEVICE || p < r->first || p >= r->end) continue;
-                /* A decode reservation can exceed the actual mapped window. */
+                /* Only the exact static/dynamic union is mapped, not its hull. */
                 want = 0;
                 for (u32 k = 0; k < LEDGER_MAX_RESOURCES; k++) {
-                    const struct ledger_resource *res = &ledger_resources[k];
-                    if ((r->res_mask & (1U << k)) && p >= res->map_first && p < res->map_end)
+                    if ((r->res_mask & (1U << k)) && ledger_resource_page_mapped(k, p))
                         want = PAGE_RW | PTE_PCD;
                 }
             }

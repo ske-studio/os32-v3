@@ -106,7 +106,7 @@ static i32 power(const struct gf5 *g,u32 *off,u32 *size,u8 *ver)
             *ver=g->rom.bytes[e+1]; *size=le16(g,e+2); *off=le16(g,e+4);
             return span(g,*off,*size) ? 0 : GF5_EBIOS;
         }
-        return GF5_ENOTSUP;
+        return GF5_ENODEV;
     }
     return GF5_ENOTSUP;
 }
@@ -131,7 +131,7 @@ static i32 gpio_find(struct gf5 *g,u8 tag,u8 *line,u8 log[2])
     if (!g->rom.bytes) return GF5_ENOTSUP;
     if (!span(g,DCB_POINTER,2)) return GF5_EBIOS;
     u32 d=le16(g,DCB_POINTER),p=0;
-    if (!d) return GF5_ENOTSUP;
+    if (!d) return GF5_ENODEV;
     if (!span(g,d,1)) return GF5_EBIOS;
     u8 ver=g->rom.bytes[d];
     if (ver>=0x42 || ver<0x20) return GF5_ENOTSUP;
@@ -147,7 +147,7 @@ static i32 gpio_find(struct gf5 *g,u8 tag,u8 *line,u8 log[2])
             if (g->rom.bytes[d-1]>=DCB_OLD_PREFIX) p=le16(g,d-DCB_OLD_GPIO_BACK);
         }
     }
-    if (!p) return GF5_ENOTSUP;
+    if (!p) return GF5_ENODEV;
     if (!span(g,p,3)) return GF5_EBIOS;
     struct table t={.off=p,.ver=g->rom.bytes[p]};
     if (t.ver>0x41) return GF5_ENOTSUP;
@@ -172,7 +172,7 @@ static i32 gpio_find(struct gf5 *g,u8 tag,u8 *line,u8 log[2])
         *line=l; log[0]=a; log[1]=b;
         return 0;
     }
-    return GF5_ENOTSUP;
+    return GF5_ENODEV;
 }
 i32 gf5_gpio_find(struct gf5 *g,u8 tag,u8 *line,u8 log[2])
 {
@@ -226,7 +226,7 @@ static i32 voltage_table(struct gf5 *g,struct table *t,struct pin pins[VID_BITS]
     i32 rc=power_pointer(g,false,&t->off);
     if (rc) return rc;
     u32 p=t->off;
-    if (!p) return GF5_ENOTSUP;
+    if (!p) return GF5_ENODEV;
     if (!span(g,p,1)) return GF5_EBIOS;
     t->ver=g->rom.bytes[p];
     if (t->ver!=0x12 && t->ver!=0x20 && t->ver!=0x30) return GF5_ENOTSUP;
@@ -238,12 +238,12 @@ static i32 voltage_table(struct gf5 *g,struct table *t,struct pin pins[VID_BITS]
     t->mask=g->rom.bytes[p+(t->ver==0x20 ? 5 : 4)];
     rc=table_span(g,t,hdr,2);
     if (rc) return rc;
-    if (!t->mask || !t->cnt) return GF5_ENOTSUP;
+    if (!t->cnt) return GF5_ERANGE;
     /* volt/gpio.c:30-97, bios/gpio.h:15-22. */
     static const u8 tags[VID_BITS]={0x04,0x05,0x06,0x1a,0x73,0x74,0x75,0x76};
     for (u32 i=0;i<VID_BITS;++i) if (t->mask&(1U<<i)) {
         rc=gpio_find(g,tags[i],&pins[i].line,pins[i].log);
-        if (rc==GF5_ENOTSUP) t->mask&=~(1U<<i);
+        if (rc==GF5_ENODEV) t->mask&=~(1U<<i);
         else if (rc) return rc;
     }
     return 0;
@@ -282,21 +282,26 @@ i32 gf5_volt_get(struct gf5 *g,u32 *out)
     if (!g || !out) return done(g,GF5_EINVAL);
     return done(g,voltage_get(g,out));
 }
-static i32 voltage_set(struct gf5 *g,u32 uv)
+static i32 voltage_choice(const struct gf5 *g,const struct table *t,u32 uv,u8 *vid)
 {
-    struct table t={0}; struct pin pins[VID_BITS];
-    i32 rc=voltage_table(g,&t,pins);
-    if (rc) return rc;
-    u32 best=t.cnt,best_uv=U32_MAX;
+    u32 best=t->cnt,best_uv=U32_MAX;
     /* volt/base.c:51-78: equal nonzero errors replace, exact exits first. */
-    for (u32 i=0;i<t.cnt;++i) {
-        u32 candidate=entry_uv(g,&t,i);
+    for (u32 i=0;i<t->cnt;++i) {
+        u32 candidate=entry_uv(g,t,i);
         if (candidate<uv || candidate>best_uv) continue;
         best=i; best_uv=candidate;
         if (candidate==uv) break;
     }
-    if (best==t.cnt) return GF5_ERANGE;
-    u8 vid=entry_vid(g,&t,best);
+    if (best==t->cnt) return GF5_ERANGE;
+    *vid=entry_vid(g,t,best);
+    return 0;
+}
+static i32 voltage_set(struct gf5 *g,u32 uv)
+{
+    struct table t={0}; struct pin pins[VID_BITS]; u8 vid;
+    i32 rc=voltage_table(g,&t,pins);
+    if (!rc) rc=voltage_choice(g,&t,uv,&vid);
+    if (rc) return rc;
     if (g->vid.set) {
         rc=g->vid.set(g->vid.owner,vid);
         if (rc) g->source_rc=rc;
@@ -317,11 +322,11 @@ i32 gf5_volt_set(struct gf5 *g,u32 uv)
 /* bios/vmap.c:29-53,93-153; volt/base.c:104-153,233-239.
  * nv40 has no speedo_read. The handoff checks speedo BEFORE every mode,
  * including constant modes: a present valid entry is always ENOTSUP here. */
-static i32 voltage_map(struct gf5 *g,u8 id,u32 *uv)
+static i32 voltage_map_request(struct gf5 *g,u8 id,u32 *uv,bool optional_zero)
 {
     u32 p=0;
     i32 rc=power_pointer(g,true,&p);
-    if (rc!=GF5_ENOTSUP && rc) return rc;
+    if (rc) return rc;
     if (p) {
         if (!span(g,p,4)) return GF5_EBIOS;
         struct table t={.off=p,.ver=g->rom.bytes[p],.hdr=g->rom.bytes[p+1],
@@ -331,16 +336,40 @@ static i32 voltage_map(struct gf5 *g,u8 id,u32 *uv)
         if (rc) return rc;
         if (id<t.cnt) return GF5_ENOTSUP;
     }
-    if (!id) return GF5_ENOTSUP;
+    /* A zero minimum without a vmap entry means no extra floor.  A real
+     * entry (including index zero) still requires speedo above. */
+    if (!id && !optional_zero) return GF5_ENOTSUP;
     *uv=(u32)id*VOLT_UNIT_UV;
     return 0;
+}
+static i32 voltage_map(struct gf5 *g,u8 id,u32 *uv)
+{ return voltage_map_request(g,id,uv,false); }
+i32 gf5_volt_check_id(struct gf5 *g,u8 id,u8 min_id)
+{
+    if (!g) return GF5_EINVAL;
+    g->source_rc=0;
+    struct table t={0}; struct pin pins[VID_BITS]; u8 vid;
+    u32 request,minimum;
+    /* Confirm the component before interpreting id=0.  Parsing the GPIO
+     * wiring must not mask unsupported/corrupt tables as missing pins. */
+    i32 rc=voltage_table(g,&t,pins);
+    if (!rc) rc=voltage_map(g,id,&request);
+    if (!rc) {
+        rc=voltage_map_request(g,min_id,&minimum,true);
+        if (!rc && minimum>request) request=minimum;
+    }
+    if (!rc) rc=voltage_choice(g,&t,request,&vid);
+    return done(g,rc);
 }
 i32 gf5_volt_id(struct gf5 *g,u8 id,u8 min_id,i32 condition)
 {
     if (!g) return GF5_EINVAL;
     g->source_rc=0;
+    struct table t={0}; struct pin pins[VID_BITS];
+    i32 rc=voltage_table(g,&t,pins);
+    if (rc) return done(g,rc);
     u32 request,prev,minimum;
-    i32 rc=voltage_map(g,id,&request);
+    rc=voltage_map(g,id,&request);
     if (rc) return done(g,rc);
     rc=voltage_get(g,&prev);
     /* volt/base.c:156-182: compare request to prev BEFORE mapping min_id. */

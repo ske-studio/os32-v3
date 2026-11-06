@@ -19,6 +19,16 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
+ # GF lifetime A1/A2: losing dynamic membership or accepting the decode hull
+ # must fail at runtime, while the helper still compiles in the real MM unit.
+ ('device-static-only', 'mm/paging.c',
+  'ledger_resource_page_mapped(k, p)',
+  '(p >= ledger_resources[k].map_first && p < ledger_resources[k].map_end)',
+  'FAIL !paging_master_audit(exec_tramp_page_addr())'),
+ ('device-decode-hull', 'mm/paging.c',
+  'ledger_resource_page_mapped(k, p)',
+  '(ledger_resource_page_mapped(k, p) || ((e & PTE_PRESENT) && p >= ledger_resources[k].decode_first && p < ledger_resources[k].decode_end))',
+  'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
  ('boot-slack-all-present', 'mm/paging.c', '        boot_slack_valid() &&',
   '        boot_range_valid(MEM_SHM_RESV_START, MEM_FIXED_PAGING_GUARD_BASE, 1) &&',
   'FAIL !paging_as_audit(&space, shlib_read_page)'),

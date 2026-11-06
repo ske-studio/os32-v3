@@ -573,8 +573,10 @@ static void cint_real_dispatch(void)
     struct gf3_surface b = a;
     b.off += MEM_PAGE_SIZE; /* both descriptors stay in the real test reservation */
     assert(!cint_slot->scale(cint_slot->ctx, &a, &b, r, r, r, false, cint_deadline()));
-    assert(!geforce_fill_rect(0, 0, 2, 2, 1));
-    assert(!geforce_blit(2, 2, 0, 0, 2, 2));
+    /* The deliberately unaligned legacy scan remains valid for CPU scanout,
+     * but is outside the drawing surface contract. */
+    assert(geforce_fill_rect(0, 0, 2, 2, 1)==OS32_ERR_IO);
+    assert(geforce_blit(2, 2, 0, 0, 2, 2)==OS32_ERR_IO);
     cint_owned_reservations();
     cint_stop_display();
 }

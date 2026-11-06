@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 2216851024,
+  "module_abi_gen": 865989951,
   "imports": [
     {
       "name": "trial_begin",
@@ -262,6 +262,24 @@
     {
       "name": "gf5_test",
       "index": 43,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "geforce_resource_lookup",
+      "index": 44,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "paging_device_map",
+      "index": 45,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "paging_device_unmap",
+      "index": 46,
       "kind": 1,
       "type_ver": 1
     }

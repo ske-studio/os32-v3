@@ -150,7 +150,7 @@ KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
 #   選択は $(LGY98_STAMP) に残るので以後の make kernel / deploy-nhd も同じ設定でビルドする。
 #   BASE / IRQ / FLAGS は LGY98_BASE / LGY98_IRQ / LGY98_FLAGS で上書きできる
 #   (既定は NP21/W の値。FLAGS = LGY98_FLAG_* の和。DIAG 1 / LOOPBACK 2 / REFLECT 4 / LINKTEST 8)。
-#   読むのは drivers/net/ne2000/lgy98.c だけで、その .o は毎回コンパイルされる (build/kernel.mk)。
+#   読むのは drivers/net/ne2000/lgy98.c だけで、設定の変化時にその .o を組み直す (build/kernel.mk)。
 LGY98_STAMP = $(BUILD_OUT)/lgy98.flags
 LGY98_BASE  ?= 0x10D0
 LGY98_IRQ   ?= 5

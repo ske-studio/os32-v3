@@ -17,7 +17,17 @@ enum session_event { SESSION_SAVE, SESSION_RESTORE, SESSION_RELEASE,
 /* One start + initial restore + final restore/release, with retry room. */
 #define SESSION_EVENTS (GF4_MODES * 16U)
 #define SESSION_NOW 123U
+static u32 session_now = SESSION_NOW;
+static bool slow_operations;
 #define SESSION_FAILURE (-777)
+static bool forced_leave;
+static i32 abandon_rc;
+static u32 abandons;
+static u32 heat_clear_calls;
+static int heat_clear_rc;
+int geforce_heat_latch_clear(void) { heat_clear_calls++; return heat_clear_rc; }
+static int current_owner = 2;
+int res_owner_get(void) { return current_owner; }
 static struct gf4_host host;
 static struct gf4_state state;
 static struct gf4_test_ops normal, replacement;
@@ -39,6 +49,11 @@ static struct gf4_route routes[2];
 static u8 image[IMAGE_BYTES], back_image[IMAGE_BYTES];
 static u8 head0_image[2][IMAGE_BYTES];
 static bool output_fixture, revoke_gamma, enter_invalid, leave_failed, perturb_other;
+static bool backend_failed, core_reject;
+static u32 core_inits, core_shutdowns;
+static const GfxMode core_mode = {
+    .width=IMAGE_WIDTH, .height=IMAGE_HEIGHT, .format=GFX_FMT_PACKED8
+};
 static u32 gammas, enters, leaves, prepared_head[GF4_HEADS], discarded_head[GF4_HEADS];
 /* docs/decisions/realhw/GF_FEAT4_DESIGN.md:574: identity, dark curve,
  * identity; palette return has no gamma. */
@@ -101,6 +116,7 @@ void serial_puts_polled(const char *s)
 static i32 case_event(enum session_event e)
 {
     assert(nevents < SESSION_EVENTS); events[nevents++] = e;
+    if (slow_operations) session_now += GF3_TIMEOUT_US / 3U;
     if (e == fail_event && failure_nth && ++failure_calls == failure_nth) return failure_rc;
     return 0;
 }
@@ -115,7 +131,7 @@ static i32 prepare_call(struct gf4_ctx *ctx, u8 head, u32 id,
                         struct gf3_surface out[2], u32 dl)
 {
     assert(ctx == &host.ctx && (head == 1 || (output_fixture && head == 0)) && id >= 1 && id <= state.nmodes);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     ++prepares; ++prepared_head[head];
     i32 rc = case_event(CASE_PREPARE);
     if (rc) return rc;
@@ -132,14 +148,14 @@ static i32 prepare_call(struct gf4_ctx *ctx, u8 head, u32 id,
 static i32 discard_call(struct gf4_ctx *ctx, u8 head, u32 dl)
 {
     assert(ctx == &host.ctx && (head == 1 || (output_fixture && head == 0)) && !ctx->saved_closed);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     ++discards; ++discarded_head[head]; return case_event(CASE_DISCARD);
 }
 static int upload_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
                        struct gf3_rect r, const struct gf3_ram *ram, bool force, u32 dl)
 {
     assert(ctx == &host.base.ctx && force && r.h == 1 && s->reservation_id);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     u32 cpp = s->fmt == GF3_INDEX8 ? 1U : s->fmt == GF3_RGB565 ? 2U : 4U;
     assert(ram->bytes == r.w * cpp && ram->pitch == ram->bytes);
     assert(r.x + r.w <= s->width && r.y < s->height);
@@ -155,7 +171,7 @@ static int upload_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
 static int download_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
                          struct gf3_rect r, struct gf3_ram *ram, u32 dl)
 {
-    assert(ctx == &host.base.ctx && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.base.ctx && dl == session_now + GF3_TIMEOUT_US);
     ++downloads;
     i32 rc = case_event(CASE_DOWNLOAD);
     if (rc) return rc;
@@ -171,7 +187,7 @@ static int set_call(struct gf4_ctx *ctx, const struct gf4_route *r, u32 id,
 {
     assert(ctx == &host.ctx && (r->connector == routes[0].connector || output_fixture));
     assert(r->head == 1 || (output_fixture && r->head == 0));
-    assert(s->reservation_id == id && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(s->reservation_id == id && dl == session_now + GF3_TIMEOUT_US);
     assert(uploads == downloads && uploads);
     ++sets;
     i32 rc = case_event(CASE_SET);
@@ -193,7 +209,7 @@ static i32 palette_call(struct gf4_ctx *ctx, u8 head, u32 first, u32 n, const u8
 }
 static int dpms_call(struct gf4_ctx *ctx, u8 head, enum gf4_dpms power, u32 dl)
 {
-    assert(ctx == &host.ctx && (head == 1 || output_fixture) && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.ctx && (head == 1 || output_fixture) && dl == session_now + GF3_TIMEOUT_US);
     assert(powers < sizeof(power_seen) / sizeof(power_seen[0]));
     power_seen[powers++] = power;
     i32 rc = case_event(CASE_DPMS);
@@ -206,7 +222,7 @@ static int dpms_call(struct gf4_ctx *ctx, u8 head, enum gf4_dpms power, u32 dl)
 static int cursor_image_call(struct gf4_ctx *ctx, u8 head,
                              const struct gf4_cursor *c, u32 dl)
 {
-    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.ctx && head == 1 && dl == session_now + GF3_TIMEOUT_US);
     assert(c->w == c->h && (c->w == 32 || c->w == 64));
     assert(c->pitch == c->w * sizeof(u32) && c->bytes == c->pitch * c->h);
     assert(c->hot_x == 3 && c->hot_y == 5 && cursor_images < EXPECTED_CURSOR_IMAGES);
@@ -240,7 +256,7 @@ static int cursor_show_call(struct gf4_ctx *ctx, u8 head, bool show)
 static int flip_call(struct gf4_ctx *ctx, u8 head, const struct gf3_surface *s,
                      bool sync, u32 dl)
 {
-    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.ctx && head == 1 && dl == session_now + GF3_TIMEOUT_US);
     assert(flips < EXPECTED_FLIP_TOTAL && !ctx->hold[head].pending && uploads == downloads);
     /* First target is back, then front, repeated independently of product constants. */
     if (output_fixture) assert(sync && s->off == GF3_STAGING_BYTES + IMAGE_BYTES);
@@ -256,7 +272,7 @@ static int flip_call(struct gf4_ctx *ctx, u8 head, const struct gf3_surface *s,
 }
 static int vblank_call(struct gf4_ctx *ctx, u8 head, u32 after, u32 dl, u32 *seen)
 {
-    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.ctx && head == 1 && dl == session_now + GF3_TIMEOUT_US);
     ++waits;
     i32 rc = case_event(CASE_VBLANK);
     if (rc) return rc;
@@ -293,9 +309,16 @@ static int gamma_call(struct gf4_ctx *ctx, u8 head, const u16 rgb[3][256])
 static void enter_call(void)
 {
     ++enters;
+    /* backend_geforce.c:geforce_init needs the CLIENT binding supplied by
+     * gfx_select_and_init_backend, not merely the published F4 ops. */
+    if (backend_failed) return;
+    if (!gfx_backend_geforce.bb_base || !gfx_backend_geforce.selected_mode) {
+        backend_failed = true;
+        return;
+    }
     i32 rc = case_event(CASE_ENTER);
     if (rc) { normal_slot = NULL; return; }
-    normal_slot = &normal; host.ctx.ready = true;
+    normal_slot = &normal; management_slot = &management; host.ctx.ready = true;
     state.head[0].enabled = !enter_invalid; state.head[0].mode = state.modes[0];
     state.head[0].front.reservation_id = enters;
     state.head[0].dpms = GF4_ON;
@@ -305,15 +328,30 @@ static void leave_call(void)
     ++leaves;
     i32 rc = case_event(CASE_LEAVE);
     if (rc || leave_failed) return;
-    assert(!host.ctx.diagnostic_saved && !display_session.valid);
+    if (!forced_leave) assert(!host.ctx.diagnostic_saved && !display_session.valid);
     normal_slot = NULL; host.ctx.ready = false;
+    host.ctx.cleanup_pending = display_session.valid;
+    management_slot = host.ctx.cleanup_pending ? &management : NULL;
     state.head[0].enabled = false;
 }
 GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
+void gfx_init(void)
+{
+    ++core_inits;
+    if (core_reject) return; /* Core admission failed before backend init. */
+    gfx_backend_geforce.selected_mode = &core_mode;
+    gfx_backend_geforce.bb_base = image;
+    enter_call();
+}
+void gfx_shutdown(void)
+{
+    ++core_shutdowns;
+    leave_call();
+}
 static int ddc_call(struct gf4_ctx *ctx, u8 bus, u8 block, u8 out[128], u32 dl)
 {
     assert(ctx == &host.ctx && bus == expected_ddc_bus && block == ddcs);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     ++ddcs;
     i32 rc = case_event(CASE_DDC);
     if (rc) return rc;
@@ -351,7 +389,7 @@ static void event(enum session_event e, struct gf4_ctx *ctx,
 static int clock_read(void *owner, u32 *now)
 {
     assert(owner == &host);
-    *now = SESSION_NOW;
+    *now = session_now;
     if (swap_after_clock) {
         normal_slot = &replacement;
         management_slot = &replacement_management;
@@ -361,7 +399,7 @@ static int clock_read(void *owner, u32 *now)
 static i32 save_call(struct gf4_ctx *ctx, struct gf4_saved *saved, u32 dl)
 {
     event(SESSION_SAVE, ctx, saved);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     if (save_rc) return save_rc;
     for (u8 h = 0; h < GF4_HEADS; ++h) saved->head[h] = state.head[h];
     saved->version = GF4_SAVED_VERSION; saved->size = sizeof(*saved);
@@ -372,7 +410,7 @@ static i32 save_call(struct gf4_ctx *ctx, struct gf4_saved *saved, u32 dl)
 static i32 restore_call(struct gf4_ctx *ctx, const struct gf4_saved *saved, u32 dl)
 {
     event(SESSION_RESTORE, ctx, saved);
-    assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(dl == session_now + GF3_TIMEOUT_US);
     assert(saved->version == GF4_SAVED_VERSION && saved->size == sizeof(*saved));
     assert(ctx->diagnostic_saved == saved && display_session.valid);
     if (swap_after_restore) management_slot = &replacement_management;
@@ -391,11 +429,31 @@ static i32 release_call(struct gf4_ctx *ctx, const struct gf4_saved *saved)
     ctx->diagnostic_saved = NULL;
     return 0;
 }
+/* External service seam: A8/A9's real stop/abandon is covered by c2svc.
+ * This fixture observes A3 re-reading the current slot after gfx_shutdown. */
+static i32 abandon_call(struct gf4_ctx *ctx,const struct gf4_saved *saved)
+{
+    ++abandons;
+    assert(ctx==&host.ctx && !ctx->ready && ctx->cleanup_pending);
+    assert(saved==&display_session.saved);
+    if (abandon_rc) return abandon_rc;
+    ctx->diagnostic_saved=NULL; ctx->saved_closed=false;
+    ctx->cleanup_pending=false; management_slot=NULL;
+    return 0;
+}
 static void reset(void)
 {
+    session_now = SESSION_NOW; slow_operations = false;
+    display_cui_owner = 0; current_owner = 2; forced_leave = false;
+    abandon_rc=0; abandons=0;
+    gf2_host_memset(&state, 0, sizeof(state));
     gf4_host_init(&host, &state);
     output_fixture = revoke_gamma = enter_invalid = leave_failed = perturb_other = false;
     gammas = enters = leaves = 0;
+    core_inits = core_shutdowns = 0; backend_failed = core_reject = false;
+    /* Other display cases start during an application's existing gfx session. */
+    gfx_backend_geforce.selected_mode = &core_mode;
+    gfx_backend_geforce.bb_base = image;
     for (u8 h = 0; h < GF4_HEADS; ++h) prepared_head[h] = discarded_head[h] = 0;
     gfx_backend_geforce.enter = enter_call; gfx_backend_geforce.leave = leave_call;
     gf2_host_memset(&display_session, 0, sizeof(display_session));
@@ -419,7 +477,7 @@ static void reset(void)
             .t={.hd=IMAGE_WIDTH,.vd=IMAGE_HEIGHT}, .pitch=IMAGE_WIDTH*cpp};
     }
     management = (struct gf4_restore_ops){.ctx=&host.ctx,
-        .restore=restore_call, .saved_release=release_call};
+        .restore=restore_call, .saved_release=release_call,.abandon=abandon_call};
     replacement = (struct gf4_test_ops){.ctx=&host.ctx};
     replacement_management = (struct gf4_restore_ops){.ctx=&host.ctx};
     normal_slot = &normal; management_slot = &management;
@@ -792,6 +850,15 @@ static void flip_steps(void)
     assert(!gf_display_test(FLIP_WIRE | NEXT_PHASE));
     assert(!display_session.valid && discards == 1 && !host.ctx.hold[1].pending);
 }
+static void operation_budgets(void)
+{
+    reset(); slow_operations = true;
+    assert(!gf_display_test(FLIP_WIRE));
+    assert(!gf_display_test(FLIP_WIRE | NEXT_PHASE));
+    assert(flips == EXPECTED_FLIP_TOTAL && uploads == downloads);
+    assert(session_now - SESSION_NOW > GF3_TIMEOUT_US);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+}
 static void cursor_flip_failures(void)
 {
     static const enum session_event failed[] = {
@@ -948,6 +1015,15 @@ static void outputs_pair_ready(void)
     assert(!gf_display_test(OUTPUT_WIRE));
     assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
     assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+}
+static void output_budgets(void)
+{
+    outputs_reset(); slow_operations = true;
+    outputs_pair_ready();
+    assert(display_session.output_pair_ready && prepared_head[0] && prepared_head[1]);
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(!gf_display_test(DISPLAY_RESTORE));
 }
 static void outputs_steps(void)
 {
@@ -1107,12 +1183,112 @@ static void lifecycle_steps(void)
     assert(occurrences("SKIP") == 1 && !occurrences("READY"));
 }
 
+static void reset_cold_cui(void)
+{
+    reset();
+    host.ctx.ready = false;
+    /* Production idle/complete stop has neither display dispatch. */
+    normal_slot = NULL; management_slot = NULL;
+    gfx_backend_geforce.bb_base = NULL;
+    gfx_backend_geforce.selected_mode = NULL;
+}
+static void cui_controls(void)
+{
+    reset_cold_cui();
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
+    heat_clear_calls=0; heat_clear_rc=GF4_EBUSY;
+    assert(gf_display_test(GF4_CUI_ENTER)==GF4_EBUSY && !enters && !display_cui_owner);
+    heat_clear_rc=0;
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 1 && display_cui_owner == 2);
+    assert(heat_clear_calls==2 && core_inits == 1 && !backend_failed);
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && enters == 1);
+    current_owner = 3;
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
+    gf_display_owner_exit(3); assert(!leaves && display_cui_owner == 2);
+    current_owner = 2;
+    assert(!gf_display_test(MODE_WIRE) && display_session.valid);
+    assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 1 && !normal_slot);
+    assert(core_shutdowns == 1);
+    assert(!display_cui_owner && !display_session.valid);
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && leaves == 1);
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2);
+    gf_display_owner_exit(2);
+    assert(leaves == 2 && !display_cui_owner && !host.ctx.ready);
+    assert(core_shutdowns == 2);
+    gf_display_owner_exit(2); assert(leaves == 2);
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    /* hello_gfx shuts down the core while the shell owner survives. */
+    gfx_shutdown();
+    assert(!normal_slot); /* Full production stop closes the normal slot. */
+    assert(!host.ctx.ready && display_cui_owner == 2);
+    assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2 && display_cui_owner == 2);
+    assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 2);
+    reset_cold_cui();
+    fail_event = CASE_ENTER; failure_nth = 1;
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner && leaves == 1);
+    assert(!backend_failed && core_shutdowns == 1);
+    /* A failure before backend init leaves it usable by the next gfx app. */
+    reset_cold_cui(); core_reject = true;
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner);
+    assert(!enters && !backend_failed && core_shutdowns == 1);
+    core_reject = false; gfx_init();
+    assert(host.ctx.ready && !backend_failed && enters == 1);
+    gfx_shutdown();
+    reset(); assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && !enters);
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER)); leave_failed = true;
+    assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && display_cui_owner == 2);
+    leave_failed = false; assert(!gf_display_test(GF4_CUI_LEAVE));
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    restore_rc = SESSION_FAILURE;
+    assert(gf_display_test(MODE_WIRE) == SESSION_FAILURE && display_session.valid);
+    forced_leave = true;
+    assert(gf_display_test(GF4_CUI_LEAVE) == SESSION_FAILURE);
+    assert(leaves == 1 && core_shutdowns == 1 && !host.ctx.ready);
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(MODE_WIRE));
+    restore_rc = SESSION_FAILURE; forced_leave = true;
+    gf_display_owner_exit(2);
+    assert(!display_cui_owner && !host.ctx.ready && leaves == 1);
+    assert(!display_session.valid && !host.ctx.diagnostic_saved && abandons==1);
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    /* Terminal release failure preserves CUI owner and session for retry. */
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(MODE_WIRE));
+    restore_rc=SESSION_FAILURE; forced_leave=true; abandon_rc=GF3_EBUSY;
+    assert(gf_display_test(GF4_CUI_LEAVE)==SESSION_FAILURE);
+    assert(display_cui_owner==2 && display_session.valid && host.ctx.cleanup_pending);
+    assert(!display_session.running && !display_session.lifecycle && abandons==1);
+    assert(gf2_host_strstr(output,"stage=leave_cleanup rc=-306"));
+    assert(gf_display_test(GF4_CUI_ENTER)==GF4_EBUSY);
+    /* Stopped pending cleanup bypasses restore, then retries current slot. */
+    u32 restores_before=nevents;
+    abandon_rc=0;
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    assert(nevents==restores_before+1U && events[restores_before]==CASE_LEAVE);
+    assert(abandons==2 && !display_cui_owner);
+    assert(!display_session.valid && !host.ctx.cleanup_pending);
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    reset();
+    assert(gf_display_test(MODE_WIRE | NEXT_PHASE) == GF4_ESTATE);
+    assert(gf2_host_strstr(output, "GF4 ERROR stage=display_admit rc=-408"));
+    reset(); normal_slot = NULL;
+    assert(gf_display_test(MODE_WIRE) == GF4_ESTATE);
+    assert(gf2_host_strstr(output, "GF4 ERROR stage=display_begin rc=-408"));
+}
+
 void _start(void)
 {
-    wire_and_admission(); start_failures(); restore_retries();
+    cui_controls(); wire_and_admission(); start_failures(); restore_retries();
     mode_steps(); dpms_steps(); enumeration(); enumeration_ports();
     skipped_modes(); case_failures();
-    cursor_steps(); flip_steps(); cursor_flip_failures();
-    gamma_steps(); outputs_steps(); outputs_failures(); lifecycle_steps();
+    cursor_steps(); flip_steps(); operation_budgets(); cursor_flip_failures();
+    gamma_steps(); output_budgets(); outputs_steps(); outputs_failures(); lifecycle_steps();
     gf2_host_exit(0);
 }

@@ -11,7 +11,16 @@
 #include "kprintf.h"
 #include "gf_production.h"
 #include "pc98_route.h"
+#include "../../../fs/vfs.h"
+#include "../../../exec/appslot.h"
+#include "serial_diag.h"
+#include "io.h"
+#include "idt.h"
+#include "time_units.h"
 #include "../../../hwdev/gf/display/api.h"
+#include "leave_log.h"
+#include "con_sink.h"
+#include "gui.h"
 
 extern const u32 geforce_kexports[];
 extern const struct module_symbol_contract geforce_import_contracts[], geforce_export_contracts[];
@@ -35,6 +44,101 @@ const struct gf4_restore_ops *geforce_display_restore_ops(void)
 { return registered ? display_restore_slot : 0; }
 const struct gf5_test_ops *geforce_feature5_ops(void)
 { return registered ? feature5_slot : 0; }
+/* Thermal work runs only at cooperative foreground points. */
+static bool heat_notice_pending;
+static struct geforce_heat_bridge heat_bridge={.request=geforce_heat_stop_request};
+static bool foreground_deadline_valid;
+static u32 foreground_next_tick;
+bool geforce_fg_due(u32 now_tick)
+{
+    return heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !foreground_deadline_valid ||
+        (i32)(now_tick-foreground_next_tick)>=0;
+}
+/* F5 owns the absolute microsecond deadlines. Cache values only, never its
+ * context. Floor the delay using a tick sampled before clock64 so the cheap
+ * syscall gate may wake early but cannot postpone the shortest F5 deadline.
+ * Limit the cache to one second (also keeps division strictly 32-bit). */
+static void foreground_deadline_update(const struct gf5_test_ops *ops)
+{
+    foreground_deadline_valid=false;
+    if (!ops || !ops->ctx || !ops->ctx->links.clock64) return;
+    struct gf5 *g=ops->ctx;
+    u32 tick=tick_count;
+    u64 now, next;
+    if (g->links.clock64(g->links.owner,&now)) return;
+    next=now+USEC_PER_SEC;
+    const u64 deadlines[]={g->next_sensor,g->next_auto,g->next_step,g->next_toggle};
+    for (u32 i=0;i<sizeof(deadlines)/sizeof(deadlines[0]);i++)
+        if (deadlines[i] && deadlines[i]<next) next=deadlines[i];
+    if ((g->fan.sensor_poll && !g->next_sensor) ||
+        (g->fan.mode==GF5_FAN_AUTO && !g->next_auto)) next=now;
+    u32 delay=next>now ? (u32)(next-now) : 0;
+    foreground_next_tick=tick+delay/(USEC_PER_SEC/PIT_HZ);
+    foreground_deadline_valid=true;
+}
+
+void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
+{
+    /* Preserve the first cause across nested waits and repeated requests. */
+    if (heat_bridge.stop_state.state!=GF5_STOP_NORMAL) return;
+    heat_bridge.stop_state=(struct gf5_stop_state){GF5_STOP_REQUESTED,reason,milli_c,source_rc};
+}
+int geforce_heat_latch_clear(void)
+{
+    if (heat_bridge.stop_state.state==GF5_STOP_NORMAL) return 0;
+    if (heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !registered || !heat_bridge.clear)
+        return GF5_ESTATE;
+    int rc=heat_bridge.clear();
+    if (!rc) heat_bridge.stop_state=(struct gf5_stop_state){0};
+    return rc;
+}
+static void heat_stop_consume(void)
+{
+    if (heat_bridge.stop_state.state!=GF5_STOP_REQUESTED) return;
+    /* Stop the GPU first. Recover the current app only if it uses GeForce. */
+    bool recover_app=heat_bridge.backend_active && heat_bridge.backend_active();
+    int stop_rc=heat_bridge.stop ? heat_bridge.stop() : GF5_ESTATE;
+    if (stop_rc || !pc98_route_safe || !pc98_route_safe()) {
+        int sync_rc=vfs_sync();
+        /* Emergency output must not use a console on the stopped device. */
+        serial_puts_polled("[geforce] heat halt reason="); serial_diag_i32(heat_bridge.stop_state.reason);
+        serial_puts_polled(" milli_c="); serial_diag_i32(heat_bridge.stop_state.milli_c);
+        serial_puts_polled(" source_rc="); serial_diag_i32(heat_bridge.stop_state.source_rc);
+        serial_puts_polled(" stop_rc="); serial_diag_i32(stop_rc);
+        serial_puts_polled(" sync_rc="); serial_diag_i32(sync_rc);
+        serial_puts_polled("\n");
+        _disable();
+        for (;;) { _halt(); }
+    }
+    heat_bridge.stop_state.state=GF5_STOPPED;
+    /* Stop and route precede the existing GUI -> CUI handoff. */
+    if (recover_app) {
+        geforce_display_stopped();
+        AppSlot *app=appslot_get(appslot_cur());
+        if (app && app->state!=APP_STATE_FREE) app->abort_req=1;
+    }
+    if (con_sink_is_enabled()) gui_display_failed();
+    heat_notice_pending=true;
+    geforce_heat_notice();
+}
+/* GUI output is buffered and discarded on CUI return. Print once after the
+ * existing shell handoff has restored the text console. */
+void geforce_heat_notice(void)
+{
+    if (!heat_notice_pending || con_sink_is_enabled()) return;
+    heat_notice_pending=false;
+    kprintf(KLOG_ATTR,"[geforce] heat stop reason=%d milli_c=%d source_rc=%d\n",
+            heat_bridge.stop_state.reason,heat_bridge.stop_state.milli_c,heat_bridge.stop_state.source_rc);
+}
+
+void geforce_foreground_poll(void)
+{
+    const struct gf5_test_ops *ops=geforce_feature5_ops();
+    if (ops && ops->service_poll) (void)ops->service_poll(ops->ctx);
+    foreground_deadline_update(ops);
+    /* No module context is used after the common stop. */
+    heat_stop_consume();
+}
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};
 static GeforceModuleContext context = {
@@ -42,7 +146,7 @@ static GeforceModuleContext context = {
     .height=&gfx_current_height, .flip=&gfx_flip_enabled, .page=&gfx_display_page,
     .accel_out=&accel_slot, .foundation_out=&foundation_slot,
     .display_out=&display_slot, .feature5_out=&feature5_slot,
-    .display_restore_out=&display_restore_slot
+    .display_restore_out=&display_restore_slot, .heat=&heat_bridge
 };
 int geforce_pc98_safe(void)
 {
@@ -77,7 +181,11 @@ int geforce_boot_reserve(void)
 static int geforce_return(void *opaque)
 {
     struct geforce_platform *p = opaque;
+    struct gf_display_context *video = p->device ? p->device->context : 0;
+    struct gf_io *leave_io = video ? &video->io : 0;
     int rc = p->stop ? p->stop() : 0;
+    /* Match backend stop: sample after quiesce, before 98 restore/redraw. */
+    geforce_leave_log(leave_io, rc);
     if (pc98_route_to_98()) rc = -1;
     return rc;
 }
