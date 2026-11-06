@@ -18,6 +18,11 @@ const u32 lan_kexports[] = {0};
 const struct module_symbol_contract lan_import_contracts[] = {{0}};
 const struct module_symbol_contract lan_export_contracts[] = {{0}};
 const struct bootinfo *bootinfo_get(void) { finish(2); }
+/* Full boot registration/start is exercised by hostsvc-boot. */
+int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter)
+{ (void)id; (void)adapter; return 0; }
+int net_start(enum NetNicId id, const u8 peer[6])
+{ (void)id; (void)peer; return 0; }
 
 
 enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL,
