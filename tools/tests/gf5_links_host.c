@@ -82,6 +82,7 @@ static void test_map(void)
         {GF5_EINVAL,GF5_EINVAL},{GF5_ENOTSUP,GF5_ENOTSUP},{GF5_EBIOS,GF5_EBIOS},
         {GF5_ERANGE,GF5_ERANGE},{GF5_EBUSY,GF5_EBUSY},{GF5_ETIME,GF5_ETIME},
         {GF5_EIO,GF5_EIO},{GF5_ENOMEM,GF5_ENOMEM},{GF5_ESTATE,GF5_ESTATE},
+        {GF5_ENODEV,GF5_ENODEV},
         {-999,GF5_EIO},{1,GF5_EIO}
     };
     for (u32 i=0;i<sizeof(pairs)/sizeof(pairs[0]);++i)
