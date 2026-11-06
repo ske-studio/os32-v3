@@ -229,6 +229,15 @@ int lan_module_load(void)
     int rc = module_load(&request, &lan_handle);
     if (!rc) rc = module_start(lan_handle);
     if (!rc && !module_exports(lan_handle)) rc = MODULE_INIT_FAILED;
+    /* POST_ROOT precedes BOOT_NIC_LEGACY: publish a detected 82557 first,
+     * so AUTO keeps its priority when LGY registers later. The adapter stays
+     * in lan.mod; net_start acquires its active reference before binding. */
+    if (!rc && candidate.adapter &&
+        (e82557_state() == E82557_RUNNING || e82557_state() == E82557_RX_WAIT ||
+         e82557_state() == E82557_RECOVER)) {
+        rc = net_adapter_register(NET_NIC_E82557, candidate.adapter);
+        if (!rc) rc = net_start(NET_NIC_AUTO, NULL);
+    }
     kprintf(KLOG_ATTR, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->img_crc, tick_target != 0);
     return rc;
 }
