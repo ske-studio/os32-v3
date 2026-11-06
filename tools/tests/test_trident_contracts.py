@@ -50,9 +50,8 @@ CONSTANTS = {
     'TRI_PCI_BUS': 0, 'TRI_PCI_SLOT': 8, 'TRI_PCI_FUNCTION': 0,
     'TRI_PCI_COMMAND': 2, 'TRI_BAR0_PHYS': 0x20000000, 'TRI_BAR1_PHYS': 0x20400000,
     'TRI_BAR0_DECODE_BYTES': 4194304, 'TRI_BAR1_DECODE_BYTES': 65536,
-    'TRI_REG_MAPPED_BYTES': 36864, 'TRI_WIDTH': 640, 'TRI_HEIGHT': 480,
+    'TRI_REG_MAPPED_BYTES': 65536, 'TRI_WIDTH': 640, 'TRI_HEIGHT': 480,
     'TRI_PITCH': 640, 'TRI_DISPLAY_BYTES': 307200, 'TRI_DISPLAY_PAGES': 75,
-    'TRI_PAGE_BYTES': 4096, 'TRI_VRAM_SCRATCH_BYTES': 8192,
     'TRI_DAC_COLORS': 256, 'TRI_DAC_BYTES': 768, 'TRI_SAVED_BYTES': 852,
     'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 1,
     'GFX_EMERGENCY_KERNEL_OWNER': 0,
@@ -85,9 +84,9 @@ CONSTANTS = {
     'TRI_FAKE_PORT_SPACE': 2,
 }
 STEPS = ('NONE', 'RESOURCES', 'PIN', 'ARM', 'IDENTIFY', 'SAVE', 'PC98_INIT',
-         'CAPACITY_PLAN', 'MODE', 'ENABLE', 'VERIFY', 'CLIENT', 'ACTIVE',
+         'CAPACITY_PLAN', 'MODE', 'ENABLE', None, 'CLIENT', 'ACTIVE',
          'RESTORE', 'LOCK', 'DISABLE', 'CLOSED')
-CONSTANTS.update((f'TRI_STEP_{name}', i) for i, name in enumerate(STEPS))
+CONSTANTS.update((f'TRI_STEP_{name}', i) for i, name in enumerate(STEPS) if name is not None)
 # Fixed ILP32 layout: 3a is the common starting point for parallel 3b/3c.
 LAYOUTS = {
     'struct trident_saved': (856, dict(value=0, vga_base=852, valid=854)),
@@ -97,12 +96,12 @@ LAYOUTS = {
         bar0_rid=16, bar1_rid=20, decode_bytes=24, mapped_bytes=28,
         display_sid=32, client_sid=36, client_bytes=40, bar0_phys=44,
         bar1_phys=48, regs_bytes=52, pci=56, ready=76)),
-    'struct trident_device': (932, dict(res=0, saved=4, declared_bytes=860,
-        verified_bytes=864, step=868, last_rc=872, restore_rc=876, disable_rc=880,
-        init_done=884, first_init_done=885, active=886, returning=887, armed=888,
-        leave_done=889, closed=890, io=892, io_opaque=896, failed_step=900,
-        display_owner=904, chip=908, spr=909, reference=910, pinned=911,
-        declared_unknown=912, upper=916, scratch=920, scratch_bytes=924, cur_vga_base=928)),
+    'struct trident_device': (912, dict(res=0, saved=4, declared_bytes=860,
+        step=864, last_rc=868, restore_rc=872, disable_rc=876,
+        init_done=880, preinit_done=881, active=882, returning=883, armed=884,
+        leave_done=885, closed=886, io=888, io_opaque=892, failed_step=896,
+        display_owner=900, chip=904, spr=905, reference=906, pinned=907,
+        declared_unknown=908, screen_ready=909, cur_vga_base=910)),
     'struct trident_io': (32, dict(read8=0, read16=4, read32=8,
         write8=12, write16=16, write32=20, port8=24, write_span32=28)),
     'TridentModuleContext': (32, dict(backend=0, counters=4, resources=8,
@@ -144,7 +143,7 @@ SIGNATURES = {
     'trident_fake_accept_init': 'int (*)(struct trident_fake *, u32, const struct trident_fake_event *, u32)',
 }
 for name in ('identify', 'regs_bind', 'pc98_init', 'state_save', 'state_restore',
-             'capacity_plan', 'vram_verify', 'mode_640', 'route_enable',
+             'capacity_plan', 'video_reset', 'adjust_frame', 'mode_640', 'route_enable',
              'route_disable', 'screen_init', 'enter', 'leave', 'close'):
     SIGNATURES['trident_' + name] = 'int (*)(struct trident_device *)'
 for bits in (8, 16, 32):
@@ -160,7 +159,6 @@ TYPES = {
     '((struct trident_resources *)0)->client': 'u8 *',
     '((struct trident_device *)0)->res': 'const struct trident_resources *',
     '((struct trident_device *)0)->io': 'const struct trident_io *',
-    '((struct trident_device *)0)->scratch': 'u32 *',
     '((struct trident_saved *)0)->valid': 'bool',
     '((TridentModuleContext *)0)->display_owner': 'int (*)(void)',
     '((TridentModuleContext *)0)->arm': 'int (*)(int (*)(void *), void *, u32)',
@@ -177,14 +175,14 @@ TYPES['((struct trident_io *)0)->port8'] = 'int (*)(void *, u16, u8)'
 for typ, members in {
     'struct trident_resources': ('owner bar0_rid bar1_rid decode_bytes mapped_bytes '
         'display_sid client_sid client_bytes bar0_phys bar1_phys regs_bytes'),
-    'struct trident_device': ('declared_bytes verified_bytes step failed_step '
-        'display_owner scratch_bytes'),
+    'struct trident_device': ('declared_bytes step failed_step '
+        'display_owner'),
 }.items():
     for member in members.split():
         TYPES[f'(({typ} *)0)->{member}'] = 'u32'
 for member in ('last_rc', 'restore_rc', 'disable_rc'):
     TYPES[f'((struct trident_device *)0)->{member}'] = 'int'
-for member in ('init_done', 'first_init_done', 'active', 'returning', 'armed',
+for member in ('init_done', 'preinit_done', 'active', 'returning', 'armed',
                'leave_done', 'closed', 'pinned', 'declared_unknown'):
     TYPES[f'((struct trident_device *)0)->{member}'] = 'bool'
 for member in ('chip', 'spr', 'reference'):
@@ -199,7 +197,6 @@ TYPES.update({
     '((struct trident_resources *)0)->ready': 'bool',
     '((struct trident_resources *)0)->pci': 'struct trident_pci_info',
     '((struct trident_device *)0)->saved': 'struct trident_saved',
-    '((struct trident_device *)0)->upper': 'enum trident_upper',
     '((TridentModuleContext *)0)->backend': 'GfxBackend *',
     '((TridentModuleContext *)0)->counters': 'GfxCounters *',
     '((TridentModuleContext *)0)->resources': 'const struct trident_resources *',

@@ -59,8 +59,9 @@ MUTATIONS = (
      'if (!badmap) serial_puts("[trident] stage=save-palette rc=-6 default DAC\\n");',
      'unreadable DAC diagnostic count'),
     ('M_SAVE_AGAIN', PRODUCT,
-     'if (d->saved.valid) return 0;', 'if (d->saved.valid) { /* mutated */ }',
-     'second save zero accesses/immutable image'),
+     'bool palette_saved = d->saved.valid;',
+     'if (d->saved.valid) return 0;\n    bool palette_saved = false;',
+     'second save refreshes mode registers'),
     ('M_SAVE_DROP_RC', PRODUCT,
      'if (rc) return rc;', 'if (rc) return TRI_E_ACCESS;', 'each access preserves -73'),
 )
@@ -99,7 +100,7 @@ def main():
                         '-c', str(ROOT / PRODUCT), '-o', str(work / 'save.o')], check=True)
         exe = build(work, ROOT / PRODUCT)
         for runner in runners:
-            print(f'PASS save trace, all slots, mono/color, DAC fallback, immutable save, every I/O failure ({runner}): '
+            print(f'PASS save trace, all slots, mono/color, DAC fallback, repeat mode save/cached palette, every I/O failure ({runner}): '
                   + execute(exe, runner), flush=True)
         if args.mutate:
             original = (ROOT / PRODUCT).read_text()

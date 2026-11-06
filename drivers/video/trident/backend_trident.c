@@ -7,7 +7,6 @@
 #include "lib/serial_diag.h"
 
 static struct trident_device device;
-
 static void report(u32 stage, int rc)
 {
     if (!rc || serial_gate_active()) return;
@@ -29,7 +28,8 @@ static int remember(u32 stage, int rc)
 
 int trident_backend_prepare(void)
 {
-    if (device.last_rc) return device.last_rc;
+    device.failed_step = 0;
+    device.last_rc = 0;
     const TridentModuleContext *c = trident_context;
     if (!c || !c->backend || !c->counters || !c->resources || !c->arm ||
         !c->height || !c->flip || !c->page || !c->display_owner)
@@ -66,6 +66,7 @@ static void finish(u32 stage, int rc, bool recover)
 }
 static void init(void)
 {
+    device.last_rc = device.failed_step = 0;
     int rc = trident_backend_prepare();
     if (rc) { finish(device.failed_step, rc, false); return; }
     if (!device.armed) {
