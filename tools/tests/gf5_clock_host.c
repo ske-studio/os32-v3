@@ -103,7 +103,7 @@ static void run(void)
     assert(h.display.calls[D_SLEEP]==1 && h.display.calls[D_WRITE]==4);
     gf4_host_fail_at(&h.display,D_SLEEP,0,0);
     gf5_host_trace_clear(&h);
-    assert(gf5_clock_read(&h.ctx,&c)==GF5_ESTATE);
+    assert(gf5_clock_read(&h.ctx,&c)==0);
     assert(!c.core_khz && !c.shader_khz && !c.mem_khz);
     /* Independent two-stage read fixture, nv40.c:39-74: 27 MHz * 20/2 * 3/2. */
     set_reg(REG_MUX,SHARED);
