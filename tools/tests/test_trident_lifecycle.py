@@ -40,6 +40,15 @@ FLAGS = ['-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
          '-ffreestanding','-fno-pie','-fno-stack-protector','-fno-builtin']
 # name, file, unique old, replacement, runtime rejection.
 MUTATIONS = (
+ ('M_DUMP_REPEATED','backend_trident.c','registers_pending = false;',
+  'registers_pending = true;','one dump per activation'),
+ ('M_DUMP_CR_SHORT','backend_trident.c','"CR", 25, 95, cr, cv',
+  '"CR", 25, 94, cr, cv','all extended CRTC registers observed'),
+ ('M_DUMP_AR_BLANK','backend_trident.c','i | 0x20, &ar[i]',
+  'i, &ar[i]','AR sampling retains display PAS'),
+ ('M_DUMP_NO_ENTER','backend_trident.c','if (!rc && !was_active)',
+  'if (rc && !was_active)','EnterVT rearms diagnostic'),
+
  ('M_REINIT_NOOP','lifecycle.c','if (d->returning) return TRI_E_BUSY;\n    if (!d->first_init_done) {',
   'if (d->returning) return TRI_E_BUSY;\n    if (d->active) return 0;\n    if (!d->first_init_done) {','active ScreenInit reapplies mode/palette/client'),
  ('M_SAVE_AFTER_INIT','lifecycle.c',
@@ -265,6 +274,23 @@ def check_trace(data):
                     trace.access(False,1,0x3DA,0x5A); trace.access(False,1,0x3DA,0x5A)
             trace.done()
         elif step==12:
+            # Read-only diagnostic immediately before the first LFB write.
+            for port,first,last in [(0x3C4,0,15),(0x3D4,0,24),
+                                    (0x3D4,25,95),(0x3CE,0,15)]:
+                selector=trace.access(False,1,port)
+                for index in range(first,last+1):
+                    trace.access(True,1,port,index)
+                    trace.access(False,1,port+1)
+                trace.access(True,1,port,selector)
+            selector=trace.access(False,1,0x3C0)
+            for index,value in zip(range(16,21),[0x41,0,15,0,0]):
+                trace.access(False,1,0x3DA,0x5A)
+                trace.access(True,1,0x3C0,index|32)
+                trace.access(False,1,0x3C1,value)
+            trace.access(False,1,0x3DA,0x5A)
+            trace.access(True,1,0x3C0,selector)
+            trace.access(False,1,0x3DA,0x5A)
+            trace.access(False,1,0x3CC,0xEB)
             # Row-span values carry the first dword; full H-equivalent bitmap
             # and its last byte are checked independently in the C harness.
             for row in range(480): trace.access(True,4,row*640,space=1,count=160)

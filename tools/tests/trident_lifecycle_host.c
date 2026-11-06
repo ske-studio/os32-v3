@@ -30,6 +30,8 @@ const TridentModuleContext *trident_context;
 static int (*recovery_callback)(void *);
 static void *recovery_opaque;
 static u32 output_traces;
+static char serial_text[8192];
+static u32 serial_length;
 static void emit(const void *p, u32 n)
 {
     u32 rc = 4;
@@ -37,7 +39,23 @@ static void emit(const void *p, u32 n)
 }
 int serial_gate_active(void) { return 0; }
 void serial_puts_polled(const char *s)
-{ if (emergency) ++emergency_logs; while (*s) if (*s++ == '\n') ++logs; }
+{
+    if (emergency) ++emergency_logs;
+    while (*s) {
+        if (serial_length + 1 < sizeof(serial_text)) serial_text[serial_length++] = *s;
+        if (*s++ == '\n') ++logs;
+    }
+    serial_text[serial_length] = 0;
+}
+static bool contains(const char *part)
+{
+    for (u32 i = 0; i < serial_length; ++i) {
+        u32 j = 0;
+        while (part[j] && serial_text[i+j] && part[j] == serial_text[i+j]) ++j;
+        if (!part[j]) return true;
+    }
+    return false;
+}
 void serial_puts(const char *s) { serial_puts_polled(s); }
 const PaletteEntry *palette_get_all(void) { return system_palette; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b)
@@ -135,6 +153,7 @@ int __wrap_trident_crtc_lock(struct trident_device *d,u16 base,bool lock)
 static int setup(bool use_mono, bool bad_dac)
 {
     device=(struct trident_device){0};
+    registers_pending=false; register_entry=0; serial_length=0; serial_text[0]=0;
     CHECK(!trident_fake_reset(&f,storage,sizeof(storage),trace,N(trace)));
     f.resources.client=client;
     f.resources.client_bytes=sizeof(client);
@@ -200,6 +219,12 @@ static int image(void)
     backend.present_rect(0,0,640,480);
     end(TRI_STEP_ACTIVE,start);
     f.trace_lfb=false;
+    CHECK(contains("stage=registers entry=1 SR00=03 01 0f 00 0e"));
+    CHECK(contains("CR10=ea 2c df 50 00 df 0b c3 ff"));
+    CHECK(contains("CR59=") && contains("GR00=") && contains("AR10=41 00 0f 00 00"));
+    CHECK(contains("MISC00=eb") && contains("START.CR0c=00") && contains("START.CR0d=00"));
+    CHECK(contains("START.CR1e=80") && contains("START.CR27=08"));
+    CHECK(!registers_pending && register_entry==1);
     CHECK(!device.last_rc && equal(counters.present_bytes,307200) && counters.commits==1);
     for (u32 i=0;i<sizeof(client);++i) CHECK(equal(storage[i],client[i]));
     for (u32 i=0;i<16;++i) {
@@ -217,6 +242,11 @@ static int sequence(void)
 {
     for (u32 m=0;m<2;++m) {
         CALL(setup(m,false)); CALL(start()); CALL(image());
+        u32 lines=logs;
+        if (!output_traces) {
+            backend.present_rect(0,0,1,1);
+            CHECK(logs==lines); /* one dump for this activation */
+        }
         struct trident_saved saved=device.saved;
         u32 ops=f.operations;
         backend.enter(); CHECK(equal(f.operations,ops));
@@ -242,6 +272,17 @@ static int sequence(void)
     client[0]=123; f.dac[0]=9;
     backend.enter(); CHECK(device.active && client[0]==123 && f.dac[0]==9);
     CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_VERIFY]==1);
+    CHECK(!contains("stage=registers")); /* not during Enable/client setup */
+    u8 sr[256], cr[256], gr[256], ar[32];
+    for (u32 i=0;i<256;++i) { sr[i]=f.sr[i]; cr[i]=f.cr_color[i]; gr[i]=f.gr[i]; }
+    for (u32 i=0;i<32;++i) ar[i]=f.ar[i];
+    backend.present_rect(0,0,1,1);
+    CHECK(contains("stage=registers entry=2 SR00=") && !registers_pending);
+    CHECK(client[0]==123 && storage[0]==123 && f.dac[0]==9);
+    for (u32 i=0;i<256;++i) CHECK(sr[i]==f.sr[i] && cr[i]==f.cr_color[i] && gr[i]==f.gr[i]);
+    for (u32 i=0;i<32;++i) CHECK(ar[i]==f.ar[i]);
+    CHECK((f.ar_index & 0x20) && !f.ar_data);
+    u32 lines=logs; backend.present_rect(0,0,1,1); CHECK(logs==lines);
     /* A second ScreenInit while active still resets mode/palette/client. */
     backend.init(); CHECK(!device.last_rc && device.active && client[0]==0);
     CHECK(calls[TRI_STEP_MODE]==3 && calls[TRI_STEP_ENABLE]==3 &&
@@ -295,6 +336,10 @@ static int failures(void)
     backend.present_rect(0,0,1,1); CHECK(!device.last_rc && counters.commits==1);
     /* Actual per-access error through real regs/present into HAL's void seam. */
     CALL(setup(false,false)); f.resources.mapped_bytes=TRI_DISPLAY_BYTES; CALL(start());
+    /* A failed diagnostic read is reported, never latched as a mode error. */
+    trident_fake_fail(&f,f.operations+3,-90); backend.present_rect(0,0,1,1);
+    CHECK(!device.last_rc && device.active && counters.commits==1);
+    CHECK(contains("SR00=?? 01 0f 00 0e"));
     trident_fake_fail(&f,f.operations+1,-91); backend.present_rect(0,0,1,1);
     CHECK(equal(device.last_rc,(u32)-91) && !backend.probe() && !device.active && logs);
     CALL(setup(false,false)); f.resources.mapped_bytes=TRI_DISPLAY_BYTES; CALL(start());

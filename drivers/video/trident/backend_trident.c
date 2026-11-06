@@ -7,6 +7,85 @@
 #include "lib/serial_diag.h"
 
 static struct trident_device device;
+static bool registers_pending;
+static u32 register_entry;
+
+/* Diagnostic only: indexed data is never written, no unlock/probe/VRAM test.
+ * Mode has already selected New mode, so reading SR0B keeps that mode.
+ * AR selections retain PAS=1 throughout; an ordinary AR read with PAS=0
+ * would blank the display. Restore selectors and leave AR in address phase.
+ * Values are observations, not new initialization success conditions. */
+static void register_row(const char *group, u32 first, const u8 *values,
+                         const bool *valid, u32 count)
+{
+    serial_puts_polled("[trident] stage=registers entry=");
+    serial_diag_u32(register_entry);
+    serial_puts_polled(" "); serial_puts_polled(group);
+    serial_diag_hex(first, 2); serial_puts_polled("=");
+    for (u32 i = 0; i < count; ++i) {
+        if (i) serial_puts_polled(" ");
+        if (valid[i]) serial_diag_hex(values[i], 2);
+        else serial_puts_polled("??");
+    }
+    serial_puts_polled("\n");
+}
+
+static void register_bank(u16 port, const char *group, u32 first, u32 last,
+                          u8 *values, bool *valid)
+{
+    u8 selector;
+    int saved = trident_read8(&device, TRI_SPACE_REGS, port, &selector);
+    for (u32 i = first; i <= last; ++i)
+        valid[i] = !trident_indexed_read(&device, port, i, &values[i]);
+    int restored = saved ? saved :
+        trident_write8(&device, TRI_SPACE_REGS, port, selector);
+    for (u32 i = first; i <= last; i += 16) {
+        u32 count = last - i + 1;
+        if (count > 16) count = 16;
+        register_row(group, i, values + i, valid + i, count);
+    }
+    if (restored) {
+        serial_puts_polled("[trident] register selector rc=");
+        serial_diag_i32(restored); serial_puts_polled("\n");
+    }
+}
+
+static void registers_before_present(void)
+{
+    if (!registers_pending || serial_gate_active()) return;
+    registers_pending = false;
+    u8 sr[16] = {0}, cr[96] = {0}, gr[16] = {0}, ar[21] = {0};
+    bool sv[16] = {0}, cv[96] = {0}, gv[16] = {0}, av[21] = {0};
+    /* Same bank/table order as H: SR, standard CR, extended CR, GR, AR.
+     * Extended CR starts at 19, kept separate from the standard 00..18. */
+    register_bank(TRI_SR_INDEX, "SR", 0, 15, sr, sv);
+    register_bank(device.cur_vga_base, "CR", 0, 24, cr, cv);
+    register_bank(device.cur_vga_base, "CR", 25, 95, cr, cv);
+    register_bank(TRI_GR_INDEX, "GR", 0, 15, gr, gv);
+    u8 selector = 0, ignored;
+    int saved = trident_read8(&device, TRI_SPACE_REGS, TRI_AR_INDEX, &selector);
+    for (u32 i = 16; i <= 20; ++i)
+        av[i] = !trident_ar_read(&device, device.cur_vga_base, i | 0x20, &ar[i]);
+    int reset = trident_read8(&device, TRI_SPACE_REGS, device.cur_vga_base + 6u, &ignored);
+    int restore = trident_write8(&device, TRI_SPACE_REGS, TRI_AR_INDEX,
+                                 saved ? 0x20 : selector);
+    int phase = trident_read8(&device, TRI_SPACE_REGS, device.cur_vga_base + 6u, &ignored);
+    register_row("AR", 16, ar + 16, av + 16, 5);
+    if (saved || reset || restore || phase) {
+        serial_puts_polled("[trident] register AR selector rc=");
+        serial_diag_i32(saved ? saved : reset ? reset : restore ? restore : phase);
+        serial_puts_polled("\n");
+    }
+    u8 misc = 0;
+    bool valid = !trident_read8(&device, TRI_SPACE_REGS, TRI_MISC_READ, &misc);
+    register_row("MISC", 0, &misc, &valid, 1);
+    const u8 indices[] = {0x0C, 0x0D, 0x1E, 0x27};
+    for (u32 i = 0; i < sizeof(indices); ++i) {
+        u8 index = indices[i];
+        register_row("START.CR", index, cr + index, cv + index, 1);
+    }
+}
+
 
 static void report(u32 stage, int rc)
 {
@@ -77,6 +156,8 @@ static void init(void)
     }
     rc = trident_screen_init(&device);
     if (rc) { finish(device.failed_step, rc, true); return; }
+    ++register_entry;
+    registers_pending = true;
     *trident_context->height = TRI_HEIGHT;
     *trident_context->flip = *trident_context->page = 0;
 }
@@ -94,7 +175,9 @@ static int query(GFX_ScreenInfo *info)
 }
 static void enter(void)
 {
+    bool was_active = device.active;
     int rc = trident_enter(&device);
+    if (!rc && !was_active) { ++register_entry; registers_pending = true; }
     finish(device.failed_step ? device.failed_step : TRI_STEP_MODE, rc, true);
 }
 /* No serial/console output inside the emergency callback trident_restore98. */
@@ -103,6 +186,7 @@ static void shutdown(void) { int rc = trident_close(&device); finish(device.fail
 static void present(int x, int y, int w, int h)
 {
     if (device.last_rc || !device.active) return;
+    registers_before_present();
     int rc = trident_present(&device, x, y, w, h);
     if (rc) { finish(TRI_STEP_ACTIVE, rc, true); return; }
     if (gfx_clip_screen(&x, &y, &w, &h, TRI_WIDTH, TRI_HEIGHT)) {
