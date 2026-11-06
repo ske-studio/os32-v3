@@ -139,7 +139,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 ## 6. (d) ハードウェアカーソル
 | 手本の列・前提 | OS32の列 / 誤りコード |
 |---|---|
-| C:510–516,938–975 nv11_cursor_upload、:980–1015 cursor_set、:1322 | HWは64×64×32bit、16KiBをVRAM予約。入力はpremultiplied ARGB8888 (LE byte B,G,R,A)、32×32も64×64へ透明padding。0<alpha<255だけalpha+1、0/255は保持。hide→CPU転送→posted write排出→offset→show。EFORMAT/ERANGE/ENOSPC。 |
+| C:510–516,938–975 nv11_cursor_upload、:980–1015 cursor_set、:1322 | HWは64×64×32bit、16KiBをVRAM予約。入力はpremultiplied ARGB8888 (LE byte B,G,R,A)。受付時に全画素の各RGB≤alphaを検査し、違反はhide/VRAM変更前にEFORMATで拒否する。32×32も64×64へ透明padding。0<alpha<255だけalpha+1、0/255は保持。hide→CPU転送→posted write排出→offset→show。EFORMAT/ERANGE/ENOSPC。 |
 | U:39–62 set_offset、REG:257–264、H:692 | CONFIG=04011100 (alpha blend bit28=0、PM)。CR30=80\|((off>>17)&7f)→CR31=((off>>11)&3f)<<2＋dblscan bit1→CR2f=off>>24。offは2KiB整列。I:341–349に従い680300をread→同値writeしてNV40 workaround。 |
 | U:21–28 set_pos、I:372–385 show、REG:301–303 | 位置=(x-hot_x,y-hot_y)、680300=((u16)y<<16)\|(u16)x。CR31 bit0だけshow/hideでRMW→位置再write。符号16bit範囲外ERANGE、画面端はHW clipping。 |
 - CPU画像寿命は呼出し終了まで、cursor VRAMはdisable/停止まで。画像更新は一時hideして上書き、失敗時hideのままrc、途中像を表示しない。完全透明・半透明・負座標・四隅・hotspotを試験する。

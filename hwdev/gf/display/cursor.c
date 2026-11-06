@@ -150,6 +150,16 @@ static i32 cursor_input(const struct gf4_cursor *im,u32 *pos,const struct gf4_he
     i64 span=(i64)(im->h-1U)*im->pitch+row;
     if (im->pitch<row || span>im->bytes ||
         (i64)(uptr)im->argb_pm+span-1>U32_MAX) return GF4_ERANGE;
+    /* crtc.c:944-960 assumes PM input before applying alpha+1.
+     * Validate the complete image before hiding or borrowing cursor VRAM. */
+    for (u32 y=0;y<im->h;++y) {
+        const u32 *src=(const u32 *)((const u8 *)im->argb_pm+y*im->pitch);
+        for (u32 x=0;x<im->w;++x) {
+            u32 pixel=src[x],alpha=pixel>>24;
+            if (((pixel>>16)&0xffU)>alpha || ((pixel>>8)&0xffU)>alpha ||
+                (pixel&0xffU)>alpha) return GF4_EFORMAT;
+        }
+    }
     return cursor_position(s->x,s->y,im->hot_x,im->hot_y,pos);
 }
 static i32 cursor_deadline(struct gf4_ctx *c,u32 dl)
