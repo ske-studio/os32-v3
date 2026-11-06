@@ -38,6 +38,7 @@ int dev_blk_write_lba(Device *d, u32 lba, int count, const void *buf) {
 #include "vfs_host_source.c"
 /* NULL validation must return before any mount resource changes. */
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; CHECK(0); }
+void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 #include "guest_probe_host_source.c"
 #include "arg_tables_host_source.c"
 static u32 *g_cur_frame;

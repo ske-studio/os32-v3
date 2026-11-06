@@ -14,6 +14,7 @@ void *kmalloc(u32 n) { return n == sizeof(heap) ? heap : 0; }
 #include PRODUCT_SOURCE
 /* No FD is opened by this mount/session unit. D6 owns permanent FD marking. */
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
+void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 static u8 response[SFS_BUFFER_FRAME];
 static u32 rx_at, rx_end, hello_count, bye_count, seen_deadline, seen_nonce;
 static u32 bye_deadline;

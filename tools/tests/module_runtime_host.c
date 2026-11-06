@@ -37,6 +37,7 @@ static void *mount_fs(int dev)
 }
 static void unmount_fs(void *ctx) { CHECK(ctx == &fs_context); }
 void vfs_fd_invalidate_mount(void *ctx) { CHECK(ctx == &fs_context); }
+void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 static VfsOps fs_ops = {.name = "fixture", .mount = mount_fs, .umount = unmount_fs, .resource_check = 0, .resource_refresh = 0};
 int kstrcmp(const char *a, const char *b)
 {

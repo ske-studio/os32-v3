@@ -12,6 +12,7 @@ void *kmalloc(u32 n) { return n == sizeof(heap) ? heap : 0; }
 #include "../../net/host_mailbox.c"
 #include "../../fs/serialfs/serialfs_persistent.c"
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
+void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 static u8 response[SFS_BUFFER_FRAME];
 static u32 pos, end, calls, hellos, budget, delay, hello_delay;
 static int status, silent, unknown, malformed, short_stat, bad_budget, extra, paged;
