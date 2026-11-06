@@ -1358,7 +1358,9 @@
       "down_active",
       "entry_clock",
       "epoch",
+      "last_milli_c",
       "last_rc",
+      "source_rc",
       "stop_pending"
     ],
     "struct gf5_image": [

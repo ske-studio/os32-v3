@@ -99,7 +99,7 @@ import test_gf5 as suite
 
 MUTATIONS = [
     ('fancheck-write', 'hwdev/gf/therm.c',
-     'rc=th_policy(g,&policy);', 'rc=th_init(g); if (!rc) rc=th_policy(g,&policy);', 'fancheck'),
+     'rc=th_policy(g,&policy,&unsupported);', 'rc=th_init(g); if (!rc) rc=th_policy(g,&policy,&unsupported);', 'fancheck'),
     ('fancheck-absence', 'hwdev/gf/therm.c',
      'if (rc) return rc;\n    if ((log[0]&2U)',
      'if (rc) return rc==GF5_ENODEV ? GF5_ENOTSUP : rc;\n    if ((log[0]&2U)', 'fancheck'),
@@ -107,8 +107,8 @@ MUTATIONS = [
      'if ((log[0]&2U) || (*line!=2 && *line!=9)) return GF5_ENOTSUP;',
      'if (false && ((log[0]&2U) || (*line!=2 && *line!=9))) return GF5_ENOTSUP;', 'fancheck'),
     ('fancheck-version', 'hwdev/gf/therm.c',
-     'if (r[0]!=0x10U) return GF5_ENOTSUP;',
-     'if (false && r[0]!=0x10U) return GF5_ENOTSUP;', 'fancheck'),
+     'if (!rc && unsupported) rc=GF5_ENOTSUP;',
+     'if (false && !rc && unsupported) rc=GF5_ENOTSUP;', 'fancheck'),
     ('fancheck-free', 'hwdev/gf/therm.c',
      'if (policy.trip) g->links.free(g->links.owner,policy.trip);',
      'if (false && policy.trip) g->links.free(g->links.owner,policy.trip);', 'fancheck'),

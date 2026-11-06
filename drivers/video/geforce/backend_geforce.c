@@ -484,7 +484,7 @@ static int geforce_heat_clear(void)
     int rc=gf5_therm_read(feature5,&sample);
     if (rc) return rc;
     i64 cool=((i64)feature5->fan.threshold[1]-feature5->fan.hyst[1])*1000;
-    if (!sample.calibrated || sample.milli_c>=cool) return GF5_EBUSY;
+    if (!sample.calibrated || sample.milli_c>cool) return GF5_EBUSY;
     feature5->heat.stop_pending=false;
     return 0;
 }

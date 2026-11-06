@@ -507,6 +507,24 @@ static void test_rom_thresholds(void)
         no_forbidden();
     }
 }
+static void test_unknown_fan_temperature(void)
+{
+    reset(); put32(R_P+0x58,R_FAN); rom[R_FAN]=0x11;
+    const u8 tag[]={0x08,0x07,0x04,0x32};
+    const u32 limit[]={70,80,100,120},hyst[]={2,4,6,8};
+    for (u32 i=0;i<COUNT(tag);++i) entry(tag[i],(limit[i]<<4)|hyst[i]);
+    /* The therm fan trip remains the fallback for an unreadable fan table. */
+    entry(0x24,(50U<<4)|2U);
+    ready();
+    assert(h.ctx.fan.sensor_poll && h.ctx.fan.ntrip==1);
+    assert(gf5_fan_check_cstate(&h.ctx,50)==GF5_ENOTSUP);
+    for (u32 i=0;i<COUNT(tag);++i) {
+        assert(h.ctx.fan.threshold[i]==(i32)limit[i] && h.ctx.fan.hyst[i]==(i32)hyst[i]);
+        sensor_at(h.ctx.next_sensor,limit[i]);
+        assert(h.ctx.fan.active[i] && h.ctx.fan.sensor_poll);
+    }
+    assert(heat_samples==4 && pause_count==1 && h.ctx.heat.stop_pending);
+}
 static void test_fanless_heat(void)
 {
     /* ENODEV is absence; ENOTSUP remains an unsupported existing fan.
@@ -987,7 +1005,7 @@ void _start(void)
 {
     test_temperature(); test_policy(); test_pwm(); test_failures();
     test_auto(); test_sensor(); test_toggle_and_wrap();
-    test_sensor_time(); test_rom_thresholds(); test_fanless_heat();
+    test_sensor_time(); test_rom_thresholds(); test_unknown_fan_temperature(); test_fanless_heat();
     test_boost_hold(); test_heat_failure();
     test_independent_alarms(); test_boost_auto(); test_gpio_source(); test_resume();
     test_fan_retry(); test_boost_mode_failure();

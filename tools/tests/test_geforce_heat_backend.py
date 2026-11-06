@@ -23,9 +23,9 @@ ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('probe-latch', 'if (geforce_context->heat && geforce_context->heat->latched) ok=0;',
      'if (0) ok=0;'),
-    ('stop-route', 'if (pc98_route_to_98()) rc = -1;', 'if (0 && pc98_route_to_98()) rc = -1;'),
+    ('stop-route', 'int route_rc = pc98_route_to_98();', 'int route_rc = ((void)pc98_route_to_98, 0);'),
     ('stop-active', 'active = routed = 0;', 'active = routed = 1;'),
-    ('cool-gate', 'sample.milli_c>=cool', 'sample.milli_c>cool'),
+    ('cool-gate', 'sample.milli_c>cool', 'sample.milli_c>=cool'),
 ]
 def case(folder, label, mutation=None):
     path=ROOT/'drivers/video/geforce/backend_geforce.c'

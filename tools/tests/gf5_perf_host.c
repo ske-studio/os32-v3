@@ -472,17 +472,17 @@ static void heat_steps(void)
     assert(!heat_sample(HEAT_HOT,true)); heat_at(135000,1);
     assert(!heat_sample(HEAT_HOT,true)); heat_at(108000,1);
     assert(!heat_sample(HEAT_HOT,true)); heat_at(108000,0);
-    /* Two cool samples do nothing; equality breaks the sequence. */
+    /* Two cool samples do nothing; above the boundary resets them. */
     for (u32 i=1;i<=2;++i) {
         assert(!heat_sample(HEAT_COOL,true)); heat_at(108000,0);
         assert(h.ctx.heat.cool_samples==i);
     }
-    assert(!heat_sample(HEAT_EQUAL,true)); heat_at(108000,0);
+    assert(!heat_sample(HEAT_EQUAL+1,true)); heat_at(108000,0);
     assert(!h.ctx.heat.cool_samples);
     for (u32 step=0;step<4;++step) {
         u32 before=heat_current.core_khz;
         for (u32 i=1;i<=3;++i) {
-            assert(!heat_sample(HEAT_COOL,true));
+            assert(!heat_sample(HEAT_EQUAL,true));
             heat_at(i==3 ? before+27000 : before,i==3);
             assert(h.ctx.heat.cool_samples==(i==3 ? 0 : i));
         }

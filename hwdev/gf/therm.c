@@ -32,9 +32,6 @@
  * The production gf5 owns the parsed trip allocation for
  * its lifetime; snapshots borrow/copy it under the feature5.h contract. */
 #include "feature5.h"
-#ifdef GF_PRODUCTION_MODULE
-#include "geforce_module.h"
-#endif
 #include "../../include/kprintf.h"
 #define GF_ROM_BIT_ONLY
 #include "rom.inc"
@@ -172,9 +169,10 @@ static i32 th_perf_divisor(struct gf5 *g,u32 perf,u32 *divisor)
     }
     return 0;
 }
-static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f)
+static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f,bool *unsupported)
 {
     /* therm/temp.c:26-54; therm/fan.c:184-210. */
+    if (unsupported) *unsupported=false;
     *f=(struct gf5_fan_saved){.mode=GF5_FAN_NONE,.kind=GF5_FAN_OTHER,
         .max_duty=TH_PERCENT,.bump_ms=TH_BUMP_MS,.slow_ms=TH_SLOW_MS,
         .linear_min=TH_LINEAR_MIN,.linear_max=TH_LINEAR_MAX,.last_trip=-1,
@@ -197,7 +195,7 @@ static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f)
     if (fan) {
         if (!th_span(g,fan,4)) return GF5_EBIOS;
         const u8 *r=g->rom.bytes+fan;
-        if (r[0]!=0x10U) return GF5_ENOTSUP;
+        if (r[0]!=0x10U && unsupported) *unsupported=true;
         if (r[0]==0x10U) {
             u32 hdr=r[1],stride=r[2],n=r[3];
             if (hdr<4 || stride<TH_FAN_ENTRY_BYTES ||
@@ -296,7 +294,7 @@ static i32 th_init(struct gf5 *g)
 {
     if (g->fan.sensor_setup && g->fan.sensor_setup!=TH_OFF_SETUP) return 0;
     struct gf5_fan_saved f;
-    i32 rc=th_policy(g,&f);
+    i32 rc=th_policy(g,&f,0);
     if (rc) return rc;
     rc=th_setup(g);
     if (rc) {
@@ -367,8 +365,10 @@ i32 gf5_fan_check_cstate(struct gf5 *g,u8 percent)
      * the ADC. Release any temporary trip allocation on every exit. */
     if (!rc) {
         struct gf5_fan_saved policy;
-        rc=th_policy(g,&policy);
+        bool unsupported=false;
+        rc=th_policy(g,&policy,&unsupported);
         if (policy.trip) g->links.free(g->links.owner,policy.trip);
+        if (!rc && unsupported) rc=GF5_ENOTSUP;
         if (!rc) {
             u8 line,log[2];
             rc=th_fan_route(g,&line,log);
@@ -629,6 +629,7 @@ static void th_monitor_off(struct gf5 *g,i32 rc,const char *reason)
     if (g->heat.down_active || g->heat.critical_paused) {
         g->heat.stop_pending=true;
         g->heat.last_rc=gf5_rc_map(source);
+        g->heat.source_rc=source;
     }
     g->fan.sensor_poll=false;
     g->next_sensor=0;
@@ -652,6 +653,7 @@ static i32 th_sensor(struct gf5 *g,u64 now)
         th_monitor_off(g,rc,"sensor");
         return 0;
     }
+    g->heat.last_milli_c=t.milli_c;
     g->next_sensor=now+GF5_SENSOR_INTERVAL_US;
     bool critical_changed=false,boost_rising=false;
     for (u32 i=0;i<GF5_THERM_THRESHOLDS;++i) {
@@ -669,9 +671,8 @@ static i32 th_sensor(struct gf5 *g,u64 now)
     if (t.milli_c>=(i64)f->threshold[TH_SHUTDOWN]*TH_MILLI) {
         g->heat.stop_pending=true;
         g->heat.cool_samples=0;
-#ifdef GF_PRODUCTION_MODULE
-        geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);
-#endif
+        g->heat.last_rc=GF5_ESTATE;
+        g->heat.source_rc=g->source_rc;
     } else if (critical_changed && g->emergency.pause)
         g->emergency.pause(g->emergency.owner,f->active[TH_CRITICAL]);
     i32 heat_rc=gf5_heat_step(g,&t,now);

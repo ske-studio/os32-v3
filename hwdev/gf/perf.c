@@ -324,6 +324,7 @@ static i32 heat_error(struct gf5 *g,i32 rc)
     g->heat.cool_samples=0;
     g->heat.stop_pending=true;
     g->heat.last_rc=gf5_rc_map(rc);
+    g->heat.source_rc=raw_rc;
     g->last_rc=g->heat.last_rc; g->source_rc=raw_rc;
     return g->last_rc;
 }
@@ -347,7 +348,7 @@ i32 gf5_heat_step(struct gf5 *g,const struct gf5_thermal *sample,u64 now)
     if (!g->heat.down_active && temp<down) return finish(g,0);
     bool lowering=temp>=down;
     if (!lowering) {
-        if (temp>=cool || g->heat.critical_paused) {
+        if (temp>cool || g->heat.critical_paused) {
             g->heat.cool_samples=0; return finish(g,0);
         }
         if (++g->heat.cool_samples<GF5_HEAT_COOL_SAMPLES) return finish(g,0);

@@ -154,15 +154,15 @@ void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
 | 段／条件 | 決定・手本との差分 |
 |---|---|
 | 共通 | VBIOSの4しきい値/hystを使う（N/therm/temp.c:104–158）。成功した毎秒測定で判定し、shutdownを最優先する。edge通知だけに依存せずdownclockの継続/復帰を毎秒heat_stepへ渡す。fan失敗でも熱判定を続ける。 |
-| fan_boost | temp>=fan_boostで100%要求（既存ROM clamp）。active中はMANUAL/NONE/perfからのfan下げを抑える。tempがfan_boost−hystを下回れば通常制御へ。不存在/失敗は別記録し監視を継続（N/therm/fan.c:32–74）。 |
+| fan_boost | temp>=fan_boostで100%要求（既存ROM clamp）。active中はMANUAL/NONE/perfからのfan下げを抑える。tempがfan_boost−hyst以下なら通常制御へ。不存在/失敗は別記録し監視を継続（N/therm/fan.c:32–74）。 |
 | downclock | emergency.downclockをperf.cの熱状態へ結線。temp>=downclockで初回即時1段、以後超過中は1秒に1段下げる。有効perfのcore/shaderが現値を両方超えず一方が低い候補を、core降順・同値shader降順・同値bios_index順に選ぶ。calcとdecode上限検査が成功する隣の有効段を使う。mem/電圧は固定、core progのみ（N/clk/nv40.c:146–195）。 |
-| 下限と復帰 | 最低有効段では同値の再書込みをしない。downclock−hystを**下回る**有効1秒測定が3回連続したら隣の有効段へ1段上げ、計数を0へ。上げた後の次測定で再超過すれば直ちに1段下げる。等値/測定失敗/超過で計数0。開始時entry_clockを上限とし、超えるBIOS段へは戻さない。候補は降下と同じ到達可能な段列を使う。 |
-| critical | O/therm.c:643–646のemergency.pauseをfeature5_service.cのadapterへ結線。上昇時は受付を閉じ、O/feature5.h:80–81のlinks.drain_pause(owner)を1回呼ぶ。走査/表示設定には触れない。critical−hystを下回ればlinks.unpause、成功後だけ受付を開く。SAVED/FAULTなど別の閉鎖理由がある間は開かず、critical自身が取得したpauseだけを解除する。 |
+| 下限と復帰 | 最低有効段では同値の再書込みをしない。downclock−hyst以下の有効1秒測定が3回連続したら隣の有効段へ1段上げ、計数を0へ。上げた後の次測定で再超過すれば直ちに1段下げる。測定失敗/冷却境界超過で計数0。開始時entry_clockを上限とし、超えるBIOS段へは戻さない。候補は降下と同じ到達可能な段列を使う。 |
+| critical | O/therm.c:643–646のemergency.pauseをfeature5_service.cのadapterへ結線。上昇時は受付を閉じ、O/feature5.h:80–81のlinks.drain_pause(owner)を1回呼ぶ。走査/表示設定には触れない。critical−hyst以下ならlinks.unpause、成功後だけ受付を開く。SAVED/FAULTなど別の閉鎖理由がある間は開かず、critical自身が取得したpauseだけを解除する。 |
 | critical中の入口 | F2描画入口は既存GF2_ESTATE (-207、O/command.h:13)、F4公開口はGF4_ESTATE、F5通常操作はGF5_ESTATEへ既存mapperで伝える。待機キューに積まず受付閉を維持。void描画口は既存last/sourceへ記録。熱の測定/fanと管理停止だけは通す。pause/unpause失敗はFAULT/閉鎖維持＋stop_pending。 |
 | shutdown | temp>=shutdownで直ちに停止要求。降速完了やアプリ終了を待たない。前景poll出口で再入防止を保って1回消費し、`gf_production_return()`→`geforce_return()`→platform stop→pc98_route_to_98を使う（O/kernel/sys.c:24–27、O/drivers/video/geforce/geforce_module.c:77–82）。停止失敗も記録して帰還を試みる。N/therm/temp.c:118–127のpoweroffとの差はユーザー決定。 |
 | 帰還先無し | geforce_returnにpc98_route_safe()==0分岐を追加。GeForce stopを先行し、vfs_sync（O/fs/vfs.c:738）を試み、理由/最後の温度/stop・syncのrcをシリアルへ記録して割込み禁止のhaltループへ。stopの成功だけを電源断/冷却成功と呼ばない。 |
 | 故障 | 下段候補無しだけでは停止せず最低段維持。clock読取/計算/program/readback失敗、熱抑制中のsensor喪失、FAULTで必要な降速不能はstop_pendingに理由を残して保護停止。fan無し単独では停止しない。 |
-| 外部操作と再入場 | 抑制中は直接clock/RAM/perfからceilingを超える要求をEBUSY。save/restoreも熱状態を巻き戻さない。shutdown後は自動再入場禁止。常駐latchはstop/saveで消さず、有効な新しい測定がdownclock−hystを下回った後の明示gf2 enter/gfxmodeだけを許す。停止後も窓が有効なら測定継続、窓が無ければ明示操作の準備段で描画を開く前にsensorを初期化・測定し、失敗なら拒否。 |
+| 外部操作と再入場 | 抑制中は直接clock/RAM/perfからceilingを超える要求をEBUSY。save/restoreも熱状態を巻き戻さない。shutdown後は自動再入場禁止。常駐latchはstop/saveで消さず、有効な新しい測定がdownclock−hyst以下になった後の明示gf2 enter/gfxmodeだけを許す。停止後も窓が有効なら測定継続、窓が無ければ明示操作の準備段で描画を開く前にsensorを初期化・測定し、失敗なら拒否。 |
 
 - PM決定の3回・1段復帰はOS32方針。手本のalarmを協調前景に移すため、検出は§5の最初の協調点。critical中は昇速を保留し、unpause後に新たに3測定を数える。
 - `gfx_shutdown`は使わない。O/gfx/gfx_core.c:433–440のcaller/owner検査により、GUIの非所有アプリが停止要求を消費すると無処理になるため。`gfx/gfx_emergency.c`はこの作業木には存在せず、Trident枝wt/tri-intの物である。

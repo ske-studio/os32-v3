@@ -5,15 +5,6 @@
 #include "gf5_therm_host.c"
 #undef _start
 static u32 samples,failed_samples;
-#ifdef GF_PRODUCTION_MODULE
-static u32 stop_requests;
-static i32 stop_temp,stop_source;
-void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
-{
-    assert(reason==GF5_ESTATE);
-    stop_requests++; stop_temp=milli_c; stop_source=source_rc;
-}
-#endif
 static i32 sampled_temp;
 static u64 sampled_time;
 static bool shutdown_seen;
@@ -32,9 +23,6 @@ static void begin(void)
 {
     reset(); ready(); h.observe=t1_observe;
     samples=failed_samples=0; shutdown_seen=false;
-#ifdef GF_PRODUCTION_MODULE
-    stop_requests=0;
-#endif
 }
 static void sample(u32 temp)
 {
@@ -59,9 +47,8 @@ static void test_samples(void)
     begin(); sample(135);
     assert(shutdown_seen && h.ctx.heat.stop_pending && !pause_count);
     assert(samples==1 && !down_count);
-#ifdef GF_PRODUCTION_MODULE
-    assert(stop_requests==1 && stop_temp==135000 && !stop_source);
-#endif
+    assert(h.ctx.heat.last_rc==GF5_ESTATE && h.ctx.heat.last_milli_c==135000 &&
+           !h.ctx.heat.source_rc);
 }
 static void test_maximum(void)
 {

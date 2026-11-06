@@ -2,6 +2,9 @@
  * GF_FEAT5_DESIGN, final C2-service and phase/slot contracts.  This is
  * OS32 lifecycle glue; it does not implement a hardware sequence. */
 #include "production.h"
+#ifdef GF_PRODUCTION_MODULE
+#include "geforce_module.h"
+#endif
 #include "../../include/kprintf.h"
 
 static struct gf5_test_ops service_ops;
@@ -77,7 +80,7 @@ static void service_heat_failure(struct gf5 *g,i32 rc)
     g->accepting=false;
     g->phase=GF5_FAULT;
     gf5_plan_invalidate(g);
-    g->source_rc=rc;
+    g->source_rc=g->heat.source_rc=rc;
     g->last_rc=g->heat.last_rc=gf5_rc_map(rc);
     g->heat.cool_samples=0;
     g->heat.stop_pending=true;
@@ -183,8 +186,7 @@ i32 gf5_service_poll(struct gf5 *g)
         g->poll_source="clock64";
         g->poll_off=true;
         kprintf(KLOG_ATTR,"[gf5] clock off rc=%d reason=clock64\n",rc);
-        service_complete(g);
-        return 0; /* clock failure is confined to the F5 worker. */
+        goto complete; /* clock failure is confined to the F5 worker. */
     }
     /* A successful tick must not erase an earlier diagnostic. */
     previous_source=g->poll_source;
@@ -198,7 +200,14 @@ i32 gf5_service_poll(struct gf5 *g)
         g->source_rc=previous_source_rc;
         g->poll_source=previous_source;
     }
+complete:
     service_complete(g);
+#ifdef GF_PRODUCTION_MODULE
+    /* Value handoff only; the resident poll stops after releasing this loan.
+     * All protective stops share the resident re-entry latch. */
+    if (g->heat.stop_pending)
+        geforce_heat_stop_request(g->heat.last_rc,g->heat.last_milli_c,g->heat.source_rc);
+#endif
     return 0; /* F5 alarms never fail foreground rendering. */
 }
 

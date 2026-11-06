@@ -179,6 +179,36 @@ static void u6_critical(void)
     g->display->saved_closed=false;
     scanlog_finish();
 }
+/* Separate from the empty-table critical fixture: one reachable lower
+ * pstate, v0x21 core MHz at +6, memory at +11 (bios/perf.c). */
+static void u6_downclock_stop(bool sensor_failure)
+{
+    u6_setup();
+    struct gf5 *g=&cint_prod.feature5;
+    scanlog_put(S_PERF+2,1,1);
+    scanlog_put(S_PERF+8+6,108,2);
+    scanlog_put(S_PERF+8+11,270,2);
+    gf5_rom_release(g);
+    assert(!gf5_rom_acquire(g,scanlog_rom,sizeof(scanlog_rom),0));
+    u6_sample(96);
+    if (!sensor_failure)
+        /* ADC write is first; first PLL write must fail at runtime. */
+        gf3_host_fail_at(&cint_host,H_WRITE,cint_host.calls[H_WRITE]+2,-881);
+    geforce_foreground_poll();
+    if (sensor_failure) {
+        assert(g->heat.down_active && !g->heat.stop_pending && active && routed);
+        u6_sample(97);
+        gf3_host_fail_at(&cint_host,H_READ,cint_host.calls[H_READ]+1,-882);
+        geforce_foreground_poll();
+        assert(!g->fan.sensor_poll);
+    }
+    assert(g->heat.stop_pending && g->heat.last_rc==GF5_EIO);
+    assert(heat_source_rc==(sensor_failure ? -882 : -881));
+    assert(heat_milli_c==96000 && heat_reason==GF5_EIO);
+    assert(!active && !routed && !scanlog_route && !heat_pending);
+    assert(heat_bridge.latched && u6_app.abort_req && !geforce_probe());
+    scanlog_finish();
+}
 static void u6_cooperative(void)
 {
     u6_setup();
@@ -258,7 +288,7 @@ static void u6_shutdown(void)
         u6_sample(120);
         int rc=geforce_heat_latch_clear();
         assert(rc==GF5_EBUSY && heat_bridge.latched);
-        u6_sample(30);
+        u6_sample(92);
         assert(!geforce_heat_latch_clear() && !heat_bridge.latched);
         assert(geforce_probe());
         scanlog_finish();
@@ -269,6 +299,7 @@ void _start(void)
     scanlog_map(CINT_FB_PHYS,GF_MODE_VRAM_BYTES);
     scanlog_map(SCANLOG_BAR0,0x101000U);
     u6_critical();
+    u6_downclock_stop(false); u6_downclock_stop(true);
     u6_cooperative(); u6_fault_monitor(); u6_shutdown();
     u6_setup(); u6_safe=false;
 #ifdef U6_REBOOT

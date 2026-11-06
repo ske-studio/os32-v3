@@ -102,9 +102,9 @@ import sys
 import test_gf5 as suite
 
 MUTATIONS = [
-    ('resident-shutdown-request', 'hwdev/gf/therm.c',
-     'geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);',
-     'if (0) geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);', 'therm_t1'),
+    ('shutdown-reason', 'hwdev/gf/therm.c',
+     'g->heat.last_rc=GF5_ESTATE;',
+     'g->heat.last_rc=0;', 'therm_t1'),
     ('boost-auto-mode', 'hwdev/gf/therm.c',
      'if (boost_rising && f->mode!=GF5_FAN_AUTO)',
      'if (false && boost_rising && f->mode!=GF5_FAN_AUTO)', 'therm_t1'),

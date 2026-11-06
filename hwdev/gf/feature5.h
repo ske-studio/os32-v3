@@ -42,7 +42,7 @@ struct gf5_heat_state {
     bool down_active, critical_paused, stop_pending;
     u32 cool_samples, epoch;
     struct gf5_clock entry_clock, ceiling;
-    i32 last_rc;
+    i32 last_rc, source_rc, last_milli_c;
 };
 struct gf_init_program;
 /* C2-ROM owns full ROM and completed M program, independently of devinit

@@ -62,9 +62,9 @@ void _start(void)
     CHECK(test_heat.clear()==GF5_ESTATE && !reads);
     identity_rc=0; read_rc=GF5_EIO;
     CHECK(test_heat.clear()==GF5_EIO && test_heat.latched);
-    read_rc=0; temperature=80000;
+    read_rc=0; temperature=80001;
     CHECK(test_heat.clear()==GF5_EBUSY && test_heat.latched);
-    temperature=79999;
+    temperature=80000;
     CHECK(!test_heat.clear() && n==(int)before && !active && !routed);
     /* The resident owner clears only after this callback succeeds. */
     test_heat.latched=false;
