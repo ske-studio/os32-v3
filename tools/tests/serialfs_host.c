@@ -131,7 +131,7 @@ static void f_idle(void *ctx)
 
 static int f_can_wait(void *ctx) { (void)ctx; return g_can_wait; }
 
-static const SfsIo g_fio = { f_put, f_get, f_now, f_idle, f_can_wait };
+static const SfsIo g_fio = { f_put, f_get, f_now, f_idle, f_can_wait, 0 };
 
 /* ======================================================================== */
 /*  偽のホスト                                                              */
@@ -1230,7 +1230,7 @@ static int p_get(void *ctx)
 }
 static void p_idle(void *ctx) { (void)ctx; usleep(1000); }
 static int p_can_wait(void *ctx) { (void)ctx; return 1; }
-static const SfsIo g_pio = { p_put, p_get, p_now, p_idle, p_can_wait };
+static const SfsIo g_pio = { p_put, p_get, p_now, p_idle, p_can_wait, 0 };
 
 static int mode_pipe(void)
 {
@@ -1310,3 +1310,8 @@ int main(int argc, char **argv)
     else { fprintf(stderr, "unknown case %s\n", c); return 2; }
     return failed ? 1 : 0;
 }
+
+/* C1 is a separate unit; these legacy UART/LAN tests never start residency. */
+int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
+const SfsClient *sfs_persistent_client(void) { return 0; }
+void sfs_persistent_stale(void) { }

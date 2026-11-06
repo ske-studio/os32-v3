@@ -78,6 +78,12 @@ void sfs_lan_reset(SfsLan *lan)
 { if (lan_callable()) candidate.lan_reset(lan); }
 static int lan_put(void *ctx, const u8 *buf, u32 n)
 { return lan_callable() ? candidate.io.put(ctx, buf, n) : -1; }
+static int lan_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
+{
+    if (!lan_callable()) return -1;
+    return candidate.io.put_until ? candidate.io.put_until(ctx, buf, n, deadline) :
+                                   candidate.io.put(ctx, buf, n);
+}
 static int lan_get(void *ctx)
 { return lan_callable() ? candidate.io.get(ctx) : -1; }
 static u32 lan_now(void *ctx)
@@ -86,7 +92,7 @@ static void lan_idle(void *ctx)
 { if (lan_callable()) candidate.io.idle(ctx); }
 static int lan_can_wait(void *ctx)
 { return lan_callable() ? candidate.io.can_wait(ctx) : 0; }
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait};
+const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until};
 
 int lan_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
 {

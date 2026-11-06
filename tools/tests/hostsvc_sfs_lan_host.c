@@ -42,8 +42,8 @@ static void old_mac(u8 *mac) { (void)mac; private_calls++; }
 static const SfsLanNic old_nic = {old_send, old_recv, old_mac};
 static u32 clock_now(void *ctx) { (void)ctx; return now; }
 static int clock_wait(void *ctx) { (void)ctx; return wait_ok; }
-static void clock_idle(void *ctx) { (void)ctx; now++; busy = 0; }
-static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait};
+static void clock_idle(void *ctx) { (void)ctx; now++; if (busy == 1) busy = 0; }
+static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait, 0};
 static u8 *frame(int sfs, int corrupt, int stranger)
 {
     u8 payload[SFS_HELLO_RSP_LEN] = {0};
@@ -99,6 +99,23 @@ static int suite(void)
     u32 before = sends;
     REQUIRE(sfs_lan_io.put(&lan, request, n) == -1 && sends == before);
     REQUIRE(!private_calls);
+    wait_ok = 1;
+    /* Absolute deadline wins after ensure has consumed 90 ticks. */
+    now = 90; busy = 2; before = sends;
+    REQUIRE(sfs_lan_io.put_until(&lan, request, n, 100) == OS32_ERR_TIMEOUT);
+    REQUIRE(now == 100 && sends - before == 10);
+    before = sends; busy = 0;
+    REQUIRE(sfs_lan_io.put_until(&lan, request, n, 100) == OS32_ERR_TIMEOUT);
+    REQUIRE(sends == before);
+    /* The transport's own 1000ms + one-tick bound still wins for a distant deadline. */
+    now = 0xfffffff0u; busy = 2; before = sends;
+    REQUIRE(sfs_lan_io.put_until(&lan, request, n, now + 200) == OS32_ERR_TIMEOUT);
+    REQUIRE(now == 85 && sends - before == 101);
+    now = 0xfffffff0u; before = sends;
+    REQUIRE(sfs_lan_io.put_until(&lan, request, n, now + 10) == OS32_ERR_TIMEOUT);
+    REQUIRE(now == 0xfffffffau && sends - before == 10);
+    busy = 0;
+    REQUIRE(sfs_lan_io.put_until(&lan, request, n, now + 10) == 0);
     return 0;
 }
 void _start(void)
