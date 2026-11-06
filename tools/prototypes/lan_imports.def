@@ -174,6 +174,49 @@
       "source": "lib/kstring.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "net_adapter_register",
+      "source": "net/nic.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "net_rx_take",
+      "source": "net/nic.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "net_rx_reset",
+      "source": "net/nic.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "net_tx",
+      "source": "net/nic.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "net_mac",
+      "source": "net/nic.h",
+      "context": "normal",
+      "irq": true,
+      "declaration": "int net_mac(u8 out[6]);"
+    },
+    {
+      "symbol": "lan_module_session_acquire",
+      "source": "drivers/net/e82557/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_session_release",
+      "source": "drivers/net/e82557/lan_module.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

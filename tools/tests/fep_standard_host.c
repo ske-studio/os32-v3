@@ -121,6 +121,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 #include "../../lib/sqlite3/os32_sqlite_vfs.c"
 #define OS32_SQLITE_DIRECT_TEST 1
 #include "../../kernel/ime/ime_dict.c"
+#include "fep_store_host.h"
 
 static void close_db(Os32SqliteGroup *g, sqlite3 *db)
 {

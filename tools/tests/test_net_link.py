@@ -47,17 +47,17 @@ TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (
     ('l0-timeout-not-counted', 'link_selftest.inc',
-     'if (link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)',
-     'if (0 && link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)',
+     'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
+     'if (rc == OS32_ERR_AGAIN)',
      'l0_failures_are_counted_once'),
     ('l0-stale-counted-twice', 'link_selftest.inc',
-     'link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN',
-     'link_host_status(h, &st, &ln, LINK_SELF_OWNER) < 0',
+     'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
+     'if (rc < 0)',
      'l0_failures_are_counted_once'),
     ('resync-counts-stale-again', 'link.c',
      'if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {',
      'if (e->state != LINK_H_FREE) {',
-     'r6_agent_silence_resyncs_and_stales_handles'),
+     'r6_agent_silence_expires_then_resync_stales_handles'),
     ('wdata-ack-keeps-pending-length', 'link_rx.inc',
      '            e->wlen = 0;\n            e->wseq++;',
      '            e->wseq++;', 'write_contract_declared_length'),
@@ -85,11 +85,13 @@ MUTATIONS = (
 )
 
 
-def check_mutations(tmp):
+def check_mutations(tmp, cases):
     """Mutate full product files in isolation; a compile failure is not RED."""
     originals = {path.name: path.read_text() for path in
                  (ROOT / 'net/link.c', *sorted((ROOT / 'net').glob('link_*.inc')))}
     for name, filename, old, new, case in MUTATIONS:
+        if cases and case not in cases:
+            continue
         assert originals[filename].count(old) == 1, (name, 'marker must be unique')
         with tempfile.TemporaryDirectory(prefix='net-link-mut-') as directory:
             mutated = pathlib.Path(directory)
@@ -160,8 +162,10 @@ def check_timer_calls_link_tick():
                      *sorted((ROOT / directory).glob("link_*.inc"))):
             if re.search(r"tick_register\s*\([^,]+,\s*link_tick\s*\)", path.read_text()):
                 registrations.append(path.relative_to(ROOT).as_posix())
-    assert registrations == ["net/link.c"], registrations
-    assert "tick_register(PC98_TICK_LINK, link_tick)" in (ROOT / "net/link.c").read_text()
+    assert registrations == [], registrations
+    nic = (ROOT / "net/nic.c").read_text()
+    assert "tick_register(PC98_TICK_LINK, net_tick)" in nic
+    assert "link_tick();" in nic
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"
     link = "\n".join(path.read_text(encoding="utf-8") for path in
@@ -170,8 +174,12 @@ def check_timer_calls_link_tick():
     assert len(re.findall(r"\blink_tick\s*\(", link)) == 1, \
         "net/link.c / link_*.inc の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
     lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
-    assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
-        "反射モードで link_init を止めていない"
+    lgy = re.sub(r"/\*.*?\*/", "", lgy, flags=re.S)
+    assert not re.search(r"\blink_init\s*\(", lgy), \
+        "LGY が共有 NIC 所有者より先に link_init を呼んでいる"
+    assert re.search(r"if \(!\(flags & LGY98_FLAG_REFLECT\)\)\s*\{\s*"
+                     r"rc = net_adapter_register\(NET_NIC_LGY98, &net_lgy98_adapter\);", lgy), \
+        "反射モードを共有 NIC として登録している"
     print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
 
 
@@ -223,5 +231,5 @@ if __name__ == "__main__":
         rc = run_fixture([exe, *cases])
         print("EXIT net_link_host=%d" % rc, flush=True)
         if rc == 0 and '--mutate' in sys.argv:
-            check_mutations(tmp)
+            check_mutations(tmp, cases)
         sys.exit(rc)

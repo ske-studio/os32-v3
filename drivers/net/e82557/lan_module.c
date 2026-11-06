@@ -78,6 +78,12 @@ void sfs_lan_reset(SfsLan *lan)
 { if (lan_callable()) candidate.lan_reset(lan); }
 static int lan_put(void *ctx, const u8 *buf, u32 n)
 { return lan_callable() ? candidate.io.put(ctx, buf, n) : -1; }
+static int lan_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
+{
+    if (!lan_callable()) return -1;
+    return candidate.io.put_until ? candidate.io.put_until(ctx, buf, n, deadline) :
+                                   candidate.io.put(ctx, buf, n);
+}
 static int lan_get(void *ctx)
 { return lan_callable() ? candidate.io.get(ctx) : -1; }
 static u32 lan_now(void *ctx)
@@ -86,7 +92,7 @@ static void lan_idle(void *ctx)
 { if (lan_callable()) candidate.io.idle(ctx); }
 static int lan_can_wait(void *ctx)
 { return lan_callable() ? candidate.io.can_wait(ctx) : 0; }
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait};
+const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until};
 
 int lan_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
 {
@@ -229,6 +235,15 @@ int lan_module_load(void)
     int rc = module_load(&request, &lan_handle);
     if (!rc) rc = module_start(lan_handle);
     if (!rc && !module_exports(lan_handle)) rc = MODULE_INIT_FAILED;
+    /* POST_ROOT precedes BOOT_NIC_LEGACY: publish a detected 82557 first,
+     * so AUTO keeps its priority when LGY registers later. The adapter stays
+     * in lan.mod; net_start acquires its active reference before binding. */
+    if (!rc && candidate.adapter &&
+        (e82557_state() == E82557_RUNNING || e82557_state() == E82557_RX_WAIT ||
+         e82557_state() == E82557_RECOVER)) {
+        rc = net_adapter_register(NET_NIC_E82557, candidate.adapter);
+        if (!rc) rc = net_start(NET_NIC_AUTO, NULL);
+    }
     kprintf(KLOG_ATTR, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->img_crc, tick_target != 0);
     return rc;
 }

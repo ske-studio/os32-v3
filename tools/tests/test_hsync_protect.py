@@ -20,7 +20,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CROSS_DIR = os.environ.get('CROSS_DIR', '/usr/local/cross')
 
-HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+# Native host does not use the SDK's i386 calling convention.
+HOST_FLAGS = ["-D__cdecl=", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter"]
 # build/config.mk の PROGRAM_FLAGS (= USER_CFLAGS + インクルードパス) と同じ
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
@@ -72,6 +73,7 @@ if __name__ == "__main__":
         exe = tmp / "hsync-protect"
         subprocess.run(["gcc", *HOST_FLAGS,
                         "-I" + str(ROOT / "userland/system"),
+                        "-I" + str(ROOT / "sdk/include"),
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST GNU11 -Werror COMPILE PASS", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode

@@ -1,6 +1,6 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 状態: **実装中 (2026-11-05)** — R14 は「/etc 直下に限る」(ユーザー決定 2026-11-05)、契約の段 A から出す。 — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
+> 状態: **実装中 (2026-11-06)** — 段 A〜F・統合の直し 1・段 I・段 J と段 K (同じ枝で、変換・学習・ime user・辞書の切り替え・hsync の止めて戻すを store に付け替え) を main に入れた (0262abc2、CI 成功、Opus 承認)。次は段 L、申し送りは resume の予約量の照合 (K1) と辞書の無い起動の後の切り替えで学習を開く (K2) — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
 
 > 上位: [FEP の索引](00_INDEX.md)
 

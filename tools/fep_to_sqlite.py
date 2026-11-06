@@ -20,9 +20,15 @@ import glob
 import csv
 import sqlite3
 import argparse
+import hashlib
+import struct
+from datetime import datetime, timezone
 
 # OS32 カーネル側の設定と一致させる
 PAGE_SIZE = 1024
+RESERVE_KB = 192
+CACHE_PAGES = 16
+DEFAULT_INPUT = os.path.join(os.path.dirname(__file__), '../assets/ipadic')
 
 # 活用形フィルタ (fep_compiler.py と同一)
 KEEP_INFLECTIONS = {
@@ -177,7 +183,38 @@ def normalize_costs(entries):
 
     return result
 
-def create_db(entries, output_path, cost_limit):
+def read_copying(input_dir):
+    # IPADIC's distributed COPYING is Latin-1, including its final bytes.
+    with open(os.path.join(input_dir, 'COPYING'), encoding='latin-1', newline='') as f:
+        original = f.read()
+    if not original.strip():
+        raise ValueError('IPADIC COPYING is empty')
+    return original
+
+
+def dict_checksum(cur):
+    digest = hashlib.sha256()
+    for yomi, kanji, pos_id, cost in cur.execute(
+            'SELECT yomi, kanji, pos_id, cost FROM dict '
+            'ORDER BY yomi COLLATE BINARY, kanji COLLATE BINARY, pos_id, cost'):
+        for value in (yomi, kanji):
+            encoded = value.encode('utf-8')
+            digest.update(struct.pack('>I', len(encoded)))
+            digest.update(encoded)
+        digest.update(struct.pack('>ii', pos_id, cost))
+    return 'sha256:' + digest.hexdigest()
+
+
+def create_db(entries, output_path, cost_limit, variant=None, input_dir=DEFAULT_INPUT):
+    original = read_copying(input_dir)
+    if variant is None:
+        variant = next(name for name, spec in SIZE_DEFS.items()
+                       if spec['cost_limit'] == cost_limit)
+    epoch = os.environ.get('SOURCE_DATE_EPOCH')
+    date = (datetime.fromtimestamp(int(epoch), timezone.utc) if epoch is not None
+            else datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    if CACHE_PAGES * PAGE_SIZE > RESERVE_KB * 1024:
+        raise ValueError('cache exceeds dictionary reservation')
     if cost_limit > 0:
         filtered = [e for e in entries if e[3] <= cost_limit]
     else:
@@ -190,6 +227,7 @@ def create_db(entries, output_path, cost_limit):
     cur = conn.cursor()
 
     cur.execute(f"PRAGMA page_size = {PAGE_SIZE}")
+    cur.execute("PRAGMA user_version = 1")
 
     cur.execute("""
         CREATE TABLE dict_raw (
@@ -225,6 +263,21 @@ def create_db(entries, output_path, cost_limit):
 
     cur.execute("DROP TABLE dict_raw")
     cur.execute("CREATE INDEX idx_dict_yomi ON dict(yomi)")
+    final_count = cur.execute("SELECT count(*) FROM dict").fetchone()[0]
+    checksum = dict_checksum(cur)
+    metadata = {
+        'format_version': '1', 'min_fep_version': '1',
+        'dict_id': 'ipadic-2.7.0', 'kind': 'system', 'language': 'ja',
+        'charset': 'UTF-8', 'variant': variant, 'source': 'IPADIC',
+        'source_version': '2.7.0', 'license': original, 'attribution': original,
+        'build_tool': 'fep_to_sqlite.py/1', 'build_date': date,
+        'entry_count': str(final_count), 'pos_table_version': '1',
+        'cost_scale': 'os32-log2047-boost-v1',
+        'mem_reserve_kb': str(RESERVE_KB), 'cache_pages': str(CACHE_PAGES),
+        'checksum': checksum,
+    }
+    cur.execute('CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    cur.executemany('INSERT INTO meta(key, value) VALUES (?, ?)', metadata.items())
     conn.commit()
 
     cur.execute("VACUUM")
@@ -274,7 +327,7 @@ def main():
             limit = sdef['cost_limit']
             label = f"(cost<{limit})" if limit > 0 else "(full)"
             print(f"--- {size_name} {label} ---")
-            create_db(entries, out_path, limit)
+            create_db(entries, out_path, limit, size_name, args.input)
     else:
         sdef = SIZE_DEFS[args.size]
         out_path = args.output
@@ -283,7 +336,7 @@ def main():
             out_path = os.path.join(output_dir, f"{basename}{suffix}.db")
         limit = sdef['cost_limit']
         print()
-        create_db(entries, out_path, limit)
+        create_db(entries, out_path, limit, args.size, args.input)
 
     print("\n=== Done ===")
 

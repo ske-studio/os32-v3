@@ -1,6 +1,6 @@
 # TASK_NET_HOSTSVC — ネットワーク越しの Host Services (実機の /host・ネットワーク越しの CD・知らせのメールボックス・サービスの一覧)
 
-> 状態: **設計中 (2026-11-05)** — 詳細設計を確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md)、astra 起草 r1→r3・Opus レビュー 3 回)。実装はまだ出していない。往復の版は `~/os32-tmp/run/net-hostsvc/`。
+> 状態: **実装中 (2026-11-07)** — 詳細設計は確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md)、astra 起草 r1→r3・Opus レビュー 3 回)。A1〜A11・B1〜B4・C5・D1・H1〜H4 と起動の登録を main に入れた (1cbba6f5、CI 成功。NP21/W の host_time・クリップボードと実機 82557 の LAN hsync を確認)。次の波 C1・C3・B5・H6 を実装中、その後に C2・C4・D2〜D8・H5・I・S。往復の版は `~/os32-tmp/run/net-hostsvc/`。
 > 上位: [V3_PLAN](../v3/V3_PLAN.md) §5 の「ネットワーク越しの CD・HostDrv の Host Services 経路」。土台: [HOST_SERVICES_PLAN](HOST_SERVICES_PLAN.md) (リンク層の Host Services、KAPI v51)、[TASK_LAN_82557](../realhw/TASK_LAN_82557.md) (82557・LAN 版 SerialFS、L-C・L-D2・L-E)。
 
 ## 0. ユーザー決定 (2026-11-05、要旨。原文は往復の置き場の USER_DECISIONS)

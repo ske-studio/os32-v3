@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
+CASES = ['capacity', 'absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
          'close_gap', 'separate', 'errors', 'readonly', 'unsupported', 'fullpath']
 FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',

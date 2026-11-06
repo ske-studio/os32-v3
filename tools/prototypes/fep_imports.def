@@ -43,6 +43,24 @@
       "declaration": "u8 fep_kbd_shift_state(void);"
     },
     {
+      "symbol": "fep_boot_config_get",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/ime/ime_store.h"
+    },
+    {
+      "symbol": "fep_boot_user_path_get",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/ime/ime_store.h"
+    },
+    {
+      "symbol": "fep_meta_probe",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/ime/ime_store.h"
+    },
+    {
       "symbol": "fep_services_boot_fault",
       "context": "normal",
       "irq": false,
@@ -134,6 +152,12 @@
     },
     {
       "symbol": "kstrncat",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrncmp",
       "context": "normal",
       "irq": false,
       "source": "lib/kstring.h"

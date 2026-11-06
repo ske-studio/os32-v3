@@ -1,13 +1,13 @@
 # T5a-2: reuse T4 function imports, VA0 packing and paired distribution.
 FEP_OUT := $(BUILD_OUT)/fep
 FEP_GEN := $(addprefix $(FEP_OUT)/,fep_imports.h fep_imports.json fep_import_slots.c fep_import_stubs.S fep_provider_types.c fep_kexports.c)
-FEP_DEF_SOURCES := include/redir_access.h fs/fd_redirect.h include/con_sink.h drivers/input/kbd.h mm/kmalloc.h lib/kstring.h include/kprintf.h lib/sqlite3/os32_sqlite_outer.h exec/exec.h drivers/char/serial.h kernel/sqlite_engine.h include/tvram.h lib/utf8.h fs/vfs.h kernel/ime/fep_module.h kernel/ime/ime_render.h sdk/include/os32/os32_kapi_shared.h
+FEP_DEF_SOURCES := include/redir_access.h fs/fd_redirect.h include/con_sink.h drivers/input/kbd.h mm/kmalloc.h lib/kstring.h include/kprintf.h lib/sqlite3/os32_sqlite_outer.h exec/exec.h drivers/char/serial.h kernel/sqlite_engine.h include/tvram.h lib/utf8.h fs/vfs.h kernel/ime/fep_module.h kernel/ime/ime_store.h kernel/ime/ime.h kernel/ime/ime_render.h sdk/include/os32/os32_kapi_shared.h
 $(FEP_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/fep_imports.def $(FEP_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module fep --out-dir $(FEP_OUT)
 
-FEP_OBJS := $(addprefix $(FEP_OUT)/,fep_body.o ime.o ime_dict.o ime_dict_info.o ime_suspend.o ime_romkana.o ime_render_tvram.o fep_import_slots.o fep_import_stubs.o)
+FEP_OBJS := $(addprefix $(FEP_OUT)/,fep_body.o ime.o ime_dict.o ime_conn.o ime_user_store.o ime_dict_info.o ime_suspend.o ime_romkana.o ime_render_tvram.o fep_import_slots.o fep_import_stubs.o)
 FEP_INC := $(INC_KERNEL) -I. -I$(FEP_OUT)
-$(FEP_OUT)/fep_body.o $(FEP_OUT)/ime.o $(FEP_OUT)/ime_dict.o $(FEP_OUT)/ime_dict_info.o $(FEP_OUT)/ime_suspend.o $(FEP_OUT)/ime_romkana.o $(FEP_OUT)/ime_render_tvram.o: $(FEP_OUT)/%.o: kernel/ime/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
+$(FEP_OUT)/fep_body.o $(FEP_OUT)/ime.o $(FEP_OUT)/ime_dict.o $(FEP_OUT)/ime_conn.o $(FEP_OUT)/ime_user_store.o $(FEP_OUT)/ime_dict_info.o $(FEP_OUT)/ime_suspend.o $(FEP_OUT)/ime_romkana.o $(FEP_OUT)/ime_render_tvram.o: $(FEP_OUT)/%.o: kernel/ime/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@
 $(FEP_OUT)/fep_import_slots.o $(FEP_OUT)/fep_provider_types.o $(FEP_OUT)/fep_kexports.o: $(FEP_OUT)/%.o: $(FEP_OUT)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(FEP_INC) -c $< -o $@

@@ -102,9 +102,16 @@ const ClockOps pc98_clock = {
 /* Dictionary storage is outside the input wait contract. */
 int ime_dict_open(IME_Dict *d, const char *p)
 { (void)d; (void)p; serial_puts("IME: Dict loaded"); return 0; }
-int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int n)
+int fep_boot_config_get(FepMeta *m, u32 *r)
+{ (void)m; *r = FEP_DICT_RESERVE_KB; return 0; }
+int fep_boot_user_path_get(char *p, u32 n)
+{ kstrncpy(p, FEP_USER_PATH, n); return 0; }
+int fep_store_open(FepStore *s, const char *p, const char *u)
+{ (void)u; return ime_dict_open((IME_Dict *)0, p) + (s == 0); }
+void *kmalloc(u32 n) { (void)n; static u16 storage[240]; return storage; }
+int fep_store_search(FepStore *d, const char *y, IME_Result *r, int n)
 { (void)d; (void)y; (void)r; (void)n; return 0; }
-void ime_dict_learn(IME_Dict *d, const char *y, const char *k)
+void fep_store_learn(FepStore *d, const char *y, const char *k)
 { (void)d; (void)y; (void)k; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 

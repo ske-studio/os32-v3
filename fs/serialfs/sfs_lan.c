@@ -1,4 +1,5 @@
 #include "sfs_lan.h"
+#include "net/nic.h"
 #include "os32_kapi_shared.h"
 
 static int mac_equal(const u8 *a, const u8 *b)
@@ -35,7 +36,7 @@ static int lan_receive(SfsLan *lan)
 
     if (lan->rx_pos < lan->rx_end) return 1;
     lan->rx_pos = lan->rx_end = 0;
-    if (lan->nic->recv(lan->rx, sizeof(lan->rx), &n) != 0) return 0;
+    if (net_rx_take(NET_RX_SFS, lan->rx, sizeof(lan->rx), &n) != 0) return 0;
     if (n > sizeof(lan->rx) || n < SFS_LAN_HDR_LEN + SFS_PREAMBLE_LEN) return 0;
     if (lan->rx[ETH_TYPE_OFF] != (SFS_LAN_ETHERTYPE >> 8) ||
         lan->rx[ETH_TYPE_OFF + 1] != (SFS_LAN_ETHERTYPE & 0xff) ||
@@ -92,20 +93,23 @@ static int lan_get(void *ctx)
     SfsLan *lan = ctx;
     u32 i;
 
-    for (i = 0; i < SFS_LAN_RX_BUDGET; i++) {
+    for (i = 0; i < NET_RX_SCAN_MAX; i++) {
         if (lan_receive(lan) && lan_prepare(lan))
             return lan->rx[lan->rx_pos++];
     }
     return -1;
 }
 
-static int lan_put(void *ctx, const u8 *buf, u32 n)
+static int lan_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
     SfsLan *lan = ctx;
-    u32 i, size, start;
+    u32 i, size, limit;
     int r;
 
     if (!lan_can_wait(ctx)) return -1;
+    limit = lan_now(ctx) + sfs_ms_ticks(SFS_LAN_PUT_MS);
+    if ((i32)(deadline - limit) < 0) limit = deadline;
+    if ((i32)(lan_now(ctx) - limit) >= 0) return OS32_ERR_TIMEOUT;
     if (n < SFS_HDR_LEN + SFS_CRC_LEN || n > SFS_BUFFER_FRAME) return -1;
     if (buf[SFS_OFF_TYPE] == SFS_T_HELLO && n >= SFS_HDR_LEN + SFS_HELLO_REQ_LEN + SFS_CRC_LEN) {
         lan->nonce = sfs_get32(buf + SFS_HDR_LEN + SFS_HELLO_REQ_NONCE);
@@ -123,23 +127,27 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
     for (i = 0; i < n; i++) lan->tx[SFS_LAN_HDR_LEN + i] = buf[i];
     size = SFS_LAN_HDR_LEN + n;
     while (size < SFS_LAN_MIN_FRAME) lan->tx[size++] = 0;
-    start = lan_now(ctx);
     for (;;) {
-        r = lan->nic->send(lan->tx, size);
+        if ((i32)(lan_now(ctx) - limit) >= 0) return OS32_ERR_TIMEOUT;
+        r = net_tx(lan->tx, size);
         if (r == 0) return 0;
         if (r != OS32_ERR_AGAIN && r != OS32_ERR_BUSY) return -1;
         /* Preserve an SFS response in the same one-frame get buffer. Once it
          * is occupied, stop draining rather than overwrite unread bytes. */
-        for (i = 0; i < SFS_LAN_RX_BUDGET; i++)
+        for (i = 0; i < NET_RX_SCAN_MAX; i++)
             if (lan_receive(lan)) break;
-        if ((u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS))
-            return -1;
         if (!lan_can_wait(ctx)) return -1;
         lan_idle(ctx);
     }
 }
 
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait};
+static int lan_put(void *ctx, const u8 *buf, u32 n)
+{
+    u32 deadline = lan_now(ctx) + sfs_ms_ticks(SFS_LAN_PUT_MS);
+    return lan_put_until(ctx, buf, n, deadline) == 0 ? 0 : -1;
+}
+
+const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until};
 
 void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
                   const SfsIo *clock, void *clock_ctx)
@@ -150,7 +158,9 @@ void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
     lan->linked = lan->hello = lan->prepared = lan->peer_fixed = 0;
     lan->nonce = 0;
     lan->rx_pos = lan->rx_end = 0;
-    nic->mac(lan->mac);
+    /* A failed lookup must not retain a previous NIC address. */
+    for (u32 i = 0; i < SFS_LAN_MAC_LEN; i++) lan->mac[i] = 0;
+    (void)net_mac(lan->mac);
 }
 
 int sfs_lan_set_peer(SfsLan *lan, const char *mac)
@@ -178,10 +188,9 @@ int sfs_lan_set_peer(SfsLan *lan, const char *mac)
 
 void sfs_lan_reset(SfsLan *lan)
 {
-    u32 i, n;
-    /* Never wait for quiet: continuous unrelated traffic cannot hold end. */
-    for (i = 0; i < SFS_LAN_RX_BUDGET; i++)
-        if (lan->nic->recv(lan->rx, sizeof(lan->rx), &n) != 0) break;
+    u32 i;
+    /* Reset only SFS: link frames belong to the other shared queue. */
+    net_rx_reset(NET_RX_SFS);
     lan->rx_pos = lan->rx_end = 0;
     lan->linked = lan->hello = lan->prepared = lan->peer_fixed = 0;
     lan->nonce = 0;

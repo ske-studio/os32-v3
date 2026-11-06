@@ -119,7 +119,7 @@ MUTATIONS += (
     ('notice-order', 'sdk/include/os32/os32_host_notice.h',
      'serial, dropped, host_generation', 'dropped, serial, host_generation'),
     ('reply-order', 'fs/serialfs/sfs_client.h', 'capacity, length', 'length, capacity'),
-    ('lan-slots', 'drivers/net/e82557/lan_module.h', 'API_SLOTS 22u', 'API_SLOTS 23u'),
+    ('lan-slots', 'drivers/net/e82557/lan_module.h', 'API_SLOTS 23u', 'API_SLOTS 24u'),
     ('lan-order', 'drivers/net/e82557/lan_module.h',
      '    const struct NetAdapter *adapter;\n    int (*netcd_register)(const char *);',
      '    int (*netcd_register)(const char *);\n    const struct NetAdapter *adapter;'),
@@ -144,10 +144,12 @@ def source():
                for i, field in enumerate(('generation', 'last_use', 'alive_seen'))]
     checks += [('NET_NIC_AUTO', '0'), ('NET_NIC_E82557', '1'),
                ('NET_NIC_LGY98', '2'), ('NET_RX_SFS', '1'), ('NET_RX_LINK', '2'),
-               ('NET_RX_SCAN_MAX', '8'), ('LAN_MODULE_OPS_VERSION', '2'),
-               ('LAN_MODULE_API_SLOTS', '22'), ('sizeof(LanModuleApi)', '88'),
+               ('NET_RX_SCAN_MAX', '8'), ('LAN_MODULE_OPS_VERSION', '3'),
+               ('LAN_MODULE_API_SLOTS', '23'), ('sizeof(LanModuleApi)', '92'),
                ('sizeof(Device)', '72'), ('sizeof(VfsOps)', '104')]
     layouts = {
+        'SfsIo': (24, [('put', 0), ('get', 4), ('now', 8), ('idle', 12),
+                       ('can_wait', 16), ('put_until', 20)]),
         'struct NetAdapter': (8, [('acquire', 0), ('release', 4)]),
         'HostNotice': (256, [('serial', 0), ('dropped', 4), ('host_generation', 8),
                             ('service', 12), ('kind', 14), ('length', 16),
@@ -162,8 +164,8 @@ def source():
     for typ, (size, fields) in layouts.items():
         checks.append((f'sizeof({typ})', str(size)))
         checks.extend((f'OFF({typ}, {field})', str(offset)) for field, offset in fields)
-    checks += [('OFF(LanModuleApi, io)', '60'), ('OFF(LanModuleApi, adapter)', '80'),
-               ('OFF(LanModuleApi, netcd_register)', '84'),
+    checks += [('OFF(LanModuleApi, io)', '60'), ('OFF(LanModuleApi, adapter)', '84'),
+               ('OFF(LanModuleApi, netcd_register)', '88'),
                ('OFF(Device, blk_read_u32)', '64'), ('OFF(Device, media_check)', '68'),
                ('OFF(VfsOps, resource_check)', '96'), ('OFF(VfsOps, resource_refresh)', '100')]
     # Compile-time checks concern types only; all layout checks execute below.
