@@ -152,6 +152,7 @@ int fep_boot_config_get(FepMeta *m, u32 *r)
 {
     if (boot_config_rc) return boot_config_rc;
     int rc = fep_meta_probe(FEP_DICT_PATH_M, m);
+    m->reserve_kb = FEP_DICT_RESERVE_KB; /* Core keeps the boot snapshot. */
     *r = boot_reserve_kb;
     return rc;
 }
@@ -401,8 +402,13 @@ int main(void)
     g_ime.mode = IME_MODE_KATAKANA;
     require(!ime_dict_suspend(1) && !ime_boot_connections() && !g_ime.dict_loaded,
             "production suspend closes both");
-    /* Both resume and OFF -> ON must pass the real store budget check. */
+    /* A settings reservation below the accepted dictionary still resumes. */
     g_ime.store.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
+    require(!ime_dict_suspend(0) && ime_boot_connections() == 2 &&
+            g_ime.mode == IME_MODE_KATAKANA, "same dictionary resumes below request");
+    require(!ime_dict_suspend(1) && !ime_boot_connections(), "suspend before replacement");
+    /* Model hsync replacing the stopped dictionary with a larger request. */
+    fep_host_probe_reserve_kb = FEP_DICT_RESERVE_KB + 1;
     require(ime_dict_suspend(0) == OS32_ERR_AGAIN && !ime_boot_connections() &&
             !g_ime.dict_loaded && g_ime.mode == IME_MODE_OFF, "resume budget keeps OFF");
     boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
@@ -412,6 +418,7 @@ int main(void)
     ime_set_mode(IME_MODE_HIRAGANA);
     require(!ime_boot_connections() && !g_ime.dict_loaded &&
             g_ime.mode == IME_MODE_OFF, "set_mode budget keeps OFF");
+    fep_host_probe_reserve_kb = FEP_DICT_RESERVE_KB;
     boot_reserve_kb = FEP_DICT_RESERVE_KB;
     g_ime.store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
     /* A normal writer can now open the selected dictionary for replacement. */
