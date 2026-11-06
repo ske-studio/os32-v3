@@ -34,6 +34,8 @@ void _halt(void)
 }
 /* L11 has no selected GF device or registered return callback. */
 int gf_production_return(void) { return 0; }
+/* Resident adapter boundary; the trace verifies dispatch before halt. */
+void geforce_foreground_poll(void) { event('P', 0, 0); }
 #include "sys_control.inc"
 void _start(void)
 {

@@ -23,6 +23,8 @@ SOURCES = ('kernel/sys.c', 'platform/pc98/system.c')
 HEADERS = ('include/platform_sys.h',)
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l11_baseline.json'
 MUTATIONS = (
+    ('kernel/sys.c', '    geforce_foreground_poll();',
+     '    (void)0;'),
     ('platform/pc98/system.c',
      '    outp(SYSPORT_C_BSR, BSR_SHUT0_SET);\n    outp(SYSPORT_C_BSR, BSR_SHUT1_SET);',
      '    outp(SYSPORT_C_BSR, BSR_SHUT1_SET);\n    outp(SYSPORT_C_BSR, BSR_SHUT0_SET);'),
@@ -79,8 +81,13 @@ def verify(mutation=None):
     for enabled in (0, 1):
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-io-') as td:
             actual = trace(build(Path(td), enabled, mutation))
-        assert actual == expected['traces'][str(enabled)], (enabled, actual)
-    print('PASS L11 reset/beep/halt order, IF=0/1, no reads or waits', flush=True)
+        # Keep the historical hardware trace, inserting exactly one resident
+        # foreground dispatch before the waking sys_halt, never in reboot.
+        rows = list(expected['traces'][str(enabled)])
+        first_halt = next(i for i, row in enumerate(rows) if row[0] == 'H')
+        rows.insert(first_halt, ['P', 0, 0, enabled])
+        assert actual == rows, (enabled, actual)
+    print('PASS L11 reset/beep/halt order and F3 poll before halt, IF=0/1', flush=True)
 
 
 if __name__ == '__main__':
@@ -93,3 +100,4 @@ if __name__ == '__main__':
                 print('RED', mutation[1], flush=True)
             else:
                 raise AssertionError('mutation escaped: ' + mutation[1])
+            verify()  # Restored control must remain GREEN after every RED.
