@@ -1185,7 +1185,7 @@ static int copy_verify(const char *src, const char *dst, u32 expect,
 /* ======== 保護対象の判定 ======== */
 
 /* Read the destination's setting without creating or modifying its DB.
- * A missing row selects the default; any unreadable/invalid setting stops sync.
+ * A missing DB/table/row selects the default; unreadable/invalid settings stop sync.
  * CFG_DB_PATH and FEP_SETTING_USER_PATH are mirrored from cfg/ime_store.h. */
 static int register_fep_user_path(void)
 {
@@ -1200,7 +1200,25 @@ static int register_fep_user_path(void)
     if (!str_ncpy(settings, g_root, (int)sizeof(settings)) ||
         !str_ncat(settings, "/etc/settings.db", (int)sizeof(settings))) return -1;
     db = api->db_open_existing(settings, 0);
-    if (db < 0) return -1;
+    if (db < 0) {
+        OS32_Stat st;
+        return api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND ?
+            hsp_set_fep_user_path(HSP_FEP_USER_PATH) : -1;
+    }
+    rc = api->db_prepare_only(db,
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'");
+    if (rc == 0) {
+        rc = api->db_step(db);
+        if (rc == DB_STATUS_DONE)
+            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+        else if (rc == DB_STATUS_ROW) result = 1; /* Read the setting below. */
+    }
+    if (api->db_finalize(db) != 0) result = -1;
+    if (result != 1) {
+        if (api->db_close(db) != 0) result = -1;
+        return result;
+    }
+    result = -1;
     rc = api->db_prepare_only(db,
         "SELECT CASE WHEN typeof(tval)='text' THEN type ELSE -1 END,"
         "tval,length(CAST(tval AS BLOB)) FROM settings "

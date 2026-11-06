@@ -31,13 +31,6 @@ int ime_dict_suspend(int on)
         return 0;
     }
     if (!suspended) return 0;
-    FepMeta target;
-    rc = fep_meta_probe(saved_path, &target);
-    if (rc) return rc;
-    if (target.reserve_kb > ime->store.boot_reserve_kb) {
-        kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
-        return OS32_ERR_AGAIN;
-    }
     rc = fep_store_open(&ime->store, saved_path, saved_user_path);
     if (rc) {
         kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");

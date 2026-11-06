@@ -780,7 +780,14 @@ int fep_store_open(FepStore *s, const char *path, const char *user_path)
         /* Retain the configured learning path even if the system is missing. */
         kstrncpy(s->user.path, user_path, sizeof(s->user.path));
     }
-    int rc = store_system_open(s, path);
+    FepMeta meta;
+    int rc = fep_meta_probe(path, &meta);
+    if (rc) return rc;
+    if (s->boot_reserve_kb && meta.reserve_kb > s->boot_reserve_kb) {
+        kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
+        return OS32_ERR_AGAIN;
+    }
+    rc = store_system_open(s, path);
     if (rc) return rc;
     /* D requires the complete system identity and user path before open. */
     (void)store_user_open(s); /* Learning failure does not disable conversion. */

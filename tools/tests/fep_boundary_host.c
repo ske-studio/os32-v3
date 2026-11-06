@@ -146,12 +146,13 @@ int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
 enum services_stage services_stage = SERVICES_READY;
 volatile u32 services_boot_fault;
 static int boot_config_rc, boot_path_rc;
+static u32 boot_reserve_kb = FEP_DICT_RESERVE_KB;
 void *kmalloc(u32 n) { return malloc(n); }
 int fep_boot_config_get(FepMeta *m, u32 *r)
 {
     if (boot_config_rc) return boot_config_rc;
     int rc = fep_meta_probe(FEP_DICT_PATH_M, m);
-    *r = FEP_DICT_RESERVE_KB;
+    *r = boot_reserve_kb;
     return rc;
 }
 int fep_boot_user_path_get(char *p, u32 n)
@@ -400,6 +401,19 @@ int main(void)
     g_ime.mode = IME_MODE_KATAKANA;
     require(!ime_dict_suspend(1) && !ime_boot_connections() && !g_ime.dict_loaded,
             "production suspend closes both");
+    /* Both resume and OFF -> ON must pass the real store budget check. */
+    g_ime.store.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
+    require(ime_dict_suspend(0) == OS32_ERR_AGAIN && !ime_boot_connections() &&
+            !g_ime.dict_loaded && g_ime.mode == IME_MODE_OFF, "resume budget keeps OFF");
+    boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
+    ime_toggle();
+    require(!ime_boot_connections() && !g_ime.dict_loaded &&
+            g_ime.mode == IME_MODE_OFF, "toggle budget keeps OFF");
+    ime_set_mode(IME_MODE_HIRAGANA);
+    require(!ime_boot_connections() && !g_ime.dict_loaded &&
+            g_ime.mode == IME_MODE_OFF, "set_mode budget keeps OFF");
+    boot_reserve_kb = FEP_DICT_RESERVE_KB;
+    g_ime.store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
     /* A normal writer can now open the selected dictionary for replacement. */
     sqlite3 *replacement = 0;
     require(setup_open(FEP_DICT_PATH_L, &replacement, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK &&

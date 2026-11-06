@@ -86,8 +86,17 @@ int main(void)
             "INSERT INTO dict VALUES('かなか','前',10,800);"
             "INSERT INTO dict VALUES('かなかい','先',11,400);");
     CHECK(setup_close(db) == SQLITE_OK);
-    /* An explicit smaller settings reservation is not a switch. */
+    /* Reopen must check the boot budget before either connection is opened. */
     s.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_AGAIN);
+    CHECK(!s.system.db && !s.user.db && !s.system.group.generation &&
+          !s.user.group.generation && !s.system.path[0] &&
+          !strcmp(s.user.path, FEP_USER_PATH));
+    probe_error = OS32_ERR_IO;
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_IO);
+    probe_error = 0;
+    /* Zero means the boot reservation has not been published yet. */
+    s.boot_reserve_kb = 0;
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(s.user_enabled && fep_store_live_connections(&s) == 2);
     CHECK(sqlite3_exec(s.system.db, "DELETE FROM dict", 0, 0, 0) == SQLITE_READONLY);

@@ -33,7 +33,7 @@ static int fixture_shell_read(void *buf, u32 size)
 /* Existing sync cases use a readable settings DB with no custom row.
  * Stage L cases inject failures at this same KAPI boundary. */
 static const char *fixture_user_path;
-static int fixture_settings_fault, fixture_settings_step;
+static int fixture_settings_fault, fixture_settings_step, fixture_settings_schema;
 static char fixture_settings_path[OS32_MAX_PATH];
 static int fixture_db_open(const char *path, int writable)
 {
@@ -44,11 +44,19 @@ static int fixture_db_open(const char *path, int writable)
     return writable || fixture_settings_fault == 1 ? -1 : 1;
 }
 static int fixture_db_prepare(int h, const char *sql)
-{ (void)h; (void)sql; return fixture_settings_fault == 2 ? -1 : 0; }
+{
+    (void)h;
+    fixture_settings_schema = strstr(sql, "sqlite_master") != 0;
+    fixture_settings_step = 0;
+    return fixture_settings_fault == 2 ? -1 : 0;
+}
 static int fixture_db_step(int h)
 {
     (void)h;
     if (fixture_settings_fault == 3) return DB_STATUS_ERROR;
+    if (fixture_settings_schema)
+        return fixture_settings_fault != 8 && !fixture_settings_step++ ?
+            DB_STATUS_ROW : DB_STATUS_DONE;
     return fixture_user_path && !fixture_settings_step++ ? DB_STATUS_ROW : DB_STATUS_DONE;
 }
 static int fixture_db_int(int h, int col)

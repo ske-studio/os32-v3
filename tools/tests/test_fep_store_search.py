@@ -100,6 +100,11 @@ def main():
                 raise RuntimeError('hot journal anchor not unique')
             cases.append(('hot-journal', product.replace(old, old.replace('if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0))', 'if (0)')), user_product,
                           'hits(&s, out) == 3 && !s.user_enabled && !s.user.db'))
+            old = 's->boot_reserve_kb && meta.reserve_kb > s->boot_reserve_kb'
+            if product.count(old) != 1:
+                raise RuntimeError('open reservation anchor not unique')
+            cases.append(('resume-budget', product.replace(old, '0'), user_product,
+                          'fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == OS32_ERR_AGAIN'))
             old = 'else if (!had_system && !s->user.db && s->user.path[0])'
             if product.count(old) != 1:
                 raise RuntimeError('cold switch anchor not unique')
