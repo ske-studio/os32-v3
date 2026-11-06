@@ -57,6 +57,7 @@ static const struct gf4_exec_ops *ops;
 static u32 loans,returns,restores,points,tracked_owner_writes,runner_writes;
 static bool loaned,fail_acquire,fail_restore,expire_acquire;
 static u32 expire_clock,writes_at_expiry,events_at_acquire;
+static bool expiry_origin;
 static u32 steps_at_release,head_at_release,or_at_release,dl_at_release,pc_at_release;
 static GeforceModuleContext module_context;
 const GeforceModuleContext *geforce_context=&module_context;
@@ -75,7 +76,11 @@ static void code(u32 off,const u8 *data,u32 n)
 static void observe(struct gf4_host *host,const struct gf4_host_event *e)
 {
     if (e->op==D_CLOCK && e->nth==expire_clock) {
-        *(u32 *)e->p[1]=host->local_now+GF_INIT_OPCODE_US;
+        /* Keep the fake clock monotonic, including after an origin sample.
+         * A new opcode owns its full budget; a sample inside it may expire. */
+        host->local_now+=GF_INIT_OPCODE_US;
+        *(u32 *)e->p[1]=host->local_now;
+        expiry_origin=e->p[1]==&script_ctx.opcode_started_us;
         writes_at_expiry=host->calls[D_WRITE];
     }
 }
@@ -136,6 +141,7 @@ static void fixture(void)
     loans=returns=restores=points=tracked_owner_writes=runner_writes=0;
     loaned=fail_acquire=fail_restore=expire_acquire=false;
     expire_clock=writes_at_expiry=events_at_acquire=0;
+    expiry_origin=false;
     steps_at_release=head_at_release=or_at_release=dl_at_release=pc_at_release=0;
     legacy=(struct gf_display_context){.initialized=true,.reusable=true,.owner=&owner,
         .io={.opaque=&h,.read=loan_read,.write=tracked_write,
@@ -337,21 +343,23 @@ static void failures(void)
     u32 clocks=h.calls[D_CLOCK];
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2); expire_clock=n;
-        assert(run(HIGH_KHZ,DEADLINE)==GF4_ETIME);
-        if (n>2) {
+        i32 rc=run(HIGH_KHZ,DEADLINE);
+        assert(rc==(expiry_origin ? 0 : GF4_ETIME));
+        if (!expiry_origin && n>2) {
             assert(gf2_host_strstr(startlog,"GF4 ERROR stage=rom_script rc=-409 head=1 remain_us="));
             assert(gf2_host_strstr(startlog," pc="));
         }
-        /* Clock #2 establishes the new preparation origin. If that sample
-         * jumps into the future, the next clock rejects it after the raw
-         * owner pair; all other rejecting samples only allow cleanup. */
-        assert(h.calls[D_WRITE]==writes_at_expiry+
-               (n==2 ? OWNER_WRITES+CLEANUP_WRITES : n>2 ? 1U : 0U));
+        /* Preparation/opcode origins start a fresh operation. Rejection
+         * inside an operation permits only the binding cleanup write. */
+        assert(h.calls[D_WRITE]==(expiry_origin ? OWNER_WRITES+CLEANUP_WRITES :
+               writes_at_expiry+(n>2 ? CLEANUP_WRITES : 0U)));
     }
     for (u32 n=1;n<=clocks;n++) {
         fixture(); put(CLOCK_B+2,PC_WAIT,2);
         gf4_host_fail_at(&h,D_CLOCK,n,INJECT);
-        assert(run(HIGH_KHZ,DEADLINE)==-1);
+        /* The post-acquire clock is called directly and preserves its rc;
+         * runner and pre-acquire clock failures retain their -1 contract. */
+        assert(run(HIGH_KHZ,DEADLINE)==(n==2 ? INJECT : -1));
         assert(h.calls[D_WRITE]==(n>2 ? OWNER_WRITES+CLEANUP_WRITES : 0U));
     }
 }

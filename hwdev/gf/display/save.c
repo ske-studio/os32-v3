@@ -328,6 +328,9 @@ i32 gf4_display_restore_stage(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl
             case GF4_TV: *stage="tv_load"; rc=gf4_tv_load(c,&v->route,&c->state->work[h],dl); break;
             default: rc=GF4_EUNSUPPORTED; break;
             }
+            /* TMDS starts a new MMIO budget after its opcode-timed ROM
+             * script. DPMS and the next head must use that same deadline. */
+            if (!rc) dl=c->deadline;
         }
         if (!rc) { *stage="lut_load"; rc=gf4_lut_load(c,h); }
         if (!rc) { *stage="dpms"; rc=save_dpms(c,h,v,dl); }

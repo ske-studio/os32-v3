@@ -1718,6 +1718,12 @@ GF4_COMPONENTS = {
 }
 # Start-line observations execute the real video entry and lifecycle.
 GF4_MUTATIONS += [
+    ('c0', 'rollback-old-deadline', 'hwdev/gf/display/transaction.c',
+     'int rc=gf4_stage_deadline(c,c->ch->f,&c->deadline);', 'int rc=0;',
+     'rollback gets a new budget after a timed-out mode load'),
+    ('c2save', 'restore-tmds-deadline', 'hwdev/gf/display/save.c',
+     'if (!rc) dl=c->deadline;', '(void)dl;',
+     'two TMDS heads restore with the post-script deadline'),
     ('c2log', 'start-line-prefix', 'hwdev/gf/display/service.c',
      '[gf4] start fail stage=%s rc=%d', '[gfX] start fail stage=%s rc=%d',
      'exactly one correctly formatted failure line'),
