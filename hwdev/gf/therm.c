@@ -193,6 +193,7 @@ static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f)
     if (fan) {
         if (!th_span(g,fan,4)) return GF5_EBIOS;
         const u8 *r=g->rom.bytes+fan;
+        if (r[0]!=0x10U) return GF5_ENOTSUP;
         if (r[0]==0x10U) {
             u32 hdr=r[1],stride=r[2],n=r[3];
             if (hdr<4 || stride<TH_FAN_ENTRY_BYTES ||
@@ -342,8 +343,35 @@ static void th_fan_off(struct gf5 *g,i32 rc)
                 g->poll_source ? g->poll_source : "fan");
     g->fan_off=true;
 }
-/* therm/fan.c:234-254: GPIO output, PWM then toggle then unavailable.
- * A0 lends line/polarity; the B4 implementation owns DCB/GPIO decoding. */
+/* therm/fan.c:234-250, nv40.c:105-115, fantog.c:96-99:
+ * only output GPIO2/9 can drive an NV40 fan. Keep classification free
+ * of sensor setup and toggle PWM writes; parser errors remain errors. */
+static i32 th_fan_route(struct gf5 *g,u8 *line,u8 log[2])
+{
+    g->poll_source="fan-gpio-find";
+    i32 rc=gf5_gpio_find(g,TH_FAN_TAG,line,log);
+    if (rc) return rc;
+    if ((log[0]&2U) || (*line!=2 && *line!=9)) return GF5_ENOTSUP;
+    return 0;
+}
+i32 gf5_fan_check_cstate(struct gf5 *g,u8 percent)
+{
+    if (g) g->source_rc=0;
+    i32 rc=th_check(g);
+    if (!rc && percent>TH_PERCENT) rc=GF5_EINVAL;
+    /* Parse into a temporary policy, never publish state or initialize
+     * the ADC. Release any temporary trip allocation on every exit. */
+    if (!rc) {
+        struct gf5_fan_saved policy;
+        rc=th_policy(g,&policy);
+        if (policy.trip) g->links.free(g->links.owner,policy.trip);
+        if (!rc) {
+            u8 line,log[2];
+            rc=th_fan_route(g,&line,log);
+        }
+    }
+    return th_exit(g,rc);
+}
 static i32 th_fan_prepare(struct gf5 *g)
 {
     i32 rc=th_init(g);
@@ -352,23 +380,13 @@ static i32 th_fan_prepare(struct gf5 *g)
     if (f->gpio_line!=U8_MAX) return f->method ? 0 : GF5_ENOTSUP;
     u8 line,log[2];
     g->source_rc=0;
-    g->poll_source="fan-gpio-find";
-    rc=gf5_gpio_find(g,TH_FAN_TAG,&line,log);
+    rc=th_fan_route(g,&line,log);
     if (rc) {
-        if (rc==GF5_ENOTSUP) { g->poll_source="no-fan"; th_fan_off(g,rc); }
+        if (rc==GF5_ENODEV) g->poll_source="no-fan";
+        if (rc==GF5_ENODEV || rc==GF5_ENOTSUP) th_fan_off(g,rc);
         return rc;
     }
     f->gpio_line=line; f->gpio_log[0]=log[0]; f->gpio_log[1]=log[1];
-    if (log[0]&2U) {
-        f->method=GF5_FAN_METHOD_NONE; g->poll_source="no-fan";
-        th_fan_off(g,GF5_ENOTSUP); return GF5_ENOTSUP;
-    }
-    /* GPIO2/9 以外は nv40.c:111-115 で -ENODEV → fannil
-     * (fan.c:232-250, fantog.c:96-99). */
-    if (line!=2 && line!=9) {
-        f->method=GF5_FAN_METHOD_NONE; g->poll_source="no-fan";
-        th_fan_off(g,GF5_ENOTSUP); return GF5_ENOTSUP;
-    }
     if (f->method!=GF5_FAN_TOGGLE) f->method=GF5_FAN_PWM;
     else {
         g->poll_source="fan-pwm";
@@ -718,7 +736,8 @@ i32 gf5_therm_resume(struct gf5 *g,const struct gf5_fan_saved *saved)
         /* Toggle preparation seeds duty; retain the saved restore value. */
         u32 duty=g->fan.duty;
         rc=th_fan_prepare(g);
-        if (rc==GF5_ENOTSUP) { rc=0; }
+        if (rc==GF5_ENODEV) { rc=0; }
+        else if (rc==GF5_ENOTSUP) { rc=0; }
         else if (!rc) {
             rc=th_set(g,th_clamp(&g->fan,duty),now);
             /* base.c:383-386: restore mode even after a failed duty write. */
