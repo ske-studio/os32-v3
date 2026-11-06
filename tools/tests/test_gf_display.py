@@ -185,8 +185,8 @@ GF4_MUTATIONS = [
   '*geforce_context->display_restore_out=&restore_ops;\n}',
   '*geforce_context->display_restore_out=0;\n}', 'save/failed restore management retry'),
  ('a3', 'leave-after-restore-error', 'kdebug/gf_display_test.c',
-  '        gfx_shutdown();\n        if (!rc) {',
-  '        if (!rc) gfx_shutdown();\n        if (!rc) {', 'failed begin then leave routes back'),
+  '        gfx_shutdown();\n        i32 cleanup_rc = display_cui_cleanup();',
+  '        if (!rc) gfx_shutdown();\n        i32 cleanup_rc = display_cui_cleanup();', 'failed begin then leave routes back'),
  ('c2svc', 'feature5-start-admission', 'hwdev/gf/display/service.c',
   's->production->feature5.accepting=true;',
   's->production->feature5.accepting=false;', 'normal display start opens F5'),
@@ -194,8 +194,8 @@ GF4_MUTATIONS = [
   '            gfx_init();', '            gfx_backend_geforce.enter();',
   'cui_controls: cold core must bind CLIENT before backend enter'),
  ('a3', 'cui-stale-owner', 'kdebug/gf_display_test.c',
-  'if (display_cui_owner && !display_session.valid &&\n            (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;',
-  'if (false) display_cui_owner = 0;', 'cui_controls'),
+  'if (display_cui_owner && !display_session.valid &&\n            (!m || !m->ctx || !m->ctx->cleanup_pending) &&\n            (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;',
+  'if (false && m) display_cui_owner = 0;', 'cui_controls'),
  ('a3', 'cui-enter', 'kdebug/gf_display_test.c',
   'display_cui_owner = res_owner_get();', 'display_cui_owner = 0;', 'cui_controls'),
  ('a3', 'cui-leave', 'kdebug/gf_display_test.c',
@@ -1817,6 +1817,38 @@ GF4_MUTATIONS += [
      'present_bytes += (u32)w * (u32)h;', 'present_bytes += 0;', 'upload bytes'),
 ]
 
+# H2: guard acceptance A8/A9/A10. Each replacement compiles and must fail
+# at runtime; source trees are private and restored after every mutant.
+GF4_MUTATIONS += [
+    ('c2svc','guard-engaged','hwdev/gf/display/save.c',
+     'c->legacy->engaged || c->ch->state!=GF2_OFF || c->ready',
+     'c->ch->state!=GF2_OFF || c->ready','test_terminal_guard quiesce failure'),
+    ('c2svc','guard-release-node','hwdev/gf/display/scan.c',
+     'rc=scan_drop(c,&c->test);',
+     'rc=scan_drop(c,&c->test); if (rc) c->test.value=(struct gf_vram_reservation){0};',
+     'test_terminal_guard retained test key after release failure'),
+    ('c2svc','guard-enter-pending','hwdev/gf/display/service.c',
+     'if (c->cleanup_pending)\n        return svc_start_failure',
+     'if (false)\n        return svc_start_failure','guard_pending reenter refusal'),
+    ('c2svc','guard-abandon-pointer','hwdev/gf/display/save.c',
+     'if (c->diagnostic_saved!=s &&', 'if (false &&',
+     'test_terminal_guard stale pointer refusal'),
+    ('c2svc','guard-restore-cause','hwdev/gf/display/save.c',
+     'c->last_rc=original;\n    return rc;', 'c->last_rc=original ? 0 : original;\n    return rc;',
+     'test_terminal_guard original restore rc'),
+    ('c2svc','guard-retire-stop','hwdev/gf/display/service.c',
+     'rc=gf5_tiles_retire(g);', 'rc=0;',
+     'test_stop_guard tile retirement failure and retry'),
+    ('a3','guard-abandon-owner','kdebug/gf_display_test.c',
+     'if (rc) return rc;\n    } else {\n        const struct gf4_test_ops *o',
+     'if (rc) rc=0;\n    } else {\n        const struct gf4_test_ops *o',
+     'cui_controls failed abandon retains owner/session'),
+    ('a3','guard-stopped-restore','kdebug/gf_display_test.c',
+     'if (m && m->ctx && !m->ctx->ready && m->ctx->cleanup_pending) return 0;',
+     'if (false && m && m->ctx && !m->ctx->ready && m->ctx->cleanup_pending) return 0;',
+     'cui_controls retries only terminal cleanup'),
+]
+
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
                  'c2scan', 'c2links', 'c2linkb', 'c2save', 'c3', 'c2linit', 'c2log', 'scanlog')
 
@@ -1910,6 +1942,8 @@ def gf4_case(tree, case, directory):
              '-I'+str(ROOT/'build/out/geforce')]
     if case in GF4_LIFECYCLE or case in ('b5', 'c0', 'c0log'):
         flags += ['-DGF_PRODUCTION_MODULE', '-DGF4_REAL_DISPLAY']
+    if case == 'c2svc':
+        flags += ['-DGF4_GUARD_LIFETIME']
     if case in ('c2scan', 'c2links', 'c2linkb'):
         flags += ['-DOS32_GEFORCE_MODULE']
     if case == 'c2links' or case in GF4_LIFECYCLE:

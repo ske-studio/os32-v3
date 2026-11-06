@@ -21,6 +21,8 @@ static u32 session_now = SESSION_NOW;
 static bool slow_operations;
 #define SESSION_FAILURE (-777)
 static bool forced_leave;
+static i32 abandon_rc;
+static u32 abandons;
 static int current_owner = 2;
 int res_owner_get(void) { return current_owner; }
 static struct gf4_host host;
@@ -324,7 +326,9 @@ static void leave_call(void)
     i32 rc = case_event(CASE_LEAVE);
     if (rc || leave_failed) return;
     if (!forced_leave) assert(!host.ctx.diagnostic_saved && !display_session.valid);
-    normal_slot = NULL; management_slot = NULL; host.ctx.ready = false;
+    normal_slot = NULL; host.ctx.ready = false;
+    host.ctx.cleanup_pending = display_session.valid;
+    management_slot = host.ctx.cleanup_pending ? &management : NULL;
     state.head[0].enabled = false;
 }
 GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
@@ -422,10 +426,23 @@ static i32 release_call(struct gf4_ctx *ctx, const struct gf4_saved *saved)
     ctx->diagnostic_saved = NULL;
     return 0;
 }
+/* External service seam: A8/A9's real stop/abandon is covered by c2svc.
+ * This fixture observes A3 re-reading the current slot after gfx_shutdown. */
+static i32 abandon_call(struct gf4_ctx *ctx,const struct gf4_saved *saved)
+{
+    ++abandons;
+    assert(ctx==&host.ctx && !ctx->ready && ctx->cleanup_pending);
+    assert(saved==&display_session.saved);
+    if (abandon_rc) return abandon_rc;
+    ctx->diagnostic_saved=NULL; ctx->saved_closed=false;
+    ctx->cleanup_pending=false; management_slot=NULL;
+    return 0;
+}
 static void reset(void)
 {
     session_now = SESSION_NOW; slow_operations = false;
     display_cui_owner = 0; current_owner = 2; forced_leave = false;
+    abandon_rc=0; abandons=0;
     gf2_host_memset(&state, 0, sizeof(state));
     gf4_host_init(&host, &state);
     output_fixture = revoke_gamma = enter_invalid = leave_failed = perturb_other = false;
@@ -457,7 +474,7 @@ static void reset(void)
             .t={.hd=IMAGE_WIDTH,.vd=IMAGE_HEIGHT}, .pitch=IMAGE_WIDTH*cpp};
     }
     management = (struct gf4_restore_ops){.ctx=&host.ctx,
-        .restore=restore_call, .saved_release=release_call};
+        .restore=restore_call, .saved_release=release_call,.abandon=abandon_call};
     replacement = (struct gf4_test_ops){.ctx=&host.ctx};
     replacement_management = (struct gf4_restore_ops){.ctx=&host.ctx};
     normal_slot = &normal; management_slot = &management;
@@ -1230,11 +1247,28 @@ static void cui_controls(void)
     restore_rc = SESSION_FAILURE; forced_leave = true;
     gf_display_owner_exit(2);
     assert(!display_cui_owner && !host.ctx.ready && leaves == 1);
-    assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
-    assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY);
-    restore_rc = 0;
-    assert(gf_display_test(DISPLAY_RESTORE) == GF4_ESTATE);
-    assert(display_session.valid && host.ctx.diagnostic_saved);
+    assert(!display_session.valid && !host.ctx.diagnostic_saved && abandons==1);
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    /* Terminal release failure preserves CUI owner and session for retry. */
+    reset_cold_cui();
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(MODE_WIRE));
+    restore_rc=SESSION_FAILURE; forced_leave=true; abandon_rc=GF3_EBUSY;
+    assert(gf_display_test(GF4_CUI_LEAVE)==SESSION_FAILURE);
+    assert(display_cui_owner==2 && display_session.valid && host.ctx.cleanup_pending);
+    assert(!display_session.running && !display_session.lifecycle && abandons==1);
+    assert(gf2_host_strstr(output,"stage=leave_cleanup rc=-306"));
+    assert(gf_display_test(GF4_CUI_ENTER)==GF4_EBUSY);
+    /* Stopped pending cleanup bypasses restore, then retries current slot. */
+    u32 restores_before=nevents;
+    abandon_rc=0;
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    assert(nevents==restores_before+1U && events[restores_before]==CASE_LEAVE);
+    assert(abandons==2 && !display_cui_owner);
+    assert(!display_session.valid && !host.ctx.cleanup_pending);
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
     reset();
     assert(gf_display_test(MODE_WIRE | NEXT_PHASE) == GF4_ESTATE);
     assert(gf2_host_strstr(output, "GF4 ERROR stage=display_admit rc=-408"));
