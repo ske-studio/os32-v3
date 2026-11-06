@@ -2577,6 +2577,33 @@
       "stage": "S6",
       "context_safe": false,
       "retained": false
+    },
+    {
+      "index": 317,
+      "symbol": "geforce_resource_lookup",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
+    },
+    {
+      "index": 318,
+      "symbol": "paging_device_map",
+      "source": "mm/paging.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
+    },
+    {
+      "index": 319,
+      "symbol": "paging_device_unmap",
+      "source": "mm/paging.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

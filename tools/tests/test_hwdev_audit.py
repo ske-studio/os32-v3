@@ -41,6 +41,29 @@ def main():
                                            '| 36 | geforce_foundation_ops | 309 |'))
         p = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         assert p.returncode != 0 and 'kernel import table order/symbol/index' in p.stderr, p
+        document.write_text(source.replace('| 45 | paging_device_map | 318 |',
+                                           '| 45 | paging_device_map | 319 |'))
+        p = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+        assert p.returncode != 0 and 'kernel import table order/symbol/index' in p.stderr, p
+        if '--mutate' in sys.argv:
+            product = ROOT / 'tools/hwdev_audit.py'
+            body = product.read_text()
+            old = 'kernel_names |= GEFORCE_RETAINED_IMPORTS'
+            assert body.count(old) == 1
+            mutant = Path(td) / 'audit.py'
+            mutant.write_text(body.replace(old, 'kernel_names |= frozenset()'))
+            p = subprocess.run([sys.executable, '-O', '-c',
+                'import sys; from pathlib import Path; sys.path.insert(0,"tools"); '
+                'scope={"__file__":sys.argv[2],"__name__":"mutant"}; '
+                'exec(compile(Path(sys.argv[1]).read_text(),sys.argv[2],"exec"),scope); '
+                'scope["audit"](Path("build/out"),Path(sys.argv[3]))',
+                str(mutant), str(product), os.environ['CROSS_DIR']],
+                cwd=ROOT, capture_output=True, text=True)
+            assert p.returncode != 0 and 'kernel import table count' in p.stderr, p
+            print('MUTATE runtime RED retained GF imports omitted', flush=True)
+            document.write_text(source)
+            subprocess.run(command, cwd=ROOT, check=True)
+            print('GREEN restored HWDEV audit', flush=True)
     print('PASS audit under -O: rejects missing slot, ignores rows outside section 2')
 
 if __name__ == '__main__':

@@ -22,6 +22,8 @@ FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diag
 S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
 outstanding transfer ownership. Existing sizes and member offsets stay fixed.
 IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
+M5 appends resource_lookup/device_map/device_unmap at indices 44-46;
+only the import declaration pin changes, not the layout/inventory pins.
 Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
 F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
 GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
@@ -52,7 +54,7 @@ from gen_kdebug_imports import declaration
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
 REVIEWED_LAYOUT_CRC = 0x477e95fe
-REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
+REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
 REVIEWED_INVENTORY_SHA = '84c9635cc9d847cd8aec5c5814610c8dd9d2007012e547984bd326d9a4d22b00'
 
 

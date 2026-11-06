@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 3637799731,
+  "module_abi_gen": 2498533430,
   "stage": "S6",
-  "count": 317,
+  "count": 320,
   "imports": [
     {
       "stage": "S1",
@@ -4796,6 +4796,54 @@
       "type_ver": 1,
       "signature": "u32 exec_hwb_abort_take(void);",
       "source_declaration": "u32 exec_hwb_abort_take(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 317,
+      "symbol": "geforce_resource_lookup",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "geforce_resource_lookup",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);",
+      "source_declaration": "int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 318,
+      "symbol": "paging_device_map",
+      "source": "mm/paging.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "paging_device_map",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int paging_device_map(u32 owner, u32 rid, u32 first, u32 end);",
+      "source_declaration": "int paging_device_map(u32 owner, u32 rid, u32 first, u32 end);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 319,
+      "symbol": "paging_device_unmap",
+      "source": "mm/paging.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "paging_device_unmap",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);",
+      "source_declaration": "int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);",
       "dtype": null,
       "array": false
     }

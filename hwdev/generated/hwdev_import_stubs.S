@@ -221,4 +221,19 @@ gf_display_test:
 gf5_test:
     jmp *hwdev_import_slots+172
 .size gf5_test, .-gf5_test
+.globl geforce_resource_lookup
+.type geforce_resource_lookup, @function
+geforce_resource_lookup:
+    jmp *hwdev_import_slots+176
+.size geforce_resource_lookup, .-geforce_resource_lookup
+.globl paging_device_map
+.type paging_device_map, @function
+paging_device_map:
+    jmp *hwdev_import_slots+180
+.size paging_device_map, .-paging_device_map
+.globl paging_device_unmap
+.type paging_device_unmap, @function
+paging_device_unmap:
+    jmp *hwdev_import_slots+184
+.size paging_device_unmap, .-paging_device_unmap
 .section .note.GNU-stack,"",@progbits
