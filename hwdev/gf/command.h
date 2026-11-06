@@ -118,8 +118,8 @@ struct gf2_dma_ops {
 struct gf2_fault {
     bool latched;
     u32 epoch, chid, put, get, reference;
-    /* first fixed at first foreground observation; latest aggregates later
-     * counts and OR masks. NSOURCE/NSTATUS were saved by F1 before ACK. */
+    /* first uses F1's pre-ACK status/trap latch and foreground counters;
+     * latest aggregates later counts and OR masks. */
     struct gf_irq_stats first, latest;
     u32 caches, push1, cache_get, pull0, method, data, dma_state, dma_fetch;
     u32 dma_push, dma_dcount, gr_trap, gr_method, gr_data, gr_class;

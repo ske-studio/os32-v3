@@ -1597,6 +1597,18 @@ GF4_MUTATIONS = [
   'return (gf4_service_stop(c->display4,now+GF3_TIMEOUT_US),0);',
   'normal_clock_dispatch'),
  ('b12',
+  'IRQ保護',
+  'hwdev/gf/display/heads.c',
+  'unsigned saved = irq_save();',
+  'unsigned saved = irq_save(); irq_restore(saved);',
+  'IRQ callback observes IF clear'),
+ ('b12',
+  'IRQ復元',
+  'hwdev/gf/display/heads.c',
+  '    irq_restore(saved);',
+  '    (void)saved;',
+  'caller IF restored on success and failure'),
+ ('b12',
   'fifo保持',
   'hwdev/gf/display/heads.c',
   'f->wanted_fifo != 0',
@@ -1676,7 +1688,7 @@ GF4_COMPONENTS = {
     'b10': ['hwdev/gf/display/tmds.c'],
     'b11d': ['drivers/video/geforce/tv_data.c'],
     'b11m': ['hwdev/gf/display/tv.c'],
-    'b12': ['hwdev/gf/display/heads.c'],
+    'b12': [],
     'd0': ['hwdev/gf/display/dcb.c'],
     'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c'],
     'c0log': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
@@ -1890,7 +1902,7 @@ def gf4_case(tree, case, directory):
         flags += ['-DGF_PRODUCTION_MODULE', '-DGF4_REAL_DISPLAY']
     if case in ('c2scan', 'c2links', 'c2linkb'):
         flags += ['-DOS32_GEFORCE_MODULE']
-    if case == 'c2links':
+    if case == 'c2links' or case in GF4_LIFECYCLE:
         flags[1:1] = ['-I'+str(tree/'tools/tests/host_arch')]
     sources = gf4_sources(tree, case)
     objects = []

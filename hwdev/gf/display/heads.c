@@ -22,6 +22,7 @@
  * Authors: Ben Skeggs
  */
 #include "api.h"
+#include "../../../include/io.h"
 
 /* nouveau nvkm/engine/disp/nv04.c:30-44 enables VBLANK per head.
  * F1 owns the actual IRQ programming and ACK (irq.c:106-125); its wanted
@@ -30,7 +31,9 @@
 i32 gf4_heads_apply(struct gf4_ctx *ctx, u32 heads)
 {
     struct gf_foundation *f = ctx->ch->f;
+    unsigned saved = irq_save();
     int rc = gf_irq_enable(f, f->wanted_fifo != 0, f->wanted_graph != 0, heads);
+    irq_restore(saved);
     if (rc) return rc;
     ctx->ch->heads = heads;
     return 0;

@@ -1564,9 +1564,23 @@
       "trace",
       "write"
     ],
+    "struct gf_irq_first": [
+      "fifo_latched",
+      "gr_class",
+      "gr_data",
+      "gr_method",
+      "gr_trap",
+      "graph_latched",
+      "nsource",
+      "nstatus",
+      "pfifo",
+      "pgraph",
+      "pmc"
+    ],
     "struct gf_irq_stats": [
       "entries",
       "fifo",
+      "first",
       "graph",
       "nsource",
       "nstatus",

@@ -172,6 +172,8 @@ MUTATIONS = {
          'u32 graph_delta = 0;'),
         ('irq-close', 'rc |= gf_irq_enable(ch->f, false, false, ch->heads);',
          'rc |= 0;'),
+        ('pre-ack-gr', 'if (fault->first.first.graph_latched) {',
+         'if (false) {'),
         ('first-fixed', 'merge(&ch->fault.latest, &now);',
          'merge(&ch->fault.first, &now);'),
         ('graph-gate', 'rc |= close_gate(ch->f, FAULT_GRAPH_FIFO);', 'rc |= 0;'),
