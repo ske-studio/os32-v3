@@ -208,6 +208,17 @@ static i32 stop_admission(void *owner,bool open)
     return gf3_service_admission(cint_service,false);
 }
 static struct gf4_links stop_links;
+static bool scan_stop_fail;
+static int scan_stop_record(struct gf_display_context *c)
+{
+    if (scan_stop_fail) {
+        gf3_host_fail_at(&cint_host,H_WRITE,cint_host.calls[H_WRITE]+1U,CINT_IO_FAILURE);
+        scan_stop_fail=false;
+    }
+    int rc=cint_foundation_stop(c);
+    if (rc) c->target=RECOVER_PBUS1854;
+    return rc;
+}
 static void normal_clock_dispatch(void)
 {
     const i32 results[]={0,CINT_RESTORE_FAILURE};
@@ -226,6 +237,9 @@ static void normal_clock_dispatch(void)
         stop_ctx.ready=true; stop_ctx.accepting=true;
         stop_ctx.epoch=cint_prod.chan.epoch;
         struct gf_vram_reservation scan=cint_service->scan_node.value;
+        cint_prod.display.baseline_valid=true;
+        cint_prod.display.baseline_start[0]=0x12000U;
+        cint_prod.display.baseline_start[1]=0x34000U;
         cint_trace_clear();
         stop_admissions=0; stop_deadline=cint_deadline();
         cint_restore_rc=results[i];
@@ -250,17 +264,47 @@ static void normal_clock_dispatch(void)
             assert(stop_ctx.deadline==stop_deadline && stop_admissions==STOP_PASSES_PER_ENTRY+STOP_PASSES_PER_ENTRY);
         }
         assert(!cint_prod.display.engaged && cint_prod.display.stop_ok);
+        if (!results[i]) {
+            /* service.c keeps its stop entry after a complete stop. A second
+             * stop can fail in F1's mask_sources while engaged is false.
+             * Only annotate the real lower failure's diagnostic target. */
+            struct gf_display_owner owner=cint_display_owner;
+            owner.foundation_stop=scan_stop_record;
+            cint_prod.display.owner=&owner;
+            cint_restore_seen=false;
+            cint_trace_clear();
+            scan_stop_fail=true;
+            stop_deadline=cint_deadline();
+            assert(gf_display_stop(&cint_prod.display)==GF1_EIO);
+            assert(cint_prod.foundation.last_rc==GF1_EIO);
+            assert(!cint_prod.foundation.revoked && !cint_prod.display.engaged);
+            assert(!cint_prod.display.stop_ok && !cint_prod.display.reusable);
+            assert(cint_prod.display.last_rc==GF1_EIO);
+            assert(cint_prod.display.target==RECOVER_PBUS1854);
+            assert(cint_restore_calls==2 && cint_restore_rc==0);
+            assert(!gf2_host_memcmp(&scan,&cint_service->scan_node.value,sizeof(scan)));
+            /* Both successful START writes would replace the lower target
+             * with head B without the first_rc guard in quiesce.c. */
+            u32 values[2]={0};
+            for (u32 e=0;e<cint_host.nevents;e++) {
+                const struct gf3_host_event *event=&cint_events[e];
+                if (event->op!=H_WRITE || event->rc) continue;
+                if (event->a[1]==0x600800U) values[0]=event->a[3];
+                if (event->a[1]==0x602800U) values[1]=event->a[3];
+            }
+            assert(values[0]==0x12000U && values[1]==0x34000U);
+            gf3_host_fail_at(&cint_host,H_WRITE,0,0);
+            cint_restore_seen=false;
+            stop_deadline=cint_deadline();
+            assert(!gf_display_stop(&cint_prod.display));
+            assert(!cint_prod.foundation.last_rc && !cint_prod.display.engaged);
+            cint_prod.display.owner=&cint_display_owner;
+        }
         /* Only the lower F3 fixture owns these nodes; F4 cannot free them. */
         assert(!gf3_service_release(cint_service));
         assert(!gf3_service_owner_bind(cint_service,0));
         cint_no_resources();
     }
-}
-static int scan_stop_record(struct gf_display_context *c)
-{
-    int rc=cint_foundation_stop(c);
-    if (rc) c->target=RECOVER_PBUS1854;
-    return rc;
 }
 static void scan_origins(void)
 {
@@ -275,7 +319,8 @@ static void scan_origins(void)
         cint_trace_clear();
         /* Ordinary stop: first lower write fails. Revoked stop skips those
          * writes, so inject separately into the first scan restore (case 3).
-         * Case 2 leaves scan restore successful to expose target clobbering. */
+         * Case 2 allows scan writes, but cint_restore rejects revocation;
+         * the non-engaged retry above covers successful local restoration. */
         if (fail==1U || fail==3U) gf3_host_fail_at(&cint_host,H_WRITE,1,CINT_IO_FAILURE);
         if (fail>=2U) cint_prod.foundation.revoked=true;
         struct gf_display_owner owner=cint_display_owner;
