@@ -5,6 +5,89 @@
 /*  予約権限は資源レコード (decode 範囲 + その根拠) から来る。生の {first,   */
 /*  end} だけでは予約できない。1 レコード = decode 区間 1 組 (B10)。         */
 /* ======================================================================== */
+/* Kernel-owned windows; end == 0 marks an unused slot. Paging holds saved
+ * IRQs from its final prepare through PTE/TLB updates and commit. */
+static struct ledger_device_map ledger_device_maps[LEDGER_MAX_DEVICE_MAPS];
+STATIC_ASSERT(sizeof(ledger_device_maps) == 1024, ledger_device_maps_1024);
+
+int ledger_resource_page_mapped(u32 rid, u32 pfn)
+{
+    unsigned int flags = irq_save();
+    int mapped = 0;
+    if (rid < LEDGER_MAX_RESOURCES && ledger_resources[rid].bus &&
+        pfn < PHYSMEM_MAX_PFN) {
+        const struct ledger_resource *r = &ledger_resources[rid];
+        mapped = r->map_first <= pfn && pfn < r->map_end;
+        for (u32 i = 0; !mapped && i < LEDGER_MAX_DEVICE_MAPS; i++) {
+            const struct ledger_device_map *m = &ledger_device_maps[i];
+            if (m->end && m->rid == rid && m->first <= pfn && pfn < m->end)
+                mapped = 1;
+        }
+    }
+    irq_restore(flags);
+    return mapped;
+}
+
+int ledger_device_map_prepare(u32 owner, u32 rid, u32 first, u32 end,
+                              int unmap, u32 *slot)
+{
+    unsigned int flags = irq_save();
+    u32 free_slot = LEDGER_MAX_DEVICE_MAPS;
+    int rc = -1, reserved = 0;
+    const struct ledger_resource *r;
+    if (!online || !slot || !owner_ok(owner) ||
+        ledger_owners[owner].kind != LEDGER_KIND_DEVICE ||
+        rid >= LEDGER_MAX_RESOURCES || first >= end || end > PHYSMEM_MAX_PFN)
+        goto done;
+    r = &ledger_resources[rid];
+    if (!r->bus || !r->width_basis || r->width_basis > LEDGER_WB_GLUE_CONST ||
+        first < r->decode_first || end > r->decode_end) goto done;
+    for (u32 i = 0; i < ledger_region_count; i++) {
+        const struct ledger_region *g = &ledger_regions[i];
+        if (g->type == LEDGER_R_DEVICE && g->owner == owner &&
+            g->cache == LEDGER_CACHE_UC && (g->res_mask & (1UL << rid)) &&
+            g->first <= first && end <= g->end) reserved = 1;
+    }
+    if (!reserved) goto done;
+    if (unmap) {
+        for (u32 i = 0; i < LEDGER_MAX_DEVICE_MAPS; i++) {
+            const struct ledger_device_map *m = &ledger_device_maps[i];
+            if (m->end && m->owner == owner && m->rid == rid &&
+                m->first == first && m->end == end) {
+                *slot = i;
+                rc = 0;
+                goto done;
+            }
+        }
+        goto done;
+    }
+    /* Physical overlap is forbidden even across different resources/owners.
+     * Adjacent windows deliberately retain their separate identities. */
+    for (u32 i = 0; i < LEDGER_MAX_RESOURCES; i++) {
+        const struct ledger_resource *s = &ledger_resources[i];
+        if (s->bus && s->map_first < s->map_end &&
+            first < s->map_end && s->map_first < end) goto done;
+    }
+    for (u32 i = 0; i < LEDGER_MAX_DEVICE_MAPS; i++) {
+        const struct ledger_device_map *m = &ledger_device_maps[i];
+        if (!m->end) {
+            if (free_slot == LEDGER_MAX_DEVICE_MAPS) free_slot = i;
+        } else if (first < m->end && m->first < end) goto done;
+    }
+    if (free_slot == LEDGER_MAX_DEVICE_MAPS) goto done;
+    *slot = free_slot;
+    rc = 0;
+done:
+    irq_restore(flags);
+    return rc;
+}
+
+void ledger_device_map_commit(u32 slot, const struct ledger_device_map *map)
+{
+    if (map) ledger_device_maps[slot] = *map;
+    else ledger_device_maps[slot] = (struct ledger_device_map){0};
+}
+
 int ledger_resource_add(const struct ledger_resource *rec, u32 *rid)
 {
     u32 i;
@@ -19,6 +102,14 @@ int ledger_resource_add(const struct ledger_resource *rec, u32 *rid)
         (rec->map_first < rec->map_end &&
          (rec->map_first < rec->decode_first || rec->map_end > rec->decode_end)))
         goto done;
+    /* Adding static provenance must not absorb an already live window. */
+    if (rec->map_first < rec->map_end) {
+        for (i = 0; i < LEDGER_MAX_DEVICE_MAPS; i++) {
+            const struct ledger_device_map *m = &ledger_device_maps[i];
+            if (m->end && rec->map_first < m->end && m->first < rec->map_end)
+                goto done;
+        }
+    }
     for (i = 0; i < LEDGER_MAX_RESOURCES && ledger_resources[i].bus; i++) {}
     if (i == LEDGER_MAX_RESOURCES) {
         ledger_res_overflow++;
@@ -40,11 +131,19 @@ int ledger_resource_set_map(u32 rid, u32 first, u32 end)
         struct ledger_resource *r = &ledger_resources[rid];
         if ((!first && !end) || (first < end && first >= r->decode_first &&
                                end <= r->decode_end)) {
+            if (first != r->map_first || end != r->map_end) {
+                for (u32 i = 0; i < LEDGER_MAX_DEVICE_MAPS; i++) {
+                    const struct ledger_device_map *m = &ledger_device_maps[i];
+                    if (m->end && (m->rid == rid ||
+                        (first < m->end && m->first < end))) goto done;
+                }
+            }
             r->map_first = first;
             r->map_end = end;
             ok = 1;
         }
     }
+done:
     irq_restore(flags);
     return ok;
 }
