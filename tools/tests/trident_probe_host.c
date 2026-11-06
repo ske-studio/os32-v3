@@ -30,6 +30,10 @@ static int test(void)
     f.resources.pci.bar1 |= 1;
     if (trident_pci_validate(&f.resources.pci) != TRI_E_RESOURCE) return 8;
     f.resources.pci.bar1 &= ~1u;
+    f.resources.pci.bus=2; f.resources.pci.slot=12; f.resources.pci.function=3;
+    f.resources.pci.revision=0x42;
+    f.resources.pci.bar0=0x30000008; f.resources.pci.bar1=0x40000000;
+    if (trident_pci_validate(&f.resources.pci)) return 10;
     f.resources.pci.vendor = 0;
     if (trident_pci_validate(&f.resources.pci) != TRI_E_DEVICE) return 9;
     return 0;

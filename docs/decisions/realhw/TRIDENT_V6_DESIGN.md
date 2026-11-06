@@ -46,7 +46,7 @@
 | 2 | `D:1028–1034`, `V:574–604` | CR11 bit7 を落としてから `call protect_on`（S:123–132）。旧値を必要な変数に保存する |
 | 3 | `V:845–872` 標準 VGA restore | 3C2←E3h、SR1..4←21,0F,00,0E（消画を保持するため SR1 の20hを追加）。CR11←下表値&7F、CR00..18 を下表順、GR00..08←00,00,00,00,00,40,05,0F,FF、AR00..0F←00..0F、AR10..14←41,00,0F,00,00。最後も消画状態を保つ。段2bの比較引数 `keepgr6=1` の回だけ GR06 は保存した元値を書き、既定値0では05hとする |
 | 4 | `A:781–791` DAC hidden command | SR0B 選択/read → SR0E←C2。3C8 read → 3C6 を4回 read → 3C6←00 → 3C8 read。通常の palette mask とは別の hidden command を 8bpp/non-MUX にする |
-| 5 | `A:793–810` 拡張 restore の順 | CR1E←80、CR21←20、SR0D←20、CR50←00、CR27←08、CR2B←00、CR29←旧値&CF、CR36←80、CR2F←旧値\|10、CR2A←旧値\|40、CR3A←00（下記注）、CR38←00、CR39←(旧値&F9)\|06、CR55←1F、GR2F←旧値\|04、GR0F←(旧値&F0)\|02、CR13←50（640/8） |
+| 5 | `A:793–810` 拡張 restore の順 | CR1E←80、CR21←20、SR0D←20、CR50←00、CR27←08、CR2B←00、CR29←旧値&CF、CR36←00（NoAccel、D:2069-2073 / X/dac:694-700）、CR2F←旧値\|10、CR2A←旧値\|40、CR3A←00（下記注）、CR38←00、CR39←(旧値&F9)\|06、CR55←1F、GR2F←旧値\|04、GR0F←(旧値&F0)\|02、CR13←50（640/8） |
 | 6 | `A:871–907`, `P:60–135` | 9682 は非3D・NewClockCode=false (`D:2384,2525`)。v+43C8←PLL a、v+43C9←PLL b、v+3C2←EB（E3 の ClockSelect bits を08へ）、SR0E←C2。SR18/19 や新 PLL の式は使わない。MCLK は順0aで80MHzに設定済み |
 | 6a | `D:1039–1040` | 順6の直後に `call protect_off`（SR00同期リセット解除・SR01消画解除）。直後に順10の Enable を呼び、以後の BAR0・パレット/作画中はリセットしない |
 | 6b | `D:1036–1047`, `S:57–83` | 順6aの直後に S と同じ Enable を call（68←0E、6A←07,8F,06、protect_on、CR23&DF、CR29\|04、拡張DAC、GR23&FC、SR1&EF、protect_off、FAC←02）。拡張DACは83C8←4/83C6 read/83C8←4/83C6 write を3回、値は旧値\|06、旧値\|08、旧値\|01 |

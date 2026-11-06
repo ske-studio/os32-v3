@@ -50,6 +50,10 @@ SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/ut
 HEADERS = [p for p in TARGET_SRCS if p.endswith(".h")]
 CORE='userland/lib/gfx/libos32gfx_core.c'
 MUTANTS = [
+ ('attach-diag-missing', [(CORE,'        gfx_api->serial_puts(msg);',
+   '        (void)msg;')], 'FAIL attach_logs==1 && attach_logged'),
+ ('attach-diag-wrong-rc', [(CORE,'hex[((u32)rc >> (28 - i * 4)) & 15]',
+   'hex[((u32)0 >> (28 - i * 4)) & 15]')], 'FAIL attach_logs==1 && attach_logged'),
  ('shutdown-flag-ignored', [(CORE,'    if (gfx_stopped) return OS32_ERR_INVAL;','')],
    'FAIL shutdown_waits_stay_detached'),
  ('halt-no-check', [(CORE,'    gfx_api->sys_halt();\n    (void)libos32gfx_check();','    gfx_api->sys_halt();')],

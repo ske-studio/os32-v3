@@ -18,7 +18,7 @@ PRODUCT = ROOT / 'drivers/video/trident/probe.c'
 MUTATIONS = [
     ('chip', 'chip != TRI_CHIP_9682', 'chip == TRI_CHIP_9682'),
     ('arm', '!d->pinned || !d->armed || !d->res->ready', 'false'),
-    ('bar', 'pci->bar1 != TRI_BAR1_PHYS', 'false'),
+    ('bar', '(pci->bar1 & 0x07u)', 'false'),
 ]
 def main():
     parser = argparse.ArgumentParser()

@@ -157,6 +157,17 @@ int libos32gfx_attach_checked(void)
         gfx_sprite_init();
         gfx_pools_initialized = 1;
     }
+    /* One observation per explicit attach, never per primitive/check. Use
+     * serial only: console output here would itself draw into CLIENT. */
+    if (gfx_api && gfx_api->serial_puts) {
+        char msg[] = "[libos32gfx] attach rc=00000000 ready=0\n";
+        const char hex[] = "0123456789abcdef";
+        for (u32 i = 0; i < 8; ++i)
+            msg[sizeof("[libos32gfx] attach rc=") - 1 + i] =
+                hex[((u32)rc >> (28 - i * 4)) & 15];
+        msg[sizeof(msg) - 3] = gfx_ready ? '1' : '0';
+        gfx_api->serial_puts(msg);
+    }
     return rc;
 }
 

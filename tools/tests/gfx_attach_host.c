@@ -7,6 +7,21 @@ unsigned int host_arch_if = 0x202U;
 unsigned int host_sdk_cpl = 3;
 static u32 queries, legacy_calls, draws, releases, asm_calls;
 static int bad_view, deny_query, bad_screen;
+static u32 attach_logs;
+static char attach_log[80];
+static void __cdecl attach_serial(const char *msg)
+{
+    u32 i;
+    for (i=0; msg[i] && i+1<sizeof(attach_log); i++) attach_log[i]=msg[i];
+    attach_log[i]=0;
+    attach_logs++;
+}
+static int attach_logged(const char *expected)
+{
+    u32 i=0;
+    while (expected[i] && expected[i]==attach_log[i]) i++;
+    return expected[i]==attach_log[i];
+}
 
 /* Translate SDK values through actual B1 user storage, not a kernel model. */
 static int port_query(struct gfx_attach_desc *out)
@@ -150,6 +165,7 @@ static void run(void)
     host_cr3=space.pd_phys;CHECK(caller_access_enter(&prev,CALLER_USER));
     api.mem_alloc=sdk_alloc;api.version=69;api.gfx_get_framebuffer=legacy_fb;api.gfx_screen_info=screen;
     api.gfx_add_dirty_rect=dirty;api.gfx_present_raster=raster;
+    api.serial_puts=attach_serial;
     gfx_api=&api;gfx_attach_port=&port;
     /* The very first attach fails: present must recover usable pools. */
     gfx_set_backend_pref(GFX_PREF_PC98);gfx_prepare_backend();gfx_init();
@@ -157,9 +173,13 @@ static void run(void)
     CHECK(!port_query(&first_desc));
     for(u32 i=0;i<MEM_LEASE_MAX;i++) CHECK(!port_lease(&first_desc.ref,&first_full[i]));
     CHECK(libos32gfx_attach_checked()==OS32_ERR_FULL);empty();
+    CHECK(attach_logs==1 && attach_logged("[libos32gfx] attach rc=fffffff3 ready=0\n"));
     for(u32 i=0;i<MEM_LEASE_MAX;i++) CHECK(!port_unlease(first_full[i].token));
     sdk_gfx_present();CHECK(gfx_ready && live()==1);
     CHECK(sdk_allocations==1);
+    CHECK(attach_logs==1); /* implicit recovery/present does not repeat it */
+    CHECK(!libos32gfx_attach_checked());
+    CHECK(attach_logs==2 && attach_logged("[libos32gfx] attach rc=00000000 ready=1\n"));
     GFX_Surface *kept_surface=sdk_gfx_create_surface(8,8);CHECK(kept_surface);
     sdk_gfx_surface_pixel(kept_surface,0,0,3);
     GFX_Sprite *kept_sprite=sdk_gfx_create_sprite(kept_surface,0);CHECK(kept_sprite);

@@ -52,8 +52,8 @@
  * Script: trident_mode.hwb:1497-1585. VGA indexed writes follow the
  * reference mmioWriteSeq/Crtc/Gr (8bit index + data), rather than the
  * script's packed 16bit VGA writes. Trident OUTW remains 16bit.
- * Current MISC selects entry base; saved MISC selects VGA/exit base,
- * as specified by the frozen trident.h contract. No fonts on this card.
+ * Retained IOBase selects entry; saved MISC selects VGA/exit base.
+ * No fonts on this nonprimary card.
  */
 #include "trident.h"
 
@@ -75,15 +75,14 @@ static int palette_access(struct trident_device *d, u16 base, u8 value)
 
 int trident_state_restore(struct trident_device *d)
 {
-    u8 misc, ignored;
+    u8 ignored;
     u16 base;
     if (!d) return TRI_E_INVAL;
     if (!d->active) return TRI_OK;
     if (!d->saved.valid) return TRI_E_STATE;
     const u8 *s = d->saved.value;
 
-    TRY(trident_read8(d, TRI_SPACE_REGS, TRI_MISC_READ, &misc));
-    base = (misc & 1u) ? TRI_CR_COLOR : TRI_CR_MONO;
+    base = d->cur_vga_base; /* D:1123 retains vgaHW IOBase. */
     TRY(trident_protect(d, base, true));
 
     /* TridentRestore, old PLL path; default MCLK is not saved. */
