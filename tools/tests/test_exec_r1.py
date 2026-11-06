@@ -44,6 +44,7 @@ def landing(s, start, buf, name):
 
 PRE = r'''
 #include "types.h"
+void geforce_foreground_poll(void) {}
 static u32 host_cr3;
 #include "font_guard_inactive.h"
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
