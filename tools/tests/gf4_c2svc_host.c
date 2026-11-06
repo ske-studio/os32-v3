@@ -18,18 +18,38 @@ static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #endif
 #include GF4_SERVICE_SOURCE
 #undef gf4_detect
+/* Include the real module service so a fixture reboot can forget its empty
+ * publication binding before invoking the production initializer again. */
+#define service_check guard_f5_check
+#define service_publish guard_f5_publish
+#include "../../hwdev/gf/feature5_service.c"
+#undef service_publish
+#undef service_check
+static const struct gf5_test_ops *guard_f5_slot;
 
-static struct gf4_host svc_host;
+static const struct gf4_test_ops *svc_slot;
 static struct gf4_state svc_state;
+#ifdef GF4_GUARD_LIFETIME
+/* H2 uses the actual stopped management slot published by service.c. */
+static const struct gf4_restore_ops *guard_management;
+static GfxBackend guard_backend;
+static struct geforce_platform guard_platform={.display_phys=CINT_FB_PHYS};
+static int guard_height;
+static GeforceModuleContext guard_module={.display_restore_out=&guard_management,
+    .display_out=&svc_slot,.backend=&guard_backend,.platform=&guard_platform,
+    .height=&guard_height,.display_state=&svc_state};
+const GeforceModuleContext *geforce_context=&guard_module;
+#endif
+static struct gf4_host svc_host;
 static struct gf4_host_event svc_events[GF4_HEADS*GF4_HOST_LUT_BYTES*16U];
 static struct gf3_host_reg svc_regs[GF4_HEADS*GF4_HOST_VGA_REGS];
 static struct gf4_ctx svc_ctx;
 static struct gf4_links svc_links;
 static struct gf4_exec_ops svc_exec;
-static const struct gf4_test_ops *svc_slot;
 static i32 svc_open_rc,svc_close_rc,svc_restore_rc,svc_acquire_rc;
 static u32 svc_opens,svc_closes,svc_restores,svc_acquires,svc_releases;
 static u32 svc_cleanup_after_off;
+static bool guard_retire_fail;
 static bool svc_slow_validate,svc_spend_objects,svc_spend_detect;
 static i32 svc_detect_budget(struct gf4_ctx *c,u32 dl)
 {
@@ -83,19 +103,26 @@ static i32 svc_admission(void *owner,bool open)
     assert(c==&svc_ctx);
     if (!open) {
         ++svc_closes; svc_slot=0;
+#ifdef GF4_GUARD_LIFETIME
+        i32 rc=gf4_links_table()->admission(c,false);
+#else
         i32 rc=gf3_service_admission(cint_service,false);
+#endif
         return rc ? rc : svc_close_rc;
     }
     ++svc_opens;
     assert(c->ready && c->epoch==c->ch->epoch && c->ch->state==GF2_RUN);
     if (svc_open_rc) return svc_open_rc;
+#ifdef GF4_GUARD_LIFETIME
+    return gf4_links_table()->admission(c,true);
+#else
     i32 rc=gf3_service_admission(cint_service,true);
     if (!rc) {
-        /* Borrow a non-NULL token only; no invented gf4 ops are invoked. */
         c->accepting=true;
         svc_slot=(const struct gf4_test_ops *)&svc_ctx;
     }
     return rc;
+#endif
 }
 static i32 svc_i2c(void *owner,u8 index,struct gf4_i2c_port *out)
 {
@@ -149,6 +176,9 @@ static int svc_restore(void *owner,struct gf_init_context *cleanup)
     assert(owner==&cint_host && cleanup->io.opaque==owner && !svc_slot);
     assert(cint_prod.chan.state==GF2_OFF && !cint_prod.accel.ready);
     ++svc_restores;
+    if (guard_retire_fail)
+        gf3_host_fail_at(&cint_host,H_WRITE,cint_host.calls[H_WRITE]+4U,SVC_INJECT);
+    /* Three PC98 quiesce writes precede tile retirement. */
     return svc_restore_rc;
 }
 static const struct gf_display_owner svc_display_owner={
@@ -198,6 +228,10 @@ static void svc_fixture_state(bool cold)
     svc_opens=svc_closes=svc_restores=svc_acquires=svc_releases=svc_cleanup_after_off=0;
     assert(!gf4_service_bind(&svc_ctx,&cint_prod.display,&svc_links));
     assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
+    /* cint_reset simulates reboot and clears production storage. No live
+     * loans survive it; recreate F5 through the same init as module startup. */
+    service_ctx=NULL; service_slot=NULL;
+    assert(!gf5_service_init(&cint_prod,&svc_ctx,&guard_f5_slot));
 }
 static void svc_fixture(void)
 {
@@ -375,8 +409,179 @@ static void test_failed_start(void)
     assert(!cint_prod.display.init && !cint_prod.display.program && !svc_slot);
     svc_finish();
 }
+#ifdef GF4_GUARD_LIFETIME
+/* Guard lifetime A8/A9: nouveau c03c1a1 dispnv04/disp.c:189-207
+ * ends saved-image ownership after display use. Fallible OS32 cleanup must
+ * retain real registry nodes until a retry, including after saved_release.
+ * MM/production adapter atomicity is exercised by H1/H4, not modeled here. */
+static struct gf4_saved guard_saved,guard_stale;
+static struct gf_vram_borrow guard_loan;
+static u32 guard_reservations(void)
+{
+    u32 cursor=0,count=0;
+    struct gf_vram_reservation key;
+    int rc;
+    while ((rc=gf_vram_next(&cint_prod.chan,&cursor,&key))>0) ++count;
+    assert(!rc);
+    return count;
+}
+static void guard_pending(void)
+{
+    assert(svc_ctx.cleanup_pending && !svc_ctx.accepting && !svc_slot);
+    assert(cint_prod.display.display4==&svc_ctx && svc_ctx.legacy==&cint_prod.display);
+    assert(cint_service->owner==gf4_service_owner_table());
+    assert(guard_management && guard_management->ctx==&svc_ctx);
+    assert(guard_management->abandon && guard_management->saved_release);
+    u32 epoch=cint_prod.chan.epoch,opens=svc_opens;
+    assert(gf4_service_start(&svc_ctx,cint_deadline())==GF4_EBUSY);
+    assert(cint_prod.chan.epoch==epoch && svc_opens==opens);
+}
+static void guard_clean(void)
+{
+    assert(!svc_ctx.cleanup_pending && !svc_ctx.diagnostic_saved && !svc_ctx.saved_closed);
+    assert(!guard_management && !registry.borrows && !guard_reservations());
+    assert(!svc_ctx.hold_saved.version && !cint_service->scan.bytes && !cint_service->test.bytes);
+    for (u8 h=0;h<GF4_HEADS;++h) {
+        struct gf4_head_image zero={0};
+        struct gf4_flip_hold hold={0};
+        assert(!gf2_host_memcmp(&svc_state.head[h],&zero,sizeof(zero)));
+        assert(!gf2_host_memcmp(&svc_ctx.hold[h],&hold,sizeof(hold)));
+        assert(!svc_ctx.scan_bank[h] && !svc_ctx.cursor_view[h].mapped);
+    }
+    for (u32 i=0;i<GF5_TILE_COUNT;++i) {
+        assert(cint_prod.feature5.tile_slot[i].state==GF_TILE_FREE);
+        assert(!cint_prod.feature5.tile_live[i]);
+    }
+    cint_no_resources();
+}
+static void guard_reenter(void)
+{
+    guard_clean();
+    /* No fixture reset: new reservations/epoch must be produced by enter. */
+    assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(svc_ctx.ready && svc_ctx.accepting && svc_slot);
+    svc_keys_live(&svc_state.head[0].front);
+    assert(gf4_diagnostic_abandon(&svc_ctx,&guard_saved)==GF4_ESTATE);
+    svc_finish(); guard_clean();
+}
+static void test_terminal_guard(void)
+{
+    /* Successful restore is the normal contrast to terminal abandonment. */
+    svc_fixture_state(true);
+    assert(!cint_prod.chan.f);
+    assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(svc_slot && svc_slot->display_save);
+    assert(!svc_slot->display_save(&svc_ctx,&guard_saved,cint_deadline()));
+    assert(guard_management && guard_management->restore);
+    assert(!guard_management->restore(&svc_ctx,&guard_saved,cint_deadline()));
+    assert(guard_management && guard_management->saved_release);
+    assert(!guard_management->saved_release(&svc_ctx,&guard_saved));
+    svc_finish(); guard_reenter();
+
+    /* quiesce failure must keep engaged and refuse abandon, even with OFF. */
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(svc_slot && svc_slot->display_save);
+    assert(!svc_slot->display_save(&svc_ctx,&guard_saved,cint_deadline()));
+    gf4_host_fail_at(&svc_host,D_WRITE,svc_host.calls[D_WRITE]+1U,SVC_INJECT);
+    assert(guard_management && guard_management->restore);
+    assert(guard_management->restore(&svc_ctx,&guard_saved,cint_deadline())==SVC_INJECT);
+    u32 count=guard_reservations();
+    svc_restore_rc=SVC_OTHER;
+    assert(gf4_service_stop(&svc_ctx,cint_deadline())==SVC_OTHER);
+    assert(cint_prod.chan.state==GF2_OFF && cint_prod.display.engaged);
+    guard_pending();
+    assert(guard_management->abandon(&svc_ctx,&guard_saved)==GF4_EBUSY);
+    assert(guard_reservations()==count && svc_ctx.diagnostic_saved==&guard_saved);
+    svc_restore_rc=0;
+    assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
+    guard_pending();
+    assert(guard_management->abandon(&svc_ctx,&guard_stale)==GF4_ESTATE);
+    svc_ctx.last_rc=SVC_INJECT;
+    assert(!guard_management->abandon(&svc_ctx,&guard_saved));
+    assert(svc_ctx.last_rc==SVC_INJECT);
+    assert(gf4_diagnostic_abandon(&svc_ctx,&guard_saved)==GF4_ESTATE);
+    /* Repeated shutdown has no reservation or DMA left to free twice. */
+    assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
+    guard_clean();
+    /* Legacy quiesce failure permanently revokes reuse (quiesce.c), even
+     * after terminal memory cleanup. Never reopen unsafe hardware. */
+    assert(!cint_prod.display.reusable);
+    assert(gf4_service_start(&svc_ctx,cint_deadline())==GF4_ESTATE);
+
+    /* A8's restore-only failure, with successful complete stop, permits
+     * reentry on the same initialized owner without a fixture reset. */
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(svc_slot && svc_slot->display_save);
+    assert(!svc_slot->display_save(&svc_ctx,&guard_saved,cint_deadline()));
+    gf4_host_fail_at(&svc_host,D_WRITE,svc_host.calls[D_WRITE]+1U,SVC_INJECT);
+    assert(guard_management && guard_management->restore);
+    assert(guard_management->restore(&svc_ctx,&guard_saved,cint_deadline())==SVC_INJECT);
+    assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
+    guard_pending();
+    assert(!guard_management->abandon(&svc_ctx,&guard_saved));
+    guard_reenter();
+
+    /* saved_release succeeds, but a real outstanding loan makes release_all
+     * fail. Its key/node must survive without the diagnostic pointer. */
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    assert(svc_slot && svc_slot->display_save);
+    assert(!svc_slot->display_save(&svc_ctx,&guard_saved,cint_deadline()));
+    struct gf_vram_reservation key=svc_ctx.test.value;
+    assert(!gf_vram_borrow_get(&cint_prod.chan,&guard_loan,&key,key.off,key.bytes,GF_BORROW_VIEW));
+    assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
+    guard_pending(); count=guard_reservations();
+    svc_ctx.last_rc=SVC_INJECT;
+    assert(guard_management->abandon(&svc_ctx,&guard_saved)==GF3_EBUSY);
+    assert(svc_ctx.last_rc==SVC_INJECT && !svc_ctx.diagnostic_saved);
+    assert(guard_reservations()==count);
+    assert(!gf2_host_memcmp(&key,&svc_ctx.test.value,sizeof(key)));
+    guard_pending();
+    assert(!gf_vram_borrow_put(&cint_prod.chan,&guard_loan));
+    assert(!guard_management->abandon(&svc_ctx,&guard_saved));
+    guard_reenter();
+}
+static void test_stop_guard(void)
+{
+    /* A failed window close leaves both its view loan and reservation live. */
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    cint_open_windows();
+    u32 count=guard_reservations();
+    struct gf_vram_borrow loan=cint_view[0].borrow;
+    cint_unmap_fail=CINT_MAP_VIEW0;
+    assert(gf4_service_stop(&svc_ctx,cint_deadline())==GF2_EMAP);
+    guard_pending();
+    assert(guard_reservations()==count && cint_view[0].mapped);
+    assert(!gf2_host_memcmp(&loan,&cint_view[0].borrow,sizeof(loan)));
+    svc_finish(); guard_reenter();
+
+    /* A10: set a real tile on the scan reservation, leave without clear.
+     * Arm a PFB write failure at the external restore boundary (after OFF),
+     * so no earlier F2/F1 write consumes the injected failure. */
+    svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+    struct gf_vram_reservation key=svc_ctx.scan[0][0].value;
+    /* nouveau_bo.c:178-188: 64 rows at the NV4x minimum pitch. */
+    enum { GUARD_TILE_PITCH=1024U, GUARD_TILE_ROWS=64U };
+    struct gf5_tile tile={.base=key.off,.bytes=GUARD_TILE_PITCH*GUARD_TILE_ROWS,.pitch=GUARD_TILE_PITCH,
+        .reservation_id=key.reservation_id,.generation=key.generation};
+    cint_prod.feature5.deadline=cint_deadline();
+    assert(!gf5_tile_set(&cint_prod.feature5,0,&tile));
+    assert(cint_prod.feature5.tile_slot[0].state==GF_TILE_OWNED);
+    guard_retire_fail=true;
+    assert(gf4_service_stop(&svc_ctx,cint_deadline())==GF5_EIO);
+    assert(cint_prod.feature5.source_rc==SVC_INJECT);
+    guard_retire_fail=false;
+    guard_pending();
+    assert(!cint_prod.display.engaged && cint_prod.chan.state==GF2_OFF);
+    assert(cint_prod.feature5.tile_slot[0].state==GF_TILE_UNKNOWN);
+    assert(gf_vram_release(&cint_prod.chan,&key)==GF3_EBUSY);
+    svc_finish(); guard_reenter();
+}
+#endif
 void _start(void)
 {
+#ifdef GF4_GUARD_LIFETIME
+    test_terminal_guard(); test_stop_guard();
+#endif
     test_bind_and_start(); test_cleanup_failures();
     test_diagnostic_roundtrip(); test_stopped_cursor(); test_slow_start(); test_failed_start();
     gf2_host_exit(0);
