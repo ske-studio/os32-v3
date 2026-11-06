@@ -439,18 +439,22 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     first=c->links->admission(c->links->owner,false);
     /* nouveau_drm.c:955-988. All display waits precede F2/F1 stop. A held
      * flip that cannot converge retains both keys until display use ends. */
-    if (c->ready && c->ch->state==GF2_RUN && !c->ch->fault.latched) {
-        for (u8 h=0;h<GF4_HEADS;++h) {
-            i32 rc=0;
-            if (c->hold[h].pending) rc=gf4_flip_complete(c,h,dl);
+    bool running=c->ready && c->ch->state==GF2_RUN && !c->ch->fault.latched;
+    for (u8 h=0;h<GF4_HEADS;++h) {
+        i32 rc=0;
+        if (running && c->hold[h].pending) {
+            rc=gf4_stage_deadline(c,f,&dl);
+            if (!rc) rc=gf4_flip_complete(c,h,dl);
             if (rc && !first) first=rc;
-            if (!c->state->head[h].enabled) continue;
-            rc=gf4_cursor_apply(c,h,false);
+        }
+        /* Cursor MMIO does not need a live push channel. Hide even after
+         * failed recovery stopped F2; the owner bus still rejects revocation. */
+        rc=gf4_cursor_apply(c,h,false);
+        if (rc && !first) first=rc;
+        if (running && c->state->head[h].enabled && !c->saved_closed) {
+            rc=gf4_stage_deadline(c,f,&dl);
+            if (!rc) rc=svc_dpms_on(c,h,dl);
             if (rc && !first) first=rc;
-            if (!c->saved_closed) {
-                rc=svc_dpms_on(c,h,dl);
-                if (rc && !first) first=rc;
-            }
         }
     }
     i32 rc=gf3_service_close(s);
@@ -458,7 +462,8 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     if (rc && !first) first=rc;
     if (rc && !f->revoked) return svc_result(c,first);
     if (closed) {
-        rc=gf3_service_fini(s,dl);
+        rc=gf4_stage_deadline(c,f,&dl);
+        if (!rc) rc=gf3_service_fini(s,dl);
         if (rc && !first) first=rc;
     }
     rc=gf2_stop(c->ch);

@@ -447,8 +447,7 @@ void gfx_shutdown(void)
     if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {
         gfx_current_height = GFX_HEIGHT;
         gfx_flip_enabled = gfx_display_page = 0;
-    }
-    if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {
+        /* The selected output is now 98 even while GeForce remains usable. */
         gfx_select_mode(&gfx_backend_pc98, 0);
         g_backend = &gfx_backend_pc98;
         gfx_bind_client();

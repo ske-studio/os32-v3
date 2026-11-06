@@ -1670,6 +1670,16 @@ GF4_MUTATIONS += [
      'restore_failure_tail: CR44 owner restoration'),
 ]
 
+GF4_MUTATIONS += [
+    ('a3', 'fragment-budget', 'kdebug/gf_display_test.c',
+     'i32 rc = display_transfer_deadline(a->ctx, &dl);',
+     'i32 rc = 0;', 'operation_budgets: upload starts after earlier work'),
+    ('c2svc', 'stopped-cursor-hide', 'hwdev/gf/display/service.c',
+     'rc=gf4_cursor_apply(c,h,false);',
+     'rc=running ? gf4_cursor_apply(c,h,false) : 0;',
+     'test_stopped_cursor: F2 OFF must still hide the hardware cursor'),
+]
+
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.
 GF4_COMPONENTS = {

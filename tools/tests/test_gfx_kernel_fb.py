@@ -22,6 +22,10 @@ TARGET_SRCS = ['gfx/gfx_core.c',
                'mm/pgalloc.c',
                'kernel/sys.c', 'mm/physmem.c']
 MUTANTS = [
+ ('geforce-leave-backend',
+  'if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {',
+  'if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {',
+  'FAIL g_backend == (safe ? &gfx_backend_pc98 : &gfx_backend_geforce)'),
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
   '    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);',
