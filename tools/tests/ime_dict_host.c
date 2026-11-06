@@ -142,7 +142,7 @@ static const char *first_kanji(IME_Dict *d, int *n)
 
 /* N/O: two independent resident connections; cursor fault injection is supplied
  * by the freestanding search driver at the sqlite3_step boundary. */
-static void store_merge_cases(void (*fault)(sqlite3_stmt *, int))
+__attribute__((unused)) static void store_merge_cases(void (*fault)(sqlite3_stmt *, int))
 {
     FepStore s = {0};
     IME_Result out[IME_MAX_RESULTS];
