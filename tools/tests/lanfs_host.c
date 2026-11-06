@@ -1,5 +1,6 @@
 /* Real SfsClient + LAN transport; only NIC, clock and UART observation are fake. */
 #include "sfs_lan.h"
+#include "net/nic.h"
 #include "serialfs.h"
 int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 #include "os32_kapi_shared.h"
@@ -7,6 +8,16 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 static SfsLan lan;
 static SfsClient client;
 static SfsLanNic nic;
+/* Legacy Python fixture supplies the already selected SFS queue boundary.
+ * The A10 hostsvc-sfs-lan test exercises the real shared demux/queues. */
+int net_tx(const void *buf, u32 n) { return nic.send(buf, n); }
+int net_mac(u8 out[6]) { nic.mac(out); return 0; }
+int net_rx_take(u16 protocol, void *buf, u32 cap, u32 *n)
+{
+    if (protocol != NET_RX_SFS) return OS32_ERR_INVAL;
+    return nic.recv(buf, cap, n);
+}
+void net_rx_reset(u16 protocol) { (void)protocol; }
 static u32 ticks;
 static int wait_ok, gates;
 static u8 result[10 * 1024];

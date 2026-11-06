@@ -167,6 +167,22 @@ int e82557_recv(void *buf, u32 cap, u32 *len)
     return 0;
 }
 
+/* Session tests model the shared SFS queue boundary; A10 tests the real
+ * demux separately. Reset drops queued SFS without polling the NIC. */
+int net_tx(const void *buf, u32 n) { return e82557_send(buf, n); }
+int net_mac(u8 mac[6]) { e82557_get_mac(mac); return 0; }
+int net_rx_take(u16 protocol, void *buf, u32 cap, u32 *n)
+{
+    if (protocol != NET_RX_SFS) abort();
+    return e82557_recv(buf, cap, n);
+}
+void net_rx_reset(u16 protocol)
+{
+    if (protocol != NET_RX_SFS) abort();
+    g_stale = 0;
+    g_nic_rx_n = 0;
+}
+
 void cpu_delay_us(u32 us) { (void)us; }
 volatile u32 tick_count;
 
@@ -661,7 +677,7 @@ static void lan_start(void)
     g_stale = SFS_LAN_RX_BUDGET; g_rnr = 17;
     g_cfg_peer = "02:00:00:00:00:01";
     CHECK(serialfs_session_begin() == 0);
-    CHECK(g_hello_drained == SFS_LAN_RX_BUDGET && !g_hello_stale);
+    CHECK(g_hello_drained == 0 && !g_hello_stale);
     CHECK(g_hello_ready && g_hello_tick == 1002 && g_nic_hello == 1);
     CHECK(g_lan.peer_fixed && g_cli.resends == 0 && g_cli.timeouts == 0);
     g_rnr += 3;
@@ -681,7 +697,7 @@ static void lan_start(void)
     reset(); g_cfg_lan = 1; g_ru_ready = 0; g_ru_stuck = 1;
     g_nic_state = E82557_RX_WAIT; g_rx_flood = 1;
     CHECK(serialfs_session_begin() == OS32_ERR_IO);
-    CHECK(g_hello_drained == SFS_LAN_RX_BUDGET);
+    CHECK(g_hello_drained == 0);
     CHECK(g_hello_tick == 1000 + sfs_ms_ticks(SFS_LAN_READY_MS));
     CHECK(!g_hello_ready && g_nic_hello > 0 && !g_active);
     const char *warning = strstr(g_kout, "LAN RX not ready after 100ms");
