@@ -261,3 +261,6 @@ void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
 - R2-2 (P1、戻り先の無い機械の停止): 「GeForce を止め、FS を sync、シリアルに理由と温度を残して halt」は熱の停止を消費する側 (F0s) にだけ置く。geforce_return は変えない (sys_reboot sys.c:31 からも呼ばれ、route が使えない状態の再起動が halt で止まり platform_reset に届かなくなるため)。U6 に「route が使えない状態で再起動すると reset に届く」。
 - P3 (推測): syscall の出口から呼ぶと caller_access_leave の後に g_gui_handler を呼ぶ文脈になる。U6 でこの位置から呼ぶ場合を 1 件通す。
 - P3-2 (丸め) はレビュー未確認。実装の段で clock_read と calc の式の一致を file:line で確かめ、違えば止めて報告。
+
+## 実装の段で決めたこと (2026-11-06、PM)
+- P0 の欠け (§2 :72 と確定の節 P3-2 の「readback と calc actual の厳密一致」): 固定の第 2 段 (fixedgain2) では、calc の actual は第 1 段だけ (`kdebug/gfinit_pll/solve.inc:53-60`、手本 `nvkm/subdev/clk/pllnv04.c:190-203` も calcclk2=calcclk1)、readback は第 2 段の倍率を掛ける (`hwdev/gf/clock.c:79-85`、手本 `clk/nv40.c:65-78` の read_pll_2) ので一致しない。手本は prog の後に readback と calc を照合しない (`clk/nv40.c:146-195`)。**手本どおり、readback と calc actual の一致の照合は外す**。guard (calc→prog の強制・改変・世代) の照合は残す。readback は記録だけにする。
