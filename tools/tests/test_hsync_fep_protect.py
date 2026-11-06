@@ -18,6 +18,9 @@ PRODUCT = 'userland/system/hsync_protect.inc'
 SCAN = 'userland/system/hsync.c'
 # (name, file, unique old, new). Compilation must succeed; RED is runtime only.
 MUTANTS = [
+    ('full-name', SCAN, 'g_prot_name[HS_MAX_PROT][OS32_MAX_PATH]',
+     'g_prot_name[HS_MAX_PROT][64]'),
+
     ('setter-success', PRODUCT,
      "hsp_fep_user_path[i] = '\\0';\n    return 0;",
      "hsp_fep_user_path[i] = '\\0';\n    return 1;"),

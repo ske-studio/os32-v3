@@ -172,9 +172,9 @@ static void case_fdrecov(void)
     fdrecov_setup(0, 1);
     check(run2("--root", "/hd0") == 0 && g_errors == 0, "CRC 正常の対照");
 
-    /* T5c-4: FD MINIMAL / SQLITE_ONLY recovery must not need any db API.
-     * The fixture leaves those slots NULL, so an accidental call also fails.
-     * The LAN image is copied as part of the existing whole-root operation. */
+    /* DICT_META L: recovery must also read the destination learning path.
+     * Without DB access, stop before any writes; readable settings permit
+     * the existing whole-root LAN/shell recovery without a CREATE API. */
     fdrecov_setup(1, 1);
     g_fake.vfs_devname = fdrecov_lan_devname;
     fs_add_file("/host/boot/lan.mod", (const u8 *)"paired lan", 10);
@@ -182,8 +182,13 @@ static void case_fdrecov(void)
     fs_add_file("/boot/lan.mod", (const u8 *)"FD lan", 6);
     fs_add_dir("/hd0/boot");
     fs_add_file("/hd0/boot/lan.mod", (const u8 *)"old lan", 7);
-    check(g_fake.db_open == 0 && g_fake.db_open_existing == 0,
-          "FD 全体復旧の対照は db API なし");
+    g_fake.db_open_existing = 0;
+    check(run2("--root", "/hd0") != 0 && wrote_nothing() &&
+          log_has("fep_user_dict_path unavailable or invalid"),
+          "FDRECOV: 設定読取不可は全書込み前に拒否する");
+    fixture_settings_init(&g_fake);
+    check(g_fake.db_open == 0 && g_fake.db_open_existing != 0,
+          "FD 全体復旧は設定を既存 DB から読めることが必要");
     {
         char *av[] = {"hsync", "--root", "/hd0", "--verify", "--no-backup", 0};
         int n;
@@ -192,7 +197,7 @@ static void case_fdrecov(void)
         check(rc == 0 && g_errors == 0 && n >= 0 &&
               fs_nodes[n].size == 10 && memcmp(fs_nodes[n].data, "paired lan", 10) == 0 &&
               fs_find("/hd0/sys/shell.bin") >= 0 && fk_header_reads == 0,
-              "FDRECOV: db なしの別根全体復旧で lan.mod と shell をコピーする");
+              "FDRECOV: 設定読取可能な別根全体復旧で lan.mod と shell をコピーする");
         n = fs_find("/boot/lan.mod");
         check(n >= 0 && fs_nodes[n].size == 6 &&
               memcmp(fs_nodes[n].data, "FD lan", 6) == 0 &&

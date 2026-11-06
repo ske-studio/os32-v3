@@ -27,6 +27,18 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('missing-settings-db', 'userland/system/hsync.c',
+     'return api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND ?',
+     'return 0 && api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND ?',
+     'missing settings continues sync'),
+    ('missing-settings-table', 'userland/system/hsync.c',
+     'if (rc == DB_STATUS_DONE)\n            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);',
+     'if (rc == DB_STATUS_DONE)\n            result = -1;',
+     'missing settings continues sync'),
+    ('settings-fail-closed', 'userland/system/hsync.c',
+     'if (register_fep_user_path() != 0)', 'if (register_fep_user_path() != 0 && 0)',
+     'settings failure stops before sync'),
+
     ('failed-reopen-retried-at-exit', 'kernel/ime/fep_module.c',
      '    if (!on) suspend_owner = 0;',
      '    if (!on && !rc) suspend_owner = 0;',

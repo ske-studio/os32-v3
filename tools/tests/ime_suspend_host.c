@@ -53,6 +53,7 @@ static void require(int cond, const char *name)
 { __asm__ volatile("" : "+r"(cond)); if (!cond) { printf("FAIL %s\n", name); exit(1); } }
 int main(void)
 {
+    state.store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
     require(!ime_dict_suspend(0) && !opens, "reopen without suspend");
     require(!ime_dict_suspend(1) && !closes, "unloaded no-op");
     require(!fep_store_open(&state.store, "/db/fep_s.db", "/etc/custom.db"), "initial open");

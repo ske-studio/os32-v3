@@ -112,6 +112,15 @@ static int test(void)
     for (i = 248; i < 256; i++) path[i] = 'a';
     CHECK(hsp_set_fep_user_path(path) == OS32_ERR_INVAL);
     CHECK(hsp_set_fep_user_path("/etc/learn.db") == 0);
+    /* A protected name beyond the old 63-byte cap still guards its inode. */
+    entries = 1;
+    str_ncpy(names[0], "fep_user.db", sizeof(names[0]));
+    for (i = 11; i < 110; i++) names[0][i] = 'a';
+    names[0][110] = 0;
+    CHECK(scan_protected_entities() == 0 && g_prot_count == 1);
+    CHECK(eq(g_prot_name[0], names[0]));
+    alias_dev = 7; alias_ino = 100;
+    CHECK(is_same_as_protected("/bin/alias") == 1);
     /* Existing 11 + default 3 + custom 3 = 17; then mixed-case/suffix names. */
     for (i = 0; hsp_protected_names[i]; i++)
         str_ncpy(names[i], hsp_protected_names[i], sizeof(names[i]));
