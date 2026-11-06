@@ -81,6 +81,7 @@ static void u6_halt(void)
 void platform_reset(void)
 {
     assert(!u6_safe && ++u6_resets==1);
+    assert(scanlog_count("GF4 STATE stage=leave98 stop_rc=")==1);
     gf2_host_exit(0);
 }
 int con_sink_is_enabled(void) { return u6_gui; }

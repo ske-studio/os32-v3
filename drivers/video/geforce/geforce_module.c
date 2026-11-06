@@ -18,6 +18,7 @@
 #include "idt.h"
 #include "time_units.h"
 #include "../../../hwdev/gf/display/api.h"
+#include "leave_log.h"
 
 extern const u32 geforce_kexports[];
 extern const struct module_symbol_contract geforce_import_contracts[], geforce_export_contracts[];
@@ -171,7 +172,11 @@ int geforce_boot_reserve(void)
 static int geforce_return(void *opaque)
 {
     struct geforce_platform *p = opaque;
+    struct gf_display_context *video = p->device ? p->device->context : 0;
+    struct gf_io *leave_io = video ? &video->io : 0;
     int rc = p->stop ? p->stop() : 0;
+    /* Match backend stop: sample after quiesce, before 98 restore/redraw. */
+    geforce_leave_log(leave_io, rc);
     if (pc98_route_to_98()) rc = -1;
     return rc;
 }
