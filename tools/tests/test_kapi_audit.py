@@ -76,6 +76,7 @@ def run(runner, mutation=None, case=0, expected=None):
     sources[3] = '\n'.join(wrappers)
     start = sources[6].index('int ring3_wait_pending(void)')
     sources[6] = sources[6][start:sources[6].index('\n}', start)+2]
+    sources[6] = 'static void exec_cui_display_abort(void) {}\n' + sources[6]
     if mutation:
         name, idx, old, new = mutation
         if new in ('ch < 0', 'ch >= OPN_CHANNEL_COUNT', 'abort', 'user-guard', 'probe', 'cleanup', 'keyoff'):

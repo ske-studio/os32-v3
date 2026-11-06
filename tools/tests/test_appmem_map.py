@@ -207,7 +207,7 @@ def main():
                 return source[begin:end]
 
             def exec_parts(source):
-                parts = [function(source, sig) for sig in
+                parts = ['static void exec_cui_display_abort(void) {}'] + [function(source, sig) for sig in
                          ('void exec_addrspace_abort(', 'void ring3_abort_check(', 'static void exec_teardown_app(')]
                 # Execute actual safe-point tails; Linux boundary supplies the
                 # non-returning kill and MMU entry. R1 separately tests real kill.

@@ -54,7 +54,7 @@ def sources():
     a = s.index("void __cdecl ring3_syscall_dispatch(u32 *frame)")
     b = s.index("\n}", a) + 2
     return {"access": (ROOT / "exec/redir_access.c").read_text(),
-            "dispatch": s[a:b],
+            "dispatch": 'static void exec_cui_display_abort(void) {}\n' + s[a:b],
             "wm": function(s, "ring3_wm_enter") + "\n" + function(s, "ring3_wm_leave"),
             "host": (ROOT / "tools/tests/caller_access_host.c").read_text()}
 

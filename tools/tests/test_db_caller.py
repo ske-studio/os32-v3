@@ -36,7 +36,7 @@ def sources():
         start = generated.index('int __cdecl ' + name + '(')
         result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2] + '\n'
     start = src.index('void __cdecl ring3_syscall_dispatch(')
-    result['dispatch'] = src[start:src.index('\n}', start) + 2]
+    result['dispatch'] = 'static void exec_cui_display_abort(void) {}\n' + src[start:src.index('\n}', start) + 2]
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
     result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
     guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()

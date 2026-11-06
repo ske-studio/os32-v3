@@ -85,7 +85,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     (tmp / 'arch_io.h').write_text(io)
     for name in ('paging', 'pgalloc'):
         (tmp / (name + '_source.c')).write_text(read('mm/' + name + '.c'))
-    parts = [function(exe, sig) for sig in
+    parts = ['static void exec_cui_display_abort(void) {}'] + [function(exe, sig) for sig in
              ('void exec_addrspace_abort(', 'void ring3_abort_check(', 'static void exec_teardown_app(')]
     resume = function(exe, 'i32 exec_resume(')
     tail = resume[resume.index('    appslot_resume_commit('):resume.index('    return 0;   /* 到達しない */')]
