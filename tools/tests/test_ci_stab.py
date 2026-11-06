@@ -983,43 +983,64 @@ class InfrastructureTests(unittest.TestCase):
                 self.assertEqual(len(compiles), 2)
 
 
-    def test_net_agent_wait_and_tmpdir(self):
+    def test_net_agent_socketpair_and_tmpdir(self):
         import test_net_link as net
         body = r'''
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-static int connects, delayed, mode, kills, waits;
-static pid_t fake_fork(void) { return 4242; }
-static pid_t fake_waitpid(pid_t p, int *s, int f) { (void)s; if (!f) { waits++; return p; } return mode == 2 ? p : 0; }
-static int fake_kill(pid_t p, int sig) { (void)p; (void)sig; kills++; return 0; }
-static int fake_usleep(useconds_t u) { (void)u; return 0; }
-static int fake_connect(int f, const struct sockaddr *s, socklen_t n)
-{ (void)f; (void)s; (void)n; return mode == 1 ? -1 : ++connects >= (delayed ? 201 : 1) ? 0 : -1; }
+#include <signal.h>
+#include <fcntl.h>
+#include <errno.h>
+static int mode, kills, waits, pairs, forks, pair_fds[2] = {-1, -1};
+static pid_t fake_fork(void) { forks++; return mode == 2 ? -1 : 4242; }
+static pid_t fake_waitpid(pid_t p, int *s, int f)
+{ (void)s; if (p != 4242 || f) return -1; waits++;
+  if (waits == 1) { errno = EINTR; return -1; } return p; }
+static int fake_kill(pid_t p, int sig)
+{ if (p != 4242 || sig != SIGTERM) return -1; kills++; return 0; }
+static int fake_socketpair(int domain, int type, int protocol, int sv[2])
+{
+    int rc;
+    pairs++;
+    if (mode == 1) { errno = EMFILE; return -1; }
+    rc = socketpair(domain, type, protocol, sv);
+    if (!rc) { pair_fds[0] = sv[0]; pair_fds[1] = sv[1]; }
+    return rc;
+}
 #define kill fake_kill
 #define fork fake_fork
 #define waitpid fake_waitpid
-#define usleep fake_usleep
-#define connect fake_connect
+#define socketpair fake_socketpair
 #define main fixture_main
 #include "HOST_SOURCE"
 #undef main
 int main(int argc, char **argv)
 {
-    int rc, wrong_path;
+    int rc;
     const char *dir = getenv("TMPDIR");
     (void)argc;
-    delayed = !strcmp(argv[1], "wait");
-    mode = !strcmp(argv[1], "timeout") ? 1 : (!strcmp(argv[1], "dead") ? 2 : 0);
+    mode = !strcmp(argv[1], "socketpair") ? 1 : (!strcmp(argv[1], "fork") ? 2 : 0);
     rc = agent_start();
-    if (!strcmp(argv[1], "long")) return rc == -1 ? 0 : 4;
-    if (mode) return rc == -1 && agent_pid == -1 && !agent_state[0] &&
-        (mode == 2 || (kills == 1 && waits == 1)) ? 0 : 3;
-    wrong_path = strncmp(agent_sock, dir, strlen(dir));
-    agent_pid = -1;
+    if (!strcmp(argv[1], "long"))
+        return rc == -1 && !pairs && !forks && !agent_state[0] ? 0 : 4;
+    if (pairs != 1 || forks != (mode != 1)) return 5;
+    if (mode) {
+        if (rc != -1 || agent_pid != -1 || agent_fd != -1 || agent_state[0] ||
+            tx_hook || wire_pump_fn || kills || waits) return 3;
+    } else {
+        if (rc || agent_pid != 4242 || agent_fd != pair_fds[0] ||
+            fcntl(agent_fd, F_GETFD) < 0 ||
+            strncmp(agent_state, dir, strlen(dir)) || agent_state[strlen(dir)] != '/' ||
+            access(agent_state, F_OK) || tx_hook != agent_tx ||
+            wire_pump_fn != agent_pump) return 2;
+    }
+    if (pair_fds[1] >= 0 && (fcntl(pair_fds[1], F_GETFD) != -1 || errno != EBADF)) return 6;
     agent_stop();
-    return rc ? 1 : (!delayed && wrong_path ? 2 : 0);
+    if (pair_fds[0] >= 0 && (fcntl(pair_fds[0], F_GETFD) != -1 || errno != EBADF)) return 7;
+    return agent_pid == -1 && agent_fd == -1 && !agent_state[0] &&
+        !tx_hook && !wire_pump_fn && kills == !mode && waits == (!mode ? 2 : 0) ? 0 : 8;
 }
 '''.replace('HOST_SOURCE', str(net.HOST_SRC))
         with tempfile.TemporaryDirectory() as directory:
@@ -1030,7 +1051,9 @@ int main(int argc, char **argv)
             compiled = subprocess.run(['gcc', *net.FLAGS, *net.argptr_defines(), *net.INC,
                             '-I' + str(tmp), str(src), '-o', str(exe)], capture_output=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr.decode())
-            for mode in ('wait', 'tmp', 'timeout', 'dead'):
+            # socketpair has no connect/readiness wait. Inject failures only at
+            # the current startup boundaries; keep real descriptors and paths.
+            for mode in ('tmp', 'socketpair', 'fork'):
                 with self.subTest(mode=mode):
                     result = subprocess.run([str(exe), mode], env={**os.environ, 'TMPDIR': directory})
                     self.assertEqual(result.returncode, 0, mode)
