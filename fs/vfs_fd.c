@@ -46,6 +46,7 @@ typedef struct {
     int stale;          /* 1 = 失効 (unlink / 置き換え rename / umount の後) */
     int pinned;         /* 1 = 使用中の loop イメージ (unlink・置き換えは BUSY) */
     u32 mount_generation;
+    u32 resource_generation; /* backend の資源世代 (mount 自体の世代とは別) */
     int sqlite_main;
     int sqlite_db;      /* 1 = SQLite の DB / ジャーナル (rename は BUSY) */
 } VfsFile;
@@ -71,6 +72,23 @@ static void fd_release(VfsFile *f)
     f->stale = 0;
     f->pinned = 0;
     f->sqlite_db = 0;
+}
+
+/* ctx の外枠は refresh 後も同じ。旧 FD は新しい内部資源へ移さない。 */
+static int fd_resource_check(VfsFile *f)
+{
+    u32 generation;
+    int rc;
+    if (f->stale) return VFS_ERR_STALE;
+    if (!f->ops->resource_check) return VFS_OK;
+    rc = f->ops->resource_check(f->fs_ctx, &generation);
+    if (rc != VFS_OK) return rc;
+    if (generation != f->resource_generation) {
+        vfs_fd_stale_mount(f->fs_ctx);
+        return VFS_ERR_STALE;
+    }
+    /* hook 自身が失効を通知した場合も backend へ進まない。 */
+    return f->stale ? VFS_ERR_STALE : VFS_OK;
 }
 
 /* backend から明示 offset で 1 回読む (位置 f->offset は触らない)。
@@ -159,7 +177,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
 {
     int i, fd = -1;
     char resolved[VFS_MAX_PATH], rel_path[VFS_MAX_PATH];
-    u32 file_size = 0;
+    u32 file_size = 0, resource_generation = 0;
     u32 ino = 0;
     int rc, created = 0;
     void *fs_ctx;
@@ -181,6 +199,10 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel_path, VFS_MAX_PATH, &fs_ctx);
     if (!ops) return VFS_ERR_NOMOUNT;
+    if (ops->resource_check) {
+        rc = ops->resource_check(fs_ctx, &resource_generation);
+        if (rc != VFS_OK) return rc;
+    }
 
     /* ---- 排他的作成 O_EXCL (票 H2 §2-1、KAPI v53) ----
      *
@@ -236,6 +258,13 @@ static int vfs_open_internal(const char *path, int mode, int owner,
         }
     }
 
+    /* パス probe 中の再接続・媒体交換でも旧サイズの FD を発行しない。 */
+    if (ops->resource_check) {
+        u32 after;
+        rc = ops->resource_check(fs_ctx, &after);
+        if (rc != VFS_OK) return rc;
+        if (after != resource_generation) return VFS_ERR_STALE;
+    }
     open_files[fd].generation++;
     kstrlcpy(open_files[fd].path, rel_path, VFS_MAX_PATH);
     open_files[fd].offset = 0;
@@ -245,6 +274,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     open_files[fd].fs_ctx = fs_ctx;
     open_files[fd].dev = vfs_path_dev(resolved);
     open_files[fd].mount_generation = vfs_path_mount_generation(resolved);
+    open_files[fd].resource_generation = resource_generation;
     open_files[fd].sqlite_main = 0;
     open_files[fd].protect = 0;
     open_files[fd].owner = owner;
@@ -375,6 +405,8 @@ int vfs_font_read_at(const VfsFontLease *l, u32 offset, void *dst, u32 len)
     int rc = vfs_validate_font(l);
     if (rc != VFS_OK) return rc;
     f = &open_files[l->fd];
+    rc = fd_resource_check(f);
+    if (rc != VFS_OK) return rc;
     if (offset > f->size || len > f->size - offset) return VFS_ERR_INVAL;
     if (len == 0) return 0;
     if (!dst) return VFS_ERR_INVAL;
@@ -453,7 +485,8 @@ int vfs_read_fd(int fd, void *buf, u32 size)
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
-    if (f->stale) return VFS_ERR_STALE;   /* fs_ctx より先に見る */
+    rc = fd_resource_check(f);
+    if (rc != VFS_OK) return rc;
     if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */
 
     if (f->offset >= f->size) return 0; /* EOF */
@@ -486,7 +519,8 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
-    if (f->stale) return VFS_ERR_STALE;   /* 書かない。fs_ctx より先に見る */
+    rc = fd_resource_check(f);
+    if (rc != VFS_OK) return rc;
     if ((f->mode & KAPI_O_ACCMODE) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */
 
     if (f->has_ino || f->ops->write_stream) {
@@ -510,13 +544,14 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
 int vfs_seek(int fd, int offset, int whence)
 {
     VfsFile *f;
-    int new_pos;
+    int new_pos, rc;
 
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* 位置を持たない */
-    if (f->stale) return VFS_ERR_STALE;
+    rc = fd_resource_check(f);
+    if (rc != VFS_OK) return rc;
 
     if (whence == SEEK_SET) {
         new_pos = offset;
@@ -606,7 +641,10 @@ int vfs_fstat(int fd, OS32_Stat *buf)
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
     /* umount 後の FD は fs_ctx が解放済み。印を先に見る */
-    if (open_files[fd].stale) return VFS_ERR_STALE;
+    {
+        int rc = fd_resource_check(&open_files[fd]);
+        if (rc != VFS_OK) return rc;
+    }
 
     if (open_files[fd].has_ino) {
         int rc = open_files[fd].ops->ino->stat(open_files[fd].fs_ctx,
@@ -641,6 +679,16 @@ void vfs_fd_invalidate_ino(void *fs_ctx, u32 ino)
         VfsFile *f = &open_files[fd];
         if (f->in_use && f->has_ino && f->fs_ctx == fs_ctx && f->ino == ino)
             f->stale = 1;
+    }
+}
+
+void vfs_fd_stale_mount(void *ctx)
+{
+    int fd;
+    if (!ctx) return;
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
+        VfsFile *f = &open_files[fd];
+        if (f->in_use && f->fs_ctx == ctx) f->stale = 1;
     }
 }
 
