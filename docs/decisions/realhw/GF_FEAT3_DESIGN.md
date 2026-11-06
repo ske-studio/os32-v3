@@ -172,6 +172,7 @@ int gf3_present_m2mf(struct gf3_ctx *c,const struct gf3_surface *scan,
 | ARGB8888 (4) | a / b / 3 / 4 / 3 | E:97–104のGDI alpha強制ff回避としてY32=bを使う。 |
 | Y8 (1) | 1 / 1 / 3 / 不可 / 8 | H:255,925、輝度専用。 |
 | YUY2/UYVY (2) | 2D描画の出力は不可 / IFC不可 / SIFM 5/6 | X/nv04_xv_blit.c:83–93、M2MFはbyte列として可。 |
+- 描画用途 (`GF3_USE_BYTES` 以外) の面は pitch を64B、基点を256Bに整列し、`gf3_surface_check` の受入口で違反を `GF3_ERANGE` とする。根拠: `nouveau_exa.c:434-435`、SIFM入力のpitchは `nouveau_xv.c:929-942`。部分矩形は整列した面から座標で指定する。BYTES/M2MFのbyte pitch・基点と、層4 scanの独立した契約にはこの制限を追加しない。
 - 今の表示設定/PAL/GfxModeは8bitのまま。16/32bitのVRAM試験面には既に同じAPIを使用できる。層4の表示モード追加後もformat引数/色u32は変えない。任意の15/24bppモード追加はこの票の前提に含めない。
 
 ## 10. (h) HAL hook・serial入口

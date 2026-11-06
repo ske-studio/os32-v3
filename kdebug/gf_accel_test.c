@@ -56,6 +56,8 @@
  * 3*64 differs from all source pitches (64/128/256), fits 32 pixels at
  * every tested depth, and 32 rows fit the existing 8KiB tail. */
 #define TEST_COPY_DST_PITCH (3U * 64U)
+/* nouveau_xv.c:929-942: all 16-pixel input formats fit a 64B row. */
+#define TEST_SCALE_SRC_PITCH 64U
 #define TEST_COPY_ALU 3U
 #define TEST_FULL_MASK 0xffffffffU
 #define TEST_FRAC_BITS 20U
@@ -371,8 +373,8 @@ static int mono_case(void)
     return 0;
 }
 /* RAM offsets include pitch padding and the trailing guard. Derive each
- * payload byte from the tightly packed seed, not the transfer's own data. */
-static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch)
+ * payload byte from the GPU seed at its own pitch, not the transfer's data. */
+static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch, u32 gpu_pitch)
 {
     u32 count = 0, bad = 0, first = TEST_FULL_MASK, delta = 0;
     u8 first_expected = 0, first_actual = 0;
@@ -380,7 +382,7 @@ static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch)
         u32 y = i / pitch, b = i % pitch;
         bool payload = y < rows && b < rowbytes;
         if (payload && !download) continue;
-        u8 want = payload ? expected[y * rowbytes + b] : TEST_GUARD_VALUE;
+        u8 want = payload ? expected[y * gpu_pitch + b] : TEST_GUARD_VALUE;
         u8 actual = transfer[i];
         count++;
         if (actual == want) continue;
@@ -415,6 +417,9 @@ static int transfer_case(enum gf3_case which)
         u32 n = cpp(fmt), w = widths[t], h = heights[t];
         u32 rowbytes = w * n, ram_pitch = rowbytes + 3U;
         u32 ram_bytes = (h - 1U) * ram_pitch + rowbytes;
+        /* Keep byte-transfer boundaries; only IFC-capable drawing surfaces
+         * use the EXA 64B pitch (nouveau_exa.c:435). */
+        u32 gpu_pitch = t < 5U ? rowbytes : (rowbytes + 63U) & ~63U;
         struct gf3_rect r = {0, 0, w, h};
         seed();
         int rc = bytes_transfer(false); if (rc) return rc;
@@ -428,7 +433,7 @@ static int transfer_case(enum gf3_case which)
         const struct gf3_test_ops *o = dispatch();
         struct gf3_surface s;
         if (!o) return GF3_ESTATE;
-        rc = surface(o, &s, fmt, 0, w, h, rowbytes);
+        rc = surface(o, &s, fmt, 0, w, h, gpu_pitch);
         if (rc) return rc;
         if (which == TEST_DOWNLOAD)
             rc = o->download ? o->download(o->ctx, &s, r, &ram, dl) : GF3_ESTATE;
@@ -453,12 +458,12 @@ static int transfer_case(enum gf3_case which)
         serial_puts_polled("\r\n");
         /* Record payload/padding/guard mismatches before returning, even
          * when this is the first transfer and no VRAM comparison has run. */
-        rc = compare_transfer(which == TEST_DOWNLOAD, rowbytes, h, ram_pitch);
+        rc = compare_transfer(which == TEST_DOWNLOAD, rowbytes, h, ram_pitch, gpu_pitch);
         if (rc) return rc;
         if (which != TEST_DOWNLOAD)
             for (u32 y = 0; y < h; y++)
             for (u32 b = 0; b < rowbytes; b++)
-                expected[y * rowbytes + b] = transfer[y * ram_pitch + b];
+                expected[y * gpu_pitch + b] = transfer[y * ram_pitch + b];
         /* Independent UC window first, then a separate download comparison:
          * a matching M2MF round trip alone never establishes correctness. */
         rc = compare(false, false); if (rc) return rc;
@@ -478,7 +483,7 @@ static u32 clamp8(i32 value)
  * BT.601 limited range. Packed result is R in bits 0..7, then G/B/A. */
 static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
 {
-    const u8 *p = before + y * 16U * cpp(fmt) + x * cpp(fmt);
+    const u8 *p = before + y * TEST_SCALE_SRC_PITCH + x * cpp(fmt);
     u32 r, g, b, a = 255;
     if (fmt == GF3_RGB565) {
         u32 v = get_pixel(p, 2);
@@ -486,7 +491,7 @@ static u32 rgba(enum gf3_fmt fmt, u32 x, u32 y)
         r = (r << 3) | (r >> 2); g = (g << 2) | (g >> 4); b = (b << 3) | (b >> 2);
     } else if (fmt == GF3_Y8) r = g = b = *p;
     else if (fmt == GF3_YUY2 || fmt == GF3_UYVY) {
-        const u8 *pair = before + y * 32U + (x & ~1U) * 2U;
+        const u8 *pair = before + y * TEST_SCALE_SRC_PITCH + (x & ~1U) * 2U;
         i32 c, d, e;
         if (fmt == GF3_YUY2) {
             c = (i32)pair[(x & 1U) * 2U] - 16;
@@ -529,7 +534,7 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
     seed();
     for (u32 y = 0; y < 16U; y++)
     for (u32 x = 0; x < 16U; x++) {
-        u8 *p = expected + (y * 16U + x) * cpp(fmt);
+        u8 *p = expected + y * TEST_SCALE_SRC_PITCH + x * cpp(fmt);
         u32 r = solid ? 96U : x * 16U, g = solid ? 160U : y * 16U, b = solid ? 32U : (x ^ y) * 16U;
         if (fmt == GF3_RGB565)
             put_pixel(p, 2, ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
@@ -568,7 +573,7 @@ static int scale_case(void)
         const struct gf3_test_ops *o = dispatch();
         struct gf3_surface src, dst;
         if (!o || !o->scale) return GF3_ESTATE;
-        rc = surface(o, &src, fmt, 0, 16, 16, 16U * cpp(fmt));
+        rc = surface(o, &src, fmt, 0, 16, 16, TEST_SCALE_SRC_PITCH);
         if (!rc) rc = surface(o, &dst, dst_fmt, TEST_HALF, 32, 32, pitch);
         if (!rc) rc = o->scale(o->ctx, &src, &dst, sr, dr, clip, bilinear, dl);
         if (rc) return rc;

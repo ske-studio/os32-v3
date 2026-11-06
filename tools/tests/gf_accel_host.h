@@ -308,7 +308,9 @@ static inline int gf3_host_surface(struct gf3_host *h, struct gf3_ctx *c,
         (use == GF3_USE_IFC && !f.ifc) || (use == GF3_USE_SIFM_SRC && !f.sifm))
         return GF3_EFORMAT;
     if (use != GF3_USE_BYTES) {
-        if (s->pitch > U16_MAX) return GF3_ERANGE;
+        /* nouveau_exa.c:434-435 / nouveau_xv.c:929-942. */
+        if (s->pitch > U16_MAX || (s->pitch & 63U) || (s->off & 255U))
+            return GF3_ERANGE;
         if (use == GF3_USE_SIFM_SRC) {
             /* nv04_xv_blit.c:74-93: 16bit full size, 12.4 origin. */
             if (s->width > U16_MAX || s->height > U16_MAX ||
