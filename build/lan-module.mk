@@ -1,11 +1,21 @@
 # T5c-4: reuse T4 function imports, VA0 packing and paired distribution.
 LAN_OUT := $(BUILD_OUT)/lan
 LAN_GEN := $(addprefix $(LAN_OUT)/,lan_imports.h lan_imports.json lan_import_slots.c lan_import_stubs.S lan_provider_types.c lan_kexports.c)
-LAN_DEF_SOURCES := include/pci_dev_contract.h include/pci_bind_contract.h include/lan_contract.h drivers/net/e82557/lan_module.h drivers/net/e82557/e82557.h kernel/irq/irq.h mm/dma_pool.h fs/serialfs/sfs_lan.h fs/serialfs/sfs_proto.h fs/serialfs/sfs_client.h kernel/time/cpu_calibrate.h drivers/pci/pci.h drivers/pci/pci_decode.h drivers/pci/pci_bind.h init/sysconfig.h fs/vfs.h include/bootinfo.h lib/kstring.h include/kprintf.h
+LAN_DEF_SOURCES := net/nic.h include/pci_dev_contract.h include/pci_bind_contract.h include/lan_contract.h drivers/net/e82557/lan_module.h drivers/net/e82557/e82557.h kernel/irq/irq.h mm/dma_pool.h fs/serialfs/sfs_lan.h fs/serialfs/sfs_proto.h fs/serialfs/sfs_client.h kernel/time/cpu_calibrate.h drivers/pci/pci.h drivers/pci/pci_decode.h drivers/pci/pci_bind.h init/sysconfig.h fs/vfs.h include/bootinfo.h lib/kstring.h include/kprintf.h
 $(LAN_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/lan_imports.def $(LAN_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module lan --out-dir $(LAN_OUT)
 
-LAN_OBJS := $(addprefix $(LAN_OUT)/,lan_body.o e82557.o e82557_eeprom.o e82557_desc.o sfs_lan.o lan_import_slots.o lan_import_stubs.o)
+# Later stages supply these bodies. Register their rules now; never build a
+# second resident copy. Once present, each source joins lan.mod automatically.
+LAN_HOSTSVC_SOURCES := $(wildcard net/nic_e82557.c fs/serialfs/sfs_block.c drivers/block/netcd.c)
+LAN_HOSTSVC_OBJS := $(addprefix $(LAN_OUT)/,$(notdir $(LAN_HOSTSVC_SOURCES:.c=.o)))
+LAN_OBJS := $(addprefix $(LAN_OUT)/,lan_body.o e82557.o e82557_eeprom.o e82557_desc.o sfs_lan.o lan_import_slots.o lan_import_stubs.o) $(LAN_HOSTSVC_OBJS)
+$(LAN_OUT)/nic_e82557.o: net/nic_e82557.c $(LAN_GEN) build/config.mk build/lan-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@
+$(LAN_OUT)/sfs_block.o: fs/serialfs/sfs_block.c $(LAN_GEN) build/config.mk build/lan-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@
+$(LAN_OUT)/netcd.o: drivers/block/netcd.c $(LAN_GEN) build/config.mk build/lan-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@
 LAN_INC := $(INC_KERNEL) -I. -I$(LAN_OUT)
 $(LAN_OUT)/lan_body.o: drivers/net/e82557/lan_body.c $(LAN_GEN) build/config.mk build/lan-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@

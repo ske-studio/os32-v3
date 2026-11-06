@@ -613,6 +613,7 @@ static KernelAPI g_fake;
 static void fake_api_init(void)
 {
     memset(&g_fake, 0, sizeof(g_fake));
+    fixture_settings_init(&g_fake);
     g_fake.version = 53;
     g_fake.mem_alloc = fk_mem_alloc;
     g_fake.mem_free = fk_mem_free;

@@ -1,6 +1,12 @@
 /* Paired POST_ROOT FEP body. Initialization stays private to services_boot. */
 #include "fep_module.h"
 
+/* Count retained groups too: failed close must keep rollback quarantined. */
+u32 ime_boot_connections(void)
+{
+    return fep_store_live_connections(ime_current_store());
+}
+
 static const FepModuleApi api = {
     .boot_abort = ime_boot_abort,
     .boot_bytes = ime_boot_bytes,
@@ -24,6 +30,7 @@ static const FepModuleApi api = {
     .getkey_kapi = ime_getkey_kapi,
     .dict_info = ime_dict_info_facade,
     .dict_suspend = ime_dict_suspend,
+    .boot_connections = ime_boot_connections,
 };
 
 int fep_module_init(FepModuleApi *out)

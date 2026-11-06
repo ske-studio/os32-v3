@@ -75,7 +75,7 @@ static int gui_draw_wide(int x, int y, u32 ch, u8 attr)
 { (void)attr; gui_ime_cells[y][x] = ch; return 2; }
 static void gui_clear_row(int y, u8 attr)
 { (void)attr; kmemset(gui_ime_cells[y], 0, sizeof(gui_ime_cells[y])); }
-void *kmalloc(u32 n) { (void)n; return 0; }
+
 
 /* Storage is a stub in this shared-service fixture. B2's actual SQL/copy
  * failure and lifetime checks live in fep_boundary_host.c. */
@@ -95,21 +95,28 @@ int copy_to_caller(const struct caller_access *c, void *d, const void *s, u32 n)
 
 /* The same dictionary instance is shared through all nine IME entries.
  * SQLite/VFS error propagation is covered separately by ime_dict_host.c. */
-static IME_Dict *shared_dict;
-int ime_dict_open(IME_Dict *d, const char *p)
-{ opens++; shared_dict = d; kstrncpy(d->path, p, sizeof(d->path)); d->db = d; return 0; }
-int ime_dict_reopen(IME_Dict *d, const char *p)
+static FepStore *shared_dict;
+int fixture_store_open(FepStore *d, const char *p)
+{ opens++; shared_dict = d; kstrncpy(d->system.path, p, sizeof(d->system.path)); d->system.db = d; return 0; }
+int fep_store_open(FepStore *d, const char *p, const char *u)
+{ (void)u; return fixture_store_open(d, p); }
+int fep_boot_config_get(FepMeta *m, u32 *r)
+{ (void)m; *r = FEP_DICT_RESERVE_KB; return 0; }
+int fep_boot_user_path_get(char *p, u32 n)
+{ kstrncpy(p, FEP_USER_PATH, n); return 0; }
+void *kmalloc(u32 n) { (void)n; static u16 storage[240]; return storage; }
+int fep_store_switch(FepStore *d, const char *p)
 {
     reopens++;
     if (reopen_failure == 2) return -1; /* Old close failed, connection remains. */
-    d->db = NULL;
+    d->system.db = NULL;
     if (reopen_failure) return -1; /* Old connection closed, new open failed. */
-    return ime_dict_open(d, p);
+    return fixture_store_open(d, p);
 }
-int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int max)
+int fep_store_search(FepStore *d, const char *y, IME_Result *r, int max)
 {
     (void)max;
-    if (d != shared_dict || !d->db) return 0;
+    if (d != shared_dict || !d->system.db) return 0;
     searches++;
     if (search_miss) return 0;
     kstrncpy(r[0].kanji, kstrcmp(y, "かんじ") == 0 ? "換字" : "亜", sizeof(r[0].kanji));
@@ -120,20 +127,28 @@ int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int max)
     kstrncpy(r[1].kanji, "阿", sizeof(r[1].kanji));
     return 2;
 }
-void ime_dict_learn(IME_Dict *d, const char *y, const char *k)
+void fep_store_learn(FepStore *d, const char *y, const char *k)
 { (void)y; (void)k; if (d == shared_dict) learns++; }
-int ime_user_list(IME_Dict *d, const char *prefix, IME_UserEntry *out, int max)
+int fep_store_user_list(FepStore *d, const char *prefix, IME_UserEntry *out, int max)
 { (void)d; (void)prefix; (void)out; (void)max; management++; return storage_rc; }
-int ime_user_delete(IME_Dict *d, const char *y, const char *k)
+int fep_store_user_delete(FepStore *d, const char *y, const char *k)
 { (void)y; (void)k; management++; return d == shared_dict ? storage_rc : -99; }
-int ime_user_export(IME_Dict *d, const char *p)
+int fep_store_user_export(FepStore *d, const char *p)
 { (void)p; management++; return d == shared_dict ? storage_rc : -99; }
-int ime_user_clear(IME_Dict *d)
+int fep_store_user_clear(FepStore *d)
 { management++; return d == shared_dict ? storage_rc : -99; }
 
 #include "../../drivers/input/kbd.h"
 #include "../../drivers/input/kbd_dlog.c"
 #include "kbd_source.inc"
+/* Back the CUI candidate save/restore addresses with host memory. */
+#include "tvram.h"
+static u16 fixture_tvram_text[25 * 80];
+static u8 fixture_tvram_attr[25 * 160];
+#undef TVRAM_BASE
+#undef TVRAM_ATTR
+#define TVRAM_BASE ((uptr)fixture_tvram_text)
+#define TVRAM_ATTR ((uptr)fixture_tvram_attr)
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
@@ -345,7 +360,7 @@ static int lifetime(void)
         CHECK(ime_trygetkey() == -1 && ime_trygetchar() == -1, "child empty polls");
         ime_owner_exit(3);
         CHECK(equal_state(&saved), "nonreader child exit preserves parent candidate/dictionary");
-        CHECK(ime_switch_dict(2) == 0 && !kstrcmp(g_ime.dict.path, "/db/fep_l.db"),
+        CHECK(ime_switch_dict(2) == 0 && !kstrcmp(g_ime.store.system.path, "/db/fep_l.db"),
               "dictionary switch globally visible");
         CHECK(g_ime.result_count == saved.result_count && g_ime.converting == saved.converting &&
               !memcmp(g_ime.results, saved.results, sizeof(saved.results)),
@@ -363,8 +378,8 @@ static int lifetime(void)
         CHECK(first == 0xe4, "parent commit");
         ime_owner_exit(2);
         CHECK(!g_ime.commit_len && !g_ime.kana_len && !g_ime.result_count && !g_ime.converting &&
-              g_ime.mode == IME_MODE_HIRAGANA && g_ime.dict.db &&
-              !kstrcmp(g_ime.dict.path, "/db/fep_l.db"), "nonblocking reader exit cancels only input");
+              g_ime.mode == IME_MODE_HIRAGANA && g_ime.store.system.db &&
+              !kstrcmp(g_ime.store.system.path, "/db/fep_l.db"), "nonblocking reader exit cancels only input");
         /* A child that really reads advances the one shared composition;
          * its parent is then no longer the reader whose exit cancels it. */
         owner = 2; key(0x1d); (void)ime_trygetkey();
@@ -374,7 +389,7 @@ static int lifetime(void)
         saved = g_ime; ime_owner_exit(2);
         CHECK(equal_state(&saved), "old reader exit preserves current child's candidate");
         ime_owner_exit(3);
-        CHECK(!g_ime.result_count && !g_ime.kana_len && g_ime.dict.db,
+        CHECK(!g_ime.result_count && !g_ime.kana_len && g_ime.store.system.db,
               "child reader exit cancels shared input and keeps resident dictionary");
     }
     say("PASS X11 parent child output lifetime\n"); return 0;
@@ -413,7 +428,7 @@ static int gui_input_lifetime(void)
                   !g_ime.result_count && !g_ime.converting && !g_ime.convert_len &&
                   g_ime.state == IME_ST_INPUT && !g_ime.commit_len && !g_ime.commit_pos,
                   "IMECAND input lifetime cancels all transient state");
-            CHECK(learns == learned && g_ime.dict.db && ime_is_active() && scroll_rows == 1,
+            CHECK(learns == learned && g_ime.store.system.db && ime_is_active() && scroll_rows == 1,
                   "IMECAND cancellation keeps mode dictionary without learning");
             u32 (*cells)[80] = boundary ? ime_cells : gui_ime_cells;
             CHECK(cells[24][0] == '[' && cells[24][1] == 0x3042,
@@ -572,11 +587,11 @@ static int dict_recovery(void)
     for (int toggle = 0; toggle < 2; toggle++) {
         reset(); ime_toggle();
         reopen_failure = 1;
-        CHECK(ime_switch_dict(2) == -1 && !g_ime.dict.db,
+        CHECK(ime_switch_dict(2) == -1 && !g_ime.store.system.db,
               "IMEDICT switch closes old dictionary before failure");
         ime_set_mode(IME_MODE_OFF);
         if (toggle) ime_toggle(); else ime_set_mode(IME_MODE_HIRAGANA);
-        CHECK(opens == 2 && g_ime.dict_loaded && g_ime.dict.db,
+        CHECK(opens == 2 && g_ime.dict_loaded && g_ime.store.system.db,
               "IMEDICT ON retries dictionary after failed switch");
         (void)ime_feed_key((0x1d << 8) | 'a');
         (void)ime_feed_key((KEY_SPACE << 8) | ' ');
@@ -587,7 +602,7 @@ static int dict_recovery(void)
     ime_toggle();
     CHECK(opens == 1 && g_ime.dict_loaded, "IMEDICT ON reuses successful switch");
     reopen_failure = 2;
-    CHECK(ime_switch_dict(2) == -1 && g_ime.dict_loaded && g_ime.dict.db,
+    CHECK(ime_switch_dict(2) == -1 && g_ime.dict_loaded && g_ime.store.system.db,
           "IMEDICT close failure retains existing connection state");
     say("PASS IMEDICT failed and successful dictionary switches\n"); return 0;
 }

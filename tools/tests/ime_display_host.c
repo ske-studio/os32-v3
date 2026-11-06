@@ -9,11 +9,15 @@
 
 void *kmemcpy(void *dst, const void *src, u32 n)
 { u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst; }
-void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
+void fep_store_learn(FepStore *dict, const char *yomi, const char *kanji)
 { (void)dict; (void)yomi; (void)kanji; }
 int services_public = 1;
-int ime_dict_open(IME_Dict *dict, const char *path)
-{ (void)dict; (void)path; return 0; }
+volatile u32 services_boot_fault;
+int fep_boot_config_get(FepMeta *m, u32 *r) { (void)m; *r = FEP_DICT_RESERVE_KB; return 0; }
+int fep_boot_user_path_get(char *p, u32 n) { (void)n; p[0] = 0; return 0; }
+int fep_store_open(FepStore *s, const char *p, const char *u)
+{ (void)s; (void)p; (void)u; return 0; }
+void *kmalloc(u32 n) { (void)n; static u16 storage[3 * TVRAM_COLS]; return storage; }
 void __cdecl kprintf(u8 color, const char *fmt, ...)
 { (void)color; (void)fmt; }
 static u16 saved_text[3 * TVRAM_COLS];

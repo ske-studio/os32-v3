@@ -54,9 +54,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x7f9e46e0
+REVIEWED_LAYOUT_CRC = 0xbf2f474e
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = '622c931620e2074f3570b086f50af2133f8dc2e834bbab4041aed6ad1d29a6d4'
+REVIEWED_INVENTORY_SHA = '4920103287ca5c382e71d9c3062ae9fb85c5fbca88b54c0cafb903deb06c6f9f'
 
 
 def import_declarations(root):

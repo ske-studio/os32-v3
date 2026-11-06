@@ -6,7 +6,7 @@ No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
 CHECK = dict(name='lanfs-host', tier=1,
-    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
+    covers=['fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
     needs=[], budget=2.257142)
 
 import ctypes as C
@@ -608,7 +608,7 @@ def build(work, changes=None, target=False):
             changes.get(rel, (ROOT / rel).read_text()))
     py_path = work / "lanfs_host.py"
     py_path.write_text(changes.get("tools/lanfs_host.py", PY_SRC.read_text()))
-    inc = ["-I" + str(work), "-I" + str(ROOT / "include"),
+    inc = ["-I" + str(work), "-I" + str(ROOT), "-I" + str(ROOT / "include"),
            "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "fs"), "-I" + str(ROOT / "fs/serialfs"),
            "-I" + str(ROOT / "sdk/include/os32")]
     flags = ["-std=gnu11", "-Wall", "-Wextra", "-D__cdecl="]
@@ -619,7 +619,7 @@ def build(work, changes=None, target=False):
                str(work / "serialfs.c"),
                str(ROOT / "lib/crc32.c")]
     output = work / "lanfs.so"
-    subprocess.run(["gcc", *flags, *inc, "-shared", "-fPIC", *sources,
+    subprocess.run(["gcc", *flags, *inc, "-shared", "-fPIC", "-nostdlib", *sources,
                     "-o", str(output)], check=True)
     if target:
         cc = pathlib.Path(os.environ["CROSS_DIR"]) / "bin/i386-elf-gcc"
@@ -655,11 +655,11 @@ def run_mutations(tmp, root):
         ("image_close", "tools/lanfs_host.py",
          "self.image.close_session(fr.sid)", "self.image.open_session(fr.sid)"),
         ("put_deadline", "fs/serialfs/sfs_lan.c",
-         "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
-         "0"),
-        ("uart_gate", "fs/serialfs/sfs_lan.c", "    nic->mac(lan->mac);",
+         "for (;;) {\n        if ((i32)(lan_now(ctx) - limit) >= 0)",
+         "for (;;) {\n        if (0)"),
+        ("uart_gate", "fs/serialfs/sfs_lan.c", "    (void)net_mac(lan->mac);",
          "    extern void serial_gate_set(int on);\n"
-         "    serial_gate_set(1);\n    nic->mac(lan->mac);"),
+         "    serial_gate_set(1);\n    (void)net_mac(lan->mac);"),
     ]
     for name, rel, old, new in mutations:
         text = (ROOT / rel).read_text()

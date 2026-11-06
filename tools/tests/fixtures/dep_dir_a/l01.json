@@ -105,7 +105,7 @@
     },
     "lan": {
       "type": "LanModuleApi",
-      "size": 88,
+      "size": 92,
       "members": [
         "probe",
         "send",
@@ -127,7 +127,7 @@
         "netcd_register"
       ],
       "body": "int (*probe)(const struct pci_dev *dev); int (*send)(const void *buf, u32 len); int (*recv)(void *buf, u32 cap, u32 *len); void (*mac)(u8 *mac); int (*state)(void); u32 (*rx_free)(void); int (*rx_ready)(void); int (*loopback)(int on); u32 (*stat)(u32 idx); void (*tick)(void); int (*quiet)(void); int (*release)(void); void (*lan_init)(SfsLan *, const SfsLanNic *, const SfsIo *, void *); int (*lan_peer)(SfsLan *, const char *); void (*lan_reset)(SfsLan *); SfsIo io; const struct NetAdapter *adapter; int (*netcd_register)(const char *);",
-      "ops_version": 2,
+      "ops_version": 3,
       "offsets": [
         0,
         4,
@@ -145,8 +145,8 @@
         52,
         56,
         60,
-        80,
-        84
+        84,
+        88
       ]
     }
   },
@@ -159,7 +159,7 @@
   "imports_sha256": {
     "pcm": "3434cbffe02404f83ea2e62f1d18e3cdb38e2da619b90af87cb4eff78ea07e16",
     "fm": "78fb135af8b858bf87eb388f46a9f4add4a21ba66ae5314a380a9308c58fcd66",
-    "lan": "21c9c654c0080108c760c38174397c934e6f53628474a376f4b1c8fe283a7a03",
+    "lan": "59a6e9284ee27a0d2b47c5782aa30ca10a9a9455ef7a13920493132104392355",
     "kdebug": "b82d0ccdf7ce2aad53d038c08303235ff717db2921e45e1cb4931b3341dbe8a9"
   }
 }

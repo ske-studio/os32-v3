@@ -33,7 +33,7 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BRIDGE_SRC = ROOT / "tools/lan_bridge.py", "tools/host_image.py"
+BRIDGE_SRC = ROOT / "tools/lan_bridge.py"
 HOST_AGENT = ROOT / "tools/host_agent.py"
 
 LINK_ETHERTYPE = 0x88B5
@@ -306,6 +306,39 @@ def foreign_ethertype_is_dropped():
         assert st["drop_ethertype"] >= 1, st
 
 
+def sfs_is_dropped_but_eof_passes():
+    """Both forwarding paths share the three-byte SFS discriminator."""
+    from hostsvc_fixture import Fixture
+    LB = load_bridge(BRIDGE)
+    fixture = Fixture('PY_LINK')
+
+    class Port:
+        def recv_frames(self):
+            frames = list(fixture.rx)
+            fixture.rx.clear()
+            return frames
+
+        def send(self, frame):
+            fixture.tx.append(frame)
+
+    bridge = LB.Bridge(Port(), Port(), quiet=True)
+    header = AGENT_MAC + OS32_MAC + b'\x88\xb5'
+    # Includes partial prefixes and mismatches in each byte, plus real EOF.
+    payloads = [b'', b'\x05', b'\x05S', b'\x05SG', b'\x05TF',
+                b'\x04SF', b'\x05\x00\x01' + bytes(17)]
+    for forward in (bridge.from_nic, bridge.from_agent):
+        frames = [header + payload for payload in payloads]
+        fixture.inject(header + b'\x05SF' + bytes(30))
+        for frame in frames:
+            fixture.inject(frame)
+        forward()
+        expected = frames if forward == bridge.from_nic else [
+            frame.ljust(60, b'\x00') for frame in frames]
+        assert fixture.take() == expected, 'SFS leaked or link EOF dropped'
+    assert bridge.stats['drop_sfs'] == 2
+    fixture.close()
+
+
 def short_frame_is_dropped():
     """Ethernet ヘッダにも満たないフレームは捨てる (index エラーで死なない)。"""
     with tempfile.TemporaryDirectory(prefix="os32-lanbr-") as tmp:
@@ -410,6 +443,7 @@ CASES = [
     framing_matches_host_agent,
     l0_hello_roundtrip,
     foreign_ethertype_is_dropped,
+    sfs_is_dropped_but_eof_passes,
     short_frame_is_dropped,
     stats_on_sigusr1_and_exit,
     sigusr1_while_busy_keeps_the_bridge_alive,
@@ -421,6 +455,11 @@ CASES = [
 # 否定側。**実物は 1 バイトも触らず**写しの上で 1 か所だけ壊す (= check-par で
 # 並列に回せる)。(パターン, 置換, 説明)
 MUTATIONS = [
+    (r'if frame\[ETH_HDR:ETH_HDR \+ 3\] == SFS_PREFIX:',
+     'if False:', 'SFS 除外を外す'),
+    (r'if frame\[ETH_HDR:ETH_HDR \+ 3\] == SFS_PREFIX:',
+     'if frame[ETH_HDR:ETH_HDR + 1] == SFS_PREFIX[:1]:',
+     'byte0 だけで選別し link EOF も捨てる'),
     (r'if struct\.unpack\(">H", frame\[12:14\]\)\[0\] != self\.ethertype:',
      "if False:",
      "EtherType のフィルタを外す (0x88B5 以外も Agent へ流す)"),
@@ -458,15 +497,21 @@ def run(cases):
 RACE_RETRIES = 30
 
 
-def mutate(tmp):
+def mutate(tmp, sfs_only=False):
     global BRIDGE
     original = BRIDGE_SRC.read_text(encoding="utf-8")
     bad = 0
     # 変異に関係しうるケースだけ回す (実 NIC の権限ケースは無関係)。
     cases = [framing_matches_host_agent, l0_hello_roundtrip,
+             sfs_is_dropped_but_eof_passes,
              foreign_ethertype_is_dropped, short_frame_is_dropped,
              sigusr1_while_busy_keeps_the_bridge_alive]
-    for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
+    mutations = MUTATIONS
+    if sfs_only:
+        cases = [sfs_is_dropped_but_eof_passes]
+        mutations = MUTATIONS[:2]
+    for i, (pattern, repl, why) in enumerate(mutations, 1):
+        assert len(re.findall(pattern, original)) == 1, why
         text, n = re.subn(pattern, repl, original, count=1)
         if n != 1:
             print("MUTATION %d NOT APPLICABLE: %s" % (i, why), flush=True)
@@ -485,7 +530,7 @@ def mutate(tmp):
         # 踏まないことがある (make check の check-par が変異を並列に回すようになって
         # 2 回続けて見逃した、2026-09-26 TASK_CHECK_MUT_PARALLEL)。どのケースも落ちなければ
         # その 1 ケースだけ回し直す — 1 回でも落ちれば RED (実物の側は 1 回で通ること)。
-        for _ in range(RACE_RETRIES if not hits else 0):
+        for _ in range(RACE_RETRIES if not hits and not sfs_only else 0):
             try:
                 sigusr1_while_busy_keeps_the_bridge_alive()
             except Exception:                        # noqa: BLE001
@@ -506,7 +551,7 @@ def main():
     rc = run([c for c in CASES if not want or c.__name__ in want])
     if "--mutate" in args:
         with tempfile.TemporaryDirectory(prefix="os32-lanbr-mut-") as tmp:
-            rc += mutate(tmp)
+            rc += mutate(tmp, sfs_only=want == ['sfs_is_dropped_but_eof_passes'])
     return 1 if rc else 0
 
 

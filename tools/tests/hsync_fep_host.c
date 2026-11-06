@@ -30,6 +30,7 @@ static int fake_fep_suspend(int on)
 }
 static void prepare(void)
 {
+    fixture_used = 0; /* Previous invocation is finished; free is a bump-runtime no-op. */
     setup_pair(32, 1, 200, 16, 2, 100);
     fake_api_init();
     fk_version = KAPI_VERSION;
@@ -58,6 +59,44 @@ int main(void)
     check(rc && !fep_closes && !fk_write_calls && log_has("FEP suspend"), "fep old kernel rejected");
     prepare(); fk_version = 80; rc = run2("--fep-off", "-n");
     check(!rc && !fep_closes, "fep old kernel dry-run");
+    for (int fault = 2; fault <= 7; fault++) {
+        prepare(); fixture_user_path = "/etc/learn.db"; fixture_settings_fault = fault;
+        rc = run2("--fep-off", "bin");
+        check(rc && !fk_write_calls && !fk_sync_calls && !fep_closes &&
+              log_has("fep_user_dict_path unavailable or invalid"),
+              "settings failure stops before sync");
+    }
+    /* No DB, no table, and no row all retain the default protection. */
+    for (int missing = 0; missing < 3; missing++) {
+        prepare();
+        fixture_settings_fault = missing == 0 ? 1 : missing == 1 ? 8 : 0;
+        rc = run2("--fep-off", "bin");
+        check(!rc && fk_write_calls > 0 && fep_closes == 1 && fep_opens == 1 &&
+              hsp_path_classify("/etc/fep_user.db-journal") == 1 &&
+              !hsp_path_classify("/etc/learn.db"), "missing settings continues sync");
+    }
+    prepare(); fixture_settings_fault = 1;
+    int node = fs_add_file("/etc/settings.db", 0, 0);
+    rc = run1("bin");
+    check(rc && !fk_write_calls, "existing unreadable DB stops");
+    fs_nodes[node].stat_err = OS32_ERR_IO;
+    rc = run1("bin");
+    check(rc && !fk_write_calls, "settings stat failure stops");
+    prepare(); fixture_user_path = "/other/learn.db";
+    rc = run1("bin");
+    check(rc && !fk_write_calls && !fk_sync_calls, "invalid custom path stops");
+    prepare(); fixture_user_path = "/etc/./learn.db";
+    rc = run1("bin");
+    check(!rc && hsp_path_classify("/etc/learn.db-journal") == 1 &&
+          hsp_path_classify("/etc/fep_user.db.new") == 1, "custom settings registered");
+    prepare(); rc = run1("bin");
+    check(!rc && !hsp_path_classify("/etc/learn.db"), "setting reset between runs");
+    prepare(); api = &g_fake;
+    str_ncpy(g_root, "/hd0", (int)sizeof(g_root));
+    fixture_user_path = "/etc/learn.db";
+    check(!register_fep_user_path() &&
+          !str_cmp(fixture_settings_path, "/hd0/etc/settings.db") &&
+          hsp_path_classify("/etc/learn.db.new") == 1, "destination root setting");
     printf("%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }

@@ -1716,6 +1716,11 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
   超える capacity は 256 として扱う)。戻り = 写した byte 数 (0 = 終わり) / `NOSYS` (FEP なし) /
   `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE`。FEP 部品の ops slot 21 (`dict_info`、
   `FEP_MODULE_OPS_VERSION` 2) へ渡す。正典は [DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md) の追記 (確定 A1〜A6)。
+  起動結線後、STATUS は検査済みの形式 1 で `meta`、旧形式で `legacy`、辞書なしで `unloaded`。
+  先行実装の `metadata-unavailable` は返さない。旧形式でも FORMAT_VERSION=0、DICT_ID、
+  POS_TABLE_VERSION、COST_SCALE、MEM_RESERVE_KB=192、CACHE_PAGES=16 と固定パスの VARIANT は
+  既定値を返す (従来の NOTFOUND から変更)。その他の未収録キーは NOTFOUND。
+  形式 1 の必須キーが読めない・欠けた場合は IO、接続隔離中は BUSY。STATUS も STALE を返し、開き直さない。
 - `gfx_osri_show` (slot 257 / 0x40C): `.osri` をカーネルが全画面で再生する同期の口。`gfx_init` の後に呼ぶ。
   `duration_ms` は 1〜`GFX_OSRI_SHOW_MAX_MS` (動的画像の初期枠、Esc 以外のキーで締切を
   max(今の締切, 今 + `GFX_OSRI_SHOW_EXTEND_MS`) へ延長、固定の画像は Esc まで)。戻り = 0 (枠の終わり) /

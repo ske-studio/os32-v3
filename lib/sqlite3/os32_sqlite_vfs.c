@@ -736,7 +736,7 @@ int os32_sqlite_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 static sqlite3_vfs group_vfs[OS32_SQLITE_GROUPS];
 static const char *const group_names[OS32_SQLITE_GROUPS] = {
     "os32-g0", "os32-g1", "os32-g2", "os32-g3", "os32-g4",
-    "os32-g5", "os32-g6", "os32-g7", "os32-resident", "os32-resident1"
+    "os32-g5", "os32-g6", "os32-g7", "os32-resident", "os32-resident1", "os32-resident2"
 };
 typedef char Os32GroupCapacityCheck[(DB_MAX_CONNECTIONS == 8) ? 1 : -1];
 static int vfs_registered;

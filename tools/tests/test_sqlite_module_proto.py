@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T4c-1: paired product SQLite controls, write-free rejection and mutants."""
 CHECK = dict(name='sqlite-module-proto-host', tier=1,
-    covers=['drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'kernel/ime/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/tvram.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'kernel/ime/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/tvram.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=['make:sqlite-module-proto'], budget=11.907954)
 
 import argparse
@@ -249,15 +249,16 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
     (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
-        source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
-        # Disk settings I/O belongs to the VFS fixture; use a private RAM DB here.
-        source = source.replace('SYS_SETTINGS_DB, SQLITE_OPEN_READONLY', '":memory:", SQLITE_OPEN_READWRITE')
+        source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
+        # RAM storage seam shared with C2/O5; core retains header/SQL ordering.
         if name == 'sqlite_engine':
-            source = ('struct sqlite3; extern void host_seed_settings(struct sqlite3 *db);\n'
-                      'extern int host_final_boot_check(int, int);\n') + source.replace(
-                'os32_sqlite_outer_boot_check(1, reserve)', 'host_final_boot_check(1, reserve)').replace(
-                '    if (!rc && !os32_sqlite_prepare_v2(db,',
-                '    if (!rc) host_seed_settings(db);\n    if (!rc && !os32_sqlite_prepare_v2(db,')
+            source = ('extern int host_final_boot_check(int, int);\n') + source.replace(
+                'os32_sqlite_outer_boot_check(ime_boot_connections(), reserve)',
+                'host_final_boot_check(ime_boot_connections(), reserve)')
+            source = source.replace('os32_sqlite_outer_group_open(', 'host_core_group_open(')
+            source = source.replace('#include "../lib/sqlite3/generated/sqlite_facade.h"',
+                '#include "../lib/sqlite3/generated/sqlite_facade.h"\n'
+                'extern int host_core_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);')
         (folder / (name + '.c')).write_text(source.replace(
             '../lib/sqlite3/generated/', str(generated) + '/'))
     (folder / 'io.h').write_text(
@@ -292,8 +293,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             'kfree', 'kmalloc_block_size', 'serial_puts', 'sqlite_engine_available',
             'con_sink_is_enabled', 'kbd_trygetkey', 'kbd_trygetchar', 'kbd_getkey_wait',
             'ring3_call_from_user', 'res_owner_get', 'ring3_abort_check',
-            'tvram_set_scroll_reserve'}
-    wrappers = {'os32_sqlite_outer_group_open': 'host_fep_group_open',
+            'tvram_set_scroll_reserve', 'vfs_stat', 'vfs_fd_is_stale', 'kstrcmp', 'kstrncmp'}
+    wrappers = {'os32_sqlite_outer_db_fd': 'host_fep_db_fd', 'os32_sqlite_outer_group_open': 'host_fep_group_open',
                 'os32_sqlite_outer_group_acquire': 'host_fep_group_acquire',
                 'os32_sqlite_prepare_v2': 'host_fep_prepare'}
     (folder / 'fep_kexports.c').write_text(
@@ -301,6 +302,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         'extern void sqlite_forbidden_import(void);\n'
         'extern int host_fep_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);\n'
         'extern int host_fep_group_acquire(int, int, Os32SqliteGroup *);\n'
+        'extern int host_fep_db_fd(void *);\n'
         'extern int host_fep_prepare(sqlite3 *, const char *, int, sqlite3_stmt **, const char **);\n'
         'const u32 fep_kexports[] = {\n' + ''.join(
             '    (u32)(uptr)' + wrappers.get(row['name'], row['name'] if
@@ -540,18 +542,18 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         linker = compiler.with_name('i386-elf-ld')
         mutated_dir = folder / 'fep-body'
         mutated_dir.mkdir()
-        body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_dict_info',
+        body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_conn', 'ime_user_store', 'ime_dict_info',
                         'ime_suspend', 'ime_romkana',
                         'ime_render_tvram', 'fep_import_slots', 'fep_import_stubs')
         spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
         original_offsets = (folder / 'fep_host_offsets.h').read_text()
         for label, name, old, new, mode in (
             ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;',
-             '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
-            ('close-fault-after-ready', 'ime_dict',
+             '    if (!g_ime.store.user_enabled) return -1;\n    g_ime.dict_loaded = 1;', 32),
+            ('close-fault-after-ready', 'ime_conn',
              'services_stage < SERVICES_READY &&\n        ', '', 33)):
-            source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
-            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'ime_dict_close')
+            source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
+            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'fep_conn_close')
             assert scope.count(old) == 1, label
             source_path = mutated_dir / (name + '.c')
             source_path.write_text(source.replace(scope, scope.replace(old, new)))

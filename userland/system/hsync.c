@@ -1184,6 +1184,64 @@ static int copy_verify(const char *src, const char *dst, u32 expect,
 
 /* ======== 保護対象の判定 ======== */
 
+/* Read the destination's setting without creating or modifying its DB.
+ * A missing DB/table/row selects the default; unreadable/invalid settings stop sync.
+ * CFG_DB_PATH and FEP_SETTING_USER_PATH are mirrored from cfg/ime_store.h. */
+static int register_fep_user_path(void)
+{
+    char settings[OS32_MAX_PATH], path[OS32_MAX_PATH];
+    const char *text;
+    int db, rc, result = -1;
+
+    hsp_fep_user_path[0] = '\0';
+    if (api->version < 50 || !api->db_open_existing || !api->db_prepare_only ||
+        !api->db_step || !api->db_column_int || !api->db_column_text ||
+        !api->db_finalize || !api->db_close) return -1;
+    if (!str_ncpy(settings, g_root, (int)sizeof(settings)) ||
+        !str_ncat(settings, "/etc/settings.db", (int)sizeof(settings))) return -1;
+    db = api->db_open_existing(settings, 0);
+    if (db < 0) {
+        OS32_Stat st;
+        return api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND ?
+            hsp_set_fep_user_path(HSP_FEP_USER_PATH) : -1;
+    }
+    rc = api->db_prepare_only(db,
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'");
+    if (rc == 0) {
+        rc = api->db_step(db);
+        if (rc == DB_STATUS_DONE)
+            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+        else if (rc == DB_STATUS_ROW) result = 1; /* Read the setting below. */
+    }
+    if (api->db_finalize(db) != 0) result = -1;
+    if (result != 1) {
+        if (api->db_close(db) != 0) result = -1;
+        return result;
+    }
+    result = -1;
+    rc = api->db_prepare_only(db,
+        "SELECT CASE WHEN typeof(tval)='text' THEN type ELSE -1 END,"
+        "tval,length(CAST(tval AS BLOB)) FROM settings "
+        "WHERE scope='system' AND key='fep_user_dict_path'");
+    if (rc == 0) {
+        rc = api->db_step(db);
+        if (rc == DB_STATUS_DONE) {
+            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+        } else if (rc == DB_STATUS_ROW && api->db_column_int(db, 0) == 1) {
+            int bytes = api->db_column_int(db, 2);
+            text = api->db_column_text(db, 1);
+            if (text && bytes >= 0 && bytes < (int)sizeof(path) &&
+                str_len(text) == bytes && str_ncpy(path, text, (int)sizeof(path))) {
+                result = hsp_set_fep_user_path(path);
+                if (api->db_step(db) != DB_STATUS_DONE) result = -1;
+            }
+        }
+    }
+    if (api->db_finalize(db) != 0) result = -1;
+    if (api->db_close(db) != 0) result = -1;
+    return result;
+}
+
 /* 現に存在する /etc/settings.db* の実体。同期を始める前に 1 度だけ集める
  * (ファイルごとに何度も stat すると 16MHz の実機では効く)。
  *
@@ -1202,7 +1260,7 @@ static int copy_verify(const char *src, const char *dst, u32 expect,
 static u32 g_prot_dev[HS_MAX_PROT];
 static u32 g_prot_ino[HS_MAX_PROT];
 static int g_prot_count;
-static char g_prot_name[HS_MAX_PROT][64];
+static char g_prot_name[HS_MAX_PROT][OS32_MAX_PATH];
 static int g_prot_name_count;
 /* 一覧が HS_MAX_PROT を越えた。守れないので同期を拒否する (往復 2 の 3) */
 static int g_prot_overflow;
@@ -1220,8 +1278,12 @@ static void prot_scan_cb(const DirEntry_Ext *entry, void *ctx)
         g_prot_overflow++;
         return;
     }
+    if (!hsp_name_fits(entry->name, (int)sizeof(g_prot_name[0]))) {
+        g_prot_overflow += 1;
+        return;
+    }
     i = 0;
-    while (entry->name[i] && i < 63) {
+    while (entry->name[i]) {
         g_prot_name[g_prot_name_count][i] = entry->name[i];
         i++;
     }
@@ -2866,6 +2928,11 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
 
     /* 守るべき実体を 1 度だけ集める (票 S0-D の実体規則)。
      * 集められなければ守れないので同期そのものを行わない。 */
+    if (register_fep_user_path() != 0) {
+        api->kprintf(ATTR_RED, "Error: fep_user_dict_path unavailable or invalid; 0 files written\n");
+        api->mem_free(file_buf);
+        return 1;
+    }
     if (scan_protected_entities() != 0) {
         api->mem_free(file_buf);
         return 1;

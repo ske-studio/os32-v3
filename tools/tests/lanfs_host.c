@@ -1,5 +1,6 @@
 /* Real SfsClient + LAN transport; only NIC, clock and UART observation are fake. */
 #include "sfs_lan.h"
+#include "net/nic.h"
 #include "serialfs.h"
 int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 #include "os32_kapi_shared.h"
@@ -7,6 +8,16 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 static SfsLan lan;
 static SfsClient client;
 static SfsLanNic nic;
+/* Legacy Python fixture supplies the already selected SFS queue boundary.
+ * The A10 hostsvc-sfs-lan test exercises the real shared demux/queues. */
+int net_tx(const void *buf, u32 n) { return nic.send(buf, n); }
+int net_mac(u8 out[6]) { nic.mac(out); return 0; }
+int net_rx_take(u16 protocol, void *buf, u32 cap, u32 *n)
+{
+    if (protocol != NET_RX_SFS) return OS32_ERR_INVAL;
+    return nic.recv(buf, cap, n);
+}
+void net_rx_reset(u16 protocol) { (void)protocol; }
 static u32 ticks;
 static int wait_ok, gates;
 static u8 result[10 * 1024];
@@ -15,7 +26,7 @@ static u16 result_len;
 static u32 clock_now(void *ctx) { (void)ctx; return ticks; }
 static void clock_idle(void *ctx) { (void)ctx; ticks++; }
 static int clock_wait(void *ctx) { (void)ctx; return wait_ok; }
-static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait};
+static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait, 0};
 
 /* A mutant may call the real UART gate API. Observe it, never open a UART. */
 void serial_gate_set(int on) { if (on) gates++; }
@@ -93,3 +104,8 @@ u32 test_avg(void) { return client.rtt_samples ? (u32)(client.rtt_total_us/clien
 u32 test_max(void) { return client.rtt_max_us; }
 
 u32 test_trial(u32 baud) { return sfs_trial_ticks_limit(baud, client.max_payload); }
+
+/* C1 is a separate unit; these legacy UART/LAN tests never start residency. */
+int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
+const SfsClient *sfs_persistent_client(void) { return 0; }
+void sfs_persistent_stale(void) { }

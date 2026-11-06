@@ -1331,6 +1331,7 @@ int utf8_strlen(const u8 *s)
 void *kzalloc(u32 n) { return calloc(1, n); }
 void kfree(void *p) { free(p); }
 #include "../../kernel/ime/ime_dict.c"
+#include "fep_store_host.h"
 static void group_callers(void)
 {
     Os32SqliteGroup boot, boot2;

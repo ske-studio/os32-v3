@@ -67,7 +67,7 @@ def product_image(folder):
         assert name in core.symbols, name
     exe = build_validator(folder)
     contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
-                    abi=metadata['module_abi_gen'], pair=pair, ops=2, img_valid=1, module_id=9,
+                    abi=metadata['module_abi_gen'], pair=pair, ops=3, img_valid=1, module_id=9,
                     imports=[(fnv(e['name']), e['type_ver'], e['kind']) for e in metadata['imports']],
                     exports=[(1, fnv('initialize'), 1)])
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():

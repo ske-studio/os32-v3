@@ -59,6 +59,7 @@ LINK_ETHERTYPE = 0x88B5
 ETH_HDR = 14
 ETH_MIN_FRAME = 60          # Ethernet の最小フレーム (padding の下限)
 LINK_HDR = 20
+SFS_PREFIX = b"\x05SF"     # link EOF (op=5) とは後続2Bで区別する
 MAX_FRAME = 65536
 OPNAME = {1: "HELLO", 2: "REQUEST", 3: "RESPONSE", 4: "DATA", 5: "EOF",
           6: "ACK", 7: "WINDOW", 8: "WDATA", 9: "STATUS", 10: "RELEASE"}
@@ -261,7 +262,7 @@ class Bridge:
         self.pcap = pcap
         self.quiet = quiet
         self.stats = {"nic_to_agent": 0, "agent_to_nic": 0,
-                      "drop_ethertype": 0, "drop_short": 0,
+                      "drop_ethertype": 0, "drop_short": 0, "drop_sfs": 0,
                       "padded": 0, "tx_error": 0, "reconnect": 0}
         # SIGUSR1 は**旗を立てるだけ**。ハンドラから print すると、主流が print の
         # 途中だったときに "reentrant call inside <_io.BufferedWriter>" で
@@ -273,12 +274,15 @@ class Bridge:
             print(*a, flush=True)
 
     def accept(self, frame):
-        """EtherType 0x88B5 のフレームだけ通す (他所の通信を Agent へ流さない)。"""
+        """共用 EtherType のうち SFS を除いた link フレームを通す。"""
         if len(frame) < ETH_HDR:
             self.stats["drop_short"] += 1
             return False
         if struct.unpack(">H", frame[12:14])[0] != self.ethertype:
             self.stats["drop_ethertype"] += 1
+            return False
+        if frame[ETH_HDR:ETH_HDR + 3] == SFS_PREFIX:
+            self.stats["drop_sfs"] += 1
             return False
         return True
 

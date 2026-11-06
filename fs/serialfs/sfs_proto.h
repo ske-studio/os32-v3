@@ -101,9 +101,16 @@
 /* Block RPC wire layout: NET_HOSTSVC_DESIGN §4, all fields LE.
  * Responses use op|SFS_T_RESP. Handles are valid only within their sid.
  * Serialize explicitly with sfs_put/get helpers, never cast a structure.
- * BOPEN identity is size + mtime_ns (each low/high u32), not a hash.
+ * BOPEN request is the entire UTF-8 alias (1..63 bytes), without a length
+ * prefix or NUL. It opens read-only; identity is size + mtime_ns (each
+ * low/high u32), not a hash. Size must be a multiple of 512 bytes and its
+ * sector count must fit u32.
+ * BREAD uses that open FD, with lba in 512-byte sectors and count 1..2.
+ * Check range and multiplication overflow; changed fstat identity is STALE.
  * BREAD success must contain exactly status + count*512 bytes; short EOF is IO.
- * Error replies and BCLOSE replies contain status only. */
+ * Error replies and BCLOSE replies contain status only (i32 OS32_ERR_*).
+ * Reopening a session requires BOPEN again to acquire a new handle.
+ * The two-sector response fits the LAN limit; the serial limit stays 512. */
 #define SFS_BLOCK_ALIAS_MIN          1
 #define SFS_BLOCK_ALIAS_MAX          63
 #define SFS_BOPEN_STATUS_OFF         0
