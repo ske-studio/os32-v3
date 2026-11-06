@@ -85,6 +85,12 @@ MUTATIONS = {
          'if (stopped == GF2_ESTOP) return c->last_rc = rc;', 'tools/tests/gf_accel_b0_host.c'),
     ],
     'b1': [
+        ('draw-pitch', 'hwdev/gf/accel_surface.c',
+         '(s->pitch & (GF3_DRAW_PITCH_ALIGN - 1U))',
+         'false', 'tools/tests/gf_accel_b1_host.c'),
+        ('draw-base', 'hwdev/gf/accel_surface.c',
+         '(s->off & (GF3_DRAW_BASE_ALIGN - 1U))',
+         'false', 'tools/tests/gf_accel_b1_host.c'),
         ('b1_argb_gdi', 'hwdev/gf/accel_surface.c',
          '{4, 10, 11, 3, 3, 4, 3}',
          '{4, 10, 10, 3, 3, 4, 3}', 'tools/tests/gf_accel_b1_host.c'),

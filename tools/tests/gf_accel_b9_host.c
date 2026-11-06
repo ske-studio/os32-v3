@@ -75,7 +75,7 @@ void _start(void)
     assert(words[packets[4].first+4]==TEST_RATIO(sr.w,dr.w));
     gf3_host_trace_clear(&h);
     sr.w=4; dr.w=8;
-    src.fmt=GF3_YUY2; src.pitch=32;
+    src.fmt=GF3_YUY2; src.pitch=64;
     assert(!gf3_scale(&h.ctx,&src,&dst,sr,dr,clip,false,TEST_DEADLINE));
     assert(words[packets[2].first]==TEST_YUY2_FORMAT);
     gf3_host_trace_clear(&h);
