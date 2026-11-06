@@ -1,6 +1,6 @@
 /* Dictionary metadata query. No open/recovery, retained SQLite pointers or
  * resident copy of the source text; only one bounded caller staging buffer. */
-#include "ime.h"
+#include "ime_store.h"
 #include "redir_access.h"
 #include "exec.h"
 #include "kstring.h"
@@ -9,10 +9,6 @@
 #include "fep_imports.h"
 #define services_public fep_services_public()
 #endif
-
-/* The variant fallback must agree with ime_switch_dict's fixed paths. */
-#define IME_INFO_SMALL_PATH "/db/fep_s.db"
-#define IME_INFO_LARGE_PATH "/db/fep_l.db"
 
 static const char *const ime_meta_keys[] = {
     NULL, NULL, "format_version", "min_fep_version", "dict_id", "kind",
@@ -36,6 +32,95 @@ static int ime_info_slice(const void *value, int len, int offset,
     return n;
 }
 
+static int ime_meta_read(FepConn *conn, int key, int offset,
+                         char *out, int capacity)
+{
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(conn->db,
+        "SELECT value FROM meta WHERE key = ?", -1, &stmt, NULL);
+    int result = OS32_ERR_IO;
+    if (rc == SQLITE_OK)
+        rc = sqlite3_bind_text(stmt, 1, ime_meta_keys[key], -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK) {
+        rc = sqlite3_step(stmt);
+        if (rc == SQLITE_DONE) result = OS32_ERR_IO;
+        else if (rc == SQLITE_ROW) {
+            int type = sqlite3_column_type(stmt, 0);
+            const void *value = sqlite3_column_blob(stmt, 0);
+            int len = sqlite3_column_bytes(stmt, 0);
+            /* NULL/failed conversion is not a recorded empty string. */
+            if (type != SQLITE_NULL &&
+                (value || (len == 0 && sqlite3_errcode(conn->db) != SQLITE_NOMEM)))
+                result = ime_info_slice(value, len, offset, out, capacity);
+        }
+    }
+    if (sqlite3_finalize(stmt) != SQLITE_OK) result = OS32_ERR_IO; /* store */
+    return result;
+}
+
+/* Only the compatibility defaults specified for a validated legacy file. */
+static int ime_legacy_info(FepStore *s, int key, int offset,
+                           char *out, int capacity)
+{
+    const char *value;
+    char number[11]; /* u32 decimal plus NUL */
+    u32 numeric;
+    switch (key) {
+    case IME_DICT_INFO_FORMAT_VERSION: numeric = 0; break;
+    case IME_DICT_INFO_POS_TABLE_VERSION: numeric = FEP_DICT_POS_VERSION; break;
+    case IME_DICT_INFO_MEM_RESERVE_KB: numeric = FEP_DICT_RESERVE_KB; break;
+    case IME_DICT_INFO_CACHE_PAGES: numeric = FEP_DICT_CACHE_PAGES; break;
+    case IME_DICT_INFO_DICT_ID: value = FEP_DICT_ID; goto text;
+    case IME_DICT_INFO_COST_SCALE: value = FEP_DICT_COST_SCALE; goto text;
+    case IME_DICT_INFO_VARIANT:
+        if (!kstrcmp(s->system.path, FEP_DICT_PATH_S)) value = "S";
+        else if (!kstrcmp(s->system.path, FEP_DICT_PATH_M)) value = "M";
+        else if (!kstrcmp(s->system.path, FEP_DICT_PATH_L)) value = "L";
+        else return OS32_ERR_NOTFOUND;
+        goto text;
+    default: return OS32_ERR_NOTFOUND;
+    }
+    int start = sizeof(number) - 1;
+    number[start] = 0;
+    do {
+        number[--start] = '0' + numeric % 10;
+        numeric /= 10;
+    } while (numeric);
+    value = number + start;
+text:
+    return ime_info_slice(value, (int)kstrlen(value), offset, out, capacity);
+}
+
+int fep_store_info(FepStore *s, int key, int offset, char *out, int capacity)
+{
+    char staging[IME_DICT_INFO_CAP];
+    int n;
+    const char *value;
+    if (!s || key < IME_DICT_INFO_STATUS || key > IME_DICT_INFO_CHECKSUM ||
+        offset < 0 || capacity < 2 || !out) return OS32_ERR_INVAL;
+    if (capacity > IME_DICT_INFO_CAP) capacity = IME_DICT_INFO_CAP;
+    int rc = fep_conn_ready(&s->system);
+    if (rc == OS32_ERR_AGAIN) {
+        if (key != IME_DICT_INFO_STATUS) return rc;
+        value = "unloaded";
+    } else {
+        if (rc) return rc;
+        if (key == IME_DICT_INFO_STATUS) {
+            value = s->meta.format ? "meta" : "legacy";
+        } else if (!s->meta.format) {
+            n = ime_legacy_info(s, key, offset, staging, capacity);
+            goto copy;
+        } else {
+            n = ime_meta_read(&s->system, key, offset, staging, capacity);
+            goto copy;
+        }
+    }
+    n = ime_info_slice(value, (int)kstrlen(value), offset, staging, capacity);
+copy:
+    if (n >= 0) kmemcpy(out, staging, (u32)n + 1);
+    return n;
+}
+
 /* The schema probe distinguishes an absent table from a failed read. */
 static int ime_meta_present(sqlite3 *db)
 {
@@ -53,7 +138,7 @@ static int ime_meta_present(sqlite3 *db)
     return result;
 }
 
-static int ime_meta_read(const IME_Dict *dict, int key, int offset,
+static int ime_dict_meta_read(const IME_Dict *dict, int key, int offset,
                          char *out, int capacity)
 {
     sqlite3_stmt *stmt = NULL;
@@ -107,12 +192,12 @@ int ime_dict_info_facade(int key, int offset, char *out, int capacity)
         if (key == IME_DICT_INFO_STATUS) {
             value = present ? "meta" : "metadata-unavailable";
         } else if (present) {
-            n = ime_meta_read(dict, key, offset, staging, capacity);
+            n = ime_dict_meta_read(dict, key, offset, staging, capacity);
             goto copy;
         } else if (key == IME_DICT_INFO_VARIANT) {
-            if (!kstrcmp(dict->path, IME_INFO_SMALL_PATH)) value = "S";
+            if (!kstrcmp(dict->path, FEP_DICT_PATH_S)) value = "S";
             else if (!kstrcmp(dict->path, IME_DICT_PATH)) value = "M";
-            else if (!kstrcmp(dict->path, IME_INFO_LARGE_PATH)) value = "L";
+            else if (!kstrcmp(dict->path, FEP_DICT_PATH_L)) value = "L";
             else return OS32_ERR_NOTFOUND;
         } else return OS32_ERR_NOTFOUND;
     }

@@ -79,6 +79,9 @@ static void capacity(void)
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 2, &g[8]) == SQLITE_OK);
     CHECK(g[8].group_index == 8);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &g[9]) == SQLITE_OK);
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &g[10]) == SQLITE_OK);
+    CHECK(!strcmp(os32_sqlite_group_vfs_name(&g[10]), "os32-resident2"));
+    CHECK(sqlite3_vfs_find("os32-resident2") != NULL);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &extra) == SQLITE_FULL);
     CHECK(os32_sqlite_group_acquire(99, 0, &extra) == SQLITE_MISUSE);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_EXEC, -1, &extra) == SQLITE_MISUSE);

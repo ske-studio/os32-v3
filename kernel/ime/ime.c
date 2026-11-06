@@ -52,8 +52,11 @@ IME_State *ime_suspend_state(void)
 
 const IME_Dict *ime_current_dict(void)
 {
+    /* J will transfer connection ownership to store. */
     return &g_ime.dict;
 }
+FepStore *ime_current_store(void) { return &g_ime.store; }
+
 static int g_ime_reader_owner;
 static int g_ime_cui_redraw;
 static void ime_cancel_input(void);

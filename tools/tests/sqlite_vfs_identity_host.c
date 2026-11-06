@@ -182,7 +182,8 @@ int main(int argc, char **argv)
     CHECK(argc == 2);
     CHECK(os32_sqlite_init() == SQLITE_OK);
     fixture_init();
-    if (!strcmp(argv[1], "separate")) separate();
+    if (!strcmp(argv[1], "capacity")) capacity();
+    else if (!strcmp(argv[1], "separate")) separate();
     else if (!strcmp(argv[1], "errors")) errors();
     else if (!strcmp(argv[1], "readonly")) readonly();
     else if (!strcmp(argv[1], "unsupported")) unsupported();

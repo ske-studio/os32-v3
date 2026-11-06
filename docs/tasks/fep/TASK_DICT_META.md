@@ -1,6 +1,6 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 状態: **実装中 (2026-11-05)** — R14 は「/etc 直下に限る」(ユーザー決定 2026-11-05)、契約の段 A から出す。 — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
+> 状態: **実装中 (2026-11-06)** — 段 A・B・C・C2・D・F と統合の直し 1 (Opus の R1〜R3、J までは辞書の参照と情報の口を今の動作のまま) を main に入れた (cc0f2097、CI 成功、Opus 承認)。段 I を実装中、続いて J・K・L。J への申し送りは facade の付け替えと KAPI の文字列の変化 — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
 
 > 上位: [FEP の索引](00_INDEX.md)
 
