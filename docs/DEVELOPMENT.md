@@ -136,7 +136,7 @@
 
 ## 3. 参照
 
-- Claude Code / Codex 共用スキル: [run-os32](../.claude/skills/run-os32/SKILL.md) (NP21/W 操作・調査) と [08_build.md](08_build.md) (変更別ビルド・反映確認)。本文は `.claude/skills/`、Codex の `.agents/skills/` から同じフォルダを参照する。`.agents/` は現行の Git 除外対象なので共有リンクは環境ごとに設置する (例: `.agents/skills/run-os32` → `../../.claude/skills/run-os32`)。
+- Claude Code / Codex 共用スキル: [run-os32](../.claude/skills/run-os32/SKILL.md) (NP21/W 操作・調査) と [08_build.md](08_build.md) (変更別ビルド・反映確認)。本文は `.claude/skills/`、Codex の `.agents/skills/` から同じフォルダを参照する。`.agents/` は現行の Git 除外対象なので共有リンクは環境ごとに設置する (例: `.agents/skills/run-os32` → `../../.claude/skills/run-os32`)。**全部のスキルをリンクで置き、実体のコピーを置かない** (2026-11-06、コピーが更新されずに古い検査の手順が Codex に残っていた)。
 - 規則の正典: [CONSTRAINTS.md](CONSTRAINTS.md) (CLAUDE.md は ID で参照。Hermes 用だった SOUL.md は `SOUL.md` (非公開・リポジトリ外、`.gitignore`)、効力なし)
 - 成果の履歴: [CHANGELOG.md](../CHANGELOG.md)、`docs/archive/ROADMAP_v1.0.md`。計画: `docs/ROADMAP.md`
 - 落とし穴の経緯: [POLICY_DEBUG.md §4](POLICY_DEBUG.md)。短い注意は同じ §4 の冒頭「領域別の早見」

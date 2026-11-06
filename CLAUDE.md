@@ -17,7 +17,7 @@
 
 ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-1「ビルド手順」・§8-2「ビルドパイプライン」・§8-4「ホスト側イメージ生成ツール」(配備と「検査の 3 段」)。
 `make all` / `make kernel` / `make programs` でビルドする。
-`make check-<name>` / `check-changed` / `check` — 指定の検査 / 変更に当たる検査 (段は各検査の `CHECK` 宣言、`tools/checks/run.py`) / 全部を変異込み (節目に PM が 1 回)。
+`make check-<name>` は指定の検査 (実装者は触ったファイルを直接組む試験だけ回す)。取り込みの検査は GitHub の CI (build の `make check-fast` = 全部を変異なし)、変異込みの全体は workflow `full-check`。`check-changed` は使わない ([PARALLEL_BRANCHES](docs/tasks/agents/PARALLEL_BRANCHES.md) §3)。
 PM の作業のスキル: **[os32-design-rally](.claude/skills/os32-design-rally/SKILL.md)** (設計の往復)・**[os32-delegate](.claude/skills/os32-delegate/SKILL.md#2-実装の依頼の型)** (実装の依頼)・**[os32-land](.claude/skills/os32-land/SKILL.md#3-検査)** (取り込み・CI・push)・**[os32-realhw-update](.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く)** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
 KAPI 変更後は `make clean` → `make all` ([ABI])。
 `make deploy` は HostDrv、`make deploy-kernel` / `deploy-boot` は NP21/W 停止後 ([D1])。
