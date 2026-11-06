@@ -20,8 +20,8 @@ MUTANTS = [('M_LAST_ROW', 'row < (u32)h;', 'row + 1u < (u32)h;'),
            ('M_SOURCE_END', 'end > r->client_bytes', 'end > TRI_DISPLAY_BYTES'),
            ('M_DROP_RC', 'if (rc) return rc;\n            ++off; ++src; --left;\n        }\n    }',
             'if (rc) return TRI_OK;\n            ++off; ++src; --left;\n        }\n    }'),
-           ('M_DWORD_PRESENT', '#define TRI_PRESENT_USE_SPAN32 0',
-            '#define TRI_PRESENT_USE_SPAN32 1')]
+           ('M_BYTE_PRESENT', '#define TRI_PRESENT_USE_SPAN32 1',
+            '#define TRI_PRESENT_USE_SPAN32 0')]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -30,11 +30,11 @@ def main():
     original = SOURCE.read_text()
     with tempfile.TemporaryDirectory(prefix='trident-present-') as tmp:
         work = Path(tmp)
-        for name, old, new in [('normal', None, None), ('span32', None, None)] + (MUTANTS if args.mutate else []):
+        for name, old, new in [('normal', None, None), ('byte', None, None)] + (MUTANTS if args.mutate else []):
             source = original
-            if name == 'span32':
-                source = source.replace('#define TRI_PRESENT_USE_SPAN32 0',
-                                        '#define TRI_PRESENT_USE_SPAN32 1')
+            if name == 'byte':
+                source = source.replace('#define TRI_PRESENT_USE_SPAN32 1',
+                                        '#define TRI_PRESENT_USE_SPAN32 0')
             if old is not None:
                 assert source.count(old) == 1
                 source = source.replace(old, new, 1)
@@ -44,7 +44,7 @@ def main():
             subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-                *(['-DTEST_PRESENT_SPAN32'] if name == 'span32' else []),
+                *(['-DTEST_PRESENT_BYTE'] if name == 'byte' else []),
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
                 *include_flags(ROOT), str(path), str(ROOT / 'tools/tests/trident_device_fake.c'),
                 str(ROOT / 'tools/tests/trident_present_host.c'), '-o', str(exe)], check=True)

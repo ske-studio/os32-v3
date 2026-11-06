@@ -10,13 +10,13 @@ static int test(void)
     trident_fake_bind(&f, &d);
     f.resources.client = client;
     f.resources.client_bytes = TRI_DISPLAY_BYTES;
-    d.verified_bytes = TRI_DISPLAY_BYTES;
+    d.declared_bytes = TRI_DISPLAY_BYTES;
     /* Stand-in for the separately tested Init and linear-mode sequences. */
     f.pc98_initialized = true; f.cr_color[0x21] = 0x20; f.trace_lfb = true;
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) client[i] = (u8)(i * 17u + 1u);
     CHECK(!trident_present(&d, 0, 0, 640, 480));
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) CHECK(vram[i] == client[i]);
-#ifdef TEST_PRESENT_SPAN32
+#ifndef TEST_PRESENT_BYTE
     CHECK(f.trace_count == 480 && !f.trace_overflow);
     for (u32 i = 0; i < 480; ++i)
         CHECK(f.trace[i].offset == i * 640 && f.trace[i].count == 160 && f.trace[i].width == 4);
@@ -42,9 +42,9 @@ static int test(void)
     f.resources.client_bytes = 307199;
     CHECK(trident_present(&d, 0, 0, 640, 480) == TRI_E_ACCESS && f.operations == operations);
     f.resources.client_bytes = TRI_DISPLAY_BYTES;
-    d.verified_bytes = 307199;
+    d.declared_bytes = 307199;
     CHECK(trident_present(&d, 0, 0, 640, 480) == TRI_E_ACCESS && f.operations == operations);
-    d.verified_bytes = TRI_DISPLAY_BYTES;
+    d.declared_bytes = TRI_DISPLAY_BYTES;
     f.resources.mapped_bytes = 307199;
     CHECK(trident_present(&d, 0, 0, 640, 480) == TRI_E_ACCESS && f.operations == operations);
     f.resources.mapped_bytes = TRI_BAR0_DECODE_BYTES;
@@ -53,6 +53,9 @@ static int test(void)
     f.resources.decode_bytes = TRI_BAR0_DECODE_BYTES;
     trident_fake_fail(&f, operations + 1, -73);
     CHECK(trident_present(&d, 0, 0, 8, 1) == -73);
+    trident_fake_fail(&f, 0, 0);
+    trident_fake_fail(&f, f.operations + 2, -74);
+    CHECK(trident_present(&d, 0, 0, 5, 1) == -74);
     trident_fake_fail(&f, 0, 0);
     f.resources.client = client + 1;
     CHECK(!trident_present(&d, 0, 0, 8, 1));

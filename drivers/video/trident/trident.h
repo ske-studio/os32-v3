@@ -72,14 +72,13 @@
 #define TRI_BAR1_PHYS MEM_TRIDENT_REGS_VA
 #define TRI_BAR0_DECODE_BYTES 0x00400000u
 #define TRI_BAR1_DECODE_BYTES 0x00010000u
-#define TRI_REG_MAPPED_BYTES 0x00009000u /* covers 0..83C8, 9 pages */
+#define TRI_REG_MAPPED_BYTES 0x00010000u /* D:1609-1635 MMIO aperture */
 #define TRI_WIDTH 640u
 #define TRI_HEIGHT 480u
 #define TRI_PITCH 640u
 #define TRI_DISPLAY_BYTES 307200u
 #define TRI_DISPLAY_PAGES 75u
 #define TRI_PAGE_BYTES 4096u
-#define TRI_VRAM_SCRATCH_BYTES 8192u /* 1024 boundary words + one page */
 #define TRI_DAC_COLORS 256u
 #define TRI_DAC_BYTES 768u
 #define TRI_SAVED_BYTES 852u
@@ -176,15 +175,11 @@ struct trident_resources {
 struct trident_device {
     const struct trident_resources *res;
     struct trident_saved saved;
-    u32 declared_bytes, verified_bytes, step;
+    u32 declared_bytes, step;
     int last_rc, restore_rc, disable_rc;
-    bool init_done, first_init_done, active, returning, armed, leave_done, closed;
-    /* New device is entirely zero; regs_bind installs io without hardware I/O.
-     * pin/arm must precede identify (even index selection writes hardware).
-     * saved.valid commits only after a complete save and is never overwritten.
-     * lifecycle owns init_done (sets only after pc98_init returns success)
-     * and first_init_done (complete first init). pc98_init does not set it.
-     * Both persist across leave/close, as do verified_bytes and the maps. */
+    bool init_done, preinit_done, active, returning, armed, leave_done, closed;
+    /* PreInit caches identification/SPR. ScreenInit always saves and programs
+     * hardware. active tracks D's vtSema, set during ModeInit. */
     const struct trident_io *io;
     void *io_opaque;
     u32 failed_step, display_owner; /* arm-time diagnostic only, never a filter */
@@ -192,11 +187,7 @@ struct trident_device {
                              * mode_640 caches IsClearTV on first ModeInit after PC98 Init:
                              * 0=unset, 1=NTSC, 0x81=PAL; persists across reentry. */
     bool pinned, declared_unknown;
-    enum trident_upper upper;
-    /* RAM loan for first VRAM verification only; lifecycle allocates/frees.
-     * Emergency restoration never uses scratch or allocates. */
-    u32 *scratch;
-    u32 scratch_bytes;
+    bool screen_ready;
     /* vgaHW IOBase (index port): Save selects saved MISC; VGA mode restore
      * selects color; state restore selects saved MISC again. PC98 Init
      * deliberately retains Save's selection even after changing MISC. */
@@ -243,20 +234,21 @@ int trident_pc98_init(struct trident_device *d);
 /* state_save.c/default_dac.c/state_restore.c: 852 slots, nonprimary,
  * no font/text planes, default MCLK not saved, SR0E restore XOR 02.
  * Save selects base from MISC at save time (vgaHW.c:1021–1025). Restore
- * entry protect/Trident uses current MISC; VGA Restore writes saved MISC
+ * entry protect/Trident uses retained IOBase; VGA Restore writes saved MISC
  * then uses its base for AR/CRTC and exit protect (vgaHW.c:845–865;
  * trident_dac.c:781–810, D:1111–1136). */
 int trident_state_save(struct trident_device *d);
 extern const u8 trident_default_dac[TRI_DAC_BYTES];
 int trident_state_restore(struct trident_device *d);
-/* vram.c: plan reads SPR/CR C1 before Save/Init (PreInit D:2920-2969);
- * pin/arm and boot MISC-selected cur_vga_base are required, not init_done.
- * Full table + unknown diagnostic.
- * verify runs after Enable, before publication/leases. Uses scratch, records
- * continuous capacity and upper status; restores all probes in reverse order.
- * >= DISPLAY_BYTES succeeds, not a requirement for 2MiB or 4MiB. */
+/* PreInit SPR declaration, D:2920-2969; no VRAM write/read test. */
 int trident_capacity_plan(struct trident_device *d);
-int trident_vram_verify(struct trident_device *d);
+/* D:3490-3491,1182-1190; X/trident_video.c:225-270,1332-1343. */
+int trident_screen_blank(struct trident_device *, bool blank);
+int trident_adjust_frame(struct trident_device *);
+int trident_video_reset(struct trident_device *);
+/* D:1299-1340. No upper HAL DPMS request exists yet. */
+enum trident_dpms { TRI_DPMS_ON, TRI_DPMS_STANDBY, TRI_DPMS_SUSPEND, TRI_DPMS_OFF };
+int trident_dpms_set(struct trident_device *, enum trident_dpms);
 /* mode_640.c excludes Enable; lifecycle calls Enable once after ModeInit.
  * Mode entry and route protect use cur_vga_base (vgaHW IOBase).
  * Mode VGA Restore switches it to color; state VGA Restore to saved MISC.
@@ -287,16 +279,12 @@ static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
     return (u8)(x >> (bits - 6));
 }
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
-/* lifecycle.c: every ScreenInit=Save→Init→Mode→Enable→palette/client;
- * plan precedes Save and verify follows Enable only on the first init.
- * enter=Mode→Enable (active enter is no-op).
- * Palette defaults come from gfx/palette.c shadow.
- * leave=Restore→lock→Disable, close=Disable→Restore→lock only when active;
- * close after leave and duplicate close touch no hardware. Enter never re-saves.
- * Recovery tries both operations, keeps both rc, no allocation/log/tick/GE.
- * A failed first init returns its recorded rc on later init; restore failure
- * prevents automatic reentry. returning guards recursive restoration.
- * The caller always writes the TVRAM fault, regardless of recovery rc. */
+/* ScreenInit: PreInit once, Save/PC98 Init/Mode/Enable/blank/viewport,
+ * client/palette, video reset each time. NoAccel/SWCursor are D:2065-2073,
+ * 3664-3703,1206-1240,3333-3340: no accelerator or HW cursor callbacks.
+ * EnterVT always Mode/Enable; Leave Restore/lock/Disable; Close reverses
+ * Disable/Restore. Maps and arm survive close for emergency restoration.
+ * last_rc is diagnostic for the latest attempt, reset on the next init. */
 int trident_screen_init(struct trident_device *d);
 int trident_enter(struct trident_device *d);
 int trident_leave(struct trident_device *d);

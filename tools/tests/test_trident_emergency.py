@@ -44,6 +44,9 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 
 # Each literal product anchor must be unique. RED must come from execution.
 MUTATIONS = [
+    ('M_SELECT_RETRY', 'gfx/gfx_core.c',
+     'if (want == &gfx_backend_trident && want && want->prepare) want->prepare();',
+     'if (0) want->prepare();', 'core'),
     ('live-owner', DISPATCH, '!GFX_EMERGENCY_MATCHES_OWNER(owner, appslot_gfx_owner)',
      '(owner != 2 && owner != 0)', 'entries'),
     ('kernel-owner', DISPATCH,

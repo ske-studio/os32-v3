@@ -44,8 +44,8 @@ MUTATIONS = (
     ('active', 'if (!d->active) return TRI_OK;', 'if (d->active) return TRI_OK;'),
     ('valid', 'if (!d->saved.valid) return TRI_E_STATE;',
      'if (!d->saved.valid) return TRI_OK;'),
-    ('current-base', '(misc & 1u) ? TRI_CR_COLOR : TRI_CR_MONO',
-     '(misc & 1u) ? TRI_CR_MONO : TRI_CR_COLOR'),
+    ('current-base', 'base = d->cur_vga_base;',
+     'base = d->cur_vga_base == TRI_CR_COLOR ? TRI_CR_MONO : TRI_CR_COLOR;'),
     ('saved-base', '(s[TRI_SAVE_MISC] & 1u) ? TRI_CR_COLOR : TRI_CR_MONO',
      '(s[TRI_SAVE_MISC] & 1u) ? TRI_CR_MONO : TRI_CR_COLOR'),
     ('mclk-unsaved', 'if (TRI_SAVE_MCLK)', 'if (!TRI_SAVE_MCLK)'),
@@ -67,7 +67,7 @@ def oracle(current, saved):
     values[768] = 0xA0 | saved
     env = dict(save=values, savemclk=0, cb=0x3D4 if saved else 0x3B4,
                savedseq=0x15, t=0, flip=0)
-    events = [(False, 1, 0x3CC, 0)]  # frozen contract's current-base selection
+    events = []  # D:1123 uses the retained vgaHW IOBase
     current_base = 0x3D4 if current else 0x3B4
     stack = []
     pc = labels['state_restore'] + 1

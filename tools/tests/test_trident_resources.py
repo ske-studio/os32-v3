@@ -2,8 +2,8 @@
 """3b core transaction: real resource construction over libc-free kernel seams.
 
 No register/LFB access: common trident_device_fake supplies cold PCI values.
-BAR geometry oracle: TRIDENT_S3_DESIGN §3, BARLEN_DESIGN §2 and Intel 8255x
-SDM rev1.3 §4.1.10. Failure points are API-level, never product-only hooks.
+Resource contract: TRIDENT_S3_DESIGN §§2,4. Failure points are API-level;
+fixed revision, BAR placement and neighbouring-device vetoes are absent.
 """
 CHECK = dict(name='trident-resources', tier=1, needs=[], budget=5,
     covers=[
@@ -80,42 +80,7 @@ FAKE = 'tools/tests/trident_device_fake.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 # name, product file, unique old text, replacement, runtime RED case.
-MUTATIONS = [
-    ('master', PRODUCT, 'paging_current_cr3() == paging_kernel_pd_phys()', '1', 1),
-    ('live-as', PRODUCT, '!paging_live_addrspaces()', '1', 2),
-    ('memory-enable', PRODUCT, '!(p->command & PCI_CMD_MEM_ENABLE)', '0', 4),
-    ('revision-bound', PRODUCT, 'p->revision != TRI_RA266_REVISION', '0', 5),
-    ('bar-type', PRODUCT, 'p->bar0 != MEM_TRIDENT_LFB_VA', '(p->bar0 & ~1u) != MEM_TRIDENT_LFB_VA', 6),
-    ('full-overlap', PRODUCT, 'first < other_end && other_first < end', 'first == other_first && end == other_end', 8),
-    ('unknown-not-veto', PRODUCT, 'if (end == first) end = first + 1;', 'if (end == first) return TRI_E_RESOURCE;', 9),
-    ('ram-overlap', PRODUCT, 'if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))',
-        'if (0 && pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 10),
-    ('reserve-first', PRODUCT, 'if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))',
-        'if (0 && !ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 0),
-    ('map-rc', PRODUCT, 'if (paging_map_phys(bases[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))',
-        'if (paging_map_phys(bases[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD) == 1)', 15),
-    ('supervisor', PRODUCT, 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD)',
-        'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD | PTE_USER)', 0),
-    ('map-rollback', PRODUCT, 'mapped[i] = true;', 'mapped[i] = false;', 16),
-    ('map-record', PRODUCT, 'if (!ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,',
-        'if (0 && !ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 17),
-    ('surface-rollback', PRODUCT, 'if (!surface_created[i]) continue;', 'if (i == 0 || !surface_created[i]) continue;', 21),
-    ('client-free', PRODUCT, 'if (client_allocated) {', 'if (false && client_allocated) {', 20),
-    ('armed-busy', PRODUCT, 'if (armed) return TRI_E_BUSY;', 'if (false && armed) return TRI_E_BUSY;', 22),
-    ('lease-busy', PRODUCT, 'surface_created[i] && ledger_surfaces[sids[i]].lease_count',
-        'false && surface_created[i] && ledger_surfaces[sids[i]].lease_count', 23),
-    ('lease-ceiling', PRODUCT, '.perm_max = LEDGER_PERM_RW', '.perm_max = LEDGER_PERM_NONE', 0),
-    ('publisher-private', PRODUCT, 'gfx_surface_unready |= 1u << resources.display_sid;',
-        'gfx_surface_unready |= 0u << resources.display_sid;', 0),
-    ('ready-commit', PRODUCT, 'resources.ready = true;', 'resources.ready = false;', 0),
-    ('no-reserve-repeat', PRODUCT, 'if (attempted) return boot_rc;', 'if (false && attempted) return boot_rc;', 0),
-    ('client-clear', PRODUCT, 'kmemset(resources.client, 0, TRI_DISPLAY_BYTES);',
-        'kmemset(resources.client, 0, 0);', 0),
-    ('bridge-prefetch', PRODUCT, 'rc = bridge_window(dev, fn, PCI_CFG_PREF_WINDOW);',
-        'rc = 0;', 45),
-    ('multifunction', PRODUCT, 'header & PCI_HDR_MULTIFUNCTION ? PCI_FN_COUNT : 1',
-        'header & PCI_HDR_MULTIFUNCTION ? 1 : 1', 35),
-]
+MUTATIONS = [('master', 'drivers/video/trident/resources.c', 'paging_current_cr3() == paging_kernel_pd_phys()', '1', 1), ('live-as', 'drivers/video/trident/resources.c', '!paging_live_addrspaces()', '1', 2), ('memory-enable', 'drivers/video/trident/resources.c', '!(p->command & PCI_CMD_MEM_ENABLE)', '0', 4), ('ram-overlap', 'drivers/video/trident/resources.c', 'if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 'if (0 && pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 10), ('reserve-first', 'drivers/video/trident/resources.c', 'if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 'if (0 && !ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 0), ('map-rc', 'drivers/video/trident/resources.c', 'if (paging_map_phys(bases[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))', 'if (paging_map_phys(bases[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD) == 1)', 15), ('supervisor', 'drivers/video/trident/resources.c', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD | PTE_USER)', 0), ('map-rollback', 'drivers/video/trident/resources.c', 'mapped[i] = true;', 'mapped[i] = false;', 16), ('map-record', 'drivers/video/trident/resources.c', 'if (!ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 'if (0 && !ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 17), ('surface-rollback', 'drivers/video/trident/resources.c', 'if (!surface_created[i]) continue;', 'if (i == 0 || !surface_created[i]) continue;', 21), ('client-free', 'drivers/video/trident/resources.c', 'if (client_allocated) {', 'if (false && client_allocated) {', 20), ('armed-busy', 'drivers/video/trident/resources.c', 'if (armed) return TRI_E_BUSY;', 'if (false && armed) return TRI_E_BUSY;', 22), ('lease-busy', 'drivers/video/trident/resources.c', 'surface_created[i] && ledger_surfaces[sids[i]].lease_count', 'false && surface_created[i] && ledger_surfaces[sids[i]].lease_count', 23), ('lease-ceiling', 'drivers/video/trident/resources.c', '.perm_max = LEDGER_PERM_RW', '.perm_max = LEDGER_PERM_NONE', 0), ('publisher-private', 'drivers/video/trident/resources.c', 'gfx_surface_unready |= 1u << resources.display_sid;', 'gfx_surface_unready |= 0u << resources.display_sid;', 0), ('ready-commit', 'drivers/video/trident/resources.c', 'resources.ready = true;', 'resources.ready = false;', 0), ('no-reserve-repeat', 'drivers/video/trident/resources.c', 'if (attempted) return boot_rc;', 'if (false && attempted) return boot_rc;', 0), ('client-clear', 'drivers/video/trident/resources.c', 'kmemset(resources.client, 0, TRI_DISPLAY_BYTES);', 'kmemset(resources.client, 0, 0);', 0)]
 
 
 def build(folder, source):

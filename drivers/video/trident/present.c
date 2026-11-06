@@ -4,13 +4,8 @@
  * trident.h). The OS32 row-transfer interface is specified in trident.h. */
 #include "trident.h"
 
-/* Trial for PC-98 Ra266 hardware (2026-11-06): matching mode readbacks
- * still produced narrow, skewed bands with dword stores, while H's
- * mmiofill8 displayed correctly. Address decoding by access width remains
- * a hypothesis. Unlike X.Org trident_shadow.c:19-36 (memcpy) and :74-107
- * (CARD32 stores for rotation), force write8 here. Set to 1 to restore the
- * aligned span32 path; this choice does not change vram.c's dword probe. */
-#define TRI_PRESENT_USE_SPAN32 0
+/* X/trident_shadow.c:19-36 copies each row with memcpy. */
+#define TRI_PRESENT_USE_SPAN32 1
 
 int trident_present(struct trident_device *d, int x, int y, int w, int h)
 {
@@ -33,7 +28,7 @@ int trident_present(struct trident_device *d, int x, int y, int w, int h)
 
     end = ((u32)y + (u32)h - 1u) * TRI_PITCH + (u32)x + (u32)w;
     if (end > r->client_bytes || end > r->mapped_bytes ||
-        end > r->decode_bytes || end > d->verified_bytes)
+        end > r->decode_bytes || end > d->declared_bytes)
         return TRI_E_ACCESS;
 
     for (u32 row = 0; row < (u32)h; ++row) {

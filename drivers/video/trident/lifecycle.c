@@ -2,14 +2,13 @@
  * 2920-2969,3333-3348,3471-3488; vgaHW.c:1786-1789.
  * PM 2026-11-06: PreInit capacity read precedes Save/PC98 Init, unlike the
  * original S3 contract. PM fix6: every HAL init is ScreenInit, so Save and
- * PC98 Init repeat (D:3472-3487); only VRAM measurement remains first-only.
+ * PC98 Init repeat (D:3472-3487).
  * 0xFAC is shared with pc98_route.c (mask 3): Trident owns values 2/0 while
  * active/returning. Keep Enable/Disable's unconditional OUTB and ordering;
  * route_set's conditional write/readback cannot replace this sequence.
  * Cooperative switching serializes the backends. No 98 drawing here.
  */
 #include "trident.h"
-#include "mm/kmalloc.h"
 
 static int failed(struct trident_device *d, u32 step, int rc)
 {
@@ -29,7 +28,6 @@ static int failed(struct trident_device *d, u32 step, int rc)
 static int mode_enable(struct trident_device *d)
 {
     /* vtSema covers partial mode programming, not just a published screen. */
-    d->active = true;
     d->closed = d->leave_done = false;
     STAGE(TRI_STEP_MODE, trident_mode_640(d));
     STAGE(TRI_STEP_ENABLE, trident_route_enable(d));
@@ -87,17 +85,17 @@ static int client_init(struct trident_device *d)
 int trident_screen_init(struct trident_device *d)
 {
     if (!d || !d->res || !d->io) return TRI_E_INVAL;
-    if (d->last_rc) return d->last_rc;
     if (!d->armed || !d->pinned || !d->res->ready) return TRI_E_STATE;
     if (d->returning) return TRI_E_BUSY;
-    if (!d->first_init_done) {
+    d->last_rc = d->failed_step = d->restore_rc = d->disable_rc = 0;
+    if (!d->preinit_done) {
         u8 misc;
         STAGE(TRI_STEP_IDENTIFY, trident_identify(d));
         STAGE(TRI_STEP_CAPACITY_PLAN, trident_read8(d, TRI_SPACE_REGS, TRI_MISC_READ, &misc));
         d->cur_vga_base = (misc & 1u) ? TRI_CR_COLOR : TRI_CR_MONO;
         STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));
+        d->preinit_done = true;
     }
-    d->active = true; /* even a failed Save can require Disable */
     d->closed = d->leave_done = false;
     STAGE(TRI_STEP_SAVE, trident_state_save(d));
     d->init_done = false;
@@ -105,21 +103,13 @@ int trident_screen_init(struct trident_device *d)
     d->init_done = true;
     int rc = mode_enable(d);
     if (rc) return rc;
-    if (!d->first_init_done) {
-        d->scratch = kmalloc(TRI_VRAM_SCRATCH_BYTES);
-        if (!d->scratch) return failed(d, TRI_STEP_VERIFY, TRI_E_RESOURCE);
-        d->scratch_bytes = TRI_VRAM_SCRATCH_BYTES;
-        rc = trident_vram_verify(d);
-        kfree(d->scratch);
-        d->scratch = NULL;
-        d->scratch_bytes = 0;
-        if (rc) return failed(d, TRI_STEP_VERIFY, rc);
-        d->step = TRI_STEP_VERIFY;
-    }
+    STAGE(TRI_STEP_MODE, trident_screen_blank(d, true));
+    STAGE(TRI_STEP_MODE, trident_adjust_frame(d));
     rc = client_init(d);
     if (rc) return failed(d, TRI_STEP_CLIENT, rc);
     d->step = TRI_STEP_CLIENT;
-    d->first_init_done = true;
+    STAGE(TRI_STEP_CLIENT, trident_video_reset(d));
+    d->screen_ready = true;
     d->step = TRI_STEP_ACTIVE;
     return 0;
 }
@@ -127,10 +117,9 @@ int trident_screen_init(struct trident_device *d)
 int trident_enter(struct trident_device *d)
 {
     if (!d) return TRI_E_INVAL;
-    if (d->last_rc) return d->last_rc;
     if (d->returning) return TRI_E_BUSY;
-    if (d->active) return 0;
-    if (!d->first_init_done) return TRI_E_STATE;
+    if (!d->screen_ready) return TRI_E_STATE;
+    d->last_rc = d->failed_step = 0;
     int rc = mode_enable(d);
     if (!rc) d->step = TRI_STEP_ACTIVE;
     return rc;

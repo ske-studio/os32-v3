@@ -229,7 +229,7 @@ static int setup(u8 config, bool mono, u8 seed)
 }
 static int unchanged_lifecycle(void)
 {
-    REQUIRE(!device.init_done && !device.first_init_done && !device.active);
+    REQUIRE(!device.init_done && !device.preinit_done && !device.active);
     REQUIRE(!device.saved.valid && equal(device.step, TRI_STEP_SAVE));
     REQUIRE(device.last_rc == -91 && !device.failed_step);
     return 0;

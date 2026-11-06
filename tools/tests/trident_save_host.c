@@ -236,7 +236,7 @@ static int oracle(bool color,bool readable)
     REQUIRE(equal(diagnostics,readable ? 0 : 1));
     REQUIRE(equal(fake.sr[14],boot_sr[14]) && equal(fake.gr[6],12));
     if (readable) for (u32 i=0;i<768;++i) REQUIRE(equal(fake.dac[i],boot_dac[i]));
-    REQUIRE(!device.init_done && !device.first_init_done && !fake.pc98_initialized);
+    REQUIRE(!device.init_done && !device.preinit_done && !fake.pc98_initialized);
     REQUIRE(!fake.reads[1] && !fake.reads[2] && !fake.writes[2] && !fake.port_writes);
     return 0;
 }

@@ -146,7 +146,10 @@ static void run(void)
     CHECK(g_backend == &gfx_backend_pc98 && gfx_is_started() && tri_returns == 1);
     CHECK(gfx_backend_pc98.bb_base == bb[0] && gfx_current_height == GFX_HEIGHT);
     gfx_shutdown();
-    tri_failure = 0; recovery_failure = -72; gfx_init();
+    fail_after_init = 0; gfx_init();
+    CHECK(g_backend == &gfx_backend_trident && gfx_is_started() && !tri_failure);
+    gfx_shutdown();
+    fail_after_init = 1; recovery_failure = -72; gfx_init();
     CHECK(g_backend == &gfx_backend_trident && !gfx_is_started() && tri_returns == 2);
     CHECK(!route_safe);
     SAY("GREEN core: forced/auto, boot exclusivity, SF5/CLIENT, prepare/init failure, recovery failure");

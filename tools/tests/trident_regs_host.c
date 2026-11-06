@@ -32,6 +32,7 @@ static int reset(void)
     int rc = trident_fake_reset(&f, storage, sizeof(storage), trace, 32);
     if (rc) return rc;
     trident_fake_bind(&f, &d);
+    d.active = true;
     f.sr[1] = 0xB7;
     f.cr_color[0x11] = f.cr_mono[0x11] = 0x55;
     f.ar[0x12] = 0x35;
