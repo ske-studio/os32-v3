@@ -68,6 +68,39 @@ static i32 svc_result(struct gf4_ctx *c,i32 rc)
     return rc;
 }
 
+/* The stopped management loan belongs to this module, independently of
+ * links.c's live admission table. dispnv04/disp.c:189-207 stops display
+ * use before destroying its saved state; failed releases remain retryable. */
+static i32 svc_management_last_rc(struct gf4_ctx *c)
+{
+    return c ? c->last_rc : GF4_EINVAL;
+}
+static struct gf4_restore_ops svc_management={
+    .restore=gf4_diagnostic_restore,.last_rc=svc_management_last_rc,
+    .saved_release=gf4_display_saved_release,.abandon=gf4_diagnostic_abandon
+};
+
+void gf4_service_cleanup_reset(struct gf4_ctx *c)
+{
+    struct gf3_service *s=gf3_service_get(c->ch);
+    for (u8 h=0;h<GF4_HEADS;++h) {
+        c->state->head[h]=(struct gf4_head_image){0};
+        c->hold[h]=(struct gf4_flip_hold){0};
+        c->scan_bank[h]=0;
+    }
+    c->saved_closed=false;
+    c->hold_saved.version=0;
+    /* OFF invalidated F3; end its value loans without reopening objects. */
+    s->scan=(struct gf3_surface){0};
+    s->test=(struct gf3_surface){0};
+    if (geforce_context && geforce_context->display_restore_out &&
+        *geforce_context->display_restore_out &&
+        (*geforce_context->display_restore_out)->ctx==c)
+        *geforce_context->display_restore_out=0;
+    c->cleanup_pending=false;
+    c->legacy->stop_ok=true;
+}
+
 /* crtc.c:175-233; hw.h:119-140,238-240; nvreg.h:129-139.
  * Stop must not use the public DPMS transaction: its successful end could
  * reopen slots and restore cursor visibility. Only the physical ON column
@@ -361,6 +394,8 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         !l->owner->acquire || !l->owner->release ||
         !l->owner->validate || !l->owner->foundation_start)
         return svc_start_failure(c,"service_ops",GF4_EINVAL);
+    if (c->cleanup_pending)
+        return svc_start_failure(c,"cleanup_pending",GF4_EBUSY);
     if (c->ready || c->accel->ready || c->saved_closed || c->diagnostic_saved ||
         l->engaged || !c->reusable || !l->reusable ||
         (c->ch->state!=GF2_OFF && c->ch->state!=GF2_RUN))
@@ -381,7 +416,11 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         stage="foundation_start"; rc=l->owner->foundation_start(l);
     }
     if (!rc && c->ch->state==GF2_OFF) {
-        stage="channel_start"; rc=gf2_start(c->ch,f);
+        /* A cold channel has no foundation until gf2_start. Lend the
+         * already started F1 here so tile init uses the same real I/O. */
+        c->ch->f=f;
+        stage="tiles_init"; rc=gf5_tiles_init(&s->production->feature5);
+        if (!rc) { stage="channel_start"; rc=gf2_start(c->ch,f); }
     }
     if (!rc) {
         stage="channel_state";
@@ -435,8 +474,19 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     struct gf_display_context *l=c->legacy;
     struct gf_foundation *f=&s->production->foundation;
     c->deadline=dl; c->accepting=false; l->active=false;
-    s->production->feature5.accepting=false;
+    struct gf5 *g=&s->production->feature5;
+    g->accepting=false;
+    c->cleanup_pending=true;
+    /* R2-2: leave terminates the F5 snapshot even after failed save/restore.
+     * free owns the single allocation; never copy or erase tile loan nodes. */
+    if (g->image) gf5_state_free(g,g->image);
+    g->busy=false;
+    g->phase=GF5_FAULT;
     first=c->links->admission(c->links->owner,false);
+    if (geforce_context && geforce_context->display_restore_out) {
+        svc_management.ctx=c;
+        *geforce_context->display_restore_out=&svc_management;
+    }
     /* nouveau_drm.c:955-988. All display waits precede F2/F1 stop. A held
      * flip that cannot converge retains both keys until display use ends. */
     if (c->ready && c->ch->state==GF2_RUN && !c->ch->fault.latched) {
@@ -470,27 +520,19 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     rc=gf_display_quiesce(l);
     if (rc && !first) first=rc;
     if (!rc && off && closed) {
-        /* X3: quiesce leaves ownership flags intact. This caller confirms
-         * local cleanup, F2 OFF and closed windows before ending display use;
-         * a later release failure must not make cleanup pending again. */
+        /* X3: only quiesce + OFF + closed windows ends display use.
+         * Pending survives retire/release failures and diagnostic loans. */
         l->engaged=false;
-        rc=gf4_scan_release_all(c,dl);
+        /* ROM/master failure can stop before the first gf2_start bound F1.
+         * The proven stopped context still needs F1 I/O for tile retirement. */
+        c->ch->f=f;
+        if (!c->diagnostic_saved) c->saved_closed=false;
+        rc=gf5_tiles_retire(g);
+        if (!rc && !c->diagnostic_saved) rc=gf4_scan_release_all(c,dl);
         if (rc && !first) first=rc;
-        if (!rc && !c->diagnostic_saved) {
-            for (u8 h=0;h<GF4_HEADS;++h) {
-                c->state->head[h]=(struct gf4_head_image){0};
-                c->hold[h]=(struct gf4_flip_hold){0};
-            }
-            c->saved_closed=false;
-            c->hold_saved.version=0; /* Normal stop ended the retained loan. */
-            /* surfaces() requires ready F3. OFF invalidated the objects;
-             * discard the now-ended value loans without reinitializing it. */
-            s->scan=(struct gf3_surface){0};
-            s->test=(struct gf3_surface){0};
-            for (u8 h=0;h<GF4_HEADS;++h) c->scan_bank[h]=0;
-        }
+        if (!rc && !c->diagnostic_saved) gf4_service_cleanup_reset(c);
     }
-    l->stop_ok=!first && !l->engaged;
+    l->stop_ok=!first && !l->engaged && !c->cleanup_pending;
     /* N1: display4, legacy, links and owner table survive until module exit. */
     return svc_result(c,first);
 }
