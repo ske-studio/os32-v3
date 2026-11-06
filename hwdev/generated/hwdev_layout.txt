@@ -438,6 +438,10 @@ offset	KernelAPI.hdd_geom_info	940
 member_size	KernelAPI.hdd_geom_info	4
 offset	KernelAPI.host_close	856
 member_size	KernelAPI.host_close	4
+offset	KernelAPI.host_notice_read	1044
+member_size	KernelAPI.host_notice_read	4
+offset	KernelAPI.host_notice_serial	1048
+member_size	KernelAPI.host_notice_serial	4
 offset	KernelAPI.host_open	840
 member_size	KernelAPI.host_open	4
 offset	KernelAPI.host_read	848
@@ -494,8 +498,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1044
-member_size	KernelAPI.kapi_reserved	164
+offset	KernelAPI.kapi_reserved	1052
+member_size	KernelAPI.kapi_reserved	156
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1328,6 +1332,24 @@ offset	struct GfxScanout.reservation_id	0
 member_size	struct GfxScanout.reservation_id	4
 offset	struct GfxScanout.width	16
 member_size	struct GfxScanout.width	4
+size	struct HostNotice	256
+align	struct HostNotice	4
+offset	struct HostNotice.data	20
+member_size	struct HostNotice.data	236
+offset	struct HostNotice.dropped	4
+member_size	struct HostNotice.dropped	4
+offset	struct HostNotice.host_generation	8
+member_size	struct HostNotice.host_generation	4
+offset	struct HostNotice.kind	14
+member_size	struct HostNotice.kind	2
+offset	struct HostNotice.length	16
+member_size	struct HostNotice.length	2
+offset	struct HostNotice.reserved	18
+member_size	struct HostNotice.reserved	2
+offset	struct HostNotice.serial	0
+member_size	struct HostNotice.serial	4
+offset	struct HostNotice.service	12
+member_size	struct HostNotice.service	2
 size	struct addrspace	1228
 align	struct addrspace	4
 offset	struct addrspace.app_pde	8

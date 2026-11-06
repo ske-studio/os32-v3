@@ -1,4 +1,4 @@
-# KernelAPI v81 仕様書
+# KernelAPI v82 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **81** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 259・予約 41) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **82** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 261・予約 39) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -129,6 +129,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
 | v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
+| v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -295,7 +296,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 259〜299 (`kapi_reserved[41]`、v81 時点。v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 261〜299 (`kapi_reserved[39]`、v82 時点。v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1727,9 +1728,28 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
   1 (Esc・CTRL+STOP) / `INVAL` / `NOTFOUND` / `IO` / `NOSPC` / `NOSYS` (非対応の表示経路) / `BUSY` / `AGAIN`。
   正典は [OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) §3。ビューアーのアプリは GeForce の後。
 
+### §4-17 Host Services 通知 (v82)
+
+| slot | オフセット | 関数 | 型 |
+|---|---|---|---|
+| 259 | 0x414 | `host_notice_read` | `int(u32 generation, u32 service, HostNotice *out)` |
+| 260 | 0x418 | `host_notice_serial` | `u32(void)` |
+
+`HostNotice` は公開 C89 型 (`os32_host_notice.h`)、256 バイト。
+`host_notice_read` は一致する最古の通知を1件写し、成功時だけ消費する。
+`service=65535` は全サービス、`generation=0` は全サービス取得時のみ現世代を指す。
+戻りは 0 / `AGAIN` (-14、空) / `INVAL` (-9、引数・出力範囲不正・copyout失敗) /
+`NOSYS` (-10、mailbox 未確保) / `STALE` (-11、指定世代が古い)。空でも `HOSTDOWN` は返さない。
+呼び手の書込み範囲を検査し、カーネルの一時 `HostNotice` へ stage、copyout が成功した後、
+同じ世代・serial だけ commit する。不正な CPL3 ポインタと copyout 失敗は通知を消費しない。
+`host_notice_serial` は最新の投入通番を非消費で返す (初期値 0)。
+契約の正典は [NET_HOSTSVC_DESIGN](decisions/network/NET_HOSTSVC_DESIGN.md) §7・追記 #4。
+B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存アプリはないため、
+`build/app.conf` の要求版は据え置く。利用側を接続する段で v82 以上へ上げる。
+
 ### 予約スロット (v63〜)
 
-0x414〜0x4B4 (slot 259〜299、41 本、v81 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x41C〜0x4B4 (slot 261〜299、39 本、v82 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2104,6 +2124,8 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x408 | ime_dict_info | `int(int key, int offset, char *out, int capacity)` |
 | 0x40C | gfx_osri_show | `int(const char *path, u32 duration_ms)` |
 | 0x410 | ime_dict_suspend | `int(int on)` |
+| 0x414 | host_notice_read | `int(u32 generation, u32 service, HostNotice *out)` |
+| 0x418 | host_notice_serial | `u32(void)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

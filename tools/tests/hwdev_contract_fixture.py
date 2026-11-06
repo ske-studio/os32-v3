@@ -35,6 +35,9 @@ GF CUI fix12 adds per-opcode TMDS timing and two saved scan origins.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
 adds that member; refresh both pins with --snapshot after reviewing the diff.
+KAPI v82 appends host_notice_read/serial at offsets 1044/1048 and exposes
+struct HostNotice (256 bytes); reserved tail moves to 1052, size 156.
+Reviewed generated inventory/layout; import declarations remain unchanged.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -54,9 +57,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xbf2f474e
+REVIEWED_LAYOUT_CRC = 0x5de602bf
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = '4920103287ca5c382e71d9c3062ae9fb85c5fbca88b54c0cafb903deb06c6f9f'
+REVIEWED_INVENTORY_SHA = '8c91f446d61777142760c1cc9475f1e49310056a82f28e6ba18c0624c9ab7ec5'
 
 
 def import_declarations(root):
