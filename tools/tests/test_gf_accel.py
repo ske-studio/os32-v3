@@ -228,6 +228,9 @@ MUTATIONS = {
          '(void)0;', 'tools/tests/gf_accel_b7_host.c'),
     ],
     'b8': [
+        ('staging-reuse', 'hwdev/gf/accel_transfer.c',
+         'if (c->ch->staging_pending) {',
+         'if (false) {', 'tools/tests/gf_accel_b8_host.c'),
         ('rows-cap', 'hwdev/gf/accel_transfer.c',
          'if (rows > GF3_M2MF_MAX_ROWS) rows = GF3_M2MF_MAX_ROWS;',
          'if (rows > GF3_M2MF_MAX_ROWS) rows = GF3_M2MF_MAX_ROWS + 1U;', 'tools/tests/gf_accel_b8_host.c'),

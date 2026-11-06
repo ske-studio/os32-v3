@@ -1626,6 +1626,8 @@ offset	struct gf2_chan.staging	912
 member_size	struct gf2_chan.staging	12
 offset	struct gf2_chan.staging_live	898
 member_size	struct gf2_chan.staging_live	1
+offset	struct gf2_chan.staging_pending	899
+member_size	struct gf2_chan.staging_pending	1
 offset	struct gf2_chan.state	4
 member_size	struct gf2_chan.state	4
 offset	struct gf2_chan.va	40

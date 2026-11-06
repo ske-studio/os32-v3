@@ -144,6 +144,9 @@ struct gf2_chan {
     struct recover_bar_extent bar1, push_extent;
     u32 map_bytes;
     bool mapped, vram_reserved, staging_live;
+    /* Transfer owns this until a later reference completes; retain on error
+     * and across F3 reinitialization, since staging belongs to F2. */
+    bool staging_pending;
     int dma_rc, last_rc;
     const struct gf2_dma_ops *dma_ops;
     struct gf2_dma_buf staging;
