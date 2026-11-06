@@ -1,0 +1,26 @@
+# gf1
+
+GeForce 層1の状態と基盤を試験する
+
+## SYNOPSIS
+
+`gf1 status|instmem|vblank|cycle`
+
+## DESCRIPTION
+
+診断結果をシリアルに `GF1` 行として出す。入場には `gf2 enter` を使う。
+
+- `status` — command、PMC の期待値と実測値、稼働フラグを比較する。退場後も確認できる。
+- `instmem` — 入場中にインスタンスメモリの確保・書込み・読出しと表示 CRC の不変を確認する。
+- `vblank` — 入場中に head A の割込みを有効・無効・再有効にして差分を測る。
+- `cycle` — 入場中から停止・再開を行い、各段の状態を確認する。
+
+## EXIT STATUS
+
+- `0` — 成功。
+- `1` — 試験失敗、または診断口が使えない。
+- `2` — 引数の誤り。
+
+## SEE ALSO
+
+gf2, ver

@@ -1,0 +1,59 @@
+# gf2
+
+GeForce の入場・退場と層2〜5の試験を行う
+
+## SYNOPSIS
+
+`gf2 enter|leave`
+`gf2 status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank`
+`gf2 accel init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all`
+`gf2 display packed-session`
+`gf2 feature operation [operand halfword]`
+
+## DESCRIPTION
+
+診断の詳細はシリアルの `GF2`、`GF3`、`GF4`、`GF5` 行で確認する。
+
+- `enter` — 設定済みの backend を core の初期化経路で起動する。GeForce の設定と準備が必要。入場後もシェルを使え、テキストは98に残る。二重入場は失敗する。
+- `leave` — 同じ owner の入場を終了し、表示を98へ戻す。未入場では失敗する。終了・CTRL+STOP・fault も owner 回収の経路で退場する。
+- `status` — command 層の状態を確認する。
+- `start` / `stop` / `recover` — command 層の開始・停止・回復を試験する。
+- `reference` — reference の往復を確認する。
+- `cycle` — command 層の停止・回復を繰り返す。
+- `bad-handle` / `bad-method` — 不正な handle / method の検出を試験する。
+- `vblank` — 垂直帰線の待ちを試験する。
+- `accel` — 指定した初期化・塗り・コピー・単色展開・IFC・転送・拡縮・present を試験する。`all` は一通り実行する。
+- `display` — packed-session の下位8ビットが試験番号。0=列挙、1=モード、2=DPMS、3=カーソル、4=flip、5=gamma、6=出力、7=lifecycle、8=restore。bit 8〜15 は connector、bit 16 は head、bit 17 は phase。例: `gf2 display 7`。
+
+稼働状態が必要な試験は `gf2 enter` の後に行い、終わったら `gf2 leave` を行う。
+
+### feature (層5)
+
+`operation` は次のいずれか。
+
+- `info` — 機能情報。
+- `arg-lo` / `arg-hi` — 続く `operand halfword` で引数の下位/上位16ビットを設定する。operand は0〜7、halfword は0〜65535の十進数。
+- `clock-read` / `clock-calc` / `clock-prog` — クロックの読出し・計算・設定。
+- `ram-prog` — RAM クロック設定。
+- `perf-count` / `perf-get` / `perf-select` — 性能状態の件数・取得・選択。
+- `therm` — 温度取得。
+- `fan-mode` / `fan-get` / `fan-cstate` — ファンのモード・状態・冷却状態。
+- `volt-get` / `volt-set` / `volt-id` — 電圧の取得・設定・VID。
+- `gpio-find` / `gpio-get` / `gpio-set` — GPIO の検索・取得・設定。
+- `tile-find` / `tile-set` / `tile-clear` — tile の検索・設定・解除。
+- `save` / `restore` / `free` — 状態の保存・復元・保存資源の解放。
+- `poll` / `wait` / `last-rc` — 保守処理・待ち・直前の結果の取得。
+
+例: `gf2 feature info`、`gf2 feature therm`、`gf2 feature volt-get`。
+各操作の結果と未対応理由はシリアルに記録する。
+
+## EXIT STATUS
+
+- `0` — 成功。
+- `1` — 試験または入場・退場の失敗。
+- `2` — 引数の誤り。
+- `77` — feature が未対応、または feature の診断口が使えない。合格には数えない。
+
+## SEE ALSO
+
+gf1, ver
