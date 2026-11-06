@@ -9,7 +9,7 @@
 
 void *kmemcpy(void *dst, const void *src, u32 n)
 { u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst; }
-void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
+void fep_store_learn(FepStore *dict, const char *yomi, const char *kanji)
 { (void)dict; (void)yomi; (void)kanji; }
 int services_public = 1;
 volatile u32 services_boot_fault;

@@ -786,6 +786,54 @@ int fep_store_open(FepStore *s, const char *path, const char *user_path)
     return 0;
 }
 
+/* K: probe and reservation checks precede any change to the live store. */
+int fep_store_switch(FepStore *s, const char *path)
+{
+    FepMeta target, old_meta;
+    char old_path[OS32_MAX_PATH], target_path[OS32_MAX_PATH];
+    if (!s || !path || !path[0] || kstrlen(path) >= sizeof(target_path))
+        return OS32_ERR_INVAL;
+    if (s->system.isolated || s->user.isolated) {
+        kprintf(ATTR_RED, "IME: isolated connection; restart required\r\n");
+        return OS32_ERR_BUSY;
+    }
+    if (!SQLITE_OUTER_READY(1)) return OS32_ERR_IO;
+    kstrncpy(target_path, path, sizeof(target_path));
+    int rc = fep_meta_probe(target_path, &target);
+    if (rc) return rc;
+    if (target.reserve_kb > s->boot_reserve_kb) {
+        kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
+        return OS32_ERR_AGAIN;
+    }
+    old_meta = s->meta;
+    kstrncpy(old_path, s->system.path, sizeof(old_path));
+    int had_system = s->system.db != 0;
+    rc = fep_conn_close(&s->system);
+    if (rc) {
+        kprintf(ATTR_RED, "IME: dictionary close failed; restart required\r\n");
+        return rc;
+    }
+    rc = store_system_open(s, target_path);
+    if (rc) {
+        if (!s->system.isolated && had_system && !store_system_open(s, old_path))
+            s->meta = old_meta;
+        else
+            kprintf(ATTR_RED, "IME: dictionary unavailable; restart required\r\n");
+        return rc;
+    }
+    if (kstrcmp(old_meta.dict_id, s->meta.dict_id) ||
+        old_meta.pos_version != s->meta.pos_version) {
+        s->user_enabled = 0;
+        rc = fep_conn_close(&s->user);
+        if (rc) {
+            kprintf(ATTR_RED, "IME: learning close failed; restart required\r\n");
+            return rc;
+        }
+        (void)store_user_open(s);
+    }
+    return 0;
+}
+
 int fep_store_close(FepStore *s)
 {
     if (!s) return OS32_ERR_INVAL;

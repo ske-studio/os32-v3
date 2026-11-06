@@ -6,16 +6,16 @@ int ime_switch_dict(int variant)
     if (!services_public) return OS32_ERR_NOSYS;
     const char *path;
     if (variant == 0) {
-        path = "/db/fep_s.db";
+        path = FEP_DICT_PATH_S;
     } else if (variant == 1) {
-        path = "/db/fep.db";
+        path = FEP_DICT_PATH_M;
     } else if (variant == IME_DICT_LARGE) {
-        path = "/db/fep_l.db";
+        path = FEP_DICT_PATH_L;
     } else {
         return -1;
     }
-    int rc = ime_dict_reopen(&g_ime.dict, path);
-    g_ime.dict_loaded = g_ime.dict.db != NULL;
+    int rc = fep_store_switch(&g_ime.store, path);
+    g_ime.dict_loaded = g_ime.store.system.db != NULL && !g_ime.store.system.isolated;
     return rc;
 }
 
@@ -49,7 +49,7 @@ int ime_user_list_facade(const char *yomi_prefix, void *out, int max)
     ime_user_staging_busy = 1;
     irq_restore(flags);
     kmemset(ime_user_staging, 0, sizeof(ime_user_staging));
-    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);
+    n = fep_store_user_list(&g_ime.store, yomi_prefix, ime_user_staging, max);
     /* The last outer finalize has left the engine before the fresh B1 walk.
      * B1 preflights all actual bytes before writing any of them. */
     if (n >= 0 && !copy_to_caller(&caller, out, ime_user_staging,
@@ -72,7 +72,7 @@ int ime_user_delete_facade(const char *yomi, const char *kanji)
         kanji = k;
     }
     if (!sqlite_engine_available(1)) return -1;
-    return ime_user_delete(&g_ime.dict, y, kanji);
+    return fep_store_user_delete(&g_ime.store, y, kanji);
 }
 
 int ime_user_export_facade(const char *path)
@@ -83,12 +83,12 @@ int ime_user_export_facade(const char *path)
     if (!path || !caller_access_get(&caller) ||
         !copy_caller_cstr(&caller, path, p, sizeof(p)) || !p[0] ||
         !sqlite_engine_available(1)) return -1;
-    return ime_user_export(&g_ime.dict, p);
+    return fep_store_user_export(&g_ime.store, p);
 }
 
 int ime_user_clear_facade(void)
 {
     if (!services_public) return OS32_ERR_NOSYS;
-    return ime_user_clear(&g_ime.dict);
+    return fep_store_user_clear(&g_ime.store);
 }
 

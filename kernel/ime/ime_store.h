@@ -103,7 +103,7 @@ int fep_store_user_export(FepStore *s, const char *path);
 int fep_store_user_clear(FepStore *s);
 
 /* C owns system-only metadata access in ime_dict_info.c, including the
- * store reader. J will bind ime_dict_info_facade and ime_current_dict() to it.
+ * store reader. ime_dict_info_facade uses the typed ime_current_store() owner.
  * Same 20 keys, byte offsets/cap clamp and errors as IME_DICT_INFO_* in the
  * shared SDK header. No open/recover/yield; error leaves out untouched.
  */

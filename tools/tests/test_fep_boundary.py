@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T5a-1 B2 production facade/dictionary, ordinary failures and lifetime mutants."""
 CHECK = dict(name='fep-boundary-host', tier=1,
-    covers=['tools/tests/fep_boundary_host.c', 'tools/tests/fep_boundary_runtime.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c', 'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/test_vfs_fd_path.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'tools/tests/fep_store_host.h', 'kernel/ime/ime_dict_info.c', 'tools/tests/ime_dict_info_host.inc', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/fep_module.c', 'kernel/ime/fep_body.c', 'kernel/ime/fep_module.h', 'kernel/ime/ime_store.h', 'lib/kstring.h', 'include/redir_access.h', 'include/io.h', 'fs/vfs_fd.c', 'fs/vfs.h', 'lib/sqlite3/**', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'build/core.yaml', 'drivers/block/fdc_track.c', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'lib/kutf16.c', 'platform/pc98/boot_names.c', 'sdk/allocator/nano_adapter.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/mutpar.py', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'userland/deploy.yaml', 'userland/lib/rt/ls.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c'],
+    covers=['tools/tests/fep_boundary_host.c', 'tools/tests/fep_boundary_runtime.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c', 'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/test_vfs_fd_path.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'kernel/ime/ime.c', 'kernel/ime/ime_convert.inc', 'kernel/ime/ime_suspend.c', 'kernel/ime/ime_romkana.c', 'lib/utf8.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'tools/tests/fep_store_host.h', 'kernel/ime/ime_dict_info.c', 'tools/tests/ime_dict_info_host.inc', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/fep_module.c', 'kernel/ime/fep_body.c', 'kernel/ime/fep_module.h', 'kernel/ime/ime_store.h', 'lib/kstring.h', 'include/redir_access.h', 'include/io.h', 'fs/vfs_fd.c', 'fs/vfs.h', 'lib/sqlite3/**', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'build/core.yaml', 'drivers/block/fdc_track.c', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'lib/kutf16.c', 'platform/pc98/boot_names.c', 'sdk/allocator/nano_adapter.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/mutpar.py', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'userland/deploy.yaml', 'userland/lib/rt/ls.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c'],
     needs=['make:all'], budget=4.429502)
 
 from kernel_includes import include_flags
@@ -15,11 +15,22 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('convert-old-owner', 'kernel/ime/ime_convert.inc',
+     'fep_store_search(&g_ime.store,', 'ime_dict_search(&g_ime.dict,', 'production conversion'),
+    ('learn-old-owner', 'kernel/ime/ime_convert.inc',
+     'fep_store_learn(&g_ime.store,', 'ime_dict_learn(&g_ime.dict,', 'production learning'),
+    ('suspend-old-owner', 'kernel/ime/ime_suspend.c',
+     'fep_store_close(&ime->store)', 'ime_dict_close(&ime->dict)', 'production suspend closes both'),
+    ('switch-budget', 'kernel/ime/ime_dict.c',
+     'target.reserve_kb > s->boot_reserve_kb', '0', 'production switch reservation preserves store'),
+    ('switch-old-owner', 'kernel/ime/ime_dict_api.inc',
+     'fep_store_switch(&g_ime.store, path)', 'ime_dict_reopen(&g_ime.dict, path)', 'production switch'),
+
     ('boot-config-error', 'kernel/ime/ime.c',
      'if (rc) return rc;\n    rc = fep_boot_user_path_get',
      'if (rc) return 0;\n    rc = fep_boot_user_path_get', 'boot config failure'),
     ('boot-live-dict', 'kernel/ime/ime.c',
-     'return (const IME_Dict *)&g_ime.store.system;', 'return &g_ime.dict;',
+     'return &g_ime.store;', 'return NULL;',
      'boot counts live store dictionary'),
     ('invalid-output-returns-error', 'kernel/ime/ime_dict_api.inc',
      '        ring3_fault_kill();\n        return -1;',
@@ -30,8 +41,8 @@ MUTANTS = [
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) kanji = NULL;\n        else kanji = k;',
      'invalid input engine0/output unchanged'),
     ('copyout-before-finalize', 'kernel/ime/ime_dict_api.inc',
-     '    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
-     '    (void)copy_to_caller(&caller, out, ime_user_staging, sizeof(ime_user_staging));\n    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
+     '    n = fep_store_user_list(&g_ime.store, yomi_prefix, ime_user_staging, max);',
+     '    (void)copy_to_caller(&caller, out, ime_user_staging, sizeof(ime_user_staging));\n    n = fep_store_user_list(&g_ime.store, yomi_prefix, ime_user_staging, max);',
      'finalize then leave then copyout'),
     ('late-busy-leak', 'kernel/ime/ime_dict_api.inc',
      '(u32)n * sizeof(IME_UserEntry))) n = -1;',
@@ -107,7 +118,7 @@ def main():
         (work / 'fep_boundary_host.c').write_text(
             (ROOT / 'tools/tests/fep_boundary_host.c').read_text())
         (work / 'ime_dict_info_host.inc').write_text((ROOT / 'tools/tests/ime_dict_info_host.inc').read_text())
-        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/fep_module.c')}
+        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_convert.inc', 'kernel/ime/ime_suspend.c', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/fep_module.c')}
         cases = [('normal', None)]
         if args.mutate:
             cases += [(m[0], m) for m in MUTANTS]
@@ -118,6 +129,8 @@ def main():
                 assert current[path].count(old) == 1, name
                 current[path] = current[path].replace(old, new)
             (work / 'ime_source.inc').write_text(current['kernel/ime/ime.c'] + '\n#include \"' + str(ROOT / 'kernel/ime/fep_body.c') + '\"\n')
+            (work / 'ime_convert.inc').write_text(current['kernel/ime/ime_convert.inc'])
+            (work / 'ime_suspend_source.inc').write_text(current['kernel/ime/ime_suspend.c'])
             (work / 'ime_dict_api.inc').write_text(current['kernel/ime/ime_dict_api.inc'])
             (work / 'ime_dict.inc').write_text(current['kernel/ime/ime_dict.c'])
             (work / 'ime_dict_info.inc').write_text(current['kernel/ime/ime_dict_info.c'].replace('../../lib/', str(ROOT / 'lib') + '/'))
@@ -130,6 +143,7 @@ def main():
             start = harness.index('#define __KSTRING_H')
             end = harness.index('#include \"' + str(ROOT / 'lib'), start)
             harness = harness[:start] + 'void *kzalloc(u32 n) { return calloc(1, n); }\nvoid kfree(void *p) { free(p); }\n' + harness[end:]
+            harness = harness.replace('int utf8_strlen(const u8 *s)', 'int fixture_utf8_strlen(const u8 *s)')
             (work / 'ime_dict_host.c').write_text(harness)
             exe = work / name
             cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
@@ -141,7 +155,7 @@ def main():
                           '-I' + str(work), '-I' + str(work / 'ime_shim'),
                           *(['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT)),
                           str(work / 'fep_boundary_host.c'),
-                          *[str(ROOT / p) for p in ('lib/kstring_c.c', 'lib/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')], str(work / 'sqlite.o'), '-o', str(exe)], check=True)
+                          *[str(ROOT / p) for p in ('lib/kstring_c.c', 'lib/kstring.c', 'lib/kmath.c', 'lib/divdi3.c', 'lib/utf8.c', 'kernel/ime/ime_romkana.c')], str(work / 'sqlite.o'), '-o', str(exe)], check=True)
             result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=120)
             print(result.stdout + result.stderr, end='', flush=True)
             if mutation:

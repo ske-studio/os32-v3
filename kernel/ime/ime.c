@@ -50,10 +50,6 @@ IME_State *ime_suspend_state(void)
     return &g_ime;
 }
 
-const IME_Dict *ime_current_dict(void)
-{
-    return (const IME_Dict *)&g_ime.store.system;
-}
 FepStore *ime_current_store(void) { return &g_ime.store; }
 
 static int g_ime_reader_owner;
@@ -174,7 +170,7 @@ void ime_set_mode(int mode)
     if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
 
     /* FEP ON 時は辞書を遅延オープンする (ime_toggle と同じ)。
-     * これを欠くと dict->db が NULL のまま ime_dict_search が常に
+     * これを欠くと store.system.db が NULL のまま fep_store_search が常に
      * 0 件を返し、変換がかな確定にフォールバックする。 */
     if (mode != IME_MODE_OFF && !g_ime.dict_loaded) {
         if (ime_dict_boot() == 0) {

@@ -100,7 +100,7 @@ static void metadata(void)
     g_ime.store.system.db = g_ime.dict.db;
     g_ime.store.system.group = g_ime.dict.group;
     kstrncpy(g_ime.store.system.path, g_ime.dict.path, OS32_MAX_PATH);
-    require(ime_current_dict() == (const IME_Dict *)&g_ime.store.system && ime_boot_connections() == 1,
+    require(ime_current_store() == &g_ime.store && ime_boot_connections() == 1,
             "boot counts live store dictionary");
     require(stub_dict_info(IME_DICT_INFO_STATUS, 0, (char *)info_out, 256) == OS32_ERR_NOSYS &&
             stub_dict_info(0, -1, NULL, 0) == OS32_ERR_NOSYS, "metadata absent module stub");

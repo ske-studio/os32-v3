@@ -158,7 +158,7 @@ static int test(void)
     fd = -1; check(call(1, 0, 256, 0) == OS32_ERR_IO); fd = 7;
     /* The store owns the live system connection. */
     g_ime.dict.db = (void *)99;
-    check(ime_current_dict() == (const IME_Dict *)&g_ime.store.system);
+    check(ime_current_store() == &g_ime.store);
     check(ime_current_store() == &g_ime.store);
     return bad;
 }

@@ -100,8 +100,8 @@ static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss)
     /* Search again through the still-live, globally switched dictionary. */
     REQUIRE(ime_feed_key((0x1d << 8) | 'a') == -1 &&
             ime_feed_key((KEY_SPACE << 8) | ' ') == -1 && searches == 2 &&
-            g_ime.result_count == 2 && g_ime.dict.db == shared_dict &&
-            !kstrcmp(g_ime.dict.path, "/db/fep_l.db") && opens == 2 && reopens == 1,
+            g_ime.result_count == 2 && g_ime.store.system.db == shared_dict &&
+            !kstrcmp(g_ime.store.system.path, "/db/fep_l.db") && opens == 2 && reopens == 1,
             "resumed dictionary remains usable without reopening");
     prepare_wait();
     (void)exec_park(); /* a second real park returns through exec_resume's landing */

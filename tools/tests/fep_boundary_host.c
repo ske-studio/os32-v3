@@ -128,7 +128,7 @@ int check_caller_write_range(const struct caller_access *c, void *p, u32 n)
 { (void)c; return p && !(bad_byte && (uptr)bad_byte >= (uptr)p && (uptr)bad_byte - (uptr)p < n); }
 int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
 {
-    require(!engine && (info_test ? live == 0 || live == 3 : live == 3 && finals > 0), "finalize then leave then copyout");
+    require(!engine && (info_test ? live == 0 || live == 3 : live == 5 && finals > 0), "finalize then leave then copyout");
     copies++;
     if (reenter) {
         reenter = 0;
@@ -157,9 +157,16 @@ int fep_boot_config_get(FepMeta *m, u32 *r)
 int fep_boot_user_path_get(char *p, u32 n)
 {
     if (boot_path_rc) return boot_path_rc;
-    kstrncpy(p, FEP_USER_PATH, n);
+    kstrncpy(p, "/etc/flow.db", n);
     return 0;
 }
+
+/* Display hardware is outside this production IME/store composition. */
+const IME_Render g_ime_render_tvram = {0};
+void tvram_set_scroll_reserve(int rows) { (void)rows; }
+void tvram_readchar_at(int x, int y, u16 *text, u8 *attr)
+{ (void)x; (void)y; *text = 0; *attr = 0; }
+#include "ime_suspend_source.inc"
 
 static IME_UserEntry out[64];
 static void watch(void)
@@ -227,14 +234,14 @@ static void inputs(void)
     watched = NULL;
     /* A 255B key is accepted in full; >32B is not a new input limit. */
     memset(key, 'x', 255); key[255] = 0;
-    ime_dict_learn(&g_ime.dict, key, "long");
+    fep_store_learn(&g_ime.store, key, "long");
     watch(); caller_y = key;
     require(ime_user_list_facade(key, out, 64) == 1, "255B prefix accepted");
     watched = NULL;
     require(ime_user_delete_facade(key, "long") == 0, "255B yomi accepted");
     caller_y = NULL;
     char kanji[256]; memset(kanji, 'k', 255); kanji[255] = 0;
-    ime_dict_learn(&g_ime.dict, "long-kanji", kanji);
+    fep_store_learn(&g_ime.store, "long-kanji", kanji);
     caller_k = kanji;
     require(ime_user_delete_facade("long-kanji", kanji) == 0, "255B kanji accepted");
     caller_k = NULL;
@@ -243,7 +250,7 @@ static void deletes(void)
 {
     for (int mode = 0; mode < 3; mode++) {
         watched = NULL;
-        ime_dict_learn(&g_ime.dict, "か", "蚊"); ime_dict_learn(&g_ime.dict, "か", "課");
+        fep_store_learn(&g_ime.store, "か", "蚊"); fep_store_learn(&g_ime.store, "か", "課");
         char bad[256]; memset(bad, 'x', sizeof(bad));
         if (!mode) {
             int entered = entries;
@@ -258,7 +265,7 @@ static void deletes(void)
 static void listing(void)
 {
     watched = NULL;
-    for (int i = 0; i < 64; i++) { char k[16]; snprintf(k, sizeof(k), "k%02d", i); ime_dict_learn(&g_ime.dict, "row", k); }
+    for (int i = 0; i < 64; i++) { char k[16]; snprintf(k, sizeof(k), "k%02d", i); fep_store_learn(&g_ime.store, "row", k); }
     watch(); require(ime_user_list_facade(NULL, out, 64) == 64 && writes == sizeof(out), "64 rows exact copy");
     watch(); require(ime_user_list_facade("", out, 1) == 1 && writes == sizeof(out[0]) && !memcmp((char *)out + sizeof(out[0]), before + sizeof(out[0]), sizeof(out) - sizeof(out[0])), "copy returned rows only");
     /* Prefix/output alias: snapshot must survive output writes. */
@@ -271,11 +278,18 @@ static void listing(void)
     require(ime_user_list_facade(NULL, out, 64) == 64, "busy released after late refusal");
     for (int i = 0; i < 6; i++) {
         watch(); fail_prepare = i == 0; fail_bind = i == 1; fail_step = i == 2; fail_final = i == 3; fail_int = i == 4; fail_after = i == 5 ? 3 : 0; steps = 0;
-        require(ime_user_list_facade("row", out, 64) < 0 && !writes && !memcmp(out, before, sizeof(out)) && live == 3, "SQL failure no partial output or live stmt");
+        require(ime_user_list_facade("row", out, 64) < 0 && !writes && !memcmp(out, before, sizeof(out)) && live == 5, "SQL failure no partial output or live stmt");
         fail_prepare = fail_bind = fail_step = fail_final = fail_int = fail_after = 0;
         require(ime_user_list_facade(NULL, out, 64) == 64, "busy released after SQL failure");
     }
     watched = NULL;
+    /* UTF8 display truncation, NUL and unused bytes. */
+    fep_store_learn(&g_ime.store, "utf", "あああああああああああ");
+    watch(); require(ime_user_list_facade("utf", out, 1) == 1 && strlen(out[0].kanji) == 30 && !out[0].kanji[31], "UTF8 display boundary and zero tail");
+    watched = NULL;
+}
+static void legacy_lifetime(void)
+{
     ime_dict_learn(&g_ime.dict, "borrow-key", "borrow-kanji");
     no_borrow(g_ime.dict.learn_stmt);
     IME_Result r[2]; ime_dict_search(&g_ime.dict, "borrow-key", r, 1);
@@ -287,10 +301,6 @@ static void listing(void)
         ime_dict_learn(&g_ime.dict, "borrow-key", "borrow-kanji"); no_borrow(g_ime.dict.learn_stmt);
         fail_bind = fail_step = 0;
     }
-    /* UTF8 display truncation, NUL and unused bytes. */
-    ime_dict_learn(&g_ime.dict, "utf", "あああああああああああ");
-    watch(); require(ime_user_list_facade("utf", out, 1) == 1 && strlen(out[0].kanji) == 30 && !out[0].kanji[31], "UTF8 display boundary and zero tail");
-    watched = NULL;
 }
 static int generic_fds(void)
 {
@@ -316,15 +326,15 @@ static void exports(void)
     int baseline = generic_fds();
     for (int i = 0; i < 3; i++) {
         fail_prepare = i == 0; fail_step = i == 1; fail_final = i == 2;
-        require(ime_user_export_facade(path) < 0 && live == 3 && generic_fds() == baseline, "export SQL cleanup");
+        require(ime_user_export_facade(path) < 0 && live == 5 && generic_fds() == baseline, "export SQL cleanup");
         fail_prepare = fail_step = fail_final = 0;
     }
     mock_ops.write_stream = export_write_error;
-    require(ime_user_export_facade(path) == -5 && live == 3 && generic_fds() == baseline, "export write failure cleanup");
+    require(ime_user_export_facade(path) == -5 && live == 5 && generic_fds() == baseline, "export write failure cleanup");
     mock_ops.write_stream = fixture_write;
     int held[VFS_MAX_OPEN_FILES], n = 0, fd;
     while ((fd = vfs_open(path, KAPI_O_RDONLY)) >= 0) held[n++] = fd;
-    require(ime_user_export_facade(path) == -2 && live == 3 && generic_fds() == baseline + n, "export open failure cleanup");
+    require(ime_user_export_facade(path) == -2 && live == 5 && generic_fds() == baseline + n, "export open failure cleanup");
     while (n) vfs_close(held[--n]);
 }
 #include "ime_dict_info_host.inc"
@@ -332,11 +342,15 @@ static void exports(void)
 int main(void)
 {
     CHECK(os32_sqlite_init() == SQLITE_OK); fixture_init(); make_dict("/db/fep.db", "蚊");
-    CHECK(ime_dict_open(&g_ime.dict, "/db/fep.db") == 0);
+    require(!fep_store_open(&g_ime.store, FEP_DICT_PATH_M, FEP_USER_PATH), "admin store open");
     for (origin = CALLER_TRUSTED; origin <= CALLER_USER; origin++) {
         require(ime_user_clear_facade() == 0, "clear fixture");
         inputs(); deletes(); listing(); exports();
     }
+    watched = NULL;
+    require(!fep_store_close(&g_ime.store), "admin store close");
+    CHECK(ime_dict_open(&g_ime.dict, "/db/fep.db") == 0);
+    legacy_lifetime();
     metadata();
     require(ime_dict_close(&g_ime.dict) == 0 && live == 0, "all statements finalized");
     /* Fresh boot owns a RO system and RW user, and abort releases both. */
@@ -353,8 +367,51 @@ int main(void)
             "boot opens system and user");
     require(g_ime.store.boot_reserve_kb == FEP_DICT_RESERVE_KB &&
             !kstrcmp(g_ime.store.meta.dict_id, FEP_DICT_ID) &&
-            !kstrcmp(g_ime.store.user.path, FEP_USER_PATH), "boot snapshot copied");
+            !kstrcmp(g_ime.store.user.path, "/etc/flow.db"), "boot snapshot copied");
     require(!ime_dict_boot() && ime_boot_connections() == 2, "boot idempotent");
+    /* The real conversion, admin and suspend code all use this booted store. */
+    info_test = 0;
+    g_ime.per_page = 9;
+    kstrncpy(g_ime.kana_buf, "か", sizeof(g_ime.kana_buf));
+    g_ime.kana_len = 3;
+    require(ime_input_key(' ', KEY_SPACE) == 0 && g_ime.result_count > 0 &&
+            !kstrcmp(g_ime.results[0].kanji, "蚊"), "production conversion");
+    commit_candidate();
+    require(!kstrcmp(g_ime.commit_buf, "蚊") &&
+            ime_user_list_facade("か", out, 64) == 1, "production learning");
+    require(!ime_user_export_facade("/db/flow.csv"), "production user export");
+    void *user_db = g_ime.store.user.db, *system_db = g_ime.store.system.db;
+    g_ime.store.boot_reserve_kb = 0;
+    require(ime_switch_dict(2) == OS32_ERR_AGAIN && g_ime.store.system.db == system_db &&
+            g_ime.store.user.db == user_db && ime_boot_connections() == 2,
+            "production switch reservation preserves store");
+    g_ime.store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
+    require(!ime_switch_dict(2) && g_ime.dict_loaded &&
+            g_ime.store.user.db == user_db && ime_boot_connections() == 2 &&
+            !kstrcmp(g_ime.store.system.path, FEP_DICT_PATH_L), "production switch");
+    g_ime.store.system.isolated = 1;
+    require(ime_switch_dict(1) == OS32_ERR_BUSY && !g_ime.dict_loaded &&
+            ime_boot_connections() == 2, "production isolated switch disabled");
+    g_ime.store.system.isolated = 0;
+    g_ime.dict_loaded = 1;
+    require(!fixture_rm(FEP_DICT_PATH_S), "remove unselected dictionary");
+    require(ime_switch_dict(0) != 0 && ime_boot_connections() == 2,
+            "production switch missing preserves old");
+    g_ime.mode = IME_MODE_KATAKANA;
+    require(!ime_dict_suspend(1) && !ime_boot_connections() && !g_ime.dict_loaded,
+            "production suspend closes both");
+    /* A normal writer can now open the selected dictionary for replacement. */
+    sqlite3 *replacement = 0;
+    require(setup_open(FEP_DICT_PATH_L, &replacement, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK &&
+            setup_close(replacement) == SQLITE_OK, "production suspend releases file");
+    require(!ime_dict_suspend(0) && ime_boot_connections() == 2 &&
+            g_ime.mode == IME_MODE_KATAKANA &&
+            !kstrcmp(g_ime.store.system.path, FEP_DICT_PATH_L) &&
+            !kstrcmp(g_ime.store.user.path, "/etc/flow.db") &&
+            ime_user_list_facade("か", out, 64) == 1, "production resume paths and learning");
+    require(!ime_user_delete_facade("か", "蚊") &&
+            !ime_user_list_facade("か", out, 64) && !ime_user_clear_facade(),
+            "production user delete clear");
     require(!ime_boot_abort() && !ime_boot_connections() && !g_ime.dict_loaded &&
             !g_cand_save_text && !g_cand_save_attr && !live, "boot abort releases store");
     puts("PASS B2 bounds NULL staged output lifetime SQL errors busy export"); return 0;

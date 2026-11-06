@@ -49,7 +49,7 @@ static void commit_candidate(void)
         g_ime.commit_buf[g_ime.commit_len] = '\0';
 
         /* 学習: ユーザーが選択した候補を記録 */
-        ime_dict_learn(&g_ime.dict,
+        fep_store_learn(&g_ime.store,
                        g_ime.results[g_ime.candidate_idx].yomi,
                        g_ime.results[g_ime.candidate_idx].kanji);
     }
@@ -241,7 +241,7 @@ static inline int ime_input_key(u8 ascii, u8 scancode)
             saved_char = g_ime.kana_buf[try_len];
             g_ime.kana_buf[try_len] = '\0';
 
-            count = ime_dict_search(&g_ime.dict, g_ime.kana_buf,
+            count = fep_store_search(&g_ime.store, g_ime.kana_buf,
                                     g_ime.results, IME_MAX_RESULTS);
 
             g_ime.kana_buf[try_len] = saved_char;
