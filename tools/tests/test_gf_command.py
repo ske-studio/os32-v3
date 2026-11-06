@@ -299,7 +299,7 @@ def build_integration(component, source, directory):
                  '-I'+str(ROOT/'tools/tests'), '-DGF_PRODUCTION_MODULE']
         backend = directory/'real_backend.o'
         aliases = ('geforce_backend_ops', 'geforce_backend_bind',
-                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind')
+                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind', 'geforce_heat_stop_request')
         fixture = ROOT/'tools/tests/geforce_module_host.c'
         sources = gf4_sources(ROOT, 'c3', fixture)
         commands = [

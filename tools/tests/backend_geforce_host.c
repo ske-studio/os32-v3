@@ -68,7 +68,14 @@ static struct gf4_test_ops log_ops;
 static const struct gf4_test_ops *log_dispatch;
 static GfxBackend module_backend;
 static int module_height, module_flip, module_page;
+#ifdef GF_F0S_HOST
+static struct geforce_heat_bridge test_heat;
+static struct geforce_platform test_platform;
+#endif
 static const GeforceModuleContext module_context = {
+#ifdef GF_F0S_HOST
+    .heat=&test_heat, .platform=&test_platform,
+#endif
     .display_out=&log_dispatch, .backend=&module_backend, .height=&module_height,
     .flip=&module_flip, .page=&module_page
 };

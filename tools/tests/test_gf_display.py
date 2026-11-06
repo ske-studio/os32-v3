@@ -1660,6 +1660,9 @@ GF4_MUTATIONS = [
 # C2-save must observe the real C0 failure cleanup, including failures
 # after shared clock/index state has already changed.
 GF4_MUTATIONS += [
+    ('a3', 'explicit-heat-clear', 'kdebug/gf_display_test.c',
+     'else if ((rc=geforce_heat_latch_clear())!=0)',
+     'else if ((rc=0)!=0)', 'explicit enter preserves a hot latch'),
     ('c2save', 'restore-gate-cleanup', 'hwdev/gf/display/modeset.c',
      'if (rc && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
      'if (false && l.gate_valid) gate_rc=ms_write(&l,GF_PLL_GATE,4,l.gate);',
@@ -1954,7 +1957,7 @@ def gf4_case(tree, case, directory):
         # Preserve C3's ABI table probes while linking C1's real metadata hook.
         obj = directory/'c3_backend.o'
         aliases = ['geforce_backend_ops', 'geforce_backend_bind',
-                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind']
+                   'geforce_backend_wc_bind', 'geforce_backend_stop_bind', 'geforce_heat_stop_request']
         subprocess.run([*flags, '-DOS32_GEFORCE_MODULE',
                         *['-D'+name+'=c3_real_'+name for name in aliases],
                         '-c', str(tree/'drivers/video/geforce/backend_geforce.c'),
