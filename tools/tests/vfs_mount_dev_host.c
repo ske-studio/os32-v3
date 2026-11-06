@@ -13,6 +13,7 @@
 /* fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
 void vfs_fd_invalidate_ino(void *c, u32 i) { (void)c; (void)i; }
 void vfs_fd_invalidate_mount(void *c) { (void)c; }
+void vfs_fd_stale_mount(void *c) { (void)c; }
 int vfs_fd_rename_busy(void *c, const char *a, const char *b)
 { (void)c; (void)a; (void)b; return 0; }
 int vfs_fd_pinned_busy(void *c, int h, u32 i, const char *r)

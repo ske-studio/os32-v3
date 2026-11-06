@@ -365,6 +365,8 @@ int dev_register_cd(Device *dev, int preferred)
         "cd0", "cd1", "cd2", "cd3", "cd4", "cd5", "cd6", "cd7",
         "cd8", "cd9", "cd10", "cd11", "cd12", "cd13", "cd14", "cd15"
     };
+    _Static_assert(sizeof(names) / sizeof(names[0]) == MAX_DEVICES,
+                   "CD names must cover the device table");
     int index;
     if (!dev || (preferred != -1 && preferred != 0)) return OS32_ERR_INVAL;
     if (preferred == 0 && dev_find(names[0])) return OS32_ERR_EXIST;

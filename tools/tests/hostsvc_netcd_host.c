@@ -31,7 +31,7 @@ static u8 response[SFS_BUFFER_FRAME];
 static u32 pos, end, hello_count, opens, closes, reads, bye_count;
 static u32 host_sid, handle, size_lo = 8192, size_hi, mtime_lo = 123, mtime_hi = 456;
 static u32 first_deadline, wire_error, read_lba, total_read;
-static int silent, reply_status, short_read, delay, inject_alive, reuse_sid;
+static int silent, reply_status, short_read, delay, inject_alive, reuse_sid, restart;
 static int put(void *arg, const u8 *buf, u32 n)
 {
     SfsDec dec;
@@ -77,6 +77,13 @@ static int put(void *arg, const u8 *buf, u32 n)
             u32 lba = sfs_get32(f.payload + 4);
             u16 count = sfs_get16(f.payload + 8);
             reads++;
+            if (restart) {
+                restart = 0; handle = 0;
+                pos = 0;
+                end = sfs_encode_limit(response, SFS_T_ERR, f.sid, f.seq,
+                                       data, SFS_STATUS_LEN, SFS_LAN_MAX_PAYLOAD);
+                return 0;
+            }
             if (sfs_get32(f.payload) != handle || lba != read_lba || count < 1 || count > 2)
                 wire_error++;
             read_lba += count;
@@ -158,9 +165,14 @@ static int suite(void)
     REQUIRE(read_at(13, 4, buf) == OS32_ERR_INVAL && reads == old_reads);
     REQUIRE(read_at(0xffffffff, 2, buf) == OS32_ERR_INVAL);
     REQUIRE(read_at(0, 0, buf) == OS32_ERR_INVAL);
+    /* Host restart rejects BREAD with T_ERR; retry same image in one budget. */
+    old_opens = opens; old_hello = hello_count; restart = 1;
+    REQUIRE(!read_at(0, 4, buf));
+    REQUIRE(hello_count == old_hello + 1 && opens == old_opens + 1);
+    REQUIRE(total_read == 4 && !wire_error && !check(&gen) && gen == 1);
     /* Same image after exact idle threshold, including tick wrap. */
     hs_advance(3000); old_hello = hello_count;
-    REQUIRE(!check(&gen) && gen == 1 && opens == 2 && hello_count == old_hello + 1);
+    REQUIRE(!check(&gen) && gen == 1 && opens == old_opens + 2 && hello_count == old_hello + 1);
     /* Same-generation ALIVE; arrival during BOPEN remains for next access. */
     alive = (struct HostAlive){7, 1, 1}; inject_alive = 1; reuse_sid = 1;
     REQUIRE(!check(&gen) && gen == 1 && cd.media.alive_seen == 1);

@@ -14,6 +14,8 @@
 #include "../../fs/vfs.h"
 #include "pc98.h"
 #include "boot_platform.h"
+#include "config.h"
+#include "sysconfig.h"
 enum services_stage services_stage;
 volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
@@ -131,6 +133,19 @@ void kprintf(u8 attr, const char *fmt, ...)
     (void)attr;
     if (strstr(fmt, "[dma] RAM short")) diag++;
     if (strstr(fmt, "[selftest] DMA pool skipped")) dma_skipped++;
+}
+/* This fixture exercises DMA gates with no optional NETCD setting. */
+int sysconfig_get_str(const char *path, const char *key, char *out, int outsz)
+{
+    CHECK(!strcmp(path, SYS_NETCD_CFG) && !strcmp(key, "NETCD") && outsz > 0);
+    out[0] = '\0';
+    return -1;
+}
+static int lan_module_netcd_register(const char *alias)
+{
+    (void)alias;
+    CHECK(0);
+    return -1;
 }
 #include "kernel_dma_gate.c"
 int main(int argc, char **argv)

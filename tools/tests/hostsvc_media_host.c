@@ -21,24 +21,33 @@ void *kmalloc(u32 n) { void *p=heap+used; if(n>sizeof(heap)-used) return 0; used
 void *kzalloc(u32 n) { void *p=kmalloc(n); if(p) kmemset(p,0,n); return p; }
 void kfree(void *p) { (void)p; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void real_fd_stale_mount(void *ctx);
 static void *staled;
 static unsigned stale_calls;
-void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; vfs_resource_stale_mount(ctx); }
-void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
+void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; real_fd_stale_mount(ctx); }
 #include "fs/isofs/iso9660.c"
 #include "fs/vfs.c"
+#define vfs_fd_stale_mount real_fd_stale_mount
+#include "fs/vfs_fd.c"
+#undef vfs_fd_stale_mount
+struct VfsStdinRead *exec_stdin_state(void) { return 0; }
+int input_getchar_kapi(void) { return -1; }
+int res_owner_get(void) { return 1; }
+int fd_is_redirected(int fd) { (void)fd; return 0; }
+int fd_redirect_read(int fd, void *b, u32 n) { (void)fd; (void)b; (void)n; return -1; }
 #include "platform/pc98/boot_names.c"
 
 #define SECTORS 40u
 static u8 images[2][SECTORS * ISO_SECTOR_SIZE];
 static u32 gen, checks, reads;
-static int image, failure, read_failure, swap_read, fail_once, post_failure;
+static int image, failure, read_failure, swap_read, ua_read, fail_once, post_failure;
 static u32 fail_check;
 static int check_media(Device *d, u32 *g) { (void)d; checks++; if(fail_check == checks) return OS32_ERR_HOSTDOWN; if(failure) return failure; *g=gen; return 0; }
 static int read_media(Device *d, int lba, int count, void *buf)
 {
     u32 bytes=(u32)count*(u32)d->sect_size, off=(u32)lba*(u32)d->sect_size;
     reads++;
+    if(ua_read) { ua_read=0; gen++; }
     if(read_failure) { int rc=read_failure; if(fail_once) read_failure=0; return rc; }
     if(post_failure) { post_failure=0; fail_check=checks+1; }
     if(off>sizeof(images[0]) || bytes>sizeof(images[0])-off) return OS32_ERR_IO;
@@ -223,7 +232,7 @@ static int wiring(Iso9660Ctx *ctx, Device *cd)
 
 static int suite(void)
 {
-    static Device cd={.name="cd0",.type=DEV_BLOCK,.bus_type=DEV_BUS_ATAPI,
+    static Device cd={.name="cd0",.type=DEV_BLOCK,.bus_type=DEV_BUS_NONE,
         .sect_size=ISO_SECTOR_SIZE,.total_sects=SECTORS,.blk_read=read_media,.media_check=check_media};
     make_image(0); make_image(1); pc98_boot_names_bind();
     REQUIRE(!dev_register(&cd)); REQUIRE(!vfs_register_fs(&iso9660_ops));
@@ -300,6 +309,33 @@ static int suite(void)
     REQUIRE(!iso9660_resource_refresh(ctx));
     int rc=operations(ctx); if(rc) return rc;
     rc=wiring(ctx,&cd); if(rc) return rc;
+    /* Real FD + same-media UA/reset: no replacement, no permanent stale. */
+    vfs_umount("/cd0");
+    cd.bus_type=DEV_BUS_ATAPI;
+    REQUIRE(!vfs_mount("/cd0","cd0","iso9660"));
+    ctx=mounts[0].fs_ctx;
+    int fd=vfs_open("/cd0/A.TXT",O_RDONLY);
+    REQUIRE(fd>=3);
+    unsigned old_stale=stale_calls;
+    u32 old_gen=gen;
+    ctx->ra_valid=0;
+    for(int i=0;i<ISO_SCACHE_SLOTS;i++) ctx->scache[i].valid=0;
+    ua_read=1;
+    REQUIRE(vfs_read_fd(fd,out,4)==4 && out[0]==(image?'B':'A'));
+    REQUIRE(gen==old_gen+1 && ctx->media_gen==gen);
+    REQUIRE(stale_calls==old_stale && !vfs_fd_is_stale(fd));
+    REQUIRE(vfs_seek(fd,0,SEEK_SET)==0 && vfs_read_fd(fd,out,4)==4);
+    /* Also detect UA at the FD entry, before a physical read. */
+    gen++;
+    REQUIRE(!iso9660_resource_check(ctx,0) && caches_empty(ctx));
+    REQUIRE(vfs_seek(fd,0,SEEK_SET)==0 && vfs_read_fd(fd,out,4)==4);
+    REQUIRE(!vfs_fd_is_stale(fd) && stale_calls==old_stale);
+    vfs_close(fd);
+    for(int error=-1;error>=-4;error--) {
+        read_failure=error;
+        REQUIRE(iso9660_resource_refresh(ctx)==VFS_ERR_IO);
+    }
+    read_failure=0; REQUIRE(!iso9660_resource_refresh(ctx));
     REQUIRE(!dev_unregister(&cd)); REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_refresh(ctx)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_check(0,0)==VFS_ERR_NOMOUNT);

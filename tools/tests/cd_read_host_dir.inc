@@ -207,8 +207,6 @@ static void t_dir_media(void)
     /* A known generation change before a cache hit drops all shared caches. */
     M.m = &g_media_b; s_media_gen++;
     u32 size;
-    CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &size) == OS32_ERR_STALE);
-    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &size) == VFS_OK);
     CHECK(size == DEEP_SIZE_B);
     CHECK(c->stats.drops > 0);

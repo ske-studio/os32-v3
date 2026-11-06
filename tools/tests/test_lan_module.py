@@ -95,13 +95,15 @@ def boot_distribution():
     begin = kernel.index('services_stage = SERVICES_ROOT_READY;')
     end = kernel.index('services_boot();', begin)
     boot = kernel[begin:end]
-    assert kernel.count('lan_module_load();') == 2
+    assert kernel.count('lan_module_load();') == 1
+    assert kernel.count('kernel_boot_lan(&boot);') == 2
+    helper = re.search(r'static void kernel_boot_lan\(struct boot_context \*boot\)\n\{.*?\n}\n', kernel, re.S).group()
+    assert helper.index('BOOT_PCI_RESOURCES') < helper.index('lan_module_load();')
+    assert helper.index('lan_module_load();') < helper.index('lan_module_pci_bind_fallback();')
     early = kernel[kernel.index('if (netcd_boot) {'):kernel.index('cd_module_load();')]
-    assert early.index('BOOT_PCI_RESOURCES') < early.index('lan_module_load();')
-    assert early.index('lan_module_load();') < early.index('lan_module_netcd_register(netcd_alias)')
-    assert 'if (!netcd_boot)' in boot
-    assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', boot)
-    assert boot.index('lan_module_pci_bind_fallback();') > boot.index('lan_module_load();')
+    assert early.index('kernel_boot_lan(&boot);') < early.index('lan_module_netcd_register(netcd_alias)')
+    assert re.search(r'if \(!netcd_boot\)\s*\{\s*kernel_boot_lan\(&boot\);\s*\}', boot)
+    assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', helper)
     assert 'services_boot_mode' not in boot and 'SYS_LAN_MOD' in (ROOT / 'include/config.h').read_text()
     plan = mkpkg.load_plan(ROOT / 'build/packages.yaml')
     for loader in ('boot/loader_fat_new.bin', 'boot/loader_fat144.bin'):

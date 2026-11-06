@@ -40,6 +40,7 @@ def kernel_source(root, overrides=None):
         body = match[1]
         # Bind the existing boot context pointer to the caller's local object.
         body = body.replace('boot->', 'boot.').replace(', boot);', ', &boot);')
+        body = body.replace('(boot);', '(&boot);')
         source = source[:match.start()] + source[match.end():]
         call = '    ' + name + '(' + arguments + ');\n'
         assert source.count(call) == 1, name + ': exactly one boot call'

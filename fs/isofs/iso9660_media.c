@@ -47,8 +47,15 @@ int iso9660_resource_check(void *raw, u32 *generation)
         }
         return rc;
     }
-    if (generation) *generation = gen;
+    /* ATAPI generations include reset/UA, not just media replacement. Keep
+     * the FD resource identity stable while tracking cache identity locally. */
+    if (generation) *generation = dev->bus_type == DEV_BUS_ATAPI ? 0 : gen;
     if (gen != ctx->media_gen) {
+        if (dev->bus_type == DEV_BUS_ATAPI) {
+            media_drop_caches(ctx);
+            ctx->media_gen = gen;
+            return 0;
+        }
         vfs_fd_stale_mount(ctx);
         iso9660_media_drop(ctx);
         ctx->media_gen = gen;
@@ -69,7 +76,11 @@ static int media_read(Device *dev, u32 lba, u32 count, void *buf)
         (dev->bus_type != DEV_BUS_ATAPI &&
          (lba > dev->total_sects / ratio ||
           count > dev->total_sects / ratio - lba))) return VFS_ERR_IO;
-    return dev_blk_read_lba(dev, lba * ratio, (int)(count * ratio), buf);
+    int rc = dev_blk_read_lba(dev, lba * ratio, (int)(count * ratio), buf);
+    /* Legacy ATAPI -1..-4 are private statuses, not VFS errors. */
+    if (rc && dev->bus_type == DEV_BUS_ATAPI &&
+        rc != OS32_ERR_HOSTDOWN && rc != OS32_ERR_STALE) return VFS_ERR_IO;
+    return rc;
 }
 
 int iso9660_resource_refresh(void *raw)

@@ -62,6 +62,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5, covers=[
 ])
 import argparse
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -107,7 +108,9 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     kernel = kernel_source(ROOT)
-    assert kernel.index('lan_module_load();') < kernel.index('boot_platform_run(BOOT_NIC_LEGACY, &boot);')
+    calls = [m.start() for m in re.finditer(r'kernel_boot_lan\(&boot\);', kernel)]
+    assert len(calls) == 2
+    assert max(calls) < kernel.index('boot_platform_run(BOOT_NIC_LEGACY, &boot);')
     boot = (ROOT / 'platform/pc98/boot.c').read_text()
     assert '[BOOT_NIC_LEGACY] = pc98_boot_nic_legacy' in boot
     assert 'lgy98_init();' in boot

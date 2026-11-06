@@ -4,6 +4,7 @@ CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=10, covers=[
     'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h',
     'fs/isofs/iso9660.c', 'fs/isofs/iso9660.h', 'fs/isofs/*.inc',
     'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
+    'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h',
     'platform/pc98/boot_names.c', 'platform/pc98/boot_names.h',
     'drivers/base/dev.c', 'drivers/base/dev.h',
     'tools/tests/hostsvc_media_host.c', 'tools/tests/host32.py',
@@ -21,7 +22,7 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
-         '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
+         '-Werror', '-Wno-unused-parameter', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTATIONS = (
     ('generation', 'if (gen != ctx->media_gen)', 'if (0 && gen != ctx->media_gen)'),
     ('check', 'rc = dev_media_check(dev, &gen);', 'gen = ctx->media_gen; rc = 0;'),
@@ -30,6 +31,10 @@ MUTATIONS = (
     ('ra-drop', 'ctx->ra_valid = 0;', 'ctx->ra_valid = 1;'),
     ('sector-drop', 'ctx->scache[i].valid = 0;', 'ctx->scache[i].valid = 1;'),
     ('fd-stale', 'vfs_fd_stale_mount(ctx);\n        iso9660_media_drop(ctx);', 'iso9660_media_drop(ctx);'),
+    ('atapi-cache', '            media_drop_caches(ctx);\n            ctx->media_gen = gen;',
+     '            ctx->media_gen = gen;'),
+    ('atapi-fd', 'dev->bus_type == DEV_BUS_ATAPI ? 0 : gen', 'gen'),
+    ('atapi-read-result', '    if (rc && dev->bus_type == DEV_BUS_ATAPI &&', '    if (0 && rc && dev->bus_type == DEV_BUS_ATAPI &&'),
     ('read-result', 'if (rc) return rc;\n\n    volume', 'if (rc) return VFS_ERR_IO;\n\n    volume'),
     ('post-read', 'if (after != before)', 'if (0 && after != before)'),
     ('magic', 'pvd[1] != ISO_PVD_MAGIC[0]', '0'),
@@ -40,11 +45,14 @@ MUTATIONS = (
 
 # Old generation/retry anchors in test_cd_read.py move to the Device boundary.
 OP_MUTATIONS = (
+    ('atapi-retry', 'iso9660.c',
+     'if (before != ctx->media_gen && iso_legacy_atapi(ctx)) continue;',
+     'if (before != ctx->media_gen && iso_legacy_atapi(ctx)) return OS32_ERR_STALE;'),
     ('entry-check', 'iso9660.c', 'int ret = iso_check_media(ctx);', 'int ret = iso_check_media(ctx); ret = 0;'),
     ('read-errors', 'iso9660.c', '    return rc;\n}\n\n/* 覚えているもの',
      '    return rc ? VFS_ERR_IO : 0;\n}\n\n/* 覚えているもの'),
-    ('read-post', 'iso9660.c', '    if (checked) return checked;\n    ctx->touched',
-     '    (void)checked;\n    ctx->touched'),
+    ('read-post', 'iso9660.c', '    if (checked) return checked;\n    if (before != ctx->media_gen) return OS32_ERR_STALE;',
+     '    (void)checked;\n    if (before != ctx->media_gen) return OS32_ERR_STALE;'),
     ('extent-fallback', 'iso9660.c', '                if (rc != VFS_ERR_IO) return rc;', ''),
     ('directory-fallback', 'iso9660_dir_read.inc',
      '                if (rc != VFS_ERR_IO) { scan->error = rc; return (const u8 *)0; }', ''),

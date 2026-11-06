@@ -257,6 +257,7 @@ static struct {
     int short_single;  /* T5b-5: truncated PVD transfer */
     int short_multi;   /* count > 1 の READ(10) で 1 セクタ少なく渡す */
     int ua_next;       /* 次のこの数のコマンドで UNIT ATTENTION を返し、媒体を B へ */
+    int ua_same;       /* reset 後の UA: 媒体はそのまま */
     int stale;         /* 境目の後の古い状態の回数 */
     int fail_after_block; /* data error after the first DRQ */
     int cap_nodata;    /* READ CAPACITY がデータ無しで終わる */
@@ -315,7 +316,7 @@ static void model_exec(void)
     M.err = 0;
     if (M.ua_next > 0) {
         M.ua_next--;
-        M.m = &g_media_b;
+        if (!M.ua_same) M.m = &g_media_b;
         model_error(ATAPI_SK_UNIT_ATTENTION);
         if (op == SCSI_CMD_READ_10) M.n_read10++;
         return;
@@ -1415,7 +1416,7 @@ static void t_list_reentrant(void)
 }
 
 /* UNIT ATTENTION: 読みの途中で媒体が替わった。atapi は世代を進めて出し直し、
- * iso9660 は STALE を返し、refresh 後の次操作で新媒体を読む */
+ * iso9660 は cache を捨て、同じ操作を 1 回だけ読み直す */
 static void t_unit_attention(void)
 {
     Iso9660Ctx *c;
@@ -1427,8 +1428,6 @@ static void t_unit_attention(void)
     gen0 = atapi_media_gen();
     M.ua_next = 1;
     /* 窓の外 (次の READ(10) が要る位置) を読む */
-    CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 40u * SEC) == OS32_ERR_STALE);
-    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 40u * SEC) == 4096);
     CHECK(atapi_media_gen() == gen0 + 1u);
     for (i = 0; i < 4096; i++)
@@ -1439,11 +1438,21 @@ static void t_unit_attention(void)
     for (i = 0; i < 4096; i++)
         CHECK(buf[i] == file_byte(&g_media_b, BIG_LBA_B, i));
     iso9660_ops.umount(c);
+    /* DEVICE RESET may report UA without replacing the installed CD. */
+    setup(); c = do_mount();
+    CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 0) == 4096);
+    gen0 = atapi_media_gen();
+    M.ua_same = 1; M.ua_next = 1;
+    CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 40u * SEC) == 4096);
+    CHECK(atapi_media_gen() == gen0 + 1u && M.m == &g_media_a);
+    for (i = 0; i < 4096; i++)
+        CHECK(buf[i] == file_byte(&g_media_a, BIG_LBA_A, 40u * SEC + i));
+    iso9660_ops.umount(c);
 }
 
 /* 解決の途中で媒体が替わる (Codex レビュー 1 の P2)。根は A のものがキャッシュに
  * あり SUB = 21 と答える。SUB を読む READ(10) が UNIT ATTENTION → 出し直しで
- * B の 21 (囮) を読む。世代を見て STALE。refresh 後に B の本物 (24) の答えを返す */
+ * B の 21 (囮) を読む。世代を見て読み直し、B の本物 (24) の答えを返す */
 static void t_stat_swap(void)
 {
     Iso9660Ctx *c;
@@ -1452,8 +1461,6 @@ static void t_stat_swap(void)
     setup(); c = do_mount();
     CHECK(iso9660_ops.stat(c, "/TINY.TXT", &st) == VFS_OK);   /* A の根を LRU へ */
     M.ua_next = 1;
-    CHECK(iso9660_ops.stat(c, "/SUB/DEEP.BIN", &st) == OS32_ERR_STALE);
-    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.stat(c, "/SUB/DEEP.BIN", &st) == VFS_OK);
     CHECK(st.st_size == DEEP_SIZE_B);
     CHECK(lba_reads(SUB_LBA_B + 1u) == 1);
@@ -1463,14 +1470,12 @@ static void t_stat_swap(void)
     setup(); c = do_mount();
     CHECK(iso9660_ops.get_file_size(c, "/TINY.TXT", &sz) == VFS_OK && sz == TINY_SIZE);
     M.ua_next = 1;
-    CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &sz) == OS32_ERR_STALE);
-    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &sz) == VFS_OK);
     CHECK(sz == DEEP_SIZE_B);
     iso9660_ops.umount(c);
 }
 
-/* list_dir: 解決のあいだの交換も STALE を返す、一覧の途中 (cb の後) の交換は中断 */
+/* list_dir: 解決のあいだの交換は読み直す、一覧の途中 (cb の後) の交換は中断 */
 static Iso9660Ctx *g_sw_ctx;
 static int g_sw_calls, g_sw_arm, g_sw_read, g_sw_deep_b;
 static void sw_cb(const VfsDirEntry *e, void *u)
@@ -1492,13 +1497,11 @@ static void t_list_swap(void)
 {
     Iso9660Ctx *c;
     OS32_Stat st;
-    /* (1) 解決中の交換は STALE。refresh 後に B の SUB (24) を一覧する */
+    /* (1) 解決中の交換は読み直し、B の SUB (24) を一覧する */
     setup(); c = do_mount();
     M.ua_next = 1;
     g_sw_calls = g_sw_arm = g_sw_read = g_sw_deep_b = 0;
     g_sw_ctx = c;
-    CHECK(iso9660_ops.list_dir(c, "/SUB", sw_cb, NULL) == OS32_ERR_STALE);
-    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.list_dir(c, "/SUB", sw_cb, NULL) == VFS_OK);
     CHECK(g_sw_deep_b);
     iso9660_ops.umount(c);
@@ -1659,6 +1662,8 @@ static void t_np2_empty(void)
     CHECK(atapi_read_sectors(16, 1, buf) != ATAPI_OK);
     CHECK(strstr(g_klog, "[atapi] READ(10) drv=0 lba=16 n=1") != NULL);
     CHECK(strstr(g_klog, "sense=5") != NULL);
+    c = (Iso9660Ctx *)iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0));
+    CHECK(c == NULL);
     /* 入った */
     N.d[0].loaded = 1;
     CHECK(atapi_read_sectors(16, 1, buf) == ATAPI_OK);

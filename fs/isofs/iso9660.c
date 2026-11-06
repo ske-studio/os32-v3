@@ -56,9 +56,11 @@ static int iso_dev_read(Iso9660Ctx *ctx, u32 lba, u32 count, void *buf)
     if (!dev) return VFS_ERR_IO;
     rc = iso9660_resource_check(ctx, 0);
     if (rc) return rc;
+    u32 before = ctx->media_gen;
     rc = iso_read_device(dev, lba, count, buf);
     int checked = iso9660_resource_check(ctx, 0);
     if (checked) return checked;
+    if (before != ctx->media_gen) return OS32_ERR_STALE;
     ctx->touched = 1;
     ctx->last_tick = tick_count;
     return rc;
@@ -416,18 +418,33 @@ static int iso9660_is_mounted(void *ctx_raw)
     return (ctx_raw != (void *)0) ? 1 : 0;
 }
 
-/* 媒体交換を検出した操作は STALE。内部の再構築は次のパス操作を扱う
- * VFS の resource_refresh に任せ、同じ操作を新媒体でやり直さない。 */
+/* ATAPI keeps the legacy single retry after reset/UNIT ATTENTION. Other
+ * media retain #10's permanent FD invalidation and next-path refresh. */
+static int iso_legacy_atapi(Iso9660Ctx *ctx)
+{
+    Device *dev = dev_find(ctx->devname);
+    return dev && dev->bus_type == DEV_BUS_ATAPI;
+}
+
 static int iso_resolve_checked(Iso9660Ctx *ctx, const char *path,
                                u32 *out_lba, u32 *out_size, u8 *out_flags,
                                u32 *gen_out)
 {
-    int ret = iso_check_media(ctx);
-    if (ret) return ret;
-    if (gen_out) *gen_out = ctx->media_gen;
-    ret = iso_resolve_path(ctx, path, out_lba, out_size, out_flags);
-    int checked = iso9660_resource_check(ctx, 0);
-    return checked ? checked : ret;
+    for (int attempt = 0; attempt < ISO_IO_ATTEMPTS; attempt++) {
+        int ret = iso_check_media(ctx);
+        if (ret) return ret;
+        u32 before = ctx->media_gen;
+        ret = iso_resolve_path(ctx, path, out_lba, out_size, out_flags);
+        int checked = iso9660_resource_check(ctx, 0);
+        if (checked) return checked;
+        if (before != ctx->media_gen) {
+            if (iso_legacy_atapi(ctx)) continue;
+            return OS32_ERR_STALE;
+        }
+        if (gen_out) *gen_out = before;
+        return ret;
+    }
+    return VFS_ERR_IO;
 }
 
 /* --- list_dir --- */
@@ -502,21 +519,25 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
 static int iso_read_range(Iso9660Ctx *ctx, const char *path,
                           void *buf, u32 size, u32 offset)
 {
-    u32 file_lba, file_size;
-    u32 to_read = 0;
-    u8 flags;
-    int ret = iso_resolve_checked(ctx, path, &file_lba, &file_size, &flags, 0);
-    if (ret) return ret;
-    if (flags & ISO_FLAG_DIRECTORY) return VFS_ERR_ISDIR;
-    if (offset < file_size) {
-        u32 secs = (file_size - 1) / ISO_SECTOR_SIZE + 1;
-        to_read = file_size - offset;
-        if (to_read > size) to_read = size;
-        ret = iso_read_extent(ctx, file_lba, secs, offset, (u8 *)buf, to_read);
+    for (int attempt = 0; attempt < ISO_IO_ATTEMPTS; attempt++) {
+        u32 file_lba, file_size, before;
+        u32 to_read = 0;
+        u8 flags;
+        int ret = iso_resolve_checked(ctx, path, &file_lba, &file_size, &flags, &before);
+        if (ret) return ret;
+        if (flags & ISO_FLAG_DIRECTORY) return VFS_ERR_ISDIR;
+        if (offset < file_size) {
+            u32 secs = (file_size - 1) / ISO_SECTOR_SIZE + 1;
+            to_read = file_size - offset;
+            if (to_read > size) to_read = size;
+            ret = iso_read_extent(ctx, file_lba, secs, offset, (u8 *)buf, to_read);
+        }
+        int checked = iso9660_resource_check(ctx, 0);
+        if (checked) return checked;
+        if (before != ctx->media_gen && iso_legacy_atapi(ctx)) continue;
+        return ret ? ret : (int)to_read;
     }
-    int checked = iso9660_resource_check(ctx, 0);
-    if (checked) return checked;
-    return ret ? ret : (int)to_read;
+    return VFS_ERR_IO;
 }
 
 /* --- read_file --- */

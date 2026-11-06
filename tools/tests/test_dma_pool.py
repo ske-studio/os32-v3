@@ -139,8 +139,11 @@ def boot_gate(tmp):
     mount_helper = re.search(
         r"static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n",
         kernel, re.S).group()
+    lan_helper = re.search(
+        r"static void kernel_boot_lan\(struct boot_context \*boot\)\n\{.*?\n}\n",
+        kernel, re.S).group()
     (d / "kernel_dma_gate.c").write_text(
-        '#include "kprintf.h"\n' + mount_helper +
+        '#include "kprintf.h"\n' + mount_helper + lan_helper +
         'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
     selftests = (ROOT / "kdebug/kselftest.c").read_text()
     helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()

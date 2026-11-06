@@ -132,8 +132,8 @@ int netcd_read(Device *dev, u32 lba, int count, void *buf)
         u32 bytes = (u32)chunk * SFS_LOGICAL_BLOCK_SIZE;
         rc = sfs_bread(&ctx->block, lba, chunk, dst, bytes, deadline);
         if (rc) {
-            if (rc == OS32_ERR_STALE && client->sid &&
-                client->sid != ctx->block.sid) continue;
+            if (rc == OS32_ERR_STALE &&
+                (!client->sid || client->sid != ctx->block.sid)) continue;
             /* STALE from the host requires BOPEN even if sid is unchanged. */
             if (rc == OS32_ERR_STALE) ctx->recheck = 1;
             return rc;

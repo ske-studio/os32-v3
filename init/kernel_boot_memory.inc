@@ -1,3 +1,12 @@
+static void kernel_boot_lan(struct boot_context *boot)
+{
+    boot_platform_run(BOOT_PCI_RESOURCES, boot);
+    if (memory_boot_dma_available()) {
+        lan_module_load();
+    }
+    lan_module_pci_bind_fallback();
+}
+
 static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
 {
     /* ページング初期化 (メモリ保護有効化) */
@@ -52,11 +61,7 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
     int netcd_boot = sysconfig_get_str(SYS_NETCD_CFG, "NETCD",
                                       netcd_alias, sizeof(netcd_alias)) > 0;
     if (netcd_boot) {
-        boot_platform_run(BOOT_PCI_RESOURCES, boot);
-        if (memory_boot_dma_available()) {
-            lan_module_load();
-        }
-        lan_module_pci_bind_fallback();
+        kernel_boot_lan(boot);
         int rc = lan_module_netcd_register(netcd_alias);
         kprintf(KLOG_ATTR, "[netcd] register rc=%d\n", rc);
     }
@@ -71,11 +76,7 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
     services_stage = SERVICES_UNICODE;
 
     if (!netcd_boot) {
-        boot_platform_run(BOOT_PCI_RESOURCES, boot);
-        if (memory_boot_dma_available()) {
-            lan_module_load();
-        }
-        lan_module_pci_bind_fallback();
+        kernel_boot_lan(boot);
     }
 
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。

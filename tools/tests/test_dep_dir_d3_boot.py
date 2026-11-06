@@ -12,11 +12,31 @@ SOURCES = ('platform/pc98/boot.c', 'init/boot_platform.c', 'init/boot_display.c'
 HEADERS = ('include/ide_contract.h', 'init/boot_platform.h', 'init/boot_display.h', 'include/platform_emergency.h')
 
 
-def kernel_order(kernel=None):
+def kernel_order(kernel=None, overrides=None):
     if kernel is None:
-        kernel = kernel_source(ROOT)
+        kernel = kernel_source(ROOT, overrides)
     else:
         kernel = kernel_source(ROOT, {'init/kernel.c': kernel})
+    lan = re.search(r'^static void kernel_boot_lan\(struct boot_context \*boot\)\n\{\n(.*?)^}\n',
+                    kernel, re.M | re.S)
+    assert lan, 'shared LAN boot helper'
+    lan_markers = ['boot_platform_run(BOOT_PCI_RESOURCES, boot);',
+                   'lan_module_load();', 'lan_module_pci_bind_fallback();']
+    positions = [lan[1].index(m) for m in lan_markers]
+    assert positions == sorted(positions), 'LAN helper order'
+    for m in lan_markers:
+        assert kernel.count(m) == 1, m
+    assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', lan[1])
+    kernel = kernel[:lan.start()] + kernel[lan.end():]
+    early = re.search(r'    if \(netcd_boot\) \{\n(.*?)^    }\n', kernel, re.M | re.S)
+    assert early, 'NETCD boot branch'
+    assert early[1].index('kernel_boot_lan(&boot);') < early[1].index('lan_module_netcd_register(netcd_alias)')
+    assert kernel.index('kdebug.ops.selftest_run();') < early.start() < early.end() < kernel.index('cd_module_load();')
+    assert re.search(r'if \(!netcd_boot\)\s*\{\s*kernel_boot_lan\(&boot\);\s*\}', kernel)
+    assert kernel.count('kernel_boot_lan(&boot);') == 2
+    assert kernel.count('lan_module_netcd_register(netcd_alias)') == 1
+    # Check the retained path after checking the early NETCD path separately.
+    kernel = kernel[:early.start()] + kernel[early.end():]
     # Include the intervening operations: slot ordering alone is insufficient.
     markers = [
         'kstack_hw_init();', 'pc98_boot_bind(&boot, boot_drive);',
@@ -40,8 +60,7 @@ def kernel_order(kernel=None):
         'cd_module_load();',
         'kcg_module_load();', 'kernel_mount_children(boot.root_dev);',
         'services_stage = SERVICES_ROOT_READY;', 'unicode_file_load();',
-        'boot_platform_run(BOOT_PCI_RESOURCES, &boot);', 'lan_module_load();',
-        'lan_module_pci_bind_fallback();', 'pcm_module_load();',
+        'kernel_boot_lan(&boot);', 'pcm_module_load();',
         'fd_redirect_init();', 'pipe_buffer_init();',
         '(void)sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfmode, sizeof(gfmode));',
         'gfx_boot_reserve();',
@@ -103,6 +122,37 @@ def main():
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-boot-') as td:
         subprocess.run([str(build(Path(td)))], check=True)
     if '--mutate' in sys.argv:
+        memory_path = 'init/kernel_boot_memory.inc'
+        memory = (ROOT / memory_path).read_text()
+        early_order = ('        kernel_boot_lan(boot);\n'
+                       '        int rc = lan_module_netcd_register(netcd_alias);')
+        assert memory.count(early_order) == 1
+        changed = memory.replace(early_order,
+                                 '        int rc = lan_module_netcd_register(netcd_alias);\n'
+                                 '        kernel_boot_lan(boot);')
+        try:
+            kernel_order(overrides={memory_path: changed})
+        except AssertionError:
+            print('RED NETCD LAN/register boundary swap')
+        else:
+            raise AssertionError('NETCD LAN/register swap escaped order check')
+        for label, a, b in (
+            ('NETCD/CD', '    if (netcd_boot) {', '    cd_module_load();'),
+            ('Unicode/LAN', '    unicode_file_load();', '    if (!netcd_boot) {'),
+            ('LAN/PCM', '    if (!netcd_boot) {\n        kernel_boot_lan(boot);\n    }',
+             '    if (memory_boot_dma_available()) {\n        pcm_module_load();\n    }'),
+            ('PCI/LAN', '    boot_platform_run(BOOT_PCI_RESOURCES, boot);', '        lan_module_load();'),
+            ('LAN/fallback', '        lan_module_load();', '    lan_module_pci_bind_fallback();'),
+        ):
+            assert memory.count(a) == memory.count(b) == 1, label
+            changed = memory.replace(a, 'SWAP_BOOT_POINT').replace(b, a).replace('SWAP_BOOT_POINT', b)
+            try:
+                kernel_order(overrides={memory_path: changed})
+            except (AssertionError, ValueError):
+                print('RED', label, 'LAN boundary swap')
+            else:
+                raise AssertionError(label + ': LAN boundary swap escaped order check')
+
         for label, a, b in (
             ('PCI_ENUM/DISK', 'BOOT_PCI_ENUM, &boot', 'BOOT_DISK, &boot'),
             ('CPU/input', 'kernel_boot_cpu(mem_kb, &boot);',

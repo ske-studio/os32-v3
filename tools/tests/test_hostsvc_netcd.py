@@ -41,6 +41,8 @@ MUTATIONS = (
     ('chunk', 'count > SFS_BREAD_COUNT_MAX ? SFS_BREAD_COUNT_MAX : count', 'count'),
     ('deadline', 'sfs_bread(&ctx->block, lba, chunk, dst, bytes, deadline)',
      'sfs_bread(&ctx->block, lba, chunk, dst, bytes, deadline + 1)'),
+    ('restart', '!client->sid || client->sid != ctx->block.sid',
+     'client->sid && client->sid != ctx->block.sid'),
     ('stale', 'if (rc == OS32_ERR_STALE) ctx->recheck = 1;', ''),
 )
 

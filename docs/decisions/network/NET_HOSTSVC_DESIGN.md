@@ -527,3 +527,6 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 2. `SfsIo` の末尾に、任意の `int (*put_until)(void *ctx, const u8 *buf, u32 n, u32 deadline)` を足す。NULL でもよく、UART は NULL。期限が切れたら OS32_ERR_TIMEOUT を返す。期限つきの要求・HELLO・片道は、put_until が有ればそれを使い、無ければ put を使う。末尾に足すので既存の初期化子はそのまま通る。
 3. `sfs_client_oneway_deadline(c, type, payload, len, deadline)` を sfs_client.h に宣言する。実体は C3 が sfs_client.c に置き、C1 の BYE はこれで送る。
 4. sfs_lan.c の `lan_put_until` は C3 が書く。待ちの上限は min(開始 + SFS_LAN_PUT_MS, deadline) にする。`lan_put` は期限なしの put_until として残し、UART の経路は変えない。
+
+## D の統合で決めたこと (2026-11-07、PM 決定)
+DEV_BUS_ATAPI は世代変更で cache を捨て、同じ操作内で 1 回だけ読み直し、FD は失効させない (reset/UNIT ATTENTION の従来動作)。netcd とその他の媒体は #10 の STALE・永久失効を維持する。
