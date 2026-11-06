@@ -1,5 +1,4 @@
-/* C1 SFS unit: real VFS/SerialFS/client/mailbox, one virtual SfsIo.
- * C3 deadline HELLO/oneway are dependency seams until that stage lands. */
+/* Integrated C1/C3 unit: real VFS/SerialFS/client/mailbox, one virtual SfsIo. */
 #include "hostsvc_fixture.h"
 #include "fs/serialfs/serialfs.h"
 #include "fs/vfs_device.h"
@@ -47,6 +46,29 @@ static void idle(void *ctx) { (void)ctx; hs_advance(1); }
 static int can_wait(void *ctx) { (void)ctx; return hs_if(); }
 static int put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
+    SfsDec dec;
+    SfsFrame f;
+    sfs_dec_reset(&dec);
+    for (u32 i = 0; i < n; i++) {
+        if (sfs_dec_feed(&dec, buf[i], &f) != 1) continue;
+        if (f.type == SFS_T_BYE) bye_deadline = deadline;
+        if (f.type == SFS_T_HELLO) {
+            int rc;
+            u32 value = sfs_get32(f.payload + SFS_HELLO_REQ_NONCE);
+            seen_deadline = deadline;
+            if (value == seen_nonce) __builtin_trap();
+            seen_nonce = value;
+            if (hs_failure_take("sfs.reply", &rc)) {
+                while ((i32)(hs_now() - deadline) < 0) hs_advance(1);
+                return rc;
+            }
+            if (during_hello) {
+                u32 gen = 9;
+                host_mailbox_put(gen, 1, 1, &gen, sizeof(gen), 1);
+                during_hello = 0;
+            }
+        }
+    }
     /* Model a busy TX: the deadline stops waiting before any frame is sent. */
     if ((i32)(hs_now() + (u32)bye_ticks - deadline) >= 0) {
         while ((i32)(hs_now() - deadline) < 0) hs_advance(1);
@@ -55,30 +77,6 @@ static int put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
     return put(ctx, buf, n);
 }
 const SfsIo hs_sfs_io = {put, get, now, idle, can_wait, put_until};
-int sfs_client_oneway_deadline(SfsClient *c, u8 type, const u8 *payload,
-                               u16 len, u32 deadline)
-{
-    u16 n = sfs_encode_limit(c->tx, type, c->sid, 0, payload, len, c->max_payload);
-    bye_deadline = deadline;
-    return c->io->put_until(c->ctx, c->tx, n, deadline);
-}
-int sfs_client_hello_deadline(SfsClient *c, u32 value, u32 deadline)
-{
-    int rc;
-    seen_deadline = deadline;
-    if (value == seen_nonce) __builtin_trap();
-    seen_nonce = value;
-    if (hs_failure_take("sfs.reply", &rc)) {
-        while ((i32)(hs_now() - deadline) < 0) hs_advance(1);
-        return rc;
-    }
-    if (during_hello) {
-        u32 gen = 9;
-        host_mailbox_put(gen, 1, 1, &gen, sizeof(gen), 1);
-        during_hello = 0;
-    }
-    return sfs_client_hello(c, value);
-}
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static int suite(void)
 {
