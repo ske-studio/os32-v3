@@ -26,7 +26,7 @@ static u16 result_len;
 static u32 clock_now(void *ctx) { (void)ctx; return ticks; }
 static void clock_idle(void *ctx) { (void)ctx; ticks++; }
 static int clock_wait(void *ctx) { (void)ctx; return wait_ok; }
-static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait};
+static const SfsIo clock_io = {0, 0, clock_now, clock_idle, clock_wait, 0};
 
 /* A mutant may call the real UART gate API. Observe it, never open a UART. */
 void serial_gate_set(int on) { if (on) gates++; }
@@ -104,3 +104,8 @@ u32 test_avg(void) { return client.rtt_samples ? (u32)(client.rtt_total_us/clien
 u32 test_max(void) { return client.rtt_max_us; }
 
 u32 test_trial(u32 baud) { return sfs_trial_ticks_limit(baud, client.max_payload); }
+
+/* C1 is a separate unit; these legacy UART/LAN tests never start residency. */
+int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
+const SfsClient *sfs_persistent_client(void) { return 0; }
+void sfs_persistent_stale(void) { }

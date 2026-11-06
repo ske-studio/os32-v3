@@ -144,8 +144,8 @@ def source():
                for i, field in enumerate(('generation', 'last_use', 'alive_seen'))]
     checks += [('NET_NIC_AUTO', '0'), ('NET_NIC_E82557', '1'),
                ('NET_NIC_LGY98', '2'), ('NET_RX_SFS', '1'), ('NET_RX_LINK', '2'),
-               ('NET_RX_SCAN_MAX', '8'), ('LAN_MODULE_OPS_VERSION', '2'),
-               ('LAN_MODULE_API_SLOTS', '22'), ('sizeof(LanModuleApi)', '88'),
+               ('NET_RX_SCAN_MAX', '8'), ('LAN_MODULE_OPS_VERSION', '3'),
+               ('LAN_MODULE_API_SLOTS', '23'), ('sizeof(LanModuleApi)', '92'),
                ('sizeof(Device)', '72'), ('sizeof(VfsOps)', '104')]
     layouts = {
         'struct NetAdapter': (8, [('acquire', 0), ('release', 4)]),

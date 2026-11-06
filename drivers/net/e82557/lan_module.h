@@ -8,7 +8,7 @@
 #include "../../../kernel/module/module_runtime.h"
 #include "../../../kernel/irq/irq.h"
 #include "../../../mm/dma_pool.h"
-#define LAN_MODULE_OPS_VERSION 2u
+#define LAN_MODULE_OPS_VERSION 3u /* 3: SfsIo に put_until (2026-11-07) */
 typedef struct {
     int (*probe)(const struct pci_dev *dev);
     int (*send)(const void *buf, u32 len);
@@ -29,7 +29,7 @@ typedef struct {
     const struct NetAdapter *adapter;
     int (*netcd_register)(const char *);
 } LanModuleApi;
-#define LAN_MODULE_API_SLOTS 22u
+#define LAN_MODULE_API_SLOTS 23u
 int lan_module_probe(const struct pci_dev *dev);
 const struct pci_driver *platform_lan_driver(void);
 int lan_module_load(void);
