@@ -1,7 +1,9 @@
 /* Paired API: exercise the production full-slot validator and private boot relay. */
 #include "kernel/ime/fep_module.c"
-static IME_Dict dict;
-const IME_Dict *ime_current_dict(void) { return &dict; }
+static FepStore store;
+FepStore *ime_current_store(void) { return &store; }
+u32 fep_store_live_connections(const FepStore *s)
+{ return !!s->system.group.generation + !!s->user.group.generation; }
 u32 body_boot_connections(void);
 int services_public;
 enum services_stage services_stage;
@@ -36,12 +38,17 @@ static int test(void)
         if (ime_boot_connections() != live) return 4;
     services_public = exported = 1;
     if (ime_boot_connections() != live) return 5;
-    dict.db = 0;
+    store.system.group.generation = 0;
     if (body_boot_connections()) return 6;
-    dict.db = (void *)1;
+    store.system.group.generation = 1;
     if (body_boot_connections() != 1) return 7;
-    dict.isolated = 1; /* Failed close still owns its connection. */
+    store.system.isolated = 1; /* Failed close still owns its connection. */
     if (body_boot_connections() != 1) return 8;
+    store.user.group.generation = 2;
+    store.user_enabled = 1;
+    if (body_boot_connections() != 2) return 9;
+    store.user_enabled = 0; /* Retained isolated group still counts. */
+    if (body_boot_connections() != 2) return 10;
     return 0;
 }
 void _start(void)

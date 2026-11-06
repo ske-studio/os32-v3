@@ -443,11 +443,6 @@ int ime_dict_close(IME_Dict *dict)
                 kprintf(ATTR_RED, "IME: finalize evaluation rc=%d\r\n", next);
         }
     }
-#ifndef OS32_SQLITE_DIRECT_TEST
-    if (services_stage < SERVICES_READY &&
-        services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
-    else
-#endif
     if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);
     if (rc == SQLITE_OK) dict->db = 0;
     next = os32_sqlite_group_finish(&dict->group, rc);

@@ -156,9 +156,9 @@ static int test(void)
     fixture.store.system.isolated = 1; check(call(1, 0, 256, 0) == OS32_ERR_BUSY); fixture.store.system.isolated = 0;
     available = 0; check(call(1, 0, 256, 0) == OS32_ERR_IO); available = 1;
     fd = -1; check(call(1, 0, 256, 0) == OS32_ERR_IO); fd = 7;
-    /* J has not opened store: the live compatibility dictionary owns boot. */
+    /* The store owns the live system connection. */
     g_ime.dict.db = (void *)99;
-    check(ime_current_dict() == &g_ime.dict);
+    check(ime_current_dict() == (const IME_Dict *)&g_ime.store.system);
     check(ime_current_store() == &g_ime.store);
     return bad;
 }
@@ -168,3 +168,6 @@ void _start(void)
     __asm__ volatile ("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+enum services_stage services_stage = SERVICES_READY;
+volatile u32 services_boot_fault;

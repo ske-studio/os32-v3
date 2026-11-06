@@ -63,6 +63,8 @@ static void info_error(int key, int off, int cap, int expected)
 static void info_value(int key, int off, int cap, const char *expected, int size)
 {
     int n = info_call(key, off, cap);
+    if (n != size || memcmp(info_out + 1, expected, size))
+        fprintf(stderr, "key=%d expected=%s size=%d actual=%d text=%s\n", key, expected, size, n, info_out + 1);
     require(n == size && !memcmp(info_out + 1, expected, size), "metadata exact bytes");
     require(info_out[n + 1] == 0, "metadata NUL");
     require(info_out[0] == 0xa5, "metadata leading sentinel");
@@ -95,11 +97,15 @@ static void info_fault(const char *bad)
 static void metadata(void)
 {
     watched = NULL; info_test = 1;
-    require(!g_ime.store.system.db && g_ime.dict.db && ime_boot_connections() == 1,
-            "boot counts live legacy dictionary");
+    g_ime.store.system.db = g_ime.dict.db;
+    g_ime.store.system.group = g_ime.dict.group;
+    kstrncpy(g_ime.store.system.path, g_ime.dict.path, OS32_MAX_PATH);
+    require(ime_current_dict() == (const IME_Dict *)&g_ime.store.system && ime_boot_connections() == 1,
+            "boot counts live store dictionary");
     require(stub_dict_info(IME_DICT_INFO_STATUS, 0, (char *)info_out, 256) == OS32_ERR_NOSYS &&
             stub_dict_info(0, -1, NULL, 0) == OS32_ERR_NOSYS, "metadata absent module stub");
     for (origin = CALLER_TRUSTED; origin <= CALLER_USER; origin++) {
+        kstrncpy(g_ime.store.system.path, g_ime.dict.path, OS32_MAX_PATH);
         services_public = 0;
         for (int key = IME_DICT_INFO_STATUS; key <= IME_DICT_INFO_CHECKSUM; key++)
             info_error(key, 0, 256, OS32_ERR_NOSYS);
@@ -116,11 +122,17 @@ static void metadata(void)
         info_fault((char *)info_out + IME_DICT_INFO_CAP);
         /* Clamping must precede the caller range walk. */
         bad_byte = (char *)info_out + IME_DICT_INFO_CAP + 1;
-        info_value(IME_DICT_INFO_STATUS, 0, 257, "metadata-unavailable", 20);
+        info_value(IME_DICT_INFO_STATUS, 0, 257, "legacy", 6);
         bad_byte = NULL;
         for (int key = IME_DICT_INFO_STATUS; key <= IME_DICT_INFO_CHECKSUM; key++) {
-            if (key == IME_DICT_INFO_STATUS) info_value(key, 0, 256, "metadata-unavailable", 20);
+            if (key == IME_DICT_INFO_STATUS) info_value(key, 0, 256, "legacy", 6);
             else if (key == IME_DICT_INFO_VARIANT) info_value(key, 0, 256, "M", 1);
+            else if (key == IME_DICT_INFO_FORMAT_VERSION) info_value(key, 0, 256, "0", 1);
+            else if (key == IME_DICT_INFO_DICT_ID) info_value(key, 0, 256, FEP_DICT_ID, strlen(FEP_DICT_ID));
+            else if (key == IME_DICT_INFO_POS_TABLE_VERSION) info_value(key, 0, 256, "1", 1);
+            else if (key == IME_DICT_INFO_COST_SCALE) info_value(key, 0, 256, FEP_DICT_COST_SCALE, strlen(FEP_DICT_COST_SCALE));
+            else if (key == IME_DICT_INFO_MEM_RESERVE_KB) info_value(key, 0, 256, "192", 3);
+            else if (key == IME_DICT_INFO_CACHE_PAGES) info_value(key, 0, 256, "16", 2);
             else info_error(key, 0, 256, OS32_ERR_NOTFOUND);
         }
         int fd = dict_fd(&g_ime.dict), entered = entries;
@@ -130,21 +142,28 @@ static void metadata(void)
         require(entries == entered, "metadata stale never SQL");
         open_files[fd].stale = 0;
         require(ime_dict_close(&g_ime.dict) == 0, "metadata close");
+        g_ime.store.system.db = NULL;
         info_value(IME_DICT_INFO_STATUS, 0, 256, "unloaded", 8);
         for (int key = IME_DICT_INFO_FORMAT_VERSION; key <= IME_DICT_INFO_CHECKSUM; key++)
             info_error(key, 0, 256, OS32_ERR_AGAIN);
         require(ime_dict_open(&g_ime.dict, "/db/fep.db") == 0, "metadata reopen");
+        g_ime.store.system.db = g_ime.dict.db;
         const char *paths[] = {"/db/fep_s.db", "/db/fep_l.db", "/db/custom.db"};
         for (int i = 0; i < 3; i++) {
             if (origin == CALLER_TRUSTED) make_dict(paths[i], "試");
             require(ime_dict_reopen(&g_ime.dict, paths[i]) == 0, "metadata switch");
+            g_ime.store.system.db = g_ime.dict.db;
+            kstrncpy(g_ime.store.system.path, paths[i], OS32_MAX_PATH);
             if (i < 2) info_value(IME_DICT_INFO_VARIANT, 0, 256, i ? "L" : "S", 1);
             else info_error(IME_DICT_INFO_VARIANT, 0, 256, OS32_ERR_NOTFOUND);
         }
         require(ime_dict_reopen(&g_ime.dict, "/db/missing.db") != 0, "metadata failed switch");
+        g_ime.store.system.db = NULL;
         info_value(IME_DICT_INFO_STATUS, 0, 256, "unloaded", 8);
         info_error(IME_DICT_INFO_VARIANT, 0, 256, OS32_ERR_AGAIN);
         require(ime_dict_reopen(&g_ime.dict, "/db/fep.db") == 0, "metadata switch back");
+        g_ime.store.system.db = g_ime.dict.db;
+        g_ime.store.meta.format = 1;
         info_sql("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)");
         for (int i = 1; i < (int)(sizeof(info_names) / sizeof(info_names[0])); i++) info_put(info_names[i], info_values[i]);
         for (int key = IME_DICT_INFO_STATUS; key <= IME_DICT_INFO_CHECKSUM; key++)
@@ -170,22 +189,23 @@ static void metadata(void)
         info_value(IME_DICT_INFO_LICENSE, 0x7fffffff, 256, "", 0);
         info_put("attribution", ""); info_value(IME_DICT_INFO_ATTRIBUTION, 0, 256, "", 0);
         info_sql("DELETE FROM meta WHERE key='attribution'");
-        info_error(IME_DICT_INFO_ATTRIBUTION, 0, 256, OS32_ERR_NOTFOUND);
+        info_error(IME_DICT_INFO_ATTRIBUTION, 0, 256, OS32_ERR_IO);
         for (int i = 0; i < 4; i++) {
             fail_prepare = i == 0; fail_bind = i == 1; fail_step = i == 2; fail_final = i == 3;
             info_error(IME_DICT_INFO_LICENSE, 0, 256, OS32_ERR_IO);
             require(live == 3, "metadata SQL stmt cleanup");
             fail_prepare = fail_bind = fail_step = fail_final = 0;
         }
-        fail_final = finals + 2;
+        fail_final = finals + 1;
         info_error(IME_DICT_INFO_LICENSE, 0, 256, OS32_ERR_IO);
         require(live == 3, "metadata read finalize cleanup");
         fail_final = 0;
         late = 1; info_error(IME_DICT_INFO_LICENSE, 0, 256, OS32_ERR_IO); late = 0;
-        g_ime.dict.isolated = 1; info_error(IME_DICT_INFO_STATUS, 0, 256, OS32_ERR_IO); g_ime.dict.isolated = 0;
+        g_ime.store.system.isolated = 1; info_error(IME_DICT_INFO_STATUS, 0, 256, OS32_ERR_BUSY); g_ime.store.system.isolated = 0;
         info_sql("DROP TABLE meta; CREATE TABLE meta(wrong TEXT)");
         info_error(IME_DICT_INFO_LICENSE, 0, 256, OS32_ERR_IO);
         info_sql("DROP TABLE meta");
+        g_ime.store.meta.format = 0;
     }
     info_test = 0;
     puts("PASS metadata all keys byte chunks states errors stale caller bounds");

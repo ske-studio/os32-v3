@@ -1,9 +1,11 @@
 /* Paired POST_ROOT FEP body. Initialization stays private to services_boot. */
 #include "fep_module.h"
 
-/* I/J will count store.system + store.user. Until then the legacy dictionary
- * owns the only RESIDENT connection; a failed close keeps db non-NULL. */
-u32 ime_boot_connections(void) { return ime_current_dict()->db ? 1u : 0u; }
+/* Count retained groups too: failed close must keep rollback quarantined. */
+u32 ime_boot_connections(void)
+{
+    return fep_store_live_connections(ime_current_store());
+}
 
 static const FepModuleApi api = {
     .boot_abort = ime_boot_abort,

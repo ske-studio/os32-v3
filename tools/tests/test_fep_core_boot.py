@@ -82,8 +82,8 @@ def build(folder, directory):
             'kfree', 'kmalloc_block_size', 'serial_puts', 'sqlite_engine_available',
             'con_sink_is_enabled', 'kbd_trygetkey', 'kbd_trygetchar', 'kbd_getkey_wait',
             'ring3_call_from_user', 'res_owner_get', 'ring3_abort_check',
-            'tvram_set_scroll_reserve'}
-    wrappers = {'os32_sqlite_outer_group_open': 'host_fep_group_open',
+            'tvram_set_scroll_reserve', 'vfs_stat', 'vfs_fd_is_stale', 'kstrcmp', 'kstrncmp'}
+    wrappers = {'os32_sqlite_outer_db_fd': 'host_fep_db_fd', 'os32_sqlite_outer_group_open': 'host_fep_group_open',
                 'os32_sqlite_outer_group_acquire': 'host_fep_group_acquire',
                 'os32_sqlite_prepare_v2': 'host_fep_prepare'}
     (folder / 'fep_kexports.c').write_text(
@@ -91,6 +91,7 @@ def build(folder, directory):
         'extern void sqlite_forbidden_import(void);\n'
         'extern int host_fep_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);\n'
         'extern int host_fep_group_acquire(int, int, Os32SqliteGroup *);\n'
+        'extern int host_fep_db_fd(void *);\n'
         'extern int host_fep_prepare(sqlite3 *, const char *, int, sqlite3_stmt **, const char **);\n'
         'const u32 fep_kexports[] = {\n' + ''.join(
             '    (u32)(uptr)' + wrappers.get(row['name'], row['name'] if

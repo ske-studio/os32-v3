@@ -5,7 +5,7 @@ CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=15,
         'kernel/ime/ime_dict.c',
         'kernel/ime/ime_conn.c',
         'kernel/ime/ime_user_store.c',
-        'kernel/ime/ime_store.h',
+        'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h',
         'kernel/ime/ime.h',
         'kernel/input_service.c',
         'kernel/serial_diag.c',
@@ -95,6 +95,11 @@ def main():
                 raise RuntimeError('readonly probe anchor not unique')
             cases.append(('readonly-probe', product, user_product.replace(old, 'result = 0;'),
                           '!s.user_enabled && fep_store_live_connections(&s) == 1'))
+            old = 'if (fep_conn_close(c)) return 0;\n    int rc = vfs_stat(journal, &st);\n    if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {'
+            if product.count(old) != 1:
+                raise RuntimeError('hot journal anchor not unique')
+            cases.append(('hot-journal', product.replace(old, old.replace('if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0))', 'if (0)')), user_product,
+                          'hits(&s, out) == 3 && !s.user_enabled && !s.user.db'))
         for name, code, user_code, assertion in cases:
             (work / 'product.c').write_text(code)
             (work / 'user_product.c').write_text(user_code)

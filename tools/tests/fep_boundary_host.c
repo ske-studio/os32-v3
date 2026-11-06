@@ -142,6 +142,25 @@ int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
 }
 #include "ime_source.inc"
 
+/* Boot imports copy the core snapshot; keep actual store/SQLite/VFS opens. */
+enum services_stage services_stage = SERVICES_READY;
+volatile u32 services_boot_fault;
+static int boot_config_rc, boot_path_rc;
+void *kmalloc(u32 n) { return malloc(n); }
+int fep_boot_config_get(FepMeta *m, u32 *r)
+{
+    if (boot_config_rc) return boot_config_rc;
+    int rc = fep_meta_probe(FEP_DICT_PATH_M, m);
+    *r = FEP_DICT_RESERVE_KB;
+    return rc;
+}
+int fep_boot_user_path_get(char *p, u32 n)
+{
+    if (boot_path_rc) return boot_path_rc;
+    kstrncpy(p, FEP_USER_PATH, n);
+    return 0;
+}
+
 static IME_UserEntry out[64];
 static void watch(void)
 {
@@ -320,5 +339,23 @@ int main(void)
     }
     metadata();
     require(ime_dict_close(&g_ime.dict) == 0 && live == 0, "all statements finalized");
+    /* Fresh boot owns a RO system and RW user, and abort releases both. */
+    kmemset(&g_ime.store, 0, sizeof(g_ime.store));
+    watched = NULL;
+    boot_config_rc = OS32_ERR_IO;
+    require(ime_dict_boot() == OS32_ERR_IO && !ime_boot_connections(), "boot config failure");
+    boot_config_rc = 0; boot_path_rc = OS32_ERR_INVAL;
+    require(!ime_dict_boot() && ime_boot_connections() == 1 &&
+            !g_ime.store.user_enabled, "boot path failure preserves system");
+    require(!ime_boot_abort() && !ime_boot_connections(), "boot path failure cleanup");
+    boot_path_rc = 0;
+    require(!ime_dict_boot() && g_ime.dict_loaded && ime_boot_connections() == 2,
+            "boot opens system and user");
+    require(g_ime.store.boot_reserve_kb == FEP_DICT_RESERVE_KB &&
+            !kstrcmp(g_ime.store.meta.dict_id, FEP_DICT_ID) &&
+            !kstrcmp(g_ime.store.user.path, FEP_USER_PATH), "boot snapshot copied");
+    require(!ime_dict_boot() && ime_boot_connections() == 2, "boot idempotent");
+    require(!ime_boot_abort() && !ime_boot_connections() && !g_ime.dict_loaded &&
+            !g_cand_save_text && !g_cand_save_attr && !live, "boot abort releases store");
     puts("PASS B2 bounds NULL staged output lifetime SQL errors busy export"); return 0;
 }

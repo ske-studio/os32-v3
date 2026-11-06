@@ -249,7 +249,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
     (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
-        source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
+        source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
         # RAM storage seam shared with C2/O5; core retains header/SQL ordering.
         if name == 'sqlite_engine':
             source = ('extern int host_final_boot_check(int, int);\n') + source.replace(
@@ -293,8 +293,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             'kfree', 'kmalloc_block_size', 'serial_puts', 'sqlite_engine_available',
             'con_sink_is_enabled', 'kbd_trygetkey', 'kbd_trygetchar', 'kbd_getkey_wait',
             'ring3_call_from_user', 'res_owner_get', 'ring3_abort_check',
-            'tvram_set_scroll_reserve'}
-    wrappers = {'os32_sqlite_outer_group_open': 'host_fep_group_open',
+            'tvram_set_scroll_reserve', 'vfs_stat', 'vfs_fd_is_stale', 'kstrcmp', 'kstrncmp'}
+    wrappers = {'os32_sqlite_outer_db_fd': 'host_fep_db_fd', 'os32_sqlite_outer_group_open': 'host_fep_group_open',
                 'os32_sqlite_outer_group_acquire': 'host_fep_group_acquire',
                 'os32_sqlite_prepare_v2': 'host_fep_prepare'}
     (folder / 'fep_kexports.c').write_text(
@@ -302,6 +302,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         'extern void sqlite_forbidden_import(void);\n'
         'extern int host_fep_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);\n'
         'extern int host_fep_group_acquire(int, int, Os32SqliteGroup *);\n'
+        'extern int host_fep_db_fd(void *);\n'
         'extern int host_fep_prepare(sqlite3 *, const char *, int, sqlite3_stmt **, const char **);\n'
         'const u32 fep_kexports[] = {\n' + ''.join(
             '    (u32)(uptr)' + wrappers.get(row['name'], row['name'] if
@@ -548,11 +549,11 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         original_offsets = (folder / 'fep_host_offsets.h').read_text()
         for label, name, old, new, mode in (
             ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;',
-             '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
-            ('close-fault-after-ready', 'ime_dict',
+             '    if (!g_ime.store.user_enabled) return -1;\n    g_ime.dict_loaded = 1;', 32),
+            ('close-fault-after-ready', 'ime_conn',
              'services_stage < SERVICES_READY &&\n        ', '', 33)):
-            source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
-            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'ime_dict_close')
+            source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
+            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'fep_conn_close')
             assert scope.count(old) == 1, label
             source_path = mutated_dir / (name + '.c')
             source_path.write_text(source.replace(scope, scope.replace(old, new)))

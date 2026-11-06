@@ -1,8 +1,11 @@
 /* Shared FEP connection lifetime; reopen policy belongs to each store caller. */
 #include "ime_store.h"
+#include "sqlite_engine.h"
 #include "../../lib/sqlite3/os32_sqlite_outer.h"
 #ifdef OS32_FEP_MODULE
 #include "fep_imports.h"
+#define services_stage fep_services_stage()
+#define services_boot_fault fep_services_boot_fault()
 #endif
 
 int fep_conn_close(FepConn *conn)
@@ -23,6 +26,11 @@ int fep_conn_close(FepConn *conn)
             *statements[i] = 0;
         }
     }
+#ifndef OS32_SQLITE_DIRECT_TEST
+    if (services_stage < SERVICES_READY &&
+        services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
+    else
+#endif
     if (conn->db) rc = sqlite3_close((sqlite3 *)conn->db);
     if (rc == SQLITE_OK) conn->db = 0;
     if (os32_sqlite_group_finish(&conn->group, rc) != SQLITE_OK) {

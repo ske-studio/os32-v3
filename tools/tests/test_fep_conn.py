@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """FEP shared connection teardown and readiness, freestanding ILP32."""
 CHECK = dict(name='fep-conn', tier=1, needs=[], budget=3,
-    covers=['kernel/ime/ime_conn.c', 'kernel/ime/ime_store.h',
+    covers=['kernel/ime/ime_conn.c', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.h',
             'tools/tests/fep_conn_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk'])
