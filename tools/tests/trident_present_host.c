@@ -16,7 +16,7 @@ static int test(void)
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) client[i] = (u8)(i * 17u + 1u);
     CHECK(!trident_present(&d, 0, 0, 640, 480));
     for (u32 i = 0; i < TRI_DISPLAY_BYTES; ++i) CHECK(vram[i] == client[i]);
-#ifndef TEST_PRESENT_BYTE
+#ifdef TEST_PRESENT_SPAN32
     CHECK(f.trace_count == 480 && !f.trace_overflow);
     for (u32 i = 0; i < 480; ++i)
         CHECK(f.trace[i].offset == i * 640 && f.trace[i].count == 160 && f.trace[i].width == 4);

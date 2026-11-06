@@ -4,8 +4,12 @@
  * trident.h). The OS32 row-transfer interface is specified in trident.h. */
 #include "trident.h"
 
-/* X/trident_shadow.c:19-36 copies each row with memcpy. */
-#define TRI_PRESENT_USE_SPAN32 1
+/* X/trident_shadow.c:19-36 copies each row with memcpy. PC-98 exception
+ * (Ra266, observed 2026-11-06 a59a7c7 and 2026-11-07 45a6ac9a): dword
+ * stores to the Trident LFB through the PC-98 path draw a lattice and
+ * squeezed bands while byte stores display correctly, so present uses
+ * write8. TRIDENT_S3_DESIGN records this as a PC-98 platform deviation. */
+#define TRI_PRESENT_USE_SPAN32 0
 
 int trident_present(struct trident_device *d, int x, int y, int w, int h)
 {

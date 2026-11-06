@@ -84,3 +84,4 @@ ScreenInit の初回/反復、active EnterVT、leave/close、失敗後の再試�
 - video reset は VSYNC low→high を2回待ち、CR8E=84 → 拡張 DAC[57]=C0 → CRBE=26 → DAC[50]=FF,51=00,52=00,54=FF,55=00,56=00。独自の待ち上限を足さない。色 key は X/driver:1647-1650 の既定値を depth8 で mask した FF。
 - DPMS は D:1299-1340 の On/Standby/Suspend/Off を関数として追加。HAL に上位の要求口がないので登録・自動 On 呼出しは足さない。
 - 全域 VERIFY と undo、verified_bytes による公開条件、first_init_done、恒久失敗 latch、固定 BDF/BAR/revision と BAR2/ROM/隣接走査の拒否、byte 転送の強制、常設レジスタ診断を除去。
+- present の書き方 (2026-11-07、PM 決定): 手本 (X/trident_shadow.c:19-36) は memcpy だが、Ra266 の PC-98 の経路では LFB への 32 ビットの書き込みで格子と詰まった色の帯になる (a59a7c7・45a6ac9a の 2 回、8 ビットでは正しい)。PC-98 の事情として present は 8 ビットで書く (`TRI_PRESENT_USE_SPAN32` 0)。
