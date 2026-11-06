@@ -40,6 +40,10 @@ FLAGS = ['-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
          '-ffreestanding','-fno-pie','-fno-stack-protector','-fno-builtin']
 # name, file, unique old, replacement, runtime rejection.
 MUTATIONS = (
+ ('M_CLIENT_STALE','backend_trident.c','values[i] = src[i];',
+  'values[i] = src[i] & 0;','CLIENT samples reflect current RAM'),
+ ('M_CLIENT_SHORT','backend_trident.c','row < sizeof(offsets) / sizeof(offsets[0])',
+  'row + 1 < sizeof(offsets) / sizeof(offsets[0])','central CLIENT sample included'),
  ('M_DAC_SKIP','backend_trident.c','    palette_before_present();',
   '    if (register_entry == 0) palette_before_present();','DAC dump on each activation'),
  ('M_DAC_INDEX','backend_trident.c','TRI_DAC_READ_INDEX, 0);',

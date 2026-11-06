@@ -21,7 +21,7 @@ static void register_row(const char *group, u32 first, const u8 *values,
     serial_puts_polled("[trident] stage=registers entry=");
     serial_diag_u32(register_entry);
     serial_puts_polled(" "); serial_puts_polled(group);
-    serial_diag_hex(first, 2); serial_puts_polled("=");
+    serial_diag_hex(first, first > 0xffu ? 8 : 2); serial_puts_polled("=");
     for (u32 i = 0; i < count; ++i) {
         if (i) serial_puts_polled(" ");
         if (valid[i]) serial_diag_hex(values[i], 2);
@@ -117,6 +117,21 @@ static void registers_before_present(void)
         register_row("START.CR", index, cr + index, cv + index, 1);
     }
     palette_before_present();
+    /* Read the actual transfer source, including background and text-area
+     * samples. Offsets are byte offsets in the fixed 640x480 packed CLIENT.
+     * register_row prints the full RAM offset for samples beyond byte 255. */
+    const u32 offsets[] = {0, 160u * TRI_PITCH,
+                           168u * TRI_PITCH + 172u, 240u * TRI_PITCH + TRI_WIDTH / 2};
+    for (u32 row = 0; row < sizeof(offsets) / sizeof(offsets[0]); ++row) {
+        u8 values[8];
+        bool valid[8];
+        const volatile u8 *src = device.res->client + offsets[row];
+        for (u32 i = 0; i < sizeof(values); ++i) {
+            values[i] = src[i];
+            valid[i] = true;
+        }
+        register_row("CLIENT", offsets[row], values, valid, sizeof(values));
+    }
 }
 
 

@@ -226,6 +226,9 @@ static int image(void)
     CHECK(contains("START.CR1e=80") && contains("START.CR27=08"));
     CHECK(contains("entry=1 DAC.MASK00=ff") && contains("entry=1 DAC00=00 00 00"));
     CHECK(contains("entry=1 DAC0f=3f 3f 3f"));
+    CHECK(contains("entry=1 CLIENT00=07 07 07 07 07 07 07 07"));
+    CHECK(contains("entry=1 CLIENT00019000=07 00 00 00 00 00 00 00"));
+    CHECK(contains("entry=1 CLIENT00025940=04 04 04 04 04 04 04 04"));
     CHECK(!registers_pending && register_entry==1);
     CHECK(!device.last_rc && equal(counters.present_bytes,307200) && counters.commits==1);
     for (u32 i=0;i<sizeof(client);++i) CHECK(equal(storage[i],client[i]));
@@ -272,8 +275,18 @@ static int sequence(void)
         }
         for (u32 gray=0;gray<24;++gray,++color) for (u32 c=0;c<3;++c)
             CHECK(f.dac[color*3+c]==((8+gray*10)*63+127)/255);
+        /* Distinct second-run contents prove these are fresh RAM samples,
+         * independent of register/DAC equality and the one-pixel transfer. */
+        client[0]=0x12; client[160*640]=0x34;
+        client[168*640+172]=0x56; client[240*640+320]=0x78;
         backend.present_rect(0,0,1,1);
         CHECK(contains("entry=2 DAC.MASK00=ff") && contains("entry=2 DAC0f=3f 3f 3f"));
+        CHECK(contains("entry=2 CLIENT00=12 00 00 00 00 00 00 00"));
+        CHECK(contains("entry=2 CLIENT00019000=34 00 00 00 00 00 00 00"));
+        CHECK(contains("entry=2 CLIENT0001a4ac=56 00 00 00 00 00 00 00"));
+        CHECK(contains("entry=2 CLIENT00025940=78 00 00 00 00 00 00 00"));
+        CHECK(client[0]==0x12 && client[160*640]==0x34 &&
+              client[168*640+172]==0x56 && client[240*640+320]==0x78);
         for (u32 i=0;i<sizeof(saved);++i) CHECK(equal(((u8 *)&saved)[i],((u8 *)&device.saved)[i]));
         backend.shutdown();
         CHECK(order[norder-3]==TRI_STEP_DISABLE && order[norder-2]==TRI_STEP_RESTORE && order[norder-1]==TRI_STEP_LOCK);
