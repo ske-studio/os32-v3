@@ -13,6 +13,12 @@
 #include "../../hwdev/gfinit_mode.h"
 /* gf4_c2svc_host.c already includes the real F5 service for this fixture. */
 
+/* Scanlog supplies synthetic PCI and host mmap, rather than kernel PTEs. */
+int gf_production_identity(struct gf_production *p)
+{ assert(p==&cint_prod); return p->revoked ? -1 : 0; }
+int gf_production_mapped(struct gf_production *p)
+{ assert(p==&cint_prod); return p->foundation.bar0 ? 0 : -1; }
+
 /* Synthetic ROM: DCB 3.0 analog A (bios/dcb.c:28-95,121-193),
  * PLL 0x21 (bios/pll.c), BIT P v2 thermal conversion (bios/therm.c).
  * No parsed route, PLL limit or F5 policy is injected into product state. */
@@ -105,6 +111,25 @@ static void scanlog_cold(void)
     gf3_host_set(&cint_host,0,0x10f0,0x80460064); /* PWM2: divisor100, duty30 */
     scanlog_devinit_calls=0;
     assert(!svc_ctx.ch->f && !svc_ctx.nroutes && !svc_ctx.limits_valid[0]);
+}
+/* Thermal tests need a readable clock and a supported performance table. */
+static void __attribute__((unused)) scanlog_heat_fixture(void)
+{
+    /* bios/perf.c v0x21: supported empty table (header8, entry22),
+     * no lower pstate. The scanlog's v0x20 only supplies its fan divisor. */
+    scanlog_rom[S_PERF]=0x21;
+    scanlog_rom[S_PERF+3]=22;
+    gf5_rom_release(&cint_prod.feature5);
+    assert(!gf5_rom_acquire(&cint_prod.feature5,scanlog_rom,sizeof(scanlog_rom),0));
+    /* nv40.c:39-114: enabled PLL, 27MHz * 20 / 2, divide by 2;
+     * shared core/shader mux, memory's second stage multiplies by two. */
+    gf3_host_set(&svc_host.base,0,GF_PLL_GATE,0x23);
+    gf3_host_set(&cint_host,0,GF_PLL_GATE,0x23);
+    gf3_host_set(&cint_host,0,0x4000,0xc0010000);
+    gf3_host_set(&cint_host,0,0x4004,0x02011402);
+    gf3_host_set(&cint_host,0,0x4008,0x80011402);
+    gf3_host_set(&cint_host,0,0x4020,0xc0010000);
+    gf3_host_set(&cint_host,0,0x4024,0x02011402);
 }
 static PaletteEntry scanlog_colors[16];
 const PaletteEntry *palette_get_all(void) { return scanlog_colors; }

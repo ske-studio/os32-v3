@@ -12,6 +12,15 @@
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 
+/* Rebooted fixture storage needs the real F5 binding before stop retires
+ * tiles (GF_GUARD_LIFETIME_DESIGN section 4). No thermal policy is faked. */
+#define service_check guard_f5_check
+#define service_publish guard_f5_publish
+#include "../../hwdev/gf/feature5_service.c"
+#undef service_publish
+#undef service_check
+static const struct gf5_test_ops *guard_f5_slot;
+
 /* Typed links callback exported by recover.c; C2-links binds this name. */
 i32 gf4_service_failed(void *,i32,u32);
 static struct gf4_host host;
@@ -270,6 +279,8 @@ static void recover_setup(enum gf3_fmt fmt)
      * table as well as the F3 service, so final teardown is a valid call. */
     host.ctx.ready=false; host.ctx.legacy=0; cint_prod.display.display4=0;
     assert(!gf4_service_bind(&host.ctx,&cint_prod.display,&host.links));
+    service_ctx=0; service_slot=0;
+    assert(!gf5_service_init(&cint_prod,&host.ctx,&guard_f5_slot));
     assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
     assert(!gf3_service_objects_init(cint_service,deadline));
     host.ctx.ready=true;

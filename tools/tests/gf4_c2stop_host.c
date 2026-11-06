@@ -27,6 +27,15 @@
 #endif
 #include GF4_SERVICE_SOURCE
 
+/* Rebooted fixture storage needs the real F5 binding before stop retires
+ * tiles (GF_GUARD_LIFETIME_DESIGN section 4). No thermal policy is faked. */
+#define service_check guard_f5_check
+#define service_publish guard_f5_publish
+#include "../../hwdev/gf/feature5_service.c"
+#undef service_publish
+#undef service_check
+static const struct gf5_test_ops *guard_f5_slot;
+
 /* Callback failure is an existing owner boundary, not a fake F3 service
  * symbol. Distinct errors check that neither F4 nor F2 codes are rounded. */
 static u32 owner_calls[3], owner_deadline;
@@ -222,6 +231,8 @@ static void normal_clock_dispatch(void)
         stop_links=stop_host.links;
         stop_links.owner=&stop_ctx; stop_links.admission=stop_admission;
         assert(!gf4_service_bind(&stop_ctx,&cint_prod.display,&stop_links));
+        service_ctx=0; service_slot=0;
+        assert(!gf5_service_init(&cint_prod,&stop_ctx,&guard_f5_slot));
         assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
         stop_ctx.ready=true; stop_ctx.accepting=true;
         stop_ctx.epoch=cint_prod.chan.epoch;

@@ -21,6 +21,7 @@ static i32 critical_count_resume(void *owner)
 static void critical_setup(void)
 {
     scanlog_init();
+    scanlog_heat_fixture();
     struct gf5 *g=&cint_prod.feature5;
     assert(g->emergency.pause && g->emergency.owner==g);
     assert(!scanlog_f5_ops->service_poll(g));

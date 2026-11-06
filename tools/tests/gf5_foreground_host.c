@@ -57,11 +57,6 @@ static bool kbd_gui_mode;
 #include "../../drivers/input/kbd_fgpoll.inc"
 
 int pc98_route_safe(void) { return u6_safe; }
-/* Scanlog supplies synthetic PCI and host mmap, rather than kernel PTEs. */
-int gf_production_identity(struct gf_production *p)
-{ assert(p==&cint_prod); return p->revoked ? -1 : 0; }
-int gf_production_mapped(struct gf_production *p)
-{ assert(p==&cint_prod); return p->foundation.bar0 ? 0 : -1; }
 int gf_production_return(void) { return geforce_return(&c1_platform); }
 int vfs_sync(void)
 {
@@ -140,21 +135,7 @@ static void u6_setup(void)
     scanlog_init();
     registered=1; feature5_slot=scanlog_f5_ops;
     assert(heat_bridge.stop && heat_bridge.clear);
-    /* bios/perf.c v0x21: supported empty table (header8, entry22),
-     * no lower pstate. The scanlog's v0x20 only supplies its fan divisor. */
-    scanlog_rom[S_PERF]=0x21;
-    scanlog_rom[S_PERF+3]=22;
-    gf5_rom_release(&cint_prod.feature5);
-    assert(!gf5_rom_acquire(&cint_prod.feature5,scanlog_rom,sizeof(scanlog_rom),0));
-    /* nv40.c:39-114: enabled PLL, 27MHz * 20 / 2, divide by 2;
-     * shared core/shader mux, memory's second stage multiplies by two. */
-    gf3_host_set(&svc_host.base,0,GF_PLL_GATE,0x23);
-    gf3_host_set(&cint_host,0,GF_PLL_GATE,0x23);
-    gf3_host_set(&cint_host,0,0x4000,0xc0010000);
-    gf3_host_set(&cint_host,0,0x4004,0x02011402);
-    gf3_host_set(&cint_host,0,0x4008,0x80011402);
-    gf3_host_set(&cint_host,0,0x4020,0xc0010000);
-    gf3_host_set(&cint_host,0,0x4024,0x02011402);
+    scanlog_heat_fixture();
     startlog_clear();
     geforce_foreground_poll();
     assert(cint_prod.feature5.fan.sensor_setup);
