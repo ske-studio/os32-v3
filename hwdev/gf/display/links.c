@@ -197,7 +197,7 @@ static i32 links_admission(void *owner,bool open)
         .scan_prepare=gf4_scan_prepare,.scan_discard=gf4_scan_discard
     };
     restore_ops=(struct gf4_restore_ops){c,links_diagnostic_restore,links_restore_last_rc,
-                                          gf4_display_saved_release};
+                                          gf4_display_saved_release,0};
     /* No waits or failing HW operations in this foreground publication
      * interval. F3 validates loans before it publishes its resident ops. */
     rc=gf3_service_admission(s,true);

@@ -1043,6 +1043,7 @@
       "accepting",
       "ch",
       "changing",
+      "cleanup_pending",
       "cursor",
       "cursor_view",
       "data",
@@ -1177,6 +1178,7 @@
       "t"
     ],
     "struct gf4_restore_ops": [
+      "abandon",
       "ctx",
       "last_rc",
       "restore",
@@ -1285,6 +1287,7 @@
       "source_rc",
       "tile",
       "tile_live",
+      "tile_slot",
       "vid"
     ],
     "struct gf5_clock": [
@@ -1350,6 +1353,7 @@
       "saved_epoch",
       "tile",
       "tile_live",
+      "tile_saved",
       "version",
       "vid"
     ],
@@ -1429,6 +1433,20 @@
       "generation",
       "pitch",
       "reservation_id"
+    ],
+    "struct gf5_tile_saved": [
+      "raw_addr",
+      "raw_limit",
+      "raw_pitch",
+      "state"
+    ],
+    "struct gf5_tile_slot": [
+      "current",
+      "loan",
+      "raw_addr",
+      "raw_limit",
+      "raw_pitch",
+      "state"
     ],
     "struct gf5_vid_ops": [
       "get",
@@ -1667,7 +1685,15 @@
       "s0_ok",
       "values"
     ],
+    "struct gf_vram_borrow": [
+      "bytes",
+      "key",
+      "kind",
+      "next",
+      "off"
+    ],
     "struct gf_vram_registry": [
+      "borrows",
       "ch",
       "head",
       "next_id"
@@ -1684,6 +1710,7 @@
       "value"
     ],
     "struct gf_vram_view": [
+      "borrow",
       "bytes",
       "ch",
       "close",
@@ -2003,6 +2030,12 @@
       "sid",
       "slot",
       "token"
+    ],
+    "struct ledger_device_map": [
+      "end",
+      "first",
+      "owner",
+      "rid"
     ],
     "struct ledger_owner": [
       "alloc_irq",
@@ -2658,6 +2691,7 @@
     "GF2_VBLANK",
     "GF3_ACCEL",
     "GF3_ARGB8888",
+    "GF3_EBUSY",
     "GF3_EFORMAT",
     "GF3_EINVAL",
     "GF3_ERANGE",
@@ -2771,6 +2805,8 @@
     "GF5_RUN",
     "GF5_SAVED",
     "GF5_SAVING",
+    "GF_BORROW_TILE",
+    "GF_BORROW_VIEW",
     "GF_C_AR",
     "GF_C_AR_GATE",
     "GF_C_BRANCH",
@@ -2869,6 +2905,9 @@
     "GF_SCRIPT_EIO",
     "GF_SCRIPT_ETIME",
     "GF_SCRIPT_OK",
+    "GF_TILE_FREE",
+    "GF_TILE_OWNED",
+    "GF_TILE_UNKNOWN",
     "GF_VERIFY_CR",
     "GF_VERIFY_MMIO",
     "GF_VERIFY_SR",

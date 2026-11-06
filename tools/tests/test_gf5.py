@@ -1,6 +1,6 @@
 """Layer 5 component hosts and the existing runner trace acceptance suite."""
 CHECK = dict(name='gf5-host', tier=1, needs=[], budget=90.0,
-             covers=['hwdev/gf/**', 'kdebug/gf5_test.c', 'kdebug/gfinit_pll.*',
+             covers=['tools/tests/gf_guard_fake.h', 'hwdev/gf/**', 'kdebug/gf5_test.c', 'kdebug/gfinit_pll.*',
                      'kdebug/gfinit_decode*', 'kdebug/gfinit_exec.c',
                      'kdebug/recover.c', 'kdebug/recover_gf.c', 'tools/tests/gf5*', 'tools/tests/gf_startlog_host.h', 'include/kprintf.h',
                      'tools/tests/test_gf5.py', 'tools/tests/test_gf_runner.py',

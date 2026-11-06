@@ -7,6 +7,30 @@
 #include <stdbool.h>
 #include "command.h"
 
+struct gf_vram_reservation {
+    const void *owner;
+    u32 off, bytes, reservation_id, generation;
+};
+/* Registry owns linkage, callers own zero-initialized resident nodes.
+ * Linked nodes never move. Exact key identity and contained byte range;
+ * duplicate get is rejected, put failure preserves node and ownership.
+ * GF3_EINVAL/ERANGE/ESTATE follow registry rules; release while any loan
+ * of that reservation lives returns GF3_EBUSY, without changing the node. */
+enum gf_vram_borrow_kind { GF_BORROW_VIEW, GF_BORROW_TILE };
+struct gf_vram_borrow {
+    struct gf_vram_reservation key;
+    u32 off, bytes;
+    enum gf_vram_borrow_kind kind;
+    struct gf_vram_borrow *next;
+};
+i32 gf_vram_borrow_get(struct gf2_chan *, struct gf_vram_borrow *,
+                        const struct gf_vram_reservation *, u32 off, u32 bytes,
+                        enum gf_vram_borrow_kind);
+i32 gf_vram_borrow_put(struct gf2_chan *, struct gf_vram_borrow *);
+/* 0 absent/1 overlapping; invalid input returns negative GF3 rc. */
+int gf_vram_borrow_overlaps(struct gf2_chan *, u32 off, u32 bytes,
+                            enum gf_vram_borrow_kind);
+
 /* Caller-owned, initially all zero, immovable from map to successful unmap.
  * extent/map_base/map_bytes describe the page-rounded UC map; va/bytes
  * describe only the requested byte range. Borrow ops/owner until unmap.
@@ -28,6 +52,9 @@ struct gf_vram_view {
     struct gf_vram_view *next;
     void *close_owner;
     i32 (*close)(void *owner, struct gf_vram_view *view);
+    /* get before PTE map; publish only after map success, rollback on error.
+     * Keep key/loan on unmap failure; put only after successful PTE unmap. */
+    struct gf_vram_borrow borrow;
 };
 /* off/len: nonzero length, both 4B aligned, contained in one live reservation
  * of ch. Page-rounded extent must fit BAR1/physical range and must not
@@ -45,10 +72,6 @@ int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
  * Keep reservation and borrowed adapter alive until successful unmap. */
 int gf_vram_view_unmap(struct gf_vram_view *view);
 
-struct gf_vram_reservation {
-    const void *owner;
-    u32 off, bytes, reservation_id, generation;
-};
 /* Owner supplies zero-initialized static/resident nodes; registered nodes
  * and their non-NULL owner identity addresses stay alive and immovable.
  * Based on nouveau_bo.c:594-599,618-629 pin/unpin ownership, replacing
@@ -61,6 +84,7 @@ struct gf_vram_registry {
     struct gf2_chan *ch;
     struct gf_vram_reservation_node *head;
     u32 next_id;
+    struct gf_vram_borrow *borrows;
 };
 /* V0 owns one static registry, initially zero, for one production channel
  * (also one ch per host process). First init: ch=argument, head=NULL, next_id=1.

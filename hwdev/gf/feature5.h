@@ -10,7 +10,7 @@
 typedef unsigned long long u64;
 typedef long long i64;
 #define GF5_TILE_COUNT 12U /* nouveau c03c1a1 nvkm/subdev/fb/nv44.c:60. */
-#define GF5_IMAGE_VERSION 1U
+#define GF5_IMAGE_VERSION 2U
 #define GF5_THERM_THRESHOLDS 4U /* fanboost, downclock, critical, shutdown. */
 
 enum gf5_rc {
@@ -30,6 +30,22 @@ struct gf5_rom_view {
     const struct gf_init_program *memory_program; u32 memory_pc;
 };
 struct gf5_tile { u32 base, bytes, pitch, reservation_id, generation; };
+/* Guard lifetime design section 4: nodes stay resident across replacement,
+ * save/restart/restore and failed I/O. current selects the committed loan;
+ * the other loan retains the replacement until all programming succeeds. */
+enum gf5_tile_owner { GF_TILE_FREE, GF_TILE_OWNED, GF_TILE_UNKNOWN };
+struct gf5_tile_slot {
+    enum gf5_tile_owner state;
+    u32 raw_addr, raw_limit, raw_pitch;
+    struct gf_vram_borrow loan[2];
+    u32 current;
+};
+/* Saved values only: never copy intrusive nodes or borrowed pointers.
+ * UNKNOWN cannot be saved. Match retained reservation keys on restore. */
+struct gf5_tile_saved {
+    enum gf5_tile_owner state;
+    u32 raw_addr, raw_limit, raw_pitch;
+};
 struct gf5_thermal { u32 raw; i32 milli_c; bool calibrated; };
 enum gf5_fan_mode { GF5_FAN_NONE, GF5_FAN_MANUAL, GF5_FAN_AUTO };
 enum gf5_fan_kind { GF5_FAN_TRIP, GF5_FAN_LINEAR, GF5_FAN_OTHER };
@@ -66,6 +82,7 @@ struct gf5_image {
     struct gf5_clock clock; u32 requested_uv; u8 vid;
     struct gf5_fan_saved fan;
     struct gf5_tile tile[GF5_TILE_COUNT]; bool tile_live[GF5_TILE_COUNT];
+    struct gf5_tile_saved tile_saved[GF5_TILE_COUNT];
     struct gf4_saved display;
     struct gf5_extent *extent; bool complete;
 };
@@ -107,6 +124,7 @@ struct gf5 {
     struct gf5_fan_saved fan;
     u64 next_auto, next_step, next_sensor, next_toggle;
     struct gf5_tile tile[GF5_TILE_COUNT]; bool tile_live[GF5_TILE_COUNT];
+    struct gf5_tile_slot tile_slot[GF5_TILE_COUNT];
     struct gf5_image *image;
 };
 i32 gf5_clock_read(struct gf5 *, struct gf5_clock *);
@@ -132,6 +150,16 @@ i32 gf5_gpio_find(struct gf5 *, u8 tag, u8 *line, u8 log[2]);
 i32 gf5_gpio_get(struct gf5 *, u8 line, const u8 log[2], bool *);
 i32 gf5_gpio_set(struct gf5 *, u8 line, const u8 log[2], bool);
 /* Caller reserves the entire rounded tile range; clear never releases it. */
+/* Binding alone does not initialize hardware. After devinit, before F2
+ * start/reservations/admission, zero all 12 PFB slots and flush; publish
+ * FREE only on complete success, otherwise UNKNOWN with admission closed.
+ * Retry only with GR stopped and no loans. Recover keeps OWNED PFB values. */
+i32 gf5_tiles_init(struct gf5 *);
+/* After windows close, F2 OFF and display quiesce, before release_all:
+ * disable PFB/GR without drain_pause. Failed slot stays UNKNOWN with both
+ * loans; successful slot puts loans then becomes FREE. End F5 save/free
+ * before retire even when SAVED (final R2-2); OWNED never crosses leave. */
+i32 gf5_tiles_retire(struct gf5 *);
 i32 gf5_tile_find(struct gf5 *, u32 *slot);
 i32 gf5_tile_set(struct gf5 *, u32 slot, const struct gf5_tile *);
 i32 gf5_tile_clear(struct gf5 *, u32 slot);

@@ -122,6 +122,15 @@ int paging_map_range(u32 virt_start, u32 virt_end, u32 phys_start, u32 flags);
  * クライアント面は私有 lease 窓へ貸す (旧 keep 経路の撤去は e11)。
  * 戻り値: 0=成功, -1=逆順/桁あふれ/必要 PT の確保不可 (全範囲を未変更)。 */
 int paging_map_phys(u32 virt_addr, u32 phys_addr, u32 npages, u32 flags);
+/* Device-owner windows: identity UC supervisor RW, PFN [first,end).
+ * 0 success/-1 failure. Require preallocated shared PTs; validate all
+ * pages, resource ownership and ledger capacity before atomic PTE/ledger
+ * commit under saved IRQs. No allocation/callback/yield in commit.
+ * Reject static/dynamic overlaps; adjacent windows stay separate. Unmap
+ * requires an exact registered tuple and validates every PTE first.
+ * Failure preserves PTEs and ledger. Caller ends GPU/posted writes first. */
+int paging_device_map(u32 owner, u32 rid, u32 first, u32 end);
+int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);
 
 /* boot は shm_init 後・最初の AS 前の一度だけ。共有 USER は WB。 */
 int paging_boot_user_shared(u32 tramp_page);

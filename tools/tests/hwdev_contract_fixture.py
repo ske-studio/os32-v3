@@ -22,6 +22,9 @@ FIX3 adds gf5 fan_off/poll_off/poll_source for optional-worker shutdown and diag
 S03 adds gf2_chan.staging_pending in existing padding (offset 899) to retain
 outstanding transfer ownership. Existing sizes and member offsets stay fixed.
 IRQ B01 adds the small pre-ACK first-fault latch to gf_irq_stats.
+Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
+F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
+GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
 These changes own the pins below.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
@@ -45,9 +48,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x2552eaee
+REVIEWED_LAYOUT_CRC = 0xace60670
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9e5ad9003939bbd125702101d945f05ba55886355a6f483362b5af156677f580'
-REVIEWED_INVENTORY_SHA = '61bcba18d3b5ece287bee3f022439ee5be9dd8f9891ded6872a3fbd6c28efbb8'
+REVIEWED_INVENTORY_SHA = '0eb72b9fecabb13cba5f568aa09127b056c297b5e58119c2cb98cd21a879da4f'
 
 
 def import_declarations(root):

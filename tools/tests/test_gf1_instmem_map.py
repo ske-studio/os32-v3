@@ -1,6 +1,6 @@
 """BAR2 mapping lifecycle and production paging adapter."""
 CHECK = dict(name='gf1-instmem-map-host', tier=1,
-             covers=['hwdev/gf/instmem_map.c', 'hwdev/gf/foundation.h',
+             covers=['tools/tests/gf_guard_fake.h', 'hwdev/gf/instmem_map.c', 'hwdev/gf/foundation.h',
                      'tools/tests/gf1_instmem_map_host.c', 'tools/tests/test_gf1_instmem_map.py',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
              needs=[], budget=30.0)

@@ -1920,7 +1920,7 @@ offset	struct gf3_test_ops.unmap	44
 member_size	struct gf3_test_ops.unmap	4
 offset	struct gf3_test_ops.upload	24
 member_size	struct gf3_test_ops.upload	4
-size	struct gf4_ctx	6652
+size	struct gf4_ctx	6728
 align	struct gf4_ctx	4
 offset	struct gf4_ctx.accel	4
 member_size	struct gf4_ctx.accel	4
@@ -1928,67 +1928,69 @@ offset	struct gf4_ctx.accepting	41
 member_size	struct gf4_ctx.accepting	1
 offset	struct gf4_ctx.ch	0
 member_size	struct gf4_ctx.ch	4
-offset	struct gf4_ctx.changing	646
+offset	struct gf4_ctx.changing	718
 member_size	struct gf4_ctx.changing	1
+offset	struct gf4_ctx.cleanup_pending	6724
+member_size	struct gf4_ctx.cleanup_pending	1
 offset	struct gf4_ctx.cursor	140
 member_size	struct gf4_ctx.cursor	48
 offset	struct gf4_ctx.cursor_view	212
-member_size	struct gf4_ctx.cursor_view	120
+member_size	struct gf4_ctx.cursor_view	192
 offset	struct gf4_ctx.data	12
 member_size	struct gf4_ctx.data	4
-offset	struct gf4_ctx.dcb	756
+offset	struct gf4_ctx.dcb	828
 member_size	struct gf4_ctx.dcb	748
 offset	struct gf4_ctx.deadline	32
 member_size	struct gf4_ctx.deadline	4
-offset	struct gf4_ctx.diagnostic_saved	1504
+offset	struct gf4_ctx.diagnostic_saved	1576
 member_size	struct gf4_ctx.diagnostic_saved	4
 offset	struct gf4_ctx.epoch	28
 member_size	struct gf4_ctx.epoch	4
 offset	struct gf4_ctx.exec	16
 member_size	struct gf4_ctx.exec	4
-offset	struct gf4_ctx.hold	332
+offset	struct gf4_ctx.hold	404
 member_size	struct gf4_ctx.hold	152
-offset	struct gf4_ctx.hold_saved	1512
+offset	struct gf4_ctx.hold_saved	1584
 member_size	struct gf4_ctx.hold_saved	5140
 offset	struct gf4_ctx.last_rc	36
 member_size	struct gf4_ctx.last_rc	4
-offset	struct gf4_ctx.legacy	488
+offset	struct gf4_ctx.legacy	560
 member_size	struct gf4_ctx.legacy	4
-offset	struct gf4_ctx.limits	492
+offset	struct gf4_ctx.limits	564
 member_size	struct gf4_ctx.limits	152
-offset	struct gf4_ctx.limits_valid	644
+offset	struct gf4_ctx.limits_valid	716
 member_size	struct gf4_ctx.limits_valid	2
-offset	struct gf4_ctx.links	484
+offset	struct gf4_ctx.links	556
 member_size	struct gf4_ctx.links	4
-offset	struct gf4_ctx.next_mode_id	652
+offset	struct gf4_ctx.next_mode_id	724
 member_size	struct gf4_ctx.next_mode_id	4
 offset	struct gf4_ctx.nroutes	24
 member_size	struct gf4_ctx.nroutes	4
 offset	struct gf4_ctx.ready	40
 member_size	struct gf4_ctx.ready	1
-offset	struct gf4_ctx.recovery_rc	648
+offset	struct gf4_ctx.recovery_rc	720
 member_size	struct gf4_ctx.recovery_rc	4
 offset	struct gf4_ctx.reusable	42
 member_size	struct gf4_ctx.reusable	1
 offset	struct gf4_ctx.routes	20
 member_size	struct gf4_ctx.routes	4
-offset	struct gf4_ctx.saved_closed	647
+offset	struct gf4_ctx.saved_closed	719
 member_size	struct gf4_ctx.saved_closed	1
 offset	struct gf4_ctx.scan	44
 member_size	struct gf4_ctx.scan	96
-offset	struct gf4_ctx.scan_bank	752
+offset	struct gf4_ctx.scan_bank	824
 member_size	struct gf4_ctx.scan_bank	2
-offset	struct gf4_ctx.scan_next	656
+offset	struct gf4_ctx.scan_next	728
 member_size	struct gf4_ctx.scan_next	96
 offset	struct gf4_ctx.state	8
 member_size	struct gf4_ctx.state	4
 offset	struct gf4_ctx.test	188
 member_size	struct gf4_ctx.test	24
-offset	struct gf4_ctx.tv_pin_mask	1508
+offset	struct gf4_ctx.tv_pin_mask	1580
 member_size	struct gf4_ctx.tv_pin_mask	1
-offset	struct gf4_ctx.tv_sense_valid	1510
+offset	struct gf4_ctx.tv_sense_valid	1582
 member_size	struct gf4_ctx.tv_sense_valid	1
-offset	struct gf4_ctx.tv_subconnector	1509
+offset	struct gf4_ctx.tv_subconnector	1581
 member_size	struct gf4_ctx.tv_subconnector	1
 size	struct gf4_cursor	28
 align	struct gf4_cursor	4
@@ -2172,8 +2174,10 @@ offset	struct gf4_mode.pitch	32
 member_size	struct gf4_mode.pitch	4
 offset	struct gf4_mode.t	4
 member_size	struct gf4_mode.t	24
-size	struct gf4_restore_ops	16
+size	struct gf4_restore_ops	20
 align	struct gf4_restore_ops	4
+offset	struct gf4_restore_ops.abandon	16
+member_size	struct gf4_restore_ops.abandon	4
 offset	struct gf4_restore_ops.ctx	0
 member_size	struct gf4_restore_ops.ctx	4
 offset	struct gf4_restore_ops.last_rc	8
@@ -2328,7 +2332,7 @@ offset	struct gf4_tv_state.version	0
 member_size	struct gf4_tv_state.version	4
 offset	struct gf4_tv_state.vfilter	300
 member_size	struct gf4_tv_state.vfilter	112
-size	struct gf5	556
+size	struct gf5	1660
 align	struct gf5	4
 offset	struct gf5.accel	4
 member_size	struct gf5.accel	4
@@ -2348,7 +2352,7 @@ offset	struct gf5.fan	132
 member_size	struct gf5.fan	136
 offset	struct gf5.fan_off	126
 member_size	struct gf5.fan_off	1
-offset	struct gf5.image	552
+offset	struct gf5.image	1656
 member_size	struct gf5.image	4
 offset	struct gf5.last_rc	116
 member_size	struct gf5.last_rc	4
@@ -2376,6 +2380,8 @@ offset	struct gf5.tile	300
 member_size	struct gf5.tile	240
 offset	struct gf5.tile_live	540
 member_size	struct gf5.tile_live	12
+offset	struct gf5.tile_slot	552
+member_size	struct gf5.tile_slot	1104
 offset	struct gf5.vid	84
 member_size	struct gf5.vid	12
 size	struct gf5_clock	12
@@ -2470,17 +2476,17 @@ offset	struct gf5_fan_trip.hyst	4
 member_size	struct gf5_fan_trip.hyst	4
 offset	struct gf5_fan_trip.temp	0
 member_size	struct gf5_fan_trip.temp	4
-size	struct gf5_image	5572
+size	struct gf5_image	5764
 align	struct gf5_image	4
 offset	struct gf5_image.bytes	4
 member_size	struct gf5_image.bytes	4
 offset	struct gf5_image.clock	16
 member_size	struct gf5_image.clock	12
-offset	struct gf5_image.complete	5568
+offset	struct gf5_image.complete	5760
 member_size	struct gf5_image.complete	1
-offset	struct gf5_image.display	424
+offset	struct gf5_image.display	616
 member_size	struct gf5_image.display	5140
-offset	struct gf5_image.extent	5564
+offset	struct gf5_image.extent	5756
 member_size	struct gf5_image.extent	4
 offset	struct gf5_image.fan	36
 member_size	struct gf5_image.fan	136
@@ -2494,6 +2500,8 @@ offset	struct gf5_image.tile	172
 member_size	struct gf5_image.tile	240
 offset	struct gf5_image.tile_live	412
 member_size	struct gf5_image.tile_live	12
+offset	struct gf5_image.tile_saved	424
+member_size	struct gf5_image.tile_saved	192
 offset	struct gf5_image.version	0
 member_size	struct gf5_image.version	4
 offset	struct gf5_image.vid	32
@@ -2638,6 +2646,30 @@ offset	struct gf5_tile.pitch	8
 member_size	struct gf5_tile.pitch	4
 offset	struct gf5_tile.reservation_id	12
 member_size	struct gf5_tile.reservation_id	4
+size	struct gf5_tile_saved	16
+align	struct gf5_tile_saved	4
+offset	struct gf5_tile_saved.raw_addr	4
+member_size	struct gf5_tile_saved.raw_addr	4
+offset	struct gf5_tile_saved.raw_limit	8
+member_size	struct gf5_tile_saved.raw_limit	4
+offset	struct gf5_tile_saved.raw_pitch	12
+member_size	struct gf5_tile_saved.raw_pitch	4
+offset	struct gf5_tile_saved.state	0
+member_size	struct gf5_tile_saved.state	4
+size	struct gf5_tile_slot	92
+align	struct gf5_tile_slot	4
+offset	struct gf5_tile_slot.current	88
+member_size	struct gf5_tile_slot.current	4
+offset	struct gf5_tile_slot.loan	16
+member_size	struct gf5_tile_slot.loan	72
+offset	struct gf5_tile_slot.raw_addr	4
+member_size	struct gf5_tile_slot.raw_addr	4
+offset	struct gf5_tile_slot.raw_limit	8
+member_size	struct gf5_tile_slot.raw_limit	4
+offset	struct gf5_tile_slot.raw_pitch	12
+member_size	struct gf5_tile_slot.raw_pitch	4
+offset	struct gf5_tile_slot.state	0
+member_size	struct gf5_tile_slot.state	4
 size	struct gf5_vid_ops	12
 align	struct gf5_vid_ops	4
 offset	struct gf5_vid_ops.get	0
@@ -2970,7 +3002,7 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	11488
+size	struct gf_production	12592
 align	struct gf_production	4
 offset	struct gf_production.accel	3412
 member_size	struct gf_production.accel	7512
@@ -2983,16 +3015,16 @@ member_size	struct gf_production.chan	1044
 offset	struct gf_production.display	0
 member_size	struct gf_production.display	1888
 offset	struct gf_production.feature5	10924
-member_size	struct gf_production.feature5	556
+member_size	struct gf_production.feature5	1660
 offset	struct gf_production.foundation	2124
 member_size	struct gf_production.foundation	244
 offset	struct gf_production.indexes	1932
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	2028
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	11480
+offset	struct gf_production.map_ops	12584
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	11484
+offset	struct gf_production.map_owner	12588
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1908
 member_size	struct gf_production.prepared	1
@@ -3068,8 +3100,22 @@ offset	struct gf_stage_state.s0_ok	6
 member_size	struct gf_stage_state.s0_ok	1
 offset	struct gf_stage_state.values	212
 member_size	struct gf_stage_state.values	40
-size	struct gf_vram_registry	12
+size	struct gf_vram_borrow	36
+align	struct gf_vram_borrow	4
+offset	struct gf_vram_borrow.bytes	24
+member_size	struct gf_vram_borrow.bytes	4
+offset	struct gf_vram_borrow.key	0
+member_size	struct gf_vram_borrow.key	20
+offset	struct gf_vram_borrow.kind	28
+member_size	struct gf_vram_borrow.kind	4
+offset	struct gf_vram_borrow.next	32
+member_size	struct gf_vram_borrow.next	4
+offset	struct gf_vram_borrow.off	20
+member_size	struct gf_vram_borrow.off	4
+size	struct gf_vram_registry	16
 align	struct gf_vram_registry	4
+offset	struct gf_vram_registry.borrows	12
+member_size	struct gf_vram_registry.borrows	4
 offset	struct gf_vram_registry.ch	0
 member_size	struct gf_vram_registry.ch	4
 offset	struct gf_vram_registry.head	4
@@ -3094,8 +3140,10 @@ offset	struct gf_vram_reservation_node.next	20
 member_size	struct gf_vram_reservation_node.next	4
 offset	struct gf_vram_reservation_node.value	0
 member_size	struct gf_vram_reservation_node.value	20
-size	struct gf_vram_view	60
+size	struct gf_vram_view	96
 align	struct gf_vram_view	4
+offset	struct gf_vram_view.borrow	60
+member_size	struct gf_vram_view.borrow	36
 offset	struct gf_vram_view.bytes	28
 member_size	struct gf_vram_view.bytes	4
 offset	struct gf_vram_view.ch	44
@@ -3678,6 +3726,16 @@ offset	struct lease_mapping.slot	16
 member_size	struct lease_mapping.slot	4
 offset	struct lease_mapping.token	20
 member_size	struct lease_mapping.token	4
+size	struct ledger_device_map	16
+align	struct ledger_device_map	4
+offset	struct ledger_device_map.end	12
+member_size	struct ledger_device_map.end	4
+offset	struct ledger_device_map.first	8
+member_size	struct ledger_device_map.first	4
+offset	struct ledger_device_map.owner	0
+member_size	struct ledger_device_map.owner	4
+offset	struct ledger_device_map.rid	4
+member_size	struct ledger_device_map.rid	4
 size	struct ledger_owner	24
 align	struct ledger_owner	4
 offset	struct ledger_owner.alloc_irq	16
@@ -4806,6 +4864,7 @@ enum	GF2_STOP	3
 enum	GF2_VBLANK	8
 enum	GF3_ACCEL	9
 enum	GF3_ARGB8888	3
+enum	GF3_EBUSY	4294966990
 enum	GF3_EFORMAT	4294966994
 enum	GF3_EINVAL	4294966995
 enum	GF3_ERANGE	4294966993
@@ -4919,6 +4978,8 @@ enum	GF5_RESTORING	3
 enum	GF5_RUN	0
 enum	GF5_SAVED	2
 enum	GF5_SAVING	1
+enum	GF_BORROW_TILE	1
+enum	GF_BORROW_VIEW	0
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5
@@ -5017,6 +5078,9 @@ enum	GF_MODE_CR_VT	6
 enum	GF_SCRIPT_EIO	4294967295
 enum	GF_SCRIPT_ETIME	4294967291
 enum	GF_SCRIPT_OK	0
+enum	GF_TILE_FREE	0
+enum	GF_TILE_OWNED	1
+enum	GF_TILE_UNKNOWN	2
 enum	GF_VERIFY_CR	1
 enum	GF_VERIFY_MMIO	0
 enum	GF_VERIFY_SR	2

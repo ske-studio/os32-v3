@@ -77,6 +77,9 @@ struct gf4_ctx {
      * diagnostic STOP->START. Capture head/hold/IRQ before suspend changes
      * DPMS; never use state.rollback or overwrite diagnostic_saved. */
     struct gf4_saved hold_saved;
+    /* Set before retire/release; retain through partial cleanup and any
+     * diagnostic loan. Clear only after complete successful reset. */
+    bool cleanup_pending;
 };
 int gf4_modes(struct gf4_ctx *,u8,const struct gf4_mode **,u32 *);
 int gf4_set_mode(struct gf4_ctx *,const struct gf4_route *,u32,const struct gf3_surface *,u32);
@@ -162,6 +165,14 @@ i32 gf4_service_recover(struct gf4_ctx *,u32 dl);
 i32 gf4_diagnostic_save(struct gf4_ctx *,struct gf4_saved *,u32 dl);
 i32 gf4_diagnostic_restore(struct gf4_ctx *,const struct gf4_saved *,u32 dl);
 i32 gf4_display_saved_release(struct gf4_ctx *,const struct gf4_saved *);
+/* Terminal diagnostic cleanup, separate from restore and saved_release.
+ * Require exact saved pointer, !legacy->engaged, F2 OFF, !ready and no F5
+ * save. Retire -> saved_release -> release_all -> cleanup_reset; preserve
+ * ownership/pending on failure for retry, and preserve original restore rc. */
+i32 gf4_diagnostic_abandon(struct gf4_ctx *,const struct gf4_saved *);
+/* Only after release_all success and diagnostic loan termination. Reset
+ * head/hold, saved_closed/hold_saved.version, service scan/test and banks. */
+void gf4_service_cleanup_reset(struct gf4_ctx *);
 /* Kernel-only C4 binding; clear only after a complete stop. */
 i32 gf4_data_bind(const struct gf4_data_ops **,struct gf4_state **);
 struct gf4_restore_ops {
@@ -169,6 +180,8 @@ struct gf4_restore_ops {
     i32 (*restore)(struct gf4_ctx *,const struct gf4_saved *,u32 dl);
     i32 (*last_rc)(struct gf4_ctx *);
     i32 (*saved_release)(struct gf4_ctx *,const struct gf4_saved *);
+    /* Management only; NULL until S1/S2 wiring. Reread slot before use. */
+    i32 (*abandon)(struct gf4_ctx *,const struct gf4_saved *);
 };
 struct gf4_test_ops {
     struct gf4_ctx *ctx; __typeof__(&gf4_set_mode) set_mode;
