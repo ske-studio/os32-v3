@@ -82,6 +82,12 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
         return state_reject(g,GF5_EBUSY);
     if (g->phase!=GF5_RUN) return state_reject(g,GF5_ESTATE);
+    for (u32 i=0;i<GF5_TILE_COUNT;++i) {
+        const struct gf5_tile_slot *s=&g->tile_slot[i];
+        if ((s->state!=GF_TILE_FREE && s->state!=GF_TILE_OWNED) ||
+            g->tile_live[i]!=(s->state==GF_TILE_OWNED))
+            return state_reject(g,GF5_ESTATE);
+    }
     g->last_rc=g->source_rc=0;
     i32 rc=state_deadline(g);
     if (rc) return state_result(g,rc);
@@ -130,6 +136,9 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     for (u32 i=0;i<image->fan.ntrip;++i) image->fan.trip[i]=g->fan.trip[i];
     for (u32 i=0;i<GF5_TILE_COUNT;++i) {
         image->tile[i]=g->tile[i]; image->tile_live[i]=g->tile_live[i];
+        const struct gf5_tile_slot *s=&g->tile_slot[i];
+        image->tile_saved[i]=(struct gf5_tile_saved){
+            s->state,s->raw_addr,s->raw_limit,s->raw_pitch};
     }
     u8 *copy=(u8 *)(image->extent+count)+image->fan.ntrip*sizeof(struct gf5_fan_trip);
     cursor=0;
@@ -200,12 +209,46 @@ i32 gf5_state_restore(struct gf5 *g, const struct gf5_image *image)
         }
         if (!rc && (live.off!=key->off || live.bytes!=key->bytes)) rc=GF5_ESTATE;
     }
+    /* The image owns values, not loans. OFF/recover must leave the resident
+     * nodes linked until the replacement descriptor has been programmed.
+     * Reject a retired/reused slot instead of resurrecting its reservation. */
+    for (u32 i=0;!rc && i<GF5_TILE_COUNT;++i) {
+        const struct gf5_tile_saved *saved=&image->tile_saved[i];
+        const struct gf5_tile_slot *s=&g->tile_slot[i];
+        if ((saved->state!=GF_TILE_FREE && saved->state!=GF_TILE_OWNED) ||
+            s->state!=saved->state || s->raw_addr!=saved->raw_addr ||
+            s->raw_limit!=saved->raw_limit || s->raw_pitch!=saved->raw_pitch ||
+            image->tile_live[i]!=(saved->state==GF_TILE_OWNED) ||
+            g->tile_live[i]!=image->tile_live[i]) { rc=GF5_ESTATE; break; }
+        if (saved->state==GF_TILE_OWNED) {
+            if (s->current>1U) { rc=GF5_ESTATE; break; }
+            const struct gf_vram_borrow *loan=&s->loan[s->current];
+            const struct gf_vram_reservation *key=&loan->key;
+            const struct gf5_tile *tile=&image->tile[i];
+            struct gf_vram_reservation live;
+            if (!key->reservation_id || loan->kind!=GF_BORROW_TILE ||
+                key->reservation_id!=tile->reservation_id ||
+                key->generation!=tile->generation || loan->off!=tile->base ||
+                loan->bytes!=tile->bytes) { rc=GF5_ESTATE; break; }
+            rc=gf_vram_match(g->ch,key->owner,key->reservation_id,key->generation,
+                             key->off,key->bytes,&live);
+            if (rc==GF3_ERANGE) {
+                g->source_rc=rc; g->last_rc=GF5_ESTATE; rc=GF5_ESTATE;
+            }
+            if (!rc && (live.off!=key->off || live.bytes!=key->bytes)) rc=GF5_ESTATE;
+        }
+    }
     if (!rc) rc=g->links.restart(g->links.owner,g->deadline);
     if (!rc && (g->ch->state!=GF2_RUN || g->ch->epoch==image->saved_epoch)) rc=GF5_ESTATE;
     if (!rc) rc=state_performance(g,image);
     for (u32 i=0;!rc && i<GF5_TILE_COUNT;++i) {
-        if (image->tile_live[i]) rc=gf5_tile_set(g,i,&image->tile[i]);
+        if (image->tile_saved[i].state==GF_TILE_OWNED) rc=gf5_tile_set(g,i,&image->tile[i]);
         else rc=gf5_tile_clear(g,i);
+        const struct gf5_tile_saved *saved=&image->tile_saved[i];
+        const struct gf5_tile_slot *s=&g->tile_slot[i];
+        if (!rc && (s->state!=saved->state || s->raw_addr!=saved->raw_addr ||
+                    s->raw_limit!=saved->raw_limit || s->raw_pitch!=saved->raw_pitch))
+            rc=GF5_ESTATE;
     }
     for (u32 i=0;!rc && i<image->nextent;++i)
         rc=g->links.copy_extent(g->links.owner,&image->extent[i].key,
