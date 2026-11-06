@@ -58,6 +58,10 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         start = vfs.index('#define VFS_NAME_MAX')
         end = vfs.index('/* 末尾の', start)
         sources['resolve'] = ('#include "' + str(ROOT / 'fs/vfs.h') + '"\n' +
+                              # These caller/range fixtures have no mounted FS.
+                              # Resource lifetime is outside their boundary.
+                              'int vfs_resource_prepare(VfsOps *ops, void *ctx)\n'
+                              '{ (void)ops; (void)ctx; return VFS_OK; }\n' +
                               'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
         memstat = (ROOT / 'kapi/kapi_sys.c').read_text()
         sources['memstat'] = memstat[memstat.index('STATIC_ASSERT(sizeof(MemStat)'):memstat.index('static void build_time_copy(')].replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
