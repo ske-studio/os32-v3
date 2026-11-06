@@ -22,6 +22,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "kstring.h"
 #include "link.h"
 #include "net/nic.h"
+#include "os32/os32_kapi_shared.h"
 
 #define LGY_MAC_HEX_DIGITS    2
 #define LGY_MAC_TEXT_STRIDE   (LGY_MAC_HEX_DIGITS + 1)
@@ -124,6 +125,12 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
         rc = net_adapter_register(NET_NIC_LGY98, &net_lgy98_adapter);
         if (rc) {
             kprintf(ATTR_YELLOW, "[lgy98] adapter registration failed rc=%d\n", rc);
+            return NE2K_ERR_IO;
+        }
+        rc = net_start(NET_NIC_AUTO, NULL);
+        /* lan.mod starts earlier; BUSY preserves the preferred 82557. */
+        if (rc && rc != OS32_ERR_BUSY) {
+            kprintf(ATTR_YELLOW, "[lgy98] shared NIC start failed rc=%d\n", rc);
             return NE2K_ERR_IO;
         }
     }

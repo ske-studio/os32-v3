@@ -28,6 +28,11 @@ int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter)
     if (!initialized || id != NET_NIC_LGY98 || adapter != &net_lgy98_adapter) bad = 1;
     return register_rc;
 }
+int net_start(enum NetNicId id, const u8 peer[6])
+{
+    if (id != NET_NIC_AUTO || peer || registrations != 1 || register_rc) bad = 1;
+    return 0;
+}
 int ne2k_init(const struct ne2k_config *cfg)
 {
     if (cfg->reg_base != LGY98_BASE_DEFAULT || cfg->irq != LGY98_INT0_IRQ) bad = 1;
