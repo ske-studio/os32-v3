@@ -140,6 +140,59 @@ static const char *first_kanji(IME_Dict *d, int *n)
     return *n > 0 ? r[0].kanji : "";
 }
 
+/* N/O: two independent resident connections; cursor fault injection is supplied
+ * by the freestanding search driver at the sqlite3_step boundary. */
+static void store_merge_cases(void (*fault)(sqlite3_stmt *, int))
+{
+    FepStore s = {0};
+    IME_Result out[IME_MAX_RESULTS];
+    sqlite3 *db = 0;
+    make_dict("/db/merge.db", "蚊");
+    CHECK(setup_open("/db/merge.db", &db, SQLITE_OPEN_READWRITE, 0) == 0);
+    CHECK(sqlite3_exec(db,
+        "INSERT INTO dict VALUES('か','先',7,-10001);"
+        "INSERT INTO dict VALUES('か','同',8,10);"
+        "INSERT INTO dict VALUES('かなか','前',9,600);",
+        0, 0, 0) == 0);
+    CHECK(setup_close(db) == 0);
+    CHECK(fep_store_open(&s, "/db/merge.db", "/etc/merge.db") == 0);
+    CHECK(fep_store_live_connections(&s) == 2);
+    CHECK(os32_sqlite_db_fd(s.system.db) != os32_sqlite_db_fd(s.user.db));
+    CHECK(sqlite3_exec(s.system.db, "DELETE FROM dict", 0, 0, 0) == SQLITE_READONLY);
+    fep_store_learn(&s, "か", "同");
+    CHECK(fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3);
+    /* Equal -10001 cost: user wins, and dedup keeps its pos_id=0. */
+    CHECK(!strcmp(out[0].kanji, "同") && out[0].pos_id == 0);
+    CHECK(!strcmp(out[1].kanji, "先") && out[1].pos_id == 7);
+    CHECK(!strcmp(out[2].kanji, "蚊"));
+    CHECK(fep_store_search(&s, "かなか", out, IME_MAX_RESULTS) == 1);
+    CHECK(out[0].cost == 100);
+    void *system_db = s.system.db;
+    u32 system_generation = s.system.group.generation;
+    /* Fail after a user row has entered the merge. Its partial result must
+     * disappear; system restarts at its first row and retains both duplicates. */
+    fault(s.user.exact, 2);
+    CHECK(fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3);
+    CHECK(!strcmp(out[0].kanji, "先") && out[0].pos_id == 7);
+    CHECK((out[1].pos_id == 8 && !strcmp(out[1].kanji, "同")) ||
+          (out[2].pos_id == 8 && !strcmp(out[2].kanji, "同")));
+    CHECK(s.system.db == system_db && s.system.group.generation == system_generation);
+    fault(0, 0);
+    CHECK(fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3 && out[0].pos_id == 0);
+    CHECK(fep_store_close(&s) == 0);
+    /* Incompatible user identity disables learning without touching its data. */
+    db = 0;
+    CHECK(setup_open("/etc/merge.db", &db, SQLITE_OPEN_READWRITE, 0) == 0);
+    CHECK(sqlite3_exec(db, "UPDATE meta SET value='other' WHERE key='dict_id'", 0, 0, 0) == 0);
+    CHECK(setup_close(db) == 0);
+    CHECK(fep_store_open(&s, "/db/merge.db", "/etc/merge.db") == 0);
+    CHECK(!s.user_enabled && !s.user.db && fep_store_live_connections(&s) == 1);
+    CHECK(fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3 && out[0].pos_id == 7);
+    CHECK(fep_store_close(&s) == 0);
+    CHECK(fixture_rm("/db/merge.db") == 0 && fixture_rm("/etc/merge.db") == 0);
+    puts("PASS two-connection tie/dedup/prefix/mid-cursor retry/identity failure");
+}
+
 /* ---- (7) ユーザー辞書の管理 API も同じ回復経路 (Codex 実装レビュー
  *      ラリー 1 の B5) ---- */
 static int has_bytes(const unsigned char *d, u32 n, const char *pat)

@@ -89,7 +89,12 @@ def main():
             if product.count(OLD) != 1:
                 raise RuntimeError('system retry anchor not unique')
             cases.append(('system-only-retry', product.replace(OLD, NEW), user_product,
-                          'hits(&s, out) == 3'))
+                          'fep_store_search(&s, "か", out, IME_MAX_RESULTS) == 3'))
+            old = 'if (i == 2) valid = user_text(p, n, s->meta.dict_id);'
+            if user_product.count(old) != 1:
+                raise RuntimeError('user identity anchor not unique')
+            cases.append(('user-identity', product, user_product.replace(old, 'if (i == 2) valid = 1;'),
+                          '!s.user_enabled && !s.user.db && fep_store_live_connections(&s) == 1'))
             old = 'result = user_exec(db, "UPDATE dict_user SET freq=freq WHERE 0");'
             if user_product.count(old) != 1:
                 raise RuntimeError('readonly probe anchor not unique')
