@@ -281,7 +281,7 @@ static void normal_clock_dispatch(void)
             assert(!cint_prod.display.stop_ok && !cint_prod.display.reusable);
             assert(cint_prod.display.last_rc==GF1_EIO);
             assert(cint_prod.display.target==RECOVER_PBUS1854);
-            assert(cint_restore_calls==2 && cint_restore_rc==0);
+            assert(cint_restore_calls==1 && cint_restore_rc==0);
             assert(!gf2_host_memcmp(&scan,&cint_service->scan_node.value,sizeof(scan)));
             /* Both successful START writes would replace the lower target
              * with head B without the first_rc guard in quiesce.c. */
