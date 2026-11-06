@@ -40,6 +40,15 @@ FLAGS = ['-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
          '-ffreestanding','-fno-pie','-fno-stack-protector','-fno-builtin']
 # name, file, unique old, replacement, runtime rejection.
 MUTATIONS = (
+ ('M_DAC_SKIP','backend_trident.c','    palette_before_present();',
+  '    if (register_entry == 0) palette_before_present();','DAC dump on each activation'),
+ ('M_DAC_INDEX','backend_trident.c','TRI_DAC_READ_INDEX, 0);',
+  'TRI_DAC_READ_INDEX, 1);','DAC starts at color zero'),
+ ('M_DAC_MASK','backend_trident.c','TRI_DAC_MASK, &mask)',
+  'TRI_DAC_DATA, &mask)','read ordinary DAC mask'),
+ ('M_DAC_SHORT','backend_trident.c','i < sizeof(rgb) && !rc',
+  'i + 1 < sizeof(rgb) && !rc','all 48 components observed'),
+
  ('M_DUMP_REPEATED','backend_trident.c','registers_pending = false;',
   'registers_pending = true;','one dump per activation'),
  ('M_DUMP_CR_SHORT','backend_trident.c','"CR", 25, 95, cr, cv',
@@ -291,6 +300,15 @@ def check_trace(data):
             trace.access(True,1,0x3C0,selector)
             trace.access(False,1,0x3DA,0x5A)
             trace.access(False,1,0x3CC,0xEB)
+            dac_selector=trace.access(False,1,0x3C8)
+            trace.access(False,1,0x3C6,255)
+            trace.access(True,1,0x3C7,0)
+            for i in range(16):
+                for _ in range(3):
+                    trace.access(False,1,0x3C9,(i<<2)|(i>>2))
+                    trace.access(False,1,0x3DA,0x5A)
+                    trace.access(False,1,0x3DA,0x5A)
+            trace.access(True,1,0x3C8,dac_selector)
             # Every LFB byte, including the final byte, must use write8.
             # Full H-equivalent bitmap is also checked in the C harness.
             for off in range(640*480): trace.access(True,1,off,space=1,count=1)

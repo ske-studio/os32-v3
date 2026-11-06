@@ -224,6 +224,8 @@ static int image(void)
     CHECK(contains("CR59=") && contains("GR00=") && contains("AR10=41 00 0f 00 00"));
     CHECK(contains("MISC00=eb") && contains("START.CR0c=00") && contains("START.CR0d=00"));
     CHECK(contains("START.CR1e=80") && contains("START.CR27=08"));
+    CHECK(contains("entry=1 DAC.MASK00=ff") && contains("entry=1 DAC00=00 00 00"));
+    CHECK(contains("entry=1 DAC0f=3f 3f 3f"));
     CHECK(!registers_pending && register_entry==1);
     CHECK(!device.last_rc && equal(counters.present_bytes,307200) && counters.commits==1);
     for (u32 i=0;i<sizeof(client);++i) CHECK(equal(storage[i],client[i]));
@@ -260,6 +262,18 @@ static int sequence(void)
         ops=f.operations; backend.enter(); CHECK(equal(f.operations,ops));
         CHECK(calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_PC98_INIT]==1 && calls[TRI_STEP_VERIFY]==1);
         CHECK(calls[TRI_STEP_MODE]==2 && calls[TRI_STEP_ENABLE]==2 && allocs==1 && frees==1);
+        /* Real second ScreenInit must reload all 256 colors after boot DAC
+         * restoration, then sample that reloaded image before present. */
+        for (u32 i=0;i<16;++i) for (u32 c=0;c<3;++c)
+            CHECK(f.dac[i*3+c]==((i<<2)|(i>>2)));
+        u32 color=16;
+        for (u32 r=0;r<6;++r) for (u32 g=0;g<6;++g) for (u32 b=0;b<6;++b,++color) {
+            CHECK(f.dac[color*3]==r*63/5 && f.dac[color*3+1]==g*63/5 && f.dac[color*3+2]==b*63/5);
+        }
+        for (u32 gray=0;gray<24;++gray,++color) for (u32 c=0;c<3;++c)
+            CHECK(f.dac[color*3+c]==((8+gray*10)*63+127)/255);
+        backend.present_rect(0,0,1,1);
+        CHECK(contains("entry=2 DAC.MASK00=ff") && contains("entry=2 DAC0f=3f 3f 3f"));
         for (u32 i=0;i<sizeof(saved);++i) CHECK(equal(((u8 *)&saved)[i],((u8 *)&device.saved)[i]));
         backend.shutdown();
         CHECK(order[norder-3]==TRI_STEP_DISABLE && order[norder-2]==TRI_STEP_RESTORE && order[norder-1]==TRI_STEP_LOCK);
@@ -287,6 +301,29 @@ static int sequence(void)
     backend.init(); CHECK(!device.last_rc && device.active && client[0]==0);
     CHECK(calls[TRI_STEP_MODE]==3 && calls[TRI_STEP_ENABLE]==3 &&
         calls[TRI_STEP_SAVE]==1 && calls[TRI_STEP_PC98_INIT]==1 && calls[TRI_STEP_VERIFY]==1);
+    return 0;
+}
+static int dac_observation(void)
+{
+    CALL(setup(false,false)); CALL(start());
+    /* Hardware values, including non-FF mask and hidden command, are evidence;
+     * diagnostics must not replace them with the intended HAL palette. */
+    for (u32 i=0;i<TRI_DAC_BYTES;++i) f.dac[i]=(i*7+3)&63;
+    f.regs[TRI_DAC_MASK]=0x5A; f.hidden_dac=0xA6; f.hidden_reads=4;
+    f.regs[TRI_DAC_WRITE_INDEX]=42; f.dac_write=42*3; f.dac_read=87;
+    backend.present_rect(0,0,1,1);
+    CHECK(!device.last_rc && counters.commits==1);
+    CHECK(contains("entry=1 DAC.MASK00=5a"));
+    CHECK(contains("entry=1 DAC00=03 0a 11") && contains("entry=1 DAC0f=3e 05 0c"));
+    CHECK(f.regs[TRI_DAC_MASK]==0x5A && f.hidden_dac==0xA6);
+    CHECK(f.regs[TRI_DAC_WRITE_INDEX]==42 && f.dac_write==42*3);
+    for (u32 i=0;i<TRI_DAC_BYTES;++i) CHECK(f.dac[i]==((i*7+3)&63));
+    /* Inject a failed component read directly at the diagnostic seam. */
+    trident_fake_fail(&f,f.operations+4,-94);
+    serial_length=0; serial_text[0]=0;
+    palette_before_present();
+    CHECK(contains("DAC00=?? ?? ??") && contains("DAC0f=?? ?? ??"));
+    CHECK(contains("register DAC rc=-94") && !device.last_rc && device.active);
     return 0;
 }
 static int failures(void)
@@ -399,6 +436,7 @@ static int production_binding(void)
 void _start(void)
 {
     int rc=sequence();
+    if (!rc) rc=dac_observation();
     if (!rc) rc=failures();
     if (!rc) rc=production_binding();
     if (!rc) {

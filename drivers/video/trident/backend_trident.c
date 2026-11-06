@@ -50,6 +50,38 @@ static void register_bank(u16 port, const char *group, u32 first, u32 last,
     }
 }
 
+/* vgaHW.c:876-896,1121-1126: DAC components are raw 6-bit values;
+ * DACDelay uses two current-ST01 reads. Only select the read address here,
+ * never write the mask or RGB data. Reading 3C8 first exits hidden-DAC access.
+ * The DAC read cursor ends at color 16; VGA cannot read back that cursor.
+ * Every palette writer explicitly selects its own write address. */
+static void palette_before_present(void)
+{
+    u8 selector = 0, mask = 0, ignored;
+    u8 rgb[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) * GFX_RGB_COMPONENTS] = {0};
+    bool valid[sizeof(rgb)] = {0};
+    int saved = trident_read8(&device, TRI_SPACE_REGS, TRI_DAC_WRITE_INDEX, &selector);
+    int rc = saved ? saved : trident_read8(&device, TRI_SPACE_REGS, TRI_DAC_MASK, &mask);
+    bool mask_valid = !rc;
+    register_row("DAC.MASK", 0, &mask, &mask_valid, 1);
+    if (!rc) rc = trident_write8(&device, TRI_SPACE_REGS, TRI_DAC_READ_INDEX, 0);
+    for (u32 i = 0; i < sizeof(rgb) && !rc; ++i) {
+        rc = trident_read8(&device, TRI_SPACE_REGS, TRI_DAC_DATA, &rgb[i]);
+        if (!rc) rc = trident_read8(&device, TRI_SPACE_REGS, device.cur_vga_base + 6u, &ignored);
+        if (!rc) rc = trident_read8(&device, TRI_SPACE_REGS, device.cur_vga_base + 6u, &ignored);
+        valid[i] = !rc;
+    }
+    int restore = saved ? saved :
+        trident_write8(&device, TRI_SPACE_REGS, TRI_DAC_WRITE_INDEX, selector);
+    for (u32 i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); ++i)
+        register_row("DAC", i, rgb + i * GFX_RGB_COMPONENTS,
+                     valid + i * GFX_RGB_COMPONENTS, GFX_RGB_COMPONENTS);
+    if (rc || restore) {
+        serial_puts_polled("[trident] register DAC rc=");
+        serial_diag_i32(rc ? rc : restore); serial_puts_polled("\n");
+    }
+}
+
 static void registers_before_present(void)
 {
     if (!registers_pending || serial_gate_active()) return;
@@ -84,6 +116,7 @@ static void registers_before_present(void)
         u8 index = indices[i];
         register_row("START.CR", index, cr + index, cv + index, 1);
     }
+    palette_before_present();
 }
 
 
