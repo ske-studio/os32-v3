@@ -108,15 +108,20 @@ static u32 pattern(u32 off) { return off ^ 0x69C35AA5u; }
 /* Never abandon the remaining undo operations after one failure. Read back
  * each restored word; writing an absent upper word back to FF is harmless.
  * Page bodies are undone before tags, and all undo runs in reverse order. */
-static int undo(struct trident_device *d, u32 off, const u32 *saved, u32 words)
+static int undo(struct trident_device *d, u32 off, const u32 *saved, u32 words,
+                u32 *restore_end)
 {
     int result = 0;
     while (words) {
         u32 i = --words, value;
-        int rc = WRITE(off + i * WORD_BYTES, saved[i]);
-        if (rc) result = TRI_E_RESTORE;
-        rc = READ(off + i * WORD_BYTES, &value);
-        if (rc || value != saved[i]) result = TRI_E_RESTORE;
+        u32 at = off + i * WORD_BYTES;
+        int rc = WRITE(at, saved[i]);
+        bool bad = rc != 0;
+        rc = READ(at, &value);
+        if (bad || rc || value != saved[i]) {
+            result = TRI_E_RESTORE;
+            if (at < *restore_end) *restore_end = at;
+        }
     }
     return result;
 }
@@ -129,7 +134,7 @@ static int measure(struct trident_device *d, u32 limit, u32 *end, u32 *complete,
                    bool *mirror, bool *upper_checked, int *access_rc)
 {
     u32 *tags = d->scratch, *page = tags + TAG_WORDS;
-    u32 retained = 0;
+    u32 retained = 0, restore_end = limit;
     int restored = 0;
     *end = *complete = 0;
     for (u32 off = 0; off < limit; off += TRI_PAGE_BYTES) {
@@ -158,28 +163,27 @@ static int measure(struct trident_device *d, u32 limit, u32 *end, u32 *complete,
                     *end = at; bad = true;
                 }
             }
-            bool separate = true;
             for (u32 i = 0; i < retained; ++i) {
                 u32 value, at = i * TRI_PAGE_BYTES;
                 int rc = READ(at, &value);
                 if (rc || value != pattern(at)) {
                     if (rc) *access_rc = rc;
                     else *mirror = true;
-                    separate = false;
                     *end = off; bad = true;
                 }
             }
-            if (off >= TRI_BAR0_DECODE_BYTES / 2 && words && separate && !stop)
-                *upper_checked = true;
         }
+        /* Both patterns and the retained lower tags must have survived. */
+        if (off >= TRI_BAR0_DECODE_BYTES / 2 && words && !bad && !stop)
+            *upper_checked = true;
         if (bad || stop || words < PAGE_WORDS) {
-            if (undo(d, off, page, words)) restored = TRI_E_RESTORE;
+            if (undo(d, off, page, words, &restore_end)) restored = TRI_E_RESTORE;
             if (!bad) *complete = *end;
             break;
         }
         /* Leave only the boundary tag live; restore the page body now. */
         tags[retained] = page[0];
-        if (undo(d, off + WORD_BYTES, page + 1, words - 1))
+        if (undo(d, off + WORD_BYTES, page + 1, words - 1, &restore_end))
             restored = TRI_E_RESTORE;
         int rc = WRITE(off, pattern(off));
         ++retained; /* even a failed tag write must be undone */
@@ -189,8 +193,11 @@ static int measure(struct trident_device *d, u32 limit, u32 *end, u32 *complete,
     }
     while (retained) {
         u32 i = --retained;
-        if (undo(d, i * TRI_PAGE_BYTES, tags + i, 1)) restored = TRI_E_RESTORE;
+        if (undo(d, i * TRI_PAGE_BYTES, tags + i, 1, &restore_end)) restored = TRI_E_RESTORE;
     }
+    /* A late tag failure also invalidates the published continuous prefix.
+     * Failures above the required display remain diagnostic only. */
+    if (*complete > restore_end) *complete = restore_end;
     return restored;
 }
 
@@ -238,6 +245,6 @@ int trident_vram_verify(struct trident_device *d)
     if (!rc && d->verified_bytes < TRI_DISPLAY_BYTES)
         rc = access_rc ? access_rc : TRI_E_CAP_TOO_SMALL;
     diagnostic(d, rc, access_rc);
-    /* Cleanup failure is diagnostic once the display prefix is verified. */
+    /* Only a successfully restored display prefix may be published. */
     return d->verified_bytes >= TRI_DISPLAY_BYTES ? TRI_OK : rc;
 }

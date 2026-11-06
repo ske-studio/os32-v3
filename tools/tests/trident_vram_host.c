@@ -20,11 +20,25 @@ static u32 scratch[TRI_VRAM_SCRATCH_BYTES / sizeof(u32)];
 static struct trident_fake_event trace[512];
 static char logbuf[512];
 static u32 loglen, lines, lower_writes, maximum_write;
+static u32 corrupt_restore_at, fail_upper_phase;
+static u32 original_word(u32 off)
+{
+    u32 value = 0;
+    for (u32 i = 0; i < 4; ++i)
+        value |= (u32)(u8)(((off+i) * 13u) ^ ((off+i) >> 8) ^ 0xB7u) << (i*8);
+    return value;
+}
 static int observe_write(void *opaque, enum trident_space space, u32 off, u32 v)
 {
     if (space == TRI_SPACE_LFB) {
         if (off == 4) ++lower_writes;
         if (off > maximum_write) maximum_write = off;
+        /* Inferred bus/RAM faults: the write returns success, but stores a
+         * wrong bit. The ordinary fake still supplies decode and readback. */
+        if (off == corrupt_restore_at && v == original_word(off)) v ^= 1u;
+        if (off == TRI_FAKE_REAL_BYTES && fail_upper_phase &&
+            v == (fail_upper_phase == 1 ? (off ^ 0x69C35AA5u) :
+                                         ~(off ^ 0x69C35AA5u))) v ^= 1u;
     }
     return trident_fake_io.write32(opaque, space, off, v);
 }
@@ -83,7 +97,8 @@ static int setup(bool initialize)
     observed_io = trident_fake_io;
     observed_io.write32 = observe_write;
     d.io = &observed_io;
-    lower_writes = maximum_write = 0;
+    lower_writes = maximum_write = fail_upper_phase = 0;
+    corrupt_restore_at = U32_MAX;
     trident_fake_trace_reset(&f);
     loglen = lines = 0;
     return 0;
@@ -140,7 +155,7 @@ static int memory_cases(void)
         u32 verified;
         int rc;
     } cases[] = {
-        {2097152,U32_MAX,4194304,TRI_UPPER_INDEPENDENT,TRI_UPPER_INDEPENDENT,2097152,0},
+        {2097152,U32_MAX,4194304,TRI_UPPER_INDEPENDENT,TRI_UPPER_UNKNOWN,2097152,0},
         {2097152,U32_MAX,4194304,TRI_UPPER_MIRROR,TRI_UPPER_MIRROR,2097152,0},
         {4194304,U32_MAX,4194304,TRI_UPPER_INDEPENDENT,TRI_UPPER_INDEPENDENT,4194304,0},
         {2097152,2097152,4194304,TRI_UPPER_INDEPENDENT,TRI_UPPER_UNKNOWN,2097152,0},
@@ -166,7 +181,7 @@ static int memory_cases(void)
             CHECK(equal(lower_writes, 6)); /* full lower-range recheck */
         CHECK(maximum_write < cases[i].mapped);
     }
-    /* A final tag undo failure after >=300KiB is recorded, not fatal. */
+    /* A final display tag readback fault must fail even after both phases. */
     CHECK(!setup(true));
     f.resources.mapped_bytes = TRI_DISPLAY_BYTES;
     CHECK(!trident_vram_verify(&d));
@@ -174,9 +189,9 @@ static int memory_cases(void)
     CHECK(!setup(true));
     f.resources.mapped_bytes = TRI_DISPLAY_BYTES;
     trident_fake_fail(&f, final_read, -123);
-    CHECK(!trident_vram_verify(&d));
-    CHECK(equal(d.verified_bytes, TRI_DISPLAY_BYTES));
-    CHECK(contains("rc=-7") && contains("verified=307200") && !intact());
+    CHECK(equal(trident_vram_verify(&d), (u32)TRI_E_RESTORE));
+    CHECK(!d.verified_bytes);
+    CHECK(contains("rc=-7") && contains("verified=0") && !intact());
     /* Decode and mapping independently constrain the traversal. */
     CHECK(!setup(true)); f.resources.decode_bytes = TRI_DISPLAY_BYTES;
     CHECK(!trident_vram_verify(&d));
@@ -193,6 +208,40 @@ static int memory_cases(void)
     CHECK(!setup(false)); d.init_done = true;
     CHECK(equal(trident_vram_verify(&d), (u32)TRI_E_CAP_TOO_SMALL));
     CHECK(!d.verified_bytes && !intact());
+    return 0;
+}
+static int guard_cases(void)
+{
+    /* Each upper phase must succeed independently; phase 1 success alone
+     * does not prove independent upper RAM when the inverted write fails. */
+    for (u32 phase = 1; phase <= 2; ++phase) {
+        CHECK(!setup(true));
+        CHECK(!trident_fake_memory(&f, sizeof(storage), TRI_UPPER_INDEPENDENT));
+        fail_upper_phase = phase;
+        CHECK(!trident_vram_verify(&d));
+        CHECK(equal(d.verified_bytes, TRI_FAKE_REAL_BYTES));
+        CHECK(equal(d.upper, TRI_UPPER_UNKNOWN));
+        CHECK(contains("mirror=unknown") && !intact());
+    }
+    /* Tag undo after the full probe, body undo, and partial-page undo.
+     * Include the exact display boundary: optional failures stay diagnostic. */
+    static const struct { u32 off, mapped; } restore[] = {
+        {0, 4194304}, {4, 4194304}, {307196, 307200},
+        {307200, 4194304}, {2097152, 4194304}, {2097156, 4194304}
+    };
+    for (u32 i = 0; i < N(restore); ++i) {
+        CHECK(!setup(true));
+        CHECK(!trident_fake_memory(&f, sizeof(storage), TRI_UPPER_INDEPENDENT));
+        f.resources.mapped_bytes = restore[i].mapped;
+        corrupt_restore_at = restore[i].off;
+        int rc = trident_vram_verify(&d);
+        CHECK(equal(rc, restore[i].off < TRI_DISPLAY_BYTES ? TRI_E_RESTORE : TRI_OK));
+        CHECK(d.verified_bytes <= restore[i].off);
+        CHECK(equal(lines, 1) && contains("rc=-7"));
+        /* All other words must still be restored, including earlier tags. */
+        for (u32 j = 0; j < sizeof(storage); ++j)
+            CHECK(equal(storage[j], original(j) ^ (j == restore[i].off ? 1u : 0u)));
+    }
     return 0;
 }
 static int small_trace(void)
@@ -264,6 +313,7 @@ void _start(void)
 {
     int rc = invalid_inputs();
     if (!rc) rc = spr_table();
+    if (!rc) rc = guard_cases();
     if (!rc) rc = memory_cases();
     if (!rc) rc = small_trace();
     if (!rc) rc = production_binding();

@@ -38,7 +38,7 @@ MUTATIONS = (
     ('M_SPR_EXT', 'case 0x10: kib = 28672;', 'case 0x10: kib = 24576;'),
     ('M_SPR_BASE', 'u16 base = d->cur_vga_base;', 'u16 base = TRI_CR_COLOR;'),
     ('M_PROBE_INVERT', 'phase < 2 && !bad', 'phase < 1 && !bad'),
-    ('M_PROBE_UNDO', 'saved[i]);', 'saved[i] ^ 1u);'),
+    ('M_PROBE_UNDO', 'WRITE(at, saved[i]);', 'WRITE(at, saved[i] ^ 1u);'),
     ('M_PROBE_TAGS', 'value != pattern(at)', '(value != pattern(at) && off < WORD_BYTES)'),
     ('M_LOWER_RECHECK', '!rc && end < limit && end', '!rc && end < limit && !end'),
     ('M_DECODE_BOUND', 'u32 limit = d->res->decode_bytes;',
@@ -50,6 +50,9 @@ MUTATIONS = (
     ('M_RESTORE_RC', 'return restored;', 'return 0;'),
     ('M_CLEANUP_FATAL', 'return d->verified_bytes >= TRI_DISPLAY_BYTES ? TRI_OK : rc;',
      'return rc;'),
+    ('M_DISPLAY_RESTORE', 'if (*complete > restore_end) *complete = restore_end;',
+     'if (*complete > restore_end) *complete = *complete;'),
+    ('M_UPPER_PHASES', 'words && !bad && !stop', 'words && !stop'),
     ('M_LOG', 'diagnostic(d, rc, access_rc);',
      'if (rc) diagnostic(d, rc, access_rc);'),
 )
