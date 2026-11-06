@@ -35,7 +35,9 @@ static u32 checks;
 /* GeForce integration supplies its real backend and routing fixture. */
 /* A successful leave keeps probe available, but selects the 98 output. */
 static int host_route_safe = 1, host_gf_leaves;
+#ifndef HOST_OWN_PC98_ROUTE /* trident_core_host.c supplies its own route state */
 int pc98_route_safe(void) { return host_route_safe; }
+#endif
 static int host_gf_probe(void) { return 1; }
 static void host_gf_leave(void) { ++host_gf_leaves; }
 GfxBackend gfx_backend_geforce = {
