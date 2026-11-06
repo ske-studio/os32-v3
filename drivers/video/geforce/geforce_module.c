@@ -35,6 +35,18 @@ const struct gf4_restore_ops *geforce_display_restore_ops(void)
 { return registered ? display_restore_slot : 0; }
 const struct gf5_test_ops *geforce_feature5_ops(void)
 { return registered ? feature5_slot : 0; }
+/* Resident guard also covers service callbacks that reach a foreground wait.
+ * Do not retain a module loan between calls or gate thermal work on drawing. */
+static bool foreground_poll_busy;
+void geforce_foreground_poll(void)
+{
+    if (foreground_poll_busy) return;
+    foreground_poll_busy=true;
+    const struct gf5_test_ops *ops=geforce_feature5_ops();
+    if (ops && ops->service_poll) (void)ops->service_poll(ops->ctx);
+    /* F0s consumes pending heat stop here, with reentry still excluded. */
+    foreground_poll_busy=false;
+}
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};
 static GeforceModuleContext context = {
