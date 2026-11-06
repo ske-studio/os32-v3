@@ -109,6 +109,9 @@ static void reset(void)
     h.ctx.tile_live[0]=true;
     h.ctx.tile[0]=(struct gf5_tile){.base=0,.bytes=LARGE_BYTES,.pitch=1024,
         .reservation_id=1,.generation=4};
+    h.ctx.tile_slot[0]=(struct gf5_tile_slot){.state=GF_TILE_OWNED,
+        .raw_addr=1,.raw_limit=LARGE_BYTES-1U,.raw_pitch=1024,.current=0,
+        .loan={{.key=nodes[1].value,.off=0,.bytes=LARGE_BYTES,.kind=GF_BORROW_TILE}}};
     display.head[0].enabled=true; display.head[0].dpms=GF4_ON;
     display.head[0].cursor=nodes[0].value;
     display.head[0].cursor_visible=true;
