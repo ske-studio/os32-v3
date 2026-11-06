@@ -795,8 +795,11 @@ static void core_boot_transaction(void)
                input[0] == 65 || input[0] == 78 || input[0] == 80 || input[0] == 83 ||
                input[0] == 85 || input[0] >= 88;
     CHECK(services_public == good);
-    CHECK(core_headers == (fep_opens ? 2u : 1u));
-    CHECK(core_probes == (u32)(!(input[0] >= 66 && input[0] <= 69) + !!fep_opens));
+    /* Core probes before reserving memory (DICT_META_DESIGN §6). L2 also
+     * probes in fep_store_open for the shared boot/resume reservation check,
+     * then store_system_open probes before opening the resident connection. */
+    CHECK(core_headers == (fep_opens ? 3u : 1u));
+    CHECK(core_probes == (u32)(!(input[0] >= 66 && input[0] <= 69) + 2 * !!fep_opens));
     if (!good) {
         if (input[0] == 87) {
             CHECK(services_stage == SERVICES_MINIMAL_QUARANTINED && !fep_opens);
