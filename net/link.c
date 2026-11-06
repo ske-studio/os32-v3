@@ -15,8 +15,9 @@
 
 #include "link.h"
 #include "nic.h"
+#include "link_notify.h"
 
-/* A9 RX / legacy selftests still use the LGY declarations. */
+/* Legacy selftests still use the LGY declarations. */
 #include "ne2000.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -245,6 +246,19 @@ static int link_send(u8 op, u8 flags, u32 seq, u32 ack, u32 rid,
     return link_send_ex(op, flags, link_sess, link_epoch, seq, ack, rid, payload, len);
 }
 
+/* Notification control is independent of request handles and byte credit. */
+int link_notify_control(u8 op, u32 ack, u16 window)
+{
+    u8 payload[LINK_WINDOW_LEN];
+    if (op != LINK_OP_ACK && op != LINK_OP_WINDOW) return OS32_ERR_INVAL;
+    if (link_state != LINK_S_UP) return OS32_ERR_HOSTDOWN;
+    le_write16(payload, window);
+    return link_send(op, 0, 0, ack, LINK_NOTIFY_RID,
+                     op == LINK_OP_WINDOW ? payload : 0,
+                     op == LINK_OP_WINDOW ? LINK_WINDOW_LEN : 0)
+           ? 0 : OS32_ERR_AGAIN;
+}
+
 /* ======================================================================== */
 /*  セッション                                                              */
 /* ======================================================================== */
@@ -273,6 +287,7 @@ static void link_drop_all(void)
 /* 新しい HELLO を出す。sess_hint = 0 なら新セッション。 */
 static void link_start_hello(u16 sess_hint, u16 epoch_hint)
 {
+    link_notify_reset();
     link_nonce++;                       /* HELLO ごとに +1 (応答の対応付け) */
     link_syn_sess = sess_hint;
     link_syn_epoch = epoch_hint;
@@ -494,6 +509,7 @@ void link_tick(void)
     link_host_deadlines();
     link_timers();
     link_tx_round();
+    link_notify_tick(tick_count);
 }
 
 /* ======================================================================== */

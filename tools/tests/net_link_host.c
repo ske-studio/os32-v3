@@ -51,6 +51,8 @@ typedef signed int     i32;
 #define __cdecl
 #endif
 
+#include "net/nic.h"
+
 /* ---- 贋 os32_kapi_shared.h ([C4] 共有定数のうちこの票が使う分だけ) ------ */
 #define OS32_KAPI_SHARED_H
 #define OS32_ERR_IO        -1
@@ -94,7 +96,7 @@ static int kutoa_dec(u32 val, char *buf, int bufsz)
 #define NE2K_STATE_OFF      0
 #define NE2K_STATE_RUNNING  1
 struct ne2k_stats { u32 rx_frames; u32 rx_pages_total; };
-static int  ne2k_recv(void *frame, unsigned int capacity, unsigned int *length);
+int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length);
 static void ne2k_get_stats(struct ne2k_stats *s);
 
 /* ======================================================================== */
@@ -155,10 +157,11 @@ int net_tx(const void *frame, u32 length)
     return NE2K_OK;
 }
 
-static int ne2k_recv(void *frame, unsigned int capacity, unsigned int *length)
+int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length)
 {
     unsigned int n;
-    if (nic_rxh == nic_rxt) return NE2K_ERR_AGAIN;
+    if (protocol != NET_RX_LINK) return OS32_ERR_INVAL;
+    if (nic_rxh == nic_rxt) return OS32_ERR_AGAIN;
     n = nic_rxlen[nic_rxh];
     if (n > capacity) n = capacity;
     memcpy(frame, nic_rx[nic_rxh], n);
@@ -1793,3 +1796,10 @@ int main(int argc, char **argv)
     printf("SUMMARY %d/%d PASS\n", ran - bad, ran);
     return bad ? 1 : 0;
 }
+
+/* These legacy cases exercise request traffic; A9 core fixture uses real B2. */
+void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
+{ (void)s; (void)e; (void)x; (void)g; (void)a; }
+void link_notify_rx(u32 s, const u8 *p, u16 n) { (void)s; (void)p; (void)n; }
+void link_notify_reset(void) { }
+void link_notify_tick(u32 now) { (void)now; }

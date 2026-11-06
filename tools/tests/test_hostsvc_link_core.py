@@ -1,6 +1,7 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=5,
-    covers=['net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
+    covers=['net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
+            'sdk/include/os32/os32_host_notice.h', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
@@ -18,14 +19,29 @@ ROOT = Path(__file__).resolve().parents[2]
 ANCHOR = '    link_host_deadlines();'
 
 
-def build(folder, mutant=False):
+MUTATIONS = (
+    ('net/link.c', ANCHOR, '    /* deadline hook omitted */'),
+    ('net/link_rx.inc', '    link_host_progress((i32)(e - link_h));\n    e->last_rx_tick', '    e->last_rx_tick'),
+    ('net/link_rx.inc', '            link_host_progress((i32)(e - link_h)); /* REQUEST ACK advances */', ''),
+    ('net/link_rx.inc', '            link_host_progress((i32)(e - link_h)); /* WDATA ACK advances */', ''),
+    ('net/link_rx.inc', '                link_host_progress((i32)(e - link_h)); /* New DATA accepted */', ''),
+    ('net/link_rx.inc', 'if (seq == e->ack_seq + 1)', 'if (seq >= e->ack_seq)'),
+    ('net/link_rx.inc', 'if (rid != LINK_NOTIFY_RID)', 'if (0 && rid != LINK_NOTIFY_RID)'),
+    ('net/link_rx.inc', 'int extended = plen == LINK_HELLO_ES_EXT_LEN;', 'int extended = plen == LINK_HELLO_ES_EXT_LEN && 0;'),
+    ('net/link.c', '    link_notify_tick(tick_count);', ''),
+    ('net/link.c', '    link_notify_reset();', ''),
+)
+
+
+def build(folder, mutant=None):
     folder.mkdir()
     shutil.copytree(ROOT / 'net', folder / 'net')
-    core = folder / 'net/link.c'
-    source = core.read_text()
-    assert source.count(ANCHOR) == 1
-    if mutant:
-        core.write_text(source.replace(ANCHOR, '    /* deadline hook omitted */'))
+    if mutant is not None:
+        path, anchor, replacement = MUTATIONS[mutant]
+        core = folder / path
+        source = core.read_text()
+        assert source.count(anchor) == 1, anchor
+        core.write_text(source.replace(anchor, replacement))
     exe = folder / 'probe'
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-march=i386', '-O2',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdlib', '-static',
@@ -43,11 +59,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix='hostsvc-core-') as tmp:
         folder = Path(tmp)
         host32.run([str(build(folder / 'control'))], check=True)
-        print('GREEN A8 shared TX/credit, init without tick registration, deadline before RTO/wrap/isolation/reuse')
+        print('GREEN A8/A9 TX/credit, shared RX, HELLO, real NOTIFY, progress and silence deadlines')
         if args.mutate:
-            rc = host32.run([str(build(folder / 'mutant', True))]).returncode
-            assert rc == 1, rc
-            print('RED runtime: A8 deadline hook omitted (compiled successfully)')
+            for i, (path, anchor, _) in enumerate(MUTATIONS):
+                rc = host32.run([str(build(folder / ('mutant%d' % i), i))]).returncode
+                assert rc == 1, (path, anchor, rc)
+                print('RED runtime (compiled, unique anchor):', path, anchor.strip())
 
 
 if __name__ == '__main__':
