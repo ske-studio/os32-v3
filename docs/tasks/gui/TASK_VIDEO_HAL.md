@@ -24,7 +24,4 @@
 - 今の HAL: `include/gfx_hal.h`、設計記録 [gfx_hal.md](../../design/include/gfx_hal.md) (再描画モデル、HAL とバックエンドの表)。
 - バックエンド: PC-98 (`drivers/video/pc98/`)、Cirrus (`drivers/video/cirrus/`)、GeForce (`drivers/video/geforce/`)、Trident (段 3、確定設計 [TRIDENT_S3_DESIGN](../../decisions/realhw/TRIDENT_S3_DESIGN.md))。
 - 上に載るもの: P8 の GUI 層 (TASK_P8_GUI_LAYER)、移植の候補 (PORT_CANDIDATES、SDL 1.2・VESA2 的な互換層)。
-- 入口の検査の案 (PM、2026-11-06。GeForce の copy の pitch=40 で GPU が止まった件と、手本のガードの洗い出し `~/os32-tmp/run/guard-{gf,tri}/report.md` から):
-  - 面の幅・番地は HAL が割り当てるときに決める。呼び手には決めさせない。手本 nouveau の「割り当てで揃える」と同じ形。
-  - 各バックエンドは制約の表を出す (整列・最大の幅と高さ・形式・加速が使える組み合わせ)。HAL は面を作るときに 1 回だけ照合し、描画の呼び出しでは照合済みの面 (世代付き) と矩形の切り取りだけを見る。
-  - HAL で担保できないもの (レジスタの順・待ち・時間切れの後・失敗の後始末・監査の台帳) は、ドライバのレビュー (PORT_FLOW §4-1) に残す。
+- 入口の検査 (ガード) の基準: [gfx_hal.md](../../design/include/gfx_hal.md) §9 (2026-11-06 の方針。面は HAL が割り当て、制約の表を作るときに 1 回照合、HAL で担保できない物はドライバのレビュー)。
