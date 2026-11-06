@@ -15,12 +15,15 @@ enum gf2_case {
 };
 /* GF5 session: op[7:0], operand index[15:8], halfword[31:16].
  * ARG_LO/HI set one of eight u32 operands, without truncating VRAM offsets.
+ * GPIO_GET/SET require GF5_WIRE_GPIO_TAG in session; all other upper bits
+ * must be zero. Without this explicit format bit legacy line/log requests
+ * are EINVAL, even when their operand values equal a tag request.
  * Other operations require session's upper 24 bits to be zero.
  * Operand meanings (unused operands ignored):
  * CLOCK_CALC: core,shader,mem kHz; PERF_GET/SELECT: index;
  * FAN_MODE: mode; FAN_CSTATE: percent,signed direction;
  * VOLT_SET: requested uV; VOLT_ID: id,min_id,signed condition;
- * GPIO_FIND: tag; GPIO_GET/SET: line,log0,log1,logical value;
+ * GPIO_FIND/GET: tag; GPIO_SET: tag,logical value (0 or 1);
  * TILE_SET: slot,base,bytes,pitch,reservation_id,generation;
  * TILE_CLEAR: slot; WAIT: microseconds. RESTORE/FREE use the held image.
  * CLOCK_PROG/RAM_PROG use the last successful CALC (args invalidate it).
@@ -30,6 +33,7 @@ enum gf2_case {
 #define GF5_WIRE_INDEX_SHIFT 8U
 #define GF5_WIRE_VALUE_SHIFT 16U
 #define GF5_WIRE_OPERANDS 8U
+#define GF5_WIRE_GPIO_TAG (1U << GF5_WIRE_INDEX_SHIFT)
 enum gf5_case {
     GF5T_INFO, GF5T_ARG_LO, GF5T_ARG_HI, GF5T_CLOCK_READ,
     GF5T_CLOCK_CALC, GF5T_CLOCK_PROG, GF5T_RAM_PROG,
