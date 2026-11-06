@@ -435,9 +435,10 @@ def run(overrides=None):
     transition = read('exec/appslot_transition.inc').replace(
         '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
     hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
+    hwb_flag += '\n' + re.search(r'^static volatile u32 g_cui_display_abort_pending;', ex, re.M)[0]
     code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + '\n'.join(function(ex,n) for n in (
-        'ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
+        'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
