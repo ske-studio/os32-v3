@@ -27,6 +27,13 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('resume-budget', 'kernel/ime/ime_suspend.c',
+     'target.reserve_kb > ime->store.boot_reserve_kb', '0',
+     'resume reservation rejects before open'),
+    ('settings-fail-closed', 'userland/system/hsync.c',
+     'if (register_fep_user_path() != 0)', 'if (register_fep_user_path() != 0 && 0)',
+     'settings failure stops before sync'),
+
     ('failed-reopen-retried-at-exit', 'kernel/ime/fep_module.c',
      '    if (!on) suspend_owner = 0;',
      '    if (!on && !rc) suspend_owner = 0;',

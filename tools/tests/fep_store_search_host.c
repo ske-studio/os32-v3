@@ -208,6 +208,21 @@ int main(void)
     CHECK(fep_store_live_connections(&s) == 0);
     probe_error = 0;
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
+    /* Boot without a system must retain the custom path for a later switch,
+     * including the case where the core snapshot already has the same ID. */
+    CHECK(fep_store_close(&s) == 0);
+    static FepStore cold;
+    cold.meta = s.meta;
+    cold.boot_reserve_kb = FEP_DICT_RESERVE_KB;
+    CHECK(fep_store_open(&cold, "/db/missing.db", "/etc/later.db") != 0);
+    CHECK(!strcmp(cold.user.path, "/etc/later.db"));
+    CHECK(fep_store_switch(&cold, FEP_DICT_PATH_M) == 0);
+    CHECK(cold.user_enabled && cold.user.db && fep_store_live_connections(&cold) == 2);
+    fep_store_learn(&cold, "か", "後");
+    CHECK(fep_store_user_list(&cold, 0, entries, 4) == 1 &&
+          !strcmp(entries[0].kanji, "後"));
+    CHECK(fep_store_close(&cold) == 0);
+    CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     /* Close both sides even if user has an unowned statement: quarantine is
      * retained, counted, and cannot be reset by another open. */
     sqlite3_stmt *unowned;

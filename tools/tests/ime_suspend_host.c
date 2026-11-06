@@ -46,6 +46,14 @@ int fep_store_open(FepStore *store, const char *path, const char *user_path)
     dict->db = dict; /* Any non-NULL connection represents a live DB. */
     return 0;
 }
+static u32 probe_reserve = FEP_DICT_RESERVE_KB;
+static int probe_rc;
+int fep_meta_probe(const char *path, FepMeta *out)
+{
+    if (kstrcmp(path, closed_path)) return OS32_ERR_INVAL;
+    out->reserve_kb = probe_reserve;
+    return probe_rc;
+}
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { (void)attr; (void)fmt; warnings++; }
 #include "ime_suspend_source.inc"
@@ -53,6 +61,7 @@ static void require(int cond, const char *name)
 { __asm__ volatile("" : "+r"(cond)); if (!cond) { printf("FAIL %s\n", name); exit(1); } }
 int main(void)
 {
+    state.store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
     require(!ime_dict_suspend(0) && !opens, "reopen without suspend");
     require(!ime_dict_suspend(1) && !closes, "unloaded no-op");
     require(!fep_store_open(&state.store, "/db/fep_s.db", "/etc/custom.db"), "initial open");
@@ -91,6 +100,19 @@ int main(void)
     state.dict_loaded = 1;
     require(!ime_dict_suspend(1) && !ime_dict_suspend(0) && reopened_same_path &&
             !kstrcmp(state.store.system.path, "/db/fep_l.db"), "large dictionary path preserved");
+    require(!ime_dict_suspend(1), "close before larger replacement");
+    int before_opens = opens;
+    probe_reserve++;
+    require(ime_dict_suspend(0) == OS32_ERR_AGAIN && opens == before_opens &&
+            !state.dict_loaded && state.mode == IME_MODE_OFF && !state.store.system.db,
+            "resume reservation rejects before open");
+    probe_reserve--;
+    probe_rc = OS32_ERR_IO;
+    require(ime_dict_suspend(0) == OS32_ERR_IO && opens == before_opens,
+            "resume probe failure stops");
+    probe_rc = 0;
+    require(!ime_dict_suspend(0) && state.dict_loaded && reopened_same_path,
+            "resume retry after valid replacement");
     close_rc = -3; close_isolates = 1;
     require(ime_dict_suspend(1) == -3 && state.store.system.isolated && state.mode == IME_MODE_OFF, "isolated close stays OFF");
     puts("GREEN ime suspend");

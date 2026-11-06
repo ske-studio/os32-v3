@@ -771,17 +771,18 @@ int fep_store_open(FepStore *s, const char *path, const char *user_path)
         s->system.db || s->user.db || s->system.isolated || s->user.isolated)
         return OS32_ERR_BUSY;
     if (!SQLITE_OUTER_READY(1)) return OS32_ERR_IO;
-    int rc = store_system_open(s, path);
-    if (rc) return rc;
     /* Never truncate an invalid learning path into another file name. */
     if (kstrlen(user_path) >= sizeof(s->user.path)) {
         s->user_enabled = 0;
         s->user.path[0] = 0;
         kprintf(ATTR_RED, "IME: learning disabled (path rc=%d)\r\n", OS32_ERR_INVAL);
-        return 0;
+    } else {
+        /* Retain the configured learning path even if the system is missing. */
+        kstrncpy(s->user.path, user_path, sizeof(s->user.path));
     }
+    int rc = store_system_open(s, path);
+    if (rc) return rc;
     /* D requires the complete system identity and user path before open. */
-    kstrncpy(s->user.path, user_path, sizeof(s->user.path));
     (void)store_user_open(s); /* Learning failure does not disable conversion. */
     return 0;
 }
@@ -829,6 +830,8 @@ int fep_store_switch(FepStore *s, const char *path)
             kprintf(ATTR_RED, "IME: learning close failed; restart required\r\n");
             return rc;
         }
+        (void)store_user_open(s);
+    } else if (!had_system && !s->user.db && s->user.path[0]) {
         (void)store_user_open(s);
     }
     return 0;

@@ -29,3 +29,48 @@ static int fixture_shell_read(void *buf, u32 size)
     fixture_shell_pos += n;
     return (int)n;
 }
+
+/* Existing sync cases use a readable settings DB with no custom row.
+ * Stage L cases inject failures at this same KAPI boundary. */
+static const char *fixture_user_path;
+static int fixture_settings_fault, fixture_settings_step;
+static char fixture_settings_path[OS32_MAX_PATH];
+static int fixture_db_open(const char *path, int writable)
+{
+    int i;
+    for (i = 0; path[i] && i < OS32_MAX_PATH - 1; i++) fixture_settings_path[i] = path[i];
+    fixture_settings_path[i] = 0;
+    fixture_settings_step = 0;
+    return writable || fixture_settings_fault == 1 ? -1 : 1;
+}
+static int fixture_db_prepare(int h, const char *sql)
+{ (void)h; (void)sql; return fixture_settings_fault == 2 ? -1 : 0; }
+static int fixture_db_step(int h)
+{
+    (void)h;
+    if (fixture_settings_fault == 3) return DB_STATUS_ERROR;
+    return fixture_user_path && !fixture_settings_step++ ? DB_STATUS_ROW : DB_STATUS_DONE;
+}
+static int fixture_db_int(int h, int col)
+{
+    (void)h;
+    if (!col) return fixture_settings_fault == 4 ? 0 : 1;
+    return (int)strlen(fixture_user_path) + (fixture_settings_fault == 7);
+}
+static const char *fixture_db_text(int h, int col)
+{ (void)h; (void)col; return fixture_user_path; }
+static int fixture_db_finalize(int h)
+{ (void)h; return fixture_settings_fault == 5 ? -1 : 0; }
+static int fixture_db_close(int h)
+{ (void)h; return fixture_settings_fault == 6 ? -1 : 0; }
+static void fixture_settings_init(KernelAPI *table)
+{
+    fixture_user_path = 0; fixture_settings_fault = 0;
+    table->db_open_existing = fixture_db_open;
+    table->db_prepare_only = fixture_db_prepare;
+    table->db_step = fixture_db_step;
+    table->db_column_int = fixture_db_int;
+    table->db_column_text = fixture_db_text;
+    table->db_finalize = fixture_db_finalize;
+    table->db_close = fixture_db_close;
+}

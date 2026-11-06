@@ -100,6 +100,11 @@ def main():
                 raise RuntimeError('hot journal anchor not unique')
             cases.append(('hot-journal', product.replace(old, old.replace('if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0))', 'if (0)')), user_product,
                           'hits(&s, out) == 3 && !s.user_enabled && !s.user.db'))
+            old = 'else if (!had_system && !s->user.db && s->user.path[0])'
+            if product.count(old) != 1:
+                raise RuntimeError('cold switch anchor not unique')
+            cases.append(('cold-switch-learning', product.replace(old, 'else if (0)'), user_product,
+                          'cold.user_enabled && cold.user.db'))
         for name, code, user_code, assertion in cases:
             (work / 'product.c').write_text(code)
             (work / 'user_product.c').write_text(user_code)

@@ -411,6 +411,7 @@ static int fk_sys_rename(const char *oldpath, const char *newpath)
 static void fake_api_init(void)
 {
     memset(&g_fake, 0, sizeof(g_fake));
+    fixture_settings_init(&g_fake);
     g_fake.mem_alloc = fk_mem_alloc;
     g_fake.mem_free = fk_mem_free;
     g_fake.kprintf = fk_kprintf;
