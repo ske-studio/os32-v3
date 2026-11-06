@@ -1827,10 +1827,14 @@ GF4_MUTATIONS += [
 ]
 
 GF4_MUTATIONS += [
+    ('scanlog', 'leave-after-redraw', 'drivers/video/geforce/backend_geforce.c',
+     'geforce_leave_log(leave_io, rc);\n#endif\n    int route_rc = pc98_route_to_98();',
+     'int route_rc = pc98_route_to_98();\n    geforce_leave_log(leave_io, rc);\n#endif',
+     '98 route starts only after diagnostic completes'),
     ('c2linkb', 'script-timeout-line', 'hwdev/gf/display/links.c',
      'if (run==GF_SCRIPT_ETIME) {', 'if (run==GF_SCRIPT_ETIME && false) {', 'ROM script timeout evidence'),
     ('scanlog', 'leave-readback-call', 'drivers/video/geforce/backend_geforce.c',
-     'geforce_leave_log(leave_io, route_rc);', 'if (route_rc) geforce_leave_log(leave_io, route_rc);', 'leave emits after route success'),
+     'geforce_leave_log(leave_io, rc);', 'if (rc) geforce_leave_log(leave_io, rc);', 'leave emits after stop success'),
     ('diag', 'timeout-head', 'hwdev/gf/display/timeout.h',
      'stage,head,(i32)(dl-now)', 'stage,0U,(i32)(dl-now)', 'timeout source head'),
     ('diag', 'leave-pvideo-offset', 'drivers/video/geforce/leave_log.h',

@@ -124,6 +124,18 @@ static int start_logs(struct video_device *d)
             /* Compose the independent expected line with the fixture formatter. */
             char actual[sizeof(startlog)];
             for (unsigned j = 0; j < sizeof(startlog); j++) actual[j] = startlog[j];
+#ifdef OS32_GEFORCE_MODULE
+            /* Keep the start failure assertion exact while checking the added
+             * stop diagnostic independently. This fixture has no MMIO bus. */
+            unsigned end = 0;
+            while (actual[end] && actual[end] != '\n') end++;
+            if (!actual[end]) return 24;
+            unsigned diag = end + 1;
+            const char *prefix = "GF4 STATE stage=leave98 stop_rc=0 read_rc=-408 valid=00000000 ";
+            for (unsigned j = 0; prefix[j]; j++)
+                if (actual[diag + j] != prefix[j]) return 25;
+            actual[diag] = 0;
+#endif
             startlog_clear();
             kprintf(KLOG_ATTR, "[geforce] start rc=%d stage=%s", fail_step == FAIL_WC ? -1 : 1, stages[i]);
 #ifdef OS32_GEFORCE_MODULE

@@ -17,7 +17,7 @@ static void check_leave(void)
     struct gf_io *io=&host.base.f.io;
     startlog_clear();
     geforce_leave_log(io,-77);
-    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 route_rc=-77 read_rc=0 valid=00000fff h0_cr31=15 h1_cr31=24"));
+    assert(gf2_host_strstr(startlog,"GF4 STATE stage=leave98 stop_rc=-77 read_rc=0 valid=00000fff h0_cr31=15 h1_cr31=24"));
     assert(gf2_host_strstr(startlog,"h0_cursor=00000100 h1_cursor=00000101 h0_start=00000102 h1_start=00000103 pvideo_stop=00000104 pvideo_intr_en=00000105 offset0=00000106 offset1=00000107 limit0=00000108 limit1=00000109\n"));
     assert(host.cr[0][0x31]==0x15 && host.cr[1][0x31]==0x24);
     for (u32 i=0;i<host.nevents;i++) if (events[i].op==D_WRITE) {
@@ -27,7 +27,7 @@ static void check_leave(void)
     gf4_host_trace_clear(&host); startlog_clear();
     gf4_host_fail_at(&host,D_READ,1,-88);
     geforce_leave_log(io,0);
-    assert(gf2_host_strstr(startlog,"route_rc=0 read_rc=-88 valid=00000ffe"));
+    assert(gf2_host_strstr(startlog,"stop_rc=0 read_rc=-88 valid=00000ffe"));
     assert(gf2_host_strstr(startlog,"limit1=00000109"));
 }
 void _start(void)

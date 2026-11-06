@@ -434,10 +434,11 @@ static int geforce_stop(void)
 #endif
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
-    int route_rc = pc98_route_to_98();
+    /* Sample stopped GF state before route_to_98 performs the final redraw. */
 #ifdef OS32_GEFORCE_MODULE
-    geforce_leave_log(leave_io, route_rc);
+    geforce_leave_log(leave_io, rc);
 #endif
+    int route_rc = pc98_route_to_98();
     if (route_rc) rc = -1;
     active = routed = 0;
     if (rc) failed = 1;

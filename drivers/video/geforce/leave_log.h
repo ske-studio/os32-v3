@@ -1,4 +1,4 @@
-/* Read-only display state after routing to 98. MIT nouveau c03c1a1:
+/* Read-only display state after stop, before routing to 98. MIT nouveau c03c1a1:
  * dispnv04/hw.c:682-689, hw.h:127-136; nvreg.h:153,257,301,468-478.
  * CR31 is indexed: only the selector byte is written and restored. Never
  * write CR data, CR44 owner, cursor position, PCRTC or PVIDEO state here. */
@@ -6,7 +6,7 @@
 #define GEFORCE_LEAVE_LOG_H
 #define LEAVE_CR 0x6013d4U
 #define LEAVE_STRIDE 0x2000U
-static void geforce_leave_log(struct gf_io *io,int route_rc)
+static void geforce_leave_log(struct gf_io *io,int stop_rc)
 {
     u32 cr[2]={0},v[10]={0},valid=0;
     int rc=0;
@@ -33,7 +33,7 @@ static void geforce_leave_log(struct gf_io *io,int route_rc)
             if (!rc) rc=err;
         }
     }
-    kprintf(KLOG_ATTR,"GF4 STATE stage=leave98 route_rc=%d read_rc=%d valid=%08x h0_cr31=%02x h1_cr31=%02x h0_cursor=%08x h1_cursor=%08x h0_start=%08x h1_start=%08x pvideo_stop=%08x pvideo_intr_en=%08x offset0=%08x offset1=%08x limit0=%08x limit1=%08x\n",
-            route_rc,rc,valid,cr[0],cr[1],v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],v[9]);
+    kprintf(KLOG_ATTR,"GF4 STATE stage=leave98 stop_rc=%d read_rc=%d valid=%08x h0_cr31=%02x h1_cr31=%02x h0_cursor=%08x h1_cursor=%08x h0_start=%08x h1_start=%08x pvideo_stop=%08x pvideo_intr_en=%08x offset0=%08x offset1=%08x limit0=%08x limit1=%08x\n",
+            stop_rc,rc,valid,cr[0],cr[1],v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],v[9]);
 }
 #endif
