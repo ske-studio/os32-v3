@@ -140,9 +140,10 @@ i32 link_host_open(const char *req, u32 len, int owner)
     unsigned int f;
     int i, hh = -1, busy_rel = 0;
     u16 gen;
+    u8 mac[ETH_ALEN];
 
     if (!link_ready) return OS32_ERR_NOSYS;
-    if (ne2k_state() != NE2K_STATE_RUNNING) return OS32_ERR_HOSTDOWN;
+    if (net_mac(mac) != 0) return OS32_ERR_HOSTDOWN;
     if (req == 0 || len == 0 || len > LINK_MAX_PAYLOAD) return OS32_ERR_INVAL;
 
     f = LINK_IRQ_SAVE();

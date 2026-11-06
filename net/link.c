@@ -1,12 +1,8 @@
-#include "tick.h"
-#include "tick_order.h"
-_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* ======================================================================== */
 /*  LINK.C — OS32 リンクプロトコル v2 (非ブロッキング)                        */
 /*                                                                          */
-/*  契約の正典: docs/archive/network/TASK_N0.md §1b (ワイヤ) / §1a (KAPI の   */
-/*  ABI) / §2 (駆動・排他・状態機械)。ドライバ API (drivers/net/ne2000/ne2000.c) だけに  */
-/*  依存し、NIC の詳細は持たない。                                            */
+/*  契約の正典: docs/decisions/network/NET_HOSTSVC_DESIGN.md §2・§6。         */
+/*  NIC 共用層が駆動・送信・credit を所有する。                               */
 /*                                                                          */
 /*  設計の 3 本柱:                                                           */
 /*   (1) **状態機械を進めるのは `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
@@ -18,7 +14,9 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /* ======================================================================== */
 
 #include "link.h"
+#include "nic.h"
 
+/* A9 RX / legacy selftests still use the LGY declarations. */
 #include "ne2000.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -238,7 +236,7 @@ static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
     le_write32(h + LINK_OFF_RID, rid);
     le_write16(h + LINK_OFF_SESS, sess);
     if (len) kmemcpy(h + LINK_HDR_LEN, payload, len);
-    return (ne2k_send(p, LINK_ETH_HDR_LEN + LINK_HDR_LEN + len) == NE2K_OK) ? 1 : 0;
+    return net_tx(p, LINK_ETH_HDR_LEN + LINK_HDR_LEN + len) == 0;
 }
 
 static int link_send(u8 op, u8 flags, u32 seq, u32 ack, u32 rid,
@@ -302,9 +300,7 @@ static void link_resync(void)
 /* ======================================================================== */
 static u16 link_credit_pages(void)
 {
-    unsigned int ring = ne2k_rx_ring_free_pages();
-    unsigned int qpages = ne2k_rx_queue_free() * LINK_MAXFRAME_PAGES;
-    unsigned int c = (ring < qpages) ? ring : qpages;
+    unsigned int c = net_rx_credit_bytes() / LINK_PAGE_BYTES;
     unsigned int spages = link_stream_free() / LINK_PAGE_BYTES;
     if (spages < c) c = spages;
     c = (c > LINK_CREDIT_MARGIN) ? c - LINK_CREDIT_MARGIN : 0;
@@ -493,9 +489,9 @@ static void link_tx_round(void)
 void link_tick(void)
 {
     if (!link_ready) return;
-    if (ne2k_state() != NE2K_STATE_RUNNING) return;
-    if (ne2k_is_busy()) return;      /* foreground の send/recv を中断した tick */
+    /* net_tick owns the bound-NIC/reentry guards and invokes us with IF=0. */
     link_rx_pump();
+    link_host_deadlines();
     link_timers();
     link_tx_round();
 }
@@ -505,10 +501,6 @@ void link_tick(void)
 /* ======================================================================== */
 void link_init(const u8 my_mac[ETH_ALEN])
 {
-    if (tick_register(PC98_TICK_LINK, link_tick) != 0) {
-        kprintf(ATTR_YELLOW, "[link] tick registration failed\n");
-        return;
-    }
     int i;
     kmemcpy(link_my_mac, my_mac, ETH_ALEN);
     kmemset(link_peer_mac, 0, ETH_ALEN);
