@@ -812,6 +812,10 @@ int fep_store_switch(FepStore *s, const char *path)
         return OS32_ERR_BUSY;
     }
     if (!SQLITE_OUTER_READY(1)) return OS32_ERR_IO;
+    /* A live dictionary already owns this inode. Probing it through a new
+     * SQLite connection would fail the VFS same-inode exclusion. */
+    if (s->system.db && !kstrcmp(path, s->system.path))
+        return fep_conn_ready(&s->system);
     kstrncpy(target_path, path, sizeof(target_path));
     int rc = fep_meta_probe(target_path, &target);
     if (rc) return rc;

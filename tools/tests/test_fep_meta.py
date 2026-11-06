@@ -98,7 +98,15 @@ def runtime_body(paths):
             body += f'CHECK(m.{field} == {meta[key]}u && m.{field} == {const});\n'
         body += f'CHECK(!strcmp(m.dict_id, "{meta["dict_id"]}") && !strcmp(m.dict_id, FEP_DICT_ID));\n'
         body += f'CHECK(!strcmp("{meta["cost_scale"]}", FEP_DICT_COST_SCALE) && m.entries == {meta["entry_count"]}u);\n'
-    body += '''FixtureFile *f = fixture_find(FEP_DICT_PATH_M, 0);
+    body += '''FepStore store = {0};
+    store.boot_reserve_kb = FEP_DICT_RESERVE_KB;
+    CHECK(fep_store_open(&store, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
+    void *system_db = store.system.db, *user_db = store.user.db;
+    CHECK(fep_meta_probe(FEP_DICT_PATH_M, &m) == OS32_ERR_IO);
+    CHECK(fep_store_switch(&store, FEP_DICT_PATH_M) == 0);
+    CHECK(store.system.db == system_db && store.user.db == user_db);
+    CHECK(fep_store_close(&store) == 0);
+    FixtureFile *f = fixture_find(FEP_DICT_PATH_M, 0);
     FepMeta sentinel; memset(&sentinel, 0x55, sizeof(sentinel)); m = sentinel;
     f->data[63] = 2;
     CHECK(fep_meta_probe(FEP_DICT_PATH_M, &m) == OS32_ERR_INVAL);
@@ -151,6 +159,21 @@ def main():
                 red = run_case(label)
                 assert red.returncode == 1 and 'FAIL main:' in red.stderr, label
                 print('RED runtime ' + label, flush=True)
+            (work / 'probe.c').write_text(probe)
+            product_path = ROOT / 'kernel/ime/ime_dict.c'
+            product = product_path.read_text()
+            anchor = 'if (s->system.db && !kstrcmp(path, s->system.path))'
+            assert product.count(anchor) == 1
+            (work / 'dict-mutant.c').write_text(product.replace(anchor, 'if (0)'))
+            harness_path = work / 'ime_dict_host.c'
+            harness = harness_path.read_text()
+            include = '#include "' + str(product_path) + '"'
+            assert harness.count(include) == 1
+            harness_path.write_text(harness.replace(include, '#include "dict-mutant.c"'))
+            red = run_case('same-selection')
+            assert red.returncode == 1 and 'fep_store_switch(&store' in red.stderr
+            print('RED runtime same-selection', flush=True)
+            harness_path.write_text(harness)
             for label, old, new in [
                 ('checksum-endian', "struct.pack('>ii', pos_id, cost)", "struct.pack('<ii', pos_id, cost)"),
                 ('entry-count', "'entry_count': str(final_count)", "'entry_count': str(final_count + 1)"),

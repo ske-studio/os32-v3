@@ -61,6 +61,20 @@ static int os32_ls(const char *dir, DirCallback cb, void *ctx)
 /* HSP_ENTITY_SCAN */
 static int test(void)
 {
+    hsp_fep_all_db = 1;
+    CHECK(hsp_path_classify("/ETC/Other.dB") == 1);
+    CHECK(hsp_path_classify("/etc/a.DB-journal") == 1);
+    CHECK(hsp_path_classify("/etc/a.db.new/x") == 1);
+    CHECK(!hsp_path_classify("/etc/a.d"));
+    CHECK(!hsp_path_classify("/etc/sub/a.db"));
+    CHECK(!hsp_path_classify("/else/a.db"));
+    entries = 1;
+    str_ncpy(names[0], "Other.DB", sizeof(names[0]));
+    CHECK(scan_protected_entities() == 0 && g_prot_count == 1);
+    alias_dev = 7; alias_ino = 100;
+    CHECK(is_same_as_protected("/bin/alias") == 1);
+    hsp_fep_all_db = 0; entries = 0;
+    CHECK(!hsp_path_classify("/etc/Other.DB"));
     char path[OS32_MAX_PATH + 1];
     int i, j;
     const char *suffix[] = {"", "-journal", ".new", ".whatever", "2", 0};

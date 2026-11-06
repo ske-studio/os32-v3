@@ -1,6 +1,6 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 状態: **実装中 (2026-11-07)** — 段 A〜N は main。段 P はゲスト試験・文書の段。ゲスト受入は PM が行う。
+> 状態: **実装済み (2026-11-07)** — 段 A〜P を main に入れた (2df328af)。NP21/W のゲスト受入 fep_meta_test は 37/37 PASS (メタ 20 キー・学習・S→L→S の頻度・予約 224/225KiB・ID/品詞の不一致)。受入で見つけた製品の不具合 2 件 (hsync の設定の SQL の CAST、同じ辞書の選び直しの probe の衝突) も main に。残りは延ばした試験 FEPLEARN-1 (学習 → hsync で system の辞書を差し替え → 再起動で学習が残る、DEFERRED_TESTS)。確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
 > 上位: [FEP の索引](00_INDEX.md)。契約・形式・実装分担・受入の正典は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) §2〜9 と末尾の確定事項。
 
 ## 0. 決定
