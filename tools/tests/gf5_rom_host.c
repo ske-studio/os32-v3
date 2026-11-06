@@ -76,4 +76,69 @@ static void test(void)
     assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_EBIOS);
     assert(!host.calls[F5_ALLOC] && !host.live_allocs);
 }
-void _start(void) { test(); gf2_host_exit(0); }
+/* The reference keeps calc/prog private (nouveau clk/base.c:195-198).
+ * OS32's public plans must lose that provenance at every ROM boundary. */
+static void seed_guard(u32 generation)
+{
+    const struct gf5_clock request = {0};
+    const struct gf5_plan plan = {0};
+    gf5_host_plan_seed(&host, &request, &plan, host.ctx.ch->epoch, generation);
+    assert(host.ctx.plan_guard.valid);
+}
+static void invalid_before_callback(struct gf5_host *h,
+                                    const struct gf5_host_event *e)
+{
+    if (e->op==F5_ALLOC || e->op==F5_FREE)
+        assert(!h->ctx.plan_guard.valid);
+}
+static void rom_guard(void)
+{
+    fixture();
+    host.observe=invalid_before_callback;
+    seed_guard(0);
+    assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_OK);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==1);
+    const u8 *first=host.ctx.rom.bytes;
+    seed_guard(1);
+    gf5_rom_release(&host.ctx);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==2);
+    seed_guard(2);
+    assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_OK);
+    assert(host.ctx.rom.bytes==first); /* allocator deliberately reuses storage */
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==3);
+    seed_guard(3);
+    struct gf5_rom_view owned=host.ctx.rom;
+    assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_EBUSY);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==4);
+    assert(host.ctx.rom.bytes==owned.bytes &&
+           host.ctx.rom.memory_program==owned.memory_program && host.live_allocs==2);
+    gf5_rom_release(&host.ctx);
+    gf5_host_trace_clear(&host);
+    seed_guard(U32_MAX);
+    gf5_rom_release(&host.ctx); /* empty release and generation wrap */
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==0);
+    assert(!host.calls[F5_FREE]);
+    seed_guard(U32_MAX);
+    assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_OK);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==0);
+    gf5_rom_release(&host.ctx);
+
+    fixture(); seed_guard(0);
+    assert(gf5_rom_acquire(&host.ctx,0,sizeof(rom),&program)==GF5_EINVAL);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==1);
+    fixture(); seed_guard(0); rom[FIX_BIT_ENTRY + 2]=0;
+    assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_EBIOS);
+    assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==1);
+    for (u32 nth=1; nth<=2; ++nth) {
+        fixture(); seed_guard(0); host.observe=invalid_before_callback;
+        gf5_host_fail_at(&host,F5_ALLOC,nth,GF5_ENOMEM);
+        assert(gf5_rom_acquire(&host.ctx,rom,sizeof(rom),&program)==GF5_ENOMEM);
+        assert(!host.ctx.plan_guard.valid && host.ctx.rom_generation==1);
+        assert(!host.live_allocs && !host.ctx.rom.bytes);
+    }
+    assert(gf5_rom_acquire(0,rom,sizeof(rom),&program)==GF5_EINVAL);
+    gf5_rom_release(0);
+    struct gf5_host_activity activity=gf5_host_activity(&host);
+    assert(!activity.reads && !activity.writes && !activity.pauses && !activity.resumes);
+}
+void _start(void) { test(); rom_guard(); gf2_host_exit(0); }
