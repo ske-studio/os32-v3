@@ -845,10 +845,12 @@ static i32 display_cui(bool enter)
         else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
         else {
             display_cui_owner = res_owner_get();
-            gfx_backend_geforce.enter();
+            /* Like a CUI graphics app, select the configured backend and bind
+             * its CLIENT buffer before backend init/enter. */
+            gfx_init();
             o = geforce_display_ops();
             if (!o || !o->ctx || !o->ctx->ready) {
-                gfx_backend_geforce.leave();
+                gfx_shutdown();
                 display_cui_owner = 0;
                 rc = GF4_ESTATE;
             }
@@ -858,7 +860,7 @@ static i32 display_cui(bool enter)
         /* Complete a camera snapshot before the backend tears down its loans. */
         rc = display_restore(true);
         if (!rc) {
-            gfx_backend_geforce.leave();
+            gfx_shutdown();
             o = geforce_display_ops();
             if (o && o->ctx && o->ctx->ready) rc = GF4_ESTATE;
             else {
@@ -876,7 +878,7 @@ void gf_display_owner_exit(int id)
     /* A failing restore must not prevent routing back to 98 on owner death. */
     i32 rc = display_restore(true);
     if (rc) display_failure("owner_restore", rc);
-    if (gfx_backend_geforce.leave) gfx_backend_geforce.leave();
+    gfx_shutdown();
     display_cui_owner = 0;
     if (!rc) display_session = (typeof(display_session)){0};
     else display_session.running = display_session.lifecycle = false;

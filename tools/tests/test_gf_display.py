@@ -181,6 +181,9 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('a3', 'cui-core-entry', 'kdebug/gf_display_test.c',
+  '            gfx_init();', '            gfx_backend_geforce.enter();',
+  'cui_controls: cold core must bind CLIENT before backend enter'),
  ('a3', 'cui-stale-owner', 'kdebug/gf_display_test.c',
   'if (display_cui_owner && o && o->ctx && !o->ctx->ready) display_cui_owner = 0;',
   'if (false) display_cui_owner = 0;', 'cui_controls'),

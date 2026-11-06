@@ -42,6 +42,11 @@ static struct gf4_route routes[2];
 static u8 image[IMAGE_BYTES], back_image[IMAGE_BYTES];
 static u8 head0_image[2][IMAGE_BYTES];
 static bool output_fixture, revoke_gamma, enter_invalid, leave_failed, perturb_other;
+static bool backend_failed, core_reject;
+static u32 core_inits, core_shutdowns;
+static const GfxMode core_mode = {
+    .width=IMAGE_WIDTH, .height=IMAGE_HEIGHT, .format=GFX_FMT_PACKED8
+};
 static u32 gammas, enters, leaves, prepared_head[GF4_HEADS], discarded_head[GF4_HEADS];
 /* docs/decisions/realhw/GF_FEAT4_DESIGN.md:574: identity, dark curve,
  * identity; palette return has no gamma. */
@@ -296,6 +301,13 @@ static int gamma_call(struct gf4_ctx *ctx, u8 head, const u16 rgb[3][256])
 static void enter_call(void)
 {
     ++enters;
+    /* backend_geforce.c:geforce_init needs the CLIENT binding supplied by
+     * gfx_select_and_init_backend, not merely the published F4 ops. */
+    if (backend_failed) return;
+    if (!gfx_backend_geforce.bb_base || !gfx_backend_geforce.selected_mode) {
+        backend_failed = true;
+        return;
+    }
     i32 rc = case_event(CASE_ENTER);
     if (rc) { normal_slot = NULL; return; }
     normal_slot = &normal; host.ctx.ready = true;
@@ -313,6 +325,19 @@ static void leave_call(void)
     state.head[0].enabled = false;
 }
 GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
+void gfx_init(void)
+{
+    ++core_inits;
+    if (core_reject) return; /* Core admission failed before backend init. */
+    gfx_backend_geforce.selected_mode = &core_mode;
+    gfx_backend_geforce.bb_base = image;
+    enter_call();
+}
+void gfx_shutdown(void)
+{
+    ++core_shutdowns;
+    leave_call();
+}
 static int ddc_call(struct gf4_ctx *ctx, u8 bus, u8 block, u8 out[128], u32 dl)
 {
     assert(ctx == &host.ctx && bus == expected_ddc_bus && block == ddcs);
@@ -401,6 +426,10 @@ static void reset(void)
     gf4_host_init(&host, &state);
     output_fixture = revoke_gamma = enter_invalid = leave_failed = perturb_other = false;
     gammas = enters = leaves = 0;
+    core_inits = core_shutdowns = 0; backend_failed = core_reject = false;
+    /* Other display cases start during an application's existing gfx session. */
+    gfx_backend_geforce.selected_mode = &core_mode;
+    gfx_backend_geforce.bb_base = image;
     for (u8 h = 0; h < GF4_HEADS; ++h) prepared_head[h] = discarded_head[h] = 0;
     gfx_backend_geforce.enter = enter_call; gfx_backend_geforce.leave = leave_call;
     gf2_host_memset(&display_session, 0, sizeof(display_session));
@@ -1112,11 +1141,20 @@ static void lifecycle_steps(void)
     assert(occurrences("SKIP") == 1 && !occurrences("READY"));
 }
 
+static void reset_cold_cui(void)
+{
+    reset();
+    host.ctx.ready = false;
+    /* Production publishes ops while idle; publishing does not bind CLIENT. */
+    gfx_backend_geforce.bb_base = NULL;
+    gfx_backend_geforce.selected_mode = NULL;
+}
 static void cui_controls(void)
 {
-    reset(); host.ctx.ready = false; normal_slot = NULL;
+    reset_cold_cui();
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
     assert(!gf_display_test(GF4_CUI_ENTER) && enters == 1 && display_cui_owner == 2);
+    assert(core_inits == 1 && !backend_failed);
     assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && enters == 1);
     current_owner = 3;
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
@@ -1124,29 +1162,39 @@ static void cui_controls(void)
     current_owner = 2;
     assert(!gf_display_test(MODE_WIRE) && display_session.valid);
     assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 1 && !normal_slot);
+    assert(core_shutdowns == 1);
     assert(!display_cui_owner && !display_session.valid);
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && leaves == 1);
     assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2);
     gf_display_owner_exit(2);
     assert(leaves == 2 && !display_cui_owner && !host.ctx.ready);
+    assert(core_shutdowns == 2);
     gf_display_owner_exit(2); assert(leaves == 2);
-    reset(); host.ctx.ready = false; normal_slot = NULL;
+    reset_cold_cui();
     assert(!gf_display_test(GF4_CUI_ENTER));
-    /* hello_gfx exits through the backend while the shell owner survives. */
-    gfx_backend_geforce.leave();
+    /* hello_gfx shuts down the core while the shell owner survives. */
+    gfx_shutdown();
     normal_slot = &normal; /* Production keeps its published ops while idle. */
     assert(!host.ctx.ready && display_cui_owner == 2);
     assert(!gf_display_test(GF4_CUI_ENTER) && enters == 2 && display_cui_owner == 2);
     assert(!gf_display_test(GF4_CUI_LEAVE) && leaves == 2);
-    reset(); host.ctx.ready = false; normal_slot = NULL;
+    reset_cold_cui();
     fail_event = CASE_ENTER; failure_nth = 1;
     assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner && leaves == 1);
+    assert(!backend_failed && core_shutdowns == 1);
+    /* A failure before backend init leaves it usable by the next gfx app. */
+    reset_cold_cui(); core_reject = true;
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE && !display_cui_owner);
+    assert(!enters && !backend_failed && core_shutdowns == 1);
+    core_reject = false; gfx_init();
+    assert(host.ctx.ready && !backend_failed && enters == 1);
+    gfx_shutdown();
     reset(); assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && !enters);
-    reset(); host.ctx.ready = false; normal_slot = NULL;
+    reset_cold_cui();
     assert(!gf_display_test(GF4_CUI_ENTER)); leave_failed = true;
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && display_cui_owner == 2);
     leave_failed = false; assert(!gf_display_test(GF4_CUI_LEAVE));
-    reset(); host.ctx.ready = false; normal_slot = NULL;
+    reset_cold_cui();
     assert(!gf_display_test(GF4_CUI_ENTER));
     assert(!gf_display_test(MODE_WIRE));
     restore_rc = SESSION_FAILURE; forced_leave = true;
