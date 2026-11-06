@@ -11,12 +11,11 @@ static struct gf5 *service_ctx;
 /* nouveau c03c1a1 therm/base.c:343-357 and clk/base.c:591-598:
  * workers end before their device lifetime ends. OS32 also validates borrowed
  * diagnostic ops at each call, since a caller may retain them after stop. */
-static i32 service_live(struct gf5 *g)
+static i32 service_ready(struct gf5 *g)
 {
     if (!g) return GF5_EINVAL;
     if (g!=service_ctx) return GF5_ESTATE;
-    if (g->busy || (service_slot && !*service_slot)) return GF5_EBUSY;
-    if (g->phase!=GF5_RUN || !g->accepting || !g->ch || !g->ch->f ||
+    if (g->phase!=GF5_RUN || g->heat.critical_paused || !g->accepting || !g->ch || !g->ch->f ||
         g->ch->state!=GF2_RUN || g->ch->fault.latched || !g->ch->f->running ||
         !g->display || g->display->ch!=g->ch ||
         !g->display->ready || !g->display->accepting || g->display->changing ||
@@ -24,6 +23,14 @@ static i32 service_live(struct gf5 *g)
         g->display->epoch!=g->ch->epoch)
         return GF5_ESTATE;
     return 0;
+}
+
+static i32 service_live(struct gf5 *g)
+{
+    if (!g) return GF5_EINVAL;
+    if (g!=service_ctx) return GF5_ESTATE;
+    if (g->busy || (service_slot && !*service_slot)) return GF5_EBUSY;
+    return service_ready(g);
 }
 
 static i32 service_check(struct gf5 *g, bool management)
@@ -61,6 +68,65 @@ static bool thermal_live(struct gf5 *g)
         g->display->epoch!=g->ch->epoch)
         return false;
     return g->fan.sensor_setup || !service_live(g);
+}
+
+static void service_heat_failure(struct gf5 *g,i32 rc)
+{
+    /* Preserve the failing boundary even if closing admission also fails. */
+    (void)g->links.admission(g->links.owner,false);
+    g->accepting=false;
+    g->phase=GF5_FAULT;
+    gf5_plan_invalidate(g);
+    g->source_rc=rc;
+    g->last_rc=g->heat.last_rc=gf5_rc_map(rc);
+    g->heat.cool_samples=0;
+    g->heat.stop_pending=true;
+    g->poll_source="critical";
+}
+
+/* MIT nouveau c03c1a1 therm/temp.c:104-158 supplies the edge callback.
+ * Guard design section 6 maps it to the existing OS32 drain/pause links;
+ * no display/scanout programming or snapshot state belongs here. */
+static void service_heat_pause(void *owner,bool active)
+{
+    struct gf5 *g=owner;
+    if (!thermal_live(g)) return;
+    i32 rc;
+    if (active) {
+        if (g->heat.critical_paused) return;
+        /* A saved/faulted or already closed channel has another owner.
+         * Never acquire its pause, or reopen it on the falling edge. */
+        bool live=!service_ready(g);
+        rc=g->links.admission(g->links.owner,false);
+        g->accepting=false;
+        if (rc) { service_heat_failure(g,rc); return; }
+        if (!live) return;
+        u64 now;
+        rc=g->links.clock64(g->links.owner,&now);
+        if (!rc) {
+            g->deadline=(u32)now+GF2_TIMEOUT_US;
+            rc=g->links.drain_pause(g->links.owner);
+        }
+        if (rc) { service_heat_failure(g,rc); return; }
+        g->heat.epoch=g->ch->epoch;
+        g->heat.critical_paused=true;
+        g->heat.cool_samples=0;
+        gf5_plan_invalidate(g);
+        return;
+    }
+    if (!g->heat.critical_paused || g->heat.epoch!=g->ch->epoch) return;
+    /* Closed admission is ours; all other reasons for closure still win.
+     * Do not resume a stopped FIFO or one now owned by save/restore. */
+    if (g->phase!=GF5_RUN || g->heat.stop_pending ||
+        g->ch->state!=GF2_RUN || g->ch->fault.latched || g->ch->f->running==false ||
+        !g->display->ready || g->display->changing || g->display->saved_closed)
+        return;
+    rc=g->links.unpause(g->links.owner);
+    if (rc) { service_heat_failure(g,rc); return; }
+    g->heat.critical_paused=false;
+    g->heat.cool_samples=0;
+    rc=g->links.admission(g->links.owner,true);
+    if (rc) service_heat_failure(g,rc);
 }
 
 #define SERVICE_OP(name, args, call) \
@@ -207,6 +273,8 @@ i32 gf5_service_init(struct gf_production *p,struct gf4_ctx *display,
     g->ch=&p->chan; g->accel=&p->accel; g->display=display;
     links->owner=g;
     g->links=*links;
+    g->emergency.pause=service_heat_pause;
+    g->emergency.owner=g;
     service_ctx=g; service_slot=slot;
     service_ops=(struct gf5_test_ops){
         .ctx=g,.clock_read=service_clock_read,.clock_calc=service_clock_calc,
