@@ -50,6 +50,7 @@ Enable/Disable は D:699-775 の 68h、6Ah、0FACh、CR23/29、拡張 DAC[4] を
 
 SaveScreen は V:618-635 の SR1 読取 → SR0=1 → SR1 bit5 設定 → SR0=3。OUTB の対で書く。
 AdjustFrame は D:1182-1190 の CR0C/0D を OUTW、CR1E bit5 と CR27 bits0..2 を OUTB の RMW で更新。
+blank は gfx/gfx_core_init.inc の enter → ModeInit の unprotect → Enable の SR01=00 で解除する。
 開始0でも後半の手順を省かない。後の HAL present が blank の解除を暗黙に行う契約はない。
 
 ## 4. 容量・転送・資源
@@ -62,7 +63,7 @@ VRAM の読戻しや、常設診断による SR/CR/AR/DAC selector 操作を pre
 
 PCI は vendor/device と一般の memory BAR 契約を照合する。固定 BDF は Ra266 の装置を探す入口であり、probe の拒否条件にはしない。
 revision、BAR の固定アドレス、BAR2、ROM、隣接全走査を機種固有の起動条件にしない。
-取得した BAR の番地を台帳・写像・面へ渡す。RAM 重複・台帳予約失敗・写像失敗は OS の資源契約として返す。
+取得した BAR の物理番地を台帳・写像元・面へ渡し、写像先 VA は memmap の固定窓を使う。RAM 重複・台帳予約失敗・写像失敗は OS の資源契約として返す。
 Close で共有写像を解除せず、arm 後の rollback は拒否する。arm 前は成功済みの写像・面・RAM を解放する。
 
 ## 5. 検証

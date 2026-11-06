@@ -84,9 +84,9 @@ CONSTANTS = {
     'TRI_FAKE_PORT_SPACE': 2,
 }
 STEPS = ('NONE', 'RESOURCES', 'PIN', 'ARM', 'IDENTIFY', 'SAVE', 'PC98_INIT',
-         'CAPACITY_PLAN', 'MODE', 'ENABLE', 'VERIFY', 'CLIENT', 'ACTIVE',
+         'CAPACITY_PLAN', 'MODE', 'ENABLE', None, 'CLIENT', 'ACTIVE',
          'RESTORE', 'LOCK', 'DISABLE', 'CLOSED')
-CONSTANTS.update((f'TRI_STEP_{name}', i) for i, name in enumerate(STEPS))
+CONSTANTS.update((f'TRI_STEP_{name}', i) for i, name in enumerate(STEPS) if name is not None)
 # Fixed ILP32 layout: 3a is the common starting point for parallel 3b/3c.
 LAYOUTS = {
     'struct trident_saved': (856, dict(value=0, vga_base=852, valid=854)),

@@ -48,10 +48,11 @@ u8 pci_cfg_read8(u32 bus, u32 dev, u32 fn, u32 reg)
     ++read8_count;
     return pci_cfg_read32(bus, dev, fn, reg & ~3u) >> ((reg & 3) * 8);
 }
+#define LFB_BASE (mode == 55 ? 0x21000000u : 0x20000000u)
 #define REG_BASE (mode == 32 ? 0x20410000u : 0x20400000u)
 int pgalloc_range_has_ram(u32 first, u32 end)
 {
-    CHECK((first == 0x20000 && end == 0x20400) || (first == REG_BASE / PAGE_SIZE && end == REG_BASE / PAGE_SIZE + 16));
+    CHECK((first == LFB_BASE / PAGE_SIZE && end == LFB_BASE / PAGE_SIZE + 1024) || (first == REG_BASE / PAGE_SIZE && end == REG_BASE / PAGE_SIZE + 16));
     return failure(10) || (failure(33) && first == 0x20400);
 }
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *owner)
@@ -69,9 +70,9 @@ int ledger_resource_add(const struct ledger_resource *r, u32 *rid)
     CHECK(r->bus == LEDGER_BUS_PCI && r->bdf == 0x40 && r->revision == (mode == 5 ? 0xd2 : 0xd3));
     CHECK(r->bar == records - 1 && r->width_basis == LEDGER_WB_GLUE_CONST);
     CHECK(!r->map_first && !r->map_end);
-    CHECK(r->raw_bar == (records == 1 ? 0x20000000u : REG_BASE));
-    CHECK(r->decode_first == (records == 1 ? 0x20000u : REG_BASE / PAGE_SIZE));
-    CHECK(r->decode_end == (records == 1 ? 0x20400u : REG_BASE / PAGE_SIZE + 16));
+    CHECK(r->raw_bar == (records == 1 ? LFB_BASE : REG_BASE));
+    CHECK(r->decode_first == (records == 1 ? LFB_BASE / PAGE_SIZE : REG_BASE / PAGE_SIZE));
+    CHECK(r->decode_end == (records == 1 ? LFB_BASE / PAGE_SIZE + 1024 : REG_BASE / PAGE_SIZE + 16));
     /* Imported RAW records may already occupy slots: RID != BAR index. */
     *rid = records + 2;
     ledger_resources[*rid] = *r; return 1;
@@ -80,7 +81,7 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *sp, u32 n)
 {
     ++reservations;
     CHECK(owner == 8 && n == 2);
-    CHECK(sp[0].first == 0x20000 && sp[0].end == 0x20400 && sp[0].res == 3);
+    CHECK(sp[0].first == LFB_BASE / PAGE_SIZE && sp[0].end == LFB_BASE / PAGE_SIZE + 1024 && sp[0].res == 3);
     CHECK(sp[1].first == REG_BASE / PAGE_SIZE && sp[1].end == REG_BASE / PAGE_SIZE + 16 && sp[1].res == 4);
     CHECK(sp[0].kind == LEDGER_SPAN_MMIO && sp[1].kind == LEDGER_SPAN_MMIO);
     if (failure(14)) return 0;
@@ -89,15 +90,16 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *sp, u32 n)
 int paging_map_phys(u32 va, u32 pa, u32 n, u32 flags)
 {
     ++map_calls;
-    CHECK(last_spans == 2 && va == pa && flags == (PAGE_RW | PTE_PCD));
-    CHECK((va == 0x20000000 && n == 1024) || (va == REG_BASE && n == 16));
+    CHECK(last_spans == 2 && flags == (PAGE_RW | PTE_PCD));
+    CHECK((va == MEM_TRIDENT_LFB_VA && pa == LFB_BASE && n == 1024) ||
+          (va == MEM_TRIDENT_REGS_VA && pa == REG_BASE && n == 16));
     if ((failure(15) && map_calls == 1) || (failure(16) && map_calls == 2)) return -71;
     present_maps |= va == 0x20000000 ? 1u : 2u; return 0;
 }
 int paging_set_not_present(u32 first, u32 last)
 {
     CHECK((first == 0x20000000 && last == 0x203fffff) ||
-          (first == REG_BASE && last == REG_BASE + 65535));
+          (first == MEM_TRIDENT_REGS_VA && last == MEM_TRIDENT_REGS_VA + 65535));
     CHECK(!allocated);
     present_maps &= first == 0x20000000 ? ~1u : ~2u; return 0;
 }
@@ -107,8 +109,8 @@ int ledger_resource_set_map(u32 rid, u32 first, u32 end)
     if (end) {
         ++map_records;
         if ((failure(17) && map_records == 1) || (failure(18) && map_records == 2)) return 0;
-        CHECK(first == (rid == 3 ? 0x20000u : REG_BASE / PAGE_SIZE));
-        CHECK(end == (rid == 3 ? 0x20400u : REG_BASE / PAGE_SIZE + 16));
+        CHECK(first == (rid == 3 ? LFB_BASE / PAGE_SIZE : REG_BASE / PAGE_SIZE));
+        CHECK(end == (rid == 3 ? LFB_BASE / PAGE_SIZE + 1024 : REG_BASE / PAGE_SIZE + 16));
     } else CHECK(!first);
     ledger_resources[rid].map_first = first; ledger_resources[rid].map_end = end; return 1;
 }
@@ -134,7 +136,7 @@ int ledger_surface_create(const struct ledger_surface *s, u32 *sid)
     CHECK(s->backend == 5 && s->format == GFX_BB_PACKED8 && s->planes == 1);
     CHECK(s->perm_max == LEDGER_PERM_RW && !s->lease_count && !s->closing);
     if (surface_calls == 1) {
-        CHECK(s->owner == 8 && s->first == 0x20000 && s->role == LEDGER_ROLE_DISPLAY);
+        CHECK(s->owner == 8 && s->first == LFB_BASE / PAGE_SIZE && s->role == LEDGER_ROLE_DISPLAY);
         CHECK(s->backing == LEDGER_SB_MMIO && s->cache == LEDGER_CACHE_UC);
         if (failure(20)) return 0;
     } else {
@@ -183,6 +185,7 @@ static void seed(void)
 static void run(void)
 {
     seed();
+    if (mode == 55) config[8][0][4] = LFB_BASE;
     if (mode == 3) config[8][0][0] ^= 1;
     if (mode == 4) config[8][0][1] = 0;
     if (mode == 5) config[8][0][2] = 0xd2;
@@ -256,12 +259,12 @@ static void run(void)
     }
     CHECK(!trident_resources_get());
     int rc = trident_boot_reserve();
-    if (mode == 32 || mode == 5 || mode == 8 || mode == 25 || mode == 27 || mode == 28 || mode == 29 || mode == 34 || mode == 35 || mode == 38 || mode == 39 || mode == 40 || mode == 44 || mode == 45 || mode == 46 || mode == 48 || mode == 50 || mode == 53 || mode == 0 || mode == 51 || mode == 52 || mode == 54 || mode == 49 || mode == 9 || mode == 26 || mode == 42 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
+    if (mode == 55 || mode == 32 || mode == 5 || mode == 8 || mode == 25 || mode == 27 || mode == 28 || mode == 29 || mode == 34 || mode == 35 || mode == 38 || mode == 39 || mode == 40 || mode == 44 || mode == 45 || mode == 46 || mode == 48 || mode == 50 || mode == 53 || mode == 0 || mode == 51 || mode == 52 || mode == 54 || mode == 49 || mode == 9 || mode == 26 || mode == 42 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
         CHECK(rc == 0);
         const struct trident_resources *r = trident_resources_get();
         CHECK(r && r->ready && r->owner == 8 && r->bar0_rid == 3 && r->bar1_rid == 4);
-        CHECK((u32)r->lfb == 0x20000000 && (u32)r->regs == REG_BASE);
-        CHECK(r->bar0_phys == 0x20000000 && r->bar1_phys == REG_BASE);
+        CHECK((u32)r->lfb == 0x20000000 && (u32)r->regs == MEM_TRIDENT_REGS_VA);
+        CHECK(r->bar0_phys == LFB_BASE && r->bar1_phys == REG_BASE);
         CHECK(r->decode_bytes == 4194304 && r->mapped_bytes == 4194304 && r->regs_bytes == 65536);
         CHECK(r->client == client_ram && r->client_bytes == 307200);
         CHECK(r->display_sid == 2 && r->client_sid == 3);
@@ -287,7 +290,7 @@ static void run(void)
         CHECK(!trident_resources_get() && !present_maps && !allocated && frees == 1);
         CHECK(release_calls == 2 && last_spans == 2 && owner_calls == 1);
         CHECK(!ledger_resources[3].map_end && !ledger_resources[4].map_end);
-        CHECK(ledger_resources[3].decode_end == 0x20400 && ledger_resources[4].decode_end == REG_BASE / PAGE_SIZE + 16);
+        CHECK(ledger_resources[3].decode_end == LFB_BASE / PAGE_SIZE + 1024 && ledger_resources[4].decode_end == REG_BASE / PAGE_SIZE + 16);
         CHECK(trident_resources_rollback(false) == 0 && frees == 1 && release_calls == 2);
     } else {
         int expected = mode == 1 || mode == 2 || mode == 30 || mode == 31 ? TRI_E_STATE :

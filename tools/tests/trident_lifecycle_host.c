@@ -44,6 +44,11 @@ WRAP(state_save,3)
 WRAP(pc98_init,4)
 WRAP(mode_640,5)
 WRAP(route_enable,6)
+int __real_trident_screen_blank(struct trident_device *, bool);
+int __wrap_trident_screen_blank(struct trident_device *d, bool blank) {
+    stages[count++]=7; return __real_trident_screen_blank(d,blank);
+}
+WRAP(client_init,12)
 WRAP(adjust_frame,8)
 WRAP(video_reset,9)
 WRAP(state_restore,10)
@@ -69,24 +74,25 @@ static int test(void) {
     context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner};
     trident_context=&context;
     init();
-    static const u32 first[]={1,2,3,4,5,6,8,9};
-    CHECK(!order(first,8));
+    static const u32 first[]={1,2,3,4,5,6,7,8,12,9};
+    CHECK(!order(first,10));
     CHECK(!device.last_rc && device.active && device.screen_ready && device.preinit_done && arms==1);
     CHECK(f.sr[1]&32); CHECK(f.cr_color[0x36]==0 && f.cr_color[0x50]==0);
     CHECK(f.cr_color[0x8E]==0x84 && f.cr_color[0xBE]==0x26);
     CHECK(f.ext_dac[0x50]==255 && f.ext_dac[0x54]==255);
     CHECK(!f.reads[2] && !f.writes[2]);
-    init(); static const u32 again[]={3,4,5,6,8,9}; CHECK(!order(again,6));
+    init(); static const u32 again[]={3,4,5,6,7,8,12,9}; CHECK(!order(again,8));
     CHECK(!device.last_rc && arms==1);
     enter();static const u32 vt[]={5,6}; CHECK(!order(vt,2));
+    CHECK(!(f.sr[1]&32));
     leave();static const u32 leaving[]={10,11};CHECK(!order(leaving,2));
     CHECK(!device.active);shutdown();CHECK(!count);
-    init();CHECK(!order(again,6));shutdown();static const u32 closing[]={11,10};CHECK(!order(closing,2));
+    init();CHECK(!order(again,8));shutdown();static const u32 closing[]={11,10};CHECK(!order(closing,2));
     /* Failure is local to one attempt; the next ScreenInit runs again. */
     trident_fake_fail(&f,f.operations+1,-73);init();CHECK(device.last_rc==-73);
     CHECK(!probe());
     trident_fake_fail(&f,0,0);count=0;prepare();CHECK(probe());
-    init();CHECK(!device.last_rc && device.active);CHECK(!order(again,6));
+    init();CHECK(!device.last_rc && device.active);CHECK(!order(again,8));
     /* ResetVideo exact write order/width, and two complete VSYNC periods. */
     count=0;status_reads=0;trident_fake_trace_reset(&f);
     CHECK(!trident_video_reset(&device));CHECK(status_reads==8);

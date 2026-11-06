@@ -12,7 +12,7 @@ from kernel_includes import include_flags
 ROOT=Path(__file__).resolve().parents[2]
 DIR='drivers/video/trident/'
 SOURCES=('lifecycle','regs','probe','state_save','pc98_init','mode_640','route_ra266','vram','default_dac','state_restore','present','palette','screen','video','dpms')
-WRAPS=('identify','capacity_plan','state_save','pc98_init','mode_640','route_enable','adjust_frame','video_reset','state_restore','route_disable','regs_bind')
+WRAPS=('identify','capacity_plan','state_save','pc98_init','mode_640','route_enable','adjust_frame','video_reset','screen_blank','state_restore','route_disable','regs_bind')
 MUTATIONS=[
  ('prepare-retry','backend_trident','    device.failed_step = 0;\n    device.last_rc = 0;','    if (device.last_rc) return device.last_rc;'),
  ('protect-inactive','regs','if (!d->active) return 0;', 'if (d->active) return 0;'),
@@ -31,6 +31,9 @@ MUTATIONS=[
  ('dpms-off','dpms','dpms |= 3','dpms |= 0'),
  ('screen-video','lifecycle','STAGE(TRI_STEP_CLIENT, trident_video_reset(d));','/* removed video */'),
  ('screen-blank','lifecycle','STAGE(TRI_STEP_MODE, trident_screen_blank(d, true));','/* removed blank */'),
+ ('blank-after-video','lifecycle',
+  '    STAGE(TRI_STEP_MODE, trident_screen_blank(d, true));\n    STAGE(TRI_STEP_MODE, trident_adjust_frame(d));\n    rc = client_init(d);\n    if (rc) return failed(d, TRI_STEP_CLIENT, rc);\n    d->step = TRI_STEP_CLIENT;\n    STAGE(TRI_STEP_CLIENT, trident_video_reset(d));',
+  '    STAGE(TRI_STEP_MODE, trident_adjust_frame(d));\n    rc = client_init(d);\n    if (rc) return failed(d, TRI_STEP_CLIENT, rc);\n    d->step = TRI_STEP_CLIENT;\n    STAGE(TRI_STEP_CLIENT, trident_video_reset(d));\n    STAGE(TRI_STEP_MODE, trident_screen_blank(d, true));'),
  ('screen-frame','lifecycle','STAGE(TRI_STEP_MODE, trident_adjust_frame(d));','/* removed viewport */'),
  ('screen-retry','lifecycle','    d->last_rc = d->failed_step = d->restore_rc = d->disable_rc = 0;','    if (d->last_rc) return d->last_rc;'),
  ('active-enter','lifecycle','    if (!d->screen_ready) return TRI_E_STATE;','    if (d->active) return 0;\n    if (!d->screen_ready) return TRI_E_STATE;'),
@@ -45,6 +48,13 @@ def main():
           text=(ROOT/DIR/(stem+'.c')).read_text()
           if stem==file:
             assert text.count(old)==1,(name,text.count(old));text=text.replace(old,new)
+          if stem=='lifecycle':
+            # Keep the private client implementation intact, redirect only its
+            # call through the host WRAP seam (same-TU calls bypass ld --wrap).
+            old_decl='static int client_init(struct trident_device *d)'
+            assert text.count(old_decl)==1 and text.count('rc = client_init(d);')==1
+            text=text.replace(old_decl, 'int __wrap_trident_client_init(struct trident_device *);\nint __real_trident_client_init(struct trident_device *d)')
+            text=text.replace('rc = client_init(d);','rc = __wrap_trident_client_init(d);')
           path=work/(stem+'.c');path.write_text(text)
           if stem!='backend_trident':sources.append(str(path))
           else:(work/'backend_under_test.c').write_text(text)

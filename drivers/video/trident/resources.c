@@ -18,7 +18,8 @@ static bool attempted, client_allocated;
 static bool mapped[TRI_BAR_COUNT], surface_created[TRI_BAR_COUNT];
 static u32 rids[TRI_BAR_COUNT], client_pfn;
 static int boot_rc;
-static u32 bases[TRI_BAR_COUNT] = {MEM_TRIDENT_LFB_VA, MEM_TRIDENT_REGS_VA};
+static u32 bases[TRI_BAR_COUNT];
+static const u32 vas[TRI_BAR_COUNT] = {MEM_TRIDENT_LFB_VA, MEM_TRIDENT_REGS_VA};
 static const u32 decodes[TRI_BAR_COUNT] = {TRI_BAR0_DECODE_BYTES, TRI_BAR1_DECODE_BYTES};
 static const u32 maps[TRI_BAR_COUNT] = {TRI_BAR0_DECODE_BYTES, TRI_REG_MAPPED_BYTES};
 
@@ -57,7 +58,7 @@ int trident_resources_rollback(bool armed)
     resources.client_bytes = 0;
     for (u32 i = TRI_BAR_COUNT; i-- > 0;) {
         if (!mapped[i]) continue;
-        if (paging_set_not_present(bases[i], bases[i] + maps[i] - 1)) return TRI_E_MAP;
+        if (paging_set_not_present(vas[i], vas[i] + maps[i] - 1)) return TRI_E_MAP;
         if (!ledger_resource_set_map(rids[i], 0, 0)) return TRI_E_RESOURCE;
         mapped[i] = false;
     }
@@ -118,7 +119,7 @@ int __attribute__((cold)) trident_boot_reserve(void)
     if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))
         return fail("reserve", TRI_E_RESOURCE);
     for (u32 i = 0; i < TRI_BAR_COUNT; ++i) {
-        if (paging_map_phys(bases[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))
+        if (paging_map_phys(vas[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))
             return fail("map", TRI_E_MAP);
         mapped[i] = true;
         if (!ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,
@@ -149,8 +150,9 @@ int __attribute__((cold)) trident_boot_reserve(void)
     if (!ledger_surface_create(&sf, &resources.client_sid)) return fail("client", TRI_E_SURFACE);
     surface_created[1] = true;
     gfx_surface_unready |= 1u << resources.client_sid;
-    resources.lfb = P2V_IO(bases[0]);
-    resources.regs = P2V_IO(bases[1]);
+    /* These are mapped VAs; the ledger and surfaces retain physical PFNs. */
+    resources.lfb = (volatile u8 *)(uptr)vas[0];
+    resources.regs = (volatile u8 *)(uptr)vas[1];
     resources.bar0_phys = bases[0]; resources.bar1_phys = bases[1];
     resources.decode_bytes = TRI_BAR0_DECODE_BYTES;
     resources.mapped_bytes = TRI_BAR0_DECODE_BYTES;
