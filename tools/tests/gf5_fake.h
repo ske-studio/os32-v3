@@ -415,7 +415,7 @@ static inline void gf5_host_init(struct gf5_host *h,struct gf4_state *state)
 /* New guard boundaries follow the existing UNIT split. UNIT1 owns real
  * clock/guard code; UNIT7 links the production assembly. All other stubs
  * expose arguments/rc to observe and fail_at without validating plans. */
-#if GF5_HOST_UNIT != 1 && GF5_HOST_UNIT != 7
+#if GF5_HOST_UNIT != 1 && GF5_HOST_UNIT != 7 && !defined(GF5_HOST_REAL_CLOCK)
 i32 gf5_plan_check(struct gf5 *g,const struct gf5_plan *plan,bool ram)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -479,14 +479,14 @@ i32 gf5_rc_map(i32 rc)
     }
 }
 #endif
-#if GF5_HOST_UNIT == 5 || GF5_HOST_UNIT == 6
+#if (GF5_HOST_UNIT == 5 || GF5_HOST_UNIT == 6) && !defined(GF5_HOST_REAL_VRAM)
 int gf_vram_match(struct gf2_chan *ch,const void *owner,u32 id,u32 generation,
                   u32 off,u32 bytes,struct gf_vram_reservation *out)
 {
     return gf5_host_match(gf5_host_current,ch,owner,id,generation,off,bytes,out);
 }
 #endif
-#if GF5_HOST_UNIT == 6
+#if GF5_HOST_UNIT == 6 && !defined(GF5_HOST_REAL_VRAM)
 int gf_vram_next(struct gf2_chan *ch,u32 *cursor,struct gf_vram_reservation *out)
 {
     return gf5_host_next(gf5_host_current,ch,cursor,out);
@@ -631,6 +631,7 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     e->p[0]=g; e->a[0]=F5_CALL_SELECT; e->a[1]=index;
     return gf5_host_end(h,e);
 }
+#ifndef GF5_HOST_REAL_TILE
 i32 gf5_tile_find(struct gf5 *g,u32 *slot)
 {
     struct gf5_host *h=gf5_host_context(g);
@@ -643,6 +644,15 @@ i32 gf5_tile_set(struct gf5 *g,u32 slot,const struct gf5_tile *tile)
     struct gf5_host *h=gf5_host_context(g);
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG);
     e->p[0]=g; e->p[1]=tile; e->a[0]=F5_CALL_SET; e->a[1]=slot;
+    /* UNIT6 models a successful tile boundary, including its value state.
+     * H3's REAL_TILE fixture links tile.c and retains real loan nodes. */
+    if (!e->rc) {
+        g->tile[slot]=*tile; g->tile_live[slot]=true;
+        g->tile_slot[slot].state=GF_TILE_OWNED;
+        g->tile_slot[slot].raw_addr=tile->base|1U;
+        g->tile_slot[slot].raw_limit=tile->base+tile->bytes-1U;
+        g->tile_slot[slot].raw_pitch=tile->pitch;
+    }
     return gf5_host_end(h,e);
 }
 i32 gf5_tile_clear(struct gf5 *g,u32 slot)
@@ -650,8 +660,11 @@ i32 gf5_tile_clear(struct gf5 *g,u32 slot)
     struct gf5_host *h=gf5_host_context(g);
     struct gf5_host_event *e=gf5_host_begin(h,F5_PROG);
     e->p[0]=g; e->a[0]=F5_CALL_SET; e->a[1]=slot;
+    if (!e->rc) { g->tile_slot[slot]=(struct gf5_tile_slot){0};
+        g->tile_live[slot]=false; g->tile[slot]=(struct gf5_tile){0}; }
     return gf5_host_end(h,e);
 }
+#endif /* GF5_HOST_REAL_TILE */
 #endif
 #if GF5_HOST_UNIT == 9
 /* Real links calls these F2/F4 boundaries. No F5 adapter or rc_map stub. */
