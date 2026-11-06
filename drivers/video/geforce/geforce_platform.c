@@ -21,6 +21,8 @@ STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
 /* BAR1 DISPLAY may be effective WC through MTRR. Ledger cache/intervals,
  * permanent reservations and the existing 75 display PTEs remain unchanged. */
 static struct gf_production_resources boot_resources;
+static u32 boot_resource_ids[RECOVER_BAR_COUNT];
+static bool boot_resources_valid;
 static struct geforce_platform platform;
 static int reserve_fail(const char *stage)
 {
@@ -29,6 +31,7 @@ static int reserve_fail(const char *stage)
 }
 static int reserve(void)
 {
+    boot_resources_valid = false;
     if (!gf_production_selected()) return reserve_fail("selection");
     if (gf_production_identify(&boot_resources)) return reserve_fail("identify");
     struct ledger_span spans[RECOVER_BAR_COUNT];
@@ -81,6 +84,9 @@ static int reserve(void)
     platform.bar0_phys = boot_resources.bars[GF_MODE_REGISTER_BAR].base;
     platform.display_phys = boot_resources.bars[GF_MODE_VRAM_BAR].base;
     platform.resources = &boot_resources;
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i)
+        boot_resource_ids[i] = ids[i];
+    boot_resources_valid = true;
     return 1;
 }
 struct geforce_platform *geforce_platform_get(void)
@@ -90,6 +96,25 @@ struct geforce_platform *geforce_platform_get(void)
     platform.wc_stop = geforce_wc_stop;
     platform.report = geforce_wc_report;
     return gf_production_selected() ? &platform : 0;
+}
+
+int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid)
+{
+    if (!boot_resources_valid || !owner || !rid || !bytes ||
+        bytes > ~0U - base) return -1;
+    u32 end = base + bytes;
+    u32 match = RECOVER_BAR_COUNT;
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i) {
+        const struct recover_bar_extent *b = &boot_resources.bars[i];
+        if (!b->length || b->length > ~0U - b->base ||
+            base < b->base || end > b->base + b->length) continue;
+        if (match != RECOVER_BAR_COUNT) return -1;
+        match = i;
+    }
+    if (match == RECOVER_BAR_COUNT) return -1;
+    *owner = LEDGER_OWNER_GFX;
+    *rid = boot_resource_ids[match];
+    return 0;
 }
 
 int geforce_range_reserved(u32 base, u32 length)
