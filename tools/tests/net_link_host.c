@@ -59,6 +59,7 @@ typedef signed int     i32;
 #define OS32_ERR_STALE     -11
 #define OS32_ERR_FULL      -13
 #define OS32_ERR_AGAIN     -14
+#define OS32_ERR_HOSTDOWN  -18
 
 /* ---- 贋 kstring.h / kprintf.h ----------------------------------------- */
 #define __KSTRING_H
@@ -1340,14 +1341,14 @@ static void handles_are_owner_private(void)
     check(link_host_close(h, host_owner) == 0, "持ち主が close できない");
 }
 
-/* 空き無し = FULL、NIC 無し = NOSYS、未確立 = STALE */
+/* 空き無し = FULL、NIC 停止・未確立 = HOSTDOWN */
 static void open_error_codes(void)
 {
     i32 a, b;
 
     /* 未確立 (HELLO 前) */
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_STALE,
-          "HELLO 前の open が STALE でない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_HOSTDOWN,
+          "HELLO 前の open が HOSTDOWN でない");
     script_handshake(SCRIPT_SESS, 0);
     check(link_host_open("", 0, host_owner) == OS32_ERR_INVAL, "0 長が INVAL でない");
     check(link_host_open("x", LINK_MAX_PAYLOAD + 1, host_owner) == OS32_ERR_INVAL,
@@ -1355,9 +1356,11 @@ static void open_error_codes(void)
     a = link_host_open("PING", 4, host_owner);
     b = link_host_open("TIME", 4, host_owner);
     check(a >= 0 && b >= 0, "2 本開けない");
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_FULL, "3 本目が FULL でない");
+    for (int i = 2; i < LINK_HANDLES; i++)
+        check(link_host_open("TIME", 4, host_owner) >= 0, "8 本開けない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_FULL, "9 本目が FULL でない");
     nic_up = 0;
-    check(link_host_open("PING", 4, host_owner) == OS32_ERR_NOSYS, "NIC 無しが NOSYS でない");
+    check(link_host_open("PING", 4, host_owner) == OS32_ERR_HOSTDOWN, "NIC 停止が HOSTDOWN でない");
     nic_up = 1;
     /* RELEASE が未 ACK の間、そのハンドルは AGAIN */
     ticks(3);

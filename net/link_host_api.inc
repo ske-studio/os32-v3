@@ -1,5 +1,61 @@
 /* 要求行の解析と非同期ホスト API・所有者回収。link.c から取り込む。 */
 
+/* 100Hz: 1000ms without peer progress (NET_HOSTSVC_DESIGN §6).
+ * Separate from last_rx_tick, which the old STATUS scheduler also writes.
+ * A8 wires these hooks into RX/timers; API calls never advance the machine.
+ * Slot keys prevent a freed/reused handle inheriting a terminal result. */
+#define LINK_HOST_SILENCE_TICKS 100u
+struct link_host_deadline {
+    u32 progress_tick, rid;
+    u16 gen, epoch;
+    int expired;
+};
+static struct link_host_deadline link_deadline[LINK_HANDLES];
+
+static struct link_host_deadline *link_deadline_for(struct link_handle *e)
+{
+    struct link_host_deadline *d = &link_deadline[e - link_h];
+    return d->rid == e->rid && d->gen == e->gen && d->epoch == e->epoch ? d : 0;
+}
+
+void link_host_progress(i32 h)
+{
+    if (h < 0 || h >= LINK_HANDLES) return;
+    struct link_handle *e = &link_h[h];
+    struct link_host_deadline *d = link_deadline_for(e);
+    if (d && !d->expired && e->state != LINK_H_FREE && e->state != LINK_H_STALE)
+        d->progress_tick = tick_count;
+}
+
+void link_host_deadlines(void)
+{
+    for (int i = 0; i < LINK_HANDLES; i++) {
+        struct link_handle *e = &link_h[i];
+        struct link_host_deadline *d = link_deadline_for(e);
+        if (!d || d->expired || e->state == LINK_H_FREE ||
+            e->state == LINK_H_STALE || e->state == LINK_H_DONE) continue;
+        /* All bytes received means only the local reader remains. */
+        if (e->state == LINK_H_RESP && e->recv_bytes >= e->length) continue;
+        if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
+        d->expired = 1;
+        /* STALE excludes this slot from existing RX/TX/timers; the API maps
+         * this local terminal cause to HOSTDOWN until the session changes. */
+        e->state = LINK_H_STALE;
+        e->req_due = e->w_due = e->wlen = 0;
+        e->want_ack = e->want_window = e->want_status = 0;
+        if (e->ring_owner) {
+            e->ring_owner = 0;
+            if (link_ring_owner == i) { link_ring_owner = -1; link_stream_reset(); }
+        }
+    }
+}
+
+static i32 link_host_terminal(struct link_handle *e)
+{
+    struct link_host_deadline *d = link_deadline_for(e);
+    return d && d->expired && e->epoch == link_epoch ? OS32_ERR_HOSTDOWN : OS32_ERR_STALE;
+}
+
 /* ======================================================================== */
 /*  要求行の宣言長 (ECHO / CLIP PUT / PRINT DATA / PUT)                      */
 /* ======================================================================== */
@@ -85,15 +141,16 @@ i32 link_host_open(const char *req, u32 len, int owner)
     int i, hh = -1, busy_rel = 0;
     u16 gen;
 
-    if (!link_ready || ne2k_state() != NE2K_STATE_RUNNING) return OS32_ERR_NOSYS;
+    if (!link_ready) return OS32_ERR_NOSYS;
+    if (ne2k_state() != NE2K_STATE_RUNNING) return OS32_ERR_HOSTDOWN;
     if (req == 0 || len == 0 || len > LINK_MAX_PAYLOAD) return OS32_ERR_INVAL;
 
     f = LINK_IRQ_SAVE();
-    if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
+    if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_HOSTDOWN; }
     if (link_next_rid >= U32_MAX) {          /* rid 枯渇 = 新セッションへ */
         link_resync();
         LINK_IRQ_RESTORE(f);
-        return OS32_ERR_STALE;
+        return OS32_ERR_HOSTDOWN;
     }
     for (i = 0; i < LINK_HANDLES; i++) {
         if (link_h[i].state != LINK_H_FREE) continue;
@@ -114,7 +171,7 @@ i32 link_host_open(const char *req, u32 len, int owner)
         LINK_IRQ_RESTORE(f);
         return OS32_ERR_AGAIN;
     }
-    if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
+    if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_HOSTDOWN; }
     {
         struct link_handle *e = &link_h[hh];
         e->state = LINK_H_SENT;
@@ -132,6 +189,10 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->decl_len = link_decl_len((const char *)e->req_copy, len);
         e->wsent_total = 0;
         e->last_rx_tick = tick_count;
+        link_deadline[hh] = (struct link_host_deadline){
+            .progress_tick = tick_count, .rid = e->rid,
+            .gen = e->gen, .epoch = e->epoch, .expired = 0
+        };
         e->retries = 0;
         e->probes = 0;
         e->ack_seq = 0;
@@ -151,7 +212,7 @@ i32 link_host_status(i32 h, u32 *status, u32 *length, int owner)
     f = LINK_IRQ_SAVE();
     e = link_slot(h, owner);
     if (!e) rc = OS32_ERR_INVAL;
-    else if (e->state == LINK_H_STALE) rc = OS32_ERR_STALE;
+    else if (e->state == LINK_H_STALE) rc = link_host_terminal(e);
     else if (e->state == LINK_H_SENT) rc = OS32_ERR_AGAIN;
     else {
         if (status) *status = e->status;
@@ -175,7 +236,7 @@ i32 link_host_read_stage(i32 h, u32 cap, const u8 **out, int owner)
     f = LINK_IRQ_SAVE();
     e = link_slot(h, owner);
     if (!e) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
-    if (e->state == LINK_H_STALE) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
+    if (e->state == LINK_H_STALE) { i32 rc = link_host_terminal(e); LINK_IRQ_RESTORE(f); return rc; }
     if (e->state == LINK_H_SENT) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
     if (e->length == 0 || e->read_bytes >= e->length) {
         LINK_IRQ_RESTORE(f);
@@ -215,7 +276,7 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     f = LINK_IRQ_SAVE();
     e = link_slot(h, owner);
     if (!e) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
-    if (e->state == LINK_H_STALE) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
+    if (e->state == LINK_H_STALE) { i32 rc = link_host_terminal(e); LINK_IRQ_RESTORE(f); return rc; }
     if (e->decl_len == 0) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
     if (e->state != LINK_H_SENT) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
     remain = e->decl_len - e->wsent_total;
@@ -232,7 +293,7 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     f = LINK_IRQ_SAVE();
     e = link_slot(h, owner);
     if (!e || e->gen != gen) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
-    if (e->state == LINK_H_STALE) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
+    if (e->state == LINK_H_STALE) { i32 rc = link_host_terminal(e); LINK_IRQ_RESTORE(f); return rc; }
     if (e->state != LINK_H_SENT || e->wlen || !e->req_acked) {
         LINK_IRQ_RESTORE(f);
         return OS32_ERR_AGAIN;
