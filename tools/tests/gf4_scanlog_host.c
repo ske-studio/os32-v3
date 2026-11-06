@@ -144,6 +144,9 @@ static void scanlog_init(void)
     scanlog_point_fail=false;
     scanlog_device=(struct video_device){.ops=&gf_video_ops,.context=&cint_prod.display};
     geforce_backend_bind(&scanlog_device,scanlog_identify,SCANLOG_BAR0,scanlog_point,&cint_host);
+    /* Host mapping seam corresponding to devinit.c's BAR0 loan. */
+    cint_prod.foundation.bar0=(volatile u8 *)(uptr)SCANLOG_BAR0;
+    cint_prod.display.bar0_map=(void *)(uptr)SCANLOG_BAR0;
     startlog_clear();
     geforce_init();
     assert(active && routed && !failed && scanlog_route && !scanout_logged);
@@ -250,7 +253,10 @@ static void scanlog_present(void)
     geforce_present(0,0,640,400);
     assert(startlog_len==len && gfx_counters.present_bytes==2U*640U*400U);
 }
-void _start(void)
+#ifndef GF4_SCANLOG_ENTRY
+#define GF4_SCANLOG_ENTRY _start
+#endif
+void GF4_SCANLOG_ENTRY(void)
 {
     scanlog_map(CINT_FB_PHYS,GF_MODE_VRAM_BYTES);
     scanlog_map(SCANLOG_BAR0,0x101000U);
