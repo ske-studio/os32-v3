@@ -36,6 +36,10 @@ import sys
 import tempfile
 import time
 
+import host_linux
+from host_notify import Notify, new_generation
+from host_services import Registry
+
 # ---------------------------------------------------------------- ワイヤ定数
 LINK_ETHERTYPE = 0x88B5
 ETH_HDR = 14
@@ -53,8 +57,9 @@ OP_WINDOW = 7
 OP_WDATA = 8
 OP_STATUS = 9
 OP_RELEASE = 10
+OP_NOTIFY = 11
 OPNAME = {1: "HELLO", 2: "REQUEST", 3: "RESPONSE", 4: "DATA", 5: "EOF",
-          6: "ACK", 7: "WINDOW", 8: "WDATA", 9: "STATUS", 10: "RELEASE"}
+          6: "ACK", 7: "WINDOW", 8: "WDATA", 9: "STATUS", 10: "RELEASE", 11: "NOTIFY"}
 
 # HELLO の段階 (flags)
 HS_SYN = 0
@@ -93,7 +98,8 @@ PAYLEN = {
     OP_WINDOW: (2, 2),
 }
 # HELLO は段階ごとに長さが違う
-HELLO_PAYLEN = {HS_SYN: 0, HS_SYNACK: 6, HS_CONFIRM: 0, HS_ESTAB: 2}
+HELLO_PAYLEN = {HS_SYN: (0,), HS_SYNACK: (6, 12),
+                HS_CONFIRM: (0,), HS_ESTAB: (2, 8)}
 
 # ------------------------------------------------- N2 サービス定数 (PRINT / CLIP)
 # 業務結果の HTTP 風ステータス (RESPONSE flags 0)。制御符号 (CTL_*) とは別空間。
@@ -143,7 +149,7 @@ SUBPROC_ERRORS = (OSError, subprocess.TimeoutExpired,
                   ValueError, binascii.Error)
 
 
-CLIP_BACKENDS = ("auto", "win32", "wsl", "none")   # file:<path> は接頭辞で別扱い
+CLIP_BACKENDS = ("auto", "win32", "wsl", "wayland", "xclip", "none")   # file:<path> は接頭辞で別扱い
 
 
 def valid_clip_arg(value):
@@ -367,6 +373,9 @@ class HostAgent:
         self.quiet = quiet
         self.rng = rng or random.Random()
         self.agent_gen = agent_gen if agent_gen is not None else self.rng.randint(1, 0xFFFF)
+        self.host_generation = new_generation()
+        self.registry = Registry(self.host_generation)
+        self.notifier = Notify(self.registry, self.host_generation)
         self.sessions = SessCounter(state_dir, sess_start)
         self.allow_net = allow_net
         self.file_root = file_root
@@ -402,6 +411,9 @@ class HostAgent:
         self.counts = {"hello": 0, "request": 0, "wdata": 0, "ack": 0,
                        "window": 0, "status": 0, "release": 0, "dropped": 0,
                        "no_slot": 0, "tombstone": 0, "processing": 0}
+
+    def notify(self, name, kind, data):
+        self.notifier.notify(name, kind, data)
 
     # ------------------------------------------------------------ ログ
     def log(self, *a):
@@ -452,6 +464,11 @@ class HostAgent:
             self.counts["dropped"] += 1
             return
 
+        if rid == 0 and op in (OP_ACK, OP_WINDOW):
+            window = struct.unpack("<H", payload)[0] if op == OP_WINDOW else self.notifier.window
+            self.notifier.ack(sess, epoch, ack, window)
+            return
+
         if op == OP_REQUEST:
             self.counts["request"] += 1
             self._on_request(rid, seq, payload, out)
@@ -476,7 +493,7 @@ class HostAgent:
     def _paylen_ok(self, op, flags, plen):
         if op == OP_HELLO:
             want = HELLO_PAYLEN.get(flags)
-            return want is not None and plen == want
+            return want is not None and plen in want
         lim = PAYLEN.get(op)
         if lim is None:
             return False
@@ -511,7 +528,8 @@ class HostAgent:
              "os32_nonce": nonce, "agent_nonce": self.rng.randint(1, 0xFFFFFFFF),
              "req_sess": req_sess, "req_epoch": epoch}
         self.cand = c
-        pl = struct.pack("<HHH", self.agent_gen, c["req_sess"], c["req_epoch"])
+        pl = (struct.pack("<HHH", self.agent_gen, c["req_sess"], c["req_epoch"])
+              + self.notifier.hello_extension())
         out.send(self.build(src, OP_HELLO, HS_SYNACK, seq=c["os32_nonce"],
                             ack=c["agent_nonce"], payload=pl,
                             sess=c["sess"], epoch=c["epoch"]))
@@ -527,7 +545,11 @@ class HostAgent:
             self._switch_to(c)
         out.send(self.build(src, OP_HELLO, HS_ESTAB, seq=c["agent_nonce"],
                             ack=c["os32_nonce"],
-                            payload=struct.pack("<H", self.agent_gen)))
+                            payload=struct.pack("<H", self.agent_gen)
+                            + self.notifier.hello_extension()))
+        if not c.get("confirmed"):
+            self.notifier.session(self.sess, self.epoch, self.now())
+            c["confirmed"] = True
         self.log("CONFIRM ok -> ESTABLISHED sess %d epoch %d" % (self.sess, self.epoch))
 
     def _switch_to(self, c):
@@ -535,6 +557,7 @@ class HostAgent:
         # 捨てる (結果を旧セッションへ返さない。往復 3 B-1)。
         for job in self.pending.values():
             job["proc"].kill()
+            self._print_failed(job["ent"], "session changed")
         self.pending = {}
         new_sess = c["sess"] != self.sess
         self.sess, self.epoch, self.peer = c["sess"], c["epoch"], c["mac"]
@@ -664,6 +687,7 @@ class HostAgent:
         job = self.pending.pop(rid, None)              # 実行中の子は結果ごと捨てる
         if job is not None:
             job["proc"].kill()
+            self._print_failed(job["ent"], "released")
         self.ledger[rid] = {"st": "RELEASED"}          # (4) 先着でも墓標を作る
         self._reap_tombstones()
         self._ack(rid, 0, out, flags=F_RELACK)
@@ -720,6 +744,18 @@ class HostAgent:
     def _serve(self, rid, ent, out):
         """要求行を読む。宣言長のある要求は本文を待ち、無い要求はすぐ答える。"""
         line = ent["req"].decode("latin1").strip()
+        aliases = {"os32.clip": "CLIP", "os32.print": "PRINT", "os32.http": "GET"}
+        named = line.split(None, 1)
+        name = named[0] if named else ""
+        args = named[1] if len(named) > 1 else ""
+        if name in aliases:
+            # HTTP の新しい口は os32.http GET <url>。
+            line = args if name == "os32.http" else aliases[name] + " " + args
+        elif line == "LIST" or "." in name:
+            status, body = self.registry.dispatch(line, b"")
+            self._answer(rid, ent, status, body, None, out)
+            return
+        ent["line"] = line
         parts = line.split()
         verb = parts[0].upper() if parts else ""
         # --- 宣言長 (WDATA) のある要求。範囲は要求行の時点で検査 (B2) ---
@@ -805,7 +841,8 @@ class HostAgent:
                          out, total=total, plen=plen, dropseq=drop)
         else:
             self.log("unknown request: %r" % line)
-            self._answer(rid, ent, 400, b"", None, out)
+            status, body = self.registry.dispatch(line, b"")
+            self._answer(rid, ent, status, body, None, out)
 
     def _service_get(self, rid, ent, resource, out):
         if resource.startswith("/pattern/"):
@@ -878,7 +915,7 @@ class HostAgent:
 
     def _finish_body(self, rid, ent, out):
         """宣言長ぶんの WDATA を受け切った要求に答える (verb で分岐)。"""
-        parts = ent["req"].decode("latin1").strip().split()
+        parts = ent.get("line", ent["req"].decode("latin1").strip()).split()
         verb = parts[0].upper() if parts else ""
         sub = parts[1].upper() if len(parts) > 1 else ""
         if verb == "ECHO":
@@ -910,9 +947,10 @@ class HostAgent:
     # ----------------------------------------------------- N2: 非同期の巡回
     def tick(self, out):
         """常駐ループが毎周呼ぶ。子プロセスの完了 / 期限を拾って応答する。"""
-        if not self.pending:
-            return
         now = self.now()
+        for op, flags, seq, ack, rid, window, payload in self.notifier.tick(now):
+            out.send(self.build(self.peer, op, flags, seq=seq, ack=ack,
+                                rid=rid, payload=payload))
         for rid in list(self.pending):
             job = self.pending[rid]
             ent = job["ent"]
@@ -926,12 +964,15 @@ class HostAgent:
             try:
                 rc = job["proc"].poll()
             except SUBPROC_ERRORS as e:
+                job["proc"].kill()
+                self._print_failed(ent, str(e))
                 del self.pending[rid]
                 self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
                 continue
             if rc is None:
                 if now >= job["deadline"]:               # 期限超過 → kill + 503
                     job["proc"].kill()
+                    self._print_failed(ent, "timeout")
                     del self.pending[rid]
                     self._answer(rid, ent, HTTP_UNAVAIL,
                                  self._err_body("timeout"), None, out)
@@ -947,6 +988,11 @@ class HostAgent:
                 if closer is not None:
                     closer()                             # nb1: 完了経路でも fd を閉じる
             self._answer(rid, ent, status, body, None, out)
+
+    def _print_failed(self, ent, message):
+        job = self.jobs.get(ent.get("print_job"))
+        if job is not None:
+            job["state"], job["error"] = "error", message
 
     def _start_async(self, rid, ent, proc, finish, timeout=None):
         # 期限は要求種別ごと (§7 B4): CLIP は subproc_timeout (4 秒)、GET は 25 秒。
@@ -1016,10 +1062,10 @@ class HostAgent:
         if not name:
             self._answer(rid, ent, HTTP_BAD, b"", None, out)
             return
-        if kind == "raw":
+        if kind == "raw" and not (self.printer and sys.platform == "linux"):
             self._answer(rid, ent, HTTP_NOT_IMPL, b"", None, out)  # raw は v2
             return
-        if kind != "text":
+        if kind not in ("text", "raw"):
             self._answer(rid, ent, HTTP_BAD, b"", None, out)       # 未知 kind
             return
         # nb(c): ジョブ保存の用意 (makedirs) / id 採番 (job.txt 書き込み) /
@@ -1060,7 +1106,7 @@ class HostAgent:
             self._answer(rid, ent, HTTP_CONFLICT, b"", None, out)
             return
         st = job["state"]
-        if st == "open":
+        if st in ("open", "queued"):
             body = b"queued"
         elif st == "done":
             body = b"done"
@@ -1079,6 +1125,28 @@ class HostAgent:
             return
         if job["state"] == "done":                       # 再 CLOSE は冪等 200
             self._answer(rid, ent, 200, b"pages %d" % job["pages"], None, out)
+            return
+        if self.printer and sys.platform == "linux":
+            if any(p["ent"].get("print_job") == job_id for p in self.pending.values()):
+                self._answer(rid, ent, HTTP_CONFLICT, b"", None, out)
+                return
+            try:
+                with open(job["spool"], "rb") as f:
+                    data = f.read()
+                proc = host_linux.print_start(data, None, job["kind"] == "raw")
+            except (OSError, host_linux.ServiceUnavailable) as e:
+                job["state"], job["error"] = "error", str(e)
+                self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
+                return
+            job["state"] = "queued"
+            ent["print_job"] = job_id
+            def finish(proc):
+                if proc.poll():
+                    job["state"], job["error"] = "error", "lp failed"
+                    raise self._subproc_failed(proc, "lp", proc.poll())
+                job["state"], job["pages"] = "done", self._count_pages(data)
+                return 200, b"pages %d" % job["pages"]
+            self._start_async(rid, ent, proc, finish)
             return
         status, body = self._print_output(job)           # open / error を出力
         self._answer(rid, ent, status, body, None, out)
@@ -1161,7 +1229,7 @@ class HostAgent:
             pass
         if shutil.which("clip.exe") or shutil.which("powershell.exe"):
             return "wsl"
-        return "none"
+        return "auto" if sys.platform == "linux" else "none"
 
     @staticmethod
     def _clip_trim_get(data):
@@ -1196,6 +1264,14 @@ class HostAgent:
                 return
             self._answer(rid, ent, 200, self._clip_trim_get(data), None, out)
             return
+        if b in ("auto", "wayland", "xclip"):
+            try:
+                proc = host_linux.clip_start("get", b"", b)
+            except host_linux.ServiceUnavailable as e:
+                self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
+                return
+            self._start_async(rid, ent, proc, self._finish_linux_clip_get)
+            return
         # wsl: powershell が base64(UTF-8) を吐く → 非同期に受けてデコード (B-1)
         cmd = ["powershell.exe", "-NoProfile", "-Command",
                "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("
@@ -1206,6 +1282,10 @@ class HostAgent:
             self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
             return
         self._start_async(rid, ent, proc, self._finish_clip_get)
+
+    def _finish_linux_clip_get(self, proc):
+        self._finish_clip_put(proc)
+        return 200, self._clip_trim_get(proc.output())
 
     def _finish_clip_get(self, proc):
         rc = proc.poll()
@@ -1247,6 +1327,14 @@ class HostAgent:
                 self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
                 return
             self._answer(rid, ent, 200, b"", None, out)
+            return
+        if b in ("auto", "wayland", "xclip"):
+            try:
+                proc = host_linux.clip_start("put", ent["got"].replace(b"\r\n", b"\n"), b)
+            except host_linux.ServiceUnavailable as e:
+                self._answer(rid, ent, HTTP_UNAVAIL, self._err_body(e), None, out)
+                return
+            self._start_async(rid, ent, proc, self._finish_clip_put)
             return
         # wsl: clip.exe に UTF-16LE + BOM を stdin (非同期)
         try:
@@ -1322,15 +1410,15 @@ def main():
     ap.add_argument("--print-dir", metavar="DIR",
                     help="to-file 印刷の出力先 (指定でスプールを一意名で移す)")
     ap.add_argument("--printer", action="store_true",
-                    help="CLOSE で win32print により既定プリンタへ送る (任意依存)")
+                    help="CLOSE で既定プリンタへ送る (Linux: lp、Windows: win32print)")
     ap.add_argument("--lines-per-page", type=int, default=DEFAULT_LINES_PER_PAGE,
                     metavar="N", help="\\f が無いときのページ換算行数 (既定 60)")
     ap.add_argument("--clip", default="auto",
-                    metavar="{auto,win32,wsl,file:<path>,none}",
+                    metavar="{auto,win32,wsl,wayland,xclip,file:<path>,none}",
                     help="クリップボード backend (既定 auto)")
     args = ap.parse_args()
     if not valid_clip_arg(args.clip):
-        ap.error("--clip は {auto,win32,wsl,none} か file:<path> "
+        ap.error("--clip は {auto,win32,wsl,wayland,xclip,none} か file:<path> "
                  "(不正: %r)" % args.clip)
 
     if args.state_dir:
