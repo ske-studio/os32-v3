@@ -72,6 +72,7 @@ i32 gf_display_quiesce(struct gf_display_context *c)
     if (stopped) {
         c->reusable=false;c->stop_ok=false;
         if (c->engaged && !revoked) {
+            c->target=target;
             c->last_rc=stop_rc ? stop_rc : -1;
             return c->last_rc;
         }
@@ -79,7 +80,7 @@ i32 gf_display_quiesce(struct gf_display_context *c)
     struct gf_init_context cleanup={.io=c->io};
     int local_rc=c->io.restore(c->io.opaque,&cleanup);
     if (!rc) rc=local_rc;
-    if (!rc) target=c->target;
+    if (!rc && !first_rc) target=c->target;
     if (stopped && !first_rc) first_rc=stop_rc ? stop_rc : -1;
     if (rc && !first_rc) first_rc=rc;
     rc=(stopped || rc) ? -1 : 0;

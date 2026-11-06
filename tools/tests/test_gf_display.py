@@ -141,6 +141,8 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/display/quiesce.c', '            c->target=target;\n            c->last_rc=stop_rc ? stop_rc : -1;',
+         '            c->last_rc=stop_rc ? stop_rc : -1;', 'lower stop target survives scan restore'),
         ('hwdev/gf/display/quiesce.c', 'if (c->engaged && !revoked) {', 'if (c->engaged && revoked) {', 'failed stop cleanup forbidden'),
         ('hwdev/gf/service.c', ' || c->owner->foundation_start(c)', '', 'start hook omitted'),
         ('hwdev/gf/display/quiesce.c', 'int stopped=c->owner->foundation_stop(c);', 'int stopped=0;', 'stop hook omitted'),
@@ -1854,6 +1856,9 @@ GF4_MUTATIONS += [
     ('b10', 'post-script-old-deadline', 'hwdev/gf/display/tmds.c',
      'if (!rc) ctx->deadline=dl=now+GF2_TIMEOUT_US;',
      'if (!rc) ctx->deadline=dl;', 'post-script MMIO has independent budget'),
+    ('c2stop', 'revoked-stop-target-preserved', 'hwdev/gf/display/quiesce.c',
+     'if (!rc && !first_rc) target=c->target;',
+     'if (!rc) target=c->target;', 'lower stop target survives revoked cleanup'),
     ('c2stop', 'lower-stop-error-preserved', 'hwdev/gf/display/quiesce.c',
      'if (stopped) first_rc=stop_rc ? stop_rc : -1;',
      'if (stopped) first_rc=0;', 'revoked stop error survives later scan restore error'),

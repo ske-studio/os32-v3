@@ -256,9 +256,15 @@ static void normal_clock_dispatch(void)
         cint_no_resources();
     }
 }
+static int scan_stop_record(struct gf_display_context *c)
+{
+    int rc=cint_foundation_stop(c);
+    if (rc) c->target=RECOVER_PBUS1854;
+    return rc;
+}
 static void scan_origins(void)
 {
-    for (u32 fail=0;fail<3U;fail++) {
+    for (u32 fail=0;fail<4U;fail++) {
         cint_reset(); cint_start();
         assert(!gf3_service_stop(cint_service));
         cint_prod.display.baseline_valid=true;
@@ -267,12 +273,18 @@ static void scan_origins(void)
         gf3_host_set(&cint_host,0,0x600800U,0x9e000U);
         gf3_host_set(&cint_host,0,0x602800U,0x7e000U);
         cint_trace_clear();
-        /* First lower-stop write fails, as on the failing leave. */
-        if (fail) gf3_host_fail_at(&cint_host,H_WRITE,1,CINT_IO_FAILURE);
-        if (fail==2U) cint_prod.foundation.revoked=true;
+        /* Ordinary stop: first lower write fails. Revoked stop skips those
+         * writes, so inject separately into the first scan restore (case 3).
+         * Case 2 leaves scan restore successful to expose target clobbering. */
+        if (fail==1U || fail==3U) gf3_host_fail_at(&cint_host,H_WRITE,1,CINT_IO_FAILURE);
+        if (fail>=2U) cint_prod.foundation.revoked=true;
+        struct gf_display_owner owner=cint_display_owner;
+        owner.foundation_stop=scan_stop_record;
+        cint_prod.display.owner=&owner;
         int rc=gf_display_quiesce(&cint_prod.display);
         assert((rc!=0)==(fail!=0));
-        if (fail==2U) assert(rc==GF1_EPCI);
+        if (fail>=2U) assert(rc==GF1_EPCI);
+        if (fail) assert(cint_prod.display.target==RECOVER_PBUS1854);
         u32 values[2]={0};
         for (u32 i=0;i<cint_host.nevents;i++) {
             const struct gf3_host_event *e=&cint_events[i];
@@ -283,6 +295,7 @@ static void scan_origins(void)
         if (fail) assert(cint_prod.display.engaged && cint_service->scan_node.value.owner);
         gf3_host_fail_at(&cint_host,H_WRITE,0,0);
         cint_prod.foundation.revoked=false;
+        cint_prod.display.owner=&cint_display_owner;
         cint_restore_seen=false;
         assert(!gf_display_stop(&cint_prod.display));
         cint_no_resources();
