@@ -182,6 +182,41 @@ static bool ignored(u32 i)
     return (i & 3U) == 3U &&
         (i < xrgb_first || (i >= TEST_HALF && i - TEST_HALF < xrgb_second));
 }
+/* PM acceptance 2026-11-06: cl0077.h specifies formats/FOH but not
+ * interpolation precision, rounding or the 565 dither matrix. Nouveau
+ * nv_accel_common.c:480-482 selects DITHER (as accel_objects.c:122 does)
+ * and nv04_xv_blit.c does not compare output pixels. Allow one output
+ * channel LSB for DITHER formats/FOH; keep point/solid 8-bit exact.
+ * Only the written clip is eligible: source, padding and guards stay exact.
+ * Expected pixels remain the independent integer ideal, never HW samples. */
+static bool scale_tolerant(enum gf3_fmt fmt, bool bilinear, bool solid)
+{
+    return fmt == GF3_RGB565 || (!solid &&
+           (bilinear || fmt == GF3_YUY2 || fmt == GF3_UYVY));
+}
+static enum gf3_fmt scale_compare_fmt;
+static struct gf3_rect scale_compare_clip;
+static u32 scale_compare_pitch;
+static bool scale_within_lsb(u32 i)
+{
+    if (i < TEST_HALF) return false;
+    u32 n = cpp(scale_compare_fmt), off = i - TEST_HALF;
+    u32 y = off / scale_compare_pitch, x = (off % scale_compare_pitch) / n;
+    const struct gf3_rect *c = &scale_compare_clip;
+    if (x < c->x || x >= c->x + c->w || y < c->y || y >= c->y + c->h)
+        return false;
+    u32 base = i - off % n;
+    u32 a = get_pixel(transfer + base, n), e = get_pixel(expected + base, n);
+    for (u32 b = 0; b < (n == 2U ? 3U : 4U); b++) {
+        u32 shift = n == 2U ? (b == 0U ? 0U : b == 1U ? 5U : 11U) : b * 8U;
+        u32 mask = n == 2U ? (b == 1U ? 63U : 31U) : 255U;
+        if (n == 4U && ignored(base + b)) continue;
+        u32 av = (a >> shift) & mask, ev = (e >> shift) & mask;
+        u32 d = av > ev ? av - ev : ev - av;
+        if (d > 1U) return false;
+    }
+    return true;
+}
 static int compare(bool download, bool ideal)
 {
     int rc;
@@ -208,13 +243,14 @@ static int compare(bool download, bool ideal)
         rc = gf3_test_view_close(&test_view, &test_view.view);
         if (rc) return rc; /* static record retains ownership for retry */
     }
-    u32 bad = 0, first = TEST_FULL_MASK, delta = 0, count = 0;
+    u32 bad = 0, first = TEST_FULL_MASK, delta = 0, count = 0, rejected = 0;
     for (u32 i = 0; i < TEST_BYTES; i++) {
         if (ignored(i)) { transfer[i] = expected[i]; continue; }
         count++;
         if (transfer[i] == expected[i]) continue;
         if (!bad) first = i;
         bad++;
+        if (!ideal || !scale_within_lsb(i)) rejected++;
         u32 d = transfer[i] > expected[i] ? transfer[i] - expected[i] : expected[i] - transfer[i];
         if (d > delta) delta = d;
     }
@@ -231,10 +267,10 @@ static int compare(bool download, bool ideal)
         number(" actual_byte=", transfer[first]);
     }
     hex(" crc_expected=", crc_expected); hex(" crc_actual=", crc_actual);
-    serial_puts_polled(ideal ? " comparison=ideal-observation\r\n" : " comparison=exact\r\n");
-    /* No guessed tolerance for bilinear/YUV. Differences require explicit
-     * hardware acceptance; report a failure while preserving the evidence. */
-    return bad ? GF2_EIO : 0;
+    number(" outside_tolerance=", rejected);
+    serial_puts_polled(ideal ? " comparison=channel-lsb1\r\n" : " comparison=exact\r\n");
+    /* Preserve raw byte differences/CRCs even when accepted. */
+    return rejected ? GF2_EIO : 0;
 }
 
 /* Independent NVROP truth tables, xf86-video-nouveau nv_rop.h:303-318.
@@ -600,11 +636,10 @@ static int scale_case(void)
         number(" scale_fmt=", fmt); number(" trial=", trial);
         number(" bilinear=", bilinear); number(" solid=", solid);
         serial_puts_polled("\r\n");
-        /* RGB565 output also has an ideal, not exact, oracle: the SIFM
-         * setup selects DITHER while packing above uses truncation.
-         * Keep every difference fatal until hardware acceptance. */
-        rc = compare(false, bilinear || dst_fmt == GF3_RGB565 ||
-                     fmt == GF3_YUY2 || fmt == GF3_UYVY);
+        scale_compare_fmt = dst_fmt;
+        scale_compare_clip = clip;
+        scale_compare_pitch = pitch;
+        rc = compare(false, scale_tolerant(fmt, bilinear, solid));
         if (rc && !first_rc) first_rc = rc;
         /* Numerical differences are observations; continue collecting all
          * formats/filters. Mapping/cleanup errors retain ownership and stop. */
