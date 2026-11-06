@@ -49,6 +49,12 @@
       "source": "drivers/char/serial.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

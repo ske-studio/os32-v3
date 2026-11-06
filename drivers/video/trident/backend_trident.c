@@ -5,10 +5,77 @@
 #include "trident_module.h"
 #include "gfx/gfx_internal.h"
 #include "lib/serial_diag.h"
+#include "lib/crc32_core.inc"
+#include "kprintf.h"
+#include "config.h"
 
 static struct trident_device device;
 static bool registers_pending;
 static u32 register_entry;
+
+static bool present_diag_done, present_error_done;
+
+/* Use the same byte-access seam as present; never probe or write the LFB.
+ * The full fixed surface is compared even if the first present is partial. */
+static void diag_after_present(void)
+{
+    if (present_diag_done) return;
+    present_diag_done = true;
+    const struct trident_resources *r = device.res;
+    if (r->client_bytes < TRI_DISPLAY_BYTES || r->mapped_bytes < TRI_DISPLAY_BYTES ||
+        r->decode_bytes < TRI_DISPLAY_BYTES || device.verified_bytes < TRI_DISPLAY_BYTES) {
+        kprintf(KLOG_ATTR, "[trident] diag readback gen=%u skipped=range\n", register_entry);
+        return;
+    }
+    u32 client_crc = CRC32_INIT, lfb_crc = CRC32_INIT;
+    u32 first = TRI_DISPLAY_BYTES, read_bytes = 0;
+    u8 first_client = 0, first_lfb = 0;
+    int rc = 0;
+    for (u32 off = 0; off < TRI_DISPLAY_BYTES; ++off) {
+        u8 value, source = r->client[off];
+        rc = trident_read8(&device, TRI_SPACE_LFB, off, &value);
+        if (rc) break;
+        client_crc = crc32_core_update(client_crc, &source, 1);
+        lfb_crc = crc32_core_update(lfb_crc, &value, 1);
+        ++read_bytes;
+        if (first == TRI_DISPLAY_BYTES && source != value) {
+            first = off; first_client = source; first_lfb = value;
+        }
+    }
+    kprintf(KLOG_ATTR, "[trident] diag crc gen=%u bytes=%u rc=%d client=%08x lfb=%08x\n",
+            register_entry, read_bytes, rc,
+            crc32_core_final(client_crc), crc32_core_final(lfb_crc));
+    /* offset=-1 means no mismatch in the successfully read prefix. */
+    kprintf(KLOG_ATTR, "[trident] diag mismatch gen=%u offset=%d client=%02x lfb=%02x\n",
+            register_entry, first == TRI_DISPLAY_BYTES ? -1 : (int)first,
+            first_client, first_lfb);
+    /* Band interiors at x=32 avoid the text box; (340,260) is the
+     * approximate white-rectangle center requested for the hardware trial. */
+    static const u16 points[][2] = {
+        {0, 0}, {320, 240}, {32, 30}, {32, 90}, {32, 150},
+        {32, 210}, {32, 270}, {32, 350}, {340, 260}
+    };
+    for (u32 i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        u32 off = points[i][1] * TRI_PITCH + points[i][0];
+        u8 value = 0;
+        int sample_rc = trident_read8(&device, TRI_SPACE_LFB, off, &value);
+        kprintf(KLOG_ATTR, "[trident] diag sample gen=%u x=%u y=%u client=%02x lfb=%02x rc=%d\n",
+                register_entry, points[i][0], points[i][1], r->client[off], value, sample_rc);
+    }
+}
+
+static void diag_present_error(int rc, int x, int y, int w, int h)
+{
+    if (!rc || present_error_done) return;
+    present_error_done = true;
+    u32 end = 0;
+    if (gfx_clip_screen(&x, &y, &w, &h, TRI_WIDTH, TRI_HEIGHT))
+        end = ((u32)y + (u32)h - 1u) * TRI_PITCH + (u32)x + (u32)w;
+    const struct trident_resources *r = device.res;
+    kprintf(KLOG_ATTR, "[trident] diag present gen=%u rc=%d end=%u verified_bytes=%u mapped_bytes=%u decode_bytes=%u client_bytes=%u\n",
+            register_entry, rc, end, device.verified_bytes,
+            r->mapped_bytes, r->decode_bytes, r->client_bytes);
+}
 
 /* Diagnostic only: indexed data is never written, no unlock/probe/VRAM test.
  * Mode has already selected New mode, so reading SR0B keeps that mode.
@@ -205,6 +272,10 @@ static void init(void)
     rc = trident_screen_init(&device);
     if (rc) { finish(device.failed_step, rc, true); return; }
     ++register_entry;
+    present_diag_done = present_error_done = false;
+    kprintf(KLOG_ATTR, "[trident] diag buffer gen=%u bb=%08x client=%08x\n",
+            register_entry, (u32)(uptr)trident_context->backend->bb_base,
+            (u32)(uptr)device.res->client);
     registers_pending = true;
     *trident_context->height = TRI_HEIGHT;
     *trident_context->flip = *trident_context->page = 0;
@@ -236,7 +307,9 @@ static void present(int x, int y, int w, int h)
     if (device.last_rc || !device.active) return;
     registers_before_present();
     int rc = trident_present(&device, x, y, w, h);
+    diag_present_error(rc, x, y, w, h);
     if (rc) { finish(TRI_STEP_ACTIVE, rc, true); return; }
+    diag_after_present();
     if (gfx_clip_screen(&x, &y, &w, &h, TRI_WIDTH, TRI_HEIGHT)) {
         trident_context->counters->present_bytes += (u32)w * (u32)h;
         ++trident_context->counters->commits;

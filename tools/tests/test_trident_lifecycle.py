@@ -18,7 +18,7 @@ Intentional differences from H, following reference:
 * Final CR11 lock after Restore (D:3347), absent from the script.
 """
 CHECK = dict(name='trident-lifecycle', tier=1, needs=[], budget=600,
-    covers=['drivers/video/trident/lifecycle.c', 'drivers/video/trident/backend_trident.c', 'drivers/video/trident/trident.h', 'drivers/video/trident/trident_module.h', 'drivers/video/trident/regs.c', 'drivers/video/trident/probe.c', 'drivers/video/trident/state_save.c', 'drivers/video/trident/pc98_init.c', 'drivers/video/trident/mode_640.c', 'drivers/video/trident/route_ra266.c', 'drivers/video/trident/vram.c', 'drivers/video/trident/default_dac.c', 'drivers/video/trident/state_restore.c', 'drivers/video/trident/present.c', 'drivers/video/trident/palette.c', 'tools/tests/trident_lifecycle_host.c', 'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'tools/tests/trident_pc98init_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'include/pegc.h', 'gfx/gfx.h', 'gfx/palette.h', 'gfx/gfx_internal.h', 'mm/kmalloc.h', 'lib/serial_diag.h', 'userland/tests/hw/trident_mode.hwb', 'drivers/char/serial.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h'])
+    covers=['drivers/video/trident/lifecycle.c', 'drivers/video/trident/backend_trident.c', 'drivers/video/trident/trident.h', 'drivers/video/trident/trident_module.h', 'drivers/video/trident/regs.c', 'drivers/video/trident/probe.c', 'drivers/video/trident/state_save.c', 'drivers/video/trident/pc98_init.c', 'drivers/video/trident/mode_640.c', 'drivers/video/trident/route_ra266.c', 'drivers/video/trident/vram.c', 'drivers/video/trident/default_dac.c', 'drivers/video/trident/state_restore.c', 'drivers/video/trident/present.c', 'drivers/video/trident/palette.c', 'tools/tests/trident_lifecycle_host.c', 'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'tools/tests/trident_pc98init_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'include/pegc.h', 'gfx/gfx.h', 'gfx/palette.h', 'gfx/gfx_internal.h', 'mm/kmalloc.h', 'lib/serial_diag.h', 'lib/crc32_core.inc', 'include/kprintf.h', 'include/config.h', 'userland/tests/hw/trident_mode.hwb', 'drivers/char/serial.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h'])
 import argparse
 import os
 from pathlib import Path
@@ -321,6 +321,10 @@ def check_trace(data):
             # Every LFB byte, including the final byte, must use write8.
             # Full H-equivalent bitmap is also checked in the C harness.
             for off in range(640*480): trace.access(True,1,off,space=1,count=1)
+            for off in range(640*480): trace.access(False,1,off,space=1,count=1)
+            for x,y in [(0,0),(320,240),(32,30),(32,90),(32,150),
+                        (32,210),(32,270),(32,350),(340,260)]:
+                trace.access(False,1,y*640+x,space=1,count=1)
             trace.done()
         elif step==15: script('disable',trace,env)
         elif step==13:

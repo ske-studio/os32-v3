@@ -1,7 +1,7 @@
 # Trident S3: VA0 body, function imports, paired optional GUI distribution.
 TRIDENT_OUT := $(BUILD_OUT)/trident
 TRIDENT_GEN := $(addprefix $(TRIDENT_OUT)/,trident_imports.h trident_imports.json trident_import_slots.c trident_import_stubs.S trident_provider_types.c trident_kexports.c)
-TRIDENT_DEF_SOURCES := drivers/video/trident/trident_module.h include/gfx_hal.h include/gfx_mode.h drivers/video/trident/trident.h gfx/palette.h lib/serial_diag.h mm/kmalloc.h drivers/char/serial.h
+TRIDENT_DEF_SOURCES := include/kprintf.h drivers/video/trident/trident_module.h include/gfx_hal.h include/gfx_mode.h drivers/video/trident/trident.h gfx/palette.h lib/serial_diag.h mm/kmalloc.h drivers/char/serial.h
 $(TRIDENT_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/trident_imports.def $(TRIDENT_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module trident --out-dir $(TRIDENT_OUT)
 

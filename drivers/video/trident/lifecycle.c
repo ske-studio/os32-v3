@@ -10,6 +10,8 @@
  */
 #include "trident.h"
 #include "mm/kmalloc.h"
+#include "kprintf.h"
+#include "config.h"
 
 static int failed(struct trident_device *d, u32 step, int rc)
 {
@@ -20,10 +22,19 @@ static int failed(struct trident_device *d, u32 step, int rc)
     return rc;
 }
 
+/* Observations only: rc/step retain the existing stage outcome. */
+static void diag_stage(struct trident_device *d, const char *name, int rc,
+                       bool skipped)
+{
+    kprintf(KLOG_ATTR, "[trident] diag init stage=%s rc=%d step=%u first_init_done=%d skipped=%d\n",
+            name, rc, d->step, d->first_init_done, skipped);
+}
+
 #define STAGE(stage, call) do { \
     int rc = (call); \
+    if (!rc) d->step = (stage); \
+    diag_stage(d, (stage) == TRI_STEP_CAPACITY_PLAN ? "CAPACITY" : #stage + 9, rc, false); \
     if (rc) return failed(d, (stage), rc); \
-    d->step = (stage); \
 } while (0)
 
 static int mode_enable(struct trident_device *d)
@@ -97,6 +108,10 @@ int trident_screen_init(struct trident_device *d)
         d->cur_vga_base = (misc & 1u) ? TRI_CR_COLOR : TRI_CR_MONO;
         STAGE(TRI_STEP_CAPACITY_PLAN, trident_capacity_plan(d));
     }
+    else {
+        diag_stage(d, "IDENTIFY", 0, true);
+        diag_stage(d, "CAPACITY", 0, true);
+    }
     d->active = true; /* even a failed Save can require Disable */
     d->closed = d->leave_done = false;
     STAGE(TRI_STEP_SAVE, trident_state_save(d));
@@ -107,16 +122,23 @@ int trident_screen_init(struct trident_device *d)
     if (rc) return rc;
     if (!d->first_init_done) {
         d->scratch = kmalloc(TRI_VRAM_SCRATCH_BYTES);
-        if (!d->scratch) return failed(d, TRI_STEP_VERIFY, TRI_E_RESOURCE);
+        if (!d->scratch) {
+            diag_stage(d, "VERIFY", TRI_E_RESOURCE, false);
+            return failed(d, TRI_STEP_VERIFY, TRI_E_RESOURCE);
+        }
         d->scratch_bytes = TRI_VRAM_SCRATCH_BYTES;
         rc = trident_vram_verify(d);
         kfree(d->scratch);
         d->scratch = NULL;
         d->scratch_bytes = 0;
+        if (!rc) d->step = TRI_STEP_VERIFY;
+        diag_stage(d, "VERIFY", rc, false);
         if (rc) return failed(d, TRI_STEP_VERIFY, rc);
-        d->step = TRI_STEP_VERIFY;
     }
+    else diag_stage(d, "VERIFY", 0, true);
     rc = client_init(d);
+    if (!rc) d->step = TRI_STEP_CLIENT;
+    diag_stage(d, "CLIENT", rc, false);
     if (rc) return failed(d, TRI_STEP_CLIENT, rc);
     d->step = TRI_STEP_CLIENT;
     d->first_init_done = true;

@@ -3,6 +3,7 @@
  * Reference MIT notices: trident.h and trident_pc98init_host.c.
  */
 #include "trident_device_fake.h"
+#include <stdarg.h>
 #include "drivers/video/trident/trident_module.h"
 /* Include the real HAL boundary to inspect its private retained error state.
  * A separate cross compilation checks its production translation unit. */
@@ -14,7 +15,7 @@ static int equal(u32 a, u32 b)
 #define CALL(x) do { int result=(x); if (result) return result; } while (0)
 static struct trident_fake f;
 static u8 storage[TRI_BAR0_DECODE_BYTES], client[TRI_DISPLAY_BYTES];
-static struct trident_fake_event trace[TRI_DISPLAY_BYTES + 16384];
+static struct trident_fake_event trace[2 * TRI_DISPLAY_BYTES + 16384];
 static u32 scratch[TRI_VRAM_SCRATCH_BYTES / sizeof(u32)];
 static u32 calls[17], starts[17], ends[17], order[64], norder;
 static u32 fail_step, fail_restore, fail_disable, fail_lock, fail_arm, fail_alloc, fail_client;
@@ -45,6 +46,28 @@ void serial_puts_polled(const char *s)
         if (*s++ == '\n') ++logs;
     }
     serial_text[serial_length] = 0;
+}
+/* Capture production diagnostic arguments without a console sink. */
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    va_list ap;
+    va_start(ap, fmt);
+    while (*fmt) {
+        if (*fmt != '%') {
+            char one[] = {*fmt++, 0}; serial_puts_polled(one); continue;
+        }
+        ++fmt;
+        u32 width = 0;
+        while (*fmt >= '0' && *fmt <= '9') width = width * 10 + *fmt++ - '0';
+        switch (*fmt++) {
+        case 's': serial_puts_polled(va_arg(ap, const char *)); break;
+        case 'u': serial_diag_u32(va_arg(ap, u32)); break;
+        case 'd': serial_diag_i32(va_arg(ap, int)); break;
+        case 'x': serial_diag_hex(va_arg(ap, u32), width ? width : 8); break;
+        }
+    }
+    va_end(ap);
 }
 static bool contains(const char *part)
 {
@@ -230,6 +253,10 @@ static int image(void)
     CHECK(contains("entry=1 CLIENT00=07 07 07 07 07 07 07 07"));
     CHECK(contains("entry=1 CLIENT00019000=07 00 00 00 00 00 00 00"));
     CHECK(contains("entry=1 CLIENT00025940=04 04 04 04 04 04 04 04"));
+    CHECK(contains("diag crc gen=1 bytes=307200 rc=0 client=54907c7b lfb=54907c7b"));
+    CHECK(contains("diag mismatch gen=1 offset=-1"));
+    CHECK(contains("diag sample gen=1 x=320 y=240 client=04 lfb=04 rc=0"));
+    CHECK(contains("diag sample gen=1 x=340 y=260 client=04 lfb=04 rc=0"));
     CHECK(!registers_pending && register_entry==1);
     CHECK(!device.last_rc && equal(counters.present_bytes,307200) && counters.commits==1);
     for (u32 i=0;i<sizeof(client);++i) CHECK(equal(storage[i],client[i]));
@@ -454,9 +481,30 @@ static int production_binding(void)
     CHECK(!backend.probe() && equal(backend.query(0),(u32)TRI_E_INVAL));
     return 0;
 }
+static int diagnostic_observations(void)
+{
+    CALL(setup(false,false)); CALL(start());
+    CHECK(contains("diag init stage=IDENTIFY rc=0 step=4 first_init_done=0 skipped=0"));
+    CHECK(contains("diag init stage=CLIENT rc=0 step=11"));
+    registers_pending=false; /* test readback independently of register dump */
+    serial_length=0; serial_text[0]=0;
+    client[17]=0x56; storage[17]=0xAB;
+    diag_after_present();
+    CHECK(contains("diag mismatch gen=1 offset=17 client=56 lfb=ab"));
+    u32 lines=logs;
+    diag_after_present(); CHECK(logs==lines);
+    device.verified_bytes=TRI_DISPLAY_BYTES-1;
+    backend.present_rect(0,0,640,480);
+    CHECK(contains("diag present gen=1 rc=-"));
+    CHECK(contains("end=307200 verified_bytes=307199"));
+    lines=logs;
+    diag_present_error(TRI_E_ACCESS,0,0,640,480); CHECK(logs==lines);
+    return 0;
+}
 void _start(void)
 {
     int rc=sequence();
+    if (!rc) rc=diagnostic_observations();
     if (!rc) rc=dac_observation();
     if (!rc) rc=failures();
     if (!rc) rc=production_binding();
