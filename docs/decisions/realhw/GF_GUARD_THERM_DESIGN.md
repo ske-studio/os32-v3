@@ -264,3 +264,4 @@ void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
 
 ## 実装の段で決めたこと (2026-11-06、PM)
 - P0 の欠け (§2 :72 と確定の節 P3-2 の「readback と calc actual の厳密一致」): 固定の第 2 段 (fixedgain2) では、calc の actual は第 1 段だけ (`kdebug/gfinit_pll/solve.inc:53-60`、手本 `nvkm/subdev/clk/pllnv04.c:190-203` も calcclk2=calcclk1)、readback は第 2 段の倍率を掛ける (`hwdev/gf/clock.c:79-85`、手本 `clk/nv40.c:65-78` の read_pll_2) ので一致しない。手本は prog の後に readback と calc を照合しない (`clk/nv40.c:146-195`)。**手本どおり、readback と calc actual の一致の照合は外す**。guard (calc→prog の強制・改変・世代) の照合は残す。readback は記録だけにする。
+- U4 の欠け (§6 の「しきい値−hyst を下回る」): 手本 nouveau `therm/temp.c:150-153` は下降を `temp <= thrs->temp - thrs->hysteresis` で判定する。**手本どおり「以下」とする** (ちょうど等しいときも下降)。
