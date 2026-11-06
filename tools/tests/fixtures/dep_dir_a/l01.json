@@ -105,7 +105,7 @@
     },
     "lan": {
       "type": "LanModuleApi",
-      "size": 88,
+      "size": 92,
       "members": [
         "probe",
         "send",
@@ -127,7 +127,7 @@
         "netcd_register"
       ],
       "body": "int (*probe)(const struct pci_dev *dev); int (*send)(const void *buf, u32 len); int (*recv)(void *buf, u32 cap, u32 *len); void (*mac)(u8 *mac); int (*state)(void); u32 (*rx_free)(void); int (*rx_ready)(void); int (*loopback)(int on); u32 (*stat)(u32 idx); void (*tick)(void); int (*quiet)(void); int (*release)(void); void (*lan_init)(SfsLan *, const SfsLanNic *, const SfsIo *, void *); int (*lan_peer)(SfsLan *, const char *); void (*lan_reset)(SfsLan *); SfsIo io; const struct NetAdapter *adapter; int (*netcd_register)(const char *);",
-      "ops_version": 2,
+      "ops_version": 3,
       "offsets": [
         0,
         4,
@@ -145,8 +145,8 @@
         52,
         56,
         60,
-        80,
-        84
+        84,
+        88
       ]
     }
   },
