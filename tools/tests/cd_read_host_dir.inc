@@ -82,7 +82,7 @@ static void t_dir_batch(void)
             if (n) {
                 u32 before = M.n_read10;
                 c->ra_valid = 0;
-                CHECK(iso_get_sector(c, base + n - 1));
+                CHECK(iso_get_sector(c, base + n - 1, NULL));
                 CHECK(M.n_read10 == before);
             }
             iso9660_ops.umount(c);
@@ -171,7 +171,7 @@ static void t_dir_failure(void)
         u32 size;
         CHECK(iso9660_ops.get_file_size(c, "/TINY.TXT", &size) == VFS_OK);
         u32 base = dir_fixture(c, 16 * SEC);
-        CHECK(iso_get_sector(c, ROOT_LBA));
+        CHECK(iso_get_sector(c, ROOT_LBA, NULL));
         c->pc_valid = 1; strcpy(c->pc_path, "/saved"); c->pc_size = 77;
         c->pc_flags = 0; c->pc_lba = TINY_LBA;
         c->ra_valid = 1; c->ra_lba = base; c->ra_count = 1;
@@ -186,7 +186,7 @@ static void t_dir_failure(void)
         CHECK(iso9660_ops.get_file_size(c, "/saved", &size) == VFS_OK && size == 77);
         if (!needed_bad) {
             u32 before = M.n_read10;
-            CHECK(iso_get_sector(c, ROOT_LBA));
+            CHECK(iso_get_sector(c, ROOT_LBA, NULL));
             CHECK(M.n_read10 == before);
         }
         CHECK(g_dev_cnt[1] == 16); /* [0] was unrelated ROOT_LBA */
@@ -207,6 +207,8 @@ static void t_dir_media(void)
     /* A known generation change before a cache hit drops all shared caches. */
     M.m = &g_media_b; s_media_gen++;
     u32 size;
+    CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &size) == OS32_ERR_STALE);
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &size) == VFS_OK);
     CHECK(size == DEEP_SIZE_B);
     CHECK(c->stats.drops > 0);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""D4 Device media boundary, real ISO/VFS and libc-free ILP32 runtime."""
+"""D4/D5 Device media boundary, real ISO/VFS and libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=10, covers=[
     'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h',
     'fs/isofs/iso9660.c', 'fs/isofs/iso9660.h', 'fs/isofs/*.inc',
@@ -38,19 +38,50 @@ MUTATIONS = (
 )
 
 
+# Old generation/retry anchors in test_cd_read.py move to the Device boundary.
+OP_MUTATIONS = (
+    ('entry-check', 'iso9660.c', 'int ret = iso_check_media(ctx);', 'int ret = iso_check_media(ctx); ret = 0;'),
+    ('read-errors', 'iso9660.c', '    return rc;\n}\n\n/* 覚えているもの',
+     '    return rc ? VFS_ERR_IO : 0;\n}\n\n/* 覚えているもの'),
+    ('read-post', 'iso9660.c', '    if (checked) return checked;\n    ctx->touched',
+     '    (void)checked;\n    ctx->touched'),
+    ('extent-fallback', 'iso9660.c', '                if (rc != VFS_ERR_IO) return rc;', ''),
+    ('directory-fallback', 'iso9660_dir_read.inc',
+     '                if (rc != VFS_ERR_IO) { scan->error = rc; return (const u8 *)0; }', ''),
+    ('directory-errors', 'iso9660.c', '            if (!sector) return scan.error;',
+     '            if (!sector) return VFS_ERR_IO;'),
+    ('sector-errors', 'iso9660_dir_read.inc', 'if (error) *error = rc; return (const u8 *)0; }\n        ctx->stats.scache_fills',
+     'if (error) *error = VFS_ERR_IO; return (const u8 *)0; }\n        ctx->stats.scache_fills'),
+    ('callback-check', 'iso9660.c',
+     '            /* cb がこの FS を読んで媒体の交換を踏んだかもしれない */\n            ret = iso9660_resource_check(ctx, 0);',
+     '            ret = 0;'),
+    ('mount-retry', 'iso9660.c', 'if (rc != OS32_ERR_STALE) break;', 'break;'),
+    ('check-hook', 'iso9660.c', '    iso9660_resource_check,', '    0,'),
+    ('refresh-hook', 'iso9660.c', '    iso9660_resource_refresh\n', '    0\n'),
+)
 
 
-def build_run(work, source):
+def build_run(work, source, operation=None):
+    tree = work / 'fs/isofs'
+    tree.mkdir(parents=True, exist_ok=True)
+    for name in ('iso9660.c', 'iso9660_dir_read.inc', 'iso9660_dir_record.inc'):
+        data = (ROOT / 'fs/isofs' / name).read_text()
+        if operation and operation[1] == name:
+            _, _, before, after = operation
+            if data.count(before) != 1:
+                raise RuntimeError(f'{operation[0]}: mutation anchor not unique')
+            data = data.replace(before, after)
+        (tree / name).write_text(data)
+    harness = work / 'hostsvc_media_host.c'
+    harness.write_text((ROOT / 'tools/tests/hostsvc_media_host.c').read_text())
     src = work / 'iso9660_media.c'
     src.write_text(source)
     exe = work / 'media-test'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT),
+    subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
-                    str(src), str(ROOT / 'drivers/base/dev.c'),
-                    str(ROOT / 'tools/tests/hostsvc_media_host.c'),
+                    str(src), str(ROOT / 'drivers/base/dev.c'), str(harness),
                     '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
-                    '-o', str(exe)],
-                   check=True, cwd=ROOT)
+                    '-o', str(exe)], check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
 
 
@@ -64,7 +95,7 @@ def main():
         rc = build_run(work, original)
         if rc:
             raise RuntimeError(f'control failed at runtime: rc={rc}')
-        print('GREEN D4 MEDIA generation/cache/PVD/errors/ATAPI/512-byte device', flush=True)
+        print('GREEN D4/D5 MEDIA operations/cache/PVD/errors/ATAPI/512-byte device', flush=True)
         if args.mutate:
             for name, before, after in MUTATIONS:
                 if original.count(before) != 1:
@@ -73,6 +104,11 @@ def main():
                 if rc <= 0:
                     raise RuntimeError(f'{name}: expected runtime RED, rc={rc}')
                 print(f'RED {name}: runtime rc={rc}', flush=True)
+            for mutation in OP_MUTATIONS:
+                rc = build_run(work, original, mutation)
+                if rc <= 0:
+                    raise RuntimeError(f'{mutation[0]}: expected runtime RED, rc={rc}')
+                print(f'RED {mutation[0]}: runtime rc={rc}', flush=True)
     return 0
 
 

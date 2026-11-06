@@ -1,6 +1,7 @@
 /* Shared sector LRU and the directory side of the existing physical-LBA window.
  * Lifetime/media checks stay at the ISO operation's existing entry/result sites. */
 typedef struct {
+    int error;
     bool use_ra;
     u32 end;                 /* exclusive sector index of the last window used */
 } IsoDirScan;
@@ -21,7 +22,7 @@ static const u8 *iso_lookup_sector(Iso9660Ctx *ctx, u32 lba)
 
 /* Register only the requested sector. A window copy is not a physical single
  * read, and therefore does not increment scache_fills. */
-static const u8 *iso_fill_sector(Iso9660Ctx *ctx, u32 lba, const u8 *source)
+static const u8 *iso_fill_sector(Iso9660Ctx *ctx, u32 lba, const u8 *source, int *error)
 {
     int victim = -1;
     IsoSectorSlot *s;
@@ -36,7 +37,8 @@ static const u8 *iso_fill_sector(Iso9660Ctx *ctx, u32 lba, const u8 *source)
     if (source) {
         kmemcpy(s->data, source, ISO_SECTOR_SIZE);
     } else {
-        if (iso_dev_read(ctx, lba, 1, s->data) != 0) return (const u8 *)0;
+        int rc = iso_dev_read(ctx, lba, 1, s->data);
+        if (rc) { if (error) *error = rc; return (const u8 *)0; }
         ctx->stats.scache_fills++;
     }
     s->lba = lba;
@@ -46,10 +48,12 @@ static const u8 *iso_fill_sector(Iso9660Ctx *ctx, u32 lba, const u8 *source)
 }
 
 /* The returned LRU pointer lasts until the next sector acquisition. */
-static const u8 *iso_get_sector(Iso9660Ctx *ctx, u32 lba)
+static const u8 *iso_get_sector(Iso9660Ctx *ctx, u32 lba, int *error)
 {
+    int rc = iso9660_resource_check(ctx, 0);
+    if (rc) { if (error) *error = rc; return (const u8 *)0; }
     const u8 *sec = iso_lookup_sector(ctx, lba);
-    return sec ? sec : iso_fill_sector(ctx, lba, (const u8 *)0);
+    return sec ? sec : iso_fill_sector(ctx, lba, (const u8 *)0, error);
 }
 
 static const u8 *iso_dir_sector(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
@@ -59,6 +63,9 @@ static const u8 *iso_dir_sector(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
     u32 lba;
     const u8 *sec;
 
+    scan->error = iso9660_resource_check(ctx, 0);
+    if (scan->error) return (const u8 *)0;
+    scan->error = VFS_ERR_IO;
     if (sect_idx >= sectors || dir_lba >= ctx->volume_size ||
         sect_idx >= ctx->volume_size - dir_lba) return (const u8 *)0;
     lba = dir_lba + sect_idx;
@@ -75,7 +82,9 @@ static const u8 *iso_dir_sector(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
             if (n > ISO_RA_SECTORS) n = ISO_RA_SECTORS;
             if (n > ctx->volume_size - lba) n = ctx->volume_size - lba;
             ctx->ra_valid = 0;
-            if (iso_dev_read(ctx, lba, n, ctx->ra_buf) != 0) {
+            int rc = iso_dev_read(ctx, lba, n, ctx->ra_buf);
+            if (rc != 0) {
+                if (rc != VFS_ERR_IO) { scan->error = rc; return (const u8 *)0; }
                 scan->use_ra = false;
             } else {
                 ctx->ra_lba = lba;
@@ -90,8 +99,8 @@ static const u8 *iso_dir_sector(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
             scan->end = sect_idx + left;
             ctx->stats.ra_hits++;
             return iso_fill_sector(ctx, lba,
-                                    ctx->ra_buf + (lba - ctx->ra_lba) * ISO_SECTOR_SIZE);
+                                    ctx->ra_buf + (lba - ctx->ra_lba) * ISO_SECTOR_SIZE, &scan->error);
         }
     }
-    return iso_fill_sector(ctx, lba, (const u8 *)0);
+    return iso_fill_sector(ctx, lba, (const u8 *)0, &scan->error);
 }

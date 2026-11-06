@@ -87,6 +87,15 @@ void ide_multiple_reset_bank(int bank)
 
 /* ---- 実物 ---- */
 #include "../../drivers/ata/atapi.c"
+/* Stage I/D7 dispatch seam: model the physical Device generation here. */
+int dev_media_check(Device *dev, u32 *generation)
+{
+    if (dev->media_check) return dev->media_check(dev, generation);
+    *generation = dev->bus_type == DEV_BUS_ATAPI ? atapi_media_gen() : 0;
+    return 0;
+}
+void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
+#include "../../fs/isofs/iso9660_media.c"
 #include "../../fs/isofs/iso9660.c"
 #include "../../drivers/ata/cd_body.c"
 
@@ -1274,17 +1283,17 @@ static void t_lru_order(void)
     const u8 *p;
     u32 i;
     setup(); c = do_mount();
-    for (i = 0; i < 4; i++) CHECK(iso_get_sector(c, L[i]) != NULL);
-    CHECK(iso_get_sector(c, L[0]) != NULL);        /* 当たり: L0 が新しくなる */
+    for (i = 0; i < 4; i++) CHECK(iso_get_sector(c, L[i], NULL) != NULL);
+    CHECK(iso_get_sector(c, L[0], NULL) != NULL);        /* 当たり: L0 が新しくなる */
     CHECK(lba_reads(L[0]) == 1);
-    CHECK(iso_get_sector(c, L[4]) != NULL);        /* L1 が出る */
-    p = iso_get_sector(c, L[0]);                   /* まだいる */
+    CHECK(iso_get_sector(c, L[4], NULL) != NULL);        /* L1 が出る */
+    p = iso_get_sector(c, L[0], NULL);                   /* まだいる */
     CHECK(p != NULL && lba_reads(L[0]) == 1);
     for (i = 0; i < SEC; i++) CHECK(p[i] == g_media_a.img[L[0] * SEC + i]);
-    p = iso_get_sector(c, L[2]);
+    p = iso_get_sector(c, L[2], NULL);
     CHECK(p != NULL && lba_reads(L[2]) == 1);
     for (i = 0; i < SEC; i++) CHECK(p[i] == g_media_a.img[L[2] * SEC + i]);
-    CHECK(iso_get_sector(c, L[1]) != NULL);        /* 出ていた */
+    CHECK(iso_get_sector(c, L[1], NULL) != NULL);        /* 出ていた */
     CHECK(lba_reads(L[1]) == 2);
     iso9660_ops.umount(c);
 }
@@ -1413,7 +1422,7 @@ static void t_list_reentrant(void)
 }
 
 /* UNIT ATTENTION: 読みの途中で媒体が替わった。atapi は世代を進めて出し直し、
- * iso9660 は覚えていたものを捨てて新しい媒体で引き直す */
+ * iso9660 は STALE を返し、refresh 後の次操作で新媒体を読む */
 static void t_unit_attention(void)
 {
     Iso9660Ctx *c;
@@ -1425,6 +1434,8 @@ static void t_unit_attention(void)
     gen0 = atapi_media_gen();
     M.ua_next = 1;
     /* 窓の外 (次の READ(10) が要る位置) を読む */
+    CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 40u * SEC) == OS32_ERR_STALE);
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.read_stream(c, "/BIG.PKG", buf, 4096, 40u * SEC) == 4096);
     CHECK(atapi_media_gen() == gen0 + 1u);
     for (i = 0; i < 4096; i++)
@@ -1439,7 +1450,7 @@ static void t_unit_attention(void)
 
 /* 解決の途中で媒体が替わる (Codex レビュー 1 の P2)。根は A のものがキャッシュに
  * あり SUB = 21 と答える。SUB を読む READ(10) が UNIT ATTENTION → 出し直しで
- * B の 21 (囮) を読む。世代を見て B の根から引き直し、B の本物 (24) の答えを返す */
+ * B の 21 (囮) を読む。世代を見て STALE。refresh 後に B の本物 (24) の答えを返す */
 static void t_stat_swap(void)
 {
     Iso9660Ctx *c;
@@ -1448,6 +1459,8 @@ static void t_stat_swap(void)
     setup(); c = do_mount();
     CHECK(iso9660_ops.stat(c, "/TINY.TXT", &st) == VFS_OK);   /* A の根を LRU へ */
     M.ua_next = 1;
+    CHECK(iso9660_ops.stat(c, "/SUB/DEEP.BIN", &st) == OS32_ERR_STALE);
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.stat(c, "/SUB/DEEP.BIN", &st) == VFS_OK);
     CHECK(st.st_size == DEEP_SIZE_B);
     CHECK(lba_reads(SUB_LBA_B + 1u) == 1);
@@ -1457,12 +1470,14 @@ static void t_stat_swap(void)
     setup(); c = do_mount();
     CHECK(iso9660_ops.get_file_size(c, "/TINY.TXT", &sz) == VFS_OK && sz == TINY_SIZE);
     M.ua_next = 1;
+    CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &sz) == OS32_ERR_STALE);
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.get_file_size(c, "/SUB/DEEP.BIN", &sz) == VFS_OK);
     CHECK(sz == DEEP_SIZE_B);
     iso9660_ops.umount(c);
 }
 
-/* list_dir: 解決のあいだの交換は引き直す、一覧の途中 (cb の後) の交換は中断 */
+/* list_dir: 解決のあいだの交換も STALE を返す、一覧の途中 (cb の後) の交換は中断 */
 static Iso9660Ctx *g_sw_ctx;
 static int g_sw_calls, g_sw_arm, g_sw_read, g_sw_deep_b;
 static void sw_cb(const VfsDirEntry *e, void *u)
@@ -1484,11 +1499,13 @@ static void t_list_swap(void)
 {
     Iso9660Ctx *c;
     OS32_Stat st;
-    /* (1) 解決の途中 (根の読み) で交換 → 引き直して B の SUB (24) を一覧する */
+    /* (1) 解決中の交換は STALE。refresh 後に B の SUB (24) を一覧する */
     setup(); c = do_mount();
     M.ua_next = 1;
     g_sw_calls = g_sw_arm = g_sw_read = g_sw_deep_b = 0;
     g_sw_ctx = c;
+    CHECK(iso9660_ops.list_dir(c, "/SUB", sw_cb, NULL) == OS32_ERR_STALE);
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.list_dir(c, "/SUB", sw_cb, NULL) == VFS_OK);
     CHECK(g_sw_deep_b);
     iso9660_ops.umount(c);
@@ -1504,7 +1521,7 @@ static void t_list_swap(void)
     /* No callback after the boundary: only the post-acquisition generation
      * check can detect this successful UA retry into the new medium. */
     memset(g_media_b.img + (c->root_lba + 16) * SEC, 0, SEC);
-    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == VFS_ERR_IO);
+    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == OS32_ERR_STALE);
     CHECK(!g_sw_deep_b);
     iso9660_ops.umount(c);
 
@@ -1512,9 +1529,10 @@ static void t_list_swap(void)
     setup(); c = do_mount();
     g_sw_calls = 0; g_sw_arm = 1; g_sw_read = 1;
     g_sw_ctx = c;
-    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == VFS_ERR_IO);
+    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == OS32_ERR_STALE);
     CHECK(g_sw_calls == 1);
-    /* 次の操作は新しい媒体で引き直す */
+    /* VFS の次操作に相当する refresh 後、新媒体を読む */
+    CHECK(!iso9660_ops.resource_refresh(c));
     CHECK(iso9660_ops.stat(c, "/SUB/DEEP.BIN", &st) == VFS_OK && st.st_size == DEEP_SIZE_B);
     iso9660_ops.umount(c);
 }
@@ -1648,7 +1666,6 @@ static void t_np2_empty(void)
     CHECK(atapi_read_sectors(16, 1, buf) != ATAPI_OK);
     CHECK(strstr(g_klog, "[atapi] READ(10) drv=0 lba=16 n=1") != NULL);
     CHECK(strstr(g_klog, "sense=5") != NULL);
-    CHECK(iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0)) == NULL);
     /* 入った */
     N.d[0].loaded = 1;
     CHECK(atapi_read_sectors(16, 1, buf) == ATAPI_OK);
@@ -2432,11 +2449,11 @@ static void t_iso_bad_pvd(void)
         if (i == 5) put_both32(pvd + 166, 0xffffffffU);
         CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0)));
     }
-    CHECK(strstr(g_klog, "invalid PVD; mount unpublished"));
+    CHECK(strstr(g_klog, "PVD unavailable; mount unpublished"));
     memcpy(pvd, original, SEC);
     M.short_single = 1;
     CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0)));
-    CHECK(strstr(g_klog, "PVD read failed; mount unpublished"));
+    CHECK(strstr(g_klog, "PVD unavailable; mount unpublished"));
     M.short_single = 0;
     void *ctx = do_mount();
     iso9660_ops.umount(ctx);

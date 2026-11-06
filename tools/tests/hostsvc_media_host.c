@@ -1,6 +1,5 @@
-/* D4 MEDIA: real ISO/VFS/Device, fake physical and network media.
- * dev_media_check is the #9 dispatch seam pending stage I. D5/I hooks are
- * invoked explicitly; this test does not claim the future wiring is present. */
+/* D4/D5 MEDIA: real ISO/VFS/Device, fake physical and network media.
+ * dev_media_check is the #9 dispatch seam pending stage I. ISO operations use the real D5 hooks; VFS refresh is explicit until I. */
 #include "fs/isofs/iso9660.h"
 #include "fs/isofs/iso9660_media.h"
 #include "drivers/base/dev.h"
@@ -22,7 +21,6 @@ void *kmalloc(u32 n) { void *p=heap+used; if(n>sizeof(heap)-used) return 0; used
 void *kzalloc(u32 n) { void *p=kmalloc(n); if(p) kmemset(p,0,n); return p; }
 void kfree(void *p) { (void)p; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
-u32 atapi_media_gen(void) { return 0; } /* D5 still uses this in ISO operations. */
 static void *staled;
 static unsigned stale_calls;
 void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; }
@@ -36,14 +34,15 @@ int dev_media_check(Device *d, u32 *g) { if(d->media_check) return d->media_chec
 #define SECTORS 40u
 static u8 images[2][SECTORS * ISO_SECTOR_SIZE];
 static u32 gen, checks, reads;
-static int image, failure, read_failure, swap_read;
+static int image, failure, read_failure, swap_read, fail_once, post_failure;
 static u32 fail_check;
 static int check_media(Device *d, u32 *g) { (void)d; checks++; if(fail_check == checks) return OS32_ERR_HOSTDOWN; if(failure) return failure; *g=gen; return 0; }
 static int read_media(Device *d, int lba, int count, void *buf)
 {
     u32 bytes=(u32)count*(u32)d->sect_size, off=(u32)lba*(u32)d->sect_size;
     reads++;
-    if(read_failure) return read_failure;
+    if(read_failure) { int rc=read_failure; if(fail_once) read_failure=0; return rc; }
+    if(post_failure) { post_failure=0; fail_check=checks+1; }
     if(off>sizeof(images[0]) || bytes>sizeof(images[0])-off) return OS32_ERR_IO;
     kmemcpy(buf,images[image]+off,bytes);
     if(swap_read) { swap_read=0; image^=1; gen++; }
@@ -76,6 +75,94 @@ static void fill_caches(Iso9660Ctx *ctx)
     ctx->pc_valid=ctx->ra_valid=ctx->touched=1;
     for(int i=0;i<ISO_SCACHE_SLOTS;i++) ctx->scache[i].valid=1;
 }
+static unsigned listed;
+static void list_cb(const VfsDirEntry *entry, void *raw)
+{
+    (void)raw;
+    if(kstrcmp(entry->name,"A.TXT")==0) listed++;
+}
+static void down_cb(const VfsDirEntry *entry, void *raw)
+{
+    list_cb(entry,raw);
+    failure=OS32_ERR_HOSTDOWN;
+}
+
+/* Exercise both pointer-returning directory helpers and all data read paths. */
+static int operations(Iso9660Ctx *ctx)
+{
+    u8 out[ISO_RA_BYTES];
+    OS32_Stat st;
+    u32 size;
+    u8 *ra=ctx->ra_buf;
+    REQUIRE(iso9660_ops.resource_check==iso9660_resource_check);
+    REQUIRE(iso9660_ops.resource_refresh==iso9660_resource_refresh);
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==4);
+    fail_check=checks+1;
+    REQUIRE(iso9660_ops.stat(ctx,"A.TXT",&st)==OS32_ERR_HOSTDOWN);
+    fail_check=0;
+    u32 n=reads;
+    failure=OS32_ERR_HOSTDOWN;
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==OS32_ERR_HOSTDOWN);
+    REQUIRE(iso9660_ops.read_stream(ctx,"A.TXT",out,4,0)==OS32_ERR_HOSTDOWN);
+    REQUIRE(iso9660_ops.stat(ctx,"A.TXT",&st)==OS32_ERR_HOSTDOWN);
+    REQUIRE(iso9660_ops.get_file_size(ctx,"A.TXT",&size)==OS32_ERR_HOSTDOWN);
+    REQUIRE(iso9660_ops.list_dir(ctx,"/",list_cb,0)==OS32_ERR_HOSTDOWN && reads==n);
+    failure=0;
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==4);
+    gen++; image^=1;
+    REQUIRE(iso9660_ops.stat(ctx,"A.TXT",&st)==OS32_ERR_STALE && caches_empty(ctx));
+    REQUIRE(iso9660_ops.stat(ctx,"A.TXT",&st)==OS32_ERR_STALE);
+    REQUIRE(!iso9660_ops.resource_refresh(ctx));
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==4 && out[0]==(image?'B':'A'));
+    for(int window=0;window<2;window++) {
+        ctx->ra_buf=window?ra:0;
+        const int errors[]={OS32_ERR_HOSTDOWN,OS32_ERR_STALE,OS32_ERR_IO};
+        for(unsigned e=0;e<sizeof(errors)/sizeof(errors[0]);e++) {
+            iso_drop_caches(ctx); read_failure=errors[e]; fail_once=1; n=reads;
+            int stat_rc=iso9660_ops.stat(ctx,"A.TXT",&st);
+            REQUIRE(stat_rc==errors[e] || (window && errors[e]==OS32_ERR_IO && stat_rc==0));
+            if(errors[e]!=OS32_ERR_IO) REQUIRE(reads==n+1);
+            read_failure=0; fail_once=0;
+            iso_drop_caches(ctx); read_failure=errors[e];
+            REQUIRE(iso9660_ops.list_dir(ctx,"/",list_cb,0)==errors[e]);
+            read_failure=0;
+            iso_drop_caches(ctx);
+            REQUIRE(!iso9660_ops.stat(ctx,"A.TXT",&st));
+            /* Path is cached; next failure belongs to the file extent. */
+            read_failure=errors[e]; fail_once=1; n=reads;
+            int rc=iso9660_ops.read_file(ctx,"A.TXT",out,4);
+            REQUIRE(rc==errors[e] || (window && errors[e]==OS32_ERR_IO && rc==4));
+            if(errors[e]!=OS32_ERR_IO) REQUIRE(reads==n+1);
+            read_failure=0; fail_once=0;
+        }
+        iso_drop_caches(ctx); post_failure=1;
+        REQUIRE(iso9660_ops.stat(ctx,"A.TXT",&st)==OS32_ERR_HOSTDOWN);
+        fail_check=0;
+        iso_drop_caches(ctx); swap_read=1;
+        REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==OS32_ERR_STALE);
+        REQUIRE(caches_empty(ctx) && !ctx->block_size);
+        REQUIRE(!iso9660_ops.resource_refresh(ctx));
+    }
+    ctx->ra_buf=ra;
+    listed=0;
+    REQUIRE(iso9660_ops.list_dir(ctx,"/",down_cb,0)==OS32_ERR_HOSTDOWN && listed==1);
+    failure=0;
+    /* Direct bulk read and cached-window copy preserve post-read failures. */
+    iso_drop_caches(ctx); post_failure=1;
+    REQUIRE(iso_read_extent(ctx,20,ISO_RA_SECTORS,0,out,ISO_RA_BYTES)==OS32_ERR_HOSTDOWN);
+    fail_check=0;
+    iso_drop_caches(ctx); read_failure=OS32_ERR_STALE;
+    REQUIRE(iso_read_extent(ctx,20,ISO_RA_SECTORS,0,out,ISO_RA_BYTES)==OS32_ERR_STALE);
+    read_failure=0;
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==4);
+    post_failure=1; /* force a physical file read while keeping its path */
+    ctx->ra_valid=0;
+    for(int i=0;i<ISO_SCACHE_SLOTS;i++) ctx->scache[i].valid=0;
+    REQUIRE(iso9660_ops.read_file(ctx,"A.TXT",out,4)==OS32_ERR_HOSTDOWN);
+    fail_check=0;
+    return 0;
+}
+
 static int suite(void)
 {
     static Device cd={.name="cd0",.type=DEV_BLOCK,.bus_type=DEV_BUS_ATAPI,
@@ -92,7 +179,7 @@ static int suite(void)
     REQUIRE(vfs_read("/cd0/A.TXT",out,4)==4 && reads==n);
     fill_caches(ctx); image=1; gen=1;
     REQUIRE(iso9660_resource_check(ctx,&observed)==OS32_ERR_STALE && observed==1);
-    REQUIRE(staled==ctx && stale_calls==1 && caches_empty(ctx));
+    REQUIRE(staled==ctx && stale_calls==2 && caches_empty(ctx));
     REQUIRE(!ctx->root_lba && !ctx->root_size && !ctx->volume_size && !ctx->block_size);
     REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_STALE);
     REQUIRE(!iso9660_resource_refresh(ctx));
@@ -147,6 +234,14 @@ static int suite(void)
     REQUIRE(!iso9660_resource_refresh(ctx));
     iso9660_media_drop(ctx); REQUIRE(caches_empty(ctx) && !ctx->block_size);
     REQUIRE(!iso9660_resource_refresh(ctx));
+    /* An unpublished mount can rebuild once after a PVD-time exchange. */
+    swap_read=1;
+    Iso9660Ctx *fresh=iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD,0));
+    REQUIRE(fresh && fresh->root_lba==20u+(u32)image);
+    iso9660_ops.umount(fresh);
+    REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_STALE);
+    REQUIRE(!iso9660_resource_refresh(ctx));
+    int rc=operations(ctx); if(rc) return rc;
     REQUIRE(!dev_unregister(&cd)); REQUIRE(iso9660_resource_check(ctx,0)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_refresh(ctx)==OS32_ERR_IO);
     REQUIRE(iso9660_resource_check(0,0)==VFS_ERR_NOMOUNT);

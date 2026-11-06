@@ -24,7 +24,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['fs/isofs/iso9660_dir_record.inc', 'tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h', 'fs/isofs/iso9660_dir_record.inc', 'tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=12.534032)
 
 from kernel_boot_source import kernel_parts, kernel_source
@@ -46,7 +46,7 @@ TREE_FILES = ["tools/tests/cd_read_host_multiple_reset.inc", 'drivers/ata/atapi_
               "fs/isofs/iso9660_dir_record.inc",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "drivers/base/dev.h",
-              "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h",
+              "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h", "fs/isofs/iso9660_media.c", "fs/isofs/iso9660_media.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, "tools/tests/cd_read_host_dir.inc", "tools/tests/cd_read_host_pio.inc", PKG_HARNESS, SHIM + "/io.h"]
 
@@ -100,6 +100,7 @@ REBUILD = {
     "drivers/base/dev.c": ("read", "wide"),
     "drivers/ata/atapi.c": ("read", "wide"),
     "fs/isofs/iso9660.c": ("read", "wide"),
+    "fs/isofs/iso9660_media.c": ("read", "wide"),
     "userland/lib/rt/pkg.c": ("pkg",),
 }
 
@@ -269,7 +270,7 @@ MUTATIONS = [
      "if (type != VFS_DEV_CD && type != VFS_DEV_HD) return (void *)0;\n"
      "    devname[0] = type == VFS_DEV_CD ? 'c' : 'h';\n"
      "    devname[1] = 'd';", "T5b5: HD 上の ISO を受付"),
-    ("fs/isofs/iso9660.c",
+    ("fs/isofs/iso9660_media.c",
      r"pvd\[6\] != ISO_PVD_VERSION", "0", "T5b5: 壊れた PVD を公開"),
     # --- fs/isofs/iso9660.c: 覚えたパス
     ("fs/isofs/iso9660.c",
@@ -294,25 +295,17 @@ MUTATIONS = [
      "    (void)i;\n    ctx->stats.drops++;",
      "捨てるときにセクタの LRU を残す"),
     ("fs/isofs/iso9660.c",
-     r"if \(gen != ctx->media_gen\n        \|\| ",
-     "if (",
-     "媒体の世代を見ない"),
-    ("fs/isofs/iso9660.c",
      r"\(u32\)\(now - ctx->last_tick\) > \(u32\)ISO_IDLE_TICKS",
      "(u32)(now - ctx->last_tick) >= (u32)ISO_IDLE_TICKS",
      "2 秒規則の境目を 1 tick 早める"),
     ("fs/isofs/iso9660.c",
-     r"\|\| \(ctx->touched && \(u32\)\(now - ctx->last_tick\) > \(u32\)ISO_IDLE_TICKS\)",
-     "|| ((void)now, 0)",
+     r"ctx->touched && \(u32\)\(now - ctx->last_tick\) > \(u32\)ISO_IDLE_TICKS",
+     "((void)now, 0)",
      "2 秒規則を当てない"),
     ("fs/isofs/iso9660.c",
-     r"    ctx->media_gen = gen;\n}",
-     "    ctx->media_gen = gen;\n    ctx->last_tick = now;\n}",
-     "キャッシュの当たりでも時刻を進める (読み続ける限り捨てない)"),
-    ("fs/isofs/iso9660.c",
-     r"if \(atapi_media_gen\(\) == gen0\) \{\n            return \(ret != 0\) \? ret : \(int\)to_read;",
-     "if (atapi_media_gen() == gen0 || 1) {\n            return (ret != 0) ? ret : (int)to_read;",
-     "読みの途中で世代が進んでも読み直さない (iso_read_range)"),
+     r'    return 0;\n}\n\n#include "iso9660_dir_read.inc"',
+     '    ctx->last_tick = now;\n    return 0;\n}\n\n#include "iso9660_dir_read.inc"',
+     "キャッシュの当たりでも時刻を進める"),
     # --- セクタの LRU
     ("fs/isofs/iso9660_dir_read.inc",
      r"if \(victim < 0 \|\| s->used < ctx->scache\[victim\]\.used\) victim = i;",
@@ -344,16 +337,16 @@ MUTATIONS = [
      "&& left >= ISO_SECTOR_SIZE) {",
      "窓より小さい揃った読みも直接読む (4KB ごとに READ(10))"),
     ("fs/isofs/iso9660.c",
-     r"            ctx->ra_valid = 0;\n            if \(iso_dev_read\(ctx, lba, n, ctx->ra_buf\) != 0\)",
-     "            if (iso_dev_read(ctx, lba, n, ctx->ra_buf) != 0)",
+     r"            ctx->ra_valid = 0;\n            rc = iso_dev_read\(ctx, lba, n, ctx->ra_buf\);",
+     "            rc = iso_dev_read(ctx, lba, n, ctx->ra_buf);",
      "窓を読む前に捨てない (失敗の後に上書きされかけの窓を当てる)"),
     ("fs/isofs/iso9660.c",
      r"            u32 chunk = ctx->ra_count \* ISO_SECTOR_SIZE - pos;",
      "            u32 chunk = ctx->ra_count * ISO_SECTOR_SIZE;",
      "窓の中の位置を引かずに写す長さを決める"),
     ("fs/isofs/iso9660.c",
-     r"                u32 secs = \(u32\)\(\(\(file_size - 1\) / ISO_SECTOR_SIZE\) \+ 1\);",
-     "                u32 secs = (u32)(file_size / ISO_SECTOR_SIZE);",
+     r"        u32 secs = \(file_size - 1\) / ISO_SECTOR_SIZE \+ 1;",
+     "        u32 secs = file_size / ISO_SECTOR_SIZE;",
      "ファイルのセクタ数を切り捨てる (末尾の半端なセクタで窓が 0 本)"),
     # --- userland/lib/rt/pkg.c
     ("userland/lib/rt/pkg.c",
@@ -377,18 +370,6 @@ MUTATIONS = [
      r"                use_ra = 0;\n                continue;",
      "                return VFS_ERR_IO;",
      "窓の先読みが要求の外の不良で落ちたら失敗にする (レビュー 1 の P2-1 の姿)"),
-    ("fs/isofs/iso9660.c",
-     r"        if \(atapi_media_gen\(\) == gen0\) \{\n            if \(gen_out\) \*gen_out = gen0;",
-     "        if (atapi_media_gen() == gen0 || 1) {\n            if (gen_out) *gen_out = gen0;",
-     "stat / get_file_size / list_dir の解決の途中で世代が進んでも引き直さない"),
-    ("fs/isofs/iso9660.c",
-     r"            if \(atapi_media_gen\(\) != gen0\) return VFS_ERR_IO;\n            kmemcpy",
-     "            kmemcpy",
-     "list_dir がセクタを読んだ後に世代を見ない (続きを別の媒体から一覧する)"),
-    ("fs/isofs/iso9660.c",
-     r"            cb\(&ent, user_ctx\);\n            /\* cb がこの FS を読んで媒体の交換を踏んだかもしれない \*/\n            if \(atapi_media_gen\(\) != gen0\) return VFS_ERR_IO;",
-     "            cb(&ent, user_ctx);",
-     "list_dir が cb の後に世代を見ない"),
     # --- 2026-09-26 NP21/W で 1 セクタも読めない (セカンダリのスレーブの CD)
     ("drivers/ata/atapi.c",
      r"    for \(i = 0; i < ATAPI_DRIVE_COUNT; i\+\+\) \{\n        if \(atapi_probe_sig\(sels\[i\]\)\) \{\n            found\[n\+\+\] = sels\[i\];\n            s_present_mask \|= \(u8\)\(1 << i\);\n        \}\n    \}\n\n    if \(n == 0 && atapi_srst\(\) == ATAPI_OK\)",
