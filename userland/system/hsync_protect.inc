@@ -29,6 +29,7 @@
 #define HSP_FEP_USER_DIR "/etc/"
 #define HSP_FEP_JOURNAL_SUFFIX "-journal"
 static char hsp_fep_user_path[HSP_FEP_PATH_CAP];
+static int hsp_fep_all_db;
 
 /* 保護対象のベース名。末尾は番兵。
  *
@@ -167,7 +168,7 @@ static int hsp_normalize(const char *in, char *out, int cap)
 }
 
 /* Own a normalized /etc direct-child path. 0 = success, OS32_ERR_INVAL = invalid;
- * callers must stop synchronization on nonzero (including settings read errors).
+ * callers enable broad /etc DB protection on nonzero (including read errors).
  * Keep the previous registration on failure. No old custom-path discovery. */
 int hsp_set_fep_user_path(const char *absolute_path)
 {
@@ -210,6 +211,11 @@ static int hsp_is_protected_basename(const char *name)
     int i;
 
     if (!name) return 0;
+    /* Include journals and placement suffixes of every possible learning DB. */
+    if (hsp_fep_all_db) {
+        for (i = 0; name[i]; i++)
+            if (name[i] == '.' && hsp_fep_prefix(name + i, ".db")) return 1;
+    }
     if (hsp_fep_prefix(name, HSP_FEP_USER_PATH + sizeof(HSP_FEP_USER_DIR) - 1))
         return 1;
     if (hsp_fep_user_path[0] &&

@@ -1184,61 +1184,76 @@ static int copy_verify(const char *src, const char *dst, u32 expect,
 
 /* ======== 保護対象の判定 ======== */
 
-/* Read the destination's setting without creating or modifying its DB.
- * A missing DB/table/row selects the default; unreadable/invalid settings stop sync.
- * CFG_DB_PATH and FEP_SETTING_USER_PATH are mirrored from cfg/ime_store.h. */
-static int register_fep_user_path(void)
+/* Read only the destination DB. Missing DB/table/row selects the default.
+ * Return the failing KAPI rc and stage; the caller enables broad protection. */
+static int register_fep_user_path(const char **stage)
 {
     char settings[OS32_MAX_PATH], path[OS32_MAX_PATH];
     const char *text;
-    int db, rc, result = -1;
+    int db, rc, result;
 
     hsp_fep_user_path[0] = '\0';
+    hsp_fep_all_db = 0;
+    *stage = "open";
     if (api->version < 50 || !api->db_open_existing || !api->db_prepare_only ||
         !api->db_step || !api->db_column_int || !api->db_column_text ||
-        !api->db_finalize || !api->db_close) return -1;
+        !api->db_finalize || !api->db_close) return OS32_ERR_NOSYS;
     if (!str_ncpy(settings, g_root, (int)sizeof(settings)) ||
-        !str_ncat(settings, "/etc/settings.db", (int)sizeof(settings))) return -1;
+        !str_ncat(settings, "/etc/settings.db", (int)sizeof(settings))) return OS32_ERR_INVAL;
     db = api->db_open_existing(settings, 0);
     if (db < 0) {
         OS32_Stat st;
-        return api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND ?
-            hsp_set_fep_user_path(HSP_FEP_USER_PATH) : -1;
+        if (api->sys_stat(settings, &st) == OS32_ERR_NOTFOUND)
+            return hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+        return db;
     }
-    rc = api->db_prepare_only(db,
+    *stage = "table-prepare";
+    result = api->db_prepare_only(db,
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'");
-    if (rc == 0) {
-        rc = api->db_step(db);
-        if (rc == DB_STATUS_DONE)
-            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
-        else if (rc == DB_STATUS_ROW) result = 1; /* Read the setting below. */
+    if (result != 0) goto finish;
+    *stage = "table-step";
+    rc = api->db_step(db);
+    if (rc == DB_STATUS_DONE) {
+        result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+        goto finish;
     }
-    if (api->db_finalize(db) != 0) result = -1;
-    if (result != 1) {
-        if (api->db_close(db) != 0) result = -1;
-        return result;
-    }
-    result = -1;
-    rc = api->db_prepare_only(db,
+    if (rc != DB_STATUS_ROW) { result = rc; goto finish; }
+    *stage = "table-finalize";
+    result = api->db_finalize(db);
+    if (result != 0) goto close;
+    *stage = "prepare";
+    result = api->db_prepare_only(db,
         "SELECT CASE WHEN typeof(tval)='text' THEN type ELSE -1 END,"
-        "tval,length(CAST(tval AS BLOB)) FROM settings "
+        "tval,length(hex(tval))/2 FROM settings "
         "WHERE scope='system' AND key='fep_user_dict_path'");
-    if (rc == 0) {
-        rc = api->db_step(db);
-        if (rc == DB_STATUS_DONE) {
-            result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
-        } else if (rc == DB_STATUS_ROW && api->db_column_int(db, 0) == 1) {
-            int bytes = api->db_column_int(db, 2);
-            text = api->db_column_text(db, 1);
-            if (text && bytes >= 0 && bytes < (int)sizeof(path) &&
-                str_len(text) == bytes && str_ncpy(path, text, (int)sizeof(path))) {
-                result = hsp_set_fep_user_path(path);
-                if (api->db_step(db) != DB_STATUS_DONE) result = -1;
+    if (result != 0) goto finish;
+    *stage = "step";
+    rc = api->db_step(db);
+    if (rc == DB_STATUS_DONE) {
+        result = hsp_set_fep_user_path(HSP_FEP_USER_PATH);
+    } else if (rc == DB_STATUS_ROW) {
+        int bytes = api->db_column_int(db, 2);
+        *stage = "value";
+        result = OS32_ERR_INVAL;
+        text = api->db_column_text(db, 1);
+        if (api->db_column_int(db, 0) == 1 && text &&
+            bytes >= 0 && bytes < (int)sizeof(path) && str_len(text) == bytes &&
+            str_ncpy(path, text, (int)sizeof(path))) {
+            result = hsp_set_fep_user_path(path);
+            if (result == 0) {
+                *stage = "step";
+                rc = api->db_step(db);
+                if (rc != DB_STATUS_DONE)
+                    result = rc == DB_STATUS_ROW ? OS32_ERR_INVAL : rc;
             }
         }
-    }
-    if (api->db_finalize(db) != 0) result = -1;
-    if (api->db_close(db) != 0) result = -1;
+    } else result = rc;
+finish:
+    rc = api->db_finalize(db);
+    if (result == 0 && rc != 0) { *stage = "finalize"; result = rc; }
+close:
+    rc = api->db_close(db);
+    if (result == 0 && rc != 0) { *stage = "close"; result = rc; }
     return result;
 }
 
@@ -2928,10 +2943,15 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
 
     /* 守るべき実体を 1 度だけ集める (票 S0-D の実体規則)。
      * 集められなければ守れないので同期そのものを行わない。 */
-    if (register_fep_user_path() != 0) {
-        api->kprintf(ATTR_RED, "Error: fep_user_dict_path unavailable or invalid; 0 files written\n");
-        api->mem_free(file_buf);
-        return 1;
+    {
+        const char *stage;
+        int rc = register_fep_user_path(&stage);
+        if (rc != 0) {
+            hsp_fep_all_db = 1;
+            api->kprintf(ATTR_YELLOW,
+                "Warning: fep_user_dict_path stage=%s rc=%d; protecting /etc/*.db*, continuing sync\n",
+                stage, rc);
+        }
     }
     if (scan_protected_entities() != 0) {
         api->mem_free(file_buf);

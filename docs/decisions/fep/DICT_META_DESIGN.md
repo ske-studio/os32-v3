@@ -135,7 +135,7 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 /* hsp_name_protected(norm): 既存settings判定 || 既定/etc/fep_user.db prefix
  * || 設定pathの本体とそのsuffix。hsp_ancestor_protectedにも同じ判定を適用。 */
 ```
-- hsync 呼出元が settings から fep.user_dict_path を取得し、コピー開始前に登録。設定読取不能/不正は同期を開始しない。
+- hsync 呼出元が settings から fep.user_dict_path を取得し、コピー開始前に登録。DB・表・行が無ければ既定 path。open・表確認・prepare・step・値検査などで失敗したら、段と rc を警告1行に出し、宛先 /etc 直下の全 *.db とその journal・一時配置 suffix を大文字小文字を区別せず保護して同期を続ける。settings.db 自体の既存保護も維持する。
 - 既定名は設定変更後も保護。現在のカスタム名とその journal/一時名も保護する。実在別名収集と HS_MAX_PROT の上限超過も失敗扱い。
 - パスを変更する運用は旧学習を新パスに移してから設定更新。旧カスタムパスを自動探索・永久登録する機能は足さない。
 - FEP imports の個数上限は無い。追加の core probe/config_getは登録担当が追加し、生成表を手編集しない。
