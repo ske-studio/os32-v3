@@ -253,6 +253,36 @@
       "source": "fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "host_alive_snapshot",
+      "source": "net/host_mailbox.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kstrlen",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kstrncpy",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "dev_find",
+      "source": "drivers/base/dev.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "dev_register",
+      "source": "drivers/base/dev.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

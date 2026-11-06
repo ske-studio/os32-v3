@@ -69,8 +69,10 @@ MUTATIONS = [
     (SRC, "        if (open_files[fd].lifetime == VFS_FD_FONT) return;\n        fd_release(",
      "        fd_release(", "公開 vfs_close が FONT を閉じる"),
     (SRC, "    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */\n"
-          "    if (f->stale) return VFS_ERR_STALE;   /* fs_ctx より先に見る */\n",
-     "    if (f->stale) return VFS_ERR_STALE;   /* fs_ctx より先に見る */\n",
+          "    rc = fd_resource_check(f);\n    if (rc != VFS_OK) return rc;\n"
+          "    if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY)",
+     "    rc = fd_resource_check(f);\n    if (rc != VFS_OK) return rc;\n"
+     "    if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY)",
      "公開 vfs_read_fd が FONT を断らない"),
     (SRC, "    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* 位置を持たない */\n", "",
      "公開 vfs_seek が FONT を断らない"),
