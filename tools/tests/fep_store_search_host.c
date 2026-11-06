@@ -27,6 +27,8 @@ static int stage_i_step(sqlite3_stmt *stmt)
         return step_error;
     return sqlite3_step(stmt);
 }
+static void inject_merge_fault(sqlite3_stmt *stmt, int at)
+{ fail_cursor = stmt; fail_step_at = at; step_calls = 0; step_error = SQLITE_ERROR; }
 static struct { sqlite3_stmt *stmt; const char *p[2]; } borrowed[16];
 static int borrow_slot(sqlite3_stmt *stmt)
 {
@@ -69,6 +71,8 @@ int main(void)
     IME_UserEntry entries[4];
     CHECK(os32_sqlite_init() == SQLITE_OK);
     fixture_init();
+    store_merge_cases(inject_merge_fault);
+    step_error = SQLITE_IOERR;
     /* The shared admin helpers still serve J's active legacy facade. */
     static IME_Dict legacy;
     make_dict("/db/legacy.db", "旧");
