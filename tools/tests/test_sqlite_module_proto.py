@@ -250,14 +250,15 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
         source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
-        # Disk settings I/O belongs to the VFS fixture; use a private RAM DB here.
-        source = source.replace('SYS_SETTINGS_DB, SQLITE_OPEN_READONLY', '":memory:", SQLITE_OPEN_READWRITE')
+        # RAM storage seam shared with C2/O5; core retains header/SQL ordering.
         if name == 'sqlite_engine':
-            source = ('struct sqlite3; extern void host_seed_settings(struct sqlite3 *db);\n'
-                      'extern int host_final_boot_check(int, int);\n') + source.replace(
-                'os32_sqlite_outer_boot_check(1, reserve)', 'host_final_boot_check(1, reserve)').replace(
-                '    if (!rc && !os32_sqlite_prepare_v2(db,',
-                '    if (!rc) host_seed_settings(db);\n    if (!rc && !os32_sqlite_prepare_v2(db,')
+            source = ('extern int host_final_boot_check(int, int);\n') + source.replace(
+                'os32_sqlite_outer_boot_check(ime_boot_connections(), reserve)',
+                'host_final_boot_check(ime_boot_connections(), reserve)')
+            source = source.replace('os32_sqlite_outer_group_open(', 'host_core_group_open(')
+            source = source.replace('#include "../lib/sqlite3/generated/sqlite_facade.h"',
+                '#include "../lib/sqlite3/generated/sqlite_facade.h"\n'
+                'extern int host_core_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);')
         (folder / (name + '.c')).write_text(source.replace(
             '../lib/sqlite3/generated/', str(generated) + '/'))
     (folder / 'io.h').write_text(
