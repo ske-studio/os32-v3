@@ -203,6 +203,9 @@ static void gfx_select_backend(int legacy200)
                                 g_backend_pref == GFX_PREF_GEFORCE ? &gfx_backend_geforce : (g_backend_pref == GFX_PREF_CIRRUS)
                                      ? &gfx_backend_cirrus
                                      : &gfx_backend_pegc;
+        /* Refresh Trident's descriptor/error state before the selection probe,
+         * so a failed ScreenInit can be retried. prepare performs no device I/O. */
+        if (want == &gfx_backend_trident && want && want->prepare) want->prepare();
         for (i = 0; i < n; i++) {
             /* weak 宣言なので未リンクなら要素が 0 (→ 9801 へ落ちる) */
             if (!g_backend_list[i]) continue;

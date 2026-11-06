@@ -46,7 +46,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  *
  */
-/* Fixed 640x480x8, 25.175MHz, non-Cyber/old PLL, PCI MMIO (reference default !NoAccel register image).
+/* Fixed 640x480x8, 25.175MHz, non-Cyber/old PLL, PCI MMIO (NoAccel register image).
  * Sources (MIT): trident_driver-1.4.0.c:940-1047;
  * trident_dac.c:235-278,572-576,631-749,781-810,871-907;
  * trident_pll.c:42-135; vgaHW.c:369-409,845-872,1219-1353,1391-1468.
@@ -62,7 +62,7 @@
  *   TridentRestore later writes CR13=50. H uses OUTWs, 21 and 50.
  * - VGA Restore brackets AR with enable/disablePalette (H omits these).
  * - DRAMControl CR3A stays zero on 9682 (dac.c:673-678); GraphEngReg
- *   CR36=80 with PCI/UseMMIO/!NoAccel (dac.c:694-700), matching H:295.
+ *   CR36=00 with NoAccel (X/trident_dac.c:694-700).
  * - PACK item 2 differs from D:2504-2529 and pll.c:42-55,71: 9682
  *   leaves frequency unset, so IsClearTV reads CR C0 on first ModeInit only
  *   and caches PAL/NTSC; H:150-156 reads it on every mode change.
@@ -117,6 +117,7 @@ int trident_mode_640(struct trident_device *d)
 
     /* D:1004; TridentInit prepares its image before vgaHWProtect. */
     TRY(trident_crtc_lock(d, base, false));
+    d->active = true; /* D:1010 vtSema, after CRTC unlock. */
     TRY(trident_indexed_read(d, TRI_SR_INDEX, 0x0B, &ignored));
     TRY(trident_indexed_read(d, TRI_GR_INDEX, 0x0F, &misc_ext));
     /* IsClearTV caches frequency, including NTSC (CR C0 bit7 clear).
@@ -161,7 +162,7 @@ int trident_mode_640(struct trident_device *d)
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x27, 0x08));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2B, 0));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x29, addcol & 0xCF));
-    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x36, 0x80));
+    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x36, 0));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2F, performance | 0x10));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2A, interface | 0x40));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x3A, 0));

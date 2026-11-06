@@ -44,7 +44,7 @@ static int selftest(void)
     trident_fake_bind(f, &device);
     REQUIRE(device.io == &trident_fake_io && device.io_opaque == f);
     REQUIRE(!device.armed && !device.pinned && !device.saved.valid);
-    REQUIRE(!device.init_done && !device.first_init_done && !device.active);
+    REQUIRE(!device.init_done && !device.preinit_done && !device.active);
     REQUIRE(!f->resources.ready && !f->resources.client && !f->resources.owner);
     REQUIRE(!f->resources.bar0_rid && !f->resources.bar1_rid);
     REQUIRE(!f->resources.display_sid && !f->resources.client_sid);
@@ -52,7 +52,7 @@ static int selftest(void)
     REQUIRE(equal(f->cr_color[0x1F], 0x7F) && equal(f->gr[6], 0x0C));
     REQUIRE(equal(f->real_bytes, 2097152) && f->upper == TRI_UPPER_INDEPENDENT);
     REQUIRE(equal(f->resources.decode_bytes, 4194304));
-    REQUIRE(equal(f->resources.regs_bytes, 36864));
+    REQUIRE(equal(f->resources.regs_bytes, 65536));
     REQUIRE(equal(f->resources.pci.bar0, 0x20000000));
     REQUIRE(equal(f->resources.pci.bar1, 0x20400000));
     REQUIRE(!f->pc98_initialized && !f->cr_color[0x21]);

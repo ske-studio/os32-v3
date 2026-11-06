@@ -127,6 +127,7 @@ static int scenario(u32 current, u32 saved)
     trident_fake_bind(&fake, &device);
     REQUIRE(!device.active && !device.saved.valid && !device.pinned && !device.armed);
     REQUIRE(!trident_state_restore(&device) && !fake.operations);
+    device.cur_vga_base = current ? TRI_CR_COLOR : TRI_CR_MONO;
     device.active = true;
     REQUIRE(trident_state_restore(&device) == TRI_E_STATE && !fake.operations);
     REQUIRE(trident_state_restore(0) == TRI_E_INVAL);
