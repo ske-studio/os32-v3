@@ -11,11 +11,7 @@
 #include "gf4_c1_host.c"
 #undef GF4_C1_ENTRY
 #include "../../hwdev/gfinit_mode.h"
-#define service_check scanlog_f5_check
-#define service_publish scanlog_f5_publish
-#include "../../hwdev/gf/feature5_service.c"
-#undef service_check
-#undef service_publish
+/* gf4_c2svc_host.c already includes the real F5 service for this fixture. */
 
 /* Synthetic ROM: DCB 3.0 analog A (bios/dcb.c:28-95,121-193),
  * PLL 0x21 (bios/pll.c), BIT P v2 thermal conversion (bios/therm.c).
@@ -26,7 +22,8 @@ static u8 scanlog_rom[S_ROM_BYTES];
 static struct gf_init_context scanlog_init_ctx;
 static struct gf_init_program scanlog_program;
 static struct gf_display_owner scanlog_owner;
-static const struct gf5_test_ops *scanlog_f5_ops;
+/* Share the publication slot initialized by svc_fixture_state, too. */
+#define scanlog_f5_ops guard_f5_slot
 static bool scanlog_calibrated=true,scanlog_rom_fail;
 static u32 scanlog_devinit_calls;
 static bool scanlog_clock_error;

@@ -400,6 +400,8 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         l->engaged || !c->reusable || !l->reusable ||
         (c->ch->state!=GF2_OFF && c->ch->state!=GF2_RUN))
         return svc_start_failure(c,"service_state",GF4_ESTATE);
+    struct gf5 *g=&s->production->feature5;
+    gf5_plan_invalidate(g); /* Display start boundary, before admission/MMIO. */
     c->deadline=dl; c->accepting=false; c->tv_sense_valid=false;
     stage="admission_close";
     rc=c->links->admission(c->links->owner,false);
@@ -428,6 +430,16 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     }
     if (!rc) {
         c->epoch=c->ch->epoch;
+        /* nouveau c03c1a1 therm/base.c:343-357, clk/base.c:591-598:
+         * work belongs to one device lifetime. A new F2 epoch cannot own
+         * the previous channel's pause or count its cooling samples.
+         * Keep suppression ceilings and pending shutdown across leave/enter;
+         * neither a display restart nor a saved image proves cooling. */
+        if (g->heat.epoch!=c->epoch) {
+            g->heat.critical_paused=false;
+            g->heat.cool_samples=0;
+            g->heat.epoch=c->epoch;
+        }
         stage="scan_reserve"; rc=gf4_scan_reserve_initial(c,dl);
     }
     if (!rc) {
@@ -476,6 +488,7 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     c->deadline=dl; c->accepting=false; l->active=false;
     struct gf5 *g=&s->production->feature5;
     g->accepting=false;
+    gf5_plan_invalidate(g); /* Display stop boundary, including failed stop. */
     c->cleanup_pending=true;
     /* R2-2: leave terminates the F5 snapshot even after failed save/restore.
      * free owns the single allocation; never copy or erase tile loan nodes. */
