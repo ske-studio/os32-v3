@@ -16,7 +16,8 @@
   - critical: 描画のエンジンを一時停止する (表示は保つ)。
   - shutdown: 電源断 (手本の orderly_poweroff) の代わりに、GeForce を止めて 98 の画面に戻し、警告を出す。
   - shutdown の追加の決定 (原文): 「緊急避難的なシャットダウンと言う事であればPC98の場合はネイティブに戻ってください。そうでない描画機能がない場合はなるべく安全にシャットダウンするように。アプリのデータ消失よりハードウェア保護を優先して」。動いているアプリの終了を待たずに GeForce を止める。アプリのデータが失われても止める。
-  - 刻み・下限・戻す条件、描画と独立した周期の監視 (A11) は、層 5 の設計の追記で決める。
+  - 刻み・下限・戻す条件、描画と独立した周期の監視 (A11) は [GF_GUARD_THERM_DESIGN](../../decisions/realhw/GF_GUARD_THERM_DESIGN.md) で決めた (2026-11-06 確定)。
+- 手本のガードの洗い出し (2026-11-06) の追記の確定設計: [GF_GUARD_LIFETIME_DESIGN](../../decisions/realhw/GF_GUARD_LIFETIME_DESIGN.md) (監査の台帳の複数の窓・保存像・tile)、[GF_GUARD_THERM_DESIGN](../../decisions/realhw/GF_GUARD_THERM_DESIGN.md) (層 5 の時計・熱・perf)。
 
 ## 1. 範囲 (1〜5)
 
