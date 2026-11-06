@@ -131,7 +131,7 @@ int ledger_surface_create(const struct ledger_surface *s, u32 *sid)
     CHECK(allocated && present_maps == 3);
     CHECK(s->width == 640 && s->height == 480 && s->pitch == 640 && s->npages == 75);
     CHECK(s->backend == 5 && s->format == GFX_BB_PACKED8 && s->planes == 1);
-    CHECK(s->perm_max == LEDGER_PERM_NONE && !s->lease_count && !s->closing);
+    CHECK(s->perm_max == LEDGER_PERM_RW && !s->lease_count && !s->closing);
     if (surface_calls == 1) {
         CHECK(s->owner == 8 && s->first == 0x20000 && s->role == LEDGER_ROLE_DISPLAY);
         CHECK(s->backing == LEDGER_SB_MMIO && s->cache == LEDGER_CACHE_UC);
@@ -265,7 +265,8 @@ static void run(void)
         CHECK(r->client == client_ram && r->client_bytes == 307200);
         CHECK(r->display_sid == 2 && r->client_sid == 3);
         CHECK((gfx_surface_unready & 12) == 12);
-        CHECK(!ledger_surfaces[2].perm_max && !ledger_surfaces[3].perm_max);
+        CHECK(ledger_surfaces[2].perm_max == LEDGER_PERM_RW);
+        CHECK(ledger_surfaces[3].perm_max == LEDGER_PERM_RW);
         CHECK(r->pci.command == 2 && r->pci.revision == 0xd3);
         for (u32 i = 0; i < sizeof(client_ram); ++i) CHECK(client_ram[i] == 0);
         u32 reads = config_reads;

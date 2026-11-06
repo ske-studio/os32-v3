@@ -104,7 +104,7 @@ MUTATIONS = [
     ('armed-busy', PRODUCT, 'if (armed) return TRI_E_BUSY;', 'if (false && armed) return TRI_E_BUSY;', 22),
     ('lease-busy', PRODUCT, 'surface_created[i] && ledger_surfaces[sids[i]].lease_count',
         'false && surface_created[i] && ledger_surfaces[sids[i]].lease_count', 23),
-    ('display-private', PRODUCT, '.perm_max = LEDGER_PERM_NONE', '.perm_max = LEDGER_PERM_RW', 0),
+    ('lease-ceiling', PRODUCT, '.perm_max = LEDGER_PERM_RW', '.perm_max = LEDGER_PERM_NONE', 0),
     ('publisher-private', PRODUCT, 'gfx_surface_unready |= 1u << resources.display_sid;',
         'gfx_surface_unready |= 0u << resources.display_sid;', 0),
     ('ready-commit', PRODUCT, 'resources.ready = true;', 'resources.ready = false;', 0),

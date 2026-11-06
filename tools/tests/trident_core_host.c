@@ -44,8 +44,6 @@ static void tri_init(void)
     CHECK(!gfx_arm_emergency(tri_restore, &tri_device, (u32)appslot_gfx_owner()));
     tri_device.active = true; route_safe = 0;
     if (fail_after_init) { tri_failure = -71; return; }
-    ledger_surfaces[tri_client].perm_max = LEDGER_PERM_RW;
-    ledger_surfaces[tri_display].perm_max = LEDGER_PERM_RW;
     gfx_current_height = TRI_HEIGHT;
 }
 static void tri_enter(void) { CHECK(tri_device.active); }
@@ -83,12 +81,14 @@ int trident_boot_reserve(void)
         .height=TRI_HEIGHT, .pitch=TRI_PITCH, .owner=LEDGER_OWNER_GFX,
         .backing=LEDGER_SB_MMIO, .backend=LEDGER_SF_TRIDENT,
         .role=LEDGER_ROLE_DISPLAY, .format=GFX_FMT_PACKED8, .planes=1,
-        .cache=LEDGER_CACHE_UC, .perm_max=LEDGER_PERM_NONE
+        .cache=LEDGER_CACHE_UC, .perm_max=LEDGER_PERM_RW
     };
     CHECK(ledger_surface_create(&sf, &tri_display));
+    gfx_surface_unready |= 1u << tri_display;
     sf.first=pfn; sf.owner=LEDGER_OWNER_BOOT; sf.backing=LEDGER_SB_RAM;
     sf.role=LEDGER_ROLE_CLIENT; sf.cache=LEDGER_CACHE_WB;
     CHECK(ledger_surface_create(&sf, &tri_client));
+    gfx_surface_unready |= 1u << tri_client;
     return 0;
 }
 static void run(void) __attribute__((used));
@@ -105,6 +105,16 @@ static void run(void)
     CHECK(reserved == 1 && !tri_probes && !tri_inits);
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_CLIENT));
     CHECK(!ledger_surface_find(LEDGER_SF_CIRRUS,LEDGER_ROLE_CLIENT));
+    u32 owner;
+    CallerAccessFrame previous;
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "tri-client", &owner));
+    CHECK(!paging_addrspace_create_lease(&space, owner));
+    payload = pgalloc_alloc_phys(owner, 1);
+    CHECK(payload && !paging_addrspace_map_user(&space, MEM_EXEC_LOAD_ADDR,
+                                              payload, PAGE_RW | PTE_USER));
+    slot.state = APP_STATE_RUNNING; slot.cpl3 = 1; slot.as = &space;
+    host_cr3 = space.pd_phys;
+    CHECK(caller_access_enter(&previous, CALLER_USER));
     gfx_set_backend_pref(GFX_PREF_AUTO); gfx_prepare_backend();
     CHECK(!tri_probes && g_backend == &gfx_backend_pc98);
     gfx_set_backend_pref(GFX_PREF_TRIDENT); gfx_prepare_backend();
@@ -116,8 +126,15 @@ static void run(void)
     host_user = 0; gfx_init();
     CHECK(g_backend == &gfx_backend_trident && gfx_is_started() && tri_inits == 1);
     CHECK(gfx_selected_selfcheck());
+    /* Init must not repair the resource descriptor: real resources.c sets
+     * the ceiling; core readiness and caller authorization control leases. */
+    view_check(LEDGER_SF_TRIDENT, TRI_HEIGHT, 1);
     CHECK(!gfx_surface_source(LEDGER_ROLE_CLIENT, &source) && source.backend == LEDGER_SF_TRIDENT);
     CHECK(!gfx_surface_source(LEDGER_ROLE_DISPLAY, &source) && source.count == 1);
+    CHECK(surface_query_refs(&source, source.refs, 1, LEDGER_PERM_RW) == OS32_ERR_INVAL);
+    slot.hdr_flags = OS32X_FLAG_GFX;
+    CHECK(!surface_query_refs(&source, source.refs, 1, LEDGER_PERM_RW));
+    slot.hdr_flags = 0;
     gfx_shutdown();
     CHECK(!gfx_is_started() && tri_leaves == 1 && tri_closes == 1);
     gfx_init(); CHECK(gfx_is_started() && tri_inits == 2);

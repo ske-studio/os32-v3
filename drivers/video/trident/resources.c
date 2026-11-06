@@ -265,12 +265,15 @@ int __attribute__((cold)) trident_boot_reserve(void)
     client_allocated = true;
     resources.client = P2V(client_pfn * PAGE_SIZE);
     kmemset(resources.client, 0, TRI_DISPLAY_BYTES);
+    /* perm_max is the lease ceiling, not publication readiness. The core
+     * keeps both surfaces unready through verify/init and gates USER access
+     * on gfx_started. NONE would also forbid CLIENT attach after success. */
     struct ledger_surface sf = {
         .first = MEM_TRIDENT_LFB_VA / PAGE_SIZE, .npages = TRI_DISPLAY_PAGES,
         .width = TRI_WIDTH, .height = TRI_HEIGHT, .pitch = TRI_PITCH,
         .owner = resources.owner, .backing = LEDGER_SB_MMIO, .backend = LEDGER_SF_TRIDENT,
         .role = LEDGER_ROLE_DISPLAY, .format = GFX_BB_PACKED8, .planes = 1,
-        .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE
+        .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW
     };
     if (!ledger_surface_create(&sf, &resources.display_sid)) return fail("display", TRI_E_SURFACE);
     surface_created[0] = true;
