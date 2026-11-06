@@ -521,3 +521,9 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 4. **A6/A8 への申し送り (Opus P2-1)**: 本番の `link_init` (net/link.c) は自分で `tick_register(PC98_TICK_LINK, link_tick)` を呼ぶ。net_bind が先に net_tick を同じ枠に登録するので、結線したら衝突して link が初期化されない (または net_bind が BUSY で失敗する)。A8 (か A6) で link_init から tick の登録を外す。A2 の試験の偽物 link_init は登録しない前提を REQUIRE で固定してある。
 5. H1: lanfs_host.py は H2 の host_image.ImageStore を起動時に読み込む (H1 と H2 は同時に入れた)。
 6. 送りの P3: B2 は順序の合った NOTIFY でも中身が不正なら ACK せずに捨てる (今の H3 はそうした通知を作らない — ホスト側の検査を緩めるときに見直す)。A3 の `net_rx_sfs_dropped`・`net_rx_link_dropped` の宣言は読み手ができる段 I で nic_rx.h に足す。
+
+## C1・C3 で決めたこと (2026-11-07、PM 決定)
+1. C1・C3 はどちらも同じ所で止まった。`SfsIo.put` には要求の絶対期限が渡らず、LAN の `lan_put` (fs/serialfs/sfs_lan.c) は送れるまで自分で最大 `SFS_LAN_PUT_MS`=1000ms 待つ。このため #7 の「入口から同じ期限」を守れない (実行の反例は ~/os32-tmp/run/hs-c1/BYE_DEADLINE.txt と hs-c3 の報告)。
+2. `SfsIo` の末尾に、任意の `int (*put_until)(void *ctx, const u8 *buf, u32 n, u32 deadline)` を足す。NULL でもよく、UART は NULL。期限が切れたら OS32_ERR_TIMEOUT を返す。期限つきの要求・HELLO・片道は、put_until が有ればそれを使い、無ければ put を使う。末尾に足すので既存の初期化子はそのまま通る。
+3. `sfs_client_oneway_deadline(c, type, payload, len, deadline)` を sfs_client.h に宣言する。実体は C3 が sfs_client.c に置き、C1 の BYE はこれで送る。
+4. sfs_lan.c の `lan_put_until` は C3 が書く。待ちの上限は min(開始 + SFS_LAN_PUT_MS, deadline) にする。`lan_put` は期限なしの put_until として残し、UART の経路は変えない。
