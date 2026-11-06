@@ -32,6 +32,9 @@
  * The production gf5 owns the parsed trip allocation for
  * its lifetime; snapshots borrow/copy it under the feature5.h contract. */
 #include "feature5.h"
+#ifdef GF_PRODUCTION_MODULE
+#include "geforce_module.h"
+#endif
 #include "../../include/kprintf.h"
 #define GF_ROM_BIT_ONLY
 #include "rom.inc"
@@ -666,6 +669,9 @@ static i32 th_sensor(struct gf5 *g,u64 now)
     if (t.milli_c>=(i64)f->threshold[TH_SHUTDOWN]*TH_MILLI) {
         g->heat.stop_pending=true;
         g->heat.cool_samples=0;
+#ifdef GF_PRODUCTION_MODULE
+        geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);
+#endif
     } else if (critical_changed && g->emergency.pause)
         g->emergency.pause(g->emergency.owner,f->active[TH_CRITICAL]);
     i32 heat_rc=gf5_heat_step(g,&t,now);

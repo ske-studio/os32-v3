@@ -6,6 +6,9 @@ CHECK = dict(name='gf5-therm-t1', tier=1, needs=[], budget=20.0,
                      'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
                      'tools/tests/gf4_display_fake.h', 'tools/tests/gf_accel_host.h',
                      'include/types.h', 'include/kprintf.h',
+                     'drivers/video/geforce/geforce_module.h',
+                     'kernel/module/*.h', 'include/gfx_hal.h',
+                     'include/video_service.h',
                      'kdebug/gfinit_decode.c', 'kdebug/gfinit_exec.c',
                      'kdebug/gfinit_pll.c', 'kdebug/recover.c', 'kdebug/recover_gf.c',
                      'tools/tests/gf4_c2linit_host.c', 'tools/tests/gf_runner_host.c',
@@ -16,6 +19,9 @@ import sys
 import test_gf5 as suite
 
 MUTATIONS = [
+    ('resident-shutdown-request', 'hwdev/gf/therm.c',
+     'geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);',
+     'if (0) geforce_heat_stop_request(GF5_ESTATE,t.milli_c,g->source_rc);', 'therm_t1'),
     ('boost-auto-mode', 'hwdev/gf/therm.c',
      'if (boost_rising && f->mode!=GF5_FAN_AUTO)',
      'if (false && boost_rising && f->mode!=GF5_FAN_AUTO)', 'therm_t1'),
@@ -42,7 +48,13 @@ MUTATIONS = [
      '(void)g;', 'therm_t1'),
 ]
 
+original_command=suite.command
+
+def production_command(tree, case, exe):
+    return original_command(tree,case,exe)+['-DGF_PRODUCTION_MODULE']
+
 def main():
+    suite.command=production_command
     suite.CASES = {'therm_t1': (3, ['hwdev/gf/therm.c'])}
     suite.MUTATIONS = MUTATIONS
     sys.argv += ['--case', 'therm_t1']

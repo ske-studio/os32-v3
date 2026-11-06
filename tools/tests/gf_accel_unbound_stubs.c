@@ -5,6 +5,14 @@
  * fixture's explicit lower-layer model or real backend to take precedence. */
 #include "hwdev/gf/accel.h"
 #include "hwdev/gf/feature5.h"
+#include "hwdev/gf/production.h"
+/* Ownerless fixtures cannot prepare or measure a stopped production card. */
+__attribute__((weak)) int gf_production_identity(struct gf_production *p)
+{ (void)p; __builtin_trap(); }
+__attribute__((weak)) int gf_production_mapped(struct gf_production *p)
+{ (void)p; __builtin_trap(); }
+__attribute__((weak)) i32 gf5_therm_read(struct gf5 *g,struct gf5_thermal *t)
+{ (void)g;(void)t; __builtin_trap(); }
 #include "kprintf.h"
 /* The start-failure hosts assert output; ownerless/link hosts borrow only
  * the kernel printing dependency. */

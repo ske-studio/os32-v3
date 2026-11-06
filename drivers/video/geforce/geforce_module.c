@@ -11,6 +11,10 @@
 #include "kprintf.h"
 #include "gf_production.h"
 #include "pc98_route.h"
+#include "../../../fs/vfs.h"
+#include "../../../exec/appslot.h"
+#include "serial_diag.h"
+#include "io.h"
 #include "../../../hwdev/gf/display/api.h"
 
 extern const u32 geforce_kexports[];
@@ -38,13 +42,59 @@ const struct gf5_test_ops *geforce_feature5_ops(void)
 /* Resident guard also covers service callbacks that reach a foreground wait.
  * Do not retain a module loan between calls or gate thermal work on drawing. */
 static bool foreground_poll_busy;
+static bool heat_pending;
+static i32 heat_reason, heat_milli_c, heat_source_rc;
+static struct geforce_heat_bridge heat_bridge={.request=geforce_heat_stop_request};
+void geforce_heat_stop_request(i32 reason,i32 milli_c,i32 source_rc)
+{
+    /* Preserve the first cause across nested waits and repeated requests. */
+    if (heat_bridge.latched) return;
+    heat_bridge.latched=true;
+    heat_reason=reason; heat_milli_c=milli_c; heat_source_rc=source_rc;
+    heat_pending=true;
+}
+int geforce_heat_latch_clear(void)
+{
+    if (!heat_bridge.latched) return 0;
+    if (foreground_poll_busy || heat_pending || !registered || !heat_bridge.clear)
+        return GF5_ESTATE;
+    foreground_poll_busy=true;
+    int rc=heat_bridge.clear();
+    if (!rc) heat_bridge.latched=false;
+    foreground_poll_busy=false;
+    return rc;
+}
+static void heat_stop_consume(void)
+{
+    if (!heat_pending) return;
+    heat_pending=false;
+    int stop_rc=heat_bridge.stop ? heat_bridge.stop() : gf_production_return();
+    if (!pc98_route_safe || !pc98_route_safe()) {
+        int sync_rc=vfs_sync();
+        /* Emergency output must not use a console on the stopped device. */
+        serial_puts_polled("[geforce] heat halt reason="); serial_diag_i32(heat_reason);
+        serial_puts_polled(" milli_c="); serial_diag_i32(heat_milli_c);
+        serial_puts_polled(" source_rc="); serial_diag_i32(heat_source_rc);
+        serial_puts_polled(" stop_rc="); serial_diag_i32(stop_rc);
+        serial_puts_polled(" sync_rc="); serial_diag_i32(sync_rc);
+        serial_puts_polled("\n");
+        _disable();
+        for (;;) { _halt(); }
+    }
+    /* Stop and route precede GUI notification and CUI/running-app recovery. */
+    geforce_display_failed();
+    (void)appslot_abort_request();
+    kprintf(KLOG_ATTR,"[geforce] heat stop reason=%d milli_c=%d source_rc=%d stop_rc=%d\n",
+            heat_reason,heat_milli_c,heat_source_rc,stop_rc);
+}
 void geforce_foreground_poll(void)
 {
     if (foreground_poll_busy) return;
     foreground_poll_busy=true;
     const struct gf5_test_ops *ops=geforce_feature5_ops();
     if (ops && ops->service_poll) (void)ops->service_poll(ops->ctx);
-    /* F0s consumes pending heat stop here, with reentry still excluded. */
+    /* The borrowed module context is no longer in use when stop runs. */
+    heat_stop_consume();
     foreground_poll_busy=false;
 }
 static int missing_probe(void) { return 0; }
@@ -54,7 +104,7 @@ static GeforceModuleContext context = {
     .height=&gfx_current_height, .flip=&gfx_flip_enabled, .page=&gfx_display_page,
     .accel_out=&accel_slot, .foundation_out=&foundation_slot,
     .display_out=&display_slot, .feature5_out=&feature5_slot,
-    .display_restore_out=&display_restore_slot
+    .display_restore_out=&display_restore_slot, .heat=&heat_bridge
 };
 int geforce_pc98_safe(void)
 {

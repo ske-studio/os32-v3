@@ -371,7 +371,7 @@ def module_registration(mutation=None):
                  '-I'+str(ROOT/'tools/tests'), '-DGF_PRODUCTION_MODULE']
         real_backend=Path(td)/'real_backend.o'
         aliases=('geforce_backend_ops','geforce_backend_bind',
-                 'geforce_backend_wc_bind','geforce_backend_stop_bind')
+                 'geforce_backend_wc_bind','geforce_backend_stop_bind','geforce_heat_stop_request')
         subprocess.run([*flags, '-DOS32_GEFORCE_MODULE',
             *['-D'+name+'=loader_real_'+name for name in aliases],
             '-c', str(ROOT/'drivers/video/geforce/backend_geforce.c'),

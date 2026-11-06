@@ -16,6 +16,14 @@ struct gf4_test_ops;
 struct gf4_restore_ops;
 struct gf5;
 struct gf5_test_ops;
+/* Resident storage; module callbacks are published for the pinned boot owner.
+ * Requests carry values only. Clearing requires an explicit cold measurement. */
+struct geforce_heat_bridge {
+    bool latched;
+    void (*request)(i32 reason, i32 milli_c, i32 source_rc);
+    int (*stop)(void);
+    int (*clear)(void);
+};
 const struct gf3_test_ops *geforce_accel_ops(void);
 const struct gf1_test_ops *geforce_foundation_ops(void);
 /* Read the normal/restore slot on every call; do not retain across unload. */
@@ -34,6 +42,7 @@ void geforce_foreground_poll(void);
 /* Value-only stop request; do not retain any module pointers. The consumer
  * owns no-route sync/halt; geforce_return must retain its reboot semantics. */
 void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
+int geforce_heat_latch_clear(void);
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);
@@ -78,6 +87,7 @@ typedef struct {
     const struct gf4_test_ops **display_out;
     const struct gf5_test_ops **feature5_out;
     const struct gf4_restore_ops **display_restore_out;
+    struct geforce_heat_bridge *heat;
 } GeforceModuleContext;
 extern const GeforceModuleContext *geforce_context;
 extern GfxBackend geforce_backend_ops;

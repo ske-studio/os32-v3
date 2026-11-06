@@ -5,6 +5,7 @@ CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:all'], budget=5.0,
                      'tools/tests/kernel_includes.py', 'build/config.mk',
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
                      'gfx/gfx_internal.h', 'gfx/palette.h', 'mm/pgalloc.h',
+                     'fs/vfs.h', 'exec/appslot.h', 'lib/serial_diag.h',
                      'kernel/module/*.h', 'lib/kstring.h',
                      'drivers/video/pc98/pc98_route.h',
                      'build/out/geforce/geforce_imports.h'])
@@ -23,6 +24,12 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/video/geforce/geforce_module.c'
 MUTATIONS = [
+    ('heat-consume', '    heat_stop_consume();', '    if (0) heat_stop_consume();'),
+    ('heat-latch', '    heat_bridge.latched=true;', '    heat_bridge.latched=false;'),
+    ('heat-notify', '    geforce_display_failed();', '    if (0) geforce_display_failed();'),
+    ('heat-abort', '    (void)appslot_abort_request();', '    if (0) (void)appslot_abort_request();'),
+    ('heat-sync', 'int sync_rc=vfs_sync();', 'int sync_rc=0;'),
+    ('heat-clear', 'if (!rc) heat_bridge.latched=false;', 'if (0) heat_bridge.latched=false;'),
     ('foreground-dispatch', 'if (ops && ops->service_poll)',
      'if (0 && ops && ops->service_poll)'),
     ('foreground-reentry', 'if (foreground_poll_busy) return;',
@@ -36,6 +43,7 @@ def run_case(folder, label, replacement=None):
         old, new = replacement
         assert source.count(old) == 1, label
         source = source.replace(old, new, 1)
+    source=source.replace('_disable();', 'host_disable();').replace('_halt();', 'host_halt();')
     # Rebase quoted sibling includes for the temporary product translation unit.
     source = re.sub(r'#include "([^"\n]+)"',
                     lambda m: '#include "' + str((SOURCE.parent / m[1]).resolve()) + '"'

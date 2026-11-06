@@ -23,6 +23,9 @@ static bool slow_operations;
 static bool forced_leave;
 static i32 abandon_rc;
 static u32 abandons;
+static u32 heat_clear_calls;
+static int heat_clear_rc;
+int geforce_heat_latch_clear(void) { heat_clear_calls++; return heat_clear_rc; }
 static int current_owner = 2;
 int res_owner_get(void) { return current_owner; }
 static struct gf4_host host;
@@ -1193,8 +1196,11 @@ static void cui_controls(void)
 {
     reset_cold_cui();
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);
+    heat_clear_calls=0; heat_clear_rc=GF4_EBUSY;
+    assert(gf_display_test(GF4_CUI_ENTER)==GF4_EBUSY && !enters && !display_cui_owner);
+    heat_clear_rc=0;
     assert(!gf_display_test(GF4_CUI_ENTER) && enters == 1 && display_cui_owner == 2);
-    assert(core_inits == 1 && !backend_failed);
+    assert(heat_clear_calls==2 && core_inits == 1 && !backend_failed);
     assert(gf_display_test(GF4_CUI_ENTER) == GF4_EBUSY && enters == 1);
     current_owner = 3;
     assert(gf_display_test(GF4_CUI_LEAVE) == GF4_ESTATE && !leaves);

@@ -937,6 +937,7 @@ static i32 display_cui(bool enter)
             (!o || !o->ctx || !o->ctx->ready)) display_cui_owner = 0;
         if (display_cui_owner || display_session.valid || (o && o->ctx && o->ctx->ready)) rc = GF4_EBUSY;
         else if (!gfx_backend_geforce.enter || !gfx_backend_geforce.leave) rc = GF4_ENODEV;
+        else if ((rc=geforce_heat_latch_clear())!=0) { /* Keep the latch on failure. */ }
         else {
             display_cui_owner = res_owner_get();
             /* Like a CUI graphics app, select the configured backend and bind

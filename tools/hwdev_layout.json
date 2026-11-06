@@ -97,6 +97,7 @@
       "feature5_out",
       "flip",
       "foundation_out",
+      "heat",
       "height",
       "page",
       "platform"
@@ -805,6 +806,12 @@
       "queried",
       "rsvd",
       "valid"
+    ],
+    "struct geforce_heat_bridge": [
+      "clear",
+      "latched",
+      "request",
+      "stop"
     ],
     "struct geforce_platform": [
       "bar0_phys",

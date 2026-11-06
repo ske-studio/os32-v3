@@ -144,7 +144,7 @@ offset	GFX_Surface.planes	12
 member_size	GFX_Surface.planes	16
 offset	GFX_Surface.w	0
 member_size	GFX_Surface.w	4
-size	GeforceModuleContext	52
+size	GeforceModuleContext	56
 align	GeforceModuleContext	4
 offset	GeforceModuleContext.accel_out	24
 member_size	GeforceModuleContext.accel_out	4
@@ -166,6 +166,8 @@ offset	GeforceModuleContext.flip	12
 member_size	GeforceModuleContext.flip	4
 offset	GeforceModuleContext.foundation_out	28
 member_size	GeforceModuleContext.foundation_out	4
+offset	GeforceModuleContext.heat	52
+member_size	GeforceModuleContext.heat	4
 offset	GeforceModuleContext.height	8
 member_size	GeforceModuleContext.height	4
 offset	GeforceModuleContext.page	16
@@ -1500,6 +1502,16 @@ offset	struct bootinfo_wire_drive.rsvd	11
 member_size	struct bootinfo_wire_drive.rsvd	5
 offset	struct bootinfo_wire_drive.valid	1
 member_size	struct bootinfo_wire_drive.valid	1
+size	struct geforce_heat_bridge	16
+align	struct geforce_heat_bridge	4
+offset	struct geforce_heat_bridge.clear	12
+member_size	struct geforce_heat_bridge.clear	4
+offset	struct geforce_heat_bridge.latched	0
+member_size	struct geforce_heat_bridge.latched	1
+offset	struct geforce_heat_bridge.request	4
+member_size	struct geforce_heat_bridge.request	4
+offset	struct geforce_heat_bridge.stop	8
+member_size	struct geforce_heat_bridge.stop	4
 size	struct geforce_platform	52
 align	struct geforce_platform	4
 offset	struct geforce_platform.bar0_phys	24
