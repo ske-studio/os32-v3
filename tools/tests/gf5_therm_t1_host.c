@@ -54,7 +54,7 @@ static void test_samples(void)
     assert(samples==n+1 && h.ctx.next_sensor==h.now+T_POLL);
     sample(106); assert(pause_count==1 && pause_active);
     sample(106); assert(pause_count==1);
-    sample(100); assert(pause_count==1); /* equality keeps pause */
+    sample(100); assert(pause_count==2 && !pause_active); /* equality releases: temp <= thr - hyst (nouveau therm/temp.c:150-153) */
     sample(99); assert(pause_count==2 && !pause_active);
     begin(); sample(135);
     assert(shutdown_seen && h.ctx.heat.stop_pending && !pause_count);
@@ -76,7 +76,8 @@ static void test_maximum(void)
         assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_AUTO));
         assert(h.ctx.fan.target==T_FULL);
         sample(89); assert(h.ctx.fan.duty==T_FULL && h.ctx.fan.target==T_FULL);
-        sample(87); assert(h.ctx.fan.active[0]);
+        sample(88); assert(h.ctx.fan.active[0]);
+        sample(87); assert(!h.ctx.fan.active[0]); /* equality releases (temp <= thr - hyst) */
         sample(86); assert(!h.ctx.fan.active[0]);
     }
     begin(); h.ctx.fan.max_duty=80; sample(90);
