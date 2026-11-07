@@ -3,7 +3,7 @@ CHECK = dict(name='gf5-observe', tier=1, needs=[], budget=20.0,
              covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',
-                     'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h',
+                     'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
                      'include/types.h', 'tools/tests/gf5_observe_host.c',
                      'tools/tests/serial_diag_host.h', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
@@ -45,7 +45,18 @@ def main():
             return 1
         print('PASS Q1: runtime GREEN', flush=True)
         if args.mutate:
+            crc_anchor = 'scratch, key->bytes));'
             source = (ROOT / PRODUCT).read_text()
+            if source.count(crc_anchor) != 1:
+                raise RuntimeError('CRC mutation anchor is not unique')
+            for replacement in ['saved ? saved : scratch, key->bytes));',
+                                'scratch, key->bytes - 1U));']:
+                tree = mutpar.build_in_tree(ROOT, Path(td) / ('crc-' + str(len(replacement))),
+                    {PRODUCT: source.replace(crc_anchor, replacement)}, [cmd])
+                rc = host32.run([str(exe)], cwd=tree).returncode
+                if rc <= 0:
+                    raise RuntimeError(f'CRC mutation did not fail at runtime: {rc}')
+                print(f'PASS VRAM CRC mutation: runtime RED rc={rc}', flush=True)
             if source.count(ANCHOR) != 1:
                 raise RuntimeError('Q1 mutation anchor is not unique')
             tree = mutpar.build_in_tree(ROOT, Path(td) / 'mutant',

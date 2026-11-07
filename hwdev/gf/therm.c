@@ -169,10 +169,9 @@ static i32 th_perf_divisor(struct gf5 *g,u32 perf,u32 *divisor)
     }
     return 0;
 }
-static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f,bool *unsupported)
+static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f)
 {
     /* therm/temp.c:26-54; therm/fan.c:184-210. */
-    if (unsupported) *unsupported=false;
     *f=(struct gf5_fan_saved){.mode=GF5_FAN_NONE,.kind=GF5_FAN_OTHER,
         .max_duty=TH_PERCENT,.bump_ms=TH_BUMP_MS,.slow_ms=TH_SLOW_MS,
         .linear_min=TH_LINEAR_MIN,.linear_max=TH_LINEAR_MAX,.last_trip=-1,
@@ -193,10 +192,10 @@ static i32 th_policy(struct gf5 *g,struct gf5_fan_saved *f,bool *unsupported)
     u32 fan=version==2 && plen>=0x5cU ? th_le32(g->rom.bytes+p+0x58U) : 0;
     bool fan_table=false;
     if (fan) {
-        if (!th_span(g,fan,4)) return GF5_EBIOS;
+        if (!th_span(g,fan,1)) return GF5_EBIOS;
         const u8 *r=g->rom.bytes+fan;
-        if (r[0]!=0x10U && unsupported) *unsupported=true;
         if (r[0]==0x10U) {
+            if (!th_span(g,fan,4)) return GF5_EBIOS;
             u32 hdr=r[1],stride=r[2],n=r[3];
             if (hdr<4 || stride<TH_FAN_ENTRY_BYTES ||
                 !th_span(g,fan,hdr+stride*n)) return GF5_EBIOS;
@@ -294,7 +293,7 @@ static i32 th_init(struct gf5 *g)
 {
     if (g->fan.sensor_setup && g->fan.sensor_setup!=TH_OFF_SETUP) return 0;
     struct gf5_fan_saved f;
-    i32 rc=th_policy(g,&f,0);
+    i32 rc=th_policy(g,&f);
     if (rc) return rc;
     rc=th_setup(g);
     if (rc) {
@@ -368,7 +367,7 @@ static i32 th_fan_route(struct gf5 *g,u8 *line,u8 log[2])
     g->poll_source="fan-gpio-find";
     i32 rc=gf5_gpio_find(g,TH_FAN_TAG,line,log);
     if (rc) return rc;
-    if ((log[0]&2U) || (*line!=2 && *line!=9)) return GF5_ENOTSUP;
+    if ((log[0]&2U) || (*line!=2 && *line!=9)) return GF5_ENODEV;
     return 0;
 }
 i32 gf5_fan_check_cstate(struct gf5 *g,u8 percent)
@@ -380,13 +379,13 @@ i32 gf5_fan_check_cstate(struct gf5 *g,u8 percent)
      * the ADC. Release any temporary trip allocation on every exit. */
     if (!rc) {
         struct gf5_fan_saved policy;
-        bool unsupported=false;
-        rc=th_policy(g,&policy,&unsupported);
+        rc=th_policy(g,&policy);
         if (policy.trip) g->links.free(g->links.owner,policy.trip);
-        if (!rc && unsupported) rc=GF5_ENOTSUP;
         if (!rc) {
             u8 line,log[2];
             rc=th_fan_route(g,&line,log);
+            /* fan.c:246-250: fannil still accepts cstate updates. */
+            if (rc==GF5_ENODEV) { rc=0; g->source_rc=0; }
         }
     }
     return th_exit(g,rc);
@@ -396,7 +395,7 @@ static i32 th_fan_prepare(struct gf5 *g)
     i32 rc=th_init(g);
     if (rc) return rc;
     struct gf5_fan_saved *f=&g->fan;
-    if (f->gpio_line!=U8_MAX) return f->method ? 0 : GF5_ENOTSUP;
+    if (f->gpio_line!=U8_MAX) return f->method ? 0 : GF5_ENODEV;
     u8 line,log[2];
     g->source_rc=0;
     rc=th_fan_route(g,&line,log);
@@ -627,8 +626,12 @@ i32 gf5_fan_cstate(struct gf5 *g,u8 percent,i32 dir)
         rc=th_now(g,&now);
         if (!rc) {
             g->fan.cstate=percent;
-            if (g->fan.mode==GF5_FAN_AUTO) rc=th_auto(g,now);
-            else if (g->fan.mode==GF5_FAN_MANUAL) rc=th_mode(g,GF5_FAN_MANUAL,now);
+            /* base.c:164-173: cstate updates succeed even when the
+             * fan update fails (including fannil get/set = ENODEV). */
+            i32 fan_rc=0;
+            if (g->fan.mode==GF5_FAN_AUTO) fan_rc=th_auto(g,now);
+            else if (g->fan.mode==GF5_FAN_MANUAL) fan_rc=th_mode(g,GF5_FAN_MANUAL,now);
+            if (fan_rc) th_fan_off(g,fan_rc);
         }
     }
     return th_exit(g,rc);

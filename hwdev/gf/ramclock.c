@@ -23,7 +23,7 @@
  */
 /* NV4a single-partition RAM reclocking, nouveau c03c1a1
  * nvkm/subdev/fb/ramnv40.c:78-175. GF_FEAT5_DESIGN section 3 adds
- * checked deadlines and one rollback attempt; BIT M is already prepared. */
+ * one rollback attempt; waits retain the reference budgets. BIT M is prepared. */
 #include "feature5.h"
 
 /* Addresses/masks/waits: ramnv40.c:78-175 (all accesses BAR0). */
@@ -74,24 +74,19 @@ static i32 clock_now(struct gf_io *io, u32 *now)
 {
     return io->timing.clock_us(io->opaque, now);
 }
-/* Foreground waits use existing short chunks; outer deadline never changes. */
-static i32 delay(struct gf5 *g, struct gf_io *io, u32 us)
+/* ramnv40.c:90,146,152: fixed delays have no outer deadline. */
+static i32 delay(struct gf_io *io, u32 us)
 {
     while (us) {
-        u32 now, n = us > GF2_WAIT_MAX_US ? GF2_WAIT_MAX_US : us;
-        i32 rc = clock_now(io, &now);
-        if (rc) return rc;
-        if ((i32)(now - g->deadline) >= 0) return GF5_ETIME;
-        if (n > g->deadline - now) n = g->deadline - now;
-        rc = io->timing.wait_us(io->opaque, n);
+        u32 n = us > GF2_WAIT_MAX_US ? GF2_WAIT_MAX_US : us;
+        i32 rc = io->timing.wait_us(io->opaque, n);
         if (rc) return rc;
         us -= n;
     }
-    u32 now;
-    i32 rc = clock_now(io, &now);
-    return rc ? rc : (i32)(now - g->deadline) >= 0 ? GF5_ETIME : 0;
+    return 0;
 }
-static i32 vblank(struct gf5 *g, struct gf_io *io, u32 head, bool high)
+/* ramnv40.c:99-109,165-169: each edge has its own full 2s budget. */
+static i32 vblank(struct gf_io *io, u32 head, bool high)
 {
     u32 start, now, v;
     i32 rc = clock_now(io, &start);
@@ -99,14 +94,14 @@ static i32 vblank(struct gf5 *g, struct gf_io *io, u32 head, bool high)
     for (;;) {
         rc = clock_now(io, &now);
         if (rc) return rc;
-        if ((i32)(now - g->deadline) >= 0 || now - start >= RAM_VBLANK_US)
+        if (now - start >= RAM_VBLANK_US)
             return GF5_ETIME;
         rc = rd(io, RAM_VBLANK + head * RAM_STRIDE, RAM_WORD, &v);
         if (rc) return rc;
         if (!!(v & RAM_VBLANK_BIT) == high) return 0;
         u32 n = RAM_VBLANK_US - (now - start);
         if (n > GF2_WAIT_MAX_US) n = GF2_WAIT_MAX_US;
-        rc = delay(g, io, n);
+        rc = delay(io, n);
         if (rc) return rc;
     }
 }
@@ -199,14 +194,14 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
                 if (!(sr[h] & RAM_BLANK)) active |= 1U << h;
                 break;
             }
-            rc = delay(g, io, 1);
+            rc = delay(io, 1);
             if (rc) goto cleanup;
         }
     }
     for (u32 h = 0; h < RAM_HEADS; ++h) {
         if (!(active & (1U << h))) continue;
-        rc = vblank(g, io, h, false);
-        if (!rc) rc = vblank(g, io, h, true);
+        rc = vblank(io, h, false);
+        if (!rc) rc = vblank(io, h, true);
         if (rc) goto cleanup;
         blanked |= 1U << h; /* A failing adapter write may have applied. */
         rc = sr_write(io, h, sr[h] | RAM_BLANK);
@@ -223,11 +218,11 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
     if (!rc) rc = mask(io, RAM_MUX, RAM_MUX_MASK, 0);
     if (!rc) rc = mask(io, RAM_CTRL, RAM_CTRL_MASK, plan->mc);
     if (!rc) rc = wr(io, RAM_COEF, RAM_WORD, plan->mn);
-    if (!rc) rc = delay(g, io, RAM_SETTLE_US);
+    if (!rc) rc = delay(io, RAM_SETTLE_US);
     if (!rc) rc = mask(io, RAM_MUX, RAM_MUX_MASK, RAM_MUX_MASK);
     if (!rc) rc = wr(io, RAM_SELF, RAM_WORD, 0);
     if (!rc) rc = mask(io, RAM_AUTO, RAM_AUTO_BIT, RAM_AUTO_BIT);
-    if (!rc) rc = delay(g, io, RAM_SETTLE_US);
+    if (!rc) rc = delay(io, RAM_SETTLE_US);
     if (!rc && g->rom.memory_program)
         rc = g->links.memory_script(g->links.owner, g->rom.memory_pc);
 cleanup:
@@ -238,7 +233,7 @@ cleanup:
     /* ramnv40.c:161-175: even timeout must attempt every saved SR1. */
     for (u32 h = 0; h < RAM_HEADS; ++h) {
         if (!(blanked & (1U << h))) continue;
-        if (!rc) first(&rc, vblank(g, io, h, true));
+        if (!rc) first(&rc, vblank(io, h, true));
         first(&rc, sr_write(io, h, sr[h]));
     }
     /* SR1/vblank can fail after the first rollback decision. Preserve rc,

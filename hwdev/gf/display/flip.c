@@ -1,6 +1,8 @@
 /* NV04 display flip: nouveau dispnv04/crtc.c:1074-1087,1136-1217;
  * dispnv04/hw.c:702-710, hw.h:353-357, nvreg.h:299. */
 #include "api.h"
+#include "../../../include/sys.h"
+#include "../../../lib/serial_diag.h"
 
 #define FLIP_BAR 0U
 #define FLIP_START 0x600800U
@@ -9,6 +11,37 @@
 #define FLIP_RETRACE 0x08U
 #define FLIP_WORD 4U
 #define FLIP_BYTE 1U
+
+/* Diagnostic samples use the same 64-bit microsecond clock as F5 clock64.
+ * Clock failures are reported, without changing the flip result or retrying. */
+struct flip_time { u32 lo, hi; int rc; };
+
+static void sample(struct flip_time *t)
+{
+    t->rc = sys_time_now(&t->lo, &t->hi);
+}
+
+static void stamp(const char *name, const struct flip_time *t)
+{
+    serial_puts_polled(name);
+    serial_diag_hex(t->hi, 8);
+    serial_diag_hex(t->lo, 8);
+    serial_puts_polled(" clock_rc="); serial_diag_i32(t->rc);
+}
+
+static void diagnostic(u8 head, bool sync, const struct flip_time *edge,
+                       const struct flip_time *pre, const struct flip_time *post,
+                       int rc)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("[gf4] flip head="); serial_diag_u32(head);
+    serial_puts_polled(" sync="); serial_diag_u32(sync);
+    if (sync) stamp(" edge_us=0x", edge);
+    stamp(" pre_us=0x", pre);
+    stamp(" post_us=0x", post);
+    serial_puts_polled(" rc="); serial_diag_i32(rc);
+    serial_puts_polled("\r\n");
+}
 
 static int valid(struct gf4_ctx *c, u8 head)
 {
@@ -130,6 +163,7 @@ int gf4_flip(struct gf4_ctx *c, u8 head, const struct gf3_surface *front,
     struct gf_io *io;
     struct gf2_fence fence;
     u32 before, seen, status, readback;
+    struct flip_time edge = {0}, pre = {0}, post = {0};
     int rc;
     if (!front) return GF4_EINVAL;
     rc = valid(c, head);
@@ -155,7 +189,7 @@ int gf4_flip(struct gf4_ctx *c, u8 head, const struct gf3_surface *front,
             rc = io->read(io->opaque, FLIP_BAR, FLIP_STATUS + head * FLIP_HEAD_STRIDE,
                           FLIP_BYTE, &status);
             if (rc) return rc;
-            if (status & FLIP_RETRACE) break;
+            if (status & FLIP_RETRACE) { sample(&edge); break; }
             rc = tick(c, head, dl);
             if (rc) return rc;
         }
@@ -164,14 +198,20 @@ int gf4_flip(struct gf4_ctx *c, u8 head, const struct gf3_surface *front,
     h->new_front = *front;
     h->pending = h->base_written = true;
     h->base_verified = false;
+    sample(&pre);
     rc = io->write(io->opaque, FLIP_BAR, FLIP_START + head * FLIP_HEAD_STRIDE,
                    FLIP_WORD, front->off);
-    if (rc) return rc;
+    sample(&post);
+    if (rc) goto done;
     rc = io->read(io->opaque, FLIP_BAR, FLIP_START + head * FLIP_HEAD_STRIDE,
                   FLIP_WORD, &readback);
-    if (rc) return rc;
-    if (readback != front->off) return GF4_ESTATE;
+    if (rc) goto done;
+    if (readback != front->off) { rc = GF4_ESTATE; goto done; }
     h->after = counter(c, head);
     h->base_verified = true;
-    return sync ? gf4_flip_complete(c, head, dl) : 0;
+    rc = sync ? gf4_flip_complete(c, head, dl) : 0;
+done:
+    /* Serial output follows completion, including its final vblank wait. */
+    diagnostic(head, sync, &edge, &pre, &post, rc);
+    return rc;
 }

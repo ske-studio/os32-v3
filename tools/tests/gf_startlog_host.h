@@ -43,6 +43,27 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     }
     __builtin_va_end(args);
 }
+/* Lifecycle/scanout oracles compare their own diagnostics. B0 separately
+ * checks detect/parser/rejection lines, which can precede those messages. */
+static inline void startlog_remove_mode_diagnostics(void)
+{
+    unsigned read=0,write=0;
+    while (read<startlog_len) {
+        unsigned end=read;
+        while (end<startlog_len && startlog[end]!='\n') end++;
+        if (end<startlog_len) end++;
+        const char *prefix="[gf4] detect ";
+        unsigned i=0;
+        while (read+i<end && prefix[i] && startlog[read+i]==prefix[i]) i++;
+        int detect=!prefix[i];
+        prefix="[gf4] reject "; i=0;
+        while (read+i<end && prefix[i] && startlog[read+i]==prefix[i]) i++;
+        if (!detect && prefix[i])
+            while (read<end) startlog[write++]=startlog[read++];
+        read=end;
+    }
+    startlog_len=write; startlog[write]=0;
+}
 static void startlog_clear(void) { startlog_len = 0; startlog[0] = 0; }
 static int startlog_equal(const char *s)
 {

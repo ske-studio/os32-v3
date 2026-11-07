@@ -18,9 +18,33 @@ import mutpar
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-MUTATION = ('accept-two-lsb', 'kdebug/gf_accel_test.c',
+MUTATIONS = [('accept-two-lsb', 'kdebug/gf_accel_test.c',
             'if (d > 1U) return false;',
-            'if (d > 2U) return false;')
+            'if (d > 2U) return false;'),
+    ('observe-as-failure', 'kdebug/gf_accel_test.c',
+     'return (observe_yuv ? spec_bad : rejected) ? GF2_EIO : 0;',
+     'return rejected ? GF2_EIO : 0;'),
+    ('observe-ignore-clip-corruption', 'kdebug/gf_accel_test.c',
+     'if (observe_yuv && !scale_in_clip(i)) spec_bad++;',
+     'if (observe_yuv && !scale_in_clip(i)) spec_bad += 0;'),
+    ('observe-unbounded', 'kdebug/gf_accel_test.c',
+     'if (shown >= TEST_SCALE_SAMPLES) continue;',
+     'if (shown >= TEST_SCALE_SAMPLES + 1U) continue;'),
+    ('observe-disconnected', 'kdebug/gf_accel_test.c',
+     'bool observe_yuv = bilinear && !solid &&',
+     'bool observe_yuv = false && bilinear && !solid &&'),
+    ('observe-rgb-disconnected', 'kdebug/gf_accel_test.c',
+     '(trial == 5U && fmt <= GF3_ARGB8888)',
+     '(trial == 6U && fmt <= GF3_ARGB8888)'),
+    ('observe-rgb-stride', 'kdebug/gf_accel_test.c',
+     'x * cpp(scale_compare_fmt);', 'x * 4U;'),
+    ('observe-rgb565-blue', 'kdebug/gf_accel_test.c',
+     '(((g << 2) | (g >> 4)) << 8) | (b << 3) | (b >> 2);',
+     '(((g << 2) | (g >> 4)) << 8) | (b << 3);'),
+    ('observe-yuv-swap', 'kdebug/gf_accel_test.c',
+     'number(" U=", p[yuy2 ? 1U : 0U]);',
+     'number(" U=", p[yuy2 ? 3U : 2U]);'),
+]
 
 
 def command(exe):
@@ -49,12 +73,12 @@ def main():
         subprocess.run(command(exe), cwd=ROOT, check=True)
         execute(exe, True, 'control')
         if args.mutate:
-            name, rel, old, new = MUTATION
-            source = (ROOT/rel).read_text()
-            assert source.count(old) == 1, name
-            mutpar.build_in_tree(ROOT, directory/name,
-                {rel: source.replace(old, new, 1)}, [command(exe)])
-            execute(exe, False, name)
+            for name, rel, old, new in MUTATIONS:
+                source = (ROOT/rel).read_text()
+                assert source.count(old) == 1, name
+                mutpar.build_in_tree(ROOT, directory/name,
+                    {rel: source.replace(old, new, 1)}, [command(exe)])
+                execute(exe, False, name)
             subprocess.run(command(exe), cwd=ROOT, check=True)
             execute(exe, True, 'restored')
     return 0

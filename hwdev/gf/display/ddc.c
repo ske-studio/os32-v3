@@ -180,7 +180,7 @@ static int ddc_get(struct ddc_bus *b,u8 *out,bool last)
     return rc;
 }
 
-int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
+static int ddc_transfer(struct gf4_ctx *ctx,u8 bus,u8 block,u8 *out,u32 count,u32 dl)
 {
     if (!ctx) return GF4_EINVAL;
     if (!out || !ctx->ch || !ctx->ch->f || !ctx->links ||
@@ -213,8 +213,8 @@ int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
     if (!rc) rc=ddc_put(&b,(u8)((block&1U)*DDC_BLOCK_BYTES));
     if (!rc) rc=ddc_start(&b);
     if (!rc) rc=ddc_put(&b,DDC_EDID_READ);
-    for (u32 n=0;!rc && n<DDC_BLOCK_BYTES;++n)
-        rc=ddc_get(&b,&bytes[n],n==DDC_BLOCK_BYTES-1U);
+    for (u32 n=0;!rc && n<count;++n)
+        rc=ddc_get(&b,&bytes[n],n==count-1U);
     if (drive_saved) {
         int cleanup=ddc_stop(&b);
         if (!rc) rc=cleanup;
@@ -227,7 +227,20 @@ int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
         int cleanup=ddc_write_reg(&b,DDC_OWNER,owner);
         if (!rc) rc=cleanup;
     }
-    if (!rc) for (u32 n=0;n<DDC_BLOCK_BYTES;++n) out[n]=bytes[n];
+    if (!rc) for (u32 n=0;n<count;++n) out[n]=bytes[n];
     ctx->last_rc=rc;
     return rc;
+}
+
+/* MIT nouveau include/nvkm/subdev/i2c.h:90-102,152-154:
+ * nvkm_probe_i2c reads one byte from address 0x50, register 0. */
+int gf4_ddc_probe(struct gf4_ctx *ctx,u8 bus,u32 dl)
+{
+    u8 value;
+    return ddc_transfer(ctx,bus,0,&value,1U,dl);
+}
+
+int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
+{
+    return ddc_transfer(ctx,bus,block,out,DDC_BLOCK_BYTES,dl);
 }

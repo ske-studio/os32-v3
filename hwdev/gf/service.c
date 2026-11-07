@@ -355,7 +355,13 @@ i32 gf3_service_recover(struct gf3_service *s, u32 dl)
     if (!p->display.engaged) return 0;
     rc = gf3_service_release(s);
     if (rc) return service_result(s, rc);
-    return service_publish(s, dl);
+    /* Like F4 objects_init, start a fresh budget after F1/F2 recovery.
+     * nouveau nvkm/engine/gr/nv04.c:1220 starts nvkm_msec at the wait. */
+    u32 now;
+    if (!p->chan.f->io.timing.clock_us ||
+        p->chan.f->io.timing.clock_us(p->chan.f->io.opaque, &now))
+        return service_result(s, GF2_EIO);
+    return service_publish(s, now + GF3_TIMEOUT_US);
 }
 
 static int gf_failure(struct gf_display_context *c)
