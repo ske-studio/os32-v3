@@ -243,11 +243,27 @@ void _start(void)
         r->generation++;
         CHECK(!hwdev_module_ops() && ops->call(0, 0, 0, 0, 0, 0) == -1);
         r->generation--;
+        #ifndef HWDEV_REAL_IMAGE
+        CHECK(r->registration_refs == 2);
+#else
         CHECK(r->registration_refs == 1);
+#endif
         CHECK(module_abort(hwdev_handle) == MODULE_ISOLATED && !hwdev_module_ops() && live);
+        CHECK(r->registration_refs == 1); /* probe ref gone before retained boot pin */
     }
     CHECK(c->state == MODULE_RUNNING); /* HWDEV failure never rolls back S0's body. */
     if (input[0] == 2) CHECK(!opens && !logs);
     else CHECK(opens == closes + (input[0] == 1));
     finish(0);
 }
+
+#define contains broker_contains
+#define entries broker_entries
+#include "kernel/module/debug_probe.c"
+#undef entries
+#undef contains
+
+int kstrcmp(const char *a, const char *b)
+{ while (*a && *a==*b) { a++; b++; } return (u8)*a-(u8)*b; }
+char *kstrncpy(char *d, const char *s, u32 n)
+{ u32 i=0; if (!n) return d; while (i+1<n && s[i]) { d[i]=s[i]; i++; } d[i]=0; return d; }

@@ -78,6 +78,12 @@ static int publishing_init(GfxBackend *out,const GeforceModuleContext *ctx)
     CHECK(!geforce_accel_ops()); /* Not registered yet. */
     return init_rc;
 }
+static i32 failing_probe_decls(const struct probe_decl **t, u32 *n)
+{
+    if (input[1]==3) return -1;
+    *t=0; *n=1; /* real broker rejects the invalid RO declaration span */
+    return 0;
+}
 static void start_failures(void)
 {
     struct module_record r={0};
@@ -146,15 +152,19 @@ void _start(void)
     r->text=(u32)(uptr)probe & ~(PAGE_SIZE-1); r->text_size=16*PAGE_SIZE;
     /* A live STARTING record makes a missing hook check reach registration,
      * so either bad hook must fail before taking a registration reference. */
+    r->exports[2]=(u32)(uptr)get_probe_decls;
     r->state=MODULE_STARTING;
     geforce_backend_ops.fill_rect=(void *)(uptr)(r->text+r->text_size);
-    CHECK(geforce_start(r,r->init,0)==MODULE_INIT_FAILED && !accel_slot);
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
     CHECK(!registered && !r->registration_refs);
     geforce_backend_ops.fill_rect=fill;
     geforce_backend_ops.blit=(void *)(uptr)(r->text+r->text_size);
-    CHECK(geforce_start(r,r->init,0)==MODULE_INIT_FAILED && !accel_slot);
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
     CHECK(!registered && !r->registration_refs);
     geforce_backend_ops.blit=blit;
+    r->exports[2]=(u32)(uptr)get_probe_decls;
+    if (input[1]==3 || input[1]==4) r->exports[2]=(u32)(uptr)failing_probe_decls;
+    if (input[1]==5) r->exports[2]=0;
     r->state=MODULE_RELOCATED;
     if (input[1]==1) geforce_backend_ops.prepare=0;
     if (input[1]==2) geforce_backend_ops.fill_rect=(void *)(uptr)(r->text+r->text_size);
@@ -201,3 +211,9 @@ void _start(void)
     CHECK(!diagnostic.running && diagnostic_stops==2 && returned==before);
     finish(0);
 }
+
+#define contains broker_contains
+#define entries broker_entries
+#include "kernel/module/debug_probe.c"
+#undef entries
+#undef contains

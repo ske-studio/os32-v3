@@ -43,8 +43,8 @@ struct probe_list { u32 count; struct probe_info points[PROBE_POINT_MAX]; };
 
 /* register is atomic; STARTING entries stay invisible until RUNNING.
  * One registration reference per point protects borrowed slots. Zero count is
- * a valid empty declaration table. A2 must call unregister before freeing an
- * owner, including startup rollback. No automatic loader connection in A1.
+ * a valid empty declaration table. Loaders call unregister before freeing an
+ * owner, including startup rollback.
  * unregister stops the entire attachment before removing/reusing any ids.
  * Consumers must discard settings for removed registrations before rearming.
  * DETACH takes the callback owner's handle and is idempotent when stopped.

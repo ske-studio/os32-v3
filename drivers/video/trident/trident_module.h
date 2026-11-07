@@ -3,7 +3,7 @@
 #define TRIDENT_MODULE_H
 #include "gfx_hal.h"
 #include "trident.h"
-#define TRIDENT_MODULE_OPS_VERSION 2u
+#define TRIDENT_MODULE_OPS_VERSION 3u
 #define TRIDENT_DIAGNOSTIC_OPS_VERSION 1u
 /* F10 publishes this table and the production device through diagnostic_out.
  * The table is module resident and immutable; context borrows F10's device,
@@ -87,11 +87,13 @@ typedef struct TridentModuleContext {
     const struct TridentDiagnosticOps **diagnostic_out; /* kernel static slot */
 } TridentModuleContext;
 #define TRIDENT_MODULE_CONTEXT_SIZE ((u32)sizeof(TridentModuleContext))
+struct probe_decl;
 struct TridentModuleOps {
     u32 version;
     int (*initialize)(GfxBackend *, const TridentModuleContext *);
     int (*prepare)(void); /* rc boundary behind HAL's void prepare */
     int (*restore)(void *);
+    i32 (*get_probe_decls)(const struct probe_decl **, u32 *);
 };
 #define TRIDENT_MODULE_OPS_SIZE ((u32)sizeof(struct TridentModuleOps))
 /* F13 core getter, also imported by F18b for F17. NULL until validated/pinned

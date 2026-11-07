@@ -1,3 +1,4 @@
+#include "debug_probe.h"
 #include "geforce_module.h"
 #include "geforce_imports.h"
 #include "geforce_tick.h"
@@ -191,7 +192,6 @@ static int geforce_return(void *opaque)
 }
 static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
 {
-    (void)exports;
     int (*init)(GfxBackend *, const GeforceModuleContext *) =
         (int (*)(GfxBackend *, const GeforceModuleContext *))(uptr)entry;
     int rc = init(&candidate, &context);
@@ -224,7 +224,20 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
             rc=MODULE_INIT_FAILED;
             goto failed;
         }
+    if (!exports || !module_text_contains(r, exports[2])) {
+        rc=MODULE_INIT_FAILED;
+        goto failed;
+    }
     if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0)) {
+        rc=MODULE_INIT_FAILED;
+        goto failed;
+    }
+    const struct probe_decl *probe_table = 0;
+    u32 probe_count = 0;
+    probe_get_decls_fn get_decls = (probe_get_decls_fn)(uptr)exports[2];
+    if (get_decls(&probe_table, &probe_count) ||
+        debug_probe_register(geforce_handle, probe_table, probe_count)) {
+        module_ref_release(geforce_handle, MODULE_REF_REGISTRATION);
         rc=MODULE_INIT_FAILED;
         goto failed;
     }
@@ -241,6 +254,7 @@ failed:
 static int geforce_detach(struct module_record *r)
 {
     (void)r;
+    if (geforce_handle.generation && debug_probe_unregister(geforce_handle)) return 0;
     /* Close admission even when the module must retain its resources. */
     accel_slot=0;
     display_slot=0;

@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 268108052,
+  "module_abi_gen": 2282586157,
   "stage": "S6",
-  "count": 321,
+  "count": 322,
   "imports": [
     {
       "stage": "S1",
@@ -4860,6 +4860,22 @@
       "type_ver": 1,
       "signature": "const struct TridentDiagnosticOps *trident_diagnostic_ops(void);",
       "source_declaration": "const struct TridentDiagnosticOps *trident_diagnostic_ops(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "debug_probe_control",
+      "source": "include/debug_probe.h",
+      "context_safe": false,
+      "index": 321,
+      "retained": true,
+      "name": "debug_probe_control",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "i32 debug_probe_control(u32 action, void *arg, u32 size);",
+      "source_declaration": "i32 debug_probe_control(u32 action, void *arg, u32 size);",
       "dtype": null,
       "array": false
     }

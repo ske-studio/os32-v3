@@ -241,12 +241,12 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 1U, \
-        .ops_slots = 1U, \
+        .ops_version = 2U, \
+        .ops_slots = 2U, \
         .image_max = 262144U, \
         .mem_max = 262144U, \
         .reloc_max = 16384U, \
-        .export_max = 1U, \
+        .export_max = 2U, \
         .load_span_max = 327680U, \
     }, \
     { \
@@ -255,12 +255,12 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 5U, \
-        .ops_slots = 1U, \
+        .ops_version = 6U, \
+        .ops_slots = 2U, \
         .image_max = 262144U, \
         .mem_max = 262144U, \
         .reloc_max = 8192U, \
-        .export_max = 1U, \
+        .export_max = 2U, \
         .load_span_max = 327680U, \
     }, \
     { \
@@ -269,12 +269,12 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 2U, \
-        .ops_slots = 3U, \
+        .ops_version = 3U, \
+        .ops_slots = 4U, \
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .export_max = 3U, \
+        .export_max = 4U, \
         .load_span_max = 81920U, \
     }, \
 }

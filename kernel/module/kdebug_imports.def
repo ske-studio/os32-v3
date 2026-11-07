@@ -2613,6 +2613,15 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "debug_probe_control",
+      "source": "include/debug_probe.h",
+      "context_safe": false,
+      "index": 321,
+      "retained": true
     }
   ]
 }

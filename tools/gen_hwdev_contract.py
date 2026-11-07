@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import zlib
 from gen_kdebug_imports import declaration, fnv1a
+from module_schema import COMPONENTS
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
@@ -143,6 +144,9 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
         # The layout probe is not a shared declaration.
         preprocessed = preprocessed.split('const u32 values[]', 1)[0]
         contract = ''.join(f'{e["group"]}:{e["index"]}:{e["symbol"]}:{normalize(e["declaration"])}\n' for e in entries)+normalize(preprocessed)
+    component = next(row for row in COMPONENTS if row['name'] == 'HWDEV')
+    contract += str(component['ops_version']) + repr(component['ops_names'])
+    contract += normalize((ROOT / 'include/debug_probe.h').read_text())
     out.mkdir(parents=True, exist_ok=True)
     crc = zlib.crc32(contract.encode()) & 0xffffffff
     lcrc = zlib.crc32(layout.encode()) & 0xffffffff
@@ -159,7 +163,8 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
                'static const struct module_symbol_contract hwdev_import_contracts[] = {']
     imports += [f'    {{0x{fnv1a(e["symbol"].encode()):08x}U, 1, 1}},' for e in entries]
     imports += ['};', 'static const struct module_symbol_contract hwdev_export_contracts[] = {',
-                f'    {{0x{fnv1a(b"initialize"):08x}U, 1, 0}},', '};',
+                f'    {{0x{fnv1a(b"initialize"):08x}U, 1, 0}},',
+                f'    {{0x{fnv1a(b"get_probe_decls"):08x}U, 1, 0}},', '};',
                 'static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {']
     imports += [f'    slots[{e["index"]}] = (u32)(uptr)'+('core->' if e['group']=='core' else '')+e['symbol']+';' for e in entries]
     imports += ['}']

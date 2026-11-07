@@ -1,3 +1,4 @@
+#include "debug_probe.h"
 /* Resident loans and pin precede prepare/arm; no hardware initialization here. */
 #include "trident_module.h"
 #include "trident_imports.h"
@@ -156,6 +157,12 @@ static int start(struct module_record *r, u32 entry, u32 *exports)
     if (!module_ref_acquire(handle, r->owner, MODULE_REF_REGISTRATION, 0))
         return MODULE_INIT_FAILED;
     pinned = true;
+    const struct probe_decl *probe_table = 0;
+    u32 probe_count = 0;
+    if (!module_text_contains(r, exports[4])) return MODULE_INIT_FAILED;
+    probe_get_decls_fn get_decls = (probe_get_decls_fn)(uptr)exports[4];
+    if (get_decls(&probe_table, &probe_count) ||
+        debug_probe_register(handle, probe_table, probe_count)) return MODULE_INIT_FAILED;
     int (*prepare)(void) = (int (*)(void))(uptr)exports[2];
     rc = prepare(); /* real bind and descriptor checks, no indexed access */
     if (!rc && (!modes_valid(r, true) || !diagnostics_valid(r))) rc = MODULE_INIT_FAILED;
@@ -167,6 +174,7 @@ static int start(struct module_record *r, u32 entry, u32 *exports)
 static int detach(struct module_record *r)
 {
     (void)r;
+    if (debug_probe_unregister(handle)) return 0;
     if (armed) return 0;
     diagnostic_candidate = diagnostic_slot = NULL;
     gfx_backend_trident = (GfxBackend){.name="trident-unavailable", .probe=missing_probe};
