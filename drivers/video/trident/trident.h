@@ -368,6 +368,11 @@ struct trident_device {
     struct tri_accel_state accel;
     struct tri_cursor_state cursor;
     struct tri_video_state video;
+    /* PM 決定 (2026-11-07、F2 の設計の欠け): 今の 256 色の DAC の値 (6 bit、
+     * R,G,B)。持ち主は F8 (palette.c)。DAC へ書く経路 (trident_palette と
+     * lifecycle の既定の palette の load) は全部 tri_palette_record を通して
+     * ここを更新する。F2 は INDEX8 の近似色の選択でここを読むだけ (I/O なし)。 */
+    u8 dac[256][3];
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;
@@ -568,6 +573,9 @@ static inline u8 trident_palette_dac6(u8 component, u32 component_bits)
     return (u8)(x >> (bits - 6));
 }
 int trident_palette(struct trident_device *, int first, int count, const u8 *rgb);
+/* F8: dac6 は DAC の単位 (変換済み)。d->dac[first..first+count) を写すだけ、
+ * I/O なし。範囲外は TRI_E_INVAL。 */
+int tri_palette_record(struct trident_device *, int first, int count, const u8 *dac6);
 /* F9 target: ScreenInit PreInit once, then Save/PC98 Init/Mode/Enable/blank/
  * viewport/surfaces/Accel/Cursor/palette/DPMS registration/video reset.
  * NoAccel/SWCursor retain D:2065-2073 settings, not mandatory defaults.
