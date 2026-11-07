@@ -84,6 +84,7 @@
 - **ゲストの SQL は、製品の SQLite の OMIT の設定 (lib/sqlite3/os32_sqlite_config.h) で通る形だけ使う** — CAST・CTE・window 関数などは prepare で必ず誤りになる。host の普通の SQLite では通るので気づけない。`tools/tests/test_sqlite_product_sql.py` に新しい SQL の置き場を足す。KAPI の `db_column_text` は INTEGER の列を文字にしないので、整数は `db_column_int` か SQL の `''||列` で読む (2026-11-07、hsync の CAST で実機の同期が全部止まり、fep_meta_test は CAST と INTEGER の読み方で 2 回落ちた)。
 - **新しいソースを足す段・その枝を合わせるときは、ソースの一覧の 3 か所を揃える** — `build/sources/order.mk` (リンクの順)・`build/sources/common.mk` か arch/platform の一覧 (選択)・`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。一覧が分かれる前に作った枝は `build/kernel.mk` の行が衝突するので、`kernel.mk` は main 側を取り、新しいソースを 3 か所へ写す (2026-11-07、kdebug の採取点の段 A1 の `debug_probe.c` でリンクの未定義と CI の build の選択の試験を順に落とした)。
 - **共有の形式 (sdk/kapi.json・OS32X ヘッダ・部品の表) を変える段は、push の前にその形を固定で持つ試験を手元で全部回す** — kapi.json のハッシュ (`tools/tests/fixtures/dep_dir_a/l01.json` の kapi_sha256・`l04.json` の api_sha256 など)、ヘッダの大きさ、exec を組む host 試験の土台の stub とヘッダの作り方。`grep -l kapi.json tools/tests/*.py` と exec を組む `*_host.c` を並列で回してから push する (2026-11-08、.text の読み取り専用化で CI を 1 本ずつ 4 回落とした: 常駐像の限界・app_bb_overlap・l01・l04)。
+- **相手が止まって再開する部品 (LAN のサーバ・ホストの agent・媒体) は、host の試験の偽物に「再起動」と「止まっている間に溜まった要求」を持たせる** — 実機で初めて見つかった (2026-11-08、Host Services の ESTALE と SYN の 89 回)。
 - **レビューの指摘を次の依頼に回す前に、PM が「動くアプリは 1 つだけ」で読み直す** — 依頼文に前提を書いても、指摘をそのまま流すと持ち主の区別・並行の再入の守りが入り込む (2026-11-07、GeForce の熱の停止。ユーザー「なんかシングルタスクOSって忘れてませんか？」)。
 
 レビューで 1 つの段に見つかった誤りが、ほかの段にもありうる種類なら、PM は走っている全段の依頼に追記し、統合の前に grep で確かめる (層 2 では B6 の `s32` を B0・B1 に流さず、まとめビルドで再び出た)。
@@ -163,6 +164,8 @@
 | kdebug・build | 束ねた枝でリンクの未定義、次に CI の build の選択の試験が落ちた | ソースの一覧が分かれる前の枝で、新しいソースが order・common・fixture に無かった | §4 のソースの一覧の 3 か所 |
 | kdebug | 段 B の実装者が 2 回止まった (自分の handle を得る口、停止中の解除と再登録の見分け) | 設計が consumer (kdebug) の側の境目を宣言の段に入れていなかった | §3 の「宣言の段に入れる範囲」— 土台の段 A3 を足して再開 |
 | .text の読み取り専用 | 形式の版上げで CI を 4 回落とした | 固定のハッシュ・大きさ・stub を持つ試験を、push の前に洗わなかった | §4 の共有の形式を変える段 |
+| Host Services | 実機で、サーバの再起動の後の最初の `/host` が Stale file handle、ホストの再起動の後に SYN が 89 回 | host の試験の偽物が「サーバの再起動」「止まっている間の溜まり」を作っていなかった。NP21/W に 82557 が無く、LAN の経路は実機で初めて通った | §4 の「止まる・再開する」相手を持つ部品は、偽物に再起動と溜まりを持たせる |
+| Trident | 書きが消える件の仮説 3 つ (幅の設定・GE の待ち・CR39 の無視) を HW-BASIC の 1 本の台本で一度に潰した | — (うまくいった型) | 実機の観測は、仮説ごとの条件を 1 本の台本に並べて 1 回で回す |
 新しく踏んだことは、ここに 1 行で足し、§3・§4 のどこで防ぐかを書く。
 
 ## 6. 評価
