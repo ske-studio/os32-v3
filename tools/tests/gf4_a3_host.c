@@ -724,8 +724,9 @@ static void edid_diagnostics(void)
     edid_fixture[127] = (u8)(0U - sum);
     state.edid = (struct gf4_edid_state){.base_valid=true, .ntiming=7,
         .preferred=4, .last_rc=GF4_EUNSUPPORTED};
+    state.edid_connector=2;
     assert(!gf_display_test(0) && ddcs == 1);
-    assert(gf2_host_strstr(output, "GF4 detect-edid last_rc=-410 base_valid=1 ntiming=7 preferred=4"));
+    assert(gf2_host_strstr(output, "GF4 detect-edid last_rc=-410 base_valid=1 ntiming=7 preferred=4 connector=2\r\n"));
     assert(state.edid.ntiming == 7 && state.edid.preferred == 4);
     assert(gf2_host_strstr(output, "GF4 edid-id vendor=10ac product=4660"));
     assert(gf2_host_strstr(output, "GF4 edid-name name=TEST PANEL\r\n"));

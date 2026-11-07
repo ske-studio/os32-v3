@@ -235,6 +235,7 @@ static void ranges_and_tv(void)
     h.tv_modes.ntiming=1; h.tv_modes.timing[0]=svga;
     assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==B0_DEPTHS);
     assert(h.calls[D_TV_MODES]==1 && !h.calls[D_EDID] && state.modes[0].t.hd==800);
+    assert(state.edid_connector==routes[0].connector);
 }
 static void fairness(void)
 {
@@ -247,6 +248,7 @@ static void fairness(void)
         state.edid.timing[i].khz+=i;
     }
     assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==GF4_MODES && state.edid.truncated);
+    assert(state.edid_connector==31);
     for (u32 i=0;i<32U;i++) {
         const struct gf4_mode *m; u32 n;
         assert(!gf4_modes(&h.ctx,(u8)i,&m,&n));
