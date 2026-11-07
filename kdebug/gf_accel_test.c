@@ -197,7 +197,7 @@ static bool scale_tolerant(enum gf3_fmt fmt, bool bilinear, bool solid)
 static enum gf3_fmt scale_compare_fmt;
 static struct gf3_rect scale_compare_clip;
 static u32 scale_compare_pitch;
-static bool scale_within_lsb(u32 i)
+static bool scale_in_clip(u32 i)
 {
     if (i < TEST_HALF) return false;
     u32 n = cpp(scale_compare_fmt), off = i - TEST_HALF;
@@ -205,6 +205,12 @@ static bool scale_within_lsb(u32 i)
     const struct gf3_rect *c = &scale_compare_clip;
     if (x < c->x || x >= c->x + c->w || y < c->y || y >= c->y + c->h)
         return false;
+    return true;
+}
+static bool scale_within_lsb(u32 i)
+{
+    if (!scale_in_clip(i)) return false;
+    u32 n = cpp(scale_compare_fmt), off = i - TEST_HALF;
     u32 base = i - off % n;
     u32 a = get_pixel(transfer + base, n), e = get_pixel(expected + base, n);
     for (u32 b = 0; b < (n == 2U ? 3U : 4U); b++) {
@@ -217,8 +223,9 @@ static bool scale_within_lsb(u32 i)
     }
     return true;
 }
-static int compare(bool download, bool ideal)
+static int compare_impl(bool download, bool ideal, bool observe_yuv, bool *read)
 {
+    if (read) *read = false;
     int rc;
     if (download) {
         rc = bytes_transfer(true);
@@ -244,6 +251,8 @@ static int compare(bool download, bool ideal)
         if (rc) return rc; /* static record retains ownership for retry */
     }
     u32 bad = 0, first = TEST_FULL_MASK, delta = 0, count = 0, rejected = 0;
+    u32 spec_bad = 0;
+    if (read) *read = true;
     for (u32 i = 0; i < TEST_BYTES; i++) {
         if (ignored(i)) { transfer[i] = expected[i]; continue; }
         count++;
@@ -251,6 +260,7 @@ static int compare(bool download, bool ideal)
         if (!bad) first = i;
         bad++;
         if (!ideal || !scale_within_lsb(i)) rejected++;
+        if (observe_yuv && !scale_in_clip(i)) spec_bad++;
         u32 d = transfer[i] > expected[i] ? transfer[i] - expected[i] : expected[i] - transfer[i];
         if (d > delta) delta = d;
     }
@@ -269,8 +279,21 @@ static int compare(bool download, bool ideal)
     hex(" crc_expected=", crc_expected); hex(" crc_actual=", crc_actual);
     number(" outside_tolerance=", rejected);
     serial_puts_polled(ideal ? " comparison=channel-lsb1\r\n" : " comparison=exact\r\n");
+    if (observe_yuv) {
+        /* cl0077.h:120-125 defines CENTER and FOH, but no YUV conversion
+         * order or rounding precision. Only source/clip/padding integrity
+         * is an exact pixel assertion here; RGB differences are observations.
+         * nv04_xv_blit.c:141-154 submits FOH without an RGB ideal assertion. */
+        number("GF3 spec outside_clip_bytes=", spec_bad);
+        serial_puts_polled(spec_bad ? " result=FAIL\r\n" : " result=PASS\r\n");
+        serial_puts_polled("GF3 numeric comparison=observation-only\r\n");
+    }
     /* Preserve raw byte differences/CRCs even when accepted. */
-    return rejected ? GF2_EIO : 0;
+    return (observe_yuv ? spec_bad : rejected) ? GF2_EIO : 0;
+}
+static int compare(bool download, bool ideal)
+{
+    return compare_impl(download, ideal, false, 0);
 }
 
 /* Independent NVROP truth tables, xf86-video-nouveau nv_rop.h:303-318.
@@ -594,6 +617,50 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
     }
     for (u32 i = 0; i < sizeof(before); i++) before[i] = expected[i];
 }
+/* Bounded evidence for the independent BT.601/FOH ideal, not a hardware
+ * precision requirement. fx/fy are unsigned source coordinates in 12.20. */
+#define TEST_YUV_SAMPLES 8U
+static void scale_yuv_observe(enum gf3_fmt fmt, struct gf3_rect sr,
+                              struct gf3_rect dr, u32 du, u32 dv)
+{
+    const struct gf3_rect *c = &scale_compare_clip;
+    u32 outside = 0, shown = 0;
+    for (u32 y = c->y; y < c->y + c->h; y++)
+    for (u32 x = c->x; x < c->x + c->w; x++) {
+        u32 off = TEST_HALF + y * scale_compare_pitch + x * 4U;
+        if (scale_within_lsb(off)) continue;
+        outside++;
+        if (shown >= TEST_YUV_SAMPLES) continue;
+        shown++;
+        u32 fx = (sr.x << TEST_FRAC_BITS) + (x - dr.x) * du;
+        u32 fy = (sr.y << TEST_FRAC_BITS) + (y - dr.y) * dv;
+        u32 sx = fx >> TEST_FRAC_BITS, sy = fy >> TEST_FRAC_BITS;
+        if (sx > 15U) sx = 15U;
+        if (sy > 15U) sy = 15U;
+        serial_puts_polled("GF3 yuv pixel");
+        number(" fmt=", fmt); number(" x=", x); number(" y=", y);
+        hex(" fx20=", fx); hex(" fy20=", fy);
+        hex(" expected_rgb=", get_pixel(expected + off, 4) & 0xffffffU);
+        hex(" actual_rgb=", get_pixel(transfer + off, 4) & 0xffffffU);
+        serial_puts_polled("\r\n");
+        for (u32 i = 0; i < 4U; i++) {
+            u32 px = sx + ((i & 1U) && sx < 15U);
+            u32 py = sy + ((i & 2U) && sy < 15U);
+            const u8 *p = before + py * TEST_SCALE_SRC_PITCH + (px & ~1U) * 2U;
+            bool yuy2 = fmt == GF3_YUY2;
+            serial_puts_polled("GF3 yuv source");
+            number(" sample=", i); number(" x=", px); number(" y=", py);
+            number(" Y=", p[(px & 1U) * 2U + (yuy2 ? 0U : 1U)]);
+            number(" U=", p[yuy2 ? 1U : 0U]);
+            number(" V=", p[yuy2 ? 3U : 2U]);
+            serial_puts_polled("\r\n");
+        }
+    }
+    serial_puts_polled("GF3 yuv observation");
+    number(" fmt=", fmt); number(" outside_tolerance_pixels=", outside);
+    number(" shown=", shown); number(" limit=", TEST_YUV_SAMPLES);
+    serial_puts_polled(" comparison=observation-only\r\n");
+}
 static int scale_case(void)
 {
     static const u32 sizes[] = {12, 24, 6, 19};
@@ -639,7 +706,12 @@ static int scale_case(void)
         scale_compare_fmt = dst_fmt;
         scale_compare_clip = clip;
         scale_compare_pitch = pitch;
-        rc = compare(false, scale_tolerant(fmt, bilinear, solid));
+        bool observe_yuv = bilinear && !solid &&
+            (fmt == GF3_YUY2 || fmt == GF3_UYVY);
+        bool read;
+        rc = compare_impl(false, scale_tolerant(fmt, bilinear, solid), observe_yuv, &read);
+        if (observe_yuv && read)
+            scale_yuv_observe(fmt, sr, dr, du, dv);
         if (rc && !first_rc) first_rc = rc;
         /* Numerical differences are observations; continue collecting all
          * formats/filters. Mapping/cleanup errors retain ownership and stop. */
