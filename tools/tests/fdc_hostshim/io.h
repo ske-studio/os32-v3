@@ -24,5 +24,6 @@ unsigned int irq_save(void);
 void irq_restore(unsigned int saved);
 
 static inline void io_wait(void) { }
+static inline void _stop(void) { __builtin_trap(); }
 
 #endif /* IO_H */

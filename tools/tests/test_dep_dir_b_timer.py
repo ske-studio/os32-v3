@@ -24,7 +24,8 @@ FIXTURE = ROOT / 'tools/tests/dep_dir_b_l13_baseline.json'
 SOURCES = ('kernel/time/sysclk.c', 'kernel/time/pit.c', 'kernel/time/ktime.c',
            'kernel/time/pit_math.c', 'kernel/time/time_math.c',
            'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
-HEADERS = ('include/platform_timer.h', 'include/platform_irq.h', 'arch/x86/kernel/idt.h',
+HEADERS = ('include/platform_timer.h', 'include/platform_irq.h',
+           'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h',
            'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'kernel/time/pit_math.h', 'kernel/time/time_math.h',
            'kernel/time/ktime.h',
            'kernel/time/sysclk.h', 'kernel/v86/v86_bios.h')

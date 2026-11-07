@@ -56,6 +56,7 @@ def build_cmd(temp, dispatch=None, expire=0):
             '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
             '-I'+str(temp), '-I'+str(ROOT / 'tools/tests/recover_hostshim'),
             '-I'+str(ROOT / 'include'),
+            '-I'+str(ROOT / 'platform/pc98'),
             str(ROOT / 'tools/tests/recover_virtual_host.c'), '-o', str(temp / ('virtual'+str(expire)))]
 
 

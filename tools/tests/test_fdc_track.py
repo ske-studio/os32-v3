@@ -501,7 +501,9 @@ def host_build(tmp, mutated=None):
     tmpd = pathlib.Path(tmp)
     exe = tmpd / "fdc-track-host"
     source = (ROOT / "platform/pc98/pic.c").read_text()
-    pic = []
+    # PIC command constants live in the platform implementation's idt.h.
+    pic = ['#include "idt.h"', '#include "irq_policy.c"',
+           '#include "irq_complete.c"']
     for name in ('pic_eoi', 'platform_irq_slave_last_in_service',
                  'platform_irq_eoi_master'):
         body = re.search(r'^(?:void|int) ' + name + r'\([^\n]*\)\n\{.*?^\}',
