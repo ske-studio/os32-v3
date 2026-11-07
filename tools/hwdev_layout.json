@@ -239,6 +239,8 @@
       "gui_register",
       "hdd_geom_info",
       "host_close",
+      "host_notice_read",
+      "host_notice_serial",
       "host_open",
       "host_read",
       "host_status",
@@ -709,6 +711,16 @@
       "pitch",
       "reservation_id",
       "width"
+    ],
+    "struct HostNotice": [
+      "data",
+      "dropped",
+      "host_generation",
+      "kind",
+      "length",
+      "reserved",
+      "serial",
+      "service"
     ],
     "struct addrspace": [
       "app_pde",

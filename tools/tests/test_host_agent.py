@@ -986,6 +986,29 @@ def n2_b5_clip_file_roundtrip():
         assert read_body(o, 2) == b"hello\n", "GET が CRLF→LF にしていない"
 
 
+def a11_named_body_roundtrip():
+    """Named CLIP/PRINT reach the same WDATA handlers as the legacy lines."""
+    with tempfile.TemporaryDirectory() as d:
+        clip = os.path.join(d, "clip.txt")
+        a, o = up(clip="file:" + clip, state_dir=d)
+        assert a.registry.resolve("os32.clip") > 0
+        assert a.registry.resolve("os32.print") > 0
+        o.send(HA.OP_REQUEST, rid=1, seq=0, payload=b"os32.clip PUT 6")
+        out = o.send(HA.OP_WDATA, rid=1, seq=1, payload=b"hello\n")
+        assert resp(only(out, HA.OP_RESPONSE)) == (False, 200, 0)
+        o.send(HA.OP_RELEASE, rid=1)
+        out = o.send(HA.OP_REQUEST, rid=2, seq=0, payload=b"os32.clip GET")
+        assert resp(only(out, HA.OP_RESPONSE)) == (False, 200, 6)
+        assert read_body(o, 2) == b"hello\n"
+        o.send(HA.OP_RELEASE, rid=2)
+        assert open_job(o, 3) == b"job 1"
+        o.send(HA.OP_REQUEST, rid=4, seq=0, payload=b"os32.print DATA 1 6")
+        out = o.send(HA.OP_WDATA, rid=4, seq=1, payload=b"print\n")
+        assert resp(only(out, HA.OP_RESPONSE)) == (False, 200, 0)
+        with open(a.jobs[1]["spool"], "rb") as f:
+            assert f.read() == b"print\n"
+
+
 def n2_clip_get_trim_utf8_boundary():
     """B5 / 切り詰め: CLIP GET は 64KB を UTF-8 境界で切って返す。"""
     with tempfile.TemporaryDirectory() as d:
@@ -1696,6 +1719,7 @@ def h5_mutations():
 
 
 CASES = [
+    a11_named_body_roundtrip,
     h5_hello_list_and_notify,
     h5_named_services_and_linux_clip,
     h5_linux_print_lifecycle,

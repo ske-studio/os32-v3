@@ -8,7 +8,7 @@
 |---|---|---|---|
 | KernelAPI を足す | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) (手順の正典)・[依頼の型](../.claude/skills/os32-delegate/SKILL.md) | `sdk/kapi.json` → 再生成 → 実体 | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | カーネルを直す | 該当部の仕様 [01](01_system.md)〜[10](10_notes.md)、[CONSTRAINTS.md](CONSTRAINTS.md) | `init/` `kernel/` `mm/` `arch/x86/kernel/` `drivers/` `fs/` `gfx/` (下の地図) | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
-| ドライバを足す / 変える | [05_drivers.md](05_drivers.md)、ハード資料 `docs/hw/` (UNDOCUMENTED 優先) | `drivers/`、定数は [C4] の三層 | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
+| ドライバを足す / 変える | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) (PCI 装置の扱い)、[05_drivers.md](05_drivers.md)、ハード資料 `docs/hw/` (UNDOCUMENTED 優先) | `drivers/`、定数は [C4] の三層 | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | 外部プログラムを書く | [09_exec.md](09_exec.md)、[KAPI_SPEC.md](KAPI_SPEC.md)、`sdk/example/` | `userland/` (本体) / `apps/` `game/` (submodule) | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | ユーザ空間ライブラリを触る | 各設計書 `tasks/lib*/`、[07_shell.md](07_shell.md) | `userland/lib/<name>/` | 対応する `userland/tests/<name>_test` |
 | シェルを触る | [07_shell.md](07_shell.md) | `userland/shell/` | rshell から `/api/cmd`。パイプ・リダイレクトは `ext_cmd1 \| ext_cmd2` も |

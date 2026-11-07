@@ -796,6 +796,9 @@ def case_install(plan, resolved):
         check(False, "FD の構成と成果物が揃っている (先に make all)")
         return
     fd_files = [(g, os.path.getsize(os.path.join(ROOT, h))) for g, h in files]
+    # fd_netcd_config.py writes live settings before boot; test that FD too.
+    fd_files = [(g, n) for g, n in fd_files if g.lower() != '/etc/netcd.cfg']
+    fd_files.append(('/ETC/NETCD.CFG', 67))
     exclude = {e['guest'] for e in fd.get('exclude') or []}
     check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod', '/boot/geforce.mod',
                       '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod'},
@@ -816,6 +819,12 @@ def case_install(plan, resolved):
     check(not miss and not extra and not size,
           f"HDD の集合 = MINIMAL - fd.exclude ({len(got)} 件、欠け {len(miss)}、余分 {len(extra)}、"
           f"大きさ違い {len(size)})")
+    if '--mutate' in sys.argv:
+        mark = '    "/etc/netcd.cfg"'
+        check(src.count(mark) == 1, "netcd.cfg 変異の目印がちょうど 1 か所")
+        bad = run_install_fdset(src.replace(mark, '    "/etc/unused.cfg"'), fd_files)
+        check(bad is not None and '/etc/netcd.cfg' in bad,
+              "RED: netcd.cfg の除外を外すと設定が HDD に漏れる")
     # 否定側: 逆変換を当てない (8.3 名のまま写す) と不一致
     mark = '        if (!str_eq_lower(src_path, fd_renames[i].fd)) continue;'
     check(src.count(mark) == 1, "変異の目印がちょうど 1 か所")
@@ -861,7 +870,8 @@ def run(ctx) -> int:
     import subprocess
     base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     env = dict(base_env)
-    argv = ['python3', '-B', 'tools/tests/test_packages.py']
+    argv = ['python3', '-B', 'tools/tests/test_packages.py',
+            *(['--mutate'] if ctx.mutate else [])]
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc

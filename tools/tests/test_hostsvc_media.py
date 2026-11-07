@@ -45,6 +45,9 @@ MUTATIONS = (
 
 # Old generation/retry anchors in test_cd_read.py move to the Device boundary.
 OP_MUTATIONS = (
+    ('atapi-list-io', 'iso9660.c',
+     'if (error == OS32_ERR_STALE && iso_legacy_atapi(ctx)) return VFS_ERR_IO;',
+     'if (error == OS32_ERR_STALE && iso_legacy_atapi(ctx)) return OS32_ERR_STALE;'),
     ('atapi-retry', 'iso9660.c',
      'if (before != ctx->media_gen && iso_legacy_atapi(ctx)) continue;',
      'if (before != ctx->media_gen && iso_legacy_atapi(ctx)) return OS32_ERR_STALE;'),

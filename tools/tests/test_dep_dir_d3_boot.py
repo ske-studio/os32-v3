@@ -21,13 +21,20 @@ def kernel_order(kernel=None, overrides=None):
                     kernel, re.M | re.S)
     assert lan, 'shared LAN boot helper'
     lan_markers = ['boot_platform_run(BOOT_PCI_RESOURCES, boot);',
-                   'lan_module_load();', 'lan_module_pci_bind_fallback();']
+                   'lan_module_load();', 'lan_module_pci_bind_fallback();',
+                   'kernel_boot_hostsvc(boot);']
     positions = [lan[1].index(m) for m in lan_markers]
     assert positions == sorted(positions), 'LAN helper order'
     for m in lan_markers:
         assert kernel.count(m) == 1, m
     assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', lan[1])
     kernel = kernel[:lan.start()] + kernel[lan.end():]
+    hostsvc = re.search(r'^static void kernel_boot_hostsvc\(struct boot_context \*boot\)\n\{\n(.*?)^}\n', kernel, re.M | re.S)
+    assert hostsvc, 'configured host services boot helper'
+    assert hostsvc[1].index('boot_platform_run(BOOT_NIC_LEGACY, boot);') < hostsvc[1].index('net_start(') < hostsvc[1].index('sfs_persistent_start(')
+    assert 'boot_legacy_started = 1;' in hostsvc[1]
+    kernel = kernel[:hostsvc.start()] + kernel[hostsvc.end():]
+    assert re.search(r'if \(!boot_legacy_started\)\s*\{\s*boot_platform_run\(BOOT_NIC_LEGACY, &boot\);', kernel)
     early = re.search(r'    if \(netcd_boot\) \{\n(.*?)^    }\n', kernel, re.M | re.S)
     assert early, 'NETCD boot branch'
     assert early[1].index('kernel_boot_lan(&boot);') < early[1].index('lan_module_netcd_register(netcd_alias)')

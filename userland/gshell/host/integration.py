@@ -72,6 +72,20 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('HOST_NOTICE unchanged serial delivered', 'src/wm.rs',
+     '    if serial == st.host_notice_seen {', '    if false {',
+     'host_notice_cycles_'),
+    ('HOST_NOTICE wrap ignored', 'src/wm.rs',
+     '    if serial == st.host_notice_seen {', '    if serial <= st.host_notice_seen {',
+     'host_notice_cycles_'),
+    ('HOST_NOTICE full marked sent', 'src/wm.rs',
+     '        if ring::append(st, slot, &ev) {\n            st.host_notice_seen = serial;',
+     '        if { ring::append(st, slot, &ev); true } {\n            st.host_notice_seen = serial;',
+     'host_notice_full_'),
+    ('HOST_NOTICE cycle disconnected', 'src/wm.rs',
+     '        deliver_host_notice(st);', '        if false { deliver_host_notice(st); }',
+     'host_notice_cycles_'),
+
     ('IMETAB Pass leaves kernel commit', 'src/fep.rs',
      '    if v >= 0x100 || v == 0x1B {\n        collect_kernel_commit();',
      '    if v >= 0x100 || v == 0x1B {', 'imetab_'),

@@ -288,7 +288,8 @@ static const FdRename fd_renames[] = {
  * (/usr/bin が無い)、/LOADER.BIN は FAT の IPL が読む 2 段目 */
 static const char *const fd_only[] = {
     "/loader.bin",
-    "/etc/profile"
+    "/etc/profile",
+    "/etc/netcd.cfg"
 };
 
 #define FD_DIM(a) ((int)(sizeof(a) / sizeof((a)[0])))
