@@ -54,6 +54,7 @@ import argparse
 from source_roots import SCAN_ROOTS
 import json
 import os
+from pathlib import Path
 import re
 import shlex
 import shutil
@@ -219,54 +220,22 @@ def make_config_vars(config_root=PROJ_DIR):
         env.pop(name, None)
     query = "include build/config.mk\n.PHONY: __arm_config\n__arm_config:\n\t@"
     query += "".join("$(info %s=$(%s))" % (name, name) for name in names) + ":\n"
-    result = subprocess.run(
-        ["make", "--no-print-directory", "-rRsf", "-", "__arm_config"],
-        input=query, cwd=config_root, env=env, text=True,
-        capture_output=True, check=True)
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='arm-config-') as temporary:
+        query_out = Path(temporary) / 'out'
+        result = subprocess.run(
+            ["make", "--no-print-directory", "-rRsf", "-", "ARCH=x86", "PLATFORM=pc98", "BUILD_OUT=" + str(query_out), "__arm_config"],
+            input=query, cwd=config_root, env=env, text=True,
+            capture_output=True, check=True)
     return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
 
-def parse_kernel_vars(text):
-    """build/kernel.mk の変数。ARCH の分岐で 2 回代入されるものは
-    **空でない方**を採る。
-
-    順序 4-b で `KSTRING_C_SRC` が入った — ARCH が x86 なら空 (kstring は
-    lib/kstring_asm.asm のアセンブリ)、それ以外なら lib/kstring_c.c。この
-    計測器が測るのは **ARM のビルド**なので、x86 側の空の代入ではなく
-    非 x86 側を採るのが正しい。ifeq を本気で評価するのは大げさなので、
-    「同じ名前に空と非空があったら非空」という単純な規則で足りる。
-    """
-    text = re.sub(r"\\\n", " ", text)
-    out = {}
-    for line in text.split("\n"):
-        line = line.split("#", 1)[0]
-        m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::|\?)?=\s*(.*)$", line)
-        if not m:
-            continue
-        name, value = m.group(1), m.group(2).strip()
-        if name not in out or (value and not out[name]):
-            out[name] = value
-    return out
-
-
-def parse_c_kernel(text):
-    """build/kernel.mk の C_KERNEL (カーネルにリンクされる C ソースの正典)。
-
-    `$(VAR)` の形で入っているものは build/kernel.mk 自身の代入から解決する
-    (順序 4-b の `$(KSTRING_C_SRC)`)。"""
-    varmap = parse_kernel_vars(text)
-    joined = re.sub(r"\\\n", " ", text)
-    m = re.search(r"^\s*C_KERNEL\s*:?=\s*(.*)$", joined, re.M)
-    if not m:
-        return []
-    files = []
-    for tok in m.group(1).split():
-        ref = re.match(r"^\$\(([A-Za-z_][A-Za-z0-9_]*)\)$", tok)
-        if ref:
-            files.extend(varmap.get(ref.group(1), "").split())
-        else:
-            files.append(tok)
-    return sorted(set(files))
+def parse_c_kernel(config_root=None):
+    """Legacy x86 measurement explicitly includes the C kstring alternative."""
+    from build_profile import query
+    return query(config_root or PROJ_DIR,
+                 ['ARCH=x86', 'PLATFORM=pc98', 'KSTRING_C_SRC=lib/kstring_c.c'],
+                 config_only=True)['C_KERNEL']
 
 
 def scan_glob():
@@ -436,7 +405,7 @@ def main():
         return 0
 
     varmap = make_config_vars()
-    files = parse_c_kernel(read(KERNEL_MK))
+    files = parse_c_kernel()
     if not files:
         print("Error: build/kernel.mk から C_KERNEL を読めません", file=sys.stderr)
         return 1

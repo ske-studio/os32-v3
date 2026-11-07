@@ -15,6 +15,10 @@ import subprocess
 import tempfile
 import host32
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/display.c'
@@ -100,9 +104,8 @@ def main():
         once(source,old,new)
     for rel in FILES:
         assert rel in CHECK['covers'], rel
-    make=subprocess.run(['make','-qp'],cwd=ROOT,capture_output=True,text=True)
-    assert make.returncode in (0,1), make.stderr
-    resident(make.stdout)
+    selected = 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL'])
+    resident(selected)
     generic=(ROOT/'kernel/v86/v86.c').read_text()
     for name in ('display_out','display_text_start','display_restore_98','display_recover_ready',
                  'display_recover_cell_read','display_recover_cell_write'):
@@ -119,7 +122,7 @@ def main():
         print('PASS unique mutation anchors and isolated -Werror mutation builds')
     if args.mutate:
         try:
-            resident(make.stdout.replace(BACKEND+' ',''))
+            resident(selected.replace(BACKEND+' ',''))
         except AssertionError:
             pass
         else:

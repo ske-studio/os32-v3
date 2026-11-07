@@ -20,7 +20,7 @@ $(CD_OUT)/cd_import_slots.o $(CD_OUT)/cd_provider_types.o $(CD_OUT)/cd_kexports.
 $(CD_OUT)/cd_import_stubs.o: $(CD_OUT)/cd_import_stubs.S build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(CD_OUT)/cd.elf: $(CD_OBJS) build/cd-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/cd-module.ld -Map=$(CD_OUT)/cd.map $(CD_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/cd-module.ld -Map=$(CD_OUT)/cd.map $(CD_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(CD_OUT)/cd_kexports.o
@@ -30,10 +30,10 @@ $(KERNEL_OBJ_PREFIX)drivers/ata/cd_module.o $(R1_OBJ)/drivers/ata/cd_module.o: $
 $(KERNEL_OBJ_PREFIX)drivers/ata/cd_module.o $(R1_OBJ)/drivers/ata/cd_module.o: private CFLAGS_BASE += -I$(CD_OUT)
 
 define pack_cd
-	python3 tools/mkmod.py --module-id 4 --elf $(CD_OUT)/cd.elf --metadata $(CD_OUT)/cd_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 4 --elf $(CD_OUT)/cd.elf --metadata $(CD_OUT)/cd_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/cd.mod: $(CD_OUT)/cd.elf $(CD_OUT)/cd_imports.json $(CD_OUT)/cd_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/cd-module.mk
+$(BUILD_OUT)/cd.mod: $(CD_OUT)/cd.elf $(CD_OUT)/cd_imports.json $(CD_OUT)/cd_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/cd-module.mk
 	$(call pack_cd,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/cd.mod: $(CD_OUT)/cd.elf $(CD_OUT)/cd_imports.json $(CD_OUT)/cd_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/cd-module.mk
+$(R1_OUT)/cd.mod: $(CD_OUT)/cd.elf $(CD_OUT)/cd_imports.json $(CD_OUT)/cd_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/cd-module.mk
 	$(call pack_cd,$(R1_OUT)/vmkernel.lz4)
 -include $(CD_OBJS:.o=.d) $(CD_OUT)/cd_kexports.d $(CD_OUT)/cd_provider_types.d

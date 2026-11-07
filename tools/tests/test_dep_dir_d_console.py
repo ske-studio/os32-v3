@@ -15,6 +15,10 @@ import subprocess
 import tempfile
 import host32
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/console_attr.c'
@@ -29,10 +33,7 @@ OLD, NEW = 'attr | TATTR_VISIBLE', 'attr | 0'
 
 
 def kernel_list():
-    # The broad selector owns build-rule changes, without a build/*.mk input.
-    result = subprocess.run(['make', '-qp'], cwd=ROOT, capture_output=True, text=True)
-    assert result.returncode in (0, 1), result.stderr
-    return result.stdout
+    return 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL']) + '\n'
 
 
 def once(text, old, new):

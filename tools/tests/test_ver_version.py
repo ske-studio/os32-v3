@@ -79,13 +79,13 @@ def main():
             print('RED: product version=9.9-test')
         else:
             raise AssertionError('version mutant survived')
-        makefile = (ROOT/'Makefile').read_text()
+        makefile = (ROOT/'build/targets/x86-pc98.mk').read_text()
         anchor = '-include $(DEPFILES)'
         assert makefile.count(anchor) == 1
         consumer = (ROOT/CONSUMER).read_text()
         assert consumer.count(VERSION_USE) == 1
         for label, edits, expected in (
-            ('dependency loading removed', {'Makefile': makefile.replace(anchor, '# dependency loading removed')},
+            ('dependency loading removed', {'build/targets/x86-pc98.mk': makefile.replace(anchor, '# dependency loading removed')},
              'missing config-only rebuild'),
             ('consumer hardcodes version', {CONSUMER: consumer.replace(VERSION_USE, '"PC-9821 OS32 v" "3.0-dev"', 1)},
              'consumer ignored changed SYS_VERSION'),

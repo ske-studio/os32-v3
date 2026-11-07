@@ -104,7 +104,7 @@ def rewrite(text, filename, moves, root=None):
     table = reference_replacements(text, filename, moves)
     if table:
         text = path_pattern(table).sub(lambda m: table[m[0]], text)
-    if filename == 'build/config.mk':
+    if filename == 'build/config.mk' or filename.startswith(('build/sources/', 'build/features/', 'build/platform/', 'build/arch/')):
         added = {}
         for old, new in moves.items():
             old_dir, new_dir = str(Path(old).parent), str(Path(new).parent)

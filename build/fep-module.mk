@@ -14,7 +14,7 @@ $(FEP_OUT)/fep_import_slots.o $(FEP_OUT)/fep_provider_types.o $(FEP_OUT)/fep_kex
 $(FEP_OUT)/fep_import_stubs.o: $(FEP_OUT)/fep_import_stubs.S build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(FEP_OUT)/fep.elf: $(FEP_OBJS) build/fep-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/fep-module.ld -Map=$(FEP_OUT)/fep.map $(FEP_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/fep-module.ld -Map=$(FEP_OUT)/fep.map $(FEP_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(FEP_OUT)/fep_kexports.o
@@ -24,10 +24,10 @@ $(KERNEL_OBJ_PREFIX)kernel/ime/fep_module.o $(R1_OBJ)/kernel/ime/fep_module.o: $
 $(KERNEL_OBJ_PREFIX)kernel/ime/fep_module.o $(R1_OBJ)/kernel/ime/fep_module.o: private CFLAGS_BASE += -I$(FEP_OUT)
 
 define pack_fep
-	python3 tools/mkmod.py --module-id 3 --elf $(FEP_OUT)/fep.elf --metadata $(FEP_OUT)/fep_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 3 --elf $(FEP_OUT)/fep.elf --metadata $(FEP_OUT)/fep_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/fep.mod: $(FEP_OUT)/fep.elf $(FEP_OUT)/fep_imports.json $(FEP_OUT)/fep_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/fep-module.mk
+$(BUILD_OUT)/fep.mod: $(FEP_OUT)/fep.elf $(FEP_OUT)/fep_imports.json $(FEP_OUT)/fep_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fep-module.mk
 	$(call pack_fep,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/fep.mod: $(FEP_OUT)/fep.elf $(FEP_OUT)/fep_imports.json $(FEP_OUT)/fep_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/fep-module.mk
+$(R1_OUT)/fep.mod: $(FEP_OUT)/fep.elf $(FEP_OUT)/fep_imports.json $(FEP_OUT)/fep_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fep-module.mk
 	$(call pack_fep,$(R1_OUT)/vmkernel.lz4)
 -include $(FEP_OBJS:.o=.d) $(FEP_OUT)/fep_kexports.d $(FEP_OUT)/fep_provider_types.d

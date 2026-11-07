@@ -18,6 +18,10 @@ import subprocess
 import tempfile
 import host32
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 SOURCES = ('init/boot_display.c', 'arch/x86/kernel/isr_handlers.c',
@@ -45,11 +49,7 @@ def function(text, name):
 
 
 def kernel_list():
-    # Query make without building, as check-build-no-deploy does. The broad
-    # selector owns build-rule changes; no build/*.mk in this check's shard.
-    result = subprocess.run(['make', '-qp'], cwd=ROOT, capture_output=True, text=True)
-    assert result.returncode in (0, 1), result.stderr
-    return result.stdout
+    return 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL']) + '\n'
 
 
 def once(text, old, new):

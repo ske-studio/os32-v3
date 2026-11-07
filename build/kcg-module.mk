@@ -14,7 +14,7 @@ $(KCG_OUT)/kcg_import_slots.o $(KCG_OUT)/kcg_provider_types.o $(KCG_OUT)/kcg_kex
 $(KCG_OUT)/kcg_import_stubs.o: $(KCG_OUT)/kcg_import_stubs.S build/config.mk build/kcg-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(KCG_OUT)/kcg.elf: $(KCG_OBJS) build/kcg-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/kcg-module.ld -Map=$(KCG_OUT)/kcg.map $(KCG_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/kcg-module.ld -Map=$(KCG_OUT)/kcg.map $(KCG_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(KCG_OUT)/kcg_kexports.o
@@ -24,10 +24,10 @@ $(KERNEL_OBJ_PREFIX)drivers/video/kcg/kcg_module.o $(R1_OBJ)/drivers/video/kcg/k
 $(KERNEL_OBJ_PREFIX)drivers/video/kcg/kcg_module.o $(R1_OBJ)/drivers/video/kcg/kcg_module.o: private CFLAGS_BASE += -I$(KCG_OUT)
 
 define pack_kcg
-	python3 tools/mkmod.py --module-id 5 --elf $(KCG_OUT)/kcg.elf --metadata $(KCG_OUT)/kcg_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 5 --elf $(KCG_OUT)/kcg.elf --metadata $(KCG_OUT)/kcg_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/kcg.mod: $(KCG_OUT)/kcg.elf $(KCG_OUT)/kcg_imports.json $(KCG_OUT)/kcg_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/kcg-module.mk
+$(BUILD_OUT)/kcg.mod: $(KCG_OUT)/kcg.elf $(KCG_OUT)/kcg_imports.json $(KCG_OUT)/kcg_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/kcg-module.mk
 	$(call pack_kcg,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/kcg.mod: $(KCG_OUT)/kcg.elf $(KCG_OUT)/kcg_imports.json $(KCG_OUT)/kcg_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/kcg-module.mk
+$(R1_OUT)/kcg.mod: $(KCG_OUT)/kcg.elf $(KCG_OUT)/kcg_imports.json $(KCG_OUT)/kcg_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/kcg-module.mk
 	$(call pack_kcg,$(R1_OUT)/vmkernel.lz4)
 -include $(KCG_OBJS:.o=.d) $(KCG_OUT)/kcg_kexports.d $(KCG_OUT)/kcg_provider_types.d

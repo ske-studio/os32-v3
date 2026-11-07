@@ -362,6 +362,16 @@ class RunnerTest(unittest.TestCase):
                 self.assertNotEqual(R.build_content(head + ' F\n-D="#one"\nendef\n', 'build/config.mk'),
                                     R.build_content(head + ' F\n-D="#two"\nendef\n', 'build/config.mk'))
 
+    def test_target_selection_makefiles_always_route_full_configuration(self):
+        self.check('stable', covers=['unrelated.c'], tier=1)
+        for path in ('build/arch/ppc.mk', 'build/sources/order.mk'):
+            with self.subTest(path=path):
+                self.write(path, 'C_ORDER_LEGACY = first.c\n')
+                self.commit()
+                base = self.git('rev-parse', 'HEAD')
+                self.write(path, 'C_ORDER_LEGACY = first.c second.c\n')
+                self.assertEqual(R.plan(self.root, self.registry(), (path,), base=base).tier, 4)
+
     def test_build_source_lists_route_sources_and_artifacts(self):
         cases = (
             ('build/kernel.mk', 'drivers/video/pc98/splash_raster_plan.c',

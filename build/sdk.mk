@@ -44,6 +44,7 @@ sdk: $(ALL_LIB_ARCHIVES) $(CRT0_USER_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	cp $(LIBDIR)/libos32nano.json $(SDK_OUT)/lib/
 	cp sdk/allocator/nano.LICENSE $(SDK_OUT)/lib/
 	cp sdk/os32_generations.py          $(SDK_OUT)/bin/
+	cp sdk/target_profile.py             $(SDK_OUT)/bin/
 	cp sdk/os32x_hdr.py                  $(SDK_OUT)/bin/
 	cp sdk/rust/i686-os32-none.json      $(SDK_OUT)/rust/
 	cp -r sdk/rust/os32api               $(SDK_OUT)/rust/

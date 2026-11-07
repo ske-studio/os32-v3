@@ -15,6 +15,10 @@ import subprocess
 import tempfile
 import host32
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/splash.c'
@@ -99,9 +103,8 @@ def main():
         once(source, old, new)
     for rel in FILES:
         assert rel in CHECK['covers'], rel
-    make = subprocess.run(['make', '-qp'], cwd=ROOT, capture_output=True, text=True)
-    assert make.returncode in (0, 1), make.stderr
-    resident(make.stdout)
+    selected = 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL'])
+    resident(selected)
     generic = (ROOT/'init/boot_splash.c').read_text()
     for token in ('splash_fb', 'GFX_BB_PLANAR4', 'GFX_PREF_PC98', 'GFX_PLANE_SZ',
                   'GFX_BPL', 'GVRAM_PLANES', 'bb_fill_rect', 'splash_gfx_init'):
@@ -118,7 +121,7 @@ def main():
         print('PASS unique mutation anchors and isolated -Werror mutation builds')
     if args.mutate:
         try:
-            resident(make.stdout.replace(BACKEND+' ', ''))
+            resident(selected.replace(BACKEND+' ', ''))
         except AssertionError:
             pass
         else:

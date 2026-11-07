@@ -28,7 +28,7 @@ $(GEFORCE_OUT)/geforce_import_slots.o $(GEFORCE_OUT)/geforce_provider_types.o $(
 $(GEFORCE_OUT)/geforce_import_stubs.o: $(GEFORCE_OUT)/geforce_import_stubs.S build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(GEFORCE_OUT)/geforce.elf: $(GEFORCE_OBJS) build/geforce-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GEFORCE_OUT)/geforce.map $(GEFORCE_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/geforce-module.ld -Map=$(GEFORCE_OUT)/geforce.map $(GEFORCE_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(GEFORCE_OUT)/geforce_kexports.o
@@ -39,11 +39,11 @@ $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/vid
 
 # mkmod enforces the GF_FEAT4_DESIGN C3 160/160/208 KiB budgets.
 define pack_geforce
-	python3 tools/mkmod.py --module-id 12 --elf $(GEFORCE_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 12 --elf $(GEFORCE_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/geforce-module.mk
+$(BUILD_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/geforce-module.mk
 	$(call pack_geforce,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/geforce-module.mk
+$(R1_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/geforce-module.mk
 	$(call pack_geforce,$(R1_OUT)/vmkernel.lz4)
 -include $(GEFORCE_OBJS:.o=.d) $(GEFORCE_OUT)/geforce_kexports.d $(GEFORCE_OUT)/geforce_provider_types.d
 
@@ -97,9 +97,9 @@ $(GFA_OUT)/gf_accept.o: $(BUILD_OUT)/vmkernel.lz4
 $(GFA_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) $(GFA_OUT)/build-id build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GFA_FLAGS) $(GEFORCE_INC) -c $< -o $@
 $(GFA_OUT)/geforce.elf: $(GFA_OBJS) build/geforce-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GFA_OUT)/geforce.map $(GFA_OBJS) -o $@
-$(GFA_OUT)/geforce.mod: $(GFA_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json
-	python3 tools/mkmod.py --module-id 12 --elf $(GFA_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/geforce-module.ld -Map=$(GFA_OUT)/geforce.map $(GFA_OBJS) -o $@
+$(GFA_OUT)/geforce.mod: $(GFA_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 12 --elf $(GFA_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 .PHONY: geforce-accept
 geforce-accept: $(GFA_OUT)/geforce.mod
 -include $(GFA_OBJS:.o=.d)

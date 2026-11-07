@@ -32,6 +32,16 @@ def limited_mode():
 
 
 class ClangTest(unittest.TestCase):
+    def test_declared_powerpc_compiler_is_not_silently_dropped(self):
+        from clang_ast.build import parse_compile_lines, dependency_files
+        line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c lib/kstring_c.c -o out.o'
+        units = parse_compile_lines(line, declared_cc='/cross/bin/powerpc-elf-gcc')
+        self.assertEqual([u['src'] for u in units], ['lib/kstring_c.c'])
+        self.assertEqual(parse_compile_lines(line), [])
+        self.assertEqual(parse_compile_lines('gcc -c wrong.c -o out.o', declared_cc='/cross/bin/powerpc-elf-gcc'), [])
+        self.assertIsNone(dependency_files(['build/arch/ppc.mk']))
+        self.assertIsNone(dependency_files(['build/sources/order.mk']))
+
     def test_changed_unit_dependencies(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)

@@ -114,11 +114,27 @@ GAS_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(GAS_KERNEL:.S=.o))
 2. `kernel-compile` は選んだCとGASの.oだけに依存。PPCの `C_ARCH_NEW` は現状空、`GAS_KERNEL` は既存 `arch/ppc/entry.S ofw_note.S`、`C_PLATFORM_NEW` は既存 `platform/powermac/{ofw,escc_tree,escc,boot}.c`、C_COMMONにkstring_cを旧挿入位置で選ぶ。
 3. 共有kernel-objects.mkの `.c` 規則はPPC CCと従来のパス別旗を使う。`.S` は静的パターン規則 `$(GAS_KERNEL_OBJ): $(KERNEL_OBJ_PREFIX)%.o: %.S` で対象を固定し、recipeを `$(CC) $(CFLAGS_MACHINE) $(INC_COMMON) -c $< -o $@`（hwdev stubと同型、-include unit_stamp等のC旗なし）とする。`exec/ring3_ls.c` と `.S` が共存するため、Cの暗黙パターン規則との競合でGAS対象の入力を誤選択させない。x86 NASM、ring3_ls_shim、PC98ソース、module/SDKのldを実行しない。PPC compileにはx86のLAYOUT_HEADERを一律前提にしない。
 4. `arch_io.h/arch_cpu.h/platform_io.h` はppc-mmu待ち。通常makeは共通候補の欠落ヘッダ等で非0終了してよい。`make -k -j1 kernel-compile` で全件を試行し、必須成功集合を `platform/powermac/{ofw,escc_tree,escc,boot}.c lib/kstring_c.c arch/ppc/{entry,ofw_note}.S` の7本に固定する。起草時は独立ppc.mkの実規則で7/7成功。さらに提案のCFLAGS_MACHINE＋C用旗/個別include、.S用旗をconfigから展開して7/7成功、全.oがELF32/BE/EM_PPC=20、生成.dにx86/pc98混入なし（新graph自体は未実装）。新graphでも同じ7本を実行・成功必須とし、一覧欠落・コンパイル失敗・古い.o流用はRED。他の成功TUは実装初回測定で明示一覧に追加固定し以後減少を拒否。ヘッダの空実装・x86へのfallbackは作らない。
-5. 到達点は「PPC一覧による実コンパイラ実行＋成功.o＋残課題の列挙」。計測入口の終了値は7本以上の固定成功集合充足・全選択TU試行・ELF検証・依存検査の成否で決め、make -kの非0だけでPASSにしない。全Cの成功、kernel ELF、起動成功は受入外。`kernel` は当段ではcompile後に未対応リンクの明示エラー、SDK/モジュール/配備の明示要求はコンパイル前に未対応エラー。
+5. 到達点は「PPC一覧による実コンパイラ実行＋成功.o＋残課題の列挙」。計測入口の終了値は7本以上の固定成功集合充足・全選択TU試行・ELF検証・依存検査の成否で決め、make -kの非0だけでPASSにしない。第1段の成功TUの.d受入は、正規化・重複除去した非選択ヘッダ依存が下記の固定一覧と一致し、一覧外の依存がゼロであることとする（既知違反ゼロを意味しない）。全Cの成功、kernel ELF、起動成功は受入外。`kernel` は当段ではcompile後に未対応リンクの明示エラー、SDK/モジュール/配備の明示要求はコンパイル前に未対応エラー。
 6. `make -f build/ppc.mk all/check` はそのまま保持。`ppc-boot` aliasは `$(MAKE) -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) all`、check用も同じ転送でcheckを呼ぶ。起草時に無指定転送が `/home/hight/opt/cross/bin/powerpc-elf-gcc` を選び、明示転送でcross-ppcへ直ることを再現済み。後段でbootとkernelの接続時にツール定義だけ共通arch profileへ寄せる（現在のbootstrap独自最適化旗を勝手に替えない）。
 - 計測器は変更可能。`ppc-gauge/tools/ppc/check_compile.py:37,53,61,118` はx86 makeを使いARM計測器へPPC旗を足す実装。`--source-profile=legacy-x86|selected` を追加し既定をselectedへ、旧数字はlegacy-x86として別系列保存。
 - selectedは新 `tools/build_profile.py` のmake展開結果（ARCH/PLATFORM/feature/C_KERNEL/CC/実コンパイルargv）を使い、各TUの `-c` を実行。ARMのX86_ONLY_FLAGS除去やinclude対応表を流用しない。PPC CC不在は通常計測ではSKIP、`--accept` 受入入口では非0。実コンパイル入口は `tools/ppc/check_compile.py --source-profile selected --accept --json`（NOTEST、tools/ppc/README.mdに実行条件を記載）。
 - 生成ヘッダ準備は選択したPython生成規則だけを隔離コピーで実行。無条件の `*-module.mk` globと固定CROSS_DIRを廃止。未選択module由来の欠落は別分類、hwdevのi386 DWARF出力をPPC成功の証拠にしない。JSONに選択順/argv/target/生成失敗/最初のエラー/成功.oのELF class・endian・machineを記録。
+
+
+### S3 の既知の非選択ヘッダ依存（第1段だけの受入）
+- **案 (a) を採用**：実測 `final-ppc.json` と実ソースの include 経路が一致する6成功TU・11組の既知違反を固定し、x86の振る舞い・生成物とC本体・ヘッダの所有を変えず第1段を閉じる。
+- 理由：commonは共通候補であり、6 TUを除外すると成功集合を縮めて未分離の依存を隠す。依存の解消は第2段以降の契約分離で行い、当段は増加検出を受入にする。
+
+一覧の実装上の置き場は `tools/ppc/known_header_dependencies.json`（selected / ppc-powermac専用、キーはリポジトリ相対のTUとヘッダの完全一致ペア、後段IDも記録）。初期値は次表だけとし、ディレクトリ・TU単位の包括許可や自動追加は禁止。全成功TUの実.dを `..` を含め正規化し重複を除いて照合し、1組でも追加されたらRED。減少時は消えた組を一覧から削除して再検査するまでREDとし、残存する組を復活用の許可として残さない。成功TUの欠落・失敗・.d未生成を削減とは扱わず、固定成功集合の受入を維持する。失敗TUの.d未生成は従来どおり別集計し成功扱いしない。既知違反はJSONに明示して残し、一覧との一致だけで他の受入を省略しない。
+
+|成功TU|固定する非選択ヘッダ（各パスが1組）|第2段以降の解消先（SURVEY ID）|
+|---|---|---|
+|`mm/memory_boot.c`|`platform/pc98/platform_memory_desc.h`|第2段 I2/V5：初期化・機種メモリ記述の共通契約へ分離する追加対象|
+|`kernel/gui.c`|`kernel/ime/ime.h`、`kernel/ime/ime_render.h`、`kernel/ime/ime_store.h`|第5段 V3：GUIからFEPへの描画接続・非搭載契約を分離する追加対象|
+|`init/bootlog_save.c`|`arch/x86/kernel/gdt.h`、`arch/x86/kernel/idt.h`|第2段 I2：起動ログが使う時計・例外の共通宣言を分離|
+|`kernel/kaudit.c`|`kernel/v86/v86_mem.h`|第2段 V1：V86監査の非搭載契約を分離|
+|`kernel/ver_collect.c`|`arch/x86/kernel/gdt.h`、`arch/x86/kernel/idt.h`|第2段 I2：診断収集が使う時計・例外の共通宣言を分離|
+|`kernel/ver_format.c`|`arch/x86/kernel/gdt.h`、`arch/x86/kernel/idt.h`|第2段 I2：診断表示が使う時計・例外の共通宣言を分離|
 
 ## 4. T1 profileの口（PPCモジュール形式は未決定のまま）
 |profile API|x86-pc98|ppc-powermac（当段）|
@@ -225,3 +241,4 @@ GAS_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(GAS_KERNEL:.S=.o))
 - B7: GASの.S規則をGAS_KERNEL_OBJ対象の静的パターンに固定した。
 - B8: KERNEL_SRC_DIRS全dirのinclude所有者表とdrivers/base共有を明記し、R1のt2h専用配備前後の手順を反映した。
 - 追加（IDなし）: IPAex不在による手元の比較範囲と、os32-v3 PM側で全生成物比較を完了する条件を明記した。
+- S3 の実装で埋めた欠け：成功TUの非選択ヘッダ依存6 TU・11組は§3の固定一覧で増加・陳腐化を拒否し、後段IDへ解消を引き継ぐ受入に確定した（実装・再計測の合格は別途確認）。

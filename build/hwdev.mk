@@ -10,11 +10,11 @@ $(HWDEV_OUT)/gfinit_decode.o: private KERNEL_CFLAGS += -Os
 $(HWDEV_OUT)/%.o: kdebug/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -c $< -o $@
-$(HWDEV_OUT)/hwdev_pair.h: $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/vmkernel.lz4 tools/gen_hwdev_pair.py tools/mkmod.py tools/module_schema.py
+$(HWDEV_OUT)/hwdev_pair.h: $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/vmkernel.lz4 tools/gen_hwdev_pair.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py
 	python3 tools/gen_hwdev_pair.py --kernel $(BUILD_OUT)/vmkernel.lz4 --core $(BUILD_OUT)/kdebug.bin --out $@
 # The embedded manifest binds to the matching kernel/core, including R1.
 R1_HWDEV_OUT := $(R1_OUT)/hwdev
-$(R1_HWDEV_OUT)/hwdev_pair.h: $(R1_OUT)/kdebug.bin $(R1_OUT)/vmkernel.lz4 tools/gen_hwdev_pair.py tools/mkmod.py tools/module_schema.py
+$(R1_HWDEV_OUT)/hwdev_pair.h: $(R1_OUT)/kdebug.bin $(R1_OUT)/vmkernel.lz4 tools/gen_hwdev_pair.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py
 	python3 tools/gen_hwdev_pair.py --kernel $(R1_OUT)/vmkernel.lz4 --core $(R1_OUT)/kdebug.bin --out $@
 $(HWDEV_OUT)/hwdev_main.o: $(HWDEV_OUT)/hwdev_pair.h
 $(R1_HWDEV_OUT)/hwdev_main.o: $(R1_HWDEV_OUT)/hwdev_pair.h
@@ -27,16 +27,16 @@ $(HWDEV_OUT)/hwdev_import_stubs.o: $(HWDEV_GEN)/hwdev_import_stubs.S build/confi
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(HWDEV_OUT)/hwdev.elf: $(HWDEV_OBJS) build/hwdev.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/hwdev.ld -Map=$(HWDEV_OUT)/hwdev.map $(HWDEV_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/hwdev.ld -Map=$(HWDEV_OUT)/hwdev.map $(HWDEV_OBJS) -o $@
 R1_HWDEV_OBJS := $(filter-out $(HWDEV_OUT)/hwdev_main.o,$(HWDEV_OBJS)) $(R1_HWDEV_OUT)/hwdev_main.o
 $(R1_HWDEV_OUT)/hwdev.elf: $(R1_HWDEV_OBJS) build/hwdev.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/hwdev.ld -Map=$(R1_HWDEV_OUT)/hwdev.map $(R1_HWDEV_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/hwdev.ld -Map=$(R1_HWDEV_OUT)/hwdev.map $(R1_HWDEV_OBJS) -o $@
 define pack_hwdev
-	python3 tools/mkmod.py --module-id 11 --elf $(1)/hwdev.elf --metadata $(HWDEV_GEN)/hwdev_imports.json --vmkernel $(2)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 11 --elf $(1)/hwdev.elf --metadata $(HWDEV_GEN)/hwdev_imports.json --vmkernel $(2)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(R1_OUT)/hwdev.mod: $(R1_HWDEV_OUT)/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py build/hwdev.mk sdk/kapi.json sdk/include/os32/os32_generations.h
+$(R1_OUT)/hwdev.mod: $(R1_HWDEV_OUT)/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py build/hwdev.mk sdk/kapi.json sdk/include/os32/os32_generations.h
 	$(call pack_hwdev,$(R1_HWDEV_OUT),$(R1_OUT))
-$(BUILD_OUT)/hwdev.mod: $(HWDEV_OUT)/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py build/hwdev.mk sdk/kapi.json sdk/include/os32/os32_generations.h
+$(BUILD_OUT)/hwdev.mod: $(HWDEV_OUT)/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py build/hwdev.mk sdk/kapi.json sdk/include/os32/os32_generations.h
 	$(call pack_hwdev,$(HWDEV_OUT),$(BUILD_OUT))
 all: $(BUILD_OUT)/hwdev.mod
 -include $(HWDEV_OBJS:.o=.d) $(R1_HWDEV_OUT)/hwdev_main.d
@@ -62,9 +62,9 @@ $(VPLL_OUT)/core/hwdev_core.o: $(HWDEV_GEN)/hwdev_core.c $(HWDEV_GENERATED)
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(HWDEV_GEN) -DGF_VPLL_PROBE=1 -c $< -o $@
 $(VPLL_OUT)/core/kdebug.elf: $(VPLL_CORE_OBJS) build/module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -Map=$(VPLL_OUT)/core/kdebug.map -T build/module.ld $(VPLL_CORE_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -Map=$(VPLL_OUT)/core/kdebug.map -T build/module.ld $(VPLL_CORE_OBJS) -o $@
 $(VPLL_OUT)/kdebug.bin: $(VPLL_OUT)/core/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json tools/mkmod.py vpll-force
-	python3 tools/mkmod.py --elf $< --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --elf $< --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 $(VPLL_OUT)/hw/%.o: kdebug/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(if $(filter gfinit_decode,$*),-Os) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -c $< -o $@
@@ -80,7 +80,7 @@ $(VPLL_OUT)/hw/hwdev_import_stubs.o: $(HWDEV_GEN)/hwdev_import_stubs.S $(HWDEV_G
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(VPLL_OUT)/hw/hwdev.elf: $(VPLL_HW_OBJS) build/hwdev.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/hwdev.ld -Map=$(VPLL_OUT)/hw/hwdev.map $(VPLL_HW_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/hwdev.ld -Map=$(VPLL_OUT)/hw/hwdev.map $(VPLL_HW_OBJS) -o $@
 $(VPLL_OUT)/hwdev.mod: $(VPLL_OUT)/hw/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json tools/mkmod.py
 	$(call pack_hwdev,$(VPLL_OUT)/hw,$(BUILD_OUT))
 -include $(VPLL_CORE_OBJS:.o=.d) $(VPLL_HW_OBJS:.o=.d)

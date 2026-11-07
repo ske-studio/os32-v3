@@ -23,7 +23,7 @@ KDEBUG_DEF_SOURCES := $(shell python3 -c 'import json; print(" ".join(sorted({e[
 # static checks (including CI without a cross compiler) need these under -n.
 KDEBUG_GENERATED := $(addprefix $(KDEBUG_GEN)/,kdebug_imports.h kdebug_imports.json \
     kdebug_kexports.c kdebug_import_slots.c kdebug_import_stubs.S kdebug_import_macros.h)
-$(KDEBUG_GENERATED) &: kernel/module/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py tools/module_schema.py build/kdebug.mk $(MODULE_SCHEMA) $(KDEBUG_DEF_SOURCES)
+$(KDEBUG_GENERATED) &: kernel/module/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py build/kdebug.mk $(MODULE_SCHEMA) $(KDEBUG_DEF_SOURCES)
 	python3 tools/gen_kdebug_imports.py --stage $(KDEBUG_STAGE) --out-dir $(KDEBUG_GEN)
 
 $(KERNEL_OBJ_PREFIX)kernel/module/module.o: kernel/module/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h $(MODULE_SCHEMA)
@@ -45,20 +45,20 @@ $(KDEBUG_OUT)/kdebug_import_stubs.o: $(KDEBUG_GEN)/kdebug_import_stubs.S build/c
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 
 $(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OBJS) build/module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -Map=$(KDEBUG_OUT)/kdebug.map -T build/module.ld $(KDEBUG_OBJS) $(KDEBUG_OUT)/hwdev_core.o -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -Map=$(KDEBUG_OUT)/kdebug.map -T build/module.ld $(KDEBUG_OBJS) $(KDEBUG_OUT)/hwdev_core.o -o $@
 
 # Values come from their authoritative definitions, including before S1b's bump.
 KDEBUG_KAPI_GEN = $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])')
 KDEBUG_LAYOUT_GEN = $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h)
 
 define pack_kdebug
-	python3 tools/mkmod.py --elf $(KDEBUG_OUT)/kdebug.elf --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --elf $(KDEBUG_OUT)/kdebug.elf --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
 
-$(BUILD_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
+$(BUILD_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
 	$(call pack_kdebug,$(BUILD_OUT)/vmkernel.lz4)
 
-$(R1_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
+$(R1_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
 	$(call pack_kdebug,$(R1_OUT)/vmkernel.lz4)
 
 $(R1_OBJ)/kernel/module/module.o: kernel/module/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h

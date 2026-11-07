@@ -571,7 +571,7 @@ MUTANTS = [
      lambda: rep(CFG, "CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os",
                  "CFLAGS_SQLITE = $(CFLAGS_COMMON) -Os")),
     ("core の os32_sqlite_test.o を gnu89 に戻す", "RED",
-     lambda: rep("build/kernel.mk",
+     lambda: rep("build/kernel-objects.mk",
                  "$(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c\n"
                  "\t@mkdir -p $(@D)\n\t$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@",
                  "$(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c\n"

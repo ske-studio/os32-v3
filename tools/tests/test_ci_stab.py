@@ -225,7 +225,7 @@ class InfrastructureTests(unittest.TestCase):
     def test_make_clean_removes_control_receipts(self):
         import re
         root = pathlib.Path(__file__).resolve().parents[2]
-        rule = re.search(r'^clean:.*\n(?:\t.*\n)+', (root / 'Makefile').read_text(), re.M)[0]
+        rule = re.search(r'^clean:.*\n(?:\t.*\n)+', (root / 'build/targets/x86-pc98.mk').read_text(), re.M)[0]
         with tempfile.TemporaryDirectory() as directory:
             tmp = pathlib.Path(directory)
             cache = tmp / 'build/out/host32-controls'
@@ -1224,7 +1224,29 @@ int main(int argc, char **argv)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    mutate = '--mutate' in sys.argv
+    if mutate:
+        sys.argv.remove('--mutate')
+    result = unittest.main(exit=False).result
+    if not result.wasSuccessful():
+        raise SystemExit(1)
+    if mutate:
+        original = pathlib.Path.read_text
+        anchor = "shutil.rmtree('build/out/host32-controls', ignore_errors=True)"
+        def changed(path, *args, **kwargs):
+            source = original(path, *args, **kwargs)
+            if path.as_posix().endswith('build/targets/x86-pc98.mk'):
+                assert source.count(anchor) == 1
+                return source.replace(anchor, "shutil.rmtree('build/out/other-controls', ignore_errors=True)")
+            return source
+        with patch.object(pathlib.Path, 'read_text', changed):
+            suite = unittest.TestSuite([InfrastructureTests('test_make_clean_removes_control_receipts')])
+            negative_result = unittest.TestResult()
+            suite.run(negative_result)
+        if negative_result.errors or len(negative_result.failures) != 1:
+            raise AssertionError('cleanup mutation did not fail at runtime')
+        print('RED: moved clean rule leaves control receipts')
 
 
 def run(ctx) -> int:

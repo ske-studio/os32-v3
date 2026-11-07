@@ -284,15 +284,15 @@ class LayoutTools(unittest.TestCase):
         left, right = self.root / 'a', self.root / 'b'
         for tree in (left, right):
             for path in module.artifacts(tree):
-                target = tree / 'build/out' / path
+                target = tree / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(b'fixed')
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(module.compare(left, right), [])
             (right / 'build/out/kernel.bin').write_bytes(b'changed')
-            self.assertEqual(module.compare(left, right), ['kernel.bin'])
+            self.assertEqual(module.compare(left, right), ['build/out/kernel.bin'])
             (left / 'build/out/extra.mod').write_bytes(b'new')
-            self.assertEqual(module.compare(left, right), ['extra.mod', 'kernel.bin'])
+            self.assertEqual(module.compare(left, right), ['build/out/extra.mod', 'build/out/kernel.bin'])
         for tree, number, obj in ((left, 1, 'kernel/example.o'), (right, 2, 'build/out/obj/kernel/example.o')):
             source = tree / 'example.c'
             source.write_text(f'int changed(void) {{ return {number}; }}\nint stable(void) {{ return 3; }}\n')
@@ -355,7 +355,7 @@ def mutations():
          'input=query.replace("$(INC_KERNEL)", "-Ibroken"), cwd=config_root, env=env, text=True,'),
         ('check_arm_compile.py', 'if path in DRIVERS_INC_GFX:', 'if False:'),
         ('include_resolve.py', '(file.parent, *directories)', '(*directories, file.parent)'),
-        ('build_compare.py', 'a.read_bytes() == b.read_bytes()', 'True'),
+        ('build_compare.py', 'before == after', 'before == before'),
         ('gen_build_id.py', '        return fixed', "        return 'unknown'"),
     ]
     for filename, old, new in cases:

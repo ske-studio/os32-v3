@@ -44,12 +44,13 @@ def main(mutate):
             # real; no mutation ever touches the working tree.
             tree = tmp / 'tree'
             for directory in ('tools/tests', 'kernel', 'drivers', 'arch',
-                              'include', 'sdk/include', 'mm', 'lib'):
+                              'include', 'sdk/include', 'mm', 'lib', 'build/arch', 'build/sources', 'build/platform', 'build/features'):
                 shutil.copytree(ROOT / directory, tree / directory,
                                 ignore=shutil.ignore_patterns('out', '__pycache__', '*.o', '*.d'))
             config = tree / 'build/config.mk'
             config.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / 'build/config.mk', config)
+            shutil.copyfile(ROOT / 'build/select.mk', tree / 'build/select.mk')
             original = (tree / IRQ).read_text()
             for anchor, replacement, reason in MUTATIONS:
                 if original.count(anchor) != 1:

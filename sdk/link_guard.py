@@ -9,6 +9,12 @@ import subprocess
 import sys
 import tempfile
 import os32x_hdr as H
+from target_profile import require as require_target, check_elf_identity
+
+
+def checked_elf(path):
+    check_elf_identity(path, require_target('x86-pc98', 'link_guard'))
+    return H.Elf32(path)
 
 
 def check_note(elf):
@@ -52,7 +58,21 @@ def vendor_inputs(args):
 
 
 def main():
-    linker, *args = sys.argv[1:]
+    args = sys.argv[1:]
+    target, ar = 'x86-pc98', None
+    try:
+        while args and args[0] in ('--target', '--ar'):
+            option, value, *args = args
+            if option == '--target':
+                target = value
+            else:
+                ar = value
+        profile = require_target(target, 'link_guard')
+        ar = ar or profile['ar']
+        linker, *args = args
+    except ValueError as error:
+        print('link_guard: ' + str(error), file=sys.stderr)
+        return 1
     if not any('app.ld' in a or 'app_sys.ld' in a or 'shlib.ld' in a or 'os32.ld' in a for a in args):
         return subprocess.call([linker, *args])
     out = pathlib.Path(args[args.index('-o') + 1])
@@ -100,11 +120,11 @@ def main():
                     continue
                 if match:
                     member = pathlib.Path(tmp) / 'member.o'
-                    member.write_bytes(subprocess.check_output(['i386-elf-ar', 'p', str(path), match[2]]))
-                    check_note(H.Elf32(member))
+                    member.write_bytes(subprocess.check_output([ar, 'p', str(path), match[2]]))
+                    check_note(checked_elf(member))
                 else:
-                    check_note(H.Elf32(path))
-            check_note(H.Elf32(out))
+                    check_note(checked_elf(path))
+            check_note(checked_elf(out))
             # Evidence for wrapping and the build manifest, including used/exempt inputs.
             out.with_suffix('.inputs.json').write_text(__import__('json').dumps(
                 {'selected': sorted(selected), 'vendor': sorted(exempt),

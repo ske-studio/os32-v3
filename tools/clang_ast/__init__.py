@@ -3,6 +3,7 @@ import ctypes
 import functools
 import os
 import pathlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -79,7 +80,7 @@ def cross_free_notice():
 def cross_compiler(cc=None):
     compiler = cc or os.environ.get('OS32_CC', 'i386-elf-gcc')
     cross = shutil.which(compiler)
-    if not cross:
+    if not cross and pathlib.Path(compiler).name == 'i386-elf-gcc':
         cross = str(pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
     return cross if os.access(cross, os.X_OK) and pathlib.Path(cross).is_file() else None
 
@@ -139,7 +140,14 @@ def parse(src, argv=(), root=ROOT, text=None):
     tu.os32_parse_input = (src, args, text if text is not None else pathlib.Path(src).read_text())
     return tu
 
-def units(root=ROOT):
+def units(root=ROOT, source_profile='legacy-x86'):
+    if source_profile == 'selected':
+        from build_profile import query
+        profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], commands=True)
+        return parse_compile_lines('\n'.join(shlex.join(argv) for argv in profile['argv']),
+                                   declared_cc=profile['CC'][0])
+    if source_profile != 'legacy-x86':
+        raise ParseError('unknown source profile: ' + source_profile)
     rc, out, err = dry_run(root)
     if rc:
         raise ParseError('make dry-run: ' + err)

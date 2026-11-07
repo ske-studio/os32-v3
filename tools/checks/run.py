@@ -121,7 +121,7 @@ KAPI_GENERATED = (
 )
 
 
-BUILD_CONFIG_GLOBS = ("**/Makefile", "build/**/*.mk", "**/Cargo.lock",
+BUILD_CONFIG_GLOBS = ("tools/build_profile.py", "**/Makefile", "build/**/*.mk", "**/Cargo.lock",
                       "**/.cargo/config", "**/.cargo/config.toml", "**/Cargo.toml",
                       "**/rust-toolchain", "**/rust-toolchain.toml", "**/*-target.json",
                       "sdk/rust/i686-os32-none.json")
@@ -383,6 +383,23 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-selection-host", "tools/build_compare.py"):
+        "host test imports scanners only; snapshot/build entry point is never called",
+    ("check-target-profile-host", "tools/gen_memmap.py"):
+        "unsupported target is rejected before reading layout artifacts",
+    "tools/tests/test_build_selection.py": "make fixture has a private build directory",
+    "tools/tests/test_ppc_selection.py": "private query/dry-run fixture; compiler is never executed",
+    ("check-shell-service-host", "tools/tests/test_shell_service.py"):
+        "build configuration is copied only for private query and host mutations",
+
+    ("check-build-compare-host", "tools/build_compare.py"):
+        "comparison unit tests use private fixture roots; main is never invoked",
+    ("check-src-layout-host", "tools/build_compare.py"):
+        "layout tests use private snapshot/object fixtures; main is never invoked",
+    "tools/tests/test_build_compare.py": "all artifacts are created inside TemporaryDirectory",
+    "tools/tests/test_build_profile.py": "make fixture lives inside TemporaryDirectory",
+    "tools/tests/test_target_toolchain.py": "only copied config is queried; no products are read",
+
     "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",
     "tools/tests/" + "test_preflight.py": "preflight fixtures create private build artifacts and tool stubs",
     "tools/tests/" + "host32.py": "cache contains only freshly compiled host fixtures",
@@ -806,6 +823,8 @@ def routed_build_inputs(root, base, path):
         return None
     if old == new:
         return frozenset()
+    if matches(path, ("build/arch/*.mk", "build/sources/*.mk", "build/features/*.mk", "build/platform/*.mk", "build/select.mk")):
+        return None  # Selection changes always require the complete configuration route.
     if matches(path, ("build/**/*.mk",)):
         old_shape, old_lists = source_list_content(old)
         new_shape, new_lists = source_list_content(new)
