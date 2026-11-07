@@ -5,6 +5,7 @@
 #include "pegc.h"
 #include "gfx_hal.h"
 #include "bootinfo.h"
+#include "bootinfo_native.h"
 #include "idt.h"
 #include "paging.h"
 #include "v86_bios.h"
@@ -1121,4 +1122,11 @@ void _start(void)
     setup(1, 0); frozen = 1;
     REQUIRE(probe_phase() < 0 && irq_on);
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

@@ -23,7 +23,6 @@
 #include "drivers/pci/pci.h"
 #include "drivers/video/geforce/geforce_module.h"
 #include "gfx/gfx.h"
-#include "include/bootinfo.h"
 #include "include/gf_production.h"
 #include "include/kprintf.h"
 #include "include/sys.h"
@@ -33,6 +32,7 @@
 #include "lib/serial_diag.h"
 #include "mm/paging.h"
 #include "mm/pgalloc.h"
+#include "platform/pc98/bootinfo_native.h"
 struct hwdev_core_api {
     u32 abi, size, contract_crc, layout_crc;
     int (*trial_begin)(struct recover *r, const struct recover_profile *profile, u32 plan_hash, u32 budget);
@@ -62,7 +62,7 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0xe0a4260cU
+#define HWDEV_CONTRACT_CRC 0x0bd63ff4U
 #define HWDEV_LAYOUT_CRC 0x8c7fea41U
 #define HWDEV_IMPORT_COUNT 47U
 #define HWDEV_CORE_SLOTS 26U

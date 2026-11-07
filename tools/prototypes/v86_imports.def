@@ -67,7 +67,7 @@
     },
     {
       "symbol": "v86_bios_real_lowmem",
-      "source": "kernel/v86/v86_bios.h",
+      "source": "platform/pc98/bios_snapshot.h",
       "context": "normal",
       "irq": false
     },

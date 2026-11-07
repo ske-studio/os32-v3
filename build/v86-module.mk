@@ -1,7 +1,7 @@
 # T5c-3: reuse T4 function imports, VA0 packing and paired distribution.
 V86_OUT := $(BUILD_OUT)/v86
 V86_GEN := $(addprefix $(V86_OUT)/,v86_imports.h v86_imports.json v86_import_slots.c v86_import_stubs.S v86_provider_types.c v86_kexports.c)
-V86_DEF_SOURCES := kernel/v86/v86_module.h kernel/v86/v86_bios.h kernel/v86/v86_io.h kernel/v86/v86_pic.h kernel/v86/v86_kbd.h kernel/module/module.h
+V86_DEF_SOURCES := platform/pc98/bios_snapshot.h kernel/v86/v86_module.h kernel/v86/v86_bios.h kernel/v86/v86_io.h kernel/v86/v86_pic.h kernel/v86/v86_kbd.h kernel/module/module.h
 $(V86_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/v86_imports.def $(V86_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module v86 --out-dir $(V86_OUT)
 

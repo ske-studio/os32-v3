@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Actual loader/body/HAL assembly; case 65 initializes the real device over
  * fake hardware and calls the core drawing entrypoints and public cursor hooks. */
 #include "drivers/video/trident/trident_module.c"
@@ -304,4 +305,11 @@ void _start(void)
         CHECK(!trident_diagnostic_ops());
     }
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

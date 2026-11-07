@@ -15,7 +15,7 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
-#include "../include/bootinfo.h"
+#include "../platform/pc98/bootinfo_wire.h"
 #include "../include/pc98.h"
 #include "pc98pt.h"   /* 区画表の共有部 (標準配置) */
 

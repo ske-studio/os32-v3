@@ -96,7 +96,7 @@ static int checked_map(u32 base, u32 end, u32 phys, u32 flags) {
     return paging_v86_map_range(base, end, phys, flags);
 }
 #include "v86_bios.c"
-#include "v86_snapshot.c"
+#include "bios_snapshot.c"
 #include "clock.c"
 #include "sysclk.c"
 #include "bios_consumer_slice.inc"
@@ -403,7 +403,7 @@ static void restored(void) {
     CHECK(!(page_tables[0][0] & PTE_PRESENT), "normal page0 NP");
     for (u32 i = 0; i < PAGE_SIZE; i++) {
         CHECK(*(volatile u8 *)P2V(i) == original(i), "page0 restored all 4096 bytes");
-        CHECK(v86_session.real_lowmem[i] == original(i), "immutable boot original");
+        CHECK(v86_bios_real_lowmem()[i] == original(i), "immutable boot original");
     }
     for (u32 i = 0; i < MEM_AUTOPLAY_MAILBOX_SIZE; i++)
         CHECK(*(volatile u8 *)P2V(MEM_AUTOPLAY_MAILBOX_BASE + i) == mailbox_byte(i), "mailbox restored");

@@ -1,6 +1,6 @@
 """Diagnostic records execute; the ordinary player retains identical text."""
 CHECK = dict(name='splash-raster-diag-host', tier=1,
-    covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
+    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
             'tools/tests/splash_raster_diag_host.c', 'tools/tests/splash_raster_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'gfx/gfx_osri.h', 'gfx/gfx.h', 'include/types.h', 'include/pc98.h',

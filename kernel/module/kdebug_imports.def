@@ -110,7 +110,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "bootinfo_get",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 13
     },
@@ -118,7 +118,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "bootinfo_hdd_geom",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 14
     },
@@ -126,7 +126,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "bootinfo_parse",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 15
     },
@@ -134,7 +134,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "bootinfo_seal",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 16
     },
@@ -142,7 +142,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "bootinfo_seal_image",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 17
     },
@@ -1721,7 +1721,7 @@
       "stage": "S4",
       "kind": "FUNC",
       "symbol": "boot_image_info",
-      "source": "include/bootinfo.h",
+      "source": "platform/pc98/bootinfo_native.h",
       "context_safe": false,
       "index": 212
     },
@@ -2630,6 +2630,15 @@
       "source": "include/legacy_guest.h",
       "context_safe": false,
       "index": 322,
+      "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "v86_bios_real_lowmem",
+      "source": "platform/pc98/bios_snapshot.h",
+      "context_safe": true,
+      "index": 323,
       "retained": true
     }
   ]

@@ -95,7 +95,7 @@ static inline int v86_guest_read_ok(u32 linear, u32 len)
     return 1;
 }
 
-/* One owner for mapping, real page zero and runtime unwind state. */
+/* One owner for mapping and runtime unwind state. */
 struct v86_session_state {
     int open;
     int closing;
@@ -103,12 +103,10 @@ struct v86_session_state {
     int running;
     int aborting;
     int release_pending;
-    int real_saved; /* Boot capture latch: never clear on session reset. */
     u32 jmpbuf[KSETJMP_BUF_LEN];
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
     struct legacy_lowmap_snapshot lowmap;
-    u8 real_lowmem[PAGE_SIZE]; /* Immutable core boot page0; T7a-1c. */
 };
 extern struct v86_session_state v86_session;
 extern u32 v86_restore_mismatch;

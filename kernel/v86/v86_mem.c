@@ -1,3 +1,4 @@
+#include "bios_snapshot.h"
 #ifdef OS32_R1_FIXTURE
 #include "../r1_fixture.h"
 #endif
@@ -61,7 +62,7 @@ int v86_session_begin(u32 owner)
     /* V86_LOW remains FIXED/kernel/WB; only the session changes its PTEs.
      * Save the host mailbox before clearing physical conventional RAM. */
     (void)owner;
-    if (!v86_call_mailbox() || !v86_session.real_saved) return -2;
+    if (!v86_call_mailbox() || !platform_bios_ready()) return -2;
     kmemcpy(v86_call_mailbox(), P2V(MEM_AUTOPLAY_MAILBOX_BASE),
             MEM_AUTOPLAY_MAILBOX_SIZE);
     if (!v86_module_session_acquire()) return -1;

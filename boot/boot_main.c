@@ -39,7 +39,7 @@ static int find_partition(u32 *out_lba)
 }
 
 /* ================================================================ */
-/*  ブート情報域のイメージ欄 (正典 include/bootinfo.h、写しは boot_defs.h) */
+/*  ブート情報域のイメージ欄 (正典 platform/pc98/bootinfo_wire.h、写しは boot_defs.h) */
 /* ================================================================ */
 static void wr32_low(u32 addr, u32 v)
 {
@@ -112,7 +112,7 @@ int boot_main(void)
         return BOOT_ERR_IMAGE;
     }
 
-    /* 6. 起動したイメージの CRC をブート情報域へ (include/bootinfo.h の
+    /* 6. 起動したイメージの CRC をブート情報域へ (platform/pc98/bootinfo_wire.h の
      *    イメージ欄)。主部は実モードで封じ済み — イメージ欄は自分の
      *    チェック語を**最後に**書く。 */
     bootinfo_set_image(img_crc, (u32)file_size);

@@ -62,12 +62,12 @@ static int kcg_detach(struct module_record *r)
 int kcg_module_load(void)
 {
     if (kcg_handle.generation) return MODULE_BUSY;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_KCG_MOD, .name = "kcg",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, KCG_MODULE_ABI_GEN,
-            bi->img_crc, KCG_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, KCG_MODULE_OPS_VERSION, bi->image_valid,
             KCG_IMPORT_COUNT, kcg_import_contracts, kcg_export_contracts,
             MODULE_ID_KCG
         },
@@ -78,7 +78,7 @@ int kcg_module_load(void)
     if (!rc) rc = module_start(kcg_handle);
     if (!rc && !module_exports(kcg_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[KCG] ROM module rc=%d pair=%08x cache=%u\n",
-            rc, bi->img_crc, KCG_ROM_CACHE_BYTES);
+            rc, bi->image_crc, KCG_ROM_CACHE_BYTES);
     if (rc) kprintf(KLOG_ATTR, "[KCG] ROM stub; TVRAM CUI retained\n");
     return rc;
 }

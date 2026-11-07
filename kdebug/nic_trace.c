@@ -2,6 +2,7 @@
 #include "nic_trace.h"
 #include "drivers/net/e82557/e82557.h"
 #include "include/bootinfo.h"
+#include "platform/pc98/bootinfo_native.h"
 #include "include/kprintf.h"
 #include "fs/vfs.h"
 #include "generated/kdebug_import_macros.h"

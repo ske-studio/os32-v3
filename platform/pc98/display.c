@@ -4,7 +4,7 @@
 #include "display_private.h"
 #include "io.h"
 #include "gfx_internal.h"
-#include "v86_bios.h"
+#include "bios_snapshot.h"
 #include "palette.h"
 #include "pegc.h"
 #include "con_sink.h"

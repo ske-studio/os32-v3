@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
 #include "../../kernel/module/hwdev_module.c"
 #include "pgalloc.h"
@@ -267,3 +268,10 @@ int kstrcmp(const char *a, const char *b)
 { while (*a && *a==*b) { a++; b++; } return (u8)*a-(u8)*b; }
 char *kstrncpy(char *d, const char *s, u32 n)
 { u32 i=0; if (!n) return d; while (i+1<n && s[i]) { d[i]=s[i]; i++; } d[i]=0; return d; }
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
+}

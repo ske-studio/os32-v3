@@ -193,11 +193,11 @@ int trident_module_load(void)
         kprintf(KLOG_ATTR, "[trident] stage=resources rc=%d\n", TRI_E_RESOURCE);
         return TRI_E_RESOURCE;
     }
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path=SYS_TRIDENT_MOD, .name="trident",
         .policy={KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, TRIDENT_MODULE_ABI_GEN,
-            bi->img_crc, TRIDENT_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, TRIDENT_MODULE_OPS_VERSION, bi->image_valid,
             TRIDENT_IMPORT_COUNT, trident_import_contracts, trident_export_contracts,
             MODULE_ID_TRIDENT},
         .imports=trident_kexports, .lifecycle={.start=start, .detach=detach}
@@ -210,7 +210,7 @@ int trident_module_load(void)
         context.backend = &gfx_backend_trident;
     }
     else diagnostic_candidate = diagnostic_slot = NULL;
-    kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, bi->img_crc, pinned);
+    kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, bi->image_crc, pinned);
     return rc;
 }
 int trident_module_abort(void)

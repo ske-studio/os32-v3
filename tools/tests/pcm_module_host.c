@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Real runtime + resident PCM brokers. Relocated body calls are a host seam;
  * the CS4231 fixture separately exercises the real device stop evidence. */
 #define _start unused_runtime_start
@@ -213,4 +214,11 @@ void _start(void)
         empty();
     }
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

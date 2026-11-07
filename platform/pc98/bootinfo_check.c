@@ -12,7 +12,7 @@
 /* ======================================================================== */
 
 #include "kstring.h"
-#include "bootinfo.h"
+#include "bootinfo_native.h"
 
 static u16 rd16(const u8 *p)
 {

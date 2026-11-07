@@ -1,7 +1,7 @@
 #include "platform_memory.h"
 #include "paging.h"
 #include "pc98.h"
-#include "v86_bios.h"
+#include "bios_snapshot.h"
 
 /* Probe pattern is derived from the address, so any aliasing (24-bit wrap or
  * a short RAM array repeating) shows up as a mismatch on the second pass. */

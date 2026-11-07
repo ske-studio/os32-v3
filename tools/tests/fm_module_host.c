@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Real runtime + FM resident adapter. Init functions stand in for relocated
  * body text; prefix-return failure exercises the actual post-registration
  * rollback. Destructive page fixture verifies body/owner/FD reclamation. */
@@ -112,4 +113,11 @@ void _start(void)
         empty();
     }
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

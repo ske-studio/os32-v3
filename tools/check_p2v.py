@@ -225,7 +225,7 @@ def audit(root, changed=None):
     functions, files = set(), set()
     try:
         units = [u for u in ast.units(root)
-                 if any(u['src'].startswith(d + '/') for d in ROOTS)
+                 if any(u['src'] == d or u['src'].startswith(d + '/') for d in ROOTS)
                  and not EXCLUDED.intersection(pathlib.Path(u['src']).parts)]
         for u in select_units(units, root, changed):
             def compute():
@@ -246,7 +246,7 @@ def audit(root, changed=None):
                 files.update(includes)
             functions.update(map(tuple, funcs))
             for rel,ln,func,rule in hits:
-                if not any(rel.startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(rel).parts):
+                if not any(rel == d or rel.startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(rel).parts):
                     continue
                 if rule in ('physical-cast','physical-sink') and (rel,func) in allowed:
                     continue

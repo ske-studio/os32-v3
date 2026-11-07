@@ -33,7 +33,7 @@ def host_cmd(exe):
 
 
 MUTATIONS = [
-    ("page0_direct", "kdi_ptr_v86_session()->real_lowmem[crt_work_addr[i]]",
+    ("page0_direct", "v86_bios_real_lowmem()[crt_work_addr[i]]",
      "*(const volatile u8 *)P2V(crt_work_addr[i])"),
     ("extra_out", "    r->hsync = (u8)inp(PEGC_HSYNC_PORT);",
      "    outpw(CRT_DIAG_SYSPORT_A, 0);\n    r->hsync = (u8)inp(PEGC_HSYNC_PORT);"),

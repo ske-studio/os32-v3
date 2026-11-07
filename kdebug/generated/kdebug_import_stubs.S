@@ -1616,4 +1616,9 @@ debug_probe_control:
 legacy_lowmap_busy:
     jmp *kdebug_import_slots+1288
 .size legacy_lowmap_busy, .-legacy_lowmap_busy
+.globl v86_bios_real_lowmem
+.type v86_bios_real_lowmem, @function
+v86_bios_real_lowmem:
+    jmp *kdebug_import_slots+1292
+.size v86_bios_real_lowmem, .-v86_bios_real_lowmem
 .section .note.GNU-stack,"",@progbits

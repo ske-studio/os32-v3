@@ -44,13 +44,13 @@ void kdebug_load(void)
     if (kdebug.open_count ||
         sysconfig_get_int(SYS_SYSTEM_CFG, "KDEBUG", 0) != 1) return;
     kdebug.open_count++;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_KDEBUG_BIN,
         .name = "kdebug",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, KDEBUG_ABI_GEN,
-            bi->img_crc, KDEBUG_OPS_VERSION, bi->img_valid, KDEBUG_IMPORT_COUNT,
+            bi->image_crc, KDEBUG_OPS_VERSION, bi->image_valid, KDEBUG_IMPORT_COUNT,
             kdebug_import_contracts, kdebug_export_contracts, MODULE_ID_KDEBUG
         },
         .imports = (const u32 *)kdebug_kexports,

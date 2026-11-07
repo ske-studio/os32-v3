@@ -1,6 +1,6 @@
 """Run the diagnostic probe with bounded fake scan/clock and buffered output."""
 CHECK = dict(name='splash-probe-host', tier=1,
-    covers=['platform/pc98/splash_probe.c', 'drivers/video/pc98/splash_raster.c',
+    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/splash_probe.c', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'tools/tests/splash_probe_host.c',
             'drivers/video/pc98/splash_raster_image.h',
             'tools/tests/host32.py',

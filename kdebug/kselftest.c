@@ -60,7 +60,8 @@
 #include "ktime.h"        /* ktime_now: 実時計の単調性 */
 #include "sys.h"          /* sys_time_now */
 #include "io.h"           /* inp / irq_save */
-#include "bootinfo.h"     /* ブート情報域 (票 TASK_HDD_INSTALL 段 0) */
+#include "bootinfo.h"
+#include "platform/pc98/bootinfo_native.h"     /* ブート情報域 (票 TASK_HDD_INSTALL 段 0) */
 #include "bootlog.h"      /* 起動ログ (/var/log/boot.log) */
 #include "gui.h"          /* gui_ime_set_render (ime_set_render の門) */
 #include "memory_boot.h"

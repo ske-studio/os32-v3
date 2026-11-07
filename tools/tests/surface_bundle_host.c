@@ -1,3 +1,5 @@
+static int host_bios_ready;
+int platform_bios_ready(void) { return host_bios_ready; }
 /* T2e e3: real B1, query, leases, paging, native cache and V86 paths. */
 #define HOST_CALLER_COPY_TEST
 static void bundle_root_check(unsigned long root);
@@ -167,7 +169,7 @@ static void caller_copy_tests(void)
     host_cr3 = paging_kernel_pd_phys();
     limit = 4096;
     native_cache();
-    v86_session.real_saved = 1;
+    host_bios_ready = 1;
     CHECK(!v86_mem_setup(space.owner)); native_cache();
     v86_mem_teardown(); native_cache();
     CHECK(!v86_restore_mismatch);
