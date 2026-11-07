@@ -39,17 +39,37 @@ DIR = 'drivers/video/trident/'
 MUTATIONS = (
  ('M_CONTEXT', 'trident_body.c', '!context->display_owner)', 'false)', 'NULL display owner rejection'),
  ('M_PIN_RELEASE', 'trident_module.c', 'if (armed) return TRI_E_BUSY;', 'if (false) return TRI_E_BUSY;', 'arm retains module on abort'),
- ('M_OPTIONAL_NULL', 'trident_module.c', 'if (candidate.fill_rect ||', 'if (!candidate.fill_rect ||', 'production optional NULL slots accepted'),
+ ('M_OPTIONAL_TEXT', 'trident_module.c', 'if (optional[i] && !module_text_contains(r, optional[i]))', 'if (false)', 'out-of-text optional hooks rejected'),
+ ('M_OPTIONAL_ACCEPT', 'trident_module.c', 'if (optional[i] && !module_text_contains(r, optional[i]))', 'if (optional[i])', 'in-text optional hooks accepted'),
  ('M_REQUIRED', 'trident_module.c', 'if (!module_text_contains(r, required[i]))', 'if (required[i] && !module_text_contains(r, required[i]))', 'missing required prepare rejected'),
  ('M_PIN_FAIL', 'trident_module.c', 'return MODULE_INIT_FAILED;\n    pinned = true;', 'pinned = false;\n    pinned = true;', 'ref acquisition failure prevents prepare'),
  ('M_PREPARE_RC', 'trident_module.c', 'return rc;\n}\nstatic int detach', 'return 0;\n}\nstatic int detach', 'prepare failure prevents publication'),
+ ('M_MODE_COUNT', 'trident_module.c', '!candidate.mode_count || candidate.mode_count > TRI_MODE_COUNT ||', 'candidate.mode_count || candidate.mode_count > TRI_MODE_COUNT ||', 'nonempty mode array accepted'),
+ ('M_MODE_LIMIT', 'trident_module.c', 'candidate.mode_count > TRI_MODE_COUNT', 'candidate.mode_count > 2', 'three-mode normal control accepted'),
+ ('M_DEFAULT', 'trident_module.c', 'candidate.default_mode >= candidate.mode_count', 'candidate.default_mode > candidate.mode_count', 'default at end rejected'),
+ ('M_MODE_RANGE', 'trident_module.c', 'a - r->base <= size - bytes', 'a - r->base > size - bytes', 'mode and device data must be resident'),
+ ('M_SELECTION_END', 'trident_module.c', '(selected - first) / sizeof(GfxMode) >= candidate.mode_count', '(selected - first) / sizeof(GfxMode) > candidate.mode_count', 'one-past selection rejected'),
+ ('M_SELECTION_ALIGN', 'trident_module.c', '(selected - first) % sizeof(GfxMode)', '0', 'unaligned selection rejected'),
+ ('M_DAC', 'trident_module.c', 'm->dac_bits != TRI_MODULE_DAC_BITS', 'false', 'six-bit DAC required'),
+ ('M_RESERVED', 'trident_module.c', '|| m->reserved ||', '|| false ||', 'reserved mode byte rejected'),
+ ('M_MIN_PITCH', 'trident_module.c', 'm->pitch < (u32)m->width * cpp', 'false', 'depth-scaled minimum pitch'),
+ ('M_PITCH_ALIGN', 'trident_module.c', 'm->pitch % cpp', '0', 'pitch aligned to pixel size'),
+ ('M_MAP_CAPACITY', 'trident_module.c', 'm->pitch > res->mapped_bytes / m->height', 'false', 'mapped capacity enforced'),
+ ('M_DECODE_CAPACITY', 'trident_module.c', 'm->pitch > res->decode_bytes / m->height', 'false', 'decode capacity enforced'),
+ ('M_BB_PITCH', 'trident_module.c', 'candidate.bb_pitch != selected->pitch', 'false', 'selected pitch matches BB'),
+ ('M_BB_FORMAT', 'trident_module.c', 'candidate.bb_format != GFX_BB_PACKED8', 'false', 'legacy BB marker retained'),
+ ('M_BB_BASE', 'trident_module.c', 'candidate.bb_base == res->client', 'true', 'BB uses client base'),
+ ('M_BB_SIZE', 'trident_module.c', 'candidate.bb_size == res->client_bytes', 'true', 'BB size matches descriptor'),
+ ('M_CLIENT_CAPACITY', 'trident_module.c', 'selected->pitch <= candidate.bb_size / selected->height', 'true', 'selected image fits client capacity'),
+ ('M_CLIENT_PITCH', 'trident_module.c', 'res->client_surface.pitch == selected->pitch', 'true', 'surface pitch matches selection'),
+
 )
 
 def build(work, changed=None):
     from mutpar import build_in_tree
     exe=work/'module'
     sources=[DIR+n+'.c' for n in ('backend_trident','probe','regs','default_dac',
-        'state_save','state_restore','pc98_init','vram','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
+        'state_save','state_restore','pc98_init','vram','accel','cursor','ddc1','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
     cmd=['gcc',*FLAGS,'-I.','-I'+DIR,'-Ibuild/out/trident',
          *include_flags(ROOT),'-nostdlib','-static','-no-pie',
          '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','-o',str(exe)]
@@ -63,7 +83,7 @@ def build(work, changed=None):
 
 def execute(exe,runners,red=False):
     rejected=False
-    for mode in range(37):
+    for mode in range(65):
         for runner in runners:
             result=host32.run([str(exe)],input=struct.pack('<I',mode),runner=runner,capture_output=True)
             if red:
@@ -85,14 +105,14 @@ def product(work,runners):
         spec['version'],spec['generations']['memory_layout'],module_id=13)
     assert rebuilt==data
     contract=dict(kapi=spec['version'],layout=spec['generations']['memory_layout'],
-        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=1,img_valid=1,module_id=13,
+        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=2,img_valid=1,module_id=13,
         imports=[(fnv(e['name']),e['type_ver'],e['kind']) for e in meta['imports']],
         exports=[(i,fnv(n),1) for i,n in enumerate(('initialize','prepare','restore'),1)])
     exe=build_validator(work)
     for runner in runners:
         good=validate(exe,data,relocate_base=0x1200000,runner=runner,**contract)
         assert good.returncode==0,good
-        for field,value in ((31,contract['pair']^1),(6,contract['abi']^1),(8,1),(33,2)):
+        for field,value in ((31,contract['pair']^1),(6,contract['abi']^1),(8,1),(33,1)):
             bad=bytearray(data); word(bad,field,value)
             result=validate(exe,crc(bad),relocate_base=0x1200000,runner=runner,**contract)
             assert result.returncode!=0,result
@@ -151,6 +171,8 @@ def main():
             for name,path,old,new,reason in MUTATIONS:
                 exe,tree=build(work/name,(DIR+path,old,new)); execute(exe,runners,red=True)
                 print(f'MUTATE RED {name}: {reason} (compiled runtime)',flush=True)
+            execute(build(work/'restored')[0],runners)
+            print('GREEN restored module controls',flush=True)
     return 0
 
 def run(ctx):
