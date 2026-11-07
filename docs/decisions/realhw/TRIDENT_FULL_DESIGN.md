@@ -322,3 +322,4 @@ F5 drivers/video/trident/vram.c: usable に decode 上限も反映し、ペー�
 - A2 (P2): 大きさが違うときの作り直しは、両面を release してから DISPLAY → CLIENT の順に create する (片面だけ解放すると重なりの検査 pgalloc_surface.inc:75 で落ちる)。
 - A3 (P2): 作り直しの後の SID は暫定の面と同じであることを要求し、違えば失敗にする (gfx_core_surface.inc:331-343 の pending の印は SID ごと)。試験で確かめる。
 - A4 (P3): F6h で configure の宣言を変えたら、試験の複製も追従する: tools/tests/trident_resources_host.c、test_trident_contracts.py、test_trident_resources.py、test_trim_flow.py。
+- 実装中の欠け (PM 決定 2026-11-07): Close (F9) から core の面の unready・lease の revoke は呼ばない。lease の回収と面の再公開は既存の gfx_shutdown (gfx_core) が持つ経路のまま。gfx_return_emergency は緊急の戻りで lease を考えない (シングルタスク、戻った先は CUI)。表の Close の行の「unready・lease revoke」は削る。configure に Close 用の呼び出しも別の callback も足さない。Close の後の再入場は A1 (再 prepare で既定の形に regen) で整える。
