@@ -1,4 +1,4 @@
-/* OS tick counter; storage remains in the architecture interrupt code. */
+/* OS tick counter; storage is owned by kernel/time/tick.c. */
 #ifndef KERNEL_TICK_H
 #define KERNEL_TICK_H
 

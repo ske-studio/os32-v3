@@ -2,27 +2,21 @@
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_B_DESIGN・DEP_DIR_D2_DESIGN・VER_INFO_DESIGN (D1 で移した)
 ソース: `kernel/time/`
 
-### ktime
+### ktime と PC98 clock source
 
-```c
-/* kernel/time/ktime.c: irq_save 済みの既存 retry loop 内 */
-platform_timer_sample(&hw);
-p1 = hw.p1; count = hw.count; p2 = hw.p2;
-t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
-/* 以後 feed→time_decide→time_us_from→clamp→irq_restore→出力をそのまま残す */
-```
+`include/clock_source.h` は tick 周波数と counter 入力周波数を別々に公開する。
+共通 `kernel/time/ktime.c` は irq_save → platform_clock_read_us → 成功時 clamp → irq_restore → 成功時だけ user 出力の順。
+失敗時は出力を触らず、呼出元の IF=0/1 を復元する。`time_clamp` と単調性の保存域・計数は共通側に残る。
+`kernel/time/tick.c` が tick_count を所有し、x86 ISR の更新順は変えない。
 
-|所有者／文脈|移動・維持する中身|
+|所有者／文脈|契約|
 |---|---|
-|kernel/time/ktime.c、呼出元 IF を保存|ps の valid/mode/reload 検査、retry 上限 TIME_RETRY_MAX、feed、補間、s_last_us と clamp_count を所有。sample は IRQ 内でも待たない|
+|platform/pc98/clock_source.c、IF=0、出力は kernel 局所変数|PIT valid/mode/reload 検査、最大3回の sample → tick → decide → us_from。未設定 NOSYS、上限 AGAIN|
+|platform/pc98/pit_time.c/.h|time_decide/time_us_from、退役した time_branch_hits/reset の互換保存域。判定は計数を更新しない|
+|platform/pc98/pit.c・pit_math.c/.h|PIT 設定と純粋整数演算。100Hz: reload 19968/24576、period_us=10000|
 
-- p1/p2 不一致の再試行、上限時 AGAIN、未設定時 NOSYS、失敗時出力不変、NULL 出力、feed 中 clamp 無効、成功時の単調性を維持。
-
-### pit_math
-
-|所有者／文脈|移動・維持する中身|
-|---|---|
-|kernel/time/pit_math.*|構造体の型・配置・mode 値・純粋整数演算をそのまま維持。100Hz: reload 19968/24576、period_us=10000|
+退役した time_test_feed の保存域と clear は共通側で保持するが、時計の読取りには使わない。
+実呼出元・provider の試験は `tools/tests/test_clock_caller.py`。保護した出力頁で IF 復元前の書込みも検出する。
 
 ### clock_service
 
@@ -35,5 +29,5 @@ CPU の行の「実測か既定か」は値からは見分けない (正しい�
 
 ## 索引
 
-- [kernel/time/pit.c](pit.md)
+- [platform/pc98/pit.c](pit.md)
 - [kernel/time/sysclk.c](sysclk.md)

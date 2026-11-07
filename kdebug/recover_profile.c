@@ -1,3 +1,4 @@
+#include "../platform/pc98/pit.h"
 /* T2 common injectable primitives. No GF ROM/opcode classification here.
  * GF targets/rules are the shared recover descriptor, supplied by S1/S2.
  * Existing HAL PIT mode 2 is sampled without reprogramming; IRQ-off spans
@@ -8,7 +9,6 @@
 #include "recover_diag.h"
 #include "config.h"
 #include "memmap.h"
-#include "../arch/x86/kernel/idt.h"
 #include "../mm/paging.h"
 #include "pc98.h"
 #include "io.h"

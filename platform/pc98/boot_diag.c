@@ -1,4 +1,5 @@
 #include "boot_diag.h"
+#include "pit.h"
 #include "idt.h"
 void platform_boot_diag(struct boot_diag *out)
 {

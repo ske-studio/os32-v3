@@ -5,6 +5,8 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'drivers/video/pc98/splash_raster_image.h',
             'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'include/platform_splash.h',
+            'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
+            'include/time_units.h', 'include/memmap.h',
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
             'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
@@ -216,7 +218,8 @@ def ordinary():
         obj = Path(td) / 'probe.o'
         cross = Path(os.environ['CROSS_DIR']) / 'bin'
         subprocess.run([str(cross / 'i386-elf-gcc'), '-std=gnu11', '-O2',
-            '-ffreestanding', '-c', str(ROOT / SOURCE), '-o', str(obj)], check=True)
+            '-ffreestanding', *include_flags(ROOT),
+            '-c', str(ROOT / SOURCE), '-o', str(obj)], check=True)
         assert not subprocess.check_output([str(cross / 'i386-elf-nm'), str(obj)]).strip()
     print('GREEN ordinary build contains no probe code/storage', flush=True)
     with tempfile.TemporaryDirectory(prefix='splash-probe-instructions-') as td:

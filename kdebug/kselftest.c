@@ -1,3 +1,4 @@
+#include "pit.h"
 #include "appmem.h"
 #include "kcg_module.h"
 #include "kcg.h"
@@ -54,6 +55,7 @@
 #include "pcm_cs4231.h"
 #include "dma8237.h"      /* 8237 の共通部 (同 §1-2) */
 #include "irq.h"          /* 動的 IRQ 登録 (票 TASK_HAL_WIRING §1-1) */
+#include "../platform/pc98/pit_time.h"
 #include "time_math.h"    /* time_clamped (票 §1-5) */
 #include "ktime.h"        /* ktime_now: 実時計の単調性 */
 #include "sys.h"          /* sys_time_now */

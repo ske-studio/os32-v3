@@ -1,26 +1,8 @@
-/* ======================================================================== */
-/*  KTIME.C — µs 時計 sys_time_now (票 TASK_HAL_WIRING §1-5)                */
-/*                                                                          */
-/*  時間源は tick_count (1-0 の後はどちらのクロックでもちょうど 10ms) と     */
-/*  PIT ch0 のラッチ読み。`us = tick × period + 経過ぶん` を 64bit で組む。  */
-/*                                                                          */
-/*  **難しいのは周期の境界**: ラッチの直前に再ロードが起きると、新しい周期の */
-/*  count を古い tick と組ませて時刻が 1 周期ぶん戻る。そこでラッチを        */
-/*  PIC1 の IRR bit0 (= IRQ0 が立っているか) で**挟んで読む** (票 §1-5 R8)。 */
-/*                                                                          */
-/*  契約: この時計が正しいのは **IRQ0 が失われない範囲**、つまりシステム全体 */
-/*  で IF=0 の区間が 1 周期 (10ms) 未満のとき。2 回以上の境界を IF=0 で跨ぐと */
-/*  tick が 1 つ落ち、この時計も tick_count も 10ms 遅れる — 検出はしない。  */
-/*  tick_count の u32 周回 (497 日) も扱わない。                            */
-/*                                                                          */
-/*  算数と判定は kernel/time/time_math.c (ホストで全分岐を踏む)。ここは           */
-/*  スナップショットの採り方だけ。                                          */
-/* ======================================================================== */
+/* Common microsecond clock: saved-IF provider read, monotonic clamp, user output. */
 
 #include "types.h"
-#include "../../arch/x86/kernel/idt.h"
+#include "clock_source.h"
 #include "io.h"
-#include "../../include/platform_timer.h"
 #include "sys.h"
 #include "time_math.h"
 #include "ktime.h"          /* 退役した私有 import の互換宣言 */
@@ -55,40 +37,9 @@ u32 ktime_clamp_count = 0;
 
 int sys_time_now(u32 *lo, u32 *hi)
 {
-    const struct pit_setup *ps = pit_get_setup();
-    struct time_snapshot snap;
-    unsigned int saved;
-    unsigned int out_lo = 0, out_hi = 0;
-    int attempt;
-    int rc = OS32_ERR_AGAIN;
-
-    /* PIT を積んでいない / mode 2 でない機械では補間の意味が無い。 */
-    if (!ps->valid || ps->mode != (u8)PIT_MODE_TIMER0 || ps->reload == 0) {
-        return OS32_ERR_NOSYS;
-    }
-
-    saved = irq_save();
-    for (attempt = 0; attempt < TIME_RETRY_MAX; attempt++) {
-        unsigned int count, t;
-        struct platform_timer_sample hw;
-        int p1, p2;
-
-        platform_timer_sample(&hw);
-        p1 = hw.p1;
-        count = hw.count;
-        p2 = hw.p2;
-
-        /* 4. tick (IF=0 の中なので 1〜3 の間は不変) */
-        t = (unsigned int)tick_count;
-
-        /* 5. 判定 */
-        if (time_decide(p1, p2, t, count, &snap) == TIME_DECIDE_OK) {
-            time_us_from(snap.tick, snap.count, ps->reload, ps->period_us,
-                         &out_lo, &out_hi);
-            rc = 0;
-            break;
-        }
-    }
+    u32 out_lo = 0, out_hi = 0;
+    unsigned int saved = irq_save();
+    int rc = platform_clock_read_us(&out_lo, &out_hi);
 
     /* 6. 単調性のクランプ (同じ IF=0 の中で。成功時は必ず通す)。 */
     if (rc == 0) {
