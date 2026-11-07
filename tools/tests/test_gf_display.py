@@ -183,6 +183,14 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('a3', 'edid-parser', 'kdebug/gf_display_test.c',
+  'data->edid_modes(display_row, block, edid) : GF4_EUNSUPPORTED;',
+  '(i32)GF4_EUNSUPPORTED : GF4_EUNSUPPORTED;', 'CRC read uses existing parser'),
+ ('a3', 'edid-name', 'kdebug/gf_display_test.c',
+  'd[3] == 0xfc', 'd[3] == 0xfd', 'monitor name descriptor'),
+ ('a3', 'edid-first-dtd', 'kdebug/gf_display_test.c',
+  'display_edid_timing("GF4 edid-first-dtd", &one.timing[0]);',
+  'display_edid_timing("GF4 edid-first-dtd", &one.timing[1]);', 'first DTD timing'),
  ('c2stop', 'off-stop-hardware-idempotent', 'hwdev/gf/display/service.c',
   'if (c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
   'if (false && c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
@@ -595,7 +603,7 @@ GF4_MUTATIONS = [
  ('b3',
   'b3-final-nack',
   'hwdev/gf/display/ddc.c',
-  'rc=ddc_get(&b,&bytes[n],n==DDC_BLOCK_BYTES-1U);',
+  'rc=ddc_get(&b,&bytes[n],n==count-1U);',
   'rc=ddc_get(&b,&bytes[n],false);',
   'b3'),
  ('b3',
@@ -847,8 +855,8 @@ GF4_MUTATIONS = [
  ('b7',
   'b7_retrace_inverted',
   'hwdev/gf/display/flip.c',
-  'if (status & FLIP_RETRACE) break;',
-  'if (!(status & FLIP_RETRACE)) break;',
+  'if (status & FLIP_RETRACE) { sample(&edge); break; }',
+  'if (!(status & FLIP_RETRACE)) { sample(&edge); break; }',
   'gf4_b7_host: high 即書込みと low→high'),
  ('b7',
   'b7_no_pending',
@@ -1693,6 +1701,16 @@ GF4_MUTATIONS += [
 ]
 
 GF4_MUTATIONS += [
+    ('b7', 'flip-edge-time', 'hwdev/gf/display/flip.c',
+     'sample(&edge); break;', 'break;', 'synchronized flip records the observed edge'),
+    ('b7', 'flip-pre-time', 'hwdev/gf/display/flip.c',
+     '    sample(&pre);', '    (void)pre;', 'pre-write timestamp and ordering'),
+    ('b7', 'flip-post-time', 'hwdev/gf/display/flip.c',
+     '    sample(&post);', '    (void)post;', 'post-write timestamp and ordering'),
+    ('b7', 'flip-early-log', 'hwdev/gf/display/flip.c',
+     '    rc = sync ? gf4_flip_complete(c, head, dl) : 0;',
+     '    diagnostic(head, sync, &edge, &pre, &post, 0);\n    rc = sync ? gf4_flip_complete(c, head, dl) : 0;',
+     'serial output must follow final flip completion'),
     ('b7', 'completed-hold-clear', 'hwdev/gf/display/flip.c',
      'c->hold[head] = (struct gf4_flip_hold){0};',
      'c->hold[head].pending = false;', 'completed hold must contain no stale surface keys'),
@@ -1703,9 +1721,56 @@ GF4_MUTATIONS += [
 
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.
+GF4_MUTATIONS += [
+    ('b0', 'detect-block-budget', 'hwdev/gf/display/modes.c',
+     'i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);',
+     'i32 rc=0; dl=1;', 'block_budgets'),
+    ('b0', 'native-doublescan-height', 'hwdev/gf/display/modes.c',
+     'return (t->flags&GF4_DBLSCAN) ? t->vd/2U : t->vd;',
+     'return t->vd;', 'native_and_diagnostics'),
+    ('b0', 'native-doublescan-refresh', 'hwdev/gf/display/modes.c',
+     'u32 total=(u32)t->ht*t->vt;',
+     'u32 total=(u32)t->ht*t->vt; if (t->flags&GF4_DBLSCAN) total*=2U;',
+     'native_and_diagnostics'),
+    ('b0', 'native-largest', 'hwdev/gf/display/modes.c',
+     'if (t->hd<b->hd) continue;', 'if (t->hd>b->hd) continue;',
+     'native_and_diagnostics'),
+    ('b0', 'native-preferred', 'hwdev/gf/display/modes.c',
+     'if (best==e->preferred) continue;', 'if (false) continue;',
+     'native_and_diagnostics'),
+    ('b0', 'detect-parser', 'hwdev/gf/display/modes.c',
+     'rc=c->data->edid_modes(block,block_no,e);', 'rc=GF4_EEDID;',
+     'declared_edid'),
+    ('b0', 'detect-timing-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,-1,"timing/range",GF4_ERANGE);',
+     '(void)t;', 'native_and_diagnostics'),
+    ('b0', 'detect-vram-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,m.fmt,"VRAM/pitch",GF4_ERANGE);',
+     '(void)t;', 'native_and_diagnostics'),
+    ('b0', 'detect-pll-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,m.fmt,"PLL",rc);',
+     '(void)t;', 'native_and_diagnostics'),
+]
+
+
+GF4_MUTATIONS += [
+    ('b3', 'probe-length', 'hwdev/gf/display/ddc.c',
+     'ddc_transfer(ctx,bus,0,&value,1U,dl)',
+     'ddc_transfer(ctx,bus,0,&value,0U,dl)', 'probe wire reads exactly one byte'),
+    ('b3', 'probe-offset', 'hwdev/gf/display/ddc.c',
+     'ddc_transfer(ctx,bus,0,&value,1U,dl)',
+     'ddc_transfer(ctx,bus,1,&value,1U,dl)', 'probe wire offset zero'),
+    ('b0', 'probe-failure', 'hwdev/gf/display/modes.c',
+     'if (rc) return rc; /* No EDID on this connector. */',
+     'if (rc) rc=0; /* No EDID on this connector. */', 'failed probe skips EDID'),
+    ('b0', 'probe-success', 'hwdev/gf/display/modes.c',
+     'rc=gf4_ddc_probe(c,bus,dl);',
+     'rc=gf4_ddc_probe(c,bus,dl); if (!rc) rc=GF4_EDDC;', 'successful probe reads EDID'),
+]
+
 GF4_COMPONENTS = {
-    'b0': ['hwdev/gf/display/modes.c'],
-    'b01tv': ['hwdev/gf/display/modes.c', 'hwdev/gf/display/timing.c'],
+    'b0': ['hwdev/gf/display/modes.c', 'drivers/video/geforce/edid.c'],
+    'b01tv': ['hwdev/gf/display/modes.c', 'hwdev/gf/display/timing.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b1': ['hwdev/gf/display/'+n+'.c' for n in ('timing', 'format', 'fifo')],
     'b2': ['hwdev/gf/display/pll_program.c', 'kdebug/gfinit_pll.c'],
     'b2b': ['kdebug/gfinit_pll.c'],
@@ -1724,7 +1789,7 @@ GF4_COMPONENTS = {
     'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c'],
     'c0log': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
     'c4': ['drivers/video/geforce/'+n+'.c' for n in ('edid', 'tv_data', 'gf_display_data')],
-    'a3': [],
+    'a3': ['drivers/video/geforce/edid.c'],
 }
 # Start-line observations execute the real video entry and lifecycle.
 GF4_MUTATIONS += [
@@ -1833,7 +1898,7 @@ GF4_MUTATIONS += [
     ('scanlog', 'fan-off-once', 'hwdev/gf/therm.c',
      'if (!g->fan_off)\n        kprintf', 'if (true)\n        kprintf', 'fanless logs exactly once even on first poll'),
     ('scanlog', 'clock-off-once', 'hwdev/gf/feature5_service.c',
-     'if (g->busy || !thermal_live(g)) return 0;', 'if (g->busy || g->last_rc || !thermal_live(g)) return 0;', 'clock retries after a temporary failure'),
+     'if (!thermal_live(g)) return 0;', 'if (g->last_rc || !thermal_live(g)) return 0;', 'clock retries after a temporary failure'),
     ('scanlog', 'scan-log-start', 'drivers/video/geforce/backend_geforce.c',
      'SCAN_START, 4, &start', 'SCAN_START, 4, &config', 'scanlog_present'),
     ('scanlog', 'scan-log-pitch', 'drivers/video/geforce/backend_geforce.c',

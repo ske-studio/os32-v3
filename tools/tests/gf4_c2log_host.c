@@ -130,7 +130,9 @@ static int log_start(void)
 {
     struct video_mode mode;
     assert(!video_mode_info(&log_device,0,&mode));
-    return video_start(&log_device,mode.id,log_palette);
+    int rc=video_start(&log_device,mode.id,log_palette);
+    startlog_remove_mode_diagnostics();
+    return rc;
 }
 static void log_expect(const char *stage,int rc)
 {

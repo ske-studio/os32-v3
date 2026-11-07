@@ -88,7 +88,7 @@ static const struct gf5_plan plan = {
     .actual={REQUEST_KHZ,REQUEST_KHZ,REQUEST_KHZ}
 };
 static u32 write_count, read_count, sleep_count, clock_count, self_depth, protected_heads;
-static bool timeout_jump;
+static bool timeout_jump, slow_edges;
 struct golden { u32 off,width,value; };
 static const struct golden golden[] = {
     {SR_INDEX,BYTE,SR1}, {SR_INDEX+STRIDE,BYTE,SR1},
@@ -138,6 +138,9 @@ static void observe_mmio(struct gf4_host *d,const struct gf4_host_event *e)
         assert(!h.calls[F5_COPY] && !h.calls[F5_RESUME]);
     }
     if (timeout_jump && e->op==D_SLEEP) h.now+=VBLANK_US;
+    /* One failed read per edge, each followed by 1.5s of elapsed time. */
+    if (slow_edges && e->op==D_SLEEP && d->next_read>=5U &&
+        (d->next_read&1U)) h.now+=VBLANK_US*3U/4U;
 }
 static void observe_link(struct gf5_host *host,const struct gf5_host_event *e)
 {
@@ -212,7 +215,7 @@ static void setup(u32 active,u32 preblank,bool script)
         add_read(VBL+head*STRIDE,HIGH,&n);
     gf4_host_reads(&h.display,reads,n);
     h.display.observe=observe_mmio; h.observe=observe_link;
-    self_depth=0; protected_heads=active&~preblank; timeout_jump=false;
+    self_depth=0; protected_heads=active&~preblank; timeout_jump=false; slow_edges=false;
 }
 static void retained(void)
 {
@@ -292,6 +295,33 @@ static void normal(void)
     sleep_count=h.display.calls[D_SLEEP]; clock_count=h.display.calls[D_CLOCK];
     assert(h.display.sr[0][1]==SR_OLD && h.display.sr[1][1]==SR_OLD);
 }
+/* ramnv40.c:99-109,165-169: six independent waits may total >2s,
+ * and neither prior work nor an expired outer deadline reduces a budget. */
+static void independent_waits(void)
+{
+    setup(3,0,true);
+    u32 n=HEADS*2U;
+    for (u32 head=0;head<HEADS;++head) {
+        add_read(VBL+head*STRIDE,HIGH,&n);
+        add_read(VBL+head*STRIDE,0,&n);
+        add_read(VBL+head*STRIDE,0,&n);
+        add_read(VBL+head*STRIDE,HIGH,&n);
+    }
+    for (u32 head=0;head<HEADS;++head) {
+        add_read(VBL+head*STRIDE,0,&n);
+        add_read(VBL+head*STRIDE,HIGH,&n);
+    }
+    gf4_host_reads(&h.display,reads,n);
+    h.now=DEADLINE-100U;
+    slow_edges=true;
+    assert(gf5_ram_prog(&h.ctx,&plan)==0);
+    assert(h.display.next_read==n && h.now>DEADLINE+4U*VBLANK_US);
+    assert(h.ctx.deadline==DEADLINE && h.ctx.accepting);
+    assert(h.calls[F5_SCRIPT]==1 && h.calls[F5_RESUME]==1);
+    assert(reg(CTRL)==NEW_CTRL && reg(COEF)==NEW_COEF);
+    assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
+    assert(h.display.sr[0][SR1]==SR_OLD && h.display.sr[1][SR1]==SR_OLD);
+}
 static void rejected(const struct gf5_plan *p,i32 rc)
 {
     struct gf5_host_activity before=gf5_host_activity(&h);
@@ -341,6 +371,7 @@ void _start(void)
 {
     guard_cases();
     normal();
+    independent_waits();
     /* Every successful-path I/O site can fail, including applied writes.
      * The first source rc survives every cleanup; no script is retried. */
     for (u32 nth=1;nth<=write_count;++nth) {
@@ -431,6 +462,7 @@ void _start(void)
     h.display.nreads=7; timeout_jump=true;
     assert(gf5_ram_prog(&h.ctx,&plan)==GF5_ETIME);
     retained(); assert(!h.calls[F5_SCRIPT] && reg(CTRL)==OLD_CTRL);
+    assert(h.now==VBLANK_US+GF2_WAIT_MAX_US);
     assert(h.display.sr[0][1]==SR_OLD && h.display.sr[1][1]==SR_OLD);
     for (u32 i=0;i<h.display.nevents;++i)
         assert(display_events[i].op!=D_WRITE || display_events[i].a[1]!=PRECHARGE);

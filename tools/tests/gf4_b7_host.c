@@ -18,6 +18,38 @@ static struct gf3_surface next = {.off=NEW_OFF};
 static const struct gf4_host_read retrace_high[] = {
     {0,STATUS,1,RETRACE_HIGH}
 };
+static char output[512];
+static u32 output_len, samples, sample_events[3];
+static int clock_rc, gated;
+static bool require_complete;
+int sys_time_now(u32 *lo, u32 *hi)
+{
+    assert(samples < 3);
+    sample_events[samples] = h.nevents;
+    *lo = ++samples;
+    *hi = 1; /* Exercise the upper word, beyond the 32-bit clock wrap. */
+    return clock_rc;
+}
+int serial_gate_active(void) { return gated; }
+void serial_puts_polled(const char *s)
+{
+    if (require_complete) assert(!h.ctx.hold[0].pending);
+    assert(h.calls[D_WRITE]); /* Never print between edge and base write. */
+    while (*s) {
+        assert(output_len + 1 < sizeof(output));
+        output[output_len++] = *s++;
+    }
+    output[output_len] = 0;
+}
+static bool contains(const char *s)
+{
+    for (u32 i=0;i<output_len;++i) {
+        u32 j=0;
+        while (s[j] && output[i+j] && s[j]==output[i+j]) ++j;
+        if (!s[j]) return true;
+    }
+    return false;
+}
 static unsigned advance;
 static void observe(struct gf4_host *host, const struct gf4_host_event *e)
 {
@@ -25,6 +57,7 @@ static void observe(struct gf4_host *host, const struct gf4_host_event *e)
 }
 static void reset(void)
 {
+    output_len=samples=0; output[0]=0; clock_rc=gated=0; require_complete=false;
     gf2_host_memset(&state,0,sizeof(state));
     gf4_host_init(&h,&state);
     h.events=events; h.cevents=CAP; h.base.regs=regs; h.base.cregs=16;
@@ -134,8 +167,16 @@ void _start(void)
     reset();
     assert(gf4_vblank_wait(&h.ctx,0,0,DEADLINE,&seen)==GF4_ETIME && seen==99);
     reset();
+    require_complete=true;
     advance=1; gf4_host_reads(&h,retrace_high,sizeof(retrace_high)/sizeof(retrace_high[0]));
     assert(gf4_flip(&h.ctx,0,&next,true,DEADLINE)==0);
+    assert(samples==3);
+    assert(contains("edge_us=0x0000000100000001 clock_rc=0"));
+    assert(contains("pre_us=0x0000000100000002 clock_rc=0"));
+    assert(contains("post_us=0x0000000100000003 clock_rc=0"));
+    assert(contains(" rc=0\r\n"));
+    assert(sample_events[0]==sample_events[1]);
+    assert(sample_events[2]==sample_events[1]+1);
     for (u32 i=0;i<h.nevents;++i) {
         if (events[i].op==D_READ && events[i].a[1]==STATUS) {
             assert(i+1<h.nevents && events[i+1].op==D_WRITE);
@@ -143,5 +184,15 @@ void _start(void)
             break;
         }
     }
+    reset();
+    assert(gf4_flip(&h.ctx,0,&next,false,DEADLINE)==0);
+    assert(samples==2 && !contains("edge_us="));
+    assert(contains("pre_us=0x0000000100000001 clock_rc=0"));
+    reset(); clock_rc=-81;
+    assert(gf4_flip(&h.ctx,0,&next,false,DEADLINE)==0);
+    assert(contains("clock_rc=-81") && h.ctx.hold[0].base_verified);
+    reset(); gated=1;
+    assert(gf4_flip(&h.ctx,0,&next,false,DEADLINE)==0);
+    assert(!output_len && h.ctx.hold[0].base_verified);
     gf2_host_exit(0);
 }

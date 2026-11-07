@@ -547,10 +547,17 @@ static int agent_start(void)
     return 0;
 }
 
-static void agent_stop(void)
+static void agent_disconnect(void)
 {
     if (agent_fd >= 0) { close(agent_fd); agent_fd = -1; }
     if (agent_pid > 0) { kill(agent_pid, SIGTERM); while (waitpid(agent_pid, 0, 0) < 0 && errno == EINTR) {} agent_pid = -1; }
+    tx_hook = 0;
+    wire_pump_fn = 0;
+}
+
+static void agent_stop(void)
+{
+    agent_disconnect();
     if (agent_state[0]) {
         char f[160];
         snprintf(f, sizeof(f), "%s/sess.txt", agent_state);
@@ -1047,7 +1054,11 @@ static void r4_hello_stage_losses(void)
 /* A8: silence expires requests; a later session resync must not recount them. */
 static void r6_agent_silence_expires_then_resync_stales_handles(void)
 {
-    script_handshake(SCRIPT_SESS, 0);
+    if (agent_start() != 0) { check(0, "initial agent start failed"); return; }
+    check(agent_up(200), "initial agent handshake failed");
+    u16 old_sess = link_sess;
+    /* Preserve the real agent's on-disk session counter across restart. */
+    agent_disconnect();
     i32 a = link_host_open("PING", 4, host_owner);
     i32 b = link_host_open("TIME", 4, host_owner);
     ticks(LINK_HOST_SILENCE_TICKS);
@@ -1060,15 +1071,24 @@ static void r6_agent_silence_expires_then_resync_stales_handles(void)
     b = link_host_open("TIME", 4, host_owner);
     check(b >= 0 && b != a, "new request could not use released slot");
     tx_clear();
-    /* Explicit legacy resync tests the separate session invalidation contract. */
-    link_resync();
-    script_handshake(SCRIPT_SESS, link_syn_epoch);
+    /* Restarted agent has no knowledge of the old sess. Only HELLO recovers. */
+    if (agent_start() != 0) { check(0, "agent restart failed"); return; }
+    ticks(LINK_RTO_TICKS + 2);
+    check(link_resyncs == 1, "HOSTDOWN/close stopped RTO recovery");
+    check(agent_up(200), "restarted agent did not establish a new session");
+    check(link_sess != old_sess, "restart kept the unknown session");
     check(link_rt_fail == 1, "resync recounted an already terminal request");
     check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_STALE &&
           link_host_status(b, 0, 0, host_owner) == OS32_ERR_STALE,
           "session resync did not make old handles STALE");
     check(link_host_close(a, host_owner) == 0 && link_host_close(b, host_owner) == 0,
           "STALE close failed");
+    i32 h = link_host_open("PING", 4, host_owner);
+    u32 st = 0, len = 0;
+    check(h >= 0 && wait_status(h, &st, &len, 200) == 0 && st == 200,
+          "next request failed after agent restart");
+    check(link_host_close(h, host_owner) == 0, "recovered request close failed");
+    agent_stop();
 }
 
 /* CPL=0 経路 (ディスパッチャを通らない直呼び) の open / close */

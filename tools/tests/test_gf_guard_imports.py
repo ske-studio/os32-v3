@@ -30,7 +30,11 @@ def main():
     sys.path.insert(0, str(ROOT / 'tools'))
     from gen_kdebug_imports import load_def
     entries = load_def()
-    assert [e['symbol'] for e in entries[-3:]] == list(NAMES)
+    symbols = [e['symbol'] for e in entries]
+    # Later append-only imports (e.g. trident_diagnostic_ops) may follow; the
+    # GeForce guard trio must stay consecutive and in this order.
+    start = symbols.index(NAMES[0])
+    assert symbols[start:start + len(NAMES)] == list(NAMES)
     out = ROOT / 'build/out/geforce'
     meta = json.loads((out / 'geforce_imports.json').read_text())['imports']
     declared = json.loads((ROOT / 'tools/prototypes/geforce_imports.def').read_text())['imports']

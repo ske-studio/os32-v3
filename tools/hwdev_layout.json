@@ -1320,6 +1320,12 @@
       "mem_khz",
       "shader_khz"
     ],
+    "struct gf5_clock_raw": [
+      "mux",
+      "nc",
+      "nn",
+      "sc"
+    ],
     "struct gf5_emergency_ops": [
       "downclock",
       "owner",
@@ -1377,10 +1383,13 @@
     "struct gf5_image": [
       "bytes",
       "clock",
+      "clock_available",
+      "clock_raw",
       "complete",
       "display",
       "extent",
       "fan",
+      "fan_available",
       "nextent",
       "requested_uv",
       "saved_epoch",
@@ -1388,7 +1397,8 @@
       "tile_live",
       "tile_saved",
       "version",
-      "vid"
+      "vid",
+      "volt_available"
     ],
     "struct gf5_links": [
       "admission",
@@ -1461,6 +1471,7 @@
       "perf_select",
       "ram_prog",
       "service_poll",
+      "state_boot_target",
       "state_free",
       "state_restore",
       "state_save",
@@ -2806,6 +2817,7 @@
     "GF4_TV",
     "GF5T_ARG_HI",
     "GF5T_ARG_LO",
+    "GF5T_BOOT_TARGET",
     "GF5T_CLOCK_CALC",
     "GF5T_CLOCK_PROG",
     "GF5T_CLOCK_READ",

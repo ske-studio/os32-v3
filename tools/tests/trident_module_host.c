@@ -1,8 +1,9 @@
-/* Loader loan/pin tests use actual body and HAL facade. No device operations
- * run here; real regs/device assembly is test_trident_lifecycle's oracle. */
+/* Actual loader/body/HAL assembly; case 65 initializes the real device over
+ * fake hardware and calls the core drawing entrypoints and public cursor hooks. */
 #include "drivers/video/trident/trident_module.c"
 #include "drivers/video/trident/trident_body.c"
 #include "lib/kstring.h"
+#include "trident_device_fake.h"
 #include "mm/kmalloc.h"
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
 static void finish(int line)
@@ -21,7 +22,41 @@ static struct module_record record;
 static struct trident_resources resources;
 static struct bootinfo bi;
 static u32 ops[4], mode, pins, prepares, aborts, rollbacks;
-static u8 client[TRI_DISPLAY_BYTES], regs[TRI_REG_MAPPED_BYTES], lfb[TRI_DISPLAY_BYTES];
+static u8 client[TRI_FAKE_REAL_BYTES], regs[TRI_REG_MAPPED_BYTES], lfb[1228800];
+/* Independent HAL descriptors: padded pitches, three public formats, selected
+ * nondefault entry. No device initialization or register I/O is involved. */
+static GfxMode test_modes[] = {
+    {640, 480, GFX_FMT_PACKED8, 6, 1, 0, 1024},
+    {640, 400, GFX_FMT_RGB565, 6, 3, 0, 2048},
+    {640, 350, GFX_FMT_XRGB8888, 6, 5, 0, 2560},
+    {0, 480, GFX_FMT_PACKED8, 6, 1, 0, 640}
+};
+static void optional_hook(void) { }
+static int failure_mode(void)
+{ return mode==1 || mode==2 || mode==3 || mode==4 || mode==5 || mode==6 ||
+         mode==10 || (mode>=11 && mode<=36) || (mode>=40 && mode<=64); }
+/* Use the core's actual public drawing dispatch on the published backend. */
+static struct trident_fake fake;
+static struct trident_io fake_io;
+static u32 status_reads;
+static int fake_read8(void *opaque, enum trident_space space, u32 off, u8 *v)
+{
+    if (space == TRI_SPACE_REGS && off == TRI_CR_COLOR + 6)
+        fake.regs[off] = ((status_reads++ % 4) == 0 || (status_reads % 4) == 0) ? 8 : 0;
+    return trident_fake_io.read8(opaque, space, off, v);
+}
+const GfxBackend *g_backend;
+static int gfx_started;
+#include "gfx/gfx_core_api.inc"
+int __wrap_trident_regs_bind(struct trident_device *d)
+{
+    trident_fake_bind(&fake, d);
+    d->res = &resources;
+    fake_io = trident_fake_io;
+    fake_io.read8 = fake_read8;
+    d->io = &fake_io;
+    return 0;
+}
 GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 const u32 trident_kexports[TRIDENT_IMPORT_COUNT]={0};
@@ -35,7 +70,7 @@ const struct trident_resources *trident_resources_get(void) { return mode==1 ? 0
 int trident_resources_rollback(bool after) { CHECK(!after); ++rollbacks; return 0; }
 int module_load(const struct module_request *q, struct module_handle *h)
 {
-    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==1);
+    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==2);
     CHECK(q->lifecycle.start==start && q->lifecycle.detach==detach);
     CHECK(q->path[0]=='/');
     if (mode==2) return -72;
@@ -65,13 +100,57 @@ int module_start(struct module_handle h)
         (void **)&trident_backend_ops.cursor_show,(void **)&trident_backend_ops.vsync,
         (void **)&trident_backend_ops.page_flip,(void **)&trident_backend_ops.gamma,
         (void **)&trident_backend_ops.osri_show};
+    if (mode>=37 && mode<=64) {
+        trident_backend_ops.modes=test_modes;
+        trident_backend_ops.mode_count=3;
+        trident_backend_ops.default_mode=1;
+        trident_backend_ops.selected_mode=&test_modes[2];
+        trident_backend_ops.bb_pitch=2560;
+        resources.client_surface.pitch=2560;
+        for (u32 i=0;i<sizeof(optional)/sizeof(optional[0]);++i)
+            *optional[i]=mode==38 ? 0 : (void *)optional_hook;
+    }
+    if (mode==39) {
+        trident_backend_ops.fill_rect=0;
+        trident_backend_ops.blit=0;
+    }
+    if (mode==40) trident_backend_ops.mode_count=0;
+    if (mode==41) trident_backend_ops.default_mode=3;
+    if (mode==42) {
+        trident_backend_ops.selected_mode=test_modes+3;
+        trident_backend_ops.bb_pitch=resources.client_surface.pitch=640;
+    }
+    if (mode==43) {
+        trident_backend_ops.selected_mode=(void *)((u8 *)&test_modes[2]+1);
+        trident_backend_ops.bb_pitch=resources.client_surface.pitch=
+            trident_backend_ops.selected_mode->pitch;
+    }
+    if (mode==44) trident_backend_ops.selected_mode=(void *)((u32)(uptr)test_modes-4);
+    if (mode==45) test_modes[0].format=255;
+    if (mode==46) test_modes[0].width=0;
+    if (mode==47) test_modes[0].height=0;
+    if (mode==48) test_modes[0].dac_bits=4;
+    if (mode==49) test_modes[0].reserved=1;
+    if (mode==50) test_modes[1].pitch=1278;
+    if (mode==51) test_modes[1].pitch=2049;
+    if (mode==52) test_modes[2].pitch=2562;
+    if (mode==53) resources.mapped_bytes=2560*350-1;
+    if (mode==54) resources.decode_bytes=2560*350-1;
+    if (mode==55) trident_backend_ops.bb_pitch=640;
+    if (mode==56) trident_backend_ops.bb_format=255;
+    if (mode==57) resources.client_bytes=2560*350-1;
+    if (mode==58) resources.client_surface.pitch=2048;
+    if (mode==59) trident_backend_ops.modes=(void *)(uptr)(record.base+
+        record.pages*MODULE_PAGE_SIZE-sizeof(GfxMode));
+    if (mode==60) trident_backend_ops.modes=(void *)(uptr)record.text;
+    if (mode==61) record.prefix_pages=record.pages+1;
     if (mode>=11 && mode<20) *required[mode-11]=(void *)1;
     if (mode>=20 && mode<31) *optional[mode-20]=(void *)1;
     if (mode==31) trident_backend_ops.name=(void *)1;
     if (mode==32) trident_backend_ops.modes=(void *)1;
-    if (mode==33) trident_backend_ops.mode_count=2;
+    if (mode==33) trident_backend_ops.mode_count=TRI_MODE_COUNT+1;
     if (mode==34) trident_backend_ops.bb_size=1;
-    if (mode==35) ops[0]=2;
+    if (mode==35) ops[0]=1;
     if (mode==36) ops[2]=0;
     return start(&record,ops[1],ops);
 }
@@ -79,6 +158,7 @@ int module_abort(struct module_handle h)
 { (void)h; ++aborts; return detach(&record) ? 0 : MODULE_ISOLATED; }
 int trident_backend_prepare(void); /* actual HAL prepare below is linked */
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr;(void)fmt; }
+int sys_time_now(u32 *lo,u32 *hi) { *lo=0; *hi=0; return 0; }
 int serial_gate_active(void) { return 0; }
 void serial_puts(const char *p) { (void)p; }
 void serial_puts_polled(const char *p) { (void)p; }
@@ -93,7 +173,32 @@ int __wrap_trident_backend_prepare(void)
     CHECK(pinned && pins==1);
     CHECK(gfx_backend_trident.probe==missing_probe);
     if (mode==6) return -76;
-    return trident_backend_prepare();
+    int rc=trident_backend_prepare();
+    /* Corrupt only after the real prepare has produced its descriptor. */
+    if (mode==39 && diagnostic_candidate) {
+        diagnostic_candidate->context->settings.no_accel=true;
+        diagnostic_candidate->context->mode.no_accel=true;
+    }
+    if (mode==58) candidate.bb_pitch=2560;
+    if (mode==62) candidate.bb_base=client+1;
+    if (mode==63) candidate.bb_size=sizeof(client)-1;
+    if (mode==64) candidate.bb_base=0;
+    return rc;
+}
+/* Loader fixtures supply synthetic committed descriptors (including
+ * nondefault formats). F6's transaction and arguments are tested separately;
+ * this seam retains those descriptors through the I/O-free prepare call. */
+static int configure(const struct tri_mode *m, u32 bytes, bool final)
+{
+    if (mode != 65) { (void)m; (void)bytes; CHECK(!final); return TRI_OK; }
+    u32 pitch = m->display_width * (m->bpp / 8u);
+    resources.client = client;
+    resources.client_bytes = pitch * m->vd;
+    resources.display = (struct tri_surface){0, pitch*m->vd, pitch, m->hd, m->vd,
+                                            m->bpp/8u, TRI_FMT_INDEX8};
+    resources.client_surface = resources.display;
+    ++resources.generation;
+    return TRI_OK;
 }
 extern char __executable_start[], _etext[], _end[];
 void _start(void)
@@ -101,16 +206,26 @@ void _start(void)
     u32 read_rc;
     __asm__ volatile("int $0x80":"=a"(read_rc):"0"(3),"b"(0),"c"(&mode),"d"(4):"memory");
     CHECK(read_rc==4);
-    resources=(struct trident_resources){.ready=true,.regs=regs,.lfb=lfb,.client=client,
+    resources=(struct trident_resources){.ready=true,.regs=regs,.lfb=lfb,.client=client,.configure=configure,
         .client_bytes=sizeof(client),.mapped_bytes=sizeof(lfb),
         .decode_bytes=TRI_BAR0_DECODE_BYTES,.regs_bytes=sizeof(regs),
         .pci={.bus=TRI_PCI_BUS,.slot=TRI_PCI_SLOT,.function=TRI_PCI_FUNCTION,
             .vendor=TRI_PCI_VENDOR,.device=TRI_PCI_DEVICE,.command=TRI_PCI_COMMAND,
             .bar0=TRI_BAR0_PHYS,.bar1=TRI_BAR1_PHYS}};
+    if (mode == 65) {
+        CHECK(!trident_fake_reset(&fake, client, sizeof(client), 0, 0));
+        resources = fake.resources;
+        resources.ready = true;
+        resources.client = client;
+        resources.client_bytes = sizeof(client);
+        resources.configure = configure;
+    }
     record.text=(u32)(uptr)__executable_start;
     record.text_size=(u32)(_etext-__executable_start);
     record.ro=(u32)(uptr)_etext; record.ro_size=(u32)(_end-_etext);
-    ops[0]=1; ops[1]=(u32)(uptr)trident_module_init;
+    record.base=record.ro;
+    record.pages=(record.ro_size+MODULE_PAGE_SIZE-1)/MODULE_PAGE_SIZE;
+    ops[0]=2; ops[1]=(u32)(uptr)trident_module_init;
     ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98;
     TridentModuleContext loan=context;
     GfxBackend out={0};
@@ -127,17 +242,46 @@ void _start(void)
     }
     CHECK(!trident_context);
     int rc=trident_module_load();
-    if (mode==1 || mode==2 || mode==3 || mode==4 || mode==5 || mode==6 || mode==10 || mode>=11) {
+    if (failure_mode()) {
         CHECK(rc!=0 && gfx_backend_trident.probe==missing_probe);
-        CHECK(prepares==(mode==6));
+        CHECK(prepares==(mode==6 || (mode>=57 && mode<=58) || mode>=62));
         if (pinned) CHECK(!trident_module_abort());
         finish(0);
     }
     CHECK(!rc && pinned && pins==1 && prepares==1 && !armed);
-    CHECK(trident_context->backend==&candidate);
-    CHECK(gfx_backend_trident.bb_base==client && gfx_backend_trident.bb_size==sizeof(client));
-    CHECK(!gfx_backend_trident.fill_rect && !gfx_backend_trident.osri_show);
+    CHECK(gfx_backend_trident.bb_base==client && gfx_backend_trident.bb_size==resources.client_bytes);
+    if (mode==37 || mode==39) {
+        CHECK(gfx_backend_trident.osri_show);
+        CHECK(!!gfx_backend_trident.fill_rect==(mode==37));
+        CHECK(!!gfx_backend_trident.blit==(mode==37));
+        CHECK(gfx_backend_trident.mode_count==3 && gfx_backend_trident.default_mode==1);
+        CHECK(gfx_backend_trident.selected_mode==&test_modes[2]);
+        CHECK(gfx_backend_trident.bb_pitch==2560);
+    } else CHECK(!gfx_backend_trident.fill_rect && !gfx_backend_trident.osri_show);
+    CHECK(trident_diagnostic_ops());
+    if (mode==39) CHECK(trident_diagnostic_ops()->context->settings.no_accel &&
+        gfx_backend_trident.set_mode && gfx_backend_trident.dpms);
     CHECK(trident_module_load()==MODULE_BUSY);
+    if (mode == 65) {
+        g_backend = &gfx_backend_trident;
+        g_backend->init();
+        GFX_ScreenInfo info;
+        CHECK(!g_backend->query(&info));
+        CHECK(!gfx_hw_fill_rect(0, 0, 8, 8, 3));
+        CHECK(!gfx_hw_blit(8, 0, 0, 0, 8, 8));
+        CHECK((info.flags & (GFX_CAP_HW_FILL | GFX_CAP_HW_BLT)) ==
+              (GFX_CAP_HW_FILL | GFX_CAP_HW_BLT));
+        CHECK(g_backend->selected_mode && g_backend->mode_count > 1);
+        static const u32 pixel = 0xffffffffu;
+        struct GfxCursorImage image = {&pixel, sizeof(pixel), sizeof(pixel), 1, 1, 0, 0};
+        CHECK(g_backend->cursor_image && g_backend->cursor_move && g_backend->cursor_show);
+        CHECK(!g_backend->cursor_image(0, &image));
+        CHECK(!g_backend->cursor_move(0, 4, 5));
+        CHECK(!g_backend->cursor_show(0, 1));
+        CHECK(gfx_counters.hw_ops >= 2);
+        g_backend->shutdown();
+        finish(0);
+    }
     if (mode==7 || mode==8) {
         rc=context.arm(trident_restore98,&resources,42);
         if (mode==7) {
@@ -150,6 +294,7 @@ void _start(void)
     } else {
         CHECK(!trident_module_abort() && !pinned && pins==0 && rollbacks==1);
         CHECK(gfx_backend_trident.probe==missing_probe);
+        CHECK(!trident_diagnostic_ops());
     }
     finish(0);
 }

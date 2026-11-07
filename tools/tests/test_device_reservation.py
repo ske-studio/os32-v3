@@ -312,6 +312,47 @@ BODIES['trident_and_82557'] = r'''
     CHECK(ledger_region_count == n0 + 4 && ledger_selfcheck("pci"));
 '''
 
+# F6/F12 normal control: real ledger accepts the exact VRAM/UC role pair.
+# TRIDENT_FULL_DESIGN §2 + DESIGN.final.md F6: fixed capacity, regen both roles.
+BODIES['trident_vram_alias'] = r'''
+    u32 tri, display, client, r0, r1, free, regions;
+    struct ledger_span sp[2];
+    struct ledger_surface sf = {0};
+    host_pool_boot(8192);
+    CHECK(host_regions());
+    r0 = host_res(LEDGER_BUS_PCI, LEDGER_WB_GLUE_CONST, 0x20000, 0x20400, 0x20000, 0x20400);
+    r1 = host_res(LEDGER_BUS_PCI, LEDGER_WB_GLUE_CONST, 0x20400, 0x20410, 0x20400, 0x20410);
+    CHECK(ledger_owner_new(LEDGER_KIND_DEVICE, 0x40, "trident", &tri));
+    host_span(&sp[0], 0x20000, 0x20400, MMIO, r0);
+    host_span(&sp[1], 0x20400, 0x20410, MMIO, r1);
+    CHECK(ledger_reserve_set(tri, sp, 2));
+    regions = ledger_region_count;
+    free = pgalloc_free_pages();
+    sf.first = 0x20000; sf.npages = 768; /* fixed 3MiB, not current pitch*height */
+    sf.width = 640; sf.height = 480; sf.pitch = 640;
+    sf.owner = tri; sf.backing = LEDGER_SB_VRAM; sf.cache = LEDGER_CACHE_UC;
+    sf.backend = LEDGER_SF_TRIDENT; sf.role = LEDGER_ROLE_DISPLAY;
+    sf.format = 1; /* HAL PACKED8 */
+    sf.planes = 1; sf.perm_max = LEDGER_PERM_RW;
+    CHECK(ledger_surface_create(&sf, &display));
+    sf.role = LEDGER_ROLE_CLIENT;
+    CHECK(ledger_surface_create(&sf, &client) && client != display);
+    CHECK(ledger_surfaces[display].gen == 1 && ledger_surfaces[client].gen == 1);
+    sf.width = 800; sf.height = 600; sf.pitch = 1664; sf.format = 2; /* HAL RGB565 */
+    CHECK(ledger_surface_regen(display, &sf));
+    CHECK(ledger_surface_regen(client, &sf));
+    CHECK(ledger_surfaces[display].gen == 2 && ledger_surfaces[client].gen == 2);
+    CHECK(ledger_surfaces[display].role == LEDGER_ROLE_DISPLAY);
+    CHECK(ledger_surfaces[client].role == LEDGER_ROLE_CLIENT);
+    CHECK(ledger_surfaces[display].pitch == 1664 && ledger_surfaces[client].pitch == 1664);
+    CHECK(ledger_surfaces[display].first == 0x20000 && ledger_surfaces[client].first == 0x20000);
+    CHECK(ledger_surfaces[display].npages == 768 && ledger_surfaces[client].npages == 768);
+    CHECK(pgalloc_free_pages() == free && ledger_owner_pages(tri) == 0);
+    CHECK(ledger_surface_release(client) && ledger_surface_release(display));
+    CHECK(pgalloc_free_pages() == free && ledger_region_count == regions);
+    CHECK(ledger_reserve_set(tri, sp, 2) && ledger_selfcheck("trident-alias"));
+'''
+
 # RAW / PROBE_UNVERIFIED は予約権限にならない。資源の表の検査と満杯。
 BODIES['resource_authority_and_full'] = r'''
     u32 raw, probe, i, rid, n;
@@ -662,6 +703,9 @@ class DeviceReservation(unittest.TestCase):
 
     def test_trident_and_82557(self):
         self.run_body('trident_and_82557')
+
+    def test_trident_vram_alias(self):
+        self.run_body('trident_vram_alias')
 
     def test_resource_authority_and_full(self):
         self.run_body('resource_authority_and_full')

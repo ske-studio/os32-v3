@@ -43,7 +43,7 @@ enum gf5_case {
     GF5T_GPIO_FIND, GF5T_GPIO_GET, GF5T_GPIO_SET,
     GF5T_TILE_FIND, GF5T_TILE_SET, GF5T_TILE_CLEAR,
     GF5T_SAVE, GF5T_RESTORE, GF5T_FREE, GF5T_POLL, GF5T_WAIT,
-    GF5T_LAST_RC
+    GF5T_LAST_RC, GF5T_BOOT_TARGET
 };
 struct gf2_request { u32 size, test, session; int rc; };
 #endif
