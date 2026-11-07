@@ -101,7 +101,7 @@ void _start(void)
     const u32 sizes[]={2,4,4,1,2,2};
     for (u32 f=GF3_RGB565;f<=GF3_UYVY;f++) {
         u32 i=f-GF3_RGB565;
-        scale_seed((enum gf3_fmt)f,false);
+        scale_seed((enum gf3_fmt)f,false,false);
         assert(get_pixel(expected+9*64+7*sizes[i],sizes[i])==raw[i]);
         assert(rgba((enum gf3_fmt)f,7,9)==colors[i]);
     }

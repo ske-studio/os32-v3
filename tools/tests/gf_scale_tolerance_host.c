@@ -10,6 +10,7 @@ static const struct gf3_surface test_surface = {.off=0x10000, .bytes=TEST_BYTES}
 static char output[1024 * 1024];
 static u32 output_used;
 static bool perturb_rgb;
+static bool quantized_rgb;
 void serial_puts_polled(const char *s)
 {
     while (*s) { assert(output_used + 1 < sizeof(output)); output[output_used++] = *s++; }
@@ -42,6 +43,52 @@ static int upload(struct gf3_ctx *c, const struct gf3_surface *s,
     for (u32 i=0; i<TEST_BYTES; i++) vram[i]=((const u8 *)ram->ptr)[i];
     return 0;
 }
+/* Independent uploaded-source control for every format/trial. In particular,
+ * point XOR edges, solid colors, Y8 and packed YUV keep their old bytes. */
+static void source_control(enum gf3_fmt fmt, bool solid, bool smooth)
+{
+    for (u32 y=0; y<16; y++)
+    for (u32 x=0; x<16; x++) {
+        u32 r=solid ? 96 : x*16, g=solid ? 160 : y*16;
+        u32 b=solid ? 32 : smooth ? x*16 : (x^y)*16;
+        u32 v=0x7d000000U|(r<<16)|(g<<8)|b;
+        if (fmt==GF3_RGB565) v=((r>>3)<<11)|((g>>2)<<5)|(b>>3);
+        if (fmt==GF3_Y8) v=solid ? 128 : (x+y)*8;
+        if (fmt==GF3_YUY2 || fmt==GF3_UYVY) {
+            u32 luma=solid ? 128 : 32+x*8+y*3, chroma=(x&1) ? 176 : 96;
+            v=fmt==GF3_YUY2 ? luma|(chroma<<8) : chroma|(luma<<8);
+        }
+        assert(get_pixel(vram+y*64+x*cpp(fmt),cpp(fmt))==v);
+    }
+}
+/* Diagnostic hypothesis from gf-scb: horizontal 8-bit nearest weight,
+ * vertical 4-bit floor weight, rounded after each stage. Read uploaded raw
+ * texels, never the tested ideal. This is no claim about SIFM precision. */
+static u32 raw_channel(enum gf3_fmt fmt, u32 x, u32 y, u32 c)
+{
+    u32 v=get_pixel(vram+y*64+x*cpp(fmt),cpp(fmt));
+    if (fmt!=GF3_RGB565) return (v>>(8*c))&255;
+    u32 n=c==1 ? 6 : 5, shift=c==2 ? 11 : c==1 ? 5 : 0;
+    u32 a=(v>>shift)&((1U<<n)-1);
+    return (a<<(8-n))|(a>>(2*n-8));
+}
+static u32 quantized_pixel(enum gf3_fmt fmt, u32 fx, u32 fy)
+{
+    u32 x=fx>>20, y=fy>>20;
+    if (x>15) x=15;
+    if (y>15) y=15;
+    u32 x1=x<15 ? x+1 : x, y1=y<15 ? y+1 : y;
+    u32 wx=((fx&0xfffff)+2048)>>12, wy=(fy&0xfffff)>>16;
+    u32 out=0x7d000000U;
+    for (u32 c=0; c<3; c++) {
+        u32 top=(raw_channel(fmt,x,y,c)*(256-wx)+raw_channel(fmt,x1,y,c)*wx+128)>>8;
+        u32 bot=(raw_channel(fmt,x,y1,c)*(256-wx)+raw_channel(fmt,x1,y1,c)*wx+128)>>8;
+        out|=((top*(16-wy)+bot*wy+8)>>4)<<(8*c);
+    }
+    if (fmt==GF3_RGB565)
+        out=(((out>>19)&31)<<11)|(((out>>10)&63)<<5)|((out>>3)&31);
+    return out;
+}
 /* Oracle loopback only to exercise scale_case's classification and logging.
  * Deliberate YUV RGB perturbations stand for unspecified hardware precision;
  * hand-selected raw samples above/below test the diagnostic independently. */
@@ -50,6 +97,8 @@ static int scale(struct gf3_ctx *c, const struct gf3_surface *s,
                  struct gf3_rect dr, struct gf3_rect clip, bool filter, u32 dl)
 {
     (void)c; (void)dl;
+    if (!quantized_rgb)
+        source_control(s->fmt,filter && sr.x!=0,filter && sr.x==0);
     u32 du=(sr.w<<20)/dr.w, dv=(sr.h<<20)/dr.h, n=cpp(d->fmt);
     for (u32 y=clip.y; y<clip.y+clip.h; y++)
     for (u32 x=clip.x; x<clip.x+clip.w; x++) {
@@ -58,6 +107,8 @@ static int scale(struct gf3_ctx *c, const struct gf3_surface *s,
         u32 r=v&255U, g=(v>>8)&255U, b=(v>>16)&255U;
         u32 packed=n==2 ? ((r>>3)<<11)|((g>>2)<<5)|(b>>3) :
                          (v&0xff000000U)|(r<<16)|(g<<8)|b;
+        if (quantized_rgb && filter && sr.x==0 && s->fmt<=GF3_ARGB8888)
+            packed=quantized_pixel(s->fmt,(x-dr.x)*du,(y-dr.y)*dv);
         if (filter && sr.x==0 && (s->fmt==GF3_YUY2 || s->fmt==GF3_UYVY))
             packed = (packed & ~255U) | (b <= 252U ? b + 3U : b - 3U);
         if (perturb_rgb && filter && sr.x==0 && s->fmt<=GF3_ARGB8888)
@@ -137,7 +188,7 @@ void _start(void)
      * clip border and padding are still exact specification controls. */
     for (u32 fmt=GF3_YUY2; fmt<=GF3_UYVY; fmt++) {
         clear();
-        scale_seed(fmt,false);
+        scale_seed(fmt,false,false);
         for (u32 i=0; i<TEST_BYTES; i++) vram[i]=expected[i];
         scale_compare_fmt=GF3_XRGB8888; scale_compare_pitch=128;
         xrgb_second=32*128;
@@ -236,6 +287,12 @@ void _start(void)
     assert(occurrences("x=0 y=18 ")==0);
     clear();
     foundation.io.opaque=&foundation; foundation.io.timing.clock_us=clock_now;
+    clear(); quantized_rgb=true;
+    assert(scale_case()==0); /* 576 pixels each: RGB565/XRGB/ARGB, native LSB1. */
+    assert(occurrences("GF3 rgb observation")==3);
+    assert(occurrences("outside_tolerance_pixels=0 shown=0 limit=576")==3);
+    quantized_rgb=false;
+    clear();
     assert(scale_case()==0);
     assert(occurrences("GF3 rgb observation")==3);
     assert(occurrences("outside_tolerance_pixels=0 shown=0 limit=576")==3);
