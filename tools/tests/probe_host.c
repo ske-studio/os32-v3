@@ -20,6 +20,7 @@
 static u32 fake_if=1, pte=OLD_PTE, stores, loads, port_stores, port_loads;
 static u32 bus_step, fail_step, map_fail, unmap_fail, saved_index=OLD_INDEX, prints;
 static bool reenter, no_owner, no_serial, renamed;
+static const char *test_point_name;
 static probe_hit_fn callback;
 static u32 registry_epoch=1, attached_count, attached_ids[8];
 static struct module_handle fake_owner={2,3};
@@ -88,6 +89,7 @@ i32 debug_probe_control(u32 op,void *arg,u32 size)
         for(u32 i=0;i<l->count;i++){
             kstrncpy(l->points[i].name,"point.0",PROBE_NAME_SIZE);l->points[i].name[6]+=(char)i;
             if(renamed)l->points[i].name[0]='x';
+            if (!i && test_point_name) kstrncpy(l->points[i].name,test_point_name,PROBE_NAME_SIZE);
             l->points[i].id=i;l->points[i].enabled=callback!=0;
         }
         return 0;

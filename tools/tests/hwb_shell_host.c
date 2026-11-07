@@ -18,6 +18,7 @@ int strcmp(const char *a, const char *b)
     return (u8)*a - (u8)*b;
 }
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_log.c"
 #include "userland/shell/hwb_exec.c"
 #include "userland/shell/cmd_hw.c"

@@ -235,7 +235,10 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
     while (p.p < p.end && !hp_space(p.s[p.p])) p.p++;
     cmd.end = p.p;
 #define CMD(word) hp_equal(p.s, cmd, (word))
-    if (CMD("dim")) {
+    if (CMD("probe")) {
+        i->op = HWB_PROBE;
+        p.bad = !hwb_probe_parse(p.s, p.p, p.end, &i->probe); p.p = p.end;
+    } else if (CMD("dim")) {
         i->op = HWB_DIM; i->name = hp_name(&p); i->value = hp_operand(&p, 1);
     } else if (CMD("let")) {
         i->op = HWB_LET; hp_destination(&p, i); hp_need(&p, "="); i->value = hp_operand(&p, 1);
