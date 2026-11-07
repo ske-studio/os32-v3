@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small standalone jobs.sh tests; deliberately not registered with make check."""
+"""Small jobs.sh tests, registered by tools/checks/jobs-host.py."""
 import json
 import os
 from pathlib import Path
