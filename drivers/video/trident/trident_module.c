@@ -13,10 +13,17 @@
 
 extern const u32 trident_kexports[];
 extern const struct module_symbol_contract trident_import_contracts[], trident_export_contracts[];
+/* F10's VGA DAC width, independent of the framebuffer pixel depth. */
+#define TRI_MODULE_DAC_BITS 6u
 static struct module_handle handle;
 static GfxBackend candidate;
 static bool pinned, armed;
 static u32 restore_entry;
+static const struct TridentDiagnosticOps *diagnostic_candidate, *diagnostic_slot;
+const struct TridentDiagnosticOps *trident_diagnostic_ops(void)
+{
+    return diagnostic_slot;
+}
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_trident = {.name="trident-unavailable", .probe=missing_probe};
 static int arm(int (*restore)(void *), void *opaque, u32 owner)
@@ -29,12 +36,86 @@ static int arm(int (*restore)(void *), void *opaque, u32 owner)
 static TridentModuleContext context = {
     .backend=&candidate, .counters=&gfx_counters, .arm=arm,
     .height=&gfx_current_height, .flip=&gfx_flip_enabled, .page=&gfx_display_page,
-    .display_owner=appslot_gfx_owner
+    .display_owner=appslot_gfx_owner, .size=TRIDENT_MODULE_CONTEXT_SIZE,
+    .diagnostic_out=&diagnostic_candidate
 };
 static int resident_ro(const struct module_record *r, const void *p, u32 bytes)
 {
     u32 a = (u32)(uptr)p;
     return a >= r->ro && bytes <= r->ro_size && a - r->ro <= r->ro_size - bytes;
+}
+/* The runtime retains RO separately, but modes and the production device
+ * live in DATA/BSS. The body allocation excludes the container prefix. */
+static int resident_data(const struct module_record *r, const void *p, u32 bytes)
+{
+    u32 a = (u32)(uptr)p;
+    if (r->prefix_pages > r->pages) return 0;
+    u32 size = (r->pages - r->prefix_pages) * MODULE_PAGE_SIZE;
+    return a >= r->ro && a >= r->base && bytes <= size &&
+           a - r->base <= size - bytes;
+}
+static int modes_valid(const struct module_record *r, bool prepared)
+{
+    if (!candidate.mode_count || candidate.mode_count > TRI_MODE_COUNT ||
+        candidate.default_mode >= candidate.mode_count ||
+        !resident_data(r, candidate.modes, candidate.mode_count * sizeof(GfxMode)))
+        return 0;
+    if (candidate.selected_mode) {
+        u32 selected = (u32)(uptr)candidate.selected_mode;
+        u32 first = (u32)(uptr)candidate.modes;
+        if (selected < first || (selected - first) % sizeof(GfxMode) ||
+            (selected - first) / sizeof(GfxMode) >= candidate.mode_count) return 0;
+    }
+    const struct trident_resources *res = context.resources;
+    for (u32 i = 0; i < candidate.mode_count; ++i) {
+        const GfxMode *m = &candidate.modes[i];
+        u32 cpp;
+        switch (m->format) {
+        case GFX_FMT_PACKED8: cpp = 1; break;
+        case GFX_FMT_RGB565: cpp = 2; break;
+        case GFX_FMT_XRGB8888: cpp = 4; break;
+        default: return 0;
+        }
+        /* F10 publishes the six-bit VGA DAC and packed byte pitches. */
+        if (!m->width || !m->height || m->dac_bits != TRI_MODULE_DAC_BITS || m->reserved ||
+            m->pitch < (u32)m->width * cpp || m->pitch % cpp ||
+            m->pitch > res->mapped_bytes / m->height ||
+            m->pitch > res->decode_bytes / m->height) return 0;
+    }
+    const GfxMode *selected = gfx_backend_mode(&candidate);
+    /* F10 keeps the legacy BB marker; the mode format carries the depth. */
+    if (candidate.bb_pitch != selected->pitch || candidate.bb_format != GFX_BB_PACKED8)
+        return 0;
+    if (!prepared && !candidate.bb_base && !candidate.bb_size) return 1;
+    return candidate.bb_base == res->client && candidate.bb_size == res->client_bytes &&
+           candidate.bb_base && selected->pitch <= candidate.bb_size / selected->height &&
+           (!res->client_surface.pitch || res->client_surface.pitch == selected->pitch);
+}
+static int diagnostics_valid(const struct module_record *r)
+{
+    const struct TridentDiagnosticOps *d = diagnostic_candidate;
+    if (!d) return 1; /* Optional diagnostics do not gate display startup. */
+    if (!resident_ro(r, d, sizeof(*d)) ||
+        d->version != TRIDENT_DIAGNOSTIC_OPS_VERSION ||
+        d->size != TRIDENT_DIAGNOSTIC_OPS_SIZE ||
+        !resident_data(r, d->context, sizeof(*d->context))) return 0;
+    const u32 entries[] = {
+        (u32)(uptr)d->set_mode, (u32)(uptr)d->dpms,
+        (u32)(uptr)d->cursor_image, (u32)(uptr)d->cursor_move,
+        (u32)(uptr)d->cursor_show, (u32)(uptr)d->sync,
+        (u32)(uptr)d->clear_sync, (u32)(uptr)d->copy_direction,
+        (u32)(uptr)d->line_setup, (u32)(uptr)d->fill,
+        (u32)(uptr)d->copy, (u32)(uptr)d->pattern,
+        (u32)(uptr)d->line, (u32)(uptr)d->pattern_upload,
+        (u32)(uptr)d->video_query, (u32)(uptr)d->video_put,
+        (u32)(uptr)d->video_set_key, (u32)(uptr)d->video_stop,
+        (u32)(uptr)d->poll, (u32)(uptr)d->video_surface_alloc,
+        (u32)(uptr)d->video_surface_display, (u32)(uptr)d->video_surface_stop,
+        (u32)(uptr)d->video_surface_free
+    };
+    for (u32 i = 0; i < sizeof(entries)/sizeof(entries[0]); ++i)
+        if (entries[i] && !module_text_contains(r, entries[i])) return 0;
+    return 1;
 }
 static int start(struct module_record *r, u32 entry, u32 *exports)
 {
@@ -58,30 +139,28 @@ static int start(struct module_record *r, u32 entry, u32 *exports)
     };
     for (u32 i=0; i<sizeof(required)/sizeof(required[0]); ++i)
         if (!module_text_contains(r, required[i])) return MODULE_INIT_FAILED;
-    /* All optional function slots are NULL in this CPU-only backend. Reject
-     * unexpected hooks, rather than treating NULL as a required text address. */
-    if (candidate.fill_rect || candidate.blit || candidate.set_mode || candidate.dpms ||
-        candidate.cursor_image || candidate.cursor_move || candidate.cursor_show ||
-        candidate.vsync || candidate.page_flip || candidate.gamma || candidate.osri_show)
-        return MODULE_INIT_FAILED;
-    if (!resident_ro(r, candidate.name, sizeof("trident")) ||
-        !resident_ro(r, candidate.modes, sizeof(GfxMode)) ||
-        candidate.mode_count != 1 || candidate.default_mode || candidate.selected_mode ||
-        candidate.bb_base || candidate.bb_size || candidate.bb_pitch != TRI_PITCH ||
-        candidate.bb_format != GFX_BB_PACKED8)
+    const u32 optional[] = {
+        (u32)(uptr)candidate.fill_rect, (u32)(uptr)candidate.blit,
+        (u32)(uptr)candidate.set_mode, (u32)(uptr)candidate.dpms,
+        (u32)(uptr)candidate.cursor_image, (u32)(uptr)candidate.cursor_move,
+        (u32)(uptr)candidate.cursor_show, (u32)(uptr)candidate.vsync,
+        (u32)(uptr)candidate.page_flip, (u32)(uptr)candidate.gamma,
+        (u32)(uptr)candidate.osri_show
+    };
+    for (u32 i=0; i<sizeof(optional)/sizeof(optional[0]); ++i)
+        if (optional[i] && !module_text_contains(r, optional[i])) return MODULE_INIT_FAILED;
+    if (!resident_ro(r, candidate.name, sizeof("trident")) || !modes_valid(r, false))
         return MODULE_INIT_FAILED;
     if (kstrcmp(candidate.name, "trident")) return MODULE_INIT_FAILED;
-    const GfxMode *mode = candidate.modes;
-    if (mode->width != TRI_WIDTH || mode->height != TRI_HEIGHT ||
-        mode->format != GFX_FMT_PACKED8 || mode->dac_bits != 6 ||
-        mode->hw_mode || mode->reserved || mode->pitch != TRI_PITCH)
-        return MODULE_INIT_FAILED;
     restore_entry = exports[3];
     if (!module_ref_acquire(handle, r->owner, MODULE_REF_REGISTRATION, 0))
         return MODULE_INIT_FAILED;
     pinned = true;
     int (*prepare)(void) = (int (*)(void))(uptr)exports[2];
     rc = prepare(); /* real bind and descriptor checks, no indexed access */
+    if (!rc && (!modes_valid(r, true) || !diagnostics_valid(r))) rc = MODULE_INIT_FAILED;
+    if (!rc) diagnostic_slot = diagnostic_candidate;
+    else diagnostic_candidate = diagnostic_slot = NULL;
     if (rc) kprintf(KLOG_ATTR, "[trident] stage=prepare rc=%d\n", rc);
     return rc;
 }
@@ -89,6 +168,7 @@ static int detach(struct module_record *r)
 {
     (void)r;
     if (armed) return 0;
+    diagnostic_candidate = diagnostic_slot = NULL;
     gfx_backend_trident = (GfxBackend){.name="trident-unavailable", .probe=missing_probe};
     if (pinned) {
         module_ref_release(handle, MODULE_REF_REGISTRATION);
@@ -99,6 +179,7 @@ static int detach(struct module_record *r)
 int trident_module_load(void)
 {
     if (handle.generation) return MODULE_BUSY;
+    diagnostic_candidate = diagnostic_slot = NULL;
     context.resources = trident_resources_get();
     if (!context.resources) {
         kprintf(KLOG_ATTR, "[trident] stage=resources rc=%d\n", TRI_E_RESOURCE);
@@ -117,6 +198,7 @@ int trident_module_load(void)
     if (!rc) rc = module_start(handle);
     if (!rc && !module_exports(handle)) rc = MODULE_INIT_FAILED;
     if (!rc) gfx_backend_trident = candidate;
+    else diagnostic_candidate = diagnostic_slot = NULL;
     kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, bi->img_crc, pinned);
     return rc;
 }
