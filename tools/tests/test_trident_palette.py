@@ -26,6 +26,8 @@ MUTATIONS = (
     ('record', 'd->dac[first + i][c] = dac6[i * GFX_RGB_COMPONENTS + c];', 'd->dac[first + i][c] = dac6[i * GFX_RGB_COMPONENTS + c] ^ 1;'),
     ('record_early', 'const u8 *color = dac6 + i * GFX_RGB_COMPONENTS;',
      'const u8 *color = dac6 + i * GFX_RGB_COMPONENTS; tri_palette_record(d, first + i, 1, color);'),
+    ('ramp_overwrites_index8', 'if (d->mode.selected.depth == 8) {\n            rc = tri_palette_record',
+     'if (1) {\n            rc = tri_palette_record'),
     ('green565', 'rgb[i * 3 + 1] = i;', 'rgb[i * 3 + 1] = i * 63 / 31;'),
     ('unused565', 'i * PALETTE_DAC_MAX / PALETTE_RGB5_MAX : 0;', 'i * PALETTE_DAC_MAX / PALETTE_RGB5_MAX : 63;'),
     ('ramp555', 'rgb[i * 3 + c] = i * PALETTE_DAC_MAX / PALETTE_RGB5_MAX;', 'rgb[i * 3 + c] = i;'),
