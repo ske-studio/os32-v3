@@ -1,6 +1,6 @@
 """T4b-1: real op 11 dispatcher, 40-byte wire rejection, no HAL calls."""
 CHECK = dict(name='recover-wire-host', tier=1,
-    covers=['kdebug/kdebug_main.c', 'kdebug/recover_wire.h', 'tools/tests/recover_wire_host.c', 'tools/tests/kdebug_init_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_virtual.h', 'tools/tests/recover_hostshim/io.h', 'kdebug/recover.h', 'tools/tests/kernel_includes.py'],
+    covers=['kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'kdebug/recover_wire.h', 'tools/tests/recover_wire_host.c', 'tools/tests/kdebug_init_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_virtual.h', 'tools/tests/recover_hostshim/io.h', 'kdebug/recover.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.380322)
 
 from kernel_includes import include_flags
