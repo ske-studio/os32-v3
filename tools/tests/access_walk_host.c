@@ -125,6 +125,66 @@ __asm__(".text\n.globl _start\n_start:\n"
         "1: mov $1, %eax\nmov $98, %ebx\nint $0x80\n"
 #endif
         );
+/* Real protection API, crossing a PDE with both contiguous and sparse PFNs. */
+static void code_protection_tests(u32 owner, u32 other)
+{
+    static struct addrspace a;
+    /* Put the second page exactly across the next PDE boundary. */
+    u32 base = ((MEM_EXEC_LOAD_ADDR >> PDE_SHIFT) + 1) * (1u << PDE_SHIFT) - PAGE_SIZE;
+    for (u32 sparse = 0; sparse < 2; sparse++) {
+        u32 frames[4], pa, *pd, saved, old;
+        CHECK(!paging_addrspace_create(&a, owner));
+        u32 block = sparse ? 0 : pgalloc_alloc_phys(owner, 4);
+        for (u32 i = 0; i < 4; i++) {
+            frames[i] = sparse ? pgalloc_alloc_phys(owner, 1) : block + i * PAGE_SIZE;
+            CHECK(frames[i]);
+            if (sparse) CHECK(pgalloc_alloc_phys(other, 1));
+            for (u32 j = 0; j < PAGE_SIZE; j++) ((u8 *)P2V(frames[i]))[j] = i + 1;
+            CHECK(!paging_addrspace_map_user(&a, base + i * PAGE_SIZE, frames[i],
+                                            PAGE_RW | PTE_USER | 0x60));
+        }
+        CHECK(!paging_addrspace_map_user(&a, MEM_EXEC_HEAP_BASE, frames[2], PAGE_RW | PTE_USER));
+        CHECK(!paging_addrspace_map_user(&a, MEM_APP_STACK_TOP - PAGE_SIZE, frames[3], PAGE_RW | PTE_USER));
+        pd = P2V(a.pd_phys);
+        u32 k = PDE_INDEX(base + PAGE_SIZE) - APP_BAND_PDE;
+        u32 *last = P2V(a.app_pt_phys[k]);
+        old = last[PTE_INDEX(base + PAGE_SIZE)];
+        /* Late missing PT and wrong owner must leave the first page RW. */
+        saved = a.app_pt_phys[k]; a.app_pt_phys[k] = 0;
+        CHECK(paging_addrspace_protect_code_ro(&a, base, base + 2 * PAGE_SIZE) == -1);
+        CHECK(!as_va_to_pa(a.pd_phys, base, &pa));
+        a.app_pt_phys[k] = saved;
+        u32 foreign = pgalloc_alloc_phys(other, 1);
+        last[PTE_INDEX(base + PAGE_SIZE)] = foreign | PAGE_RW | PTE_USER;
+        CHECK(paging_addrspace_protect_code_ro(&a, base, base + 2 * PAGE_SIZE) == -1);
+        CHECK(!as_va_to_pa(a.pd_phys, base, &pa));
+        last[PTE_INDEX(base + PAGE_SIZE)] = old;
+        CHECK(paging_addrspace_protect_code_ro(&a, base + 1, base + PAGE_SIZE) == -1);
+        CHECK(paging_addrspace_protect_code_ro(&a, base, base) == -1);
+        CHECK(!paging_addrspace_protect_code_ro(&a, base, base + 2 * PAGE_SIZE));
+        CHECK(last[PTE_INDEX(base + PAGE_SIZE)] == (old & ~PTE_RW));
+        for (u32 i = 0; i < 4; i++) {
+            u32 va = base + i * PAGE_SIZE;
+            CHECK(pd[PDE_INDEX(va)] & PTE_RW);
+            CHECK(!as_va_to_pa_read(a.pd_phys, va + PAGE_SIZE - 1, &pa));
+            CHECK(pa == frames[i] + PAGE_SIZE - 1);
+            CHECK(as_va_to_pa(a.pd_phys, va, &pa) == (i < 2 ? AS_VA_PTE : 0));
+            for (u32 j = 0; j < PAGE_SIZE; j++) CHECK(((u8 *)P2V(frames[i]))[j] == i + 1);
+        }
+        CHECK(!as_va_to_pa(a.pd_phys, MEM_EXEC_HEAP_BASE, &pa));
+        CHECK(!as_va_to_pa(a.pd_phys, MEM_APP_STACK_TOP - 1, &pa));
+        /* Remove alias PTEs before freeing the four payload frames. */
+        {
+            u32 *heap_pt = P2V(a.app_pt_phys[PDE_INDEX(MEM_EXEC_HEAP_BASE) - APP_BAND_PDE]);
+            u32 *stack_pt = P2V(a.app_pt_phys[PDE_INDEX(MEM_APP_STACK_TOP - 1) - APP_BAND_PDE]);
+            heap_pt[PTE_INDEX(MEM_EXEC_HEAP_BASE)] = 0;
+            stack_pt[PTE_INDEX(MEM_APP_STACK_TOP - 1)] = 0;
+        }
+        CHECK(paging_addrspace_free_user_range(&a, base, base + 4 * PAGE_SIZE) == 4);
+        paging_addrspace_destroy(&a);
+    }
+    SAY("PASS: code RO, sparse/contiguous PFNs, PDE boundary, atomic validation");
+}
 static void host_start(void)
 {
     u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0};
@@ -140,6 +200,8 @@ static void host_start(void)
           MEM_LEDGER_META_BASE / PAGE_SIZE, MEM_LEDGER_META_BASE / PAGE_SIZE + 1, LEDGER_CACHE_WB, 0));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "d3", &owner));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 3, "other", &other));
+    host_cr3 = paging_kernel_pd_phys();
+    code_protection_tests(owner, other);
     CHECK(!paging_addrspace_create_lease(&space, owner));
     payload = pgalloc_alloc_phys(owner, 2);
     fake = pgalloc_alloc_phys(other, 1);

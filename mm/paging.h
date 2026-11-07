@@ -385,6 +385,10 @@ int paging_poke_user_bit(u32 virt, int set_user);
  * いたが呼び側が見ていないので、空振りが成功に見えていた (票 §4 の 2)。 */
 extern u32 paging_range_reject_count;
 
+/* Unscheduled AS, called under master CR3 after image I/O. Validate every
+ * private payload page before clearing only PTE.RW; the later CR3 load flushes. */
+int paging_addrspace_protect_code_ro(struct addrspace *as, u32 base, u32 end);
+
 /* Only the macros above need PFN geometry. Keep these declarations last:
  * HWDEV hashes the preprocessed order of the shared header declarations. */
 #include "physmem.h"

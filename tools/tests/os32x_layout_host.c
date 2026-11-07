@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include "os32_kapi_shared.h"
+/* Stage B tests the v5 contract before stage A generated constants land. */
+#undef OS32X_HDR_VERSION
+#define OS32X_HDR_VERSION 5
 /* Compile the same loader predicate as protocol 1 for the reverse direction. */
 #ifdef OS32_TEST_OLD_SHLIB
 #undef OS32_SHLIB_PROTOCOL
@@ -24,6 +27,8 @@ int main(void)
 {
     OS32Header h = valid();
     u32 i;
+    CHECK(OS32X_HDR_SIZE == 64 && sizeof(h) == 16 * sizeof(u32));
+    CHECK(OS32X_HDR_VERSION == 5);
     CHECK(OS32_MEMORY_LAYOUT_GENERATION == 4);
 #ifndef OS32_TEST_OLD_SHLIB
     CHECK(OS32_SHLIB_PROTOCOL == 2);

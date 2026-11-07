@@ -22,6 +22,11 @@ FILES = {
     'boot': 'kdebug/kselftest/caller_boot.inc',
 }
 MUTANTS = [
+    ('paging', 'pt[PTE_INDEX(va)] &= ~PTE_RW;', 'pt[PTE_INDEX(va)] |= PTE_RW;', 'code RW unchanged'),
+    ('paging', 'for (va = base; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'for (va = base + PAGE_SIZE; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'code start plus page'),
+    ('paging', 'for (va = base; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'for (va = base; va < end - PAGE_SIZE; va += PAGE_SIZE) {\n        u32 *pt', 'code end minus page'),
+    ('paging', 'for (va = base; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'for (va = base; va < end + PAGE_SIZE; va += PAGE_SIZE) {\n        u32 *pt', 'code end plus page'),
+    ('paging', 'pt[PTE_INDEX(va)] &= ~PTE_RW;', 'pt[PTE_INDEX(va)] &= ~PTE_RW; pd[PDE_INDEX(va)] &= ~PTE_RW;', 'code PDE RW cleared'),
     ('access_walk', '!sf->lease_count', '0', 'lease live reference'),
     ('access_walk', 'sf->npages != l->npages', '0', 'lease page count'),
     ('access_walk', 'sf->perm_max == LEDGER_PERM_NONE', '0', 'lease NONE input'),

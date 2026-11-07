@@ -204,7 +204,7 @@ typedef enum {
 #define OS32X_HDR_V2_SIZE 44            /* v2ヘッダのサイズ (load_addr を末尾に追記) */
 #define OS32X_HDR_V3_SIZE 48            /* v3ヘッダのサイズ (kapi_data_off を末尾に追記) */
 #include "os32_generations.h"
-#define OS32X_HDR_SIZE 60
+#define OS32X_HDR_SIZE 64
 /* v3 のバイナリが要求する最低 KAPI 版。v3 の照合を持たない旧カーネル
  * (v62 以前) が v3 バイナリを受け入れないよう、生成器が min_api_ver を
  * これ以上に引き上げる (票 TASK_KAPI_DATA_FIELDS)。 */
@@ -256,8 +256,8 @@ typedef struct {
     u32 kapi_abi_generation;
     u32 memory_layout_generation;
     u32 shlib_protocol;
-} OS32Header;             /* 合計: 60バイト (0x3C)。version 1 は先頭 40 バイト、
-                           * version 2 は44バイト、version 3 は48バイト。旧版はローダが拒否。 */
+    u32 code_size;        /* 0x3C: ロード先から読み取り専用の終わりまで (コード・rodata・末尾のページ埋め、4096 の倍数)。text_size は初期化済みの像全体 */
+} OS32Header;             /* 合計: 64 バイト (0x40) */
 
 /* ======================================================================== */
 /*  共有ライブラリ (OS32X_FLAG_SHLIB) のジャンプ表 — GUI v1.1 K3 / C3        */
