@@ -63,7 +63,7 @@ def kernel_order(kernel=None, overrides=None):
         'paging_reclaim_conventional();', 'boot_platform_run(BOOT_FONT, &boot);',
         'arch_boot_after_paging()', 'memory_boot_init(mem_kb)', 'shm_init();',
         'paging_boot_user_shared(exec_tramp_page_addr())', 'dma_pool_init();',
-        'v86_module_load();', 'kdebug_load();', 'kdebug.ops.selftest_run();',
+        'legacy_init();', 'kdebug_load();', 'kdebug.ops.selftest_run();',
         'cd_module_load();',
         'kcg_module_load();', 'kernel_mount_children(boot.root_dev);',
         'services_stage = SERVICES_ROOT_READY;', 'unicode_file_load();',
