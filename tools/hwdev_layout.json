@@ -492,6 +492,7 @@
     ],
     "OS32Header": [
       "bss_size",
+      "code_size",
       "entry_offset",
       "flags",
       "header_size",

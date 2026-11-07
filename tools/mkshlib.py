@@ -226,6 +226,8 @@ def main():
 
     text_pages = (data_start - MEM_SHLIB_BASE) // PAGE
     data_pages = (data_end - data_start) // PAGE
+    if text_pages <= 0 or data_start - MEM_SHLIB_BASE > len(raw):
+        die("invalid shlib code range")
 
     # --- 先頭 32B の検算 / 穴埋め ---
     magic, version, nfunc, vaddr, dpages, tpages, r0, r1 = \
@@ -273,7 +275,7 @@ def main():
     if image_end > data_end:
         die(f"生イメージが data 範囲を越えています ({image_end:#x} > {data_end:#x})")
 
-    # --- OS32X ヘッダ v3 (エントリは使わない: 入口はジャンプ表) ---
+    # --- OS32X ヘッダ v5 (エントリは使わない: 入口はジャンプ表) ---
     #   load_addr     = MEM_SHLIB_BASE (カーネルは見ないが v2 の欄として正しく埋める)
     #   kapi_data_off = os32api の刻印 (票 TASK_KAPI_DATA_FIELDS)
     bss = elf.bss_size()
@@ -281,7 +283,7 @@ def main():
         kapi_data_off = H.read_kapi_layout(elf)
         H.check_raw_matches_elf(elf, raw_as_read, in_path)
         header = H.build_header(OS32X_FLAG_SHLIB, 0, len(raw), bss, 0,
-                                min_api, MEM_SHLIB_BASE, kapi_data_off, shlib_protocol=H.OS32_SHLIB_PROTOCOL)
+                                min_api, MEM_SHLIB_BASE, kapi_data_off, data_start - MEM_SHLIB_BASE, shlib_protocol=H.OS32_SHLIB_PROTOCOL)
     except H.HeaderError as e:
         die(str(e))
     with open(out_path, 'wb') as f:

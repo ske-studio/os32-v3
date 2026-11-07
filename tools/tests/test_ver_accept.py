@@ -115,7 +115,7 @@ def min_api(runner):
     # Real header generation raises low app.conf requests without editing them.
     for requested in (0, 63, 78, version, version + 1):
         blob = header.build_header(0, 0, 1, 0, 0, requested, header.OS32X_APP_LOAD_ADDR,
-                                   0x4b8)
+                                   0x4b8, code_size=4096)
         assert header.parse_header(blob)['min_api_ver'] == max(requested, version)
     # Execute the actual exec guard against both kernel generations. This is
     # the API-version gate only; PM checks complete old/new binaries in guest.
