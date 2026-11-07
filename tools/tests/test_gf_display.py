@@ -183,6 +183,15 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('a3', 'detect-edid-connector', 'kdebug/gf_display_test.c',
+  'display_number(" connector=", o->ctx->state->edid_connector);',
+  'display_number(" connector=", 0);', 'retained image connector attribution'),
+ ('b0', 'detect-image-owner', 'hwdev/gf/display/modes.c',
+  'c->state->edid_connector=(u8)connector;',
+  'c->state->edid_connector=0;', 'last connector owns the retained image'),
+ ('c2log', 'detect-state-owner', 'hwdev/gf/display/service.c',
+  'if (!rc) rc=svc_index(io,SVC_CR,RECOVER_CR44,&cr44,false);',
+  'if (!rc) cr44=0;', 'observe the live owner before detect'),
  ('a3', 'edid-parser', 'kdebug/gf_display_test.c',
   'data->edid_modes(display_row, block, edid) : GF4_EUNSUPPORTED;',
   '(i32)GF4_EUNSUPPORTED : GF4_EUNSUPPORTED;', 'CRC read uses existing parser'),

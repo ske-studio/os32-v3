@@ -240,6 +240,7 @@ static void svc_feature5(struct gf4_ctx *c)
     u8 version=0;
     i32 source=gf_rom_bit_entry(init->rom,init->rom_size,'M',&table,&length,&version);
     i32 rc=source<0 ? GF5_EBIOS : 0;
+    c->memory_prepare_attempted=false; c->memory_prepare_rc=0;
     g->deadline=c->deadline;
     if (!source) {
         if (length<SVC_MEMORY_PC_BYTES) { source=GF_SCRIPT_EIO; rc=GF5_EBIOS; }
@@ -254,6 +255,7 @@ static void svc_feature5(struct gf4_ctx *c)
         else {
             memory=allocation;
             source=gf_init_script_prepare(init,memory,pc,0,0,c->deadline);
+            c->memory_prepare_attempted=true; c->memory_prepare_rc=source;
             if (source) rc=source==GF_SCRIPT_EIO ? GF5_EBIOS : gf5_rc_map(source);
         }
     }
@@ -381,6 +383,24 @@ static i32 svc_start_failure(struct gf4_ctx *c,const char *stage,i32 rc)
     return svc_result(c,rc);
 }
 
+/* Observe the live owner/lock without changing either. A preparation error
+ * can restore A2's saved locks; initial mode load has not run here yet. */
+static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
+{
+    struct gf_io *io=&c->ch->f->io;
+    u32 index=0,cr1f=U32_MAX,cr44=U32_MAX;
+    i32 rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,&index);
+    if (!rc) {
+        rc=svc_index(io,SVC_CR,RECOVER_CR1F,&cr1f,false);
+        if (!rc) rc=svc_index(io,SVC_CR,RECOVER_CR44,&cr44,false);
+        i32 restore=io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,index);
+        if (!rc) rc=restore;
+    }
+    kprintf(KLOG_ATTR,"[gf4] detect state cr1f=%x cr44=%x read_rc=%d m_attempted=%u m_rc=%d f5_rc=%d source_rc=%d\n",
+            cr1f,cr44,rc,c->memory_prepare_attempted,c->memory_prepare_rc,
+            g->last_rc,g->source_rc);
+}
+
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
     const char *stage="service_check";
@@ -451,6 +471,7 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     if (!rc) {
         c->ready=true;
         stage="detect";
+        svc_detect_diagnostic(c,g);
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf4_detect(c,dl);
     }
