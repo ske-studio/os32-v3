@@ -56,6 +56,51 @@
       "source": "kernel/ver_format.c",
       "header": "arch/x86/kernel/idt.h",
       "survey_id": "I2"
+    },
+    {
+      "source": "exec/ring3_str.c",
+      "header": "arch/x86/x86_flags.h",
+      "survey_id": "I4"
+    },
+    {
+      "source": "kernel/irq/irq.c",
+      "header": "arch/x86/kernel/gdt.h",
+      "survey_id": "I1/I2"
+    },
+    {
+      "source": "kernel/irq/irq.c",
+      "header": "arch/x86/kernel/idt.h",
+      "survey_id": "I1/I2"
+    },
+    {
+      "source": "kernel/sys.c",
+      "header": "drivers/video/geforce/geforce_module.h",
+      "survey_id": "A5"
+    },
+    {
+      "source": "kernel/time/ktime.c",
+      "header": "arch/x86/kernel/gdt.h",
+      "survey_id": "I3"
+    },
+    {
+      "source": "kernel/time/ktime.c",
+      "header": "arch/x86/kernel/idt.h",
+      "survey_id": "I3"
+    },
+    {
+      "source": "mm/paging.c",
+      "header": "arch/x86/x86_flags.h",
+      "survey_id": "I4"
+    },
+    {
+      "source": "mm/paging.c",
+      "header": "kernel/v86/v86_mem.h",
+      "survey_id": "V1"
+    },
+    {
+      "source": "mm/paging.c",
+      "header": "platform/pc98/platform_memory_desc.h",
+      "survey_id": "I2/V5"
     }
   ]
 }

@@ -242,3 +242,4 @@ GAS_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(GAS_KERNEL:.S=.o))
 - B8: KERNEL_SRC_DIRS全dirのinclude所有者表とdrivers/base共有を明記し、R1のt2h専用配備前後の手順を反映した。
 - 追加（IDなし）: IPAex不在による手元の比較範囲と、os32-v3 PM側で全生成物比較を完了する条件を明記した。
 - S3 の実装で埋めた欠け：成功TUの非選択ヘッダ依存6 TU・11組は§3の固定一覧で増加・陳腐化を拒否し、後段IDへ解消を引き継ぐ受入に確定した（実装・再計測の合格は別途確認）。
+- ppc-mmu の取り込みの後 (2026-11-07、PM): arch/ppc/arch_io.h が揃って成功 TU が 69→86 本に増え、同じ検査が新しい依存を見つけた。固定一覧は 11 TU・20 組 (exec/ring3_str.c、kernel/irq/irq.c、kernel/sys.c、kernel/time/ktime.c、mm/paging.c を追加)、selected_success.json も更新。製品のコードは変えていない。mm/paging.c の v86_mem.h・platform_memory_desc.h は案 D で mm を繋ぐ前に解く。
