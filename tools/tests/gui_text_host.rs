@@ -155,6 +155,7 @@ static mut BLOCKS: Option<HashMap<usize, usize>> = None;
 static mut FILES: Option<HashMap<u32, File>> = None;
 static mut NEXT_ID: u32 = 0;
 static mut PACKED8: bool = false;
+static mut SCREEN_H: i32 = ffi::H;
 /// ROM reads: ('a', ank) / ('k', jis).
 static mut ROM_READS: Vec<(char, u16)> = Vec::new();
 
@@ -262,7 +263,7 @@ unsafe extern "C" fn m_screen_info(out: *mut u8) {
     let i = &mut *(out as *mut ScreenInfo);
     *i = ScreenInfo::ZERO;
     i.width = ffi::W as u16;
-    i.height = ffi::H as u16;
+    i.height = SCREEN_H as u16;
     i.bpp = if PACKED8 { 8 } else { 4 };
     i.format = if PACKED8 { GFX_FMT_PACKED8 } else { GFX_FMT_PLANAR4 };
 }
@@ -828,6 +829,79 @@ fn t12_latin1_is_half_width() {
     check(fb() == want, "latin1-kcg");
     cfgro::set(Some((0, 1)));
     font::reload();
+}
+
+// tri-term: DISPLAY and CLIENT are one allocation; present cannot repair it.
+// Use an offset window, padded rows, and a second paint over different text.
+#[test]
+fn t20_direct_scanout_repaint_padded_pitch() {
+    const PITCH: usize = 1024;
+    const HEIGHT: usize = 480;
+    const DESKTOP: u8 = 12;
+    const BG: u8 = 15;
+    const FG: u8 = 1;
+    const GUARD: usize = 32;
+    set_mode(true);
+    let saved = unsafe { ffi::gfx_fb };
+    let mut display = vec![0xA5; GUARD + PITCH * HEIGHT + GUARD];
+    for y in 0..HEIGHT {
+        display[GUARD + y * PITCH..GUARD + y * PITCH + 640].fill(DESKTOP);
+    }
+    unsafe {
+        SCREEN_H = HEIGHT as i32;
+        ffi::gfx_fb = ffi::GfxFramebuffer {
+            width: 640, height: HEIGHT as i32, pitch: PITCH as i32,
+            planes: [display.as_mut_ptr().add(GUARD), core::ptr::null_mut(),
+                     core::ptr::null_mut(), core::ptr::null_mut()],
+        };
+    }
+    gstate::refresh_screen_info();
+    let area = Rect::new(83, 327, 317, 126);
+    let local = Rect::new(0, 0, area.w, area.h);
+    let win = surface::create_window_surface(area);
+    assert!(!win.is_null());
+    assert_eq!(clip::set_base_clip(win, local), 0);
+    let style = Style::new(FG, BG);
+    let paint = |text: &[u8]| {
+        draw::fill_rect(win, local, style);
+        draw::text(win, 8, 8, text, style);
+        // Terminal renderer emits both foreground and background as hline runs.
+        draw::hline(win, 8, 40, 48, Style::pen(BG));
+        draw::hline(win, 16, 40, 8, Style::pen(FG));
+    };
+    paint(b"old shell prompt");
+    let first = display.clone();
+    paint(b"sh");
+    let repeated = display.clone();
+    // Independently start a fresh client area, then draw the final frame once.
+    for y in area.y as usize..area.bottom() as usize {
+        display[GUARD + y * PITCH + area.x as usize..
+                GUARD + y * PITCH + area.right() as usize].fill(DESKTOP);
+    }
+    paint(b"sh");
+    check(display == repeated, "direct-scanout-old-text-erased");
+    check(first != repeated, "direct-scanout-new-text-visible");
+    for y in 0..HEIGHT {
+        for x in 0..PITCH {
+            let got = display[GUARD + y * PITCH + x];
+            let inside = x >= area.x as usize && x < area.right() as usize
+                && y >= area.y as usize && y < area.bottom() as usize;
+            if !inside {
+                check(got == if x < 640 { DESKTOP } else { 0xA5 },
+                      "direct-scanout-pitch-guard");
+            } else if !(91..211).contains(&x) || !(335..351).contains(&y) {
+                if y != 367 || !(99..107).contains(&x) {
+                    check(got == BG, "direct-scanout-background");
+                }
+            }
+        }
+    }
+    check(display[..GUARD].iter().chain(display[GUARD + PITCH * HEIGHT..].iter())
+          .all(|&c| c == 0xA5), "direct-scanout-allocation-guard");
+    clip::clear_base_clip();
+    assert_eq!(surface::destroy_surface(win), 0);
+    unsafe { ffi::gfx_fb = saved; SCREEN_H = ffi::H; }
+    gstate::refresh_screen_info();
 }
 
 #[test]
