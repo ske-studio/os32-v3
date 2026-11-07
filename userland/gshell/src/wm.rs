@@ -23,7 +23,7 @@ use os32api::gui::proto::{
 
 use crate::cursor::Cursor;
 use crate::{
-    chrome, cursor, damage, desktop, fep, input, kbdnav, lease, modal, session, startmenu, taskbar,
+    chrome, cursor, damage, desktop, fep, input, kbdnav, lease, modal, ring, session, startmenu, taskbar,
     visible,
 };
 
@@ -451,6 +451,8 @@ pub struct GuiState {
 
     /* 入力取りこぼしの累計 (kbd_dropped_count の前回値)。 */
     pub last_kbd_dropped: u32,
+    /// HOST_NOTICE を配送できた最後の非消費通番。満杯なら進めず再試行する。
+    pub host_notice_seen: u32,
 
     /* マウスカーソル (損傷とは別経路。契約 W1 作業 7)。 */
     pub cursor: Cursor,
@@ -523,6 +525,7 @@ impl GuiState {
         kn: crate::kbdnav::KbdNav::NEW,
         screen_dirty: RectSet::EMPTY,
         last_kbd_dropped: 0,
+        host_notice_seen: 0,
         cursor: Cursor::EMPTY,
         now: 0,
         in_pump: false,
@@ -1152,6 +1155,20 @@ pub fn flush_screen_dirty(st: &mut GuiState) {
 /*  WM の周期 (契約 X3 / 単独ループ)                                 */
 /* ================================================================ */
 
+/// 通知本文はアプリが読む。前景の ring へ置けるまで通番の差を保留する。
+fn deliver_host_notice(st: &mut GuiState) {
+    let serial = unsafe { (os32api::api().host_notice_serial)() };
+    if serial == st.host_notice_seen {
+        return;
+    }
+    if let Some(slot) = st.slot_of_owner(st.front_owner()) {
+        let ev = ring::ev_simple(os32api::gui::proto::GUI_EV_HOST_NOTICE, 0, 0);
+        if ring::append(st, slot, &ev) {
+            st.host_notice_seen = serial;
+        }
+    }
+}
+
 /// WM の 1 周: 入力取り込み → パレットのリース調停 → FEP の配置 →
 /// クローム/デスクトップの present → FEP の描画。
 /// 文脈は [`input::Ctx`] (X3 = Wait / Standalone、X4 = Pump)。
@@ -1170,6 +1187,7 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump { gf_accept::event_done(); }
     if ctx != input::Ctx::Pump {
+        deliver_host_notice(st);
         /* モーダルの X3 分 (W4): 保留していた VFS 走査と、sticky な
          * `GUI_EV_MODAL` の再配送 (リングに空きができるまで諦めない)。 */
         modal::x3_cycle(st);
