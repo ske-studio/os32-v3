@@ -4,7 +4,13 @@
 
 # ビルド成果物出力ディレクトリ (kernel.bin / sqlite.mod / kdebug.bin / vmkernel.lz4 /
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
+ARCH ?= x86
+PLATFORM ?= pc98
+ifeq ($(ARCH),ppc)
+BUILD_OUT ?= build/out/ppc-powermac
+else
 BUILD_OUT ?= build/out
+endif
 LAYOUT_HEADER = $(BUILD_OUT)/memmap_layout.h
 LAYOUT_CPP = $(CC) -E -P -x c -imacros $(LAYOUT_HEADER)
 KERNEL_OBJ_PREFIX = $(BUILD_OUT)/obj/
@@ -37,12 +43,11 @@ PROJDIR = .
 ARCH     ?= x86
 PLATFORM ?= pc98
 
-# Tools
-CC = i386-elf-gcc
-AR = i386-elf-ar
-AS = nasm
-LD = python3 sdk/link_guard.py i386-elf-ld
-OBJCOPY = i386-elf-objcopy
+ifeq ($(filter $(ARCH),x86 ppc),)
+$(error unsupported ARCH $(ARCH))
+endif
+include build/arch/$(ARCH).mk
+PROFILE_MAKEFILES = $(filter build/%.mk,$(MAKEFILE_LIST))
 
 # === インクルードパス (モジュール別) ===
 # 共通: 全カーネルモジュールが参照する基盤ヘッダ
@@ -56,7 +61,7 @@ SDK_KAPI_HDR = sdk/include/os32/os32_kapi_shared.h
 # "arch_io.h" / "platform_io.h" をここで解決する。
 INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
 
-KERNEL_SRC_DIRS = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
+include build/select.mk
 KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
 
 # カーネルコア: 自身 + ドライバ + fs + exec + shell + gfx + lib + kapi
@@ -131,8 +136,6 @@ C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int -W
 #                    共有する ABI ヘッダ**に enum があるため、enum の幅が
 #                    両側で食い違うと構造体のレイアウトごとずれる ([ABI])。
 #                    int 幅に固定する。
-CFLAGS_MACHINE = -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
-                 -nostdlib -mno-red-zone -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)
 CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 
 # カーネル空間。__KERNEL_BUILD__ は include/os32_kapi_shared.h が
@@ -166,8 +169,10 @@ LGY98       ?= 1
 LGY98_FLAGS ?= $(strip $(shell cat $(LGY98_STAMP)))
 endif
 LGY98_FLAGS ?= 0
+ifeq ($(ARCH),x86)
 ifdef LGY98
 KERNEL_CFLAGS += -DCONFIG_LGY98_BASE=$(LGY98_BASE) -DCONFIG_LGY98_IRQ=$(LGY98_IRQ) -DCONFIG_LGY98_FLAGS=$(LGY98_FLAGS)
+endif
 endif
 
 # ユーザー空間。__KERNEL_BUILD__ を付けないので KAPI テーブルの固定アドレスは
@@ -182,7 +187,7 @@ CFLAGS_BASE = $(KERNEL_CFLAGS)
 # 機械・ABI の旗 (CFLAGS_MACHINE) だけを継ぐ。
 CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
                 -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__
-LDFLAGS = -m elf_i386 -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
+LDFLAGS = -m $(ELF_EMULATION) -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
 	-L$(shell $(CC) -print-libgcc-file-name | xargs dirname)
 
 # === 外部プログラム用フラグ ===
@@ -199,7 +204,7 @@ LDFLAGS = -m elf_i386 -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nost
 # なったら、それは特権命令を呼ぼうとしている印なので、-I を足す前に
 # 「なぜ CPL=3 のコードが原始命令を要るのか」を先に疑うこと。
 PROGRAM_FLAGS = $(USER_CFLAGS) -I. -Iinclude $(SDK_INC) -Iuserland/lib -I$(CROSS_DIR)/i386-elf/include
-PROGRAM_LDFLAGS = -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections \
+PROGRAM_LDFLAGS = -m $(ELF_EMULATION) -T sdk/link/app.ld -nostdlib --nmagic --gc-sections \
 	-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0
 
 # ライブラリアーカイブは --start-group で囲む。アーカイブは左から順に

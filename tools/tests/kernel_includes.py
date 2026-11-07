@@ -19,11 +19,14 @@ def include_dirs(config_root=ROOT):
     # -n/-j flags, or command-line overrides from the invoking test target.
     for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS'):
         env.pop(name, None)
-    result = subprocess.run(
-        ['make', '--no-print-directory', '-rRsf', '-', '__host_includes'],
-        input='include build/config.mk\n.PHONY: __host_includes\n'
-              '__host_includes:\n\t@$(info $(INC_KERNEL)):\n',
-        cwd=config_root, env=env, text=True, capture_output=True, check=True)
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='kernel-includes-') as temporary:
+        query_out = Path(temporary) / 'out'
+        result = subprocess.run(
+            ['make', '--no-print-directory', '-rRsf', '-', 'ARCH=x86', 'PLATFORM=pc98', 'BUILD_OUT=' + str(query_out), '__host_includes'],
+            input='include build/config.mk\n.PHONY: __host_includes\n'
+                  '__host_includes:\n\t@$(info $(INC_KERNEL)):\n',
+            cwd=config_root, env=env, text=True, capture_output=True, check=True)
     flags = shlex.split(result.stdout)
     if not flags or any(not flag.startswith('-I') or len(flag) == 2 for flag in flags):
         raise ValueError('INC_KERNEL must contain ordered -Idirectory flags')

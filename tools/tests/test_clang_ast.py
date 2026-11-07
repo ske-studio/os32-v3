@@ -32,6 +32,16 @@ def limited_mode():
 
 
 class ClangTest(unittest.TestCase):
+    def test_declared_powerpc_compiler_is_not_silently_dropped(self):
+        from clang_ast.build import parse_compile_lines, dependency_files
+        line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c lib/kstring_c.c -o out.o'
+        units = parse_compile_lines(line, declared_cc='/cross/bin/powerpc-elf-gcc')
+        self.assertEqual([u['src'] for u in units], ['lib/kstring_c.c'])
+        self.assertEqual(parse_compile_lines(line), [])
+        self.assertEqual(parse_compile_lines('gcc -c wrong.c -o out.o', declared_cc='/cross/bin/powerpc-elf-gcc'), [])
+        self.assertIsNone(dependency_files(['build/arch/ppc.mk']))
+        self.assertIsNone(dependency_files(['build/sources/order.mk']))
+
     def test_changed_unit_dependencies(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -133,6 +143,10 @@ class ClangTest(unittest.TestCase):
             self.assertEqual(a.relpath(cursor, '.'), 'kernel/clang_probe.c')
         with contextlib.chdir(ROOT / 'kernel'):
             self.assertEqual(a.relpath(cursor, '.'), 'clang_probe.c')
+
+    def test_missing_non_x86_compiler(self):
+        with mock.patch.object(a.shutil, 'which', return_value=None):
+            self.assertIsNone(a.cross_compiler('powerpc-elf-gcc'))
 
     def test_cross_free_build_commands(self):
         # Exercise the real make graph with neither cross GCC nor libc.a.
@@ -551,7 +565,10 @@ def main():
     if args.mutate:
         # Every mutant declares its coverage; GCC-only coverage follows the
         # same predicate and reason as test_review_gcc_branches.
-        cases = [('all modes', 'tools/clang_ast/build.py',
+        cases = [('all modes', 'tools/clang_ast/__init__.py',
+                  '    if not cross:\n        return None',
+                  '    if not cross:\n        return compiler'),
+                 ('all modes', 'tools/clang_ast/build.py',
                   '"cirrus", "geforce", "trident"', '"cirrus", "geforce"'),
                  ('all modes', 'tools/check_p2v.py',
                   'locations.append(first)', 'pass'),

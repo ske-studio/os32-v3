@@ -5,6 +5,11 @@ The product build packages kdebug separately from the resident kernel. Metadata
 comes from gen_kdebug_imports.py; exports come from the linked kdebug_ops
 initializer (version followed by the nineteen function pointers).
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sdk'))
+from target_profile import require as require_target
+
 import argparse
 import json
 from pathlib import Path
@@ -322,8 +327,10 @@ def main():
     parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('--layout-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('-o', '--output', type=Path, required=True)
+    parser.add_argument('--target', default='x86-pc98')
     args = parser.parse_args()
     try:
+        require_target(args.target, 'module_codec')
         image, stats = build(args.elf.read_bytes(), json.loads(args.metadata.read_text()),
                              args.vmkernel.read_bytes() if args.vmkernel else b'',
                              args.kapi_abi_gen, args.layout_gen, module_id=args.module_id)

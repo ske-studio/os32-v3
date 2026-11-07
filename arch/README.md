@@ -25,8 +25,8 @@ OS32 の移植点は **2 本の軸**に分かれている。
     PLATFORM ?= pc98
     INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
 
-の 2 本の `-I` だけ。だから**アーキテクチャを足す作業は「ディレクトリを 1 つ
-足す」で閉じ、既存のファイルには触らない**。`#ifdef __i386__` のような分岐を
+の 2 本の `-I` が原始命令のヘッダを選ぶ。移植にはさらにツール、ソース集合、
+製品 graph、ELF と配置の能力を選ぶ必要がある。`#ifdef __i386__` のような分岐を
 本文に増やさないのがこの構成の目的で、`#ifdef` で 1 ファイルの中を分ける形に
 戻してはいけない。
 
@@ -72,10 +72,20 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    なる。CPU と機種は独立に選べるので、`arch/` を足すたびに `platform/` を
    足す必要はない (逆もまた同じ)。
 
-4. **選ばせる。** `make ARCH=<arch> PLATFORM=<platform> ...`。既定値は
+4. **ビルドの選択を定義する。** `build/arch/<arch>.mk` にツールと機械旗、
+   `<arch>-sources.mk` に CPU 所有の C/ASM/GAS を宣言する。
+   `build/platform/<platform>.mk` は対応 ARCH・機種ソース・既定 feature を持つ。
+   各 `build/features/*.mk` は早期には集合と遅期適用用の値だけを宣言する。
+   `build/sources/order.mk` が既存のリンク/include 順を保持し、`build/select.mk`
+   が所有者集合で filter する。共通候補の選択は移植成功を意味しない。
+   `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
+   `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
+   未実装の能力は入力を読む前に拒否する。
+
+5. **選ばせる。** `make ARCH=<arch> PLATFORM=<platform> ...`。既定値は
    `build/config.mk` の `?=` なので、コマンドラインでも環境変数でも上書きできる。
 
-5. **計る。** 移植度は合否ではなく数字で見る:
+6. **計る。** 移植度は合否ではなく数字で見る:
 
        python3 tools/check_arm_compile.py        # または make check-arm-compile
 
@@ -104,3 +114,16 @@ C ソースに `hlt` / `cli` / `sti` の直書きが無いことを検査する�
 
 `arch/arm/` は**まだ無い**。この骨格は受け皿を先に用意するためのもので、
 ARM 実装は別票で行う。
+
+## PowerPC の現在の到達点
+
+`make ARCH=ppc PLATFORM=powermac` は共通候補と既存 bootstrap の C/GAS を
+コンパイルする。出力は `build/out/ppc-powermac`、コンパイラは
+`PPC_CROSS_DIR`（既定 `/home/hight/opt/cross-ppc`）から選ぶ。
+原始命令ヘッダ等が未実装なので全 TU 成功・kernel リンク・起動は未達。
+SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-only である。
+
+実測は `python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json`。
+必須 7 本、ELF32/BE/EM_PPC、実 `.d`、全 TU の試行と失敗分類を照合する。
+既存 bootstrap は `make ppc-boot` / `make ppc-boot-check` で独立して扱う。
+x86 の旧一覧を ARM に通す測定は別系列のまま維持する。

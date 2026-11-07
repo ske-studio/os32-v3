@@ -18,7 +18,7 @@ $(CIRRUS_OUT)/cirrus_import_slots.o $(CIRRUS_OUT)/cirrus_provider_types.o $(CIRR
 $(CIRRUS_OUT)/cirrus_import_stubs.o: $(CIRRUS_OUT)/cirrus_import_stubs.S build/config.mk build/cirrus-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(CIRRUS_OUT)/cirrus.elf: $(CIRRUS_OBJS) build/cirrus-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/cirrus-module.ld -Map=$(CIRRUS_OUT)/cirrus.map $(CIRRUS_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/cirrus-module.ld -Map=$(CIRRUS_OUT)/cirrus.map $(CIRRUS_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(CIRRUS_OUT)/cirrus_kexports.o
@@ -28,10 +28,10 @@ $(KERNEL_OBJ_PREFIX)drivers/video/cirrus/cirrus_module.o $(R1_OBJ)/drivers/video
 $(KERNEL_OBJ_PREFIX)drivers/video/cirrus/cirrus_module.o $(R1_OBJ)/drivers/video/cirrus/cirrus_module.o: private CFLAGS_BASE += -I$(CIRRUS_OUT)
 
 define pack_cirrus
-	python3 tools/mkmod.py --module-id 10 --elf $(CIRRUS_OUT)/cirrus.elf --metadata $(CIRRUS_OUT)/cirrus_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 10 --elf $(CIRRUS_OUT)/cirrus.elf --metadata $(CIRRUS_OUT)/cirrus_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/cirrus.mod: $(CIRRUS_OUT)/cirrus.elf $(CIRRUS_OUT)/cirrus_imports.json $(CIRRUS_OUT)/cirrus_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/cirrus-module.mk
+$(BUILD_OUT)/cirrus.mod: $(CIRRUS_OUT)/cirrus.elf $(CIRRUS_OUT)/cirrus_imports.json $(CIRRUS_OUT)/cirrus_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/cirrus-module.mk
 	$(call pack_cirrus,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/cirrus.mod: $(CIRRUS_OUT)/cirrus.elf $(CIRRUS_OUT)/cirrus_imports.json $(CIRRUS_OUT)/cirrus_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/cirrus-module.mk
+$(R1_OUT)/cirrus.mod: $(CIRRUS_OUT)/cirrus.elf $(CIRRUS_OUT)/cirrus_imports.json $(CIRRUS_OUT)/cirrus_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/cirrus-module.mk
 	$(call pack_cirrus,$(R1_OUT)/vmkernel.lz4)
 -include $(CIRRUS_OBJS:.o=.d) $(CIRRUS_OUT)/cirrus_kexports.d $(CIRRUS_OUT)/cirrus_provider_types.d

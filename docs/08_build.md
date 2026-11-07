@@ -1177,3 +1177,24 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
 > ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。
+
+### CPU・機種のビルド選択
+
+既定は `ARCH=x86 PLATFORM=pc98`。`build/arch/*.mk` がツールと機械旗、
+`build/select.mk` と所有者別の mk が順序を保ったソース/include 集合を選ぶ。
+製品規則は `build/targets/`、共有コンパイル規則は `build/kernel-objects.mk` にある。
+新しい選択 mk は通常の再構築依存であり、同じ出力先の target 変更は拒否する。
+`FEATURE_*` の off は完全非搭載サービスが未実装のため `kernel-compile` 専用。
+
+PowerPC の `make ARCH=ppc PLATFORM=powermac` は compile-only で、
+`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力 `build/out/ppc-powermac` を使う。
+未分離の共通候補のエラーは測定結果として残し、リンク・module・SDK・配備へは進めない。
+独立 bootstrap は `make ppc-boot` / `make ppc-boot-check`。
+原始命令ヘッダだけを足して移植完了とはしない（[arch の手順](../arch/README.md)）。
+
+観測口は `tools/build_profile.py`。`tools/build_compare.sh BASE HEAD` は fonts 不要の
+kernel・R1・全 paired の `.o`/ELF/bin/mod/VK32 を同じ絶対パスで順にビルドして比較する。
+`--all` は fonts を用意した PM 側で全製品を比較する。`.a` はメンバ名・順序・内容を照合し、
+build ID と日時以外のデータや ELF メタデータも差として扱う。
+ELF/module/配置/guard の能力は `sdk/target_profile.py` を正とし、PPC の未対応能力を
+machine 値の変更だけで有効化しない。

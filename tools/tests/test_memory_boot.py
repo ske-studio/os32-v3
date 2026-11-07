@@ -25,6 +25,10 @@ import sys
 import tempfile
 import unittest
 
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # (名前, 当てるファイル, 置き換え前, 置き換え後, 落とすべき場面 (case, kb))
@@ -237,7 +241,7 @@ class MemoryBoot(unittest.TestCase):
         # 割り込みを禁じたまま止まること (io.h の _stop() = cli; hlt)。
         # 眠って起きる _halt() ではいけない — 先へ進んでしまう。
         self.assertIn('for (;;) { _stop(); }', s[start:downstream])
-        self.assertIn('mm/memory_boot.c', (ROOT / 'build/kernel.mk').read_text())
+        self.assertIn('mm/memory_boot.c', query(ROOT, config_only=True)['C_KERNEL'])
 
     def test_legacy_allocator_is_gone(self):
         # D32 / T1a: legacy の口は製品のどこにも残っていない。

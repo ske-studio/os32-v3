@@ -69,7 +69,7 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 
 ## 3. 観測と受け渡しの道具 (2026-11-03 に確かめた形)
 
-- **ssh / scp**: `ssh -i ~/.ssh/brain_pwsh4 -o BatchMode=yes hight@100.76.241.127` (tailscale の IP)。ホスト名 `hight-pc-vj24lfwz1srg` で入ると鍵が違い `Permission denied`。scp も同じ鍵と IP。してよいのは §冒頭のとおりファイルを置くことと状態の確認まで。置いたら sha256 を両側で照合する。
+- **ssh / scp**: `ssh notebook` (`~/.ssh/config` の別名: tailscale の IP 100.76.241.127・ユーザー hight・鍵 `~/.ssh/id_notebook`、2026-11-07 に鍵の名前を brain_pwsh4 から変えた)。ホスト名 `hight-pc-vj24lfwz1srg` で入ると鍵が違い `Permission denied`。scp も同じ鍵と IP。してよいのは §冒頭のとおりファイルを置くことと状態の確認まで。置いたら sha256 を両側で照合する。
 - **カメラ** (画面): `curl -s http://hight-pc-vj24lfwz1srg:8080/api/frames` (JSON、約 5fps・直近約 300 秒分の名前の配列 `YYYYMMDD-HHMMSS-mmm.jpg`、末尾が最新) → `curl -s -o x.jpg http://hight-pc-vj24lfwz1srg:8080/frames/<名前>` を Read で見る。CUI の文字はおおむね読める — 写った・崩れ・真っ黒の判定だけ (正典 [RA266](../../../docs/decisions/realhw/RA266.md) §3-1)。**ノートに reboot の時刻 (秒まで) を先に返させ**、その時刻からの枚を見る。
 - **起動の途中のシリアル** (起動ログ・診断の行): ノートが rshell で `reboot` を打ち、そのまま約 150 秒シリアルを記録して `<名札>/splr-boot.log` と `.raw`、各段の開始・終了・rc を `TIMES.txt` に残す (2026-11-02 の splash-diag-b9c239d4 の形)。依頼文に「前回と同じ採り方」でなく、この 1 行を書く。
 - **診断の像 (別の BUILD_OUT、例 `make kernel-splash-diag` → `build/out/splash-diag/`) の渡し方**: `deploy.yaml` は `build/out` を前提にするので、次の手で HostDrv の根を作る。

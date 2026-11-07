@@ -18,7 +18,7 @@ $(PCM_OUT)/pcm_import_slots.o $(PCM_OUT)/pcm_provider_types.o $(PCM_OUT)/pcm_kex
 $(PCM_OUT)/pcm_import_stubs.o: $(PCM_OUT)/pcm_import_stubs.S build/config.mk build/pcm-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(PCM_OUT)/pcm.elf: $(PCM_OBJS) build/pcm-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/pcm-module.ld -Map=$(PCM_OUT)/pcm.map $(PCM_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/pcm-module.ld -Map=$(PCM_OUT)/pcm.map $(PCM_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(PCM_OUT)/pcm_kexports.o
@@ -28,10 +28,10 @@ $(KERNEL_OBJ_PREFIX)drivers/sound/cs4231/pcm_module.o $(R1_OBJ)/drivers/sound/cs
 $(KERNEL_OBJ_PREFIX)drivers/sound/cs4231/pcm_module.o $(R1_OBJ)/drivers/sound/cs4231/pcm_module.o: private CFLAGS_BASE += -I$(PCM_OUT)
 
 define pack_pcm
-	python3 tools/mkmod.py --module-id 7 --elf $(PCM_OUT)/pcm.elf --metadata $(PCM_OUT)/pcm_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 7 --elf $(PCM_OUT)/pcm.elf --metadata $(PCM_OUT)/pcm_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/pcm_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/pcm-module.mk
+$(BUILD_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/pcm_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/pcm-module.mk
 	$(call pack_pcm,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/pcm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/pcm-module.mk
+$(R1_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/pcm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/pcm-module.mk
 	$(call pack_pcm,$(R1_OUT)/vmkernel.lz4)
 -include $(PCM_OBJS:.o=.d) $(PCM_OUT)/pcm_kexports.d $(PCM_OUT)/pcm_provider_types.d

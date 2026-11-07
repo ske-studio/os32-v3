@@ -88,17 +88,17 @@ def _is_cross_cc(tok):
     return b.startswith("i386-elf-") and b.endswith("gcc")
 
 
-def parse_compile_lines(text):
+def parse_compile_lines(text, declared_cc=None):
     """`make -n` の出力から i386-elf-gcc の -c の行を拾い、
     [{"src": 元の .c, "sig": 旗の組 (tuple), "cc": コンパイラ, "argv": 引数}] で返す。
     旗の組からは -I・依存生成・-c・-o と元のソースを外す (言語に効かないもの)。
     argv は依存生成・-c・-o だけを外した実際の引数 (前処理に使う)。"""
     units = []
     for line in text.splitlines():
-        if "gcc" not in line:
+        if declared_cc is None and "gcc" not in line:
             continue
         for seg in _segments(line):
-            if not seg or not _is_cross_cc(seg[0]) or "-c" not in seg[1:]:
+            if not seg or not (seg[0] == declared_cc if declared_cc is not None else _is_cross_cc(seg[0])) or "-c" not in seg[1:]:
                 continue
             sig = []
             srcs = []
@@ -206,7 +206,7 @@ def dry_run(root):
         src = pathlib.Path(root, REAL_BUILD_OUT, name)
         if src.is_file():
             shutil.copyfile(str(src), os.path.join(out_dir, name))
-    cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
+    cmd = (["make", "ARCH=x86", "PLATFORM=pc98", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
            + ["BUILD_OUT=" + os.path.join(tmp, "out")])
     if env.get("OS32_CLANG_CROSS_FREE") == "1":
         # Supply only external link inputs, keeping all C prerequisites and

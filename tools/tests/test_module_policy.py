@@ -10,6 +10,10 @@ import sys
 
 import yaml
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import module_schema as schema
@@ -54,8 +58,8 @@ def conformance():
     distributed = schema.COMPONENTS
     expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()
-    paired = re.search(r'^KERNEL_PAIRED_MODULES := (.*)$', build, re.M)[1]
-    assert paired.split() == ['$(BUILD_OUT)/' + name for name in expected], 'paired build list'
+    paired = query(ROOT)['KERNEL_PAIRED_MODULES']
+    assert [Path(name).name for name in paired] == expected, 'paired build list'
     actual = [row for row in deployed if row['guest'].endswith(('.mod', '/kdebug.bin'))]
     assert sorted((row['host'], row['guest'], row['tags']) for row in actual) == sorted(
         ('build/out/' + name, row['path'], ['gui'] if row['name'] == 'TRIDENT' else ['core'])

@@ -42,7 +42,11 @@ INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 SRC = "exec/shell_service.c"
 HDR = "exec/shell_service.h"
 EXEC = "exec/exec.c"
-KERNEL_MK = "build/kernel.mk"
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from build_profile import query
+
+KERNEL_MK = "build/kernel-objects.mk"
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 # (ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, 何を崩したか)
@@ -182,7 +186,7 @@ def static_checks(root, quiet=False):
         bad.append("build/kernel.mk が shell_service.o を -fno-optimize-sibling-calls で組まない")
     if "$(R1_OBJ)/exec/shell_service.o: private KERNEL_CFLAGS += -fno-optimize-sibling-calls" not in mk:
         bad.append("build/kernel.mk が r1 の shell_service.o を -fno-optimize-sibling-calls で組まない")
-    if " exec/shell_service.c " not in mk or "| $(SHELL_SERVICE_OBJ)" in mk:
+    if "exec/shell_service.c" not in query(root, config_only=True)["C_KERNEL"] or "| $(SHELL_SERVICE_OBJ)" in mk:
         bad.append("build/kernel.mk: shell_service.c が C_KERNEL に無い / 順序だけの前提が残る")
     # S3b: exec/exec.c の字面 (組めない部分)
     ex = exec_source(root)
@@ -258,6 +262,10 @@ def mutate():
                                 ignore=shutil.ignore_patterns("target"))
             (copy / KERNEL_MK).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / KERNEL_MK, copy / KERNEL_MK)
+            for directory in ('arch', 'sources', 'platform', 'features'):
+                shutil.copytree(ROOT / 'build' / directory, copy / 'build' / directory, dirs_exist_ok=True)
+            for name in ('config.mk', 'select.mk'):
+                shutil.copy2(ROOT / 'build' / name, copy / 'build' / name)
             # exec/ は INC_DIRS で写る (exec.c を含む)
             src = copy / rel
             text = src.read_text(encoding="utf-8")

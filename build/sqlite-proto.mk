@@ -23,10 +23,10 @@ $(SQLITE_PROTO_OUT)/kstring.o $(SQLITE_PROTO_OUT)/kstring_c.o $(SQLITE_PROTO_OUT
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os $(INC_LIB) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite.elf: $(SQLITE_PROTO_OBJS) build/sqlite-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/sqlite-module.ld -Map=$(SQLITE_PROTO_OUT)/sqlite.map $(SQLITE_PROTO_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/sqlite-module.ld -Map=$(SQLITE_PROTO_OUT)/sqlite.map $(SQLITE_PROTO_OBJS) -o $@
 # Measurement consumes the already built VK32 without invoking its FORCE
 # relink (which would stale distribution hashes while host checks run).
-$(SQLITE_PROTO_OUT)/sqlite.bin: .FORCE $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json tools/sqlite_module_proto.py tools/mkmod.py tools/module_schema.py sdk/kapi.json
+$(SQLITE_PROTO_OUT)/sqlite.bin: .FORCE $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json tools/sqlite_module_proto.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json
 	python3 tools/sqlite_module_proto.py --directory $(SQLITE_PROTO_OUT) --vmkernel $(BUILD_OUT)/vmkernel.lz4
 
 sqlite-module-proto: $(SQLITE_PROTO_OUT)/sqlite.bin $(SQLITE_PROTO_OUT)/sqlite_provider_types.o
@@ -50,10 +50,10 @@ $(KERNEL_OBJ_PREFIX)kernel/sqlite_engine.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_out
 $(SQLITE_PROTO_OUT)/sqlite_module.o: $(SQLITE_GENERATED)
 
 define pack_sqlite
-	python3 tools/mkmod.py --module-id 2 --elf $(SQLITE_PROTO_OUT)/sqlite.elf --metadata $(SQLITE_PROTO_OUT)/sqlite_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 2 --elf $(SQLITE_PROTO_OUT)/sqlite.elf --metadata $(SQLITE_PROTO_OUT)/sqlite_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/sqlite.mod: $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/sqlite-proto.mk
+$(BUILD_OUT)/sqlite.mod: $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/sqlite-proto.mk
 	$(call pack_sqlite,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/sqlite.mod: $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/sqlite-proto.mk
+$(R1_OUT)/sqlite.mod: $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/sqlite-proto.mk
 	$(call pack_sqlite,$(R1_OUT)/vmkernel.lz4)
 -include $(SQLITE_KEXPORT_OBJ:.o=.d)

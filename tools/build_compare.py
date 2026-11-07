@@ -9,6 +9,8 @@ under --output (default TMPDIR/build-compare-*); never write to either .git.
 import argparse
 import difflib
 import io
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -53,22 +55,97 @@ def snapshot(root, revision, destination):
         print(f'{revision}: supplied build-ID comparison hook', flush=True)
 
 
-def artifacts(root):
-    out = root / 'build/out'
-    paths = {Path(name) for name in ('kernel.bin', 'vmkernel.lz4', 'kdebug.bin', 'hwdev.mod',
-                                    'r1/kernel.bin', 'r1/vmkernel.lz4', 'r1/kdebug.bin', 'r1/hwdev.mod')}
-    paths.update(p.relative_to(out) for p in out.glob('*.mod'))
-    paths.update(p.relative_to(out) for p in out.rglob('hwdev.bin'))
-    paths.update(p.relative_to(out) for p in (out / 'r1').glob('*.mod'))
+def archive_members(data):
+    """Compare payload members, including duplicate names, in stored order."""
+    if not data.startswith(b'!<arch>\n'):
+        raise ValueError('invalid ar archive')
+    result, strings, offset = [], b'', 8
+    while offset < len(data):
+        header = data[offset:offset + 60]
+        if len(header) != 60 or header[58:] != b'`\n':
+            raise ValueError('invalid ar member header')
+        size = int(header[48:58])
+        payload = data[offset + 60:offset + 60 + size]
+        if len(payload) != size:
+            raise ValueError('truncated ar member')
+        name = header[:16].decode().strip()
+        offset += 60 + size + (size & 1)
+        if name == '//':
+            strings = payload
+            continue
+        if name in ('/', '/SYM64/'):
+            continue
+        if name.startswith('#1/'):
+            length = int(name[3:])
+            name, payload = payload[:length].decode(), payload[length:]
+        elif name.startswith('/') and name[1:].isdigit():
+            start = int(name[1:])
+            end = strings.find(b'/\n', start)
+            if end < 0:
+                raise ValueError('invalid ar string offset')
+            name = strings[start:end].decode()
+        else:
+            name = name.rstrip('/')
+        result.append((name, payload))
+    return result
+
+
+def artifacts(root, all_products=False):
+    """Relative paths, with objects and ELF metadata included in the verdict."""
+    directories = ('build/out',)
+    if all_products:
+        directories += ('boot', 'programs', 'userland', 'sdk', 'lib', 'images', 'build/sdk')
+    suffixes = {'.o', '.elf', '.bin', '.mod', '.lz4', '.a'}
+    paths = set()
+    for directory in directories:
+        for path in (root / directory).rglob('*'):
+            rel = path.relative_to(root)
+            if 'target' in rel.parts or not path.is_file():
+                continue
+            if path.suffix in suffixes or (all_products and
+                    (directory in ('programs', 'images', 'build/sdk') or
+                     str(rel).startswith('sdk/include/'))):
+                paths.add(rel)
+    # Missing required products must fail even when absent on both sides.
+    paths.update(Path('build/out') / name for name in (
+        'kernel.bin', 'kernel.elf', 'vmkernel.lz4', 'kdebug.bin',
+        'r1/kernel.bin', 'r1/kernel.elf', 'r1/vmkernel.lz4', 'r1/kdebug.bin'))
     return paths
 
 
-def compare(left, right):
-    paths = artifacts(left) | artifacts(right)
+# Approved B1/B2/T1 SDK tool changes, pinned to both reviewed contents.
+# A path alone never permits an arbitrary tool change or a missing target.
+ALLOWED_TOOL_DIFFS = {
+    'build/sdk/bin/link_guard.py': (
+        '319f4e3fd31f4c12181966246f732b6824ee99fd644a0d72eecfd7967c85f92e',
+        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
+    'build/sdk/bin/target_profile.py': (
+        None, '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6'),
+}
+
+
+def allowed_tool_difference(rel, a, b):
+    approved = ALLOWED_TOOL_DIFFS.get(str(rel))
+    digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return approved is not None and (digest(a), digest(b)) == approved
+
+
+def compare(left, right, all_products=False):
+    paths = artifacts(left, all_products) | artifacts(right, all_products)
     different = []
     for rel in sorted(paths):
-        a, b = left / 'build/out' / rel, right / 'build/out' / rel
-        equal = a.is_file() and b.is_file() and a.read_bytes() == b.read_bytes()
+        a, b = left / rel, right / rel
+        equal = a.is_file() and b.is_file()
+        if equal:
+            before, after = a.read_bytes(), b.read_bytes()
+            equal = (archive_members(before) == archive_members(after)
+                     if rel.suffix == '.a' else before == after)
+        if not equal and all_products and allowed_tool_difference(rel, a, b):
+            print('ALLOW ' + str(rel), flush=True)
+            before = a.read_text().splitlines(True) if a.is_file() else []
+            print(''.join(difflib.unified_diff(before, b.read_text().splitlines(True),
+                                             'base/' + str(rel), 'target/' + str(rel))), flush=True)
+            continue
         print(('MATCH ' if equal else 'DIFF  ') + str(rel), flush=True)
         if not equal:
             different.append(str(rel))
@@ -123,6 +200,7 @@ def main():
     ap.add_argument('base')
     ap.add_argument('target')
     ap.add_argument('--output', type=Path)
+    ap.add_argument('--all', action='store_true', dest='all_products')
     args = ap.parse_args()
     output = args.output or Path(tempfile.mkdtemp(prefix='build-compare-'))
     output = output.resolve()
@@ -133,24 +211,42 @@ def main():
     env['PATH'] = str(cross / 'bin') + os.pathsep + env['PATH']
     print('comparison directory: ' + str(output), flush=True)
     trees = []
+    inputs = []
     for label, revision in (('base', args.base), ('target', args.target)):
-        tree = output / label
+        tree = output / ('input-' + label)
         snapshot(ROOT, revision, tree)
-        trees.append(tree)
+        inputs.append(tree)
+    workspace = output / 'workspace'
+    font_manifest = {}
+    for path in (ROOT / 'assets/fonts').rglob('*'):
+        if path.is_file():
+            font_manifest[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (output / 'fonts.json').write_text(json.dumps(font_manifest, indent=2) + '\n')
+    for label, tree_input in zip(('base', 'target'), inputs):
+        tree_input.rename(workspace)
+        for name in font_manifest:
+            target = workspace / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, target)
         log = output / (label + '.log')
+        goals = ['all', 'kernel-r1'] if args.all_products else ['kernel', 'kernel-r1', 'libs']
         with log.open('w') as stream:
-            result = subprocess.run(['make', 'kernel', 'kernel-r1'], cwd=tree, env=env,
+            result = subprocess.run(['make', 'CROSS_DIR=' + str(cross), *goals],
+                                    cwd=workspace, env=env,
                                     stdout=stream, stderr=subprocess.STDOUT)
         if result.returncode:
             print(f'{label}: build failed, rc={result.returncode}: {log}', flush=True)
             return result.returncode
-    different = compare(*trees)
+        tree = output / label
+        workspace.rename(tree)
+        trees.append(tree)
+    different = compare(*trees, args.all_products)
     if different:
         report = output / 'function-diff.txt'
         report.write_text(function_diff(*trees, str(cross / 'bin/i386-elf-objdump')))
         print('function differences: ' + str(report))
         return 1
-    print(f'All {len(artifacts(trees[0]))} artifacts match.')
+    print(f'All {len(artifacts(trees[0], args.all_products))} artifacts match.')
     return 0
 
 

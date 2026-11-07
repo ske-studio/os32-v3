@@ -18,7 +18,7 @@ $(FM_OUT)/fm_import_slots.o $(FM_OUT)/fm_provider_types.o $(FM_OUT)/fm_kexports.
 $(FM_OUT)/fm_import_stubs.o: $(FM_OUT)/fm_import_stubs.S build/config.mk build/fm-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(FM_OUT)/fm.elf: $(FM_OBJS) build/fm-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/fm-module.ld -Map=$(FM_OUT)/fm.map $(FM_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/fm-module.ld -Map=$(FM_OUT)/fm.map $(FM_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(FM_OUT)/fm_kexports.o
@@ -28,10 +28,10 @@ $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_m
 $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_module.o: private CFLAGS_BASE += -I$(FM_OUT)
 
 define pack_fm
-	python3 tools/mkmod.py --module-id 6 --elf $(FM_OUT)/fm.elf --metadata $(FM_OUT)/fm_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 6 --elf $(FM_OUT)/fm.elf --metadata $(FM_OUT)/fm_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
-$(BUILD_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
+$(BUILD_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
 	$(call pack_fm,$(BUILD_OUT)/vmkernel.lz4)
-$(R1_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
+$(R1_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
 	$(call pack_fm,$(R1_OUT)/vmkernel.lz4)
 -include $(FM_OBJS:.o=.d) $(FM_OUT)/fm_kexports.d $(FM_OUT)/fm_provider_types.d

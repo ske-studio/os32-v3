@@ -37,6 +37,11 @@ kernel.map が無いときは**推測しない**。__bss_end を決め打ちに�
 「それらしく」出てしまい、今回とまったく同じ嘘をもう一度書くことになる。
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sdk'))
+from target_profile import require as require_target
+
 import argparse
 import hashlib
 import json
@@ -1017,7 +1022,13 @@ def main():
     ap.add_argument("--chain-limit", default=None,
                     help="鎖の上限のmemmap.h定数名 (既定: 固定paging guard)")
     ap.add_argument("--layout-header", help="ld/NASM/C 共通の生成ヘッダ (memmap_layout.h) を書き出す")
+    ap.add_argument('--target', default='x86-pc98')
     args = ap.parse_args()
+    try:
+        require_target(args.target, 'layout')
+    except ValueError as error:
+        print('gen_memmap: ' + str(error), file=sys.stderr)
+        return 1
 
     root = args.root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if args.layout_header:

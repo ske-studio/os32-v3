@@ -1,0 +1,3 @@
+SUPPORTED_ARCH = ppc
+DEFAULT_FEATURE_VALUE = 0
+C_PLATFORM_NEW = platform/powermac/ofw.c platform/powermac/escc_tree.c platform/powermac/escc.c platform/powermac/boot.c

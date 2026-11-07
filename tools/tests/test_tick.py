@@ -11,6 +11,10 @@ import tempfile
 import sys
 import host32
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_profile import query
+
 ROOT = Path(__file__).resolve().parents[2]
 OWNERS = {
     'drivers/sound/fm/fm_module.c': ('SND', 'snd_tick', 'int fm_module_load(void)'),
@@ -55,7 +59,7 @@ def wiring():
         assert src.index('tick_register(') < src.index(boundary), rel
     assert 'tick_register' not in (ROOT / 'net/link.c').read_text()
     assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
-    assert 'kernel/irq/tick.c' in (ROOT / 'build/kernel.mk').read_text()
+    assert 'kernel/irq/tick.c' in query(ROOT, config_only=True)['C_KERNEL']
     print('PASS timer fixture order, six resident owners plus GF slot (owner checked when present), platform boundary', flush=True)
 
 
