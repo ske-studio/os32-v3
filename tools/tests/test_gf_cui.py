@@ -16,6 +16,8 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('gpio-tag', 'userland/shell/cmd_gf2.c',
+     'q.session |= GF5_WIRE_GPIO_TAG;', 'q.session |= 0;'),
     ('feature-skip', 'userland/shell/cmd_gf2.c',
      'if (q.test == GF5_FEATURE) {\n        int result',
      'if (false) {\n        int result'),
