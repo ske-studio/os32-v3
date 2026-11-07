@@ -13,4 +13,5 @@ void ppc_sync(void);
 void ppc_disable(void);
 void ppc_stop(void) __attribute__((noreturn));
 void powermac_boot(ppc_ci ci);
+void powermac_mmu_boot(ppc_ci ci);
 #endif

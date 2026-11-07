@@ -77,7 +77,11 @@ _start:
 .Lcleared:
     stwu 0,-PM_ABI_FRAME(1)
     mr 3,5
+#ifdef PPC_MMU
+    bl powermac_mmu_boot
+#else
     bl powermac_boot
+#endif
     b ppc_stop
     .globl ppc_load8
 ppc_load8:
@@ -106,6 +110,7 @@ ppc_disable:
 ppc_stop:
     sync
     bl ppc_disable
+    sync
     .globl ppc_stop_loop
 ppc_stop_loop:
     b ppc_stop_loop

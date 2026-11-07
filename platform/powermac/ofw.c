@@ -155,7 +155,12 @@ int ofw_setup(struct ofw_env *e)
     e->ac = e->sc = 1;
     ofw_getprop(root,"#address-cells",&e->ac,sizeof(e->ac));
     ofw_getprop(root,"#size-cells",&e->sc,sizeof(e->sc));
+#ifdef PPC_MMU
+    /* NetBSD ofw_machdep.c:223-253 handles both 32- and 64-bit cells. */
+    if ((e->sc != 1 && e->sc != 2) || (e->ac != 1 && e->ac != 2)) return -2;
+#else
     if (e->sc != 1 || (e->ac != 1 && e->ac != 2)) return -2;
+#endif
     e->memory = e->mmu = -1;
     ofw_getprop(chosen,"memory",&e->memory,sizeof(e->memory));
     ofw_getprop(chosen,"mmu",&e->mmu,sizeof(e->mmu));

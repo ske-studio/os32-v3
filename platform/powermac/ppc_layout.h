@@ -61,6 +61,20 @@
 #define PM_NOTE_NAMESZ 8
 #define PM_NOTE_DESCSZ 20
 #define PM_NOTE_TYPE 0x1275
+/* Independent MMU test image budgets and reserved address windows. */
+#define PM_MMU_IMAGE_LIMIT 0x20000
+#define PM_MMU_ELF_BUDGET 0x18000
+#define PM_LOW_RESERVED_END 0x3000
+#define PM_BAT_RAM_END 0x10000000
+#define PM_IO_ALIAS 0xf0000000
+#define PM_TEST_ALIAS 0x40000000
+#define PM_MAPPING_COUNT 16
+#define PM_REGION_COUNT 35
+#define PM_MEMORY_REGIONS 32
+#define PM_PTEG_INITIAL 0x1000
+#define PM_DEC_HZ 100
+#define PM_DEC_DUMP_N 2
+#define PM_MEMORY "/memory"
 #define PM_ROOT "/"
 #define PM_CHOSEN "/chosen"
 #define PM_OPTIONS "/options"
