@@ -233,6 +233,7 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
     u32 a = 0, b = 0, c = 0;
     enum hwb_rc rc;
     switch (i->op) {
+    case HWB_PROBE: return hwb_probe_execute(s, i);
     case HWB_DIM: {
         rc = hwb_eval(s, i->value, &a); if (rc) return rc;
         if (!a || a > HWB_ARRAY_ELEMENTS - s->array_used || he_slot(s, i->name) >= 0)
@@ -458,7 +459,7 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     }
     r.rc = rc;
     if (i.op == HWB_POLL) hwb_log_poll(s->backend, &r, &poll);
-    else if (rc || (i.op != HWB_PRINT && i.op != HWB_LOG)) hwb_log_end(s->backend, &r);
+    else if (i.op != HWB_PROBE && (rc || (i.op != HWB_PRINT && i.op != HWB_LOG))) hwb_log_end(s->backend, &r);
     if (rc) return he_stop(s, rc);
     s->pc = next;
     if (next == HWB_NO_PC) return he_stop(s, HWB_OK);

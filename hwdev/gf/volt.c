@@ -254,7 +254,9 @@ static u8 entry_vid(const struct gf5 *g,const struct table *t,u32 i)
 {
     u8 vid=g->rom.bytes[t->off+t->hdr+i*t->len+1];
     if (t->ver==0x30) vid >>= 2;
-    return vid&t->mask;
+    /* bios/volt.c:143-150, volt/base.c:212-214: keep the table VID.
+     * volt/gpio.c:84-93 masks only GPIO reads, never table entries. */
+    return vid;
 }
 static u32 entry_uv(const struct gf5 *g,const struct table *t,u32 i)
 { return (u32)g->rom.bytes[t->off+t->hdr+i*t->len]*VOLT_UNIT_UV; }

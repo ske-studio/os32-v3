@@ -80,6 +80,18 @@
 - pollのmask/valueは幅内、valueはmask外ビット0、timeout 1..10,000,000、interval 1..timeout。最終値・回数・経過を返す。TIMEOUTは実行停止。
 - 各命令の失敗でその場停止、次命令へ進まず、再実行もしない。実行済み書込みは取り消さない。対話から次の操作を選べる。
 
+### 採取点の台本命令（KDBG 段 C）
+
+- `probe reset` / `probe list` は停止中の設定・記録消去 / 登録名と有効状態の列挙。
+- `probe add <名前> ioread8|ioread16|ioread32 port <番地>`、`probe add <名前> mmioread8|mmioread16|mmioread32 phys <物理番地>` は1行1項目を追加する。名前は変数名と別の字句で `[a-z0-9_.]` の1～31字。番地は確定した十進・十六進u32リテラルのみ。
+- `probe add <名前> idxio8|idxmmio8 <index番地> <data番地> <index値>` は保存可能な単純な index/data 対だけを指定する。index の選択・復元のみ書込みを許し、data 書込み・unlock・bank/head 切替・Attribute Controller の flip-flop は扱わない。対象対の成立はメーカー資料と MIT/BSD 実装で確認し受入台本に記す。
+- `probe arm` は ring 採取、`probe arm serial` は各項目の採取直後にも `phase=hit` の1行を既存 kprintf ミラーへ送る。通常文脈の採取点に限り、ARM 時にシリアルの利用可能性を検証する。シリアル出力時間が手順に影響する。IRQ/NMI・共用MMIO窓の使用中には採取点を置かない。
+- run/load の終了・step/abort は採取を解除しない。別のシェル操作の後、`probe stop` → `probe drain` の台本を `hw run -o <パス> <台本>` で実行する。変更と DRAIN は停止中のみで、稼働中は BUSY。セッションは kdebug が所有し、再起動で消失する。
+- ADD 後は STATUS を読みログへ出す。登録 epoch の不一致による旧設定の失効は ADD 応答でなく、この状態行の ARG に現れる。今の ADD は新しい設定の先頭として成立し、再 ARM できる。状態は明示 RESET まで保持する。
+- DRAIN は `more=0` まで全項目を出力して消去し、最後に captured/dropped/overflow と状態を出す。run/seq は外側 HW ログと共通、hit は採取時の別連番。出力失敗後も残りを消費・消去し、既存の `log_rc` と終了値で失敗を返す。再送保証はない。`-o` なしは同じ行を kprintf ミラーへ送る。欠落・overflow は成功扱いしない。
+- 読むと状態が変わるレジスタ（0x3DA の flip-flop、read-clear ISR 等）は指定者の責任。点は手順の区切り（原則 post）に置き、detect.pre も直前手順完了後の境界とする。バス停止・CPU fault では復元も DRAIN も保証できず未出力記録を失う。
+- 私有 PROBE_OP=20、128B/version=1 wire を使い、既存 HW_OP/32B wire・公開 KAPI を変更しない。LIMIT/BUSY/OVERFLOW/SKIP は probe 行に記録し、既存終了値では IO に対応する（ARG/NOSYS/WINDOW は従来どおり）。採取の上限・寿命は [採取点設計](KDBG_PROBE_DESIGN.md) §§3–4 に従う。
+
 ## 3. 特権の境目と停止
 ```c
 /* 新規 kdebug/hwb_wire.h。公開SDKを変更しない固定長u32 wire。 */

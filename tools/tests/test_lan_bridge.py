@@ -439,7 +439,42 @@ def sigusr1_while_busy_keeps_the_bridge_alive():
         assert "reentrant" not in out, out
 
 
+def reconnect_discards_backlog():
+    from unittest.mock import patch
+    mod = load_bridge(BRIDGE)
+    class Nic:
+        def __init__(self):
+            self.frames = [b"old SYN", b"older SYN"]
+        def recv_frames(self):
+            return [self.frames.pop(0)]
+    nic = Nic()
+    bridge = mod.Bridge(nic, None, quiet=True)
+    forwarded = []
+    def ready(*args):
+        return ([nic] if nic.frames else [], [], [])
+    def pump():
+        forwarded.extend(nic.frames)
+        raise KeyboardInterrupt
+    bridge.pump = pump
+    with patch.object(mod.select, "select", side_effect=ready):
+        try:
+            bridge.run()
+        except KeyboardInterrupt:
+            pass
+    assert forwarded == [], forwarded
+    # A new frame after reconnect must still be forwarded normally.
+    nic.frames.append(b"fresh SYN")
+    class Agent:
+        def send(self, frame):
+            forwarded.append(frame)
+    bridge.agent = Agent()
+    bridge.accept = lambda frame: True
+    bridge.from_nic()
+    assert forwarded == [b"fresh SYN"]
+
+
 CASES = [
+    reconnect_discards_backlog,
     framing_matches_host_agent,
     l0_hello_roundtrip,
     foreign_ethertype_is_dropped,
@@ -455,6 +490,7 @@ CASES = [
 # 否定側。**実物は 1 バイトも触らず**写しの上で 1 か所だけ壊す (= check-par で
 # 並列に回せる)。(パターン, 置換, 説明)
 MUTATIONS = [
+    (r"        self\.discard_nic_backlog\(\)", "        pass", "reconnect backlog drain omitted"),
     (r'if frame\[ETH_HDR:ETH_HDR \+ 3\] == SFS_PREFIX:',
      'if False:', 'SFS 除外を外す'),
     (r'if frame\[ETH_HDR:ETH_HDR \+ 3\] == SFS_PREFIX:',
@@ -502,14 +538,17 @@ def mutate(tmp, sfs_only=False):
     original = BRIDGE_SRC.read_text(encoding="utf-8")
     bad = 0
     # 変異に関係しうるケースだけ回す (実 NIC の権限ケースは無関係)。
-    cases = [framing_matches_host_agent, l0_hello_roundtrip,
+    cases = [reconnect_discards_backlog, framing_matches_host_agent, l0_hello_roundtrip,
              sfs_is_dropped_but_eof_passes,
              foreign_ethertype_is_dropped, short_frame_is_dropped,
              sigusr1_while_busy_keeps_the_bridge_alive]
     mutations = MUTATIONS
     if sfs_only:
         cases = [sfs_is_dropped_but_eof_passes]
-        mutations = MUTATIONS[:2]
+        mutations = MUTATIONS[1:3]
+    if sfs_only == "reconnect":
+        cases = [reconnect_discards_backlog]
+        mutations = MUTATIONS[:1]
     for i, (pattern, repl, why) in enumerate(mutations, 1):
         assert len(re.findall(pattern, original)) == 1, why
         text, n = re.subn(pattern, repl, original, count=1)
@@ -551,7 +590,7 @@ def main():
     rc = run([c for c in CASES if not want or c.__name__ in want])
     if "--mutate" in args:
         with tempfile.TemporaryDirectory(prefix="os32-lanbr-mut-") as tmp:
-            rc += mutate(tmp, sfs_only=want == ['sfs_is_dropped_but_eof_passes'])
+            rc += mutate(tmp, sfs_only='reconnect' if want == ['reconnect_discards_backlog'] else want == ['sfs_is_dropped_but_eof_passes'])
     return 1 if rc else 0
 
 

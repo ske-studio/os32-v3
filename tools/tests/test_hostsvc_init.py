@@ -25,6 +25,8 @@ MUTATIONS = (
     ('FD-config', 'int enabled = sysconfig_get_int(SYS_NETCD_CFG, "SFS_LAN", 0) == 1;',
      'int enabled = 0;'),
     ('peer', 'have_peer ? boot_sfs_lan.peer : 0', '0'),
+    ('preserve-start', '    rc = net_start(NET_NIC_AUTO, net_peer);\n    if (rc',
+     '    net_unbind();\n    rc = net_start(NET_NIC_AUTO, net_peer);\n    if (rc'),
     ('resident', 'rc = sfs_persistent_start(&cfg);', '(void)cfg; rc = 0;'),
     ('clock', 'return tick_count;', 'return 0;'),
     ('init', 'sfs_lan_init(&boot_sfs_lan, 0, &boot_sfs_clock, 0);',

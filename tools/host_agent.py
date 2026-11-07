@@ -510,13 +510,13 @@ class HostAgent:
 
     def _on_syn(self, src, epoch, nonce, req_sess, out):
         """候補を 1 件だけ作って SYN-ACK を返す。**現行セッションは変えない**。"""
-        # **SYN のたびに候補を作り直す** (nonce は HELLO ごとに +1 されるので、
-        # 同じ nonce の SYN は「同じ RTC 秒に再起動した別の OS32」でもありうる
-        # = 往復 3 の B3。候補を使い回すと再起動が旧 sess を貰ってしまう)。
-        # 採番するのは新セッションの SYN だけで、セッション内の再同期 (req_sess
-        # が現行 sess) は同じ sess のまま — 再送で sess を減らさない。
+        # Unconfirmed SYNs from the same MAC replace the nonce, not the sess.
+        # A confirmed candidate must never be reused after an OS restart.
         if req_sess != 0 and self.established and req_sess == self.sess:
             assigned = self.sess                      # セッション内の再同期
+        elif (self.cand is not None and not self.cand.get("confirmed")
+              and self.cand["mac"] == src and self.cand["req_sess"] == req_sess):
+            assigned = self.cand["sess"]
         else:
             assigned = self.sessions.alloc()
             if assigned is None:

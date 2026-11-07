@@ -47,6 +47,13 @@ static int hw_access(void *ctx, struct hw_req *req)
     if (rc == OS32_ERR_NOSYS) hw_unavailable = 1;
     return rc;
 }
+static int hw_probe(void *ctx, struct probe_wire *w)
+{
+    (void)ctx;
+    int rc = g_api->kdebug_call(PROBE_OP, w, PROBE_WIRE_BYTES);
+    if (rc == OS32_ERR_NOSYS) hw_unavailable = 1;
+    return rc;
+}
 static int hw_time(void *ctx, u32 *lo, u32 *hi)
 {
     (void)ctx;
@@ -119,7 +126,7 @@ static int hw_find_id(void *ctx, u32 vendor, u32 device, u32 start, u32 *bdfs, u
     return (int)total;
 }
 static const struct hwb_backend hw_backend = {
-    0, hw_access, hw_time, hw_yield, hw_point, hw_line, hw_read_file, hw_find_id
+    0, hw_probe, hw_access, hw_time, hw_yield, hw_point, hw_line, hw_read_file, hw_find_id
 };
 static void hw_release(void)
 {

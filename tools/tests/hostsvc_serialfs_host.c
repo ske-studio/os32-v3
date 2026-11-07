@@ -63,7 +63,11 @@ static int put(void *ctx, const u8 *buf, u32 n)
                 if (paged && cookie < 3) sfs_put32(pl + SFS_STATUS_LEN, cookie + 1);
             }
             if (extra) len++;
-            if (unknown) type = SFS_T_ERR;
+            if (unknown) {
+                type = SFS_T_ERR;
+                sfs_put32(pl, (u32)OS32_ERR_STALE);
+                if (unknown == 2) unknown = 0;
+            }
             if (malformed) len = 1;
         }
         pos = 0;
@@ -132,9 +136,13 @@ static int suite(void)
     CHECK(hs_now() - before == 100);
     silent = 0; budget = 0;
     CHECK(ops->stat(ctx, "/a", &st) == 0);
+    gen = sfs_persistent_generation(); unknown = 2; budget = 0;
+    u32 old_sid = sfs_persistent_client()->sid;
+    CHECK(ops->stat(ctx, "/a", &st) == 0);
+    CHECK(sfs_persistent_generation() == gen + 1 && sfs_persistent_client()->sid != old_sid);
     gen = sfs_persistent_generation(); unknown = 1;
     CHECK(ops->write_file(ctx, "/a", data, 1) == OS32_ERR_STALE);
-    CHECK(sfs_persistent_generation() == gen + 1 && !sfs_persistent_client()->sid);
+    CHECK(sfs_persistent_generation() == gen + 2 && !sfs_persistent_client()->sid);
     unknown = 0;
     CHECK(ops->resource_refresh(ctx) == 0 && sfs_persistent_client()->sid);
     CHECK(ops->resource_check(ctx, &gen) == 0 && gen == sfs_persistent_generation());

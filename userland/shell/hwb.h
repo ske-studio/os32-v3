@@ -5,6 +5,7 @@
 #ifndef SHELL_HWB_H
 #define SHELL_HWB_H
 #include "kdebug/hwb_wire.h"
+#include "kdebug/probe_wire.h"
 
 #define HWB_VARIABLES 64U
 #define HWB_ARRAY_ELEMENTS 16384U
@@ -37,6 +38,8 @@ const char *hwb_rc_name(enum hwb_rc rc);
 
 struct hwb_backend {
     void *ctx;
+    /* Private PROBE_OP, exact 128B/version=1; outputs valid only at zero. */
+    int (*probe)(void *ctx, struct probe_wire *wire);
     /* Raw kdebug_call result (0 or OS32_ERR_*); req outputs only valid at 0. */
     int (*access)(void *ctx, struct hw_req *req);
     /* Same snapshot lo/hi microseconds; negative failure leaves both untouched. */
@@ -76,7 +79,7 @@ struct hwb_program {
 enum hwb_opcode {
     HWB_DIM, HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
     HWB_READ, HWB_WRITE, HWB_FILL, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
-    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END, HWB_BLOCK32 /* all mmioblock widths, selected by width */
+    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END, HWB_PROBE, HWB_BLOCK32 /* all mmioblock widths, selected by width */
 };
 enum hwb_address_kind { HWB_ADDR_PCI, HWB_ADDR_PORT, HWB_ADDR_PHYS,
                         HWB_ADDR_BAR, HWB_ADDR_WINDOW };
@@ -86,6 +89,7 @@ struct hwb_address {
     struct hwb_span bar, offset;
 };
 struct hwb_instruction {
+    struct probe_wire probe;
     enum hwb_opcode op;
     /* READ/WRITE/FILL: requested PCI/IO/PHYS from the command spelling, independent
      * of address.kind. Exec uses it for dispatch and BAR type validation;
@@ -134,6 +138,11 @@ struct hwb_log_record {
     u32 indexed, index;
     u32 requested_us, elapsed_lo, elapsed_hi, count, done, increment;
 };
+
+int hwb_probe_parse(const char *source, u32 begin, u32 end, struct probe_wire *w);
+enum hwb_rc hwb_probe_execute(struct hwb_state *s, const struct hwb_instruction *i);
+void hwb_log_probe(const struct hwb_backend *backend, const struct hwb_log_record *r,
+                   const struct probe_wire *w);
 
 /* Validate all syntax/labels before effects. On failure *out is scratch/invalid,
  * *error_line identifies the physical line; source and live state unchanged. */

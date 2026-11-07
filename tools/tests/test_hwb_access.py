@@ -1,6 +1,6 @@
 """HW_BASIC_DESIGN §§3/7: real access/window/dispatch, libc-free ILP32."""
 CHECK = dict(name='hwb-access-host', tier=1, covers=[
-    'kdebug/probe_wire.h', 'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h',
+    'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h',
     'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h',
     'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h', 'include/io.h',
     'include/types.h', 'include/memmap.h', 'mm/paging.h',
