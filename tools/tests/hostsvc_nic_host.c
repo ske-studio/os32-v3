@@ -18,6 +18,8 @@ static int tick_logs, logged_tick_rc, poll_reentry, poll_reentry_rc;
 static tick_fn callback;
 static u8 seen_peer[6], seen_local[6];
 static int saw_peer;
+u32 link_hello_ok;
+u8 link_peer_mac[ETH_ALEN];
 static u32 pending, rx_calls, rx_head;
 /* Match the 82557 hardware ring's capacity; A3 owns separate protocol queues. */
 static u8 rx_frames[E82557_RFD_COUNT][ETH_FRAME_MAX - ETH_FCS_LEN];
@@ -205,7 +207,8 @@ static int test(void)
     REQUIRE(net_start(NET_NIC_AUTO, 0) == 0);
     REQUIRE(inits == saved_inits && acquired == saved_acquired);
     REQUIRE(net_start(NET_NIC_E82557, 0) == OS32_ERR_BUSY);
-    REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == OS32_ERR_BUSY);
+    REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == 0);
+    REQUIRE(inits == saved_inits && acquired == saved_acquired);
     REQUIRE(net_bind(&ops) == OS32_ERR_BUSY);
     REQUIRE(net_mac(out) == 0 && equal(out, mac_addr, 6));
     REQUIRE(net_rx_credit_bytes() == 4096 && net_mac(0) == OS32_ERR_INVAL);

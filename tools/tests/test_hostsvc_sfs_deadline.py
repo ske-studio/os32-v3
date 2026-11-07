@@ -35,15 +35,17 @@ MUTATIONS = (
     ('retry-after-tx', 'retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;',
      'retry = now + SFS_LAN_RETRY_TICKS;'),
     ('seq-retry', 'if (sent) c->resends++;', 'if (sent) { c->resends++; c->seq++; }'),
-    ('sticky-dead', 'if (rc) return rc;\n    if (f.type == SFS_T_ERR)',
-     'if (rc) { c->dead = SFS_DEAD_FAILS; return rc; }\n    if (f.type == SFS_T_ERR)'),
+    ('sticky-dead', 'if (rc < 0) return rc;\n    if (sent) *sent = rc;\n    if (f.type == SFS_T_ERR)',
+     'if (rc < 0) { c->dead = SFS_DEAD_FAILS; return rc; }\n    if (sent) *sent = rc;\n    if (f.type == SFS_T_ERR)'),
     ('stale', '        sfs_persistent_stale();', ''),
-    ('no-recovery', 'if (attempt == 1) return rc;', 'if (attempt == 0) return rc;'),
-    ('two-recoveries', 'if (attempt == 1) return rc;', 'if (attempt == 2) return rc;'),
+    ('no-recovery', 'if (attempt == 1 || sent != 1) return rc;', 'if (attempt == 0 || sent != 1) return rc;'),
+    ('two-recoveries', 'if (attempt == 1 || sent != 1) return rc;', 'if (attempt == 2 || sent != 1) return rc;'),
+    ('recover-after-resend', 'if (attempt == 1 || sent != 1) return rc;',
+     'if (attempt == 1) return rc;'),
     ('copy', '((u8 *)out->data)[i] = f.payload[i];', '((u8 *)out->data)[i] = 0;'),
     ('capacity', 'if (out->capacity < f.len) return OS32_ERR_NOSPC;', ''),
-    ('shared-deadline', 'out, deadline);\n        if (rc != OS32_ERR_STALE)',
-     'out, deadline + 100);\n        if (rc != OS32_ERR_STALE)'),
+    ('shared-deadline', 'out, deadline, &sent);\n        if (rc != OS32_ERR_STALE)',
+     'out, deadline + 100, &sent);\n        if (rc != OS32_ERR_STALE)'),
 )
 
 

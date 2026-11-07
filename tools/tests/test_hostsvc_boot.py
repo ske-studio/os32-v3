@@ -73,8 +73,9 @@ from kernel_boot_source import kernel_source
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['drivers/net/e82557/lan_body.c', 'drivers/net/e82557/lan_module.c',
-           'drivers/net/ne2000/lgy98.c']
+           'drivers/net/ne2000/lgy98.c', 'net/nic.c']
 MUTATIONS = [
+    ('pin-auto-peer', 3, 'fixed_peer = 1; /* Pin AUTO without restarting the link. */', 'fixed_peer = 0;'),
     ('body-adapter', 0, '.adapter = &net_e82557_adapter,', '.adapter = 0,'),
     ('82557-registration', 1, 'rc = net_adapter_register(NET_NIC_E82557, candidate.adapter);', 'rc = 0;'),
     ('82557-start', 1, 'if (!rc) rc = net_start(NET_NIC_AUTO, NULL);', 'if (!rc) rc = 0;'),
@@ -98,11 +99,11 @@ def build_run(work, sources):
                     '-DLAN_RESIDENT_SOURCE="' + str(paths[1]) + '"',
                     '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                     str(ROOT / 'tools/tests/hostsvc_boot_host.c'), str(paths[2]),
-                    str(ROOT / 'net/nic.c'), str(ROOT / 'net/nic_e82557.c'),
+                    str(paths[3]), str(ROOT / 'net/nic_e82557.c'),
                     str(ROOT / 'net/nic_lgy98.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([mode]), capture_output=True).returncode
-            for mode in (1, 2, 3, 4)]
+            for mode in (1, 2, 3, 4, 5, 6, 7)]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -124,7 +125,7 @@ def main():
         results = build_run(work, originals)
         if any(results):
             raise RuntimeError(f'control runtime rc={results}')
-        print('GREEN boot: 82557 only / LGY only / both / missing lan.mod', flush=True)
+        print('GREEN boot: 82557 only / LGY only / both / missing lan.mod / configured peer (pending, same, different)', flush=True)
         if args.mutate:
             for name, index, before, after in MUTATIONS:
                 assert originals[index].count(before) == 1, name

@@ -29,7 +29,8 @@ void *kmemset(void *dst, int value, u32 n)
 { u8 *p = dst; for (u32 i = 0; i < n; i++) p[i] = (u8)value; return dst; }
 
 static int present, loaded, link_ticks, link_registrations, selected, module_error;
-static int syns;
+static int syns, saw_fixed_peer;
+static const u8 configured_peer[6] = {2, 4, 6, 8, 10, 12};
 static struct module_record record;
 static struct bootinfo bi;
 static int hw_state(void) { return present ? E82557_RUNNING : E82557_OFF; }
@@ -131,7 +132,13 @@ void link_init(const u8 mac[ETH_ALEN])
 void link_tick(void) { link_ticks++; boot_real_link_tick(); }
 void net_rx_reset(u16 protocol) { (void)protocol; }
 void net_rx_demux(const struct NetNicOps *ops, const u8 *mac, const u8 *peer)
-{ (void)ops; (void)mac; (void)peer; }
+{
+    (void)ops; (void)mac;
+    saw_fixed_peer = peer != 0;
+    if (peer)
+        for (u32 i = 0; i < 6; i++)
+            if (peer[i] != configured_peer[i]) saw_fixed_peer = -1;
+}
 unsigned int ne2k_rx_ring_free_pages(void) { return 8; }
 unsigned int ne2k_rx_queue_free(void) { return 4; }
 unsigned int boot_irq_save(void) { return 0; }
@@ -140,20 +147,33 @@ void boot_irq_restore(unsigned int flags) { (void)flags; }
 static int boot_run(int mode)
 {
     u8 mac[6];
-    present = mode == 1 || mode == 3;
+    present = mode == 1 || mode == 3 || mode >= 5;
     module_error = mode == 4 ? MODULE_INIT_FAILED : 0;
     /* Same order as kernel_boot_memory -> BOOT_NIC_LEGACY. */
     if (lan_module_load() != module_error) return 20;
-    if (mode != 1 && lgy98_attach(LGY98_BASE_DEFAULT, LGY98_INT0_IRQ, 0)) return 21;
+    if (mode != 1 && mode < 5 && lgy98_attach(LGY98_BASE_DEFAULT, LGY98_INT0_IRQ, 0)) return 21;
     if (net_mac(mac) || selected != (present ? 1 : 2)) return 22;
     if (mac[0] != (present ? 16 : 0)) return 23;
     if (link_inits != 1 || link_registrations != 1) return 24;
     if (record.active_refs != (present ? 1u : 0u)) return 25;
     net_tick();
     if (link_ticks != 1) return 26;
-    if (net_start(NET_NIC_AUTO, 0)) return 28;
+    if (mode >= 6) {
+        link_hello_ok = 1;
+        for (u32 i = 0; i < 6; i++) link_peer_mac[i] = configured_peer[i];
+        if (mode == 7) link_peer_mac[5]++;
+    }
+    const u8 *peer = mode >= 5 ? configured_peer : 0;
+    int rc = net_start(NET_NIC_AUTO, peer);
+    if (mode == 7) {
+        if (rc != OS32_ERR_BUSY) return 30;
+        net_unbind();
+        rc = net_start(NET_NIC_AUTO, peer);
+        if (rc || link_inits != 2) return 31;
+    } else if (rc) return 28;
     net_tick();
-    if (link_inits != 1 || syns + tx_calls != 1) return 29;
+    if (mode != 7 && (link_inits != 1 || syns + tx_calls != 1)) return 29;
+    if (saw_fixed_peer != (mode >= 5)) return 32;
     net_unbind();
     if (record.active_refs || net_mac(mac) != OS32_ERR_HOSTDOWN) return 27;
     return 0;

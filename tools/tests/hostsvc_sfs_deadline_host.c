@@ -11,7 +11,8 @@ static u32 bounded_sends, passed_deadline, second_send;
 static int recover, rejects;
 static u32 ensure_calls, executions, recovered_sid;
 /* modes: 0 normal, 1 silence, 2 continuous stray, 3 unknown sid,
- * 4 short response, 5 delayed until resend, 6 wrong nonce, 7 bad version. */
+ * 4 short response, 5 delayed until resend, 6 wrong nonce, 7 bad version,
+ * 8 first WRITE executed without reply, then host restarted before retry. */
 static int put(void *ctx, const u8 *buf, u32 n)
 {
     (void)ctx;
@@ -36,6 +37,7 @@ static int put(void *ctx, const u8 *buf, u32 n)
     hs_advance(put_delay);
     int fail;
     if (hs_failure_take("sfs.reply", &fail)) return fail;
+    if (mode == 8 && f.type != SFS_T_HELLO && sends == 1) return 0;
     if (mode == 1 || (mode == 5 && sends == 1)) return 0;
     u8 payload[SFS_HELLO_RSP_LEN] = {0};
     u16 len = SFS_STATUS_LEN;
@@ -49,7 +51,7 @@ static int put(void *ctx, const u8 *buf, u32 n)
         sfs_put32(payload + SFS_HELLO_RSP_NONCE,
                   sfs_get32(f.payload + SFS_HELLO_REQ_NONCE) + (mode == 6));
     } else sfs_put32(payload, (u32)OS32_ERR_NOTFOUND);
-    if (mode == 3 || (recover && f.type != SFS_T_HELLO && rejects-- > 0)) {
+    if (mode == 3 || (mode == 8 && f.type != SFS_T_HELLO && !recovered_sid) || (recover && f.type != SFS_T_HELLO && rejects-- > 0)) {
         type = SFS_T_ERR;
         sfs_put32(payload, (u32)OS32_ERR_STALE);
         if (recover && f.sid == recovered_sid) executions--;
@@ -160,6 +162,11 @@ static int suite(void)
         REQUIRE(sfs_request_deadline(op ? SFS_T_WRITE : SFS_T_STAT, 0, 0, &reply, 100) == OS32_ERR_STALE);
         REQUIRE(stale == 2 && ensure_calls == 2 && !client.sid && !executions);
     }
+    reset(0); mode = 8; recover = 1; client.sid = 66;
+    REQUIRE(sfs_request_deadline(SFS_T_WRITE, 0, 0, &reply, 100) == OS32_ERR_STALE);
+    REQUIRE(sends == 2 && client.resends == 1 && client.seq == 1);
+    REQUIRE(stale == 1 && ensure_calls == 1 && !client.sid && !executions);
+    REQUIRE(reply.length == 0 && hs_now() == 10);
     reset(0); mode = 4;
     REQUIRE(sfs_request_deadline(SFS_T_STAT, 0, 0, &reply, 100) == OS32_ERR_IO);
     reset(0); ensure_delay = 90; mode = 1;

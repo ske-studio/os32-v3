@@ -69,7 +69,15 @@ int net_start(enum NetNicId choice, const u8 peer[6])
         return OS32_ERR_INVAL;
     adapter = adapters[choice];
     if (bound) {
-        if (!adapter || owner != adapter || fixed_peer != (peer != 0)) return OS32_ERR_BUSY;
+        if (!adapter || owner != adapter) return OS32_ERR_BUSY;
+        if (!fixed_peer && peer) {
+            if (link_hello_ok)
+                for (u32 i = 0; i < sizeof(peer_mac); i++)
+                    if (link_peer_mac[i] != peer[i]) return OS32_ERR_BUSY;
+            for (u32 i = 0; i < sizeof(peer_mac); i++) peer_mac[i] = peer[i];
+            fixed_peer = 1; /* Pin AUTO without restarting the link. */
+        }
+        if (fixed_peer != (peer != 0)) return OS32_ERR_BUSY;
         if (peer)
             for (u32 i = 0; i < sizeof(peer_mac); i++)
                 if (peer_mac[i] != peer[i]) return OS32_ERR_BUSY;
