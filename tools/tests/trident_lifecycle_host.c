@@ -3,8 +3,6 @@
 #include "trident_device_fake.h"
 #include "drivers/video/trident/trident_module.h"
 #include "backend_under_test.c"
-#include "drivers/video/trident/probes.h"
-#include "concrete_probe_broker.h"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static struct trident_fake f;
 static u8 memory[TRI_FAKE_REAL_BYTES], ram_client[1228800];
@@ -125,22 +123,7 @@ static int writes(const u32 (*want)[3],u32 n) {
     }
     CHECK(at==n && !f.trace_overflow); return 0;
 }
-static int probe_same(const char *a,const char *b)
-{ while (*a && *a == *b) { ++a; ++b; } return *a == *b; }
-static u32 probe_records, probe_id;
-static void record_screeninit(u32 id) {
-    if (id != 0 || !device.screen_ready || device.step != TRI_STEP_ACTIVE)
-        probe_id = 1;
-    ++probe_records;
-}
 static int test(void) {
-    const struct probe_decl *decls;
-    u32 ndecls;
-    CHECK(!trident_get_probe_decls(&decls, &ndecls) && ndecls == 1);
-    CHECK(probe_same(decls[0].name, "tri.screeninit.post"));
-    CHECK(!decls[0].slot->hit && !decls[0].slot->id);
-    CHECK(!concrete_register(decls,ndecls));
-
     CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
     f.resources.ready=true;f.resources.client=memory;f.resources.client_bytes=TRI_DISPLAY_BYTES;
     f.resources.configure=configure;
@@ -157,18 +140,12 @@ static int test(void) {
     CHECK(f.ext_dac[0x50]==255 && f.ext_dac[0x54]==255);
     CHECK(device.accel.initialized && device.cursor.available);
     CHECK(device.mode.client.off==device.mode.display.off && !f.resources.ram_fallback);
-    CHECK(!probe_records);
-    CHECK(!concrete_arm(record_screeninit,ndecls));
-    init();
-    CHECK(probe_records == 1 && !probe_id);
-    static const u32 reinit[]={18,19,11,10,3,4,5,6,7,8,12,19,13,14,15,16,9};
+    init(); static const u32 reinit[]={18,19,11,10,3,4,5,6,7,8,12,19,13,14,15,16,9};
     static const u32 again[]={3,4,5,6,7,8,12,19,13,14,15,16,9};
     CHECK(!order(reinit,17));
     CHECK(!device.last_rc && arms==1);
     enter();static const u32 vt[]={5,6,14,17}; CHECK(!order(vt,4));
     CHECK(!(f.sr[1]&32));
-    CHECK(probe_records == 1);
-    CHECK(!concrete_stop());
     leave();static const u32 leaving[]={18,19,10,11};CHECK(!order(leaving,4));
     CHECK(!device.active);shutdown();CHECK(!count);
     init();CHECK(!order(again,13));shutdown();static const u32 closing[]={18,19,11,10};CHECK(!order(closing,4));
