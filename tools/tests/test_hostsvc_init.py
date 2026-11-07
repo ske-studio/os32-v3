@@ -5,7 +5,8 @@ CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=5, covers=[
     'include/config.h', 'include/types.h', 'include/kprintf.h', 'include/net_eth.h',
     'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_lan.c',
     'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h',
-    'net/nic.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'net/nic.h', 'net/host_mailbox.c', 'net/host_mailbox.h',
+    'sdk/include/os32/os32_host_notice.h', 'mm/kmalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_init_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'])
 import os
@@ -17,6 +18,9 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('mailbox-init', 'int rc = host_mailbox_init();', 'int rc = 0;'),
+    ('mailbox-log', 'if (rc) kprintf(KLOG_ATTR, "[hostsvc] mailbox init rc=%d\\n", rc);',
+     '(void)rc;'),
     ('legacy-before-start', 'boot_platform_run(BOOT_NIC_LEGACY, boot);', '(void)boot;'),
     ('FD-config', 'int enabled = sysconfig_get_int(SYS_NETCD_CFG, "SFS_LAN", 0) == 1;',
      'int enabled = 0;'),
@@ -34,18 +38,20 @@ def build_run(work, source):
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
         '-ffunction-sections', '-fdata-sections', '-I'+str(work), '-I'+str(ROOT),
         *include_flags(ROOT), '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-        str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), '-o', str(exe)], check=True)
-    return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(9)]
+        str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), str(ROOT / 'net/host_mailbox.c'), '-o', str(exe)], check=True)
+    return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(10)]
 def main():
     source = (ROOT / 'init/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
     with tempfile.TemporaryDirectory(prefix='hostsvc-init-') as td:
         work=Path(td)
+        (work / 'io.h').write_text('static inline unsigned int irq_save(void) { return 0; }\n'
+            'static inline void irq_restore(unsigned int f) { (void)f; }\n')
         lan=(ROOT / 'fs/serialfs/sfs_lan.c').read_text()
         lan=lan.replace('sfs_lan_init', 'body_lan_init').replace('sfs_lan_set_peer', 'body_lan_peer').replace('sfs_lan_io', 'body_lan_io')
         (work / 'lan.c').write_text(lan)
         results=build_run(work,source)
         assert not any(results), results
-        print('GREEN absent / SFS / peer only / SFS+peer / invalid / missing module / NIC failure+restore / mount failure / restore failure', flush=True)
+        print('GREEN absent / SFS / peer only / SFS+peer / invalid / missing module / NIC failure+restore / mount failure / restore failure / mailbox heap failure', flush=True)
         if '--mutate' in sys.argv:
             for name,before,after in MUTATIONS:
                 assert source.count(before)==1, name

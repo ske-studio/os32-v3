@@ -2,6 +2,8 @@
 #include "fs/serialfs/serialfs.h"
 #include "fs/serialfs/sfs_lan.h"
 #include "net/nic.h"
+#include "net/host_mailbox.h"
+#include <stdarg.h>
 #include "init/sysconfig.h"
 #include "include/config.h"
 #include "lib/kstring.h"
@@ -15,6 +17,25 @@ static int boot_legacy_started;
 static struct SfsPersistentConfig saved;
 static const u8 expected[6] = {2, 0xAB, 0xcd, 0x10, 0x20, 0x30};
 static int same(const char *a,const char *b) { while(*a && *a==*b) {a++; b++;} return *a==*b; }
+/* Only the production boot helper initializes the real mailbox. */
+static u8 notice_heap[64 * sizeof(HostNotice)];
+static int allocations, mailbox_logs;
+void *kmalloc(u32 size)
+{
+    CHECK(size == sizeof(notice_heap) && ++allocations == 1 && step == 0);
+    return mode == 9 ? 0 : notice_heap;
+}
+void *kmemset(void *dst, int value, u32 n)
+{ u8 *p = dst; for (u32 i = 0; i < n; i++) p[i] = (u8)value; return dst; }
+void *kmemcpy(void *dst, const void *src, u32 n)
+{ u8 *p = dst; const u8 *q = src; for (u32 i = 0; i < n; i++) p[i] = q[i]; return dst; }
+static void mailbox_at_link_start(void)
+{
+    CHECK(allocations == 1);
+    u32 generation = 7;
+    int rc = host_mailbox_put(generation, 3, 1, &generation, sizeof(generation), 1);
+    CHECK(rc == (mode == 9 ? OS32_ERR_NOSYS : 0));
+}
 int sysconfig_get_int(const char *path,const char *key,int def)
 {
     CHECK(same(path,SYS_NETCD_CFG) && same(key,"SFS_LAN") && def==0);
@@ -31,7 +52,7 @@ static int memory_boot_dma_available(void) { return 1; }
 void boot_platform_run(enum boot_point point,const struct boot_context *boot)
 { (void)boot; CHECK((point==BOOT_PCI_RESOURCES && step++==0) ||
                      (point==BOOT_NIC_LEGACY && step++==3)); }
-static int lan_module_load(void) { CHECK(step++==1); loaded=mode!=5; return loaded?0:-1; }
+static int lan_module_load(void) { CHECK(step++==1); mailbox_at_link_start(); loaded=mode!=5; return loaded?0:-1; }
 static void lan_module_pci_bind_fallback(void) { CHECK(step++==2); }
 void net_unbind(void) { CHECK(parsed && step==4); unbinds++; }
 int net_start(enum NetNicId id,const u8 peer[6])
@@ -63,7 +84,17 @@ int sfs_persistent_start(const struct SfsPersistentConfig *cfg)
     saved=*cfg; mounts++;
     return mode==7 ? -1 : 0;
 }
-void kprintf(u8 attr,const char *fmt,...) { (void)attr; (void)fmt; }
+void kprintf(u8 attr,const char *fmt,...)
+{
+    (void)attr;
+    if (same(fmt, "[hostsvc] mailbox init rc=%d\n")) {
+        va_list args;
+        va_start(args, fmt);
+        CHECK(mode == 9 && va_arg(args, int) == OS32_ERR_NOSYS);
+        va_end(args);
+        mailbox_logs++;
+    }
+}
 static void host_halt(void) { halted++; }
 #define _halt host_halt
 #define _irq_enabled() 1
@@ -73,6 +104,18 @@ static int suite(void)
     struct boot_context boot={0};
     kernel_boot_lan(&boot);
     CHECK(step==3 || step==4);
+    CHECK(allocations == 1 && mailbox_logs == (mode == 9));
+    HostNotice notice;
+    CHECK(host_mailbox_stage(7, 3, &notice) == (mode == 9 ? OS32_ERR_NOSYS : 0));
+    CHECK(host_mailbox_latest_serial() == (mode == 9 ? 0u : 1u));
+    struct HostAlive alive;
+    host_alive_snapshot(&alive);
+    CHECK(alive.valid && alive.host_generation == 7 && alive.observation == 1);
+    if (mode != 9) {
+        CHECK(notice.serial == 1 && notice.host_generation == 7 && notice.data[0] == 7);
+        host_mailbox_commit(7, notice.serial);
+        CHECK(host_mailbox_stage(7, 3, &notice) == OS32_ERR_AGAIN);
+    }
     if(mode==0 || mode==4 || mode==5) {CHECK(!starts && !mounts && !unbinds); return 0;}
     if(mode==6 || mode==8) {CHECK(starts==2 && unbinds==1 && !mounts && !initialized); return 0;}
     CHECK(starts==1 && unbinds==1);
