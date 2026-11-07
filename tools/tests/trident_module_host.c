@@ -162,13 +162,18 @@ int __wrap_trident_backend_prepare(void)
     if (mode==64) candidate.bb_base=0;
     return rc;
 }
+/* Loader fixtures supply synthetic committed descriptors (including
+ * nondefault formats). F6's transaction and arguments are tested separately;
+ * this seam retains those descriptors through the I/O-free prepare call. */
+static int configure(const struct tri_mode *m, u32 bytes, bool final)
+{ (void)m; (void)bytes; CHECK(!final); return TRI_OK; }
 extern char __executable_start[], _etext[], _end[];
 void _start(void)
 {
     u32 read_rc;
     __asm__ volatile("int $0x80":"=a"(read_rc):"0"(3),"b"(0),"c"(&mode),"d"(4):"memory");
     CHECK(read_rc==4);
-    resources=(struct trident_resources){.ready=true,.regs=regs,.lfb=lfb,.client=client,
+    resources=(struct trident_resources){.ready=true,.regs=regs,.lfb=lfb,.client=client,.configure=configure,
         .client_bytes=sizeof(client),.mapped_bytes=sizeof(lfb),
         .decode_bytes=TRI_BAR0_DECODE_BYTES,.regs_bytes=sizeof(regs),
         .pci={.bus=TRI_PCI_BUS,.slot=TRI_PCI_SLOT,.function=TRI_PCI_FUNCTION,

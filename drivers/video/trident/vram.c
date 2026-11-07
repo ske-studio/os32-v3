@@ -79,6 +79,7 @@ static u32 tri_usable_bytes(const struct trident_device *d)
 {
     u32 bytes = d->declared_bytes;
     if (bytes > d->res->mapped_bytes) bytes = d->res->mapped_bytes;
+    if (bytes > d->res->decode_bytes) bytes = d->res->decode_bytes;
     if (d->settings.vram_bytes && bytes > d->settings.vram_bytes)
         bytes = d->settings.vram_bytes;
     return bytes;
@@ -141,6 +142,8 @@ u32 tri_vram_display_max_bytes(const struct trident_device *d)
         u32 pitch = (u32)m.display_width * cap->cpp;
         if (m.vd > U32_MAX / pitch || m.vd > usable / pitch) continue;
         u32 bytes = pitch * m.vd;
+        u32 page_bytes;
+        if (tri_round_up(bytes, TRI_PAGE_BYTES, &page_bytes) || page_bytes > usable) continue;
         if (maximum < bytes) maximum = bytes;
     }
     /* D:3637-3661's fixed virtual display, page sized for F6's aliases. */
@@ -178,8 +181,8 @@ int tri_vram_init(struct trident_device *d, const struct tri_mode *m)
     u32 pitch = (u32)m->display_width * cap->cpp;
     u32 usable = tri_usable_bytes(d);
     if (m->vd > usable / pitch) return TRI_E_CAP_TOO_SMALL;
-    u32 first_off = tri_vram_display_max_bytes(d);
-    if (!first_off) return TRI_E_CAP_TOO_SMALL;
+    u32 first_off = d->vram.first_off ? d->vram.first_off : tri_vram_display_max_bytes(d);
+    if (!first_off || first_off > usable || m->vd > first_off / pitch) return TRI_E_CAP_TOO_SMALL;
     u32 rows = usable / pitch;
     if (rows > TRI_GE_MAX_Y) rows = TRI_GE_MAX_Y;
     d->vram.usable_bytes = usable;

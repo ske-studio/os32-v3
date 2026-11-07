@@ -82,12 +82,17 @@ FAKE = 'tools/tests/trident_device_fake.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 # name, product file, unique old text, replacement, runtime RED case.
-MUTATIONS = [('master', 'drivers/video/trident/resources.c', 'paging_current_cr3() == paging_kernel_pd_phys()', '1', 1), ('live-as', 'drivers/video/trident/resources.c', '!paging_live_addrspaces()', '1', 2), ('memory-enable', 'drivers/video/trident/resources.c', '!(p->command & PCI_CMD_MEM_ENABLE)', '0', 4), ('ram-overlap', 'drivers/video/trident/resources.c', 'if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 'if (0 && pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 10), ('reserve-first', 'drivers/video/trident/resources.c', 'if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 'if (0 && !ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 0), ('map-rc', 'drivers/video/trident/resources.c', 'if (paging_map_phys(vas[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))', 'if (paging_map_phys(vas[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD) == 1)', 15), ('supervisor', 'drivers/video/trident/resources.c', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD | PTE_USER)', 0), ('map-rollback', 'drivers/video/trident/resources.c', 'mapped[i] = true;', 'mapped[i] = false;', 16), ('map-record', 'drivers/video/trident/resources.c', 'if (!ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 'if (0 && !ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 17), ('surface-rollback', 'drivers/video/trident/resources.c', 'if (!surface_created[i]) continue;', 'if (i == 0 || !surface_created[i]) continue;', 0), ('armed-busy', 'drivers/video/trident/resources.c', 'if (armed) return TRI_E_BUSY;', 'if (false && armed) return TRI_E_BUSY;', 22), ('lease-ceiling', 'drivers/video/trident/resources.c', '.perm_max = LEDGER_PERM_RW', '.perm_max = LEDGER_PERM_NONE', 0), ('publisher-private', 'drivers/video/trident/resources.c', 'gfx_surface_unready |= 1u << resources.display_sid;', 'gfx_surface_unready |= 0u << resources.display_sid;', 0), ('ready-commit', 'drivers/video/trident/resources.c', 'resources.ready = true;', 'resources.ready = false;', 0), ('no-reserve-repeat', 'drivers/video/trident/resources.c', 'if (attempted) return boot_rc;', 'if (false && attempted) return boot_rc;', 0)]
+MUTATIONS = [('master', 'drivers/video/trident/resources.c', 'paging_current_cr3() == paging_kernel_pd_phys()', '1', 1), ('live-as', 'drivers/video/trident/resources.c', '!paging_live_addrspaces()', '1', 2), ('memory-enable', 'drivers/video/trident/resources.c', '!(p->command & PCI_CMD_MEM_ENABLE)', '0', 4), ('ram-overlap', 'drivers/video/trident/resources.c', 'if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 'if (0 && pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))', 10), ('reserve-first', 'drivers/video/trident/resources.c', 'if (!ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 'if (0 && !ledger_reserve_set(resources.owner, spans, TRI_BAR_COUNT))', 0), ('map-rc', 'drivers/video/trident/resources.c', 'if (paging_map_phys(vas[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD))', 'if (paging_map_phys(vas[i], bases[i], maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD) == 1)', 15), ('supervisor', 'drivers/video/trident/resources.c', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'maps[i] / PAGE_SIZE, PAGE_RW | PTE_PCD | PTE_USER)', 0), ('map-rollback', 'drivers/video/trident/resources.c', 'mapped[i] = true;', 'mapped[i] = false;', 16), ('map-record', 'drivers/video/trident/resources.c', 'if (!ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 'if (0 && !ledger_resource_set_map(rids[i], bases[i] / PAGE_SIZE,', 17), ('surface-rollback', 'drivers/video/trident/resources.c', 'if (!surface_created[i]) continue;', 'if (i == 0 || !surface_created[i]) continue;', 0), ('armed-busy', 'drivers/video/trident/resources.c', 'if (armed) return TRI_E_BUSY;', 'if (false && armed) return TRI_E_BUSY;', 22), ('lease-ceiling', 'drivers/video/trident/resources.c', '.perm_max = LEDGER_PERM_RW', '.perm_max = LEDGER_PERM_NONE', 0), ('publisher-private', 'drivers/video/trident/resources.c', 'gfx_surface_unready |= 1u << live_sids[0];', 'gfx_surface_unready |= 0u << live_sids[0];', 0), ('ready-commit', 'drivers/video/trident/resources.c', 'resources.ready = true;', 'resources.ready = false;', 0), ('no-reserve-repeat', 'drivers/video/trident/resources.c', 'if (attempted) return boot_rc;', 'if (false && attempted) return boot_rc;', 0)]
 
 MUTATIONS += [
+    ('final-required', PRODUCT, 'if (final) capacity_final = true;', 'if (false) capacity_final = true;', 75),
+    ('resize-regen', PRODUCT, 'bool recreate = display_capacity && display_bytes != display_capacity;', 'bool recreate = false;', 75),
+    ('same-sid', PRODUCT, 'if (sids_fixed && created[0] != fixed_sids[0]) goto cleanup;', 'if (false) goto cleanup;', 79),
+    ('fixed-pages', PRODUCT, '.npages = display_bytes / PAGE_SIZE,', '.npages = pitch * mode->vd / PAGE_SIZE,', 75),
+
     ('client-regen', PRODUCT, 'if (!ledger_surface_regen(resources.client_sid, &sf)) goto done;', 'if (0) goto done;', 56),
     ('display-regen', PRODUCT, 'if (!ledger_surface_regen(resources.display_sid, &sf)) goto done;', 'if (0) goto done;', 56),
-    ('capacity-fixed', PRODUCT, 'if (display_capacity && display_bytes != display_capacity) return TRI_E_STATE;', 'if (0) return TRI_E_STATE;', 58),
+    ('capacity-fixed', PRODUCT, 'if (capacity_final && final && display_bytes != display_capacity) return TRI_E_STATE;', 'if (0) return TRI_E_STATE;', 58),
     ('client-alias', PRODUCT, '.backing = LEDGER_SB_VRAM,', '.backing = LEDGER_SB_MMIO,', 0),
     ('lease-revoke', PRODUCT, '            revoked += lease_revoke_surface(sids[i]);\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n        if (revoked)', '            revoked += 0;\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n        if (revoked)', 66),
     ('lease-revoke-rollback', PRODUCT, '            revoked += lease_revoke_surface(sids[i]);\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n    }', '            revoked += 0;\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n    }', 24),
@@ -135,10 +140,10 @@ def main():
                        check=True, capture_output=True)
         exe = build(folder, ROOT / PRODUCT)
         for runner in runners:
-            for mode in range(75):
+            for mode in range(81):
                 result = execute(exe, mode, runner)
                 assert result.returncode == 0, (mode, result.returncode, result.stdout, result.stderr)
-            print(f'GREEN {runner}: 75 boot/configure/rollback cases, real resource construction, cold common fake', flush=True)
+            print(f'GREEN {runner}: 81 boot/configure/rollback cases, real resource construction, cold common fake', flush=True)
         if args.mutate:
             original = (ROOT / PRODUCT).read_text()
             for name, path, old, new, mode in MUTATIONS:
@@ -151,6 +156,12 @@ def main():
                     assert result.returncode == 1 and b'FAIL ' in result.stdout, (
                         name, mode, result.returncode, result.stdout, result.stderr)
                 print(f'RED runtime {name} case={mode}', flush=True)
+            exe = build(folder, ROOT / PRODUCT)
+            for runner in runners:
+                for mode in range(81):
+                    result = execute(exe, mode, runner)
+                    assert result.returncode == 0, (mode, result)
+            print('RESTORED GREEN resources', flush=True)
     return 0
 
 

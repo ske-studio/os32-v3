@@ -70,13 +70,13 @@ int __wrap_tri_video_stop(struct trident_device *d, bool release) {
     if (optional_fail==19) return -81;
     return __real_tri_video_stop(d,release);
 }
-static int configure(const struct tri_mode *m, u32 bytes) {
-    stages[count++]=13;
+static int configure(const struct tri_mode *m, u32 bytes, bool final) {
+    if (final) stages[count++]=13;
     /* 640x480 XRGB8888 is the largest HAL-visible mode in the 2MiB fake.
      * The selected INDEX8 screen must reserve this fixed display extent. */
-    if (bytes!=(device.settings.no_accel ? 1228800u : 1966080u) ||
-        m->id!=device.mode.selected.id) return -90;
-    if (configure_fail) return configure_fail;
+    if (final && (bytes!=1966080u || m->id!=device.mode.selected.id)) return -90;
+    if (!final && f.operations == 0 && bytes != 307200u) return -90;
+    if (final && configure_fail) return configure_fail;
     u32 pitch=m->display_width*(m->bpp/8);
     f.resources.display=(struct tri_surface){0,pitch*m->vd,pitch,m->hd,m->vd,
                                            m->bpp/8,TRI_FMT_INDEX8};
@@ -166,7 +166,7 @@ static int test(void) {
     shutdown(); count=0; device.settings.no_accel=true;
     init(); CHECK(!order(again,13));
     CHECK(device.active && device.screen_ready && !device.accel.initialized &&
-          device.mode.no_accel && !backend.fill_rect && device.cursor.available);
+          device.mode.no_accel && !backend.fill_rect && !device.cursor.available);
     leave(); CHECK(!order(leaving,4)); enter(); CHECK(!order(vt,4));
     shutdown(); count=0; device.settings.no_accel=false;
     configure_fail=-82; init();

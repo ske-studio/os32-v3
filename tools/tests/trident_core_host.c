@@ -56,7 +56,7 @@ static void tri_init(void)
 static void tri_enter(void) { CHECK(tri_device.active); }
 static void tri_leave(void) { tri_leaves++; tri_device.active = false; route_safe = 1; }
 static void tri_close(void) { tri_closes++; CHECK(!tri_device.active); }
-static void tri_prepare(void) { tri_failure = prepare_failure; }
+static void tri_prepare(void) { tri_failure = prepare_failure; if (!tri_failure) tri_configure(); }
 GfxBackend gfx_backend_trident = {
     .name="trident-test", .probe=tri_probe, .init=tri_init, .query=tri_query,
     .enter=tri_enter, .leave=tri_leave, .shutdown=tri_close, .prepare=tri_prepare,
@@ -89,6 +89,9 @@ int trident_boot_reserve(void)
 static void tri_configure(void)
 {
     if (configured) return;
+    unsigned int flags = irq_save();
+    u32 cr3 = paging_current_cr3();
+    paging_load_cr3(paging_kernel_pd_phys());
     const struct ledger_resource *r=&ledger_resources[tri_rid];
     struct ledger_surface sf = {
         .first=r->decode_first, .npages=TRI_DISPLAY_PAGES, .width=TRI_WIDTH,
@@ -103,6 +106,8 @@ static void tri_configure(void)
     CHECK(ledger_surface_create(&sf, &tri_client));
     gfx_surface_unready |= 1u << tri_client;
     configured=1;
+    paging_load_cr3(cr3);
+    irq_restore(flags);
 }
 static void run(void) __attribute__((used));
 static void run(void)

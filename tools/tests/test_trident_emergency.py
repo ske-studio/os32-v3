@@ -16,6 +16,11 @@ CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=90,
             'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/idt.h',
             'exec/exec_finish.inc', 'exec/appslot.h',
             'tools/tests/trident_emergency_host.c', 'tools/tests/trident_core_host.c',
+            'tools/tests/trident_surface_lifetime_host.c', 'drivers/video/trident/*.c',
+            'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'exec/surface_limits.h',
+            'drivers/video/trident/trident_module.h', 'lib/kstring.h',
+            'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'lib/serial_diag.h',
+            'mm/kmalloc.h', 'drivers/char/serial.h', 'userland/tests/hw/trident_mode.hwb',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'drivers/video/trident/trident.h', 'tools/tests/test_gfx_kernel_fb.py',
             'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py',
@@ -143,6 +148,45 @@ def core(runner, mutation):
     return run_case(None, runner, changes, fixture, stage=stage)
 
 
+def lifetime(runner, mutation=None):
+    def stage(tmp, sources):
+        # Real boot reserves two additional master PTs for BAR0/BAR1.
+        host = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
+        assert host.count('u32 pages = 1;') == 1
+        (tmp / 'lifetime_kernel_host.c').write_text(host.replace('u32 pages = 1;', 'u32 pages = 3;'))
+        directory = ROOT / 'drivers/video/trident'
+        for stem in ('resources', 'lifecycle', 'regs', 'probe', 'state_save',
+                     'pc98_init', 'mode_640', 'route_ra266', 'vram', 'default_dac',
+                     'state_restore', 'present', 'palette', 'screen', 'video',
+                     'dpms', 'accel', 'cursor', 'backend_trident'):
+            body = source('drivers/video/trident/' + stem + '.c', mutation)
+            for header in ('trident.h', 'trident_module.h'):
+                body = body.replace('"' + header + '"', '"' + str(directory / header) + '"')
+            if stem == 'backend_trident':
+                body = body.replace('trident_regs_bind(&device)', 'lifetime_bind(&device)')
+                body = '#define trident_backend_ops gfx_backend_trident\n' + body
+                (tmp / 'lifetime_backend.c').write_text(body)
+            else:
+                path = tmp / ('lifetime_' + stem + '.c')
+                path.write_text(body)
+                sources.append(path)
+        sources.append(ROOT / 'tools/tests/trident_device_fake.c')
+    fixture = 'unsigned int host_arch_if = 0x202U;\n#include "trident_surface_lifetime_host.c"\n'
+    return run_case(None, runner, (), fixture, stage=stage)
+
+
+LIFETIME_MUTATIONS = [
+    ('prepare-configure', 'drivers/video/trident/backend_trident.c',
+     'rc = r->configure(&provisional, bytes, false);', 'rc = 0;', 'lifetime'),
+    ('final-configure', 'drivers/video/trident/lifecycle.c',
+     'configure(&d->mode.selected, d->vram.first_off, true)',
+     'configure(&d->mode.selected, d->vram.first_off, false)', 'lifetime'),
+    ('close-default', 'drivers/video/trident/backend_trident.c',
+     'if (device.mode.valid) device.mode.selected = provisional;',
+     'if (false) device.mode.selected = provisional;', 'lifetime'),
+]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
@@ -152,17 +196,20 @@ def main():
     with tempfile.TemporaryDirectory(prefix='trident-emergency-') as td:
         work = Path(td)
         for runner in runners:
-            for kind in ('entries', 'core'):
-                result = entries(work, runner, None) if kind == 'entries' else core(runner, None)
+            for kind in ('entries', 'core', 'lifetime'):
+                result = entries(work, runner, None) if kind == 'entries' else core(runner, None) if kind == 'core' else lifetime(runner)
                 print(result.stdout + result.stderr, end='', flush=True)
                 assert result.returncode == 0 and 'GREEN' in result.stdout, result
         if args.mutate:
-            for m in MUTATIONS:
+            for m in MUTATIONS + LIFETIME_MUTATIONS:
                 # Check uniqueness in the actual source, even for expanded inc.
                 source(m[1], m)
-                result = entries(work, runners[0], m) if m[4] == 'entries' else core(runners[0], m)
+                result = entries(work, runners[0], m) if m[4] == 'entries' else core(runners[0], m) if m[4] == 'core' else lifetime(runners[0], m)
                 assert result.returncode == 1 and ('RED ' in result.stdout or 'FAIL ' in result.stdout), (m[0], result)
                 print('MUTATE RED ' + m[0], flush=True)
+            result = lifetime(runners[0])
+            assert result.returncode == 0 and 'GREEN' in result.stdout, result
+            print('RESTORED ' + result.stdout.strip(), flush=True)
     return 0
 
 

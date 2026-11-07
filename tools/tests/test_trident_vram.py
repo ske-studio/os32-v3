@@ -25,6 +25,11 @@ PRODUCT = 'drivers/video/trident/vram.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTATIONS = (
+    ('M_DECODE_CAP', 'bytes = d->res->decode_bytes;', 'bytes = d->declared_bytes;'),
+    ('M_SPR_USABLE', 'u32 bytes = d->declared_bytes;', 'u32 bytes = d->res->mapped_bytes;'),
+    ('M_ROUNDED_FIT', 'page_bytes > usable', 'false'),
+    ('M_REINIT_FIXED', 'd->vram.first_off ? d->vram.first_off : tri_vram_display_max_bytes(d)',
+     'tri_vram_display_max_bytes(d)'),
     ('M_PLAN_AFTER_INIT', 'if (!d->armed || !d->pinned) return TRI_E_STATE;',
      'if (!d->init_done || !d->armed || !d->pinned) return TRI_E_STATE;'),
     ('M_SPR_CAP', 'case 0x0F: kib = 4096;', 'case 0x0F: kib = 2048;'),
@@ -32,7 +37,7 @@ MUTATIONS = (
      'default: kib = 2048; unknown = true;'),
     ('M_SPR_MASK', 'switch (spr & 0x0F)', 'switch (spr & 0x07)'),
     ('M_SPR_EXT', 'case 0x10: kib = 28672;', 'case 0x10: kib = 24576;'),
-    ('M_FIXED_DISPLAY', 'u32 first_off = tri_vram_display_max_bytes(d);',
+    ('M_FIXED_DISPLAY', 'u32 first_off = d->vram.first_off ? d->vram.first_off : tri_vram_display_max_bytes(d);',
      'u32 first_off = pitch * m->vd;'),
     ('M_MAX_SELECT', 'if (maximum < bytes) maximum = bytes;',
      'if (!maximum) maximum = bytes;'),

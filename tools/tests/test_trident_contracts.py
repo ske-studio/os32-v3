@@ -232,7 +232,7 @@ for member in ('vendor', 'device', 'command'):
 for member in ('bus', 'slot', 'function', 'revision'):
     TYPES[f'((struct trident_pci_info *)0)->{member}'] = 'u8'
 TYPES.update({
-    '((struct trident_resources *)0)->configure': 'int (*)(const struct tri_mode *, u32)',
+    '((struct trident_resources *)0)->configure': 'int (*)(const struct tri_mode *, u32, bool)',
     '((TridentModuleContext *)0)->diagnostic_out': 'const struct TridentDiagnosticOps **',
     '((struct trident_saved *)0)->vga_base': 'u16',
     '((struct trident_device *)0)->cur_vga_base': 'u16',

@@ -58,7 +58,7 @@ static u32 expected_max(u32 bytes, bool na)
     for (u32 h = 0; h < 3; ++h)
         for (u32 c = 0; c < 3; ++c) {
             u32 size = (na ? 640 : 1024) * cpp[c] * heights[h];
-            if (size <= bytes && size > maximum) maximum = size;
+            if (round_to(size, 4096) <= bytes && size > maximum) maximum = size;
         }
     return round_to(maximum, 4096);
 }
@@ -88,7 +88,18 @@ static int display_tests(void)
             f.resources.mapped_bytes = 4*1024*1024;
             d.settings.vram_bytes = cap;
             REQUIRE(tri_vram_display_max_bytes(&d) == maximum);
+            d.settings.vram_bytes = 0;
+            f.resources.decode_bytes = cap;
+            REQUIRE(tri_vram_display_max_bytes(&d) == maximum);
         }
+    /* Switching pitch cannot move offscreen storage into the fixed aliases. */
+    setup(2*1024*1024, false);
+    struct tri_mode fixed;
+    REQUIRE(tri_mode_prepare(&d, &tri_modes[0], &fixed) == TRI_OK);
+    REQUIRE(tri_vram_init(&d, &fixed) == TRI_OK);
+    d.settings.no_accel = true;
+    REQUIRE(tri_mode_prepare(&d, &tri_modes[0], &fixed) == TRI_OK);
+    REQUIRE(tri_vram_init(&d, &fixed) == TRI_OK && d.vram.first_off == 1966080u);
     static const u32 partial[] = {224000,256000,448000,900000};
     for (u32 na = 0; na < 2; ++na)
         for (u32 c = 0; c < 4; ++c) {

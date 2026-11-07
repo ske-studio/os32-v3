@@ -337,12 +337,12 @@ struct trident_resources {
      * (no new module import). Revokes leases, replaces both ledger surfaces,
      * updates descriptors/generation; never programs hardware. F13 validates
      * the resulting bb/mode consistency, not this kernel text as module text.
-     * mode is prepared/validated by F3/F5 before this call.
-     * PM 決定 (2026-11-07、F6 の設計の欠け 3): display_bytes は module (F5) の
-     * tri_vram_display_max_bytes の値。core は最初の呼び出しで DISPLAY・CLIENT を
-     * この大きさで 1 回だけ作り、以後は regen で形だけ替える (値が変わったら
-     * TRI_E_STATE)。起動時の資源の段では面を作らない。 */
-    int (*configure)(const struct tri_mode *mode, u32 display_bytes);
+     * final=false creates an I/O-free default provisional extent; ScreenInit
+     * passes final=true to fix the capacity. Later calls preserve that extent
+     * and regenerate geometry (including the default shape after Close).
+     * Before finalization, resized aliases are released together and recreated
+     * DISPLAY first, retaining their SIDs for gfx_core's pending publication. */
+    int (*configure)(const struct tri_mode *mode, u32 display_bytes, bool final);
 };
 struct trident_device {
     const struct trident_resources *res;

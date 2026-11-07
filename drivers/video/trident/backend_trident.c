@@ -187,13 +187,24 @@ int trident_backend_prepare(void)
         c->size != TRIDENT_MODULE_CONTEXT_SIZE || !c->diagnostic_out)
         return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_INVAL);
     const struct trident_resources *r = c->resources;
-    u32 client_bytes = device.mode.valid ? device.mode.client.bytes : TRI_DISPLAY_BYTES;
-    if (!r->ready || !r->regs || !r->lfb || !r->client ||
-        r->client_bytes < client_bytes || r->mapped_bytes < client_bytes ||
-        r->decode_bytes < client_bytes || r->regs_bytes < TRI_REG_MAPPED_BYTES)
+    if (!r->ready || !r->regs || !r->lfb || !r->configure ||
+        !r->mapped_bytes || !r->decode_bytes || r->regs_bytes < TRI_REG_MAPPED_BYTES)
         return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_RESOURCE);
     int rc = trident_pci_validate(&r->pci);
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
+    if (!device.active) {
+        const GfxMode *def = &modes[c->backend->default_mode];
+        struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
+        provisional.display_width = def->pitch; /* default is INDEX8 */
+        u32 bytes = (def->pitch * def->height + TRI_PAGE_BYTES - 1u) & ~(TRI_PAGE_BYTES - 1u);
+        if (device.settings.vram_bytes && bytes > device.settings.vram_bytes)
+            return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_CAP_TOO_SMALL);
+        rc = r->configure(&provisional, bytes, false);
+        if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
+        if (device.mode.valid) device.mode.selected = provisional;
+    }
+    if (!r->client || r->client_bytes < r->client_surface.pitch * r->client_surface.height)
+        return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_RESOURCE);
     device.res = r;
     rc = trident_regs_bind(&device); /* descriptor-only, no hardware access */
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
@@ -505,7 +516,7 @@ int tri_hal_mode(u32 id)
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
     /* F6: revoke old leases and replace both surfaces before programming the
      * new scanout. configure performs no hardware access. */
-    rc = device.res->configure(&prepared, tri_vram_display_max_bytes(&device));
+    rc = device.res->configure(&prepared, device.vram.first_off, true);
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
     u32 video_feature = device.mode.features & TRI_CAP_VIDEO;
     device.screen_ready = false;

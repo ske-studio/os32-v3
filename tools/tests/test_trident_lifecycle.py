@@ -44,7 +44,7 @@ MUTATIONS=[
  ('enter-palette','lifecycle','STAGE(TRI_STEP_CLIENT, tri_palette_reload(d));','/* removed reload */'),
  ('enter-save','lifecycle','    u32 features = d->mode.features;','    trident_state_save(d);\n    u32 features = d->mode.features;'),
  ('close-sync-order','lifecycle','    int first = tri_sync(d);','    int first = trident_state_restore(d);\n    if (!first) first = tri_sync(d);'),
- ('configure-size','lifecycle','configure(&d->mode.selected, tri_vram_display_max_bytes(d))','configure(&d->mode.selected, TRI_DISPLAY_BYTES)'),
+ ('configure-size','lifecycle','configure(&d->mode.selected, d->vram.first_off, true)','configure(&d->mode.selected, TRI_DISPLAY_BYTES, true)'),
  ('optional-accel','lifecycle','        d->mode.no_accel = true;','        d->screen_ready = false; return;'),
  ('optional-cursor','lifecycle','        d->cursor.available = false;','        return rc;'),
  ('optional-video','lifecycle','        d->video.polling = false;','        return rc;'),
