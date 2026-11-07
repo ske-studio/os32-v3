@@ -38,6 +38,50 @@ def check():
             assert 'build/out/unreferenced.o' in verdict
             (right / 'build/out/kernel.elf').unlink()
             assert 'build/out/kernel.elf' in B.compare(left, right)
+            (right / 'build/out/kernel.elf').write_bytes(b'fixture')
+            (right / 'build/out/unreferenced.o').write_bytes(b'ELF metadata and code')
+            for name in ('link_guard.py', 'target_profile.py'):
+                rel = Path('build/sdk/bin') / name
+                a, b = left / rel, right / rel
+                b.parent.mkdir(parents=True, exist_ok=True)
+                b.write_bytes((B.ROOT / 'sdk' / name).read_bytes())
+                if name == 'link_guard.py':
+                    a.parent.mkdir(parents=True, exist_ok=True)
+                    a.write_bytes(B.git(B.ROOT, 'show', '6d44e368:sdk/link_guard.py'))
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    assert not B.compare(left, right, True)
+                assert 'ALLOW ' + str(rel) in output.getvalue()
+                assert '--- base/' + str(rel) in output.getvalue()
+                assert '+++ target/' + str(rel) in output.getvalue()
+                assert any(line.startswith('+') and not line.startswith('+++')
+                           for line in output.getvalue().splitlines())
+                approved = b.read_bytes()
+                b.write_bytes(approved + b'\n# unapproved change\n')
+                assert str(rel) in B.compare(left, right, True)
+                b.write_bytes(approved)
+                b.unlink()
+                if a.is_file():
+                    assert str(rel) in B.compare(left, right, True)
+                b.write_bytes(approved)
+                if a.is_file():
+                    before = a.read_bytes()
+                    a.write_bytes(before + b'\n# different baseline\n')
+                else:
+                    a.parent.mkdir(parents=True, exist_ok=True)
+                    a.write_bytes(approved)
+                    before = None
+                    b.write_bytes(approved + b'\n')
+                assert str(rel) in B.compare(left, right, True)
+                if before is None:
+                    a.unlink()
+                    b.write_bytes(approved)
+                else:
+                    a.write_bytes(before)
+            unexpected = right / 'build/sdk/bin/other.py'
+            unexpected.write_text('unexpected tool')
+            assert 'build/sdk/bin/other.py' in B.compare(left, right, True)
+
 
 
 if __name__ == '__main__':
@@ -46,14 +90,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
     check()
     if args.mutate:
-        try:
-            original = B.artifacts
-            def without_objects(root, all_products=False):
-                return {p for p in original(root, all_products) if p.suffix != ".o"}
-            B.artifacts = without_objects
-            check()
-        except AssertionError:
-            print('RED: ignored object difference rejected at runtime')
-        else:
-            raise SystemExit('mutation survived')
+        original_artifacts = B.artifacts
+        original_allow = B.allowed_tool_difference
+        mutations = {
+            'ignored objects': lambda: setattr(B, 'artifacts', lambda root, all_products=False:
+                {p for p in original_artifacts(root, all_products) if p.suffix != '.o'}),
+            'no approved differences': lambda: setattr(B, 'allowed_tool_difference', lambda *args: False),
+            'path-only permission': lambda: setattr(B, 'allowed_tool_difference',
+                lambda rel, a, b: str(rel) in B.ALLOWED_TOOL_DIFFS),
+            'permit every difference': lambda: setattr(B, 'allowed_tool_difference', lambda *args: True),
+        }
+        for name, apply in mutations.items():
+            try:
+                apply()
+                check()
+            except AssertionError:
+                print('RED: ' + name + ' rejected at runtime')
+            else:
+                raise SystemExit('mutation survived: ' + name)
+            finally:
+                B.artifacts = original_artifacts
+                B.allowed_tool_difference = original_allow
     print('PASS build compare')

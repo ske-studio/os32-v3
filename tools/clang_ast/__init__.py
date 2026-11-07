@@ -82,6 +82,8 @@ def cross_compiler(cc=None):
     cross = shutil.which(compiler)
     if not cross and pathlib.Path(compiler).name == 'i386-elf-gcc':
         cross = str(pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
+    if not cross:
+        return None
     return cross if os.access(cross, os.X_OK) and pathlib.Path(cross).is_file() else None
 
 

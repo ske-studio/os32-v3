@@ -144,6 +144,10 @@ class ClangTest(unittest.TestCase):
         with contextlib.chdir(ROOT / 'kernel'):
             self.assertEqual(a.relpath(cursor, '.'), 'clang_probe.c')
 
+    def test_missing_non_x86_compiler(self):
+        with mock.patch.object(a.shutil, 'which', return_value=None):
+            self.assertIsNone(a.cross_compiler('powerpc-elf-gcc'))
+
     def test_cross_free_build_commands(self):
         # Exercise the real make graph with neither cross GCC nor libc.a.
         env = {'PATH': '/usr/bin:/bin', 'CROSS_DIR': '/nonexistent',
@@ -561,7 +565,10 @@ def main():
     if args.mutate:
         # Every mutant declares its coverage; GCC-only coverage follows the
         # same predicate and reason as test_review_gcc_branches.
-        cases = [('all modes', 'tools/clang_ast/build.py',
+        cases = [('all modes', 'tools/clang_ast/__init__.py',
+                  '    if not cross:\n        return None',
+                  '    if not cross:\n        return compiler'),
+                 ('all modes', 'tools/clang_ast/build.py',
                   '"cirrus", "geforce", "trident"', '"cirrus", "geforce"'),
                  ('all modes', 'tools/check_p2v.py',
                   'locations.append(first)', 'pass'),

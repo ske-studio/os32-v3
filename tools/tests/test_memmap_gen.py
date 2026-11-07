@@ -76,7 +76,7 @@ def _unused_mirrors(root, m):"""),
     "guess-map": ("""    if not os.path.isfile(map_path):
         raise MissingMap(""",
                   """    if not os.path.isfile(map_path):
-        return {"__bss_end": 0x140000, "__kernel_resident_end": 0x140000}
+        return {"__bss_end": 0x280000, "__kernel_resident_end": 0x280000, "__ledger_fixed_start": 0x27e000, "__ledger_fixed_end": 0x280000}
     if False:
         raise MissingMap("""),
 }
@@ -119,8 +119,11 @@ def make_tree(tmp, bss_end):
 
 
 def run(script, root, *args):
-    return subprocess.run([sys.executable, "-B", str(script), "--root", str(root),
-                           *args], capture_output=True, text=True, timeout=60)
+    result = subprocess.run([sys.executable, "-B", str(script), "--root", str(root),
+                             *args], capture_output=True, text=True, timeout=60)
+    if 'Traceback (most recent call last)' in result.stderr:
+        raise RuntimeError('generator crashed: ' + result.stderr)
+    return result
 
 
 def check(cond, what):
@@ -452,17 +455,24 @@ def layout_cases(script):
 def mutation_result(item):
     name, (old, new) = item
     source = SCRIPT.read_text(encoding="utf-8")
-    if old not in source:
+    if source.count(old) != 1:
         raise SystemExit("変異 %s の当て先が見つからない" % name)
     with tempfile.TemporaryDirectory(prefix="os32-genmm-mut-") as tmp:
-        mutated = pathlib.Path(tmp) / "gen_memmap.py"
+        tree = pathlib.Path(tmp)
+        (tree / 'tools').mkdir()
+        (tree / 'sdk').mkdir()
+        shutil.copy2(ROOT / 'sdk/target_profile.py', tree / 'sdk/target_profile.py')
+        mutated = tree / 'tools/gen_memmap.py'
+        mutated.write_text(source, encoding="utf-8")
+        cases(mutated)  # The identical isolated, unmutated control must pass.
+        compile(source.replace(old, new, 1), str(mutated), 'exec')
         mutated.write_text(source.replace(old, new, 1), encoding="utf-8")
         try:
             cases(mutated)
         except subprocess.TimeoutExpired as e:
             # 並列の負荷による時間切れは run_ordered に逐次で再試行させる
             return mutpar.timeout_red((name, "RED (timeout: %s)" % e, True))
-        except (AssertionError, subprocess.SubprocessError) as e:
+        except AssertionError as e:
             return name, "RED (%s)" % e, True
     return name, "**GREEN — 試験が穴を見逃した**", False
 

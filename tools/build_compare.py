@@ -113,6 +113,23 @@ def artifacts(root, all_products=False):
     return paths
 
 
+# Approved B1/B2/T1 SDK tool changes, pinned to both reviewed contents.
+# A path alone never permits an arbitrary tool change or a missing target.
+ALLOWED_TOOL_DIFFS = {
+    'build/sdk/bin/link_guard.py': (
+        '319f4e3fd31f4c12181966246f732b6824ee99fd644a0d72eecfd7967c85f92e',
+        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
+    'build/sdk/bin/target_profile.py': (
+        None, '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6'),
+}
+
+
+def allowed_tool_difference(rel, a, b):
+    approved = ALLOWED_TOOL_DIFFS.get(str(rel))
+    digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return approved is not None and (digest(a), digest(b)) == approved
+
+
 def compare(left, right, all_products=False):
     paths = artifacts(left, all_products) | artifacts(right, all_products)
     different = []
@@ -123,6 +140,12 @@ def compare(left, right, all_products=False):
             before, after = a.read_bytes(), b.read_bytes()
             equal = (archive_members(before) == archive_members(after)
                      if rel.suffix == '.a' else before == after)
+        if not equal and all_products and allowed_tool_difference(rel, a, b):
+            print('ALLOW ' + str(rel), flush=True)
+            before = a.read_text().splitlines(True) if a.is_file() else []
+            print(''.join(difflib.unified_diff(before, b.read_text().splitlines(True),
+                                             'base/' + str(rel), 'target/' + str(rel))), flush=True)
+            continue
         print(('MATCH ' if equal else 'DIFF  ') + str(rel), flush=True)
         if not equal:
             different.append(str(rel))
