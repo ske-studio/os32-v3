@@ -158,10 +158,18 @@ static void abi_check(void)
     CHECK(!gf2_host_memcmp(&before,&plan,sizeof(plan)));
 }
 /* Each optional HAL entry must be NULL or reside in pinned module text. */
+static i32 fixture_probe_decls(const struct probe_decl **table, u32 *count)
+{
+    /* C3's synthetic module owns no resident probe slots. The real display
+     * declarations and broker registration are covered by gf4-probes. */
+    *table=0;
+    *count=0;
+    return 0;
+}
 static void invalid_hooks(struct module_record *r)
 {
     GfxBackend saved=geforce_backend_ops;
-    r->exports[2]=(u32)(uptr)get_probe_decls;
+    r->exports[2]=(u32)(uptr)fixture_probe_decls;
     r->state=MODULE_STARTING;
     void *outside=(void *)(uptr)(r->text+r->text_size);
     enum { MODE, DPMS, IMAGE, MOVE, SHOW, VSYNC, FLIP, GAMMA, HOOK_COUNT };

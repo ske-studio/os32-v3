@@ -161,9 +161,10 @@ void _start(void)
     struct module_record *r=module_record_get(geforce_handle);
     r->init=(u32)(uptr)publishing_init;
     r->text=(u32)(uptr)probe & ~(PAGE_SIZE-1); r->text_size=16*PAGE_SIZE;
+    r->ro=r->base; r->ro_size=32;
     /* A live STARTING record makes a missing hook check reach registration,
      * so either bad hook must fail before taking a registration reference. */
-    r->exports[2]=(u32)(uptr)get_probe_decls;
+    r->exports[2]=(u32)(uptr)fixture_probe_decls;
     r->state=MODULE_STARTING;
     geforce_backend_ops.fill_rect=(void *)(uptr)(r->text+r->text_size);
     CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
@@ -173,7 +174,7 @@ void _start(void)
     CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
     CHECK(!registered && !r->registration_refs);
     geforce_backend_ops.blit=blit;
-    r->exports[2]=(u32)(uptr)get_probe_decls;
+    r->exports[2]=(u32)(uptr)fixture_probe_decls;
     if (input[1]==3 || input[1]==4) r->exports[2]=(u32)(uptr)failing_probe_decls;
     if (input[1]==5) r->exports[2]=0;
     if (!input[1]) {
