@@ -5,7 +5,7 @@
 static u32 host_cr3;
 #include "paging_host_source.c"
 #define LEGACY_FAKE_LOWMAP_ENABLE
-#define LEGACY_FAKE_LOWMAP paging_v86_session_open()
+#define LEGACY_FAKE_LOWMAP paging_lowmap_busy()
 #include "legacy_guest_fake.h"
 #include "pgalloc_host_source.c"
 #include "sys_host_source.c"

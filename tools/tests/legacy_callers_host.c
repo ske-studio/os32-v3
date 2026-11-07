@@ -41,7 +41,7 @@ struct v86_session_state v86_session;
 int v86_module_load(void) { return 17; }
 int v86_is_active(void) { return active; }
 int v86_call_pinned(void) { return pinned; }
-int paging_v86_session_open(void) { return busy; }
+int paging_lowmap_busy(void) { return busy; }
 void v86_session_end(void) { end_count++; end_seq=++seq; }
 void v86_call_cleanup(void) { cleaned++; cleanup_seq=++seq; }
 void v86_request_exit(void) { exits++; }

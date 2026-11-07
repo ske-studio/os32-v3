@@ -64,7 +64,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
 {
     u32 pd_phys, i;
     u32 *pd;
-    if (paging_v86_session_open()) return -1;
+    if (paging_lowmap_busy()) return -1;
     if (!as || !owner || !pde_count || pde_count > MEM_APP_BAND_MAX_PDES ||
         as_generation == ~(u32)0) return -1;
     for (i = 0; i < sizeof(*as) / sizeof(u32); i++) ((u32 *)as)[i] = 0;

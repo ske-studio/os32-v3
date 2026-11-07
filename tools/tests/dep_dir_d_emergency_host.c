@@ -25,7 +25,7 @@ static void host_stop(void) { record(2, 0, 0, 0); }
 static struct { u32 eip, esp, cr3; } kernel_tss;
 static u32 paging_sqlite_stack_guard;
 static u32 v86_restore_mismatch;
-static struct { u32 restore_pte_bad, restore_pde_bad; } v86_session;
+static struct { struct { u32 restore_pte_bad, restore_pde_bad; } lowmap; } v86_session;
 #include "emergency_source.inc"
 static void reset(const char *name)
 {
@@ -45,7 +45,7 @@ void _start(void)
     reset("df-engine"); double_fault_halt(0x700fff);
     reset("df-unknown"); double_fault_halt(0x701000);
     reset("v86"); v86_restore_mismatch = 0x123;
-    v86_session.restore_pte_bad = 0x12; v86_session.restore_pde_bad = 0x34;
+    v86_session.lowmap.restore_pte_bad = 0x12; v86_session.lowmap.restore_pde_bad = 0x34;
     v86_diagnostic();
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(records), "d"(used * sizeof(u32)));
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));

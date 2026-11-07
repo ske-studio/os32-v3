@@ -5,6 +5,7 @@
 #include "types.h"
 static u32 host_cr3;
 static void flush_low(void);
+static void check_flush_owned(void);
 #include "v86.h"
 #include "v86_mem.h"
 #define LEGACY_FAKE_ACTIVE_ENABLE
@@ -16,6 +17,7 @@ static void flush_low(void);
 #include "idt.h"
 #include "tvram.h"
 #include "paging.c"
+#include "../../arch/x86/legacy/lowmap.c"
 #include "pgalloc.c"
 #include "pgalloc_host_fixture.h"
 #include "module.h"
@@ -34,6 +36,7 @@ static void say(const char *s, u32 n) {
 static u32 corrupt_restore_pde;
 static u32 tlb[MEM_1MB / PAGE_SIZE], tlb_pde, tlb_root, flushes;
 static void flush_low(void) {
+    check_flush_owned();
     flushes++;
     if (corrupt_restore_pde) page_directory[0] ^= PTE_USER;
     tlb_root = host_cr3;
@@ -43,6 +46,10 @@ static void flush_low(void) {
 }
 static u32 fail_map, maps, module_refs, refuse_module, snapshot_fail;
 static u32 boundary_fail, boundaries, abort_jmp[5], stop_jmp[5], expect_stop;
+static void check_flush_owned(void) {
+    if (v86_session.closing && v86_session.open && !expect_stop)
+        CHECK(paging_lowmap_busy(), "flush before token release");
+}
 static u8 mailbox_storage[MEM_AUTOPLAY_MAILBOX_SIZE];
 static int missing_mailbox;
 void *v86_call_mailbox(void) { return missing_mailbox ? 0 : mailbox_storage; }
@@ -415,6 +422,23 @@ static void before(void) {
         *(volatile u8 *)P2V(MEM_AUTOPLAY_MAILBOX_BASE + i) = mailbox_byte(i);
 }
 static void execute_low(void) {
+    struct legacy_lowmap_snapshot other = v86_session.lowmap;
+    struct addrspace rejected;
+    u32 stamp = page_tables[0][1], f = flushes;
+    rejected.owner = 0x12345678;
+    CHECK(paging_lowmap_snapshot(&other, saved_pt, 1, PAGE_SIZE) == -1,
+          "single lowmap token");
+    CHECK(paging_lowmap_map_range(&other, PAGE_SIZE, PAGE_SIZE * 2,
+                                 MEM_POOL_BASE, PAGE_RW | PTE_USER) == -1,
+          "foreign token rejected");
+    CHECK(paging_lowmap_restore(&other) == -1 && paging_lowmap_busy(),
+          "foreign restore rejected");
+    CHECK(page_tables[0][1] == stamp && flushes == f, "foreign token unchanged");
+    CHECK(paging_addrspace_create_n(&rejected, 2, 1) == -1 &&
+          rejected.owner == 0x12345678, "lowmap AS admission before writes");
+    CHECK(paging_memmap_selftest(0) == -1 && paging_master_audit(0) == -1,
+          "lowmap audit skip");
+
     reservation_unchanged();
     for (u32 a = 0; a < MEM_CONV_END; a += PAGE_SIZE) {
         CHECK((tlb[a / PAGE_SIZE] & ~(PAGE_SIZE - 1)) == a, "direct physical PFN");
@@ -461,6 +485,29 @@ void _start(void) {
     CHECK(!(page_tables[0][0] & PTE_PRESENT) && memmap_want_at(0, 0) == MM_NP, "normal page0 NP");
     /* Shared SHM/trampoline PDE USER must survive all exits, including failure
      * before the final ROM mapping (last saved PTE is deliberately nontrivial). */
+    /* Distinct master/active roots make omission of either PDE observable. */
+    for (u32 i = 0; i < PDE_COUNT; i++) caller_pd[i] = page_directory[i];
+    {
+        struct legacy_lowmap_snapshot snap;
+        u32 saved[MEM_1MB / PAGE_SIZE];
+        u32 master = page_directory[0], active = caller_pd[0];
+        CHECK(paging_lowmap_snapshot(&snap, saved, PTE_COUNT + 1, PAGE_SIZE) == -1 &&
+              paging_lowmap_snapshot(&snap, saved, 1, PAGE_SIZE * 2) == -1 &&
+              paging_lowmap_snapshot(&snap, saved, 1, PAGE_SIZE - 1) == -1 &&
+              !paging_lowmap_busy(), "lowmap geometry before publication");
+        paging_load_cr3(V2P(caller_pd));
+        CHECK(!paging_lowmap_snapshot(&snap, saved, MEM_1MB / PAGE_SIZE, MEM_1MB),
+              "distinct root snapshot");
+        CHECK(!paging_lowmap_map_range(&snap, PAGE_SIZE, PAGE_SIZE * 2,
+                                       MEM_POOL_BASE, PAGE_RW | PTE_USER),
+              "distinct root map");
+        CHECK(!paging_lowmap_restore(&snap), "both PDEs restored");
+        CHECK(page_directory[0] == master && caller_pd[0] == active,
+              "both PDEs restored");
+        CHECK(page_tables[0][1] == saved[1] && tlb[1] == saved[1],
+              "distinct root alias removed");
+        paging_load_cr3(paging_kernel_pd_phys());
+    }
     page_directory[0] |= PTE_USER;
     for (u32 i = 0; i < PDE_COUNT; i++) caller_pd[i] = page_directory[i];
     live_addrspaces = 1;
@@ -530,7 +577,7 @@ void _start(void) {
     for (u32 kind = 1; kind <= 3; kind++) {
         before(); CHECK(!v86_session_begin(2), "fail-stop begin");
         expect_stop = kind;
-        if (kind == 1) v86_map_session = 0;
+        if (kind == 1) lowmap_token = 0;
         if (kind == 2) corrupt_restore_pde = 1;
         if (kind == 3) v86_session.low_pte[V86_VRAM_START / PAGE_SIZE] ^= PTE_PCD;
         kmemset(P2V_IO(TVRAM_BASE), 0, TVRAM_BPR);
@@ -540,7 +587,7 @@ void _start(void) {
         CHECK(module_refs && v86_session.open, "fail-stop retains pin");
         /* Only the fixture resumes a fail-stop, to exercise each diagnosis. */
         corrupt_restore_pde = v86_restore_mismatch = v86_session.closing = 0;
-        v86_map_session = &v86_session;
+        lowmap_token = &v86_session.lowmap;
         kmemcpy(v86_session.low_pte, saved_pt, sizeof(saved_pt));
         v86_session_end();
         restored();

@@ -41,7 +41,7 @@
 #include "paging.h"
 
 #include "io.h"
-#include "../kernel/v86/v86_mem.h"
+#include "legacy_lowmap.h"
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"
@@ -223,6 +223,7 @@ STATIC_ASSERT((MEM_SHELL_BAND_END >> PDE_SHIFT) < APP_BAND_PDE, shell_outside_pr
 #include "paging_boot.inc"
 
 #include "paging_map.inc"
+#include "paging_lowmap.inc"
 
 #include "paging_addrspace.inc"
 
@@ -481,7 +482,7 @@ int paging_memmap_selftest(u32 tramp_page)
     u8 want, seen;
     int runs = 0;
 
-    if (paging_v86_session_open()) return -1;
+    if (paging_lowmap_busy()) return -1;
     paging_memmap_bad_count = 0;
     if (!pg_enabled || !page_tables[0] || !fixed_paging_valid()) return -1;
 
@@ -517,7 +518,7 @@ int paging_memmap_selftest(u32 tramp_page)
 int paging_master_audit(u32 tramp)
 {
     int bad = 0;
-    if (paging_v86_session_open()) return -1;
+    if (paging_lowmap_busy()) return -1;
     if (!pg_enabled || !fixed_paging_valid()) return 1;
     for (u32 di = 0; di < PDE_COUNT; di++) {
         u32 d = page_directory[di];

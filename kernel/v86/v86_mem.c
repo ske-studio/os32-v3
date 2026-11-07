@@ -160,9 +160,9 @@ void v86_session_end(void)
     v86_restore_mismatch += paging_v86_restore(&v86_session);
     if (v86_restore_mismatch) {
         char line[] = "V86 RESTORE: bad=00000000 PTE=00000000 PDE=00000000 PCD=00000000";
-        u32 counts[] = { v86_restore_mismatch, v86_session.restore_pte_bad,
-            v86_session.restore_pde_bad, v86_restore_mismatch -
-            v86_session.restore_pte_bad - v86_session.restore_pde_bad };
+        u32 counts[] = { v86_restore_mismatch, v86_session.lowmap.restore_pte_bad,
+            v86_session.lowmap.restore_pde_bad, v86_restore_mismatch -
+            v86_session.lowmap.restore_pte_bad - v86_session.lowmap.restore_pde_bad };
         const unsigned int offsets[] = { V86_RESTORE_COL_BAD, V86_RESTORE_COL_PTE, V86_RESTORE_COL_PDE, V86_RESTORE_COL_PCD };
         for (unsigned int n = 0; n < sizeof(offsets) / sizeof(offsets[0]); n++)
             for (int i = V86_HEX_DIGITS - 1; i >= 0; i--) {

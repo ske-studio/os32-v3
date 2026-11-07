@@ -5,6 +5,7 @@ static void bundle_root_check(unsigned long root);
 #include "access_walk_host.c"
 #include "surface_query.h"
 #include "v86_mem.h"
+#include "../../arch/x86/legacy/lowmap.c"
 #include "platform_emergency.h"
 #include "memmap.h"
 #include "tvram.h"
@@ -207,7 +208,7 @@ static void caller_copy_tests(void)
     /* Test-only continuation after observing the product's fail-stop. */
     v86_restore_mismatch = 0;
     v86_session.closing = 0;
-    v86_map_session = &v86_session;
+    lowmap_token = &v86_session.lowmap;
     v86_mem_teardown();
     _enable();
     /* Filler ends immediately before the fourth plane crosses a PDE. */

@@ -1,7 +1,7 @@
 {
   "source_revision": "b400acb6fcd9fb326c9bcf4b8acaff3ddfed37fa",
   "trace_sha256": "fd18c77f42fd084b55025a85d3dd8e59d7ea7f874fdcb8f6741e91cf8f01be6c",
-  "harness_sha256": "5ccc710f0083b1eb74babd79f3cc64246f1a1bdcbf5de121d433306995e97d16",
+  "harness_sha256": "fde4f3a8ad8ee1dbaf568edbd78e455ac21ee4d7aa7ac7de0e2491554712aade",
   "sources_sha256": {
     "init/boot_display.c": "f2c3b40e01848acfa3c3790d9d2c6f9186fc2dadf783366bce963b3d86c1bccc",
     "arch/x86/kernel/isr_handlers.c": "3f8fbd502efb97da04edef439124c2fbf89f661a7d780d6c450f94bc16c3e0c7",
@@ -11,5 +11,6 @@
   "inputs": "Harness _start: boot right edge/high byte/bottom/empty; legacy exception plus hex; DF kernel/engine/unknown; V86 counts 0x123/0x12/0x34. Memory initialized to 0xa5 before each case.",
   "record": "little-endian u32 address,width,value,resulting u16 cell; width 0: serial byte or disable/stop event",
   "capture": "Separate capture.py in run/depdir-l18, git show b400acb6 sources, same isolated build and MMIO seam; verifier never reads git.",
-  "capture_script_sha256": "93fff992b83b2ea2e2a7fa7773d6c3f36892324888589bf491a5915494cded5b"
+  "capture_script_sha256": "93fff992b83b2ea2e2a7fa7773d6c3f36892324888589bf491a5915494cded5b",
+  "harness_note": "Stage F: restore diagnostic counters nested under lowmap; captured trace and historical source hashes unchanged."
 }

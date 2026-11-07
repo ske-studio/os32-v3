@@ -12,7 +12,9 @@ void platform_fault_cell(u32 pos, u16 code, u8 attr)
     ((volatile u16 *)P2V_IO(TVRAM_BASE))[pos] = code;
     ((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;
 }
+#include "v86_mem.h"
 #include "paging.c"
+#include "../../arch/x86/legacy/lowmap.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"
 #define HOST_POOL_IRQ_SAVE() 0U
@@ -420,6 +422,8 @@ void _start(void)
     v86_mem_teardown();
     CHECK(entry(0) == old && !v86_restore_mismatch, "V86 double end");
     page0_equal();
+    CHECK(paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) == -1 &&
+          entry(0) == old, "V86 outside session unchanged");
     CHECK(v86_session.real_saved, "V86 second original valid");
     /* Make active PDE USER differ from master, then prove exact restoration. */
     ((u32 *)P2V(a.pd_phys))[0] &= ~PTE_USER;
@@ -461,7 +465,7 @@ void _start(void)
     host_cr3 = a.pd_phys;
     CHECK(!v86_mem_setup(2), "V86 after CR3 switch begin");
     /* Inject a rejected map operation; direct restore still removes aliases. */
-    v86_map_session = 0;
+    lowmap_token = 0;
     expected_stop = 1;
     if (!__builtin_setjmp(stop_jmp)) {
         v86_mem_teardown();
@@ -472,7 +476,7 @@ void _start(void)
     /* The fixture resumes after observing fail-stop; product never resumes. */
     v86_restore_mismatch = 0;
     v86_session.closing = 0;
-    v86_map_session = &v86_session;
+    lowmap_token = &v86_session.lowmap;
     v86_mem_teardown();
     CHECK(!v86_restore_mismatch, "V86 rejected restore counted");
     CHECK(entry(0) == old && (entry(V86_TEST_BB) & PTE_USER),

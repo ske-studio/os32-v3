@@ -12,7 +12,6 @@ int legacy_active(void) { return v86_is_active(); }
 int legacy_pinned(void) { return v86_call_pinned(); }
 int legacy_session_open(void) { return v86_session.open; }
 int legacy_closing(void) { return v86_session.closing; }
-int legacy_lowmap_busy(void) { return paging_v86_session_open(); }
 void legacy_abort_begin(void) { v86_session.aborting = 1; }
 void legacy_end(void) { v86_session_end(); }
 void legacy_cleanup(void) { v86_call_cleanup(); }

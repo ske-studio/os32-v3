@@ -227,64 +227,6 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
     return 0;
 }
 
-static struct v86_session_state *v86_map_session;
-int paging_v86_session_open(void) { return v86_map_session != 0; }
-
-int paging_v86_snapshot(struct v86_session_state *s)
-{
-    if (v86_map_session || !pg_enabled || !page_tables[0]) return -1;
-    s->active_cr3 = paging_current_cr3();
-    s->master_pde = page_directory[0];
-    s->active_pde = ((u32 *)P2V(s->active_cr3))[0];
-    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
-        s->low_pte[i] = page_tables[0][i];
-    v86_map_session = s;
-    return 0;
-}
-
-/* Restore is allocation-free and cannot leave a live backing alias behind.
- * Count a missing session, then restore the shared PT directly. No PDE USER
- * propagation to the current CR3 (which may differ from the captured CR3),
- * and only one TLB flush after all saved PTEs/PDEs have been written. */
-int paging_v86_restore(struct v86_session_state *s)
-{
-    u32 bad = 0;
-    s->restore_pte_bad = s->restore_pde_bad = 0;
-    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++) {
-        u32 saved = s->low_pte[i];
-        if (v86_map_session != s) bad++;
-        page_tables[0][i] = saved;
-    }
-    page_directory[0] = s->master_pde;
-    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;
-    arch_mmu_flush_tlb();
-    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
-        if (page_tables[0][i] != s->low_pte[i]) bad++;
-    s->restore_pte_bad = bad; /* Includes a rejected session/PTE restore. */
-    if (page_directory[0] != s->master_pde ||
-        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) {
-        s->restore_pde_bad++;
-        bad++;
-    }
-    v86_map_session = 0;
-    return (int)bad;
-}
-
-/* Open session only: never promote outside the low 1MB. */
-int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
-{
-    u32 a;
-    if (!v86_map_session || base >= end || end > platform_memory_attributes.bios_rom.end ||
-        ((base | end | phys) & (PAGE_SIZE - 1)) ||
-        phys > ~(u32)0 - (end - base - 1) || !page_tables[0]) return -1;
-    for (a = base; a < end; a += PAGE_SIZE, phys += PAGE_SIZE)
-        set_page_noflush(a, phys, flags);
-    if (flags & PTE_USER)
-        ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;
-    if (pg_enabled) arch_mmu_flush_tlb();
-    return 0;
-}
-
 /* ======================================================================== */
 /*  paging_set_readonly — 範囲内の全ページをRead-Onlyに                     */
 /* ======================================================================== */

@@ -17,6 +17,7 @@
 
 #include "pc98.h"
 #include "types.h"
+#include "legacy_lowmap.h"
 #include "ksetjmp.h"
 #include "../../mm/paging.h"
 #include "memmap.h"
@@ -106,8 +107,7 @@ struct v86_session_state {
     u32 jmpbuf[KSETJMP_BUF_LEN];
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
-    u32 master_pde, active_pde, active_cr3;
-    u32 restore_pte_bad, restore_pde_bad; /* Last restore diagnostic counts. */
+    struct legacy_lowmap_snapshot lowmap;
     u8 real_lowmem[PAGE_SIZE]; /* Immutable core boot page0; T7a-1c. */
 };
 extern struct v86_session_state v86_session;
@@ -116,6 +116,7 @@ int v86_session_begin(u32 owner);
 void v86_session_end(void);
 void v86_runtime_end(void);
 int paging_v86_session_open(void);
+int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags);
 int paging_v86_snapshot(struct v86_session_state *s);
 int paging_v86_restore(struct v86_session_state *s);
 

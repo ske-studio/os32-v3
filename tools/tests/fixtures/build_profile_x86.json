@@ -189,6 +189,7 @@
     "exec/shell_service.c",
     "arch/x86/legacy/v86_call.c",
     "arch/x86/legacy/guest.c",
+    "arch/x86/legacy/lowmap.c",
     "exec/appmem.c",
     "exec/appmem_map.c",
     "exec/appmem_unmap.c",

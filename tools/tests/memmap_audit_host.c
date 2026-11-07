@@ -449,8 +449,8 @@ static void run(void)
     extern volatile u32 lease_revoke_all_fail_count;
     u32 failed = lease_revoke_all_fail_count;
     CHECK(lease_revoke_all(0) == 1 && lease_revoke_all_fail_count == failed + 1);
-    struct v86_session_state session = {0};
-    v86_map_session = &session;
+    struct legacy_lowmap_snapshot session = {0};
+    lowmap_token = &session;
     u32 runs = memmap_audit_runs;
     CHECK(!kselftest_run_audit("skip"));
     CHECK(memmap_audit_runs == runs && memmap_audit_skip == 1);
@@ -458,7 +458,7 @@ static void run(void)
     CHECK(kdi_kaudit_skipped(KAUDIT_POST_EXEC));
     CHECK(!kdi_kaudit_last_rc(KAUDIT_POST_EXEC));
     CHECK(memmap_audit_runs == runs && memmap_audit_skip == 2);
-    v86_map_session = 0;
+    lowmap_token = 0;
     kaudit_post_exec();
     CHECK(!kdi_kaudit_skipped(KAUDIT_POST_EXEC));
     CHECK(memmap_audit_runs == runs + 1);
