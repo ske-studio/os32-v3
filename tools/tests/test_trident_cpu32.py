@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run real CPU32 diagnostics with NoAccel and failed GE initialization."""
+"""Run real CLIENT transfer comparisons with and without GE callbacks."""
 CHECK = dict(name='trident-cpu32', tier=1, needs=[], budget=10,
     covers=['kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',
             'kdebug/tri_command_wire.h', 'kdebug/generated/**',
@@ -18,8 +18,11 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kdebug/trident_command_test.c'
 MUTATIONS = [
-    ('skip-no-ge', '    if (ge) {', '    if (!ge) return TRI_E_NOSYS;\n    if (ge) {'),
+    ('skip-no-ge', '    write_row(d, count, false, TRI_TEST_STRIDE);', '    return TRI_E_NOSYS;'),
     ('skip-stores', '"cld; rep movsl"', '"cld"'),
+    ('skip-second-sync', 'if (test == 1u) {', 'if (test == 4u) {'),
+    ('skip-scalar', 'p[i] = cpu_row[i];', 'p[i] = 0;'),
+    ('skip-comparison', 'test < 3u', 'test < 2u'),
     ('skip-readback', 'rc = read_row(o, "cpu32_read", TRI_TEST_SOURCE_Y, count);', 'rc = 0;'),
 ]
 

@@ -108,7 +108,27 @@ static int read_row(const struct TridentDiagnosticOps *o, const char *phase,
     }
     return emit(o, phase, rc, false);
 }
-static int cpu32(const struct TridentDiagnosticOps *o)
+/* Keep the same CLIENT, width and read path for each transfer comparison.
+ * Scalar stores intentionally have no intervening reads or port delays. */
+static void write_row(struct trident_device *d, u32 count, bool scalar, u32 salt)
+{
+    const struct tri_surface *s = &d->mode.client;
+    for (u32 i = 0; i < count; ++i)
+        cpu_row[i] = TRI_TEST_PATTERN ^ (i * TRI_TEST_STRIDE) ^ salt;
+    if (scalar) {
+        volatile u32 *p = (volatile u32 *)d->res->client;
+        for (u32 i = 0; i < count; ++i) p[i] = cpu_row[i];
+        return;
+    }
+    u32 *dst = (u32 *)(d->res->client + TRI_TEST_SOURCE_Y * s->pitch);
+    const u32 *src = cpu_row;
+    u32 words = count;
+    /* One full visible row, contiguous 32-bit stores through drawing CLIENT.
+     * No byte-store loop, readback, or I/O callback between dwords. */
+    __asm__ volatile ("cld; rep movsl" : "+D"(dst), "+S"(src), "+c"(words)
+                      : : "memory", "cc");
+}
+static int cpu32_sequence(const struct TridentDiagnosticOps *o)
 {
     struct trident_device *d = o->context;
     int rc = client_rows(d);
@@ -144,15 +164,7 @@ static int cpu32(const struct TridentDiagnosticOps *o)
         emit(o, "cpu32_sync", rc, false);
         if (rc) return rc;
     }
-    for (u32 i = 0; i < count; ++i)
-        cpu_row[i] = TRI_TEST_PATTERN ^ (i * TRI_TEST_STRIDE);
-    u32 *dst = (u32 *)(d->res->client + TRI_TEST_SOURCE_Y * s->pitch);
-    const u32 *src = cpu_row;
-    u32 words = count;
-    /* One full visible row, contiguous 32-bit stores through drawing CLIENT.
-     * No byte-store loop, readback, or I/O callback between dwords. */
-    __asm__ volatile ("cld; rep movsl" : "+D"(dst), "+S"(src), "+c"(words)
-                      : : "memory", "cc");
+    write_row(d, count, false, 0);
     rc = read_row(o, "cpu32_read", TRI_TEST_SOURCE_Y, count);
     if (rc) return rc;
     if (!ge) return optional(o, "ge", TRI_E_NOSYS);
@@ -164,6 +176,55 @@ static int cpu32(const struct TridentDiagnosticOps *o)
     emit(o, "ge_copy", rc, false);
     if (rc) return rc;
     return read_row(o, "ge_copy_read", TRI_TEST_DEST_Y, count);
+}
+/* tri cpu32/modes: run independent comparisons even if a CPU read mismatches.
+ * "no_ge" means no GE command issued by this invocation yet; the GUI may have
+ * used GE earlier. This is not an engine reset or a claim of power-on state.
+ * A:226-277 is unchanged in production. Extra Sync is diagnostic only. */
+static int cpu32(const struct TridentDiagnosticOps *o)
+{
+    struct trident_device *d = o->context;
+    int rc = client_rows(d);
+    if (rc) return optional(o, "cpu32_precheck", rc);
+    u32 count = (u32)d->mode.client.width * d->mode.client.cpp / sizeof(u32);
+    write_row(d, count, false, TRI_TEST_STRIDE);
+    int result = read_row(o, "cpu32_no_ge_read", TRI_TEST_SOURCE_Y, count);
+    bool ge = o->fill && o->copy && o->copy_direction && o->sync &&
+        !d->mode.no_accel && d->accel.initialized &&
+        (d->mode.features & (TRI_CAP_FILL | TRI_CAP_COPY)) ==
+        (TRI_CAP_FILL | TRI_CAP_COPY);
+    if (!ge) {
+        optional(o, "ge", TRI_E_NOSYS);
+        return result ? result : TRI_E_NOSYS;
+    }
+    static const char *const phases[] = {
+        "cpu32_fill_read", "cpu32_double_sync_read", "cpu32_scalar_read"
+    };
+    const struct tri_surface *s = &d->mode.client;
+    for (u32 test = 0; test < 3u; ++test) {
+        /* Each case starts with the same GE fill and verifies real VRAM.
+         * fill's exit already performs the first Sync, exactly as in A. */
+        u32 fill = TRI_TEST_FILL;
+        if (s->cpp == 1u) fill |= fill << 8;
+        if (s->cpp <= 2u) fill |= fill << 16;
+        for (u32 i = 0; i < count; ++i) cpu_row[i] = fill;
+        rc = o->fill(d, s, 0, TRI_TEST_SOURCE_Y, s->width, TRI_TEST_ROWS,
+                     TRI_TEST_FILL, TRI_TEST_ROP_COPY);
+        emit(o, "probe_ge_fill", rc, false);
+        if (rc) return rc;
+        rc = read_row(o, "probe_ge_fill_read", TRI_TEST_SOURCE_Y, count);
+        if (rc) return rc;
+        if (test == 1u) {
+            rc = o->sync(d);
+            emit(o, "probe_second_sync", rc, false);
+            if (rc) return rc;
+        }
+        write_row(d, count, test == 2u, (test + 2u) * TRI_TEST_STRIDE);
+        remember(&result, read_row(o, phases[test], TRI_TEST_SOURCE_Y, count));
+    }
+    /* Retain transparent-copy + Sync + rep and the subsequent GE copy test. */
+    remember(&result, cpu32_sequence(o));
+    return result;
 }
 static int dpms(const struct TridentDiagnosticOps *o)
 {
