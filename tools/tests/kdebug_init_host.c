@@ -51,6 +51,7 @@ void v86_gcap_note_emul_in(u16 p, int s, u32 v) { (void)p; (void)s; (void)v; cal
 void v86_gcap_note_emul_out(u16 p, int s, u32 v) { (void)p; (void)s; (void)v; calls++; }
 void v86_gcap_detach(void) { calls++; }
 void v86_gcap_release(void) { calls++; }
+i32 probe_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
 /* HW access must also stay dormant during init. */
 #ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real kdebug/hwb_access.c */
 i32 hwb_access(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
