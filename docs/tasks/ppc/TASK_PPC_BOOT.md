@@ -1,6 +1,6 @@
 # TASK_PPC_BOOT — PowerPC 移植: Open Firmware から 1 行出す
 
-> 状態: **実装中 (2026-11-07)** — 設計は確定、実装者 sol が段ごとにビルドで進める。
+> 状態: **受入完了・実機確認待ち (2026-11-07)** — QEMU mac99 で 2 行を出して停止、main 72597f33。証拠 ~/os32-tmp/evidence/2026-11-07/ppc-boot/RESULT.md。実機は DEFERRED_TESTS の PPC-BOOT-RH。
 
 ## 0. ユーザー決定
 
@@ -23,3 +23,7 @@
 ## 3. 実機で確かめる点
 
 設計 §7。実機は未確認で、第一の観測路は OF の画面。ESCC は筐体の外に出ていない前提。
+
+## 4. 実行
+
+`make -f build/ppc.mk CROSS_DIR=$HOME/opt/cross-ppc` → `python3 tools/ppc/run.py --timeout 30 [--mutate]`。toolchain の作り方は `tools/ppc/build_cross.sh`。
