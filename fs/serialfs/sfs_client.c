@@ -331,7 +331,13 @@ int sfs_request_deadline(u8 op, const void *in, u16 n,
     /* Only this mutation endpoint uses C1's borrowed client for communication. */
     SfsClient *c = (SfsClient *)sfs_persistent_client();
     if (!c) return OS32_ERR_HOSTDOWN;
-    rc = sfs_client_call_deadline(c, op, in, n, out, deadline);
-    if (rc == OS32_ERR_STALE) sfs_persistent_stale();
-    return rc;
+    for (int attempt = 0; ; attempt++) {
+        rc = sfs_client_call_deadline(c, op, in, n, out, deadline);
+        if (rc != OS32_ERR_STALE) return rc;
+        sfs_persistent_stale();
+        /* Unknown sid was rejected before execution, even for WRITE. */
+        if (attempt == 1) return rc;
+        rc = sfs_ensure_session(deadline);
+        if (rc) return rc;
+    }
 }

@@ -84,7 +84,9 @@ void sfs_alive_observe(u32 host_generation); /* 非消費の内部観測、再�
 ```
 - LAN の1操作に入口から **1000ms の絶対期限**（HELLO・TX待ち・再送込み）。同一 sid/seq の再送のみ 100ms 間隔、期限を伸ばさない。応答無しは HOSTDOWN、UART は従来時間式のまま。
 - 期限切れの結果はその要求に記録し、次のアプリ要求は必ず通信を試す。連続失敗数で LAN client を DEAD に固定しない。切れた sid は破棄してよい（通信状態であり down 状態ではない）。
+- 不明 sid の STALE 応答はホストで未実行なので、FD 世代を失効させたまま、同じ絶対期限内で HELLO し直し同じ要求（write を含む）を 1 回だけ再送してよい。
 - 不明 sid 応答／新しいホスト起動世代の ALIVE は mount generation を進め、以前の FD の read/write/fstat/seek は STALE、close は解放できる。次の open は新しい HELLO で開始する。
+- open のパス probe 中に resource_generation が変わったら、新世代で種別・サイズを1回だけ再取得し、再度変われば STALE。作成済みの O_CREAT は再作成せず、旧 FD は STALE のままとする。
 - seqが **0xF000を超えた次要求の前**に同じ1000ms期限内でBYE→HELLO。netcdはBOPEN・同一性を再確認。同じ像は媒体交換にしない。SFSファイルはパス＋offsetで要求し遠隔handleを持たない。再取得が必要な遠隔handleはnetcdのBOPENだけ（旧handleを新sidへ送らない）。
 - 通常の30秒 idle や同じ起動世代の定期 ALIVE による HELLO 更新だけでは既存 FD を失効させない。sid と FD 世代を分ける。ALIVE を失っても次の要求の sid 不一致で検出する。
 - 期限切れした write は「適用されたか不明」。自動的に新 sid で再実行しない。アプリが確認・再要求を判断する。同一 sid/seq の重複は現行 LanServer の応答キャッシュで二重実行しない。
@@ -338,7 +340,7 @@ int net_start(enum NetNicId choice, const u8 peer[6]); void net_unbind(void);
 int net_tx(const void *frame, u32 len); int net_mac(u8 out[6]); u32 net_rx_credit_bytes(void);
 extern const struct NetAdapter net_lgy98_adapter, net_e82557_adapter;
 ```
-A2 が選択・bound・peer・参照を所有。A6/A7 が検出済み adapter を登録（未検出は登録しない）、I1 が net_start。AUTO は82557優先、明示選択不在は NOSYS、acquire 失敗はその負値を返す。 acquire は task で A7 の session_acquire 後に A5 の静的 ops を返す（LGY は既存寿命）。A2 が net_bind・link_init・tick登録、失敗時 release。二重start/bindは BUSY。ops/adapter は解除まで生存。 unbind は利用者停止後 task で IF保存/cli→tick解除・bound解除・両queue破棄→IF復元→release。tickで参照操作しない。tx は Ethernet全体/FCSなし、0=受理、AGAIN=再試行、未bind=HOSTDOWN、待たない。
+A2 が選択・bound・peer・参照を所有。A6/A7 が検出済み adapter を登録（未検出は登録しない）、I1 が net_start。AUTO は82557優先、明示選択不在は NOSYS、acquire 失敗はその負値を返す。 acquire は task で A7 の session_acquire 後に A5 の静的 ops を返す（LGY は既存寿命）。A2 が net_bind・link_init・tick登録、失敗時 release。同じadapter/peerのstartは既存のhandshakeを保って成功、それ以外の二重start/bindは BUSY。ops/adapter は解除まで生存。 unbind は利用者停止後 task で IF保存/cli→tick解除・bound解除・両queue破棄→IF復元→release。tickで参照操作しない。tx は Ethernet全体/FCSなし、0=受理、AGAIN=再試行、未bind=HOSTDOWN、待たない。
 ## #2 共用RXと3バイト選別（本文 §2、使用 A2/A3/A8〜A10/H6）
 ```c
 /* net/nic.h: protocol は EtherType ではなく以下の論理値 */
@@ -401,7 +403,7 @@ int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline);
 ```
 outは必須、呼出側がdata/capacityを用意、開始時length=0。成功は0、statusを含む応答全体をcopyしlengthを返す（ホストの負statusもここではデータ）。不足はNOSPC・必要length・copyなし、不正応答IO、無応答HOSTDOWN。保存先は呼出側所有、次要求でも有効。C4/D2がstatus/正確な応答長をdecodeして写像する。
 時計はSfsIo.nowの10ms tick、入口now+100、再送間隔10、idle3000。周回比較は `(i32)(now-deadline)>=0`、期限差は半周未満。同一操作のensure/HELLO/BOPEN/BREADへ同じ期限を渡し取り直さない。
-C3が両deadline関数と公開request wrapperを実装、wrapperはC1のensureを呼ぶ。C1がHELLOを行う条件・nonce・sid更新・FD世代を所有、C3は同sid/seq再送を担当しLANをDEAD固定しない。不明sidはSTALEをC1へ報告して世代失効、writeを新sidで自動再実行しない。UART既存call/helloは維持。
+C3が両deadline関数と公開request wrapperを実装、wrapperはC1のensureを呼ぶ。C1がHELLOを行う条件・nonce・sid更新・FD世代を所有、C3は同sid/seq再送を担当しLANをDEAD固定しない。不明sidはSTALEをC1へ報告して世代失効、未実行の要求は同じ期限内でHELLOし直し1回だけ再送する。UART既存call/helloは維持。
 ## #8 block RPC と netcd 所有（本文 §4、使用 D2/D3）
 ```c
 /* 新 fs/serialfs/sfs_block.h */

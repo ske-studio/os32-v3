@@ -63,12 +63,18 @@ int net_start(enum NetNicId choice, const u8 peer[6])
     const struct NetNicOps *ops = 0;
     int rc;
 
-    if (bound) return OS32_ERR_BUSY;
     if (choice == NET_NIC_AUTO)
         choice = adapters[NET_NIC_E82557] ? NET_NIC_E82557 : NET_NIC_LGY98;
     if (choice != NET_NIC_E82557 && choice != NET_NIC_LGY98)
         return OS32_ERR_INVAL;
     adapter = adapters[choice];
+    if (bound) {
+        if (!adapter || owner != adapter || fixed_peer != (peer != 0)) return OS32_ERR_BUSY;
+        if (peer)
+            for (u32 i = 0; i < sizeof(peer_mac); i++)
+                if (peer_mac[i] != peer[i]) return OS32_ERR_BUSY;
+        return 0; /* Same NIC/peer: preserve the handshake and its nonce. */
+    }
     if (!adapter) return OS32_ERR_NOSYS;
     rc = adapter->acquire(&ops);
     if (rc) return rc;

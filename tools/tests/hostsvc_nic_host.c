@@ -201,7 +201,11 @@ static int test(void)
     REQUIRE(net_tx(frame, sizeof(frame)) == OS32_ERR_HOSTDOWN); tick_rc = 0;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == 0 && selected == 2);
     REQUIRE(registrations == 4 && callback == net_tick); /* No link_init registration. */
+    int saved_inits = inits, saved_acquired = acquired;
+    REQUIRE(net_start(NET_NIC_AUTO, 0) == 0);
+    REQUIRE(inits == saved_inits && acquired == saved_acquired);
     REQUIRE(net_start(NET_NIC_E82557, 0) == OS32_ERR_BUSY);
+    REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == OS32_ERR_BUSY);
     REQUIRE(net_bind(&ops) == OS32_ERR_BUSY);
     REQUIRE(net_mac(out) == 0 && equal(out, mac_addr, 6));
     REQUIRE(net_rx_credit_bytes() == 4096 && net_mac(0) == OS32_ERR_INVAL);
@@ -217,6 +221,12 @@ static int test(void)
     REQUIRE(net_start(NET_NIC_AUTO, 0) == OS32_ERR_INVAL);
     REQUIRE(released == 5); invalid_ops = 0;
     REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == 0 && selected == 1);
+    saved_inits = inits; saved_acquired = acquired;
+    REQUIRE(net_start(NET_NIC_AUTO, peer_addr) == 0);
+    REQUIRE(inits == saved_inits && acquired == saved_acquired);
+    u8 changed_peer[6] = {8, 9, 10, 11, 12, 14};
+    REQUIRE(net_start(NET_NIC_AUTO, changed_peer) == OS32_ERR_BUSY);
+    REQUIRE(net_start(NET_NIC_AUTO, 0) == OS32_ERR_BUSY);
     REQUIRE(net_adapter_register(NET_NIC_E82557, &replacement) == OS32_ERR_BUSY);
     for (u32 i = 0; i < sizeof(frame); i++) frame[i] = (u8)(i + 1);
     hs_fail("nic.tx", OS32_ERR_AGAIN);

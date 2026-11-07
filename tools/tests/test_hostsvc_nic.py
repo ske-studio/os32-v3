@@ -26,6 +26,8 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 # A2 portion of §11 nic: selection, lifetime, dispatch and TX facade.
 # MARK/EOF mutation belongs to the A3 demux stage, not this fake boundary.
 MUTATIONS = (
+    ('restart-same-peer', 'return 0; /* Same NIC/peer: preserve the handshake and its nonce. */',
+     'return OS32_ERR_BUSY;'),
     ('auto-preference', 'choice = adapters[NET_NIC_E82557] ? NET_NIC_E82557 : NET_NIC_LGY98;',
      'choice = adapters[NET_NIC_LGY98] ? NET_NIC_LGY98 : NET_NIC_E82557;'),
     ('release-reference', 'if (adapter) adapter->release();', 'if (0 && adapter) adapter->release();'),
