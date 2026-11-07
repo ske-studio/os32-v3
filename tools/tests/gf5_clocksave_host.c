@@ -129,12 +129,85 @@ static void optional_image_contract(void)
     image=(struct gf5_image){.fan_available=true,.volt_available=true};
     assert(image.fan_available && image.volt_available && !image.clock_available);
 }
+static void raw_roundtrip(void)
+{
+    struct gf5_clock_raw raw;
+    reset();
+    /* No BIOS, plan or frequency is needed for a boot snapshot. */
+    h.ctx.rom.bytes=0;
+    assert(!gf5_clock_raw_save(&h.ctx,&raw));
+    assert(raw.nc==observed[1].value && raw.nn==observed[2].value &&
+           raw.sc==observed[3].value && raw.mux==observed[0].value);
+    assert(h.display.calls[D_READ]==4 && !h.display.calls[D_WRITE] &&
+           !h.display.calls[D_SLEEP]);
+    for (u32 i=0;i<4;++i)
+        gf3_host_set(&h.display.base,0,observed[i].reg,~observed[i].value);
+    gf5_host_trace_clear(&h);
+    assert(!gf5_clock_raw_restore(&h.ctx,&raw));
+    /* nv40_clk_prog: disconnect, coefficient, core, shader, 5ms, mux.
+     * OS32 restores full words, including bits outside the calc masks. */
+    const u32 order[]={0,2,1,3,0};
+    u32 writes=0,waited=0;
+    for (u32 i=0;i<h.display.nevents;++i) {
+        const struct gf4_host_event *e=&dtrace[i];
+        if (e->op==D_WRITE) {
+            assert(writes<5 && e->a[0]==0 && e->a[2]==4);
+            u32 at=order[writes];
+            assert(e->a[1]==observed[at].reg);
+            assert(e->a[3]==(writes ? observed[at].value :
+                                      (~raw.mux & ~0x333U)));
+            assert(writes==4 ? waited==5000U : waited==0);
+            ++writes;
+        } else if (e->op==D_SLEEP) {
+            assert(writes==4);
+            waited+=e->a[0];
+        }
+    }
+    assert(writes==5 && waited==5000U);
+    struct gf5_clock_raw copy;
+    assert(!gf5_clock_raw_save(&h.ctx,&copy));
+    assert(copy.nc==raw.nc && copy.nn==raw.nn && copy.sc==raw.sc && copy.mux==raw.mux);
+    /* All-zero raw words are also a valid snapshot, with no PLL checks. */
+    raw=(struct gf5_clock_raw){0};
+    assert(!gf5_clock_raw_restore(&h.ctx,&raw));
+    assert(!gf5_clock_raw_save(&h.ctx,&copy));
+    assert(!copy.nc && !copy.nn && !copy.sc && !copy.mux);
+}
+static void raw_errors(void)
+{
+    for (u32 nth=1;nth<=4;++nth) {
+        reset();
+        struct gf5_clock_raw raw={1,2,3,4};
+        gf4_host_fail_at(&h.display,D_READ,nth,-73);
+        assert(gf5_clock_raw_save(&h.ctx,&raw)==GF5_EIO && h.ctx.source_rc==-73);
+        assert(raw.nc==1 && raw.nn==2 && raw.sc==3 && raw.mux==4);
+        assert(h.display.calls[D_READ]==nth && !h.display.calls[D_WRITE]);
+    }
+    const struct gf5_clock_raw raw={0xc002001cU,0x14032809U,0xc000001cU,0x3c0bc003U};
+    for (u32 nth=1;nth<=5;++nth) {
+        reset();
+        gf4_host_fail_at(&h.display,D_WRITE,nth,-73);
+        assert(gf5_clock_raw_restore(&h.ctx,&raw)==GF5_EIO && h.ctx.source_rc==-73);
+        assert(h.display.calls[D_WRITE]==nth);
+        assert(h.display.calls[D_SLEEP]==(nth==5 ? 1U : 0U));
+    }
+    reset();
+    gf4_host_fail_at(&h.display,D_READ,1,-73);
+    assert(gf5_clock_raw_restore(&h.ctx,&raw)==GF5_EIO && h.ctx.source_rc==-73);
+    assert(!h.display.calls[D_WRITE]);
+    reset();
+    gf4_host_fail_at(&h.display,D_SLEEP,1,-73);
+    assert(gf5_clock_raw_restore(&h.ctx,&raw)==GF5_EIO && h.ctx.source_rc==-73);
+    assert(h.display.calls[D_WRITE]==4 && h.display.calls[D_SLEEP]==1);
+}
 _Static_assert(__builtin_types_compatible_p(__typeof__(&gf5_clock_raw_save),
     i32 (*)(struct gf5 *,struct gf5_clock_raw *)),"raw save boundary");
 _Static_assert(__builtin_types_compatible_p(__typeof__(&gf5_clock_raw_restore),
     i32 (*)(struct gf5 *,const struct gf5_clock_raw *)),"raw restore boundary");
 void _start(void)
 {
+    raw_roundtrip();
+    raw_errors();
     optional_image_contract();
     roundtrip();
     readback();
