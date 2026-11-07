@@ -102,9 +102,63 @@ static i32 arm(struct probe_attach *a)
 {
     return debug_probe_control(PROBE_ATTACH, a, sizeof(*a));
 }
+static void owner_lookup(void)
+{
+    struct module_handle owner = {0, 0};
+    u32 before = acquire_calls;
+    /* Earlier slots are RUNNING providers, not kdebug. Return its generation. */
+    module_records[2].generation = 7;
+    CHECK(!debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner)));
+    CHECK(owner.slot == 2 && owner.generation == 7);
+    CHECK(acquire_calls == before && !module_records[2].registration_refs);
+    for (u32 state = MODULE_ABSENT; state <= MODULE_QUARANTINED; state++) {
+        if (state == MODULE_RUNNING) continue;
+        module_records[2].state = state;
+        CHECK(debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner)) == PROBE_ERR_ARG);
+    }
+    module_records[2].state = MODULE_RUNNING;
+    CHECK(debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner) - 1) == PROBE_ERR_ARG);
+    CHECK(debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner) + 1) == PROBE_ERR_ARG);
+    CHECK(debug_probe_control(PROBE_KDEBUG_OWNER, 0, sizeof(owner)) == PROBE_ERR_ARG);
+    module_records[2].generation = 1;
+}
+static void registry_changes(void)
+{
+    list(0); CHECK(listing.epoch == 1U);
+    u32 epoch = listing.epoch;
+    CHECK(!debug_probe_register(owners[0], images[0].ro.table, 2));
+    list(2); CHECK(listing.epoch == epoch);
+    struct probe_info saved = listing.points[0];
+    CHECK(!debug_probe_unregister(owners[1]));
+    CHECK(debug_probe_unregister((struct module_handle){0, 2}) == PROBE_ERR_ARG);
+    list(2); CHECK(listing.epoch == epoch);
+    /* Stopped settings must expire even if owner, name and id are reused. */
+    CHECK(!debug_probe_unregister(owners[0]));
+    list(0); CHECK(listing.epoch == epoch + 1U);
+    CHECK(!debug_probe_register(owners[0], images[0].ro.table, 2));
+    list(2); CHECK(listing.epoch == epoch + 1U);
+    CHECK(listing.points[0].id == saved.id);
+    CHECK(listing.points[0].owner.slot == saved.owner.slot);
+    CHECK(listing.points[0].owner.generation == saved.owner.generation);
+    CHECK(!kstrcmp(listing.points[0].name, saved.name));
+    epoch = listing.epoch;
+    struct probe_attach a = attachment(1);
+    CHECK(!arm(&a));
+    CHECK(!debug_probe_control(PROBE_DETACH, &owners[2], sizeof(owners[2])));
+    CHECK(!debug_probe_control(PROBE_DETACH, &owners[2], sizeof(owners[2])));
+    list(2); CHECK(listing.epoch == epoch);
+    CHECK(!arm(&a));
+    CHECK(!debug_probe_unregister(owners[2]));
+    list(2); CHECK(listing.epoch == epoch && !listing.points[0].enabled);
+    CHECK(!arm(&a));
+    empty();
+    CHECK(listing.epoch == epoch + 1U);
+}
 void _start(void)
 {
     setup();
+    owner_lookup();
+    registry_changes();
     struct probe_decl *table = images[0].ro.table;
     struct probe_decl saved = table[0];
     PROBE_HIT(images[0].slots[0]); CHECK(!calls);
