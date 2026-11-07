@@ -1,7 +1,8 @@
 """Run tri_burst on an indexed CR39/byte LFB bus, including dropped bursts."""
 CHECK = dict(name='tri-burst', tier=1, needs=[], budget=15, covers=[
     'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'tools/tests/test_tri_burst.py',
-    'tools/tests/tri_burst2_host.c', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
+    'tools/tests/tri_burst2_host.c', 'tools/tests/tri_burst3_host.c',
+    'userland/tests/hw/tri_burst3.hwb', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/shell/hwb.h', 'userland/shell/hwb_parse.c',
     'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
@@ -167,9 +168,34 @@ def trial2(mutation=None):
             hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
 
 
+def trial3(mutation=None):
+    script = (hwb_host.ROOT / 'userland/tests/hw/tri_burst3.hwb').read_text(encoding='ascii')
+    if mutation:
+        name, before, after = mutation
+        assert script.count(before) == 1, name
+        script = script.replace(before, after)
+    code = (hwb_host.ROOT / 'tools/tests/tri_burst3_host.c').read_text().replace('SCRIPT_DATA', json.dumps(script))
+    with tempfile.TemporaryDirectory(prefix='tri-burst3-') as directory:
+        fixture = Path(directory) / 'host.c'
+        exe = Path(directory) / 'host'
+        fixture.write_text(code)
+        hwb_host.build(hwb_host.ROOT, fixture, exe)
+        result = hwb_host.execute(exe)
+        print(result.stdout, end='', flush=True)
+        if mutation:
+            if result.returncode != 1 or 'FAIL:tri-burst3:' not in result.stdout:
+                raise RuntimeError(name + ': expected runtime RED')
+            print(name + ': RED runtime')
+        elif result.returncode:
+            raise RuntimeError('tri-burst3 control failed')
+        else:
+            hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
+
+
 def main():
     trial()
     trial2()
+    trial3()
     if '--mutate' in sys.argv:
         for mutation in [
             ('burst-bit1', 'let trialcr = burstcr & 0xFD', 'let trialcr = burstcr & 0xFB'),
@@ -194,6 +220,23 @@ def main():
             ('cr07', 'let trialcr = (burstcr & 0xF8) | 7', 'let trialcr = (burstcr & 0xF8) | 1'),
         ]:
             trial2(mutation)
+        for mutation in [
+            ('interface-bit', '0x2A | ((t | 0x40) << 8)', '0x2A | ((t | 0x00) << 8)'),
+            ('performance-bit', '0x2F | ((t | 0x10) << 8)', '0x2F | ((t | 0x00) << 8)'),
+            ('ge-wait', 'if (status & 0x80) == 0 goto ge_idle', 'if (status & 0x80) != 0 goto ge_idle'),
+            ('ge-bound', 'if polls != 10000 goto ge_wait', 'if polls != 9999 goto ge_wait'),
+            ('ge-init', 'mmiowrite16 v + 0x2122 0x100', 'mmiowrite16 v + 0x2122 0'),
+            ('sr-unlock', '((t ^ 2) | 0x80)', '((t ^ 2) | 0x00)'),
+            ('readback', 'print "CR39-before" t', 'print "CR39-before" trialcr'),
+            ('observe', 'call observe', 'log "observe omitted"'),
+            ('range', 'print "match-start" off', 'print "match-start" 1'),
+            ('misses', 'print "mismatch-count" bad', 'print "mismatch-count" 0'),
+            ('vram-restore', 'mmiowrite32 f + (i << 2) original[i]', 'mmiowrite32 f + (i << 2) 0'),
+            ('cr23-restore', '0x23 | ((save[852]) << 8)', '0x23 | (0 << 8)'),
+            ('cr55-restore', '0x55 | ((save[841]) << 8)', '0x55 | (0 << 8)'),
+            ('ge-restore', 'mmiowrite16 v + 0x2122 ge_saved', 'mmiowrite16 v + 0x2122 0'),
+        ]:
+            trial3(mutation)
     return 0
 
 
