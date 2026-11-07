@@ -136,9 +136,13 @@ static int palette_write_dac6(struct trident_device *d,
             rc = palette_write(d, TRI_DAC_DATA, color[c]);
             if (rc) return rc;
         }
-        /* Only completed RGB entries become visible to cursor color lookup. */
-        rc = tri_palette_record(d, first + i, 1, color);
-        if (rc) return rc;
+        /* xf86cmap.c:525-665 keeps colormap colors separate from gamma.
+         * Only completed INDEX8 entries update the map used by reload and
+         * cursor color lookup; TrueColor ramps only change the hardware. */
+        if (d->mode.selected.depth == 8) {
+            rc = tri_palette_record(d, first + i, 1, color);
+            if (rc) return rc;
+        }
     }
     return TRI_OK;
 }

@@ -1079,6 +1079,8 @@
       "limits",
       "limits_valid",
       "links",
+      "memory_prepare_attempted",
+      "memory_prepare_rc",
       "next_mode_id",
       "nroutes",
       "ready",
@@ -1229,6 +1231,7 @@
     "struct gf4_state": [
       "committed",
       "edid",
+      "edid_connector",
       "head",
       "mode_connector",
       "modes",

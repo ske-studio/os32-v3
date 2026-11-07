@@ -594,13 +594,14 @@ static u32 filtered(enum gf3_fmt fmt, u32 fx, u32 fy, bool bilinear)
     }
     return value;
 }
-static void scale_seed(enum gf3_fmt fmt, bool solid)
+static void scale_seed(enum gf3_fmt fmt, bool solid, bool bilinear)
 {
     seed();
     for (u32 y = 0; y < 16U; y++)
     for (u32 x = 0; x < 16U; x++) {
         u8 *p = expected + y * TEST_SCALE_SRC_PITCH + x * cpp(fmt);
-        u32 r = solid ? 96U : x * 16U, g = solid ? 160U : y * 16U, b = solid ? 32U : (x ^ y) * 16U;
+        /* Smooth RGB ramps for FOH; point trials retain the XOR edges. */
+        u32 r = solid ? 96U : x * 16U, g = solid ? 160U : y * 16U, b = solid ? 32U : (bilinear ? x : (x ^ y)) * 16U;
         if (fmt == GF3_RGB565)
             put_pixel(p, 2, ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
         else if (fmt == GF3_Y8) *p = solid ? 128U : (x + y) * 8U;
@@ -620,7 +621,8 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
 /* Bounded evidence for the independent RGB/BT.601/FOH ideal.
  * RGB acceptance is unchanged; YUV remains observation-only.
  * fx/fy are unsigned source coordinates in 12.20. */
-#define TEST_SCALE_SAMPLES 8U
+/* Trial 5 covers 24 x 24 pixels per format; keep one RGB pixel per line. */
+#define TEST_SCALE_SAMPLES 576U
 static u32 scale_observed_rgb(const u8 *p)
 {
     u32 v = get_pixel(p, cpp(scale_compare_fmt));
@@ -688,7 +690,7 @@ static int scale_case(void)
             (struct gf3_rect){0, 0, 16, 16} : (struct gf3_rect){2, 2, 12, 12};
         struct gf3_rect dr = {1, 2, side, side}, clip = {3, 3, side - 3U, side - 2U};
         if (trial == 5U) clip = dr; /* include the full-surface clamped edge */
-        scale_seed(fmt, solid);
+        scale_seed(fmt, solid, bilinear);
         int rc = bytes_transfer(false); if (rc) return rc;
         u32 dl; rc = deadline(&dl); if (rc) return rc;
         const struct gf3_test_ops *o = dispatch();

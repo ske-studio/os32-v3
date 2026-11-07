@@ -240,6 +240,7 @@ static void svc_feature5(struct gf4_ctx *c)
     u8 version=0;
     i32 source=gf_rom_bit_entry(init->rom,init->rom_size,'M',&table,&length,&version);
     i32 rc=source<0 ? GF5_EBIOS : 0;
+    c->memory_prepare_attempted=false; c->memory_prepare_rc=0;
     g->deadline=c->deadline;
     if (!source) {
         if (length<SVC_MEMORY_PC_BYTES) { source=GF_SCRIPT_EIO; rc=GF5_EBIOS; }
@@ -254,6 +255,7 @@ static void svc_feature5(struct gf4_ctx *c)
         else {
             memory=allocation;
             source=gf_init_script_prepare(init,memory,pc,0,0,c->deadline);
+            c->memory_prepare_attempted=true; c->memory_prepare_rc=source;
             if (source) rc=source==GF_SCRIPT_EIO ? GF5_EBIOS : gf5_rc_map(source);
         }
     }
@@ -381,6 +383,66 @@ static i32 svc_start_failure(struct gf4_ctx *c,const char *stage,i32 rc)
     return svc_result(c,rc);
 }
 
+/* Read-only evidence before detect/initial mode. NV04 pad acquisition has
+ * no hardware callback (MIT nouveau i2c/padnv04.c:27-35). Observe the actual
+ * DCB CR pair as well as the legacy pairs; never unlock or reroute here.
+ * PMC bit0: devinit/nv04.c:406-412; ENGINE_CTRL bit4: crtc.c:496-499. */
+#define SVC_ENGINE_CTRL 0x600860U
+#define SVC_DDC_SENSE0 0x3eU
+#define SVC_DDC_DRIVE0 0x3fU
+#define SVC_DDC_SENSE1 0x36U
+#define SVC_DDC_DRIVE1 0x37U
+static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
+{
+    struct gf_io *io=&c->ch->f->io;
+    u32 index=0,cr1f=U32_MAX,cr44=U32_MAX,cr11=U32_MAX;
+    u32 cr3e=U32_MAX,cr3f=U32_MAX,cr36=U32_MAX,cr37=U32_MAX;
+    u32 pmc=U32_MAX,engine[GF4_HEADS]={U32_MAX,U32_MAX};
+    i32 rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,&index);
+    if (!rc) {
+        rc=svc_index(io,SVC_CR,RECOVER_CR1F,&cr1f,false);
+        if (!rc) rc=svc_index(io,SVC_CR,RECOVER_CR44,&cr44,false);
+        if (!rc) rc=svc_index(io,SVC_CR,RECOVER_CR11,&cr11,false);
+        if (!rc) rc=svc_index(io,SVC_CR,SVC_DDC_SENSE0,&cr3e,false);
+        if (!rc) rc=svc_index(io,SVC_CR,SVC_DDC_DRIVE0,&cr3f,false);
+        if (!rc) rc=svc_index(io,SVC_CR,SVC_DDC_SENSE1,&cr36,false);
+        if (!rc) rc=svc_index(io,SVC_CR,SVC_DDC_DRIVE1,&cr37,false);
+        i32 restore=io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,index);
+        if (!rc) rc=restore;
+    }
+    i32 mmio_rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,RECOVER_PMC_ENABLE,4,&pmc);
+    for (u32 h=0;!mmio_rc && h<GF4_HEADS;++h)
+        mmio_rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,
+                         SVC_ENGINE_CTRL+h*RECOVER_HEAD_STRIDE,4,&engine[h]);
+    kprintf(KLOG_ATTR,"[gf4] detect state cr1f=%x cr44=%x read_rc=%d m_attempted=%u m_rc=%d f5_rc=%d source_rc=%d cr11=%x cr3e=%x cr3f=%x cr36=%x cr37=%x pmc=%x ec0=%x ec1=%x mmio_rc=%d\n",
+            cr1f,cr44,rc,c->memory_prepare_attempted,c->memory_prepare_rc,
+            g->last_rc,g->source_rc,cr11,cr3e,cr3f,cr36,cr37,pmc,
+            engine[0],engine[1],mmio_rc);
+    for (u32 i=0;i<c->nroutes;++i) {
+        const struct gf4_route *r=&c->routes[i];
+        if (r->type==GF4_TV || r->i2c_index==U8_MAX) continue;
+        u32 bus=r->i2c_index,drive=U32_MAX,sense=U32_MAX;
+        struct gf4_i2c_port port={0};
+        /* Inspect the same value loan as links_i2c_port, without changing
+         * last_rc or invoking a transfer. Non-NV04 entries retain their rc. */
+        i32 port_rc=bus<sizeof(c->dcb.i2c)/sizeof(c->dcb.i2c[0]) ?
+                    c->dcb.i2c_rc[bus] : GF4_ENODEV;
+        i32 read_rc=0;
+        if (!port_rc) {
+            port=c->dcb.i2c[bus];
+            read_rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,&index);
+            if (!read_rc) {
+                read_rc=svc_index(io,SVC_CR,port.drive,&drive,false);
+                if (!read_rc) read_rc=svc_index(io,SVC_CR,port.sense,&sense,false);
+                i32 restore=io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,index);
+                if (!read_rc) read_rc=restore;
+            }
+        }
+        kprintf(KLOG_ATTR,"[gf4] detect port conn=%u bus=%u port_rc=%d drive_cr=%x drive=%x sense_cr=%x sense=%x read_rc=%d\n",
+                r->connector,bus,port_rc,port.drive,drive,port.sense,sense,read_rc);
+    }
+}
+
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
     const char *stage="service_check";
@@ -451,6 +513,7 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     if (!rc) {
         c->ready=true;
         stage="detect";
+        svc_detect_diagnostic(c,g);
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf4_detect(c,dl);
     }

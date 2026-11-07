@@ -35,6 +35,12 @@ DRAW = 'userland/rust/libos32gui/src/draw.rs'
 
 # 変異 1 本 = (名前, 置き換え前, 置き換え後, RED の印)。どれも draw.rs。
 MUTATIONS = [
+    ('direct-scanout-no-background',
+     'core::ptr::write_bytes(self.fb_base.offset(off), color, n)',
+     'if color != 15 { core::ptr::write_bytes(self.fb_base.offset(off), color, n) }',
+     'direct-scanout-background'),
+    ('direct-scanout-packed-width', '(fb.planes[0], fb.pitch)',
+     '(fb.planes[0], fb.width)', 'direct-scanout-pitch-guard'),
     # b4② cell 契約: 半角 cell の右へはみ出す列を落とさない → 隣の cell を汚す。
     ('cell-clip-dropped', "    let wmask: u16 = if w >= KANJI_W { 0xFFFF } else { 0xFF00 };",
      "    let wmask: u16 = 0xFFFF;", 'cell-contract'),
@@ -106,8 +112,8 @@ def main():
         work = Path(d)
         rlib, font_rlib, deps, env = build_units(work)
 
-        def run(m=None):
-            src, name = draw, 'normal'
+        def run(m=None, name='normal'):
+            src = draw
             if m:
                 name, old, new, _ = m
                 assert src.count(old) == 1, name
@@ -131,6 +137,9 @@ def main():
                 r = run(m)
                 assert r.returncode == 101 and m[3] in r.stdout, (m[0], r.stdout[-2000:], r.stderr[-2000:])
                 print('RED ' + m[0] + ' rc=101 -> ' + m[3])
+            r = run(name='restored')
+            assert r.returncode == 0, r.stdout + r.stderr
+            print('GREEN restored')
             print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} draw.rs mutants')
     print('test_gui_text: OK')
 

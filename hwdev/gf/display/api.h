@@ -37,6 +37,7 @@ struct gf4_saved {
 struct gf4_state {
     u32 version,size,nmodes; struct gf4_mode modes[GF4_MODES];
     u8 mode_connector[GF4_MODES]; struct gf4_edid_state edid;
+    u32 edid_connector; /* GF4_CONNECTORS means no detect image yet. */
     struct gf4_head_image head[GF4_HEADS]; struct gf4_tv_state tv[GF4_HEADS];
     struct gfinit_mode work[GF4_HEADS]; struct gf4_saved rollback;
     struct gf4_head_image next[GF4_HEADS];
@@ -80,6 +81,8 @@ struct gf4_ctx {
     /* Set before retire/release; retain through partial cleanup and any
      * diagnostic loan. Clear only after complete successful reset. */
     bool cleanup_pending;
+    /* Optional cold-start M preparation, retained after devinit release. */
+    bool memory_prepare_attempted; i32 memory_prepare_rc;
 };
 int gf4_modes(struct gf4_ctx *,u8,const struct gf4_mode **,u32 *);
 int gf4_set_mode(struct gf4_ctx *,const struct gf4_route *,u32,const struct gf3_surface *,u32);

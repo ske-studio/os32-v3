@@ -58,7 +58,8 @@ static int dac_trace(u32 first, u32 count)
     }
     for (u32 i = 0; i < TRI_DAC_BYTES; ++i) {
         u8 value = i >= first*3 && i < (first+count)*3 ? expected[i] : 0xA5;
-        CHECK(fake.dac[i] == value && (&dev.dac[0][0])[i] == value);
+        CHECK(fake.dac[i] == value);
+        CHECK((&dev.dac[0][0])[i] == (dev.mode.selected.depth == 8 ? value : 0xA5));
     }
     return 0;
 }
@@ -115,7 +116,7 @@ static int defaults(void)
             CHECK(!trident_palette(&dev, 0, 256, rgb) && !fake.trace_count);
             for (u32 i = 0; i < TRI_DAC_BYTES; ++i) {
                 u8 value = i < count*3 ? expected[i] : 0xA5;
-                CHECK(fake.dac[i] == value && (&dev.dac[0][0])[i] == value);
+                CHECK(fake.dac[i] == value && (&dev.dac[0][0])[i] == 0xA5);
             }
         }
     }
@@ -149,6 +150,36 @@ static int record_reload(void)
         CHECK(!tri_palette_reload(&dev));
         CHECK(!dac_trace(0, count) && !overscan_trace(count*15, 0));
     }
+    return 0;
+}
+/* Preserve a HAL-installed INDEX8 map across the mode-switch reload path.
+ * The TrueColor ramps reach hardware, but must not replace cursor's INDEX8
+ * color source or the map reinstalled when returning to 8bpp. */
+static int mode_roundtrip(void)
+{
+    CHECK(!reset(8, TRI_CR_COLOR));
+    for (u32 i = 0; i < TRI_DAC_BYTES; ++i) {
+        rgb[i] = (i * 7 + i / 3 + 5) % 16;
+        expected[i] = hal6(rgb[i]);
+    }
+    CHECK(!trident_palette(&dev, 0, 256, rgb));
+    CHECK(!dac_trace(0, 256));
+    const u8 depths[] = {16,24,8};
+    for (u32 m = 0; m < 3; ++m) {
+        dev.mode.selected.depth = depths[m];
+        dev.mode.selected.bpp = depths[m] == 24 ? 32 : depths[m];
+        trident_fake_trace_reset(&fake);
+        CHECK(!tri_palette_reload(&dev));
+        for (u32 i = 0; i < TRI_DAC_BYTES; ++i) {
+            CHECK((&dev.dac[0][0])[i] == expected[i]);
+            u32 index = i / 3, component = i % 3;
+            u8 value = m == 0 && index < 64 ?
+                (component == 1 ? index : index < 32 ? index * 63 / 31 : 0) :
+                m == 1 ? index * 63 / 255 : expected[i];
+            CHECK(fake.dac[i] == value);
+        }
+    }
+    CHECK(!dac_trace(0, 256));
     return 0;
 }
 /* CMapSetOverscan: reverse full search, forward changed search, strict sum
@@ -238,7 +269,8 @@ static int test(void)
     for (u32 i = 0; i < 16; ++i) {
         system_colors[i].r = i+1; system_colors[i].g = 15-i; system_colors[i].b = 1;
     }
-    int rc = defaults(); if (rc) return rc;
+    int rc = mode_roundtrip(); if (rc) return rc;
+    rc = defaults(); if (rc) return rc;
     rc = record_reload(); if (rc) return rc;
     rc = overscan_cases(); if (rc) return rc;
     return boundaries_errors();

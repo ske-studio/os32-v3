@@ -292,13 +292,13 @@ static i32 display_enumerate(const struct display_request *q)
 {
     const struct gf4_test_ops *o = geforce_display_ops();
     if (!o || !o->ctx) return GF4_ESTATE;
-    /* Detect retains only the last connector's parsed state, without its
-     * connector/bus or the DDC/parser return codes. Do not invent attribution. */
+    /* Detect retains the last connector's image, including TV mode lists. */
     if (o->ctx->state && !serial_gate_active()) {
         const struct gf4_edid_state *e = &o->ctx->state->edid;
         serial_puts_polled("GF4 detect-edid last_rc="); serial_diag_i32(e->last_rc);
         display_number(" base_valid=", e->base_valid);
         display_number(" ntiming=", e->ntiming); display_number(" preferred=", e->preferred);
+        display_number(" connector=", o->ctx->state->edid_connector);
         serial_puts_polled("\r\n");
     }
     u32 nroutes = o->ctx->nroutes;
