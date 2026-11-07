@@ -40,7 +40,7 @@ void _start(void)
     startlog_clear();
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));
     assert(records[0] == 1 && records[1] == 1 && order == 2);
-    /* A general restore is not the initial-mode point. */
+    /* After STOP, a restart through the service records no further hits. */
     assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
     assert(!concrete_stop());
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));

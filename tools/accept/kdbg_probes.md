@@ -14,6 +14,7 @@ geforce.mod / trident.mod / shell、KDEBUG 有効、選択バックエンドと 
 共通の `reset.hwb`（各試行の最初に必ず実行）:
 
 ```text
+probe stop
 probe reset
 probe list
 ```
@@ -47,6 +48,7 @@ GeForce が選択された実機の CUI から行う。未 ARM の `gf2 enter` /
 `gf-arm.hwb`（BAR0=0x24000000 の例）:
 
 ```text
+probe stop
 probe reset
 probe list
 probe add gf4.detect.pre idxmmio8 0x246013d4 0x246013d5 0x1f
@@ -91,10 +93,11 @@ Trident が選択された実機で、CUI から `os32gui` による GUI への�
 まず未 ARM で同じ往復を1回行い、表示・戻り値・既存診断を保存する。
 
 `tri-arm.hwb` の `INDEX_PHYS` / `DATA_PHYS` は実測のレジスタ BAR1 の
-メモリベース+0x3d4 / +0x3d5 を計算した16進リテラルに置換してから使う。
+メモリベース+0x3d4 / +0x3d5 を計算した16進リテラルに置換してから使う (0x3d4 は既存の診断の cur_vga_base、misc bit0 が 0 なら 0x3b4)。
 I/Oポート0x3d4/5と MMIO の応答を同一視しない。
 
 ```text
+probe stop
 probe reset
 probe list
 probe add tri.screeninit.post idxmmio8 INDEX_PHYS DATA_PHYS 0x39
