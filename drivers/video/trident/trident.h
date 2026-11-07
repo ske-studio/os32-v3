@@ -372,10 +372,10 @@ struct trident_device {
     struct tri_accel_state accel;
     struct tri_cursor_state cursor;
     struct tri_video_state video;
-    /* PM 決定 (2026-11-07、F2 の設計の欠け): 今の 256 色の DAC の値 (6 bit、
-     * R,G,B)。持ち主は F8 (palette.c)。DAC へ書く経路 (trident_palette と
-     * lifecycle の既定の palette の load) は全部 tri_palette_record を通して
-     * ここを更新する。F2 は INDEX8 の近似色の選択でここを読むだけ (I/O なし)。 */
+    /* PM 決定 (2026-11-07、F2 の設計の欠け): 今の INDEX8 の 256 色 (6 bit、
+     * R,G,B)。持ち主は F8 (palette.c)。INDEX8 の DAC へ書く経路は全部
+     * tri_palette_record を通してここを更新する。TrueColor の ramp はここを
+     * 変えない。F2 は INDEX8 の近似色の選択でここを読むだけ (I/O なし)。 */
     u8 dac[256][3];
     /* PM 決定 (2026-11-07、F8 の overscan): 今の overscan の index。持ち主は F8。
      * xf86cmap.c の pColPriv->overscan (未設定 = -1) に当たり、overscan_valid=false
@@ -593,7 +593,8 @@ int tri_palette_record(struct trident_device *, int first, int count, const u8 *
 /* F8 (F8 追記 2026-11-07、xf86cmap.c:254-275,525-665,855-904): 選択 mode の
  * 深度の既定の DAC 表を作って書く。depth8 は system/cube/gray、15 は 0..31
  * に i*63/31、16 は 0..63 に G=i・R/B は i<=31 で i*63/31 (ほかは 0)、24/32 は
- * 0..255 に i*63/255。呼ぶ時点は F9 (ScreenInit の palette 段)。 */
+ * 0..255 に i*63/255。TrueColor の表は d->dac を変えない。
+ * 呼ぶ時点は F9 (ScreenInit の palette 段)。 */
 int tri_palette_load_default(struct trident_device *);
 /* F9 の Enter・F10 の mode 切替の後。depth8 は d->dac を書き直し、TrueColor は
  * tri_palette_load_default。 */
