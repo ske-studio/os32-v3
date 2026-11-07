@@ -1,6 +1,6 @@
 #include "memmap_layout.h"
 /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_4_fmt_4 = 0;
+__os32_abi_1_mem_4_fmt_5 = 0;
 /* GENERATED GENERATION REF END */
 __os32_shell_load_addr = LAYOUT_MEM_SHELL_LOAD_ADDR;
 __os32_shell_sbrk_limit = LAYOUT_MEM_SHELL_HEAP_BASE; /* private CRT diagnostic */
@@ -14,12 +14,19 @@ SECTIONS
         /* crt0.asm の _start を必ず先頭に配置 */
         *(.text.startup)
         *(.text*)
+        *(.rodata*)
+        __text_used_end = .;
+        . = ALIGN(4096);
+        __text_end = .;
     }
 
     .data : {
         *(.data)
         *(.data.*)
-        *(.rodata*)
+        *(.got.plt)
+        *(.got)
+        /* Keep the raw image end equal to __bss_start. */
+        . = ALIGN(ALIGNOF(.bss));
     }
 
     .bss : {

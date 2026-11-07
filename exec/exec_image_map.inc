@@ -73,6 +73,9 @@ static const char *exec_image_reject_reason(const OS32Header *hdr, int is_shell,
     else if (!hdr->text_size || hdr->entry_offset >= hdr->text_size ||
              hdr->text_size > max_size || hdr->bss_size > max_size - hdr->text_size)
         reason = "Error: invalid image entry or range\n";
+    else if (!hdr->code_size || (hdr->code_size & (PAGE_SIZE - 1)) ||
+             hdr->code_size > hdr->text_size || hdr->entry_offset >= hdr->code_size)
+        reason = "Error: invalid image code range\n";
     else if (is_shell && hdr->shlib_protocol)
         reason = "Error: resident shell must have shlib_protocol=0\n";
     else if (hdr->shlib_protocol && !shlib_loaded())

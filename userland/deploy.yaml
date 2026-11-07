@@ -292,6 +292,11 @@ filesystem:
     - host: userland/tests/time_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- text_ro_test (アプリの .text・.rodata は読み取り専用、.data は書ける。
+    #     `text` と `rodata` は**わざとアプリを殺す**) ---
+    - host: userland/tests/text_ro_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- pcm_test (票 TASK_PCM_CS4231 §3 E3 / E5: CS4231 再生の CPL=3 受入。
     #     左 = 1kHz 正弦 / 右 = frame 番号なので、採った PCM から左右の
     #     取り違えと欠落が見分けられる。`short` / `nodev` の引数あり) ---

@@ -15,6 +15,11 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('old-format-accepted', 'layout', 'hdr->version != OS32X_HDR_VERSION',
+     '(hdr->version != OS32X_HDR_VERSION && hdr->version != 4)'),
+    ('code-protect-omitted', 'source',
+     'want_ring3 && paging_addrspace_protect_code_ro',
+     '0 && paging_addrspace_protect_code_ro'),
     ('x87-launch-save', 'source',
      '        x87_save(&x87_parent[x87_depth]);\n        x87_init();',
      '        (void)0;\n        x87_init();'),
@@ -65,7 +70,7 @@ MUTATIONS = (
 )
 
 
-def run(source=None, image=None, argv=None):
+def run(source=None, image=None, argv=None, layout=None):
     if source is None:
         source = exec_source(ROOT)
     if image is None:
@@ -76,6 +81,7 @@ def run(source=None, image=None, argv=None):
         tmp = Path(directory)
         # Keep the entire TU and its local helper together, including mutants.
         (tmp / 'exec.c').write_text(source)
+        (tmp / 'os32x_hdr.c').write_text(layout or (ROOT / 'exec/os32x_hdr.c').read_text())
         (tmp / 'exec_image.inc').write_text(image)
         (tmp / 'exec_argv.inc').write_text(argv)
         exe = tmp / 'test'
@@ -107,7 +113,8 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         originals = {'source': exec_source(ROOT),
                      'image': (ROOT / 'exec/exec_image.inc').read_text(),
-                     'argv': (ROOT / 'exec/exec_argv.inc').read_text()}
+                     'argv': (ROOT / 'exec/exec_argv.inc').read_text(),
+                     'layout': (ROOT / 'exec/os32x_hdr.c').read_text()}
         for name, target, old, new in MUTATIONS:
             assert originals[target].count(old) == 1, (name, originals[target].count(old))
             changed = dict(originals)

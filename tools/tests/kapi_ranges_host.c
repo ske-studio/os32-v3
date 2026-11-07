@@ -201,10 +201,16 @@ static void caller_copy_tests(void)
     for (u32 i = 0; i < sizeof(expected); i++) named(((u8 *)tail)[i] == ((u8 *)&expected)[i], "mem_stat all bytes");
     EXPECT("input two pages", 0, wrap_sys_write(1, (void *)tail, 2));
     EXPECT("output two pages", 0, wrap_sys_read(1, (void *)tail, 2));
-    pt[index + 1] &= ~PTE_RW;
+    for (u32 i = 0; i < sizeof(MemStat); i++) ((u8 *)tail)[i] = 0xa5;
+    u32 saved_cr3 = host_cr3;
+    host_cr3 = paging_kernel_pd_phys();
+    named(!paging_addrspace_protect_code_ro(&space, va + PAGE_SIZE, va + 2 * PAGE_SIZE), "protect private code tail");
+    host_cr3 = saved_cr3;
     EXPECT("mem_stat RO tail", 1, wrap_mem_stat(-1, (void *)tail, sizeof(MemStat)));
     EXPECT("input RO tail", 0, wrap_sys_write(1, (void *)tail, 2));
     EXPECT("output RO tail", 1, wrap_sys_read(1, (void *)tail, 2));
+    for (u32 i = 0; i < sizeof(MemStat); i++)
+        named(((u8 *)tail)[i] == 0xa5, "RO boundary no partial output");
     pt[index + 1] = 0;
     EXPECT("input length overflow", 1, wrap_sys_write(1, (void *)va, 0xffffffffU));
     slot.disk_write_authorized = 1;
@@ -239,7 +245,9 @@ static void caller_copy_tests(void)
     EXPECT("redirect bad len", 1, wrap_sys_redirect_fd_buf(0, (u8 *)va, 8, PAGE_SIZE + 1));
     EXPECT("redirect good", 0, wrap_sys_redirect_fd_buf(0, (u8 *)va, 8, 8));
     EXPECT("multi-output atomic", 1, wrap_gfx_get_palette(0, (u8 *)va, 0, (u8 *)va));
-    pt[index] &= ~PTE_RW;
+    host_cr3 = paging_kernel_pd_phys();
+    named(!paging_addrspace_protect_code_ro(&space, va, va + PAGE_SIZE), "protect private code");
+    host_cr3 = saved_cr3;
     EXPECT("RO input", 0, wrap_sys_write(1, (void *)va, PAGE_SIZE));
     EXPECT("RO output", 1, wrap_sys_read(1, (void *)va, 1));
     pt[index] = saved;

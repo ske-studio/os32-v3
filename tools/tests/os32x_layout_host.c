@@ -24,6 +24,16 @@ int main(void)
 {
     OS32Header h = valid();
     u32 i;
+    CHECK(OS32X_HDR_VERSION == 5);
+    CHECK(OS32X_HDR_SIZE == 64 && sizeof(h) == 16 * sizeof(u32));
+#if __SIZEOF_LONG__ == 4
+    CHECK(sizeof(h) == 64);
+#endif
+    h.version = 4; h.header_size = 60;
+    CHECK(os32x_layout_check(&h, 60, KAPI_DATA_FIELDS_OFF));
+    h.header_size = 64;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF));
+    h = valid();
     CHECK(OS32_MEMORY_LAYOUT_GENERATION == 4);
 #ifndef OS32_TEST_OLD_SHLIB
     CHECK(OS32_SHLIB_PROTOCOL == 2);

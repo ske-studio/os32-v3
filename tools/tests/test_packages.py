@@ -801,8 +801,8 @@ def case_install(plan, resolved):
     fd_files.append(('/ETC/NETCD.CFG', 67))
     exclude = {e['guest'] for e in fd.get('exclude') or []}
     check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod', '/boot/geforce.mod',
-                      '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod'},
-          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod、fm.mod、pcm.mod、fep.mod {sorted(exclude)}")
+                      '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod', '/bin/hexdump.bin'},
+          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod、fm.mod、pcm.mod、fep.mod、hexdump.bin {sorted(exclude)}")
     minimal = {g: os.path.getsize(h) for n, _, _, fs in resolved
                if n.startswith('minimal') for g, h in fs if g not in exclude}
     got = run_install_fdset(src, fd_files)

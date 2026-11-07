@@ -4,6 +4,7 @@
 #include "types.h"
 static u32 host_cr3;
 #include "exec.c"
+#include "os32x_hdr.c"
 
 static void say(const char *s)
 {
@@ -19,7 +20,7 @@ static void die(void)
 }
 #define CHECK(x) do { if (!(x)) { say("FAIL: " #x "\n"); die(); } } while (0)
 
-enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, READ_ERROR };
+enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, READ_ERROR, PROTECT_FAIL };
 static int failure, is_user, opened, closed, aborted, reads, maps, jump_ready;
 static int last_slot_id;
 static int x87_calls, x87_entry_depth, x87_init_after_save;
@@ -28,6 +29,7 @@ void x87_save(X87State *p) { x87_saved = p; x87_calls++; }
 void x87_restore(const X87State *p) { (void)p; x87_calls++; }
 void x87_init(void) { x87_init_after_save = x87_calls == 1; x87_calls++; }
 static u32 image_size, bss_size, copied;
+static int protected, image_mapped;
 static char events[32];
 static u32 event_count;
 static u8 backing[3][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
@@ -50,6 +52,7 @@ static u32 stack_phys(u32 va)
 static void argv_done(void)
 {
     CHECK(argv_mode && closed == 1 && !aborted);
+    CHECK(protected == is_user);
     CHECK(read_fail_at < 0 && store_fail_at < 0);
     CHECK(!is_user || argv_tables == 1);
     __builtin_longjmp(escape, 1);
@@ -61,6 +64,7 @@ void *kmemset(void *p, int c, u32 n) { u8 *b = p; while (n--) *b++ = c; return p
 static void reached_argv(void)
 {
     CHECK(closed == 1 && failure == OK);
+    CHECK(protected == is_user);
     CHECK(last_slot_id == (is_user ? 2 : 1));
     CHECK(slots[last_slot_id].cpl3 == is_user);
     event('V');
@@ -84,9 +88,14 @@ int vfs_read(const char *path, void *buf, u32 n)
     CHECK((argv_mode || !kstrcmp(path, "/fixture")) && n == OS32X_HDR_SIZE);
     OS32Header *hdr = buf;
     kmemset(hdr, 0, n);
-    hdr->header_size = 173; /* distinguish the payload offset from header size in memory */
+    hdr->magic = OS32X_MAGIC; hdr->version = OS32X_HDR_VERSION;
+    hdr->header_size = OS32X_HDR_SIZE;
+    hdr->kapi_data_off = KAPI_DATA_FIELDS_OFF;
+    hdr->kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
+    hdr->memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     hdr->load_addr = is_user ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR;
     hdr->text_size = image_size;
+    hdr->code_size = PAGE_SIZE;
     hdr->bss_size = bss_size;
     return n;
 }
@@ -100,7 +109,7 @@ int vfs_open(const char *path, int mode)
 }
 int vfs_seek(int fd, int offset, int whence)
 {
-    CHECK(opened && !closed && fd == 7 && offset == 173 && whence == 0);
+    CHECK(opened && !closed && fd == 7 && offset == OS32X_HDR_SIZE && whence == 0);
     event('S');
     return failure == SEEK_FAIL ? -1 : offset;
 }
@@ -141,6 +150,13 @@ int vfs_read_fd(int fd, void *buf, u32 n)
 }
 void vfs_close(int fd) { CHECK(opened && !closed && fd == 7); closed++; event('C'); }
 /* External admission/allocation and CPU boundaries; exec internals stay real. */
+int paging_addrspace_protect_code_ro(struct addrspace *as, u32 base, u32 end)
+{
+    CHECK(is_user && as == &space && closed == 1 && copied == image_size);
+    CHECK(!protected && base == MEM_EXEC_LOAD_ADDR && end == base + PAGE_SIZE);
+    event('P'); protected = 1;
+    return failure == PROTECT_FAIL ? -1 : 0;
+}
 int paging_v86_session_open(void) { return 0; }
 int v86_call_pinned(void) { return 0; }
 u32 paging_current_cr3(void) { return argv_mode && is_user ? 17 : 1; }
@@ -170,8 +186,6 @@ int appslot_cur(void) { return argv_mode && is_user ? 3 : 1; }
 AppSlot *appslot_at(int id) { CHECK(id >= 0 && id < APP_SLOT_COUNT); last_slot_id = id; return &slots[id]; }
 int appslot_start_admit(int gui, u32 pages, u32 free_pages) { (void)gui; (void)pages; (void)free_pages; return 2; }
 int appslot_cui_only_admit(int gui, u32 flags) { (void)gui; (void)flags; return 0; }
-int os32x_layout_check(const OS32Header *h, u32 n, u32 off) { (void)h; (void)n; (void)off; return OS32X_LAYOUT_OK; }
-const char *os32x_layout_reason(int rc) { (void)rc; CHECK(0); return 0; }
 u32 pgalloc_free_pages(void) { return 100; }
 void exec_heap_save_state(u32 *used) { *used = 0; }
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *out) { (void)kind; (void)id; (void)name; *out = 9; return 1; }
@@ -213,7 +227,12 @@ int as_va_to_pa_read(u32 pd, u32 va, u32 *pa)
 /* Mapping is outside this test: image reads use the reversed backing above. */
 static u8 allocation[MEM_EXEC_STACK_SIZE] __attribute__((aligned(PAGE_SIZE)));
 u32 pgalloc_alloc_phys(u32 owner, int n) { CHECK(owner == 9 && n > 0 && (u32)n <= sizeof(allocation) / PAGE_SIZE); return (u32)allocation; }
-int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 b, u32 e, u32 pa, u32 flags) { (void)b; (void)e; (void)flags; CHECK(as == &space && pa == (u32)allocation); return 0; }
+int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 b, u32 e, u32 pa, u32 flags)
+{
+    (void)e; (void)flags; CHECK(as == &space && pa == (u32)allocation);
+    if (b == MEM_EXEC_LOAD_ADDR) { image_mapped = 1; kmemset(backing, 0, sizeof(backing)); }
+    return 0;
+}
 int paging_addrspace_map_user(struct addrspace *as, u32 va, u32 pa, u32 flags) { (void)as; (void)va; (void)pa; (void)flags; CHECK(0); return -1; }
 int pgalloc_free_n_owner(u32 owner, u32 start, int n) { (void)owner; (void)start; (void)n; CHECK(0); return 0; }
 void caller_access_save(volatile CallerAccessFrame *out) { kmemset((void *)out, 0, sizeof(*out)); }
@@ -273,6 +292,7 @@ static void check_case(int user, int fault, u32 text)
 {
     is_user = user; failure = fault; image_size = text; bss_size = 33;
     opened = closed = aborted = reads = maps = jump_ready = 0;
+    protected = image_mapped = 0;
     copied = event_count = x87_calls = 0;
     kmemset(events, 0, sizeof(events));
     kmemset(slots, 0, sizeof(slots));
@@ -287,7 +307,7 @@ static void check_case(int user, int fault, u32 text)
             /* Full admission rejects an empty executable. Keep the original
              * zero-payload/BSS I/O control at the loader helper's boundary. */
             AppSlot *ctx = &slots[user ? 2 : 1];
-            OS32Header hdr = {.header_size = 173, .text_size = 0, .bss_size = bss_size};
+            OS32Header hdr = {.header_size = OS32X_HDR_SIZE, .text_size = 0, .bss_size = bss_size};
             ctx->cpl3 = user; ctx->as = &space;
             ctx->load_addr = user ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR;
             space.pd_phys = 23;
@@ -306,16 +326,17 @@ static void check_case(int user, int fault, u32 text)
     case SEEK_FAIL: expected = "JOSCA"; break;
     case SHORT_FIRST: case READ_ERROR: expected = user ? "JOSMRCA" : "JOSRCA"; break;
     case SHORT_LAST: expected = user ? "JOSMRMRCA" : "JOSRRCA"; break;
+    case PROTECT_FAIL: expected = "JOSMRMRCPA"; break;
     case MAP_FIRST: expected = "JOSMCA"; break;
     case MAP_LAST: expected = "JOSMRMCA"; break;
     default: expected = text == 0 ? "JOSCV" : text <= PAGE_SIZE ?
-        (user ? "JOSMRCV" : "JOSRCV") : (user ? "JOSMRMRCV" : "JOSRRCV"); break;
+        (user ? "JOSMRCPV" : "JOSRCV") : (user ? "JOSMRMRCPV" : "JOSRRCV"); break;
     }
     CHECK(!kstrcmp(events, expected));
     for (u32 off = 0; off < 3 * PAGE_SIZE; off++) {
         u8 actual = user ? backing[2 - off / PAGE_SIZE][off % PAGE_SIZE] : ((u8 *)MEM_SHELL_LOAD_ADDR)[off];
         u8 expected_byte = off < copied ? pattern(off) :
-            (!user && fault == OK && off < text + bss_size ? 0 : 0xA5);
+            ((user && image_mapped) || (!user && fault == OK && off < text + bss_size) ? 0 : 0xA5);
         CHECK(actual == expected_byte);
     }
 }
@@ -332,8 +353,9 @@ static u32 stack_word(int user, u32 va)
 static void argv_case(int user, const char *command, const char *bytes,
                       u32 byte_count, int argc, int read_fault, int store_fault)
 {
-    argv_mode = 1; is_user = user; failure = OK; image_size = 1; bss_size = 33;
+    argv_mode = 1; is_user = user; failure = OK; image_size = PAGE_SIZE; bss_size = 33;
     opened = closed = aborted = reads = maps = jump_ready = 0;
+    protected = image_mapped = 0;
     copied = event_count = x87_calls = 0; stores = argv_tables = 0;
     read_fail_at = read_fault; store_fail_at = store_fault;
     kmemset(slots, 0, sizeof(slots));
@@ -426,8 +448,29 @@ static void argv_cases(void)
     x87_entry_depth = 0;
     say("PASS exec argv: 45 launches, quoting/escape/limits/pages, read/store errors, frame and abort\n");
 }
+static void image_range_tests(void)
+{
+    OS32Header h = {.load_addr = MEM_EXEC_LOAD_ADDR, .text_size = 2 * PAGE_SIZE,
+                    .code_size = PAGE_SIZE};
+    CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.code_size = 0; CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.code_size = PAGE_SIZE - 1; CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.code_size = 3 * PAGE_SIZE; CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.code_size = PAGE_SIZE; h.entry_offset = PAGE_SIZE;
+    CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.entry_offset--; CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.code_size = h.text_size; CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.magic = OS32X_MAGIC; h.header_size = OS32X_HDR_SIZE; h.version = 4;
+    h.kapi_data_off = KAPI_DATA_FIELDS_OFF;
+    h.kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
+    h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
+    h.header_size = 60;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
+}
 void _start(void)
 {
+    image_range_tests();
     u32 result, args[6] = {MEM_SHELL_LOAD_ADDR, 3 * PAGE_SIZE, 3, 0x32, 0xffffffffu, 0};
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == MEM_SHELL_LOAD_ADDR);
@@ -438,15 +481,15 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == args[0]);
     for (int user = 0; user <= 1; user++) {
-        for (int fault = OK; fault <= READ_ERROR; fault++) {
-            if (!user && (fault == MAP_FIRST || fault == MAP_LAST)) continue;
+        for (int fault = OK; fault <= PROTECT_FAIL; fault++) {
+            if (!user && (fault == MAP_FIRST || fault == MAP_LAST || fault == PROTECT_FAIL)) continue;
             check_case(user, fault, PAGE_SIZE + 17);
         }
         check_case(user, OK, PAGE_SIZE);
-        check_case(user, OK, 1);
+        check_case(user, OK, 2 * PAGE_SIZE);
         check_case(user, OK, 0);
     }
-    say("PASS exec image: 20 cases (18 launches, 2 empty-payload controls), bytes, page boundaries, BSS and close-before-abort\n");
+    say("PASS exec image: 21 cases (19 launches, 2 empty-payload controls), bytes, page boundaries, BSS and close-before-abort\n");
     argv_cases();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}

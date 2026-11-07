@@ -36,6 +36,7 @@ int shlib_init(void)
     }
     if (oh.flags != OS32X_FLAG_SHLIB || oh.load_addr != MEM_SHLIB_BASE ||
         oh.entry_offset != 0 || oh.text_size < PAGE_SIZE ||
+        !oh.code_size || (oh.code_size & (PAGE_SIZE - 1)) || oh.code_size > oh.text_size ||
         oh.text_size > MEM_SHLIB_SIZE || oh.bss_size > MEM_SHLIB_SIZE - oh.text_size)
         goto fail;
     size = oh.text_size + oh.bss_size;
@@ -54,7 +55,7 @@ int shlib_init(void)
     sh = P2V(g_pages[0]);
     if (sh->magic != OS32_SHLIB_MAGIC || sh->_rsvd[0] != oh.shlib_protocol ||
         sh->nfunc > OS32_SHLIB_MAX_FUNC || !sh->text_pages ||
-        sh->text_pages > pages || sh->data_vaddr != MEM_SHLIB_BASE + sh->text_pages * PAGE_SIZE ||
+        sh->text_pages > pages || oh.code_size != sh->text_pages * PAGE_SIZE || sh->data_vaddr != MEM_SHLIB_BASE + sh->text_pages * PAGE_SIZE ||
         sh->data_pages > pages - sh->text_pages ||
         sh->text_pages + sh->data_pages != pages) goto fail;
     for (i = 0; i < sh->nfunc; i++) {

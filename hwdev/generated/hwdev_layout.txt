@@ -934,10 +934,12 @@ offset	MouseInfo.x	0
 member_size	MouseInfo.x	2
 offset	MouseInfo.y	2
 member_size	MouseInfo.y	2
-size	OS32Header	60
+size	OS32Header	64
 align	OS32Header	4
 offset	OS32Header.bss_size	24
 member_size	OS32Header.bss_size	4
+offset	OS32Header.code_size	60
+member_size	OS32Header.code_size	4
 offset	OS32Header.entry_offset	16
 member_size	OS32Header.entry_offset	4
 offset	OS32Header.flags	12
