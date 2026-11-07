@@ -14,8 +14,10 @@ static void check_cr3(u32 root);
 #include "exec.h"
 #include "r1_fixture.h"
 #include "v86.h"
+#include "v86_mem.h"
 #include "tvram.h"
 #include "paging_source.c"
+#include "../../arch/x86/legacy/lowmap.c"
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
