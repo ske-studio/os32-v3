@@ -6,11 +6,9 @@ static unsigned int inp(unsigned int port);
 static void outp(unsigned int port, unsigned int value);
 #include "../../arch/x86/x86_flags.h"
 #include "cpu.h"
-/* Linux keeps the real IF bit set. Mask its observation at the CPU boundary
- * so irq_save/restore and IF=0 foreground waits can be exercised unchanged. */
+/* Supply IF at the existing CPU boundary, including IF=0 waits. */
 static unsigned int host_if_mask = EFLAGS_IF;
-#undef EFLAGS_IF
-#define EFLAGS_IF host_if_mask
+static int _irq_enabled(void) { return host_if_mask != 0; }
 static unsigned int irq_save(void)
 {
     unsigned int saved = host_if_mask;

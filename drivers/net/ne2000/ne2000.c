@@ -148,9 +148,7 @@ static void cr_page1_idle(void)
 
 static int eflags_if(void)
 {
-    unsigned int f;
-    __asm__ volatile("pushfl\n\tpopl %0" : "=r"(f));
-    return (f & EFLAGS_IF) != 0;
+    return _irq_enabled();
 }
 
 /* ====================================================================== */

@@ -89,16 +89,8 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
 
     boot_platform_run(BOOT_FONT, boot);
 
-    /* FPU 初期化 (paging_init の後で CR0 に対して設定)
-     * CR0.EM=0 (ネイティブFPU使用), CR0.TS=0 (タスクスイッチ不要)
-     * SQLite が double 演算を使用するため必須 */
-    {
-        u32 cr0_val;
-        __asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));
-        cr0_val &= ~((u32)(CR0_EM | CR0_TS));  /* EM(bit2) と TS(bit3) をクリア */
-        __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
-        x87_probe();
-    }
+    /* Preserve the x86 CR0/x87 initialization after paging and fonts. */
+    arch_boot_after_paging();
 
     /* 物理ページフレームアロケータ初期化 (paging_initの後) */
     if (!memory_boot_init(mem_kb)) {

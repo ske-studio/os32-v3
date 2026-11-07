@@ -1,5 +1,9 @@
 {
   "C_KERNEL": [
+    "arch/x86/kernel/boot_cpu.c",
+    "arch/x86/kernel/boot_after_paging.c",
+    "arch/x86/kernel/fault_fixture.c",
+    "platform/pc98/boot_irq.c",
     "kdebug/gf5_test.c",
     "kdebug/gf_display_test.c",
     "drivers/video/geforce/edid.c",

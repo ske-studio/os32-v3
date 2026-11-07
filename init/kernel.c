@@ -8,9 +8,9 @@
 
 #define GUI_FAULT_STREAK_MAX 3
 #include "serial_diag.h"
-#include "../arch/x86/kernel/x87.h"
+#include "boot_cpu.h"
+#include "platform_boot.h"
 #include "../arch/x86/kernel/idt.h"
-#include "../arch/x86/kernel/tss.h"
 #include "../kernel/v86/v86.h"
 #include "io.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */

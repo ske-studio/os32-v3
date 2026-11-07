@@ -48,7 +48,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
         old, new = mutation
         assert old in fixture
         fixture = fixture.replace(old, new, 1)
-    fixture = fixture.replace('__asm__ volatile("ud2")', 'host_raise_ud()')
+    fixture = fixture.replace('arch_fixture_ud()', 'host_raise_ud()')
     fixture = fixture.replace('"../exec/appslot.h"', '"appslot.h"')
     (tmp / 'fixture_source.c').write_text(fixture)
     (tmp / 'pgalloc_source.c').write_text(read('mm/pgalloc.c').replace('#include "io.h"', ''))
@@ -170,7 +170,7 @@ def main():
                 ('!= R1_FIXTURE_ARM', '== R1_FIXTURE_ARM'),
                 ('pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1)', '(u32)0'),
                 ('pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 0, 1)', '(int)0'),
-                ('__asm__ volatile("ud2")', '(void)0'),
+                ('arch_fixture_ud(); /* Actual nested exception, with closing=1. */', '(void)0; /* nested injection removed */'),
             ]:
                 assert fixture(tmp, (old, new), runner=args.runner) != 0, 'survived: ' + old
                 print('RED: ' + old)

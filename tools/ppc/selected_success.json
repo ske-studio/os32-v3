@@ -32,6 +32,7 @@
   "init/bootlog.c",
   "init/bootlog_save.c",
   "init/kaudit_boot.c",
+  "init/kernel.c",
   "init/sysconfig.c",
   "kapi/kapi_db.c",
   "kapi/kapi_host.c",

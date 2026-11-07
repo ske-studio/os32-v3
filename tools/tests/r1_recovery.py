@@ -56,7 +56,7 @@ def recovery(tmp, function, runner, mutation=None):
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
     stage('entry_source.c', '#include "idt.h"\n' + entry)
-    stage('fixture_source.c', read('kernel/r1_fixture.c').replace('__asm__ volatile("ud2")', 'host_raise_ud()'))
+    stage('fixture_source.c', read('kernel/r1_fixture.c').replace('arch_fixture_ud()', 'host_raise_ud()'))
     flags = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
              '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
@@ -97,13 +97,16 @@ def lease_recovery(function, runner, mutation=None):
             dest.write_text(pattern.sub(lambda m: 'sdk_'+m[0], body))
             if path in SDK_SRCS: sources.append(dest)
         (tmp/'fixture_source.c').write_text(fixture.replace('"../exec/appslot.h"', '"appslot.h"')
-                                          .replace('__asm__ volatile("ud2")', 'host_raise_ud()'))
+                                          .replace('arch_fixture_ud()', 'host_raise_ud()'))
         prefix = (ROOT/'tools/tests/gfx_attach_host.c').read_text().split('static void run(void) __attribute__((used));')[0]
         (tmp/'fixture.c').write_text(prefix + (ROOT/'tools/tests/r1_lease_host.c').read_text())
     return run_case(None, runner, source_texts=texts, stage=stage)
 
 
 RECOVERY_MUTANTS = [
+    ('ready-injection', 'kernel/r1_fixture.c',
+     'arch_fixture_ud(); /* CPL0, before entering the V86 guest. */',
+     '(void)0; /* ready injection removed */', 'FAIL 0'),
     ('K1-hook', 'kernel/v86/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
     ('parent-hook', 'exec/exec.c', '        r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
     ('parent-too-late', 'exec/exec.c',
