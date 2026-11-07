@@ -53,7 +53,8 @@ enum gf5_host_op {
 enum gf5_host_call {
     F5_CALL_READ,F5_CALL_CALC,F5_CALL_GET,F5_CALL_SET,F5_CALL_ID,
     F5_CALL_COUNT,F5_CALL_SELECT,F5_CALL_MODE,F5_CALL_CSTATE,F5_CALL_TICK,
-    F5_CALL_THERM,F5_CALL_PREPARE,F5_CALL_EXECUTE,F5_CALL_THERM_RESUME
+    F5_CALL_THERM,F5_CALL_PREPARE,F5_CALL_EXECUTE,F5_CALL_THERM_RESUME,
+F5_CALL_RAW_SAVE,F5_CALL_RAW_RESTORE
 };
 struct gf5_host_event {
     enum gf5_host_op op; u32 nth,a[GF5_HOST_VALUE_ARGS];
@@ -530,6 +531,20 @@ i32 gf5_clock_read(struct gf5 *g,struct gf5_clock *out)
     struct gf5_host *h=gf5_host_context(g);
     struct gf5_host_event *e=gf5_host_begin(h,F5_CALC);
     e->p[0]=g; e->p[1]=out; e->a[0]=F5_CALL_READ;
+    return gf5_host_end(h,e);
+}
+i32 gf5_clock_raw_save(struct gf5 *g,struct gf5_clock_raw *out)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_CALC);
+    e->p[0]=g; e->p[1]=out; e->a[0]=F5_CALL_RAW_SAVE;
+    return gf5_host_end(h,e);
+}
+i32 gf5_clock_raw_restore(struct gf5 *g,const struct gf5_clock_raw *raw)
+{
+    struct gf5_host *h=gf5_host_context(g);
+    struct gf5_host_event *e=gf5_host_begin(h,F5_PROG);
+    e->p[0]=g; e->p[1]=raw; e->a[0]=F5_CALL_RAW_RESTORE;
     return gf5_host_end(h,e);
 }
 i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *plan)
