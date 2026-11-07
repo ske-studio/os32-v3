@@ -1,6 +1,6 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **実装中 (2026-11-07)** — 案 D を採用、MMU の外の 33 件を順に直す。第 1 段の確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **実装中 (2026-11-07)** — 案 D を採用、MMU の外の 33 件を順に直す。第 1 段 (B1・B2・T1) は main acf3f3fc で受入完了 (--all と NP21/W は os32-v3 の PM、証拠はその ~/os32-tmp/evidence/2026-11-07/ppc-sep1/)、確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)。第 2 段の確定設計は [PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
 
 **本体接続は案 D とし、案 B には着手しない。分離は実際に甘く、MMU 外の33件も直す。**
 今の ppc-mmu は案 C を続け、`include/cpu.h` は変えず、context 操作は `arch/ppc/ppc_pmap.h` の `ppc_*` に閉じる。
