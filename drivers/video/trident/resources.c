@@ -8,15 +8,17 @@
 #include "mm/pgalloc.h"
 #include "gfx_hal.h"
 #include "kprintf.h"
-#include "lib/kstring.h"
+#include "exec/lease.h"
+#include "gfx_format.h"
+#include "io.h"
 
 #define TRI_BAR_COUNT 2u
 #define TRI_BDF ((TRI_PCI_BUS << 8) | (TRI_PCI_SLOT << 3) | TRI_PCI_FUNCTION)
 
 static struct trident_resources resources;
-static bool attempted, client_allocated;
+static bool attempted;
 static bool mapped[TRI_BAR_COUNT], surface_created[TRI_BAR_COUNT];
-static u32 rids[TRI_BAR_COUNT], client_pfn;
+static u32 rids[TRI_BAR_COUNT], display_capacity;
 static int boot_rc;
 static u32 bases[TRI_BAR_COUNT];
 static const u32 vas[TRI_BAR_COUNT] = {MEM_TRIDENT_LFB_VA, MEM_TRIDENT_REGS_VA};
@@ -38,22 +40,29 @@ int trident_resources_rollback(bool armed)
 {
     if (armed) return TRI_E_BUSY;
     if (!boot_context()) return TRI_E_STATE;
-    /* No lease may outlive backing or mapping. 3b keeps both surfaces private. */
+    /* No lease may outlive backing or mapping. */
     u32 sids[TRI_BAR_COUNT] = {resources.display_sid, resources.client_sid};
-    for (u32 i = 0; i < TRI_BAR_COUNT; ++i)
-        if (surface_created[i] && ledger_surfaces[sids[i]].lease_count) return TRI_E_BUSY;
+    unsigned int flags = irq_save();
+    int revoked = 0;
+    for (u32 i = 0; i < TRI_BAR_COUNT; ++i) {
+        if (surface_created[i]) {
+            gfx_surface_unready |= 1u << sids[i];
+            revoked += lease_revoke_surface(sids[i]);
+            if (ledger_surfaces[sids[i]].lease_count) revoked++;
+        }
+    }
+    irq_restore(flags);
+    if (revoked) return TRI_E_BUSY;
     resources.ready = false;
     for (u32 i = TRI_BAR_COUNT; i-- > 0;) {
         if (!surface_created[i]) continue;
         if (!ledger_surface_release(sids[i])) return TRI_E_SURFACE;
         surface_created[i] = false;
-        if (i == 1) client_allocated = false; /* release frees RAM backing */
     }
-    if (client_allocated) {
-        if (!pgalloc_free_n_owner(LEDGER_OWNER_BOOT, client_pfn, TRI_DISPLAY_PAGES))
-            return TRI_E_RESOURCE;
-        client_allocated = false;
-    }
+    display_capacity = 0;
+    resources.generation = 0;
+    resources.display = (struct tri_surface){0};
+    resources.client_surface = (struct tri_surface){0};
     resources.client = 0;
     resources.client_bytes = 0;
     for (u32 i = TRI_BAR_COUNT; i-- > 0;) {
@@ -66,6 +75,92 @@ int trident_resources_rollback(bool armed)
     resources.mapped_bytes = resources.regs_bytes = 0;
     if (attempted) boot_rc = TRI_E_STATE;
     return 0; /* DEVICE owner, records and decode reservations survive */
+}
+
+/* D:3534-3546 uses FbBase directly without ShadowFB. F5 reserves the
+ * fixed display capacity before every offscreen allocation (D:3637-3661).
+ * PM F6 decisions 1-4: create once, retain PFNs/npages/SIDs, regen both roles.
+ * The callback is core text: it must not call module-owned F3/F5 functions. */
+static int configure(const struct tri_mode *mode, u32 display_bytes)
+{
+    if (!resources.ready || kctx_irq_depth || kctx_exc_depth) return TRI_E_STATE;
+    if (!mode) return TRI_E_INVAL;
+    u8 cpp, format, hal_format;
+    if (mode->depth == 8 && mode->bpp == 8) {
+        cpp = 1; format = TRI_FMT_INDEX8; hal_format = GFX_BB_PACKED8;
+    } else if (mode->depth == 16 && mode->bpp == 16) {
+        cpp = 2; format = TRI_FMT_RGB565; hal_format = GFX_FMT_RGB565;
+    } else if (mode->depth == 24 && mode->bpp == 32) {
+        cpp = 4; format = TRI_FMT_XRGB8888; hal_format = GFX_FMT_XRGB8888;
+    } else return TRI_E_NOSYS;
+    if (display_capacity && display_bytes != display_capacity) return TRI_E_STATE;
+    if (!display_bytes || display_bytes % PAGE_SIZE ||
+        display_bytes > resources.mapped_bytes || display_bytes > resources.decode_bytes)
+        return TRI_E_CAP_TOO_SMALL;
+    u32 pitch = (u32)mode->display_width * cpp;
+    if (!mode->hd || !mode->vd || mode->display_width < mode->hd ||
+        pitch > (u16)~0u) return TRI_E_INVAL;
+    if (mode->vd > display_bytes / pitch) return TRI_E_CAP_TOO_SMALL;
+    struct ledger_surface sf = {
+        .first = bases[0] / PAGE_SIZE, .npages = display_bytes / PAGE_SIZE,
+        .width = mode->hd, .height = mode->vd, .pitch = pitch,
+        .owner = resources.owner, .backing = LEDGER_SB_VRAM,
+        .backend = LEDGER_SF_TRIDENT, .role = LEDGER_ROLE_DISPLAY,
+        .format = hal_format, .planes = 1, .cache = LEDGER_CACHE_UC,
+        .perm_max = LEDGER_PERM_RW
+    };
+    unsigned int flags = irq_save();
+    u32 cr3 = paging_current_cr3();
+    paging_load_cr3(paging_kernel_pd_phys());
+    int rc = TRI_E_SURFACE;
+    if (!display_capacity) {
+        /* A failed second create is cleaned up before a later retry. */
+        if (surface_created[0] || surface_created[1]) goto done;
+        if (!ledger_surface_create(&sf, &resources.display_sid)) goto done;
+        surface_created[0] = true;
+        gfx_surface_unready |= 1u << resources.display_sid;
+        sf.role = LEDGER_ROLE_CLIENT;
+        if (!ledger_surface_create(&sf, &resources.client_sid)) {
+            if (ledger_surface_release(resources.display_sid)) surface_created[0] = false;
+            goto done;
+        }
+        surface_created[1] = true;
+        gfx_surface_unready |= 1u << resources.client_sid;
+        display_capacity = display_bytes;
+    } else {
+        u32 sids[TRI_BAR_COUNT] = {resources.display_sid, resources.client_sid};
+        for (u32 i = 0; i < TRI_BAR_COUNT; ++i) {
+            const struct ledger_surface *old = &ledger_surfaces[sids[i]];
+            if (!old->npages || old->closing || old->gen == LEDGER_SURFACE_GEN_MAX)
+                goto done;
+        }
+        u32 bits = (1u << resources.display_sid) | (1u << resources.client_sid);
+        u32 unready = gfx_surface_unready & bits;
+        gfx_surface_unready |= bits;
+        int revoked = 0;
+        for (u32 i = 0; i < TRI_BAR_COUNT; ++i) {
+            revoked += lease_revoke_surface(sids[i]);
+            if (ledger_surfaces[sids[i]].lease_count) revoked++;
+        }
+        if (revoked) { rc = TRI_E_BUSY; goto done; }
+        if (!ledger_surface_regen(resources.display_sid, &sf)) goto done;
+        if (!ledger_surface_regen(resources.client_sid, &sf)) goto done;
+        gfx_surface_unready = (gfx_surface_unready & ~bits) | unready;
+    }
+    resources.display = (struct tri_surface){
+        .off = 0, .bytes = pitch * mode->vd, .pitch = pitch,
+        .width = mode->hd, .height = mode->vd, .cpp = cpp, .format = format
+    };
+    resources.client_surface = resources.display;
+    resources.client = (u8 *)resources.lfb;
+    resources.client_bytes = resources.client_surface.bytes;
+    resources.generation = ledger_surfaces[resources.client_sid].gen;
+    rc = TRI_OK;
+done:
+    /* Revocation can alter the caller's lease PTEs: reload even its old CR3. */
+    paging_load_cr3(cr3);
+    irq_restore(flags);
+    return rc;
 }
 
 static int fail(const char *stage, int rc)
@@ -126,30 +221,6 @@ int __attribute__((cold)) trident_boot_reserve(void)
                                     (bases[i] + maps[i]) / PAGE_SIZE))
             return fail("map-record", TRI_E_RESOURCE);
     }
-    if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, TRI_DISPLAY_PAGES,
-            MEM_PHYS_EXEC_FLOOR / PAGE_SIZE, pgalloc_arena_end(), LEDGER_TOP_DOWN, &client_pfn))
-        return fail("client-ram", TRI_E_RESOURCE);
-    client_allocated = true;
-    resources.client = P2V(client_pfn * PAGE_SIZE);
-    kmemset(resources.client, 0, TRI_DISPLAY_BYTES);
-    /* perm_max is the lease ceiling, not publication readiness. The core
-     * keeps both surfaces unready through init and gates USER access
-     * on gfx_started. NONE would also forbid CLIENT attach after success. */
-    struct ledger_surface sf = {
-        .first = bases[0] / PAGE_SIZE, .npages = TRI_DISPLAY_PAGES,
-        .width = TRI_WIDTH, .height = TRI_HEIGHT, .pitch = TRI_PITCH,
-        .owner = resources.owner, .backing = LEDGER_SB_MMIO, .backend = LEDGER_SF_TRIDENT,
-        .role = LEDGER_ROLE_DISPLAY, .format = GFX_BB_PACKED8, .planes = 1,
-        .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW
-    };
-    if (!ledger_surface_create(&sf, &resources.display_sid)) return fail("display", TRI_E_SURFACE);
-    surface_created[0] = true;
-    gfx_surface_unready |= 1u << resources.display_sid;
-    sf.first = client_pfn; sf.owner = LEDGER_OWNER_BOOT; sf.backing = LEDGER_SB_RAM;
-    sf.role = LEDGER_ROLE_CLIENT; sf.cache = LEDGER_CACHE_WB;
-    if (!ledger_surface_create(&sf, &resources.client_sid)) return fail("client", TRI_E_SURFACE);
-    surface_created[1] = true;
-    gfx_surface_unready |= 1u << resources.client_sid;
     /* These are mapped VAs; the ledger and surfaces retain physical PFNs. */
     resources.lfb = (volatile u8 *)(uptr)vas[0];
     resources.regs = (volatile u8 *)(uptr)vas[1];
@@ -157,7 +228,12 @@ int __attribute__((cold)) trident_boot_reserve(void)
     resources.decode_bytes = TRI_BAR0_DECODE_BYTES;
     resources.mapped_bytes = TRI_BAR0_DECODE_BYTES;
     resources.regs_bytes = TRI_REG_MAPPED_BYTES;
+    /* Borrowed boot descriptor for prepare, before F5 selects the mode.
+     * No ledger surface or RAM backing is allocated until configure. */
+    resources.client = (u8 *)(uptr)vas[0];
     resources.client_bytes = TRI_DISPLAY_BYTES;
+    resources.configure = configure;
+    resources.ram_fallback = false;
     resources.ready = true;
     return 0;
 }
