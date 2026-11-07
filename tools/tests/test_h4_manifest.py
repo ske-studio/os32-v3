@@ -163,6 +163,10 @@ def legacy_manifest_compat(tmp):
 
 
 MUTATIONS = [
+    ("manifest_stale_retry_removed",
+     "if (fd == OS32_ERR_STALE)\n        fd = api->sys_open(HS_MANIFEST_PATH, KAPI_O_RDONLY);",
+     "if (0) fd = api->sys_open(HS_MANIFEST_PATH, KAPI_O_RDONLY);"),
+    ("manifest_transport_gate_removed", "if (g_man_open_error) {", "if (0 && g_man_open_error) {"),
     ("fdrecov_running_gate_removed",
      "!g_other_root && running_generation_gate() != 0",
      "g_other_root && running_generation_gate() != 0"),

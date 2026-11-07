@@ -14,7 +14,7 @@ void *kmalloc(u32 n) { return n == sizeof(heap) ? heap : 0; }
 #include PRODUCT_SOURCE
 /* No FD is opened by this mount/session unit. D6 owns permanent FD marking. */
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
-void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
+void vfs_fd_stale_mount(void *ctx) { vfs_resource_stale_mount(ctx); }
 static u8 response[SFS_BUFFER_FRAME];
 static u32 rx_at, rx_end, hello_count, bye_count, seen_deadline, seen_nonce;
 static u32 bye_deadline;
@@ -118,7 +118,7 @@ static int suite(void)
     CHECK(sfs_persistent_scope_begin() == OS32_ERR_BUSY);
     CHECK(sfs_persistent_scope_end(23) == 0);
     CHECK(sfs_persistent_scope_end(0) == OS32_ERR_INVAL);
-    CHECK(vfs_is_mounted(SERIALFS_PREFIX) && !bye_count && !hello_count);
+    CHECK(vfs_is_mounted(SERIALFS_PREFIX) && !bye_count && hello_count == 1);
     CHECK(sfs_ensure_session(hs_now() + 100) == 0);
     CHECK(hello_count == 1 && client->sid && client->max_payload == SFS_LAN_MAX_PAYLOAD);
     gen = sfs_persistent_generation(); sid = client->sid;
@@ -174,11 +174,34 @@ static int suite(void)
     CHECK(sfs_ensure_session(hs_now() + 100) == 0 && client->sid);
     CHECK(sfs_persistent_generation() == gen + 3);
     CHECK(vfs_is_mounted(SERIALFS_PREFIX));
+    /* An ALIVE generation change is absorbed before the first child open. */
+    VfsOps *before = vfs_route("/host/a", rel, sizeof(rel), &ctx);
+    CHECK(vfs_resource_prepare(before, ctx) == 0);
+    value = 10;
+    CHECK(host_mailbox_put(10, 1, 1, &value, sizeof(value), 1) == 0);
+    CHECK(sfs_persistent_scope_begin() == 0);
+    VfsOps *ops = vfs_route("/host/a", rel, sizeof(rel), &ctx);
+    CHECK(vfs_resource_prepare(ops, ctx) == 0);
+    CHECK(sfs_persistent_generation() == gen + 4);
+    CHECK(sfs_persistent_scope_end(0) == 0);
+    /* A failed ensure must leave the scope available for the next command. */
+    sfs_persistent_stale();
+    hs_fail("sfs.reply", OS32_ERR_HOSTDOWN);
+    CHECK(sfs_persistent_scope_begin() == OS32_ERR_HOSTDOWN);
+    CHECK(sfs_persistent_scope_begin() == 0);
+    CHECK(sfs_persistent_scope_end(0) == 0);
     return 0;
 }
 void _start(void)
 {
     int rc = suite();
+    if (rc) {
+        char line[] = "persistent failure line 000\n";
+        line[24] = '0' + rc / 100 % 10;
+        line[25] = '0' + rc / 10 % 10;
+        line[26] = '0' + rc % 10;
+        __asm__ volatile("int $0x80" :: "a"(4), "b"(2), "c"(line), "d"(sizeof(line)-1) : "memory");
+    }
     /* Exit with 1 for every assertion, retaining the line in eax before exit. */
     __asm__ volatile("int $0x80" :: "a"(1), "b"(rc ? 1 : 0) : "memory");
     __builtin_unreachable();

@@ -223,7 +223,18 @@ int serialfs_session_begin(void)
     u32 mode = 0, baud = 0, fifo = 0;
     int rc;
 
-    if (sfs_persistent_enabled()) return sfs_persistent_scope_begin();
+    if (sfs_persistent_enabled()) {
+        rc = sfs_persistent_scope_begin();
+        if (rc != 0) return rc;
+        const SfsClient *c = sfs_persistent_client();
+        /* I1 keeps the resident LAN transport alive for the boot lifetime. */
+        const SfsLan *lan = c->ctx;
+        kprintf(KLOG_LEGACY_CYAN,
+                "sfs: transport=lan nic=82557 peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
+                (u32)lan->peer[0], (u32)lan->peer[1], (u32)lan->peer[2],
+                (u32)lan->peer[3], (u32)lan->peer[4], (u32)lan->peer[5], c->sid);
+        return 0;
+    }
 
     /* 常駐シェルの `sfs run` だけ (sh.bin・外部プログラムは断る) */
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
@@ -323,7 +334,11 @@ int sfs_lan_peer_mac(u8 *out)
 
 int serialfs_session_end(int exit_code)
 {
-    if (sfs_persistent_enabled()) return sfs_persistent_scope_end(exit_code);
+    if (sfs_persistent_enabled()) {
+        int rc = sfs_persistent_scope_end(exit_code);
+        if (rc == 0) kprintf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", exit_code);
+        return rc;
+    }
 
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (!g_active) return OS32_ERR_INVAL;

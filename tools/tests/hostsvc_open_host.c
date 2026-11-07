@@ -35,6 +35,17 @@ static int put(void *ctx,const u8 *buf,u32 n)
             sfs_put16(pl+SFS_HELLO_RSP_MAX,SFS_LAN_MAX_PAYLOAD);
             sfs_put32(pl+SFS_HELLO_RSP_NONCE,sfs_get32(f.payload+SFS_HELLO_REQ_NONCE));
             len=SFS_HELLO_RSP_LEN;
+        } else if (f.type==SFS_T_READ) {
+            static const char manifest[]="format=2\n";
+            u32 off=sfs_get32(f.payload);
+            u16 want=sfs_get16(f.payload+SFS_READ_COUNT_OFF);
+            u16 count=0;
+            while (count<want && off+count<sizeof(manifest)-1) {
+                pl[SFS_STATUS_LEN+count]=(u8)manifest[off+count];
+                count++;
+            }
+            sfs_put32(pl,count);
+            len+=count;
         } else {
             if (f.type!=SFS_T_STAT) __builtin_trap();
             len+=SFS_STAT_RSP_LEN;
@@ -68,6 +79,10 @@ static int put_until(void *ctx,const u8 *buf,u32 n,u32 deadline)
 }
 const SfsIo hs_sfs_io={put,get,now,idle,can_wait,put_until};
 int res_owner_get(void) { return 1; }
+struct VfsStdinRead *exec_stdin_state(void) { return 0; }
+int input_getchar_kapi(void) { return -1; }
+int fd_is_redirected(int fd) { (void)fd; return 0; }
+int fd_redirect_read(int fd,void *b,u32 n) { (void)fd; (void)b; (void)n; return -1; }
 #define CHECK(e) do { if (!(e)) return __LINE__; } while (0)
 static int suite(void)
 {
@@ -92,6 +107,30 @@ static int suite(void)
     restarts=2; restart_retry=stat_in_probe=0;
     CHECK(vfs_open("/host/a",O_RDONLY)==VFS_ERR_STALE);
     CHECK(restarts==0);
+    /* The resident sid expires while idle; the first manifest open/read
+     * must reconnect and use the new generation. H4 tests the hsync retry. */
+    restarts=0; unknown=0;
+    CHECK(sfs_persistent_scope_begin()==0);
+    unknown=1;
+    int manifest=vfs_open("/host/.deploy/manifest.txt",O_RDONLY);
+    CHECK(manifest>=3);
+    CHECK(open_files[manifest].resource_generation==sfs_persistent_generation());
+    char text[10]={0};
+    CHECK(vfs_read_fd(manifest,text,9)==9 && kstrcmp(text,"format=2\n")==0);
+    vfs_close(manifest);
+    CHECK(sfs_persistent_scope_end(0)==0);
+    /* Known generation changes are absorbed before the first child open. */
+    u32 value=1;
+    CHECK(host_mailbox_put(1,1,1,&value,sizeof(value),1)==0);
+    CHECK(sfs_persistent_scope_begin()==0);
+    value=2;
+    CHECK(sfs_persistent_scope_end(0)==0);
+    CHECK(host_mailbox_put(2,1,1,&value,sizeof(value),1)==0);
+    CHECK(sfs_persistent_scope_begin()==0);
+    manifest=vfs_open("/host/.deploy/manifest.txt",O_RDONLY);
+    CHECK(manifest>=3);
+    vfs_close(manifest);
+    CHECK(sfs_persistent_scope_end(0)==0);
     return 0;
 }
 void _start(void)

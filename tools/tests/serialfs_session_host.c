@@ -72,6 +72,10 @@ static int g_nic_calls;
 static int g_resident, g_scope, g_scope_begins, g_scope_ends, g_scope_exit;
 static int g_scope_begin_error, g_scope_end_error;
 
+static SfsLan resident_lan = {.peer = {2, 0, 0, 0, 0, 1}};
+static SfsClient resident_client = {.sid = 123, .ctx = &resident_lan};
+const SfsClient *sfs_persistent_client(void) { return g_resident ? &resident_client : 0; }
+
 /* C1 owns pairing and errors; C2 only dispatches through serialfs.h. */
 int sfs_persistent_enabled(void) { return g_resident; }
 int sfs_persistent_scope_begin(void)
@@ -635,11 +639,9 @@ static void end_not_quiet(void)
 static void resident_scope(void)
 {
     u32 start;
-    int kout;
 
     reset();
     start = tick_count;
-    kout = g_kout_n;
     g_resident = 1;
     g_cfg_lan = 1;
     strcpy(g_fstype, "serialfs");
@@ -664,8 +666,11 @@ static void resident_scope(void)
     CHECK(!g_mount_calls && !g_umount_calls && !g_permit_now);
     CHECK(!strcmp(g_fstype, "serialfs"));
     CHECK(!g_cfg_reads && !g_module_acquires && !g_module_releases && !g_nic_calls);
-    CHECK(!serial_gate_active() && !g_hello_n && !g_tx_n && !g_frames_n);
-    CHECK(g_kout_n == kout && tick_count == start);
+    CHECK(!serial_gate_active() && !g_hello_n && g_tx_n > 0 && !g_frames_n);
+    CHECK(strstr(g_kout, "sfs: transport=lan nic=82557 peer=02:00:00:00:00:01 sid=123\n"));
+    CHECK(strstr(g_kout, "sfs: exit=-7\n"));
+    CHECK(strstr(g_kout, "sfs: exit=12\n"));
+    CHECK(tick_count == start);
 }
 
 static void lan_session(void)
@@ -842,5 +847,4 @@ int main(int argc, char **argv)
 
 /* C1 communication is a separate unit; the scope test above never does I/O. */
 int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
-const SfsClient *sfs_persistent_client(void) { return 0; }
 void sfs_persistent_stale(void) { }

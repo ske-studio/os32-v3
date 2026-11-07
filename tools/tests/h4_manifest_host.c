@@ -89,6 +89,7 @@ static int fk_rename_calls;
 static int fk_mkdir_calls;
 static int fk_sync_calls;
 static int fk_mtime_calls;
+static int manifest_open_error, manifest_open_failures, manifest_opens;
 static int fk_header_reads;
 static int fk_other_mount;       /* 0: 無し、1: 別デバイス、2: 稼働ルートの別名 */
 
@@ -111,6 +112,7 @@ static void fs_reset(void)
     fk_sync_calls = 0;
     fk_mtime_calls = 0;
     fk_header_reads = 0;
+    manifest_open_error = manifest_open_failures = manifest_opens = 0;
     fk_log_len = 0;
     fk_log[0] = '\0';
 }
@@ -285,6 +287,13 @@ static int fk_sys_stat(const char *path, OS32_Stat *buf)
 
 static int fk_sys_open(const char *path, int mode)
 {
+    if (strcmp(path, "/host/.deploy/manifest.txt") == 0 && mode == KAPI_O_RDONLY) {
+        manifest_opens++;
+        if (manifest_open_failures) {
+            manifest_open_failures--;
+            return manifest_open_error;
+        }
+    }
     if (fixture_shell_enabled && strcmp(path, "/host/sys/shell.bin") == 0 &&
         mode == KAPI_O_RDONLY) {
         fixture_shell_pos = 0;
@@ -607,6 +616,33 @@ static void put_good_manifest(const char *build)
 /* ========================================================================= */
 /*  M5 — 名札が無い配備元は今までどおり (後方互換)                            */
 /* ========================================================================= */
+
+static void case_manifest_transport(void)
+{
+    setup_tree();
+    put_good_manifest("resident-restarted");
+    manifest_open_error = OS32_ERR_STALE;
+    manifest_open_failures = 1;
+    check(run2("-n", "bin") == 0, "first hsync after stale open succeeds");
+    check(manifest_opens == 2 && g_man_valid, "STALE retries exactly once and reads manifest");
+    check(log_has("DEPLOY build=resident-restarted"), "refreshed manifest is displayed");
+    check(wrote_nothing(), "dry run writes nothing");
+    {
+        const int errors[] = {OS32_ERR_HOSTDOWN, OS32_ERR_TIMEOUT, OS32_ERR_STALE};
+        const char *reasons[] = {"reason=hostdown", "reason=timeout", "reason=stale"};
+        int i;
+        for (i = 0; i < 3; i++) {
+            setup_tree();
+            put_good_manifest("unavailable");
+            manifest_open_error = errors[i];
+            manifest_open_failures = 3;
+            check(run2("-n", "bin") == 1, "unavailable manifest refuses even scoped dry run");
+            check(manifest_opens == (i == 2 ? 2 : 1), "retry is bounded and only for STALE");
+            check(log_has(reasons[i]) && !log_has("manifest_absent"), "transport reason survives manifest open");
+            check(wrote_nothing(), "transport failure writes nothing");
+        }
+    }
+}
 
 static void case_m5(void)
 {
@@ -1296,6 +1332,7 @@ int main(int argc, char **argv)
         (void)run2("-n", "bin");
         return !g_man_valid || log_has("manifest_invalid");
     }
+    case_manifest_transport();
     case_m5();
     case_m6();
     case_m7_m8();
