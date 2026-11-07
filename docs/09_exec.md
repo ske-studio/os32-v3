@@ -7,15 +7,15 @@ KernelAPIポインタを引数として実行する。
 
 | 項目 | 値 |
 |------|------|
-| バイナリ形式 | OS32X v4 (60バイトヘッダ + フラットバイナリ)。`sdk/mkos32x.py` が付与 |
+| バイナリ形式 | OS32X v5 (64バイトヘッダ + フラットバイナリ)。`sdk/mkos32x.py` が付与 |
 | ヘッダマジック | 0x4F533332 ('OS32') |
 | ソースファイル | `exec/exec.c` / `exec/exec.h` / `exec/exec_heap.c` |
 | KAPIラッパー | `kapi/kapi_*.c` (自動生成分 + 手動分)。版は [KAPI_SPEC.md](KAPI_SPEC.md) |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
-| ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v4 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
+| ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v5 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
 | 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は常駐 shell (CPL=0)。受理するフラグは `exec/os32x_hdr.c:6` を参照 |
 | アドレス空間 | プログラムごとに PD。APP_BAND より下 (カーネル帯 0x100000〜・シェル帯 0x400000〜0x4FFFFF を含む) は全 PD 共有・非 USER。USER にするのは下の「Ring3 の USER 写像」の範囲だけ |
-| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`mm/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
+| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`mm/shlib.c`)。.text/.rodata はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
 | ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) |
 | ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
 | 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`exec/appslot.c:261`)。保護されたカーネル常駐 FD は回収しない |
@@ -48,7 +48,8 @@ WAIT_KEY との共有承認は v3 で改めた (GUIRUNKEY-1、ユーザー決定
 
 | 範囲 | 属性 | 目的 |
 |---|---|---|
-| image/libc 0x80100000〜sbrk_end、exec_heap 0x88000000〜exec_heap_end | RW+USER (私有・疎PT) | 初期域と実行中の mem_map 伸長 |
+| image 0x80100000〜0x80100000+code_size | RO+USER (私有・疎PT) | .text・.rodata とページ末尾の埋草 (v5 ヘッダの code_size まで) |
+| image の code_size 以降〜sbrk_end、exec_heap 0x88000000〜exec_heap_end | RW+USER (私有・疎PT) | .data・.bss・ヒープと実行中の mem_map 伸長 |
 | guard_a=sbrk_end、guard_b=stack_top-stack_size-PAGE_SIZE | 非 present | libc 初期末尾 / stack 境界 (`ring3_guard`) |
 | stack_top-stack_size〜stack_top | RW+USER | 可変ユーザスタック全量 |
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
@@ -57,7 +58,12 @@ WAIT_KEY との共有承認は v3 で改めた (GUIRUNKEY-1、ユーザー決定
 | Unicode の組表 (kernel 所有の 7 頁、T3d1〜) | supervisor | CPL=3 は KAPI `unicode_to_jis` だけ (表は公開しない、[KAPI_SPEC §4-13](KAPI_SPEC.md#4-13-unicode_to_jis-v76)) |
 | pool から確保した 32 頁 (SURFACE、9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
-| 0x80000000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
+| 0x80000000〜 shlib .text/.rodata | RO+USER (共有) / .data・.bss は RW+USER (per-app) | 共有ライブラリ |
+
+`code_size` はロード先からの RO 範囲長で、正のページ整列値かつ `text_size` 以下とし、入口もその範囲内に置く。
+`text_size` は .data を含む初期化済み画像全体の長さである。CPL=3 から自分の .text・.rodata へ直接書くと #PF でアプリを kill する。
+KAPI の出力先に渡した場合は `ring3_user_ranges_writable` が拒否して kill する。入力としての読み取りは許可する。
+旧 v1〜v4 の画像は AS 確保前に拒否し、再ビルドを要求する。常駐 shell は CPL=0 であり、この USER 書き込み保護の対象外。
 
 SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。

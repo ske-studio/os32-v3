@@ -89,6 +89,7 @@ static void make_file(void) {
     oh->min_api_ver = KAPI_VERSION; oh->kapi_data_off = KAPI_DATA_FIELDS_OFF;
     oh->kapi_abi_generation = OS32_KAPI_ABI_GENERATION; oh->memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     oh->shlib_protocol = OS32_SHLIB_PROTOCOL;
+    oh->code_size = 2 * PAGE_SIZE;
     sh->magic = OS32_SHLIB_MAGIC; sh->version = 1; sh->nfunc = 1; sh->text_pages = 2;
     sh->data_vaddr = MEM_SHLIB_BASE + 2 * PAGE_SIZE; sh->data_pages = 2; sh->_rsvd[0] = OS32_SHLIB_PROTOCOL;
     ((u32 *)sh)[OS32_SHLIB_ENTRY_OFF / 4] = MEM_SHLIB_BASE + PAGE_SIZE;
@@ -108,6 +109,14 @@ void _start(void) {
     for (i = MEM_SHM_RESV_START / PAGE_SIZE + 1; i < MEM_SHM_RESV_START / PAGE_SIZE + 32; i += 2)
         CHECK(ledger_claim_fixed(LEDGER_OWNER_BOOT, i, i + 1));
     before = used_pages; make_file();
+    for (i = 0; i < 4; i++) {
+        static const u32 bad[] = {0, PAGE_SIZE - 1, 5 * PAGE_SIZE, PAGE_SIZE};
+        ((OS32Header *)file_bytes)->code_size = bad[i];
+        read_calls = alloc_calls = 0;
+        CHECK(shlib_init() == -1 && !g_loaded && used_pages == before);
+        CHECK(!ledger_owner_pages(LEDGER_OWNER_SHLIB));
+    }
+    make_file();
     for (i = 1; i <= 4; i++) {
         fail_alloc = i; alloc_calls = read_calls = 0;
         CHECK(shlib_init() == -1); CHECK(!g_loaded && used_pages == before);

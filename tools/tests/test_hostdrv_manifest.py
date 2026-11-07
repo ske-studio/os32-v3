@@ -426,11 +426,11 @@ def os32x_blob(version, kapi_off, body=b"\x90" * 32):
     import struct
     if version == hd.os32x_hdr.OS32X_HDR_VERSION:
         h = hd.os32x_hdr
-        hdr = struct.pack("<15I", h.OS32X_MAGIC, h.OS32X_HDR_SIZE,
+        hdr = struct.pack("<16I", h.OS32X_MAGIC, h.OS32X_HDR_SIZE,
                           h.OS32X_HDR_VERSION, 0, 0, len(body), 0, 0, 0,
                           h.OS32X_MIN_API, h.OS32X_APP_LOAD_ADDR, kapi_off,
                           h.OS32_KAPI_ABI_GENERATION,
-                          h.OS32_MEMORY_LAYOUT_GENERATION, 0)
+                          h.OS32_MEMORY_LAYOUT_GENERATION, 0, 4096)
     elif version >= 3:
         hdr = struct.pack("<12I", 0x4F533332, 48, 3, 0, 0, len(body), 0, 0, 0,
                           63, 0x500000, kapi_off)

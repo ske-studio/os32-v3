@@ -1,6 +1,6 @@
 # TASK_NET_HOSTSVC — ネットワーク越しの Host Services (実機の /host・ネットワーク越しの CD・知らせのメールボックス・サービスの一覧)
 
-> 状態: **実装中 (2026-11-07)** — 詳細設計は確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md)、astra 起草 r1→r3・Opus レビュー 3 回)。A1〜A11・B1〜B4・C5・D1・H1〜H4 と起動の登録を main に入れた (1cbba6f5、CI 成功。NP21/W の host_time・クリップボードと実機 82557 の LAN hsync を確認)。次の波 C1・C3・B5・H6 を実装中、その後に C2・C4・D2〜D8・H5・I・S。往復の版は `~/os32-tmp/run/net-hostsvc/`。
+> 状態: **実装中 (2026-11-08)** — 詳細設計は確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md))。段 A・B・C・D・H・I・S を main に入れた (統合 11195dc5、起動の host_mailbox_init 5d5f93a5、期限切れの後の再同期 f79480bc)。NP21/W で host_time・クリップボード・通知・期限切れの後の再同期は合格、実機 82557 は LAN の hsync だけ確認。残り: 実機 Ra266 の受入 (82557 の上の host の時刻・クリップボード・通知・ネットワーク越しの CD・LAN の SerialFS の読み書き・再同期)。往復の版は `~/os32-tmp/run/net-hostsvc/`。
 > 上位: [V3_PLAN](../v3/V3_PLAN.md) §5 の「ネットワーク越しの CD・HostDrv の Host Services 経路」。土台: [HOST_SERVICES_PLAN](HOST_SERVICES_PLAN.md) (リンク層の Host Services、KAPI v51)、[TASK_LAN_82557](../realhw/TASK_LAN_82557.md) (82557・LAN 版 SerialFS、L-C・L-D2・L-E)。
 
 ## 0. ユーザー決定 (2026-11-05、要旨。原文は往復の置き場の USER_DECISIONS)

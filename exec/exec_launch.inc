@@ -340,6 +340,9 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     int image_rc = exec_load_image(ctx, resolved, hdr);
     if (image_rc) return exec_launch_abort(launcher_id, id, image_rc);
+    if (want_ring3 && paging_addrspace_protect_code_ro(ctx->as, load_base,
+                                                      load_base + hdr->code_size))
+        return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
 
     /* 常駐 CRT と USER の sbrk 上限を公開する。 */
     kapi->sbrk_heap_limit = sbrk_end;

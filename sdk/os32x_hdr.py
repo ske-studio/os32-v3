@@ -6,11 +6,11 @@ os32x_hdr.py — OS32X ヘッダの生成を 1 か所にまとめた共通モジ
 `tools/mkshlib.py` (共有ライブラリ) の両方がここを import する。
 ヘッダの並びは `sdk/include/os32/os32_kapi_shared.h` の OS32Header と一致させる。
 
-ヘッダ v4 (T2c、旧v3の先頭48Bを保つ。票 docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md、KAPI v63):
+ヘッダ v5 (旧v4の先頭60Bを保つ):
 
     0x00 magic          'OS32'
-    0x04 header_size    60
-    0x08 version        4
+    0x04 header_size    64
+    0x08 version        5
     0x0C flags
     0x10 entry_offset
     0x14 text_size
@@ -23,6 +23,7 @@ os32x_hdr.py — OS32X ヘッダの生成を 1 か所にまとめた共通モジ
     0x30 kapi_abi_generation
     0x34 memory_layout_generation
     0x38 shlib_protocol  0=依存なし
+    0x3C code_size      RO prefix (code + rodata + page padding)
 
 `kapi_data_off` は**包装時の値ではなくコードが実際に使った配置**から取る:
 crt0 (`sdk/crt/crt0_c.c`) と Rust の os32api が非ロードのセクション
@@ -39,7 +40,9 @@ OS32X_HDR_V1_SIZE = 40
 OS32X_HDR_V2_SIZE = 44
 OS32X_HDR_V3_SIZE = 48
 from os32_generations import *
-OS32X_HDR_SIZE = 60
+OS32X_HDR_V4_SIZE = 60
+OS32X_HDR_SIZE = 64
+PAGE_SIZE = 4096
 # Address mirrors checked against include/memmap.h by gen_memmap.py.
 OS32X_APP_LOAD_ADDR = 0x80100000
 OS32X_SHELL_LOAD_ADDR = 0x400000
@@ -56,6 +59,7 @@ KAPI_LAYOUT_SECTION = '.os32_kapi_layout'
 
 SHT_NOBITS = 8
 SHF_ALLOC = 0x2
+SHF_WRITE = 0x1
 PT_LOAD = 1
 
 
@@ -272,13 +276,13 @@ def effective_min_api(min_api, compat=False):
 
 
 def build_header(flags, entry_offset, text_size, bss_size, heap_size,
-                 min_api_ver, load_addr, kapi_data_off, stack_size=0, shlib_protocol=0, compat_api=False):
+                 min_api_ver, load_addr, kapi_data_off, code_size, stack_size=0, shlib_protocol=0, compat_api=False):
     """現行形式を返す。世代と最低機能版は生成した正典から読む。"""
     if kapi_data_off is None or kapi_data_off == 0:
         raise HeaderError("kapi_data_off が無い (刻印を読めていない)")
     if compat_api and (shlib_protocol or flags & OS32X_FLAG_SHLIB):
         raise HeaderError("compatibility probe must be statically linked")
-    hdr = struct.pack('<15I',
+    hdr = struct.pack('<16I',
                       OS32X_MAGIC,
                       OS32X_HDR_SIZE,
                       OS32X_HDR_VERSION,
@@ -293,7 +297,8 @@ def build_header(flags, entry_offset, text_size, bss_size, heap_size,
                       kapi_data_off,
                       OS32_KAPI_ABI_GENERATION,
                       OS32_MEMORY_LAYOUT_GENERATION,
-                      shlib_protocol)
+                      shlib_protocol,
+                      code_size)
     assert len(hdr) == OS32X_HDR_SIZE
     return hdr
 
@@ -310,6 +315,8 @@ def parse_header(blob):
         (h['load_addr'],) = struct.unpack_from('<I', blob, 40)
     if h['header_size'] >= OS32X_HDR_V3_SIZE and len(blob) >= OS32X_HDR_V3_SIZE:
         (h['kapi_data_off'],) = struct.unpack_from('<I', blob, 44)
-    if h['header_size'] >= OS32X_HDR_SIZE and len(blob) >= OS32X_HDR_SIZE:
+    if h['header_size'] >= OS32X_HDR_V4_SIZE and len(blob) >= OS32X_HDR_V4_SIZE:
         h.update(zip(('kapi_abi_generation', 'memory_layout_generation', 'shlib_protocol'), struct.unpack_from('<3I', blob, 48)))
+    if h['header_size'] >= OS32X_HDR_SIZE and len(blob) >= OS32X_HDR_SIZE:
+        (h['code_size'],) = struct.unpack_from('<I', blob, 60)
     return h

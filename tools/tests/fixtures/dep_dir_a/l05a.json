@@ -1,7 +1,7 @@
 {
   "base": "b400acb6",
   "public_sha256_recipe": "Review sdk/kapi.json append-only ABI and generated diffs; load the spec, pop includes, remove target/body from every api entry, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(). For each generated key use SHA256(Path(key).read_bytes()).hexdigest() after sdk/gen_kapi.py --check. Preserve base, wrappers, offsets and constants. Shared by L06/L08/L09/L10.",
-  "public_sha256": "7f1ea07ca10a63465366580c0ca145dedd4b5e95978bbe74e765de6fc1fdceab",
+  "public_sha256": "93f693351ffac7cc8e2cd1ee9cfb45678735fc53fc0cd1b626721e76624f3126",
   "wrappers": {
     "ide_init": "void __cdecl wrap_ide_init(void)\n{\n    KAPI_HIT(49);\n    ide_init();\n}\n",
     "ide_drive_present": "int __cdecl wrap_ide_drive_present(int drv)\n{\n    KAPI_HIT(50);\n    return ide_drive_present(drv);\n}\n",
