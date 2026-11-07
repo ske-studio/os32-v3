@@ -95,6 +95,7 @@ static int setup(const struct mode_case *c)
     d.last_rc = -77;
     d.declared_bytes = 4u * 1024u * 1024u;
     d.settings.no_accel = c->noaccel;
+    d.settings.ram_fallback = TRI_RAM_FALLBACK_DEFAULT;
     /* At the exact boundary MUX is off; one kHz below enables it. */
     d.settings.mux_threshold_khz = c->mux ? 25174 : 25175;
     return 0;
@@ -115,7 +116,7 @@ static int check_case(const struct mode_case *c)
     }
     if (!d.mode.valid || d.mode.selected.id != c->mode + 1u ||
         d.mode.selected.display_width * (d.mode.selected.bpp / 8u) != c->pitch ||
-        d.mode.no_accel != (c->noaccel || c->mode % 5 == 3) ||
+        d.mode.no_accel != (c->noaccel || TRI_RAM_FALLBACK_DEFAULT || c->mode % 5 == 3) ||
         d.mode.mux != c->mux) return 6;
     /* Reenter with the opposite C0 bit at the now-color base. IsClearTV
      * must retain the first selection even when that selection was NTSC.

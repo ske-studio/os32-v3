@@ -369,7 +369,8 @@ int tri_mode_set(struct trident_device *d, const struct tri_mode *candidate)
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x2A, interface | 0x40));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x3A, 0));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x38, pixel_bus));
-    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x39, (pci & 0xF9) | 0x06));
+    TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x39,
+                             (pci & 0xF9) | (d->settings.ram_fallback ? 0 : 0x06)));
     TRY(trident_indexed_write(d, TRI_CR_COLOR, 0x55, 0x1F));
     TRY(trident_indexed_write(d, TRI_GR_INDEX, 0x2F, misc_int | 0x04));
     TRY(trident_indexed_write(d, TRI_GR_INDEX, 0x0F, (misc_ext & 0xF0) | ext));
