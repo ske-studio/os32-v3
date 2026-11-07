@@ -1,11 +1,5 @@
 #include "debug_probe.h"
-/* A2 publishes an empty table; concrete points are added in stage D. */
-static i32 get_probe_decls(const struct probe_decl **table, u32 *count)
-{
-    *table = 0;
-    *count = 0;
-    return 0;
-}
+
 /* The body only publishes immutable descriptors; M3b connects trial dispatch. */
 #include "generated/hwdev_contract.h"
 #include "hwdev_pair.h"
@@ -36,6 +30,12 @@ struct hwdev_exports {
     int (*initialize)(const struct hwdev_manifest **, const struct hwdev_ops **);
     probe_get_decls_fn get_probe_decls;
 };
+static i32 get_probe_decls(const struct probe_decl **table, u32 *count)
+{
+    *table = 0;
+    *count = 0;
+    return 0;
+}
 const struct hwdev_exports hwdev_ops = {HWDEV_MODULE_OPS_VERSION, initialize, get_probe_decls};
 int hwdev_init(struct hwdev_exports *out)
 {
