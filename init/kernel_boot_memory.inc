@@ -1,3 +1,5 @@
+#include "host_mailbox.h"
+
 /* Borrowed by the resident client for the rest of boot, never stack storage. */
 static SfsLan boot_sfs_lan;
 
@@ -64,6 +66,9 @@ static void kernel_boot_hostsvc(struct boot_context *boot)
 
 static void kernel_boot_lan(struct boot_context *boot)
 {
+    /* Allocate notification storage before either NIC can start link ticks. */
+    int rc = host_mailbox_init();
+    if (rc) kprintf(KLOG_ATTR, "[hostsvc] mailbox init rc=%d\n", rc);
     boot_platform_run(BOOT_PCI_RESOURCES, boot);
     if (memory_boot_dma_available()) {
         lan_module_load();
