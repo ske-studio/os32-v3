@@ -99,6 +99,7 @@ static void roundtrip(void)
     struct gf5_image *image=0;
     assert(gf5_state_save(&h.ctx,&image)==0);
     assert(image && image->complete && h.ctx.phase==GF5_SAVED);
+    assert(image->version==3U);
     assert(image->clock.core_khz==CORE_KHZ && !image->clock.shader_khz &&
            image->clock.mem_khz==MEM_KHZ && image->requested_uv==UV);
     gf5_host_trace_clear(&h);
@@ -111,8 +112,30 @@ static void roundtrip(void)
     gf5_state_free(&h.ctx,image);
     assert(!h.ctx.image && !h.live_allocs && h.calls[F5_FREE]==1);
 }
+static void optional_image_contract(void)
+{
+    /* Declaration control for S/C: fan absent and voltage unknown can
+     * coexist with an acquired clock whose shader source is absent (0).
+     * Raw values retain the observed mux, independently of frequency calc. */
+    struct gf5_image image={.clock={CORE_KHZ,0,MEM_KHZ},
+        .clock_available=true,.clock_raw={0xc002001cU,0x14032809U,
+                                         0xc000001cU,0x3c0bc003U}};
+    struct gf5_image copy=image;
+    assert(!copy.fan_available && !copy.volt_available && copy.clock_available);
+    assert(!copy.clock.shader_khz && copy.clock_raw.nc==observed[1].value &&
+           copy.clock_raw.nn==observed[2].value &&
+           copy.clock_raw.sc==observed[3].value &&
+           copy.clock_raw.mux==observed[0].value);
+    image=(struct gf5_image){.fan_available=true,.volt_available=true};
+    assert(image.fan_available && image.volt_available && !image.clock_available);
+}
+_Static_assert(__builtin_types_compatible_p(__typeof__(&gf5_clock_raw_save),
+    i32 (*)(struct gf5 *,struct gf5_clock_raw *)),"raw save boundary");
+_Static_assert(__builtin_types_compatible_p(__typeof__(&gf5_clock_raw_restore),
+    i32 (*)(struct gf5 *,const struct gf5_clock_raw *)),"raw restore boundary");
 void _start(void)
 {
+    optional_image_contract();
     roundtrip();
     readback();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));

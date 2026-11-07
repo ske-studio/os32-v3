@@ -26,7 +26,9 @@ M5 appends resource_lookup/device_map/device_unmap at indices 44-46;
 only the import declaration pin changes, not the layout/inventory pins.
 Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
 F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
-GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
+GF5_IMAGE_VERSION is 3 after GF D0: optional fan/volt/clock availability and
+raw boot core/shader/mux snapshot declarations. The inventory/layout pins
+include those additions; import indices/signatures and public KAPI are unchanged.
 Guard D0 adds the private plan guard, ROM generation and live heat state,
 plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
 make all regenerates the contract after the reviewed inventory update.
@@ -54,9 +56,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0xbf2f474e
+REVIEWED_LAYOUT_CRC = 0x14d8dbe1
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = '4920103287ca5c382e71d9c3062ae9fb85c5fbca88b54c0cafb903deb06c6f9f'
+REVIEWED_INVENTORY_SHA = '987b4a63d53ef92c96586ad0a043deac205205b80a790c1d689429731bfeb231'
 
 
 def import_declarations(root):
