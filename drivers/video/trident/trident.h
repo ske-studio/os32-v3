@@ -468,8 +468,7 @@ int tri_video_surface_free(struct trident_device *, struct tri_video_surface *);
 /* F8, C:1245-1282; F9/F10 call after selected mode/palette changes. */
 int tri_overscan(struct trident_device *, u8 index);
 /* C:1218-1242 DDC1 callback only, NOT an EDID acquisition gate. The design
- * §9 does not assign its implementation file/stage; PM must assign that
- * owner before this optional callback is wired. Read result is bit0 (0/1). */
+ * owner is F19 (ddc1.c, PM decision 2026-11-07). Read result is bit0 (0/1). */
 int tri_ddc1_read(struct trident_device *, u8 *bit);
 
 /* F10 owns these adapters (existing HAL signatures), translating failures

@@ -212,8 +212,6 @@ int tri_mode_prepare(struct trident_device *d, const struct tri_mode *candidate,
     if (m.dot_khz < MODE_MIN_CLOCK_KHZ || m.dot_khz > max_clock ||
         m.dot_khz * 1000u < MODE_MIN_HZ * m.ht ||
         m.dot_khz * 1000u > MODE_MAX_HZ * m.ht) return TRI_E_INVAL;
-    if (mode_mux(d, &m) && m.bpp == 8 &&
-        ((m.hd | m.hs | m.he | m.ht) & 15u)) return TRI_E_INVAL;
     if (d->settings.no_accel || m.bpp == 24) m.flags |= TRI_MODE_NOACCEL;
     if (m.flags & TRI_MODE_NOACCEL) {
         m.display_width = m.hd; /* already an eight-pixel multiple */
