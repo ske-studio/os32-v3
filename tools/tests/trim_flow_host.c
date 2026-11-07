@@ -95,7 +95,10 @@ void appslot_trim_request_as(struct addrspace *as)
     }
     trim_product_request(as);
 }
-static int v86_call_pinned(void) { return 0; }
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_PINNED 0
+#include "legacy_guest_fake.h"
+
 #include "trim_exec_source.c"
 void kbd_set_gui_mode(int on) { (void)on; }
 void ime_set_render(void *table) { (void)table; }

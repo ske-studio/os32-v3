@@ -83,6 +83,7 @@
   "mm/physmem.c",
   "mm/shlib.c",
   "mm/shm.c",
+  "platform/none/legacy_guest.c",
   "platform/powermac/boot.c",
   "platform/powermac/escc.c",
   "platform/powermac/escc_tree.c",

@@ -1,6 +1,6 @@
 CHECK = dict(
     name='x87-lifecycle-host', tier=1,
-    covers=['exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm',
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'exec/exec.c', 'exec/exec_*.inc', 'arch/x86/kernel/setjmp.asm',
             'arch/x86/kernel/cpu_flags.inc', 'tools/tests/x87_lifecycle_host.c',
             'tools/tests/test_x87_lifecycle.py', 'tools/tests/exec_source.py',
             'tools/tests/host_arch/*.h', 'tools/tests/host32.py',

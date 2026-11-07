@@ -141,8 +141,17 @@ int vfs_read_fd(int fd, void *buf, u32 n)
 }
 void vfs_close(int fd) { CHECK(opened && !closed && fd == 7); closed++; event('C'); }
 /* External admission/allocation and CPU boundaries; exec internals stay real. */
-int paging_v86_session_open(void) { return 0; }
-int v86_call_pinned(void) { return 0; }
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_PINNED 0
+#define LEGACY_FAKE_LOWMAP_ENABLE
+#define LEGACY_FAKE_LOWMAP 0
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_ABORT_ENABLE
+#include "legacy_guest_fake.h"
+
+
 u32 paging_current_cr3(void) { return argv_mode && is_user ? 17 : 1; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd)
@@ -265,8 +274,8 @@ UNREACHABLE_STUB(res_owner_set);
 UNREACHABLE_STUB(shm_free_owned);
 UNREACHABLE_STUB(snd_owner_exit);
 UNREACHABLE_STUB(tss_set_esp0);
-UNREACHABLE_STUB(v86_call_cleanup);
-UNREACHABLE_STUB(v86_session_end);
+
+
 UNREACHABLE_STUB(vfs_close_owned);
 
 static void check_case(int user, int fault, u32 text)
@@ -451,3 +460,5 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}
 }
+
+int gfx_return_emergency(u32 owner, int reason) { (void)owner; (void)reason; __builtin_trap(); }

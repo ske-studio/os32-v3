@@ -14,7 +14,9 @@ static int capture_putchar(char c)
 }
 static const ConOutputOps capture_output = { .putchar = capture_putchar };
 
-int v86_is_active(void) { return 1; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE 1
+#include "legacy_guest_fake.h"
 int con_sink_is_enabled(void) { return 0; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
 void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

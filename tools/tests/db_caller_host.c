@@ -83,12 +83,11 @@ static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_ARG_WINDOW 64u
 /* This suite exercises DB slots; V86 admission has its own entry fixture. */
-static int v86_call_dispatch(u32 slot, void *target, const void *args,
-                              u32 bytes, u32 *result)
-{
-    (void)slot; (void)target; (void)args; (void)bytes; (void)result;
-    return 0;
-}
+#define LEGACY_FAKE_TRAP_ENABLE
+#define LEGACY_FAKE_TRAP (( ((u32 *)frame)[V86I_EFLAGS] & EFLAGS_VM) ? (v86_int80(frame), 1) : 0)
+#define LEGACY_FAKE_DISPATCH_ENABLE
+#include "legacy_guest_fake.h"
+
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "dispatch_host_source.c"
 

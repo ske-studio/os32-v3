@@ -1,13 +1,11 @@
+#include "legacy_guest.h"
 #include "x87.h"
-#include "v86_call.h"
 #include "font_guard.h"
-#include "v86_mem.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
 #include "serial_diag.h"
 #include "appmem.h"
-#include "v86.h"
 #include "memmap.h"
 #include "exec.h"
 #include "kselftest.h"
@@ -460,7 +458,7 @@ int ring3_user_range_writable(u32 p, u32 len)
 
 i32 exec_trim_done(u32 epoch)
 {
-    if (v86_call_pinned()) return OS32_ERR_BUSY;
+    if (legacy_pinned()) return OS32_ERR_BUSY;
     struct caller_access c;
     AppSlot *slot;
     u32 pages;

@@ -3,7 +3,7 @@
 Record: tools/tests/display_cleanup_tdd.md
 """
 CHECK = dict(name='display-cleanup-host', tier=1,
-    covers=['gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'kernel/v86/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'kernel/v86/v86_gcap.c', 'kdebug/v86_gcap.c', 'kernel/v86/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'kernel/v86/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
+    covers=['hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'kernel/v86/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'kernel/v86/v86_gcap.c', 'kdebug/v86_gcap.c', 'kernel/v86/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'kernel/v86/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.h'],
     needs=[], budget=2.141466)
 
@@ -129,6 +129,8 @@ def main():
                     target = tree / source.relative_to(ROOT)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
+        (tree / 'hwdev/gf').mkdir(parents=True)
+        shutil.copyfile(ROOT / 'hwdev/gf/stop_state.h', tree / 'hwdev/gf/stop_state.h')
         (tree / 'exec').mkdir(parents=True, exist_ok=True)
         for name in ('surface_query.h', 'surface_limits.h', 'lease.h', 'appslot.h', 'exec.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)

@@ -120,7 +120,17 @@ void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 static volatile u32 sqlite_engine_active;
 static void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2) { (void)vector; (void)eip; (void)cr2; CHECK(0); }
 /* These direct session cases have no public-entry staging. */
-static void v86_call_cleanup(void) {}
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_END v86_session_end()
+#define LEGACY_FAKE_SESSION_OPEN_ENABLE
+#define LEGACY_FAKE_SESSION_OPEN v86_session.open
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_CLOSING v86_session.closing
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_ABORT (v86_session.aborting = 1)
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP do { (void)0; } while (0)
+#include "legacy_guest_fake.h"
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "exec_source.c"
 static void caller_access_leave(int *p) { (void)p; }

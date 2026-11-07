@@ -1,3 +1,4 @@
+#include "legacy_guest.h"
 /* ============================================================
  * kernel.c — PC-9801 32ビットOS カーネル
  * プロテクトモードで動作、テキストVRAMに直接書き込む
@@ -11,7 +12,7 @@
 #include "boot_cpu.h"
 #include "platform_boot.h"
 #include "../arch/x86/kernel/idt.h"
-#include "../kernel/v86/v86.h"
+#include "../kernel/v86/v86_bios.h"
 #include "io.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
 /* fs.h 削除 — レガシーFS廃止 */
@@ -59,7 +60,6 @@
 #include "pipe_buffer.h"
 #include "../drivers/sound/fm/snd_engine.h"
 #include "../drivers/sound/fm/fm_module.h"
-#include "../kernel/v86/v86_module.h"
 #include "../drivers/sound/cs4231/pcm_module.h"
 #include "../drivers/net/e82557/lan_module.h"
 #include "../drivers/video/cirrus/cirrus_module.h"

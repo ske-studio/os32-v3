@@ -73,7 +73,7 @@ SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し�
 V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラフィック対応機では出口で 6Ah に標準グラフィック (20h) を書いて戻す
 (`kernel/v86/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
 
-### V86 セッションの入場と呼出元 (T7a、`exec/v86_call.c`)
+### V86 セッションの入場と呼出元 (T7a、`arch/x86/legacy/v86_call.c`)
 
 V86 に入るのは CPL=3 の `v86` コマンドが呼ぶ KAPI (`V86_SELFTEST` / `V86_DISKTEST` / `V86_BOOT` / `V86_BOOT2` / `V86_GDC_CAPTURE`) で、呼出元の AS があること自体は断る理由にしない。流れは CUI → 準備 → V86 → 復元 → CUI。
 

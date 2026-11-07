@@ -2,7 +2,7 @@
 Normal controls always run before compiled runtime-RED mutations.
 """
 CHECK = dict(name='v86-call-host', tier=1,
-    covers=['exec/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'arch/x86/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=1.61671)
 
 from kernel_includes import include_flags
@@ -31,7 +31,7 @@ MUTANTS = [
 
 
 def main():
-    sources = {'call': (ROOT / 'exec/v86_call.c').read_text(),
+    sources = {'call': (ROOT / 'arch/x86/legacy/v86_call.c').read_text(),
                'redir': (ROOT / 'exec/redir_access.c').read_text(),
                'guest': (ROOT / 'userland/tests/kstr_v86.c').read_text().replace(
                    '#include <string.h>', '')}

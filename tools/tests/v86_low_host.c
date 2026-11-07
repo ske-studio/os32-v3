@@ -6,6 +6,12 @@
 static u32 host_cr3;
 static void flush_low(void);
 #include "v86.h"
+#include "v86_mem.h"
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE v86_session.active
+#define LEGACY_FAKE_KBD_ENABLE
+#define LEGACY_FAKE_EXIT_ENABLE
+#include "legacy_guest_fake.h"
 #include "v86_call.h"
 #include "idt.h"
 #include "tvram.h"

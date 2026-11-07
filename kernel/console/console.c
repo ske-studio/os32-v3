@@ -24,7 +24,7 @@
  * Unicode-JIS 表は独立した kernel 所有頁にあるが、TVRAM/KCG への書き込みは
  * ゲストの画面と CG 状態を汚す。
  * 描画だけを抑止し、シリアル出力 (rshell ログ) は通す。 */
-extern int v86_is_active(void);
+#include "legacy_guest.h"
 
 /* デフォルトの通常console属性。 */
 #ifndef ATTR_WHITE
@@ -52,7 +52,7 @@ static int cursor_y = 0;
 static int console_render_allowed(void)
 {
     return (!pc98_console_safe || pc98_console_safe()) &&
-           !v86_is_active() && !con_sink_is_enabled();
+           !legacy_active() && !con_sink_is_enabled();
 }
 
 /* GDC (テキスト) のハードウェアカーソルを論理カーソルへ追従させる。
@@ -64,7 +64,7 @@ static int console_render_allowed(void)
 static void console_hw_cursor_sync(void)
 {
     if (pc98_console_safe && !pc98_console_safe()) return;
-    if (v86_is_active()) return;
+    if (legacy_active()) return;
     con_backend_cursor_at(cursor_x, cursor_y);
 }
 
@@ -399,7 +399,7 @@ void console_set_cursor(int x, int y)
 void console_hw_cursor_enable(void)
 {
     if (pc98_console_safe && !pc98_console_safe()) return;
-    if (v86_is_active()) return;
+    if (legacy_active()) return;
     con_backend_cursor_shape(1);
     console_hw_cursor_sync();
 }
@@ -417,7 +417,7 @@ void console_text_gdc_stop(void)
      * **前**に置く — GDC を触らない場合でも「テキスト面が見えない」ことは
      * 変わらないので、溜め始める側は抑止しない。 */
     con_sink_enable();
-    if (v86_is_active()) return;
+    if (legacy_active()) return;
     con_backend_cursor_shape(0);
 }
 

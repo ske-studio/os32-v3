@@ -63,13 +63,15 @@ static void ring3_abort_kill(void) { aborted++; }
 static void ring3_context_clear(void) { caller=ring3_in_syscall=ring3_wm_depth=0; g_cur_frame=0; clears++; }
 static void exec_restore_context(int id) { CHECK(id==1); g_cur_app=0; }
 void exec_heap_save_state(u32 *p) { *p=17; }
-int paging_v86_session_open(void) { return 0; }
-static int v86_call_pinned(void) { return 0; }
-static int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u32 *out)
-{
-    (void)slot; (void)fn; (void)args; (void)bytes; (void)out;
-    return 0;
-}
+
+
+#define LEGACY_FAKE_TRAP_ENABLE
+#define LEGACY_FAKE_TRAP (( ((u32 *)frame)[V86I_EFLAGS] & EFLAGS_VM) ? (v86_int80(frame), 1) : 0)
+#define LEGACY_FAKE_LOWMAP_ENABLE
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_DISPATCH_ENABLE
+#include "legacy_guest_fake.h"
+
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { cr3=p; }
 void exec_longjmp(u32 *p) {

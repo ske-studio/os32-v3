@@ -68,12 +68,15 @@ static void selftest(void)
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES && !dma_pool_leaked());
 }
 struct kdebug kdebug;
-static int v86_module_load(void)
+static int host_legacy_init(void)
 {
     CHECK(reserved && !loaded && !tested);
     v86_loaded++;
     return 0;
 }
+#define LEGACY_FAKE_INIT_ENABLE
+#define LEGACY_FAKE_INIT host_legacy_init()
+#include "legacy_guest_fake.h"
 void kdebug_load(void)
 {
     CHECK(v86_loaded == 1);

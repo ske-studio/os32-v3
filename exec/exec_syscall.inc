@@ -57,8 +57,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 {
     /* VM frames also carry ES/DS/FS/GS after SS. This is a guest INT,
      * never an OS caller, even when EAX happens to name a valid KAPI slot. */
-    if (frame[V86I_EFLAGS] & EFLAGS_VM) {
-        v86_int80(frame);
+    if (legacy_trap(frame)) {
         return;
     }
     u32 slot     = frame[APP_FRAME_EAX];         /* スタブが積んだ slot (eax) */
@@ -117,7 +116,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
 
-    int vcall = v86_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[APP_FRAME_EAX]);
+    int vcall = legacy_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[APP_FRAME_EAX]);
     if (vcall < 0) ring3_fault_kill();
     if (vcall) goto syscall_complete;
 

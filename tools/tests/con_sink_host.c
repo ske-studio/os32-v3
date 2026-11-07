@@ -58,7 +58,10 @@ static void host_outp(unsigned int port, unsigned int value)
 
 /* console.c が引く外部シンボル (カーネル側の本物の代わり) */
 static int g_v86;
-int v86_is_active(void) { return g_v86; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE g_v86
+#include "legacy_guest_fake.h"
+
 #include "../../kernel/port_service.c"
 static char copied[128];
 static u32 copied_len;

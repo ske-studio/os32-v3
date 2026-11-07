@@ -42,8 +42,19 @@ int vfs_open(const char *p,int m) { (void)p; CHECK(!m); return 7; }
 int vfs_seek(int fd,int off,int w) { CHECK(fd==7 && off==OS32X_HDR_SIZE && !w); return off; }
 int vfs_read_fd(int fd,void *p,u32 n) { CHECK(fd==7 && n==1); *(u8 *)p=0; return n; }
 void vfs_close(int fd) { CHECK(fd==7); }
-int paging_v86_session_open(void) { return 0; }
-int v86_call_pinned(void) { return 0; }
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_PINNED 0
+#define LEGACY_FAKE_LOWMAP_ENABLE
+#define LEGACY_FAKE_LOWMAP 0
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_END (void)0
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP (void)0
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_ABORT_ENABLE
+#include "legacy_guest_fake.h"
+
+
 u32 paging_current_cr3(void) { return 1; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd) { host_cr3=pd; }
@@ -99,8 +110,8 @@ int paging_set_not_present(u32 b,u32 e) { (void)b; (void)e; return 0; }
 void shell_print(const char *s,u8 a) { (void)a; say(s); CHECK(0); }
 void shell_print_dec(u32 n,u8 a) { (void)n; (void)a; CHECK(0); }
 void __cdecl kprintf(u8 a,const char *s,...) { (void)a; (void)s; CHECK(0); }
-void v86_session_end(void) {}
-void v86_call_cleanup(void) {}
+
+
 void font_guard_fault(u32 a,u32 b,u32 c) { (void)a; (void)b; (void)c; CHECK(0); }
 void res_owner_set(int id) { (void)id; }
 #define CLEANUP(name) void name(int id) { CHECK(id==cur); }
@@ -180,7 +191,7 @@ void _start(void)
     say("PASS x87 normal return: app main -> exec_exit -> launch landing -> parent[0]\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(0)); for (;;) {}
 }
-struct v86_session_state v86_session;
+
 int as_va_to_pa_read(u32 pd,u32 va,u32 *pa) { (void)pd; *pa=va; return 0; }
 int shlib_loaded(void) { return 0; }
 u32 shlib_data_pages(void) { return 0; }

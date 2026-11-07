@@ -67,9 +67,16 @@ int rshell_active;
 static int stub_v86;
 static int stub_v86_pushed;
 void irq_enable(unsigned int irq) { (void)irq; }
-int  v86_is_active(void) { return stub_v86; }
-void v86_request_exit(void) { }
-int  v86_kbd_push(u8 scancode) { (void)scancode; stub_v86_pushed++; return 0; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE stub_v86
+#define LEGACY_FAKE_EXIT_ENABLE
+#define LEGACY_FAKE_EXIT (void)0
+#define LEGACY_FAKE_KBD_ENABLE
+#define LEGACY_FAKE_KBD (stub_v86_pushed++, 0)
+#include "legacy_guest_fake.h"
+
+
+
 static int stub_abort_requests;
 void ring3_abort_request(void) { stub_abort_requests++; }
 void ring3_abort_check(void) { }

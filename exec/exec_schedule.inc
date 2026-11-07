@@ -14,7 +14,7 @@
 i32 exec_park(void)
 {
     if (font_guard_active) return OS32_ERR_BUSY;
-    if (v86_call_pinned()) return OS32_ERR_BUSY;
+    if (legacy_pinned()) return OS32_ERR_BUSY;
     int id = appslot_cur();
     AppSlot *a;
     int rc;
@@ -184,8 +184,8 @@ i32 exec_sys_yield(void)
 i32 exec_resume(i32 app_id, i32 wait_ret)
 {
     if (font_guard_active) return OS32_ERR_BUSY;
-    if (paging_v86_session_open()) return OS32_ERR_BUSY;
-    if (v86_call_pinned()) return OS32_ERR_BUSY;
+    if (legacy_lowmap_busy()) return OS32_ERR_BUSY;
+    if (legacy_pinned()) return OS32_ERR_BUSY;
     AppSlot *a;
     int rc;
     int src;

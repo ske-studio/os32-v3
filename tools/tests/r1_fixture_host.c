@@ -17,6 +17,15 @@ static void irq_restore(unsigned int f) { host_if = f; }
 int paging_boot_context(void) { return 1; }
 void *paging_phys_identity_ptr(u32 phys, u32 bytes) { (void)bytes; return (void *)phys; }
 struct v86_session_state v86_session;
+#define LEGACY_FAKE_SESSION_OPEN_ENABLE
+#define LEGACY_FAKE_SESSION_OPEN v86_session.open
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_CLOSING v86_session.closing
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_ABORT (v86_session.aborting = 1)
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_END v86_session_end()
+#include "legacy_guest_fake.h"
 volatile u32 exec_stop_count;
 static const char *serial_line;
 static void serial_puts_polled(const char *s) { serial_line = s; }

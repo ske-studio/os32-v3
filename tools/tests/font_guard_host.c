@@ -40,7 +40,10 @@ void appslot_park_kbd_commit(void) { parks++; }
 void appslot_park_poll_commit(void) { parks++; }
 void appslot_park_yield_commit(void) { parks++; }
 void appslot_park_stop_commit(void) { parks++; }
-int v86_call_pinned(void) { return 0; }
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_PINNED 0
+#include "legacy_guest_fake.h"
+
 int con_sink_is_enabled(void) { return 1; }
 void exec_heap_save_state(u32 *n) { *n=0; }
 static void ring3_context_clear(void) {}

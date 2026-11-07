@@ -23,11 +23,6 @@
       "survey_id": "V3"
     },
     {
-      "source": "kernel/kaudit.c",
-      "header": "kernel/v86/v86_mem.h",
-      "survey_id": "V1"
-    },
-    {
       "source": "kernel/sys.c",
       "header": "drivers/video/geforce/geforce_module.h",
       "survey_id": "A5"
@@ -60,16 +55,6 @@
     {
       "source": "init/kernel.c",
       "header": "drivers/ata/cd_module.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "drivers/input/kbd.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "drivers/input/kbd_status.h",
       "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     },
     {
@@ -134,32 +119,7 @@
     },
     {
       "source": "init/kernel.c",
-      "header": "kernel/v86/v86.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
       "header": "kernel/v86/v86_bios.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/v86/v86_io.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/v86/v86_kbd.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/v86/v86_module.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/v86/v86_pic.h",
       "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     },
     {

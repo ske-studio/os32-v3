@@ -19,6 +19,8 @@ ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_V86 on $(ARCH)-$(PLATFORM))
 endif
 include build/features/v86.mk
+else
+C_FEATURES += platform/none/legacy_guest.c
 endif
 FEATURE_X87 ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_X87))),1)

@@ -112,7 +112,7 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
     } else {
         kprintf(KLOG_ATTR, "[dma] RAM short; pool/PCI/PCM skipped\n");
     }
-    v86_module_load(); /* Core facades are ready before kdebug selftests. */
+    legacy_init(); /* Core facades are ready before kdebug selftests. */
     kdebug_load();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();

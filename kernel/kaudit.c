@@ -1,6 +1,6 @@
 #include "kselftest.h"
 #include "../mm/paging.h"
-#include "v86/v86_mem.h"
+#include "legacy_guest.h"
 #include "memmap.h"
 #include "lease.h"
 #include "exec.h"
@@ -17,7 +17,7 @@ char audit_first_fail_tag[AUDIT_TAG_MAX];
 int kselftest_run_audit(const char *tag)
 {
     int a, b, bad;
-    if (paging_v86_session_open()) { memmap_audit_skip++; return 0; }
+    if (legacy_lowmap_busy()) { memmap_audit_skip++; return 0; }
     a = paging_master_audit(exec_tramp_page_addr());
     b = lease_audit_all();
     memmap_audit_runs++;
@@ -51,7 +51,7 @@ static int kaudit_skipped[KAUDIT_TAG_COUNT];
 
 void kaudit_post_exec(void)
 {
-    kaudit_skipped[KAUDIT_POST_EXEC] = paging_v86_session_open() != 0;
+    kaudit_skipped[KAUDIT_POST_EXEC] = legacy_lowmap_busy() != 0;
     kaudit_last_rc[KAUDIT_POST_EXEC] = kselftest_run_audit("post-exec");
     /* Keep the linker-derived address in the kernel; the optional selftest
      * consumes the same boot SHM permission observation through last_rc. */

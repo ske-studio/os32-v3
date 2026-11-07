@@ -40,7 +40,10 @@ static void store(u32 address,u32 width,u32 value)
 }
 static void port(unsigned p, unsigned v) { event(2, p, v); }
 #define outp(p,v) port(p,v)
-int v86_is_active(void) { return active; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE active
+#include "legacy_guest_fake.h"
+
 int con_sink_is_enabled(void) { return gui; }
 void con_sink_enable(void) { event(3,0,0); gui=1; }
 void con_sink_disable(void) { event(4,0,0); gui=0; }

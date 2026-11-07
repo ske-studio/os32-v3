@@ -173,6 +173,8 @@ def object_paths(root):
             key = path.relative_to(root).as_posix()
             if key.startswith('build/out/obj/'):
                 key = key[len('build/out/obj/'):]
+            # E: compare the moved adapter against its original translation unit.
+            key = key.replace("arch/x86/legacy/v86_call.o", "exec/v86_call.o")
             paths[key] = path
     return paths
 

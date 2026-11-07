@@ -129,7 +129,10 @@ int kbd_inject_take(u8 *b) {
     if (injected_byte < 0) return 0;
     *b = (u8)injected_byte; injected_byte = -1; return 1;
 }
-int v86_is_active(void) { return 0; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE 0
+#include "legacy_guest_fake.h"
+
 int con_sink_is_enabled(void) { return sink; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
 void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

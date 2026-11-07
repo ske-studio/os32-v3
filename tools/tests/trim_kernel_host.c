@@ -51,7 +51,10 @@ static int done_caller(struct caller_access *c)
 }
 #define caller_access_get_user done_caller
 #define exec_heap_user_trim done_trim
-static int v86_call_pinned(void) { return 0; }
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_PINNED 0
+#include "legacy_guest_fake.h"
+
 #include "trim_exec_source.c"
 #undef exec_heap_user_trim
 #undef caller_access_get_user

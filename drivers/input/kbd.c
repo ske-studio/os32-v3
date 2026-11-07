@@ -34,9 +34,7 @@ extern void irq_enable(unsigned int irq);
 /* 外部: V86 セッション (kernel/v86/v86.c, kernel/v86/v86_kbd.c)。
  * drivers/ は -Ikernel を持たないので、この 3 本だけここで宣言する
  * (irq_enable と同じ扱い)。ドライバが V86 の中身を知る必要はない。 */
-extern int  v86_is_active(void);
-extern void v86_request_exit(void);
-extern int  v86_kbd_push(u8 scancode);
+#include "legacy_guest.h"
 
 /* rshellモード判定用 (shell.cで定義) */
 extern int rshell_active;
@@ -329,7 +327,7 @@ int kbd_irq_handler(void)
     /* 記録のフラグは配る前の状態で決める (配った結果で V86 を抜けることがある) */
     lflags = 0;
     if (kind == KBD_ST_OVERRUN) lflags |= KBD_DLOG_F_OVERRUN;
-    if (v86_is_active())        lflags |= KBD_DLOG_F_V86;
+    if (legacy_active())        lflags |= KBD_DLOG_F_V86;
     if (kbd_gui_mode)           lflags |= KBD_DLOG_F_GUI;
 
     kbd_deliver(scancode);
@@ -385,9 +383,9 @@ static void kbd_deliver(u8 scancode)
      * ホットキーのときも呼び手は反射する (従来どおり): irq_stub_1 は反射の
      * 後で v86_check_exit_request を見てセッションを畳むので、反射された
      * INT 09h をゲストが走らせることはない。 */
-    if (v86_is_active()) {
-        if (v86_kbd_push(scancode)) {
-            v86_request_exit();
+    if (legacy_active()) {
+        if (legacy_kbd_push(scancode)) {
+            legacy_request_exit();
         }
         return;
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
 CHECK = dict(name='ime-display-host', tier=1,
-    covers=['drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -40,6 +40,7 @@ def main():
         fixture = fixture.replace('../../kernel/console/console.c', str(tmp / 'console.c'))
         fixture = fixture.replace('../../', str(ROOT) + '/')
         (tmp / 'con_sink_host.c').write_text(fixture)
+        (tmp / 'legacy_guest_fake.h').write_text((ROOT / 'tools/tests/legacy_guest_fake.h').read_text())
         source = (ROOT / 'tools/tests/ime_display_host.c').read_text()
         source = source.replace('../../', str(ROOT) + '/')
         source = source.replace(str(ROOT / 'kernel/ime/ime.c'), str(tmp / 'ime.c'))

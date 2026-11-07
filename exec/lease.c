@@ -1,4 +1,4 @@
-#include "v86_mem.h"
+#include "legacy_guest.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
@@ -366,7 +366,7 @@ int lease_audit_all(void)
     unsigned int flags;
     u32 cr3;
     int bad = 0;
-    if (paging_v86_session_open()) return -1;
+    if (legacy_lowmap_busy()) return -1;
     if (kctx_irq_depth || kctx_exc_depth) return 1;
     /* Normal context has no scheduling/reclamation point here. IRQ handlers
      * cannot change AS/lease ownership. Restore IF and CR3 between ASes. */

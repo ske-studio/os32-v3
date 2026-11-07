@@ -87,12 +87,15 @@ static int g_last_kind,g_last_code,exec_exit_status,exec_nest_level;
 static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
 static AppSlot *g_cur_app;
 volatile u32 kctx_irq_depth,kctx_exc_depth;
-struct v86_session_state v86_session;
 static int font_guard_active;
 static void font_guard_fault(int a,int b,int c) { (void)a;(void)b;(void)c;CHECK(0); }
 static void exec_stop_mark(void) { CHECK(0); }
-void v86_session_end(void) {}
-static void v86_call_cleanup(void) { CHECK(!kctx_irq_depth && !kctx_exc_depth); }
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP do { CHECK(!kctx_irq_depth && !kctx_exc_depth); } while (0)
+#include "legacy_guest_fake.h"
 static void ring3_context_clear(void) { host_user=0; }
 static void res_owner_set(int id) { host_owner=id; }
 static void exec_reclaim_resources(int id) { CHECK(id==APP_ID_SHELL); }

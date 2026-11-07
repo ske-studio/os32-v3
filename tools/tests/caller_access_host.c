@@ -57,12 +57,11 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n);
 /* This fixture uses a non-string slot to test caller identity and nesting.
  * String staging/output boundaries are exercised by db_caller/kapi_strings. */
 int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
-int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
-                      u32 *result)
-{
-    (void)slot; (void)target; (void)args; (void)bytes; (void)result;
-    return 0;
-}
+#define LEGACY_FAKE_TRAP_ENABLE
+#define LEGACY_FAKE_TRAP (( ((u32 *)frame)[V86I_EFLAGS] & EFLAGS_VM) ? (v86_int80(frame), 1) : 0)
+#define LEGACY_FAKE_DISPATCH_ENABLE
+#include "legacy_guest_fake.h"
+
 int kapi_strings_call(u32 slot, void *target, const void *args,
                       u32 nbytes, u16 ptrmask, u32 *result)
 {
@@ -243,6 +242,15 @@ int main(void)
     assert(ls_frame[7] == 91 && ls_calls == 1);
     assert(!caller_access_get(&out) && !ring3_in_syscall && !g_cur_frame);
     assert(stop_park_calls == invoked + ls_calls);
+    /* A bad legacy caller result must enter the real dispatcher kill exit,
+     * without ordinary invoke/result writeback. The fixture kill longjmps. */
+    select_parent(); ring3_in_syscall=0;
+    legacy_fake.dispatch_result=-1;
+    u32 bad_frame[13]={0};bad_frame[11]=MEM_APP_BAND_BASE;
+    int invoke_before=invoked, park_before=stop_park_calls;
+    if (!setjmp(killed)) { ring3_syscall_dispatch(bad_frame); assert(0); }
+    assert(bad_frame[7]==0&&invoked==invoke_before&&stop_park_calls==park_before);
+    legacy_fake.dispatch_result=0;
     puts("caller d2: actual dispatcher, USER/TRUSTED/WM/nesting/rejection/IF PASS");
     return 0;
 }

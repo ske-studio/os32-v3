@@ -189,7 +189,15 @@ void exec_longjmp(u32 *buf) {
 }
 #define v86_active v86_session.active
 /* Entry staging is covered by v86_call_host; this harness owns low-PTE unwind. */
-void v86_call_cleanup(void) {}
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_END v86_session_end()
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_CLOSING v86_session.closing
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_ABORT (v86_session.aborting = 1)
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP do { (void)0; } while (0)
+#include "legacy_guest_fake.h"
 static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
     CHECK(!v86_session.release_pending, "kill release before owner reclaim");

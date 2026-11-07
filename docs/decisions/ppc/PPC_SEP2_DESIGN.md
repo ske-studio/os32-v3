@@ -98,6 +98,7 @@ extern volatile u32 tick_count;
 ```c
 /* include/legacy_guest.h、link時にx86かnoneを1つ選ぶ */
 int legacy_init(void); int legacy_active(void); int legacy_pinned(void);
+int legacy_session_open(void);
 int legacy_closing(void); int legacy_lowmap_busy(void);
 void legacy_abort_begin(void); void legacy_end(void); void legacy_cleanup(void);
 int legacy_trap(void *native_frame); /* x86だけframeのVMを読む。消費1、通常0 */
@@ -106,7 +107,8 @@ int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u32 *r
 ```
 - dispatchの返値は非対象0、処理済1、-1 = 呼び手が ring3_fault_kill する。`exec/v86_call.c:119,129,154,157–158` はcleanup後に-1を返すだけで、killは `exec/exec_syscall.inc:120–121` が行う。-1ではcallerは通常のresult書戻しをしない（既存exec fault出口へ）。legacy_trapはEでexecのVM分岐の同位置へ結線。
 - `exec/v86_call.c` の移設先は `arch/x86/legacy/v86_call.c`。x86 adapterは現行v86_callとsession各fieldへ転送。終了再入時のexec_stop_mark/_stopはcallerで維持。abort_beginはaborting=1だけ、endとcleanupをまとめない。session.open、closing、pin、mapping占有を独立に扱う。
-- `platform/none/legacy_guest.c`（feature offで選ぶ実装）はactive/pinned/closing/lowmap_busy/trap/kbd_push=0、end/cleanup/abort_begin/request_exitは無操作、init=NOSYS。dispatchは対象5slotならresult=NOSYS・消費1、その他は0；args/frameを読まない。
+- `legacy_session_open()` はsessionがopenなら1、そうでなければ0を返す独立照会。`arch/x86/legacy/guest.c` は `kernel/v86/v86_mem.c` が所有する `v86_session.open` をそのまま返す（beginのsnapshot成功後に1、endの復元・I/O policy reset・detach後に0）。active/pinned/closing/lowmap_busyから導出せず、closing=1でもopen=1の期間を保持する。通常のカーネル文脈・IRQ/例外文脈で呼出可、IFの事前条件なし。状態の読取だけで、割当・待機・module呼出・IF変更・状態更新を行わず、複数照会間の一貫したsnapshotは保証しない。`kernel/r1_fixture.c` のready/endは既存のopen読取だけをこの口へ置換し、closing・ring3_in_syscall・one-shotの判定順とx86の挙動を変えない。
+- `platform/none/legacy_guest.c`（feature offで選ぶ実装）はactive/pinned/session_open/closing/lowmap_busy/trap/kbd_push=0、end/cleanup/abort_begin/request_exitは無操作、init=NOSYS。dispatchは対象5slotならresult=NOSYS・消費1、その他は0；args/frameを読まない。
 - KAPIの既存名5facadeもnone実装を用意しNOSYS、出力バッファ不変。常駐x86 facadeのmodule未ロードと、非x86の非搭載を区別。sdk/kapi.json・スロット順・生成ラッパーは変更しない。
 - `include/legacy_lowmap.h` の唯一の型は `struct legacy_lowmap_snapshot { u32 root, master_pde, active_pde; u32 *saved_pte; u32 page_count, limit, restore_pte_bad, restore_pde_bad; };`。session内へ埋め、既存配列をsaved_pteへ渡す。open時にpage_count/limitを固定してPT0/容量内を検査、復元時にcaller値を再採用しない。割当を増やさない。
 - `mm/paging_lowmap.inc` にsnapshot/restore/mapの実装を切り出し、V86定数はcallerのページ数/上限として渡す。単一取引tokenで占有を照会。全PTE→2つのPDE→flush一度→照合→占有解除、復元中無割当を保持。
@@ -203,6 +205,7 @@ const struct boot_common *boot_common_get(void);
 - F2は受入①provider host ②誤include変異 ③x86機械語比較 ④known2組確認の4項。mm本体接続の前提はF/F2/A完了、F2の暫定PPC providerを実RAM/機器範囲で確定、RAM BAT撤去と案DのHPT/flush/guard受入（MMU設計参照）。表形式の変更を混ぜない。
 - B実測（2026-11-07）：CR0操作の分離で `init/kernel.c` がselected compile成功へ移った。既存known 16組は消失0、同TUの既存ヘッダ依存25組が初めて実.dで観測可能となり、knownは41組。選択TUを除外せずselected_successへ追加し、G以降の分離で解消を追う（コンパイル成功はPPC起動可能を意味しない）。
 - D実測（2026-11-07）：selected compile の実 .d で `kernel/time/ktime.c` → gdt.h/idt.h の2組消失を確認。known は35→33組、selected成功は88 TU（PC98 pit_math を機種所有へ移し、共通 tick.c を追加）。PPC全リンク・起動は未確認。
+- E実測（2026-11-07）：legacy口への置換でkaudit→v86_memの1組、init/kernel.cのmodule宣言をBIOS原本宣言へ絞ったことで7組（kbd/kbd_status、v86/v86_io/v86_kbd/v86_module/v86_pic）が実.dから消失。knownは33→25組、selected成功はnone providerを含む89 TU。R1のsession.open照会は契約に口が無いため既存読取を保持（active/pin/lowmapとの同一視はしない）。PPC全リンク・起動は未確認。
 - 第3段へ：legacy_trapのnative frame境界、例外分類とexec復帰の順序、pin/closing/busy契約、ABI_WORD_*とABI_STACK_ALIGNの暫定配置、syscall5予約slot、KAPI未変更の証拠、ring3 markerの基点を渡す。汎用frame/context/ユーザ遷移ABIはここで先取りしない。
 - PPCへ：boot各段、kernel_tick、clock_source、IRQ topology/claim/complete、native boot情報、none legacyを渡す。DECはCPU例外、OpenPICは機種controllerであり同一IRQ線に押し込まない。DEC再arm後のtick更新/共通handler順は後段で定義する。
 - BSD根拠（ローカル実物、GPL未参照）：N=`/home/hight/os32-tmp/ref/netbsd`、O=`/home/hight/os32-tmp/ref/openbsd`。`N/sys/arch/powerpc/powerpc/clock.c:103–116` timebase周波数/hzからDEC設定、`:139–159` 遅延分を考慮した再arm、`:300` counter周波数。OS tickとcounterを分ける手本。
@@ -225,4 +228,5 @@ const struct boot_common *boot_common_get(void);
 - S9：pit_time.c/.hとv86_call.cの移設先、import source、IRQ検証失敗時停止を確定。
 - S10：F2にmemory_boot/mem_statの相対include用コピー修正を追加。
 - S11：H2のfeature off検査にarch/x86/legacyとplatform/pc98/legacyを追加。
+- 段 E の実装で埋めた欠け：R1の独立open照会 `int legacy_session_open(void)` を§2へ追加（x86はsession.openの読取、noneは0）。
 - 前提：第1段wt/ppc-sep1の上に積み、mainへ入ったSHAを基点とする。

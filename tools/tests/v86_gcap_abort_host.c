@@ -66,6 +66,15 @@ void exec_longjmp(u32 *buf) {
     __builtin_longjmp(killed, 1);
 }
 #include "cleanup.inc"
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_CLOSING v86_session.closing
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_ABORT (v86_session.aborting = 1)
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_END v86_session_end()
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP v86_call_cleanup()
+#include "legacy_guest_fake.h"
 #include "kill.inc"
 /* Only kernel-context faults during the capture syscall reach these handlers.
  * Guest VM faults go through the V86 decoder, not the app kill dispatcher. */

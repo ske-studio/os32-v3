@@ -16,7 +16,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
-    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.873258)
 
 from kernel_includes import include_flags
@@ -87,7 +87,7 @@ MUTATIONS = [
     ("k", r"(    is_mod = is_lock;.*?\n    }\n)(.*?)(?=    /\* 生イベント)",
      r"\2\1",
      "修飾更新を V86 分岐の後へ戻す (V86 中の CTRL break が OS32 に反映されない)"),
-    ("k", r"(        if \(v86_kbd_push\(scancode\)\) {.*?\n        }\n)        return;",
+    ("k", r"(        if \(legacy_kbd_push\(scancode\)\) {.*?\n        }\n)        return;",
      r"\1",
      "V86 へ渡した後も OS32 へ配る (通常キーが cooked/raw に混入する)"),
     # ロックキーの方式 B (票 TASK_KBD_NAV §2)
@@ -98,7 +98,7 @@ MUTATIONS = [
      "    if (!is_break) kbd_shift_state |= bit;\n",
      "ロックキーの break を無視する (make で立てるだけ = 外しても落ちない)"),
     ("k", r"    is_lock = kbd_lock_apply\(keycode, is_break\);\n",
-     "    is_lock = v86_is_active() ? 0 : kbd_lock_apply(keycode, is_break);\n",
+     "    is_lock = legacy_active() ? 0 : kbd_lock_apply(keycode, is_break);\n",
      "V86 中はロックを追わない (セッション後に食い違う)"),
     ("k", r"kbd_shift_state = kbd_lock_bits_from_bios\(kbd_bios_shift_peek\(\)\);",
      "kbd_shift_state = 0;",

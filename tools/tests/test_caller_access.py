@@ -13,9 +13,10 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("dispatch", "if (vcall < 0) ring3_fault_kill();", "if (0) ring3_fault_kill();", "legacy bad caller kill"),
     ("access", "result.owner = caller.owner;", "result.owner = caller.owner + 1;", "identity wrong AS"),
     ("access", "result.generation = caller.generation;", "result.generation = caller.generation + 1;", "identity wrong generation"),
-    ("dispatch", "frame[V86I_EFLAGS] & EFLAGS_VM", "0", "VM int80 bypasses KAPI"),
+    ("dispatch", "legacy_trap(frame)", "0", "VM int80 bypasses KAPI"),
     ("access", "if (ring3_wm_depth > 0)", "if (0)", "WM trusted scope"),
     ("access", "if (user_only && a->origin != CALLER_USER)", "if (0 && user_only)", "saved USER only"),
     ("access", "caller_frame.valid = 0;", ";", "invalidation"),
@@ -67,6 +68,7 @@ def run(src, quiet=False):
         (tmp / "exec/redir_access.c").write_text(src["access"])
         host = tmp / "tools/tests/caller_access_host.c"
         host.write_text(src["host"])
+        (host.parent / "legacy_guest_fake.h").write_text((ROOT / "tools/tests/legacy_guest_fake.h").read_text())
         (host.parent / "dispatcher.inc").write_text(src["dispatch"])
         (host.parent / "wm.inc").write_text(src["wm"])
         exe = tmp / "caller"

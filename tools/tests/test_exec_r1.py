@@ -71,15 +71,22 @@ static void die(int n) {
 }
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 /* These cases have no V86 session; its live unwind is shm_user_host.c. */
-static struct host_v86_session { int aborting, closing; } v86_session;
-static void v86_session_end(void) {}
-static int v86_call_pinned(void) { return 0; }
-static void v86_call_cleanup(void) { CHECK(!kctx_irq_depth && !kctx_exc_depth); }
-static int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u32 *out)
-{
-    (void)slot; (void)fn; (void)args; (void)bytes; (void)out;
-    return 0;
-}
+
+
+
+
+#define LEGACY_FAKE_TRAP_ENABLE
+#define LEGACY_FAKE_TRAP (( ((u32 *)frame)[V86I_EFLAGS] & EFLAGS_VM) ? (v86_int80(frame), 1) : 0)
+#define LEGACY_FAKE_PINNED_ENABLE
+#define LEGACY_FAKE_END_ENABLE
+#define LEGACY_FAKE_CLOSING_ENABLE
+#define LEGACY_FAKE_ABORT_ENABLE
+#define LEGACY_FAKE_CLEANUP_ENABLE
+#define LEGACY_FAKE_CLEANUP CHECK(!kctx_irq_depth && !kctx_exc_depth)
+#define LEGACY_FAKE_LOWMAP_ENABLE
+#define LEGACY_FAKE_DISPATCH_ENABLE
+#include "legacy_guest_fake.h"
+
 static void exec_stop_mark(void) {}
 static X87State x87_parent[APP_SLOT_COUNT];
 static int x87_saves;
@@ -485,7 +492,7 @@ static int resume_src, resume_allowed = 1, key_count, key_owner = 2;
 static u32 expected_eax, expected_eip;
 static int expected_keys;
 struct tss_entry kernel_tss;
-int paging_v86_session_open(void) { return 0; }
+
 int appslot_resume_check(int id) { CHECK(id == 2); return resume_allowed ? 0 : OS32_ERR_STALE; }
 int appslot_resume_source(int id) { CHECK(id == 2); return resume_src; }
 void appslot_resume_commit(int id) { cur = owner = id; slots[id].state = APP_STATE_RUNNING; }
@@ -682,8 +689,8 @@ MUTATIONS = (
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('resume-landing-invalidate', '    if (exec_setjmp(a->jmpbuf) != 0) {\n        ring3_context_clear();',
      '    if (exec_setjmp(a->jmpbuf) != 0) {'),
-    ('exit-invalidation', '    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish(appslot_cur()',
-     '    v86_call_cleanup();\n    exec_finish(appslot_cur()'),
+    ('exit-invalidation', '    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish(appslot_cur()',
+     '    legacy_cleanup();\n    exec_finish(appslot_cur()'),
     ('pending-invalidation', '    ring3_context_clear();\n    g_pending_id = id;',
      '    g_pending_id = id;'),
     ('landing-restore', '        ring3_context_restore(&caller_context);',
@@ -700,7 +707,7 @@ MUTATIONS = (
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
-    ('landing-if-missing', '    _enable();\n    v86_session_end();', '    v86_session_end();'),
+    ('landing-if-missing', '    _enable();\n    legacy_end();', '    legacy_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',

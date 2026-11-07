@@ -329,11 +329,11 @@ void exec_exit(int status, int kind)
 {
     if (font_guard_active) font_guard_fault(0, 0, 0);
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (v86_session.closing) { exec_stop_mark(); for (;;) { _stop(); } }
-    v86_session.aborting = 1;
-    v86_session_end();
+    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    legacy_abort_begin();
+    legacy_end();
     ring3_context_clear();
-    v86_call_cleanup();
+    legacy_cleanup();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
@@ -348,9 +348,9 @@ static void exec_pending_transfer(int kind)
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (v86_session.closing) { exec_stop_mark(); for (;;) { _stop(); } }
-    v86_session.aborting = 1;
-    v86_session_end();
+    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    legacy_abort_begin();
+    legacy_end();
     ring3_context_clear();
     g_pending_id = id;
     g_pending_kind = kind;
@@ -373,8 +373,8 @@ static void exec_pending_finish(void)
     g_longjmp_id = 0;
     paging_load_cr3(paging_kernel_pd_phys());
     _enable();
-    v86_session_end();
-    v86_call_cleanup();
+    legacy_end();
+    legacy_cleanup();
     exec_finish(id, EXEC_ERR_FAULT, kind);
 }
 

@@ -45,9 +45,16 @@ int ring3_wait_pending(void) { return 1; }
 int exec_park_kbd(void) { return 0; }
 int exec_park_poll(u32 t) { (void)t; return 0; }
 void appslot_poll_yield_reset(void) {}
-int v86_is_active(void) { return 0; }
-int v86_kbd_push(u8 code) { (void)code; return 0; }
-void v86_request_exit(void) {}
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE 0
+#define LEGACY_FAKE_EXIT_ENABLE
+#define LEGACY_FAKE_EXIT (void)0
+#define LEGACY_FAKE_KBD_ENABLE
+#define LEGACY_FAKE_KBD 0
+#include "legacy_guest_fake.h"
+
+
+
 int serial_peekchar(void) { return -1; }
 void ring3_wm_enter(void) { wm_depth++; ring3_wm_depth++; }
 void ring3_wm_leave(void) { wm_depth--; ring3_wm_depth--; }

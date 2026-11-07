@@ -1,9 +1,9 @@
+#include "legacy_guest.h"
 /* T2h: one-shot destructive probes, linked only into kernel-r1. */
 #ifdef OS32_R1_FIXTURE
 #include "fault_fixture.h"
 #include "r1_fixture.h"
 #include "../mm/pgalloc.h"
-#include "v86/v86_mem.h"
 #include "../exec/appslot.h"
 #include "../mm/paging.h"
 
@@ -34,13 +34,13 @@ void r1_fixture_exception(u32 vector)
 
 void r1_fixture_v86_end(void)
 {
-    if (v86_session.open && ring3_in_syscall && r1_fixture_take(R1_FIXTURE_V86_END))
+    if (legacy_session_open() && ring3_in_syscall && r1_fixture_take(R1_FIXTURE_V86_END))
         arch_fixture_ud(); /* Actual nested exception, with closing=1. */
 }
 
 void r1_fixture_v86_ready(void)
 {
-    if (v86_session.open && !v86_session.closing && ring3_in_syscall &&
+    if (legacy_session_open() && !legacy_closing() && ring3_in_syscall &&
         r1_fixture_take(R1_FIXTURE_V86_FAULT))
         arch_fixture_ud(); /* CPL0, before entering the V86 guest. */
 }

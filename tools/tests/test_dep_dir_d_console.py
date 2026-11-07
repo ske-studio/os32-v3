@@ -1,6 +1,6 @@
 """L16a/L16b: immutable pre-move attribute/grid/cursor traces and isolated closure."""
 CHECK = dict(name='dep-dir-d-console-host', tier=1,
-    covers=['include/console_attr.h', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/memmap.h', 'include/tvram.h', 'kernel/console/console.c', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/platform_io.h', 'tools/tests/dep_dir_d_console_grid_host.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/console_attr.h', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/memmap.h', 'include/tvram.h', 'kernel/console/console.c', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/platform_io.h', 'tools/tests/dep_dir_d_console_grid_host.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -127,7 +127,7 @@ def main():
         mutations(source, expected)
 
 
-GRID_FILES = ('drivers/video/pc98/pc98_route.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_attr.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/kprintf.h', 'include/memmap.h', 'include/pc98.h', 'include/tvram.h', 'include/types.h', 'kernel/console/console.c', 'kernel/console/console_backend.h', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/console.c', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
+GRID_FILES = ('include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_attr.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/kprintf.h', 'include/memmap.h', 'include/pc98.h', 'include/tvram.h', 'include/types.h', 'kernel/console/console.c', 'kernel/console/console_backend.h', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/console.c', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
 
 GRID = 'platform/pc98/console.c'
 GRID_KERNEL = 'kernel/console/console.c'
@@ -135,8 +135,8 @@ GRID_HEADER = 'kernel/console/console_backend.h'
 GRID_HARNESS = 'tools/tests/dep_dir_d_console_grid_host.c'
 GRID_MUTATIONS = (
     (GRID, '*p ^= TATTR_REVERSE;', '*p |= TATTR_REVERSE;'),
-    (GRID_KERNEL, '    con_sink_enable();\n    if (v86_is_active()) return;',
-     '    if (v86_is_active()) return;\n    con_sink_enable();'),
+    (GRID_KERNEL, '    con_sink_enable();\n    if (legacy_active()) return;',
+     '    if (legacy_active()) return;\n    con_sink_enable();'),
 )
 
 

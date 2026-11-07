@@ -241,7 +241,9 @@ static const ConOutputOps capture_output = { .putchar = capture_putchar };
 u16 unicode_to_jis(u32 cp) { (void)cp; return 0; }
 u8 unicode_to_ank(u32 cp) { (void)cp; return 0; }
 utf8_decode_t utf8_decode(const u8 *src) { utf8_decode_t d; (void)src; kmemset(&d, 0, sizeof(d)); return d; }
-int v86_is_active(void) { return fake_v86_active; }
+#define LEGACY_FAKE_ACTIVE_ENABLE
+#define LEGACY_FAKE_ACTIVE fake_v86_active
+#include "legacy_guest_fake.h"
 
 /* ---- 残りの依存 (この試験の経路では呼ばれない、または無害) ---- */
 GfxCounters gfx_counters;
