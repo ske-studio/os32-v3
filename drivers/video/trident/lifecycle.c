@@ -29,57 +29,56 @@ static int mode_enable(struct trident_device *d)
 {
     /* vtSema covers partial mode programming, not just a published screen. */
     d->closed = d->leave_done = false;
-    STAGE(TRI_STEP_MODE, trident_mode_640(d));
+    const struct tri_mode *mode = d->mode.valid ? &d->mode.selected :
+                                  &tri_modes[TRI_MODE_DEFAULT_ID - 1u];
+    STAGE(TRI_STEP_MODE, tri_mode_set(d, mode));
     STAGE(TRI_STEP_ENABLE, trident_route_enable(d));
     return 0;
 }
 
-/* TridentLoadPalette, trident_dac.c:1259-1282: each mask/index/RGB OUTB
- * has two status reads (DACDelay), including the initial HAL palette. */
-static int dac_write(struct trident_device *d, u32 port, u8 value)
-{
-    u8 ignored;
-    int rc = trident_write8(d, TRI_SPACE_REGS, port, value);
-    if (rc) return rc;
-    rc = trident_read8(d, TRI_SPACE_REGS, d->cur_vga_base + 6u, &ignored);
-    if (rc) return rc;
-    return trident_read8(d, TRI_SPACE_REGS, d->cur_vga_base + 6u, &ignored);
-}
-
-#define CLIENT_WRITE(call) do { int rc = (call); if (rc) return rc; } while (0)
-
+/* D:3534-3546,3637-3661: framebuffer and offscreen manager precede
+ * accelerator/cursor setup. Release old consumers before resetting F5's
+ * bookkeeping; the core callback owns the surface/lease replacement. */
 static int client_init(struct trident_device *d)
 {
-    const PaletteEntry *sys = palette_get_all();
-    u8 rgb[TRI_DAC_BYTES];
-    u32 i = 0;
-    /* System colors use HAL component units; cube/gray use DAC units. */
-    for (; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); ++i) {
-        rgb[i * 3] = trident_palette_dac6(sys[i].r, GFX_PALETTE_COMPONENT_BITS);
-        rgb[i * 3 + 1] = trident_palette_dac6(sys[i].g, GFX_PALETTE_COMPONENT_BITS);
-        rgb[i * 3 + 2] = trident_palette_dac6(sys[i].b, GFX_PALETTE_COMPONENT_BITS);
+    int rc = tri_video_stop(d, true);
+    if (rc) return rc;
+    rc = tri_vram_free(d, &d->accel.pattern);
+    if (rc) return rc;
+    d->accel.initialized = false;
+    rc = tri_vram_free(d, &d->cursor.allocation);
+    if (rc) return rc;
+    d->cursor.available = false;
+    rc = tri_vram_init(d, &d->mode.selected);
+    if (rc) return rc;
+    if (!d->res->configure) return TRI_E_STATE;
+    rc = d->res->configure(&d->mode.selected, d->vram.first_off, true);
+    if (rc) return rc;
+    d->mode.display = d->res->display;
+    d->mode.client = d->res->client_surface;
+    d->mode.generation = d->res->generation;
+    for (u32 i = 0; i < d->mode.client.bytes; ++i) {
+        if (d->res->ram_fallback) d->res->client[i] = 0;
+        else {
+            rc = trident_write8(d, TRI_SPACE_LFB, d->mode.client.off + i, 0);
+            if (rc) return rc;
+        }
     }
-    const u32 dac_max = (1u << 6) - 1u;
-    for (u32 r = 0; r < GFX_PALETTE_CUBE_LEVELS; ++r)
-        for (u32 g = 0; g < GFX_PALETTE_CUBE_LEVELS; ++g)
-            for (u32 b = 0; b < GFX_PALETTE_CUBE_LEVELS; ++b, ++i) {
-                rgb[i * 3] = r * dac_max / (GFX_PALETTE_CUBE_LEVELS - 1u);
-                rgb[i * 3 + 1] = g * dac_max / (GFX_PALETTE_CUBE_LEVELS - 1u);
-                rgb[i * 3 + 2] = b * dac_max / (GFX_PALETTE_CUBE_LEVELS - 1u);
-            }
-    for (u32 gray = 0; i < TRI_DAC_COLORS; ++i, ++gray) {
-        u32 gray8 = GFX_PALETTE_GRAY_FIRST + gray * GFX_PALETTE_GRAY_STEP;
-        u8 v = (gray8 * dac_max + 127u) / 255u;
-        for (u32 c = 0; c < GFX_RGB_COMPONENTS; ++c) rgb[i * 3 + c] = v;
+    return TRI_OK;
+}
+
+/* D:3692,3700-3703: optional initialization never rejects ScreenInit.
+ * Keep the failure diagnostic, but publish only usable component features. */
+static void accel_init(struct trident_device *d)
+{
+    int rc = tri_accel_init(d, &d->mode.selected);
+    if (rc) {
+        failed(d, TRI_STEP_CLIENT, rc);
+        d->accel.initialized = false;
+        d->mode.no_accel = true;
     }
-    for (i = 0; i < TRI_DAC_COLORS; ++i) {
-        CLIENT_WRITE(dac_write(d, TRI_DAC_MASK, 0xFF));
-        CLIENT_WRITE(dac_write(d, TRI_DAC_WRITE_INDEX, i));
-        for (u32 c = 0; c < GFX_RGB_COMPONENTS; ++c)
-            CLIENT_WRITE(dac_write(d, TRI_DAC_DATA, rgb[i * 3 + c]));
-    }
-    for (i = 0; i < TRI_DISPLAY_BYTES; ++i) d->res->client[i] = 0;
-    return 0;
+    if (!d->accel.initialized) d->mode.features &= ~TRI_CAP_GE;
+    if (!d->accel.pattern.allocated) d->mode.features &= ~TRI_CAP_MONO_PATTERN;
 }
 
 int trident_screen_init(struct trident_device *d)
@@ -88,6 +87,7 @@ int trident_screen_init(struct trident_device *d)
     if (!d->armed || !d->pinned || !d->res->ready) return TRI_E_STATE;
     if (d->returning) return TRI_E_BUSY;
     d->last_rc = d->failed_step = d->restore_rc = d->disable_rc = 0;
+    d->screen_ready = false;
     if (!d->preinit_done) {
         u8 misc;
         STAGE(TRI_STEP_IDENTIFY, trident_identify(d));
@@ -108,7 +108,22 @@ int trident_screen_init(struct trident_device *d)
     rc = client_init(d);
     if (rc) return failed(d, TRI_STEP_CLIENT, rc);
     d->step = TRI_STEP_CLIENT;
-    STAGE(TRI_STEP_CLIENT, trident_video_reset(d));
+    accel_init(d);
+    rc = tri_cursor_init(d);
+    if (rc) {
+        failed(d, TRI_STEP_CLIENT, rc);
+        d->cursor.available = false;
+    }
+    if (!d->cursor.available) d->mode.features &= ~TRI_CAP_CURSOR;
+    STAGE(TRI_STEP_CLIENT, tri_palette_load_default(d));
+    /* D:3741 DPMS registration is F10's static HAL hook; no automatic On. */
+    rc = trident_video_reset(d);
+    d->video.last_rc = rc;
+    if (rc) {
+        failed(d, TRI_STEP_CLIENT, rc);
+        d->video.polling = false;
+        d->mode.features &= ~TRI_CAP_VIDEO;
+    }
     d->screen_ready = true;
     d->step = TRI_STEP_ACTIVE;
     return 0;
@@ -120,9 +135,15 @@ int trident_enter(struct trident_device *d)
     if (d->returning) return TRI_E_BUSY;
     if (!d->screen_ready) return TRI_E_STATE;
     d->last_rc = d->failed_step = 0;
+    u32 features = d->mode.features;
     int rc = mode_enable(d);
-    if (!rc) d->step = TRI_STEP_ACTIVE;
-    return rc;
+    if (rc) return rc;
+    /* Enter does not reinitialize cursor/video: retain their availability. */
+    d->mode.features &= features | TRI_CAP_GE;
+    accel_init(d);
+    STAGE(TRI_STEP_CLIENT, tri_palette_reload(d));
+    d->step = TRI_STEP_ACTIVE;
+    return TRI_OK;
 }
 
 static int restore_lock(struct trident_device *d)
@@ -159,20 +180,27 @@ static int return98(struct trident_device *d, bool close)
         return d->restore_rc ? d->restore_rc : d->disable_rc;
     }
     d->returning = true;
-    int first, second;
+    int first = tri_sync(d);
+    if (first) failed(d, TRI_STEP_ACTIVE, first);
+    /* F4: remove cooperative polling even if the stop itself fails. */
+    d->video.polling = false;
+    int stop = tri_video_stop(d, true);
+    if (stop) failed(d, TRI_STEP_ACTIVE, stop);
+    if (!first) first = stop;
+    int second, third;
     if (close) {
-        first = disable(d);
-        second = restore_lock(d);
-    } else {
-        first = restore_lock(d);
         second = disable(d);
+        third = restore_lock(d);
+    } else {
+        second = restore_lock(d);
+        third = disable(d);
     }
     d->active = false; /* state_restore requires vtSema until it returns */
     d->returning = false;
     d->leave_done = !close;
     d->closed = close;
-    if (close && !first && !second) d->step = TRI_STEP_CLOSED;
-    return first ? first : second;
+    if (close && !first && !second && !third) d->step = TRI_STEP_CLOSED;
+    return first ? first : (second ? second : third);
 }
 
 int trident_leave(struct trident_device *d) { return return98(d, false); }

@@ -72,6 +72,12 @@ static u32 port_reads;
 #define FIRST_DDC_BUS 3U
 #define NEXT_DDC_BUS (FIRST_DDC_BUS + 1U)
 static u8 expected_ddc_bus;
+static u8 edid_fixture[128];
+static bool real_edid;
+static const struct gf4_data_ops diagnostic_data = {
+    .version=GF4_DATA_VERSION, .size=sizeof(struct gf4_data_ops),
+    .edid_modes=gf4_edid_modes
+};
 
 /* Independent A3-card oracle: 10 camera steps, two initial cursor images
  * plus the mode-change upload; two flip steps of 16 frames each. */
@@ -355,6 +361,10 @@ static int ddc_call(struct gf4_ctx *ctx, u8 bus, u8 block, u8 out[128], u32 dl)
     ++ddcs;
     i32 rc = case_event(CASE_DDC);
     if (rc) return rc;
+    if (real_edid) {
+        gf2_host_memcpy(out, edid_fixture, 128);
+        return 0;
+    }
     gf2_host_memset(out, block, 128);
     if (!block) out[126] = 1; /* One extension: confirms traversal, not EDID parsing. */
     return 0;
@@ -494,6 +504,7 @@ static void reset(void)
     revoke_cursor = revoke_flip = revoke_snapshot = wrong_base = false; snapshot_rc = 0;
     foundation_ops = (struct gf1_test_ops){.production=&host.base.f, .call=snapshot_call};
     host.base.f.stats.vblank[1] = U32_MAX - 7U; /* Exercise natural wrap in 16 flips. */
+    real_edid = false; host.ctx.data = &diagnostic_data;
     expected_ddc_bus = FIRST_DDC_BUS;
     host.links.i2c_port = port_call;
 }
@@ -691,6 +702,46 @@ static void enumeration(void)
     assert(gf_display_test(0) == GF4_ENODEV && !nevents);
     reset(); normal_slot = NULL;
     assert(gf_display_test(0) == GF4_ESTATE && !nevents);
+}
+/* E-EDID table 3.21: 640/160, 480/45, H16/96, V10/2 at 25.17MHz.
+ * Includes the name descriptor and checksum in the same bytes as the CRC. */
+static void edid_diagnostics(void)
+{
+    reset(); real_edid = true;
+    gf2_host_memset(edid_fixture, 0, sizeof(edid_fixture));
+    for (u32 i = 1; i < 7; ++i) edid_fixture[i] = 255;
+    edid_fixture[8] = 0x10; edid_fixture[9] = 0xac;
+    edid_fixture[10] = 0x34; edid_fixture[11] = 0x12;
+    edid_fixture[18] = 1; edid_fixture[19] = 4; edid_fixture[24] = 2;
+    for (u32 i = 38; i < 54; ++i) edid_fixture[i] = 1;
+    static const u8 dtd[] = {0xd5,0x09,0x80,0xa0,0x20,0xe0,0x2d,0x10,
+                            16,96,0xa2,0,0,0,0,0,0,0x18};
+    gf2_host_memcpy(edid_fixture + 54, dtd, sizeof(dtd));
+    edid_fixture[75] = 0xfc;
+    gf2_host_memcpy(edid_fixture + 77, "TEST PANEL\n  ", 13);
+    u8 sum = 0;
+    for (u32 i = 0; i < 127; ++i) sum += edid_fixture[i];
+    edid_fixture[127] = (u8)(0U - sum);
+    state.edid = (struct gf4_edid_state){.base_valid=true, .ntiming=7,
+        .preferred=4, .last_rc=GF4_EUNSUPPORTED};
+    assert(!gf_display_test(0) && ddcs == 1);
+    assert(gf2_host_strstr(output, "GF4 detect-edid last_rc=-410 base_valid=1 ntiming=7 preferred=4"));
+    assert(state.edid.ntiming == 7 && state.edid.preferred == 4);
+    assert(gf2_host_strstr(output, "GF4 edid-id vendor=10ac product=4660"));
+    assert(gf2_host_strstr(output, "GF4 edid-name name=TEST PANEL\r\n"));
+    assert(gf2_host_strstr(output, "GF4 edid-first-dtd width=640 height=480 khz=25170 hs=656 he=752 ht=800 vs=490 ve=492 vt=525 flags=3"));
+    assert(gf2_host_strstr(output, "GF4 edid-preferred width=640 height=480 khz=25170"));
+    assert(gf2_host_strstr(output, "GF4 edid-parse connector=165 bus=3 block=0 rc=0 base_valid=1 ntiming=1 preferred=0"));
+    u32 crc = crc32_core_final(crc32_core_update(CRC32_INIT, edid_fixture, 128));
+    char expected[] = "CRC=00000000 rc=0";
+    for (u32 i = 0; i < 8; ++i)
+        expected[4 + i] = "0123456789abcdef"[(crc >> (28 - 4 * i)) & 15];
+    assert(gf2_host_strstr(output, expected));
+    assert(!prepares && !sets && !powers);
+    /* A bad base checksum stays a successful DDC read, with parser failure. */
+    edid_fixture[127] ^= 1; ddcs = 0;
+    assert(!gf_display_test(0));
+    assert(gf2_host_strstr(output, "rc=-406 base_valid=0 ntiming=0 preferred=4294967295"));
 }
 static void enumeration_ports(void)
 {
@@ -1286,7 +1337,7 @@ static void cui_controls(void)
 void _start(void)
 {
     cui_controls(); wire_and_admission(); start_failures(); restore_retries();
-    mode_steps(); dpms_steps(); enumeration(); enumeration_ports();
+    mode_steps(); dpms_steps(); enumeration(); edid_diagnostics(); enumeration_ports();
     skipped_modes(); case_failures();
     cursor_steps(); flip_steps(); operation_budgets(); cursor_flip_failures();
     gamma_steps(); output_budgets(); outputs_steps(); outputs_failures(); lifecycle_steps();

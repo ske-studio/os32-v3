@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Trident CPU present: independently checked image, bounds, trace and failures."""
+"""Trident direct VRAM present: synchronization only for every mode."""
 CHECK = dict(name='trident-present', tier=1, needs=[], budget=3,
     covers=['drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_present_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'include/types.h', 'include/memmap.h',
-            'include/pegc.h', 'gfx/palette.h'])
+            'include/pegc.h', 'gfx/palette.h', 'build/config.mk'])
 import argparse
 import os
 from pathlib import Path
@@ -16,12 +16,16 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/video/trident/present.c'
-MUTANTS = [('M_LAST_ROW', 'row < (u32)h;', 'row + 1u < (u32)h;'),
-           ('M_SOURCE_END', 'end > r->client_bytes', 'end > TRI_DISPLAY_BYTES'),
-           ('M_DROP_RC', 'if (rc) return rc;\n            ++off; ++src; --left;\n        }\n    }',
-            'if (rc) return TRI_OK;\n            ++off; ++src; --left;\n        }\n    }'),
-           ('M_DWORD_PRESENT', '#define TRI_PRESENT_USE_SPAN32 0',
-            '#define TRI_PRESENT_USE_SPAN32 1')]
+MUTANTS = [
+    ('M_SKIP_SYNC', 'return tri_sync(d);', '(void)d; return TRI_OK;'),
+    ('M_DROP_RC', 'return tri_sync(d);', '(void)tri_sync(d); return TRI_OK;'),
+    ('M_DOUBLE_SYNC', 'return tri_sync(d);', '(void)tri_sync(d); return tri_sync(d);'),
+    ('M_NOACCEL_SKIP', 'return tri_sync(d);',
+     'if (d && d->settings.no_accel) { return TRI_OK; } return tri_sync(d);'),
+    ('M_COPY', 'return tri_sync(d);',
+     'if (d) { int rc = d->io->write8(d->io_opaque, TRI_SPACE_LFB, 0, 1); '
+     'if (rc) return rc; } return tri_sync(d);'),
+]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -30,11 +34,9 @@ def main():
     original = SOURCE.read_text()
     with tempfile.TemporaryDirectory(prefix='trident-present-') as tmp:
         work = Path(tmp)
-        for name, old, new in [('normal', None, None), ('span32', None, None)] + (MUTANTS if args.mutate else []):
+        for name, old, new in ([('normal', None, None)] +
+                               (MUTANTS + [('restored', None, None)] if args.mutate else [])):
             source = original
-            if name == 'span32':
-                source = source.replace('#define TRI_PRESENT_USE_SPAN32 0',
-                                        '#define TRI_PRESENT_USE_SPAN32 1')
             if old is not None:
                 assert source.count(old) == 1
                 source = source.replace(old, new, 1)
@@ -44,7 +46,6 @@ def main():
             subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-                *(['-DTEST_PRESENT_SPAN32'] if name == 'span32' else []),
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
                 *include_flags(ROOT), str(path), str(ROOT / 'tools/tests/trident_device_fake.c'),
                 str(ROOT / 'tools/tests/trident_present_host.c'), '-o', str(exe)], check=True)

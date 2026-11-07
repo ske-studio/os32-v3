@@ -5,6 +5,7 @@
 #include "kernel/v86/v86_gcap.h"
 #include "kdebug/kpeek.h"
 #include "kdebug/hwb_wire.h"
+#include "kdebug/trident_command_test.h"
 #include "kdebug/recover.h"
 #include "kdebug/recover_diag.h"
 #include "drivers/char/serial.h"
@@ -54,6 +55,7 @@ void v86_gcap_release(void) { calls++; }
 #ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real kdebug/hwb_access.c */
 i32 hwb_access(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
 #endif
+i32 trident_command_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return -1; }
 i32 kpeek_call(u32 op, void *buf, u32 size) { (void)op; (void)buf; (void)size; calls++; return 0; }
 /* T3 entry adapters must remain dormant during module init. Each dependency
  * counts an unexpected call; no hardware callback is executed by this test. */

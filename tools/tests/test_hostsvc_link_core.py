@@ -20,6 +20,16 @@ ANCHOR = '    link_host_deadlines();'
 
 
 MUTATIONS = (
+    ('net/link_host_api.inc', '            e->rel_tick = e->last_tx_tick;',
+     '            e->rel_tick = tick_count;'),
+    ('net/link_host_api.inc', '        e->rel_pending = 1;\n        e->rel_rid = e->rid;',
+     '        e->rel_pending = 0;\n        e->rel_rid = e->rid;'),
+    ('net/link_host_api.inc', '            e->rel_interval = LINK_PROBE_TICKS;',
+     '            e->rel_interval = LINK_RTO_TICKS;'),
+    ('net/link_host_api.inc', '            e->rel_tries = e->retries;',
+     '            e->rel_tries = 0;'),
+    ('net/link.c', '(e->rel_interval ? e->rel_interval : LINK_RTO_TICKS)',
+     'LINK_RTO_TICKS'),
     ('net/link.c', ANCHOR, '    /* deadline hook omitted */'),
     ('net/link_rx.inc', '    link_host_progress((i32)(e - link_h));\n    e->last_rx_tick', '    e->last_rx_tick'),
     ('net/link_rx.inc', '            link_host_progress((i32)(e - link_h)); /* REQUEST ACK advances */', ''),

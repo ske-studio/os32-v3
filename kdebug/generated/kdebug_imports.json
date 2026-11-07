@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2498533430,
+  "module_abi_gen": 268108052,
   "stage": "S6",
-  "count": 320,
+  "count": 321,
   "imports": [
     {
       "stage": "S1",
@@ -4844,6 +4844,22 @@
       "type_ver": 1,
       "signature": "int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);",
       "source_declaration": "int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 320,
+      "symbol": "trident_diagnostic_ops",
+      "source": "drivers/video/trident/trident_module.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "trident_diagnostic_ops",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "const struct TridentDiagnosticOps *trident_diagnostic_ops(void);",
+      "source_declaration": "const struct TridentDiagnosticOps *trident_diagnostic_ops(void);",
       "dtype": null,
       "array": false
     }

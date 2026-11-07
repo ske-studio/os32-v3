@@ -26,7 +26,9 @@ M5 appends resource_lookup/device_map/device_unmap at indices 44-46;
 only the import declaration pin changes, not the layout/inventory pins.
 Guard lifetime D1-D6 adds dynamic ledger intervals, borrow nodes, view loans,
 F5 resident tile slots/saved raw values, cleanup_pending and management abandon.
-GF5_IMAGE_VERSION is 2; import indices/signatures and public KAPI are unchanged.
+GF5_IMAGE_VERSION is 3 after GF D0: optional fan/volt/clock availability and
+raw boot core/shader/mux snapshot declarations. The inventory/layout pins
+include those additions; import indices/signatures and public KAPI are unchanged.
 Guard D0 adds the private plan guard, ROM generation and live heat state,
 plus ENODEV and perf pstate/bios_index (the latter occupy existing padding).
 make all regenerates the contract after the reviewed inventory update.
@@ -35,9 +37,6 @@ GF CUI fix12 adds per-opcode TMDS timing and two saved scan origins.
 KAPI v81 appends ime_dict_suspend at KernelAPI offset 1040, moving the
 reserved tail to 1044 and shrinking it from 168 to 164 bytes. The inventory
 adds that member; refresh both pins with --snapshot after reviewing the diff.
-KAPI v82 appends host_notice_read/serial at offsets 1044/1048 and exposes
-struct HostNotice (256 bytes); reserved tail moves to 1052, size 156.
-Reviewed generated inventory/layout; import declarations remain unchanged.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -57,9 +56,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x5de602bf
+REVIEWED_LAYOUT_CRC = 0xa0b2103f
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = '8c91f446d61777142760c1cc9475f1e49310056a82f28e6ba18c0624c9ab7ec5'
+REVIEWED_INVENTORY_SHA = '63d390ffee7f74b3d73ece40d643171835daa95070fc3923e48048f40950d878'
 
 
 def import_declarations(root):

@@ -176,6 +176,32 @@ static void success(u8 block,u32 stretch,bool wrap)
     restored();
 }
 
+/* nvkm_rdi2cr/nvkm_probe_i2c: offset 0, repeated START, one read byte
+ * followed by master NACK. Even 0xff is a successful response. */
+static void probe_cases(void)
+{
+    setup(0); payload[0]=0xff;
+    assert(!gf4_ddc_probe(&host.ctx,BUS,DEADLINE));
+    assert(starts==2 && stops==1);
+    const u8 offset[]={0xa0,0};
+    tx_frame(0,offset,sizeof(offset));
+    assert(frames[1].rises==2U*WIRE_BITS+1U);
+    assert(frames[1].word[0]==((0xa1U<<1)|1U));
+    assert(frames[1].word[1]==((0xffU<<1)|1U));
+    unchanged(); restored();
+    for (u32 frame=1;frame<=2U;frame++) {
+        for (u32 byte=0;byte<(frame==1U ? 2U : 1U);byte++) {
+            setup(0); nack_frame=frame; nack_byte=byte;
+            assert(gf4_ddc_probe(&host.ctx,BUS,DEADLINE)==GF4_EDDC);
+            assert(starts==frame && stops==1);
+            unchanged(); restored();
+        }
+    }
+    setup(0); stuck=true;
+    assert(gf4_ddc_probe(&host.ctx,BUS,25)==GF4_ETIME);
+    assert(*host.now==25 && stops==1); restored();
+}
+
 static void nack_cases(void)
 {
     /* Every write-byte ACK, including segment and read-address ACK. */
@@ -266,7 +292,7 @@ static void failures(void)
 
 void _start(void)
 {
-    success(0,0,false); success(1,3,false);
+    probe_cases(); success(0,0,false); success(1,3,false);
     success(2,0,false); success(3,0,false); success(255,0,true);
     nack_cases(); deadlines(); getters(); failures();
     gf2_host_exit(0);

@@ -209,6 +209,82 @@ static i32 display_route(const struct display_request *q, struct gf4_route *out)
     }
     return GF4_ENODEV;
 }
+/* These records describe the CRC read, not the earlier detect probe.
+ * Like nouveau_connector.c:938-955, use the existing EDID parser via data ops.
+ * Identity/0xfc are raw E-EDID base fields; no mode decoding lives here. */
+static void display_edid_timing(const char *kind, const struct gf4_timing *t)
+{
+    serial_puts_polled(kind);
+    display_number(" width=", t->hd); display_number(" height=", t->vd);
+    display_number(" khz=", t->khz);
+    display_number(" hs=", t->hs); display_number(" he=", t->he);
+    display_number(" ht=", t->ht); display_number(" vs=", t->vs);
+    display_number(" ve=", t->ve); display_number(" vt=", t->vt);
+    display_number(" flags=", t->flags); serial_puts_polled("\r\n");
+}
+static void display_edid_base(const struct gf4_data_ops *data, const u8 *raw)
+{
+    serial_puts_polled("GF4 edid-id vendor=");
+    serial_diag_hex((u32)raw[8] << 8 | raw[9], 4);
+    display_number(" product=", raw[10] | (u32)raw[11] << 8);
+    serial_puts_polled("\r\n");
+    bool first = true;
+    for (u32 i = 54; i < 126; i += 18) {
+        const u8 *d = raw + i;
+        if (!d[0] && !d[1]) {
+            if (!d[2] && d[3] == 0xfc) {
+                char name[14];
+                u32 n = 0;
+                while (n < 13 && d[5 + n] && d[5 + n] != '\n') {
+                    name[n] = d[5 + n]; ++n;
+                }
+                name[n] = 0;
+                serial_puts_polled("GF4 edid-name name=");
+                serial_puts_polled(name); serial_puts_polled("\r\n");
+            }
+            continue;
+        }
+        if (!first) continue;
+        first = false;
+        /* Isolate the first raw DTD so an unsupported DTD cannot silently
+         * be replaced by a later parsed mode. The existing parser decodes
+         * it; the original CRC block is never modified. */
+        if (data && data->edid_modes) {
+            u8 block[DISPLAY_EDID_BYTES] = {0};
+            for (u32 j = 0; j < 35; ++j) block[j] = raw[j];
+            for (u32 j = 38; j < 54; ++j) block[j] = 1;
+            for (u32 j = 0; j < 18; ++j) block[54 + j] = d[j];
+            u8 sum = 0;
+            for (u32 j = 0; j < 127; ++j) sum += block[j];
+            block[127] = (u8)(0U - sum);
+            struct gf4_edid_state one = {0};
+            i32 rc = data->edid_modes(block, 0, &one);
+            serial_puts_polled("GF4 edid-dtd"); display_number(" offset=", i);
+            serial_puts_polled(" rc="); serial_diag_i32(rc ? rc : one.last_rc);
+            serial_puts_polled("\r\n");
+            if (!rc && one.ntiming)
+                display_edid_timing("GF4 edid-first-dtd", &one.timing[0]);
+        }
+    }
+}
+static void display_edid_parse(const struct display_request *q, u8 bus, u32 block,
+                               const struct gf4_data_ops *data,
+                               struct gf4_edid_state *edid)
+{
+    i32 rc = data && data->edid_modes ?
+        data->edid_modes(display_row, block, edid) : GF4_EUNSUPPORTED;
+    if (serial_gate_active()) return;
+    serial_puts_polled("GF4 edid-parse");
+    display_number(" connector=", q->connector); display_number(" bus=", bus);
+    display_number(" block=", block); serial_puts_polled(" rc="); serial_diag_i32(rc);
+    display_number(" base_valid=", edid->base_valid);
+    display_number(" ntiming=", edid->ntiming);
+    display_number(" preferred=", edid->preferred);
+    serial_puts_polled("\r\n");
+    if (!block) display_edid_base(data, display_row);
+    if (!rc && edid->base_valid && edid->preferred < edid->ntiming)
+        display_edid_timing("GF4 edid-preferred", &edid->timing[edid->preferred]);
+}
 /* Non-destructive case0: enumerate each connector once, with all its modes
  * and base/extension EDID CRCs from the first valid route port. No detect:
  * that rebuilds the mode table and is forbidden on an active display. */
@@ -216,6 +292,15 @@ static i32 display_enumerate(const struct display_request *q)
 {
     const struct gf4_test_ops *o = geforce_display_ops();
     if (!o || !o->ctx) return GF4_ESTATE;
+    /* Detect retains only the last connector's parsed state, without its
+     * connector/bus or the DDC/parser return codes. Do not invent attribution. */
+    if (o->ctx->state && !serial_gate_active()) {
+        const struct gf4_edid_state *e = &o->ctx->state->edid;
+        serial_puts_polled("GF4 detect-edid last_rc="); serial_diag_i32(e->last_rc);
+        display_number(" base_valid=", e->base_valid);
+        display_number(" ntiming=", e->ntiming); display_number(" preferred=", e->preferred);
+        serial_puts_polled("\r\n");
+    }
     u32 nroutes = o->ctx->nroutes;
     if (!nroutes) {
         display_record(q, "SKIP", 0, 0, 0, GF4_ENODEV);
@@ -269,6 +354,7 @@ static i32 display_enumerate(const struct display_request *q)
             display_record(&item, "SKIP", 0, 0, 0, GF4_ENODEV);
             if (!result) result = GF4_ENODEV;
         }
+        struct gf4_edid_state edid = {0};
         u32 blocks = 1, dl = 0;
         o = geforce_display_ops();
         if (!o || !o->ctx || !o->ddc_read) return GF4_ESTATE;
@@ -288,7 +374,16 @@ static i32 display_enumerate(const struct display_request *q)
             u32 crc = rc ? 0 : crc32_core_final(crc32_core_update(
                 CRC32_INIT, display_row, DISPLAY_EDID_BYTES));
             display_record(&item, rc ? "SKIP" : "DDC", block, 0, crc, rc);
+            if (!serial_gate_active()) {
+                serial_puts_polled("GF4 edid-read");
+                display_number(" connector=", item.connector); display_number(" bus=", bus);
+                display_number(" block=", block); serial_puts_polled(" rc="); serial_diag_i32(rc);
+                serial_puts_polled("\r\n");
+            }
             if (rc) { if (!result) result = rc; break; }
+            o = geforce_display_ops();
+            if (!o || !o->ctx) return GF4_ESTATE;
+            display_edid_parse(&item, bus, block, o->ctx->data, &edid);
             /* EDID base byte126 is the extension count (0..255). */
             if (!block) blocks += display_row[126];
         }

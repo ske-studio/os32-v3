@@ -15,7 +15,7 @@
 #define LARGE_BYTES (9U*MIB)
 #define CURSOR_BYTES GF4_CURSOR_BYTES
 #define VRAM_BYTES (LARGE_BYTES+CURSOR_BYTES)
-#define ARENA_BYTES (VRAM_BYTES+64U*1024U) /* metadata and allocator alignment */
+#define ARENA_BYTES (2U*VRAM_BYTES+64U*1024U) /* metadata and allocator alignment */
 #define TRACE_CAP 512U /* two enumeration passes, 12 tiles and finite callbacks */
 #define BOOT_CORE_KHZ 300000U
 #define BOOT_MEM_KHZ 200000U
@@ -34,8 +34,8 @@ static struct gf5_fan_trip trips[2];
 static u32 expected_deadline, current_uv;
 static bool check_deadline, reenter, bad_epoch, nested_error, stop_off_error;
 static struct gf5_clock captured_clock;
-static struct gf5_plan thermal_plan;
-static bool use_thermal_plan;
+static struct gf5_clock_raw captured_raw;
+static struct gf5_plan captured_plan;
 
 static u8 pattern(u32 i) { return (u8)(i^(i>>8)^0xa5U); }
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
@@ -68,14 +68,25 @@ static void observe(struct gf5_host *host,const struct gf5_host_event *e)
         *(struct gf5_clock *)e->p[1]=captured_clock;
     if (e->op==F5_CALC && e->a[0]==F5_CALL_CALC) {
         const struct gf5_clock *clock=e->p[1];
-        assert(clock->core_khz==captured_clock.core_khz &&
-               clock->shader_khz==captured_clock.shader_khz &&
-               clock->mem_khz==captured_clock.mem_khz);
-        *(struct gf5_plan *)e->p[2]=use_thermal_plan ? thermal_plan :
-            (struct gf5_plan){.actual=*clock};
+        assert(clock==&g->image->clock);
+        assert(!gf2_host_memcmp(clock,&captured_clock,sizeof(*clock)));
+        *(struct gf5_plan *)e->p[2]=captured_plan;
     }
+    if (e->op==F5_RAM) {
+        assert(!gf2_host_memcmp(e->p[1],&captured_plan,sizeof(captured_plan)));
+        assert(!host->calls[F5_FAN] && !host->calls[F5_VOLT] && !host->calls[F5_PROG]);
+    }
+    if (e->op==F5_CALC && e->a[0]==F5_CALL_RAW_SAVE)
+        *(struct gf5_clock_raw *)e->p[1]=captured_raw;
+    if (e->op==F5_PROG && e->a[0]==F5_CALL_RAW_RESTORE) {
+        const struct gf5_clock_raw *raw=e->p[1];
+        assert(raw==&g->image->clock_raw);
+        assert(!gf2_host_memcmp(raw,&captured_raw,sizeof(*raw)));
+    }
+    if (e->op==F5_FAN && e->a[0]==F5_CALL_GET) *(u32 *)e->p[1]=SAVED_DUTY;
     if (e->op==F5_VOLT && e->a[0]==F5_CALL_GET) *(u32 *)e->p[1]=current_uv;
-    if (e->op==F5_RAM || e->op==F5_PROG || e->op==F5_FAN ||
+    if (e->op==F5_RAM || e->op==F5_PROG ||
+        (e->op==F5_FAN && e->a[0]!=F5_CALL_GET) ||
         (e->op==F5_COPY && e->a[0]) || e->op==F5_RESTORE) {
         assert(g->phase==GF5_RESTORING && g->busy && !g->accepting);
         assert(host->calls[F5_CLOCK64]==1);
@@ -131,7 +142,9 @@ static void reset(void)
     current_uv=BOOT_UV; check_deadline=false; reenter=false;
     bad_epoch=nested_error=stop_off_error=false;
     captured_clock=(struct gf5_clock){BOOT_CORE_KHZ,BOOT_CORE_KHZ,BOOT_MEM_KHZ};
-    use_thermal_plan=false;
+    /* Distinct synthetic solver output verifies calc -> RAM plan forwarding. */
+    captured_plan=(struct gf5_plan){.mc=0x1234U,.mn=0x5678U,.actual=captured_clock};
+    captured_raw=(struct gf5_clock_raw){0xc002001cU,0x14032809U,0xc000001cU,0x3c0bc003U};
 }
 static struct gf5_image *save(void)
 {
@@ -140,6 +153,7 @@ static struct gf5_image *save(void)
     assert(gf5_state_save(&h.ctx,&image)==0 && image);
     assert(h.ctx.phase==GF5_SAVED && !h.ctx.busy && !h.ctx.accepting);
     assert(h.ctx.image==image && image->complete && h.live_allocs==1);
+    assert(image->clock_available || h.calls[F5_CALC]==2);
     assert(image->nextent==2 && image->bytes>8U*MIB);
     assert(image->bytes==sizeof(*image)+sizeof(struct gf5_extent)*2U+
            sizeof(trips)+VRAM_BYTES);
@@ -187,8 +201,9 @@ static void roundtrip(void)
         for (u32 i=0;i<sizeof(vram);++i) assert(vram[i]==pattern(i));
         assert(display.head[0].palette[17]==91 && display.head[0].cursor_visible);
         assert(first(F5_MATCH)<first(F5_RESTART));
-        assert(first(F5_RESTART)<first(F5_RAM));
-        assert(first(F5_RAM)<call(F5_FAN,F5_CALL_CSTATE));
+        assert(first(F5_RESTART)<call(F5_FAN,F5_CALL_CSTATE));
+        assert(h.calls[F5_CALC]==1 && h.calls[F5_RAM]==1);
+        assert(first(F5_CALC)<first(F5_RAM) && first(F5_RAM)<first(F5_FAN));
         u32 volt=call(F5_VOLT,F5_CALL_SET), core=first(F5_PROG);
         assert((pass&1U) ? core<volt : volt<core);
         assert(call(F5_FAN,F5_CALL_THERM_RESUME)<first(F5_COPY));
@@ -202,6 +217,35 @@ static void roundtrip(void)
         trips[0].duty=FAN_CSTATE;
         gf5_host_trace_clear(&h);
     }
+}
+static void diagnostic_conflict(void)
+{
+    /* F4 save.c:138 rejects an active diagnostic snapshot; F5 section 7
+     * treats this as a duplicate request before starting the transaction. */
+    reset();
+    struct gf4_saved diagnostic={0}, before=diagnostic;
+    struct gf5_image retained={.version=GF5_IMAGE_VERSION,.complete=true};
+    struct gf5_image previous=retained, *out=&retained;
+    bool scan_open=h.display.scan_hook_open;
+    h.ctx.image=&retained;
+    h.display.ctx.diagnostic_saved=&diagnostic;
+    assert(gf5_state_save(&h.ctx,&out)==GF5_EBUSY);
+    assert(h.ctx.last_rc==GF5_EBUSY && h.ctx.source_rc==GF4_EBUSY);
+    assert(h.ctx.phase==GF5_RUN && !h.ctx.busy && h.ctx.accepting);
+    assert(h.display.ctx.accepting && h.display.scan_hook_open==scan_open);
+    assert(h.ctx.image==&retained && out==&retained);
+    assert(!gf2_host_memcmp(&retained,&previous,sizeof(retained)));
+    assert(h.display.ctx.diagnostic_saved==&diagnostic);
+    assert(!gf2_host_memcmp(&diagnostic,&before,sizeof(diagnostic)));
+    assert(!h.nevents && !h.display.nevents && !h.live_allocs);
+    /* Closing the diagnostic session permits the same save to complete. */
+    h.display.ctx.diagnostic_saved=0;
+    struct gf5_image *image=save();
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,image));
+    assert(h.ctx.phase==GF5_RUN && h.ctx.accepting);
+    gf5_state_free(&h.ctx,image);
+    assert(!h.ctx.image && !h.live_allocs);
 }
 static void preallocation_failure(void)
 {
@@ -264,6 +308,7 @@ static void restore_failures(void)
     for (u32 i=0;i<sizeof(failures)/sizeof(failures[0]);++i) {
         reset(); struct gf5_image *image=save(); begin_restore();
         enum gf5_host_op op=failures[i].op;
+        nested_error=op==F5_RAM;
         gf5_host_fail_at(&h,op,failures[i].nth,LOWER_ERROR);
         assert(gf5_state_restore(&h.ctx,image)==GF5_EIO);
         assert(h.ctx.source_rc==LOWER_ERROR && h.ctx.phase==GF5_FAULT);
@@ -275,10 +320,7 @@ static void restore_failures(void)
         if (op==F5_RAM) assert(!h.calls[F5_FAN] && !h.calls[F5_VOLT] && !h.calls[F5_PROG]);
         gf5_state_free(&h.ctx,image); assert(!h.live_allocs && !h.ctx.image);
     }
-    reset(); struct gf5_image *image=save(); begin_restore();
-    nested_error=true; gf5_host_fail_at(&h,F5_RAM,1,GF5_EIO);
-    assert(gf5_state_restore(&h.ctx,image)==GF5_EIO && h.ctx.source_rc==LOWER_ERROR);
-    gf5_state_free(&h.ctx,image);
+
 }
 static void identities_and_guards(void)
 {
@@ -367,22 +409,10 @@ static void heat_saved_clock_limit(void)
         assert(!h.ctx.image && !h.live_allocs); heat_equal(live);
     }
 }
-static void heat_plan_fixture(void)
-{
-    /* 27000*10/1 = 270000 core/shared shader; *7/1 = 189000 RAM.
-     * bit31 enables PLL, bit8 bypasses stage 2; mux selects shared core.
-     * actual is intentionally unrelated: fixedgain2 calc can report only
-     * stage 1 (PM's final P0 decision), so only coefficients bound heat. */
-    captured_clock=(struct gf5_clock){270000,270000,189000};
-    thermal_plan=(struct gf5_plan){.nc=0x80000100U,.nn=0x00000a01U,
-        .mc=0x80000100U,.mn=0x00000701U,.mux=0x333U,
-        .actual={1,1,1}};
-    use_thermal_plan=true;
-}
 static void heat_roundtrip(void)
 {
     for (u32 higher=0;higher<2;++higher) {
-        reset(); heat_plan_fixture();
+        reset();
         h.ctx.heat=live_heat();
         struct gf5_heat_state before=h.ctx.heat;
         struct gf5_image *image=save(); heat_equal(before);
@@ -393,53 +423,15 @@ static void heat_roundtrip(void)
         live.cool_samples=1;
         if (higher) {
             ++live.ceiling.core_khz; ++live.ceiling.shader_khz; ++live.ceiling.mem_khz;
-            /* Two-stage x2 then P=1: same decoded 270000/189000. */
-            thermal_plan.nc=thermal_plan.mc=0xc0010000U;
-            thermal_plan.nn|=0x02010000U; thermal_plan.mn|=0x02010000U;
         }
         h.ctx.heat=live; begin_restore();
         assert(gf5_state_restore(&h.ctx,image)==0);
         assert(h.ctx.phase==GF5_RUN && h.ctx.accepting && !h.ctx.busy);
-        assert(h.calls[F5_RAM]==1 && h.calls[F5_PROG]==1+GF5_TILE_COUNT);
+        assert(h.calls[F5_RAM]==1 && h.calls[F5_CALC]==1 && h.calls[F5_PROG]==1+GF5_TILE_COUNT);
         assert(h.calls[F5_RESTORE]==1 && h.calls[F5_ADMIT]==1);
         assert(h.display.base.ch.epoch==image->saved_epoch+1U);
         live.epoch=h.display.base.ch.epoch; heat_equal(live);
         gf5_state_free(&h.ctx,image);
-        assert(!h.ctx.image && !h.live_allocs); heat_equal(live);
-    }
-}
-static void heat_decoded_plan_limit(void)
-{
-    for (u32 variant=0;variant<9;++variant) {
-        reset(); heat_plan_fixture();
-        struct gf5_image *image=save();
-        struct gf5_heat_state live=live_heat();
-        if (variant==0) { ++thermal_plan.nn; } /* M=2: below ceiling control */
-        else if (variant==1) thermal_plan.nn=0x00000b01U; /* core above */
-        else if (variant==2) thermal_plan.mn=0x00000801U; /* memory above */
-        else if (variant==3) { /* shared shader alone above */
-            live.ceiling.core_khz+=27000U;
-            thermal_plan.nn=0x00000b01U;
-        } else if (variant==4) thermal_plan.nc=0x00000100U; /* disabled */
-        else if (variant==5) thermal_plan.nn=0x00000a00U; /* zero M */
-        else if (variant==6) thermal_plan.mux=0; /* unknown source */
-        else if (variant==7) { /* valid stage 2 exceeds ceiling */
-            thermal_plan.nc=0xc0000000U; thermal_plan.nn|=0x02010000U;
-        } else { /* invalid stage 2: zero N */
-            thermal_plan.nc=0xc0000000U; thermal_plan.nn|=0x00010000U;
-        }
-        h.ctx.heat=live; begin_restore();
-        i32 rc=gf5_state_restore(&h.ctx,image);
-        if (!variant) {
-            assert(rc==0 && h.calls[F5_RAM]==1 && h.ctx.accepting);
-            live.epoch=h.display.base.ch.epoch;
-        } else {
-            i32 expected=variant<=3 || variant==7 ? GF5_EBUSY : GF5_ERANGE;
-            assert(rc==expected && h.ctx.source_rc==expected && h.ctx.last_rc==expected);
-            assert(h.ctx.phase==GF5_FAULT && h.calls[F5_RESTART]==1 && h.calls[F5_CALC]==1);
-            heat_no_program(); heat_image_retained(image);
-        }
-        heat_equal(live); gf5_state_free(&h.ctx,image);
         assert(!h.ctx.image && !h.live_allocs); heat_equal(live);
     }
 }
@@ -462,9 +454,129 @@ static void heat_closed_operations(void)
         assert(!h.live_allocs && !h.ctx.image); heat_equal(live);
     }
 }
+/* nouveau volt/base.c:241-251 and therm/fan.c:246-255: unknown
+ * optional state does not prevent the mandatory display/VRAM round trip. */
+static void optional_capture(void)
+{
+    static const enum gf5_host_op missing[]={F5_VOLT,F5_FAN,F5_CALC};
+    for (u32 i=0;i<3;++i) {
+        reset();
+        gf5_host_fail_at(&h,missing[i],1,GF5_EINVAL);
+        struct gf5_image *image=0;
+        assert(gf5_state_save(&h.ctx,&image)==0 && image && image->complete);
+        assert(image->volt_available==(i!=0));
+        assert(image->fan_available==(i!=1));
+        assert(image->clock_available==(i!=2));
+        if (i==1) assert(!image->fan.trip && !image->fan.ntrip);
+        begin_restore();
+        assert(gf5_state_restore(&h.ctx,image)==0 && h.ctx.accepting);
+        assert(h.calls[F5_COPY]==2 && h.calls[F5_RESTORE]==1);
+        if (i==0) assert(!h.calls[F5_VOLT]);
+        if (i==1) assert(!h.calls[F5_FAN]);
+        if (i==2) assert(!h.calls[F5_CALC] && !h.calls[F5_RAM] &&
+                          h.calls[F5_PROG]==GF5_TILE_COUNT);
+        gf5_state_free(&h.ctx,image);
+    }
+    reset();
+    /* A successful read of a source with frequency zero is available. */
+    captured_clock=(struct gf5_clock){0,0,BOOT_MEM_KHZ};
+    struct gf5_image *image=save();
+    assert(image->clock_available && !image->clock.core_khz);
+    gf5_state_free(&h.ctx,image);
+    reset();
+    gf5_host_fail_at(&h,F5_CALC,2,GF5_EIO); /* raw read fails after frequency read */
+    image=save();
+    assert(!image->clock_available && image->volt_available && image->fan_available);
+    gf5_state_free(&h.ctx,image);
+}
+/* Boot-target is a memory operation: old A epoch is intentionally different.
+ * Normal save/restore still own all device and reservation transitions. */
+static void boot_target(void)
+{
+    reset();
+    struct gf5_image *a=save(), *b=0;
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,a));
+    captured_clock.core_khz/=2;
+    captured_clock.mem_khz/=2;
+    captured_raw.nc^=1U; captured_raw.nn^=2U;
+    captured_raw.sc^=4U; captured_raw.mux^=8U;
+    h.ctx.fan.cstate=70; trips[0].duty=70;
+    check_deadline=false;
+    assert(!gf5_state_save(&h.ctx,&b));
+    assert(a!=b && a->saved_epoch!=b->saved_epoch && h.live_allocs==2);
+    struct gf5_image expected=*b;
+    expected.clock=a->clock; expected.clock_raw=a->clock_raw;
+    expected.requested_uv=a->requested_uv; expected.vid=a->vid;
+    expected.fan=a->fan; expected.fan.trip=b->fan.trip;
+    expected.fan_available=a->fan_available;
+    expected.volt_available=a->volt_available;
+    expected.clock_available=a->clock_available;
+    struct gf5_image original_a=*a;
+    struct gf5_fan_saved live_fan=h.ctx.fan;
+    struct gf5_heat_state live_heat=h.ctx.heat;
+    gf5_host_trace_clear(&h);
+    assert(!gf5_state_boot_target(&h.ctx,b,a));
+    assert(!h.nevents && !gf2_host_memcmp(b,&expected,sizeof(expected)));
+    assert(!gf2_host_memcmp(a,&original_a,sizeof(*a)));
+    assert(!gf2_host_memcmp(&h.ctx.fan,&live_fan,sizeof(live_fan)));
+    assert(!gf2_host_memcmp(&h.ctx.heat,&live_heat,sizeof(live_heat)));
+    assert(b->fan.trip!=a->fan.trip && b->fan.trip[0].duty==FAN_CSTATE);
+    a->fan.trip[0].duty=99;
+    assert(b->fan.trip[0].duty==FAN_CSTATE);
+    a->fan.trip[0].duty=FAN_CSTATE;
+    struct gf5_image before=*b;
+    /* Each rejection leaves every destination byte intact. */
+    for (u32 i=0;i<10;++i) {
+        i32 want=GF5_ESTATE;
+        switch (i) {
+        case 0: h.ctx.busy=true; want=GF5_EBUSY; break;
+        case 1: h.ctx.phase=GF5_SAVING; want=GF5_EBUSY; break;
+        case 2: h.ctx.phase=GF5_RESTORING; want=GF5_EBUSY; break;
+        case 3: h.ctx.phase=GF5_RUN; break;
+        case 4: a->complete=false; break;
+        case 5: b->complete=false; break;
+        case 6: a->version=0; break;
+        case 7: b->version=0; break;
+        case 8: ++a->fan.ntrip; break;
+        case 9: h.ctx.image=a; break;
+        }
+        struct gf5_image unchanged=*b;
+        assert(gf5_state_boot_target(&h.ctx,b,a)==want);
+        assert(!gf2_host_memcmp(b,&unchanged,sizeof(*b)) && !h.nevents);
+        *a=original_a; *b=before; h.ctx.image=b;
+        h.ctx.busy=false; h.ctx.phase=GF5_SAVED;
+    }
+    assert(gf5_state_boot_target(0,b,a)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,0,a)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,b,0)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,b,b)==GF5_EINVAL);
+    a->fan_available=a->volt_available=a->clock_available=false;
+    a->fan.ntrip=0; /* no count comparison or fan mutation when unavailable */
+    struct gf5_fan_saved old_fan=b->fan;
+    assert(!gf5_state_boot_target(&h.ctx,b,a));
+    assert(!b->fan_available && !b->volt_available && !b->clock_available);
+    assert(!gf2_host_memcmp(&b->fan,&old_fan,sizeof(old_fan)));
+    *a=original_a;
+    /* Zero shader remains available and must not suppress the raw target. */
+    a->clock.shader_khz=0;
+    assert(!gf5_state_boot_target(&h.ctx,b,a) && b->clock_available);
+    assert(!b->clock.shader_khz);
+    h.ctx.heat.down_active=true; h.ctx.heat.ceiling.core_khz=1;
+    assert(gf5_state_restore(&h.ctx,b)==GF5_EBUSY);
+    h.ctx.heat.down_active=false;
+    captured_clock=a->clock; captured_raw=a->clock_raw;
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,b));
+    gf5_state_free(&h.ctx,a); gf5_state_free(&h.ctx,b);
+    assert(!h.ctx.image && !h.live_allocs);
+}
 void _start(void)
 {
+    boot_target();
+    diagnostic_conflict();
+    optional_capture();
     roundtrip(); preallocation_failure(); save_failures(); restore_failures(); identities_and_guards();
-    heat_saved_clock_limit(); heat_roundtrip(); heat_decoded_plan_limit(); heat_closed_operations();
+    heat_saved_clock_limit(); heat_roundtrip(); heat_closed_operations();
     gf2_host_exit(0);
 }

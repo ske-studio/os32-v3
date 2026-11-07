@@ -54,10 +54,37 @@ static i32 entry(struct gf5 *ctx, u32 index, struct gf5_perf_entry *out)
     ctx->last_rc = ctx->source_rc = 0;
     return 0;
 }
+static bool crc_test;
+static u8 vram[8] = {1,2,3,4,5,6,7,8}, saved_bytes[8], scratch[8];
+static struct gf5_extent extent;
+static struct gf5_image image;
+static u32 copies;
+static i32 alloc_copy(void *owner, u32 bytes, void **out)
+{ REQUIRE(owner == &g && bytes == 8); *out = scratch; return 0; }
+static void free_copy(void *owner, void *ptr)
+{ REQUIRE(owner == &g && ptr == scratch); }
+static i32 copy(void *owner, const struct gf_vram_reservation *key, u8 *out, bool to)
+{
+    REQUIRE(owner == &g && key->off == 4096 && key->bytes == 8 && !to);
+    ++copies;
+    if (failure) { g.last_rc = g.source_rc = failure; return failure; }
+    for (u32 i = 0; i < 8; ++i) out[i] = vram[i];
+    return 0;
+}
+static i32 save(struct gf5 *ctx, struct gf5_image **out)
+{
+    REQUIRE(ctx == &g);
+    for (u32 i = 0; i < 8; ++i) saved_bytes[i] = vram[i];
+    *out = &image; return 0;
+}
+static i32 restore(struct gf5 *ctx, const struct gf5_image *im)
+{ REQUIRE(ctx == &g && im == &image); return 0; }
+static void free_image(struct gf5 *ctx, struct gf5_image *im)
+{ REQUIRE(ctx == &g && im == &image); }
 static i32 calc(struct gf5 *ctx, const struct gf5_clock *c, struct gf5_plan *p)
-{ (void)ctx; (void)c; (void)p; return GF5_EINVAL; }
+{ (void)ctx; (void)c; (void)p; return crc_test ? 0 : GF5_EINVAL; }
 static i32 prog(struct gf5 *ctx, const struct gf5_plan *p)
-{ (void)ctx; (void)p; ++progs; return 0; }
+{ (void)ctx; (void)p; ++progs; if (crc_test) vram[0] ^= 1; return 0; }
 const struct gf5_test_ops *geforce_feature5_ops(void) { return &ops; }
 static void observe(void)
 {
@@ -131,5 +158,36 @@ void _start(void)
     REQUIRE(gf5_test(GF5T_CLOCK_CALC) == 1);
     REQUIRE(gf5_test(GF5T_CLOCK_PROG) == 1 && !progs);
     REQUIRE(host_serial_find("boundary=no_plan_or_owner"));
+    g.ch = &ch; ch.f = &f;
+    crc_test = true; failure = 0;
+    extent = (struct gf5_extent){.key={&g,4096,8,1,7},.host_copy=saved_bytes};
+    d.test.value = extent.key;
+    image = (struct gf5_image){.nextent=1,.extent=&extent,.complete=true};
+    g.links = (struct gf5_links){.owner=&g,.alloc=alloc_copy,.free=free_copy,.copy_extent=copy};
+    ops.state_save=save; ops.state_restore=restore; ops.state_free=free_image;
+    host_serial_reset();
+    REQUIRE(!gf5_test(GF5T_CLOCK_CALC));
+    REQUIRE(!gf5_test(GF5T_RAM_PROG));
+    REQUIRE(copies == 2);
+    REQUIRE(host_serial_find("stage=ram_before owner="));
+    REQUIRE(host_serial_find("stage=ram_after owner="));
+    REQUIRE(host_serial_find("reservation_id=1 generation=7 off=4096 bytes=8 vram_crc=1070237893"));
+    REQUIRE(host_serial_find("vram_crc=4083189851"));
+    host_serial_reset();
+    REQUIRE(!gf5_test(GF5T_SAVE));
+    REQUIRE(host_serial_find("stage=save_extent owner="));
+    REQUIRE(host_serial_find("vram_crc=4083189851 host_crc=4083189851 rc=0"));
+    vram[0] ^= 1;
+    host_serial_reset();
+    REQUIRE(!gf5_test(GF5T_RESTORE));
+    REQUIRE(host_serial_find("stage=restore_extent owner="));
+    REQUIRE(host_serial_find("vram_crc=1070237893 host_crc=4083189851 rc=0"));
+    /* Observation failure must not replace a successful restore result. */
+    failure = -91; g.last_rc = -506; g.source_rc = -123;
+    host_serial_reset();
+    REQUIRE(!gf5_test(GF5T_RESTORE));
+    REQUIRE(host_serial_find("vram_crc=unreadable host_crc=4083189851 rc=-91"));
+    REQUIRE(g.last_rc == -506 && g.source_rc == -123);
+    REQUIRE(!gf5_test(GF5T_FREE));
     quit(0);
 }

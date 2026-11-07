@@ -93,12 +93,16 @@ static int setup(const struct mode_case *c)
     d.saved.valid = true;
     d.reference = 0; /* IsClearTV frequency is initially unset. */
     d.last_rc = -77;
+    d.declared_bytes = 4u * 1024u * 1024u;
+    d.settings.no_accel = c->noaccel;
+    /* At the exact boundary MUX is off; one kHz below enables it. */
+    d.settings.mux_threshold_khz = c->mux ? 25174 : 25175;
     return 0;
 }
 static int check_case(const struct mode_case *c)
 {
     TRY(setup(c));
-    TRY(trident_mode_640(&d));
+    TRY(tri_mode_set(&d, &tri_modes[c->mode]));
     if (!equal(d.reference, (c->reference & 0x80) | 1) || !equal(f.trace_count, c->count) ||
         f.trace_overflow || !equal(d.last_rc, (u32)-77) || !d.active ||
         d.init_done || d.preinit_done || f.pc98_initialized || f.port_writes ||
@@ -109,15 +113,19 @@ static int check_case(const struct mode_case *c)
             !equal(a->value, b->value) || !equal(a->width, b->width) ||
             !equal(a->write, b->write) || !equal(a->count, 1) || a->rc) return 2;
     }
+    if (!d.mode.valid || d.mode.selected.id != c->mode + 1u ||
+        d.mode.selected.display_width * (d.mode.selected.bpp / 8u) != c->pitch ||
+        d.mode.no_accel != (c->noaccel || c->mode % 5 == 3) ||
+        d.mode.mux != c->mux) return 6;
     /* Reenter with the opposite C0 bit at the now-color base. IsClearTV
      * must retain the first selection even when that selection was NTSC.
      * Check both reference and actual clock writes; no C0 read is allowed. */
     f.cr_color[0xC0] = c->reference ^ 0x80;
     f.trace_count = 0;
-    TRY(trident_mode_640(&d));
+    TRY(tri_mode_set(&d, &tri_modes[c->mode]));
     if (!equal(d.reference, (c->reference & 0x80) | 1) ||
-        !equal(f.regs[TRI_PLL_LO], c->reference & 0x80 ? 0xA4 : 0xE5) ||
-        !equal(f.regs[TRI_PLL_HI], c->reference & 0x80 ? 0x0E : 0x1E)) return 4;
+        !equal(f.regs[TRI_PLL_LO], c->pll_lo) ||
+        !equal(f.regs[TRI_PLL_HI], c->pll_hi)) return 4;
     for (u32 i = 0; i < f.trace_count; ++i)
         if (trace[i].write && trace[i].offset == TRI_CR_COLOR &&
             trace[i].value == 0xC0) return 5;
@@ -126,11 +134,37 @@ static int check_case(const struct mode_case *c)
     for (u32 op = 1; c->seed == 0 && op <= c->count; ++op) {
         TRY(setup(c));
         trident_fake_fail(&f, op, -123);
-        int rc = trident_mode_640(&d);
+        int rc = tri_mode_set(&d, &tri_modes[c->mode]);
         if (!equal(rc, (u32)-123) || !equal(f.operations, op) ||
             !equal(f.trace_count, op) || !equal(trace[op - 1].rc, (u32)-123))
             return 3;
     }
+    return 0;
+}
+/* Candidate rejection must happen before touching any register. */
+static int invalid_cases(void)
+{
+    TRY(setup(&cases[0]));
+    struct tri_mode m = tri_modes[0], prepared;
+    if (tri_mode_prepare(0, &m, &prepared) != TRI_E_INVAL ||
+        tri_mode_prepare(&d, 0, &prepared) != TRI_E_INVAL ||
+        tri_mode_prepare(&d, &m, 0) != TRI_E_INVAL) return 7;
+    for (u32 i = 0; i < 7; ++i) {
+        m = tri_modes[0];
+        switch (i) {
+        case 0: m.bpp = 32; break; /* depth8/bpp32 is not a format */
+        case 1: m.flags |= 0x80000000u; break;
+        case 2: m.hs = m.hd; break;
+        case 3: m.ve = m.vt; break;
+        case 4: m.ht = 801; break;
+        case 5: m.dot_khz = 26000; break; /* exceeds 32kHz */
+        case 6: m.dot_khz = 24000; break; /* below 31kHz */
+        }
+        if (tri_mode_set(&d, &m) != TRI_E_INVAL || f.operations) return 8;
+    }
+    d.declared_bytes = 256u*1024u;
+    m = tri_modes[0];
+    if (tri_mode_set(&d, &m) != TRI_E_CAP_TOO_SMALL || f.operations) return 9;
     return 0;
 }
 static void emit(const char *s, u32 n)
@@ -138,6 +172,7 @@ static void emit(const char *s, u32 n)
 void _start(void)
 {
     int rc = trident_mode_640(0) != TRI_E_INVAL;
+    if (!rc) rc = invalid_cases();
     for (u32 i = 0; !rc && i < sizeof(cases) / sizeof(cases[0]); ++i)
         rc = check_case(&cases[i]);
     if (rc) emit("RED mode trace/rc\n", 18);

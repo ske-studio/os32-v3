@@ -141,8 +141,10 @@ static int kpeek_call(u32 op,void *p,u32 sz) {(void)op;(void)p;(void)sz;peek_cal
 #include "../../kdebug/gfinit_wire.h"
 #include "../../kdebug/gf_foundation_wire.h"
 #include "../../kdebug/gf_command_wire.h"
+#include "../../kdebug/trident_command_test.h"
 #include "../../kdebug/hwb_wire.h"
 /* HW-BASIC の HW_OP は recovery_call の先頭で分かれる。この試験は recover の op だけを流すので届かない。 */
+i32 trident_command_call(void *buf, u32 size) {(void)buf;(void)size;__builtin_trap();}
 static i32 hwb_access(void *buf, u32 size) {(void)buf;(void)size;__builtin_trap();}
 #define ATTR_RED 1
 #define ATTR_WHITE 2

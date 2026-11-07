@@ -114,7 +114,9 @@ static i32 power_pointer(const struct gf5 *g,bool vmap,u32 *out)
 {
     u32 p,n; u8 ver;
     i32 rc=power(g,&p,&n,&ver);
+    if (vmap && (rc==GF5_ENODEV || rc==GF5_ENOTSUP)) { *out=0; return 0; }
     if (rc) return rc;
+    if (vmap && ver!=2) { *out=0; return 0; }
     if (ver!=1 && ver!=2) return GF5_ENOTSUP;
     if (vmap && ver==1) { *out=0; return 0; }
     u32 field=vmap ? BIT_P_VMAP : (ver==1 ? BIT_P_VOLT1 : BIT_P_VOLT2);
@@ -238,7 +240,7 @@ static i32 voltage_table(struct gf5 *g,struct table *t,struct pin pins[VID_BITS]
     t->mask=g->rom.bytes[p+(t->ver==0x20 ? 5 : 4)];
     rc=table_span(g,t,hdr,2);
     if (rc) return rc;
-    if (!t->cnt) return GF5_ERANGE;
+    /* volt/base.c:195-223,312-317 retains an empty VID table. */
     /* volt/gpio.c:30-97, bios/gpio.h:15-22. */
     static const u8 tags[VID_BITS]={0x04,0x05,0x06,0x1a,0x73,0x74,0x75,0x76};
     for (u32 i=0;i<VID_BITS;++i) if (t->mask&(1U<<i)) {
@@ -328,17 +330,21 @@ static i32 voltage_map_request(struct gf5 *g,u8 id,u32 *uv,bool optional_zero)
     i32 rc=power_pointer(g,true,&p);
     if (rc) return rc;
     if (p) {
+        if (!span(g,p,1)) return GF5_EBIOS;
+        /* bios/vmap.c:29-53: unknown versions mean no map table. */
+        if (g->rom.bytes[p]!=0x10 && g->rom.bytes[p]!=0x20) p=0;
+    }
+    if (p) {
         if (!span(g,p,4)) return GF5_EBIOS;
         struct table t={.off=p,.ver=g->rom.bytes[p],.hdr=g->rom.bytes[p+1],
             .len=g->rom.bytes[p+2],.cnt=g->rom.bytes[p+3]};
-        if (t.ver!=0x10 && t.ver!=0x20) return GF5_ENOTSUP;
         rc=table_span(g,&t,4,t.ver==0x10 ? 0x14 : 0x22);
         if (rc) return rc;
         if (id<t.cnt) return GF5_ENOTSUP;
     }
     /* A zero minimum without a vmap entry means no extra floor.  A real
      * entry (including index zero) still requires speedo above. */
-    if (!id && !optional_zero) return GF5_ENOTSUP;
+    if (!id && !optional_zero) return GF5_ENODEV;
     *uv=(u32)id*VOLT_UNIT_UV;
     return 0;
 }
@@ -350,10 +356,9 @@ i32 gf5_volt_check_id(struct gf5 *g,u8 id,u8 min_id)
     g->source_rc=0;
     struct table t={0}; struct pin pins[VID_BITS]; u8 vid;
     u32 request,minimum;
-    /* Confirm the component before interpreting id=0.  Parsing the GPIO
-     * wiring must not mask unsupported/corrupt tables as missing pins. */
-    i32 rc=voltage_table(g,&t,pins);
-    if (!rc) rc=voltage_map(g,id,&request);
+    /* volt/base.c:168-182: a failed map never reaches get/set. */
+    i32 rc=voltage_map(g,id,&request);
+    if (!rc) rc=voltage_table(g,&t,pins);
     if (!rc) {
         rc=voltage_map_request(g,min_id,&minimum,true);
         if (!rc && minimum>request) request=minimum;
@@ -365,11 +370,8 @@ i32 gf5_volt_id(struct gf5 *g,u8 id,u8 min_id,i32 condition)
 {
     if (!g) return GF5_EINVAL;
     g->source_rc=0;
-    struct table t={0}; struct pin pins[VID_BITS];
-    i32 rc=voltage_table(g,&t,pins);
-    if (rc) return done(g,rc);
     u32 request,prev,minimum;
-    rc=voltage_map(g,id,&request);
+    i32 rc=voltage_map(g,id,&request);
     if (rc) return done(g,rc);
     rc=voltage_get(g,&prev);
     /* volt/base.c:156-182: compare request to prev BEFORE mapping min_id. */

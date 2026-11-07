@@ -14,6 +14,7 @@
 #include "gfinit.h"
 #include "gf_foundation_wire.h"
 #include "gf_command_wire.h"
+#include "trident_command_test.h"
 #include "kernel/module/hwdev_module.h"
 #include "kernel/console/display_restore.h"
 #include "arch/x86/kernel/idt.h"
@@ -132,6 +133,7 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
         recover_virtual_detach();
         return rc;
     }
+    if (op == TRI_OP_COMMAND) return trident_command_call(buf, size);
     const KdebugRecoverVirtual *req = 0;
     if (op == KDEBUG_OP_RECOVER_VIRTUAL) {
         req = buf;

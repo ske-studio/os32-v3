@@ -435,3 +435,81 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 - **PM 決定 20** (C2-links-test): gf5_fake.h (A0x) が UNIT9 に `gf_init_script_execute` の stub (呼出しの記録・失敗注入) と、gf_init_context の io の point/restore の callback (回数・失敗注入・observe) を組む helper を足す。links は memory_script の adapter の execute と成功後の cleanup 1 回、失敗時に restore を重ねないことをこれで確かめる。
 - **PM 決定 21** (B0・B2): RAM 区間の停止 (drain_pause → ram の列 → unpause → admission(true)) は B2 の `gf5_ram_prog` が自分の中で持つ (§2 の宣言の注記「この呼出しだけ drain_pause/unpause で囲む」、test_ops から直接呼んでも停止が外れない)。B0 の `gf5_perf_select` は RAM の calc の後に `gf5_ram_prog` を呼ぶだけで、自分では pause/unpause/admission を呼ばない (二重の停止を作らない)。
 - **PM 決定 22** (全段): 待ちの口が 1000µs (GF_INIT_WAIT_CHUNK_US) ずつに刻んで待つ。呼び元は長さをそのまま渡す。1000µs は devinit の実行器が中止と時計を確認する間隔で、ハードウェアの制約でも要求長の上限でもない。下位の負 rc は source_rc に元の値のまま、公開の戻り値だけを gf5_rc_map で分類する。ROM view が NULL は GF5_ENOTSUP、表の破損は GF5_EBIOS。
+
+## 追記 (2026-11-07、違う時計から boot へ戻す診断 — astra 起草、Opus 第 1 回、PM が反映)
+
+
+対象: GF_FEAT5_DESIGN.md §7・§10・相の契約。設計のみ、製品コードは変更しない。
+正典: docs/POLICY_PCIDEV.md。シングルタスク・協調切替・整数演算を維持する。
+既存 nouveau 対応の save/restore と state_performance を利用し、新相・装置手順を足さない。
+
+### 1. 診断手順と所有
+
+同じ装置・同じ起動の診断中、ROM・fan 方針・予約を変更せず、A/B は呼出元が所有する。
+A は性能変更前の boot 像、B は性能変更後の通常保存像。各操作で公開 ops と owner を再確認する。
+
+| 操作 | 相の遷移 | 操作後に保持する像 |
+|---|---|---|
+| boot の値・RAM 周波数・試験 VRAM の CRC を記録、save A | RUN→SAVING→SAVED | A（g->image=A） |
+| 通常 restore A | SAVED→RESTORING→RUN | A を解放せず保持 |
+| ROM の別性能を perf-select、変更後を記録 | RUN→RUN | A |
+| 通常 save B | RUN→SAVING→SAVED | A と B（g->image=B） |
+| 下記診断口で B の性能目標だけ A へ差替え | SAVED→SAVED | A と B |
+| 通常 restore B、復元後を記録 | SAVED→RESTORING→RUN | A と B |
+| state_free A、state_free B | RUN→RUN | なし |
+
+SAVED 中の perf-select は許可しない。A を直接再 restore せず、g->image を偽装しない。
+各段の失敗は段名・rc を記録して停止し、部分像も保持する。既存の復旧／明示破棄の経路で解放する。
+
+### 2. 診断専用口
+
+feature5.h に追加する宣言は次の2件（関数1件、gf5_test_ops の末尾メンバ1件）。
+
+```c
+i32 gf5_state_boot_target(struct gf5 *g, struct gf5_image *dst,
+                          const struct gf5_image *boot);
+/* struct gf5_test_ops の末尾 */
+__typeof__(&gf5_state_boot_target) state_boot_target;
+```
+
+本体は state.c。dst=B、boot=A。NULL は EINVAL、busy/遷移中は EBUSY、
+SAVED 以外・dst!=g->image・未完成像・版不一致は ESTATE。A の旧 epoch を B と照合しない。
+呼出元は同一 owner の別々の A/B を渡す。これは保存メモリの編集だけで、MMIO・再開・受付開は行わない。
+clock（RAM 周波数を含む）/clock_raw、requested_uv/vid と3つの available を A から B へ写す。
+fan は全設定値（mode/cstate/duty、閾値・校正・GPIO 等）と trip 各要素を深く写す。
+B の既存 trip 格納域を使い、そのポインタを保持する。A の trip ポインタは代入しない。
+同一起動の固定方針により ntrip は同数。格納数不一致は既存 therm_resume 同様 ESTATE とし、書込前に返す。
+任意部品の available=false はその復元を省く契約をそのまま移す。0 kHz を不在判定に使わない。
+B の identity、version/bytes/complete、extent/key/host_copy、saved_epoch、tile、表示像は変更しない。
+A と g の live fan/heat、予約・所有権も変更しない。失敗時は B の差替えを始めない。
+feature5_service.c は service_check(g,true) を通す薄い wrapper を追加し、上記 ops に結線する。
+SAVED の管理操作にこの口だけを追加し、実際の相・像の検査は本体へ集約する。
+通常 restore B の thermal ceiling と、RAM→fan 上げ→電圧上げ→生 core/shader/mux→電圧下げ→fan 下げ→therm_resume を維持する。
+上限で拒否された場合は拒否を報告し、boot 復帰成功とはしない。
+
+### 3. 記録・判定と保証範囲
+
+変更前→変更後→復元後の3列で、nc/nn/sc/mux、RAM kHz、同一試験 VRAM 領域の CRC を並べる。
+変更後の時計が変更前と異なることを確認し、同じなら「異なる時計からの復帰」は未検証とする。
+復元後は clock_raw の4値（0x4000/0x4004/0x4008/0xc040）の boot 復帰と VRAM CRC の一致を判定する。
+RAM は boot の周波数を目標に PLL を再計算する。要求値・読値を併記し、既存計算の周波数復元を評価する。
+RAM PLL（0x4020/0x4024）の生一致や要求 kHz と読値の厳密一致は保証しない。6レジスタ全一致を製品の拒否条件にしない。
+可用性も各列に記録し、未取得を0やPASSに置換しない。sc=0/disable 単独を異常とせず mux と core/shader 読値を併記する。
+CRC 対象は診断所有の一定内容の領域とし、表示更新による内容変更を混ぜない。
+
+### 4. 実装段・試験
+
+1ファイル1段: feature5.h（2宣言・契約）→state.c（深い差替え）→feature5_service.c（公開）→kdebug/gf5_test.c（A/B保持・手順・記録）。
+試験も tools/tests/gf5_state_host.c → tools/tests/gf5_service_live_host.c → 診断用 fixture → 各 Python 登録台本を各1ファイル別段とし、CHECK に入力を宣言する。
+試験: 実部品で A→restore→perf→B→差替え→restore を通し、深いコピー・可用性・B非性能部不変・性能列・上限・公開口・A/B解放を確認し、Ra266/NV44Aで3列とCRCを記録する。
+変異: trip浅写し／raw写し忘れ／available写し忘れ／B epoch上書き／公開未結線を一意anchorで各実行時REDにし、無変更GREEN→変異RED→復元GREEN（compile失敗は不可）を確認する。
+本追記ではビルド・試験・変異・実機は未実施。設計のみのため preflight（依頼にbase SHAなし）も未実施。
+
+### 確定 (2026-11-07、Opus 第 1 回、PM が反映)
+- P2 §3: 復元の後の VRAM の CRC は extent の書き戻し (state.c:279-281) で B の save の時点の内容に上書きされるので、restore B の RAM の再設定の確かめにならない。RAM の判定は読みの周波数と、変更前→変更後の CRC (perf-select の RAM の再設定の確かめ) で行う。
+- P2 §2: boot_target の wrapper は service_state_restore (feature5_service.c:250) と同じく busy を立てず、service_check(g,true) の後に本体を呼ぶだけ。
+- P2 §1: 「別の性能」は perf_count/perf_get を順に見て、clock が変更前の clock_read と違う最初の番号。無ければ「未検証」で止める。perf-select が上限 (thermal) で EBUSY のときも「未検証」として記録して止める。
+- P2 §4: gf5_test.c の像の枠を 2 個 (a[0]=0:A / 1:B)。SAVE・RESTORE・FREE は枠を引数に取る。GF5T_BOOT_TARGET を stage の末尾に足す。手順は台本が 1 段ずつ回す。
+- P3 §2: A.fan_available=false なら B.fan_available=false にするだけで、B.fan と trip には触れない。trip の数の照合は A.fan_available=true のときだけ。
+- P3 §2: complete と version は A と B の両方を見る。boot==dst は EINVAL。
+- P3 §2: feature5.h:300 の「SAVED: only restore/free/last_rc allowed」の注記に boot_target を加える (feature5.h の段で)。

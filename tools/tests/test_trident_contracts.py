@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """3a: standalone ILP32 declarations and a libc-free fake foundation.
 
-Numbers/slots are frozen from TRIDENT_S3_DESIGN §§3–4 and the 3a contract;
+Numbers/slots are frozen from TRIDENT_FULL_DESIGN §9 (F0/F16) and the retained 3a prefix;
 expected values never come from product output. Complete Init trace oracles
 belong to 3b; this suite checks the gate, not the hardware Init sequence.
 """
@@ -53,7 +53,10 @@ CONSTANTS = {
     'TRI_REG_MAPPED_BYTES': 65536, 'TRI_WIDTH': 640, 'TRI_HEIGHT': 480,
     'TRI_PITCH': 640, 'TRI_DISPLAY_BYTES': 307200, 'TRI_DISPLAY_PAGES': 75,
     'TRI_DAC_COLORS': 256, 'TRI_DAC_BYTES': 768, 'TRI_SAVED_BYTES': 852,
-    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 1,
+    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 2,
+    'TRIDENT_MODULE_CONTEXT_SIZE': 40, 'TRIDENT_MODULE_OPS_SIZE': 16,
+    'TRIDENT_DIAGNOSTIC_OPS_VERSION': 1, 'TRIDENT_DIAGNOSTIC_OPS_SIZE': 104,
+    'TRI_MODE_COUNT': 15, 'TRI_FORMAT_COUNT': 5, 'TRI_E_NOSYS': -12,
     'GFX_EMERGENCY_KERNEL_OWNER': 0,
     'TRI_SR_INDEX': 0x3C4, 'TRI_GR_INDEX': 0x3CE,
     'TRI_CR_COLOR': 0x3D4, 'TRI_CR_MONO': 0x3B4,
@@ -87,25 +90,62 @@ STEPS = ('NONE', 'RESOURCES', 'PIN', 'ARM', 'IDENTIFY', 'SAVE', 'PC98_INIT',
          'CAPACITY_PLAN', 'MODE', 'ENABLE', None, 'CLIENT', 'ACTIVE',
          'RESTORE', 'LOCK', 'DISABLE', 'CLOSED')
 CONSTANTS.update((f'TRI_STEP_{name}', i) for i, name in enumerate(STEPS) if name is not None)
-# Fixed ILP32 layout: 3a is the common starting point for parallel 3b/3c.
+# Fixed ILP32 layout: retained S3 prefix plus F0/F6/F16 additions.
 LAYOUTS = {
     'struct trident_saved': (856, dict(value=0, vga_base=852, valid=854)),
     'struct trident_pci_info': (20, dict(vendor=0, device=2, command=4,
         bus=6, slot=7, function=8, revision=9, bar0=12, bar1=16)),
-    'struct trident_resources': (80, dict(regs=0, lfb=4, client=8, owner=12,
+    'struct trident_resources': (132, dict(regs=0, lfb=4, client=8, owner=12,
         bar0_rid=16, bar1_rid=20, decode_bytes=24, mapped_bytes=28,
         display_sid=32, client_sid=36, client_bytes=40, bar0_phys=44,
-        bar1_phys=48, regs_bytes=52, pci=56, ready=76)),
-    'struct trident_device': (912, dict(res=0, saved=4, declared_bytes=860,
+        bar1_phys=48, regs_bytes=52, pci=56, ready=76, display=80, client_surface=100, generation=120,
+        ram_fallback=124, configure=128)),
+    'struct trident_device': (2996, dict(res=0, saved=4, declared_bytes=860,
         step=864, last_rc=868, restore_rc=872, disable_rc=876,
         init_done=880, preinit_done=881, active=882, returning=883, armed=884,
         leave_done=885, closed=886, io=888, io_opaque=892, failed_step=896,
         display_owner=900, chip=904, spr=905, reference=906, pinned=907,
-        declared_unknown=908, screen_ready=909, cur_vga_base=910)),
+        declared_unknown=908, screen_ready=909, cur_vga_base=910, settings=912,
+        mode=932, vram=1016, accel=1036, cursor=1092, video=2148,
+        dac=2224, overscan=2992, overscan_valid=2993)),
+    'struct tri_surface': (20, dict(off=0, bytes=4, pitch=8, width=12,
+        height=14, cpp=16, format=17)),
+    'struct tri_mode': (32, dict(id=0, dot_khz=4, hd=8, hs=10, he=12,
+        ht=14, vd=16, vs=18, ve=20, vt=22, display_width=24, depth=26,
+        bpp=27, flags=28)),
+    'struct tri_format_cap': (8, dict(format=0, depth=1, bpp=2, cpp=3, features=4)),
+    'struct tri_vram_block': (20, dict(next=0, off=4, bytes=8, kind=12, allocated=16)),
+    'struct tri_vram_state': (20, dict(blocks=0, usable_bytes=4, pitch=8,
+        first_off=12, area2d_end=16)),
+    'struct tri_settings': (20, dict(no_accel=0, sw_cursor=1, ram_fallback=2,
+        mux_threshold_khz=4, vram_bytes=8, hsync_skew=12, vsync_skew=16)),
+    'struct tri_mode_state': (84, dict(selected=0, display=32, client=52,
+        generation=72, features=76, valid=80, mux=81, no_accel=82)),
+    'struct tri_accel_state': (56, dict(engine_operation=0, draw_flag=4,
+        blt_scan_direction=8, pattern_location=12, line_fg=16, line_bg=20,
+        line_rop=24, dash_length=25, clipping=26, initialized=27,
+        hw_ops=28, io_accesses=32, pattern=36)),
+    'struct tri_cursor_state': (1056, dict(allocation=0, image=20, bg=1044,
+        fg=1048, available=1052)),
+    'struct tri_rect': (16, dict(x1=0, y1=4, x2=8, y2=12)),
+    'struct tri_video_image': (44, dict(format=0, width=4, height=8,
+        pitch=12, offset=24, bytes=36, data=40)),
+    'struct tri_video_state': (76, dict(allocation=0, clip=20, color_key=36,
+        status=40, off_time=44, free_time=48, now_ms=52, fix_frame=56,
+        hsync=60, vsync=64, last_rc=68, clip_valid=72, polling=73)),
+    'struct tri_video_surface': (40, dict(allocation=0, format=20, width=24,
+        height=28, pitch=32, on=36)),
+    'struct TridentDiagnosticOps': (104, dict(version=0, size=4, context=8,
+        set_mode=12, dpms=16, cursor_image=20, cursor_move=24, cursor_show=28,
+        sync=32, clear_sync=36, copy_direction=40, line_setup=44, fill=48,
+        copy=52, pattern=56, line=60, pattern_upload=64, video_query=68,
+        video_put=72, video_set_key=76, video_stop=80, poll=84,
+        video_surface_alloc=88, video_surface_display=92,
+        video_surface_stop=96, video_surface_free=100)),
     'struct trident_io': (32, dict(read8=0, read16=4, read32=8,
         write8=12, write16=16, write32=20, port8=24, write_span32=28)),
-    'TridentModuleContext': (32, dict(backend=0, counters=4, resources=8,
-        arm=12, height=16, flip=20, page=24, display_owner=28)),
+    'TridentModuleContext': (40, dict(backend=0, counters=4, resources=8,
+        arm=12, height=16, flip=20, page=24, display_owner=28, size=32, diagnostic_out=36)),
     'struct TridentModuleOps': (16, dict(version=0, initialize=4, prepare=8, restore=12)),
     'struct trident_fake_event': (24, dict(space=0, offset=4, value=8, count=12,
         width=16, write=17, rc=20)),
@@ -192,6 +232,8 @@ for member in ('vendor', 'device', 'command'):
 for member in ('bus', 'slot', 'function', 'revision'):
     TYPES[f'((struct trident_pci_info *)0)->{member}'] = 'u8'
 TYPES.update({
+    '((struct trident_resources *)0)->configure': 'int (*)(const struct tri_mode *, u32, bool)',
+    '((TridentModuleContext *)0)->diagnostic_out': 'const struct TridentDiagnosticOps **',
     '((struct trident_saved *)0)->vga_base': 'u16',
     '((struct trident_device *)0)->cur_vga_base': 'u16',
     '((struct trident_resources *)0)->ready': 'bool',
@@ -218,9 +260,12 @@ MUTATIONS = (
     ('save-size', HEADER, 'TRI_SAVED_BYTES 852u', 'TRI_SAVED_BYTES 853u'),
     ('last-save-slot', HEADER, 'TRI_SAVE_SR0D = 851', 'TRI_SAVE_SR0D = 850'),
     ('decode-width', HEADER, 'TRI_BAR0_DECODE_BYTES 0x00400000u', 'TRI_BAR0_DECODE_BYTES 0x00200000u'),
-    ('module-version', MODULE, 'OPS_VERSION 1u', 'OPS_VERSION 2u'),
+    ('module-version', MODULE, 'OPS_VERSION 2u', 'OPS_VERSION 1u'),
     ('resource-owner-order', HEADER, 'owner, bar0_rid, bar1_rid', 'bar0_rid, owner, bar1_rid'),
     ('context-order', MODULE, 'int *height, *flip, *page;', 'int *flip, *height, *page;'),
+    ('surface-pitch-order', HEADER, 'u32 off, bytes, pitch;', 'u32 off, pitch, bytes;'),
+    ('device-dac-size', HEADER, 'u8 dac[256][3];', 'u8 dac[255][3];'),
+    ('diagnostic-order', MODULE, 'u32 version, size;', 'u32 size, version;'),
     ('error-code', HEADER, 'TRI_E_RESTORE = -7', 'TRI_E_RESTORE = -12'),
     ('fake-ready', FAKE_C, 'f->pc98_initialized = false;\n    f->resources', 'f->pc98_initialized = true;\n    f->resources'),
     ('fake-capacity', FAKE_C, 'f->real_bytes = TRI_FAKE_REAL_BYTES;', 'f->real_bytes = TRI_BAR0_DECODE_BYTES;'),
@@ -354,6 +399,11 @@ def main():
                         print(f'MUTATE RED {name} ({runner}): {result.stdout.decode().strip()}', flush=True)
                 finally:
                     target.write_text(original)
+            exe = build(work, tree)
+            for runner in runners:
+                result = host32.run([str(exe)], runner=runner, capture_output=True)
+                assert result.returncode == 0 and result.stdout == b'GREEN\n', result
+            print('GREEN restored contracts', flush=True)
     return 0
 
 

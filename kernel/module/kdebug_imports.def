@@ -2604,6 +2604,15 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "index": 320,
+      "symbol": "trident_diagnostic_ops",
+      "source": "drivers/video/trident/trident_module.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

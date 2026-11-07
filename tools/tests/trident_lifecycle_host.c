@@ -5,10 +5,12 @@
 #include "backend_under_test.c"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static struct trident_fake f;
-static u8 memory[TRI_FAKE_REAL_BYTES], client[TRI_DISPLAY_BYTES];
+static u8 memory[TRI_FAKE_REAL_BYTES];
 static struct trident_fake_event trace[32768];
 static u32 stages[128], count, status_reads, arms;
-static int height, flip, page;
+static int height, flip, page, optional_fail, configure_fail;
+static const struct TridentDiagnosticOps *diagnostic;
+int sys_time_now(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 static GfxBackend backend;
 static GfxCounters counters;
 static PaletteEntry colors[16];
@@ -42,7 +44,48 @@ WRAP(identify,1)
 WRAP(capacity_plan,2)
 WRAP(state_save,3)
 WRAP(pc98_init,4)
-WRAP(mode_640,5)
+int __real_tri_mode_set(struct trident_device *, const struct tri_mode *);
+int __wrap_tri_mode_set(struct trident_device *d, const struct tri_mode *m) {
+    stages[count++]=5; return __real_tri_mode_set(d,m);
+}
+int __real_tri_accel_init(struct trident_device *, const struct tri_mode *);
+int __wrap_tri_accel_init(struct trident_device *d, const struct tri_mode *m) {
+    stages[count++]=14;
+    if (optional_fail==14) return -81;
+    return __real_tri_accel_init(d,m);
+}
+#define TRI_WRAP(name,id) \
+int __real_tri_##name(struct trident_device *); \
+int __wrap_tri_##name(struct trident_device *d) { \
+    stages[count++]=id; \
+    if (optional_fail==id) return -81; \
+    return __real_tri_##name(d); }
+TRI_WRAP(cursor_init,15)
+TRI_WRAP(palette_load_default,16)
+TRI_WRAP(palette_reload,17)
+TRI_WRAP(sync,18)
+int __real_tri_video_stop(struct trident_device *, bool);
+int __wrap_tri_video_stop(struct trident_device *d, bool release) {
+    stages[count++]=19;
+    if (optional_fail==19) return -81;
+    return __real_tri_video_stop(d,release);
+}
+static int configure(const struct tri_mode *m, u32 bytes, bool final) {
+    if (final) stages[count++]=13;
+    /* 640x480 XRGB8888 is the largest HAL-visible mode in the 2MiB fake.
+     * The selected INDEX8 screen must reserve this fixed display extent. */
+    if (final && (bytes!=1966080u || m->id!=device.mode.selected.id)) return -90;
+    if (!final && f.operations == 0 && bytes != 307200u) return -90;
+    if (final && configure_fail) return configure_fail;
+    u32 pitch=m->display_width*(m->bpp/8);
+    f.resources.display=(struct tri_surface){0,pitch*m->vd,pitch,m->hd,m->vd,
+                                           m->bpp/8,TRI_FMT_INDEX8};
+    f.resources.client_surface=f.resources.display;
+    f.resources.client=f.vram;
+    f.resources.client_bytes=pitch*m->vd;
+    ++f.resources.generation;
+    return 0;
+}
 WRAP(route_enable,6)
 int __real_trident_screen_blank(struct trident_device *, bool);
 int __wrap_trident_screen_blank(struct trident_device *d, bool blank) {
@@ -50,7 +93,12 @@ int __wrap_trident_screen_blank(struct trident_device *d, bool blank) {
 }
 WRAP(client_init,12)
 WRAP(adjust_frame,8)
-WRAP(video_reset,9)
+int __real_trident_video_reset(struct trident_device *);
+int __wrap_trident_video_reset(struct trident_device *d) {
+    stages[count++]=9;
+    if (optional_fail==9) return -81;
+    return __real_trident_video_reset(d);
+}
 WRAP(state_restore,10)
 WRAP(route_disable,11)
 static int order(const u32 *want,u32 n) {
@@ -68,31 +116,79 @@ static int writes(const u32 (*want)[3],u32 n) {
 }
 static int test(void) {
     CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
-    f.resources.ready=true;f.resources.client=client;f.resources.client_bytes=sizeof(client);
+    f.resources.ready=true;f.resources.client=memory;f.resources.client_bytes=TRI_DISPLAY_BYTES;
+    f.resources.configure=configure;
     io=trident_fake_io;io.read8=read8;
     static TridentModuleContext context;
-    context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner};
+    context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner,TRIDENT_MODULE_CONTEXT_SIZE,&diagnostic};
     trident_context=&context;
     init();
-    static const u32 first[]={1,2,3,4,5,6,7,8,12,9};
-    CHECK(!order(first,10));
+    static const u32 first[]={1,2,3,4,5,6,7,8,12,19,13,14,15,16,9};
+    CHECK(!order(first,15));
     CHECK(!device.last_rc && device.active && device.screen_ready && device.preinit_done && arms==1);
-    CHECK(f.sr[1]&32); CHECK(f.cr_color[0x36]==0 && f.cr_color[0x50]==0);
+    CHECK(f.sr[1]&32); CHECK(f.cr_color[0x36]==0x80 && f.cr_color[0x50]==0);
     CHECK(f.cr_color[0x8E]==0x84 && f.cr_color[0xBE]==0x26);
     CHECK(f.ext_dac[0x50]==255 && f.ext_dac[0x54]==255);
-    CHECK(!f.reads[2] && !f.writes[2]);
-    init(); static const u32 again[]={3,4,5,6,7,8,12,9}; CHECK(!order(again,8));
+    CHECK(device.accel.initialized && device.cursor.available);
+    CHECK(device.mode.client.off==device.mode.display.off && !f.resources.ram_fallback);
+    init(); static const u32 reinit[]={18,19,11,10,3,4,5,6,7,8,12,19,13,14,15,16,9};
+    static const u32 again[]={3,4,5,6,7,8,12,19,13,14,15,16,9};
+    CHECK(!order(reinit,17));
     CHECK(!device.last_rc && arms==1);
-    enter();static const u32 vt[]={5,6}; CHECK(!order(vt,2));
+    enter();static const u32 vt[]={5,6,14,17}; CHECK(!order(vt,4));
     CHECK(!(f.sr[1]&32));
-    leave();static const u32 leaving[]={10,11};CHECK(!order(leaving,2));
+    leave();static const u32 leaving[]={18,19,10,11};CHECK(!order(leaving,4));
     CHECK(!device.active);shutdown();CHECK(!count);
-    init();CHECK(!order(again,8));shutdown();static const u32 closing[]={11,10};CHECK(!order(closing,2));
+    init();CHECK(!order(again,13));shutdown();static const u32 closing[]={18,19,11,10};CHECK(!order(closing,4));
     /* Failure is local to one attempt; the next ScreenInit runs again. */
     trident_fake_fail(&f,f.operations+1,-73);init();CHECK(device.last_rc==-73);
     CHECK(!probe());
     trident_fake_fail(&f,0,0);count=0;prepare();CHECK(probe());
-    init();CHECK(!device.last_rc && device.active);CHECK(!order(again,8));
+    init();CHECK(!device.last_rc && device.active);CHECK(!order(again,13));
+    /* D:3692-3703: each optional failure keeps display/query usable and
+     * removes only the affected capability. Enter retains availability. */
+    for (u32 i=0;i<3;++i) {
+        shutdown(); count=0;
+        optional_fail=(u32[]){14,15,9}[i];
+        init(); CHECK(!order(again,13));
+        GFX_ScreenInfo info;
+        CHECK(device.active && device.screen_ready && device.last_rc==-81);
+        CHECK(device.failed_step==TRI_STEP_CLIENT && !display_rc && probe() && !query(&info));
+        if (i==0) CHECK(!device.accel.initialized && device.mode.no_accel &&
+                        !(device.mode.features&TRI_CAP_GE) && !backend.fill_rect && !backend.blit);
+        if (i==1) CHECK(!device.cursor.available && !(device.mode.features&TRI_CAP_CURSOR) && !backend.cursor_image);
+        if (i==2) CHECK(device.video.last_rc==-81 && !device.video.polling && !(device.mode.features&TRI_CAP_VIDEO));
+        leave(); CHECK(!order(leaving,4));
+        enter(); CHECK(!order(vt,4));
+        CHECK(device.active && device.screen_ready && !display_rc);
+        if (i==1) CHECK(!device.cursor.available && !(device.mode.features&TRI_CAP_CURSOR));
+        if (i==2) CHECK(!(device.mode.features&TRI_CAP_VIDEO));
+        optional_fail=0;
+    }
+    shutdown(); count=0; device.settings.no_accel=true;
+    init(); CHECK(!order(again,13));
+    CHECK(device.active && device.screen_ready && !device.accel.initialized &&
+          device.mode.no_accel && !backend.fill_rect && !device.cursor.available);
+    leave(); CHECK(!order(leaving,4)); enter(); CHECK(!order(vt,4));
+    shutdown(); count=0; device.settings.no_accel=false;
+    configure_fail=-82; init();
+    CHECK(device.last_rc==-82 && !device.screen_ready && !device.active);
+    configure_fail=0; count=0; init(); CHECK(!order(again,13));
+    /* Mandatory palette failures reject ScreenInit/Enter; optional setup
+     * diagnostics above must not be confused with these display failures. */
+    shutdown(); count=0; optional_fail=16; init();
+    CHECK(device.last_rc==-81 && display_rc==-81 && !device.screen_ready && !device.active);
+    optional_fail=0; count=0; init(); CHECK(!order(again,13));
+    optional_fail=17; enter();
+    CHECK(display_rc==-81 && device.last_rc==-81 && !device.active);
+    optional_fail=0; count=0; init(); CHECK(!order(again,13));
+    /* A failed Sync/overlay stop still restores and disables the route. */
+    for (int fail=18;fail<=19;++fail) {
+        optional_fail=fail; device.video.polling=true;
+        CHECK(trident_close(&device)==-81); CHECK(!order(closing,4));
+        CHECK(!device.active && !device.returning && !device.video.polling);
+        optional_fail=0; init(); CHECK(!order(again,13));
+    }
     /* ResetVideo exact write order/width, and two complete VSYNC periods. */
     count=0;status_reads=0;trident_fake_trace_reset(&f);
     CHECK(!trident_video_reset(&device));CHECK(status_reads==8);
