@@ -244,43 +244,10 @@ class Mouse:
 
 
 
-class ElfValues(dict):
-    def __getitem__(self, name):
-        value = super().__getitem__(name)
-        if value is None:
-            raise ValueError('ambiguous ELF symbol: ' + name)
-        return value
-
-    def get(self, name, default=None):
-        return self[name] if name in self else default
-
-
-class ElfSymbols:
-    """Resolve every observation from fresh nm -S output, including local names."""
-    def __init__(self, path, runner=subprocess.run):
-        self.path, self.runner = str(path), runner
-
-    def read(self):
-        nm = os.environ.get('OS32_NM') or os.path.join(
-            os.environ.get('CROSS_DIR', '/home/hight/opt/cross'), 'bin/i386-elf-nm')
-        result = self.runner([nm, '-S', '--defined-only', self.path],
-                             capture_output=True, text=True, check=True)
-        table = ElfValues()
-        for line in result.stdout.splitlines():
-            fields = line.split()
-            if len(fields) not in (3, 4):
-                continue
-            addr = int(fields[0], 16)
-            size = int(fields[1], 16) if len(fields) == 4 else 0
-            name = fields[-1]
-            value = (addr, size)
-            # Assemblers repeat absolute constants; unrelated local symbols
-            # may collide. Reject a differing definition only when requested.
-            if name in table and dict.__getitem__(table, name) != value:
-                table[name] = None
-            else:
-                table[name] = value
-        return table
+try:
+    from .symbols import ElfSymbols
+except ImportError:
+    from symbols import ElfSymbols
 
 
 def c_constants(path, extra=None):
@@ -359,6 +326,14 @@ class Gui:
     def __init__(self, transport=None, kernel_elf=None, gshell_elf=None,
                  symbol_factory=ElfSymbols, descriptor=None, fep_elf=None):
         self.transport = transport or default_transport
+        try:
+            from .symbols import VerifiedSymbols
+        except ImportError:
+            from symbols import VerifiedSymbols
+        explicit_elf = kernel_elf or os.environ.get('OS32_KERNEL_ELF')
+        explicit_map = os.environ.get('OS32_KERNEL_MAP') or (
+            str(Path(explicit_elf).with_name('kernel.map')) if explicit_elf else None)
+        self.kernel_maps = VerifiedSymbols(self.mem, explicit=explicit_map)
         self.kernel_elf = kernel_elf or os.environ.get(
             'OS32_KERNEL_ELF', '/home/hight/os32-v3/build/out/kernel.elf')
         self.gshell_elf = gshell_elf or os.environ.get(
@@ -431,8 +406,14 @@ class Gui:
     def word(self, address):
         return struct.unpack('<I', self.mem(address, 4))[0]
 
+    def kernel_symbols(self):
+        if self.symbol_factory is not ElfSymbols:
+            return self.symbol_factory(self.kernel_elf).read()
+        self.kernel_maps.select()
+        return self.kernel_maps.elf_symbols
+
     def symbols(self):
-        return (self.symbol_factory(self.kernel_elf).read(),
+        return (self.kernel_symbols(),
                 self.symbol_factory(self.gshell_elf).read())
 
     def wm_state(self):
@@ -516,7 +497,7 @@ class Gui:
         return self.word(base + fep['g_ime'][0])
 
     def _module_base(self, module_name):
-        kernel = self.symbol_factory(self.kernel_elf).read()
+        kernel = self.kernel_symbols()
         header = ROOT / 'kernel/module/module_runtime.h'
         constants = c_constants(header)
         schema = c_constants(ROOT / 'kernel/module/module_schema.h')
@@ -703,7 +684,7 @@ class Gui:
                           if source == 'screen' else bool(pattern.search(last['text'])), timeout)
 
     def consink(self, since=None, grep=None):
-        kernel = self.symbol_factory(self.kernel_elf).read()
+        kernel = self.kernel_symbols()
         size = c_constants(ROOT / 'include/con_sink.h')('CON_SINK_RING_SIZE')
         def metadata():
             return {name: self.word(kernel['g_' + name][0])

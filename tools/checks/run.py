@@ -386,6 +386,14 @@ PATH_AUDIT_ALLOW = {
     "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",
     "tools/tests/" + "test_preflight.py": "preflight fixtures create private build artifacts and tool stubs",
     "tools/tests/" + "host32.py": "cache contains only freshly compiled host fixtures",
+    "tools/tests/" + "test_np21w_symbols.py":
+        "identity fixtures link private ELF/maps under TemporaryDirectory; no repository artifacts",
+    ("check-np21w-symbols-host", "tools/np21w_mcp/" + "symbols" + ".py"):
+        "identity tests inject discovery roots and synthetic guest RAM with private ELF/maps",
+    ("check-gui-gate-host", "tools/np21w_mcp/" + "symbols" + ".py"):
+        "offline GUI fixtures inject symbol factories; production map discovery is unused",
+    ("check-key-inject-host", "tools/np21w_mcp/" + "symbols" + ".py"):
+        "key encoding tests never resolve kernel symbols or discover production maps",
     # Limit helper exceptions to these offline targets: other callers may read images.
     ("check-np21w-ctl-host", "tools/" + "nhd_profile" + ".py"):
         "FakeOps/FakeHttp replace image and process I/O; profile paths are only names",

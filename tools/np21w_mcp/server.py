@@ -23,13 +23,23 @@ from urllib.parse import urlencode
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import np21w_client as emu           # noqa: E402
-from symbols import SymbolTable      # noqa: E402
+from symbols import VerifiedSymbols      # noqa: E402
 
-MAP_PATH = os.environ.get(
-    "OS32_KERNEL_MAP",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 "..", "..", "build", "out", "kernel.map"))
-SYMS = SymbolTable(os.path.normpath(MAP_PATH))
+def _physical_memory(address, length):
+    out = bytearray()
+    while length:
+        size = min(length, 1024)
+        result = _json(emu.get('/api/mem?addr=0x%x&len=%d&space=phys' % (address, size)))
+        chunk = bytes.fromhex(result['hex'])
+        if len(chunk) != size:
+            raise emu.EmuError('short physical memory read')
+        out.extend(chunk)
+        address += size
+        length -= size
+    return bytes(out)
+
+
+SYMS = VerifiedSymbols(_physical_memory)
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "np21w-aidebug", "version": "1.1.0"}
@@ -54,9 +64,12 @@ def _annotate_eip(obj, keys=("eip", "prev_eip")):
 
 
 def _resolve_or_error(token):
-    addr = SYMS.resolve(token)
+    try:
+        addr = SYMS.resolve(token)
+    except ValueError as exc:
+        raise emu.EmuError(str(exc)) from exc
     if addr is None:
-        raise emu.EmuError("unknown symbol: %s" % token)
+        raise emu.EmuError("unknown symbol: %s (kernel_map: %s)" % (token, SYMS.info))
     return addr
 
 
@@ -644,7 +657,16 @@ GUI = Gui()
 
 def _gui_handler(method):
     def handler(args):
-        return getattr(GUI, method)(**args)
+        GUI.kernel_maps.reset()
+        try:
+            out = getattr(GUI, method)(**args)
+        except ValueError as exc:
+            if GUI.kernel_maps.info and GUI.kernel_maps.info.get('error'):
+                raise emu.EmuError(str(exc)) from exc
+            raise
+        if GUI.kernel_maps.info is not None:
+            out['kernel_map'] = GUI.kernel_maps.info
+        return out
     return handler
 
 
@@ -725,6 +747,7 @@ def _handle(msg):
             _error(req_id, -32601, "unknown tool: %s" % name)
             return
         handler = entry[0]
+        SYMS.reset()
         try:
             out = handler(args)
         except emu.EmuError as e:
@@ -737,6 +760,11 @@ def _handle(msg):
                                           "text": "internal error: %s" % e}],
                              "isError": True})
             return
+        if SYMS.info is not None:
+            if isinstance(out, dict):
+                out['kernel_map'] = SYMS.info
+            else:
+                out = str(out) + '\nkernel_map: ' + json.dumps(SYMS.info)
         text = out if isinstance(out, str) else json.dumps(
             out, indent=2, ensure_ascii=False)
         _result(req_id, {"content": [{"type": "text", "text": text}]})
