@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Francisco Jerez.
+ * Copyright (C) 2008 Maarten Maathuis.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -99,6 +100,8 @@ int gf_display_start(void *context, u32 byte_offset)
  * dispnv04/crtc.c:129-151; CRTC fields: :245-413; pitch/base: :838-903.
  * The existing diagnostic entry points above retain their fixed mode. */
 #include "api.h"
+#include "stage.h"
+#include "../../../include/kprintf.h"
 
 typedef unsigned long long u64; /* PM integrates this type in types.h. */
 #define GF4_PITCH_ALIGN 64U
@@ -214,7 +217,78 @@ static i32 candidate_pll(struct gf4_ctx *c,u8 connector,const struct gf4_mode *m
     return GF4_EPLL;
 }
 
-static i32 connector_timings(struct gf4_ctx *c,u8 connector,u32 dl,
+/* V/nouveau_connector.c:579-596 detects each connector independently.
+ * Each block read gets its own operation budget, rather than sharing the
+ * lifecycle deadline across connectors/extensions. The lower DDC operation
+ * retains that deadline for its complete transfer (including cleanup). */
+static i32 detect_block(struct gf4_ctx *c,u8 connector,u8 bus,u8 block_no,
+                        u8 block[GF4_EDID_BYTES],struct gf4_edid_state *e)
+{
+    u32 dl;
+    i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);
+    if (!rc) rc=gf4_ddc_read(c,bus,block_no,block,dl);
+    kprintf(KLOG_ATTR,"[gf4] detect conn=%u bus=%u block=%u ddc=%d\n",
+            connector,bus,block_no,rc);
+    if (rc) return rc;
+    rc=c->data->edid_modes(block,block_no,e);
+    kprintf(KLOG_ATTR,"[gf4] detect conn=%u block=%u parser=%d base=%u timings=%u preferred=%u\n",
+            connector,block_no,rc,e->base_valid,e->ntiming,e->preferred);
+    return rc;
+}
+
+/* V/nouveau_connector.c:57-91: preferred non-interlaced mode, otherwise
+ * largest width, height, rounded vertical refresh. Ordering candidates by
+ * that rule lets the first mode that passes mode_valid claim the native
+ * rows even when an earlier candidate fails PLL/VRAM admission. All EDID
+ * candidates are still visited (get_modes, :938-955). */
+static u32 native_refresh(const struct gf4_timing *t)
+{
+    if (!t->ht || !t->vt) return 0;
+    u32 total=(u32)t->ht*t->vt;
+    /* data.h uses CRTC fields: doublescan has already doubled vt. */
+    return (t->khz*1000U+total/2U)/total;
+}
+
+static u32 native_height(const struct gf4_timing *t)
+{
+    return (t->flags&GF4_DBLSCAN) ? t->vd/2U : t->vd;
+}
+
+static u32 next_timing(const struct gf4_edid_state *e,bool used[GF4_TIMINGS],bool tv)
+{
+    u32 best=e->ntiming;
+    for (u32 i=0;i<e->ntiming;i++) {
+        if (used[i]) continue;
+        if (tv) { best=i; break; }
+        const struct gf4_timing *t=&e->timing[i];
+        if (best<e->ntiming) {
+            const struct gf4_timing *b=&e->timing[best];
+            if (!!(t->flags&GF4_INTERLACE)!=!!(b->flags&GF4_INTERLACE)) {
+                if (t->flags&GF4_INTERLACE) continue;
+            } else {
+                if (best==e->preferred) continue;
+                if (i!=e->preferred) {
+                    if (t->hd<b->hd) continue;
+                    if (t->hd==b->hd && native_height(t)<native_height(b)) continue;
+                    if (t->hd==b->hd && native_height(t)==native_height(b) &&
+                        native_refresh(t)<native_refresh(b)) continue;
+                }
+            }
+        }
+        best=i;
+    }
+    if (best<e->ntiming) used[best]=true;
+    return best;
+}
+
+static void reject_timing(u8 connector,const struct gf4_timing *t,i32 fmt,
+                          const char *reason,i32 rc)
+{
+    kprintf(KLOG_ATTR,"[gf4] reject conn=%u mode=%ux%u clock=%u flags=%x fmt=%d reason=%s rc=%d\n",
+            connector,t->hd,t->vd,t->khz,t->flags,fmt,reason,rc);
+}
+
+static i32 connector_timings(struct gf4_ctx *c,u8 connector,
                              struct gf4_edid_state *e,i32 *reason)
 {
     *e=(struct gf4_edid_state){.version=GF4_EDID_VERSION,.size=sizeof(*e)};
@@ -231,21 +305,22 @@ static i32 connector_timings(struct gf4_ctx *c,u8 connector,u32 dl,
         if (!ddc && route->i2c_index!=GF4_NO_I2C && c->links && c->links->i2c_port &&
             !c->links->i2c_port(c->links->owner,route->i2c_index,&port)) ddc=route;
     }
-    if (!ddc) { *reason=GF4_ENODEV; return 0; }
-    i32 rc=gf4_ddc_read(c,ddc->i2c_index,0,block,dl);
-    if (!rc) rc=c->data->edid_modes(block,0,e);
+    if (!ddc) {
+        kprintf(KLOG_ATTR,"[gf4] detect conn=%u ddc=%d\n",connector,GF4_ENODEV);
+        *reason=GF4_ENODEV; return 0;
+    }
+    i32 rc=detect_block(c,connector,ddc->i2c_index,0,block,e);
     if (rc || !e->base_valid) {
         *reason=rc ? rc : GF4_EEDID;
         *e=(struct gf4_edid_state){.version=GF4_EDID_VERSION,.size=sizeof(*e)};
         return 0;
     }
-    /* EDID extension count is one byte; same absolute deadline throughout. */
+    /* EDID extension count is one byte; every block starts its own wait. */
     u32 extensions=e->extensions;
     if (extensions>255U) return GF4_EEDID;
     for (u32 b=1;b<=extensions;b++) {
         struct gf4_edid_state next=*e;
-        rc=gf4_ddc_read(c,ddc->i2c_index,(u8)b,block,dl);
-        if (!rc) rc=c->data->edid_modes(block,b,&next);
+        rc=detect_block(c,connector,ddc->i2c_index,(u8)b,block,&next);
         if (rc) { *reason=rc; break; } /* Preserve the valid base/prefix. */
         *e=next;
     }
@@ -283,6 +358,7 @@ static i32 mode_append(struct gf4_ctx *c,u8 connector,struct gf4_mode m,
 
 i32 gf4_detect(struct gf4_ctx *c,u32 dl)
 {
+    (void)dl; /* Block budgets start at each DDC read, not the lifecycle entry. */
     if (!c || !c->state || !c->ch || !c->data || !c->data->edid_modes ||
         (c->nroutes && !c->routes) || c->nroutes>32U) return GF4_EINVAL;
     if (c->state->version!=GF4_STATE_VERSION || c->state->size!=sizeof(*c->state) ||
@@ -306,27 +382,24 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
         }
         if (!present) continue;
         struct gf4_edid_state e;
-        rc=connector_timings(c,(u8)connector,dl,&e,&reason);
+        rc=connector_timings(c,(u8)connector,&e,&reason);
         if (rc) goto fail;
         if (e.ntiming>GF4_TIMINGS) { rc=GF4_EEDID; goto fail; }
         truncated|=e.truncated;
         if (e.last_rc) reason=e.last_rc;
-        /* An invalid preferred index simply means no preferred timing. */
-        u32 preferred=e.preferred<e.ntiming ? e.preferred : e.ntiming;
+        bool used[GF4_TIMINGS]={false};
         for (u32 pass=0;pass<=e.ntiming;pass++) {
             const struct gf4_timing *t;
             if (pass==e.ntiming) {
                 if (tv) break; /* TV norms supply their own allowed list. */
                 t=&gf4_default_timing;
             } else {
-                u32 at=pass;
-                if (preferred<e.ntiming) {
-                    at=pass ? pass-1U : preferred;
-                    if (pass && at>=preferred) at++;
-                }
-                t=&e.timing[at];
+                t=&e.timing[next_timing(&e,used,tv)];
             }
-            if (tv ? !tv_timing_fits(t,tv_norm) : !timing_fits(t,&e)) continue;
+            if (tv ? !tv_timing_fits(t,tv_norm) : !timing_fits(t,&e)) {
+                reject_timing((u8)connector,t,-1,"timing/range",GF4_ERANGE);
+                continue;
+            }
             bool surviving=false;
             for (u32 depth=0;depth<GF4_DEPTHS;depth++) {
                 static const enum gf3_fmt formats[GF4_DEPTHS]={
@@ -335,15 +408,21 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
                 struct gf4_mode m={.t=*t,.fmt=formats[depth]};
                 u32 cpp=mode_cpp(m.fmt);
                 m.pitch=((u32)t->hd*cpp+GF4_PITCH_ALIGN-1U)&~(GF4_PITCH_ALIGN-1U);
-                if (m.pitch/8U>GF4_PITCH_Q_MAX || m.pitch>c->ch->B/t->vd) continue;
+                if (m.pitch/8U>GF4_PITCH_Q_MAX || m.pitch>c->ch->B/t->vd) {
+                    reject_timing((u8)connector,t,m.fmt,"VRAM/pitch",GF4_ERANGE);
+                    continue;
+                }
                 bool duplicate=false;
                 for (u32 i=0;i<n;i++) if (c->state->mode_connector[i]==connector &&
                     c->state->modes[i].fmt==m.fmt && timing_equal(&c->state->modes[i].t,t))
                     duplicate=true;
                 if (duplicate) continue;
                 rc=candidate_pll(c,(u8)connector,&m);
-                if (rc==GF4_EPLL) continue;
-                if (rc) goto fail;
+                if (rc) {
+                    reject_timing((u8)connector,t,m.fmt,"PLL",rc);
+                    if (rc==GF4_EPLL) continue;
+                    goto fail;
+                }
                 surviving=true;
                 rc=mode_append(c,(u8)connector,m,first,pinned,&n,&truncated);
                 if (rc) goto fail;
