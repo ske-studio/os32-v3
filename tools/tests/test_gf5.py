@@ -122,6 +122,7 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+    ('image-version', 'hwdev/gf/feature5.h', '#define GF5_IMAGE_VERSION 3U', '#define GF5_IMAGE_VERSION 2U', 'clocksave'),
     ('leave-stop-no-redraw', 'drivers/video/geforce/backend_geforce.c', '(was_routed || forced_stop) ? pc98_route_to_98() : 0', '((void)was_routed, (void)forced_stop, pc98_route_to_98())', 'foreground'),
     ('forced-stop-rebuild', 'drivers/video/geforce/backend_geforce.c', '        failed = 1;\n        rc=gf_foundation_stop', '        failed = 0;\n        rc=gf_foundation_stop', 'foreground'),
     ('forced-stop-route', 'drivers/video/geforce/backend_geforce.c', '(was_routed || forced_stop) ? pc98_route_to_98() : 0', '(was_routed) ? pc98_route_to_98() : ((void)forced_stop,0)', 'foreground'),
