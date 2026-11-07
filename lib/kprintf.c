@@ -22,6 +22,7 @@
 /* ======================================================================== */
 
 #include "kprintf.h"
+#include <stdarg.h>
 
 #define KPRINTF_NUMBUF_SIZE 16
 #include "console.h"
@@ -134,9 +135,23 @@ char kprintf_spec(const char **cursor, int *width, int *left_align,
     return *p;
 }
 
-void kvprintf(u8 attr, const char *fmt, const u32 *args)
+/* Both interfaces carry 32-bit words, including %d/%c and long. Strings
+ * use va_arg's pointer type on the native variadic path. Keep a pointer to
+ * va_list: on register ABIs it need not be a simple stack pointer. */
+struct print_args {
+    const u32 *words;
+    va_list *ap;
+};
+
+static u32 print_arg(struct print_args *args, char spec)
 {
-    int ai = 0;
+    if (!args->ap) return *args->words++;
+    if (spec == 's') return (u32)va_arg(*args->ap, const char *);
+    return va_arg(*args->ap, u32);
+}
+
+static void print_format(u8 attr, const char *fmt, struct print_args *args)
+{
     const char *p = fmt;
 
     /* 属性は **ここで 1 回だけ** PC-98 のテキスト属性へ直す。
@@ -165,12 +180,12 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
             switch (*p) {
                 case 'd':
                 case 'i': {
-                    int val = (int)args[ai++];
+                    int val = (int)print_arg(args, *p);
                     int neg = 0;
                     u32 uval;
                     if (val < 0) {
                         neg = 1;
-                        uval = (u32)(-val);
+                        uval = 0u - (u32)val;
                     } else {
                         uval = (u32)val;
                     }
@@ -194,7 +209,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                     break;
                 }
                 case 'u': {
-                    u32 val = args[ai++];
+                    u32 val = print_arg(args, *p);
                     len = kutoa_dec(val, numbuf, sizeof(numbuf) - 1);
                     emit_padded(numbuf, len, width,
                                 pad_char, left_align, attr);
@@ -202,7 +217,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                 }
                 case 'x':
                 case 'X': {
-                    u32 val = args[ai++];
+                    u32 val = print_arg(args, *p);
                     int upper = (*p == 'X');
                     len = kutoa_hex(val, numbuf, sizeof(numbuf) - 1, upper);
                     emit_padded(numbuf, len, width,
@@ -210,7 +225,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                     break;
                 }
                 case 's': {
-                    const char *str = (const char *)args[ai++];
+                    const char *str = (const char *)print_arg(args, *p);
                     int slen;
                     const char *s;
                     if (!str) str = "(null)";
@@ -238,7 +253,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                 }
                 case 'c': {
                     char ch_buf[2];
-                    ch_buf[0] = (char)args[ai++];
+                    ch_buf[0] = (char)print_arg(args, *p);
                     ch_buf[1] = '\0';
                     shell_print(ch_buf, attr);
                     break;
@@ -254,7 +269,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                     char tmp[2];
                     tmp[0] = *p;
                     tmp[1] = '\0';
-                    ai++;
+                    (void)print_arg(args, *p);
                     shell_print(tmp, attr);
                     break;
                 }
@@ -276,7 +291,17 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
     }
 }
 
+void kvprintf(u8 attr, const char *fmt, const u32 *args)
+{
+    struct print_args input = { .words = args, .ap = 0 };
+    print_format(attr, fmt, &input);
+}
+
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
-    kvprintf(attr, fmt, (const u32 *)(&fmt) + 1);
+    va_list ap;
+    struct print_args input = { .words = 0, .ap = &ap };
+    va_start(ap, fmt);
+    print_format(attr, fmt, &input);
+    va_end(ap);
 }
