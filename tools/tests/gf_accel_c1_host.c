@@ -140,8 +140,8 @@ static u32 cint_pci_writes, cint_pci_fail_at;
 static u16 cint_pci_command;
 static bool cint_irq_registered, cint_dma_live, cint_expect_closed;
 static bool cint_limit_new_imem, cint_restore_seen;
-static bool cint_saw_unfinished, cint_fail_stop_after_put;
-static u32 cint_old_epoch;
+static bool cint_saw_unfinished, cint_fail_stop_after_put, cint_recover_timeout;
+static u32 cint_old_epoch, cint_recover_delay;
 
 static inline u32 cint_used_count(void)
 {
@@ -238,6 +238,10 @@ static void cint_observe(struct gf3_host *h, const struct gf3_host_event *e)
         *(const u32 *)e->p[1] != cint_prod.chan.seq) {
         assert(cint_consumed == cint_prod.chan.put);
         cint_saw_unfinished = true;
+        if (cint_recover_timeout) {
+            cint_host.now += GF3_TIMEOUT_US;
+            cint_recover_timeout = false;
+        }
     }
     if (e->op == H_READ && e->a[1] == GF2_USER_BASE + GF2_USER_REFERENCE &&
         cint_limit_new_imem && cint_prod.chan.epoch != cint_old_epoch &&
@@ -309,6 +313,8 @@ static int cint_map(void *owner, const struct recover_bar_extent *bar,
     if (bar->base == CINT_IMEM_PHYS) {
         which = CINT_MAP_IMEM; ptr = cint_imem;
         assert(bytes == CINT_IMEM_BYTES);
+        cint_host.now += cint_recover_delay;
+        cint_recover_delay = 0;
     } else if (bytes == GF2_PUSH_BYTES) {
         which = CINT_MAP_PUSH; ptr = (volatile u8 *)cint_push;
         assert(bar->base == CINT_FB_PHYS + cint_prod.chan.B);
@@ -458,6 +464,8 @@ static inline void cint_reset_cold(void)
     cint_host.writes = cint_writes; cint_host.cwrites = sizeof(cint_writes) / sizeof(cint_writes[0]);
     cint_host.observe = cint_observe;
     cint_host.now = 100;
+    cint_recover_delay = 0;
+    cint_recover_timeout = false;
     cint_map_fail = cint_unmap_fail = -1;
     cint_restore_rc = 0; cint_restore_seen = cint_expect_closed = false;
     cint_limit_new_imem = false;
@@ -632,18 +640,23 @@ static void cint_init_io_failures(void)
 }
 static void cint_recover_success_and_fault(void)
 {
-    for (unsigned fault = 0; fault < 2; ++fault) {
+    for (unsigned fault = 0; fault < 3; ++fault) {
         cint_reset(); cint_start(); cint_open_windows();
         struct gf3_surface old = cint_service->test;
         u32 epoch = cint_prod.chan.epoch, gen = cint_service->scan.generation;
-        if (fault) {
+        if (fault == 1) {
             /* Real F1 IRQ statistics feed real F2 foreground fault capture. */
             ++cint_prod.foundation.stats.graph;
             assert(gf2_fault_check(&cint_prod.chan) == GF2_EFAULT);
         }
         framebuffer = (struct video_fb){0};
         cint_trace_clear(); cint_expect_closed = true;
-        assert(!gf3_service_recover(cint_service, cint_deadline()));
+        /* F4 stage.h / nouveau nv04.c:1220: object setup gets its own
+         * budget even when F1 reinitialization consumed the caller's dl. */
+        u32 old_dl = cint_deadline();
+        if (fault == 2) cint_recover_delay = GF3_TIMEOUT_US + 1U;
+        assert(!gf3_service_recover(cint_service, old_dl));
+        if (fault == 2) assert((i32)(cint_host.now - old_dl) > 0);
         cint_expect_closed = false;
         assert(cint_slot && hook_active && cint_prod.accel.ready);
         assert(cint_prod.chan.epoch == epoch + 1U && cint_prod.accel.epoch == epoch + 1U);
@@ -811,9 +824,9 @@ static void cint_recover_f3_submission_failure(void)
             /* Old stop + new F2 reference + new F3 pre-drain + setup drain.
              * Stall only the fourth: F2's later cleanup reference can finish. */
             cint_stall_reference = cint_references + 4U;
+            cint_recover_timeout = true;
         }
-        int rc = gf3_service_recover(cint_service,
-            persistent == 2 ? cint_host.now + 3U : cint_deadline());
+        int rc = gf3_service_recover(cint_service, cint_deadline());
         assert(rc == (persistent == 0 ? GF2_EIO : persistent == 1 ? GF2_ESTOP : GF2_ETIME));
         cint_closed(); cint_owned_reservations();
         assert(cint_prod.chan.epoch == epoch + 1U && cint_service->scan.reservation_id != id);
