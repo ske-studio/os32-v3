@@ -45,14 +45,21 @@ DISPATCH_PREFIX = '''static i32 recovery_call(u32 op, void *buf, u32 size)
         !(op == KDEBUG_OP_RECOVER_VIRTUAL && recover_virtual_allowed(req))) return -1;
 '''
 MUTATIONS = [
+    ('block-fixed-count', 'kdebug/hwb_access.c', 'u32 count = block->count, value = req->value;',
+     'u32 count = 1, value = req->value;', 'block32'),
+    ('block-fixed-value', 'kdebug/hwb_access.c', 'if (!block->increment) {',
+     'if (1) {', 'block32'),
+    ('block-alignment', 'kdebug/hwb_access.c', '(req->addr & 3U) || block->count',
+     '0 || block->count', 'block32'),
+
     ('paused-dispatch', 'kdebug/kdebug_main.c',
      DISPATCH_PREFIX,
      DISPATCH_PREFIX.replace('    if (op == HW_OP) return hwb_access(buf, size);\n', '') +
      '    if (op == HW_OP) return hwb_access(buf, size);\n',
      'paused'),
     ('cleanup', 'kdebug/hwb_access.c',
-     'if (recover_window_cleanup(&window)) status = HW_WINDOW;',
-     'if (window.failed && recover_window_cleanup(&window)) status = HW_WINDOW;',
+     'if (recover_window_cleanup(&window)) status = HW_WINDOW;\n    if (!write',
+     'if (window.failed && recover_window_cleanup(&window)) status = HW_WINDOW;\n    if (!write',
      'window'),
     ('phys-write', 'kdebug/hwb_access.c',
      'write ? window.ops->store(window.opaque, va, req->width, value) :',

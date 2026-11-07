@@ -10,7 +10,7 @@ CHECK = dict(name='hwb-scripts-host', tier=1, budget=4.0, needs=[], covers=[
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
     'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb'])
+    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb'])
 import json
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ FILES = [
     'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
     'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
     'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb']
+    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb']
 MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
               'iowrite8 port 0xFAC 0', 'enable-fac'),
              ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
@@ -128,7 +128,7 @@ EXEC_MUTATIONS = [
     ('fill-count', EXEC, 'n < r->count; n++', 'n + 1U < r->count; n++', 'fill-values'),
     ('fill-point', EXEC, 'rc = he_point(s, 0); if (rc) return rc;\n            a = r->value;', 'rc = HWB_OK; if (rc) return rc;\n            a = r->value;', 'fill-abort'),
     ('fill-precheck', EXEC, 'r.count - 1U >', 'r.count - r.count >', 'fill-invalid'),
-    ('fill-log', 'userland/shell/hwb_log.c', 'str(&b, " done="); dec(&b, r->done);', 'str(&b, " lost="); dec(&b, r->done);', 'fill-values'),
+    ('fill-log', 'userland/shell/hwb_log.c', 'if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); str(&b, " done=");', 'if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); str(&b, " lost=");', 'fill-values'),
     ('mode-cap-four', MODE, ' if t == 15 goto cap_four\n', '', 'capacity'),
     ('mode-fac', MODE, 'iowrite8 port 0xFAC 0', 'iowrite8 port 0xFAC 2', 'mode'),
     ('mode-cr03', MODE, '0x03 | ((0x80) << 8)', '0x03 | ((0x82) << 8)', 'mode'),

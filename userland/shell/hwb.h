@@ -76,7 +76,7 @@ struct hwb_program {
 enum hwb_opcode {
     HWB_DIM, HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
     HWB_READ, HWB_WRITE, HWB_FILL, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
-    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END
+    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END, HWB_BLOCK32
 };
 enum hwb_address_kind { HWB_ADDR_PCI, HWB_ADDR_PORT, HWB_ADDR_PHYS,
                         HWB_ADDR_BAR, HWB_ADDR_WINDOW };
@@ -102,7 +102,7 @@ struct hwb_instruction {
      * WINDOW_BAR: address.device/bar; POLL: mask/value/timeout/interval. */
     struct hwb_span value, lhs, rhs, bus, dev, fn, vendor, device;
     struct hwb_span mask, timeout, interval, count;
-    u32 not_equal;
+    u32 not_equal, increment;
 };
 enum hwb_value_kind { HWB_SCALAR, HWB_DEVICE, HWB_WINDOW_REF, HWB_ARRAY };
 struct hwb_variable {
@@ -132,7 +132,7 @@ struct hwb_log_record {
     enum hwb_rc rc;
     const char *destination;
     u32 indexed, index;
-    u32 requested_us, elapsed_lo, elapsed_hi, count, done;
+    u32 requested_us, elapsed_lo, elapsed_hi, count, done, increment;
 };
 
 /* Validate all syntax/labels before effects. On failure *out is scratch/invalid,

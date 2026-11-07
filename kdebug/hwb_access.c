@@ -26,6 +26,34 @@ static u32 hwb_phys(struct hw_req *req)
     return status;
 }
 
+/* The whole range is mapped before the first store. No calls, readback or
+ * per-element window setup may split this burst. DF is clear on return. */
+static u32 hwb_block32(struct hw_block_req *block)
+{
+    struct hw_req *req = &block->req;
+    if (req->status || req->space != HW_PHYS || req->width != 4 || req->bdf ||
+        !block->count || block->count > HW_BLOCK32_MAX || block->increment > 1 ||
+        (req->addr & 3U) || block->count * 4U - 1U > U32_MAX - req->addr)
+        return HW_ARG;
+    struct recover_window window;
+    recover_window_hal_init(&window);
+    u32 status = HW_WINDOW;
+    if (!kdebug_window_begin(&window, req->addr, block->count * 4U, true)) {
+        u32 va = window.va + (req->addr & (MEM_PAGE_SIZE - 1U));
+        u32 count = block->count, value = req->value;
+        if (!block->increment) {
+            __asm__ volatile("cld; rep stosl"
+                             : "+D"(va), "+c"(count) : "a"(value) : "memory", "cc");
+        } else {
+            __asm__ volatile("cld; 1: stosl; incl %%eax; decl %%ecx; jnz 1b"
+                             : "+D"(va), "+c"(count), "+a"(value) : : "memory", "cc");
+        }
+        status = HW_OK;
+    }
+    if (recover_window_cleanup(&window)) status = HW_WINDOW;
+    return status;
+}
+
 static void hwb_io(struct hw_req *req)
 {
     if (req->action == HW_READ) {
@@ -42,8 +70,13 @@ static void hwb_io(struct hw_req *req)
 i32 hwb_access(void *buf, u32 size)
 {
     struct hw_req *req = buf;
-    if (!req || size != HW_REQ_BYTES || req->version != HW_VERSION)
+    if (!req || size < HW_REQ_BYTES || req->version != HW_VERSION ||
+        size != (req->action == HW_BLOCK32 ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES))
         return OS32_ERR_INVAL;
+    if (req->action == HW_BLOCK32) {
+        req->status = hwb_block32(buf);
+        return 0;
+    }
     u32 status = req->status, value = req->value;
     if (req->action == HW_READ) req->value = 0;
     req->status = HW_ARG;

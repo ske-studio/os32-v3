@@ -281,6 +281,18 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
             return HWB_ARG;
         return he_assign(s, i->name, HWB_WINDOW_REF, 0, (u32)slot, a);
     }
+    case HWB_BLOCK32: {
+        struct hw_block_req block = {
+            .req = {.version=HW_VERSION, .action=HW_BLOCK32, .space=HW_PHYS,
+                    .width=4, .addr=r->addr, .value=r->value},
+            .count=r->count, .increment=i->increment
+        };
+        if (s->backend->access(s->backend->ctx, &block.req)) return HWB_IO;
+        if (block.req.status > HW_IO_ERROR) return HWB_IO;
+        if (block.req.status) return (enum hwb_rc)block.req.status;
+        r->done = r->count; s->writes += r->count;
+        return HWB_OK;
+    }
     case HWB_FILL:
         for (u32 n = 0; n < r->count; n++) {
             rc = he_point(s, 0); if (rc) return rc;
@@ -410,16 +422,16 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     if (i.address.device.end > i.address.device.begin) {
         he_name(s, i.address.device, target); r.target = target;
     }
-    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_FILL || i.op == HWB_POLL) {
+    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_FILL || i.op == HWB_BLOCK32 || i.op == HWB_POLL) {
         if (!rc) rc = he_address(s, &i, &r);
         /* Wire BDFs use only 16 bits; this sentinel is local to logging. */
         if (rc) r.bdf = U32_MAX;
     }
-    if (!rc && (i.op == HWB_WRITE || i.op == HWB_FILL)) {
+    if (!rc && (i.op == HWB_WRITE || i.op == HWB_FILL || i.op == HWB_BLOCK32)) {
         rc = hwb_eval(s, i.value, &r.value);
         if (!rc && !he_fits(r.value, i.width)) rc = HWB_ARG;
     }
-    if (!rc && i.op == HWB_FILL) {
+    if (!rc && (i.op == HWB_FILL || i.op == HWB_BLOCK32)) {
         rc = hwb_eval(s, i.count, &r.count);
         /* Last element start plus its final byte must fit before any write. */
         if (!rc && (!r.count || r.count - 1U >
@@ -429,6 +441,8 @@ enum hwb_rc hwb_step(struct hwb_state *s)
         rc = hwb_eval(s, i.op == HWB_POLL ? i.timeout : i.value, &r.requested_us);
         if (!rc && (r.requested_us < HWB_US_MIN || r.requested_us > HWB_US_MAX)) rc = HWB_ARG;
     }
+    if (!rc && i.op == HWB_BLOCK32 && r.count > HW_BLOCK32_MAX) rc = HWB_ARG;
+    r.increment = i.increment;
     hwb_log_begin(s->backend, &r);
     u32 next = i.next_pc;
     struct hwb_poll_result poll = {0};
