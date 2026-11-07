@@ -72,11 +72,11 @@ static GfxMode modes[TRI_MODE_COUNT] = {
 };
 static u16 mode_count = 1;
 static i32 cursor_hot_x, cursor_hot_y;
-static int tri_hal_fill(int, int, int, int, u8);
-static int tri_hal_blit(int, int, int, int, int, int);
-static int tri_hal_cursor_image(u8, const struct GfxCursorImage *);
-static int tri_hal_cursor_move(u8, i32, i32);
-static int tri_hal_cursor_show(u8, int);
+int tri_hal_fill(int, int, int, int, u8);
+int tri_hal_blit(int, int, int, int, int, int);
+int tri_hal_cursor_image(u8, const struct GfxCursorImage *);
+int tri_hal_cursor_move(u8, i32, i32);
+int tri_hal_cursor_show(u8, int);
 
 /* Match the other display HAL adapters: preserve the driver's rc in the
  * diagnostic state, expose public OS32 errors only at the HAL boundary. */
@@ -346,7 +346,7 @@ static int primitive_result(int rc, u32 ops, u32 accesses)
     }
     return hal_rc(rc);
 }
-static int tri_hal_fill(int x, int y, int w, int h, u8 color)
+int tri_hal_fill(int x, int y, int w, int h, u8 color)
 {
     if (!drawable()) return OS32_ERR_IO;
     if (!trident_context->backend->fill_rect) return OS32_ERR_NOSYS;
@@ -357,7 +357,7 @@ static int tri_hal_fill(int x, int y, int w, int h, u8 color)
     int rc = tri_fill(&device, s, x, y, w, h, color, TRI_HAL_COPY_ROP);
     return primitive_result(rc, ops, accesses);
 }
-static int tri_hal_blit(int dx, int dy, int sx, int sy, int w, int h)
+int tri_hal_blit(int dx, int dy, int sx, int sy, int w, int h)
 {
     if (!drawable()) return OS32_ERR_IO;
     if (!trident_context->backend->blit) return OS32_ERR_NOSYS;
@@ -372,7 +372,7 @@ static int tri_hal_blit(int dx, int dy, int sx, int sy, int w, int h)
     return primitive_result(rc, ops, accesses);
 }
 
-static int tri_hal_dpms(u8 head, u32 state)
+int tri_hal_dpms(u8 head, u32 state)
 {
     if (head || state > TRI_DPMS_OFF) return OS32_ERR_INVAL;
     if (!probe()) return OS32_ERR_NOSYS;
@@ -393,7 +393,7 @@ static int cursor_result(int rc, u32 ops, u32 accesses)
     }
     return hal_rc(rc);
 }
-static int tri_hal_cursor_image(u8 head, const struct GfxCursorImage *im)
+int tri_hal_cursor_image(u8 head, const struct GfxCursorImage *im)
 {
     if (head || !im) return OS32_ERR_INVAL;
     if (!drawable() || !trident_context->backend->cursor_image) return OS32_ERR_NOSYS;
@@ -412,7 +412,7 @@ static i32 cursor_origin(i32 pos, i32 hot)
     if (hot < 0 && pos > S32_MAX + hot) return S32_MAX;
     return pos - hot;
 }
-static int tri_hal_cursor_move(u8 head, i32 x, i32 y)
+int tri_hal_cursor_move(u8 head, i32 x, i32 y)
 {
     if (head) return OS32_ERR_INVAL;
     if (!drawable() || !trident_context->backend->cursor_move) return OS32_ERR_NOSYS;
@@ -421,7 +421,7 @@ static int tri_hal_cursor_move(u8 head, i32 x, i32 y)
                              cursor_origin(y, cursor_hot_y));
     return cursor_result(rc, ops, accesses);
 }
-static int tri_hal_cursor_show(u8 head, int show)
+int tri_hal_cursor_show(u8 head, int show)
 {
     if (head || (show != 0 && show != 1)) return OS32_ERR_INVAL;
     if (!drawable() || !trident_context->backend->cursor_show) return OS32_ERR_NOSYS;
@@ -462,7 +462,7 @@ static int mode_failure(u32 stage, int rc)
     publish_mode();
     return hal_rc(rc);
 }
-static int tri_hal_mode(u32 id)
+int tri_hal_mode(u32 id)
 {
     if (!drawable()) return OS32_ERR_IO;
     const struct tri_mode *candidate = NULL;
