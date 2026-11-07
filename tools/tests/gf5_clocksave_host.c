@@ -110,7 +110,7 @@ static void roundtrip(void)
     gf5_host_trace_clear(&h);
     assert(gf5_state_restore(&h.ctx,image)==0);
     assert(h.ctx.phase==GF5_RUN && h.ctx.accepting && !h.ctx.busy);
-    assert(!h.calls[F5_RAM] && h.display.calls[D_WRITE]==5);
+    assert(h.calls[F5_RAM]==1 && h.display.calls[D_WRITE]==5);
     struct gf5_clock c;
     assert(gf5_clock_read(&h.ctx,&c)==0);
     assert(c.core_khz==CORE_KHZ && !c.shader_khz);

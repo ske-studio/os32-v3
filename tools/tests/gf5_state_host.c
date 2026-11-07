@@ -35,6 +35,7 @@ static u32 expected_deadline, current_uv;
 static bool check_deadline, reenter, bad_epoch, nested_error, stop_off_error;
 static struct gf5_clock captured_clock;
 static struct gf5_clock_raw captured_raw;
+static struct gf5_plan captured_plan;
 
 static u8 pattern(u32 i) { return (u8)(i^(i>>8)^0xa5U); }
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
@@ -65,6 +66,16 @@ static void observe(struct gf5_host *host,const struct gf5_host_event *e)
     }
     if (e->op==F5_CALC && e->a[0]==F5_CALL_READ)
         *(struct gf5_clock *)e->p[1]=captured_clock;
+    if (e->op==F5_CALC && e->a[0]==F5_CALL_CALC) {
+        const struct gf5_clock *clock=e->p[1];
+        assert(clock==&g->image->clock);
+        assert(!gf2_host_memcmp(clock,&captured_clock,sizeof(*clock)));
+        *(struct gf5_plan *)e->p[2]=captured_plan;
+    }
+    if (e->op==F5_RAM) {
+        assert(!gf2_host_memcmp(e->p[1],&captured_plan,sizeof(captured_plan)));
+        assert(!host->calls[F5_FAN] && !host->calls[F5_VOLT] && !host->calls[F5_PROG]);
+    }
     if (e->op==F5_CALC && e->a[0]==F5_CALL_RAW_SAVE)
         *(struct gf5_clock_raw *)e->p[1]=captured_raw;
     if (e->op==F5_PROG && e->a[0]==F5_CALL_RAW_RESTORE) {
@@ -131,6 +142,8 @@ static void reset(void)
     current_uv=BOOT_UV; check_deadline=false; reenter=false;
     bad_epoch=nested_error=stop_off_error=false;
     captured_clock=(struct gf5_clock){BOOT_CORE_KHZ,BOOT_CORE_KHZ,BOOT_MEM_KHZ};
+    /* Distinct synthetic solver output verifies calc -> RAM plan forwarding. */
+    captured_plan=(struct gf5_plan){.mc=0x1234U,.mn=0x5678U,.actual=captured_clock};
     captured_raw=(struct gf5_clock_raw){0xc002001cU,0x14032809U,0xc000001cU,0x3c0bc003U};
 }
 static struct gf5_image *save(void)
@@ -189,7 +202,8 @@ static void roundtrip(void)
         assert(display.head[0].palette[17]==91 && display.head[0].cursor_visible);
         assert(first(F5_MATCH)<first(F5_RESTART));
         assert(first(F5_RESTART)<call(F5_FAN,F5_CALL_CSTATE));
-        assert(!h.calls[F5_CALC] && !h.calls[F5_RAM]);
+        assert(h.calls[F5_CALC]==1 && h.calls[F5_RAM]==1);
+        assert(first(F5_CALC)<first(F5_RAM) && first(F5_RAM)<first(F5_FAN));
         u32 volt=call(F5_VOLT,F5_CALL_SET), core=first(F5_PROG);
         assert((pass&1U) ? core<volt : volt<core);
         assert(call(F5_FAN,F5_CALL_THERM_RESUME)<first(F5_COPY));
@@ -258,13 +272,14 @@ static void save_failures(void)
 static void restore_failures(void)
 {
     static const struct { enum gf5_host_op op; u32 nth; } failures[]={
-        {F5_MATCH,1},{F5_RESTART,1},
+        {F5_MATCH,1},{F5_RESTART,1},{F5_CALC,1},{F5_RAM,1},
         {F5_FAN,1},{F5_VOLT,1},{F5_VOLT,2},{F5_PROG,1},
         {F5_FAN,2},{F5_FAN,3},{F5_PROG,2},{F5_COPY,2},{F5_RESTORE,1},{F5_ADMIT,1}
     };
     for (u32 i=0;i<sizeof(failures)/sizeof(failures[0]);++i) {
         reset(); struct gf5_image *image=save(); begin_restore();
         enum gf5_host_op op=failures[i].op;
+        nested_error=op==F5_RAM;
         gf5_host_fail_at(&h,op,failures[i].nth,LOWER_ERROR);
         assert(gf5_state_restore(&h.ctx,image)==GF5_EIO);
         assert(h.ctx.source_rc==LOWER_ERROR && h.ctx.phase==GF5_FAULT);
@@ -383,7 +398,7 @@ static void heat_roundtrip(void)
         h.ctx.heat=live; begin_restore();
         assert(gf5_state_restore(&h.ctx,image)==0);
         assert(h.ctx.phase==GF5_RUN && h.ctx.accepting && !h.ctx.busy);
-        assert(!h.calls[F5_RAM] && !h.calls[F5_CALC] && h.calls[F5_PROG]==1+GF5_TILE_COUNT);
+        assert(h.calls[F5_RAM]==1 && h.calls[F5_CALC]==1 && h.calls[F5_PROG]==1+GF5_TILE_COUNT);
         assert(h.calls[F5_RESTORE]==1 && h.calls[F5_ADMIT]==1);
         assert(h.display.base.ch.epoch==image->saved_epoch+1U);
         live.epoch=h.display.base.ch.epoch; heat_equal(live);

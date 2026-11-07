@@ -185,15 +185,20 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     return state_result(g,0);
 }
 
-/* nvkm/subdev/clk/base.c:159-215: fan up, voltage up, core,
- * voltage down, fan down. Version 3 restores the captured raw core PLL;
- * RAM is a separate domain and is not programmed through a solved plan.
+/* nvkm/subdev/clk/base.c:272-305: RAM calc/prog, then :159-215:
+ * fan up, voltage up, core, voltage down, fan down.
+ * Version 3 restores the captured raw core PLL, with a solved RAM plan.
  * Images are private in-memory objects; older versions remain rejected. */
 static i32 state_performance(struct gf5 *g, const struct gf5_image *image)
 {
     u32 previous=0;
     i32 rc=0;
-    if (image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
+    struct gf5_plan plan;
+    if (image->clock_available) {
+        rc=gf5_clock_calc(g,&image->clock,&plan);
+        if (!rc) rc=gf5_ram_prog(g,&plan);
+    }
+    if (!rc && image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
     if (!rc && image->volt_available) rc=gf5_volt_get(g,&previous);
     if (!rc && image->volt_available && image->requested_uv>=previous)
         rc=gf5_volt_set(g,image->requested_uv);
