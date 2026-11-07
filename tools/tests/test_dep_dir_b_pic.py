@@ -46,7 +46,7 @@ def build(work, mutation=None, baseline=None):
             m = re.search(r'^void ' + name + r'\([^\n]*\)\n\{.*?^\}', idt, re.M | re.S)
             assert m, name
             funcs.append(m[0])
-        (work / 'platform/pc98/pic.c', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c').write_text(
+        (work / 'platform/pc98/pic.c').write_text(
             '#include "idt.h"\n#include "io.h"\n' + '\n'.join(funcs) +
             '\nint platform_irq_timer_pending(void) {\n'
             'outp(PIC1_CMD, OCW3_IRR);\n'
