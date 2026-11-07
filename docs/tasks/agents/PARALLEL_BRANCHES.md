@@ -28,7 +28,7 @@ GeForce・ラスタに限らず、機能の開発全般の決まり。手本が�
 - **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check-fast` = 全部の検査、変異なし) が通ったら main に早送りする。
 - **実装者**は触った像のビルドと、足した・触った試験 (`--mutate` を含む)・lint だけを回す。`check-changed` は回さない (CI の check-fast が全部を回す)。
 - **変異込みの全体検査**は GitHub の workflow `full-check` (手動の起動と、毎晩 main に対して、ユーザー決定 2026-11-05)。
-- **substream** (Ubuntu 24.04・gcc 13 の自前の runner) は CI に使わない (GitHub より 2.5〜4 倍遅い)。CI でだけ落ちる件の再現と、Host Services のホスト側の試験台に使う (ユーザー決定 2026-11-05)。
+- **substream** (Ubuntu 24.04・gcc 13) は PowerPC (PowerMac G4) の移植の開発機 (ユーザー決定 2026-11-07、セッション os32powerpc)。GitHub Actions の runner は止めてあり、CI には使わない (GitHub より 2.5〜4 倍遅い、ユーザー決定 2026-11-05)。
 - **merge は終わった順** — 後から入るブランチは、入る直前の main を取り込んで push し直し、CI を通し直す (衝突の解消を含む)。
 - **実機とエミュレータは 1 つずつ** — 実機の受入・NP21/W の操作は直列。ブランチを並列にしても、実機の回は順番に並べる。
 
