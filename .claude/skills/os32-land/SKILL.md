@@ -34,7 +34,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 | 何を入れたか | 検査 |
 |---|---|
-| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
+| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
 | 段・小さな取り込み | 作業木の枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast: **全部の検査、変異なし**) が通るのを待つ |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた) | GitHub の workflow `full-check` (変異込みの全体、`gh workflow run full-check.yml -f ref=<枝か SHA>`)。毎晩 main に対しても自動で回る |
 
