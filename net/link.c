@@ -120,6 +120,7 @@ struct link_handle {
     u16 rel_epoch;
     u32 rel_tick;
     u32 rel_tries;
+    u32 rel_interval;               /* 期限切れは元の RTO / PROBE 周期を継ぐ */
     u8  want_ack;
     u8  want_window;
     u8  want_status;
@@ -357,8 +358,10 @@ static void link_timers(void)
     for (i = 0; i < LINK_HANDLES; i++) {
         struct link_handle *e = &link_h[i];
 
-        if (e->rel_pending && !e->rel_due && since(e->rel_tick) >= LINK_RTO_TICKS) {
-            if (e->rel_tries >= LINK_TRIES) { link_resync(); return; }
+        if (e->rel_pending && !e->rel_due && since(e->rel_tick) >=
+            (e->rel_interval ? e->rel_interval : LINK_RTO_TICKS)) {
+            u32 limit = e->rel_interval == LINK_PROBE_TICKS ? LINK_PROBE_MAX : LINK_TRIES;
+            if (e->rel_tries >= limit) { link_resync(); return; }
             e->rel_due = 1;
             e->rel_tries++;
             link_retransmits++;

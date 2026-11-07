@@ -77,6 +77,7 @@ static void receive(u8 op, u8 flags, u32 seq, u32 ack, u32 rid,
 }
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static int verify_rx(void);
+static int verify_recovery(void);
 static int verify(void)
 {
     const u8 mac[6] = {2, 3, 4, 5, 6, 7};
@@ -113,10 +114,10 @@ static int verify(void)
     nic_bound = 1;
     CHECK(link_host_open("TIME", 4, 1) == 0);
     CHECK(link_host_open("TIME", 4, 1) == 1);
-    /* Exhausted legacy RTO would resync unless expiry runs before timers. */
+    /* Expiry preserves the final RTO interval instead of cancelling it. */
     link_h[0].req_due = 0;
     link_h[0].last_tx_tick = tick_count;
-    link_h[0].retries = LINK_TRIES;
+    link_h[0].retries = LINK_TRIES - 1;
     link_h[1].req_acked = 1; link_h[1].req_due = 0;
     tick_count += 99;
     link_host_progress(1); /* Explicit hook; A9 receive wiring is outstanding. */
@@ -132,9 +133,104 @@ static int verify(void)
     CHECK(link_h[0].req_due == 0 && link_h[0].want_status == 0);
     CHECK(test_if == 0);
     CHECK(link_host_close(0, 1) == 0);
+    receive(LINK_OP_ACK, LINK_F_RELACK, 0, 0, link_h[0].rel_rid, 0, 0);
+    link_tick();
     CHECK(link_host_open("TIME", 4, 1) == 0);
     CHECK(link_host_status(0, 0, 0, 1) == OS32_ERR_AGAIN);
-    return verify_rx();
+    int rc = verify_recovery();
+    return rc ? rc : verify_rx();
+}
+/* Real tick cadence, including wrap, NIC backpressure, close and owner exit. */
+static int verify_recovery(void)
+{
+    const u8 mac[6] = {2, 3, 4, 5, 6, 7};
+    for (int mode = 0; mode < 4; mode++) {
+        link_init(mac);
+        link_state = LINK_S_UP; link_hs_due = 0;
+        link_epoch = 3; link_sess = 9; link_hello_ok = 1;
+        link_resyncs = 0; tx_result = 0;
+        tick_count = U32_MAX - 49;
+        u32 start = tick_count;
+        i32 h = link_host_open("ECHO 4", 6, 1);
+        CHECK(h == 0);
+        link_tick();
+        if (mode) {
+            receive(LINK_OP_ACK, 0, 0, 0, link_h[h].rid, 0, 0);
+            link_tick();
+        }
+        if (mode == 1) {
+            CHECK(link_host_write(h, "abcd", 4, 1) == 4);
+            link_tick();
+        }
+        if (mode == 3) {
+            u8 pl[LINK_RESP_LEN];
+            le_write16(pl, 200); le_write32(pl + 2, 4);
+            receive(LINK_OP_RESPONSE, 0, 0, 0, link_h[h].rid, pl, sizeof(pl));
+            link_tick();
+        }
+        u32 interval = mode < 2 ? LINK_RTO_TICKS : LINK_PROBE_TICKS;
+        u32 end = interval * (mode < 2 ? LINK_TRIES + 1 : LINK_PROBE_MAX + 1);
+        for (u32 elapsed = 1; elapsed <= end; elapsed++) {
+            tick_count = start + elapsed;
+            link_tick();
+            if (elapsed == LINK_HOST_SILENCE_TICKS) {
+                CHECK(link_host_status(h, 0, 0, 1) == OS32_ERR_HOSTDOWN);
+                CHECK(link_resyncs == 0);
+                CHECK(!link_h[h].req_due && !link_h[h].wlen);
+                if (mode & 1) link_host_owner_exit(1);
+                else CHECK(link_host_close(h, 1) == 0);
+                /* Pending cleanup belongs to the old rid until acknowledged. */
+                CHECK(link_host_open("TIME", 4, 2) == 1);
+                receive(LINK_OP_ACK, 0, 0, 0, link_h[1].rid, 0, 0);
+            }
+            if (elapsed > LINK_HOST_SILENCE_TICKS && elapsed < end) {
+                /* Keep the other request alive: only the old failure budget
+                 * may trigger recovery at the original RTO/PROBE boundary. */
+                link_host_progress(1);
+                link_h[1].last_rx_tick = tick_count;
+            }
+            CHECK(link_resyncs == (elapsed == end ? 1u : 0u));
+        }
+        CHECK(link_state == LINK_S_SYN);
+    }
+    /* A pending cleanup transmission has no RTO until NIC acceptance. */
+    link_init(mac); link_state = LINK_S_UP; link_hs_due = 0;
+    link_epoch = 3; link_sess = 9; link_hello_ok = 1; link_resyncs = 0;
+    u32 start = tick_count;
+    CHECK(link_host_open("TIME", 4, 1) == 0);
+    link_tick();
+    for (u32 elapsed = 1; elapsed <= 150; elapsed++) {
+        tick_count = start + elapsed;
+        if (elapsed == LINK_HOST_SILENCE_TICKS) tx_result = OS32_ERR_AGAIN;
+        link_tick();
+        CHECK(link_resyncs == 0);
+    }
+    CHECK(link_h[0].rel_pending && link_h[0].rel_due);
+    CHECK(link_h[0].rel_tries == LINK_TRIES);
+    tx_result = 0; tick_count++;
+    link_tick();
+    CHECK(!link_h[0].rel_due && link_resyncs == 0);
+    tick_count += LINK_RTO_TICKS - 1;
+    link_tick(); CHECK(link_resyncs == 0);
+    tick_count++;
+    link_tick(); CHECK(link_resyncs == 1);
+    /* A healthy peer's RELACK stops cleanup without changing the session. */
+    link_init(mac); link_state = LINK_S_UP; link_hs_due = 0;
+    link_epoch = 7; link_sess = 4; link_hello_ok = 1; link_resyncs = 0;
+    i32 h = link_host_open("TIME", 4, 1);
+    link_tick();
+    receive(LINK_OP_ACK, 0, 0, 0, link_h[h].rid, 0, 0);
+    link_tick();
+    tick_count += LINK_HOST_SILENCE_TICKS;
+    link_tick();
+    CHECK(link_host_status(h, 0, 0, 1) == OS32_ERR_HOSTDOWN);
+    receive(LINK_OP_ACK, LINK_F_RELACK, 0, 0, link_h[h].rid, 0, 0);
+    link_tick();
+    tick_count += LINK_PROBE_TICKS * (LINK_PROBE_MAX + 1);
+    link_tick();
+    CHECK(link_resyncs == 0 && link_sess == 4 && link_epoch == 7);
+    CHECK(link_host_status(h, 0, 0, 1) == OS32_ERR_HOSTDOWN);
+    return 0;
 }
 /* Frames enter through the shared RX boundary, not direct dispatch calls. */
 static int verify_rx(void)
