@@ -4,6 +4,7 @@
 #include "ver_info.h"
 #include "cpu_calibrate.h"
 #include "idt.h"
+#include "boot_diag.c"
 #include "port_service.h"
 #include "pcm_cs4231.h"
 #include "gfx_hal.h"
@@ -79,6 +80,8 @@ static void snapshot(void)
     CHECK(guarded.before == 0x12345678 && guarded.after == 0x87654321);
     for (u32 i = 0; i < sizeof(calls) / sizeof(calls[0]); i++) CHECK(calls[i] == 1);
     CHECK(s->cpu_measured == (u32)!fallback);
+    CHECK(s->irq_master_vector == 0x20 && s->irq_slave_vector == 0x28);
+    CHECK(s->timer_kind == BOOT_TIMER_8254);
     CHECK(s->pit_valid == saved_pit.valid);
     CHECK(s->pit_hz == saved_pit.hz && s->pit_input == saved_pit.clk_hz);
     CHECK(s->ser_ready == (u32)(serial_rc >= 0));

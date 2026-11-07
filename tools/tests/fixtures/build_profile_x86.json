@@ -78,6 +78,10 @@
     "kernel/sys.c",
     "platform/pc98/system.c",
     "platform/pc98/pic.c",
+    "platform/pc98/irq_policy.c",
+    "platform/pc98/irq_complete.c",
+    "platform/pc98/boot_diag.c",
+
     "init/sysconfig.c",
     "kernel/kaudit.c",
     "init/kaudit_boot.c",

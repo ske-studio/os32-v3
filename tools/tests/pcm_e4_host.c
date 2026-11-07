@@ -10,6 +10,8 @@
 #undef irq_unregister
 
 #include "../../kernel/irq/irq_math.c"
+#include "../../platform/pc98/irq_policy.c"
+#include "../../platform/pc98/irq_complete.c"
 #include "../../kernel/irq/irq.c"
 #include "../../kernel/irq/tick.c"
 #include "../../drivers/sound/cs4231/pcm_e4_diag.c"

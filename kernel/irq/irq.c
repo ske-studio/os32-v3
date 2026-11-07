@@ -10,7 +10,7 @@
 /* ======================================================================== */
 
 #include "irq.h"
-#include "../../arch/x86/kernel/idt.h"
+#include "kernel_tick.h"
 #include "../../include/platform_irq.h"
 #include "io.h"
 #include "kprintf.h"
@@ -28,6 +28,30 @@ u32 irq_line_quarantined = 0;
 u32 irq_ctx_violations = 0;
 int irq_test_quiet = 0;   /* 試験専用 (irq.h の注記) */
 
+/* Legacy diagnostics project only the low 32 lines. Per-line state is authoritative. */
+static u32 irq_projection(unsigned irq)
+{
+    return irq < 32 ? (u32)(1u << irq) : 0;
+}
+
+void irq_topology_check(void)
+{
+    const struct irq_topology *t = platform_irq_topology();
+    unsigned i, j;
+    int valid = t->lines == PLATFORM_IRQ_LINES &&
+                t->dynamic_count == PLATFORM_IRQ_DYNAMIC_COUNT && t->dynamic_lines;
+    if (valid) for (i = 0; i < t->dynamic_count; i++) {
+        if (t->dynamic_lines[i] >= t->lines || platform_irq_reserved(t->dynamic_lines[i]))
+            valid = 0;
+        for (j = 0; j < i; j++)
+            if (t->dynamic_lines[j] == t->dynamic_lines[i]) valid = 0;
+    }
+    if (!valid) {
+        kprintf(ATTR_YELLOW, "[irq] invalid topology\n");
+        for (;;) _stop();
+    }
+}
+
 /* ------------------------------------------------------------------------ */
 /*  PIC のマスクは**登録数で持つ** (irq_save の中から呼ぶこと)               */
 /*  隔離された線は登録数に関係なくマスクのまま。                             */
@@ -38,10 +62,10 @@ static void irq_recount_locked(unsigned int irq, struct irq_line *ln)
         /* **成功した再計算のときだけ**ストームのマスクを解く (票 1-6)。
          * 隔離 (quarantined) はここでは解けない。 */
         ln->storm_masked = 0;
-        irq_storm_masked &= ~(u32)(1u << irq);
-        irq_enable(irq);
+        irq_storm_masked &= ~irq_projection(irq);
+        platform_irq_unmask(irq);
     } else {
-        irq_disable(irq);
+        platform_irq_mask(irq);
     }
 }
 
@@ -97,24 +121,13 @@ int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  irq_finish — 動的経路で **pic_eoi を呼ぶ唯一の場所**                     */
+/*  irq_finish — dispatch と排他的に呼ぶ互換完了口                          */
 /* ------------------------------------------------------------------------ */
 void irq_finish(unsigned int irq, int handled_any)
 {
-    int bit7 = 0;
-    int plan;
-
-    if (irq == PIC_SLAVE_LAST_IRQ) {
-        /* handled に関係なくスレーブの ISR を見る (票 §1-1 の 5)。 */
-        bit7 = platform_irq_slave_last_in_service();
-    }
-
-    plan = irq_eoi_plan(irq, bit7);
-    if (plan == IRQ_EOI_SLAVE_MASTER) {
-        pic_eoi(irq);                   /* スレーブ → マスタ */
-    } else if (plan == IRQ_EOI_MASTER) {
-        platform_irq_eoi_master();
-    }
+    struct irq_claim claim;
+    if (platform_irq_claim(irq, &claim) < 0) return;
+    if (claim.needs_finish) platform_irq_complete(&claim);
 
     if (!handled_any && !irq_test_quiet) isr_unexpected_report((u32)irq);
 }
@@ -124,10 +137,17 @@ void irq_finish(unsigned int irq, int handled_any)
 /* ------------------------------------------------------------------------ */
 void irq_dispatch(unsigned int irq)
 {
+    struct irq_claim claim;
     struct irq_line *ln;
     int idx;
     int handled = 0;
 
+    if (platform_irq_claim(irq, &claim) < 0) return;
+    if (!claim.deliver) {
+        if (claim.needs_finish) platform_irq_complete(&claim);
+        return;
+    }
+    irq = claim.line;
     idx = irq_dyn_index(irq);
     if (idx >= 0) {
         ln = &irq_lines[idx];
@@ -139,10 +159,10 @@ void irq_dispatch(unsigned int irq)
         pcm_e4_dispatch_leave(irq);
 #endif
         if (irq_storm_step(ln, (unsigned int)tick_count, handled)) {
-            ln->storm_masked = 1;
-            irq_disable(irq);
-            if (!(irq_storm_masked & (u32)(1u << irq))) {
-                irq_storm_masked |= (u32)(1u << irq);
+            platform_irq_mask(irq);
+            if (!ln->storm_masked) {
+                ln->storm_masked = 1;
+                irq_storm_masked |= irq_projection(irq);
                 if (!irq_test_quiet)
                     kprintf(ATTR_YELLOW, "[irq] storm on IRQ%d (>%d/tick unclaimed) -> masked\n",
                             (int)irq, (int)IRQ_STORM_LIMIT);
@@ -151,7 +171,8 @@ void irq_dispatch(unsigned int irq)
     }
     if (!handled) irq_unexpected++;
 
-    irq_finish(irq, handled);
+    if (claim.needs_finish) platform_irq_complete(&claim);
+    if (!handled && !irq_test_quiet) isr_unexpected_report((u32)irq);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -169,15 +190,15 @@ int irq_quarantine_line(unsigned int irq)
     saved = irq_save();
     if (!irq_lines[idx].quarantined) {
         irq_lines[idx].quarantined = 1;
-        irq_line_quarantined |= (u32)(1u << irq);
-        irq_disable(irq);
+        irq_line_quarantined |= irq_projection(irq);
+        platform_irq_mask(irq);
         irq_restore(saved);
         if (!irq_test_quiet)
             kprintf(ATTR_YELLOW, "[irq] IRQ%d quarantined (%d registrant(s) fall back to their tick hook)\n",
                     (int)irq, (int)irq_lines[idx].count);
         return 0;
     }
-    irq_disable(irq);
+    platform_irq_mask(irq);
     irq_restore(saved);
     return 0;
 }
@@ -209,8 +230,8 @@ void irq_test_reset_line(unsigned int irq)
     irq_lines[idx].storm_masked = 0;
     irq_lines[idx].tick_hits = 0;
     irq_lines[idx].tick_stamp = 0;
-    irq_storm_masked &= ~(u32)(1u << irq);
-    irq_line_quarantined &= ~(u32)(1u << irq);
+    irq_storm_masked &= ~irq_projection(irq);
+    irq_line_quarantined &= ~irq_projection(irq);
     irq_recount_locked(irq, &irq_lines[idx]);
     irq_restore(saved);
 }

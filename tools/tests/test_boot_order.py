@@ -46,6 +46,7 @@ static void tss_init(unsigned top) { CHECK(top==MEM_KSTACK_TOP && flags==expecte
 static void double_fault_init(void) { CHECK(flags==expected_flags); event('F'); }
 static void idt_init(void) { CHECK(flags==expected_flags); event('I'); }
 static void pic_init(void) { CHECK(flags==expected_flags); event('P'); }
+void irq_topology_check(void) { CHECK(flags==expected_flags); event('Q'); }
 static void sysclk_detect(void) { CHECK(flags==expected_flags); event('C'); }
 static void irq_enable(unsigned irq) { CHECK(flags==expected_flags); CHECK(irq==0 || irq==7); event(irq ? '7' : '0'); }
 static void pit_init(unsigned hz) { CHECK(hz==100 && flags==expected_flags); event('H'); }
@@ -82,12 +83,12 @@ def probe(parts):
 int main(void) {
     struct boot_context boot={0};
     kernel_boot_cpu(16384,&boot);
-    CHECK(!strcmp(trace,"GTFIPCDH07EA"));
+    CHECK(!strcmp(trace,"GTFIPQCDH07EA"));
     for (unsigned state=0;state<2;state++) {
         flags=expected_flags=state; count=0;
         arch_boot_segments(); arch_boot_exception_stack(); arch_boot_vectors();
         platform_boot_irq_controller(); platform_boot_clock_detect(); platform_boot_irq_start();
-        CHECK(flags==state && !strcmp(trace,"GTFIPC07"));
+        CHECK(flags==state && !strcmp(trace,"GTFIPQC07"));
         count=0;
         original=cr0=0x8001003fu;
         kernel_boot_memory(16384,&boot);
@@ -111,6 +112,7 @@ def main():
     if '--mutate' in sys.argv:
         for name,path,old,new in [
             ('TSS/IDT reversal',PATHS[0],'arch_boot_exception_stack();','arch_boot_vectors();'),
+            ('topology check omitted',PATHS[4],' irq_topology_check();',''),
             ('EM retained',PATHS[3],'CR0_EM | CR0_TS','CR0_TS'),
             ('TS retained',PATHS[3],'CR0_EM | CR0_TS','CR0_EM'),
             ('IF inverted',PATHS[0],'    _enable();','    _enable(); flags ^= 1;'),

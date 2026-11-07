@@ -6,30 +6,24 @@
 /* ======================================================================== */
 
 #include "irq_math.h"
-#include "pc98.h"
+
 
 #define IRQ_SHARED_MIN_HANDLERS 2
 #define IRQ_DISPATCH_PASSES     2
 
-/* 共通スタブに結ぶ線。**並びがそのまま表の添字**で、kernel/irq/irq.c の
- * irq_lines[] / 診断の順序もこれに従う。固定スタブの線 (0 タイマ / 1 KBD /
- * 2 VSYNC / 4 シリアル / 7 スプリアス / 12 サウンド / 13 マウス) は
- * ここに無く、irq_register は -NOTSUP で断る。 */
-static const unsigned char irq_dyn_lines[IRQ_DYN_COUNT] = {
-    3, 5, 6, 8, 9, 10, 11, 14, 15
-};
+int irq_dyn_index_in(const struct irq_topology *topology, unsigned int irq)
+{
+    unsigned i;
+    if (irq >= topology->lines) return -1;
+    for (i = 0; i < topology->dynamic_count; i++) {
+        if (topology->dynamic_lines[i] == irq) return (int)i;
+    }
+    return -1;
+}
 
 int irq_dyn_index(unsigned int irq)
 {
-    int i;
-
-    /* **範囲検査を先に**。呼び手は PCI の未割り当て 0xFF をそのまま渡し得る
-     * ので、シフトにも PIC のポート選択にも入れる前に落とす (票 1-6)。 */
-    if (irq >= (unsigned int)IRQ_LINE_MAX) return -1;
-    for (i = 0; i < IRQ_DYN_COUNT; i++) {
-        if ((unsigned int)irq_dyn_lines[i] == irq) return i;
-    }
-    return -1;
+    return irq_dyn_index_in(platform_irq_topology(), irq);
 }
 
 int irq_register_check(unsigned int irq, const struct irq_line *ln,
@@ -41,7 +35,7 @@ int irq_register_check(unsigned int irq, const struct irq_line *ln,
     /* ISR の中からの登録は契約違反。救済しないで断る (debug で数える)。 */
     if (in_irq) return IRQ_ERR_CTX;
 
-    if (irq >= (unsigned int)IRQ_LINE_MAX) return IRQ_ERR_INVAL;
+    if (irq >= platform_irq_topology()->lines) return IRQ_ERR_INVAL;
     if (irq_dyn_index(irq) < 0 || ln == 0) return IRQ_ERR_NOTSUP;
 
     if (fn == 0) return IRQ_ERR_INVAL;
@@ -76,7 +70,7 @@ int irq_unregister_find(unsigned int irq, const struct irq_line *ln,
     int i;
 
     if (in_irq) return IRQ_ERR_CTX;
-    if (irq >= (unsigned int)IRQ_LINE_MAX) return IRQ_ERR_INVAL;
+    if (irq >= platform_irq_topology()->lines) return IRQ_ERR_INVAL;
     if (irq_dyn_index(irq) < 0 || ln == 0) return IRQ_ERR_NOTSUP;
     if (fn == 0) return IRQ_ERR_INVAL;
 
@@ -146,17 +140,4 @@ int irq_storm_step(struct irq_line *ln, unsigned int now_tick, int handled_any)
         return ln->storm_masked ? 0 : 1;
     }
     return 0;
-}
-
-int irq_eoi_plan(unsigned int irq, int slave_isr_bit7)
-{
-    if (irq >= (unsigned int)IRQ_LINE_MAX) return IRQ_EOI_NONE;
-
-    if (irq == PIC_SLAVE_LAST_IRQ) {
-        /* スレーブ側スプリアス: ISR の IR7 が立っていなければスレーブへは
-         * 送らない (カスケード分のマスタだけ)。**handled とは無関係** —
-         * 受け手が居たかどうかでスプリアスかどうかは決まらない。 */
-        return slave_isr_bit7 ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;
-    }
-    return (irq >= PIC_IRQS) ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;
 }

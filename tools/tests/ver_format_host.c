@@ -97,6 +97,7 @@ static void baseline(void)
 {
     kmemset(&s, 0, sizeof(s));
     s.cpu_measured = s.pit_valid = s.ser_ready = s.ser_fifo = s.pcm_present = 1;
+    s.timer_kind = BOOT_TIMER_8254; s.irq_master_vector = 0x20; s.irq_slave_vector = 0x28;
     s.pit_hz = 100; s.pit_input = 1996800; s.ser_baud = 9600;
     s.gfx.width = 640; s.gfx.height = 480; s.gfx.bpp = 8;
     s.gfx_kind = 2; s.gfx_active = 1;
@@ -174,6 +175,8 @@ void _start(void)
     line(1, "CPU: x86 32-bit PM+Paging; calib=default");
     line(3, "PIT: unknown"); line(5, "SER: not initialized");
     line(6, "SND: OPN configured; PCM=none"); line(7, "GFX: unknown; GUI target");
+    baseline(); s.irq_master_vector = 0x30; s.irq_slave_vector = 0x38;
+    formatted(16); line(2, "PIC: 8259A x2; vectors=30h/38h (configured)");
     baseline(); s.gfx_active = 0; s.gfx_kind = 1;
     s.gfx.height = 400; s.gfx.bpp = 4; formatted(16);
     line(7, "GFX: 98 640x400x4 bpp; GUI target");

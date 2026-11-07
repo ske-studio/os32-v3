@@ -16,6 +16,7 @@ static void finish(unsigned int rc)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }
+void _halt(void) { finish(11); }
 static void check(int ok) { if (!ok) finish(10); }
 static void input(unsigned int port, unsigned int value)
 {

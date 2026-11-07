@@ -35,8 +35,9 @@ int irq_register(unsigned int irq, irq_handler_fn fn, void *arg,
 int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg);
 
 /* 共通スタブ irq_stub_common_%1 から呼ばれる入口 (IF=0、ネスト無し)。
- * 走査 → ストーム勘定 → irq_finish の順で、**EOI はここの下でだけ**送る。 */
+ * claim → 走査 → ストーム勘定 → complete → 報告。irq_finish と併用しない。 */
 void irq_dispatch(unsigned int irq);
+void irq_topology_check(void);
 
 /* 動的経路の唯一の終了経路。IRQ15 のスプリアス検査は handled とは独立。 */
 void irq_finish(unsigned int irq, int handled_any);

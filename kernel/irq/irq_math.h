@@ -26,9 +26,10 @@
 /* ---- 表の大きさ ------------------------------------------------------ */
 /* 動的登録を受けるのは共通スタブ irq_stub_common_%1 に結んだ線だけ
  * (3/5/6/8/9/10/11/14/15)。固定スタブの線 (0/1/2/4/7/12/13) は拒否する。 */
-#define IRQ_DYN_COUNT      9
+#include "platform_irq.h"
+#define IRQ_DYN_COUNT      PLATFORM_IRQ_DYNAMIC_COUNT
 #define IRQ_MAX_HANDLERS   4    /* 1 線あたりの登録上限 (票: 最大 4 登録) */
-#define IRQ_LINE_MAX       16   /* 8259 ×2 */
+#define IRQ_LINE_MAX       PLATFORM_IRQ_LINES
 
 /* 1 tick の間に「誰も受けない」ディスパッチがこれを**超えたら**線をマスクする。
  * 200 回ちょうどでは入らない (W3 が 200 と 201 を撃ち分ける)。 */
@@ -77,6 +78,7 @@ struct irq_line {
 
 /* irq → 動的表の添字 (0..IRQ_DYN_COUNT-1)。動的でない線と範囲外は負。
  * **シフトや PIC 操作の前にこれを通す** (PCI の未割り当て 0xFF 対策、票 1-6)。 */
+int irq_dyn_index_in(const struct irq_topology *topology, unsigned int irq);
 int irq_dyn_index(unsigned int irq);
 
 /* 登録を受けてよいか。受けるなら**入れる添字** (= ln->count) を返す。

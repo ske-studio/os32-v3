@@ -28,36 +28,6 @@
       "survey_id": "V1"
     },
     {
-      "source": "kernel/ver_collect.c",
-      "header": "arch/x86/kernel/gdt.h",
-      "survey_id": "I2"
-    },
-    {
-      "source": "kernel/ver_collect.c",
-      "header": "arch/x86/kernel/idt.h",
-      "survey_id": "I2"
-    },
-    {
-      "source": "kernel/ver_format.c",
-      "header": "arch/x86/kernel/gdt.h",
-      "survey_id": "I2"
-    },
-    {
-      "source": "kernel/ver_format.c",
-      "header": "arch/x86/kernel/idt.h",
-      "survey_id": "I2"
-    },
-    {
-      "source": "kernel/irq/irq.c",
-      "header": "arch/x86/kernel/gdt.h",
-      "survey_id": "I1/I2"
-    },
-    {
-      "source": "kernel/irq/irq.c",
-      "header": "arch/x86/kernel/idt.h",
-      "survey_id": "I1/I2"
-    },
-    {
       "source": "kernel/sys.c",
       "header": "drivers/video/geforce/geforce_module.h",
       "survey_id": "A5"

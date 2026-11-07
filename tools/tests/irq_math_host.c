@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../../kernel/irq/irq_math.c"
+#include "../../platform/pc98/irq_policy.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -324,7 +325,9 @@ static void eoi_plan(void)
 static unsigned int host_if = 1;
 static unsigned int irq_save(void) { unsigned int old = host_if; host_if = 0; return old; }
 static void irq_restore(unsigned int old) { host_if = old; }
+static void _stop(void) { CHECK(0); }
 #include IRQ_CORE_SOURCE
+#include "../../platform/pc98/irq_complete.c"
 
 volatile u32 tick_count;
 volatile u32 kctx_irq_depth;

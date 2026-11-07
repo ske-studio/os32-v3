@@ -10,6 +10,7 @@
 
 typedef struct {
     u32 cpu_measured, pit_valid, pit_hz, pit_input;
+    u32 irq_master_vector, irq_slave_vector, timer_kind;
     u32 ser_ready, ser_mode, ser_baud, ser_fifo, pcm_present;
     GFX_ScreenInfo gfx; u32 gfx_active, gfx_kind;
     u32 api_version; char build[VER_BUILD_TEXT];

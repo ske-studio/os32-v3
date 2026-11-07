@@ -2,7 +2,7 @@
 CHECK = dict(name='pcm-e4-host', tier=1, covers=[
     'tools/tests/pcm_e4_host.c', 'tools/tests/pcm_cs4231_host.c',
     'tools/tests/pcm_hostshim/io.h', 'tools/tests/kernel_includes.py',
-    'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/irq/tick.c',
+    'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/platform_irq.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/irq/tick.c',
     'kernel/module/kdebug_call.c', 'drivers/sound/cs4231/pcm_module.c',
     'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c',
     'drivers/sound/cs4231/pcm_e4_*.c', 'drivers/sound/cs4231/pcm_e4_*.h',
@@ -44,7 +44,7 @@ def main(mutate):
             # real; no mutation ever touches the working tree.
             tree = tmp / 'tree'
             for directory in ('tools/tests', 'kernel', 'drivers', 'arch',
-                              'include', 'sdk/include', 'mm', 'lib', 'build/arch', 'build/sources', 'build/platform', 'build/features'):
+                              'include', 'platform', 'sdk/include', 'mm', 'lib', 'build/arch', 'build/sources', 'build/platform', 'build/features'):
                 shutil.copytree(ROOT / directory, tree / directory,
                                 ignore=shutil.ignore_patterns('out', '__pycache__', '*.o', '*.d'))
             config = tree / 'build/config.mk'

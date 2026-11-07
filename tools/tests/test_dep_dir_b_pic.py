@@ -18,14 +18,14 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l12_baseline.json'
-SOURCES = ('kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/pic.c')
-HEADERS = ('include/platform_irq.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+SOURCES = ('kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/pic.c', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c')
+HEADERS = ('include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
            'arch/x86/kernel/idt.h', 'arch/x86/kernel/gdt.h', 'kernel/time/pit_math.h')
 MUTATIONS = (
     ('platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
     ('platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),
     ('platform/pc98/pic.c', '    outp(PIC2_CMD, OCW3_IRR);\n    return', '    /* IRR restore removed */\n    return'),
-    ('kernel/irq/irq.c', '        platform_irq_eoi_master();', '        pic_eoi(irq);'),
+    ('platform/pc98/irq_complete.c', '        platform_irq_eoi_master();', '        pic_eoi(claim->line);'),
 )
 
 
@@ -46,13 +46,13 @@ def build(work, mutation=None, baseline=None):
             m = re.search(r'^void ' + name + r'\([^\n]*\)\n\{.*?^\}', idt, re.M | re.S)
             assert m, name
             funcs.append(m[0])
-        (work / 'platform/pc98/pic.c').write_text(
+        (work / 'platform/pc98/pic.c', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c').write_text(
             '#include "idt.h"\n#include "io.h"\n' + '\n'.join(funcs) +
             '\nint platform_irq_timer_pending(void) {\n'
             'outp(PIC1_CMD, OCW3_IRR);\n'
             'return (inp(PIC1_CMD) & 0x01) ? 1 : 0;\n}\n')
         (work / 'kernel/irq/irq.c').write_text(irq)
-    (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
+    (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text() + '\n#define _stop _halt\n')
     exe = work / 'pic-test'
     subprocess.run([
         'gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
@@ -68,7 +68,18 @@ def verify(mutation=None):
     expected = json.loads(FIXTURE.read_text())
     with tempfile.TemporaryDirectory(prefix='dep-dir-b-pic-') as td:
         actual = trace(build(Path(td), mutation))
-    assert actual == expected['trace'], actual
+    # The old fixture called irq_finish on fixed lines too. They now reject claim:
+    # ASM remains their sole completion owner. Keep every captured dynamic trace.
+    trace_expected = []
+    markers = 0
+    fixed_finish = False
+    for row in expected['trace']:
+        if row[0] == 'C':
+            fixed_finish = 128 <= markers < 256 and row[1] in (0, 1, 2, 4, 7, 12, 13)
+            markers += 1
+        if row[0] == 'C' or not fixed_finish:
+            trace_expected.append(row)
+    assert actual == trace_expected, actual
     print('PASS L12 PIC init12 / all masks IF=0,1 / C irq_finish / pending / registration-quarantine', flush=True)
 
 

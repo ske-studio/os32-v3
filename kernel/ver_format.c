@@ -1,8 +1,9 @@
 /* The single ver/About wording and order. Saved values only; no probes. */
 #include "ver_info.h"
+#include "boot_diag.h"
 #include "gfx_hal.h"
 #include "config.h"
-#include "../arch/x86/kernel/idt.h"
+
 #include "module/module.h"
 #include "input_service.h"
 #include "bootinfo.h"
@@ -103,13 +104,13 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "PIC");
     ver_text(&b, "8259A x2; vectors=");
-    ver_number(&b, PIC_MASTER_OFFSET, 2);
+    ver_number(&b, s->irq_master_vector, 2);
     ver_text(&b, "h/");
-    ver_number(&b, PIC_SLAVE_OFFSET, 2);
+    ver_number(&b, s->irq_slave_vector, 2);
     ver_text(&b, "h (configured)");
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "PIT");
-    if (s->pit_valid) {
+    if (s->pit_valid && s->timer_kind == BOOT_TIMER_8254) {
         ver_text(&b, "8254 tick="); ver_number(&b, s->pit_hz, 0);
         ver_text(&b, "Hz input="); ver_number(&b, s->pit_input, 0);
         ver_text(&b, "Hz");

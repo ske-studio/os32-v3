@@ -41,6 +41,7 @@ void _start(void) {
         VerSnapshot s;
         kmemset(&s, 0, sizeof(s));
         s.cpu_measured = s.pit_valid = s.ser_ready = s.ser_fifo = s.pcm_present = 1;
+        s.timer_kind = BOOT_TIMER_8254; s.irq_master_vector = 0x20; s.irq_slave_vector = 0x28;
         s.pit_hz = 100; s.pit_input = 1996800; s.ser_baud = 9600;
         s.gfx.width = 640; s.gfx.height = 480; s.gfx.bpp = 8;
         s.gfx_kind = 2; s.gfx_active = 1; s.api_version = KAPI_VERSION;

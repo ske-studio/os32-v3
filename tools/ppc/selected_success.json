@@ -50,6 +50,7 @@
   "kernel/irq/tick.c",
   "kernel/kaudit.c",
   "kernel/kselftest_report.c",
+  "kernel/module/debug_probe.c",
   "kernel/module/module_image.c",
   "kernel/module/module_runtime.c",
   "kernel/sys.c",

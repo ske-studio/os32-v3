@@ -16,7 +16,7 @@ IF/PIC のハードウェア効果だけを差し替える。
   python3 -B tools/tests/test_irq_math.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='irq-math-host', tier=1,
-    covers=['kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'tools/tests/irq_math_host.c', 'include/pc98.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'tools/tests/kernel_includes.py', 'kdebug/kselftest/irq_dynamic.inc', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h'],
+    covers=['platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'tools/tests/irq_math_host.c', 'include/pc98.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'tools/tests/kernel_includes.py', 'kdebug/kselftest/irq_dynamic.inc', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h'],
     needs=[], budget=1.484202)
 
 from kernel_includes import include_flags
@@ -66,14 +66,10 @@ MUTATIONS = [
     (r"    if \(ln->tick_hits > \(unsigned int\)IRQ_STORM_LIMIT && !handled_any\) \{",
      "    if (ln->tick_hits >= (unsigned int)IRQ_STORM_LIMIT && !handled_any) {",
      "閾値が 1 つ手前 (200 回ちょうどでマスクが入る)"),
-    (r"        return slave_isr_bit7 \? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;",
-     "        return (slave_isr_bit7 >= 0) ? IRQ_EOI_SLAVE_MASTER\n"
-     "                                      : IRQ_EOI_MASTER;",
-     "IRQ15 のスプリアスでもスレーブに EOI を送る (本物の IR7 を潰す)"),
     (r"    if \(ln->quarantined\) return IRQ_ERR_BUSY;\n",
      "",
      "隔離済みの線に登録を許す (打ち切ったはずの線が再び動き出す)"),
-    (r"    if \(irq >= \(unsigned int\)IRQ_LINE_MAX\) return IRQ_ERR_INVAL;\n"
+    (r"    if \(irq >= platform_irq_topology\(\)->lines\) return IRQ_ERR_INVAL;\n"
      r"    if \(irq_dyn_index\(irq\) < 0 \|\| ln == 0\) return IRQ_ERR_NOTSUP;\n\n"
      r"    if \(fn == 0\) return IRQ_ERR_INVAL;",
      "    if (irq_dyn_index(irq) < 0 || ln == 0) return IRQ_ERR_NOTSUP;\n\n"
@@ -98,7 +94,8 @@ def host_build(tmp, source_text=None, core_text=None):
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/irq/irq_math.c"', '"kernel/irq/irq_math.c"'),
+                '"../../kernel/irq/irq_math.c"', '"kernel/irq/irq_math.c"').replace(
+                '"../../platform/pc98/', '"' + str(ROOT / 'platform/pc98') + '/'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
@@ -162,14 +159,13 @@ def mutate(tmp):
         bad += not hits
     original = (ROOT / "kernel/irq/irq.c").read_text()
     for old, new in [
-        ('irq_enable(irq);', 'irq_disable(irq);'),
+        ('platform_irq_unmask(irq);', 'platform_irq_mask(irq);'),
         ('irq_slot_remove(ln, slot);', '(void)slot;'),
         ('if (ln->count > 0 && !ln->quarantined)', 'if (ln->count > 0)'),
-        ('irq_disable(irq);\n            if (!(irq_storm_masked',
-         '(void)irq;\n            if (!(irq_storm_masked'),
-        ('irq_line_quarantined |= (u32)(1u << irq);', '(void)irq;'),
+        ('platform_irq_mask(irq);\n            if (!ln->storm_masked)',
+         '(void)irq;\n            if (!ln->storm_masked)'),
+        ('irq_line_quarantined |= irq_projection(irq);', '(void)irq;'),
         ('irq_restore(saved);', 'irq_restore(0);'),
-        ('platform_irq_eoi_master();', 'pic_eoi(irq);'),
     ]:
         assert old in original, old
         exe = host_build(tmp, core_text=original.replace(old, new, 1))
