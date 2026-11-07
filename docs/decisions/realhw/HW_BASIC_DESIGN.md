@@ -309,3 +309,11 @@ HW run=1 seq=1 line=1 phase=end op=mmiofill16 addr=0x20000000 val=0x1234 count=3
 
 失敗位置はaddr+done×幅。end欠落は未完了。引数不正のendはdone=0、
 countの評価失敗はcount=0を記録する。
+
+## mmioblock32 拡張 (2026-11-07 ユーザー承認)
+
+- `mmioblock32 address count value [inc]`。address は mmiowrite32 と同じ phys/bar/window 指定。count は 1..1024 dword (最大 4096 バイト)、自然整列・全範囲の32bit末尾越境を shell と kdebug の双方で検査する。BAR のサイズは既存どおり不明。
+- 1 回の kdebug 呼出しの中で全範囲を写像して連続書込みする。固定値は `rep stosl`、`inc` は `stosl` と値の加算のループ。値は u32 の周回を許す。途中の POINT・ログ・読戻し・関数呼出しはない。既存の mmiofill は各要素で POINT と特権呼出しを行う挙動を保つ。
+- private wire の action 末尾に `HW_BLOCK32=4` を追加。`hw_req` (version=1、32バイト) は変更せず、`hw_block_req { struct hw_req req; u32 count, increment; }` (40バイト) を追加する。BLOCK32 だけ40バイト、他は32バイトを要求。space=PHYS、width=4、bdf=0、入力status=0、increment=0/1。出力valueは保持、statusは既存の値。公開 KAPI の変更はない。
+- 既存の device aperture (最大2 PTE) で一括写像し、IRQ停止は写像から全store・復元まで。中止は次の命令の POINT で受ける。ログは begin を出さず end 1 行 (`addr`, `end_addr` は最後のバイト、`val`, `count`, `done`, `inc`, `rc`)。写像に失敗した場合は書かない。復元失敗時は WINDOW で停止し、成功件数に加算しない。
+- `tri_burst.hwb` は trident_mode と同じモード設定・後始末で、先頭4096バイト (0x80・0x800を含む) を単発アクセスで退避/復元する。モード設定後のCR39を基準にそのまま・bit1除去・bit2除去・両方除去を比較し、各条件でA固定値→B連番の連続書込みを行う。CR39前後、不一致総数・先頭8件のoffset/期待値/実値、全一致offsetを出力。bit1/2個別の意味は未確定。異常停止時の自動復元は既存どおり行わない。

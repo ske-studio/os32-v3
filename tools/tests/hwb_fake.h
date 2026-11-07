@@ -138,6 +138,25 @@ static inline int hwbf_access(void *ctx, struct hw_req *r)
     struct hwbf_event *e = hwbf_event(f, HWBF_ACCESS);
     e->req = *r; f->accesses++;
     if (f->access_fail_at == f->accesses) return hwbf_access_result(e, r, f->call_error);
+    if (r->action == HW_BLOCK32) {
+        struct hw_block_req *b = (struct hw_block_req *)r;
+        r->status = HW_ARG;
+        if (r->version != HW_VERSION || e->req.status || r->space != HW_PHYS ||
+            r->width != 4 || r->bdf || !b->count || b->count > HW_BLOCK32_MAX ||
+            b->increment > 1 || (r->addr & 3U) || b->count * 4U - 1U > U32_MAX-r->addr)
+            return hwbf_access_result(e, r, 0);
+        if (f->status_fail_at == f->accesses) {
+            r->status = f->failure_status; return hwbf_access_result(e, r, 0);
+        }
+        for (u32 n = 0; n < b->count; n++) {
+            u32 value = r->value + (b->increment ? n : 0);
+            for (u32 lane = 0; lane < 4; lane++)
+                *hwbf_byte(f, HW_PHYS, r->addr+n*4+lane) = value >> (lane*8);
+        }
+        f->bus_accesses++; r->status = HW_OK;
+        e->a = b->count; e->b = b->increment;
+        return hwbf_access_result(e, r, 0);
+    }
     /* Wire shape errors leave every request byte intact. POINT has its own
      * backend adapter; access accepts only READ/WRITE, per hwb_backend. */
     if (r->version != HW_VERSION || r->status != 0 ||

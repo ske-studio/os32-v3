@@ -254,6 +254,15 @@ static int hp_decode(const struct hwb_program *g, u32 pc, struct hwb_instruction
     } else if (CMD("window")) {
         i->op = HWB_WINDOW_BAR; i->name = hp_name(&p); hp_need(&p, "="); hp_word(&p, "bar");
         i->address.kind = HWB_ADDR_BAR; i->address.device = hp_name(&p); i->address.bar = hp_operand(&p, 0);
+    } else if (CMD("mmioblock32")) {
+        i->op = HWB_BLOCK32; i->width = 4; i->space = HW_PHYS;
+        hp_address(&p, i, 0);
+        if (i->address.kind != HWB_ADDR_PHYS && i->address.kind != HWB_ADDR_BAR &&
+            i->address.kind != HWB_ADDR_WINDOW) p.bad = 1;
+        i->count = hp_operand(&p, 0);
+        i->value = hp_operand(&p, 1);
+        hp_skip(&p);
+        if (p.p < p.end) { hp_word(&p, "inc"); i->increment = 1; }
     } else if (CMD("wait")) {
         i->op = HWB_WAIT; hp_word(&p, "us"); i->value = hp_operand(&p, 0);
     } else if (CMD("poll")) {
