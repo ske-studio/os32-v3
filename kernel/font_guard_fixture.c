@@ -6,6 +6,7 @@
  * TASK_FONTPERF F6: the guard no longer touches x87, so the x87 state
  * comparison and the #MF case (16) are gone. */
 #ifdef OS32_R1_FIXTURE
+#include "fault_fixture.h"
 #include "console/font_guard.h"
 #include "appslot.h"
 #include "../arch/x86/kernel/idt.h"
@@ -20,7 +21,7 @@ static int font_fixture_body(void *context)
 {
     u32 mode = (u32)(uptr)context;
     kprintf(KLOG_ATTR, "[font-test] active=%u mode=%u\n", font_guard_active, mode);
-    if (mode == 13) __asm__ volatile("mov $0xffff, %%ax; mov %%ax, %%ds" ::: "eax");
+    if (mode == 13) arch_fixture_gp();
     if (mode == 14) (void)*(volatile u32 *)P2V(0); /* actual NP page0 */
     if (mode == 3) {
         u32 start = tick_count;

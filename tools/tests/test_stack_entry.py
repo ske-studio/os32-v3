@@ -49,7 +49,7 @@ entry_bp: dd 0
     command(['nasm', '-f', 'elf32', work / 'entry.asm', '-o', work / 'entry.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', work / 'sqlite_stack.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'arch/x86/kernel/setjmp.asm', '-o', work / 'setjmp.o'])
-    boot = kernel_source(ROOT)
+    boot = (ROOT / 'arch/x86/kernel/boot_cpu.c').read_text()
     tss = re.search(r'tss_init\([^;]+;', boot).group()
     calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { '
              'int result=0; sqlite_call_on_alt_stack(sqlite_body, test_stack_top, &result); return result; }\n')

@@ -25,31 +25,29 @@ static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot)
 
     /* GDT 再構築 (ブートローダーのGDTから安全な場所へ移行) */
     tvram_print(0, 1, "GDT...", TATTR_GREEN);
-    extern void gdt_init(void);
-    gdt_init();
+    arch_boot_segments();
     tvram_print(6, 1, "OK  ", TATTR_WHITE);
 
     /* TSS (V86 モードに必須: #GP 時の Ring0 スタックと I/O 許可ビットマップ)
      * GDT のエントリ3を使うので gdt_init の直後に呼ぶ。
      * ESP0 は V86 突入直前に v86_enter が実際の ESP へ差し替える。 */
-    tss_init(MEM_KSTACK_TOP);
-    double_fault_init();
+    arch_boot_exception_stack();
 
     /* IDT/PIC/PIT 初期化 */
     tvram_print(12, 1, "IDT...", TATTR_GREEN);
-    idt_init();
+    arch_boot_vectors();
     tvram_print(18, 1, "OK  ", TATTR_WHITE);
 
 
 
     tvram_print(24, 1, "PIC...", TATTR_GREEN);
-    pic_init();
+    platform_boot_irq_controller();
     tvram_print(30, 1, "OK  ", TATTR_WHITE);
 
     /* PIT の分周は機械のシステムクロック次第 (1.9968MHz / 2.4576MHz)。
      * **pit_init より前に 1 回だけ** 0000:0501h を読む。paging_init より
      * 前なので PG=0、低位物理がそのまま見える (票 §1-0、§4-54)。 */
-    sysclk_detect();
+    platform_boot_clock_detect();
 
     boot_platform_run(BOOT_DMA, boot);
 
@@ -62,8 +60,7 @@ static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot)
                 TATTR_WHITE);
 
     /* タイマとカスケード有効化 */
-    irq_enable(0);
-    irq_enable(ICU_SLAVEID);
+    platform_boot_irq_start();
 
     /* CPU速度キャリブレーション (PITベース) */
     tvram_print(0, 2, "CPU...", TATTR_GREEN);

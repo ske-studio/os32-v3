@@ -201,6 +201,7 @@ const struct boot_common *boot_common_get(void);
 |残る4組|kernel/gui.c→IME3ヘッダ、kernel/sys.c→geforce_module.hは第5段。今回除外理由はV3/A5、既知一覧から消して隠さない|
 - 合計16組を解消目標、残4組。`known_header_dependencies.json` は段ごとに必ず更新し、実.dで消失を確認した組だけ減らす（消失0組の段も測定結果を記録）。Aはbootlog_save→gdt/idtの2組とx86_flagsの2組の計4組、F2はplatform_memory_descの2組を減らす。Cのver_collect→gdt/idtは実.dに従い、Dまで残る依存をCで先に削除しない。選択からTUを落として解消扱いにしない。実装時 `tools/ppc/check_compile.py --source-profile selected --accept --json` の測定と新mock host依存試験を併記、PPC全リンクは本段の条件でない。
 - F2は受入①provider host ②誤include変異 ③x86機械語比較 ④known2組確認の4項。mm本体接続の前提はF/F2/A完了、F2の暫定PPC providerを実RAM/機器範囲で確定、RAM BAT撤去と案DのHPT/flush/guard受入（MMU設計参照）。表形式の変更を混ぜない。
+- B実測（2026-11-07）：CR0操作の分離で `init/kernel.c` がselected compile成功へ移った。既存known 16組は消失0、同TUの既存ヘッダ依存25組が初めて実.dで観測可能となり、knownは41組。選択TUを除外せずselected_successへ追加し、G以降の分離で解消を追う（コンパイル成功はPPC起動可能を意味しない）。
 - 第3段へ：legacy_trapのnative frame境界、例外分類とexec復帰の順序、pin/closing/busy契約、ABI_WORD_*とABI_STACK_ALIGNの暫定配置、syscall5予約slot、KAPI未変更の証拠、ring3 markerの基点を渡す。汎用frame/context/ユーザ遷移ABIはここで先取りしない。
 - PPCへ：boot各段、kernel_tick、clock_source、IRQ topology/claim/complete、native boot情報、none legacyを渡す。DECはCPU例外、OpenPICは機種controllerであり同一IRQ線に押し込まない。DEC再arm後のtick更新/共通handler順は後段で定義する。
 - BSD根拠（ローカル実物、GPL未参照）：N=`/home/hight/os32-tmp/ref/netbsd`、O=`/home/hight/os32-tmp/ref/openbsd`。`N/sys/arch/powerpc/powerpc/clock.c:103–116` timebase周波数/hzからDEC設定、`:139–159` 遅延分を考慮した再arm、`:300` counter周波数。OS tickとcounterを分ける手本。

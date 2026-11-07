@@ -33,7 +33,7 @@
 | PPC-BOOT-RH | ppc-boot の実機確認: QuickSilver と Apple OF 4.x での ELF・NOTE の受理、0x20000 の非衝突、stdout=screen の OF 行、`map` の可否 (窓 0x20 は PA がページ境界でない)、ch-a の open | 実機が動くか未確認 (ユーザー 2026-11-07)。QEMU では `map` の効果を証明できない | [TASK_PPC_BOOT](ppc/TASK_PPC_BOOT.md) §3、実機が動くと分かった時 |
 | PPC-MMU-RH | ppc-mmu の実機確認: 7450/7455 の HIGH_BAT と HID0 の手順、実機の DEC の pending、キャッシュと WIMG、OF の後の ESCC の配線。切り離しの後の観測路 (FB) が先に要る | 実機が動くか未確認 (ユーザー 2026-11-07)、QEMU はキャッシュと送信の律を測れない | [TASK_PPC_MMU](ppc/TASK_PPC_MMU.md)、実機が動くと分かった時 |
 | GF-DRIVER-P0 | `check-video-service-host` の GF/Trident・REPEAT/待ち/退避は P0 の fake 契約例。製品 runner・27命令・P3 PLL と実機の正常stop/途中失敗は未検証 | P0 は宣言と契約の段で製品実体が無い。NP21/W・実機は本依頼の対象外 | P2 で実体の結合試験、P3 で表示PLLの失敗/commit、P6 で実機受入（TASK_GF_DRIVER） |
-| GF-L2-Ra266 | GeForce 層 2 (コマンドの投入) の実機受入: Ra266 の 0:13.0/0221 で、T2 (`gf2`) の起動→投入→停止→再開、10 万 reference・wrap、fault→recover (BAD_HANDLE・BAD_METHOD、障害の出力は class・subc・method)、VBLANK の増加、表示の維持、PCI の往復 (層 3 の M2MF との結合) | 層 2 は 2026-11-03 にユーザー指示でコーディングを全部終えてからまとめて検査した (ホストの試験までは通す)。実機の試験は層 2 の取り込みの後 | 層 2 の取り込みの後、ノートのセッションに実機の受入を頼む (確定設計 GF_FEAT2_DESIGN §9・末尾の T2 の追記)。実施担当・日付・serial ログの所在を実施時に記入。**初回 (2026-11-04、Ra266、main 5a29f69c、証拠はノートの `~/os32-tmp/evidence/2026-11-04/gf-accept-5a29f69c/`)**: `gf2 status` は precheck rc=-201 (本番の foundation に時計・待ちが渡っていない、`hwdev/gf/devinit.c:104-105`)、`gf1 status` は rc=-107 (起動前から PCI Command 0106h = BusMaster)、`gf2 display 0` はシリアル・画面とも無出力。直しの段 wt/gf-prodtime が進行中で、再試験はその取り込みの後 |
+| GF-L2-Ra266 | GeForce 層 2 (コマンドの投入) の実機受入: Ra266 の 0:13.0/0221 で、T2 (`gf2`) の起動→投入→停止→再開、10 万 reference・wrap、fault→recover (BAD_HANDLE・BAD_METHOD、障害の出力は class・subc・method)、VBLANK の増加、表示の維持、PCI の往復 (層 3 の M2MF との結合) | 層 2 は 2026-11-03 にユーザー指示でコーディングを全部終えてからまとめて検査した (ホストの試験までは通す)。実機の試験は層 2 の取り込みの後 | **2026-11-07 合格** (実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`)): gf1 status・instmem・vblank・cycle、gf2 status・10 万 reference (wraps=12、約 4.8 秒)・vblank・stop→start (epoch +1)・再開後の reference・recover・cycle (CRC 一致)・accel の upload/download (PCI の往復、差 0)。bad-handle・bad-method は本番のドライバでは precheck で断る設計 (rc=-201) — 障害→recover の出力の受入は診断の owner の別の回。82557 との併用は同時に負荷をかける口が無く閉じない |
 | GF2-B4-ORACLE | B4 の fixture と MIT nouveau c03c1a1 の ctxnv40.c/.h の直接の照合 (CI は fixture と製品を照合する) | 外部の手本のソースはリポジトリに置かない | `tools/tests/gf_command_b4*` か `hwdev/gf/grctx.c` を変えたとき、PM が `test_gf_command.py --component b4 --oracle <ctxnv40.c>` を直接実行 |
 | SLIM-S3C-GUEST | S3 (自己試験 5 本を kdebug へ) の KDEBUG OFF の起動 (skipped と常駐の監査)・両 FD の起動・道具の実読取り | 2026-10-25 に PM が 43984e35 の成果物で KDEBUG ON の起動・自己試験 (fail=0、pass 1823 → 1829、229/229)・ブートログの比べ・mem の監査を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s3/RESULT.md`)。OFF と FD は設定と媒体の差し替えが要る。基準は `~/os32-tmp/run/slim-s3/baseline/`、候補と同梱一覧は `s3f-evidence/` | 次に KDEBUG OFF か FD 起動の試験を回すときに PM が同じ経路を通す |
 | GFX-MODES-C480 | 票 TASK_GFX_MODES の Cirrus の受入 (guest_acceptance の gfx-modes-c480): **NP21/W で** GD5430 を有効にした構成で (実機 Ra266 に Cirrus は無い — 表示は Trident と GeForce 6200、RA266 §1-1)、対の kernel と cirrus.mod で 640×480/256 色・下端 479・HW fill/blit・小さい矩形の CPU 代替・終了と CTRL+STOP の後のリレーの戻りと再入場。別の周波数の構成での P480/P400 も | 構成の変更を段ごとに行わずまとめる (PM 決定 2026-10-26、確定設計 GFX_MODES_DESIGN の A10)。未実行は未合格 | v3 の最終段の構成別の関門で PM が採る |
@@ -106,18 +106,18 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 ## 6. GeForce 層4の実機受入
 
 [確定設計 §12](../decisions/realhw/GF_FEAT4_DESIGN.md) の実機項目。ホスト検査の合格とは区別する。
-初回の実機 (2026-11-04、main 5a29f69c) は層 1・2 の入口 (`gf1`・`gf2 status`) で止まり、層 4 の項目へ進めなかった (GF-L2-Ra266 の行)。wt/gf-prodtime の取り込みの後に、層 1 から順に再試験する。
+2026-11-07 (main 1f68ba92) に層 1・2・4 を 1 回で通した (立会いなし、シリアルとカメラ)。残りは ddc と cursor の下端 — 別のモニターをつなぐ回で。
 
 | ID | 状態 | 構成 | 受入項目 | 証跡 |
 |---|---|---|---|---|
-| GF-L4-Ra266-mode | 未実施 | Ra266 0:13.0/0221 | 各depthの色帯・格子、EDID上限、PLL/CRCと撮影 | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-ddc | 未実施 | Ra266 0:13.0/0221 | LCD1770VM EDID・抜線時既定3depth | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-dpms | 未実施 | Ra266 0:13.0/0221 | 4状態のLCD反応・OSD・帰還画面 | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-cursor | 未実施 | Ra266 0:13.0/0221 | 非対称色・半透明・四辺clip・mode/depth変更 | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-flip | 未実施 | Ra266 0:13.0/0221 | 二面flip・edge→write時間・カメラでtear確認 | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-gamma | 未実施 | Ra266 0:13.0/0221 | identity・整数暗化・8bit palette帰還・LUT checksum | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-outputs | 未実施 | Ra266 0:13.0/0221 | 端子写真・DCB・TMDS/TV/2head独立動作、不可時理由 | 担当/日付/serial/カメラ証跡は実施時記入 |
-| GF-L4-Ra266-lifecycle | 未実施 | Ra266 0:13.0/0221 | PC-98→GF→PC-98・失敗復元・停止順 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-mode | 合格 (EDID 上限は残り) | Ra266 0:13.0/0221 | 各depthの色帯・格子、EDID上限、PLL/CRCと撮影 | 8・565・32bit の 8 色帯と 1px 格子が崩れなし、CRC 1daa4f8a・095833f2・c4550aa8。EDID 上限・PLL の値は DDC が読めず既定の 3 depth だけ — ddc の行で。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-ddc | 未実施 | Ra266 0:13.0/0221 | LCD1770VM EDID・抜線時既定3depth | 今の配線 (出力が PC-98 本体のアナログ入力を経てモニターへ) では enter の detect もモード設定後も -405。別のモニターを直接つなぐ回 (ユーザー予定 2026-11-08) で |
+| GF-L4-Ra266-dpms | 合格 | Ra266 0:13.0/0221 | 4状態のLCD反応・OSD・帰還画面 | step 0〜6 の READY、STANDBY・SUSPEND・OFF で帯が消えモニターの「信号なし」の枠、ON で戻る。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-cursor | 一部 (下端が写らない) | Ra266 0:13.0/0221 | 非対称色・半透明・四辺clip・mode/depth変更 | シリアルは step 0〜9 合格。カメラで中央・左上・右上・(−8,−8) の切れ・消える・再表示・565 は合、左下・右下 (step 4・5) と格子の下端の線が写らない — モニターが下の縁を切る見込み、別のモニターで再確認。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-flip | 合格 (tear は記録だけ) | Ra266 0:13.0/0221 | 二面flip・edge→write時間・カメラでtear確認 | sync=1・sync=0 各 16 frame rc=0、base は 2 値で交互、counter>after、edge→write 11〜12µs。tear は 5fps のカメラで証明できない。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-gamma | 合格 | Ra266 0:13.0/0221 | identity・整数暗化・8bit palette帰還・LUT checksum | LUT checksum 25165440・16809510・25165440 が計算値と一致、灰の傾斜→暗く→戻る→8bit の帯。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-outputs | 合格 (配線の無い出力は写らない) | Ra266 0:13.0/0221 | 端子写真・DCB・TMDS/TV/2head独立動作、不可時理由 | nroutes=4 (c0 analog・c1 analog・c1 TMDS・c2 TV) の単独 READY と 2 head の組・B の OFF・ON+flip が rc=0、head A の「1」が消えない。11-06 の TMDS の -409 は出ない。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
+| GF-L4-Ra266-lifecycle | 合格 | Ra266 0:13.0/0221 | PC-98→GF→PC-98・失敗復元・停止順 | step0→step1 で 98 (unregister)→step2 で GeForce (register)、各項目の enter を 11 回繰り返して -411 なし。実機ノート、2026-11-07、main 1f68ba92、ノートの `~/os32-tmp/evidence/2026-11-07/gf-l24/` (台本 `~/os32-tmp/run/gf-l24-accept/RUNBOOK.md`) |
 
 ## 7. GeForce 層5の受入
 

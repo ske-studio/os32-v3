@@ -81,6 +81,131 @@
       "source": "mm/paging.c",
       "header": "platform/pc98/platform_memory_desc.h",
       "survey_id": "I2/V5"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "arch/x86/kernel/double_fault.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "arch/x86/kernel/gdt.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "arch/x86/kernel/idt.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/ata/cd_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/input/kbd.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/input/kbd_status.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/net/e82557/lan_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/sound/cs4231/pcm_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/sound/fm/fm_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/sound/fm/snd_engine.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/video/cirrus/cirrus_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/video/geforce/geforce_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/video/kcg/kcg_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/video/trident/trident.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "drivers/video/trident/trident_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/ime/ime.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/ime/ime_render.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/ime/ime_store.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86_bios.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86_io.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86_kbd.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86_module.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "kernel/v86/v86_pic.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
+    },
+    {
+      "source": "init/kernel.c",
+      "header": "platform/pc98/boot.h",
+      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     }
   ]
 }
