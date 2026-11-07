@@ -2,7 +2,7 @@
 """SPR full table without VRAM probing; D:2919-2975 is the KiB oracle.
 Production capacity_plan and register access run against the shared fake.
 """
-CHECK = dict(name='trident-vram', tier=1, needs=[], budget=60,
+CHECK = dict(name='trident-vram', tier=1, needs=[], budget=180,
     covers=['drivers/video/trident/vram.c', 'drivers/video/trident/trident.h',
             'drivers/video/trident/regs.c', 'drivers/video/trident/pc98_init.c',
             'drivers/video/trident/mode_640.c', 'drivers/video/trident/route_ra266.c',
@@ -32,6 +32,39 @@ MUTATIONS = (
      'default: kib = 2048; unknown = true;'),
     ('M_SPR_MASK', 'switch (spr & 0x0F)', 'switch (spr & 0x07)'),
     ('M_SPR_EXT', 'case 0x10: kib = 28672;', 'case 0x10: kib = 24576;'),
+    ('M_FIXED_DISPLAY', 'u32 first_off = tri_vram_display_max_bytes(d);',
+     'u32 first_off = pitch * m->vd;'),
+    ('M_MAX_SELECT', 'if (maximum < bytes) maximum = bytes;',
+     'if (!maximum) maximum = bytes;'),
+    ('M_MAX_PAGE', 'tri_round_up(maximum, TRI_PAGE_BYTES, &rounded)',
+     'tri_round_up(maximum, 1, &rounded)'),
+    ('M_MAX_HAL', 'cap->format != TRI_FMT_RGB565', 'cap->format != TRI_FMT_PACKED24'),
+    ('M_MAP_CAP', 'bytes = d->res->mapped_bytes;', 'bytes = d->declared_bytes;'),
+    ('M_SETTING_CAP', 'bytes = d->settings.vram_bytes;', 'bytes = d->declared_bytes;'),
+    ('M_ROWS', '[TRI_VRAM_2D] = {1, 1, 1, true, true}',
+     '[TRI_VRAM_2D] = {1, 1, 1, false, true}'),
+    ('M_PATTERN', '[TRI_VRAM_PATTERN] = {TRI_PATTERN_ALIGN, TRI_PATTERN_ALIGN,',
+     '[TRI_VRAM_PATTERN] = {1, 1,'),
+    ('M_CURSOR_RESERVE', 'TRI_CURSOR_RESERVE_BYTES, true, true}', '1024, true, true}'),
+    ('M_CURSOR_ALIGN', '[TRI_VRAM_CURSOR] = {1, TRI_CURSOR_ALIGN,',
+     '[TRI_VRAM_CURSOR] = {1, 1,'),
+    ('F5-video-align', '[TRI_VRAM_VIDEO] = {TRI_VIDEO_ALIGN_PIXELS, TRI_VIDEO_ALIGN_PIXELS,',
+     '[TRI_VRAM_VIDEO] = {1, 1,'),
+    ('F5-cap-min', 'if (bytes > d->res->mapped_bytes) bytes = d->res->mapped_bytes;',
+     'if (0) bytes = d->res->mapped_bytes;'),
+    ('M_DISPLAY_MAX_FIXED', 'd->vram.first_off = first_off;',
+     'd->vram.first_off = pitch * m->vd;'),
+    ('M_DISPLAY_MAX_PAGE', 'return rounded;', 'return maximum;'),
+    ('M_VIDEO_UNIT', 'unit *= cap->cpp;', 'unit *= 1;'),
+    ('M_VIDEO_ALIGN', 'alignment *= cap->cpp;', 'alignment *= 1;'),
+    ('M_Y_CEILING', 'if (rows > TRI_GE_MAX_Y) rows = TRI_GE_MAX_Y;',
+     'if (rows > TRI_GE_MAX_Y) rows = TRI_GE_MAX_Y + 1;'),
+    ('M_CALLER_ALIGN', 'tri_common_alignment(alignment, requested_align, &alignment)',
+     'tri_common_alignment(1, requested_align, &alignment)'),
+    ('M_SURFACE_EXTENT', 's->height > s->bytes / s->pitch', 's->height < s->bytes / s->pitch'),
+    ('M_RESIZE_GROW', 'block->bytes = size;\n            return TRI_OK;',
+     'block->bytes = size - 1;\n            return TRI_OK;'),
+    ('M_FREE', 'block->allocated = false;', 'block->allocated = true;'),
     ('M_SPR_BASE', 'u16 base = d->cur_vga_base;', 'u16 base = TRI_CR_COLOR;'),
 
 )
@@ -40,7 +73,7 @@ MUTATIONS = (
 def build(work, source):
     exe = work / 'vram'
     sources = ['tools/tests/trident_vram_host.c', 'tools/tests/trident_device_fake.c',
-               'drivers/video/trident/regs.c']
+               'drivers/video/trident/regs.c', 'drivers/video/trident/mode_640.c']
     subprocess.run(['gcc', *FLAGS,
                     '-I' + str(work), '-I' + str(ROOT), *include_flags(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'),
@@ -80,6 +113,7 @@ def main():
                 mutated.write_text(original.replace(old, new))
                 print(f'MUTATE RED {name} (compiled; runtime): '
                       + execute(build(work, mutated), runners, red=True), flush=True)
+            print('RESTORED ' + execute(build(work, ROOT / PRODUCT), runners), flush=True)
     return 0
 
 
