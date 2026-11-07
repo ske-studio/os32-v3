@@ -54,8 +54,7 @@ int main(void) {
     assert result.returncode == (1 if mutant else 0), (mutant, result.returncode)
     deps = (work / 'probe.d').read_text()
     assert ('platform/pc98/platform_memory_desc.h' in deps) == mutant
-    if not mutant:
-        assert 'selected/platform_memory_desc.h' in deps
+    assert mutant or 'selected/platform_memory_desc.h' in deps
     print('RED: wrong PC98 include (runtime)' if mutant else 'GREEN: selected provider')
 
 
