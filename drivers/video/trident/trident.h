@@ -373,6 +373,11 @@ struct trident_device {
      * lifecycle の既定の palette の load) は全部 tri_palette_record を通して
      * ここを更新する。F2 は INDEX8 の近似色の選択でここを読むだけ (I/O なし)。 */
     u8 dac[256][3];
+    /* PM 決定 (2026-11-07、F8 の overscan): 今の overscan の index。持ち主は F8。
+     * xf86cmap.c の pColPriv->overscan (未設定 = -1) に当たり、overscan_valid=false
+     * が未設定 (ゼロ初期化で未設定になる)。 */
+    u8 overscan;
+    bool overscan_valid;
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;
