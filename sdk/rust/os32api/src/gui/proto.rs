@@ -78,6 +78,8 @@ pub const GUI_EV_PALETTE: u8 = 13;
 pub const GUI_EV_TRIM: u8 = 14;
 /// font 設定が変わった (T7b-b3、payload なし)。face を閉じ全窓を再描画、TRIM_DONE は送らない。
 pub const GUI_EV_FONT: u8 = 15;
+/// host_notice_serial が進んだ (payload なし)。アプリは host_notice_read で読む (NET_HOSTSVC #4、KAPI v82)。未対応のアプリは無視する。
+pub const GUI_EV_HOST_NOTICE: u8 = 16;
 
 /* ======================================================================== */
 /*  Style.flags (u8) — G6                                                    */

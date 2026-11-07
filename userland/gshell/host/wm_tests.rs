@@ -4590,3 +4590,97 @@ fn k80_stop_culprit_wins_over_fullscreen_owner() {
     g.inited = false;
     fullscreen::reset();
 }
+
+// B5: gshell は通知を消費せず、前景のアプリへ payload なしで知らせる。
+#[test]
+fn host_notice_cycles_deliver_once_to_foreground() {
+    use crate::{input::Ctx, mocks, wm};
+    use std::sync::atomic::Ordering;
+    use os32api::gui::proto::GUI_EV_HOST_NOTICE;
+    for ctx in [Ctx::Wait, Ctx::Standalone] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = g2w_state(&shm);
+        wm::wm_cycle(&mut st, ctx);
+        assert!(g2w_events(&st, 2).is_empty());
+        mocks::HOST_NOTICE_SERIAL.store(7, Ordering::SeqCst);
+        wm::wm_cycle(&mut st, Ctx::Pump);
+        assert!(g2w_events(&st, 2).is_empty());
+        wm::wm_cycle(&mut st, ctx);
+        wm::wm_cycle(&mut st, ctx);
+        let events = g2w_events(&st, 2);
+        assert_eq!(events.len(), 1);
+        let ev = events[0];
+        assert_eq!((ev.kind, ev.sub, ev.serial, ev.window, ev.payload),
+                   (GUI_EV_HOST_NOTICE, 0, 0, 0, [0; 8]));
+        for id in 3..=5 { assert!(g2w_events(&st, id).is_empty()); }
+        // 非消費。read は mock_api の unexpected stub のままなので、呼ぶと失敗する。
+        assert_eq!(mocks::HOST_NOTICE_SERIAL.load(Ordering::SeqCst), 7);
+        mocks::HOST_NOTICE_SERIAL.store(8, Ordering::SeqCst);
+        wm::wm_cycle(&mut st, ctx);
+        assert_eq!(g2w_events(&st, 2).len(), 2);
+        st.host_notice_seen = u32::MAX;
+        mocks::HOST_NOTICE_SERIAL.store(0, Ordering::SeqCst);
+        wm::wm_cycle(&mut st, ctx);
+        assert_eq!(g2w_events(&st, 2).len(), 3);
+    }
+}
+
+#[test]
+fn host_notice_full_ring_retries_and_coalesces() {
+    use crate::{input::Ctx, mocks, ring, slot, wm};
+    use std::sync::atomic::Ordering;
+    use os32api::gui::proto::{GUI_EV_CLOSE, GUI_EV_HOST_NOTICE, GUI_RING_CAPACITY};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    let si = st.slot_of_owner(2).unwrap();
+    for n in 0..GUI_RING_CAPACITY {
+        let mut ev = ring::ev_simple(GUI_EV_CLOSE, 0, 99);
+        ev.serial = n as u16;
+        assert!(ring::append(&st, si, &ev));
+    }
+    let before = g2w_events(&st, 2);
+    for serial in [1, 2] {
+        mocks::HOST_NOTICE_SERIAL.store(serial, Ordering::SeqCst);
+        wm::wm_cycle(&mut st, Ctx::Wait);
+        assert_eq!(st.host_notice_seen, 0);
+        let events = g2w_events(&st, 2);
+        assert_eq!(events.len(), before.len());
+        for (a, b) in events.iter().zip(&before) {
+            assert_eq!((a.kind, a.serial, a.window), (b.kind, b.serial, b.window));
+        }
+    }
+    let mut h = slot::read_header(&st, si);
+    h.ring_head = h.ring_tail;
+    slot::write_header(&st, si, &h);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    let events = g2w_events(&st, 2);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].kind, GUI_EV_HOST_NOTICE);
+    assert_eq!(st.host_notice_seen, 2);
+}
+
+#[test]
+fn host_notice_without_front_or_slot_waits_for_delivery() {
+    use crate::{input::Ctx, mocks, wm};
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    mocks::HOST_NOTICE_SERIAL.store(1, Ordering::SeqCst);
+    let z_count = st.z_count;
+    st.z_count = 0;
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert_eq!(st.host_notice_seen, 0);
+    st.z_count = z_count;
+    let si = st.slot_of_owner(2).unwrap();
+    st.slots[si].used = false;
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert_eq!(st.host_notice_seen, 0);
+    st.slots[si].used = true;
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert_eq!(g2w_events(&st, 2).len(), 1);
+    assert_eq!(st.host_notice_seen, 1);
+}
