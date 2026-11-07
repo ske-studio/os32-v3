@@ -1,4 +1,4 @@
-"""KAPI データ欄の固定配置と OS32X ヘッダ v4 (票 TASK_KAPI_DATA_FIELDS)。
+"""KAPI データ欄の固定配置と OS32X ヘッダ v5 (票 TASK_KAPI_DATA_FIELDS)。
 
 票:   docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md (方針 v2 / v3 / ユーザー決裁)
 
@@ -7,7 +7,7 @@
      tools/tests/os32x_layout_host.c が実物を #include して踏む
      (v2 → 断る / v3 値違い → 断る / 一致 → 通す、長さの境界)。
   2. sdk/gen_kapi.py が関数表の容量 (func_capacity) を超えたら生成を拒否する。
-  3. sdk/mkos32x.py がヘッダ v4 を焼き、kapi_data_off が ELF の
+  3. sdk/mkos32x.py がヘッダ v5 を焼き、kapi_data_off が ELF の
      .os32_kapi_layout と一致する。刻印が無い / 食い違う / .raw と .elf の
      世代が違う (大きさ、または同じ大きさで PT_LOAD の中身) / --elf が無い、
      は失敗する。min_api_ver は 71 に引き上がる。
@@ -193,7 +193,7 @@ def case_capacity_full(tmp, kj):
 
 
 # --------------------------------------------------------------------------
-#  3. mkos32x.py のヘッダ v4
+#  3. mkos32x.py のヘッダ v5
 # --------------------------------------------------------------------------
 
 START_C = r'''
@@ -204,7 +204,7 @@ void _start(void) { for (;;) { } }
 '''
 
 
-def build_elf(tmp, name, stamp=True, extra_asm=None, pad=0, fill=1):
+def build_elf(tmp, name, stamp=True, extra_asm=None, pad=0, fill=1, keep=()):
     src = tmp / (name + ".c")
     body = "OS32_KAPI_LAYOUT_STAMP();" if stamp else ""
     if pad:
@@ -224,7 +224,7 @@ def build_elf(tmp, name, stamp=True, extra_asm=None, pad=0, fill=1):
             raise SystemExit("asm failed: " + r.stderr)
     elf = tmp / (name + ".elf")
     r = run([sys.executable, "sdk/link_guard.py", TLD, *LDFLAGS, "-u", "keep_" + name if pad else "_start",
-             "-o", elf, *objs])
+             "-o", elf, *[arg for sym in keep for arg in ("-u", sym)], *objs])
     if r.returncode != 0:
         raise SystemExit("link failed: " + r.stderr)
     raw = tmp / (name + ".raw")
@@ -240,7 +240,7 @@ def mkos32x(raw, out, elf=None, api=39, opts=()):
 
 
 def case_mkos32x(tmp):
-    print("== 3: mkos32x.py はヘッダ v4 を ELF の刻印から焼く ==", flush=True)
+    print("== 3: mkos32x.py はヘッダ v5 を ELF の刻印から焼く ==", flush=True)
     elf, raw = build_elf(tmp, "stamped")
     out = tmp / "stamped.bin"
     r = mkos32x(raw, out, elf)
@@ -250,7 +250,7 @@ def case_mkos32x(tmp):
         return
     blob = out.read_bytes()
     h = H.parse_header(blob)
-    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "ヘッダ v4 / 60 バイト")
+    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "ヘッダ v5 / 64 バイト")
     sec = H.Elf32(str(elf)).section(".os32_kapi_layout")
     val = struct.unpack_from("<I", H.Elf32(str(elf)).section_bytes(sec), 0)[0]
     check(h.get("kapi_data_off") == val == 0x4B8,
@@ -387,12 +387,108 @@ def case_mkos32x(tmp):
     check(r.returncode != 0, "--elf が無ければ失敗する")
 
 
+def patch_elf(tmp, elf_path, name, symbol=None, value=None, section=None, field=None):
+    """Patch a real ELF while keeping its validated input hash current."""
+    import hashlib
+    elf = H.Elf32(elf_path)
+    body = bytearray(elf.data)
+    if symbol:
+        for sec in elf.sections:
+            if sec['type'] != 2:
+                continue
+            strings = elf.section_bytes(elf.sections[sec['link']])
+            for offset in range(sec['offset'], sec['offset'] + sec['size'], 16):
+                name_off = struct.unpack_from('<I', body, offset)[0]
+                if elf._str(strings, name_off) == symbol:
+                    if value is None:
+                        struct.pack_into('<I', body, offset, 0)  # remove name
+                    else:
+                        struct.pack_into('<I', body, offset + 4, value)
+    if section:
+        index = next(i for i, sec in enumerate(elf.sections) if sec['name'] == section)
+        struct.pack_into('<I', body, elf.e_shoff + index * elf.e_shentsize + field[0], field[1])
+    out = tmp / (name + '.elf')
+    out.write_bytes(body)
+    inputs = json.loads(elf_path.with_suffix('.inputs.json').read_text())
+    inputs['elf_sha256'] = hashlib.sha256(body).hexdigest()
+    out.with_suffix('.inputs.json').write_text(json.dumps(inputs))
+    return out
+
+
+def case_code_range(tmp):
+    print("== v5: ELF code/BSS boundaries ==", flush=True)
+    for pad in (0, 4064, 4065, 4096, 8192):
+        elf, raw = build_elf(tmp, 'boundary%d' % pad, pad=pad)
+        out = tmp / ('boundary%d.bin' % pad)
+        r = mkos32x(raw, out, elf)
+        check(r.returncode == 0, 'no-data image / page boundary %d accepted' % pad)
+        if r.returncode:
+            print(r.stderr)
+            continue
+        header = H.parse_header(out.read_bytes())
+        parsed = H.Elf32(elf)
+        code = parsed.symbols['__text_end'] - parsed.text_addr()
+        check(header.get('code_size') == code == len(raw.read_bytes()),
+              'code==text includes page padding %d' % pad)
+        check(code % 4096 == 0 and code >= max(4096, pad), 'page-aligned RO prefix')
+        if pad in (4064, 4065):
+            check(code == (4096 if pad == 4064 else 8192), 'one/two-page exact edge')
+    elf, raw = build_elf(tmp, 'bad_boundary')
+    base = H.Elf32(elf).text_addr()
+    try:
+        H.check_raw_matches_elf(H.Elf32(elf), raw.read_bytes() + b'\0')
+    except H.HeaderError as error:
+        check('大きさ' in str(error), 'raw length mismatch rejected before layout checks')
+    else:
+        check(False, 'raw length mismatch rejected before layout checks')
+    for name, value in (('missing', None), ('zero', base),
+                        ('unaligned', base + 4095), ('oversized', base + 8192)):
+        bad = patch_elf(tmp, elf, name, '__text_end', value)
+        out = tmp / (name + '.bin')
+        r = mkos32x(raw, out, bad)
+        check(r.returncode != 0 and ('__text_end' if value is None else 'code range') in r.stderr,
+              'reject __text_end ' + name)
+        check(not out.exists(), 'no output for ' + name)
+    r = mkos32x(raw, tmp / 'entry_equal.bin', elf, opts=['--entry', '4096'])
+    check(r.returncode != 0 and 'entry outside code' in r.stderr, 'reject entry==code')
+    r = mkos32x(raw, tmp / 'entry_last.bin', elf, opts=['--entry', '4095'])
+    check(r.returncode == 0, 'accept entry==code-1')
+    bad = patch_elf(tmp, elf, 'bss_gap', '__bss_start', base + 4100)
+    r = mkos32x(raw, tmp / 'bss_gap.bin', bad)
+    check(r.returncode != 0 and 'BSS start' in r.stderr, 'reject BSS gap')
+    bad = patch_elf(tmp, elf, 'write_code', section='.text', field=(8, H.SHF_ALLOC | H.SHF_WRITE | 4))
+    r = mkos32x(raw, tmp / 'write_code.bin', bad)
+    check(r.returncode != 0 and 'writable section' in r.stderr, 'reject writable RO section')
+    # GNU ld must include the alignment before a strongly aligned BSS in .data.
+    asm = '.section .data,"aw"\n.global data_aligned\ndata_aligned: .long 7\n.section .bss,"aw",@nobits\n.balign 64\n.global bss_aligned\nbss_aligned: .space 64'
+    elf, raw = build_elf(tmp, 'aligned', pad=1, extra_asm=asm, keep=('data_aligned', 'bss_aligned'))
+    parsed = H.Elf32(elf)
+    check(parsed.symbols['__bss_start'] == parsed.text_addr() + len(raw.read_bytes()),
+          'BSS follows raw image exactly')
+    r = mkos32x(raw, tmp / 'aligned.bin', elf)
+    check(r.returncode == 0, 'data and 64-byte aligned BSS image accepted')
+    if r.returncode:
+        print(r.stderr)
+    check(parsed.bss_size() == 64 and len(raw.read_bytes()) == 4160,
+          'data padding absorbs alignment before nonempty BSS')
+    bad = patch_elf(tmp, elf, 'orphan', section='.data',
+                    field=(0, parsed.section('.data')['name_off'] + 1))
+    r = mkos32x(raw, tmp / 'orphan.bin', bad)
+    check(r.returncode != 0 and 'orphan alloc' in r.stderr, 'reject orphan alloc section')
+    h = H.build_header(0, 0, 4096, 0, 0, 0, base, 0x4b8, code_size=4096)
+    check(len(h) == 64 and H.parse_header(h)['code_size'] == 4096, 'v5 final word round trip')
+    old = bytearray(h[:60])
+    struct.pack_into('<II', old, 4, 60, 4)
+    check('shlib_protocol' in H.parse_header(old) and 'code_size' not in H.parse_header(old),
+          'parse v4 60B generations independently of v5 code_size')
+
+
 # --------------------------------------------------------------------------
 #  4. mkshlib.py (ビルド済みの libos32gui があれば)
 # --------------------------------------------------------------------------
 
 def case_mkshlib(tmp):
-    print("== 4: mkshlib.py もヘッダ v4 ==", flush=True)
+    print("== 4: mkshlib.py もヘッダ v5 ==", flush=True)
     elf = ROOT / "userland/libos32gui.elf"
     raw = ROOT / "userland/libos32gui.raw"
     if not elf.is_file():
@@ -412,11 +508,29 @@ def case_mkshlib(tmp):
         print(r.stdout, r.stderr)
         return
     h = H.parse_header(out.read_bytes())
-    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "shlib もヘッダ v4")
+    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "shlib もヘッダ v5")
     check(h.get("kapi_data_off") == H.read_kapi_layout(H.Elf32(str(elf))) == 0x4B8,
           "shlib の kapi_data_off = os32api の刻印 = 0x4B8")
+    code = H.Elf32(elf).symbols['__shlib_data_start'] - 0x80000000
+    check(h.get('code_size') == code == struct.unpack_from('<I', out.read_bytes(), 64 + 20)[0] * 4096,
+          'shlib OS32X code_size agrees with jump-table text_pages')
+    for field, value, word in ((12, 0x80000000 + code + 4096, 'data_vaddr'),
+                               (20, code // 4096 + 1, 'text_pages')):
+        body = bytearray(rawtmp.read_bytes())
+        struct.pack_into('<I', body, field, value)
+        bad_raw = tmp / ('shlib_bad%d.raw' % field)
+        bad_raw.write_bytes(body)
+        r = run([sys.executable, '-B', 'tools/mkshlib.py', bad_raw,
+                 tmp / ('shlib_bad%d.shlib' % field), '--elf', elf])
+        check(r.returncode != 0 and word in r.stderr, 'reject shlib boundary mismatch ' + word)
     check(h["flags"] & H.OS32X_FLAG_SHLIB, "OS32X_FLAG_SHLIB が立つ")
     check(h["min_api_ver"] == H.OS32X_MIN_API, "shlib の --api 51 も 71 に引き上がる")
+    bad_elf = patch_elf(tmp, elf, 'shlib_symbol_boundary', '__shlib_data_start',
+                        0x80000000 + code + 4096)
+    r = run([sys.executable, '-B', 'tools/mkshlib.py', rawtmp,
+             tmp / 'shlib_symbol_boundary.shlib', '--elf', bad_elf])
+    check(r.returncode != 0 and 'data_vaddr' in r.stderr,
+          'reject inconsistent ELF and jump-table boundary')
     stripped = tmp / "lib_nostamp.elf"
     run([TOBJCOPY, "--remove-section", ".os32_kapi_layout", elf, stripped])
     r = run([sys.executable, "-B", "tools/mkshlib.py", rawtmp, tmp / "x.shlib",
@@ -505,10 +619,22 @@ def case_rename(tmp):
 # --------------------------------------------------------------------------
 
 MUTATIONS = [
+    ("sdk/mkos32x.py", "missing_text_end_allowed",
+     "    if text_end is None:", "    if text_end is None:\n        return 4096\n    if False:"),
+    ("sdk/mkos32x.py", "code_zero_allowed", "    code_size = text_end - base", "    code_size = text_end - base\n    if code_size == 0:\n        return 0"),
+    ("sdk/mkos32x.py", "code_alignment_unchecked", "code_size % H.PAGE_SIZE or", "False or"),
+    ("sdk/mkos32x.py", "code_extent_unchecked", "code_size > text_size:", "False:"),
+    ("sdk/mkos32x.py", "entry_at_code_end_allowed", "entry_offset < code_size:", "entry_offset <= code_size:"),
+    ("sdk/mkos32x.py", "bss_gap_allowed", "if elf.symbols.get('__bss_start') != image_end:", "if False:"),
+    ("sdk/mkos32x.py", "orphan_alloc_allowed", "if section['name'] not in ('.text', '.data', '.bss'):", "if False:"),
+    ("sdk/mkos32x.py", "writable_code_allowed", "if section['flags'] & H.SHF_WRITE and start < text_end:", "if False:"),
+    ("tools/mkshlib.py", "shlib_boundary_mismatch_allowed", "        if cur == want:", "        if cur != 0:\n            return want\n        if cur == want:"),
+    ("exec/os32x_hdr.c", "v4_accepted", "hdr->version != OS32X_HDR_VERSION", "(hdr->version != OS32X_HDR_VERSION && hdr->version != 4)"),
+
     ("exec/os32x_hdr.c", "mismatch_accepted",
      "        return OS32X_LAYOUT_MISMATCH;", "        return OS32X_LAYOUT_OK;"),
     ("exec/os32x_hdr.c", "short_read_trusted",
-     "    if (!hdr || read_len < OS32X_HDR_SIZE)", "    if (!hdr)"),
+     "    if (!hdr || read_len < OS32X_HDR_SIZE)", "    if (!hdr || (read_len < OS32X_HDR_SIZE && 0))"),
     ("exec/os32x_hdr.c", "unknown_format_accepted",
      "hdr->version != OS32X_HDR_VERSION", "hdr->version < OS32X_HDR_VERSION"),
     ("sdk/gen_kapi.py", "capacity_not_enforced",
@@ -555,7 +681,7 @@ SELF = "tools/tests/test_kapi_layout.py"
 # cwd 相対で書き出す先 (sdk/include/os32 kapi/ exec/)、子の試験が "..." で
 # 引く先 (include/) は丸ごと実体にする — symlink を通して書くと実物を壊す。
 MUT_REAL = ("exec", "sdk", "include", "kapi", "build/os32.ld",
-            "tools/tests/os32x_layout_host.c")
+            "tools/tests/os32x_layout_host.c", "tools/mkshlib.py")
 
 
 def case_generation_isolation(tmp):
@@ -630,6 +756,7 @@ if __name__ == "__main__":
         case_check_fn(td)
         case_capacity(td)
         case_mkos32x(td)
+        case_code_range(td)
         case_mkshlib(td)
         case_rename(td)
         case_generation_isolation(td)

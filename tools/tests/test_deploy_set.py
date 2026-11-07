@@ -526,7 +526,7 @@ manifest.write_text('format=1\\nbuild=fixture\\ngenerated=fixture\\ncount={}\\n-
             path.parent.mkdir(parents=True, exist_ok=True)
             flags = hdr.OS32X_FLAG_SHLIB if name.endswith(".shlib") else hdr.OS32X_FLAG_RING3
             path.write_bytes(hdr.build_header(flags, 0, 1, 0, 0, 0,
-                                             hdr.OS32X_APP_LOAD_ADDR, 1) + b"\xc3")
+                                             hdr.OS32X_APP_LOAD_ADDR, 1, code_size=4096) + b"\xc3")
         paths = ["userland/shell.bin", "userland/libos32gui.shlib", "userland/tests/a.bin"]
         manifest = {"files": [{"path": p} for p in paths + names]}
         with patch.object(cm, "resolve_entry", side_effect=lambda e: dm.resolve_entry(e, str(self.root))):

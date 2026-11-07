@@ -204,7 +204,7 @@ typedef enum {
 #define OS32X_HDR_V2_SIZE 44            /* v2ヘッダのサイズ (load_addr を末尾に追記) */
 #define OS32X_HDR_V3_SIZE 48            /* v3ヘッダのサイズ (kapi_data_off を末尾に追記) */
 #include "os32_generations.h"
-#define OS32X_HDR_SIZE 60
+#define OS32X_HDR_SIZE 64
 /* v3 のバイナリが要求する最低 KAPI 版。v3 の照合を持たない旧カーネル
  * (v62 以前) が v3 バイナリを受け入れないよう、生成器が min_api_ver を
  * これ以上に引き上げる (票 TASK_KAPI_DATA_FIELDS)。 */
@@ -230,7 +230,7 @@ typedef enum {
 typedef struct {
     u32 magic;            /* 0x00: OS32X_MAGIC */
     u32 header_size;      /* 0x04: ヘッダ全体のサイズ (バイト) */
-    u32 version;          /* 0x08: ヘッダバージョン (現在: 1) */
+    u32 version;          /* 0x08: ヘッダバージョン (現在: 5) */
     u32 flags;            /* 0x0C: フラグ */
     u32 entry_offset;     /* 0x10: エントリポイント */
     u32 text_size;        /* 0x14: コード + 初期化済みデータ */
@@ -256,7 +256,8 @@ typedef struct {
     u32 kapi_abi_generation;
     u32 memory_layout_generation;
     u32 shlib_protocol;
-} OS32Header;             /* 合計: 60バイト (0x3C)。version 1 は先頭 40 バイト、
+    u32 code_size;        /* 0x3C: RO prefix (code + rodata + page padding) */
+} OS32Header;             /* 合計: 64バイト (0x40)。version 1 は先頭 40 バイト、
                            * version 2 は44バイト、version 3 は48バイト。旧版はローダが拒否。 */
 
 /* ======================================================================== */

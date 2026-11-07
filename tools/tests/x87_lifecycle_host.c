@@ -37,10 +37,10 @@ u32 kstrlen(const char *s) { u32 n=0; while(s[n]) n++; return n; }
 char *kstrncat(char *p,const char *s,u32 n) { u32 a=kstrlen(p); kstrncpy(p+a,s,n-a); return p; }
 int kstrcmp(const char *a,const char *b) { while(*a && *a==*b) { a++; b++; } return (u8)*a-(u8)*b; }
 int vfs_resolve_path(const char *p,char *out,int n) { kstrncpy(out,p,n); return VFS_OK; }
-int vfs_read(const char *p,void *buf,u32 n) { (void)p; CHECK(n==OS32X_HDR_SIZE); OS32Header *h=buf; kmemset(h,0,n); h->header_size=OS32X_HDR_SIZE; h->text_size=1; h->load_addr=exec_nest_level ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR; return n; }
+int vfs_read(const char *p,void *buf,u32 n) { (void)p; CHECK(n==OS32X_HDR_SIZE); OS32Header *h=buf; kmemset(h,0,n); h->header_size=OS32X_HDR_SIZE; h->text_size=PAGE_SIZE; h->code_size=PAGE_SIZE; h->load_addr=exec_nest_level ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR; return n; }
 int vfs_open(const char *p,int m) { (void)p; CHECK(!m); return 7; }
 int vfs_seek(int fd,int off,int w) { CHECK(fd==7 && off==OS32X_HDR_SIZE && !w); return off; }
-int vfs_read_fd(int fd,void *p,u32 n) { CHECK(fd==7 && n==1); *(u8 *)p=0; return n; }
+int vfs_read_fd(int fd,void *p,u32 n) { CHECK(fd==7 && n==PAGE_SIZE); kmemset(p,0,n); return n; }
 void vfs_close(int fd) { CHECK(fd==7); }
 #define LEGACY_FAKE_PINNED_ENABLE
 #define LEGACY_FAKE_PINNED 0
@@ -85,6 +85,7 @@ void appmem_init(struct addrspace *as,u32 b,u32 e,u32 h,u32 g) { (void)as; (void
 int shlib_addrspace_attach(struct addrspace *as) { (void)as; return 0; }
 u32 pgalloc_alloc_phys(u32 owner,int n) { (void)owner; CHECK(n>0 && (u32)n<=sizeof(allocation)/PAGE_SIZE); return (u32)allocation; }
 int paging_addrspace_map_user_range_phys(struct addrspace *as,u32 b,u32 e,u32 p,u32 f) { (void)as; (void)b; (void)e; (void)p; (void)f; return 0; }
+int paging_addrspace_protect_code_ro(struct addrspace *as,u32 b,u32 e) { (void)as; (void)b; (void)e; return 0; }
 int paging_addrspace_map_user(struct addrspace *as,u32 v,u32 p,u32 f) { (void)as; (void)v; (void)p; (void)f; CHECK(0); return -1; }
 int pgalloc_free_n_owner(u32 o,u32 p,int n) { (void)o; (void)p; (void)n; CHECK(0); return 0; }
 int as_va_to_pa(u32 pd,u32 va,u32 *pa) { (void)pd; *pa=(u32)stack_page+(va & (PAGE_SIZE-1)); return 0; }

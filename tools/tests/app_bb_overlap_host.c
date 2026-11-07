@@ -205,7 +205,7 @@ void _start(void) {
     }
     {
         OS32Header h = {0};
-        h.load_addr = MEM_EXEC_LOAD_ADDR; h.text_size = PAGE_SIZE;
+        h.load_addr = MEM_EXEC_LOAD_ADDR; h.text_size = PAGE_SIZE; h.code_size = PAGE_SIZE;
         CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 0x100000));
         h.shlib_protocol = OS32_SHLIB_PROTOCOL;
         CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 0x100000));

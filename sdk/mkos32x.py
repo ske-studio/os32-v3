@@ -20,7 +20,8 @@ mkos32x.py - フラットバイナリに OS32X ヘッダを付加する
     --launcher     起動要求 (launch_req) を出してよい宣言 (票 T9 D3)
     --load ADDR    リンク時のロードアドレス (--elf 指定時は ELF の .text から自動)
 
-ヘッダ v3 (48 バイト、票 docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md):
+ヘッダ v5 (64 バイト):
+    code_size は ELF の __text_end から取得する (コード・rodata・ページ埋草)。
     末尾に kapi_data_off (KernelAPI のデータ欄のオフセット) を焼く。値は ELF の
     非ロードのセクション .os32_kapi_layout (crt0 / os32api の刻印) から取る。
     **--elf は必須**で、刻印が無ければ失敗する。min_api_ver は 63 未満なら 63 に
@@ -41,6 +42,39 @@ OS32X_FLAG_RING3 = H.OS32X_FLAG_RING3
 OS32X_FLAG_SHLIB = H.OS32X_FLAG_SHLIB
 OS32X_FLAG_CUI_ONLY = H.OS32X_FLAG_CUI_ONLY
 OS32X_FLAG_LAUNCHER = H.OS32X_FLAG_LAUNCHER
+
+
+def check_image_layout(elf, base, text_size, entry_offset):
+    """Validate the ELF RO prefix and the flat image/BSS contract."""
+    text_end = elf.symbols.get('__text_end')
+    if text_end is None:
+        raise H.HeaderError("missing __text_end")
+    code_size = text_end - base
+    if code_size <= 0 or code_size % H.PAGE_SIZE or code_size > text_size:
+        raise H.HeaderError("invalid image code range")
+    if not 0 <= entry_offset < code_size:
+        raise H.HeaderError("entry outside code range")
+    image_end = base + text_size
+    if elf.symbols.get('__bss_start') != image_end:
+        raise H.HeaderError("BSS start differs from image end")
+    bss_end = elf.symbols.get('__bss_end')
+    if bss_end != image_end + elf.bss_size():
+        raise H.HeaderError("BSS end differs from image extent")
+    for section in elf.sections:
+        if not section['flags'] & H.SHF_ALLOC or not section['size']:
+            continue
+        if section['name'] not in ('.text', '.data', '.bss'):
+            raise H.HeaderError("orphan alloc section: " + section['name'])
+        start = section['addr']
+        end = start + section['size']
+        if section['type'] == H.SHT_NOBITS:
+            if start < image_end or end > bss_end:
+                raise H.HeaderError("alloc NOBITS section outside BSS")
+        elif start < base or end > image_end:
+            raise H.HeaderError("alloc section outside image")
+        if section['flags'] & H.SHF_WRITE and start < text_end:
+            raise H.HeaderError("writable section overlaps code range")
+    return code_size
 
 
 def main():
@@ -121,9 +155,9 @@ def main():
             print(f"不明なオプション: {sys.argv[i]}")
             sys.exit(1)
 
-    # ヘッダ v3 は ELF の刻印からしか作らない (票 TASK_KAPI_DATA_FIELDS)。
+    # ヘッダ v5 は ELF の境界と刻印から作る。
     if not elf_path:
-        print("mkos32x: --elf <file.elf> が要る (ヘッダ v3 の kapi_data_off を "
+        print("mkos32x: --elf <file.elf> が要る (ヘッダ v5 の kapi_data_off を "
               "ELF の .os32_kapi_layout から取る)", file=sys.stderr)
         sys.exit(1)
 
@@ -167,8 +201,7 @@ def main():
         text_size = len(code_data)
         if stack_size < 0 or stack_size > 0x7fffffff or heap_size < 0 or heap_size > 0xffffffff:
             raise H.HeaderError("invalid heap/stack size")
-        if not 0 <= entry_offset < text_size:
-            raise H.HeaderError("entry outside image")
+        code_size = check_image_layout(elf, text_addr, text_size, entry_offset)
         shlib_dependency = '__os32_shlib_dependency' in elf.symbols
         if shlib_dependency and load_addr != H.OS32X_APP_LOAD_ADDR:
             raise H.HeaderError("resident shell must be statically linked")
@@ -176,7 +209,7 @@ def main():
             raise H.HeaderError("compatibility probe must be statically linked")
         eff_api = H.effective_min_api(min_api_ver, compat_api)
         header = H.build_header(flags, entry_offset, text_size, bss_size,
-                                heap_size, min_api_ver, load_addr, kapi_data_off, stack_size, H.OS32_SHLIB_PROTOCOL if shlib_dependency else 0, compat_api=compat_api)
+                                heap_size, min_api_ver, load_addr, kapi_data_off, code_size, stack_size, H.OS32_SHLIB_PROTOCOL if shlib_dependency else 0, compat_api=compat_api)
     except H.HeaderError as e:
         print(f"mkos32x: {e}", file=sys.stderr)
         sys.exit(1)

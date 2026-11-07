@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='exec-image-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'exec/exec.c', 'tools/tests/test_exec_image.py', 'tools/tests/exec_image_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['exec/os32x_hdr.c', 'exec/os32x_hdr.h', 'tools/tests/os32x_layout_host.c', 'sdk/include/os32/os32_kapi_shared.h', 'exec/exec.c', 'tools/tests/test_exec_image.py', 'tools/tests/exec_image_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h'],
     needs=[], budget=60.0)
 
 

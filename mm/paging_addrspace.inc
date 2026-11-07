@@ -297,3 +297,32 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
     return freed;
 }
 
+
+int paging_addrspace_protect_code_ro(struct addrspace *as, u32 base, u32 end)
+{
+    u32 va, i, *pd;
+    if (!as || !as->pd_phys || base >= end ||
+        ((base | end) & (PAGE_SIZE - 1)) ||
+        base < MEM_EXEC_LOAD_ADDR || end > MEM_EXEC_HEAP_BASE)
+        return -1;
+    pd = P2V(as->pd_phys);
+    /* First pass: no page changes if any registration or payload is invalid. */
+    for (va = base; va < end; va += PAGE_SIZE) {
+        u32 k = PDE_INDEX(va) - APP_BAND_PDE;
+        u32 table = as->app_pt_phys[k], pa;
+        if (!table || (pd[PDE_INDEX(va)] & PTE_FRAME_MASK) != table ||
+            !pgalloc_page_owned(table / PAGE_SIZE, as->owner) ||
+            as_va_to_pa_read(as->pd_phys, va, &pa) ||
+            !pgalloc_page_owned(pa / PAGE_SIZE, as->owner) || pa == as->pd_phys)
+            return -1;
+        for (i = 0; i < MEM_APP_BAND_MAX_PDES; i++)
+            if (pa == as->app_pt_phys[i]) return -1;
+        for (i = 0; i < MEM_LEASE_MAX_PDES; i++)
+            if (pa == as->lease_pt_phys[i]) return -1;
+    }
+    for (va = base; va < end; va += PAGE_SIZE) {
+        u32 *pt = P2V(as->app_pt_phys[PDE_INDEX(va) - APP_BAND_PDE]);
+        pt[PTE_INDEX(va)] &= ~PTE_RW;
+    }
+    return 0;
+}
