@@ -24,6 +24,10 @@ CHECK = dict(name='hostsvc-persistent', tier=1, needs=[], budget=10, covers=[
     'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('scope-ensure', 'int rc = sfs_ensure_session(config.io->now(config.io_ctx) + SFS_SCOPE_TICKS);',
+     'int rc = 0;'),
+    ('scope-generation', 'vfs_resource_stale_mount(&resident.client);',
+     '(void)0;'),
     ('mount-gate', 'serialfs_permit(&resident.client);', 'serialfs_forbid();'),
     ('mount-conflict', 'return OS32_ERR_BUSY;\n    config = *cfg;',
      'return OS32_ERR_IO;\n    config = *cfg;'),

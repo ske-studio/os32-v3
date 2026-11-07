@@ -393,6 +393,7 @@ int sfs_persistent_enabled(void); int sfs_persistent_scope_begin(void); int sfs_
 ```
 I1がLAN設定/peerを解析、A10のSfsLanを初期化し同じpeerをnet_startとsfs_lan_set_peerへ渡す。I1の起動結線がSfsLan/clock ctxの起動全体の寿命を保持（lan.mod参照はA2）。cfgはC1がcopy、io/ctxは借用。C1が唯一の共有client・mount世代を所有、startはHELLOなしでmount公開、既存HostDrvにはBUSY。
 clientは未起動NULL、それ以外は借用の読取り参照（sid/seq確認用）、変更/通信はensure/requestだけ。C2がモードを照合してscopeへ分岐、LAN scopeはbegin/endの対応だけを持ち、終了時BYE/unmountしない。UARTは現行経路。C4/D2/D3はclientを新設しない。
+scopeの開始でensureして世代の変化を吸収し、必要ならmount世代も受け直す。開始の `sfs: transport=lan … sid=` と終了の `sfs: exit=N` は非常駐時と同じ形式で表示する。
 ## #7 応答と絶対期限（本文 §3、使用 C1/C3/C4/D2）
 ```c
 /* fs/serialfs/sfs_client.h */

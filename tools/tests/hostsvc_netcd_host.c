@@ -9,6 +9,7 @@
 static struct HostAlive alive;
 void host_alive_snapshot(struct HostAlive *out) { *out = alive; }
 int vfs_is_mounted(const char *p) { (void)p; return 0; }
+void vfs_resource_stale_mount(void *ctx) { (void)ctx; }
 int serialfs_is_mounted(void) { return 0; }
 void serialfs_permit(SfsClient *c) { (void)c; }
 void serialfs_forbid(void) { }
