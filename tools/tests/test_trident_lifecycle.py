@@ -53,6 +53,20 @@ MUTATIONS=[
  ('screen-retry','lifecycle','    d->last_rc = d->failed_step = d->restore_rc = d->disable_rc = 0;','    if (d->last_rc) return d->last_rc;'),
  ('active-enter','lifecycle','    if (!d->screen_ready) return TRI_E_STATE;','    if (d->active) return 0;\n    if (!d->screen_ready) return TRI_E_STATE;'),
 ]
+MUTATIONS += [
+ ('fallback-noaccel','mode_640','d->settings.no_accel || d->settings.ram_fallback || m.bpp == 24',
+  'd->settings.no_accel || m.bpp == 24'),
+ ('initial-byte-present','lifecycle','return trident_present(d, 0, 0, d->mode.client.width, d->mode.client.height);',
+  'return TRI_OK;'),
+ ('enter-byte-present','lifecycle','STAGE(TRI_STEP_CLIENT, trident_present(d, 0, 0, d->mode.client.width, d->mode.client.height));',
+  'STAGE(TRI_STEP_CLIENT, TRI_OK);'),
+ ('mode-byte-present','backend_trident','rc = trident_present(&device, 0, 0, device.mode.client.width, device.mode.client.height);',
+  'rc = TRI_OK;'),
+ ('cursor-byte-upload','cursor','if (d->res->ram_fallback) {','if (false) {'),
+ ('overlay-byte-upload','video','((u32)v[x / 2] << 24);\n                if (d->res->ram_fallback)',
+  '((u32)v[x / 2] << 24);\n                if (false)'),
+]
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--mutate',action='store_true');args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='trident-life-') as tmp:

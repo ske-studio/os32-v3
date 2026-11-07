@@ -64,6 +64,8 @@ static int client_init(struct trident_device *d)
             if (rc) return rc;
         }
     }
+    if (d->res->ram_fallback)
+        return trident_present(d, 0, 0, d->mode.client.width, d->mode.client.height);
     return TRI_OK;
 }
 
@@ -142,6 +144,8 @@ int trident_enter(struct trident_device *d)
     d->mode.features &= features | TRI_CAP_GE;
     accel_init(d);
     STAGE(TRI_STEP_CLIENT, tri_palette_reload(d));
+    if (d->res->ram_fallback)
+        STAGE(TRI_STEP_CLIENT, trident_present(d, 0, 0, d->mode.client.width, d->mode.client.height));
     d->step = TRI_STEP_ACTIVE;
     return TRI_OK;
 }

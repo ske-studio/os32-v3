@@ -369,14 +369,20 @@ int tri_video_put(struct trident_device *d, const struct tri_video_image *image,
             for (u32 x = left; x < left + pixels; x += 2) {
                 u32 packed = y[x] | ((u32)u[x / 2] << 8) |
                              ((u32)y[x + 1] << 16) | ((u32)v[x / 2] << 24);
-                TRY(trident_write32(d, TRI_SPACE_LFB, target, packed));
+                if (d->res->ram_fallback) {
+                    for (u32 byte = 0; byte < sizeof(u32); ++byte)
+                        TRY(trident_write8(d, TRI_SPACE_LFB, target + byte, (u8)(packed >> (byte * BITS_PER_BYTE))));
+                } else TRY(trident_write32(d, TRI_SPACE_LFB, target, packed));
                 target += 4;
             }
         } else {
             for (u32 x = left * 2; x < (left + pixels) * 2; x += 4) {
                 u32 packed = y[x] | ((u32)y[x + 1] << 8) |
                              ((u32)y[x + 2] << 16) | ((u32)y[x + 3] << 24);
-                TRY(trident_write32(d, TRI_SPACE_LFB, target, packed));
+                if (d->res->ram_fallback) {
+                    for (u32 byte = 0; byte < sizeof(u32); ++byte)
+                        TRY(trident_write8(d, TRI_SPACE_LFB, target + byte, (u8)(packed >> (byte * BITS_PER_BYTE))));
+                } else TRY(trident_write32(d, TRI_SPACE_LFB, target, packed));
                 target += 4;
             }
         }

@@ -14,6 +14,11 @@ static void die(const char *s)
     __builtin_unreachable();
 }
 #define CHECK(x) do { __asm__ volatile("" ::: "memory"); if (!(x)) die("FAIL " #x "\n"); } while (0)
+#ifndef TRI_RAM_FALLBACK_DEFAULT
+#define TRI_RAM_FALLBACK_DEFAULT 1
+#endif
+static u8 ram[3u * 1024 * 1024] __attribute__((aligned(4096)));
+static bool ram_live, fail_ram_once;
 static struct trident_fake fake;
 static u8 fake_storage[TRI_FAKE_REAL_BYTES];
 /* Fixed capacity covers every exposed format; selected bytes may be smaller. */
@@ -49,7 +54,7 @@ int lease_revoke_surface(u32 sid)
     if (!failure(67)) ledger_surfaces[sid].lease_count = 0;
     return 0;
 }
-u32 pgalloc_arena_end(void) { return PHYSMEM_MAX_PFN; }
+
 u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
 {
     ++config_reads; ++read32_count;
@@ -134,19 +139,30 @@ int ledger_resource_set_map(u32 rid, u32 first, u32 end)
 }
 int pgalloc_alloc_n_owner(u32 owner, int n, u32 first, u32 end, u32 flags, u32 *pfn)
 {
-    (void)owner; (void)n; (void)first; (void)end; (void)flags; (void)pfn;
-    ++allocs; CHECK(0); return 0; /* Direct VRAM must never allocate RAM. */
+    CHECK(TRI_RAM_FALLBACK_DEFAULT && owner == LEDGER_OWNER_BOOT && !ram_live);
+    CHECK(n > 0 && (u32)n == expected_capacity / PAGE_SIZE);
+    CHECK(first == MEM_PHYS_EXEC_FLOOR / PAGE_SIZE && end == pgalloc_arena_end() && flags == LEDGER_TOP_DOWN);
+    if (fail_ram_once) { fail_ram_once=false; return 0; }
+    ++allocs; ram_live = true; *pfn = (u32)ram / PAGE_SIZE; return 1;
 }
+u32 pgalloc_arena_end(void) { return ((u32)ram + sizeof(ram)) / PAGE_SIZE; }
 int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 {
-    (void)owner; (void)pfn; (void)n; ++frees; CHECK(0); return 0;
+    CHECK(owner == LEDGER_OWNER_BOOT && pfn == (u32)ram / PAGE_SIZE && n > 0 && ram_live);
+    ++frees; ram_live = false; return 1;
 }
 static void check_geometry(const struct ledger_surface *s)
 {
     CHECK(!irq_enabled && current_cr3 == 0x1000 && present_maps == 3);
     CHECK(s->width == expected_width && s->height == expected_height && s->pitch == expected_pitch);
-    CHECK(s->npages == expected_capacity / PAGE_SIZE && s->first == LFB_BASE / PAGE_SIZE);
-    CHECK(s->owner == 8 && s->backing == LEDGER_SB_VRAM && s->cache == LEDGER_CACHE_UC);
+    CHECK(s->npages == expected_capacity / PAGE_SIZE);
+    if (TRI_RAM_FALLBACK_DEFAULT && s->role == LEDGER_ROLE_CLIENT) {
+        CHECK(s->first == (u32)ram / PAGE_SIZE && s->owner == LEDGER_OWNER_BOOT);
+        CHECK(s->backing == LEDGER_SB_RAM && s->cache == LEDGER_CACHE_WB);
+    } else {
+        CHECK(s->first == LFB_BASE / PAGE_SIZE && s->owner == 8);
+        CHECK(s->backing == LEDGER_SB_VRAM && s->cache == LEDGER_CACHE_UC);
+    }
     CHECK(s->backend == LEDGER_SF_TRIDENT && s->format == expected_format && s->planes == 1);
     CHECK(s->perm_max == LEDGER_PERM_RW && !s->lease_count && !s->closing);
 }
@@ -175,7 +191,10 @@ int ledger_surface_regen(u32 sid, const struct ledger_surface *s)
     CHECK(sid == 2 || sid == 3);
     CHECK(revokes >= 2 && !ledger_surfaces[sid].lease_count);
     CHECK((gfx_surface_unready & 12) == 12);
-    check_geometry(s);
+    struct ledger_surface shaped = *s;
+    shaped.role = ledger_surfaces[sid].role;
+    check_geometry(&shaped);
+    CHECK(s->first == ledger_surfaces[sid].first && s->npages == ledger_surfaces[sid].npages);
     ++regens;
     if ((failure(68) && sid == 2) || (failure(69) && sid == 3)) return 0;
     struct ledger_surface *old = &ledger_surfaces[sid];
@@ -188,7 +207,8 @@ int ledger_surface_release(u32 sid)
     CHECK(sid == 2 || sid == 3 || sid == 4);
     struct ledger_surface *s = &ledger_surfaces[sid];
     CHECK(s->npages && !s->lease_count);
-    CHECK(s->backing == LEDGER_SB_VRAM);
+    if (s->backing == LEDGER_SB_RAM) CHECK(pgalloc_free_n_owner(s->owner, s->first, s->npages));
+    else CHECK(s->backing == LEDGER_SB_VRAM);
     s->npages = 0; ++release_calls; return 1;
 }
 void *kmemset(void *p, int c, u32 n)
@@ -256,12 +276,12 @@ static void configure_cases(const struct trident_resources *r, struct tri_mode s
     u32 before = reloads;
     CHECK(r->configure(mode == 74 ? 0 : &selected, capacity, true) == expected);
     CHECK(current_cr3 == 0x3000 && irq_enabled);
-    CHECK(surface_calls == 2 && !allocs && !frees);
+    CHECK(surface_calls == 2 && allocs == TRI_RAM_FALLBACK_DEFAULT && !frees);
     if (expected == TRI_OK) {
         CHECK(reloads == before + 2 && regens == 2 && revokes == 2);
         CHECK((gfx_surface_unready & 12) == 0);
         CHECK(r->display_sid == 2 && r->client_sid == 3 && r->generation == 2);
-        CHECK(r->client == (u8 *)r->lfb && r->client_bytes == expected_pitch * 600);
+        CHECK(r->client == (TRI_RAM_FALLBACK_DEFAULT ? ram : (u8 *)r->lfb) && r->client_bytes == expected_pitch * 600);
         CHECK(r->display.width == 800 && r->display.height == 600 && r->display.pitch == expected_pitch);
         CHECK(r->display.bytes == r->client_bytes && r->client_surface.bytes == r->client_bytes);
         CHECK(r->client_surface.pitch == expected_pitch && r->client_surface.width == 800);
@@ -269,7 +289,7 @@ static void configure_cases(const struct trident_resources *r, struct tri_mode s
         CHECK(r->display.format == (mode == 57 ? TRI_FMT_XRGB8888 : TRI_FMT_RGB565));
         for (u32 sid = 2; sid <= 3; sid++) {
             const struct ledger_surface *sf = &ledger_surfaces[sid];
-            CHECK(sf->first == LFB_BASE / PAGE_SIZE && sf->npages == DISPLAY_CAPACITY / PAGE_SIZE);
+            CHECK(sf->first == ((TRI_RAM_FALLBACK_DEFAULT && sid == 3) ? (u32)ram / PAGE_SIZE : LFB_BASE / PAGE_SIZE) && sf->npages == DISPLAY_CAPACITY / PAGE_SIZE);
             CHECK(sf->gen == 2 && sf->width == 800 && sf->pitch == expected_pitch);
             CHECK(sf->role == (sid == 2 ? LEDGER_ROLE_DISPLAY : LEDGER_ROLE_CLIENT));
         }
@@ -295,6 +315,7 @@ static void lifetime_cases(const struct trident_resources *r, struct tri_mode se
     CHECK(r->configure(&selected, provisional, false) == TRI_OK && surface_calls == 2 && !regens);
     expected_capacity = 1966080u;
     if (mode == 78) fail_client_once = true;
+    if (mode == 82 && TRI_RAM_FALLBACK_DEFAULT) fail_ram_once=true;
     if (mode == 79) wrong_sid_once = true;
     if (mode == 80) {
         ledger_surfaces[3].lease_count = 1;
@@ -303,7 +324,7 @@ static void lifetime_cases(const struct trident_resources *r, struct tri_mode se
         ledger_surfaces[3].lease_count = 0;
     }
     int rc = r->configure(&selected, expected_capacity, true);
-    if (mode == 78 || mode == 79) {
+    if (mode == 78 || mode == 79 || (mode == 82 && TRI_RAM_FALLBACK_DEFAULT)) {
         CHECK(rc == TRI_E_SURFACE && !ledger_surfaces[2].npages && !ledger_surfaces[3].npages);
         CHECK(!r->generation && !r->client && !r->client_bytes);
         CHECK(r->configure(&selected, expected_capacity, true) == TRI_OK);
@@ -322,7 +343,7 @@ static void lifetime_cases(const struct trident_resources *r, struct tri_mode se
     CHECK(r->configure(&selected, 307200, false) == TRI_OK);
     CHECK(ledger_surfaces[3].npages == 480 && r->client_surface.cpp == 1);
     CHECK(trident_resources_rollback(false) == TRI_OK);
-    CHECK(!present_maps && !ledger_surfaces[2].npages && !ledger_surfaces[3].npages);
+    CHECK(!present_maps && !ledger_surfaces[2].npages && !ledger_surfaces[3].npages && !ram_live && allocs==frees);
 }
 static void run(void)
 {
@@ -408,15 +429,26 @@ static void run(void)
         CHECK((u32)r->lfb == 0x20000000 && (u32)r->regs == MEM_TRIDENT_REGS_VA);
         CHECK(r->bar0_phys == LFB_BASE && r->bar1_phys == REG_BASE);
         CHECK(r->decode_bytes == 4194304 && r->mapped_bytes == 4194304 && r->regs_bytes == 65536);
-        CHECK(!r->client && !r->client_bytes && !r->ram_fallback);
+        CHECK(!r->client && !r->client_bytes && r->ram_fallback == TRI_RAM_FALLBACK_DEFAULT);
         CHECK(r->configure && !surface_calls && !allocs && !frees);
         struct tri_mode selected = {.hd = 640, .vd = 480, .display_width = 640, .depth = 8, .bpp = 8};
+        if (mode == 81) {
+            fail_ram_once=TRI_RAM_FALLBACK_DEFAULT;
+            CHECK(r->configure(&selected, DISPLAY_CAPACITY, true) ==
+                  (TRI_RAM_FALLBACK_DEFAULT ? TRI_E_SURFACE : TRI_OK));
+            if (TRI_RAM_FALLBACK_DEFAULT) {
+                CHECK(!r->client && !ram_live && !ledger_surfaces[2].npages);
+                CHECK(r->configure(&selected, DISPLAY_CAPACITY, true)==TRI_OK);
+            }
+            CHECK(trident_resources_rollback(false)==TRI_OK && !ram_live && allocs==frees);
+            return;
+        }
         if (mode >= 75) { lifetime_cases(r, selected); return; }
         int configured = r->configure(&selected, DISPLAY_CAPACITY, true);
         if (mode == 20 || mode == 21) {
             CHECK(configured == TRI_E_SURFACE && r->generation == 0);
             CHECK(release_calls == (mode == 21 ? 1u : 0u));
-            CHECK(trident_resources_rollback(false) == 0 && !present_maps);
+            CHECK(trident_resources_rollback(false) == 0 && !present_maps && !ram_live && allocs==frees);
             return;
         }
         CHECK(configured == TRI_OK && r->generation == 1);
@@ -433,22 +465,22 @@ static void run(void)
         CHECK(trident_boot_reserve() == 0 && config_reads == reads && map_calls == 2);
         if (mode == 22) {
             CHECK(trident_resources_rollback(true) == TRI_E_BUSY);
-            CHECK(trident_resources_get() == r && present_maps == 3 && !allocs && !release_calls);
+            CHECK(trident_resources_get() == r && present_maps == 3 && allocs == TRI_RAM_FALLBACK_DEFAULT && !release_calls);
             return;
         }
         if (mode == 23) {
             ledger_surfaces[3].lease_count = 1;
             CHECK(trident_resources_rollback(false) == TRI_E_BUSY);
-            CHECK(trident_resources_get() == r && present_maps == 3 && !allocs);
+            CHECK(trident_resources_get() == r && present_maps == 3 && allocs == TRI_RAM_FALLBACK_DEFAULT);
             return; /* API-level revoke failure leaves mappings and backing alive. */
         }
         if (mode == 24) ledger_surfaces[2].lease_count = ledger_surfaces[3].lease_count = 1;
         CHECK(trident_resources_rollback(false) == 0);
-        CHECK(!trident_resources_get() && !present_maps && !allocs && !frees);
+        CHECK(!trident_resources_get() && !present_maps && allocs == TRI_RAM_FALLBACK_DEFAULT && frees == allocs);
         CHECK(release_calls == 2 && last_spans == 2 && owner_calls == 1);
         CHECK(!ledger_resources[3].map_end && !ledger_resources[4].map_end);
         CHECK(ledger_resources[3].decode_end == LFB_BASE / PAGE_SIZE + 1024 && ledger_resources[4].decode_end == REG_BASE / PAGE_SIZE + 16);
-        CHECK(trident_resources_rollback(false) == 0 && !frees && release_calls == 2);
+        CHECK(trident_resources_rollback(false) == 0 && frees == allocs && release_calls == 2);
     } else {
         int expected = mode == 1 || mode == 2 || mode == 30 || mode == 31 ? TRI_E_STATE :
             (mode == 3 || mode == 4) ? TRI_E_DEVICE :

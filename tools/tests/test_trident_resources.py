@@ -102,14 +102,23 @@ MUTATIONS += [
     ('bar-type', PRODUCT, '(p->bar0 & 0x07u) || (p->bar1 & 0x07u) || ', '', 6),
 ]
 
+MUTATIONS += [
+    ('ram-backing', PRODUCT, 'sf.owner = LEDGER_OWNER_BOOT;\n            sf.backing = LEDGER_SB_RAM;',
+     'sf.owner = LEDGER_OWNER_BOOT;\n            sf.backing = LEDGER_SB_VRAM;', 0),
+    ('ram-cache', PRODUCT, 'sf.cache = LEDGER_CACHE_WB;\n            if (!pgalloc_alloc',
+     'sf.cache = LEDGER_CACHE_UC;\n            if (!pgalloc_alloc', 0),
+    ('ram-free', PRODUCT, '(void)pgalloc_free_n_owner(sf.owner, sf.first, sf.npages);',
+     '(void)sf.owner;', 21),
+]
 
-def build(folder, source):
+
+def build(folder, source, fallback=1):
     exe = folder / 'resources-host'
     host_source = folder / 'resources-seam.c'
     host_source.write_text(Path(source).read_text().replace('#include \"io.h\"',
         'unsigned int host_irq_save(void);\nvoid host_irq_restore(unsigned int);\n'
         '#define irq_save host_irq_save\n#define irq_restore host_irq_restore'))
-    subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT),
+    subprocess.run(['gcc', *FLAGS, f'-DTRI_RAM_FALLBACK_DEFAULT={fallback}', '-I' + str(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', ROOT / HOST, ROOT / FAKE, host_source,
                     '-o', exe], check=True, capture_output=True)
@@ -136,12 +145,19 @@ def main():
                         '-ffreestanding', '-I' + str(ROOT), *include_flags(ROOT),
                         '-c', ROOT / PRODUCT, '-o', folder / 'production.o'],
                        check=True, capture_output=True)
+        for fallback in (0, 1):
+            exe = build(folder, ROOT / PRODUCT, fallback)
+            for runner in runners:
+                for mode in range(83):
+                    result = execute(exe, mode, runner)
+                    assert result.returncode == 0, (fallback, mode, result.stdout, result.stderr)
+            print(f'GREEN default={fallback}', flush=True)
         exe = build(folder, ROOT / PRODUCT)
         for runner in runners:
-            for mode in range(81):
+            for mode in range(83):
                 result = execute(exe, mode, runner)
                 assert result.returncode == 0, (mode, result.returncode, result.stdout, result.stderr)
-            print(f'GREEN {runner}: 81 boot/configure/rollback cases, real resource construction, cold common fake', flush=True)
+            print(f'GREEN {runner}: 83 boot/configure/rollback cases, real resource construction, cold common fake', flush=True)
         if args.mutate:
             original = (ROOT / PRODUCT).read_text()
             for name, path, old, new, mode in MUTATIONS:
@@ -156,7 +172,7 @@ def main():
                 print(f'RED runtime {name} case={mode}', flush=True)
             exe = build(folder, ROOT / PRODUCT)
             for runner in runners:
-                for mode in range(81):
+                for mode in range(83):
                     result = execute(exe, mode, runner)
                     assert result.returncode == 0, (mode, result)
             print('RESTORED GREEN resources', flush=True)
