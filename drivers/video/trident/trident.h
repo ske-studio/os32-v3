@@ -395,6 +395,12 @@ int tri_mode_set(struct trident_device *, const struct tri_mode *);
  * alloc leaves the record unchanged on failure; resize may free/reallocate
  * per V:568-605. F2/F4 own records; F1 owns the pattern reservation below. */
 int tri_surface_validate(struct trident_device *, const struct tri_surface *);
+/* F5 (PM 決定 2026-11-07、手本 D:3637-3661 の仮想画面は起動時に固定): HAL に出す
+ * mode (INDEX8・RGB565・XRGB8888) のうち容量に収まる物の表示の大きさ
+ * (display_width*cpp*vd) の最大をページに切り上げた byte 数。表示面と CLIENT の
+ * 面 (F6) はこの大きさで 1 回だけ作り、offscreen (pattern・cursor・動画) は
+ * mode に依らずこの後ろから確保する。 */
+u32 tri_vram_display_max_bytes(const struct trident_device *);
 int tri_vram_init(struct trident_device *, const struct tri_mode *);
 int tri_vram_alloc(struct trident_device *, struct tri_vram_block *,
                    enum tri_vram_kind, u32 bytes, u32 align_bytes);
