@@ -3,11 +3,6 @@
   "source_profile": "selected",
   "dependencies": [
     {
-      "source": "mm/memory_boot.c",
-      "header": "platform/pc98/platform_memory_desc.h",
-      "survey_id": "I2/V5"
-    },
-    {
       "source": "kernel/gui.c",
       "header": "kernel/ime/ime.h",
       "survey_id": "V3"
@@ -26,11 +21,6 @@
       "source": "kernel/sys.c",
       "header": "drivers/video/geforce/geforce_module.h",
       "survey_id": "A5"
-    },
-    {
-      "source": "mm/paging.c",
-      "header": "platform/pc98/platform_memory_desc.h",
-      "survey_id": "I2/V5"
     },
     {
       "source": "init/kernel.c",

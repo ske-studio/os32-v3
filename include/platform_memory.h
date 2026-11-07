@@ -20,6 +20,6 @@ struct platform_memory_attributes {
  * Called once before paging, with IF=0. */
 u32 platform_memory_probe_high(void);
 
-#include "../platform/pc98/platform_memory_desc.h"
+#include "platform_memory_desc.h"
 
 #endif /* KERNEL_PLATFORM_MEMORY_H */

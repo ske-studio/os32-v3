@@ -94,7 +94,7 @@ MUTATIONS += [
 def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=False):
     with tempfile.TemporaryDirectory(prefix='os32-memory-boot-') as tmp:
         d = pathlib.Path(tmp)
-        # Keep the platform descriptor relative to the copied kernel header,
+        # Select the copied provider through the same fixed name as production,
         # including in mutation stages (N1).
         (d / 'kernel').mkdir()
         (d / 'include').mkdir()

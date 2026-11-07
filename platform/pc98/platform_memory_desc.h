@@ -1,4 +1,4 @@
-/* PC-9821 geometry and attributes. Include through kernel/platform_memory.h. */
+/* PC-9821 geometry and attributes. Include through include/platform_memory.h. */
 #ifndef PC98_PLATFORM_MEMORY_DESC_H
 #define PC98_PLATFORM_MEMORY_DESC_H
 

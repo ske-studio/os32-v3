@@ -168,8 +168,9 @@ def run_body(runner, mutate):
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)
-        # Preserve the descriptor's relative include in normal and mutant
-        # stages; the extracted counter now uses platform geometry (L14).
+        # Select the copied provider in normal and mutant stages; the
+        # extracted counter uses platform geometry (L14).
+        cc[1:1] = ['-I' + str(tmp / 'platform/pc98')]
         for rel in ('include/platform_memory.h', 'platform/pc98/platform_memory_desc.h'):
             dest = tmp / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
