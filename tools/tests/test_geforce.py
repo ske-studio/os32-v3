@@ -334,6 +334,20 @@ def product():
         assert old.returncode!=0,old
     print('PASS paired GF product: P2/P3 symbols, independent of KDEBUG, relocation',flush=True)
 
+MUTATIONS = {
+    'getter-registration': ('return registered ? accel_slot : 0;', 'return accel_slot;'),
+    'start-slot-clear': ('failed:\n    accel_slot=0;', 'failed:\n    (void)accel_slot;'),
+    'detach-slot-clear': ('/* Close admission even when the module must retain its resources. */\n    accel_slot=0;', '/* Close admission even when the module must retain its resources. */\n    (void)accel_slot;'),
+    'abort-slot-clear': ('int geforce_module_abort(void)\n{\n    accel_slot=0;', 'int geforce_module_abort(void)\n{\n    (void)accel_slot;'),
+    'fill-text-check': ('candidate.fill_rect && !module_text_contains', 'false && !module_text_contains'),
+    'blit-text-check': ('candidate.blit && !module_text_contains', 'false && !module_text_contains'),
+    'detach-irq': ('owner->foundation.registered ||', 'false ||'),
+    'detach-tick': ('if (geforce_tick_bind(0,0)) {', 'if (false) {'),
+    'abort-slot': ('if (registered) return MODULE_ISOLATED;', 'foundation_slot=0;accel_slot=0;'),
+    'probe-rollback-release': ('        module_ref_release(geforce_handle, MODULE_REF_REGISTRATION);', '        (void)0;'),
+    'probe-unregister': ('    if (geforce_handle.generation && debug_probe_unregister(geforce_handle)) return 0;', '    (void)0;'),
+}
+
 def module_registration(mutation=None):
     import struct
     from test_module_runtime import FLAGS as runtime_flags, INCLUDES as runtime_includes, image
@@ -343,17 +357,7 @@ def module_registration(mutation=None):
         if mutation:
             source=ROOT/'drivers/video/geforce/geforce_module.c'
             text=source.read_text()
-            old,new={
-                'getter-registration': ('return registered ? accel_slot : 0;', 'return accel_slot;'),
-                'start-slot-clear': ('failed:\n    accel_slot=0;', 'failed:\n    (void)accel_slot;'),
-                'detach-slot-clear': ('/* Close admission even when the module must retain its resources. */\n    accel_slot=0;', '/* Close admission even when the module must retain its resources. */\n    (void)accel_slot;'),
-                'abort-slot-clear': ('int geforce_module_abort(void)\n{\n    accel_slot=0;', 'int geforce_module_abort(void)\n{\n    (void)accel_slot;'),
-                'fill-text-check': ('candidate.fill_rect && !module_text_contains', 'false && !module_text_contains'),
-                'blit-text-check': ('candidate.blit && !module_text_contains', 'false && !module_text_contains'),
-                'detach-irq': ('owner->foundation.registered ||', 'false ||'),
-                'detach-tick': ('if (geforce_tick_bind(0,0)) {', 'if (false) {'),
-                'abort-slot': ('if (registered) return MODULE_ISOLATED;', 'foundation_slot=0;accel_slot=0;'),
-            }[mutation]
+            old,new=MUTATIONS[mutation]
             assert text.count(old)==1, mutation
             import re
             # Preserve normal include search for generated imports and shared headers.
@@ -380,11 +384,12 @@ def module_registration(mutation=None):
         subprocess.run([*flags, str(fixture), *[str(ROOT/f) for f in sources],
             str(real_backend), '-nostdlib','-static','-no-pie',
             '-Wl,--gc-sections','-o',str(exe)],cwd=ROOT,check=True)
-        for mode in range(6):
+        modes = (3, 4) if mutation == 'probe-rollback-release' else range(6)
+        for mode in modes:
             result=host32.run([str(exe)],input=struct.pack('<II',0,mode)+image(),
                               capture_output=True,timeout=60)
             if mutation:
-                assert result.returncode and b'FAIL' in result.stdout, (mutation,mode,result)
+                assert result.returncode == 1 and b'FAIL' in result.stdout, (mutation,mode,result)
                 print('MUTATE runtime RED: '+mutation,flush=True)
                 return
             assert result.returncode==0,(mode,result.returncode,result.stdout,result.stderr)
@@ -661,7 +666,7 @@ def main():
     present_trace(byte=True)
     if '--mutate' in sys.argv:
         component('backend_geforce', ('-DOS32_GEFORCE_MODULE',), ('rc, stage, last, state, epoch, seq, ch_rc);', 'rc, stage, last, state, epoch, seq, 0); (void)ch_rc;'))
-        for mutation in ('detach-irq', 'detach-tick', 'abort-slot', 'getter-registration', 'start-slot-clear', 'detach-slot-clear', 'abort-slot-clear', 'fill-text-check', 'blit-text-check'): module_registration(mutation)
+        for mutation in MUTATIONS: module_registration(mutation)
         for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb','push-no-pt','view-no-pt'):
             core(mutation=mutation)
         core(mutation='cold-pfb')

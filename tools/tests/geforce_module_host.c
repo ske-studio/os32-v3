@@ -78,6 +78,17 @@ static int publishing_init(GfxBackend *out,const GeforceModuleContext *ctx)
     CHECK(!geforce_accel_ops()); /* Not registered yet. */
     return init_rc;
 }
+/* Model one RO declaration/name and a writable slot in the loaded fake image. */
+static i32 fixture_probe_decls(const struct probe_decl **t, u32 *n)
+{
+    struct module_record *r=module_record_get(geforce_handle);
+    struct probe_decl *decl=(void *)(uptr)r->ro;
+    char *name=(void *)(decl+1);
+    kstrncpy(name,"gf.fixture",r->ro_size-sizeof(*decl));
+    *decl=(struct probe_decl){name,(void *)(uptr)(r->base+32)};
+    *t=decl; *n=1;
+    return 0;
+}
 static i32 failing_probe_decls(const struct probe_decl **t, u32 *n)
 {
     if (input[1]==3) return -1;
@@ -165,6 +176,10 @@ void _start(void)
     r->exports[2]=(u32)(uptr)get_probe_decls;
     if (input[1]==3 || input[1]==4) r->exports[2]=(u32)(uptr)failing_probe_decls;
     if (input[1]==5) r->exports[2]=0;
+    if (!input[1]) {
+        r->ro=r->base; r->ro_size=32;
+        r->exports[2]=(u32)(uptr)fixture_probe_decls;
+    }
     r->state=MODULE_RELOCATED;
     if (input[1]==1) geforce_backend_ops.prepare=0;
     if (input[1]==2) geforce_backend_ops.fill_rect=(void *)(uptr)(r->text+r->text_size);
@@ -175,7 +190,7 @@ void _start(void)
         CHECK(!accel_slot && !geforce_accel_ops());
         CHECK(!gfx_backend_geforce.probe()); empty(); finish(0);
     }
-    CHECK(!rc && registered && r->registration_refs==1 && return_registered==1);
+    CHECK(!rc && registered && r->registration_refs==2 && return_registered==1);
     production_bind();
     CHECK(geforce_foundation_ops()==&gf1_module_ops);
     CHECK(geforce_accel_ops()==&accel_ops_a);
@@ -185,6 +200,9 @@ void _start(void)
     *geforce_context->accel_out=&accel_ops_b;
     CHECK(geforce_accel_ops()==&accel_ops_b);
     CHECK(!geforce_detach(r) && !geforce_accel_ops() && !accel_slot);
+    CHECK(r->registration_refs==1); /* Probe released; management pin retained. */
+    struct probe_list listing={0};
+    CHECK(!debug_probe_control(PROBE_LIST,&listing,sizeof(listing)) && !listing.count);
     *geforce_context->accel_out=&accel_ops_a;
     CHECK(geforce_accel_ops()==&accel_ops_a);
     gfx_backend_geforce=candidate;

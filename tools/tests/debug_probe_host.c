@@ -186,6 +186,8 @@ void _start(void)
     list(32);
     for (u32 i = 0; i < 32; i++) CHECK(listing.points[i].enabled == (i < 8));
     PROBE_HIT(images[0].slots[7]); CHECK(calls == 1 && last_id == 7);
+    CHECK(!debug_probe_register(owners[1], 0, 0));
+    CHECK(!module_records[1].registration_refs && module_records[2].registration_refs == 1);
     CHECK(arm(&a) == PROBE_ERR_BUSY);
     CHECK(debug_probe_register(owners[1], images[1].ro.table, 1) == PROBE_ERR_BUSY);
     CHECK(debug_probe_control(PROBE_DETACH, &owners[1], sizeof(owners[1])) == PROBE_ERR_ARG);

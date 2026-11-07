@@ -17,6 +17,8 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/module/debug_probe.c'
 MUTATIONS = [
+    ('empty-while-armed', '    if (!count) return 0;',
+     '    if (!count) return attached ? PROBE_ERR_BUSY : 0;'),
     ('slot-range', '!contains(backing, r->pages * MODULE_PAGE_SIZE, slot, size)', '(0 && backing)'),
     ('name-range', 'if (!contains(r->ro, r->ro_size, name, i + 1)) return 0;',
      'if (0 && !contains(r->ro, r->ro_size, name, i + 1)) return 0;'),

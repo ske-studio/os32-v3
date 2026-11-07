@@ -80,9 +80,9 @@ i32 debug_probe_register(struct module_handle owner,
     u32 free_count = 0, acquired = 0;
     if (!r || (r->state != MODULE_STARTING && r->state != MODULE_RUNNING))
         return PROBE_ERR_ARG;
+    if (!count) return 0;
     if (attached) return PROBE_ERR_BUSY;
     if (count > PROBE_POINT_MAX) return PROBE_ERR_LIMIT;
-    if (!count) return 0;
     if ((u32)(uptr)table % __alignof__(struct probe_decl) ||
         !contains(r->ro, r->ro_size, table, count * sizeof(*table)))
         return PROBE_ERR_ARG;
