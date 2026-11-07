@@ -20,6 +20,8 @@ import test_gf_display as display
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'hwdev/gf/feature5_service.c'
 MUTATIONS = [
+    *[(name+'-deadline', 'SERVICE_TIMED_OP('+name+',', 'SERVICE_OP('+name+',')
+      for name in ('tile_set', 'tile_clear', 'ram_prog', 'perf_select')],
     ('running', '!g->ch->f->running', 'false'),
     ('busy', 'if (g->busy || (service_slot && !*service_slot)) return GF5_EBUSY;', 'if (false) return GF5_EBUSY;'),
     ('thermal-fault', 'return g->fan.sensor_setup || !service_ready(g);',

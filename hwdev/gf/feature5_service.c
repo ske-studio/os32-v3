@@ -131,22 +131,39 @@ static void service_heat_pause(void *owner,bool active)
     if (rc) service_heat_failure(g,rc);
 }
 
-#define SERVICE_OP(name, args, call) \
+/* MIT nouveau c03c1a1 nvkm/engine/gr/nv04.c:1211-1224 starts its
+ * idle budget at the operation, rather than retaining the boot deadline. */
+static i32 service_deadline(struct gf5 *g)
+{
+    u64 now;
+    i32 rc=g->links.clock64(g->links.owner,&now);
+    if (rc) {
+        g->source_rc=rc;
+        return g->last_rc=gf5_rc_map(rc);
+    }
+    g->deadline=(u32)now+GF2_TIMEOUT_US;
+    return 0;
+}
+
+#define SERVICE_DISPATCH(name, args, call, timed) \
     static i32 service_##name args { \
         i32 rc=service_check(g,false); \
         if (rc) return rc; \
         g->busy=true; \
-        rc=gf5_##name call; \
+        if (timed) rc=service_deadline(g); \
+        if (!rc) rc=gf5_##name call; \
         service_complete(g); \
         return rc; \
     }
+#define SERVICE_OP(name, args, call) SERVICE_DISPATCH(name,args,call,false)
+#define SERVICE_TIMED_OP(name, args, call) SERVICE_DISPATCH(name,args,call,true)
 SERVICE_OP(clock_read,(struct gf5 *g,struct gf5_clock *v),(g,v))
 SERVICE_OP(clock_calc,(struct gf5 *g,const struct gf5_clock *v,struct gf5_plan *p),(g,v,p))
 SERVICE_OP(clock_prog,(struct gf5 *g,const struct gf5_plan *p),(g,p))
-SERVICE_OP(ram_prog,(struct gf5 *g,const struct gf5_plan *p),(g,p))
+SERVICE_TIMED_OP(ram_prog,(struct gf5 *g,const struct gf5_plan *p),(g,p))
 SERVICE_OP(perf_count,(struct gf5 *g,u32 *v),(g,v))
 SERVICE_OP(perf_get,(struct gf5 *g,u32 i,struct gf5_perf_entry *v),(g,i,v))
-SERVICE_OP(perf_select,(struct gf5 *g,u8 i),(g,i))
+SERVICE_TIMED_OP(perf_select,(struct gf5 *g,u8 i),(g,i))
 SERVICE_OP(therm_read,(struct gf5 *g,struct gf5_thermal *v),(g,v))
 SERVICE_OP(fan_mode_set,(struct gf5 *g,enum gf5_fan_mode m),(g,m))
 SERVICE_OP(fan_get,(struct gf5 *g,u32 *v),(g,v))
@@ -158,9 +175,11 @@ SERVICE_OP(gpio_find,(struct gf5 *g,u8 tag,u8 *line,u8 log[2]),(g,tag,line,log))
 SERVICE_OP(gpio_get,(struct gf5 *g,u8 line,const u8 log[2],bool *v),(g,line,log,v))
 SERVICE_OP(gpio_set,(struct gf5 *g,u8 line,const u8 log[2],bool v),(g,line,log,v))
 SERVICE_OP(tile_find,(struct gf5 *g,u32 *slot),(g,slot))
-SERVICE_OP(tile_set,(struct gf5 *g,u32 slot,const struct gf5_tile *v),(g,slot,v))
-SERVICE_OP(tile_clear,(struct gf5 *g,u32 slot),(g,slot))
+SERVICE_TIMED_OP(tile_set,(struct gf5 *g,u32 slot,const struct gf5_tile *v),(g,slot,v))
+SERVICE_TIMED_OP(tile_clear,(struct gf5 *g,u32 slot),(g,slot))
+#undef SERVICE_TIMED_OP
 #undef SERVICE_OP
+#undef SERVICE_DISPATCH
 
 static void service_fan_tick(struct gf5 *g,u64 now)
 {
