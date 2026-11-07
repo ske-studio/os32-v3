@@ -68,6 +68,8 @@ OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 
 **実機と NP21/W の差**
 
+- PCI 装置の移植・初期化・待ち・PC-98 の例外。→ [POLICY_PCIDEV.md](POLICY_PCIDEV.md)
+
 - NP21/W で通信できても実機の baud は保証されない。→ [4-49](#4-49-シリアルの実効速度)
 - FDC のシーク・回転待ち・DMA 制限はエミュレータだけで確認できない。→ [4-51](#4-51-fdc-の時間と-dma)
 - FRY 無しで通るエミュレータと実機の Ready は違う。→ [4-53](#4-53-fdc-の-ready)
