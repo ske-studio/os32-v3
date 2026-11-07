@@ -581,6 +581,7 @@ def r4_hello_stage_losses():
     # 候補は最新の SYN で上書きされ、古い SYN-ACK の CONFIRM はもう通らない。
     out1 = o.send(HA.OP_HELLO, HA.HS_SYN, epoch=1, seq=0x99, sess=0)
     out2 = o.send(HA.OP_HELLO, HA.HS_SYN, epoch=1, seq=0x9A, sess=0)
+    assert out1[0]["sess"] == out2[0]["sess"], "SYN retries consumed sess"
     assert out1[0]["ack"] != out2[0]["ack"], "SYN 再送で Agent nonce が変わらない"
     o.sess, o.epoch = out1[0]["sess"], out1[0]["epoch"]
     assert o.send(HA.OP_HELLO, HA.HS_CONFIRM, seq=0x99, ack=out1[0]["ack"]) == [], \
@@ -1687,10 +1688,30 @@ def h5_linux_print_lifecycle():
                 assert not a.pending
 
 
+def hs_syn_candidates():
+    a = new_agent()
+    o = FakeOS32(a)
+    first = o.send(HA.OP_HELLO, HA.HS_SYN, seq=1, sess=0)[0]
+    for nonce in range(2, 50):
+        latest = o.send(HA.OP_HELLO, HA.HS_SYN, seq=nonce, sess=0)[0]
+        assert latest["sess"] == first["sess"]
+    assert not o.send(HA.OP_HELLO, HA.HS_CONFIRM, seq=1,
+                      ack=first["ack"], sess=first["sess"])
+    assert o.send(HA.OP_HELLO, HA.HS_CONFIRM, seq=49,
+                  ack=latest["ack"], sess=latest["sess"])
+    restarted = o.send(HA.OP_HELLO, HA.HS_SYN, seq=49, sess=0)[0]
+    assert restarted["sess"] != first["sess"]
+    other = FakeOS32(a, mac=bytes.fromhex("02005e000003"))
+    assert other.send(HA.OP_HELLO, HA.HS_SYN, seq=50, sess=0)[0]["sess"] != restarted["sess"]
+
+
 def h5_mutations():
     global HA
     original = HA
     mutations = [
+        ('assigned = self.cand["sess"]', 'assigned = self.sessions.alloc()'),
+        ('not self.cand.get("confirmed")', 'True'),
+        ('self.cand["mac"] == src', 'True'),
         ('+ self.notifier.hello_extension())\n        out.send', '+ b"")\n        out.send'),
         ('self.notifier.ack(sess, epoch, ack, window)', 'pass'),
         ('self.notifier.session(self.sess, self.epoch, self.now())', 'pass'),
@@ -1708,7 +1729,7 @@ def h5_mutations():
             HA = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(HA)
             try:
-                for case in (h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
+                for case in (hs_syn_candidates, h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
                     case()
             except AssertionError:
                 print("  RED h5 mutation %d" % index, flush=True)
@@ -1719,6 +1740,7 @@ def h5_mutations():
 
 
 CASES = [
+    hs_syn_candidates,
     a11_named_body_roundtrip,
     h5_hello_list_and_notify,
     h5_named_services_and_linux_clip,

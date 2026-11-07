@@ -26,8 +26,12 @@ MUTATIONS = (
      'if (0 && generation != f->resource_generation)'),
     ('permanent', 'if (f->in_use && f->fs_ctx == ctx) f->stale = 1;',
      'if (f->in_use && f->fs_ctx == ctx) f->stale = 0;'),
-    ('open-generation', 'if (after != resource_generation) return VFS_ERR_STALE;',
-     'if (0 && after != resource_generation) return VFS_ERR_STALE;'),
+    ('open-generation', 'if (after != resource_generation) {',
+     'if (0 && after != resource_generation) {'),
+    ('open-no-retry', 'goto open_probe;', 'if (0) { goto open_probe; } return VFS_ERR_STALE;'),
+    ('open-extra-retry', 'if (retried) return VFS_ERR_STALE;',
+     'if (retried > 1) return VFS_ERR_STALE;'),
+    ('open-recreate', '(created ? O_CREAT : 0)', '0'),
 )
 
 

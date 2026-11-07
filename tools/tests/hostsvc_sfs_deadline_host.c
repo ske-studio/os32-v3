@@ -8,8 +8,11 @@ static u8 rx[SFS_BUFFER_FRAME], first[SFS_BUFFER_FRAME];
 static u32 pos, end, sends, first_len, stale, ensured, ensure_delay;
 static int mode, put_delay, get_delay;
 static u32 bounded_sends, passed_deadline, second_send;
+static int recover, rejects;
+static u32 ensure_calls, executions, recovered_sid;
 /* modes: 0 normal, 1 silence, 2 continuous stray, 3 unknown sid,
- * 4 short response, 5 delayed until resend, 6 wrong nonce, 7 bad version. */
+ * 4 short response, 5 delayed until resend, 6 wrong nonce, 7 bad version,
+ * 8 first WRITE executed without reply, then host restarted before retry. */
 static int put(void *ctx, const u8 *buf, u32 n)
 {
     (void)ctx;
@@ -20,7 +23,9 @@ static int put(void *ctx, const u8 *buf, u32 n)
     int ready = 0;
     for (u32 i = 0; i < n; i++) ready = sfs_dec_feed(&dec, buf[i], &f);
     if (ready != 1) __builtin_trap();
-    if (!sends) {
+    if (recover) {
+        if (f.type != SFS_T_HELLO && f.sid == recovered_sid) executions++;
+    } else if (!sends) {
         first_len = n;
         for (u32 i = 0; i < n; i++) first[i] = buf[i];
     } else {
@@ -32,6 +37,7 @@ static int put(void *ctx, const u8 *buf, u32 n)
     hs_advance(put_delay);
     int fail;
     if (hs_failure_take("sfs.reply", &fail)) return fail;
+    if (mode == 8 && f.type != SFS_T_HELLO && sends == 1) return 0;
     if (mode == 1 || (mode == 5 && sends == 1)) return 0;
     u8 payload[SFS_HELLO_RSP_LEN] = {0};
     u16 len = SFS_STATUS_LEN;
@@ -45,7 +51,11 @@ static int put(void *ctx, const u8 *buf, u32 n)
         sfs_put32(payload + SFS_HELLO_RSP_NONCE,
                   sfs_get32(f.payload + SFS_HELLO_REQ_NONCE) + (mode == 6));
     } else sfs_put32(payload, (u32)OS32_ERR_NOTFOUND);
-    if (mode == 3) type = SFS_T_ERR;
+    if (mode == 3 || (mode == 8 && f.type != SFS_T_HELLO && !recovered_sid) || (recover && f.type != SFS_T_HELLO && rejects-- > 0)) {
+        type = SFS_T_ERR;
+        sfs_put32(payload, (u32)OS32_ERR_STALE);
+        if (recover && f.sid == recovered_sid) executions--;
+    }
     if (mode == 4) len = 1;
     end = sfs_encode(rx, type, sid, f.seq + (mode == 2), payload, len);
     pos = 0;
@@ -78,6 +88,13 @@ static const SfsIo uart_io = {put, get, now, idle, can_wait, 0};
 int sfs_ensure_session(u32 deadline)
 {
     ensured = deadline;
+    ensure_calls++;
+    if (recover && !client.sid) {
+        first_len = sends = 0;
+        int rc = sfs_client_hello_deadline(&client, 123, deadline);
+        if (rc) return rc;
+        recovered_sid = client.sid;
+    }
     hs_advance(ensure_delay);
     return 0;
 }
@@ -90,6 +107,8 @@ static void reset(u32 start)
     client.sid = 77;
     sends = pos = end = stale = ensured = ensure_delay = 0;
     mode = put_delay = get_delay = 0;
+    recover = rejects = 0;
+    ensure_calls = executions = recovered_sid = 0;
     bounded_sends = passed_deadline = second_send = 0;
 }
 static int suite(void)
@@ -132,8 +151,22 @@ static int suite(void)
     REQUIRE(sfs_client_call_deadline(&client, SFS_T_WRITE, 0, 0, &reply, 200) == 0);
     REQUIRE(sends == 2 && second_send == 60 && hs_now() == 110);
     reset(0); mode = 3;
+    REQUIRE(sfs_client_call_deadline(&client, SFS_T_WRITE, 0, 0, &reply, 100) == OS32_ERR_STALE);
+    REQUIRE(sends == 1 && !client.sid && reply.length == 0);
+    for (int op = 0; op < 2; op++) {
+        reset(0); recover = 1; rejects = 1; client.sid = 66;
+        REQUIRE(sfs_request_deadline(op ? SFS_T_WRITE : SFS_T_STAT, 0, 0, &reply, 100) == 0);
+        REQUIRE(stale == 1 && ensure_calls == 2 && client.sid == 77 && executions == 1);
+        REQUIRE(ensured == 100 && passed_deadline == 100);
+        reset(0); recover = 1; rejects = 3; client.sid = 66;
+        REQUIRE(sfs_request_deadline(op ? SFS_T_WRITE : SFS_T_STAT, 0, 0, &reply, 100) == OS32_ERR_STALE);
+        REQUIRE(stale == 2 && ensure_calls == 2 && !client.sid && !executions);
+    }
+    reset(0); mode = 8; recover = 1; client.sid = 66;
     REQUIRE(sfs_request_deadline(SFS_T_WRITE, 0, 0, &reply, 100) == OS32_ERR_STALE);
-    REQUIRE(stale == 1 && sends == 1 && !client.sid && reply.length == 0);
+    REQUIRE(sends == 2 && client.resends == 1 && client.seq == 1);
+    REQUIRE(stale == 1 && ensure_calls == 1 && !client.sid && !executions);
+    REQUIRE(reply.length == 0 && hs_now() == 10);
     reset(0); mode = 4;
     REQUIRE(sfs_request_deadline(SFS_T_STAT, 0, 0, &reply, 100) == OS32_ERR_IO);
     reset(0); ensure_delay = 90; mode = 1;

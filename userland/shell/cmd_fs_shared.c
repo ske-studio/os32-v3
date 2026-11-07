@@ -193,6 +193,9 @@ const char *fs_strerror(int rc)
     case OS32_ERR_ISDIR:    return "Is a directory";
     case OS32_ERR_INVAL:    return "Invalid argument";
     case OS32_ERR_STALE:    return "Stale file handle";
+    case OS32_ERR_ROFS:     return "Read-only file system";
+    case OS32_ERR_HOSTDOWN: return "Host is down";
+    case OS32_ERR_TIMEOUT:  return "Operation timed out";
     case OS32_ERR_NAMETOOLONG: return "File name too long";
     case OS32_ERR_BUSY:     return "Device or resource busy";
     default:                return "Unknown error";

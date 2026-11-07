@@ -222,7 +222,8 @@ int sfs_client_oneway_deadline(SfsClient *c, u8 type, const u8 *payload,
     return rc == 0 ? 0 : OS32_ERR_IO;
 }
 
-/* LAN retries share one absolute deadline, including time spent in put/get.
+/* Return the send count on success, or a negative error.
+ * LAN retries share one absolute deadline, including time spent in put/get.
  * Do not quiesce here: a delayed reply to this same sid/seq is still valid. */
 #define SFS_LAN_RETRY_TICKS 10u
 static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
@@ -243,7 +244,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
                 (void)c->io->put_until(c->ctx, c->tx, flen, deadline);
             else
                 (void)c->io->put(c->ctx, c->tx, flen);
-            sent = 1;
+            sent++;
             retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;
         }
         int b = c->io->get(c->ctx);
@@ -265,7 +266,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
         }
         if (sfs_match(c, &f, type, seq, hello, nonce)) {
             *got = f;
-            return 0;
+            return sent;
         }
         c->stray++;
     }
@@ -281,7 +282,7 @@ int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline)
     sfs_put32(pl + SFS_HELLO_REQ_NONCE, nonce);
     u16 flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, sizeof(pl));
     int rc = sfs_exchange_deadline(c, flen, SFS_T_HELLO, 0, 1, nonce, &f, deadline);
-    if (rc) return rc;
+    if (rc < 0) return rc;
     if (sfs_get16(f.payload + SFS_HELLO_RSP_VER) != SFS_VERSION ||
         sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < SFS_MAX_PAYLOAD)
         return OS32_ERR_IO;
@@ -295,8 +296,8 @@ int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline)
     return 0;
 }
 
-int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,
-                             struct SfsReply *out, u32 deadline)
+static int sfs_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,
+                             struct SfsReply *out, u32 deadline, int *sent)
 {
     SfsFrame f;
     if (!out) return OS32_ERR_INVAL;
@@ -310,7 +311,8 @@ int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,
     if (!flen) return OS32_ERR_INVAL;
     c->calls++;
     int rc = sfs_exchange_deadline(c, flen, op, c->seq, 0, 0, &f, deadline);
-    if (rc) return rc;
+    if (rc < 0) return rc;
+    if (sent) *sent = rc;
     if (f.type == SFS_T_ERR) {
         c->sid = 0;
         return OS32_ERR_STALE;
@@ -319,6 +321,12 @@ int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,
     if (out->capacity < f.len) return OS32_ERR_NOSPC;
     for (u16 i = 0; i < f.len; i++) ((u8 *)out->data)[i] = f.payload[i];
     return 0;
+}
+
+int sfs_client_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,
+                             struct SfsReply *out, u32 deadline)
+{
+    return sfs_call_deadline(c, op, in, n, out, deadline, 0);
 }
 
 int sfs_request_deadline(u8 op, const void *in, u16 n,
@@ -331,7 +339,14 @@ int sfs_request_deadline(u8 op, const void *in, u16 n,
     /* Only this mutation endpoint uses C1's borrowed client for communication. */
     SfsClient *c = (SfsClient *)sfs_persistent_client();
     if (!c) return OS32_ERR_HOSTDOWN;
-    rc = sfs_client_call_deadline(c, op, in, n, out, deadline);
-    if (rc == OS32_ERR_STALE) sfs_persistent_stale();
-    return rc;
+    for (int attempt = 0; ; attempt++) {
+        int sent = 0;
+        rc = sfs_call_deadline(c, op, in, n, out, deadline, &sent);
+        if (rc != OS32_ERR_STALE) return rc;
+        sfs_persistent_stale();
+        /* Only a single send proves the request was never executed. */
+        if (attempt == 1 || sent != 1) return rc;
+        rc = sfs_ensure_session(deadline);
+        if (rc) return rc;
+    }
 }

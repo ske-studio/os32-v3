@@ -179,7 +179,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     char resolved[VFS_MAX_PATH], rel_path[VFS_MAX_PATH];
     u32 file_size = 0, resource_generation = 0;
     u32 ino = 0;
-    int rc, created = 0;
+    int rc, created = 0, retried = 0;
     void *fs_ctx;
     VfsOps *ops;
 
@@ -216,7 +216,8 @@ static int vfs_open_internal(const char *path, int mode, int owner,
      *
      *   O_EXCL 単独 (O_CREAT なし)  … VFS_ERR_INVAL
      *   create_excl を持たない FS   … VFS_ERR_NOSYS */
-    if (mode & O_EXCL) {
+open_probe:
+    if ((mode & O_EXCL) && !created) {
         if (!(mode & O_CREAT)) return VFS_ERR_INVAL;
         if (!ops->create_excl) return VFS_ERR_NOSYS;
         /* マウント点は必ず在る — 契約 (vfs.h の create_excl) どおり EXIST。
@@ -236,9 +237,14 @@ static int vfs_open_internal(const char *path, int mode, int owner,
         file_size = 0;
         created = 1;
     } else {
-        rc = vfs_open_probe(ops, fs_ctx, resolved, rel_path, mode, &file_size,
-                            &created);
+        int probe_created = 0;
+        /* 再試行では作成・切り詰めを繰り返さず、作成済みの印を保持する。 */
+        int probe_mode = retried ? mode & ~(O_TRUNC | (created ? O_CREAT : 0))
+                                 : mode;
+        rc = vfs_open_probe(ops, fs_ctx, resolved, rel_path, probe_mode,
+                            &file_size, &probe_created);
         if (rc != VFS_OK) return rc;
+        created |= probe_created;
     }
 
     /* inode を持つ FS は inode を記録する (票 TASK_VFS_FD_PATH 方針 v3 の 1)。
@@ -247,7 +253,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     if (ops->ino) {
         rc = (ops->ino->lookup) ? ops->ino->lookup(fs_ctx, rel_path, &ino)
                                 : VFS_ERR_IO;
-        if (rc == VFS_OK && !created &&
+        if (rc == VFS_OK && !created && !retried &&
             (mode & O_TRUNC) && (mode & (O_WRONLY | O_RDWR))) {
             /* 切り詰めも inode で (戻り値を見る。ディレクトリは ISDIR) */
             rc = (ops->ino->truncate) ? ops->ino->truncate(fs_ctx, ino)
@@ -265,7 +271,14 @@ static int vfs_open_internal(const char *path, int mode, int owner,
         u32 after;
         rc = ops->resource_check(fs_ctx, &after);
         if (rc != VFS_OK) return rc;
-        if (after != resource_generation) return VFS_ERR_STALE;
+        if (after != resource_generation) {
+            if (retried) return VFS_ERR_STALE;
+            /* 次の path probe の prepare も新世代へ移し、旧 FD を失効する。 */
+            vfs_fd_stale_mount(fs_ctx);
+            resource_generation = after;
+            retried = 1;
+            goto open_probe;
+        }
     }
     open_files[fd].generation++;
     kstrlcpy(open_files[fd].path, rel_path, VFS_MAX_PATH);
