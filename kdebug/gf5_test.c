@@ -35,6 +35,7 @@
 #include "gfinit_pll.h"
 #include "../drivers/video/geforce/geforce_module.h"
 #include "../lib/serial_diag.h"
+#include "../lib/crc32_core.inc"
 #define GF_ROM_BIT_ONLY
 #include "../hwdev/gf/rom.inc"
 #undef GF_ROM_BIT_ONLY
@@ -63,6 +64,65 @@ static void clock_record(const char *stage, const struct gf5_clock *clock)
     number(" shader_khz=", clock->shader_khz);
     number(" mem_khz=", clock->mem_khz);
     serial_puts_polled("\r\n");
+}
+/* Reuse the save path's VRAM reader (nouveau_bo.c:669-689 map lifetime).
+ * Scratch is distinct from host_copy: a saved CRC alone says nothing about
+ * the bytes currently in VRAM. Observation must preserve the operation rc. */
+static void extent_record(const char *stage, const struct gf_vram_reservation *key,
+                          const u8 *saved)
+{
+    const struct gf5_test_ops *o = geforce_feature5_ops();
+    if (serial_gate_active() || !o || !o->ctx) return;
+    struct gf5 *g = o->ctx;
+    i32 last = g->last_rc, source = g->source_rc;
+    i32 rc = GF5_ENOTSUP;
+    void *scratch = NULL;
+    u32 crc = 0;
+    if (g->links.alloc && g->links.free && g->links.copy_extent) {
+        rc = g->links.alloc(g->links.owner, key->bytes, &scratch);
+        if (!rc) {
+            rc = g->links.copy_extent(g->links.owner, key, scratch, false);
+            if (!rc) crc = crc32_core_final(crc32_core_update(CRC32_INIT,
+                                                               scratch, key->bytes));
+            g->links.free(g->links.owner, scratch);
+        }
+    }
+    g->last_rc = last; g->source_rc = source;
+    serial_puts_polled("GF5 DATA stage="); serial_puts_polled(stage);
+    number(" owner=", (u32)key->owner); number(" reservation_id=", key->reservation_id);
+    number(" generation=", key->generation); number(" off=", key->off);
+    number(" bytes=", key->bytes);
+    if (!rc) number(" vram_crc=", crc);
+    else serial_puts_polled(" vram_crc=unreadable");
+    if (saved) number(" host_crc=", crc32_core_final(crc32_core_update(CRC32_INIT,
+                                                                        saved, key->bytes)));
+    signed_number(" rc=", rc); serial_puts_polled("\r\n");
+}
+static void vram_records(const char *stage, const struct gf5_image *image)
+{
+    if (serial_gate_active()) return;
+    if (image) {
+        for (u32 i = 0; i < image->nextent; ++i)
+            extent_record(stage, &image->extent[i].key,
+                          image->complete ? image->extent[i].host_copy : NULL);
+    } else {
+        const struct gf5_test_ops *o = geforce_feature5_ops();
+        if (!o || !o->ctx || !o->ctx->display) return;
+        struct gf4_ctx *d = o->ctx->display;
+        /* The resident diagnostic borrows the display's reservation keys;
+         * registry enumeration itself lives inside the loadable module. */
+        for (u32 head = 0; head < GF4_HEADS; ++head) {
+            for (u32 bank = 0; bank < 2; ++bank) {
+                if (d->scan[head][bank].value.owner)
+                    extent_record(stage, &d->scan[head][bank].value, NULL);
+                if (d->scan_next[head][bank].value.owner)
+                    extent_record(stage, &d->scan_next[head][bank].value, NULL);
+            }
+            if (d->cursor[head].value.owner)
+                extent_record(stage, &d->cursor[head].value, NULL);
+        }
+        if (d->test.value.owner) extent_record(stage, &d->test.value, NULL);
+    }
 }
 /* rc/source are copied while the slot is live. A second dispatch, even a
  * last_rc query, obtains the accessor again. No logging dereferences a loan. */
@@ -509,7 +569,11 @@ i32 gf5_test(u32 session)
             serial_puts_polled("\r\n");
         }
         if (stage == GF5T_CLOCK_PROG) { CALL(clock_prog, &diagnostic.plan); }
-        else { CALL(ram_prog, &diagnostic.plan); }
+        else {
+            vram_records("ram_before", NULL);
+            CALL(ram_prog, &diagnostic.plan);
+            vram_records("ram_after", NULL);
+        }
         break;
     case GF5T_PERF_COUNT:
     case GF5T_FAN_GET:
@@ -635,6 +699,7 @@ i32 gf5_test(u32 session)
             number(" complete=", diagnostic.image->complete);
             number(" epoch=", diagnostic.image->saved_epoch); serial_puts_polled("\r\n");
         }
+        if (diagnostic.image) vram_records("save_extent", diagnostic.image);
         break;
     case GF5T_RESTORE:
     case GF5T_FREE:
@@ -646,6 +711,7 @@ i32 gf5_test(u32 session)
         if (stage == GF5T_RESTORE) {
             if (!o->state_restore) { rc = GF5_ENOTSUP; local = true; break; }
             rc = o->state_restore(o->ctx, diagnostic.image);
+            vram_records("restore_extent", diagnostic.image);
         } else {
             if (!o->state_free) { rc = GF5_ENOTSUP; local = true; break; }
             o->state_free(o->ctx, diagnostic.image);
