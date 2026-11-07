@@ -120,6 +120,35 @@ static int tri_common_alignment(u32 a, u32 b, u32 *alignment)
     return TRI_OK;
 }
 
+u32 tri_vram_display_max_bytes(const struct trident_device *d)
+{
+    if (!d || !d->res) return 0;
+    u32 usable = tri_usable_bytes(d), maximum = 0;
+    for (u32 i = 0; i < TRI_MODE_COUNT; ++i) {
+        const struct tri_mode *candidate = &tri_modes[i];
+        const struct tri_format_cap *cap = tri_mode_format(candidate);
+        /* Same formats as F10's hal_format; RGB555/packed24 have no HAL ID. */
+        if (!cap || (cap->format != TRI_FMT_INDEX8 &&
+                     cap->format != TRI_FMT_RGB565 &&
+                     cap->format != TRI_FMT_XRGB8888)) continue;
+        struct tri_mode m;
+        /* F3's prepare/validate path only reads d, despite its mutable API.
+         * Use it like F10 so NoAccel pitch and candidate rejection agree. */
+        if (tri_mode_prepare((struct trident_device *)d, candidate, &m))
+            continue;
+        if (!m.display_width || !m.vd ||
+            m.display_width > U32_MAX / cap->cpp) continue;
+        u32 pitch = (u32)m.display_width * cap->cpp;
+        if (m.vd > U32_MAX / pitch || m.vd > usable / pitch) continue;
+        u32 bytes = pitch * m.vd;
+        if (maximum < bytes) maximum = bytes;
+    }
+    /* D:3637-3661's fixed virtual display, page sized for F6's aliases. */
+    u32 rounded;
+    if (tri_round_up(maximum, TRI_PAGE_BYTES, &rounded)) return 0;
+    return rounded;
+}
+
 int tri_surface_validate(struct trident_device *d, const struct tri_surface *s)
 {
     if (!d || !d->res || !s || s->format >= TRI_FORMAT_COUNT)
@@ -149,11 +178,13 @@ int tri_vram_init(struct trident_device *d, const struct tri_mode *m)
     u32 pitch = (u32)m->display_width * cap->cpp;
     u32 usable = tri_usable_bytes(d);
     if (m->vd > usable / pitch) return TRI_E_CAP_TOO_SMALL;
+    u32 first_off = tri_vram_display_max_bytes(d);
+    if (!first_off) return TRI_E_CAP_TOO_SMALL;
     u32 rows = usable / pitch;
     if (rows > TRI_GE_MAX_Y) rows = TRI_GE_MAX_Y;
     d->vram.usable_bytes = usable;
     d->vram.pitch = pitch;
-    d->vram.first_off = pitch * m->vd;
+    d->vram.first_off = first_off;
     d->vram.area2d_end = rows * pitch;
     return TRI_OK;
 }
