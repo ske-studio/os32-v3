@@ -83,6 +83,7 @@
 - **製品の関数の呼び出しを 1 つ足したら、その関数の兄弟の stub を持つ試験の土台を全部洗う** — `vfs_fd_invalidate_mount` の stub を持つ土台は、新しい `vfs_fd_stale_mount` も要る。`#include` で取り込む土台だけでなく、python が切り出して組む試験 (`*_host_source.c`・`index('static ...')`) も含める。触ったファイルを組む試験を 1 本ずつ手元で回してから push する (2026-11-07、Host Services の D の統合で、kernel-shell・hostsvc-serialfs・kapi-ranges を CI で 1 本ずつ落とした)。
 - **ゲストの SQL は、製品の SQLite の OMIT の設定 (lib/sqlite3/os32_sqlite_config.h) で通る形だけ使う** — CAST・CTE・window 関数などは prepare で必ず誤りになる。host の普通の SQLite では通るので気づけない。`tools/tests/test_sqlite_product_sql.py` に新しい SQL の置き場を足す。KAPI の `db_column_text` は INTEGER の列を文字にしないので、整数は `db_column_int` か SQL の `''||列` で読む (2026-11-07、hsync の CAST で実機の同期が全部止まり、fep_meta_test は CAST と INTEGER の読み方で 2 回落ちた)。
 - **新しいソースを足す段・その枝を合わせるときは、ソースの一覧の 3 か所を揃える** — `build/sources/order.mk` (リンクの順)・`build/sources/common.mk` か arch/platform の一覧 (選択)・`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。一覧が分かれる前に作った枝は `build/kernel.mk` の行が衝突するので、`kernel.mk` は main 側を取り、新しいソースを 3 か所へ写す (2026-11-07、kdebug の採取点の段 A1 の `debug_probe.c` でリンクの未定義と CI の build の選択の試験を順に落とした)。
+- **共有の形式 (sdk/kapi.json・OS32X ヘッダ・部品の表) を変える段は、push の前にその形を固定で持つ試験を手元で全部回す** — kapi.json のハッシュ (`tools/tests/fixtures/dep_dir_a/l01.json` の kapi_sha256・`l04.json` の api_sha256 など)、ヘッダの大きさ、exec を組む host 試験の土台の stub とヘッダの作り方。`grep -l kapi.json tools/tests/*.py` と exec を組む `*_host.c` を並列で回してから push する (2026-11-08、.text の読み取り専用化で CI を 1 本ずつ 4 回落とした: 常駐像の限界・app_bb_overlap・l01・l04)。
 - **レビューの指摘を次の依頼に回す前に、PM が「動くアプリは 1 つだけ」で読み直す** — 依頼文に前提を書いても、指摘をそのまま流すと持ち主の区別・並行の再入の守りが入り込む (2026-11-07、GeForce の熱の停止。ユーザー「なんかシングルタスクOSって忘れてませんか？」)。
 
 レビューで 1 つの段に見つかった誤りが、ほかの段にもありうる種類なら、PM は走っている全段の依頼に追記し、統合の前に grep で確かめる (層 2 では B6 の `s32` を B0・B1 に流さず、まとめビルドで再び出た)。
@@ -160,6 +161,8 @@
 | GeForce | 統合の枝で生成物 (hwdev_contract.h など) が衝突 | 並列の段が同じ生成物を持ち帰った | 生成物は手で解かず、片側に寄せて消してから make で作り直し、固定値は --snapshot で出し直す |
 | Trident | 実機で CPU の LFB への連続書き (rep stosl・続く 32 ビット書き) が消え、GUI が崩れた | 確定設計で退避の構成 (RAM と byte の present) を撤去していた。burst を切っても直らない | §3 の「退避の構成の残し方」 |
 | kdebug・build | 束ねた枝でリンクの未定義、次に CI の build の選択の試験が落ちた | ソースの一覧が分かれる前の枝で、新しいソースが order・common・fixture に無かった | §4 のソースの一覧の 3 か所 |
+| kdebug | 段 B の実装者が 2 回止まった (自分の handle を得る口、停止中の解除と再登録の見分け) | 設計が consumer (kdebug) の側の境目を宣言の段に入れていなかった | §3 の「宣言の段に入れる範囲」— 土台の段 A3 を足して再開 |
+| .text の読み取り専用 | 形式の版上げで CI を 4 回落とした | 固定のハッシュ・大きさ・stub を持つ試験を、push の前に洗わなかった | §4 の共有の形式を変える段 |
 新しく踏んだことは、ここに 1 行で足し、§3・§4 のどこで防ぐかを書く。
 
 ## 6. 評価
@@ -177,3 +180,5 @@
 Trident 全経路 (2026-11-07): 宣言 F0 → 部品 10 段の並列 → 結線 → まとめビルド 1 回 (機械的な誤り 1 件: static の食い違い) → 試験の追従 6 段の並列。設計の欠けで止まった段が多い (F2・F6 ×5・F8 ×3・F10 ×2・F18) — 確定設計が core と部品の境目と共有の状態の持ち主を書いていなかったため (§3 に 3 行足した)。
 
 比べるときの注意: 層 1 本体は変異込みの重い検査の時期で、ユーザー決定によるやり直し (約 2 時間) を含む。部品の難しさも違う。
+
+.text の読み取り専用 (2026-11-08): 段 A (SDK)・B (ローダ)・C (追従) を並列に出し、A が足すヘッダの欄の宣言を依頼に一字一句書いて B にも書かせた。合わせ目の衝突は注釈の違いだけで、PM が A の側を取って解いた。設計 → 実装 → NP21/W の受入までは一晩で回ったが、CI の固定値の落ちで 4 往復した (§4 に 1 行)。
