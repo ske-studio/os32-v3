@@ -24,6 +24,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 機能ごとのブランチで並列に実装する (触るファイルの一覧・共有の登録ファイルの持ち主・上限の予算・結線は直列) | [tasks/agents/PARALLEL_BRANCHES.md](tasks/agents/PARALLEL_BRANCHES.md) | ROLES §0 (案内のみ) |
 | 手本がある移植の進め方 (コンパイルを全部の実装の後に・設計の段の点検・依頼に必ず書くこと・踏んだこと) | [tasks/agents/PORT_FLOW.md](tasks/agents/PORT_FLOW.md) | ROLES §0 (1 行)、スキル `os32-delegate` (案内のみ) |
 | PCI 装置の扱い (手本・不在・待ち・初期化・番地・PC-98・試験) | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | PORT_FLOW §4、WORK_GUIDE、POLICY_DEBUG §4、05_drivers (案内のみ) |
+| 実行形式 (`os32x_format`) が変わる版の実機への入れ方 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | スキル os32-realhw-update の世代の表 (案内のみ) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
 | 番地・帯域 | `include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
@@ -131,6 +132,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
 | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | **PCI デバイス開発の注意点** — 手本のある移植で守る装置の扱い |
+| [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | **実行形式が変わる版を実機に入れる** — 古い cp で /boot と /sys を写して再起動、新しい hsync を配備元から動かす |
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v82 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 261) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |
