@@ -13,8 +13,10 @@ static struct trident_device tri_device;
 static u8 tri_storage[TRI_FAKE_REAL_BYTES];
 static int reserved, tri_probes, tri_inits, tri_leaves, tri_closes, tri_returns;
 static int tri_failure, route_safe = 1, recovery_failure, prepare_failure;
-static u32 tri_client, tri_display;
-static const GfxMode tri_modes[] = {
+static u32 tri_client, tri_display, tri_rid;
+static int configured;
+static void tri_configure(void);
+static const GfxMode tri_hal_modes[] = {
     {.width=TRI_WIDTH, .height=TRI_HEIGHT, .format=GFX_FMT_PACKED8,
      .dac_bits=6, .pitch=TRI_PITCH}
 };
@@ -37,8 +39,12 @@ static int tri_restore(void *opaque)
 }
 static void tri_init(void)
 {
+    tri_configure();
     const struct ledger_surface *sf = &ledger_surfaces[tri_client];
     tri_inits++;
+    gfx_backend_trident.bb_base = (u8 *)P2V_IO(sf->first * PAGE_SIZE);
+    gfx_backend_trident.bb_size = sf->npages * PAGE_SIZE;
+    gfx_backend_trident.bb_pitch = sf->pitch;
     CHECK(gfx_backend_trident.bb_base == P2V(sf->first * PAGE_SIZE));
     CHECK(gfx_backend_trident.bb_size == TRI_DISPLAY_BYTES);
     CHECK(gfx_backend_trident.bb_pitch == TRI_PITCH);
@@ -54,7 +60,7 @@ static void tri_prepare(void) { tri_failure = prepare_failure; }
 GfxBackend gfx_backend_trident = {
     .name="trident-test", .probe=tri_probe, .init=tri_init, .query=tri_query,
     .enter=tri_enter, .leave=tri_leave, .shutdown=tri_close, .prepare=tri_prepare,
-    .modes=tri_modes, .mode_count=1
+    .modes=tri_hal_modes, .mode_count=1
 };
 /* This seam models resources.c's committed descriptors, not its transaction.
  * Real resources.c has its own host test. Verify the core invokes this seam
@@ -67,7 +73,7 @@ int trident_boot_reserve(void)
         .decode_end=(TRI_BAR0_PHYS+TRI_BAR0_DECODE_BYTES)/PAGE_SIZE,
         .bus=LEDGER_BUS_PCI, .width_basis=LEDGER_WB_GLUE_CONST
     };
-    u32 rid, pfn;
+    u32 rid;
     reserved++;
     CHECK(pgalloc_arena_end() > MEM_PHYS_EXEC_FLOOR / PAGE_SIZE);
     CHECK(ledger_resource_add(&r, &rid));
@@ -75,22 +81,28 @@ int trident_boot_reserve(void)
     CHECK(ledger_reserve_set(LEDGER_OWNER_GFX, &sp, 1));
     CHECK(!paging_map_phys(TRI_BAR0_PHYS, TRI_BAR0_PHYS, TRI_DISPLAY_PAGES, PAGE_RW|PTE_PCD));
     CHECK(ledger_resource_set_map(rid, r.decode_first, r.decode_first+TRI_DISPLAY_PAGES));
-    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, TRI_DISPLAY_PAGES,
-          MEM_PHYS_EXEC_FLOOR/PAGE_SIZE, pgalloc_arena_end(), LEDGER_TOP_DOWN, &pfn));
+    tri_rid=rid;
+    return 0;
+}
+/* The real ScreenInit configure callback publishes two UC aliases after
+ * mode selection. This core fixture has one HAL mode, not an F6 oracle. */
+static void tri_configure(void)
+{
+    if (configured) return;
+    const struct ledger_resource *r=&ledger_resources[tri_rid];
     struct ledger_surface sf = {
-        .first=r.decode_first, .npages=TRI_DISPLAY_PAGES, .width=TRI_WIDTH,
+        .first=r->decode_first, .npages=TRI_DISPLAY_PAGES, .width=TRI_WIDTH,
         .height=TRI_HEIGHT, .pitch=TRI_PITCH, .owner=LEDGER_OWNER_GFX,
-        .backing=LEDGER_SB_MMIO, .backend=LEDGER_SF_TRIDENT,
+        .backing=LEDGER_SB_VRAM, .backend=LEDGER_SF_TRIDENT,
         .role=LEDGER_ROLE_DISPLAY, .format=GFX_FMT_PACKED8, .planes=1,
         .cache=LEDGER_CACHE_UC, .perm_max=LEDGER_PERM_RW
     };
     CHECK(ledger_surface_create(&sf, &tri_display));
     gfx_surface_unready |= 1u << tri_display;
-    sf.first=pfn; sf.owner=LEDGER_OWNER_BOOT; sf.backing=LEDGER_SB_RAM;
-    sf.role=LEDGER_ROLE_CLIENT; sf.cache=LEDGER_CACHE_WB;
+    sf.role=LEDGER_ROLE_CLIENT;
     CHECK(ledger_surface_create(&sf, &tri_client));
     gfx_surface_unready |= 1u << tri_client;
-    return 0;
+    configured=1;
 }
 static void run(void) __attribute__((used));
 static void run(void)
@@ -103,7 +115,8 @@ static void run(void)
     gfx_set_backend_pref(GFX_PREF_TRIDENT);
     CHECK(gfx_get_backend_pref() == GFX_PREF_TRIDENT);
     gfx_boot_reserve();
-    CHECK(reserved == 1 && !tri_probes && !tri_inits);
+    CHECK(reserved == 1 && !tri_probes && !tri_inits && !configured);
+    CHECK(!ledger_surface_find(LEDGER_SF_TRIDENT,LEDGER_ROLE_CLIENT));
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_CLIENT));
     CHECK(!ledger_surface_find(LEDGER_SF_CIRRUS,LEDGER_ROLE_CLIENT));
     u32 owner;
@@ -127,6 +140,9 @@ static void run(void)
     host_user = 0; gfx_init();
     CHECK(g_backend == &gfx_backend_trident && gfx_is_started() && tri_inits == 1);
     CHECK(gfx_selected_selfcheck());
+    CHECK(ledger_surfaces[tri_client].first==ledger_surfaces[tri_display].first &&
+          ledger_surfaces[tri_client].backing==LEDGER_SB_VRAM &&
+          ledger_surfaces[tri_client].cache==LEDGER_CACHE_UC);
     /* Init must not repair the resource descriptor: real resources.c sets
      * the ceiling; core readiness and caller authorization control leases. */
     view_check(LEDGER_SF_TRIDENT, TRI_HEIGHT, 1);
