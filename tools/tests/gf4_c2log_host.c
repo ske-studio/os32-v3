@@ -184,8 +184,27 @@ static void test_detect_state(void)
     assert(!io->write(io->opaque,0,SVC_CR,1,index));
     svc_ctx.memory_prepare_attempted=true; svc_ctx.memory_prepare_rc=GF_SCRIPT_EIO;
     cint_prod.feature5.last_rc=GF5_EBIOS; cint_prod.feature5.source_rc=GF_SCRIPT_EIO;
+    /* A DCB pair outside the legacy defaults must be observed verbatim. */
+    const u8 regs[]={0x11,0x3e,0x3f,0x36,0x37,0x51,0x50};
+    const u8 values[]={0x80,0x0c,0x31,0x04,0x21,0x11,0x08};
+    for (u32 i=0;i<sizeof(regs);++i) {
+        u32 value=values[i];
+        assert(!svc_index(io,SVC_CR,regs[i],&value,true));
+    }
+    assert(!io->write(io->opaque,0,RECOVER_PMC_ENABLE,4,0x12345679));
+    assert(!io->write(io->opaque,0,SVC_ENGINE_CTRL,4,0x10));
+    assert(!io->write(io->opaque,0,SVC_ENGINE_CTRL+RECOVER_HEAD_STRIDE,4,0x1000));
+    assert(!io->write(io->opaque,0,SVC_CR,1,index));
+    svc_ctx.dcb.routes[0].connector=7;
+    svc_ctx.dcb.routes[0].i2c_index=2;
+    svc_ctx.dcb.i2c[2]=(struct gf4_i2c_port){.drive=0x51,.sense=0x50};
+    svc_ctx.last_rc=GF4_EDDC;
     svc_detect_diagnostic(&svc_ctx,&cint_prod.feature5);
-    assert(startlog_equal("[gf4] detect state cr1f=99 cr44=3 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1\n"));
+    assert(startlog_equal("[gf4] detect state cr1f=99 cr44=3 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1"
+        " cr11=80 cr3e=c cr3f=31 cr36=4 cr37=21 pmc=12345679 ec0=10 ec1=1000 mmio_rc=0\n"
+        "[gf4] detect port conn=7 bus=2 port_rc=0 drive_cr=51 drive=11 sense_cr=50 sense=8 read_rc=0\n"));
+    assert(svc_ctx.last_rc==GF4_EDDC);
+    for (u32 i=0;i<sizeof(regs);++i) assert(svc_host.cr[0][regs[i]]==values[i]);
     u32 value;
     assert(!io->read(io->opaque,0,SVC_CR,1,&value) && value==index);
     assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&value,false) && value==lock);
