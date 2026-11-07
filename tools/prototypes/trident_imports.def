@@ -49,6 +49,12 @@
       "source": "drivers/char/serial.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "sys_time_now",
+      "source": "include/sys.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

@@ -194,7 +194,9 @@ COMPONENTS = (
     dict(name='TRIDENT', path='/boot/trident.mod', dependencies=(), required=False,
          module_id=13, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-         stop_allowed=0, ops_version=1, ops_slots=3,
+         # F16 v2 context loans diagnostic ops (including poll), like GeForce;
+         # initialize/prepare/restore remain the only exported ops slots.
+         stop_allowed=0, ops_version=2, ops_slots=3,
          image_max=65536, mem_max=65536, load_span_max=81920,
          reloc_max=2048, export_max=3,
          init_symbol='trident_module_init', imports_symbol='trident_import_slots',
