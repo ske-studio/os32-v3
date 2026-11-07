@@ -183,6 +183,14 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('a3', 'edid-parser', 'kdebug/gf_display_test.c',
+  'data->edid_modes(display_row, block, edid) : GF4_EUNSUPPORTED;',
+  '(i32)GF4_EUNSUPPORTED : GF4_EUNSUPPORTED;', 'CRC read uses existing parser'),
+ ('a3', 'edid-name', 'kdebug/gf_display_test.c',
+  'd[3] == 0xfc', 'd[3] == 0xfd', 'monitor name descriptor'),
+ ('a3', 'edid-first-dtd', 'kdebug/gf_display_test.c',
+  'display_edid_timing("GF4 edid-first-dtd", &one.timing[0]);',
+  'display_edid_timing("GF4 edid-first-dtd", &one.timing[1]);', 'first DTD timing'),
  ('c2stop', 'off-stop-hardware-idempotent', 'hwdev/gf/display/service.c',
   'if (c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
   'if (false && c->ch->state==GF2_OFF && !l->engaged && l->stop_ok && !c->cleanup_pending)',
@@ -1724,7 +1732,7 @@ GF4_COMPONENTS = {
     'c0': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c', 'tools/tests/gf4_modeload_print_host.c'],
     'c0log': ['hwdev/gf/display/modeset.c', 'hwdev/gf/display/transaction.c', 'hwdev/gf_load_state.c'],
     'c4': ['drivers/video/geforce/'+n+'.c' for n in ('edid', 'tv_data', 'gf_display_data')],
-    'a3': [],
+    'a3': ['drivers/video/geforce/edid.c'],
 }
 # Start-line observations execute the real video entry and lifecycle.
 GF4_MUTATIONS += [
