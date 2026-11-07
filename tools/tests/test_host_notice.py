@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """B4: caller validation, two-phase notice consumption and serial."""
 import argparse
+import hashlib
+import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -10,6 +13,9 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
+    'sdk/kapi.json', 'sdk/include/os32/os32_kapi_generated.h',
+    'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs',
+    'exec/exec_kapi_init.inc',
     'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
     'net/host_mailbox.h', 'include/redir_access.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
@@ -40,10 +46,33 @@ def build(work, source):
         raise RuntimeError(result.stderr)
     return exe
 
+def fixed_slots():
+    spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
+    # Reviewed b6e80943 v81 entries, including signatures and target metadata.
+    assert hashlib.sha256(json.dumps(spec['api'][:259], sort_keys=True).encode()).hexdigest() == \
+        'd3f59c11694d6d9d7e40d52b2976e9b4cb8e99222d32ec762c4ba1e65ddb7140'
+    slots = (ROOT / 'sdk/include/os32/os32_kapi_slots.h').read_text()
+    header = (ROOT / 'sdk/include/os32/os32_kapi_generated.h').read_text()
+    names = re.findall(r'__cdecl \*(\w+)\)\(', header)
+    assert names == [a['name'] for a in spec['api']]
+    for slot, api in enumerate(spec['api']):
+        assert re.search(r'#define KAPI_SLOT_' + api['name'].upper() + r'\s+' + str(slot) + r'\b', slots)
+    assert spec['version'] == 82 and spec['func_capacity'] == 300
+    assert [a['name'] for a in spec['api'][259:]] == ['host_notice_read', 'host_notice_serial']
+    assert spec['api'][259]['out'] == 'target'
+    init = (ROOT / 'exec/exec_kapi_init.inc').read_text()
+    rust = (ROOT / 'sdk/rust/os32api/src/kapi_generated.rs').read_text()
+    for name in ('host_notice_read', 'host_notice_serial'):
+        assert 'kapi->' + name + ' = wrap_' + name + ';' in init
+        assert 'pub ' + name + ': unsafe extern "C" fn(' in rust
+    print('PASS v81 slots/signatures unchanged; v82 slots 259/260, C/Rust/init connected')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    fixed_slots()
     with tempfile.TemporaryDirectory(prefix='host-notice-') as tmp:
         work = Path(tmp)
         source = ROOT / 'kapi/kapi_host_notice.c'

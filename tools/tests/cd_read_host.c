@@ -1517,7 +1517,7 @@ static void t_list_swap(void)
     /* No callback after the boundary: only the post-acquisition generation
      * check can detect this successful UA retry into the new medium. */
     memset(g_media_b.img + (c->root_lba + 16) * SEC, 0, SEC);
-    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == OS32_ERR_STALE);
+    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == VFS_ERR_IO);
     CHECK(!g_sw_deep_b);
     iso9660_ops.umount(c);
 
@@ -1525,7 +1525,7 @@ static void t_list_swap(void)
     setup(); c = do_mount();
     g_sw_calls = 0; g_sw_arm = 1; g_sw_read = 1;
     g_sw_ctx = c;
-    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == OS32_ERR_STALE);
+    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == VFS_ERR_IO);
     CHECK(g_sw_calls == 1);
     /* VFS の次操作に相当する refresh 後、新媒体を読む */
     CHECK(!iso9660_ops.resource_refresh(c));

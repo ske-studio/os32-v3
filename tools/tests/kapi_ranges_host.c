@@ -33,6 +33,14 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
 }
 #include "disk_host_source.c"
 #include "generated_host_source.c"
+static HostNotice notice_heap[64];
+void *kmemset(void *d, int v, u32 n)
+{ u8 *p = d; while (n--) *p++ = (u8)v; return d; }
+void *kmalloc(u32 n) { return n == sizeof(notice_heap) ? notice_heap : 0; }
+#define initialized notice_initialized
+#include "mailbox_host_source.c"
+#undef initialized
+#include "notice_host_source.c"
 
 static void *escape[5];
 static int reached, checks;
@@ -107,6 +115,30 @@ static void caller_copy_tests(void)
     u32 *pt = P2V(space.app_pt_phys[0]);
     u32 index = (va >> PAGE_SHIFT) % PTE_COUNT, saved = pt[index];
     named(caller_access_enter(&previous, CALLER_USER), "caller frame");
+    /* Real USER caller frame, page tables, generated wrapper and mailbox.
+     * Every rejected output must leave the same queued notice available. */
+    named(host_mailbox_init() == 0, "notice init");
+    const u32 bad_notice[] = {0, 0x100000, 0xA0000, 0xffffff80U, tail};
+    for (u32 i = 0; i < sizeof(bad_notice) / sizeof(bad_notice[0]); i++) {
+        u8 byte = (u8)(i + 1);
+        named(host_mailbox_put(7, 2, 1, &byte, 1, 0) == 0, "notice put");
+        named(wrap_host_notice_read(7, 2, (HostNotice *)bad_notice[i]) == OS32_ERR_INVAL,
+              "notice invalid output");
+        /* Revoke write permission on the actual managed user page. */
+        pt[index] = saved & ~PTE_RW;
+        named(wrap_host_notice_read(7, 2, (HostNotice *)va) == OS32_ERR_INVAL,
+              "notice readonly output");
+        pt[index] = saved;
+        named(wrap_host_notice_serial() == i + 1 && wrap_host_notice_serial() == i + 1,
+              "notice serial nonconsuming");
+        named(wrap_host_notice_read(7, 2, (HostNotice *)va) == 0,
+              "notice bad pointer preserves queue");
+        HostNotice *copied = P2V(payload);
+        named(copied->serial == i + 1 && copied->length == 1 && copied->data[0] == byte,
+              "notice output bytes");
+        named(wrap_host_notice_read(7, 2, (HostNotice *)va) == OS32_ERR_AGAIN,
+              "notice consumed once");
+    }
     u32 ls_args[] = {va, va, 0};
     u32 boot_args[] = {va, 0};
     u32 gui_args[] = {va, 0};

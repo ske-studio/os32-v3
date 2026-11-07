@@ -447,6 +447,14 @@ static int iso_resolve_checked(Iso9660Ctx *ctx, const char *path,
     return VFS_ERR_IO;
 }
 
+/* An interrupted physical CD listing is an I/O failure; network media keep
+ * STALE so VFS can invalidate their open descriptors. */
+static int iso_list_error(Iso9660Ctx *ctx, int error)
+{
+    if (error == OS32_ERR_STALE && iso_legacy_atapi(ctx)) return VFS_ERR_IO;
+    return error;
+}
+
 /* --- list_dir --- */
 static int iso9660_list_dir(void *ctx_raw, const char *path,
                             vfs_dir_cb cb, void *user_ctx)
@@ -479,12 +487,12 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
          * キャッシュの中身が入れ替わるので、指したまま cb を呼ばない */
         if (sect_off == 0) {
             const u8 *sec = iso_dir_sector(ctx, dir_lba, dir_size, sect_idx, &scan);
-            if (!sec) return scan.error;
+            if (!sec) return iso_list_error(ctx, scan.error);
             /* 途中で媒体が替わった: 続きは別の媒体。一覧は中断する
              * (cb に渡した分は取り消せないので読み直さない) */
             ret = iso9660_resource_check(ctx, 0);
-            if (ret) return ret;
-            if (ctx->media_gen != gen0) return OS32_ERR_STALE;
+            if (ret) return iso_list_error(ctx, ret);
+            if (ctx->media_gen != gen0) return iso_list_error(ctx, OS32_ERR_STALE);
             kmemcpy(sector, sec, ISO_SECTOR_SIZE);
             cur = sector;
         }
@@ -505,8 +513,8 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
             cb(&ent, user_ctx);
             /* cb がこの FS を読んで媒体の交換を踏んだかもしれない */
             ret = iso9660_resource_check(ctx, 0);
-            if (ret) return ret;
-            if (ctx->media_gen != gen0) return OS32_ERR_STALE;
+            if (ret) return iso_list_error(ctx, ret);
+            if (ctx->media_gen != gen0) return iso_list_error(ctx, OS32_ERR_STALE);
         }
 
         offset += rec_len;

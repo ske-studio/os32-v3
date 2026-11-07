@@ -12,6 +12,13 @@
 //!     begin 失敗で rollback しない、set / commit 失敗で rollback する、
 //!     close 失敗は IO、**直前の失敗を優先**
 
+extern crate alloc;
+// host.rs now also exposes KAPI-backed helpers. These ABI wrapper tests must
+// never call those slots; the SDK runtime test supplies an actual fake table.
+#[path = "../../../../../sdk/rust/os32api/src/kapi_generated.rs"]
+mod host_kapi;
+unsafe fn api() -> &'static host_kapi::KernelAPI { panic!("unexpected SDK KAPI call") }
+
 /// `libos32cfg` の ABI 宣言。本体では `pub use os32api::cfg as cfgabi;` で、
 /// ここでは os32api を丸ごと組まずに**実ファイルを直に**取り込む (票 S4 §4)。
 /// `cfgro.rs` が見るのはどちらでも `crate::cfgabi` の 1 名だけ。

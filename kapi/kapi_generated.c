@@ -47,6 +47,7 @@
 #include "appmem.h"
 #include "unicode_file.h"
 #include "font_source.h"
+#include "kapi_host_notice.h"
 
 extern volatile u32 tick_count;
 extern void kapi_sys_exit(int status);
@@ -65,7 +66,7 @@ extern int kapi_osri_show(const char *path, u32 duration_ms);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[259];
+volatile u32 kapi_hits[261];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -330,6 +331,8 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     16,  /* ime_dict_info */
     8,  /* gfx_osri_show */
     4,  /* ime_dict_suspend */
+    12,  /* host_notice_read */
+    0,  /* host_notice_serial */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -594,6 +597,8 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* ime_dict_info */
     0x0000,  /* gfx_osri_show */
     0x0000,  /* ime_dict_suspend */
+    0x0000,  /* host_notice_read */
+    0x0000,  /* host_notice_serial */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2502,5 +2507,17 @@ int __cdecl wrap_ime_dict_suspend(int on)
 {
     KAPI_HIT(258);
     return ime_dict_suspend(on);
+}
+
+int __cdecl wrap_host_notice_read(u32 generation, u32 service, HostNotice *out)
+{
+    KAPI_HIT(259);
+    return kapi_host_notice_read(generation, service, out);
+}
+
+u32 __cdecl wrap_host_notice_serial(void)
+{
+    KAPI_HIT(260);
+    return kapi_host_notice_serial();
 }
 
