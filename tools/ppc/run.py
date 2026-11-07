@@ -28,6 +28,10 @@ CASES = ('normal ac2 real screen bad-stdin bad-stdout bad-chosen bad-root bad-sc
          'drain-timeout delay-ready options-absent screen-fail').split()
 
 
+# flow_fake.c reports its verdicts with these codes; qemu-i386 uses rc=1 for a load failure.
+FLOW_RC_FIRST, FLOW_RC_LAST = 10, 99
+
+
 class CriterionFailure(AssertionError):
     """An acceptance criterion failed; eligible for an expected mutation RED."""
 
@@ -64,8 +68,10 @@ def host(root, runner, cases=CASES):
         p = subprocess.run((['qemu-i386'] if runner == 'qemu' else []) +
                            [str(out/'flow'), case], capture_output=True, timeout=10)
         results.append(f'{case}: rc={p.returncode}')
-        if p.returncode:
+        if FLOW_RC_FIRST <= p.returncode <= FLOW_RC_LAST:
             raise CriterionFailure('host ' + '\n'.join(results))
+        if p.returncode:  # The loader or a signal failed; flow_fake.c never ran to its verdict.
+            raise RuntimeError(f'host did not run {case}: rc={p.returncode}\n{p.stderr}')
     return '\n'.join(results) + '\n'
 
 
