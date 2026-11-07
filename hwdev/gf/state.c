@@ -85,6 +85,7 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
         return state_reject(g,GF5_EBUSY);
     if (g->phase!=GF5_RUN) return state_reject(g,GF5_ESTATE);
+    if (g->display->diagnostic_saved) return state_reject(g,GF4_EBUSY);
     if (g->heat.critical_paused || gf5_stopping(g))
         return state_reject(g,GF5_ESTATE);
     for (u32 i=0;i<GF5_TILE_COUNT;++i) {

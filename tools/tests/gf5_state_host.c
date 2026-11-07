@@ -218,6 +218,35 @@ static void roundtrip(void)
         gf5_host_trace_clear(&h);
     }
 }
+static void diagnostic_conflict(void)
+{
+    /* F4 save.c:138 rejects an active diagnostic snapshot; F5 section 7
+     * treats this as a duplicate request before starting the transaction. */
+    reset();
+    struct gf4_saved diagnostic={0}, before=diagnostic;
+    struct gf5_image retained={.version=GF5_IMAGE_VERSION,.complete=true};
+    struct gf5_image previous=retained, *out=&retained;
+    bool scan_open=h.display.scan_hook_open;
+    h.ctx.image=&retained;
+    h.display.ctx.diagnostic_saved=&diagnostic;
+    assert(gf5_state_save(&h.ctx,&out)==GF5_EBUSY);
+    assert(h.ctx.last_rc==GF5_EBUSY && h.ctx.source_rc==GF4_EBUSY);
+    assert(h.ctx.phase==GF5_RUN && !h.ctx.busy && h.ctx.accepting);
+    assert(h.display.ctx.accepting && h.display.scan_hook_open==scan_open);
+    assert(h.ctx.image==&retained && out==&retained);
+    assert(!gf2_host_memcmp(&retained,&previous,sizeof(retained)));
+    assert(h.display.ctx.diagnostic_saved==&diagnostic);
+    assert(!gf2_host_memcmp(&diagnostic,&before,sizeof(diagnostic)));
+    assert(!h.nevents && !h.display.nevents && !h.live_allocs);
+    /* Closing the diagnostic session permits the same save to complete. */
+    h.display.ctx.diagnostic_saved=0;
+    struct gf5_image *image=save();
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,image));
+    assert(h.ctx.phase==GF5_RUN && h.ctx.accepting);
+    gf5_state_free(&h.ctx,image);
+    assert(!h.ctx.image && !h.live_allocs);
+}
 static void preallocation_failure(void)
 {
     reset();
@@ -462,6 +491,7 @@ static void optional_capture(void)
 }
 void _start(void)
 {
+    diagnostic_conflict();
     optional_capture();
     roundtrip(); preallocation_failure(); save_failures(); restore_failures(); identities_and_guards();
     heat_saved_clock_limit(); heat_roundtrip(); heat_closed_operations();
