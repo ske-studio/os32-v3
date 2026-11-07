@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **実装中 (2026-11-05)** — 層 1〜5 は main (層 3 c3e018a6、層 4 5a29f69c、層 5 23a19141)。実機 Ra266 の受入は入口の不具合を 1 つずつ直している (立会いなし、カメラ): 時計・待ちの未結線 (gf-prodtime)・PMC の期待値・黙った pc98 への落ち・live AS の PT (gf-bootpt)・devinit 前の PFB 読み、の後、67f1b3ca で `gf1 status`・`gf2 status` は rc=0、hello_gfx は `[gf4] start fail stage=objects_init rc=-205`。`[gf3] wait timeout site=push_reserve … now-dl≒2 秒、GET=PUT` から、devinit の前に作った 2 秒の期限を objects_init まで使い回していたと判明し、devinit より後の段は段の入口で期限を取り直す直しを ee6bfbbd で main (astra レビュー指摘 0)。実機での再試験 (hello_gfx) がノートで進行中。取り込みを実機合格と数えず、表示が出たら層 1 から受入。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **実装中 (2026-11-07)** — 層 1〜5 は main。実機 Ra266 (main 44ae21bc) で hello_gfx が 640×480・INDEX8 で映り、終了も leftover=0。層 5 の診断 (scale の trial 5・save の拒否・boot_target・RAM の CRC) は合格。DDC は enter の detect でもモード設定の後でも -405 — 出力が PC-98 本体のアナログ入力を経てモニターへ出る配線 ([RA266](../../decisions/realhw/RA266.md) §1-1) で DDC の線が届かない見込みで、別のモニターを直接つなぐ回 (ユーザー予定 2026-11-08) で確かめる。次は層 2・層 4 の実機受入 ([DEFERRED_TESTS](../DEFERRED_TESTS.md) の GF-L2-Ra266・GF-L4-Ra266-*)。設計と段の状態は §4、機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 
