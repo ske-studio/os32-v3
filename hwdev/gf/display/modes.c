@@ -226,6 +226,14 @@ static i32 detect_block(struct gf4_ctx *c,u8 connector,u8 bus,u8 block_no,
 {
     u32 dl;
     i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);
+    if (!rc && !block_no) {
+        /* V/nouveau_connector.c:439-445 -> 579-588: probe before EDID.
+         * Borrow this block's deadline; do not enlarge its budget. */
+        rc=gf4_ddc_probe(c,bus,dl);
+        kprintf(KLOG_ATTR,"[gf4] detect conn=%u bus=%u probe=%d\n",
+                connector,bus,rc);
+        if (rc) return rc; /* No EDID on this connector. */
+    }
     if (!rc) rc=gf4_ddc_read(c,bus,block_no,block,dl);
     kprintf(KLOG_ATTR,"[gf4] detect conn=%u bus=%u block=%u ddc=%d\n",
             connector,bus,block_no,rc);

@@ -603,7 +603,7 @@ GF4_MUTATIONS = [
  ('b3',
   'b3-final-nack',
   'hwdev/gf/display/ddc.c',
-  'rc=ddc_get(&b,&bytes[n],n==DDC_BLOCK_BYTES-1U);',
+  'rc=ddc_get(&b,&bytes[n],n==count-1U);',
   'rc=ddc_get(&b,&bytes[n],false);',
   'b3'),
  ('b3',
@@ -1752,6 +1752,21 @@ GF4_MUTATIONS += [
      '(void)t;', 'native_and_diagnostics'),
 ]
 
+
+GF4_MUTATIONS += [
+    ('b3', 'probe-length', 'hwdev/gf/display/ddc.c',
+     'ddc_transfer(ctx,bus,0,&value,1U,dl)',
+     'ddc_transfer(ctx,bus,0,&value,0U,dl)', 'probe wire reads exactly one byte'),
+    ('b3', 'probe-offset', 'hwdev/gf/display/ddc.c',
+     'ddc_transfer(ctx,bus,0,&value,1U,dl)',
+     'ddc_transfer(ctx,bus,1,&value,1U,dl)', 'probe wire offset zero'),
+    ('b0', 'probe-failure', 'hwdev/gf/display/modes.c',
+     'if (rc) return rc; /* No EDID on this connector. */',
+     'if (rc) rc=0; /* No EDID on this connector. */', 'failed probe skips EDID'),
+    ('b0', 'probe-success', 'hwdev/gf/display/modes.c',
+     'rc=gf4_ddc_probe(c,bus,dl);',
+     'rc=gf4_ddc_probe(c,bus,dl); if (!rc) rc=GF4_EDDC;', 'successful probe reads EDID'),
+]
 
 GF4_COMPONENTS = {
     'b0': ['hwdev/gf/display/modes.c', 'drivers/video/geforce/edid.c'],
