@@ -617,32 +617,43 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
     }
     for (u32 i = 0; i < sizeof(before); i++) before[i] = expected[i];
 }
-/* Bounded evidence for the independent BT.601/FOH ideal, not a hardware
- * precision requirement. fx/fy are unsigned source coordinates in 12.20. */
-#define TEST_YUV_SAMPLES 8U
-static void scale_yuv_observe(enum gf3_fmt fmt, struct gf3_rect sr,
+/* Bounded evidence for the independent RGB/BT.601/FOH ideal.
+ * RGB acceptance is unchanged; YUV remains observation-only.
+ * fx/fy are unsigned source coordinates in 12.20. */
+#define TEST_SCALE_SAMPLES 8U
+static u32 scale_observed_rgb(const u8 *p)
+{
+    u32 v = get_pixel(p, cpp(scale_compare_fmt));
+    if (scale_compare_fmt != GF3_RGB565) return v & 0xffffffU;
+    u32 r = (v >> 11) & 31U, g = (v >> 5) & 63U, b = v & 31U;
+    return (((r << 3) | (r >> 2)) << 16) |
+           (((g << 2) | (g >> 4)) << 8) | (b << 3) | (b >> 2);
+}
+static void scale_observe(enum gf3_fmt fmt, struct gf3_rect sr,
                               struct gf3_rect dr, u32 du, u32 dv)
 {
     const struct gf3_rect *c = &scale_compare_clip;
+    bool yuv = fmt == GF3_YUY2 || fmt == GF3_UYVY;
     u32 outside = 0, shown = 0;
     for (u32 y = c->y; y < c->y + c->h; y++)
     for (u32 x = c->x; x < c->x + c->w; x++) {
-        u32 off = TEST_HALF + y * scale_compare_pitch + x * 4U;
+        u32 off = TEST_HALF + y * scale_compare_pitch + x * cpp(scale_compare_fmt);
         if (scale_within_lsb(off)) continue;
         outside++;
-        if (shown >= TEST_YUV_SAMPLES) continue;
+        if (shown >= TEST_SCALE_SAMPLES) continue;
         shown++;
         u32 fx = (sr.x << TEST_FRAC_BITS) + (x - dr.x) * du;
         u32 fy = (sr.y << TEST_FRAC_BITS) + (y - dr.y) * dv;
         u32 sx = fx >> TEST_FRAC_BITS, sy = fy >> TEST_FRAC_BITS;
         if (sx > 15U) sx = 15U;
         if (sy > 15U) sy = 15U;
-        serial_puts_polled("GF3 yuv pixel");
+        serial_puts_polled(yuv ? "GF3 yuv pixel" : "GF3 rgb pixel");
         number(" fmt=", fmt); number(" x=", x); number(" y=", y);
         hex(" fx20=", fx); hex(" fy20=", fy);
-        hex(" expected_rgb=", get_pixel(expected + off, 4) & 0xffffffU);
-        hex(" actual_rgb=", get_pixel(transfer + off, 4) & 0xffffffU);
+        hex(" expected_rgb=", scale_observed_rgb(expected + off));
+        hex(" actual_rgb=", scale_observed_rgb(transfer + off));
         serial_puts_polled("\r\n");
+        if (!yuv) continue;
         for (u32 i = 0; i < 4U; i++) {
             u32 px = sx + ((i & 1U) && sx < 15U);
             u32 py = sy + ((i & 2U) && sy < 15U);
@@ -656,10 +667,11 @@ static void scale_yuv_observe(enum gf3_fmt fmt, struct gf3_rect sr,
             serial_puts_polled("\r\n");
         }
     }
-    serial_puts_polled("GF3 yuv observation");
+    serial_puts_polled(yuv ? "GF3 yuv observation" : "GF3 rgb observation");
     number(" fmt=", fmt); number(" outside_tolerance_pixels=", outside);
-    number(" shown=", shown); number(" limit=", TEST_YUV_SAMPLES);
-    serial_puts_polled(" comparison=observation-only\r\n");
+    number(" shown=", shown); number(" limit=", TEST_SCALE_SAMPLES);
+    serial_puts_polled(yuv ? " comparison=observation-only\r\n" :
+                             " comparison=channel-lsb1\r\n");
 }
 static int scale_case(void)
 {
@@ -710,8 +722,8 @@ static int scale_case(void)
             (fmt == GF3_YUY2 || fmt == GF3_UYVY);
         bool read;
         rc = compare_impl(false, scale_tolerant(fmt, bilinear, solid), observe_yuv, &read);
-        if (observe_yuv && read)
-            scale_yuv_observe(fmt, sr, dr, du, dv);
+        if (read && (observe_yuv || (trial == 5U && fmt <= GF3_ARGB8888)))
+            scale_observe(fmt, sr, dr, du, dv);
         if (rc && !first_rc) first_rc = rc;
         /* Numerical differences are observations; continue collecting all
          * formats/filters. Mapping/cleanup errors retain ownership and stop. */

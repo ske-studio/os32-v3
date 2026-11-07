@@ -237,6 +237,7 @@ MUTATIONS = [
     ('state-ram-optional', 'hwdev/gf/state.c', 'if (image->clock_available) {', 'if (true) {', 'state'),
     ('state-restore-raw-values', 'hwdev/gf/state.c', 'rc=gf5_clock_raw_restore(g,&image->clock_raw);', 'rc=gf5_clock_raw_restore(g,&(struct gf5_clock_raw){0});', 'state'),
     ('state-cursor-copy', 'hwdev/gf/state.c', 'for (u32 i=0;!rc && i<count;++i)', 'for (u32 i=0;!rc && i+1<count;++i)', 'state'),
+    ('state-diagnostic-busy', 'hwdev/gf/state.c', 'if (g->display->diagnostic_saved) return state_reject(g,GF4_EBUSY);', 'if (false) return state_reject(g,GF4_EBUSY);', 'state'),
     ('state-complete', 'hwdev/gf/state.c', 'image->complete=true;', 'image->complete=false;', 'state'),
     ('state-old-epoch', 'hwdev/gf/state.c', 'g->ch->epoch==image->saved_epoch', 'g->ch->epoch==0', 'state'),
     ('state-manual-thermal', 'hwdev/gf/state.c', 'if (!rc && image->fan_available) rc=gf5_therm_resume(g,&image->fan);', 'if (!rc && image->fan_available && image->fan.mode==GF5_FAN_AUTO) rc=gf5_therm_resume(g,&image->fan);', 'state'),

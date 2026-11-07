@@ -9,6 +9,7 @@ static struct gf3_ctx context;
 static const struct gf3_surface test_surface = {.off=0x10000, .bytes=TEST_BYTES};
 static char output[65536];
 static u32 output_used;
+static bool perturb_rgb;
 void serial_puts_polled(const char *s)
 {
     while (*s) { assert(output_used + 1 < sizeof(output)); output[output_used++] = *s++; }
@@ -59,6 +60,8 @@ static int scale(struct gf3_ctx *c, const struct gf3_surface *s,
                          (v&0xff000000U)|(r<<16)|(g<<8)|b;
         if (filter && sr.x==0 && (s->fmt==GF3_YUY2 || s->fmt==GF3_UYVY))
             packed = (packed & ~255U) | (b <= 252U ? b + 3U : b - 3U);
+        if (perturb_rgb && filter && sr.x==0 && s->fmt<=GF3_ARGB8888)
+            packed ^= 2U; /* Two native blue LSBs, including RGB565. */
         put_pixel(vram+TEST_HALF+y*d->pitch+x*n,n,packed);
     }
     return 0;
@@ -147,7 +150,7 @@ void _start(void)
         bool read=false;
         assert(compare_impl(false,true,true,&read)==0 && read);
         assert(occurrences("result=PASS")==1);
-        scale_yuv_observe(fmt,(struct gf3_rect){0,0,16,16},
+        scale_observe(fmt,(struct gf3_rect){0,0,16,16},
                           (struct gf3_rect){1,2,24,24},
                           (16U<<20)/24, (16U<<20)/24);
         assert(occurrences("GF3 yuv pixel")==8);
@@ -165,7 +168,7 @@ void _start(void)
         u32 edge=TEST_HALF+25*128+24*4;
         put_pixel(expected+edge,4,0); put_pixel(transfer+edge,4,3);
         output_used=0; output[0]=0;
-        scale_yuv_observe(fmt,(struct gf3_rect){0,0,16,16},
+        scale_observe(fmt,(struct gf3_rect){0,0,16,16},
                           (struct gf3_rect){1,2,24,24},
                           (16U<<20)/24, (16U<<20)/24);
         assert(occurrences("x=15 y=15 Y=197 U=96 V=176")==4);
@@ -179,10 +182,55 @@ void _start(void)
             vram[off]^=1;
         }
     }
+    /* Independent RGB fixtures: count pixels once, retain native LSB1
+     * acceptance and log full-surface edge coordinates like the YUV probe.
+     * X/nv04_xv_blit.c:141-154 submits CENTER/FOH; no new pixel rule. */
+    for (u32 fmt=GF3_RGB565; fmt<=GF3_ARGB8888; fmt++) {
+        clear();
+        scale_compare_fmt=fmt; scale_compare_pitch=32*cpp(fmt);
+        scale_compare_clip=(struct gf3_rect){22,22,3,4};
+        if (fmt==GF3_XRGB8888) xrgb_second=32*scale_compare_pitch;
+        u32 e=fmt==GF3_RGB565 ? 0x4208 : 0x7d808080;
+        u32 a=fmt==GF3_RGB565 ? 0x420a : 0x7d808083;
+        for (u32 y=22; y<26; y++)
+        for (u32 x=22; x<25; x++) {
+            u32 off=TEST_HALF+y*scale_compare_pitch+x*cpp(fmt);
+            put_pixel(expected+off,cpp(fmt),e);
+            put_pixel(vram+off,cpp(fmt),a);
+        }
+        bool read=false;
+        assert(compare_impl(false,true,false,&read)==GF2_EIO && read);
+        scale_observe(fmt,(struct gf3_rect){0,0,16,16},
+                      (struct gf3_rect){1,2,24,24},0xaaaaa,0xaaaaa);
+        assert(occurrences("GF3 rgb pixel")==8);
+        assert(occurrences("GF3 yuv source")==0);
+        assert(occurrences("outside_tolerance_pixels=12 shown=8 limit=8")==1);
+        assert(occurrences("x=22 y=22 fx20=00dffff2 fy20=00d55548")==1);
+        assert(occurrences(fmt==GF3_RGB565 ?
+            "expected_rgb=00424142 actual_rgb=00424152" :
+            "expected_rgb=00808080 actual_rgb=00808083")==8);
+        /* Exact and one-native-LSB controls produce no rejected pixels. */
+        for (u32 i=0; i<TEST_BYTES; i++) vram[i]=expected[i];
+        u32 off=TEST_HALF+22*scale_compare_pitch+22*cpp(fmt);
+        put_pixel(vram+off,cpp(fmt),e+1);
+        assert(compare_impl(false,true,false,&read)==0 && read);
+        output_used=0; output[0]=0;
+        scale_observe(fmt,(struct gf3_rect){0,0,16,16},
+                      (struct gf3_rect){1,2,24,24},0xaaaaa,0xaaaaa);
+        assert(occurrences("GF3 rgb pixel")==0);
+        assert(occurrences("outside_tolerance_pixels=0 shown=0 limit=8")==1);
+    }
     clear();
     foundation.io.opaque=&foundation; foundation.io.timing.clock_us=clock_now;
     assert(scale_case()==0);
+    assert(occurrences("GF3 rgb observation")==3);
+    assert(occurrences("outside_tolerance_pixels=0 shown=0 limit=8")==3);
     assert(occurrences("GF3 yuv observation")==2);
     assert(occurrences("outside_tolerance_pixels=576 shown=8 limit=8")==2);
+    clear(); perturb_rgb=true;
+    assert(scale_case()==GF2_EIO);
+    assert(occurrences("GF3 rgb observation")==3);
+    assert(occurrences("GF3 rgb pixel")==24);
+    assert(occurrences("outside_tolerance_pixels=576 shown=8 limit=8")==5);
     gf2_host_exit(0);
 }
