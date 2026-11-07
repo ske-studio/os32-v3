@@ -113,36 +113,37 @@ static int cpu32(const struct TridentDiagnosticOps *o)
     struct trident_device *d = o->context;
     int rc = client_rows(d);
     if (rc) return optional(o, "cpu32_precheck", rc);
-    if (!o->fill || !o->copy || !o->copy_direction || !o->sync ||
-        d->mode.no_accel || !d->accel.initialized ||
-        (d->mode.features & (TRI_CAP_FILL | TRI_CAP_COPY)) !=
-        (TRI_CAP_FILL | TRI_CAP_COPY))
-        return optional(o, "cpu32", TRI_E_NOSYS);
+    bool ge = o->fill && o->copy && o->copy_direction && o->sync &&
+        !d->mode.no_accel && d->accel.initialized &&
+        (d->mode.features & (TRI_CAP_FILL | TRI_CAP_COPY)) ==
+        (TRI_CAP_FILL | TRI_CAP_COPY);
     const struct tri_surface *s = &d->mode.client;
     u32 count = (u32)s->width * s->cpp / sizeof(u32);
-    u32 fill = TRI_TEST_FILL;
-    /* Match F1 ge_replicate: one byte or halfword repeated per dword. */
-    if (s->cpp == 1u) fill |= fill << 8;
-    if (s->cpp <= 2u) fill |= fill << 16;
-    for (u32 i = 0; i < count; ++i) cpu_row[i] = fill;
-    rc = o->fill(d, s, 0, TRI_TEST_SOURCE_Y, s->width, TRI_TEST_ROWS,
-                 TRI_TEST_FILL, TRI_TEST_ROP_COPY);
-    emit(o, "ge_fill", rc, false);
-    if (rc) return rc;
-    rc = read_row(o, "ge_fill_read", TRI_TEST_SOURCE_Y, count);
-    if (rc) return rc;
-    /* Exercise DST_ENABLE as well. Review #1: ClearSync at copy's exit only
-     * polls; Sync MUST restore OPERMODE before the following CPU drawing. */
-    rc = o->copy_direction(d, 1, 1);
-    emit(o, "transparent_direction", rc, false);
-    if (rc) return rc;
-    rc = o->copy(d, s, s, 0, TRI_TEST_SOURCE_Y, 0, TRI_TEST_DEST_Y,
-                 s->width, 1, TRI_TEST_ROP_COPY, true, TRI_TEST_FILL);
-    emit(o, "transparent_copy", rc, false);
-    if (rc) return rc;
-    rc = o->sync(d);
-    emit(o, "cpu32_sync", rc, false);
-    if (rc) return rc;
+    if (ge) {
+        u32 fill = TRI_TEST_FILL;
+        /* Match F1 ge_replicate: one byte or halfword repeated per dword. */
+        if (s->cpp == 1u) fill |= fill << 8;
+        if (s->cpp <= 2u) fill |= fill << 16;
+        for (u32 i = 0; i < count; ++i) cpu_row[i] = fill;
+        rc = o->fill(d, s, 0, TRI_TEST_SOURCE_Y, s->width, TRI_TEST_ROWS,
+                     TRI_TEST_FILL, TRI_TEST_ROP_COPY);
+        emit(o, "ge_fill", rc, false);
+        if (rc) return rc;
+        rc = read_row(o, "ge_fill_read", TRI_TEST_SOURCE_Y, count);
+        if (rc) return rc;
+        /* Exercise DST_ENABLE as well. Review #1: ClearSync at copy's exit only
+         * polls; Sync MUST restore OPERMODE before the following CPU drawing. */
+        rc = o->copy_direction(d, 1, 1);
+        emit(o, "transparent_direction", rc, false);
+        if (rc) return rc;
+        rc = o->copy(d, s, s, 0, TRI_TEST_SOURCE_Y, 0, TRI_TEST_DEST_Y,
+                     s->width, 1, TRI_TEST_ROP_COPY, true, TRI_TEST_FILL);
+        emit(o, "transparent_copy", rc, false);
+        if (rc) return rc;
+        rc = o->sync(d);
+        emit(o, "cpu32_sync", rc, false);
+        if (rc) return rc;
+    }
     for (u32 i = 0; i < count; ++i)
         cpu_row[i] = TRI_TEST_PATTERN ^ (i * TRI_TEST_STRIDE);
     u32 *dst = (u32 *)(d->res->client + TRI_TEST_SOURCE_Y * s->pitch);
@@ -154,6 +155,7 @@ static int cpu32(const struct TridentDiagnosticOps *o)
                       : : "memory", "cc");
     rc = read_row(o, "cpu32_read", TRI_TEST_SOURCE_Y, count);
     if (rc) return rc;
+    if (!ge) return optional(o, "ge", TRI_E_NOSYS);
     rc = o->copy_direction(d, 1, 1);
     emit(o, "ge_copy_direction", rc, false);
     if (rc) return rc;

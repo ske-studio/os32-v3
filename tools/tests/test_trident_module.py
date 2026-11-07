@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Trident actual facade/loader loans, rejection/pin/abort and paired product.
-Device and real regs integration oracle lives in test_trident_lifecycle.
+Includes real device initialization and core drawing dispatch over fake hardware.
 """
 CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=120,
     covers=['drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
+            'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
             'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py',
             'tools/tests/module_image_host.c', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py',
@@ -37,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DIR = 'drivers/video/trident/'
 # Unique anchors; all mutants compile and fail a normal runtime assertion.
 MUTATIONS = (
+ ('M_PUBLIC_CONTEXT', 'trident_module.c', 'context.backend = &gfx_backend_trident;', 'context.backend = &candidate;', 'runtime publication reaches core'),
  ('M_CONTEXT', 'trident_body.c', '!context->display_owner)', 'false)', 'NULL display owner rejection'),
  ('M_PIN_RELEASE', 'trident_module.c', 'if (armed) return TRI_E_BUSY;', 'if (false) return TRI_E_BUSY;', 'arm retains module on abort'),
  ('M_OPTIONAL_TEXT', 'trident_module.c', 'if (optional[i] && !module_text_contains(r, optional[i]))', 'if (false)', 'out-of-text optional hooks rejected'),
@@ -72,7 +74,7 @@ def build(work, changed=None):
         'state_save','state_restore','pc98_init','vram','accel','cursor','ddc1','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
     cmd=['gcc',*FLAGS,'-I.','-I'+DIR,'-Ibuild/out/trident',
          *include_flags(ROOT),'-nostdlib','-static','-no-pie',
-         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','-o',str(exe)]
+         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','tools/tests/trident_device_fake.c','-Wl,--wrap=trident_regs_bind','-o',str(exe)]
     changes={}
     if changed:
         path,old,new=changed; original=(ROOT/path).read_text()
@@ -83,7 +85,7 @@ def build(work, changed=None):
 
 def execute(exe,runners,red=False):
     rejected=False
-    for mode in range(65):
+    for mode in range(66):
         for runner in runners:
             result=host32.run([str(exe)],input=struct.pack('<I',mode),runner=runner,capture_output=True)
             if red:

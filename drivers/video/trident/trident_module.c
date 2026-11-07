@@ -197,7 +197,10 @@ int trident_module_load(void)
     int rc = module_load(&request, &handle);
     if (!rc) rc = module_start(handle);
     if (!rc && !module_exports(handle)) rc = MODULE_INIT_FAILED;
-    if (!rc) gfx_backend_trident = candidate;
+    if (!rc) {
+        gfx_backend_trident = candidate;
+        context.backend = &gfx_backend_trident;
+    }
     else diagnostic_candidate = diagnostic_slot = NULL;
     kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, bi->img_crc, pinned);
     return rc;
