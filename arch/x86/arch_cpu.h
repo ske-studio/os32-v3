@@ -14,6 +14,7 @@
 #ifndef ARCH_CPU_H
 #define ARCH_CPU_H
 
+#include "x86_flags.h"
 #include "gdt.h"        /* USER_CS / USER_DS (CONTRACTS C1 で凍結したセレクタ) */
 #include "tss.h"        /* kernel_tss.esp0 — CPL=3 からの trap が使うスタック */
 

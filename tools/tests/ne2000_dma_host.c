@@ -4,6 +4,7 @@
 #include "types.h"
 static unsigned int inp(unsigned int port);
 static void outp(unsigned int port, unsigned int value);
+#include "../../arch/x86/x86_flags.h"
 #include "cpu.h"
 /* Linux keeps the real IF bit set. Mask its observation at the CPU boundary
  * so irq_save/restore and IF=0 foreground waits can be exercised unchanged. */

@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include "double_fault.h"
 #include "cpu.h"
+#include "x86_flags.h"
 #include "gdt.h"
 #include "tss.h"
 #include "memmap.h"

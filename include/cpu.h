@@ -26,8 +26,6 @@
 #ifndef CPU_H
 #define CPU_H
 
-/* CPU flag bits are also used by io.h without the MMU/TSS implementation. */
-#include "../arch/x86/x86_flags.h"
 /* i386 cdecl argument word size/alignment; stack alignment is separate. */
 #define ABI_WORD_BYTES 4
 #define ABI_WORD_ALIGN ABI_WORD_BYTES

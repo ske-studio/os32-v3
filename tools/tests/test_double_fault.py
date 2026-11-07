@@ -63,7 +63,7 @@ def check_asm_constants(folder):
         r'^%define (\w+) (0x[0-9a-fA-F]+|[0-9]+)$',
         (ROOT / 'arch/x86/kernel/cpu_flags.inc').read_text(), re.M)}
     source = ('#define __ASSEMBLER__ 1\n#include "cpu.h"\n#include "types.h"\n'
-              '#include "tss.h"\n#include "ksetjmp.h"\n#include <stddef.h>\n')
+              '#include "x86_flags.h"\n#include "tss.h"\n#include "ksetjmp.h"\n#include <stddef.h>\n')
     for name in ('EFLAGS_IF', 'EFLAGS_VM', 'EFLAGS_RESERVED1', 'ABI_STACK_ALIGN'):
         source += f'STATIC_ASSERT({name} == {values[name]}, asm_{name});\n'
     source += (f'STATIC_ASSERT(offsetof(struct tss_entry, cr3) == '
