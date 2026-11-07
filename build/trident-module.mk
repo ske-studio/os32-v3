@@ -5,7 +5,7 @@ TRIDENT_DEF_SOURCES := drivers/video/trident/trident_module.h include/gfx_hal.h 
 $(TRIDENT_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/trident_imports.def $(TRIDENT_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module trident --out-dir $(TRIDENT_OUT)
 
-TRIDENT_PARTS := trident_body backend_trident probe regs default_dac state_save state_restore pc98_init vram mode_640 route_ra266 present palette screen video dpms lifecycle
+TRIDENT_PARTS := trident_body backend_trident probe regs default_dac state_save state_restore pc98_init vram mode_640 route_ra266 present palette screen video accel cursor ddc1 dpms lifecycle
 TRIDENT_OBJS := $(addprefix $(TRIDENT_OUT)/,$(addsuffix .o,$(TRIDENT_PARTS)) trident_import_slots.o trident_import_stubs.o)
 TRIDENT_INC := $(INC_KERNEL) -I. -I$(TRIDENT_OUT)
 $(addprefix $(TRIDENT_OUT)/,$(addsuffix .o,$(TRIDENT_PARTS))): $(TRIDENT_OUT)/%.o: drivers/video/trident/%.c $(TRIDENT_GEN) build/config.mk build/trident-module.mk
