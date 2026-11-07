@@ -174,8 +174,27 @@ static void test_cold_start(void)
     log_expect("detect",LOG_INJECT);
     svc_finish();
 }
+static void test_detect_state(void)
+{
+    log_fixture();
+    struct gf_io *io=&cint_prod.foundation.io;
+    u32 lock=0x99,owner=3,index=0x28;
+    assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&lock,true));
+    assert(!svc_index(io,SVC_CR,RECOVER_CR44,&owner,true));
+    assert(!io->write(io->opaque,0,SVC_CR,1,index));
+    svc_ctx.memory_prepare_attempted=true; svc_ctx.memory_prepare_rc=GF_SCRIPT_EIO;
+    cint_prod.feature5.last_rc=GF5_EBIOS; cint_prod.feature5.source_rc=GF_SCRIPT_EIO;
+    svc_detect_diagnostic(&svc_ctx,&cint_prod.feature5);
+    assert(startlog_equal("[gf4] detect state cr1f=99 cr44=3 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1\n"));
+    u32 value;
+    assert(!io->read(io->opaque,0,SVC_CR,1,&value) && value==index);
+    assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&value,false) && value==lock);
+    assert(!svc_index(io,SVC_CR,RECOVER_CR44,&value,false) && value==owner);
+    svc_finish();
+}
 void _start(void)
 {
+    test_detect_state();
     test_cold_start();
     const char *stages[]={"admission_close","rom_validate","scan_reserve",
         "objects_init","detect","surfaces","restore_drain","restore_matches","mode_calc",

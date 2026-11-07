@@ -620,7 +620,8 @@ static void scale_seed(enum gf3_fmt fmt, bool solid)
 /* Bounded evidence for the independent RGB/BT.601/FOH ideal.
  * RGB acceptance is unchanged; YUV remains observation-only.
  * fx/fy are unsigned source coordinates in 12.20. */
-#define TEST_SCALE_SAMPLES 8U
+/* Trial 5 covers 24 x 24 pixels per format; keep one RGB pixel per line. */
+#define TEST_SCALE_SAMPLES 576U
 static u32 scale_observed_rgb(const u8 *p)
 {
     u32 v = get_pixel(p, cpp(scale_compare_fmt));

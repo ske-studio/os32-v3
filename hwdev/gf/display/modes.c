@@ -376,6 +376,7 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
     for (u32 h=0;h<GF4_HEADS;h++)
         if (c->state->head[h].enabled || c->hold[h].pending) return GF4_EBUSY;
     c->state->nmodes=0;
+    c->state->edid_connector=GF4_CONNECTORS;
     u32 n=0;
     bool pinned[GF4_MODES]={false},truncated=false;
     i32 reason=0,rc=0;
@@ -438,6 +439,7 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
             if (surviving) first=false;
         }
         c->state->edid=e;
+        c->state->edid_connector=(u8)connector;
     }
     c->state->edid.truncated=truncated;
     c->state->nmodes=n; /* The only publication point. */
