@@ -1,8 +1,9 @@
-/* Loader loan/pin tests use actual body and HAL facade. No device operations
- * run here; real regs/device assembly is test_trident_lifecycle's oracle. */
+/* Actual loader/body/HAL assembly; case 65 initializes the real device over
+ * fake hardware and calls the core drawing entrypoints and public cursor hooks. */
 #include "drivers/video/trident/trident_module.c"
 #include "drivers/video/trident/trident_body.c"
 #include "lib/kstring.h"
+#include "trident_device_fake.h"
 #include "mm/kmalloc.h"
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
 static void finish(int line)
@@ -21,7 +22,7 @@ static struct module_record record;
 static struct trident_resources resources;
 static struct bootinfo bi;
 static u32 ops[4], mode, pins, prepares, aborts, rollbacks;
-static u8 client[1228800], regs[TRI_REG_MAPPED_BYTES], lfb[1228800];
+static u8 client[TRI_FAKE_REAL_BYTES], regs[TRI_REG_MAPPED_BYTES], lfb[1228800];
 /* Independent HAL descriptors: padded pitches, three public formats, selected
  * nondefault entry. No device initialization or register I/O is involved. */
 static GfxMode test_modes[] = {
@@ -33,7 +34,29 @@ static GfxMode test_modes[] = {
 static void optional_hook(void) { }
 static int failure_mode(void)
 { return mode==1 || mode==2 || mode==3 || mode==4 || mode==5 || mode==6 ||
-         mode==10 || (mode>=11 && mode<=36) || mode>=40; }
+         mode==10 || (mode>=11 && mode<=36) || (mode>=40 && mode<=64); }
+/* Use the core's actual public drawing dispatch on the published backend. */
+static struct trident_fake fake;
+static struct trident_io fake_io;
+static u32 status_reads;
+static int fake_read8(void *opaque, enum trident_space space, u32 off, u8 *v)
+{
+    if (space == TRI_SPACE_REGS && off == TRI_CR_COLOR + 6)
+        fake.regs[off] = ((status_reads++ % 4) == 0 || (status_reads % 4) == 0) ? 8 : 0;
+    return trident_fake_io.read8(opaque, space, off, v);
+}
+const GfxBackend *g_backend;
+static int gfx_started;
+#include "gfx/gfx_core_api.inc"
+int __wrap_trident_regs_bind(struct trident_device *d)
+{
+    trident_fake_bind(&fake, d);
+    d->res = &resources;
+    fake_io = trident_fake_io;
+    fake_io.read8 = fake_read8;
+    d->io = &fake_io;
+    return 0;
+}
 GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 const u32 trident_kexports[TRIDENT_IMPORT_COUNT]={0};
@@ -77,7 +100,7 @@ int module_start(struct module_handle h)
         (void **)&trident_backend_ops.cursor_show,(void **)&trident_backend_ops.vsync,
         (void **)&trident_backend_ops.page_flip,(void **)&trident_backend_ops.gamma,
         (void **)&trident_backend_ops.osri_show};
-    if (mode>=37) {
+    if (mode>=37 && mode<=64) {
         trident_backend_ops.modes=test_modes;
         trident_backend_ops.mode_count=3;
         trident_backend_ops.default_mode=1;
@@ -166,7 +189,17 @@ int __wrap_trident_backend_prepare(void)
  * nondefault formats). F6's transaction and arguments are tested separately;
  * this seam retains those descriptors through the I/O-free prepare call. */
 static int configure(const struct tri_mode *m, u32 bytes, bool final)
-{ (void)m; (void)bytes; CHECK(!final); return TRI_OK; }
+{
+    if (mode != 65) { (void)m; (void)bytes; CHECK(!final); return TRI_OK; }
+    u32 pitch = m->display_width * (m->bpp / 8u);
+    resources.client = client;
+    resources.client_bytes = pitch * m->vd;
+    resources.display = (struct tri_surface){0, pitch*m->vd, pitch, m->hd, m->vd,
+                                            m->bpp/8u, TRI_FMT_INDEX8};
+    resources.client_surface = resources.display;
+    ++resources.generation;
+    return TRI_OK;
+}
 extern char __executable_start[], _etext[], _end[];
 void _start(void)
 {
@@ -179,6 +212,14 @@ void _start(void)
         .pci={.bus=TRI_PCI_BUS,.slot=TRI_PCI_SLOT,.function=TRI_PCI_FUNCTION,
             .vendor=TRI_PCI_VENDOR,.device=TRI_PCI_DEVICE,.command=TRI_PCI_COMMAND,
             .bar0=TRI_BAR0_PHYS,.bar1=TRI_BAR1_PHYS}};
+    if (mode == 65) {
+        CHECK(!trident_fake_reset(&fake, client, sizeof(client), 0, 0));
+        resources = fake.resources;
+        resources.ready = true;
+        resources.client = client;
+        resources.client_bytes = sizeof(client);
+        resources.configure = configure;
+    }
     record.text=(u32)(uptr)__executable_start;
     record.text_size=(u32)(_etext-__executable_start);
     record.ro=(u32)(uptr)_etext; record.ro_size=(u32)(_end-_etext);
@@ -208,8 +249,7 @@ void _start(void)
         finish(0);
     }
     CHECK(!rc && pinned && pins==1 && prepares==1 && !armed);
-    CHECK(trident_context->backend==&candidate);
-    CHECK(gfx_backend_trident.bb_base==client && gfx_backend_trident.bb_size==sizeof(client));
+    CHECK(gfx_backend_trident.bb_base==client && gfx_backend_trident.bb_size==resources.client_bytes);
     if (mode==37 || mode==39) {
         CHECK(gfx_backend_trident.osri_show);
         CHECK(!!gfx_backend_trident.fill_rect==(mode==37));
@@ -222,6 +262,26 @@ void _start(void)
     if (mode==39) CHECK(trident_diagnostic_ops()->context->settings.no_accel &&
         gfx_backend_trident.set_mode && gfx_backend_trident.dpms);
     CHECK(trident_module_load()==MODULE_BUSY);
+    if (mode == 65) {
+        g_backend = &gfx_backend_trident;
+        g_backend->init();
+        GFX_ScreenInfo info;
+        CHECK(!g_backend->query(&info));
+        CHECK(!gfx_hw_fill_rect(0, 0, 8, 8, 3));
+        CHECK(!gfx_hw_blit(8, 0, 0, 0, 8, 8));
+        CHECK((info.flags & (GFX_CAP_HW_FILL | GFX_CAP_HW_BLT)) ==
+              (GFX_CAP_HW_FILL | GFX_CAP_HW_BLT));
+        CHECK(g_backend->selected_mode && g_backend->mode_count > 1);
+        static const u32 pixel = 0xffffffffu;
+        struct GfxCursorImage image = {&pixel, sizeof(pixel), sizeof(pixel), 1, 1, 0, 0};
+        CHECK(g_backend->cursor_image && g_backend->cursor_move && g_backend->cursor_show);
+        CHECK(!g_backend->cursor_image(0, &image));
+        CHECK(!g_backend->cursor_move(0, 4, 5));
+        CHECK(!g_backend->cursor_show(0, 1));
+        CHECK(gfx_counters.hw_ops >= 2);
+        g_backend->shutdown();
+        finish(0);
+    }
     if (mode==7 || mode==8) {
         rc=context.arm(trident_restore98,&resources,42);
         if (mode==7) {

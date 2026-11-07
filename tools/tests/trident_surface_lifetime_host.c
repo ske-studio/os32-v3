@@ -142,11 +142,11 @@ static void run(void)
     caller_access_leave(&previous);
     gfx_prepare_backend(); gfx_init();
     CHECK(g_backend == &gfx_backend_trident && gfx_is_started());
-    CHECK(!tri_hal_mode(8)); /* RGB565, 400 lines: reinit uses actual height. */
-    /* Direct HAL ScreenInit retains the selected shape. gfx_init chooses
-     * the default mode; Close/reselection above tests that core contract. */
+    CHECK(!tri_hal_mode(8)); /* RGB565, 400 lines before Close/reinit. */
+    /* Active HAL reinit closes first, then prepare selects the default.
+     * Never save the active Trident registers as the CUI return state. */
     gfx_backend_trident.init();
-    CHECK(gfx_backend_trident.probe() && device.screen_ready && device.mode.client.height == 400);
+    CHECK(gfx_backend_trident.probe() && device.screen_ready && device.mode.client.height == TRI_HEIGHT);
     SAY("GREEN lifetime: real prepare/core/resources/init, reinit, modes, Close/default, offscreen, lease revoke");
     die(0);
 }

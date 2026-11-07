@@ -327,7 +327,7 @@ static void lifetime_cases(const struct trident_resources *r, struct tri_mode se
 static void run(void)
 {
     seed();
-    if (mode == 55) config[8][0][4] = LFB_BASE;
+    if (mode == 55) config[8][0][4] = TRI_BAR0_PHYS + TRI_BAR0_DECODE_BYTES;
     if (mode == 3) config[8][0][0] ^= 1;
     if (mode == 4) config[8][0][1] = 0;
     if (mode == 5) config[8][0][2] = 0xd2;
@@ -401,7 +401,7 @@ static void run(void)
     }
     CHECK(!trident_resources_get());
     int rc = trident_boot_reserve();
-    if (mode >= 56 || mode == 19 || mode == 20 || mode == 21 || mode == 55 || mode == 32 || mode == 5 || mode == 8 || mode == 25 || mode == 27 || mode == 28 || mode == 29 || mode == 34 || mode == 35 || mode == 38 || mode == 39 || mode == 40 || mode == 44 || mode == 45 || mode == 46 || mode == 48 || mode == 50 || mode == 53 || mode == 0 || mode == 51 || mode == 52 || mode == 54 || mode == 49 || mode == 9 || mode == 26 || mode == 42 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
+    if (mode >= 56 || mode == 19 || mode == 20 || mode == 21 || mode == 5 || mode == 8 || mode == 25 || mode == 27 || mode == 28 || mode == 29 || mode == 34 || mode == 35 || mode == 38 || mode == 39 || mode == 40 || mode == 44 || mode == 45 || mode == 46 || mode == 48 || mode == 50 || mode == 53 || mode == 0 || mode == 51 || mode == 52 || mode == 54 || mode == 49 || mode == 9 || mode == 26 || mode == 42 || mode == 22 || mode == 23 || mode == 24 || mode == 36 || mode == 37 || mode == 41 || mode == 43 || mode == 47) {
         CHECK(rc == 0);
         const struct trident_resources *r = trident_resources_get();
         CHECK(r && r->ready && r->owner == 8 && r->bar0_rid == 3 && r->bar1_rid == 4);

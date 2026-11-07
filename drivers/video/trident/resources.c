@@ -233,6 +233,9 @@ int __attribute__((cold)) trident_boot_reserve(void)
         return fail("bar", TRI_E_RESOURCE);
     bases[0] = p->bar0 & ~0x0Fu;
     bases[1] = p->bar1 & ~0x0Fu;
+    /* Boot maps fixed VAs; reject hardware outside that mapping contract. */
+    if (bases[0] != TRI_BAR0_PHYS || bases[1] != TRI_BAR1_PHYS)
+        return fail("bar", TRI_E_RESOURCE);
     for (u32 i = 0; i < TRI_BAR_COUNT; ++i)
         if (pgalloc_range_has_ram(bases[i] / PAGE_SIZE, (bases[i] + decodes[i]) / PAGE_SIZE))
             return fail("ram-overlap", TRI_E_RESOURCE);

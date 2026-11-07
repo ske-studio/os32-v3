@@ -236,6 +236,10 @@ static void finish(u32 stage, int rc, bool recover)
 }
 static void init(void)
 {
+    if (device.active) {
+        int close_rc = trident_close(&device);
+        if (close_rc) { finish(TRI_STEP_RESTORE, close_rc, false); return; }
+    }
     device.last_rc = device.failed_step = 0;
     device.screen_ready = false;
     int rc = trident_backend_prepare();

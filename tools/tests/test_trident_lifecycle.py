@@ -14,6 +14,7 @@ DIR='drivers/video/trident/'
 SOURCES=('lifecycle','regs','probe','state_save','pc98_init','mode_640','route_ra266','vram','default_dac','state_restore','present','palette','screen','video','dpms','accel','cursor')
 WRAPS=('identify','capacity_plan','state_save','pc98_init','route_enable','adjust_frame','video_reset','screen_blank','state_restore','route_disable','regs_bind')
 MUTATIONS=[
+ ('close-before-init','backend_trident','if (device.active) {','if (false) {'),
  ('prepare-retry','backend_trident','    device.failed_step = 0;\n    device.last_rc = 0;','    if (device.last_rc) return device.last_rc;'),
  ('protect-inactive','regs','if (!d->active) return 0;', 'if (d->active) return 0;'),
  ('wait-twice','video','frame < 2','frame < 1'),

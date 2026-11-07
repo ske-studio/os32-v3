@@ -131,7 +131,9 @@ static int test(void) {
     CHECK(f.ext_dac[0x50]==255 && f.ext_dac[0x54]==255);
     CHECK(device.accel.initialized && device.cursor.available);
     CHECK(device.mode.client.off==device.mode.display.off && !f.resources.ram_fallback);
-    init(); static const u32 again[]={3,4,5,6,7,8,12,19,13,14,15,16,9}; CHECK(!order(again,13));
+    init(); static const u32 reinit[]={18,19,11,10,3,4,5,6,7,8,12,19,13,14,15,16,9};
+    static const u32 again[]={3,4,5,6,7,8,12,19,13,14,15,16,9};
+    CHECK(!order(reinit,17));
     CHECK(!device.last_rc && arms==1);
     enter();static const u32 vt[]={5,6,14,17}; CHECK(!order(vt,4));
     CHECK(!(f.sr[1]&32));

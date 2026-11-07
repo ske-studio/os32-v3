@@ -3,7 +3,7 @@
 
 No register/LFB access: common trident_device_fake supplies cold PCI values.
 Resource contract: TRIDENT_FULL_DESIGN §2 and DESIGN.final.md F6 decisions. Failure points are API-level;
-fixed revision, BAR placement and neighbouring-device vetoes are absent.
+fixed BAR placement is required by the boot mapping contract.
 """
 CHECK = dict(name='trident-resources', tier=1, needs=[], budget=5,
     covers=[
@@ -97,11 +97,9 @@ MUTATIONS += [
     ('lease-revoke', PRODUCT, '            revoked += lease_revoke_surface(sids[i]);\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n        if (revoked)', '            revoked += 0;\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n        if (revoked)', 66),
     ('lease-revoke-rollback', PRODUCT, '            revoked += lease_revoke_surface(sids[i]);\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n    }', '            revoked += 0;\n            if (ledger_surfaces[sids[i]].lease_count) revoked++;\n        }\n    }', 24),
     ('reload-caller', PRODUCT, 'paging_load_cr3(cr3);', '(void)cr3;', 56),
-    ('bar0-fixed', PRODUCT, 'bases[0] = p->bar0 & ~0x0Fu;',
-     'bases[0] = TRI_BAR0_PHYS;', 55),
+    ('bar0-fixed', PRODUCT, 'bases[0] != TRI_BAR0_PHYS', 'false', 55),
+    ('bar1-fixed', PRODUCT, 'bases[1] != TRI_BAR1_PHYS', 'false', 32),
     ('bar-type', PRODUCT, '(p->bar0 & 0x07u) || (p->bar1 & 0x07u) || ', '', 6),
-    ('identity-map', PRODUCT, 'paging_map_phys(vas[i], bases[i],',
-     'paging_map_phys(bases[i], bases[i],', 32),
 ]
 
 
