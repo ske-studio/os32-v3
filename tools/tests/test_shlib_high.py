@@ -27,7 +27,6 @@ def run(mutation=None):
         source = source.replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
         tmp = pathlib.Path(tmp)
-        (tmp / 'format.h').write_text('#include "os32_kapi_shared.h"\n#undef OS32X_HDR_VERSION\n#define OS32X_HDR_VERSION 5\n')
         (tmp / 'shlib_host_source.c').write_text(source)
         (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
         allocator = (ROOT / 'mm/pgalloc.c').read_text()
@@ -39,7 +38,7 @@ def run(mutation=None):
         includes = include_flags(ROOT) + ['-I' + str(tmp)]
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
-        cmd = ['gcc', '-include', str(tmp / 'format.h'), *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
+        cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
                *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:

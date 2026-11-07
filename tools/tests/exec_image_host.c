@@ -4,8 +4,6 @@
 #include "types.h"
 static u32 host_cr3;
 #include "exec.c"
-#undef OS32X_HDR_VERSION
-#define OS32X_HDR_VERSION 5
 #include "os32x_hdr.c"
 
 static void say(const char *s)
