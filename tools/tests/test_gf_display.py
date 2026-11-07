@@ -1833,7 +1833,7 @@ GF4_MUTATIONS += [
     ('scanlog', 'fan-off-once', 'hwdev/gf/therm.c',
      'if (!g->fan_off)\n        kprintf', 'if (true)\n        kprintf', 'fanless logs exactly once even on first poll'),
     ('scanlog', 'clock-off-once', 'hwdev/gf/feature5_service.c',
-     'if (g->busy || !thermal_live(g)) return 0;', 'if (g->busy || g->last_rc || !thermal_live(g)) return 0;', 'clock retries after a temporary failure'),
+     'if (!thermal_live(g)) return 0;', 'if (g->last_rc || !thermal_live(g)) return 0;', 'clock retries after a temporary failure'),
     ('scanlog', 'scan-log-start', 'drivers/video/geforce/backend_geforce.c',
      'SCAN_START, 4, &start', 'SCAN_START, 4, &config', 'scanlog_present'),
     ('scanlog', 'scan-log-pitch', 'drivers/video/geforce/backend_geforce.c',

@@ -73,12 +73,18 @@ void _start(void)
     reset(); check(GF5_EINVAL,101); assert(!h.calls[F5_GPIO_FIND]);
     assert(gf5_fan_check_cstate(0,50)==GF5_EINVAL);
     reset(); h.ctx.ch=0; check(GF5_EINVAL,50);
-    reset(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV); check(GF5_ENODEV,50);
+    reset(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV); check(0,50);
     reset(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP); check(GF5_ENOTSUP,50);
     reset(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_EBIOS); check(GF5_EBIOS,50);
-    reset(); line=8; check(GF5_ENOTSUP,50); /* present, unsupported NV40 pin */
-    reset(); direction=2; check(GF5_ENOTSUP,50); /* present input pin */
-    reset(); fan_table(1); rom[FAN]=0x11; check(GF5_ENOTSUP,50);
+    reset(); line=8; check(0,50); /* present, unsupported NV40 pin */
+    reset(); direction=2; check(0,50); /* present input pin */
+    reset(); fan_table(1); rom[FAN]=0x11; check(0,50);
+    /* Unknown versions need only their version byte; recognized tables
+     * must still validate the header and complete declared range. */
+    reset(); put32(POWER+0x58,SIZE-1); rom[SIZE-1]=0x11; check(0,50);
+    reset(); put32(POWER+0x58,SIZE-1); rom[SIZE-1]=0x10; check(GF5_EBIOS,50);
+    reset(); fan_table(1); rom[FAN+3]=255; check(GF5_EBIOS,50);
+    reset(); put32(POWER+0x58,SIZE); check(GF5_EBIOS,50);
     reset(); rom[BIT+13]=3; check(GF5_ENOTSUP,50);
     reset(); fan_table(1); rom[FAN+2]=1; check(GF5_EBIOS,50);
     reset(); rom[THERM+3]=255; check(GF5_EBIOS,50);
@@ -87,14 +93,14 @@ void _start(void)
     for (u32 fail=0;fail<2;++fail) {
         reset(); rom[THERM+3]=1; rom[THERM+4]=0x24;
         if (fail) gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV);
-        check(fail ? GF5_ENODEV : 0,50);
+        check(0,50);
         assert(h.calls[F5_ALLOC]==1 && h.calls[F5_FREE]==1);
     }
     /* Cached live state must not bypass fresh ROM/DCB validation. */
     reset(); h.ctx.fan.sensor_setup=0xff; h.ctx.fan.gpio_line=2;
     h.ctx.fan.method=GF5_FAN_PWM; h.ctx.fan.cstate=75;
     h.ctx.next_sensor=17; h.ctx.next_toggle=19;
-    gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV); check(GF5_ENODEV,50);
+    gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV); check(0,50);
     /* The normal path and resume retain ENODEV without programming an
      * invented PWM pin. Temperature setup remains independent. */
     reset(); gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENODEV);
@@ -106,5 +112,18 @@ void _start(void)
     assert(!gf5_therm_resume(&h.ctx,&saved));
     assert(h.display.calls[D_WRITE]==1 && h.display.calls[D_READ]==1);
     assert(!h.calls[F5_GPIO_SET]);
+    /* fannil: valid cstate changes and mode selection succeed, direct
+     * get and the internal set retain ENODEV without touching PWM/GPIO. */
+    for (u32 pin=0;pin<2;++pin) {
+        reset(); line=pin ? 8 : 2; direction=pin ? 0 : 2;
+        check(0,50);
+        assert(!gf5_fan_cstate(&h.ctx,50,0) && h.ctx.fan.cstate==50);
+        assert(!gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL));
+        assert(gf5_fan_get(&h.ctx,&duty)==GF5_ENODEV);
+        gf5_host_trace_clear(&h);
+        assert(!gf5_fan_cstate(&h.ctx,75,0) && h.ctx.fan.cstate==75);
+        assert(!h.display.nevents && !h.calls[F5_GPIO_GET] && !h.calls[F5_GPIO_SET]);
+        assert(!h.ctx.next_step && !h.ctx.next_toggle);
+    }
     gf2_host_exit(0);
 }
