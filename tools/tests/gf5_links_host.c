@@ -161,16 +161,39 @@ static void test_pause(void)
     fixture(); h.ctx.ch->state=GF2_OFF;
     assert(gf5_link_unpause(&h.ctx)==GF2_ESTATE && !h.ctx.accepting);
 }
+static void slow_pause(struct gf5_host *host,const struct gf5_host_event *e)
+{
+    if (e->op==F5_PAUSE) host->now+=GF2_TIMEOUT_US+111U;
+}
+static void idle_after_wait(struct gf4_host *host,const struct gf4_host_event *e)
+{
+    if (e->op==D_SLEEP && e->nth==1500U)
+        gf3_host_set(&host->base,0,TEST_GR_STATUS,TEST_SYNC_STALL);
+}
 static void test_idle(void)
 {
     fixture(); h.ctx.deadline=(u32)h.now+1500U;
     gf3_host_set(&h.display.base,0,TEST_GR_STATUS,TEST_BUSY|TEST_SYNC_STALL);
     assert(gf5_link_drain_pause(&h.ctx)==GF2_ETIME); error_is(GF2_ETIME);
-    assert(h.now==1600U && h.display.calls[D_SLEEP]==2 && !h.calls[F5_RESUME]);
+    assert(h.now==100U+GF2_TIMEOUT_US && h.display.calls[D_SLEEP]==2000U && !h.calls[F5_RESUME]);
     u32 sleeps=0;
     for (u32 i=0;i<h.display.nevents;++i) if (display_events[i].op==D_SLEEP) {
-        assert(display_events[i].a[0]==(sleeps ? 500U : 1000U)); ++sleeps;
+        assert(display_events[i].a[0]==1000U); ++sleeps;
     }
+    assert(sleeps==2000U);
+    /* nv04_gr_idle starts its full budget after pause, even when preceding
+     * work consumed the outer operation deadline. Busy may then clear. */
+    fixture(); h.observe=slow_pause; h.display.observe=idle_after_wait;
+    gf3_host_set(&h.display.base,0,TEST_GR_STATUS,TEST_BUSY);
+    assert(gf5_link_drain_pause(&h.ctx)==0);
+    assert(h.now==100U+GF2_TIMEOUT_US+111U+1500000U);
+    assert(h.display.calls[D_SLEEP]==1500U && h.display.calls[D_READ]==1501U);
+    assert(h.ctx.deadline==10000U && h.display.base.paused && !h.ctx.accepting);
+    /* Persistent busy still expires two seconds after the delayed pause. */
+    fixture(); h.observe=slow_pause;
+    gf3_host_set(&h.display.base,0,TEST_GR_STATUS,TEST_BUSY);
+    assert(gf5_link_drain_pause(&h.ctx)==GF2_ETIME); error_is(GF2_ETIME);
+    assert(h.now==100U+2U*GF2_TIMEOUT_US+111U && h.display.calls[D_SLEEP]==2000U);
     fixture(); h.ctx.deadline=(u32)h.now+GF2_TIMEOUT_US+1000U;
     gf3_host_set(&h.display.base,0,TEST_GR_STATUS,TEST_BUSY);
     assert(gf5_link_drain_pause(&h.ctx)==GF2_ETIME);
@@ -185,7 +208,7 @@ static void test_idle(void)
     fixture(); h.now=U32_MAX-499U; h.ctx.deadline=1000U;
     gf3_host_set(&h.display.base,0,TEST_GR_STATUS,TEST_BUSY);
     assert(gf5_link_drain_pause(&h.ctx)==GF2_ETIME);
-    assert((u32)h.now==1000U && h.display.calls[D_SLEEP]==2);
+    assert((u32)h.now==GF2_TIMEOUT_US-500U && h.display.calls[D_SLEEP]==2000U);
 }
 static void off_with_error(struct gf5_host *host,const struct gf5_host_event *e)
 {
