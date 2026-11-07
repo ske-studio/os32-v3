@@ -1,7 +1,7 @@
 """HW-BASIC §2 syntax and checked expression evaluation, libc-free ILP32."""
 CHECK = dict(name='hwb-parse-host', tier=1, budget=4.0, needs=[],
-    covers=['userland/shell/hwb_parse.c', 'userland/shell/hwb.h',
-            'kdebug/hwb_wire.h', 'include/types.h',
+    covers=['userland/shell/hwb_log.c', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c', 'userland/shell/hwb.h',
+            'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
             'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/hwb_parse_host.c', 'tools/tests/hwb_fake.h',
             'tools/tests/hwb_host.py', 'tools/tests/host32.py',

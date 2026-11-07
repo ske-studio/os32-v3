@@ -3,9 +3,9 @@ CHECK = dict(name='tri-burst', tier=1, needs=[], budget=15, covers=[
     'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'tools/tests/test_tri_burst.py',
     'tools/tests/tri_burst2_host.c', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-    'userland/shell/hwb.h', 'userland/shell/hwb_parse.c',
+    'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
     'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
-    'kdebug/hwb_wire.h', 'include/types.h',
+    'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
     'sdk/include/os32/os32_kapi_shared.h'])
 import json
 from pathlib import Path
@@ -25,6 +25,7 @@ def trial(mutation=None):
     code = r'''
 #include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_exec.c"
 #include "userland/shell/hwb_log.c"
 static const char *script = SCRIPT_DATA;

@@ -1,6 +1,7 @@
 /* Real executor against indexed VGA, DAC and byte-addressed LFB models. */
 #include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_exec.c"
 #include "userland/shell/hwb_log.c"
 /* SCRIPTS_DATA */
@@ -150,7 +151,7 @@ static int file(void *ctx,const char *path,char *buf,u32 cap,u32 *n) {
 static int find(void *ctx,u32 v,u32 d,u32 start,u32 *b,u32 cap) {
     (void)ctx;(void)v;(void)d;(void)start;(void)b;(void)cap; return 0;
 }
-static struct hwb_backend backend={0,bus,now,yield,point,line,file,find};
+static struct hwb_backend backend={0,0,bus,now,yield,point,line,file,find};
 static enum hwb_rc run(const char *s,u32 mode) {
     input=s; active_mode=mode; hwb_init(&st,&backend);
     struct hwb_initial init={"mode",mode};
