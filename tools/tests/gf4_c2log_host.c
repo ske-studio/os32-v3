@@ -8,7 +8,15 @@ static const char *log_inject_stage;
 static bool log_cold_devinit;
 static bool log_check_ddc;
 static u32 log_expected_engine;
+static bool log_probe_check;
+static u32 log_probe_count;
+static i32 log_detect_rc;
+static i32 log_before_probe_rc;
+static u32 log_port_calls;
 static void log_detect_ready(void);
+struct gf4_ctx;
+static i32 log_detect(struct gf4_ctx *,u32);
+static i32 log_probe(struct gf4_ctx *,u8,u32);
 static int log_same(const char *a,const char *b)
 {
     if (!a || !b) return a==b;
@@ -26,6 +34,37 @@ static int log_gate(const char *stage)
 #define _start c2svc_unused_start
 #include "gf4_c2svc_host.c"
 #undef _start
+static struct gf4_state log_detected;
+static i32 log_detect(struct gf4_ctx *c,u32 dl)
+{
+    i32 rc=gf4_detect(c,dl);
+    if (log_probe_check) {
+        log_detected=*c->state;
+        log_detect_rc=c->last_rc;
+    }
+    return rc;
+}
+static i32 log_probe(struct gf4_ctx *c,u8 bus,u32 dl)
+{
+    if (!log_probe_check) return gf4_ddc_probe(c,bus,dl);
+    assert(c->state->head[0].enabled && !c->accepting);
+    if (!log_probe_count) log_before_probe_rc=c->last_rc;
+    assert(bus==(log_probe_count ? 3 : 2));
+    assert(dl>cint_host.now);
+    /* Compare the whole detect-owned prefix: modes, attribution and EDID. */
+    u32 bytes=(u8 *)&c->state->head-(u8 *)c->state;
+    for (u32 i=0;i<bytes;++i)
+        assert(((u8 *)c->state)[i]==((u8 *)&log_detected)[i]);
+    ++log_probe_count;
+    return c->last_rc=bus==2 ? 0 : GF4_EDDC;
+}
+static i32 log_i2c(void *owner,u8 bus,struct gf4_i2c_port *out)
+{
+    assert(bus==2 || bus==3);
+    /* Port selection succeeds; the following real DDC probe sees NACK. */
+    if (++log_port_calls%2U==0) return GF4_EDDC;
+    return svc_i2c(owner,bus,out);
+}
 
 /* The same real restore implementation, with external dependency faults. */
 static bool log_after_pll,log_after_lut;
@@ -94,6 +133,12 @@ static int log_foundation_start(struct gf_display_context *l)
 }
 static i32 log_admission(void *owner,bool open)
 {
+    if (open && log_probe_check) {
+        assert(log_probe_count==2 && svc_ctx.last_rc==log_before_probe_rc);
+        u32 bytes=(u8 *)&svc_state.head-(u8 *)&svc_state;
+        for (u32 i=0;i<bytes;++i)
+            assert(((u8 *)&svc_state)[i]==((u8 *)&log_detected)[i]);
+    }
     if (log_gate(open ? "admission_open" : "admission_close")) return LOG_INJECT;
     return svc_admission(owner,open);
 }
@@ -249,6 +294,25 @@ static void test_detect_state(void)
 }
 void _start(void)
 {
+    /* Non-default buses distinguish connectors from I2C indices. Detect
+     * falls back; a later ACK must not rebuild its modes or hide its rc. */
+    log_fixture();
+    svc_ctx.nroutes=2;
+    svc_ctx.dcb.routes[1]=svc_ctx.dcb.routes[0];
+    for (u8 i=0;i<2;++i) {
+        svc_ctx.dcb.routes[i].connector=i;
+        svc_ctx.dcb.routes[i].i2c_index=i+2;
+        svc_ctx.dcb.i2c_rc[i+2]=0;
+    }
+    svc_links.i2c_port=log_i2c; log_port_calls=0;
+    log_probe_check=true; log_probe_count=0;
+    assert(!log_start());
+    assert(log_probe_count==2);
+    assert(log_port_calls==4);
+    assert(startlog_equal("[gf4] probe-after-mode conn=0 rc=0\n"
+                          "[gf4] probe-after-mode conn=1 rc=-405\n"));
+    assert(log_detect_rc==GF4_EDDC && svc_ctx.last_rc==log_detect_rc);
+    log_probe_check=false; svc_finish();
     test_enter_ddc_prepare();
     test_detect_state();
     test_cold_start();

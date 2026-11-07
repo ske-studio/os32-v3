@@ -183,6 +183,21 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('c2log', 'probe-after-mode-line', 'hwdev/gf/display/service.c',
+  '[gf4] probe-after-mode conn=%u rc=%d', '[gfX] probe-after-mode conn=%u rc=%d',
+  'post-mode probe line includes connector and actual rc'),
+ ('c2log', 'probe-after-mode-missing', 'hwdev/gf/display/service.c',
+  'if (!rc) svc_probe_after_mode(c);', 'if (rc) svc_probe_after_mode(c);',
+  'successful initial restore is followed by probes'),
+ ('c2log', 'probe-after-mode-bus', 'hwdev/gf/display/service.c',
+  'rc=gf4_ddc_probe(c,r->i2c_index,dl);', 'rc=gf4_ddc_probe(c,connector,dl);',
+  'probe uses the connector route bus'),
+ ('c2log', 'probe-after-mode-result', 'hwdev/gf/display/service.c',
+  'c->last_rc=saved_rc;', 'c->last_rc=GF4_EDDC; (void)saved_rc;',
+  'diagnostic keeps detect result before admission'),
+ ('c2log', 'probe-after-mode-state', 'hwdev/gf/display/service.c',
+  'c->deadline=saved_deadline;', 'c->deadline=saved_deadline; c->state->nmodes=0;',
+  'diagnostic keeps the detected mode table'),
  ('c2log', 'detect-prepare-unlock', 'hwdev/gf/display/service.c',
   'i32 rc=svc_index(io,SVC_CR,RECOVER_CR1F,&unlock,true);',
   'i32 rc=0; (void)unlock;', 'each enter unlocks extended CR before detect'),

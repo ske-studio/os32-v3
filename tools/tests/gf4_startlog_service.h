@@ -16,7 +16,8 @@ static i32 log_surfaces(struct gf3_service *s,const struct gf3_surface *scan,
 #define gf2_start(...) (log_gate("channel_start") ? LOG_INJECT : gf2_start(__VA_ARGS__))
 #define gf4_scan_reserve_initial(...) (log_gate("scan_reserve") ? LOG_INJECT : gf4_scan_reserve_initial(__VA_ARGS__))
 #define gf3_service_objects_init(...) (log_gate("objects_init") ? LOG_INJECT : gf3_service_objects_init(__VA_ARGS__))
-#define gf4_detect(...) (log_gate("detect") ? LOG_INJECT : gf4_detect(__VA_ARGS__))
+#define gf4_detect(...) (log_gate("detect") ? LOG_INJECT : log_detect(__VA_ARGS__))
+#define gf4_ddc_probe(...) log_probe(__VA_ARGS__)
 #define gf3_service_surfaces(...) (log_gate("surfaces") ? LOG_INJECT : log_surfaces(__VA_ARGS__))
 #include "../../hwdev/gf/display/service.c"
 #undef gf_master_enable
@@ -28,4 +29,5 @@ static i32 log_surfaces(struct gf3_service *s,const struct gf3_surface *scan,
 #undef gf4_scan_reserve_initial
 #undef gf3_service_objects_init
 #undef gf4_detect
+#undef gf4_ddc_probe
 #undef gf3_service_surfaces

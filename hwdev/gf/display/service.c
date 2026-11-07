@@ -458,6 +458,28 @@ static i32 svc_detect_prepare(struct gf_foundation *f)
     return rc;
 }
 
+/* Diagnostic only: compare DDC with the signal-producing initial mode.
+ * Keep detect's modes, EDID and result; each probe gets its own budget. */
+static void svc_probe_after_mode(struct gf4_ctx *c)
+{
+    i32 saved_rc=c->last_rc;
+    u32 saved_deadline=c->deadline;
+    for (u8 connector=0;connector<2;++connector) {
+        for (u32 i=0;i<c->nroutes;++i) {
+            const struct gf4_route *r=&c->routes[i];
+            if (r->connector!=connector || r->type==GF4_TV ||
+                r->i2c_index==U8_MAX) continue;
+            u32 dl;
+            i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);
+            if (!rc) rc=gf4_ddc_probe(c,r->i2c_index,dl);
+            kprintf(KLOG_ATTR,"[gf4] probe-after-mode conn=%u rc=%d\n",connector,rc);
+            break;
+        }
+    }
+    c->last_rc=saved_rc;
+    c->deadline=saved_deadline;
+}
+
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
     const char *stage="service_check";
@@ -541,6 +563,7 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         stage="initial_deadline";
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=svc_initial(c,dl,&stage);
+        if (!rc) svc_probe_after_mode(c);
     }
     if (!rc && g->heat.down_active) {
         struct gf5_clock current;
