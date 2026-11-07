@@ -31,7 +31,6 @@
  * for DRM BOs. No hardware register/method is introduced in this adapter. */
 #include "api.h"
 #include "stage.h"
-#include "probes.h"
 #include "../../../include/kprintf.h"
 #include "../internal.h"
 #include "../accel_service.h"
@@ -40,18 +39,6 @@
 #define GF_ROM_BIT_ONLY
 #include "../rom.inc"
 #undef GF_ROM_BIT_ONLY
-
-static struct probe_slot detect_pre, mode_post;
-static const struct probe_decl probe_decls[] = {
-    {"gf4.detect.pre", &detect_pre},
-    {"gf4.mode.post", &mode_post}
-};
-i32 gf4_get_probe_decls(const struct probe_decl **table, u32 *count)
-{
-    *table = probe_decls;
-    *count = sizeof(probe_decls) / sizeof(probe_decls[0]);
-    return 0;
-}
 
 /* C2-service owns the address; C4/kernel owns the borrowed state/helpers. */
 static struct gf4_ctx svc_production_ctx;
@@ -384,11 +371,7 @@ static i32 svc_initial(struct gf4_ctx *c,u32 dl,const char **stage)
     *stage="surfaces";
     i32 rc=gf3_service_surfaces(gf3_service_get(c->ch),&v->front,
                                c->test.value.owner ? &test : 0);
-    if (!rc) {
-        rc=gf4_display_restore_stage(c,initial,dl,stage);
-        /* Initial mode only; the shared restore path has no probe. */
-        if (!rc) PROBE_HIT(mode_post);
-    }
+    if (!rc) rc=gf4_display_restore_stage(c,initial,dl,stage);
     return rc;
 }
 
@@ -571,7 +554,6 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
     if (!rc) {
         c->ready=true;
         stage="detect";
-        PROBE_HIT(detect_pre);
         svc_detect_diagnostic(c,g);
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf4_detect(c,dl);

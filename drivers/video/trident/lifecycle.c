@@ -9,18 +9,6 @@
  * Cooperative switching serializes the backends. No 98 drawing here.
  */
 #include "trident.h"
-#include "probes.h"
-
-static struct probe_slot screeninit_post;
-static const struct probe_decl probe_decls[] = {
-    {"tri.screeninit.post", &screeninit_post}
-};
-i32 trident_get_probe_decls(const struct probe_decl **table, u32 *count)
-{
-    *table = probe_decls;
-    *count = sizeof(probe_decls) / sizeof(probe_decls[0]);
-    return 0;
-}
 
 static int failed(struct trident_device *d, u32 step, int rc)
 {
@@ -140,7 +128,6 @@ int trident_screen_init(struct trident_device *d)
     }
     d->screen_ready = true;
     d->step = TRI_STEP_ACTIVE;
-    PROBE_HIT(screeninit_post);
     return 0;
 }
 
