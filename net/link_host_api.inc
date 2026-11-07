@@ -38,6 +38,25 @@ void link_host_deadlines(void)
         if (e->state == LINK_H_RESP && e->recv_bytes >= e->length) continue;
         if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
         d->expired = 1;
+        /* Keep the existing session failure detector alive after local expiry
+         * (N4). RELEASE replaces request/body retransmission, and RELACK can
+         * still prove the peer is alive even though STALE rejects late data.
+         * Its dedicated slot survives close/owner exit and cannot be reused
+         * before RELACK or resync. Do not restart or shorten the old budget. */
+        e->rel_pending = 1;
+        e->rel_rid = e->rid;
+        e->rel_epoch = e->epoch;
+        if (!e->req_acked || e->wlen) {
+            e->rel_interval = LINK_RTO_TICKS;
+            e->rel_tick = e->last_tx_tick;
+            e->rel_tries = e->retries;
+            e->rel_due = e->req_due || e->w_due;
+        } else {
+            e->rel_interval = LINK_PROBE_TICKS;
+            e->rel_tick = e->last_rx_tick;
+            e->rel_tries = e->probes;
+            e->rel_due = 0;
+        }
         /* STALE excludes this slot from existing RX/TX/timers; the API maps
          * this local terminal cause to HOSTDOWN until the session changes. */
         e->state = LINK_H_STALE;
@@ -316,6 +335,7 @@ static void link_free_handle(struct link_handle *e, int idx)
         e->rel_rid = e->rid;
         e->rel_epoch = e->epoch;
         e->rel_tries = 0;
+        e->rel_interval = LINK_RTO_TICKS;
     }
     if (e->ring_owner) {
         e->ring_owner = 0;
