@@ -143,6 +143,69 @@ static int palette_write_dac6(struct trident_device *d,
     return TRI_OK;
 }
 
+/* xf86cmap.c:673-685: strict integer RGB sum comparison. */
+static u32 palette_color_sum(const u8 *color)
+{
+    return (u32)color[0] + color[1] + color[2];
+}
+
+/* CMapSetOverscan, xf86cmap.c:688-830. HAL indices are contiguous and
+ * ascending; preserve the reference's reverse full search and forward
+ * changed-entry search, including its different tie/black choices. */
+static int palette_set_overscan(struct trident_device *d, int first, int count)
+{
+    int overscan = d->overscan;
+    bool new_overscan = false;
+
+    if (d->mode.selected.depth != 8) {
+        /* TrueColor uses index zero regardless of the DAC ramp length. */
+        overscan = 0;
+        new_overscan = true;
+    } else {
+        if (!d->overscan_valid ||
+            (overscan >= first && overscan < first + count))
+            new_overscan = true;
+
+        if (new_overscan) {
+            int candidate = d->overscan_valid ? overscan :
+                            (int)TRI_DAC_COLORS - 1;
+            int i;
+            for (i = (int)TRI_DAC_COLORS - 1; i >= 0; --i) {
+                if (palette_color_sum(d->dac[i]) == 0) {
+                    overscan = i;
+                    break;
+                }
+                if (palette_color_sum(d->dac[i]) <
+                    palette_color_sum(d->dac[candidate]))
+                    candidate = i;
+            }
+            if (i < 0) overscan = candidate;
+        } else if (palette_color_sum(d->dac[overscan]) != 0) {
+            int old_overscan = overscan;
+            int candidate = overscan;
+            int i;
+            for (i = first; i < first + count; ++i) {
+                if (palette_color_sum(d->dac[i]) == 0) {
+                    overscan = i;
+                    break;
+                }
+                if (palette_color_sum(d->dac[i]) <
+                    palette_color_sum(d->dac[candidate]))
+                    candidate = i;
+            }
+            if (i == first + count) overscan = candidate;
+            if (overscan != old_overscan) new_overscan = true;
+        }
+    }
+    if (new_overscan) {
+        /* Like CMapSetOverscan, record selection before SetOverscan. */
+        d->overscan = (u8)overscan;
+        d->overscan_valid = true;
+        return tri_overscan(d, d->overscan);
+    }
+    return TRI_OK;
+}
+
 int trident_palette(struct trident_device *d, int first, int count, const u8 *rgb)
 {
     int rc = palette_range(d, first, count, rgb);
@@ -156,7 +219,9 @@ int trident_palette(struct trident_device *d, int first, int count, const u8 *rg
     u8 dac6[TRI_DAC_BYTES];
     for (int i = 0; i < count * GFX_RGB_COMPONENTS; ++i)
         dac6[i] = trident_palette_dac6(*rgb++, GFX_PALETTE_COMPONENT_BITS);
-    return palette_write_dac6(d, first, count, dac6);
+    rc = palette_write_dac6(d, first, count, dac6);
+    if (rc) return rc;
+    return palette_set_overscan(d, first, count);
 }
 
 int tri_palette_load_default(struct trident_device *d)
@@ -216,14 +281,22 @@ int tri_palette_load_default(struct trident_device *d)
     default:
         return TRI_E_INVAL;
     }
-    return palette_write_dac6(d, 0, count, rgb);
+    int rc = palette_write_dac6(d, 0, count, rgb);
+    if (rc) return rc;
+    return palette_set_overscan(d, 0, count);
 }
 
 int tri_palette_reload(struct trident_device *d)
 {
     if (!d) return TRI_E_INVAL;
-    if (d->mode.selected.depth == 8)
-        return palette_write_dac6(d, 0, TRI_DAC_COLORS, &d->dac[0][0]);
+    if (d->mode.selected.depth == 8) {
+        int rc = palette_write_dac6(d, 0, TRI_DAC_COLORS, &d->dac[0][0]);
+        if (rc) return rc;
+        /* CMapReinstallMap, xf86cmap.c:544-548: restore the saved index.
+         * An uninitialised map instead follows CMapRefreshColors. */
+        if (d->overscan_valid) return tri_overscan(d, d->overscan);
+        return palette_set_overscan(d, 0, TRI_DAC_COLORS);
+    }
     return tri_palette_load_default(d);
 }
 
