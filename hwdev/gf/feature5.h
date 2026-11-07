@@ -273,6 +273,12 @@ i32 gf5_tile_clear(struct gf5 *, u32 slot);
 i32 gf5_state_save(struct gf5 *, struct gf5_image **out);
 i32 gf5_state_restore(struct gf5 *, const struct gf5_image *);
 void gf5_state_free(struct gf5 *, struct gf5_image *);
+/* SAVED diagnostic only: replace dst's performance target from retained boot.
+ * Distinct complete/version-matched caller-owned images, dst == g->image.
+ * Preserve dst trip storage and all non-performance state; no device I/O.
+ * Only available fan policy requires matching trip counts. Epochs may differ. */
+i32 gf5_state_boot_target(struct gf5 *g, struct gf5_image *dst,
+                          const struct gf5_image *boot);
 
 i32 gf5_rom_acquire(struct gf5 *, const u8 *, u32, const struct gf_init_program *);
 void gf5_rom_release(struct gf5 *);
@@ -298,7 +304,7 @@ i32 gf5_service_init(struct gf_production *, struct gf4_ctx *, const struct gf5_
  * no-op; clock64 -> fan_tick. Never hook IRQ/geforce_tick/kernel idle. */
 i32 gf5_service_poll(struct gf5 *);
 /* Reread module slot per dispatch. SAVING/RESTORING: NULL. SAVED: only
- * restore/free/last_rc allowed. FAULT retains management while resources
+ * restore/free/last_rc/boot_target allowed. FAULT retains management while resources
  * remain. F3/F4 rendering stays closed until final successful RUN. */
 struct gf5_test_ops {
     struct gf5 *ctx;
@@ -328,5 +334,6 @@ struct gf5_test_ops {
     __typeof__(&gf5_state_free) state_free;
     __typeof__(&gf5_service_poll) service_poll;
     i32 (*last_rc)(struct gf5 *);
+    __typeof__(&gf5_state_boot_target) state_boot_target;
 };
 #endif

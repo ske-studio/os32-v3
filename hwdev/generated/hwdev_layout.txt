@@ -2678,7 +2678,7 @@ offset	struct gf5_stop_state.source_rc	12
 member_size	struct gf5_stop_state.source_rc	4
 offset	struct gf5_stop_state.state	0
 member_size	struct gf5_stop_state.state	4
-size	struct gf5_test_ops	108
+size	struct gf5_test_ops	112
 align	struct gf5_test_ops	4
 offset	struct gf5_test_ops.clock_calc	8
 member_size	struct gf5_test_ops.clock_calc	4
@@ -2714,6 +2714,8 @@ offset	struct gf5_test_ops.ram_prog	16
 member_size	struct gf5_test_ops.ram_prog	4
 offset	struct gf5_test_ops.service_poll	100
 member_size	struct gf5_test_ops.service_poll	4
+offset	struct gf5_test_ops.state_boot_target	108
+member_size	struct gf5_test_ops.state_boot_target	4
 offset	struct gf5_test_ops.state_free	96
 member_size	struct gf5_test_ops.state_free	4
 offset	struct gf5_test_ops.state_restore	92
@@ -5040,6 +5042,7 @@ enum	GF4_TMDS	2
 enum	GF4_TV	1
 enum	GF5T_ARG_HI	2
 enum	GF5T_ARG_LO	1
+enum	GF5T_BOOT_TARGET	29
 enum	GF5T_CLOCK_CALC	4
 enum	GF5T_CLOCK_PROG	5
 enum	GF5T_CLOCK_READ	3

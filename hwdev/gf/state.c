@@ -293,6 +293,36 @@ i32 gf5_state_restore(struct gf5 *g, const struct gf5_image *image)
     return state_result(g,0);
 }
 
+/* Diagnostic image edit only. The normal restore keeps nouveau's RAM ->
+ * fan/voltage/core ordering (clk/base.c:159-215,272-305). Like therm_resume,
+ * retain the destination's trip allocation; never transfer live policy. */
+i32 gf5_state_boot_target(struct gf5 *g, struct gf5_image *dst,
+                          const struct gf5_image *boot)
+{
+    if (!g || !dst || !boot || dst==boot) return state_reject(g,GF5_EINVAL);
+    if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
+        return state_reject(g,GF5_EBUSY);
+    if (g->phase!=GF5_SAVED || dst!=g->image || !dst->complete ||
+        !boot->complete || dst->version!=GF5_IMAGE_VERSION ||
+        boot->version!=GF5_IMAGE_VERSION) return state_reject(g,GF5_ESTATE);
+    if (boot->fan_available && dst->fan.ntrip!=boot->fan.ntrip)
+        return state_reject(g,GF5_ESTATE);
+    if (boot->fan_available) {
+        struct gf5_fan_trip *trip=dst->fan.trip;
+        dst->fan=boot->fan;
+        dst->fan.trip=trip;
+        for (u32 i=0;i<boot->fan.ntrip;++i) trip[i]=boot->fan.trip[i];
+    }
+    dst->clock=boot->clock;
+    dst->clock_raw=boot->clock_raw;
+    dst->requested_uv=boot->requested_uv;
+    dst->vid=boot->vid;
+    dst->fan_available=boot->fan_available;
+    dst->volt_available=boot->volt_available;
+    dst->clock_available=boot->clock_available;
+    return state_result(g,0);
+}
+
 void gf5_state_free(struct gf5 *g, struct gf5_image *image)
 {
     if (!g || !image || !g->links.free) return;

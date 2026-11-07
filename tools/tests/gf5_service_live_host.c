@@ -158,6 +158,124 @@ static void operation_deadlines(void)
     scanlog_clock_error=false;
 }
 
+/* Kernel allocation is the only replaced service seam. Two snapshots need
+ * distinct live allocations (the older scanlog allocator returns one page). */
+static u8 boot_arena[16U*1024U*1024U] __attribute__((aligned(4096)));
+static u32 boot_used,boot_freed;
+static i32 boot_alloc(void *owner,u32 bytes,void **out)
+{
+    assert(owner==&cint_prod.feature5);
+    u32 aligned=(bytes+15U)&~15U;
+    assert(aligned<=sizeof(boot_arena)-boot_used);
+    *out=boot_arena+boot_used; boot_used+=aligned; return 0;
+}
+static void boot_free(void *owner,void *ptr)
+{
+    assert(owner==&cint_prod.feature5 && ptr);
+    ++boot_freed;
+}
+/* Extend C1's two-page map fake to cover the real display reservations. */
+static u8 boot_vram[2U*1024U*1024U] __attribute__((aligned(4096)));
+static int boot_map(void *owner,const struct recover_bar_extent *bar,
+                    u32 bytes,volatile u8 **out)
+{
+    if (bar->base>=CINT_FB_PHYS && bar->base-CINT_FB_PHYS<sizeof(boot_vram)) {
+        u32 off=bar->base-CINT_FB_PHYS;
+        assert(bytes<=sizeof(boot_vram)-off);
+        *out=boot_vram+off; return 0;
+    }
+    return cint_map(owner,bar,bytes,out);
+}
+static int boot_unmap(void *owner,volatile u8 *ptr,u32 bytes)
+{
+    if ((uptr)ptr>=(uptr)boot_vram && (uptr)ptr<(uptr)boot_vram+sizeof(boot_vram))
+        return 0;
+    return cint_unmap(owner,ptr,bytes);
+}
+static const struct gf_instmem_map_ops boot_map_ops={boot_map,boot_unmap};
+/* Full production assembly: ROM performance selection, real RAM/core ops,
+ * ordinary A/B save/restore, retained extents, public boot_target and free. */
+static void boot_roundtrip(void)
+{
+    struct gf5 *g=&cint_prod.feature5;
+    scanlog_heat_fixture();
+    /* NV44A boot has no separate shader source. Keep zero available.
+     * Populate all four v2x PLL records, not only scanlog's pixel PLL. */
+    gf3_host_set(&cint_host,0,GF_PLL_GATE,0x3);
+    gf3_host_set(&cint_host,0,0x4008,0);
+    u32 first=GF_INIT_PLL_TABLE+GF_PLL_TBL_HDR_MIN;
+    for (u32 i=1;i<GF_PLL_TBL_COUNT;++i)
+        gf2_host_memcpy(scanlog_rom+first+i*GF_PLL_TBL_ENTRY_MIN,
+                       scanlog_rom+first,GF_PLL_TBL_ENTRY_MIN);
+    scanlog_put(S_PERF+2,1,1);
+    scanlog_put(S_PERF+8+6,108,2);
+    scanlog_put(S_PERF+8+11,216,2);
+    gf5_rom_release(g);
+    assert(!gf5_rom_acquire(g,scanlog_rom,sizeof(scanlog_rom),0));
+    struct gf5_links old=g->links;
+    const struct gf_instmem_map_ops *old_maps=g->ch->map_ops;
+    struct recover_bar_extent old_bar=g->ch->bar1;
+    void *old_fb=g->display->legacy->bar1_map;
+    g->display->legacy->bar1_map=(void *)(uptr)CINT_FB_PHYS;
+    g->ch->map_ops=&boot_map_ops;
+    g->ch->map_owner=&cint_prod;
+    g->ch->bar1=(struct recover_bar_extent){.base=CINT_FB_PHYS,
+        .length=GF_PRODUCTION_PFB_MIN,.valid=true};
+    g->links.alloc=boot_alloc; g->links.free=boot_free;
+    struct gf5_clock before,after,restored;
+    assert(!scanlog_f5_ops->clock_read(g,&before));
+    struct gf5_image *a=0,*b=0;
+    assert(!scanlog_f5_ops->state_save(g,&a) && a && a->complete);
+    assert(!scanlog_f5_ops->state_restore(g,a));
+    assert(!scanlog_f5_ops->perf_select(g,0));
+    assert(!scanlog_f5_ops->clock_read(g,&after));
+    assert(after.core_khz!=before.core_khz && after.mem_khz!=before.mem_khz);
+    assert(!scanlog_f5_ops->state_save(g,&b) && b && b!=a && b->complete);
+    u32 epoch=b->saved_epoch;
+    assert(!scanlog_f5_ops->state_boot_target(g,b,a));
+    assert(g->image==b && b->saved_epoch==epoch && a->saved_epoch!=epoch);
+    assert(!gf2_host_memcmp(&b->clock_raw,&a->clock_raw,sizeof(a->clock_raw)));
+    g->heat.down_active=true; g->heat.ceiling=(struct gf5_clock){1,1,1};
+    assert(scanlog_f5_ops->state_restore(g,b)==GF5_EBUSY);
+    g->heat.down_active=false;
+    assert(!scanlog_f5_ops->state_restore(g,b));
+    assert(!scanlog_f5_ops->clock_read(g,&restored));
+    assert(restored.core_khz==before.core_khz && restored.shader_khz==before.shader_khz);
+    assert(restored.mem_khz==before.mem_khz);
+    struct gf5_clock_raw raw;
+    assert(!gf5_clock_raw_save(g,&raw));
+    assert(!gf2_host_memcmp(&raw,&a->clock_raw,sizeof(raw)));
+    scanlog_f5_ops->state_free(g,a); scanlog_f5_ops->state_free(g,b);
+    assert(boot_freed==2 && !g->image);
+    g->links=old; g->ch->map_ops=old_maps; g->ch->bar1=old_bar;
+    g->display->legacy->bar1_map=old_fb;
+}
+/* The production service's memory-only management path works in SAVED,
+ * even with drawing closed. It must not pre-set busy before the body. */
+static void boot_management(void)
+{
+    struct gf5 *g=&cint_prod.feature5;
+    struct gf5_image a={.version=GF5_IMAGE_VERSION,.complete=true,
+        .clock={135000,0,270000},.clock_available=true,.saved_epoch=1},
+        b={.version=GF5_IMAGE_VERSION,.complete=true,.saved_epoch=2};
+    g->phase=GF5_SAVED; g->image=&b;
+    c1_clear_trace();
+    assert(scanlog_f5_ops->state_boot_target);
+    assert(!scanlog_f5_ops->state_boot_target(g,&b,&a));
+    assert(b.clock_available && b.clock.mem_khz==270000 && b.saved_epoch==2);
+    assert(!g->busy && g->phase==GF5_SAVED && g->image==&b);
+    assert(!cint_host.calls[H_READ] && !cint_host.calls[H_WRITE]);
+    g->busy=true;
+    assert(scanlog_f5_ops->state_boot_target(g,&b,&a)==GF5_EBUSY);
+    g->busy=false;
+    const struct gf5_test_ops *borrowed=scanlog_f5_ops;
+    scanlog_f5_ops=0;
+    assert(borrowed->state_boot_target(g,&b,&a)==GF5_EBUSY);
+    scanlog_f5_ops=borrowed;
+    g->phase=GF5_RUN;
+    assert(scanlog_f5_ops->state_boot_target(g,&b,&a)==GF5_ESTATE);
+    g->image=0;
+}
 static bool live_in_observe;
 static u32 live_reentries;
 static void live_observe(struct gf3_host *h,const struct gf3_host_event *e)
@@ -181,6 +299,8 @@ void _start(void)
     live_rejects();
     operation_deadlines();
     thermal_lifetime();
+    boot_roundtrip();
+    boot_management();
     live_old_observe=cint_host.observe;
     cint_host.observe=live_observe;
     struct gf5_thermal sample;

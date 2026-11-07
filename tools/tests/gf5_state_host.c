@@ -15,7 +15,7 @@
 #define LARGE_BYTES (9U*MIB)
 #define CURSOR_BYTES GF4_CURSOR_BYTES
 #define VRAM_BYTES (LARGE_BYTES+CURSOR_BYTES)
-#define ARENA_BYTES (VRAM_BYTES+64U*1024U) /* metadata and allocator alignment */
+#define ARENA_BYTES (2U*VRAM_BYTES+64U*1024U) /* metadata and allocator alignment */
 #define TRACE_CAP 512U /* two enumeration passes, 12 tiles and finite callbacks */
 #define BOOT_CORE_KHZ 300000U
 #define BOOT_MEM_KHZ 200000U
@@ -489,8 +489,91 @@ static void optional_capture(void)
     assert(!image->clock_available && image->volt_available && image->fan_available);
     gf5_state_free(&h.ctx,image);
 }
+/* Boot-target is a memory operation: old A epoch is intentionally different.
+ * Normal save/restore still own all device and reservation transitions. */
+static void boot_target(void)
+{
+    reset();
+    struct gf5_image *a=save(), *b=0;
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,a));
+    captured_clock.core_khz/=2;
+    captured_clock.mem_khz/=2;
+    captured_raw.nc^=1U; captured_raw.nn^=2U;
+    captured_raw.sc^=4U; captured_raw.mux^=8U;
+    h.ctx.fan.cstate=70; trips[0].duty=70;
+    check_deadline=false;
+    assert(!gf5_state_save(&h.ctx,&b));
+    assert(a!=b && a->saved_epoch!=b->saved_epoch && h.live_allocs==2);
+    struct gf5_image expected=*b;
+    expected.clock=a->clock; expected.clock_raw=a->clock_raw;
+    expected.requested_uv=a->requested_uv; expected.vid=a->vid;
+    expected.fan=a->fan; expected.fan.trip=b->fan.trip;
+    expected.fan_available=a->fan_available;
+    expected.volt_available=a->volt_available;
+    expected.clock_available=a->clock_available;
+    struct gf5_image original_a=*a;
+    struct gf5_fan_saved live_fan=h.ctx.fan;
+    struct gf5_heat_state live_heat=h.ctx.heat;
+    gf5_host_trace_clear(&h);
+    assert(!gf5_state_boot_target(&h.ctx,b,a));
+    assert(!h.nevents && !gf2_host_memcmp(b,&expected,sizeof(expected)));
+    assert(!gf2_host_memcmp(a,&original_a,sizeof(*a)));
+    assert(!gf2_host_memcmp(&h.ctx.fan,&live_fan,sizeof(live_fan)));
+    assert(!gf2_host_memcmp(&h.ctx.heat,&live_heat,sizeof(live_heat)));
+    assert(b->fan.trip!=a->fan.trip && b->fan.trip[0].duty==FAN_CSTATE);
+    a->fan.trip[0].duty=99;
+    assert(b->fan.trip[0].duty==FAN_CSTATE);
+    a->fan.trip[0].duty=FAN_CSTATE;
+    struct gf5_image before=*b;
+    /* Each rejection leaves every destination byte intact. */
+    for (u32 i=0;i<10;++i) {
+        i32 want=GF5_ESTATE;
+        switch (i) {
+        case 0: h.ctx.busy=true; want=GF5_EBUSY; break;
+        case 1: h.ctx.phase=GF5_SAVING; want=GF5_EBUSY; break;
+        case 2: h.ctx.phase=GF5_RESTORING; want=GF5_EBUSY; break;
+        case 3: h.ctx.phase=GF5_RUN; break;
+        case 4: a->complete=false; break;
+        case 5: b->complete=false; break;
+        case 6: a->version=0; break;
+        case 7: b->version=0; break;
+        case 8: ++a->fan.ntrip; break;
+        case 9: h.ctx.image=a; break;
+        }
+        struct gf5_image unchanged=*b;
+        assert(gf5_state_boot_target(&h.ctx,b,a)==want);
+        assert(!gf2_host_memcmp(b,&unchanged,sizeof(*b)) && !h.nevents);
+        *a=original_a; *b=before; h.ctx.image=b;
+        h.ctx.busy=false; h.ctx.phase=GF5_SAVED;
+    }
+    assert(gf5_state_boot_target(0,b,a)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,0,a)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,b,0)==GF5_EINVAL);
+    assert(gf5_state_boot_target(&h.ctx,b,b)==GF5_EINVAL);
+    a->fan_available=a->volt_available=a->clock_available=false;
+    a->fan.ntrip=0; /* no count comparison or fan mutation when unavailable */
+    struct gf5_fan_saved old_fan=b->fan;
+    assert(!gf5_state_boot_target(&h.ctx,b,a));
+    assert(!b->fan_available && !b->volt_available && !b->clock_available);
+    assert(!gf2_host_memcmp(&b->fan,&old_fan,sizeof(old_fan)));
+    *a=original_a;
+    /* Zero shader remains available and must not suppress the raw target. */
+    a->clock.shader_khz=0;
+    assert(!gf5_state_boot_target(&h.ctx,b,a) && b->clock_available);
+    assert(!b->clock.shader_khz);
+    h.ctx.heat.down_active=true; h.ctx.heat.ceiling.core_khz=1;
+    assert(gf5_state_restore(&h.ctx,b)==GF5_EBUSY);
+    h.ctx.heat.down_active=false;
+    captured_clock=a->clock; captured_raw=a->clock_raw;
+    begin_restore();
+    assert(!gf5_state_restore(&h.ctx,b));
+    gf5_state_free(&h.ctx,a); gf5_state_free(&h.ctx,b);
+    assert(!h.ctx.image && !h.live_allocs);
+}
 void _start(void)
 {
+    boot_target();
     diagnostic_conflict();
     optional_capture();
     roundtrip(); preallocation_failure(); save_failures(); restore_failures(); identities_and_guards();

@@ -259,6 +259,13 @@ static i32 service_state_restore(struct gf5 *g,const struct gf5_image *image)
     return rc;
 }
 
+static i32 service_state_boot_target(struct gf5 *g,struct gf5_image *dst,
+                                      const struct gf5_image *boot)
+{
+    i32 rc=service_check(g,true);
+    return rc ? rc : gf5_state_boot_target(g,dst,boot);
+}
+
 static void service_state_free(struct gf5 *g,struct gf5_image *image)
 {
     if (!service_check(g,true)) {
@@ -308,7 +315,8 @@ i32 gf5_service_init(struct gf_production *p,struct gf4_ctx *display,
         .gpio_find=service_gpio_find,.gpio_get=service_gpio_get,.gpio_set=service_gpio_set,
         .tile_find=service_tile_find,.tile_set=service_tile_set,.tile_clear=service_tile_clear,
         .state_save=service_state_save,.state_restore=service_state_restore,
-        .state_free=service_state_free,.service_poll=service_poll,.last_rc=service_last_rc
+        .state_free=service_state_free,.service_poll=service_poll,.last_rc=service_last_rc,
+        .state_boot_target=service_state_boot_target
     };
     service_publish(g);
     return 0;
