@@ -26,6 +26,7 @@ PPC_FLAGS = ["-mcpu=7450", "-m32", "-mbig-endian", "-msoft-float",
 
 # Keep generation failures separate from architectural dependencies.
 CAT_GENERATED = "generated"
+MAKE_TIMEOUT = 300  # seconds for each generated-header make
 GENERATED_RE = re.compile(r"fatal error: \w+_imports\.h:")
 gauge_classify = gauge.classify
 
@@ -63,7 +64,9 @@ def prepare_generated_headers():
            "SQLITE_GEN=build/out/ppc-gauge/sqlite"]
     records = []
     try:
-        expanded = subprocess.run(cmd + ["__ppc_headers"], input=query,
+        # Same make rules as a normal build, so a stale tracked kernel/module/module_schema.h
+        # is regenerated here too; everything else stays under build/out.
+        expanded = subprocess.run(cmd + ["__ppc_headers"], input=query, timeout=MAKE_TIMEOUT,
                                   cwd=root, env=env, text=True, capture_output=True)
         if expanded.returncode:
             raise RuntimeError(expanded.stderr.strip() or expanded.stdout.strip())
@@ -75,7 +78,7 @@ def prepare_generated_headers():
                 raise RuntimeError("generated header outside build/out: " + header)
         for header in headers:
             proc = subprocess.run(cmd + [header], input=query, cwd=root, env=env,
-                                  text=True, capture_output=True)
+                                  timeout=MAKE_TIMEOUT, text=True, capture_output=True)
             ok = proc.returncode == 0 and (root / header).is_file()
             record = {"header": header, "ok": ok}
             if not ok:
@@ -85,7 +88,7 @@ def prepare_generated_headers():
             records.append(record)
         includes = sorted({str(Path(r["header"]).parent) for r in records if r["ok"]})
         return ["-I" + path for path in includes], records
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print("生成ヘッダの準備失敗: %s" % exc, file=sys.stderr)
         return [], [{"ok": False, "reason": str(exc)}]
 
