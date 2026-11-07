@@ -121,6 +121,43 @@ static void thermal_lifetime(void)
 }
 
 static void (*live_old_observe)(struct gf3_host *,const struct gf3_host_event *);
+static void operation_deadlines(void)
+{
+    struct gf5 *g=&cint_prod.feature5;
+    struct gf_vram_reservation_node node={0};
+    assert(!gf_vram_reserve(g->ch,&node,g->ch->B-65536U,65536U,&node));
+    struct gf5_tile tile={.base=node.value.off,.bytes=65536U,.pitch=1024U,
+        .reservation_id=node.value.reservation_id,.generation=node.value.generation};
+    u32 slot;
+    assert(!scanlog_f5_ops->tile_find(g,&slot));
+    /* nouveau nv04_gr_idle starts a fresh 2000ms wait on every operation.
+     * Simulate user think time beyond the boot and previous call budgets. */
+    cint_host.now=g->deadline+100000000U;
+    u32 start=cint_host.now;
+    assert(!scanlog_f5_ops->tile_set(g,slot,&tile));
+    assert(g->deadline==start+GF2_TIMEOUT_US && g->tile_live[slot] && !g->busy);
+    cint_host.now=g->deadline+100000000U;
+    start=cint_host.now;
+    assert(!scanlog_f5_ops->tile_clear(g,slot));
+    assert(g->deadline==start+GF2_TIMEOUT_US && !g->tile_live[slot] && !g->busy);
+    assert(!gf_vram_release(g->ch,&node.value));
+    /* Even rejected requests enter with a current outer budget. */
+    cint_host.now=g->deadline+100000000U;
+    start=cint_host.now;
+    assert(scanlog_f5_ops->ram_prog(g,0)==GF5_EINVAL);
+    assert(g->deadline==start+GF2_TIMEOUT_US && !g->busy);
+    cint_host.now=g->deadline+100000000U;
+    start=cint_host.now;
+    assert(scanlog_f5_ops->perf_select(g,255)==GF5_ENOTSUP); /* fixture's v0x20 */
+    assert(g->deadline==start+GF2_TIMEOUT_US && !g->busy);
+    scanlog_clock_error=true;
+    c1_clear_trace();
+    assert(scanlog_f5_ops->tile_clear(g,slot)==GF5_EIO);
+    assert(g->source_rc==-901 && g->last_rc==GF5_EIO && !g->busy);
+    assert(!cint_host.calls[H_READ] && !cint_host.calls[H_WRITE]);
+    scanlog_clock_error=false;
+}
+
 static bool live_in_observe;
 static u32 live_reentries;
 static void live_observe(struct gf3_host *h,const struct gf3_host_event *e)
@@ -142,6 +179,7 @@ void _start(void)
     scanlog_map(SCANLOG_BAR0,0x101000U);
     scanlog_init();
     live_rejects();
+    operation_deadlines();
     thermal_lifetime();
     live_old_observe=cint_host.observe;
     cint_host.observe=live_observe;
