@@ -1,5 +1,7 @@
 ## 第5部 デバイスドライバ
 
+PCI 装置の設計・実装の共通の注意は [POLICY_PCIDEV.md](POLICY_PCIDEV.md)。
+
 ### §5-1 キーボード (kbd.c / kbd.h)
 
 PC-98キーボードコントローラ制御。IRQ1割り込みハンドラで入力を取得。
