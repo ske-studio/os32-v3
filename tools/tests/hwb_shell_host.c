@@ -1,6 +1,10 @@
 /* Real shell adapters/parser/exec/logger. Only KernelAPI and bus are fake. */
-/* gf_regs.hwb reads CR00-CR9F in a loop: each command logs begin/end. */
-#define HWBF_LINES 4096U
+/* tri_w32.hwb completes on the byte-cell bus with 65,306 events and 28,665
+ * lines: 22,308 accesses + 14,333 points + 28,665 lines. Palette save/restore
+ * alone executes 762/768 six-command iterations; these are bounded loops.
+ * Keep the full trace, with headroom, local to this shell integration test. */
+#define HWBF_EVENTS 131072U
+#define HWBF_LINES 32768U
 #include "hwb_fake.h"
 #include "userland/shell/shell.h"
 #include "pci_dev_contract.h"
@@ -259,6 +263,11 @@ static void scripts(void)
             /* §8 example BAR1, independent from shell address resolver. */
             struct hwbf_pci *p = hwbf_add_pci(&bus, HW_BDF(0,8,0), 0x1023, 0x9660);
             p->config[0x17] = 0x20; p->config[0x16] = 0x40; /* BAR1 0x20400000 */
+            if (hwbf_equal(script->name, "tri_w32.hwb")) {
+                p->config[0x13] = 0x20; /* BAR0 0x20000000 */
+                for (u32 n = 0; n < 32; n++)
+                    *hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) = 0x80U + n;
+            }
             if (hwbf_equal(script->name, "gf_regs.hwb") || hwbf_equal(script->name, "gf_palette.hwb")) {
                 /* Ra266 GeForce 0:13.0, BAR0 0x24000000 (RA266 §1-1). */
                 struct hwbf_pci *g = hwbf_add_pci(&bus, HW_BDF(0,13,0), 0x10de, 0x0221);
@@ -279,6 +288,11 @@ static void scripts(void)
             if (hwbf_equal(script->name, "np21w_loop.hwb")) { bus.point_at = 8; expected = 130; }
             const char *arg = mode == 1 ? "mode=1" : mode == 2 ? "mode=2" : 0;
             CHECK(command("run", script->name, arg) == expected && !live);
+            if (hwbf_equal(script->name, "tri_w32.hwb")) {
+                CHECK(scalar("same") == 1);
+                for (u32 n = 0; n < 32; n++)
+                    CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) == 0x80U + n);
+            }
             if (hwbf_equal(script->name, "np21w_gdc.hwb")) CHECK(*hwbf_byte(&bus, HW_IO, 0x68) == 0x0F);
             if (hwbf_equal(script->name, "np21w_tvram.hwb")) CHECK(*hwbf_byte(&bus, HW_PHYS, TVRAM_SPARE) == 0);
             if (hwbf_equal(script->name, "trident.hwb")) {

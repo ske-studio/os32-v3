@@ -7,6 +7,7 @@ CHECK = dict(name='hwb-shell-host', tier=1, budget=8.0, needs=[], covers=[
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py',
     'tools/tests/kernel_includes.py'])
 import json
+import re
 from argparse import Namespace
 from pathlib import Path
 import sys
@@ -70,12 +71,25 @@ def inspect_records(output):
                         'hw mmioread8 phys missing -> x', 'echo $?']:
                     raise AssertionError('real unresolved capture failed: ' + body)
         # Removing a begin leaves an end-only record (supported by collector).
-        # Removing any end or terminal must make the capture incomplete.
+        # Removing every end must leave its begin pending at the next record.
+        # Check that local transition (renumbered from 1) rather than rescan
+        # the entire run for every deletion: palette loops emit 28k+ rows.
+        # The complete unmodified run was checked above.
         for i, row in enumerate(rows):
-            if ' phase=end ' in row or (' op=end ' in row and ' phase=' not in row):
-                _, missing = rshell_hwb.inspect('\n'.join(rows[:i] + rows[i+1:]))
-                if not missing:
+            if ' phase=end ' in row:
+                if i == 0 or ' phase=begin ' not in rows[i-1]:
+                    raise AssertionError('end lacks adjacent begin: ' + row)
+                begin = re.sub(r' seq=\d+ ', ' seq=1 ', rows[i-1])
+                following = re.sub(r' seq=\d+ ', ' seq=2 ', rows[i+1])
+                context = [begin, following]
+                if i + 1 != len(rows) - 1:
+                    context.append(rows[-1])
+                _, missing = rshell_hwb.inspect('\n'.join(context))
+                if not any(e.startswith('missing end seq=1 ') for e in missing):
                     raise AssertionError('missing line accepted: ' + row)
+        _, missing = rshell_hwb.inspect('\n'.join(rows[:-1]))
+        if 'missing terminal' not in missing:
+            raise AssertionError('missing terminal accepted: ' + rows[-1])
     if failures:
         raise AssertionError('serial integration:\n' + '\n'.join(failures))
     if not runs:
