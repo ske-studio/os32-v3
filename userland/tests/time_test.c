@@ -14,10 +14,9 @@
 /*    3. NULL — lo / hi のどちらが NULL でも負、出力は不変                    */
 /*    4. 交差 — 2 本の 4 バイト範囲が重なる (差 0〜3) なら負。差 4 は通る      */
 /*    5. ヒープ — malloc した番地 (これも非恒等写像) へ書ける                 */
-/*    6. `time_test ro` — **読み取り専用の USER ページ**を出力に渡す。        */
-/*       OS32 は CR0.WP = 0 なので、カーネルが止めなければ #PF も起きずに     */
-/*       書けてしまう (Codex 往復 10)。**期待は「アプリが kill される」**で、 */
-/*       この行の後に何も出なければ合格。出力が続いたら不合格。              */
+/*    6. `time_test ro` — 自分の .text (読み取り専用の USER ページ) を出力に */
+/*       渡す。ring3_user_ranges_writable が拒否してアプリを kill する。     */
+/*       「6 passing own .text」の後に「6 **NOT KILLED**」が出たら不合格。   */
 /*                                                                           */
 /*  ⚠ 未実装 (PM の NP21/W 側で見る): 「4 バイトが帯の境界を跨ぐ」と          */
 /*  「共有ライブラリの .text を出力に渡す」は、アプリ側から番地を安全に       */
@@ -113,9 +112,9 @@ int main(int argc, char **argv, KernelAPI *api)
 
     /* --- 6. 読み取り専用の USER ページ (明示的に頼んだときだけ) --- */
     if (argc > 1 && argv[1][0] == 'r' && argv[1][1] == 'o') {
-        /* このプログラム自身の .text。**期待は kill** — この後の行が
-         * 出たら、カーネルが読み取り専用の USER ページへの書き込みを
-         * 止めていない (CR0.WP = 0 なのでハードウェアも止めない)。
+        /* 自分の .text は読み取り専用の USER ページ。KAPI の出力先に
+         * 渡すと ring3_user_ranges_writable が拒否し、kill される。
+         * 「6 **NOT KILLED**」が出たら、出力先検査が効いていない。
          * 共有ライブラリの .text を渡す版は GUI を attach した試験が要る。 */
         u32 *code = (u32 *)(void *)main;
         api->kprintf(0xE1, "6 passing own .text (%p) as lo: expect kill\n",
