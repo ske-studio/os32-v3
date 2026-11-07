@@ -22,6 +22,7 @@ typedef i32 (*probe_get_decls_fn)(const struct probe_decl **table, u32 *count);
 #define PROBE_LIST 1U
 #define PROBE_ATTACH 2U
 #define PROBE_DETACH 3U
+#define PROBE_KDEBUG_OWNER 4U
 /* Broker results: ARG/BUSY/LIMIT use the existing kernel error numbers. */
 #define PROBE_ERR_ARG OS32_ERR_INVAL
 #define PROBE_ERR_BUSY OS32_ERR_BUSY
@@ -38,16 +39,18 @@ struct probe_info {
     struct module_handle owner;
     u32 id, enabled;
 };
-/* LIST copies RUNNING entries only, in id order; count is output. */
-struct probe_list { u32 count; struct probe_info points[PROBE_POINT_MAX]; };
+/* LIST copies RUNNING entries only, in id order; epoch includes all removals. */
+struct probe_list { u32 count; struct probe_info points[PROBE_POINT_MAX]; u32 epoch; };
 
 /* register is atomic; STARTING entries stay invisible until RUNNING.
  * One registration reference per point protects borrowed slots. Zero count is
  * a valid empty declaration table. Loaders call unregister before freeing an
  * owner, including startup rollback.
  * unregister stops the entire attachment before removing/reusing any ids.
- * Consumers must discard settings for removed registrations before rearming.
+ * Consumers must discard settings when LIST epoch changes before rearming.
  * DETACH takes the callback owner's handle and is idempotent when stopped.
+ * KDEBUG_OWNER returns the RUNNING kdebug handle without acquiring a reference;
+ * it takes sizeof(struct module_handle), otherwise returns PROBE_ERR_ARG.
  * Control buffers are trusted kernel buffers, never userspace wire payloads. */
 i32 debug_probe_register(struct module_handle owner,
                          const struct probe_decl *table, u32 count);

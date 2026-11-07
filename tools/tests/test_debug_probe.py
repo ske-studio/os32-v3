@@ -1,4 +1,4 @@
-"""A1 resident probe registry, ownership and synchronous slot publication (ILP32)."""
+"""Resident probe registry, owner lookup, epoch and slot publication (ILP32)."""
 CHECK = dict(name='debug-probe', tier=1, needs=[], budget=4,
     covers=['include/debug_probe.h', 'kernel/module/debug_probe.c',
             'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
@@ -17,6 +17,9 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/module/debug_probe.c'
 MUTATIONS = [
+    ('owner-running', 'if (r->state != MODULE_RUNNING) continue;', 'if (0) continue;'),
+    ('owner-kdebug', 'if (r->module_id != MODULE_ID_KDEBUG) continue;', 'if (0) continue;'),
+    ('unregister-epoch', '    if (found) registry_epoch++;', '    (void)found;'),
     ('empty-while-armed', '    if (!count) return 0;',
      '    if (!count) return attached ? PROBE_ERR_BUSY : 0;'),
     ('slot-range', '!contains(backing, r->pages * MODULE_PAGE_SIZE, slot, size)', '(0 && backing)'),

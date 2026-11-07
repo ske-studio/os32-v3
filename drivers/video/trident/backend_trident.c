@@ -197,7 +197,13 @@ int trident_backend_prepare(void)
         struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
         if (r->ram_fallback || device.settings.no_accel)
             provisional.display_width = provisional.hd;
-        else provisional.display_width = TRI_PITCH;
+        else {
+            provisional.display_width = TRI_PITCH;
+            if (device.preinit_done)
+                for (u16 i = 0; i < mode_count; ++i)
+                    if (modes[i].hw_mode == TRI_MODE_DEFAULT_ID)
+                        provisional.display_width = modes[i].pitch / (provisional.bpp / BITS_PER_BYTE);
+        }
         u32 bytes = (provisional.display_width * provisional.vd + TRI_PAGE_BYTES - 1u) & ~(TRI_PAGE_BYTES - 1u);
         if (device.settings.vram_bytes && bytes > device.settings.vram_bytes)
             return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_CAP_TOO_SMALL);

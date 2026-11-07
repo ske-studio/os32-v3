@@ -186,6 +186,9 @@ LIFETIME_MUTATIONS = [
     ('close-default', 'drivers/video/trident/backend_trident.c',
      'if (device.mode.valid) device.mode.selected = provisional;',
      'if (false) device.mode.selected = provisional;', 'lifetime'),
+    ('close-default-pitch', 'drivers/video/trident/backend_trident.c',
+     'provisional.display_width = modes[i].pitch / (provisional.bpp / BITS_PER_BYTE);',
+     'provisional.display_width = TRI_PITCH;', 'lifetime'),
 ]
 
 
@@ -209,12 +212,13 @@ def main():
             for m in MUTATIONS + LIFETIME_MUTATIONS:
                 # Check uniqueness in the actual source, even for expanded inc.
                 source(m[1], m)
-                result = entries(work, runners[0], m) if m[4] == 'entries' else core(runners[0], m) if m[4] == 'core' else lifetime(runners[0], m)
+                result = entries(work, runners[0], m) if m[4] == 'entries' else core(runners[0], m) if m[4] == 'core' else lifetime(runners[0], m, fallback=0 if m[0] == 'close-default-pitch' else 1)
                 assert result.returncode == 1 and ('RED ' in result.stdout or 'FAIL ' in result.stdout), (m[0], result)
                 print('MUTATE RED ' + m[0], flush=True)
-            result = lifetime(runners[0])
-            assert result.returncode == 0 and 'GREEN' in result.stdout, result
-            print('RESTORED ' + result.stdout.strip(), flush=True)
+            for fallback in (0, 1):
+                result = lifetime(runners[0], fallback=fallback)
+                assert result.returncode == 0 and 'GREEN' in result.stdout, result
+                print(f'RESTORED default={fallback} ' + result.stdout.strip(), flush=True)
     return 0
 
 
