@@ -5,6 +5,10 @@
  * width * height * cpp, not values read from the product under test. */
 #define GF4_HOST_UNIT 0
 #include "gf4_display_fake.h"
+#include "kprintf.h"
+#include <stdarg.h>
+
+i32 gf4_edid_modes(const u8 [128],u32,struct gf4_edid_state *);
 
 #define B0_DEPTHS 3U /* §3: INDEX8, RGB565, XRGB8888. */
 #define B0_MIXED_TIMINGS 3U /* The explicit xga/svga/vga list below. */
@@ -25,10 +29,37 @@ static const struct gf4_timing vga={25175,640,656,752,800,480,490,492,525,3};
 /* VESA DMT 800x600@60 and 1024x768@60, in generator-normalized units. */
 static const struct gf4_timing svga={40000,800,840,968,1056,600,601,605,628,0};
 static const struct gf4_timing xga={65000,1024,1048,1184,1344,768,771,777,806,3};
-static bool reject_head0,reject_port1;
+static bool reject_head0,reject_port1,slow_reads,dead_port0;
+static u32 timing_logs,vram_logs,pll_logs,ddc_logs,parser_logs;
+void __cdecl kprintf(u8 attr,const char *fmt,...)
+{
+    (void)attr;
+    va_list ap;
+    va_start(ap,fmt);
+    if (fmt[6]=='r') {
+        for (u32 i=0;i<6U;i++) (void)va_arg(ap,u32);
+        const char *reason=va_arg(ap,const char *);
+        i32 rc=va_arg(ap,i32);
+        assert(rc<0);
+        if (reason[0]=='t') timing_logs++;
+        else if (reason[0]=='V') vram_logs++;
+        else if (reason[0]=='P') pll_logs++;
+        else assert(false);
+    } else {
+        bool parser=false;
+        for (u32 i=0;fmt[i];i++) if (fmt[i]=='p' && fmt[i+1]=='a') parser=true;
+        if (parser) parser_logs++; else ddc_logs++;
+    }
+    va_end(ap);
+}
 static void observe(struct gf4_host *host,const struct gf4_host_event *e)
 {
     assert(host==&h);
+    if (dead_port0 && e->op==D_EDID && e->p[0]!=&h.ctx) {
+        struct gf4_edid_state *out=(struct gf4_edid_state *)e->p[1];
+        out->base_valid=true; out->ntiming=1; out->timing[0]=svga;
+        out->extensions=2;
+    }
     if (e->op==D_LOAD) {
         const struct gf4_route *r=e->p[1];
         assert(r && r->head<2U);
@@ -38,7 +69,16 @@ static void observe(struct gf4_host *host,const struct gf4_host_event *e)
     }
     if (reject_port1 && e->op==D_I2C_PORT && e->a[0]==1U)
         ((struct gf4_host_event *)e)->rc=GF4_ENODEV;
-    if (e->op==D_EDID && e->p[0]==&h.ctx) assert(e->a[2]==B0_DL);
+    if (e->op==D_EDID && e->p[0]==&h.ctx) {
+        assert(e->a[2]==(u32)*h.now+GF2_TIMEOUT_US);
+        if (slow_reads) {
+            *h.now+=GF2_TIMEOUT_US-1U;
+            if (dead_port0 && !e->a[0]) {
+                ++*h.now;
+                ((struct gf4_host_event *)e)->rc=GF4_ETIME;
+            }
+        }
+    }
 }
 static void fresh(u32 nroutes)
 {
@@ -55,7 +95,8 @@ static void fresh(u32 nroutes)
     for (u32 i=0;i<nroutes;i++) routes[i]=(struct gf4_route){
         .connector=(u8)i,.type=GF4_ANALOG,.head_mask=3,.or_mask=1
     };
-    reject_head0=reject_port1=false;
+    reject_head0=reject_port1=slow_reads=dead_port0=false;
+    timing_logs=vram_logs=pll_logs=ddc_logs=parser_logs=0;
 }
 static void expect_vga(const struct gf4_mode *m,u32 n)
 {
@@ -214,6 +255,86 @@ static void fairness(void)
     assert(!gf4_modes(&h.ctx,0,&m,&n) && n==GF4_MODES-B0_DEPTHS);
     assert(!gf4_modes(&h.ctx,1,&m,&n)); expect_vga(m,n);
 }
+/* The first port consumes a whole budget; the next connector still reads
+ * its base and extensions. A slow successful block must not shorten the
+ * following block, including across the u32 clock wrap. */
+static void block_budgets(void)
+{
+    fresh(2); routes[1].i2c_index=1;
+    state.edid.ntiming=1; state.edid.timing[0]=svga; state.edid.extensions=2;
+    slow_reads=dead_port0=true; *h.now=0xffff0000U;
+    assert(!gf4_detect(&h.ctx,1)); /* Expired lifecycle dl is irrelevant. */
+    const struct gf4_mode *m; u32 n;
+    assert(!gf4_modes(&h.ctx,0,&m,&n)); expect_vga(m,n);
+    assert(!gf4_modes(&h.ctx,1,&m,&n) && m[0].t.hd==800 && n==6);
+    assert(ddc_logs==4 && parser_logs==3);
+    fresh(1); slow_reads=true;
+    state.edid.ntiming=1; state.edid.timing[0]=xga; state.edid.extensions=2;
+    assert(!gf4_detect(&h.ctx,1) && state.modes[0].t.hd==1024);
+    assert(ddc_logs==3 && parser_logs==3);
+}
+static void native_and_diagnostics(void)
+{
+    fresh(1); state.edid.preferred=~0U; state.edid.ntiming=3;
+    state.edid.timing[0]=svga; state.edid.timing[1]=xga; state.edid.timing[2]=vga;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.hd==1024);
+    /* A valid preferred beats a larger mode. */
+    fresh(1); state.edid.preferred=0; state.edid.ntiming=2;
+    state.edid.timing[0]=svga; state.edid.timing[1]=xga;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.hd==800);
+    fresh(1); state.edid.preferred=~0U; state.edid.ntiming=2;
+    state.edid.timing[0]=vga; state.edid.timing[1]=vga;
+    state.edid.timing[1].khz=31500; /* Same size, 75 Hz wins over 60 Hz. */
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.khz==31500);
+    fresh(1); state.edid.preferred=~0U; state.edid.ntiming=2;
+    state.edid.timing[0]=(struct gf4_timing){50350,640,656,752,800,
+        960,980,984,1050,GF4_DBLSCAN|3}; /* Source 640x480, 60 Hz. */
+    state.edid.timing[1]=(struct gf4_timing){40000,640,656,752,800,
+        600,601,605,628,3}; /* Larger source height wins over doubled fields. */
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.vd==600);
+    fresh(1); state.edid.preferred=~0U; state.edid.ntiming=2;
+    state.edid.timing[0]=(struct gf4_timing){62940,640,656,752,800,
+        960,980,984,1050,GF4_DBLSCAN|3}; /* Source 640x480, 75 Hz. */
+    state.edid.timing[1]=vga;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.flags&GF4_DBLSCAN);
+    fresh(1); state.edid.preferred=0; state.edid.ntiming=2;
+    state.edid.timing[0]=xga; state.edid.timing[0].flags|=GF4_INTERLACE;
+    state.edid.timing[1]=svga;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.hd==800);
+    /* Unsupported preferred clock must not hide the other declared mode. */
+    fresh(1); state.edid.ntiming=2;
+    state.edid.timing[0]=xga; state.edid.timing[1]=svga;
+    routes[0].max_khz=40000;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.modes[0].t.hd==800 && pll_logs==3);
+    fresh(1); state.edid.ntiming=1; state.edid.timing[0]=xga;
+    state.edid.max_khz=40000; state.edid.range_valid=true;
+    assert(!gf4_detect(&h.ctx,B0_DL) && timing_logs==1);
+    fresh(1); h.base.ch.B=B0_VGA8_BYTES;
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==1 && vram_logs==2);
+}
+/* Real parser -> detect: an EDID DTD declares XGA, rather than injecting a
+ * pre-parsed timing. Bytes are E-EDID table 3.21's 1024x768@60 raster. */
+static void declared_edid(void)
+{
+    fresh(1);
+    gf2_host_memset(block,0,sizeof(block));
+    for (u32 i=1;i<7;i++) block[i]=0xff;
+    block[18]=1; block[19]=3; block[24]=2;
+    for (u32 i=38;i<54;i++) block[i]=1;
+    static const u8 dtd[18]={0x64,0x19,0x00,0x40,0x41,0x00,0x26,0x30,
+                            24,136,0x36,0,0,0,0,0,0,0x18};
+    for (u32 i=0;i<18;i++) block[54+i]=dtd[i];
+    u8 sum=0;
+    for (u32 i=0;i<127;i++) sum+=block[i];
+    block[127]=(u8)(0U-sum);
+    struct gf4_data_ops data=*h.ctx.data;
+    data.edid_modes=gf4_edid_modes; h.ctx.data=&data;
+    assert(!gf4_detect(&h.ctx,B0_DL));
+    assert(state.edid.base_valid && state.edid.ntiming==1 && state.edid.preferred==0);
+    assert(state.modes[0].t.hd==1024 && state.modes[0].t.vd==768 &&
+           state.modes[0].t.khz==65000 && state.nmodes==6);
+    assert(!timing_logs && !vram_logs && !pll_logs && ddc_logs==1 && parser_logs==1);
+}
 static void surfaces(void)
 {
     fresh(1);
@@ -245,7 +366,7 @@ static void surfaces(void)
 }
 void _start(void)
 {
-    fallback_and_ids(); candidates_and_heads(); failures(); ranges_and_tv(); fairness(); surfaces();
+    fallback_and_ids(); candidates_and_heads(); failures(); ranges_and_tv(); fairness(); surfaces(); block_budgets(); native_and_diagnostics(); declared_edid();
     __asm__ volatile("int $0x80" : : "a"(1),"b"(0));
     __builtin_unreachable();
 }

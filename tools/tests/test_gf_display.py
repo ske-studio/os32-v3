@@ -1703,9 +1703,41 @@ GF4_MUTATIONS += [
 
 # GF4 units 0..13 use the frozen A1 dependency boundary; UNIT14 links real
 # lifecycle components. A TU included by a fixture is never linked twice.
+GF4_MUTATIONS += [
+    ('b0', 'detect-block-budget', 'hwdev/gf/display/modes.c',
+     'i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);',
+     'i32 rc=0; dl=1;', 'block_budgets'),
+    ('b0', 'native-doublescan-height', 'hwdev/gf/display/modes.c',
+     'return (t->flags&GF4_DBLSCAN) ? t->vd/2U : t->vd;',
+     'return t->vd;', 'native_and_diagnostics'),
+    ('b0', 'native-doublescan-refresh', 'hwdev/gf/display/modes.c',
+     'u32 total=(u32)t->ht*t->vt;',
+     'u32 total=(u32)t->ht*t->vt; if (t->flags&GF4_DBLSCAN) total*=2U;',
+     'native_and_diagnostics'),
+    ('b0', 'native-largest', 'hwdev/gf/display/modes.c',
+     'if (t->hd<b->hd) continue;', 'if (t->hd>b->hd) continue;',
+     'native_and_diagnostics'),
+    ('b0', 'native-preferred', 'hwdev/gf/display/modes.c',
+     'if (best==e->preferred) continue;', 'if (false) continue;',
+     'native_and_diagnostics'),
+    ('b0', 'detect-parser', 'hwdev/gf/display/modes.c',
+     'rc=c->data->edid_modes(block,block_no,e);', 'rc=GF4_EEDID;',
+     'declared_edid'),
+    ('b0', 'detect-timing-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,-1,"timing/range",GF4_ERANGE);',
+     '(void)t;', 'native_and_diagnostics'),
+    ('b0', 'detect-vram-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,m.fmt,"VRAM/pitch",GF4_ERANGE);',
+     '(void)t;', 'native_and_diagnostics'),
+    ('b0', 'detect-pll-diagnostic', 'hwdev/gf/display/modes.c',
+     'reject_timing((u8)connector,t,m.fmt,"PLL",rc);',
+     '(void)t;', 'native_and_diagnostics'),
+]
+
+
 GF4_COMPONENTS = {
-    'b0': ['hwdev/gf/display/modes.c'],
-    'b01tv': ['hwdev/gf/display/modes.c', 'hwdev/gf/display/timing.c'],
+    'b0': ['hwdev/gf/display/modes.c', 'drivers/video/geforce/edid.c'],
+    'b01tv': ['hwdev/gf/display/modes.c', 'hwdev/gf/display/timing.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b1': ['hwdev/gf/display/'+n+'.c' for n in ('timing', 'format', 'fifo')],
     'b2': ['hwdev/gf/display/pll_program.c', 'kdebug/gfinit_pll.c'],
     'b2b': ['kdebug/gfinit_pll.c'],
