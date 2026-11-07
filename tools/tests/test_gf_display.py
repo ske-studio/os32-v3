@@ -847,8 +847,8 @@ GF4_MUTATIONS = [
  ('b7',
   'b7_retrace_inverted',
   'hwdev/gf/display/flip.c',
-  'if (status & FLIP_RETRACE) break;',
-  'if (!(status & FLIP_RETRACE)) break;',
+  'if (status & FLIP_RETRACE) { sample(&edge); break; }',
+  'if (!(status & FLIP_RETRACE)) { sample(&edge); break; }',
   'gf4_b7_host: high 即書込みと low→high'),
  ('b7',
   'b7_no_pending',
@@ -1693,6 +1693,16 @@ GF4_MUTATIONS += [
 ]
 
 GF4_MUTATIONS += [
+    ('b7', 'flip-edge-time', 'hwdev/gf/display/flip.c',
+     'sample(&edge); break;', 'break;', 'synchronized flip records the observed edge'),
+    ('b7', 'flip-pre-time', 'hwdev/gf/display/flip.c',
+     '    sample(&pre);', '    (void)pre;', 'pre-write timestamp and ordering'),
+    ('b7', 'flip-post-time', 'hwdev/gf/display/flip.c',
+     '    sample(&post);', '    (void)post;', 'post-write timestamp and ordering'),
+    ('b7', 'flip-early-log', 'hwdev/gf/display/flip.c',
+     '    rc = sync ? gf4_flip_complete(c, head, dl) : 0;',
+     '    diagnostic(head, sync, &edge, &pre, &post, 0);\n    rc = sync ? gf4_flip_complete(c, head, dl) : 0;',
+     'serial output must follow final flip completion'),
     ('b7', 'completed-hold-clear', 'hwdev/gf/display/flip.c',
      'c->hold[head] = (struct gf4_flip_hold){0};',
      'c->hold[head].pending = false;', 'completed hold must contain no stale surface keys'),
