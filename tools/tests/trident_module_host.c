@@ -21,7 +21,7 @@ int kstrcmp(const char *a,const char *b)
 static struct module_record record;
 static struct trident_resources resources;
 static struct bootinfo bi;
-static u32 ops[4], mode, pins, prepares, aborts, rollbacks;
+static u32 ops[5], mode, pins, prepares, aborts, rollbacks;
 static u8 client[TRI_FAKE_REAL_BYTES], regs[TRI_REG_MAPPED_BYTES], lfb[1228800];
 /* Independent HAL descriptors: padded pitches, three public formats, selected
  * nondefault entry. No device initialization or register I/O is involved. */
@@ -34,11 +34,17 @@ static GfxMode test_modes[] = {
 static void optional_hook(void) { }
 static int failure_mode(void)
 { return mode==1 || mode==2 || mode==3 || mode==4 || mode==5 || mode==6 ||
-         mode==10 || (mode>=11 && mode<=36) || (mode>=40 && mode<=64); }
+         mode>=66 || mode==10 || (mode>=11 && mode<=36) || (mode>=40 && mode<=64); }
 /* Use the core's actual public drawing dispatch on the published backend. */
 static struct trident_fake fake;
 static struct trident_io fake_io;
 static u32 status_reads;
+static bool probes_registered;
+i32 debug_probe_register(struct module_handle h, const struct probe_decl *t, u32 n)
+{ (void)h; CHECK(pinned && !prepares && !t && !n); if (mode==67) return -1; probes_registered=true; return 0; }
+i32 debug_probe_unregister(struct module_handle h)
+{ (void)h; probes_registered=false; return 0; }
+
 static int fake_read8(void *opaque, enum trident_space space, u32 off, u8 *v)
 {
     if (space == TRI_SPACE_REGS && off == TRI_CR_COLOR + 6)
@@ -61,16 +67,16 @@ GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 const u32 trident_kexports[TRIDENT_IMPORT_COUNT]={0};
 const struct module_symbol_contract trident_import_contracts[TRIDENT_IMPORT_COUNT]={{0}};
-const struct module_symbol_contract trident_export_contracts[3]={{0}};
+const struct module_symbol_contract trident_export_contracts[4]={{0}};
 const struct bootinfo *bootinfo_get(void) { return &bi; }
 int appslot_gfx_owner(void) { return 42; }
 int gfx_arm_emergency(int (*cb)(void *), void *opaque, u32 owner)
 { CHECK(pinned && cb && opaque && owner==42); return mode==8 ? -78 : 0; }
 const struct trident_resources *trident_resources_get(void) { return mode==1 ? 0 : &resources; }
-int trident_resources_rollback(bool after) { CHECK(!after); ++rollbacks; return 0; }
+int trident_resources_rollback(bool after) { CHECK(!after && !probes_registered); ++rollbacks; return 0; }
 int module_load(const struct module_request *q, struct module_handle *h)
 {
-    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==2);
+    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==3);
     CHECK(q->lifecycle.start==start && q->lifecycle.detach==detach);
     CHECK(q->path[0]=='/');
     if (mode==2) return -72;
@@ -87,6 +93,7 @@ int module_start(struct module_handle h)
     (void)h;
     CHECK(!trident_context && !pinned);
     if (mode==3) ops[3]=0;
+    if (mode==66) ops[4]=0;
     if (mode==4) trident_backend_ops.osri_show=(void *)1;
     if (mode==10) trident_backend_ops.prepare=0;
     void **required[]={(void **)&trident_backend_ops.probe,(void **)&trident_backend_ops.init,
@@ -170,7 +177,7 @@ void kfree(void *p) { (void)p; }
 int __wrap_trident_backend_prepare(void)
 {
     ++prepares;
-    CHECK(pinned && pins==1);
+    CHECK(pinned && pins==1 && probes_registered);
     CHECK(gfx_backend_trident.probe==missing_probe);
     if (mode==6) return -76;
     int rc=trident_backend_prepare();
@@ -225,8 +232,8 @@ void _start(void)
     record.ro=(u32)(uptr)_etext; record.ro_size=(u32)(_end-_etext);
     record.base=record.ro;
     record.pages=(record.ro_size+MODULE_PAGE_SIZE-1)/MODULE_PAGE_SIZE;
-    ops[0]=2; ops[1]=(u32)(uptr)trident_module_init;
-    ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98;
+    ops[0]=3; ops[1]=(u32)(uptr)trident_module_init;
+    ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98; ops[4]=(u32)(uptr)get_probe_decls;
     TridentModuleContext loan=context;
     GfxBackend out={0};
     CHECK(trident_module_init(0,&loan)==TRI_E_INVAL);
@@ -244,7 +251,7 @@ void _start(void)
     int rc=trident_module_load();
     if (failure_mode()) {
         CHECK(rc!=0 && gfx_backend_trident.probe==missing_probe);
-        CHECK(prepares==(mode==6 || (mode>=57 && mode<=58) || mode>=62));
+        CHECK(prepares==(mode==6 || (mode>=57 && mode<=58) || (mode>=62 && mode<=64)));
         if (pinned) CHECK(!trident_module_abort());
         finish(0);
     }

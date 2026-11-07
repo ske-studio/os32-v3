@@ -53,8 +53,8 @@ CONSTANTS = {
     'TRI_REG_MAPPED_BYTES': 65536, 'TRI_WIDTH': 640, 'TRI_HEIGHT': 480,
     'TRI_PITCH': 640, 'TRI_DISPLAY_BYTES': 307200, 'TRI_DISPLAY_PAGES': 75,
     'TRI_DAC_COLORS': 256, 'TRI_DAC_BYTES': 768, 'TRI_SAVED_BYTES': 852,
-    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 2,
-    'TRIDENT_MODULE_CONTEXT_SIZE': 40, 'TRIDENT_MODULE_OPS_SIZE': 16,
+    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 3,
+    'TRIDENT_MODULE_CONTEXT_SIZE': 40, 'TRIDENT_MODULE_OPS_SIZE': 20,
     'TRIDENT_DIAGNOSTIC_OPS_VERSION': 1, 'TRIDENT_DIAGNOSTIC_OPS_SIZE': 104,
     'TRI_MODE_COUNT': 15, 'TRI_FORMAT_COUNT': 5, 'TRI_E_NOSYS': -12,
     'GFX_EMERGENCY_KERNEL_OWNER': 0,
@@ -146,7 +146,7 @@ LAYOUTS = {
         write8=12, write16=16, write32=20, port8=24, write_span32=28)),
     'TridentModuleContext': (40, dict(backend=0, counters=4, resources=8,
         arm=12, height=16, flip=20, page=24, display_owner=28, size=32, diagnostic_out=36)),
-    'struct TridentModuleOps': (16, dict(version=0, initialize=4, prepare=8, restore=12)),
+    'struct TridentModuleOps': (20, dict(version=0, initialize=4, prepare=8, restore=12, get_probe_decls=16)),
     'struct trident_fake_event': (24, dict(space=0, offset=4, value=8, count=12,
         width=16, write=17, rc=20)),
 }
@@ -205,6 +205,7 @@ TYPES = {
     '((struct TridentModuleOps *)0)->initialize': 'int (*)(GfxBackend *, const TridentModuleContext *)',
     '((struct TridentModuleOps *)0)->prepare': 'int (*)(void)',
     '((struct TridentModuleOps *)0)->restore': 'int (*)(void *)',
+    '((struct TridentModuleOps *)0)->get_probe_decls': 'i32 (*)(const struct probe_decl **, u32 *)',
 }
 for bits in (8, 16, 32):
     TYPES[f'((struct trident_io *)0)->read{bits}'] = f'int (*)(void *, enum trident_space, u32, u{bits} *)'
@@ -260,7 +261,7 @@ MUTATIONS = (
     ('save-size', HEADER, 'TRI_SAVED_BYTES 852u', 'TRI_SAVED_BYTES 853u'),
     ('last-save-slot', HEADER, 'TRI_SAVE_SR0D = 851', 'TRI_SAVE_SR0D = 850'),
     ('decode-width', HEADER, 'TRI_BAR0_DECODE_BYTES 0x00400000u', 'TRI_BAR0_DECODE_BYTES 0x00200000u'),
-    ('module-version', MODULE, 'OPS_VERSION 2u', 'OPS_VERSION 1u'),
+    ('module-version', MODULE, 'TRIDENT_MODULE_OPS_VERSION 3u', 'TRIDENT_MODULE_OPS_VERSION 2u'),
     ('resource-owner-order', HEADER, 'owner, bar0_rid, bar1_rid', 'bar0_rid, owner, bar1_rid'),
     ('context-order', MODULE, 'int *height, *flip, *page;', 'int *flip, *height, *page;'),
     ('surface-pitch-order', HEADER, 'u32 off, bytes, pitch;', 'u32 off, pitch, bytes;'),

@@ -2,6 +2,8 @@
 
 > 状態: **実装中 (2026-11-05)** — 設計 ([HW_BASIC_DESIGN](../../decisions/realhw/HW_BASIC_DESIGN.md)) どおりの実装は main (a9819c78、CI で取り込み)。実機 Ra266 で `hw run /test/hw/trident.hwb` の mode=0/1/2 を流し、止まらずに通った (結果は TASK_TRIDENT_DRIVER §2-1 の 11-05)。次の段: `mmiofill` の追加 (TRIDENT_V6_DESIGN の段 2a、wt/trident-2a で実装中)。
 
+名前付き採取点の確定設計: [KDBG_PROBE_DESIGN](../../decisions/realhw/KDBG_PROBE_DESIGN.md)。
+
 ## 0. ユーザー決定 (原文)
 
 - 2026-10-21「Geforce が終わった後の Trident で実験しましょう」

@@ -116,8 +116,8 @@ static void start_failures(void)
 /* Header validation is independent of the producer: preserve the existing
  * KDEBUG fixture's valid layout, change only component ID and ops version.
  * No body CRC needs recomputing for the read-only header allocation check. */
-#define C3_CONTEXT_VERSION 5U
-#define C3_OLD_CONTEXT_VERSION 4U
+#define C3_CONTEXT_VERSION 6U
+#define C3_OLD_CONTEXT_VERSION 5U
 /* PM decision 23: GEFORCE budgets, docs/08_build.md:202. */
 #define C3_IMAGE_LIMIT (256U * 1024U)
 #define C3_MEM_LIMIT (256U * 1024U)
@@ -134,7 +134,7 @@ static void abi_check(void)
     for (u32 i=0; i<sizeof(rows)/sizeof(rows[0]); i++)
         if (rows[i].module_id==MODULE_ID_GEFORCE) gf=&rows[i];
     CHECK(gf && gf->ops_version==C3_CONTEXT_VERSION);
-    CHECK(gf->ops_slots==1 && gf->export_max==1);
+    CHECK(gf->ops_slots==2 && gf->export_max==2);
     CHECK(gf->image_max==C3_IMAGE_LIMIT && gf->mem_max==C3_MEM_LIMIT);
     CHECK(gf->load_span_max==C3_SPAN_LIMIT);
     CHECK(GEFORCE_MODULE_OPS_VERSION==C3_CONTEXT_VERSION);
@@ -161,6 +161,7 @@ static void abi_check(void)
 static void invalid_hooks(struct module_record *r)
 {
     GfxBackend saved=geforce_backend_ops;
+    r->exports[2]=(u32)(uptr)get_probe_decls;
     r->state=MODULE_STARTING;
     void *outside=(void *)(uptr)(r->text+r->text_size);
     enum { MODE, DPMS, IMAGE, MOVE, SHOW, VSYNC, FLIP, GAMMA, HOOK_COUNT };
@@ -176,7 +177,7 @@ static void invalid_hooks(struct module_record *r)
         case FLIP: geforce_backend_ops.page_flip=outside; break;
         case GAMMA: geforce_backend_ops.gamma=outside; break;
         }
-        CHECK(geforce_start(r,r->init,0)==MODULE_INIT_FAILED);
+        CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED);
         CHECK(!registered && !r->registration_refs);
         CHECK(!display_slot && !display_restore_slot && !accel_slot);
     }
@@ -266,3 +267,9 @@ void _start(void)
     CHECK(!context.display_data && !context.display_state);
     finish(0);
 }
+
+#define contains broker_contains
+#define entries broker_entries
+#include "kernel/module/debug_probe.c"
+#undef entries
+#undef contains
