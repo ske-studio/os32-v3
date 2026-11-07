@@ -38,7 +38,9 @@ void _start(void)
     for (u32 i=0; i<sizeof(names)/sizeof(*names); ++i) {
         char *args[] = {"gf2", "feature", (char *)names[i], "7", "65535"};
         assert(!shell_cmd_gf2(i==1 || i==2 ? 5:3, args));
-        assert(captured.test == 11 && captured.session == (i==1 || i==2 ? 0xffff0700U | i : i));
+        u32 expected = i==1 || i==2 ? 0xffff0700U | i : i;
+        if (i == GF5T_GPIO_GET || i == GF5T_GPIO_SET) expected |= GF5_WIRE_GPIO_TAG;
+        assert(captured.test == 11 && captured.session == expected);
     }
     const char *bad[] = {"", "-1", "+1", "65536", "4294967296", "12x", " 1"};
     for (u32 i=0; i<sizeof(bad)/sizeof(*bad); ++i) {

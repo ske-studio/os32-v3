@@ -223,7 +223,7 @@ MUTATIONS = [
     ('volt-upper', 'hwdev/gf/volt.c', 'if (candidate<uv || candidate>best_uv) continue;', 'if (candidate>uv || candidate>best_uv) continue;', 'volt'),
     ('volt-tie', 'hwdev/gf/volt.c', 'if (candidate<uv || candidate>best_uv) continue;', 'if (candidate<uv || candidate>=best_uv) continue;', 'volt'),
     ('volt-exact', 'hwdev/gf/volt.c', 'if (candidate==uv) break;', 'if (0) break;', 'volt'),
-    ('volt-mask', 'hwdev/gf/volt.c', 'return vid&t->mask;', 'return vid;', 'volt'),
+    ('volt-mask', 'hwdev/gf/volt.c', '    return vid;\n}', '    return vid&t->mask;\n}', 'volt'),
     ('gpio-polarity', 'hwdev/gf/volt.c', '==!!(log[1]&1);', '==!!(log[0]&1);', 'volt'),
     ('volt-min', 'hwdev/gf/volt.c', 'if (!voltage_map(g,min_id,&minimum) && minimum>request) request=minimum;', 'if (!voltage_map(g,min_id,&minimum) && minimum>request) request=0;', 'volt'),
     ('volt-direction', 'hwdev/gf/volt.c', '(condition<0 && request<prev)', '(condition<0 && request>prev)', 'volt'),
