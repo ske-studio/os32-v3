@@ -90,17 +90,20 @@ static u32 video_depth(const struct trident_device *d)
 
 int trident_video_reset(struct trident_device *d)
 {
+    static u32 key_depth; /* Single Trident device; depth of the packed key. */
     u32 depth;
     if (!d) return TRI_E_INVAL;
     depth = video_depth(d);
     /* V:356-362 adaptor setup, D:2090-2093 default packed color key.
-     * The first reset is ScreenInit; later surface resets preserve the key. */
-    if (!d->video.fix_frame && !d->video.hsync && !d->video.vsync) {
+     * Surface resets preserve the key until the framebuffer depth changes. */
+    if (key_depth != depth ||
+        (!d->video.fix_frame && !d->video.hsync && !d->video.vsync)) {
         if (depth == 8) d->video.color_key = 0xFF;
         else if (depth == 15) d->video.color_key = (1u << 10) | (1u << 5) | ((1u << 5) - 2);
         else if (depth == 16) d->video.color_key = (1u << 11) | (1u << 5) | ((1u << 5) - 2);
         else d->video.color_key = (1u << 16) | (1u << 8) | ((1u << 8) - 2);
         d->video.fix_frame = VIDEO_FIX_PERIOD;
+        key_depth = depth;
     }
     TRY(video_vblank(d));
     TRY(trident_indexed_write(d, d->cur_vga_base, 0x8E, 0x84));
@@ -331,7 +334,7 @@ int tri_video_put(struct trident_device *d, const struct tri_video_image *image,
 {
     struct tri_video_image layout;
     struct tri_rect s, box;
-    u32 pitch, top, left, pixels, lines, off, dh;
+    u32 pitch, top, left, pixels, lines, off, dh, dst_start;
     int rc;
     if (!d || !image || !image->data) return TRI_E_INVAL;
     layout = *image;
@@ -348,6 +351,8 @@ int tri_video_put(struct trident_device *d, const struct tri_video_image *image,
     top = s.y1 >> 16;
     left = (s.x1 >> 16) & ~1u;
     pixels = ((((s.x2 + VIDEO_FP - 1) >> 16) + 1) & ~1u) - left;
+    /* V:845-856: destination precedes YV12's source top even alignment. */
+    dst_start = d->video.allocation.off + top * pitch + left * 2;
     if (image->format == TRI_VIDEO_YV12) {
         top &= ~1u;
         lines = ((((s.y2 + VIDEO_FP - 1) >> 16) + 1) & ~1u) - top;
@@ -356,7 +361,7 @@ int tri_video_put(struct trident_device *d, const struct tri_video_image *image,
     }
     TRY(tri_sync(d));
     for (u32 row = 0; row < lines; ++row) {
-        u32 target = d->video.allocation.off + (top + row) * pitch + left * 2;
+        u32 target = dst_start + row * pitch;
         const u8 *y = image->data + image->offset[0] + (top + row) * image->pitch[0];
         if (image->format == TRI_VIDEO_YV12) {
             const u8 *v = image->data + image->offset[1] + ((top + row) / 2) * image->pitch[1];
@@ -541,6 +546,7 @@ int tri_video_poll(struct trident_device *d)
 {
     u32 now_ms;
     if (!d) return TRI_E_INVAL;
+    d->video.last_rc = 0;
     TRY(video_clock(d, &now_ms));
     tri_video_tick(d, now_ms);
     return d->video.last_rc;
