@@ -58,7 +58,7 @@
 # Same mode/save/restore as trident_mode.hwb; no full-screen paint or alias probe.
 # Each byte is printed as offset, expected, actual (hexadecimal values).
 # Results are observations, not proof of a PCI/cache cause. Mixed patterns => unknown.
-# normal=正常; lane-missing=レーンの欠け; address-unit=番地の単位; reversed=順が逆.
+# normal; lane-missing; address-unit; reversed (classification names).
  device d = bdf 0:8.0
  window v = bar d 1
  window f = bar d 0
