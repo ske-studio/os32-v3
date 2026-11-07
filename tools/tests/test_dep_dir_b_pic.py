@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l12_baseline.json'
 SOURCES = ('kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/pic.c', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c')
 HEADERS = ('include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-           'arch/x86/kernel/idt.h', 'arch/x86/kernel/gdt.h', 'kernel/time/pit_math.h')
+           'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'arch/x86/kernel/gdt.h', 'platform/pc98/pit_math.h')
 MUTATIONS = (
     ('platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
     ('platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),

@@ -21,12 +21,11 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l13_baseline.json'
-SOURCES = ('kernel/time/sysclk.c', 'kernel/time/pit.c', 'kernel/time/ktime.c',
-           'kernel/time/pit_math.c', 'kernel/time/time_math.c',
+SOURCES = ('kernel/time/sysclk.c', 'platform/pc98/pit.c', 'kernel/time/ktime.c', 'platform/pc98/clock_source.c', 'platform/pc98/pit_time.c',
+           'platform/pc98/pit_math.c', 'kernel/time/time_math.c',
            'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
-HEADERS = ('include/platform_timer.h', 'include/platform_irq.h',
-           'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h',
-           'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'kernel/time/pit_math.h', 'kernel/time/time_math.h',
+HEADERS = ('include/platform_timer.h', 'include/clock_source.h', 'platform/pc98/pit_time.h', 'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h',
+           'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'platform/pc98/pit_math.h', 'kernel/time/time_math.h',
            'kernel/time/ktime.h',
            'kernel/time/sysclk.h', 'kernel/v86/v86_bios.h')
 MUTATIONS = (
@@ -39,13 +38,11 @@ MUTATIONS = (
     ('platform/pc98/timer.c',
      '    out->p1 = platform_irq_timer_pending();',
      '    out->p1 = platform_irq_timer_pending();\n    out->p2 = platform_irq_timer_pending();'),
-    ('kernel/time/ktime.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
-    ('kernel/time/ktime.c', '        platform_timer_sample(&hw);',
+    ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
+    ('platform/pc98/clock_source.c', '        platform_timer_sample(&hw);',
      '        t = (unsigned int)tick_count;\n        platform_timer_sample(&hw);'),
-    ('kernel/time/ktime.c', 'if (lo) *lo = (u32)out_lo;',
-     'if (lo) *lo = (u32)out_lo ^ (attempt == 1);'),
-    ('kernel/time/ktime.c', 'if (hi) *hi = (u32)out_hi;',
-     'if (hi) *hi = (u32)out_hi ^ (attempt == 1);'),
+    ('platform/pc98/clock_source.c', '*lo = out_lo;', '*lo = out_lo ^ (attempt == 1);'),
+    ('platform/pc98/clock_source.c', '*hi = out_hi;', '*hi = out_hi ^ (attempt == 1);'),
     ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)s_last_us;'),
     ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
@@ -73,15 +70,15 @@ def build(work, clock_byte, mutation=None, baseline=None, retry_value=False):
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
     if baseline is None:
         clock = (work / 'kernel/time/sysclk.c').read_text()
-        pit = (work / 'kernel/time/pit.c').read_text()
-        ktime = (work / 'kernel/time/ktime.c').read_text()
+        pit = (work / 'platform/pc98/pit.c').read_text()
+        ktime = (work / 'platform/pc98/clock_source.c').read_text() + '\n' + (work / 'kernel/time/ktime.c').read_text()
     else:
         clock, idt, ktime = baseline
         pit = re.search(r'static struct pit_setup s_pit.*?^int pit_init\(unsigned int hz\)\n\{.*?^\}', idt, re.M | re.S)[0]
     for name, text in (('clock', clock), ('pit', pit), ('ktime', ktime)):
         (work / (name + '_source.inc')).write_text(text)
     exe = work / 'timer-test'
-    linked = ['kernel/time/pit_math.c', 'kernel/time/time_math.c']
+    linked = ['platform/pc98/pit_math.c', 'kernel/time/time_math.c', 'platform/pc98/pit_time.c']
     if baseline is None:
         linked += ['platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c']
     libgcc = subprocess.check_output([str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'), '-print-libgcc-file-name'], text=True).strip()
@@ -103,7 +100,12 @@ def verify(mutation=None):
     for byte in (0, 128):
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-timer-') as td:
             actual = trace(build(Path(td), byte, mutation))
-        assert actual == expected['traces'][str(byte)], (byte, actual)
+        baseline = list(expected['traces'][str(byte)])
+        # D: invalid setup is checked inside the saved-IF provider contract.
+        # Only these three NOSYS calls gain a balanced save/restore pair.
+        for at in (11, 10, 0):
+            baseline[at:at] = [['S', 0, 0, 0], ['F', 0, 0, 0]]
+        assert actual == baseline, (byte, actual)
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-retry-') as td:
             trace(build(Path(td), byte, mutation, retry_value=True))
     print('PASS L13 clock/default/once, PIT/fallback/state, sample7/tick, retry/clamp/IF/output', flush=True)

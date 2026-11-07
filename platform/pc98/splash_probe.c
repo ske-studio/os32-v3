@@ -1,3 +1,4 @@
+#include "pit.h"
 /* Diagnostic-only foreground scan measurements. No output inside a scan.
  * I/O: FreeBSD releng/10.4 sys/pc98/cbus/gdc.c:655,685,831 (BSD-3-Clause).
  * Timing: NEC Technical Databook Hardware (1993), p.350-351; design section 2. */

@@ -17,7 +17,7 @@
   python3 -B tools/tests/test_time_math.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='time-math-host', tier=4,
-    covers=['kernel/time/ktime.c', 'kernel/time/time_math.c', 'tools/tests/time_math_host.c', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'kernel/time/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['platform/pc98/clock_source.c', 'kernel/time/ktime.c', 'kernel/time/time_math.c', 'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h', 'kernel/time/time_math.h', 'tools/tests/time_math_host.c', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.233208)
 
 from kernel_includes import include_flags
@@ -36,6 +36,8 @@ SRC = ROOT / "kernel/time/time_math.c"
 # 固定するため (u64 が libgcc 経由で解けることもここで分かる)。
 TARGET_SRCS = [
     ("kernel/time/time_math.c", []),
+    ("platform/pc98/pit_time.c", []),
+    ("platform/pc98/clock_source.c", []),
     ("kernel/time/ktime.c", []),
 ]
 
@@ -85,24 +87,19 @@ MUTATIONS = [
 ]
 
 
-def host_build(tmp, source_text=None):
+def host_build(tmp, source_text=None, mutation_source=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "time-math-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
     if source_text is not None:
-        mut = src_dir / SRC.relative_to(ROOT).parent
-        mut.mkdir(parents=True, exist_ok=True)
-        (mut / "time_math.c").write_text(source_text, encoding="utf-8")
-        (mut / "time_math.h").write_text(
-            (ROOT / "kernel/time/time_math.h").read_text(encoding="utf-8"),
-            encoding="utf-8")
+        for rel in ("kernel/time/time_math.c", "kernel/time/time_math.h",
+                    "platform/pc98/pit_time.c", "platform/pc98/pit_time.h"):
+            dest = src_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(source_text if rel == mutation_source else (ROOT / rel).read_text())
         shim = src_dir / "harness.c"
-        shim.write_text(
-            HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/time/time_math.c"', '"kernel/time/time_math.c"'),
-            encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
-               *include_flags(ROOT), str(shim), "-o", str(exe)]
+        shim.write_text(HARNESS.read_text().replace('"../../', '"'))
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), *include_flags(ROOT), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -132,16 +129,18 @@ def build_target(tmp):
 
 
 def mutate(tmp):
-    original = SRC.read_text(encoding="utf-8")
+
     bad = 0
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
+        rel = "platform/pc98/pit_time.c" if i <= 6 else "kernel/time/time_math.c"
+        original = (ROOT / rel).read_text()
         mutated, n = re.subn(pattern, repl, original)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
             continue
         try:
-            exe = host_build(tmp, mutated)
+            exe = host_build(tmp, mutated, rel)
         except subprocess.CalledProcessError:
             print(f"MUTATION {i} INVALID (compile): {why}", flush=True)
             bad += 1

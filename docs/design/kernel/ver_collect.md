@@ -7,7 +7,7 @@
 
 | 行 | 出す値／取り方 | 取れないとき／意味の限界 |
 |---|---|---|
-| PIT | `8254 tick=100Hz input=1996800Hz`。pit_get_setup() の valid/hz/clk_hz（kernel/time/pit.c） | valid=0 なら `PIT: unknown`。PIT_HZ の表示だけで実設定を代用しない |
+| PIT | `8254 tick=100Hz input=1996800Hz`。pit_get_setup() の valid/hz/clk_hz（platform/pc98/pit.c） | valid=0 なら `PIT: unknown`。PIT_HZ の表示だけで実設定を代用しない |
 | KBD | `8251-compatible; IRQ1 (configured)`。既存 KBD IRQ 定義を使用 | ドライバ構成を表示。kbd_diag の IRQ 数ゼロを未搭載判定に使わず、I/O 読出しも不要 |
 | SER | `8251 baud=9600 mode=compat FIFO=yes/no`。serial_get_status()（drivers/char/serial.c:457） | 戻り負なら `SER: not initialized`。FIFO 搭載と VFAST 動作中を分ける |
 | SND | `OPN configured; PCM=CS4231-family/none`。FM 構成＋常駐 pcm_present()（drivers/sound/cs4231/pcm_module.c:61） | FM 実在は unknown。drivers/sound/fm/fm.c:54 の BUSY 成功はチップ同定ではない。PCM の none は未検出またはモジュール未読込 |

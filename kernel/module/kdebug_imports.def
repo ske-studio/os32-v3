@@ -900,7 +900,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "pit_get_setup",
-      "source": "arch/x86/kernel/idt.h",
+      "source": "platform/pc98/pit.h",
       "context_safe": false,
       "index": 111
     },
@@ -1028,7 +1028,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "time_branch_reset",
-      "source": "kernel/time/time_math.h",
+      "source": "platform/pc98/pit_time.h",
       "context_safe": false,
       "index": 127,
       "retained": true
@@ -1070,7 +1070,7 @@
       "stage": "S2",
       "kind": "GETTER",
       "symbol": "tick_count",
-      "source": "arch/x86/kernel/idt.h",
+      "source": "include/kernel_tick.h",
       "context_safe": false,
       "index": 132,
       "retained": true
@@ -1470,7 +1470,7 @@
       "stage": "S2",
       "kind": "PTR",
       "symbol": "time_branch_hits",
-      "source": "kernel/time/time_math.h",
+      "source": "platform/pc98/pit_time.h",
       "context_safe": false,
       "index": 181,
       "retained": true

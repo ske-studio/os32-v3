@@ -1,4 +1,4 @@
-#include "../../arch/x86/kernel/idt.h"
+#include "pit.h"
 #include "sysclk.h"
 #include "../../include/platform_timer.h"
 

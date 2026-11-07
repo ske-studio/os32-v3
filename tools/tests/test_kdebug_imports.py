@@ -101,7 +101,7 @@ class ImportsTests(unittest.TestCase):
         # which must still reference the retained storage.
         for obj, function, retired in (
                 (ROOT / 'build/out/obj/kernel/time/ktime.o', 'sys_time_now', 'time_test_feed'),
-                (ROOT / 'build/out/obj/kernel/time/time_math.o', 'time_decide', 'time_branch_hits')):
+                (ROOT / 'build/out/obj/platform/pc98/pit_time.o', 'time_decide', 'time_branch_hits')):
             with self.subTest(function=function):
                 code = subprocess.check_output([
                     str(self.cross / 'i386-elf-objdump'), '-dr',

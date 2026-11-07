@@ -33,16 +33,6 @@
       "survey_id": "A5"
     },
     {
-      "source": "kernel/time/ktime.c",
-      "header": "arch/x86/kernel/gdt.h",
-      "survey_id": "I3"
-    },
-    {
-      "source": "kernel/time/ktime.c",
-      "header": "arch/x86/kernel/idt.h",
-      "survey_id": "I3"
-    },
-    {
       "source": "mm/paging.c",
       "header": "kernel/v86/v86_mem.h",
       "survey_id": "V1"

@@ -1,3 +1,4 @@
+#include "pit.h"
 /* PC-98 PIT hardware only. Setup and time state belong to the kernel. */
 #include "platform_timer.h"
 #include "platform_irq.h"
