@@ -61,7 +61,9 @@ def dependency_checks(root, mutate):
     source = known['dependencies'][0]['source']
     header = known['dependencies'][0]['header']
     row = next(row for row in reduced['units'] if row['source'] == source)
-    row['dependencies'] = 'out.o: ' + source
+    # Drop only the first known pair; the same source may own several pairs.
+    kept = [entry['header'] for entry in known['dependencies'][1:] if entry['source'] == source]
+    row['dependencies'] = 'out.o: ' + ' '.join([source] + kept)
     assert any('stale known dependency' in error for error in audit.validate(reduced))
     trimmed = copy.deepcopy(known)
     trimmed['dependencies'].pop(0)
