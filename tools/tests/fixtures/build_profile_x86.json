@@ -93,6 +93,7 @@
     "kernel/module/hwdev_module.c",
     "kernel/module/module_image.c",
     "kernel/module/module_runtime.c",
+    "kernel/module/debug_probe.c",
     "kernel/console/unicode_file.c",
     "kernel/ime/fep_module.c",
     "drivers/ata/cd_module.c",
