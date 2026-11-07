@@ -74,6 +74,7 @@ static void op(struct logbuf *b, const struct hwb_log_record *r)
     else if (r->op == HWB_WAIT) str(b, "wait");
     else if (r->op == HWB_PRINT) str(b, "print");
     else if (r->op == HWB_LOG) str(b, "log");
+    else if (r->op == HWB_PROBE) str(b, "probe");
     else str(b, "unknown");
 }
 static void prefix(struct logbuf *b, const struct hwb_log_record *r, const char *phase)
@@ -106,7 +107,7 @@ static void destination(struct logbuf *b, const struct hwb_log_record *r)
 }
 void hwb_log_begin(const struct hwb_backend *backend, const struct hwb_log_record *r)
 {
-    if (r->op == HWB_BLOCK32) return; /* one completed record per block */
+    if (r->op == HWB_BLOCK32 || r->op == HWB_PROBE) return; /* one completed record per block */
     struct logbuf b; prefix(&b, r, "begin");
     if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL || r->op == HWB_POLL) address(&b, r, 1);
     if (r->op == HWB_FILL) { str(&b, " count="); dec(&b, r->count); }
@@ -155,4 +156,38 @@ void hwb_log_finish(const struct hwb_state *state)
 {
     struct logbuf b; b.n = 0; str(&b, "HW run="); dec(&b, state->run); str(&b, " op=end"); suffix(&b, state->rc);
     str(&b, " lines="); dec(&b, state->lines); str(&b, " writes="); dec(&b, state->writes); emit(state->backend, &b);
+}
+
+static const char *probe_rc_name(i32 rc)
+{
+    switch (rc) {
+    case PROBE_OK: return "OK"; case PROBE_ARG: return "ARG";
+    case PROBE_NOSYS: return "NOSYS"; case PROBE_WINDOW: return "WINDOW";
+    case PROBE_LIMIT: return "LIMIT"; case PROBE_BUSY: return "BUSY";
+    case PROBE_OVERFLOW: return "OVERFLOW"; case PROBE_SKIP: return "SKIP";
+    default: return "IO";
+    }
+}
+void hwb_log_probe(const struct hwb_backend *backend, const struct hwb_log_record *r,
+                   const struct probe_wire *w)
+{
+    struct logbuf b; prefix(&b,r,"end");
+    str(&b," action="); dec(&b,w->action);
+    if (w->name[0]) { str(&b," name=");
+        for (u32 n=0; n<sizeof(w->name) && w->name[n]; n++) ch(&b,w->name[n]); }
+    if (w->action == PROBE_CMD_LIST) { str(&b," id="); dec(&b,w->id); str(&b," enabled="); dec(&b,w->flags); }
+    if (w->hit) {
+        str(&b," hit="); dec(&b,w->hit); str(&b," item="); dec(&b,w->item);
+        str(&b," kind="); dec(&b,w->kind); str(&b," width="); dec(&b,w->width);
+        str(&b," addr="); hex(&b,w->address,1);
+        str(&b," data_addr="); hex(&b,w->data_address,1); str(&b," index="); dec(&b,w->index);
+        str(&b," val="); hex(&b,w->value,1);
+        str(&b," restore_rc="); str(&b,probe_rc_name(w->restore_rc));
+    }
+    if (w->action == PROBE_CMD_STATUS) {
+        str(&b," armed="); dec(&b,w->flags);
+        str(&b," captured="); dec(&b,w->captured); str(&b," dropped="); dec(&b,w->dropped);
+        str(&b," overflow="); dec(&b,w->overflow);
+    }
+    str(&b," rc="); str(&b,probe_rc_name(w->status)); emit(backend,&b);
 }

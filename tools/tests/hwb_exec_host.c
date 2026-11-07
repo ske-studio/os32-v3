@@ -1,6 +1,7 @@
 /* HW_BASIC_DESIGN §§2,3,7: real parser/logger/executor, only backend is fake. */
 #include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_log.c"
 #include "userland/shell/hwb_exec.c"
 

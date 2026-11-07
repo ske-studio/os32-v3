@@ -1,6 +1,8 @@
 /* libc-free ILP32: source is included, backend is the a0 fake only. */
 #include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
+#include "userland/shell/hwb_log.c"
 static struct hwb_program program;
 static struct hwb_state state;
 static struct hwb_fake fake;

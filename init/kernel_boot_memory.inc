@@ -44,10 +44,14 @@ static void kernel_boot_hostsvc(struct boot_context *boot)
      * original, later boot point remains unchanged. */
     boot_platform_run(BOOT_NIC_LEGACY, boot);
     boot_legacy_started = 1;
-    /* The existing loader starts AUTO without a peer. No users are published
-     * yet, so replace that binding before NETCD or /host can use it. */
-    net_unbind();
-    rc = net_start(NET_NIC_AUTO, have_peer ? boot_sfs_lan.peer : 0);
+    /* Preserve the loader's handshake when AUTO and peer are unchanged.
+     * A different binding can still be replaced before users are published. */
+    const u8 *net_peer = have_peer ? boot_sfs_lan.peer : 0;
+    rc = net_start(NET_NIC_AUTO, net_peer);
+    if (rc == OS32_ERR_BUSY) {
+        net_unbind();
+        rc = net_start(NET_NIC_AUTO, net_peer);
+    }
     if (rc) {
         net_start(NET_NIC_AUTO, 0);
     }
