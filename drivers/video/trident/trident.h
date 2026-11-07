@@ -576,6 +576,14 @@ int trident_palette(struct trident_device *, int first, int count, const u8 *rgb
 /* F8: dac6 は DAC の単位 (変換済み)。d->dac[first..first+count) を写すだけ、
  * I/O なし。範囲外は TRI_E_INVAL。 */
 int tri_palette_record(struct trident_device *, int first, int count, const u8 *dac6);
+/* F8 (F8 追記 2026-11-07、xf86cmap.c:254-275,525-665,855-904): 選択 mode の
+ * 深度の既定の DAC 表を作って書く。depth8 は system/cube/gray、15 は 0..31
+ * に i*63/31、16 は 0..63 に G=i・R/B は i<=31 で i*63/31 (ほかは 0)、24/32 は
+ * 0..255 に i*63/255。呼ぶ時点は F9 (ScreenInit の palette 段)。 */
+int tri_palette_load_default(struct trident_device *);
+/* F9 の Enter・F10 の mode 切替の後。depth8 は d->dac を書き直し、TrueColor は
+ * tri_palette_load_default。 */
+int tri_palette_reload(struct trident_device *);
 /* F9 target: ScreenInit PreInit once, then Save/PC98 Init/Mode/Enable/blank/
  * viewport/surfaces/Accel/Cursor/palette/DPMS registration/video reset.
  * NoAccel/SWCursor retain D:2065-2073 settings, not mandatory defaults.
