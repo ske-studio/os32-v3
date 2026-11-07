@@ -65,6 +65,8 @@ MUTATIONS += [
  ('cursor-byte-upload','cursor','if (d->res->ram_fallback) {','if (false) {'),
  ('overlay-byte-upload','video','((u32)v[x / 2] << 24);\n                if (d->res->ram_fallback)',
   '((u32)v[x / 2] << 24);\n                if (false)'),
+ ('overlay-packed-byte-upload','video','((u32)y[x + 3] << 24);\n                if (d->res->ram_fallback)',
+  '((u32)y[x + 3] << 24);\n                if (false)'),
 ]
 
 def main():

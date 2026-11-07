@@ -110,6 +110,12 @@ static void run(void)
     gfx_prepare_backend();
     CHECK(g_backend == &gfx_backend_trident && life_fake.operations == operations);
     CHECK(device.mode.selected.id == TRI_MODE_DEFAULT_ID);
+    /* A1 applies before init too: regen both surfaces to the built default. */
+    life_shape(1, TRI_RAM_FALLBACK_DEFAULT ? 640 : 1024, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
+    CHECK(r->display.pitch == r->client_surface.pitch &&
+          ledger_surfaces[display_sid].pitch == r->client_surface.pitch &&
+          gfx_backend_trident.bb_pitch == r->client_surface.pitch);
+    CHECK(device.mode.selected.display_width == r->client_surface.pitch);
     CHECK(r->client_surface.cpp == 1 && ledger_surfaces[client_sid].npages == (TRI_RAM_FALLBACK_DEFAULT ? 300 : 480));
     gfx_init();
     CHECK(gfx_is_started() && g_backend == &gfx_backend_trident);
