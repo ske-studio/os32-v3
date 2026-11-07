@@ -32,6 +32,8 @@ def vk32():
 
 
 MUTATIONS = [
+    ('probe-registration', 'debug_probe_register(hwdev_handle, probe_table, probe_count)', '0'),
+    ('probe-unregister', 'if (debug_probe_unregister(hwdev_handle)) return 0;', '(void)0;'),
     ('core-image-crc', 'm->identity.core_image_crc != core->image_crc ||', ''),
     ('contract-crc', 'm->identity.contract_crc != core_api->contract_crc ||', ''),
     ('callback-range', '!contains(r->text, r->text_size, (u32)(uptr)ops->call, 1)', '0'),
@@ -76,7 +78,7 @@ def fixtures(folder):
         cases.append((label, 0, rc, b))
     change('body-over-limit', 10 * 4, mkmod.POLICIES[11]['mem_max'] + 4096, 3)
     change('image-crc', manifest + 12, 2, 9, False)
-    change('ops-version', 33 * 4, 2, 6)
+    change('ops-version', 33 * 4, 1, 6)
     change('format-version', 4, 2, 3)
     change('module-abi', 6 * 4, contract ^ 1, 6)
     change('undefined-id-12', 7 * 4, 12, 3)
@@ -91,11 +93,11 @@ def fixtures(folder):
     # Remove all exports, preserving valid prefix layout/CRC; facade rejects missing initialize.
     b = bytearray(image)
     struct.pack_into('<I', b, 26 * 4, 0)
-    struct.pack_into('<I', b, 28 * 4, h[28] - len(b'initialize\0'))
+    struct.pack_into('<I', b, 28 * 4, h[28] - len(b'initialize\0get_probe_decls\0'))
     struct.pack_into('<I', b, 128, 0)
     struct.pack_into('<I', b, 128, zlib.crc32(b))
     cases.append(('missing-initialize', 0, 10, b))
-    for symbol, span in (('fixture_manifest', 68), ('fixture_callbacks', 16)):
+    for symbol, span in (('fixture_manifest', 68), ('fixture_callbacks', 16), ('fixture_decls', 8)):
         value = elf.symbol(symbol)['value']
         relocs = [struct.unpack_from('<I', image, h[21] + 4 * i)[0] for i in range(h[22])]
         refs = [off for off in relocs if struct.unpack_from('<I', image, h[11] + off)[0] == value]
@@ -104,6 +106,9 @@ def fixtures(folder):
                             ('data', h[17])):
             change(symbol + '-' + label, h[11] + refs[0], dest)
 
+    # The slot belongs to RW memory; a RO slot must be rejected by the real broker.
+    decl = h[11] + elf.symbol('fixture_decls')['value']
+    change('probe-slot-ro', decl + 4, h[15])
     for slot in (8, 12):
         # An absent callback has no relocation and remains a genuine null pointer.
         b = bytearray(image)

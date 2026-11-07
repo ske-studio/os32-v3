@@ -3,6 +3,7 @@
 #include "types.h"
 #include "kdebug/recover.h"
 #define HWDEV_ABI 1U
+#define HWDEV_MODULE_OPS_VERSION 2U
 #define HWDEV_KIND_GF6200 1U
 #define HWDEV_LIFETIME_FLAGS 7U
 #define HWDEV_WORK_MAX_PAGES 269U

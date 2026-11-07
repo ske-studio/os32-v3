@@ -148,7 +148,7 @@ def core(runner, mutation):
     return run_case(None, runner, changes, fixture, stage=stage)
 
 
-def lifetime(runner, mutation=None):
+def lifetime(runner, mutation=None, fallback=1):
     def stage(tmp, sources):
         # Real boot reserves two additional master PTs for BAR0/BAR1.
         host = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
@@ -160,6 +160,8 @@ def lifetime(runner, mutation=None):
                      'state_restore', 'present', 'palette', 'screen', 'video',
                      'dpms', 'accel', 'cursor', 'backend_trident'):
             body = source('drivers/video/trident/' + stem + '.c', mutation)
+            if stem == 'resources':
+                body = f'#define TRI_RAM_FALLBACK_DEFAULT {fallback}\n' + body
             for header in ('trident.h', 'trident_module.h'):
                 body = body.replace('"' + header + '"', '"' + str(directory / header) + '"')
             if stem == 'backend_trident':
@@ -171,7 +173,7 @@ def lifetime(runner, mutation=None):
                 path.write_text(body)
                 sources.append(path)
         sources.append(ROOT / 'tools/tests/trident_device_fake.c')
-    fixture = 'unsigned int host_arch_if = 0x202U;\n#include "trident_surface_lifetime_host.c"\n'
+    fixture = f'#define TRI_RAM_FALLBACK_DEFAULT {fallback}\n' + 'unsigned int host_arch_if = 0x202U;\n#include "trident_surface_lifetime_host.c"\n'
     return run_case(None, runner, (), fixture, stage=stage)
 
 
@@ -196,6 +198,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='trident-emergency-') as td:
         work = Path(td)
         for runner in runners:
+            result = lifetime(runner, fallback=0)
+            assert result.returncode == 0 and 'GREEN' in result.stdout, result
+            print('GREEN lifetime default=0', flush=True)
             for kind in ('entries', 'core', 'lifetime'):
                 result = entries(work, runner, None) if kind == 'entries' else core(runner, None) if kind == 'core' else lifetime(runner)
                 print(result.stdout + result.stderr, end='', flush=True)

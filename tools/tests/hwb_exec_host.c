@@ -476,6 +476,40 @@ static void arrays(void)
           s.array_values[2] == 8 && s.array_values[3] == 7);
     CHECK(contains(f.lines[5], "val=0xABCD dest=a index=0 rc=OK"));
 }
+static void blocks(void)
+{
+    HWB_TEST("block32-exec"); setup();
+    CHECK(run("mmioblock32 phys 0x1000 4 0xFFFFFFFE inc") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==4 && f.line_count==2);
+    CHECK(contains(f.lines[0],"op=mmioblock32 addr=0x1000 val=0xFFFFFFFE count=4 done=4 inc=1 end_addr=0x100F rc=OK"));
+    CHECK(!count_access(HW_PHYS,HW_READ) && count_access(HW_PHYS,HW_BLOCK32)==1);
+    CHECK(*hwbf_byte(&f,HW_PHYS,0x1008)==0 && *hwbf_byte(&f,HW_PHYS,0x100C)==1);
+    setup(); CHECK(run("mmioblock32 phys 0 1024 7") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==1024 && *hwbf_byte(&f,HW_PHYS,4092)==7);
+    setup(); CHECK(run("mmioblock8 phys 1 4096 0xFE inc") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==4096 && f.line_count==2);
+    CHECK(contains(f.lines[0],"op=mmioblock8 addr=0x1 val=0xFE count=4096 done=4096 inc=1 end_addr=0x1000 rc=OK"));
+    CHECK(*hwbf_byte(&f,HW_PHYS,3)==0 && *hwbf_byte(&f,HW_PHYS,4096)==0xFD);
+    setup(); CHECK(run("mmioblock16 phys 2 2048 0xFFFE inc") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==2048 && f.line_count==2);
+    CHECK(contains(f.lines[0],"op=mmioblock16 addr=0x2 val=0xFFFE count=2048 done=2048 inc=1 end_addr=0x1001 rc=OK"));
+    CHECK(*hwbf_byte(&f,HW_PHYS,6)==0 && *hwbf_byte(&f,HW_PHYS,4096)==0xFD);
+    const char *bad[]={"mmioblock8 phys 0 4097 1", "mmioblock16 phys 0 2049 1",
+        "mmioblock8 phys 0 1 256", "mmioblock16 phys 1 1 1",
+        "mmioblock8 phys 0xFFFFFFFF 2 1", "mmioblock32 phys 0 0 1", "mmioblock32 phys 0 1025 1",
+        "mmioblock32 phys 0xFFFFFFFC 2 1", "mmioblock32 phys 1 1 1",
+        "mmioblock32 port 0 1 1", "mmioblock32 phys 0 1 1 nope",
+        "mmioblock16 phys 0 1 0x10000", "mmioblock32 phys 0 1 1 inc inc"};
+    for(u32 n=0;n<sizeof(bad)/sizeof(bad[0]);n++) {
+        setup(); CHECK(run(bad[n])==HWB_ARG && !s.writes && !f.accesses);
+    }
+    setup(); f.status_fail_at=1; f.failure_status=HW_WINDOW;
+    CHECK(run("mmioblock32 phys 0 4 1") == HWB_WINDOW && !s.writes);
+    setup(); f.access_fail_at=1; f.call_error=OS32_ERR_NOSYS;
+    CHECK(run("mmioblock32 phys 0 4 1") == HWB_IO && !s.writes);
+    HWB_TEST("instruction-point"); setup(); f.point_at=2;
+    CHECK(run("mmioblock32 phys 0 4 1") == HWB_ABORT && !f.accesses);
+}
 void _start(void)
 {
     HWB_TEST("record-pairs"); setup();
@@ -483,7 +517,7 @@ void _start(void)
     CHECK(f.line_count == 5 && contains(f.lines[0], "phase=begin") &&
           contains(f.lines[1], "phase=end") && contains(f.lines[2], "seq=2 ") &&
           contains(f.lines[3], "phase=end"));
-    arrays(); fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
+    blocks(); arrays(); fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
     deadlines(); aborts(); sessions(); bars(); poll_aliases(); suspended_records(); begin_records(); ids(); trident_modes();
     hwb_test_write("PASS hwb-exec\n"); hwb_test_exit(0);
 }

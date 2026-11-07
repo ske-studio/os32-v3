@@ -1606,4 +1606,9 @@ paging_device_unmap:
 trident_diagnostic_ops:
     jmp *kdebug_import_slots+1280
 .size trident_diagnostic_ops, .-trident_diagnostic_ops
+.globl debug_probe_control
+.type debug_probe_control, @function
+debug_probe_control:
+    jmp *kdebug_import_slots+1284
+.size debug_probe_control, .-debug_probe_control
 .section .note.GNU-stack,"",@progbits

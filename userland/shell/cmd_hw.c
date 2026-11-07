@@ -42,7 +42,8 @@ static void hw_log_append(char c)
 static int hw_access(void *ctx, struct hw_req *req)
 {
     (void)ctx;
-    int rc = g_api->kdebug_call(HW_OP, req, sizeof(*req));
+    int rc = g_api->kdebug_call(HW_OP, req,
+        HW_IS_BLOCK(req->action) ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES);
     if (rc == OS32_ERR_NOSYS) hw_unavailable = 1;
     return rc;
 }

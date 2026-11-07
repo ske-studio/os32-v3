@@ -187,7 +187,10 @@ int tri_cursor_image(struct trident_device *d, const struct GfxCursorImage *im)
         const u8 *p = &d->cursor.image[i];
         u32 word = (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
                    ((u32)p[3] << 24);
-        TRY(trident_write32(d, TRI_SPACE_LFB, d->cursor.allocation.off + i, word));
+        if (d->res->ram_fallback) {
+            for (u32 byte = 0; byte < sizeof(u32); ++byte)
+                TRY(trident_write8(d, TRI_SPACE_LFB, d->cursor.allocation.off + i + byte, p[byte]));
+        } else TRY(trident_write32(d, TRI_SPACE_LFB, d->cursor.allocation.off + i, word));
     }
     u32 address = d->cursor.allocation.off / TRI_CURSOR_ALIGN;
     TRY(trident_indexed_write(d, d->cur_vga_base, CUR_ADDRESS_LO, (u8)address));

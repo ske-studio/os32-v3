@@ -52,6 +52,7 @@ static const struct module_symbol_contract hwdev_import_contracts[] = {
 };
 static const struct module_symbol_contract hwdev_export_contracts[] = {
     {0xce92964bU, 1, 0},
+    {0xcc967978U, 1, 0},
 };
 static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {
     slots[0] = (u32)(uptr)core->trial_begin;

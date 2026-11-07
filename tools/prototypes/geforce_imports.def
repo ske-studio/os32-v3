@@ -9,7 +9,8 @@
     "hwdev/gf/internal.h",
     "drivers/video/geforce/geforce_tick.h",
     "hwdev/gf/gf1_test.h",
-    "kdebug/gfinit_bus.h"
+    "kdebug/gfinit_bus.h",
+    "include/debug_probe.h"
   ],
   "imports": [
     {

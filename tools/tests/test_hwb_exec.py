@@ -13,6 +13,13 @@ import hwb_host
 FIXTURE = 'tools/tests/hwb_exec_host.c'
 PRODUCT = 'userland/shell/hwb_exec.c'
 MUTATIONS = [
+    ('block-count', PRODUCT, '.count=r->count, .increment=i->increment',
+     '.count=1, .increment=i->increment', 'block32-exec'),
+    ('block-inc', PRODUCT, '.count=r->count, .increment=i->increment',
+     '.count=r->count, .increment=0', 'block32-exec'),
+    ('block-log', 'userland/shell/hwb_log.c', 'dec(&b, r->increment);',
+     'dec(&b, 0);', 'block32-exec'),
+
     ('array-log-index', 'userland/shell/hwb_log.c',
      'str(b, " index="); dec(b, r->index);',
      'str(b, " index="); dec(b, r->index + 1U);', 'array-values'),

@@ -176,31 +176,31 @@ COMPONENTS = (
     dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
          module_id=11, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-         stop_allowed=0, ops_version=1, ops_slots=1,
+         stop_allowed=0, ops_version=2, ops_slots=2,
          image_max=262144, mem_max=262144, load_span_max=327680,
-         reloc_max=16384, export_max=1,
+         reloc_max=16384, export_max=2,
          init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
-         ops_symbol='hwdev_ops', ops_names=('initialize',)),
+         ops_symbol='hwdev_ops', ops_names=('initialize', 'get_probe_decls')),
     dict(name='GEFORCE', path='/boot/geforce.mod', dependencies=(), required=False,
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-         stop_allowed=0, ops_version=5, ops_slots=1,
+         stop_allowed=0, ops_version=6, ops_slots=2,
          # GF layer 5 integration (2026-11-04): measured mem end 181,044 B > 160 KiB;
          # no physical limit (pgalloc, no fixed band), widened like HWDEV: 256/256/320 KiB.
          image_max=256 * 1024, mem_max=256 * 1024, load_span_max=320 * 1024,
-         reloc_max=8192, export_max=1,
+         reloc_max=8192, export_max=2,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',
-         ops_symbol='geforce_module_ops', ops_names=('initialize',)),
+         ops_symbol='geforce_module_ops', ops_names=('initialize', 'get_probe_decls')),
     dict(name='TRIDENT', path='/boot/trident.mod', dependencies=(), required=False,
          module_id=13, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          # F16 v2 context loans diagnostic ops (including poll), like GeForce;
-         # initialize/prepare/restore remain the only exported ops slots.
-         stop_allowed=0, ops_version=2, ops_slots=3,
+         # get_probe_decls appends the private probe declaration export.
+         stop_allowed=0, ops_version=3, ops_slots=4,
          image_max=65536, mem_max=65536, load_span_max=81920,
-         reloc_max=2048, export_max=3,
+         reloc_max=2048, export_max=4,
          init_symbol='trident_module_init', imports_symbol='trident_import_slots',
-         ops_symbol='trident_module_ops', ops_names=('initialize', 'prepare', 'restore')),
+         ops_symbol='trident_module_ops', ops_names=('initialize', 'prepare', 'restore', 'get_probe_decls')),
 
 )
 

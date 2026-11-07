@@ -386,6 +386,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))paging_device_map,
     (void (*)(void))paging_device_unmap,
     (void (*)(void))trident_diagnostic_ops,
+    (void (*)(void))debug_probe_control,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -711,6 +712,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xd0d1dfc5u, 1, 1},
     {0x942474e8u, 1, 1},
     {0xd8320740u, 1, 1},
+    {0x9349162fu, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

@@ -38,6 +38,8 @@ ROOT = Path(__file__).resolve().parents[2]
 DIR = 'drivers/video/trident/'
 # Unique anchors; all mutants compile and fail a normal runtime assertion.
 MUTATIONS = (
+ ('M_PROBE_REGISTER', 'trident_module.c', 'debug_probe_register(handle, probe_table, probe_count)', '0', 'register before prepare'),
+ ('M_PROBE_UNREGISTER', 'trident_module.c', 'if (debug_probe_unregister(handle)) return 0;', '(void)0;', 'unregister before rollback'),
  ('M_PUBLIC_CONTEXT', 'trident_module.c', 'context.backend = &gfx_backend_trident;', 'context.backend = &candidate;', 'runtime publication reaches core'),
  ('M_CONTEXT', 'trident_body.c', '!context->display_owner)', 'false)', 'NULL display owner rejection'),
  ('M_PIN_RELEASE', 'trident_module.c', 'if (armed) return TRI_E_BUSY;', 'if (false) return TRI_E_BUSY;', 'arm retains module on abort'),
@@ -85,7 +87,7 @@ def build(work, changed=None):
 
 def execute(exe,runners,red=False):
     rejected=False
-    for mode in range(66):
+    for mode in range(68):
         for runner in runners:
             result=host32.run([str(exe)],input=struct.pack('<I',mode),runner=runner,capture_output=True)
             if red:
@@ -107,9 +109,9 @@ def product(work,runners):
         spec['version'],spec['generations']['memory_layout'],module_id=13)
     assert rebuilt==data
     contract=dict(kapi=spec['version'],layout=spec['generations']['memory_layout'],
-        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=2,img_valid=1,module_id=13,
+        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=3,img_valid=1,module_id=13,
         imports=[(fnv(e['name']),e['type_ver'],e['kind']) for e in meta['imports']],
-        exports=[(i,fnv(n),1) for i,n in enumerate(('initialize','prepare','restore'),1)])
+        exports=[(i,fnv(n),1) for i,n in enumerate(('initialize','prepare','restore','get_probe_decls'),1)])
     exe=build_validator(work)
     for runner in runners:
         good=validate(exe,data,relocate_base=0x1200000,runner=runner,**contract)
@@ -123,7 +125,7 @@ def product(work,runners):
         assert name not in core.symbols,name
     for name in ('gfx_backend_trident','trident_module_load','trident_boot_reserve'):
         assert name in core.symbols,name
-    print('GREEN paired product, three exports, relocation, ABI/PAIR rejection, core/body split',flush=True)
+    print('GREEN paired product, four exports, relocation, ABI/PAIR rejection, core/body split',flush=True)
 
 def boot_order(work, runners):
     # Execute the real boot call sequence with observers for module publication.

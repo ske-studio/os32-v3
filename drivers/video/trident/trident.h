@@ -222,7 +222,8 @@ struct tri_vram_state {
     u32 usable_bytes, pitch, first_off, area2d_end;
 };
 /* F9 initializes settings before ModeInit; zero means reference defaults.
- * ram_fallback is a BOOT-WIDE configuration, never a per-mode choice.
+ * ram_fallback defaults to RAM CLIENT + byte present, is fixed at boot,
+ * and is copied from resources to settings by prepare before mode selection.
  * mux_threshold_khz=0 selects 90000; skews are D:2179-2195 Xv adjustments. */
 struct tri_settings {
     bool no_accel, sw_cursor, ram_fallback;
