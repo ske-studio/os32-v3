@@ -1,7 +1,7 @@
 # T5c-5b: reuse T4 function imports, VA0 packing and paired distribution.
 GEFORCE_OUT := $(BUILD_OUT)/geforce
 GEFORCE_GEN := $(addprefix $(GEFORCE_OUT)/,geforce_imports.h geforce_imports.json geforce_import_slots.c geforce_import_stubs.S geforce_provider_types.c geforce_kexports.c)
-GEFORCE_DEF_SOURCES := hwdev/gf/command.h hwdev/gf/gf1_test.h hwdev/gf/gf2_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
+GEFORCE_DEF_SOURCES := include/debug_probe.h hwdev/gf/command.h hwdev/gf/gf1_test.h hwdev/gf/gf2_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
 $(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 

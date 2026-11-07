@@ -323,3 +323,60 @@ F5 drivers/video/trident/vram.c: usable に decode 上限も反映し、ペー�
 - A3 (P2): 作り直しの後の SID は暫定の面と同じであることを要求し、違えば失敗にする (gfx_core_surface.inc:331-343 の pending の印は SID ごと)。試験で確かめる。
 - A4 (P3): F6h で configure の宣言を変えたら、試験の複製も追従する: tools/tests/trident_resources_host.c、test_trident_contracts.py、test_trident_resources.py、test_trim_flow.py。
 - 実装中の欠け (PM 決定 2026-11-07): Close (F9) から core の面の unready・lease の revoke は呼ばない。lease の回収と面の再公開は既存の gfx_shutdown (gfx_core) が持つ経路のまま。gfx_return_emergency は緊急の戻りで lease を考えない (シングルタスク、戻った先は CUI)。表の Close の行の「unready・lease revoke」は削る。configure に Close 用の呼び出しも別の callback も足さない。Close の後の再入場は A1 (再 prepare で既定の形に regen) で整える。
+
+## 追記 (2026-11-07、退避の構成を既定に): RAM CLIENT + byte present を Trident の既定にする
+
+ユーザー決定「退避の構成にして調べを続ける」により、§2 N1・§9 F6/F7 の既定を置き換える。
+シングルタスク・協調切替。burst・FIFO・ブリッジの調査は HW-BASIC で継続し、修復後は設定だけで案3へ戻す。
+根拠: 手本 D=xf86-video-trident 1.4.0 の trident_driver.c:2220-2230 (ShadowFB→NoAccel)、3534-3546 (RAM shadow/直接の分岐)、3721-3739 (refresh)。
+byte 転送は実機で映った `5a6d64a2:drivers/video/trident/present.c` の write8 列を使い、固定 TRI_PITCH/寸法は復活させない。
+
+### 描画と切替設定
+- 退避時は CLIENT=独立した RAM/WB、DISPLAY=LFB 先頭の VRAM/UC。アプリと CPU fill/blit は CLIENT に描く。
+- `trident_resources.ram_fallback` を起動全体の唯一の選択値とし、resources.c の初期設定を true にする。prepare で既存 `device.settings.ram_fallback` へ写し、最初の mode 選択より前に揃える。
+- 有効 NoAccel は `settings.no_accel || settings.ram_fallback`。mode_prepare と accel_init の両方で扱い、ScreenInit・Enter・mode 切替で GE を再有効化しない。
+- 退避時は GE fill/blit/pattern の初期化・機能広告・HAL hook を無効にする。DISPLAY だけを GE で更新する経路は作らない。既存 HAL の CPU 代替描画→present で CLIENT と表示を一致させる。
+- cursor・overlay・palette は今の手順・機能・VRAM 配置を維持する。present の対象は DISPLAY の画素領域だけで、後方の cursor/video 領域へ書かない。
+- 案3に戻す操作は resources.c の同じ起動設定を false に変更して再ビルド・再起動するだけ。CLIENT は従来の VRAM/UC alias、present は tri_sync のみ、NoAccel の独立設定は引き続き有効。
+- 起動途中や mode 単位では backing を変更しない。RAM 確保失敗時に案3へ自動退避せず、候補を利用不能として既存の選択失敗経路へ返す。
+
+### present の契約
+- 退避時は同期成功後、現在の CLIENT の width/height で矩形を安全に clip し、各行 `src=client+y*client.pitch+x*cpp` から `dst=display.off+y*display.pitch+x*cpp` へ `w*cpp` 回 write8 する。
+- pitch は選択 mode の `display_width*cpp`。CLIENT/DISPLAY/ledger/bb の形を一致させる。8bit=1、RGB565=2、depth24/bpp32=4 byte を画素変換なしで写す。
+- RGB555/packed24 は確定決定4を保ち TRI_E_NOSYS。packed24 を新規公開しない。現行の 3 形式すべてを試験する。
+- 行末は CLIENT 有効 bytes と DISPLAY 有効 bytes、および mapped/decode/申告容量内であることを検査する。空矩形は無転送、書込み失敗は直ちに返す。
+- 32bit store・memcpy・write_span32 を VRAM 転送に使わない。RAM の通常の CPU 描画は32bitのまま。成功時の present_bytes は clip 後の w*h*cpp。
+- ScreenInit の RAM クリア後は全画面を byte present して旧 VRAM の画素を消す。mode 切替成功後・Enter 後も現在の CLIENT 全画面を転送してから利用可能とする。
+
+### 面の寿命（確定 A1〜A4 と Close の PM 決定を維持）
+- configure(mode, display_bytes, final) の宣言・呼出し契約は変更しない。display_bytes は両面に確保する共通容量であり、RAM の物理番地は別になる。
+- boot は予約・写像と構成値の固定だけ。初回 prepare は I/O なしで P=page_up(既定 pitch*height) を渡し、DISPLAY P byte と RAM CLIENT P byte を暫定作成して unready。lease・画素転送はしない。
+- ScreenInit は SPR 確定後、選択した構成の有効 HAL mode 全候補の実 pitch*height の最大をページ切上げした B を渡す。NoAccel pitch を使い、B は SPR/設定/mapped/decode の最小以下。
+- DISPLAY.npages=CLIENT.npages=B/PAGE_SIZE、F5 first_off=B。RAM 側も B を固定確保し、mode 切替では npages/PFN/SID を変えず両面 regen・世代更新だけを行う。
+- 暫定 P→確定 B が異なるときは lease ゼロ・両面 unready を確認し、両面 release 後 DISPLAY→CLIENT を create。同サイズなら regen。A3 の同一 SID 条件を検査し、不一致は失敗。
+- RAM は S3 同様 LEDGER_OWNER_BOOT で連続ページを確保・ゼロ化し、CLIENT は LEDGER_SB_RAM/WB、ポインタは P2V。DISPLAY の DEVICE owner を RAM 確保に使わない。公開後の owner 移譲は既存 ledger の経路を使う。
+- 成功時だけ descriptor/client ポインタ/gen/確定フラグを公開。失敗時は候補を unready にし、登録済み RAM は surface_release、未登録の確保だけは元 owner で free して二重解放を避け、再試行可能にする。
+- 確定後は異なる B を拒否。Close は面と RAM を保持し、復帰順も維持する。Close に revoke や configure を追加しない。通常の lease 回収・再公開は gfx_shutdown 等の既存 gfx_core 経路が担う。
+- Close 後の prepare は A1 通り既定 mode の形へ両面 regen、device.mode.selected も既定へ戻す。B と backing は維持。最終 rollback だけ disarm/lease ゼロ後に面 release→unmap、RAM と確定状態を解放する。
+- mm/pgalloc_surface.inc は既存 RAM/WB 検査・release 時 free・regen の容量不変をそのまま使う。案3用 VRAM alias の許可も保持する。共有 gfx_core と公開 KAPI は変更不要。
+
+### 実装の段（各行1ファイル、同じ取り込みで結線）
+1. drivers/video/trident/resources.c: 既定設定、RAM CLIENT の P/B 確保・再作成・失敗回収・rollback、案3分岐を保持。
+2. drivers/video/trident/backend_trident.c: prepare の設定同期、RAM bb/モード表/GE hook の一致、mode 切替・Enter 完了時の全画面転送。
+3. drivers/video/trident/mode_640.c: ram_fallback を有効 NoAccel に含め、NoAccel pitch と機能へ反映。
+4. drivers/video/trident/accel.c: ram_fallback 時は初期化を無効にし、GE/pattern を使わせない。
+5. drivers/video/trident/present.c: 退避の可変 pitch/cpp byte 転送と案3の同期のみを分岐。
+6. drivers/video/trident/lifecycle.c: RAM 初期化後の全画面 byte present、既存 Close/再入場の列を保持。
+7. drivers/video/trident/trident.h: ram_fallback の既定・設定同期のコメントだけ追従（宣言変更0件）。
+試験: 各試験ファイルを独立段で追従（test_trident_resources/present/mode/lifecycle、GE/HAL の既存 harness）。両構成の選択→init、3形式の端・dirty・非表示領域保持、P/B増減/一致、RAM不足/第二create失敗/SID不一致/解放、16bit→Close→再選択、Enter、GE不使用と案3無転送をhostで検査し、Ra266でGUI・CPU fill/blit・dirty更新・cursor/overlay/paletteの回帰を観測する。
+変異: RAMをVRAMへ置換、WB→UC、退避NoAccel判定削除、write8→32bit転送、固定pitch化、cpp乗算削除、初回全画面転送削除、regenで現mode容量化、RAM解放漏れを各一意anchorとし、正常GREEN→実行時RED→復元GREENを確認する。
+本作業は追記案だけ。製品・試験未変更、ビルド・実行試験・変異・lintは未実施。宣言の追加・変更は0件。
+
+### 確定 (2026-11-07、Opus 第 1 回の指摘を PM が反映、r2 なし)
+- R1 (PM 決定): ram_fallback が有効なときは cursor の像 (cursor.c:190 の trident_write32 の列) と overlay の書き込み (video.c:372,379) も VRAM へは write8 にする。32 ビット書きは案 3 側だけに残す。段 8 = cursor.c、段 9 = video.c を足す。変異に「cursor の像を 32 ビットに戻す」「overlay を 32 ビットに戻す」を足す。
+- R2: resources.c に `#ifndef TRI_RAM_FALLBACK_DEFAULT` / `#define TRI_RAM_FALLBACK_DEFAULT 1` を置き、resources.c:276 の固定の代入をこれに替える。host 試験は 0 と 1 の両方で組む (trident_resources_host.c:411 の期待を 2 通りに)。ヘッダの宣言は 0 件のまま。
+- R3: 既にある分岐 (backend_trident.c:141-142 の GE hook を外す、:319 の present_bytes、lifecycle.c:60-61 の RAM ゼロ化、video.c:307-315 の color key、mode_640.c:387 の GE 機能を落とす、accel.c:168 の早期 return) は作り直さない。各段は「既にある所を確かめる + 足す差分」だけ。
+- R4: 段 4 (accel.c) は変更なし。mode_640.c:215 で ram_fallback のときも NOACCEL を立て、accel.c:168 の既存の return で止める。試験で確かめるだけ。
+- R5: settings.ram_fallback へ写すのは prepare の中で `r->configure(&provisional…)` (backend の 202 行目付近) と build_modes・tri_vram_display_max_bytes より前。
+- R6: 段 5 で present.c:9 のコメントを「present の中で clip する」に直す (backend_trident.c:315-316 は clip 前の座標で呼ぶ)。
+- 確かめ済み (Opus): RAM CLIENT は今の configure・create の重なりの規則・regen・release にそのまま入る。B は 640×480×4 を切り上げた 300 ページ、P は 75 ページで毎回作り直しの経路。GE を止める判断は手本の ShadowFB→NoAccel と合い、手本も HW cursor を残す。

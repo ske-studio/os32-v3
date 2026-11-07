@@ -32,7 +32,7 @@ void hwdev_trace_load(const u32 *imports)
     if (rc) fail();
     const struct module_image_policy policy = {
         KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, HWDEV_CONTRACT_CRC,
-        HWDEV_KERNEL_PAIR_CRC, HWDEV_ABI, 1, HWDEV_IMPORT_COUNT,
+        HWDEV_KERNEL_PAIR_CRC, HWDEV_MODULE_OPS_VERSION, 1, HWDEV_IMPORT_COUNT,
         hwdev_import_contracts, hwdev_export_contracts, MODULE_ID_HWDEV
     };
     struct module_image_plan plan;

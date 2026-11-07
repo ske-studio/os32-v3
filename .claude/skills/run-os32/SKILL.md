@@ -270,8 +270,13 @@ CUI で `os32gui on` を実行して `GUI=1` を永続化する (既存の設定
 CPL3 のページングと V86 のセグメントを考慮し、`space` と16/32bitモードを明示する。
 `emu_disasm` はホスト objdump を使う。フォールバック時の命令長警告を無視しない。
 ホスト objdump が必要なら実在するパスを確認して `OS32_OBJDUMP` に指定する。
-`OS32_KERNEL_MAP` は起動中のビルドに対応させる。設定変更後の読み込み方法は
-`server.py` / `symbols.py` を確認する。
+MCP は本体・自身の作業木・`~/wt/os32-v3/*/build/out/kernel.map` から、ゲストメモリの
+Commit と Image CRC/size に一致する map を自動選択し、返事の `kernel_map` にパスと版を出す。
+隣接する `kernel.elf`・`vmkernel.lz4`・`build_id.c` が必要で、map/ELF と ELF/イメージも照合する。
+`OS32_KERNEL_MAP` は候補をそのパスだけに絞る指定で、版の検証は省略しない。
+一致がなければシンボル解決を拒否し、数値アドレスは使えるが注釈は付けない。
+ツール呼出しごとに再照合するため、再起動・state load 後も前回の選択を引き継がない。
+設定は MCP サーバープロセスの環境なので、変更時は接続先サーバーを再起動する。
 
 ## 実行制御と通信
 

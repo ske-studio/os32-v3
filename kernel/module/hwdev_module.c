@@ -1,3 +1,4 @@
+#include "debug_probe.h"
 #include "hwdev_module.h"
 #include "module.h"
 #include "hwdev/generated/hwdev_imports.h"
@@ -47,6 +48,7 @@ const struct hwdev_ops *hwdev_module_ops(void)
 static int hwdev_detach(struct module_record *r)
 {
     (void)r;
+    if (debug_probe_unregister(hwdev_handle)) return 0;
     published = 0;
     return 1;
 }
@@ -80,6 +82,12 @@ static int hwdev_start(struct module_record *r, u32 entry, u32 *exports)
         ops->abi != HWDEV_ABI || ops->size != sizeof(*ops)) return MODULE_ABI_MISMATCH;
     if (!contains(r->text, r->text_size, (u32)(uptr)ops->call, 1) ||
         !contains(r->text, r->text_size, (u32)(uptr)ops->release_work, 1)) return MODULE_INIT_FAILED;
+    const struct probe_decl *probe_table = 0;
+    u32 probe_count = 0;
+    if (!module_text_contains(r, exports[2])) return MODULE_INIT_FAILED;
+    probe_get_decls_fn get_decls = (probe_get_decls_fn)(uptr)exports[2];
+    if (get_decls(&probe_table, &probe_count) ||
+        debug_probe_register(hwdev_handle, probe_table, probe_count)) return MODULE_INIT_FAILED;
     published = ops; /* externally available only after module_start commits */
     return 0;
 }
@@ -110,7 +118,7 @@ int hwdev_module_load(struct module_handle core_handle)
     const struct module_request request = {
         .path = SYS_HWDEV_MOD, .name = "hwdev",
         .policy = {KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, HWDEV_CONTRACT_CRC,
-                   bi->img_crc, HWDEV_ABI, bi->img_valid, HWDEV_IMPORT_COUNT,
+                   bi->img_crc, HWDEV_MODULE_OPS_VERSION, bi->img_valid, HWDEV_IMPORT_COUNT,
                    hwdev_import_contracts, hwdev_export_contracts, MODULE_ID_HWDEV},
         .imports = imports,
         .dependencies = &core_handle, .dependency_count = 1,
@@ -122,6 +130,7 @@ int hwdev_module_load(struct module_handle core_handle)
         struct module_record *r = module_record_get(hwdev_handle);
         /* BOOT_BODY: no hot unload; rollback before publication remains free. */
         if (!module_ref_acquire(hwdev_handle, r->owner, MODULE_REF_REGISTRATION, 0)) {
+            (void)debug_probe_unregister(hwdev_handle);
             published = 0;
             rc = MODULE_INIT_FAILED;
         }

@@ -5,7 +5,8 @@
 #include "backend_under_test.c"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static struct trident_fake f;
-static u8 memory[TRI_FAKE_REAL_BYTES];
+static u8 memory[TRI_FAKE_REAL_BYTES], ram_client[1228800];
+static u32 lfb8, lfb32;
 static struct trident_fake_event trace[32768];
 static u32 stages[128], count, status_reads, arms;
 static int height, flip, page, optional_fail, configure_fail;
@@ -26,6 +27,14 @@ static int arm(int (*cb)(void *),void *opaque,u32 who) {
     ++arms; return 0;
 }
 static struct trident_io io;
+static int write8(void *o, enum trident_space space, u32 off, u8 v) {
+    if (space == TRI_SPACE_LFB) ++lfb8;
+    return trident_fake_io.write8(o,space,off,v);
+}
+static int write32(void *o, enum trident_space space, u32 off, u32 v) {
+    if (space == TRI_SPACE_LFB) ++lfb32;
+    return trident_fake_io.write32(o,space,off,v);
+}
 static int read8(void *o,enum trident_space space,u32 off,u8 *v) {
     /* Deterministic VSYNC waveform: already high, then low, then rising.
      * Four reads per complete transition exercises both wait loops. */
@@ -74,14 +83,14 @@ static int configure(const struct tri_mode *m, u32 bytes, bool final) {
     if (final) stages[count++]=13;
     /* 640x480 XRGB8888 is the largest HAL-visible mode in the 2MiB fake.
      * The selected INDEX8 screen must reserve this fixed display extent. */
-    if (final && (bytes!=1966080u || m->id!=device.mode.selected.id)) return -90;
+    if (final && (bytes!=(f.resources.ram_fallback ? 1228800u : 1966080u) || (!f.resources.ram_fallback && m->id!=device.mode.selected.id))) return -90;
     if (!final && f.operations == 0 && bytes != 307200u) return -90;
     if (final && configure_fail) return configure_fail;
     u32 pitch=m->display_width*(m->bpp/8);
     f.resources.display=(struct tri_surface){0,pitch*m->vd,pitch,m->hd,m->vd,
                                            m->bpp/8,TRI_FMT_INDEX8};
     f.resources.client_surface=f.resources.display;
-    f.resources.client=f.vram;
+    f.resources.client=f.resources.ram_fallback ? ram_client : f.vram;
     f.resources.client_bytes=pitch*m->vd;
     ++f.resources.generation;
     return 0;
@@ -118,7 +127,7 @@ static int test(void) {
     CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
     f.resources.ready=true;f.resources.client=memory;f.resources.client_bytes=TRI_DISPLAY_BYTES;
     f.resources.configure=configure;
-    io=trident_fake_io;io.read8=read8;
+    io=trident_fake_io;io.read8=read8;io.write8=write8;io.write32=write32;
     static TridentModuleContext context;
     context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner,TRIDENT_MODULE_CONTEXT_SIZE,&diagnostic};
     trident_context=&context;
@@ -224,8 +233,69 @@ static int test(void) {
     CHECK(!trident_screen_init(&device) && !device.last_rc);
     return 0;
 }
+static int fallback_test(void) {
+    shutdown(); count=0;
+    device=(struct trident_device){0};
+    CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
+    f.resources.ready=true; f.resources.configure=configure;
+    f.resources.ram_fallback=true;
+    f.resources.mapped_bytes=sizeof(memory);
+    /* Drawing fixture: full PC98 Init traces are checked by trident-pc98init. */
+    f.pc98_initialized=true;
+    for (u32 i=0;i<sizeof(memory);++i) memory[i]=0xA5;
+    lfb8=lfb32=0;
+    init(); count=0;
+    CHECK(!display_rc && device.active && device.screen_ready);
+    CHECK(device.settings.ram_fallback && device.mode.no_accel && f.cr_color[0x36]==0);
+    CHECK(device.mode.client.pitch==640 && backend.bb_base==ram_client && backend.bb_pitch==640);
+    CHECK(!device.accel.initialized && !device.accel.pattern.allocated && !(device.mode.features&TRI_CAP_GE));
+    CHECK(!backend.fill_rect && !backend.blit && lfb8==307200 && !lfb32);
+    for(u32 i=0;i<307200;++i) CHECK(!memory[i] && !ram_client[i]);
+    CHECK(memory[1228800]==0xA5);
+    /* CPU dirty drawing reaches DISPLAY through the HAL present counter. */
+    ram_client[641]=0x69; counters.present_bytes=0;
+    present(1,1,1,1); count=0;
+    CHECK(memory[641]==0x69 && counters.present_bytes==1);
+    ram_client[614399]=0x3A;
+    CHECK(!tri_hal_mode(3)); count=0; /* RGB565 */
+    CHECK(memory[614399]==0x3A);
+    CHECK(device.mode.client.cpp==2 && backend.bb_pitch==1280 && !device.accel.initialized);
+    CHECK(!backend.fill_rect && !backend.blit && !lfb32);
+    ram_client[7]=0x37; memory[7]=0;
+    leave(); count=0; enter(); count=0;
+    CHECK(!display_rc && device.screen_ready && memory[7]==0x37 && !device.accel.initialized);
+    static const u32 pixel=0xffffffffu;
+    struct GfxCursorImage im={&pixel,4,4,1,1,0,0};
+    u32 before=lfb8;
+    CHECK(!tri_hal_cursor_image(0,&im)); count=0;
+    CHECK(lfb8==before+TRI_CURSOR_IMAGE_BYTES && !lfb32);
+    u32 off=device.cursor.allocation.off;
+    for(u32 i=0;i<TRI_CURSOR_IMAGE_BYTES;++i) CHECK(memory[off+i]==device.cursor.image[i]);
+    static const u8 data[32]={1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,
+                              17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+    const u32 formats[]={TRI_VIDEO_RV16,TRI_VIDEO_YUY2,TRI_VIDEO_YV12};
+    struct tri_rect rect={0,0,4,2};
+    for(u32 i=0;i<3;++i) {
+        struct tri_video_image imv={.format=formats[i],.width=4,.height=2,.data=data};
+        CHECK(!tri_video_query(&imv));
+        CHECK(!tri_video_put(&device,&imv,&rect,&rect,0x1234)); count=0;
+        CHECK(!lfb32 && memory[device.video.allocation.off]==1);
+        CHECK(memory[device.video.allocation.off+2]==(i==2?2:3));
+    }
+    /* Present must preserve the cursor and overlay behind fixed B. */
+    u8 cursor=memory[off], overlay=memory[device.video.allocation.off];
+    present(0,0,640,480); count=0;
+    CHECK(memory[off]==cursor && memory[device.video.allocation.off]==overlay);
+    shutdown(); count=0; prepare(); count=0;
+    CHECK(device.mode.selected.id==TRI_MODE_DEFAULT_ID && backend.bb_pitch==640);
+    init(); count=0;
+    CHECK(!display_rc && device.mode.client.cpp==1 && !device.accel.initialized && !lfb32);
+    shutdown(); count=0;
+    return 0;
+}
 void _start(void) {
     int rc=test();
+    if (!rc) rc=fallback_test();
     if(rc) { char s[32]="RED lifecycle ";u32 n=14,v=rc;char digits[10];u32 k=0;
       do {digits[k++]='0'+v%10;v/=10;}while(v);while(k)s[n++]=digits[--k];s[n++]='\n';
       __asm__ volatile("int $0x80"::"a"(4),"b"(1),"c"(s),"d"(n):"memory"); }

@@ -23,7 +23,9 @@
 static u32 reads, writes, seen_space, seen_addr, seen_width, seen_bdf, stored;
 static u32 backend_status, abort_flag, abort_calls, pci_absent;
 static u32 fake_if, pte = ORIGINAL_PTE, map_flags, map_fail, access_fail;
-static u32 saves, restores, maps, unmaps, write_only;
+static u32 saves, restores, maps, unmaps, write_only, block_mode;
+static u32 block_memory[2048] __attribute__((aligned(4096)));
+static u32 aperture(void) { return block_mode ? (u32)(uptr)block_memory : MEM_DEVICE_APERTURE_BASE; }
 static void trace(u32 space, u32 addr, u32 width, bool write, u32 value)
 {
     if (space == HW_PHYS) CHECK(fake_if == 0);
@@ -71,17 +73,17 @@ static unsigned int irq_save(void)
 static void irq_restore(unsigned int v)
 { CHECK(fake_if == 0); fake_if = v; restores++; }
 u32 paging_pte_raw(u32 va)
-{ CHECK(fake_if == 0 && va == MEM_DEVICE_APERTURE_BASE); return pte; }
+{ CHECK(fake_if == 0 && (va == aperture() || (block_mode && va == aperture()+MEM_PAGE_SIZE))); return pte; }
 int paging_map_phys(u32 va, u32 pa, u32 pages, u32 flags)
 {
-    CHECK(fake_if == 0 && va == MEM_DEVICE_APERTURE_BASE);
-    CHECK(pa == TEST_PHYS && pages == 1);
+    CHECK(fake_if == 0 && (va == aperture() || (block_mode && va == aperture()+MEM_PAGE_SIZE)));
+    CHECK(pa == TEST_PHYS && (pages == 1 || (block_mode && pages == 2)));
     maps++; map_flags = flags; pte = pa | flags;
     return map_fail ? -1 : 0;
 }
 int paging_pte_restore(u32 va, u32 raw)
 {
-    CHECK(fake_if == 0 && va == MEM_DEVICE_APERTURE_BASE);
+    CHECK(fake_if == 0 && (va == aperture() || (block_mode && va == aperture()+MEM_PAGE_SIZE)));
     pte = raw; unmaps++; return 0;
 }
 #define KPEEK_HOST
@@ -104,7 +106,7 @@ static const struct recover_window_ops fake_ops = {
     window_hal_unmap, fake_load, fake_store
 };
 void recover_window_hal_init(struct recover_window *w)
-{ *w = (struct recover_window){.ops=&fake_ops, .va=MEM_DEVICE_APERTURE_BASE}; }
+{ *w = (struct recover_window){.ops=&fake_ops, .va=aperture()}; }
 #include "kdebug/hwb_access.c"
 
 static struct hw_req request(u32 action, u32 space, u32 width)
@@ -269,9 +271,91 @@ static void failures(void)
         CHECK(pte==ORIGINAL_PTE && fake_if==initial_if && !window_busy);
     }
 }
+static void blocks(void)
+{
+    HWB_TEST("block32"); block_mode=1;
+    for (u32 inc=0; inc<2; inc++) for (u32 cross=0; cross<2; cross++) {
+        for (u32 n=0; n<2048; n++) block_memory[n]=0xBAD0BAD0;
+        reset_trace(); fake_if=inc;
+        struct hw_block_req b={.req=request(HW_BLOCK32,HW_PHYS,4),
+                               .count=1024,.increment=inc};
+        u32 start=cross ? 1023U : 0;
+        b.req.addr+=start*4; b.req.value=0xFFFFFFFE;
+        CHECK(kdebug_ops.dbg_call(HW_OP,&b,sizeof(b))==0 && b.req.status==HW_OK);
+        CHECK(b.req.value==0xFFFFFFFE && maps==1 && unmaps==cross+1);
+        CHECK(reads==0 && writes==0 && abort_calls==0 && saves==1 && restores==1);
+        CHECK(fake_if==inc && pte==ORIGINAL_PTE && (map_flags & PTE_PCD) && (map_flags & PTE_RW));
+        for (u32 n=0; n<2048; n++)
+            CHECK(block_memory[n]==(n>=start && n<start+1024 ?
+                  0xFFFFFFFEU+(inc ? n-start : 0) : 0xBAD0BAD0U));
+    }
+    for (u32 width=1; width<=2; width++) for (u32 inc=0; inc<2; inc++) {
+        HWB_TEST("block-narrow");
+        for (u32 n=0; n<sizeof(block_memory); n++) ((u8 *)block_memory)[n]=0xA5;
+        reset_trace(); fake_if=inc;
+        struct hw_block_req b={.req=request(width==1 ? HW_BLOCK8 : HW_BLOCK16,HW_PHYS,width),
+                               .count=HW_BLOCK_BYTES/width,.increment=inc};
+        u32 start=4096-width;
+        b.req.addr+=start; b.req.value=width==1 ? 0xFE : 0xFFFE;
+        CHECK(hwb_access(&b,sizeof(b))==0 && b.req.status==HW_OK);
+        CHECK(maps==1 && unmaps==2 && !reads && !writes && !abort_calls);
+        CHECK(fake_if==inc && pte==ORIGINAL_PTE && saves==1 && restores==1);
+        for (u32 n=0; n<sizeof(block_memory); n++) {
+            u32 v=b.req.value+(inc ? (n-start)/width : 0);
+            CHECK(((u8 *)block_memory)[n]==(n>=start && n<start+HW_BLOCK_BYTES ?
+                  (u8)(v >> (((n-start)%width)*8)) : 0xA5));
+        }
+        struct hw_block_req goodn=b;
+        for (u32 bad=0; bad<(width==2 ? 8U : 7U); bad++) {
+            b=goodn; b.req.status=0;
+            if(bad==0)b.count++;
+            if(bad==1)b.count=0;
+            if(bad==2)b.req.value=width==1 ? 0x100 : 0x10000;
+            if(bad==3){b.req.addr=0xFFFFFFFE;b.count=4;}
+            if(bad==4)b.req.width=4;
+            if(bad==5)b.increment=2;
+            if(bad==6){b.req.space=HW_IO;}
+            if(bad==7)b.req.addr++;
+            reset_trace();
+            CHECK(hwb_access(&b,sizeof(b))==0 && b.req.status==HW_ARG && !maps && !saves);
+        }
+    }
+    HWB_TEST("block32");
+    struct hw_block_req good={.req=request(HW_BLOCK32,HW_PHYS,4),.count=1};
+    for (u32 which=0; which<9; which++) {
+        struct hw_block_req b=good;
+        if(which==0)b.count=0;
+        if(which==1)b.count=1025;
+        if(which==2)b.increment=2;
+        if(which==3)b.req.width=2;
+        if(which==4)b.req.space=HW_IO;
+        if(which==5)b.req.addr++;
+        if(which==6){b.req.addr=0xFFFFFFFC;b.count=2;}
+        if(which==7)b.req.bdf=1;
+        if(which==8)b.req.status=1;
+        reset_trace();
+        CHECK(hwb_access(&b,sizeof(b))==0 && b.req.status==HW_ARG);
+        CHECK(maps==0 && saves==0 && !reads && !writes);
+    }
+    reset_trace();
+    CHECK(hwb_access(&good,HW_REQ_BYTES)==OS32_ERR_INVAL);
+    good.req.action=HW_WRITE;
+    CHECK(hwb_access(&good,sizeof(good))==OS32_ERR_INVAL);
+    good.req.action=HW_BLOCK32;
+    for(u32 initial_if=0;initial_if<2;initial_if++) {
+        reset_trace(); fake_if=initial_if; map_fail=1;
+        CHECK(hwb_access(&good,sizeof(good))==0 && good.req.status==HW_WINDOW);
+        CHECK(unmaps==1 && fake_if==initial_if && pte==ORIGINAL_PTE);
+        good.req.status=0;
+        reset_trace(); window_busy=true;
+        CHECK(hwb_access(&good,sizeof(good))==0 && good.req.status==HW_WINDOW);
+        CHECK(!maps && fake_if==initial_if); window_busy=false; good.req.status=0;
+    }
+    block_mode=0;
+}
 void _start(void)
 {
-    reset_trace(); wire(); arguments(); accesses(); failures();
+    reset_trace(); wire(); arguments(); accesses(); blocks(); failures();
     hwb_test_write("GREEN wire/arguments/paused/PCI lanes/IO widths/window/failures/write-only\n");
     hwb_test_exit(0);
 }

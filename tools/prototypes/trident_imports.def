@@ -5,7 +5,8 @@
     "drivers/video/trident/trident.h",
     "include/gfx_hal.h",
     "include/gfx_mode.h",
-    "gfx/palette.h"
+    "gfx/palette.h",
+    "include/debug_probe.h"
   ],
   "imports": [
     {

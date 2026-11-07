@@ -182,7 +182,9 @@ static void scanlog_init(void)
     assert(scanlog_devinit_calls==1 && cint_prod.display.initialized && cint_prod.display.baseline_valid);
     assert((!!cint_prod.feature5.rom.bytes)==!scanlog_rom_fail && scanlog_f5_ops);
     assert(c1_normal==&c1_ops && selected_front.bytes && !selected_front.off);
-    assert(startlog_equal("")); /* Boot's initial clearing transfer is not the app present. */
+    /* This synthetic ROM has no usable DDC port. The new diagnostic does
+     * not interfere with boot's initial clearing transfer. */
+    assert(startlog_equal("[gf4] probe-after-mode conn=0 rc=-412\n"));
 }
 static void scanlog_finish(void)
 {

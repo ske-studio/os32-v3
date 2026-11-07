@@ -11,6 +11,11 @@
 #include "exec/lease.h"
 #include "gfx_format.h"
 #include "io.h"
+#include "lib/kstring.h"
+
+#ifndef TRI_RAM_FALLBACK_DEFAULT
+#define TRI_RAM_FALLBACK_DEFAULT 1
+#endif
 
 #define TRI_BAR_COUNT 2u
 #define TRI_BDF ((TRI_PCI_BUS << 8) | (TRI_PCI_SLOT << 3) | TRI_PCI_FUNCTION)
@@ -159,13 +164,33 @@ static int configure(const struct tri_mode *mode, u32 display_bytes, bool final)
         gfx_surface_unready |= 1u << live_sids[0];
         if (sids_fixed && created[0] != fixed_sids[0]) goto cleanup;
         sf.role = LEDGER_ROLE_CLIENT;
-        if (!ledger_surface_create(&sf, &created[1])) goto cleanup;
+        if (resources.ram_fallback) {
+            sf.owner = LEDGER_OWNER_BOOT;
+            sf.backing = LEDGER_SB_RAM;
+            sf.cache = LEDGER_CACHE_WB;
+            if (!pgalloc_alloc_n_owner(sf.owner, sf.npages, MEM_PHYS_EXEC_FLOOR / PAGE_SIZE,
+                                      pgalloc_arena_end(), LEDGER_TOP_DOWN, &sf.first))
+                goto cleanup;
+            kmemset(P2V(sf.first * PAGE_SIZE), 0, display_bytes);
+        }
+        if (!ledger_surface_create(&sf, &created[1])) {
+            if (resources.ram_fallback)
+                (void)pgalloc_free_n_owner(sf.owner, sf.first, sf.npages);
+            goto cleanup;
+        }
         live_sids[1] = created[1];
         surface_created[1] = true;
         gfx_surface_unready |= 1u << live_sids[1];
         if (sids_fixed && created[1] != fixed_sids[1]) goto cleanup;
     } else {
         if (!ledger_surface_regen(resources.display_sid, &sf)) goto done;
+        if (resources.ram_fallback) {
+            const struct ledger_surface *client = &ledger_surfaces[resources.client_sid];
+            sf.first = client->first;
+            sf.owner = client->owner;
+            sf.backing = LEDGER_SB_RAM;
+            sf.cache = LEDGER_CACHE_WB;
+        }
         if (!ledger_surface_regen(resources.client_sid, &sf)) goto done;
     }
     resources.display_sid = live_sids[0];
@@ -181,7 +206,8 @@ static int configure(const struct tri_mode *mode, u32 display_bytes, bool final)
         .width = mode->hd, .height = mode->vd, .cpp = cpp, .format = format
     };
     resources.client_surface = resources.display;
-    resources.client = (u8 *)resources.lfb;
+    resources.client = resources.ram_fallback ?
+        P2V(ledger_surfaces[resources.client_sid].first * PAGE_SIZE) : (u8 *)resources.lfb;
     resources.client_bytes = resources.client_surface.bytes;
     resources.generation = ledger_surfaces[resources.client_sid].gen;
     rc = TRI_OK;
@@ -273,7 +299,7 @@ int __attribute__((cold)) trident_boot_reserve(void)
     resources.regs_bytes = TRI_REG_MAPPED_BYTES;
     /* prepare creates the provisional aliases; boot only reserves/maps. */
     resources.configure = configure;
-    resources.ram_fallback = false;
+    resources.ram_fallback = TRI_RAM_FALLBACK_DEFAULT;
     resources.ready = true;
     return 0;
 }

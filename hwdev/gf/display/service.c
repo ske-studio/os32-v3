@@ -443,6 +443,43 @@ static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
     }
 }
 
+/* PC-98 has no VGA BIOS POST to select I2C before the first mode load.
+ * MIT nouveau dispnv04/crtc.c:496-499, hw.c:674-680 select primary head A;
+ * modeset.c uses the same GF_MODE_ENGINE_I2C value (POLICY_PCIDEV §6).
+ * devinit/base.c:94,117 keeps extended CR unlocked until device destruction.
+ * OS32 restores local owner state at leave, so renew the unlock each enter. */
+static i32 svc_detect_prepare(struct gf_foundation *f)
+{
+    struct gf_io *io=&f->io;
+    u32 unlock=RECOVER_CR1F_UNLOCK,engine;
+    i32 rc=svc_index(io,SVC_CR,RECOVER_CR1F,&unlock,true);
+    if (!rc) rc=io->read(io->opaque,0,SVC_ENGINE_CTRL,4,&engine);
+    if (!rc) rc=io->write(io->opaque,0,SVC_ENGINE_CTRL,4,engine|GF_MODE_ENGINE_I2C);
+    return rc;
+}
+
+/* Diagnostic only: compare DDC with the signal-producing initial mode.
+ * Keep detect's modes, EDID and result; each probe gets its own budget. */
+static void svc_probe_after_mode(struct gf4_ctx *c)
+{
+    i32 saved_rc=c->last_rc;
+    u32 saved_deadline=c->deadline;
+    for (u8 connector=0;connector<2;++connector) {
+        for (u32 i=0;i<c->nroutes;++i) {
+            const struct gf4_route *r=&c->routes[i];
+            if (r->connector!=connector || r->type==GF4_TV ||
+                r->i2c_index==U8_MAX) continue;
+            u32 dl;
+            i32 rc=gf4_stage_deadline(c,c->ch->f,&dl);
+            if (!rc) rc=gf4_ddc_probe(c,r->i2c_index,dl);
+            kprintf(KLOG_ATTR,"[gf4] probe-after-mode conn=%u rc=%d\n",connector,rc);
+            break;
+        }
+    }
+    c->last_rc=saved_rc;
+    c->deadline=saved_deadline;
+}
+
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
     const char *stage="service_check";
@@ -511,6 +548,10 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         if (!rc) rc=gf3_service_objects_init(s,dl);
     }
     if (!rc) {
+        stage="detect_prepare";
+        rc=svc_detect_prepare(f);
+    }
+    if (!rc) {
         c->ready=true;
         stage="detect";
         svc_detect_diagnostic(c,g);
@@ -522,6 +563,7 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         stage="initial_deadline";
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=svc_initial(c,dl,&stage);
+        if (!rc) svc_probe_after_mode(c);
     }
     if (!rc && g->heat.down_active) {
         struct gf5_clock current;

@@ -55,7 +55,12 @@ static void life_shape(u32 cpp, u32 pitch, u32 pages)
     CHECK(ledger_surfaces[r->display_sid].npages == pages);
     CHECK(ledger_surfaces[r->client_sid].npages == pages);
     CHECK(ledger_surfaces[r->client_sid].pitch == pitch);
-    CHECK(ledger_surfaces[r->client_sid].first == ledger_surfaces[r->display_sid].first);
+    if (TRI_RAM_FALLBACK_DEFAULT) {
+        CHECK(ledger_surfaces[r->client_sid].first != ledger_surfaces[r->display_sid].first);
+        CHECK(ledger_surfaces[r->client_sid].backing == LEDGER_SB_RAM);
+        CHECK(ledger_surfaces[r->client_sid].cache == LEDGER_CACHE_WB);
+        CHECK(r->client == P2V(ledger_surfaces[r->client_sid].first * PAGE_SIZE));
+    } else CHECK(ledger_surfaces[r->client_sid].first == ledger_surfaces[r->display_sid].first);
     CHECK(device.vram.first_off == pages * PAGE_SIZE);
     for (struct tri_vram_block *b = device.vram.blocks; b; b = b->next)
         CHECK(b->off >= pages * PAGE_SIZE);
@@ -89,26 +94,26 @@ static void run(void)
     gfx_init();
     CHECK(gfx_is_started() && g_backend == &gfx_backend_trident && device.screen_ready);
     CHECK(r->display_sid == display_sid && r->client_sid == client_sid);
-    life_shape(1, 1024, 480);
+    life_shape(1, TRI_RAM_FALLBACK_DEFAULT ? 640 : 1024, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     gfx_init(); CHECK(gfx_is_started() && g_backend == &gfx_backend_trident);
-    life_shape(1, 1024, 480);
-    CHECK(!tri_hal_mode(3)); life_shape(2, 2048, 480);
-    CHECK(!tri_hal_mode(5)); life_shape(4, 4096, 480);
+    life_shape(1, TRI_RAM_FALLBACK_DEFAULT ? 640 : 1024, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
+    CHECK(!tri_hal_mode(3)); life_shape(2, TRI_RAM_FALLBACK_DEFAULT ? 1280 : 2048, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
+    CHECK(!tri_hal_mode(5)); life_shape(4, TRI_RAM_FALLBACK_DEFAULT ? 2560 : 4096, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     device.settings.no_accel = true;
-    CHECK(!tri_hal_mode(3)); life_shape(2, 1280, 480);
+    CHECK(!tri_hal_mode(3)); life_shape(2, 1280, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     CHECK(!device.accel.initialized);
-    CHECK(!tri_hal_mode(5)); life_shape(4, 2560, 480);
+    CHECK(!tri_hal_mode(5)); life_shape(4, 2560, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     device.settings.no_accel = false;
-    CHECK(!tri_hal_mode(3)); life_shape(2, 2048, 480);
+    CHECK(!tri_hal_mode(3)); life_shape(2, TRI_RAM_FALLBACK_DEFAULT ? 1280 : 2048, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     gfx_shutdown();
     u32 operations = life_fake.operations;
     gfx_prepare_backend();
     CHECK(g_backend == &gfx_backend_trident && life_fake.operations == operations);
     CHECK(device.mode.selected.id == TRI_MODE_DEFAULT_ID);
-    CHECK(r->client_surface.cpp == 1 && ledger_surfaces[client_sid].npages == 480);
+    CHECK(r->client_surface.cpp == 1 && ledger_surfaces[client_sid].npages == (TRI_RAM_FALLBACK_DEFAULT ? 300 : 480));
     gfx_init();
     CHECK(gfx_is_started() && g_backend == &gfx_backend_trident);
-    life_shape(1, 1024, 480);
+    life_shape(1, TRI_RAM_FALLBACK_DEFAULT ? 640 : 1024, TRI_RAM_FALLBACK_DEFAULT ? 300 : 480);
     /* Obtain an actual application lease; the mode change must revoke it. */
     u32 owner;
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "lifetime", &owner));
