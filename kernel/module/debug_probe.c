@@ -10,6 +10,7 @@ struct probe_entry {
 static struct probe_entry entries[PROBE_POINT_MAX];
 static struct module_handle callback_owner;
 static u32 attached;
+static u32 registry_epoch = 1U;
 
 static int same_owner(struct module_handle a, struct module_handle b)
 {
@@ -128,6 +129,7 @@ i32 debug_probe_unregister(struct module_handle owner)
     for (u32 i = 0; i < PROBE_POINT_MAX; i++)
         if (entries[i].slot && same_owner(entries[i].owner, owner)) found = 1;
     if (found || (attached && same_owner(callback_owner, owner))) stop_attachment();
+    if (found) registry_epoch++;
     for (u32 i = 0; i < PROBE_POINT_MAX; i++) {
         if (!entries[i].slot || !same_owner(entries[i].owner, owner)) continue;
         entries[i].slot->hit = 0;
@@ -170,6 +172,16 @@ static i32 attach(const struct probe_attach *a)
 i32 debug_probe_control(u32 action, void *arg, u32 size)
 {
     if (!arg) return PROBE_ERR_ARG;
+    if (action == PROBE_KDEBUG_OWNER && size == sizeof(struct module_handle)) {
+        for (u32 i = 0; i < MODULE_RECORD_CAP; i++) {
+            const struct module_record *r = &module_records[i];
+            if (r->state != MODULE_RUNNING) continue;
+            if (r->module_id != MODULE_ID_KDEBUG) continue;
+            *(struct module_handle *)arg = (struct module_handle){i, r->generation};
+            return 0;
+        }
+        return PROBE_ERR_ARG;
+    }
     if (action == PROBE_ATTACH && size == sizeof(struct probe_attach))
         return attach(arg);
     if (action == PROBE_DETACH && size == sizeof(struct module_handle)) {
@@ -181,6 +193,7 @@ i32 debug_probe_control(u32 action, void *arg, u32 size)
     if (action == PROBE_LIST && size == sizeof(struct probe_list)) {
         struct probe_list *list = arg;
         kmemset(list, 0, sizeof(*list));
+        list->epoch = registry_epoch;
         for (u32 i = 0; i < PROBE_POINT_MAX; i++) {
             const struct probe_entry *e = &entries[i];
             struct module_record *r = module_record_get(e->owner);

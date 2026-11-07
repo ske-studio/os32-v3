@@ -155,3 +155,59 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 
 ## 確定 (2026-11-07、Opus 第 1 回の F1〜F7 を r2 で反映、PM が確認)
 - r2 は確認だけで足りるとのレビュアーの判断に沿い、PM が F1〜F7 の反映と PROBE_OP=20 を確かめて確定。
+
+## 追記 (2026-11-07): 段 A3 — kdebug の owner の取得と登録の epoch
+
+> 出所: ~/os32-tmp/run/kdbg-badd/ADDENDUM.final.md (astra 起草、Opus 第 1 回、PM が反映)。段 B の実装者が止まった 2 件 (自分の handle を得る口、停止中の解除と再登録の見分け) を埋める。末尾の「確定」が本文より優先。
+
+対象: main cde310ef、A1/A2 済み。単一アプリ・協調切替、公開 KAPI は変更しない。
+### 1. kdebug の owner 取得
+既存 control に専用 op を足す。init、ATTACH の owner/text 検証・参照保持は維持する。
+```c
+/* include/debug_probe.h: LIST=1, ATTACH=2, DETACH=3 は維持 */
+#define PROBE_KDEBUG_OWNER 4U
+/* debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner));
+ * out: struct module_handle owner; 成功0、未RUNNING/サイズ不正はPROBE_ERR_ARG */
+```
+broker が module_records[0..MODULE_RECORD_CAP) の RUNNING かつ MODULE_ID_KDEBUG を探し、
+`(struct module_handle){slot_index, record.generation}` を返す。取得だけでは参照を取らない。
+これは汎用の「呼出し元識別」ではなく唯一の kdebug の取得。ARM 直前に呼び、失敗なら ARM しない。
+### 2. 停止中の unregister を検出
+登録集合の epoch を LIST に追加し、解除があれば全設定を失効させる（最小の一括失効）。
+```c
+/* include/debug_probe.h: 既存欄の末尾に追加 */
+struct probe_list { u32 count; struct probe_info points[PROBE_POINT_MAX]; u32 epoch; };
+/* kernel/module/debug_probe.c: 新規内部状態 */
+static u32 registry_epoch = 1U;
+```
+LIST は件数0でも現在の epoch を返す。実際に点を1つ以上消す unregister で、
+既存 stop_attachment → epoch 更新 → entries 消去・参照解放の順とする。停止中も更新する。
+空解除・失敗解除・DETACH・register では更新しない。同じ owner/name/id の再登録でも旧 epoch と異なる。
+周回しない: U32_MAX の次は0（永久失効）。0では非空 register を PROBE_ERR_LIMIT、ATTACH も PROBE_ERR_LIMIT。
+既存点の解除・LIST・DETACH は引き続き可能。失敗 register による点・参照の部分更新は禁止。
+B は最初の ADD で epoch を保存し、以後 ADD/ARM/STATUS/DRAIN の入口で LIST と照合する。
+不一致/0なら全設定を破棄し STOP 状態へ、ARM は失敗（再ADDを要求）。旧記録は停止済みとして排出可。
+ARM の LIST 照合から ATTACH までは yield しない。wire と採取 ID は変更しない。
+これは §2 の「解除時に設定も無効化」を遅延照合で具体化する。点ごとの世代付き採取 ID は設けない。
+### 3. 生成契約・固定値
+`kernel/module/kdebug_imports.def` は control の既存 index=321、schema=2、計322本を維持（追加 import 不要）。
+`tools/module_schema.py` の KDEBUG `ops_version=4` を `5` に上げ、旧像を loader で拒否する。
+`python3 tools/gen_module_schema.py` → `kernel/module/module_schema.h`、
+`python3 tools/gen_kdebug_imports.py --stage S6 --out-dir kdebug/generated` を実行する。
+control の関数型は同じなので KDEBUG_ABI_GEN は変わらない。私有契約変更は ops_version で識別する。
+`make all` の build/kdebug.mk の正規レシピで hwdev/generated を再生成（debug_probe.h は contract CRC の入力）。
+HWDEV_ABI=1、HWDEV_MODULE_OPS_VERSION=2、core 26 slots と provider export 番号・版は維持。
+hwdev_contract_fixture.py の import/layout/inventory 固定値は当該入力不変なので維持し、CRC の kernel/core/body 一致を確認する。
+KDEBUG 版を固定する試験値のみ5へ追従し、旧4の拒否も試験。生成物の手編集は禁止。
+### 4. 段と受入
+A3: include/debug_probe.h、kernel/module/debug_probe.c、tools/module_schema.py、上記生成物、tools/tests/debug_probe_host.c・test_debug_probe.py と KDEBUG版固定の既存試験。正典への本追記はPMが反映。
+B PACK追記:「A3後の基点を使い、ARM直前に PROBE_KDEBUG_OWNER で owner を取得する。ADD時epoch保存、操作入口の照合・全設定失効・再ADD要求を実装する。」
+試験: A3はowner取得の成功/未RUNNING/誤サイズ、停止中ADD相当のLIST→解除→同一再登録のepoch差、空解除不変、周回封鎖、既存detach/参照回帰をqemuで検査。Bで旧設定ARM拒否→再ADD成功を検査。実装時に対象ビルド・変更試験 --mutate・--lint、取込CIはPM。
+変異: owner取得のRUNNING条件削除、停止中unregisterのepoch更新削除、Bのepoch比較削除を各一意アンカーで実行時REDにする（A3とBそれぞれの担当試験）。
+
+### 確定 (2026-11-07、Opus 第 1 回を PM が反映、本文より優先)
+- KDEBUG の ops_version は 4 のまま (確定設計 §3「kdebug ops v4 は不変」)。§3 の 5 への版上げ・module_schema.h と kdebug/generated の再生成・「旧 4 の拒否」の試験は削除。旧 kdebug.bin は FLAG_PAIR の pair CRC (kernel/module/module_image.c:127) で拒否される。
+- epoch は単に足すだけ。周回の扱い (0 で永久失効、0 のとき register・ATTACH を LIMIT で拒否、B の「0 なら破棄」、試験の「周回封鎖」) は削除 (シングルタスクで 4G 回の解除に届かない)。
+- hwdev/generated/{hwdev_contract.h, hwdev_core.c, hwdev_imports.json} は include/debug_probe.h が contract の入力なので CRC (HWDEV_CONTRACT_CRC・module_abi_gen) だけ変わる。再生成は make all (build/kdebug.mk:81-82) で行い、A3 の取り込みに含める。REVIEWED_* の 3 値は動かない。hwdev・GeForce・Trident の像は kernel と同時に配備する。
+- B: ADD で保存する epoch は、名前から ID を引いたのと同じ LIST の応答の値。ADD の入口で不一致なら全設定を破棄し、今の ADD を最初の ADD として続ける (失敗にするのは ARM だけ、状態の欄で失効を示す)。記録の名前は ADD のときに保存したものを使う。
+- 変異を 1 件足す: OWNER の検索から MODULE_ID_KDEBUG の条件を外す (kdebug より若い slot に RUNNING の別の module の記録を置く試験で RED)。
