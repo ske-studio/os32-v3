@@ -774,6 +774,7 @@ static void case_lower(void)
     setup();
     fx_dir("/ETC/RC.D");
     fx_put("/ETC/RC.D/BOOT.SH", 12);
+    fx_put("/ETC/NETCD.CFG", 67);
     CHECK(run() == 0);
     CHECK(fx_exists("/hd0/sys/shell.bin"));
     CHECK(fx_exists("/hd0/bin/ls.bin"));
@@ -789,6 +790,8 @@ static void case_lower(void)
     /* profile は写さない (FDD 用の PATH が HDD に残ると /usr/bin が消える) */
     CHECK(!fx_exists("/hd0/etc/profile"));
     CHECK(!fx_exists("/hd0/etc/PROFILE"));
+    CHECK(!fx_exists("/hd0/etc/netcd.cfg"));
+    CHECK(!fx_exists("/hd0/etc/NETCD.CFG"));
 }
 
 /* (2) 事前検査: 欠損・空で 1 バイトも書かない */

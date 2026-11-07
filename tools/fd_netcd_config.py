@@ -119,6 +119,7 @@ def configure(source, output, alias, peer):
     with output.open('xb') as stream:
         stream.write(result)
     if Floppy(output.read_bytes()).read_config() != payload:
+        output.unlink()
         raise ValueError('netcd.cfg readback mismatch')
 
 

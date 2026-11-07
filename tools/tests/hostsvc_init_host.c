@@ -37,10 +37,13 @@ void net_unbind(void) { CHECK(parsed && step==4); unbinds++; }
 int net_start(enum NetNicId id,const u8 peer[6])
 {
     CHECK(id==NET_NIC_AUTO && unbinds==1 && !mounts && !initialized);
+    if (starts++) {
+        CHECK(starts==2 && (mode==6 || mode==8) && !peer);
+        return mode==8 ? -1 : 0;
+    }
     if(mode==1) CHECK(!peer);
     else {CHECK(peer); for(int i=0;i<6;i++) CHECK(peer[i]==expected[i]);}
-    starts++;
-    return mode==6 ? -1 : 0;
+    return mode==6 || mode==8 ? -1 : 0;
 }
 int net_mac(u8 mac[6]) { for(int i=0;i<6;i++) mac[i]=(u8)(i+1); return 0; }
 void body_lan_init(SfsLan *,const SfsLanNic *,const SfsIo *,void *);
@@ -71,8 +74,9 @@ static int suite(void)
     kernel_boot_lan(&boot);
     CHECK(step==3 || step==4);
     if(mode==0 || mode==4 || mode==5) {CHECK(!starts && !mounts && !unbinds); return 0;}
+    if(mode==6 || mode==8) {CHECK(starts==2 && unbinds==1 && !mounts && !initialized); return 0;}
     CHECK(starts==1 && unbinds==1);
-    if(mode==2 || mode==6) {CHECK(!mounts); return 0;}
+    if(mode==2) {CHECK(!mounts); return 0;}
     CHECK(mounts==1 && initialized==1 && saved.io_ctx==&boot_sfs_lan);
     /* Use borrowed objects after the entire boot helper's stack has returned. */
     SfsLan *lan=saved.io_ctx;

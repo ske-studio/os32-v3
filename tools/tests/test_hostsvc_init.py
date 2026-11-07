@@ -25,6 +25,7 @@ MUTATIONS = (
     ('clock', 'return tick_count;', 'return 0;'),
     ('init', 'sfs_lan_init(&boot_sfs_lan, 0, &boot_sfs_clock, 0);',
      '(void)boot_sfs_clock;'),
+    ('restore-bind', '        net_start(NET_NIC_AUTO, 0);', '        (void)0;'),
 )
 def build_run(work, source):
     (work / 'hostsvc_init_source.inc').write_text(source)
@@ -34,7 +35,7 @@ def build_run(work, source):
         '-ffunction-sections', '-fdata-sections', '-I'+str(work), '-I'+str(ROOT),
         *include_flags(ROOT), '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
         str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), '-o', str(exe)], check=True)
-    return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(8)]
+    return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(9)]
 def main():
     source = (ROOT / 'init/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
     with tempfile.TemporaryDirectory(prefix='hostsvc-init-') as td:
@@ -44,7 +45,7 @@ def main():
         (work / 'lan.c').write_text(lan)
         results=build_run(work,source)
         assert not any(results), results
-        print('GREEN absent / SFS / peer only / SFS+peer / invalid / missing module / NIC failure / mount failure', flush=True)
+        print('GREEN absent / SFS / peer only / SFS+peer / invalid / missing module / NIC failure+restore / mount failure / restore failure', flush=True)
         if '--mutate' in sys.argv:
             for name,before,after in MUTATIONS:
                 assert source.count(before)==1, name

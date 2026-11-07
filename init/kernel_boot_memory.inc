@@ -46,6 +46,9 @@ static void kernel_boot_hostsvc(struct boot_context *boot)
      * yet, so replace that binding before NETCD or /host can use it. */
     net_unbind();
     rc = net_start(NET_NIC_AUTO, have_peer ? boot_sfs_lan.peer : 0);
+    if (rc) {
+        net_start(NET_NIC_AUTO, 0);
+    }
     if (!rc && enabled) {
         sfs_lan_init(&boot_sfs_lan, 0, &boot_sfs_clock, 0);
         rc = sfs_lan_set_peer(&boot_sfs_lan, peer);

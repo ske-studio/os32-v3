@@ -145,3 +145,6 @@ fd:
     - fd: /etc/profile
       host: assets/profile_fdd
       reason: FD 用の PATH (/bin:/sbin、/usr/bin を含めない) と起動の表示。install.bin は写さない。HDD の /etc/profile (assets/profile) は配備マニフェストに無い
+    - fd: /etc/netcd.cfg
+      host: assets/netcd.cfg
+      reason: FD 起動専用の NETCD・SFS_LAN・peer 設定。fd_netcd_config.py が設定し、install.bin は HDD へ写さない

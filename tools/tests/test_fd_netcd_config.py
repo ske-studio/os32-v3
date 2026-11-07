@@ -125,7 +125,7 @@ def exercise(script, work):
             assert subprocess.run([sys.executable, '-B', '-c', probe,
                                    str(script.parent), str(source), str(bad_output)],
                                   capture_output=True).returncode != 0
-            bad_output.unlink()
+            assert not bad_output.exists(), 'unverified output image remains'
     return 0
 
 
@@ -140,6 +140,7 @@ MUTATIONS = (
     ('geometry', "for name in fat.GEOMETRIES:", "for name in ('2hd',):"),
     ('readback', 'if Floppy(output.read_bytes()).read_config() != payload:',
      'if False:'),
+    ('readback-cleanup', '        output.unlink()', '        pass'),
 )
 
 
