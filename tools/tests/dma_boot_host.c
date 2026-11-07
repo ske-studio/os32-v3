@@ -111,6 +111,9 @@ static void unicode_file_load(void)
 void boot_platform_run(enum boot_point point, const struct boot_context *ctx)
 { (void)ctx; CHECK(point == BOOT_PCI_RESOURCES && reserved); }
 
+/* Notification allocation is covered by hostsvc-init; keep the DMA seam. */
+int host_mailbox_init(void) { CHECK(reserved && tested == 1); return 0; }
+
 static int lan_module_load(void)
 {
     struct dma_buf b;
