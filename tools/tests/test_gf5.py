@@ -122,6 +122,11 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+    ('boot-trip-deep', 'hwdev/gf/state.c', 'dst->fan.trip=trip;', 'trip=dst->fan.trip;', 'state'),
+    ('boot-raw', 'hwdev/gf/state.c', 'dst->clock_raw=boot->clock_raw;', 'dst->clock_raw=dst->clock_raw;', 'state'),
+    ('boot-available', 'hwdev/gf/state.c', 'dst->clock_available=boot->clock_available;', 'dst->clock_available=dst->clock_available;', 'state'),
+    ('boot-epoch', 'hwdev/gf/state.c', 'dst->vid=boot->vid;', 'dst->vid=boot->vid; dst->saved_epoch=boot->saved_epoch;', 'state'),
+
     ('raw-save-core', 'hwdev/gf/clock.c', 'rd(io,CLK_CORE,&raw.nc);', 'rd(io,CLK_SHADER,&raw.nc);', 'clocksave'),
     ('raw-save-coef', 'hwdev/gf/clock.c', 'rd(io,CLK_COEF,&raw.nn);', 'rd(io,CLK_SHADER,&raw.nn);', 'clocksave'),
     ('raw-save-shader', 'hwdev/gf/clock.c', 'rd(io,CLK_SHADER,&raw.sc);', 'rd(io,CLK_CORE,&raw.sc);', 'clocksave'),

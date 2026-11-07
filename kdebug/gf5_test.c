@@ -43,8 +43,8 @@
 static struct {
     u32 arg[GF5_WIRE_OPERANDS];
     struct gf5_plan plan;
-    struct gf5 *plan_owner, *image_owner;
-    struct gf5_image *image;
+    struct gf5 *plan_owner, *image_owner[2];
+    struct gf5_image *image[2];
     bool planned;
 } diagnostic;
 
@@ -123,6 +123,71 @@ static void vram_records(const char *stage, const struct gf5_image *image)
         }
         if (d->test.value.owner) extent_record(stage, &d->test.value, NULL);
     }
+}
+/* Only this reserved test face participates in the RAM comparison. Scanout
+ * and cursor bytes may change between commands. Restore CRC is observation
+ * only: state_restore writes B's host copies back after RAM programming. */
+static void test_vram_record(const char *stage)
+{
+    const struct gf5_test_ops *o = geforce_feature5_ops();
+    if (o && o->ctx && o->ctx->display && o->ctx->display->test.value.owner)
+        extent_record(stage, &o->ctx->display->test.value, NULL);
+    else if (!serial_gate_active()) {
+        serial_puts_polled("GF5 DATA stage="); serial_puts_polled(stage);
+        serial_puts_polled(" vram_crc=unavailable\r\n");
+    }
+}
+static bool same_clock(const struct gf5_clock *a, const struct gf5_clock *b)
+{
+    return a->core_khz == b->core_khz && a->shader_khz == b->shader_khz &&
+        a->mem_khz == b->mem_khz;
+}
+/* UINT32_MAX asks the diagnostic to choose the first dense ROM entry whose
+ * clock differs from the current read. No synthesized performance target. */
+static i32 different_performance(bool *local)
+{
+    const struct gf5_test_ops *o = geforce_feature5_ops();
+    if (!o || !o->ctx || !o->clock_read) { *local = true; return GF5_ENOTSUP; }
+    struct gf5 *owner = o->ctx;
+    struct gf5_clock before, after;
+    i32 rc = o->clock_read(owner, &before);
+    if (rc) return rc;
+    clock_record("before", &before);
+    o = geforce_feature5_ops();
+    if (!o || o->ctx != owner || !o->perf_count) { *local = true; return o && o->ctx && o->ctx != owner ? GF5_ESTATE : GF5_ENOTSUP; }
+    u32 count;
+    rc = o->perf_count(owner, &count);
+    if (rc) return rc;
+    for (u32 i = 0; i < count; ++i) {
+        struct gf5_perf_entry entry;
+        o = geforce_feature5_ops();
+        if (!o || o->ctx != owner || !o->perf_get) { *local = true; return o && o->ctx && o->ctx != owner ? GF5_ESTATE : GF5_ENOTSUP; }
+        rc = o->perf_get(owner, i, &entry);
+        if (rc) return rc;
+        if (same_clock(&before, &entry.clock)) continue;
+        clock_record("requested", &entry.clock);
+        test_vram_record("before");
+        o = geforce_feature5_ops();
+        if (!o || o->ctx != owner || !o->perf_select) { *local = true; return o && o->ctx && o->ctx != owner ? GF5_ESTATE : GF5_ENOTSUP; }
+        rc = o->perf_select(owner, (u8)i);
+        if (rc) {
+            if (rc == GF5_EBUSY && !serial_gate_active())
+                serial_puts_polled("GF5 DATA stage=after verification=unverified reason=thermal_ceiling\r\n");
+            return rc;
+        }
+        test_vram_record("after");
+        o = geforce_feature5_ops();
+        if (!o || o->ctx != owner || !o->clock_read) { *local = true; return o && o->ctx && o->ctx != owner ? GF5_ESTATE : GF5_ENOTSUP; }
+        rc = o->clock_read(owner, &after);
+        if (rc) return rc;
+        clock_record("after", &after);
+        if (same_clock(&before, &after)) break;
+        return 0;
+    }
+    if (!serial_gate_active())
+        serial_puts_polled("GF5 DATA stage=after verification=unverified reason=no_different_clock\r\n");
+    *local = true;
+    return GF5_ENOTSUP;
 }
 /* rc/source are copied while the slot is live. A second dispatch, even a
  * last_rc query, obtains the accessor again. No logging dereferences a loan. */
@@ -346,7 +411,7 @@ static void observation(struct gf5 *g)
     /* Only dereference the current owner's retained image. */
     number(" image=", g->image != NULL);
     if (g->image) number(" complete=", g->image->complete);
-    number(" diagnostic_image=", diagnostic.image != NULL);
+    number(" diagnostic_image=", (diagnostic.image[0] != NULL || diagnostic.image[1] != NULL));
     number(" plan=", diagnostic.planned && diagnostic.plan_owner == g);
     number(" plan_valid=", g->plan_guard.valid);
     number(" plan_epoch=", g->plan_guard.epoch);
@@ -446,7 +511,7 @@ static i32 info(bool *local)
         signed_number(" offset_num=", g->fan.offset_num);
         signed_number(" offset_den=", g->fan.offset_den);
         signed_number(" offset_constant=", g->fan.offset_constant);
-        number(" image_held=", diagnostic.image != NULL);
+        number(" image_held=", (diagnostic.image[0] != NULL || diagnostic.image[1] != NULL));
         serial_puts_polled("\r\n");
     }
     i32 rc = rom_records(&o->ctx->rom);
@@ -507,12 +572,12 @@ i32 gf5_test(u32 session)
     }
     bool gpio = stage == GF5T_GPIO_GET || stage == GF5T_GPIO_SET;
     u32 format = gpio ? GF5_WIRE_GPIO_TAG : 0;
-    if ((session & ~GF5_WIRE_BYTE_MASK) != format || stage > GF5T_LAST_RC)
+    if ((session & ~GF5_WIRE_BYTE_MASK) != format || stage > GF5T_BOOT_TARGET)
         return finish(stage, GF5_EINVAL, true);
     const struct gf5_test_ops *o = geforce_feature5_ops();
     if (!o || !o->ctx) return finish(stage, GF5_ENOTSUP, true);
     if (o->ctx->phase != GF5_RUN && stage != GF5T_INFO && stage != GF5T_RESTORE &&
-        stage != GF5T_FREE && stage != GF5T_LAST_RC) {
+        stage != GF5T_FREE && stage != GF5T_LAST_RC && stage != GF5T_BOOT_TARGET) {
         if (!serial_gate_active()) serial_puts_polled("GF5 DATA boundary=phase\r\n");
         return finish(stage, GF5_ESTATE, true);
     }
@@ -607,7 +672,8 @@ i32 gf5_test(u32 session)
         break;
     }
     case GF5T_PERF_SELECT:
-        if (a[0] > U8_MAX) { rc = GF5_EINVAL; local = true; }
+        if (a[0] == U32_MAX) rc = different_performance(&local);
+        else if (a[0] > U8_MAX) { rc = GF5_EINVAL; local = true; }
         else { CALL(perf_select, (u8)a[0]); }
         break;
     case GF5T_THERM: {
@@ -687,36 +753,71 @@ i32 gf5_test(u32 session)
     }
     case GF5T_TILE_CLEAR: CALL(tile_clear, a[0]); break;
     case GF5T_SAVE:
-        if (diagnostic.image) { rc = GF5_EBUSY; local = true; break; }
+        if (a[0] > 1U) { rc = GF5_EINVAL; local = true; break; }
+        if (diagnostic.image[a[0]]) { rc = GF5_EBUSY; local = true; break; }
         o = geforce_feature5_ops();
         if (!o || !o->ctx || !o->state_save) { rc = GF5_ENOTSUP; local = true; break; }
-        diagnostic.image_owner = o->ctx;
+        diagnostic.image_owner[a[0]] = o->ctx;
         /* Direct out retains a partial image even if save/stop fails. */
-        rc = o->state_save(o->ctx, &diagnostic.image);
-        if (diagnostic.image && !serial_gate_active()) {
-            serial_puts_polled("GF5 DATA stage=save"); number(" bytes=", diagnostic.image->bytes);
-            number(" extents=", diagnostic.image->nextent);
-            number(" complete=", diagnostic.image->complete);
-            number(" epoch=", diagnostic.image->saved_epoch); serial_puts_polled("\r\n");
+        rc = o->state_save(o->ctx, &diagnostic.image[a[0]]);
+        if (diagnostic.image[a[0]] && !serial_gate_active()) {
+            const struct gf5_image *im = diagnostic.image[a[0]];
+            serial_puts_polled("GF5 DATA stage=save"); number(" slot=", a[0]);
+            number(" bytes=", im->bytes); number(" extents=", im->nextent);
+            number(" complete=", im->complete); number(" epoch=", im->saved_epoch);
+            number(" clock_available=", im->clock_available);
+            number(" fan_available=", im->fan_available);
+            number(" volt_available=", im->volt_available);
+            if (im->clock_available) {
+                number(" nc=", im->clock_raw.nc); number(" nn=", im->clock_raw.nn);
+                number(" sc=", im->clock_raw.sc); number(" mux=", im->clock_raw.mux);
+                number(" core_khz=", im->clock.core_khz);
+                number(" shader_khz=", im->clock.shader_khz);
+                number(" mem_khz=", im->clock.mem_khz);
+            }
+            serial_puts_polled("\r\n");
         }
-        if (diagnostic.image) vram_records("save_extent", diagnostic.image);
+        if (diagnostic.image[a[0]]) vram_records("save_extent", diagnostic.image[a[0]]);
+        test_vram_record(a[0] ? "changed" : "boot");
         break;
     case GF5T_RESTORE:
     case GF5T_FREE:
+        if (a[0] > 1U) { rc = GF5_EINVAL; local = true; break; }
         o = geforce_feature5_ops();
-        if (!o || !o->ctx || !diagnostic.image || o->ctx != diagnostic.image_owner) {
+        if (!o || !o->ctx || !diagnostic.image[a[0]] ||
+            o->ctx != diagnostic.image_owner[a[0]]) {
             if (!serial_gate_active()) serial_puts_polled("GF5 DATA stage=image boundary=no_image_or_owner\r\n");
             rc = GF5_ESTATE; local = true; break;
         }
         if (stage == GF5T_RESTORE) {
             if (!o->state_restore) { rc = GF5_ENOTSUP; local = true; break; }
-            rc = o->state_restore(o->ctx, diagnostic.image);
-            vram_records("restore_extent", diagnostic.image);
+            rc = o->state_restore(o->ctx, diagnostic.image[a[0]]);
+            vram_records("restore_extent", diagnostic.image[a[0]]);
+            if (!rc && a[0] == 1U) {
+                clock_record("ram_requested", &diagnostic.image[1]->clock);
+                struct gf5_clock clock;
+                CALL(clock_read, &clock);
+                if (!rc) clock_record("restored", &clock);
+                test_vram_record("restored_observation_only");
+            }
         } else {
             if (!o->state_free) { rc = GF5_ENOTSUP; local = true; break; }
-            o->state_free(o->ctx, diagnostic.image);
-            diagnostic.image = NULL; diagnostic.image_owner = NULL;
+            o->state_free(o->ctx, diagnostic.image[a[0]]);
+            o = geforce_feature5_ops();
+            if (!o || o->ctx != diagnostic.image_owner[a[0]] || o->ctx->busy) {
+                rc = GF5_EBUSY; local = true; break;
+            }
+            diagnostic.image[a[0]] = NULL; diagnostic.image_owner[a[0]] = NULL;
         }
+        break;
+    case GF5T_BOOT_TARGET:
+        o = geforce_feature5_ops();
+        if (!o || !o->ctx || !diagnostic.image[0] || !diagnostic.image[1] ||
+            diagnostic.image_owner[0] != o->ctx || diagnostic.image_owner[1] != o->ctx) {
+            rc = GF5_ESTATE; local = true; break;
+        }
+        if (!o->state_boot_target) { rc = GF5_ENOTSUP; local = true; break; }
+        rc = o->state_boot_target(o->ctx, diagnostic.image[1], diagnostic.image[0]);
         break;
     case GF5T_POLL: rc = poll(&local); break;
     case GF5T_WAIT: {
