@@ -23,6 +23,8 @@
 #include "../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
 #include "../kernel/time/cpu_calibrate.h"
+#include "clock_source.h"
+#include "kernel_tick.h"
 #include "../kernel/time/sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
 #include "../mm/paging.h"
 #include "../mm/memory_boot.h"

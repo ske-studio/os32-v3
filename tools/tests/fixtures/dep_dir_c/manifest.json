@@ -79,7 +79,7 @@
     "drivers/sound/cs4231/pcm_module.h": "f40daeb739db309fdfe2511c8a6437f49cbb78a72565e12bd30b403b39b3a52a",
     "mm/pgalloc.h": "985854019b6bcf8762d82df9470ebbf1efd7e4e982f1c27b9c620c78766b9815",
     "mm/physmem.h": "2c85e17269cd06be6411828316979a933fb9583e5d3daa7fd15d8752de1f2474",
-    "kernel/time/pit_math.h": "97230ceceff5173682cecc01300366beb3d953bd9c98a8515f8dbd6814b82ded",
+    "platform/pc98/pit_math.h": "97230ceceff5173682cecc01300366beb3d953bd9c98a8515f8dbd6814b82ded",
     "include/platform_irq.h": "7b1ace28c3e9c488a8cca804d13193fbdafde347bc22638d75ebe162f00ed5e3",
     "include/platform_sys.h": "6ea00b601903be17ee054a5b3d50aa8e418ca82c40f7b6b3758359ef822da020",
     "include/platform_timer.h": "a4896aff7b7dd756127481b52ba506ca80a958aa4f3b4da06261ea4c5cd655ee",

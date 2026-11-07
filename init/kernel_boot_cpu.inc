@@ -52,7 +52,7 @@ static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot)
     boot_platform_run(BOOT_DMA, boot);
 
     tvram_print(36, 1, "PIT...", TATTR_GREEN);
-    pit_init(PIT_HZ);
+    platform_clock_init(PIT_HZ);
     tvram_print(42, 1, "OK  ", TATTR_WHITE);
     /* どちらのクロックで分周したかを出す。**NP21/W では常に 1.9968M** なので、
      * 実機で 2.4576M が出ていることがこの修正の目視確認になる。 */

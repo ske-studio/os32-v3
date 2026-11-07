@@ -15,8 +15,6 @@
 static struct idt_entry idt[IDT_ENTRIES];
 static struct idt_ptr   idtp;
 
-/* フレームカウンタ (タイマ割り込みで更新) */
-volatile u32 tick_count = 0;
 
 /* ======================================================================== */
 /*  外部ASMスタブ (isr_stub.asm で定義)                                     */

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../../kernel/time/time_math.c"
+#include "../../platform/pc98/pit_time.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

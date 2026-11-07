@@ -57,7 +57,7 @@
   "kernel/time/clock_service.c",
   "kernel/time/cpu_calibrate_math.c",
   "kernel/time/ktime.c",
-  "kernel/time/pit_math.c",
+  "kernel/time/tick.c",
   "kernel/time/time_math.c",
   "kernel/ver_collect.c",
   "kernel/ver_format.c",

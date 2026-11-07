@@ -49,7 +49,7 @@ def kernel_order(kernel=None, overrides=None):
         'kstack_hw_init();', 'pc98_boot_bind(&boot, boot_drive);',
         'bootinfo_capture();', 'v86_bios_save_real();',
         'mem_kb = memory_boot_detect(mem_kb);', 'platform_boot_clock_detect();',
-        'boot_platform_run(BOOT_DMA, &boot);', 'pit_init(PIT_HZ);',
+        'boot_platform_run(BOOT_DMA, &boot);', 'platform_clock_init(PIT_HZ);',
         'platform_boot_irq_start();',
         'cpu_calibrate();', 'boot_platform_run(BOOT_INPUT, &boot);',
         'boot_platform_run(BOOT_FLOPPY, &boot);',

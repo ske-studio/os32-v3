@@ -1,9 +1,9 @@
-"""PIT の分周 (kernel/time/pit_math.c) のホスト試験。
+"""PIT の分周 (platform/pc98/pit_math.c) のホスト試験。
 
 記録: tools/tests/pit_clock_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-0 (PIT の分周をクロック判定に合わせる)
 
-実物の kernel/time/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
+実物の platform/pc98/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
 I/O もタイマも触らず、模型は 1 つも要らない。
 
 **NP21/W は 1.9968MHz 固定なので、2.4576MHz 系の分岐はエミュレータでは
@@ -14,7 +14,7 @@ I/O もタイマも触らず、模型は 1 つも要らない。
   python3 -B tools/tests/test_pit_clock.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pit-clock-host', tier=4,
-    covers=['include/time_units.h', 'arch/x86/kernel/idt.c', 'kernel/time/pit_math.c', 'kernel/time/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'kernel/time/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'kernel/time/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.464296)
 
 from kernel_includes import include_flags
@@ -26,15 +26,15 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pit_clock_host.c"
-SRC = ROOT / "kernel/time/pit_math.c"
+SRC = ROOT / "platform/pc98/pit_math.c"
 # カーネルと同じ i386-elf で通す実ソース。idt.c まで入れるのは、
 # pit_init が pit_compute と sysclk_hz を**実際に**呼ぶ形を固定するため。
 # STATIC_ASSERT (中間積が 32bit に収まるか) が効くのもこちら側。
 TARGET_SRCS = [
-    ("kernel/time/pit_math.c", []),
+    ("platform/pc98/pit_math.c", []),
     ("kernel/time/sysclk.c", []),
     ("arch/x86/kernel/idt.c", []),
-    ("kernel/time/pit.c", []),
+    ("platform/pc98/pit.c", []),
     ("platform/pc98/clock.c", []),
     ("platform/pc98/timer.c", []),
 ]
@@ -80,12 +80,12 @@ def host_build(tmp, source_text=None):
         mut.mkdir(parents=True, exist_ok=True)
         (mut / "pit_math.c").write_text(source_text, encoding="utf-8")
         (mut / "pit_math.h").write_text(
-            (ROOT / "kernel/time/pit_math.h").read_text(encoding="utf-8"),
+            (ROOT / "platform/pc98/pit_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/time/pit_math.c"', '"kernel/time/pit_math.c"'),
+                '"../../platform/pc98/pit_math.c"', '"platform/pc98/pit_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pit-clock-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/time/pit_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real platform/pc98/pit_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

@@ -1,3 +1,4 @@
+#include "pit.h"
 /* Same harness for fixed baseline capture and the platform implementation. */
 #include "io.h"
 #include "idt.h"

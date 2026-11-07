@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PATHS = ['init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc',
          'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
          'platform/pc98/boot_irq.c']
-CHECK = dict(name='boot-order-host', tier=1, covers=['init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc',
+CHECK = dict(name='boot-order-host', tier=1, covers=['include/clock_source.h', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc',
     'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
     'platform/pc98/boot_irq.c',
     'tools/tests/test_boot_order.py',
@@ -49,7 +49,7 @@ static void pic_init(void) { CHECK(flags==expected_flags); event('P'); }
 void irq_topology_check(void) { CHECK(flags==expected_flags); event('Q'); }
 static void sysclk_detect(void) { CHECK(flags==expected_flags); event('C'); }
 static void irq_enable(unsigned irq) { CHECK(flags==expected_flags); CHECK(irq==0 || irq==7); event(irq ? '7' : '0'); }
-static void pit_init(unsigned hz) { CHECK(hz==100 && flags==expected_flags); event('H'); }
+static int platform_clock_init(u32 hz) { CHECK(hz==100 && flags==expected_flags); event('H'); return 0; }
 static void _enable(void) { flags=1; event('E'); }
 static void cpu_calibrate(void) { CHECK(flags==1); event('A'); }
 static unsigned cpu_loops_per_tick(void) { return 1000; }
