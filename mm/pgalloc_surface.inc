@@ -63,7 +63,22 @@ ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
     for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
         const struct ledger_surface *other = &ledger_surfaces[i];
         if (other->npages && sf->first < other->first + other->npages &&
-            other->first < sf->first + sf->npages) goto done;
+            other->first < sf->first + sf->npages) {
+            /* TRIDENT_FULL_DESIGN §2: DISPLAY and CLIENT name one VRAM
+             * drawing target. Only CLIENT is leased; neither owns RAM. */
+            if (sf->owner != other->owner ||
+                sf->backend != LEDGER_SF_TRIDENT || other->backend != LEDGER_SF_TRIDENT ||
+                sf->backing != LEDGER_SB_VRAM || other->backing != LEDGER_SB_VRAM ||
+                sf->cache != LEDGER_CACHE_UC || other->cache != LEDGER_CACHE_UC ||
+                !((sf->role == LEDGER_ROLE_DISPLAY && other->role == LEDGER_ROLE_CLIENT) ||
+                  (sf->role == LEDGER_ROLE_CLIENT && other->role == LEDGER_ROLE_DISPLAY)) ||
+                sf->first != other->first || sf->npages != other->npages ||
+                sf->width != other->width || sf->height != other->height ||
+                sf->pitch != other->pitch || sf->format != other->format ||
+                sf->planes != other->planes) goto done;
+            for (u32 n = 0; n < sf->planes; n++)
+                if (sf->plane_offset[n] != other->plane_offset[n]) goto done;
+        }
     }
     for (i = 0; i < LEDGER_MAX_SURFACES; i++)
         if (!ledger_surfaces[i].npages && ledger_surfaces[i].gen != LEDGER_SURFACE_GEN_MAX) break;
