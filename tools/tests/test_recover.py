@@ -25,6 +25,7 @@ def host_cmd(exe):
     return ["gcc", *FLAGS, "-O0", "-nostdlib", "-static", "-no-pie",
             "-I" + str(ROOT / "tools/tests/recover_hostshim"),
             "-I" + str(ROOT / "include"),
+            "-I" + str(ROOT / "platform/pc98"),
             str(ROOT / "tools/tests/recover_host.c"), "-o", str(exe)]
 
 
