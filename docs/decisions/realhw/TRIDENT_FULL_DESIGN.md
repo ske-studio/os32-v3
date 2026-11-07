@@ -247,3 +247,78 @@ hostはMMIO記録fakeで値/幅/順/分岐を比較し、GPU描画は実機で�
 - N1: NoAccel (packed24 含む) も VRAM CLIENT に直接描く。RAM CLIENT と byte の present は tri-w32 で 32 ビット書き不可と決まったときの起動全体の退避構成だけ (§2・F6・F7・§10・§11)。
 - N2: hook の出口の待ち = 各操作末尾の Sync・ClearSync そのもの、足し増ししない (§10 F1 clip/同期)。
 - R10 残り: test_device_reservation を F6/F12 の追従試験に追加 (§10)。
+
+## 追記 (2026-11-07、表示と CLIENT の面の寿命 — astra 起草、Opus 第 1 回、PM が反映。実装中の PM 決定 F6 の 1〜3 を置き換える)
+
+2026-11-07。案3・単一タスク・協調切替を維持。共有 gfx/gfx_core.c は変更しない。
+根拠: DESIGN.final.md 末尾 F6 1〜4・F10・tri-w32、tt-life/report.md、tri-fixsel/report.md。
+手本 D は確定設計の略号。D:3534-3546 の直接描画、D:3637-3661 の固定仮想画面と後方 offscreen に対応する。
+
+### 決定と時点
+「起動時に一度」を「初回 ScreenInit で確定して以後固定」に替える。選択用の暫定面だけをその前に置く。
+DISPLAY / CLIENT は常に同一 VRAM 先頭の UC 別名。暫定面も RAM を持たず、内容の読書き・lease 公開をしない。
+| 時点 | 容量・既定 mode の知識 | 面の操作 | lease |
+|---|---|---|---|
+| 起動資源 | mapping/decode 上限のみ、既定 ID は静的既知 | 予約・写像のみ、面なし | なし |
+| 初回 prepare | SPR 未知、既定の暫定 pitch/format は HAL 静的記述から既知 | 既定の必要ページだけ両面 create、unready | なし |
+| gfx_core 選択 | 同上、加速 pitch は未確定 | CLIENT の format/planes/npages で既定 mode を検査 | なし |
+| init/ScreenInit | arm 後 PreInit で SPR・識別、既定 mode の実 pitch が確定 | 全 HAL 候補の最大領域 B を算出し両面を確定 | 初回はなし |
+| ScreenInit 完了 | 容量・mode とも確定 | bb・query・mode 表を更新し、成功後に利用可能化 | ここから許可 |
+| mode 切替 | 容量 B は既知・固定、要求 mode を検証 | Sync/利用停止・lease revoke 後、両面 regen | 操作中はゼロ |
+| Close | 容量 B・最終 mode を保持 | unready・lease revoke、描画停止と既存復帰順、面は保持 | 無効化 |
+再 prepare/init は確定面を縮小せず、現在の形を使う。再 ScreenInit は既存の固定 B のまま regen する。
+Close は映像復帰であり資源解放ではない。最終 rollback は disarm・lease ゼロを確認して面 release → unmap、確定状態も消す。
+
+### configure の契約（擬似 C）
+```c
+/* trident.h の callback 宣言を1件変更。core は module 関数を呼ばない。 */
+int (*configure)(const struct tri_mode *mode, u32 display_bytes, bool final);
+/* resources.c: static bool capacity_final; 内部状態のみ追加 */
+prepare: /* I/O なし。初回だけ。declared_bytes を仮値で埋めない */
+    C0 = min(mapped_bytes, decode_bytes, nonzero_setting_or_unlimited);
+    P = page_up(hal_default_pitch * hal_default_height);
+    require(P != 0 && P <= C0);
+    configure(&provisional_default, P, false); /* 両面が既存なら何もしない */
+ScreenInit: /* PreInit の SPR 読取・識別後、実 mode の検証後 */
+    B = tri_vram_display_max_bytes(d);
+    require(B != 0 && B <= min(SPR_bytes, C0));
+    configure(&prepared_mode, B, true);
+set_mode:
+    require(mode_bytes <= fixed_B);
+    configure(&prepared_mode, fixed_B, true);
+```
+暫定 mode は既定 HAL 記述の pitch と同じ display_width を持たせる。識別前の tri_mode_prepare/max_bytes は呼ばない。
+prepare は resources の ready/regs/lfb/境界/configure を先に検査し、configure 成功後に client と bb を検査・公開する。
+configure は format を検査し、display_bytes の整列・境界・pitch×height の収容を検証する。npages=display_bytes/PAGE_SIZE。
+未確定→確定では両面 unready、lease_count=0 を必須とし、サイズが異なれば ledger_surface_release（free）+create。
+同サイズなら regen でよい。regen に npages 変更を期待しない（mm/pgalloc_surface.inc:107-130）。
+両面成功時だけ capacity_final=true と descriptor/SID/gen を公開する。途中失敗は候補を利用不能にし、片面を片付けて再試行可能にする。
+作り直し時の SID/世代の連続性は要求しない。lease は未公開なので失効したアプリの参照は存在しない。
+確定後は異なる display_bytes を拒否し、同じ値での形変更だけを許す。false の再呼出しは確定状態を戻さない。
+B は HAL 対応形式の有効候補について、実際の加速/NoAccel pitch×height の最大をページ切上げした値。
+F5 first_off=B と両面 npages を一致させ、候補のページ切上げ後も実容量以内とする。容量・設定は確定後に変更しない。
+手本の ScreenInit で固定する仮想画面に相当するのは B。OS32 では mode 群の最大領域を固定し、形だけ切り替える。
+選択用 P は OS32 固有の前段で offscreen を持たない。SPR を prepare で読む案や gfx_core の CLIENT 検査を緩める案は採らない。
+GeForce の boot 面作成、Cirrus/PEGC の選択前 CLIENT と同じ選択契約を、Trident は暫定 VRAM 面で満たす。
+
+### PM 決定の置換文
+1: 「両面は初回 prepare で暫定作成し、初回 ScreenInit で容量を確定する。以後は固定 npages/SID のまま regen し世代を進める」。起動時一度だけ、を削除。
+2: 「表示領域は PreInit 後の初回 ScreenInit で B に固定する。offscreen は B 以後、両面の npages は B/PAGE_SIZE」。固定領域の考え方は残す。
+3: 「core の configure(mode, bytes, final) に module が暫定 P または確定 B を渡す。boot 資源段では面を作らず prepare で作る」。core/module 分離は残す。
+4: 変更なし。INDEX8/RGB565/XRGB8888 のみ。RGB555/packed24 は TRI_E_NOSYS、HAL ID 追加まで延期。F10 overscan 決定も維持。
+
+### 修正する段と検証
+F6h drivers/video/trident/trident.h: configure callback に final を追加（宣言変更は1件、公開 KAPI 変更なし）。
+F6 drivers/video/trident/resources.c: 暫定/確定状態、容量変更時の release+create、両面失敗処理、rollback の状態消去。
+F10 drivers/video/trident/backend_trident.c: 選択前 prepare の暫定作成・再呼出しの無変更、確定容量を渡す mode 切替、bb の更新。
+F9 drivers/video/trident/lifecycle.c: PreInit 後の確定 configure、Close の lease 無効化、再 init の固定容量維持。
+F5 drivers/video/trident/vram.c: usable に decode 上限も反映し、ページ切上げ後の収容検査、確定 B と first_off の一致を保証。
+試験: 実 resources と gfx_core を通す初回選択→init（prepare I/O=0）、再 init、8/16/32bit・NoAccel 切替、SPR で P と B が増減/一致する条件・容量不足・第二 create 失敗・lease 失効・offscreen 非重複を検査する。
+変異: prepare configure 削除、final 指定削除、再作成を regen に置換、npages/first_off を現 mode サイズに変更、SPR 制限無視、revoke 削除を各一意 anchor とし、それぞれ正常 GREEN→実行時 RED→復元 GREEN を確認する。
+本作業は設計追記のみ。製品・試験は未変更。基点 SHA の指定なしのため preflight、ビルド、実行試験、変異、lint は未実施。
+
+### 確定 (2026-11-07、Opus 第 1 回、PM が反映)
+- A1 (P1): Close の後の再 prepare (lease ゼロ・I/O なし) は、両面を既定 mode の形に regen し、device.mode.selected も既定に戻す (前の mode のまま再 init しない)。上の「再 prepare/init は…現在の形を使う」はこの文で置き換える。試験に「16bpp に切り替え → Close → 再選択 → init が Trident で通る」。
+- A2 (P2): 大きさが違うときの作り直しは、両面を release してから DISPLAY → CLIENT の順に create する (片面だけ解放すると重なりの検査 pgalloc_surface.inc:75 で落ちる)。
+- A3 (P2): 作り直しの後の SID は暫定の面と同じであることを要求し、違えば失敗にする (gfx_core_surface.inc:331-343 の pending の印は SID ごと)。試験で確かめる。
+- A4 (P3): F6h で configure の宣言を変えたら、試験の複製も追従する: tools/tests/trident_resources_host.c、test_trident_contracts.py、test_trident_resources.py、test_trim_flow.py。
