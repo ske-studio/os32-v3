@@ -183,6 +183,18 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('c2log', 'detect-prepare-unlock', 'hwdev/gf/display/service.c',
+  'i32 rc=svc_index(io,SVC_CR,RECOVER_CR1F,&unlock,true);',
+  'i32 rc=0; (void)unlock;', 'each enter unlocks extended CR before detect'),
+ ('c2log', 'detect-prepare-i2c', 'hwdev/gf/display/service.c',
+  'engine|GF_MODE_ENGINE_I2C);', 'engine);', 'boot selects I2C before detect'),
+ ('c2log', 'detect-prepare-head', 'hwdev/gf/display/service.c',
+  'SVC_ENGINE_CTRL,4,engine|GF_MODE_ENGINE_I2C);',
+  'SVC_ENGINE_CTRL+RECOVER_HEAD_STRIDE,4,engine|GF_MODE_ENGINE_I2C);',
+  'I2C belongs to primary head A'),
+ ('c2log', 'detect-prepare-preserve', 'hwdev/gf/display/service.c',
+  'engine|GF_MODE_ENGINE_I2C);', 'GF_MODE_ENGINE_I2C);',
+  'preserve unrelated engine controls'),
  ('a3', 'detect-edid-connector', 'kdebug/gf_display_test.c',
   'display_number(" connector=", o->ctx->state->edid_connector);',
   'display_number(" connector=", 0);', 'retained image connector attribution'),

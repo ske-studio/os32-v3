@@ -6,6 +6,9 @@
 enum { LOG_INJECT=-1701 };
 static const char *log_inject_stage;
 static bool log_cold_devinit;
+static bool log_check_ddc;
+static u32 log_expected_engine;
+static void log_detect_ready(void);
 static int log_same(const char *a,const char *b)
 {
     if (!a || !b) return a==b;
@@ -14,6 +17,7 @@ static int log_same(const char *a,const char *b)
 }
 static int log_gate(const char *stage)
 {
+    if (log_check_ddc && log_same(stage,"detect")) log_detect_ready();
     if (!log_same(log_inject_stage,stage)) return 0;
     log_inject_stage=0;
     return 1;
@@ -126,6 +130,16 @@ static void log_fixture(void)
 {
     log_fixture_state(false);
 }
+static void log_detect_ready(void)
+{
+    struct gf_io *io=&cint_prod.foundation.io;
+    u32 value;
+    assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&value,false));
+    assert(value==0x57); /* Fake retains write value; hardware reads 3. */
+    assert(!io->read(io->opaque,0,0x600860U,4,&value) && value==log_expected_engine);
+    assert(!io->read(io->opaque,0,0x602860U,4,&value) && value==0x200U);
+    log_check_ddc=false;
+}
 static int log_start(void)
 {
     struct video_mode mode;
@@ -133,6 +147,28 @@ static int log_start(void)
     int rc=video_start(&log_device,mode.id,log_palette);
     startlog_remove_mode_diagnostics();
     return rc;
+}
+static void test_enter_ddc_prepare(void)
+{
+    for (u32 reenter=0;reenter<2;++reenter) {
+        log_fixture();
+        if (reenter) {
+            assert(!log_start());
+            assert(!video_stop(&log_device));
+        }
+        struct gf_io *io=&cint_prod.foundation.io;
+        /* Measured boot (unlocked, I2C disabled) and post-leave (locked).
+         * Keep unrelated engine bits and head B as independent controls. */
+        u32 lock=reenter ? 0 : 3;
+        assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&lock,true));
+        assert(!io->write(io->opaque,0,0x600860U,4,reenter ? 0x100U : 0));
+        assert(!io->write(io->opaque,0,0x602860U,4,0x200U));
+        log_expected_engine=reenter ? 0x110U : 0x10U;
+        log_check_ddc=true; log_inject_stage="detect";
+        assert(log_start()==LOG_INJECT);
+        assert(!log_check_ddc && !log_inject_stage);
+        svc_finish();
+    }
 }
 static void log_expect(const char *stage,int rc)
 {
@@ -213,6 +249,7 @@ static void test_detect_state(void)
 }
 void _start(void)
 {
+    test_enter_ddc_prepare();
     test_detect_state();
     test_cold_start();
     const char *stages[]={"admission_close","rom_validate","scan_reserve",

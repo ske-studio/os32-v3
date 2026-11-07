@@ -443,6 +443,21 @@ static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
     }
 }
 
+/* PC-98 has no VGA BIOS POST to select I2C before the first mode load.
+ * MIT nouveau dispnv04/crtc.c:496-499, hw.c:674-680 select primary head A;
+ * modeset.c uses the same GF_MODE_ENGINE_I2C value (POLICY_PCIDEV §6).
+ * devinit/base.c:94,117 keeps extended CR unlocked until device destruction.
+ * OS32 restores local owner state at leave, so renew the unlock each enter. */
+static i32 svc_detect_prepare(struct gf_foundation *f)
+{
+    struct gf_io *io=&f->io;
+    u32 unlock=RECOVER_CR1F_UNLOCK,engine;
+    i32 rc=svc_index(io,SVC_CR,RECOVER_CR1F,&unlock,true);
+    if (!rc) rc=io->read(io->opaque,0,SVC_ENGINE_CTRL,4,&engine);
+    if (!rc) rc=io->write(io->opaque,0,SVC_ENGINE_CTRL,4,engine|GF_MODE_ENGINE_I2C);
+    return rc;
+}
+
 i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
 {
     const char *stage="service_check";
@@ -509,6 +524,10 @@ i32 gf4_service_start(struct gf4_ctx *c,u32 dl)
         stage="objects_init";
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf3_service_objects_init(s,dl);
+    }
+    if (!rc) {
+        stage="detect_prepare";
+        rc=svc_detect_prepare(f);
     }
     if (!rc) {
         c->ready=true;
