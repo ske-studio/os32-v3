@@ -22,6 +22,34 @@ void *kmemset(void *dst, int v, u32 n)
     u8 *d = dst; while (n--) *d++ = v; return dst;
 }
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
+static int verify_named_body(void)
+{
+    static const char *const requests[] = {
+        "os32.clip PUT 3", "os32.print DATA 1 3",
+        "CLIP PUT 3", "PRINT DATA 1 3", "ECHO 3", "PUT /file/x 3"
+    };
+    static const u32 lengths[] = {sizeof("os32.clip PUT 3") - 1, sizeof("os32.print DATA 1 3") - 1,
+        sizeof("CLIP PUT 3") - 1, sizeof("PRINT DATA 1 3") - 1,
+        sizeof("ECHO 3") - 1, sizeof("PUT /file/x 3") - 1};
+    link_ready = 1; link_state = LINK_S_UP; link_epoch = 7;
+    for (u32 i = 0; i < sizeof(requests) / sizeof(requests[0]); i++) {
+        i32 h = link_host_open(requests[i], lengths[i], 1);
+        CHECK(h == 0);
+        CHECK(link_h[h].decl_len == 3);
+        CHECK(link_host_write(h, "abc", 3, 1) == OS32_ERR_AGAIN);
+        link_h[h].req_acked = 1;
+        CHECK(link_host_write(h, "abcd", 4, 1) == OS32_ERR_INVAL);
+        CHECK(link_host_write(h, "abc", 3, 1) == 3);
+        CHECK(link_h[h].wlen == 3 && link_h[h].wsent_total == 3);
+        CHECK(link_h[h].wcopy[0] == 'a' && link_h[h].wcopy[2] == 'c');
+        CHECK(link_host_close(h, 1) == 0);
+        link_h[h].rel_pending = 0;
+    }
+    CHECK(link_decl_len("os32.clip GET", 13) == 0);
+    CHECK(link_decl_len("os32.print STATUS 1", 19) == 0);
+    CHECK(link_decl_len("os32.clip PUT 65537", sizeof("os32.clip PUT 65537") - 1) == 0);
+    return 0;
+}
 static int verify(void)
 {
     link_ready = 1;
@@ -65,7 +93,8 @@ static int verify(void)
 }
 void _start(void)
 {
-    int rc = verify();
+    int rc = verify_named_body();
+    if (!rc) rc = verify();
     if (rc) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();

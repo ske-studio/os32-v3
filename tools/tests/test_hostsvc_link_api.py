@@ -18,14 +18,19 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 ANCHOR = 'if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;'
 
-def build(folder, mutant=False):
+MUTATIONS = [(ANCHOR, "if (1) continue;", "deadline disabled"),
+    ('tok_eq(req, a0, b0, "os32.clip")', "0", "named clip body disabled"),
+    ('tok_eq(req, a0, b0, "os32.print")', "0", "named print body disabled")]
+
+def build(folder, mutation=None):
     folder.mkdir()
     shutil.copytree(ROOT / 'net', folder / 'net')
     api = folder / 'net/link_host_api.inc'
     text = api.read_text()
-    assert text.count(ANCHOR) == 1
-    if mutant:
-        api.write_text(text.replace(ANCHOR, 'if (1) continue;'))
+    if mutation:
+        old, new, _ = mutation
+        assert text.count(old) == 1
+        api.write_text(text.replace(old, new))
     exe = folder / 'probe'
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
         '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
@@ -42,9 +47,10 @@ def main():
         host32.run([str(build(folder / 'control'))], check=True)
         print('GREEN: eight slots, isolated expiry, progress, wrap, close/reuse, stale, IF')
         if args.mutate:
-            rc = host32.run([str(build(folder / 'mutant', True))]).returncode
-            assert rc == 1, rc
-            print('RED runtime: deadline disabled (compiled successfully)')
+            for i, mutation in enumerate(MUTATIONS):
+                rc = host32.run([str(build(folder / f'mutant{i}', mutation))]).returncode
+                assert rc == 1, (mutation[2], rc)
+                print('RED runtime:', mutation[2], '(compiled successfully)')
 if __name__ == '__main__': main()
 def run(ctx):
     return subprocess.call(['python3', '-B', __file__, *(['--mutate'] if ctx.mutate else [])], cwd=ctx.root)
