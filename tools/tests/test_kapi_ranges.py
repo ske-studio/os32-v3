@@ -2,6 +2,7 @@
 Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
+              'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
               'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c']
 from exec_source import exec_source
 import argparse
@@ -14,6 +15,11 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('notice copy skipped', 'notice',
+     'copy_to_caller(&caller, out, &notice, sizeof(notice))', '1', 'notice output bytes'),
+    ('notice not consumed', 'notice',
+     'host_mailbox_commit(notice.host_generation, notice.serial);',
+     '(void)notice.serial;', 'notice consumed once'),
     ('mem_stat out none', 'schema', None, None, 'mem_stat NULL'),
     ('legacy VRAM exception restored', 'exec', '    return 0;\n}', '    if (p >= 0xA0000UL && p < 0xC0000UL) return 1;\n    return 0;\n}', 'unleased VRAM refused'),
     ('output NULL bypass', 'generated', '((u32)(n))', '((p) ? (u32)(n) : 0u)', 'output NULL'),
@@ -39,6 +45,10 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         rc, output, generated = generator.gen(directory, data)
         assert rc == 0, output
         sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
+        sources['notice'] = (ROOT / 'kapi/kapi_host_notice.c').read_text().replace(
+            '#include "../net/host_mailbox.h"', '#include "' + str(ROOT / 'net/host_mailbox.h') + '"')
+        sources['mailbox'] = (ROOT / 'net/host_mailbox.c').read_text().replace(
+            '#include "host_mailbox.h"', '#include "' + str(ROOT / 'net/host_mailbox.h') + '"')
         sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
         source = exec_source(ROOT)
         sources['exec'] = source[source.index('int ring3_ptr_ok('):source.index('\n#include "ksetjmp.h"')]

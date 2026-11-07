@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 81,
+  "version": 82,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -52,7 +52,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci_dev_contract.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
+    "pci_dev_contract.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h", "kapi_host_notice.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1976,6 +1976,19 @@
       "name": "ime_dict_suspend",
       "ret": "int",
       "args": ["int on"]
+    },
+    {
+      "name": "host_notice_read",
+      "ret": "int",
+      "args": ["u32 generation", "u32 service", "HostNotice *out"],
+      "out": "target",
+      "target": "kapi_host_notice_read"
+    },
+    {
+      "name": "host_notice_serial",
+      "ret": "u32",
+      "args": [],
+      "target": "kapi_host_notice_serial"
     }
   ]
 }

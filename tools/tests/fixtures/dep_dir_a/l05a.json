@@ -1,7 +1,7 @@
 {
   "base": "b400acb6",
   "public_sha256_recipe": "Review sdk/kapi.json append-only ABI and generated diffs; load the spec, pop includes, remove target/body from every api entry, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(). For each generated key use SHA256(Path(key).read_bytes()).hexdigest() after sdk/gen_kapi.py --check. Preserve base, wrappers, offsets and constants. Shared by L06/L08/L09/L10.",
-  "public_sha256": "448ceff9aaff42c12c41f8caad5eada931d663c6969750af8219c55cf8d6e6ab",
+  "public_sha256": "7f1ea07ca10a63465366580c0ca145dedd4b5e95978bbe74e765de6fc1fdceab",
   "wrappers": {
     "ide_init": "void __cdecl wrap_ide_init(void)\n{\n    KAPI_HIT(49);\n    ide_init();\n}\n",
     "ide_drive_present": "int __cdecl wrap_ide_drive_present(int drv)\n{\n    KAPI_HIT(50);\n    return ide_drive_present(drv);\n}\n",
@@ -12,10 +12,10 @@
     "ide_get_info": "int __cdecl wrap_ide_get_info(int drv, void *info)\n{\n    KAPI_HIT(151);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_get_info(drv, (IdeInfo *)info);\n}\n"
   },
   "generated": {
-    "sdk/include/os32/os32_kapi_generated.h": "577835f57a29b7f51d183b50fbbb4f44c4a18198ad570e3c625a00072096df7b",
-    "sdk/include/os32/os32_kapi_slots.h": "4080fdab108f67653ea587635e4f5e557accd8a13b6c6f72b3c6182f96856d01",
-    "exec/exec_kapi_init.inc": "d9c24ce182df7fdfb7b1f51f6ddf31f502a32b04ff48f419cc1c66fefaa2b0db",
-    "sdk/rust/os32api/src/kapi_generated.rs": "fc412dbdade45448575d532f0c1eec3fcea972a32994f3c2d59b2d9dde113011"
+    "sdk/include/os32/os32_kapi_generated.h": "deb182a566afd0ca31ae633e31b368d00120fda5546068a0e8b793963bac7bb4",
+    "sdk/include/os32/os32_kapi_slots.h": "552bfc6489ec402a552866e205f0525a39eb800637c15d066e5337e9cd744e6e",
+    "exec/exec_kapi_init.inc": "fe4298a39bbe48fe0f2126e8c37780a4266fa875541c3d97198f59b563ca46d3",
+    "sdk/rust/os32api/src/kapi_generated.rs": "30a2cf91ff4d9ac931f5429a54723b9670cc88ac3e14848e51fca74871b47d84"
   },
   "offsets": {
     "total_sectors": 0,

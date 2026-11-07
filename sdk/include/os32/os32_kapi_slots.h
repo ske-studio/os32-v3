@@ -263,8 +263,10 @@
 #define KAPI_SLOT_IME_DICT_INFO 256
 #define KAPI_SLOT_GFX_OSRI_SHOW 257
 #define KAPI_SLOT_IME_DICT_SUSPEND 258
+#define KAPI_SLOT_HOST_NOTICE_READ 259
+#define KAPI_SLOT_HOST_NOTICE_SERIAL 260
 
-#define KAPI_SLOT_COUNT 259
+#define KAPI_SLOT_COUNT 261
 #define KAPI_FUNC_CAPACITY 300
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x4B8\n\t.popsection")
