@@ -6,6 +6,7 @@
 
 #define SFS_PERSISTENT_IDLE_TICKS 3000u
 #define SFS_PERSISTENT_SEQ_LIMIT  0xF000u
+#define SFS_SCOPE_TICKS           100u
 #define SFS_PERSISTENT_BAUD       115200u
 
 static struct SfsPersistent resident;
@@ -85,6 +86,11 @@ int sfs_persistent_scope_begin(void)
 {
     if (!enabled) return OS32_ERR_INVAL;
     if (scope) return OS32_ERR_BUSY;
+    int rc = sfs_ensure_session(config.io->now(config.io_ctx) + SFS_SCOPE_TICKS);
+    if (rc != 0) return rc;
+    /* The next VFS operation accepts the ensured generation. Existing FDs
+     * still compare their saved generation and remain permanently stale. */
+    vfs_resource_stale_mount(&resident.client);
     scope = 1;
     return 0;
 }

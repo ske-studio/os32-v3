@@ -756,6 +756,8 @@ static int man_parse(char *text)
 }
 
 /* 名札を読む。**無ければ今までどおり動く** (後方互換、受入 M5)。 */
+static int g_man_open_error;
+
 static void man_load(void)
 {
     int fd;
@@ -766,9 +768,16 @@ static void man_load(void)
     g_man_valid = 0;
     g_man_count = 0;
     g_man_bad = 0;
+    g_man_open_error = 0;
 
     fd = api->sys_open(HS_MANIFEST_PATH, KAPI_O_RDONLY);
-    if (fd < 0) return;
+    if (fd == OS32_ERR_STALE)
+        fd = api->sys_open(HS_MANIFEST_PATH, KAPI_O_RDONLY);
+    if (fd < 0) {
+        if (fd == OS32_ERR_HOSTDOWN || fd == OS32_ERR_TIMEOUT || fd == OS32_ERR_STALE)
+            g_man_open_error = fd;
+        return;
+    }
     g_man_present = 1;
 
     text = (char *)file_buf;
@@ -799,6 +808,13 @@ static void man_load(void)
  * 戻り値 0 = 同期を続けてよい / 1 = **1 件も書かずに断る**。 */
 static int man_gate(void)
 {
+    if (g_man_open_error) {
+        const char *reason = g_man_open_error == OS32_ERR_HOSTDOWN ? "hostdown" :
+                             g_man_open_error == OS32_ERR_TIMEOUT ? "timeout" : "stale";
+        api->kprintf(ATTR_RED, "Error: DEPLOY reason=%s err=%d\n",
+                     reason, g_man_open_error);
+        return 1;
+    }
     if (g_man_present && g_man_valid) {
         api->kprintf(ATTR_CYAN, "DEPLOY build=%s count=%d generated=%s kapi=%d/v%d\n",
                      g_man_build, g_man_count, g_man_generated,
