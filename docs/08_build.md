@@ -685,7 +685,7 @@ FD が作れなくなった (`mkfat12.py` の「ディスク容量不足」)。
 | カーネル、unicode.bin、shell.bin (組み込みコマンド)、filetypes、settings.tsv / settings.db (FD は profile も) | 起動と設定 |
 | install / cdinst | HDD へ入れる |
 | hsync | 残り (NORMAL 以降) を `/host` から取ってくる。NP21/W は HostDrv、実機は SerialFS 経由で利用できる ([KAPI_SPEC.md v66](KAPI_SPEC.md#シリアル越しの-host-v66)、§8-6 の実機更新手順) |
-| less / grep / hexdump | 壊れたファイルを見る |
+| less / grep (hexdump は MINIMAL にあるが起動 FD からは外す) | 壊れたファイルを見る |
 | cfg | 設定を直す |
 
 NORMAL へ移した物: more / find / sort / head / tail / wc / tee / touch / sleep /
@@ -761,7 +761,7 @@ FD に旧フォントを手で置いても読まない。**install.bin (FD → H
 FD 上のパスはすべて 8.3 に収まること (mkfat12 は収まらない名前を黙って切り詰めるので、
 mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以外 FD にも入る** — 空きは 2026-09-25 に
 **2HD 359KB / 1221KB、1.44MB 568KB / 1424KB** (MINIMAL をレスキュー兼インストーラに絞った後。
-絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-11-05 (HW-BASIC がシェルに入って 2HD が下限ちょうどになり、`fd.exclude` に fm.mod・pcm.mod・fep.mod を足した後 — ユーザー決定) は **2HD 109KB、1.44MB 320KB**。`fd.exclude` は kdebug.bin・hwdev.mod・geforce.mod・fm.mod・pcm.mod・fep.mod (理由は build/packages.yaml の各行)。2HD が先に尽きるので、MINIMAL に
+絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-11-08 (アプリの .text を読み取り専用にして末尾をページの境目に揃え、2HD が 54KB に減ったので `fd.exclude` に hexdump.bin を足した後 — ユーザー決定) は **2HD 75KB、1.44MB 266KB** (1.44MB は hexdump を外す前の値)。`fd.exclude` は kdebug.bin・hwdev.mod・geforce.mod・fm.mod・pcm.mod・fep.mod・hexdump.bin (理由は build/packages.yaml の各行)。2HD が先に尽きるので、MINIMAL に
 足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB
 (`tools/tests/test_packages.py` の `FD_MIN_FREE_KB`、2HD と 1.44MB の両方) を切ると
 `make check-packages-host` が落ちる** — 溢れて `make all` が割れる前に、MINIMAL に足す物を
