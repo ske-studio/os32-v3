@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -27,12 +28,28 @@ CASES = ('normal ac2 real screen bad-stdin bad-stdout bad-chosen bad-root bad-sc
          'drain-timeout delay-ready options-absent screen-fail').split()
 
 
+class CriterionFailure(AssertionError):
+    """An acceptance criterion failed; eligible for an expected mutation RED."""
+
+
+def require(condition, message):
+    if not condition:
+        raise CriterionFailure(message)
+
+
 def command(args, cwd=ROOT, timeout=30):
-    p = subprocess.run([str(a) for a in args], cwd=cwd, capture_output=True,
-                       timeout=timeout, text=True)
-    if p.returncode:
-        raise RuntimeError(f'{args}: rc={p.returncode}\n{p.stdout}{p.stderr}')
-    return p.stdout + p.stderr
+    with subprocess.Popen([str(a) for a in args], cwd=cwd,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          start_new_session=True, text=True) as p:
+        try:
+            stdout, stderr = p.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)
+            p.communicate()
+            raise
+        if p.returncode:
+            raise RuntimeError(f'{args}: rc={p.returncode}\n{stdout}{stderr}')
+        return stdout + stderr
 
 
 def paths(root):
@@ -48,7 +65,7 @@ def host(root, runner, cases=CASES):
                            [str(out/'flow'), case], capture_output=True, timeout=10)
         results.append(f'{case}: rc={p.returncode}')
         if p.returncode:
-            raise RuntimeError('host ' + '\n'.join(results))
+            raise CriterionFailure('host ' + '\n'.join(results))
     return '\n'.join(results) + '\n'
 
 
@@ -62,32 +79,32 @@ def static(root, cross):
     (out/'readelf.log').write_text(header)
     (out/'objdump.log').write_text(dis)
     (out/'symbols.log').write_text(syms)
-    assert not undefined.strip(), 'undefined symbols'
+    require(not undefined.strip(), 'undefined symbols')
     data = elf.read_bytes()
-    assert len(data) <= 24*1024, 'ELF budget'
-    assert data[:7] == b'\x7fELF\x01\x02\x01', 'ELF32 big endian'
+    require(len(data) <= 24*1024, 'ELF budget')
+    require(data[:7] == b'\x7fELF\x01\x02\x01', 'ELF32 big endian')
     h = struct.unpack_from('>HHIIIIIHHHHHH', data, 16)
-    assert h[0:2] == (2, 20), 'EXEC / EM_PPC'
+    require(h[0:2] == (2, 20), 'EXEC / EM_PPC')
     symbols = {m[2]: int(m[0], 16) for line in syms.splitlines()
                if len(m := line.split()) == 3}
-    assert h[3] == symbols['_start'], 'entry'
+    require(h[3] == symbols['_start'], 'entry')
     ph = [struct.unpack_from('>8I', data, h[4]+i*h[8]) for i in range(h[9])]
     loads = [p for p in ph if p[0] == 1]
     notes = [p for p in ph if p[0] == 4]
-    assert len(loads) == len(notes) == 1 and len(ph) == 2, 'LOAD/NOTE count'
+    require(len(loads) == len(notes) == 1 and len(ph) == 2, 'LOAD/NOTE count')
     load, note = loads[0], notes[0]
-    assert load[2:4] == (0x20000,0x20000) and load[6] == 7, 'LOAD address/flags'
-    assert load[5] < 64*1024 and load[7] == 4, 'LOAD extent/alignment'
-    assert note[1] >= load[1] and note[1]+note[4] <= load[1]+load[4], 'NOTE in LOAD'
+    require(load[2:4] == (0x20000,0x20000) and load[6] == 7, 'LOAD address/flags')
+    require(load[5] < 64*1024 and load[7] == 4, 'LOAD extent/alignment')
+    require(note[1] >= load[1] and note[1]+note[4] <= load[1]+load[4], 'NOTE in LOAD')
     expected = struct.pack('>III8s5I',8,20,0x1275,b'PowerPC\0',0,*([0xffffffff]*4))
-    assert data[note[1]:note[1]+note[4]] == expected, 'NOTE content'
-    assert symbols['__stack_top'] % 16 == 0, 'stack alignment'
-    assert symbols['__stack_top']-symbols['__stack_bottom'] == 8192, 'stack size'
-    assert symbols['_edata'] <= symbols['__stack_bottom'] < symbols['_end'], 'BSS stack'
+    require(data[note[1]:note[1]+note[4]] == expected, 'NOTE content')
+    require(symbols['__stack_top'] % 16 == 0, 'stack alignment')
+    require(symbols['__stack_top']-symbols['__stack_bottom'] == 8192, 'stack size')
+    require(symbols['_edata'] <= symbols['__stack_bottom'] < symbols['_end'], 'BSS stack')
     instructions = re.findall(r'^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2} ){4}\s*(.*)$',dis,re.M)
     for ins in instructions:
         op = ins.split()[0]
-        assert not re.match(r'^(f|v|xv|lfs|lfd|stfs|stfd|lv|stv|lxv|stxv)',op), f'FP/VMX {ins}'
+        require(not re.match(r'^(f|v|xv|lfs|lfd|stfs|stfd|lv|stv|lxv|stxv)',op), f'FP/VMX {ins}')
     entry = dis.split('<_start>:\n',1)[1].split('<ppc_load8>:',1)[0]
     # Exact BSD non-601/non-970 sequence, allowing only address relocation.
     expected_ops = ['hwsync','isync','lis','addi','mfmsr','li','mtmsr','isync',
@@ -96,10 +113,10 @@ def static(root, cross):
                     'lis','addi','lis','addi','cmpw','bge','stb','stb','stb','stb',
                     'addi','b','stwu','mr','bl','b']
     entry_ins = re.findall(r'^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2} ){4}\s*(.*)$',entry,re.M)
-    assert [x.split()[0] for x in entry_ins] == expected_ops, 'BAT/MSR/BSS instruction order'
-    assert 'r9,18' in entry and 'r9,8190' in entry, 'BAT values'
+    require([x.split()[0] for x in entry_ins] == expected_ops, 'BAT/MSR/BSS instruction order')
+    require('r9,18' in entry and 'r9,8190' in entry, 'BAT values')
     for offset in range(4):
-        assert f'r0,{offset}(r8)' in entry, 'BSS byte stores'
+        require(f'r0,{offset}(r8)' in entry, 'BSS byte stores')
     return symbols['ppc_stop_loop']
 
 
@@ -175,24 +192,24 @@ def qemu(root, timeout, stop_pc, expected_fail=None):
                         break
                 q.call('cont')
                 time.sleep(min(0.1,max(0,deadline-time.monotonic())))
-            assert stable == 2, f'stop PC/EE not observed twice; last registers:\n{registers}'
+            require(stable == 2, f'stop PC/EE not observed twice; last registers:\n{registers}')
             (out/'qmp.log').write_text('\nRESTART/RESTOP\n'.join(snapshots))
             # OF serial write expands LF to CRLF; keep raw logs, normalize only
             # duplicated CR for comparison to the caller's CRLF message.
             serial_a = a.read_bytes().replace(b'\r\r\n',b'\r\n')
             serial_b = b.read_bytes().replace(b'\r\r\n',b'\r\n')
-            assert serial_a.count(OF_LINE) == 1, 'OF stdout line count'
-            assert OF_LINE not in serial_b, 'OF line on B'
+            require(serial_a.count(OF_LINE) == 1, 'OF stdout line count')
+            require(OF_LINE not in serial_b, 'OF line on B')
             if expected_fail:
-                assert expected_fail in serial_a, 'timeout FAIL/stop'
+                require(expected_fail in serial_a, 'timeout FAIL/stop')
                 if expected_fail.startswith(b'FAIL:tx:'):
-                    assert ESCC_LINE not in serial_a, 'tx timeout wrote data'
+                    require(ESCC_LINE not in serial_a, 'tx timeout wrote data')
                 else:
-                    assert serial_a.count(ESCC_LINE) == 1, 'drain timeout lost data'
+                    require(serial_a.count(ESCC_LINE) == 1, 'drain timeout lost data')
             else:
-                assert serial_a.count(ESCC_LINE) == 1, 'ESCC-A line count'
-                assert b'FAIL:' not in serial_a, 'unexpected failure'
-            assert ESCC_LINE not in serial_b, 'ESCC line on B'
+                require(serial_a.count(ESCC_LINE) == 1, 'ESCC-A line count')
+                require(b'FAIL:' not in serial_a, 'unexpected failure')
+            require(ESCC_LINE not in serial_b, 'ESCC line on B')
             q.call('quit')
             p.wait(timeout=max(0.01,deadline-time.monotonic()))
             return f'PC=0x{stop_pc:x}, EE=0, observed twice\n'
@@ -274,7 +291,7 @@ def mutate(args):
             elif detector in ('tx','drain'):
                 try:
                     host(dest,args.runner,['normal'])
-                except RuntimeError as exc:
+                except CriterionFailure as exc:
                     (dest/'host-red.log').write_text(str(exc))
                 else:
                     raise RuntimeError('mask mutation host unexpectedly GREEN')
@@ -283,14 +300,14 @@ def mutate(args):
                 # intended deadline failure and the correct stopped PC explicitly.
                 try:
                     qemu(dest,args.timeout,pc)
-                except AssertionError as exc:
+                except CriterionFailure as exc:
                     (dest/'normal-red.log').write_text(str(exc))
                 else:
                     raise RuntimeError('mask mutation QEMU unexpectedly GREEN')
                 qemu(dest,args.timeout,pc,f'FAIL:{detector}:-1\r\n'.encode())
-                raise AssertionError('normal criterion RED; FAIL and stop observed')
+                raise CriterionFailure('normal criterion RED; FAIL and stop observed')
             else: qemu(dest,args.timeout,static(dest,args.cross_dir))
-        except (AssertionError,RuntimeError) as exc:
+        except CriterionFailure as exc:
             if detector in ('tx','drain') and str(exc) != 'normal criterion RED; FAIL and stop observed':
                 raise
             (dest/'red.log').write_text(str(exc)+'\n')
