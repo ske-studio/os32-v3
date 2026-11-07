@@ -26,6 +26,7 @@ PM は実機に直接つながっていない。実機のシリアル (/dev/ttyU
    |---|---|
    | `OS32_MEMORY_LAYOUT_GENERATION` | 配置の作り替え。この手順では入れない。ユーザーに手順を示して別に決める |
    | KAPI の版 (`KAPI_VERSION` / `OS32X_MIN_API`) が上がった (追記だけ) | 実機の旧い hsync は「配備物の版がカーネルより新しい」と全体同期を断る (`userland/system/hsync.c` の kapi_version 照合、`/boot` だけは通す)。**boot を先に入れて再起動**してから全体を入れる |
+   | 実行形式 (`os32x_format`、OS32X ヘッダの形) が変わった | 古い hsync が配備元を断り、新しいカーネルは古いアプリを断るので、この手順では入らない。[REALHW_FORMAT_UPDATE](../../../docs/REALHW_FORMAT_UPDATE.md) (古い cp で /boot と /sys を写して再起動 → 新しい hsync を配備元から) |
    | どちらも同じ | 同じ順でよい (boot → 再起動 → 全体) |
    互換の無い更新 (配置・ABI が変わる版) は、実機に入れる前に手順をユーザーに示す。
 4. **旧いユーザーランドが新しいカーネルで動くか**: boot の後の 1 回目の再起動から全体同期までは、
