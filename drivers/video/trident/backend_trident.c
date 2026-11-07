@@ -505,7 +505,7 @@ static int tri_hal_mode(u32 id)
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
     /* F6: revoke old leases and replace both surfaces before programming the
      * new scanout. configure performs no hardware access. */
-    rc = device.res->configure(&prepared);
+    rc = device.res->configure(&prepared, tri_vram_display_max_bytes(&device));
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
     u32 video_feature = device.mode.features & TRI_CAP_VIDEO;
     device.screen_ready = false;

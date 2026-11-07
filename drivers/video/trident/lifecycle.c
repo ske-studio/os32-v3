@@ -52,7 +52,7 @@ static int client_init(struct trident_device *d)
     rc = tri_vram_init(d, &d->mode.selected);
     if (rc) return rc;
     if (!d->res->configure) return TRI_E_STATE;
-    rc = d->res->configure(&d->mode.selected);
+    rc = d->res->configure(&d->mode.selected, tri_vram_display_max_bytes(d));
     if (rc) return rc;
     d->mode.display = d->res->display;
     d->mode.client = d->res->client_surface;
