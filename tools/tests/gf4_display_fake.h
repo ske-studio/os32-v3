@@ -41,7 +41,7 @@ enum gf4_host_op { D_READ,D_WRITE,D_CLOCK,D_SLEEP,D_SNAPSHOT,D_IRQ,D_FENCE,
     D_HEADS,D_EDID,D_TV,D_LOAD,D_SAVE,D_RESTORE,D_SCRIPT,D_EXTERNAL,D_DPMS,
     D_I2C_PORT,D_ADMISSION,D_FAILED,D_SCAN_CHANGED,D_CHANGE_BEGIN,D_CHANGE_END,
     D_CURSOR_APPLY,D_FLIP_COMPLETE,D_PLLSEL,D_DAC,D_EXTERNAL_DPMS,D_TV_GPIO,
-    D_TV_MODES,D_OP_COUNT };
+    D_TV_MODES,D_PROBE,D_OP_COUNT };
 struct gf4_host_event {
     enum gf4_host_op op;
     u32 nth,a[GF4_HOST_VALUE_ARGS];
@@ -562,6 +562,13 @@ int gf_vram_view_unmap(struct gf_vram_view *view)
 }
 #endif
 #if GF4_HOST_UNIT == 0
+int gf4_ddc_probe(struct gf4_ctx *ctx,u8 bus,u32 dl)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_PROBE);
+    e->p[0]=ctx; e->a[0]=bus; e->a[2]=dl;
+    return gf4_host_end(h,e);
+}
 int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
 {
     struct gf4_host *h=gf4_host_current;

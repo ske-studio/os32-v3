@@ -75,6 +75,9 @@ static int verify(void)
     CHECK(link_host_read_stage(0, 1, &out, 1) == OS32_ERR_HOSTDOWN);
     CHECK(link_host_write(0, "x", 1, 1) == OS32_ERR_HOSTDOWN);
     CHECK(link_host_close(0, 1) == 0);
+    CHECK(link_host_open("TIME", 4, 1) == OS32_ERR_AGAIN);
+    /* API-only seam: peer acknowledges the dedicated RELEASE slot. */
+    link_h[0].rel_pending = link_h[0].rel_due = 0;
     CHECK(link_host_open("TIME", 4, 1) == 0);
     CHECK(link_host_status(0, 0, 0, 1) == OS32_ERR_AGAIN);
     link_h[0].state = LINK_H_RESP; link_h[0].length = link_h[0].recv_bytes = 4;

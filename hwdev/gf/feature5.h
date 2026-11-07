@@ -12,7 +12,7 @@
 typedef unsigned long long u64;
 typedef long long i64;
 #define GF5_TILE_COUNT 12U /* nouveau c03c1a1 nvkm/subdev/fb/nv44.c:60. */
-#define GF5_IMAGE_VERSION 2U
+#define GF5_IMAGE_VERSION 3U
 #define GF5_THERM_THRESHOLDS 4U /* fanboost, downclock, critical, shutdown. */
 #define GF5_SENSOR_INTERVAL_US 1000000U /* Guard design §5: one second. */
 #define GF5_HEAT_COOL_SAMPLES 3U /* Guard design §6: consecutive cool samples. */
@@ -24,6 +24,11 @@ enum gf5_rc {
     GF5_ENODEV=-510 /* Decoded table/wiring confirms component absence only. */
 };
 struct gf5_clock { u32 core_khz, shader_khz, mem_khz; };
+/* OS32 boot-return extension: retain raw core control/coefficient, shader
+ * control and mux, rather than solving again from rounded frequencies.
+ * N/nvkm/subdev/clk/base.c:607-618 saves frequencies only and does not
+ * promise bit-identical PLL restoration. RAM remains a separate domain. */
+struct gf5_clock_raw { u32 nc, nn, sc, mux; };
 struct gf5_plan { u32 nc, nn, sc, mux, mc, mn; struct gf5_clock actual; };
 /* Private provenance, owned by gf5; the public nine-u32 plan stays unchanged.
  * Check before MMIO/pause, consume each domain before its first side effect.
@@ -107,6 +112,13 @@ struct gf5_image {
     struct gf5_tile_saved tile_saved[GF5_TILE_COUNT];
     struct gf4_saved display;
     struct gf5_extent *extent; bool complete;
+    /* N/nvkm/subdev/volt/base.c:241-251 and therm/fan.c:246-250:
+     * unknown voltage / absent controllable fan must not prevent a save.
+     * Each flag means its values were acquired; false skips that restore.
+     * clock_available covers clock and clock_raw. Zero kHz is a valid
+     * absent clock source, not an availability flag. S/C wire these later. */
+    bool fan_available, volt_available, clock_available;
+    struct gf5_clock_raw clock_raw;
 };
 struct gf5;
 /* C2-links owns the resident table; owner borrows the same production gf5.
@@ -207,6 +219,11 @@ static inline i32 gf5_plan_ceiling(const struct gf5 *g,const struct gf5_plan *p)
 i32 gf5_clock_read(struct gf5 *, struct gf5_clock *);
 i32 gf5_clock_calc(struct gf5 *, const struct gf5_clock *, struct gf5_plan *);
 i32 gf5_clock_prog(struct gf5 *, const struct gf5_plan *);
+/* Internal boot snapshot boundary, implemented by stage C; no facade slots.
+ * Save reads raw values without calc/program; restore consumes those values
+ * without re-solving frequencies. Availability belongs to the saved image. */
+i32 gf5_clock_raw_save(struct gf5 *, struct gf5_clock_raw *);
+i32 gf5_clock_raw_restore(struct gf5 *, const struct gf5_clock_raw *);
 i32 gf5_ram_prog(struct gf5 *, const struct gf5_plan *);
 /* Internal clock.c boundaries; no public facade slots. Invalid/stale/used:
  * ESTATE, altered plan: EINVAL, re-solve failure: EBIOS/ERANGE. */
@@ -256,6 +273,12 @@ i32 gf5_tile_clear(struct gf5 *, u32 slot);
 i32 gf5_state_save(struct gf5 *, struct gf5_image **out);
 i32 gf5_state_restore(struct gf5 *, const struct gf5_image *);
 void gf5_state_free(struct gf5 *, struct gf5_image *);
+/* SAVED diagnostic only: replace dst's performance target from retained boot.
+ * Distinct complete/version-matched caller-owned images, dst == g->image.
+ * Preserve dst trip storage and all non-performance state; no device I/O.
+ * Only available fan policy requires matching trip counts. Epochs may differ. */
+i32 gf5_state_boot_target(struct gf5 *g, struct gf5_image *dst,
+                          const struct gf5_image *boot);
 
 i32 gf5_rom_acquire(struct gf5 *, const u8 *, u32, const struct gf_init_program *);
 void gf5_rom_release(struct gf5 *);
@@ -281,7 +304,7 @@ i32 gf5_service_init(struct gf_production *, struct gf4_ctx *, const struct gf5_
  * no-op; clock64 -> fan_tick. Never hook IRQ/geforce_tick/kernel idle. */
 i32 gf5_service_poll(struct gf5 *);
 /* Reread module slot per dispatch. SAVING/RESTORING: NULL. SAVED: only
- * restore/free/last_rc allowed. FAULT retains management while resources
+ * restore/free/last_rc/boot_target allowed. FAULT retains management while resources
  * remain. F3/F4 rendering stays closed until final successful RUN. */
 struct gf5_test_ops {
     struct gf5 *ctx;
@@ -311,5 +334,6 @@ struct gf5_test_ops {
     __typeof__(&gf5_state_free) state_free;
     __typeof__(&gf5_service_poll) service_poll;
     i32 (*last_rc)(struct gf5 *);
+    __typeof__(&gf5_state_boot_target) state_boot_target;
 };
 #endif

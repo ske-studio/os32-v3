@@ -177,6 +177,7 @@ static void scanlog_init(void)
     cint_prod.display.bar0_map=(void *)(uptr)SCANLOG_BAR0;
     startlog_clear();
     geforce_init();
+    startlog_remove_mode_diagnostics();
     assert(active && routed && !failed && scanlog_route && !scanout_logged);
     assert(scanlog_devinit_calls==1 && cint_prod.display.initialized && cint_prod.display.baseline_valid);
     assert((!!cint_prod.feature5.rom.bytes)==!scanlog_rom_fail && scanlog_f5_ops);

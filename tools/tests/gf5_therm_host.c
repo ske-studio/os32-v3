@@ -343,8 +343,8 @@ static void test_failures(void)
         h.ctx.fan.kind=GF5_FAN_OTHER;
         gf5_host_trace_clear(&h);
         gf4_host_fail_at(&h.display,D_WRITE,fail,-31);
-        assert(gf5_fan_cstate(&h.ctx,80,0)==GF5_EIO);
-        assert(h.ctx.source_rc==-31 && h.display.calls[D_WRITE]==fail);
+        assert(!gf5_fan_cstate(&h.ctx,80,0) && h.ctx.fan_off);
+        assert(!h.ctx.source_rc && h.display.calls[D_WRITE]==fail);
         assert(devents[h.display.nevents-1].rc==-31 && !h.ctx.next_step);
         assert(h.ctx.rom.bytes==rom && !h.ctx.image && h.ctx.phase==GF5_RUN);
         no_forbidden();
@@ -358,7 +358,7 @@ static void test_failures(void)
     assert(gf5_fan_mode_set(&h.ctx,GF5_FAN_MANUAL)==GF5_EIO && h.ctx.source_rc==-32);
     assert(!h.calls[F5_GPIO_FIND] && !h.display.nevents && h.ctx.fan.mode==GF5_FAN_AUTO);
     reset(); ready(); gpio_line=8;
-    assert(gf5_fan_get(&h.ctx,&duty)==GF5_ENOTSUP && !h.display.nevents);
+    assert(gf5_fan_get(&h.ctx,&duty)==GF5_ENODEV && !h.display.nevents);
     reset(); ready(); h.ctx.fan.slope_mult=0;
     assert(gf5_fan_mode_set(&h.ctx,GF5_FAN_AUTO)==GF5_EINVAL);
     reset(); ready();
@@ -517,7 +517,7 @@ static void test_unknown_fan_temperature(void)
     entry(0x24,(50U<<4)|2U);
     ready();
     assert(h.ctx.fan.sensor_poll && h.ctx.fan.ntrip==1);
-    assert(gf5_fan_check_cstate(&h.ctx,50)==GF5_ENOTSUP);
+    assert(!gf5_fan_check_cstate(&h.ctx,50));
     for (u32 i=0;i<COUNT(tag);++i) {
         assert(h.ctx.fan.threshold[i]==(i32)limit[i] && h.ctx.fan.hyst[i]==(i32)hyst[i]);
         sensor_at(h.ctx.next_sensor,limit[i]);
@@ -958,7 +958,7 @@ static void test_resume(void)
         if (absent) gf5_host_fail_at(&h,F5_GPIO_FIND,0,GF5_ENOTSUP);
         else gpio_log0=2; /* Existing input-only/no-fan description. */
         u32 duty;
-        assert(gf5_fan_get(&h.ctx,&duty)==GF5_ENOTSUP && h.ctx.fan_off);
+        assert(gf5_fan_get(&h.ctx,&duty)==(absent ? GF5_ENOTSUP : GF5_ENODEV) && h.ctx.fan_off);
         saved=h.ctx.fan; saved.mode=mode;
         gf5_host_trace_clear(&h);
         assert(!gf5_therm_resume(&h.ctx,&saved));

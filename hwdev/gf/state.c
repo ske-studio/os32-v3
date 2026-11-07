@@ -85,6 +85,7 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
         return state_reject(g,GF5_EBUSY);
     if (g->phase!=GF5_RUN) return state_reject(g,GF5_ESTATE);
+    if (g->display->diagnostic_saved) return state_reject(g,GF4_EBUSY);
     if (g->heat.critical_paused || gf5_stopping(g))
         return state_reject(g,GF5_ESTATE);
     for (u32 i=0;i<GF5_TILE_COUNT;++i) {
@@ -96,15 +97,23 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     g->last_rc=g->source_rc=0;
     i32 rc=state_deadline(g);
     if (rc) return state_result(g,rc);
-    struct gf5_clock clock;
-    u32 uv;
+    struct gf5_clock clock={0};
+    struct gf5_clock_raw raw={0};
+    u32 uv=0, duty=0;
     u8 vid=0;
     /* Read-only capture precedes the closed transaction. */
-    rc=gf5_clock_read(g,&clock);
-    if (!rc) rc=gf5_volt_get(g,&uv);
-    if (!rc && g->vid.get) rc=g->vid.get(g->vid.owner,&vid);
-    if (rc) return state_result(g,rc);
-    if (g->fan.ntrip && !g->fan.trip) return state_reject(g,GF5_ESTATE);
+    bool clock_available=!gf5_clock_read(g,&clock);
+    if (clock_available) clock_available=!gf5_clock_raw_save(g,&raw);
+    /* nouveau volt/base.c:241-251: a negative get means unknown, even
+     * for an empty voltage table. It is not a failed restore request. */
+    bool volt_available=!gf5_volt_get(g,&uv);
+    if (volt_available && g->vid.get)
+        volt_available=!g->vid.get(g->vid.owner,&vid);
+    /* therm/fan.c:246-255: no controllable fan is a valid configuration.
+     * Keep policy only when its current duty and deep storage are usable. */
+    bool fan_available=!gf5_fan_get(g,&duty);
+    if (g->fan.ntrip && !g->fan.trip) fan_available=false;
+    g->last_rc=g->source_rc=0;
     g->busy=true; g->phase=GF5_SAVING;
     bool was_accepting=g->accepting;
     g->accepting=false;
@@ -112,7 +121,8 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     if (rc) return state_fault(g,rc);
 
     u32 cursor=0, count=0;
-    u64 total=sizeof(struct gf5_image)+(u64)g->fan.ntrip*sizeof(struct gf5_fan_trip);
+    u32 ntrip=fan_available ? g->fan.ntrip : 0;
+    u64 total=sizeof(struct gf5_image)+(u64)ntrip*sizeof(struct gf5_fan_trip);
     struct gf_vram_reservation key;
     while (!rc) {
         i32 next=gf_vram_next(g->ch,&cursor,&key);
@@ -134,7 +144,10 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     struct gf5_image *image=allocation;
     *image=(struct gf5_image){.version=GF5_IMAGE_VERSION,.bytes=(u32)total,
         .nextent=count,.saved_epoch=g->ch->epoch,.clock=clock,
-        .requested_uv=uv,.vid=vid,.fan=g->fan};
+        .requested_uv=uv,.vid=vid,
+        .fan_available=fan_available,.volt_available=volt_available,
+        .clock_available=clock_available,.clock_raw=raw};
+    if (fan_available) { image->fan=g->fan; image->fan.duty=duty; }
     image->extent=(void *)(image+1);
     image->fan.trip=(void *)(image->extent+count);
     if (!image->fan.ntrip) image->fan.trip=0;
@@ -173,23 +186,28 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
     return state_result(g,0);
 }
 
-/* nvkm/subdev/clk/base.c:159-215: RAM, fan up, voltage up, core,
- * voltage down, fan down. The outer deadline and closed RESTORING phase
- * survive nested RAM/tile operations; B2 owns its own pause interval. */
+/* nvkm/subdev/clk/base.c:272-305: RAM calc/prog, then :159-215:
+ * fan up, voltage up, core, voltage down, fan down.
+ * Version 3 restores the captured raw core PLL, with a solved RAM plan.
+ * Images are private in-memory objects; older versions remain rejected. */
 static i32 state_performance(struct gf5 *g, const struct gf5_image *image)
 {
-    struct gf5_plan plan;
     u32 previous=0;
-    i32 rc=gf5_clock_calc(g,&image->clock,&plan);
-    if (!rc) rc=gf5_plan_ceiling(g,&plan);
-    if (!rc) rc=gf5_ram_prog(g,&plan);
-    if (!rc) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
-    if (!rc) rc=gf5_volt_get(g,&previous);
-    if (!rc && image->requested_uv>=previous) rc=gf5_volt_set(g,image->requested_uv);
-    if (!rc) rc=gf5_clock_prog(g,&plan);
-    if (!rc && image->requested_uv<previous) rc=gf5_volt_set(g,image->requested_uv);
-    if (!rc) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,-1);
-    if (!rc) rc=gf5_therm_resume(g,&image->fan);
+    i32 rc=0;
+    struct gf5_plan plan;
+    if (image->clock_available) {
+        rc=gf5_clock_calc(g,&image->clock,&plan);
+        if (!rc) rc=gf5_ram_prog(g,&plan);
+    }
+    if (!rc && image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
+    if (!rc && image->volt_available) rc=gf5_volt_get(g,&previous);
+    if (!rc && image->volt_available && image->requested_uv>=previous)
+        rc=gf5_volt_set(g,image->requested_uv);
+    if (!rc && image->clock_available) rc=gf5_clock_raw_restore(g,&image->clock_raw);
+    if (!rc && image->volt_available && image->requested_uv<previous)
+        rc=gf5_volt_set(g,image->requested_uv);
+    if (!rc && image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,-1);
+    if (!rc && image->fan_available) rc=gf5_therm_resume(g,&image->fan);
     return rc;
 }
 
@@ -202,7 +220,7 @@ i32 gf5_state_restore(struct gf5 *g, const struct gf5_image *image)
         image->version!=GF5_IMAGE_VERSION) return state_reject(g,GF5_ESTATE);
     if (g->heat.critical_paused || gf5_stopping(g))
         return state_reject(g,GF5_ESTATE);
-    if (gf5_above_ceiling(g,&image->clock)) return state_reject(g,GF5_EBUSY);
+    if (image->clock_available && gf5_above_ceiling(g,&image->clock)) return state_reject(g,GF5_EBUSY);
     g->last_rc=g->source_rc=0;
     i32 rc=state_deadline(g);
     if (rc) return state_result(g,rc);
@@ -272,6 +290,36 @@ i32 gf5_state_restore(struct gf5 *g, const struct gf5_image *image)
     /* Restart advances the channel epoch, not the thermal policy's lifetime. */
     if (g->heat.down_active) g->heat.epoch=g->ch->epoch;
     g->accepting=true; g->busy=false;
+    return state_result(g,0);
+}
+
+/* Diagnostic image edit only. The normal restore keeps nouveau's RAM ->
+ * fan/voltage/core ordering (clk/base.c:159-215,272-305). Like therm_resume,
+ * retain the destination's trip allocation; never transfer live policy. */
+i32 gf5_state_boot_target(struct gf5 *g, struct gf5_image *dst,
+                          const struct gf5_image *boot)
+{
+    if (!g || !dst || !boot || dst==boot) return state_reject(g,GF5_EINVAL);
+    if (g->busy || g->phase==GF5_SAVING || g->phase==GF5_RESTORING)
+        return state_reject(g,GF5_EBUSY);
+    if (g->phase!=GF5_SAVED || dst!=g->image || !dst->complete ||
+        !boot->complete || dst->version!=GF5_IMAGE_VERSION ||
+        boot->version!=GF5_IMAGE_VERSION) return state_reject(g,GF5_ESTATE);
+    if (boot->fan_available && dst->fan.ntrip!=boot->fan.ntrip)
+        return state_reject(g,GF5_ESTATE);
+    if (boot->fan_available) {
+        struct gf5_fan_trip *trip=dst->fan.trip;
+        dst->fan=boot->fan;
+        dst->fan.trip=trip;
+        for (u32 i=0;i<boot->fan.ntrip;++i) trip[i]=boot->fan.trip[i];
+    }
+    dst->clock=boot->clock;
+    dst->clock_raw=boot->clock_raw;
+    dst->requested_uv=boot->requested_uv;
+    dst->vid=boot->vid;
+    dst->fan_available=boot->fan_available;
+    dst->volt_available=boot->volt_available;
+    dst->clock_available=boot->clock_available;
     return state_result(g,0);
 }
 

@@ -20,7 +20,7 @@ int shell_cmd_gf2(int argc, char **argv)
         "ram-prog", "perf-count", "perf-get", "perf-select", "therm",
         "fan-mode", "fan-get", "fan-cstate", "volt-get", "volt-set", "volt-id",
         "gpio-find", "gpio-get", "gpio-set", "tile-find", "tile-set", "tile-clear",
-        "save", "restore", "free", "poll", "wait", "last-rc"
+        "save", "restore", "free", "poll", "wait", "last-rc", "boot-target"
     };
     struct gf2_request q = {0};
     if (argc < 2) goto usage;
@@ -35,9 +35,9 @@ int shell_cmd_gf2(int argc, char **argv)
     if (q.test > GF5_FEATURE) goto usage;
     if (q.test == GF5_FEATURE) {
         if (argc < 3) goto usage;
-        for (q.session = 0; q.session <= GF5T_LAST_RC; ++q.session)
+        for (q.session = 0; q.session <= GF5T_BOOT_TARGET; ++q.session)
             if (str_eq(argv[2], feature_cases[q.session])) break;
-        if (q.session > GF5T_LAST_RC) goto usage;
+        if (q.session > GF5T_BOOT_TARGET) goto usage;
         if (q.session == GF5T_ARG_LO || q.session == GF5T_ARG_HI) {
             u32 operand[2] = {0, 0};
             if (argc != 5) goto usage;
@@ -83,6 +83,6 @@ dispatch:
     }
     return rc || q.rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc> [operand halfword]\n");
+    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc|boot-target> [operand halfword]\n");
     return 2;
 }

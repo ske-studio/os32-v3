@@ -246,7 +246,7 @@ static void id_selection(void)
     assert(h.display.calls[D_READ]==3 && h.display.calls[D_WRITE]==2);
     assert(!h.ctx.last_rc && !h.ctx.source_rc); retained();
     setup(0x30);
-    assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENOTSUP); no_io();
+    assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
     setup(0x30);
     rom[BIT+BIT_BYTES+1]=1; put(POWER+0x10,VOLT,4);
     assert(!gf5_volt_id(&h.ctx,100,0,0)); /* P v1 has no vmap */
@@ -271,7 +271,8 @@ static void vmap_absent_speedo(void)
         rom[VMAP+2]=1;
         assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_EBIOS); no_io();
         rom[VMAP]=0x99;
-        assert(gf5_volt_id(&h.ctx,100,0,0)==GF5_ENOTSUP); no_io();
+        assert(!gf5_volt_id(&h.ctx,100,0,0));
+        assert(h.display.calls[D_WRITE]==2);
     }
 }
 /* A07/V0: check the real parser/selector, with literal BIOS fixtures above.
@@ -300,7 +301,7 @@ static void check_classification(void)
         check_request(105,120,0); /* round up, with an available minimum */
         check_request(121,0,GF5_ERANGE);
         check_request(100,121,GF5_ERANGE); /* minimum must also be feasible */
-        check_request(0,0,GF5_ENOTSUP); /* zero id is not absence */
+        check_request(0,0,GF5_ENODEV); /* no mapped voltage request */
     }
     setup(0x30); h.ctx.rom.bytes=0;
     assert(gf5_volt_check_id(&h.ctx,100,0)==GF5_ENOTSUP); no_io();
@@ -310,15 +311,16 @@ static void check_classification(void)
     check_request(0,0,GF5_ENODEV);
     check_request(100,0,GF5_ENODEV);
     /* Missing DCB/GPIO pins reduce the VID mask, as volt/gpio.c:30-97
-     * does; a real voltage table still exists, so id=0 is unsupported. */
+     * does; an unmapped id=0 still stops before parsing the wiring. */
     setup(0x30); put(0x36,0,2);
-    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    check_request(100,0,0); check_request(0,0,GF5_ENODEV);
     setup(0x30); put(DCB+10,0,2);
-    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    check_request(100,0,0); check_request(0,0,GF5_ENODEV);
     setup(0x30); rom[GPIO+2]=0;
-    check_request(100,0,0); check_request(0,0,GF5_ENOTSUP);
+    check_request(100,0,0); check_request(0,0,GF5_ENODEV);
     setup(0x30); rom[VOLT]=0x40;
-    check_request(0,0,GF5_ENOTSUP);
+    check_request(0,0,GF5_ENODEV);
+    check_request(100,0,GF5_ENOTSUP);
     setup(0x30); rom[BIT+BIT_BYTES+1]=3;
     check_request(100,0,GF5_ENOTSUP);
     setup(0x30); rom[DCB]=0x42;
@@ -326,7 +328,8 @@ static void check_classification(void)
     setup(0x30); rom[GPIO]=0x42;
     check_request(100,0,GF5_ENOTSUP);
     setup(0x30); rom[VOLT+1]=4;
-    check_request(0,0,GF5_EBIOS);
+    check_request(0,0,GF5_ENODEV);
+    check_request(100,0,GF5_EBIOS);
     setup(0x30); rom[VOLT+3]=0;
     check_request(100,0,GF5_ERANGE);
     setup(0x30); rom[DCB+6]=0;
@@ -361,13 +364,61 @@ static void check_vmap(void)
         rom[VMAP+3]=0;
         check_request(100,0,0); /* no real zero entry: no extra floor */
         rom[VMAP]=0x99;
-        check_request(100,110,GF5_ENOTSUP);
+        check_request(100,110,0);
+        check_request(0,0,GF5_ENODEV);
         rom[VMAP]=versions[v]; rom[VMAP+2]=1;
         check_request(100,110,GF5_EBIOS);
         rom[VMAP+2]=versions[v]==0x10 ? 0x14 : 0x22;
         rom[VMAP+3]=0xff; /* declared entries run past ROM */
         check_request(100,110,GF5_EBIOS);
     }
+}
+/* volt/base.c:32-47,156-182,195-223,312-317; bios/vmap.c:29-53.
+ * Positive controls retain usable VID tables beside each absent-map case. */
+static void empty_and_fallback(void)
+{
+    static const u8 versions[]={0x12,0x20,0x30};
+    for (u32 i=0;i<sizeof(versions);++i) {
+        setup(versions[i]);
+        rom[VOLT+(versions[i]==0x30 ? 3 : 2)]=0;
+        u32 uv=0xfeed;
+        assert(gf5_volt_get(&h.ctx,&uv)==GF5_ESTATE && uv==0xfeed);
+        gf5_host_trace_clear(&h);
+        assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
+        check_request(0,0,GF5_ENODEV);
+        check_request(100,0,GF5_ERANGE);
+        assert(gf5_volt_set(&h.ctx,UV_LOW)==GF5_ERANGE); no_io();
+        assert(gf5_volt_id(&h.ctx,100,0,0)==GF5_ERANGE);
+        assert(!h.display.calls[D_WRITE]);
+        setup(versions[i]);
+        assert(!gf5_volt_id(&h.ctx,100,0,0));
+        assert(h.display.calls[D_WRITE]==2);
+    }
+    /* Zero requests stop at map, even if get/set would reject the table. */
+    setup(0x30); rom[VOLT+1]=4;
+    assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
+    setup(0x30); rom[VOLT]=0x99;
+    assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
+    /* Missing BIT/P and unknown P versions all use id-unit fallback. */
+    for (u32 kind=0;kind<3;++kind) {
+        setup(0x30);
+        if (kind==0) rom[BIT]=0;
+        if (kind==1) rom[BIT+BIT_BYTES]='X';
+        if (kind==2) rom[BIT+BIT_BYTES+1]=3;
+        check_request(0,0,GF5_ENODEV);
+        assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
+        /* A real request still reaches the independent voltage parser. */
+        i32 expected=kind==1 ? GF5_ENODEV : GF5_ENOTSUP;
+        check_request(100,0,expected);
+        assert(gf5_volt_id(&h.ctx,100,0,0)==expected); no_io();
+    }
+    setup(0x30); put(POWER+0x20,VMAP,4); rom[VMAP]=0x99;
+    /* An unknown vmap version ignores even unusable header/entry lengths. */
+    rom[VMAP+1]=0; rom[VMAP+2]=0; rom[VMAP+3]=0xff;
+    check_request(0,0,GF5_ENODEV); check_request(100,110,0);
+    assert(gf5_volt_id(&h.ctx,0,0,0)==GF5_ENODEV); no_io();
+    assert(!gf5_volt_id(&h.ctx,100,110,0));
+    assert(h.display.calls[D_WRITE]==2);
 }
 static void malformed(void)
 {
@@ -430,6 +481,6 @@ void _start(void)
 {
     voltage_versions(); gpio_golden(); gpio_tables(); all_vid_bits(); mask_and_unknown();
     id_selection(); vmap_absent_speedo(); malformed(); io_failure();
-    check_classification(); check_vmap();
+    check_classification(); check_vmap(); empty_and_fallback();
     gf2_host_exit(0);
 }

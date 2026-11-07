@@ -103,6 +103,33 @@ i32 gf5_clock_read(struct gf5 *g,struct gf5_clock *out)
     *out=c;
     return result(g,0); /* Zero is an absent source, nv40.c:82-115. */
 }
+/* OS32 boot restoration extension: retain all bits, without frequency calc.
+ * Restore follows nouveau nv40_clk_prog (nv40.c:183-196) ordering. */
+i32 gf5_clock_raw_save(struct gf5 *g,struct gf5_clock_raw *out)
+{
+    struct gf_io *io=clock_io(g); struct gf5_clock_raw raw;
+    if (!io || !io->read || !out) return result(g,GF5_EINVAL);
+    int rc=rd(io,CLK_CORE,&raw.nc);
+    if (!rc) rc=rd(io,CLK_COEF,&raw.nn);
+    if (!rc) rc=rd(io,CLK_SHADER,&raw.sc);
+    if (!rc) rc=rd(io,CLK_MUX,&raw.mux);
+    if (rc) return result(g,rc);
+    *out=raw;
+    return result(g,0);
+}
+i32 gf5_clock_raw_restore(struct gf5 *g,const struct gf5_clock_raw *raw)
+{
+    struct gf_io *io=clock_io(g);
+    if (!io || !io->read || !io->write || !io->timing.wait_us || !raw)
+        return result(g,GF5_EINVAL);
+    int rc=mask(io,CLK_MUX,CLK_MUX_MASK,0);
+    if (!rc) rc=io->write(io->opaque,0,CLK_COEF,4,raw->nn);
+    if (!rc) rc=io->write(io->opaque,0,CLK_CORE,4,raw->nc);
+    if (!rc) rc=io->write(io->opaque,0,CLK_SHADER,4,raw->sc);
+    if (!rc) rc=io->timing.wait_us(io->opaque,CLK_SETTLE_US);
+    if (!rc) rc=io->write(io->opaque,0,CLK_MUX,4,raw->mux);
+    return result(g,rc);
+}
 static u32 coefficient(const struct gfinit_pll_solution *s)
 {
     u32 v=(s->n1<<8)|s->m1;
