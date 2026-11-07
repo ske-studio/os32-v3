@@ -8,8 +8,7 @@
 /*  open ごとに 1 つの HScript を消費する台本方式で駆動する。sys_yield は     */
 /*  贋クロック fk_now を進める。                                              */
 /*                                                                           */
-/*  HOST_LIB_TEST_SEAMS を定義してビルドするので、無進捗期限を「絶対期限」に  */
-/*  落とす変異点 host__np_absolute が使える (回帰の否定側)。                  */
+/*  S1-S3: STALE は即時返却、用途別 API は要求全体の期限で待つ。             */
 /*                                                                           */
 /*  実行: tools/tests/test_host_lib.py。記録は tools/tests/n3_tdd.md。        */
 /* ========================================================================= */
@@ -28,7 +27,7 @@ typedef struct {
     int open_full;       /* この回数だけ open が FULL (減算) */
     int open_nosys;      /* open が NOSYS を返す */
     int status_again;    /* 業務 RESPONSE 前に status が AGAIN を返す回数 */
-    int status_forever;  /* status が常に AGAIN (無進捗 ETIMEOUT 用) */
+    int status_forever;  /* status が常に AGAIN (全体期限用) */
     u32 status;          /* 業務ステータス */
     const u8 *body;      /* read 本文 (NULL 可) */
     u32 body_len;
@@ -70,8 +69,6 @@ static u32 fk_total_write;   /* 全 host_write の合計 (open ごとに消え�
 static u8 g_pat[200000];
 static const char *g_time = "2026-09-14 12:34:56";   /* 19B */
 
-/* 外部 (libos32host.c の) 変異点 */
-extern int host__np_absolute;
 
 /* ------------------------------------------------------------------------- */
 /*  贋 KAPI                                                                   */
@@ -168,8 +165,11 @@ static i32 fk_sys_yield(void) { fk_now += fk_yield_step; return 0; }
 static KernelAPI g_fake;
 KernelAPI *kapi = &g_fake;
 
-#define HOST_LIB_TEST_SEAMS
-#include "../../userland/lib/host/libos32host.c"
+#include "../../userland/lib/host/host_call.c"
+#ifndef HOST_LIB_SOURCE
+#define HOST_LIB_SOURCE "../../userland/lib/host/libos32host.c"
+#endif
+#include HOST_LIB_SOURCE
 
 /* ------------------------------------------------------------------------- */
 /*  試験土台                                                                  */
@@ -191,8 +191,6 @@ static void fk_reset(void)
     fk_now = 0; fk_yield_step = 100;
     fk_open_count = 0; fk_close_count = 0;
     fk_open_flag = 0; fk_total_write = 0;
-    host__np_absolute = 0;
-    g_link_up = 0;                 /* 最初の open の STALE 予算を復活 */
     for (i = 0; i < MAXS; i++) reqlog[i][0] = '\0';
 }
 
@@ -351,14 +349,14 @@ static void case_open_stale_up(void)
 {
     char out[HOST_TIME_BUF];
     int rc;
-    /* 最初の open が STALE を 2 回 (200 tick < 3 秒) 返してから成功 */
+    /* STALE does not wait for the link to recover. */
     fk_reset();
     nscripts = 1;
     scripts[0].open_stale = 2;
     scripts[0].status = 200; scripts[0].body = (const u8 *)g_time; scripts[0].body_len = 19;
     rc = host_time(out);
-    check(rc == 0, "openstale_up: link comes up within 3s");
-    check(fk_now <= HOST_OPEN_STALE_TICKS, "openstale_up: succeeded before budget");
+    check(rc == HOST_ELINK, "openstale_up: STALE is immediate");
+    check(fk_now == 0, "openstale_up: no yield");
 }
 
 static void case_open_stale_timeout(void)
@@ -370,8 +368,8 @@ static void case_open_stale_timeout(void)
     scripts[0].open_stale = 999;   /* ずっと STALE */
     scripts[0].status = 200;
     rc = host_time(out);
-    check(rc == HOST_ELINK, "openstale_to: ELINK after 3s budget");
-    check(fk_now >= HOST_OPEN_STALE_TICKS, "openstale_to: waited the budget");
+    check(rc == HOST_ELINK, "openstale_to: immediate ELINK");
+    check(fk_now == 0, "openstale_to: no yield");
 }
 
 static void case_second_stage_stale(void)
@@ -379,14 +377,14 @@ static void case_second_stage_stale(void)
     u32 pages = 0, svc = 0;
     int rc;
     static const char *job = "job 7";
-    /* stage1 (OPEN) 成功 -> g_link_up=1、stage2 (DATA) が STALE -> 即 ELINK */
+    /* OPEN succeeds, DATA is STALE: return ELINK immediately. */
     fk_reset();
     nscripts = 2;
     scripts[0].status = 200; scripts[0].body = (const u8 *)job; scripts[0].body_len = 5;
     scripts[1].open_stale = 999;   /* DATA の open が STALE */
     rc = host_print_text("doc", "hello", 5, &pages, &svc);
     check(rc == HOST_ELINK, "stage2stale: ELINK immediately (established)");
-    check(fk_now < HOST_OPEN_STALE_TICKS, "stage2stale: did NOT wait the 3s budget");
+    check(fk_now == 0, "stage2stale: did NOT wait the 3s budget");
     check(!reqlog_has_prefix("PRINT CLOSE"), "stage2stale: no PRINT CLOSE sent");
 }
 
@@ -399,45 +397,43 @@ static void case_status_timeout(void)
     scripts[0].status_forever = 1;   /* AGAIN のみ */
     rc = host_time(out);
     check(rc == HOST_ETIMEOUT, "statusto: ETIMEOUT on no progress");
-    check(fk_now >= HOST_NOPROG_TICKS, "statusto: waited the 30s deadline");
+    check(fk_now >= HOST_CALL_TIMEOUT_MS / 10u, "statusto: waited the 30s deadline");
 }
 
-static void case_noprogress_positive(void)
+static void case_read_within_deadline(void)
 {
     CapSink c;
     int rc, http = -1;
     u32 nb = 0;
-    /* 20 秒 (2000 tick) ごとに 1 チャンク、3 チャンク = 60 秒。基準取り直しで成功。 */
+    /* Three 5s chunks fit inside the whole-call deadline. */
     fk_reset();
     fk_yield_step = 250;             /* 8 yield = 2000 tick */
     nscripts = 1;
     scripts[0].status = 200;
     scripts[0].body = g_pat; scripts[0].body_len = 3000; scripts[0].read_chunk = 1000;
-    scripts[0].read_gap = 2000;
+    scripts[0].read_gap = 500;
     c.total = 0; c.bad = 0; c.abort_at = 0;
     rc = host_get("http://x/slow", cap_sink, &c, &http, &nb);
-    check(rc == 0, "noprog+: 60s transfer with 20s gaps succeeds");
+    check(rc == 0, "noprog+: 15s transfer with 5s gaps succeeds");
     check(c.total == 3000, "noprog+: full body");
-    check(fk_now >= 6000, "noprog+: really spanned ~60s");
+    check(fk_now >= 1500, "noprog+: really spanned ~15s");
 }
 
-static void case_noprogress_absolute_mutant(void)
+static void case_read_whole_deadline(void)
 {
     CapSink c;
     int rc, http = -1;
     u32 nb = 0;
-    /* 変異: 絶対期限にすると同じ 60s/20s 転送が 30s で死ぬ (回帰の否定側) */
+    /* Progress does not extend the whole-call deadline. */
     fk_reset();
     fk_yield_step = 250;
     nscripts = 1;
     scripts[0].status = 200;
     scripts[0].body = g_pat; scripts[0].body_len = 3000; scripts[0].read_chunk = 1000;
     scripts[0].read_gap = 2000;
-    host__np_absolute = 1;
     c.total = 0; c.bad = 0; c.abort_at = 0;
     rc = host_get("http://x/slow", cap_sink, &c, &http, &nb);
-    check(rc == HOST_ETIMEOUT, "noprog-: absolute-deadline mutant times out");
-    host__np_absolute = 0;
+    check(rc == HOST_ETIMEOUT, "deadline: progress does not extend timeout");
 }
 
 static void case_nosys(void)
@@ -501,26 +497,25 @@ static void case_write_again_yield(void)
     check(fk_total_write == 5, "wagain: 5B delivered after retries");
 }
 
-static void case_write_noprogress_positive(void)
+static void case_write_within_deadline(void)
 {
     static u8 big[3000];
     int rc, i;
     u32 svc = 0;
-    /* N3-fix (c) 肯定側: write>0 が 20 秒 (2000 tick) ごとに進む 60 秒転送。
-     * 無進捗基準の取り直しで成功する (write 経路の np_reset)。 */
+    /* Three writes with 5s gaps finish before the whole-call deadline. */
     for (i = 0; i < 3000; i++) big[i] = (u8)i;
     fk_reset();
     fk_yield_step = 250;             /* 8 yield = 2000 tick */
     nscripts = 1;
     scripts[0].status = 200;
-    scripts[0].write_gap = 2000; scripts[0].write_chunk = 1000;
+    scripts[0].write_gap = 500; scripts[0].write_chunk = 1000;
     rc = host_clip_put((const char *)big, 3000, &svc);
-    check(rc == 0, "wnoprog+: 60s write with 20s gaps succeeds");
+    check(rc == 0, "wnoprog+: 15s write with 5s gaps succeeds");
     check(fk_total_write == 3000, "wnoprog+: full body written");
-    check(fk_now >= 6000, "wnoprog+: really spanned ~60s");
+    check(fk_now >= 1500, "wnoprog+: really spanned ~15s");
 }
 
-static void case_write_noprogress_absolute_mutant(void)
+static void case_write_whole_deadline(void)
 {
     static u8 big[3000];
     int rc, i;
@@ -533,10 +528,8 @@ static void case_write_noprogress_absolute_mutant(void)
     nscripts = 1;
     scripts[0].status = 200;
     scripts[0].write_gap = 2000; scripts[0].write_chunk = 1000;
-    host__np_absolute = 1;
     rc = host_clip_put((const char *)big, 3000, &svc);
-    check(rc == HOST_ETIMEOUT, "wnoprog-: absolute-deadline mutant times out on write");
-    host__np_absolute = 0;
+    check(rc == HOST_ETIMEOUT, "wdeadline: progress does not extend timeout on write");
 }
 
 static void case_clip_put_ok(void)
@@ -759,14 +752,14 @@ int main(void)
     case_open_stale_timeout();
     case_second_stage_stale();
     case_status_timeout();
-    case_noprogress_positive();
-    case_noprogress_absolute_mutant();
+    case_read_within_deadline();
+    case_read_whole_deadline();
     case_nosys();
     case_open_again_yield();
     case_open_full_yield();
     case_write_again_yield();
-    case_write_noprogress_positive();
-    case_write_noprogress_absolute_mutant();
+    case_write_within_deadline();
+    case_write_whole_deadline();
     case_clip_put_ok();
     case_clip_put_empty();
     case_clip_get_503();
