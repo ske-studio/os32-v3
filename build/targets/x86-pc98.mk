@@ -99,7 +99,8 @@ clean-external:
 # === クリーン (全サブモジュール) ===
 clean: clean-kernel clean-programs clean-libs clean-images clean-sdk clean-assets clean-deps
 	rm -f os.img os.d88 os_install.img os_install.d88 os_raw.img
-	python3 -c "import shutil; shutil.rmtree('build/out/host32-controls', ignore_errors=True)"
+	# 部品の中間物・生成物も消す。ソース側の生成物と取得済みフォントは保持する。
+	rm -rf "$(BUILD_OUT)"
 
 # 依存ファイル (.d) の一括削除 — Rust の target/ 以下は対象外
 clean-deps:
