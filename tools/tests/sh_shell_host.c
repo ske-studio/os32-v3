@@ -1355,6 +1355,9 @@ static void case_exit_unwinds_nested(void)
 void _start(void)
 {
     build_api();
+    check(strcmp(fs_strerror(OS32_ERR_ROFS), "Read-only file system") == 0, "ROFS message");
+    check(strcmp(fs_strerror(OS32_ERR_HOSTDOWN), "Host is down") == 0, "HOSTDOWN message");
+    check(strcmp(fs_strerror(OS32_ERR_TIMEOUT), "Operation timed out") == 0, "TIMEOUT message");
     case_redraw_extend();
     case_redraw_rebuild();
     case_redraw_cursor_not_at_end();

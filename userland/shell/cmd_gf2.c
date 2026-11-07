@@ -53,6 +53,8 @@ int shell_cmd_gf2(int argc, char **argv)
             if (operand[0] >= GF5_WIRE_OPERANDS) goto usage;
             q.session |= operand[0] << GF5_WIRE_INDEX_SHIFT | operand[1] << GF5_WIRE_VALUE_SHIFT;
         } else if (argc != 3) goto usage;
+        if (q.session == GF5T_GPIO_GET || q.session == GF5T_GPIO_SET)
+            q.session |= GF5_WIRE_GPIO_TAG;
     } else if (q.test == GF3_ACCEL) {
         if (argc != 3) goto usage;
         for (q.session = 0; q.session < sizeof(accel_cases)/sizeof(accel_cases[0]); q.session++)

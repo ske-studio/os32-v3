@@ -202,7 +202,8 @@ static void all_vid_bits(void)
 static void mask_and_unknown(void)
 {
     setup(0x30);
-    /* Missing bit 1 leaves only VID0. Applied to both sense and table VID. */
+    /* volt/gpio.c:84-93 removes missing VID1 only from GPIO reads.
+     * bios/volt.c:143-150 and volt/base.c:37-44 keep table VIDs intact. */
     rom[GPIO+2]=1;
     seed(LOW,0); seed(MID,4);
     u32 uv=0;
@@ -213,8 +214,12 @@ static void mask_and_unknown(void)
     assert(h.display.calls[D_WRITE]==1); write_trace(0,LOW,0x10);
     gf5_host_trace_clear(&h);
     rom[VOLT+3]=1; volt_entry(0,110,2);
-    assert(!gf5_volt_get(&h.ctx,&uv) && uv==UV_MID);
+    uv=0xfeed;
+    assert(gf5_volt_get(&h.ctx,&uv)==GF5_ESTATE && uv==0xfeed);
     assert(h.display.calls[D_READ]==1);
+    /* Positive control: an entry with the sensed VID still matches. */
+    volt_entry(0,110,0);
+    assert(!gf5_volt_get(&h.ctx,&uv) && uv==UV_MID);
     setup(0x30);
     rom[VOLT+3]=1; seed(LOW,0x100); seed(MID,4);
     uv=0xfeed;

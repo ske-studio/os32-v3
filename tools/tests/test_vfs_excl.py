@@ -129,10 +129,10 @@ def build_host(tmp, name, src="tools/tests/vfs_excl_host.c"):
 MUTATIONS = [
     # 変異 1: 非対応 FS の判定を種別検査より後ろへ動かした版 (往復 2 の指摘)。
     ("nosys_after_kind",
-     "    if (mode & O_EXCL) {\n"
+     "    if ((mode & O_EXCL) && !created) {\n"
      "        if (!(mode & O_CREAT)) return VFS_ERR_INVAL;\n"
      "        if (!ops->create_excl) return VFS_ERR_NOSYS;\n",
-     "    if (mode & O_EXCL) {\n"
+     "    if ((mode & O_EXCL) && !created) {\n"
      "        if (!(mode & O_CREAT)) return VFS_ERR_INVAL;\n"
      "        if (!ops->create_excl) {\n"
      "            int k = vfs_path_kind(resolved);\n"

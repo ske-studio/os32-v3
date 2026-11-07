@@ -18,6 +18,7 @@ int strcmp(const char *a, const char *b)
     return (u8)*a - (u8)*b;
 }
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_log.c"
 #include "userland/shell/hwb_exec.c"
 #include "userland/shell/cmd_hw.c"
@@ -264,9 +265,9 @@ static void scripts(void)
             /* §8 example BAR1, independent from shell address resolver. */
             struct hwbf_pci *p = hwbf_add_pci(&bus, HW_BDF(0,8,0), 0x1023, 0x9660);
             p->config[0x17] = 0x20; p->config[0x16] = 0x40; /* BAR1 0x20400000 */
-            if (hwbf_equal(script->name, "tri_w32.hwb") || (hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb"))) {
+            if (hwbf_equal(script->name, "tri_w32.hwb") || (hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb"))) {
                 p->config[0x13] = 0x20; /* BAR0 0x20000000 */
-                for (u32 n = 0; n < ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb")) ? 4096U : 32U); n++)
+                for (u32 n = 0; n < ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb")) ? 4096U : 32U); n++)
                     *hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) = 0x80U + n;
             }
             if (hwbf_equal(script->name, "gf_regs.hwb") || hwbf_equal(script->name, "gf_palette.hwb")) {
@@ -294,7 +295,7 @@ static void scripts(void)
                 for (u32 n = 0; n < 32; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) == 0x80U + n);
             }
-            if ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb"))) {
+            if ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb"))) {
                 CHECK(scalar("bad") == 0);
                 for (u32 n = 0; n < 4096; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U+n) == (u8)(0x80U+n));

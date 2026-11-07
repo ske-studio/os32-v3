@@ -57,7 +57,7 @@ static void lan_module_pci_bind_fallback(void) { CHECK(step++==2); }
 void net_unbind(void) { CHECK(parsed && step==4); unbinds++; }
 int net_start(enum NetNicId id,const u8 peer[6])
 {
-    CHECK(id==NET_NIC_AUTO && unbinds==1 && !mounts && !initialized);
+    CHECK(id==NET_NIC_AUTO && step==4 && !unbinds && !mounts && !initialized);
     if (starts++) {
         CHECK(starts==2 && (mode==6 || mode==8) && !peer);
         return mode==8 ? -1 : 0;
@@ -117,8 +117,8 @@ static int suite(void)
         CHECK(host_mailbox_stage(7, 3, &notice) == OS32_ERR_AGAIN);
     }
     if(mode==0 || mode==4 || mode==5) {CHECK(!starts && !mounts && !unbinds); return 0;}
-    if(mode==6 || mode==8) {CHECK(starts==2 && unbinds==1 && !mounts && !initialized); return 0;}
-    CHECK(starts==1 && unbinds==1);
+    if(mode==6 || mode==8) {CHECK(starts==2 && !unbinds && !mounts && !initialized); return 0;}
+    CHECK(starts==1 && !unbinds);
     if(mode==2) {CHECK(!mounts); return 0;}
     CHECK(mounts==1 && initialized==1 && saved.io_ctx==&boot_sfs_lan);
     /* Use borrowed objects after the entire boot helper's stack has returned. */

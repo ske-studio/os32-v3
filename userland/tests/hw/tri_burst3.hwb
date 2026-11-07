@@ -1,0 +1,1575 @@
+# Sources: trident_driver-1.4.0.c:616-692,694-775; trident_regs.h:302-325
+# vgaHW.c:398-409,418-421,474-488,574-604,723-730
+# Copyright 1991-1999 by The XFree86 Project, Inc.
+# Copyright 1990,91 by Thomas Roell, Dinkelscherben, Germany.
+# vgaHW.c license: xorg-server-21.1.13 COPYING:54-76
+# Copyright (C) 1994-2003 The XFree86 Project, Inc.  All Rights Reserved.
+# Copyright (C) Colin Harrison 2005-2008
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FIT-
+# NESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+# XFREE86 PROJECT BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+# AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Except as contained in this notice, the name of the XFree86 Project shall not
+# be used in advertising or otherwise to promote the sale, use or other dealings
+# in this Software without prior written authorization from the XFree86 Project.
+# Copyright 1992-2003 by Alan Hourihane, North Wales, UK.
+#
+# Permission to use, copy, modify, distribute, and sell this software and its
+# documentation for any purpose is hereby granted without fee, provided that
+# the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation, and that the name of Alan Hourihane not be used in
+# advertising or publicity pertaining to distribution of the software without
+# specific, written prior permission.  Alan Hourihane makes no representations
+# about the suitability of this software for any purpose.  It is provided
+# "as is" without express or implied warranty.
+#
+# ALAN HOURIHANE DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+# EVENT SHALL ALAN HOURIHANE BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+# DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+# TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+#
+# 640x480x8 setup copied from trident_mode.hwb; see its source references.
+# Manufacturer: NEC LCD172VXM/192VXM manual p.20 (preset/sync).
+# https://www.sharp-nec-displays.com/support/webdl/dl_service/data/display_j/manual/manu_LCD172_192VXM_No01.pdf
+# Trident ProVidia 9682 datasheet unavailable; extended delivery is unverified.
+# Sources: trident_driver-1.4.0.c:1028-1047,1064,2294,2313,2384,2525-2529
+# trident_dac.c:256,572-576,631-658,673-678,781-810,871-907
+# trident_pll.c:42-55,60-135; trident_regs.h:27-28
+# vgaHW.c:845-872,1240-1286,1391-1468 (KGA_ENABLE_ON_ZERO).
+# Run: hw run -o /tmp/tri_burst3.log /test/hw/tri_burst3.hwb
+# Same mode/save/restore as trident_mode.hwb. One burst spans 0..0xFFF,
+# including 0x80 and 0x800. Save/restore every touched byte with single accesses.
+# PCIReg bits 1/2: xf86-video-trident trident_dac.c:715-721 (MIT/X11).
+# Their individual read/write meanings are unknown; report observations only.
+# Each trial prints SR/CR/GE status, CR39 readback, ranges and first 8 misses.
+# Interface: xf86-video-trident trident_dac.c:665-678 (MIT/X11).
+# GE init: xf86-video-trident-1.3.8 src/trident_accel.c:97-141.
+# Existing driver reference D:3199-3211,3263-3276; 9682 delivery unverified.
+# CTRL+STOP or an access error stops execution; cleanup is the normal path only.
+ device d = bdf 0:8.0
+ window v = bar d 1
+ window f = bar d 0
+ mmiowrite8 v + 0x3CE 6
+ mmioread8 v + 0x3CF -> gr6
+ label setup
+ call state_save
+ # PC-98 PCI skips MMIO enable: driver 519-521;
+ # INB/OUTB/OUTW, including configuration ports, use BAR1: regs 302-325.
+ call pc98_init
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3D4 0xC0
+ mmioread8 v + 0x3D5 -> ref
+ let a = 0xE5
+ let b = 0x1E
+ if (ref & 0x80) == 0 goto pll_ready
+ let a = 0xA4
+ let b = 0x0E
+ label pll_ready
+ print "reference-select" ref
+ print "PLL-a" a
+ print "PLL-b" b
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D5 t & 0x7F
+ call protect_on
+ # Column 3: blanked standard VGA restore.
+ mmiowrite8 v + 0x3C2 0xE3
+ mmiowrite16 v + 0x3C4 0x01 | ((0x21) << 8)
+ mmiowrite16 v + 0x3C4 0x02 | ((0x0F) << 8)
+ mmiowrite16 v + 0x3C4 0x03 | ((0x00) << 8)
+ mmiowrite16 v + 0x3C4 0x04 | ((0x0E) << 8)
+ mmiowrite16 v + 0x3D4 0x11 | ((0x2C) << 8)
+ mmiowrite16 v + 0x3D4 0x00 | ((0x5F) << 8)
+ mmiowrite16 v + 0x3D4 0x01 | ((0x4F) << 8)
+ mmiowrite16 v + 0x3D4 0x02 | ((0x4F) << 8)
+ mmiowrite16 v + 0x3D4 0x03 | ((0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x04 | ((0x52) << 8)
+ mmiowrite16 v + 0x3D4 0x05 | ((0x1E) << 8)
+ mmiowrite16 v + 0x3D4 0x06 | ((0x0B) << 8)
+ mmiowrite16 v + 0x3D4 0x07 | ((0x3E) << 8)
+ mmiowrite16 v + 0x3D4 0x08 | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x09 | ((0x40) << 8)
+ mmiowrite16 v + 0x3D4 0x0A | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0B | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0C | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0D | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0E | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x0F | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x10 | ((0xEA) << 8)
+ mmiowrite16 v + 0x3D4 0x11 | ((0x2C) << 8)
+ mmiowrite16 v + 0x3D4 0x12 | ((0xDF) << 8)
+ mmiowrite16 v + 0x3D4 0x13 | ((0x50) << 8)
+ mmiowrite16 v + 0x3D4 0x14 | ((0x00) << 8)
+ mmiowrite16 v + 0x3D4 0x15 | ((0xDF) << 8)
+ mmiowrite16 v + 0x3D4 0x16 | ((0x0B) << 8)
+ mmiowrite16 v + 0x3D4 0x17 | ((0xC3) << 8)
+ mmiowrite16 v + 0x3D4 0x18 | ((0xFF) << 8)
+ mmiowrite16 v + 0x3CE 0x00 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x01 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x02 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x03 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x04 | ((0x00) << 8)
+ mmiowrite16 v + 0x3CE 0x05 | ((0x40) << 8)
+ if mode == 3 goto keep_gr6
+ mmiowrite16 v + 0x3CE 0x06 | ((5) << 8)
+ goto gr6_ready
+ label keep_gr6
+ mmiowrite16 v + 0x3CE 0x06 | ((gr6) << 8)
+ label gr6_ready
+ mmiowrite16 v + 0x3CE 0x07 | ((0x0F) << 8)
+ mmiowrite16 v + 0x3CE 0x08 | ((0xFF) << 8)
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x00
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x01
+ mmiowrite8 v + 0x3C0 0x01
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x02
+ mmiowrite8 v + 0x3C0 0x02
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x03
+ mmiowrite8 v + 0x3C0 0x03
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x04
+ mmiowrite8 v + 0x3C0 0x04
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x05
+ mmiowrite8 v + 0x3C0 0x05
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x06
+ mmiowrite8 v + 0x3C0 0x06
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x07
+ mmiowrite8 v + 0x3C0 0x07
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x08
+ mmiowrite8 v + 0x3C0 0x08
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x09
+ mmiowrite8 v + 0x3C0 0x09
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0A
+ mmiowrite8 v + 0x3C0 0x0A
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0B
+ mmiowrite8 v + 0x3C0 0x0B
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0C
+ mmiowrite8 v + 0x3C0 0x0C
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0D
+ mmiowrite8 v + 0x3C0 0x0D
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0E
+ mmiowrite8 v + 0x3C0 0x0E
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x0F
+ mmiowrite8 v + 0x3C0 0x0F
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x10
+ mmiowrite8 v + 0x3C0 0x41
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x11
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x12
+ mmiowrite8 v + 0x3C0 0x0F
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x13
+ mmiowrite8 v + 0x3C0 0x00
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x14
+ mmiowrite8 v + 0x3C0 0x00
+ # Column 4: hidden command is separate from palette mask.
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0xC20E
+ mmioread8 v + 0x3C8 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmiowrite8 v + 0x3C6 0
+ mmioread8 v + 0x3C8 -> t
+ # Column 5: extended restore, zero-initialized CR3A/CR50.
+ mmiowrite16 v + 0x3D4 0x1E | ((0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x21 | ((0x20) << 8)
+ mmiowrite16 v + 0x3C4 0x0D | ((0x20) << 8)
+ mmiowrite16 v + 0x3D4 0x50 | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x27 | ((8) << 8)
+ mmiowrite16 v + 0x3D4 0x2B | ((0) << 8)
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t & 0xCF) << 8)
+ mmiowrite16 v + 0x3D4 0x36 | ((0x80) << 8)
+ mmiowrite8 v + 0x3D4 0x2F
+ mmioread8 v + 0x3D5 -> t
+ # CR2F is deferred to the interface trial.
+ mmiowrite8 v + 0x3D4 0x2A
+ mmioread8 v + 0x3D5 -> t
+ # CR2A is deferred to the interface trial.
+ mmiowrite16 v + 0x3D4 0x3A | ((0) << 8)
+ mmiowrite16 v + 0x3D4 0x38 | ((0) << 8)
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x39 | (((t & 0xF9) | 6) << 8)
+ mmiowrite16 v + 0x3D4 0x55 | ((0x1F) << 8)
+ mmiowrite8 v + 0x3CE 0x2F
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x2F | ((t | 4) << 8)
+ mmiowrite8 v + 0x3CE 0x0F
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x0F | (((t & 0xF0) | 2) << 8)
+ mmiowrite16 v + 0x3D4 0x13 | ((0x50) << 8)
+ # Column 6: old PLL; MCLK was set by PC98 init, no SR18/19 changes.
+ mmiowrite8 v + 0x43C8 a
+ mmiowrite8 v + 0x43C9 b
+ mmiowrite8 v + 0x3C2 0xEB
+ mmiowrite16 v + 0x3C4 0xC20E
+ call protect_off
+ call enable
+ pciread32 d 0x10 -> t
+ print "BAR0" t
+ mmiowrite8 v + 0x3D4 0x21
+ mmioread8 v + 0x3D5 -> t
+ print "CR21" t
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> t
+ print "CR39" t
+ dim original 1024
+ let i = 0
+ label backup_words
+ mmioread32 f + (i << 2) -> original[i]
+ let i = i + 1
+ if i != 1024 goto backup_words
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> burstcr
+ print "CR39-saved" burstcr
+ # Four cumulative conditions, each 1024 incrementing 32-bit stores.
+ let trialcr = 1
+ let width = 4
+ let count = 1024
+ let seed = 0x5A000000
+ log "trial-32-current"
+ call burst_trial
+ log "trial-32-interface"
+ mmiowrite8 v + 0x3D4 0x2A
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x2A | ((t | 0x40) << 8)
+ mmiowrite8 v + 0x3D4 0x2F
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x2F | ((t | 0x10) << 8)
+ let seed = 0x5B000000
+ call burst_trial
+ let ge_changed = 0
+ log "trial-32-ge"
+ # Bounded reads, like accel.c ge_poll; timeout still reaches cleanup.
+ let polls = 0
+ label ge_wait
+ mmioread8 v + 0x2120 -> status
+ if (status & 0x80) == 0 goto ge_idle
+ let polls = polls + 1
+ if polls != 10000 goto ge_wait
+ log "GE-timeout-skip-init-and-trial"
+ goto ge_done
+ label ge_idle
+ # X13 trident_accel.c:97-111: 9682 init writes only OPERMODE.
+ # 8bpp/no clipping. No command: 640-byte pitch has no GE pitch code.
+ mmioread16 v + 0x2122 -> ge_saved
+ mmiowrite16 v + 0x2122 0x100
+ let ge_changed = 1
+ let seed = 0x5C000000
+ call burst_trial
+ label ge_done
+ log "trial-32-unlock"
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ # SR0E read/write bit1 is inverted (TridentRestore).
+ mmiowrite16 v + 0x3C4 0x0E | (((t ^ 2) | 0x80) << 8)
+ let seed = 0x5D000000
+ call burst_trial
+ # Restore VRAM with single stores and burst disabled before restoring CR39.
+ let i = 0
+ label restore_words
+ mmiowrite32 f + (i << 2) original[i]
+ let i = i + 1
+ if i != 1024 goto restore_words
+ if ge_changed == 0 goto ge_restored
+ mmiowrite16 v + 0x2122 ge_saved
+ label ge_restored
+ call disable
+ call state_restore
+ end
+
+ label burst_trial
+ call observe
+ print "CR39-requested" trialcr
+ mmiowrite16 v + 0x3D4 0x39 | (trialcr << 8)
+ mmioread8 v + 0x3D5 -> t
+ print "CR39-before" t
+ print "width" width
+ print "count" count
+ # A uses individual stores: clear every byte, including after a shorter B.
+ mmiofill32 f + 0 1024 0xA5A5A5A5
+ print "B-seed" seed
+ mmioblock32 f + 0 count seed inc
+ let step = 1
+ let maskval = 0xFFFFFFFF
+ label compare_begin
+ let i = 0
+ let off = 0
+ let bad = 0
+ let inrange = 0
+ let expected = seed
+ label compare_words
+ mmioread32 f + off -> got
+ label compare_value
+ if got != expected goto word_mismatch
+ if inrange != 0 goto word_next
+ let inrange = 1
+ print "match-start" off
+ goto word_next
+ label word_mismatch
+ if inrange == 0 goto count_mismatch
+ print "match-end" (off - 1)
+ let inrange = 0
+ label count_mismatch
+ let bad = bad + 1
+ if ((bad-1) >> 3) != 0 goto word_next
+ print "mismatch-offset" off
+ print "expected" expected
+ print "actual" got
+ label word_next
+ let expected = (expected + step) & maskval
+ let i = i + 1
+ let off = off + width
+ if i != count goto compare_words
+ if inrange == 0 goto compared
+ print "match-end" (off - 1)
+ label compared
+ print "mismatch-count" bad
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> t
+ print "CR39-after" t
+ return
+
+ label observe
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ print "SR0E" t
+ mmiowrite8 v + 0x3D4 0x2A
+ mmioread8 v + 0x3D5 -> t
+ print "CR2A" t
+ mmiowrite8 v + 0x3D4 0x2F
+ mmioread8 v + 0x3D5 -> t
+ print "CR2F" t
+ mmiowrite8 v + 0x3D4 0x38
+ mmioread8 v + 0x3D5 -> t
+ print "CR38" t
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ print "CR23" t
+ mmiowrite8 v + 0x3D4 0x39
+ mmioread8 v + 0x3D5 -> t
+ print "CR39" t
+ mmiowrite8 v + 0x3D4 0x55
+ mmioread8 v + 0x3D5 -> t
+ print "CR55" t
+ mmioread8 v + 0x2120 -> status
+ print "GE_STATUS" status
+ return
+
+ label enable
+ iowrite8 port 0x68 0x0E
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8F
+ iowrite8 port 0x6A 0x06
+ call protect_on
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t & 0xDF) << 8)
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t | 4) << 8)
+ let mask = 0xFF
+ let bits = 6
+ call dac
+ let bits = 8
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | ((t & 0xFC) << 8)
+ let bits = 1
+ call dac
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t & 0xEF) << 8)
+ call protect_off
+ iowrite8 port 0xFAC 2
+ return
+ label disable
+ iowrite8 port 0xFAC 0
+ call protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 1 | ((t | 0x10) << 8)
+ let bits = 0
+ let mask = 0xFE
+ call dac
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + 0x3CF -> t
+ mmiowrite16 v + 0x3CE 0x23 | (((t & 0xFC) | 1) << 8)
+ let mask = 0xFD
+ call dac
+ let mask = 0xCF
+ call dac
+ let mask = 0xF7
+ call dac
+ let mask = 0xFB
+ call dac
+ mmiowrite8 v + 0x3D4 0x29
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x29 | ((t & 0xFB) << 8)
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite16 v + 0x3D4 0x23 | ((t | 0x20) << 8)
+ call protect_off
+ iowrite8 port 0x6A 0x07
+ iowrite8 port 0x6A 0x8E
+ iowrite8 port 0x6A 0x06
+ iowrite8 port 0x68 0x0F
+ return
+ label dac
+ mmiowrite8 v + 0x83C8 4
+ mmioread8 v + 0x83C6 -> t
+ mmiowrite8 v + 0x83C8 4
+ mmiowrite8 v + 0x83C6 (t & mask) | bits
+ return
+ label protect_on
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 1
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq | 0x20
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0
+ return
+ label protect_off
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq & 0xDF
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 3
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x20
+ return
+
+ # PC98TRIDENT96xxInit: driver 616-692, vgaHW.c 1795-1806.
+ label pc98_init
+ mmioread8 v + 0x3CC -> t
+ mmiowrite8 v + 0x3C2 t | 0xC3
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0B | (t << 8)
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t | 0x20) << 8)
+ mmiowrite8 v + 0x3C4 0x0C
+ mmioread8 v + 0x3C5 -> flip
+ let flip = flip & 0x10
+ print "PC98-SR0C-bit4" flip
+ if flip == 0 goto pc98_config_alt
+ mmiowrite8 v + 0x3C4 0x0E
+ mmiowrite8 v + 0x94 0
+ mmiowrite8 v + 0x102 1
+ mmiowrite8 v + 0x94 0x20
+ mmioread8 v + 0x3C3 -> t
+ mmiowrite8 v + 0x3C3 t | 1
+ goto pc98_config_done
+ label pc98_config_alt
+ mmiowrite8 v + 0x3C4 0x0E
+ mmiowrite8 v + 0x46E8 0x10
+ mmiowrite8 v + 0x102 1
+ mmiowrite8 v + 0x46E8 8
+ label pc98_config_done
+ mmioread8 v + 0x3DA -> flip
+ mmiowrite8 v + 0x3C0 0x10
+ mmiowrite8 v + 0x3C0 0x41
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D4 0x11
+ mmiowrite8 v + 0x3D5 t & 0x7F
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t | 0x80) << 8)
+ mmiowrite16 v + 0x3D4 0x3820
+ mmiowrite16 v + 0x3D4 0x2020
+ mmiowrite16 v + 0x3D4 0x0E30
+ mmiowrite16 v + 0x3D4 0x0031
+ mmiowrite16 v + 0x3D4 0x0032
+ mmiowrite16 v + 0x3D4 0x213B
+ mmiowrite8 v + 0x43C6 0xAF
+ mmiowrite8 v + 0x43C7 0
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + 0x3C5 -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((t & 0x7F) << 8)
+ mmiowrite8 v + 0x3D4 0x11
+ mmioread8 v + 0x3D5 -> t
+ mmiowrite8 v + 0x3D4 0x11
+ mmiowrite8 v + 0x3D5 t | 0x80
+ return
+
+ # TRIDENTSave/Restore: driver 1084-1136; VGA 1016-1166,845-892.
+ # Ra266 is not the boot VGA primary: PCI Command=0002, PC-98 display.
+ # Primary && text is false (PM decision); no font/text planes are touched.
+ # 9682: progClock=true, non-Cyber, non-3D, NewClockCode=false, TVChipset=0.
+ # MCLK option defaults to 0 (driver 3046-3051); Init 80MHz is independent.
+ # save[0..767] DAC; 768 misc; 769..793 CR; 794..814 AR;
+ # 815..823 GR; 824..827 SR1..4; 828..851 Trident.
+ label state_save
+ dim save 859
+ let cb = 0x3D4
+ # vgaHWGetIOBase precedes ScreenInit/Save (driver:1970).
+ mmioread8 v + 0x3CC -> t
+ if (t & 1) != 0 goto palette_base
+ let cb = 0x3B4
+ label palette_base
+ # NEED_SAVED_CMAP: first invocation, VGA 1051-1140.
+ mmiowrite8 v + 0x3C6 0xFF
+ mmiowrite8 v + 0x3C7 0
+ let i = 0
+ label save_rgb6
+ mmioread8 v + 0x3C9 -> save[i]
+ let i = i + 1
+ if i != 6 goto save_rgb6
+ mmiowrite8 v + 0x3C8 1
+ let i = 3
+ label test_rgb_write
+ mmiowrite8 v + 0x3C9 (save[i] ^ 0x3F) & 0x3F
+ let i = i + 1
+ if i != 6 goto test_rgb_write
+ mmiowrite8 v + 0x3C7 1
+ let badmap = 0
+ let i = 3
+ label test_rgb_read
+ mmioread8 v + 0x3C9 -> t
+ if t == ((save[i] ^ 0x3F) & 0x3F) goto test_rgb_match
+ let badmap = 1
+ label test_rgb_match
+ let i = i + 1
+ if i != 6 goto test_rgb_read
+ mmiowrite8 v + 0x3C8 1
+ let i = 3
+ label undo_rgb_test
+ mmiowrite8 v + 0x3C9 save[i]
+ let i = i + 1
+ if i != 6 goto undo_rgb_test
+ if badmap != 0 goto default_rgb
+ mmiowrite8 v + 0x3C7 2
+ let i = 6
+ label save_rgb
+ mmioread8 v + 0x3C9 -> save[i]
+ mmioread8 v + (cb+6) -> t
+ mmioread8 v + (cb+6) -> t
+ let i = i + 1
+ if i != 768 goto save_rgb
+ goto saved_rgb
+ label default_rgb
+ # VGA defaultDAC[768], vgaHW.c:90-155 (MIT).
+ let save[0] = 0
+ let save[1] = 0
+ let save[2] = 0
+ let save[3] = 0
+ let save[4] = 0
+ let save[5] = 42
+ let save[6] = 0
+ let save[7] = 42
+ let save[8] = 0
+ let save[9] = 0
+ let save[10] = 42
+ let save[11] = 42
+ let save[12] = 42
+ let save[13] = 0
+ let save[14] = 0
+ let save[15] = 42
+ let save[16] = 0
+ let save[17] = 42
+ let save[18] = 42
+ let save[19] = 21
+ let save[20] = 0
+ let save[21] = 42
+ let save[22] = 42
+ let save[23] = 42
+ let save[24] = 21
+ let save[25] = 21
+ let save[26] = 21
+ let save[27] = 21
+ let save[28] = 21
+ let save[29] = 63
+ let save[30] = 21
+ let save[31] = 63
+ let save[32] = 21
+ let save[33] = 21
+ let save[34] = 63
+ let save[35] = 63
+ let save[36] = 63
+ let save[37] = 21
+ let save[38] = 21
+ let save[39] = 63
+ let save[40] = 21
+ let save[41] = 63
+ let save[42] = 63
+ let save[43] = 63
+ let save[44] = 21
+ let save[45] = 63
+ let save[46] = 63
+ let save[47] = 63
+ let save[48] = 0
+ let save[49] = 0
+ let save[50] = 0
+ let save[51] = 5
+ let save[52] = 5
+ let save[53] = 5
+ let save[54] = 8
+ let save[55] = 8
+ let save[56] = 8
+ let save[57] = 11
+ let save[58] = 11
+ let save[59] = 11
+ let save[60] = 14
+ let save[61] = 14
+ let save[62] = 14
+ let save[63] = 17
+ let save[64] = 17
+ let save[65] = 17
+ let save[66] = 20
+ let save[67] = 20
+ let save[68] = 20
+ let save[69] = 24
+ let save[70] = 24
+ let save[71] = 24
+ let save[72] = 28
+ let save[73] = 28
+ let save[74] = 28
+ let save[75] = 32
+ let save[76] = 32
+ let save[77] = 32
+ let save[78] = 36
+ let save[79] = 36
+ let save[80] = 36
+ let save[81] = 40
+ let save[82] = 40
+ let save[83] = 40
+ let save[84] = 45
+ let save[85] = 45
+ let save[86] = 45
+ let save[87] = 50
+ let save[88] = 50
+ let save[89] = 50
+ let save[90] = 56
+ let save[91] = 56
+ let save[92] = 56
+ let save[93] = 63
+ let save[94] = 63
+ let save[95] = 63
+ let save[96] = 0
+ let save[97] = 0
+ let save[98] = 63
+ let save[99] = 16
+ let save[100] = 0
+ let save[101] = 63
+ let save[102] = 31
+ let save[103] = 0
+ let save[104] = 63
+ let save[105] = 47
+ let save[106] = 0
+ let save[107] = 63
+ let save[108] = 63
+ let save[109] = 0
+ let save[110] = 63
+ let save[111] = 63
+ let save[112] = 0
+ let save[113] = 47
+ let save[114] = 63
+ let save[115] = 0
+ let save[116] = 31
+ let save[117] = 63
+ let save[118] = 0
+ let save[119] = 16
+ let save[120] = 63
+ let save[121] = 0
+ let save[122] = 0
+ let save[123] = 63
+ let save[124] = 16
+ let save[125] = 0
+ let save[126] = 63
+ let save[127] = 31
+ let save[128] = 0
+ let save[129] = 63
+ let save[130] = 47
+ let save[131] = 0
+ let save[132] = 63
+ let save[133] = 63
+ let save[134] = 0
+ let save[135] = 47
+ let save[136] = 63
+ let save[137] = 0
+ let save[138] = 31
+ let save[139] = 63
+ let save[140] = 0
+ let save[141] = 16
+ let save[142] = 63
+ let save[143] = 0
+ let save[144] = 0
+ let save[145] = 63
+ let save[146] = 0
+ let save[147] = 0
+ let save[148] = 63
+ let save[149] = 16
+ let save[150] = 0
+ let save[151] = 63
+ let save[152] = 31
+ let save[153] = 0
+ let save[154] = 63
+ let save[155] = 47
+ let save[156] = 0
+ let save[157] = 63
+ let save[158] = 63
+ let save[159] = 0
+ let save[160] = 47
+ let save[161] = 63
+ let save[162] = 0
+ let save[163] = 31
+ let save[164] = 63
+ let save[165] = 0
+ let save[166] = 16
+ let save[167] = 63
+ let save[168] = 31
+ let save[169] = 31
+ let save[170] = 63
+ let save[171] = 39
+ let save[172] = 31
+ let save[173] = 63
+ let save[174] = 47
+ let save[175] = 31
+ let save[176] = 63
+ let save[177] = 55
+ let save[178] = 31
+ let save[179] = 63
+ let save[180] = 63
+ let save[181] = 31
+ let save[182] = 63
+ let save[183] = 63
+ let save[184] = 31
+ let save[185] = 55
+ let save[186] = 63
+ let save[187] = 31
+ let save[188] = 47
+ let save[189] = 63
+ let save[190] = 31
+ let save[191] = 39
+ let save[192] = 63
+ let save[193] = 31
+ let save[194] = 31
+ let save[195] = 63
+ let save[196] = 39
+ let save[197] = 31
+ let save[198] = 63
+ let save[199] = 47
+ let save[200] = 31
+ let save[201] = 63
+ let save[202] = 55
+ let save[203] = 31
+ let save[204] = 63
+ let save[205] = 63
+ let save[206] = 31
+ let save[207] = 55
+ let save[208] = 63
+ let save[209] = 31
+ let save[210] = 47
+ let save[211] = 63
+ let save[212] = 31
+ let save[213] = 39
+ let save[214] = 63
+ let save[215] = 31
+ let save[216] = 31
+ let save[217] = 63
+ let save[218] = 31
+ let save[219] = 31
+ let save[220] = 63
+ let save[221] = 39
+ let save[222] = 31
+ let save[223] = 63
+ let save[224] = 47
+ let save[225] = 31
+ let save[226] = 63
+ let save[227] = 55
+ let save[228] = 31
+ let save[229] = 63
+ let save[230] = 63
+ let save[231] = 31
+ let save[232] = 55
+ let save[233] = 63
+ let save[234] = 31
+ let save[235] = 47
+ let save[236] = 63
+ let save[237] = 31
+ let save[238] = 39
+ let save[239] = 63
+ let save[240] = 45
+ let save[241] = 45
+ let save[242] = 63
+ let save[243] = 49
+ let save[244] = 45
+ let save[245] = 63
+ let save[246] = 54
+ let save[247] = 45
+ let save[248] = 63
+ let save[249] = 58
+ let save[250] = 45
+ let save[251] = 63
+ let save[252] = 63
+ let save[253] = 45
+ let save[254] = 63
+ let save[255] = 63
+ let save[256] = 45
+ let save[257] = 58
+ let save[258] = 63
+ let save[259] = 45
+ let save[260] = 54
+ let save[261] = 63
+ let save[262] = 45
+ let save[263] = 49
+ let save[264] = 63
+ let save[265] = 45
+ let save[266] = 45
+ let save[267] = 63
+ let save[268] = 49
+ let save[269] = 45
+ let save[270] = 63
+ let save[271] = 54
+ let save[272] = 45
+ let save[273] = 63
+ let save[274] = 58
+ let save[275] = 45
+ let save[276] = 63
+ let save[277] = 63
+ let save[278] = 45
+ let save[279] = 58
+ let save[280] = 63
+ let save[281] = 45
+ let save[282] = 54
+ let save[283] = 63
+ let save[284] = 45
+ let save[285] = 49
+ let save[286] = 63
+ let save[287] = 45
+ let save[288] = 45
+ let save[289] = 63
+ let save[290] = 45
+ let save[291] = 45
+ let save[292] = 63
+ let save[293] = 49
+ let save[294] = 45
+ let save[295] = 63
+ let save[296] = 54
+ let save[297] = 45
+ let save[298] = 63
+ let save[299] = 58
+ let save[300] = 45
+ let save[301] = 63
+ let save[302] = 63
+ let save[303] = 45
+ let save[304] = 58
+ let save[305] = 63
+ let save[306] = 45
+ let save[307] = 54
+ let save[308] = 63
+ let save[309] = 45
+ let save[310] = 49
+ let save[311] = 63
+ let save[312] = 0
+ let save[313] = 0
+ let save[314] = 28
+ let save[315] = 7
+ let save[316] = 0
+ let save[317] = 28
+ let save[318] = 14
+ let save[319] = 0
+ let save[320] = 28
+ let save[321] = 21
+ let save[322] = 0
+ let save[323] = 28
+ let save[324] = 28
+ let save[325] = 0
+ let save[326] = 28
+ let save[327] = 28
+ let save[328] = 0
+ let save[329] = 21
+ let save[330] = 28
+ let save[331] = 0
+ let save[332] = 14
+ let save[333] = 28
+ let save[334] = 0
+ let save[335] = 7
+ let save[336] = 28
+ let save[337] = 0
+ let save[338] = 0
+ let save[339] = 28
+ let save[340] = 7
+ let save[341] = 0
+ let save[342] = 28
+ let save[343] = 14
+ let save[344] = 0
+ let save[345] = 28
+ let save[346] = 21
+ let save[347] = 0
+ let save[348] = 28
+ let save[349] = 28
+ let save[350] = 0
+ let save[351] = 21
+ let save[352] = 28
+ let save[353] = 0
+ let save[354] = 14
+ let save[355] = 28
+ let save[356] = 0
+ let save[357] = 7
+ let save[358] = 28
+ let save[359] = 0
+ let save[360] = 0
+ let save[361] = 28
+ let save[362] = 0
+ let save[363] = 0
+ let save[364] = 28
+ let save[365] = 7
+ let save[366] = 0
+ let save[367] = 28
+ let save[368] = 14
+ let save[369] = 0
+ let save[370] = 28
+ let save[371] = 21
+ let save[372] = 0
+ let save[373] = 28
+ let save[374] = 28
+ let save[375] = 0
+ let save[376] = 21
+ let save[377] = 28
+ let save[378] = 0
+ let save[379] = 14
+ let save[380] = 28
+ let save[381] = 0
+ let save[382] = 7
+ let save[383] = 28
+ let save[384] = 14
+ let save[385] = 14
+ let save[386] = 28
+ let save[387] = 17
+ let save[388] = 14
+ let save[389] = 28
+ let save[390] = 21
+ let save[391] = 14
+ let save[392] = 28
+ let save[393] = 24
+ let save[394] = 14
+ let save[395] = 28
+ let save[396] = 28
+ let save[397] = 14
+ let save[398] = 28
+ let save[399] = 28
+ let save[400] = 14
+ let save[401] = 24
+ let save[402] = 28
+ let save[403] = 14
+ let save[404] = 21
+ let save[405] = 28
+ let save[406] = 14
+ let save[407] = 17
+ let save[408] = 28
+ let save[409] = 14
+ let save[410] = 14
+ let save[411] = 28
+ let save[412] = 17
+ let save[413] = 14
+ let save[414] = 28
+ let save[415] = 21
+ let save[416] = 14
+ let save[417] = 28
+ let save[418] = 24
+ let save[419] = 14
+ let save[420] = 28
+ let save[421] = 28
+ let save[422] = 14
+ let save[423] = 24
+ let save[424] = 28
+ let save[425] = 14
+ let save[426] = 21
+ let save[427] = 28
+ let save[428] = 14
+ let save[429] = 17
+ let save[430] = 28
+ let save[431] = 14
+ let save[432] = 14
+ let save[433] = 28
+ let save[434] = 14
+ let save[435] = 14
+ let save[436] = 28
+ let save[437] = 17
+ let save[438] = 14
+ let save[439] = 28
+ let save[440] = 21
+ let save[441] = 14
+ let save[442] = 28
+ let save[443] = 24
+ let save[444] = 14
+ let save[445] = 28
+ let save[446] = 28
+ let save[447] = 14
+ let save[448] = 24
+ let save[449] = 28
+ let save[450] = 14
+ let save[451] = 21
+ let save[452] = 28
+ let save[453] = 14
+ let save[454] = 17
+ let save[455] = 28
+ let save[456] = 20
+ let save[457] = 20
+ let save[458] = 28
+ let save[459] = 22
+ let save[460] = 20
+ let save[461] = 28
+ let save[462] = 24
+ let save[463] = 20
+ let save[464] = 28
+ let save[465] = 26
+ let save[466] = 20
+ let save[467] = 28
+ let save[468] = 28
+ let save[469] = 20
+ let save[470] = 28
+ let save[471] = 28
+ let save[472] = 20
+ let save[473] = 26
+ let save[474] = 28
+ let save[475] = 20
+ let save[476] = 24
+ let save[477] = 28
+ let save[478] = 20
+ let save[479] = 22
+ let save[480] = 28
+ let save[481] = 20
+ let save[482] = 20
+ let save[483] = 28
+ let save[484] = 22
+ let save[485] = 20
+ let save[486] = 28
+ let save[487] = 24
+ let save[488] = 20
+ let save[489] = 28
+ let save[490] = 26
+ let save[491] = 20
+ let save[492] = 28
+ let save[493] = 28
+ let save[494] = 20
+ let save[495] = 26
+ let save[496] = 28
+ let save[497] = 20
+ let save[498] = 24
+ let save[499] = 28
+ let save[500] = 20
+ let save[501] = 22
+ let save[502] = 28
+ let save[503] = 20
+ let save[504] = 20
+ let save[505] = 28
+ let save[506] = 20
+ let save[507] = 20
+ let save[508] = 28
+ let save[509] = 22
+ let save[510] = 20
+ let save[511] = 28
+ let save[512] = 24
+ let save[513] = 20
+ let save[514] = 28
+ let save[515] = 26
+ let save[516] = 20
+ let save[517] = 28
+ let save[518] = 28
+ let save[519] = 20
+ let save[520] = 26
+ let save[521] = 28
+ let save[522] = 20
+ let save[523] = 24
+ let save[524] = 28
+ let save[525] = 20
+ let save[526] = 22
+ let save[527] = 28
+ let save[528] = 0
+ let save[529] = 0
+ let save[530] = 16
+ let save[531] = 4
+ let save[532] = 0
+ let save[533] = 16
+ let save[534] = 8
+ let save[535] = 0
+ let save[536] = 16
+ let save[537] = 12
+ let save[538] = 0
+ let save[539] = 16
+ let save[540] = 16
+ let save[541] = 0
+ let save[542] = 16
+ let save[543] = 16
+ let save[544] = 0
+ let save[545] = 12
+ let save[546] = 16
+ let save[547] = 0
+ let save[548] = 8
+ let save[549] = 16
+ let save[550] = 0
+ let save[551] = 4
+ let save[552] = 16
+ let save[553] = 0
+ let save[554] = 0
+ let save[555] = 16
+ let save[556] = 4
+ let save[557] = 0
+ let save[558] = 16
+ let save[559] = 8
+ let save[560] = 0
+ let save[561] = 16
+ let save[562] = 12
+ let save[563] = 0
+ let save[564] = 16
+ let save[565] = 16
+ let save[566] = 0
+ let save[567] = 12
+ let save[568] = 16
+ let save[569] = 0
+ let save[570] = 8
+ let save[571] = 16
+ let save[572] = 0
+ let save[573] = 4
+ let save[574] = 16
+ let save[575] = 0
+ let save[576] = 0
+ let save[577] = 16
+ let save[578] = 0
+ let save[579] = 0
+ let save[580] = 16
+ let save[581] = 4
+ let save[582] = 0
+ let save[583] = 16
+ let save[584] = 8
+ let save[585] = 0
+ let save[586] = 16
+ let save[587] = 12
+ let save[588] = 0
+ let save[589] = 16
+ let save[590] = 16
+ let save[591] = 0
+ let save[592] = 12
+ let save[593] = 16
+ let save[594] = 0
+ let save[595] = 8
+ let save[596] = 16
+ let save[597] = 0
+ let save[598] = 4
+ let save[599] = 16
+ let save[600] = 8
+ let save[601] = 8
+ let save[602] = 16
+ let save[603] = 10
+ let save[604] = 8
+ let save[605] = 16
+ let save[606] = 12
+ let save[607] = 8
+ let save[608] = 16
+ let save[609] = 14
+ let save[610] = 8
+ let save[611] = 16
+ let save[612] = 16
+ let save[613] = 8
+ let save[614] = 16
+ let save[615] = 16
+ let save[616] = 8
+ let save[617] = 14
+ let save[618] = 16
+ let save[619] = 8
+ let save[620] = 12
+ let save[621] = 16
+ let save[622] = 8
+ let save[623] = 10
+ let save[624] = 16
+ let save[625] = 8
+ let save[626] = 8
+ let save[627] = 16
+ let save[628] = 10
+ let save[629] = 8
+ let save[630] = 16
+ let save[631] = 12
+ let save[632] = 8
+ let save[633] = 16
+ let save[634] = 14
+ let save[635] = 8
+ let save[636] = 16
+ let save[637] = 16
+ let save[638] = 8
+ let save[639] = 14
+ let save[640] = 16
+ let save[641] = 8
+ let save[642] = 12
+ let save[643] = 16
+ let save[644] = 8
+ let save[645] = 10
+ let save[646] = 16
+ let save[647] = 8
+ let save[648] = 8
+ let save[649] = 16
+ let save[650] = 8
+ let save[651] = 8
+ let save[652] = 16
+ let save[653] = 10
+ let save[654] = 8
+ let save[655] = 16
+ let save[656] = 12
+ let save[657] = 8
+ let save[658] = 16
+ let save[659] = 14
+ let save[660] = 8
+ let save[661] = 16
+ let save[662] = 16
+ let save[663] = 8
+ let save[664] = 14
+ let save[665] = 16
+ let save[666] = 8
+ let save[667] = 12
+ let save[668] = 16
+ let save[669] = 8
+ let save[670] = 10
+ let save[671] = 16
+ let save[672] = 11
+ let save[673] = 11
+ let save[674] = 16
+ let save[675] = 12
+ let save[676] = 11
+ let save[677] = 16
+ let save[678] = 13
+ let save[679] = 11
+ let save[680] = 16
+ let save[681] = 15
+ let save[682] = 11
+ let save[683] = 16
+ let save[684] = 16
+ let save[685] = 11
+ let save[686] = 16
+ let save[687] = 16
+ let save[688] = 11
+ let save[689] = 15
+ let save[690] = 16
+ let save[691] = 11
+ let save[692] = 13
+ let save[693] = 16
+ let save[694] = 11
+ let save[695] = 12
+ let save[696] = 16
+ let save[697] = 11
+ let save[698] = 11
+ let save[699] = 16
+ let save[700] = 12
+ let save[701] = 11
+ let save[702] = 16
+ let save[703] = 13
+ let save[704] = 11
+ let save[705] = 16
+ let save[706] = 15
+ let save[707] = 11
+ let save[708] = 16
+ let save[709] = 16
+ let save[710] = 11
+ let save[711] = 15
+ let save[712] = 16
+ let save[713] = 11
+ let save[714] = 13
+ let save[715] = 16
+ let save[716] = 11
+ let save[717] = 12
+ let save[718] = 16
+ let save[719] = 11
+ let save[720] = 11
+ let save[721] = 16
+ let save[722] = 11
+ let save[723] = 11
+ let save[724] = 16
+ let save[725] = 12
+ let save[726] = 11
+ let save[727] = 16
+ let save[728] = 13
+ let save[729] = 11
+ let save[730] = 16
+ let save[731] = 15
+ let save[732] = 11
+ let save[733] = 16
+ let save[734] = 16
+ let save[735] = 11
+ let save[736] = 15
+ let save[737] = 16
+ let save[738] = 11
+ let save[739] = 13
+ let save[740] = 16
+ let save[741] = 11
+ let save[742] = 12
+ let save[743] = 16
+ let save[744] = 0
+ let save[745] = 0
+ let save[746] = 0
+ let save[747] = 0
+ let save[748] = 0
+ let save[749] = 0
+ let save[750] = 0
+ let save[751] = 0
+ let save[752] = 0
+ let save[753] = 0
+ let save[754] = 0
+ let save[755] = 0
+ let save[756] = 0
+ let save[757] = 0
+ let save[758] = 0
+ let save[759] = 0
+ let save[760] = 0
+ let save[761] = 0
+ let save[762] = 0
+ let save[763] = 0
+ let save[764] = 0
+ let save[765] = 0
+ let save[766] = 0
+ let save[767] = 0
+ label saved_rgb
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0x20
+ mmioread8 v + 0x3CC -> save[768]
+ if (save[768] & 1) != 0 goto save_color
+ let cb = 0x3B4
+ label save_color
+ let i = 0
+ label save_cr
+ mmiowrite8 v + cb i
+ mmioread8 v + (cb+1) -> save[769+i]
+ let i = i + 1
+ if i != 25 goto save_cr
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0
+ let i = 0
+ label save_ar
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 i
+ mmioread8 v + 0x3C1 -> save[794+i]
+ let i = i + 1
+ if i != 21 goto save_ar
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0x20
+ let i = 0
+ label save_gr
+ mmiowrite8 v + 0x3CE i
+ mmioread8 v + (0x3CE+1) -> save[815+i]
+ let i = i + 1
+ if i != 9 goto save_gr
+ let i = 1
+ label save_sr
+ mmiowrite8 v + 0x3C4 i
+ mmioread8 v + (0x3C4+1) -> save[823+i]
+ let i = i + 1
+ if i != 5 goto save_sr
+ # TridentSave, A:912-1048.
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + (0x3C4+1) -> t
+ mmiowrite8 v + 0x3C4 0x0E
+ mmioread8 v + (0x3C4+1) -> save[828]
+ mmiowrite16 v + 0x3C4 0x0E | ((0xC2) << 8)
+ mmiowrite8 v + 0x3D4 0x23
+ mmioread8 v + (0x3D4+1) -> save[852]
+ mmiowrite8 v + 0x3CE 0x23
+ mmioread8 v + (0x3CE+1) -> save[853]
+ mmiowrite8 v + 0x3D4 0x20
+ mmioread8 v + (0x3D4+1) -> save[854]
+ mmiowrite8 v + 0x3D4 0x30
+ mmioread8 v + (0x3D4+1) -> save[855]
+ mmiowrite8 v + 0x3D4 0x31
+ mmioread8 v + (0x3D4+1) -> save[856]
+ mmiowrite8 v + 0x3D4 0x32
+ mmioread8 v + (0x3D4+1) -> save[857]
+ mmiowrite8 v + 0x3D4 0x3B
+ mmioread8 v + (0x3D4+1) -> save[858]
+ mmiowrite8 v + cb 0x13
+ mmioread8 v + (cb+1) -> save[829]
+ mmiowrite8 v + cb 0x21
+ mmioread8 v + (cb+1) -> save[830]
+ mmiowrite8 v + cb 0x1e
+ mmioread8 v + (cb+1) -> save[831]
+ mmiowrite8 v + cb 0x27
+ mmioread8 v + (cb+1) -> save[832]
+ mmiowrite8 v + cb 0x2b
+ mmioread8 v + (cb+1) -> save[833]
+ mmiowrite8 v + cb 0x2f
+ mmioread8 v + (cb+1) -> save[834]
+ mmiowrite8 v + cb 0x2a
+ mmioread8 v + (cb+1) -> save[835]
+ mmiowrite8 v + cb 0x3a
+ mmioread8 v + (cb+1) -> save[836]
+ mmiowrite8 v + cb 0x29
+ mmioread8 v + (cb+1) -> save[837]
+ mmiowrite8 v + cb 0x38
+ mmioread8 v + (cb+1) -> save[838]
+ mmiowrite8 v + cb 0x36
+ mmioread8 v + (cb+1) -> save[839]
+ mmiowrite8 v + cb 0x39
+ mmioread8 v + (cb+1) -> save[840]
+ mmiowrite8 v + cb 0x55
+ mmioread8 v + (cb+1) -> save[841]
+ mmiowrite8 v + cb 0x50
+ mmioread8 v + (cb+1) -> save[842]
+ mmiowrite8 v + 0x3CE 0x0F
+ mmioread8 v + (0x3CE+1) -> save[843]
+ mmiowrite8 v + 0x3CE 0x2F
+ mmioread8 v + (0x3CE+1) -> save[844]
+ mmioread8 v + 0x3C8 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> save[845]
+ mmioread8 v + 0x3C8 -> t
+ mmioread8 v + 0x3CC -> save[846]
+ mmioread8 v + 0x43C8 -> save[847]
+ mmioread8 v + 0x43C9 -> save[848]
+ let savemclk = 1
+ if savemclk == 0 goto saved_mclk
+ mmioread8 v + 0x43C6 -> save[849]
+ mmioread8 v + 0x43C7 -> save[850]
+ label saved_mclk
+ mmiowrite8 v + 0x3C4 0x0D
+ mmioread8 v + (0x3C4+1) -> save[851]
+ mmiowrite16 v + 0x3C4 0x0E | ((save[828]) << 8)
+ return
+ label state_restore
+ call protect_on
+ # TridentRestore A:763-910, current mode uses color CRTC.
+ mmiowrite8 v + 0x3C4 0x0B
+ mmioread8 v + (0x3C4+1) -> t
+ mmiowrite16 v + 0x3C4 0x0E | ((0xC2) << 8)
+ mmioread8 v + 0x3C8 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmioread8 v + 0x3C6 -> t
+ mmiowrite8 v + 0x3C6 save[845]
+ mmioread8 v + 0x3C8 -> t
+ mmiowrite16 v + 0x3D4 0x1e | ((save[831]) << 8)
+ mmiowrite16 v + 0x3D4 0x21 | ((save[830]) << 8)
+ mmiowrite16 v + 0x3C4 0x0D | ((save[851]) << 8)
+ mmiowrite16 v + 0x3D4 0x50 | ((save[842]) << 8)
+ mmiowrite16 v + 0x3D4 0x27 | ((save[832]) << 8)
+ mmiowrite16 v + 0x3D4 0x2b | ((save[833]) << 8)
+ mmiowrite16 v + 0x3D4 0x29 | ((save[837]) << 8)
+ mmiowrite16 v + 0x3D4 0x36 | ((save[839]) << 8)
+ mmiowrite16 v + 0x3D4 0x2f | ((save[834]) << 8)
+ mmiowrite16 v + 0x3D4 0x2a | ((save[835]) << 8)
+ mmiowrite16 v + 0x3D4 0x3a | ((save[836]) << 8)
+ mmiowrite16 v + 0x3D4 0x38 | ((save[838]) << 8)
+ mmiowrite16 v + 0x3D4 0x39 | ((save[840]) << 8)
+ mmiowrite16 v + 0x3D4 0x55 | ((save[841]) << 8)
+ mmiowrite16 v + 0x3CE 0x2F | ((save[844]) << 8)
+ mmiowrite16 v + 0x3CE 0x0F | ((save[843]) << 8)
+ mmiowrite16 v + 0x3D4 0x13 | ((save[829]) << 8)
+ mmiowrite16 v + 0x3D4 0x23 | ((save[852]) << 8)
+ mmiowrite16 v + 0x3CE 0x23 | ((save[853]) << 8)
+ mmiowrite16 v + 0x3D4 0x20 | ((save[854]) << 8)
+ mmiowrite16 v + 0x3D4 0x30 | ((save[855]) << 8)
+ mmiowrite16 v + 0x3D4 0x31 | ((save[856]) << 8)
+ mmiowrite16 v + 0x3D4 0x32 | ((save[857]) << 8)
+ mmiowrite16 v + 0x3D4 0x3B | ((save[858]) << 8)
+ mmiowrite8 v + 0x43C8 save[847]
+ mmiowrite8 v + 0x43C9 save[848]
+ if savemclk == 0 goto restored_mclk
+ mmiowrite8 v + 0x43C6 save[849]
+ mmiowrite8 v + 0x43C7 save[850]
+ label restored_mclk
+ mmiowrite8 v + 0x3C2 save[846]
+ mmiowrite16 v + 0x3C4 0x0E | ((save[828] ^ 2) << 8)
+ # VGA mode V:845-873.
+ mmiowrite8 v + 0x3C2 save[768]
+ let i = 1
+ label restore_sr
+ mmiowrite16 v + 0x3C4 i | ((save[823+i]) << 8)
+ let i = i + 1
+ if i != 5 goto restore_sr
+ mmiowrite16 v + cb 0x11 | ((save[786] & 0x7F) << 8)
+ let i = 0
+ label restore_cr
+ mmiowrite16 v + cb i | ((save[769+i]) << 8)
+ let i = i + 1
+ if i != 25 goto restore_cr
+ let i = 0
+ label restore_gr
+ mmiowrite16 v + 0x3CE i | ((save[815+i]) << 8)
+ let i = i + 1
+ if i != 9 goto restore_gr
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0
+ let i = 0
+ label restore_ar
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 i
+ mmiowrite8 v + 0x3C0 save[794+i]
+ let i = i + 1
+ if i != 21 goto restore_ar
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0x20
+ # VGA colormap V:876-892.
+ mmiowrite8 v + 0x3C6 0xFF
+ mmiowrite8 v + 0x3C8 0
+ let i = 0
+ label restore_rgb
+ mmiowrite8 v + 0x3C9 save[i]
+ mmioread8 v + (cb+6) -> t
+ mmioread8 v + (cb+6) -> t
+ let i = i + 1
+ if i != 768 goto restore_rgb
+ mmioread8 v + (cb+6) -> t
+ mmiowrite8 v + 0x3C0 0x20
+ # vgaHWProtect(FALSE) now uses the saved VGA IOBase.
+ mmiowrite8 v + 0x3C4 1
+ mmioread8 v + 0x3C5 -> savedseq
+ mmiowrite8 v + 0x3C4 1
+ mmiowrite8 v + 0x3C5 savedseq & 0xDF
+ mmiowrite8 v + 0x3C4 0
+ mmiowrite8 v + 0x3C5 3
+ mmioread8 v + (cb+6) -> flip
+ mmiowrite8 v + 0x3C0 0x20
+ return

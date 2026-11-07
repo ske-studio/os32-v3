@@ -1,6 +1,7 @@
 /* Indexed CRTC and byte-addressed LFB; dropped stores vary on every trial. */
 #include "hwb_fake.h"
 #include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_probe.c"
 #include "userland/shell/hwb_exec.c"
 #include "userland/shell/hwb_log.c"
 static const char *script = SCRIPT_DATA;

@@ -290,7 +290,7 @@ static inline void hwbf_init(struct hwb_fake *f)
 #endif
     f->mechanism = 1; f->call_error = OS32_ERR_IO;
     f->failure_status = HW_IO_ERROR;
-    f->backend = (struct hwb_backend){f, hwbf_access, hwbf_time, hwbf_yield,
+    f->backend = (struct hwb_backend){f, 0, hwbf_access, hwbf_time, hwbf_yield,
                                     hwbf_point, hwbf_line, hwbf_read_file, hwbf_find};
 }
 /* Retain bus/files/clock/fault settings, clear observation buffers/counters. */

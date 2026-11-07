@@ -341,7 +341,16 @@ class Bridge:
         """シグナルハンドラから呼ぶ。**代入だけ** (I/O もロックも取らない)。"""
         self.report_request = why
 
+    def discard_nic_backlog(self):
+        """Drop frames queued while the agent was disconnected."""
+        while select.select([self.nic], [], [], 0)[0]:
+            try:
+                self.nic.recv_frames()
+            except ConnectionError as e:
+                raise NicGone(str(e))
+
     def run(self):
+        self.discard_nic_backlog()
         while True:
             self.pump()
             if self.report_request:
