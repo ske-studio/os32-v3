@@ -192,11 +192,13 @@ int trident_backend_prepare(void)
         return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_RESOURCE);
     int rc = trident_pci_validate(&r->pci);
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
+    device.settings.ram_fallback = r->ram_fallback;
     if (!device.active) {
-        const GfxMode *def = &modes[c->backend->default_mode];
         struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
-        provisional.display_width = def->pitch; /* default is INDEX8 */
-        u32 bytes = (def->pitch * def->height + TRI_PAGE_BYTES - 1u) & ~(TRI_PAGE_BYTES - 1u);
+        if (r->ram_fallback || device.settings.no_accel)
+            provisional.display_width = provisional.hd;
+        else provisional.display_width = TRI_PITCH;
+        u32 bytes = (provisional.display_width * provisional.vd + TRI_PAGE_BYTES - 1u) & ~(TRI_PAGE_BYTES - 1u);
         if (device.settings.vram_bytes && bytes > device.settings.vram_bytes)
             return display_rc = remember(TRI_STEP_RESOURCES, TRI_E_CAP_TOO_SMALL);
         rc = r->configure(&provisional, bytes, false);
@@ -537,6 +539,10 @@ int tri_hal_mode(u32 id)
     optional_components();
     rc = tri_palette_reload(&device);
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
+    if (device.res->ram_fallback) {
+        rc = trident_present(&device, 0, 0, device.mode.client.width, device.mode.client.height);
+        if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
+    }
     /* No automatic DPMS On, no EnterVT video reset, no present-driven tick. */
     device.screen_ready = true;
     device.step = TRI_STEP_ACTIVE;

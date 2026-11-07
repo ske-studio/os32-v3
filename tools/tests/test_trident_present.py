@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Trident direct VRAM present: synchronization only for every mode."""
+"""Trident RAM byte present and direct VRAM synchronization."""
 CHECK = dict(name='trident-present', tier=1, needs=[], budget=3,
     covers=['drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_present_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'include/types.h', 'include/memmap.h',
+            'tools/tests/kernel_includes.py', 'drivers/video/trident/regs.c',
+            'gfx/gfx_internal.h', 'gfx/gfx.h', 'include/gfx_hal.h', 'include/gfx_format.h',
+            'include/gfx_mode.h', 'mm/kmalloc.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sdk/include/os32/os32_generations.h', 'include/types.h', 'include/memmap.h',
             'include/pegc.h', 'gfx/palette.h', 'build/config.mk'])
 import argparse
 import os
@@ -17,14 +20,14 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'drivers/video/trident/present.c'
 MUTANTS = [
-    ('M_SKIP_SYNC', 'return tri_sync(d);', '(void)d; return TRI_OK;'),
-    ('M_DROP_RC', 'return tri_sync(d);', '(void)tri_sync(d); return TRI_OK;'),
-    ('M_DOUBLE_SYNC', 'return tri_sync(d);', '(void)tri_sync(d); return tri_sync(d);'),
-    ('M_NOACCEL_SKIP', 'return tri_sync(d);',
-     'if (d && d->settings.no_accel) { return TRI_OK; } return tri_sync(d);'),
-    ('M_COPY', 'return tri_sync(d);',
-     'if (d) { int rc = d->io->write8(d->io_opaque, TRI_SPACE_LFB, 0, 1); '
-     'if (rc) return rc; } return tri_sync(d);'),
+    ('skip-sync', 'int rc = tri_sync(d);', 'int rc = TRI_OK;'),
+    ('drop-rc', 'if (rc) return rc;\n    if (!d->res', 'if (rc) return TRI_OK;\n    if (!d->res'),
+    ('ram-no-copy', 'if (!d->res->ram_fallback) return TRI_OK;', 'return TRI_OK;'),
+    ('direct-copy', 'if (!d->res->ram_fallback) return TRI_OK;', 'if (false) return TRI_OK;'),
+    ('store32', 'trident_write8(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])',
+     'trident_write32(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])'),
+    ('fixed-pitch', 'row * v->pitch', 'row * TRI_PITCH'),
+    ('drop-cpp', 'u32 bytes = (u32)w * c->cpp;', 'u32 bytes = (u32)w;'),
 ]
 
 def main():
@@ -47,7 +50,7 @@ def main():
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
-                *include_flags(ROOT), str(path), str(ROOT / 'tools/tests/trident_device_fake.c'),
+                *include_flags(ROOT), str(path), str(ROOT / 'drivers/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'),
                 str(ROOT / 'tools/tests/trident_present_host.c'), '-o', str(exe)], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                 result = host32.run([str(exe)], runner=runner, capture_output=True)
