@@ -1611,4 +1611,9 @@ trident_diagnostic_ops:
 debug_probe_control:
     jmp *kdebug_import_slots+1284
 .size debug_probe_control, .-debug_probe_control
+.globl legacy_lowmap_busy
+.type legacy_lowmap_busy, @function
+legacy_lowmap_busy:
+    jmp *kdebug_import_slots+1288
+.size legacy_lowmap_busy, .-legacy_lowmap_busy
 .section .note.GNU-stack,"",@progbits

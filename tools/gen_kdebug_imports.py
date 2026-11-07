@@ -27,7 +27,7 @@ STAGE_KINDS = {
     'S4': ('FUNC',) * 25,
     'S5': ('FUNC',) * 30,
     # S3e: all five moved selftests.
-    'S6': ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * 14,
+    'S6': ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * 15,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():

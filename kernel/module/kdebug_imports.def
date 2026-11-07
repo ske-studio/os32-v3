@@ -2622,6 +2622,15 @@
       "context_safe": false,
       "index": 321,
       "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "legacy_lowmap_busy",
+      "source": "include/legacy_guest.h",
+      "context_safe": false,
+      "index": 322,
+      "retained": true
     }
   ]
 }

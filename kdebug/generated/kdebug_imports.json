@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2282586157,
+  "module_abi_gen": 864244393,
   "stage": "S6",
-  "count": 322,
+  "count": 323,
   "imports": [
     {
       "stage": "S1",
@@ -4876,6 +4876,22 @@
       "type_ver": 1,
       "signature": "i32 debug_probe_control(u32 action, void *arg, u32 size);",
       "source_declaration": "i32 debug_probe_control(u32 action, void *arg, u32 size);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "legacy_lowmap_busy",
+      "source": "include/legacy_guest.h",
+      "context_safe": false,
+      "index": 322,
+      "retained": true,
+      "name": "legacy_lowmap_busy",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int legacy_lowmap_busy(void);",
+      "source_declaration": "int legacy_lowmap_busy(void);",
       "dtype": null,
       "array": false
     }

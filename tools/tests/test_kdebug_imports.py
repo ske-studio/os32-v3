@@ -27,7 +27,7 @@ REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
                              'geforce_accel_ops', 'gfx_present', 'gf_display_test',
                              'gf5_test', 'pci_hwb_read', 'pci_hwb_write', 'exec_hwb_abort_take',
                              'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap',
-                             'trident_diagnostic_ops', 'debug_probe_control')
+                             'trident_diagnostic_ops', 'debug_probe_control', 'legacy_lowmap_busy')
 REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):
@@ -42,6 +42,23 @@ class ImportsTests(unittest.TestCase):
         altered[1]['symbol'] = 'invented_import'
         with self.assertRaisesRegex(ValueError, 'nm mismatch'):
             gen.check_nm(altered)
+
+    def test_legacy_audit_append_preserves_v86_slot(self):
+        self.assertEqual(self.entries[106]['name'], 'paging_v86_session_open')
+        self.assertFalse(self.entries[106].get('retained', False))
+        entry = self.entries[322]
+        self.assertEqual((entry['name'], entry['signature']),
+                         ('legacy_lowmap_busy', 'int legacy_lowmap_busy(void);'))
+        self.assertTrue(entry['retained'])
+        original = gen.symbols
+        def without_lowmap(nm, paths, undefined):
+            refs = original(nm, paths, undefined)
+            if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                refs.discard('legacy_lowmap_busy')
+            return refs
+        with patch.object(gen, 'symbols', side_effect=without_lowmap):
+            with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel.*legacy_lowmap_busy'):
+                gen.check_nm(self.entries)
 
     def test_retained_slot_requires_kernel_implementation(self):
         original = gen.symbols
