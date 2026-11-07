@@ -100,15 +100,26 @@ static void roundtrip(void)
     assert(gf5_state_save(&h.ctx,&image)==0);
     assert(image && image->complete && h.ctx.phase==GF5_SAVED);
     assert(image->version==3U);
+    assert(image->clock_available && image->volt_available);
+    assert(!gf2_host_memcmp(&image->clock_raw,
+        &(struct gf5_clock_raw){observed[1].value,observed[2].value,
+                               observed[3].value,observed[0].value},
+        sizeof(image->clock_raw)));
     assert(image->clock.core_khz==CORE_KHZ && !image->clock.shader_khz &&
            image->clock.mem_khz==MEM_KHZ && image->requested_uv==UV);
     gf5_host_trace_clear(&h);
     assert(gf5_state_restore(&h.ctx,image)==0);
     assert(h.ctx.phase==GF5_RUN && h.ctx.accepting && !h.ctx.busy);
-    assert(h.calls[F5_RAM]==1 && h.display.calls[D_WRITE]==5);
+    assert(!h.calls[F5_RAM] && h.display.calls[D_WRITE]==5);
     struct gf5_clock c;
     assert(gf5_clock_read(&h.ctx,&c)==0);
-    assert(c.core_khz==CORE_KHZ && c.shader_khz==CORE_KHZ);
+    assert(c.core_khz==CORE_KHZ && !c.shader_khz);
+    for (u32 i=0;i<6;++i) {
+        u32 value=0;
+        assert(!h.ctx.ch->f->io.read(h.ctx.ch->f->io.opaque,
+                                            0,observed[i].reg,4,&value));
+        assert(value==observed[i].value);
+    }
     gf5_state_free(&h.ctx,image);
     assert(!h.ctx.image && !h.live_allocs && h.calls[F5_FREE]==1);
 }
