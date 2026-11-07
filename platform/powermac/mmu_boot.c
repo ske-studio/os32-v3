@@ -182,7 +182,10 @@ static int hpt_allocate(void)
         u32 start=avail.v[i].start, end=start+avail.v[i].size;
         if (end>PM_BAT_RAM_END) end=PM_BAT_RAM_END;
         if (start<PM_LOW_RESERVED_END) start=PM_LOW_RESERVED_END;
+        if (start>=end) continue;
+        u32 lower=start;
         start=(start+size-1)&~(size-1);
+        if (start<lower) continue;
         while (start<end && size<=end-start) {
             u32 image_start=pm_v2p_ram(pm_image_start), image_end=pm_v2p_ram(pm_image_end);
             if (start<image_end && start+size>image_start) {

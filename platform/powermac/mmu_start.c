@@ -75,7 +75,14 @@ void pm_mmu_start(const struct pm_boot_info *info)
 #if PPC_MMU_STAGE >= 3
     ppc_dec_init(info->tb_hz);
     _enable();
-    if (ppc_probe_canary(3)) ppc_stop();
+    /* Each bounded canary interval checks every saved register.  Overall
+     * completion depends on DEC progress, with a one-second TB deadline. */
+    u32 began=ppc_read_tb();
+    do {
+        if (ppc_probe_canary(3)) ppc_stop();
+        if (ppc_dec_count()>=PM_DEC_DUMP_N+2) break;
+        if ((u32)(ppc_read_tb()-began)>=info->tb_hz) ppc_stop();
+    } while (1);
     _disable();
     if (ppc_dec_count()<PM_DEC_DUMP_N+2) ppc_stop();
     pm_mmu_dump("CANARY-PASS",0);

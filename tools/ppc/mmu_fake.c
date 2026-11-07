@@ -7,7 +7,12 @@
 #include "pmap.c"
 #include "cpu_setup.c"
 #include "decrementer.c"
-static volatile u32 table[262144];
+static struct {
+    u32 before;
+    volatile u32 words[262144];
+    u32 after;
+} guarded;
+#define table guarded.words
 static u32 events[128], nevents, pvr, hid, batcount;
 __asm__(".globl pm_image_start,pm_image_end\n.set pm_image_start,0x20000\n.set pm_image_end,0x40000\n");
 static void exit_code(int rc) __attribute__((noreturn));
@@ -33,9 +38,9 @@ void ppc_sr_sdr1_load(const u32 sr[16],u32 sdr)
 volatile u32 *ppc_hpt_ptr(u32 pa) { CHECK(pa==0x100000); return table; }
 u32 ppc_read_pvr(void) { return pvr; }
 u32 ppc_read_hid0(void) { return hid; }
-void ppc_write_hid0(u32 v) { hid=v; }
-void ppc_bat_reset(u32 count) { batcount=count; }
-void ppc_bat_set(u32 index,u32 lo,u32 hi) { CHECK(index==0 && lo==0x12 && hi==0x1ffe); }
+void ppc_write_hid0(u32 v) { hid=v; event(0x10000000 | v); }
+void ppc_bat_reset(u32 count) { batcount=count; event(0x20000000 | count); }
+void ppc_bat_set(u32 index,u32 lo,u32 hi) { CHECK(index==0 && lo==0x12 && hi==0x1ffe); event(8); }
 /* Unused OF path in parser/allocator fixture; any accidental CI fails. */
 void ofw_init(ppc_ci ci) { (void)ci; exit_code(98); }
 int ofw_setup(struct ofw_env *e) { (void)e; exit_code(98); }
@@ -79,22 +84,34 @@ static void test_memory(void)
     avail.v[1]=(struct pm_region){0x123456,0x600000};
     CHECK(hpt_allocate()==0 && info.hpt_pa==0x200000 && info.hpt_mask==0x3fff);
     avail.count=1; CHECK(hpt_allocate()==-1);
+    avail.v[0]=(struct pm_region){0xfff80000,0x10000};
+    CHECK(hpt_allocate()==-1);
     ram.v[0].size=0x400000;
     avail.v[0]=(struct pm_region){0,0x400000};
     CHECK(hpt_allocate()==0 && info.hpt_pa==0x40000 && info.hpt_mask==0x7ff);
 }
 static void test_cpu(void)
 {
+    nevents=0;
     pvr=0x80000200; hid=0; ppc_cpu_setup();
     CHECK(batcount==4 && hid==0x9c);
+    CHECK(nevents==sizeof(mmu_cpu_7450)/sizeof(u32));
+    for (unsigned j=0;j<nevents;j++) CHECK(events[j]==mmu_cpu_7450[j]);
     pvr=0x80000201; hid=0; ppc_cpu_setup(); CHECK(hid==0xbc);
+    nevents=0;
     pvr=0x80010200; hid=0; ppc_cpu_setup();
     CHECK(batcount==8 && hid==0x8001bc);
+    CHECK(nevents==sizeof(mmu_cpu_7455)/sizeof(u32));
+    for (unsigned j=0;j<nevents;j++) CHECK(events[j]==mmu_cpu_7455[j]);
 }
 static void test_pmap(void)
 {
     struct pm_boot_info i={.hpt_pa=0x100000,.hpt_mask=0x3fff};
+    guarded.before=0x12345678; guarded.after=0x87654321;
+    for (unsigned j=0;j<262144;j++) table[j]=0xa5a5a5a5;
     ppc_pmap_bootstrap(&i);
+    for (unsigned j=0;j<262144;j++) CHECK(table[j]==0);
+    CHECK(guarded.before==0x12345678 && guarded.after==0x87654321);
     ppc_select_context(ppc_current_context());
     CHECK(events[nevents-2]==7 && events[nevents-1]==6);
     nevents=0;

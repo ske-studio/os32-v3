@@ -6,4 +6,7 @@ static const u32 mmu_unset_events[]={1,1,5,1,2,3,1};
 /* NF:223-253 BE 2+2 cells: 128MiB; zero; PA high; size high; wrapped end. */
 static const u32 mmu_memory_cells[]={0,0,0,0x08000000,0,0x1000,0,0,
     1,0,0,0x1000,0,0,1,0,0,0xfffff000,0,0x2000};
+/* HID0 write, sync/isync, BAT invalidation, BAT0 install, final HID0. */
+static const u32 mmu_cpu_7450[]={0x20000004,8,0x1000009c,1,4};
+static const u32 mmu_cpu_7455[]={0x10800100,1,4,0x20000008,8,0x108001bc,1,4};
 #endif

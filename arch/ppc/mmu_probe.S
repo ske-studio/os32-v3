@@ -122,7 +122,7 @@ ppc_probe_canary:
     beq .Lsetup_ro
     cmpwi 0,2
     beq .Lsetup_exec
-    lis 0,0x0200
+    li 0,4096
     mtctr 0
     b .Lsetup_common
 .Lsetup_load:

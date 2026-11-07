@@ -146,6 +146,20 @@ def static(root,cross):
         return dis.split('<'+name+'>:\n',1)[1].split('\n\n',1)[0]
     def ops(name):
         return re.findall(r'^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2} ){4}\s*(\w+)',body(name),re.M)
+    # Decode mtspr fields, including BAT4-7 which objdump may name generically.
+    def spr_writes(name):
+        words=[int(''.join(m.split()),16) for m in re.findall(
+            r'^\s*[0-9a-f]+:\s+((?:[0-9a-f]{2} ){3}[0-9a-f]{2})',body(name),re.M)]
+        return [(((w>>16)&31) | (((w>>11)&31)<<5),(w>>21)&31)
+                for w in words if w>>26==31 and (w>>1)&1023==467]
+    require(spr_writes('ppc_bat_reset')==[(s,4) for s in
+            [528,530,532,534,536,538,540,542,560,562,564,566,568,570,572,574]],
+            'BAT0-7 invalidation SPR sequence')
+    require(spr_writes('ppc_bat_set')==[(529,4),(537,4),(528,5),(536,5)],
+            'BAT0 lower before upper SPR sequence')
+    require(spr_writes('ppc_write_hid0')==[(1008,3)],'HID0 write SPR')
+    require('r3,8' in body('ppc_bat_reset') and ops('ppc_bat_reset')[10]=='bne',
+            'upper BAT reset conditional on eight BATs')
     require(ops('ppc_cache_copy')[-5:]==['dcbst','icbi','hwsync','isync','blr'],'final cache line')
     require(ops('ppc_tlb_flush_all')==['hwsync','li','li','mtctr','tlbie','eieio','hwsync','addi','bdnz','tlbsync','hwsync','blr'],'full TLB order')
     require('r4,64' in body('ppc_tlb_flush_all') and 'r3,r3,4096' in body('ppc_tlb_flush_all'),'64 TLB pages')
@@ -194,6 +208,8 @@ def api_rejection(root,cross):
 
 MUTATIONS=[
  ('boundary-ci','arch/ppc/takeover.S','    b pm_mmu_start','    bl ofw_exit\n    b pm_mmu_start','static'),
+ ('hpt-clear','arch/ppc/pmap.c','i++) hpt[i]=0;','i++) (void)hpt[i];','host'),
+ ('7455-upper-clear','arch/ppc/mmu.S','    mtspr PPC_SPR_IBAT4U,4','    nop','static'),
  ('hpt-size','platform/powermac/mmu_boot.c','    n>>=1;','    n>>=0;','host'),
  ('7450-highbat','arch/ppc/cpu_setup.c','if (version==PPC_PVR_7455)','if (version==PPC_PVR_7455 || version==PPC_PVR_7450)','host'),
  ('cache-tail','arch/ppc/cache_copy.S','    icbi 0,3\n    sync','    nop\n    sync','static'),
