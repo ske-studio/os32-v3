@@ -47,6 +47,12 @@ DOCS = ("**/*.md", "docs/.orphans-allow", "docs/images/**", "docs/logs/**")
 # sample assets and standalone operational/conversion tools. Keep names explicit
 # so adding a different file still requires a coverage decision.
 NOTEST = (
+    # PowerPC port (docs/tasks/ppc/): no ppc toolchain or QEMU on the CI runner, so
+    # its build and tests stay outside `make check` until the kernel body builds.
+    ('arch/ppc/**', ()),
+    ('platform/powermac/**', ()),
+    ('tools/ppc/**', ()),
+    ('build/ppc.mk', ()),
     ('lib/microtar/LICENSE', ()),
     ('lib/microtar/README.OS32', ()),
     ('lib/zlib/README.OS32', ()),
