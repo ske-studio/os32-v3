@@ -30,7 +30,7 @@ static const struct gf4_timing vga={25175,640,656,752,800,480,490,492,525,3};
 static const struct gf4_timing svga={40000,800,840,968,1056,600,601,605,628,0};
 static const struct gf4_timing xga={65000,1024,1048,1184,1344,768,771,777,806,3};
 static bool reject_head0,reject_port1,slow_reads,dead_port0;
-static u32 timing_logs,vram_logs,pll_logs,ddc_logs,parser_logs;
+static u32 timing_logs,vram_logs,pll_logs,ddc_logs,parser_logs,probe_logs;
 void __cdecl kprintf(u8 attr,const char *fmt,...)
 {
     (void)attr;
@@ -48,7 +48,9 @@ void __cdecl kprintf(u8 attr,const char *fmt,...)
     } else {
         bool parser=false;
         for (u32 i=0;fmt[i];i++) if (fmt[i]=='p' && fmt[i+1]=='a') parser=true;
-        if (parser) parser_logs++; else ddc_logs++;
+        bool probe=false;
+        for (u32 i=0;fmt[i];i++) if (fmt[i]=='p' && fmt[i+1]=='r') probe=true;
+        if (parser) parser_logs++; else if (probe) probe_logs++; else ddc_logs++;
     }
     va_end(ap);
 }
@@ -69,7 +71,11 @@ static void observe(struct gf4_host *host,const struct gf4_host_event *e)
     }
     if (reject_port1 && e->op==D_I2C_PORT && e->a[0]==1U)
         ((struct gf4_host_event *)e)->rc=GF4_ENODEV;
+    if (e->op==D_PROBE) {
+        assert(e->p[0]==&h.ctx && e->a[2]==(u32)*h.now+GF2_TIMEOUT_US);
+    }
     if (e->op==D_EDID && e->p[0]==&h.ctx) {
+        assert(h.calls[D_PROBE]);
         assert(e->a[2]==(u32)*h.now+GF2_TIMEOUT_US);
         if (slow_reads) {
             *h.now+=GF2_TIMEOUT_US-1U;
@@ -96,7 +102,7 @@ static void fresh(u32 nroutes)
         .connector=(u8)i,.type=GF4_ANALOG,.head_mask=3,.or_mask=1
     };
     reject_head0=reject_port1=slow_reads=dead_port0=false;
-    timing_logs=vram_logs=pll_logs=ddc_logs=parser_logs=0;
+    timing_logs=vram_logs=pll_logs=ddc_logs=parser_logs=probe_logs=0;
 }
 static void expect_vga(const struct gf4_mode *m,u32 n)
 {
@@ -335,6 +341,28 @@ static void declared_edid(void)
            state.modes[0].t.khz==65000 && state.nmodes==6);
     assert(!timing_logs && !vram_logs && !pll_logs && ddc_logs==1 && parser_logs==1);
 }
+/* V/nouveau_connector.c:439-445,579-588: one successful probe precedes
+ * the full EDID read; a failed probe leaves only this connector's fallback. */
+static void probe_detect(void)
+{
+    fresh(1); state.edid.ntiming=1; state.edid.timing[0]=svga;
+    assert(!gf4_detect(&h.ctx,B0_DL));
+    assert(h.calls[D_PROBE]==1 && h.calls[D_EDID]==2);
+    assert(probe_logs==1 && ddc_logs==1 && parser_logs==1);
+    assert(state.modes[0].t.hd==800);
+    const i32 errors[]={GF4_EDDC,GF4_ETIME};
+    for (u32 i=0;i<sizeof(errors)/sizeof(errors[0]);i++) {
+        fresh(2); routes[1].i2c_index=1;
+        state.edid.ntiming=1; state.edid.timing[0]=svga;
+        gf4_host_fail_at(&h,D_PROBE,2,errors[i]);
+        assert(!gf4_detect(&h.ctx,B0_DL) && h.ctx.last_rc==errors[i]);
+        assert(h.calls[D_PROBE]==2 && h.calls[D_EDID]==2);
+        assert(probe_logs==2 && ddc_logs==1 && parser_logs==1);
+        const struct gf4_mode *m; u32 n;
+        assert(!gf4_modes(&h.ctx,0,&m,&n) && m[0].t.hd==800);
+        assert(!gf4_modes(&h.ctx,1,&m,&n)); expect_vga(m,n);
+    }
+}
 static void surfaces(void)
 {
     fresh(1);
@@ -366,7 +394,7 @@ static void surfaces(void)
 }
 void _start(void)
 {
-    fallback_and_ids(); candidates_and_heads(); failures(); ranges_and_tv(); fairness(); surfaces(); block_budgets(); native_and_diagnostics(); declared_edid();
+    probe_detect(); fallback_and_ids(); candidates_and_heads(); failures(); ranges_and_tv(); fairness(); surfaces(); block_budgets(); native_and_diagnostics(); declared_edid();
     __asm__ volatile("int $0x80" : : "a"(1),"b"(0));
     __builtin_unreachable();
 }

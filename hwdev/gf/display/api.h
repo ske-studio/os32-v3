@@ -83,6 +83,7 @@ struct gf4_ctx {
 };
 int gf4_modes(struct gf4_ctx *,u8,const struct gf4_mode **,u32 *);
 int gf4_set_mode(struct gf4_ctx *,const struct gf4_route *,u32,const struct gf3_surface *,u32);
+int gf4_ddc_probe(struct gf4_ctx *,u8,u32);
 int gf4_ddc_read(struct gf4_ctx *,u8,u8,u8 out[128],u32);
 int gf4_dpms_set(struct gf4_ctx *,u8,enum gf4_dpms,u32);
 int gf4_cursor_image(struct gf4_ctx *,u8,const struct gf4_cursor *,u32);
