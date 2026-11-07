@@ -23,6 +23,14 @@ MUTATIONS = [
     ('skip-second-sync', 'if (test == 1u) {', 'if (test == 4u) {'),
     ('skip-scalar', 'p[i] = cpu_row[i];', 'p[i] = 0;'),
     ('skip-comparison', 'test < 3u', 'test < 2u'),
+    ('wrong-mask', 'saved & TRI_TEST_NO_PCI_BURST', 'saved & 0xF8u'),
+    ('keep-burst', '#define TRI_TEST_NO_PCI_BURST 0xF9u', '#define TRI_TEST_NO_PCI_BURST 0xFFu'),
+    ('skip-save', 'd->cur_vga_base + 1u, &saved);', 'd->cur_vga_base + 1u, &(u8){0});'),
+    ('skip-disabled-cases', 'if (!rc) remember(&result, cpu32_cases(o, disabled));', 'if (!rc) remember(&result, 0);'),
+    ('restore-disabled', 'rc = cpu32_pci_write(d, saved);', 'rc = cpu32_pci_write(d, disabled);'),
+    ('skip-restore', 'rc = cpu32_pci_write(d, saved);', 'rc = 0;'),
+    ('hide-cr39', 'if (pci >= 0) {', 'if (pci > 255) {'),
+    ('hide-restore-error', '    remember(&result, original);', '    result = original;'),
     ('skip-readback', 'rc = read_row(o, "cpu32_read", TRI_TEST_SOURCE_Y, count);', 'rc = 0;'),
 ]
 

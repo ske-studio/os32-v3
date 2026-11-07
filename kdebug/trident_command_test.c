@@ -1,7 +1,7 @@
 /* TRIDENT_FULL_DESIGN §9 F17: synchronous serial observations through F16's
  * production loan only. gf_command_test.c:42-57 supplies the call/rc pattern.
- * Register sequences remain in the MIT/X11 Trident implementation; this file
- * issues no register I/O and owns no second device or persistent ops pointer.
+ * CR39 diagnostic access borrows the production byte I/O seam; this file
+ * owns no second device or persistent ops pointer.
  */
 #include "trident_command_test.h"
 #include "../drivers/video/trident/trident_module.h"
@@ -9,6 +9,8 @@
 #include "generated/kdebug_import_macros.h"
 
 /* GXcopy (X11 logical ROP); test rows fit every F3 640-pixel timing. */
+#define TRI_TEST_PCI_REG 0x39u
+#define TRI_TEST_NO_PCI_BURST 0xF9u /* X/trident_dac.c:709-721 */
 #define TRI_TEST_ROP_COPY 3u
 #define TRI_TEST_HEAD 0u
 #define TRI_TEST_SOURCE_Y 0u
@@ -31,8 +33,8 @@ static void number(const char *key, u32 value)
     serial_puts_polled(key);
     serial_diag_u32(value);
 }
-static int emit(const struct TridentDiagnosticOps *o, const char *phase, int rc,
-                bool unavailable)
+static int emit_pci(const struct TridentDiagnosticOps *o, const char *phase, int rc,
+                    bool unavailable, int pci)
 {
     ++result_count;
     serial_puts_polled("TRI phase="); serial_puts_polled(phase);
@@ -49,8 +51,16 @@ static int emit(const struct TridentDiagnosticOps *o, const char *phase, int rc,
         number(" video_allocated=", d->video.allocation.allocated);
         serial_puts_polled(" video_rc="); serial_diag_i32(d->video.last_rc);
     }
+    if (pci >= 0) {
+        serial_puts_polled(" cr39="); serial_diag_hex((u8)pci, 2);
+    }
     serial_puts_polled("\r\n");
     return rc;
+}
+static int emit(const struct TridentDiagnosticOps *o, const char *phase, int rc,
+                bool unavailable)
+{
+    return emit_pci(o, phase, rc, unavailable, -1);
 }
 static int optional(const struct TridentDiagnosticOps *o, const char *phase,
                     int rc)
@@ -88,8 +98,8 @@ static int client_rows(const struct trident_device *d)
         s->pitch > d->res->client_bytes - row_bytes) return TRI_E_SURFACE;
     return 0;
 }
-static int read_row(const struct TridentDiagnosticOps *o, const char *phase,
-                    u32 y, u32 count)
+static int read_row_pci(const struct TridentDiagnosticOps *o, const char *phase,
+                        u32 y, u32 count, int pci)
 {
     const struct trident_device *d = o->context;
     const struct tri_surface *s = &d->mode.client;
@@ -106,7 +116,12 @@ static int read_row(const struct TridentDiagnosticOps *o, const char *phase,
         serial_puts_polled(" actual="); serial_diag_hex(actual, 8);
         serial_puts_polled("\r\n");
     }
-    return emit(o, phase, rc, false);
+    return emit_pci(o, phase, rc, false, pci);
+}
+static int read_row(const struct TridentDiagnosticOps *o, const char *phase,
+                    u32 y, u32 count)
+{
+    return read_row_pci(o, phase, y, count, -1);
 }
 /* Keep the same CLIENT, width and read path for each transfer comparison.
  * Scalar stores intentionally have no intervening reads or port delays. */
@@ -178,17 +193,17 @@ static int cpu32_sequence(const struct TridentDiagnosticOps *o)
     return read_row(o, "ge_copy_read", TRI_TEST_DEST_Y, count);
 }
 /* tri cpu32/modes: run independent comparisons even if a CPU read mismatches.
- * "no_ge" means no GE command issued by this invocation yet; the GUI may have
- * used GE earlier. This is not an engine reset or a claim of power-on state.
+ * "no_ge" means no GE command issued by this comparison group yet; the GUI
+ * and a preceding group may have used GE earlier. This is not an engine reset or a claim of power-on state.
  * A:226-277 is unchanged in production. Extra Sync is diagnostic only. */
-static int cpu32(const struct TridentDiagnosticOps *o)
+static int cpu32_cases(const struct TridentDiagnosticOps *o, u8 pci)
 {
     struct trident_device *d = o->context;
     int rc = client_rows(d);
     if (rc) return optional(o, "cpu32_precheck", rc);
     u32 count = (u32)d->mode.client.width * d->mode.client.cpp / sizeof(u32);
     write_row(d, count, false, TRI_TEST_STRIDE);
-    int result = read_row(o, "cpu32_no_ge_read", TRI_TEST_SOURCE_Y, count);
+    int result = read_row_pci(o, "cpu32_no_ge_read", TRI_TEST_SOURCE_Y, count, pci);
     bool ge = o->fill && o->copy && o->copy_direction && o->sync &&
         !d->mode.no_accel && d->accel.initialized &&
         (d->mode.features & (TRI_CAP_FILL | TRI_CAP_COPY)) ==
@@ -220,11 +235,51 @@ static int cpu32(const struct TridentDiagnosticOps *o)
             if (rc) return rc;
         }
         write_row(d, count, test == 2u, (test + 2u) * TRI_TEST_STRIDE);
-        remember(&result, read_row(o, phases[test], TRI_TEST_SOURCE_Y, count));
+        remember(&result, read_row_pci(o, phases[test], TRI_TEST_SOURCE_Y, count, pci));
     }
     /* Retain transparent-copy + Sync + rep and the subsequent GE copy test. */
     remember(&result, cpu32_sequence(o));
     return result;
+}
+/* D:539-541/581-583: bit0 controls MMIO. X/trident_dac.c:709-721:
+ * NoPciBurst clears bits1/2 together, preserving bit0 and every upper bit.
+ * The reference does not identify separate read/write burst bits.
+ * Use the loan's byte callbacks: module-local indexed helpers cannot be linked
+ * into kdebug. Always restore, including a failed disable or comparison. */
+static int cpu32_pci_write(struct trident_device *d, u8 value)
+{
+    int rc = d->io->write8(d->io_opaque, TRI_SPACE_REGS,
+                           d->cur_vga_base, TRI_TEST_PCI_REG);
+    if (rc) return rc;
+    return d->io->write8(d->io_opaque, TRI_SPACE_REGS,
+                          d->cur_vga_base + 1u, value);
+}
+static int cpu32(const struct TridentDiagnosticOps *o)
+{
+    struct trident_device *d = o->context;
+    int rc = client_rows(d);
+    if (rc) return optional(o, "cpu32_precheck", rc);
+    if (!d->io || !d->io->write8 || !d->io->read8)
+        return optional(o, "cpu32_pci_io", TRI_E_NOSYS);
+    rc = d->io->write8(d->io_opaque, TRI_SPACE_REGS,
+                       d->cur_vga_base, TRI_TEST_PCI_REG);
+    u8 saved = 0;
+    if (!rc) rc = d->io->read8(d->io_opaque, TRI_SPACE_REGS,
+                              d->cur_vga_base + 1u, &saved);
+    if (rc) return emit(o, "cpu32_pci_save", rc, false);
+    emit_pci(o, "cpu32_pci_original", 0, false, saved);
+    int original = cpu32_cases(o, saved);
+    int result = 0;
+    remember(&result, original);
+    u8 disabled = saved & TRI_TEST_NO_PCI_BURST;
+    rc = cpu32_pci_write(d, disabled);
+    emit_pci(o, "cpu32_pci_no_burst", rc, false, disabled);
+    if (!rc) remember(&result, cpu32_cases(o, disabled));
+    else remember(&result, rc);
+    rc = cpu32_pci_write(d, saved);
+    emit_pci(o, "cpu32_pci_restore", rc, false, saved);
+    remember(&result, rc);
+    return result ? result : original;
 }
 static int dpms(const struct TridentDiagnosticOps *o)
 {
