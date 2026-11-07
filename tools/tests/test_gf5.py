@@ -122,6 +122,16 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+    ('raw-save-core', 'hwdev/gf/clock.c', 'rd(io,CLK_CORE,&raw.nc);', 'rd(io,CLK_SHADER,&raw.nc);', 'clocksave'),
+    ('raw-save-coef', 'hwdev/gf/clock.c', 'rd(io,CLK_COEF,&raw.nn);', 'rd(io,CLK_SHADER,&raw.nn);', 'clocksave'),
+    ('raw-save-shader', 'hwdev/gf/clock.c', 'rd(io,CLK_SHADER,&raw.sc);', 'rd(io,CLK_CORE,&raw.sc);', 'clocksave'),
+    ('raw-save-mux', 'hwdev/gf/clock.c', 'rd(io,CLK_MUX,&raw.mux);', 'rd(io,CLK_CORE,&raw.mux);', 'clocksave'),
+    ('raw-save-error', 'hwdev/gf/clock.c', 'if (rc) return result(g,rc);\n    *out=raw;', 'if (rc) return result(g,0);\n    *out=raw;', 'clocksave'),
+    ('raw-restore-core', 'hwdev/gf/clock.c', 'io->write(io->opaque,0,CLK_CORE,4,raw->nc);', 'mask(io,CLK_CORE,CLK_CORE_MASK,raw->nc);', 'clocksave'),
+    ('raw-restore-shader', 'hwdev/gf/clock.c', 'io->write(io->opaque,0,CLK_SHADER,4,raw->sc);', 'mask(io,CLK_SHADER,CLK_SHADER_MASK,raw->sc);', 'clocksave'),
+    ('raw-restore-coef', 'hwdev/gf/clock.c', 'io->write(io->opaque,0,CLK_COEF,4,raw->nn);', 'io->write(io->opaque,0,CLK_SHADER,4,raw->nn);', 'clocksave'),
+    ('raw-restore-mux', 'hwdev/gf/clock.c', 'io->write(io->opaque,0,CLK_MUX,4,raw->mux);', 'mask(io,CLK_MUX,CLK_MUX_MASK,raw->mux);', 'clocksave'),
+    ('raw-restore-wait', 'hwdev/gf/clock.c', 'if (!rc) rc=io->write(io->opaque,0,CLK_SHADER,4,raw->sc);\n    if (!rc) rc=io->timing.wait_us(io->opaque,CLK_SETTLE_US);', 'if (!rc) rc=io->timing.wait_us(io->opaque,CLK_SETTLE_US);\n    if (!rc) rc=io->write(io->opaque,0,CLK_SHADER,4,raw->sc);', 'clocksave'),
     ('image-version', 'hwdev/gf/feature5.h', '#define GF5_IMAGE_VERSION 3U', '#define GF5_IMAGE_VERSION 2U', 'clocksave'),
     ('leave-stop-no-redraw', 'drivers/video/geforce/backend_geforce.c', '(was_routed || forced_stop) ? pc98_route_to_98() : 0', '((void)was_routed, (void)forced_stop, pc98_route_to_98())', 'foreground'),
     ('forced-stop-rebuild', 'drivers/video/geforce/backend_geforce.c', '        failed = 1;\n        rc=gf_foundation_stop', '        failed = 0;\n        rc=gf_foundation_stop', 'foreground'),
