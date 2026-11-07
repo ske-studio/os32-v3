@@ -17,6 +17,7 @@
 #ifndef ARCH_CPU_H
 #define ARCH_CPU_H
 
+#include "x86_flags.h"
 #include "memmap.h"
 /* 画像外 PD/PT を Linux の実メモリにも置く。カーネル画像/BSSの代用にしない。 */
 static inline void host_map_fixed_paging(void)

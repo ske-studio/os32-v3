@@ -13,7 +13,7 @@
 #include "kprintf.h"
 #include "bootinfo.h"
 #include "build_id.h"
-#include "../arch/x86/kernel/idt.h"                /* tick_count */
+#include "kernel_tick.h"
 
 extern void kapi_sys_get_build_info(char *buf, int size);   /* kapi/kapi_sys.c */
 
