@@ -23,7 +23,7 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=", "-D__OS32_USERLAND__"]
 LIB_INC = ["-I" + str(ROOT / p) for p in ("include", "sdk/include",
                                           "sdk/include/os32", "userland/lib/host")]
-CMD_INC = ["-I" + str(ROOT / "userland/lib/host")]
+CMD_INC = LIB_INC
 
 CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", "/usr/local/cross"))
 if not CROSS_DIR.exists():
@@ -51,9 +51,10 @@ def run_host(exe):
         return 124
 
 
-def build_lib(tmp):
+def build_lib(tmp, source=None):
     exe = str(tmp / "host-lib-host")
     subprocess.run(["gcc", *FLAGS, *LIB_INC,
+                    *(['-DHOST_LIB_SOURCE="' + str(source) + '"'] if source else []),
                     str(ROOT / "tools/tests/host_lib_host.c"), "-o", exe],
                    cwd=ROOT, check=True)
     print("HOST GNU11 -Werror compile PASS (real libos32host.c)", flush=True)
@@ -70,12 +71,15 @@ def build_cmd(tmp, cmd):
 
 
 def target_compile(tmp):
-    subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c",
+    subprocess.run([str(CROSS_DIR / "bin/i386-elf-gcc"), *TARGET_FLAGS, "-c",
                     "userland/lib/host/libos32host.c", "-o", str(tmp / "libos32host.o")],
                    cwd=ROOT, check=True)
     print("TARGET i386-elf -Werror compile PASS (libos32host.c)", flush=True)
+    subprocess.run([str(CROSS_DIR / "bin/i386-elf-gcc"), *TARGET_FLAGS, "-c",
+                    "userland/lib/host/host_call.c", "-o", str(tmp / "host_call.o")],
+                   cwd=ROOT, check=True)
     for c in ("wget", "lpr", "hclip", "hdate"):
-        subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c",
+        subprocess.run([str(CROSS_DIR / "bin/i386-elf-gcc"), *TARGET_FLAGS, "-c",
                         "userland/cmds/%s.c" % c, "-o", str(tmp / (c + ".o"))],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf -Werror compile PASS (%s.c)" % c, flush=True)
@@ -99,6 +103,26 @@ if __name__ == "__main__":
 
         if "--target" in sys.argv:
             target_compile(tmp)
+
+        if "--mutate" in sys.argv:
+            source = (ROOT / "userland/lib/host/libos32host.c").read_text()
+            mutations = (
+                ("stale-map", "case OS32_ERR_STALE: return HOST_ELINK;",
+                 "case OS32_ERR_STALE: return HOST_EIO;"),
+                ("print-abort", "if (g < 0) return HOST_EABORT;",
+                 "if (g < 0) return HOST_EIO;"),
+                ("clip-limit", "if (!len || len > HOST_CLIP_MAX) return HOST_EINVAL;",
+                 "if (!len) return HOST_EINVAL;"),
+            )
+            for name, before, after in mutations:
+                if source.count(before) != 1:
+                    raise RuntimeError(f"{name}: mutation anchor not unique")
+                mutant = tmp / "libos32host.c"
+                mutant.write_text(source.replace(before, after))
+                rc = run_host(build_lib(tmp, mutant))
+                if rc <= 0:
+                    raise RuntimeError(f"{name}: expected runtime RED: {rc}")
+                print(f"RED {name}: runtime rc={rc}", flush=True)
 
         n = 1 + len(CMDS)
         print(f"SUMMARY {n - failed}/{n} PASS", flush=True)
