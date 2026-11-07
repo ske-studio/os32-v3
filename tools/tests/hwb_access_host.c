@@ -289,6 +289,38 @@ static void blocks(void)
             CHECK(block_memory[n]==(n>=start && n<start+1024 ?
                   0xFFFFFFFEU+(inc ? n-start : 0) : 0xBAD0BAD0U));
     }
+    for (u32 width=1; width<=2; width++) for (u32 inc=0; inc<2; inc++) {
+        HWB_TEST("block-narrow");
+        for (u32 n=0; n<sizeof(block_memory); n++) ((u8 *)block_memory)[n]=0xA5;
+        reset_trace(); fake_if=inc;
+        struct hw_block_req b={.req=request(width==1 ? HW_BLOCK8 : HW_BLOCK16,HW_PHYS,width),
+                               .count=HW_BLOCK_BYTES/width,.increment=inc};
+        u32 start=4096-width;
+        b.req.addr+=start; b.req.value=width==1 ? 0xFE : 0xFFFE;
+        CHECK(hwb_access(&b,sizeof(b))==0 && b.req.status==HW_OK);
+        CHECK(maps==1 && unmaps==2 && !reads && !writes && !abort_calls);
+        CHECK(fake_if==inc && pte==ORIGINAL_PTE && saves==1 && restores==1);
+        for (u32 n=0; n<sizeof(block_memory); n++) {
+            u32 v=b.req.value+(inc ? (n-start)/width : 0);
+            CHECK(((u8 *)block_memory)[n]==(n>=start && n<start+HW_BLOCK_BYTES ?
+                  (u8)(v >> (((n-start)%width)*8)) : 0xA5));
+        }
+        struct hw_block_req goodn=b;
+        for (u32 bad=0; bad<(width==2 ? 8U : 7U); bad++) {
+            b=goodn; b.req.status=0;
+            if(bad==0)b.count++;
+            if(bad==1)b.count=0;
+            if(bad==2)b.req.value=width==1 ? 0x100 : 0x10000;
+            if(bad==3){b.req.addr=0xFFFFFFFE;b.count=4;}
+            if(bad==4)b.req.width=4;
+            if(bad==5)b.increment=2;
+            if(bad==6){b.req.space=HW_IO;}
+            if(bad==7)b.req.addr++;
+            reset_trace();
+            CHECK(hwb_access(&b,sizeof(b))==0 && b.req.status==HW_ARG && !maps && !saves);
+        }
+    }
+    HWB_TEST("block32");
     struct hw_block_req good={.req=request(HW_BLOCK32,HW_PHYS,4),.count=1};
     for (u32 which=0; which<9; which++) {
         struct hw_block_req b=good;

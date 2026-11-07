@@ -59,7 +59,7 @@ static void op(struct logbuf *b, const struct hwb_log_record *r)
     if (r->op == HWB_READ || r->op == HWB_WRITE || r->op == HWB_FILL) {
         str(b, r->space == HW_PCI ? "pci" : r->space == HW_IO ? "io" : "mmio");
         str(b, r->op == HWB_READ ? "read" : r->op == HWB_FILL ? "fill" : "write"); dec(b, r->width * 8U);
-    } else if (r->op == HWB_BLOCK32) str(b, "mmioblock32");
+    } else if (r->op == HWB_BLOCK32) { str(b, "mmioblock"); dec(b, r->width * 8U); }
     else if (r->op == HWB_DIM) str(b, "dim");
     else if (r->op == HWB_LET) str(b, "let");
     else if (r->op == HWB_DEVICE_BDF || r->op == HWB_DEVICE_ID) str(b, "device");
@@ -124,9 +124,9 @@ void hwb_log_end(const struct hwb_backend *backend, const struct hwb_log_record 
         str(&b, " done="); dec(&b, r->done);
         str(&b, " inc="); dec(&b, r->increment);
         str(&b, " end_addr=");
-        if (r->count && r->count <= HW_BLOCK32_MAX &&
-            r->count * 4U - 1U <= U32_MAX - r->addr && r->bdf != U32_MAX)
-            hex(&b, r->addr + r->count * 4U - 1U, 1);
+        if (r->count && r->width && r->count <= HW_BLOCK_BYTES / r->width &&
+            r->count * r->width - 1U <= U32_MAX - r->addr && r->bdf != U32_MAX)
+            hex(&b, r->addr + r->count * r->width - 1U, 1);
         else str(&b, "UNRESOLVED");
     }
     if (r->op == HWB_WAIT) { str(&b, " requested_us="); dec(&b, r->requested_us); str(&b, " elapsed_us="); elapsed(&b, r->elapsed_lo, r->elapsed_hi); }

@@ -1,8 +1,9 @@
 /* Real shell adapters/parser/exec/logger. Only KernelAPI and bus are fake. */
-/* Full traces for tri_burst: four 1024-dword comparisons plus VGA state
+/* Full traces for tri_burst/tri_burst2: width/length comparisons plus VGA state
  * save/restore. Keep headroom for every event/line and all 4096 LFB bytes. */
-#define HWBF_EVENTS 524288U
-#define HWBF_LINES 131072U
+#define HWBF_LAZY_TRACE_ZERO
+#define HWBF_EVENTS 2097152U
+#define HWBF_LINES 524288U
 #define HWBF_CELLS 8192U
 #include "hwb_fake.h"
 #include "userland/shell/shell.h"
@@ -55,7 +56,7 @@ static i32 fake_kdebug(u32 op, void *data, u32 bytes)
 {
     struct hw_req *r = data;
     CHECK(op == HW_OP && bytes ==
-          (r->action == HW_BLOCK32 ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES));
+          (HW_IS_BLOCK(r->action) ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES));
     if (raw_nosys) return OS32_ERR_NOSYS;
     if (r->action == HW_POINT) {
         CHECK(r->version == HW_VERSION && !r->space && !r->width &&
@@ -263,9 +264,9 @@ static void scripts(void)
             /* §8 example BAR1, independent from shell address resolver. */
             struct hwbf_pci *p = hwbf_add_pci(&bus, HW_BDF(0,8,0), 0x1023, 0x9660);
             p->config[0x17] = 0x20; p->config[0x16] = 0x40; /* BAR1 0x20400000 */
-            if (hwbf_equal(script->name, "tri_w32.hwb") || hwbf_equal(script->name, "tri_burst.hwb")) {
+            if (hwbf_equal(script->name, "tri_w32.hwb") || (hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb"))) {
                 p->config[0x13] = 0x20; /* BAR0 0x20000000 */
-                for (u32 n = 0; n < (hwbf_equal(script->name, "tri_burst.hwb") ? 4096U : 32U); n++)
+                for (u32 n = 0; n < ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb")) ? 4096U : 32U); n++)
                     *hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) = 0x80U + n;
             }
             if (hwbf_equal(script->name, "gf_regs.hwb") || hwbf_equal(script->name, "gf_palette.hwb")) {
@@ -293,7 +294,7 @@ static void scripts(void)
                 for (u32 n = 0; n < 32; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) == 0x80U + n);
             }
-            if (hwbf_equal(script->name, "tri_burst.hwb")) {
+            if ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb"))) {
                 CHECK(scalar("bad") == 0);
                 for (u32 n = 0; n < 4096; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U+n) == (u8)(0x80U+n));

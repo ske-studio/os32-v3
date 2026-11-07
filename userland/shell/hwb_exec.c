@@ -283,8 +283,8 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
     }
     case HWB_BLOCK32: {
         struct hw_block_req block = {
-            .req = {.version=HW_VERSION, .action=HW_BLOCK32, .space=HW_PHYS,
-                    .width=4, .addr=r->addr, .value=r->value},
+            .req = {.version=HW_VERSION, .action=i->width == 1 ? HW_BLOCK8 : i->width == 2 ? HW_BLOCK16 : HW_BLOCK32, .space=HW_PHYS,
+                    .width=i->width, .addr=r->addr, .value=r->value},
             .count=r->count, .increment=i->increment
         };
         if (s->backend->access(s->backend->ctx, &block.req)) return HWB_IO;
@@ -441,7 +441,7 @@ enum hwb_rc hwb_step(struct hwb_state *s)
         rc = hwb_eval(s, i.op == HWB_POLL ? i.timeout : i.value, &r.requested_us);
         if (!rc && (r.requested_us < HWB_US_MIN || r.requested_us > HWB_US_MAX)) rc = HWB_ARG;
     }
-    if (!rc && i.op == HWB_BLOCK32 && r.count > HW_BLOCK32_MAX) rc = HWB_ARG;
+    if (!rc && i.op == HWB_BLOCK32 && r.count > HW_BLOCK_BYTES / i.width) rc = HWB_ARG;
     r.increment = i.increment;
     hwb_log_begin(s->backend, &r);
     u32 next = i.next_pc;
