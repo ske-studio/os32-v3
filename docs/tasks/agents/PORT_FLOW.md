@@ -43,6 +43,7 @@
 | 資源と面の寿命 (core と部品の境目) | 起動の資源・選択・初期化 (PreInit)・切り替え・Close・再入場の各時点で、容量と mode が分かっているか、lease が公開済みか、誰が作り誰が作り直すかを表にする。core から部品の関数は呼べないので、値の渡し方 (callback の引数) も書く | Trident の F6 で PM が欠けを 5 回継ぎ足し、init の前の選択で CLIENT の面が無い不具合を作った。設計者の追記 (時点の表) と Opus で決め直した (2026-11-07) |
 | 共有の状態の持ち主 | 複数の段が読み書きする状態 (今の palette の値・overscan の index など) の置き場と、書く段・読む段を宣言の段に入れる | Trident の F2 (cursor の近似色) と F8 (overscan) が宣言の欠けで止まった (2026-11-07) |
 | 診断の口 | 既存の診断と同じ経路 (wire の op の番号・dispatch・シェルのコマンドの表) を、段の表のファイルごとに書く。実物に無い入口 (文字列のコマンドなど) を前提にしない | Trident の F17/F18 で、kdebug に文字列のコマンドの dispatch が無く形を作り直した (2026-11-07) |
+| 退避の構成の残し方 | 手本と実機の前提 (PCI のブリッジ・書き込みの幅) が PC-98 で成り立たないときに戻る形 (RAM に描いて写す・加速なし) を、撤去せず起動設定 1 つで選べる形で残すか。戻す口の試験を両方の値で組むか | Trident の F6/F7 で RAM の CLIENT と byte の present を撤去した後、実機で LFB への連続書きが消え、追記・実装・レビューをもう一周した (2026-11-07) |
 
 ## 4. 依頼に必ず書くこと
 
@@ -81,6 +82,7 @@
 - **1 つの経路に診断・段を足す枝を合わせるときは、共通の出口 (`pc98_route_to_98` など) の呼び手を grep で全部見る** — 衝突の無い所で、片方の経路だけに入る (2026-11-07、gf-cui の leave の診断が、熱・寿命の側の再起動の経路に入らず foreground-reboot が落ちた)。
 - **製品の関数の呼び出しを 1 つ足したら、その関数の兄弟の stub を持つ試験の土台を全部洗う** — `vfs_fd_invalidate_mount` の stub を持つ土台は、新しい `vfs_fd_stale_mount` も要る。`#include` で取り込む土台だけでなく、python が切り出して組む試験 (`*_host_source.c`・`index('static ...')`) も含める。触ったファイルを組む試験を 1 本ずつ手元で回してから push する (2026-11-07、Host Services の D の統合で、kernel-shell・hostsvc-serialfs・kapi-ranges を CI で 1 本ずつ落とした)。
 - **ゲストの SQL は、製品の SQLite の OMIT の設定 (lib/sqlite3/os32_sqlite_config.h) で通る形だけ使う** — CAST・CTE・window 関数などは prepare で必ず誤りになる。host の普通の SQLite では通るので気づけない。`tools/tests/test_sqlite_product_sql.py` に新しい SQL の置き場を足す。KAPI の `db_column_text` は INTEGER の列を文字にしないので、整数は `db_column_int` か SQL の `''||列` で読む (2026-11-07、hsync の CAST で実機の同期が全部止まり、fep_meta_test は CAST と INTEGER の読み方で 2 回落ちた)。
+- **新しいソースを足す段・その枝を合わせるときは、ソースの一覧の 3 か所を揃える** — `build/sources/order.mk` (リンクの順)・`build/sources/common.mk` か arch/platform の一覧 (選択)・`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。一覧が分かれる前に作った枝は `build/kernel.mk` の行が衝突するので、`kernel.mk` は main 側を取り、新しいソースを 3 か所へ写す (2026-11-07、kdebug の採取点の段 A1 の `debug_probe.c` でリンクの未定義と CI の build の選択の試験を順に落とした)。
 - **レビューの指摘を次の依頼に回す前に、PM が「動くアプリは 1 つだけ」で読み直す** — 依頼文に前提を書いても、指摘をそのまま流すと持ち主の区別・並行の再入の守りが入り込む (2026-11-07、GeForce の熱の停止。ユーザー「なんかシングルタスクOSって忘れてませんか？」)。
 
 レビューで 1 つの段に見つかった誤りが、ほかの段にもありうる種類なら、PM は走っている全段の依頼に追記し、統合の前に grep で確かめる (層 2 では B6 の `s32` を B0・B1 に流さず、まとめビルドで再び出た)。
@@ -156,6 +158,8 @@
 | Trident | init の前の mode の選択で CLIENT の面が無く、Trident を選べない (試験の追従で発見) | PM が面の作り方の欠けを 5 回継ぎ足し、時点ごとの知識を表にしていなかった | §3 の「資源と面の寿命」、§4 の「同じ境目で欠けが 2 回」 |
 | Trident | HAL の fill・blit・cursor が gfx_core から呼べない (Opus のレビューで発見) | 部品の読み込み用の写しに書き続け、公開先に写した後の口を向け直していなかった。試験も写しを直接見ていた | POLICY_PCIDEV §7 の本番の組立試験 (公開先から呼べることを見る) |
 | GeForce | 統合の枝で生成物 (hwdev_contract.h など) が衝突 | 並列の段が同じ生成物を持ち帰った | 生成物は手で解かず、片側に寄せて消してから make で作り直し、固定値は --snapshot で出し直す |
+| Trident | 実機で CPU の LFB への連続書き (rep stosl・続く 32 ビット書き) が消え、GUI が崩れた | 確定設計で退避の構成 (RAM と byte の present) を撤去していた。burst を切っても直らない | §3 の「退避の構成の残し方」 |
+| kdebug・build | 束ねた枝でリンクの未定義、次に CI の build の選択の試験が落ちた | ソースの一覧が分かれる前の枝で、新しいソースが order・common・fixture に無かった | §4 のソースの一覧の 3 か所 |
 新しく踏んだことは、ここに 1 行で足し、§3・§4 のどこで防ぐかを書く。
 
 ## 6. 評価
