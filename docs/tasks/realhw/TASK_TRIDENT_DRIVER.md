@@ -2,7 +2,7 @@
 
 > 上位: [実機の計画](PLAN.md)
 
-> 状態: **実装中 (2026-11-06)** — 段 3 (ドライバ、確定設計 [TRIDENT_S3_DESIGN](../../decisions/realhw/TRIDENT_S3_DESIGN.md)) を main に入れた (35739e59、CI 成功)。手本のガードの洗い出しの A1・B1 (VRAM の確認の成功条件) も直した。実機ではまだ動かしていない。次は GeForce の受入の後の初回の実機 (CUI で `gfxmode trident` → 再起動 → 起動ログの `[trident] stage=module rc=0` → CUI の描画アプリを 2 回 → BAR0 の端の読み書き → GUI は最後)。
+> 状態: **実装中 (2026-11-07)** — 手本の全経路 (2D 加速・HW カーソル・モード/深度・DPMS・Xv overlay、案 3 = アプリが VRAM に直接描く) の確定設計 [TRIDENT_FULL_DESIGN](../../decisions/realhw/TRIDENT_FULL_DESIGN.md) を段 F0〜F18b に分けて実装に出す。F6/F7 (CLIENT の置き場と present) は 32 ビット書きの調べ (tri-w32) の結論の後。それまで: 段 3 (ドライバ、確定設計 [TRIDENT_S3_DESIGN](../../decisions/realhw/TRIDENT_S3_DESIGN.md)) を main に入れた (35739e59、CI 成功)。手本のガードの洗い出しの A1・B1 (VRAM の確認の成功条件) も直した。実機ではまだ動かしていない。次は GeForce の受入の後の初回の実機 (CUI で `gfxmode trident` → 再起動 → 起動ログの `[trident] stage=module rc=0` → CUI の描画アプリを 2 回 → BAR0 の端の読み書き → GUI は最後)。
 >
 > それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
