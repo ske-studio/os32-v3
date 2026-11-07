@@ -56,7 +56,10 @@ MUTATIONS = (
     ('offset-high', '((offset & 0x300) >> 4)', '0'),
     ('performance', 'performance | 0x10', 'performance & 0xEF'),
     ('interface', 'interface | 0x40', 'interface & 0xBF'),
-    ('pci-burst', '(pci & 0xF9) | 0x06', '(pci & 0xF9)'),
+    ('pci-burst', 'd->settings.ram_fallback ? 0 : 0x06',
+     'd->settings.ram_fallback ? 0 : 0'),
+    ('pci-no-burst-fallback', 'd->settings.ram_fallback ? 0 : 0x06',
+     'd->settings.ram_fallback ? 0x06 : 0x06'),
     ('retry', '0x55, 0x1F)', '0x55, 0xDF)'),
     ('misc-int', 'misc_int | 0x04', 'misc_int & 0xFB'),
     ('pitch', 'm.display_width = width;', 'm.display_width = m.hd;'),
@@ -97,14 +100,15 @@ PLL = {(bpp, pal): pll(25175 * (2 if bpp == 32 else 1), pal)
 
 
 
-def oracle(base, reference, seed, misc=None, mode=0, noaccel=True, mux=False):
+def oracle(base, reference, seed, misc=None, mode=0, noaccel=True, mux=False,
+           fallback=False):
     """Explicit reference operation order; no product parser or device model."""
     timing, fmt = divmod(mode, 5)
     depth, bpp = ((8, 8), (15, 16), (16, 16), (24, 24), (24, 32))[fmt]
     height, vs, ve, vt, polarity = ((480,490,492,525,0xC0),
                                   (400,412,414,449,0x40),
                                   (350,387,389,449,0x80))[timing]
-    noaccel = noaccel or bpp == 24
+    noaccel = noaccel or fallback or bpp == 24
     width = 640 if noaccel else 1024
     offset = width * (bpp // 8) // 8
     multiplex = mux and bpp == 8
@@ -193,7 +197,7 @@ def oracle(base, reference, seed, misc=None, mode=0, noaccel=True, mux=False):
         (0x3D4, 0x29, (cr(0x29) & 207) | ((offset & 0x300) >> 4)), (0x3D4, 0x36, 0 if noaccel else 128),
         (0x3D4, 0x2F, cr(0x2F) | 16), (0x3D4, 0x2A, cr(0x2A) | 64),
         (0x3D4, 0x3A, 0), (0x3D4, 0x38, bus),
-        (0x3D4, 0x39, (cr(0x39) & 249) | 6), (0x3D4, 0x55, 31),
+        (0x3D4, 0x39, (cr(0x39) & 0xF9) | (0 if fallback else 0x06)), (0x3D4, 0x55, 31),
         (0x3CE, 0x2F, gr(0x2F) | 4),
         (0x3CE, 15, (gr(15) & 240) | (10 if bpp == 32 else 2)), (0x3D4, 19, offset & 255)):
         ext(p, i, v)
@@ -210,7 +214,7 @@ def oracle(base, reference, seed, misc=None, mode=0, noaccel=True, mux=False):
     return out
 
 
-def fixture():
+def fixture(fallback):
     text = ('struct mode_case { u16 base; u8 reference, seed, misc; '
             'u8 mode, noaccel, mux, pll_lo, pll_hi; u16 pitch; '
             'const struct trident_fake_event *events; u32 count; };\n')
@@ -227,21 +231,23 @@ def fixture():
                 for ref in (0, 128) for mux in (False, True)]
     for base, reference, seed, misc, mode, na, mux in configs:
         name = f'expected_{len(rows)}'
-        events = oracle(base, reference, seed, misc, mode, na, mux)
+        events = oracle(base, reference, seed, misc, mode, na, mux, fallback)
         text += f'static const struct trident_fake_event {name}[] = {{\n'
         for p, v, width, write in events:
             text += f'{{.space=0,.offset={p},.value={v},.count=1,.width={width},.write={write},.rc=0}},\n'
         text += '};\n'
         bpp = (8, 16, 16, 24, 32)[mode % 5]
         lo, hi = PLL[bpp, bool(reference & 128)]
-        pitch = (640 if na or bpp == 24 else 1024) * (bpp // 8)
+        pitch = (640 if na or fallback or bpp == 24 else 1024) * (bpp // 8)
         rows.append(f'{{{base},{reference},{seed},{misc},{mode},{int(na)},{int(mux)},{lo},{hi},{pitch},{name},sizeof({name})/sizeof({name}[0])}}')
     return text + 'static const struct mode_case cases[] = {\n' + ',\n'.join(rows) + '\n};\n'
 
 
-def build(work, product):
+def build(work, product, fallback):
+    (work / 'mode_expected.h').write_text(fixture(fallback))
     exe = work / 'mode'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
+    subprocess.run(['gcc', *FLAGS, f'-DTRI_RAM_FALLBACK_DEFAULT={fallback}',
+                    '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', str(ROOT / HOST),
                     str(ROOT / FAKE), str(ROOT / 'drivers/video/trident/vram.c'), str(product), '-o', str(exe)], check=True)
@@ -256,32 +262,34 @@ def main():
     assert runners, 'no runners'
     with tempfile.TemporaryDirectory(prefix='trident-mode-') as tmp:
         work = Path(tmp)
-        (work / 'mode_expected.h').write_text(fixture())
         product = ROOT / PRODUCT
         original = product.read_text()
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc'
         subprocess.run([str(cross), *FLAGS, '-I' + str(ROOT), *include_flags(ROOT),
                         '-c', str(product), '-o', str(work / 'mode.o')], check=True)
-        exe = build(work, product)
-        for runner in runners:
-            result = host32.run([str(exe)], runner=runner, capture_output=True)
-            assert result.returncode == 0 and result.stdout == b'GREEN\n', result
-            print(f'PASS 145 complete mode traces, mismatched decode, cached reentry, every I/O failure ({runner})', flush=True)
+        for fallback in (0, 1):
+            exe = build(work, product, fallback)
+            for runner in runners:
+                result = host32.run([str(exe)], runner=runner, capture_output=True)
+                assert result.returncode == 0 and result.stdout == b'GREEN\n', result
+                print(f'PASS 145 complete mode traces, mismatched decode, cached reentry, every I/O failure (fallback={fallback}, {runner})', flush=True)
         if args.mutate:
             copied = work / 'mode_640.c'
             for name, old, new in MUTATIONS:
                 assert original.count(old) == 1, (name, original.count(old))
                 copied.write_text(original.replace(old, new))
-                exe = build(work, copied)  # compile failure is never runtime RED
+                fallback = int(name == 'pci-no-burst-fallback')
+                exe = build(work, copied, fallback)  # compile failure is never runtime RED
                 for runner in runners:
                     result = host32.run([str(exe)], runner=runner, capture_output=True)
                     assert result.returncode == 1 and result.stdout.startswith(b'RED '), (name, result)
-                    print(f'MUTATE RED {name} ({runner})', flush=True)
-            exe = build(work, product)
-            for runner in runners:
-                result = host32.run([str(exe)], runner=runner, capture_output=True)
-                assert result.returncode == 0 and result.stdout == b'GREEN\n', result
-                print(f'RESTORED GREEN ({runner})', flush=True)
+                    print(f'MUTATE RED {name} (fallback={fallback}, {runner})', flush=True)
+            for fallback in (0, 1):
+                exe = build(work, product, fallback)
+                for runner in runners:
+                    result = host32.run([str(exe)], runner=runner, capture_output=True)
+                    assert result.returncode == 0 and result.stdout == b'GREEN\n', result
+                    print(f'RESTORED GREEN (fallback={fallback}, {runner})', flush=True)
     return 0
 
 
