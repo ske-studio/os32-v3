@@ -39,7 +39,7 @@ $(C_KERNEL_OBJ) $(R1_OBJECTS) $(KDEBUG_OBJS) $(FEP_OBJS) $(CD_OBJS) \
 
 # Profile changes are ordinary prerequisites, including component providers.
 ALL_TARGET_OBJECTS = $(sort $(foreach variable,$(filter %_OBJ %_OBJS %_OBJECTS,$(.VARIABLES)),$(if $(filter-out ALL_TARGET_OBJECTS,$(variable)),$($(variable)))))
-$(filter %.o %.a,$(ALL_TARGET_OBJECTS)) $(BOOT_ALL_OBJ) $(BOOT_DBG_ALL_OBJ): $(PROFILE_MAKEFILES) $(SELECTION_STAMP)
+$(filter %.o,$(ALL_TARGET_OBJECTS)) $(BOOT_ALL_OBJ) $(BOOT_DBG_ALL_OBJ): $(PROFILE_MAKEFILES) $(SELECTION_STAMP)
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf $(LAYOUT_HEADER): $(PROFILE_MAKEFILES) sdk/target_profile.py
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: sdk/link_guard.py sdk/os32x_hdr.py
 $(KERNEL_PAIRED_MODULES) $(R1_PAIRED_MODULES): sdk/target_profile.py

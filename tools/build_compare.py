@@ -229,7 +229,7 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, target)
         log = output / (label + '.log')
-        goals = ['all', 'kernel-r1'] if args.all_products else ['kernel', 'kernel-r1']
+        goals = ['all', 'kernel-r1'] if args.all_products else ['kernel', 'kernel-r1', 'libs']
         with log.open('w') as stream:
             result = subprocess.run(['make', 'CROSS_DIR=' + str(cross), *goals],
                                     cwd=workspace, env=env,

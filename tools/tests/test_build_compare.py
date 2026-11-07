@@ -40,6 +40,17 @@ def check():
             assert 'build/out/kernel.elf' in B.compare(left, right)
             (right / 'build/out/kernel.elf').write_bytes(b'fixture')
             (right / 'build/out/unreferenced.o').write_bytes(b'ELF metadata and code')
+            rel = Path('build/out/lib/libfixture.a')
+            for root in (left, right):
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_bytes(archive(members))
+            assert not B.compare(left, right)
+            for changed in (members[::-1], [('other.o', b'ABC'), members[1]],
+                            [('one.o', b'ABD'), members[1]]):
+                (right / rel).write_bytes(archive(changed))
+                assert str(rel) in B.compare(left, right)
+            (right / rel).write_bytes(archive(members, 123))
+            assert not B.compare(left, right)
             for name in ('link_guard.py', 'target_profile.py'):
                 rel = Path('build/sdk/bin') / name
                 a, b = left / rel, right / rel
@@ -93,6 +104,8 @@ if __name__ == '__main__':
         original_artifacts = B.artifacts
         original_allow = B.allowed_tool_difference
         mutations = {
+            'ignored archives': lambda: setattr(B, 'artifacts', lambda root, all_products=False:
+                {p for p in original_artifacts(root, all_products) if p.suffix != '.a'}),
             'ignored objects': lambda: setattr(B, 'artifacts', lambda root, all_products=False:
                 {p for p in original_artifacts(root, all_products) if p.suffix != '.o'}),
             'no approved differences': lambda: setattr(B, 'allowed_tool_difference', lambda *args: False),

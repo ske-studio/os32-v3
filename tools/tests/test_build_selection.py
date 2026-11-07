@@ -40,6 +40,28 @@ def check(root):
             raise AssertionError(assignments)
 
 
+def check_archives(root):
+    # Query the complete product graph without traversing or building products.
+    (root / 'archive-query.mk').write_text('$(info QUERY_ARCHIVES=$(ALL_LIB_ARCHIVES))\n.PHONY: archive-query\narchive-query:; @:\n')
+    result = subprocess.run(['make', '-pn', '-f', 'Makefile', '-f', 'archive-query.mk',
+                             'archive-query'], cwd=root, check=True,
+                            capture_output=True, text=True)
+    expected = next(line.split('=', 1)[1].split() for line in result.stdout.splitlines()
+                    if line.startswith('QUERY_ARCHIVES='))
+    archives = {}
+    for line in result.stdout.splitlines():
+        if ': ' not in line or line.startswith(('#', '\t')):
+            continue
+        target, prerequisites = line.split(': ', 1)
+        if target in expected:
+            normal = prerequisites.split('|')[0].split()
+            if normal:
+                archives[target] = normal
+    assert len(archives) >= 16 and set(archives) == set(expected), archives
+    for target, prerequisites in archives.items():
+        assert all(name.endswith(('.o', '.a')) for name in prerequisites), (target, prerequisites)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -63,4 +85,30 @@ if __name__ == '__main__':
                 print('RED: reordered legacy sources rejected at runtime')
             else:
                 raise SystemExit('mutation survived')
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        # Preserve wildcard source discovery and all real make includes.
+        names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
+        for name in names:
+            if name == 'Makefile' or name.startswith(('build/', 'userland/', 'lib/', 'sdk/', 'tools/')):
+                source = ROOT / name
+                if source.is_file():
+                    target = root / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+        check_archives(root)
+        if args.mutate:
+            target = root / 'build/targets/x86-pc98.mk'
+            source = target.read_text()
+            anchor = '$(filter %.o,$(ALL_TARGET_OBJECTS))'
+            assert source.count(anchor) == 1
+            target.write_text(source.replace(anchor, '$(filter %.o %.a,$(ALL_TARGET_OBJECTS))'))
+            try:
+                check_archives(root)
+            except AssertionError:
+                print('RED: archive profile prerequisites rejected at runtime')
+            else:
+                raise SystemExit('archive mutation survived')
+            target.write_text(source)
+            check_archives(root)
     print('PASS build selection')
