@@ -317,3 +317,9 @@ countの評価失敗はcount=0を記録する。
 - private wire の action 末尾に `HW_BLOCK32=4` を追加。`hw_req` (version=1、32バイト) は変更せず、`hw_block_req { struct hw_req req; u32 count, increment; }` (40バイト) を追加する。BLOCK32 だけ40バイト、他は32バイトを要求。space=PHYS、width=4、bdf=0、入力status=0、increment=0/1。出力valueは保持、statusは既存の値。公開 KAPI の変更はない。
 - 既存の device aperture (最大2 PTE) で一括写像し、IRQ停止は写像から全store・復元まで。中止は次の命令の POINT で受ける。ログは begin を出さず end 1 行 (`addr`, `end_addr` は最後のバイト、`val`, `count`, `done`, `inc`, `rc`)。写像に失敗した場合は書かない。復元失敗時は WINDOW で停止し、成功件数に加算しない。
 - `tri_burst.hwb` は trident_mode と同じモード設定・後始末で、先頭4096バイト (0x80・0x800を含む) を単発アクセスで退避/復元する。モード設定後のCR39を基準にそのまま・bit1除去・bit2除去・両方除去を比較し、各条件でA固定値→B連番の連続書込みを行う。CR39前後、不一致総数・先頭8件のoffset/期待値/実値、全一致offsetを出力。bit1/2個別の意味は未確定。異常停止時の自動復元は既存どおり行わない。
+
+### mmioblock8 / mmioblock16 拡張 (2026-11-07)
+
+- `mmioblock8 address count value [inc]` / `mmioblock16 address count value [inc]`。count は要素数で、それぞれ 1..4096 / 1..2048 (最大4KiB)。アドレス指定・自然整列・全範囲検査・一括写像・1命令1行の記録・後始末は32ビット版と同じ。入力値は幅に収まること、inc の値はその幅で折り返す。
+- private wire の末尾に `HW_BLOCK8=5` / `HW_BLOCK16=6` を追加し、既存の40バイト拡張要求を使う。width=1/2、それ以外の入力・出力契約は BLOCK32 と共通。固定値は `rep stosb` / `rep stosw`、inc は連続の `stosb` / `stosw` を1回の特権呼出しで実行する。
+- `tri_burst2.hwb` は CR39=01 で32ビット4KiBを異なるB値で3回、8/16ビット4KiB、32ビット1KiB/512B/256B、CR39=07で8ビット4KiBを比較する (上位ビットは保存)。各試行は単発32ビット書きでAを初期化し、一致の連続範囲 (バイト単位・両端含む) と不一致件数・先頭8件を記録する。8/16ビットのBは固定値。最後にVRAM・CR39/CR55を含む既存状態を復元する。異常停止時の自動復元は既存同様なし。

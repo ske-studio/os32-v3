@@ -77,7 +77,7 @@ def inspect_records(output):
         # The complete unmodified run was checked above.
         for i, row in enumerate(rows):
             if ' phase=end ' in row:
-                if ' op=mmioblock32 ' in row:
+                if any(' op=mmioblock' + w + ' ' in row for w in ('8', '16', '32')):
                     continue  # Blocks intentionally emit exactly one end record.
                 if i == 0 or ' phase=begin ' not in rows[i-1]:
                     raise AssertionError('end lacks adjacent begin: ' + row)

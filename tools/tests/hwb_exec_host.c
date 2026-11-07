@@ -486,10 +486,20 @@ static void blocks(void)
     CHECK(*hwbf_byte(&f,HW_PHYS,0x1008)==0 && *hwbf_byte(&f,HW_PHYS,0x100C)==1);
     setup(); CHECK(run("mmioblock32 phys 0 1024 7") == HWB_OK);
     CHECK(f.accesses==1 && s.writes==1024 && *hwbf_byte(&f,HW_PHYS,4092)==7);
-    const char *bad[]={"mmioblock32 phys 0 0 1", "mmioblock32 phys 0 1025 1",
+    setup(); CHECK(run("mmioblock8 phys 1 4096 0xFE inc") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==4096 && f.line_count==2);
+    CHECK(contains(f.lines[0],"op=mmioblock8 addr=0x1 val=0xFE count=4096 done=4096 inc=1 end_addr=0x1000 rc=OK"));
+    CHECK(*hwbf_byte(&f,HW_PHYS,3)==0 && *hwbf_byte(&f,HW_PHYS,4096)==0xFD);
+    setup(); CHECK(run("mmioblock16 phys 2 2048 0xFFFE inc") == HWB_OK);
+    CHECK(f.accesses==1 && s.writes==2048 && f.line_count==2);
+    CHECK(contains(f.lines[0],"op=mmioblock16 addr=0x2 val=0xFFFE count=2048 done=2048 inc=1 end_addr=0x1001 rc=OK"));
+    CHECK(*hwbf_byte(&f,HW_PHYS,6)==0 && *hwbf_byte(&f,HW_PHYS,4096)==0xFD);
+    const char *bad[]={"mmioblock8 phys 0 4097 1", "mmioblock16 phys 0 2049 1",
+        "mmioblock8 phys 0 1 256", "mmioblock16 phys 1 1 1",
+        "mmioblock8 phys 0xFFFFFFFF 2 1", "mmioblock32 phys 0 0 1", "mmioblock32 phys 0 1025 1",
         "mmioblock32 phys 0xFFFFFFFC 2 1", "mmioblock32 phys 1 1 1",
         "mmioblock32 port 0 1 1", "mmioblock32 phys 0 1 1 nope",
-        "mmioblock16 phys 0 1 1", "mmioblock32 phys 0 1 1 inc inc"};
+        "mmioblock16 phys 0 1 0x10000", "mmioblock32 phys 0 1 1 inc inc"};
     for(u32 n=0;n<sizeof(bad)/sizeof(bad[0]);n++) {
         setup(); CHECK(run(bad[n])==HWB_ARG && !s.writes && !f.accesses);
     }

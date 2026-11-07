@@ -138,20 +138,21 @@ static inline int hwbf_access(void *ctx, struct hw_req *r)
     struct hwbf_event *e = hwbf_event(f, HWBF_ACCESS);
     e->req = *r; f->accesses++;
     if (f->access_fail_at == f->accesses) return hwbf_access_result(e, r, f->call_error);
-    if (r->action == HW_BLOCK32) {
+    if (HW_IS_BLOCK(r->action)) {
         struct hw_block_req *b = (struct hw_block_req *)r;
         r->status = HW_ARG;
         if (r->version != HW_VERSION || e->req.status || r->space != HW_PHYS ||
-            r->width != 4 || r->bdf || !b->count || b->count > HW_BLOCK32_MAX ||
-            b->increment > 1 || (r->addr & 3U) || b->count * 4U - 1U > U32_MAX-r->addr)
+            r->width != HW_BLOCK_WIDTH(r->action) || r->bdf || !b->count || b->count > HW_BLOCK_BYTES / r->width ||
+            b->increment > 1 || (r->width < 4 && r->value >> (r->width*8)) ||
+            (r->addr & (r->width-1U)) || b->count * r->width - 1U > U32_MAX-r->addr)
             return hwbf_access_result(e, r, 0);
         if (f->status_fail_at == f->accesses) {
             r->status = f->failure_status; return hwbf_access_result(e, r, 0);
         }
         for (u32 n = 0; n < b->count; n++) {
             u32 value = r->value + (b->increment ? n : 0);
-            for (u32 lane = 0; lane < 4; lane++)
-                *hwbf_byte(f, HW_PHYS, r->addr+n*4+lane) = value >> (lane*8);
+            for (u32 lane = 0; lane < r->width; lane++)
+                *hwbf_byte(f, HW_PHYS, r->addr+n*r->width+lane) = value >> (lane*8);
         }
         f->bus_accesses++; r->status = HW_OK;
         e->a = b->count; e->b = b->increment;
@@ -168,7 +169,7 @@ static inline int hwbf_access(void *ctx, struct hw_req *r)
     u32 value = r->value;
     if (r->action == HW_READ) r->value = 0;
     r->status = HW_OK;
-    if ((r->width != 1 && r->width != 2 && r->width != 4) ||
+    if ((r->width != 1 && r->width != 2 && r->width != HW_BLOCK_WIDTH(r->action)) ||
         (r->space == HW_PCI && (r->bdf > HW_BDF_MASK || r->addr >= HW_PCI_CONFIG_BYTES ||
                                 r->width > HW_PCI_CONFIG_BYTES - r->addr)) ||
         (r->space == HW_IO && (r->addr > U16_MAX || r->width - 1 > U16_MAX - r->addr)) ||
@@ -278,7 +279,16 @@ static inline int hwbf_find(void *ctx, u32 vendor, u32 device, u32 start, u32 *b
 /* Zeroed fake: mechanism present, frozen zero clock, failures/injections off. */
 static inline void hwbf_init(struct hwb_fake *f)
 {
-    hwbf_zero(f, sizeof(*f)); f->mechanism = 1; f->call_error = OS32_ERR_IO;
+#ifdef HWBF_LAZY_TRACE_ZERO
+    /* Large shell traces are initialized per event/line before exposure.
+     * Reset every other field without touching unused trace capacity. */
+    hwbf_zero(f, __builtin_offsetof(struct hwb_fake, events));
+    f->event_count = 0;
+    hwbf_zero(&f->line_count, sizeof(*f) - __builtin_offsetof(struct hwb_fake, line_count));
+#else
+    hwbf_zero(f, sizeof(*f));
+#endif
+    f->mechanism = 1; f->call_error = OS32_ERR_IO;
     f->failure_status = HW_IO_ERROR;
     f->backend = (struct hwb_backend){f, hwbf_access, hwbf_time, hwbf_yield,
                                     hwbf_point, hwbf_line, hwbf_read_file, hwbf_find};

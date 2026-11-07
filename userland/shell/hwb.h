@@ -76,7 +76,7 @@ struct hwb_program {
 enum hwb_opcode {
     HWB_DIM, HWB_LET, HWB_DEVICE_BDF, HWB_DEVICE_ID, HWB_WINDOW_BAR,
     HWB_READ, HWB_WRITE, HWB_FILL, HWB_WAIT, HWB_POLL, HWB_PRINT, HWB_LOG,
-    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END, HWB_BLOCK32
+    HWB_LABEL, HWB_GOTO, HWB_IF, HWB_CALL, HWB_RETURN, HWB_END, HWB_BLOCK32 /* all mmioblock widths, selected by width */
 };
 enum hwb_address_kind { HWB_ADDR_PCI, HWB_ADDR_PORT, HWB_ADDR_PHYS,
                         HWB_ADDR_BAR, HWB_ADDR_WINDOW };
