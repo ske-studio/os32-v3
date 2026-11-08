@@ -603,6 +603,15 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
         self.assertNotIn({'seq': 'SHIFT+SPACE'}, [data for _, data in self.http.posts])
 
+    def test_module_elf_r1_uses_shared_build_out(self):
+        # build/<name>-module.mk builds one ELF in build/out/<name>/; R1 has none.
+        for kernel in ('/w/build/out/kernel.elf', '/w/build/out/r1/kernel.elf'):
+            self.assertEqual(gui.module_elf(kernel, 'kcg'), Path('/w/build/out/kcg/kcg.elf'))
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop('OS32_FEP_ELF', None)
+                g = gui.Gui(self.http.transport(), kernel, 'shell', symbols, descriptor=gui.NO_DESCRIPTOR)
+            self.assertEqual(g.fep_elf, '/w/build/out/fep/fep.elf')
+
     def test_launch_ime_katakana_reports_incomplete_restore(self):
         for sequence in ([0, 2], [0, 0]):
             self.states(sequence)
@@ -932,6 +941,7 @@ def mutate():
     global gui
     original_gui = gui
     mutations = [
+        ('out = out.parent', 'out = out', 'test_module_elf_r1_uses_shared_build_out'),
         ('px * 65535 + 319', 'px * 65534 + 319', 'test_coordinates_heights_and_bounds'),
         ('payload[i:i + 4]', 'payload[i:i + 8]', 'test_key_chunks_escapes_and_encoding'),
         ('time.sleep(0.35)', 'time.sleep(0.3)', 'test_key_chunks_escapes_and_encoding'),
