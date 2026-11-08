@@ -242,6 +242,13 @@ fn u2_flush_scroll_and_poll_recovery() {
     assert!(scroll::scroll(7,rect,8,0) == Err(client::GuiErr::STALE), "failed flush must invalidate");
     assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_INVALIDATE as i32+100], "failed flush must invalidate");
     assert!(*INVALIDATED.lock().unwrap() == vec![(7,rect)]);
+    // An earlier automatic flush failed and dropped its queue; the next
+    // flush reports the retained lost state even though no commands remain.
+    FLUSH_RC.store(OS32_ERR_STALE,SeqCst);
+    TRACE.lock().unwrap().clear(); INVALIDATED.lock().unwrap().clear();
+    assert!(scroll::scroll(7,rect,8,0) == Err(client::GuiErr::STALE));
+    assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_INVALIDATE as i32+100]);
+    assert!(*INVALIDATED.lock().unwrap() == vec![(7,rect)]);
     FLUSH_RC.store(0,SeqCst);
     SCROLL_RC.store(OS32_ERR_NOSYS,SeqCst);
     TRACE.lock().unwrap().clear();

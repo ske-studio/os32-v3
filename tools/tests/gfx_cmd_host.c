@@ -152,7 +152,7 @@ void _start(void)
     CHECK(!gfx_cmd_enqueue_copy(8, 9, 4, 5, 6, 7));
     fail_submit = OS32_ERR_STALE;
     CHECK(gfx_cmd_get(2, 3, 1, 1, &dst, 1) == OS32_ERR_STALE && gets == 0 && gfx_lost);
-    CHECK(!gfx_flush() && calls == 1);
+    CHECK(gfx_flush() == OS32_ERR_STALE && calls == 1);
     CHECK(gfx_cmd_enqueue_fill(0, 0, 1, 1, 0, 0) == OS32_ERR_STALE);
     reset();
     CHECK(!gfx_cmd_enqueue_copy(8, 9, 4, 5, 6, 7));
@@ -162,6 +162,6 @@ void _start(void)
     fail_submit = OS32_ERR_NOSYS;
     CHECK(gfx_cmd_enqueue_put(0, 0, 640, 10, data, 640, -1) == OS32_ERR_NOSYS);
     CHECK(gfx_lost && calls == 1 && count == 1);
-    CHECK(!gfx_flush() && calls == 1);
+    CHECK(gfx_flush() == OS32_ERR_STALE && calls == 1);
     finish(0);
 }

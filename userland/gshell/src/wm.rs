@@ -1197,7 +1197,8 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
-    if unsafe { libos32gfx_check() } >= 0 {
+    let gfx_ok = unsafe { libos32gfx_check() } >= 0;
+    if gfx_ok {
         let regen = unsafe { libos32gfx_take_regen() } != 0;
         if (regen || REGEN_PENDING.load(Ordering::SeqCst)) && !crate::fullscreen::active() {
             REGEN_PENDING.store(false, Ordering::SeqCst);
@@ -1230,8 +1231,10 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
         taskbar::x3_cycle(st);
         lease::reconcile(st);
         fep::pre_cycle(st);
-        flush_screen_dirty(st);
-        fep::post_cycle(st);
+        if gfx_ok {
+            flush_screen_dirty(st);
+            fep::post_cycle(st);
+        }
         /* 音はフォーカスに追従して排他 (決裁 D9-4、受入 G10)。KAPI を呼ぶので
          * X1 では行わない (契約 T8) — X3 と単独ループの周期だけ。フォーカスが
          * 動いていなければ何もしない。 */
@@ -1240,7 +1243,7 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump { gf_accept::finish(); }
     #[cfg(feature = "gf_accel_accept")]
-    if ctx != input::Ctx::Pump && st.ops.active { flush_present(); crate::typical_ops::on_cycle_end(st); }
+    if ctx != input::Ctx::Pump && st.ops.active { if gfx_ok { flush_present(); } crate::typical_ops::on_cycle_end(st); }
 }
 
 /* ================================================================ */

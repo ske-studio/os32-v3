@@ -25,6 +25,7 @@ MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (
     ('arena-copy', 'out[b] = in[b];', 'out[b] = 0;'),
     ('mono-bit-offset', '(u32)(bx + b)', '(u32)(bx + b + 1)'),
     ('rows-y', 'cmd.y += rows;', 'cmd.y += 0;'),
+    ('lost-empty-flush', 'if (gfx_lost) return OS32_ERR_STALE;\n    if (!nq) return 0;', 'if (!nq) return 0;'),
     ('lost-submit', 'if (rc) gfx_lost = 1;\n    return rc;\n}\n\nstatic int reserve_command',
      'if (rc) gfx_lost = 0;\n    return rc;\n}\n\nstatic int reserve_command'),
     ('get-flush', 'rc = gfx_flush();\n    if (rc) return rc;\n    rc = gfx_api->gfx_hw_get',
