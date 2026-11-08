@@ -128,8 +128,8 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 
 | ID | 状態 | 対象・解除条件 |
 |---|---|---|
-| GF-L5-Ra266 | 未実施 | Ra266 0:13.0/0221 で ROM perf 間と boot 復帰、RAM CRC、温度/fan/VID、tile、save/restore 3 回を確認。担当・日付・serial ログを実施時に記入 |
-| GF-L5-ENOTSUP | 暫定 | 未実装 stub の ENOTSUP は受入保留。B3/B4/B5 の実列 host GREEN と実機結果で解除。ROM/GPIO 不在は根拠付きの機能不在に分類し、stub 完了に流用しない |
+| GF-L5-Ra266 | 合格 (記 4 件) | 実機ノート、2026-11-08、実機 002b9bd0 (GeForce の部分は main と同じ)、ノートの `~/os32-tmp/evidence/2026-11-08/gf-l5/` (台本 `~/os32-tmp/run/gf-l5-accept/RUNBOOK.md`)。否 0。読むだけ R1〜R11 (perf の entry 1 個 300/300/400MHz、therm 32〜40℃、fan と volt-id は不在)・時計を書いて戻す W0〜W3 (core 200→300→200MHz、raw の 4 値が起動値に戻る)・tile W5 (cursor の CRC 不変)・save/restore 3 回 (CRC 全一致、epoch 5→8)・ROM の perf と boot への戻り P1〜P4 (C1=C2) が合。記: (1) volt-get が -509 (VID の GPIO tag 4 が DCB に無いのに ESTATE。不在の -510 に分けるかは票で) (2) W2 の計画は mux=819 なのにレジスタ 49216 が変わらない (3) shader の読みが常に 0 (4) 右のモニターはカメラでほぼ黒く、画の判定はできない。W4 (volt-set) は volt-get が PASS でないので未実施 |
+| GF-L5-ENOTSUP | 解除 (2026-11-08) | 実機の層 5 の受入で SKIP rc=-502 は 0 件。-510 は fan-get・volt-id (根拠: fan_method=0・no-fan、voltage_id=0・vmap absent) と gpio-find・gpio-get (DCB の GPIO 表に tag 9・4 が無い) で、どれも機能の不在。volt-get の -509 は GF-L5-Ra266 の記 (1) |
 
 ## HW-BASIC 実機受入
 
