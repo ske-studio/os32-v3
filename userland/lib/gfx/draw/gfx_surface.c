@@ -95,29 +95,36 @@ void gfx_surface_pixel(GFX_Surface *surf, int x, int y, u8 color)
 /*  ブリット                                                                */
 /* ======================================================================== */
 
-/* Surfaces keep INDEX4 planes; the temporary INDEX8 image is borrowed only
- * until enqueue has copied it. Queue splitting/clipping belongs to L1. */
+/* Convert only visible rows; enqueue copies each stack-sized bundle. */
 static void gfx_blit_direct(int dx, int dy, const GFX_Surface *src,
                             int sx, int sy, int sw, int sh, int key)
 {
-    int ix, iy;
-    u8 *pixels;
-    if (sw <= 0 || sh <= 0 || (u32)sh > 0x7fffffffU / (u32)sw) return;
-    pixels = (u8 *)gfx_api->mem_alloc(sw * sh);
-    if (!pixels) return;
-    for (iy = 0; iy < sh; iy++) {
-        for (ix = 0; ix < sw; ix++) {
-            int off = (sy + iy) * src->pitch + ((sx + ix) >> 3);
-            u8 bit = (u8)(0x80 >> ((sx + ix) & 7));
-            u8 color = 0;
-            for (int p = 0; p < 4; p++)
-                if (src->planes[p][off] & bit) color |= (u8)(1 << p);
-            pixels[iy * sw + ix] = color;
+    u8 pixels[4096];
+    if (sw <= 0 || sh <= 0) return;
+    if (dx <= -sw || dy <= -sh || dx >= gfx_fb.width || dy >= gfx_fb.height) return;
+    if (dx < 0) { sx -= dx; sw += dx; dx = 0; }
+    if (dy < 0) { sy -= dy; sh += dy; dy = 0; }
+    if (sw > gfx_fb.width - dx) sw = gfx_fb.width - dx;
+    if (sh > gfx_fb.height - dy) sh = gfx_fb.height - dy;
+    for (int row = 0; row < sh; ) {
+        int rows = sizeof(pixels) / sw;
+        if (rows > sh - row) rows = sh - row;
+        for (int iy = 0; iy < rows; iy++) {
+            for (int ix = 0; ix < sw; ix++) {
+                int off = (sy + row + iy) * src->pitch + ((sx + ix) >> 3);
+                u8 bit = (u8)(0x80 >> ((sx + ix) & 7));
+                u8 color = 0;
+                for (int p = 0; p < 4; p++)
+                    if (src->planes[p][off] & bit) color |= (u8)(1 << p);
+                pixels[iy * sw + ix] = color;
+            }
         }
+        if (gfx_cmd_enqueue_put(dx, dy + row, sw, rows, pixels, sw, key) < 0) {
+            gfx_lost = 1;
+            return;
+        }
+        row += rows;
     }
-    gfx_cmd_enqueue_put(dx, dy, sw, sh, pixels, sw, key);
-    gfx_api->mem_free(pixels);
-    return;
 }
 
 void gfx_blit(int dx, int dy,

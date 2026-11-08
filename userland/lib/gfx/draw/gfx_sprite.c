@@ -241,24 +241,34 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
         SprSlot *slot = &spr_slots[spr->_pool_idx];
         if (slot->used) {
             if (gfx_direct) {
-                u8 *pixels;
-                if (spr->w <= 0 || spr->h <= 0 ||
-                    (u32)spr->h > 0x7fffffffU / (u32)spr->w) return;
-                pixels = (u8 *)gfx_api->mem_alloc(spr->w * spr->h);
-                if (!pixels) return;
-                /* Public planes/mask are the unshifted image; 255 is outside INDEX4. */
-                for (int row = 0; row < spr->h; row++) {
-                    for (int col = 0; col < spr->w; col++) {
-                        int off = row * spr->pitch + (col >> 3);
-                        u8 bit = (u8)(0x80 >> (col & 7));
-                        u8 color = 0;
-                        for (int p = 0; p < 4; p++)
-                            if (spr->planes[p][off] & bit) color |= (u8)(1 << p);
-                        pixels[row * spr->w + col] = spr->mask[off] & bit ? 255 : color;
+                u8 pixels[4096];
+                int sx = 0, sy = 0, w = spr->w, h = spr->h;
+                if (w <= 0 || h <= 0) return;
+                if (x <= -w || y <= -h || x >= gfx_fb.width || y >= gfx_fb.height) return;
+                if (x < 0) { sx -= x; w += x; x = 0; }
+                if (y < 0) { sy -= y; h += y; y = 0; }
+                if (w > gfx_fb.width - x) w = gfx_fb.width - x;
+                if (h > gfx_fb.height - y) h = gfx_fb.height - y;
+                /* Public planes/mask are unshifted; 255 is outside INDEX4. */
+                for (int row = 0; row < h; ) {
+                    int rows = sizeof(pixels) / w;
+                    if (rows > h - row) rows = h - row;
+                    for (int r = 0; r < rows; r++) {
+                        for (int col = 0; col < w; col++) {
+                            int off = (sy + row + r) * spr->pitch + ((sx + col) >> 3);
+                            u8 bit = (u8)(0x80 >> ((sx + col) & 7));
+                            u8 color = 0;
+                            for (int p = 0; p < 4; p++)
+                                if (spr->planes[p][off] & bit) color |= (u8)(1 << p);
+                            pixels[r * w + col] = spr->mask[off] & bit ? 255 : color;
+                        }
                     }
+                    if (gfx_cmd_enqueue_put(x, y + row, w, rows, pixels, w, 255) < 0) {
+                        gfx_lost = 1;
+                        return;
+                    }
+                    row += rows;
                 }
-                gfx_cmd_enqueue_put(x, y, spr->w, spr->h, pixels, spr->w, 255);
-                gfx_api->mem_free(pixels);
                 return;
             }
             int shift = x & 7;

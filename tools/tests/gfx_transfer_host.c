@@ -16,10 +16,11 @@ GFX_Framebuffer gfx_fb;
 int gfx_ready = 1, gfx_direct, gfx_lost, gfx_packed, gfx_dirty_suppress;
 u16 gfx_gen = 1;
 static u8 heap[4000000];
-static u32 allocated;
+static u32 allocated, alloc_calls;
 static int outstanding, fail_alloc, fail_get;
 static void *alloc(u32 n)
 {
+    alloc_calls++;
     if (fail_alloc) return 0;
     CHECK(allocated + n < sizeof(heap));
     void *p = heap + allocated;
@@ -113,7 +114,7 @@ void _start(void)
     reset(1,1); gfx_blit_colorkey(1,1,s,0,255); CHECK(!gfx_flush() && seen[0].key==255);
     reset(1,1); gfx_blit(-3,-2,s,0); CHECK(!gfx_flush() && count==1);
     CHECK(seen[0].x==0 && seen[0].y==0 && seen[0].w==21 && seen[0].h==8 && data[0]==5);
-    /* A large conversion remains one enqueue; only L1 splits at its arena. */
+    /* Conversion bundles and the queue both fit complete rows in 4KiB. */
     GFX_Surface *large=gfx_create_surface(640,10); CHECK(large);
     gfx_surface_clear(large,6);
     reset(1,1); gfx_blit(0,0,large,0); CHECK(!gfx_flush() && count==2);
@@ -148,7 +149,33 @@ void _start(void)
     reset(1,1);gfx_blit(0,0,large,0); fail_get=1;
     gfx_save_rect(0,0,8,1,bg);CHECK(gets==1 && gfx_lost);fail_get=0;
     int before=outstanding;
-    reset(1,1);fail_alloc=1;gfx_blit(0,0,s,0);gfx_draw_sprite(0,0,spr);gfx_save_rect(0,0,8,1,bg);gfx_restore_rect(0,0,8,1,bg);
-    CHECK(!gfx_flush() && count==0 && gets==0 && outstanding==before && outstanding==3);
+    reset(1,1); fail_alloc=1;
+    u32 calls=alloc_calls;
+    gfx_blit(0,0,s,0); gfx_draw_sprite(0,0,spr);
+    CHECK(!gfx_flush() && count==2 && !gfx_lost && alloc_calls==calls);
+    gfx_save_rect(0,0,8,1,bg); CHECK(gfx_lost && gets==0);
+    reset(1,1); gfx_restore_rect(0,0,8,1,bg); CHECK(gfx_lost);
+    CHECK(outstanding==before && outstanding==3); fail_alloc=0;
+    /* Wider/taller than the screen: source offsets, complete row bundles, no heap. */
+    GFX_Surface *oversize=gfx_create_surface(800,20); CHECK(oversize);
+    for(int y=0;y<20;y++) for(int x=0;x<800;x++) gfx_surface_pixel(oversize,x,y,(x+3*y)&15);
+    reset(1,1); gfx_fb.height=12; calls=alloc_calls; gfx_blit(-5,-3,oversize,0);
+    CHECK(!gfx_flush() && count==2 && bytes==640*12 && alloc_calls==calls);
+    for(u32 i=0;i<count;i++) CHECK(seen[i].x==0 && seen[i].y==(int)i*6 && seen[i].w==640 && seen[i].h==6);
+    for(int y=0;y<12;y++) for(int x=0;x<640;x++) CHECK(display[y*640+x]==((x+5+3*(y+3))&15));
+    GFX_Sprite *big_spr=gfx_create_sprite(oversize,6); CHECK(big_spr);
+    reset(1,1); gfx_fb.width=32; gfx_fb.height=8; calls=alloc_calls;
+    gfx_draw_sprite(-3,-2,big_spr); CHECK(!gfx_flush() && count==1 && bytes==256 && alloc_calls==calls);
+    CHECK(seen[0].x==0 && seen[0].y==0 && seen[0].w==32 && seen[0].h==8);
+    for(int y=0;y<8;y++) for(int x=0;x<32;x++) {
+        u8 c=(x+3+3*(y+2))&15; CHECK(data[y*32+x]==(c==6?255:c));
+    }
+    /* Unsupported row widths are rejected by enqueue and must leave loss recorded. */
+    reset(1,1); gfx_fb.width=800; gfx_blit(0,0,oversize,0); CHECK(gfx_lost);
+    reset(1,1); gfx_fb.width=800;
+    GFX_Sprite invalid=*big_spr; invalid.w=700; invalid.pitch=oversize->pitch;
+    static u8 invalid_mask[2000]; invalid.mask=invalid_mask;
+    for(int p=0;p<4;p++) invalid.planes[p]=oversize->planes[p];
+    gfx_draw_sprite(0,0,&invalid); CHECK(gfx_lost);
     finish(0);
 }

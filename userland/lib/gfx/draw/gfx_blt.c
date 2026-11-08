@@ -91,7 +91,7 @@ void __cdecl gfx_save_rect(int x, int y, int w, int h, void *buf)
         u8 *pixels;
         if (sx * 8 + width > gfx_fb.width) width = gfx_fb.width - sx * 8;
         pixels = (u8 *)gfx_api->mem_alloc(width * h);
-        if (!pixels) return;
+        if (!pixels) { gfx_lost = 1; return; }
         if (!gfx_cmd_get(sx * 8, y, width, h, pixels, width)) {
             for (i = 0; i < 4; i++) {
                 for (int r = 0; r < h; r++) {
@@ -148,7 +148,7 @@ void __cdecl gfx_restore_rect(int x, int y, int w, int h, const void *buf)
         u8 *pixels;
         if (sx * 8 + width > gfx_fb.width) width = gfx_fb.width - sx * 8;
         pixels = (u8 *)gfx_api->mem_alloc(width * h);
-        if (!pixels) return;
+        if (!pixels) { gfx_lost = 1; return; }
         for (int r = 0; r < h; r++) {
             for (int col = 0; col < width; col++) {
                 u8 color = 0;
@@ -158,7 +158,8 @@ void __cdecl gfx_restore_rect(int x, int y, int w, int h, const void *buf)
                 pixels[r * width + col] = color;
             }
         }
-        gfx_cmd_enqueue_put(sx * 8, y, width, h, pixels, width, -1);
+        if (gfx_cmd_enqueue_put(sx * 8, y, width, h, pixels, width, -1) < 0)
+            gfx_lost = 1;
         gfx_api->mem_free(pixels);
         return;
     }
