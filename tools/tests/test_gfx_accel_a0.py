@@ -39,6 +39,11 @@ def run_case(folder, runner, mutation=None):
         if name == 'policy-gen-type':
             edits['gfx/gfx_policy.c'] = (ROOT / 'gfx/gfx_policy.c').read_text().replace(
                 'u16 gfx_policy_gen = 1;', 'u32 gfx_policy_gen = 1;')
+        if name == 'copy-const-backend':
+            # Keep the linked implementation buildable; TYPE still observes
+            # the mutated public declaration at runtime.
+            edits['gfx/gfx_policy.c'] = (ROOT / 'gfx/gfx_policy.c').read_text().replace(
+                'g_backend', '((GfxBackend *)g_backend)')
         edits[path] = source.replace(old, new)
     exe = folder / 'hal-host'
     command = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall',
