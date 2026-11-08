@@ -216,7 +216,7 @@
     "sdk/include/os32/help.h": "c5927b0da7817a98e1bf19fd27b36094d9bd0303a415d4ad1c686597072a178c",
     "sdk/include/os32/ls.h": "68f194288e14735b5a2a0c7e012f86c0c7d9032df01f96b8d4b39fe188a62b18",
     "sdk/include/os32/os32_generations.h": "15f21e9868389392b613808c476a36a77e60f1397c4709a1e4d95ae545e55b60",
-    "sdk/include/os32/os32_gui_shared.h": "bdd4cfee8b6b71cdd98c12d24b92b530d8815c9b8c4f0f58c2d023918ce27845",
+    "sdk/include/os32/os32_gui_shared.h": "c1eccdebf2ade22d9058c648137c2fec88a63524ec36c4c09ca8618b773049c6",
     "sdk/include/os32/os32_kapi_generated.h": "bdbc18057c58a5d78f5ef670acb69f2ca662ffd1a7ab0e0b29a2089e523634c6",
     "sdk/include/os32/os32_kapi_shared.h": "3a6148d9731701600f76038b7e895718a388c18197bc0dabcdfd4a3e3f634544",
     "sdk/include/os32/os32_kapi_slots.h": "f1d64934e77a7ced64b7fb9ea36a2e6ae7c532e595a4f99cf968a3d94074c7d0",

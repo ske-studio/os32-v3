@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-31)** — 出所: API_CONTRACTS (D1 で移した)
 ソース: `userland/rust/libos32gui/src/shlib.rs`
 
-shlib protocol は2、SHM の `GUI_PROTO_VERSION` は1。ジャンプ表は121本で、
+shlib protocol は2、SHM の `GUI_PROTO_VERSION` は2。ジャンプ表は121本で、
 末尾120の `E_TRIM_HOOK_SET` 以外の順序・意味は保つ。旧 protocol 1 は両方向で拒否する。
 
 > [要確認] 現行の `sdk/rust/os32api/src/gui/stub.rs:282` と `userland/rust/libos32gui/src/shlib.rs:217` はジャンプ表を 122 本としている。

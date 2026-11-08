@@ -15,7 +15,7 @@ use core::mem::{offset_of, size_of};
 /* ======================================================================== */
 /*  プロトコルバージョン                                                     */
 /* ======================================================================== */
-pub const GUI_PROTO_VERSION: u16 = 1;
+pub const GUI_PROTO_VERSION: u16 = 2;
 /// この proto.rs が対応する KAPI 版 (PROTO_LAYOUT.md「バージョン」)。
 pub const GUI_KAPI_VERSION: u32 = 41;
 
@@ -538,3 +538,9 @@ const _: () = assert!(offset_of!(GuiReqSession, value) == 4);
 const _: () = assert!(size_of::<GuiReqModalResult>() <= GUI_SLOT_REQ_SIZE);
 const _: () = assert!(size_of::<GuiReqSession>() <= GUI_SLOT_REQ_SIZE);
 const _: () = assert!(size_of::<GuiRespModalResult>() <= GUI_SLOT_RESP_SIZE);
+
+pub const GUI_OP_SCROLL: u32 = 82;
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct GuiReqScroll { pub window: u32, pub rect: GuiRect16, pub dx: i16, pub dy: i16 }
+const _: () = assert!(size_of::<GuiReqScroll>() == 16);
