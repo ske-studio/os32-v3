@@ -483,6 +483,8 @@ pub struct GuiState {
     pub pending_raw_n: usize,
     pub inj_lost: u32,
     pub gserial: crate::gserial::Serial,
+    #[cfg(feature = "gf_accel_accept")]
+    pub ops: crate::typical_ops::Run,
     /// CTRL+STOP を raw で見た (契約 T6)。OP_WAIT の待ちループがこれで抜けて
     /// アプリへ戻し、カーネルが syscall の出口で畳む。消費したら 0 に戻す。
     pub abort_seen: bool,
@@ -540,6 +542,8 @@ impl GuiState {
         pending_raw_n: 0,
         inj_lost: 0,
         gserial: crate::gserial::Serial::NEW,
+        #[cfg(feature = "gf_accel_accept")]
+        ops: crate::typical_ops::Run::NEW,
         abort_seen: false,
         stop_suppressed: false,
         stop_tick: 0,
@@ -1210,6 +1214,8 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     }
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump { gf_accept::finish(); }
+    #[cfg(feature = "gf_accel_accept")]
+    if ctx != input::Ctx::Pump && st.ops.active { flush_present(); crate::typical_ops::on_cycle_end(st); }
 }
 
 /* ================================================================ */
@@ -1745,14 +1751,14 @@ pub(crate) mod gf_accept {
     const COUNT: usize = 300;
     const FAILED: u32 = u32::MAX;
     struct State {
-        active: bool, valid: bool, touched: bool, warm: usize, count: usize,
+        active: bool, paused: bool, valid: bool, touched: bool, warm: usize, count: usize,
         start: u64, event: u64, event_present: u64, present: u64,
         samples: [[u32; 4]; COUNT],
     }
     struct Store(UnsafeCell<State>);
     unsafe impl Sync for Store {}
     static STORE: Store = Store(UnsafeCell::new(State {
-        active: false, valid: true, touched: false, warm: 0, count: 0,
+        active: false, paused: false, valid: true, touched: false, warm: 0, count: 0,
         start: 0, event: 0, event_present: 0, present: 0, samples: [[0; 4]; COUNT],
     }));
     fn state() -> &'static mut State { unsafe { &mut *STORE.0.get() } }
@@ -1761,7 +1767,10 @@ pub(crate) mod gf_accept {
         if unsafe { (os32api::api().sys_time_now)(&mut lo, &mut hi) } != 0 { state().valid = false; }
         (u64::from(hi) << 32) | u64::from(lo)
     }
+    pub(crate) fn busy() -> bool { let s = state(); s.count != 0 && s.count < COUNT }
+    pub(crate) fn pause(paused: bool) { state().paused = paused; }
     pub fn begin() {
+        if state().paused { return; }
         if state().count == COUNT { return; }
         state().valid = true;
         let start = if state().warm >= 10 { now() } else { 0 };
@@ -1776,7 +1785,7 @@ pub(crate) mod gf_accept {
         s.event = end.saturating_sub(s.start); s.event_present = s.present;
     }
     pub fn present_begin() -> (bool, Option<u64>) {
-        if state().count == COUNT { return (false, None); }
+        if state().paused || state().count == COUNT { return (false, None); }
         // COMMIT and Pump can flush outside wm_cycle. Measure only their
         // transfer; app rendering and time between callbacks stay outside.
         let standalone = !state().active;
@@ -1839,5 +1848,7 @@ pub(crate) mod gf_accept {
             }
         }
     }
+    #[cfg(test)]
+    mod tests { include!("../host/gf_accept_tests.rs"); }
 }
 // Acceptance timing end.

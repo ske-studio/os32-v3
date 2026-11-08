@@ -60,7 +60,7 @@ impl Write for Line {
         Ok(())
     }
 }
-fn reply(id: &[u8], args: fmt::Arguments<'_>) {
+pub(crate) fn reply(id: &[u8], args: fmt::Arguments<'_>) {
     let mut line = Line { bytes: [0; 201], n: 0 };
     let id = core::str::from_utf8(id).unwrap_or("-");
     let _ = write!(line, "gs:{} {}", id, args);
@@ -123,6 +123,8 @@ pub fn load_timeout() -> u32 {
 #[derive(Debug, PartialEq)]
 pub enum Cmd<'a> {
     Ping, State, Px, Dump, Key(&'a [u8]), Type(&'a [u8]), Cui, Wd(u32), Flush,
+    #[cfg(feature = "gf_accel_accept")]
+    Ops(u8, u16),
     Invalid, Unknown,
 }
 pub fn parse(body: &[u8]) -> Cmd<'_> {
@@ -136,6 +138,8 @@ pub fn parse(body: &[u8]) -> Cmd<'_> {
             match verb {
                 b"key" if !arg.is_empty() => Cmd::Key(arg),
                 b"type" if !arg.is_empty() => Cmd::Type(arg),
+                #[cfg(feature = "gf_accel_accept")]
+                b"ops" => crate::typical_ops::parse(arg).map_or(Cmd::Invalid, |(op, n)| Cmd::Ops(op, n)),
                 b"wd" => decimal(arg).map_or(Cmd::Invalid, Cmd::Wd),
                 b"ping" | b"state" | b"px" | b"dump" | b"cui" | b"flush" | b"key" | b"type" | b"" => Cmd::Invalid,
                 _ => Cmd::Unknown,
@@ -179,7 +183,7 @@ fn expand(scan: u8, mods: u32) -> ([u16; 6], usize, u8) {
                  else if (0x20..=0x7e).contains(&ch) { 3 } else { 2 };
     (out, n, events)
 }
-fn enqueue(st: &mut GuiState, arg: &[u8], ascii: bool) -> Result<usize, &'static str> {
+pub(crate) fn enqueue(st: &mut GuiState, arg: &[u8], ascii: bool) -> Result<usize, &'static str> {
     // Parse and expand the whole line before changing the persistent queue.
     let mut raws = [0u16; RAW_MAX];
     let mut lengths = [0u8; KEY_MAX]; let mut events = [0u8; KEY_MAX];
@@ -268,6 +272,13 @@ fn execute(st: &mut GuiState, id: &[u8], body: &[u8]) {
                 Err(msg) => { error(id, msg, if msg == "full" {4} else {1}); return; }
             }
         }
+        #[cfg(feature = "gf_accel_accept")]
+        Cmd::Ops(op, n) => {
+            if let Err(rc) = crate::typical_ops::start(st, id, op, n) {
+                error(id, if rc == 4 { "busy" } else { "pre" }, rc);
+            }
+            return;
+        }
         Cmd::Invalid => { error(id, "args", 1); return; }
         Cmd::Unknown => { error(id, "unknown", 2); return; }
     }
@@ -323,3 +334,6 @@ pub fn cycle(st: &mut GuiState) {
 #[cfg(test)]
 #[path = "../host/gserial_tests.rs"]
 mod tests;
+
+#[cfg(feature = "gf_accel_accept")]
+pub(crate) fn queued(st: &GuiState) -> bool { st.gserial.keys != 0 }
