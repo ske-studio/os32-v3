@@ -1,5 +1,6 @@
 #include <string.h>
 #include "tilemap_internal.h"
+#include "gfx_direct_internal.h"
 
 /* ======================================================================== */
 /*  ASMルーチン宣言                                                         */
@@ -874,6 +875,7 @@ void tilemap_present(void)
     if (_tilemap.kapi) {
         /* compose で登録済みの dirty rect のみを VRAM 転送する。
          * gfx_present_rect は全面 dirty rect を再登録してしまうため使わない。 */
+        if (gfx_direct) (void)gfx_flush();
         _tilemap.kapi->gfx_present_dirty();
     }
 }
