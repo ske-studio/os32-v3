@@ -21,6 +21,8 @@ static void finish(int rc)
 } } while (0)
 #define TYPE(symbol, type) CHECK(__builtin_types_compatible_p(__typeof__(symbol), type))
 
+__typeof__(g_backend) g_backend;
+
 typedef int (*predicate_fn)(void);
 typedef void (*void_fn)(void);
 typedef int (*role_fn)(u32);
