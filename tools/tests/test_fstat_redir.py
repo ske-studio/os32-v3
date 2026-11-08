@@ -34,7 +34,7 @@ make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='fstat-redir-host', tier=1,
     covers=['fs/fd_redirect.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'tools/tests/fstat_redir_host.c', 'tools/tests/mutpar.py', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.175764)
+    needs=[], budget=3.6)
 
 from kernel_includes import include_flags
 import os

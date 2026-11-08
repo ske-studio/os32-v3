@@ -2,7 +2,7 @@ CHECK = dict(
     name='exec-gui-run-host', tier=1,
     covers=['exec/exec.c', 'tools/tests/test_exec_gui_run.py',
             'tools/tests/host32.py'],
-    needs=[], budget=5.0)
+    needs=[], budget=2.8)
 
 
 def run(ctx) -> int:

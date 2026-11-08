@@ -11,7 +11,7 @@ CHECK = dict(name='gf1-dispatch-host', tier=1,
             'include/io.h', 'include/video_service.h', 'include/pci_dev_contract.h',
             'arch/x86/arch_io.h', 'tools/tests/gf1_dispatch_host.c',
             'tools/tests/test_gf1_dispatch.py', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py'], needs=[], budget=30.0)
+            'tools/tests/kernel_includes.py'], needs=[], budget=3.3)
 
 import os
 from pathlib import Path

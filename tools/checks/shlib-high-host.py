@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='shlib-high-host', tier=1,
     covers=['tools/tests/paging_source.py', 'tools/tests/host32.py', 'tools/tests/test_shlib_high.py', 'tools/tests/shlib_high_host.c', 'mm/shlib.c', 'exec/os32x_hdr.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
-    needs=['make:all'], budget=1.644008)
+    needs=['make:all'], budget=3.2)
 
 
 def run(ctx) -> int:

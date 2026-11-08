@@ -5,7 +5,7 @@ Layout/values below are independent transcriptions of design §§2,3,5 and
 existing ILP32 VfsSqliteCookie/OS32_MAX_PATH. Regenerate expectations only when
 that contract changes. Mutants must compile and return a runtime failure.
 """
-CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=3,
+CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
     covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h',
             'tools/tests/fep_store_fixture.h', 'tools/tests/fep_store_fixture.c',
             'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',

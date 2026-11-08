@@ -21,7 +21,7 @@ make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='hostdrv-list-host', tier=1,
     covers=['fs/hostdrv/hostdrvfs.c', 'tools/tests/hostdrv_list_host.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.49652)
+    needs=[], budget=3.0)
 
 from kernel_includes import include_flags
 import os

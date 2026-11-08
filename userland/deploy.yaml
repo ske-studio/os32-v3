@@ -292,6 +292,9 @@ filesystem:
     - host: userland/tests/time_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/kapi_cost.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- text_ro_test (アプリの .text・.rodata は読み取り専用、.data は書ける。
     #     `text` と `rodata` は**わざとアプリを殺す**) ---
     - host: userland/tests/text_ro_test.bin

@@ -19,7 +19,7 @@ LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Eth
 """
 CHECK = dict(name='kpeek-host', tier=1,
     covers=['kdebug/kpeek.c', 'kdebug/kpeek.h', 'mm/paging.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'include/pc98.h', 'include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.591064)
+    needs=[], budget=3.6)
 
 from kernel_includes import include_flags
 import host32

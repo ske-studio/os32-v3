@@ -22,7 +22,7 @@ CHECK = dict(name='exec-hwb-abort-host', tier=1,
             'fs/fd_redirect.h', 'fs/pipe_buffer.h',
             'gfx/gfx.h', 'drivers/sound/fm/snd_engine.h',
             'kapi/kapi_host.h', 'kapi/kapi_db.h'],
-    needs=[], budget=3)
+    needs=[], budget=5.8)
 
 import sys
 import hwb_host

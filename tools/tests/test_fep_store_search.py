@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Stage I real SQLite/VFS search merge and optional user connection."""
-CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=15,
+CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=6.5,
     covers=[
         'kernel/ime/ime_dict.c',
         'kernel/ime/ime_conn.c',

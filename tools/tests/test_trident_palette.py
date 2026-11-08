@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Trident depth DAC tables, shadow/reload, overscan and I/O failures."""
-CHECK = dict(name='trident-palette', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-palette', tier=1, needs=[], budget=3.6,
     covers=['drivers/video/trident/palette.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_palette_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',

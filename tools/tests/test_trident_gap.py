@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Calibrated spacing, MMIO write ordering, live command updates and sweep."""
-CHECK = dict(name='trident-gap', tier=1, needs=[], budget=10,
+CHECK = dict(name='trident-gap', tier=1, needs=[], budget=4.6,
     covers=['drivers/video/trident/regs.c', 'drivers/video/trident/present.c',
             'drivers/video/trident/write_gap.c', 'drivers/video/trident/*.h',
             'kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',

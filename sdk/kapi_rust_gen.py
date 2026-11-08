@@ -34,6 +34,7 @@ TYPE_MAP = {
     "void *":          "*mut u8",
     "u8 *":            "*mut u8",
     "const u8 *":      "*const u8",
+    "const GFX_Cmd *": "*const u8",
     "u16 *":           "*mut u16",
     "int *":           "*mut i32",
     "i32 *":           "*mut i32",

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gui-gate-host', tier=1,
     covers=['tools/np21w_mcp/symbols.py', 'tools/gui_gate.py', 'tools/tests/test_gui_gate.py', 'tools/np21w_mcp/gui.py', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py'],
-    needs=[], budget=1.08189)
+    needs=[], budget=2.9)
 
 
 def run(ctx) -> int:

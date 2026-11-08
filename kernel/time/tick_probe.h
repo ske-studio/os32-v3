@@ -1,0 +1,35 @@
+/* Private diagnostic contract. Durations are raw TSC cycles, never PIT time. */
+#ifndef TICK_PROBE_H
+#define TICK_PROBE_H
+#define TP_BINS 16
+#define TP_OP 21U
+#define TP_CONTROL 0x545000U
+enum tp_metric {
+    TP_IRQ0, TP_TIMER, TP_SLOT0, TP_SLOT1, TP_SLOT2, TP_SLOT3,
+    TP_SLOT4, TP_SLOT5, TP_SLOT6, TP_EOI, TP_REFLECT, TP_TIMEOUT,
+    TP_SHORT, TP_INTERVAL, TP_IF0, TP_IRQ1_DELAY, TP_IRQ10_DELAY, TP_METRICS
+};
+struct tp_stat {
+    unsigned long long total, worst, p99_upper;
+    unsigned int count, hist[TP_BINS];
+};
+struct tp_snapshot {
+    struct tp_stat bank[2][TP_METRICS]; /* normal, splash/crossing */
+    unsigned long long elapsed[2], splash_enter, splash_leave, empty_cost;
+    unsigned long long arrival[2]; /* IRQ1 / IRQ10; external trace correlation */
+    unsigned int available, running, lost, arrivals[2];
+};
+struct tp_mark { unsigned long long t; unsigned int epoch, splash, valid; };
+struct tp_request { unsigned int action; }; /* 1=start, 2=stop, 3=show */
+struct tp_control { unsigned int action; const struct tp_snapshot *snapshot; };
+void tick_probe_boot(void);
+void tick_probe_splash(unsigned int active);
+void tick_probe_begin(unsigned int metric);
+void tick_probe_end(unsigned int metric);
+void tick_probe_irq_enter(unsigned int irq);
+void tick_probe_irq_leave(unsigned int irq);
+void tick_probe_if_begin(unsigned int flags);
+void tick_probe_if_end(unsigned int flags);
+int tick_probe_control(struct tp_control *control);
+unsigned long long tick_probe_p99(const struct tp_stat *stat);
+#endif

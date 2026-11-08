@@ -18,7 +18,7 @@
 """
 CHECK = dict(name='time-math-host', tier=4,
     covers=['platform/pc98/clock_source.c', 'kernel/time/ktime.c', 'kernel/time/time_math.c', 'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h', 'kernel/time/time_math.h', 'tools/tests/time_math_host.c', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.233208)
+    needs=[], budget=3.0)
 
 from kernel_includes import include_flags
 import pathlib

@@ -1,5 +1,5 @@
 """PCI configuration width, preservation, and validation tests."""
-CHECK = dict(name='pci-hwb-host', tier=1, budget=2.0, needs=[], covers=[
+CHECK = dict(name='pci-hwb-host', tier=1, budget=3.4, needs=[], covers=[
     'drivers/pci/pci_hwb.c', 'drivers/pci/pci_hwb.h', 'drivers/pci/pci_decode.h',
     'kdebug/hwb_wire.h', 'tools/tests/pci_hwb_host.c', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py',

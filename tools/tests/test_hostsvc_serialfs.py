@@ -9,7 +9,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 
-CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=10, covers=[
+CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
     'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
     'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',

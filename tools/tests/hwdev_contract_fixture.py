@@ -58,9 +58,10 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x8c7fea41
+# GFX_ACCEL_HAL H1 appends INDEX8 direct hooks and GFX_Cmd (32B); P0b appends enum GF6_PRIM=12.
+REVIEWED_LAYOUT_CRC = 0x927d90af
 REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
-REVIEWED_INVENTORY_SHA = 'fa0a19f584f81dfbe900e78c5ff656ced6ea648366a1e8bb544d8346316d825f'
+REVIEWED_INVENTORY_SHA = '1b5fe57d12d1adaf489c2c43f8dcd707842f99ef4181b1af65cca73ccdf65214'
 
 
 def import_declarations(root):

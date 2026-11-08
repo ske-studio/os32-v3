@@ -1,7 +1,7 @@
 {
   "base": "466010d7",
   "kapi_sha256_recipe": "Review sdk/kapi.json append-only ABI changes, load it with json.loads, pop includes, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(); refresh only kapi_sha256, preserving base and old_generations.",
-  "kapi_sha256": "3df15115cb236a3728a201173d526c854b9606e7f7819e50c7c480539751e685",
+  "kapi_sha256": "9aadee2277a48e31cd4e708010c423435df77747474d08bb2bc49e948867886c",
   "apis": {
     "pcm": {
       "type": "PcmModuleApi",

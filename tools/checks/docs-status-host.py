@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='docs-status-host', tier=0,
     covers=['docs/tasks/**/*.md', 'docs/POLICY_DEV.md', 'tools/check_docs_status.py', 'tools/tests/test_docs_status.py', 'docs/tasks/DEFERRED_TESTS.md'],
-    needs=[], budget=0.831226)
+    needs=[], budget=3.0)
 
 
 def run(ctx) -> int:

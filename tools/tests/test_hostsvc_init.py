@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """I1 resident SFS boot wiring, borrowed lifetime and common peer (ILP32)."""
-CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=5, covers=[
+CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
     'init/kernel.c', 'init/kernel_boot_memory.inc', 'init/sysconfig.h', 'init/boot_platform.h',
     'include/config.h', 'include/types.h', 'include/kprintf.h', 'include/net_eth.h',
     'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_lan.c',

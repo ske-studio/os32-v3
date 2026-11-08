@@ -259,10 +259,12 @@ extern int __cdecl wrap_gfx_osri_show(const char *path, u32 duration_ms);
 extern int __cdecl wrap_ime_dict_suspend(int on);
 extern int __cdecl wrap_host_notice_read(u32 generation, u32 service, HostNotice *out);
 extern u32 __cdecl wrap_host_notice_serial(void);
+extern int __cdecl wrap_gfx_hw_submit(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done);
+extern int __cdecl wrap_gfx_hw_get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 82;
+kapi->version = 83;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -525,6 +527,8 @@ kapi->version = 82;
     kapi->ime_dict_suspend = wrap_ime_dict_suspend;
     kapi->host_notice_read = wrap_host_notice_read;
     kapi->host_notice_serial = wrap_host_notice_serial;
+    kapi->gfx_hw_submit = wrap_gfx_hw_submit;
+    kapi->gfx_hw_get = wrap_gfx_hw_get;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

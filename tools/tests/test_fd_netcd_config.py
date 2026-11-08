@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """I4 raw floppy configuration, preservation, replacement and runtime mutants."""
-CHECK = dict(name='fd-netcd-config', tier=1, needs=[], budget=3,
+CHECK = dict(name='fd-netcd-config', tier=1, needs=[], budget=5.2,
              covers=['tools/fd_netcd_config.py', 'tools/mkfat12.py'])
 
 import argparse

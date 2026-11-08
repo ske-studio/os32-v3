@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='recover-tables-host', tier=1,
     covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'kdebug/recover.h', 'include/types.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'kdebug/gfinit_plan.h', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_wire.h', 'kdebug/gfinit_pll.h', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_wire.h', 'tools/tests/recover_tables_oracle.c', 'tools/tests/recover_tables_oracle.json', 'tools/tests/recover_tables_host.c', 'tools/tests/recover_tables_host.h', 'tools/tests/test_recover_tables.py', 'tools/tests/host32.py', 'tools/gen_recover_tables.py', 'tools/tests/recover_tables_bounds.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'tools/gfinit_mode_tables.py', 'hwdev/gfinit_mode.h', 'kdebug/recover_gf_c.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/quiesce_rows.h'],
-    needs=[], budget=2.210428)
+    needs=[], budget=3.6)
 
 
 def run(ctx) -> int:

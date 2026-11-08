@@ -1,5 +1,5 @@
 """CENTER point-sample oracle: fixed half-pixel fixtures, one mutation."""
-CHECK = dict(name='gf-scale-point-host', tier=1, needs=[], budget=30,
+CHECK = dict(name='gf-scale-point-host', tier=1, needs=[], budget=3.4,
     covers=['tools/tests/test_gf_scale_point.py', 'tools/tests/gf_scale_point_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',

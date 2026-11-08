@@ -101,7 +101,10 @@ while true; do
     read -r ART_STATE CHECK_STATE < <(printf '%s' "$JOBS" | python3 -c '
 import json, sys
 jobs = {j["name"]: j.get("conclusion") or j["status"] for j in json.load(sys.stdin)["jobs"]}
-print(jobs.get("artifacts", "queued"), jobs.get("check-fast", "queued"))')
+states = [jobs.get("check-fast (" + str(i) + ")", "queued") for i in range(3)]
+state = ("success" if all(s == "success" for s in states) else
+         next((s for s in states if s != "success"), "queued"))
+print(jobs.get("artifacts", "queued"), jobs.get("check-fast", state))')
     if [ "$ART_STATE" = success ]; then
         if [ "$CHECK_STATE" != success ]; then
             echo "ci_fetch.sh: 検査は失敗 (または実行中): check-fast=$CHECK_STATE" >&2

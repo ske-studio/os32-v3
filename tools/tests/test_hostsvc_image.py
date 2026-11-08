@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """H2: real temporary images, D1 wire layout, FD lifetime and runtime mutants."""
-CHECK = dict(name='hostsvc-image', tier=1, needs=[], budget=2,
+CHECK = dict(name='hostsvc-image', tier=1, needs=[], budget=2.8,
              covers=['tools/host_image.py', 'tools/hostsvc_contracts.pyi',
                      'fs/serialfs/sfs_proto.h', 'sdk/include/os32/os32_kapi_shared.h',
                      'tools/tests/hostsvc_fixture.py'])

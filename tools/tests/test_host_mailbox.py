@@ -20,7 +20,7 @@ CHECK = dict(name='host-mailbox', tier=1, needs=[], covers=[
     'tools/tests/host_mailbox_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'], budget=10)
+    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'], budget=3.3)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('overflow-count', '            dropped++;', '            dropped += 0;'),

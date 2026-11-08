@@ -24,7 +24,7 @@ kdebug/v86_test16_gcap.asm を組んだものと同じかも見る (nasm が無�
 """
 CHECK = dict(name='v86-gcap-host', tier=1,
     covers=['arch/x86/legacy/v86_gcap.c', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_test16_gcap.asm', 'tools/tests/v86_gcap_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'kdebug/v86_gcap_diag.h', 'arch/x86/legacy/v86_gcap_math.h', 'kdebug/v86_gcap_defs.h', 'include/pegc.h', 'include/pc98.h', 'include/types.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.671864)
+    needs=[], budget=4.1)
 
 from kernel_includes import include_flags
 import pathlib

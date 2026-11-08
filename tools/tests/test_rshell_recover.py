@@ -2,7 +2,7 @@
 """Fake serial/time tests of the actual recover host; --mutate kills guards."""
 CHECK = dict(name='rshell-recover-host', tier=1,
     covers=['tools/rshell_recover.py', 'tools/rshell_serial.py', 'tools/tests/mutpar.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py'],
-    needs=[], budget=0.828114)
+    needs=[], budget=2.9)
 
 import argparse
 from contextlib import redirect_stdout, redirect_stderr

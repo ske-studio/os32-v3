@@ -4,7 +4,7 @@ CHECK = dict(name='np21w-symbols-host', tier=1,
             'tools/np21w_mcp/server.py', 'tools/np21w_mcp/gui.py',
             'tools/np21w_mcp/np21w_client.py', 'userland/gshell/src/startmenu.rs',
             'userland/gshell/src/taskbar.rs', 'include/bootinfo.h', 'include/build_id.h', 'include/types.h'],
-    needs=[], budget=5)
+    needs=[], budget=3.1)
 
 
 import contextlib

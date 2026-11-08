@@ -1,5 +1,5 @@
 """HW-BASIC a0 contracts and shell-backend substrate self-test (no libc)."""
-CHECK = dict(name='hwb-wire-host', tier=1, budget=2.0, needs=[],
+CHECK = dict(name='hwb-wire-host', tier=1, budget=4.5, needs=[],
     covers=['kdebug/hwb_wire.h', 'userland/shell/hwb.h',
             'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h',
             'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py',

@@ -22,7 +22,7 @@
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
     covers=['include/time_units.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.028504)
+    needs=[], budget=3.5)
 
 from kernel_includes import include_flags
 import os

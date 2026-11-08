@@ -30,7 +30,7 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 """
 CHECK = dict(name='db-errstr-host', tier=1,
     covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'kapi/kapi_db_*.inc'],
-    needs=[], budget=10.560164)
+    needs=[], budget=9.6)
 
 from exec_source import exec_source
 from kernel_includes import include_flags

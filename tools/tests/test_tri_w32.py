@@ -1,5 +1,5 @@
 """Execute tri_w32 with byte-addressed LFB and injected store-width faults."""
-CHECK = dict(name='tri-w32', tier=1, needs=[], budget=15, covers=[
+CHECK = dict(name='tri-w32', tier=1, needs=[], budget=8.7, covers=[
     'userland/tests/hw/tri_w32.hwb', 'tools/tests/test_tri_w32.py',
     'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',

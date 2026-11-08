@@ -116,8 +116,8 @@ static void start_failures(void)
 /* Header validation is independent of the producer: preserve the existing
  * KDEBUG fixture's valid layout, change only component ID and ops version.
  * No body CRC needs recomputing for the read-only header allocation check. */
-#define C3_CONTEXT_VERSION 6U
-#define C3_OLD_CONTEXT_VERSION 5U
+#define C3_CONTEXT_VERSION 7U
+#define C3_OLD_CONTEXT_VERSION 6U
 /* PM decision 23: GEFORCE budgets, docs/08_build.md:202. */
 #define C3_IMAGE_LIMIT (256U * 1024U)
 #define C3_MEM_LIMIT (256U * 1024U)

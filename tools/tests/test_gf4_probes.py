@@ -1,5 +1,5 @@
 """Stage D: concrete GF probe declarations and real start boundaries."""
-CHECK = dict(name='gf4-probes-host', tier=1, budget=90.0,
+CHECK = dict(name='gf4-probes-host', tier=1, budget=16.3,
              needs=['make:build/out/geforce/geforce_imports.h'],
              covers=['tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
                      'include/**', 'kdebug/**', 'mm/pgalloc.h', 'mm/physmem.h',

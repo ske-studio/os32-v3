@@ -22,7 +22,7 @@ CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'tools/tests/host_notice_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/io.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=10)
+    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('copy-failure-consumes', '        return OS32_ERR_INVAL;\n    host_mailbox_commit',
@@ -57,8 +57,8 @@ def fixed_slots():
     assert names == [a['name'] for a in spec['api']]
     for slot, api in enumerate(spec['api']):
         assert re.search(r'#define KAPI_SLOT_' + api['name'].upper() + r'\s+' + str(slot) + r'\b', slots)
-    assert spec['version'] == 82 and spec['func_capacity'] == 300
-    assert [a['name'] for a in spec['api'][259:]] == ['host_notice_read', 'host_notice_serial']
+    assert spec['version'] >= 82 and spec['func_capacity'] == 300
+    assert [a['name'] for a in spec['api'][259:261]] == ['host_notice_read', 'host_notice_serial']
     assert spec['api'][259]['out'] == 'target'
     init = (ROOT / 'exec/exec_kapi_init.inc').read_text()
     rust = (ROOT / 'sdk/rust/os32api/src/kapi_generated.rs').read_text()

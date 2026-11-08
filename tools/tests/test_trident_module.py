@@ -2,7 +2,7 @@
 """Trident actual facade/loader loans, rejection/pin/abort and paired product.
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
-CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=120,
+CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
     covers=['init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
@@ -111,7 +111,7 @@ def product(work,runners):
         spec['version'],spec['generations']['memory_layout'],module_id=13)
     assert rebuilt==data
     contract=dict(kapi=spec['version'],layout=spec['generations']['memory_layout'],
-        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=4,img_valid=1,module_id=13,
+        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=5,img_valid=1,module_id=13,
         imports=[(fnv(e['name']),e['type_ver'],e['kind']) for e in meta['imports']],
         exports=[(i,fnv(n),1) for i,n in enumerate(('initialize','prepare','restore','get_probe_decls'),1)])
     exe=build_validator(work)

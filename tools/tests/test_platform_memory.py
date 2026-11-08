@@ -10,7 +10,7 @@ CHECK = dict(name='platform-memory-host', tier=1,
     covers=['include/callconv.h', 'tools/tests/test_platform_memory.py', 'include/platform_memory.h',
             'include/types.h', 'include/memmap.h', 'include/pc98.h',
             'platform/pc98/platform_memory_desc.h',
-            'platform/powermac/platform_memory_desc.h'], needs=[], budget=5)
+            'platform/powermac/platform_memory_desc.h'], needs=[], budget=2.7)
 
 MOCK = '''static const struct platform_memory_geometry platform_memory_geometry = {
     11, 22, 33, 44, 55

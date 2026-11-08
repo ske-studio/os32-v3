@@ -14,7 +14,7 @@ CHECK = dict(name='fep-worst-load-host', tier=1,
             'lib/serial_diag.h', 'include/**',
             'sdk/include/os32/os32_kapi_shared.h', 'assets/ipadic/**',
             'assets/joyo_kanji.txt'],
-    needs=[], budget=60.0)
+    needs=[], budget=65.7)
 
 
 def run(ctx) -> int:

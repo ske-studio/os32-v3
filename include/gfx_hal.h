@@ -43,11 +43,26 @@ struct GfxScanout {
 /*                                                                          */
 /*  描画プリミティブ (fill_rect / blit) は「アクセラレータがあれば」の枠で、   */
 /*  NULL のときは呼び出し側 (共有ライブラリ = libos32gfx) が CPU 共通実装へ    */
-/*  フォールバックする。文字とビットマップは v1 では CPU 共通実装に任せるため  */
-/*  この表には置かない (契約 G2 の対応表)。                                   */
+/*  フォールバックする。末尾の INDEX8 hooks は                            */
+/*  GFX_ACCEL_HAL_DESIGN §3-1 に従う。                                     */
 /* ------------------------------------------------------------------------ */
 struct OsriImage;
 struct OsriViewRun;
+
+/* GFX_ACCEL_HAL_DESIGN §3-1/§3-7: INDEX8 only. */
+#define GFX_POLICY_SHADOW 0
+#define GFX_POLICY_DIRECT 1
+#define GFX_ROP_COPY 0
+#define GFX_ROP_XOR  1
+
+typedef struct GfxDirectOps {
+    int (*fill_rect)(int, int, int, int, u8);
+    int (*blit)(int, int, int, int, int, int);
+    int (*fill_rop)(int, int, int, int, u8, u8);
+    int (*put)(int, int, int, int, const u8 *, u32, int);
+    int (*mono)(int, int, int, int, const u8 *, u32, u8, int, int, int, int, int);
+    int (*get)(int, int, int, int, u8 *, u32);
+} GfxDirectOps;
 
 typedef struct GfxBackend {
     const char *name;
@@ -111,6 +126,21 @@ typedef struct GfxBackend {
     /* Synchronous OSRI presentation; NULL means NOSYS. Backend owns the
      * plan and hardware restoration, service owns image and borrowed BB. */
     int (*osri_show)(const struct OsriImage *, struct OsriViewRun *);
+    /* INDEX8 hooks; only gfx_policy_reeval writes policy and active hooks.
+     * key/bg: -1 = transparent, 0..255 = palette index. */
+    u8 policy;
+    int (*direct_ok)(void);
+    int (*fill_rop)(int x, int y, int w, int h, u8 color, u8 rop);
+    /* Completion drains WC writes. */
+    int (*put)(int x, int y, int w, int h, const u8 *src, u32 pitch, int key);
+    /* Optional; opaque only (bg >= 0). Transparent mono uses CPU expansion. */
+    int (*mono)(int x, int y, int w, int h, const u8 *bits, u32 pitch,
+                u8 fg, int bg, int cx, int cy, int cw, int ch);
+    int (*get)(int x, int y, int w, int h, u8 *dst, u32 pitch);
+    /* Filled once by backend prepare/init; NULL disables DIRECT. */
+    const GfxDirectOps *direct_ops;
+    int (*shadow_fill_rect)(int, int, int, int, u8);
+    int (*shadow_blit)(int, int, int, int, int, int);
 } GfxBackend;
 
 static inline const GfxMode *gfx_mode_pick(const GfxBackend *be, int legacy200)
@@ -177,6 +207,10 @@ void pegc_restore_text_sync(int hsync31) __attribute__((weak));
 extern GfxBackend gfx_backend_cirrus __attribute__((weak));
 extern GfxBackend gfx_backend_geforce __attribute__((weak));
 extern GfxBackend gfx_backend_trident __attribute__((weak));
+/* H1 NOSYS placeholders; H2 supplies the checked implementations. */
+int gfx_hw_submit(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done);
+int gfx_hw_get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen);
+
 /* Config-only boot reservation; absent until the Trident core is linked. */
 int trident_boot_reserve(void) __attribute__((weak));
 

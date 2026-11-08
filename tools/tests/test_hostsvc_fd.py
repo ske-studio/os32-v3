@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """D6 FD resource generation with real C1 and libc-free ILP32 runtime."""
-CHECK = dict(name='hostsvc-fd', tier=1, needs=[], budget=10, covers=[
+CHECK = dict(name='hostsvc-fd', tier=1, needs=[], budget=4.1, covers=[
     'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'fs/vfs.h',
     'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h',

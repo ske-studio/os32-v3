@@ -13,24 +13,41 @@
 #define ARCH_IO_H
 
 #include "x86_flags.h"
+#if defined(TICK_PROBE_IO) && !defined(TICK_PROBE_INTERNAL)
+#include "kernel/time/tick_probe.h"
+#define TP_IF_END(f) tick_probe_if_end(f)
+#define TP_IF_BEGIN(f) tick_probe_if_begin(f)
+#else
+#define TP_IF_END(f) ((void)0)
+#define TP_IF_BEGIN(f) ((void)0)
+#endif
 
 /* ---- 割り込み制御 ---- */
 static inline void _enable(void) {
+    TP_IF_END(EFLAGS_IF);
     __asm__ volatile("sti" : : : "memory");
 }
 
 static inline void _disable(void) {
+#if defined(TICK_PROBE_IO) && !defined(TICK_PROBE_INTERNAL)
+    unsigned int flags;
+    __asm__ volatile("pushfl; popl %0; cli" : "=r"(flags) : : "memory");
+    TP_IF_BEGIN(flags);
+#else
     __asm__ volatile("cli" : : : "memory");
+#endif
 }
 
 /* ---- 割り込み状態の保存/復元 ---- */
 static inline unsigned int irq_save(void) {
     unsigned int flags;
     __asm__ volatile("pushfl\n\tpopl %0\n\tcli" : "=r"(flags) : : "memory");
+    TP_IF_BEGIN(flags);
     return flags;
 }
 
 static inline void irq_restore(unsigned int flags) {
+    TP_IF_END(flags);
     __asm__ volatile("pushl %0\n\tpopfl" : : "r"(flags) : "memory", "cc");
 }
 
@@ -58,6 +75,7 @@ static inline void _halt(void) {
  * 1 つの asm 文に収めてあるかぎり不可分。**分けてはいけない** (契約は
  * include/io.h の _idle() の註)。 */
 static inline void _idle(void) {
+    TP_IF_END(EFLAGS_IF);
     __asm__ volatile("sti\n\thlt" : : : "memory");
 }
 

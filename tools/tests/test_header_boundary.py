@@ -6,7 +6,7 @@ CHECK = dict(name='header-boundary', tier=1,
             'init/bootlog_save.c', 'arch/x86/kernel/ring3_ls.S', 'exec/ring3_ls.h',
             'build/kernel-objects.mk', 'tools/tests/kernel_includes.py',
             'tools/tests/host_arch/arch_cpu.h', 'sdk/include/os32/**'],
-    needs=[], budget=5.0)
+    needs=[], budget=2.7)
 
 import argparse
 import os

@@ -53,6 +53,8 @@ fn loop_notice() {
     unsafe { (os32api::api().serial_puts)(b"[gshell] loop\r\n\0".as_ptr()); }
 }
 
+#[cfg(feature = "gf_accel_accept")]
+mod typical_ops;
 mod chrome;
 mod cursor;
 mod damage;

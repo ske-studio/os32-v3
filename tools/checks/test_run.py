@@ -24,6 +24,34 @@ SPEC.loader.exec_module(R)
 
 
 class RunnerTest(unittest.TestCase):
+    def test_shards(self):
+        for name, budget, needs in [('a', 8, []), ('b', 7, []), ('c', 6, []),
+                                    ('d', 5, []), ('e', 4, []), ('f', 3, [])]:
+            self.check(name, budget=budget, needs=needs)
+        checks = self.registry()
+        self.assertEqual(R.shards(checks, 3), (('a', 'f'), ('b', 'e'), ('c', 'd')))
+        self.check('f', budget=3, needs=['check:a'])
+        self.check('g', budget=9, needs=['check:f'])
+        checks = self.registry()
+        groups = R.shards(checks, 3)
+        self.assertIn({'a', 'f', 'g'}, [set(g) for g in groups])
+        self.assertEqual(R.shards(dict(reversed(list(checks.items()))), 3), groups)
+        self.assertEqual(sorted(n for g in groups for n in g), sorted(checks))
+        self.assertEqual(len(R.shards(checks, 12)), 12)
+        with patch.object(R, 'ROOT', self.root):
+            for i, group in enumerate(groups):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(R.main(['--list', '--shard', f'{i}/3', '--json']), 0)
+                self.assertEqual([r['name'] for r in json.loads(out.getvalue())], list(group))
+            for args in (['--list', '--shard', '3/3'], ['--list', '--shard', '0/0'],
+                         ['--list', '--shard=-1/3'], ['--lint', '--shard', '0/3']):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(R.main(args), 1 if '--lint' in args else 2)
+        self.check('bad', needs=['check:missing'])
+        with self.assertRaises(ValueError):
+            R.shards(self.registry(), 3)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='runner-fixture-')
         self.addCleanup(self.tmp.cleanup)
@@ -749,6 +777,13 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
+        ('shard-heaviest-last', '-sum(checks[n].budget for n in g)',
+         'sum(checks[n].budget for n in g)', 'test_shards'),
+        ('shard-most-loaded', '(loads[i], i)', '(-loads[i], i)', 'test_shards'),
+        ('shard-dependency-split', 'pending.extend(neighbors[name] - group)',
+         'pending.extend(())', 'test_shards'),
+        ('shard-cli-ignored', 'names = shards(checks, count)[index]',
+         'names = ordered(checks)', 'test_shards'),
         ('unconditional-static',
          '    stage = closure(checks, selected)',
          '    selected.update({"p2v", "c-dialect", "arch-asm", "map"} & checks.keys())\n    stage = closure(checks, selected)',

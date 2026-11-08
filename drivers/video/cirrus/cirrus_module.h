@@ -3,7 +3,7 @@
 #define CIRRUS_MODULE_H
 #include "gfx_hal.h"
 #include "../../../kernel/module/module_runtime.h"
-#define CIRRUS_MODULE_OPS_VERSION 1u
+#define CIRRUS_MODULE_OPS_VERSION 2u
 typedef struct {
     GfxBackend *backend;
     GfxCounters *counters;

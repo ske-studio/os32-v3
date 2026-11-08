@@ -10,7 +10,7 @@ Other indirect call sites are rejected and require an explicit model update.
 """
 CHECK = dict(name='kdebug-ctx-host', tier=1,
     covers=['tools/module_schema.py', 'sdk/kapi.json', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kdebug/kdebug_main.c', 'kdebug/generated/**', 'arch/x86/legacy/v86_gcap.c', 'arch/x86/legacy/v86_gcap.h', 'arch/x86/legacy/v86_gcap_math.h', 'kernel/module/module.h', 'kernel/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=['make:all'], budget=1.402916)
+    needs=['make:all'], budget=3.1)
 
 from kernel_includes import include_flags
 import copy

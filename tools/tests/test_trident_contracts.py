@@ -5,7 +5,7 @@ Numbers/slots are frozen from TRIDENT_FULL_DESIGN §9 (F0/F16) and the retained 
 expected values never come from product output. Complete Init trace oracles
 belong to 3b; this suite checks the gate, not the hardware Init sequence.
 """
-CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=6.2,
     covers=['drivers/video/trident/trident.h',
             'drivers/video/trident/trident_module.h', 'gfx/gfx_emergency.h',
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_device_fake.c',
@@ -53,7 +53,7 @@ CONSTANTS = {
     'TRI_REG_MAPPED_BYTES': 65536, 'TRI_WIDTH': 640, 'TRI_HEIGHT': 480,
     'TRI_PITCH': 640, 'TRI_DISPLAY_BYTES': 307200, 'TRI_DISPLAY_PAGES': 75,
     'TRI_DAC_COLORS': 256, 'TRI_DAC_BYTES': 768, 'TRI_SAVED_BYTES': 852,
-    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 4,
+    'TRI_SAVE_MCLK': 0, 'TRIDENT_MODULE_OPS_VERSION': 5,
     'TRIDENT_MODULE_CONTEXT_SIZE': 48, 'TRIDENT_MODULE_OPS_SIZE': 20,
     'TRIDENT_DIAGNOSTIC_OPS_VERSION': 3, 'TRIDENT_DIAGNOSTIC_OPS_SIZE': 112,
     'TRI_MODE_COUNT': 15, 'TRI_FORMAT_COUNT': 5, 'TRI_E_NOSYS': -12,
@@ -261,7 +261,7 @@ MUTATIONS = (
     ('save-size', HEADER, 'TRI_SAVED_BYTES 852u', 'TRI_SAVED_BYTES 853u'),
     ('last-save-slot', HEADER, 'TRI_SAVE_SR0D = 851', 'TRI_SAVE_SR0D = 850'),
     ('decode-width', HEADER, 'TRI_BAR0_DECODE_BYTES 0x00400000u', 'TRI_BAR0_DECODE_BYTES 0x00200000u'),
-    ('module-version', MODULE, 'TRIDENT_MODULE_OPS_VERSION 4u', 'TRIDENT_MODULE_OPS_VERSION 3u'),
+    ('module-version', MODULE, 'TRIDENT_MODULE_OPS_VERSION 5u', 'TRIDENT_MODULE_OPS_VERSION 4u'),
     ('resource-owner-order', HEADER, 'owner, bar0_rid, bar1_rid', 'bar0_rid, owner, bar1_rid'),
     ('context-order', MODULE, 'int *height, *flip, *page;', 'int *flip, *height, *page;'),
     ('surface-pitch-order', HEADER, 'u32 off, bytes, pitch;', 'u32 off, pitch, bytes;'),

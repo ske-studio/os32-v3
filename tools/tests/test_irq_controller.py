@@ -8,7 +8,7 @@ CHECK = dict(name='irq-controller-host', tier=1,
             'platform/pc98/pic.c', 'include/pc98.h', 'arch/x86/kernel/idt.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/ver_test_utils.py',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.6)
 from pathlib import Path
 import subprocess
 import tempfile

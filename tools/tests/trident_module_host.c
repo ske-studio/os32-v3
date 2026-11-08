@@ -85,7 +85,7 @@ const struct trident_resources *trident_resources_get(void) { return mode==1 ? 0
 int trident_resources_rollback(bool after) { CHECK(!after && !probes_registered); ++rollbacks; return 0; }
 int module_load(const struct module_request *q, struct module_handle *h)
 {
-    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==4);
+    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==5);
     CHECK(q->lifecycle.start==start && q->lifecycle.detach==detach);
     CHECK(q->path[0]=='/');
     if (mode==2) return -72;
@@ -166,7 +166,7 @@ int module_start(struct module_handle h)
     if (mode==32) trident_backend_ops.modes=(void *)1;
     if (mode==33) trident_backend_ops.mode_count=TRI_MODE_COUNT+1;
     if (mode==34) trident_backend_ops.bb_size=1;
-    if (mode==35) ops[0]=1;
+    if (mode==35) ops[0]=4;
     if (mode==36) ops[2]=0;
     return start(&record,ops[1],ops);
 }
@@ -241,7 +241,7 @@ void _start(void)
     record.ro=(u32)(uptr)_etext; record.ro_size=(u32)(_end-_etext);
     record.base=record.ro;
     record.pages=(record.ro_size+MODULE_PAGE_SIZE-1)/MODULE_PAGE_SIZE;
-    ops[0]=4; ops[1]=(u32)(uptr)trident_module_init;
+    ops[0]=5; ops[1]=(u32)(uptr)trident_module_init;
     ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98; ops[4]=(u32)(uptr)trident_get_probe_decls;
     TridentModuleContext loan=context;
     GfxBackend out={0};

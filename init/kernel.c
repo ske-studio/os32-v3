@@ -23,6 +23,9 @@
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 #include "../kernel/time/cpu_calibrate.h"
 #include "clock_source.h"
 #include "kernel_tick.h"
@@ -246,7 +249,14 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * シェル起動後に ui.c から script_source_file() で実行される。 */
 
     /* ブートスプラッシュ表示 (カーネル内蔵) */
+#ifdef TICK_PROBE
+    tick_probe_boot();
+    tick_probe_splash(1);
+#endif
     boot_splash();
+#ifdef TICK_PROBE
+    tick_probe_splash(0);
+#endif
 
     /* splash は PC98 を強制する。ここでは Cirrus 登録前に PEGC の選択・
      * probe と同期状態の記録を master PD で済ませる (BIOS ワークはアプリ PD

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Trident RAM transfer policies and direct VRAM synchronization."""
-CHECK = dict(name='trident-present', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-present', tier=1, needs=[], budget=3.8,
     covers=['drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_present_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',

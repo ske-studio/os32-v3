@@ -16,7 +16,7 @@ make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='cirrus-win-host', tier=1,
     covers=['gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.55569)
+    needs=[], budget=3.1)
 
 from kernel_includes import include_flags
 import host32

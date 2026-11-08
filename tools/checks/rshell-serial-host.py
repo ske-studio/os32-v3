@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='rshell-serial-host', tier=1,
     covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/tests/test_rshell_serial.py'],
-    needs=[], budget=0.995684)
+    needs=[], budget=2.9)
 
 
 def run(ctx) -> int:

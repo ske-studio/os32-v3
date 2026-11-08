@@ -9,7 +9,7 @@ int shell_cmd_gf2(int argc, char **argv)
 {
     static const char *const cases[] = {
         "status", "start", "reference", "stop", "recover", "cycle",
-        "bad-handle", "bad-method", "vblank", "accel", "display", "feature"
+        "bad-handle", "bad-method", "vblank", "accel", "display", "feature", "prim"
     };
     static const char *const accel_cases[] = {
         "init", "fill", "copy", "mono", "ifc", "upload", "download",
@@ -30,10 +30,13 @@ int shell_cmd_gf2(int argc, char **argv)
         q.session = str_eq(argv[1], "enter") ? GF4_CUI_ENTER : GF4_CUI_LEAVE;
         goto dispatch;
     }
-    for (q.test = 0; q.test <= GF5_FEATURE; q.test++)
+    for (q.test = 0; q.test <= GF6_PRIM; q.test++)
         if (str_eq(argv[1], cases[q.test])) break;
-    if (q.test > GF5_FEATURE) goto usage;
-    if (q.test == GF5_FEATURE) {
+    if (q.test > GF6_PRIM) goto usage;
+    if (q.test == GF6_PRIM) {
+        if (argc != 3 || argv[2][0] < '0' || argv[2][0] > '7' || argv[2][1]) goto usage;
+        q.session = (u32)(argv[2][0] - '0');
+    } else if (q.test == GF5_FEATURE) {
         if (argc < 3) goto usage;
         for (q.session = 0; q.session <= GF5T_BOOT_TARGET; ++q.session)
             if (str_eq(argv[2], feature_cases[q.session])) break;
@@ -85,6 +88,6 @@ dispatch:
     }
     return rc || q.rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc|boot-target> [operand halfword]\n");
+    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | prim <0-7> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc|boot-target> [operand halfword]\n");
     return 2;
 }

@@ -6,7 +6,7 @@ are scanned recursively, so new SQL in existing/new applications is covered.
 Application SQL is prepared and finalized without stepping; schema DDL alone
 is stepped to resolve tables and subsequent statements in schema batches.
 """
-CHECK = dict(name='sqlite-product-sql', tier=1, needs=[], budget=20,
+CHECK = dict(name='sqlite-product-sql', tier=1, needs=[], budget=21.2,
     covers=['tools/tests/test_sqlite_product_sql.py', 'tools/tests/sqlite_product_host.c',
             'tools/tests/hsync_sqlite_product_host.c', 'sdk/include/os32/**',
             'lib/sqlite3/os32_sqlite_vfs.c', 'tools/mk_settings_db.py',

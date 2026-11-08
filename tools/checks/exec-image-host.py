@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='exec-image-host', tier=1,
     covers=['include/ksetjmp.h', 'arch/x86/arch_jmp_storage.h', 'tools/tests/host_arch/arch_jmp_storage.h', 'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'exec/os32x_hdr.c', 'exec/os32x_hdr.h', 'tools/tests/os32x_layout_host.c', 'sdk/include/os32/os32_kapi_shared.h', 'exec/exec.c', 'tools/tests/test_exec_image.py', 'tools/tests/exec_image_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h'],
-    needs=[], budget=60.0)
+    needs=[], budget=4.8)
 
 
 def run(ctx) -> int:

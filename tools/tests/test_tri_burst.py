@@ -1,5 +1,5 @@
 """Run tri_burst on an indexed CR39/byte LFB bus, including dropped bursts."""
-CHECK = dict(name='tri-burst', tier=1, needs=[], budget=480, covers=[
+CHECK = dict(name='tri-burst', tier=1, needs=[], budget=141.7, covers=[
     'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'tools/tests/test_tri_burst.py',
     'tools/tests/tri_burst2_host.c', 'tools/tests/tri_burst3_host.c', 'tools/tests/tri_burst4_host.c',
     'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'tools/tests/tri_burst5_host.c',

@@ -35,7 +35,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 | 何を入れたか | 検査 |
 |---|---|
 | 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
-| 段・小さな取り込み | 作業木の枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast: **全部の検査、変異なし**) が通るのを待つ |
+| 段・小さな取り込み | 作業木の枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast (0)・(1)・(2): **3本の合計で全部の検査、変異なし。3本とも成功が必要**) が通るのを待つ |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた) | GitHub の workflow `full-check` (変異込みの全体、`gh workflow run full-check.yml -f ref=<枝か SHA>`)。毎晩 main に対しても自動で回る |
 
 - 取り込みの検査は GitHub の CI。CI を待つときは push した最後の SHA で (`gh run list --branch wt/<名> --commit <SHA>`)、待ちには上限を付ける。
@@ -43,7 +43,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
 
-NP21/W の受入と実機の更新は、CI の artifacts のジョブが作った成果物を `tools/ci_fetch.sh --sha <SHA>` で取って配る (検査した版と配った版が一致する)。artifacts のジョブが成功していれば、check-fast の途中でも取れる (調べの版はこれで実機へ。main に入れるのは check-fast まで通ってから)。
+NP21/W の受入と実機の更新は、CI の artifacts のジョブが作った成果物を `tools/ci_fetch.sh --sha <SHA>` で取って配る (検査した版と配った版が一致する)。artifacts のジョブが成功していれば、check-fast の途中でも取れる (調べの版はこれで実機へ。main に入れるのは check-fast (0)・(1)・(2) の3本とも通ってから)。
 
 ## 4. 落ちたとき
 

@@ -4,7 +4,7 @@ MIT references: trident_driver-1.4.0.c:952-1044,1691-1711,
 trident_dac.c:253-271,564-908, trident_pll.c:42-135 and
 vgaHW.c:1185-1353,1391-1468. No PM-local files needed at runtime.
 """
-CHECK = dict(name='trident-mode', tier=1, needs=[], budget=300,
+CHECK = dict(name='trident-mode', tier=1, needs=[], budget=27.4,
     covers=['drivers/video/trident/mode_640.c', 'drivers/video/trident/vram.c',
             'drivers/video/trident/trident.h', 'tools/tests/trident_mode_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',

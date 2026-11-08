@@ -1,5 +1,5 @@
 """A11 real API/deadline hooks; no libc, explicit ILP32 runner."""
-CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=5,
+CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
     covers=['net/nic.h', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',

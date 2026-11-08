@@ -20,7 +20,7 @@ CHECK = dict(name='link-notify', tier=1, needs=[], covers=[
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/io.h', 'include/types.h', 'include/net_eth.h', 'lib/le_internal.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=15)
+    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.1)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('duplicate-enqueue', 'if (seq != ack_seq + 1u)',

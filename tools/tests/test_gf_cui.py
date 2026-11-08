@@ -1,5 +1,5 @@
 """CUI GeForce parser and the existing owner cleanup notification."""
-CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=20.0,
+CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=3.1,
     covers=['tools/tests/test_gf_cui.py', 'tools/tests/gf_cui_shell_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
@@ -24,7 +24,7 @@ MUTATIONS = [
     ('enter-wire', 'userland/shell/cmd_gf2.c',
      '? GF4_CUI_ENTER : GF4_CUI_LEAVE', '? GF4_CUI_LEAVE : GF4_CUI_ENTER'),
     ('feature-wire', 'userland/shell/cmd_gf2.c',
-     'if (q.test > GF5_FEATURE)', 'if (q.test >= GF5_FEATURE)'),
+     'if (q.test > GF6_PRIM)', 'if (q.test >= GF5_FEATURE)'),
     ('operand-width', 'userland/shell/cmd_gf2.c',
      'operand[1] << GF5_WIRE_VALUE_SHIFT', 'operand[1] << GF5_WIRE_INDEX_SHIFT'),
     ('cleanup-notification', 'exec/appslot.c',

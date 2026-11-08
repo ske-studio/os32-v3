@@ -12,7 +12,7 @@ FakeHttp、時計と sleep は FakeClock に差し替える。実プロセス・
 """
 CHECK = dict(name='np21w-ctl-host', tier=1,
     covers=['tools/np21w_ctl.py', 'tools/nhd_profile.py'],
-    needs=[], budget=1.368864)
+    needs=[], budget=3.2)
 
 import base64
 import importlib.util

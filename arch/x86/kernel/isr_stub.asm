@@ -48,6 +48,44 @@ cpu 386
 ;;
 ;; T2a R1: broker も kctx_irq_depth を読む。irq_in_irq はその互換名。
 ;; ============================================================
+#ifdef TICK_PROBE
+extern tick_probe_begin
+extern tick_probe_end
+extern tick_probe_irq_enter
+extern tick_probe_irq_leave
+;; The temporary PUSHAD preserves live results and the interrupted registers.
+;; RESTORE_KSEG + CLD are required even before IRQ_ENTER (V86 null DS).
+%macro TP_CALL 2
+        pushad
+        RESTORE_KSEG
+        cld
+        push dword %2
+        call %1
+        add esp, ABI_WORD_BYTES
+        popad
+%endmacro
+%macro TP_ENTER 1
+        TP_CALL tick_probe_irq_enter, %1
+%endmacro
+%macro TP_LEAVE 1
+        TP_CALL tick_probe_irq_leave, %1
+%endmacro
+%macro TP_BEGIN 1
+        TP_CALL tick_probe_begin, %1
+%endmacro
+%macro TP_END 1
+        TP_CALL tick_probe_end, %1
+%endmacro
+#else
+%macro TP_ENTER 1
+%endmacro
+%macro TP_LEAVE 1
+%endmacro
+%macro TP_BEGIN 1
+%endmacro
+%macro TP_END 1
+%endmacro
+#endif
 extern kctx_irq_depth
 extern kctx_exc_depth
 
@@ -417,6 +455,7 @@ extern irq_dispatch
 %macro IRQ_COMMON 1
 global irq_stub_common_%1
 irq_stub_common_%1:
+        TP_ENTER %1
         IRQ_ENTER
         pushad
         RESTORE_KSEG
@@ -444,6 +483,7 @@ IRQ_COMMON 15                   ;; INT 0x2F
 ;; ============================================================
 global irq_stub_0
 irq_stub_0:
+        TP_ENTER 0
         IRQ_ENTER
         pushad
         RESTORE_KSEG
@@ -453,13 +493,21 @@ irq_stub_0:
         inc     dword [tick_count]
 
         ;; Cハンドラを呼び出し
+        TP_BEGIN 1
         call    timer_handler
+        TP_END 1
 
         ;; マスタPICにEOI送出 (PC-98: ポート 0x00)
+        TP_BEGIN 9
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
+        TP_END 9
 
+        TP_BEGIN 10
         V86_REFLECT 0           ;; IRQ0 (タイマ)。既定では INT 08h に落ちる
+
+        TP_END 10
+        TP_BEGIN 11
 
         ;; V86 セッションが長すぎたら畳む。暴走したゲストを無限に
         ;; 走らせないための保険。EOI も反射も済ませた後に判定する。
@@ -468,10 +516,14 @@ irq_stub_0:
         call    v86_tick_and_check_timeout
         test    eax, eax
         jz      .no_timeout
+        TP_END 11
+        TP_LEAVE 0
         call    v86_exit_to_kernel              ;; longjmp するので戻らない
 .no_timeout:
+        TP_END 11
 
         IRQ_LEAVE
+        TP_LEAVE 0
         popad
         IRETD_USER
 
@@ -480,6 +532,7 @@ irq_stub_0:
 ;; ============================================================
 global irq_stub_1
 irq_stub_1:
+        TP_ENTER 1
         IRQ_ENTER
         pushad
         RESTORE_KSEG

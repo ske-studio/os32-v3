@@ -472,7 +472,7 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
 | 翻訳単位の結果 (`tools/clang_ast/result_cache.py`) | `check-c-dialect`・`check-p2v`・`check-arch-asm` とその host 試験の単位ごとの指摘 | `${XDG_CACHE_HOME:-~/.cache}/os32/checks/v1/<道具>/` | `OS32_CHECK_CACHE=<置き場>` / `off` |
 | host32 の固定物 (`tools/tests/host32.py` の `build()`) | `host32.build` で組む host 試験の実行物 | `${XDG_CACHE_HOME:-~/.cache}/os32/host32-fixtures/` (512 MiB / 8192 件で古い順に消す) | `OS32_HOST32_CACHE=<置き場>` / `off` (= 今までの `build/out/host32-fixtures/`) |
 
-- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く (毎回空の CI で鍵を作る手間を足さない)。
+- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く。build の check-fast は `OS32_CHECK_CACHE=$RUNNER_TEMP/check-cache` を明示し、ジョブ内でだけ結果を共有する。actions/cache への保存・復元はせず、ジョブ終了で捨てる。c-dialect-host は check-c-dialect の完了を待って温めを再利用し、p2v は同じ検査内の2回の走査で共有する。full-check の既定は変えない。
 - 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
 - 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
 - ccache は使わない: host 試験の大半が 1 回でコンパイルとリンクをする (`gcc src.c -o exe`、ccache の対象外) うえ、PATH の包みは clang_ast の cross newlib の探し方 (`i386-elf-gcc` の置き場から引く) を壊す (2026-11-04 の実測)。
@@ -1111,9 +1111,13 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 
 `.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
 FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) は、`artifacts` と `check-fast` の
-2 ジョブを依存関係なしで並列に動かす。両方が同じ composite action で準備し、それぞれ core を完全ビルドする。
-`artifacts` は配布物を作って upload し、`check-fast` は `make check-fast` を回す。main へ入れる判定は
-両ジョブと静的ゲートの `check.yml` がすべて合格すること (変異込みの `make check` は回さない)。
+配布物1本と検査3シャード (`check-fast (0)`〜`check-fast (2)`) を依存関係なしで並列に動かす。全ジョブが同じ composite action で準備し、それぞれ core を完全ビルドする。
+`artifacts` は配布物を作って upload し、検査の各シャードは `make check-fast CHECK_SHARD=i/3` を回す。main へ入れる判定は
+配布物・検査3本と静的ゲートの `check.yml` がすべて合格すること (変異込みの `make check` は回さない)。
+
+分割は `tools/checks/run.py --list --shard i/3` で再現する。check needs の連結成分をまとめ、budget 合計の降順 (同値は名前順) で最も軽いシャードへ割り当てる LPT。各検査は全体で1回、check 前提は同じシャードに入り、計時ターゲットの依存で前提の成功後に本体を実行する。matrix の fail-fast は無効で、1本が失敗しても残りの結果を集める。`check-times-<SHA>-<i>` の3 artifacts に各シャードの TSV を保存する。
+
+budget は t27 (`27ec857fc553466407d08b160ac735c4d3f3ecea`) の check_times.tsv で測れた402本を0.1秒単位の切り上げで校正 (2026-11-08)。超過は従来どおり警告だけ。未計測の検査は宣言値を使う。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
 (小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
@@ -1122,8 +1126,8 @@ FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) は、`artifa
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast`: `make -j$(nproc) all` → `make check-fast` |
-| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。両ジョブとも `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
+| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast` 3本: `make -j$(nproc) all` → `make check-fast CHECK_SHARD=i/3` |
+| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。全ジョブとも `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |

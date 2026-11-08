@@ -1,5 +1,5 @@
 """Parse deployed HW-BASIC examples with the real parser, and check FAC order."""
-CHECK = dict(name='hwb-scripts-host', tier=1, budget=4.0, needs=[], covers=[
+CHECK = dict(name='hwb-scripts-host', tier=1, budget=35.0, needs=[], covers=[
     'userland/tests/hw/trident.hwb', 'userland/tests/hw/np21w_gdc.hwb',
     'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
     'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',

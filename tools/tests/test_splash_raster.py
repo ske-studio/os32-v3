@@ -5,7 +5,7 @@ CHECK = dict(name='splash-raster-host', tier=1,
             'tools/tests/kernel_includes.py', 'gfx/gfx_osri.h', 'gfx/gfx.h',
             'include/types.h', 'include/pc98.h', 'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
             'sdk/include/os32/os32_kapi_shared.h'],
-    needs=[], budget=15.0)
+    needs=[], budget=4.7)
 
 import argparse
 import os

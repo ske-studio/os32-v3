@@ -1,5 +1,5 @@
 """HW_BASIC_DESIGN §§2-4,7 executor integration and runtime mutations."""
-CHECK = dict(name='hwb-exec-host', tier=1, budget=12.0, needs=[],
+CHECK = dict(name='hwb-exec-host', tier=1, budget=8.3, needs=[],
     covers=['userland/shell/hwb_exec.c', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
             'userland/shell/hwb_log.c', 'userland/shell/hwb.h',
             'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',

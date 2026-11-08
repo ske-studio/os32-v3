@@ -1,5 +1,5 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
-CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=5,
+CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
     covers=['net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
             'sdk/include/os32/os32_host_notice.h', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
