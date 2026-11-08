@@ -462,7 +462,8 @@ def asm_problems(asm):
         if len(body) != 2 or '[ss:kctx_' not in body[1].split('%endmacro', 1)[0]:
             bad.append('%s は ss: で書く' % m)
     for label in IRQ_LABELS:
-        ins = _body(asm, label)
+        # TP_* は計測の像 (TICK_PROBE) だけの呼び出しで、深さを動かさない (製品の像では空の macro)
+        ins = [c for c in _body(asm, label) if not c.startswith('TP_')]
         if not ins or ins[0] != 'IRQ_ENTER':
             bad.append('%s: 入口が IRQ_ENTER でない' % label)
         rets = [i for i, c in enumerate(ins) if c == 'IRETD_USER']
