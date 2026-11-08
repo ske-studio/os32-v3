@@ -2,7 +2,7 @@
 #include "kernel/module/module.h"
 #include "kernel/kselftest.h"
 #include "kprintf.h"
-#include "kernel/v86/v86_gcap.h"
+#include "arch/x86/legacy/v86_gcap.h"
 #include "kdebug/kpeek.h"
 #include "kdebug/hwb_wire.h"
 #include "kdebug/trident_command_test.h"

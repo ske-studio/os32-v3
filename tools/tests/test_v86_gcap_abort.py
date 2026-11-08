@@ -5,7 +5,7 @@ Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
 CHECK = dict(name='v86-gcap-abort-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86_mem.*', 'kernel/v86/v86.c', 'kernel/v86/v86.h', 'kernel/v86/v86_gcap.*', 'platform/pc98/legacy/v86_io.*', 'kernel/module/module.h', 'arch/x86/legacy/v86_call.c', 'exec/exec.c', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kernel/v86/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/legacy/v86_mem.*', 'arch/x86/legacy/v86.c', 'arch/x86/legacy/v86.h', 'arch/x86/legacy/v86_gcap.*', 'platform/pc98/legacy/v86_io.*', 'kernel/module/module.h', 'arch/x86/legacy/v86_call.c', 'exec/exec.c', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'arch/x86/legacy/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=2.256406)
 
 from exec_source import read_text
@@ -36,48 +36,48 @@ GP_GATE = '''    if (kdebug.ops.gcap_insn_abort && kdebug.ops.gcap_insn_abort(op
 
     return v86_gp_emulate(frame, pc, len);'''
 MUTATIONS = (
-    ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
-    ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
+    ('arch/x86/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
+    ('arch/x86/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
     ('kdebug/v86_gcap.c', 'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;\n    gcap_ops = 0;',
      'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;', 'ops'),
     ('kdebug/v86_gcap.c', '    g->restore = V86G_RST_FALLBACK;', '', 'interrupted-ROM-sync'),
     ('kdebug/v86_gcap.c', '    tv_restore(tv);', '    (void)tv;', 'TVRAM-tail'),
     ('kdebug/v86_gcap.c', '    if (v86_session.aborting) v86_io_reset_policy();', '', 'post-session-policy'),
-    ('kernel/v86/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+    ('arch/x86/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
      'return v86_gp_emulate(frame, pc, 0);', 'GP-prefix-length-handoff'),
-    ('kernel/v86/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+    ('arch/x86/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
      'return v86_gp_emulate(frame, pc + len, len);', 'GP-pc-handoff'),
-    ('kernel/v86/v86.c', GP_GATE,
+    ('arch/x86/legacy/v86.c', GP_GATE,
      '    int result = v86_gp_emulate(frame, pc, len);\n' +
      GP_GATE.replace('return v86_gp_emulate(frame, pc, len);', 'return result;'),
      'GP-capture-after-dispatch'),
-    ('kernel/v86/v86_gp_emulate.inc',
+    ('arch/x86/legacy/v86_gp_emulate.inc',
      'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 2);',
      'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 1);',
      'GP-immediate-IP-increment'),
-    ('kernel/v86/v86_gp_emulate.inc', 'if (!v86_inject_int(frame, vec)) {',
+    ('arch/x86/legacy/v86_gp_emulate.inc', 'if (!v86_inject_int(frame, vec)) {',
      'if (v86_inject_int(frame, vec)) {', 'GP-INT-failure'),
-    ('kernel/v86/v86_gp_emulate.inc', 'v86_exit_reason = V86_EXIT_HLT;\n        return 1;',
+    ('arch/x86/legacy/v86_gp_emulate.inc', 'v86_exit_reason = V86_EXIT_HLT;\n        return 1;',
      'v86_exit_reason = V86_EXIT_HLT;\n        return 0;', 'GP-HLT-return'),
 )
 
 
 def main():
-    paths = ('kernel/v86/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
-             'arch/x86/legacy/v86_call.c', 'kernel/v86/v86_gcap.c', 'platform/pc98/legacy/v86_io.c',
-             'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86.c',
-             'kernel/v86/v86_gp_emulate.inc')
+    paths = ('arch/x86/legacy/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
+             'arch/x86/legacy/v86_call.c', 'arch/x86/legacy/v86_gcap.c', 'platform/pc98/legacy/v86_io.c',
+             'arch/x86/kernel/isr_handlers.c', 'arch/x86/legacy/v86.c',
+             'arch/x86/legacy/v86_gp_emulate.inc')
     sources = {p: read_text(ROOT / p) for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):
-            gp = parts['kernel/v86/v86.c']
+            gp = parts['arch/x86/legacy/v86.c']
             (work / 'gp.inc').write_text(
                 ''.join(line for line in gp.splitlines(keepends=True)
                         if line.startswith(('#define V86_FETCH_BYTES ', '#define V86_PREFIX_MAX '))) +
                 ''.join(function(gp, n) for n in (
                     'v86_ptr', 'v86_advance_ip', 'v86_set_al', 'v86_set_ax')) +
-                parts['kernel/v86/v86_gp_emulate.inc'] + function(gp, 'v86_gp_handler'))
+                parts['arch/x86/legacy/v86_gp_emulate.inc'] + function(gp, 'v86_gp_handler'))
             for rel in ('include/platform_emergency.h', 'platform/pc98/emergency.c'):
                 (work / Path(rel).name).write_text((ROOT / rel).read_text())
             (work / 'session.c').write_text(parts[paths[0]])

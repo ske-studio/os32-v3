@@ -146,9 +146,9 @@ def check_image_and_deploy():
         'read_before_teardown': True,
     }
     assert module.observation() == expected_metadata
-    header = (ROOT / 'kernel/v86/v86.h').read_text()
+    header = (ROOT / 'arch/x86/legacy/v86.h').read_text()
     assert re.search(r'#define V86_IPL_SEG\s+0x1FC0U', header)
-    memory = (ROOT / 'kernel/v86/v86_mem.c').read_text()
+    memory = (ROOT / 'arch/x86/legacy/v86_mem.c').read_text()
     assert 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,' in memory
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
                          (ROOT / 'drivers/block/loop_dev_format.inc').read_text())
@@ -160,7 +160,7 @@ def check_image_and_deploy():
     assert len(entries) == 7
     for size, c, h, s, bps in (map(int, entry) for entry in entries):
         assert size == c * h * s * bps, (size, c, h, s, bps)
-    boot = (ROOT / 'kernel/v86/v86.c').read_text().split('int v86_boot2(')[1]
+    boot = (ROOT / 'arch/x86/legacy/v86.c').read_text().split('int v86_boot2(')[1]
     assert 'loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,' in boot
     assert len(module.IPL) <= module.SECTOR_BYTES
     with tempfile.TemporaryDirectory(prefix='os32-int80-') as directory:

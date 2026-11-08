@@ -3,6 +3,8 @@
 import argparse
 import contextlib
 import io
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -18,7 +20,40 @@ def archive(members, time=0):
     return data
 
 
+def check_moves():
+    cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
+    with tempfile.TemporaryDirectory() as directory:
+        left, right = [Path(directory) / side for side in ('left', 'right')]
+        for root in (left, right):
+            for rel in B.artifacts(root):
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'fixture')
+        old = Path('build/out/obj/kernel/v86/v86.o')
+        new = Path('build/out/obj/arch/x86/legacy/v86.o')
+        def assemble(root, rel, label, symbol='callee', opcode='0xc3', data_symbol='data_callee'):
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run([cc, '-m32', '-x', 'assembler', '-c', '-o', str(path), '-'],
+                input=f'.file "{label}"\n.text\n.globl entry\nentry: .long {symbol}\n.byte {opcode}\n.data\n.long {data_symbol}\n',
+                text=True, check=True)
+        assemble(left, old, 'base')
+        assemble(right, new, 'target')
+        assert (left / old).read_bytes() != (right / new).read_bytes()
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert not B.compare(left, right)
+            for symbol, opcode, data_symbol in [('other_callee', '0xc3', 'data_callee'),
+                                                 ('callee', '0x90', 'data_callee'),
+                                                 ('callee', '0xc3', 'other_data_callee')]:
+                assemble(right, new, 'target', symbol, opcode, data_symbol)
+                assert str(old) in B.compare(left, right)
+            assemble(right, new, 'target')
+            (right / 'build/out/kernel.elf').write_bytes(b'changed final image')
+            assert 'build/out/kernel.elf' in B.compare(left, right)
+
+
 def check():
+    check_moves()
     members = [('one.o', b'ABC'), ('one.o', b'DEF')]
     assert B.archive_members(archive(members)) == B.archive_members(archive(members, 123))
     assert B.archive_members(archive(members)) != B.archive_members(archive(members[::-1]))
@@ -103,7 +138,11 @@ if __name__ == '__main__':
     if args.mutate:
         original_artifacts = B.artifacts
         original_allow = B.allowed_tool_difference
+        original_moves = B.H2_OBJECT_MOVES
+        original_execution = B.object_execution_relocations
         mutations = {
+            'missing move mapping': lambda: setattr(B, 'H2_OBJECT_MOVES', {}),
+            'ignored execution and relocation': lambda: setattr(B, 'object_execution_relocations', lambda path: ''),
             'ignored archives': lambda: setattr(B, 'artifacts', lambda root, all_products=False:
                 {p for p in original_artifacts(root, all_products) if p.suffix != '.a'}),
             'ignored objects': lambda: setattr(B, 'artifacts', lambda root, all_products=False:
@@ -124,4 +163,6 @@ if __name__ == '__main__':
             finally:
                 B.artifacts = original_artifacts
                 B.allowed_tool_difference = original_allow
+                B.H2_OBJECT_MOVES = original_moves
+                B.object_execution_relocations = original_execution
     print('PASS build compare')

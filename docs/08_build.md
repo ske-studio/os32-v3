@@ -220,11 +220,12 @@ os32-v3/
 │   ├── module/     部品 (KMOD) の検証と load/start/abort、kdebug/hwdev の受け口
 │   ├── console/    TVRAM コンソール・console シンク・フォントの lease・Unicode 表
 │   ├── ime/        FEP (fep.mod の本体と窓口)
-│   └── v86/        V86 モニタと v86.mod (x86 かつ PC-98 専用)
+│   └── v86/        x86 専用の旧パス互換転送ヘッダのみ
 ├── mm/             ページング・物理ページ台帳・カーネルヒープ・DMA プール・SHM・shlib
 ├── arch/           CPU 依存の実装。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
 │   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
-│       └── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
+│       ├── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
+│       └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線 (BIOS・装置の模倣は platform/pc98/legacy/)
 ├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト ほか)。`PLATFORM ?= pc98` で選ぶ
 ├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約
 ├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)

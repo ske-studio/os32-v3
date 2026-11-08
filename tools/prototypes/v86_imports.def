@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "contracts": [
-    "kernel/v86/v86_module.h",
+    "arch/x86/legacy/v86_module.h",
     "kernel/module/module.h"
   ],
   "imports": [
@@ -43,19 +43,19 @@
     },
     {
       "symbol": "v86_last_gp_cs",
-      "source": "kernel/v86/v86.h",
+      "source": "arch/x86/legacy/v86.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_last_gp_ip",
-      "source": "kernel/v86/v86.h",
+      "source": "arch/x86/legacy/v86.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_debug_ops",
-      "source": "kernel/v86/v86_module.h",
+      "source": "arch/x86/legacy/v86_module.h",
       "context": "normal,exception",
       "irq": true
     },

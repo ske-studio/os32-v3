@@ -17,18 +17,18 @@
 |---|---|---|
 | T2 の e5〜e12 の再init/revoke/再attach・200行・Unicode橋は引渡し待ち | 吸収済み | T2e 受入済み (`TASK_T2D_T2H.md:190-227`、閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`))。公開leaseを基盤として引継ぐ |
 | f2〜f13/g の map・allocator・trim は引渡し待ち | 吸収済み | 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) の F/G 各行。通常文脈の安全点を再利用し、font独自の借用guardは追加する |
-| h の V86/STOP 復元が未確定 | 要改訂 | 既存session/正確なPTE復元・通常文脈回収は `kernel/v86/v86_mem.c:50-214`、`mm/paging.c:656-687`。未観測は台帳に残し §1 で受ける |
+| h の V86/STOP 復元が未確定 | 要改訂 | 既存session/正確なPTE復元・通常文脈回収は `arch/x86/legacy/v86_mem.c:50-214`、`mm/paging.c:656-687`。未観測は台帳に残し §1 で受ける |
 | T3→T4→T5-0→T5a→T5b→T5c→T7a→T7b | r6で更新 | T5-0はstack計測・KSTK-DF。engine stack 32KiB + NP 1頁で決定済み (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。T5bはcore FAT回帰とPOST_ROOT CD、登録核T5c-0をCDより前へ。FD容量不足時だけT6b-Mを先行。EARLY/HostDrv分離段は削除。集積拡張T6b-1/2は凍結し、圧縮像が508KiBの8割 (406.4KiB≈416kB) に近づいたら起票。T7はT5c-1のKCG facade/cache・T5c-3の原本/V86復帰口とT5最終一式を受ける (T6b-Mは不要) |
 | planar BB の旧低位 backing をpoolへ移す | 維持 | `include/memmap.h:122-123`、`mm/memory_boot.c:208-220`。CLIENT/SURFACE契約は維持してbackingを替える |
 | Unicode の暫定RO leaseをT7まで残す可能性 | 要改訂 | 撤去はT3の組表/KAPI化と同時 (経緯: `docs/archive/v3/DOCS_REORG_T3.md:60`)。T7aは撤去済みを照合する |
 | `.kcgfont` 廃止とKCGのpool cache (64KiBは計上値) | 維持 | 旧低位cache/boot読込は `drivers/video/kcg/kcg.c:41-44,196-203` に存続。T5c module化とT7a caller撤去の境界を照合 |
 | 旧font KAPIをNOSYSにする | 吸収済み | boot終了後のNOSYSは `drivers/video/kcg/kcg.c:188-203`。T7aはboot読込も撤去し旧slotのNOSYSを保つ |
 | CUI表示復帰と両ページ消去 | 吸収済み | `platform/pc98/legacy/v86_io.c:238-271`、`gfx/gfx_core.c:899-912` とT2受入。KCG CODE/cache、6Ah標準/拡張、CG窓WBの残件とは別 |
-| page0 snapshot は0x600、全ページ化に+2560B | 吸収済み | `kernel/v86/v86_snapshot.c:9-26`、`kernel/v86/v86_mem.h:115-121` は既に4096B。+2560Bは再計上しない |
+| page0 snapshot は0x600、全ページ化に+2560B | 吸収済み | `kernel/v86/v86_snapshot.c:9-26`、`arch/x86/legacy/v86_mem.h:115-121` は既に4096B。+2560Bは再計上しない |
 | 起動時不変snapshot・page0通常NP・BIOS直読撤去 | 一部吸収済み | 起動時原本は保存済み (`init/kernel.c:197-198`、`kernel/v86/v86_snapshot.c:9-26`)。T7は原本不変の回帰と、残る3経路 (`drivers/video/pc98/backend_pegc.c:477-514,571`、`gfx/gfx_core.c:379`) の直読撤去・NP化・直接低位化を担当 |
-| 636KiB backing撤去とmailboxの全session排他 | 未測定 | `kernel/v86/v86_mem.c:66-103`、`include/memmap.h:127-128` (868B)。U7/U14は §3 の実証後だけ閉じる |
+| 636KiB backing撤去とmailboxの全session排他 | 未測定 | `arch/x86/legacy/v86_mem.c:66-103`、`include/memmap.h:127-128` (868B)。U7/U14は §3 の実証後だけ閉じる |
 | KCG cold 1字34 I/O | 要改訂 | `drivers/video/kcg/kcg_body.c:42-65` はOUT34+IN32=66回、さらに `kcg_wait` 34回 (:18)。時間は未測定 |
-| 診断・gcapの所在は旧kernel一体 | 要改訂 | DBGREF S0〜S3受入済み (`TASK_DBGREF.md:3`)。gcap本体は `kdebug/v86_gcap.c`、`kernel/v86/v86_gcap.c:6` はops呼出し/NOSYSの受け口。結線契約も §3 で引継ぐ |
+| 診断・gcapの所在は旧kernel一体 | 要改訂 | DBGREF S0〜S3受入済み (`TASK_DBGREF.md:3`)。gcap本体は `kdebug/v86_gcap.c`、`arch/x86/legacy/v86_gcap.c:6` はops呼出し/NOSYSの受け口。結線契約も §3 で引継ぐ |
 | PEGCの低位直読撤去で既存port probeを残す | 維持 | R7FIX2後の窓はFFF00000h (`include/memmap.h:335,351`、閉鎖台帳 R7-1)。F00000hへ戻さず、保存BIOS値との比較だけ差し替える |
 | font read leaseと使用中の更新拒否 | 更新 | FD/owner世代は検証する。FEP辞書と同様に使用中のhsyncはBUSY、新フォントは次の起動で読む (§2-4) |
 | parser公開API・欧文選定・corpus実測上限・1MiB/2MiB・FD peak・x87 | 未測定 | `userland/rust/font_test/Cargo.toml:10-12` と `userland/rust/font_test/src/lib.rs:274-282` は全ファイルread/Face::parseの試作。製品streamingの証拠ではない |
@@ -52,7 +52,7 @@ T7への引渡しはT5c-1のKCG facade (`drivers/video/kcg/kcg_module.c`)・ROM/
 | T7-V86CTX | T7a-1c: importの例外文脈の印と2回目のセッションのpage0照合 |
 | X-1 (page0 NPのみ) | T7a-1c / -2b: boot原本、直読consumer退去、通常NPと全出口復元。文字列/kprintf部分はT4/T5a |
 
-T7aの到達点は「低位を一般poolへ追加」ではなく、bootinfoの保存済み写しとmailboxを扱ったうえで **V86が低位を直接使える状態**。`kernel/v86/v86_mem.c` の636KiB backingを消すかは上位票U7の実証後に決める。高位lease窓をV86へ渡さない。
+T7aの到達点は「低位を一般poolへ追加」ではなく、bootinfoの保存済み写しとmailboxを扱ったうえで **V86が低位を直接使える状態**。`arch/x86/legacy/v86_mem.c` の636KiB backingを消すかは上位票U7の実証後に決める。高位lease窓をV86へ渡さない。
 
 | 現利用 | 切替先 / 条件 |
 |---|---|
@@ -77,7 +77,7 @@ coreの復帰状態、低位PTE、mailbox/boot dataを低位外へ保存 → **c
 
 masterの検査は共有低位PTの復元検査でもあり、caller復帰時のCR3ロードでそのTLBも更新する。KCG復帰はT7a-2cでcoreのCODE復帰口と搭載時cache失効を実装する (現状は `drivers/video/kcg/kcg_body.c:101` のinit時CODE設定だけ)。既存kcg部品のfacade (`KcgModuleApi`) に失効口を足し `KCG_MODULE_ABI_GEN` を上げる (`drivers/video/kcg/kcg_body.c:99` の再初期化はBUSYを返すため使えず、新しい段・部品は設けない)。既存定数 `MODE_FF1_PORT/MFF1_KCG_CODE` でコードアクセスモードを再設定し、ROM/CG RAM由来のキャッシュを全失効する (module未ロード時はcoreの復帰口でmodeだけ設定し、次のmodule initは空cache)。68h=0Bhを残した時のA9hの値は未確認であり、本設計の根拠を実測済みとはしない。
 
-ページ0をNPにする前に、`pegc_identify`、`pegc_boot_sync_record` (`drivers/video/pc98/backend_pegc.c:477-514`) のBIOSフラグ、`gfx_identify_candidates` (`gfx/gfx_core.c:379`) の3経路を起動時の保存済みcore写しへ変更する。PEGCの実port probeは存続しBIOS値との比較だけ写しを使う。V86用原本はページ0全体 `[0, PAGE_SIZE)` (4096B、0x600〜0xFFFを含む) の上書きされないboot snapshotとする。既存の `real_lowmem[PAGE_SIZE]` (`kernel/v86/v86_mem.h:121`) はT5c-3で起動時に一度だけ採る唯一のcore原本へ転用済み (`kernel/v86/v86_snapshot.c:9`)。bootinfo保存口もcoreに残る (`init/bootinfo.c:57`)。`real_saved` は原本有効フラグへ役替え済みで、session reset/部品回収・セッション終了で消さないことを回帰確認する。T7はT5c-3の同じ原本を共有し、4096B配列を重複保持しない。page0用の編集stagingは置かず、追加配列は0B (既存の2560B増は吸収済み)。退避は低位consumerの書換え/NP化より前、復元も全ページが対象。開始はmailboxを退避 → 実物低位640KiBをゼロ化 → 原本から物理page0へ直接4096Bをコピー → `v86_bios_setup` が物理page0上だけでguest BIOS情報を編集 (`platform/pc98/legacy/v86_bios.c:244`) → guest image配置 → 実行の順。終了時も同じ原本から物理page0全体を戻し、原本自身は変更しない。これにより前回guest/旧font/boot stackを再公開しない。終了時にmailbox原内容を復元する。ゼロ化の前に全boot stack/bootinfo consumerの退去を確認する。
+ページ0をNPにする前に、`pegc_identify`、`pegc_boot_sync_record` (`drivers/video/pc98/backend_pegc.c:477-514`) のBIOSフラグ、`gfx_identify_candidates` (`gfx/gfx_core.c:379`) の3経路を起動時の保存済みcore写しへ変更する。PEGCの実port probeは存続しBIOS値との比較だけ写しを使う。V86用原本はページ0全体 `[0, PAGE_SIZE)` (4096B、0x600〜0xFFFを含む) の上書きされないboot snapshotとする。既存の `real_lowmem[PAGE_SIZE]` (`arch/x86/legacy/v86_mem.h:121`) はT5c-3で起動時に一度だけ採る唯一のcore原本へ転用済み (`kernel/v86/v86_snapshot.c:9`)。bootinfo保存口もcoreに残る (`init/bootinfo.c:57`)。`real_saved` は原本有効フラグへ役替え済みで、session reset/部品回収・セッション終了で消さないことを回帰確認する。T7はT5c-3の同じ原本を共有し、4096B配列を重複保持しない。page0用の編集stagingは置かず、追加配列は0B (既存の2560B増は吸収済み)。退避は低位consumerの書換え/NP化より前、復元も全ページが対象。開始はmailboxを退避 → 実物低位640KiBをゼロ化 → 原本から物理page0へ直接4096Bをコピー → `v86_bios_setup` が物理page0上だけでguest BIOS情報を編集 (`platform/pc98/legacy/v86_bios.c:244`) → guest image配置 → 実行の順。終了時も同じ原本から物理page0全体を戻し、原本自身は変更しない。これにより前回guest/旧font/boot stackを再公開しない。終了時にmailbox原内容を復元する。ゼロ化の前に全boot stack/bootinfo consumerの退去を確認する。
 
 `memory_boot_fixed` の旧FONT/UNICODE/BB/残余の低位行は、`[0, MEM_CONV_END)` の単一予約 **LEDGER_R_FIXED / LEDGER_OWNER_KERNEL / WB** (用途名V86_LOW、一般poolへ供給しない) に統合する。新しい台帳型やセッションownerへの移譲は不要で、V86状態が排他使用権を表す。BBのpool移動は別のSURFACE_BACKING記録にする。memmap定数・`tools/gen_memmap.py`・`02_memory.md` の説明を同じ差分で更新し、`make docs-gen` で `build/out/MEMMAP.md` を確認し、開始/終了でこの予約の型/owner/PFN数不変を検査する。
 
@@ -167,7 +167,7 @@ parser/rasterは境界検査済み入力と上限付き領域だけを使い、a
 | T7a-2a 入場 / exec・uaccess・session | ①単独CPL3呼出し成功 ②GUI/親/他AS/parked/再入を変更前拒否 ③不正path/outputでPTE不変 ④caller pin/CR3退避 ⑤master中caller VA参照0 ⑥成功/失敗ともpin解除 | 終端欠落、2本目pathのcopy失敗、mailbox起動時確保失敗、pin解除漏れ |
 | T7a-2b 低位切替 / paging・v86_mem/bios | ①fixtureの直接低位640KiB実行 ②通常page0 NP ③page0/mailbox原内容一致 ④全出口CR3/PTE/PDE/TLB一致 ⑤前回データ/0x8C000ゼロ | 各準備境界失敗、末尾PTE復元/TLB反映/mailbox復元を1つずつ除去 |
 | T7a-2c 表示復元 / v86_io・KCG facade/body・固定診断 | ①[HW3]根拠対を固定 ②6Ah標準/拡張復元 ③既存kcg部品のfacade (`KcgModuleApi`) に失効口を足し `KCG_MODULE_ABI_GEN` を上げ、coreのCODE復帰口・搭載時cache失効を実装し68h=0Bh注入後に確認 (未搭載時はCODEのみ) ④CG窓WB/VRAM UCの前後一致 ⑤9801 gui_gate・9821実機再描画 ⑥R7FIX2のFFF窓とCUI復帰維持 | mode復帰/失効省略、古いF00000h窓へ戻す。A9h値は実測記録 |
-| T7a-2d 採取中断 / `kdebug/v86_gcap.c`・`kernel/v86/v86_gcap.c`・STOP・DBGREF境界 | ①active印を見てSTOP注入 ②CTRL+STOP は HOTKEY で戻り kills 0 (kbd.c→v86.c→isr_stub の実経路)、#PF/#GP は共通 kill で kills 増分 1 (PM 2026-10-19、STOP が kill を通る想定を実経路に合わせた) ③g/tv alloc−free差0 ④gcap_ops/active解除 ⑤TVRAM30行/CR3/出力規則復元 ⑥次のv86実行成功 | detach/release片方除去、準備失敗/#PF/#GP/STOPを各入口で注入 |
+| T7a-2d 採取中断 / `kdebug/v86_gcap.c`・`arch/x86/legacy/v86_gcap.c`・STOP・DBGREF境界 | ①active印を見てSTOP注入 ②CTRL+STOP は HOTKEY で戻り kills 0 (kbd.c→v86.c→isr_stub の実経路)、#PF/#GP は共通 kill で kills 増分 1 (PM 2026-10-19、STOP が kill を通る想定を実経路に合わせた) ③g/tv alloc−free差0 ④gcap_ops/active解除 ⑤TVRAM30行/CR3/出力規則復元 ⑥次のv86実行成功 | detach/release片方除去、準備失敗/#PF/#GP/STOPを各入口で注入 |
 | T7a-2e 予約統合・backing撤去 / memory_boot・memmap・gen_memmap・02_memory・v86_mem | ①低位全160PFNが単一FIXED/kernel/WB ②session前後で型/owner/PFN数不変 ③一般pool供給0 ④BBは別SURFACE_BACKING ⑤docs-genと台帳/定数/説明一致 ⑥通常経路を直接低位へ ⑦159ページ確保0 (旧経路との差636KiB) ⑧低位予約とpool不変 ⑨GUI→CUI→V86→GUI20回漏れ0 ⑩Ra266 -g/boot2/DOS回帰 (T7a-2c レビュー R1: `v86 -g -t` の後の 6Ah の読み (09A0h) と E0000h の状態を 1 行観測 — 採取中の表示の戻しは ROM AH=30h 任せ) | 旧低位予約1行残し、owner/端PFN違い、連続pool枯渇でもV86可 (他stagingは確保済み)、旧低位backing別名残し |
 | T7b-a1 採用ゲート / font crate・assets | ①公開API/必要reader範囲固定 ②IPA/欧文原本のhash/license/fetch確認 ③corpus全字形 (16/32px) の点/輪郭/component/深さ/span/edge・table/索引・read cache/作業域・bboxの実測最大表と上限決定 ④上限超過字一覧 ⑤W/M/m/アクセント/descenderの1x可読性 | CFF/可変font/未対応cmapはKCG。読めなければ欧文再選定 |
 | T7b-a2 x87 / 共通guard・exec安全点 | ①全状態一致 (save領域の予約byteは除外) ②既知CW内で実行 ③再入拒否 ④STOP/parkはleave後 ⑤非搭載はKCG ⑥faultの帰属が一致 | 値8本/CW丸め/例外mask変更、失敗出口のrestore除去。f32前に完成 |
@@ -205,7 +205,7 @@ T5最終一式 (`846dbeb`) の入口はVK32圧縮像220,607B、core raw 362,288B
 
 変異は実ソースの復元・検証を1箇所ずつ欠かし、正常対照GREEN→意図した観測のREDを対応づける。ビルド失敗は検出成功に数えない。font readerはhost破損corpus/上限±1とguest実I/Oの両方、V86は `check-v86-gcap-host`・T2のrecovery/lifecycle/SHM/surface試験を改訂して使う (`TASK_DBGREF.md:271-277`)。最後の変更後に選択した変異・静的検査を実行し、受入像のSHA/CRC/実行rc/観測前後値/画像の所在をRESULTへ残す。新しい採取手順は `tools/accept/`、恒久的な診断の本文は増やさない。
 
-DBGREF既定はKDEBUG=0、観測は対の `/boot/kdebug.bin` がRUNNINGかつpair CRC一致の像で行う (`TASK_DBGREF.md:6,370`)。基点ではgcap本体は `kdebug/v86_gcap.c` に移設済みで、coreの `kernel/v86/v86_gcap.c:6` はops呼出し/NOSYSの受け口。OFF `v86 -g` はNOSYS・低位副作用0、ONは採取成功/中断を受け入れる。通常 `-t/-b/-d` と必須復元はOFFでも検証し、デバッグ部品不在を受入のSKIP成功にしない。
+DBGREF既定はKDEBUG=0、観測は対の `/boot/kdebug.bin` がRUNNINGかつpair CRC一致の像で行う (`TASK_DBGREF.md:6,370`)。基点ではgcap本体は `kdebug/v86_gcap.c` に移設済みで、coreの `arch/x86/legacy/v86_gcap.c:6` はops呼出し/NOSYSの受け口。OFF `v86 -g` はNOSYS・低位副作用0、ONは採取成功/中断を受け入れる。通常 `-t/-b/-d` と必須復元はOFFでも検証し、デバッグ部品不在を受入のSKIP成功にしない。
 
 V86の4入口 `v86_smoke_test` / `v86_disk_test` / `v86_boot2` / `v86_gdc_capture` は各々、成功・準備失敗・#PF/#GP・STOPの到達可能な全出口と未到達段を表にし、共通RESTORING経由・caller出力・CR3/PTE/TLB復元を検証する。物理Ra266の `v86 -g` はNP21/Wの代替結果で閉じない。
 

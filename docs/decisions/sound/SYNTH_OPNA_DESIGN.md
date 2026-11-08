@@ -209,7 +209,7 @@ IRQ stack の増分目標 <2 KiB、既存 16 KiB 内。再帰・可変長 stack 
 | G `kernel/v86/v86_opna.c` | 新300、latch/幅変換/pending/session | E 後、F と並列可 |
 | G `kernel/v86/v86_opna.h` | 新40、V86 adapter 宣言 | G 前に固定 |
 | G `platform/pc98/legacy/v86_io.c` | 改約25、bitmap と優先分岐だけ | G 後 |
-| G `kernel/v86/v86.c` | 改約30、begin/end/IRQ12選択/復帰口 | G 後 |
+| G `arch/x86/legacy/v86.c` | 改約30、begin/end/IRQ12選択/復帰口 | G 後 |
 | F `drivers/sound/fm/snd_engine.c` | 改約80、開始/終端/ownerと通常文脈source要求 | F後 |
 | G `drivers/sound/synth/synth_timer.c` | 新250、timer制御/FIFO/期限起床adapter、§10(c)決定後 | E後 |
 | H `tools/tests/opna_host/compiler.h` | 新60、ホスト専用最小shim | H前 |

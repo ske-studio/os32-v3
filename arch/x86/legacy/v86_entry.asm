@@ -25,7 +25,7 @@ section .text
 ;; ------------------------------------------------------------
 ;; void v86_enter(const struct v86_context *ctx);
 ;;
-;; struct v86_context のオフセット (kernel/v86/v86.h と 1:1):
+;; struct v86_context のオフセット (arch/x86/legacy/v86.h と 1:1):
 ;;   0:eip  4:cs  8:eflags  12:esp  16:ss  20:es  24:ds  28:fs  32:gs
 ;; ------------------------------------------------------------
 global v86_enter

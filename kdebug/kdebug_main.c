@@ -3,7 +3,7 @@
 #include "crt_diag.h"
 #include "nic_trace.h"
 #include "kernel/kselftest.h"
-#include "kernel/v86/v86_gcap.h"
+#include "arch/x86/legacy/v86_gcap.h"
 #include "kpeek.h"
 #include "hwb_wire.h"
 #include "probe_wire.h"

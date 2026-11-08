@@ -1,10 +1,10 @@
 # file:function:reason (function-scoped; line numbers intentionally omitted)
 kdebug/kselftest/heap.inc:test_heap:無効な仮想ポインタを渡すヒープ否定試験
-kernel/v86/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-kernel/v86/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-kernel/v86/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-kernel/v86/v86.c:v86_disk_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-kernel/v86/v86.c:v86_boot2:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+arch/x86/legacy/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+arch/x86/legacy/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+arch/x86/legacy/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+arch/x86/legacy/v86.c:v86_disk_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+arch/x86/legacy/v86.c:v86_boot2:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
 platform/pc98/legacy/v86_bios.c:v86_bios_setup:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
 platform/pc98/legacy/v86_bios_sasi.inc:sasi_init:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
 platform/pc98/legacy/v86_bios_fdd_read.inc:disk_read_common:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
@@ -14,7 +14,7 @@ kdebug/v86_gcap.c:gd_get:V86 ゲスト線形の IVT / コード / magic (リマ�
 kdebug/v86_gcap.c:gd_set:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
 kdebug/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
 kdebug/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-kernel/v86/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
+arch/x86/legacy/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
 kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db_selftest.inc:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db_helpers.inc:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
