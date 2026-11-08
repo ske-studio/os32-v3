@@ -322,6 +322,16 @@ def c_word_offsets(path, name, through):
     raise ValueError('missing C field layout: ' + through)
 
 
+def module_elf(kernel_elf, name):
+    """Module ELFs are built once in build/out/<name>/ (KCG_OUT/FEP_OUT in
+    build/<name>-module.mk). The R1 image (build/out/r1/kernel.elf) packs the
+    same ELF into r1/<name>.mod, so there is no r1/<name>/<name>.elf."""
+    out = Path(kernel_elf).parent
+    if out.name == 'r1':
+        out = out.parent
+    return out / name / (name + '.elf')
+
+
 class Gui:
     def __init__(self, transport=None, kernel_elf=None, gshell_elf=None,
                  symbol_factory=ElfSymbols, descriptor=None, fep_elf=None):
@@ -339,7 +349,7 @@ class Gui:
         self.gshell_elf = gshell_elf or os.environ.get(
             'OS32_GSHELL_ELF', '/home/hight/os32-v3/userland/gshell.elf')
         self.fep_elf = fep_elf or os.environ.get(
-            'OS32_FEP_ELF', str(Path(self.kernel_elf).parent / 'fep/fep.elf'))
+            'OS32_FEP_ELF', str(module_elf(self.kernel_elf, 'fep')))
         self.symbol_factory = symbol_factory
         self.descriptor = descriptor
 
@@ -712,7 +722,7 @@ class Gui:
         base = self._module_base('MODULE_ID_KCG')
         if base is None:
             raise ValueError('KCG module unavailable')
-        elf = Path(self.kernel_elf).parent / 'kcg/kcg.elf'
+        elf = module_elf(self.kernel_elf, 'kcg')
         address, size = self.symbol_factory(elf).read()['cache']
         entry = struct.Struct('<H32s')  # KcgCacheEntry: u16 tag, u8 glyph[32]
         cache, fetched = bytearray(256 * 16), bytearray(256)
