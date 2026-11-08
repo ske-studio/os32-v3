@@ -15,6 +15,15 @@
 - 今回足す口は INDEX8 専用。16/32bpp の形式付きの口は別の版 (他社カードの調べ `~/os32-tmp/run/gpu-survey/SURVEY.md` §6 の 17 件と合わせる)。
 - 段の表・並列の順・試験と変異は確定設計の §7・§8。
 
+## 1-1. SHADOW の backend の実測 (全画面 640x480x8 の present、実機 Ra266、2026-11-08)
+| backend | 方式 | 1 枚 | 欠け |
+|---|---|---|---|
+| PEGC | rep movsd (既定) / dword / word / byte | 14.09ms / 14.09ms / 23.65ms / 46.93ms | すべて 0 |
+| PEGC | dword + 間隔 0〜600ns (`pegc gap sweep`) | 14.1ms (0ns)〜141ms | すべて 0 (間隔は要らない) |
+| Trident | dword + 間隔 80ns (既定) / 70ns / 0ns | 21.5ms / 19.8ms / 12.9ms | 0 / 0 / 59 万バイト |
+| GeForce | dword + WC (p95) | 7.37ms | 0 |
+PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ時間。HW-BASIC の pegc_burst は F00000h が RAM (043Bh=0xDF) のため unavailable。証拠 `~/os32-tmp/evidence/2026-11-08/pegc-bench/`、`tri-gap/`。
+
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
