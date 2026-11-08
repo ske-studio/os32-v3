@@ -4737,11 +4737,30 @@ fn w2_drag_commit_shadow_moves_and_configures() {
 }
 
 #[test]
+fn w2_failed_check_keeps_input() {
+    use crate::{input, mocks, wm};
+    use os32api::gui::proto::GUI_EV_KEY;
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = four_app_state(&shm);
+    mocks::REGEN_RC.store(-1, Ordering::SeqCst);
+    for key in [0x1e, 0x30] {
+        mocks::push_rawkeys(&[key | 0x100]);
+        wm::wm_cycle(&mut st, input::Ctx::Wait);
+        assert_eq!(g2w_events(&st, 5).iter().filter(|ev| ev.kind == GUI_EV_KEY).count(),
+                   if key == 0x1e { 1 } else { 2 });
+    }
+    mocks::REGEN_RC.store(0, Ordering::SeqCst);
+}
+
+#[test]
 fn w2_failed_check_skips_draw() {
     use crate::{input, mocks, wm};
     use std::sync::atomic::Ordering;
     mocks::init();
     mocks::clear(0);
+    *mocks::MOUSE.lock().unwrap() = (320, 200, 0);
     let mut st = wm::GuiState::NEW;
     st.screen_w = 640; st.screen_h = 480;
     st.screen_dirty.push(wm::Rect::new(10, 10, 20, 20));
