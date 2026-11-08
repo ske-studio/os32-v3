@@ -1,7 +1,8 @@
 """Run tri_burst on an indexed CR39/byte LFB bus, including dropped bursts."""
-CHECK = dict(name='tri-burst', tier=1, needs=[], budget=15, covers=[
+CHECK = dict(name='tri-burst', tier=1, needs=[], budget=120, covers=[
     'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'tools/tests/test_tri_burst.py',
-    'tools/tests/tri_burst2_host.c', 'tools/tests/tri_burst3_host.c',
+    'tools/tests/tri_burst2_host.c', 'tools/tests/tri_burst3_host.c', 'tools/tests/tri_burst4_host.c',
+    'userland/tests/hw/tri_burst4.hwb',
     'userland/tests/hw/tri_burst3.hwb', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
@@ -193,10 +194,37 @@ def trial3(mutation=None):
             hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
 
 
+def trial4(mutation=None):
+    script = (hwb_host.ROOT / 'userland/tests/hw/tri_burst4.hwb').read_text(encoding='ascii')
+    if mutation:
+        name, before, after = mutation
+        assert script.count(before) == 1, name
+        script = script.replace(before, after)
+    code = (hwb_host.ROOT / 'tools/tests/tri_burst4_host.c').read_text().replace('SCRIPT_DATA', json.dumps(script))
+    with tempfile.TemporaryDirectory(prefix='tri-burst4-') as directory:
+        fixture = Path(directory) / 'host.c'
+        exe = Path(directory) / 'host'
+        fixture.write_text(code)
+        hwb_host.build(hwb_host.ROOT, fixture, exe)
+        # Eight complete matrix runs exceed the usual one-script 60s budget.
+        result = hwb_host.host32.run([str(exe)], cwd=hwb_host.ROOT,
+                                     capture_output=True, text=True, timeout=240)
+        print(result.stdout, end='', flush=True)
+        if mutation:
+            if result.returncode != 1 or 'FAIL:tri-burst4:' not in result.stdout:
+                raise RuntimeError(name + ': expected runtime RED')
+            print(name + ': RED runtime')
+        elif result.returncode:
+            raise RuntimeError('tri-burst4 control failed')
+        else:
+            hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
+
+
 def main():
     trial()
     trial2()
     trial3()
+    trial4()
     if '--mutate' in sys.argv:
         for mutation in [
             ('burst-bit1', 'let trialcr = burstcr & 0xFD', 'let trialcr = burstcr & 0xFB'),
@@ -238,6 +266,26 @@ def main():
             ('ge-restore', 'mmiowrite16 v + 0x2122 ge_saved', 'mmiowrite16 v + 0x2122 0'),
         ]:
             trial3(mutation)
+        for mutation in [
+            ('matrix-pixel16', 'let pixelbus = 5', 'let pixelbus = 0'),
+            ('matrix-pitch32', 'let offset = 0x140', 'let offset = 0x40'),
+            ('matrix-dac16', 'let dacval = 0x30', 'let dacval = 0'),
+            ('matrix-gr32', 'let ext = 0x0A', 'let ext = 2'),
+            ('matrix-pll-ntsc', 'let plla = 0x77', 'let plla = a'),
+            ('matrix-pll-pal', 'let plla = 0x75', 'let plla = a'),
+            ('matrix-cr39', 'let trialcr = 1', 'let trialcr = 7'),
+            ('matrix-width8', 'mmioblock8 f + 0 count seed', 'mmioblock16 f + 0 count seed'),
+            ('matrix-width16', 'mmioblock16 f + 0 count seed', 'mmioblock8 f + 0 count seed'),
+            ('matrix-length', 'let count = 4096', 'let count = 2048'),
+            ('matrix-seed', 'let seed = (0x41 + delta) & 0xFF', 'let seed = 0x41'),
+            ('matrix-range', 'print "match-start" off', 'print "match-start" 1'),
+            ('matrix-count', 'print "mismatch-count" bad', 'print "mismatch-count" 0'),
+            ('matrix-read16', 'mmioread16 f + off -> got', 'mmioread8 f + off -> got'),
+            ('matrix-cleanup', 'let depth = 8\n call set_depth\n log "cleanup-8bpp"', 'let depth = 32\n call set_depth\n log "cleanup-8bpp"'),
+            ('matrix-vram-restore', 'mmiowrite32 f + (i << 2) original[i]', 'mmiowrite32 f + (i << 2) 0'),
+            ('matrix-cr23-restore', '0x23 | ((save[852]) << 8)', '0x23 | (0 << 8)'),
+        ]:
+            trial4(mutation)
     return 0
 
 
