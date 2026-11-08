@@ -9,7 +9,7 @@ static OFFSCREEN_WRITES: AtomicUsize = AtomicUsize::new(0);
 static PRESENTS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle] static mut gfx_api: *mut os32api::KernelAPI = core::ptr::null_mut();
 #[no_mangle] static mut gfx_direct: i32 = 0;
-#[no_mangle] extern "C" fn gfx_cmd_enqueue_fill(_:i32,_:i32,_:i32,_:i32,_:u8,_:u8) -> i32 { panic!("unexpected direct fill"); }
+#[no_mangle] extern "C" fn gfx_cmd_enqueue_fill(_:i32,_:i32,_:i32,_:i32,_:u8,_:u8) -> i32 { PENDING_FILLS.fetch_add(1,SeqCst); 0 }
 #[no_mangle] extern "C" fn gfx_cmd_enqueue_put(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:i32) -> i32 { panic!("unexpected direct put"); }
 #[no_mangle] extern "C" fn gfx_cmd_enqueue_mono(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:u8,_:i32,_:i32,_:i32,_:i32,_:i32) -> i32 { panic!("unexpected direct mono"); }
 #[no_mangle] static mut gfx_ready: i32 = 1;
@@ -17,6 +17,7 @@ static PRESENTS: AtomicUsize = AtomicUsize::new(0);
     width: 4, height: 4, pitch: 4, planes: [core::ptr::null_mut();4],
 };
 #[no_mangle] extern "C" fn libos32gfx_check() -> i32 {
+    TRACE.lock().unwrap().push(1);
     CHECKS.fetch_add(1,SeqCst);
     let rc=RC.load(SeqCst);
     unsafe { gfx_ready = if rc < 0 { 0 } else { 1 }; }
@@ -167,4 +168,98 @@ fn gdi_stops_both_renderers() {
     assert_eq!(SHLIB_CHECKS.load(SeqCst),4,"gdi shlib check missing");
     assert_eq!(DETACHED.load(SeqCst),3,"gdi static rollback missing");
     assert_eq!(SHLIB_DETACHED.load(SeqCst),3,"gdi shlib rollback missing");
+}
+
+// Only the existing window registry boundary is mocked; client/scroll are real.
+mod uistate {
+    use super::*;
+    #[derive(Clone, Copy)]
+    pub struct Win { pub used: bool, pub id: u32, pub client: Rect }
+    pub struct State { pub windows: [Win; 3] }
+    static mut STATE: State = State { windows: [Win { used: false, id: 0, client: Rect::new(0,0,0,0) }; 3] };
+    pub fn s() -> &'static mut State { unsafe { &mut *core::ptr::addr_of_mut!(STATE) } }
+}
+static TRACE: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
+static REGEN: AtomicI32 = AtomicI32::new(0);
+static FLUSH_RC: AtomicI32 = AtomicI32::new(0);
+static PENDING_FILLS: AtomicUsize = AtomicUsize::new(0);
+static FLUSHED_FILLS: AtomicUsize = AtomicUsize::new(0);
+static SCROLL_RC: AtomicI32 = AtomicI32::new(0);
+#[no_mangle] extern "C" fn gfx_flush() -> i32 {
+    TRACE.lock().unwrap().push(0);
+    let rc = FLUSH_RC.load(SeqCst);
+    if rc >= 0 { FLUSHED_FILLS.fetch_add(PENDING_FILLS.swap(0,SeqCst),SeqCst); }
+    rc
+}
+#[no_mangle] extern "C" fn libos32gfx_take_regen() -> i32 {
+    TRACE.lock().unwrap().push(2);
+    REGEN.swap(0,SeqCst)
+}
+unsafe extern "C" fn gui_request(op: u32, _: u32) -> i32 {
+    use os32api::gui::proto::*;
+    TRACE.lock().unwrap().push(op as i32 + 100);
+    if op == GUI_OP_INVALIDATE {
+        let req = core::ptr::read_unaligned(client::slot_base().add(GUI_SLOT_REQ_OFF) as *const GuiReqInvalidate);
+        INVALIDATED.lock().unwrap().push((req.window, Rect::new(req.rect.x, req.rect.y, req.rect.w, req.rect.h)));
+    }
+    if op == GUI_OP_SCROLL {
+        assert_eq!(PENDING_FILLS.load(SeqCst),0,"SCROLL must follow pending FILLs");
+        SCROLL_RC.load(SeqCst)
+    } else { 0 }
+}
+static INVALIDATED: std::sync::Mutex<Vec<(u32, Rect)>> = std::sync::Mutex::new(Vec::new());
+#[test]
+fn u2_flush_scroll_and_poll_recovery() {
+    use os32api::gui::proto::*;
+    let mut api = os32api::mock_api();
+    api.gui_call = gui_request;
+    os32api::os32_init(&mut api);
+    let mut shm = [0u8; GUI_SLOT_SIZE];
+    unsafe { client::host_base(shm.as_mut_ptr()); }
+    RC.store(0,SeqCst);
+    FLUSH_RC.store(0,SeqCst);
+    TRACE.lock().unwrap().clear();
+    assert!(client::commit(7).is_ok());
+    assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_COMMIT as i32+100], "COMMIT must follow flush");
+    let rect = Rect::new(2,3,40,30);
+    TRACE.lock().unwrap().clear();
+    for _ in 0..3 { unsafe { ffi::gfx_cmd_enqueue_fill(2,3,4,5,6,0) }; }
+    assert!(scroll::scroll(7,rect,8,-2).is_ok());
+    assert_eq!(FLUSHED_FILLS.load(SeqCst),3);
+    assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_SCROLL as i32+100]);
+    let req = unsafe { core::ptr::read_unaligned(shm.as_ptr().add(GUI_SLOT_REQ_OFF) as *const GuiReqScroll) };
+    assert_eq!((req.window, req.rect.x, req.rect.y, req.rect.w, req.rect.h, req.dx, req.dy), (7,2,3,40,30,8,-2));
+    FLUSH_RC.store(-11,SeqCst);
+    TRACE.lock().unwrap().clear(); INVALIDATED.lock().unwrap().clear();
+    assert!(scroll::scroll(7,rect,8,0) == Err(client::GuiErr::STALE), "failed flush must invalidate");
+    assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_INVALIDATE as i32+100], "failed flush must invalidate");
+    assert!(*INVALIDATED.lock().unwrap() == vec![(7,rect)]);
+    FLUSH_RC.store(0,SeqCst);
+    SCROLL_RC.store(OS32_ERR_NOSYS,SeqCst);
+    TRACE.lock().unwrap().clear();
+    assert!(scroll::scroll(7,rect,8,0).is_ok());
+    assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_SCROLL as i32+100, GUI_OP_INVALIDATE as i32+100]);
+    SCROLL_RC.store(OS32_ERR_STALE,SeqCst);
+    assert!(scroll::scroll(7,rect,8,0) == Err(client::GuiErr::STALE));
+    for (i,id) in [(0,7),(2,9)] {
+        uistate::s().windows[i] = uistate::Win { used:true, id, client:Rect::new(12,15,40,30) };
+    }
+    REGEN.store(1,SeqCst);
+    TRACE.lock().unwrap().clear(); INVALIDATED.lock().unwrap().clear();
+    assert!(client::poll(&mut []).is_ok());
+    assert!(*INVALIDATED.lock().unwrap() == vec![(7,Rect::new(0,0,40,30)),(9,Rect::new(0,0,40,30))], "regen must invalidate every own window");
+    assert_eq!(*TRACE.lock().unwrap(), vec![0,GUI_OP_POLL as i32+100,1,2,GUI_OP_INVALIDATE as i32+100,GUI_OP_INVALIDATE as i32+100]);
+    INVALIDATED.lock().unwrap().clear();
+    assert!(client::poll(&mut []).is_ok());
+    assert!(INVALIDATED.lock().unwrap().is_empty(), "regen consumed once");
+    REGEN.store(1,SeqCst); RC.store(-11,SeqCst);
+    TRACE.lock().unwrap().clear();
+    assert!(client::poll(&mut []).is_ok());
+    assert_eq!(REGEN.load(SeqCst),1,"failed check must retain regen");
+    assert!(INVALIDATED.lock().unwrap().is_empty());
+    RC.store(0,SeqCst);
+    assert!(client::wait(1).is_ok());
+    assert_eq!(INVALIDATED.lock().unwrap().len(),2);
+    uistate::s().windows.iter_mut().for_each(|w| w.used=false);
+    unsafe { client::host_base(core::ptr::null_mut()); }
 }

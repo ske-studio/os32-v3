@@ -11,9 +11,12 @@ ROOT=Path(__file__).resolve().parents[2]
 GUI='userland/rust/libos32gui/src/'
 GDI='userland/rust/gdi_test/src/lib.rs'
 # T7b-b4 S5: draw.rs text() uses font.rs (and the os32-font crate), so both are compiled in.
-UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font','textcore')
+UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font','textcore','scroll')
 TARGET_SRCS=[GUI+x+'.rs' for x in UNITS]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
+ ('scroll-no-flush-check',GUI+'scroll.rs','if unsafe { ffi::gfx_flush() } < 0 {','if unsafe { ffi::gfx_flush() } < 0 && false {','failed flush must invalidate'),
+ ('return-no-take-regen',GUI+'client.rs','if unsafe { crate::ffi::libos32gfx_take_regen() } != 0 {','if false {','regen must invalidate every own window'),
+ ('commit-no-flush',GUI+'client.rs','    unsafe { crate::ffi::gfx_flush() }; // Publish queued drawing before COMMIT.','','COMMIT must follow flush'),
  ('shlib-no-detach-entry',GUI+'shlib.rs','    .long   os32gui_gfx_detach                  /* 119 */','', 'shlib detach entry missing'),
  ('shlib-no-detach-body',GUI+'shlib.rs','    unsafe { crate::ffi::libos32gfx_detach() };','', 'shlib detach body missing'),
  ('empty-poll-check','sdk/rust/os32api/src/lib.rs','    } else { None }','    } else { input_return(); None }', 'empty poll skips gfx check'),
@@ -42,7 +45,7 @@ def main():
                 texts[m[1]]=texts[m[1]].replace(m[2],m[3])
             root='#![allow(dead_code, unused_imports)]\n'
             for path in TARGET_SRCS[:len(UNITS)]:
-                unit=Path(path).stem;(dest/(unit+'.rs')).write_text(texts[path]);root+=f'mod {unit};\n'
+                unit=Path(path).stem;(dest/(unit+'.rs')).write_text(texts[path] + ('\npub unsafe fn host_base(p: *mut u8) { c().base = p; }\n' if unit == 'client' else ''));root+=f'mod {unit};\n'
             root+=(ROOT/'tools/tests/gui_reattach_host.rs').read_text()
             input_helpers=texts['sdk/rust/os32api/src/lib.rs'].split('fn input_return() {',1)[1].split('/* ================================================================ */',1)[0]
             root+="\nmod input_api { use super::*; fn api() -> &'static os32api::KernelAPI { unsafe { os32api::api() } }\n"

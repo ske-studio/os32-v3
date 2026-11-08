@@ -196,6 +196,14 @@ fn check_gfx() -> GuiResult<()> {
         unsafe { crate::ffi::libos32gfx_detach() };
         Err(GuiErr(rc))
     } else {
+        if unsafe { crate::ffi::libos32gfx_take_regen() } != 0 {
+            for i in 0..crate::uistate::s().windows.len() {
+                let w = crate::uistate::s().windows[i];
+                if w.used {
+                    let _ = invalidate(w.id, Rect::new(0, 0, w.client.w, w.client.h));
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -329,7 +337,10 @@ pub struct Poll {
 /// (1) `OP_POLL` (WM が導出型を追記し、未読件数を返す) → (2) `[head, tail)` を
 /// `out` へ写す → (3) **`head = tail` に進める** (`tail` は WM のもの。触らない)。
 pub fn poll(out: &mut [GuiEvent]) -> GuiResult<Poll> {
-    let n = call(GUI_OP_POLL, 0)? as usize;
+    unsafe { crate::ffi::gfx_flush() };
+    let result = call(GUI_OP_POLL, 0);
+    let _ = check_gfx(); // Recover even when OP_POLL itself failed.
+    let n = result? as usize;
     let h = read_header();
     let cap = if out.len() < GUI_RING_CAPACITY { out.len() } else { GUI_RING_CAPACITY };
     let n = if n > cap { cap } else { n };
@@ -356,6 +367,7 @@ pub fn poll(out: &mut [GuiEvent]) -> GuiResult<Poll> {
 /// **ハンドラの中から呼んではいけない** (契約 U3。`debug_assert` で守る)。
 pub fn wait(timeout_ticks: u32) -> GuiResult<i32> {
     debug_assert!(!c().in_handler, "gui wait() called from inside an event handler (U3)");
+    unsafe { crate::ffi::gfx_flush() };
     let result = call(GUI_OP_WAIT, timeout_ticks);
     let _ = check_gfx(); // Drawing failure must not replace the OP_WAIT result.
     result
@@ -375,6 +387,7 @@ pub fn leave_handler() {
 /// `OP_COMMIT`: issued の矩形だけを画面へ (契約 G4)。**ループ 1 周に 1 回**。
 /// `window = 0` はこのアプリの全ウィンドウ。
 pub fn commit(window: u32) -> GuiResult<()> {
+    unsafe { crate::ffi::gfx_flush() }; // Publish queued drawing before COMMIT.
     call(GUI_OP_COMMIT, window).map(|_| ())
 }
 
