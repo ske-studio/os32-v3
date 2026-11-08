@@ -3,7 +3,7 @@ Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
               'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
-              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c']
+              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
 from exec_source import exec_source
 import argparse
 import json
@@ -59,7 +59,7 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         # Execute the actual dispatcher's early-check block, with generated
         # masks/argument sizes. The rest of int80 needs guest CPU state.
         start = source.index('    /* --- (補助) 明示ポインタ引数の早期範囲検証')
-        end = source.index('    frame[APP_FRAME_EAX] = kapi_invoke(', start)
+        end = source.index('    result = kapi_invoke(', start)
         sources['early'] = source[start:end]
         start = source.index('static int exec_disk_write_path_allowed(')
         end = source.index('/* ======================================================================== */', start)

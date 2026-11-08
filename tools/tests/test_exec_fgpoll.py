@@ -9,7 +9,7 @@ CHECK = dict(name='exec-fgpoll-host', tier=1, budget=2.7,
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
                      'sdk/include/os32/**', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'mm/paging.h', 'fs/vfs_stdin.h'])
+                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'])
 
 import argparse
 import os
@@ -34,6 +34,7 @@ def function(source, name):
 
 HOST = r'''
 #include "appslot.h"
+#include "host_exec_context.h"
 #include "exec.h"
 static void die(int rc) __attribute__((noreturn));
 static void die(int rc) {
@@ -47,7 +48,8 @@ static void say(const char *s) {
 }
 #define CHECK(c) do { if (!(c)) { say("FAIL foreground before park/halt\n"); die(1); } } while (0)
 static AppSlot app, other, *g_cur_app;
-static u32 frame[APP_FRAME_WORDS], *g_cur_frame;
+static u32 frame[APP_FRAME_WORDS];
+static struct arch_syscall call = { frame }, *g_cur_frame;
 static int font_guard_active, gui, reject, bad_slot, polls, halts, transfers;
 volatile u32 ring3_park_reject_count;
 void geforce_foreground_poll(void) { polls++; }
@@ -62,14 +64,14 @@ AppSlot *appslot_get(int id) {
 }
 void appslot_park_poll_commit(void) {}
 void appslot_park_yield_commit(void) {}
-static void exec_park_transfer(int id, AppSlot *a, u32 *f, void (*commit)(void)) {
-    CHECK(polls == 1 && !halts && id == 2 && a == &app && f == frame);
+static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *f, void (*commit)(void)) {
+    CHECK(polls == 1 && !halts && id == 2 && a == &app && f == &call);
     CHECK(commit == appslot_park_poll_commit || commit == appslot_park_yield_commit);
     transfers++;
 }
 /* PRODUCT */
 static void reset(void) {
-    g_cur_app = &app; app.cpl3 = 1; g_cur_frame = frame;
+    g_cur_app = &app; app.cpl3 = 1; g_cur_frame = &call;
     gui = 1; font_guard_active = reject = bad_slot = 0;
     polls = halts = transfers = 0; ring3_park_reject_count = 0;
 }
@@ -124,9 +126,10 @@ def run_case(folder, source, name, mutant=False):
     fixture.write_text(HOST.replace('/* PRODUCT */', parts))
     exe = folder / 'host'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
-                    '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin',
+                    '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
+                    '-fdata-sections', '-Wl,--gc-sections', '-ffreestanding', '-fno-builtin',
                     '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
-                    '-no-pie', *include_flags(ROOT), str(fixture), '-o', str(exe)],
+                    '-no-pie', '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT), str(fixture), '-o', str(exe)],
                    check=True)
     result = host32.run([str(exe)], capture_output=True, text=True, timeout=10)
     assert result.returncode == (1 if mutant else 0), (name, result)

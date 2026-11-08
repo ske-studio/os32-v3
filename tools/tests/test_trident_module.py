@@ -23,7 +23,7 @@ CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
             'init/kernel.c', 'init/kernel_gfx_config.inc', 'platform/pc98/boot_names.c', 'userland/shell/cmd_sys.c',
             'sdk/kapi.json', 'sdk/include/os32/*.h',
             'build/out/trident/*', 'build/out/trident.mod',
-            'build/out/vmkernel.lz4', 'build/out/kernel.elf'])
+            'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'])
 import os
 from pathlib import Path
 import json

@@ -24,7 +24,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
+         "-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror"]
 INC = include_flags(ROOT)
 SRC = ROOT / "tools/tests/multiapp_impl_host.c"
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         kbd = source.split('} else if (src == APP_RESUME_SRC_KBD) {', 1)[1].split('\n    } else {', 1)[0]
         (tmp / 'exec_resume_kbd.inc').write_text(kbd)
         includes.insert(0, '-I'+str(tmp))
-        command = ["gcc", *FLAGS, "-O0", "-nostdlib", "-static", "-no-pie",
+        command = ["gcc", *FLAGS, "-O0", "-nostdlib", "-static", "-no-pie", "-Wl,--gc-sections",
                         "-DKBD_INJECT_NO_IRQ_LOCK",
                         *includes, str(SRC), "-o", str(exe)]
         subprocess.run(command, cwd=ROOT, check=True)

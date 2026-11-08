@@ -1,6 +1,7 @@
 /* Full exec.c lifecycle with real setjmp.asm; only CPU, VFS and resource
  * boundaries are fake. The shell is resident for the nested CUI case. */
 #include "types.h"
+#include "host_exec_context.h"
 static u32 host_cr3;
 #include "cpu.h"
 static void user_main(void) __attribute__((noreturn));

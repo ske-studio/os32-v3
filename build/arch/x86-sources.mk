@@ -4,3 +4,6 @@ ASM_ARCH += arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm arch/x86/ker
 INCLUDE_ARCH += arch/x86/kernel
 ASM_EXTRA_OBJ = arch/x86/kernel/ring3_ls_shim.o
 KSTRING_C_SRC =
+
+C_ARCH += arch/x86/kernel/exec_context.c
+C_ARCH_NEW += arch/x86/kernel/exec_context.c

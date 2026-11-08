@@ -28,7 +28,7 @@ CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py',
             'tools/tests/paging_source.py', 'tools/tests/serial_diag_host.h',
             'tools/tests/host_arch/**', 'build/config.mk', 'include/**',
-            'sdk/include/os32/**', 'tools/tests/test_trident_emergency.py'])
+            'sdk/include/os32/**', 'tools/tests/test_trident_emergency.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'])
 import argparse
 import os
 from pathlib import Path

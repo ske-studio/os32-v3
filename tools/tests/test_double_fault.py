@@ -90,7 +90,7 @@ def check_entry_layout(folder):
         'GDT_KERNEL_DS': 'GDT_KERNEL_DS',
         'USER_DS': 'USER_DS',
         'X86_SEL_RPL_MASK': 'X86_SEL_RPL_MASK',
-        'APP_FRAME_WORDS': 'APP_FRAME_WORDS',
+        'APP_FRAME_WORDS': 'sizeof(struct arch_user_context) / sizeof(u32)',
         'TVRAM_CHAR_BASE': 'TVRAM_CHAR_BASE',
         'TVRAM_ATTR_BASE': 'TVRAM_ATTR_BASE',
         'PIC1_CMD': 'PIC1_CMD',

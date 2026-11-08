@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 static int host_bios_ready;
 int platform_bios_ready(void) { return host_bios_ready; }
 #include "font_guard_inactive.h"
@@ -138,10 +139,10 @@ static void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2) { (void)vector; (v
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "exec_source.c"
 static void caller_access_leave(int *p) { (void)p; }
-static u32 *g_cur_frame;
-static void exec_park_stop(u32 *f) { (void)f; }
+static struct arch_syscall *g_cur_frame;
+static void exec_park_stop(struct arch_syscall *f) { (void)f; }
 volatile u32 tick_count;
-static int kernel_tss;
+struct tss_entry kernel_tss;
 void ring3_resume(const u32 *f,u32 pd,void *tss) { (void)f;(void)pd;(void)tss; CHECK(0); }
 #include "tails_source.c"
 
@@ -289,7 +290,7 @@ static void poison_case(int parked) {
         CHECK(!ledger_owner_pages(child) && g_cur==2 && g_slot[2].abort_req);
         CHECK(spaces[2].appmem_poisoned && g_slot[2].state==APP_STATE_RUNNING);
         serial_len=0;
-        if (!__builtin_setjmp(jump)) { host_syscall_tail(g_slot[2].frame); CHECK(0); }
+        if (!__builtin_setjmp(jump)) { host_syscall_tail((u32 *)g_slot[2].frame.opaque); CHECK(0); }
     }
     CHECK(!r1_fixture_arm[hook] && last_kind==EXEC_KIND_ABORTED);
     CHECK(ledger_owner_pages(owner)==pages && exec_as_leftover_pages==left+pages);

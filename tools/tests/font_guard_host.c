@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 /* Product guard and exec/ISR slices. IRQ/CR3 and nonreturning kernel
  * transitions are modeled; no signal/alternate stack is claimed to model
  * delivery through the IDT. Guest injection remains separate.
@@ -18,7 +19,9 @@ static void say(const char *s) { u32 n=0; while(s[n]) n++; __asm__ volatile("int
 #define CHECK(c, msg) do { if (!(c)) { say("FAIL " msg "\n"); die(1); } } while (0)
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 static AppSlot app, *g_cur_app = &app;
-static u32 frame[APP_FRAME_WORDS], *g_cur_frame=frame;
+static u32 frame[APP_FRAME_WORDS];
+static struct arch_syscall frame_view = { frame };
+static struct arch_syscall *g_cur_frame=&frame_view;
 static int stop_pending, g_longjmp_reason, g_longjmp_id, parks, aborts, calls;
 static int ring3_in_syscall=1;
 volatile int ring3_wm_depth=1;
@@ -80,7 +83,7 @@ static int callback(void *context) {
     CHECK(!exec_park_poll(7),"poll park held");
     CHECK(exec_sys_yield()==OS32_ERR_BUSY,"yield park held");
     ring3_wm_depth=0;
-    exec_park_stop(frame);
+    exec_park_stop(&frame_view);
     ring3_wm_depth=1;
     CHECK(!parks,"STOP park held");
     return failure ? -77 : 42;
@@ -109,7 +112,7 @@ static void normal(void) {
             if(i==1) exec_park_kbd();
             if(i==2) exec_park_poll(7);
             if(i==3) exec_sys_yield();
-            if(i==4) exec_park_stop(frame);
+            if(i==4) exec_park_stop(&frame_view);
             CHECK(0,"park must transfer");
         }
         CHECK(parks==prior+1,"park after leave");

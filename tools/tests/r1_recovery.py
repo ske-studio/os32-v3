@@ -10,7 +10,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
                'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
-               'mm/paging.c', 'exec/lease.c']
+               'mm/paging.c', 'exec/lease.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
 
 
 def recovery(tmp, function, runner, mutation=None):
@@ -48,7 +48,7 @@ def recovery(tmp, function, runner, mutation=None):
     # The CUI display return is outside the R1 recovery probes.
     stage('tails_source.c', 'static void exec_cui_display_abort(void) {}\n'
           'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int x87_depth=0;\n'
-          + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + end + '}\n')
+          + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame }; u32 result = frame[7];\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
     stage('v86_source.c', read('arch/x86/legacy/v86_mem.c').replace(
         'P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)'))
@@ -125,7 +125,7 @@ RECOVERY_MUTANTS = [
     ('commit-loses-abort', 'exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
      '    a->abort_req = 0;\n    a->parked_from_wait = 0;', 'FAIL !forbid_app_pd'),
     ('resume-abort', 'exec/exec.c', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
-    ('syscall-abort', 'exec/exec.c', '    ring3_abort_check();\n    exec_park_stop(frame);', '    exec_park_stop(frame);', 'FAIL 0'),
+    ('syscall-abort', 'exec/exec.c', '    ring3_abort_check();\n    exec_park_stop(&call);', '    exec_park_stop(&call);', 'FAIL 0'),
     ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
     ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),

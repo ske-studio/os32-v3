@@ -13,6 +13,7 @@ from test_exec_r1 import function
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRE = r'''
 #include "types.h"
+#include "host_exec_context.h"
 #include <stdbool.h>
 /* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
 bool geforce_fg_due(u32 now) { (void)now; return false; }
@@ -44,7 +45,7 @@ static u32 tick_count=100;
 static k_jmpbuf saved_buf;
 void x87_save(X87State *p) { (void)p; }
 static AppSlot *g_cur_app;
-static u32 *g_cur_frame;
+static struct arch_syscall *g_cur_frame;
 static int ring3_in_syscall, caller;
 volatile int ring3_wm_depth;
 volatile u32 kctx_irq_depth, kctx_exc_depth;
@@ -166,17 +167,17 @@ static void dispatch_case(int inside) {
     CHECK(invokes==1 && jumped==1 && clears==1 && g_longjmp_id==2);
     CHECK(!appslot_stop_pending());
     CHECK(g_longjmp_reason==EXEC_LJ_PARK && !a->stop_wm_req && a->parked_from_stop);
-    CHECK(a->state==APP_STATE_WAIT_POLL && a->frame[7]==0x89abcdef);
+    CHECK(a->state==APP_STATE_WAIT_POLL && HOST_FRAME(a->frame)[7]==0x89abcdef);
     CHECK(appslot_stop_culprit()==2);
     CHECK(appslot_stop_culprit()==2 && a->parked_from_stop);
     res_owner_set(3);
     CHECK(appslot_stop_culprit()==OS32_ERR_INVAL);
     res_owner_set(APP_ID_SHELL);
-    for(int i=0;i<APP_FRAME_WORDS;i++) CHECK(a->frame[i]==frame[i]);
+    for(int i=0;i<APP_FRAME_WORDS;i++) CHECK(HOST_FRAME(a->frame)[i]==frame[i]);
     CHECK(!appslot_resume_check(2) && !appslot_kill_check(2));
     CHECK(appslot_resume_source(2)==APP_RESUME_SRC_KEEP);
     CHECK(prepare_resume(2, 999)==0);
-    CHECK(a->frame[7]==0x89abcdef && !injected && invokes==1);
+    CHECK(HOST_FRAME(a->frame)[7]==0x89abcdef && !injected && invokes==1);
     // target != culprit: caller retains all state and will run again.
     appslot_resume_commit(2);
     CHECK(a->state==APP_STATE_RUNNING && !a->parked_from_stop && !a->stop_wm_req);
@@ -364,7 +365,8 @@ static int test(void) {
         if(guard==3) appslot_get(2)->in_op_wait=1;
         if(guard==4) appslot_get(2)->cpl3=0;
         if(guard==5) g_cur_app=appslot_get(3);
-        exec_park_stop(frame); CHECK(!jumped && cr3==2 && owner==2);
+        struct arch_syscall call = { frame };
+        exec_park_stop(&call); CHECK(!jumped && cr3==2 && owner==2);
         kctx_irq_depth=kctx_exc_depth=ring3_wm_depth=0;
     }
     setup(); appslot_get(2)->gui=0; appslot_stop_request(); CHECK(!appslot_get(2)->stop_wm_req);
@@ -457,7 +459,10 @@ def run(overrides=None):
     code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
     with tempfile.TemporaryDirectory(prefix='os32-kstop-') as d:
-        d=pathlib.Path(d); (d/'t.c').write_text(code)
+        d=pathlib.Path(d)
+        (d/'provider.c').write_text(read('arch/x86/kernel/exec_context.c'))
+        code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(d/'provider.c') + '"\n' + code
+        (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
         inc=(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
@@ -469,6 +474,12 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
+ ('provider-syscall-result', 'arch/x86/kernel/exec_context.c',
+  '    ((u32 *)call->native)[FRAME_EAX] = result;',
+  '    ((u32 *)call->native)[FRAME_EAX] = result + 1;'),
+ ('provider-save-frame', 'arch/x86/kernel/exec_context.c',
+  '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque));',
+  '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque) - sizeof(u32));'),
  ('culprit-ignore-mark','exec/appslot_transition.inc',
   'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
   'a && a->state == APP_STATE_WAIT_POLL)'),
@@ -482,9 +493,9 @@ MUTATIONS = [
  ('ignore-shell-request','exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
  ('no-request','exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
- ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(frame);','    /* missing transfer */'),
- ('before-completion','exec/exec_syscall.inc','    frame[APP_FRAME_EAX] = kapi_invoke','    exec_park_stop(frame);\n    frame[APP_FRAME_EAX] = kapi_invoke'),
- ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        a->frame[APP_FRAME_EAX] = (u32)wait_ret;\n        /* STOP parked a completed syscall;'),
+ ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(&call);','    /* missing transfer */'),
+ ('before-completion','exec/exec_syscall.inc','    result = kapi_invoke','    exec_park_stop(&call);\n    result = kapi_invoke'),
+ ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        arch_user_result(&a->frame, (u32)wait_ret);\n        /* STOP parked a completed syscall;'),
  ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),

@@ -24,6 +24,7 @@
   "fs/serialfs/sfs_proto.c",
   "fs/vfs.c",
   "fs/vfs_fd.c",
+  "gfx/gfx_hw_submit.c",
   "gfx/gfx_osri.c",
   "gfx/gfx_scroll.c",
   "gfx/palette.c",
@@ -84,8 +85,8 @@
   "mm/shm.c",
   "platform/none/legacy_guest.c",
   "platform/powermac/boot.c",
+  "platform/powermac/boot_capture.c",
   "platform/powermac/escc.c",
   "platform/powermac/escc_tree.c",
-  "platform/powermac/ofw.c",
-  "platform/powermac/boot_capture.c"
+  "platform/powermac/ofw.c"
 ]

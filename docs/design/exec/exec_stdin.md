@@ -1,6 +1,6 @@
 # exec/exec_stdin.inc — GUI stdin の syscall 再実行
 
-> 状態: **現行 (2026-10-31)**
+> 状態: **現行 (2026-11-08)**
 
 GUI・CPL3 の現在のアプリが、WM 内部ではなく sys_read 自身の syscall に入っている時だけ
 `exec_stdin_state()` が AppSlot 末尾の `stdin_read` を返す。ほかは NULL。
@@ -14,7 +14,9 @@ kbd 待ちの park は従来どおり int80 フレームを保存して longjmp 
 空なら AGAIN でフレーム・状態・進捗を変えない。
 
 既存の caller_context、setjmp、resume_commit、mark_scheduled、abort_check、context 復元を経て、
-ring3_resume の直前にだけ保存 EIP を2バイト戻す。EAX は sys_read のスロット値を保つ。
+`arch_user_resume` の直前にだけ `arch_user_restart` を呼ぶ。保存結果・slot・引数は保持する。
+共通 C は opaque context を所有し、x86 provider が保存 EIP を2バイト戻す。
+slot の照会も `arch_syscall_slot` を使い、生存中の syscall view だけを借用する。
 スタブの int 0x80 が再実行され、通常 dispatch の caller/guard、引数とポインタ検査、
 入口・出口の abort と完了時 STOP の処理を通る。子の CR3 と owner の下で done から続ける。
 入力が再び空なら新しい int80 フレームを保存して park するため、EIP の巻戻しは累積しない。

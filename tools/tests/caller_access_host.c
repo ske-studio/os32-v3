@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 /* Actual dispatcher/access/WM functions; slot/CR3/IRQ/KAPI are boundaries.
  * Nonlocal lifetime coverage lives in the real exec R1 fixture. */
 #define _GNU_SOURCE
@@ -30,7 +31,7 @@ static u32 cr3 = 0x2000, tick_count;
 static int ring3_in_syscall, invoked, nesting;
 volatile int ring3_wm_depth;
 volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow;
-static u32 *g_cur_frame;
+static struct arch_syscall *g_cur_frame;
 static jmp_buf killed;
 AppSlot *appslot_get(int id) { assert(!host_if); return id > 0 && id < APP_SLOT_COUNT && slots[id].state ? &slots[id] : NULL; }
 int appslot_cur(void) { return cur; }
@@ -50,7 +51,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
 static int stop_park_calls;
-static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
+static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);

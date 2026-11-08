@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 #include "font_guard_inactive.h"
 /* Included by x11_shared_host.c after the real IME and keyboard sources.
  * Production exec_park/exec_resume, context save/restore and AppSlot transitions
@@ -27,7 +28,8 @@ void x87_save(X87State *p) { record_x87(X87_SAVE, p); }
 void x87_restore(const X87State *p) { record_x87(X87_RESTORE, p); }
 static int g_cur, g_cur_op_is_wait, ring3_in_syscall;
 static AppSlot *g_cur_app;
-static u32 *g_cur_frame, cr3, host_esp0;
+static struct arch_syscall *g_cur_frame;
+static u32 cr3, host_esp0;
 static u32 ring3_tramp_page[KAPI_DATA_IDX_SBRK_HEAP_LIMIT + 1];
 static struct x11_kapi { u32 sbrk_heap_limit; } host_kapi, *kapi = &host_kapi;
 struct tss_entry kernel_tss;
@@ -60,7 +62,7 @@ void exec_heap_restore_state(u32 base, u32 size, u32 used)
 { (void)base; (void)size; (void)used; }
 AppSlot *appslot_at(int id) { return &slots[id]; }
 static void exec_pending_finish(void) {}
-static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss);
+void ring3_resume(const u32 *frame, u32 pd, void *tss);
 
 /* These names are private globals in the extracted product AppSlot functions. */
 #define g_slot slots
@@ -74,15 +76,15 @@ static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss);
 
 static void prepare_wait(void)
 {
-    g_cur_frame = live_frame;
+    static struct arch_syscall call = { live_frame }; g_cur_frame = &call;
     ring3_in_syscall = 1;
     ring3_wm_depth = 1;
     g_cur_op_is_wait = slots[2].in_op_wait = 1;
 }
 
-static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss)
+void ring3_resume(const u32 *frame, u32 pd, void *tss)
 {
-    REQUIRE(frame == slots[2].frame && frame[8] == 0x1234 && frame[APP_FRAME_EAX] == 37 &&
+    REQUIRE((const void *)frame == HOST_FRAME(slots[2].frame) && frame[8] == 0x1234 && frame[APP_FRAME_EAX] == 37 &&
             pd == 2 && cr3 == 2 && tss == &kernel_tss &&
             owner == 2 && g_cur == 2 && slots[2].state == APP_STATE_RUNNING &&
             !slots[2].parked_from_wait, "real resume reaches saved frame");
