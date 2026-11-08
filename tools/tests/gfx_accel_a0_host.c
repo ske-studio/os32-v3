@@ -33,6 +33,13 @@ typedef int (*put_fn)(int, int, int, int, const u8 *, u32, int);
 typedef int (*mono_fn)(int, int, int, int, const u8 *, u32, u8, int, int, int, int, int);
 typedef int (*get_fn)(int, int, int, int, u8 *, u32);
 
+/* No GUI/backend in the declaration fixture; policy behavior is tested in H4. */
+__typeof__(g_backend) g_backend;
+int con_sink_is_enabled(void) { return 0; }
+int appslot_gfx_owner(void) { return 1; }
+void gfx_reinit_surface_roles(int finish, int display_only)
+{ (void)finish; (void)display_only; }
+
 void _start(void)
 {
     TYPE(g_backend, GfxBackend *);
