@@ -66,7 +66,7 @@ static int g_last_kind, g_last_code, g_pending_id, g_pending_kind;
 static int g_longjmp_reason, g_longjmp_id;
 #define EXEC_LJ_EXIT 1
 #define EXEC_LJ_PENDING 3
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 u32 exec_as_leftover_pages;
 volatile u32 exec_stop_count;
 static void *jump[5];
@@ -94,7 +94,7 @@ int appslot_return_target(int id) {
 }
 static struct addrspace spaces[APP_SLOT_COUNT];
 static void ring3_context_clear(void) { ring3_in_syscall=0; }
-void exec_longjmp(u32 *buf) {
+void exec_longjmp(k_jmpbuf buf) {
     if (buf != g_exit_jmpbuf) {
         CHECK(kctx_exc_depth == 1 && !kctx_irq_depth);
         CHECK(v86_session.release_pending);

@@ -1,26 +1,22 @@
-/* ======================================================================== */
-/*  KSETJMP.H — カーネル内 setjmp/longjmp (arch/x86/kernel/setjmp.asm)               */
-/*                                                                          */
-/*  ESP/EBP/EBX/ESI/EDI/戻り先 EIP の 6 ワードと、文脈の深さ               */
-/*  (kctx_irq_depth / kctx_exc_depth、TASK_T1_LEDGER §3-5) の 2 ワードを     */
-/*  保存/復元する。保存先は必ず KSETJMP_BUF_LEN 語で宣言すること (長さの     */
-/*  直書きは禁止 — v86.c の [6] が語 6・7 を越えて書いた、Codex B8)。        */
-/*  exec のネスト復帰と V86 セッション脱出が使う。                           */
-/*                                                                          */
-/*  注意:                                                                   */
-/*   - exec_longjmp は常に setjmp の戻り値 1 で戻る (値は渡せない)           */
-/*   - EFLAGS は復元しない。割り込み/例外文脈から longjmp した場合、         */
-/*     IF は落ちたままなので復帰側で戻すこと (exec_run / v86_run 参照)       */
-/* ======================================================================== */
-
+/* Opaque kernel jump context. exec_longjmp restores the saved IRQ/exception
+ * depths and always lands with 1. It does not restore IF; the landing path
+ * must restore interrupts. Keep the existing volatile rules at setjmp sites. */
 #ifndef __KSETJMP_H
 #define __KSETJMP_H
 
 #include "types.h"
+#include "arch_jmp_storage.h"
 
-#define KSETJMP_BUF_LEN 8
+typedef struct { unsigned char opaque[ARCH_JMP_BYTES]; }
+    __attribute__((aligned(ARCH_JMP_ALIGN))) k_jmpbuf[1];
 
-int  exec_setjmp(u32 *buf);
-void exec_longjmp(u32 *buf);
+int exec_setjmp(k_jmpbuf buf);
+void exec_longjmp(k_jmpbuf buf);
+
+/* Copy the owned context before freeing its slot. No native layout escapes. */
+static inline void k_jmp_copy(k_jmpbuf dst, const k_jmpbuf src)
+{
+    *dst = *src;
+}
 
 #endif /* __KSETJMP_H */

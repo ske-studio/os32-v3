@@ -73,7 +73,7 @@ def check_asm_constants(folder):
         source += (f'STATIC_ASSERT({values["JB_" + name]} == '
                    f'{index} * sizeof(u32), asm_jb_{name});\n')
     source += (f'STATIC_ASSERT({values["JB_EXC_DEPTH"]} + sizeof(u32) == '
-               'KSETJMP_BUF_LEN * sizeof(u32), asm_jb_size);\n')
+               'sizeof(k_jmpbuf), asm_jb_size);\n')
     path = folder / 'asm_constants.c'
     path.write_text(source)
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding',

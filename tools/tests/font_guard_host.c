@@ -50,7 +50,7 @@ static void ring3_context_clear(void) {}
 static void exec_restore_context(int id) { (void)id; }
 u32 paging_kernel_pd_phys(void) { return 0x1000; }
 void paging_load_cr3(u32 n) { (void)n; }
-void exec_longjmp(u32 *buf) { (void)buf; __builtin_longjmp(jump,1); }
+void exec_longjmp(k_jmpbuf buf) { (void)buf; __builtin_longjmp(jump,1); }
 void ring3_abort_kill(void) {
     CHECK(!font_guard_active, "STOP after leave");
     aborts++;

@@ -15,7 +15,8 @@ static void say(const char *s)
 static int owner, inject_at, resources, teardown, notices, injections, bad;
 static int kills, exec_exit_status, g_last_kind, g_last_code;
 volatile int exec_nest_level;
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN], tick_count;
+static k_jmpbuf g_exit_jmpbuf;
+static u32 tick_count;
 static AppSlot *g_cur_app;
 volatile u32 ring3_abort_count;
 

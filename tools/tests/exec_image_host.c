@@ -202,7 +202,7 @@ void kfree(void *p) { CHECK(p == &space); }
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner) { CHECK(as == &space && owner == 9); as->pd_phys = 23; as->owner = owner; return 0; }
 void appmem_init(struct addrspace *as, u32 b, u32 e, u32 h, u32 g) { (void)as; (void)b; (void)e; (void)h; (void)g; }
 int shlib_addrspace_attach(struct addrspace *as) { CHECK(as == &space); return 0; }
-int exec_setjmp(u32 *buf) { (void)buf; CHECK(!jump_ready); jump_ready = 1; event('J'); return 0; }
+int exec_setjmp(k_jmpbuf buf) { (void)buf; CHECK(!jump_ready); jump_ready = 1; event('J'); return 0; }
 void exec_heap_user_init(struct addrspace *as) { CHECK(x87_entry_depth && as == &space); }
 int kselftest_run_audit(const char *name) { (void)name; CHECK(x87_entry_depth); return 0; }
 void exec_heap_init_at(u32 base, u32 size) { (void)base; (void)size; if (argv_mode) argv_done(); CHECK(0); }

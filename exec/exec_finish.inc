@@ -253,7 +253,7 @@ static int exec_launch_abort(int launcher_id, int id, int status)
 }
 
 /* longjmp する側がスロットを空にするので、jmpbuf は先に控える。 */
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 volatile u32 exec_stop_count;
 /* Polled output works with IF=0, including a recursive teardown fault. */
 static void exec_stop_mark(void)
@@ -272,7 +272,6 @@ static void exec_finish(int id, int status, int kind)
 {
     AppSlot *a = appslot_get(id);
     int parent = APP_ID_SHELL;
-    u32 k;
 
     if (!a) return;
     exec_exit_status = status;
@@ -291,7 +290,7 @@ static void exec_finish(int id, int status, int kind)
         paging_load_cr3(paging_kernel_pd_phys());
     }
 
-    for (k = 0; k < KSETJMP_BUF_LEN; k++) g_exit_jmpbuf[k] = a->jmpbuf[k];
+    k_jmp_copy(g_exit_jmpbuf, a->jmpbuf);
 
     /* WM 通知より先に親の文脈へ戻す。gui_owner_exit() は
      * WM (gshell) のコードで、そこで KAPI の mem_alloc を踏むと exec_heap が

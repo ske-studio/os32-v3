@@ -91,9 +91,9 @@ static void _stop(void) { __builtin_longjmp(escape,1); }
 static void ring3_context_clear(void) { context_seq=++seq; }
 #define EXEC_LJ_EXIT 1
 static int finish_count, g_longjmp_reason, g_longjmp_id;
-static u32 g_exit_jmpbuf[5];
+static k_jmpbuf g_exit_jmpbuf;
 static void exec_finish(int id,int status,int kind) { CHECK(id==1&&status==2&&kind==3); finish_count++; }
-void exec_longjmp(u32 *buf) { CHECK(buf==g_exit_jmpbuf); __builtin_longjmp(escape,1); }
+void exec_longjmp(k_jmpbuf buf) { CHECK(buf==g_exit_jmpbuf); __builtin_longjmp(escape,1); }
 int appslot_cur(void) { return 1; }
 static u32 audit_scans;
 volatile u32 kctx_irq_depth,kctx_exc_depth;
