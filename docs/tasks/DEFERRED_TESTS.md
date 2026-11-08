@@ -87,6 +87,9 @@
 | H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめた。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) 以後、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される** (旧 shlib の拒否は R1c-2 で実証)。外部の Makefile は T2c 以後の `link_guard.py` 経由のリンクにも未追随 (2026-10-08 の `make external` で mkos32x が拒否)。f7 以後は SDK の CRT が `libos32nano.a` を要るので、外部 Makefile のリンクに `-los32nano` を `-lc` より前に足す (f7 レビュー P2-1)。**端末アプリに依る未実施をここに束ねる**: E11-5 の端末の子・隠れた sh、E11-9 の GUI 端末の tvdump 0 埋め (元の行 1113、1248、1810–1826、1868、3463) | 再開時ゲート | apps / game の再開時 |
 | S-4 | 外部 apps / game の再結線 | 適用外 → = H-7 | 同上 |
 | E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。旧「端末由来は全員が読める」はGUIRUNKEY-1 (2026-10-18) で変更済み。読み手とslot/launchの起動連鎖だけが取得する。全画面の起床手がかりの残件は維持。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない**、**U6 (ユーザー決定 2026-10-10): 足さない** — 全画面への矢印・機能キーの配送は E11-5 の実測で判断 (残り 2 点は E11-5 行) | 改善 (決定による持越し) | 全画面の入力に不足が出たとき |
+| HS-P3 | Host Services のレビューの軽い指摘 3 件: (a) sfs_client.c はホストの T_ERR を status を見ずに全部 STALE に扱う (今は max_payload の取り決めで届かない) (b) 常駐の scope の開始の ensure が失敗したときの表示が `session not started (-18)` だけで HOSTDOWN か TIMEOUT か出ない (c) 常駐の transport の行の NIC 名が 82557 に固定 (tools/rshell_serial.py の lan_result も 82557 に固定なので両方一緒に) | 軽い直し (P3) | Host Services に次に触る段 |
+| KDBG-P3 | kdebug の採取点 段 C の軽い指摘: `probe list` が 0 件のとき名前の無い行を出す、ADD・DRAIN の後の STATUS の kdebug_call の失敗で終端の行を出さずに返る (hwb_probe.c:93・:105) | 軽い直し (P3) | HW-BASIC の probe に次に触る段 |
+| TRI-P3 | Trident の退避の構成で、起動時の P→B の作り直しが割込み停止の中で 1.2MB の kmemset (resources.c:173-174、P100 で数十 ms と推定、未計測) | 計測と軽い直し (P3) | Trident の次の段か、起動時間の計測の回 |
 
 ## 4. 実機 Ra266 (R7、2026-10-12、9545e27)
 
