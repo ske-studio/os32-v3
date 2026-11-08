@@ -35,6 +35,10 @@ DRAW = 'userland/rust/libos32gui/src/draw.rs'
 
 # 変異 1 本 = (名前, 置き換え前, 置き換え後, RED の印)。どれも draw.rs。
 MUTATIONS = [
+    ('direct-branch-removed', '        } else if self.direct {\n            // この描画 API',
+     '        } else if false {\n            // この描画 API', 'direct-dispatch'),
+    ('direct-xor-copy', 'rc.h as i32, color, 1) };',
+     'rc.h as i32, color, 0) };', 'direct-dispatch'),
     ('direct-scanout-no-background',
      'core::ptr::write_bytes(self.fb_base.offset(off), color, n)',
      'if color != 15 { core::ptr::write_bytes(self.fb_base.offset(off), color, n) }',

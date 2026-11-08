@@ -42,6 +42,15 @@ mod ffi {
     pub static mut gfx_fb: GfxFramebuffer =
         GfxFramebuffer { width: 0, height: 0, pitch: 0, planes: [core::ptr::null_mut(); 4] };
     pub static mut gfx_ready: i32 = 1;
+    pub static mut gfx_direct: i32 = 0;
+    pub static mut CALLS: Vec<(i32, i32, i32, i32, u8, i32)> = Vec::new();
+    pub unsafe fn gfx_cmd_enqueue_fill(x: i32, y: i32, w: i32, h: i32, c: u8, rop: u8) -> i32 {
+        CALLS.push((x, y, w, h, c, rop as i32)); 0
+    }
+    pub unsafe fn gfx_cmd_enqueue_put(x: i32, y: i32, w: i32, h: i32, src: *const u8, pitch: u32, key: i32) -> i32 {
+        assert_eq!((w, h, pitch, key), (1, 1, 1, -1));
+        CALLS.push((x, y, w, h, *src, -1)); 0
+    }
 
     pub const W: i32 = 640;
     pub const H: i32 = 400;
@@ -902,6 +911,25 @@ fn t20_direct_scanout_repaint_padded_pitch() {
     assert_eq!(surface::destroy_surface(win), 0);
     unsafe { ffi::gfx_fb = saved; SCREEN_H = ffi::H; }
     gstate::refresh_screen_info();
+}
+
+#[test]
+fn t21_direct_dispatch() {
+    set_mode(true);
+    fill_fb(7);
+    unsafe { ffi::gfx_direct = 1; ffi::CALLS.clear(); }
+    let win = surface::create_window_surface(Rect::new(10, 20, 20, 20));
+    assert_eq!(clip::set_base_clip(win, Rect::new(0, 0, 20, 20)), 0);
+    draw::fill_rect(win, Rect::new(1, 2, 3, 4), Style::new(9, 5));
+    draw::fill_rect(win, Rect::new(2, 3, 2, 2), Style::new(9, 5).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
+    draw::line(win, 0, 0, 1, 0, Style::pen(6));
+    let calls = unsafe { ffi::CALLS.clone() };
+    check(calls == vec![(11,22,3,4,5,0), (12,23,2,2,9,1),
+                        (10,20,1,1,6,-1), (11,20,1,1,6,-1)], "direct-dispatch");
+    check(fb().iter().all(|&p| p == 7), "direct-no-framebuffer");
+    unsafe { ffi::gfx_direct = 0; }
+    clip::clear_base_clip();
+    assert_eq!(surface::destroy_surface(win), 0);
 }
 
 #[test]

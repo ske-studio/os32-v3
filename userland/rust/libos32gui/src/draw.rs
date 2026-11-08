@@ -35,6 +35,7 @@ pub(crate) struct Painter {
     oy: i32,
     offscreen: *mut ffi::GfxSurface, /* null = 画面 */
     packed8: bool,
+    direct: bool,
     fb_base: *mut u8,
     fb_pitch: i32,
     fb_w: i32,  /* 物理画面幅 (PACKED8 直書きの境界。レビュー ③) */
@@ -46,14 +47,15 @@ impl Painter {
     pub(crate) fn from_target(t: &Target) -> Painter {
         if !t.offscreen && unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_ready)) } == 0 {
             return Painter {
-                ox: 0, oy: 0, offscreen: core::ptr::null_mut(), packed8: true,
+                ox: 0, oy: 0, offscreen: core::ptr::null_mut(), packed8: true, direct: false,
                 fb_base: core::ptr::null_mut(), fb_pitch: 0, fb_w: 0, fb_h: 0,
                 clip: Rect::EMPTY,
             };
         }
         let info = screen_info_cached();
         let packed8 = !t.offscreen && info.format == GFX_FMT_PACKED8;
-        let (fb_base, fb_pitch) = if packed8 {
+        let direct = !t.offscreen && unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_direct)) } != 0;
+        let (fb_base, fb_pitch) = if packed8 && !direct {
             let fb = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_fb)) };
             (fb.planes[0], fb.pitch)
         } else {
@@ -64,6 +66,7 @@ impl Painter {
             oy: t.oy,
             offscreen: if t.offscreen { offscreen_ptr(t.idx) } else { core::ptr::null_mut() },
             packed8,
+            direct,
             fb_base,
             fb_pitch,
             fb_w: info.width as i32,
@@ -85,6 +88,9 @@ impl Painter {
         }
         if !self.offscreen.is_null() {
             unsafe { ffi::gfx_surface_pixel(self.offscreen, lx, ly, color) };
+        } else if self.direct {
+            // この描画 API は戻り値を持たず、失敗は libos32gfx の gfx_lost に残る。
+            let _ = unsafe { ffi::gfx_cmd_enqueue_put(self.ox + lx, self.oy + ly, 1, 1, &color, 1, -1) };
         } else if self.packed8 {
             /* PACKED8 は Rust が直接 framebuffer を書くので、局所クリップに加えて
              * 物理画面境界も最終チェックする (画面外 Window Surface での OOB write 防止、
@@ -147,6 +153,8 @@ impl Painter {
                     color,
                 )
             };
+        } else if self.direct {
+            let _ = unsafe { ffi::gfx_cmd_enqueue_fill(self.ox + rc.x as i32, self.oy + rc.y as i32, rc.w as i32, rc.h as i32, color, 0) };
         } else if self.packed8 {
             if self.fb_base.is_null() {
                 return;
@@ -192,6 +200,10 @@ impl Painter {
         }
     }
 
+    fn xor_rect(&self, rc: Rect, color: u8) {
+        let _ = unsafe { ffi::gfx_cmd_enqueue_fill(self.ox + rc.x as i32, self.oy + rc.y as i32, rc.w as i32, rc.h as i32, color, 1) };
+    }
+
     /// この矩形はクリップに全く掛からないか (セル単位の早期打ち切り用)。
     #[inline]
     pub(crate) fn cell_hidden(&self, lx: i32, ly: i32, w: i32, h: i32) -> bool {
@@ -206,7 +218,7 @@ impl Painter {
     /// (呼び出し側は従来どおり `put` を使う)。
     #[inline]
     pub(crate) fn row(&self, ly: i32) -> Option<Row> {
-        if !self.offscreen.is_null() || !self.packed8 || self.fb_base.is_null() {
+        if self.direct || !self.offscreen.is_null() || !self.packed8 || self.fb_base.is_null() {
             return None;
         }
         if ly < self.clip.y as i32 || ly >= self.clip.bottom() {
@@ -279,6 +291,10 @@ pub fn fill_rect(surface: SurfaceId, rect: Rect, style: Style) {
         return;
     }
     if style.has(GUI_STYLE_XOR) {
+        if p.direct {
+            p.xor_rect(rc, style.fg);
+            return;
+        }
         let mut ly = rc.y as i32;
         let y1 = rc.bottom();
         while ly < y1 {
@@ -400,6 +416,10 @@ fn span_pixel(p: &Painter, lx: i32, ly: i32, parity_src: i32, style: &Style) {
         return; /* 点線: 1 個おき */
     }
     if style.has(GUI_STYLE_XOR) {
+        if p.direct {
+            if p.in_clip(lx, ly) { p.xor_rect(Rect::new(lx as i16, ly as i16, 1, 1), style.fg); }
+            return;
+        }
         let old = p.get(lx, ly);
         p.put(lx, ly, old ^ style.fg);
     } else {
