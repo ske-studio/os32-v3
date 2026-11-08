@@ -30,4 +30,29 @@ NetBSD の OEA 用 I/O バリアは `eieio; sync` を組み合わせる
 (N/sys/arch/powerpc/include/pio.h:47)。
 これは BSD の I/O アクセサの選択で、あらゆるロード・ストアに対する
 `eieio` と `sync` の等価性を意味しない。
-[未] キャッシュ属性ごとの厳密な順序保証・完了条件は MPC7450 系マニュアルで補う。
+以下はメーカー資料で確認した追加条件。
+
+## 745x の命令条件 (MPC7450UM Rev 3.1)
+
+2.3.4.3.1 は上の `dcbst (または dcbf); sync; icbi; sync; isync` と一致する。
+icbi 後の sync は I-cache 無効化完了、isync は自 CPU の命令バッファを捨てるため。
+L1 のブロックは 32 バイト (3.1)。他 CPU の命令バッファ同期をこの列だけで保証しない。
+
+3.4.4.4 の dcbst は番地変換・保護判定では load として扱われ、違反は DSI、
+STEN=1 の変換 miss は data TLB miss-on-load になり得る。
+WIMG と独立に動作するが、無効な cache には効果が無い。
+M=1 の broadcast は HID1[ABE] に依存する。dirty data の書戻しだけを見て
+あらゆる属性で同じ外部トランザクションと仮定しない。
+同節は L1 を invalid、L2/L3 の該当 line を exclusive と記述している。
+この Rev 3.1 の記述から全階層に line が残るとは断定しない。Rev 5 の訂正有無は [未]。
+
+2.3.5.2 の eieio は先行の cache-inhibited/write-through access と後続の同種 access を
+順序付ける。外部への同期命令 broadcast は HID1[SYNCBE] の設定も確認する。
+isync は store queue の全 store 完了を待たない。同命令をデータ書戻しの sync の代わりにしない。
+[未] DMA の所有権移譲・別名マッピング・SMP の実行 CPU 全体への同期手順。
+
+icbi は data MMU で変換し load の保護判定を受ける。I-cache が disabled/locked でも
+一致 entry を無効化するが、L2/L3 は無効化しない。外部 broadcast は変換属性と
+HID1[ABE] に従う (MPC7450UM 3.4.4.8)。
+同節は PEM 5.1.5.2 の列に 2 個目の sync が無い点を明示している。
+資料間の差として記録し、745x には BSD と MPC7450UM が一致する 2 個の sync の列を採る。
