@@ -48,6 +48,7 @@ static void direct_one(int x, int y, const u8 *pat, int width, u8 fg, u8 bg)
     direct_glyph(bits, 8, 0, pat, width, kcg_scale);
     (void)gfx_cmd_enqueue_mono(x, y, w, h, bits, 8, fg, bg == 0xFF ? -1 : bg,
                                x, y, w, h);
+    gfx_api->gfx_add_dirty_rect(x, y, w, h);
 }
 
 void kcg_draw_ank(int x, int y, u8 ch, u8 fg, u8 bg) {
@@ -127,6 +128,7 @@ int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg) {
             if (*p == '\n' || *p == '\t') {
                 if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
                     fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+                if (width) gfx_api->gfx_add_dirty_rect(start, y, width, 16 * scale);
                 width = 0;
                 for (i = 0; i < (int)sizeof(bits); i++) bits[i] = 0;
                 if (*p++ == '\n') { cx = x; y += line_h; } else cx += ank_w * 4;
@@ -140,6 +142,7 @@ int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg) {
             if (width + glyph_w * scale > 640) {
                 (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
                     fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+                gfx_api->gfx_add_dirty_rect(start, y, width, 16 * scale);
                 width = 0; start = cx;
                 for (i = 0; i < (int)sizeof(bits); i++) bits[i] = 0;
             }
@@ -150,6 +153,7 @@ int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg) {
         }
         if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
             fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+        if (width) gfx_api->gfx_add_dirty_rect(start, y, width, 16 * scale);
         return cx - x;
     }
     while (*p) {

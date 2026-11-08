@@ -1,4 +1,4 @@
-"""L1: copied command batches, row splitting, clipping and failure ordering."""
+"""L4: text drawing through DIRECT commands and the SHADOW path."""
 import argparse
 import os
 from pathlib import Path
@@ -20,6 +20,9 @@ MUTATIONS = (
     ('font-direct', 'userland/lib/gfx/text/gfx_font.c', '    if (gfx_direct) {\n        u8 bits[8 * 80];', '    if (0) {\n        u8 bits[8 * 80];'),
     ('font-color', 'userland/lib/gfx/text/gfx_font.c', 'color, -1, cx, y, n * FONT_W, FONT_H);', 'color + 1, -1, cx, y, n * FONT_W, FONT_H);'),
     ('kcg-direct', 'userland/lib/gfx/text/gfx_kcg.c', '    if (gfx_direct) {\n        u8 bits[80 * 64];', '    if (0) {\n        u8 bits[80 * 64];'),
+    ('ank-direct', 'userland/lib/gfx/text/gfx_kcg.c', '    if (gfx_direct) {\n        gfx_api->kcg_read_ank(ch, pat);', '    if (0) {\n        gfx_api->kcg_read_ank(ch, pat);'),
+    ('kanji-direct', 'userland/lib/gfx/text/gfx_kcg.c', '    if (gfx_direct) {\n        gfx_api->kcg_read_kanji(jis_code, pat);', '    if (0) {\n        gfx_api->kcg_read_kanji(jis_code, pat);'),
+    ('kcg-boundary', 'userland/lib/gfx/text/gfx_kcg.c', 'if (width + glyph_w * scale > 640)', 'if (width + glyph_w * scale >= 640)'),
     ('kcg-color', 'userland/lib/gfx/text/gfx_kcg.c', '        if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,\n            fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);', '        if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,\n            fg + 1, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);'),
 )
 
