@@ -27,5 +27,5 @@ C_ORDER_LEGACY = arch/x86/kernel/boot_cpu.c arch/x86/kernel/boot_after_paging.c 
     drivers/video/pc98/splash_raster_play.c drivers/video/pc98/splash_raster_run.c
 
 ASM_ORDER_LEGACY = arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm kernel/v86/v86_entry.asm arch/x86/kernel/ring3_entry.asm arch/x86/kernel/setjmp.asm lib/kstring_asm.asm lib/sqlite3/sqlite_stack.asm drivers/net/ne2000/ne2000_io.asm
-INCLUDE_ORDER_LEGACY = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
+INCLUDE_ORDER_LEGACY = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 platform/pc98/legacy mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
 MODULE_ORDER_LEGACY = kdebug hwdev sqlite fep cd kcg fm pcm v86 lan cirrus geforce trident

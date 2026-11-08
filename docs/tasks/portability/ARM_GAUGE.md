@@ -160,7 +160,7 @@
 `drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
 `kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
 `kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
-`kernel/sys.c` `kernel/v86/v86.c` `kernel/v86/v86_io.c` `net/link.c`
+`kernel/sys.c` `kernel/v86/v86.c` `platform/pc98/legacy/v86_io.c` `net/link.c`
 
 ---
 

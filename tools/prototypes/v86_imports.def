@@ -61,7 +61,7 @@
     },
     {
       "symbol": "v86_cui_display_restore",
-      "source": "kernel/v86/v86_io.h",
+      "source": "platform/pc98/legacy/v86_io.h",
       "context": "normal,exception",
       "irq": true
     },

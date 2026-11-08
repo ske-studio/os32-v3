@@ -3,7 +3,7 @@ qemu -B reserves a host offset so Linux mmap_min_addr does not hide page zero.
 Normal control always precedes compiled, runtime-RED single omissions.
 """
 CHECK = dict(name='v86-low-host', tier=1,
-    covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'kernel/time/sysclk.c', 'drivers/input/kbd.c', 'tools/tests/test_shm_user.py', 'tools/tests/mutpar.py', 'mm/paging.*', 'include/platform_memory.h', 'kernel/v86/v86_mem.*', 'kernel/v86/v86_bios.*', 'platform/pc98/bios_snapshot.c', 'kernel/v86/v86.h', 'kernel/v86/v86_module.h', 'kernel/module/module.h', 'mm/pgalloc.h', 'arch/x86/kernel/idt.h', 'kernel/kselftest.h', 'kernel/v86/v86_io.h', 'arch/x86/legacy/v86_call.c', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'fs/vfs.h', 'lib/kstring.h', 'sdk/include/os32/**', 'tools/tests/v86_low_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'kernel/v86/v86.c', 'tools/tests/shm_user_host.c', 'mm/memory_boot.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/gen_memmap.py', 'docs/02_memory.md', 'boot/loader_fat_new.asm', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'include/platform_timer.h', 'platform/pc98/clock.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py', 'kernel/v86/v86_bios_*.inc'],
+    covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'kernel/time/sysclk.c', 'drivers/input/kbd.c', 'tools/tests/test_shm_user.py', 'tools/tests/mutpar.py', 'mm/paging.*', 'include/platform_memory.h', 'kernel/v86/v86_mem.*', 'platform/pc98/legacy/v86_bios.*', 'platform/pc98/bios_snapshot.c', 'kernel/v86/v86.h', 'kernel/v86/v86_module.h', 'kernel/module/module.h', 'mm/pgalloc.h', 'arch/x86/kernel/idt.h', 'kernel/kselftest.h', 'platform/pc98/legacy/v86_io.h', 'arch/x86/legacy/v86_call.c', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'fs/vfs.h', 'lib/kstring.h', 'sdk/include/os32/**', 'tools/tests/v86_low_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'kernel/v86/v86.c', 'tools/tests/shm_user_host.c', 'mm/memory_boot.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/gen_memmap.py', 'docs/02_memory.md', 'boot/loader_fat_new.asm', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'include/platform_timer.h', 'platform/pc98/clock.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc'],
     needs=['make:all'], budget=3.989154)
 
 from paging_source import paging_source
@@ -55,22 +55,22 @@ MUTATIONS += (
 
 # Keep BIOS fragments separate so each mutant is compiled through the real include.
 MUTATIONS += (
-    ('kernel/v86/v86_bios_fdd_command.inc',
+    ('platform/pc98/legacy/v86_bios_fdd_command.inc',
      'if (loop_dev_get_format(cur_fdd_slot) == LOOP_FMT_D88) {\n        if (loop_dev_track_id_d88',
      'if (loop_dev_get_format(V86_DISK_SLOT) == LOOP_FMT_D88) {\n        if (loop_dev_track_id_d88', 'bios-format-slot'),
-    ('kernel/v86/v86_bios_fdd_command.inc',
+    ('platform/pc98/legacy/v86_bios_fdd_command.inc',
      '        cur_cyl[cur_fdd_slot]  = 0;', '        cur_cyl[0]  = 0;', 'bios-drive-cylinder'),
-    ('kernel/v86/v86_bios.c',
+    ('platform/pc98/legacy/v86_bios.c',
      '    for (u32 i = 0; i < V86_DRIVE_MAX; i++) {\n        cur_cyl[i] = 0;\n    }', '', 'bios-cylinder-reset'),
-    ('kernel/v86/v86_bios_fdd_command.inc',
+    ('platform/pc98/legacy/v86_bios_fdd_command.inc',
      'cur_cyl[cur_fdd_slot] >= cyls', 'cur_cyl[cur_fdd_slot] >= (u8)cyls', 'bios-wide-geometry'),
-    ('kernel/v86/v86_bios_fdd_command.inc',
+    ('platform/pc98/legacy/v86_bios_fdd_command.inc',
      'V86_FDC_HEAD((frame[V86F_EDX] >> 8) & U8_MAX, ax_in & U8_MAX)',
      'V86_FDC_HEAD((ax_in >> 8) & U8_MAX, ax_in & U8_MAX)', 'bios-log-head'),
-    ('kernel/v86/v86_bios_sasi.inc',
+    ('platform/pc98/legacy/v86_bios_sasi.inc',
      '    disklog(log_in, pos & 0xFFFFFFU, xfer_done,',
      '    disklog_begin(log_in, frame);\n    disklog(log_in, pos & 0xFFFFFFU, xfer_done,', 'bios-sasi-log-input'),
-    ('kernel/v86/v86_bios_fdd_command.inc',
+    ('platform/pc98/legacy/v86_bios_fdd_command.inc',
      '    disklog(log_in, phys_in, xfer_done,',
      '    disklog_begin(log_in, frame);\n    disklog(log_in, phys_in, xfer_done,', 'bios-fdd-log-input'),
 )
@@ -117,11 +117,11 @@ def check_generated_map():
 
 def main():
     check_generated_map()
-    paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_bios.c', 'platform/pc98/bios_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/input/kbd.c', 'mm/memory_boot.c')
-    sources = {p: ((ROOT / p).read_text() if p == 'kernel/v86/v86_bios.c'
+    paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'platform/pc98/legacy/v86_bios.c', 'platform/pc98/bios_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/input/kbd.c', 'mm/memory_boot.c')
+    sources = {p: ((ROOT / p).read_text() if p == 'platform/pc98/legacy/v86_bios.c'
                    else paging_source(ROOT / p)) for p in (*paths,
-        'kernel/v86/v86_bios_fdd_read.inc', 'kernel/v86/v86_bios_fdd_command.inc',
-        'kernel/v86/v86_bios_sasi.inc')}
+        'platform/pc98/legacy/v86_bios_fdd_read.inc', 'platform/pc98/legacy/v86_bios_fdd_command.inc',
+        'platform/pc98/legacy/v86_bios_sasi.inc')}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)
         arch = (ROOT / 'tools/tests/host_arch/arch_cpu.h').read_text().replace(

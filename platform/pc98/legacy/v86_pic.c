@@ -3,8 +3,8 @@
 /* ======================================================================== */
 
 #include "v86_pic.h"
-#include "../../arch/x86/kernel/idt.h"       /* OCW2_EOI */
-#include "../irq/irq_math.h"  /* IRQ_LINE_MAX */
+#include "../../../arch/x86/kernel/idt.h"       /* OCW2_EOI */
+#include "../../../kernel/irq/irq_math.h"  /* IRQ_LINE_MAX */
 
 #define V86_PIC_OCW2_SPECIFIC (OCW2_EOI | 0x40)
 #define V86_PIC_ICW_IDLE      0

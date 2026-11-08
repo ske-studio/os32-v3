@@ -5,7 +5,7 @@
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_kbd.h"
-#include "../../arch/x86/kernel/tss.h"
+#include "../../../arch/x86/kernel/tss.h"
 #include "pc98.h"
 #include "pegc.h"
 #include "v86_bios.h"
@@ -14,8 +14,8 @@
 #include "gfx.h"        /* PAL_IDX_PORT / PAL_G_PORT / PAL_R_PORT / PAL_B_PORT */
 #include "palette.h"    /* palette_init() — セッション終了時の復帰 */
 #include "console.h"    /* console_hw_cursor_enable() — DOS が変えた CSRFORM を戻す */
-#include "../../drivers/sound/fm/snd_engine.h" /* snd_set_master() — FM をゲストに明け渡す */
-#include "../module/module.h"     /* v86_debug_ops()->gcap_* — `v86 -g` の採取 (票 TASK_PEGC480_REALHW §3 段 1) */
+#include "../../../drivers/sound/fm/snd_engine.h" /* snd_set_master() — FM をゲストに明け渡す */
+#include "../../../kernel/module/module.h"     /* v86_debug_ops()->gcap_* — `v86 -g` の採取 (票 TASK_PEGC480_REALHW §3 段 1) */
 
 /* GDC はコマンドとパラメータの間に I/O ウェイトが要る (gfx_internal.h と同じ) */
 static void io_out(unsigned int port, unsigned int val)

@@ -95,7 +95,7 @@ ARCHIVE_SOURCE_MOVES = {
     'fs/hostdrvfs_proto.h': 'fs/hostdrv/hostdrvfs_proto.h',
     'kernel/paging_app.c': 'mm/paging_app.c',
     'kernel/paging_app.h': 'mm/paging_app.h',
-    'kernel/v86_io.c': 'kernel/v86/v86_io.c',
+    'kernel/v86_io.c': 'platform/pc98/legacy/v86_io.c',
 }
 # D1: original decision documents remain complete in the archive; keep fragments.
 ARCHIVE_DECISION_MOVES = {

@@ -1592,7 +1592,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_cui_display_restore",
-      "source": "kernel/v86/v86_io.h",
+      "source": "platform/pc98/legacy/v86_io.h",
       "context_safe": false,
       "index": 196,
       "retained": true
@@ -1633,7 +1633,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_pic_set_imr",
-      "source": "kernel/v86/v86_pic.h",
+      "source": "platform/pc98/legacy/v86_pic.h",
       "context_safe": false,
       "index": 201
     },
@@ -1881,7 +1881,7 @@
       "stage": "S4",
       "kind": "FUNC",
       "symbol": "v86_io_reset_policy",
-      "source": "kernel/v86/v86_io.h",
+      "source": "platform/pc98/legacy/v86_io.h",
       "context_safe": false,
       "index": 232
     },

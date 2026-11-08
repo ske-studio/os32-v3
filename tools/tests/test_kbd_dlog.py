@@ -16,7 +16,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.873258)
 
 from kernel_includes import include_flags
@@ -135,7 +135,7 @@ def host_build(tmp, mutated=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-dlog-host"
     # Keep driver-local and explicit ../drivers/input/kbd.h includes in the fixture.
-    for rel in ("kernel/v86/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
+    for rel in ("platform/pc98/legacy/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")

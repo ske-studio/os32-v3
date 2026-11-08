@@ -9,7 +9,7 @@ CHECK = dict(name='splash-raster-diag-host', tier=1,
             'tools/tests/splash_probe_host.c', 'tools/tests/splash_raster_model_host.c',
             'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
             'gfx/gfx_internal.h', 'include/gfx_hal.h', 'mm/paging.h',
-            'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
+            'platform/pc98/legacy/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h',
             'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=20.0)
 import argparse
