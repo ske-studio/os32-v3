@@ -1,6 +1,6 @@
 # TASK_NET_HOSTSVC — ネットワーク越しの Host Services (実機の /host・ネットワーク越しの CD・知らせのメールボックス・サービスの一覧)
 
-> 状態: **実装中 (2026-11-08)** — 詳細設計は確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md))。段 A・B・C・D・H・I・S を main に入れた (統合 11195dc5、起動の host_mailbox_init 5d5f93a5、期限切れの後の再同期 f79480bc)。NP21/W で host_time・クリップボード・通知・期限切れの後の再同期は合格、実機 82557 は LAN の hsync だけ確認。残り: 実機 Ra266 の受入 (82557 の上の host の時刻・クリップボード・通知・ネットワーク越しの CD・LAN の SerialFS の読み書き・再同期)。往復の版は `~/os32-tmp/run/net-hostsvc/`。
+> 状態: **受入完了 (2026-11-08)** — 詳細設計は確定 ([NET_HOSTSVC_DESIGN](../../decisions/network/NET_HOSTSVC_DESIGN.md))。段 A・B・C・D・H・I・S は main。実機 Ra266 (82557、main 61bf3518) で host の時刻・クリップボード (表示の環境が無いノートでは 503)・通知・ネットワーク越しの CD・LAN の SerialFS の読み書き・ホストの停止と再開・常駐の /host がある間の `sfs run hsync` まで全項目合格。実機受入で見つかった不具合 (再起動の後の ESTALE・SYN の連打と起動の 2 回・誤りの表示・Un10) は 48f57bb3・22f95279 で直して実機で確かめた。残り (P3): ホストの T_ERR を全部 STALE に扱う所、常駐の scope の開始の失敗の表示、表示の NIC 名が 82557 に固定。往復の版は `~/os32-tmp/run/net-hostsvc/`。
 > 上位: [V3_PLAN](../v3/V3_PLAN.md) §5 の「ネットワーク越しの CD・HostDrv の Host Services 経路」。土台: [HOST_SERVICES_PLAN](HOST_SERVICES_PLAN.md) (リンク層の Host Services、KAPI v51)、[TASK_LAN_82557](../realhw/TASK_LAN_82557.md) (82557・LAN 版 SerialFS、L-C・L-D2・L-E)。
 
 ## 0. ユーザー決定 (2026-11-05、要旨。原文は往復の置き場の USER_DECISIONS)
