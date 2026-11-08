@@ -1282,3 +1282,16 @@ pub mod fontsvc {
         }
     }
 }
+
+// The normal gshell host suite exercises the SHADOW path.
+#[no_mangle]
+pub static mut gfx_direct: i32 = 0;
+#[no_mangle]
+pub extern "C" fn gfx_cmd_get(_: i32, _: i32, _: i32, _: i32, _: *mut u8, _: u32) -> i32 { -1 }
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_fill(_: i32, _: i32, _: i32, _: i32, _: u8, _: u8) -> i32 { -1 }
+
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_put(_: i32, _: i32, _: i32, _: i32, _: *const u8, _: u32, _: i32) -> i32 { -1 }
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_mono(_: i32, _: i32, _: i32, _: i32, _: *const u8, _: u32, _: u8, _: i32, _: i32, _: i32, _: i32, _: i32) -> i32 { -1 }
