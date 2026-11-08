@@ -387,7 +387,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
 | [tasks/gui/TASK_P8_GUI_LAYER.md](tasks/gui/TASK_P8_GUI_LAYER.md) | P8 GUI 層 (音のリングと入力) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
-| [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
+| [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md)・[TASK_GFX_ACCEL_HAL](tasks/gui/TASK_GFX_ACCEL_HAL.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
 | [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
 | [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |
