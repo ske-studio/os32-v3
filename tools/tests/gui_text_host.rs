@@ -960,6 +960,18 @@ fn t22_direct_cell_icon_xor() {
     unsafe { ffi::CALLS.clear(); }
     draw::line(win, 0, 5, 19, 5, Style::pen(6).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
     check(unsafe { ffi::CALLS == vec![(12, 25, 12, 1, 6, 1)] }, "direct-xor-span");
+    for &(x0, y0, x1, y1, expected) in &[
+        (-20000, 5, 20000, 5, (12, 25, 12, 1, 6, 0)),
+        (-40000, 5, 5, 5, (12, 25, 4, 1, 6, 0)),
+        (5, -40000, 5, 40000, (15, 23, 1, 14, 6, 0)),
+    ] {
+        unsafe { ffi::CALLS.clear(); }
+        draw::line(win, x0, y0, x1, y1, Style::pen(6));
+        check(unsafe { ffi::CALLS == vec![expected] }, "direct-wide-line");
+    }
+    unsafe { ffi::CALLS.clear(); }
+    draw::line(win, -40000, 1, 40000, 1, Style::pen(6));
+    check(unsafe { ffi::CALLS.is_empty() }, "direct-wide-line");
     unsafe { ffi::CALLS.clear(); }
     draw::line(win, 2, 4, 8, 6, Style::pen(6).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
     check(unsafe { ffi::CALLS == vec![(12, 24, 2, 1, 6, 1), (14, 25, 3, 1, 6, 1), (17, 26, 2, 1, 6, 1)] }, "direct-xor-diagonal-spans");

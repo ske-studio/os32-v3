@@ -459,13 +459,13 @@ pub fn line(surface: SurfaceId, x0: i32, y0: i32, x1: i32, y1: i32, style: Style
     }
     let p = Painter::from_target(&t);
     if p.direct && !style.has(GUI_STYLE_DOTTED) && (y0 == y1 || x0 == x1) {
-        let rc = if y0 == y1 {
-            Rect::new(x0.min(x1) as i16, y0 as i16, ((x1 - x0).abs() + 1) as i16, 1)
-        } else {
-            Rect::new(x0 as i16, y0.min(y1) as i16, 1, ((y1 - y0).abs() + 1) as i16)
-        };
-        let rc = clip_rect(&t, rc);
-        if !rc.is_empty() {
+        let left = x0.min(x1).max(t.clip.x as i32);
+        let right = x0.max(x1).min(t.clip.right() - 1);
+        let top = y0.min(y1).max(t.clip.y as i32);
+        let bottom = y0.max(y1).min(t.clip.bottom() - 1);
+        if left <= right && top <= bottom {
+            let rc = Rect::new(left as i16, top as i16,
+                               (right - left + 1) as i16, (bottom - top + 1) as i16);
             if style.has(GUI_STYLE_XOR) { p.xor_rect(rc, style.fg); }
             else { p.fill_solid(rc, style.fg); }
         }

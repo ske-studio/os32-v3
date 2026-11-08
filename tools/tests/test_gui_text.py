@@ -35,6 +35,8 @@ DRAW = 'userland/rust/libos32gui/src/draw.rs'
 
 # 変異 1 本 = (名前, 置き換え前, 置き換え後, RED の印)。どれも draw.rs。
 MUTATIONS = [
+    ('line-unclipped-i16', '        let left = x0.min(x1).max(t.clip.x as i32);\n        let right = x0.max(x1).min(t.clip.right() - 1);',
+     '        let left = x0.min(x1) as i16 as i32;\n        let right = x0.max(x1) as i16 as i32;', 'direct-wide-line'),
     ('cell-per-pixel', '    if p.direct {\n        let mut bits = [0u8; CELL_H as usize * 2];', '    if false {\n        let mut bits = [0u8; CELL_H as usize * 2];', 'direct-cell-mono'),
     ('direct-branch-removed', '        } else if self.direct {\n            // この描画 API',
      '        } else if false {\n            // この描画 API', 'direct-dispatch'),
