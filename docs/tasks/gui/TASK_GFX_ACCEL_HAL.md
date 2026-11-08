@@ -22,10 +22,12 @@
 | PEGC | dword + 間隔 0〜600ns (`pegc gap sweep`) | 14.1ms (0ns)〜141ms | すべて 0 (間隔は要らない) |
 | Trident | dword + 間隔 80ns (既定) / 70ns / 0ns | 21.5ms / 19.8ms / 12.9ms | 0 / 0 / 59 万バイト |
 | GeForce | dword + WC (p95) | 7.37ms | 0 |
-PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ時間。HW-BASIC の pegc_burst は F00000h が RAM (043Bh=0xDF) のため unavailable。証拠 `~/os32-tmp/evidence/2026-11-08/pegc-bench/`、`tri-gap/`。
+PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ時間。読み出しは全画面 89.0ms (dword・rep movsd)、176.9ms (word)、352.7ms (byte) で書き込みの約 6.3 倍 — PEGC は「書くだけの DIRECT」を足す方向 (確定設計の追記 2)。HW-BASIC の pegc_burst は F00000h が RAM (043Bh=0xDF) のため unavailable。証拠 `~/os32-tmp/evidence/2026-11-08/pegc-bench/`、`tri-gap/`。
 
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| P0a・P0b・H1・H2a (第 1 波) | 未着手 |
+| H1 (宣言、KAPI 83) | 実装済み (Opus レビュー取り込み可) |
+| P0a・P0b・P0c (計測) | 実装済み (P0a は Opus の直し 1 済、P0b 取り込み可) — 追記 1 で欠けを決めた |
+| H2a | 未着手 |
 | ほか 27 段 | 未着手 (確定設計 §7 の依存の順) |

@@ -353,3 +353,46 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 2. P1 移る条件: DIRECT へ移る共通の条件に「GUI が画面を所有し、全画面の所有者がいない」を足した。呼ぶ側は向きを決めない (§3-4)。全画面中の写像の中への flip で SHADOW と lease が保たれることを試験 r3-2 で見る。
 3. P1 回復の順: WM の各周と WAIT・POLL の戻りを「check → 成功なら take_regen → 描き直し」に固定した (§3-3a)。flush だけで回復を待たないことを、実際の経路の試験 r3-3 で見る。
 4. P2 INDEX8: 今回の口は INDEX8 専用。高色深度は、u32 の画素値と独立した透過の旗を持つ形式付きの口を別の版で足す (§3-7)。今回は実装しない。
+
+## 追記 1 (2026-11-08、P0a・P0b の欠けの決定と P0c の分離)
+
+
+## P0a 典型操作の台本 (DESIGN.final §7 P0a を置き換える)
+1. **操作は 6 本**。§4 の表は効果の例で、操作の一覧ではない。台本の名前と中身は次のとおり。`move` は最前面の窓を右へ 64px 動かして戻す (`wm::move_window`、wm.rs:1497)。`scroll` は焦点の edit_gui に PageDown。`menu` はスタートメニューを開くキー (kbdnav の割り当て) を押して開き、もう一度押して閉じる。`desktop` は `wm::composite_full` (wm.rs:1007)。`char` は焦点の edit_gui に `a` と BS を交互に入れる。`list` は焦点の filer に ↓。
+2. **起動の入口は gserial の動詞** `ops <名前> <回数>` だけにする (gserial.rs:128-142 の parse に 1 行、:229-272 の dispatch に 1 行)。シェルの命令・起動引数・/api/key は使わない。実機 (ノートのシリアル) と NP21/W は同じ経路で動く。
+3. **前提は呼ぶ側が整える**: edit_gui・filer の起動と焦点は、既存の `key`・`type` で台本の前に済ませておく。焦点の窓の持ち主が違えば `error "pre" 3`。gf_accept (wm.rs:1743) の計測中なら `error "busy" 4`。
+4. **入力**: キーは `Cmd::Key` と同じ注入の経路 (gserial.rs:264-270) で入れる。move と desktop は WM の関数を直接呼ぶ。
+5. **計測の状態の持ち主は `GuiState.ops`**。feature gf_accel_accept のときだけ、wm.rs の GuiState にフィールドを 1 つ足す。
+```rust
+// userland/gshell/src/typical_ops.rs (新)
+pub struct Run { op: u8, warm: u8, left: u16, i: u16, t0: u64, deadline: u32,
+                 base: GfxStats /* present_bytes, commits, hw_ops */, id: [u8; 8], active: bool }
+pub fn start(st: &mut GuiState, id: &[u8], op: u8, n: u16) -> Result<(), u8>; // gserial から
+pub fn on_cycle_end(st: &mut GuiState);   // wm.rs の周の関数 (:1180 付近) の最後、flush_present の後に 1 行
+```
+6. **始まりと終わり**: 始まりは注入の直前の `now()` と `gfx_stats` (wm.rs:1759 の now と同じ時計)。終わりは、注入の後の周で次の 4 つがそろい、その周の flush_present が済んだ時点。(a) 全部の窓の `dirty`・`issued` が空、(b) リングに配っていない物が無い、(c) `configure_pending` が無い、(d) その周で COMMIT が 1 回以上あった (desktop と move は WM の flush でよい)。1 回 2 秒で打ち切り、その回は `FAILED` として記録する。次の回は、終わった次の周で入れる。
+7. **回数と出力**: warmup 10 回の後に本番 n 回 (既定 50)。1 回ごとに `GOP1 <名前> <i> <µs> <Δpresent_bytes> <Δcommits> <Δhw_ops>` を出す (`serial_puts`、GFW1 と同じ出し方、wm.rs:1836-1838)。全部終わったら `reply(id, "end 0")`。DIRECT の量 (PUT・MONO・GET のバイト) の列は G 段で数が揃ってから末尾に足す。今は出さない。
+8. **触ってよいファイル**: typical_ops.rs (新)、gserial.rs (parse・dispatch の 2 行と `Cmd::Ops`)、wm.rs (GuiState のフィールド 1 つ・on_cycle_end の呼び出し 1 行)、lib.rs (`#[cfg(feature = "gf_accel_accept")] mod typical_ops;`)。ほかのファイルには触らない。host の試験は gshell/host/ に typical_ops_tests.rs を新しく足す (parse、終わりの 4 条件、打ち切り)。
+
+## P0b HAL の素の時間 (DESIGN.final §7 P0b を置き換える)
+1. **置き場**: `drivers/video/geforce/gf_accept_prim.c` をやめ、**kdebug/gf_prim_bench.c (新、hwdev.mod)** にする。既存の層 3 の受入 (kdebug/gf_accel_test.c) と同じく、module の境界は `geforce_accel_ops()` (gf3_test_ops) と `geforce_foundation_ops()` だけを通る。dispatch の検査は gf_accel_test.c:96-104 と同じ条件を自前で持つ (static は共有しない)。
+2. **線 (wire)**: kdebug/gf_command_wire.h:11-14 の `enum gf2_case` の末尾に `GF6_PRIM` を足す。tools/hwdev_layout.json の enum の並びを作り直す。シェルは userland/shell/cmd_gf2.c:10-12 の `cases[]` の末尾に `"prim"` を足し、:33-35 の上限を `GF6_PRIM` にする。`gf2 prim <項目>` の項目の番号は session に入れる。
+3. **振り分け** (kdebug/gf_command_test.c:272- に 1 つ足す):
+```c
+if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
+    int rc = gf_prim_bench(q.session);   /* kdebug/gf_prim_bench.h: int gf_prim_bench(u32 item); */
+    request->session = 0; request->rc = rc; return rc;
+}
+```
+4. **ビルド**: build/hwdev.mk:5 の `HWDEV_GF` に `gf_prim_bench` を足す。tools/tests/test_kdebug_imports.py の許可の一覧に、新しく使う名前があれば足す。
+5. **項目** (session、0 は全部): 1 `fence` (1×1 の fill = t_f)・2 `fill` (全面)・3 `copy` (全面、重なり無し)・4 `mono` (1KB の不透明)・5 `ifc` (64KB の upload、force_m2mf=false)・6 `m2mf` (64KB の upload、force_m2mf=true)・7 `bar0` (BAR0 0x000000 の 32 ビットの読み = t_d)。書き先は `o->test_surface` で、表示面には書かない。test_surface が 640×480 より小さいときは、面の寸法で測って寸法も出す。
+6. **時計と回数**: `f->io.timing.clock_us` (gf_accel_test.c:123 と同じ)。1 本が短いので、100 本を 1 組として組の時間を測る。warmup 1 組の後に本番 50 組。
+7. **CPU の WC の put は測らない**: test_surface の写像は WC の窓 (512KiB) の外なので、値が違ってしまう。DESIGN の 24µs/KB (TASK_GF_ACCEL 段 0、全面 7.37ms) をそのまま使う。
+8. **出力**: `GFP1 <項目> <組> <組の µs> <1 本の ns> <rc>`。終わりに `GFP1 done rc=<rc>` (serial_puts_polled)。
+9. **t_k は CPL=3 の別の段 P0c で測る** (kdebug はカーネルの中なので測れない)。userland/tests/kapi_cost.c (新、40 行): `gfx_screen_info(&si)` を 1000 回呼び、前後を `sys_time_now` で測って 1 回の ns を出す。副作用の無い今の KAPI を使い、新しい submit は待たない。DIRECT の submit の実際の t_k は H2 の後に P0a を回し直して得る。
+
+## 追記 2 (2026-11-08、PEGC の実測と「書くだけの DIRECT」の方向)
+
+- 実測 (Ra266、全画面 640x480x8 を 8 回): 書き込み rep movsd・dword 14.1ms、word 23.6ms、byte 46.9ms、間隔 0〜600ns でも欠け 0。読み出し rep movsd・dword 89.0ms、word 176.9ms、byte 352.7ms。
+- ユーザー (原文):「測ってよいですが、RAMの状態を管理しない書き込み方法として用意するのは？」「ゲームなどの場合毎秒レンダリングし続けなければならない時があるからです」「２．は必要でしょうね」(vsync)。
+- 方向: PEGC に書くだけの DIRECT を足す (blit は申告しない = 描き直し、XOR・半透明は避ける、カーソルの下の退避は読む、vsync を併用、アプリが方式を選ぶ問い合わせ)。詳細の追記は別に書く (票 TASK_GFX_ACCEL_HAL)。
