@@ -901,16 +901,8 @@ fn wm_button_up(st: &mut GuiState, mx: i32, my: i32) {
         let nf = st.drag_frame;
         let (cx, cy) = wm::clamp_to_work_area(st, nf.x, nf.y, nf.w, nf.h);
         crate::movecopy::move_window(st, idx, cx, cy);
-        /* 最後の枠が確定後の外形と違えば、枠の縁を消す (下地は損傷、クライアント
-         * 面は Paint)。普通は update_drag が同じクランプで枠を決めるので一致するが、
-         * ドラッグ中にアプリが resize_window し、マウスキーの離し (NP_DOT) が
-         * update_drag を通らずに確定すると大きさがずれる (Codex レビュー 2 回目 P2)。 */
-        if nf != st.windows[idx].outer() {
-            for e in frame_edges(nf).iter() {
-                st.dirty_screen(*e);
-            }
-            expose_frame_edges(st, nf);
-        }
+        /* 最後の枠の縁は move_window が損傷にする (外形とずれた場合も含む。
+         * ドラッグ中の resize_window と NP_DOT の離し、Codex レビュー 2 回目 P2)。 */
 
         /* Configure を通知 (座標確定、R2)。 */
         emit_configure(st, idx);

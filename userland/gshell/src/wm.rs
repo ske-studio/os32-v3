@@ -1048,8 +1048,12 @@ pub fn composite_full(st: &mut GuiState) {
 /// タスクバーに重なる候補窓が、FEP だけを描く周 (候補の更新) と枠の周 (ここ) とで
 /// 上下が入れ替わって点滅した (Codex レビュー 4 回目 P2)。FEP を最上位に置けば、
 /// FEP だけを描き直す経路は順序を崩さない。
+pub fn overlay_rects(st: &GuiState) -> [Rect; 4] {
+    [modal::rect(), taskbar::rect(st), startmenu::rect(), fep::rect()]
+}
+
 pub fn overlays_to_refresh(st: &GuiState, regions: &[Rect]) -> [Rect; 4] {
-    let cands = [modal::rect(), taskbar::rect(st), startmenu::rect(), fep::rect()];
+    let cands = overlay_rects(st);
     let mut out = [Rect::EMPTY; 4];
     let mut i = 0;
     while i < 4 {

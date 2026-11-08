@@ -203,3 +203,43 @@ fn movecopy_capacity_falls_back_to_paint() {
         }}
     }
 }
+
+#[test]
+fn movecopy_fep_preedit_is_repainted() {
+    use crate::fep;
+    let mut st = setup();
+    *fep::state() = fep::Fep::NEW;
+    st.windows[0].visible = false;
+    st.windows[2].visible = false;
+    visible::recompute_and_expose(&mut st);
+    st.windows[1].tc_visible = true;
+    st.windows[1].tc_x = 20; st.windows[1].tc_y = 20;
+    let render = &fep::GSHELL_IME_RENDER_GFX;
+    (render.begin)();
+    (render.putc)(0, fep::PREEDIT_ROW as i32, b'A', 0xA1);
+    (render.end)();
+    fep::pre_cycle(&mut st);
+    fep::post_cycle(&mut st);
+    let fr = fep::rect();
+    let old_org = st.windows[1].client_origin();
+    let client = Rect::new(old_org.0, old_org.1, st.windows[1].client_size().0, st.windows[1].client_size().1);
+    let overlap = fr.intersect(&client);
+    assert!(!overlap.is_empty(), "preedit must overlap the moved client");
+    st.windows[1].dirty.clear();
+    st.drag_index = 1;
+    st.drag_frame = st.windows[1].outer().translate(32, 32);
+    super::move_window(&mut st, 1, 64, 96);
+    let org = st.windows[1].client_origin();
+    let copies = COPIES.lock().unwrap();
+    let mut checked = 0;
+    for y in overlap.y..overlap.bottom() { for x in overlap.x..overlap.right() {
+        let lx = x - old_org.0; let ly = y - old_org.1;
+        if has(&st.windows[1].vis, lx, ly) {
+            checked += 1;
+            assert!(!copies.iter().any(|(_, src)| src.contains(x, y)), "FEP source copied");
+            assert!(has(&st.windows[1].dirty, lx, ly), "FEP source needs Paint at destination {},{}", org.0 + lx, org.1 + ly);
+        }
+    }}
+    assert!(checked > 0);
+    *fep::state() = fep::Fep::NEW;
+}

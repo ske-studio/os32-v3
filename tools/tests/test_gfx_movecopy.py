@@ -14,6 +14,7 @@ CHECK = dict(name='gfx-movecopy-host', tier=1, needs=[], budget=30, covers=[
     'tools/tests/test_gfx_movecopy.py'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('fep-source', 'wm::overlay_rects(st)', '[crate::modal::rect(), crate::taskbar::rect(st), crate::startmenu::rect()]'),
     ('dirty-source', 'visible::region_subtract_region(&old_vis, &st.windows[index].dirty)',
      'visible::region_subtract_region(&old_vis, &RectSet::EMPTY)'),
     ('issued-source', 'visible::region_subtract_region(&valid, &st.windows[index].issued)',

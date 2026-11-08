@@ -1,6 +1,6 @@
 //! 窓移動の複写 (§3-5)。呼出し元の結線は W2。
 //! index は解決済みの窓。座標の制限・最大化解除は呼出し元が行う。
-use crate::{cursor, damage, kbdnav, modal, startmenu, taskbar, visible, wm};
+use crate::{cursor, damage, kbdnav, visible, wm};
 use crate::wm::{GuiState, Rect, RectSet, MAX_VIS};
 
 extern "C" {
@@ -83,7 +83,7 @@ pub fn move_window(st: &mut GuiState, index: usize, x: i32, y: i32) {
         let (valid, b) = visible::region_subtract_region(&valid, &st.windows[index].issued);
         ok = valid;
         complete &= a && b;
-        for top in [modal::rect(), taskbar::rect(st), startmenu::rect()] {
+        for top in wm::overlay_rects(st) {
             let (next, all) = visible::region_subtract_rect(&ok, top.translate(-old_org.0, -old_org.1));
             ok = next;
             complete &= all;
