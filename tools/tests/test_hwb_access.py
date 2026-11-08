@@ -9,7 +9,7 @@ CHECK = dict(name='hwb-access-host', tier=1, covers=[
     'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
     'tools/tests/mutpar.py', 'kdebug/generated/**',
     'platform/pc98/platform_io.h', 'arch/x86/arch_io.h',
-    'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=3)
+    'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=5.0)
 
 import sys
 import tempfile

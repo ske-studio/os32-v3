@@ -1,7 +1,7 @@
 """Host fixture cache selection, cross-worktree keys, and mutation checks."""
 CHECK = dict(name='host32-cache-host', tier=1,
              covers=['tools/tests/host32.py', 'tools/tests/test_host32_cache.py'],
-             needs=['make:all'], budget=5)
+             needs=['make:all'], budget=3.0)
 
 import os
 import pathlib

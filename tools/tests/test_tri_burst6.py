@@ -1,5 +1,5 @@
 """Execute tri_burst6 grouped pacing, comparison, cleanup and log budget."""
-CHECK = dict(name='tri-burst6', tier=1, needs=[], budget=240, covers=[
+CHECK = dict(name='tri-burst6', tier=1, needs=[], budget=49.5, covers=[
     'tools/tests/test_tri_burst6.py', 'tools/tests/tri_burst6_host.c',
     'userland/tests/hw/tri_burst6.hwb', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',

@@ -5,7 +5,7 @@ No register/LFB access: common trident_device_fake supplies cold PCI values.
 Resource contract: TRIDENT_FULL_DESIGN §2 and DESIGN.final.md F6 decisions. Failure points are API-level;
 fixed BAR placement is required by the boot mapping contract.
 """
-CHECK = dict(name='trident-resources', tier=1, needs=[], budget=5,
+CHECK = dict(name='trident-resources', tier=1, needs=[], budget=16.1,
     covers=[
         'build/config.mk',
         'docs/decisions/realhw/BARLEN_DESIGN.md',

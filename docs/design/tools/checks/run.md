@@ -30,6 +30,7 @@ def main(argv: list[str]) -> int: ...
 ## CLI
 
 - `--list`: 通常列を `check-<name>` で1行1本。budget 降順、同値は name 順。
+- `--list --shard i/n`: 0始まりのシャード列。check needs の無向連結成分ごとに budget 合計の降順で LPT 分割し、同値は名前・シャード番号順。列内は通常の budget 順。`--json` と併用可能。分母0・範囲外・ほかの action との併用はエラー。
 - `--list --json`: 同じ列の name/target/path と CHECK の値。inventory が読む。
 - `--select [--base REF | --files PATH...] [--tier N]`: stdout は shell 代入、説明は stderr。明示空 --files と未指定を区別する。
 - `--run NAME... [--files PATH...]`: name/check-name を受け、明示された検査と check 前提の閉包を実行する。単独 CLI の make 前提はまとめて1回組む。
@@ -63,7 +64,7 @@ def main(argv: list[str]) -> int: ...
    段1は実装者が直接 `--select` を使う場合だけ。docs/notestの特別分岐は既定の下限2で引き上げない。節目は make check。
 5. **実行集合**: 段0〜3では tier4 を除く hit をすべて回す。当たった tier2/3 を浅い段という理由で削らない。
    静的検査・tier0・tier3・文書検査も当たりがある場合だけ選ぶ。段4は通常列全て。
-   check needs の閉包を加えて重複を除く。ver-info の前提もここで加えるだけで、実行依存グラフは作らない。
+   check needs の閉包を加えて重複を除く。ver-info の前提も閉包へ加える。並列 make は check-time 間の依存辺で前提の完了を待つ。
    変異は段1なし、段2/3は hit ∩ stage のうち mutate_tier≤段、段4は全て。docs の MUT1=stage と fast の MUT1=空は旧互換。
 6. **準備**: stage の make needs の和が CC_NEEDS。親 make が検査の前に1回組む。make の内部前提は既存の build 規則に任せる。
 7. **出力**: CC_MODE/CC_STAGE1/CC_MUT1/CC_SUMMARY の名前と quoting を維持 (`tools/check_select.py:1424`)。CC_TIER/CC_NEEDS/CC_FILES_JSON を足す。
@@ -93,7 +94,7 @@ HOST32_RUNNERS の全列で正常対照、変異は先頭 runner だけ (`build/
 旧 recipe の行順、環境、失敗中断を run に移す。旧 __main__/unittest は subprocess の argv で呼び、一律 main() 呼出しへ変えない。
 make は --list の名前に `.PHONY` と静的パターン `$(CHECK_NAMES): check-%:` を付ける。列外7入口は手書き make のまま。
 check-changed は CC_NEEDS を1回組み、tree save → check-par → verify の順。check/fast は全列の needs を同様に集める。
-親 make の準備対象は選択結果、全列時は --list --json の needs から得る。make 断片や check-time 間の依存辺は生成しない。
+親 make の準備対象は選択結果、全列時は --list --json の needs から得る。make 断片は作らず、JSON の check needs から check-time 間の依存辺を make 内で生成する。`CHECK_SHARD=i/n` があれば CHECK_PAR_TARGETS の既定をそのシャード列にする。全検査の登録・make 前提の準備は維持する。
 check-par の既存計時子は CHECK_TIME_CHILD=1 を渡す。子の --run は指定名の本体だけを実行し、閉包の再展開・前提の再準備をしない (`build/sdk.mk:169,174`)。
 直接 make check-X/CLI --run は同じ閉包の make needs をまとめて1回組んでから実行する。ver-info の前提は重複なく選択へ加える。
 BUILD_OUT/SQLITE_PROTO_OUT/CROSS_DIR 等は make の展開値を渡し、Python にパスの別定義を作らない。

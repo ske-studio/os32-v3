@@ -5,7 +5,7 @@ CHECK = dict(name='hwb-log-host', tier=1,
                      'kdebug/hwb_wire.h', 'tools/tests/hwb_log_host.c',
                      'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-                     'tools/tests/mutpar.py'], needs=[], budget=10)
+                     'tools/tests/mutpar.py'], needs=[], budget=4.5)
 import argparse
 import hwb_host
 

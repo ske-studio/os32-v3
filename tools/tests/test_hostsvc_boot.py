@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Production boot assembly starts exactly one shared NIC (ILP32/qemu)."""
-CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5, covers=['platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
+CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
     'drivers/net/e82557/lan_body.c',
     'drivers/block/netcd.h',
     'drivers/base/dev.h',

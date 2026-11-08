@@ -23,7 +23,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
 """
 CHECK = dict(name='shell-service-host', tier=1,
     covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
-    needs=[], budget=1.566306)
+    needs=[], budget=2.9)
 
 from exec_source import exec_source
 from kernel_includes import include_dirs, include_flags

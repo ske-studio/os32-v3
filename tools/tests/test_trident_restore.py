@@ -10,7 +10,7 @@ expectations. To regenerate expectations, run this suite after an approved
 script/contract change. Full production bind/lifecycle assembly belongs to
 3c/3d; this standalone 3b tree has declarations only for those components.
 """
-CHECK = dict(name='trident-restore', tier=1, needs=[], budget=30,
+CHECK = dict(name='trident-restore', tier=1, needs=[], budget=4.6,
     covers=['drivers/video/trident/state_restore.c',
             'drivers/video/trident/trident.h', 'tools/tests/trident_restore_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',

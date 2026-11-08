@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """D4/D5 Device media boundary, real ISO/VFS and libc-free ILP32 runtime."""
-CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=10, covers=[
+CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=6.5, covers=[
     'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h',
     'fs/isofs/iso9660.c', 'fs/isofs/iso9660.h', 'fs/isofs/*.inc',
     'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',

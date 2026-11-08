@@ -11,7 +11,7 @@ CHECK = dict(name='probe-host', tier=1, covers=[
     'tools/tests/probe_host.c', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/shell/hwb.h', 'sdk/include/os32/os32_kapi_shared.h',
-    'platform/pc98/platform_io.h', 'arch/x86/arch_io.h'], needs=[], budget=5)
+    'platform/pc98/platform_io.h', 'arch/x86/arch_io.h'], needs=[], budget=4.6)
 import sys
 import tempfile
 from pathlib import Path

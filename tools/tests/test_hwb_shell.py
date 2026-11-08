@@ -1,5 +1,5 @@
 """HW_BASIC_DESIGN §§2-7 real shell wiring and emitted serial records."""
-CHECK = dict(name='hwb-shell-host', tier=1, budget=240.0, needs=[], covers=[
+CHECK = dict(name='hwb-shell-host', tier=1, budget=115.9, needs=[], covers=[
     'userland/shell/cmd_hw.c', 'userland/shell/hwb*.c', 'userland/shell/hwb.h',
     'userland/shell/shell.h', 'userland/shell/main.c', 'sdk/include/os32/*.h', 'include/types.h',
     'include/pci_dev_contract.h', 'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'userland/tests/hw/*.hwb',

@@ -11,7 +11,7 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
             'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
-    needs=[], budget=60.0)
+    needs=[], budget=9.2)
 
 import argparse
 import os

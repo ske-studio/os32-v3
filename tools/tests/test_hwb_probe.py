@@ -1,5 +1,5 @@
 """Stage C: real shell/engine, ring consumption, serial and wire mutations."""
-CHECK = dict(name='hwb-probe-host', tier=1, budget=10, needs=[], covers=[
+CHECK = dict(name='hwb-probe-host', tier=1, budget=9.4, needs=[], covers=[
     'userland/shell/hwb*.c', 'userland/shell/hwb.h', 'userland/shell/cmd_hw.c',
     'userland/shell/shell.h', 'sdk/include/os32/*.h', 'include/**',
     'kdebug/**', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """LGY attach transfers shared link ownership and preserves reflection."""
-CHECK = dict(name='hostsvc-lgy98-attach', tier=1, needs=[], budget=3, covers=[
+CHECK = dict(name='hostsvc-lgy98-attach', tier=1, needs=[], budget=3.4, covers=[
     'drivers/net/ne2000/lgy98.c', 'drivers/net/ne2000/lgy98.h',
     'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h',
     'drivers/char/np2sysp.h', 'net/nic.h', 'net/link.h',

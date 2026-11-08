@@ -2,7 +2,7 @@
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
 CHECK = dict(name='allocator-bench-host', tier=1,
     covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
-    needs=['make:all'], budget=3.283154)
+    needs=['make:all'], budget=5.4)
 
 from exec_source import exec_source
 from kernel_includes import include_flags

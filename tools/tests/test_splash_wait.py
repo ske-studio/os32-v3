@@ -2,7 +2,7 @@
 CHECK = dict(name='splash-wait-host', tier=1,
     covers=['platform/pc98/splash.c', 'lib/divdi3.c',
             'tools/tests/splash_wait_host.c', 'tools/tests/kernel_includes.py',
-            'tools/tests/host32.py'], needs=[], budget=10.0)
+            'tools/tests/host32.py'], needs=[], budget=3.1)
 
 import argparse
 import os

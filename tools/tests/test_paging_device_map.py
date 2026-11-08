@@ -1,5 +1,5 @@
 """M2: actual paging/ledger transactions, privileged instruction seams only."""
-CHECK = dict(name='paging-device-map-host', tier=1, budget=30.0,
+CHECK = dict(name='paging-device-map-host', tier=1, budget=6.4,
              covers=['mm/paging.c', 'mm/paging.h', 'mm/paging_*.inc',
                      'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
                      'mm/physmem.c', 'mm/physmem.h', 'include/memmap.h',

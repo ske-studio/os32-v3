@@ -22,7 +22,7 @@ CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'tools/tests/host_notice_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/io.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=10)
+    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('copy-failure-consumes', '        return OS32_ERR_INVAL;\n    host_mailbox_commit',

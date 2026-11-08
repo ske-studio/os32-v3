@@ -1,5 +1,5 @@
 """Resident probe registry, owner lookup, epoch and slot publication (ILP32)."""
-CHECK = dict(name='debug-probe', tier=1, needs=[], budget=4,
+CHECK = dict(name='debug-probe', tier=1, needs=[], budget=3.5,
     covers=['include/debug_probe.h', 'kernel/module/debug_probe.c',
             'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
             'kernel/module/module_schema.h', 'include/types.h', 'include/memmap.h',

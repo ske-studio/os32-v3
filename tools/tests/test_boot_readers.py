@@ -25,7 +25,7 @@ CHECK = dict(name='boot-readers-host', tier=1, covers=['tools/tests/test_module_
     'tools/tests/kernel_includes.py', 'include/platform_boot.h',
     'include/memmap.h', 'include/types.h', 'include/build_id.h',
     'init/boot_disk.h', 'mm/paging.h', 'lib/kstring.h', 'lib/le_internal.h',
-    'sdk/include/os32/**'], needs=[], budget=5.0)
+    'sdk/include/os32/**'], needs=[], budget=3.2)
 
 PRELUDE = r'''
 #include "memmap.h"

@@ -605,6 +605,37 @@ def ordered(checks, names=None):
                         key=lambda n: (-checks[n].budget, n)))
 
 
+def shards(checks, count):
+    """LPT over undirected check-dependency components; never split a need."""
+    if count < 1:
+        raise ValueError("shard count must be positive")
+    closure(checks, checks)  # Reject unknown prerequisites even for empty shards.
+    neighbors = {n: set() for n in checks}
+    for name, check in checks.items():
+        for need in check.needs:
+            if need.startswith("check:"):
+                dependency = need[6:]
+                neighbors[name].add(dependency)
+                neighbors[dependency].add(name)
+    groups, remaining = [], set(checks)
+    while remaining:
+        pending, group = [min(remaining)], set()
+        while pending:
+            name = pending.pop()
+            if name in group:
+                continue
+            group.add(name)
+            pending.extend(neighbors[name] - group)
+        remaining.difference_update(group)
+        groups.append(tuple(sorted(group)))
+    result, loads = [set() for _ in range(count)], [0.0] * count
+    for group in sorted(groups, key=lambda g: (-sum(checks[n].budget for n in g), g)):
+        index = min(range(count), key=lambda i: (loads[i], i))
+        result[index].update(group)
+        loads[index] += sum(checks[n].budget for n in group)
+    return tuple(ordered(checks, names) for names in result)
+
+
 def discover(root: Path) -> dict[str, Check]:
     checks = {}
     paths = set((root / "tools/checks").rglob("*.py"))
@@ -1075,6 +1106,7 @@ def main(argv: list[str]) -> int:
     action.add_argument("--run", nargs="+")
     action.add_argument("--lint", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--shard", help="zero-based index/count, with --list only")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--base")
     source.add_argument("--files", nargs="*")
@@ -1082,11 +1114,19 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     try:
         checks = discover(ROOT)
+        names = ordered(checks)
+        if args.shard is not None:
+            if not args.list or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
+                raise ValueError("--shard requires --list and index/count")
+            index, count = map(int, args.shard.split("/"))
+            if index >= count:
+                raise ValueError("shard index must be less than count")
+            names = shards(checks, count)[index]
         if args.list:
             if args.json:
-                print(json.dumps([dict(asdict(checks[n]), target="check-" + n) for n in ordered(checks)]))
+                print(json.dumps([dict(asdict(checks[n]), target="check-" + n) for n in names]))
             else:
-                print("\n".join("check-" + n for n in ordered(checks)), end="\n" if checks else "")
+                print("\n".join("check-" + n for n in names), end="\n" if names else "")
             return 0
         if args.lint:
             return lint(ROOT, checks)

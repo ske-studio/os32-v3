@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run real CLIENT transfer comparisons with and without GE callbacks."""
-CHECK = dict(name='trident-cpu32', tier=1, needs=[], budget=10,
+CHECK = dict(name='trident-cpu32', tier=1, needs=[], budget=4.2,
     covers=['kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',
             'kdebug/tri_command_wire.h', 'kdebug/generated/**',
             'tools/tests/trident_cpu32_host.c', 'tools/tests/test_trident_cpu32.py',

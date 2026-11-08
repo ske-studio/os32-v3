@@ -11,7 +11,7 @@ CHECK = dict(name='splash-wire-host', tier=1,
             'lib/crc32_core.inc', 'lib/kstring.h', 'mm/kmalloc.h', 'fs/vfs.h',
             'gfx/gfx.h', 'gfx/palette.h', 'include/types.h', 'include/pc98.h', 'include/pegc.h',
             'include/sys.h', 'include/gfx_hal.h', 'include/tvram.h',
-            'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=30.0)
+            'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=72.5)
 import argparse
 import os
 from pathlib import Path

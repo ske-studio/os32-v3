@@ -14,7 +14,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
 """
 CHECK = dict(name='font-source-host', tier=1,
     covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
-    needs=[], budget=3.680518)
+    needs=[], budget=4.7)
 
 from kernel_includes import include_dirs, include_flags
 import pathlib

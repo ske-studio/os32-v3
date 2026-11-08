@@ -6,7 +6,7 @@ userland/tests/hw/trident_mode.hwb:499-577; no external reference file is
 needed in CI. regs.c link doubles are stateless adapters to the shared fake.
 Production regs_bind/module wiring remains the wiring-stage acceptance test.
 """
-CHECK = dict(name='trident-pc98init', tier=1, needs=[], budget=10,
+CHECK = dict(name='trident-pc98init', tier=1, needs=[], budget=7.5,
     covers=['drivers/video/trident/pc98_init.c',
             'drivers/video/trident/trident.h',
             'tools/tests/trident_pc98init_host.c',

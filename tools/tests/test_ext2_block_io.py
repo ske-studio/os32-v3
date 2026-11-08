@@ -7,7 +7,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 
-CHECK = dict(name='ext2-block-io-host', tier=1, budget=3,
+CHECK = dict(name='ext2-block-io-host', tier=1, budget=3.0,
              covers=['fs/ext2/ext2_super.c', 'fs/ext2/ext2_super_block_io.inc',
                      'fs/ext2/ext2_priv.h', 'tools/tests/ext2_block_io_host.c',
                      'tools/tests/test_ext2_block_io.py', 'tools/tests/host32.py',

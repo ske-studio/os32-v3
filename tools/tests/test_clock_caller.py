@@ -7,7 +7,7 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
             'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=3)
+    needs=[], budget=2.9)
 from pathlib import Path
 import subprocess
 import tempfile

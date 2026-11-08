@@ -1,5 +1,5 @@
 """Scale acceptance: output channel LSB boundary, clip and exact controls."""
-CHECK = dict(name='gf-scale-tolerance-host', tier=1, needs=[], budget=30,
+CHECK = dict(name='gf-scale-tolerance-host', tier=1, needs=[], budget=3.9,
     covers=['tools/tests/test_gf_scale_tolerance.py', 'tools/tests/gf_scale_tolerance_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',

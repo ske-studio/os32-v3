@@ -11,7 +11,7 @@ import b8_e2fsck
 from ext2_oracle_cache import OracleCache, check_cache
 from kernel_includes import include_flags
 
-CHECK = dict(name='ext2-write-batch-host', tier=1, budget=900,
+CHECK = dict(name='ext2-write-batch-host', tier=1, budget=171.2,
              covers=['fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',

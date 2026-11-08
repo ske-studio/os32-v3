@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A3 real receive demux/queues with fake NIC polling (ILP32)."""
-CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3, covers=[
+CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=[
     'net/nic_rx.c', 'lib/kstring.h', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'drivers/net/e82557/e82557_regs.h',

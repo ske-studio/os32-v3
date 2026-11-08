@@ -1,5 +1,5 @@
 """Boot-target A/B foreground commands, selection, availability and owner checks."""
-CHECK = dict(name='gf5-boot-target-diag', tier=1, needs=[], budget=20.0,
+CHECK = dict(name='gf5-boot-target-diag', tier=1, needs=[], budget=4.1,
              covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',

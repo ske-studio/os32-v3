@@ -3,7 +3,7 @@ CHECK = dict(name='gf1-instmem-host', tier=1,
              covers=['hwdev/gf/vram_layout.h', 'hwdev/gf/instmem.c', 'hwdev/gf/foundation.h',
                      'hwdev/gf/internal.h', 'tools/tests/gf1_instmem_host.c',
                      'tools/tests/test_gf1_instmem.py', 'tools/tests/host32.py',
-                     'tools/tests/kernel_includes.py'], needs=[], budget=30.0)
+                     'tools/tests/kernel_includes.py'], needs=[], budget=2.8)
 import os
 from pathlib import Path
 import subprocess

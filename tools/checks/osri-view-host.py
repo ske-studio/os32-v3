@@ -21,7 +21,7 @@ CHECK = dict(name='osri-view-host', tier=1,
             'exec/appslot.h', 'exec/exec.h', 'fs/vfs.h', 'fs/serialfs/serialfs.h',
             'fs/serialfs/sfs_client.h', 'mm/kmalloc.h', 'lib/kstring.h', 'lib/serial_diag.h',
             'lib/le_internal.h', 'lib/crc32_core.inc', 'sdk/include/os32/os32_kapi_shared.h'],
-    needs=[], budget=30.0)
+    needs=[], budget=5.6)
 import subprocess
 
 def run(ctx):

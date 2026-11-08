@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """H7: generation-local ids, LIST origins and dispatch, with runtime mutants."""
-CHECK = dict(name='hostsvc-services', tier=1, needs=[], budget=2,
+CHECK = dict(name='hostsvc-services', tier=1, needs=[], budget=2.9,
              covers=['tools/host_services.py', 'tools/hostsvc_contracts.pyi',
                      'tools/tests/hostsvc_fixture.py'])
 import argparse

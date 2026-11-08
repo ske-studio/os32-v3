@@ -1,5 +1,5 @@
 """L1 display start/stop guard and heat epoch, production assembly."""
-CHECK = dict(name='gf5-display-lifetime-host', tier=1, budget=90.0,
+CHECK = dict(name='gf5-display-lifetime-host', tier=1, budget=17.3,
              needs=['make:build/out/geforce/geforce_imports.h'],
              covers=['tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
                      'include/**', 'kdebug/**', 'mm/pgalloc.h', 'mm/physmem.h',

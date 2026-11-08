@@ -5,7 +5,7 @@ Numbers/slots are frozen from TRIDENT_FULL_DESIGN §9 (F0/F16) and the retained 
 expected values never come from product output. Complete Init trace oracles
 belong to 3b; this suite checks the gate, not the hardware Init sequence.
 """
-CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=6.2,
     covers=['drivers/video/trident/trident.h',
             'drivers/video/trident/trident_module.h', 'gfx/gfx_emergency.h',
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_device_fake.c',

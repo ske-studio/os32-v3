@@ -1,5 +1,5 @@
 """Foreground copy table: legal EXA pitches, pixels and pre-fault inputs."""
-CHECK = dict(name='gf-copy-case-host', tier=1, needs=[], budget=30,
+CHECK = dict(name='gf-copy-case-host', tier=1, needs=[], budget=3.4,
     covers=['tools/tests/test_gf_copy_case.py', 'tools/tests/gf_copy_case_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/gf_command_host.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',

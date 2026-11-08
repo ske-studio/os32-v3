@@ -4,7 +4,7 @@ CHECK = dict(name='gf1-master-host', tier=1,
             'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'kdebug/recover.h',
             'tools/tests/gf1_master_host.c', 'tools/tests/test_gf1_master.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=2.8)
 
 from pathlib import Path
 import subprocess

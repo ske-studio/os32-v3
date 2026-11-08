@@ -5,7 +5,7 @@
 """
 CHECK = dict(name='np21w-ini-live-host', tier=1,
     covers=['tools/np21w_ini_live.py', 'tools/np21w_ini.py'],
-    needs=[], budget=2.110098)
+    needs=[], budget=4.7)
 
 import copy
 import importlib.util

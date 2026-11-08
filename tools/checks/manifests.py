@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='manifests', tier=0,
     covers=['apps', 'game', 'userland/**', 'docs/manpages/**', 'assets/**', 'build/app.conf', 'build/core.yaml', 'build/packages.yaml', 'docs/07_shell.md', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'CLAUDE.md', 'build/programs.mk', 'tools/check_artifacts.py', 'include/config.h', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'sdk/gen_kapi.py'],
-    needs=['make:all'], budget=3.413684)
+    needs=['make:all'], budget=5.4)
 
 
 def run(ctx) -> int:

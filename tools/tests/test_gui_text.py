@@ -16,7 +16,7 @@ font_source_*・kcg_read_*・unicode_to_jis・gfx_screen_info) を host の贋�
 """
 CHECK = dict(name='gui-text-host', tier=1,
     covers=['tools/tests/gui_text_host.rs', 'tools/tests/test_gui_trim.py', 'tools/tests/os32api_host.py', 'tools/tests/test_font_outline.py', 'tools/fetch_fonts.py', 'userland/lib/font/**', 'userland/rust/libos32gui/src/draw.rs', 'userland/rust/libos32gui/src/font.rs', 'userland/rust/libos32gui/src/gstate.rs', 'userland/rust/libos32gui/src/clip.rs', 'userland/rust/libos32gui/src/surface.rs', 'userland/rust/libos32gui/src/ffi.rs', 'sdk/rust/os32api/src/**', 'lib/utf8.c', 'tools/tests/gui_trim_host.rs', 'tools/tests/rust_alloc_host.rs', 'tools/tests/test_font_reader.py', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui_stub/src/lib.rs', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv'],
-    needs=[], budget=6.804462)
+    needs=[], budget=10.1)
 
 import argparse
 import os

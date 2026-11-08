@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gui-proto', tier=1,
     covers=['sdk/rust/os32api/src/gui/proto.rs', 'tools/check_gui_proto.py'],
-    needs=[], budget=0.72346)
+    needs=[], budget=2.7)
 
 
 def run(ctx) -> int:

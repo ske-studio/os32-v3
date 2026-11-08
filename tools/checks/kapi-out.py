@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kapi-out', tier=1,
     covers=['kapi/kapi_generated.c', 'sdk/gen_kapi.py', 'tools/tests/test_kapi_out.py', 'sdk/kapi.json', 'tools/tests/test_gen_kapi_cli.py', 'build/os32.ld', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld'],
-    needs=['make:all'], budget=2.891648)
+    needs=['make:all'], budget=4.5)
 
 
 def run(ctx) -> int:

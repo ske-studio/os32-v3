@@ -12,7 +12,7 @@
 """
 CHECK = dict(name='fdc-seek-host', tier=1,
     covers=['drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.113006)
+    needs=[], budget=3.2)
 
 from kernel_includes import include_flags
 import pathlib

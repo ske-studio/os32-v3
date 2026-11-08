@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='shm-user-host', tier=1,
     covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/platform_emergency.h', 'tools/tests/font_guard_inactive.h', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'include/pegc.h', 'gfx/gfx.h', 'platform/pc98/bios_snapshot.c', 'arch/x86/legacy/v86_module.h', 'mm/paging.*', 'mm/shm.*', 'arch/x86/legacy/v86_mem.*', 'arch/x86/legacy/v86.h', 'arch/x86/kernel/idt.h', 'arch/x86/legacy/v86.c', 'platform/pc98/legacy/v86_bios.c', 'init/kernel.c', 'mm/pgalloc.*', 'mm/physmem.*', 'exec/exec.c', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/shm_user_host.c', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
-    needs=['make:all'], budget=4.193996)
+    needs=['make:all'], budget=6.1)
 
 
 def run(ctx) -> int:

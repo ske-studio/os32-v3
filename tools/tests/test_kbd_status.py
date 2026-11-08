@@ -18,7 +18,7 @@
 """
 CHECK = dict(name='kbd-status-host', tier=1,
     covers=['include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_status.c', 'platform/pc98/legacy/v86_kbd.c', 'tools/tests/kbd_status_host.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.493568)
+    needs=[], budget=3.2)
 
 from kernel_includes import include_flags
 import pathlib

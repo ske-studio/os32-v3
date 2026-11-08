@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='dep-dir-b-host', tier=1,
     covers=['include/clock_source.h', 'platform/pc98/clock_source.c', 'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/sys.c', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pc98.h', 'tools/tests/dep_dir_b_io_host.c', 'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/dep_dir_b_l11_baseline.json', 'tools/tests/test_dep_dir_b_io.py', 'tools/tests/host32.py', 'include/platform_irq.h', 'platform/pc98/pic.c', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'tools/tests/test_dep_dir_b_pic.py', 'tools/tests/dep_dir_b_pic_host.c', 'tools/tests/dep_dir_b_l12_baseline.json', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'kernel/time/sysclk.c', 'kernel/time/sysclk.h', 'kernel/time/ktime.c', 'kernel/time/ktime.h', 'platform/pc98/pit_math.c', 'platform/pc98/pit_math.h', 'kernel/time/time_math.c', 'kernel/time/time_math.h', 'include/types.h', 'include/memmap.h', 'include/time_units.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/bios_snapshot.h', 'tools/tests/test_dep_dir_b_timer.py', 'tools/tests/dep_dir_b_timer_host.c', 'tools/tests/dep_dir_b_l13_baseline.json', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=4.2)
 
 
 def run(ctx) -> int:

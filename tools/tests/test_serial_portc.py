@@ -17,7 +17,7 @@ platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255
 """
 CHECK = dict(name='serial-portc-host', tier=1,
     covers=['drivers/char/serial.c', 'drivers/char/serial_plan.c', 'kernel/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.31909)
+    needs=[], budget=3.0)
 
 from kernel_includes import include_flags
 import pathlib

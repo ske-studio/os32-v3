@@ -4,7 +4,7 @@ CHECK = dict(name='gf1-mc-host', tier=1,
                      'hwdev/gf/production.h', 'hwdev/gf/internal.h',
                      'tools/tests/gf1_mc_host.c', 'tools/tests/test_gf1_mc.py',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-             needs=[], budget=30.0)
+             needs=[], budget=3.3)
 import os
 from pathlib import Path
 import subprocess

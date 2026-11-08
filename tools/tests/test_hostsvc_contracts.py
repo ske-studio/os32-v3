@@ -32,7 +32,7 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
             'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
             'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
-            'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=3)
+            'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=5.7)
 
 import argparse
 import os

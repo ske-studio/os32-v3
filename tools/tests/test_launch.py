@@ -14,7 +14,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 """
 CHECK = dict(name='launch-host', tier=1,
     covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/host32.py', 'exec/launch.c', 'tools/tests/launch_host.c', 'exec/appslot.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.447408)
+    needs=[], budget=3.3)
 
 from kernel_includes import include_flags
 import host32

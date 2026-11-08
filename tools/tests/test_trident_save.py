@@ -6,7 +6,7 @@ No test reads references outside the repository. regs.c/default_dac.c are
 parallel work: this unit links register adapters and the H default-DAC fixture.
 Production assembly/ScreenInit ordering is deferred to 3c integration.
 """
-CHECK = dict(name='trident-save', tier=1, needs=[], budget=30,
+CHECK = dict(name='trident-save', tier=1, needs=[], budget=18.5,
              covers=['drivers/video/trident/state_save.c',
                      'drivers/video/trident/trident.h',
                      'tools/tests/trident_save_host.c',

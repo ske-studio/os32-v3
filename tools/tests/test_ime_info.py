@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run the actual ime info printer against byte-sliced metadata."""
-CHECK = dict(name='ime-info', tier=1, needs=[], budget=5, covers=[
+CHECK = dict(name='ime-info', tier=1, needs=[], budget=2.8, covers=[
     'tools/tests/test_ime_info.py', 'userland/cmds/ime_info.inc',
     'sdk/include/os32/**'])
 import argparse

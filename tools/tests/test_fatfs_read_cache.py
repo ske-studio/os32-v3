@@ -6,7 +6,7 @@ CHECK = dict(name='fatfs-read-cache-host', tier=1,
                      'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/ff.h',
                      'fs/fat/fatfs/ffconf.h', 'fs/fat/fatfs/diskio.h',
                      'drivers/block/pc98pt.c'],
-             needs=[], budget=60)
+             needs=[], budget=4.1)
 import os
 import pathlib
 import subprocess

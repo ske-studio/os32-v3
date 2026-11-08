@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='sh-input-host', tier=1,
     covers=['tools/tests/host32.py', 'drivers/block/pc98pt.c', 'drivers/pci/pci_decode.c', 'tools/tests/sh_status_host.c', 'tools/tests/test_sh_status.py', 'userland/shell/cmd_base.c', 'userland/shell/cmd_dir.c', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_filer.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_hdprep.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_pci.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_gf1.c', 'userland/shell/cmd_gf2.c', 'userland/shell/cmd_tri.c', 'kdebug/tri_command_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'userland/shell/hdprep_plan.c', 'userland/shell/kbd_watch.c', 'userland/shell/main.c', 'userland/shell/pci_verbose.c', 'userland/shell/rshell.c', 'userland/shell/serial_watchdog.c', 'userland/shell/ui.c', 'tools/tests/mutpar.py', 'init/kernel.c', 'tools/tests/sh_truncation_host.c', 'tools/tests/test_sh_truncation.py', 'tools/run_host_group.py', 'platform/pc98/boot.c'],
-    needs=[], budget=15.590698)
+    needs=[], budget=14.0)
 
 
 def run(ctx) -> int:

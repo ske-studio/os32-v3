@@ -1,5 +1,5 @@
 """F0s backend stop, probe latch and explicit temperature gate."""
-CHECK = dict(name='geforce-heat-backend', tier=1, needs=[], budget=5.0,
+CHECK = dict(name='geforce-heat-backend', tier=1, needs=[], budget=3.4,
              covers=['tools/tests/test_geforce_heat_backend.py',
                      'tools/tests/geforce_heat_backend_host.c',
                      'tools/tests/backend_geforce_host.c',

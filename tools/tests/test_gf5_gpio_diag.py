@@ -1,5 +1,5 @@
 """B03: real gf5 diagnostic dispatch with module boundary callbacks."""
-CHECK = dict(name='gf5-gpio-diag', tier=1, needs=[], budget=20.0,
+CHECK = dict(name='gf5-gpio-diag', tier=1, needs=[], budget=3.4,
              covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',

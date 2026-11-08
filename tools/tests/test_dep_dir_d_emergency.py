@@ -5,7 +5,7 @@ product code. Both positive and mutation builds use an isolated header tree.
 """
 CHECK = dict(name='dep-dir-d-emergency-host', tier=1,
     covers=['include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'init/boot_display.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c', 'arch/x86/legacy/v86_mem.c', 'platform/pc98/emergency.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'sdk/include/os32/*.h', 'tools/tests/dep_dir_d_emergency_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.1)
 
 from kernel_includes import include_dirs, include_flags
 import argparse

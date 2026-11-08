@@ -1,5 +1,5 @@
 """CUI GeForce parser and the existing owner cleanup notification."""
-CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=20.0,
+CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=3.1,
     covers=['tools/tests/test_gf_cui.py', 'tools/tests/gf_cui_shell_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',

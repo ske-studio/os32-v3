@@ -1,5 +1,5 @@
 """M4 real surface static/dynamic membership, with runtime-only guard mutations."""
-CHECK = dict(name='ledger-surface-map-host', tier=1, budget=30.0,
+CHECK = dict(name='ledger-surface-map-host', tier=1, budget=4.4,
              covers=['mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
                      'mm/physmem.c', 'mm/physmem.h', 'include/memmap.h',
                      'tools/tests/ledger_surface_map_host.c',

@@ -6,7 +6,7 @@ static pair table. Runtime mutants are optional (--mutate, PM only).
 """
 CHECK = dict(name='unicode-lookup-host', tier=1,
     covers=['lib/unicode_jis_table.h', 'lib/utf8.c', 'lib/utf8.h', 'include/types.h', 'include/endian_le.h', 'tools/gen_unicode.c', 'tools/tests/host32.py', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'mm/pgalloc.h', 'fs/vfs.h', 'include/config.h', 'include/memmap.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/kernel.mk', 'tools/tests/unicode_lookup_sdk.c', 'tools/tests/unicode_lookup_host.c', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'build/programs.mk', 'build/deploy.mk', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=4.413458)
+    needs=[], budget=6.1)
 
 from kernel_includes import include_flags
 import argparse

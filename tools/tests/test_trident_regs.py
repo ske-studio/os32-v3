@@ -4,7 +4,7 @@
 Trace fixtures live in trident_regs_host.c; no external reference checkout is
 needed in CI. Privileged outp alone is replaced for the production host run.
 """
-CHECK = dict(name='trident-regs', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-regs', tier=1, needs=[], budget=4.8,
     covers=['drivers/video/trident/regs.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_regs_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',

@@ -4,7 +4,7 @@ CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/build.yml', '.github/workflows/full-check.yml',
                      '.github/actions/build-setup/action.yml',
                      'tools/ci_fetch.sh', 'tools/tests/test_ci_split.py'],
-             needs=[], budget=3)
+             needs=[], budget=5.3)
 
 import json
 import os
@@ -26,7 +26,7 @@ SHA = 'a' * 40
 def workflow_cases(source):
     workflow = yaml.safe_load(source)
     jobs = workflow['jobs']
-    assert set(jobs) == {'artifacts', 'check-fast'}, 'two build jobs'
+    assert set(jobs) == {'artifacts', 'check-fast'}, 'artifact job and check matrix'
     prefixes = []
     for name, job in jobs.items():
         assert not job.get('needs'), 'jobs must run independently'
@@ -34,7 +34,8 @@ def workflow_cases(source):
         assert runner == 'ubuntu-latest', 'GitHub runner (substream not used, user decision 2026-11-05)'
         assert job['timeout-minutes'] == 150
         assert job['concurrency']['cancel-in-progress'] is True
-        assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name, 'separate concurrency groups'
+        suffix = '-${{ matrix.shard }}' if name == 'check-fast' else ''
+        assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name + suffix, 'separate concurrency groups'
         steps = job['steps']
         core = next(i for i, step in enumerate(steps) if step.get('name') == 'Build core (make all)')
         prefixes.append(steps[:core + 1])
@@ -43,8 +44,12 @@ def workflow_cases(source):
         uploads = [s for s in steps if s.get('uses') == 'actions/upload-artifact@v4']
         assert bool(checks) == (name == 'check-fast'), 'check placement'
         if name == 'check-fast':
+            assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2]}}, 'all three shards must finish'
+            assert checks[0]['env']['OS32_CHECK_CACHE'] == '${{ runner.temp }}/check-cache', 'job-local result cache'
+            assert 'CHECK_SHARD=${{ matrix.shard }}/3' in checks[0]['run'], 'make receives shard'
+            assert not any('check-cache' in str(s.get('with', {})) for s in steps), 'result cache never persists'
             # 検査ごとの実時間だけを上げる (budget の棚卸、2026-11-08)。
-            assert [u['with']['name'] for u in uploads] == ['check-times-${{ github.sha }}'], 'check-fast uploads only check times'
+            assert [u['with']['name'] for u in uploads] == ['check-times-${{ github.sha }}-${{ matrix.shard }}'], 'check-fast uploads only check times'
         else:
             assert bool(uploads) == (name == 'artifacts'), 'upload placement'
     assert prefixes[0] == prefixes[1], 'identical preparation and build'
@@ -105,9 +110,12 @@ elif args[0] == 'api' and '/jobs' in args[1]:
     state = os.environ['FIXTURE_ART_STATE']
     if state == 'wait-success':
         state = 'success' if (root / 'slept').exists() else 'in_progress'
+    checks = ([dict(name='check-fast (' + str(i) + ')', status='completed', conclusion=s)
+           for i, s in enumerate(json.loads(os.environ['FIXTURE_SHARDS']))]
+          if 'FIXTURE_SHARDS' in os.environ else
+          [dict(name='check-fast', status='in_progress', conclusion=os.environ.get('FIXTURE_CHECK_STATE'))])
     print(json.dumps({'jobs': [dict(name='artifacts', status='completed' if state in ('success', 'failure') else state,
-                                   conclusion=state if state in ('success', 'failure') else None),
-                              dict(name='check-fast', status='in_progress', conclusion=os.environ.get('FIXTURE_CHECK_STATE'))]}))
+                                   conclusion=state if state in ('success', 'failure') else None)] + checks}))
 elif args[0] == 'api' and args[1] == 'repos/fixture/repo/actions/runs/42/artifacts':
     print('os32-wt-probe-aaaaaaa')
 elif args[:2] == ['run', 'download']:
@@ -122,7 +130,7 @@ else:
 '''
 
 
-def fetch_case(script, state, flags=(), check=None):
+def fetch_case(script, state, flags=(), check=None, shard_states=None):
     with tempfile.TemporaryDirectory(prefix='ci_fetch_') as tmp:
         root = Path(tmp)
         gh = root / 'gh'
@@ -133,6 +141,8 @@ def fetch_case(script, state, flags=(), check=None):
         sleep.chmod(0o755)
         env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                    FIXTURE=str(root), FIXTURE_ART_STATE=state)
+        if shard_states is not None:
+            env['FIXTURE_SHARDS'] = json.dumps(shard_states)
         if check:
             env['FIXTURE_CHECK_STATE'] = check
         else:
@@ -149,6 +159,12 @@ def fetch_cases(script):
         result, downloaded, _, _ = fetch_case(script, 'success', check=check)
         assert result.returncode == 0 and downloaded, 'successful artifacts must download: ' + result.stderr
         assert ('検査は失敗 (または実行中)' in result.stderr) == (check != 'success'), 'check status notice'
+    for states in (['success'] * 3, ['failure', 'success', 'success'],
+                   ['success', 'failure', 'success'], ['success', 'success', 'cancelled'],
+                   ['success', 'success', 'in_progress'], ['success', 'success']):
+        result, downloaded, _, _ = fetch_case(script, 'success', shard_states=states)
+        assert result.returncode == 0 and downloaded, result.stderr
+        assert ('検査は失敗 (または実行中)' in result.stderr) == (states != ['success'] * 3), 'all shards required for success notice'
     for state in ('in_progress', 'failure'):
         result, downloaded, slept, calls = fetch_case(script, state)
         assert result.returncode == 1 and not downloaded and not slept, 'unfinished/failed artifacts must not download'
@@ -171,6 +187,12 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('workflow', 'shard: [0, 1, 2]', 'shard: [0, 1]', 'lose shard'),
+            ('workflow', 'fail-fast: false', 'fail-fast: true', 'cancel sibling shards'),
+            ('workflow', 'CHECK_SHARD=${{ matrix.shard }}/3', 'CHECK_SHARD=0/3', 'repeat first shard'),
+            ('workflow', 'name: check-times-${{ github.sha }}-${{ matrix.shard }}', 'name: check-times-${{ github.sha }}', 'artifact collision'),
+            ('workflow', 'OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache', 'OS32_CHECK_CACHE: off', 'disable shared cache'),
+            ('fetch', 'all(s == "success" for s in states)', 'any(s == "success" for s in states)', 'accept partial shards'),
             ('workflow', '  check-fast:\n', '  check-fast:\n    needs: artifacts\n', 'serialize jobs'),
             ('workflow', '    runs-on: ubuntu-latest', '    runs-on: [self-hosted, substream]', 'route to substream'),
             ('full-check', 'MUTATE=1', 'MUTATE=0', 'disable full-check mutations'),
@@ -203,7 +225,7 @@ def main():
                     print('MUTATION RED: ' + name + ': ' + str(exc).splitlines()[0])
                 else:
                     raise AssertionError('mutation survived: ' + name)
-        print('ci-split: 5 runtime RED / 0 survived / 0 ERROR')
+        print(f'ci-split: {len(mutations)} runtime RED / 0 survived / 0 ERROR')
     return 0
 
 
