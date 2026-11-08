@@ -32,6 +32,11 @@ static u32 checks;
 #include "wab_xe10.h"
 #include "wab_glue.h"
 #include "surface_query.h"
+__attribute__((weak)) int system_surface_source(u32 role, struct surface_query_source *out)
+{ (void)role; (void)out; return OS32_ERR_INVAL; }
+static int host_direct_map;
+__attribute__((weak)) int gfx_policy_blocks_map(u32 role)
+{ return host_direct_map && (role == LEDGER_ROLE_CLIENT || role == LEDGER_ROLE_DISPLAY); }
 #include "appslot.h"
 #include "gf_production.h"
 #ifndef GF_RESERVATION_TEST
@@ -347,6 +352,19 @@ static void bridge_check(int started)
         slot.abort_req=0;
         return;
     }
+    host_direct_map = 1;
+    CHECK(surface_api_lease(LEDGER_ROLE_CLIENT, 0, LEDGER_PERM_RW, 0) == OS32_ERR_NOSYS);
+    CHECK(surface_api_bundle(LEDGER_ROLE_DISPLAY, 0, 0, LEDGER_PERM_RW, 0) == OS32_ERR_NOSYS);
+    CHECK(!surface_api_query(LEDGER_ROLE_CLIENT, (void *)(MEM_EXEC_LOAD_ADDR+1024)));
+    gfx_get_framebuffer((void *)(MEM_EXEC_LOAD_ADDR+512));
+    CHECK(!fb->width && !fb->height && !fb->pitch && !fb->planes[0]);
+    gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
+    CHECK(!fb->width && !fb->planes[0]);
+    CHECK(!slot.abort_req);
+    host_direct_map = 0;
+    failures = gfx_bridge_fail_count;
+    users = gfx_bridge_user_count;
+    gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
     CHECK(!slot.abort_req && gfx_bridge_fail_count == failures);
     CHECK(gfx_bridge_user_count == users+1 && gfx_bridge_last_va == (u32)fb->planes[0]);
     CHECK((u32)fb->planes[0] >= MEM_LEASE_BASE && (u32)fb->planes[0] < MEM_LEASE_END);

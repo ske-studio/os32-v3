@@ -1,4 +1,5 @@
 #include "types.h"
+__attribute__((weak)) int gfx_policy_blocks_map(u32 role) { (void)role; return 0; }
 static u32 host_cr3;
 #include "paging_host_source.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */

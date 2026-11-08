@@ -1,4 +1,5 @@
 /* Public USER framebuffer compatibility lease bridge. */
+#include "gfx_policy.h"
 /* Public USER compatibility bridge; regen invalidates the held token.
  * One compatibility CLIENT token per AS, inside the existing eight slots.
  * The saved caller origin, never current CPL/CR3, selects TRUSTED vs USER.
@@ -30,6 +31,7 @@ void gfx_framebuffer_bridge(void *out)
         bad_output = 1;
         goto fail;
     }
+    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;
     /* USER pre-init is not drawable. CPL0 discovery still uses selected alias. */
     if (gfx_surface_source(LEDGER_ROLE_CLIENT, &source)) goto fail;
     flags = irq_save();
