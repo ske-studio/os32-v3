@@ -34,6 +34,17 @@ x87 親復元の後、IRQ 禁止中に復元する。
 KBD は入力を消費して返す。未完了 stdin だけは非消費 peek の後、slot と引数を
 保ったまま `arch_user_restart` で syscall を一度だけ再実行する。
 
+初回入口は `include/exec_arch.h` の `arch_entry_prepare` / `arch_entry_enter`
+を通る。AppSlot が所有する `arch_entry_context` は x86 では16B/align4で、
+初回 SP・入口・モード・呼出元 SP を backend だけが解釈する。
+共通側は argv 文字列と AS を所有し、4引数 argc/argv/api/aux を選んで渡す。
+prepare は減算・整列の underflow と store の失敗を返し、commit 前に完了する。
+x86 は call 前の16B整列を保ち、USER はダミー ret を含む20B、CPL0 は16Bを保存する。
+argv/store → CR3 → heap → x87 → commit → entry の順を維持する。
+`arch/x86/kernel/exec_entry.c` は USER の CLI → ESP0 → CR3 → セグメント → iret
+を一続きに行う。USER は戻らず、CPL0 は ID 別の退避域から正常 return するか
+longjmp で親へ戻る。共通側へ TSS ポインタを渡さない。
+
 ### 実行方式
 
 ```bash

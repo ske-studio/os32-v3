@@ -235,6 +235,7 @@
     "drivers/video/pc98/splash_raster_plan.c",
     "drivers/video/pc98/splash_raster_play.c",
     "drivers/video/pc98/splash_raster_run.c",
+    "arch/x86/kernel/exec_entry.c",
     "arch/x86/kernel/exec_context.c"
   ],
   "ASM_KERNEL": [

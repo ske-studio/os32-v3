@@ -134,6 +134,7 @@ typedef struct {
     u32 trim_epoch;
     VfsStdinRead stdin_read;  /* sys_read progress across KBD park */
     X87State x87_state;
+    struct arch_entry_context entry; /* owned initial entry and saved caller SP */
 } AppSlot;
 
 extern u32 appslot_trim_epoch;
@@ -210,7 +211,7 @@ int appslot_cui_only_admit(int gui, u32 hdr_flags);
  * に聞いて渡す)。free_pages == 0 は「勘定しない」の合図 (CPL=0 の子)。 */
 int appslot_start_admit(int gui, u32 pages, u32 free_pages);
 
-/* admit した ID を実際に走らせる (iret の直前)。ring3_transition_count++。 */
+/* admit した ID を実際に走らせる (初回 entry の直前)。ring3_transition_count++。 */
 void appslot_start_commit(int id, int gui, u32 pages);
 
 /* シェル帯 (ID 1) を走らせる。親は無く、段は必ず 1 (K4 のシェル起動ループが

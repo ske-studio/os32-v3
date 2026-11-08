@@ -9,7 +9,7 @@ CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:build/out/geforce/
                      'arch/x86/kernel/idt.h',
                      'kernel/module/*.h', 'lib/kstring.h',
                      'drivers/video/pc98/pc98_route.h',
-                     'build/out/geforce/geforce_imports.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'])
+                     'build/out/geforce/geforce_imports.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'])
 
 import argparse
 import os

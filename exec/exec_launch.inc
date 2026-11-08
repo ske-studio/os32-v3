@@ -1,3 +1,9 @@
+/* Adapt the common address-space owner to the entry store contract. */
+static int exec_entry_store(void *owner, u32 va, const void *src, u32 bytes)
+{
+    return app_store(owner, va, src, bytes);
+}
+
 /* Image launch, context handoff and entry. Included by exec.c. */
 /* ======================================================================== */
 /*  exec_launch — 外部プログラムのロードと実行 (exec_run / exec_start の実体) */
@@ -34,7 +40,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     OS32Header *hdr;
     int sz;
     u32 text_sz, bss_sz, heap_sz, entry_off;
-    ExecEntry entry;
+    u32 entry;
     AppSlot *ctx;
     int want_ring3 = 0;      /* CPL=3 で走らせるか (OS32X_FLAG_RING3, v2 M1) */
 
@@ -336,7 +342,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         return gui ? 0 : exec_exit_status;
     }
 
-    entry = (ExecEntry)(load_addr + entry_off);
+    entry = (u32)(load_addr + entry_off);
 
     int image_rc = exec_load_image(ctx, resolved, hdr);
     if (image_rc) return exec_launch_abort(launcher_id, id, image_rc);
@@ -348,50 +354,22 @@ static int exec_launch(const char *cmdline, int gui_arg)
     kapi->sbrk_heap_limit = sbrk_end;
     {
         u32 argv_addr;
-        u32 frame[EXEC_ENTRY_ARGS + 1];
-        u32 new_esp;
-        u32 u_esp;   /* ring3: iret に渡すユーザ ESP (ダミー retaddr 込み) */
-        /* 呼び出し元 ESP の退避先。ローカルにしないのは、子のスタックへ
-         * 切り替えた後の復帰ムーブが %esp/%ebp 相対では読めないため。
-         * ID 別に持つ (単一 static だとネスト exec で上書きされる)。 */
-        static u32 saved_esp_stack[APP_SLOT_COUNT];
+        struct exec_entry_args args;
 
         int argc = exec_build_argv(ctx, launcher_pd, cmdline, launch_cmd_len, &argv_addr);
         if (argc < 0) return exec_launch_abort(launcher_id, id, argc);
-        stack_top = argv_addr;
-
-        /* ---- 呼び出しフレームを子スタック上に自分で組む ----
-         * ExecEntry は __cdecl (int argc, char **argv, KernelAPI *api) で、
-         * CRT0 `_start_c` は 4 語目 aux (常駐 shell には内部入口の表の番地、
-         * app には 0 — T7b-b2 §3-1) も受ける。低位から argc, argv, kapi, aux
-         * の順に並べる。call 時点で ESP を 16 バイト境界に揃えるのは
-         * SysV i386 ABI の要求。 */
-        new_esp = (stack_top - EXEC_ENTRY_ARGS * sizeof(u32)) & ~(u32)(ABI_STACK_ALIGN - 1);
-        frame[1] = (u32)argc;
-        frame[2] = argv_addr;
-        frame[3] = (u32)kapi;
-        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;
-
+        args.argc = (u32)argc;
+        args.argv = argv_addr;
+        args.api = (u32)kapi;
+        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;
         if (want_ring3) {
-            /* --- M2c: CPL=3 アプリには本物の表でなくトランポリン表を渡す ---
-             * CPL=3 の初期 sbrk 上限は guard_a = sbrk_end = page_up(img_end) + PAGE_SIZE。 */
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = sbrk_end;
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;
-            frame[3] = ring3_tramp_page;   /* api = トランポリン */
-
-            /* --- crt0 スタック規約合わせ (retaddr ズレ修正) ---
-             * ring3 は iret でエントリへ飛ぶため call が無く retaddr が
-             * 積まれない。iret に渡す ESP を argc の 1 スロット下にし、
-             * そこにダミー retaddr を置いて call 経路と同一に揃える。 */
-            u_esp = new_esp - sizeof(u32);
-            frame[0] = 0;   /* ダミー retaddr */
-
+            args.api = ring3_tramp_page;
             g_cur_app = ctx;
         }
-
-        if (app_store(ctx, want_ring3 ? u_esp : new_esp,
-                      want_ring3 ? frame : frame + 1,
-                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))
+        if (arch_entry_prepare(&ctx->entry, argv_addr, entry, want_ring3,
+                               &args, exec_entry_store, ctx))
             return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
         /* The heap header needs its user VA; switch only after image and argv. */
         if (want_ring3) paging_load_cr3(ctx->as->pd_phys);
@@ -420,22 +398,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
         }
         exec_nest_level = ctx->depth;
 
-        if (want_ring3) {
-            /* --- M1d: CPL=3 に降りる ---
-             * cli → TSS.ESP0 に現在のカーネル ESP → CR3 をアプリ PD へ →
-             * セグメント → iret (IF=1 はユーザモードに入ると同時)、を 1 つの
-             * 原始命令で行う。途中に割り込みが入ると TSS.ESP0 と CR3 が
-             * 食い違うので分けない (契約は include/cpu.h、x86 の命令列は
-             * arch/x86/arch_cpu.h)。CPL=3 実行中の割り込み / int 0x80 の
-             * フレームはこの直下に積まれ、setjmp フレームを踏まない。
-             * ここから通常 return しない — 終了は int 0x80 → longjmp。 */
-            exec_entry_calls++;
-            arch_enter_user(ctx->as->pd_phys, u_esp, (u32)entry);
-            /* iret 後はここへ戻らない */
-        } else {
-            exec_entry_calls++;
-            arch_call_on_stack(saved_esp_stack[id], new_esp, entry);
-        }
+        exec_entry_calls++;
+        arch_entry_enter(&ctx->entry, want_ring3 ? ctx->as->pd_phys : 0);
         /* CPL=0 プログラムから普通に戻ってきた = 正常終了 (§1 事実 15)。 */
         exec_exit(EXEC_SUCCESS, EXEC_KIND_EXITED);
     }

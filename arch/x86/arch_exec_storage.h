@@ -5,4 +5,6 @@
 #define ARCH_USER_ALIGN 4
 #define ARCH_PRIV_BYTES 4
 #define ARCH_PRIV_ALIGN 4
+#define ARCH_ENTRY_BYTES 16
+#define ARCH_ENTRY_ALIGN 4
 #endif

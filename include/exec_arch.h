@@ -10,6 +10,18 @@ struct arch_user_context {
 struct arch_priv_context {
     unsigned char opaque[ARCH_PRIV_BYTES];
 } __attribute__((aligned(ARCH_PRIV_ALIGN)));
+/* AppSlot owns this storage across nested launches and longjmp. */
+struct arch_entry_context {
+    unsigned char opaque[ARCH_ENTRY_BYTES];
+} __attribute__((aligned(ARCH_ENTRY_ALIGN)));
+struct exec_entry_args { u32 argc, argv, api, aux; };
+/* Returns nonzero on arithmetic or store failure; complete before commit.
+ * store returns zero on success. owner remains borrowed for this call only. */
+int arch_entry_prepare(struct arch_entry_context *, u32 top, u32 entry,
+                       int user, const struct exec_entry_args *,
+                       int (*store)(void *, u32, const void *, u32), void *owner);
+/* USER never returns; CPL0 may return normally or leave via exec_longjmp. */
+void arch_entry_enter(struct arch_entry_context *, u32 address_space);
 /* Save once on the surviving launch/resume stack, before setjmp. */
 void arch_priv_save(volatile struct arch_priv_context *);
 /* Caller holds IRQs disabled until the parent context is fully restored. */

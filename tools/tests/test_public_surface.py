@@ -8,7 +8,7 @@ from test_surface_lease import main, ROOT
 TARGET_SRC = ['sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/surface_query.c',
               'exec/lease.c', 'sdk/include/os32/os32_surface.h', 'exec/ring3_ls.c',
               'sdk/include/os32/os32_ls.h', 'mm/shm.c',
-              'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
+              'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 NAMES = ['surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease',
          'sys_ls_window', 'caller_identity']
 

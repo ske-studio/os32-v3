@@ -5,5 +5,7 @@ INCLUDE_ARCH += arch/x86/kernel
 ASM_EXTRA_OBJ = arch/x86/kernel/ring3_ls_shim.o
 KSTRING_C_SRC =
 
+C_ARCH += arch/x86/kernel/exec_entry.c
 C_ARCH += arch/x86/kernel/exec_context.c
+C_ARCH_NEW += arch/x86/kernel/exec_entry.c
 C_ARCH_NEW += arch/x86/kernel/exec_context.c
