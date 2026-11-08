@@ -51,10 +51,29 @@ static int reserve_command(void)
     return 0;
 }
 
+/* Intersect both coordinates with the screen, preserving their offset. */
+static int clip_axis(int *dst, int *src, int *length, int limit)
+{
+    long long start = 0, end = *length;
+    long long d = *dst, s = *src;
+    if (-d > start) start = -d;
+    if (-s > start) start = -s;
+    if ((long long)limit - d < end) end = (long long)limit - d;
+    if ((long long)limit - s < end) end = (long long)limit - s;
+    if (start >= end) return 0;
+    *dst = (int)(d + start);
+    *src = (int)(s + start);
+    *length = (int)(end - start);
+    return 1;
+}
+
 int gfx_cmd_enqueue_fill(int x, int y, int w, int h, u8 color, u8 rop)
 {
-    int rc;
-    if (!rect_valid(x, y, w, h) || rop > 1) return OS32_ERR_INVAL;
+    int rc, sx = x, sy = y;
+    if (w <= 0 || h <= 0 || rop > 1) return OS32_ERR_INVAL;
+    if (!clip_axis(&x, &sx, &w, gfx_fb.width) ||
+        !clip_axis(&y, &sy, &h, gfx_fb.height)) return 0;
+    if (!rect_valid(x, y, w, h)) return OS32_ERR_INVAL;
     rc = reserve_command();
     if (rc) return rc;
     q[nq++] = (GFX_Cmd){ .op = GFX_CMD_FILL, .rop = rop,
@@ -65,6 +84,9 @@ int gfx_cmd_enqueue_fill(int x, int y, int w, int h, u8 color, u8 rop)
 int gfx_cmd_enqueue_copy(int dx, int dy, int sx, int sy, int w, int h)
 {
     int rc;
+    if (w <= 0 || h <= 0) return OS32_ERR_INVAL;
+    if (!clip_axis(&dx, &sx, &w, gfx_fb.width) ||
+        !clip_axis(&dy, &sy, &h, gfx_fb.height)) return 0;
     if (!rect_valid(dx, dy, w, h) || !rect_valid(sx, sy, w, h))
         return OS32_ERR_INVAL;
     rc = reserve_command();

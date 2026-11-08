@@ -427,3 +427,9 @@ void gfx_cmd_drop(void);
 - GET は同期で、flush 成功後だけ KAPI の gfx_hw_get を呼び、dst を返却後に保持しない。drop は区画と命令を捨てるだけで送信しない。flush の失敗時は捨てて gfx_lost を立てる。A0 は空の flush が0、drop が何もしない、enqueue/get は NOSYS。
 - L6 の `int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)` は `draw/gfx_copy.c`、宣言は `libos32gfx.h`。同じ画面内の COPY を SHADOW/DIRECT に振り分ける口で、0 成功・負値失敗。A0 は NOSYS。`gfx_flush`・`libos32gfx_take_regen` と併せて後続の C/Rust/WM が呼ぶ入口で、共有ライブラリや Rust への結線は各後続段で行う。既存の check/attach/detach の宣言と動作は維持する。
 - G2 の `int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop)` は既存の fill/blit と同じ共有ヘッダ `hwdev/gf/accel.h`。G1 の `int gf_direct_ok(void)` と `extern const GfxDirectOps gf_direct_ops` は `drivers/video/geforce/geforce_module.h`。G1/G2 の実体をここに複製しない。`gf_direct.o` の build/geforce-module.mk への追加・登録・module text の検査は G3 の所有のまま。
+
+## 追記 4 (2026-11-09、PM 決定)
+
+- FILL は画面内に削ってから命令の範囲を検査する。COPY は書き先・読み元の両方を画面内に削り、片方の削りに合わせて他方もずらす。画面内に残らなければ命令を積まず成功とする。座標と寸法の計算で int をあふれさせない。
+- `libos32gfx_check` は `gfx_lost` が立っていた回に `gfx_regen` を立てる。方式や世代が変わらなくても、捨てられた命令の描き直しが必要である。
+- U1 の draw.rs は失敗時に窓 ID で INVALIDATE しない。失敗は `gfx_lost` に残り、次の check が `gfx_regen` を立てる。U2 の WAIT・POLL の戻りで check → take_regen → 自分の窓を全面 INVALIDATE の順に回復する。§7 の U1 の「失敗したら INVALIDATE」はこの意味に読み替える。

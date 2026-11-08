@@ -343,13 +343,13 @@ static void run(void)
         flush_pending=3; libos32gfx_halt();
         flush_failure=1;
         CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
-        CHECK(!libos32gfx_take_regen());
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
         direct_gen++;
         CHECK(!libos32gfx_check() && gfx_direct && gfx_gen==direct_gen);
         CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
         gfx_lost=1;
         CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
-        CHECK(!libos32gfx_take_regen());
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
         direct_mode=0;
         CHECK(!libos32gfx_check() && !gfx_direct && gfx_ready);
         CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
