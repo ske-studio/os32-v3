@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* =========================================================================
  *  PEGC_MODE_HOST.C — PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO・VSYNC 待ち
  *

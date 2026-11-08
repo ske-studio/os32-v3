@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* Real splash + gfx dispatch + PC98 lifecycle; only hardware edges stubbed. */
 #define _GNU_SOURCE
 #include "serial_diag_host.h"

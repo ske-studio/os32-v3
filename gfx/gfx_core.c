@@ -1,6 +1,7 @@
 #include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"
+#include "gfx_policy.h"
 #include "gfx_hal.h"
 #include "gfx_emergency.h"
 #include "os32_kapi_shared.h"
@@ -431,7 +432,10 @@ static int gfx_kapi_claim(void)
         kapi_sys_exit(1);
         return -1;
     }
-    if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) return 0;
+    if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) {
+        gfx_policy_reeval();
+        return 0;
+    }
     /* 票 T8-2 (受入 F6 の実測): 断って **続行させる**と、プログラムは失敗を
      * 知らないまま描画 KAPI と VRAM 直書きで描き続け GUI を壊す。断ったら
      * そのアプリを畳む — appslot_gfx_claim が abort_req を立てているので、
@@ -471,6 +475,7 @@ void gfx_shutdown(void)
     }
     pc98_splash_raster_reset();
     gfx_started = 0;
+    gfx_policy_reeval();
     gfx_reinit_surfaces(0);
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。
      * 9801 では leave は空、shutdown がフリップ解除 + GDC 表示停止を行う
