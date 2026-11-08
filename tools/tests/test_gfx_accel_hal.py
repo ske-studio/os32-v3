@@ -31,7 +31,7 @@ MUTATIONS = (
 )
 
 
-def run(folder, runner, mutation=None):
+def run_case(folder, runner, mutation=None):
     edits = {}
     if mutation:
         name, path, old, new = mutation
@@ -60,7 +60,14 @@ def main():
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         for mutation in (None, *MUTATIONS) if args.mutate else (None,):
             with tempfile.TemporaryDirectory(prefix='gfx-accel-hal-') as td:
-                run(Path(td), runner, mutation)
+                run_case(Path(td), runner, mutation)
+
+
+def run(ctx) -> int:
+    import subprocess
+    env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    argv = ['python3', '-B', 'tools/tests/test_gfx_accel_hal.py', *(['--mutate'] if ctx.mutate else [])]
+    return subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
 
 
 if __name__ == '__main__':
