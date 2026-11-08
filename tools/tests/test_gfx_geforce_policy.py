@@ -11,6 +11,7 @@ from mutpar import build_in_tree
 
 CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers=[
     'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_direct.c',
+    'drivers/video/geforce/gf_hook.c',
     'drivers/video/geforce/geforce_module.h', 'tools/tests/gfx_geforce_policy_host.c',
     'tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/test_gfx_geforce_policy.py',
     'drivers/video/pc98/pc98_route.h', 'hwdev/gf/**', 'hwdev/gfinit_mode.h', 'gfx/palette.h',
@@ -48,6 +49,9 @@ CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('scan-notify', '    gfx_policy_scan_changed();', '    (void)0;'),
+    ('stop-reeval', '    gfx_policy_reeval();\n#endif\n    int rc = stop_device', '    (void)0;\n#endif\n    int rc = stop_device'),
+    ('enter-reeval', '    gfx_policy_reeval();\n#endif\n}\nstatic void geforce_leave', '    (void)0;\n#endif\n}\nstatic void geforce_leave'),
+    ('direct-failure', '            geforce_fail(); /* DIRECT device failure */', '            (void)0; /* DIRECT device failure */'),
     ('started', 'active && gfx_is_started() && gf_direct_ok()', 'active && gf_direct_ok()'),
     ('active', 'active && gfx_is_started() && gf_direct_ok()', 'gfx_is_started() && gf_direct_ok()'),
     ('capability', 'info->flags |= GFX_CAP_DIRECT;', 'info->flags |= 0;'),

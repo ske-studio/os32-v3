@@ -680,6 +680,16 @@ static void geforce_present(int x, int y, int w, int h)
         geforce_fail(); return;
     }
     if (gfx_backend_geforce.policy == GFX_POLICY_DIRECT) {
+        /* DIRECT skips transfer, but must retain its device-failure exit.
+         * F4 borrows the same channel/accel owner as the drawing hooks. */
+        const struct gf4_test_ops *ops = display_ops();
+        struct gf4_ctx *ctx = ops ? ops->ctx : 0;
+        if ((ctx && ctx->ch && ctx->ch->state != GF2_RUN) ||
+            (ctx && ctx->accel && ctx->accel->last_rc) ||
+            (interrupt_point && interrupt_point(interrupt_context))) {
+            geforce_fail(); /* DIRECT device failure */
+            return;
+        }
         geforce_context->counters->commits++;
         return;
     }
