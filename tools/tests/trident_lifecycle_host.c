@@ -305,7 +305,7 @@ static int fallback_test(void) {
         /* Byte present isolates the overlay upload's own store width. */
         u32 put32=lfb32; device.present_method=TRI_PRESENT_BYTE;
         CHECK(!tri_video_put(&device,&imv,&rect,&rect,0x1234)); count=0;
-        device.present_method=TRI_PRESENT_DWORD_SYNC;
+        device.present_method=TRI_PRESENT_DWORD_PLAIN;
         CHECK(lfb32==put32 && memory[device.video.allocation.off]==1);
         CHECK(memory[device.video.allocation.off+2]==(i==2?2:3));
     }

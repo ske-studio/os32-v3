@@ -193,8 +193,10 @@ int trident_backend_prepare(void)
     int rc = trident_pci_validate(&r->pci);
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
     device.settings.ram_fallback = r->ram_fallback;
-    /* Ra266 2026-11-08: dword_sync 81ms vs byte 107ms per frame, 0 mismatches. */
-    device.present_method = TRI_PRESENT_DWORD_SYNC;
+    /* Ra266 2026-11-08 (tri present, 640x480x8, 8 frames each, 0 mismatches):
+     * dword_plain 26ms, dword_sync 81ms, byte 104ms, dword_wait 134ms.
+     * Per-call stores stay intact; only tight block stores (rep) were lost. */
+    device.present_method = TRI_PRESENT_DWORD_PLAIN;
     if (!device.active) {
         struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
         if (r->ram_fallback || device.settings.no_accel)
