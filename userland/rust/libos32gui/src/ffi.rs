@@ -46,6 +46,10 @@ extern "C" {
     /// 全画面バックバッファ記述子 (libos32gfx の可変グローバル)。読むだけ。
     pub static mut gfx_fb: GfxFramebuffer;
     pub static mut gfx_ready: i32;
+    pub static mut gfx_direct: i32;
+    pub fn gfx_cmd_enqueue_fill(x: i32, y: i32, w: i32, h: i32, color: u8, rop: u8) -> i32;
+    pub fn gfx_cmd_enqueue_mono(x: i32, y: i32, w: i32, h: i32, bits: *const u8, pitch: u32, fg: u8, bg: i32, cx: i32, cy: i32, cw: i32, ch: i32) -> i32;
+    pub fn gfx_cmd_enqueue_put(x: i32, y: i32, w: i32, h: i32, src: *const u8, pitch: u32, key: i32) -> i32;
     pub static mut gfx_api: *mut os32api::KernelAPI;
     pub fn libos32gfx_attach_checked() -> i32;
     pub fn libos32gfx_check() -> i32;
