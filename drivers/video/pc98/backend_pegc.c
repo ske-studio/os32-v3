@@ -30,6 +30,7 @@
 /*       (io/gdc.c gdc_work, vram/scrndraw.c scrndraw_draw)                  */
 /* ======================================================================== */
 
+#include "pegc_diagnostic.h"
 #include "serial_diag.h"
 #include "idt.h"
 #include "memmap.h"
@@ -529,3 +530,15 @@ GfxBackend gfx_backend_pegc = {
     (const GfxMode *)0         /* selected_mode */,
     .set_mode = 0             /* optional display hooks default to unavailable */
 };
+
+/* Diagnostics borrow the established mapping, including the alternate
+ * window selected by production. No register changes. */
+int pegc_diagnostic_view(struct pegc_diagnostic_view *view)
+{
+    if (!view || !s_active || g_backend != &gfx_backend_pegc ||
+        !s_bb_phys)
+        return OS32_ERR_NOSYS;
+    view->client = P2V(s_bb_phys);
+    view->vram = P2V_IO(s_window_base);
+    return 0;
+}

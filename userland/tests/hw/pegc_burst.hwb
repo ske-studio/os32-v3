@@ -1,0 +1,163 @@
+# Run in a terminal after starting the PEGC GUI (640x480x8, F00000h).
+# No register changes. Restores all 4KiB on normal completion; CTRL+STOP
+# or an access error aborts HW-BASIC before cleanup, as in tri_burst5.
+# Mapping: include/pegc.h [B] section 3-2 / [BM], existing linear window.
+# V0 packed block; V1 individual stores; V2 store + same-width readback.
+# Widths are CPU access widths; display depth stays 8bpp throughout.
+ # 043Bh bit2=1 makes F00000h ordinary RAM (include/pegc.h [UM]).
+ # The GUI can instead use the high window; never probe its RAM alias here.
+ ioread8 port 0x43B -> sys16m
+ if (sys16m & 4) != 0 goto unavailable
+ let base = 0xF00000
+ dim original 1024
+ let i = 0
+ label save_vram
+ mmioread32 phys (base + (i << 2)) -> original[i]
+ let i = i + 1
+ if i != 1024 goto save_vram
+ let variant = 0
+ label variants
+ let width = 1
+ label widths
+ let count = 4096
+ let seed = 0x69
+ if width == 1 goto ready
+ let count = 2048
+ let seed = 0x9669
+ if width == 2 goto ready
+ let count = 1024
+ let seed = 0x5AA59669
+ label ready
+ let seed = seed + variant
+ call burst_trial
+ let width = width << 1
+ if width != 8 goto widths
+ let variant = variant + 1
+ if variant != 3 goto variants
+ let restore_bad = 0
+ let i = 0
+ label restore_vram
+ # Restore byte-wise with a read between writes, preserving every byte lane.
+ let lane = 0
+ label restore_lane
+ mmiowrite8 phys (base + (i << 2) + lane) (original[i] >> (lane << 3)) & 0xFF
+ mmioread8 phys (base + (i << 2) + lane) -> restored
+ if restored == ((original[i] >> (lane << 3)) & 0xFF) goto restore_next
+ let restore_bad = restore_bad + 1
+ label restore_next
+ let lane = lane + 1
+ if lane != 4 goto restore_lane
+ let i = i + 1
+ if i != 1024 goto restore_vram
+ print "restore-mismatch-count" restore_bad
+ log "PEGC burst restored"
+ end
+ label burst_trial
+ print "variant" variant
+ print "width" width
+ print "count" count
+ # A uses individual stores: clear every byte, including after a shorter B.
+ mmiofill32 phys base 1024 0xA5A5A5A5
+ print "B-seed" seed
+ if variant != 0 goto single_begin
+ if width == 1 goto block8
+ if width == 2 goto block16
+ mmioblock32 phys base count seed inc
+ let step = 1
+ let maskval = 0xFFFFFFFF
+ goto compare_begin
+ label block8
+ mmioblock8 phys base count seed
+ let step = 0
+ let maskval = 0xFF
+ goto compare_begin
+ label block16
+ mmioblock16 phys base count seed
+ let step = 0
+ let maskval = 0xFFFF
+ goto compare_begin
+ label single_begin
+ let step = 0
+ let maskval = 0xFF
+ if width == 1 goto single_ready
+ let maskval = 0xFFFF
+ if width == 2 goto single_ready
+ let step = 1
+ let maskval = 0xFFFFFFFF
+ label single_ready
+ let off = 0
+ let i = 0
+ let data = seed
+ label single_store
+ if width == 1 goto store8
+ if width == 2 goto store16
+ mmiowrite32 phys (base + off) data
+ goto store_done
+ label store8
+ mmiowrite8 phys (base + off) data
+ goto store_done
+ label store16
+ mmiowrite16 phys (base + off) data
+ label store_done
+ if variant == 1 goto single_next
+ if width == 1 goto flush8
+ if width == 2 goto flush16
+ mmioread32 phys (base + off) -> discard
+ goto single_next
+ label flush8
+ mmioread8 phys (base + off) -> discard
+ goto single_next
+ label flush16
+ mmioread16 phys (base + off) -> discard
+ goto single_next
+ label single_next
+ let data = (data + step) & maskval
+ let off = off + width
+ let i = i + 1
+ if i != count goto single_store
+ label compare_begin
+ let i = 0
+ let off = 0
+ let bad = 0
+ let inrange = 0
+ let expected = seed & maskval
+ label compare_words
+ if width == 1 goto read8
+ if width == 2 goto read16
+ mmioread32 phys (base + off) -> got
+ goto compare_value
+ label read8
+ mmioread8 phys (base + off) -> got
+ goto compare_value
+ label read16
+ mmioread16 phys (base + off) -> got
+ label compare_value
+ if got != expected goto word_mismatch
+ if inrange != 0 goto word_next
+ let inrange = 1
+ print "match-start" off
+ goto word_next
+ label word_mismatch
+ if inrange == 0 goto count_mismatch
+ print "match-end" (off - 1)
+ let inrange = 0
+ label count_mismatch
+ let bad = bad + 1
+ if ((bad-1) >> 3) != 0 goto word_next
+ print "mismatch-offset" off
+ print "expected" expected
+ print "actual" got
+ label word_next
+ let expected = (expected + step) & maskval
+ let i = i + 1
+ let off = off + width
+ if i != count goto compare_words
+ if inrange == 0 goto compared
+ print "match-end" (off - 1)
+ label compared
+ print "mismatch-count" bad
+ return
+
+ label unavailable
+ log "PEGC burst unavailable: F00000h is RAM; use pegc present/gap on the active window"
+ end

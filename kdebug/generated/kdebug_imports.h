@@ -10,6 +10,7 @@
 #include "drivers/pci/pci_hwb.h"
 #include "drivers/video/geforce/geforce_module.h"
 #include "drivers/video/kcg/kcg_module.h"
+#include "drivers/video/pc98/pegc_diagnostic.h"
 #include "drivers/video/trident/trident_module.h"
 #include "exec/appmem.h"
 #include "exec/appslot.h"
@@ -149,8 +150,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 324
-#define KDEBUG_ABI_GEN 0x979587c7u
+#define KDEBUG_IMPORT_COUNT 325
+#define KDEBUG_ABI_GEN 0xa43cc5b5u
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

@@ -1,6 +1,6 @@
 """HW_BASIC_DESIGN §§3/7: real access/window/dispatch, libc-free ILP32."""
 CHECK = dict(name='hwb-access-host', tier=1, covers=[
-    'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h',
+    'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'kdebug/pegc_command_wire.h',
     'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h',
     'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h', 'include/io.h',
     'include/types.h', 'include/memmap.h', 'mm/paging.h',
@@ -32,6 +32,7 @@ DISPATCH_PREFIX = '''static i32 recovery_call(u32 op, void *buf, u32 size)
         recover_virtual_detach();
         return rc;
     }
+    if (op == PEGC_OP_COMMAND) return pegc_command_call(buf, size);
     if (op == TRI_OP_COMMAND) return trident_command_call(buf, size);
     const KdebugRecoverVirtual *req = 0;
     if (op == KDEBUG_OP_RECOVER_VIRTUAL) {

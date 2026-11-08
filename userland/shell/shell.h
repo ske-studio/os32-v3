@@ -182,6 +182,7 @@ int  shell_cmd_gfinit(int argc, char **argv);
 int  shell_cmd_hw(int argc, char **argv);
 int  shell_cmd_gf1(int argc, char **argv);
 int  shell_cmd_gf2(int argc, char **argv);
+int  shell_cmd_pegc(int argc, char **argv);
 int  shell_cmd_tri(int argc, char **argv);
 int  shell_cmd_recover(int argc, char **argv);
 int  shell_cmd_peek(int argc, char **argv); /* cmd_peek.c: peek (TASK_KPEEK、表は cmd_sys.c) */

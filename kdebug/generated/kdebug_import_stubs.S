@@ -1621,4 +1621,9 @@ legacy_lowmap_busy:
 v86_bios_real_lowmem:
     jmp *kdebug_import_slots+1292
 .size v86_bios_real_lowmem, .-v86_bios_real_lowmem
+.globl pegc_diagnostic_view
+.type pegc_diagnostic_view, @function
+pegc_diagnostic_view:
+    jmp *kdebug_import_slots+1296
+.size pegc_diagnostic_view, .-pegc_diagnostic_view
 .section .note.GNU-stack,"",@progbits

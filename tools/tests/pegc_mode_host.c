@@ -44,6 +44,7 @@ static volatile void *host_pegc_window(u32 pa)
 #define P2V_IO(pa) host_pegc_window(pa)
 
 #include "../../drivers/video/pc98/backend_pegc.c"
+const GfxBackend *g_backend;
 #include "../../drivers/char/np2sysp.c"
 #include "../../drivers/input/mouse_seamless.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
@@ -1666,8 +1667,24 @@ static void case_seamless_exchange(void)
     output("PASS seamless_exchange (init/poll mode=0, 4 OUT before command, drain, replies)\n");
 }
 
+static void case_diagnostic_view(void)
+{
+    struct pegc_diagnostic_view v;
+    s_active = 1; s_bb_phys = MEM_PAGE_SIZE; s_window_base = PEGC_LINEAR_BASE;
+    g_backend = &gfx_backend_pegc;
+    CHECK(!pegc_diagnostic_view(&v));
+    CHECK(v.client == P2V(s_bb_phys) && v.vram == P2V_IO(PEGC_LINEAR_BASE));
+    s_active = 0;
+    CHECK(pegc_diagnostic_view(&v) == OS32_ERR_NOSYS);
+    s_active = 1; g_backend = 0;
+    CHECK(pegc_diagnostic_view(&v) == OS32_ERR_NOSYS);
+    g_backend = &gfx_backend_pegc; s_window_base = PEGC_LINEAR_ALT_BASE;
+    CHECK(!pegc_diagnostic_view(&v) && v.vram == P2V_IO(PEGC_LINEAR_ALT_BASE));
+    CHECK(pegc_diagnostic_view(0) == OS32_ERR_NOSYS);
+}
 void _start(void)
 {
+    case_diagnostic_view();
     con_output_register(&capture_output);
     world_reset();
     pegc_palette_init();

@@ -56,6 +56,7 @@ i32 probe_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; 
 #ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real kdebug/hwb_access.c */
 i32 hwb_access(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
 #endif
+int pegc_command_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return -1; }
 i32 trident_command_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return -1; }
 i32 kpeek_call(u32 op, void *buf, u32 size) { (void)op; (void)buf; (void)size; calls++; return 0; }
 /* T3 entry adapters must remain dormant during module init. Each dependency

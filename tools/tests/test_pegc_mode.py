@@ -17,7 +17,7 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='pegc-mode-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/pc98/pegc_diagnostic.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.12602)
 
 from kernel_includes import include_flags
@@ -58,6 +58,11 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("diagnostic_inactive", MUT_TARGET,
+     "!view || !s_active || g_backend != &gfx_backend_pegc ||",
+     "!view || g_backend != &gfx_backend_pegc ||"),
+    ("diagnostic_wrong_backend", MUT_TARGET,
+     "g_backend != &gfx_backend_pegc ||", "0 ||"),
     ("mode_height_400", MUT_TARGET,
      "{PEGC_WIDTH, PEGC_HEIGHT_480, GFX_FMT_PACKED8, PEGC_DAC_BITS, PEGC_MODE_480, 0, PEGC_PITCH}",
      "{PEGC_WIDTH, PEGC_HEIGHT_400, GFX_FMT_PACKED8, PEGC_DAC_BITS, PEGC_MODE_480, 0, PEGC_PITCH}"),

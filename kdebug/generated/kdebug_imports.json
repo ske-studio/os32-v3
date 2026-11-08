@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2543159239,
+  "module_abi_gen": 2755446197,
   "stage": "S6",
-  "count": 324,
+  "count": 325,
   "imports": [
     {
       "stage": "S1",
@@ -4908,6 +4908,21 @@
       "type_ver": 1,
       "signature": "const u8 *v86_bios_real_lowmem(void);",
       "source_declaration": "const u8 *v86_bios_real_lowmem(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "pegc_diagnostic_view",
+      "source": "drivers/video/pc98/pegc_diagnostic.h",
+      "context_safe": false,
+      "index": 324,
+      "name": "pegc_diagnostic_view",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int pegc_diagnostic_view(struct pegc_diagnostic_view *view);",
+      "source_declaration": "int pegc_diagnostic_view(struct pegc_diagnostic_view *view);",
       "dtype": null,
       "array": false
     }

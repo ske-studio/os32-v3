@@ -2640,6 +2640,14 @@
       "context_safe": true,
       "index": 323,
       "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "pegc_diagnostic_view",
+      "source": "drivers/video/pc98/pegc_diagnostic.h",
+      "context_safe": false,
+      "index": 324
     }
   ]
 }
