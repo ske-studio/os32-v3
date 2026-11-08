@@ -51,7 +51,7 @@ from g16_fixture import g16_fixture
 os.environ['OS32_GSHELL_G16'] = str(g16_fixture(FONT_DIR / 'JF-Dot-Shinonome16.ttf', OUT / 'g16'))
 
 
-def build(gshell: Path, name: str, quiet: bool = False) -> Path:
+def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -> Path:
     """gshell の src/lib.rs を試験用の根に書き換えて rustc --test でビルドする。"""
     src = gshell / 'src'
     root = (src / 'lib.rs').read_text().replace('#![no_std]', '#![allow(dead_code)]').replace('#[no_mangle]', '').replace('pub extern "C" fn main(', 'pub extern "C" fn guest_main(')
@@ -62,6 +62,10 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
     exe = OUT / (name + '-tests')
     args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'),
             '-L', 'dependency='+str(FONT_DEPS), '--extern', 'os32_font='+str(FONT_RLIB), '-o', str(exe)]
+    if typical:
+        args += ['--cfg', 'feature="gf_accel_accept"']
+        os.environ['GF_ACCEPT_ID'] = 'host'
+        os.environ['GF_ACCEPT_MODE'] = 'shadow'
     if quiet:
         subprocess.run(args, cwd=ROOT, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -509,6 +513,21 @@ MUTATIONS = [
 ]
 
 
+
+# P0a uses the same real crate with acceptance-only code enabled.
+MUTATIONS += [
+    ('P0a cycle disconnected', 'src/wm.rs', 'flush_present(); crate::typical_ops::on_cycle_end(st);', 'flush_present();', 'p0a_wm_cycle'),
+    ('P0a dirty ignored', 'src/typical_ops.rs', 'w.dirty.len == 0 && w.issued.len == 0', 'w.issued.len == 0', 'p0a_completion'),
+    ('P0a issued ignored', 'src/typical_ops.rs', 'w.dirty.len == 0 && w.issued.len == 0', 'w.dirty.len == 0', 'p0a_completion'),
+    ('P0a configure ignored', 'src/typical_ops.rs', ' && !w.configure_pending', '', 'p0a_completion'),
+    ('P0a ring ignored', 'src/typical_ops.rs', '!s.used || ring::pending(st, i) == 0', 'true', 'p0a_completion'),
+    ('P0a commit ignored', 'src/typical_ops.rs', '        && committed', '        && true', 'p0a_completion'),
+    ('P0a timeout ignored', 'src/typical_ops.rs', '(tick.wrapping_sub(st.ops.deadline) as i32) >= 0', 'false', 'p0a_timeout'),
+    ('P0a warmup missing', 'src/typical_ops.rs', '    if r.warm < WARM {', '    if false {', 'p0a_warmup'),
+    ('P0a extra count accepted', 'src/typical_ops.rs', 'words.next().is_some() || n == 0', 'n == 0', 'p0a_parse'),
+    ('P0a return leg omitted', 'src/typical_ops.rs', 'matches!(st.ops.op, 0 | 2)', 'false', 'p0a_key'),
+]
+
 def one_mutation(k: int) -> tuple:
     """変異 k を一時の写しに当ててビルドし、絞り込んだ試験を走らせる。(ok, 行)。"""
     name, rel, old, new, filt = MUTATIONS[k]
@@ -522,7 +541,7 @@ def one_mutation(k: int) -> tuple:
             return False, f'MUTATION BROKEN  {name}: {rel} has {text.count(old)} matches'
         f.write_text(text.replace(old, new))
         try:
-            exe = build(g, f'mutant{k}', quiet=True)
+            exe = build(g, f'mutant{k}', quiet=True, typical=filt.startswith('p0a_'))
         except subprocess.CalledProcessError:
             return False, f'MUTATION NOT BUILT  {name}'
         r = subprocess.run([str(exe), '--test-threads=1', filt], cwd=ROOT,
@@ -560,5 +579,7 @@ def mutate() -> int:
 
 exe = build(ROOT / 'userland/gshell', 'integration')
 run([str(exe), '--test-threads=1'])
+typical_exe = build(ROOT / 'userland/gshell', 'typical-ops', typical=True)
+run([str(typical_exe), '--test-threads=1', 'p0a_'])
 if '--mutate' in sys.argv[1:]:
     sys.exit(1 if mutate() else 0)
