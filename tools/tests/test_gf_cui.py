@@ -24,7 +24,7 @@ MUTATIONS = [
     ('enter-wire', 'userland/shell/cmd_gf2.c',
      '? GF4_CUI_ENTER : GF4_CUI_LEAVE', '? GF4_CUI_LEAVE : GF4_CUI_ENTER'),
     ('feature-wire', 'userland/shell/cmd_gf2.c',
-     'if (q.test > GF5_FEATURE)', 'if (q.test >= GF5_FEATURE)'),
+     'if (q.test > GF6_PRIM)', 'if (q.test >= GF5_FEATURE)'),
     ('operand-width', 'userland/shell/cmd_gf2.c',
      'operand[1] << GF5_WIRE_VALUE_SHIFT', 'operand[1] << GF5_WIRE_INDEX_SHIFT'),
     ('cleanup-notification', 'exec/appslot.c',

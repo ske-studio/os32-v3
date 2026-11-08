@@ -2,6 +2,7 @@
  * GF_FEAT2_DESIGN section 9 and the T2 addenda define the observations. */
 #include "gf_command_test.h"
 #include "gf_accel_test.h"
+#include "gf_prim_bench.h"
 #include "gf_display_test.h"
 #include "gf5_test.h"
 #include "../hwdev/gf/command.h"
@@ -274,6 +275,10 @@ int gf_command_test(struct gf2_request *request, struct gf_foundation *f,
 {
     if (!request) return GF2_EINVAL;
     const struct gf2_request q = *request;
+    if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
+        int rc = gf_prim_bench(q.session);
+        request->session = 0; request->rc = rc; return rc;
+    }
     if (q.size == sizeof(q) && q.test == GF3_ACCEL && !q.rc) {
         int rc = gf_accel_test(q.session);
         request->session = 0;
