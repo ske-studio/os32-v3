@@ -78,7 +78,7 @@ void _start(void) { int rc=test(); __asm__ volatile("int $0x80"::"a"(1),"b"(rc ?
 '''
 
 
-def run(mutation=None, none=False, bad_image=False, pair_probe=False):
+def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
     with tempfile.TemporaryDirectory(prefix='boot-readers-') as td:
         tmp=Path(td)
         paths=['init/bootinfo.c']
@@ -134,14 +134,14 @@ def run(mutation=None, none=False, bad_image=False, pair_probe=False):
 
 def module_pair():
     from test_module_image import build_validator, validate, fixture, word, crc, POLICY
-    valid, image_crc=run(pair_probe=True)
+    valid, image_crc=run_case(pair_probe=True)
     with tempfile.TemporaryDirectory(prefix='boot-pair-') as td:
         exe=build_validator(Path(td))
         image=crc(word(fixture(),31,image_crc))
         assert validate(exe,image,pair=image_crc,img_valid=valid,**POLICY).returncode==0
         mismatch=validate(exe,image,pair=image_crc ^ 1,img_valid=valid,**POLICY)
         assert mismatch.returncode==1 and mismatch.stdout==b'RED 04\n'
-        invalid, _=run(bad_image=True,pair_probe=True)
+        invalid, _=run_case(bad_image=True,pair_probe=True)
         missing=validate(exe,image,pair=image_crc,img_valid=invalid,**POLICY)
         assert missing.returncode==1 and missing.stdout==b'RED 05\n'
     print('GREEN captured image ABI feeds real module pair validation; mismatched/missing CRC rejected')
@@ -149,9 +149,9 @@ def module_pair():
 
 def main():
     module_pair()
-    assert run()==0
-    assert run(none=True)==0
-    assert run(bad_image=True)==0
+    assert run_case()==0
+    assert run_case(none=True)==0
+    assert run_case(bad_image=True)==0
     print('GREEN native image/ABI, immutable page0, capture order, feature-off and none')
     if '--mutate' in sys.argv:
         mutations=[
@@ -161,8 +161,16 @@ def main():
             ('platform/pc98/boot_capture.c', '    v86_bios_save_real();', '    /* optional guest disabled */'),
         ]
         for m in mutations:
-            assert run(m, bad_image='IMG_CHECK' in m[1])==1, m
+            assert run_case(m, bad_image='IMG_CHECK' in m[1])==1, m
             print('RED',m[0],m[1].splitlines()[0])
+
+
+def run(ctx) -> int:
+    import os
+    import subprocess
+    env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    argv = ['python3', '-B', 'tools/tests/test_boot_readers.py', *(['--mutate'] if ctx.mutate else [])]
+    return subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
 
 
 if __name__=='__main__':
