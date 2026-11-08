@@ -1,4 +1,4 @@
-"""L1: copied command batches, row splitting, clipping and failure ordering."""
+"""L2: DIRECT drawing primitives, dirty rectangles and line batching."""
 import argparse
 import os
 from pathlib import Path
@@ -18,6 +18,7 @@ CHECK = dict(name='gfx-draw-direct-host', tier=1, needs=[], budget=15, covers=[
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_draw.c'
 MUTATIONS = (
+    ('line-unbatched', SOURCE, 'if (last || (dx >= dy ? y0 != oldy : x0 != oldx))', 'if (1)'),
     ('branch', SOURCE, 'void gfx_pixel(int x, int y, u8 color)\n{\n    if (!gfx_ready) return;\n    if (gfx_direct)', 'void gfx_pixel(int x, int y, u8 color)\n{\n    if (!gfx_ready) return;\n    if (1)'),
     ('coordinate', SOURCE, 'gfx_cmd_enqueue_fill(0, 0, gfx_fb.width, gfx_fb.height, color, 0)', 'gfx_cmd_enqueue_fill(1, 0, gfx_fb.width, gfx_fb.height, color, 0)'),
 )
@@ -42,7 +43,7 @@ def run_case(folder, runner, mutation=None):
     assert result.returncode == (1 if mutation else 0), result
     if mutation:
         assert result.stdout.startswith('FAIL '), result
-    print(('MUTATE RED ' + mutation[0]) if mutation else 'PASS L1 command batches (' + runner + ')')
+    print(('MUTATE RED ' + mutation[0]) if mutation else 'PASS L2 drawing primitives (' + runner + ')')
 
 
 def main():

@@ -35,7 +35,7 @@ static void gfx_line_packed(int x0, int y0, int x1, int y1, u8 color)
 void gfx_clear(u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(0, 0, gfx_fb.width, gfx_fb.height, color, 0); return; }
+    if (gfx_direct) { gfx_cmd_enqueue_fill(0, 0, gfx_fb.width, gfx_fb.height, color, 0); gfx_api->gfx_add_dirty_rect(0, 0, gfx_fb.width, gfx_fb.height); return; }
     if (gfx_packed) {
         /* バックバッファ全面 (pitch × height) を 1 バイト/画素で塗る */
         int rows = gfx_fb.height;
@@ -59,7 +59,15 @@ void gfx_clear(u8 color)
 void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(rx, ry, rw, rh, color, 0); return; }
+    if (gfx_direct) {
+        gfx_cmd_enqueue_fill(rx, ry, rw, rh, color, 0);
+        if (rx < 0) { rw += rx; rx = 0; }
+        if (ry < 0) { rh += ry; ry = 0; }
+        if (rx + rw > gfx_fb.width) rw = gfx_fb.width - rx;
+        if (ry + rh > gfx_fb.height) rh = gfx_fb.height - ry;
+        if (rw > 0 && rh > 0) gfx_api->gfx_add_dirty_rect(rx, ry, rw, rh);
+        return;
+    }
     int p;
     int byte_x, byte_w;
     int start_off;
@@ -110,7 +118,7 @@ void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color)
 void gfx_pixel(int x, int y, u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, 1, 1, color, 0); return; }
+    if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, 1, 1, color, 0); if (x >= 0 && x < gfx_fb.width && y >= 0 && y < gfx_fb.height) gfx_api->gfx_add_dirty_rect(x, y, 1, 1); return; }
     int offset;
     u8 bit;
     int p;
@@ -194,7 +202,14 @@ u8 gfx_get_pixel(int x, int y)
 void gfx_hline(int x, int y, int w, u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, w, 1, color, 0); return; }
+    if (gfx_direct) {
+        gfx_cmd_enqueue_fill(x, y, w, 1, color, 0);
+        if (y < 0 || y >= gfx_fb.height || w <= 0) return;
+        if (x < 0) { w += x; x = 0; }
+        if (x + w > gfx_fb.width) w = gfx_fb.width - x;
+        if (w > 0) gfx_api->gfx_add_dirty_rect(x, y, w, 1);
+        return;
+    }
     int x2;
 
     if (y < 0 || y >= gfx_fb.height || w <= 0) return;
@@ -215,7 +230,14 @@ void gfx_hline(int x, int y, int w, u8 color)
 void gfx_vline(int x, int y, int h, u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, 1, h, color, 0); return; }
+    if (gfx_direct) {
+        gfx_cmd_enqueue_fill(x, y, 1, h, color, 0);
+        if (x < 0 || x >= gfx_fb.width || h <= 0) return;
+        if (y < 0) { h += y; y = 0; }
+        if (y + h > gfx_fb.height) h = gfx_fb.height - y;
+        if (h > 0) gfx_api->gfx_add_dirty_rect(x, y, 1, h);
+        return;
+    }
     int p, off;
     u8 bit;
 
@@ -262,14 +284,32 @@ void gfx_line(int x0, int y0, int x1, int y1, u8 color)
         int dy = (y1 > y0) ? y1 - y0 : y0 - y1;
         int sx = (x0 < x1) ? 1 : -1;
         int sy = (y0 < y1) ? 1 : -1;
-        int err = dx - dy;
+        int err = dx - dy, startx = x0, starty = y0;
+        int minx = (x0 < x1) ? x0 : x1, maxx = (x0 > x1) ? x0 : x1;
+        int miny = (y0 < y1) ? y0 : y1, maxy = (y0 > y1) ? y0 : y1;
+        if (minx < 0) minx = 0;
+        if (miny < 0) miny = 0;
+        if (maxx >= gfx_fb.width) maxx = gfx_fb.width - 1;
+        if (maxy >= gfx_fb.height) maxy = gfx_fb.height - 1;
+        if (minx <= maxx && miny <= maxy)
+            gfx_api->gfx_add_dirty_rect(minx, miny, maxx - minx + 1, maxy - miny + 1);
         for (;;) {
-            int e2;
-            if (gfx_cmd_enqueue_fill(x0, y0, 1, 1, color, 0)) return;
-            if (x0 == x1 && y0 == y1) break;
-            e2 = err * 2;
-            if (e2 > -dy) { err -= dy; x0 += sx; }
-            if (e2 < dx) { err += dx; y0 += sy; }
+            int e2, oldx = x0, oldy = y0;
+            int last = x0 == x1 && y0 == y1;
+            if (!last) {
+                e2 = err * 2;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
+            }
+            if (last || (dx >= dy ? y0 != oldy : x0 != oldx)) {
+                int x = (startx < oldx) ? startx : oldx;
+                int y = (starty < oldy) ? starty : oldy;
+                int w = (dx >= dy) ? (oldx - startx) * sx + 1 : 1;
+                int h = (dx >= dy) ? 1 : (oldy - starty) * sy + 1;
+                if (gfx_cmd_enqueue_fill(x, y, w, h, color, 0)) return;
+                startx = x0; starty = y0;
+            }
+            if (last) break;
         }
         return;
     }
@@ -304,7 +344,13 @@ void gfx_rect(int x, int y, int w, int h, u8 color)
 {
     if (!gfx_ready) return;
     if (gfx_direct) {
+        int x2 = x + w - 1, y2 = y + h - 1;
+        int left = (x < 0) ? 0 : x;
         if (w <= 0 || h <= 0) return;
+        if (x2 >= gfx_fb.width) x2 = gfx_fb.width - 1;
+        if (y2 >= gfx_fb.height) y2 = gfx_fb.height - 1;
+        if (left <= x2 && y >= 0 && y <= y2)
+            gfx_api->gfx_add_dirty_rect(left, y, x2 - left + 1, y2 - y + 1);
         gfx_hline(x, y, w, color);
         gfx_hline(x, y + h - 1, w, color);
         gfx_vline(x, y, h, color);
@@ -339,7 +385,16 @@ void gfx_rect(int x, int y, int w, int h, u8 color)
 void gfx_fill_rect(int x, int y, int w, int h, u8 color)
 {
     if (!gfx_ready) return;
-    if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, w, h, color, 0); return; }
+    if (gfx_direct) {
+        gfx_cmd_enqueue_fill(x, y, w, h, color, 0);
+        if (w <= 0 || h <= 0) return;
+        if (x < 0) { w += x; x = 0; }
+        if (y < 0) { h += y; y = 0; }
+        if (x + w > gfx_fb.width) w = gfx_fb.width - x;
+        if (y + h > gfx_fb.height) h = gfx_fb.height - y;
+        if (w > 0 && h > 0) gfx_api->gfx_add_dirty_rect(x, y, w, h);
+        return;
+    }
     int x2, r, base;
 
     if (w <= 0 || h <= 0) return;
