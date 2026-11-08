@@ -12,10 +12,21 @@ static bool benchmark;
 static u32 bench_calls, bench_reads, bench_clock, bench_lines, bench_method;
 static int bench_fault, bench_field;
 static u32 bench_fields, ram_lines, ram_method, allocs, frees;
-static bool ram_phase, alloc_fail;
-static u32 ram_storage[4];
-void *kmalloc(u32 size) { ++allocs; if (size != 10) failed=1; return alloc_fail ? 0 : ram_storage; }
-void kfree(void *p) { if (p != ram_storage) failed=1; ++frees; }
+static bool ram_phase, alloc_fail, free_fail;
+static u32 ram_storage[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
+u32 pgalloc_alloc_phys(u32 owner, int pages)
+{
+    ++allocs;
+    if (owner != LEDGER_OWNER_KERNEL || pages != 1) failed=1;
+    return alloc_fail ? 0 : (u32)ram_storage;
+}
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int pages)
+{
+    if (owner != LEDGER_OWNER_KERNEL || pfn != (u32)ram_storage / PAGE_SIZE || pages != 1)
+        failed=1;
+    ++frees;
+    return !free_fail;
+}
 
 int sys_time_now(u32 *lo, u32 *hi)
 {
@@ -325,6 +336,10 @@ static int test(void)
     ram_lines=ram_method=allocs=frees=0;
     if (ram_compare(&o)!=TRI_E_RESOURCE || ram_lines!=4 || ram_method!=15 ||
         allocs!=1 || frees || failed) return 1;
+    alloc_fail=false; free_fail=true; ram_phase=false;
+    ram_lines=ram_method=allocs=frees=0;
+    if (ram_compare(&o)!=TRI_E_RESOURCE || ram_lines!=4 || ram_method!=15 ||
+        allocs!=1 || frees!=1 || failed) return 1;
     return 0;
 }
 void _start(void)

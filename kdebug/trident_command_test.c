@@ -6,6 +6,7 @@
 #include "trident_command_test.h"
 #include "sys.h"
 #include "mm/kmalloc.h"
+#include "../mm/pgalloc.h"
 #include "../drivers/video/trident/trident_module.h"
 #include "../lib/serial_diag.h"
 #include "generated/kdebug_import_macros.h"
@@ -292,7 +293,11 @@ static int ram_compare(const struct TridentDiagnosticOps *o)
     u32 bytes = d->mode.client.bytes;
     static const char *const names[] = {"rep_stosd", "rep_movsd", "dword", "byte"};
     int setup = !bytes || bytes > d->res->client_bytes ? TRI_E_SURFACE : 0;
-    u8 *buffer = setup ? 0 : kmalloc(bytes);
+    /* The kernel heap (192KiB) cannot hold a 300KiB frame: borrow pages
+     * like kdebug/gf_prim_bench.c and return them after the four methods. */
+    u32 pages = (bytes + PAGE_SIZE - 1u) / PAGE_SIZE;
+    u32 phys = setup ? 0 : pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, (int)pages);
+    u8 *buffer = phys ? (u8 *)P2V(phys) : 0;
     if (!setup && !buffer) setup = TRI_E_RESOURCE;
     int result = setup;
     for (u32 method = 0; method < 4u; ++method) {
@@ -341,7 +346,9 @@ static int ram_compare(const struct TridentDiagnosticOps *o)
         serial_puts_polled("\r\n");
         remember(&result, rc);
     }
-    if (buffer) kfree(buffer);
+    /* pgalloc_free_n_owner returns 1 on success (mm/pgalloc_owner.inc). */
+    if (phys && !pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE, (int)pages))
+        remember(&result, TRI_E_RESOURCE);
     return result;
 }
 static int present_compare(const struct TridentDiagnosticOps *o)
