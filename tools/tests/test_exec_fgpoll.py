@@ -8,7 +8,7 @@ CHECK = dict(name='exec-fgpoll-host', tier=1, budget=5.0,
                      'exec/exec_schedule.inc', 'exec/appslot.h', 'exec/exec.h',
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
-                     'sdk/include/os32/**', 'sdk/gen_kapi.py',
+                     'sdk/include/os32/**', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
                      'mm/paging.h', 'fs/vfs_stdin.h'])
 
 import argparse

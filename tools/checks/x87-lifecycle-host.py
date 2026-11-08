@@ -4,7 +4,7 @@ CHECK = dict(
             'arch/x86/kernel/cpu_flags.inc', 'tools/tests/x87_lifecycle_host.c',
             'tools/tests/test_x87_lifecycle.py', 'tools/tests/exec_source.py',
             'tools/tests/host_arch/*.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'sdk/gen_kapi.py'],
+            'tools/tests/kernel_includes.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
     needs=[], budget=15.0)
 
 

@@ -3,7 +3,7 @@
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
 CHECK = dict(name='appmem-map-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
+    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py'],
     needs=['make:all'], budget=3.190182)
 
 from exec_source import read_text
@@ -23,7 +23,7 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = ['exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c', 'exec/exec_heap.c']
-TARGET_SRCS = ['exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
+TARGET_SRCS = ['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'tools/tests/host_arch/arch_abi.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
     'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h',
     'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',

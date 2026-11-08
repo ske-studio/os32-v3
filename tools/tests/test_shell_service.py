@@ -22,7 +22,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
     needs=[], budget=1.566306)
 
 from exec_source import exec_source
@@ -192,7 +192,7 @@ def static_checks(root, quiet=False):
     ex = exec_source(root)
     if not re.search(r"^#define EXEC_ENTRY_ARGS 4$", (root / "exec/exec.h").read_text(), re.M):
         bad.append("EXEC_ENTRY_ARGS must remain four words")
-    if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "include/cpu.h").read_text(), re.M):
+    if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "arch/x86/arch_abi.h").read_text(), re.M):
         bad.append("ABI_STACK_ALIGN must remain sixteen bytes")
     disp = _func_body(ex, "void __cdecl ring3_syscall_dispatch(u32 *frame)")
     if "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;" not in disp:

@@ -20,7 +20,7 @@ KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
     sdk/os32_generations.py sdk/rust/os32api/src/generations.rs \
     sdk/crt/generations.inc sdk/link/generations.ld \
     sdk/link/app.ld sdk/link/app_sys.ld sdk/link/shlib.ld build/os32.ld
-$(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py
+$(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/target_profile.py
 	python3 sdk/gen_kapi.py
 
 # GCC honors SOURCE_DATE_EPOCH for __DATE__/__TIME__ in kapi_sys.c.
@@ -56,7 +56,7 @@ kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-ma
 
 # === カーネルクリーン ===
 clean-kernel:
-	rm -f $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(ASM_KERNEL:.asm=.o) $(C_KERNEL:.c=.o) exec/ring3_ls_shim.o $(BUILD_ID_SRC) $(BUILD_ID_OBJ) $(BUILD_OUT)/kernel.elf $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kernel.map
+	rm -f $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(ASM_KERNEL:.asm=.o) $(C_KERNEL:.c=.o) arch/x86/kernel/ring3_ls_shim.o $(BUILD_ID_SRC) $(BUILD_ID_OBJ) $(BUILD_OUT)/kernel.elf $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kernel.map
 
 .PHONY: kernel clean-kernel
 

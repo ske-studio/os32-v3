@@ -157,7 +157,8 @@ def case_capacity_full(tmp, kj):
     for d in ("sdk/include", "kapi", "exec"):
         (gk / d).mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "sdk/include/os32", gk / "sdk/include/os32")
-    shutil.copy(ROOT / "sdk/gen_kapi.py", gk / "sdk/gen_kapi.py")
+    for name in ("gen_kapi.py", "kapi_abi_x86.py", "target_profile.py"):
+        shutil.copy(ROOT / "sdk" / name, gk / "sdk" / name)
     shutil.copy(ROOT / "exec/exec.c", gk / "exec/exec.c")
     d = dict(kj)
     d["func_capacity"] = n
@@ -691,7 +692,7 @@ def case_generation_isolation(tmp):
                       'sdk/link', 'kapi', 'exec', 'include', 'build', 'tools/tests'):
         (seed / directory).mkdir(parents=True, exist_ok=True)
     links = ('sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'build/os32.ld')
-    for rel in ('sdk/gen_kapi.py', 'sdk/kapi.json', 'tools/tests/os32x_layout_host.c', *links):
+    for rel in ('sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sdk/kapi.json', 'tools/tests/os32x_layout_host.c', *links):
         shutil.copy2(ROOT / rel, seed / rel)
     def snapshot():
         return {rel: ((seed / rel).read_bytes(), (seed / rel).stat().st_mtime_ns)

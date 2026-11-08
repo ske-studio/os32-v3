@@ -13,7 +13,7 @@ INCLUDES := -I. -Iinclude -Ilib -Iarch/ppc -Iplatform/powermac
 COMMON := -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector \
  -fno-asynchronous-unwind-tables -fno-tree-loop-distribute-patterns -O2 \
  -Wall -Wextra -Werror=vla -Werror=implicit-int -Werror=implicit-function-declaration
-PPC_FLAGS := $(COMMON) $(INCLUDES) -mcpu=7450 -m32 -mbig-endian \
+PPC_FLAGS := -D__cdecl= $(COMMON) $(INCLUDES) -mcpu=7450 -m32 -mbig-endian \
  -msoft-float -mno-altivec -msdata=none -nostdlib
 HOST_FLAGS := $(COMMON) $(INCLUDES) -Itools/ppc -m32 -nostdlib -nostdinc \
  -isystem $(shell $(HOST_CC) -print-file-name=include) -no-pie

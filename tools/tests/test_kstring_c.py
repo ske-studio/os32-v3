@@ -60,7 +60,7 @@ COMMON_FLAGS = ["-std=gnu11", "-ffreestanding", "-fno-pie",
                 "-Wall", "-Wextra", "-Werror"]
 X86_FLAGS = ["-m32", "-march=i386", "-mno-red-zone"]
 INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "lib", "sdk/include/os32")]
+            for p in ("include", "arch/x86", "lib", "sdk/include/os32")]
 
 
 def run(cmd, **kw):

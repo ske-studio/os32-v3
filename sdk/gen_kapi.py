@@ -2,6 +2,7 @@ import argparse
 import json
 import re
 import sys
+from kapi_abi_x86 import fixed_arg_bytes
 
 parser = argparse.ArgumentParser(
     description="Generate KAPI files from sdk/kapi.json.", allow_abbrev=False)
@@ -450,8 +451,7 @@ c_content += "/* 各スロットの cdecl 引数バイト数 (固定分)。int 0
 c_content += " * ユーザスタックからこの量をコピーして本物の wrap を呼ぶ (可変長は下限)。 */\n"
 c_content += "const u16 kapi_argsize[KAPI_FUNC_COUNT] = {\n"
 for _slot, _api in enumerate(data["api"]):
-    _fixed = [a for a in _api.get("args", []) if a != "..."]
-    _bytes = 4 * len(_fixed)
+    _bytes = fixed_arg_bytes(_api.get("args", []))
     _variadic = any(a == "..." for a in _api.get("args", []))
     _tag = "  /* %s%s */" % (_api["name"], " (...)" if _variadic else "")
     c_content += f"    {_bytes},{_tag}\n"

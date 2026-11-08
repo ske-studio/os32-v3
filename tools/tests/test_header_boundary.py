@@ -3,7 +3,7 @@
 CHECK = dict(name='header-boundary', tier=1,
     covers=['include/cpu.h', 'include/kernel_tick.h', 'include/types.h',
             'arch/x86/**', 'arch/ppc/arch_cpu.h', 'include/bootlog.h',
-            'init/bootlog_save.c', 'exec/ring3_ls.S', 'exec/ring3_ls.h',
+            'init/bootlog_save.c', 'arch/x86/kernel/ring3_ls.S', 'exec/ring3_ls.h',
             'build/kernel-objects.mk', 'tools/tests/kernel_includes.py',
             'tools/tests/host_arch/arch_cpu.h', 'sdk/include/os32/**'],
     needs=[], budget=5.0)
@@ -47,10 +47,10 @@ def main():
         print('PASS mock architecture dependencies (normal control)', flush=True)
         for label in ('normal', 'r1'):
             out = directory / (label + '.o')
-            command([cc, '-m32', '-Isdk/include/os32',
+            command([cc, '-m32', '-Iarch/x86', '-Iexec', '-Iarch/x86/kernel', '-Isdk/include/os32',
                      *(['-DOS32_R1_FIXTURE'] if label == 'r1' else []),
-                     '-c', 'exec/ring3_ls.S', '-o', str(out)])
-            dep = command([cc, '-m32', '-Isdk/include/os32', '-M', 'exec/ring3_ls.S'])
+                     '-c', 'arch/x86/kernel/ring3_ls.S', '-o', str(out)])
+            dep = command([cc, '-m32', '-Iarch/x86', '-Iexec', '-Iarch/x86/kernel', '-Isdk/include/os32', '-M', 'arch/x86/kernel/ring3_ls.S'])
             assert 'x86_flags.h' not in dep, dep
             print('PASS ' + label + ' real ring3 ASM and dependencies', flush=True)
         dep = command([cc, *include_flags(ROOT), '-M', 'init/bootlog_save.c'])

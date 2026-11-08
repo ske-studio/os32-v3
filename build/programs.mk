@@ -477,7 +477,7 @@ userland/tests/kstr_asm_a.o: lib/kstring_asm.asm
 	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_a.txt userland/tests/kstr_asm_raw.o $@
 	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_ren_a.txt
 
-userland/tests/kstr_c_c.o: lib/kstring_c.c lib/kstring.h include/types.h
+userland/tests/kstr_c_c.o: lib/kstring_c.c lib/kstring.h include/types.h include/callconv.h
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o userland/tests/kstr_c_raw.o
 	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f c_$$f"; done > userland/tests/kstr_ren_c.txt
 	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.o $@
@@ -593,7 +593,7 @@ userland/%.bin: userland/%.raw userland/%.elf
 # === ヘルパーツール ===
 unicode_bin: $(BUILD_OUT)/unicode.bin
 
-tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h
+tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h include/callconv.h
 	gcc -std=gnu11 -O2 -I. -Iinclude $< -o $@
 
 $(BUILD_OUT)/unicode.bin: tools/gen_unicode

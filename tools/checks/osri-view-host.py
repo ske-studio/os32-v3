@@ -1,6 +1,6 @@
 """OSRI KAPI owner, backend and rational run controller host tests."""
 CHECK = dict(name='osri-view-host', tier=1,
-    covers=['kapi/kapi_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h',
+    covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'kapi/kapi_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h',
             'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'gfx/gfx_core.c', 'gfx/gfx_internal.h',
             'gfx/gfx.h', 'gfx/palette.h', 'gfx/osri_profile.h',
             'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pc98_osri.c', 'drivers/video/pc98/splash_raster_run.c',

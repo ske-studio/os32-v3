@@ -45,7 +45,7 @@ R1_OUT := $(BUILD_OUT)/r1
 R1_OBJ := $(R1_OUT)/obj
 $(R1_OBJ)/exec/shell_service.o: private KERNEL_CFLAGS += -fno-optimize-sibling-calls
 R1_C := $(C_KERNEL) kernel/r1_fixture.c kernel/font_guard_fixture.c
-R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o
+R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) arch/x86/kernel/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o
 R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c mm/paging_app.c
 
 $(R1_OBJ)/%.o: %.c
@@ -60,9 +60,9 @@ $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/
 	$(LAYOUT_CPP) -traditional-cpp $< -o $(call legacy_asm_input,$@.asm)
 	$(AS) -p sdk/crt/generations.inc -f elf32 $(call legacy_asm_input,$@.asm) -o $@
 
-$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h arch/x86/kernel/idt.h
+$(R1_OBJ)/arch/x86/kernel/ring3_ls_shim.o: arch/x86/kernel/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h include/abi.h arch/x86/arch_abi.h arch/x86/kernel/idt.h
 	@mkdir -p $(@D)
-	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
+	$(CC) -m32 -Iarch/$(ARCH) -Iexec -Iarch/x86/kernel -Isdk/include/os32 -c $< -o $@
 
 $(R1_OUT)/build_id.c: .FORCE
 	@mkdir -p $(@D)
@@ -98,9 +98,9 @@ $(KERNEL_OBJ_PREFIX)%.o: %.c
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(KERNEL_INCLUDES) -c $< -o $@
 
 ifeq ($(ARCH),x86)
-$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h arch/x86/kernel/idt.h
+$(KERNEL_OBJ_PREFIX)arch/x86/kernel/ring3_ls_shim.o: arch/x86/kernel/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h include/abi.h arch/x86/arch_abi.h arch/x86/kernel/idt.h
 	@mkdir -p $(@D)
-	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
+	$(CC) -m32 -Iarch/$(ARCH) -Iexec -Iarch/x86/kernel -Isdk/include/os32 -c $< -o $@
 
 $(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
 $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c

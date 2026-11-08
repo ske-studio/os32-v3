@@ -48,6 +48,7 @@ def measure(root, assignments, source_profile='selected'):
     report = dict(target='ppc-powermac', source_profile=source_profile, cc=declared,
                   selected=profile['C_KERNEL'] + profile['GAS_KERNEL'], units=[])
     for argv in profile['argv']:
+        argv = [*argv, '-D__cdecl=']
         source = argv[argv.index('-c') + 1]
         output = Path(argv[argv.index('-o') + 1])
         if not output.is_absolute():
