@@ -74,10 +74,10 @@ PTE の変更の TLB への反映は CR3 の読み直しで行い、`invlpg` を
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
 V86 session の全出口 (正常・失敗・STOP・kill) で、低位の PTE の属性を戻し (VRAM/E の setup と teardown の両方で PCD を台帳と一致させる)、
-boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`kernel/v86/v86_mem.c`)。
+boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`arch/x86/legacy/v86_mem.c`)。
 SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し、通常の地図を検査する。V86 中は通常 AS の実行・生成・検査をしない。
 V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラフィック対応機では出口で 6Ah に標準グラフィック (20h) を書いて戻す
-(`kernel/v86/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
+(`arch/x86/legacy/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
 
 ### V86 セッションの入場と呼出元 (T7a、`arch/x86/legacy/v86_call.c`)
 

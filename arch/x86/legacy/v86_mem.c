@@ -11,16 +11,16 @@
 #include "kstring.h"
 #include "v86.h"
 #include "v86_module.h"
-#include "../../mm/paging.h"
-#include "../../mm/pgalloc.h"
+#include "../../../mm/paging.h"
+#include "../../../mm/pgalloc.h"
 #include "io.h"
 #include "v86_io.h"
 #include "v86_bios.h"
 #include "../module/module.h"
 #include "../kselftest.h"
 #include "tvram.h"
-#include "../../include/platform_emergency.h"
-#include "../../gfx/gfx.h"
+#include "../../../include/platform_emergency.h"
+#include "../../../gfx/gfx.h"
 
 
 enum { V86_RESTORE_COL_BAD = 17, V86_RESTORE_COL_PTE = 30,

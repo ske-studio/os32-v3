@@ -130,16 +130,52 @@ def allowed_tool_difference(rel, a, b):
     return approved is not None and (digest(a), digest(b)) == approved
 
 
+# H2: explicit old/new object paths; final images remain byte comparisons.
+H2_OBJECT_MOVES = {
+    'kernel/v86/' + name + '.o': 'arch/x86/legacy/' + name + '.o'
+    for name in ('v86', 'v86_mem', 'v86_module', 'v86_gcap', 'v86_entry')
+}
+
+
+def h2_object_path(rel, root):
+    for old, new in H2_OBJECT_MOVES.items():
+        if str(rel).endswith(old):
+            moved = Path(str(rel)[:-len(old)] + new)
+            if (root / moved).is_file():
+                return moved
+    return rel
+
+
+def object_execution_relocations(path):
+    cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
+    records = []
+    for flags in ('-drwz', '-r'):
+        output = subprocess.check_output(
+            [str(cross / 'bin/i386-elf-objdump'), flags, str(path)], text=True)
+        # Only the objdump file heading contains the compared object's path.
+        records.append('\n'.join(line for line in output.splitlines()
+                                 if not line.startswith(str(path) + ':')))
+    return tuple(records)
+
+
+
 def compare(left, right, all_products=False):
     paths = artifacts(left, all_products) | artifacts(right, all_products)
+    for old, new in H2_OBJECT_MOVES.items():
+        paths = {Path(str(rel)[:-len(new)] + old)
+                 if str(rel).endswith(new) else rel for rel in paths}
     different = []
     for rel in sorted(paths):
-        a, b = left / rel, right / rel
+        left_rel, right_rel = h2_object_path(rel, left), h2_object_path(rel, right)
+        a, b = left / left_rel, right / right_rel
         equal = a.is_file() and b.is_file()
         if equal:
             before, after = a.read_bytes(), b.read_bytes()
             equal = (archive_members(before) == archive_members(after)
                      if rel.suffix == '.a' else before == after)
+        if not equal and a.is_file() and b.is_file() and left_rel != right_rel:
+            equal = object_execution_relocations(a) == object_execution_relocations(b)
+            print(('EXEC/RELOC MATCH ' if equal else 'EXEC/RELOC DIFF ') + str(rel), flush=True)
         if not equal and all_products and allowed_tool_difference(rel, a, b):
             print('ALLOW ' + str(rel), flush=True)
             before = a.read_text().splitlines(True) if a.is_file() else []
@@ -177,6 +213,9 @@ def object_paths(root):
             key = key.replace("arch/x86/legacy/v86_call.o", "exec/v86_call.o")
             key = key.replace("platform/pc98/bootinfo_check.o", "init/bootinfo_check.o")
             key = key.replace("platform/pc98/bios_snapshot.o", "kernel/v86/v86_snapshot.o")
+            for old, new in H2_OBJECT_MOVES.items():
+                if key.endswith(new):
+                    key = key[:-len(new)] + old
             paths[key] = path
     return paths
 

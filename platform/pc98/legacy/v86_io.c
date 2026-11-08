@@ -52,7 +52,7 @@ u32 v86_iolog[V86_IOLOG_N * V86_IOLOG_WORDS];
  *  [2] cs<<16 | ip                    どの命令から来たか
  *  [3] 同じ内容が連続した回数 */
 
-/* #GP ハンドラが記録しているゲストの CS:IP (kernel/v86/v86.c) */
+/* #GP ハンドラが記録しているゲストの CS:IP (arch/x86/legacy/v86.c) */
 #include "v86.h"
 #include "v86_module.h"
 

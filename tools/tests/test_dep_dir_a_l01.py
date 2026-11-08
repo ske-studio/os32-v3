@@ -55,7 +55,7 @@ def abi(folder, fixture):
     probe = ['#include <stddef.h>']
     for name, api in fixture['apis'].items():
         directory = {'pcm': 'drivers/sound/cs4231', 'fm': 'drivers/sound/fm',
-                     'lan': 'drivers/net/e82557', 'v86': 'kernel/v86'}[name]
+                     'lan': 'drivers/net/e82557', 'v86': 'arch/x86/legacy'}[name]
         text = (ROOT / directory / f'{name}_module.h').read_text()
         block = re.search(r'typedef struct \{(.*?)\} ' + api['type'] + ';', text, re.S).group(1)
         assert ' '.join(re.sub(r'/\*.*?\*/', '', block, flags=re.S).split()) == api['body']

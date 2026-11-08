@@ -1,6 +1,6 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'kernel/v86/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'arch/x86/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=0.718344)
 
 import copy
@@ -69,7 +69,7 @@ def conformance():
         adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
         directory = {
             'module': 'kernel/module', 'hwdev_module': 'kernel/module',
-            'fep_module': 'kernel/ime', 'v86_module': 'kernel/v86',
+            'fep_module': 'kernel/ime', 'v86_module': 'arch/x86/legacy',
             'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
             'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',
             'cirrus_module': 'drivers/video/cirrus', 'trident_module': 'drivers/video/trident',

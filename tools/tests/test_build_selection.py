@@ -29,7 +29,8 @@ def check(root):
         assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
     assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
-    assert not any('kernel/v86/' in name for name in off['C_KERNEL'])
+    assert not any(path in name for name in off['C_KERNEL'] for path in
+                   ('kernel/v86/', 'arch/x86/legacy/', 'platform/pc98/legacy/'))
     assert not any('geforce/' in name for name in off['C_KERNEL'])
     for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0']):
         try:

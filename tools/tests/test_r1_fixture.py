@@ -21,7 +21,7 @@ from r1_recovery import recovery, lease_recovery, RECOVERY_MUTANTS, LEASE_MUTANT
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['kernel/r1_fixture.c', 'kernel/r1_fixture.h', 'arch/x86/kernel/isr_handlers.c',
-               'kernel/v86/v86_mem.c', 'exec/exec.c', 'mm/pgalloc.c',
+               'arch/x86/legacy/v86_mem.c', 'exec/exec.c', 'mm/pgalloc.c',
                'tools/tests/r1_fixture_host.c', 'tools/r1_manifest.py',
                'tools/tests/r1_recovery.py', 'tools/tests/r1_recovery_host.c',
                'tools/tests/r1_lease_host.c', 'exec/appslot.c', 'exec/appslot.h',
@@ -61,7 +61,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;\n', '')
     entry = entry.replace('    _disable();', '    (void)error_code;\n    _disable();')
-    end = function(read('kernel/v86/v86_mem.c'), 'void v86_session_end(')
+    end = function(read('arch/x86/legacy/v86_mem.c'), 'void v86_session_end(')
     end = end[:end.index('    if (!v86_session.open)')] + '    irq_restore(flags);\n}\n'
     (tmp / 'entry_source.c').write_text('#include "idt.h"\n' + entry + end)
     (tmp / 'timer_source.c').write_text(function(isr, 'void timer_handler('))
