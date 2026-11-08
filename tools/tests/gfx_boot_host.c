@@ -149,7 +149,7 @@ static int g_backend_pref = PREF;
 GfxBackend gfx_backend_pc98;
 GfxBackend gfx_backend_pegc;
 GfxBackend gfx_backend_cirrus;
-const GfxBackend *g_backend = &gfx_backend_pc98;
+GfxBackend *g_backend = &gfx_backend_pc98;
 
 static char trace[40];
 static u32 ntrace;
@@ -533,7 +533,7 @@ void _start(void)
     if (HW == LEDGER_SF_CIRRUS && sc) sel = LEDGER_SF_CIRRUS;
     if (HW == LEDGER_SF_PEGC && se) sel = LEDGER_SF_PEGC;
     g_backend = sel == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus :
-                sel == LEDGER_SF_PEGC ? (const GfxBackend *)&gfx_backend_pegc :
+                sel == LEDGER_SF_PEGC ? &gfx_backend_pegc :
                 &gfx_backend_pc98;
     cl = sel == LEDGER_SF_CIRRUS ? sc : sel == LEDGER_SF_PEGC ? se : sp;
     gfx_bb_phys_range(&base, &size);

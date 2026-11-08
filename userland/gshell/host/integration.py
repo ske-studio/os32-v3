@@ -76,6 +76,18 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('W2 drag move disconnected', 'src/input.rs',
+     '        crate::movecopy::move_window(st, idx, cx, cy);',
+     '        let _ = (idx, cx, cy);', 'w2_drag_commit_shadow'),
+    ('W2 regen taken before check', 'src/wm.rs',
+     '    if unsafe { libos32gfx_check() } >= 0 {\n        let regen = unsafe { libos32gfx_take_regen() } != 0;',
+     '    let regen = unsafe { libos32gfx_take_regen() } != 0;\n    if unsafe { libos32gfx_check() } >= 0 {', 'w2_regen_cycle'),
+    ('W2 cycle skips check', 'src/wm.rs',
+     '    if unsafe { libos32gfx_check() } >= 0 {\n        let regen',
+     '    if false {\n        let regen', 'w2_regen_cycle'),
+    ('W2 ignores pending', 'src/wm.rs',
+     'regen || REGEN_PENDING.load(Ordering::SeqCst)',
+     'regen', 'w2_regen_cycle'),
     ('HOST_NOTICE unchanged serial delivered', 'src/wm.rs',
      '    if serial == st.host_notice_seen {', '    if false {',
      'host_notice_cycles_'),
@@ -409,9 +421,9 @@ MUTATIONS = [
      '        if cr.intersects(&touched) {\n            cursor::discard(st);',
      '        if true {\n            cursor::discard(st);',
      'commit_frame_redraw_under_the_cursor_saves_the_real_background'),
-    ('drop leaves the last frame when it differs from the outer', 'src/input.rs',
-     '        if nf != st.windows[idx].outer() {',
-     '        if false && nf != st.windows[idx].outer() {',
+    ('drop leaves the last frame when it differs from the outer', 'src/movecopy.rs',
+     '    if !frame.is_empty() {',
+     '    if false && !frame.is_empty() {',
      'drop_after_app_resize_erases_the_last_frame'),
     # Codex レビュー 3 回目 (2026-09-29) P2×2: 重なり順 アプリ < 枠 < 最前面物 < カーソル。
     ('overlays are judged by the app rects only', 'src/handler.rs',
@@ -529,6 +541,26 @@ MUTATIONS += [
     ('P0a extra count accepted', 'src/typical_ops.rs', 'words.next().is_some() || n == 0', 'n == 0', 'p0a_parse'),
     ('P0a return leg omitted', 'src/typical_ops.rs', 'matches!(st.ops.op, 0 | 2)', 'false', 'p0a_key'),
 ]
+
+MUTATIONS += [
+    ('W3 scroll overlays ignore frame edges', 'src/scroll_op.rs',
+     'let overlays = wm::overlays_to_refresh(st, &regions);',
+     'let overlays = wm::overlays_to_refresh(st, &regions[..1]);',
+     'scroll_frame_redraw_keeps_taskbar_on_top'),
+    ('W3 destination escapes scroll rect', 'src/scroll_op.rs',
+     'let dst = r.translate(dx, dy).intersect(&rect);',
+     'let dst = r.translate(dx, dy);', 'scroll_formula_'),
+    ('W3 dirty source copied', 'src/scroll_op.rs',
+     'visible::region_subtract_region(&rv, &st.windows[idx].dirty)',
+     '(rv, true)', 'scroll_formula_'),
+    ('W3 old protocol accepted', 'src/handler.rs',
+     'if arg != 0 && arg != GUI_PROTO_VERSION as u32 {',
+     'if false {', 'scroll_protocol_'),
+    ('W3 commit disconnected', 'src/scroll_op.rs',
+     '    super::op_commit(st, owner, slot_no, req.window);',
+     '', 'scroll_protocol_'),
+]
+
 
 def one_mutation(k: int) -> tuple:
     """変異 k を一時の写しに当ててビルドし、絞り込んだ試験を走らせる。(ok, 行)。"""

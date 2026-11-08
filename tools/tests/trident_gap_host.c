@@ -1,5 +1,8 @@
 /* Production conversion, MMIO span, next-frame updates and wire sweep. */
 #include "kdebug/trident_command_test.c"
+u32 pgalloc_alloc_phys(u32 owner, int pages) { (void)owner; (void)pages; return 0; }
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int pages)
+{ (void)owner; (void)pfn; (void)pages; return 1; }
 static u32 lfb[16];
 static u8 client[64];
 static struct trident_resources r;

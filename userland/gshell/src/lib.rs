@@ -72,6 +72,7 @@ mod input;
 mod kbdnav;
 mod lease;
 mod modal;
+mod movecopy;
 mod multiapp;
 mod os32x;
 mod pump;

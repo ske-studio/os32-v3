@@ -13,6 +13,7 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"
+#include "gfx_policy.h"
 #include "bootlog.h"
 #include "console.h"
 #include "console_backend.h"
@@ -417,6 +418,7 @@ void console_text_gdc_stop(void)
      * **前**に置く — GDC を触らない場合でも「テキスト面が見えない」ことは
      * 変わらないので、溜め始める側は抑止しない。 */
     con_sink_enable();
+    gfx_policy_reeval();
     if (legacy_active()) return;
     con_backend_cursor_shape(0);
 }
@@ -430,6 +432,7 @@ void console_text_gdc_start(void)
      * 再び正になるので、リングの中身はもう誰も描き直さない)。読み手の所有は
      * ここでは返さない — 返すのは exec_exit / exec_kill の owner 回収だけ。 */
     con_sink_disable();
+    gfx_policy_reeval();
     /* 票 K7 D5: 注入リングも捨てる。CUI では打鍵が IRQ1 の cooked リングから
      * 来るので、GUI 中に注がれた残りをシェルのプロンプトへ流し込まない。 */
     kbd_inject_discard();

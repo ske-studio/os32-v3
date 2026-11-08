@@ -396,3 +396,40 @@ if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
 - 実測 (Ra266、全画面 640x480x8 を 8 回): 書き込み rep movsd・dword 14.1ms、word 23.6ms、byte 46.9ms、間隔 0〜600ns でも欠け 0。読み出し rep movsd・dword 89.0ms、word 176.9ms、byte 352.7ms。
 - ユーザー (原文):「測ってよいですが、RAMの状態を管理しない書き込み方法として用意するのは？」「ゲームなどの場合毎秒レンダリングし続けなければならない時があるからです」「２．は必要でしょうね」(vsync)。
 - 方向: PEGC に書くだけの DIRECT を足す (blit は申告しない = 描き直し、XOR・半透明は避ける、カーソルの下の退避は読む、vsync を併用、アプリが方式を選ぶ問い合わせ)。詳細の追記は別に書く (票 TASK_GFX_ACCEL_HAL)。
+
+## 追記 3 (宣言の段 A0)
+
+2026-11-09。第 2 波の共有契約を以下に固定する。A0 は宣言・状態の置き場・リンクできる仮実装までで、方式切替・描画・束の実装は各所有者の段で置き換える。追記 2 の PEGC の「書くだけの DIRECT」は取り消し、PEGC は §2 の SHADOW のまま。
+
+- `include/gfx_hal.h` と `gfx/gfx_core.c` の `g_backend` は `GfxBackend *` に揃える。backend 自体は元から可変であり、表のコピーや別の切替入口は作らない。policy と方式に応じた active hook を更新するのは H4 の `gfx_policy_reeval` だけ (§3-4)。既存の初期化・登録経路の振る舞いは A0 では変えない。
+- `gfx/gfx_core_surface.inc` の既存 `void gfx_reinit_surface_roles(int finish, int display_only)` を非 static にし、`gfx/gfx_internal.h` に宣言する。所有者は core (H6 の接続、H4 から呼ぶ)。通常文脈で `finish=0` の revoke → `finish=1` の regen の順。`display_only=0` は CLIENT/DISPLAY、1 は DISPLAY だけ。既存の実体を使い、revoke/regen の処理は変更しない。
+- H4 の置き場は `gfx/gfx_policy.h` / `.c`。`extern u16 gfx_policy_gen` (初期値 1、世代は u16 で 0 を飛ばす)、`int gfx_direct_wanted(void)`、`void gfx_policy_reeval(void)`、`int gfx_policy_blocks_map(u32 role)`。wanted は真偽、blocks_map は LEDGER_ROLE_* に対する真偽で query の認可には使わない。A0 では wanted/blocks_map は 0、reeval は何もしない。
+- H4 の同じヘッダに `int gfx_fullscreen_owner(void)` (GUI 以外の全画面所有者があれば非0、H4 が appslot の所有者から判断) と `extern int gfx_scan_changed` (H4 が実体を持つ、初期値0) も置く。H6/G3 は確定した走査面変更後に旗を 1 にして `gfx_policy_reeval()` を呼ぶ。H4 は同方式でも旗が立てば世代を上げ、処理後に旗を消す。向きを指定する別入口は作らない。A0 の fullscreen_owner は 0、通知・旗の消費は H6/G3・H4 の実装に残す。
+- H3 は `gfx/gfx_hw_mono_cpu.h` / `.c` の `int gfx_hw_mono_cpu(int x, int y, int w, int h, const u8 *bits, u32 pitch, u8 fg, int bg, int cx, int cy, int cw, int ch)` を実装し、H2 が検査後に呼ぶ。bits は MSB-first、pitch はバイト、bg=-1 は透過、他は INDEX8。clip は画面座標。選択 backend の put を同期的に使い、bits を返却後に保持しない。0 成功、負値失敗 (部分描画はありうる)。A0 は NOSYS。policy と mono の `.c` はカーネルの sources/common.mk・order.mk に登録済みで、H2 は H3/H4 の実装前でもリンクできる。
+
+libos32gfx の内部共有ヘッダは `userland/lib/gfx/gfx_direct_internal.h`。L0 は `libos32gfx_core.c` の `int gfx_direct`、`u16 gfx_gen`、`int gfx_lost` の実体と attach/recovery を所有する (A0 は全て 0)。gfx_gen は screen_info.reserved[0] の非0世代で、KAPI の u32 gen に渡す際に拡張する。L1 は送信/GET の失敗時に gfx_lost を立て、回復と旗の消去は L0 に任せる。再描画旗は L0 の非公開状態とし、`int libos32gfx_take_regen(void)` で一度だけ取得・消去する (A0 は 0)。check → 成功 → take_regen → 再描画の順は §3-3a のまま。
+
+次の関数は全て `int` で、0 成功・負値失敗。L1 の置き場は `userland/lib/gfx/draw/gfx_cmd.c`、宣言は内部共有ヘッダ (flush は公開 `libos32gfx.h` からも見える)。L2〜L6 はこの口を使う。
+
+```c
+int gfx_cmd_enqueue_fill(int x, int y, int w, int h, u8 color, u8 rop);
+int gfx_cmd_enqueue_copy(int dx, int dy, int sx, int sy, int w, int h);
+int gfx_cmd_enqueue_put(int x, int y, int w, int h, const u8 *src, u32 pitch, int key);
+int gfx_cmd_enqueue_mono(int x, int y, int w, int h, const u8 *bits, u32 pitch,
+                         u8 fg, int bg, int cx, int cy, int cw, int ch);
+int gfx_cmd_get(int x, int y, int w, int h, u8 *dst, u32 pitch);
+int gfx_flush(void);
+void gfx_cmd_drop(void);
+```
+
+- FILL の rop は COPY=0/XOR=1。COPY の座標は書き先→読み元。PUT の key=-1 は鍵なし、MONO の bg=-1 は透過、それ以外は INDEX8。MONO のビット順・clip は H3 の口と同じ。clip は L1 で適用し、必要なビット列を詰め直してから MONO 命令にする。MONO の fg は color、bg は key に入れる。画面内の寸法で PUT は最大640B/行、MONO は最大80B/行とする。
+- PUT/MONO は enqueue 中に 4KiB の区画へコピーし、呼出側のポインタを保持しない。行の分割と自動 flush は L1 が所有し、順序を保つ。検査に失敗する値や GFX_Cmd の i16 に表せない値を暗黙に切り詰めない。失敗前に先頭の命令が送信された可能性があるため、呼出側で再送しない。
+- GET は同期で、flush 成功後だけ KAPI の gfx_hw_get を呼び、dst を返却後に保持しない。drop は区画と命令を捨てるだけで送信しない。flush の失敗時は捨てて gfx_lost を立てる。A0 は空の flush が0、drop が何もしない、enqueue/get は NOSYS。
+- L6 の `int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)` は `draw/gfx_copy.c`、宣言は `libos32gfx.h`。同じ画面内の COPY を SHADOW/DIRECT に振り分ける口で、0 成功・負値失敗。A0 は NOSYS。`gfx_flush`・`libos32gfx_take_regen` と併せて後続の C/Rust/WM が呼ぶ入口で、共有ライブラリや Rust への結線は各後続段で行う。既存の check/attach/detach の宣言と動作は維持する。
+- G2 の `int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop)` は既存の fill/blit と同じ共有ヘッダ `hwdev/gf/accel.h`。G1 の `int gf_direct_ok(void)` と `extern const GfxDirectOps gf_direct_ops` は `drivers/video/geforce/geforce_module.h`。G1/G2 の実体をここに複製しない。`gf_direct.o` の build/geforce-module.mk への追加・登録・module text の検査は G3 の所有のまま。
+
+## 追記 4 (2026-11-09、PM 決定)
+
+- FILL は画面内に削ってから命令の範囲を検査する。COPY は書き先・読み元の両方を画面内に削り、片方の削りに合わせて他方もずらす。画面内に残らなければ命令を積まず成功とする。座標と寸法の計算で int をあふれさせない。
+- `libos32gfx_check` は `gfx_lost` が立っていた回に `gfx_regen` を立てる。方式や世代が変わらなくても、捨てられた命令の描き直しが必要である。
+- U1 の draw.rs は失敗時に窓 ID で INVALIDATE しない。失敗は `gfx_lost` に残り、次の check が `gfx_regen` を立てる。U2 の WAIT・POLL の戻りで check → take_regen → 自分の窓を全面 INVALIDATE の順に回復する。§7 の U1 の「失敗したら INVALIDATE」はこの意味に読み替える。

@@ -1,6 +1,6 @@
 # HAL に織り込む描画の高速化 (DIRECT/SHADOW)
 
-> 状態: **実装中 (2026-11-08)** — 設計は確定 ([GFX_ACCEL_HAL_DESIGN](../../decisions/gui/GFX_ACCEL_HAL_DESIGN.md))。段 31 本、第 1 波 (P0a・P0b・H1・H2a) から。
+> 状態: **実装中 (2026-11-09)** — 設計は確定 ([GFX_ACCEL_HAL_DESIGN](../../decisions/gui/GFX_ACCEL_HAL_DESIGN.md))。段 31 本、第 1 波 (P0a・P0b・H1・H2a) から。
 
 ## 0. ユーザー決定 (2026-11-08、原文)
 - 「すべて要ります。重要度別に分けて機能実装。あ、でもHALに織り込んだほうが良いのかも？」
@@ -29,5 +29,6 @@ PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ
 |---|---|
 | H1 (宣言、KAPI 83) | 実装済み (Opus レビュー取り込み可) |
 | P0a・P0b・P0c (計測) | 実装済み (P0a は Opus の直し 1 済、P0b 取り込み可) — 追記 1 で欠けを決めた |
+| A0 (宣言の段、追記 3)・H2・H3・H4・L0・L1・G1・G2 | 実装済み (第 2 波、Opus レビュー取り込み可)。L1b でレビューの F1・F2・F3・F5・F6 を直した |
 | H2a | 未着手 |
-| ほか 27 段 | 未着手 (確定設計 §7 の依存の順) |
+| ほか | 未着手 (確定設計 §7 の依存の順)。**G3・I 系の結線 (カーネルが GFX_CAP_DIRECT を立てる所) は L2〜L6 の後** — 先に入れると libos32gfx の今の primitive が planes[0]=NULL に書く (第 2 波のレビュー F4) |

@@ -12,7 +12,7 @@
 GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 GfxBackend gfx_backend_pc98;
-const GfxBackend *g_backend = &gfx_backend_pc98;
+GfxBackend *g_backend = &gfx_backend_pc98;
 static u32 probes, enables, mode;
 static int probe(void) { probes++; return 1; }
 static void enable(void) { enables++; }

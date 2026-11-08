@@ -1,4 +1,6 @@
 #include "host_exec_context.h"
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* ========================================================================
  *  multiapp_impl_host.c — K5b-K の「実装」を K5a の模型と同じ検査で回す
  *

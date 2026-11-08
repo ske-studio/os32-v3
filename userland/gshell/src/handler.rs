@@ -6,16 +6,19 @@
 //! 各処理へ渡す (match の巨大化を避ける)。
 //!
 //! 実行文脈の割り当て (契約 T8。**票の鉄則と対**):
-//!   - X1 = WAIT / COMMIT 以外のすべて。**状態更新とリング追記だけ**。VRAM へ
+//!   - X1 = WAIT / COMMIT / SCROLL 以外のすべて。**状態更新とリング追記だけ**。VRAM へ
 //!     書かず、待たず、数十 µs で戻る。画面の描き直しが要るものは
 //!     `st.screen_dirty` / `win.dirty` に積むだけで、実際に描くのは X3。
-//!   - X2 = [`op_commit`]。issued 矩形の present とカーソルの描き直しだけ。
+//!   - X2 = [`op_commit`] と SCROLL。issued の present、SCROLL の複写と露出通知。
 //!   - X3 = [`op_wait`]。WM の全周期 (入力 → WM の UI → クローム present → halt)。
 //!
 //! 要求は SHM スロットの要求ブロック (512B) から読み、応答は応答ブロック
 //! (512B) へ書く。小さい値 (WindowId など) は `arg` に直接載ってくるので、
 //! **`arg != 0` ならそれを、0 なら要求ブロックの `GuiReqWindow` を**採る
 //! (どちらの流儀のクライアントでも動く)。
+
+#[path = "scroll_op.rs"]
+mod scroll_op;
 
 use crate::wm::{self, GuiState, Rect, RectSet, MAX_DMG, MAX_VIS};
 use crate::{
@@ -105,11 +108,12 @@ struct Entry {
     f: OpFn,
 }
 
-static TABLE: [Entry; 23] = [
+static TABLE: [Entry; 24] = [
     Entry { op: GUI_OP_POLL, f: op_poll },
     Entry { op: GUI_OP_WAIT, f: op_wait },
     Entry { op: GUI_OP_COMMIT, f: op_commit },
     Entry { op: GUI_OP_INVALIDATE, f: op_invalidate },
+    Entry { op: os32api::gui::proto::GUI_OP_SCROLL, f: scroll_op::request },
     Entry { op: GUI_OP_STATS, f: op_stats },
     Entry { op: GUI_OP_LEASE_PALETTE, f: op_lease_palette },
     Entry { op: GUI_OP_WIN_CREATE, f: op_win_create },

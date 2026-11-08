@@ -8,6 +8,10 @@ static HEIGHT: AtomicI32 = AtomicI32::new(4);
 static OFFSCREEN_WRITES: AtomicUsize = AtomicUsize::new(0);
 static PRESENTS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle] static mut gfx_api: *mut os32api::KernelAPI = core::ptr::null_mut();
+#[no_mangle] static mut gfx_direct: i32 = 0;
+#[no_mangle] extern "C" fn gfx_cmd_enqueue_fill(_:i32,_:i32,_:i32,_:i32,_:u8,_:u8) -> i32 { panic!("unexpected direct fill"); }
+#[no_mangle] extern "C" fn gfx_cmd_enqueue_put(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:i32) -> i32 { panic!("unexpected direct put"); }
+#[no_mangle] extern "C" fn gfx_cmd_enqueue_mono(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:u8,_:i32,_:i32,_:i32,_:i32,_:i32) -> i32 { panic!("unexpected direct mono"); }
 #[no_mangle] static mut gfx_ready: i32 = 1;
 #[no_mangle] static mut gfx_fb: ffi::GfxFramebuffer = ffi::GfxFramebuffer {
     width: 4, height: 4, pitch: 4, planes: [core::ptr::null_mut();4],

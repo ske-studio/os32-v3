@@ -22,6 +22,13 @@ use crate::wm::{GuiState, Rect};
 use os32api::gfx;
 use os32api::gui::proto::{GUI_COLOR_TEXT, GUI_COLOR_WINDOW};
 
+extern "C" {
+    static gfx_direct: i32;
+    fn gfx_cmd_get(x: i32, y: i32, w: i32, h: i32, dst: *mut u8, pitch: u32) -> i32;
+    fn gfx_cmd_enqueue_put(x: i32, y: i32, w: i32, h: i32, src: *const u8, pitch: u32, key: i32) -> i32;
+    fn gfx_cmd_enqueue_mono(x: i32, y: i32, w: i32, h: i32, bits: *const u8, pitch: u32, fg: u8, bg: i32, cx: i32, cy: i32, cw: i32, ch: i32) -> i32;
+}
+
 pub const CUR_W: i32 = 10;
 pub const CUR_H: i32 = 16;
 const NPIX: usize = (CUR_W * CUR_H) as usize;
@@ -83,30 +90,51 @@ pub fn show(st: &mut GuiState) {
     }
     let (cx, cy) = (st.cursor.x, st.cursor.y);
     /* 下地の退避 (dirty 登録なし: gfx_get_pixel は読むだけ)。 */
-    let mut i = 0;
-    while i < NPIX {
-        let px = cx + (i as i32) % CUR_W;
-        let py = cy + (i as i32) / CUR_W;
-        st.cursor.saved[i] = if on_screen(st, px, py) {
-            unsafe { ffi::gfx_get_pixel(px, py) }
-        } else {
-            0
-        };
-        i += 1;
+    if unsafe { gfx_direct != 0 } {
+        st.cursor.saved = [0; NPIX];
+        if unsafe { gfx_cmd_get(cx, cy, CUR_W, CUR_H, st.cursor.saved.as_mut_ptr(), CUR_W as u32) } != 0 {
+            return;
+        }
+    } else {
+        let mut i = 0;
+        while i < NPIX {
+            let px = cx + (i as i32) % CUR_W;
+            let py = cy + (i as i32) / CUR_W;
+            st.cursor.saved[i] = if on_screen(st, px, py) {
+                unsafe { ffi::gfx_get_pixel(px, py) }
+            } else {
+                0
+            };
+            i += 1;
+        }
     }
     /* 形を描く。 */
-    let mut k = 0;
-    while k < NPIX {
-        let s = SHAPE[k];
-        if s != 0 {
-            let px = cx + (k as i32) % CUR_W;
-            let py = cy + (k as i32) / CUR_W;
-            if on_screen(st, px, py) {
-                let c = if s == 1 { GUI_COLOR_TEXT } else { GUI_COLOR_WINDOW };
-                unsafe { gfx::gfx_pixel(px, py, c) };
+    if unsafe { gfx_direct != 0 } {
+        for (shape, color) in [(1, GUI_COLOR_TEXT), (2, GUI_COLOR_WINDOW)] {
+            let mut bits = [0u8; 2 * CUR_H as usize];
+            for k in 0..NPIX {
+                if SHAPE[k] == shape {
+                    bits[(k / CUR_W as usize) * 2 + (k % CUR_W as usize) / 8] |=
+                        0x80 >> (k % CUR_W as usize % 8);
+                }
             }
+            unsafe { gfx_cmd_enqueue_mono(cx, cy, CUR_W, CUR_H, bits.as_ptr(), 2,
+                                           color, -1, cx, cy, CUR_W, CUR_H) };
         }
-        k += 1;
+    } else {
+        let mut k = 0;
+        while k < NPIX {
+            let s = SHAPE[k];
+            if s != 0 {
+                let px = cx + (k as i32) % CUR_W;
+                let py = cy + (k as i32) / CUR_W;
+                if on_screen(st, px, py) {
+                    let c = if s == 1 { GUI_COLOR_TEXT } else { GUI_COLOR_WINDOW };
+                    unsafe { gfx::gfx_pixel(px, py, c) };
+                }
+            }
+            k += 1;
+        }
     }
     st.cursor.shown = true;
 }
@@ -117,16 +145,20 @@ pub fn hide(st: &mut GuiState) {
         return;
     }
     let (cx, cy) = (st.cursor.x, st.cursor.y);
-    let mut k = 0;
-    while k < NPIX {
-        if SHAPE[k] != 0 {
-            let px = cx + (k as i32) % CUR_W;
-            let py = cy + (k as i32) / CUR_W;
-            if on_screen(st, px, py) {
-                unsafe { gfx::gfx_pixel(px, py, st.cursor.saved[k]) };
+    if unsafe { gfx_direct != 0 } {
+        unsafe { gfx_cmd_enqueue_put(cx, cy, CUR_W, CUR_H, st.cursor.saved.as_ptr(), CUR_W as u32, -1) };
+    } else {
+        let mut k = 0;
+        while k < NPIX {
+            if SHAPE[k] != 0 {
+                let px = cx + (k as i32) % CUR_W;
+                let py = cy + (k as i32) / CUR_W;
+                if on_screen(st, px, py) {
+                    unsafe { gfx::gfx_pixel(px, py, st.cursor.saved[k]) };
+                }
             }
+            k += 1;
         }
-        k += 1;
     }
     st.cursor.shown = false;
 }

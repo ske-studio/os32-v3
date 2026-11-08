@@ -82,6 +82,7 @@ static int sink, cursors, shapes;
 static int safe(void) { return 1; }
 static int (*pc98_console_safe)(void)=safe;
 static int con_sink_is_enabled(void) { return sink; }
+static void gfx_policy_reeval(void) {}
 static void con_sink_enable(void) { sink=1; }
 static void con_backend_cursor_at(int x,int y) { CHECK(!x&&!y); cursors++; }
 static void con_backend_cursor_shape(int show) { shapes+=show?1:10; }

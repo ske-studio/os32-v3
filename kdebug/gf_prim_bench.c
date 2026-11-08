@@ -143,7 +143,7 @@ int gf_prim_bench(u32 item)
     if (phys) {
         int free_rc = pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE,
                                            BENCH_UPLOAD_BYTES / PAGE_SIZE);
-        if (!rc && free_rc) rc = GF2_EIO;
+        if (!rc && !free_rc) rc = GF2_EIO; /* returns 1 on success */
     }
     serial_puts_polled("GFP1 done rc="); serial_diag_i32(rc);
     serial_puts_polled("\r\n");

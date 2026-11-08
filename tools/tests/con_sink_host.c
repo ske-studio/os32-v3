@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* ========================================================================
  *  con_sink_host.c — console シンクのリングを **実物のソースで** 確かめる
  *

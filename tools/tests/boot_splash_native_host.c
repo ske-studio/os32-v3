@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* Real splash + gfx dispatch + PC98 lifecycle; only hardware edges stubbed. */
 #define _GNU_SOURCE
 #include "serial_diag_host.h"
@@ -421,6 +423,7 @@ int check_caller_write_range(const struct caller_access *c, void *p, u32 n)
 { (void)c; (void)p; (void)n; abort(); }
 int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
 { (void)c; (void)p; (void)s; (void)n; abort(); }
+int gfx_policy_blocks_map(u32 role) { (void)role; return 0; }
 int surface_query_authorize(const struct surface_query_source *s, struct caller_access *c)
 { (void)s; (void)c; abort(); }
 int surface_query_refs(const struct surface_query_source *s, const struct surface_ref *r, u32 n, u32 a)

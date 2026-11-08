@@ -194,6 +194,8 @@ int gf3_present_m2mf(struct gf3_ctx *, const struct gf3_surface *scan,
  * Stop/fault/recover closes admission and dispatch before invalidation. */
 int geforce_fill_rect(int x, int y, int w, int h, u8 color);
 int geforce_blit(int dx, int dy, int sx, int sy, int w, int h);
+/* G2 implements; G1 uses this in gf_direct_ops. */
+int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop);
 void gf_hook_ctx_bind(struct gf3_ctx *);
 void gf_hook_scan_bind(bool active, const struct gf3_surface *);
 /* C1 owns (backend_geforce.c/gf_hook.c): the HAL descriptor and format-specific

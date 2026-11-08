@@ -29,6 +29,7 @@ TARGET_SRCS = [
     'kernel/sys.c',
     'mm/physmem.c',
     'userland/lib/gfx/libos32gfx_core.c',
+    'userland/lib/gfx/draw/gfx_cmd.c',
     'userland/lib/gfx/draw/gfx_draw.c',
     'userland/lib/gfx/draw/gfx_blt.c',
     'userland/lib/gfx/draw/gfx_surface.c',
@@ -42,6 +43,7 @@ TARGET_SRCS = [
     'userland/lib/gfx/libos32gfx.h',
     'userland/lib/gfx/libgfx_internal.h',
     'userland/lib/gfx/libgfx_attach_internal.h',
+    'userland/lib/gfx/gfx_direct_internal.h',
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',]
@@ -50,17 +52,26 @@ SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/ut
 HEADERS = [p for p in TARGET_SRCS if p.endswith(".h")]
 CORE='userland/lib/gfx/libos32gfx_core.c'
 MUTANTS = [
+ ('lost-regen-missing', [(CORE, '    if (gfx_lost) gfx_regen = 1;', '    (void)gfx_lost;')], 'FAIL libos32gfx_take_regen() && !libos32gfx_take_regen()'),
+ ('direct-mode-ignored', [(CORE, 'want == gfx_direct', '1')], 'FAIL !libos32gfx_check() && !gfx_direct && gfx_ready'),
+ ('direct-generation-ignored', [(CORE, 'si.reserved[0] == gfx_gen', '1')], 'FAIL !libos32gfx_check() && gfx_direct && gfx_gen==direct_gen'),
+ ('getchar-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    key = gfx_api->kbd_getchar();', '    key = gfx_api->kbd_getchar();')], 'FAIL flush_pending==0'),
+ ('trygetchar-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    key = gfx_api->kbd_trygetchar();', '    key = gfx_api->kbd_trygetchar();')], 'FAIL flush_pending==0'),
+ ('yield-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    gfx_api->sys_yield();', '    gfx_api->sys_yield();')], 'FAIL flush_pending==0'),
+ ('halt-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    gfx_api->sys_halt();', '    gfx_api->sys_halt();')], 'FAIL flush_pending==0'),
+ ('present-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    if (gfx_api->version >= 83)', '    if (gfx_api->version >= 83)')], 'FAIL flush_pending==0'),
+
  ('attach-diag-missing', [(CORE,'        gfx_api->serial_puts(msg);',
    '        (void)msg;')], 'FAIL attach_logs==1 && attach_logged'),
  ('attach-diag-wrong-rc', [(CORE,'hex[((u32)rc >> (28 - i * 4)) & 15]',
    'hex[((u32)0 >> (28 - i * 4)) & 15]')], 'FAIL attach_logs==1 && attach_logged'),
- ('shutdown-flag-ignored', [(CORE,'    if (gfx_stopped) return OS32_ERR_INVAL;','')],
+ ('shutdown-flag-ignored', [(CORE,'    if (gfx_stopped || !gfx_api) return OS32_ERR_INVAL;','    if (!gfx_api) return OS32_ERR_INVAL;')],
    'FAIL shutdown_waits_stay_detached'),
  ('halt-no-check', [(CORE,'    gfx_api->sys_halt();\n    (void)libos32gfx_check();','    gfx_api->sys_halt();')],
    'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
  ('production-port-absent', [(CORE,'gfx_api->version >= 70','gfx_api->version > 70')],
    'FAIL gfx_attach_port && public_queries==1 && public_leases==1'),
- ('getchar-no-check', [(CORE,'    int key = gfx_api->kbd_getchar();\n    (void)libos32gfx_check();','    int key = gfx_api->kbd_getchar();')],
+ ('getchar-no-check', [(CORE,'    key = gfx_api->kbd_getchar();\n    (void)libos32gfx_check();','    key = gfx_api->kbd_getchar();')],
    'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
  ('trygetchar-no-check', [(CORE,'    if (key >= 0) (void)libos32gfx_check();','    (void)key;')],
    'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
@@ -133,6 +144,11 @@ def main():
                             body=body.replace(old,new)
                     if path.endswith('libos32gfx_core.c'):
                         body=body.replace('return cs & 3U;', 'extern unsigned int host_sdk_cpl; return host_sdk_cpl;')
+                    if path.endswith('gfx_cmd.c'):
+                        body=body.replace('../gfx_direct_internal.h', 'gfx_direct_internal.h')
+                        start=body.index('int gfx_flush(void)\n{')
+                        end=body.index('\nstatic int reserve_command', start)
+                        body=body[:start] + ('extern int flush_pending, flush_failure; int gfx_flush(void) { flush_pending=0; if (flush_failure) { flush_failure=0; gfx_lost=1; return -1; } return 0; }\n') + body[end:]
                     if path.endswith('gfx_dump.c'):
                         # Existing sizeof loop is signed; target build allows it.
                         body='#pragma GCC diagnostic ignored "-Wsign-compare"\n'+body

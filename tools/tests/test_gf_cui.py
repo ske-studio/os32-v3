@@ -49,6 +49,7 @@ def run_case(root, directory):
 static int calls, last_id, g_gfx_owner;
 #define GFX_OWNER_WM 1
 void gf_display_owner_exit(int id) { ++calls; last_id = id; }
+void gfx_policy_reeval(void) {}
 void appslot_gfx_owner_exit(int id)
 '''+body+'''
 void _start(void) {

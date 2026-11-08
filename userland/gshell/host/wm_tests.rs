@@ -4684,3 +4684,54 @@ fn host_notice_without_front_or_slot_waits_for_delivery() {
     assert_eq!(g2w_events(&st, 2).len(), 1);
     assert_eq!(st.host_notice_seen, 1);
 }
+
+#[test]
+fn w2_regen_cycle_and_pending() {
+    use crate::{mocks, wm, input};
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    mocks::clear(0);
+    let mut st = wm::GuiState::NEW;
+    st.screen_w = 640; st.screen_h = 480;
+    st.windows[0].used = true; st.windows[0].w = 100; st.windows[0].h = 100;
+    mocks::REGEN_VALUE.store(1, Ordering::SeqCst);
+    wm::flush_present();
+    assert_eq!(&*mocks::REGEN_LOG.lock().unwrap(), &["check", "take", "present"]);
+    mocks::REGEN_LOG.lock().unwrap().clear();
+    mocks::REGEN_RC.store(-1, Ordering::SeqCst);
+    wm::wm_cycle(&mut st, input::Ctx::Pump);
+    assert!(st.windows[0].dirty.is_empty());
+    assert_eq!(mocks::REGEN_LOG.lock().unwrap()[0], "check");
+    mocks::REGEN_LOG.lock().unwrap().clear();
+    mocks::REGEN_RC.store(0, Ordering::SeqCst);
+    wm::wm_cycle(&mut st, input::Ctx::Pump);
+    assert!(!st.windows[0].dirty.is_empty());
+    assert_eq!(&mocks::REGEN_LOG.lock().unwrap()[..5], &["check", "take", "check", "take", "present"]);
+    st.windows[0].dirty.clear();
+    mocks::REGEN_LOG.lock().unwrap().clear();
+    wm::wm_cycle(&mut st, input::Ctx::Pump);
+    assert!(st.windows[0].dirty.is_empty());
+    assert_eq!(&mocks::REGEN_LOG.lock().unwrap()[..2], &["check", "take"]);
+}
+
+#[test]
+fn w2_drag_commit_shadow_moves_and_configures() {
+    use crate::{mocks, visible, wm};
+    mocks::init();
+    mocks::clear(0);
+    let mut st = wm::GuiState::NEW;
+    st.screen_w = 640; st.screen_h = 480;
+    let w = &mut st.windows[0];
+    w.used = true; w.visible = true; w.gen = 1;
+    w.x = 40; w.y = 50; w.w = 100; w.h = 100;
+    st.zorder[0] = 0; st.z_count = 1;
+    visible::recompute_and_expose(&mut st);
+    st.windows[0].dirty.clear();
+    st.drag_index = 0;
+    st.drag_frame = wm::Rect::new(80, 90, 100, 100);
+    super::wm_button_up(&mut st, 80, 90);
+    assert_eq!((st.windows[0].x, st.windows[0].y), (80, 90));
+    assert_eq!(st.drag_index, -1);
+    assert!(st.windows[0].configure_pending);
+    assert!(mocks::present_counts().1 > 0);
+}

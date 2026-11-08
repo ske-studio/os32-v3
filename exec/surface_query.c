@@ -227,6 +227,7 @@ done:
 STATIC_ASSERT(OS32_SURFACE_PLANAR4 == GFX_FMT_PLANAR4, abi_surface_planar4);
 STATIC_ASSERT(OS32_SURFACE_PACKED8 == GFX_FMT_PACKED8, abi_surface_packed8);
 #include "system_surface.h"
+#include "gfx_policy.h"
 __attribute__((section(".text.surface_api")))
 static int surface_api_source(u32 role, struct surface_query_source *source)
 {
@@ -252,6 +253,7 @@ int surface_api_lease(u32 role, const struct surface_ref *ref, u32 access,
                       struct lease_view *out)
 {
     struct surface_query_source source;
+    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;
     int rc = surface_api_source(role, &source);
     return rc ? rc : surface_lease(&source, ref, access, out);
 }
@@ -260,6 +262,7 @@ int surface_api_bundle(u32 role, const struct surface_ref *refs, u32 count,
                        u32 access, struct surface_lease_result *out)
 {
     struct surface_query_source source;
+    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;
     int rc = surface_api_source(role, &source);
     return rc ? rc : surface_lease_bundle(&source, refs, count, access, out);
 }

@@ -91,6 +91,8 @@ def lease_recovery(function, runner, mutation=None):
             body = texts[path]
             if path == CORE:
                 body = body.replace('return cs & 3U;', 'extern unsigned int host_sdk_cpl; return host_sdk_cpl;')
+            if path.endswith('gfx_cmd.c'):
+                body = body.replace('../gfx_direct_internal.h', 'gfx_direct_internal.h')
             if path.endswith('gfx_dump.c'):
                 body = '#pragma GCC diagnostic ignored "-Wsign-compare"\n'+body
             dest = tmp/Path(path).name

@@ -71,6 +71,7 @@
 #include "../../hwdev/gf/accel_transfer.c"
 #include "../../hwdev/gf/accel_scale.c"
 #include "../../drivers/video/geforce/gf_present_m2mf.c"
+GfxCounters gfx_counters;
 #include "../../drivers/video/geforce/gf_hook.c"
 
 /* Use the real C0a getter and its borrowed metadata, not a custom getter. */

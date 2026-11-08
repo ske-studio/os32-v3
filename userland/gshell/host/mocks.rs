@@ -4,6 +4,17 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Mutex,
 };
+pub static REGEN_RC: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+pub static REGEN_VALUE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+pub static REGEN_LOG: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+#[no_mangle]
+pub extern "C" fn libos32gfx_check() -> i32 {
+    lk(&REGEN_LOG).push("check"); REGEN_RC.load(Ordering::SeqCst)
+}
+#[no_mangle]
+pub extern "C" fn libos32gfx_take_regen() -> i32 {
+    lk(&REGEN_LOG).push("take"); REGEN_VALUE.swap(0, Ordering::SeqCst)
+}
 pub const W: usize = 640;
 pub const H: usize = 480;
 static PIXELS: Mutex<Vec<u8>> = Mutex::new(Vec::new());
@@ -180,6 +191,7 @@ unsafe extern "C" fn dirty(_: i32, _: i32, _: i32, _: i32) {
     DIRTY_RECTS.fetch_add(1, Ordering::SeqCst);
 }
 unsafe extern "C" fn present_dirty() {
+    lk(&REGEN_LOG).push("present");
     PRESENTS.fetch_add(1, Ordering::SeqCst);
 }
 unsafe extern "C" fn mouse(p: *mut u8) {
@@ -944,6 +956,9 @@ pub static HOST_NOTICE_SERIAL: std::sync::atomic::AtomicU32 = std::sync::atomic:
 unsafe extern "C" fn host_notice_serial() -> u32 { HOST_NOTICE_SERIAL.load(Ordering::SeqCst) }
 
 pub fn init() {
+    REGEN_RC.store(0, Ordering::SeqCst);
+    REGEN_VALUE.store(0, Ordering::SeqCst);
+    lk(&REGEN_LOG).clear();
     unsafe { gfx_ready = 1; }
     let mut a = os32api::mock_api();
     a.get_tick = get_tick;
@@ -1282,3 +1297,16 @@ pub mod fontsvc {
         }
     }
 }
+
+// The normal gshell host suite exercises the SHADOW path.
+#[no_mangle]
+pub static mut gfx_direct: i32 = 0;
+#[no_mangle]
+pub extern "C" fn gfx_cmd_get(_: i32, _: i32, _: i32, _: i32, _: *mut u8, _: u32) -> i32 { -1 }
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_fill(_: i32, _: i32, _: i32, _: i32, _: u8, _: u8) -> i32 { -1 }
+
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_put(_: i32, _: i32, _: i32, _: i32, _: *const u8, _: u32, _: i32) -> i32 { -1 }
+#[no_mangle]
+pub extern "C" fn gfx_cmd_enqueue_mono(_: i32, _: i32, _: i32, _: i32, _: *const u8, _: u32, _: u8, _: i32, _: i32, _: i32, _: i32, _: i32) -> i32 { -1 }

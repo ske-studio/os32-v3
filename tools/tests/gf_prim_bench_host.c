@@ -17,7 +17,7 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
 int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 {
     assert(owner==LEDGER_OWNER_KERNEL && n==16 && pfn==(u32)buffer/4096);
-    ++frees; return 0;
+    ++frees; return 1; /* real pgalloc_free_n_owner returns 1 on success */
 }
 static char output[16384];
 static u32 used;

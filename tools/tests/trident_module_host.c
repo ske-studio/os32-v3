@@ -60,7 +60,7 @@ static int fake_read8(void *opaque, enum trident_space space, u32 off, u8 *v)
         fake.regs[off] = ((status_reads++ % 4) == 0 || (status_reads % 4) == 0) ? 8 : 0;
     return trident_fake_io.read8(opaque, space, off, v);
 }
-const GfxBackend *g_backend;
+GfxBackend *g_backend;
 static int gfx_started;
 #include "gfx/gfx_core_api.inc"
 int __wrap_trident_regs_bind(struct trident_device *d)

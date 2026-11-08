@@ -5,6 +5,8 @@
  */
 #include "trident_command_test.h"
 #include "sys.h"
+#include "mm/kmalloc.h"
+#include "../mm/pgalloc.h"
 #include "../drivers/video/trident/trident_module.h"
 #include "../lib/serial_diag.h"
 #include "generated/kdebug_import_macros.h"
@@ -285,6 +287,70 @@ static int cpu32(const struct TridentDiagnosticOps *o)
 /* Compare the current image without yielding or modifying CLIENT. Only the
  * present itself is timed; serial output and VRAM verification are outside. */
 #define TRI_PRESENT_RUNS 8u
+static int ram_compare(const struct TridentDiagnosticOps *o)
+{
+    const struct trident_device *d = o->context;
+    u32 bytes = d->mode.client.bytes;
+    static const char *const names[] = {"rep_stosd", "rep_movsd", "dword", "byte"};
+    int setup = !bytes || bytes > d->res->client_bytes ? TRI_E_SURFACE : 0;
+    /* The kernel heap (192KiB) cannot hold a 300KiB frame: borrow pages
+     * like kdebug/gf_prim_bench.c and return them after the four methods. */
+    u32 pages = (bytes + PAGE_SIZE - 1u) / PAGE_SIZE;
+    u32 phys = setup ? 0 : pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, (int)pages);
+    u8 *buffer = phys ? (u8 *)P2V(phys) : 0;
+    if (!setup && !buffer) setup = TRI_E_RESOURCE;
+    int result = setup;
+    for (u32 method = 0; method < 4u; ++method) {
+        u32 minimum = (u32)-1, maximum = 0, count = 0;
+        unsigned long long total = 0;
+        int rc = setup;
+        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS; ++run) {
+            u32 before, after, hi;
+            rc = sys_time_now(&before, &hi);
+            if (rc) break;
+            u32 words = bytes / sizeof(u32);
+            if (method == 0) {
+                u32 *dst = (u32 *)buffer, n = words;
+                __asm__ volatile ("cld; rep stosl" : "+D"(dst), "+c"(n)
+                                  : "a"(TRI_TEST_PATTERN) : "memory", "cc");
+                for (u32 i = words * 4u; i < bytes; ++i) buffer[i] = (u8)TRI_TEST_PATTERN;
+            } else if (method == 1) {
+                u32 *dst = (u32 *)buffer, n = words;
+                const u32 *src = (const u32 *)d->res->client;
+                __asm__ volatile ("cld; rep " "movsl" : "+D"(dst), "+S"(src), "+c"(n)
+                                  : : "memory", "cc");
+                for (u32 i = words * 4u; i < bytes; ++i) buffer[i] = d->res->client[i];
+            } else if (method == 2) {
+                volatile u32 *dst = (volatile u32 *)buffer;
+                for (u32 i = 0; i < words; ++i) dst[i] = TRI_TEST_PATTERN;
+                for (u32 i = words * 4u; i < bytes; ++i) buffer[i] = (u8)TRI_TEST_PATTERN;
+            } else {
+                volatile u8 *dst = buffer;
+                for (u32 i = 0; i < bytes; ++i) dst[i] = (u8)TRI_TEST_PATTERN;
+            }
+            rc = sys_time_now(&after, &hi);
+            if (rc) break;
+            u32 elapsed = after - before;
+            if (elapsed < minimum) minimum = elapsed;
+            if (elapsed > maximum) maximum = elapsed;
+            total += elapsed;
+            ++count;
+        }
+        ++result_count;
+        serial_puts_polled("TRI phase=ram method="); serial_puts_polled(names[method]);
+        number(" count=", count);
+        number(" min_us=", count ? minimum : 0);
+        number(" max_us=", maximum);
+        number(" avg_us=", count == TRI_PRESENT_RUNS ? (u32)(total >> 3) : 0);
+        serial_puts_polled(" rc="); serial_diag_i32(rc);
+        serial_puts_polled("\r\n");
+        remember(&result, rc);
+    }
+    /* pgalloc_free_n_owner returns 1 on success (mm/pgalloc_owner.inc). */
+    if (phys && !pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE, (int)pages))
+        remember(&result, TRI_E_RESOURCE);
+    return result;
+}
 static int present_compare(const struct TridentDiagnosticOps *o)
 {
     struct trident_device *d = o->context;
@@ -340,6 +406,7 @@ static int present_compare(const struct TridentDiagnosticOps *o)
         remember(&result, rc);
     }
     d->present_method = saved;
+    remember(&result, ram_compare(o));
     return result;
 }
 /* Alternate the image so lost writes cannot match already-correct VRAM.

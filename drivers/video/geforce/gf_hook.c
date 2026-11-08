@@ -30,9 +30,14 @@
 #include "../../../gfx/gfx_internal.h"
 #include "hwdev/gf/accel.h"
 #include "hwdev/gf/feature5.h"
+#ifdef OS32_GEFORCE_MODULE
+#include "geforce_module.h"
+#define gfx_counters (*geforce_context->counters)
+#endif
 
 /* GXcopy from X11 GX, nv04_exa.c:46-84; all INDEX8 planes are selected. */
 #define GF_HOOK_GXCOPY 3U
+#define GF_HOOK_GXXOR 6U
 #define GF_HOOK_FULL_MASK 0xffU
 
 static struct gf3_ctx *hook_ctx;
@@ -74,10 +79,11 @@ static int hook_deadline(u32 *dl)
     return 0;
 }
 
-int geforce_fill_rect(int x, int y, int w, int h, u8 color)
+int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop)
 {
     u32 dl;
     if (!hook_active || !hook_ctx) return OS32_ERR_NOSYS;
+    if (rop != GFX_ROP_COPY && rop != GFX_ROP_XOR) return OS32_ERR_INVAL;
     int poll = hook_feature5_poll();
     if (poll) return poll;
     if (!gfx_clip_screen(&x, &y, &w, &h, hook_scan.width, hook_scan.height))
@@ -85,9 +91,16 @@ int geforce_fill_rect(int x, int y, int w, int h, u8 color)
     if (hook_deadline(&dl)) return OS32_ERR_IO;
     struct gf3_rect r = {(u32)x, (u32)y, (u32)w, (u32)h};
     int rc = gf3_fill(hook_ctx, &hook_scan, r, color,
-                      GF_HOOK_GXCOPY, GF_HOOK_FULL_MASK, dl);
+                      rop == GFX_ROP_COPY ? GF_HOOK_GXCOPY : GF_HOOK_GXXOR,
+                      GF_HOOK_FULL_MASK, dl);
+    gfx_counters.hw_ops++;
     hook_ctx->last_rc = rc;
     return rc ? OS32_ERR_IO : 0;
+}
+
+int geforce_fill_rect(int x, int y, int w, int h, u8 color)
+{
+    return geforce_fill_rop(x, y, w, h, color, GFX_ROP_COPY);
 }
 
 int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
@@ -108,6 +121,7 @@ int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
     struct gf3_rect sr = {(u32)sx, (u32)sy, (u32)w, (u32)h};
     int rc = gf3_copy(hook_ctx, &hook_scan, &hook_scan, sr, (u32)dx, (u32)dy,
                       GF_HOOK_GXCOPY, GF_HOOK_FULL_MASK, dl);
+    gfx_counters.hw_ops++;
     hook_ctx->last_rc = rc;
     return rc ? OS32_ERR_IO : 0;
 }

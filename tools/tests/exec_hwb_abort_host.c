@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* HW_BASIC_DESIGN §3/F, N4/P3: actual exec TU and actual AppSlot table.
  * Only console mode, resource owner and CPU interrupt/MMU edges are faked. */
 #include "hwb_fake.h"
