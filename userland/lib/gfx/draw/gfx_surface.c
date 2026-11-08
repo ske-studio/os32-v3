@@ -145,6 +145,8 @@ void gfx_blit(int dx, int dy,
 
     if (gfx_direct) {
         gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, -1);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
 
@@ -214,6 +216,8 @@ void gfx_blit_colorkey(int dx, int dy,
 
     if (gfx_direct) {
         gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, colorkey);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
 
@@ -253,6 +257,8 @@ void gfx_blit_transparent(int dx, int dy,
 
     if (gfx_direct) {
         gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, 0);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
 

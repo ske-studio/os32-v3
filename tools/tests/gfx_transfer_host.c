@@ -29,8 +29,16 @@ static void *alloc(u32 n)
     return p;
 }
 static void release(void *p) { CHECK(p != 0); outstanding--; }
+static GFX_Rect dirty_rect;
+static u32 dirty_count;
 static void dirty(int x, int y, int w, int h)
-{ (void)x; (void)y; (void)w; (void)h; CHECK(!gfx_direct); }
+{ dirty_rect = (GFX_Rect){x, y, w, h}; dirty_count++; }
+static void check_dirty(int x, int y, int w, int h)
+{
+    CHECK(dirty_count == 1);
+    CHECK(dirty_rect.x == x && dirty_rect.y == y);
+    CHECK(dirty_rect.w == w && dirty_rect.h == h);
+}
 static GFX_Cmd seen[128];
 static u8 data[16000], display[640*24], expected[640*24], planar[4][80*24];
 static u32 count, bytes, gets;
@@ -64,7 +72,7 @@ static int get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)
 }
 static void reset(int direct, int packed)
 {
-    gfx_cmd_drop(); gfx_lost=0; count=bytes=gets=0;
+    gfx_cmd_drop(); gfx_lost=0; count=bytes=gets=dirty_count=0;
     gfx_direct=direct; gfx_packed=packed;
     gfx_fb=(GFX_Framebuffer){.width=640,.height=24,.pitch=packed?640:80};
     for(int p=0;p<4;p++) gfx_fb.planes[p]=direct?0:(packed?display:planar[p]);
@@ -97,6 +105,7 @@ void _start(void)
         if(mode==0) gfx_blit(5,2,s,&rect);
         if(mode==1) gfx_blit_colorkey(5,2,s,&rect,7);
         if(mode==2) gfx_blit_transparent(5,2,s,&rect);
+        check_dirty(5,2,13,4);
         CHECK(!gfx_flush() && count==1);
         CHECK(seen[0].op==GFX_CMD_PUT && seen[0].x==5 && seen[0].y==2);
         CHECK(seen[0].w==13 && seen[0].h==4 && seen[0].pitch==13);
@@ -114,17 +123,28 @@ void _start(void)
     reset(1,1); gfx_blit_colorkey(1,1,s,0,255); CHECK(!gfx_flush() && seen[0].key==255);
     reset(1,1); gfx_blit(-3,-2,s,0); CHECK(!gfx_flush() && count==1);
     CHECK(seen[0].x==0 && seen[0].y==0 && seen[0].w==21 && seen[0].h==8 && data[0]==5);
+    check_dirty(-3,-2,24,10);
+    for(int mode=0;mode<3;mode++) {
+        reset(1,1); gfx_dirty_suppress=1;
+        if(mode==0) gfx_blit(5,2,s,&rect);
+        if(mode==1) gfx_blit_colorkey(5,2,s,&rect,7);
+        if(mode==2) gfx_blit_transparent(5,2,s,&rect);
+        CHECK(!dirty_count && !gfx_flush() && count==1);
+        gfx_dirty_suppress=0;
+    }
     /* Conversion bundles and the queue both fit complete rows in 4KiB. */
     GFX_Surface *large=gfx_create_surface(640,10); CHECK(large);
     gfx_surface_clear(large,6);
     reset(1,1); gfx_blit(0,0,large,0); CHECK(!gfx_flush() && count==2);
+    check_dirty(0,0,640,10);
     CHECK(seen[0].h==6 && seen[1].y==6 && seen[1].h==4 && bytes==6400);
     GFX_Sprite *spr=gfx_create_sprite(s,7); CHECK(spr);
     reset(1,1); gfx_draw_sprite(5,2,spr); CHECK(!gfx_flush() && count==1);
+    check_dirty(5,2,24,10);
     CHECK(seen[0].w==24 && seen[0].h==10 && seen[0].x==5 && seen[0].y==2 && seen[0].key==255);
     for(int y=0;y<10;y++) for(int x=0;x<24;x++) CHECK(data[y*24+x]==(((x+y)&15)==7?255:((x+y)&15)));
     for(u32 i=0;i<sizeof(display);i++) expected[i]=display[i];
-    for(int packed=0;packed<2;packed++) {reset(0,packed);gfx_draw_sprite(5,2,spr);same();}
+    for(int packed=0;packed<2;packed++) {reset(0,packed);gfx_draw_sprite(5,2,spr);check_dirty(5,2,24,10);same();}
     for(int angle=0;angle<512;angle+=64) for(int scale=128;scale<=512;scale*=2) {
         reset(1,1);gfx_blit_affine(8,4,s,angle,scale,0);
         CHECK(!gfx_flush() && count==9);
@@ -137,7 +157,8 @@ void _start(void)
     reset(1,1);gfx_draw_sprite(5,2,spr);gfx_sprite_save_bg(5,2,spr);
     CHECK(gets==1 && count==1);
     for(u32 i=0;i<sizeof(display);i++) expected[i]=display[i];
-    gfx_sprite_restore_bg(5,2,spr);CHECK(!gfx_flush() && count==2);
+    dirty_count=0;
+    gfx_sprite_restore_bg(5,2,spr);check_dirty(5,2,24,10);CHECK(!gfx_flush() && count==2);
     for(int r=0;r<10;r++) for(int c=0;c<32;c++)
         CHECK(data[240+r*32+c]==expected[(r+2)*640+c]);
     CHECK(seen[1].x==0 && seen[1].w==32 && seen[1].h==10 && seen[1].key==-1);
@@ -166,6 +187,7 @@ void _start(void)
     GFX_Sprite *big_spr=gfx_create_sprite(oversize,6); CHECK(big_spr);
     reset(1,1); gfx_fb.width=32; gfx_fb.height=8; calls=alloc_calls;
     gfx_draw_sprite(-3,-2,big_spr); CHECK(!gfx_flush() && count==1 && bytes==256 && alloc_calls==calls);
+    check_dirty(-3,-2,800,20);
     CHECK(seen[0].x==0 && seen[0].y==0 && seen[0].w==32 && seen[0].h==8);
     for(int y=0;y<8;y++) for(int x=0;x<32;x++) {
         u8 c=(x+3+3*(y+2))&15; CHECK(data[y*32+x]==(c==6?255:c));

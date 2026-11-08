@@ -241,6 +241,7 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
         SprSlot *slot = &spr_slots[spr->_pool_idx];
         if (slot->used) {
             if (gfx_direct) {
+                gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
                 u8 pixels[4096];
                 int sx = 0, sy = 0, w = spr->w, h = spr->h;
                 if (w <= 0 || h <= 0) return;
@@ -298,7 +299,6 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
             }
         }
     }
-    if (gfx_direct) return;
     gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
 }
 
@@ -314,6 +314,5 @@ void gfx_sprite_restore_bg(int x, int y, GFX_Sprite *spr)
     if (!gfx_ready) return;
     if (!spr || !spr->bg_buf) return;
     gfx_restore_rect(x, y, spr->w, spr->h, spr->bg_buf);
-    if (gfx_direct) return;
     gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
 }
