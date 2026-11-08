@@ -7,13 +7,13 @@ GFX_Framebuffer gfx_fb;
 int gfx_dirty_suppress;
 int gfx_packed;
 int gfx_ready;
-/* A0 storage only; L0 owns attachment/recovery transitions. */
 int gfx_direct;
 u16 gfx_gen;
 int gfx_lost;
 const struct gfx_attach_port *gfx_attach_port;
 static int gfx_pools_initialized;
 static int gfx_stopped;
+static int gfx_regen;
 static struct gfx_attach_ref gfx_ref;
 static struct gfx_attach_view gfx_view;
 
@@ -72,6 +72,10 @@ static unsigned int gfx_cpl(void)
 void libos32gfx_detach(void)
 {
     u32 token = gfx_view.token;
+    if (gfx_direct) (void)gfx_flush();
+    gfx_cmd_drop();
+    gfx_direct = 0;
+    gfx_gen = 0;
     gfx_ready = 0;
     gfx_fb = (GFX_Framebuffer){0};
     gfx_packed = 0;
@@ -90,6 +94,21 @@ static int gfx_refresh(void)
     int rc;
     u32 i;
     if (!gfx_api) goto invalid;
+    if (gfx_api->version >= 83) {
+        gfx_api->gfx_screen_info(&si);
+        if (si.flags & GFX_CAP_DIRECT) {
+            if (!si.reserved[0] || si.width <= 0 || si.height <= 0 ||
+                si.format != GFX_FMT_PACKED8) goto invalid;
+            libos32gfx_detach();
+            gfx_fb.width = si.width; gfx_fb.height = si.height;
+            gfx_fb.pitch = si.width;
+            gfx_packed = 1;
+            gfx_direct = 1;
+            gfx_gen = si.reserved[0];
+            gfx_ready = 1;
+            return 0;
+        }
+    }
     /* CPL0 (including gshell) bypasses USER query authorization.
      * A NULL port is only the pre-v70 compatibility path. */
     if (gfx_cpl() == 0 || !gfx_attach_port) {
@@ -178,12 +197,24 @@ int libos32gfx_attach_checked(void)
 
 int libos32gfx_check(void)
 {
-    /* CLIENT regen occurs in our fullscreen init/shutdown only. V86 return
-     * regenerates DISPLAY only. Check at present and explicit wait returns,
-     * never in each drawing primitive. */
-    if (gfx_stopped) return OS32_ERR_INVAL;
-    if (gfx_ready && (gfx_cpl() == 0 || !gfx_attach_port)) return 0;
-    return gfx_refresh();
+    GFX_ScreenInfo si = {0};
+    int want, rc;
+    if (gfx_stopped || !gfx_api) return OS32_ERR_INVAL;
+    if (gfx_direct) (void)gfx_flush();
+    if (gfx_api->version >= 83) gfx_api->gfx_screen_info(&si);
+    want = !!(si.flags & GFX_CAP_DIRECT);
+    if (gfx_ready && !gfx_lost && want == gfx_direct &&
+        (!want || si.reserved[0] == gfx_gen)) {
+        if (gfx_cpl() == 0 || !gfx_attach_port || want) return 0;
+        return gfx_refresh();
+    }
+    gfx_cmd_drop();
+    libos32gfx_detach();
+    gfx_direct = 0;
+    gfx_lost = 0;
+    rc = libos32gfx_attach_checked();
+    gfx_regen = 1;
+    return rc;
 }
 
 void libos32gfx_attach(KernelAPI *api)
@@ -214,14 +245,18 @@ void gfx_present(void)
 
 int libos32gfx_getchar(void)
 {
-    int key = gfx_api->kbd_getchar();
+    int key;
+    if (gfx_direct) (void)gfx_flush();
+    key = gfx_api->kbd_getchar();
     (void)libos32gfx_check();
     return key;
 }
 
 int libos32gfx_trygetchar(void)
 {
-    int key = gfx_api->kbd_trygetchar();
+    int key;
+    if (gfx_direct) (void)gfx_flush();
+    key = gfx_api->kbd_trygetchar();
     /* Empty polling does not park. Match Rust's input return gate. */
     if (key >= 0) (void)libos32gfx_check();
     return key;
@@ -229,18 +264,21 @@ int libos32gfx_trygetchar(void)
 
 void libos32gfx_yield(void)
 {
+    if (gfx_direct) (void)gfx_flush();
     gfx_api->sys_yield();
     (void)libos32gfx_check();
 }
 
 void libos32gfx_halt(void)
 {
+    if (gfx_direct) (void)gfx_flush();
     gfx_api->sys_halt();
     (void)libos32gfx_check();
 }
 
-/* A0 placeholder; L0 supplies the one-shot repaint flag. */
 int libos32gfx_take_regen(void)
 {
-    return 0;
+    int regen = gfx_regen;
+    gfx_regen = 0;
+    return regen;
 }

@@ -4,9 +4,12 @@ unsigned int host_arch_if = 0x202U;
 #include "gfx_kernel_fb_host.c"
 #undef run
 #include "libgfx_attach_internal.h"
+#include "gfx_direct_internal.h"
 unsigned int host_sdk_cpl = 3;
 static u32 queries, legacy_calls, draws, releases, asm_calls;
-static int bad_view, deny_query, bad_screen;
+static int bad_view, deny_query, bad_screen, direct_mode;
+static u16 direct_gen = 1;
+int flush_pending, flush_failure;
 static u32 attach_logs;
 static char attach_log[80];
 static void __cdecl attach_serial(const char *msg)
@@ -93,6 +96,9 @@ static int __cdecl public_lease(u32 role, const OS32_SurfaceRef *ref, u32 access
     return 0;
 }
 static int __cdecl public_unlease(u32 token) {return port_unlease(token);}
+static int __cdecl direct_key(void) {CHECK(flush_pending==0);return 65;}
+static i32 __cdecl direct_yield(void) {CHECK(flush_pending==0);return 0;}
+static void __cdecl direct_halt(void) {CHECK(flush_pending==0);}
 static int __cdecl waited_key(void) {gfx_init_200();return 65;}
 static int __cdecl empty_key(void) {return -1;}
 static i32 __cdecl waited_yield(void) {gfx_init();return 0;}
@@ -112,6 +118,11 @@ static void __cdecl legacy_fb(void *out)
 static void __cdecl screen(void *out) {
     gfx_screen_info(out);
     if(bad_screen) ((GFX_ScreenInfo *)out)->height=0;
+    if (direct_mode) {
+        GFX_ScreenInfo *si=out;
+        si->flags |= GFX_CAP_DIRECT; si->reserved[0]=direct_gen;
+        si->format=GFX_FMT_PACKED8;
+    }
 }
 static void __cdecl dirty(int x,int y,int w,int h) {(void)x;(void)y;(void)w;(void)h;draws++;}
 static void __cdecl raster(void *p) {(void)p;draws++;}
@@ -173,13 +184,14 @@ static void run(void)
     CHECK(!port_query(&first_desc));
     for(u32 i=0;i<MEM_LEASE_MAX;i++) CHECK(!port_lease(&first_desc.ref,&first_full[i]));
     CHECK(libos32gfx_attach_checked()==OS32_ERR_FULL);empty();
+    CHECK(sdk_allocations==1);
     CHECK(attach_logs==1 && attach_logged("[libos32gfx] attach rc=fffffff3 ready=0\n"));
     for(u32 i=0;i<MEM_LEASE_MAX;i++) CHECK(!port_unlease(first_full[i].token));
     sdk_gfx_present();CHECK(gfx_ready && live()==1);
     CHECK(sdk_allocations==1);
-    CHECK(attach_logs==1); /* implicit recovery/present does not repeat it */
+    CHECK(attach_logs==2); /* recovery performs an explicit reattach */
     CHECK(!libos32gfx_attach_checked());
-    CHECK(attach_logs==2 && attach_logged("[libos32gfx] attach rc=00000000 ready=1\n"));
+    CHECK(attach_logs==3 && attach_logged("[libos32gfx] attach rc=00000000 ready=1\n"));
     GFX_Surface *kept_surface=sdk_gfx_create_surface(8,8);CHECK(kept_surface);
     sdk_gfx_surface_pixel(kept_surface,0,0,3);
     GFX_Sprite *kept_sprite=sdk_gfx_create_sprite(kept_surface,0);CHECK(kept_sprite);
@@ -312,6 +324,35 @@ static void run(void)
     deny_query=0;public_count=4;
     CHECK(libos32gfx_check()==OS32_ERR_INVAL && !live());
     public_count=1;CHECK(!libos32gfx_check());libos32gfx_detach();
+    /* Policy recovery is shared by trusted and user callers. */
+    for (int cpl=0; cpl<=3; cpl+=3) {
+        host_sdk_cpl=cpl; api.version=83; direct_mode=1;
+        CHECK(!libos32gfx_attach_checked() && gfx_ready && gfx_direct &&
+              gfx_gen==direct_gen && !live() && !gfx_fb.planes[0]);
+        (void)libos32gfx_take_regen();
+        flush_pending=3; sdk_gfx_present(); CHECK(flush_pending==0);
+        api.kbd_getchar=direct_key; api.kbd_trygetchar=direct_key;
+        api.sys_yield=direct_yield; api.sys_halt=direct_halt;
+        flush_pending=3; CHECK(libos32gfx_getchar()==65);
+        flush_pending=3; CHECK(libos32gfx_trygetchar()==65);
+        flush_pending=3; libos32gfx_yield();
+        flush_pending=3; libos32gfx_halt();
+        flush_failure=1;
+        CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        direct_gen++;
+        CHECK(!libos32gfx_check() && gfx_direct && gfx_gen==direct_gen);
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        gfx_lost=1;
+        CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        direct_mode=0;
+        CHECK(!libos32gfx_check() && !gfx_direct && gfx_ready);
+        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        libos32gfx_detach();
+    }
+    host_sdk_cpl=3; api.version=70;
+    api.kbd_getchar=waited_key; api.sys_yield=waited_yield; api.sys_halt=waited_halt;
     /* A nonowner shutdown can leave CLIENT published. Wait returns must not
      * reopen drawing, even if their KAPI calls regenerate that storage. */
     api.gfx_shutdown=shutdown_keeps_client;api.gfx_init=waited_halt;
