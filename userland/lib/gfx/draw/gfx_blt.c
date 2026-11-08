@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 
 extern void __cdecl asm_copy_plane_rect(u8 *dst, int dst_pitch,
                                         const u8 *src, int src_pitch,
@@ -85,6 +86,29 @@ void __cdecl gfx_save_rect(int x, int y, int w, int h, void *buf)
     ex = (x + w + 7) / 8;
     wb = ex - sx;
 
+    if (gfx_direct) {
+        int width = wb * 8;
+        u8 *pixels;
+        if (sx * 8 + width > gfx_fb.width) width = gfx_fb.width - sx * 8;
+        pixels = (u8 *)gfx_api->mem_alloc(width * h);
+        if (!pixels) { gfx_lost = 1; return; }
+        if (!gfx_cmd_get(sx * 8, y, width, h, pixels, width)) {
+            for (i = 0; i < 4; i++) {
+                for (int r = 0; r < h; r++) {
+                    for (int b = 0; b < wb; b++) {
+                        u8 v = 0;
+                        for (int k = 0; k < 8 && b * 8 + k < width; k++)
+                            if (pixels[r * width + b * 8 + k] & (1 << i))
+                                v |= (u8)(0x80 >> k);
+                        dst_base[i * orig_wb * h + r * orig_wb + b] = v;
+                    }
+                }
+            }
+        }
+        gfx_api->mem_free(pixels);
+        return;
+    }
+
     if (gfx_packed) {
         gfx_packed_save_planar(sx, y, wb, h, dst_base, orig_wb);
         return;
@@ -118,6 +142,27 @@ void __cdecl gfx_restore_rect(int x, int y, int w, int h, const void *buf)
     sx = x / 8;
     ex = (x + w + 7) / 8;
     wb = ex - sx;
+
+    if (gfx_direct) {
+        int width = wb * 8;
+        u8 *pixels;
+        if (sx * 8 + width > gfx_fb.width) width = gfx_fb.width - sx * 8;
+        pixels = (u8 *)gfx_api->mem_alloc(width * h);
+        if (!pixels) { gfx_lost = 1; return; }
+        for (int r = 0; r < h; r++) {
+            for (int col = 0; col < width; col++) {
+                u8 color = 0;
+                for (i = 0; i < 4; i++)
+                    if (src_base[i * orig_wb * h + r * orig_wb + col / 8] &
+                        (0x80 >> (col & 7))) color |= (u8)(1 << i);
+                pixels[r * width + col] = color;
+            }
+        }
+        if (gfx_cmd_enqueue_put(sx * 8, y, width, h, pixels, width, -1) < 0)
+            gfx_lost = 1;
+        gfx_api->mem_free(pixels);
+        return;
+    }
 
     if (gfx_packed) {
         gfx_packed_restore_planar(sx, y, wb, h, src_base, orig_wb);

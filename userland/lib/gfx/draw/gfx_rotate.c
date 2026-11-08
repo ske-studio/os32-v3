@@ -10,6 +10,7 @@
 
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "libos32math.h"
 #include "os32api.h"
 
@@ -115,6 +116,31 @@ void gfx_blit_affine(int dx, int dy,
         clip_right = gfx_fb.width - bbox_x;
     }
     draw_x0 = (bbox_x < 0) ? 0 : bbox_x;
+
+    if (gfx_direct) {
+        u8 row[640];
+        int width = clip_right - clip_left;
+        if (width > (int)sizeof(row)) return;
+        for (iy = 0; iy < bbox_h; iy++) {
+            u = u_row_start + (i32)clip_left * du_x;
+            v = v_row_start + (i32)clip_left * dv_x;
+            for (ix = 0; ix < width; ix++) {
+                sx = (int)(u >> 8);
+                sy = (int)(v >> 8);
+                row[ix] = colorkey;
+                if ((unsigned)sx < (unsigned)src->w &&
+                    (unsigned)sy < (unsigned)src->h)
+                    row[ix] = _read_pixel(src, sx, sy);
+                u += du_x;
+                v += dv_x;
+            }
+            if (gfx_cmd_enqueue_put(draw_x0, bbox_y + iy, width, 1,
+                                    row, width, colorkey)) return;
+            u_row_start += du_y;
+            v_row_start += dv_y;
+        }
+        return;
+    }
 
     /* 4. スキャンラインループ (逆アフィン変換) */
     for (iy = 0; iy < bbox_h; iy++) {

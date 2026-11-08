@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 extern void __cdecl asm_fill_plane_rect(u8 *start, int pitch, int rows, int width_bytes, u8 fill_val);
@@ -94,6 +95,38 @@ void gfx_surface_pixel(GFX_Surface *surf, int x, int y, u8 color)
 /*  ブリット                                                                */
 /* ======================================================================== */
 
+/* Convert only visible rows; enqueue copies each stack-sized bundle. */
+static void gfx_blit_direct(int dx, int dy, const GFX_Surface *src,
+                            int sx, int sy, int sw, int sh, int key)
+{
+    u8 pixels[4096];
+    if (sw <= 0 || sh <= 0) return;
+    if (dx <= -sw || dy <= -sh || dx >= gfx_fb.width || dy >= gfx_fb.height) return;
+    if (dx < 0) { sx -= dx; sw += dx; dx = 0; }
+    if (dy < 0) { sy -= dy; sh += dy; dy = 0; }
+    if (sw > gfx_fb.width - dx) sw = gfx_fb.width - dx;
+    if (sh > gfx_fb.height - dy) sh = gfx_fb.height - dy;
+    for (int row = 0; row < sh; ) {
+        int rows = sizeof(pixels) / sw;
+        if (rows > sh - row) rows = sh - row;
+        for (int iy = 0; iy < rows; iy++) {
+            for (int ix = 0; ix < sw; ix++) {
+                int off = (sy + row + iy) * src->pitch + ((sx + ix) >> 3);
+                u8 bit = (u8)(0x80 >> ((sx + ix) & 7));
+                u8 color = 0;
+                for (int p = 0; p < 4; p++)
+                    if (src->planes[p][off] & bit) color |= (u8)(1 << p);
+                pixels[iy * sw + ix] = color;
+            }
+        }
+        if (gfx_cmd_enqueue_put(dx, dy + row, sw, rows, pixels, sw, key) < 0) {
+            gfx_lost = 1;
+            return;
+        }
+        row += rows;
+    }
+}
+
 void gfx_blit(int dx, int dy,
               const GFX_Surface *src, const GFX_Rect *src_rect)
 {
@@ -108,6 +141,13 @@ void gfx_blit(int dx, int dy,
         sw = src_rect->w; sh = src_rect->h;
     } else {
         sx = 0; sy = 0; sw = src->w; sh = src->h;
+    }
+
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, -1);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
+        return;
     }
 
     /* バイト境界揃い時の高速パス (プレーン限定 — サーフェスは常に 4 プレーン
@@ -174,6 +214,13 @@ void gfx_blit_colorkey(int dx, int dy,
         sx = 0; sy = 0; sw = src->w; sh = src->h;
     }
 
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, colorkey);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
+        return;
+    }
+
     for (iy = 0; iy < sh; iy++) {
         for (ix = 0; ix < sw; ix++) {
             int soff = (sy + iy) * src->pitch + ((sx + ix) >> 3);
@@ -206,6 +253,13 @@ void gfx_blit_transparent(int dx, int dy,
         sw = src_rect->w; sh = src_rect->h;
     } else {
         sx = 0; sy = 0; sw = src->w; sh = src->h;
+    }
+
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, 0);
+        if (!gfx_dirty_suppress)
+            gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
+        return;
     }
 
     /* バイト境界揃い時の高速パス (プレーン限定。理由は gfx_blit と同じ) */

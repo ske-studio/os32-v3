@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 /* ======================================================================== */
@@ -239,6 +240,38 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
     if (spr->_pool_idx >= 0 && spr->_pool_idx < SPR_POOL_MAX) {
         SprSlot *slot = &spr_slots[spr->_pool_idx];
         if (slot->used) {
+            if (gfx_direct) {
+                gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
+                u8 pixels[4096];
+                int sx = 0, sy = 0, w = spr->w, h = spr->h;
+                if (w <= 0 || h <= 0) return;
+                if (x <= -w || y <= -h || x >= gfx_fb.width || y >= gfx_fb.height) return;
+                if (x < 0) { sx -= x; w += x; x = 0; }
+                if (y < 0) { sy -= y; h += y; y = 0; }
+                if (w > gfx_fb.width - x) w = gfx_fb.width - x;
+                if (h > gfx_fb.height - y) h = gfx_fb.height - y;
+                /* Public planes/mask are unshifted; 255 is outside INDEX4. */
+                for (int row = 0; row < h; ) {
+                    int rows = sizeof(pixels) / w;
+                    if (rows > h - row) rows = h - row;
+                    for (int r = 0; r < rows; r++) {
+                        for (int col = 0; col < w; col++) {
+                            int off = (sy + row + r) * spr->pitch + ((sx + col) >> 3);
+                            u8 bit = (u8)(0x80 >> ((sx + col) & 7));
+                            u8 color = 0;
+                            for (int p = 0; p < 4; p++)
+                                if (spr->planes[p][off] & bit) color |= (u8)(1 << p);
+                            pixels[r * w + col] = spr->mask[off] & bit ? 255 : color;
+                        }
+                    }
+                    if (gfx_cmd_enqueue_put(x, y + row, w, rows, pixels, w, 255) < 0) {
+                        gfx_lost = 1;
+                        return;
+                    }
+                    row += rows;
+                }
+                return;
+            }
             int shift = x & 7;
             const u8 *planes[4];
             const u8 *mask = 0;
