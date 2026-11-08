@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include "libos32filer.h"
 #include "libos32gfx.h"
+#include "gfx_direct_internal.h"
 
 /* ======================================================================== */
 /*  内部状態                                                                */
@@ -274,6 +275,7 @@ int filer_open(const char *dir, const char *filter)
         /* 描画 */
         draw_filer_panel();
         gfx_present();
+        if (gfx_direct) (void)gfx_flush();
         f_api->gfx_present_dirty();
 
         /* キー入力 */
