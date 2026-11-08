@@ -1,6 +1,6 @@
 # kernel/v86/ — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN・DEP_DIR_D1_DESIGN・DEP_DIR_D_DESIGN・MEMMAP_V3 (D1 で移した)
-ソース: `kernel/v86/`、機種 BIOS・PIC・KBD・I/O は `platform/pc98/legacy/`
+ソース: `arch/x86/legacy/`（旧 `kernel/v86/` は転送ヘッダのみ）、機種 BIOS・PIC・KBD・I/O は `platform/pc98/legacy/`
 
 ### v86_bios
 
@@ -24,4 +24,4 @@ V86失敗はline→残列空白の順で同口を使う。
 
 ## 索引
 
-- [kernel/v86/v86.c](v86.md)
+- [arch/x86/legacy/v86.c](v86.md)

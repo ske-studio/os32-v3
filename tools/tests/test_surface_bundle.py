@@ -1,12 +1,12 @@
 """T2e e3: PC98 DISPLAY bundle and native alias lifetime, real ILP32 paths."""
 CHECK = dict(name='surface-bundle-host', tier=1,
-    covers=['arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/platform_emergency.h', 'kernel/v86/v86_module.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/exec.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/v86/v86_mem.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_bundle_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/test_surface_lease.py', 'tools/tests/surface_lease_host.c', 'exec/ring3_ls.c', 'kapi/kapi_generated.c', 'mm/shm.c', 'sdk/kapi.json', 'tools/tests/public_surface_host.c', 'tools/tests/test_public_surface.py', 'README.md', 'docs/INDEX.md', 'docs/KAPI_SPEC.md', 'exec/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/check_kapi_version.py', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
+    covers=['arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/platform_emergency.h', 'arch/x86/legacy/v86_module.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/exec.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'arch/x86/legacy/v86_mem.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_bundle_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/test_surface_lease.py', 'tools/tests/surface_lease_host.c', 'exec/ring3_ls.c', 'kapi/kapi_generated.c', 'mm/shm.c', 'sdk/kapi.json', 'tools/tests/public_surface_host.c', 'tools/tests/test_public_surface.py', 'README.md', 'docs/INDEX.md', 'docs/KAPI_SPEC.md', 'exec/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/check_kapi_version.py', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
     needs=['make:all'], budget=2.632578)
 
 import subprocess
 from test_surface_lease import main
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/exec.c',
-              'kernel/v86/v86_mem.c', 'mm/paging.c', 'mm/pgalloc.c',
+              'arch/x86/legacy/v86_mem.c', 'mm/paging.c', 'mm/pgalloc.c',
               'tools/tests/surface_bundle_host.c']
 MUTANTS = [
     ('lease', 'source->backend != gfx_sf_backend()', '0', 'active backend mismatch'),
@@ -44,7 +44,7 @@ MUTANTS = [
 if __name__ == '__main__':
     try:
         main(fixture_name='surface_bundle_host.c', mutants=MUTANTS,
-             extra_sources={'v86': 'kernel/v86/v86_mem.c'},
+             extra_sources={'v86': 'arch/x86/legacy/v86_mem.c'},
              lease_hook='#define paging_lease_unmap host_bundle_unmap\n')
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')

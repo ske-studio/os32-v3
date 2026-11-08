@@ -31,7 +31,7 @@ extern volatile int exec_nest_level;  /* exec/exec.c */
 /* 外部: irq_enable (idt.c で定義) */
 extern void irq_enable(unsigned int irq);
 
-/* 外部: V86 セッション (kernel/v86/v86.c, platform/pc98/legacy/v86_kbd.c)。
+/* 外部: V86 セッション (arch/x86/legacy/v86.c, platform/pc98/legacy/v86_kbd.c)。
  * drivers/ は -Ikernel を持たないので、この 3 本だけここで宣言する
  * (irq_enable と同じ扱い)。ドライバが V86 の中身を知る必要はない。 */
 #include "legacy_guest.h"

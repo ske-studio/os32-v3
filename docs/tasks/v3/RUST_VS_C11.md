@@ -84,7 +84,7 @@ Rust が**確実に効く**のは「外部入力を解釈する純粋計算で�
 | E4 | **FEP** (ローマ字かな・変換・辞書) | `kernel/ime/ime.c` 916、`ime_dict.c` 618、`ime_romkana.c` 256、`ime_render_tvram.c` 76 (C)。辞書は SQLite | **モジュール化** (T5a、案 A → B)、facade の bounded copy (FEP_BOUNDARY、D31) | ローマ字かなの状態機械 (256 行) は Rust のホスト試験向きだが小さく、既に動く。変換は SQLite の C API を呼ぶ側なので Rust にしても `unsafe` の FFI が本体 | **C11 (維持)** |
 | E5 | **SQLite** | `lib/sqlite3/sqlite3.c` (C89 amalgamation、専用の旗 `kernel.mk:175`) | モジュール化 (T4) | 無い (決定 D12: C のまま) | **C (専用規則、gnu89 のまま可)** |
 | E6 | **PCM ドライバ (CS4231)** | `drivers/sound/cs4231/pcm_cs4231.c` 763 + `_math.c` 448 (純粋部、ホスト試験 21 + 変異 24) | モジュール化 (T5c)。合成器 (N1) の**顧客** — `pcm_advance` (IF=0) から `opna_render` を呼ぶ | 無い (レジスタ・DMA・状態機械)。既に C で「純粋部を分けてホスト試験」を達成している | **C11 (維持)**。Rust の合成器を呼ぶ側 |
-| E7 | **V86 モニタ / gfx バックエンド / FDC / IDE / ATAPI / kbd / mouse / serial** | 全部 C (`drivers/` `gfx/` `kernel/v86/v86*.c`) | コアかモジュール | 無い (装置) | **C11** |
+| E7 | **V86 モニタ / gfx バックエンド / FDC / IDE / ATAPI / kbd / mouse / serial** | 全部 C (`drivers/` `gfx/` `arch/x86/legacy/v86*.c`) | コアかモジュール | 無い (装置) | **C11** |
 | E8 | **CUI シェル・rshell・コマンド群・userland/lib** | `userland/shell/` + `userland/lib/` ≈ 19,930 行 (C)、25 コマンド | 帯の再リンク (T2) だけ | 無い | **C11** |
 | E9 | **SDK (crt / syscalls / ヘッダ / newlib)** | `sdk/crt/crt0.asm` 39、`crt0_c.c` 51、`syscalls.c` 184、`sdk/include/` (C89 互換の要否 = C3) | `mem_map` の追従 (N6)、`opendir` 等の穴 (PORT_CANDIDATES §1) | 無い (利用者が C) | **C11** (ヘッダの C89 互換は §5 の 4) |
 | E10 | **ブートローダ** | `boot/` (asm `.8086` + C `-std=gnu89` `boot.mk:15`) | T5b / T6b (集積域・同梱域) | 無い (実モード・PG=0) | **C11 可 (旗だけ)**。asm はそのまま |

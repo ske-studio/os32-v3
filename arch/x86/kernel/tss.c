@@ -12,7 +12,7 @@
  * 足りないとリミット外のポートが CPL/IOPL 次第で素通りする。 */
 STATIC_ASSERT(TSS_IOMAP_SIZE == 65536 / 8, tss_iomap_covers_all_ports);
 
-/* kernel/v86/v86_entry.asm が TSS.ESP0 を `mov [kernel_tss + 4], eax` と
+/* arch/x86/legacy/v86_entry.asm が TSS.ESP0 を `mov [kernel_tss + 4], eax` と
  * オフセット直書きで更新している (NASM から C の構造体は見えない)。
  * ここがずれると V86 の #GP が拾えないスタックにフレームを積み、
  * 原因不明のトリプルフォルトになる。構造体を触ったらここで止まる。 */

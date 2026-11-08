@@ -34,6 +34,7 @@ def check(root):
             assert '-mbig-endian' in argv
     assert forbidden_dependencies('out.o: lib/kstring_c.c arch/x86/arch_io.h\n') == ['arch/x86/arch_io.h']
     assert forbidden_dependencies('out.o: platform/pc98/legacy/v86_io.h\n') == ['platform/pc98/legacy/v86_io.h']
+    assert forbidden_dependencies('out.o: arch/x86/legacy/v86.h\n') == ['arch/x86/legacy/v86.h']
     assert not forbidden_dependencies('out.o: fs/ext2/ext2.c drivers/base/dev.h\n')
     assert validate(dict(cc=['powerpc-elf-gcc'], selected=[], units=[]))
 

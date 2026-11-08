@@ -32,21 +32,21 @@ GENERIC_GUARD = '    if (live_addrspaces && (flags & PTE_USER)) return -1;\n'
 assert GENERIC_LIVE.count(GENERIC_GUARD) == 3
 
 MUTATIONS = (
-    ('return-audit', 'kernel/v86/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
-    ('return-gfx', 'kernel/v86/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
-    ('kill-gcap-release', 'kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
-    ('end-guest-iopl', 'kernel/v86/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
+    ('return-audit', 'arch/x86/legacy/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
+    ('return-gfx', 'arch/x86/legacy/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
+    ('kill-gcap-release', 'arch/x86/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
+    ('end-guest-iopl', 'arch/x86/legacy/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
     ('direct-kill-no-end', 'exec/exec.c', '    legacy_end();\n    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish', '    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
-    ('end-reentry', 'kernel/v86/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
+    ('end-reentry', 'arch/x86/legacy/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
     ('landing-if', 'exec/exec.c', '    _enable();\n    legacy_end();', '    legacy_end();\n    _enable();', 'FAIL release IF enabled'),
     ('restore-flush', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
     ('restore-current-pde', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
-    ('int80-offset', 'kernel/v86/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
+    ('int80-offset', 'arch/x86/legacy/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
 
     ('exec-gate', 'exec/exec.c', '    if (legacy_lowmap_busy()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
     ('resume-gate', 'exec/exec.c', '    if (legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
     ('kill-no-release', 'exec/exec.c', '    legacy_end();\n    legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
-    ('release-on-exception', 'kernel/v86/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
+    ('release-on-exception', 'arch/x86/legacy/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
     ('page0-forget', 'platform/pc98/bios_snapshot.c', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);\n    real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'platform/pc98/bios_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
@@ -124,7 +124,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
+    paths = ('mm/paging.c', 'mm/shm.c', 'arch/x86/legacy/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
     sources = {p: paging_source(ROOT/p) for p in paths}
     if mutation:
         name, path, old, new, expected = mutation
@@ -150,8 +150,8 @@ def run(runner, mutation=None):
         consumer += function(sources['drivers/video/pc98/backend_pegc.c'], 'pegc_identify')
         consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')
         (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
-        (work/'v86_unwind_slice.inc').write_text(function(sources['kernel/v86/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
-        (work/'v86_int_slice.inc').write_text((function(sources['kernel/v86/v86.c'], 'v86_do_int') + function(sources['kernel/v86/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
+        (work/'v86_unwind_slice.inc').write_text(function(sources['arch/x86/legacy/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
+        (work/'v86_int_slice.inc').write_text((function(sources['arch/x86/legacy/v86.c'], 'v86_do_int') + function(sources['arch/x86/legacy/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
         arch = (ROOT/'tools/tests/host_arch/arch_cpu.h').read_text()
         arch = arch.replace('static inline void arch_mmu_flush_tlb(void)\n{\n}',
                             'static inline void arch_mmu_flush_tlb(void)\n{\n    host_flushes++; host_flushed_cr3 = host_cr3;\n}')
@@ -159,7 +159,7 @@ def run(runner, mutation=None):
         for p in paths[:3]:
             source = sources[p]
             # Linux low bytes are modeled here; v86_low_host executes real low RAM.
-            if p == 'kernel/v86/v86_mem.c':
+            if p == 'arch/x86/legacy/v86_mem.c':
                 source = source.replace('P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
             (work/Path(p).name).write_text(source)
         alloc = paging_source(ROOT/'mm/pgalloc.c')

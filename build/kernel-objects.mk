@@ -47,10 +47,13 @@ $(R1_OBJ)/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fat/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
+# Preserve NASM's STT_FILE identity across H2's source move, including R1.
+legacy_asm_input = $(subst /arch/x86/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
+
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
-	@mkdir -p $(@D)
-	$(LAYOUT_CPP) -traditional-cpp $< -o $@.asm
-	$(AS) -p sdk/crt/generations.inc -f elf32 $@.asm -o $@
+	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$@.asm))
+	$(LAYOUT_CPP) -traditional-cpp $< -o $(call legacy_asm_input,$@.asm)
+	$(AS) -p sdk/crt/generations.inc -f elf32 $(call legacy_asm_input,$@.asm) -o $@
 
 $(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h arch/x86/kernel/idt.h
 	@mkdir -p $(@D)
@@ -102,9 +105,9 @@ $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 
 $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
-	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)
-	$(LAYOUT_CPP) -traditional-cpp $< -o $(BUILD_OUT)/asm/$<
-	$(AS) -p sdk/crt/generations.inc -f elf32 $(BUILD_OUT)/asm/$< -o $@
+	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$(BUILD_OUT)/asm/$<))
+	$(LAYOUT_CPP) -traditional-cpp $< -o $(call legacy_asm_input,$(BUILD_OUT)/asm/$<)
+	$(AS) -p sdk/crt/generations.inc -f elf32 $(call legacy_asm_input,$(BUILD_OUT)/asm/$<) -o $@
 
 # The boot selftest stays in core and calls the same typed facade as DB/FEP.
 $(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c

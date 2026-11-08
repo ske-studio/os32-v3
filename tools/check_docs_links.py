@@ -96,6 +96,20 @@ ARCHIVE_SOURCE_MOVES = {
     'kernel/paging_app.c': 'mm/paging_app.c',
     'kernel/paging_app.h': 'mm/paging_app.h',
     'kernel/v86_io.c': 'platform/pc98/legacy/v86_io.c',
+    'kernel/v86/v86.c': 'arch/x86/legacy/v86.c',
+    'kernel/v86/v86.h': 'arch/x86/legacy/v86.h',
+    'kernel/v86/v86_entry.asm': 'arch/x86/legacy/v86_entry.asm',
+    'kernel/v86/v86_mem.c': 'arch/x86/legacy/v86_mem.c',
+    'kernel/v86/v86_mem.h': 'arch/x86/legacy/v86_mem.h',
+    'kernel/v86/v86_gp_emulate.inc': 'arch/x86/legacy/v86_gp_emulate.inc',
+    'kernel/v86/v86_test16.asm': 'arch/x86/legacy/v86_test16.asm',
+    'kernel/v86/v86_test16_disk.asm': 'arch/x86/legacy/v86_test16_disk.asm',
+    'kernel/v86/v86_body.c': 'arch/x86/legacy/v86_body.c',
+    'kernel/v86/v86_module.c': 'arch/x86/legacy/v86_module.c',
+    'kernel/v86/v86_module.h': 'arch/x86/legacy/v86_module.h',
+    'kernel/v86/v86_gcap.c': 'arch/x86/legacy/v86_gcap.c',
+    'kernel/v86/v86_gcap.h': 'arch/x86/legacy/v86_gcap.h',
+    'kernel/v86/v86_gcap_math.h': 'arch/x86/legacy/v86_gcap_math.h',
 }
 # D1: original decision documents remain complete in the archive; keep fragments.
 ARCHIVE_DECISION_MOVES = {

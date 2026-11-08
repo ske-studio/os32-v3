@@ -3,7 +3,7 @@
 Record: tools/tests/display_cleanup_tdd.md
 """
 CHECK = dict(name='display-cleanup-host', tier=1,
-    covers=['hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'kernel/v86/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'kernel/v86/v86_gcap.c', 'kdebug/v86_gcap.c', 'platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'platform/pc98/legacy/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
+    covers=['hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'arch/x86/legacy/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'arch/x86/legacy/v86_gcap.c', 'kdebug/v86_gcap.c', 'platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'platform/pc98/legacy/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.h'],
     needs=[], budget=2.141466)
 
@@ -41,7 +41,7 @@ def build_run(tree, kind, cases, execute=True):
             gcap = (tree / TARGET_SRCS[1]).read_text()
             names = ['io_out']
             core = (tree / TARGET_SRCS[4]).read_text()
-            body = function((tree / 'kernel/v86/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
+            body = function((tree / 'arch/x86/legacy/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
             if 'static void gcap_out(' in gcap:
                 body += function(gcap, 'gcap_out')
             body += function(gcap, 'gcap_cui_rebuild')
