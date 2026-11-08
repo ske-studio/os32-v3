@@ -1215,7 +1215,7 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump { gf_accept::finish(); }
     #[cfg(feature = "gf_accel_accept")]
-    if ctx != input::Ctx::Pump { flush_present(); crate::typical_ops::on_cycle_end(st); }
+    if ctx != input::Ctx::Pump && st.ops.active { flush_present(); crate::typical_ops::on_cycle_end(st); }
 }
 
 /* ================================================================ */
@@ -1767,7 +1767,7 @@ pub(crate) mod gf_accept {
         if unsafe { (os32api::api().sys_time_now)(&mut lo, &mut hi) } != 0 { state().valid = false; }
         (u64::from(hi) << 32) | u64::from(lo)
     }
-    pub(crate) fn busy() -> bool { state().active }
+    pub(crate) fn busy() -> bool { let s = state(); s.count != 0 && s.count < COUNT }
     pub(crate) fn pause(paused: bool) { state().paused = paused; }
     pub fn begin() {
         if state().paused { return; }
@@ -1848,5 +1848,7 @@ pub(crate) mod gf_accept {
             }
         }
     }
+    #[cfg(test)]
+    mod tests { include!("../host/gf_accept_tests.rs"); }
 }
 // Acceptance timing end.

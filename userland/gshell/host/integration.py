@@ -516,6 +516,8 @@ MUTATIONS = [
 
 # P0a uses the same real crate with acceptance-only code enabled.
 MUTATIONS += [
+    ('P0a idle flush unguarded', 'src/wm.rs', 'ctx != input::Ctx::Pump && st.ops.active', 'ctx != input::Ctx::Pump', 'p0a_idle_cycles'),
+    ('P0a busy only during cycle', 'src/wm.rs', 's.count != 0 && s.count < COUNT', 's.active', 'p0a_busy_between'),
     ('P0a cycle disconnected', 'src/wm.rs', 'flush_present(); crate::typical_ops::on_cycle_end(st);', 'flush_present();', 'p0a_wm_cycle'),
     ('P0a dirty ignored', 'src/typical_ops.rs', 'w.dirty.len == 0 && w.issued.len == 0', 'w.issued.len == 0', 'p0a_completion'),
     ('P0a issued ignored', 'src/typical_ops.rs', 'w.dirty.len == 0 && w.issued.len == 0', 'w.dirty.len == 0', 'p0a_completion'),
