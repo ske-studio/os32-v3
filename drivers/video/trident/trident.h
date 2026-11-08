@@ -384,7 +384,7 @@ struct trident_device {
      * が未設定 (ゼロ初期化で未設定になる)。 */
     u8 overscan;
     bool overscan_valid;
-    enum tri_present_method present_method; /* zero/default: byte */
+    enum tri_present_method present_method; /* display_start sets dword_sync */
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;

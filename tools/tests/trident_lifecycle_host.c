@@ -272,7 +272,8 @@ static int fallback_test(void) {
     CHECK(device.settings.ram_fallback && device.mode.no_accel && f.cr_color[0x36]==0);
     CHECK(device.mode.client.pitch==640 && backend.bb_base==ram_client && backend.bb_pitch==640);
     CHECK(!device.accel.initialized && !device.accel.pattern.allocated && !(device.mode.features&TRI_CAP_GE));
-    CHECK(!backend.fill_rect && !backend.blit && lfb8==307200 && !lfb32);
+    /* dword_sync present (default since 2026-11-08): 32-bit stores only. */
+    CHECK(!backend.fill_rect && !backend.blit && !lfb8 && lfb32==307200/4);
     for(u32 i=0;i<307200;++i) CHECK(!memory[i] && !ram_client[i]);
     CHECK(memory[1228800]==0xA5);
     /* CPU dirty drawing reaches DISPLAY through the HAL present counter. */
@@ -283,15 +284,15 @@ static int fallback_test(void) {
     CHECK(!tri_hal_mode(3)); count=0; /* RGB565 */
     CHECK(memory[614399]==0x3A);
     CHECK(device.mode.client.cpp==2 && backend.bb_pitch==1280 && !device.accel.initialized);
-    CHECK(!backend.fill_rect && !backend.blit && !lfb32);
+    CHECK(!backend.fill_rect && !backend.blit);
     ram_client[7]=0x37; memory[7]=0;
     leave(); count=0; enter(); count=0;
     CHECK(!display_rc && device.screen_ready && memory[7]==0x37 && !device.accel.initialized);
     static const u32 pixel=0xffffffffu;
     struct GfxCursorImage im={&pixel,4,4,1,1,0,0};
-    u32 before=lfb8;
+    u32 before=lfb8, before32=lfb32;
     CHECK(!tri_hal_cursor_image(0,&im)); count=0;
-    CHECK(lfb8==before+TRI_CURSOR_IMAGE_BYTES && !lfb32);
+    CHECK(lfb8==before+TRI_CURSOR_IMAGE_BYTES && lfb32==before32);
     u32 off=device.cursor.allocation.off;
     for(u32 i=0;i<TRI_CURSOR_IMAGE_BYTES;++i) CHECK(memory[off+i]==device.cursor.image[i]);
     static const u8 data[32]={1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,
@@ -301,8 +302,11 @@ static int fallback_test(void) {
     for(u32 i=0;i<3;++i) {
         struct tri_video_image imv={.format=formats[i],.width=4,.height=2,.data=data};
         CHECK(!tri_video_query(&imv));
+        /* Byte present isolates the overlay upload's own store width. */
+        u32 put32=lfb32; device.present_method=TRI_PRESENT_BYTE;
         CHECK(!tri_video_put(&device,&imv,&rect,&rect,0x1234)); count=0;
-        CHECK(!lfb32 && memory[device.video.allocation.off]==1);
+        device.present_method=TRI_PRESENT_DWORD_SYNC;
+        CHECK(lfb32==put32 && memory[device.video.allocation.off]==1);
         CHECK(memory[device.video.allocation.off+2]==(i==2?2:3));
     }
     /* Present must preserve the cursor and overlay behind fixed B. */
@@ -312,7 +316,7 @@ static int fallback_test(void) {
     shutdown(); count=0; prepare(); count=0;
     CHECK(device.mode.selected.id==TRI_MODE_DEFAULT_ID && backend.bb_pitch==640);
     init(); count=0;
-    CHECK(!display_rc && device.mode.client.cpp==1 && !device.accel.initialized && !lfb32);
+    CHECK(!display_rc && device.mode.client.cpp==1 && !device.accel.initialized);
     shutdown(); count=0;
     return 0;
 }
