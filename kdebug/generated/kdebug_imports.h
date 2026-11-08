@@ -23,7 +23,6 @@
 #include "fs/serialfs/serialfs.h"
 #include "fs/vfs.h"
 #include "gfx/gfx.h"
-#include "include/bootinfo.h"
 #include "include/bootlog.h"
 #include "include/con_sink.h"
 #include "include/console.h"
@@ -70,6 +69,8 @@
 #include "mm/paging.h"
 #include "mm/pgalloc.h"
 #include "mm/shlib.h"
+#include "platform/pc98/bios_snapshot.h"
+#include "platform/pc98/bootinfo_native.h"
 #include "platform/pc98/pit.h"
 #include "platform/pc98/pit_time.h"
 extern u32 v86_gp_cs;
@@ -148,8 +149,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 323
-#define KDEBUG_ABI_GEN 0x338352a9u
+#define KDEBUG_IMPORT_COUNT 324
+#define KDEBUG_ABI_GEN 0x979587c7u
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

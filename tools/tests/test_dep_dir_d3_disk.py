@@ -7,9 +7,10 @@ import sys
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('init/bootinfo.c', 'init/bootinfo_check.c',
-           'platform/pc98/boot_disk.c')
-HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_disk.h', 'init/boot_disk.h')
+SOURCES = ('init/bootinfo.c', 'platform/pc98/bootinfo_check.c',
+           'platform/pc98/boot_disk.c', 'platform/pc98/bootinfo_capture.c',
+           'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_report.c')
+HEADERS = ('platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_wire.h', 'include/ide_contract.h', 'platform/pc98/boot_disk.h', 'init/boot_disk.h')
 
 
 def build(tmp, mutation=None):

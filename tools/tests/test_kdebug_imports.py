@@ -27,7 +27,7 @@ REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
                              'geforce_accel_ops', 'gfx_present', 'gf_display_test',
                              'gf5_test', 'pci_hwb_read', 'pci_hwb_write', 'exec_hwb_abort_take',
                              'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap',
-                             'trident_diagnostic_ops', 'debug_probe_control', 'legacy_lowmap_busy')
+                             'trident_diagnostic_ops', 'debug_probe_control', 'legacy_lowmap_busy', 'v86_bios_real_lowmem')
 REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):
@@ -281,7 +281,8 @@ class ImportsTests(unittest.TestCase):
         self.assertEqual(self.entries[205]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
-            'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
+            'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip',
+            'kdi_ptr_v86_session', 'v86_bios_real_lowmem'})
         for field, value in [('name', 'changed'), ('signature', 'int changed(void);'), ('index', 9)]:
             changed = copy.deepcopy(self.entries)
             changed[0][field] = value

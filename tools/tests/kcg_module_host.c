@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Adapter/runtime lifetime is real. The injected init supplies body addresses;
  * test_kcg_module.py separately executes the real body with deterministic ports. */
 #define vfs_open runtime_fixture_open
@@ -78,4 +79,11 @@ void _start(void)
     CHECK(!candidate.read_ank && !candidate.read_kanji && !candidate.stats);
     CHECK(!kcg_module_abort());
     empty(); finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

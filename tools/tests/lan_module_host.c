@@ -1,3 +1,4 @@
+#include "bootinfo_native.h"
 /* Real module runtime and resident LAN facade. PCI enumeration, device I/O,
  * and relocated body entry are explicit seams, not hardware evidence. */
 #define _start unused_runtime_start
@@ -296,4 +297,11 @@ void _start(void)
         CHECK(!lan_module_abort()); empty();
     }
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

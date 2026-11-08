@@ -229,9 +229,9 @@ def mutant(case):
     name, body, rule = case
     with tempfile.TemporaryDirectory(prefix='os32-p2v-') as tmp:
         root = pathlib.Path(tmp)
-        root = mutant_tree(ROOT, root / 'tree', {}, real={'init/bootinfo.c','kernel/time/sysclk.c'})
+        root = mutant_tree(ROOT, root / 'tree', {}, real={'platform/pc98/bootinfo_capture.c','kernel/time/sysclk.c'})
         if name.startswith('bootinfo-'):
-            target = root / 'init/bootinfo.c'
+            target = root / 'platform/pc98/bootinfo_capture.c'
             original = 'volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);'
             source = target.read_text()
             if source.count(original) != 1:

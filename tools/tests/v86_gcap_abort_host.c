@@ -1,3 +1,5 @@
+static int host_bios_ready;
+int platform_bios_ready(void) { return host_bios_ready; }
 #include "font_guard_inactive.h"
 /* Real recorder + session begin/end + exec transfer/landing. CPU mappings,
  * ROM execution and IRQ arrival are substitutes, never a simulated IDT stack. */
@@ -216,7 +218,7 @@ void _start(void) {
     __asm__ volatile("int $0x80":"=a"(result):"a"(90),"b"(args):"memory");
     CHECK(!result, "low fixture mapping");
     test_gp_handler();
-    v86_session.real_saved = 1;
+    host_bios_ready = 1;
     kdebug.ops.gcap_capture = capture_body;
     kdebug.ops.gcap_active = v86_gcap_active;
     kdebug.ops.gcap_detach = v86_gcap_detach;

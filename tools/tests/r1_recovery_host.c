@@ -1,3 +1,5 @@
+static int host_bios_ready;
+int platform_bios_ready(void) { return host_bios_ready; }
 #include "font_guard_inactive.h"
 /* Real paging/ledger/V86 and exec lifecycle slices; CPU and device edges only. */
 #include "types.h"
@@ -303,7 +305,7 @@ void _start(void) {
     CHECK(result==KERNEL_LOAD_ADDR);
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     g_slot[APP_ID_SHELL].state=APP_STATE_RUNNING;
-    v86_session.real_saved = 1;
+    host_bios_ready = 1;
     v86_case(); poison_case(0); poison_case(1);
     CHECK(!ledger_irq_ops && !ledger_exc_ops && !exec_stop_count);
     say("r1 recovery: K1, parent syscall exit, PARKED pre-commit, quarantine/owner-exit PASS\n");

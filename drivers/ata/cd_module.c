@@ -72,12 +72,12 @@ static int cd_detach(struct module_record *r)
 int cd_module_load(void)
 {
     if (cd_handle.generation) return MODULE_BUSY;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_CD_MOD, .name = "cd",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, CD_MODULE_ABI_GEN,
-            bi->img_crc, CD_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, CD_MODULE_OPS_VERSION, bi->image_valid,
             CD_IMPORT_COUNT, cd_import_contracts, cd_export_contracts,
             MODULE_ID_ATAPI_ISO
         },
@@ -88,7 +88,7 @@ int cd_module_load(void)
     if (!rc) rc = module_start(cd_handle);
     if (!rc && !module_exports(cd_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[cd] module rc=%d pair=%08x fs=%d device=%d\n",
-            rc, bi->img_crc, fs_registered, device_registered);
+            rc, bi->image_crc, fs_registered, device_registered);
     return rc;
 }
 

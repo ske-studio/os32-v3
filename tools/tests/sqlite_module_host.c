@@ -9,6 +9,7 @@
 #include "paging.h"
 #include "memmap.h"
 #include "bootinfo.h"
+#include "bootinfo_native.h"
 #include "config.h"
 #include "ime.h"
 #include "fep_module.h"
@@ -1130,4 +1131,11 @@ void _start(void)
     stubs();
     say("PASS real SQLite init/CRUD/typed diagnostics/prefix reuse/engine stack/reclaim\n");
     finish(0);
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

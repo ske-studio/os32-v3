@@ -104,11 +104,6 @@
     },
     {
       "source": "init/kernel.c",
-      "header": "kernel/v86/v86_bios.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
       "header": "platform/pc98/boot.h",
       "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     }

@@ -13,8 +13,8 @@ static void *fake_map(u32 pa, int io);
 #define P2V(pa) fake_map((pa), 0)
 #define P2V_IO(pa) fake_map((pa), 1)
 #include "../../kdebug/crt_diag.c"
-static struct v86_session_state boot_snapshot;
-struct v86_session_state *kdi_ptr_v86_session(void) { return &boot_snapshot; }
+static u8 boot_snapshot[PAGE_SIZE];
+const u8 *v86_bios_real_lowmem(void) { return boot_snapshot; }
 
 static void output(const char *s)
 {
@@ -125,7 +125,7 @@ void _start(void)
     char buf[CRT_DIAG_BUFSZ], again[CRT_DIAG_BUFSZ];
     int n = length(expected);
     for (int i = 0; i < FAKE_SIZE; i++) fake[i] = (u8)(i * 17 + i / 256 + 3);
-    for (int i = 0; i < 6; i++) boot_snapshot.real_lowmem[work[i]] = (u8)(0x10 + i);
+    for (int i = 0; i < 6; i++) boot_snapshot[work[i]] = (u8)(0x10 + i);
     for (int i = 0; i < 15; i++) fake[0xA3FE2 + 2 * i] = (u8)(0x20 + i);
     protect_fake();
 

@@ -45,4 +45,9 @@ def kernel_source(root, overrides=None):
         call = '    ' + name + '(' + arguments + ');\n'
         assert source.count(call) == 1, name + ': exactly one boot call'
         source = source.replace(call, body, 1)
+    call = '    platform_boot_capture();'
+    if call in source:
+        capture = read('platform/pc98/boot_capture.c')
+        body = re.search(r'void platform_boot_capture\(void\)\n\{\n(.*?)^}', capture, re.M | re.S)[1]
+        source = source.replace(call, body)
     return source

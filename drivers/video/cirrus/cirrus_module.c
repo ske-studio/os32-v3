@@ -61,12 +61,12 @@ static int cirrus_detach(struct module_record *r)
 int cirrus_module_load(void)
 {
     if (cirrus_handle.generation) return MODULE_BUSY;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_CIRRUS_MOD, .name = "cirrus",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, CIRRUS_MODULE_ABI_GEN,
-            bi->img_crc, CIRRUS_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, CIRRUS_MODULE_OPS_VERSION, bi->image_valid,
             CIRRUS_IMPORT_COUNT, cirrus_import_contracts, cirrus_export_contracts,
             MODULE_ID_CIRRUS
         },
@@ -78,7 +78,7 @@ int cirrus_module_load(void)
     if (!rc && !module_exports(cirrus_handle)) rc = MODULE_INIT_FAILED;
     if (!rc) gfx_backend_cirrus = candidate;
     kprintf(KLOG_ATTR, "[cirrus] module rc=%d pair=%08x registered=%d\n",
-            rc, bi->img_crc, registered);
+            rc, bi->image_crc, registered);
     return rc;
 }
 int cirrus_module_abort(void) { return module_abort(cirrus_handle); }

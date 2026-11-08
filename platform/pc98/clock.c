@@ -2,7 +2,7 @@
 #include "platform_timer.h"
 #include "pc98.h"
 #include "memmap.h"
-#include "v86_bios.h"
+#include "bios_snapshot.h"
 
 void platform_clock_read(struct platform_clock_value *out)
 {

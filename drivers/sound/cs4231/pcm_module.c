@@ -185,12 +185,12 @@ int pcm_module_load(void)
 {
     if (tick_register(PC98_TICK_PCM, pcm_tick) != 0) return MODULE_INIT_FAILED;
     if (pcm_handle.generation) return MODULE_BUSY;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_PCM_MOD, .name = "pcm",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, PCM_MODULE_ABI_GEN,
-            bi->img_crc, PCM_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, PCM_MODULE_OPS_VERSION, bi->image_valid,
             PCM_IMPORT_COUNT, pcm_import_contracts, pcm_export_contracts,
             MODULE_ID_PCM
         },
@@ -202,7 +202,7 @@ int pcm_module_load(void)
     if (!rc) rc = module_start(pcm_handle);
     if (!rc && !module_exports(pcm_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[pcm] module rc=%d pair=%08x tick=%d\n",
-            rc, bi->img_crc, tick_target != 0);
+            rc, bi->image_crc, tick_target != 0);
     return rc;
 }
 

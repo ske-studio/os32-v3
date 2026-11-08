@@ -100,7 +100,7 @@ def main():
         # The wire header/entry sizes already have C canonical definitions.
         names = ["VK32_COMMON_SIZE", "VK32_ENTRY_SIZE"]
         check_c("boot/boot_defs.h", zip(names, asm_values(tmp, "vk32_defs.inc", names)))
-        check_c("include/bootinfo.h", [("BOOTINFO_DA_HD1", 0x81)])
+        check_c("platform/pc98/bootinfo_wire.h", [("BOOTINFO_DA_HD1", 0x81)])
         # Compile the CRC canonical definition with the types it requires.
         source = ('typedef unsigned char u8; typedef unsigned int u32;\n'
                   '#include "lib/crc32_core.inc"\n'

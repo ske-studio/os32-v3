@@ -47,9 +47,9 @@ MUTATIONS = (
     ('resume-gate', 'exec/exec.c', '    if (legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
     ('kill-no-release', 'exec/exec.c', '    legacy_end();\n    legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'kernel/v86/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
-    ('page0-forget', 'kernel/v86/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
+    ('page0-forget', 'platform/pc98/bios_snapshot.c', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);\n    real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
-    ('page0-short', 'kernel/v86/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
+    ('page0-short', 'platform/pc98/bios_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
     ('kill-no-end', 'exec/exec.c', '    legacy_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
     ('fixed-restore', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
     ('active-pde', 'mm/paging.c', '    ((u32 *)P2V(s->root))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
@@ -124,7 +124,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
+    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
     sources = {p: paging_source(ROOT/p) for p in paths}
     if mutation:
         name, path, old, new, expected = mutation
@@ -145,7 +145,7 @@ def run(runner, mutation=None):
         work = Path(directory)
         (work/'platform_emergency.h').write_text(
             (ROOT/'include/platform_emergency.h').read_text())
-        (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_restore_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
+        (work/'v86_bios_slice.inc').write_text('static int real_saved;\nstatic u8 real_lowmem[PAGE_SIZE];\n' + function(sources['platform/pc98/bios_snapshot.c'], 'platform_bios_ready') + re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['platform/pc98/bios_snapshot.c'], re.M)[0] + '\n' + (function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_save_real') + function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_restore_real') + function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
         consumer = function(sources['drivers/video/pc98/backend_pegc.c'], 'bios_flag')
         consumer += function(sources['drivers/video/pc98/backend_pegc.c'], 'pegc_identify')
         consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')

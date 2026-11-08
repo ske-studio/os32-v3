@@ -23,6 +23,7 @@ void link_init(const u8 mac[ETH_ALEN]);
 #include "drivers/net/e82557/e82557_regs.h"
 #include "kernel/module/module.h"
 #include "bootinfo.h"
+#include "bootinfo_native.h"
 #include "io.h"
 extern const struct NetAdapter net_lgy98_adapter;
 void *kmemset(void *dst, int value, u32 n)
@@ -186,4 +187,11 @@ void _start(void)
     int rc = n == 1 ? boot_run(mode) : 99;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
+}
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
 }

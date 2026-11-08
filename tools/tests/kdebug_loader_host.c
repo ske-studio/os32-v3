@@ -5,6 +5,7 @@
 #include "mm/pgalloc.h"
 #include "init/sysconfig.h"
 #include "bootinfo.h"
+#include "bootinfo_native.h"
 #include "config.h"
 #include "fs/vfs.h"
 #include "lib/kstring.h"
@@ -253,3 +254,10 @@ void _start(void)
 int hwdev_module_load(struct module_handle core)
 { CHECK(kdebug.state == KDEBUG_RUNNING && module_exports(core) != 0);
   hwdev_loads++; return MODULE_NOT_FOUND; }
+
+const struct boot_common *boot_common_get(void) {
+    static struct boot_common info;
+    const struct bootinfo *bi = bootinfo_get();
+    info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
+    return &info;
+}

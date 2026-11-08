@@ -146,11 +146,11 @@ u32  v86_bios_boot_daua(void);
 void v86_bios_setup(void);
 
 /* セッション終了時に実機の IVT/BDA を書き戻す */
-void v86_bios_restore_real(void);
+
 
 /* Boot-only capture before paging; session reset never changes this copy. */
-void v86_bios_save_real(void);
-const u8 *v86_bios_real_lowmem(void);
+
+#include "bios_snapshot.h"
 
 /* このベクタを HLE するか (しないならゲストの IVT へ流す) */
 int  v86_bios_is_hle(u32 vector);

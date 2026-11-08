@@ -7,7 +7,7 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
-#include "../include/bootinfo.h"
+#include "../platform/pc98/bootinfo_wire.h"
 
 /* 内部状態 */
 static u32 s_base_lba;         /* パーティション開始LBA */

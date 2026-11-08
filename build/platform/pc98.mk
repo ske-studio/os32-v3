@@ -3,3 +3,5 @@ C_PLATFORM += platform/pc98/boot_irq.c init/boot_platform.c init/boot_display.c 
 SUPPORTED_ARCH = x86
 DEFAULT_FEATURE_VALUE = 1
 C_PLATFORM += platform/pc98/pit.c platform/pc98/pit_math.c platform/pc98/pit_time.c platform/pc98/clock_source.c
+
+C_PLATFORM += platform/pc98/bootinfo_capture.c platform/pc98/bootinfo_geom.c platform/pc98/bootinfo_report.c platform/pc98/bootinfo_check.c platform/pc98/bios_snapshot.c platform/pc98/boot_capture.c

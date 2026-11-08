@@ -170,12 +170,12 @@ int os32_sqlite_start(void)
 {
     if (sqlite_module_ready()) return SQLITE_OK;
     if (sqlite_handle.generation) return OS32_ERR_NOSYS;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_SQLITE_MOD, .name = "sqlite",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, SQLITE_MODULE_ABI_GEN,
-            bi->img_crc, SQLITE_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, SQLITE_MODULE_OPS_VERSION, bi->image_valid,
             SQLITE_IMPORT_COUNT, sqlite_import_contracts,
             sqlite_export_contracts, MODULE_ID_SQLITE
         },
@@ -186,7 +186,7 @@ int os32_sqlite_start(void)
     if (!rc) rc = module_start(sqlite_handle);
     if (!rc && module_exports(sqlite_handle)) sqlite_module_api = &candidate_api;
     else if (!rc) rc = MODULE_INIT_FAILED;
-    kprintf(KLOG_ATTR, "[sqlite] module rc=%d pair=%08x\n", rc, bi->img_crc);
+    kprintf(KLOG_ATTR, "[sqlite] module rc=%d pair=%08x\n", rc, bi->image_crc);
     struct module_record *record = module_record_get(sqlite_handle);
     struct memory_page_counts counts;
     memory_boot_page_counts(kdebug.pages ? kdebug.base_pa / PAGE_SIZE : 0,

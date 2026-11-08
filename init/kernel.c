@@ -12,7 +12,7 @@
 #include "boot_cpu.h"
 #include "platform_boot.h"
 #include "../arch/x86/kernel/idt.h"
-#include "../kernel/v86/v86_bios.h"
+#include "platform_boot.h"
 #include "io.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
 /* fs.h 削除 — レガシーFS廃止 */
@@ -40,7 +40,7 @@
 #include "exec.h"
 #include "../kernel/irq/irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
 #include "../mm/dma_pool.h"   /* DMA プール (同 §1-3) */
-#include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
+#include "bootinfo.h"
 #include "../drivers/ata/cd_module.h"
 #include "vfs.h"
 #include "../fs/serialfs/serialfs.h"
@@ -129,8 +129,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ヒープ・その他の低位の再利用より前でなければ上書きされる。
      * memory_boot_detect も保存した BDA (0594h) を読むので、順序を固定する
      * ためここに置く。以後は写しだけを使う (bootinfo_get / _hdd_geom)。 */
-    bootinfo_capture();
-    v86_bios_save_real();
+    platform_boot_capture();
 
     /* ローダの 512KB プローブは 16MB 手前までしか見ない (その先は PC-98 の
      * 16MB システム空間で、書き込みプローブが VRAM を壊す)。16MB 超は BIOS

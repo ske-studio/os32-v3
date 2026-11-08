@@ -99,7 +99,7 @@ typedef unsigned long  u32;
 /* ヘッダ・エントリはバイト列を**オフセットで**読む (vk32_boot.c)。
  * 構造体は旧 v1 の説明用に残さない。 */
 
-/* ブート情報域 (0x7E00) のイメージ欄。**正典は include/bootinfo.h**。
+/* ブート情報域 (0x7E00) のイメージ欄。**正典は platform/pc98/bootinfo_wire.h**。
  * ローダ (C) はカーネルのヘッダを読まないので写しを持つ。一致は
  * tools/tests/test_vk32_crc.py が名前ごとに照合する。 */
 #define BOOTINFO_BASE          0x7E00UL

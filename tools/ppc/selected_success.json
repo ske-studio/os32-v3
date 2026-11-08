@@ -28,7 +28,6 @@
   "gfx/gfx_scroll.c",
   "gfx/palette.c",
   "init/bootinfo.c",
-  "init/bootinfo_check.c",
   "init/bootlog.c",
   "init/bootlog_save.c",
   "init/kaudit_boot.c",
@@ -87,5 +86,6 @@
   "platform/powermac/boot.c",
   "platform/powermac/escc.c",
   "platform/powermac/escc_tree.c",
-  "platform/powermac/ofw.c"
+  "platform/powermac/ofw.c",
+  "platform/powermac/boot_capture.c"
 ]

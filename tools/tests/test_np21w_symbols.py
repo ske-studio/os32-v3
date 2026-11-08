@@ -1,6 +1,6 @@
 """Offline identity tests with real linked ELF/maps and synthetic guest RAM."""
 CHECK = dict(name='np21w-symbols-host', tier=1,
-    covers=['tools/tests/test_np21w_symbols.py', 'tools/np21w_mcp/symbols.py',
+    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'tools/tests/test_np21w_symbols.py', 'tools/np21w_mcp/symbols.py',
             'tools/np21w_mcp/server.py', 'tools/np21w_mcp/gui.py',
             'tools/np21w_mcp/np21w_client.py', 'userland/gshell/src/startmenu.rs',
             'userland/gshell/src/taskbar.rs', 'include/bootinfo.h', 'include/build_id.h', 'include/types.h'],
@@ -100,9 +100,9 @@ probe: .long 7
 
     def test_probe_layout_matches_target_headers(self):
         source = self.home / 'layout.c'
-        source.write_text('#include "bootinfo.h"\n#include "build_id.h"\n_Static_assert(sizeof(struct bootinfo) == 48, "bootinfo size");\n_Static_assert(__builtin_offsetof(struct bootinfo, status) == 0, "status");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_valid) == 36, "valid");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_crc) == 40, "crc");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_size) == 44, "size");\n_Static_assert(BUILD_COMMIT_MAX == 24, "commit");\n')
+        source.write_text('#include "platform/pc98/bootinfo_native.h"\n#include "build_id.h"\n_Static_assert(sizeof(struct bootinfo) == 48, "bootinfo size");\n_Static_assert(__builtin_offsetof(struct bootinfo, status) == 0, "status");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_valid) == 36, "valid");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_crc) == 40, "crc");\n_Static_assert(__builtin_offsetof(struct bootinfo, img_size) == 44, "size");\n_Static_assert(BUILD_COMMIT_MAX == 24, "commit");\n')
         gcc = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc'
-        subprocess.run([str(gcc), '-std=gnu11', '-I', str(ROOT / 'include'),
+        subprocess.run([str(gcc), '-std=gnu11', '-I', str(ROOT), '-I', str(ROOT / 'include'),
                         '-c', str(source), '-o', str(self.home / 'layout.o')],
                        check=True, capture_output=True)
 

@@ -293,11 +293,11 @@ int geforce_module_load(void)
     int rc=gf4_data_bind(&context.display_data, &context.display_state);
     if (rc) return rc;
     context.platform=geforce_platform_get();
-    const struct bootinfo *bi=bootinfo_get();
+    const struct boot_common *bi=boot_common_get();
     const struct module_request request = {
         .path = SYS_GEFORCE_MOD, .name="geforce",
         .policy={KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, GEFORCE_MODULE_ABI_GEN,
-            bi->img_crc, GEFORCE_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, GEFORCE_MODULE_OPS_VERSION, bi->image_valid,
             GEFORCE_IMPORT_COUNT, geforce_import_contracts, geforce_export_contracts, MODULE_ID_GEFORCE},
         .imports=geforce_kexports, .lifecycle={.start=geforce_start, .detach=geforce_detach}
     };
@@ -309,7 +309,7 @@ int geforce_module_load(void)
         foundation_slot=0;accel_slot=0;
         display_slot=0;display_restore_slot=0;feature5_slot=0;
     }
-    kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, bi->img_crc, registered);
+    kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, bi->image_crc, registered);
     return rc;
 }
 int geforce_module_abort(void)

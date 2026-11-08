@@ -162,12 +162,12 @@ static int fep_quiesce(struct module_record *r)
 int fep_module_load(struct module_handle sqlite)
 {
     if (fep_handle.generation) return MODULE_BUSY;
-    const struct bootinfo *bi = bootinfo_get();
+    const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path = SYS_FEP_MOD, .name = "fep",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, FEP_MODULE_ABI_GEN,
-            bi->img_crc, FEP_MODULE_OPS_VERSION, bi->img_valid,
+            bi->image_crc, FEP_MODULE_OPS_VERSION, bi->image_valid,
             FEP_IMPORT_COUNT, fep_import_contracts, fep_export_contracts,
             MODULE_ID_FEP
         },
@@ -179,7 +179,7 @@ int fep_module_load(struct module_handle sqlite)
     if (!rc) rc = module_start(fep_handle);
     if (!rc && !module_exports(fep_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[fep] module rc=%d pair=%08x pages=%u\n",
-            rc, bi->img_crc, fep_module_pages());
+            rc, bi->image_crc, fep_module_pages());
     return rc;
 }
 

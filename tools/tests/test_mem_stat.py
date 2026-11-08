@@ -162,7 +162,7 @@ def run_body(runner, mutate):
     assert 'if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);' in exe
     assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
     boot = (ROOT / 'init/kernel.c').read_text()
-    assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('bootinfo_capture();')
+    assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('platform_boot_capture();')
     source = (ROOT / 'kapi/kapi_sys.c').read_text()
     source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('static void build_time_copy(')]
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:

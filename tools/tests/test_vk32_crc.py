@@ -44,7 +44,7 @@ VK32_SRC = ROOT / "boot/vk32_boot.c"
 MINI_SRC = ROOT / "boot/lz4_mini.c"
 ASM_SRC = ROOT / "boot/loader_fat_new.asm"
 DEFS = ROOT / "boot/boot_defs.h"
-BOOTINFO_H = ROOT / "include/bootinfo.h"
+BOOTINFO_H = ROOT / "platform/pc98/bootinfo_wire.h"
 REAL_VMK = ROOT / "build/out/vmkernel.lz4"
 FD_IMAGES = {"2hd": ROOT / "images/os32_boot.img", "144": ROOT / "images/os32_boot144.img"}
 
@@ -691,7 +691,7 @@ def check_mirror(asm_text):
     bi = c_values(str(BOOTINFO_H), MIRROR_BI, (ROOT / "include",))
     for n in MIRROR_BI:
         if bi[n] != defs[n]:
-            bad.append("{}: include/bootinfo.h 0x{:X} / boot_defs.h 0x{:X}".format(n, bi[n], defs[n]))
+            bad.append("{}: platform/pc98/bootinfo_wire.h 0x{:X} / boot_defs.h 0x{:X}".format(n, bi[n], defs[n]))
     return bad
 
 
@@ -704,7 +704,7 @@ def run_all(srcs, script, target, real):
     if bad:
         raise Fail("[mirror]\n  " + "\n  ".join(bad))
     lines.append("[mirror] ASM の VK32_* / MAX_IMAGE_SIZE と boot_defs.h、"
-                 "boot_defs.h のイメージ欄と include/bootinfo.h が名前ごとに一致")
+                 "boot_defs.h のイメージ欄と platform/pc98/bootinfo_wire.h が名前ごとに一致")
     with tempfile.TemporaryDirectory(prefix="vk32_crc_") as work:
         exes = {g: build(work, srcs, target, g) for g in GEOMS}
         k, s = synthetic()

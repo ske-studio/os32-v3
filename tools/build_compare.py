@@ -175,6 +175,8 @@ def object_paths(root):
                 key = key[len('build/out/obj/'):]
             # E: compare the moved adapter against its original translation unit.
             key = key.replace("arch/x86/legacy/v86_call.o", "exec/v86_call.o")
+            key = key.replace("platform/pc98/bootinfo_check.o", "init/bootinfo_check.o")
+            key = key.replace("platform/pc98/bios_snapshot.o", "kernel/v86/v86_snapshot.o")
             paths[key] = path
     return paths
 

@@ -230,3 +230,4 @@ const struct boot_common *boot_common_get(void);
 - S11：H2のfeature off検査にarch/x86/legacyとplatform/pc98/legacyを追加。
 - 段 E の実装で埋めた欠け：R1の独立open照会 `int legacy_session_open(void)` を§2へ追加（x86はsession.openの読取、noneは0）。
 - 前提：第1段wt/ppc-sep1の上に積み、mainへ入ったSHAを基点とする。
+- 段 G の実装で埋めた欠け：native image 情報の供給口 `void boot_common_set(const struct boot_common *info, u8 source)` を `include/bootinfo.h` に追加（PC98 parser が capture 時に一度供給、PPC/none はゼロ情報と source=0）。`[boot] src=` と BootImageInfo.source の供給元を保つため。wire/BIOS 情報は共通ヘッダに入れず、BootImageInfo・KAPI・SDK の ABI は不変（PM 判断 2026-11-08）。

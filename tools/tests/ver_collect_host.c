@@ -9,6 +9,7 @@
 #include "pcm_cs4231.h"
 #include "gfx_hal.h"
 #include "bootinfo.h"
+#include "bootinfo_native.h"
 #include "kstring.h"
 
 static struct pit_setup saved_pit;

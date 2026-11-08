@@ -26,6 +26,7 @@
 #include "drivers/pci/pci.h"
 #include "drivers/char/serial.h"
 #include "include/bootinfo.h"
+#include "platform/pc98/bootinfo_native.h"
 #include "include/hwdev_private.h"
 #include "sys.h"
 #include "kprintf.h"
