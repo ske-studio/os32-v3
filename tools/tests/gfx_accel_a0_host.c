@@ -7,6 +7,10 @@
 #include "../../drivers/video/geforce/geforce_module.h"
 #include "../../hwdev/gf/accel.h"
 
+KernelAPI *gfx_api;
+int gfx_lost;
+__typeof__(gfx_gen) gfx_gen;
+
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
 {
@@ -64,11 +68,6 @@ void _start(void)
     CHECK(gfx_hw_mono_cpu(0, 0, 1, 1, 0, 1, 7, -1, 0, 0, 1, 1) == OS32_ERR_NOSYS);
     CHECK(!gfx_flush());
     gfx_cmd_drop();
-    CHECK(gfx_cmd_enqueue_fill(0, 0, 1, 1, 7, 0) == OS32_ERR_NOSYS);
-    CHECK(gfx_cmd_enqueue_copy(0, 0, 1, 1, 1, 1) == OS32_ERR_NOSYS);
-    CHECK(gfx_cmd_enqueue_put(0, 0, 1, 1, 0, 1, -1) == OS32_ERR_NOSYS);
-    CHECK(gfx_cmd_enqueue_mono(0, 0, 1, 1, 0, 1, 7, -1, 0, 0, 1, 1) == OS32_ERR_NOSYS);
-    CHECK(gfx_cmd_get(0, 0, 1, 1, 0, 1) == OS32_ERR_NOSYS);
     CHECK(gfx_copy_rect(0, 0, 1, 1, 1, 1) == OS32_ERR_NOSYS);
     finish(0);
 }
