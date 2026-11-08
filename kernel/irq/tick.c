@@ -1,6 +1,9 @@
 #include "tick.h"
 #include "io.h"
 #include "irq.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 
 static struct tick_slot slots[TICK_SLOT_COUNT];
 
@@ -20,6 +23,14 @@ int tick_register(unsigned int slot, tick_fn fn)
 void tick_dispatch(void)
 {
     for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {
-        if (slots[slot].fn) slots[slot].fn();
+        if (slots[slot].fn) {
+#ifdef TICK_PROBE
+            tick_probe_begin(TP_SLOT0 + slot);
+#endif
+            slots[slot].fn();
+#ifdef TICK_PROBE
+            tick_probe_end(TP_SLOT0 + slot);
+#endif
+        }
     }
 }

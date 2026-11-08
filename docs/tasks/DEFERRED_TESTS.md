@@ -30,6 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| TICK-A-MEASURE | A0/A1 の NP21/W・実機の負荷実測、IRQ 要求/配送の外部突合、raw ASM/モジュールを含む非 IRQ IF=0 の全区間 | 段 A1 の依頼は計測の道具と host 検証のみ。TSC 不可機の時間・IRQ1/IRQ10 遅延・外部要求欠落は未測定、常駐 C の IF=0 計測だけで全区間の合格にはしない | [TASK_TICK_1KHZ](v3/TASK_TICK_1KHZ.md) 段 A の実測・ゲート、B より前 |
 | PPC-BOOT-RH | ppc-boot の実機確認: QuickSilver と Apple OF 4.x での ELF・NOTE の受理、0x20000 の非衝突、stdout=screen の OF 行、`map` の可否 (窓 0x20 は PA がページ境界でない)、ch-a の open | 実機が動くか未確認 (ユーザー 2026-11-07)。QEMU では `map` の効果を証明できない | [TASK_PPC_BOOT](ppc/TASK_PPC_BOOT.md) §3、実機が動くと分かった時 |
 | PPC-MMU-RH | ppc-mmu の実機確認: 7450/7455 の HIGH_BAT と HID0 の手順、実機の DEC の pending、キャッシュと WIMG、OF の後の ESCC の配線。切り離しの後の観測路 (FB) が先に要る | 実機が動くか未確認 (ユーザー 2026-11-07)、QEMU はキャッシュと送信の律を測れない | [TASK_PPC_MMU](ppc/TASK_PPC_MMU.md)、実機が動くと分かった時 |
 | GF-DRIVER-P0 | `check-video-service-host` の GF/Trident・REPEAT/待ち/退避は P0 の fake 契約例。製品 runner・27命令・P3 PLL と実機の正常stop/途中失敗は未検証 | P0 は宣言と契約の段で製品実体が無い。NP21/W・実機は本依頼の対象外 | P2 で実体の結合試験、P3 で表示PLLの失敗/commit、P6 で実機受入（TASK_GF_DRIVER） |

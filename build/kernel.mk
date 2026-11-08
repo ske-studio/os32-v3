@@ -180,3 +180,17 @@ splash-obs-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
 kernel-pcm-e4-diag:
 	$(MAKE) BUILD_OUT=$(BUILD_OUT)/pcm-e4-diag PCM_E4_DIAG_BUILD=1 pcm-e4-diag-image
 pcm-e4-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
+
+# A1 remains 100Hz; all objects and paired modules live under tick-probe/.
+.PHONY: kernel-tick-probe tick-probe-image
+kernel-tick-probe:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/tick-probe TICK_PROBE_BUILD=1 tick-probe-image
+tick-probe-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) $(BUILD_OUT)/tickprobe.bin
+
+$(BUILD_OUT)/tickprobe.elf: userland/diag/tickprobe.c kernel/time/tick_probe.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
+	$(CC) $(PROGRAM_FLAGS) -c $< -o $(BUILD_OUT)/tickprobe.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BUILD_OUT)/tickprobe.o -lc -lgcc
+$(BUILD_OUT)/tickprobe.raw: $(BUILD_OUT)/tickprobe.elf
+	$(OBJCOPY) -O binary $< $@
+$(BUILD_OUT)/tickprobe.bin: $(BUILD_OUT)/tickprobe.raw $(BUILD_OUT)/tickprobe.elf
+	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/tickprobe.elf --api 78 --cui-only
