@@ -196,7 +196,7 @@ COMPONENTS = (
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          # F16 v2 context loans diagnostic ops (including poll), like GeForce;
          # get_probe_decls appends the private probe declaration export.
-         stop_allowed=0, ops_version=4, ops_slots=4,
+         stop_allowed=0, ops_version=5, ops_slots=4,
          image_max=65536, mem_max=65536, load_span_max=81920,
          reloc_max=2048, export_max=4,
          init_symbol='trident_module_init', imports_symbol='trident_import_slots',

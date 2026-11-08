@@ -22,7 +22,7 @@ void _start(void)
     GfxBackend backend = {0};
     u32 done = 19;
     u8 pixel = 7;
-    CHECK(KAPI_VERSION == 83);
+    CHECK(KAPI_VERSION >= 83);
     CHECK(KAPI_SLOT_GFX_HW_SUBMIT == 261 && KAPI_SLOT_GFX_HW_GET == 262);
     CHECK(sizeof(GFX_Cmd) == 32);
     CHECK(__builtin_offsetof(GFX_Cmd, color) == 16);

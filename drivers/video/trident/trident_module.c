@@ -1,4 +1,6 @@
 #include "debug_probe.h"
+#include "init/sysconfig.h"
+#include "kernel/time/cpu_calibrate.h"
 /* Resident loans and pin precede prepare/arm; no hardware initialization here. */
 #include "trident_module.h"
 #include "trident_imports.h"
@@ -112,7 +114,7 @@ static int diagnostics_valid(const struct module_record *r)
         (u32)(uptr)d->video_set_key, (u32)(uptr)d->video_stop,
         (u32)(uptr)d->poll, (u32)(uptr)d->video_surface_alloc,
         (u32)(uptr)d->video_surface_display, (u32)(uptr)d->video_surface_stop,
-        (u32)(uptr)d->video_surface_free, (u32)(uptr)d->present
+        (u32)(uptr)d->video_surface_free, (u32)(uptr)d->present, (u32)(uptr)d->set_gap
     };
     for (u32 i = 0; i < sizeof(entries)/sizeof(entries[0]); ++i)
         if (entries[i] && !module_text_contains(r, entries[i])) return 0;
@@ -193,6 +195,9 @@ int trident_module_load(void)
         kprintf(KLOG_ATTR, "[trident] stage=resources rc=%d\n", TRI_E_RESOURCE);
         return TRI_E_RESOURCE;
     }
+    int gap_ns = sysconfig_get_int(SYS_SYSTEM_CFG, "TRI_WRITE_GAP", TRI_WRITE_GAP_DEFAULT_NS);
+    context.write_gap_ns = gap_ns < 0 ? TRI_WRITE_GAP_DEFAULT_NS : (u32)gap_ns;
+    context.write_gap_lpt = cpu_loops_per_tick();
     const struct boot_common *bi = boot_common_get();
     const struct module_request request = {
         .path=SYS_TRIDENT_MOD, .name="trident",

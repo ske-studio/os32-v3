@@ -77,7 +77,7 @@ static int test(void)
       }
     /* Independent row oracle: every destination alignment and short tail,
      * with an unaligned RAM source on alternating rows. */
-    for (u32 method = TRI_PRESENT_DWORD_SYNC; method <= TRI_PRESENT_DWORD_PLAIN; ++method) {
+    for (u32 method = TRI_PRESENT_DWORD_SYNC; method <= TRI_PRESENT_DWORD_GAP; ++method) {
         d.present_method = (enum tri_present_method)method;
         f.resources.ram_fallback = true;
         d.mode.client = (struct tri_surface){.bytes=51, .pitch=17,
@@ -101,7 +101,7 @@ static int test(void)
                               e->offset == dst+i && e->width == n && !e->rc);
                         for (u32 b = 0; b < n; ++b)
                             CHECK(vram[dst+i+b] == client[row*17+i+b]);
-                        if (n == 4 && method != TRI_PRESENT_DWORD_PLAIN) {
+                        if (n == 4 && method != TRI_PRESENT_DWORD_GAP) {
                             CHECK(at < f.trace_count);
                             e = &trace[at++];
                             CHECK(e->width == 1 && !e->rc);
@@ -119,7 +119,7 @@ static int test(void)
         }
         /* The dword write and its following read/wait propagate failure. */
         d.mode.display.off = 32;
-        for (u32 fault = 1; fault <= (method == TRI_PRESENT_DWORD_PLAIN ? 1u : 2u); ++fault) {
+        for (u32 fault = 1; fault <= (method == TRI_PRESENT_DWORD_GAP ? 1u : 2u); ++fault) {
             trident_fake_trace_reset(&f);
             trident_fake_fail(&f, f.operations + fault, -79);
             CHECK(trident_present(&d,0,0,4,1) == -79 && f.trace_count == fault);

@@ -3,8 +3,8 @@
 #define TRIDENT_MODULE_H
 #include "gfx_hal.h"
 #include "trident.h"
-#define TRIDENT_MODULE_OPS_VERSION 4u
-#define TRIDENT_DIAGNOSTIC_OPS_VERSION 2u
+#define TRIDENT_MODULE_OPS_VERSION 5u
+#define TRIDENT_DIAGNOSTIC_OPS_VERSION 3u
 /* F10 publishes this table and the production device through diagnostic_out.
  * The table is module resident and immutable; context borrows F10's device,
  * never a second diagnostic device. F13 validates the complete table and
@@ -65,6 +65,7 @@ struct TridentDiagnosticOps {
     int (*video_surface_stop)(struct trident_device *, struct tri_video_surface *);
     int (*video_surface_free)(struct trident_device *, struct tri_video_surface *);
     int (*present)(struct trident_device *, int, int, int, int);
+    void (*set_gap)(struct trident_device *, u32 ns);
 };
 #define TRIDENT_DIAGNOSTIC_OPS_SIZE ((u32)sizeof(struct TridentDiagnosticOps))
 /* All loans (including backend, counters and scalar addresses) are kernel
@@ -73,8 +74,8 @@ struct TridentDiagnosticOps {
  * Loader validates initialize/prepare/restore text and pins before arm.
  * prepare only inspects descriptors; it must not invoke Init or indexed I/O.
  * Optional GfxBackend slots are NULL or validated module text (F13).
- * The version-1 prefix is unchanged; version 2 appends the diagnostic output
- * slot and context size. Both sides require size == TRIDENT_MODULE_CONTEXT_SIZE
+ * The retained prefix includes the diagnostic output slot and context size;
+ * version 4 appends the boot gap and CPU calibration. Both sides require size == TRIDENT_MODULE_CONTEXT_SIZE
  * before using diagnostic_out. The module ops version gates this
  * larger context; initialize/prepare/restore retain their existing slots. */
 typedef struct TridentModuleContext {
@@ -86,6 +87,7 @@ typedef struct TridentModuleContext {
     int (*display_owner)(void); /* current owner on every return, not arm owner */
     u32 size;
     const struct TridentDiagnosticOps **diagnostic_out; /* kernel static slot */
+    u32 write_gap_ns, write_gap_lpt;
 } TridentModuleContext;
 #define TRIDENT_MODULE_CONTEXT_SIZE ((u32)sizeof(TridentModuleContext))
 struct probe_decl;

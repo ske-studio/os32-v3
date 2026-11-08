@@ -291,9 +291,9 @@ static int present_compare(const struct TridentDiagnosticOps *o)
     if (!d->res->ram_fallback || !o->present || !d->io || !d->io->read8)
         return optional(o, "present_precheck", TRI_E_NOSYS);
     enum tri_present_method saved = d->present_method;
-    static const char *const names[] = {"byte", "dword_sync", "dword_wait", "dword_plain"};
+    static const char *const names[] = {"byte", "dword_sync", "dword_wait", "dword_gap"};
     int result = 0;
-    for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_PLAIN; ++method) {
+    for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_GAP; ++method) {
         const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
         u32 minimum = (u32)-1, maximum = 0, count = 0, mismatches = 0;
         unsigned long long total = 0;
@@ -340,6 +340,89 @@ static int present_compare(const struct TridentDiagnosticOps *o)
         remember(&result, rc);
     }
     d->present_method = saved;
+    return result;
+}
+/* Alternate the image so lost writes cannot match already-correct VRAM.
+ * Only visible CLIENT bytes change; eight inversions preserve the image. */
+static void gap_invert(struct trident_device *d)
+{
+    const struct tri_surface *c = &d->mode.client;
+    for (u32 y = 0; y < c->height; ++y)
+        for (u32 x = 0; x < (u32)c->width * c->cpp; ++x)
+            d->res->client[y * c->pitch + x] ^= 0xffu;
+}
+/* Each interval verifies all eight frames, outside the timed writes. */
+static int gap_command(const struct TridentDiagnosticOps *o, const struct tri_request *q)
+{
+    struct trident_device *d = o->context;
+    if (q->test == TRI_TEST_GAP || q->test == TRI_TEST_GAP_SET) {
+        if (q->test == TRI_TEST_GAP_SET) {
+            if (!o->set_gap) return optional(o, "gap", TRI_E_NOSYS);
+            o->set_gap(d, q->arg);
+        }
+        ++result_count;
+        number("TRI phase=gap gap_ns=", d->write_gap_ns);
+        number(" loops=", d->write_gap_loops);
+        serial_puts_polled(" rc=0\r\n");
+        return TRI_OK;
+    }
+    if (!o->set_gap || !o->present || !d->res->ram_fallback ||
+        !d->io || !d->io->read8) return optional(o, "gap_precheck", TRI_E_NOSYS);
+    u32 saved_ns = d->write_gap_ns;
+    enum tri_present_method saved_method = d->present_method;
+    int result = 0;
+    d->present_method = TRI_PRESENT_DWORD_GAP;
+    for (u32 ns = q->arg;;) {
+        o->set_gap(d, ns);
+        const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
+        u32 minimum = (u32)-1, maximum = 0, count = 0, bad = 0;
+        unsigned long long total = 0;
+        int rc = 0;
+        bool inverted = false;
+        for (u32 frame = 0; frame < TRI_PRESENT_RUNS; ++frame) {
+            gap_invert(d);
+            inverted = !inverted;
+            u32 before, after, hi;
+            rc = sys_time_now(&before, &hi);
+            if (rc) break;
+            rc = o->present(d, 0, 0, c->width, c->height);
+            if (rc) break;
+            rc = sys_time_now(&after, &hi);
+            if (rc) break;
+            u32 elapsed = after - before;
+            if (elapsed < minimum) minimum = elapsed;
+            if (elapsed > maximum) maximum = elapsed;
+            total += elapsed;
+            ++count;
+            for (u32 row = 0; !rc && row < c->height; ++row) {
+                for (u32 i = 0; i < (u32)c->width * c->cpp; ++i) {
+                    u8 actual;
+                    rc = d->io->read8(d->io_opaque, TRI_SPACE_LFB,
+                                      v->off + row * v->pitch + i, &actual);
+                    if (rc) break;
+                    if (actual != d->res->client[row * c->pitch + i]) ++bad;
+                }
+            }
+            if (rc) break;
+        }
+        if (inverted) gap_invert(d); /* Also restore CLIENT after an early error. */
+        if (!rc && bad) rc = TRI_E_ACCESS;
+        ++result_count;
+        number("TRI phase=gap gap_ns=", d->write_gap_ns);
+        number(" loops=", d->write_gap_loops);
+        number(" count=", count);
+        number(" min_us=", count ? minimum : 0);
+        number(" max_us=", maximum);
+        number(" avg_us=", count == TRI_PRESENT_RUNS ? (u32)(total >> 3) : 0);
+        number(" mismatches=", bad);
+        serial_puts_polled(" rc="); serial_diag_i32(rc);
+        serial_puts_polled("\r\n");
+        remember(&result, rc);
+        if (q->end_ns - ns < q->step_ns) break;
+        ns += q->step_ns;
+    }
+    o->set_gap(d, saved_ns);
+    d->present_method = saved_method;
     return result;
 }
 static int dpms(const struct TridentDiagnosticOps *o)
@@ -444,8 +527,11 @@ i32 trident_command_call(void *buf, u32 size)
     result_count = 0;
     int rc;
     if (q.version != TRI_COMMAND_VERSION || q.size != sizeof(q) ||
-        q.test > TRI_TEST_PRESENT || q.rc || q.result_count ||
-        (q.test != TRI_TEST_MODE && q.arg) ||
+        q.test > TRI_TEST_GAP_SWEEP || q.rc || q.result_count ||
+        (q.test != TRI_TEST_GAP_SWEEP && (q.end_ns || q.step_ns)) ||
+        (q.test == TRI_TEST_GAP_SWEEP && (!q.step_ns || q.arg > q.end_ns)) ||
+        (q.test != TRI_TEST_MODE && q.test != TRI_TEST_GAP_SET &&
+         q.test != TRI_TEST_GAP_SWEEP && q.arg) ||
         (q.test == TRI_TEST_MODE && (!q.arg || q.arg > TRI_MODE_COUNT))) {
         rc = TRI_E_INVAL;
         goto reply;
@@ -479,6 +565,8 @@ i32 trident_command_call(void *buf, u32 size)
     case TRI_TEST_CPU32: rc = cpu32(o); break;
     case TRI_TEST_POLL: rc = poll_video(o); break;
     case TRI_TEST_PRESENT: rc = present_compare(o); break;
+    case TRI_TEST_GAP: case TRI_TEST_GAP_SET: case TRI_TEST_GAP_SWEEP:
+        rc = gap_command(o, &q); break;
     default: rc = TRI_E_INVAL; break;
     }
     optional(o, "end", rc);

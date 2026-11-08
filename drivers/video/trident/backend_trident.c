@@ -193,10 +193,9 @@ int trident_backend_prepare(void)
     int rc = trident_pci_validate(&r->pci);
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
     device.settings.ram_fallback = r->ram_fallback;
-    /* Ra266 2026-11-08 (tri present, 640x480x8, 8 frames each, 0 mismatches):
-     * dword_plain 26ms, dword_sync 81ms, byte 104ms, dword_wait 134ms.
-     * Per-call stores stay intact; only tight block stores (rep) were lost. */
-    device.present_method = TRI_PRESENT_DWORD_PLAIN;
+    device.present_method = TRI_PRESENT_DWORD_GAP;
+    device.write_gap_lpt = c->write_gap_lpt;
+    tri_write_gap_set(&device, c->write_gap_ns);
     if (!device.active) {
         struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
         if (r->ram_fallback || device.settings.no_accel)
@@ -579,7 +578,7 @@ static const struct TridentDiagnosticOps diagnostics = {
     .video_surface_display = tri_video_surface_display,
     .video_surface_stop = tri_video_surface_stop,
     .video_surface_free = tri_video_surface_free,
-    .present = trident_present
+    .present = trident_present, .set_gap = tri_write_gap_set
 };
 
 GfxBackend trident_backend_ops = {

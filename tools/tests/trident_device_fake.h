@@ -15,6 +15,7 @@ struct trident_fake_event {
     int rc;
 };
 struct trident_fake {
+    u32 gap_loops, gap_calls;
     struct trident_resources resources;
     /* Inferred VGA decode: MISC bit0 selects color(1)/mono(0); inactive
      * index/data/status read FF, ignore writes and do not reset AR flip. */

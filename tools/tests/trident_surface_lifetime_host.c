@@ -81,7 +81,7 @@ static void run(void)
     static TridentModuleContext context;
     context = (TridentModuleContext){&gfx_backend_trident, &gfx_counters, r,
         gfx_arm_emergency, &gfx_current_height, &gfx_flip_enabled, &gfx_display_page,
-        life_owner, TRIDENT_MODULE_CONTEXT_SIZE, &life_diagnostic};
+        life_owner, TRIDENT_MODULE_CONTEXT_SIZE, &life_diagnostic, 300, 1000000};
     trident_context = &context;
     device.settings.vram_bytes = 307200u - 1u;
     gfx_prepare_backend();

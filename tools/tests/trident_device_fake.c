@@ -269,8 +269,22 @@ static int write_span32(void *opaque, u32 off, const u32 *src, u32 count)
     if (f->trace_count > before) f->trace[before].count = count;
     return rc;
 }
+static int write_gap32(void *opaque, u32 off, const u8 *src, u32 count, u32 loops)
+{
+    struct trident_fake *f = opaque;
+    f->gap_loops = loops;
+    ++f->gap_calls;
+    for (u32 i = 0; i < count; ++i) {
+        const u8 *p = src + i * 4u;
+        u32 value = (u32)p[0] | ((u32)p[1] << 8) |
+                    ((u32)p[2] << 16) | ((u32)p[3] << 24);
+        int rc = write32(opaque, TRI_SPACE_LFB, off + i * 4u, value);
+        if (rc) return rc;
+    }
+    return TRI_OK;
+}
 const struct trident_io trident_fake_io = {
     .read8 = read8, .read16 = read16, .read32 = read32,
     .write8 = write8, .write16 = write16, .write32 = write32, .port8 = port8,
-    .write_span32 = write_span32
+    .write_span32 = write_span32, .write_gap32 = write_gap32
 };

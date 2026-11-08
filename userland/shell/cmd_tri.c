@@ -5,6 +5,19 @@
 /* kdebug_call became available at this KAPI version (cmd_gf2.c). */
 #define TRI_KAPI_MIN 78U
 
+static int tri_number(const char *s, u32 *out)
+{
+    if (!*s) return 0;
+    u32 n = 0;
+    for (; *s; ++s) {
+        if (*s < '0' || *s > '9') return 0;
+        u32 digit = (u32)(*s - '0');
+        if (n > ((u32)-1 - digit) / 10U) return 0;
+        n = n * 10U + digit;
+    }
+    *out = n;
+    return 1;
+}
 int shell_cmd_tri(int argc, char **argv)
 {
     static const char *const cases[] = {
@@ -20,6 +33,20 @@ int shell_cmd_tri(int argc, char **argv)
     struct tri_request req = {0};
 
     if (argc < 2) goto usage;
+    if (str_eq(argv[1], "gap")) {
+        req.test = TRI_TEST_GAP;
+        if (argc == 3) {
+            req.test = TRI_TEST_GAP_SET;
+            if (!tri_number(argv[2], &req.arg)) goto usage;
+        } else if (argc == 6 && str_eq(argv[2], "sweep")) {
+            req.test = TRI_TEST_GAP_SWEEP;
+            if (!tri_number(argv[3], &req.arg) ||
+                !tri_number(argv[4], &req.end_ns) ||
+                !tri_number(argv[5], &req.step_ns) ||
+                !req.step_ns || req.arg > req.end_ns) goto usage;
+        } else if (argc != 2) goto usage;
+        goto dispatch;
+    }
     for (req.test = 0; req.test < sizeof(cases) / sizeof(cases[0]); ++req.test)
         if (str_eq(argv[1], cases[req.test])) break;
     if (req.test == sizeof(cases) / sizeof(cases[0])) goto usage;
@@ -34,6 +61,7 @@ int shell_cmd_tri(int argc, char **argv)
         if (!req.arg) goto usage;
     } else if (argc != 2) goto usage;
 
+dispatch:
     if (g_api->version < TRI_KAPI_MIN || !g_api->kdebug_call) {
         g_api->kprintf(ATTR_RED, "tri: rejected rc=%d result_count=0 kdebug unavailable\n",
                        OS32_ERR_NOSYS);
@@ -48,6 +76,6 @@ int shell_cmd_tri(int argc, char **argv)
     return rc || req.rc ? SH_STATUS_ERROR : SH_STATUS_OK;
 usage:
     g_api->kprintf(ATTR_WHITE,
-                   "Usage: tri all|modes|mode <number>|dpms|cursor|cpu32|poll|present\n");
+                   "Usage: tri all|modes|mode <number>|dpms|cursor|cpu32|poll|present|gap [<ns>|sweep <start> <end> <step>]\n");
     return SH_STATUS_USAGE;
 }

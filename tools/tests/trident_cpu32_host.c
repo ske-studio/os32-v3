@@ -92,7 +92,7 @@ void serial_puts_polled(const char *s)
         if (same(s, "byte")) bench_method |= 1;
         if (same(s, "dword_sync")) bench_method |= 2;
         if (same(s, "dword_wait")) bench_method |= 4;
-        if (same(s, "dword_plain")) bench_method |= 8;
+        if (same(s, "dword_gap")) bench_method |= 8;
         return;
     }
     if (wrapper) {
