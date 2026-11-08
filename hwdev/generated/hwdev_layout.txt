@@ -38,6 +38,32 @@ offset	DirEntry_Ext.size	256
 member_size	DirEntry_Ext.size	4
 offset	DirEntry_Ext.type	260
 member_size	DirEntry_Ext.type	1
+size	GFX_Cmd	32
+align	GFX_Cmd	4
+offset	GFX_Cmd.color	16
+member_size	GFX_Cmd.color	4
+offset	GFX_Cmd.data	24
+member_size	GFX_Cmd.data	4
+offset	GFX_Cmd.h	10
+member_size	GFX_Cmd.h	2
+offset	GFX_Cmd.key	20
+member_size	GFX_Cmd.key	4
+offset	GFX_Cmd.op	0
+member_size	GFX_Cmd.op	2
+offset	GFX_Cmd.pitch	28
+member_size	GFX_Cmd.pitch	4
+offset	GFX_Cmd.rop	2
+member_size	GFX_Cmd.rop	2
+offset	GFX_Cmd.sx	12
+member_size	GFX_Cmd.sx	2
+offset	GFX_Cmd.sy	14
+member_size	GFX_Cmd.sy	2
+offset	GFX_Cmd.w	8
+member_size	GFX_Cmd.w	2
+offset	GFX_Cmd.x	4
+member_size	GFX_Cmd.x	2
+offset	GFX_Cmd.y	6
+member_size	GFX_Cmd.y	2
 size	GFX_Color	3
 align	GFX_Color	1
 offset	GFX_Color.b	2
@@ -400,6 +426,10 @@ offset	KernelAPI.gfx_hw_blit	688
 member_size	KernelAPI.gfx_hw_blit	4
 offset	KernelAPI.gfx_hw_fill_rect	684
 member_size	KernelAPI.gfx_hw_fill_rect	4
+offset	KernelAPI.gfx_hw_get	1056
+member_size	KernelAPI.gfx_hw_get	4
+offset	KernelAPI.gfx_hw_submit	1052
+member_size	KernelAPI.gfx_hw_submit	4
 offset	KernelAPI.gfx_init	8
 member_size	KernelAPI.gfx_init	4
 offset	KernelAPI.gfx_init_200	12
@@ -498,8 +528,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1052
-member_size	KernelAPI.kapi_reserved	156
+offset	KernelAPI.kapi_reserved	1060
+member_size	KernelAPI.kapi_reserved	148
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1204,7 +1234,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	112
+size	struct GfxBackend	148
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1224,14 +1254,22 @@ offset	struct GfxBackend.cursor_show	92
 member_size	struct GfxBackend.cursor_show	4
 offset	struct GfxBackend.default_mode	70
 member_size	struct GfxBackend.default_mode	2
+offset	struct GfxBackend.direct_ok	116
+member_size	struct GfxBackend.direct_ok	4
+offset	struct GfxBackend.direct_ops	136
+member_size	struct GfxBackend.direct_ops	4
 offset	struct GfxBackend.dpms	80
 member_size	struct GfxBackend.dpms	4
 offset	struct GfxBackend.enter	28
 member_size	struct GfxBackend.enter	4
 offset	struct GfxBackend.fill_rect	36
 member_size	struct GfxBackend.fill_rect	4
+offset	struct GfxBackend.fill_rop	120
+member_size	struct GfxBackend.fill_rop	4
 offset	struct GfxBackend.gamma	104
 member_size	struct GfxBackend.gamma	4
+offset	struct GfxBackend.get	132
+member_size	struct GfxBackend.get	4
 offset	struct GfxBackend.init	8
 member_size	struct GfxBackend.init	4
 offset	struct GfxBackend.leave	32
@@ -1240,18 +1278,24 @@ offset	struct GfxBackend.mode_count	68
 member_size	struct GfxBackend.mode_count	2
 offset	struct GfxBackend.modes	64
 member_size	struct GfxBackend.modes	4
+offset	struct GfxBackend.mono	128
+member_size	struct GfxBackend.mono	4
 offset	struct GfxBackend.name	0
 member_size	struct GfxBackend.name	4
 offset	struct GfxBackend.osri_show	108
 member_size	struct GfxBackend.osri_show	4
 offset	struct GfxBackend.page_flip	100
 member_size	struct GfxBackend.page_flip	4
+offset	struct GfxBackend.policy	112
+member_size	struct GfxBackend.policy	1
 offset	struct GfxBackend.prepare	60
 member_size	struct GfxBackend.prepare	4
 offset	struct GfxBackend.present_rect	20
 member_size	struct GfxBackend.present_rect	4
 offset	struct GfxBackend.probe	4
 member_size	struct GfxBackend.probe	4
+offset	struct GfxBackend.put	124
+member_size	struct GfxBackend.put	4
 offset	struct GfxBackend.query	12
 member_size	struct GfxBackend.query	4
 offset	struct GfxBackend.selected_mode	72
@@ -1260,6 +1304,10 @@ offset	struct GfxBackend.set_mode	76
 member_size	struct GfxBackend.set_mode	4
 offset	struct GfxBackend.set_palette	24
 member_size	struct GfxBackend.set_palette	4
+offset	struct GfxBackend.shadow_blit	144
+member_size	struct GfxBackend.shadow_blit	4
+offset	struct GfxBackend.shadow_fill_rect	140
+member_size	struct GfxBackend.shadow_fill_rect	4
 offset	struct GfxBackend.shutdown	16
 member_size	struct GfxBackend.shutdown	4
 offset	struct GfxBackend.vsync	96
@@ -1290,6 +1338,20 @@ offset	struct GfxCursorImage.pitch	8
 member_size	struct GfxCursorImage.pitch	4
 offset	struct GfxCursorImage.width	12
 member_size	struct GfxCursorImage.width	4
+size	struct GfxDirectOps	24
+align	struct GfxDirectOps	4
+offset	struct GfxDirectOps.blit	4
+member_size	struct GfxDirectOps.blit	4
+offset	struct GfxDirectOps.fill_rect	0
+member_size	struct GfxDirectOps.fill_rect	4
+offset	struct GfxDirectOps.fill_rop	8
+member_size	struct GfxDirectOps.fill_rop	4
+offset	struct GfxDirectOps.get	20
+member_size	struct GfxDirectOps.get	4
+offset	struct GfxDirectOps.mono	16
+member_size	struct GfxDirectOps.mono	4
+offset	struct GfxDirectOps.put	12
+member_size	struct GfxDirectOps.put	4
 size	struct GfxFormatDesc	6
 align	struct GfxFormatDesc	2
 offset	struct GfxFormatDesc.bits_per_plane	3

@@ -130,6 +130,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
+| v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -1749,7 +1750,7 @@ B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存ア�
 
 ### 予約スロット (v63〜)
 
-0x41C〜0x4B4 (slot 261〜299、39 本、v82 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x424〜0x4B4 (slot 263〜299、37 本、v83 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2126,6 +2127,8 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x410 | ime_dict_suspend | `int(int on)` |
 | 0x414 | host_notice_read | `int(u32 generation, u32 service, HostNotice *out)` |
 | 0x418 | host_notice_serial | `u32(void)` |
+| 0x41C | gfx_hw_submit | `int(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done)` |
+| 0x420 | gfx_hw_get | `int(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

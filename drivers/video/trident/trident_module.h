@@ -3,7 +3,7 @@
 #define TRIDENT_MODULE_H
 #include "gfx_hal.h"
 #include "trident.h"
-#define TRIDENT_MODULE_OPS_VERSION 3u
+#define TRIDENT_MODULE_OPS_VERSION 4u
 #define TRIDENT_DIAGNOSTIC_OPS_VERSION 2u
 /* F10 publishes this table and the production device through diagnostic_out.
  * The table is module resident and immutable; context borrows F10's device,

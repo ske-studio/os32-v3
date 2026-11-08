@@ -266,15 +266,17 @@ typedef struct {
     int (__cdecl *ime_dict_suspend)(int on);
     int (__cdecl *host_notice_read)(u32 generation, u32 service, HostNotice *out);
     u32 (__cdecl *host_notice_serial)(void);
-    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、39 本)。末尾追記はここを削って使う */
-    i32 (__cdecl *kapi_reserved[39])(void);
+    int (__cdecl *gfx_hw_submit)(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done);
+    int (__cdecl *gfx_hw_get)(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen);
+    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、37 本)。末尾追記はここを削って使う */
+    i32 (__cdecl *kapi_reserved[37])(void);
     u32 sbrk_heap_limit;  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     u32 shm_base;  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 } KernelAPI;
 
-#define KAPI_FUNC_COUNT 261
+#define KAPI_FUNC_COUNT 263
 #define KAPI_FUNC_CAPACITY 300
-#define KAPI_FUNC_RESERVED 39
+#define KAPI_FUNC_RESERVED 37
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 302
 #define KAPI_DATA_IDX_SHM_BASE 303

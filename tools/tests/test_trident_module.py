@@ -109,7 +109,7 @@ def product(work,runners):
         spec['version'],spec['generations']['memory_layout'],module_id=13)
     assert rebuilt==data
     contract=dict(kapi=spec['version'],layout=spec['generations']['memory_layout'],
-        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=3,img_valid=1,module_id=13,
+        abi=meta['module_abi_gen'],pair=mkmod.pair_crc(kernel),ops=4,img_valid=1,module_id=13,
         imports=[(fnv(e['name']),e['type_ver'],e['kind']) for e in meta['imports']],
         exports=[(i,fnv(n),1) for i,n in enumerate(('initialize','prepare','restore','get_probe_decls'),1)])
     exe=build_validator(work)
