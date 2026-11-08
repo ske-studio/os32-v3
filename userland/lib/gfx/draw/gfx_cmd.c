@@ -71,6 +71,7 @@ int gfx_cmd_enqueue_fill(int x, int y, int w, int h, u8 color, u8 rop)
 {
     int rc, sx = x, sy = y;
     if (w <= 0 || h <= 0 || rop > 1) return OS32_ERR_INVAL;
+    if (!gfx_direct) return OS32_ERR_NOSYS;
     if (!clip_axis(&x, &sx, &w, gfx_fb.width) ||
         !clip_axis(&y, &sy, &h, gfx_fb.height)) return 0;
     if (!rect_valid(x, y, w, h)) return OS32_ERR_INVAL;
@@ -85,6 +86,7 @@ int gfx_cmd_enqueue_copy(int dx, int dy, int sx, int sy, int w, int h)
 {
     int rc;
     if (w <= 0 || h <= 0) return OS32_ERR_INVAL;
+    if (!gfx_direct) return OS32_ERR_NOSYS;
     if (!clip_axis(&dx, &sx, &w, gfx_fb.width) ||
         !clip_axis(&dy, &sy, &h, gfx_fb.height)) return 0;
     if (!rect_valid(dx, dy, w, h) || !rect_valid(sx, sy, w, h))

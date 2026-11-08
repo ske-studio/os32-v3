@@ -67,6 +67,8 @@ void _start(void)
     CHECK(!gfx_flush() && calls == 0);
     gfx_direct = 0;
     CHECK(gfx_cmd_enqueue_fill(0, 0, 1, 1, 0, 0) == OS32_ERR_NOSYS);
+    CHECK(gfx_cmd_enqueue_fill(-10, -10, 1, 1, 0, 0) == OS32_ERR_NOSYS);
+    CHECK(gfx_cmd_enqueue_copy(-10, -10, 0, 0, 1, 1) == OS32_ERR_NOSYS);
     gfx_direct = 1;
     for (int i = 0; i < 65; i++)
         CHECK(!gfx_cmd_enqueue_fill(i, 0, 1, 1, i, i & 1));
