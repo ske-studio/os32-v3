@@ -186,3 +186,23 @@ jobs:
           test -x "$CROSS_DIR/bin/i386-elf-gcc"
           test -f "$CROSS_DIR/i386-elf/include/stdio.h"
           make check-fast CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+
+      # 検査ごとの実時間 (tools/check_time.py: 検査名・経過秒数・終了コード) を残し、
+      # budget の棚卸の材料にする (2026-11-08、budget 超えは警告だけで結果は落とさない)。
+      - name: Collect check times
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/check-times"
+          if [ -f build/out/check_times.tsv ]; then
+            cp build/out/check_times.tsv "$RUNNER_TEMP/check-times/"
+          else
+            echo 'check_times.tsv unavailable' > "$RUNNER_TEMP/check-times/missing.txt"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-times-${{ github.sha }}
+          path: ${{ runner.temp }}/check-times/
+          retention-days: 30
+          if-no-files-found: error

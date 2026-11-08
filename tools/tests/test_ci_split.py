@@ -42,7 +42,11 @@ def workflow_cases(source):
         checks = [s for s in steps if s.get('name') == 'make check-fast']
         uploads = [s for s in steps if s.get('uses') == 'actions/upload-artifact@v4']
         assert bool(checks) == (name == 'check-fast'), 'check placement'
-        assert bool(uploads) == (name == 'artifacts'), 'upload placement'
+        if name == 'check-fast':
+            # 検査ごとの実時間だけを上げる (budget の棚卸、2026-11-08)。
+            assert [u['with']['name'] for u in uploads] == ['check-times-${{ github.sha }}'], 'check-fast uploads only check times'
+        else:
+            assert bool(uploads) == (name == 'artifacts'), 'upload placement'
     assert prefixes[0] == prefixes[1], 'identical preparation and build'
     setup = yaml.safe_load(SETUP.read_text())
     assert setup['runs']['using'] == 'composite'
