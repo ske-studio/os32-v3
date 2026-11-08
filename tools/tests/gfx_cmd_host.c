@@ -67,6 +67,8 @@ void _start(void)
     CHECK(!gfx_flush() && calls == 0);
     gfx_direct = 0;
     CHECK(gfx_cmd_enqueue_fill(0, 0, 1, 1, 0, 0) == OS32_ERR_NOSYS);
+    CHECK(gfx_cmd_enqueue_fill(-10, -10, 1, 1, 0, 0) == OS32_ERR_NOSYS);
+    CHECK(gfx_cmd_enqueue_copy(-10, -10, 0, 0, 1, 1) == OS32_ERR_NOSYS);
     gfx_direct = 1;
     for (int i = 0; i < 65; i++)
         CHECK(!gfx_cmd_enqueue_fill(i, 0, 1, 1, i, i & 1));
@@ -74,6 +76,17 @@ void _start(void)
     CHECK(!gfx_flush() && count == 65 && seen[64].color == 64);
     CHECK(seen[1].rop == 1 && seen[1].x == 1);
     reset();
+    CHECK(!gfx_cmd_enqueue_fill(-100, -100, 10000, 10000, 3, 0));
+    CHECK(!gfx_flush() && count == 1 && seen[0].x == 0 && seen[0].y == 0 &&
+          seen[0].w == 800 && seen[0].h == 480);
+    reset();
+    CHECK(!gfx_cmd_enqueue_copy(-10, 470, 5, -5, 30, 30));
+    CHECK(!gfx_flush() && count == 1 && seen[0].x == 0 && seen[0].y == 475 &&
+          seen[0].sx == 15 && seen[0].sy == 0 && seen[0].w == 20 && seen[0].h == 5);
+    reset();
+    CHECK(!gfx_cmd_enqueue_fill(-2147483647-1, 0, 2147483647, 1, 0, 0));
+    CHECK(!gfx_cmd_enqueue_copy(0, 0, 2147483647, 0, 2147483647, 1));
+    CHECK(!gfx_flush() && calls == 0);
     for (u32 i = 0; i < sizeof data; i++) data[i] = i;
     CHECK(!gfx_cmd_enqueue_put(0, 0, 640, 6, data, 640, -1));
     CHECK(!gfx_cmd_enqueue_put(0, 0, 256, 1, data, 256, -1));
@@ -127,8 +140,8 @@ void _start(void)
     CHECK(!gfx_cmd_enqueue_fill(0, 0, 1, 1, 1, 0));
     gfx_cmd_drop();
     CHECK(!gfx_flush() && calls == 0);
-    CHECK(gfx_cmd_enqueue_fill(32768, 0, 1, 1, 0, 0) == OS32_ERR_INVAL);
-    CHECK(gfx_cmd_enqueue_copy(0, 0, -32769, 0, 1, 1) == OS32_ERR_INVAL);
+    CHECK(!gfx_cmd_enqueue_fill(32768, 0, 1, 1, 0, 0));
+    CHECK(!gfx_cmd_enqueue_copy(0, 0, -32769, 0, 1, 1));
     CHECK(gfx_cmd_enqueue_put(0, 0, 641, 1, data, 641, -1) == OS32_ERR_INVAL);
     CHECK(gfx_cmd_enqueue_put(0, 0, 2, 1, data, 1, -1) == OS32_ERR_INVAL);
     CHECK(gfx_cmd_enqueue_put(0, 0, 1, 3, data, 0xffffffffU, -1) == OS32_ERR_INVAL);

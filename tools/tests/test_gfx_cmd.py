@@ -18,6 +18,9 @@ CHECK = dict(name='gfx-cmd-host', tier=1, needs=[], budget=15, covers=[
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_cmd.c'
 MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (
+    ('fill-clipping', 'clip_axis(&x, &sx, &w, gfx_fb.width)', '((void)sx, w > 0)'),
+    ('copy-clipping', 'clip_axis(&dx, &sx, &w, gfx_fb.width)', '(w > 0)'),
+    ('copy-y-clipping', 'clip_axis(&dy, &sy, &h, gfx_fb.height)', '(h > 0)'),
     ('arena-offset', '(u32)(arena + q[i].data)', '(u32)arena'),
     ('arena-copy', 'out[b] = in[b];', 'out[b] = 0;'),
     ('mono-bit-offset', '(u32)(bx + b)', '(u32)(bx + b + 1)'),

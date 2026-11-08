@@ -52,6 +52,7 @@ SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/ut
 HEADERS = [p for p in TARGET_SRCS if p.endswith(".h")]
 CORE='userland/lib/gfx/libos32gfx_core.c'
 MUTANTS = [
+ ('lost-regen-missing', [(CORE, '    if (gfx_lost) gfx_regen = 1;', '    (void)gfx_lost;')], 'FAIL libos32gfx_take_regen() && !libos32gfx_take_regen()'),
  ('direct-mode-ignored', [(CORE, 'want == gfx_direct', '1')], 'FAIL !libos32gfx_check() && !gfx_direct && gfx_ready'),
  ('direct-generation-ignored', [(CORE, 'si.reserved[0] == gfx_gen', '1')], 'FAIL !libos32gfx_check() && gfx_direct && gfx_gen==direct_gen'),
  ('getchar-flush-missing', [(CORE, '    if (gfx_direct) (void)gfx_flush();\n    key = gfx_api->kbd_getchar();', '    key = gfx_api->kbd_getchar();')], 'FAIL flush_pending==0'),

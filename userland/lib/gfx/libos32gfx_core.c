@@ -211,6 +211,7 @@ int libos32gfx_check(void)
     }
     old_direct = gfx_direct;
     old_gen = gfx_gen;
+    if (gfx_lost) gfx_regen = 1;
     gfx_cmd_drop();
     libos32gfx_detach();
     gfx_lost = 0;
