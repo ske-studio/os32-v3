@@ -1,3 +1,5 @@
+/* Policy transitions are exercised separately by test_gfx_policy_triggers. */
+void gfx_policy_reeval(void) {}
 /* ========================================================================
  *  launch_host.c — 起動要求表を **実物のソースで** 確かめる
  *

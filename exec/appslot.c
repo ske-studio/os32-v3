@@ -13,6 +13,7 @@
 /* ======================================================================== */
 
 #include "appslot.h"
+#include "gfx_policy.h"
 #include "pgalloc.h"       /* §6 ownership/mapping management target sizeof */
 #include "os32_kapi_shared.h"   /* OS32_ERR_* / EXEC_ERR_* */
 #include "fd_redirect.h"       /* T9 §12 T1: リダイレクト表を ID の文脈にする */
@@ -547,7 +548,10 @@ extern void gf_display_owner_exit(int id) __attribute__((weak));
 void appslot_gfx_owner_exit(int id)
 {
     if (gf_display_owner_exit) gf_display_owner_exit(id);
-    if (g_gfx_owner == id) g_gfx_owner = GFX_OWNER_WM;
+    if (g_gfx_owner == id) {
+        g_gfx_owner = GFX_OWNER_WM;
+        gfx_policy_reeval();
+    }
 }
 
 #include "appslot_selftest.inc"
