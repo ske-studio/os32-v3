@@ -1,6 +1,6 @@
 # TASK_PCM_CS4231 — CS4231 (MATE-X PCM) の PCM 再生ドライバ (§5-5 の P1)
 
-> 状態: **受入待ち (2026-11-08)** — 着地済み・v2.1 に同梱。NP21/W で E0〜E4 合格 (E4 は 2026-11-04)、実装レビュー往復 2 で Approve。実機 Ra266 の pcm_test は main 5a29f69c で 3 回とも under/rep/resync 0・close 0。実機の聴取は 2026-11-08 に pcm_play で合格 (E6 の行)。残: E5 (NP21/W)。台帳から: H-4 (b)(c)。
+> 状態: **受入完了 (2026-11-08)** — 着地済み・v2.1 に同梱。NP21/W で E0〜E4 合格 (E4 は 2026-11-04)、実装レビュー往復 2 で Approve。実機 Ra266 の pcm_test は main 5a29f69c で 3 回とも under/rep/resync 0・close 0。実機の聴取は 2026-11-08 に pcm_play で合格 (E6 の行)。E5 (再生中の CTRL+STOP) は実機でユーザーが確かめた (E5 の行)。台帳から: H-4 (b)(c)。
 >
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-23) / それまでの状態: **実装済み・NP21/W で E0〜E3 合格 (2026-09-23、§3-1)。実装レビュー (Codex) 往復 1 = Request changes 5 件 (reclaim と restart の競合、close 入口の非原子性、close 期限の公開順、時計の巻き戻り判定、FAULTED 後の音量書き) → 修正済み (e301a61: 交互試験 7 ケース RED→GREEN、変異 30 本)。合流後に NP21/W で E3 を再確認 (5 秒 × 2 + 短いストリーム、close 0、fault site 0、kselftest 197/197)。**実装レビュー往復 2 = Approve** (P1〜P5 閉、新規 blocker 無し。非 blocker: claim のコメント、wrapper 経由の write 契約試験、交互試験の補強 3 件 — §3-1 の残件に)。E4/E5 は残件、E6 は実機**。
 > 正典の関係: `docs/archive/v3/PLAN.md` §5-5、土台は `TASK_HAL_WIRING` (1-1 割り込み、1-2 8237、1-3 プール、1-5 時計)、
@@ -254,7 +254,7 @@ close / reclaim が各状態から 1 度だけ解放すること)。
 | E2 | 合格: `np21w-trial-pcm-sndboard64.ini`、`pcm_test nodev` の対照 (§3 の受入条件) |
 | E3 | 合格 (採取できた範囲): `pcm_test` / `pcm_test short`、当時の観測は下記。**未実施**: 200ms 書込み停止、開始直後/close直前の採取、ミュートの別確認、8KBコピー時間 |
 | E4 | 合格 (2026-11-04): 診断の像 `make kernel-pcm-e4-diag` (Image CRC cda63788、7720e20c) を NP21/W `np21w-trial-pcm-sndboard64.ini` で起動し `pcm_test e4` が 5/5 PASS (pcm・fake・both・second・tick、leftover=0)。証明の範囲はソフトウェアの共有 — 電気的な共有は実機の 82557 で。証拠 `~/os32-tmp/evidence/2026-11-04/pcm-e4/` |
-| E5 | 未: 当時は再生中の CTRL+STOP 注入を実施できなかった。後続の回収試験を当時の合格にはしない |
+| E5 | 合格 (2026-11-08、実機 002b9bd0): 再生中の CTRL+STOP で止まることをユーザーが確かめた (「再生中のCtrl+STOPは効きましたよ？」)。その後の pcm_play 3 回は open から close まで通り leftover=0 (次の open が通る)。NP21/W での注入は、/api/cmd が再生の間 HTTP を塞ぐのと、エミュレータの再生が実時間より速いため、再生中に STOP を差し込めなかった (2026-11-08、証拠 `~/os32-tmp/evidence/2026-11-08/pcm-e5/`) |
 | E6 | 部分: Ra266 の検出・初期化。**2026-11-04 (main 5a29f69c)**: `pcm_test` 3 回とも under/rep/resync 0・close 0。以前の「ブツブツいう音」は pcm_test の右チャンネルの frame 番号の下位 16bit の飛び (65536/44100 ≈ 1.49 秒周期) が原因で、ドライバの不具合ではない (ユーザー「音のブツは周期的です」)。以前の不規則な音切れ (R7-2) と GUI でのマウスキーの音 (R7-3) は再現せず (R7-3 はユーザー「GUIで動かしたときには音がなりませんでした。」)。H-4(b)(c) は [持越し台帳](../DEFERRED_TESTS.md)。**2026-11-08 (実機 002b9bd0)**: `pcm_play /tmp/startup.wav` (44.1kHz・16bit・ステレオ、3.16 秒) を 3 回、どれも under=0 rep=0 resync=0・pcm_close=0・leftover=0。ユーザーがその場で聞いて「ちゃんと私が聞いているので大丈夫」。ノートのマイクの録音 3 本は元の WAV と包絡の相関が 1 か所で一致、音の欠け 0/228 区間、時間の伸びは 1.015 倍 (0.5% 刻みの推定、マイク側の時計の差を含む)、スペクトルの重心は 661→520Hz (マイクの特性)。録音 `~/os32-tmp/evidence/2026-11-08/pcm-play/` |
 
 E3 の当時の観測 (2026-09-23): 5秒再生で underruns/repeats/resyncs=0、close=0、PI累積109。生frameは右41,368 frameで欠落0、左1,000Hz、末尾無音2,732 frame。停止後PEN/IEN=0。
