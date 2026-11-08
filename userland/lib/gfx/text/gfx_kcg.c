@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "os32api.h"
+#include "gfx_direct_internal.h"
 
 /* lib/utf8.c equivalents for kcg */
 /* (Currently we will just declare what we need or implement lightweight versions) */
@@ -25,9 +26,38 @@ static void draw_scaled_pixel(int x, int y, u8 color) {
     }
 }
 
+/* Expand a KCG glyph into a row-major, MSB-first 1bpp tile. */
+static void direct_glyph(u8 *bits, int pitch, int offset, const u8 *pat,
+                         int width, int scale)
+{
+    int row, col, sx, sy;
+    for (row = 0; row < 16; row++)
+        for (col = 0; col < width; col++)
+            if (pat[row * (width / 8) + col / 8] & (0x80 >> (col & 7)))
+                for (sy = 0; sy < scale; sy++)
+                    for (sx = 0; sx < scale; sx++) {
+                        int px = offset + col * scale + sx;
+                        bits[(row * scale + sy) * pitch + px / 8] |= 0x80 >> (px & 7);
+                    }
+}
+
+static void direct_one(int x, int y, const u8 *pat, int width, u8 fg, u8 bg)
+{
+    u8 bits[8 * 64] = {0};
+    int w = width * kcg_scale, h = 16 * kcg_scale;
+    direct_glyph(bits, 8, 0, pat, width, kcg_scale);
+    (void)gfx_cmd_enqueue_mono(x, y, w, h, bits, 8, fg, bg == 0xFF ? -1 : bg,
+                               x, y, w, h);
+}
+
 void kcg_draw_ank(int x, int y, u8 ch, u8 fg, u8 bg) {
     u8 pat[16];
     int row, col;
+    if (gfx_direct) {
+        gfx_api->kcg_read_ank(ch, pat);
+        direct_one(x, y, pat, 8, fg, bg);
+        return;
+    }
     if (bg != 0xFF) gfx_fill_rect(x, y, 8 * kcg_scale, 16 * kcg_scale, bg);
     gfx_api->kcg_read_ank(ch, pat);
     if (kcg_scale == 1) {
@@ -46,6 +76,11 @@ void kcg_draw_ank(int x, int y, u8 ch, u8 fg, u8 bg) {
 void kcg_draw_kanji(int x, int y, u16 jis_code, u8 fg, u8 bg) {
     u8 pat[32];
     int row, col;
+    if (gfx_direct) {
+        gfx_api->kcg_read_kanji(jis_code, pat);
+        direct_one(x, y, pat, 16, fg, bg);
+        return;
+    }
     if (bg != 0xFF) gfx_fill_rect(x, y, 16 * kcg_scale, 16 * kcg_scale, bg);
     gfx_api->kcg_read_kanji(jis_code, pat);
     if (kcg_scale == 1) {
@@ -79,6 +114,44 @@ int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg) {
     int kanji_w = 16 * scale;
     int line_h = 18 * scale;
 
+    if (gfx_direct) {
+        u8 bits[80 * 64];
+        int start = cx, width = 0, i;
+        for (i = 0; i < (int)sizeof(bits); i++) bits[i] = 0;
+        while (*p) {
+            utf8_decode_t dec;
+            u32 cp;
+            u8 ank, pat[32];
+            u16 jis;
+            int glyph_w;
+            if (*p == '\n' || *p == '\t') {
+                if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
+                    fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+                width = 0;
+                for (i = 0; i < (int)sizeof(bits); i++) bits[i] = 0;
+                if (*p++ == '\n') { cx = x; y += line_h; } else cx += ank_w * 4;
+                start = cx;
+                continue;
+            }
+            dec = utf8_decode(p); cp = dec.codepoint; p += dec.bytes_used;
+            if (cp == 0xFEFF || cp < 0x20) continue;
+            ank = unicode_to_ank(cp);
+            glyph_w = ank ? 8 : 16;
+            if (width + glyph_w * scale > 640) {
+                (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
+                    fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+                width = 0; start = cx;
+                for (i = 0; i < (int)sizeof(bits); i++) bits[i] = 0;
+            }
+            if (ank) gfx_api->kcg_read_ank(ank, pat);
+            else { jis = unicode_to_jis(cp); gfx_api->kcg_read_kanji(jis ? jis : 0x2222, pat); }
+            direct_glyph(bits, 80, width, pat, glyph_w, scale);
+            width += glyph_w * scale; cx += glyph_w * scale;
+        }
+        if (width) (void)gfx_cmd_enqueue_mono(start, y, width, 16 * scale, bits, 80,
+            fg, bg == 0xFF ? -1 : bg, start, y, width, 16 * scale);
+        return cx - x;
+    }
     while (*p) {
         utf8_decode_t dec;
         u32 cp;

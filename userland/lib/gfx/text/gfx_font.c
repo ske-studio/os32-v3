@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "gfx_font.h"
+#include "gfx_direct_internal.h"
 
 /* ======================================================================== */
 /*  8x8 ビットマップフォントデータ                                          */
@@ -123,6 +124,11 @@ void gfx_putchar(int x, int y, char ch, u8 color)
     if (idx < 0 || idx >= 95) return;
 
     glyph = font8x8[idx];
+    if (gfx_direct) {
+        (void)gfx_cmd_enqueue_mono(x, y, FONT_W, FONT_H, glyph, 1, color, -1,
+                                   x, y, FONT_W, FONT_H);
+        return;
+    }
 
     /* 8dot境界ならASM高速パスへ */
     gfx_draw_font(x, y, glyph, 1, FONT_H, color);
@@ -134,6 +140,23 @@ void gfx_putchar(int x, int y, char ch, u8 color)
 void gfx_puts(int x, int y, const char *str, u8 color)
 {
     int cx = x;
+    if (gfx_direct) {
+        u8 bits[8 * 80];
+        while (*str) {
+            int n = 0, row;
+            if (*str == '\n') { cx = x; y += FONT_H + 1; str++; continue; }
+            while (*str && *str != '\n' && n < 80) {
+                int idx = (int)*str++ - 0x20;
+                for (row = 0; row < FONT_H; row++)
+                    bits[row * 80 + n] = (idx >= 0 && idx < 95) ? font8x8[idx][row] : 0;
+                n++;
+            }
+            (void)gfx_cmd_enqueue_mono(cx, y, n * FONT_W, FONT_H, bits, 80,
+                                       color, -1, cx, y, n * FONT_W, FONT_H);
+            cx += n * FONT_W;
+        }
+        return;
+    }
     while (*str) {
         if (*str == '\n') {
             cx = x;
