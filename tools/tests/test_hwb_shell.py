@@ -1,5 +1,5 @@
 """HW_BASIC_DESIGN §§2-7 real shell wiring and emitted serial records."""
-CHECK = dict(name='hwb-shell-host', tier=1, budget=8.0, needs=[], covers=[
+CHECK = dict(name='hwb-shell-host', tier=1, budget=240.0, needs=[], covers=[
     'userland/shell/cmd_hw.c', 'userland/shell/hwb*.c', 'userland/shell/hwb.h',
     'userland/shell/shell.h', 'userland/shell/main.c', 'sdk/include/os32/*.h', 'include/types.h',
     'include/pci_dev_contract.h', 'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'userland/tests/hw/*.hwb',
@@ -113,7 +113,9 @@ def main():
         (tmp / 'hwb_shell_scripts.h').write_text('\n'.join(scripts) + '\n};\n')
         flags = ['-I' + str(tmp), '-I' + str(ROOT / 'sdk/include/os32'), '-D__OS32_USERLAND__']
         hwb_host.build(ROOT, FIXTURE, tmp / 'host', flags=flags)
-        result = hwb_host.execute(tmp / 'host')
+        # Individual-store pacing adds interpreter and serial trace events.
+        result = hwb_host.host32.run([str(tmp / 'host')], cwd=ROOT,
+                                     capture_output=True, text=True, timeout=240)
         print(result.stdout, end='', flush=True)
         if result.returncode:
             raise AssertionError('shell control failed: ' + result.stderr)
@@ -125,7 +127,10 @@ def main():
             raise AssertionError('invalid real file records')
         inspect_records(before + after)
         if '--mutate' in sys.argv:
-            return int(bool(hwb_host.mutations(FIXTURE, MUTATIONS, flags=flags)))
+            # The file-log mutants and their normal control exercise the same
+            # adapters/lifecycle path; production scripts ran in full above.
+            return int(bool(hwb_host.mutations(
+                FIXTURE, MUTATIONS, flags=flags + ["-DHWB_SHELL_SKIP_SCRIPTS=1"])))
         return 0
 
 

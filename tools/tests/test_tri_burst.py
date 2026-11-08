@@ -1,8 +1,8 @@
 """Run tri_burst on an indexed CR39/byte LFB bus, including dropped bursts."""
-CHECK = dict(name='tri-burst', tier=1, needs=[], budget=120, covers=[
+CHECK = dict(name='tri-burst', tier=1, needs=[], budget=480, covers=[
     'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'tools/tests/test_tri_burst.py',
     'tools/tests/tri_burst2_host.c', 'tools/tests/tri_burst3_host.c', 'tools/tests/tri_burst4_host.c',
-    'userland/tests/hw/tri_burst4.hwb',
+    'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'tools/tests/tri_burst5_host.c',
     'userland/tests/hw/tri_burst3.hwb', 'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
@@ -219,12 +219,38 @@ def trial4(mutation=None):
         else:
             hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
 
+def trial5(mutation=None):
+    script = (hwb_host.ROOT / 'userland/tests/hw/tri_burst5.hwb').read_text(encoding='ascii')
+    if mutation:
+        name, before, after = mutation
+        assert script.count(before) == 1, name
+        script = script.replace(before, after)
+    code = (hwb_host.ROOT / 'tools/tests/tri_burst5_host.c').read_text().replace('SCRIPT_DATA', json.dumps(script))
+    with tempfile.TemporaryDirectory(prefix='tri-burst5-') as directory:
+        fixture = Path(directory) / 'host.c'
+        exe = Path(directory) / 'host'
+        fixture.write_text(code)
+        hwb_host.build(hwb_host.ROOT, fixture, exe)
+        # Four complete pacing matrices exceed the usual one-script 60s budget.
+        result = hwb_host.host32.run([str(exe)], cwd=hwb_host.ROOT,
+                                     capture_output=True, text=True, timeout=240)
+        print(result.stdout, end='', flush=True)
+        if mutation:
+            if result.returncode != 1 or 'FAIL:tri-burst5:' not in result.stdout:
+                raise RuntimeError(name + ': expected runtime RED')
+            print(name + ': RED runtime')
+        elif result.returncode:
+            raise RuntimeError('tri-burst5 control failed')
+        else:
+            hwb_host.build(hwb_host.ROOT, fixture, Path(directory) / 'target.o', cross=True)
+
 
 def main():
     trial()
     trial2()
     trial3()
     trial4()
+    trial5()
     if '--mutate' in sys.argv:
         for mutation in [
             ('burst-bit1', 'let trialcr = burstcr & 0xFD', 'let trialcr = burstcr & 0xFB'),
@@ -286,6 +312,21 @@ def main():
             ('matrix-cr23-restore', '0x23 | ((save[852]) << 8)', '0x23 | (0 << 8)'),
         ]:
             trial4(mutation)
+        for mutation in [
+            ('pacing-variant', 'if variant != 4 goto variant_loop', 'if variant != 3 goto variant_loop'),
+            ('pacing-read-lfb', 'mmioread16 f + off -> discard', 'mmioread8 f + off -> discard'),
+            ('pacing-read-status', 'mmioread8 v + 0x3DA -> discard', 'mmioread8 v + 0x3CC -> discard'),
+            ('pacing-store8', 'mmiowrite8 f + off data', 'mmiowrite16 f + off data'),
+            ('pacing-store16', 'mmiowrite16 f + off data', 'mmiowrite8 f + off data'),
+            ('pacing-store32', 'mmiowrite32 f + off data', 'mmiowrite16 f + off data'),
+            ('pacing-depth', 'call set_depth\n print "depth-bpp" depth', 'log "depth omitted"\n print "depth-bpp" depth'),
+            ('pacing-seed', 'let delta = delta + 0x01010101\n return', 'let delta = delta + 0x02020202\n return'),
+            ('pacing-count', 'print "mismatch-count" bad', 'print "mismatch-count" 0'),
+            ('pacing-range', 'print "match-start" off', 'print "match-start" 1'),
+            ('pacing-vram', 'mmiowrite32 f + (i << 2) original[i]', 'mmiowrite32 f + (i << 2) 0'),
+            ('pacing-cr23', '0x23 | ((save[852]) << 8)', '0x23 | (0 << 8)'),
+        ]:
+            trial5(mutation)
     return 0
 
 
