@@ -248,7 +248,7 @@ def unsafe_console(old=False):
     if old:
         body=subprocess.check_output(['git','show','HEAD:kernel/console/console.c'],cwd=ROOT,text=True)
     harness=(ROOT/'tools/tests/dep_dir_d_console_grid_host.c').read_text()
-    harness='int safe=1; static int serial_count;\n'+harness
+    harness='int safe=1; static int serial_count;\nvoid gfx_policy_reeval(void) {}\n'+harness
     harness=harness.replace('    if (address < TVRAM_CHAR_BASE',
                             '    if (!safe) finish(71);\n    if (address < TVRAM_CHAR_BASE')
     harness=harness.replace('event(2, p, v);', 'if (!safe) finish(72); event(2, p, v);')

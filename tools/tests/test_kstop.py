@@ -59,6 +59,7 @@ void fd_redirect_save(FdRedirectState *p) { (void)p; }
 void fd_redirect_restore(const FdRedirectState *p) { (void)p; }
 void fd_redirect_clear_state(FdRedirectState *p) { (void)p; }
 void gfx_shutdown(void) { CHECK(0); }
+void gfx_policy_reeval(void) {}
 static int con_sink_is_enabled(void) { return gui; }
 static void ring3_abort_kill(void) { aborted++; }
 static void ring3_context_clear(void) { caller=ring3_in_syscall=ring3_wm_depth=0; g_cur_frame=0; clears++; }
