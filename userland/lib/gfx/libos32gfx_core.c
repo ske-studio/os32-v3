@@ -1,11 +1,16 @@
 #include "libos32gfx.h"
 #include "libgfx_attach_internal.h"
+#include "gfx_direct_internal.h"
 
 KernelAPI *gfx_api;
 GFX_Framebuffer gfx_fb;
 int gfx_dirty_suppress;
 int gfx_packed;
 int gfx_ready;
+/* A0 storage only; L0 owns attachment/recovery transitions. */
+int gfx_direct;
+u16 gfx_gen;
+int gfx_lost;
 const struct gfx_attach_port *gfx_attach_port;
 static int gfx_pools_initialized;
 static int gfx_stopped;
@@ -232,4 +237,10 @@ void libos32gfx_halt(void)
 {
     gfx_api->sys_halt();
     (void)libos32gfx_check();
+}
+
+/* A0 placeholder; L0 supplies the one-shot repaint flag. */
+int libos32gfx_take_regen(void)
+{
+    return 0;
 }

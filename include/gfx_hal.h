@@ -178,7 +178,7 @@ extern GfxCounters gfx_counters;
 
 /* 現在選択されているバックエンド。gfx_init() が probe 順に最初の 1 枚を選ぶ。
  * 静的初期化子で 9801 を指すので、gfx_init 前でも NULL にはならない。 */
-extern const GfxBackend *g_backend;
+extern GfxBackend *g_backend;
 
 /* 9801 プレーンバックエンド (drivers/video/pc98/backend_pc98.c)。
  * H3 (Cirrus) はこの表にもう 1 枚足す。 */

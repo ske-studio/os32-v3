@@ -49,7 +49,7 @@ GfxBackend gfx_backend_geforce = BACKEND;
 GfxBackend gfx_backend_trident = BACKEND;
 #endif
 static GfxBackend other = BACKEND;
-const GfxBackend *g_backend;
+GfxBackend *g_backend;
 #include "getter.inc"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc) {

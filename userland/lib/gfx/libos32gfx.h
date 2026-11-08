@@ -38,6 +38,11 @@ int libos32gfx_attach_checked(void);
 int libos32gfx_check(void);
 void libos32gfx_shutdown(void);
 void gfx_present(void);
+/* DIRECT batching/recovery entries (L1/L0); 0 success, negative error. */
+int gfx_flush(void);
+int libos32gfx_take_regen(void);
+/* L6: screen-to-screen COPY, destination first; 0 success, negative error. */
+int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h);
 
 /* Primitives */
 void gfx_clear(u8 color);

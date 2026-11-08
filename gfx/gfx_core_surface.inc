@@ -320,7 +320,7 @@ int gfx_selected_selfcheck(void)
  * phases the publisher is not-ready, so public query/lease cannot acquire it.
  * The normal-context transition performs no scheduling or callbacks.
  * regen rechecks zero references even if this normal-context contract breaks. */
-static void gfx_reinit_surface_roles(int finish, int display_only)
+void gfx_reinit_surface_roles(int finish, int display_only)
 {
     unsigned int flags = irq_save();
     u32 cr3 = paging_current_cr3(), i;

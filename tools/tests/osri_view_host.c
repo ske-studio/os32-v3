@@ -27,7 +27,7 @@ static u16 text_attrs[TVRAM_COLS * TVRAM_ROWS];
 #include "../../kapi/kapi_osri.c"
 
 volatile u32 tick_count;
-const GfxBackend *g_backend = &gfx_backend_pc98;
+GfxBackend *g_backend = &gfx_backend_pc98;
 GfxCounters gfx_counters;
 int gfx_current_height = GFX_HEIGHT, gfx_flip_enabled, gfx_display_page;
 DirtyRectQueue dirty_queue, prev_dirty;

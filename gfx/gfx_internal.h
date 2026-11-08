@@ -50,6 +50,9 @@ u32 pegc_window_base(void);
 int pegc_select_window(u32 base);
 void gfx_diag_first_present(u32 before);
 void gfx_scroll_init(void);
+/* H4: normal context, revoke (finish=0) before regen (finish=1).
+ * display_only=0 covers CLIENT and DISPLAY; 1 covers DISPLAY only. */
+void gfx_reinit_surface_roles(int finish, int display_only);
 /* PC98 planar の初期化・スプラッシュ終了専用 (戻りの描画ページは1)。 */
 void gfx_clear_planar_pages(u32 plane_size);
 

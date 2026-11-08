@@ -42,6 +42,7 @@ TARGET_SRCS = [
     'userland/lib/gfx/libos32gfx.h',
     'userland/lib/gfx/libgfx_internal.h',
     'userland/lib/gfx/libgfx_attach_internal.h',
+    'userland/lib/gfx/gfx_direct_internal.h',
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',]

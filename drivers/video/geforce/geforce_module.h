@@ -97,6 +97,9 @@ typedef struct {
 } GeforceModuleContext;
 extern const GeforceModuleContext *geforce_context;
 extern GfxBackend geforce_backend_ops;
+/* G1 definitions; G3 registers these and links gf_direct.o. */
+int gf_direct_ok(void);
+extern const GfxDirectOps gf_direct_ops;
 void geforce_backend_bind(struct video_device *, int (*)(void), u32,
                           int (*)(void *), void *);
 void geforce_backend_stop_bind(int (*stop)(void));

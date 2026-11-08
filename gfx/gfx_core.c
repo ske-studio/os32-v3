@@ -52,7 +52,7 @@ int gfx_display_page = 0;
 /* ======================================================================== */
 GfxCounters gfx_counters = { 0, 0, 0, 0 };
 
-const GfxBackend *g_backend = &gfx_backend_pc98;
+GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
 int gfx_is_started(void) { return gfx_started; }

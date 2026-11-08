@@ -161,6 +161,8 @@
     "net/nic_lgy98.c",
     "gfx/gfx_core.c",
     "gfx/gfx_hw_submit.c",
+    "gfx/gfx_policy.c",
+    "gfx/gfx_hw_mono_cpu.c",
     "gfx/gfx_osri.c",
     "gfx/gfx_osri_view.c",
     "gfx/gfx_vram.c",
