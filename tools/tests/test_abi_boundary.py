@@ -25,7 +25,7 @@ typedef unsigned long word;
 __attribute__((noinline)) word __cdecl callee(word a, word b, word c) {
     return a + b * 3 + c * 7;
 }
-int main(void) {
+static int probe_main(void) {
     word before, after, result;
     __asm__ volatile("movl %%esp,%0" : "=r"(before));
     __asm__ volatile("pushl $3; pushl $2; pushl $1; call callee; addl $12,%%esp"
@@ -38,10 +38,17 @@ int main(void) {
     if (result != 28 || ABI_WORD_BYTES != 4 || ABI_WORD_BITS != 32 || ABI_WORD_ALIGN != 4) return 2;
     return (0x1237UL & ~(ABI_STACK_ALIGN - 1UL)) != 0x1230UL;
 }
+/* No libc: CI and PM hosts lack 32-bit crt1.o/libc, like the other host32 tests. */
+void _start(void) {
+    int code = probe_main();
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(code));
+    for (;;) {}
+}
 ''')
     exe = directory / 'probe'
     host32.build(['gcc', '-m32', '-std=gnu89', '-O0', '-fno-omit-frame-pointer',
-                  '-fno-pie', '-no-pie', str(source), '-o', str(exe)], check=True,
+                  '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
+                  str(source), '-o', str(exe)], check=True,
                  capture_output=True, text=True)
     return host32.run([str(exe)]).returncode
 
