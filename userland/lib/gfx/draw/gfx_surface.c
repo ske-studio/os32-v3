@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 extern void __cdecl asm_fill_plane_rect(u8 *start, int pitch, int rows, int width_bytes, u8 fill_val);
@@ -94,6 +95,31 @@ void gfx_surface_pixel(GFX_Surface *surf, int x, int y, u8 color)
 /*  ブリット                                                                */
 /* ======================================================================== */
 
+/* Surfaces keep INDEX4 planes; the temporary INDEX8 image is borrowed only
+ * until enqueue has copied it. Queue splitting/clipping belongs to L1. */
+static void gfx_blit_direct(int dx, int dy, const GFX_Surface *src,
+                            int sx, int sy, int sw, int sh, int key)
+{
+    int ix, iy;
+    u8 *pixels;
+    if (sw <= 0 || sh <= 0 || (u32)sh > 0x7fffffffU / (u32)sw) return;
+    pixels = (u8 *)gfx_api->mem_alloc(sw * sh);
+    if (!pixels) return;
+    for (iy = 0; iy < sh; iy++) {
+        for (ix = 0; ix < sw; ix++) {
+            int off = (sy + iy) * src->pitch + ((sx + ix) >> 3);
+            u8 bit = (u8)(0x80 >> ((sx + ix) & 7));
+            u8 color = 0;
+            for (int p = 0; p < 4; p++)
+                if (src->planes[p][off] & bit) color |= (u8)(1 << p);
+            pixels[iy * sw + ix] = color;
+        }
+    }
+    gfx_cmd_enqueue_put(dx, dy, sw, sh, pixels, sw, key);
+    gfx_api->mem_free(pixels);
+    return;
+}
+
 void gfx_blit(int dx, int dy,
               const GFX_Surface *src, const GFX_Rect *src_rect)
 {
@@ -108,6 +134,11 @@ void gfx_blit(int dx, int dy,
         sw = src_rect->w; sh = src_rect->h;
     } else {
         sx = 0; sy = 0; sw = src->w; sh = src->h;
+    }
+
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, -1);
+        return;
     }
 
     /* バイト境界揃い時の高速パス (プレーン限定 — サーフェスは常に 4 プレーン
@@ -174,6 +205,11 @@ void gfx_blit_colorkey(int dx, int dy,
         sx = 0; sy = 0; sw = src->w; sh = src->h;
     }
 
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, colorkey);
+        return;
+    }
+
     for (iy = 0; iy < sh; iy++) {
         for (ix = 0; ix < sw; ix++) {
             int soff = (sy + iy) * src->pitch + ((sx + ix) >> 3);
@@ -206,6 +242,11 @@ void gfx_blit_transparent(int dx, int dy,
         sw = src_rect->w; sh = src_rect->h;
     } else {
         sx = 0; sy = 0; sw = src->w; sh = src->h;
+    }
+
+    if (gfx_direct) {
+        gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, 0);
+        return;
     }
 
     /* バイト境界揃い時の高速パス (プレーン限定。理由は gfx_blit と同じ) */

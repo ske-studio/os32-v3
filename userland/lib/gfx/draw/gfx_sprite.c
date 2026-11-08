@@ -1,5 +1,6 @@
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 /* ======================================================================== */
@@ -239,6 +240,27 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
     if (spr->_pool_idx >= 0 && spr->_pool_idx < SPR_POOL_MAX) {
         SprSlot *slot = &spr_slots[spr->_pool_idx];
         if (slot->used) {
+            if (gfx_direct) {
+                u8 *pixels;
+                if (spr->w <= 0 || spr->h <= 0 ||
+                    (u32)spr->h > 0x7fffffffU / (u32)spr->w) return;
+                pixels = (u8 *)gfx_api->mem_alloc(spr->w * spr->h);
+                if (!pixels) return;
+                /* Public planes/mask are the unshifted image; 255 is outside INDEX4. */
+                for (int row = 0; row < spr->h; row++) {
+                    for (int col = 0; col < spr->w; col++) {
+                        int off = row * spr->pitch + (col >> 3);
+                        u8 bit = (u8)(0x80 >> (col & 7));
+                        u8 color = 0;
+                        for (int p = 0; p < 4; p++)
+                            if (spr->planes[p][off] & bit) color |= (u8)(1 << p);
+                        pixels[row * spr->w + col] = spr->mask[off] & bit ? 255 : color;
+                    }
+                }
+                gfx_cmd_enqueue_put(x, y, spr->w, spr->h, pixels, spr->w, 255);
+                gfx_api->mem_free(pixels);
+                return;
+            }
             int shift = x & 7;
             const u8 *planes[4];
             const u8 *mask = 0;
@@ -266,6 +288,7 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
             }
         }
     }
+    if (gfx_direct) return;
     gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
 }
 
@@ -281,5 +304,6 @@ void gfx_sprite_restore_bg(int x, int y, GFX_Sprite *spr)
     if (!gfx_ready) return;
     if (!spr || !spr->bg_buf) return;
     gfx_restore_rect(x, y, spr->w, spr->h, spr->bg_buf);
+    if (gfx_direct) return;
     gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);
 }
