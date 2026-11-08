@@ -23,6 +23,7 @@ MUTATIONS = [
      'if (v->vram[i] == v->client[i]) ++mismatches;'),
     ('kdebug/pegc_command.c', 'v.vram[i] = saved[i];', 'v.vram[i] = 0;'),
     ('kdebug/pegc_command.c', 'loops |= 1u << bit;', 'loops |= 0u << bit;'),
+    ('kdebug/pegc_command.c', 'dst[i] = v->vram[i];', 'dst[i] = 0;'),
     ('userland/shell/cmd_pegc.c', '!req.step_ns || req.start_ns > req.end_ns',
      'req.start_ns > req.end_ns'),
 ]

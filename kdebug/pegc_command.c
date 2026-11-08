@@ -65,6 +65,28 @@ static void transfer(const struct pegc_diagnostic_view *v, u32 method, u32 loops
         for (u32 i = 0; i < PEGC_FRAME_BYTES; ++i) v->vram[i] = v->client[i];
     }
 }
+static void read_frame(const struct pegc_diagnostic_view *v, u8 *dst, u32 method)
+{
+    if (method == REP_MOVSD) {
+        for (u32 y = 0; y < PEGC_HEIGHT_480; ++y) {
+            const volatile u8 *src = v->vram + y * PEGC_PITCH;
+            u8 *out = dst + y * PEGC_PITCH;
+            u32 words = PEGC_WIDTH / sizeof(u32);
+            __asm__ volatile("cld; rep movsl" : "+S"(src), "+D"(out), "+c"(words)
+                             : : "memory", "cc");
+        }
+    } else if (method == DWORD) {
+        const volatile u32 *src = (const volatile u32 *)v->vram;
+        u32 *out = (u32 *)dst;
+        for (u32 i = 0; i < PEGC_FRAME_BYTES / sizeof(u32); ++i) out[i] = src[i];
+    } else if (method == WORD) {
+        const volatile u16 *src = (const volatile u16 *)v->vram;
+        u16 *out = (u16 *)dst;
+        for (u32 i = 0; i < PEGC_FRAME_BYTES / sizeof(u16); ++i) out[i] = src[i];
+    } else {
+        for (u32 i = 0; i < PEGC_FRAME_BYTES; ++i) dst[i] = v->vram[i];
+    }
+}
 static void number(const char *key, u32 n)
 {
     serial_puts_polled(key); serial_diag_u32(n);
@@ -105,6 +127,32 @@ static int compare(const struct pegc_diagnostic_view *v, u32 method, u32 ns, u32
     number(" max_us=", maximum);
     number(" avg_us=", count == PEGC_RUNS ? (u32)(total >> 3) : 0);
     number(" mismatches=", mismatches);
+    serial_puts_polled(" rc="); serial_diag_i32(rc); serial_puts_polled("\r\n");
+    return rc;
+}
+static int measure_read(const struct pegc_diagnostic_view *v, u8 *dst, u32 method)
+{
+    u32 minimum = (u32)-1, maximum = 0, count = 0;
+    unsigned long long total = 0;
+    int rc = 0;
+    for (u32 run = 0; run != PEGC_RUNS; ++run) {
+        u32 before, after, hi;
+        rc = sys_time_now(&before, &hi);
+        if (rc) break;
+        read_frame(v, dst, method);
+        rc = sys_time_now(&after, &hi);
+        if (rc) break;
+        u32 elapsed = after - before;
+        if (elapsed < minimum) minimum = elapsed;
+        if (elapsed > maximum) maximum = elapsed;
+        total += elapsed;
+        ++count;
+    }
+    serial_puts_polled("PEGC phase=read method="); serial_puts_polled(names[method]);
+    number(" count=", count);
+    number(" min_us=", count ? minimum : 0);
+    number(" max_us=", maximum);
+    number(" avg_us=", count == PEGC_RUNS ? (u32)(total >> 3) : 0);
     serial_puts_polled(" rc="); serial_diag_i32(rc); serial_puts_polled("\r\n");
     return rc;
 }
@@ -151,14 +199,21 @@ int pegc_command_call(void *buf, u32 size)
         v.vram[i] = saved[i];
         if (v.vram[i] != saved[i]) ++restore_bad;
     }
-    int freed = pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, saved_phys / MEM_PAGE_SIZE,
-                                     PEGC_SAVE_PAGES);
-    if (!freed && !rc) rc = OS32_ERR_IO;
     if (restore_bad && !rc) rc = OS32_ERR_IO;
     number("PEGC phase=restore mismatches=", restore_bad);
     serial_puts_polled(" rc="); serial_diag_i32(restore_bad ? OS32_ERR_IO : 0);
     serial_puts_polled("\r\n");
     ++q.result_count;
+    if (q.test == PEGC_TEST_PRESENT) {
+        for (u32 method = REP_MOVSD; method <= BYTE; ++method) {
+            int result = measure_read(&v, saved, method);
+            ++q.result_count;
+            if (!rc && result) rc = result;
+        }
+    }
+    int freed = pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, saved_phys / MEM_PAGE_SIZE,
+                                     PEGC_SAVE_PAGES);
+    if (!freed && !rc) rc = OS32_ERR_IO;
 reply:
     q.rc = rc;
     q.result_count = rc == OS32_ERR_INVAL ? 0 : q.result_count;

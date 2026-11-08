@@ -40,7 +40,7 @@ void *kmemcpy(void *d,const void *s,u32 n) {
 int sys_time_now(u32 *lo,u32 *hi) {
     *lo=(u32)-10 + clocks/2*100 + (clocks%2 ? clocks/2%8+10 : 0);*hi=0;
     ++clocks;
-    if(clocks%2==0 && fault==1) vram_words[7]^=1;
+    if(clocks%2==0 && clocks<=64 && fault==1) vram_words[7]^=1;
     return fault==2 && clocks==2 ? OS32_ERR_IO : 0;
 }
 int strcmp(const char *a,const char *b) {
@@ -68,17 +68,26 @@ void _start(void) {
     CHECK(gap_loops(1000000,600)==60);
     CHECK(gap_loops((u32)-1,(u32)-1)==(u32)-1);
     struct pegc_request q=request(PEGC_TEST_PRESENT);
-    CHECK(pegc_command_call(&q,sizeof(q))==0 && q.rc==0 && q.result_count==5);
-    CHECK(clocks==64 && loans==1);
+    CHECK(pegc_command_call(&q,sizeof(q))==0 && q.rc==0 && q.result_count==9);
+    CHECK(clocks==128 && loans==1);
     for(u32 m=0;m<4;m++) {
-        CHECK(has(output,names[m]));
+        char line[80] = "PEGC phase=read method=";
+        u32 n=23, j=0;
+        while(names[m][j]) line[n++]=names[m][j++];
+        line[n]=0;
+        CHECK(has(output,line));
+        struct pegc_diagnostic_view v={(u8 *)client_words,(u8 *)vram_words};
+        for(u32 i=0;i<PEGC_FRAME_BYTES;i++) heap[i]=0;
+        read_frame(&v,heap,m);
+        for(u32 i=0;i<PEGC_FRAME_BYTES;i++) CHECK(heap[i]==((u8 *)vram_words)[i]);
     }
+    CHECK(has(output,"count=8 min_us=10 max_us=17 avg_us=13 rc=0"));
     CHECK(has(output,"count=8 min_us=10 max_us=17 avg_us=13 mismatches=0 rc=0"));restored();
     reset();q=request(PEGC_TEST_PRESENT);fault=1;
-    CHECK(pegc_command_call(&q,sizeof(q))==OS32_ERR_IO && q.result_count==5);
-    CHECK(has(output,"mismatches=8 rc=-1") && clocks==64);restored();
+    CHECK(pegc_command_call(&q,sizeof(q))==OS32_ERR_IO && q.result_count==9);
+    CHECK(has(output,"mismatches=8 rc=-1") && clocks==128);restored();
     reset();q=request(PEGC_TEST_PRESENT);fault=2;
-    CHECK(pegc_command_call(&q,sizeof(q))==OS32_ERR_IO && q.result_count==5);restored();
+    CHECK(pegc_command_call(&q,sizeof(q))==OS32_ERR_IO && q.result_count==9);restored();
     reset();q=request(PEGC_TEST_GAP_SWEEP);q.start_ns=0;q.end_ns=125;q.step_ns=50;
     CHECK(!pegc_command_call(&q,sizeof(q)) && q.result_count==4 && clocks==48);
     CHECK(has(output,"gap_ns=100 loops=10") && !has(output,"gap_ns=150"));restored();
