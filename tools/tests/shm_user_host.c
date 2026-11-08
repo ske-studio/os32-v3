@@ -81,7 +81,7 @@ static void say(const char *s, u32 n)
 #define SAY(s) say(s "\n", sizeof(s "\n") - 1)
 static u32 checks;
 static int expected_stop;
-static u32 stop_jmp[KSETJMP_BUF_LEN];
+static k_jmpbuf stop_jmp;
 #define CHECK(x, s) do { checks++; if (!(x)) { SAY("FAIL " s); die(1); } } while (0)
 static void host_restore_stop(void) {
     CHECK(expected_stop, "unexpected restore fail-stop");
@@ -155,7 +155,7 @@ void v86_bios_detach_disk(void) {
     CHECK(_irq_enabled(), "release IF enabled");
 }
 /* Production exception transfer/runtime unwind, with only machine edges stubbed. */
-typedef struct { int state; u32 jmpbuf[KSETJMP_BUF_LEN]; } AppSlot;
+typedef struct { int state; k_jmpbuf jmpbuf; } AppSlot;
 static AppSlot fault_app;
 static int g_pending_id, g_pending_kind, g_longjmp_reason, g_longjmp_id;
 #define EXEC_LJ_EXIT 5
@@ -167,7 +167,7 @@ static int appslot_cur(void) { return 2; }
 static AppSlot *appslot_get(int id) { (void)id; return &fault_app; }
 static void ring3_context_clear(void) {}
 static u32 irq_disabled, restored_esp0, reenter_end, end_entries;
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 static int fault_kill_count, ring3_wm_depth, ring3_wm_fault_count;
 void irq_disable(unsigned int irq) { irq_disabled |= 1U << irq; }
 static void tss_set_esp0(u32 esp0) {
@@ -177,7 +177,7 @@ static void tss_set_esp0(u32 esp0) {
         v86_session_end();
     }
 }
-void exec_longjmp(u32 *buf) {
+void exec_longjmp(k_jmpbuf buf) {
     if (buf == g_exit_jmpbuf) {
         CHECK(!v86_session.open && !v86_session.active &&
               !paging_v86_session_open(), "direct kill closes session");

@@ -40,7 +40,8 @@ static void die(int line) {
     __asm__ volatile("int $0x80"::"a"(1),"b"(1):"memory"); for (;;) {}
 }
 static int owner=1, cr3=1, gui=1, invokes, jumped, clears, injected;
-static u32 tick_count=100, saved_buf[KSETJMP_BUF_LEN];
+static u32 tick_count=100;
+static k_jmpbuf saved_buf;
 void x87_save(X87State *p) { (void)p; }
 static AppSlot *g_cur_app;
 static u32 *g_cur_frame;
@@ -74,10 +75,10 @@ void exec_heap_save_state(u32 *p) { *p=17; }
 
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { cr3=p; }
-void exec_longjmp(u32 *p) {
+void exec_longjmp(k_jmpbuf p) {
     CHECK(p==appslot_at(2)->jmpbuf && !caller && !ring3_in_syscall && !ring3_wm_depth);
     CHECK(!kctx_irq_depth && !kctx_exc_depth && owner==1 && cr3==1);
-    jumped++; extern void asm_longjmp(u32 *); asm_longjmp(saved_buf);
+    jumped++; extern void asm_longjmp(k_jmpbuf); asm_longjmp(saved_buf);
 }
 int caller_access_enter(CallerAccessFrame *p, enum caller_origin origin) { (void)origin; p->valid=caller; caller=1; return 1; }
 void caller_access_leave(const volatile CallerAccessFrame *p) { caller=p->valid; }

@@ -103,7 +103,7 @@ struct v86_session_state {
     int running;
     int aborting;
     int release_pending;
-    u32 jmpbuf[KSETJMP_BUF_LEN];
+    k_jmpbuf jmpbuf;
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
     struct legacy_lowmap_snapshot lowmap;

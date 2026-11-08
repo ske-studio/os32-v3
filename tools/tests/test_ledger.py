@@ -506,34 +506,38 @@ def asm_problems(asm):
 
 SETJMP_C = r'''#include "ksetjmp.h"
 volatile u32 kctx_irq_depth, kctx_exc_depth;
-static u32 buf[KSETJMP_BUF_LEN + 1];
+static struct { k_jmpbuf saved; u32 guard; } storage;
+#define buf storage.saved
 static void out(const char *s, u32 n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(s), "d"(n) : "memory"); }
 #define CHECK(x) do { if (!(x)) { out("FAIL " #x "\n", sizeof("FAIL " #x "\n") - 1); return 1; } } while (0)
+static k_jmpbuf copied;
 static volatile int round;
 static int test(void) {
-    CHECK(KSETJMP_BUF_LEN == 8);
-    buf[KSETJMP_BUF_LEN] = 0x5a5a5a5aUL;
+    CHECK(sizeof(k_jmpbuf) == 32 && __alignof__(k_jmpbuf) == 4);
+    storage.guard = 0x5a5a5a5aUL;
     kctx_irq_depth = 0; kctx_exc_depth = 0;
     round = 0;
     if (exec_setjmp(buf) == 0) {
         /* CTRL+STOP (IRQ1 の上) / fault kill (例外の上) から抜ける形 */
         kctx_irq_depth = 2; kctx_exc_depth = 1;
         round = 1;
-        exec_longjmp(buf);
+        k_jmp_copy(copied, buf);
+        exec_longjmp(copied);
     }
     CHECK(round == 1);
     CHECK(kctx_irq_depth == 0 && kctx_exc_depth == 0);
-    CHECK(buf[6] == 0 && buf[7] == 0 && buf[KSETJMP_BUF_LEN] == 0x5a5a5a5aUL);
+    CHECK(((u32 *)buf)[6] == 0 && ((u32 *)buf)[7] == 0 && storage.guard == 0x5a5a5a5aUL);
     /* 控えは setjmp の時点の値 (入れ子の setjmp 点が深さ > 0 の場合も戻す) */
     kctx_irq_depth = 3; kctx_exc_depth = 2;
     round = 0;
     if (exec_setjmp(buf) == 0) {
         kctx_irq_depth = 9; kctx_exc_depth = 9;
         round = 1;
-        exec_longjmp(buf);
+        k_jmp_copy(copied, buf);
+        exec_longjmp(copied);
     }
     CHECK(round == 1 && kctx_irq_depth == 3 && kctx_exc_depth == 2);
-    CHECK(buf[6] == 3 && buf[7] == 2 && buf[KSETJMP_BUF_LEN] == 0x5a5a5a5aUL);
+    CHECK(((u32 *)buf)[6] == 3 && ((u32 *)buf)[7] == 2 && storage.guard == 0x5a5a5a5aUL);
     return 0;
 }
 void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(r) : "memory"); for (;;) {} }
@@ -552,7 +556,7 @@ def setjmp_run(texts):
             return False, 'compile\n' + r.stderr
         r = subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Werror', '-O0',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
-                            '-static', '-no-pie', '-I' + str(tmp), '-I' + str(ROOT / 'include'),
+                            '-static', '-no-pie', '-I' + str(tmp), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/x86'),
                             str(tmp / 't.c'), str(tmp / 's.o'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
@@ -562,12 +566,12 @@ def setjmp_run(texts):
 
 
 def jmpbuf_hardcoded():
-    """jmpbuf の長さの直書き (B8、T1-R8)。保存先は KSETJMP_BUF_LEN で宣言する。"""
+    """jmpbuf の長さの直書き (B8、T1-R8)。保存先は k_jmpbuf で宣言する。"""
     hits = []
     for top in ('kernel', 'exec', 'include'):
         for f in sorted((ROOT / top).rglob('*.[ch]')):
             for n, line in enumerate(paging_source(f).splitlines(), 1):
-                if re.search(r'jmpbuf\s*\[\s*[0-9]', line):
+                if re.search(r'\b(?!k_jmpbuf\b)\w*jmpbuf\s*\[\s*[0-9]', line):
                     hits.append('%s:%d' % (f.relative_to(ROOT), n))
     return hits
 
@@ -652,7 +656,7 @@ class Ledger(unittest.TestCase):
     def test_jmpbuf_length_not_hardcoded(self):
         self.assertEqual(jmpbuf_hardcoded(), [])
         v86 = paging_source(ROOT / 'arch/x86/legacy/v86.c')
-        self.assertIn('jmpbuf[KSETJMP_BUF_LEN]', (ROOT / 'arch/x86/legacy/v86_mem.h').read_text())
+        self.assertIn('k_jmpbuf jmpbuf', (ROOT / 'arch/x86/legacy/v86_mem.h').read_text())
         self.assertIn('#define v86_jmpbuf v86_session.jmpbuf', v86)
 
     def test_broker_judgement_unchanged(self):
@@ -691,6 +695,11 @@ MUTATIONS = [
     ('reclaim-device', 'mm/pgalloc.c',
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
+    ('jump-copy-omitted', 'include/ksetjmp.h',
+     '    *dst = *src;', '    (void)dst; (void)src;'),
+    ('jump-save-overrun', 'arch/x86/kernel/setjmp.asm',
+     '        mov     [eax+JB_EXC_DEPTH], ecx',
+     '        mov     [eax+JB_EXC_DEPTH], ecx\n        mov     [eax+32], ecx'),
     ('longjmp-no-restore', 'arch/x86/kernel/setjmp.asm',
      '        mov     ecx, [eax+JB_IRQ_DEPTH]\n        mov     [kctx_irq_depth], ecx\n'
      '        mov     ecx, [eax+JB_EXC_DEPTH]\n        mov     [kctx_exc_depth], ecx\n',

@@ -67,7 +67,7 @@ static void sputs(const char *s) { (void)s; }
     end = isr.index('\n/* exec フォルト復帰用', begin)
     classify += isr[begin:end]
     classify += '''
-static u32 jumpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf jumpbuf;
 u32 kctx_irq_depth, kctx_exc_depth;
 static int exec_nest_level = 1;
 /* Model exec's teardown at its boundary; execute the product longjmp itself. */

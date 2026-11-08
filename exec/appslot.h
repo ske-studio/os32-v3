@@ -25,7 +25,7 @@
 #include "types.h"
 #include "x87.h"
 #include "paging.h"        /* struct addrspace (値で持つ。関数は呼ばない) */
-#include "ksetjmp.h"       /* KSETJMP_BUF_LEN */
+#include "ksetjmp.h"       /* k_jmpbuf */
 #include "../fs/vfs_stdin.h"
 
 /* ---- ID の池 (D3) ---------------------------------------------------- */
@@ -107,7 +107,7 @@ typedef struct {
      * 畳むのはその暴走 1 例外だけ。 */
     u32  last_kernel_tick;
 
-    u32  jmpbuf[KSETJMP_BUF_LEN];   /* この ID の呼び出し元へ帰る点 */
+    k_jmpbuf jmpbuf;   /* この ID の呼び出し元へ帰る点 */
     u32  frame[APP_FRAME_WORDS];    /* park した CPL=3 フレーム (D2 の (b)) */
 
     /* 旧 ExecContext の中身 (レイアウトは 1 バイトも動かさない — I12/I13) */

@@ -111,7 +111,7 @@ static int exec_exit_status, ring3_in_syscall;
 static int fault_kill_count;
 volatile u32 ring3_wm_fault_count;
 static int g_last_kind, g_last_code;
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_kill_check(int id) { CHECK(id == 2); return 0; }
@@ -193,8 +193,8 @@ static void con_sink_owner_exit(int id) { CHECK(id == 2); }
 void appslot_gfx_owner_exit(int id) { CHECK(id == 2); }
 static void poison_landing(void);
 static void check_invalid_caller(void);
-void asm_longjmp(u32 *buf);
-void exec_longjmp(u32 *buf) {
+void asm_longjmp(k_jmpbuf buf);
+void exec_longjmp(k_jmpbuf buf) {
     if (g_longjmp_reason == EXEC_LJ_PENDING) {
         CHECK(cleanup == 0 && teardown == 0 && notices == 0);
         CHECK(g_pending_id == 2 && g_pending_kind == scheduled_kind);

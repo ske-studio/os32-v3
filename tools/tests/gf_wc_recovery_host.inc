@@ -84,7 +84,7 @@ static void wc_restored(void)
 /* Unrelated owner resources are inert. The real notify sequence still calls
  * gui_owner_exit; no fixture directly calls shutdown or the stop callback. */
 static int g_last_kind,g_last_code,exec_exit_status,exec_nest_level;
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 static AppSlot *g_cur_app;
 volatile u32 kctx_irq_depth,kctx_exc_depth;
 static int font_guard_active;

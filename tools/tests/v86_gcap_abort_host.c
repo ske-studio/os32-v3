@@ -40,7 +40,7 @@ volatile int ring3_in_syscall = 1;
 volatile u32 ring3_wm_fault_count, tick_count;
 volatile int ring3_wm_depth;
 static int g_cur_app = 1;
-static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+static k_jmpbuf g_exit_jmpbuf;
 static int g_pending_id, g_pending_kind, g_longjmp_reason, g_longjmp_id;
 #define EXEC_LJ_EXIT 5
 #define EXEC_LJ_PENDING 4
@@ -61,7 +61,7 @@ static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
     CHECK(!call.pinned && allocations == frees, "release before owner reclaim"); finishes++;
 }
-void exec_longjmp(u32 *buf) {
+void exec_longjmp(k_jmpbuf buf) {
     if (buf == g_exit_jmpbuf) __builtin_longjmp(landed, 1);
     CHECK(!v86_session.open && !v86_gcap_active(), "exception detach before transfer");
     CHECK(allocations != frees, "no allocator on exception stack");

@@ -5,7 +5,7 @@
 ;;  exec_longjmp(buf): 保存したレジスタと深さを復元。setjmpの呼び出し元に
 ;;                     戻り値=1で復帰する。
 ;;
-;;  バッファレイアウト (u32 buf[KSETJMP_BUF_LEN] = 8 語、include/ksetjmp.h):
+;;  バッファレイアウト (opaque k_jmpbuf = 32B、arch/x86/arch_jmp_storage.h):
 ;;    [0] = ESP  [1] = EBP  [2] = EBX
 ;;    [3] = ESI  [4] = EDI  [5] = EIP (return address)
 ;;    [6] = kctx_irq_depth  [7] = kctx_exc_depth
