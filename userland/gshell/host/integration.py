@@ -76,6 +76,12 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('W2 cycle skips check', 'src/wm.rs',
+     '    if unsafe { libos32gfx_check() } >= 0 {\n        let regen',
+     '    if false {\n        let regen', 'w2_regen_cycle'),
+    ('W2 ignores pending', 'src/wm.rs',
+     'regen || REGEN_PENDING.load(Ordering::SeqCst)',
+     'regen', 'w2_regen_cycle'),
     ('HOST_NOTICE unchanged serial delivered', 'src/wm.rs',
      '    if serial == st.host_notice_seen {', '    if false {',
      'host_notice_cycles_'),

@@ -14,6 +14,14 @@
 #![allow(dead_code)]
 
 use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicBool, Ordering};
+
+static REGEN_PENDING: AtomicBool = AtomicBool::new(false);
+
+extern "C" {
+    fn libos32gfx_check() -> i32;
+    fn libos32gfx_take_regen() -> i32;
+}
 
 use os32api::gui::proto::{
     GuiRgb, GuiWinSpec, GUI_MAX_DAMAGE, GUI_MAX_TIMERS, GUI_MAX_WINDOWS, GUI_SLOT_MAX,
@@ -904,6 +912,9 @@ pub fn flush_present() {
     if crate::fullscreen::active() {
         return;
     }
+    if unsafe { libos32gfx_check() } >= 0 && unsafe { libos32gfx_take_regen() } != 0 {
+        REGEN_PENDING.store(true, Ordering::SeqCst);
+    }
     #[cfg(feature = "gf_accel_accept")]
     let timing = gf_accept::present_begin();
     unsafe {
@@ -1182,6 +1193,16 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
+    if unsafe { libos32gfx_check() } >= 0 {
+        let regen = unsafe { libos32gfx_take_regen() } != 0;
+        if (regen || REGEN_PENDING.load(Ordering::SeqCst)) && !crate::fullscreen::active() {
+            REGEN_PENDING.store(false, Ordering::SeqCst);
+            composite_full(st);
+            damage::invalidate_all_clients(st);
+        } else if regen {
+            REGEN_PENDING.store(true, Ordering::SeqCst);
+        }
+    }
     if ctx != input::Ctx::Pump {
         crate::gserial::poll_x3(st);
     }

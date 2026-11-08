@@ -896,15 +896,11 @@ fn wm_button_down(st: &mut GuiState, mx: i32, my: i32) {
 fn wm_button_up(st: &mut GuiState, mx: i32, my: i32) {
     if st.drag_index >= 0 {
         let idx = st.drag_index as usize;
-        let old_outer = st.windows[idx].outer();
         /* 枠の最終位置へ実体を移す。ドラッグ確定は作業領域へクランプする
          * (契約 D1。枠の追従でも同じ規則を使っているので普通は動かない)。 */
         let nf = st.drag_frame;
         let (cx, cy) = wm::clamp_to_work_area(st, nf.x, nf.y, nf.w, nf.h);
-        st.windows[idx].x = cx;
-        st.windows[idx].y = cy;
-        st.drag_index = -1;
-        st.drag_frame = Rect::EMPTY;
+        crate::movecopy::move_window(st, idx, cx, cy);
         /* 最後の枠が確定後の外形と違えば、枠の縁を消す (下地は損傷、クライアント
          * 面は Paint)。普通は update_drag が同じクランプで枠を決めるので一致するが、
          * ドラッグ中にアプリが resize_window し、マウスキーの離し (NP_DOT) が
@@ -916,14 +912,7 @@ fn wm_button_up(st: &mut GuiState, mx: i32, my: i32) {
             expose_frame_edges(st, nf);
         }
 
-        /* 露出計算 + 旧位置と新位置を画面損傷に。 */
-        st.dirty_screen(old_outer);
-        st.dirty_screen(st.windows[idx].outer());
-        visible::recompute_and_expose(st);
-        /* 移動した窓のクライアントは全面再描画が要る (中身は同じでも位置が変わる)。 */
-        crate::damage::set_dirty_full(&mut st.windows[idx]);
         /* Configure を通知 (座標確定、R2)。 */
-        st.windows[idx].configure_pending = true;
         emit_configure(st, idx);
         return;
     }

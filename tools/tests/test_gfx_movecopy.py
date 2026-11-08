@@ -41,7 +41,6 @@ def run_case(work, libs, mutation=None):
     source.write_text(text)
     root = (gshell / 'src/lib.rs').read_text().replace('#![no_std]', '#![allow(dead_code)]')
     root = root.replace('#[no_mangle]', '').replace('pub extern "C" fn main(', 'pub extern "C" fn guest_main(')
-    root += '\nmod movecopy;\n'
     root = re.sub(r'^mod (\w+);', lambda m: f'#[path="{gshell / "src" / (m[1]+".rs")}"] mod {m[1]};', root, flags=re.M)
     root += f'\n#[path="{gshell / "host/mocks.rs"}"] mod mocks;\n'
     (work / 'root.rs').write_text(root)
