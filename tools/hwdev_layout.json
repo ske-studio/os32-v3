@@ -2911,6 +2911,7 @@
     "GF5_STOPPED",
     "GF5_STOP_NORMAL",
     "GF5_STOP_REQUESTED",
+    "GF6_PRIM",
     "GF_BORROW_TILE",
     "GF_BORROW_VIEW",
     "GF_C_AR",

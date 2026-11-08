@@ -1,7 +1,7 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
 CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h', 'make:build/out/kernel.elf'], budget=90.0,
     covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'kernel/module/debug_probe.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'gfx/gfx_core.c', 'gfx/gfx_emergency.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'kernel/sys.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/paging_source.py', 'tools/tests/kernel_layout.py', 'tools/tests/serial_diag_host.h', 'tools/tests/host_arch/*.h', 'mm/paging.c', 'mm/paging_*.inc', 'mm/pgalloc.c', 'mm/pgalloc_*.inc', 'tools/tests/gf_guard_fake.h', 'tools/tests/gf_startlog_host.h', 'build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
-            'kdebug/gf_accel_test.h', 'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
+            'kdebug/gf_accel_test.h', 'kdebug/gf_prim_bench.h', 'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
             'kdebug/gf_command_wire.h', 'kdebug/recover.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
             'include/io.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
@@ -93,6 +93,7 @@ MUTATIONS = {
         'if (o.production && (q.test == GF2_BAD_HANDLE || q.test == GF2_BAD_METHOD))',
         'if (false)'),
         ('gf3-dispatch', 'gf_accel_test(q.session)', 'gf_accel_test(0)'),
+        ('prim-dispatch', 'gf_prim_bench(q.session)', 'gf_prim_bench(0)'),
      ('gf4-dispatch', 'gf_display_test(q.session)', 'gf_display_test(1)'),
      ('reference-count',
       '#define GF2_REFERENCE_COUNT 100000U',

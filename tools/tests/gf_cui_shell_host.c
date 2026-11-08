@@ -28,6 +28,10 @@ static struct {
 #include "../../userland/shell/cmd_gf2.c"
 void _start(void)
 {
+    char *prim[] = {"gf2", "prim", "7"};
+    assert(!shell_cmd_gf2(3, prim) && captured.test == GF6_PRIM && captured.session == 7);
+    prim[2] = "8"; assert(shell_cmd_gf2(3, prim) == 2);
+    prim[2] = "01"; assert(shell_cmd_gf2(3, prim) == 2);
     char *enter[] = {"gf2", "enter"}, *leave[] = {"gf2", "leave"};
     assert(!shell_cmd_gf2(2, enter) && captured.test == GF4_DISPLAY && captured.session == 9);
     assert(!shell_cmd_gf2(2, leave) && captured.test == GF4_DISPLAY && captured.session == 10);

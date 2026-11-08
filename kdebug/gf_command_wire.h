@@ -11,7 +11,7 @@
 enum gf2_case {
     GF2_STATUS, GF2_START, GF2_REFERENCE, GF2_STOP, GF2_RECOVER,
     GF2_CYCLE, GF2_BAD_HANDLE, GF2_BAD_METHOD, GF2_VBLANK, GF3_ACCEL, GF4_DISPLAY,
-    GF5_FEATURE
+    GF5_FEATURE, GF6_PRIM
 };
 /* GF5 session: op[7:0], operand index[15:8], halfword[31:16].
  * ARG_LO/HI set one of eight u32 operands, without truncating VRAM offsets.

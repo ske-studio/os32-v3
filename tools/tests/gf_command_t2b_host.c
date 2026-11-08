@@ -327,6 +327,10 @@ void _start(void)
     t2b_reference_count();t2b_reference_stalled();t2b_wrap_required();
     t2b_recover_epoch();t2b_fault_recover();t2b_display_changed();
     t2b_deadline_wrap();t2b_fault_subchannel();t2b_accel_dispatch();
+    struct gf2_request prim = {sizeof(prim), GF6_PRIM, 7, 0};
+    assert(gf_command_test(&prim, 0, 0, 0) == 7 && prim.rc == 7 && prim.session == 0);
     t2b_display_dispatch();t2b_lifecycle_rejections();
     gf2_host_exit(0);
 }
+
+int gf_prim_bench(u32 item) { return (int)item; }

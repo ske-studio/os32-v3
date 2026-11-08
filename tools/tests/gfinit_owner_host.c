@@ -57,12 +57,15 @@ static void command_selection_test(void)
     q=(struct gf2_request){sizeof(q),GF5_FEATURE,0xffff0101U,0};
     CHECK(!gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0));
     CHECK(command_calls==3 && command_session==0xffff0101U);
-    q=(struct gf2_request){sizeof(q),GF5_FEATURE+1,0,0};
+    q=(struct gf2_request){sizeof(q),GF6_PRIM,7,0};
+    CHECK(!gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(command_calls==4 && command_test_id==GF6_PRIM && command_session==7);
+    q=(struct gf2_request){sizeof(q),GF6_PRIM+1,0,0};
     CHECK(gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0)==GF2_EINVAL);
-    CHECK(command_calls==3 && q.rc==GF2_EINVAL);
+    CHECK(command_calls==4 && q.rc==GF2_EINVAL);
     q=(struct gf2_request){sizeof(q),GF2_STATUS,1,0};
     CHECK(gfinit_call(GF_OP_COMMAND,&q,sizeof(q),&base,&transport,&s0)==GF2_EINVAL);
-    CHECK(command_calls==3);
+    CHECK(command_calls==4);
 }
 void _start(void)
 {

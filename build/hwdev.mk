@@ -2,7 +2,7 @@
 HWDEV_OUT := $(BUILD_OUT)/hwdev
 GF_CALC_NAMES := calc timing format pitch start dac_format output cursor fifo extended pll_program
 GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(GF_CALC_NAMES)))
-HWDEV_GF := gf_load_state gf_stage_state gf_foundation_test gf_command_test gf_accel_test gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf calc timing format pitch start dac_format output cursor fifo extended pll_program
+HWDEV_GF := gf_load_state gf_stage_state gf_foundation_test gf_command_test gf_accel_test gf_prim_bench gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf calc timing format pitch start dac_format output cursor fifo extended pll_program
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
 # Normal and R1 share this decoder object; keep all other units at -O2.

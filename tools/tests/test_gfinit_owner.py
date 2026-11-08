@@ -13,8 +13,8 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 MUTATIONS = [
-    ('feature_dispatch_range', 'q.test > GF5_FEATURE', 'q.test > GF4_DISPLAY'),
-    ('feature_dispatch_session', 'q.test != GF5_FEATURE && q.session', 'q.session'),
+    ('feature_dispatch_range', 'q.test > GF6_PRIM', 'q.test > GF4_DISPLAY'),
+    ('feature_dispatch_session', 'q.test != GF6_PRIM && q.session', 'q.session'),
 
     ('foundation_production_owner', 'if (production) f = ops->production;', 'if (production) f = 0;'),
     ('foundation_cycle_policy_count', 'policy.count = owner->policy_count;', 'policy.count = 0;'),
