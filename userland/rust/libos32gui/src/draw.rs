@@ -80,6 +80,16 @@ impl Painter {
         self.clip.contains(lx, ly)
     }
 
+    pub(crate) fn is_direct(&self) -> bool { self.direct }
+
+    pub(crate) fn direct_icon(&self, x: i32, y: i32, pixels: &[u8; 256]) -> bool {
+        if !self.direct { return false; }
+        let _ = unsafe { ffi::gfx_cmd_enqueue_put(self.ox + x, self.oy + y, 16, 16, pixels.as_ptr(), 16, 255) };
+        true
+    }
+
+    pub(crate) fn direct_contains(&self, x: i32, y: i32) -> bool { self.in_clip(x, y) }
+
     /// 1 画素 (局所座標、クリップ判定つき)。
     #[inline]
     pub(crate) fn put(&self, lx: i32, ly: i32, color: u8) {
@@ -372,6 +382,10 @@ pub fn hline(surface: SurfaceId, x: i32, y: i32, w: i32, style: Style) {
         p.fill_solid(rc, style.fg);
         return;
     }
+    if p.direct && style.has(GUI_STYLE_XOR) && !style.has(GUI_STYLE_DOTTED) {
+        p.xor_rect(rc, style.fg);
+        return;
+    }
     let mut lx = rc.x as i32;
     let x1 = rc.right();
     let ly = rc.y as i32;
@@ -400,6 +414,10 @@ pub fn vline(surface: SurfaceId, x: i32, y: i32, h: i32, style: Style) {
         p.fill_solid(rc, style.fg);
         return;
     }
+    if p.direct && style.has(GUI_STYLE_XOR) && !style.has(GUI_STYLE_DOTTED) {
+        p.xor_rect(rc, style.fg);
+        return;
+    }
     let lx = rc.x as i32;
     let mut ly = rc.y as i32;
     let y1 = rc.bottom();
@@ -422,6 +440,8 @@ fn span_pixel(p: &Painter, lx: i32, ly: i32, parity_src: i32, style: &Style) {
         }
         let old = p.get(lx, ly);
         p.put(lx, ly, old ^ style.fg);
+    } else if p.direct {
+        if p.in_clip(lx, ly) { p.fill_solid(Rect::new(lx as i16, ly as i16, 1, 1), style.fg); }
     } else {
         p.put(lx, ly, style.fg);
     }
@@ -438,6 +458,59 @@ pub fn line(surface: SurfaceId, x0: i32, y0: i32, x1: i32, y1: i32, style: Style
         return;
     }
     let p = Painter::from_target(&t);
+    if p.direct && !style.has(GUI_STYLE_DOTTED) && (y0 == y1 || x0 == x1) {
+        let rc = if y0 == y1 {
+            Rect::new(x0.min(x1) as i16, y0 as i16, ((x1 - x0).abs() + 1) as i16, 1)
+        } else {
+            Rect::new(x0 as i16, y0.min(y1) as i16, 1, ((y1 - y0).abs() + 1) as i16)
+        };
+        let rc = clip_rect(&t, rc);
+        if !rc.is_empty() {
+            if style.has(GUI_STYLE_XOR) { p.xor_rect(rc, style.fg); }
+            else { p.fill_solid(rc, style.fg); }
+        }
+        return;
+    }
+    if p.direct && style.has(GUI_STYLE_XOR) {
+        let (mut x, mut y) = (x0, y0);
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        let sx = if x < x1 { 1 } else { -1 };
+        let sy = if y < y1 { 1 } else { -1 };
+        let horizontal = dx >= -dy;
+        let mut err = dx + dy;
+        let mut step = 0;
+        let mut run: Option<(i32, i32, i32, i32)> = None;
+        loop {
+            let visible = p.in_clip(x, y) && (!style.has(GUI_STYLE_DOTTED) || step & 1 == 0);
+            if visible {
+                match run {
+                    Some((ax, ay, bx, by)) if (horizontal && y == by && (x - bx).abs() == 1)
+                        || (!horizontal && x == bx && (y - by).abs() == 1) => run = Some((ax, ay, x, y)),
+                    _ => {
+                        if let Some((ax, ay, bx, by)) = run {
+                            p.xor_rect(Rect::new(ax.min(bx) as i16, ay.min(by) as i16,
+                                ((ax - bx).abs() + 1) as i16, ((ay - by).abs() + 1) as i16), style.fg);
+                        }
+                        run = Some((x, y, x, y));
+                    }
+                }
+            } else if let Some((ax, ay, bx, by)) = run.take() {
+                p.xor_rect(Rect::new(ax.min(bx) as i16, ay.min(by) as i16,
+                    ((ax - bx).abs() + 1) as i16, ((ay - by).abs() + 1) as i16), style.fg);
+            }
+            if x == x1 && y == y1 { break; }
+            let e2 = 2 * err;
+            if e2 >= dy { err += dy; x += sx; }
+            if e2 <= dx { err += dx; y += sy; }
+            step += 1;
+        }
+        if let Some((ax, ay, bx, by)) = run {
+            p.xor_rect(Rect::new(ax.min(bx) as i16, ay.min(by) as i16,
+                ((ax - bx).abs() + 1) as i16, ((ay - by).abs() + 1) as i16), style.fg);
+        }
+        return;
+    }
     let mut x = x0 as i32;
     let mut y = y0 as i32;
     let xe = x1 as i32;
@@ -718,6 +791,18 @@ fn engine_cell(e: &mut AppEngine, cp: u32, cell: FontCell, w: i32) -> Option<Cel
 
 /// 1 cell を置く: 不透過は cell∩clip を `bg` で塗り、`fg` の画素を Painter の clip で。
 fn put_cell(p: &Painter, penx: i32, ly: i32, w: i32, rows: &CellRows, fg: u8, bg: Option<u8>) {
+    if p.direct {
+        let mut bits = [0u8; CELL_H as usize * 2];
+        for (i, row) in rows.iter().enumerate() {
+            bits[2 * i] = (row >> 8) as u8;
+            bits[2 * i + 1] = *row as u8;
+        }
+        let c = p.clip;
+        let _ = unsafe { ffi::gfx_cmd_enqueue_mono(p.ox + penx, p.oy + ly, w, CELL_H,
+            bits.as_ptr(), 2, fg, bg.map_or(-1, i32::from),
+            p.ox + c.x as i32, p.oy + c.y as i32, c.w as i32, c.h as i32) };
+        return;
+    }
     if let Some(b) = bg {
         p.fill_solid(Rect::new(penx as i16, ly as i16, w as i16, CELL_H as i16), b);
     }

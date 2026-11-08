@@ -47,9 +47,14 @@ mod ffi {
     pub unsafe fn gfx_cmd_enqueue_fill(x: i32, y: i32, w: i32, h: i32, c: u8, rop: u8) -> i32 {
         CALLS.push((x, y, w, h, c, rop as i32)); 0
     }
+    pub static mut DATA_CALLS: Vec<(i32, i32, i32, i32, u32, i32, Vec<u8>, i32, i32, i32, i32, i32)> = Vec::new();
+    pub unsafe fn gfx_cmd_enqueue_mono(x: i32, y: i32, w: i32, h: i32, bits: *const u8, pitch: u32, fg: u8, bg: i32, cx: i32, cy: i32, cw: i32, ch: i32) -> i32 {
+        DATA_CALLS.push((x, y, w, h, pitch, bg, std::slice::from_raw_parts(bits, (pitch * h as u32) as usize).to_vec(), fg as i32, cx, cy, cw, ch)); 0
+    }
     pub unsafe fn gfx_cmd_enqueue_put(x: i32, y: i32, w: i32, h: i32, src: *const u8, pitch: u32, key: i32) -> i32 {
-        assert_eq!((w, h, pitch, key), (1, 1, 1, -1));
-        CALLS.push((x, y, w, h, *src, -1)); 0
+        if w == 1 && h == 1 { CALLS.push((x, y, w, h, *src, -1)); }
+        else { DATA_CALLS.push((x, y, w, h, pitch, key, std::slice::from_raw_parts(src, (pitch * h as u32) as usize).to_vec(), -1, 0, 0, 0, 0)); }
+        0
     }
 
     pub const W: i32 = 640;
@@ -923,10 +928,41 @@ fn t21_direct_dispatch() {
     draw::fill_rect(win, Rect::new(1, 2, 3, 4), Style::new(9, 5));
     draw::fill_rect(win, Rect::new(2, 3, 2, 2), Style::new(9, 5).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
     draw::line(win, 0, 0, 1, 0, Style::pen(6));
+    draw::fill_rect(win, Rect::new(0, 0, 1, 1), Style::new(3, 5).with_flags(os32api::gui::proto::GUI_STYLE_DITHER50));
     let calls = unsafe { ffi::CALLS.clone() };
     check(calls == vec![(11,22,3,4,5,0), (12,23,2,2,9,1),
-                        (10,20,1,1,6,-1), (11,20,1,1,6,-1)], "direct-dispatch");
+                        (10,20,2,1,6,0), (10,20,1,1,3,-1)], "direct-dispatch");
     check(fb().iter().all(|&p| p == 7), "direct-no-framebuffer");
+    unsafe { ffi::gfx_direct = 0; }
+    clip::clear_base_clip();
+    assert_eq!(surface::destroy_surface(win), 0);
+}
+
+#[test]
+fn t22_direct_cell_icon_xor() {
+    set_mode(true);
+    unsafe { ffi::gfx_direct = 1; ffi::CALLS.clear(); ffi::DATA_CALLS.clear(); }
+    let win = surface::create_window_surface(Rect::new(10, 20, 20, 20));
+    assert_eq!(clip::set_base_clip(win, Rect::new(2, 3, 12, 14)), 0);
+    draw::text(win, 0, 0, b"A", Style::new(9, 5));
+    let calls = unsafe { ffi::DATA_CALLS.clone() };
+    check(calls.len() == 1 && calls[0].0 == 10 && calls[0].1 == 20 && calls[0].2 == 8 && calls[0].3 == 16 && calls[0].4 == 2 && calls[0].5 == 5 && calls[0].7 == 9 && calls[0].8 == 12 && calls[0].9 == 23 && calls[0].10 == 12 && calls[0].11 == 14 && calls[0].6.iter().any(|&b| b != 0), "direct-cell-mono");
+    unsafe { ffi::DATA_CALLS.clear(); }
+    draw::text(win, 0, 0, b"A", Style::new(9, 5).with_flags(GUI_STYLE_TRANSPARENT_BG));
+    check(unsafe { ffi::DATA_CALLS.len() == 1 && ffi::DATA_CALLS[0].5 == -1 }, "direct-cell-transparent");
+    let mut icon = icon::GuiIcon16::ZERO;
+    icon.pixels[8 * 4 + 2] = 0xab;
+    icon.mask[2 * 4] = 0x0c;
+    unsafe { ffi::DATA_CALLS.clear(); }
+    icon::draw_icon16(win, 0, 0, &icon);
+    let calls = unsafe { ffi::DATA_CALLS.clone() };
+    check(calls.len() == 1 && (calls[0].0, calls[0].1, calls[0].2, calls[0].3, calls[0].4, calls[0].5) == (10, 20, 16, 16, 16, 255) && calls[0].6[68] == 10 && calls[0].6[69] == 11 && calls[0].6[0] == 255, "direct-icon-put");
+    unsafe { ffi::CALLS.clear(); }
+    draw::line(win, 0, 5, 19, 5, Style::pen(6).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
+    check(unsafe { ffi::CALLS == vec![(12, 25, 12, 1, 6, 1)] }, "direct-xor-span");
+    unsafe { ffi::CALLS.clear(); }
+    draw::line(win, 2, 4, 8, 6, Style::pen(6).with_flags(os32api::gui::proto::GUI_STYLE_XOR));
+    check(unsafe { ffi::CALLS == vec![(12, 24, 2, 1, 6, 1), (14, 25, 3, 1, 6, 1), (17, 26, 2, 1, 6, 1)] }, "direct-xor-diagonal-spans");
     unsafe { ffi::gfx_direct = 0; }
     clip::clear_base_clip();
     assert_eq!(surface::destroy_surface(win), 0);

@@ -42,6 +42,20 @@ pub fn draw_icon16(surface: SurfaceId, x: i32, y: i32, icon: &GuiIcon16) {
     if p.cell_hidden(x, y, ICON16_SIZE, ICON16_SIZE) {
         return;
     }
+    if p.is_direct() {
+        let mut pixels = [255u8; 256];
+        for row in 0..16usize {
+            for col in 0..16usize {
+                if p.direct_contains(x + col as i32, y + row as i32)
+                    && icon.mask[row * 2 + col / 8] & (0x80 >> (col & 7)) != 0 {
+                    let b = icon.pixels[row * 8 + col / 2];
+                    pixels[row * 16 + col] = if col & 1 == 0 { b >> 4 } else { b & 15 };
+                }
+            }
+        }
+        p.direct_icon(x, y, &pixels);
+        return;
+    }
     let mut row = 0i32;
     while row < ICON16_SIZE {
         let mrow = (row * 2) as usize;

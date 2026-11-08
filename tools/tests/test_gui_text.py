@@ -15,7 +15,7 @@ font_source_*・kcg_read_*・unicode_to_jis・gfx_screen_info) を host の贋�
 - 旧 KCG 描画 (kcg_draw_utf8 / kcg_set_scale) を draw.rs が呼ばない。
 """
 CHECK = dict(name='gui-text-host', tier=1,
-    covers=['tools/tests/gui_text_host.rs', 'tools/tests/test_gui_trim.py', 'tools/tests/os32api_host.py', 'tools/tests/test_font_outline.py', 'tools/fetch_fonts.py', 'userland/lib/font/**', 'userland/rust/libos32gui/src/draw.rs', 'userland/rust/libos32gui/src/font.rs', 'userland/rust/libos32gui/src/gstate.rs', 'userland/rust/libos32gui/src/clip.rs', 'userland/rust/libos32gui/src/surface.rs', 'userland/rust/libos32gui/src/ffi.rs', 'sdk/rust/os32api/src/**', 'lib/utf8.c', 'tools/tests/gui_trim_host.rs', 'tools/tests/rust_alloc_host.rs', 'tools/tests/test_font_reader.py', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui_stub/src/lib.rs', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv'],
+    covers=['tools/tests/gui_text_host.rs', 'tools/tests/test_gui_trim.py', 'tools/tests/os32api_host.py', 'tools/tests/test_font_outline.py', 'tools/fetch_fonts.py', 'userland/lib/font/**', 'userland/rust/libos32gui/src/draw.rs', 'userland/rust/libos32gui/src/icon.rs', 'userland/rust/libos32gui/src/font.rs', 'userland/rust/libos32gui/src/gstate.rs', 'userland/rust/libos32gui/src/clip.rs', 'userland/rust/libos32gui/src/surface.rs', 'userland/rust/libos32gui/src/ffi.rs', 'sdk/rust/os32api/src/**', 'lib/utf8.c', 'tools/tests/gui_trim_host.rs', 'tools/tests/rust_alloc_host.rs', 'tools/tests/test_font_reader.py', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui_stub/src/lib.rs', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv'],
     needs=[], budget=10.1)
 
 import argparse
@@ -35,6 +35,7 @@ DRAW = 'userland/rust/libos32gui/src/draw.rs'
 
 # 変異 1 本 = (名前, 置き換え前, 置き換え後, RED の印)。どれも draw.rs。
 MUTATIONS = [
+    ('cell-per-pixel', '    if p.direct {\n        let mut bits = [0u8; CELL_H as usize * 2];', '    if false {\n        let mut bits = [0u8; CELL_H as usize * 2];', 'direct-cell-mono'),
     ('direct-branch-removed', '        } else if self.direct {\n            // この描画 API',
      '        } else if false {\n            // この描画 API', 'direct-dispatch'),
     ('direct-xor-copy', 'rc.h as i32, color, 1) };',
@@ -100,7 +101,7 @@ def compose(unit, draw_src):
     (unit / 'draw.rs').write_text(draw_src)
     host = (ROOT / 'tools/tests/gui_text_host.rs').read_text()
     head, body = host.split('// ---- crate ----', 1)
-    mods = ''.join(f'#[path="{GUI / n}.rs"] mod {n};\n' for n in ('gstate', 'clip', 'surface', 'font', 'textcore'))
+    mods = ''.join(f'#[path="{GUI / n}.rs"] mod {n};\n' for n in ('gstate', 'clip', 'surface', 'font', 'textcore', 'icon'))
     mods += f'#[path="{unit / "draw.rs"}"] mod draw;\n'
     (unit / 'main.rs').write_text(head + mods + body)
 
