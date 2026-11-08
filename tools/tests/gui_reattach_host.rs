@@ -9,7 +9,7 @@ static OFFSCREEN_WRITES: AtomicUsize = AtomicUsize::new(0);
 static PRESENTS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle] static mut gfx_api: *mut os32api::KernelAPI = core::ptr::null_mut();
 #[no_mangle] static mut gfx_direct: i32 = 0;
-#[no_mangle] extern "C" fn gfx_cmd_enqueue_fill(_:i32,_:i32,_:i32,_:i32,_:u8,_:u8) -> i32 { PENDING_FILLS.fetch_add(1,SeqCst); 0 }
+#[no_mangle] extern "C" fn gfx_cmd_enqueue_fill(_:i32,_:i32,_:i32,_:i32,_:u8,_:u8) -> i32 { assert!(ALLOW_U2_FILLS.load(SeqCst), "unexpected direct fill"); PENDING_FILLS.fetch_add(1,SeqCst); 0 }
 #[no_mangle] extern "C" fn gfx_cmd_enqueue_put(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:i32) -> i32 { panic!("unexpected direct put"); }
 #[no_mangle] extern "C" fn gfx_cmd_enqueue_mono(_:i32,_:i32,_:i32,_:i32,_:*const u8,_:u32,_:u8,_:i32,_:i32,_:i32,_:i32,_:i32) -> i32 { panic!("unexpected direct mono"); }
 #[no_mangle] static mut gfx_ready: i32 = 1;
@@ -182,6 +182,7 @@ mod uistate {
 static TRACE: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
 static REGEN: AtomicI32 = AtomicI32::new(0);
 static FLUSH_RC: AtomicI32 = AtomicI32::new(0);
+static ALLOW_U2_FILLS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static PENDING_FILLS: AtomicUsize = AtomicUsize::new(0);
 static FLUSHED_FILLS: AtomicUsize = AtomicUsize::new(0);
 static SCROLL_RC: AtomicI32 = AtomicI32::new(0);
@@ -223,8 +224,10 @@ fn u2_flush_scroll_and_poll_recovery() {
     assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_COMMIT as i32+100], "COMMIT must follow flush");
     let rect = Rect::new(2,3,40,30);
     TRACE.lock().unwrap().clear();
+    ALLOW_U2_FILLS.store(true,SeqCst);
     for _ in 0..3 { unsafe { ffi::gfx_cmd_enqueue_fill(2,3,4,5,6,0) }; }
     assert!(scroll::scroll(7,rect,8,-2).is_ok());
+    ALLOW_U2_FILLS.store(false,SeqCst);
     assert_eq!(FLUSHED_FILLS.load(SeqCst),3);
     assert_eq!(*TRACE.lock().unwrap(), vec![0, GUI_OP_SCROLL as i32+100]);
     let req = unsafe { core::ptr::read_unaligned(shm.as_ptr().add(GUI_SLOT_REQ_OFF) as *const GuiReqScroll) };
@@ -258,7 +261,9 @@ fn u2_flush_scroll_and_poll_recovery() {
     assert_eq!(REGEN.load(SeqCst),1,"failed check must retain regen");
     assert!(INVALIDATED.lock().unwrap().is_empty());
     RC.store(0,SeqCst);
+    TRACE.lock().unwrap().clear();
     assert!(client::wait(1).is_ok());
+    assert_eq!(*TRACE.lock().unwrap(), vec![0,GUI_OP_WAIT as i32+100,1,2,GUI_OP_INVALIDATE as i32+100,GUI_OP_INVALIDATE as i32+100], "WAIT must follow flush");
     assert_eq!(INVALIDATED.lock().unwrap().len(),2);
     uistate::s().windows.iter_mut().for_each(|w| w.used=false);
     unsafe { client::host_base(core::ptr::null_mut()); }

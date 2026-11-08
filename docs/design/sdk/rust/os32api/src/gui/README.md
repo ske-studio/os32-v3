@@ -4,10 +4,10 @@
 
 ### stub
 
-shlib protocol は2、SHM の `GUI_PROTO_VERSION` は2。ジャンプ表は121本で、
-末尾120の `E_TRIM_HOOK_SET` 以外の順序・意味は保つ。旧 protocol 1 は両方向で拒否する。
-
-> [要確認] sdk/rust/os32api/src/gui/stub.rs の現行 SHLIB_NFUNC は 122。121本は記述時点の値。
+shlib protocol は2、SHM の `GUI_PROTO_VERSION` は2。ジャンプ表は124本。
+既存の0..=121を保ち、122・123にスクロールの口を末尾追記した。
+契約と互換規則は [共有ライブラリ設計](../../../../../userland/rust/libos32gui/src/shlib.md) を参照。
+旧 protocol 1 は両方向で拒否する。
 
 Rust stub の `init` は OP_INIT 成功後だけ retry を有効化し、アプリ側 trampoline を登録する。
 `set_trim_hook(f: fn() -> u32)` は任意のキャッシュ解放 hook を置く。

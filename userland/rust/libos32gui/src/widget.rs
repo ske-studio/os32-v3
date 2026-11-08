@@ -380,6 +380,10 @@ pub fn rect(id: WidgetId) -> Rect {
     }
 }
 
+#[path = "widget_scroll.rs"]
+mod scrolling;
+pub use scrolling::textarea_scroll;
+
 /* ---- リストボックス ---- */
 
 pub fn list_clear(id: WidgetId) -> GuiResult<()> {
@@ -443,9 +447,11 @@ pub fn list_set_selection(id: WidgetId, index: i32) -> GuiResult<()> {
     if index < -1 || index >= s().widgets[i].item_count as i32 {
         return Err(GuiErr::INVAL);
     }
+    let old_sel = s().widgets[i].sel;
+    let old_top = s().widgets[i].top;
     s().widgets[i].sel = index as i16;
     ensure_visible(i);
-    invalidate(i);
+    scrolling::list_damage(i, old_top, old_sel);
     Ok(())
 }
 
@@ -1593,9 +1599,11 @@ fn key_listbox(idx: usize, scan: u8, out: &mut WidgetOut) {
         _ => return,
     }
     if sel != s().widgets[idx].sel {
+        let old_sel = s().widgets[idx].sel;
+        let old_top = s().widgets[idx].top;
         s().widgets[idx].sel = sel;
         ensure_visible(idx);
-        invalidate(idx);
+        scrolling::list_damage(idx, old_top, old_sel);
         out.push(WEV_SELECT, id_of(idx), sel as i32);
     }
 }

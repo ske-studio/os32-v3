@@ -14,6 +14,10 @@ GDI='userland/rust/gdi_test/src/lib.rs'
 UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font','textcore','scroll')
 TARGET_SRCS=[GUI+x+'.rs' for x in UNITS]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
+ ('poll-no-return-check',GUI+'client.rs','    let _ = check_gfx(); // Recover even when OP_POLL itself failed.','', 'regen must invalidate every own window'),
+ ('take-before-check',GUI+'client.rs','    let rc = unsafe { crate::ffi::libos32gfx_check() };','    let regen = unsafe { crate::ffi::libos32gfx_take_regen() };\n    let rc = unsafe { crate::ffi::libos32gfx_check() };', 'assertion `left == right` failed'),
+ ('wait-no-flush',GUI+'client.rs','    unsafe { crate::ffi::gfx_flush() };\n    let result = call(GUI_OP_WAIT, timeout_ticks);','    let result = call(GUI_OP_WAIT, timeout_ticks);', 'WAIT must follow flush'),
+ ('poll-no-flush',GUI+'client.rs','    unsafe { crate::ffi::gfx_flush() };\n    let result = call(GUI_OP_POLL, 0);','    let result = call(GUI_OP_POLL, 0);', 'assertion `left == right` failed'),
  ('scroll-no-flush-check',GUI+'scroll.rs','if unsafe { ffi::gfx_flush() } < 0 {','if unsafe { ffi::gfx_flush() } < 0 && false {','failed flush must invalidate'),
  ('return-no-take-regen',GUI+'client.rs','if unsafe { crate::ffi::libos32gfx_take_regen() } != 0 {','if false {','regen must invalidate every own window'),
  ('commit-no-flush',GUI+'client.rs','    unsafe { crate::ffi::gfx_flush() }; // Publish queued drawing before COMMIT.','','COMMIT must follow flush'),
@@ -43,6 +47,10 @@ def main():
             if m:
                 assert texts[m[1]].count(m[2])==(2 if m[0]=='input-no-check' else 1),(m[0],texts[m[1]].count(m[2]))
                 texts[m[1]]=texts[m[1]].replace(m[2],m[3])
+                if m[0] == 'take-before-check':
+                    anchor = 'if unsafe { crate::ffi::libos32gfx_take_regen() } != 0 {'
+                    assert texts[m[1]].count(anchor) == 1
+                    texts[m[1]] = texts[m[1]].replace(anchor, 'if regen != 0 {')
             root='#![allow(dead_code, unused_imports)]\n'
             for path in TARGET_SRCS[:len(UNITS)]:
                 unit=Path(path).stem;(dest/(unit+'.rs')).write_text(texts[path] + ('\npub unsafe fn host_base(p: *mut u8) { c().base = p; }\n' if unit == 'client' else ''));root+=f'mod {unit};\n'

@@ -24,6 +24,7 @@ pub mod clip;
 pub mod draw;
 pub mod layout;
 pub mod surface;
+pub mod scroll;
 pub mod timer;
 pub mod widget;
 pub mod window;

@@ -278,8 +278,11 @@ pub const E_TRIM_HOOK_SET: usize = 120;
 /// T7b-b3: 字形 engine の数 (`os32gui_font_stats(out, len) -> i32`、観測用)。
 pub const E_FONT_STATS: usize = 121;
 
+pub const E_SCROLL: usize = 122;
+pub const E_W_TEXTAREA_SCROLL: usize = 123;
+
 /// ジャンプ表の本数 (末尾追記のたびに増やす)。
-pub const SHLIB_NFUNC: usize = 122;
+pub const SHLIB_NFUNC: usize = 124;
 
 const _: () = assert!(SHLIB_NFUNC <= OS32_SHLIB_MAX_FUNC);
 

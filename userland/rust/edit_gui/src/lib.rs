@@ -253,10 +253,28 @@ impl Editor {
     fn refresh(&mut self) {
         let (cols, height) = self.view_geom();
         let d = doc();
+        let old_top = self.top;
         self.top = d.scroll_to_caret(cols, height, self.top);
 
         let mut rows = [VRow::EMPTY; doc::MAX_VIEW_ROWS];
         let n = d.fill_view(cols, self.top, &mut rows[..height]);
+        if self.top != old_top {
+            let mut lines: [&[u8]; doc::MAX_VIEW_ROWS] = [&[]; doc::MAX_VIEW_ROWS];
+            for i in 0..n {
+                let r = rows[i];
+                lines[i] = &d.line(r.line)[r.start..r.end];
+            }
+            let cv = d.caret_vrow(cols);
+            let (crow, ccol) = if cv >= self.top && cv < self.top + n {
+                let k = cv - self.top;
+                (k as i32, d.cx.saturating_sub(rows[k].start) as i32)
+            } else { (-1, 0) };
+            if widget::textarea_scroll(self.area, self.top as i32 - old_top as i32,
+                &lines[..n], crow, ccol).is_ok() {
+                self.update_status();
+                return;
+            }
+        }
 
         let _ = widget::textarea_clear(self.area);
         let mut i = 0usize;
