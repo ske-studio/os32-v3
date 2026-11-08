@@ -47,12 +47,14 @@ TARGET_SRCS = [
     'userland/lib/gfx/draw/gfx_rotate.c',
     'userland/lib/gfx/draw/gfx_raster.c',
     'userland/lib/gfx/draw/gfx_dump.c',
+    'userland/lib/gfx/draw/gfx_cmd.c',
     'userland/lib/gfx/geom/gfx_fill.c',
     'userland/lib/gfx/geom/gfx_circle.c',
     'userland/lib/gfx/geom/gfx_bezier.c',
     'userland/lib/gfx/libos32gfx.h',
     'userland/lib/gfx/libgfx_internal.h',
     'userland/lib/gfx/libgfx_attach_internal.h',
+    'userland/lib/gfx/gfx_direct_internal.h',
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',
@@ -82,7 +84,8 @@ def main():
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(originals[x] for x in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
     first = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')
-    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port']
+    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port',
+                'gfx_direct', 'gfx_gen', 'gfx_lost', 'gfx_regen']
     second = re.compile(r'(?<!->)(?<!\.)(?<!struct )\b('+'|'.join(sorted(names | set(globals_)))+
                         r'|libos32gfx_\w+|utf8_\w+(?=\s*\()|unicode_to_\w+(?=\s*\())\b')
     with tempfile.TemporaryDirectory(prefix='os32-e8a-objects-') as cache:
@@ -99,6 +102,8 @@ def main():
                         body = texts[path]
                         if path == CORE:
                             body = body.replace('return cs & 3U;', 'extern unsigned int host_sdk_cpl; return host_sdk_cpl;')
+                        if path.endswith('gfx_cmd.c'):
+                            body = body.replace('../gfx_direct_internal.h', 'gfx_direct_internal.h')
                         if path.endswith('gfx_dump.c'):
                             body = '#pragma GCC diagnostic ignored "-Wsign-compare"\n'+body
                         body = (second.sub(lambda x: 'shl_'+x[0], body) if shlib else
