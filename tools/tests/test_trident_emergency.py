@@ -17,6 +17,7 @@ CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=90,
             'exec/exec_finish.inc', 'exec/appslot.h',
             'tools/tests/trident_emergency_host.c', 'tools/tests/trident_core_host.c',
             'tools/tests/trident_surface_lifetime_host.c', 'drivers/video/trident/*.c',
+            'drivers/video/trident/probes.h',
             'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'exec/surface_limits.h',
             'drivers/video/trident/trident_module.h', 'lib/kstring.h',
             'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'lib/serial_diag.h',
@@ -162,7 +163,7 @@ def lifetime(runner, mutation=None, fallback=1):
             body = source('drivers/video/trident/' + stem + '.c', mutation)
             if stem == 'resources':
                 body = f'#define TRI_RAM_FALLBACK_DEFAULT {fallback}\n' + body
-            for header in ('trident.h', 'trident_module.h'):
+            for header in ('trident.h', 'trident_module.h', 'probes.h'):
                 body = body.replace('"' + header + '"', '"' + str(directory / header) + '"')
             if stem == 'backend_trident':
                 body = body.replace('trident_regs_bind(&device)', 'lifetime_bind(&device)')

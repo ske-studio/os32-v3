@@ -42,7 +42,15 @@ static struct trident_io fake_io;
 static u32 status_reads;
 static bool probes_registered;
 i32 debug_probe_register(struct module_handle h, const struct probe_decl *t, u32 n)
-{ (void)h; CHECK(pinned && !prepares && !t && !n); if (mode==67) return -1; probes_registered=true; return 0; }
+{
+    (void)h;
+    CHECK(pinned && !prepares && t && n==1);
+    CHECK(!kstrcmp(t[0].name, "tri.screeninit.post"));
+    CHECK(t[0].slot && !t[0].slot->hit);
+    if (mode==67) return -1;
+    probes_registered=true;
+    return 0;
+}
 i32 debug_probe_unregister(struct module_handle h)
 { (void)h; probes_registered=false; return 0; }
 
@@ -234,7 +242,7 @@ void _start(void)
     record.base=record.ro;
     record.pages=(record.ro_size+MODULE_PAGE_SIZE-1)/MODULE_PAGE_SIZE;
     ops[0]=3; ops[1]=(u32)(uptr)trident_module_init;
-    ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98; ops[4]=(u32)(uptr)get_probe_decls;
+    ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98; ops[4]=(u32)(uptr)trident_get_probe_decls;
     TridentModuleContext loan=context;
     GfxBackend out={0};
     CHECK(trident_module_init(0,&loan)==TRI_E_INVAL);

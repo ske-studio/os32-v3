@@ -1,11 +1,5 @@
-#include "debug_probe.h"
-/* A2 publishes an empty table; concrete points are added in stage D. */
-static i32 get_probe_decls(const struct probe_decl **table, u32 *count)
-{
-    *table = 0;
-    *count = 0;
-    return 0;
-}
+#include "hwdev/gf/display/probes.h"
+
 #include "geforce_module.h"
 #include "hwdev/gf/production.h"
 #include "hwdev/gf/gf1_test.h"
@@ -74,4 +68,4 @@ const struct {
     u32 version;
     int (*initialize)(GfxBackend *, const GeforceModuleContext *);
     probe_get_decls_fn get_probe_decls;
-} geforce_module_ops = {GEFORCE_MODULE_OPS_VERSION, geforce_module_init, get_probe_decls};
+} geforce_module_ops = {GEFORCE_MODULE_OPS_VERSION, geforce_module_init, gf4_get_probe_decls};

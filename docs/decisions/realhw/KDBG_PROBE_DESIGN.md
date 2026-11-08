@@ -136,6 +136,8 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 | B 採取エンジン | kdebug/probe_wire.h（wire）、probe.c（設定/採取/リング）、probe_index.c（pairアクセス）、kdebug_main.c（op振分け）、ビルド目録 |
 | C 台本・出力 | userland/shell/hwb_probe.c（命令）、hwb_parse.c/hwb_exec.c（dispatch）、hwb_log.c（probe行）、HW_BASIC_DESIGN.md（利用契約） |
 | D 実点・受入 | hwdev/gf/display/service.c、drivers/video/trident/lifecycle.c（点）、各export宣言表、tools/accept/（台本）。最初の実点はA/Bのホスト偽部品受入後 |
+
+段 D の PM 決定: GF の2点は geforce.mod の宣言表にだけ登録し、HWDEV の get_probe_decls は空のまま（display/service.c は HWDEV に組まれない）。
 - HWDEV core表を伸ばす必要はない。内部モジュールexport/import変更は生成契約・CRC・該当ABIを同期し、新旧不一致をloaderで拒否する。
 - 公開KAPI追加を避ける。もし実装で必要と判明した場合は本票を改訂し sdk/kapi.json と[ABI]の clean→all を別途適用する。
 

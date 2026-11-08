@@ -106,6 +106,9 @@ int pc98_route_select_98(void) { return 0; }
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 { CHECK(!active && !scan); }
 #include "../../drivers/video/geforce/geforce_body.c"
+/* This ownerless WC fixture omits the F4 service and its resident slots. */
+i32 gf4_get_probe_decls(const struct probe_decl **table, u32 *count)
+{ *table=0; *count=0; return 0; }
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }
