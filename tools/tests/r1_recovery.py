@@ -10,7 +10,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
                'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
-               'mm/paging.c', 'exec/lease.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
+               'mm/paging.c', 'exec/lease.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
 
 
 def recovery(tmp, function, runner, mutation=None):

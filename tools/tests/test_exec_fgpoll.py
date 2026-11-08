@@ -9,7 +9,7 @@ CHECK = dict(name='exec-fgpoll-host', tier=1, budget=2.7,
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
                      'sdk/include/os32/**', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'])
+                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'])
 
 import argparse
 import os
@@ -126,7 +126,8 @@ def run_case(folder, source, name, mutant=False):
     fixture.write_text(HOST.replace('/* PRODUCT */', parts))
     exe = folder / 'host'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
-                    '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin',
+                    '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
+                    '-fdata-sections', '-Wl,--gc-sections', '-ffreestanding', '-fno-builtin',
                     '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
                     '-no-pie', '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT), str(fixture), '-o', str(exe)],
                    check=True)

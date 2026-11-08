@@ -3,7 +3,7 @@ Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
               'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
-              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
+              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
 from exec_source import exec_source
 import argparse
 import json

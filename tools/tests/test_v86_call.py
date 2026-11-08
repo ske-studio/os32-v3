@@ -2,7 +2,7 @@
 Normal controls always run before compiled runtime-RED mutations.
 """
 CHECK = dict(name='v86-call-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'arch/x86/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'arch/x86/legacy/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'arch/x86/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'arch/x86/legacy/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'],
     needs=[], budget=3.1)
 
 from kernel_includes import include_flags

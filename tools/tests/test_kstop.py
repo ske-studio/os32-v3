@@ -458,7 +458,10 @@ def run(overrides=None):
     code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
     with tempfile.TemporaryDirectory(prefix='os32-kstop-') as d:
-        d=pathlib.Path(d); (d/'t.c').write_text(code)
+        d=pathlib.Path(d)
+        (d/'provider.c').write_text(read('arch/x86/kernel/exec_context.c'))
+        code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(d/'provider.c') + '"\n' + code
+        (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
         inc=(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
@@ -470,6 +473,12 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
+ ('provider-syscall-result', 'arch/x86/kernel/exec_context.c',
+  '    ((u32 *)call->native)[FRAME_EAX] = result;',
+  '    ((u32 *)call->native)[FRAME_EAX] = result + 1;'),
+ ('provider-save-frame', 'arch/x86/kernel/exec_context.c',
+  '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque));',
+  '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque) - sizeof(u32));'),
  ('culprit-ignore-mark','exec/appslot_transition.inc',
   'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
   'a && a->state == APP_STATE_WAIT_POLL)'),

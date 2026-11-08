@@ -572,7 +572,7 @@ static void test_stdin_resume(void) {
 '''
 
 
-def run(source=None, irq=None):
+def run(source=None, irq=None, provider=None):
     source = source or exec_source(ROOT)
     irq = irq or (ROOT / 'kernel/irq/irq.c').read_text()
     constants = '\n'.join(l for l in source.splitlines() if
@@ -595,6 +595,9 @@ def run(source=None, irq=None):
             function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
+        if provider is not None:
+            (tmp / 'provider.c').write_text(provider)
+            code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(tmp / 'provider.c') + '"\n' + code
         (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nint appslot_gfx_owner(void) { return 2; }\n' + code)
         asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
@@ -724,6 +727,15 @@ if __name__ == '__main__':
     if not suite.result.wasSuccessful():
         sys.exit(1)
     if '--mutate' in sys.argv:
+        provider = (ROOT / 'arch/x86/kernel/exec_context.c').read_text()
+        for name, old, new in (
+                ('provider-priv-restore', '    tss_set_esp0(esp0);', '    (void)esp0;'),
+                ('provider-restart', '    eip -= 2;', '    eip -= 0;')):
+            assert provider.count(old) == 1, name
+            status, log = run(provider=provider.replace(old, new))
+            print(name + ': ' + status)
+            if status != 'runtime':
+                raise SystemExit(log or 'mutation must fail at runtime')
         inject = (ROOT / 'kernel/kbd_inject.c').read_text()
         old = '    got = inj_read(out, id, 0);'
         assert inject.count(old) == 1

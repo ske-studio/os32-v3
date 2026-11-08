@@ -5,7 +5,7 @@ checks the hot-path gate and delivery of a poll's abort before ring3 return.
 Full service/module composition remains U6's acceptance test.
 """
 CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=2.8,
-             covers=['tools/tests/test_exec_syscall_fgpoll.py',
+             covers=['arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h', 'tools/tests/test_exec_syscall_fgpoll.py',
                      'exec/exec_syscall.inc', 'drivers/video/geforce/geforce_module.h',
                      'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',

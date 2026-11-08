@@ -2,6 +2,7 @@
  * Image controls stop at argv; argv controls inspect the completed entry frame.
  * test_exec_r1 covers setjmp/landing. Expected bytes/order are fixed here. */
 #include "types.h"
+#include "host_exec_context.h"
 static u32 host_cr3;
 #include "exec.c"
 #include "os32x_hdr.c"

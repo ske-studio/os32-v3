@@ -22,7 +22,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
+    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'],
     needs=[], budget=2.9)
 
 from exec_source import exec_source
@@ -37,7 +37,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
+         "-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror"]
 INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 SRC = "exec/shell_service.c"
 HDR = "exec/shell_service.h"
@@ -233,7 +233,7 @@ def run_host(root, tmp, quiet=False):
             print("  FAIL wire: %s" % e)
         return 1
     p = subprocess.run(["gcc", *FLAGS, "-O0", "-D__KERNEL_BUILD__", "-I" + str(wire), *includes(root),
-                        "-fno-optimize-sibling-calls", "-nostdlib", "-static", "-no-pie",
+                        "-fno-optimize-sibling-calls", "-nostdlib", "-static", "-no-pie", "-Wl,--gc-sections",
                         str(root / "tools/tests/shell_service_host.c"), "-o", str(exe)],
                        cwd=root, capture_output=True, text=True)
     if p.returncode != 0:

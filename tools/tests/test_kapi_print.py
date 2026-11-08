@@ -10,7 +10,7 @@ import test_access_walk as walk
 ROOT = walk.ROOT
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_print.c', 'lib/kprintf.c',
               'lib/kprintf_attr.c', 'platform/pc98/console_attr.c',
-              'include/console_attr.h', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
+              'include/console_attr.h', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
 MUTANTS = [
     ('format raw pointer', 'print',
      'format, sizeof(format))) return 0;',

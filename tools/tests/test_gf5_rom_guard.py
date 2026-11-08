@@ -1,7 +1,7 @@
 """P2 ROM lifetime boundaries; reuse the freestanding ROM host and runner."""
 CHECK = dict(name='gf5-rom-guard-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=3.9,
              # Includes inputs reached through the shared test_gf5 runner.
-             covers=[
+             covers=['arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
                  'tools/tests/test_gf5_rom_guard.py',
                  'tools/tests/test_gf5.py',
                  'tools/tests/gf5_rom_host.c',
