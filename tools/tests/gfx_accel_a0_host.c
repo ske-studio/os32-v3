@@ -10,7 +10,8 @@
 KernelAPI *gfx_api;
 int gfx_lost;
 int gfx_direct;
-int gfx_ready, gfx_dirty_suppress;
+int gfx_ready, gfx_dirty_suppress, gfx_packed;
+void *memmove(void *dst, const void *src, unsigned int n) { (void)src; (void)n; return dst; }
 u8 gfx_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
 void gfx_pixel_nodirty(int x, int y, u8 c) { (void)x; (void)y; (void)c; }
 GFX_Framebuffer gfx_fb;

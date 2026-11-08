@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_copy.c'
 MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (
     ('dispatch', 'if (gfx_direct) {', 'if (1) {'),
+    ('direction', 'ystep = dy > sy ? -1 : 1;', 'ystep = 1;'),
+    ('packed-copy', '(unsigned int)(right - left));', '(unsigned int)0);'),
     ('copy-x', 'gfx_cmd_enqueue_copy(dx, dy, sx, sy, w, h)', 'gfx_cmd_enqueue_copy(dx + 1, dy, sx, sy, w, h)'),
 ))
 

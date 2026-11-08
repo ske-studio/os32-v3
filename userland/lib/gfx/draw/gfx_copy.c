@@ -4,6 +4,7 @@
 int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)
 {
     int left, top, right, bottom, x, y, xstep, ystep;
+    if (w <= 0 || h <= 0) return 0;
     if (gfx_direct) {
         int rc = gfx_cmd_enqueue_copy(dx, dy, sx, sy, w, h);
         if (!rc && !gfx_dirty_suppress)
@@ -11,7 +12,6 @@ int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)
         return rc;
     }
     if (!gfx_ready) return OS32_ERR_NOSYS;
-    if (w <= 0 || h <= 0) return 0;
     /* Clip both rectangles together, using wide arithmetic for the edges. */
     long long l = 0, t = 0, r = w, b = h;
     if (l < -(long long)dx) l = -(long long)dx;
@@ -26,9 +26,15 @@ int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)
     left = (int)l; top = (int)t; right = (int)r; bottom = (int)b;
     xstep = dx > sx ? -1 : 1;
     ystep = dy > sy ? -1 : 1;
-    for (y = ystep > 0 ? top : bottom - 1; y >= top && y < bottom; y += ystep)
-        for (x = xstep > 0 ? left : right - 1; x >= left && x < right; x += xstep)
-            gfx_pixel_nodirty(dx + x, dy + y, gfx_get_pixel(sx + x, sy + y));
+    for (y = ystep > 0 ? top : bottom - 1; y >= top && y < bottom; y += ystep) {
+        if (gfx_packed)
+            __builtin_memmove(gfx_fb.planes[0] + (dy + y) * gfx_fb.pitch + dx + left,
+                              gfx_fb.planes[0] + (sy + y) * gfx_fb.pitch + sx + left,
+                              (unsigned int)(right - left));
+        else
+            for (x = xstep > 0 ? left : right - 1; x >= left && x < right; x += xstep)
+                gfx_pixel_nodirty(dx + x, dy + y, gfx_get_pixel(sx + x, sy + y));
+    }
     if (!gfx_dirty_suppress)
         gfx_api->gfx_add_dirty_rect(dx + left, dy + top, right - left, bottom - top);
     return 0;
