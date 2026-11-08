@@ -1,11 +1,11 @@
 # T5c-5b: reuse T4 function imports, VA0 packing and paired distribution.
 GEFORCE_OUT := $(BUILD_OUT)/geforce
 GEFORCE_GEN := $(addprefix $(GEFORCE_OUT)/,geforce_imports.h geforce_imports.json geforce_import_slots.c geforce_import_stubs.S geforce_provider_types.c geforce_kexports.c)
-GEFORCE_DEF_SOURCES := include/debug_probe.h hwdev/gf/command.h hwdev/gf/gf1_test.h hwdev/gf/gf2_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
+GEFORCE_DEF_SOURCES := gfx/gfx_policy.h gfx/gfx_osri_view.h include/debug_probe.h hwdev/gf/command.h hwdev/gf/gf1_test.h hwdev/gf/gf2_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
 $(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 
-GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o gf_hook.o gf_present_m2mf.o geforce_import_slots.o geforce_import_stubs.o)
+GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o gf_hook.o gf_direct.o gf_present_m2mf.o geforce_import_slots.o geforce_import_stubs.o)
 GEFORCE_INC := $(INC_KERNEL) -I. -I$(GEFORCE_OUT)
 $(GEFORCE_OUT)/geforce_body.o: drivers/video/geforce/geforce_body.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
@@ -13,7 +13,7 @@ $(GEFORCE_OUT)/backend_geforce.o: drivers/video/geforce/backend_geforce.c $(GEFO
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
-$(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_present_m2mf.o: $(GEFORCE_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
+$(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_direct.o $(GEFORCE_OUT)/gf_present_m2mf.o: $(GEFORCE_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)
