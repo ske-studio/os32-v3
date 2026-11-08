@@ -58,7 +58,7 @@ fn gserial_queue_atomic_inverse_break_and_long_type() {
     assert_eq!(st.gserial.keys,65);
     let mut rounds=0;
     while st.gserial.keys > 0 {
-        deliver(&mut st); assert!(st.pending_raw_n <= 32);
+        deliver(&mut st); assert!(st.pending_raw_n <= st.pending_raw.len());
         assert_eq!(st.pending_raw_n % 2,0);
         for pair in st.pending_raw[..st.pending_raw_n].chunks(2) {
             assert_eq!(pair, &[0x11d,0x1d]);
@@ -77,12 +77,12 @@ fn gserial_pending_reservation_and_modifier_expansion_preserve_queue() {
     st.pending_raw[..2].copy_from_slice(&[0x11d,0x1d]); st.pending_raw_n=2;
     space(&st,9); deliver(&mut st); assert_eq!((st.gserial.keys,st.pending_raw_n),(1,2));
     space(&st,11); deliver(&mut st); assert_eq!((st.gserial.keys,st.pending_raw_n),(0,4));
-    st.z_count=0; st.pending_raw_n=30;
+    st.z_count=0; st.pending_raw_n=126;
     enqueue(&mut st,b"1d+g",false).unwrap(); deliver(&mut st);
-    assert_eq!((st.gserial.keys,st.pending_raw_n),(1,30));
-    st.pending_raw_n=28; deliver(&mut st);
-    assert_eq!((st.gserial.keys,st.pending_raw_n),(0,32));
-    assert_eq!(&st.pending_raw[28..32],&[raw(SC_GRPH,true,8) as i32, raw(0x1d,true,8) as i32,raw(0x1d,false,8) as i32,raw(SC_GRPH,false,0) as i32]);
+    assert_eq!((st.gserial.keys,st.pending_raw_n),(1,126));
+    st.pending_raw_n=124; deliver(&mut st);
+    assert_eq!((st.gserial.keys,st.pending_raw_n),(0,128));
+    assert_eq!(&st.pending_raw[124..128],&[raw(SC_GRPH,true,8) as i32, raw(0x1d,true,8) as i32,raw(0x1d,false,8) as i32,raw(SC_GRPH,false,0) as i32]);
     assert_eq!(expand(0x1d,12).1,6);
 }
 #[test]
