@@ -4,6 +4,7 @@ Mutations compile then fail at runtime. Only the two C sources and fixture are
 copied per variant; headers use the original read-only include paths.
 """
 from exec_source import exec_source
+from syscall_source import syscall_providers
 from kernel_includes import include_flags
 import argparse
 import pathlib
@@ -13,10 +14,10 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ("dispatch", "if (vcall < 0) ring3_fault_kill();", "if (0) ring3_fault_kill();", "legacy bad caller kill"),
+    ("dispatch", "if (handled < 0) {", "if (0) {", "legacy bad caller kill"),
     ("access", "result.owner = caller.owner;", "result.owner = caller.owner + 1;", "identity wrong AS"),
     ("access", "result.generation = caller.generation;", "result.generation = caller.generation + 1;", "identity wrong generation"),
-    ("dispatch", "legacy_trap(frame)", "0", "VM int80 bypasses KAPI"),
+    ("dispatch", "legacy_trap(native)", "0", "VM int80 bypasses KAPI"),
     ("access", "if (ring3_wm_depth > 0)", "if (0)", "WM trusted scope"),
     ("access", "if (user_only && a->origin != CALLER_USER)", "if (0 && user_only)", "saved USER only"),
     ("access", "caller_frame.valid = 0;", ";", "invalidation"),
@@ -52,10 +53,10 @@ def function(source, name):
 
 def sources():
     s = exec_source(ROOT)
-    a = s.index("void __cdecl ring3_syscall_dispatch(u32 *frame)")
+    a = s.index("void exec_syscall_dispatch(struct arch_syscall *view)")
     b = s.index("\n}", a) + 2
     return {"access": (ROOT / "exec/redir_access.c").read_text(),
-            "dispatch": 'static void exec_cui_display_abort(void) {}\n' + s[a:b],
+            "dispatch": 'static void exec_cui_display_abort(void) {}\n' + syscall_providers(ROOT) + s[a:b],
             "wm": function(s, "ring3_wm_enter") + "\n" + function(s, "ring3_wm_leave"),
             "host": (ROOT / "tools/tests/caller_access_host.c").read_text()}
 

@@ -29,6 +29,8 @@
 | KernelAPIラッパー | `__attribute__((cdecl))` または通常 | cdecl/System V |
 | 外部プログラム | `gcc -m32 -ffreestanding` | System V i386 ABI |
 
+固定引数の内部表現は `include/kapi_call.h` の values とし、x86 の引数位置・cdecl 呼出しは arch が扱う。公開の番号・配置・cdecl・int 0x80 と生成される `kapi_argsize` は不変。汎用経路の未 map 引数域は checked copy の失敗による FAULT kill となり、#PF ログを出さない。実行側の契約は [09_exec.md](09_exec.md) を参照。
+
 外部プログラムの `main` は `void main(int argc, char **argv, KernelAPI *api)` のシグネチャを持ちます。crt0 が argc/argv と共に api ポインタを渡します。
 
 ---

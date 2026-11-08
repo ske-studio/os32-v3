@@ -44,6 +44,7 @@
 #include "kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"
+#include "kapi_call.h"
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"
 #include "shell_service.h" /* T7b-b2: 常駐 shell の内部入口 (publish / retire / WM の印) */
@@ -73,11 +74,6 @@ static KernelAPI *kapi;
 static u8  ring3_tramp_raw[PAGE_SIZE * EXEC_TRAMP_RAW_PAGES];
 static u32 ring3_tramp_page = 0;             /* 4KB 境界に揃えた実アドレス (=物理) */
 static void ring3_trampoline_init(void);
-
-/* int 0x80 引数コピー+呼び出しの ASM ヘルパ (arch/x86/kernel/ring3_entry.asm)。
- * args_src から nbytes をスタックへコピーして wrapfn を cdecl 呼び出し、
- * 戻り値 (eax) を返す。 */
-extern u32 kapi_invoke(void *wrapfn, const void *args_src, u32 nbytes);
 
 /* CPL=3 由来のフォールト/不正 slot でアプリを kill (定義は下方, v2 M1e/M2d) */
 void ring3_fault_kill(void);

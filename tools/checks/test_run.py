@@ -195,7 +195,7 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(set(docs.stage), {'a'})
         self.assertEqual(docs.mutations, docs.stage)
         for file in ('Makefile', 'build/kernel.mk', 'build/sdk.mk', 'sdk/kapi.json',
-                     'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
+                     'include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
                      'tools/checks/run.py'):
             with self.subTest(file=file):
                 result = self.plan(file)

@@ -9,3 +9,6 @@ C_ARCH += arch/x86/kernel/exec_entry.c
 C_ARCH += arch/x86/kernel/exec_context.c
 C_ARCH_NEW += arch/x86/kernel/exec_entry.c
 C_ARCH_NEW += arch/x86/kernel/exec_context.c
+
+C_ARCH += arch/x86/kernel/kapi_call.c arch/x86/kernel/syscall_entry.c
+C_ARCH_NEW += arch/x86/kernel/kapi_call.c arch/x86/kernel/syscall_entry.c

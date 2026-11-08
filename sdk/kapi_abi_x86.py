@@ -4,7 +4,7 @@ from target_profile import require
 
 _SCALARS = {'char', 'signed char', 'unsigned char', 'short', 'short int',
             'unsigned short', 'int', 'unsigned', 'unsigned int', 'long',
-            'long int', 'unsigned long', 'u8', 'i8', 'u16', 'i16', 'u32', 'i32'}
+            'long int', 'unsigned long', 'u8', 'i8', 'u16', 'i16', 'u32', 'i32', 'os_time_t'}
 
 
 def fixed_arg_bytes(args, target='x86-pc98'):

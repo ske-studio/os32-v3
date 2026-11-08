@@ -193,7 +193,7 @@ def static_checks(root, quiet=False):
         bad.append("EXEC_ENTRY_ARGS must remain four words")
     if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "arch/x86/arch_abi.h").read_text(), re.M):
         bad.append("ABI_STACK_ALIGN must remain sixteen bytes")
-    disp = _func_body(ex, "void __cdecl ring3_syscall_dispatch(u32 *frame)")
+    disp = _func_body(ex, "void exec_syscall_dispatch(struct arch_syscall *view)")
     if "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;" not in disp:
         bad.append("dispatch 入口で ring3_wm_shell_gen を 0 にしない (深さの 0 の隣)")
     if "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;" not in ex:

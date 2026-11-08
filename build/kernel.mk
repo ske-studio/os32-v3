@@ -14,7 +14,7 @@ $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
 
 # kapi/ モジュール
-KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
+KAPI_GENERATED := include/kapi_call_generated.h kapi/kapi_generated.c exec/exec_kapi_init.inc \
     sdk/include/os32/os32_kapi_generated.h sdk/include/os32/os32_kapi_slots.h \
     sdk/include/os32/os32_generations.h sdk/include/os32/os32_unit_stamp.h \
     sdk/os32_generations.py sdk/rust/os32api/src/generations.rs \
@@ -194,3 +194,5 @@ $(BUILD_OUT)/tickprobe.raw: $(BUILD_OUT)/tickprobe.elf
 	$(OBJCOPY) -O binary $< $@
 $(BUILD_OUT)/tickprobe.bin: $(BUILD_OUT)/tickprobe.raw $(BUILD_OUT)/tickprobe.elf
 	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/tickprobe.elf --api 78 --cui-only
+
+$(C_KERNEL_OBJ) $(filter %.o,$(R1_OBJECTS)): include/kapi_call_generated.h

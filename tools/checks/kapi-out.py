@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kapi-out', tier=1,
-    covers=['kapi/kapi_generated.c', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/test_kapi_out.py', 'sdk/kapi.json', 'tools/tests/test_gen_kapi_cli.py', 'build/os32.ld', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld'],
+    covers=['kapi/kapi_generated.c', 'include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/test_kapi_out.py', 'sdk/kapi.json', 'tools/tests/test_gen_kapi_cli.py', 'build/os32.ld', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld'],
     needs=['make:all'], budget=4.5)
 
 
@@ -15,7 +15,7 @@ def run(ctx) -> int:
     if rc:
         return rc
     env = dict(base_env)
-    argv = ['python3', '-B', 'tools/tests/test_gen_kapi_cli.py']
+    argv = ['python3', '-B', 'tools/tests/test_gen_kapi_cli.py', *(['--mutate'] if ctx.mutate else [])]
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc

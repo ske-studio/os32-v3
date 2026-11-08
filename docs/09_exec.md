@@ -24,6 +24,8 @@ KernelAPIポインタを引数として実行する。
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
 
 保存済み USER 文脈は AppSlot が `arch_user_context` の値として所有する。
+D1 の汎用 syscall は arch の `read_block` で固定引数を一括コピーし、ポインタの早期範囲検証後に `arch_kapi_invoke` で呼ぶ。未 map の引数域は copy の失敗で FAULT kill するため、従来の呼出 ASM 内での #PF と異なり `[ring3] #PF ... err=` は出ない。kill の種別と子だけを終了する契約は同じ。予約 slot (`KAPI_FUNC_COUNT` 以上) も範囲拒否する。legacy・strings・print・private LS の raw 引数経路は D2/D3/E3 まで x86 adapter が維持する。
+
 `include/exec_arch.h` の syscall view は生存中の入口スタックを借りるだけで、
 AppSlot に保存しない。x86 の保存域は USER 52B/align4、親の特権 snapshot は
 4B/align4。実装は `arch/x86/kernel/exec_context.c` が持つ。親 snapshot は

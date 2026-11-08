@@ -111,6 +111,7 @@ OUTSIDE = frozenset(("arm-compile", "gfinit-fixture-host", "e10c-lifecycle",
     "host-agent", "host-lib-host", "net-link-host", "lan-bridge-host"))
 
 KAPI_GENERATED = (
+    "include/kapi_call_generated.h",
     "sdk/include/os32/os32_kapi_generated.h", "sdk/include/os32/os32_kapi_slots.h",
     "kapi/kapi_generated.c", "exec/exec_kapi_init.inc",
     "sdk/include/os32/os32_generations.h", "sdk/os32_generations.py",
