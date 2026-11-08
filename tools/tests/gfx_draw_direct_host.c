@@ -25,7 +25,7 @@ void _start(void) {
  gfx_hline(1,2,3,5); gfx_vline(6,1,4,6); gfx_fill_rect(3,2,4,5,7);
  gfx_rect(1,1,3,2,8); gfx_line(0,0,1,1,9);
  CHECK(gfx_get_pixel(2,3)==91 && gets==1 && n==13 && dirty==12);
- check(0,0,0,10,8,1); check(1,-1,2,4,3,2); check(2,2,3,1,1,3); check(3,4,5,1,1,4);
+ check(0,0,0,10,8,1); check(1,0,2,3,3,2); /* L1c clips the queued FILL to the screen. */ check(2,2,3,1,1,3); check(3,4,5,1,1,4);
  check(4,1,2,3,1,5); check(5,6,1,1,4,6); check(6,3,2,4,5,7);
  check(7,1,1,3,1,8); check(8,1,2,3,1,8); check(9,1,1,1,2,8); check(10,3,1,1,2,8);
  check(11,0,0,1,1,9); check(12,1,1,1,1,9);
