@@ -32,6 +32,7 @@ pub mod surface;
 /* ---- T / U クライアント層 (票 C2) ---- */
 pub mod app;
 pub mod client;
+pub mod scroll;
 pub mod layout;
 pub mod timer;
 mod uistate;

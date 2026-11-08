@@ -356,8 +356,22 @@ impl Filer {
             return;
         }
         if old_top != self.list_top {
-            /* スクロールした: 行が全部ずれるので帯ごと。 */
-            self.repaint(self.rows_band(&r));
+            let band = Rect::new(r.x + 1, r.y + ROWS_Y0 as i16, r.w - 2,
+                (self.visible_rows(&r) as i32 * ROW_H) as i16);
+            let dy = (old_top as i32 - self.list_top as i32) * ROW_H;
+            if dy > -(band.h as i32) && dy < band.h as i32
+                && libos32gui::scroll::scroll(self.win_id(), band, 0, dy as i16).is_ok() {
+                let exposed = if dy < 0 {
+                    Rect::new(band.x, (band.bottom() + dy) as i16, band.w, -dy as i16)
+                } else {
+                    Rect::new(band.x, band.y, band.w, dy as i16)
+                };
+                self.repaint(exposed);
+                self.repaint(self.row_rect(&r, old_sel));
+                self.repaint(self.row_rect(&r, self.list_sel));
+            } else {
+                self.repaint(self.rows_band(&r));
+            }
         } else {
             self.repaint(self.row_rect(&r, old_sel));
             if self.list_sel != old_sel {

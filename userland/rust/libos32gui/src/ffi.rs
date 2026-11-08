@@ -53,6 +53,8 @@ extern "C" {
     pub static mut gfx_api: *mut os32api::KernelAPI;
     pub fn libos32gfx_attach_checked() -> i32;
     pub fn libos32gfx_check() -> i32;
+    pub fn libos32gfx_take_regen() -> i32;
+    pub fn gfx_flush() -> i32;
     pub fn libos32gfx_detach();
 
     /* --- 全画面バックバッファへの描画 (絶対座標) --- */
