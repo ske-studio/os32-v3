@@ -1,5 +1,6 @@
 /* RAM CLIENT transfer policy; direct VRAM CLIENT only synchronizes. */
 #include "trident.h"
+#include "pc98.h"
 #include "gfx/gfx_internal.h"
 
 int trident_present(struct trident_device *d, int x, int y, int w, int h)
@@ -23,16 +24,23 @@ int trident_present(struct trident_device *d, int x, int y, int w, int h)
             dst > d->declared_bytes || bytes > d->declared_bytes - dst)
             return TRI_E_CAP_TOO_SMALL;
         for (u32 i = 0; i < bytes;) {
-            if (d->present_method == TRI_PRESENT_DWORD_SYNC &&
+            if ((d->present_method == TRI_PRESENT_DWORD_SYNC ||
+                 d->present_method == TRI_PRESENT_DWORD_WAIT ||
+                 d->present_method == TRI_PRESENT_DWORD_PLAIN) &&
                 !((dst + i) & 3u) && bytes - i >= 4u) {
                 const u8 *p = d->res->client + src + i;
                 u32 value = (u32)p[0] | ((u32)p[1] << 8) |
                             ((u32)p[2] << 16) | ((u32)p[3] << 24);
                 rc = trident_write32(d, TRI_SPACE_LFB, dst + i, value);
                 if (rc) return rc;
-                u8 status;
-                rc = trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6u, &status);
-                if (rc) return rc;
+                if (d->present_method == TRI_PRESENT_DWORD_SYNC) {
+                    u8 status;
+                    rc = trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6u, &status);
+                    if (rc) return rc;
+                } else if (d->present_method == TRI_PRESENT_DWORD_WAIT) {
+                    rc = trident_port8(d, PC98_IO_WAIT_PORT, 0);
+                    if (rc) return rc;
+                }
                 i += 4u;
                 continue;
             }

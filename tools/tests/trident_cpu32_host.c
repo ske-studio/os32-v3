@@ -22,7 +22,7 @@ int sys_time_now(u32 *lo, u32 *hi)
 static int bench_present(struct trident_device *d, int x, int y, int w, int h)
 {
     if (x || y || w != 3 || h != 2 || d->present_method !=
-        (bench_calls < 8 ? TRI_PRESENT_BYTE : TRI_PRESENT_DWORD_SYNC)) failed=1;
+        (enum tri_present_method)bench_lines) failed=1;
     ++bench_calls;
     return bench_fault == 1 ? TRI_E_ACCESS : 0;
 }
@@ -31,9 +31,9 @@ static int bench_read(void *opaque, enum trident_space space, u32 off, u8 *value
     (void)opaque;
     if (space != TRI_SPACE_LFB || off != 16 + (bench_reads % 6 / 3)*7 + bench_reads%3)
         failed=1;
-    if ((!bench_fault && bench_calls != (bench_reads < 6 ? 8u : 16u))) failed=1;
+    if ((!bench_fault && bench_calls != (bench_reads / 6u + 1u) * 8u)) failed=1;
     *value = (u8)(bench_reads%6 + 1);
-    if (bench_fault == 3) *value ^= 1;
+    if (bench_fault == 3 || (bench_fault == 5 && bench_lines == 2)) *value ^= 1;
     ++bench_reads;
     return bench_fault == 4 ? TRI_E_ACCESS : 0;
 }
@@ -91,6 +91,8 @@ void serial_puts_polled(const char *s)
         if (same(s, "TRI phase=present")) ++bench_lines;
         if (same(s, "byte")) bench_method |= 1;
         if (same(s, "dword_sync")) bench_method |= 2;
+        if (same(s, "dword_wait")) bench_method |= 4;
+        if (same(s, "dword_plain")) bench_method |= 8;
         return;
     }
     if (wrapper) {
@@ -275,15 +277,16 @@ static int test(void)
     d.mode.display=(struct tri_surface){.off=16,.pitch=7};
     const struct trident_io bench_io={.read8=bench_read};
     d.io=&bench_io; o.present=bench_present;
-    for (bench_fault=0; bench_fault<=4; ++bench_fault) {
+    for (bench_fault=0; bench_fault<=5; ++bench_fault) {
         bench_calls=bench_reads=bench_clock=bench_lines=bench_method=bench_fields=0;
         bench_field=0;
         failed=0;
         d.present_method=TRI_PRESENT_DWORD_SYNC;
         int rc=present_compare(&o);
-        if (rc != (bench_fault ? TRI_E_ACCESS : 0) || bench_lines!=2 ||
-            bench_method!=3 || d.present_method!=TRI_PRESENT_DWORD_SYNC) return 1;
-        if (!bench_fault && (failed || bench_calls!=16 || bench_reads!=12 || bench_clock!=32 || bench_fields!=10))
+        if (rc != (bench_fault ? TRI_E_ACCESS : 0) || bench_lines!=4 ||
+            bench_method!=15 || d.present_method!=TRI_PRESENT_DWORD_SYNC) return 1;
+        if (bench_fault == 5 && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=64)) return 1;
+        if (!bench_fault && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=64 || bench_fields!=20))
             return 1;
     }
     return 0;

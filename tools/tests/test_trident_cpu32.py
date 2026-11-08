@@ -18,6 +18,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kdebug/trident_command_test.c'
 MUTATIONS = [
+    ('present-stop-on-mismatch', 'if (!rc && mismatches) rc = TRI_E_ACCESS;', 'if (!rc && mismatches) { d->present_method = saved; return TRI_E_ACCESS; }'),
     ('present-count', 'run < TRI_PRESENT_RUNS', 'run < TRI_PRESENT_RUNS - 1u'),
     ('present-restore', 'd->present_method = saved;', 'd->present_method = TRI_PRESENT_BYTE; (void)saved;'),
     ('present-readback', 'if (actual != d->res->client[row * c->pitch + i]) ++mismatches;', 'if (actual == d->res->client[row * c->pitch + i]) ++mismatches;'),

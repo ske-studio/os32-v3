@@ -345,7 +345,10 @@ struct trident_resources {
      * DISPLAY first, retaining their SIDs for gfx_core's pending publication. */
     int (*configure)(const struct tri_mode *mode, u32 display_bytes, bool final);
 };
-enum tri_present_method { TRI_PRESENT_BYTE = 0, TRI_PRESENT_DWORD_SYNC = 1 };
+enum tri_present_method {
+    TRI_PRESENT_BYTE = 0, TRI_PRESENT_DWORD_SYNC = 1,
+    TRI_PRESENT_DWORD_WAIT = 2, TRI_PRESENT_DWORD_PLAIN = 3
+};
 struct trident_device {
     const struct trident_resources *res;
     struct trident_saved saved;
@@ -568,8 +571,9 @@ int trident_route_disable(struct trident_device *d);
 /* Direct VRAM CLIENT (accel and NoAccel): synchronization only, no transfer.
  * Boot-wide RAM fallback only: clip and validate both source/destination ends,
  * use selected cpp and independent client/display byte pitches, then copy
- * with write8 only. write_span32 is NOT the fallback present path. No VRAM
- * readback. CPU direct stores and cursor/pattern/video uploads may use 32bit.
+ * with byte stores or aligned dword stores and byte edges. Dword policies:
+ * sync reads VGA status, wait writes the PC-98 wait port, plain has no delay.
+ * write_span32 is NOT the fallback present path; no VRAM readback.
  * The S3 implementation is migrated by F7; API remains unchanged. */
 int trident_present(struct trident_device *, int x, int y, int w, int h);
 /* HAL RGB components use GFX_PALETTE_COMPONENT_BITS (currently 4, up to 8

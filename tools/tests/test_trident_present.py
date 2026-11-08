@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trident RAM byte present and direct VRAM synchronization."""
+"""Trident RAM transfer policies and direct VRAM synchronization."""
 CHECK = dict(name='trident-present', tier=1, needs=[], budget=3,
     covers=['drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_present_host.c', 'tools/tests/trident_device_fake.c',
@@ -8,7 +8,7 @@ CHECK = dict(name='trident-present', tier=1, needs=[], budget=3,
             'gfx/gfx_internal.h', 'gfx/gfx.h', 'include/gfx_hal.h', 'include/gfx_format.h',
             'include/gfx_mode.h', 'mm/kmalloc.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_generations.h', 'include/types.h', 'include/memmap.h',
-            'include/pegc.h', 'gfx/palette.h', 'build/config.mk'])
+            'include/pegc.h', 'include/pc98.h', 'gfx/palette.h', 'build/config.mk'])
 import argparse
 import os
 from pathlib import Path
@@ -27,6 +27,11 @@ MUTANTS = [
     ('store32', 'trident_write8(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])',
      'trident_write32(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])'),
     ('skip-dword-read', 'rc = trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6u, &status);', 'rc = TRI_OK; (void)status;'),
+    ('skip-dword-wait', 'rc = trident_port8(d, PC98_IO_WAIT_PORT, 0);', 'rc = TRI_OK;'),
+    ('plain-reads', 'if (d->present_method == TRI_PRESENT_DWORD_SYNC) {', 'if (d->present_method != TRI_PRESENT_DWORD_WAIT) {'),
+    ('plain-waits', 'd->present_method == TRI_PRESENT_DWORD_WAIT) {', 'd->present_method != TRI_PRESENT_DWORD_SYNC) {'),
+    ('wait-before-store', 'rc = trident_write32(d, TRI_SPACE_LFB, dst + i, value);',
+     'if (d->present_method == TRI_PRESENT_DWORD_WAIT) { rc = trident_port8(d, PC98_IO_WAIT_PORT, 0); if (rc) return rc; }\n                rc = trident_write32(d, TRI_SPACE_LFB, dst + i, value);'),
     ('wrong-dword', '((u32)p[3] << 24)', '((u32)p[2] << 24)'),
     ('fixed-pitch', 'row * v->pitch', 'row * TRI_PITCH'),
     ('drop-cpp', 'u32 bytes = (u32)w * c->cpp;', 'u32 bytes = (u32)w;'),

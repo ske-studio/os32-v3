@@ -291,8 +291,9 @@ static int present_compare(const struct TridentDiagnosticOps *o)
     if (!d->res->ram_fallback || !o->present || !d->io || !d->io->read8)
         return optional(o, "present_precheck", TRI_E_NOSYS);
     enum tri_present_method saved = d->present_method;
+    static const char *const names[] = {"byte", "dword_sync", "dword_wait", "dword_plain"};
     int result = 0;
-    for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_SYNC; ++method) {
+    for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_PLAIN; ++method) {
         const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
         u32 minimum = (u32)-1, maximum = 0, count = 0, mismatches = 0;
         unsigned long long total = 0;
@@ -328,7 +329,7 @@ static int present_compare(const struct TridentDiagnosticOps *o)
         serial_puts_polled("TRI phase=present");
         number(" mode=", d->mode.selected.id);
         serial_puts_polled(" method=");
-        serial_puts_polled(method == TRI_PRESENT_BYTE ? "byte" : "dword_sync");
+        serial_puts_polled(names[method]);
         number(" count=", count);
         number(" min_us=", count ? minimum : 0);
         number(" max_us=", maximum);
