@@ -9,7 +9,7 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'include/time_units.h', 'include/memmap.h',
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
-            'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
+            'mm/paging.h', 'platform/pc98/legacy/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h', 'arch/x86/kernel/idt.h',
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[],
     # Reduced host workload measured 13.13 s locally; allow over 2x headroom.

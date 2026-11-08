@@ -57,9 +57,7 @@
 #include "kernel/time/sysclk.h"
 #include "kernel/v86/v86.h"
 #include "kernel/v86/v86_gcap.h"
-#include "kernel/v86/v86_io.h"
 #include "kernel/v86/v86_mem.h"
-#include "kernel/v86/v86_pic.h"
 #include "lib/kstring.h"
 #include "lib/path.h"
 #include "lib/serial_diag.h"
@@ -71,6 +69,8 @@
 #include "mm/shlib.h"
 #include "platform/pc98/bios_snapshot.h"
 #include "platform/pc98/bootinfo_native.h"
+#include "platform/pc98/legacy/v86_io.h"
+#include "platform/pc98/legacy/v86_pic.h"
 #include "platform/pc98/pit.h"
 #include "platform/pc98/pit_time.h"
 extern u32 v86_gp_cs;

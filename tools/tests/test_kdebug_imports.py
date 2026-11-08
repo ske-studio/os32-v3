@@ -269,7 +269,7 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'hwdev_module_ops'),
         ])
         self.assertEqual(self.entries[196]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[196]['source'], 'kernel/v86/v86_io.h')
+        self.assertEqual(self.entries[196]['source'], 'platform/pc98/legacy/v86_io.h')
         self.assertTrue(self.entries[196]['retained'])
         self.assertEqual(self.entries[244]['name'], 'display_text_start')
         for index, name in ((244, 'display_text_start'), (250, 'display_restore_98'),

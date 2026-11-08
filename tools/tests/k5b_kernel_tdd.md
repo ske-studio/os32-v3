@@ -526,7 +526,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
   `test_sbrk_tier` / `tools/check_constraints.py`。
 - `make kernel` の警告: **`exec/exec.c` と `exec/appslot.c` からは 1 件も出ていない**。
   フルビルドのログには既存の警告 (`include/pc98.h` の `TVRAM_BPR` 再定義、
-  `kernel/v86/v86_bios.c` の `-Warray-bounds`、`kernel/console/console.c` の暗黙宣言など) が
+  `platform/pc98/legacy/v86_bios.c` の `-Warray-bounds`、`kernel/console/console.c` の暗黙宣言など) が
   36 件残っているが、いずれも本変更の前からあるもので触っていない。
 - **`--cpl0` で作られている在庫バイナリは 1 つも無い** (下記)。したがって「アプリを
   閉じてから使え」の実害はいまのところゼロだが、これは実機で確かめていない。

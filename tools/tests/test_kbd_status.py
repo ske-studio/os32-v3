@@ -1,11 +1,11 @@
 """キーボード 8251 のステータス判定 (drivers/input/kbd_status.c) と仮想 8251
-(kernel/v86/v86_kbd.c) のホスト試験。
+(platform/pc98/legacy/v86_kbd.c) のホスト試験。
 
 記録: tools/tests/kbd_status_tdd.md
 経緯: docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線 (実機 PC-9821Ra266 で打鍵が届かない、
       その実装レビューで出た V86 への偽 ESC と OE の扱い)
 
-実物の drivers/input/kbd_status.c と kernel/v86/v86_kbd.c を 1 行も写さずに #include
+実物の drivers/input/kbd_status.c と platform/pc98/legacy/v86_kbd.c を 1 行も写さずに #include
 して回す。I/O を持たないので模型は要らない。
 
 **ここで見る分岐のうち EMPTY / ERROR / OVERRUN は NP21/W では (ほぼ) 踏めない**
@@ -17,7 +17,7 @@
   python3 -B tools/tests/test_kbd_status.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-status-host', tier=1,
-    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_status.c', 'kernel/v86/v86_kbd.c', 'tools/tests/kbd_status_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_status.c', 'platform/pc98/legacy/v86_kbd.c', 'tools/tests/kbd_status_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.493568)
 
 from kernel_includes import include_flags
@@ -33,7 +33,7 @@ HARNESS = ROOT / "tools/tests/kbd_status_host.c"
 SOURCES = {
     "c": "drivers/input/kbd_status.c",
     "h": "drivers/input/kbd_status.h",
-    "v": "kernel/v86/v86_kbd.c",
+    "v": "platform/pc98/legacy/v86_kbd.c",
 }
 
 # カーネルと同じ i386-elf で通す実ソース。kbd.c まで入れるのは、
@@ -42,7 +42,7 @@ SOURCES = {
 TARGET_SRCS = [
     "drivers/input/kbd_status.c",
     "drivers/input/kbd.c",
-    "kernel/v86/v86_kbd.c",
+    "platform/pc98/legacy/v86_kbd.c",
 ]
 
 CASES = ["empty", "error", "overrun", "data", "reflect", "v86empty"]
@@ -109,7 +109,7 @@ def host_build(tmp, mutated=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-status-host"
     # Preserve the component's explicit ../drivers/input/kbd.h dependency.
-    for rel in ("kernel/v86/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
+    for rel in ("platform/pc98/legacy/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kbd-status-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/input/kbd_status.c + kernel/v86/v86_kbd.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/input/kbd_status.c + platform/pc98/legacy/v86_kbd.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

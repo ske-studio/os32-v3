@@ -8,7 +8,7 @@
 #include "kstring.h"
 #include "loop_dev.h"
 #include "v86_mem.h"
-#include "../../mm/paging.h"
+#include "../../../mm/paging.h"
 #include "vfs.h"
 
 static u32 bios_calls = 0;

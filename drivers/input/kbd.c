@@ -17,7 +17,7 @@
 /* ======================================================================== */
 
 #include "kbd.h"
-#include "../../kernel/v86/v86_bios.h"
+#include "../../platform/pc98/legacy/v86_bios.h"
 #include "io.h"
 #include "kprintf.h"
 #include "memmap.h"
@@ -31,7 +31,7 @@ extern volatile int exec_nest_level;  /* exec/exec.c */
 /* 外部: irq_enable (idt.c で定義) */
 extern void irq_enable(unsigned int irq);
 
-/* 外部: V86 セッション (kernel/v86/v86.c, kernel/v86/v86_kbd.c)。
+/* 外部: V86 セッション (kernel/v86/v86.c, platform/pc98/legacy/v86_kbd.c)。
  * drivers/ は -Ikernel を持たないので、この 3 本だけここで宣言する
  * (irq_enable と同じ扱い)。ドライバが V86 の中身を知る必要はない。 */
 #include "legacy_guest.h"
@@ -297,7 +297,7 @@ int kbd_irq_handler(void)
      * (status bit1) を立てる。エラービットは向こうのバッファが溢れたときの
      * OE だけなので、通常の打鍵では従来どおり KBD_ST_DATA に落ちる。
      * **V86 分岐より前に置く** — V86 中も化けたバイトはゲストへ渡さない
-     * (ゲストの 0041h/0043h は kernel/v86/v86_kbd.c の FIFO が答えるので、
+     * (ゲストの 0041h/0043h は platform/pc98/legacy/v86_kbd.c の FIFO が答えるので、
      * 実チップを読むのはここだけ)。 */
     st = (u8)inp(KBD_CMD);
     kbd_diag_irq++;

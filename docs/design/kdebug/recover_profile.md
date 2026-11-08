@@ -32,7 +32,7 @@ profile は 98 画面・予算・indexed 復帰等。後者も全体を装置部
 | --- |
 | 新設 `recover status` で profile/version、CUI、DMA/IRQ、route/legacy、page、PTE 復元結果。09A8h 下位 2 bit=1。読めない FF は設定した値を `shadow` と明記。legacy decode 解放の読戻し成功後、A0000h の予約した空きテキストセル 1 つの元値を保存し、元値と異なる試験値を書いて読戻し、一致後に元値を戻して再照合する。98 側へ届かない、復元不一致、検査不能なら FAIL。実表示はユーザー確認 |
 
-- [HW3] 根拠: 98 復帰の資料と FreeBSD 対照は `kernel/v86/v86_io.c:250`。NVIDIA 公開 MIT 実装 `/home/hight/os32-tmp/refs/geforce6200/xf86-video-nv/src/nv_driver.c:2290` は選別した保存状態を順序付きで復元する前例で、Ra266 の冷間復帰保証ではない。
+- [HW3] 根拠: 98 復帰の資料と FreeBSD 対照は `platform/pc98/legacy/v86_io.c:250`。NVIDIA 公開 MIT 実装 `/home/hight/os32-tmp/refs/geforce6200/xf86-video-nv/src/nv_driver.c:2290` は選別した保存状態を順序付きで復元する前例で、Ra266 の冷間復帰保証ではない。
 
 - PBUS の意味は `/home/hight/os32-tmp/refs/geforce6200/envytools/docs/hw/bus/pci.rst:50`、`:60`。ライセンスは `/home/hight/os32-tmp/refs/geforce6200/INDEX.md:6`、`:7`。専有 driver/ROM x86 コードは解析しない。新しい装置 profile はメーカー資料と BSD/MIT 実装の照合を実装開始条件とする。
 
