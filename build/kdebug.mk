@@ -13,6 +13,9 @@ KDEBUG_OBJS := $(KDEBUG_OUT)/v86_gcap.o $(KDEBUG_OUT)/v86_gcap_math.o $(KDEBUG_O
                $(KDEBUG_OUT)/probe.o $(KDEBUG_OUT)/probe_index.o $(KDEBUG_OUT)/hwb_access.o $(KDEBUG_OUT)/kpeek.o $(KDEBUG_OUT)/kdebug_window.o $(KDEBUG_OUT)/recover.o $(KDEBUG_OUT)/recover_profile.o $(KDEBUG_OUT)/recover_virtual.o \
                $(KDEBUG_OUT)/trident_command_test.o $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
 KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
+ifeq ($(TICK_PROBE_BUILD),1)
+KDEBUG_OBJS += $(KDEBUG_OUT)/tick_probe.o
+endif
 C_KERNEL_OBJ += $(KDEBUG_KEXPORT_OBJ)
 # kernel.elf's prerequisites were expanded before this include.
 $(BUILD_OUT)/kernel.elf: $(KDEBUG_KEXPORT_OBJ)

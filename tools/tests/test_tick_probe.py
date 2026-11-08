@@ -1,0 +1,66 @@
+"""A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
+CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
+    covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h',
+            'init/kernel.c', 'tools/tests/tick_probe_host.c',
+            'arch/x86/kernel/isr_stub.asm', 'kernel/irq/tick.c',
+            'arch/x86/arch_io.h', 'kdebug/tick_probe.c',
+            'userland/diag/tickprobe.c', 'build/kernel.mk',
+            'build/kernel-objects.mk', 'build/select.mk', 'build/kdebug.mk',
+            'kernel/module/debug_probe.c', 'kdebug/kdebug_main.c',
+            'tools/tests/host32.py'])
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import host32
+
+ROOT = Path(__file__).resolve().parents[2]
+
+def main():
+    original = (ROOT / 'kernel/time/tick_probe.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
+    begin = kernel.index('#ifdef TICK_PROBE\n    tick_probe_boot();')
+    end = kernel.index('#endif', kernel.index('    tick_probe_splash(0);', begin))
+    boundary = kernel[begin:end + len('#endif')] + '\n'
+    with tempfile.TemporaryDirectory(prefix='tick-probe-') as td:
+        work = Path(td)
+        def run(source, body):
+            src = work / 'tick_probe.c'; src.write_text(source)
+            inc = work / 'boundary.inc'; inc.write_text(body)
+            exe = work / 'probe'
+            subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall',
+                '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin',
+                '-fno-pie', '-no-pie', '-nostdlib', '-static',
+                '-I' + str(ROOT / 'kernel/time'), '-DTP_SOURCE="' + str(src) + '"',
+                '-DTP_BOUNDARY="' + str(inc) + '"',
+                str(ROOT / 'tools/tests/tick_probe_host.c'), '-o', str(exe)], check=True)
+            return host32.run([str(exe)], runner='qemu').returncode
+        assert run(original, boundary) == 0
+        print('GREEN aggregate/histogram/p99/u64/splash returns/crossing/IF0/IRQ/short/lost', flush=True)
+        if '--mutate' in sys.argv:
+            mutants = [
+                ('worst', 'if (d > s->worst) s->worst = d;', 's->worst = d;', False),
+                ('histogram', 's->hist[bin]++;', 's->hist[0]++;', False),
+                ('p99', 's->count - s->count / 100', 's->count', False),
+                ('crossing', 'm.epoch != epoch', '0', False),
+                ('total', 's->total += d;', 's->total += (unsigned int)d;', False),
+                ('IF nesting', '(flags & (1U << 9)) && if0.valid', 'if0.valid && (flags || !flags)', False),
+                ('entry mark', '    tick_probe_splash(1);', '    tick_probe_splash(0);', True),
+                ('return mark', '    tick_probe_splash(0);', '    tick_probe_splash(1);', True),
+            ]
+            for label, old, new, boot in mutants:
+                text = boundary if boot else original
+                assert text.count(old) == 1, (label, text.count(old))
+                changed = text.replace(old, new)
+                rc = run(original if boot else changed, changed if boot else boundary)
+                assert rc == 1, (label, rc)
+                print('RED runtime exit=1 ' + label, flush=True)
+
+if __name__ == '__main__':
+    main()
+
+def run(ctx):
+    return subprocess.call([sys.executable, '-B', 'tools/tests/test_tick_probe.py',
+        *(['--mutate'] if ctx.mutate else [])], cwd=ctx.root,
+        env=dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners)))

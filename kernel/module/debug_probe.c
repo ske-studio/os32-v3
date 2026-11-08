@@ -1,6 +1,10 @@
 #include "debug_probe.h"
 #include "memmap.h"
 #include "kstring.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#include "io.h"
+#endif
 
 struct probe_entry {
     char name[PROBE_NAME_SIZE];
@@ -171,6 +175,10 @@ static i32 attach(const struct probe_attach *a)
 
 i32 debug_probe_control(u32 action, void *arg, u32 size)
 {
+#ifdef TICK_PROBE
+    if (action == TP_CONTROL && size == sizeof(struct tp_control) && arg &&
+        _irq_enabled()) return tick_probe_control(arg);
+#endif
     if (!arg) return PROBE_ERR_ARG;
     if (action == PROBE_KDEBUG_OWNER && size == sizeof(struct module_handle)) {
         for (u32 i = 0; i < MODULE_RECORD_CAP; i++) {

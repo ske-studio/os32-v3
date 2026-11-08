@@ -84,8 +84,8 @@ def main():
                 ('kctx_irq_depth != 0', 'kctx_irq_depth > 1', 'IRQ registration accepted'),
                 ('slots[slot].fn != fn', 'slots[slot].fn == fn', 'duplicate/competition reversed'),
                 ('else slots[slot].fn = fn;', 'else slots[slot].fn = 0;', 'registration lost'),
-                ('if (slots[slot].fn) slots[slot].fn();',
-                 'if (slots[slot].fn) { slots[slot].fn(); slots[slot].fn(); }', 'double callback'),
+                ('            slots[slot].fn();',
+                 '            slots[slot].fn(); slots[slot].fn();', 'double callback'),
                 ('slot < TICK_SLOT_COUNT;', 'slot < TICK_SLOT_COUNT - 1;', 'seventh slot omitted'),
                 ('irq_restore(saved);', 'irq_restore(saved & ~0x200U);', 'IF lost'),
             ]

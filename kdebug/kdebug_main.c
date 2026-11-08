@@ -7,6 +7,10 @@
 #include "kpeek.h"
 #include "hwb_wire.h"
 #include "probe_wire.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+extern int tick_probe_call(void *buf, unsigned int size);
+#endif
 
 #include "recover.h"
 #include "recover_diag.h"
@@ -124,6 +128,9 @@ static int recovery_attach(void)
 }
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+#ifdef TICK_PROBE
+    if (op == TP_OP) return tick_probe_call(buf, size);
+#endif
     if (op == HW_OP) return hwb_access(buf, size);
     if (op == PROBE_OP) return probe_call(buf, size);
     struct recover *r = recover_owner();

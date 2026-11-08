@@ -246,7 +246,13 @@ KERNEL_SRC_DIRS = $(filter $(INCLUDE_COMMON) $(INCLUDE_ARCH) $(INCLUDE_PLATFORM)
 ifneq ($(words $(C_SELECTED)),$(words $(sort $(C_SELECTED))))
 $(error duplicate source owner)
 endif
-C_DIAGNOSTICS = $(DIAGNOSTIC_SPLASH_DIAG_BUILD) $(DIAGNOSTIC_SPLASH_OBS_BUILD) $(DIAGNOSTIC_PCM_E4_DIAG_BUILD)
+C_DIAGNOSTICS = $(DIAGNOSTIC_SPLASH_DIAG_BUILD) $(DIAGNOSTIC_SPLASH_OBS_BUILD) $(DIAGNOSTIC_PCM_E4_DIAG_BUILD) $(DIAGNOSTIC_TICK_PROBE_BUILD)
+ifeq ($(TICK_PROBE_BUILD),1)
+ifneq ($(ARCH)-$(PLATFORM)-$(FEATURE_KDEBUG),x86-pc98-1)
+$(error tick probe requires x86-pc98 kdebug)
+endif
+DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c
+endif
 KNOWN_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))
 ifneq ($(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))),)
 $(error unknown feature variable $(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))))
