@@ -2,7 +2,8 @@
 
 static GFX_Cmd q[GFX_CMD_MAX];
 static u32 nq;
-static u8 arena[4096];
+#define GFX_CMD_ARENA_BYTES 4096u
+static u8 arena[GFX_CMD_ARENA_BYTES];
 static u32 used;
 
 static int rect_valid(int x, int y, int w, int h)
@@ -83,7 +84,7 @@ static int push_rows(GFX_Cmd cmd, const u8 *src, u32 pitch, int bx, int by)
         int rc = reserve_command();
         u32 rows;
         if (rc) return rc;
-        rows = (sizeof arena - used) / rowbytes;
+        rows = (GFX_CMD_ARENA_BYTES - used) / rowbytes;
         if (!rows) {
             rc = gfx_flush();
             if (rc) return rc;
