@@ -224,6 +224,30 @@
       "source": "mm/paging.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "gfx_policy_scan_changed",
+      "source": "gfx/gfx_policy.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx_policy_gen_get",
+      "source": "gfx/gfx_policy.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx_policy_reeval",
+      "source": "gfx/gfx_policy.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx_is_started",
+      "source": "gfx/gfx_osri_view.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

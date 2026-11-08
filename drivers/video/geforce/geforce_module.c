@@ -213,7 +213,34 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
         rc=MODULE_INIT_FAILED;
         goto failed;
     }
+    if (candidate.direct_ok &&
+        !module_text_contains(r, (u32)(uptr)candidate.direct_ok)) {
+        rc=MODULE_INIT_FAILED;
+        goto failed;
+    }
+    if (candidate.direct_ops) {
+        u32 address = (u32)(uptr)candidate.direct_ops;
+        if (address < r->ro || sizeof(GfxDirectOps) > r->ro_size ||
+            address - r->ro > r->ro_size - sizeof(GfxDirectOps)) {
+            rc=MODULE_INIT_FAILED;
+            goto failed;
+        }
+        const GfxDirectOps *d = candidate.direct_ops;
+        const u32 direct_entries[] = {
+            (u32)(uptr)d->fill_rect, (u32)(uptr)d->blit,
+            (u32)(uptr)d->fill_rop, (u32)(uptr)d->put,
+            (u32)(uptr)d->mono, (u32)(uptr)d->get
+        };
+        for (u32 i=0; i<sizeof(direct_entries)/sizeof(direct_entries[0]); i++)
+            if (direct_entries[i] && !module_text_contains(r, direct_entries[i])) {
+                rc=MODULE_INIT_FAILED;
+                goto failed;
+            }
+    }
     const u32 display_entries[] = {
+        (u32)(uptr)candidate.fill_rop, (u32)(uptr)candidate.put,
+        (u32)(uptr)candidate.mono, (u32)(uptr)candidate.get,
+        (u32)(uptr)candidate.shadow_fill_rect, (u32)(uptr)candidate.shadow_blit,
         (u32)(uptr)candidate.set_mode, (u32)(uptr)candidate.dpms,
         (u32)(uptr)candidate.cursor_image, (u32)(uptr)candidate.cursor_move,
         (u32)(uptr)candidate.cursor_show, (u32)(uptr)candidate.vsync,

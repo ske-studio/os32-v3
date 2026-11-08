@@ -63,3 +63,14 @@ int gfx_policy_blocks_map(u32 role)
     return g_backend && g_backend->policy == GFX_POLICY_DIRECT &&
            (role == LEDGER_ROLE_CLIENT || role == LEDGER_ROLE_DISPLAY);
 }
+
+void gfx_policy_scan_changed(void)
+{
+    gfx_scan_changed = 1;
+    gfx_policy_reeval();
+}
+
+u16 gfx_policy_gen_get(void)
+{
+    return gfx_policy_gen;
+}

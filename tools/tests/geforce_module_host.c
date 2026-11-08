@@ -79,8 +79,10 @@ static int publishing_init(GfxBackend *out,const GeforceModuleContext *ctx)
     return init_rc;
 }
 /* Model one RO declaration/name and a writable slot in the loaded fake image. */
+static int probe_decl_calls;
 static i32 fixture_probe_decls(const struct probe_decl **t, u32 *n)
 {
+    probe_decl_calls++;
     struct module_record *r=module_record_get(geforce_handle);
     struct probe_decl *decl=(void *)(uptr)r->ro;
     char *name=(void *)(decl+1);
@@ -174,6 +176,27 @@ void _start(void)
     CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
     CHECK(!registered && !r->registration_refs);
     geforce_backend_ops.blit=blit;
+    /* DIRECT eligibility and every saved callback must be module text;
+     * the immutable table must be readable from the pinned RO interval. */
+    geforce_backend_ops.direct_ok=(void *)(uptr)(r->text+r->text_size);
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
+    CHECK(!probe_decl_calls && !registered && !r->registration_refs);
+    geforce_backend_ops.direct_ok=probe;
+    static GfxDirectOps direct;
+    geforce_backend_ops.direct_ops=&direct;
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
+    CHECK(!probe_decl_calls && !registered && !r->registration_refs);
+    u32 saved_ro=r->ro, saved_size=r->ro_size;
+    r->ro=(u32)(uptr)&direct; r->ro_size=sizeof(direct);
+    for (u32 i=0;i<sizeof(direct)/sizeof(u32);i++) {
+        kmemset(&direct,0,sizeof(direct));
+        u32 bad=r->text+r->text_size;
+        kmemcpy((u8 *)&direct+i*sizeof(bad),&bad,sizeof(bad));
+        CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED && !accel_slot);
+        CHECK(!probe_decl_calls && !registered && !r->registration_refs);
+    }
+    geforce_backend_ops.direct_ops=0; geforce_backend_ops.direct_ok=0;
+    r->ro=saved_ro; r->ro_size=saved_size;
     r->exports[2]=(u32)(uptr)fixture_probe_decls;
     if (input[1]==3 || input[1]==4) r->exports[2]=(u32)(uptr)failing_probe_decls;
     if (input[1]==5) r->exports[2]=0;

@@ -143,7 +143,7 @@ static void c1_formats(void)
         /* Even direct rebinds cannot reopen the old INDEX8 adapter on 16/32. */
         gf_hook_scan_bind(true,&front);
         if (formats[i]==GF3_INDEX8) {
-            assert(c1_hal.fill_rect==geforce_fill_rect && c1_hal.blit==geforce_blit);
+            assert(!c1_hal.fill_rect && !c1_hal.blit); /* SHADOW kernel seam. */
             assert(!geforce_fill_rect(front.width,0,1,1,0));
         } else {
             assert(!c1_hal.fill_rect && !c1_hal.blit);
@@ -185,7 +185,7 @@ static void c1_geometry(void)
     svc_state.mode_connector[index]=svc_state.head[0].route.connector;
     assert(!c1_hal.set_mode(xga.id));
     c1_expect(&svc_state.head[0].front,GFX_FMT_PACKED8,C1_INDEX_BPP);
-    assert(c1_hal.fill_rect==geforce_fill_rect);
+    assert(!c1_hal.fill_rect); /* Scan publication cannot install DIRECT hooks. */
     c1_clear_trace();
     assert(geforce_transfer(0,0,1,1)==OS32_ERR_INVAL);
     assert(svc_ctx.last_rc==GF4_EFORMAT && !cint_host.nevents && !svc_host.nevents);
