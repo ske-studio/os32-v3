@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='term-model', tier=1,
     covers=['userland/libos32term/**'],
-    needs=[], budget=1.055124)
+    needs=[], budget=5.7)
 
 
 def run(ctx) -> int:

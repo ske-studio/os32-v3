@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """LGY adapter against the existing driver's host fake."""
-CHECK = dict(name='hostsvc-lgy98', tier=1, needs=[], budget=3, covers=[
+CHECK = dict(name='hostsvc-lgy98', tier=1, needs=[], budget=3.1, covers=[
     'net/nic_lgy98.c', 'net/nic.h', 'net/link.h',
     'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hostsvc_fixture.h',

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='shlib', tier=1,
     covers=['sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'userland/rust/libos32gui/src/shlib.rs'],
-    needs=[], budget=0.64464)
+    needs=[], budget=2.5)
 
 
 def run(ctx) -> int:

@@ -2,7 +2,7 @@
 CHECK = dict(name='kprintf-va-host', tier=4,
     covers=['lib/kprintf.c', 'include/kprintf.h', 'include/console.h',
             'include/types.h', 'sdk/include/os32/*.h', 'tools/tests/host32.py'],
-    needs=[], budget=2)
+    needs=[], budget=3.1)
 
 import pathlib
 import sys

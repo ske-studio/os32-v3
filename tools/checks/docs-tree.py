@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='docs-tree', tier=1,
     covers=['**/*.md', 'tools/doc_graph.py', 'tools/doc_tree_baseline.json'],
-    needs=[], budget=5.103676)
+    needs=[], budget=9.5)
 
 
 def run(ctx) -> int:

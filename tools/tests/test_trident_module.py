@@ -2,7 +2,7 @@
 """Trident actual facade/loader loans, rejection/pin/abort and paired product.
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
-CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=120,
+CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
     covers=['init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',

@@ -1,5 +1,5 @@
 """T1 continuous thermal samples, priority, pause edges and maximum fan."""
-CHECK = dict(name='gf5-therm-t1', tier=1, needs=['make:all'], budget=20.0,
+CHECK = dict(name='gf5-therm-t1', tier=1, needs=['make:all'], budget=4.8,
              # Includes inputs reached through the shared test_gf5 runner.
              covers=[
                  'hwdev/gf/**',

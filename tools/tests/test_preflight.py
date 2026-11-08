@@ -2,7 +2,7 @@
 """Lightweight preflight fixtures; no network or OS build."""
 CHECK = dict(name='preflight-host', tier=1,
     covers=['tools/preflight.sh', 'tools/fetch_fonts.py'],
-    needs=[], budget=4.009738)
+    needs=[], budget=4.5)
 
 import hashlib
 import os

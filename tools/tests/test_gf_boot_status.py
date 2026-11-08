@@ -1,5 +1,5 @@
 """Unprepared production GF1 status must not call a missing MMIO callback."""
-CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=10.0,
+CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=3.2,
     covers=['tools/tests/test_gf_boot_status.py', 'tools/tests/gf_boot_status_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'kdebug/gf_foundation_test.c', 'kdebug/gf_foundation_test.h',

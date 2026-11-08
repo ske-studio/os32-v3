@@ -1,5 +1,5 @@
 """S5C shared policy, CLI routing, and default one-file integration."""
-CHECK = dict(name='osri-profile', tier=1, needs=['make:osri-enc2-core'], budget=90,
+CHECK = dict(name='osri-profile', tier=1, needs=['make:osri-enc2-core'], budget=3.3,
              covers=['gfx/osri_profile.h', 'gfx/gfx_osri.h', 'tools/osri_profile.py',
                      'tools/img2osri.py', 'tools/osri_enc2_native.py',
                      'tools/osri_enc2_spec.py', 'tools/osri_enc2_decode.py',

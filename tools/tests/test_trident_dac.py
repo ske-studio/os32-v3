@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compare the linked DAC image with the independently recorded hardware script."""
-CHECK = dict(name='trident-dac', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-dac', tier=1, needs=[], budget=2.8,
     covers=['drivers/video/trident/default_dac.c', 'drivers/video/trident/trident.h',
             'userland/tests/hw/trident_mode.hwb', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'])

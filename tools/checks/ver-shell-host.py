@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-shell-host', tier=4,
     covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/shell/cmd_base.c', 'sdk/include/os32/os32_ver_info.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'tools/tests/test_ver_shell.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.4)
 
 
 def run(ctx) -> int:

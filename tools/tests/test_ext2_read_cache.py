@@ -8,7 +8,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 
-CHECK = dict(name='ext2-read-cache-host', tier=1, budget=90,
+CHECK = dict(name='ext2-read-cache-host', tier=1, budget=4.2,
              covers=['fs/ext2/*.c', 'fs/ext2/*.inc', 'fs/ext2/*.h',
                      'tools/tests/ext2_read_cache_host.c',
                      'tools/tests/test_ext2_read_cache.py', 'tools/tests/host32.py',

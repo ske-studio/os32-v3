@@ -2,7 +2,7 @@
 """Timing regressions with two fake checks; mutations never touch the live tree."""
 CHECK = dict(name='check-times-host', tier=1,
     covers=['tools/checks/run.py', 'tools/check_time.py', 'build/sdk.mk', 'sdk/kapi.json'],
-    needs=[], budget=47.1)
+    needs=[], budget=24.5)
 
 import contextlib
 import io
@@ -49,7 +49,7 @@ class CheckTimesTest(unittest.TestCase):
         # 呼び手の CHECK_TIMES・CHECK_TIME_CHILD を引き継ぐと、偽の木の表の置き場や前提が変わる。
         for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD', 'CC_FILES_JSON', 'CC_TIER',
                     'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY',
-                    'CHECK_NEEDS', 'CHECK_PAR_TARGETS', 'CHECK_NO_NEEDS'):
+                    'CHECK_NEEDS', 'CHECK_PAR_TARGETS', 'CHECK_NO_NEEDS', 'CHECK_SHARD'):
             self.env.pop(key, None)
 
     def write(self, path, text):
@@ -130,6 +130,29 @@ class CheckTimesTest(unittest.TestCase):
         self.assertIn('--list failed', result.stderr)
         self.assertFalse((self.root / 'prepared').exists())
 
+    def test_shard_make_dependencies(self):
+        self.env.pop('CHECK_SHARD', None)
+        self.write('tools/checks/a.py',
+                   "CHECK = dict(name='a', covers=[], budget=5, needs=['make:shared'])\n"
+                   "def run(ctx):\n    import time\n    time.sleep(.1)\n"
+                   "    (ctx.root / 'done').touch()\n    return 0\n")
+        self.write('tools/checks/b.py',
+                   "CHECK = dict(name='b', covers=[], budget=2, needs=['check:a'])\n"
+                   "def run(ctx):\n    return 0 if (ctx.root / 'done').exists() else 7\n")
+        seen = []
+        for i in range(3):
+            (self.root / 'done').unlink(missing_ok=True)
+            result = self.make('check-fast', f'CHECK_SHARD={i}/3')
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            rows = (self.root / 'build/out/check_times.tsv').read_text().splitlines()
+            seen.extend(line.split('\t')[0] for line in rows)
+        self.assertEqual(sorted(seen), ['check-a', 'check-b'])
+        # A failure must block the consumer, even with make -k.
+        self.write('tools/checks/a.py', (self.root / 'tools/checks/a.py').read_text().replace('return 0', 'return 7'))
+        result = self.make('check-fast', 'CHECK_SHARD=0/3')
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(len((self.root / 'build/out/check_times.tsv').read_text().splitlines()), 1)
+
     def test_command_rc_and_output(self):
         path = self.root / 'direct.tsv'
         result = subprocess.run([sys.executable, str(self.root / 'tools/check_time.py'),
@@ -158,6 +181,8 @@ def main():
             ('timer', 'elapsed = time.monotonic() - start', 'elapsed = 0'),
             ('sdk', '--reset "$(CHECK_TIMES)"', '--reset "$(CHECK_TIMES).unused"'),
             ('sdk', 'check-par CHECK_PAR_TARGETS="$$CC_STAGE1"', '$$CC_STAGE1'),
+            ('sdk', '$(foreach edge,$(CHECK_EDGES),$(eval $(subst :, : ,$(edge))))', ''),
+            ('sdk', 'CHECK_PAR_TARGETS ?= $(CHECK_SHARD_TARGETS)', 'CHECK_PAR_TARGETS ?= $(CHECK_NAMES)'),
         )
         for index, (kind, old, new) in enumerate(mutations, 1):
             TIMER, SDK = originals

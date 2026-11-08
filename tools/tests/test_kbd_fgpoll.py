@@ -1,5 +1,5 @@
 """F2/F2i: real keyboard CUI foreground calls, ILP32 runtime mutants."""
-CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=10.0,
+CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
              covers=['tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
                      'tools/tests/host_arch/**', 'build/config.mk',

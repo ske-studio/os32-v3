@@ -6,7 +6,7 @@ CHECK = dict(name='legacy-callers-host', tier=1,
             'tools/tests/legacy_callers_host.c', 'tools/tests/legacy_guest_fake.h',
             'tools/tests/test_legacy_callers.py', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'include/**', 'sdk/include/os32/**'],
-    needs=[], budget=8)
+    needs=[], budget=2.9)
 from pathlib import Path
 import subprocess
 import sys

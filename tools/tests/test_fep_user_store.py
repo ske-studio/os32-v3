@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Learning DB open/schema/meta fault injection, freestanding ILP32."""
-CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=8,
+CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=4.3,
     covers=['kernel/ime/ime_user_store.c', 'kernel/ime/ime_conn.c',
             'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_outer.h',
             'lib/sqlite3/os32_sqlite_vfs.h', 'lib/kstring_c.c',

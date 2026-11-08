@@ -1,5 +1,5 @@
 """T0c critical pause ownership and independent thermal lifetime, production assembly."""
-CHECK = dict(name='gf5-critical-service-host', tier=1, budget=90.0,
+CHECK = dict(name='gf5-critical-service-host', tier=1, budget=16.1,
              needs=['make:build/out/geforce/geforce_imports.h'],
              covers=['tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
                      'include/**', 'kdebug/**', 'mm/pgalloc.h', 'mm/physmem.h',

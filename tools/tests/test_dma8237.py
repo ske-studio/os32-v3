@@ -16,7 +16,7 @@
 """
 CHECK = dict(name='dma8237-host', tier=4,
     covers=['drivers/dma/dma8237.c', 'drivers/dma/dma8237_math.c', 'tools/tests/dma8237_host.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.530974)
+    needs=[], budget=3.0)
 
 from kernel_includes import include_flags
 import os

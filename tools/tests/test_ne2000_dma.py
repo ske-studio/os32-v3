@@ -1,7 +1,7 @@
 """D04: execute real NE2000 DMA, OVW, TX timeout and initialization paths."""
 CHECK = dict(name='ne2000-dma-host', tier=4,
     covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/net_m2_test.py', 'tools/net_m4_test.py', 'tools/net_l1_test.py', 'tools/net_l2_test.py'],
-    needs=['make:all'], budget=60.0)
+    needs=['make:all'], budget=3.4)
 
 import os
 from pathlib import Path

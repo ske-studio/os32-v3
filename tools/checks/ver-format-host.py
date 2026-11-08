@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-format-host', tier=1,
     covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/boot_diag.h', 'kernel/ver_format.c', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'kernel/ver_info.h', 'kernel/module/module.c', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'arch/x86/kernel/idt.h', 'include/input_service.h', 'kernel/input_service.c', 'platform/pc98/d2_bind.c', 'include/bootinfo.h', 'include/config.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_format_host.c', 'tools/tests/test_ver_format.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.0)
 
 
 def run(ctx) -> int:

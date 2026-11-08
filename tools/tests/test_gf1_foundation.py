@@ -14,7 +14,7 @@ CHECK = dict(name='gf1-foundation-host', tier=1,
             'drivers/video/geforce/geforce_tick.c',
             'tools/tests/gf1_foundation_host.c', 'tools/tests/test_gf1_foundation.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.3)
 
 from pathlib import Path
 import os

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='sqlite-memsys5-host', tier=1,
     covers=['lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_config.h', 'tools/tests/sqlite_memsys5_proto.c', 'tools/tests/sqlite_memsys5_proto.h', 'tools/tests/sqlite_memsys5_host.c', 'tools/tests/sqlite_memsys5_start.S', 'tools/tests/sqlite_memsys5_linux.c', 'tools/tests/test_sqlite_memsys5.py', 'tools/tests/sqlite_memsys5_tdd.md', 'tools/tests/host32.py'],
-    needs=[], budget=1.77527)
+    needs=[], budget=4.8)
 
 
 def run(ctx) -> int:

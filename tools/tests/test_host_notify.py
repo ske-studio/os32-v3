@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host notification wire, timing, queue, and mutation tests."""
 CHECK = dict(name='host-notify', tier=1, needs=[],
-             covers=['tools/host_notify.py', 'net/link.h'], budget=1)
+             covers=['tools/host_notify.py', 'net/link.h'], budget=2.8)
 import argparse
 import importlib.util
 from pathlib import Path

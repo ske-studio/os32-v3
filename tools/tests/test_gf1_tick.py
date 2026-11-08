@@ -3,7 +3,7 @@ CHECK = dict(name='gf1-tick-host', tier=3,
     covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.h',
             'platform/pc98/tick_order.h', 'tools/tests/gf1_tick_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=2.6)
 
 from pathlib import Path
 import os

@@ -2,7 +2,7 @@
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
 CHECK = dict(name='ime-display-host', tier=1,
     covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=60.0)
+    needs=[], budget=3.1)
 
 from kernel_includes import include_flags
 import argparse

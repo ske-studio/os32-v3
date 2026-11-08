@@ -1,5 +1,5 @@
 """Q1: read-only GF5 observations preserve the diagnosed failure."""
-CHECK = dict(name='gf5-observe', tier=1, needs=[], budget=20.0,
+CHECK = dict(name='gf5-observe', tier=1, needs=[], budget=3.6,
              covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',

@@ -17,7 +17,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
     covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=1.873258)
+    needs=[], budget=3.4)
 
 from kernel_includes import include_flags
 import pathlib

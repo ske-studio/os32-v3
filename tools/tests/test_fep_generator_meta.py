@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Check generated system dictionary metadata against the SQLite contents."""
-CHECK = dict(name='fep-generator-meta', tier=1, needs=[], budget=5,
+CHECK = dict(name='fep-generator-meta', tier=1, needs=[], budget=2.5,
              covers=['tools/fep_to_sqlite.py', 'assets/ipadic/COPYING',
                      'assets/joyo_kanji.txt', 'tools/tests/test_fep_generator_meta.py'])
 import argparse

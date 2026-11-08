@@ -2,7 +2,7 @@
 """SPR full table without VRAM probing; D:2919-2975 is the KiB oracle.
 Production capacity_plan and register access run against the shared fake.
 """
-CHECK = dict(name='trident-vram', tier=1, needs=[], budget=180,
+CHECK = dict(name='trident-vram', tier=1, needs=[], budget=4.3,
     covers=['drivers/video/trident/vram.c', 'drivers/video/trident/trident.h',
             'drivers/video/trident/regs.c', 'drivers/video/trident/pc98_init.c',
             'drivers/video/trident/mode_640.c', 'drivers/video/trident/route_ra266.c',

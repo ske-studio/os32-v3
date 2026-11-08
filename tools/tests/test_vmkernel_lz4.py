@@ -22,7 +22,7 @@ tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM �
 """
 CHECK = dict(name='vmkernel-lz4-host', tier=1,
     covers=['boot/boot_defs.h', 'include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_artifacts.py', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
-    needs=['make:all'], budget=3.292628)
+    needs=['make:all'], budget=5.1)
 
 import host32
 import os

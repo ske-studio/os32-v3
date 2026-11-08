@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """C3 absolute deadlines and caller-owned replies, libc-free ILP32 runtime."""
-CHECK = dict(name='hostsvc-sfs-deadline', tier=1, needs=[], budget=5, covers=[
+CHECK = dict(name='hostsvc-sfs-deadline', tier=1, needs=[], budget=4.0, covers=[
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
     'fs/vfs.h', 'include/types.h', 'include/time_units.h',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """S1-S3 SDK: real host_call transport and generation-scoped LIST cache."""
-CHECK = dict(name='hostsvc-sdk', tier=1, needs=[], budget=120, covers=[
+CHECK = dict(name='hostsvc-sdk', tier=1, needs=[], budget=3.5, covers=[
     'userland/lib/host/host_call.c', 'userland/lib/host/host_call_internal.h',
     'userland/lib/host/libos32host.h',
     'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h',

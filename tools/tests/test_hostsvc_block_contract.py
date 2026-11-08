@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """D1 block wire contract, NET_HOSTSVC_DESIGN §4; libc-free ILP32 runtime."""
-CHECK = dict(name='hostsvc-block-contract', tier=1, needs=[], budget=3, covers=[
+CHECK = dict(name='hostsvc-block-contract', tier=1, needs=[], budget=3.1, covers=[
     'fs/serialfs/sfs_proto.h', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c',
     'lib/crc32.h', 'lib/le_internal.h', 'include/types.h',
     'include/time_units.h', 'include/memmap.h', 'tools/tests/host32.py',

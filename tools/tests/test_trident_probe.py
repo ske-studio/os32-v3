@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Probe against the shared device fake; script expectations H:70-81."""
-CHECK = dict(name='trident-probe', tier=1, needs=[], budget=3,
+CHECK = dict(name='trident-probe', tier=1, needs=[], budget=3.2,
     covers=['drivers/video/trident/probe.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_probe_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',

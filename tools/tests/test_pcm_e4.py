@@ -6,7 +6,7 @@ CHECK = dict(name='pcm-e4-host', tier=1, covers=[
     'kernel/module/kdebug_call.c', 'drivers/sound/cs4231/pcm_module.c',
     'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c',
     'drivers/sound/cs4231/pcm_e4_*.c', 'drivers/sound/cs4231/pcm_e4_*.h',
-    'userland/tests/pcm_test.c', 'build/kernel.mk'], needs=[], budget=3)
+    'userland/tests/pcm_test.c', 'build/kernel.mk'], needs=[], budget=3.4)
 
 from kernel_includes import include_flags
 from pathlib import Path

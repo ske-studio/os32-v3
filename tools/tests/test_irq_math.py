@@ -17,7 +17,7 @@ IF/PIC のハードウェア効果だけを差し替える。
 """
 CHECK = dict(name='irq-math-host', tier=1,
     covers=['platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'tools/tests/irq_math_host.c', 'include/pc98.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'tools/tests/kernel_includes.py', 'kdebug/kselftest/irq_dynamic.inc', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h'],
-    needs=[], budget=1.484202)
+    needs=[], budget=3.1)
 
 from kernel_includes import include_flags
 import pathlib

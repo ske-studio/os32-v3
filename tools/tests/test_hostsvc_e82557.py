@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """82557 adapter with libc-free driver and module-reference fakes."""
-CHECK = dict(name='hostsvc-e82557', tier=1, needs=[], budget=3, covers=[
+CHECK = dict(name='hostsvc-e82557', tier=1, needs=[], budget=3.4, covers=[
     'net/nic_e82557.c', 'net/nic.h', 'include/lan_contract.h',
     'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',

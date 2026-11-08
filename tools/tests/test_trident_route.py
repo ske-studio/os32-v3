@@ -5,7 +5,7 @@ Oracle and license provenance live in trident_route_host.c / route_ra266.c.
 No local reference checkout or 32-bit libc is needed by CI. Production
 regs/lifecycle/module assembly belongs to their subsequent integration test.
 """
-CHECK = dict(name='trident-route', tier=1, needs=[], budget=30,
+CHECK = dict(name='trident-route', tier=1, needs=[], budget=9.1,
     covers=['drivers/video/trident/route_ra266.c',
             'drivers/video/trident/trident.h',
             'tools/tests/trident_route_host.c',

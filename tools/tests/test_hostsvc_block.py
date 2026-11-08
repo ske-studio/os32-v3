@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """D2 stateless block RPC, libc-free ILP32 runtime."""
-CHECK = dict(name='hostsvc-block', tier=1, needs=[], budget=5, covers=[
+CHECK = dict(name='hostsvc-block', tier=1, needs=[], budget=4.1, covers=[
     'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',

@@ -11,7 +11,7 @@ CHECK = dict(name='splash-raster-diag-host', tier=1,
             'gfx/gfx_internal.h', 'include/gfx_hal.h', 'mm/paging.h',
             'platform/pc98/legacy/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h',
-            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=20.0)
+            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=33.2)
 import argparse
 import os
 from pathlib import Path

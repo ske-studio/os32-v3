@@ -4,7 +4,7 @@ Resident scheduling is verified by test_geforce_fgpoll; this boundary test
 checks the hot-path gate and delivery of a poll's abort before ring3 return.
 Full service/module composition remains U6's acceptance test.
 """
-CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=5.0,
+CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=2.8,
              covers=['tools/tests/test_exec_syscall_fgpoll.py',
                      'exec/exec_syscall.inc', 'drivers/video/geforce/geforce_module.h',
                      'tools/tests/host32.py',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Freestanding ILP32 production FEP facade validation and boot count relay."""
-CHECK = dict(name='fep-module', tier=1, needs=[], budget=3,
+CHECK = dict(name='fep-module', tier=1, needs=[], budget=3.3,
     covers=['kernel/ime/fep_module.c', 'kernel/ime/fep_module.h',
             'kernel/ime/fep_body.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h',
             'tools/tests/fep_module_host.c',

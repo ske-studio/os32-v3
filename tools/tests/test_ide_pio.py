@@ -6,7 +6,7 @@ import sys
 import tempfile
 from kernel_includes import include_flags
 
-CHECK = dict(name='ide-pio-host', tier=1, budget=4,
+CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
              covers=['drivers/ata/ide.c', 'drivers/ata/ide.h',
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',

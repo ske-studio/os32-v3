@@ -1,7 +1,7 @@
 """V1: real build dependency loading and the kernel formatter's product version."""
 CHECK = dict(name='ver-version-host', tier=1,
     covers=['include/config.h', 'docs/decisions/VERSIONS.md', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'kernel/module/module.c', 'tools/tests/mutpar.py', 'kernel/ver_format.c', 'kernel/ver_info.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
-    needs=['make:all'], budget=60.0)
+    needs=['make:all'], budget=12.2)
 
 import os
 import pathlib

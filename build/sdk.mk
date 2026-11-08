@@ -169,12 +169,21 @@ CHECK_NAMES := $(shell python3 -B tools/checks/run.py --list)
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --list failed)
 endif
+CHECK_SHARD ?=
+CHECK_SHARD_TARGETS := $(shell python3 -B tools/checks/run.py --list $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
+ifneq ($(.SHELLSTATUS),0)
+$(error tools/checks/run.py --list --shard failed)
+endif
+CHECK_EDGES := $(shell python3 -B -c 'import json, subprocess; rows = json.loads(subprocess.check_output(["python3", "-B", "tools/checks/run.py", "--list", "--json"])); print(" ".join("check-time-" + c["target"] + ":check-time-check-" + n[6:] for c in rows for n in c["needs"] if n.startswith("check:")))')
+ifneq ($(.SHELLSTATUS),0)
+$(error tools/checks/run.py dependency listing failed)
+endif
 CHECK_ALL_NEEDS := $(shell python3 -B -c 'import json, subprocess; rows = json.loads(subprocess.check_output(["python3", "-B", "tools/checks/run.py", "--list", "--json"])); print(" ".join(sorted({n[5:] for c in rows for n in c["needs"] if n.startswith("make:")})))')
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --list --json failed)
 endif
 endif
-CHECK_PAR_TARGETS ?= $(CHECK_NAMES)
+CHECK_PAR_TARGETS ?= $(CHECK_SHARD_TARGETS)
 CHECK_NEEDS ?= $(CHECK_ALL_NEEDS)
 
 .PHONY: $(CHECK_NAMES) check-prepare check-par-run
@@ -196,6 +205,8 @@ check-times-init:
 check-par: check-times-init check-prepare
 	+@$(MAKE) check-par-run
 check-par-run: $(addprefix check-time-,$(CHECK_PAR_TARGETS))
+# Needs finish before their consumers (including the shared AST cache warmup).
+$(foreach edge,$(CHECK_EDGES),$(eval $(subst :, : ,$(edge))))
 $(addprefix check-time-,$(CHECK_NAMES)): check-time-%:
 	+@python3 tools/check_time.py "$(CHECK_TIMES)" "$*" $(MAKE) --no-print-directory CHECK_TIME_CHILD=1 $*
 

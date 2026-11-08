@@ -14,7 +14,7 @@ CHECK = dict(name='boot-order-host', tier=1, covers=['include/clock_source.h', '
     'platform/pc98/boot_irq.c',
     'tools/tests/test_boot_order.py',
     'include/boot_cpu.h', 'include/platform_boot.h', 'include/fault_fixture.h',
-    'arch/x86/kernel/fault_fixture.c'], needs=[], budget=5.0)
+    'arch/x86/kernel/fault_fixture.c'], needs=[], budget=2.8)
 
 PRELUDE = r'''
 #include <stdio.h>

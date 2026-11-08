@@ -1,5 +1,5 @@
 """M1 real ledger window validation, with runtime-only guard mutations."""
-CHECK = dict(name='ledger-device-map-host', tier=1, budget=30.0,
+CHECK = dict(name='ledger-device-map-host', tier=1, budget=4.7,
              covers=['mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
                      'mm/physmem.c', 'mm/physmem.h', 'include/memmap.h',
                      'tools/tests/ledger_device_map_host.c',
