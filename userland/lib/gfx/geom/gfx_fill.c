@@ -9,6 +9,7 @@
 
 #include "libos32gfx.h"
 #include "libgfx_internal.h"
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 /* ベジェ平坦化の最大深度 */
@@ -289,10 +290,15 @@ void gfx_scanline_fill(GFX_EdgeTable *et, u8 color, int min_y, int max_y)
             int x_start = et->intersect_buf[i];
             int x_end = et->intersect_buf[i + 1];
 
-            if (x_start < 0) x_start = 0;
-            if (x_end >= 640) x_end = 639;
-            if (x_start <= x_end) {
-                gfx_span_raw(base, x_start, x_end, color);
+            if (gfx_direct) {
+                if (x_start <= x_end)
+                    (void)gfx_cmd_enqueue_fill(x_start, y, x_end - x_start + 1, 1, color, 0);
+            } else {
+                if (x_start < 0) x_start = 0;
+                if (x_end >= 640) x_end = 639;
+                if (x_start <= x_end) {
+                    gfx_span_raw(base, x_start, x_end, color);
+                }
             }
         }
 

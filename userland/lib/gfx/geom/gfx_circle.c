@@ -7,6 +7,7 @@
 
 #include "libos32gfx.h"
 #include "libgfx_internal.h"   /* gfx_span_raw (H2b: プレーン/パックド共通スパン) */
+#include "gfx_direct_internal.h"
 #include "os32api.h"
 
 /* gfx_fill_circle \u3067 dirty rect \u767b\u9332\u3092\u56de\u907f\u3057\u3066\u76f4\u63a5\u547c\u3073\u51fa\u3059 */
@@ -71,6 +72,25 @@ void gfx_fill_circle(int cx, int cy, int r, u8 color)
 
     /* dirty rect をバウンディングボックスで1回だけ登録 */
     gfx_api->gfx_add_dirty_rect(cx - r, cy - r, r * 2 + 1, r * 2 + 1);
+
+    if (gfx_direct) {
+        while (x <= y) {
+            (void)gfx_cmd_enqueue_fill(cx - x, cy + y, x * 2 + 1, 1, color, 0);
+            if (y != 0)
+                (void)gfx_cmd_enqueue_fill(cx - x, cy - y, x * 2 + 1, 1, color, 0);
+            (void)gfx_cmd_enqueue_fill(cx - y, cy + x, y * 2 + 1, 1, color, 0);
+            if (x != 0)
+                (void)gfx_cmd_enqueue_fill(cx - y, cy - x, y * 2 + 1, 1, color, 0);
+            if (d < 0) {
+                d += 2 * x + 3;
+            } else {
+                d += 2 * (x - y) + 5;
+                y--;
+            }
+            x++;
+        }
+        return;
+    }
 
     /* 内部では gfx_span_raw を直接呼び、dirty rect の個別登録を回避 */
     while (x <= y) {
