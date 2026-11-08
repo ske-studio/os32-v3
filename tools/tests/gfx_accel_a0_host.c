@@ -10,6 +10,9 @@
 KernelAPI *gfx_api;
 int gfx_lost;
 int gfx_direct;
+int gfx_ready, gfx_dirty_suppress;
+u8 gfx_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
+void gfx_pixel_nodirty(int x, int y, u8 c) { (void)x; (void)y; (void)c; }
 GFX_Framebuffer gfx_fb;
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 __typeof__(gfx_gen) gfx_gen;
