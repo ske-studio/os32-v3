@@ -11,9 +11,36 @@ static bool expected_ge=true;
 static bool benchmark;
 static u32 bench_calls, bench_reads, bench_clock, bench_lines, bench_method;
 static int bench_fault, bench_field;
-static u32 bench_fields;
+static u32 bench_fields, ram_lines, ram_method, allocs, frees;
+static bool ram_phase, alloc_fail, free_fail;
+static u32 ram_storage[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
+u32 pgalloc_alloc_phys(u32 owner, int pages)
+{
+    ++allocs;
+    if (owner != LEDGER_OWNER_KERNEL || pages != 1) failed=1;
+    return alloc_fail ? 0 : (u32)ram_storage;
+}
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int pages)
+{
+    if (owner != LEDGER_OWNER_KERNEL || pfn != (u32)ram_storage / PAGE_SIZE || pages != 1)
+        failed=1;
+    ++frees;
+    return !free_fail;
+}
+
 int sys_time_now(u32 *lo, u32 *hi)
 {
+    if (benchmark && !bench_fault && bench_clock >= 64 && (bench_clock & 1u)) {
+        u32 method = (bench_clock - 64u) / 16u;
+        const u8 source[10] = {1,2,3,0,0,4,5,6,0,0};
+        const u8 pattern[4] = {0x69,0x96,0xa5,0x5a};
+        const u8 *p = (const u8 *)ram_storage;
+        for (u32 i=0; i<10; ++i) {
+            u8 expected = method == 1 ? source[i] :
+                method == 3 || i >= 8 ? 0x69 : pattern[i % 4];
+            if (p[i] != expected) failed=1;
+        }
+    }
     *lo = (u32)-51 + (bench_clock / 2u) * 100u +
           (bench_clock % 2u ? 10u + (bench_clock / 2u) % 8u : 0);
     ++bench_clock; *hi = 0;
@@ -77,7 +104,7 @@ int serial_gate_active(void) { return 0; }
 void serial_puts_polled(const char *s)
 {
     if (benchmark) {
-        if (!bench_fault) {
+        if (!bench_fault && !ram_phase) {
             if (bench_field) {
                 const char *expected[] = {"", "8", "10", "17", "13", "0"};
                 if (!same(s, expected[bench_field])) failed=1;
@@ -87,6 +114,22 @@ void serial_puts_polled(const char *s)
             else if (same(s, " max_us=")) bench_field=3;
             else if (same(s, " avg_us=")) bench_field=4;
             else if (same(s, " mismatches=")) bench_field=5;
+        }
+        if (same(s, "TRI phase=ram method=")) { ram_phase=true; ++ram_lines; }
+        if (ram_phase) {
+            if (!bench_fault && bench_field) {
+                const char *expected[] = {"", "8", "10", "17", "13", "0"};
+                if (!same(s, expected[bench_field])) failed=1;
+                bench_field=0;
+            } else if (!bench_fault && same(s, " count=")) bench_field=1;
+            else if (!bench_fault && same(s, " min_us=")) bench_field=2;
+            else if (!bench_fault && same(s, " max_us=")) bench_field=3;
+            else if (!bench_fault && same(s, " avg_us=")) bench_field=4;
+            if (same(s, "rep_stosd")) ram_method |= 1;
+            if (same(s, "rep_movsd")) ram_method |= 2;
+            if (same(s, "dword")) ram_method |= 4;
+            if (same(s, "byte")) ram_method |= 8;
+            return;
         }
         if (same(s, "TRI phase=present")) ++bench_lines;
         if (same(s, "byte")) bench_method |= 1;
@@ -279,16 +322,24 @@ static int test(void)
     d.io=&bench_io; o.present=bench_present;
     for (bench_fault=0; bench_fault<=5; ++bench_fault) {
         bench_calls=bench_reads=bench_clock=bench_lines=bench_method=bench_fields=0;
-        bench_field=0;
+        bench_field=0; ram_phase=false; ram_lines=ram_method=allocs=frees=0;
         failed=0;
         d.present_method=TRI_PRESENT_DWORD_SYNC;
         int rc=present_compare(&o);
         if (rc != (bench_fault ? TRI_E_ACCESS : 0) || bench_lines!=4 ||
-            bench_method!=15 || d.present_method!=TRI_PRESENT_DWORD_SYNC) return 1;
-        if (bench_fault == 5 && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=64)) return 1;
-        if (!bench_fault && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=64 || bench_fields!=20))
+            bench_method!=15 || ram_lines!=4 || ram_method!=15 || allocs!=1 || frees!=1 || d.present_method!=TRI_PRESENT_DWORD_SYNC) return 1;
+        if (bench_fault == 5 && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=128)) return 1;
+        if (!bench_fault && (failed || bench_calls!=32 || bench_reads!=24 || bench_clock!=128 || bench_fields!=20))
             return 1;
     }
+    bench_fault=1; alloc_fail=true; ram_phase=false;
+    ram_lines=ram_method=allocs=frees=0;
+    if (ram_compare(&o)!=TRI_E_RESOURCE || ram_lines!=4 || ram_method!=15 ||
+        allocs!=1 || frees || failed) return 1;
+    alloc_fail=false; free_fail=true; ram_phase=false;
+    ram_lines=ram_method=allocs=frees=0;
+    if (ram_compare(&o)!=TRI_E_RESOURCE || ram_lines!=4 || ram_method!=15 ||
+        allocs!=1 || frees!=1 || failed) return 1;
     return 0;
 }
 void _start(void)
