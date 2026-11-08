@@ -578,7 +578,7 @@ int trident_route_disable(struct trident_device *d);
  * sync reads VGA status, wait writes the PC-98 wait port, gap uses calibrated loops.
  * write_gap32 transfers each aligned row interior; no VRAM readback.
  * The S3 implementation is migrated by F7; API remains unchanged. */
-#define TRI_WRITE_GAP_DEFAULT_NS 300u
+#define TRI_WRITE_GAP_DEFAULT_NS 110u /* Ra266 2026-11-08 sweep: 60ns lost 48 bytes, 70ns 0; about x1.5 margin */
 #define TRI_WRITE_GAP_TICK_NS 10000000u
 void tri_write_gap_set(struct trident_device *, u32 ns);
 int trident_present(struct trident_device *, int x, int y, int w, int h);

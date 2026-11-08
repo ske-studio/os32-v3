@@ -265,7 +265,7 @@ void _start(void)
         finish(0);
     }
     CHECK(!rc && pinned && pins==1 && prepares==1 && !armed);
-    CHECK(context.write_gap_ns == (mode == 65 ? 1250u : mode == 7 ? 0u : 300u));
+    CHECK(context.write_gap_ns == (mode == 65 ? 1250u : mode == 7 ? 0u : TRI_WRITE_GAP_DEFAULT_NS));
     CHECK(context.write_gap_lpt == 1000000u);
     if (mode == 65) {
         CHECK(diagnostic_candidate->context->write_gap_ns == 1250u);
@@ -324,7 +324,7 @@ void _start(void)
 
 int sysconfig_get_int(const char *path, const char *key, int def)
 {
-    CHECK(!kstrcmp(path, SYS_SYSTEM_CFG) && !kstrcmp(key, "TRI_WRITE_GAP") && def==300);
+    CHECK(!kstrcmp(path, SYS_SYSTEM_CFG) && !kstrcmp(key, "TRI_WRITE_GAP") && def==(int)TRI_WRITE_GAP_DEFAULT_NS);
     return mode == 65 ? 1250 : mode == 7 ? 0 : mode == 38 ? -1 : def;
 }
 u32 cpu_loops_per_tick(void) { return 1000000; }
