@@ -179,6 +179,8 @@
 //! 120 os32gui_trim_hook_set
 //!  ---- T7b-b3 字形 engine の観測 ----
 //! 121 os32gui_font_stats            `font::AppFontStats` を caller buffer へ
+//! 122 os32gui_scroll                窓内の行領域を複写
+//! 123 os32gui_w_textarea_scroll     表示行とキャレットを更新して複写
 //! ```
 #![allow(clippy::missing_safety_doc)]
 
@@ -214,7 +216,7 @@ core::arch::global_asm!(
 __os32_shlib_header:
     .long   0x42494C53                  /* 0x00 magic  'SLIB'            */
     .long   2                           /* 0x04 version = GUI_PROTO_VERSION */
-    .long   122                         /* 0x08 nfunc                    */
+    .long   124                         /* 0x08 nfunc                    */
     .long   __shlib_data_start          /* 0x0C data_vaddr               */
     .long   __shlib_data_pages          /* 0x10 data_pages               */
     .long   __shlib_text_pages          /* 0x14 text_pages               */
@@ -343,6 +345,8 @@ __os32_shlib_header:
     .long   os32gui_gfx_detach                  /* 119 */
     .long   os32gui_trim_hook_set               /* 120 */
     .long   os32gui_font_stats                  /* 121 */
+    .long   os32gui_scroll                      /* 122 */
+    .long   os32gui_w_textarea_scroll           /* 123 */
     .text
 "#
 );
@@ -1459,4 +1463,34 @@ pub extern "C" fn os32gui_font_stats(out: *mut u8, len: u32) -> i32 {
     let n = core::cmp::min(len as usize, core::mem::size_of::<crate::font::AppFontStats>());
     unsafe { ptr::copy_nonoverlapping(&snap as *const _ as *const u8, out, n) };
     n as i32
+}
+
+/// U3/U4: append-only local-window scroll entry.
+#[no_mangle]
+pub extern "C" fn os32gui_scroll(window: u32, rect: Rect, dx: i16, dy: i16) -> i32 {
+    gate!(os32api::gui::proto::OS32_ERR_VERSION);
+    if unsafe { crate::ffi::gfx_direct } != 0 {
+        r0(crate::scroll::scroll(window, rect, dx, dy))
+    } else {
+        let _ = client::invalidate(window, rect);
+        os32api::gui::proto::OS32_ERR_NOSYS
+    }
+}
+
+/// Snapshot arrays are caller-owned only for the duration of this call.
+#[no_mangle]
+pub extern "C" fn os32gui_w_textarea_scroll(id: u32, rows: i32,
+    ptrs: *const *const u8, lens: *const u32, n: u32, crow: i32, ccol: i32) -> i32 {
+    gate!(os32api::gui::proto::OS32_ERR_VERSION);
+    const MAX: usize = os32api::gui::proto::GUI_MAX_TEXTAREA_ROWS;
+    if n as usize > MAX || (n != 0 && (ptrs.is_null() || lens.is_null())) {
+        return os32api::gui::proto::OS32_ERR_INVAL;
+    }
+    let mut lines: [&[u8]; MAX] = [&[]; MAX];
+    for i in 0..n as usize {
+        let (p, len) = unsafe { (*ptrs.add(i), *lens.add(i)) };
+        if len != 0 && p.is_null() { return os32api::gui::proto::OS32_ERR_INVAL; }
+        lines[i] = unsafe { slice(p, len) };
+    }
+    r0(widget::textarea_scroll(WidgetId(id), rows, &lines[..n as usize], crow, ccol))
 }

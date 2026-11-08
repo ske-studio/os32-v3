@@ -432,3 +432,18 @@ pub fn resolve(id: WidgetId) -> Option<usize> {
 pub fn id_of(idx: usize) -> WidgetId {
     WidgetId(shcall!(sh::E_W_ID_OF, extern "C" fn(u32) -> u32, idx as u32))
 }
+
+/// Replace the visible snapshot and scroll by rows (positive = forward).
+pub fn textarea_scroll(id: WidgetId, rows: i32, lines: &[&[u8]], crow: i32, ccol: i32) -> GuiResult<()> {
+    const MAX: usize = os32api::gui::proto::GUI_MAX_TEXTAREA_ROWS;
+    if lines.len() > MAX { return Err(GuiErr::FULL); }
+    let mut ptrs = [core::ptr::null(); MAX];
+    let mut lens = [0u32; MAX];
+    for (i, line) in lines.iter().enumerate() {
+        ptrs[i] = line.as_ptr();
+        lens[i] = line.len() as u32;
+    }
+    ok0(shcall!(sh::E_W_TEXTAREA_SCROLL,
+        extern "C" fn(u32, i32, *const *const u8, *const u32, u32, i32, i32) -> i32,
+        id.raw(), rows, ptrs.as_ptr(), lens.as_ptr(), lines.len() as u32, crow, ccol))
+}
