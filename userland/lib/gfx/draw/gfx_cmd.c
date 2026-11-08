@@ -32,6 +32,7 @@ int gfx_flush(void)
 {
     u32 done = 0;
     int rc;
+    if (gfx_lost) return OS32_ERR_STALE;
     if (!nq) return 0;
     for (u32 i = 0; i < nq; i++) {
         if (q[i].op == GFX_CMD_PUT || q[i].op == GFX_CMD_MONO)

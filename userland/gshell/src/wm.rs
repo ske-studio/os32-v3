@@ -1197,7 +1197,9 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
-    if unsafe { libos32gfx_check() } >= 0 {
+    let gfx_ok = unsafe { libos32gfx_check() } >= 0;
+    if !gfx_ok { return; }
+    if gfx_ok {
         let regen = unsafe { libos32gfx_take_regen() } != 0;
         if (regen || REGEN_PENDING.load(Ordering::SeqCst)) && !crate::fullscreen::active() {
             REGEN_PENDING.store(false, Ordering::SeqCst);

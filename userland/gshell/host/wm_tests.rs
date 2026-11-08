@@ -4735,3 +4735,25 @@ fn w2_drag_commit_shadow_moves_and_configures() {
     assert!(st.windows[0].configure_pending);
     assert!(mocks::present_counts().1 > 0);
 }
+
+#[test]
+fn w2_failed_check_skips_draw() {
+    use crate::{input, mocks, wm};
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    mocks::clear(0);
+    let mut st = wm::GuiState::NEW;
+    st.screen_w = 640; st.screen_h = 480;
+    st.screen_dirty.push(wm::Rect::new(10, 10, 20, 20));
+    let before = mocks::present_counts();
+    mocks::REGEN_LOG.lock().unwrap().clear();
+    mocks::REGEN_RC.store(-1, Ordering::SeqCst);
+    wm::wm_cycle(&mut st, input::Ctx::Wait);
+    assert!(!st.screen_dirty.is_empty(), "failed check must retain damage");
+    assert_eq!(mocks::present_counts(), before, "failed check must not present");
+    assert_eq!(&*mocks::REGEN_LOG.lock().unwrap(), &["check"]);
+    mocks::REGEN_RC.store(0, Ordering::SeqCst);
+    wm::wm_cycle(&mut st, input::Ctx::Wait);
+    assert!(st.screen_dirty.is_empty(), "successful check must draw retained damage");
+    assert!(mocks::present_counts().1 > before.1);
+}
