@@ -32,7 +32,7 @@ KernelAPI *g_api = &api;
 /* Two simultaneously live loads, each source and index, as in §5. */
 static u8 heap[4][HWB_FILE_BYTES];
 static u32 allocated[4], live, alloc_calls, fail_alloc;
-/* tri_burst5/6 have a separate indexed-bus oracle for every output record.
+/* tri_burst5/6/7 have a separate indexed-bus oracle for every output record.
  * Run its shell lifecycle without retaining millions of interpreter lines. */
 static u32 quiet_script;
 static u32 open_file, file_offset, closes, read_fail, raw_nosys;
@@ -272,9 +272,9 @@ static void scripts(void)
             /* §8 example BAR1, independent from shell address resolver. */
             struct hwbf_pci *p = hwbf_add_pci(&bus, HW_BDF(0,8,0), 0x1023, 0x9660);
             p->config[0x17] = 0x20; p->config[0x16] = 0x40; /* BAR1 0x20400000 */
-            if (hwbf_equal(script->name, "tri_w32.hwb") || (hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb")))) {
+            if (hwbf_equal(script->name, "tri_w32.hwb") || (hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb") || hwbf_equal(script->name, "tri_burst7.hwb")))) {
                 p->config[0x13] = 0x20; /* BAR0 0x20000000 */
-                for (u32 n = 0; n < ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb"))) ? 4096U : 32U); n++)
+                for (u32 n = 0; n < ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb") || hwbf_equal(script->name, "tri_burst7.hwb"))) ? 4096U : 32U); n++)
                     *hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) = 0x80U + n;
             }
             if (hwbf_equal(script->name, "gf_regs.hwb") || hwbf_equal(script->name, "gf_palette.hwb")) {
@@ -291,7 +291,7 @@ static void scripts(void)
                 h->config[0x1C] = 0x2D; h->config[0x1D] = 0x60; /* ctl1 0x602c */
                 h->config[0x20] = 0x01; h->config[0x21] = 0xC0; /* bm 0xc000 */
             }
-            quiet_script = (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb"));
+            quiet_script = (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb") || hwbf_equal(script->name, "tri_burst7.hwb"));
             int expected = 0;
             if (hwbf_equal(script->name, "np21w_nopci.hwb")) { bus.mechanism = 0; expected = 3; }
             if (hwbf_equal(script->name, "np21w_poll.hwb")) expected = 124;
@@ -303,7 +303,7 @@ static void scripts(void)
                 for (u32 n = 0; n < 32; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U + n) == 0x80U + n);
             }
-            if ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb")))) {
+            if ((hwbf_equal(script->name, "tri_burst.hwb") || hwbf_equal(script->name, "tri_burst2.hwb") || hwbf_equal(script->name, "tri_burst3.hwb") || hwbf_equal(script->name, "tri_burst4.hwb") || (hwbf_equal(script->name, "tri_burst5.hwb") || hwbf_equal(script->name, "tri_burst6.hwb") || hwbf_equal(script->name, "tri_burst7.hwb")))) {
                 CHECK(scalar("bad") == 0);
                 for (u32 n = 0; n < 4096; n++)
                     CHECK(*hwbf_byte(&bus, HW_PHYS, 0x20000000U+n) == (u8)(0x80U+n));

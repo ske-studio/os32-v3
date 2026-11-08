@@ -17,7 +17,7 @@
 
 filesystem:
   files:
-    # Includes trident_mode.hwb, tri_w32.hwb and tri_burst[2-6].hwb; disk/CD test payload only.
+    # Includes trident_mode.hwb, tri_w32.hwb and tri_burst[2-7].hwb; disk/CD test payload only.
     - host: "userland/tests/hw/*.hwb"
       guest: /test/hw/
       type: glob
