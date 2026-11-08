@@ -878,7 +878,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     # including readers whose covers contain no build output paths.
     artifact_targets = {n for n, c in checks.items() if "make:all" in c.needs or any(
         p.startswith(("build/out/", "build/sdk/")) for p in c.covers)}
-    generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_rust_gen.py")
+    generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_abi_x86.py", "sdk/target_profile.py", "sdk/kapi_rust_gen.py")
     for f in changed:
         hit.update(n for n, pats in patterns.items() if matches(f, pats))
         if matches(f, ("build/**/*.mk",)):
@@ -906,7 +906,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     build_changes = {f for f in changed if matches(f, FULL + BUILD_CONFIG_GLOBS)
                      and not routed_build_safe(root, base, f)}
     forced = bool(build_changes) or any(f in KAPI_GENERATED or f in
-        ("sdk/kapi.json", "sdk/gen_kapi.py", "sdk/kapi_rust_gen.py", "tools/checks/run.py") for f in changed)
+        ("sdk/kapi.json", "sdk/gen_kapi.py", "sdk/kapi_abi_x86.py", "sdk/target_profile.py", "sdk/kapi_rust_gen.py", "tools/checks/run.py") for f in changed)
     if not changed:
         tier, mode, selected = 4, "fast", set(checks)
     elif forced:
@@ -1022,7 +1022,7 @@ def lint(root, checks):
                         continue
                     required = [output]
                     if output in KAPI_GENERATED:
-                        required.append("sdk/kapi_rust_gen.py" if output.endswith("/kapi_generated.rs") else "sdk/gen_kapi.py")
+                        required.extend(("sdk/kapi_rust_gen.py",) if output.endswith("/kapi_generated.rs") else ("sdk/gen_kapi.py", "sdk/kapi_abi_x86.py", "sdk/target_profile.py"))
                     for dep in required:
                         if not matches(dep, patterns) and dep not in missing:
                             errors.append(f"{name}: uncovered generated input {dep}")

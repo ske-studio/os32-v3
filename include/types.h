@@ -20,9 +20,7 @@
 /* os32_kapi_shared.h で既に定義されている場合はスキップ */
 #ifndef OS32_KAPI_SHARED_H
 
-#ifndef __cdecl
-#define __cdecl __attribute__((cdecl))
-#endif
+#include "callconv.h"
 
 typedef unsigned char  u8;
 typedef unsigned short u16;

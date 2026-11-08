@@ -46,7 +46,7 @@ def run(args, mutant=None):
         'ext2_cb': function((ROOT / 'fs/ext2/ext2_vfs.c').read_text(),
                             'static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)'),
         'ls': (ROOT / 'exec/ring3_ls.c').read_text(),
-        'shim': (ROOT / 'exec/ring3_ls.S').read_text(),
+        'shim': (ROOT / 'arch/x86/kernel/ring3_ls.S').read_text(),
     }
     if mutant:
         name, key, old, new, expected = mutant

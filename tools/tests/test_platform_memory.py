@@ -7,7 +7,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='platform-memory-host', tier=1,
-    covers=['tools/tests/test_platform_memory.py', 'include/platform_memory.h',
+    covers=['include/callconv.h', 'tools/tests/test_platform_memory.py', 'include/platform_memory.h',
             'include/types.h', 'include/memmap.h', 'include/pc98.h',
             'platform/pc98/platform_memory_desc.h',
             'platform/powermac/platform_memory_desc.h'], needs=[], budget=5)
@@ -63,8 +63,9 @@ def main(mutate=False):
         work = Path(directory)
         for sub in ('include', 'selected', 'platform/pc98'):
             (work / sub).mkdir(parents=True)
-        for rel in ('include/types.h', 'include/memmap.h', 'include/pc98.h',
+        for rel in ('include/callconv.h', 'include/types.h', 'include/memmap.h', 'include/pc98.h',
                     'platform/pc98/platform_memory_desc.h'):
+            (work / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, work / rel)
         probe(work, MOCK, [11,22,33,44,55,1,2,3,4,5,6,7,8,9,10])
         if mutate:

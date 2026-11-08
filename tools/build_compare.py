@@ -136,6 +136,9 @@ H2_OBJECT_MOVES = {
     for name in ('v86', 'v86_mem', 'v86_module', 'v86_gcap', 'v86_entry')
 }
 
+# E1 preserves the shim's position in both normal and R1 links.
+H2_OBJECT_MOVES['exec/ring3_ls_shim.o'] = 'arch/x86/kernel/ring3_ls_shim.o'
+
 
 def h2_object_path(rel, root):
     for old, new in H2_OBJECT_MOVES.items():

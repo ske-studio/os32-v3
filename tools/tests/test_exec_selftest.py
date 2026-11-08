@@ -139,7 +139,7 @@ class ExecSelftest(unittest.TestCase):
             renames = ['-D' + n + '=host_' + n for n in sorted(set(IMPORTS) | definitions)]
             objects = []
             sources = [(ROOT / 'tools/tests/exec_selftest_host.c', renames),
-                       (ROOT / 'exec/ring3_ls.S', []),
+                       (ROOT / 'arch/x86/kernel/ring3_ls.S', []),
                        (ROOT / 'kdebug/selftest_exec.c', []),
                        (ROOT / 'kdebug/generated/kdebug_import_slots.c', []),
                        (ROOT / 'kdebug/generated/kdebug_import_stubs.S', []),

@@ -26,10 +26,7 @@
 #ifndef CPU_H
 #define CPU_H
 
-/* i386 cdecl argument word size/alignment; stack alignment is separate. */
-#define ABI_WORD_BYTES 4
-#define ABI_WORD_ALIGN ABI_WORD_BYTES
-#define ABI_STACK_ALIGN 16
+#include "abi.h"
 
 #ifndef __ASSEMBLER__
 #include "types.h"

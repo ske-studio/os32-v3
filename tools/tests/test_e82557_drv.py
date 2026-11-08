@@ -31,7 +31,7 @@ FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffr
 INCLUDES = include_flags(ROOT)
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/net/e82557/e82557.c", "drivers/net/e82557/e82557.h", "drivers/net/e82557/e82557_regs.h", "drivers/net/e82557/e82557_eeprom.c", "drivers/net/e82557/e82557_eeprom.h", "drivers/pci/pci_decode.c", "fs/vfs.h", "kernel/module/module.h", "include/bootinfo.h", "include/config.h"]
 MIRROR += ["drivers/net/e82557/e82557_desc.c", "drivers/net/e82557/e82557_desc.h", "drivers/pci/pci_bind_match.c", "mm/dma_pool.h"]
-MIRROR += ["include/pci_dev_contract.h", "include/pci_bind_contract.h",
+MIRROR += ['include/callconv.h', "include/pci_dev_contract.h", "include/pci_bind_contract.h",
            "include/lan_contract.h", "drivers/pci/pci_bind.h", "drivers/pci/pci.h",
            "drivers/pci/pci_decode.h", "include/types.h", "drivers/net/e82557/lan_module.h",
            "platform/pc98/lan_match.c"]

@@ -8,15 +8,17 @@ OS32 の移植点は **2 本の軸**に分かれている。
 | `platform/<platform>/` | 機種 | ポート I/O、I/O ウェイト、機器のつなぎ方 | `PLATFORM` (`pc98`) |
 
 契約 (どの実装も満たすべき宣言と註) は `include/` にあり、実装はそこに無い。
-契約は **2 本**あり、どちらも末尾で **固定名**を引く:
+原始命令と ABI 定数の契約は **固定名**で実装を引く:
 
 | 契約 | 何の契約か | 引く固定名 |
 |---|---|---|
 | [`include/io.h`](../include/io.h) | ポート I/O、割り込み制御、CPU 停止、IDT のロード | `arch_io.h` / `platform_io.h` |
+| [`include/abi.h`](../include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
 | [`include/cpu.h`](../include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
 
     #include "arch_io.h"        /* arch/$(ARCH)/arch_io.h     */
     #include "platform_io.h"    /* platform/$(PLATFORM)/platform_io.h */
+    #include "arch_abi.h"       /* arch/$(ARCH)/arch_abi.h    */
     #include "arch_cpu.h"       /* arch/$(ARCH)/arch_cpu.h    */
 
 どの実装が来るかを決めるのは `build/config.mk` の
@@ -127,3 +129,7 @@ SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-
 必須 7 本、ELF32/BE/EM_PPC、実 `.d`、全 TU の試行と失敗分類を照合する。
 既存 bootstrap は `make ppc-boot` / `make ppc-boot-check` で独立して扱う。
 x86 の旧一覧を ARM に通す測定は別系列のまま維持する。
+
+内部呼出属性は [`callconv.h`](../include/callconv.h) に集約する。
+i386 は cdecl、他 target は通常 C ABI。PPC の ABI 定数は 4/4/16 の暫定値で、
+selected compile の依存確認用であり PPC 実走を許可しない。

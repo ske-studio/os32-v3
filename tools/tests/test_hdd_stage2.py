@@ -73,7 +73,7 @@ ILP32 = ["gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
          "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-sign-compare",
          "-Wno-unused-function", "-D__cdecl="]
 
-MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
+MIRROR = ['platform/pc98/bootinfo_wire.h', 'include/callconv.h', "userland/system/inst_disk.c", "userland/system/inst_disk.h",
           "userland/system/inst_hdd.c", "userland/system/inst_hdd.h",
           "userland/system/cdinst.c", "userland/system/install.c",
           "userland/system/install_recover.inc",
