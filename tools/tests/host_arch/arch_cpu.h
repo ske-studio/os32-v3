@@ -61,19 +61,4 @@ static inline void arch_mmu_enable(void)
 #endif
 }
 
-/* 特権境界はホストで再現できない。呼ばれたらその場で止める
- * (ホスト試験に載っているのは mm/paging.c だけで、呼び手はいない)。 */
-#define arch_enter_user(root_phys, user_sp, entry)                      \
-do {                                                                    \
-    (void)(root_phys); (void)(user_sp); (void)(entry);                  \
-    for (;;) { }                                                        \
-} while (0)
-
-#define arch_call_on_stack(saved_sp_slot, new_sp, entry)                \
-do {                                                                    \
-    (void)(new_sp); (void)(entry);                                      \
-    (saved_sp_slot) = 0;                                                \
-    for (;;) { }                                                        \
-} while (0)
-
 #endif /* ARCH_CPU_H */

@@ -4,6 +4,7 @@
 #include "types.h"
 #include "host_exec_context.h"
 static u32 host_cr3;
+#include "host_exec_entry.h"
 #include "exec.c"
 #include "os32x_hdr.c"
 

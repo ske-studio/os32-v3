@@ -15,7 +15,6 @@
 #include "appslot.h"
 #include "exec_heap.h"
 #include "io.h"
-#include "cpu.h"      /* arch_enter_user / arch_call_on_stack (arch/$(ARCH)/arch_cpu.h) */
 #include "console.h"
 #include "kstring.h"
 #include "vfs.h"

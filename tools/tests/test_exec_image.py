@@ -64,7 +64,7 @@ MUTATIONS = (
     ('argv-caller-error-ignored', 'source',
      'if (argc < 0) return exec_launch_abort(launcher_id, id, argc);',
      'if (0 && argc < 0) return exec_launch_abort(launcher_id, id, argc);'),
-    ('argv-stack-handoff', 'source', '        stack_top = argv_addr;', '        stack_top += 0;'),
+    ('argv-stack-handoff', 'source', 'arch_entry_prepare(&ctx->entry, argv_addr,', 'arch_entry_prepare(&ctx->entry, stack_top,'),
     ('argv-launcher-pd', 'source', 'exec_build_argv(ctx, launcher_pd,',
      'exec_build_argv(ctx, paging_kernel_pd_phys(),'),
 )

@@ -23,7 +23,7 @@ NULLABLE.update(sys_rename=3, sys_redirect_fd=2,
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_strings.c', 'include/kapi_strings.h',
               'exec/exec.c', 'sdk/kapi.json', 'exec/ring3_ls.c',
               'userland/tests/kstr_boundary.c',
-              'build/app.conf', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h']
+              'build/app.conf', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 
 
 def guest_declarations():

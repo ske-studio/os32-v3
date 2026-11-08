@@ -7,7 +7,7 @@ S3b: exec/exec.c の結線は、exec.c から関数・分岐を切り出して t
 wire_*.inc に書き、shell_service_host.c が実物として #include する
 (ring3_wm_enter/leave、ring3_context_*、exec_run の shell 確定 = retire → publish、
 exec_finish の shell 分岐 = 回収の後に retire)。dispatch 入口の印の 0 と
-entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
+aux の選択は実物 exec_launch の runtime 試験で確認する。
 
 見るもの (tools/tests/shell_service_host.c):
   (1) publish / retire — 表の印・版・関数 4 本・text 範囲・generation
@@ -22,7 +22,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/tss.h'],
+    covers=['exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=2.9)
 
 from exec_source import exec_source
@@ -114,10 +114,9 @@ MUTATIONS = [
            "        shell_service_retire();\n",
      "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n",
      "exec_finish の shell 分岐が retire しない"),
-    ('exec/exec_launch.inc', "        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
-     "        frame[4] = (u32)(uptr)&g_shell_service;\n", "app にも service 表の番地を渡す"),
-    ('exec/exec_launch.inc', "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
-     "                      (want_ring3 ? EXEC_ENTRY_ARGS : EXEC_ENTRY_ARGS - 1) * sizeof(u32)))", "entry frame を 4 語目なしで積む"),
+    ('exec/exec_launch.inc', "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
+     "        args.aux = (u32)(uptr)&g_shell_service;\n", "app にも service 表の番地を渡す"),
+
 ]
 
 # exec/exec.c の結線を切り出す (wire_*.inc)。(名前, 始まり, 終わり, 終わりを含むか)
@@ -197,16 +196,8 @@ def static_checks(root, quiet=False):
     disp = _func_body(ex, "void __cdecl ring3_syscall_dispatch(u32 *frame)")
     if "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;" not in disp:
         bad.append("dispatch 入口で ring3_wm_shell_gen を 0 にしない (深さの 0 の隣)")
-    for want, why in (
-            ("        u32 frame[EXEC_ENTRY_ARGS + 1];\n", "entry frame が 5 語でない"),
-            ("        new_esp = (stack_top - EXEC_ENTRY_ARGS * sizeof(u32)) & ~(u32)(ABI_STACK_ALIGN - 1);\n", "new_esp の式が設計と違う"),
-            ("        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
-             "frame[4] が shell だけに表の番地を渡さない"),
-            ("                      want_ring3 ? frame : frame + 1,\n"
-             "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
-             "shell は frame+1 から 4 語 / CPL=3 は frame から 5 語 でない")):
-        if want not in ex:
-            bad.append(why)
+    if "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;" not in ex:
+        bad.append("shell aux selection missing")
     reclaim = _func_body(ex, "static void exec_reclaim_resources(int id)")
     if "    font_lease_close_owned(id);\n    vfs_close_owned(id);" not in reclaim:
         bad.append("exec_reclaim_resources: font_lease_close_owned が vfs_close_owned の直前に無い")
@@ -273,9 +264,17 @@ def mutate():
                 print("MUTATION %d SKIP (pattern not found once): %s" % (i, why))
                 return 1
             src.write_text(text.replace(old, new), encoding="utf-8")
-            rc = run_host(copy, copy, quiet=True)
-            if rc == 0:
-                rc = static_checks(copy, quiet=True)
+            if rel == 'exec/exec_launch.inc' and 'args.aux' in old:
+                from test_exec_image import run as execute_image
+                status, log = execute_image(source=exec_source(copy))
+                if status != 'runtime':
+                    print(log)
+                    return 1
+                rc = 1
+            else:
+                rc = run_host(copy, copy, quiet=True)
+                if rc == 0:
+                    rc = static_checks(copy, quiet=True)
             state = "RED" if rc != 0 else "GREEN (bad)"
             print("MUTATION %d %s: %s" % (i, state, why), flush=True)
             if rc != 0:

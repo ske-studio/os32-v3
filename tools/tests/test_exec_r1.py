@@ -284,7 +284,7 @@ void appslot_park_stop_commit(void) { stop_pending = 0; appslot_park_commit(); }
 
 POST = r'''
 static void simulate(void) {
-    /* arch_enter_user / ring3_resume install a deeper kernel entry stack.
+    /* arch_entry_enter / ring3_resume install a deeper kernel entry stack.
      * Do not reset this in setup: repeated children must not consume it. */
     host_esp0 -= 1756; /* EXECNEST-1: observed per-child stack consumption */
     cur = owner = cr3 = 2; g_cur_app = &slots[2];
@@ -373,7 +373,7 @@ static int test(void) {
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
     CHECK(sizeof(VfsStdinRead) == 16);
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(X87State));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(X87State) + sizeof(struct arch_entry_context));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */

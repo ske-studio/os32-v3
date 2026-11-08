@@ -257,7 +257,7 @@ void appslot_start_commit(int id, int gui, u32 pages)
     a->trim_epoch = 0;
     g_cur = id;
     res_owner_set(id);
-    /* 起動の iret は「生存アプリの集合が変わる瞬間」で、生存アプリ間の
+    /* 初回 entry は「生存アプリの集合が変わる瞬間」で、生存アプリ間の
      * 実行切替ではない (D0)。受入 G7 が数える switch とは別勘定にする。 */
     ring3_transition_count++;
 }

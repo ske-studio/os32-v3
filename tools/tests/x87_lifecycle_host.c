@@ -6,10 +6,9 @@ static u32 host_cr3;
 #include "cpu.h"
 static void user_main(void) __attribute__((noreturn));
 static void resident_main(void);
-#undef arch_enter_user
-#define arch_enter_user(pd, sp, entry) do { (void)(pd); (void)(sp); (void)(entry); user_main(); } while (0)
-#undef arch_call_on_stack
-#define arch_call_on_stack(saved, sp, entry) do { (saved) = 0; (void)(sp); (void)(entry); resident_main(); } while (0)
+#define ARCH_ENTRY_USER(pd, sp, entry) do { (void)(pd); (void)(sp); (void)(entry); user_main(); } while (0)
+#define ARCH_ENTRY_CALL(saved, sp, entry) do { (void)(saved); (void)(sp); (void)(entry); resident_main(); } while (0)
+#include "host_exec_entry.h"
 #include "exec.c"
 
 static void say(const char *s) { u32 n=0; while(s[n]) n++; __asm__ volatile("int $0x80"::"a"(4),"b"(1),"c"(s),"d"(n):"memory"); }

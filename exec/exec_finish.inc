@@ -230,7 +230,7 @@ static void exec_reclaim_owned(int id, int kind)
 /*  exec_launch_abort — 起動途中で失敗したときの唯一の巻き戻し口             */
 /*                                                                          */
 /*  K5b で構成が単純になった: 起動は **最後まで失敗しうる操作を済ませてから** */
-/*  appslot_start_commit する (= owner / 段 / ヒープの切り替えは iret の      */
+/*  appslot_start_commit する (= owner / 段 / ヒープの切り替えは entry の      */
 /*  直前 1 か所) ので、ここで戻すのは 3 つだけ:                              */
 /*    (1) アプリの物理ページとアドレス空間 (取れていれば)                     */
 /*    (2) CR3 と「現在のプログラム」を起動元へ                               */
