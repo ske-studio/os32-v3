@@ -76,6 +76,18 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('W2 drag move disconnected', 'src/input.rs',
+     '        crate::movecopy::move_window(st, idx, cx, cy);',
+     '        let _ = (idx, cx, cy);', 'w2_drag_commit_shadow'),
+    ('W2 regen taken before check', 'src/wm.rs',
+     '    if unsafe { libos32gfx_check() } >= 0 {\n        let regen = unsafe { libos32gfx_take_regen() } != 0;',
+     '    let regen = unsafe { libos32gfx_take_regen() } != 0;\n    if unsafe { libos32gfx_check() } >= 0 {', 'w2_regen_cycle'),
+    ('W2 cycle skips check', 'src/wm.rs',
+     '    if unsafe { libos32gfx_check() } >= 0 {\n        let regen',
+     '    if false {\n        let regen', 'w2_regen_cycle'),
+    ('W2 ignores pending', 'src/wm.rs',
+     'regen || REGEN_PENDING.load(Ordering::SeqCst)',
+     'regen', 'w2_regen_cycle'),
     ('HOST_NOTICE unchanged serial delivered', 'src/wm.rs',
      '    if serial == st.host_notice_seen {', '    if false {',
      'host_notice_cycles_'),
@@ -409,9 +421,9 @@ MUTATIONS = [
      '        if cr.intersects(&touched) {\n            cursor::discard(st);',
      '        if true {\n            cursor::discard(st);',
      'commit_frame_redraw_under_the_cursor_saves_the_real_background'),
-    ('drop leaves the last frame when it differs from the outer', 'src/input.rs',
-     '        if nf != st.windows[idx].outer() {',
-     '        if false && nf != st.windows[idx].outer() {',
+    ('drop leaves the last frame when it differs from the outer', 'src/movecopy.rs',
+     '    if !frame.is_empty() {',
+     '    if false && !frame.is_empty() {',
      'drop_after_app_resize_erases_the_last_frame'),
     # Codex レビュー 3 回目 (2026-09-29) P2×2: 重なり順 アプリ < 枠 < 最前面物 < カーソル。
     ('overlays are judged by the app rects only', 'src/handler.rs',

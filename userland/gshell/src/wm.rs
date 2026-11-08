@@ -14,6 +14,14 @@
 #![allow(dead_code)]
 
 use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicBool, Ordering};
+
+static REGEN_PENDING: AtomicBool = AtomicBool::new(false);
+
+extern "C" {
+    fn libos32gfx_check() -> i32;
+    fn libos32gfx_take_regen() -> i32;
+}
 
 use os32api::gui::proto::{
     GuiRgb, GuiWinSpec, GUI_MAX_DAMAGE, GUI_MAX_TIMERS, GUI_MAX_WINDOWS, GUI_SLOT_MAX,
@@ -904,6 +912,9 @@ pub fn flush_present() {
     if crate::fullscreen::active() {
         return;
     }
+    if unsafe { libos32gfx_check() } >= 0 && unsafe { libos32gfx_take_regen() } != 0 {
+        REGEN_PENDING.store(true, Ordering::SeqCst);
+    }
     #[cfg(feature = "gf_accel_accept")]
     let timing = gf_accept::present_begin();
     unsafe {
@@ -1037,8 +1048,12 @@ pub fn composite_full(st: &mut GuiState) {
 /// タスクバーに重なる候補窓が、FEP だけを描く周 (候補の更新) と枠の周 (ここ) とで
 /// 上下が入れ替わって点滅した (Codex レビュー 4 回目 P2)。FEP を最上位に置けば、
 /// FEP だけを描き直す経路は順序を崩さない。
+pub fn overlay_rects(st: &GuiState) -> [Rect; 4] {
+    [modal::rect(), taskbar::rect(st), startmenu::rect(), fep::rect()]
+}
+
 pub fn overlays_to_refresh(st: &GuiState, regions: &[Rect]) -> [Rect; 4] {
-    let cands = [modal::rect(), taskbar::rect(st), startmenu::rect(), fep::rect()];
+    let cands = overlay_rects(st);
     let mut out = [Rect::EMPTY; 4];
     let mut i = 0;
     while i < 4 {
@@ -1182,6 +1197,16 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
+    if unsafe { libos32gfx_check() } >= 0 {
+        let regen = unsafe { libos32gfx_take_regen() } != 0;
+        if (regen || REGEN_PENDING.load(Ordering::SeqCst)) && !crate::fullscreen::active() {
+            REGEN_PENDING.store(false, Ordering::SeqCst);
+            composite_full(st);
+            damage::invalidate_all_clients(st);
+        } else if regen {
+            REGEN_PENDING.store(true, Ordering::SeqCst);
+        }
+    }
     if ctx != input::Ctx::Pump {
         crate::gserial::poll_x3(st);
     }
