@@ -85,7 +85,7 @@ const struct trident_resources *trident_resources_get(void) { return mode==1 ? 0
 int trident_resources_rollback(bool after) { CHECK(!after && !probes_registered); ++rollbacks; return 0; }
 int module_load(const struct module_request *q, struct module_handle *h)
 {
-    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==3);
+    CHECK(q->policy.module_id==MODULE_ID_TRIDENT && q->policy.ops_version==4);
     CHECK(q->lifecycle.start==start && q->lifecycle.detach==detach);
     CHECK(q->path[0]=='/');
     if (mode==2) return -72;
@@ -241,7 +241,7 @@ void _start(void)
     record.ro=(u32)(uptr)_etext; record.ro_size=(u32)(_end-_etext);
     record.base=record.ro;
     record.pages=(record.ro_size+MODULE_PAGE_SIZE-1)/MODULE_PAGE_SIZE;
-    ops[0]=3; ops[1]=(u32)(uptr)trident_module_init;
+    ops[0]=4; ops[1]=(u32)(uptr)trident_module_init;
     ops[2]=(u32)(uptr)__wrap_trident_backend_prepare; ops[3]=(u32)(uptr)trident_restore98; ops[4]=(u32)(uptr)trident_get_probe_decls;
     TridentModuleContext loan=context;
     GfxBackend out={0};
@@ -265,6 +265,13 @@ void _start(void)
         finish(0);
     }
     CHECK(!rc && pinned && pins==1 && prepares==1 && !armed);
+    CHECK(context.write_gap_ns == (mode == 65 ? 1250u : mode == 7 ? 0u : 300u));
+    CHECK(context.write_gap_lpt == 1000000u);
+    if (mode == 65) {
+        CHECK(diagnostic_candidate->context->write_gap_ns == 1250u);
+        CHECK(diagnostic_candidate->context->write_gap_loops == 125u);
+        CHECK(diagnostic_candidate->context->present_method == TRI_PRESENT_DWORD_GAP);
+    }
     CHECK(gfx_backend_trident.bb_base==client && gfx_backend_trident.bb_size==resources.client_bytes);
     if (mode==37 || mode==39) {
         CHECK(gfx_backend_trident.osri_show);
@@ -315,6 +322,12 @@ void _start(void)
     finish(0);
 }
 
+int sysconfig_get_int(const char *path, const char *key, int def)
+{
+    CHECK(!kstrcmp(path, SYS_SYSTEM_CFG) && !kstrcmp(key, "TRI_WRITE_GAP") && def==300);
+    return mode == 65 ? 1250 : mode == 7 ? 0 : mode == 38 ? -1 : def;
+}
+u32 cpu_loops_per_tick(void) { return 1000000; }
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;
     const struct bootinfo *bi = bootinfo_get();

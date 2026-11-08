@@ -24,9 +24,19 @@ int trident_present(struct trident_device *d, int x, int y, int w, int h)
             dst > d->declared_bytes || bytes > d->declared_bytes - dst)
             return TRI_E_CAP_TOO_SMALL;
         for (u32 i = 0; i < bytes;) {
+            if (d->present_method == TRI_PRESENT_DWORD_GAP &&
+                !((dst + i) & 3u) && bytes - i >= 4u) {
+                u32 count = (bytes - i) / 4u;
+                if (!d->io->write_gap32) return TRI_E_INVAL;
+                rc = d->io->write_gap32(d->io_opaque, dst + i,
+                                       d->res->client + src + i, count,
+                                       d->write_gap_loops);
+                if (rc) return rc;
+                i += count * 4u;
+                continue;
+            }
             if ((d->present_method == TRI_PRESENT_DWORD_SYNC ||
-                 d->present_method == TRI_PRESENT_DWORD_WAIT ||
-                 d->present_method == TRI_PRESENT_DWORD_PLAIN) &&
+                 d->present_method == TRI_PRESENT_DWORD_WAIT) &&
                 !((dst + i) & 3u) && bytes - i >= 4u) {
                 const u8 *p = d->res->client + src + i;
                 u32 value = (u32)p[0] | ((u32)p[1] << 8) |

@@ -11,6 +11,15 @@
 > `DEVICE_RESERVATION`、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md)、
 > `TASK_HAL_WIRING` §1-4 (PCI の結線表)、`gui/DESIGN` §2・§3・§6、[05_drivers.md §5-5](../../05_drivers.md)。
 
+描画の間隔の調整 (2026-11-08): RAM CLIENT の既定方式は `dword_gap`。
+`/etc/system.cfg` の `TRI_WRITE_GAP=<ns>` (未指定・負値は 300ns、0 は待ち無し) を起動時に読み、
+`tri gap` で現在の ns とループ数、`tri gap <ns>` で次の描画からの値を変更する。
+CPU の起動較正 (1 tick = 10ms) から `floor(loops_per_tick * ns / 10000000)` を変更時だけ計算する。
+32 ビットの直接書きの後に NOP ループを置き、行の端はバイト書きとする。
+`tri gap sweep 0 600 50` は各間隔で全画面 8 回を計測・毎回読み戻す。各回で RAM 画像を反転し、前の値が残る書き損じも検出する。欠けがあっても続行し、
+各間隔の最後 (途中エラーを含む) に RAM 画像を戻し、最後に元の間隔と描画方式を復元する。`TRI phase=gap gap_ns=... loops=... count=8 min_us=... max_us=... avg_us=... mismatches=... rc=...` を各間隔に出す。
+`tri present` は byte / dword_sync / dword_wait / dword_gap を比較する。300ns の実機での適否は sweep 待ち。
+
 ## 0. ユーザー決定 (2026-09-29) とこの票の範囲
 
 > 「Cirrus はエミュレータ互換のためだけ。実機 (Ra266) は Trident。Trident のドライバが必要なら Trident のドライバを作成する」

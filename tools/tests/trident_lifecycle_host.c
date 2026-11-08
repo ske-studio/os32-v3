@@ -33,6 +33,10 @@ static int write8(void *o, enum trident_space space, u32 off, u8 v) {
     if (space == TRI_SPACE_LFB) ++lfb8;
     return trident_fake_io.write8(o,space,off,v);
 }
+static int write_gap32(void *o, u32 off, const u8 *src, u32 n, u32 loops) {
+    lfb32 += n;
+    return trident_fake_io.write_gap32(o,off,src,n,loops);
+}
 static int write32(void *o, enum trident_space space, u32 off, u32 v) {
     if (space == TRI_SPACE_LFB) ++lfb32;
     return trident_fake_io.write32(o,space,off,v);
@@ -144,9 +148,9 @@ static int test(void) {
     CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
     f.resources.ready=true;f.resources.client=memory;f.resources.client_bytes=TRI_DISPLAY_BYTES;
     f.resources.configure=configure;
-    io=trident_fake_io;io.read8=read8;io.write8=write8;io.write32=write32;
+    io=trident_fake_io;io.read8=read8;io.write8=write8;io.write32=write32;io.write_gap32=write_gap32;
     static TridentModuleContext context;
-    context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner,TRIDENT_MODULE_CONTEXT_SIZE,&diagnostic};
+    context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner,TRIDENT_MODULE_CONTEXT_SIZE,&diagnostic,300,1000000};
     trident_context=&context;
     init();
     static const u32 first[]={1,2,3,4,5,6,7,8,12,19,13,14,15,16,9};
@@ -305,7 +309,7 @@ static int fallback_test(void) {
         /* Byte present isolates the overlay upload's own store width. */
         u32 put32=lfb32; device.present_method=TRI_PRESENT_BYTE;
         CHECK(!tri_video_put(&device,&imv,&rect,&rect,0x1234)); count=0;
-        device.present_method=TRI_PRESENT_DWORD_PLAIN;
+        device.present_method=TRI_PRESENT_DWORD_GAP;
         CHECK(lfb32==put32 && memory[device.video.allocation.off]==1);
         CHECK(memory[device.video.allocation.off+2]==(i==2?2:3));
     }

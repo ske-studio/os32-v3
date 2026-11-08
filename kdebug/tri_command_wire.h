@@ -3,7 +3,7 @@
 #define KDEBUG_TRI_COMMAND_WIRE_H
 #include "types.h"
 #define TRI_OP_COMMAND 19U
-#define TRI_COMMAND_VERSION 1U
+#define TRI_COMMAND_VERSION 2U
 /* Fixed case numbers for the shell and kdebug dispatch. */
 enum tri_command_case {
     TRI_TEST_ALL = 0,
@@ -13,10 +13,11 @@ enum tri_command_case {
     TRI_TEST_CURSOR = 4,
     TRI_TEST_CPU32 = 5,
     TRI_TEST_POLL = 6,
-    TRI_TEST_PRESENT = 7
+    TRI_TEST_PRESENT = 7,
+    TRI_TEST_GAP = 8, TRI_TEST_GAP_SET = 9, TRI_TEST_GAP_SWEEP = 10
 };
-/* Input: version, sizeof(struct tri_request), test, arg. Only MODE uses arg
- * (F3 mode ID); other cases require zero. rc/result_count must start at zero.
+/* Input: version, sizeof(struct tri_request), test, arg. MODE uses arg (F3 mode ID); GAP_SET uses arg (ns),
+ * GAP_SWEEP uses arg/end_ns/step_ns; other cases require zero. rc/result_count must start at zero.
  * Output: rc matches the call result; result_count counts emitted phase lines
  * including unavailable/precheck/end, excluding detail and mismatch lines.
  * NULL buffer/incorrect outer size: INVAL without a reply. Invalid request fields:
@@ -31,5 +32,6 @@ struct tri_request {
     u32 version, size, test, arg;
     i32 rc;
     u32 result_count;
+    u32 end_ns, step_ns; /* GAP_SWEEP: arg=start, inclusive end, positive step */
 };
 #endif

@@ -310,6 +310,8 @@ struct trident_io {
     /* One LFB row span: aligned offset/source, count in dwords; validate the
      * whole range before writing. No readback. Scalar write8 handles edges. */
     int (*write_span32)(void *, u32 off, const u32 *src, u32 count);
+    /* Unaligned RAM source is allowed; destination/count are dwords. */
+    int (*write_gap32)(void *, u32 off, const u8 *src, u32 count, u32 loops);
 };
 struct trident_pci_info {
     u16 vendor, device, command;
@@ -347,7 +349,7 @@ struct trident_resources {
 };
 enum tri_present_method {
     TRI_PRESENT_BYTE = 0, TRI_PRESENT_DWORD_SYNC = 1,
-    TRI_PRESENT_DWORD_WAIT = 2, TRI_PRESENT_DWORD_PLAIN = 3
+    TRI_PRESENT_DWORD_WAIT = 2, TRI_PRESENT_DWORD_GAP = 3
 };
 struct trident_device {
     const struct trident_resources *res;
@@ -387,7 +389,8 @@ struct trident_device {
      * が未設定 (ゼロ初期化で未設定になる)。 */
     u8 overscan;
     bool overscan_valid;
-    enum tri_present_method present_method; /* display_start sets dword_plain */
+    enum tri_present_method present_method; /* boot defaults to dword_gap */
+    u32 write_gap_ns, write_gap_loops, write_gap_lpt;
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;
@@ -572,9 +575,12 @@ int trident_route_disable(struct trident_device *d);
  * Boot-wide RAM fallback only: clip and validate both source/destination ends,
  * use selected cpp and independent client/display byte pitches, then copy
  * with byte stores or aligned dword stores and byte edges. Dword policies:
- * sync reads VGA status, wait writes the PC-98 wait port, plain has no delay.
- * write_span32 is NOT the fallback present path; no VRAM readback.
+ * sync reads VGA status, wait writes the PC-98 wait port, gap uses calibrated loops.
+ * write_gap32 transfers each aligned row interior; no VRAM readback.
  * The S3 implementation is migrated by F7; API remains unchanged. */
+#define TRI_WRITE_GAP_DEFAULT_NS 300u
+#define TRI_WRITE_GAP_TICK_NS 10000000u
+void tri_write_gap_set(struct trident_device *, u32 ns);
 int trident_present(struct trident_device *, int x, int y, int w, int h);
 /* HAL RGB components use GFX_PALETTE_COMPONENT_BITS (currently 4, up to 8
  * per component for 32bit color), not a backend-fixed input width.

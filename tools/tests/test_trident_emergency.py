@@ -158,7 +158,7 @@ def lifetime(runner, mutation=None, fallback=1):
         directory = ROOT / 'drivers/video/trident'
         for stem in ('resources', 'lifecycle', 'regs', 'probe', 'state_save',
                      'pc98_init', 'mode_640', 'route_ra266', 'vram', 'default_dac',
-                     'state_restore', 'present', 'palette', 'screen', 'video',
+                     'state_restore', 'present', 'write_gap', 'palette', 'screen', 'video',
                      'dpms', 'accel', 'cursor', 'backend_trident'):
             body = source('drivers/video/trident/' + stem + '.c', mutation)
             if stem == 'resources':
