@@ -95,7 +95,12 @@ fn scroll(st: &mut GuiState, idx: usize, rect: Rect, dx: i32, dy: i32) {
     for r in cp.as_slice() { wm::queue_present(st, r.translate(org.0, org.1)); }
     for r in paint.as_slice() { damage::add_dirty(&mut st.windows[idx], *r); }
     if edges.is_some() { input::draw_live_outline(st); }
-    let overlays = wm::overlays_to_refresh(st, &[touched]);
+    let mut regions = [Rect::EMPTY; 5];
+    regions[0] = touched;
+    if let Some(es) = edges {
+        regions[1..5].copy_from_slice(&es);
+    }
+    let overlays = wm::overlays_to_refresh(st, &regions);
     wm::refresh_overlays(st, &overlays);
     cursor::show(st);
     wm::queue_present(st, cursor::rect(st));

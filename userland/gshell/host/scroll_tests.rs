@@ -142,3 +142,27 @@ fn scroll_excludes_issued_topmost_and_offscreen_source() {
         }
     }
 }
+
+#[test]
+fn scroll_frame_redraw_keeps_taskbar_on_top() {
+    let mut st = setup();
+    st.windows[0].vis.clear();
+    st.windows[0].vis.push(Rect::new(0,0,128,128));
+    st.windows[1].used = true;
+    st.drag_index = 1;
+    st.drag_frame = Rect::new(100,100,200,370);
+    let rect = Rect::new(32,32,16,16);
+    let org = st.windows[0].client_origin();
+    let touched = rect.translate(org.0,org.1);
+    assert!(touched.intersects(&Rect::new(100,100,1,370)));
+    assert!(!touched.intersects(&taskbar::rect(&st)));
+    taskbar::draw(&st, taskbar::rect(&st));
+    let before = mocks::pixels();
+    scroll(&mut st,0,rect,0,4);
+    let after = mocks::pixels();
+    let bar = taskbar::rect(&st);
+    for y in bar.y..bar.bottom() { for x in bar.x..bar.right() {
+        let i = y as usize * mocks::W + x as usize;
+        assert_eq!(after[i],before[i],"taskbar pixel ({x},{y})");
+    }}
+}

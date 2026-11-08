@@ -531,6 +531,10 @@ MUTATIONS += [
 ]
 
 MUTATIONS += [
+    ('W3 scroll overlays ignore frame edges', 'src/scroll_op.rs',
+     'let overlays = wm::overlays_to_refresh(st, &regions);',
+     'let overlays = wm::overlays_to_refresh(st, &regions[..1]);',
+     'scroll_frame_redraw_keeps_taskbar_on_top'),
     ('W3 destination escapes scroll rect', 'src/scroll_op.rs',
      'let dst = r.translate(dx, dy).intersect(&rect);',
      'let dst = r.translate(dx, dy);', 'scroll_formula_'),
