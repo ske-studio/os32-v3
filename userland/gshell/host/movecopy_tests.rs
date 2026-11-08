@@ -16,6 +16,7 @@ pub extern "C" fn gfx_copy_rect(dx: i32, dy: i32, sx: i32, sy: i32, w: i32, h: i
     COPIES.lock().unwrap().push((Rect::new(dx, dy, w, h), Rect::new(sx, sy, w, h)));
     let pixels = mocks::pixels(); // memmove semantics within each COPY
     for y in 0..h { for x in 0..w {
+        if sx + x < 0 || sy + y < 0 || sx + x >= mocks::W as i32 || sy + y >= mocks::H as i32 { continue; }
         let c = pixels[(sy + y) as usize * mocks::W + (sx + x) as usize];
         mocks::gfx_pixel(dx + x, dy + y, c);
     }}
@@ -131,12 +132,58 @@ fn movecopy_failure_repaints_and_frame_damage_excludes_copy() {
         assert!(has(&st.windows[1].dirty, r.x, r.y));
     }
     let mut st = setup();
+    st.windows[0].visible = false;
+    st.windows[2].visible = false;
+    visible::recompute_and_expose(&mut st);
+    st.windows[1].dirty.clear();
     st.drag_index = 1;
-    st.drag_frame = st.windows[1].outer();
-    super::move_window(&mut st, 1, 64, 96);
-    assert!(COPIES.lock().unwrap().is_empty(), "erased frame damage excludes source");
+    st.drag_frame = st.windows[1].outer().translate(8, 0);
+    let old_vis = st.windows[1].vis;
+    let old_org = st.windows[1].client_origin();
+    let frame = st.drag_frame;
+    let mut expected = st.windows[1];
+    for e in [Rect::new(frame.x, frame.y, frame.w, 2),
+        Rect::new(frame.x, frame.bottom()-2, frame.w, 2),
+        Rect::new(frame.x, frame.y, 2, frame.h),
+        Rect::new(frame.right()-2, frame.y, 2, frame.h)] {
+        damage::add_dirty_band(&mut expected, e.translate(-old_org.0, -old_org.1));
+    }
+    super::move_window(&mut st, 1, 40, 64);
+    let org = st.windows[1].client_origin();
+    let copies = COPIES.lock().unwrap();
+    let mut copied_count = 0;
+    for r in st.windows[1].vis.as_slice() { for y in r.y..r.bottom() { for x in r.x..r.right() {
+        let copied = copies.iter().any(|(d, _)| d.contains(org.0+x, org.1+y));
+        let valid = has(&old_vis, x, y) && !has(&expected.dirty, x, y);
+        assert_eq!(copied, valid, "overlap must be copied except frame edges");
+        if copied { copied_count += 1; } else { assert!(has(&st.windows[1].dirty, x, y)); }
+    }}}
+    assert!(copied_count > 0);
     assert!(st.drag_frame.is_empty());
     assert_eq!(st.drag_index, -1);
+}
+
+#[test]
+fn movecopy_offscreen_source_is_repainted() {
+    let mut st = setup();
+    st.windows[0].visible = false;
+    st.windows[2].visible = false;
+    st.windows[1].x = -40;
+    visible::recompute_and_expose(&mut st);
+    st.windows[1].dirty.clear();
+    let old_org = st.windows[1].client_origin();
+    super::move_window(&mut st, 1, 40, 64);
+    let org = st.windows[1].client_origin();
+    let copies = COPIES.lock().unwrap();
+    let mut exposed = 0;
+    for r in st.windows[1].vis.as_slice() { for y in r.y..r.bottom() { for x in r.x..r.right() {
+        if old_org.0 + x < 0 {
+            exposed += 1;
+            assert!(!copies.iter().any(|(d, _)| d.contains(org.0+x, org.1+y)));
+            assert!(has(&st.windows[1].dirty, x, y));
+        }
+    }}}
+    assert!(exposed > 0);
 }
 
 #[test]
