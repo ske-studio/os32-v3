@@ -1,5 +1,7 @@
 /* Production conversion, MMIO span, next-frame updates and wire sweep. */
 #include "kdebug/trident_command_test.c"
+void *kmalloc(u32 size) { (void)size; return 0; }
+void kfree(void *p) { (void)p; }
 static u32 lfb[16];
 static u8 client[64];
 static struct trident_resources r;
