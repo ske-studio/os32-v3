@@ -1,4 +1,4 @@
-"""Cursor SHADOW regression and DIRECT GET/FILL sequence."""
+"""Cursor SHADOW regression and DIRECT GET/MONO/PUT sequence."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'userland/gshell/src/cursor.rs'
 MUTATIONS = (
     ('mode', 'if unsafe { gfx_direct != 0 } {\n        st.cursor.saved', 'if false {\n        st.cursor.saved'),
-    ('fill-width', 'gfx_cmd_enqueue_fill(px, py, 1, 1, c, 0)', 'gfx_cmd_enqueue_fill(px, py, 2, 1, c, 0)'),
+    ('mono-color', 'color, -1, cx, cy, CUR_W, CUR_H)', '0, -1, cx, cy, CUR_W, CUR_H)'),
+    ('pixel-restore', 'gfx_cmd_enqueue_put(cx, cy, CUR_W, CUR_H, st.cursor.saved.as_ptr(), CUR_W as u32, -1)',
+     '{ for k in 0..NPIX { gfx_cmd_enqueue_put(cx + (k as i32) % CUR_W, cy + (k as i32) / CUR_W, 1, 1, st.cursor.saved.as_ptr().add(k), 1, -1); } 0 }'),
 )
 
 def run_case(folder, mutation=None):
