@@ -18,6 +18,9 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kdebug/trident_command_test.c'
 MUTATIONS = [
+    ('present-count', 'run < TRI_PRESENT_RUNS', 'run < TRI_PRESENT_RUNS - 1u'),
+    ('present-restore', 'd->present_method = saved;', 'd->present_method = TRI_PRESENT_BYTE; (void)saved;'),
+    ('present-readback', 'if (actual != d->res->client[row * c->pitch + i]) ++mismatches;', 'if (actual == d->res->client[row * c->pitch + i]) ++mismatches;'),
     ('skip-no-ge', '    write_row(d, count, false, TRI_TEST_STRIDE);', '    return TRI_E_NOSYS;'),
     ('skip-stores', '"cld; rep movsl"', '"cld"'),
     ('skip-second-sync', 'if (test == 1u) {', 'if (test == 4u) {'),

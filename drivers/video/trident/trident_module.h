@@ -4,7 +4,7 @@
 #include "gfx_hal.h"
 #include "trident.h"
 #define TRIDENT_MODULE_OPS_VERSION 3u
-#define TRIDENT_DIAGNOSTIC_OPS_VERSION 1u
+#define TRIDENT_DIAGNOSTIC_OPS_VERSION 2u
 /* F10 publishes this table and the production device through diagnostic_out.
  * The table is module resident and immutable; context borrows F10's device,
  * never a second diagnostic device. F13 validates the complete table and
@@ -15,7 +15,7 @@
  * F17/H reread trident_diagnostic_ops() before dispatch. NULL table/optional
  * callback means unavailable, not a failure of mandatory display startup.
  * Primitive calls return TRI_* rc unchanged; optional features may return
- * TRI_E_NOSYS. Observe context state without modifying it. Surface arguments
+ * TRI_E_NOSYS. PRESENT temporarily selects context.present_method and restores it. Surface arguments
  * obey trident.h's validation/clipping and allocation lifetime contracts.
  * Mode/DPMS/cursor use F10's HAL adapters (HAL rc/head0 contract); all other
  * callbacks have the exact corresponding tri_* signature from trident.h. */
@@ -64,6 +64,7 @@ struct TridentDiagnosticOps {
                                  const struct tri_rect *dst, u32 key);
     int (*video_surface_stop)(struct trident_device *, struct tri_video_surface *);
     int (*video_surface_free)(struct trident_device *, struct tri_video_surface *);
+    int (*present)(struct trident_device *, int, int, int, int);
 };
 #define TRIDENT_DIAGNOSTIC_OPS_SIZE ((u32)sizeof(struct TridentDiagnosticOps))
 /* All loans (including backend, counters and scalar addresses) are kernel

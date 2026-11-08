@@ -4,6 +4,7 @@
  * owns no second device or persistent ops pointer.
  */
 #include "trident_command_test.h"
+#include "sys.h"
 #include "../drivers/video/trident/trident_module.h"
 #include "../lib/serial_diag.h"
 #include "generated/kdebug_import_macros.h"
@@ -281,6 +282,65 @@ static int cpu32(const struct TridentDiagnosticOps *o)
     remember(&result, rc);
     return result ? result : original;
 }
+/* Compare the current image without yielding or modifying CLIENT. Only the
+ * present itself is timed; serial output and VRAM verification are outside. */
+#define TRI_PRESENT_RUNS 8u
+static int present_compare(const struct TridentDiagnosticOps *o)
+{
+    struct trident_device *d = o->context;
+    if (!d->res->ram_fallback || !o->present || !d->io || !d->io->read8)
+        return optional(o, "present_precheck", TRI_E_NOSYS);
+    enum tri_present_method saved = d->present_method;
+    int result = 0;
+    for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_SYNC; ++method) {
+        const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
+        u32 minimum = (u32)-1, maximum = 0, count = 0, mismatches = 0;
+        unsigned long long total = 0;
+        int rc = 0;
+        d->present_method = (enum tri_present_method)method;
+        for (u32 run = 0; run < TRI_PRESENT_RUNS; ++run) {
+            u32 before, after, hi;
+            rc = sys_time_now(&before, &hi);
+            if (rc) break;
+            rc = o->present(d, 0, 0, c->width, c->height);
+            if (rc) break;
+            rc = sys_time_now(&after, &hi);
+            if (rc) break;
+            u32 elapsed = after - before;
+            if (elapsed < minimum) minimum = elapsed;
+            if (elapsed > maximum) maximum = elapsed;
+            total += elapsed;
+            ++count;
+        }
+        if (!rc) {
+            for (u32 row = 0; !rc && row < c->height; ++row) {
+                for (u32 i = 0; i < (u32)c->width * c->cpp; ++i) {
+                    u8 actual;
+                    rc = d->io->read8(d->io_opaque, TRI_SPACE_LFB,
+                                      v->off + row * v->pitch + i, &actual);
+                    if (rc) break;
+                    if (actual != d->res->client[row * c->pitch + i]) ++mismatches;
+                }
+            }
+        }
+        if (!rc && mismatches) rc = TRI_E_ACCESS;
+        ++result_count;
+        serial_puts_polled("TRI phase=present");
+        number(" mode=", d->mode.selected.id);
+        serial_puts_polled(" method=");
+        serial_puts_polled(method == TRI_PRESENT_BYTE ? "byte" : "dword_sync");
+        number(" count=", count);
+        number(" min_us=", count ? minimum : 0);
+        number(" max_us=", maximum);
+        number(" avg_us=", count == TRI_PRESENT_RUNS ? (u32)(total >> 3) : 0);
+        number(" mismatches=", mismatches);
+        serial_puts_polled(" rc="); serial_diag_i32(rc);
+        serial_puts_polled("\r\n");
+        remember(&result, rc);
+    }
+    d->present_method = saved;
+    return result;
+}
 static int dpms(const struct TridentDiagnosticOps *o)
 {
     if (!o->dpms) return optional(o, "dpms", TRI_E_NOSYS);
@@ -383,7 +443,7 @@ i32 trident_command_call(void *buf, u32 size)
     result_count = 0;
     int rc;
     if (q.version != TRI_COMMAND_VERSION || q.size != sizeof(q) ||
-        q.test > TRI_TEST_POLL || q.rc || q.result_count ||
+        q.test > TRI_TEST_PRESENT || q.rc || q.result_count ||
         (q.test != TRI_TEST_MODE && q.arg) ||
         (q.test == TRI_TEST_MODE && (!q.arg || q.arg > TRI_MODE_COUNT))) {
         rc = TRI_E_INVAL;
@@ -417,6 +477,7 @@ i32 trident_command_call(void *buf, u32 size)
     case TRI_TEST_CURSOR: rc = cursor(o); break;
     case TRI_TEST_CPU32: rc = cpu32(o); break;
     case TRI_TEST_POLL: rc = poll_video(o); break;
+    case TRI_TEST_PRESENT: rc = present_compare(o); break;
     default: rc = TRI_E_INVAL; break;
     }
     optional(o, "end", rc);

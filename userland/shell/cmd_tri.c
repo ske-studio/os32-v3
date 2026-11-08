@@ -14,7 +14,8 @@ int shell_cmd_tri(int argc, char **argv)
         [TRI_TEST_DPMS] = "dpms",
         [TRI_TEST_CURSOR] = "cursor",
         [TRI_TEST_CPU32] = "cpu32",
-        [TRI_TEST_POLL] = "poll"
+        [TRI_TEST_POLL] = "poll",
+        [TRI_TEST_PRESENT] = "present"
     };
     struct tri_request req = {0};
 
@@ -47,6 +48,6 @@ int shell_cmd_tri(int argc, char **argv)
     return rc || req.rc ? SH_STATUS_ERROR : SH_STATUS_OK;
 usage:
     g_api->kprintf(ATTR_WHITE,
-                   "Usage: tri all|modes|mode <number>|dpms|cursor|cpu32|poll\n");
+                   "Usage: tri all|modes|mode <number>|dpms|cursor|cpu32|poll|present\n");
     return SH_STATUS_USAGE;
 }

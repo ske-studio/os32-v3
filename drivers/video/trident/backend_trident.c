@@ -574,7 +574,8 @@ static const struct TridentDiagnosticOps diagnostics = {
     .poll = tri_video_poll, .video_surface_alloc = tri_video_surface_alloc,
     .video_surface_display = tri_video_surface_display,
     .video_surface_stop = tri_video_surface_stop,
-    .video_surface_free = tri_video_surface_free
+    .video_surface_free = tri_video_surface_free,
+    .present = trident_present
 };
 
 GfxBackend trident_backend_ops = {

@@ -8,6 +8,35 @@ static int fail_group, group_fault, restores, saves;
 static u8 pci_value, pci_saved;
 static bool expect_hex;
 static bool expected_ge=true;
+static bool benchmark;
+static u32 bench_calls, bench_reads, bench_clock, bench_lines, bench_method;
+static int bench_fault, bench_field;
+static u32 bench_fields;
+int sys_time_now(u32 *lo, u32 *hi)
+{
+    *lo = (u32)-51 + (bench_clock / 2u) * 100u +
+          (bench_clock % 2u ? 10u + (bench_clock / 2u) % 8u : 0);
+    ++bench_clock; *hi = 0;
+    return bench_fault == 2 && bench_clock == 2 ? TRI_E_ACCESS : 0;
+}
+static int bench_present(struct trident_device *d, int x, int y, int w, int h)
+{
+    if (x || y || w != 3 || h != 2 || d->present_method !=
+        (bench_calls < 8 ? TRI_PRESENT_BYTE : TRI_PRESENT_DWORD_SYNC)) failed=1;
+    ++bench_calls;
+    return bench_fault == 1 ? TRI_E_ACCESS : 0;
+}
+static int bench_read(void *opaque, enum trident_space space, u32 off, u8 *value)
+{
+    (void)opaque;
+    if (space != TRI_SPACE_LFB || off != 16 + (bench_reads % 6 / 3)*7 + bench_reads%3)
+        failed=1;
+    if ((!bench_fault && bench_calls != (bench_reads < 6 ? 8u : 16u))) failed=1;
+    *value = (u8)(bench_reads%6 + 1);
+    if (bench_fault == 3) *value ^= 1;
+    ++bench_reads;
+    return bench_fault == 4 ? TRI_E_ACCESS : 0;
+}
 static void check_group(void)
 {
     if (read_reports!=1 || (expected_ge ?
@@ -47,6 +76,23 @@ static bool same(const char *a, const char *b)
 int serial_gate_active(void) { return 0; }
 void serial_puts_polled(const char *s)
 {
+    if (benchmark) {
+        if (!bench_fault) {
+            if (bench_field) {
+                const char *expected[] = {"", "8", "10", "17", "13", "0"};
+                if (!same(s, expected[bench_field])) failed=1;
+                ++bench_fields; bench_field=0;
+            } else if (same(s, " count=")) bench_field=1;
+            else if (same(s, " min_us=")) bench_field=2;
+            else if (same(s, " max_us=")) bench_field=3;
+            else if (same(s, " avg_us=")) bench_field=4;
+            else if (same(s, " mismatches=")) bench_field=5;
+        }
+        if (same(s, "TRI phase=present")) ++bench_lines;
+        if (same(s, "byte")) bench_method |= 1;
+        if (same(s, "dword_sync")) bench_method |= 2;
+        return;
+    }
     if (wrapper) {
         if (expect_hex) {
             const char *hex="0123456789abcdef";
@@ -220,6 +266,25 @@ static int test(void)
         if (!fault && (restores!=1 || groups_done!=2 || cr_reports!=5 ||
                        ge_reports!=2 || pci_value!=pci_saved)) return 1;
         if (fault>2 && (restores!=1 || (fault<5 && pci_value!=pci_saved))) return 1;
+    }
+    benchmark=true;
+    u8 image[10]={1,2,3,0,0,6,0,0,0,0};
+    image[5]=4; image[6]=5; image[7]=6;
+    r.client=image; r.client_bytes=sizeof(image); r.ram_fallback=true;
+    d.mode.client=(struct tri_surface){.width=3,.height=2,.cpp=1,.pitch=5,.bytes=10};
+    d.mode.display=(struct tri_surface){.off=16,.pitch=7};
+    const struct trident_io bench_io={.read8=bench_read};
+    d.io=&bench_io; o.present=bench_present;
+    for (bench_fault=0; bench_fault<=4; ++bench_fault) {
+        bench_calls=bench_reads=bench_clock=bench_lines=bench_method=bench_fields=0;
+        bench_field=0;
+        failed=0;
+        d.present_method=TRI_PRESENT_DWORD_SYNC;
+        int rc=present_compare(&o);
+        if (rc != (bench_fault ? TRI_E_ACCESS : 0) || bench_lines!=2 ||
+            bench_method!=3 || d.present_method!=TRI_PRESENT_DWORD_SYNC) return 1;
+        if (!bench_fault && (failed || bench_calls!=16 || bench_reads!=12 || bench_clock!=32 || bench_fields!=10))
+            return 1;
     }
     return 0;
 }

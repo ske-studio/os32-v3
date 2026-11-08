@@ -26,6 +26,8 @@ MUTANTS = [
     ('direct-copy', 'if (!d->res->ram_fallback) return TRI_OK;', 'if (false) return TRI_OK;'),
     ('store32', 'trident_write8(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])',
      'trident_write32(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])'),
+    ('skip-dword-read', 'rc = trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6u, &status);', 'rc = TRI_OK; (void)status;'),
+    ('wrong-dword', '((u32)p[3] << 24)', '((u32)p[2] << 24)'),
     ('fixed-pitch', 'row * v->pitch', 'row * TRI_PITCH'),
     ('drop-cpp', 'u32 bytes = (u32)w * c->cpp;', 'u32 bytes = (u32)w;'),
 ]

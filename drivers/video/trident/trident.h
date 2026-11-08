@@ -345,6 +345,7 @@ struct trident_resources {
      * DISPLAY first, retaining their SIDs for gfx_core's pending publication. */
     int (*configure)(const struct tri_mode *mode, u32 display_bytes, bool final);
 };
+enum tri_present_method { TRI_PRESENT_BYTE = 0, TRI_PRESENT_DWORD_SYNC = 1 };
 struct trident_device {
     const struct trident_resources *res;
     struct trident_saved saved;
@@ -383,6 +384,7 @@ struct trident_device {
      * が未設定 (ゼロ初期化で未設定になる)。 */
     u8 overscan;
     bool overscan_valid;
+    enum tri_present_method present_method; /* zero/default: byte */
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;

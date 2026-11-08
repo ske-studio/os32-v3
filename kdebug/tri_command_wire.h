@@ -12,7 +12,8 @@ enum tri_command_case {
     TRI_TEST_DPMS = 3,
     TRI_TEST_CURSOR = 4,
     TRI_TEST_CPU32 = 5,
-    TRI_TEST_POLL = 6
+    TRI_TEST_POLL = 6,
+    TRI_TEST_PRESENT = 7
 };
 /* Input: version, sizeof(struct tri_request), test, arg. Only MODE uses arg
  * (F3 mode ID); other cases require zero. rc/result_count must start at zero.

@@ -75,6 +75,51 @@ static int test(void)
             trident_fake_fail(&f,0,0);
         }
       }
+    /* Independent row oracle: every destination alignment and short tail,
+     * with an unaligned RAM source on alternating rows. */
+    d.present_method = TRI_PRESENT_DWORD_SYNC;
+    f.resources.ram_fallback = true;
+    d.mode.client = (struct tri_surface){.bytes=51, .pitch=17,
+        .width=16, .height=3, .cpp=1};
+    for (u32 alignment = 0; alignment < 4; ++alignment) {
+        d.mode.display = d.mode.client;
+        d.mode.display.off = 32 + alignment;
+        d.mode.display.pitch = 19;
+        d.mode.display.bytes = 57;
+        for (u32 width = 0; width <= 16; ++width) {
+            trident_fake_trace_reset(&f);
+            CHECK(!trident_present(&d,0,0,width,3));
+            u32 at = 0;
+            for (u32 row = 0; width && row < 3; ++row) {
+                u32 dst = 32 + alignment + row * 19;
+                for (u32 i = 0; i < width;) {
+                    u32 n = (dst + i) % 4 == 0 && width - i >= 4 ? 4 : 1;
+                    CHECK(at < f.trace_count);
+                    const struct trident_fake_event *e = &trace[at++];
+                    CHECK(e->space == TRI_SPACE_LFB && e->write &&
+                          e->offset == dst+i && e->width == n && !e->rc);
+                    for (u32 b = 0; b < n; ++b)
+                        CHECK(vram[dst+i+b] == client[row*17+i+b]);
+                    if (n == 4) {
+                        CHECK(at < f.trace_count);
+                        e = &trace[at++];
+                        CHECK(e->space == TRI_SPACE_REGS && !e->write &&
+                              e->offset == 0x3DA && e->width == 1 && !e->rc);
+                    }
+                    i += n;
+                }
+            }
+            CHECK(at == f.trace_count && !f.trace_overflow);
+        }
+    }
+    /* Both the dword write and its following read must propagate failure. */
+    d.mode.display.off = 32;
+    for (u32 fault = 1; fault <= 2; ++fault) {
+        trident_fake_trace_reset(&f);
+        trident_fake_fail(&f, f.operations + fault, -79);
+        CHECK(trident_present(&d,0,0,4,1) == -79 && f.trace_count == fault);
+        trident_fake_fail(&f,0,0);
+    }
     sync_result = TRI_E_INVAL;
     CHECK(trident_present(0,0,0,1,1) == TRI_E_INVAL);
     return 0;

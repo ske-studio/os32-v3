@@ -112,7 +112,7 @@ static int diagnostics_valid(const struct module_record *r)
         (u32)(uptr)d->video_set_key, (u32)(uptr)d->video_stop,
         (u32)(uptr)d->poll, (u32)(uptr)d->video_surface_alloc,
         (u32)(uptr)d->video_surface_display, (u32)(uptr)d->video_surface_stop,
-        (u32)(uptr)d->video_surface_free
+        (u32)(uptr)d->video_surface_free, (u32)(uptr)d->present
     };
     for (u32 i = 0; i < sizeof(entries)/sizeof(entries[0]); ++i)
         if (entries[i] && !module_text_contains(r, entries[i])) return 0;
