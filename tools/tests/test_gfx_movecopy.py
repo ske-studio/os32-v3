@@ -22,6 +22,10 @@ MUTATIONS = (
     ('composite-before-copy', '    if !copy_valid(&ok, old_org, new_org) { ok.clear(); }',
      '    wm::composite_rect(st, old_outer);\n    if !copy_valid(&ok, old_org, new_org) { ok.clear(); }'),
     ('copy-row-order', 'if new.1 > old.1 { n - step } else { step }', 'if false { n - step } else { step }'),
+    ('copy-column-order', 'if new.0 > old.0 { rects.len - 1 - j } else { j }',
+     'if false { rects.len - 1 - j } else { j }'),
+    ('screen-intersection', 'let (next, all) = intersect(&ok, &screen);',
+     'let (next, all) = (ok, true);'),
 )
 
 

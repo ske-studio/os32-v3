@@ -1,6 +1,6 @@
 //! 窓移動の複写 (§3-5)。呼出し元の結線は W2。
 //! index は解決済みの窓。座標の制限・最大化解除は呼出し元が行う。
-use crate::{cursor, damage, input, kbdnav, modal, startmenu, taskbar, visible, wm};
+use crate::{cursor, damage, kbdnav, modal, startmenu, taskbar, visible, wm};
 use crate::wm::{GuiState, Rect, RectSet, MAX_VIS};
 
 extern "C" {
@@ -59,7 +59,21 @@ pub fn move_window(st: &mut GuiState, index: usize, x: i32, y: i32) {
     st.drag_index = -1;
     st.drag_frame = Rect::EMPTY;
     kbdnav::drop_kmove(st);
-    input::erase_frame(st, frame);
+    if !frame.is_empty() {
+        let t = 2;
+        for edge in [Rect::new(frame.x, frame.y, frame.w, t),
+            Rect::new(frame.x, frame.bottom() - t, frame.w, t),
+            Rect::new(frame.x, frame.y, t, frame.h),
+            Rect::new(frame.right() - t, frame.y, t, frame.h)] {
+            st.dirty_screen(edge);
+            for win in &mut st.windows {
+                if win.used && win.visible {
+                    let (ox, oy) = win.client_origin();
+                    damage::add_dirty_band(win, edge.translate(-ox, -oy));
+                }
+            }
+        }
+    }
     let flushed = unsafe { gfx_flush() } >= 0;
     let mut ok = RectSet::EMPTY;
     let mut complete = flushed;
