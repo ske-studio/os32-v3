@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 #define OS32_SQLITE_DIRECT_TEST 1
 /* Actual dispatcher, DB/output wrappers, VFS and caller copy/walk.
  * Only SQLite and the filesystem driver are entry-recording boundaries. */
@@ -46,13 +47,13 @@ void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; CHECK(0); }
 void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 #include "guest_probe_host_source.c"
 #include "arg_tables_host_source.c"
-static u32 *g_cur_frame;
+static struct arch_syscall *g_cur_frame;
 static u32 tick_count;
 volatile u32 ring3_caller_reject_count;
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
 static int stop_park_calls;
-static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
+static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 /* kprintf is outside this fixture; sys_stat uses the real string staging. */
 int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
 static char string_heap[KAPI_STRING_ARGS][KAPI_STRING_CAP];

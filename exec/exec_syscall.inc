@@ -25,10 +25,9 @@
 STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
 
 /* Each park origin checks admission before saving its selected frame here. */
-static void exec_park_transfer(int id, AppSlot *a, const u32 *frame, void (*commit)(void))
+static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *frame, void (*commit)(void))
 {
-    u32 k;
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = frame[k];
+    arch_user_save(&a->frame, frame);
     x87_save(&a->x87_state);
     exec_heap_save_state(&a->exec_heap_used);
     ring3_context_clear();     /* This syscall ends without passing the WM exit. */
@@ -42,7 +41,7 @@ static void exec_park_transfer(int id, AppSlot *a, const u32 *frame, void (*comm
 
 /* Fifth park origin: only after the entire KAPI/callback has returned.
  * No cleanup here; the existing WM top-level selects the owner to kill. */
-static void exec_park_stop(u32 *frame)
+static void exec_park_stop(struct arch_syscall *frame)
 {
     if (font_guard_active) return;
     int id = appslot_cur();
@@ -60,12 +59,14 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     if (legacy_trap(frame)) {
         return;
     }
-    u32 slot     = frame[APP_FRAME_EAX];         /* スタブが積んだ slot (eax) */
-    u32 user_esp = frame[APP_FRAME_ESP];        /* CPL=3 の ESP (int が積んだ) */
+    struct arch_syscall call = { frame };
+    u32 result;
+    u32 slot     = arch_syscall_slot(&call);         /* スタブが積んだ slot (eax) */
+    u32 user_esp = frame[11] /* D1: native argument extraction */;        /* CPL=3 の ESP (int が積んだ) */
     const void *args_src;
     u32 nbytes;
     u32 wrapptr;
-    u32 *prev_frame = g_cur_frame;
+    struct arch_syscall *prev_frame = g_cur_frame;
     int prev_in_syscall = ring3_in_syscall;
     CallerAccessFrame prev_caller;
 
@@ -75,7 +76,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         ring3_fault_kill();
         return;
     }
-    g_cur_frame = frame;
+    g_cur_frame = &call;
     /* WM の文脈の深さは **CPL=3 の syscall の入口で必ず 0** (不変条件)。
      * WM を longjmp で抜けた (park / kill) 後に 1 が残っていても、ここで
      * 立ち直る — 残ると 3 つの門がアプリのポインタを素通しする穴になる。 */
@@ -99,7 +100,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * address crosses this boundary; raw public slot 12 is guarded as well. */
     if (slot == RING3_LS_CALL) {
         ring3_in_syscall = 1;
-        frame[APP_FRAME_EAX] = (u32)ring3_ls_dispatch(user_esp);
+        result = (u32)ring3_ls_dispatch(user_esp);
         goto syscall_complete;
     }
 
@@ -116,7 +117,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
 
-    int vcall = legacy_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[APP_FRAME_EAX]);
+    int vcall = legacy_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &result);
     if (vcall < 0) ring3_fault_kill();
     if (vcall) goto syscall_complete;
 
@@ -124,12 +125,12 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * word past the caller's mapped argument tail, or emit a partial line. */
     if (slot == KAPI_SLOT_KPRINTF) {
         if (!kapi_print_call(args_src)) ring3_fault_kill();
-        frame[APP_FRAME_EAX] = 0;
+        result = 0;
         goto syscall_complete;
     }
 
     int strings = kapi_strings_call(slot, (void *)wrapptr, args_src,
-                                    nbytes, kapi_argptr[slot], &frame[APP_FRAME_EAX]);
+                                    nbytes, kapi_argptr[slot], &result);
     if (strings < 0) ring3_fault_kill();
     if (strings) goto syscall_complete;
 
@@ -150,9 +151,10 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* 本物の wrap を呼ぶ (現 CR3 = アプリ PD)。戻り値を eax スロットへ。
      * gui_call(OP_WAIT) → exec_park() はここから longjmp して戻らない。 */
-    frame[APP_FRAME_EAX] = kapi_invoke((void *)wrapptr, args_src, nbytes);
+    result = kapi_invoke((void *)wrapptr, args_src, nbytes);
 
 syscall_complete:
+    arch_syscall_result(&call, result);
     /* 正常復帰: ガードを下ろす */
     caller_access_leave(&prev_caller);
     ring3_in_syscall = prev_in_syscall;
@@ -166,5 +168,5 @@ syscall_complete:
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();
-    exec_park_stop(frame);
+    exec_park_stop(&call);
 }

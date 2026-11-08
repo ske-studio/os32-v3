@@ -1,5 +1,5 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
-TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc']
+TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
 
 from exec_source import exec_source
 import host32

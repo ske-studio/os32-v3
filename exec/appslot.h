@@ -25,6 +25,7 @@
 #include "types.h"
 #include "x87.h"
 #include "paging.h"        /* struct addrspace (値で持つ。関数は呼ばない) */
+#include "exec_arch.h"
 #include "ksetjmp.h"       /* k_jmpbuf */
 #include "../fs/vfs_stdin.h"
 
@@ -68,15 +69,6 @@
  * (その syscall の入口で控えが更新されている)。 */
 #define APP_RUNAWAY_TICKS  200
 
-/* int80_stub が積むフレームの語数 ([0..7]=pushad, [8]=EIP [9]=CS
- * [10]=EFLAGS [11]=userESP [12]=userSS)。ring3_entry.asm と同期。 */
-#define APP_FRAME_WORDS    13
-/* pushad の EAX スロット = 戻り値 (resume の wait_ret を書く先) */
-#define APP_FRAME_EAX      7
-#define APP_FRAME_EIP      8
-/* CPL=3 の int80 が保存したユーザ ESP。 */
-#define APP_FRAME_ESP      11
-
 typedef struct {
     int  state;               /* APP_STATE_* */
     int  parent;              /* 起動した側の ID (GUI アプリは常に 1) */
@@ -108,7 +100,7 @@ typedef struct {
     u32  last_kernel_tick;
 
     k_jmpbuf jmpbuf;   /* この ID の呼び出し元へ帰る点 */
-    u32  frame[APP_FRAME_WORDS];    /* park した CPL=3 フレーム (D2 の (b)) */
+    struct arch_user_context frame;    /* park した CPL=3 フレーム (D2 の (b)) */
 
     /* 旧 ExecContext の中身 (レイアウトは 1 バイトも動かさない — I12/I13) */
     u32  guard_a;             /* 初期 sbrk ガード (= page_up(img_end) + PAGE_SIZE) */

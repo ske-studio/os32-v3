@@ -205,15 +205,15 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         /* 票 T9 D5: 明示的な譲り (sys_yield) は **注入リングを読まない**。
          * 読むと、sh が譲っている間に届いた子宛の 1 バイトを吸って捨てる
          * (票 §6 blocker 1)。アプリからは sys_yield() が 0 を返して見える。 */
-        a->frame[APP_FRAME_EAX] = 0;
+        arch_user_result(&a->frame, 0);
     } else if (src == APP_RESUME_SRC_POLL) {
         /* 票 T8 §7 D8: ポーリング型は **1 周だけ**の譲りなので、注入リングが
          * 空でも起こす (WAIT_KEY と違って OS32_ERR_AGAIN を返さない)。
          * 空なら EAX = -1 = 「キーなし」で、アプリの kbd_trygetchar() は
          * 普通に -1 を返したように見える。WM が渡した wait_ret は使わない。 */
         ch = 0;
-        if (kbd_inject_take_for((int)app_id, &ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
-        else                      a->frame[APP_FRAME_EAX] = (u32)(i32)-1;
+        if (kbd_inject_take_for((int)app_id, &ch)) arch_user_result(&a->frame, (u32)ch);
+        else                      arch_user_result(&a->frame, (u32)(i32)-1);
     } else if (src == APP_RESUME_SRC_KBD) {
         /* 単独 getchar/getkey はここで取得し、stdin は非消費で存在を確認する。
          * WM が渡した wait_ret は使わない。
@@ -227,10 +227,10 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
             if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
         } else {
             if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
-            a->frame[APP_FRAME_EAX] = (u32)ch;
+            arch_user_result(&a->frame, (u32)ch);
         }
     } else {
-        a->frame[APP_FRAME_EAX] = (u32)wait_ret;
+        arch_user_result(&a->frame, (u32)wait_ret);
     }
 
     volatile int x87_depth = exec_nest_level;
@@ -264,8 +264,8 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
      * iretd が保存済み EFLAGS (IF=1) を復元するのでアプリ側の IF は変わらない。 */
     /* Saved EIP follows the two-byte int 0x80; EAX still contains sys_read's slot.
      * Each new park saves a fresh post-int80 frame, so this is once per resume. */
-    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;
-    ring3_resume(a->frame, a->as->pd_phys, &kernel_tss);
+    if (restart_stdin) arch_user_restart(&a->frame);
+    arch_user_resume(&a->frame, a->as->pd_phys);
     return 0;   /* 到達しない */
 }
 

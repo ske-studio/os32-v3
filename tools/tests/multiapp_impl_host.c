@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 /* ========================================================================
  *  multiapp_impl_host.c — K5b-K の「実装」を K5a の模型と同じ検査で回す
  *
@@ -326,7 +327,7 @@ static int ma_resume_kbd(int id)
         int restart_stdin = a->stdin_read.active;
 #include "exec_resume_kbd.inc"
     } else {
-        a->frame[APP_FRAME_EAX] = 0;
+        HOST_FRAME(a->frame)[APP_FRAME_EAX] = 0;
     }
     appslot_resume_commit(id);
     H.turn_used[id] = 1;
@@ -361,13 +362,13 @@ static int ma_resume_poll(int id)
      * 明示的な譲り (T9 D5) は注入リングを読まず 0 を入れる。 */
     switch (appslot_resume_source(id)) {
     case APP_RESUME_SRC_YIELD:
-        a->frame[APP_FRAME_EAX] = 0;
+        HOST_FRAME(a->frame)[APP_FRAME_EAX] = 0;
         break;
     case APP_RESUME_SRC_POLL:
 #include "exec_resume_poll.inc"
         break;
     default:
-        a->frame[APP_FRAME_EAX] = 0;
+        HOST_FRAME(a->frame)[APP_FRAME_EAX] = 0;
         break;
     }
     appslot_resume_commit(id);
@@ -1290,7 +1291,7 @@ static void case_wait_key(void)
     check(kbd_inject((const u8 *)"ab", 2) == 2, "19n 端末アプリが 2 バイト注ぐ");
     res_owner_set(APP_ID_SHELL);           /* resume を呼ぶのは WM */
     check(ma_resume_kbd(id) == 0, "19o 注入があれば起こせる");
-    check(appslot_get(id)->frame[APP_FRAME_EAX] == (u32)'a',
+    check(HOST_FRAME(appslot_get(id)->frame)[APP_FRAME_EAX] == (u32)'a',
           "19p EAX には最初の 1 バイトだけが入る");
     check(kbd_inject_pending() == 1, "19q 残りは 1 バイト (まとめて渡さない)");
     check(ring3_switch_count == sw0 + 1, "19r 成功は switch_count を 1 増やす");
@@ -1310,7 +1311,7 @@ static void case_wait_key(void)
           "19w 鍵待ちのアプリは exec_kill で畳める (D5)");
     a->parked_from_kbd = 1;
     check(ma_resume_kbd(id) == 0, "19x 印を戻せば起こせる (残りの 'b')");
-    check(appslot_get(id)->frame[APP_FRAME_EAX] == (u32)'b',
+    check(HOST_FRAME(appslot_get(id)->frame)[APP_FRAME_EAX] == (u32)'b',
           "19y 2 バイト目が次の resume で届く");
     check(kbd_inject_pending() == 0, "19z 注入リングは空に戻る");
 
@@ -1551,7 +1552,7 @@ static void case_poll_yield(void)
     /* (b) 注入が空でも起こす。EAX は -1 (キーなし) */
     check(kbd_inject_pending() == 0, "22j 注入リングは空");
     check(ma_resume_poll(id) == 0, "22k 空でも resume は通る (WAIT_KEY との差)");
-    check(appslot_get(id)->frame[APP_FRAME_EAX] == (u32)(i32)-1,
+    check(HOST_FRAME(appslot_get(id)->frame)[APP_FRAME_EAX] == (u32)(i32)-1,
           "22l EAX には -1 (キーなし) が入る");
     check(ring3_switch_count == sw0 + 1, "22m 成功は switch_count を 1 増やす");
     check(appslot_get(id)->parked_from_poll == 0,
@@ -1576,7 +1577,7 @@ static void case_poll_yield(void)
     check(kbd_inject((const u8 *)"ab", 2) == 2, "22u 端末アプリが 2 バイト注ぐ");
     res_owner_set(APP_ID_SHELL);           /* resume を呼ぶのは WM */
     check(ma_resume_poll(id) == 0, "22v 注入があっても resume は通る");
-    check(appslot_get(id)->frame[APP_FRAME_EAX] == (u32)'a',
+    check(HOST_FRAME(appslot_get(id)->frame)[APP_FRAME_EAX] == (u32)'a',
           "22w EAX には最初の 1 バイトだけが入る");
     check(kbd_inject_pending() == 1, "22x 残りは 1 バイト (まとめて渡さない)");
 
@@ -1595,7 +1596,7 @@ static void case_poll_yield(void)
     a->parked_from_kbd = 0;
     a->parked_from_poll = 1;
     check(ma_resume_poll(id) == 0, "22C 印を戻せば起こせる (残りの 'b')");
-    check(appslot_get(id)->frame[APP_FRAME_EAX] == (u32)'b',
+    check(HOST_FRAME(appslot_get(id)->frame)[APP_FRAME_EAX] == (u32)'b',
           "22D 2 バイト目が次の resume で届く");
     check(kbd_inject_pending() == 0, "22E 注入リングは空に戻る");
 
@@ -1689,7 +1690,7 @@ static void case_yield_and_kill_chain(void)
     res_owner_set(APP_ID_SHELL);
     check(kbd_inject_pending() == 2, "23l 注入リングに 2 バイト");
     check(ma_resume_poll(term) == 0, "23m 譲りからの resume は通る");
-    check(appslot_get(term)->frame[APP_FRAME_EAX] == 0,
+    check(HOST_FRAME(appslot_get(term)->frame)[APP_FRAME_EAX] == 0,
           "23n EAX は 0 (sys_yield が普通に戻ったように見える)");
     check(kbd_inject_pending() == 2,
           "23o 注入リングは不変 (子宛の打鍵を吸わない)");
@@ -2055,12 +2056,12 @@ static void case_fullscreen_resume_destination(void)
     check(ma_resume_kbd(sh) == OS32_ERR_AGAIN, "F1 hidden shell resume cannot take q");
     check(appslot_get(sh)->parked_from_kbd == 1 && appslot_cur() == APP_ID_SHELL,
           "F1 refused shell keeps park mark and WM context");
-    check(ma_resume_poll(y) == 0 && appslot_get(y)->frame[APP_FRAME_EAX] == 'q',
+    check(ma_resume_poll(y) == 0 && HOST_FRAME(appslot_get(y)->frame)[APP_FRAME_EAX] == 'q',
           "F1 real WAIT_POLL branch delivers only to Y");
     check(ma_park_kbd() == 0, "F1 Y WAIT_KEY");
     check(kbd_inject((const u8 *)"r", 1) == 1, "F1 WM injects r");
     check(ma_resume_kbd(sh) == OS32_ERR_AGAIN, "F1 shell still cannot take r");
-    check(ma_resume_kbd(y) == 0 && appslot_get(y)->frame[APP_FRAME_EAX] == 'r',
+    check(ma_resume_kbd(y) == 0 && HOST_FRAME(appslot_get(y)->frame)[APP_FRAME_EAX] == 'r',
           "F1 real WAIT_KEY branch delivers only to Y");
     ma_init(4096);
     kbd_inject_discard();

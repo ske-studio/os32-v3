@@ -44,8 +44,7 @@
 #include "kapi_host.h"   /* N1: Host Services のハンドル回収 (host_owner_exit) */
 #include "kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
-#include "gdt.h"
-#include "tss.h"
+#include "exec_arch.h"
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"
 #include "shell_service.h" /* T7b-b2: 常駐 shell の内部入口 (publish / retire / WM の印) */
@@ -54,9 +53,6 @@
 extern void shell_print(const char *s, u8 attr);
 extern void shell_print_dec(u32 val, u8 color);
 extern u32 sys_mem_kb;
-/* arch/x86/kernel/tss.c の TSS 実体。CPL=3 遷移で TSS.ESP0 を現在のカーネル ESP に
- * 合わせる (割り込み/int 0x80 のフレームが exec_run の frame を踏まないよう)。*/
-extern struct tss_entry kernel_tss;
 static KernelAPI *kapi;
 
 /* ======================================================================== */
@@ -161,7 +157,7 @@ static volatile int g_longjmp_id = 0;      /* park した ID (resume の戻り�
 
 /* いま処理中の int 0x80 フレーム (ring3_syscall_dispatch が控える)。
  * exec_park はこれを AppSlot へ写して CPL=3 の続きを保存する (D2 の (b))。 */
-static u32 *g_cur_frame = 0;
+static struct arch_syscall *g_cur_frame = 0;
 
 /* ======================================================================== */
 /*  リング3 (CPL=3) 実行状態 (v2 M1)                                        */
@@ -260,8 +256,8 @@ void ring3_wm_leave(void)
  * prevents stack-slot reuse: our assembly setjmp has no returns_twice attribute. */
 typedef struct {
     CallerAccessFrame caller;
-    u32 *frame;
-    u32 esp0;
+    struct arch_syscall *frame;
+    struct arch_priv_context priv;
     int in_syscall, wm_depth;
     u32 wm_shell_gen;   /* T7b-b2: WM 区間の世代付きの印 (ring3_wm_shell_gen) */
 } Ring3CallContext;
@@ -274,7 +270,7 @@ static void ring3_context_save(volatile Ring3CallContext *out)
 {
     caller_access_save(&out->caller);
     out->frame = g_cur_frame;
-    out->esp0 = tss_get_esp0();
+    arch_priv_save(&out->priv);
     out->in_syscall = ring3_in_syscall;
     out->wm_depth = ring3_wm_depth;
     out->wm_shell_gen = ring3_wm_shell_gen;
@@ -296,7 +292,7 @@ static void ring3_context_restore(const volatile Ring3CallContext *saved)
     unsigned int flags = irq_save();
     caller_access_leave(&saved->caller);
     g_cur_frame = saved->frame;
-    tss_set_esp0(saved->esp0);
+    arch_priv_restore(&saved->priv);
     ring3_in_syscall = saved->in_syscall;
     ring3_wm_depth = saved->wm_depth;
     ring3_wm_shell_gen = saved->wm_shell_gen;
@@ -507,13 +503,6 @@ int ring3_user_range_ok(u32 p, u32 len)
 #include "exec_stdin.inc"
 
 #include "exec_fault.inc"
-
-/* ======================================================================== */
-/*  ring3_resume — 保存した CPL=3 フレームへ戻る (P4、arch/x86/kernel/ring3_entry.asm)*/
-/*  cli → TSS.ESP0 → CR3 → フレームを積んで popad; iretd を割り込み禁止で    */
-/*  一続きに行う。戻らない。                                                 */
-/* ======================================================================== */
-extern void ring3_resume(const u32 *frame, u32 pd_phys, void *tss);
 
 /* 常駐シェル帯の分割 (画像+sbrk / exec_heap)。文脈の公開と読み込みより前に
  * 1 回だけ決める。短い exec_heap の残りは予約のままで、sbrk には貸さない。 */

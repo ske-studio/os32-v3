@@ -22,7 +22,7 @@ STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
 TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'exec/exec_schedule.inc', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
          'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
          'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
-         CACHE, WM, APP, STUB]
+         CACHE, WM, APP, STUB, 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
 MUTANTS = [
     ('stop-leaves-bit', SLOT, '    slot_zero(a);\n    appslot_reclaim_count++;',
      '    u32 pending = a->trim_pending, epoch = a->trim_epoch;\n'

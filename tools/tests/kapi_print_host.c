@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 #define HOST_CALLER_COPY_TEST
 #include "setup_host_source.c"
 #undef used
@@ -60,13 +61,15 @@ static void *kill_escape[5];
 void ring3_fault_kill(void) { __builtin_longjmp(kill_escape, 1); }
 static int dispatch_print(u32 va)
 {
-    u32 frame[8] = {0}, slot = KAPI_SLOT_KPRINTF;
+    u32 result, frame[8] = {0}, slot = KAPI_SLOT_KPRINTF;
     const void *args_src = (const void *)(uptr)va;
     if (__builtin_setjmp(kill_escape)) return 0;
     /* Actual USER dispatch branch, including refusal -> kill ordering. */
 #include "dispatch_host_source.c"
     CHECK(0);
 syscall_complete:
+    struct arch_syscall call = { frame };
+    arch_syscall_result(&call, result);
     CHECK(frame[7] == 0);
     return 1;
 }

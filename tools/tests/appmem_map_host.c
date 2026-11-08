@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 #include "font_guard_inactive.h"
 /* Real paging/pgalloc/physmem/appmem; Linux/MMU/IRQ are the only host boundary. */
 #include "types.h"
@@ -682,9 +683,9 @@ volatile u32 appslot_trim_done_count, appslot_trim_done_reject_count, appslot_tr
 void appslot_trim_request_as(struct addrspace *as) { (void)as; }
 static u32 ring3_abort_count, tick_count;
 static int ring3_in_syscall;
-static u32 *g_cur_frame;
+static struct arch_syscall *g_cur_frame;
 static int killed, entered_user;
-static void *kernel_tss;
+struct tss_entry kernel_tss;
 static long kill_jump[5];
 AppSlot *appslot_get(int id) {
     return id >= APP_ID_SHELL && id <= APP_ID_MAX && g_slot[id].state != APP_STATE_FREE ? &g_slot[id] : 0;
@@ -697,7 +698,7 @@ void appslot_mark_scheduled(int id, u32 ticks) { (void)id; (void)ticks; }
 static void exec_restore_context(int id) { (void)id; entered_user++; }
 void ring3_resume(const u32 *frame, u32 pd, void *tss) { (void)frame; (void)pd; (void)tss; entered_user++; }
 static void host_caller_access_leave(int *prev) { (void)prev; }
-static void exec_park_stop(u32 *frame) { (void)frame; entered_user++; }
+static void exec_park_stop(struct arch_syscall *frame) { (void)frame; entered_user++; }
 #define caller_access_leave host_caller_access_leave
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "exec_source.c"
@@ -753,7 +754,7 @@ static void poison_abort_cases(void) {
         killed = entered_user = 0;
         if (!__builtin_setjmp(kill_jump)) {
             if (resume) host_resume_tail(2);
-            else host_syscall_tail(g_slot[2].frame);
+            else host_syscall_tail(&g_slot[2].frame);
         }
         if (resume) CHECK("poison resume killed before CR3", killed == 1 && !entered_user && host_cr3 == roots[0]);
         else CHECK("poison syscall exit killed", killed == 1 && !entered_user);

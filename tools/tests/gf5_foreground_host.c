@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 /* U6: production service -> resident poll -> backend stop -> recovery.
  * Build with the scanlog source set and the extracted foreground entries
  * described in run/gt-u6/run-foreground.py. U7 owns CHECK/runner registration.
@@ -50,7 +51,7 @@ static u32 u6_notifications,u6_aborts,u6_syncs,u6_halts,u6_resets;
 static bool u6_gui, u6_caller, u6_wm;
 static int ring3_in_syscall,font_guard_active;
 static AppSlot u6_app, u6_owner_app, *g_cur_app;
-static u32 *g_cur_frame;
+static struct arch_syscall *g_cur_frame;
 volatile u32 ring3_park_reject_count;
 static GeforceModuleContext u6_module;
 volatile u32 tick_count;
@@ -97,7 +98,7 @@ int appslot_park_poll_check(u32 tick) { (void)tick; return -1; }
 int appslot_park_yield_check(void) { return -1; }
 void appslot_park_poll_commit(void) { assert(false); }
 void appslot_park_yield_commit(void) { assert(false); }
-static void exec_park_transfer(int id,AppSlot *a,const u32 *f,void (*commit)(void))
+static void exec_park_transfer(int id,AppSlot *a,const struct arch_syscall *f,void (*commit)(void))
 { (void)id;(void)a;(void)f;(void)commit; assert(false); }
 static void caller_access_leave(const int *previous) { u6_caller=!!*previous; }
 static void exec_cui_display_abort(void) {}
@@ -106,7 +107,7 @@ static void ring3_abort_check(void)
     assert(!cint_prod.feature5.busy);
     if (u6_app.abort_req) ++u6_aborts;
 }
-static void exec_park_stop(u32 *f) { (void)f; }
+static void exec_park_stop(struct arch_syscall *f) { (void)f; }
 static void gfx_reinit_surfaces(int start) { assert(!start); }
 static int gfx_started;
 static GuiHandler g_gui_handler;
@@ -327,7 +328,7 @@ static void u6_cooperative(void)
         if (entry==0) kbd_foreground_poll();
         if (entry==1) sys_halt();
         if (entry==2) assert(!exec_sys_yield());
-        if (entry==3) { u32 frame[APP_FRAME_WORDS]={0}; g_cur_frame=frame;
+        if (entry==3) { u32 frame[APP_FRAME_WORDS]={0}; struct arch_syscall call = { frame }; g_cur_frame=&call;
                        assert(!exec_park_poll(tick_count)); }
         assert(g->next_sensor>old && !g->busy);
         u64 next=g->next_sensor;

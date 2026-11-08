@@ -26,7 +26,7 @@ TARGET_SRCS = ['kernel/r1_fixture.c', 'kernel/r1_fixture.h', 'arch/x86/kernel/is
                'tools/tests/r1_recovery.py', 'tools/tests/r1_recovery_host.c',
                'tools/tests/r1_lease_host.c', 'exec/appslot.c', 'exec/appslot.h',
                'exec/owner_diag.h', 'mm/paging.c', 'exec/lease.c',
-               'kdebug/selftest_lease.c', 'tools/tests/lease_selftest_host.h']
+               'kdebug/selftest_lease.c', 'tools/tests/lease_selftest_host.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
 
 
 def function(source, signature):

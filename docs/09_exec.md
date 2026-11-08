@@ -23,6 +23,17 @@ KernelAPIポインタを引数として実行する。
 | プログラム専用スタック | CPL=3: `MEM_APP_STACK_TOP` (0x90000000) から可変量 (既定256KiB) を全 map、その直下に guard_b 1 page。常駐 shell/gshell は固定配置 |
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
 
+保存済み USER 文脈は AppSlot が `arch_user_context` の値として所有する。
+`include/exec_arch.h` の syscall view は生存中の入口スタックを借りるだけで、
+AppSlot に保存しない。x86 の保存域は USER 52B/align4、親の特権 snapshot は
+4B/align4。実装は `arch/x86/kernel/exec_context.c` が持つ。親 snapshot は
+launch/resume の生存スタック上で setjmp 前に一度保存し、着地時の cleanup と
+x87 親復元の後、IRQ 禁止中に復元する。
+
+再開時は STOP の KEEP が完了済み結果を保持し、YIELD は 0、POLL は文字/-1、
+KBD は入力を消費して返す。未完了 stdin だけは非消費 peek の後、slot と引数を
+保ったまま `arch_user_restart` で syscall を一度だけ再実行する。
+
 ### 実行方式
 
 ```bash

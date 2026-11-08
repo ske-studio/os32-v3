@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 /* ========================================================================
  *  shell_service_host.c — 常駐 shell の内部入口の段 A / B と登録 (T7b-b2 S3a)
  *                         + exec/exec.c への結線 (S3b)
@@ -220,7 +221,7 @@ static void plain_context(void)
 
 /* ---- exec/exec.c から切り出した結線 (S3b) ------------------------------ */
 /* ring3_context_* が引く外部 (caller の控え・TSS・IRQ) の贋物。 */
-static u32 *g_cur_frame = 0;
+static struct arch_syscall *g_cur_frame = 0;
 static u32 host_esp0;
 static int host_caller_saves, host_caller_invalidates, host_caller_leaves;
 void caller_access_save(volatile CallerAccessFrame *out) { (void)out; host_caller_saves++; }

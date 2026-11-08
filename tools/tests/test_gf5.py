@@ -361,8 +361,8 @@ def foreground_header(tree):
                 ('exec/appslot.c', 'appslot_abort_request'))]
     source = (tree / 'exec/exec_syscall.inc').read_text()
     tail = source.split('syscall_complete:', 1)[1]
-    pieces.append('static void u6_syscall_tail(u32 *frame) {\n'
-                  'int prev_caller=0, prev_in_syscall=0;\nu32 *prev_frame=0;\n' + tail)
+    pieces.append('static void u6_syscall_tail(u32 *frame) {\n    struct arch_syscall call = { frame }; u32 result = frame[7];\n'
+                  'int prev_caller=0, prev_in_syscall=0;\nstruct arch_syscall *prev_frame=0;\n' + tail)
     (tree / 'tools/tests/gf5_foreground_entries.h').write_text(
         '\n'.join(pieces).replace('_halt();', 'u6_halt();'))
 

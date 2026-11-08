@@ -1,3 +1,4 @@
+#include "host_exec_context.h"
 #define HOST_CALLER_COPY_TEST
 #include "setup_host_source.c"
 #undef used
@@ -61,7 +62,7 @@ u32 kapi_invoke(void *target, const void *words, u32 bytes)
 void ring3_fault_kill(void) { __builtin_longjmp(killed, 1); }
 static int dispatch_strings(u32 slot, u32 va, u32 nbytes, u16 ptrmask)
 {
-    u32 frame[8] = {0}, wrapptr = 0x1234;
+    u32 result, frame[8] = {0}, wrapptr = 0x1234;
     const void *args_src = (const void *)(uptr)va;
     /* Per-call pointer metadata comes from the public API declarations. */
     u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
@@ -70,6 +71,8 @@ static int dispatch_strings(u32 slot, u32 va, u32 nbytes, u16 ptrmask)
 #include "dispatch_host_source.c"
     CHECK(0);
 syscall_complete:
+    struct arch_syscall call = { frame };
+    arch_syscall_result(&call, result);
     CHECK(frame[7] == 0x76543210);
     return 1;
 }

@@ -44,6 +44,7 @@ def landing(s, start, buf, name):
 
 PRE = r'''
 #include "types.h"
+#include "host_exec_context.h"
 #include <stdbool.h>
 /* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
 bool geforce_fg_due(u32 now) { (void)now; return false; }
@@ -103,7 +104,9 @@ u32 tss_get_esp0(void) { return host_esp0; }
 void tss_set_esp0(u32 esp0) { CHECK(!host_if); host_esp0 = esp0; }
 static int cleanup, teardown, notices, transfers, scheduled_kind, phase;
 static int host_wm_kill, nested_parent, dispatch_action, parent_probe;
-static u32 *g_cur_frame, parent_frame[13], child_frame[13];
+static u32 parent_frame[13], child_frame[13];
+static struct arch_syscall parent_view = { parent_frame }, child_view = { child_frame };
+static struct arch_syscall *g_cur_frame;
 static struct addrspace spaces[APP_SLOT_COUNT];
 volatile u32 ring3_transition_count;
 volatile int exec_nest_level, ring3_wm_depth;
@@ -229,7 +232,7 @@ D2_PRE = r'''
 static void check_invalid_caller(void) { CHECK(!caller_frame.valid); }
 static void poison_landing(void) {
     caller_frame.valid = 1; /* emulate a stale interrupted entry at the landing */
-    ring3_in_syscall = 1; ring3_wm_depth = 2; g_cur_frame = child_frame;
+    ring3_in_syscall = 1; ring3_wm_depth = 2; g_cur_frame = &child_view;
 }
 static void simulate_action(void);
 static void _halt(void) { die(__LINE__); }
@@ -245,7 +248,7 @@ static void ring3_abort_check(void) {}
 static void exec_cui_display_abort(void) {}
 static int stop_pending;
 int appslot_stop_pending(void) { return stop_pending; }
-static void exec_park_stop(u32 *f);
+static void exec_park_stop(struct arch_syscall *f);
 static void ring3_gui_pump(void) {}
 int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 #include "os32_kapi_slots.h"
@@ -411,7 +414,7 @@ static int test(void) {
         nested_parent = 1; cur = owner = cr3 = 3;
         CallerAccessFrame prev;
         CHECK(caller_access_enter(&prev, CALLER_USER));
-        ring3_in_syscall = 1; g_cur_frame = parent_frame;
+        ring3_in_syscall = 1; g_cur_frame = &parent_view;
         CHECK((resumed ? resume_landing() : launch_landing()) == 2);
         CHECK(!stop_pending && !cleanup && caller_frame.valid);
         caller_access_leave(&prev);
@@ -436,13 +439,13 @@ static int test(void) {
         nested_parent = 1; cur = owner = cr3 = 3;
         CallerAccessFrame prev;
         CHECK(caller_access_enter(&prev, CALLER_USER));
-        ring3_in_syscall = 1; g_cur_frame = parent_frame;
+        ring3_in_syscall = 1; g_cur_frame = &parent_view;
         ring3_wm_enter(); ring3_wm_enter();
         int rc = resumed ? resume_landing() : launch_landing();
         CHECK(tss_get_esp0() == MEM_SHELL_STACK_TOP);
         CHECK(rc == (action == 0 || action >= 5 ? 2 : resumed ? 0 : action == 3 ? 17 : EXEC_ERR_FAULT));
         CHECK(caller_frame.valid && caller_frame.access.app_id == 3);
-        CHECK(ring3_in_syscall == 1 && ring3_wm_depth == 2 && g_cur_frame == parent_frame);
+        CHECK(ring3_in_syscall == 1 && ring3_wm_depth == 2 && g_cur_frame == &parent_view);
         struct caller_access out;
         CHECK(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
         ring3_wm_leave(); ring3_wm_leave();
@@ -505,13 +508,13 @@ int kbd_inject_take_for(int id, u8 *out) {
     if (!kbd_inject_peek_for(id, out)) return 0;
     key_count--; return 1;
 }
-static void ring3_resume(u32 *frame, u32 pd, void *tss) {
+void ring3_resume(const u32 *frame, u32 pd, void *tss) {
     CHECK(tss == &kernel_tss && pd == 2 && cr3 == 2 && cur == 2 && owner == 2);
     CHECK(frame[7] == expected_eax && frame[8] == expected_eip && key_count == expected_keys);
     /* Model the immediately reissued int80, then use the real park + landing. */
     for (int i = 0; i < APP_FRAME_WORDS; i++) child_frame[i] = frame[i];
     child_frame[8] = 0x1002; child_frame[7] = KAPI_SLOT_SYS_READ;
-    g_cur_frame = child_frame; ring3_in_syscall = 1;
+    g_cur_frame = &child_view; ring3_in_syscall = 1;
     exec_park_kbd(); CHECK(0);
 }
 '''
@@ -519,20 +522,20 @@ STDIN_POST = r'''
 static void test_stdin_resume(void) {
     setup(1, EXEC_KIND_EXITED); stdin_resume_test = 1;
     AppSlot *a = &slots[2];
-    child_frame[7] = KAPI_SLOT_SYS_READ; g_cur_frame = child_frame; ring3_in_syscall = 1;
+    child_frame[7] = KAPI_SLOT_SYS_READ; g_cur_frame = &child_view; ring3_in_syscall = 1;
     CHECK(exec_stdin_state() == &a->stdin_read);
     a->gui = 0; CHECK(!exec_stdin_state()); a->gui = 1;
     a->cpl3 = 0; CHECK(!exec_stdin_state()); a->cpl3 = 1;
     ring3_wm_depth = 1; CHECK(!exec_stdin_state()); ring3_wm_depth = 0;
     ring3_in_syscall = 0; CHECK(!exec_stdin_state()); ring3_in_syscall = 1;
-    g_cur_frame = 0; CHECK(!exec_stdin_state()); g_cur_frame = child_frame;
+    g_cur_frame = 0; CHECK(!exec_stdin_state()); g_cur_frame = &child_view;
     child_frame[7] = KAPI_SLOT_SYS_READ + 1; CHECK(!exec_stdin_state());
     child_frame[7] = KAPI_SLOT_SYS_READ;
     g_cur_app = 0; CHECK(!exec_stdin_state()); g_cur_app = a;
     cur = 3; CHECK(!exec_stdin_state()); cur = 2;
     a->stdin_read.active = 1; a->stdin_read.done = 1;
     a->stdin_read.size = 4; a->stdin_read.buf = (u8 *)0x2000;
-    a->frame[7] = KAPI_SLOT_SYS_READ; a->frame[8] = 0x1002;
+    HOST_FRAME(a->frame)[7] = KAPI_SLOT_SYS_READ; HOST_FRAME(a->frame)[8] = 0x1002;
     a->state = APP_STATE_WAIT_KEY;
     cur = owner = cr3 = 1; ring3_context_clear();
     resume_src = APP_RESUME_SRC_KBD; key_count = 0;
@@ -540,24 +543,24 @@ static void test_stdin_resume(void) {
     CHECK(exec_resume(2, 999) == OS32_ERR_AGAIN);
     for (u32 i = 0; i < sizeof(saved); i++) CHECK(((u8 *)a)[i] == ((u8 *)&saved)[i]);
     CHECK(cur == 1 && owner == 1 && cr3 == 1);
-    CHECK(a->frame[7] == KAPI_SLOT_SYS_READ && a->frame[8] == 0x1002);
+    CHECK(HOST_FRAME(a->frame)[7] == KAPI_SLOT_SYS_READ && HOST_FRAME(a->frame)[8] == 0x1002);
     CHECK(a->state == APP_STATE_WAIT_KEY && a->stdin_read.active && a->stdin_read.done == 1);
     key_count = 1; key_owner = 3;
     CHECK(exec_resume(2, 999) == OS32_ERR_AGAIN && key_count == 1);
     key_owner = 2; resume_allowed = 0;
-    CHECK(exec_resume(2, 999) == OS32_ERR_STALE && key_count == 1 && a->frame[8] == 0x1002);
+    CHECK(exec_resume(2, 999) == OS32_ERR_STALE && key_count == 1 && HOST_FRAME(a->frame)[8] == 0x1002);
     resume_allowed = 1;
     expected_eax = KAPI_SLOT_SYS_READ; expected_eip = 0x1000; expected_keys = 1;
     for (int i = 0; i < 3; i++) {
         CHECK(exec_resume(2, 999) == 2);
-        CHECK(a->frame[8] == 0x1002 && a->stdin_read.done == 1 && a->stdin_read.active);
+        CHECK(HOST_FRAME(a->frame)[8] == 0x1002 && a->stdin_read.done == 1 && a->stdin_read.active);
     }
     a->stdin_read.active = 0;
     expected_eip = 0x1002; expected_eax = 'A'; expected_keys = 0;
     CHECK(exec_resume(2, 999) == 2);
     for (int src = 0; src <= APP_RESUME_SRC_KEEP; src++) {
         if (src == APP_RESUME_SRC_KBD) continue;
-        resume_src = src; key_count = 1; a->frame[7] = 3;
+        resume_src = src; key_count = 1; HOST_FRAME(a->frame)[7] = 3;
         expected_eax = src == APP_RESUME_SRC_KEEP ? 3 : src == APP_RESUME_SRC_POLL ? 'A' : src == APP_RESUME_SRC_YIELD ? 0 : 999;
         expected_keys = src == APP_RESUME_SRC_POLL ? 0 : 1;
         CHECK(exec_resume(2, 999) == 2);
@@ -585,7 +588,7 @@ def run(source=None, irq=None):
     access = (ROOT / 'exec/redir_access.c').read_text()
     stdin_start = source.index('VfsStdinRead *exec_stdin_state(')
     stdin_state = source[stdin_start:source.index('\n}', stdin_start) + 2]
-    code = ('#include "types.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' + stdin_state + '\n' +
+    code = ('#include "types.h"\n#include "host_exec_context.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' + stdin_state + '\n' +
             '\n'.join(function(source, n) for n in names) + '\n' + POST +
             landing(source, 'static int exec_launch(', 'ctx->jmpbuf', 'launch_landing') +
             landing(source, 'i32 exec_resume(', 'a->jmpbuf', 'resume_landing') + BROKER +
@@ -665,13 +668,13 @@ MUTATIONS = (
      '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
     ('x87-resume-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
      '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
-    ('stdin-wrong-call', '        g_cur_frame[APP_FRAME_EAX] != KAPI_SLOT_SYS_READ ||', ''),
+    ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
-    ('stdin-no-rewind', '    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;', ''),
+    ('stdin-no-rewind', '    if (restart_stdin) arch_user_restart(&a->frame);', ''),
     ('stdin-consume', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;'),
     ('stdin-eax-clobber', '            /* Leave the byte for sys_read in the child\'s normal syscall context. */',
-     '            a->frame[APP_FRAME_EAX] = 65;'),
+     '            arch_user_result(&a->frame, 65);'),
     ('stdin-ignore-empty', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
@@ -701,8 +704,8 @@ MUTATIONS = (
      '    out->in_syscall = 0;'),
     ('snapshot-WM', '    out->wm_depth = ring3_wm_depth;', '    out->wm_depth = 0;'),
     ('snapshot-frame', '    out->frame = g_cur_frame;', '    out->frame = 0;'),
-    ('snapshot-esp0', '    out->esp0 = tss_get_esp0();', '    out->esp0 = 0;'),
-    ('restore-esp0', '    tss_set_esp0(saved->esp0);', ''),
+    ('snapshot-esp0', '    arch_priv_save(&out->priv);', '    __builtin_memset((void *)&out->priv, 0, sizeof(out->priv));'),
+    ('restore-esp0', '    arch_priv_restore(&saved->priv);', ''),
     ('wm-notify-before-as',
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),

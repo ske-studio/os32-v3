@@ -10,7 +10,7 @@ import subprocess
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'exec/exec.c',
-              'arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm']
+              'arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
 
 def run(runner, mutant=None):
     with tempfile.TemporaryDirectory(prefix='sqlite-engine-') as directory:

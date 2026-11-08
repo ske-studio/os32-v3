@@ -15,6 +15,7 @@ OS32 の移植点は **2 本の軸**に分かれている。
 | [`include/io.h`](../include/io.h) | ポート I/O、割り込み制御、CPU 停止、IDT のロード | `arch_io.h` / `platform_io.h` |
 | [`include/abi.h`](../include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
 | [`include/cpu.h`](../include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
+| [`include/exec_arch.h`](../include/exec_arch.h) | syscall の借用 view、USER 保存域、親の特権 snapshot と復帰 | `arch_exec_storage.h` (容量・整列のみ) |
 
     #include "arch_io.h"        /* arch/$(ARCH)/arch_io.h     */
     #include "platform_io.h"    /* platform/$(PLATFORM)/platform_io.h */

@@ -3,7 +3,7 @@
 Only successful compilation followed by runtime failure counts as mutation RED.
 """
 CHECK = dict(name='h3-park-resume-host', tier=1,
-    covers=['tools/np21w_mcp/symbols.py', 'exec/exec.c', 'arch/x86/kernel/isr_stub.asm', 'tools/h3_layout.c', 'tools/h3_park_resume.py', 'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/h3_state_host.c', 'tools/tests/host32.py', 'userland/tests/h3/protocol.h', 'userland/tests/h3a.c', 'userland/tests/h3b.c', 'tools/np21w_mcp/gui.py', 'tools/np21w_mcp/gui_desc.py', 'userland/gshell/src/wm.rs', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
+    covers=['tools/np21w_mcp/symbols.py', 'exec/exec.c', 'arch/x86/kernel/isr_stub.asm', 'tools/h3_layout.c', 'tools/h3_park_resume.py', 'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/h3_state_host.c', 'tools/tests/host32.py', 'userland/tests/h3/protocol.h', 'userland/tests/h3a.c', 'userland/tests/h3b.c', 'tools/np21w_mcp/gui.py', 'tools/np21w_mcp/gui_desc.py', 'userland/gshell/src/wm.rs', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
     needs=['make:all'], budget=4.1)
 
 import argparse

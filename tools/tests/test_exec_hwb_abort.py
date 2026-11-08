@@ -21,7 +21,7 @@ CHECK = dict(name='exec-hwb-abort-host', tier=1,
             'lib/path.h', 'fs/vfs.h', 'fs/vfs_stdin.h',
             'fs/fd_redirect.h', 'fs/pipe_buffer.h',
             'gfx/gfx.h', 'drivers/sound/fm/snd_engine.h',
-            'kapi/kapi_host.h', 'kapi/kapi_db.h'],
+            'kapi/kapi_host.h', 'kapi/kapi_db.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
     needs=[], budget=5.8)
 
 import sys

@@ -24,6 +24,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 HOST = r'''
 #include "types.h"
+#include "host_exec_context.h"
 #include <stdbool.h>
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc) {
@@ -33,7 +34,7 @@ static void finish(int rc) {
 #define CHECK(c) do { if (!(c)) finish(1); } while (0)
 static int caller, ring3_in_syscall, checks, polls, aborts, parks;
 static bool due, stop_pending;
-static u32 *g_cur_frame, *saved_frame;
+static struct arch_syscall *g_cur_frame, *saved_frame;
 static u32 tick_count=100;
 static void caller_access_leave(const int *prev) { caller=*prev; }
 static void exec_cui_display_abort(void) { CHECK(!caller); }
@@ -50,21 +51,24 @@ static void ring3_abort_check(void) {
     CHECK(checks==1 && polls==(int)due);
     if (stop_pending) CHECK(aborts==1);
 }
-static void exec_park_stop(u32 *frame) { CHECK(frame[7]==1234); parks++; }
+static void exec_park_stop(struct arch_syscall *frame) { CHECK(arch_syscall_slot(frame)==1234); parks++; }
 static void syscall_tail(u32 *frame) {
     int prev_caller=0, prev_in_syscall=7;
-    u32 *prev_frame=saved_frame;
+    struct arch_syscall *prev_frame=saved_frame;
+    struct arch_syscall call = { frame };
+    u32 result = 1234;
 /* PRODUCT */
 void _start(void) {
     u32 frame[13]={0}, parent[13]={0};
-    frame[7]=1234; saved_frame=parent;
+    struct arch_syscall parent_call = { parent }, child_call = { frame };
+    frame[7]=1234; saved_frame=&parent_call;
     for (int mode=0; mode<3; mode++) {
-        caller=1; ring3_in_syscall=1; g_cur_frame=frame;
+        caller=1; ring3_in_syscall=1; g_cur_frame=&child_call;
         due=mode!=0; stop_pending=mode==2;
         checks=polls=aborts=parks=0;
         syscall_tail(frame);
         CHECK(checks==1 && polls==(int)due && parks==1);
-        CHECK(!caller && ring3_in_syscall==7 && g_cur_frame==parent);
+        CHECK(!caller && ring3_in_syscall==7 && g_cur_frame==&parent_call);
     }
     finish(0);
 }
@@ -80,7 +84,7 @@ def run_case(folder, source, label, mutant=False):
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                     '-Wall', '-Wextra', '-Werror', '-ffreestanding',
                     '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
-                    '-no-pie', *include_flags(ROOT), str(fixture), '-o', str(exe)],
+                    '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT), str(fixture), '-o', str(exe)],
                    check=True)
     result = host32.run([str(exe)], capture_output=True, timeout=10)
     assert result.returncode == (1 if mutant else 0), (label, result)

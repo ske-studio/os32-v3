@@ -3,7 +3,7 @@
 段: T2f f1b
 """
 CHECK = dict(name='nano-adapter-host', tier=1,
-    covers=['sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/nano_adapter_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/link_guard.py', 'sdk/crt/syscalls.c', 'userland/tests/malloc_arena_test.c', 'sdk/link/app.ld', 'userland/lib/rt/ls.c', 'tools/tests/resident_heap_host.c', 'exec/exec.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/appslot.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'include/memmap.h', 'tools/tests/host_arch/**', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
+    covers=['sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/nano_adapter_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/link_guard.py', 'sdk/crt/syscalls.c', 'userland/tests/malloc_arena_test.c', 'sdk/link/app.ld', 'userland/lib/rt/ls.c', 'tools/tests/resident_heap_host.c', 'exec/exec.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/appslot.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'include/memmap.h', 'tools/tests/host_arch/**', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
     needs=['make:all'], budget=17.2)
 
 from exec_source import exec_source

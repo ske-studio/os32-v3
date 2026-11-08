@@ -3,7 +3,7 @@
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
 CHECK = dict(name='appmem-map-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py'],
+    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
     needs=['make:all'], budget=5.9)
 
 from exec_source import read_text
@@ -31,7 +31,7 @@ TARGET_SRCS = ['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'to
     'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
     'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h']
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h']
 DATA_ABORT = '''    for (u32 va = tx->base; va < tx->end; va += PAGE_SIZE) {
         u32 *entry = app_entry(tx, va);
         if (entry && *entry) {
@@ -153,8 +153,8 @@ MUTANTS = [
      '    exec_addrspace_abort(as);', 'poison counted once'),
     ('resume-no-abort', 5, '    g_cur_app = a;\n    ring3_abort_check();',
      '    g_cur_app = a;', 'poison resume killed before CR3'),
-    ('syscall-exit-no-abort', 5, '    ring3_abort_check();\n    exec_park_stop(frame);',
-     '    exec_park_stop(frame);', 'poison syscall exit killed'),
+    ('syscall-exit-no-abort', 5, '    ring3_abort_check();\n    exec_park_stop(&call);',
+     '    exec_park_stop(&call);', 'poison syscall exit killed'),
     ('WM-clears-poison-abort', 6, 'if (!g_slot[i].as || !g_slot[i].as->appmem_poisoned)',
      'if (1)', 'poison WM clear preserves abort'),
 
@@ -217,7 +217,7 @@ def main():
                 parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id); int restart_stdin = 0;\n' + tail + '\n}')
                 dispatch = function(source, 'void __cdecl ring3_syscall_dispatch(')
                 tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
-                parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller = 0, prev_in_syscall = 0; u32 *prev_frame = 0;\n' + tail + '\n}')
+                parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int prev_caller = 0, prev_in_syscall = 0; struct arch_syscall *prev_frame = 0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
                 return '#include "owner_diag.h"\n' + '\n'.join(parts)
 
             def heap_context_parts(source):

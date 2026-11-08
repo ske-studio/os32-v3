@@ -13,7 +13,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='font-source-host', tier=1,
-    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
+    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h'],
     needs=[], budget=4.7)
 
 from kernel_includes import include_dirs, include_flags
