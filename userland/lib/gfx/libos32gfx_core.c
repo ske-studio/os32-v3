@@ -198,7 +198,8 @@ int libos32gfx_attach_checked(void)
 int libos32gfx_check(void)
 {
     GFX_ScreenInfo si = {0};
-    int want, rc;
+    int want, rc, old_direct;
+    u16 old_gen;
     if (gfx_stopped || !gfx_api) return OS32_ERR_INVAL;
     if (gfx_direct) (void)gfx_flush();
     if (gfx_api->version >= 83) gfx_api->gfx_screen_info(&si);
@@ -208,12 +209,14 @@ int libos32gfx_check(void)
         if (gfx_cpl() == 0 || !gfx_attach_port || want) return 0;
         return gfx_refresh();
     }
+    old_direct = gfx_direct;
+    old_gen = gfx_gen;
     gfx_cmd_drop();
     libos32gfx_detach();
-    gfx_direct = 0;
     gfx_lost = 0;
-    rc = libos32gfx_attach_checked();
-    gfx_regen = 1;
+    rc = gfx_refresh();
+    if (!rc && (old_direct != gfx_direct || (gfx_direct && old_gen != gfx_gen)))
+        gfx_regen = 1;
     return rc;
 }
 

@@ -31,6 +31,8 @@ static int get(int x,int y,int w,int h,u8 *s,u32 p)
 static int mono(int x,int y,int w,int h,const u8 *s,u32 p,u8 f,int b,
                 int cx,int cy,int cw,int ch)
 { (void)cx;(void)cy;(void)cw;(void)ch;return put(x,y,w,h,s,p,f+b); }
+static int logs;
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; logs++; }
 static int gui, owner = GFX_OWNER_WM, ok = 1, events, mapped = 1, token = 1;
 static u16 expected_gen = 1;
 static GfxBackend be;
@@ -132,6 +134,7 @@ void _start(void)
     gui = 1; be.policy = GFX_POLICY_DIRECT; ok = 0;
     gfx_policy_reeval(); shadow_hooks(); CHECK(gfx_policy_gen == 5);
     ok = 1; be.policy = GFX_POLICY_DIRECT; be.direct_ops = 0;
-    gfx_policy_reeval(); shadow_hooks(); CHECK(gfx_policy_gen == 6);
+    gfx_policy_reeval(); shadow_hooks(); CHECK(gfx_policy_gen == 6 && logs == 1);
+    gfx_policy_reeval(); CHECK(logs == 1);
     finish(0);
 }

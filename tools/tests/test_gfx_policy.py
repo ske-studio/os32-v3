@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('active-hooks', 'd && d->fill_rect', 'd && g_backend->fill_rect'),
     ('required-fill', ' && d->fill_rect', ''),
-    ('fullscreen', '!gfx_fullscreen_owner()', '1'),
-    ('gui', 'con_sink_is_enabled()', '1'),
+    ('fullscreen', 'con_sink_is_enabled() && !gfx_fullscreen_owner() &&', 'con_sink_is_enabled() && 1 &&'),
+    ('gui', 'return con_sink_is_enabled() &&', 'return 1 &&'),
     ('owner', 'appslot_gfx_owner() != GFX_OWNER_WM', '0'),
     ('scan-clear', '    gfx_scan_changed = 0;', '    (void)gfx_scan_changed;'),
     ('scan-bump', '} else if (gfx_scan_changed) {', '} else if (0) {'),

@@ -9,6 +9,9 @@
 
 KernelAPI *gfx_api;
 int gfx_lost;
+int gfx_direct;
+GFX_Framebuffer gfx_fb;
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 __typeof__(gfx_gen) gfx_gen;
 
 static void finish(int rc) __attribute__((noreturn));

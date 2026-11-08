@@ -145,8 +145,9 @@ def main():
                         body=body.replace('return cs & 3U;', 'extern unsigned int host_sdk_cpl; return host_sdk_cpl;')
                     if path.endswith('gfx_cmd.c'):
                         body=body.replace('../gfx_direct_internal.h', 'gfx_direct_internal.h')
-                        body=body.replace('int gfx_flush(void) { return 0; }',
-                            'extern int flush_pending, flush_failure; int gfx_flush(void) { flush_pending=0; if (flush_failure) { flush_failure=0; gfx_lost=1; return -1; } return 0; }')
+                        start=body.index('int gfx_flush(void)\n{')
+                        end=body.index('\nstatic int reserve_command', start)
+                        body=body[:start] + ('extern int flush_pending, flush_failure; int gfx_flush(void) { flush_pending=0; if (flush_failure) { flush_failure=0; gfx_lost=1; return -1; } return 0; }\n') + body[end:]
                     if path.endswith('gfx_dump.c'):
                         # Existing sizeof loop is signed; target build allows it.
                         body='#pragma GCC diagnostic ignored "-Wsign-compare"\n'+body

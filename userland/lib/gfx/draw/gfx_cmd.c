@@ -44,6 +44,7 @@ int gfx_flush(void)
 
 static int reserve_command(void)
 {
+    if (!gfx_direct) return OS32_ERR_NOSYS;
     if (gfx_lost) return OS32_ERR_STALE;
     if (nq == GFX_CMD_MAX) return gfx_flush();
     return 0;
@@ -117,10 +118,18 @@ static int push_rows(GFX_Cmd cmd, const u8 *src, u32 pitch, int bx, int by)
 
 int gfx_cmd_enqueue_put(int x, int y, int w, int h, const u8 *src, u32 pitch, int key)
 {
-    if (!rect_valid(x, y, w, h) || w > 640 || key < -1 || key > 255 ||
+    int left, top, right, bottom;
+    if (!rect_valid(x, y, w, h) || key < -1 || key > 255 ||
         !span_valid(src, pitch, w, h)) return OS32_ERR_INVAL;
-    return push_rows((GFX_Cmd){ .op = GFX_CMD_PUT, .x = x, .y = y,
-        .w = w, .h = h, .key = key }, src, pitch, 0, 0);
+    left = x > 0 ? x : 0;
+    top = y > 0 ? y : 0;
+    right = x + w < gfx_fb.width ? x + w : gfx_fb.width;
+    bottom = y + h < gfx_fb.height ? y + h : gfx_fb.height;
+    if (left >= right || top >= bottom) return 0;
+    if (right - left > 640) return OS32_ERR_INVAL;
+    src += (u32)(top - y) * pitch + (left - x);
+    return push_rows((GFX_Cmd){ .op = GFX_CMD_PUT, .x = left, .y = top,
+        .w = right - left, .h = bottom - top, .key = key }, src, pitch, 0, 0);
 }
 
 int gfx_cmd_enqueue_mono(int x, int y, int w, int h, const u8 *bits, u32 pitch,
@@ -134,6 +143,10 @@ int gfx_cmd_enqueue_mono(int x, int y, int w, int h, const u8 *bits, u32 pitch,
     top = y > cy ? y : cy;
     right = x + w < cx + cw ? x + w : cx + cw;
     bottom = y + h < cy + ch ? y + h : cy + ch;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right > gfx_fb.width) right = gfx_fb.width;
+    if (bottom > gfx_fb.height) bottom = gfx_fb.height;
     if (left >= right || top >= bottom) return 0;
     if (right - left > 640) return OS32_ERR_INVAL;
     return push_rows((GFX_Cmd){ .op = GFX_CMD_MONO, .x = left, .y = top,

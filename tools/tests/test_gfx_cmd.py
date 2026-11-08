@@ -26,7 +26,9 @@ MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (
      'if (rc) gfx_lost = 0;\n    return rc;\n}\n\nstatic int reserve_command'),
     ('get-flush', 'rc = gfx_flush();\n    if (rc) return rc;\n    rc = gfx_api->gfx_hw_get',
      'rc = 0;\n    if (rc) return rc;\n    rc = gfx_api->gfx_hw_get'),
-    ('put-width', 'w > 640', 'w > 641'),
+    ('put-width', 'if (right - left > 640) return OS32_ERR_INVAL;\n    src +=', 'if (right - left > 641) return OS32_ERR_INVAL;\n    src +='),
+    ('arena-capacity', 'sizeof arena - used', 'sizeof arena'),
+    ('rows-flush', 'rc = gfx_flush();\n            if (rc) return rc;', 'return OS32_ERR_IO;\n            if (rc) return rc;'),
 ))
 
 

@@ -19,6 +19,8 @@ static u32 count, bytes, calls, gets;
 static int fail_submit, fail_get;
 KernelAPI *gfx_api;
 int gfx_lost;
+int gfx_direct = 1;
+GFX_Framebuffer gfx_fb = {.width = 800, .height = 480};
 u16 gfx_gen = 123;
 
 static int submit(const GFX_Cmd *cmd, u32 n, u32 gen, u32 *done)
@@ -63,6 +65,9 @@ void _start(void)
     api.gfx_hw_get = get;
     gfx_api = &api;
     CHECK(!gfx_flush() && calls == 0);
+    gfx_direct = 0;
+    CHECK(gfx_cmd_enqueue_fill(0, 0, 1, 1, 0, 0) == OS32_ERR_NOSYS);
+    gfx_direct = 1;
     for (int i = 0; i < 65; i++)
         CHECK(!gfx_cmd_enqueue_fill(i, 0, 1, 1, i, i & 1));
     CHECK(calls == 1 && count == 64);
@@ -70,6 +75,11 @@ void _start(void)
     CHECK(seen[1].rop == 1 && seen[1].x == 1);
     reset();
     for (u32 i = 0; i < sizeof data; i++) data[i] = i;
+    CHECK(!gfx_cmd_enqueue_put(0, 0, 640, 6, data, 640, -1));
+    CHECK(!gfx_cmd_enqueue_put(0, 0, 256, 1, data, 256, -1));
+    CHECK(!gfx_cmd_enqueue_put(0, 0, 1, 1, data, 1, -1));
+    CHECK(calls == 1 && count == 2);
+    reset();
     CHECK(!gfx_cmd_enqueue_put(0, 5, 640, 10, data, 650, 17));
     CHECK(calls == 1 && count == 1 && seen[0].h == 6);
     for (u32 i = 0; i < sizeof data; i++) data[i] = 0;
@@ -77,6 +87,13 @@ void _start(void)
     CHECK(seen[1].y == 11 && seen[1].h == 4 && seen[1].pitch == 640 && seen[1].key == 17);
     for (u32 r = 0; r < 10; r++)
         for (u32 b = 0; b < 640; b++) CHECK(copied[r * 640 + b] == (u8)(r * 650 + b));
+    reset();
+    gfx_fb.width = 640;
+    for (u32 i = 0; i < 648; i++) data[i] = i;
+    CHECK(!gfx_cmd_enqueue_put(-8, 0, 648, 1, data, 648, -1));
+    CHECK(!gfx_flush() && count == 1 && seen[0].w == 640 && copied[0] == 8);
+    CHECK(!gfx_cmd_enqueue_put(-8, -2, 2, 1, data, 2, -1));
+    gfx_fb.width = 800;
     reset();
     data[0] = 0x12; data[1] = 0x34;
     CHECK(!gfx_cmd_enqueue_put(1, 2, 2, 1, data, 2, -1));

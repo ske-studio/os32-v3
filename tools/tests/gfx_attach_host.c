@@ -189,9 +189,9 @@ static void run(void)
     for(u32 i=0;i<MEM_LEASE_MAX;i++) CHECK(!port_unlease(first_full[i].token));
     sdk_gfx_present();CHECK(gfx_ready && live()==1);
     CHECK(sdk_allocations==1);
-    CHECK(attach_logs==2); /* recovery performs an explicit reattach */
+    CHECK(attach_logs==1); /* recovery does not log an explicit attach */
     CHECK(!libos32gfx_attach_checked());
-    CHECK(attach_logs==3 && attach_logged("[libos32gfx] attach rc=00000000 ready=1\n"));
+    CHECK(attach_logs==2 && attach_logged("[libos32gfx] attach rc=00000000 ready=1\n"));
     GFX_Surface *kept_surface=sdk_gfx_create_surface(8,8);CHECK(kept_surface);
     sdk_gfx_surface_pixel(kept_surface,0,0,3);
     GFX_Sprite *kept_sprite=sdk_gfx_create_sprite(kept_surface,0);CHECK(kept_sprite);
@@ -323,6 +323,10 @@ static void run(void)
     deny_query=1;CHECK(libos32gfx_getchar()==65 && !gfx_ready && !live());
     deny_query=0;public_count=4;
     CHECK(libos32gfx_check()==OS32_ERR_INVAL && !live());
+    { u32 logs = attach_logs;
+      (void)libos32gfx_take_regen();
+      CHECK(libos32gfx_check()==OS32_ERR_INVAL && attach_logs==logs);
+      CHECK(!libos32gfx_take_regen()); }
     public_count=1;CHECK(!libos32gfx_check());libos32gfx_detach();
     /* Policy recovery is shared by trusted and user callers. */
     for (int cpl=0; cpl<=3; cpl+=3) {
@@ -339,13 +343,13 @@ static void run(void)
         flush_pending=3; libos32gfx_halt();
         flush_failure=1;
         CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
-        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        CHECK(!libos32gfx_take_regen());
         direct_gen++;
         CHECK(!libos32gfx_check() && gfx_direct && gfx_gen==direct_gen);
         CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
         gfx_lost=1;
         CHECK(!libos32gfx_check() && !gfx_lost && gfx_direct);
-        CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());
+        CHECK(!libos32gfx_take_regen());
         direct_mode=0;
         CHECK(!libos32gfx_check() && !gfx_direct && gfx_ready);
         CHECK(libos32gfx_take_regen() && !libos32gfx_take_regen());

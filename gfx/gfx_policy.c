@@ -3,6 +3,7 @@
 #include "gfx_hal.h"
 #include "con_sink.h"
 #include "pgalloc.h"
+#include "kprintf.h"
 #include "../exec/appslot.h"
 
 u16 gfx_policy_gen = 1;
@@ -31,6 +32,12 @@ void gfx_policy_reeval(void)
     if (!g_backend) return;
     u8 want = gfx_direct_wanted() ? GFX_POLICY_DIRECT : GFX_POLICY_SHADOW;
     if (want != g_backend->policy) {
+        const GfxDirectOps *ops = g_backend->direct_ops;
+        if (want == GFX_POLICY_SHADOW && con_sink_is_enabled() &&
+            !gfx_fullscreen_owner() &&
+            (!ops || !ops->fill_rect || !ops->blit || !ops->fill_rop ||
+             !ops->put || !ops->get))
+            kprintf(7, "gfx: incomplete direct_ops; using SHADOW\n");
         if (want == GFX_POLICY_DIRECT) {
             gfx_reinit_surface_roles(0, 0);
             gfx_reinit_surface_roles(1, 0);
