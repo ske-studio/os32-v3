@@ -2,7 +2,7 @@
 CHECK = dict(name='widget-scroll-host', tier=1,
     covers=['tools/tests/test_widget_scroll.py', 'tools/tests/widget_scroll_host.rs',
             'tools/tests/os32api_host.py', 'userland/rust/libos32gui/src/widget*.rs',
-            'userland/rust/libos32gui/src/uistate.rs', 'userland/rust/libos32gui/src/layout.rs',
+            'userland/rust/libos32gui/src/uistate.rs', 'userland/rust/libos32gui/src/scroll.rs', 'userland/rust/libos32gui/src/layout.rs',
             'userland/rust/libos32gui/src/textcore.rs', 'userland/rust/libos32gui/src/utf8core.rs',
             'userland/rust/edit_gui/src/lib.rs', 'userland/rust/edit_gui/src/doc.rs',
             'userland/rust/filer/src/lib.rs', 'userland/rust/libos32gui/src/shlib.rs',
@@ -18,6 +18,9 @@ import os32api_host
 ROOT = Path(__file__).resolve().parents[2]
 GUI = 'userland/rust/libos32gui/src/'
 MUTANTS = [
+    ('pending-destination', GUI+'scroll.rs', 'if p.window == window {', 'if false {', 'filer two downs pixels'),
+    ('focus-frame', GUI+'widget_scroll.rs', '    if focused {', '    if false {', 'textarea pixels'),
+    ('old-caret', GUI+'widget_scroll.rs', '        if old.ta_caret_row >= 0 {', '        if false {', 'textarea pixels'),
     ('selection-row', GUI+'widget_scroll.rs', 'for sel in [old_sel, w.sel]', 'for sel in [w.sel, w.sel]', 'list pixels'),
     ('exposed-direction', GUI+'widget_scroll.rs', 'let exposed = if dy < 0', 'let exposed = if dy > 0', 'textarea pixels'),
     ('error-full', GUI+'widget_scroll.rs', '    } else {\n        invalidate(idx);\n    }', '    } else {\n        // missing fallback\n    }', 'textarea pixels'),
@@ -47,7 +50,7 @@ def main():
     paths = [GUI+n+'.rs' for n in ('widget', 'widget_scroll', 'uistate', 'layout', 'textcore', 'utf8core')]
     paths += ['userland/rust/edit_gui/src/lib.rs', 'userland/rust/edit_gui/src/doc.rs', 'userland/rust/filer/src/lib.rs']
     paths += [GUI+'shlib.rs', 'userland/rust/libos32gui_stub/src/widget.rs',
-              'userland/rust/libos32gui_stub/src/scroll.rs']
+              'userland/rust/libos32gui_stub/src/scroll.rs', GUI+'scroll.rs']
     original = {p: (ROOT/p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='widget-scroll-') as tmp:
         base = Path(tmp)
@@ -67,10 +70,11 @@ def main():
                 if name != 'widget_scroll':
                     root += f'mod {name};\n'
             (dest/'doc.rs').write_text(texts['userland/rust/edit_gui/src/doc.rs'])
-            root += 'mod doc;\n'
+            root += 'mod doc;\nmod scroll;\n'
+            (dest/'scroll.rs').write_text(texts[GUI+'scroll.rs'])
             root += (ROOT/'tools/tests/widget_scroll_host.rs').read_text()
             root += '\nimpl Editor {\n'+ '\n'.join(method(texts[paths[6]], n) for n in ('refresh', 'view_geom'))+'\n}\n'
-            root += '\nimpl Filer {\n'+ '\n'.join(method(texts[paths[8]], n) for n in ('repaint_sel', 'row_rect', 'rows_band', 'visible_rows'))+'\n}\n'
+            root += '\nimpl Filer {\n'+ '\n'.join(method(texts[paths[8]], n).replace('libos32gui::scroll::scroll', 'crate::stub_scroll::scroll') for n in ('repaint_sel', 'row_rect', 'rows_band', 'visible_rows'))+'\n}\n'
             root += '\nmacro_rules! gate { ($v:expr) => {}; }\n'
             root += 'fn r0(r:client::GuiResult<()>) -> i32 { r.map(|_|0).unwrap_or_else(|e|e.0) }\n'
             root += "unsafe fn slice<'a>(p:*const u8,n:u32)->&'a [u8] { if n==0 { &[] } else { core::slice::from_raw_parts(p,n as usize) } }\n"

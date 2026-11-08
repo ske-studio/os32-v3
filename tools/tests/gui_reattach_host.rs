@@ -175,8 +175,13 @@ mod uistate {
     use super::*;
     #[derive(Clone, Copy)]
     pub struct Win { pub used: bool, pub id: u32, pub client: Rect }
-    pub struct State { pub windows: [Win; 3] }
-    static mut STATE: State = State { windows: [Win { used: false, id: 0, client: Rect::new(0,0,0,0) }; 3] };
+    // This fixture has no queued widget Paint damage.
+    #[derive(Clone, Copy)]
+    pub struct PaintReq { pub window:u32, pub rect:Rect }
+    pub struct Damage { pub items:[PaintReq;0], pub len:usize }
+    impl Damage { pub fn push(&mut self,_:u32,_:Rect) { panic!("no pending damage in reattach fixture"); } }
+    pub struct State { pub windows: [Win; 3], pub damage:Damage }
+    static mut STATE: State = State { damage:Damage {items:[],len:0}, windows: [Win { used: false, id: 0, client: Rect::new(0,0,0,0) }; 3] };
     pub fn s() -> &'static mut State { unsafe { &mut *core::ptr::addr_of_mut!(STATE) } }
 }
 static TRACE: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());

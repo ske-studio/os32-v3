@@ -15,36 +15,43 @@ use os32api::gui::types::{Rect, Style, SurfaceId};
 use widget::WidgetId;
 use doc::VRow;
 const W: usize = 180;
-const H: usize = 140;
+const H: usize = 260;
 static mut PIXELS: [u8; W*H] = [0; W*H];
 static mut CLIP: Rect = Rect::new(0,0,W as i16,H as i16);
 static mut SCROLL_RC: bool = true;
 static mut SCROLLS: usize = 0;
-mod ffi { pub static mut gfx_direct: i32 = 0; }
+mod ffi { pub static mut gfx_direct: i32 = 0; pub unsafe fn gfx_flush()->i32 {0} }
 mod client {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct GuiErr(pub i32);
-    impl GuiErr { pub const STALE: Self=Self(-1); pub const INVAL: Self=Self(-2); pub const FULL: Self=Self(-3); }
+    impl GuiErr { pub const STALE: Self=Self(-1); pub const NOSYS: Self=Self(-4); pub const INVAL: Self=Self(-2); pub const FULL: Self=Self(-3); }
     pub type GuiResult<T> = Result<T,GuiErr>;
     pub fn ok0(r:i32)->GuiResult<()> {if r<0 {Err(GuiErr(r))} else {Ok(())}}
     pub fn invalidate(_:u32,_:super::Rect)->GuiResult<()> { Ok(()) }
+    pub fn write_req<T:Copy>(v:&T) { unsafe {
+        assert_eq!(core::mem::size_of::<T>(), core::mem::size_of::<os32api::gui::proto::GuiReqScroll>());
+        super::REQUEST=Some(core::ptr::read(v as *const T as *const os32api::gui::proto::GuiReqScroll));
+    }}
+    pub fn call(op:u32,_:u32)->GuiResult<i32> {
+        assert_eq!(op,os32api::gui::proto::GUI_OP_SCROLL);
+        let q=unsafe {super::REQUEST.unwrap()};
+        super::wm_scroll(super::Rect::new(q.rect.x,q.rect.y,q.rect.w,q.rect.h),q.dx,q.dy)
+    }
     pub use crate::utf8core::{utf8_truncate, utf8_seq_len};
     pub fn win_set_text_cursor(_:u32,_:i16,_:i16,_:bool)->GuiResult<()> { Ok(()) }
 }
-// Only the WM COPY boundary is faked. Widget drawing and state are real.
-pub mod scroll {
-    use super::*;
-    pub fn scroll(_:u32, r:Rect, dx:i16, dy:i16)->client::GuiResult<()> {
-        unsafe {
-            SCROLLS += 1;
-            if !SCROLL_RC { return Err(client::GuiErr::STALE); }
-            let before = PIXELS;
-            for y in r.y as i32..r.bottom() { for x in r.x as i32..r.right() {
-                let (sx,sy)=(x-dx as i32,y-dy as i32);
-                if r.contains(sx,sy) { PIXELS[y as usize*W+x as usize]=before[sy as usize*W+sx as usize]; }
-            }}
-        }
-        Ok(())
+// Only the WM request/COPY boundary is faked; scroll.rs is real.
+static mut REQUEST: Option<os32api::gui::proto::GuiReqScroll> = None;
+fn wm_scroll(r:Rect, dx:i16, dy:i16)->client::GuiResult<i32> {
+    unsafe {
+        SCROLLS += 1;
+        if !SCROLL_RC { return Err(client::GuiErr::STALE); }
+        let before = PIXELS;
+        for y in r.y as i32..r.bottom() { for x in r.x as i32..r.right() {
+            let (sx,sy)=(x-dx as i32,y-dy as i32);
+            if r.contains(sx,sy) { PIXELS[y as usize*W+x as usize]=before[sy as usize*W+sx as usize]; }
+        }}
     }
+    Ok(0)
 }
 // Deterministic cells isolate row/background/frame/caret placement from fonts.
 mod draw {
@@ -56,10 +63,10 @@ mod draw {
         for y in r.y as i32..r.bottom() { for x in r.x as i32..r.right() { put(x,y,s.bg); }}
     }
     pub fn hline(_:SurfaceId,x:i32,y:i32,w:i32,s:Style) {
-        for i in 0..w { if !s.has(os32api::gui::proto::GUI_STYLE_DOTTED) || i%2==0 { put(x+i,y,s.fg); } }
+        for i in 0..w { if !s.has(os32api::gui::proto::GUI_STYLE_DOTTED) || (x+i)%2==0 { put(x+i,y,s.fg); } }
     }
     pub fn vline(_:SurfaceId,x:i32,y:i32,h:i32,s:Style) {
-        for i in 0..h { if !s.has(os32api::gui::proto::GUI_STYLE_DOTTED) || i%2==0 { put(x,y+i,s.fg); } }
+        for i in 0..h { if !s.has(os32api::gui::proto::GUI_STYLE_DOTTED) || (y+i)%2==0 { put(x,y+i,s.fg); } }
     }
     pub fn draw_rect(sf:SurfaceId,r:Rect,s:Style) {
         hline(sf,r.x as i32,r.y as i32,r.w as i32,s);hline(sf,r.x as i32,r.bottom()-1,r.w as i32,s);
@@ -124,7 +131,7 @@ fn check_pixels(id:WidgetId, focused:bool, label:&str) {
         for t in [b"aa",b"bb",b"cc",b"dd",b"ee"] {widget::textarea_add_row(id,t).unwrap();}
         widget::textarea_set_caret(id,2,1).unwrap();paint(id,false,focused);uistate::s().damage.clear();
         ffi::gfx_direct=1;SCROLL_RC=!fail;
-        widget::textarea_scroll(id,1,&[b"bb",b"cc",b"dd",b"ee",b"ff"],1,1).unwrap();
+        widget::textarea_scroll(id,1,&[b"bb",b"cc",b"dd",b"ee",b"ff"],3,1).unwrap();
         check_pixels(id,focused,"textarea pixels");
         widget::textarea_scroll(id,-1,&[b"aa",b"bb",b"cc",b"dd",b"ee"],2,1).unwrap();
         check_pixels(id,focused,"textarea pixels backward");
@@ -147,10 +154,10 @@ impl Editor {fn update_status(&mut self) {}}
     SCROLL_RC=false;doc().cy=6;e.refresh();check_pixels(id,false,"editor pixels failure");
 }}
 const ROW_H:i32=18;const ROWS_Y0:i32=18;
-struct Filer {right_pad:WidgetId,list_top:usize,list_sel:usize,dirty:std::cell::RefCell<Vec<Rect>>}
+struct Filer {right_pad:WidgetId,list_top:usize,list_sel:usize}
 impl Filer {
     fn win_id(&self)->u32 {7}
-    fn repaint(&self,r:Rect) {if !r.is_empty(){self.dirty.borrow_mut().push(r);}}
+    fn repaint(&self,r:Rect) {if !r.is_empty(){uistate::s().damage.push(self.win_id(),r);}}
     fn repaint_path(&self) {}
     fn render(&self,r:Rect) { unsafe {CLIP=r;}
         let pad=widget::rect(self.right_pad);
@@ -167,10 +174,11 @@ impl Filer {
 #[test] fn filer_pixels() { unsafe {
     for fail in [false,true] {
         reset();let id=setup(uistate::WK_LISTBOX,5,false);
-        let mut f=Filer {right_pad:id,list_top:0,list_sel:2,dirty:Default::default()};
-        let pad=widget::rect(id);f.render(pad);SCROLL_RC=!fail;
+        let mut f=Filer {right_pad:id,list_top:0,list_sel:2};
+        let pad=widget::rect(id);f.render(pad);SCROLL_RC=!fail;ffi::gfx_direct=1;
         f.list_top=1;f.list_sel=4;f.repaint_sel(2,0);
-        for r in f.dirty.borrow().iter() {f.render(*r);}
+        for p in uistate::s().damage.items[..uistate::s().damage.len].iter() {f.render(p.rect);}
+        uistate::s().damage.clear();
         let got=PIXELS;f.render(pad);assert!(got==PIXELS,"filer pixels");
         assert_eq!(SCROLLS,1,"filer must scroll");
     }
@@ -190,16 +198,59 @@ impl Filer {
 }}
 
 #[test] fn textarea_only_exposed_band() { unsafe {
-    reset();let id=setup(uistate::WK_TEXTAREA,5,false);ffi::gfx_direct=0;
-    for t in [b"aa",b"bb",b"cc",b"dd",b"ee"] {widget::textarea_add_row(id,t).unwrap();}
-    paint(id,false,false);uistate::s().damage.clear();ffi::gfx_direct=1;
-    widget::textarea_scroll(id,1,&[b"bb",b"cc",b"dd",b"ee",b"ff"],-1,0).unwrap();
-    assert_eq!(uistate::s().damage.len,1,"only exposed band");
-    let r=uistate::s().damage.items[0].rect;
-    assert!(r==Rect::new(8,74,98,16),"only exposed band");
-    check_pixels(id,false,"textarea pixels exposed only");
-    // A second move before Paint must preserve the first move's damage.
-    widget::textarea_scroll(id,1,&[b"cc",b"dd",b"ee",b"ff",b"gg"],-1,0).unwrap();
-    widget::textarea_scroll(id,1,&[b"dd",b"ee",b"ff",b"gg",b"hh"],-1,0).unwrap();
-    check_pixels(id,false,"textarea pixels pending damage");
+    for focused in [false,true] {
+        reset();let id=setup(uistate::WK_TEXTAREA,5,focused);ffi::gfx_direct=0;
+        for t in [b"aa",b"bb",b"cc",b"dd",b"ee"] {widget::textarea_add_row(id,t).unwrap();}
+        paint(id,false,focused);uistate::s().damage.clear();ffi::gfx_direct=1;
+        widget::textarea_scroll(id,1,&[b"bb",b"cc",b"dd",b"ee",b"ff"],-1,0).unwrap();
+        // The retained middle rows stay untouched, even with a focus frame.
+        for p in &uistate::s().damage.items[..uistate::s().damage.len] {
+            assert!(p.rect.bottom() <= 12 || p.rect.y >= 74, "only exposed band and frame lines");
+        }
+        if !focused {
+            assert_eq!(uistate::s().damage.len,1,"only exposed band");
+            assert!(uistate::s().damage.items[0].rect==Rect::new(8,74,98,16),"only exposed band");
+        }
+        check_pixels(id,focused,"textarea pixels exposed only");
+        // A second move before Paint must preserve the first move's damage.
+        widget::textarea_scroll(id,1,&[b"cc",b"dd",b"ee",b"ff",b"gg"],-1,0).unwrap();
+        widget::textarea_scroll(id,1,&[b"dd",b"ee",b"ff",b"gg",b"hh"],-1,0).unwrap();
+        check_pixels(id,focused,"textarea pixels pending damage");
+    }
+}}
+
+#[test] fn filer_two_downs_pixels() { unsafe {
+    let mut reference=None;
+    for direct in [0,1] {
+        reset();let id=setup(uistate::WK_LISTBOX,11,false);
+        let mut f=Filer {right_pad:id,list_top:0,list_sel:9};
+        let pad=widget::rect(id);
+        assert_eq!(f.visible_rows(&pad),10);
+        f.render(pad);uistate::s().damage.clear();ffi::gfx_direct=direct;
+        // Two Down events in one cycle: no Paint between them.
+        for sel in [10,11] {
+            let (old_sel,old_top)=(f.list_sel,f.list_top);
+            f.list_sel=sel;f.list_top+=1;
+            f.repaint_sel(old_sel,old_top);
+        }
+        for p in &uistate::s().damage.items[..uistate::s().damage.len] { f.render(p.rect); }
+        if let Some(want)=reference { assert!(PIXELS==want,"filer two downs pixels"); }
+        else { reference=Some(PIXELS); }
+    }
+}}
+
+#[test] fn focus_frame_absolute_parity() { unsafe {
+    for y in [8,9] { for padding in [2,7] {
+        reset();let id=setup(uistate::WK_TEXTAREA,5,true);
+        let i=widget::resolve(id).unwrap();
+        uistate::s().widgets[i].rect.y=y;
+        uistate::s().widgets[i].rect.h=5*16+padding;
+        ffi::gfx_direct=0;
+        for t in [b"aa",b"bb",b"cc",b"dd",b"ee"] {widget::textarea_add_row(id,t).unwrap();}
+        paint(id,false,true);uistate::s().damage.clear();ffi::gfx_direct=1;
+        widget::textarea_scroll(id,1,&[b"bb",b"cc",b"dd",b"ee",b"ff"],-1,0).unwrap();
+        check_pixels(id,true,"textarea pixels absolute focus parity forward");
+        widget::textarea_scroll(id,-1,&[b"aa",b"bb",b"cc",b"dd",b"ee"],-1,0).unwrap();
+        check_pixels(id,true,"textarea pixels absolute focus parity backward");
+    }}
 }}

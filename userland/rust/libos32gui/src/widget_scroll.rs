@@ -23,34 +23,27 @@ fn copy_rows(idx: usize, rows: i32, height: i16, cap: i16) -> bool {
     if crate::scroll::scroll(w.window, area, 0, dy).is_err() {
         return false;
     }
-    // Pending widget damage may not have reached Paint yet. Its copied pixels
-    // need repainting at their destination as well as at the original position.
-    let pending = s().damage.items;
-    let n = s().damage.len;
-    for p in &pending[..n] {
-        if p.window == w.window {
-            let r = p.rect.intersect(&area);
-            if !r.is_empty() {
-                damage(idx, Rect::new(r.x, r.y + dy, r.w, r.h).intersect(&area));
-            }
-        }
-    }
     let exposed = if dy < 0 {
         Rect::new(area.x, (area.bottom() + dy as i32) as i16, area.w, -dy)
     } else {
         Rect::new(area.x, area.y, area.w, dy)
     };
     damage(idx, exposed);
-    // The dotted frame is fixed to the widget. Repair its old and copied
-    // horizontal strokes, and its stationary rectangle. Row heights are even,
-    // so translated vertical dots retain their phase.
+    // Even row heights preserve the absolute phase of vertical dots. Repair
+    // horizontal strokes at their fixed and copied positions, plus area rows
+    // outside the frame where copied vertical dots must be erased.
     let focused = s().windows.iter().any(|win| win.used && win.id == w.window
         && win.focused && win.focus == idx as u16 + 1);
     if focused {
         let ring = Rect::new(w.rect.x + 2, w.rect.y + 2, w.rect.w - 4, w.rect.h - 4);
-        damage(idx, ring);
         for y in [ring.y, (ring.bottom() - 1) as i16] {
+            damage(idx, Rect::new(area.x, y, area.w, 1).intersect(&area));
             damage(idx, Rect::new(area.x, y + dy, area.w, 1).intersect(&area));
+        }
+        for y in [area.y, (area.bottom() - 1) as i16] {
+            if y < ring.y || y as i32 >= ring.bottom() {
+                damage(idx, Rect::new(area.x, y, area.w, 1));
+            }
         }
     }
     true
