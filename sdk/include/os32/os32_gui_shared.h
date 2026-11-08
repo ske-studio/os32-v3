@@ -44,7 +44,7 @@
 /* ======================================================================== */
 /*  プロトコルバージョン                                                     */
 /* ======================================================================== */
-#define GUI_PROTO_VERSION   1
+#define GUI_PROTO_VERSION   2
 
 /* ======================================================================== */
 /*  op 番号 (gui_call の第1引数) — TASKS §4                                  */
@@ -484,4 +484,10 @@ STATIC_ASSERT(sizeof(GuiReqModalResult)  <= GUI_SLOT_REQ_SIZE,  gui_req_modalres
 STATIC_ASSERT(sizeof(GuiReqSession)      <= GUI_SLOT_REQ_SIZE,  gui_req_session_fits);
 STATIC_ASSERT(sizeof(GuiRespModalResult) <= GUI_SLOT_RESP_SIZE, gui_resp_modalresult_fits);
 
+/* GFX_ACCEL_HAL W3: local client scroll; INIT rejects older protocol versions. */
+#define GUI_OP_SCROLL 82
+typedef struct { u32 window; GuiRect16 rect; i16 dx, dy; } GuiReqScroll;
+STATIC_ASSERT(sizeof(GuiReqScroll) == 16, gui_req_scroll_16);
+
 #endif /* OS32_GUI_SHARED_H */
+

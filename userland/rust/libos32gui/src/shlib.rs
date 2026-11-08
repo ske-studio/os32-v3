@@ -213,7 +213,7 @@ core::arch::global_asm!(
     .align  4
 __os32_shlib_header:
     .long   0x42494C53                  /* 0x00 magic  'SLIB'            */
-    .long   1                           /* 0x04 version = GUI_PROTO_VERSION */
+    .long   2                           /* 0x04 version = GUI_PROTO_VERSION */
     .long   122                         /* 0x08 nfunc                    */
     .long   __shlib_data_start          /* 0x0C data_vaddr               */
     .long   __shlib_data_pages          /* 0x10 data_pages               */

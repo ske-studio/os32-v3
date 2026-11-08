@@ -131,3 +131,15 @@ pub struct GuiRespModal {
     pub button: i16,
     pub _pad: i16,
 }
+
+/* SCROLL (op 82), 16B. 正典は共有 C ヘッダ。 */
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct GuiReqScroll {
+    pub window: u32,
+    pub rect: GuiRect16,
+    pub dx: i16,
+    pub dy: i16,
+}
+
+const _: () = assert!(core::mem::size_of::<GuiReqScroll>() == 16);

@@ -530,6 +530,22 @@ MUTATIONS += [
     ('P0a return leg omitted', 'src/typical_ops.rs', 'matches!(st.ops.op, 0 | 2)', 'false', 'p0a_key'),
 ]
 
+MUTATIONS += [
+    ('W3 destination escapes scroll rect', 'src/scroll_op.rs',
+     'let dst = r.translate(dx, dy).intersect(&rect);',
+     'let dst = r.translate(dx, dy);', 'scroll_formula_'),
+    ('W3 dirty source copied', 'src/scroll_op.rs',
+     'visible::region_subtract_region(&rv, &st.windows[idx].dirty)',
+     '(rv, true)', 'scroll_formula_'),
+    ('W3 old protocol accepted', 'src/handler.rs',
+     'if arg != 0 && arg != GUI_PROTO_VERSION as u32 {',
+     'if false {', 'scroll_protocol_'),
+    ('W3 commit disconnected', 'src/scroll_op.rs',
+     '    super::op_commit(st, owner, slot_no, req.window);',
+     '', 'scroll_protocol_'),
+]
+
+
 def one_mutation(k: int) -> tuple:
     """変異 k を一時の写しに当ててビルドし、絞り込んだ試験を走らせる。(ok, 行)。"""
     name, rel, old, new, filt = MUTATIONS[k]
