@@ -1,6 +1,6 @@
 """Q1: read-only GF5 observations preserve the diagnosed failure."""
 CHECK = dict(name='gf5-observe', tier=1, needs=[], budget=3.6,
-             covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',
                      'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
@@ -30,7 +30,7 @@ def command(exe):
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
             '-D__KERNEL_BUILD__', *include_flags(ROOT),
             str(ROOT / 'tools/tests/gf5_observe_host.c'),
-            str(ROOT / PRODUCT), '-o', str(exe)]
+            str(ROOT / PRODUCT), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)]
 
 
 def main():
