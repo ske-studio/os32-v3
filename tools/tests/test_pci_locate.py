@@ -17,7 +17,7 @@ MUTATIONS = [
     ('M5', 0, 'pci_cfg_read32(bus, dev, 0, PCI_CFG_VENDOR_ID) != id', '({ int absent=1; for (u32 fn=0; fn<8; fn++) if (pci_cfg_read32(bus, dev, fn, PCI_CFG_VENDOR_ID)==id) absent=0; absent; })'),
     ('M6', 0, 'pci_cfg_read32(bus, dev, 0, PCI_CFG_VENDOR_ID)', 'pci_cfg_read32(((void)bus, 0), dev, 0, PCI_CFG_VENDOR_ID)'),
 ]
-def run(td, mutation=None):
+def build_and_run(td, mutation=None):
     sources = []
     for i, rel in enumerate(SOURCES):
         source = (ROOT/rel).read_text()
@@ -32,11 +32,20 @@ def run(td, mutation=None):
                     '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'),
                     str(ROOT/'tools/tests/pci_locate_host.c'), *sources, '-o',str(exe)],check=True)
     return [subprocess.run([str(exe),case]).returncode for case in 'abcdefg']
-with tempfile.TemporaryDirectory() as td:
-    assert run(td)==[0]*7
-    print('PASS a-g')
-    if '--mutate' in sys.argv:
-        for item in MUTATIONS:
-            result=run(td,item)
-            assert 1 in result, (item[0], result)
-            print(item[0], 'RED', result)
+def main(mutate):
+    with tempfile.TemporaryDirectory() as td:
+        assert build_and_run(td)==[0]*7
+        print('PASS a-g')
+        if mutate:
+            for item in MUTATIONS:
+                result=build_and_run(td,item)
+                assert 1 in result, (item[0], result)
+                print(item[0], 'RED', result)
+    return 0
+def run(ctx) -> int:
+    argv = ['python3', '-B', 'tools/tests/test_pci_locate.py']
+    if ctx.mutate:
+        argv.append('--mutate')
+    return subprocess.call(argv, cwd=ctx.root, close_fds=False)
+if __name__ == '__main__':
+    sys.exit(main('--mutate' in sys.argv))
