@@ -5,6 +5,7 @@
 #include "ppc_frame.h"
 #include "ppc_hpt.h"
 #include "ppc_pd.h"
+#include "ppc_trap.h"
 #define TEST_VA 0x50000000U
 #define NEST_VA 0x60000000U
 #define IO_VA 0xfe300000U
@@ -21,6 +22,7 @@ extern void fixture_real(void), fixture_translated(void), fixture_finish(void);
 extern void fixture_canary(u32 kind), fixture_resume(void), fixture_load(void);
 extern u32 fixture_regs[37];
 void fixture_guard_check(void);
+volatile u32 d1_reached;
 static volatile u32 kind, dispatches, spills, nested, in_dispatch;
 static u32 msr(void) { u32 v; __asm__ volatile("mfmsr %0":"=r"(v)); return v; }
 static void say(const char *s)
@@ -47,6 +49,17 @@ int ppc_hpt_spill(struct ppc_frame *f)
     if (in_dispatch && f->dar==NEST_VA) ++nested;
     return fixture_hpt_spill(f);
 }
+void product_trap_dispatch(struct ppc_frame *f);
+static u32 table_read(u32 pa, void *ctx)
+{
+    (void)ctx;
+    if (in_dispatch && !nested) {
+        if (*(volatile u32 *)NEST_VA!=0x76543210) bad();
+    }
+    return *(volatile u32 *)pa;
+}
+void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason)
+{ (void)f; (void)reason; bad(); }
 void ppc_trap_dispatch(struct ppc_frame *f)
 {
     if ((msr() & (PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_EE)) !=
@@ -58,19 +71,22 @@ void ppc_trap_dispatch(struct ppc_frame *f)
         (u32)f+PPC_FRAME_SIZE>(u32)ppc_kernel_trap_stack+PPC_KERNEL_STACK_SIZE) bad();
     ++dispatches;
     in_dispatch=1;
-    if (*(volatile u32 *)NEST_VA!=0x76543210) bad();
+    product_trap_dispatch(f);
     in_dispatch=0;
     /* A nested spill must not change the outer frame. */
     if (f->dar!=TEST_VA+4096 || f->gpr[31]!=287 || f->cr!=0x12345678) bad();
-    f->srr0=(u32)fixture_resume;
-    f->gpr[3]=0x76543210;
+    if (f->srr0!=(u32)fixture_resume) bad();
 }
 void fixture_main(void)
 {
+    say("D1-BEGIN\r\n");
+    ppc_trap_set_reader(table_read,0);
     for (kind=0; kind<2; ++kind) {
+        if (kind && !ppc_trap_onfault((u32)fixture_load,TEST_VA+4096,
+                                     PPC_TRAP_DSI_MISS,(u32)fixture_resume)) bad();
         fixture_canary(kind);
         for (u32 r=0;r<32;++r) {
-            u32 expected=r==1 ? 0x00301000 : r==3 ? 0x76543210 : 256+r;
+            u32 expected=r==1 ? 0x00301000 : r==3 ? (kind ? TEST_VA+4096 : 0x76543210) : 256+r;
             if (fixture_regs[r]!=expected) bad();
         }
         if (fixture_regs[32]!=0x1234 || fixture_regs[33]!=0x12345678 ||
@@ -116,6 +132,7 @@ void fixture_setup_real(void)
         if (!fixture_hpt_spill(&f)) ppc_stop();
     }
     ppc_cache_copy((void *)0,ppc_kernel_vectors.src,ppc_kernel_vectors.size);
+    d1_reached=1;
     fixture_translated();
 }
 /* Called in real mode with the test's ordinary, reserved boot stack. */

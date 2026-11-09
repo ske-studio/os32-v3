@@ -41,7 +41,8 @@ int ppc_trap_onfault(u32 pc, u32 va, u32 reason, u32 resume)
 {
     if (probe.active || ((pc | resume) & 3) ||
         (reason != PPC_TRAP_DSI_MISS && reason != PPC_TRAP_DSI_PROTECT &&
-         reason != PPC_TRAP_DSI_IO && reason != PPC_TRAP_ISI)) return 0;
+         reason != PPC_TRAP_DSI_IO && reason != PPC_TRAP_ISI &&
+         reason != PPC_TRAP_ISI_PROTECT && reason != PPC_TRAP_ISI_NOEXEC)) return 0;
     probe.pc = pc; probe.va = va; probe.reason = reason; probe.resume = resume;
     probe.active = 1;
     return 1;
@@ -51,21 +52,21 @@ static u32 fault_reason(const struct ppc_frame *f)
     struct ppc_translation t;
     u32 va = f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar;
     /* DR=1: use the explicitly registered mapped reader, never pd_read_real. */
-    int mapped = table_reader && ppc_root_current() &&
-        ppc_pd_lookup_read(ppc_root_current(), va,
+    if (!table_reader || !ppc_root_current()) return PPC_TRAP_UNKNOWN;
+    int mapped = ppc_pd_lookup_read(ppc_root_current(), va,
                            f->vector == PPC_VECTOR_DSI && !!(f->dsisr & PPC_DSISR_STORE),
                            0, &t, table_reader, table_context);
     if (f->vector == PPC_VECTOR_ISI) {
         u32 cause = f->srr1 & 0x78000000;
-        if (cause == PPC_ISI_MISS || cause == 0x08000000 || cause == 0x10000000)
-            return PPC_TRAP_ISI;
+        if (cause == PPC_ISI_MISS) return PPC_TRAP_ISI;
+        if (cause == 0x08000000) return PPC_TRAP_ISI_PROTECT;
+        if (cause == 0x10000000) return PPC_TRAP_ISI_NOEXEC;
         return PPC_TRAP_UNKNOWN;
     }
     u32 cause = f->dsisr & ~PPC_DSISR_STORE;
     if (cause == PPC_DSISR_PROTECT) return PPC_TRAP_DSI_PROTECT;
     /* Atomic operation on I/W memory, or EAR-disabled external access. */
-    if (cause == 0x04000000 || cause == 0x00100000 ||
-        (cause == PPC_DSISR_MISS && mapped && (t.attr & 0x08)))
+    if (cause == 0x04000000 || cause == 0x00100000)
         return PPC_TRAP_DSI_IO;
     if (cause == PPC_DSISR_MISS && !mapped) return PPC_TRAP_DSI_MISS;
     return PPC_TRAP_UNKNOWN;
@@ -94,7 +95,13 @@ void ppc_trap_dispatch(struct ppc_frame *f)
         if (handler) { handler(f); return; }
         reason = PPC_TRAP_UNREGISTERED;
     } else if (f->vector == 0x700) {
-        reason = PPC_TRAP_PROGRAM | PPC_TRAP_UNSUPPORTED;
+        /* PEM table 6-16: preserve the program exception cause. */
+        u32 cause = f->srr1 & 0x001e0000;
+        reason = PPC_TRAP_UNKNOWN | PPC_TRAP_UNSUPPORTED;
+        if (cause == 0x00100000) reason = PPC_TRAP_PROGRAM_FP | PPC_TRAP_UNSUPPORTED;
+        if (cause == 0x00080000) reason = PPC_TRAP_PROGRAM_ILLEGAL | PPC_TRAP_UNSUPPORTED;
+        if (cause == 0x00040000) reason = PPC_TRAP_PROGRAM_PRIVILEGED | PPC_TRAP_UNSUPPORTED;
+        if (cause == 0x00020000) reason = PPC_TRAP_PROGRAM_TRAP | PPC_TRAP_UNSUPPORTED;
     } else if (f->vector == 0x600) {
         reason = PPC_TRAP_ALIGNMENT;
     } else if (f->vector == 0xc00) {
