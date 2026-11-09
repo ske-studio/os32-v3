@@ -1,26 +1,5 @@
 #include "../drivers/video/geforce/geforce_module.h"
 /* Ring3 syscall dispatch and completed-syscall STOP parking. Included by exec.c. */
-/* ======================================================================== */
-/*  ring3_syscall_dispatch — CPL=3 からの int 0x80 ディスパッチャ (v2 M2d)   */
-/*                                                                          */
-/*  arch/x86/kernel/ring3_entry.asm の int80_stub が pushad 後のフレーム先頭を渡す。  */
-/*  フレーム (u32 配列, pushad + CPU が積んだ例外フレーム):                   */
-/*    [0..7]=pushad (EDI,ESI,EBP,ESP,EBX,EDX,ECX,EAX)  → EAX=[7]             */
-/*    [8]=EIP [9]=CS [10]=EFLAGS [11]=userESP [12]=userSS                    */
-/*                                                                          */
-/*  eax(=[7]) がスタブの積んだ slot。範囲外は即 kill (CONTRACTS C4)。        */
-/*  本物の KAPI 表 (KAPI_ADDR: [magic][version][fn0..]) から wrap を引き、    */
-/*  ユーザスタック (userESP+4, スタブの ret アドレス分を飛ばす) から引数を    */
-/*  コピーして呼ぶ。戻り値は eax スロット([7])へ書く → popad で復元される。   */
-/*  現 CR3 はアプリ PD のまま呼ぶ (ユーザポインタ引数がアプリ帯で解決される)。*/
-/*  sys_exit は wrap → kapi_sys_exit が teardown+longjmp するのでここへ戻らない。*/
-/*                                                                          */
-/*  K5b: フレーム先頭を g_cur_frame に控える。gshell の op_wait が            */
-/*  exec_park() を呼んだとき、この 13 語をそのまま AppSlot へ写して           */
-/*  「CPL=3 の続き」を保存する (D2 の (b): カーネルスタックは 1 本のまま)。   */
-/* ======================================================================== */
-
-/* kprintf の可変引数上限。固定引数 syscall のコピー長とは独立。 */
 #define RING3_ARG_WINDOW  64u
 STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
 
@@ -52,20 +31,14 @@ static void exec_park_stop(struct arch_syscall *frame)
     exec_park_transfer(id, a, frame, appslot_park_stop_commit);
 }
 
-void __cdecl ring3_syscall_dispatch(u32 *frame)
+void exec_syscall_dispatch(struct arch_syscall *view)
 {
-    /* VM frames also carry ES/DS/FS/GS after SS. This is a guest INT,
-     * never an OS caller, even when EAX happens to name a valid KAPI slot. */
-    if (legacy_trap(frame)) {
-        return;
-    }
-    struct arch_syscall call = { frame };
+    struct arch_syscall call = *view;
     u32 result;
-    u32 slot     = arch_syscall_slot(&call);         /* スタブが積んだ slot (eax) */
-    u32 user_esp = frame[11] /* D1: native argument extraction */;        /* CPL=3 の ESP (int が積んだ) */
-    const void *args_src;
-    u32 nbytes;
+    u32 slot = arch_syscall_slot(&call);
     u32 wrapptr;
+    struct kapi_arg_source src;
+    struct kapi_values values;
     struct arch_syscall *prev_frame = g_cur_frame;
     int prev_in_syscall = ring3_in_syscall;
     CallerAccessFrame prev_caller;
@@ -96,54 +69,56 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * フォールトガード (ring3_in_syscall) を立てる **前** に回す。 */
     ring3_gui_pump();
 
+    arch_kapi_source(&src, &call);
+
     /* Private value-copy entry used by the CPL3 sys_ls shim. No USER callback
      * address crosses this boundary; raw public slot 12 is guarded as well. */
     if (slot == RING3_LS_CALL) {
         ring3_in_syscall = 1;
-        result = (u32)ring3_ls_dispatch(user_esp);
+        result = (u32)arch_kapi_legacy_ls(&call);
         goto syscall_complete;
     }
 
     /* 範囲外 slot はワイルド呼び出し → アプリだけ kill (カーネルを飛ばさない)。 */
     if (slot >= (u32)KAPI_FUNC_COUNT) {
         ring3_fault_kill();
+        result = OS32_ERR_INVAL;
+        goto syscall_complete;
     }
 
     /* 本物の表から wrap_<slot> を取得 ([magic][version] の後が fn 表)。 */
     wrapptr = ((const u32 *)KAPI_ADDR)[KAPI_FN_TABLE_FIRST + slot];
-    args_src = (const void *)(user_esp + sizeof(u32));
-    nbytes = (u32)kapi_argsize[slot];
+    unsigned count = kapi_fixed_count[slot];
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
 
-    int vcall = legacy_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &result);
-    if (vcall < 0) ring3_fault_kill();
-    if (vcall) goto syscall_complete;
-
-    /* Variadic input is copied by B1 on demand. Never read/copy an unused
-     * word past the caller's mapped argument tail, or emit a partial line. */
-    if (slot == KAPI_SLOT_KPRINTF) {
-        if (!kapi_print_call(args_src)) ring3_fault_kill();
-        result = 0;
+    int handled = arch_kapi_legacy_call(&call, slot, (void *)wrapptr, &result);
+    if (handled < 0) {
+        ring3_fault_kill();
+        result = OS32_ERR_INVAL;
         goto syscall_complete;
     }
+    if (handled) goto syscall_complete;
 
-    int strings = kapi_strings_call(slot, (void *)wrapptr, args_src,
-                                    nbytes, kapi_argptr[slot], &result);
-    if (strings < 0) ring3_fault_kill();
-    if (strings) goto syscall_complete;
+    if (!arch_kapi_read_block(&src, 0, count, &values)) {
+        ring3_fault_kill();
+        result = OS32_ERR_INVAL;
+        goto syscall_complete;
+    }
 
     /* --- (補助) 明示ポインタ引数の早期範囲検証 (v2 M2e) --- */
     {
         u16 ptrmask = kapi_argptr[slot];
         if (ptrmask) {
-            const u32 *a = (const u32 *)args_src;
-            u32 nfixed = nbytes / sizeof(u32);   /* 固定引数の個数 */
+            const u32 *a = values.value;
+            u32 nfixed = count;   /* 固定引数の個数 */
             u32 k;
             for (k = 0; k < nfixed && k < sizeof(ptrmask) * BITS_PER_BYTE; k++) {
                 if ((ptrmask & (u16)(1u << k)) && !ring3_ptr_ok(a[k])) {
                     ring3_fault_kill();   /* 範囲外ポインタ → kill、戻らない */
+                    result = OS32_ERR_INVAL;
+                    goto syscall_complete;
                 }
             }
         }
@@ -151,7 +126,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* 本物の wrap を呼ぶ (現 CR3 = アプリ PD)。戻り値を eax スロットへ。
      * gui_call(OP_WAIT) → exec_park() はここから longjmp して戻らない。 */
-    result = kapi_invoke((void *)wrapptr, args_src, nbytes);
+    result = arch_kapi_invoke((void *)wrapptr, &values, count);
 
 syscall_complete:
     arch_syscall_result(&call, result);

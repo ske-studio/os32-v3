@@ -42,7 +42,7 @@ def recovery(tmp, function, runner, mutation=None):
     marker = '\n    }\n\n'
     start = resume.index(marker, resume.index('if (exec_setjmp')) + len(marker)
     tail = resume[start:resume.index('    return 0;   /* 到達しない */')]
-    dispatch = function(exe, 'void __cdecl ring3_syscall_dispatch(')
+    dispatch = function(exe, 'void exec_syscall_dispatch(')
     end = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     # Recovery probes enter the tail after a completed syscall, with no stdin replay.
     # The CUI display return is outside the R1 recovery probes.

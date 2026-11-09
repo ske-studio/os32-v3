@@ -2,6 +2,7 @@
 TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 
 from exec_source import exec_source
+from syscall_source import syscall_providers
 import host32
 import argparse
 import hashlib
@@ -35,8 +36,8 @@ def sources():
     for name in ('wrap_sys_stat', 'wrap_db_bind_text', 'wrap_sys_mount', 'wrap_sys_umount_checked', 'wrap_dev_blk_write'):
         start = generated.index('int __cdecl ' + name + '(')
         result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2] + '\n'
-    start = src.index('void __cdecl ring3_syscall_dispatch(')
-    result['dispatch'] = 'static void exec_cui_display_abort(void) {}\n' + src[start:src.index('\n}', start) + 2]
+    start = src.index('void exec_syscall_dispatch(')
+    result['dispatch'] = 'static void exec_cui_display_abort(void) {}\n' + syscall_providers(walk.ROOT) + src[start:src.index('\n}', start) + 2]
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
     result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
     guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()

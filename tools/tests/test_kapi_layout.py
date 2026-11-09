@@ -172,7 +172,8 @@ def case_capacity_full(tmp, kj):
     hdr = (gk / "sdk/include/os32/os32_kapi_generated.h").read_text(encoding="utf-8")
     check("kapi_reserved[" not in hdr and "#define KAPI_FUNC_RESERVED 0\n" in hdr,
           "予約 0 本なら kapi_reserved を作らず KAPI_FUNC_RESERVED は 0")
-    inc = ["-I" + str(gk / "sdk/include"), "-I" + str(gk / "sdk/include/os32"),
+    shutil.copy(ROOT / "include/kapi_call.h", gk / "include/kapi_call.h")
+    inc = ["-I" + str(gk / "include"), "-I" + str(gk / "sdk/include"), "-I" + str(gk / "sdk/include/os32"),
            "-I" + str(gk / "exec")]
     inc += include_flags(ROOT)
     r = run([TCC, *KERNEL_CFLAGS, *inc, "-fsyntax-only", gk / "exec/exec.c"])

@@ -4,6 +4,7 @@
 #include "types.h"
 #include "arch_exec_storage.h"
 struct arch_syscall { void *native; };
+void exec_syscall_dispatch(struct arch_syscall *);
 struct arch_user_context {
     unsigned char opaque[ARCH_USER_BYTES];
 } __attribute__((aligned(ARCH_USER_ALIGN)));

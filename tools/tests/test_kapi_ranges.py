@@ -59,7 +59,7 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         # Execute the actual dispatcher's early-check block, with generated
         # masks/argument sizes. The rest of int80 needs guest CPU state.
         start = source.index('    /* --- (補助) 明示ポインタ引数の早期範囲検証')
-        end = source.index('    result = kapi_invoke(', start)
+        end = source.index('    result = arch_kapi_invoke(', start)
         sources['early'] = source[start:end]
         start = source.index('static int exec_disk_write_path_allowed(')
         end = source.index('/* ======================================================================== */', start)

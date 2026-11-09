@@ -4,6 +4,7 @@ AppSlot/CR3/IF と資源利用終了は記録する足場。全 loader/PCM 実�
 写しだけを変異し、コンパイル成功後の実行失敗だけを RED とする。
 """
 from exec_source import exec_source
+from syscall_source import syscall_providers
 from kernel_includes import include_flags
 import os
 import host32
@@ -258,7 +259,7 @@ int kapi_strings_call(u32 slot, void *target, const void *args, u32 nbytes, u16 
     CHECK(slot == 0); (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
     return 0;
 }
-static u32 kapi_invoke(void *fn, const void *args, u32 n) {
+u32 kapi_invoke(void *fn, const void *args, u32 n) {
     struct caller_access a;
     (void)fn; (void)args; (void)n;
     if (parent_probe) {
@@ -580,7 +581,7 @@ def run(source=None, irq=None, provider=None):
                                         'static volatile int g_longjmp_')))
     names = ('exec_reclaim_resources', 'exec_notify_owned', 'exec_reclaim_owned',
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
-             'ring3_wm_enter', 'ring3_wm_leave', 'ring3_syscall_dispatch',
+             'ring3_wm_enter', 'ring3_wm_leave', 'exec_syscall_dispatch',
              'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_kill', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
@@ -589,7 +590,7 @@ def run(source=None, irq=None, provider=None):
     stdin_start = source.index('VfsStdinRead *exec_stdin_state(')
     stdin_state = source[stdin_start:source.index('\n}', stdin_start) + 2]
     code = ('#include "types.h"\n#include "host_exec_context.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' + stdin_state + '\n' +
-            '\n'.join(function(source, n) for n in names) + '\n' + POST +
+            syscall_providers(ROOT) + '\n'.join(function(source, n) for n in names) + '\n' + POST +
             landing(source, 'static int exec_launch(', 'ctx->jmpbuf', 'launch_landing') +
             landing(source, 'i32 exec_resume(', 'a->jmpbuf', 'resume_landing') + BROKER +
             function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)

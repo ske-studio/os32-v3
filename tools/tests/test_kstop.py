@@ -2,6 +2,7 @@
 R1's existing harness covers both landings, IRQ/fault cleanup and parked WM kill.
 """
 from exec_source import exec_source
+from syscall_source import syscall_providers
 from kernel_includes import include_flags
 import pathlib
 import subprocess
@@ -82,6 +83,8 @@ void exec_longjmp(k_jmpbuf p) {
     CHECK(!kctx_irq_depth && !kctx_exc_depth && owner==1 && cr3==1);
     jumped++; extern void asm_longjmp(k_jmpbuf); asm_longjmp(saved_buf);
 }
+int caller_access_get_user(struct caller_access *out) { (void)out; return caller; }
+int copy_caller_bytes(const struct caller_access *c, const void *s, void *d, u32 n) { (void)c; (void)s; (void)d; CHECK(n==0); return 1; }
 int caller_access_enter(CallerAccessFrame *p, enum caller_origin origin) { (void)origin; p->valid=caller; caller=1; return 1; }
 void caller_access_leave(const volatile CallerAccessFrame *p) { caller=p->valid; }
 #define CALLER_USER 1
@@ -102,7 +105,7 @@ int kapi_strings_call(u32 slot, void *target, const void *args, u32 nbytes, u16 
     CHECK(slot == 0); (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
     return 0;
 }
-static u32 kapi_invoke(void *fn, const void *args, u32 n) {
+u32 kapi_invoke(void *fn, const void *args, u32 n) {
     (void)fn; (void)args; (void)n;
     CHECK(caller && ring3_in_syscall && owner==2 && cr3==2 && !jumped);
     invokes++;
@@ -448,8 +451,8 @@ def run(overrides=None):
     hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
     hwb_flag += '\n' + re.search(r'^static volatile u32 g_cui_display_abort_pending;', ex, re.M)[0]
     code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
-        '#include "appslot_transition.inc"', transition) + '\n' + '\n'.join(function(ex,n) for n in (
-        'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
+        '#include "appslot_transition.inc"', transition) + '\n' + syscall_providers(ROOT, read) + '\n'.join(function(ex,n) for n in (
+        'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','exec_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
@@ -494,7 +497,7 @@ MUTATIONS = [
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
  ('no-request','exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
  ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(&call);','    /* missing transfer */'),
- ('before-completion','exec/exec_syscall.inc','    result = kapi_invoke','    exec_park_stop(&call);\n    result = kapi_invoke'),
+ ('before-completion','exec/exec_syscall.inc','    result = arch_kapi_invoke','    exec_park_stop(&call);\n    result = arch_kapi_invoke'),
  ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        arch_user_result(&a->frame, (u32)wait_ret);\n        /* STOP parked a completed syscall;'),
  ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),

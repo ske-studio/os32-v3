@@ -46,8 +46,11 @@ def run(args, mutant=None):
     sources['setup'] = setup
     sources['strings'] = (ROOT / 'kapi/kapi_strings.c').read_text()
     dispatch = exec_source(ROOT)
-    start = dispatch.index('    int strings = kapi_strings_call(')
-    sources['dispatch'] = dispatch[start:dispatch.index('    /* --- (補助)', start)]
+    adapter = (ROOT / 'arch/x86/kernel/syscall_entry.c').read_text()
+    start = adapter.index('    return kapi_strings_call(')
+    # Execute the actual forwarding expression; generic dispatch is covered by
+    # kapi-call-host, and string staging remains the product translation unit.
+    sources['dispatch'] = adapter[start:adapter.index('\n}', start)]
     cleanup = dispatch.index('static void exec_reclaim_resources(int id)\n{')
     sources['cleanup'] = dispatch[cleanup:dispatch.index('    /* (1)', cleanup)] + '    (void)id;\n}\n'
     sources['ls'] = (ROOT / 'exec/ring3_ls.c').read_text().split('static int ls_copy_path', 1)[1].split('static void ls_collect_entry', 1)[0]

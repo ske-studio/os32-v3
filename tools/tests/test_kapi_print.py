@@ -45,9 +45,9 @@ def run(runner, mutant=None):
                       ('attr', 'lib/kprintf_attr.c'),
                       ('attr_backend', 'platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
-    dispatch = exec_source(ROOT)
+    dispatch = (ROOT / 'arch/x86/kernel/syscall_entry.c').read_text()
     start = dispatch.index('    if (slot == KAPI_SLOT_KPRINTF) {')
-    end = dispatch.index('    int strings = ', start)
+    end = dispatch.index('    return kapi_strings_call(', start)
     sources['dispatch'] = dispatch[start:end]
     if mutant:
         name, key, old, new = mutant

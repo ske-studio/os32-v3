@@ -59,18 +59,18 @@ void kfree(void *p)
 
 static void *kill_escape[5];
 void ring3_fault_kill(void) { __builtin_longjmp(kill_escape, 1); }
+static int forward_print(u32 slot, const void *args, u32 *result)
+{
+#include "dispatch_host_source.c"
+    return -1;
+}
 static int dispatch_print(u32 va)
 {
-    u32 result, frame[8] = {0}, slot = KAPI_SLOT_KPRINTF;
-    const void *args_src = (const void *)(uptr)va;
+    u32 result;
     if (__builtin_setjmp(kill_escape)) return 0;
-    /* Actual USER dispatch branch, including refusal -> kill ordering. */
-#include "dispatch_host_source.c"
-    CHECK(0);
-syscall_complete:
-    struct arch_syscall call = { frame };
-    arch_syscall_result(&call, result);
-    CHECK(frame[7] == 0);
+    int handled = forward_print(KAPI_SLOT_KPRINTF, (const void *)(uptr)va, &result);
+    if (handled < 0) ring3_fault_kill();
+    CHECK(handled == 1 && result == 0);
     return 1;
 }
 

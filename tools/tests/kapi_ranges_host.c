@@ -104,8 +104,14 @@ static void named(int ok, const char *name)
 
 static void dispatch_early(u32 slot, const u32 *args_src)
 {
-    u32 nbytes = kapi_argsize[slot];
+    unsigned count = kapi_argsize[slot] / sizeof(u32);
+    struct { u32 value[32]; } values;
+    for (unsigned k=0; k<count; k++) values.value[k] = args_src[k];
+    u32 result;
 #include "early_host_source.c"
+    return;
+syscall_complete:
+    (void)result;
 }
 
 static void caller_copy_tests(void)

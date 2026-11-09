@@ -60,20 +60,21 @@ u32 kapi_invoke(void *target, const void *words, u32 bytes)
 #include "cleanup_host_source.c"
 
 void ring3_fault_kill(void) { __builtin_longjmp(killed, 1); }
+static int forward_strings(u32 slot, void *wrapper, const void *args,
+                           u32 bytes, u16 mask, u32 *result)
+{
+    u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
+    kapi_argptr[slot] = mask;
+#include "dispatch_host_source.c"
+}
 static int dispatch_strings(u32 slot, u32 va, u32 nbytes, u16 ptrmask)
 {
-    u32 result, frame[8] = {0}, wrapptr = 0x1234;
-    const void *args_src = (const void *)(uptr)va;
-    /* Per-call pointer metadata comes from the public API declarations. */
-    u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
-    kapi_argptr[slot] = ptrmask;
+    u32 result;
     if (__builtin_setjmp(killed)) return 0;
-#include "dispatch_host_source.c"
-    CHECK(0);
-syscall_complete:
-    struct arch_syscall call = { frame };
-    arch_syscall_result(&call, result);
-    CHECK(frame[7] == 0x76543210);
+    int handled = forward_strings(slot, (void *)0x1234,
+                                   (const void *)(uptr)va, nbytes, ptrmask, &result);
+    if (handled < 0) ring3_fault_kill();
+    CHECK(handled == 1 && result == 0x76543210);
     return 1;
 }
 struct input_case { u32 slot, bytes, mask, pointers, cap, nullable; };

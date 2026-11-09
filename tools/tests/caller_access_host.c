@@ -53,8 +53,8 @@ static void ring3_gui_pump(void) {}
 static int stop_park_calls;
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
-static void ring3_fault_kill(void) { longjmp(killed, 1); }
-static u32 kapi_invoke(void *fn, const void *args, u32 n);
+void ring3_fault_kill(void) { longjmp(killed, 1); }
+u32 kapi_invoke(void *fn, const void *args, u32 n);
 /* This fixture uses a non-string slot to test caller identity and nesting.
  * String staging/output boundaries are exercised by db_caller/kapi_strings. */
 int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
@@ -92,7 +92,7 @@ void shell_service_wm_mark(void) { wm_marks++; ring3_wm_shell_gen = 9; }
 /* The runner inserts the unmodified ring3_syscall_dispatch definition here. */
 #include "dispatcher.inc"
 #include "wm.inc"
-static u32 kapi_invoke(void *fn, const void *args, u32 n)
+u32 kapi_invoke(void *fn, const void *args, u32 n)
 {
     struct caller_access a, b;
     CallerAccessFrame previous;
