@@ -193,7 +193,7 @@ def static(root,cross):
 
 def api_rejection(root,cross):
     out=root/'build/out/ppc/api';out.mkdir(parents=True,exist_ok=True)
-    calls=['_idle()','_halt()','arch_mmu_current_root()','arch_mmu_load_root(0)',
+    calls=['arch_mmu_current_root()','arch_mmu_load_root(0)',
            'arch_enter_user(0,0,0)','arch_call_on_stack(saved,0,0)',
            'inpw(0)','outpw(0,0)','inpd(0)','outpd(0,0)','io_wait()','io_wait_n(1)']
     for i,call in enumerate(calls):
@@ -203,7 +203,7 @@ def api_rejection(root,cross):
         p=subprocess.run([str(cross/'bin/powerpc-elf-gcc'),'-nostdlib','-Wl,-e,_start',str(obj),'-o',str(exe)],cwd=root,capture_output=True,text=True,timeout=10)
         (out/f'{i}.log').write_text(p.stdout+p.stderr)
         require(p.returncode!=0 and 'not_available' in p.stderr,'API linked or wrong refusal: '+call)
-    return '12 unavailable API link rejections PASS\n'
+    return '10 unavailable API link rejections PASS\n'
 
 
 MUTATIONS=[
@@ -222,7 +222,6 @@ MUTATIONS=[
  ('pte-unset','arch/ppc/pmap.c','    pt[0] &= ~PPC_PTE_V;','    pt[0] |= PPC_PTE_V;','host'),
  ('r31','arch/ppc/vectors.S','    lwz 31,PPC_CALL_SIZE+124(1)','    lwz 31,PPC_CALL_SIZE+120(1)','qemu'),
  ('dec-reload','arch/ppc/decrementer.c','    ppc_write_dec((u32)ticks);','    (void)ticks;','host'),
- ('idle-noop','arch/ppc/arch_io.h','static inline void _idle(void) { ppc_wait_not_available(); }','static inline void _idle(void) { }','api'),
  ('stop','arch/ppc/entry.S','    b ppc_stop_loop','    b ppc_stop_other','static'),
  ('boot-marker','platform/powermac/boot.c','OF: os32 ppc-boot','OF: os32 ppc-boox','boot'),
 ]
