@@ -383,9 +383,39 @@ static void resource_expect(const char *reason,u32 dev,u32 fn,u32 reg,u32 raw)
     CHECK(resource_text(resource_reason,reason));
     CHECK(resource_dev==dev && resource_fn==fn && resource_reg==reg && resource_raw==raw);
 }
+static void resource_usb_tests(void)
+{
+    struct recover_range ranges[RECOVER_RANGE_MAX];
+    struct resource_bounds b;
+    u32 n;
+    resource_snapshot();
+    for (u32 fn=0;fn<3;fn++) {
+        resource_cfg[12][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
+        resource_cfg[12][fn][1]=2;
+        resource_cfg[12][fn][4]=0x20411000 + fn*0x1000;
+    }
+    resource_cfg[12][0][3]=PCI_HDR_MULTIFUNCTION<<16;
+    CHECK(resource_run(ranges,&n)==0 && n==8);
+    for (u32 fn=0;fn<3;fn++) {
+        CHECK(ranges[5+fn].base==0x20411000+fn*0x1000);
+        CHECK(ranges[5+fn].len==(fn==2 ? 0x100 : 0x1000));
+    }
+    resource_cfg[12][1][4]=0xfffff000;
+    CHECK(resource_collect_bounds(&b)==0 && b.count==7);
+    for (u32 i=0;i<b.count;i++) CHECK(b.base[i]!=0xfffff000);
+    CHECK(resource_run(ranges,&n)==0 && n==7);
+    for (u32 i=0;i<n;i++) CHECK(ranges[i].base!=0xfffff000);
+    resource_cfg[12][2][4]=0x20413080;
+    resource_expect("memory_bar_range",12,2,PCI_CFG_BAR0,0x20413080);
+    resource_cfg[12][2][4]=0x20413000;
+    resource_cfg[12][2][0]=0x12341033;
+    resource_expect("memory_bar_length",12,2,PCI_CFG_BAR0,0x20413000);
+}
+
 static void resource_barlen_tests(void)
 {
     struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=0;
+    resource_usb_tests();
     const struct recover_range expected[]={
         {0x20000000,0x400000},{0x20400000,0x10000},{0x20800000,0x800000},
         {0x20410000,0x1000},{0x20500000,0x100000}};

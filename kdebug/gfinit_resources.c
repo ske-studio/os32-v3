@@ -28,11 +28,20 @@
 #define GF_RES_BAR2 2U
 #define GF_RES_FXP_CSR_LEN 0x1000U
 #define GF_RES_FXP_FLASH_LEN 0x100000U
+#define GF_RES_NEC_VENDOR 0x1033U
+#define GF_RES_OHCI_DEVICE 0x0035U
+#define GF_RES_EHCI_DEVICE 0x00e0U
+#define GF_RES_OHCI_LEN 0x1000U
+#define GF_RES_EHCI_LEN 0x100U
 
 struct resource_bar_spec { u32 id, bar, len, attr; };
 static const struct resource_bar_spec resource_bar_specs[] = {
     {((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), GF_RES_BAR0, GF_RES_FXP_CSR_LEN, PCI_BAR_MEM_PREFETCH},
-    {((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), GF_RES_BAR2, GF_RES_FXP_FLASH_LEN, PCI_BAR_MEM_TYPE32}
+    {((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), GF_RES_BAR2, GF_RES_FXP_FLASH_LEN, PCI_BAR_MEM_TYPE32},
+    /* uPD720101: OHCI 1.0a §7 (4 KiB), EHCI 1.0 §2.3; measured 2026-11-09.
+     * FreeBSD sys/dev/usb/controller/{ohci,ehci}_pci.c use BAR0. */
+    {((GF_RES_OHCI_DEVICE << 16) | GF_RES_NEC_VENDOR), GF_RES_BAR0, GF_RES_OHCI_LEN, PCI_BAR_MEM_TYPE32},
+    {((GF_RES_EHCI_DEVICE << 16) | GF_RES_NEC_VENDOR), GF_RES_BAR0, GF_RES_EHCI_LEN, PCI_BAR_MEM_TYPE32}
 };
 struct resource_bounds { u32 base[RECOVER_RANGE_MAX]; u32 count; };
 

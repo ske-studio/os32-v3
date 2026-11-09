@@ -43,6 +43,14 @@ SHARED_MUTATIONS = [
      'v->key == target && value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
+    ('kdebug/gfinit_resources.c', 'usb_ohci_row',
+     '    {((GF_RES_OHCI_DEVICE << 16) | GF_RES_NEC_VENDOR), GF_RES_BAR0, GF_RES_OHCI_LEN, PCI_BAR_MEM_TYPE32},\n', ''),
+    ('kdebug/gfinit_resources.c', 'usb_ehci_row',
+     '    {((GF_RES_EHCI_DEVICE << 16) | GF_RES_NEC_VENDOR), GF_RES_BAR0, GF_RES_EHCI_LEN, PCI_BAR_MEM_TYPE32}', ''),
+    ('kdebug/gfinit_resources/bars.inc', 'usb_skip_bar',
+     'if (resource_unassigned(spec, raw)) return 0;', 'if (false) return 0;'),
+    ('kdebug/gfinit_resources/bounds.inc', 'usb_skip_bound',
+     'resource_unassigned(resource_spec(id, bar), raw)) continue;', 'false) continue;'),
     ('kdebug/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;',
      '(void)hdr0; return PCI_FN_COUNT;'),
     ('kdebug/gfinit_resources/bounds.inc', 'resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
