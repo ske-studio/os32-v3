@@ -2,7 +2,7 @@
 """Run moved exec tests through real generated import slots/stubs on ILP32.
 
 Compile the real exec TU with section GC: retain snapshot, trampoline and
-string/WM paths, replacing only their environment. No emulator or mutants.
+string/WM paths, replacing only their environment. Optional product emit mutants.
 """
 from exec_source import read_text
 from kernel_includes import include_flags
@@ -16,6 +16,9 @@ import unittest
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
+MUTATE = '--mutate' in sys.argv
+if MUTATE:
+    sys.argv.remove('--mutate')
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_kdebug_imports as gen
 
@@ -113,6 +116,16 @@ void _start(void) {
 
 class ExecSelftest(unittest.TestCase):
     def test_generated_import_execution(self):
+        self.exercise()
+        if MUTATE:
+            original = (ROOT / 'arch/x86/kernel/syscall_code.c').read_text()
+            for old, new in (('st[6] = 0x80;', 'st[6] = 0x81;'),
+                             ('i < l.stub_count;', 'i < l.stub_count && i < KAPI_FUNC_COUNT;')):
+                self.assertEqual(original.count(old), 1)
+                self.exercise(original.replace(old, new), runtime_red=True)
+                print('product emitter mutation: compiled, selftest runtime RED: ' + old)
+
+    def exercise(self, backend=None, runtime_red=False):
         entries = gen.load_def()
         by_name = {e['name']: e for e in entries}
         cross = Path(os.environ['CROSS_DIR']) / 'bin'
@@ -137,9 +150,12 @@ class ExecSelftest(unittest.TestCase):
             definitions = {e['name'] for e in entries if re.search(
                 r'\b' + re.escape(e['name']) + r'\s*\([^;{}]*\)\s*\{', kernel_sources)}
             renames = ['-D' + n + '=host_' + n for n in sorted(set(IMPORTS) | definitions)]
+            (out / 'code.c').write_text(backend if backend is not None else
+                (ROOT / 'arch/x86/kernel/syscall_code.c').read_text())
             objects = []
             sources = [(ROOT / 'tools/tests/exec_selftest_host.c', renames),
                        (ROOT / 'arch/x86/kernel/ring3_ls.S', []),
+                       (out / 'code.c', renames),
                        (ROOT / 'kdebug/selftest_exec.c', []),
                        (ROOT / 'kdebug/generated/kdebug_import_slots.c', []),
                        (ROOT / 'kdebug/generated/kdebug_import_stubs.S', []),
@@ -156,7 +172,11 @@ class ExecSelftest(unittest.TestCase):
                 '-o', str(exe), *objects], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
-            self.assertEqual(result.returncode, 0, result.stderr)
+            if runtime_red:
+                self.assertGreater(result.returncode, 0, result.stderr)
+                self.assertTrue(result.stderr.strip().isdigit(), result.stderr)
+            else:
+                self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == '__main__':

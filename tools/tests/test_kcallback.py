@@ -65,13 +65,13 @@ def run(args, mutant=None):
         (tmp / 'client_source.inc').write_bytes((ROOT / 'userland/lib/rt/ls.c').read_bytes())
         offset = next(line for line in (ROOT / 'exec/ring3_str.h').read_text().splitlines()
                       if line.startswith('#define RING3_LS_SHIM_OFF'))
-        (tmp / 'trampoline.inc').write_text(offset + '\n' + function(source, 'static void ring3_trampoline_init(void)'))
+        (tmp / 'trampoline.inc').write_text('#include "syscall_code.h"\n' + offset + '\n' + function(source, 'static void ring3_trampoline_init(void)'))
         exe = tmp / 'test'
         subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
                         *include_flags(ROOT),
                         '-I' + str(tmp), str(ROOT / 'tools/tests/kcallback_host.c'),
-                        str(tmp / 'shim.S'), '-o', str(exe)], check=True, capture_output=True)
+                        str(tmp / 'shim.S'), str(ROOT / 'arch/x86/kernel/syscall_code.c'), '-o', str(exe)], check=True, capture_output=True)
         result = host32.run([str(exe)], runner=args.runner, timeout=30, capture_output=True, text=True)
         if mutant:
             assert result.returncode == 1 and expected in result.stdout, (name, result)
