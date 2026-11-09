@@ -255,6 +255,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 |-------------|------|
 | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機の票の索引 (機体構成と方針は [decisions/realhw/RA266.md](decisions/realhw/RA266.md))。v2.1 の到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。現在地・残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-25.md) |
 | `docs/archive/realhw/TASK_PEGC480_REALHW.md` | Ra266 の PEGC 640x480 — **受入完了 (2026-09-30、実機目視合格)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせた。今の仕様は [05_drivers.md §5-5](05_drivers.md)、480 ラインの OSD の未採取は TASK_TRIDENT_DRIVER の段 0 |
+| [tasks/realhw/TASK_USB.md](tasks/realhw/TASK_USB.md) | PCI の USB カード (NEC uPD720101) の土台 **設計中** — 確定設計 (2026-11-09)、実装は設計に専念する期間の後 |
 | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) | 内蔵 Trident (1023:9660) ドライバ **設計中** — 設計票 v5 が Codex 5 回目で Approve (2026-09-29)、実装は未着手。ユーザー決定「Cirrus はエミュレータ用、実機は Trident」 |
 | `docs/archive/realhw_v3/TASK_FDRECOV.md` | FD で起動して LAN で HDD 一式を復旧する経路と、hsync の配置の世代の門 **受入完了** (2026-10-17、NP21/W の受入 7 項に合格) |
 | [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中 (2026-11-04)**。LAN 経由の hsync は達成し日常使い。残りは LB-4。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-25.md) |
