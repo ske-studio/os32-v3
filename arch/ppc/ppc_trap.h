@@ -14,6 +14,13 @@ enum ppc_trap_reason {
     PPC_TRAP_UNSUPPORTED = 0x100
 };
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
+/* Boot CPU, EE=0. Success arms DEC before the caller may enable EE.
+ * tick_hz must be 1000 (1ms); failure leaves existing clock untouched. */
+int ppc_dec_start(u32 tb_hz, u32 tick_hz);
+void ppc_decrementer_interrupt(struct ppc_frame *frame);
+void arch_cpu_idle(void) __attribute__((noreturn));
+void arch_cpu_halt(void);
+void arch_cpu_stop(void) __attribute__((noreturn));
 /* Reader must access software PD/PT physical words via mapped RAM, DR=1.
  * NULL disables walking. Context and table mappings must outlive dispatch. */
 void ppc_trap_set_reader(ppc_pd_read_fn reader, void *context);

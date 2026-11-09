@@ -193,7 +193,7 @@ def static(root,cross):
 
 def api_rejection(root,cross):
     out=root/'build/out/ppc/api';out.mkdir(parents=True,exist_ok=True)
-    calls=['_idle()','_halt()','arch_mmu_current_root()','arch_mmu_load_root(0)',
+    calls=['arch_mmu_current_root()','arch_mmu_load_root(0)',
            'arch_enter_user(0,0,0)','arch_call_on_stack(saved,0,0)',
            'inpw(0)','outpw(0,0)','inpd(0)','outpd(0,0)','io_wait()','io_wait_n(1)']
     for i,call in enumerate(calls):
@@ -205,7 +205,7 @@ def api_rejection(root,cross):
         provider = ('ppc_root_current' if call=='arch_mmu_current_root()' else
                     'ppc_root_load' if call=='arch_mmu_load_root(0)' else 'not_available')
         require(p.returncode!=0 and provider in p.stderr,'API linked or wrong refusal: '+call)
-    return '12 standalone API link rejections (including kernel root providers) PASS\n'
+    return '10 standalone API link rejections (including kernel root providers) PASS\n'
 
 
 MUTATIONS=[
@@ -224,7 +224,6 @@ MUTATIONS=[
  ('pte-unset','arch/ppc/pmap.c','    pt[0] &= ~PPC_PTE_V;','    pt[0] |= PPC_PTE_V;','host'),
  ('r31','arch/ppc/vectors.S','    lwz 31,PPC_CALL_SIZE+124(1)','    lwz 31,PPC_CALL_SIZE+120(1)','qemu'),
  ('dec-reload','arch/ppc/decrementer.c','    ppc_write_dec((u32)ticks);','    (void)ticks;','host'),
- ('idle-noop','arch/ppc/arch_io.h','static inline void _idle(void) { ppc_wait_not_available(); }','static inline void _idle(void) { }','api'),
  ('stop','arch/ppc/entry.S','    b ppc_stop_loop','    b ppc_stop_other','static'),
  ('boot-marker','platform/powermac/boot.c','OF: os32 ppc-boot','OF: os32 ppc-boox','boot'),
 ]

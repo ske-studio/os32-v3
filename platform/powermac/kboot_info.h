@@ -34,6 +34,9 @@ struct pm_kboot_info {
     u32 of_calls_at_detach;
     struct pm_kboot_device escc, mpic;
 };
+/* Boot foreground, EE=0: copy CPU TB frequency before clock init. */
+void pm_clock_bind(const struct pm_kboot_info *info);
+u32 pm_tick_hz(void);
 const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci);
 /* Final snapshot only: after reserve, no OF allocation/map before detach. */
 void pm_kboot_refresh_available(struct pm_kboot_info *info);
