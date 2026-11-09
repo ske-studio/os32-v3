@@ -127,7 +127,12 @@ def main():
     assert not subprocess.check_output([str(cross/'i386-elf-nm'), '-u', str(OUT/'hwdev/hwdev.elf')])
     core = module.mkmod.Elf((OUT/'kdebug/kdebug.elf').read_bytes())
     gf_objects = hwdev_gf_objects()
+    # The bus-0 GeForce locator is intentionally linked into all four images
+    # (GF_BDF_DESIGN §2/§4 A3), so it is exempt from the kdebug/hwdev split.
+    shared = {'pci_locate', 'recover_gf_locate'}
     for name in gf_objects:
+        if name in shared:
+            continue
         names = subprocess.check_output([str(cross/'i386-elf-nm'), '-g', '--defined-only',
                                          str(OUT/'hwdev'/(name+'.o'))], text=True)
         for line in names.splitlines():
