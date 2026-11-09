@@ -19,7 +19,7 @@ from hwdev_contract_fixture import assert_hwdev_contract
 import test_hwdev_module as module
 import test_hwdev_trace as trace
 import test_hwdev_dispatch as dispatch
-from gen_kdebug_imports import hwdev_gf_objects
+from gen_kdebug_imports import hwdev_gf_objects, hwdev_inventory
 
 ROOT = module.ROOT
 OUT = ROOT / 'build/out'
@@ -127,12 +127,7 @@ def main():
     assert not subprocess.check_output([str(cross/'i386-elf-nm'), '-u', str(OUT/'hwdev/hwdev.elf')])
     core = module.mkmod.Elf((OUT/'kdebug/kdebug.elf').read_bytes())
     gf_objects = hwdev_gf_objects()
-    # The bus-0 GeForce locator is intentionally linked into all four images
-    # (GF_BDF_DESIGN §2/§4 A3), so it is exempt from the kdebug/hwdev split.
-    shared = {'pci_locate', 'recover_gf_locate'}
     for name in gf_objects:
-        if name in shared:
-            continue
         names = subprocess.check_output([str(cross/'i386-elf-nm'), '-g', '--defined-only',
                                          str(OUT/'hwdev'/(name+'.o'))], text=True)
         for line in names.splitlines():
@@ -246,7 +241,8 @@ def main():
             subprocess.run([str(cross/'i386-elf-gcc'), '-m32', '-c',
                             str(folder/'hwdev_import_stubs.S'), '-o', str(obj)], check=True)
             objects = [OUT/'hwdev'/ (n+'.o') for n in
-                       (*gf_objects, 'hwdev_main', 'hwdev_import_slots')]
+                       (*hwdev_inventory('HWDEV_SHARED'), *gf_objects,
+                        'hwdev_main', 'hwdev_import_slots')]
             linked = folder/'mutant.elf'
             subprocess.run([str(cross/'i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
                             '-T', str(ROOT/'build/hwdev.ld'), *map(str, objects), str(obj),

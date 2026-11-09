@@ -212,6 +212,12 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'GF object still linked'):
                 gen.check_nm(self.entries)
 
+    def test_shared_locators_are_not_hwdev_exclusive(self):
+        shared = set(gen.hwdev_inventory('HWDEV_SHARED'))
+        self.assertEqual(shared, {'pci_locate', 'recover_gf_locate'})
+        self.assertTrue(shared.isdisjoint(gen.hwdev_gf_objects()))
+        gen.check_nm(self.entries)
+
     def test_reject_gf_slot_from_core_caller(self):
         original = gen.symbols
         def contaminated(nm, paths, undefined):
