@@ -63,11 +63,11 @@ $(1)_SRC := $$(wildcard $(2)/*.c) $(foreach d,$(4),$$(wildcard $(2)/$(d)/*.c))
 $(1)_OBJ := $$($(1)_SRC:.c=.o)
 ALL_LIB_OBJ += $$($(1)_OBJ)
 
-$(2)/%.o: $(2)/%.c
+$(2)/%.o: $(2)/%.c | $$(ABI_CONTRACT_ORDER)
 	$$(CC) $$(PROGRAM_FLAGS) $$(INC_$(1)) $(3) -c $$< -o $$@
 
 $(foreach d,$(4),
-$(2)/$(d)/%.o: $(2)/$(d)/%.c
+$(2)/$(d)/%.o: $(2)/$(d)/%.c | $$(ABI_CONTRACT_ORDER)
 	$$(CC) $$(PROGRAM_FLAGS) $$(INC_$(1)) $(3) -c $$< -o $$@
 )
 
@@ -105,16 +105,16 @@ $(LIBDIR)/libos32gfx.a: $(GFX_ARCHIVE_OBJ)
 	@rm -f $@
 	$(AR) rcs $@ $^
 
-userland/lib/gfx/%.o: userland/lib/gfx/%.c
+userland/lib/gfx/%.o: userland/lib/gfx/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
 
-userland/lib/gfx/draw/%.o: userland/lib/gfx/draw/%.c
+userland/lib/gfx/draw/%.o: userland/lib/gfx/draw/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
 
-userland/lib/gfx/text/%.o: userland/lib/gfx/text/%.c
+userland/lib/gfx/text/%.o: userland/lib/gfx/text/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
 
-userland/lib/gfx/geom/%.o: userland/lib/gfx/geom/%.c
+userland/lib/gfx/geom/%.o: userland/lib/gfx/geom/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
 
 userland/lib/gfx/asm/%.o: userland/lib/gfx/asm/%.asm userland/lib/gfx/asm/gfx_const.inc
@@ -133,7 +133,7 @@ $(LIBDIR)/libos32db.a: $(LIBOS32DB_ARCHIVE_OBJ)
 	@rm -f $@
 	$(AR) rcs $@ $^
 
-userland/lib/db/%.o: userland/lib/db/%.c
+userland/lib/db/%.o: userland/lib/db/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32db) -c $< -o $@
 
 lib-libos32db: $(LIBDIR)/libos32db.a
@@ -180,7 +180,7 @@ $(LIBDIR)/libos32tilemap.a: $(TILEMAP_ARCHIVE_OBJ)
 	@rm -f $@
 	$(AR) rcs $@ $^
 
-userland/lib/tilemap/%.o: userland/lib/tilemap/%.c
+userland/lib/tilemap/%.o: userland/lib/tilemap/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32tilemap) -c $< -o $@
 
 userland/lib/tilemap/%.o: userland/lib/tilemap/%.asm
@@ -200,7 +200,7 @@ ZLIB_INFLATE_OBJ = $(ZLIB_DIR)/inflate_prog.o $(ZLIB_DIR)/inffast_prog.o \
                    $(ZLIB_DIR)/inftrees_prog.o $(ZLIB_DIR)/adler32_prog.o \
                    $(ZLIB_DIR)/zutil_prog.o
 
-$(ZLIB_DIR)/%_prog.o: $(ZLIB_DIR)/%.c
+$(ZLIB_DIR)/%_prog.o: $(ZLIB_DIR)/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Os -DNO_GZIP -DZ_SOLO -I$(ZLIB_DIR) -c $< -o $@
 
 ALL_LIB_OBJ += $(ZLIB_INFLATE_OBJ)
@@ -223,16 +223,16 @@ $(LIBDIR)/libos32snd.a: $(LIBSND_ARCHIVE_OBJ)
 	@rm -f $@
 	$(AR) rcs $@ $^
 
-userland/lib/snd/libos32snd.o: userland/lib/snd/libos32snd.c userland/lib/snd/libos32snd.h
+userland/lib/snd/libos32snd.o: userland/lib/snd/libos32snd.c userland/lib/snd/libos32snd.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32snd) -c $< -o $@
 
 ALL_LIB_OBJ += $(LIBSND_ARCHIVE_OBJ)
 
 # libos32md — Markdownパーサー + レンダラー
-userland/lib/md/md_parse.o: userland/lib/md/md_parse.c userland/lib/md/libos32md.h
+userland/lib/md/md_parse.o: userland/lib/md/md_parse.c userland/lib/md/libos32md.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32md) -c $< -o $@
 
-userland/lib/md/md_render.o: userland/lib/md/md_render.c userland/lib/md/md_render.h userland/lib/md/libos32md.h
+userland/lib/md/md_render.o: userland/lib/md/md_render.c userland/lib/md/md_render.h userland/lib/md/libos32md.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32md) $(INC_libos32filer) -c $< -o $@
 
 MDLIB_ARCHIVE_OBJ = userland/lib/md/md_parse.o userland/lib/md/md_render.o
@@ -244,10 +244,10 @@ $(LIBDIR)/libos32md.a: $(MDLIB_ARCHIVE_OBJ)
 	$(AR) rcs $@ $^
 
 # libos32filer — GFXファイラーライブラリ + TVRAM描画
-userland/lib/filer/filer_core.o: userland/lib/filer/filer_core.c userland/lib/filer/libos32filer.h sdk/include/os32/ls.h
+userland/lib/filer/filer_core.o: userland/lib/filer/filer_core.c userland/lib/filer/libos32filer.h sdk/include/os32/ls.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32filer) -c $< -o $@
 
-userland/lib/filer/filer_draw.o: userland/lib/filer/filer_draw.c userland/lib/filer/filer_draw.h
+userland/lib/filer/filer_draw.o: userland/lib/filer/filer_draw.c userland/lib/filer/filer_draw.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32filer) -c $< -o $@
 
 # filer_core.o (GFX版, filer_*) と filer_draw.o (TVRAM版, fldraw_*) を

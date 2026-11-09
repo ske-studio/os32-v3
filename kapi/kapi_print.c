@@ -3,19 +3,18 @@
 #include "redir_access.h"
 #include "kmalloc.h"
 
-int kapi_print_call(const void *user_args)
+int kapi_print_call(struct kapi_arg_source *src)
 {
-    struct caller_access caller;
-    u32 fixed[KAPI_PRINT_FIXED_WORDS], args[KAPI_PRINT_ARG_LIMIT];
+    struct kapi_values fixed;
+    u32 args[KAPI_PRINT_ARG_LIMIT];
     char *strings[KAPI_PRINT_ARG_LIMIT] = {0};
     char format[KAPI_PRINT_FORMAT_CAP];
     const char *p;
-    u32 count = 0, va = (u32)(uptr)user_args;
+    u32 count = 0;
     int ok = 0;
 
-    if (!caller_access_get(&caller) || caller.origin != CALLER_USER ||
-        !copy_caller_bytes(&caller, user_args, fixed, sizeof(fixed)) ||
-        !copy_caller_cstr(&caller, (const char *)(uptr)fixed[1],
+    if (!arch_kapi_read_block(src, 0, KAPI_PRINT_FIXED_WORDS, &fixed) ||
+        !copy_caller_cstr(&src->caller, (const char *)(uptr)fixed.value[1],
                           format, sizeof(format))) return 0;
 
     /* Parse the staged format before any console/UTF-8/redirect callback.
@@ -30,21 +29,20 @@ int kapi_print_call(const void *user_args)
         p++;
         if (spec == '%') continue;
         if (count == KAPI_PRINT_ARG_LIMIT ||
-            va > ~(u32)0 - sizeof(fixed) - count * sizeof(u32) ||
-            !copy_caller_bytes(&caller,
-                (const void *)(uptr)(va + sizeof(fixed) + count * sizeof(u32)),
-                &args[count], sizeof(u32))) goto out;
+            !arch_kapi_va_next(src,
+                (spec == 's' || spec == 'p') ? KAPI_VALUE_POINTER : KAPI_VALUE_INTEGER,
+                &args[count])) goto out;
         /* NULL %s keeps the renderer's existing "(null)" semantics. */
         if (spec == 's' && args[count]) {
             strings[count] = kmalloc(KAPI_PRINT_STRING_CAP);
             if (!strings[count] ||
-                !copy_caller_cstr(&caller, (const char *)(uptr)args[count],
+                !copy_caller_cstr(&src->caller, (const char *)(uptr)args[count],
                                   strings[count], KAPI_PRINT_STRING_CAP)) goto out;
             args[count] = (u32)(uptr)strings[count];
         }
         count++;
     }
-    kvprintf((u8)fixed[0], format, args);
+    kvprintf((u8)fixed.value[0], format, args);
     ok = 1;
 out:
     for (u32 i = 0; i < KAPI_PRINT_ARG_LIMIT; i++)

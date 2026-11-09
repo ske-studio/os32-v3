@@ -28,6 +28,7 @@
   "gfx/gfx_hw_submit.c",
   "gfx/gfx_osri.c",
   "gfx/gfx_scroll.c",
+  "gfx/gfx_vram.c",
   "gfx/palette.c",
   "init/bootinfo.c",
   "init/bootlog.c",

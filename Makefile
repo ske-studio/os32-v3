@@ -41,7 +41,11 @@ endif
 
 # === サブ Makefile のインクルード ===
 include build/config.mk
+ifeq ($(ARCH),x86)
+ABI_CONTRACT_ORDER := abi-contract-probe
+endif
 include build/targets/$(ARCH)-$(PLATFORM).mk
+include build/abi_contract.mk
 
 # The bootstrap remains independent; always forward its own cross directory.
 PPC_CROSS_DIR ?= /home/hight/opt/cross-ppc
