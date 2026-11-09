@@ -25,7 +25,12 @@ def check(root):
     assert ppc['C_KERNEL'].count('lib/kstring_c.c') == 1
     assert not ppc['ASM_KERNEL']
     assert ppc['GAS_KERNEL'] == ['arch/ppc/entry.S', 'arch/ppc/ofw_note.S']
+    assert 'drivers/video/geforce/gf_wc.c' in ppc['C_KERNEL']
+    assert 'arch/ppc/video_wc.c' in ppc['C_KERNEL']
     for name in ppc['C_KERNEL'] + ppc['KERNEL_SRC_DIRS']:
+        # D1 compiles GPU applicability with the no-WC PPC provider.
+        if name == 'drivers/video/geforce/gf_wc.c':
+            continue
         assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
     assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)

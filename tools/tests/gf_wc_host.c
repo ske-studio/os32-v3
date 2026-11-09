@@ -36,11 +36,11 @@ static struct ledger_surface saved_surface[LEDGER_MAX_SURFACES];
 static int ram, identity=1, acquire_calls, release_calls, quiesces, started, presented;
 static int fault, result=1, borrowed, restore_fail, effective, baseline, reported;
 static u32 flags, cpu_features=0x1020, max_ext=0x80000007U, msr_reads;
-static int has_id=1, wc_regs, default_wc;
+static int has_id=1, wc_regs, default_wc, intel=1;
 static unsigned long long gf_wc_msr(u32 reg)
 {
     msr_reads++;
-    CHECK(has_id && (cpu_features&0x1020)==0x1020);
+    CHECK(has_id && intel && (cpu_features&0x1020)==0x1020);
     if(reg==0x2ff) return default_wc ? 0xc01 : 0xc06;
     if(reg==0xfe) return 0x501;
     if(reg==0x200) return REGS|1;
@@ -52,7 +52,7 @@ static void gf_wc_set_flags(u32 v) { flags=has_id ? v : v&~(1U<<21); }
 static void gf_wc_cpuid(u32 leaf,u32 *a,u32 *b,u32 *c,u32 *d)
 {
     *a=*b=*c=*d=0;
-    if(!leaf) { *a=1;*b=0x756e6547;*d=0x49656e69;*c=0x6c65746e; }
+    if(!leaf) { *a=1;*b=intel ? 0x756e6547 : 0;*d=0x49656e69;*c=0x6c65746e; }
     else if(leaf==1) *d=cpu_features;
     else if(leaf==0x80000000U) *a=max_ext;
     else { CHECK(leaf==0x80000008U && max_ext>=leaf);*a=36; }
@@ -206,6 +206,11 @@ static void setup(int bios)
 static void restored(void) { CHECK(!lease.active && effective==baseline);unchanged(); }
 void _start(void)
 {
+    setup(0);intel=0;CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);intel=1;
+    setup(0);cpu_features=0;CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);
+    setup(0);CHECK(arch_video_wc_eligible(DISPLAY,GF_MODE_VRAM_BYTES,GEFORCE_WC_BYTES,REGS,0x1000000));
+    CHECK(flags==0x202);
+
     for(int bios=0;bios<2;bios++) {
         setup(bios);gfx_backend_geforce.init();CHECK(active && acquire_calls==1 && presented==1);
         gfx_backend_geforce.init();CHECK(acquire_calls==1 && presented==1);
