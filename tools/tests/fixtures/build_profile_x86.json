@@ -10,6 +10,7 @@
     "drivers/video/geforce/tv_data.c",
     "drivers/video/geforce/gf_display_data.c",
     "arch/x86/kernel/mtrr_wc.c",
+    "arch/x86/kernel/video_wc.c",
     "arch/x86/kernel/x87.c",
     "init/boot_platform.c",
     "init/boot_display.c",

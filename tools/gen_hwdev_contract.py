@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the shared i386 HWDEV contract; inventory changes require review."""
+"""Generate the target HWDEV contract; inventory changes require review."""
 import argparse
 import json
 from pathlib import Path
@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
 OUT = ROOT / 'hwdev/generated'
+PPC_OUT = ROOT / 'build/out/ppc-powermac/hwdev-layout'
 # docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 21 kernel imports.
 HWDEV_IMPORT_SLOTS = 26 + 21
 
@@ -96,7 +97,41 @@ def dwarf_inventory(raw):
     return dict(types=dict(sorted(types.items())), enums=sorted(set(enums)))
 
 
-def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
+TARGETS = {'x86-pc98': (1, 3), 'ppc-powermac': (2, 20)}
+
+
+def target_gate(target, layout_only):
+    if target not in TARGETS:
+        raise SystemExit('unknown HWDEV target: ' + target)
+    if target == 'ppc-powermac' and not layout_only:
+        raise SystemExit('PPC HWDEV requires --layout-only')
+
+
+def elf_order(data, target):
+    if len(data) < 52 or data[:5] != b'\x7fELF\x01' or data[5] not in (1, 2):
+        raise SystemExit('HWDEV requires a valid ELF32 object')
+    order = '<' if data[5] == 1 else '>'
+    identity = (data[5], struct.unpack(order + 'H', data[18:20])[0])
+    if identity != TARGETS[target]:
+        raise SystemExit('HWDEV ELF target mismatch')
+    return order
+
+
+def decode_layout(raw, count, order):
+    if len(raw) != count * 4:
+        raise SystemExit('HWDEV layout section length mismatch')
+    return struct.unpack(order + 'I' * count, raw)
+
+
+def generate(cc, flags, includes, out=None, inventory=INVENTORY, seed=False, *,
+             target='x86-pc98', readelf=None, objcopy=None, layout_only=False):
+    target_gate(target, layout_only)
+    out = out if out is not None else (OUT if target == 'x86-pc98' else PPC_OUT)
+    # Legacy positional callers retain the x86 defaults; other targets are explicit.
+    if target != 'x86-pc98' and (readelf is None or objcopy is None):
+        raise SystemExit('target tools must be explicit')
+    readelf = readelf or str(Path(cc).with_name('i386-elf-readelf'))
+    objcopy = objcopy or str(Path(cc).with_name('i386-elf-objcopy'))
     entries = slots()
     core_entries = [e for e in entries if e['group'] == 'core']
     headers = ['kdebug/recover.h', 'kdebug/recover_gf.h', 'kdebug/gf_stage_state.h']
@@ -119,9 +154,9 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
         src, obj = td/'contract.c', td/'contract.o'
         src.write_text(umbrella)
         subprocess.run([*command, '-g', '-fno-eliminate-unused-debug-types', '-c', str(src), '-o', str(obj)], check=True)
-        readelf = str(Path(cc).with_name('i386-elf-readelf'))
+        elf_order(obj.read_bytes(), target)
         observed = dwarf_inventory(subprocess.check_output([readelf, '--debug-dump=info', str(obj)], text=True))
-        if seed:
+        if seed and target == 'x86-pc98' and not inventory.exists():
             inventory.write_text(json.dumps(observed, indent=2)+'\n')
         if observed != json.loads(inventory.read_text()):
             raise SystemExit('HWDEV layout inventory differs from compiler DWARF; update reviewed inventory')
@@ -136,9 +171,10 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
                        ',\n'.join('(u32)('+e[2]+')' for e in expressions)+'\n};\n')
         subprocess.run([*command, '-c', str(src), '-o', str(obj)], check=True)
         raw = td/'layout.bin'
-        subprocess.run([str(Path(cc).with_name('i386-elf-objcopy')),
+        order = elf_order(obj.read_bytes(), target)
+        subprocess.run([objcopy,
                         '--dump-section', '.hwdev_layout='+str(raw), str(obj)], check=True)
-        values = struct.unpack('<'+'I'*len(expressions), raw.read_bytes())
+        values = decode_layout(raw.read_bytes(), len(expressions), order)
         layout = ''.join(f'{kind}\t{name}\t{value}\n' for (kind,name,_),value in zip(expressions,values))
         preprocessed = subprocess.check_output([*command, '-E', '-P', str(src)], text=True)
         # The layout probe is not a shared declaration.
@@ -154,8 +190,14 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     header += f'#define HWDEV_CONTRACT_CRC 0x{crc:08x}U\n#define HWDEV_LAYOUT_CRC 0x{lcrc:08x}U\n#define HWDEV_IMPORT_COUNT {len(entries)}U\n#define HWDEV_CORE_SLOTS 26U\n'
     for i, ((_,_,expr),value) in enumerate(zip(expressions,values)):
         header += f'STATIC_ASSERT((u32)({expr}) == {value}U, hwdev_layout_{i});\n'
-    header += 'const struct hwdev_core_api *hwdev_core_get(void);\n#endif\n'
+    if not layout_only:
+        header += 'const struct hwdev_core_api *hwdev_core_get(void);\n'
+    header += '#endif\n'
     files = {'hwdev_contract.h':header, 'hwdev_layout.txt':layout}
+    if layout_only:
+        for name, text in files.items():
+            (out/name).write_text(text)
+        return
     files['hwdev_core.c'] = '#include "hwdev_contract.h"\nstatic const struct hwdev_core_api core = {\n    HWDEV_ABI, sizeof(core), HWDEV_CONTRACT_CRC, HWDEV_LAYOUT_CRC,\n'+''.join('    '+e['symbol']+',\n' for e in core_entries)+'};\nconst struct hwdev_core_api *hwdev_core_get(void) { return &core; }\n'
     imports = ['#include "hwdev_contract.h"', '#include "kernel/module/module_image.h"',
                'static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {' +
@@ -197,20 +239,29 @@ def main():
     p.add_argument('--cc', required=True)
     p.add_argument('--flags', required=True)
     p.add_argument('--includes', required=True)
-    p.add_argument('--out', type=Path, default=OUT)
+    p.add_argument('--out', type=Path)
+    p.add_argument('--target', default='x86-pc98', choices=TARGETS)
+    p.add_argument('--readelf')
+    p.add_argument('--objcopy')
+    p.add_argument('--layout-only', action='store_true')
     p.add_argument('--seed-inventory', action='store_true')
     p.add_argument('--check', action='store_true')
     a = p.parse_args()
+    target_gate(a.target, a.layout_only)
+    a.out = a.out or (OUT if a.target == 'x86-pc98' else
+                     PPC_OUT)
+    options = dict(target=a.target, readelf=a.readelf, objcopy=a.objcopy,
+                   layout_only=a.layout_only)
     if a.check:
         with tempfile.TemporaryDirectory(prefix='hwdev-reproduce-') as td:
             out = Path(td)
-            generate(a.cc, shlex.split(a.flags), shlex.split(a.includes), out)
+            generate(a.cc, shlex.split(a.flags), shlex.split(a.includes), out, **options)
             for path in out.iterdir():
                 if path.read_bytes() != (a.out/path.name).read_bytes():
                     raise SystemExit('stale HWDEV contract: ' + path.name)
         print('PASS HWDEV generated contract/layout/asserts reproduce exactly')
     else:
-        generate(a.cc, shlex.split(a.flags), shlex.split(a.includes), a.out, seed=a.seed_inventory)
+        generate(a.cc, shlex.split(a.flags), shlex.split(a.includes), a.out, seed=a.seed_inventory, **options)
 
 if __name__ == '__main__':
     main()

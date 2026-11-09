@@ -5,6 +5,7 @@ AR = $(PPC_CROSS_DIR)/bin/powerpc-elf-ar
 AS = $(CC)
 LD = $(PPC_CROSS_DIR)/bin/powerpc-elf-ld
 OBJCOPY = $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
+READELF = $(PPC_CROSS_DIR)/bin/powerpc-elf-readelf
 CFLAGS_MACHINE = -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)
 MODULE_LD = $(LD)
 MODULE_LDFLAGS = -m elf32ppc
