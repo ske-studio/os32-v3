@@ -68,7 +68,9 @@ def host(out, source, mutation=None):
 
 
 def build(out, source):
-    vectors.PRODUCT=[x for x in BASE_PRODUCT if 'kboot_vectors_fixture' not in x]
+    # C4's fixture owns ppc_trap_dispatch: keep D2's product trap out of this link.
+    vectors.PRODUCT=[x for x in BASE_PRODUCT if 'kboot_vectors_fixture' not in x
+                     and x != 'arch/ppc/kernel_trap.c']
     vectors.PRODUCT += ['tools/ppc/kboot_cpu_fixture.S','tools/ppc/kboot_cpu_fixture.c',str(source)]
     # C2 is used directly; vectors.build normally renames its spill for the D1 wrapper.
     # Provide that alias without altering any product source.

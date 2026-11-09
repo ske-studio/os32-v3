@@ -67,16 +67,15 @@ $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OU
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
 $(KB_ELF): $(KB_OBJ) $(KB_OUT)/kernel.ld
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined \
-	 -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
+	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
 	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) -o $@
 
-# H3 audits: nothing unresolved, integer-only code, and no user of the 100 Hz
-# PIT_HZ constant inside a kernel that ticks at 1 kHz (design R7).
+# H3 audits (tools/ppc/kboot_audit.py): nothing unresolved, integer-only code by
+# decoded mnemonic, and no direct or macro-mediated user of the 100 Hz PIT_HZ
+# inside a kernel that ticks at 1 kHz (design R7). Mutated sources are audited too.
 audit: $(KB_ELF)
-	@test -z "$$($(KB_NM) -u $(KB_ELF))" || { echo "undefined symbols:"; $(KB_NM) -u $(KB_ELF); exit 1; }
-	@! $(KB_OBJDUMP) -d $(KB_ELF) | grep -E '\s(l|st)f[sd]u?x?\s|\sf(add|sub|mul|div|mr|cmp)[a-z.]*\s|\s(l|st)vx\s' \
-	 || { echo "floating-point/AltiVec instruction in kernel"; exit 1; }
-	@! grep -l 'PIT_HZ' $(KB_C) $(KB_ASM) || { echo "PIT_HZ user in the 1 kHz closure"; exit 1; }
-	@echo "kboot audit OK: $(KB_ELF)"
+	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
+	 --sources $(KB_C) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) \
+	 -- $(KB_CC) $(KB_FLAGS)
 
 -include $(KB_OBJ:.o=.d)

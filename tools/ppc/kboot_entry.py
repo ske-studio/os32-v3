@@ -82,6 +82,16 @@ ppc_store8:
  stb 4,0(3)
  eieio
  blr
+# platform/powermac/ofw.c masks EE before its detached stop (same body as arch/ppc/entry.S).
+.globl ppc_disable
+ppc_disable:
+ mfmsr 3
+ li 4,0
+ ori 4,4,0x8000
+ andc 3,3,4
+ mtmsr 3
+ isync
+ blr
 '''
 
 

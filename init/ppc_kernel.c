@@ -40,6 +40,7 @@ volatile unsigned long long kboot_ready_tb;
 static volatile u32 ipi_seen;
 static unsigned char flush_a[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static unsigned char flush_b[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+static unsigned char user_gate[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 
 static void kboot_stop(const char *why) __attribute__((noreturn));
 static void kboot_stop(const char *why)
@@ -143,12 +144,26 @@ void ppc_kernel_main(void)
      * memory_boot_init -> shm_init; kmalloc is independent of both). */
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
     shm_init();
+    /* Same contract as x86 kernel_boot_memory(): shm_free/shm_lock toggle RW
+     * on the *shared USER* mapping that paging_boot_user_shared() establishes
+     * (mm/paging_map.inc). Its second argument is exec's trampoline page on
+     * x86; milestone 2 has no exec, so a dedicated, never-executed, read-only
+     * zero page stands in until exec/ provides the real one (milestone 3). */
+    int shared_user = paging_boot_user_shared((u32)user_gate) == 0;
     kmalloc_init((void *)KHEAP_BASE, KHEAP_SIZE);
-    void *heap = kmalloc(256), *shared = shm_alloc(1);
+    void *heap = kmalloc(256);
     int heap_ok = heap && kmalloc_used() >= 256;
-    int shm_ok = shared != 0;
     if (heap) { *(volatile u32 *)heap = 0x4b424f54; kfree(heap); }
-    if (shared) { *(volatile u32 *)shared = 0x4b424f54; shm_free(shared); }
+    /* A full round trip: the block must really return to the free state. */
+    void *shared = shm_alloc(1);
+    int shm_ok = shared_user && shared;
+    if (shared) {
+        *(volatile u32 *)shared = 0x4b424f54;
+        shm_ok = shm_ok && shm_lock(shared) == 0 && shm_free(shared) == 0;
+        void *again = shm_alloc(1);
+        shm_ok = shm_ok && again == shared && *(volatile u32 *)again == 0 &&
+                 shm_free(again) == 0;
+    }
     kprintf(KBOOT_ATTR, "KBOOT MEMORY online=%u heap=%u shm=%u\r\n",
             (u32)(pgalloc_model_state() == PGALLOC_ONLINE && pgalloc_free_pages() > 0),
             (u32)heap_ok, (u32)shm_ok);
@@ -188,12 +203,26 @@ void ppc_kernel_main(void)
 
     if (!wait_until((volatile u32 *)&tick_count, 10, info->tb_hz, 1000))
         kboot_stop("no tick");
-    u32 us_lo = 0, us_hi = 0;
+    /* The clock provider must advance with the time base: read it twice
+     * ~20 ms apart and compare its microseconds with the TB interval. */
+    u32 us0 = 0, us_lo = 0, us_hi = 0, hi0 = 0;
     u32 saved = ppc_irq_save();                 /* contract: read with IF=0 */
-    int clock_ok = platform_clock_read_us(&us_lo, &us_hi) == 0;
+    int clock_ok = platform_clock_read_us(&us0, &hi0) == 0;
+    unsigned long long tb0 = tb_now();
+    ppc_irq_restore(saved);
+    u32 after = tick_count + 20;
+    if (!wait_until((volatile u32 *)&tick_count, after, info->tb_hz, 1000))
+        kboot_stop("no tick");
+    saved = ppc_irq_save();
+    clock_ok = clock_ok && platform_clock_read_us(&us_lo, &us_hi) == 0;
+    unsigned long long tb1 = tb_now();
     u32 ticks = tick_count;
     ppc_irq_restore(saved);
-    if (!clock_ok || us_hi) kboot_stop("clock_read");
+    if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
+    u32 want = (u32)((tb1 - tb0) * 1000000 / info->tb_hz), got = us_lo - us0;
+    u32 error = got > want ? got - want : want - got;
+    if (want < 10000 || error * 50 > want + 2500)  /* 2% + the two-read skew */
+        kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", pm_tick_hz(), ticks, us_lo);
 
     unsigned long long start = tb_now();

@@ -14,6 +14,8 @@ static u32 misses, guard_expected, guard_seen, translated_msr;
 extern u32 c3_read_alias(u32 va);
 __asm__(".text\n.globl c3_read_alias\nc3_read_alias:\n lwz 3,0(3)\n blr\n");
 static u32 msr(void) { u32 v; __asm__ volatile("mfmsr %0":"=r"(v)); return v; }
+/* C3 in isolation: D3's first-load hook is not part of this image. */
+void ppc_boot_load_root(u32 root) { ppc_root_load(root); }
 static void say(const char *s, u32 n)
 {
     if (pm_escc_write(&console,s,n) || pm_escc_drain(&console)) ppc_stop();

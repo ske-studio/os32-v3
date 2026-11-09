@@ -180,6 +180,8 @@ void ppc_store8(cell va,unsigned v)
 {
     REQUIRE(va==FX_CSR && v==1 && !selected,71); selected=1;
 }
+/* ofw.c masks EE before its detached stop (D3); never reached in this flow. */
+void ppc_disable(void) { }
 void ppc_stop(void)
 {
     REQUIRE(testcase!=0 && cursor==used && !selected,72);
