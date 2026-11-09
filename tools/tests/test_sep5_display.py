@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""B1: legacy palette state and fixed pre-separation PC-98 I/O trace."""
+"""B1/B2: legacy palette/scroll state and fixed pre-separation PC-98 I/O trace."""
 CHECK = dict(name='sep5-display-host', tier=1, needs=[], budget=5,
-    covers=['gfx/palette.c', 'kernel/console/display_restore.h',
+    covers=['gfx/palette.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'kernel/console/display_restore.h',
             'platform/pc98/display.c', 'platform/powermac/display.c',
             'build/platform/powermac.mk', 'tools/tests/sep5_display_host.c',
             'tools/tests/test_sep5_display.py', 'tools/tests/host32.py',
@@ -17,6 +17,12 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('scroll-scale', 'scroll_provider', 'line_mul = GFX_HEIGHT / height;', 'line_mul = 1;'),
+    ('scroll-sign', 'scroll', 'vram_scroll_y += lines % gfx_current_height;', 'vram_scroll_y -= lines % gfx_current_height;'),
+    ('scroll-page', 'scroll_provider', 'sad_base = page * (height * GFX_WPL);', 'sad_base = 0; (void)page;'),
+    ('scroll-no-bb', 'scroll', 'if (!bb_b) return;', 'if (0) return;'),
+    ('scroll-command-order', 'scroll_provider', '_out(GDC_GFX_CMD, GDC_CMD_SCROLL);\n    gfx_vsync_wait();', 'gfx_vsync_wait();\n    _out(GDC_GFX_CMD, GDC_CMD_SCROLL);'),
+    ('scroll-sad', 'scroll_provider', 'sad1 = sad_base + y * GFX_WPL;', 'sad1 = sad_base;'),
     ('GR-order', 'display', 'outp(PAL_G_PORT, g & GFX_PALETTE_COMPONENT_MASK);\n    outp(PAL_R_PORT, r & GFX_PALETTE_COMPONENT_MASK);',
      'outp(PAL_R_PORT, r & GFX_PALETTE_COMPONENT_MASK);\n    outp(PAL_G_PORT, g & GFX_PALETTE_COMPONENT_MASK);'),
     ('provider-mask', 'display', 'outp(PAL_B_PORT, b & GFX_PALETTE_COMPONENT_MASK);', 'outp(PAL_B_PORT, b);'),
@@ -51,11 +57,13 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     texts = dict(palette=(ROOT/'gfx/palette.c').read_text(),
-                 display=(ROOT/'platform/pc98/display.c').read_text())
+                 display=(ROOT/'platform/pc98/display.c').read_text(),
+                 scroll=(ROOT/'gfx/gfx_scroll.c').read_text(),
+                 scroll_provider=(ROOT/'platform/pc98/gfx_scroll.c').read_text())
     with tempfile.TemporaryDirectory(prefix='sep5-display-') as directory:
         work = Path(directory)
         assert execute(texts, work) == 0
-        print('PASS host32 palette defaults/bounds/masks/shadow-only and fixed index/G/R/B trace', flush=True)
+        print('PASS host32 palette defaults/bounds/masks/shadow-only and fixed index/G/R/B and scroll/vsync trace, 200/400, flip pages, no bb', flush=True)
         if args.mutate:
             for name, unit, old, new in MUTATIONS:
                 assert texts[unit].count(old) == 1, name

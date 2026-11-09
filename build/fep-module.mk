@@ -12,6 +12,8 @@ $(FEP_OUT)/fep_body.o $(FEP_OUT)/ime.o $(FEP_OUT)/ime_dict.o $(FEP_OUT)/ime_conn
 # Display implementation remains private to the FEP module, with its basename.
 $(FEP_OUT)/ime_render_tvram.o $(FEP_OUT)/ime_display.o: $(FEP_OUT)/%.o: platform/$(PLATFORM)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@
+# 2026-11-10 第 5 段 C2 で platform/pc98 へ移設。差分ビルドの古い .d が旧パスを指すときの対策 (次の大きな整理で消してよい)。
+kernel/ime/ime_render_tvram.c: ;
 $(FEP_OUT)/fep_import_slots.o $(FEP_OUT)/fep_provider_types.o $(FEP_OUT)/fep_kexports.o: $(FEP_OUT)/%.o: $(FEP_OUT)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(FEP_INC) -c $< -o $@
 $(FEP_OUT)/fep_import_stubs.o: $(FEP_OUT)/fep_import_stubs.S build/config.mk build/fep-module.mk

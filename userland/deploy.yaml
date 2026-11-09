@@ -71,6 +71,10 @@ filesystem:
     - host: userland/tests/bench_scale2x.bin
       guest: /usr/bin/
       tags: [test]
+    # Acceptance harness: DEBUG only, never part of the boot FD.
+    - host: userland/tests/hwscroll_probe.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/gfx200_test.bin
       guest: /usr/bin/
       tags: [test]
