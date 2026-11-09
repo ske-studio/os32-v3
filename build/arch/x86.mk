@@ -5,6 +5,7 @@ AR = i386-elf-ar
 AS = nasm
 LD = python3 sdk/link_guard.py --target $(ARCH)-$(PLATFORM) --ar $(AR) i386-elf-ld
 OBJCOPY = i386-elf-objcopy
+READELF = i386-elf-readelf
 
 CFLAGS_MACHINE = -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
                  -nostdlib -mno-red-zone -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)
