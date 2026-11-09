@@ -35,6 +35,7 @@ static u32 heap_used;
 #define USER_BASE MEM_EXEC_LOAD_ADDR
 static u8 user[PAGE_SIZE * 3] __attribute__((aligned(PAGE_SIZE)));
 static int reject_second, readonly, entry_fault;
+static u32 argument_sp = USER_BASE + 512 - sizeof(u32);
 static u32 admission_notice;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { (void)attr; (void)fmt; admission_notice++; }
@@ -83,6 +84,18 @@ int as_access_page(const struct addrspace *a, u32 va, int write, u32 *pa)
     return 1;
 }
 #include "redir_source.c"
+#include "v86_call.h"
+#define arch_kapi_read_block observed_read_block
+#include "arch_call_source.c"
+#undef arch_kapi_read_block
+static unsigned reads;
+int arch_kapi_read_block(struct kapi_arg_source *src, unsigned first,
+                         unsigned count, struct kapi_values *out)
+{
+    CHECK(v86_call_pinned()); /* Admission and pin must precede even a zero-word read. */
+    reads++;
+    return observed_read_block(src, first, count, out);
+}
 #include "v86_call_source.c"
 
 static u32 invoke(const u32 *args, u32 n)
@@ -100,7 +113,13 @@ static u32 invoke(const u32 *args, u32 n)
         CHECK(((const char *)(uptr)args[1])[0] == 'b');
     }
     u32 result;
-    CHECK(v86_call_dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0, &result));
+    u32 frame[13] = {0};
+    struct arch_syscall view = {frame};
+    struct kapi_arg_source src;
+    arch_kapi_source(&src, &view);
+    unsigned before_reads = reads;
+    CHECK(v86_call_dispatch(KAPI_SLOT_V86_SELFTEST, 0, &src, 0, &result));
+    CHECK(reads == before_reads);
     CHECK((int)result == OS32_ERR_BUSY);
     calls++; ptes++; /* Simulated session's first low-PTE mutation. */
     return fail_body ? (u32)-7 : 0;
@@ -125,7 +144,12 @@ static u32 dispatch(u32 slot, u32 a, u32 b, u32 n)
 {
     u32 args[2] = {a, b}, result;
     kmemcpy(user + 512, args, sizeof(args));
-    int rc = v86_call_dispatch(slot, 0, (void *)(USER_BASE + 512), n, &result);
+    u32 frame[13] = {0};
+    frame[11] = argument_sp;
+    struct arch_syscall view = {frame};
+    struct kapi_arg_source src;
+    arch_kapi_source(&src, &view);
+    int rc = v86_call_dispatch(slot, 0, &src, n / sizeof(u32), &result);
     CHECK(rc);
     entry_fault = rc < 0;
     CHECK(root == as.pd_phys && host_if && !v86_call_pinned());
@@ -230,12 +254,21 @@ void start_c(void)
     CHECK(caller_access_enter(&previous, CALLER_USER));
     fail_alloc = 1;
     CHECK(!v86_call_init());
-    u32 r;
-    CHECK(v86_call_dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0, &r));
+    u32 r, empty_frame[13] = {0};
+    struct arch_syscall empty_call = {empty_frame};
+    struct kapi_arg_source empty_src;
+    arch_kapi_source(&empty_src, &empty_call);
+    CHECK(v86_call_dispatch(KAPI_SLOT_V86_SELFTEST, 0, &empty_src, 0, &r));
     CHECK((int)r == OS32_ERR_NOSPC && !ptes && !v86_call_pinned());
     fail_alloc = 0;
     CHECK(v86_call_init() && v86_call_init() && allocations == 1);
     CHECK(heap_used == 872);
+    CHECK(caller_access_get_user(&call.caller));
+    call.cr3 = root; call.pinned = 1;
+    unsigned before_reads = reads;
+    CHECK(v86_call_dispatch(KAPI_SLOT_V86_SELFTEST, 0, &empty_src, 0, &r) == 1);
+    CHECK((int)r == OS32_ERR_BUSY && reads == before_reads && call.pinned);
+    v86_call_cleanup();
     u32 map_args[6] = {USER_BASE, PAGE_SIZE * 2, 3, 0x32, ~0U, 0}, mapped;
     __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(map_args) : "memory");
     CHECK(mapped == USER_BASE);
@@ -246,6 +279,11 @@ void start_c(void)
     CHECK(!dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0));
     CHECK(!dispatch(KAPI_SLOT_V86_BOOT2, USER_BASE, USER_BASE + PAGE_SIZE, 8));
     CHECK(!dispatch(KAPI_SLOT_V86_DISKTEST, USER_BASE, 0, 4));
+    argument_sp = U32_MAX - 3;
+    CHECK((int)dispatch(KAPI_SLOT_V86_BOOT, USER_BASE, 0, 4) == OS32_ERR_INVAL && entry_fault);
+    argument_sp = USER_BASE + sizeof(user) - 2 * sizeof(u32);
+    CHECK((int)dispatch(KAPI_SLOT_V86_BOOT2, USER_BASE, 0, 8) == OS32_ERR_INVAL && entry_fault);
+    argument_sp = USER_BASE + 512 - sizeof(u32);
     fail_body = 1;
     CHECK((int)dispatch(KAPI_SLOT_V86_BOOT, USER_BASE, 0, 4) == -7);
     fail_body = 0;
@@ -273,7 +311,9 @@ void start_c(void)
     CHECK((int)dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0) == OS32_ERR_BUSY);
     slots[3].state = 0; v86_session.open = 1;
     CHECK((int)dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0) == OS32_ERR_BUSY);
-    v86_session.open = 0;
+    v86_session.open = 0; v86_session.closing = 1;
+    CHECK((int)dispatch(KAPI_SLOT_V86_BOOT, ~0u, ~0u, 4) == OS32_ERR_BUSY);
+    v86_session.closing = 0;
     for (u32 i = 0; i < VFS_MAX_PATH; i++) user[i] = 'x';
     CHECK((int)dispatch(KAPI_SLOT_V86_BOOT, USER_BASE, 0, 4) == OS32_ERR_INVAL);
     CHECK(entry_fault);

@@ -47,8 +47,8 @@ void v86_call_cleanup(void) { cleaned++; cleanup_seq=++seq; }
 void v86_request_exit(void) { exits++; }
 int v86_kbd_push(u8 code) { keys=code; return 3; }
 void v86_int80(u32 *frame) { CHECK(frame[V86I_EFLAGS]&EFLAGS_VM); trap_count++; }
-int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u32 *out)
-{ CHECK(slot==9 && fn==(void *)8 && args==(void *)7 && bytes==6); *out=5; return -1; }
+int v86_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count, u32 *out)
+{ CHECK(slot==9 && fn==(void *)8 && src==(void *)7 && count==6); *out=5; return -1; }
 #include "on.inc"
 #define legacy_init none_init
 #define legacy_active none_active
@@ -200,7 +200,7 @@ void _start(void) {
     CHECK(legacy_kbd_push(0x91)==3&&keys==0x91);legacy_request_exit();CHECK(exits==1);
     CHECK(none_init()==OS32_ERR_NOSYS&&!none_active()&&!none_pinned()&&!none_closing()&&!none_lowmap());
     CHECK(!none_trap((void *)1)&&!none_kbd(255));none_end();none_cleanup();none_abort();none_exit();
-    const void *unread_args=(const void *)bad_argument;
+    struct kapi_arg_source *unread_args=(struct kapi_arg_source *)bad_argument;
     const u32 slots[]={KAPI_SLOT_V86_SELFTEST,KAPI_SLOT_V86_DISKTEST,KAPI_SLOT_V86_BOOT,KAPI_SLOT_V86_BOOT2,KAPI_SLOT_V86_GDC_CAPTURE};
     for(u32 i=0;i<5;i++) { result=99;CHECK(none_dispatch(slots[i],(void *)1,unread_args,999,&result)==1&&(int)result==OS32_ERR_NOSYS); }
     result=99;CHECK(!none_dispatch(0,(void *)1,unread_args,999,&result)&&result==99);

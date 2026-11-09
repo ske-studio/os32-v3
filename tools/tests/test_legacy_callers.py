@@ -52,8 +52,8 @@ MUTANTS = [
     ('callers', 'if (legacy_closing())', 'if (0)', 'closing-ignored'),
     ('callers', '    legacy_end();\n    ring3_context_clear();\n    legacy_cleanup();',
      '    legacy_cleanup();\n    ring3_context_clear();\n    legacy_end();', 'cleanup-before-end'),
-    ('off', '(void)fn; (void)args; (void)bytes;',
-     '(void)fn; (void)bytes; (void)*(volatile const u32 *)args;', 'none-reads-args'),
+    ('off', '(void)fn; (void)src; (void)count;',
+     '(void)fn; (void)count; (void)*(volatile const u32 *)src;', 'none-reads-args'),
 ]
 
 
@@ -61,7 +61,7 @@ def main():
     original = sources()
     with tempfile.TemporaryDirectory(prefix='legacy-callers-') as td:
         work = Path(td)
-        def run(parts, red=False):
+        def exercise(parts, red=False):
             for key, body in parts.items():
                 (work / (key + '.inc')).write_text(body)
             exe = work / 'entry'
@@ -78,13 +78,13 @@ def main():
             else:
                 assert result.returncode == 0 and 'GREEN' in result.stdout, result
             print(('RED runtime' if red else 'GREEN on/off callers'), flush=True)
-        run(original)
+        exercise(original)
         if '--mutate' in sys.argv:
             for key, old, new, label in MUTANTS:
                 assert original[key].count(old) == 1, label
                 changed = dict(original)
                 changed[key] = changed[key].replace(old, new)
-                run(changed, True)
+                exercise(changed, True)
                 print(label, flush=True)
     return 0
 

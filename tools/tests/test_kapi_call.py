@@ -1,6 +1,6 @@
 """D1: product x86 call/entry and common dispatcher, ILP32 without libc."""
 CHECK = dict(name='kapi-call-host', tier=1,
-    covers=['kapi/kapi_generated.c', 'arch/x86/kernel/kapi_call.c', 'arch/x86/kernel/syscall_entry.c',
+    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'kapi/kapi_generated.c', 'arch/x86/kernel/kapi_call.c', 'arch/x86/kernel/syscall_entry.c',
             'arch/x86/kernel/ring3_entry.asm', 'arch/x86/kernel/exec_context.c',
             'arch/x86/kernel/exec_entry.c', 'arch/x86/kernel/tss.h',
             'include/kapi_call.h', 'include/kapi_call_generated.h', 'exec/redir_access.c', 'lib/kstring_asm.asm',
@@ -100,15 +100,19 @@ static void exec_park_stop(struct arch_syscall *c) { CHECK(c->native==frame); pa
 int geforce_fg_due(u32 now) { (void)now; return 0; }
 void geforce_foreground_poll(void) { CHECK(0); }
 int legacy_trap(void *native) { (void)native; return vm; }
-int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 n, u32 *r) {
-    (void)slot; (void)fn; (void)args; (void)n;
-    if (legacy_result) { *r=81; return legacy_result; } return 0;
+static int legacy_observe(struct kapi_arg_source *src, u32 *result) {
+    CHECK(!copies && !captures && !src->next && !src->caller_valid);
+    return legacy_result ? (*result=81, legacy_result) : 0;
 }
-int kapi_strings_call(u32 s, void *f, const void *a, u32 n, u16 m, u32 *r) {
-    (void)s; (void)f; (void)a; (void)n; (void)m;
+#define LEGACY_FAKE_DISPATCH_ENABLE
+#define LEGACY_FAKE_DISPATCH legacy_observe(src, result)
+#include "legacy_guest_fake.h"
+int kapi_strings_from_source(u32 s, void *f, struct kapi_arg_source *a, unsigned n, u16 m, u32 *r) {
+    (void)s; (void)f; (void)n; (void)m;
+    CHECK(a->next==0 && copies==0 && legacy_fake.count==1); legacy_fake_note(15);
     if (strings_result) { *r=82; return strings_result; } return 0;
 }
-int kapi_print_call(const void *a) { (void)a; return print_ok; }
+int kapi_print_call(const void *a) { (void)a; CHECK(!copies && legacy_fake.count==1); legacy_fake_note(14); return print_ok; }
 int ring3_ls_dispatch(u32 sp) { CHECK(sp==frame[11]); return 83; }
 static i32 typed(u8 a, i16 b, i32 c, const char *d) {
     CHECK(a==255 && b==-2 && c==-12345 && (u32)d==0x12345678);
@@ -118,6 +122,7 @@ static i32 typed(u8 a, i16 b, i32 c, const char *d) {
 /* PRODUCT */
 static void reset(unsigned count) {
     calls=copies=captures=kills=parks=aborts=0;
+    legacy_fake.count=0;
     identity=copy_ok=print_ok=1; vm=legacy_result=strings_result=abort_now=0;
     g_cur_frame=0; ring3_in_syscall=0;
     mapped_bytes=(KAPI_FIXED_MAX+2)*sizeof(u32);
@@ -186,6 +191,7 @@ MUTATIONS = (
     ('invoke-size', 'call', 'count * sizeof(u32));', 'count);'),
     ('copy-failure', 'call', 'out->value, bytes)) return 0;', 'out->value, bytes)) { for (unsigned k=0;k<count;k++) out->value[k]=0; }'),
     ('pointer-gate', 'dispatch', '(ptrmask & (u16)(1u << k))', '(0 & (u16)(1u << k))'),
+    ('consumer-order', 'dispatch', 'if (!handled) handled = arch_kapi_legacy_print(src->call, slot, result);', 'if (!handled) handled = kapi_strings_from_source(slot, wrapper, src, count, kapi_argptr[slot], result);'),
     ('entry-legacy-first', 'entry', 'if (legacy_trap(native)) return;', 'if (0 && legacy_trap(native)) return;'),
     ('abort-before-range', 'dispatch', '    ring3_abort_check();        /* 要求があれば longjmp して戻らない */', '    /* first abort omitted */'),
     ('private-before-range', 'dispatch', 'slot == RING3_LS_CALL', '0 && slot == RING3_LS_CALL'),
@@ -232,7 +238,7 @@ def main():
     cases.append(f'reset(1); words[1]=1; words[2]=1; words[3]=1; table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[1]; dispatch({slot}); CHECK(kills==1 && !calls);')
     cases.append(f'reset(1); copy_ok=0; table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[1]; dispatch({slot}); CHECK(kills==1 && !calls && frame[7]==(u32)OS32_ERR_INVAL);')
     host=HOST.replace('/* TABLES */',tables).replace('/* WRAPPERS */','\n'.join(wrappers)).replace('/* DISPATCH_CASES */','\n'.join(cases))
-    dispatch=(ROOT/'exec/exec_syscall.inc').read_text(); start=dispatch.index('void exec_syscall_dispatch(')
+    dispatch=(ROOT/'exec/exec_syscall.inc').read_text(); start=dispatch.index('/* Keep the dispatcher')
     sources=dict(call=(ROOT/'arch/x86/kernel/kapi_call.c').read_text(),entry=(ROOT/'arch/x86/kernel/syscall_entry.c').read_text(),dispatch=dispatch[start:])
     with tempfile.TemporaryDirectory(prefix='kapi-call-') as d:
         folder=Path(d)

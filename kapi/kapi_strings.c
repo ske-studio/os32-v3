@@ -1,4 +1,5 @@
 #include "kapi_strings.h"
+#include "kapi_call.h"
 #include "redir_access.h"
 #include "os32_kapi_slots.h"
 #include "kmalloc.h"
@@ -6,7 +7,6 @@
 #include "vfs.h"
 #include "launch.h"
 
-extern u32 kapi_invoke(void *target, const void *args, u32 nbytes);
 
 struct string_input {
     u16 mask, nullable;
@@ -59,12 +59,13 @@ void kapi_strings_cleanup_owned(int app_id)
     }
 }
 
-int kapi_strings_call(u32 slot, void *target, const void *user_args,
-                      u32 nbytes, u16 ptrmask, u32 *result)
+int kapi_strings_from_source(u32 slot, void *target, struct kapi_arg_source *src,
+                      unsigned count, u16 ptrmask, u32 *result)
 {
     const struct string_input *input;
     struct caller_access caller;
-    u32 args[KAPI_STRING_WORDS], count = 0;
+    struct kapi_values values;
+    u32 *args = values.value, staged_count = 0;
     int ok = -1;
     /* Constant-time absence check also keeps unrelated drawing/poll syscalls
      * out of the string-copy path. */
@@ -72,11 +73,10 @@ int kapi_strings_call(u32 slot, void *target, const void *user_args,
     input = &inputs[slot];
     if (!caller_access_get(&caller) || caller.origin != CALLER_USER ||
         caller.app_id < APP_ID_MIN || caller.app_id > APP_ID_MAX ||
-        nbytes > sizeof(args) || nbytes % sizeof(u32) ||
-        !copy_caller_bytes(&caller, user_args, args, nbytes)) return -1;
+        !arch_kapi_read_block(src, 0, count, &values)) return -1;
     /* Preserve the early pointer gate for the remaining buffer arguments.
      * String pointers instead require the entire NUL input, through B1. */
-    for (u32 i = 0; i < nbytes / sizeof(u32); i++) {
+    for (u32 i = 0; i < count; i++) {
         u16 bit = (u16)(1u << i);
         if (!(input->mask & bit)) {
             if ((ptrmask & bit) && args[i] &&
@@ -84,14 +84,14 @@ int kapi_strings_call(u32 slot, void *target, const void *user_args,
             continue;
         }
         if (!args[i] && (input->nullable & bit)) continue;
-        if (count == KAPI_STRING_ARGS) goto out;
+        if (staged_count == KAPI_STRING_ARGS) goto out;
         char *p = kmalloc(input->cap);
-        staging[caller.app_id][count++] = p;
+        staging[caller.app_id][staged_count++] = p;
         if (!p || !copy_caller_cstr(&caller, (const char *)(uptr)args[i],
                                      p, input->cap)) goto out;
         args[i] = (u32)(uptr)p;
     }
-    *result = kapi_invoke(target, args, nbytes);
+    *result = arch_kapi_invoke(target, &values, count);
     ok = 1;
 out:
     kapi_strings_cleanup_owned(caller.app_id);
