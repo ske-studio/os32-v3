@@ -36,7 +36,7 @@ static int property(const struct pm_kboot_property *p, unsigned stride)
 }
 static int contains(u32 base, u32 size, u32 a, u32 n)
 {
-    return size && size<=0xffffffffUL-base && a>=base &&
+    return size && a>=base &&
            n<=size && a-base<=size-n;
 }
 /* macio's primary memory BAR, not the first assigned entry. No guessing if
@@ -54,6 +54,26 @@ static int macio_bar(const struct pm_kboot_node *v, u32 a, u32 n)
         found++;
     }
     return found==1;
+}
+/* PCI binding 2.1 section 11.2: resolve a parent BAR token using the
+ * matching BDF/BAR assigned address before walking the PCI domain ranges. */
+static int parent_address(const struct pm_kboot_node *v, u32 hi, u32 *a)
+{
+    unsigned found=0;
+    u32 resolved=0;
+    if (!property(&v->assigned,5)) return 0;
+    for (unsigned k=0;k<v->assigned.bytes;k+=20) {
+        const unsigned char *p=v->assigned.data+k;
+        u32 ah=cell_at(p), base, size;
+        if ((ah&0x03ffffffUL)!=(hi&0x03ffffffUL)) continue;
+        if (!(ah&PCI_ABSOLUTE) || !address(p,3,&ah,&base) ||
+            !number(p+12,2,&size) || *a>=size || *a>0xffffffffUL-base)
+            return 0;
+        resolved=base+*a; found++;
+    }
+    if (found!=1) return 0;
+    *a=resolved;
+    return 1;
 }
 int pm_mpic_resolve(const struct pm_kboot_info *info, u32 *pa, u32 *bytes, int *order)
 {
@@ -79,7 +99,10 @@ int pm_mpic_resolve(const struct pm_kboot_info *info, u32 *pa, u32 *bytes, int *
             !bus->sc || bus->sc>2 || !property(&bus->ranges,stride))
             return PM_MPIC_BAD_PROPERTY;
         if (!bus->ranges.bytes) {
-            if (bus->ac!=parent->ac) return PM_MPIC_BAD_PROPERTY;
+            /* The decoded address fits either one or two numeric cells.
+             * PCI's tagged address needs the same representation. */
+            if ((bus->ac==3 || parent->ac==3) && bus->ac!=parent->ac)
+                return PM_MPIC_BAD_PROPERTY;
             continue; /* explicitly empty ranges is identity; absent is not */
         }
         for (unsigned k=0;k<bus->ranges.bytes;k+=4*stride) {
@@ -91,10 +114,11 @@ int pm_mpic_resolve(const struct pm_kboot_info *info, u32 *pa, u32 *bytes, int *
                 !number(p+4*(bus->ac+parent->ac),bus->sc,&size))
                 return PM_MPIC_BAD_ADDRESS;
             if ((ch&PCI_SPACE)!=(hi&PCI_SPACE) || !contains(child,size,a,n)) continue;
+            if (parent->ac==3 && !(dh&PCI_ABSOLUTE) && (dh&0x00ffffffUL)) {
+                if (!parent_address(bus,dh,&dest)) return PM_MPIC_BAD_ADDRESS;
+                dh=PCI_MEMORY;
+            }
             if (a-child>0xffffffffUL-dest || n>0xffffffffUL-(dest+a-child))
-                return PM_MPIC_BAD_ADDRESS;
-            /* Bus ranges carry a domain address, never a BAR-relative token. */
-            if (parent->ac==3 && (dh&0x00ffffffUL))
                 return PM_MPIC_BAD_ADDRESS;
             next=dest+(a-child); next_hi=dh; matches++;
         }

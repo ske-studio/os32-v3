@@ -65,8 +65,8 @@ void entry(unsigned *stack)
     if (which==22) { /* nonzero child origin: subtraction is necessary */
         put(m->ranges.data,0x10000); want=0x80030000;
     }
-    if (which==23) { /* a BAR-relative parent token must not become an address */
-        put(m->ranges.data+4,0x02008010); expected=PM_MPIC_BAD_ADDRESS;
+    if (which==23) { /* BAR-relative parent resolves via assigned BAR0 */
+        put(m->ranges.data+4,0x02008010); put(m->ranges.data+12,0);
     }
     if (which==24) { /* explicit empty same-width bridge ranges */
         copy.mpic.v[4]=copy.mpic.v[3]; copy.mpic.count=5;
@@ -78,8 +78,23 @@ void entry(unsigned *stack)
     }
     if (which==26) { m->ac=0x40000000; expected=PM_MPIC_BAD_TREE; }
     if (which==27) { m->sc=0; expected=PM_MPIC_BAD_TREE; }
-    REQUIRE(pm_mpic_resolve(&copy,&pa,&bytes,&order)==(int)expected);
-    if (expected==PM_MPIC_OK) REQUIRE(pa==want && bytes==size && order==PM_MPIC_MMIO_LE);
-    else REQUIRE(pa==123 && bytes==456 && order==77);
+    if (which==28) { /* valid PCI aperture ending exactly at 4GiB */
+        put(pci->ranges.data+20,0x80000000);
+    }
+    if (which==29 || which==30) { /* empty numeric ranges, 1->2 and 2->1 */
+        copy.mpic.v[4]=copy.mpic.v[3]; copy.mpic.count=5;
+        copy.mpic.v[3].ranges.present=1; copy.mpic.v[3].ranges.bytes=0;
+        if (which==29) copy.mpic.v[4].ac=2;
+        else {
+            copy.mpic.v[3].ac=2; pci->ranges.bytes=28;
+            put(pci->ranges.data+12,0); put(pci->ranges.data+16,0x80000000);
+            put(pci->ranges.data+20,0); put(pci->ranges.data+24,0x10000000);
+        }
+    }
+    if (pm_mpic_resolve(&copy,&pa,&bytes,&order)!=(int)expected) quit(80);
+    if (expected==PM_MPIC_OK) {
+        if (pa!=want || bytes!=size || order!=PM_MPIC_MMIO_LE) quit(81);
+    }
+    else if (pa!=123 || bytes!=456 || order!=77) quit(82);
     quit(0);
 }

@@ -18,6 +18,9 @@ CHECK = dict(name='ppc-kboot-mpic-tree', tier=2, budget=60,
                      'arch/ppc/*.h', 'include/types.h', 'include/callconv.h',
                      'lib/kstring.h', 'lib/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
+    ('end-overflow', 'size && a>=base &&', 'size && size<=0xffffffffUL-base && a>=base &&'),
+    ('empty-width', 'if ((bus->ac==3 || parent->ac==3) && bus->ac!=parent->ac)', 'if (bus->ac!=parent->ac)'),
+    ('bar-relative', 'if (!parent_address(bus,dh,&dest))', 'if (1 || !parent_address(bus,dh,&dest))'),
     ('range-direction', 'next=dest+(a-child);', 'next=child+(a-child);'),
     ('bar-choice', '(hi&0xff)!=PCI_BAR0', '(hi&0xff)!=0x14UL'),
     ('skip-parent', 'i+1<d->count', 'i+2<d->count'),
@@ -39,8 +42,10 @@ def exercise(directory, source):
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
-    for case in range(28):
+    for case in range(31):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
+        if result.returncode not in (0, 80, 81, 82):
+            raise RuntimeError(f'case {case}: unexpected runtime status {result.returncode}')
         if result.returncode:
             failed.append((case, result.returncode))
     return failed
@@ -56,7 +61,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 28 MPIC window cases (ILP32 product code)')
+        print('GREEN: 31 MPIC window cases (ILP32 product code)')
         if args.mutate:
             text = product.read_text()
             for name, old, new in MUTATIONS:
