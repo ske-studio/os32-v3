@@ -60,12 +60,24 @@
  * fixed-size cells and a synchronous, single-caller firmware interface. */
 #include "ofw.h"
 static ppc_ci client;
-void ofw_init(ppc_ci ci) { client = ci; }
+static unsigned calls, detached;
+/* Dedicated terminal so a rejected CI call has an unambiguous observation. */
+void ofw_detached_stop(void) __attribute__((noreturn,noinline));
+void ofw_detached_stop(void) { for (;;) {} }
+void ofw_init(ppc_ci ci)
+{
+    if (detached) { ppc_disable(); ofw_detached_stop(); }
+    client = ci;
+}
+unsigned ofw_call_count(void) { return calls; }
+unsigned ofw_detach(void) { detached = 1; return calls; }
 int ofw_call(const char *name, unsigned ni, unsigned no, cell *cells)
 {
+    if (detached) { ppc_disable(); ofw_detached_stop(); }
     cell args[3 + PM_CI_CAP] = {ppc_ptr_cell(name), ni, no};
     if (ni > PM_CI_CAP || no > PM_CI_CAP - ni) return -1;
     for (unsigned i=0; i<ni; i++) args[3+i] = cells[i];
+    ++calls;
     int rc = client(args);
     for (unsigned i=0; i<no; i++) cells[ni+i] = args[3+ni+i];
     return rc;
