@@ -1,6 +1,6 @@
 # PCI の IRQ を機器の種類で振り直す (共通の層と PC-98・PowerMac G4 の backend)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定、実装を待つ ([PCI_IRQ_ROUTE_DESIGN](../../decisions/realhw/PCI_IRQ_ROUTE_DESIGN.md))。前提は GeForce の位置の直し ([TASK_GF_BDF](TASK_GF_BDF.md))。PM は設計に専念中のため実装の着手はユーザーの解除の後。
+> 状態: **設計中 (2026-11-09)** — 設計は確定、実装を待つ ([PCI_IRQ_ROUTE_DESIGN](../../decisions/realhw/PCI_IRQ_ROUTE_DESIGN.md))。前提は GeForce の位置の直し (票 TASK_GF_BDF)。PM は設計に専念中のため実装の着手はユーザーの解除の後。
 
 ## 0. ユーザー決定 (原文)
 - 2026-11-09 (実機ノート経由):「デバイスの種類で IRQ を振り直す実装があったほうが良い」
