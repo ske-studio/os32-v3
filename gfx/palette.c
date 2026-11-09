@@ -5,8 +5,7 @@
 /* ======================================================================== */
 
 #include "palette.h"
-#include "gfx.h"   /* PAL_IDX_PORT, PAL_G_PORT, PAL_R_PORT, PAL_B_PORT */
-#include "io.h"
+#include "display_restore.h"
 
 /* シャドウパレット */
 static PaletteEntry shadow[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)];
@@ -32,21 +31,12 @@ static const PaletteEntry default_palette[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)] 
     { 15, 15, 15 },  /* 15: 白(明) */
 };
 
-/* ハードウェアにパレットを書き込み */
-static void hw_set_palette(int idx, u8 r, u8 g, u8 b)
-{
-    outp(PAL_IDX_PORT, (u8)idx);
-    outp(PAL_G_PORT, g & GFX_PALETTE_COMPONENT_MASK);
-    outp(PAL_R_PORT, r & GFX_PALETTE_COMPONENT_MASK);
-    outp(PAL_B_PORT, b & GFX_PALETTE_COMPONENT_MASK);
-}
-
 void palette_init(void)
 {
     int i;
     for (i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); i++) {
         shadow[i] = default_palette[i];
-        hw_set_palette(i, shadow[i].r, shadow[i].g, shadow[i].b);
+        display_palette4_write(i, shadow[i].r, shadow[i].g, shadow[i].b);
     }
 }
 
@@ -56,12 +46,12 @@ void palette_set(int idx, u8 r, u8 g, u8 b)
     shadow[idx].r = r & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].g = g & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].b = b & GFX_PALETTE_COMPONENT_MASK;
-    hw_set_palette(idx, shadow[idx].r, shadow[idx].g, shadow[idx].b);
+    display_palette4_write(idx, shadow[idx].r, shadow[idx].g, shadow[idx].b);
 }
 
 /* シャドウだけを更新する (ハードウェアには書かない)。
  * 256 色バックエンド (PEGC) はパレットレジスタの輝度が 8bit で、この
- * ファイルの hw_set_palette (4bit) を通せない。それでも KAPI の
+ * ファイルの display_palette4_write (4bit) を通せない。それでも KAPI の
  * gfx_get_palette は palette_get = シャドウを読むので、バックエンド側が
  * 0〜15 のシステム色を書いたときはここで台帳を合わせる (票 H2c)。 */
 void palette_shadow_set(int idx, u8 r, u8 g, u8 b)

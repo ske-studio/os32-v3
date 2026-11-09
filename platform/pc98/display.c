@@ -114,3 +114,12 @@ void platform_display_kcg_code(void)
     outp(MODE_FF1_PORT, MFF1_KCG_CODE);
     io_wait();
 }
+
+/* PC9800Bible §2-7: retain index, green, red, blue ordering without waits. */
+void display_palette4_write(int index, u8 r, u8 g, u8 b)
+{
+    outp(PAL_IDX_PORT, (u8)index);
+    outp(PAL_G_PORT, g & GFX_PALETTE_COMPONENT_MASK);
+    outp(PAL_R_PORT, r & GFX_PALETTE_COMPONENT_MASK);
+    outp(PAL_B_PORT, b & GFX_PALETTE_COMPONENT_MASK);
+}
