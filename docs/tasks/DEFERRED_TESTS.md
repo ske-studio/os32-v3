@@ -91,6 +91,7 @@
 | HS-P3 | Host Services のレビューの軽い指摘 3 件: (a) sfs_client.c はホストの T_ERR を status を見ずに全部 STALE に扱う (今は max_payload の取り決めで届かない) (b) 常駐の scope の開始の ensure が失敗したときの表示が `session not started (-18)` だけで HOSTDOWN か TIMEOUT か出ない (c) 常駐の transport の行の NIC 名が 82557 に固定 (tools/rshell_serial.py の lan_result も 82557 に固定なので両方一緒に) | 軽い直し (P3) | Host Services に次に触る段 |
 | KDBG-P3 | kdebug の採取点 段 C の軽い指摘: `probe list` が 0 件のとき名前の無い行を出す、ADD・DRAIN の後の STATUS の kdebug_call の失敗で終端の行を出さずに返る (hwb_probe.c:93・:105) | 軽い直し (P3) | HW-BASIC の probe に次に触る段 |
 | TRI-P3 | Trident の退避の構成で、起動時の P→B の作り直しが割込み停止の中で 1.2MB の kmemset (resources.c:173-174、P100 で数十 ms と推定、未計測) | 計測と軽い直し (P3) | Trident の次の段か、起動時間の計測の回 |
+| GFX-P3 | GeForce の DIRECT の受入 (2026-11-09) で気づいた小さな件: (a) edit_gui は argv を使わず、Run の窓から「edit_gui.bin <file>」で開けない (src/lib.rs の main) — Open の窓からは開ける (b) GeForce の受入の残り P3 (REVIEW.wave3・wave4 の記録: カーソルの hide の PUT が key=-1 で 160 画素を戻す、ウィジェットの枠の外の 2 行、HC の熱の pause 中の lost の繰り返しなど) (c) 実機の道具の gserial leave が cui done の前に時間切れで rc=1 になることがある | 持越し | GFX_ACCEL_HAL の次の段 (設計に専念する期間の後) |
 
 ## 4. 実機 Ra266 (R7、2026-10-12、9545e27)
 
