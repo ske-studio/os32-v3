@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""OF-loaded core-ready acceptance. Input ELF is never rebuilt or modified."""
+"""OF-loaded core-ready acceptance. Input ELF is never rebuilt or modified.
+
+Observation symbols required of positive images (not extra KBOOT log lines):
+  kboot_ready_tb: big-endian u64 TB sampled immediately before emitting READY.
+  kboot_tick: big-endian u32 live 1 kHz interrupt count, including during idle.
+Both must remain mapped/readable at each QMP stop. H3 must provide these symbols.
+"""
 import argparse
 import hashlib
 import json
@@ -10,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tempfile
 sys.dont_write_bytecode = True
 from run import ROOT, ROM, QMP, command, require, CriterionFailure
 from kboot_mutations import NEGATIVES
@@ -31,7 +38,8 @@ PATTERNS = [
 def validate(a, b, complete=False):
     require('KBOOT' not in b, 'serial B contains KBOOT')
     require(not re.search(r'FAIL|FATAL|UNSUPPORTED', a+b), 'forbidden diagnostic')
-    lines = [line for line in a.splitlines() if line.startswith('KBOOT ')]
+    lines = [line for line in a[:a.rfind('\n')+1].splitlines() if line.startswith('KBOOT ')]
+    require(len(lines) == len(set(lines)), 'duplicate/extra milestone')
     require(len(lines) <= len(PATTERNS), 'duplicate/extra milestone')
     values = []
     for i, line in enumerate(lines):
@@ -58,13 +66,13 @@ def validate(a, b, complete=False):
 
 
 def serial(path):
-    # Ignore an unfinished UART line until its newline arrives.
     raw = path.read_bytes() if path.exists() else b''
-    return raw[:raw.rfind(b'\n')+1].decode('ascii', errors='replace')
+    return raw.decode('ascii', errors='replace')
 
 
 def accept(elf, cpu, timeout, out, negative=None):
     out.mkdir(parents=True, exist_ok=True)
+    out = Path(tempfile.mkdtemp(prefix=(negative or 'normal')+'-'+cpu+'-', dir=out))
     cd = out/'cd'; cd.mkdir(exist_ok=True)
     shutil.copyfile(elf, cd/'PPCKERN.ELF')
     iso = out/'kboot.iso'
@@ -88,7 +96,29 @@ def accept(elf, cpu, timeout, out, negative=None):
     (out/'metadata.json').write_text(json.dumps(metadata, indent=2))
     if elf.with_suffix('.map').exists():
         shutil.copyfile(elf.with_suffix('.map'), out/'kernel.map')
-    q = None; snapshots = []; stable = 0; ready_seen = False; ready_tb = None
+    # H3 observation ABI: big-endian u64 READY TB, and live u32 millisecond tick.
+    if not contract:
+        for name in ('kboot_ready_tb', 'kboot_tick'):
+            require(name in symbols, 'missing observation symbol '+name)
+    q = None; snapshots = []; stable = 0; ready_seen = False
+
+    def word(name, offset=0):
+        result = q.call('human-monitor-command', {
+            'command-line': f'x /1wx 0x{symbols[name]+offset:x}'})
+        snapshots.append(name+': '+result)
+        match = re.search(r':\s*0x([0-9a-fA-F]+)', result)
+        if not match:
+            raise RuntimeError('QMP missing memory word '+name)
+        return int(match[1], 16)
+
+    def running_state(regs):
+        address = int(re.search(r'NIP\s+([0-9a-fA-F]+)', regs)[1], 16)
+        msr = int(re.search(r'MSR\s+([0-9a-fA-F]+)', regs)[1], 16)
+        ins = q.call('human-monitor-command', {'command-line': f'x /1wx 0x{address:x}'})
+        halted = address == symbols.get('ppc_kernel_entry_stop') or bool(
+            re.search(r':\s*0x48000000\b', ins))
+        require(not halted or bool(msr & 0x8000), 'stopped after READY')
+
     deadline = time.monotonic()+min(timeout, 30 if negative else 60)
     with (out/'qemu.stderr').open('w') as err:
         p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
@@ -110,30 +140,44 @@ def accept(elf, cpu, timeout, out, negative=None):
                 if not tb:
                     raise RuntimeError('QMP missing TB')
                 tb_now = (int(tb[1]) << 32) | int(tb[2])
-                if ready_seen and ready_tb is None:
-                    ready_tb = tb_now
                 if contract:
                     stable = stable+1 if address == symbols[contract.stop] else 0
                     if stable == 2:
-                        require(aa.count(contract.fatal) == 1 and aa.count('FATAL') == 1
-                                and contract.reached in aa, 'negative diagnostic/progress')
+                        lines = aa[:aa.rfind('\n')+1].splitlines()
+                        require(lines.count(contract.fatal) == 1 and
+                                lines.count(contract.reached) == 1 and
+                                lines.index(contract.reached) < lines.index(contract.fatal) and
+                                aa.count('FATAL') == 1 and
+                                not re.search(r'FAIL|UNSUPPORTED', aa+bb),
+                                'negative diagnostic/progress')
                         require('KBOOT' not in bb, 'serial B contains KBOOT')
                         break
                 elif ready_seen:
-                    # A self-branch is a terminal stop even while QMP says running.
-                    ins = q.call('human-monitor-command', {'command-line': f'x /1wx 0x{address:x}'})
-                    require(not re.search(r':\s*0x48000000\b', ins), 'stopped after READY')
-                    require(address != symbols.get('ppc_kernel_entry_stop'), 'stopped after READY')
+                    running_state(regs)
                     if done:
+                        ready_tb = (word('kboot_ready_tb') << 32) | word('kboot_ready_tb', 4)
+                        ticks_before = word('kboot_tick')
                         hz = int(re.search(r'tb_hz=(\d+)', aa)[1])
                         require(tb_now-ready_tb >= 2*hz, 'QMP READY duration')
-                        q.call('cont')
-                        require(q.call('query-status')['running'], 'QMP not running')
-                        time.sleep(0.1)
-                        q.call('stop')
-                        later = q.call('human-monitor-command', {'command-line': 'info registers'})
-                        snapshots.append(later)
-                        require(later != regs, 'QMP no execution progress')
+                        # Observe at least 100 ms of guest TB, independent of TCG speed.
+                        # An interrupt handler can temporarily have EE clear: resample it.
+                        while True:
+                            q.call('cont')
+                            require(q.call('query-status')['running'], 'QMP not running')
+                            time.sleep(0.05)
+                            q.call('stop')
+                            later = q.call('human-monitor-command', {'command-line': 'info registers'})
+                            snapshots.append(later)
+                            running_state(later)
+                            halves = re.search(r'TB\s+(\d+)\s+(\d+)', later)
+                            later_tb = (int(halves[1]) << 32) | int(halves[2])
+                            elapsed = later_tb-tb_now
+                            ee = int(re.search(r'MSR\s+([0-9a-fA-F]+)', later)[1], 16) & 0x8000
+                            if elapsed >= hz//10 and ee:
+                                break
+                            require(elapsed < hz, 'interrupts disabled after READY')
+                        tick_delta = (word('kboot_tick')-ticks_before) & 0xffffffff
+                        require(tick_delta > 0, 'QMP no tick progress')
                         validate(serial(a), serial(b), True)
                         break
                 q.call('cont')
@@ -151,6 +195,7 @@ def accept(elf, cpu, timeout, out, negative=None):
                 p.terminate()
                 try: p.wait(timeout=2)
                 except subprocess.TimeoutExpired: p.kill(); p.wait()
+    return out
 
 
 def main():

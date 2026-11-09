@@ -23,6 +23,4 @@ NEGATIVES = {
 METER_MUTATIONS = (
     ('tick-check', 'abs(ticks*1000-us)*100 <= us*5', 'True', 'tick'),
     ('duration-check', "us >= 2000000", 'True', 'duration'),
-    ('ready-stop', "require(not re.search(r':\\s*0x48000000\\b', ins), 'stopped after READY')",
-     "require(True, 'stopped after READY')", 'stop'),
 )
