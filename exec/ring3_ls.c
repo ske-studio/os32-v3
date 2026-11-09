@@ -88,17 +88,9 @@ int ring3_ls_window(const char *user_path, u32 skip, OS32_LsPacket *out)
     return 0;
 }
 
-int ring3_ls_dispatch(u32 user_esp)
+/* Logical private arguments: path, skip, output packet; no callback. */
+int ring3_ls_dispatch(const struct kapi_values *values)
 {
-    struct caller_access caller;
-    u32 args[3];                 /* path, skip, output packet; no callback */
-    if (user_esp > ~(u32)0 - sizeof(u32) ||
-        !caller_access_get_user(&caller) ||
-        !copy_caller_bytes(&caller, (const void *)(uptr)(user_esp + sizeof(u32)),
-                           args, sizeof(args))) {
-        ring3_fault_kill();
-        return OS32_ERR_INVAL;
-    }
-    return ring3_ls_window((const char *)(uptr)args[0], args[1],
-                          (OS32_LsPacket *)(uptr)args[2]);
+    return ring3_ls_window((const char *)(uptr)values->value[0], values->value[1],
+                          (OS32_LsPacket *)(uptr)values->value[2]);
 }

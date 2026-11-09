@@ -14,7 +14,7 @@ void geforce_foreground_poll(void) {}
 void *memcpy(void *d, const void *s, u32 n) { return kmemcpy(d, s, n); }
 #include "ring3_str.h"
 #include "ring3_ls.h"
-int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
+int ring3_ls_dispatch(const struct kapi_values *values) { (void)values; __builtin_trap(); }
 #include "v86.h"
 void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 volatile int ring3_in_syscall = 1;

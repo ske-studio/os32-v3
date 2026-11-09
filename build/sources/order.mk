@@ -30,4 +30,5 @@ ASM_ORDER_LEGACY = arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm arch/
 INCLUDE_ORDER_LEGACY = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time arch/x86/legacy platform/pc98/legacy mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
 MODULE_ORDER_LEGACY = kdebug hwdev sqlite fep cd kcg fm pcm v86 lan cirrus geforce trident
 
+C_ORDER_LEGACY += arch/x86/kernel/syscall_code.c
 C_ORDER_LEGACY += arch/ppc/video_wc.c

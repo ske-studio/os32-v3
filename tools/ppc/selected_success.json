@@ -8,6 +8,7 @@
   "exec/appmem_unmap.c",
   "exec/exec_heap.c",
   "exec/os32x_hdr.c",
+  "exec/ring3_ls.c",
   "exec/ring3_str.c",
   "exec/system_surface.c",
   "fs/ext2/ext2_dir.c",
