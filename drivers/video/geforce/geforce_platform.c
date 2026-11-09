@@ -34,6 +34,9 @@ static int reserve(void)
     boot_resources_valid = false;
     if (!gf_production_selected()) return reserve_fail("selection");
     if (gf_production_identify(&boot_resources)) return reserve_fail("identify");
+    kprintf(KLOG_ATTR, "[geforce] pci 0:%u.0\n", RECOVER_GF_DEV);
+    if (recover_gf_second() != U32_MAX)
+        kprintf(KLOG_ATTR, "[geforce] second 0:%u.0 ignored\n", recover_gf_second());
     struct ledger_span spans[RECOVER_BAR_COUNT];
     u32 ids[RECOVER_BAR_COUNT];
     for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i) {

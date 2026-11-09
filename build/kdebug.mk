@@ -12,6 +12,10 @@ $(MODULE_SCHEMA): tools/module_schema.py tools/gen_module_schema.py
 KDEBUG_OBJS := $(KDEBUG_OUT)/v86_gcap.o $(KDEBUG_OUT)/v86_gcap_math.o $(KDEBUG_OUT)/nic_trace.o $(KDEBUG_OUT)/kselftest.o $(KDEBUG_OUT)/selftest_kbd_inject.o $(KDEBUG_OUT)/selftest_lease.o $(KDEBUG_OUT)/selftest_exec.o $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
                $(KDEBUG_OUT)/probe.o $(KDEBUG_OUT)/probe_index.o $(KDEBUG_OUT)/hwb_access.o $(KDEBUG_OUT)/kpeek.o $(KDEBUG_OUT)/kdebug_window.o $(KDEBUG_OUT)/recover.o $(KDEBUG_OUT)/recover_profile.o $(KDEBUG_OUT)/recover_virtual.o \
                $(KDEBUG_OUT)/trident_command_test.o $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
+KDEBUG_OBJS += $(KDEBUG_OUT)/recover_gf_locate.o $(KDEBUG_OUT)/pci_locate.o
+$(KDEBUG_OUT)/pci_locate.o: drivers/pci/pci_locate.c build/config.mk build/kdebug.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -c $< -o $@
 KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
 ifeq ($(TICK_PROBE_BUILD),1)
 KDEBUG_OBJS += $(KDEBUG_OUT)/tick_probe.o

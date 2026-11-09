@@ -1,6 +1,6 @@
 """B03: real gf5 diagnostic dispatch with module boundary callbacks."""
 CHECK = dict(name='gf5-gpio-diag', tier=1, needs=[], budget=3.4,
-             covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',
                      'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
@@ -30,7 +30,7 @@ def command(exe):
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
             '-D__KERNEL_BUILD__', *include_flags(ROOT),
             str(ROOT / 'tools/tests/gf5_gpio_diag_host.c'),
-            str(ROOT / PRODUCT), '-o', str(exe)]
+            str(ROOT / PRODUCT), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)]
 
 
 def main():

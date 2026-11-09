@@ -3,7 +3,7 @@
 CHECK = dict(name='sep5-wc-host', tier=1,
     covers=['arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c', 'include/video_wc.h',
             'drivers/video/geforce/gf_wc.c', 'tools/tests/test_sep5_wc.py',
-            'tools/tests/gf_wc_host.c', 'tools/tests/kernel_includes.py',
+            'tools/tests/gf_wc_host.c', 'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
             'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_startlog_host.h',
             'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h',
             'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/backend_geforce.c',
@@ -59,7 +59,7 @@ def wc_lifecycle(mutation=None):
         harness=harness.replace('"../../drivers/video/geforce/backend_geforce.c"','"backend.inc"')
         (tmp/'host.c').write_text(harness)
         (tmp/'legacy_guest_fake.h').write_text((ROOT/'tools/tests/legacy_guest_fake.h').read_text())
-        host32.build(FLAGS+INCLUDES+['-I'+str(ROOT),'-I'+str(ROOT/'arch/x86/kernel'),'-I'+td,'-Wno-unused-function',str(tmp/'host.c'),'-o',str(exe)],check=True)
+        host32.build(FLAGS+INCLUDES+['-I'+str(ROOT),'-I'+str(ROOT/'arch/x86/kernel'),'-I'+td,'-Wno-unused-function',str(tmp/'host.c'),str(ROOT/'tools/tests/recover_gf_dev_stub.c'),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
         assert result.returncode==(1 if mutation else 0),(mutation,result.returncode,result.stdout,result.stderr)
         print(('RED '+mutation+' '+result.stdout.strip() if mutation else 'PASS WC lifetime: first/reentry/same init/reconfigure/abort/failures/double stop, owned/BIOS, unchanged PTE/ledger'),flush=True)
