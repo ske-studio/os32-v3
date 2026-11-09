@@ -1,4 +1,4 @@
-# TASK_GEFORCE6200 — 実機 Ra266 の GeForce 6200 (PCI 0:13.0) を観測して画面ドライバの根拠を集める
+# TASK_GEFORCE6200 — 実機 Ra266 の GeForce 6200 (PCI バス 0 の列挙で見つけた位置) を観測して画面ドライバの根拠を集める
 
 > 上位: [ROADMAP](../../ROADMAP.md)
 

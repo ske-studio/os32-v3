@@ -4,6 +4,7 @@
 #include "geforce_module.h"
 #include "hwdev/gf/production.h"
 #include "sys.h"
+#include "video_wc.h"
 #include "mm/paging.h"
 #include "mm/pgalloc.h"
 #include "drivers/pci/pci.h"
@@ -13,16 +14,6 @@
 #define ACCEPT_RUNS 3U
 #define ACCEPT_FAILED (~0U)
 #define ACCEPT_LINE 4096U
-#define ACCEPT_MTRR_CAP 0xfeU
-#define ACCEPT_MTRR_DEF 0x2ffU
-#define ACCEPT_MTRR_BASE 0x200U
-#define ACCEPT_MTRR_VALID (1ULL << 11)
-#define ACCEPT_MTRR_WC 1U
-#define ACCEPT_PAT 0x277U
-#define ACCEPT_ID_BIT (1U << 21)
-#define ACCEPT_PTE_PAT 0x80U
-#define ACCEPT_EXT_MAX 0x80000000U
-#define ACCEPT_EXT_WIDTH 0x80000008U
 #define ACCEPT_PAGE_COUNT (GF_MODE_VRAM_BYTES / PAGE_SIZE)
 static const struct { int x, y, w, h; } rectangles[] = {
     {0,0,0,0}, {0,0,GF_MODE_WIDTH,GF_MODE_HEIGHT}, {0,0,320,200},
@@ -60,90 +51,6 @@ static void emit(void)
     *out++ = '\n'; *out = 0;
     geforce_context->platform->report(line);
 }
-/* Read-only CPU primitives begin. Replaced by instruction-free host models. */
-static u32 flags(void)
-{
-    u32 v; __asm__ volatile("pushfl; popl %0" : "=r"(v) : : "memory"); return v;
-}
-static void set_flags(u32 v)
-{
-    __asm__ volatile("pushl %0; popfl" : : "r"(v) : "cc", "memory");
-}
-static void cpuid(u32 leaf, u32 sub, u32 *a, u32 *b, u32 *c, u32 *d)
-{
-    __asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
-                     : "a"(leaf), "c"(sub) : "memory");
-}
-static unsigned long long msr(u32 reg)
-{
-    u32 lo, hi;
-    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(reg) : "memory");
-    return ((unsigned long long)hi << 32) | lo;
-}
-/* Read-only CPU primitives end. */
-static void cpu_record(u32 leaf, u32 sub, u32 a, u32 b, u32 c, u32 d)
-{
-    begin("cpu"); number(leaf); number(sub); number(a); number(b); number(c); number(d); emit();
-}
-static unsigned long long msr_record(u32 phase, u32 reg)
-{
-    unsigned long long value = msr(reg);
-    begin("msr"); number(phase); number(reg); number((u32)value); number(value >> 32); emit();
-    return value;
-}
-/* Return 1 for confirmed UC, 2 for WC, 0 for an unclassified mapping.
- * This observes BIOS state after wc_stop and actual state after wc_start.
- * Partial/ambiguous WC never becomes a UC measurement. */
-static int inspect(u32 phase)
-{
-    const struct geforce_platform *p = geforce_context->platform;
-    int mapped = 1, result = 1;
-    for (u32 i = 0; i < ACCEPT_PAGE_COUNT; ++i) {
-        u32 address = p->display_phys + i * PAGE_SIZE, raw = paging_pte_raw(address);
-        begin("pte"); number(phase); number(i); number(raw); emit();
-        if ((raw & (PTE_FRAME_MASK | PTE_PRESENT | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT | ACCEPT_PTE_PAT)) !=
-            (address | PTE_PRESENT | PAGE_RW | PTE_PCD)) mapped = 0;
-    }
-    u32 saved = flags(); set_flags(saved ^ ACCEPT_ID_BIT); u32 changed = flags(); set_flags(saved);
-    if (!((saved ^ changed) & ACCEPT_ID_BIT)) return mapped ? 1 : 0;
-    u32 a,b,c,d,maximum;
-    cpuid(0,0,&a,&b,&c,&d); maximum = a; cpu_record(0,0,a,b,c,d);
-    if (!maximum) return mapped ? 1 : 0;
-    int intel = b == 0x756e6547U && d == 0x49656e69U && c == 0x6c65746eU;
-    cpuid(1,0,&a,&b,&c,&d); cpu_record(1,0,a,b,c,d);
-    u32 features = d;
-    if (phase == 0 && maximum >= 2) {
-        cpuid(2,0,&a,&b,&c,&d); u32 count = a & 0xffU;
-        cpu_record(2,0,a,b,c,d);
-        for (u32 i=1; i<count; ++i) { cpuid(2,0,&a,&b,&c,&d); cpu_record(2,i,a,b,c,d); }
-        if (maximum >= 4) for (u32 i=0; ; ++i) {
-            cpuid(4,i,&a,&b,&c,&d); cpu_record(4,i,a,b,c,d);
-            if (!(a & 0x1fU)) break;
-        }
-    }
-    if (!intel) return 0; /* The WC implementation also requires GenuineIntel. */
-    if (!(features & (1U << 5))) return mapped ? 1 : 0;
-    if ((features & (1U << 16)) && ((msr_record(phase, ACCEPT_PAT) >> 16) & 0xffU) != 7) mapped = 0;
-    if (!(features & (1U << 12))) return mapped ? 1 : 0;
-    unsigned long long cap = msr_record(phase,ACCEPT_MTRR_CAP), def = msr_record(phase,ACCEPT_MTRR_DEF);
-    u32 bits = 36;
-    cpuid(ACCEPT_EXT_MAX,0,&a,&b,&c,&d); cpu_record(ACCEPT_EXT_MAX,0,a,b,c,d);
-    if (a >= ACCEPT_EXT_WIDTH) { cpuid(ACCEPT_EXT_WIDTH,0,&a,&b,&c,&d); bits=a & 0xffU; cpu_record(ACCEPT_EXT_WIDTH,0,a,b,c,d); }
-    if (bits < 32 || bits > 52) return 0;
-    unsigned long long mask = ((1ULL << bits)-1) & ~(unsigned long long)(PAGE_SIZE-1);
-    if ((def & ACCEPT_MTRR_VALID) && (def & 0xffU) == ACCEPT_MTRR_WC) result = 2;
-    for (u32 i=0; i<(cap & 0xffU); ++i) {
-        unsigned long long base = msr_record(phase,ACCEPT_MTRR_BASE+2*i);
-        unsigned long long size = msr_record(phase,ACCEPT_MTRR_BASE+2*i+1);
-        if (!(def & ACCEPT_MTRR_VALID) || !(size & ACCEPT_MTRR_VALID) || (base & 0xffU) != ACCEPT_MTRR_WC) continue;
-        unsigned long long first = base & size & mask, end = first + ((~size & mask) | (PAGE_SIZE-1)) + 1;
-        if (p->display_phys < end && first < (unsigned long long)p->display_phys+GF_MODE_VRAM_BYTES) {
-            if (first <= p->display_phys && end >= (unsigned long long)p->display_phys+GF_MODE_VRAM_BYTES) result = 2;
-            else mapped = 0;
-        }
-    }
-    return mapped ? result : 0;
-}
 static int counted_point(void *opaque)
 {
     (void)opaque; ++points; return real_point(real_opaque);
@@ -159,17 +66,17 @@ static int initialize(void)
     const struct geforce_platform *p = geforce_context->platform;
     if (!p->wc_stop || !p->wc_start || !p->report) return -1;
     if (p->wc_stop() < 0) return -1;
-    int original = inspect(0), actual = original;
+    int original = arch_video_cache_inspect(0, p->display_phys, GF_MODE_VRAM_BYTES, p->report), actual = original;
     if (GF_ACCEPT_MODE == 2) {
         int rc = p->wc_start();
         if (rc < 0) return -1;
-        actual = inspect(1);
+        actual = arch_video_cache_inspect(1, p->display_phys, GF_MODE_VRAM_BYTES, p->report);
         usable = rc == 1 && actual == 2;
         reason = usable ? "ok" : "wc-unavailable";
     } else {
         usable = original == 1;
         reason = usable ? "ok" : original == 2 ? "bios-wc" : "unclassified";
-        (void)inspect(1);
+        (void)arch_video_cache_inspect(1, p->display_phys, GF_MODE_VRAM_BYTES, p->report);
     }
     effective = actual == 1 ? "UC" : actual == 2 ? "WC" : "unknown";
     begin("pair"); number(GF_ACCEPT_PAIR); emit();

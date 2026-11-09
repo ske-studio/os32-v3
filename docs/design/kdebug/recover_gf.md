@@ -6,7 +6,7 @@
 
 | 順序 | 操作・検査 | 失敗時 |
 | --- | --- | --- |
-| A1 承認後 BAR測定 | 0:13.0 の Command16・BAR0〜2を保存。Commandの I/O/Mem/BusMaster を0にし生読み確認→BARを1本ずつ FFFFFFFFh、マスクを読む→直ちに元値を戻し確認 | cleanupで全BARを復元してから Command=0102h（BMを復元しない）。復元不一致なら decodeを止めたまま異常終了 |
+| A1 承認後 BAR測定 | バス 0 の列挙で見つけた位置の Command16・BAR0〜2を保存。Commandの I/O/Mem/BusMaster を0にし生読み確認→BARを1本ずつ FFFFFFFFh、マスクを読む→直ちに元値を戻し確認 | cleanupで全BARを復元してから Command=0102h（BMを復元しない）。復元不一致なら decodeを止めたまま異常終了 |
 | A1 終了 | memory32 の `size=~(mask & fffffff0h)+1`、非零・2冪・整列・加算溢れ無し。32bit型のみ許可、64bit/I/O型は別設計まで拒否。割当て区間を他装置・bridge窓と照合、Commandを0102hへ（MemとSERRのみ、BusMaster=0を生読み確認） | BARの再割当て・ROM BARのenableはしない。Mem無効中はPBUS鏡にアクセスしない |
 | A2 G1前倒し | **PBUS BAR0+1854h←0**、PBUSとcfg54hを読み0、Command=0102h・BM=0を確認。98テキストが表示され更新できることをユーザーが確認 | 以後のscript実行を禁止。強制で54hを1に戻して試さない |
 | A2 前処理 | 1850h=0・PMC割込み=0を確認。PMC.ENABLE bit0 を立て、head0を選択、必要な拡張CRを解錠。対象値と許可行を実行前manifestに含める | readback不一致なら止める |

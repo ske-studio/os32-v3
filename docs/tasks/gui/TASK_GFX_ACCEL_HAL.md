@@ -34,4 +34,5 @@ PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ
 | H5・H6・W1・W2・W3 (第 4 波) | 実装済み (Opus レビュー・直し済み)。W3 で GUI proto 2 |
 | U2・U3+U4 | 実装済み (Opus レビュー・直し済み)。共有ライブラリの番号表に 122・123 |
 | G3・G3b | **実機受入完了 (2026-11-09、main 13a4ffd、Ra266 の GeForce)** — GeForce の既定は DIRECT。初回 (6b7e301) は gfx_draw_font に DIRECT の振り分けが無く文字が出ず低いメモリを壊した → 直し (振り分けと直書きの守り) の後、文字・窓の移動・スクロール・CUI と GUI の行き来・全画面・leftover 0 を確認。証拠はノートの `~/os32-tmp/evidence/2026-11-09/gfdirect2/` |
-| H2a・S1・G4m・G5m | 未着手 (確定設計 §7 の依存の順) |
+| H2a | 不要で閉じた (2026-11-10、H2 が読みに既存の `ring3_user_range_ok` を使って着地、`gfx/gfx_hw_submit.c:16-17`) |
+| S1・G4m・G5m | 未着手 (確定設計 §7 の依存の順)。S1 は `gfx/gfx_vram.c` が PPC の初回成功集合に入ったので PPC でも組めるまま直す、damage.rs は `userland/gshell/src/damage.rs` |
