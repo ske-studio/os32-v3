@@ -55,20 +55,36 @@ void kfree(void *p)
 #include "format_host_source.c"
 #include "attr_host_source.c"
 #include "attr_backend_host_source.c"
+#define arch_kapi_va_next product_va_next
+#include "call_host_source.c"
+#undef arch_kapi_va_next
+static enum kapi_value_kind observed_kinds[KAPI_PRINT_ARG_LIMIT];
+static unsigned observed_count;
+int arch_kapi_va_next(struct kapi_arg_source *src, enum kapi_value_kind kind, u32 *w)
+{
+    if (observed_count < KAPI_PRINT_ARG_LIMIT) observed_kinds[observed_count++] = kind;
+    return product_va_next(src, kind, w);
+}
 #include "print_host_source.c"
 
 static void *kill_escape[5];
 void ring3_fault_kill(void) { __builtin_longjmp(kill_escape, 1); }
-static int forward_print(u32 slot, const void *args, u32 *result)
+static int forward_print(u32 slot, struct kapi_arg_source *src, u32 *result)
 {
+    int handled = 0;
 #include "dispatch_host_source.c"
-    return -1;
+    return handled;
 }
 static int dispatch_print(u32 va)
 {
     u32 result;
     if (__builtin_setjmp(kill_escape)) return 0;
-    int handled = forward_print(KAPI_SLOT_KPRINTF, (const void *)(uptr)va, &result);
+    u32 frame[13] = {0};
+    frame[11] = va - sizeof(u32);
+    struct arch_syscall call = {frame};
+    struct kapi_arg_source src;
+    arch_kapi_source(&src, &call);
+    int handled = forward_print(KAPI_SLOT_KPRINTF, &src, &result);
     if (handled < 0) ring3_fault_kill();
     CHECK(handled == 1 && result == 0);
     return 1;
@@ -76,7 +92,7 @@ static int dispatch_print(u32 va)
 
 static void reset_output(void)
 {
-    output_size = output_calls = allocation_count = 0;
+    output_size = output_calls = allocation_count = observed_count = 0;
     output[0] = 0;
 }
 static void invoke(u32 args, int accepted, const char *expected)
@@ -155,7 +171,7 @@ static void caller_copy_tests(void)
         for (u32 i = 0; i < KAPI_PRINT_FORMAT_CAP; i++) fmt[i] = 'x';
         fmt[KAPI_PRINT_FORMAT_CAP - 1] = 0;
         reset_output();
-        CHECK(kapi_print_call((void *)(uptr)va));
+        CHECK(dispatch_print(va));
         CHECK(output_size == KAPI_PRINT_FORMAT_CAP - 1);
         fmt[KAPI_PRINT_FORMAT_CAP - 1] = 'x';
         invoke(va, 0, "");
@@ -167,7 +183,7 @@ static void caller_copy_tests(void)
         for (u32 i = 0; i < KAPI_PRINT_STRING_CAP; i++) data[1024 + i] = 's';
         data[1024 + KAPI_PRINT_STRING_CAP - 1] = 0;
         reset_output();
-        CHECK(kapi_print_call((void *)(uptr)va));
+        CHECK(dispatch_print(va));
         CHECK(output_size == KAPI_PRINT_STRING_CAP - 1);
         for (u32 i = 0; i < output_size; i++) CHECK(output[i] == 's');
         for (u32 i = 0; i < KAPI_PRINT_ARG_LIMIT; i++) CHECK(!allocated[i]);
@@ -213,6 +229,12 @@ static void caller_copy_tests(void)
         args[2] = 5; args[3] = (u32)-42; args[4] = va + 1024;
         args[5] = 0xab; args[6] = 'C'; args[7] = 0; args[8] = 3;
         invoke(va, 1, "05| -42|hi  |AB|C|q|3|%|%");
+        kmemcpy(fmt, "%d|%x|%s|%p|%%", sizeof("%d|%x|%s|%p|%%"));
+        args[2] = (u32)-7; args[3] = 0xab; args[4] = va + 1024; args[5] = 0;
+        invoke(va, 1, "-7|ab|hi|p|%");
+        CHECK(observed_count == 4 && observed_kinds[0] == KAPI_VALUE_INTEGER &&
+              observed_kinds[1] == KAPI_VALUE_INTEGER &&
+              observed_kinds[2] == KAPI_VALUE_POINTER && observed_kinds[3] == KAPI_VALUE_POINTER);
         /* Incomplete modifiers must not read past the staged format. */
         kmemcpy(fmt, "x%0", sizeof("x%0"));
         invoke(va, 1, "x");
@@ -220,6 +242,21 @@ static void caller_copy_tests(void)
         invoke(va, 0, "");
         space.generation--;
     }
+    /* Cursor errors leave its position unchanged, including overflow/limit. */
+    u32 frame[13] = {0}, value;
+    struct arch_syscall call = {frame};
+    struct kapi_arg_source src;
+    arch_kapi_source(&src, &call);
+    frame[11] = tail - 8;
+    src.next = 2;
+    CHECK(!arch_kapi_va_next(&src, KAPI_VALUE_INTEGER, &value) && src.next == 2);
+    frame[11] = va - sizeof(u32);
+    src.next = 16;
+    CHECK(!arch_kapi_va_next(&src, KAPI_VALUE_POINTER, &value) && src.next == 16);
+    src.next = ~0u;
+    CHECK(!arch_kapi_va_next(&src, KAPI_VALUE_INTEGER, &value) && src.next == ~0u);
+    src.next = 0; frame[11] = U32_MAX - 3;
+    CHECK(!arch_kapi_va_next(&src, KAPI_VALUE_INTEGER, &value) && !src.next);
     caller_access_leave(&previous);
     invoke(va, 0, "");
     /* Internal/CPL0 logging uses the original variadic entry without USER

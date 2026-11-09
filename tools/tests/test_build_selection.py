@@ -94,7 +94,7 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         # Preserve wildcard source discovery and all real make includes.
-        names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
+        names = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
         for name in names:
             if name == 'Makefile' or name.startswith(('build/', 'userland/', 'lib/', 'sdk/', 'tools/')):
                 source = ROOT / name
