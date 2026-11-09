@@ -169,3 +169,6 @@ NP21/W: `make all` → 起動、`[pci] mech#1 absent`、`[geforce] boot_reserve 
 - B5 の本番の書き込みの結合試験に hwdev/gf/master.c の実体を組み、Command と cache line / latency の宛先が 0:12.0 になることを確かめる (M9)。
 - test_gf_production.py の nm 検査は追加する探索関数 (recover_gf_dev・recover_gf_second・pci_locate_fn0) だけを許し、従来の recover_* の混入禁止は維持する (M10)。
 - PCI config の backend は機種・ホストブリッジの側、CPU の原始操作は arch の側 (arch/README.md:7-8)。backend の分離の実装は範囲外、pci_locate_fn0 は単一バスの探索として扱う。
+
+## 確定の後の追記 1 (2026-11-09、os32powerpc の G4 の点検)
+- `pci_locate_fn0` は CPU・機種に依らず G4 でもそのまま使える (G4 の `pci_cfg_read32` の backend が bus → host bridge を引ければ)。ただし呼び手の `RECOVER_GF_BUS 0U` は PC-98 の値。G4 の GeForce は AGP の host bridge の下で bus 番号は bus-range から決まる (0 とは限らない [未])。G4 で GeForce を探す段では bus を OF (AGP の host の bus-range) から渡すか、全部の bus を順に探す呼び手にする。今の recover・kdebug の経路は PC-98 用なので本設計は変えない。

@@ -280,3 +280,8 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 - P2: 初回の書き込みの失敗と、移動成功後の復元を区別した。復元に成功したら、全機能の公開線と owner も firmware の値へ戻す (§3-3・§3-4)。
 - 試験: 実際と同じコピーを probe へ渡し、settle で 3→5 へ移して、登録・解除が 5 だけに作用することを確かめる結合試験を足した (§6)。
 - 試験: 復元の後に、config・列挙表・owner・登録線が一致することまで確かめる復元試験を足した (§6)。
+
+## 確定の後の追記 1 (2026-11-09、os32powerpc の G4 の点検、PM 決定)
+- P2-1: 線の集合 (`cand_mask`・`reserved_mask` などの u32 の mask) は、共通の層では `PLATFORM_IRQ_LINES` の大きさの bitmap (u32 の配列) で持つ (§3-1 の「32 本超は将来に広げる」を今にする)。G4 は line = MPIC の source 番号で 32 以上が来る (source の数は OPENPIC_FEATURE から読む。NetBSD sys/arch/powerpc/pic/pic_openpic.c:63-68、KeyLargo の MPIC は 64 本の見込み [推])。PC-98 の動きは変わらない。段 2・4 の試験に 32 以上の線 (例 source 40) を含める。
+- P2-2: §3-6 の未確定に追加 — G4 の host bridge (UniNorth の AGP・PCI・内蔵) ごとの bus-range が重ならないこと (NetBSD sys/arch/macppc/pci/uninorth.c:115・160・165)。重なれば共通の PCI 層 (`pci_dev`・`pci_cfg_read32`) に domain を足し、IRQ の表はそれに従う。QuickSilver の実値は実機の OF の木で見る。
+- P3: §3-6 (b) MPIC の操作に — CPU ごとの current task priority を 0 に下げないと割込みが来ない / 宛先は CPU0 だけ (OS32 は 1 CPU) / spurious vector と IACK・EOI の順は FreeBSD の openpic_dispatch・openpic_eoi の手本どおり。sense は PCI の行だけ (level-low) で表の型で足りる、macio の子 (edge がある) は表の外で G4 の backend が MPIC に設定。UniNorth の config 空間は little-endian で G4 の pci_cfg_read32 の backend が byte を入れ替える (uninorth.c:144)、共通の層は値で受けるので影響なし。
