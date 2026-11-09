@@ -10,4 +10,7 @@ int arch_video_wc_eligible(u32 fb, u32 mapped, u32 extent, u32 regs, u32 reg_byt
 int arch_video_wc_start(u32 base, u32 bytes);
 /* Does not require device identity; also drains borrowed WC. */
 int arch_video_wc_stop(void);
+/* Acceptance module provider; 0 unknown, 1 UC, 2 WC. Borrowed callback. */
+int arch_video_cache_inspect(u32 phase, u32 base, u32 bytes,
+                             void (*report)(const char *));
 #endif

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """H5: production CPU/PTE checks and single video WC lease with host primitives."""
 CHECK = dict(name='sep5-wc-host', tier=1,
-    covers=['arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c', 'include/video_wc.h',
+    covers=['arch/x86/video/gf_accept_cpu.c', 'arch/ppc/video/gf_accept_cpu.c', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c', 'include/video_wc.h',
             'drivers/video/geforce/gf_wc.c', 'tools/tests/test_sep5_wc.py',
             'tools/tests/gf_wc_host.c', 'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
             'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_startlog_host.h',

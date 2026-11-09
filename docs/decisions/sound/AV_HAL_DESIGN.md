@@ -674,7 +674,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | snd2_dsp_unit (32B 出) / dsp_param (32B 出) / dsp_insert (n ≤ 16、4n 入) / dsp_process (n ≤ 16、in・out = frames × frame_bytes、frames ≤ max_frames、乗算は u64 で溢れ検査) | 範囲は §3-2 | out を書かない |
 | snd2_stream_open (32B 入・4B 出) / write (bytes 入、上限なし・受ける量で切る) / start / pause / pos (32B 出) / wait / volume / close | §3-3・§3-5 | pos は書かない |
 | av_focus_set / av_focus_get | set は WM だけ | — |
-| v86s_begin (136B 入・4B 出) / v86s_run (32B 入・48B 出) / v86s_fm_drain (max ≤ 512、12 × max 出) / v86s_end | §9-2、begin の owner だけ | 書かない |
+| v86s_begin (136B 入・4B 出) / v86s_run (32B 入・48B 出) / v86s_fm_drain (max ≤ 512、12 × max 出) / v86s_end | §9-2、begin の owner だけ。通り道は `legacy_call_dispatch` → `v86_call_dispatch` の slot の switch (末尾の追記) | 書かない |
 | in2_pad_state (20B 出) / pad_caps (64B 出) / pad_vibrate (4B 入) | slot < 4 | 書かない |
 | in2_dev_count / dev_info (32B 出) / read (max ≤ 128、16 × max 出) / key_state (128B 出) / mouse_state (16B 出) / acquire / unacquire / status (32B 出) / wm_state (16B 出、WM だけ) | — | 書かない |
 - 計 33 口 (snd2 15・av 2・in2 12・v86s 4)。MML の 10 口は番号を残して NOSYS (§7-6)。pcm_* の 5 口は番号を変えず target を snd2_v1.c へ。版は 1 つ上げる (仮 84→85)。
@@ -732,7 +732,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | L2 | userland/lib/snd/fmvoice.c (コアの FFI の adapter・§7-4 の時刻・samples の読み・read/status) | lib/os32_opna | — | 300 | IL | 照らし直し・コア段 D |
 | L3 | userland/lib/snd/pump.c (scratch の再送・初回の start・完了の対応 §7-3・close) | L1・L2・snd2_stream_* | 完了の表 | 280 | IL | IS |
 | L4 | userland/lib/snd/midi_host.c (+tools/host_agent.py の midi、close・切断で reset) | host_call | セッション | 280 | IL | 照らし直し |
-| L5 | build/os32snd.mk・sdk の Rust の静的ライブラリの target (SYNTH の段 D の置き換え) | — | — | 120 | IL | 照らし直し |
+| L5 | build/os32snd.mk・sdk の Rust の静的ライブラリの target (SYNTH の段 D の置き換え)。C の規則は profile の char/enum の旗と `\| $(ABI_CONTRACT_ORDER)` を持ち、`check-type-contract` を受入に (末尾の追記) | — | — | 120 | IL | 照らし直し |
 | Q1 | sound/hal/snd2_fmq.c (V86 の FM の溜め場、seq) | — | 溜め場 | 90 | IL | AV0 |
 | R0a | §7-6 の表の KAPI の行: kapi.json の retired・sdk/gen_kapi.py の retired の body・生成物 | — | — | 80 | IA | AV0 と同じ版上げ |
 | R0b | §7-6 の表のカーネル・部品・build の行 (snd_engine の削除・fm_body/fm_module (tick と静止)/fm.c/fm_contract.h・init・exec・v86_io の往復の両方・imports.def・fm-module.mk・kernel-objects.mk・hwdev_layout の再生成 (AV0 の後)・check_arm_compile と配置の表) | fm_all_off・ssg_all_off | — | −1,300 / +20 | IA | R0a |
@@ -742,7 +742,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | V2 | platform/pc98/legacy/v86_fm_io.c (+v86_io.c の bitmap の拒否と戻し・in/out の先頭の分岐 2 行、`v86_io_in2` の保留・reply・影の有効性) | V1・Q1 | latch・FIFO・reply | 260 | IL | V1 |
 | V3 | arch/x86/legacy/v86_session.c (begin/run/end・ctx の書き戻し・IOREAD・SLICE・`v86_fm_session_end`) + v86_gp_emulate.inc の IN/OUT の幅 (opsize16・EAX・幅 4) と IN 4 形の保留 (EIP を進めない)・v86.c:265 の opsize16 の受け渡し・v86.c:503 の SOFT の分岐・run_limit の呼ぶ行 | V2 | セッション | 320 | IL | V2 |
 | V4 | drivers/sound/cs4231/pcm_timer.c (hw_timer_arm・解除・hw_timer_ack と IRQ の要因の分け) | — | 装置の内部 | 130 | IL | V0・IS |
-| V5 | kapi/kapi_v86s.c (§10 の検査) | V3 | — | 130 | IL | V3 |
+| V5 | kapi/kapi_v86s.c (§10 の検査) + `arch/x86/legacy/v86_call.c` の slot の switch に v86s_* の 4 口、`platform/none/legacy_guest.c` で断る (末尾の追記) | V3 | — | 130 | IL | V3 |
 | V6 | userland/cmds/v86.c (実行のループ: run → drain → F_r への反映 → IOREAD の答え・影と shadow_seq → pump) | v86s_*・sndl_* | — | 170 | IL | V5・L3 |
 - 1,000 行を超えるファイルは無い。gshell の input.rs (1,269)・multiapp.rs (1,433) は呼ぶ行だけ、中身は excl.rs。
 
@@ -1029,3 +1029,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
   ═══╪══ KAPI snd2_stream_* (PCM 1 本) ═══ カーネル (ミキサ無し)
   ```
 - **MML の KAPI の 10 欄**: §7-6 の「中身の無い欄として残す」は v3 の最後の KAPI の整理で**削除する対象**。それまでは NOSYS の本体のまま。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `exec/exec_syscall.inc:42` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `arch/x86/legacy/guest.c:27-30` → `v86_call_dispatch` (`arch/x86/legacy/v86_call.c:78-89` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c:18-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`arch/x86/legacy` を直に呼ばない。
+- **第 4 段 B の型の契約 (§7-6・§12 の R0c・L5・合成器の段)**: `build/abi_contract.mk` が C のコンパイル規則に order-only の `| $(ABI_CONTRACT_ORDER)` を付け、`test_type_contract.py` (covers `build/**/*.mk`) が `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (解析できない呼出しは fail closed)。R0c で外す `build/libs.mk:27・218-229・273` の範囲は不変 (`:226` の規則に `| $(ABI_CONTRACT_ORDER)` が付いた)。L5 で足し直す libs.mk の規則と新しい `build/os32snd.mk` (と合成器の段の .mk) の C の規則は、`KERNEL_CFLAGS`/`CFLAGS_BASE`/`PROGRAM_FLAGS` 由来の profile の旗と `| $(ABI_CONTRACT_ORDER)` を持ち、object を `ALL_TARGET_OBJECTS` 等の一覧に載せる。`check-type-contract` (`tools/checks/run.py:387`) を L5・合成器の段の受入に加える。
