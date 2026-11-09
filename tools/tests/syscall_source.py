@@ -20,7 +20,7 @@ def syscall_providers(root, read=None):
     return ('#if __SIZEOF_LONG__ != 4\n'
             '/* LP64 host substitutes for x86 providers; no product coverage. */\n' +
             ''.join('#define arch_kapi_' + n + ' host_arch_kapi_' + n + '\n'
-                    for n in ('source', 'read_block', 'invoke', 'legacy_ls', 'legacy_print')) +
+                    for n in ('source', 'read_block', 'invoke', 'legacy_ls', 'va_next')) +
             '#define ring3_syscall_dispatch host_ring3_syscall_dispatch\n'
             '#endif\n#include "kapi_call.h"\n' +
             read('arch/x86/kernel/kapi_call.c') + '\n' +

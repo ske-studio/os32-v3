@@ -55,7 +55,7 @@ static void ring3_gui_pump(void) {}
 static int stop_park_calls;
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 /* kprintf is outside this fixture; sys_stat uses the real string staging. */
-int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
+int kapi_print_call(struct kapi_arg_source *args) { (void)args; CHECK(0); return 0; }
 static char string_heap[KAPI_STRING_ARGS][KAPI_STRING_CAP];
 static int string_used[KAPI_STRING_ARGS];
 void *kmalloc(u32 size) {
