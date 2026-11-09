@@ -32,6 +32,19 @@ int arch_kapi_read_block(struct kapi_arg_source *src, unsigned first,
     return 1;
 }
 
+int arch_kapi_va_next(struct kapi_arg_source *src, enum kapi_value_kind kind,
+                      u32 *value)
+{
+    /* The public print window has two fixed and fourteen variable words.
+     * Both kinds occupy one cdecl word; future ABIs may place them separately. */
+    struct kapi_values word;
+    (void)kind;
+    if (src->next >= 16u) return 0;
+    if (!arch_kapi_read_block(src, src->next, 1, &word)) return 0;
+    *value = word.value[0];
+    return 1;
+}
+
 u32 arch_kapi_invoke(void *wrapper, const struct kapi_values *values, unsigned count)
 {
     return kapi_invoke(wrapper, values->value, count * sizeof(u32));
