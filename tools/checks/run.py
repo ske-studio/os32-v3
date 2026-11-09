@@ -384,6 +384,10 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-type-contract", "tools/tests/test_type_contract.py"):
+        "recipe inventory and H5 artifacts use private TemporaryDirectory roots only",
+    ("check-type-contract", "tools/build_compare.py"):
+        "H5 calls compare on private fixture roots; snapshot/build main is never invoked",
     ("check-ppc-selection-host", "tools/build_compare.py"):
         "host test imports scanners only; snapshot/build entry point is never called",
     ("check-target-profile-host", "tools/gen_memmap.py"):

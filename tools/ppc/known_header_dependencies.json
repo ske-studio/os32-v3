@@ -108,6 +108,11 @@
       "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     },
     {
+      "source": "gfx/gfx_vram.c",
+      "header": "drivers/video/pc98/splash_raster.h",
+      "survey_id": "A3/H1: newly compilable gfx copy caller; retained PC98 splash dependency (V2, stage B)"
+    },
+    {
       "source": "drivers/video/geforce/gf_wc.c",
       "header": "drivers/char/serial.h",
       "survey_id": "A5"

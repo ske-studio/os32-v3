@@ -40,7 +40,11 @@ static __attribute__((noinline)) int exec_kapi_special(u32 slot, void *wrapper,
 {
     unsigned count = kapi_fixed_count[slot];
     int handled = legacy_call_dispatch(slot, wrapper, src, count, result);
-    if (!handled) handled = arch_kapi_legacy_print(src->call, slot, result);
+    if (!handled && slot == KAPI_SLOT_KPRINTF) {
+        if (!kapi_print_call(src)) return -1;
+        *result = 0;
+        handled = 1;
+    }
     if (!handled) handled = kapi_strings_from_source(slot, wrapper,
                                                     src, count, kapi_argptr[slot], result);
     return handled;

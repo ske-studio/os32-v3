@@ -112,7 +112,7 @@ int kapi_strings_from_source(u32 s, void *f, struct kapi_arg_source *a, unsigned
     CHECK(a->next==0 && copies==0 && legacy_fake.count==1); legacy_fake_note(15);
     if (strings_result) { *r=82; return strings_result; } return 0;
 }
-int kapi_print_call(const void *a) { (void)a; CHECK(!copies && legacy_fake.count==1); legacy_fake_note(14); return print_ok; }
+int kapi_print_call(struct kapi_arg_source *a) { (void)a; CHECK(!copies && legacy_fake.count==1); legacy_fake_note(14); return print_ok; }
 int ring3_ls_dispatch(u32 sp) { CHECK(sp==frame[11]); return 83; }
 static i32 typed(u8 a, i16 b, i32 c, const char *d) {
     CHECK(a==255 && b==-2 && c==-12345 && (u32)d==0x12345678);
@@ -191,7 +191,7 @@ MUTATIONS = (
     ('invoke-size', 'call', 'count * sizeof(u32));', 'count);'),
     ('copy-failure', 'call', 'out->value, bytes)) return 0;', 'out->value, bytes)) { for (unsigned k=0;k<count;k++) out->value[k]=0; }'),
     ('pointer-gate', 'dispatch', '(ptrmask & (u16)(1u << k))', '(0 & (u16)(1u << k))'),
-    ('consumer-order', 'dispatch', 'if (!handled) handled = arch_kapi_legacy_print(src->call, slot, result);', 'if (!handled) handled = kapi_strings_from_source(slot, wrapper, src, count, kapi_argptr[slot], result);'),
+    ('consumer-order', 'dispatch', 'if (!handled && slot == KAPI_SLOT_KPRINTF) {', 'if (!handled) handled = kapi_strings_from_source(slot, wrapper, src, count, kapi_argptr[slot], result);\n    if (!handled && slot == KAPI_SLOT_KPRINTF) {'),
     ('entry-legacy-first', 'entry', 'if (legacy_trap(native)) return;', 'if (0 && legacy_trap(native)) return;'),
     ('abort-before-range', 'dispatch', '    ring3_abort_check();        /* 要求があれば longjmp して戻らない */', '    /* first abort omitted */'),
     ('private-before-range', 'dispatch', 'slot == RING3_LS_CALL', '0 && slot == RING3_LS_CALL'),

@@ -48,7 +48,7 @@ R1_C := $(C_KERNEL) kernel/r1_fixture.c kernel/font_guard_fixture.c
 R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) arch/x86/kernel/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o
 R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c mm/paging_app.c
 
-$(R1_OBJ)/%.o: %.c
+$(R1_OBJ)/%.o: %.c | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fat/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
@@ -93,7 +93,7 @@ $(addprefix $(KERNEL_OBJ_PREFIX),drivers/video/cirrus/backend_cirrus.o drivers/v
 CORE_KERNEL_INCLUDES = drivers/video/trident/trident_module.o drivers/video/trident/resources.o drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
 $(addprefix $(KERNEL_OBJ_PREFIX),$(CORE_KERNEL_INCLUDES)): private KERNEL_INCLUDES = $(INC_KERNEL)
 
-$(KERNEL_OBJ_PREFIX)%.o: %.c
+$(KERNEL_OBJ_PREFIX)%.o: %.c | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(KERNEL_INCLUDES) -c $< -o $@
 

@@ -100,7 +100,7 @@ static int request_inside;
 void ring3_abort_request(void);
 #include "os32_kapi_slots.h"
 #include "kapi_strings.h"
-int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
+int kapi_print_call(struct kapi_arg_source *args) { (void)args; CHECK(0); return 0; }
 int kapi_strings_from_source(u32 slot, void *target, struct kapi_arg_source *src, unsigned count, u16 ptrmask, u32 *result) {
     CHECK(slot == 0); (void)target; (void)src; (void)count; (void)ptrmask; (void)result;
     return 0;
