@@ -374,6 +374,7 @@ static int check_can_fast(int axis, int fixed_idx, int count)
 void tilemap_compose_btf(void)
 {
     if (!gfx_ready) return;
+    if (!gfx_fb.planes[0]) return;
     int row, col;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -403,6 +404,7 @@ void tilemap_compose_btf(void)
 void tilemap_compose_ftb(void)
 {
     if (!gfx_ready) return;
+    if (!gfx_fb.planes[0]) return;
     int row, col, bg;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -480,6 +482,7 @@ void tilemap_compose_ftb(void)
 void tilemap_compose_btf_fast(void)
 {
     if (!gfx_ready) return;
+    if (!gfx_fb.planes[0]) return;
     int row, col, bg;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -836,6 +839,7 @@ static void scroll_update_prev(void)
 void tilemap_compose_scroll(void)
 {
     if (!gfx_ready) return;
+    if (!gfx_fb.planes[0]) return;
     int dx_total, dy_total, has_upper;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;

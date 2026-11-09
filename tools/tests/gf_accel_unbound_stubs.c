@@ -76,3 +76,13 @@ __attribute__((weak)) i32 gf4_service_start(struct gf4_ctx *ctx, u32 dl)
 __attribute__((weak)) int gf_vram_match(struct gf2_chan *ch,const void *owner,
     u32 id,u32 gen,u32 off,u32 bytes,struct gf_vram_reservation *out)
 { (void)ch;(void)owner;(void)id;(void)gen;(void)off;(void)bytes;(void)out;__builtin_trap(); }
+
+/* Legacy GPU hosts model kernel policy as SHADOW. G3's integration host
+ * links the real policy/eligibility and overrides these weak seams. */
+#include "gfx_hal.h"
+__attribute__((weak)) void gfx_policy_reeval(void) {}
+__attribute__((weak)) void gfx_policy_scan_changed(void) {}
+__attribute__((weak)) u16 gfx_policy_gen_get(void) { __builtin_trap(); }
+__attribute__((weak)) int gfx_is_started(void) { return 0; }
+__attribute__((weak)) int gf_direct_ok(void) { __builtin_trap(); }
+__attribute__((weak)) const GfxDirectOps gf_direct_ops = {0};

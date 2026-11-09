@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=30.7,
-    covers=['tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+    covers=['gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
             'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',

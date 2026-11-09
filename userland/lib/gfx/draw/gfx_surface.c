@@ -149,6 +149,7 @@ void gfx_blit(int dx, int dy,
             gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
 
     /* バイト境界揃い時の高速パス (プレーン限定 — サーフェスは常に 4 プレーン
      * なので、画面がパックド 8bpp のときはプレーン単位の転送ができない。
@@ -220,6 +221,7 @@ void gfx_blit_colorkey(int dx, int dy,
             gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
 
     for (iy = 0; iy < sh; iy++) {
         for (ix = 0; ix < sw; ix++) {
@@ -261,6 +263,7 @@ void gfx_blit_transparent(int dx, int dy,
             gfx_api->gfx_add_dirty_rect(dx, dy, sw, sh);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
 
     /* バイト境界揃い時の高速パス (プレーン限定。理由は gfx_blit と同じ) */
     if (!gfx_packed && (sx & 7) == 0 && (dx & 7) == 0 && (sw & 7) == 0) {

@@ -21,6 +21,7 @@ int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
     hook_args[0]=dx; hook_args[1]=dy; hook_args[2]=sx; hook_args[3]=sy; hook_args[4]=w; hook_args[5]=h;
     return 19;
 }
+const GfxDirectOps gf_direct_ops = {.fill_rect=geforce_fill_rect, .blit=geforce_blit};
 #endif
 const unsigned int __os32_abi_1_mem_4_fmt_4 = 0;
 static int events[32], n, fail_step;
@@ -173,10 +174,11 @@ static int run(void)
     struct video_device d = {0}; GFX_ScreenInfo info; u8 rgb[3]={15,0,0};
 #ifdef OS32_GEFORCE_MODULE
     module_backend = geforce_backend_ops;
-    if (!module_backend.fill_rect || !module_backend.blit) return 10;
-    if (module_backend.fill_rect(-3, 479, 5, 4, 0xa7)!=17 || hook_fill_calls!=1 ||
+    if (module_backend.fill_rect || module_backend.blit ||
+        module_backend.direct_ops != &gf_direct_ops || !module_backend.direct_ok) return 10;
+    if (module_backend.direct_ops->fill_rect(-3, 479, 5, 4, 0xa7)!=17 || hook_fill_calls!=1 ||
         hook_args[0]!=-3 || hook_args[1]!=479 || hook_args[2]!=5 || hook_args[3]!=4 || hook_args[4]!=0xa7) return 11;
-    if (module_backend.blit(639, 479, 2, 3, 0x7fffffff, 0x7fffffff)!=19 || hook_blit_calls!=1 ||
+    if (module_backend.direct_ops->blit(639, 479, 2, 3, 0x7fffffff, 0x7fffffff)!=19 || hook_blit_calls!=1 ||
         hook_args[0]!=639 || hook_args[1]!=479 || hook_args[2]!=2 || hook_args[3]!=3 ||
         hook_args[4]!=0x7fffffff || hook_args[5]!=0x7fffffff) return 12;
 #else

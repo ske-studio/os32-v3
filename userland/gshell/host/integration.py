@@ -76,6 +76,11 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('modal pump skips deferral', 'src/input.rs',
+     'ui_defer || fep::is_on()', 'fep::is_on()', 'modal_pump_defers_forty_keys_in_order'),
+    ('modal pump reverses deferred order', 'src/input.rs',
+     'let r = st.pending_raw[0];', 'let r = st.pending_raw[st.pending_raw_n - 1];',
+     'modal_pump_defers_forty_keys_in_order'),
     ('W2 drag move disconnected', 'src/input.rs',
      '        crate::movecopy::move_window(st, idx, cx, cy);',
      '        let _ = (idx, cx, cy);', 'w2_drag_commit_shadow'),

@@ -37,6 +37,8 @@
 #include "hwdev/gf/production.h"
 #include "leave_log.h"
 #include "../../../gfx/gfx_internal.h"
+#include "../../../gfx/gfx_policy.h"
+#include "../../../gfx/gfx_osri_view.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
 #define gfx_flip_enabled (*geforce_context->flip)
@@ -115,6 +117,12 @@ static u32 bar0_phys;
 static int (*interrupt_point)(void *);
 static void *interrupt_context;
 static int failed, active, routed;
+#ifdef OS32_GEFORCE_MODULE
+static int geforce_direct_ok(void)
+{
+    return active && gfx_is_started() && gf_direct_ok();
+}
+#endif
 static int (*stop_device)(void);
 static int (*start_wc)(void);
 void geforce_backend_wc_bind(int (*start)(void)) { start_wc = start; }
@@ -257,10 +265,8 @@ void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)
     }
     gfx_backend_geforce.selected_mode = &selected_scan_mode;
     gfx_current_height = front->height;
-    /* fill_rect's u8 color and the legacy RAM backing are INDEX8 only. */
-    gfx_backend_geforce.fill_rect = front->fmt == GF3_INDEX8 ? geforce_fill_rect : 0;
-    gfx_backend_geforce.blit = front->fmt == GF3_INDEX8 ? geforce_blit : 0;
     gf_hook_scan_bind(true, front);
+    gfx_policy_scan_changed();
 }
 static int geforce_set_mode(u32 id)
 {
@@ -457,6 +463,9 @@ static int geforce_stop_common(bool force)
     struct gf_io *leave_io = video ? &video->io : 0;
 #endif
     active = routed = 0;
+#ifdef OS32_GEFORCE_MODULE
+    gfx_policy_reeval();
+#endif
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
 #ifdef OS32_GEFORCE_MODULE
     if (force && rc && feature5 && feature5->ch && feature5->ch->f) {
@@ -641,6 +650,12 @@ static int geforce_query(GFX_ScreenInfo *info)
     info->lease_first = GF_LEASE_FIRST; info->lease_count = GF_LEASE_COUNT;
     for (u32 i = 0; i < sizeof(info->reserved) / sizeof(info->reserved[0]); ++i)
         info->reserved[i] = 0;
+#ifdef OS32_GEFORCE_MODULE
+    if (gfx_backend_geforce.policy == GFX_POLICY_DIRECT) {
+        info->flags |= GFX_CAP_DIRECT;
+        info->reserved[0] = gfx_policy_gen_get();
+    }
+#endif
     return 0;
 }
 
@@ -663,6 +678,20 @@ static void geforce_present(int x, int y, int w, int h)
                 feature5 ? feature5->source_rc : poll);
         scanout_logged = true;
         geforce_fail(); return;
+    }
+    if (gfx_backend_geforce.policy == GFX_POLICY_DIRECT) {
+        /* DIRECT skips transfer, but must retain its device-failure exit.
+         * F4 borrows the same channel/accel owner as the drawing hooks. */
+        const struct gf4_test_ops *ops = display_ops();
+        struct gf4_ctx *ctx = ops ? ops->ctx : 0;
+        if ((ctx && ctx->ch && ctx->ch->state != GF2_RUN) ||
+            (ctx && ctx->accel && ctx->accel->last_rc) ||
+            (interrupt_point && interrupt_point(interrupt_context))) {
+            geforce_fail(); /* DIRECT device failure */
+            return;
+        }
+        geforce_context->counters->commits++;
+        return;
     }
     u32 before = geforce_context->counters->present_bytes;
 #endif
@@ -699,6 +728,9 @@ static void geforce_enter(void)
         if (pc98_route_to_gf()) geforce_fail();
         else routed = 1;
     }
+#ifdef OS32_GEFORCE_MODULE
+    gfx_policy_reeval();
+#endif
 }
 static void geforce_leave(void)
 {
@@ -723,7 +755,7 @@ GfxBackend gfx_backend_geforce = {
     .present_rect = geforce_present, .set_palette = geforce_set_palette,
     .enter = geforce_enter, .leave = geforce_leave,
 #ifdef OS32_GEFORCE_MODULE
-    .fill_rect = geforce_fill_rect, .blit = geforce_blit,
+    .direct_ok = geforce_direct_ok, .direct_ops = &gf_direct_ops,
     .set_mode = geforce_set_mode, .dpms = geforce_dpms,
     .cursor_image = geforce_cursor_image, .cursor_move = geforce_cursor_move,
     .cursor_show = geforce_cursor_show, .vsync = geforce_vsync,

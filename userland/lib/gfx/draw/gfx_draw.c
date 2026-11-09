@@ -36,6 +36,7 @@ void gfx_clear(u8 color)
 {
     if (!gfx_ready) return;
     if (gfx_direct) { gfx_cmd_enqueue_fill(0, 0, gfx_fb.width, gfx_fb.height, color, 0); gfx_api->gfx_add_dirty_rect(0, 0, gfx_fb.width, gfx_fb.height); return; }
+    if (!gfx_fb.planes[0]) return;
     if (gfx_packed) {
         /* バックバッファ全面 (pitch × height) を 1 バイト/画素で塗る */
         int rows = gfx_fb.height;
@@ -68,6 +69,7 @@ void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color)
         if (rw > 0 && rh > 0) gfx_api->gfx_add_dirty_rect(rx, ry, rw, rh);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     int p;
     int byte_x, byte_w;
     int start_off;
@@ -119,6 +121,7 @@ void gfx_pixel(int x, int y, u8 color)
 {
     if (!gfx_ready) return;
     if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, 1, 1, color, 0); if (x >= 0 && x < gfx_fb.width && y >= 0 && y < gfx_fb.height) gfx_api->gfx_add_dirty_rect(x, y, 1, 1); return; }
+    if (!gfx_fb.planes[0]) return;
     int offset;
     u8 bit;
     int p;
@@ -149,6 +152,7 @@ void gfx_pixel_nodirty(int x, int y, u8 color)
 {
     if (!gfx_ready) return;
     if (gfx_direct) { gfx_cmd_enqueue_fill(x, y, 1, 1, color, 0); return; }
+    if (!gfx_fb.planes[0]) return;
     int offset;
     u8 bit;
     int p;
@@ -180,6 +184,7 @@ u8 gfx_get_pixel(int x, int y)
         if (gfx_cmd_get(x, y, 1, 1, &color, 1)) return 0;
         return color;
     }
+    if (!gfx_fb.planes[0]) return 0;
     int offset;
     u8 bit, color;
     int p;
@@ -210,6 +215,7 @@ void gfx_hline(int x, int y, int w, u8 color)
         if (w > 0) gfx_api->gfx_add_dirty_rect(x, y, w, 1);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     int x2;
 
     if (y < 0 || y >= gfx_fb.height || w <= 0) return;
@@ -238,6 +244,7 @@ void gfx_vline(int x, int y, int h, u8 color)
         if (h > 0) gfx_api->gfx_add_dirty_rect(x, y, 1, h);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     int p, off;
     u8 bit;
 
@@ -313,6 +320,7 @@ void gfx_line(int x0, int y0, int x1, int y1, u8 color)
         }
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     /* dirty_rect をバウンディングボックスで1回だけ登録 */
     int minx, miny, maxx, maxy;
     minx = (x0 < x1) ? x0 : x1;
@@ -357,6 +365,7 @@ void gfx_rect(int x, int y, int w, int h, u8 color)
         gfx_vline(x + w - 1, y, h, color);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     /* dirty rect を全体で1つだけ登録してから描画する (4辺個別登録を回避) */
     int x2 = x + w - 1;
     int y2 = y + h - 1;
@@ -395,6 +404,7 @@ void gfx_fill_rect(int x, int y, int w, int h, u8 color)
         if (w > 0 && h > 0) gfx_api->gfx_add_dirty_rect(x, y, w, h);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
     int x2, r, base;
 
     if (w <= 0 || h <= 0) return;
@@ -495,6 +505,13 @@ extern void __cdecl asm_kcg_draw_font(int x, int y, const u8 *pat, int w_bytes, 
 void gfx_draw_font(int x, int y, const u8 *pat, int w_bytes, int h_lines, u8 fg)
 {
     if (!gfx_ready) return;
+    if (gfx_direct) {
+        (void)gfx_cmd_enqueue_mono(x, y, w_bytes * 8, h_lines, pat, w_bytes,
+                                   fg, -1, 0, 0, gfx_fb.width, gfx_fb.height);
+        gfx_api->gfx_add_dirty_rect(x, y, w_bytes * 8, h_lines);
+        return;
+    }
+    if (!gfx_fb.planes[0]) return;
     /* パックド 8bpp: 1 バイト 1 画素で直接置く。アライメント制約は無い。
      * dirty rect はグリフ全体で 1 回だけ登録する (gfx_pixel を画素ごとに
      * 呼ぶと登録回数が h*w になり present が細切れになる)。 */

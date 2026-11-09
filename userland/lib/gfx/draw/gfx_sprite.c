@@ -272,6 +272,7 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
                 }
                 return;
             }
+            if (!gfx_fb.planes[0]) return;
             int shift = x & 7;
             const u8 *planes[4];
             const u8 *mask = 0;

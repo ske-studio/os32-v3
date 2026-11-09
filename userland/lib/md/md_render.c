@@ -9,6 +9,7 @@
 #include <string.h>
 #include "md_render.h"
 #include "libos32gfx.h"
+#include "gfx_direct_internal.h"
 
 static KernelAPI *r_api;
 
@@ -625,7 +626,8 @@ static void render_strip_nodes(MdDocument *doc, int scroll_y,
 
 void md_render_page(MdDocument *doc, int scroll_y)
 {
-    if (!gfx_ready) return;
+    /* Scrolling uses the planar SHADOW buffer. DIRECT has no CPU mapping. */
+    if (!gfx_ready || gfx_direct || !gfx_fb.planes[0]) return;
     int delta = scroll_y - prev_scroll_y;
     int abs_delta = (delta > 0) ? delta : -delta;
 

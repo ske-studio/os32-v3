@@ -11,6 +11,9 @@ extern int gfx_scan_changed;
 int gfx_direct_wanted(void);
 int gfx_fullscreen_owner(void); /* nonzero iff fullscreen owner is not GUI */
 void gfx_policy_reeval(void);
+/* Module-safe scan notification; policy and generation remain kernel-owned. */
+void gfx_policy_scan_changed(void);
+u16 gfx_policy_gen_get(void);
 int gfx_policy_blocks_map(u32 role); /* LEDGER_ROLE_*; query stays permitted */
 
 #endif

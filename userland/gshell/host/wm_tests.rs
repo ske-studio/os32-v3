@@ -6,6 +6,44 @@
 //! 中身は 2026-09-10 の独立レビュー第 2・3 回で足した挙動試験で、
 //! T5b (常駐表示パネル) 撤去のときに `host/terminal_tests.rs` から移した。
 
+#[test]
+fn modal_pump_defers_forty_keys_in_order() {
+    use crate::{input, mocks, modal, wm};
+    mocks::init();
+    let mut st = wm::GuiState::NEW;
+    modal::open_wm_input(&mut st, b"Run\0", modal::WM_PURPOSE_FILE_LAUNCH);
+    let scans = [0x1d, 0x2d, 0x2b, 0x1f]; // a b c d
+    for i in 0..40 {
+        let scan = scans[i % scans.len()];
+        mocks::push_rawkeys(&[scan | 0x100, scan]);
+        input::capture(&mut st, input::Ctx::Pump);
+    }
+    assert_eq!(st.pending_raw_n, 80);
+    assert!(mocks::RAWKEYS.lock().unwrap().is_empty());
+    input::capture(&mut st, input::Ctx::Wait);
+    mocks::push_rawkeys(&[0x11c, 0x1c]);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert_eq!(&st.launch_path[..st.launch_path_len], b"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd");
+}
+
+#[test]
+fn modal_pump_overflow_keeps_oldest_and_counts_new_raw() {
+    use crate::{input, mocks, modal, wm};
+    mocks::init();
+    let mut st = wm::GuiState::NEW;
+    modal::open_wm_input(&mut st, b"Run\0", modal::WM_PURPOSE_FILE_LAUNCH);
+    for _ in 0..64 {
+        mocks::push_rawkeys(&[0x11d, 0x1d]);
+        input::capture(&mut st, input::Ctx::Pump);
+    }
+    mocks::push_rawkeys(&[0x12d, 0x2d]);
+    input::capture(&mut st, input::Ctx::Pump);
+    assert_eq!(st.pending_raw_n, 128);
+    assert_eq!(st.pending_raw_dropped, 2);
+    assert!(st.pending_raw[..128].chunks(2).all(|pair| pair == [0x11d, 0x1d]));
+    assert!(mocks::RAWKEYS.lock().unwrap().is_empty());
+}
+
 /// X-11: X4 deferral followed by X3 must deliver the FEP's UTF-8 once, to
 /// the foreground owner only; a consumed make must not also become a Key.
 #[test]
