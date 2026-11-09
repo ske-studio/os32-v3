@@ -25,7 +25,12 @@ def check(root):
     assert ppc['C_KERNEL'].count('lib/kstring_c.c') == 1
     assert not ppc['ASM_KERNEL']
     assert ppc['GAS_KERNEL'] == ['arch/ppc/entry.S', 'arch/ppc/ofw_note.S']
+    assert 'drivers/video/geforce/gf_wc.c' in ppc['C_KERNEL']
+    assert 'arch/ppc/video_wc.c' in ppc['C_KERNEL']
     for name in ppc['C_KERNEL'] + ppc['KERNEL_SRC_DIRS']:
+        # D1 compiles GPU applicability with the no-WC PPC provider.
+        if name == 'drivers/video/geforce/gf_wc.c':
+            continue
         assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
     assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
     assert 'exec/ring3_ls.c' in ppc['C_KERNEL']
@@ -91,7 +96,7 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         # Preserve wildcard source discovery and all real make includes.
-        names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
+        names = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
         for name in names:
             if name == 'Makefile' or name.startswith(('build/', 'userland/', 'lib/', 'sdk/', 'tools/')):
                 source = ROOT / name
