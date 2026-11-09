@@ -30,6 +30,7 @@ SOURCE = r'''
 static struct pm_escc sink;
 volatile unsigned long long kboot_ready_tb;
 volatile unsigned kboot_tick;
+volatile unsigned kboot_reload = 100000;
 extern unsigned irq_start[], irq_end[];
 static void clock_init(void) {
  unsigned old, real;
@@ -63,19 +64,29 @@ fixture_stop:
  b fixture_stop
 .globl irq_start, irq_end
 irq_start:
+ /* Periodic-add reload: a late handler (TCG host scheduling) must add whole
+  * periods until DEC is positive again, or the edge-triggered exception is lost. */
  mtspr 272,0
  mtspr 273,3
- mfxer 3
- mtspr 274,3
+ mtspr 274,4
+ mfcr 3
+ mtspr 275,3
+ lis 3,kboot_reload@ha
+ lwz 3,kboot_reload@l(3)
+ mfdec 0
+ li 4,0
+1: add 0,0,3
+ addi 4,4,1
+ cmpwi 0,0
+ ble 1b
+ mtdec 0
  lis 3,kboot_tick@ha
  lwz 0,kboot_tick@l(3)
- addic 0,0,1
+ add 0,0,4
  stw 0,kboot_tick@l(3)
- lis 0,1
- ori 0,0,34464
- mtdec 0
- mfspr 3,274
- mtxer 3
+ mfspr 3,275
+ mtcr 3
+ mfspr 4,274
  mfspr 3,273
  mfspr 0,272
  rfi
@@ -154,11 +165,17 @@ def main():
             '__asm__ volatile("mtmsr %0; isync"::"r"(m)); fixture_stop();',
             'stopped after READY'),
            ('raw-fatal',LINES,good,'emit("FATAL");','forbidden diagnostic'),
+           # ALIVE is honest, then the tick drops to 10 Hz: must not pass on "tick moved".
+           ('slow-tick',LINES,good,'kboot_reload=10000000;','QMP tick rate'),
+           # EE cleared in a non-branch loop: not a stop PC, but no interrupts either.
+           ('ee-off',LINES,good,'unsigned m2; __asm__ volatile("mfmsr %0":"=r"(m2)); m2 &= ~0x8000u; '
+            '__asm__ volatile("mtmsr %0; isync"::"r"(m2));','interrupts disabled after READY'),
            ('early-fatal',['FATAL fixture']+LINES[:2], '', '', 'negative diagnostic/progress'),
            ('wrong-fatal',LINES[:2]+['FATAL fixture_wrong'], '', '', 'negative diagnostic/progress')]
     for name,lines,alive,tail,reason in extra:
         neg=name in ('early-fatal','wrong-fatal')
         elf=fixture(out/name,lines,alive,wait=not neg,stop=neg,tail=tail)
+        images[name] = elf
         try: meter.accept(elf,'7450',30,out/(name+'-guest'),'fixture-fatal' if neg else None)
         except CriterionFailure as exc:
             assert str(exc)==reason,(name,str(exc))
@@ -166,15 +183,22 @@ def main():
         else: raise AssertionError('SURVIVED '+name)
     if args.mutate:
         source=(ROOT/'tools/ppc/kboot_run.py').read_text()
-        for name,before,after,case in METER_MUTATIONS:
+        for name,before,after,case,expected in METER_MUTATIONS:
             assert source.count(before)==1, name+' unique product anchor'
             mutant=types.ModuleType('meter_mutant')
             exec(compile(source.replace(before,after),str(ROOT/'tools/ppc/kboot_run.py'),'exec'),mutant.__dict__)
-            evidence=mutant.accept(images[case],'7450',60,out/('mutant-'+name))
-            raw=(evidence/'serial-a.log').read_text()
-            assert 'KBOOT READY stage=pre-user' in raw
-            print('RED product '+name+': invalid guest accepted (runtime oracle)',flush=True)
-    print(f'PASS 12 fixture RED, 4 GREEN, {len(METER_MUTATIONS) if args.mutate else 0} product RED elapsed={time.monotonic()-started:.2f}s')
+            try:
+                evidence=mutant.accept(images[case],'7450',60,out/('mutant-'+name))
+            except mutant.CriterionFailure as exc:
+                # Only the next guard's exact reason proves the mutated line owned the verdict.
+                assert expected!='ACCEPT' and str(exc)==expected, (name,str(exc),expected)
+                print('RED product '+name+': verdict moved to "'+str(exc)+'" (runtime oracle)',flush=True)
+            else:
+                assert expected=='ACCEPT', (name,'accepted, expected '+expected)
+                raw=(evidence/'serial-a.log').read_text()
+                assert 'KBOOT READY stage=pre-user' in raw
+                print('RED product '+name+': invalid guest accepted (runtime oracle)',flush=True)
+    print(f'PASS 14 fixture RED, 4 GREEN, {len(METER_MUTATIONS) if args.mutate else 0} product RED elapsed={time.monotonic()-started:.2f}s')
 
 
 if __name__=='__main__': main()

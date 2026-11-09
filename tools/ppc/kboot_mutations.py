@@ -19,8 +19,17 @@ NEGATIVES = {
 }
 
 # Mutate the meter's product lines, then exercise it with a guest that must be
-# rejected. A returned acceptance is an observed runtime oracle failure.
+# rejected. Each row names the fixture and the exact outcome the mutant must
+# produce: 'ACCEPT' (the invalid guest is accepted) or the *different* rejection
+# reason of the next guard in depth. An unchanged reason, a timeout or any other
+# failure is a test error, never a RED.
 METER_MUTATIONS = (
-    ('tick-check', 'abs(ticks*1000-us)*100 <= us*5', 'True', 'tick'),
-    ('duration-check', "us >= 2000000", 'True', 'duration'),
+    ('tick-check', 'abs(ticks*1000-us)*100 <= us*5', 'True', 'tick', 'ACCEPT'),
+    ('duration-check', "us >= 2000000", 'True', 'duration', 'ACCEPT'),
+    ('tick-rate', 'abs(tick_delta*hz-elapsed*1000)*100 <= elapsed*1000*5+2*hz*100',
+     'True', 'slow-tick', 'ACCEPT'),
+    ('ready-stop', "require(not halted or bool(msr & 0x8000), 'stopped after READY')",
+     "require(True, 'stopped after READY')", 'stop', 'interrupts disabled after READY'),
+    ('ee-window', "require(elapsed < hz, 'interrupts disabled after READY')",
+     "if elapsed >= hz: break", 'ee-off', 'QMP tick rate'),
 )

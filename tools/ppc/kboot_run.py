@@ -159,7 +159,7 @@ def accept(elf, cpu, timeout, out, negative=None):
                         ticks_before = word('kboot_tick')
                         hz = int(re.search(r'tb_hz=(\d+)', aa)[1])
                         require(tb_now-ready_tb >= 2*hz, 'QMP READY duration')
-                        # Observe at least 100 ms of guest TB, independent of TCG speed.
+                        # Observe at least 200 ms of guest TB, independent of TCG speed.
                         # An interrupt handler can temporarily have EE clear: resample it.
                         while True:
                             q.call('cont')
@@ -173,11 +173,17 @@ def accept(elf, cpu, timeout, out, negative=None):
                             later_tb = (int(halves[1]) << 32) | int(halves[2])
                             elapsed = later_tb-tb_now
                             ee = int(re.search(r'MSR\s+([0-9a-fA-F]+)', later)[1], 16) & 0x8000
-                            if elapsed >= hz//10 and ee:
+                            if elapsed >= hz//5 and ee:
                                 break
                             require(elapsed < hz, 'interrupts disabled after READY')
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError('QEMU timeout: continuation window')
+                        # Design §2: the 1 kHz tick must *continue*, not merely advance.
+                        # Guest TB is the reference (never wall time); 2 ticks of slack
+                        # cover the sampling edges of the >=200 ms window.
                         tick_delta = (word('kboot_tick')-ticks_before) & 0xffffffff
-                        require(tick_delta > 0, 'QMP no tick progress')
+                        snapshots.append(f'rate: tick_delta={tick_delta} elapsed={elapsed} hz={hz}')
+                        require(abs(tick_delta*hz-elapsed*1000)*100 <= elapsed*1000*5+2*hz*100, 'QMP tick rate')
                         validate(serial(a), serial(b), True)
                         break
                 q.call('cont')
