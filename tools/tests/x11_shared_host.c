@@ -156,6 +156,7 @@ static u8 fixture_tvram_attr[25 * 160];
 #undef TVRAM_ATTR
 #define TVRAM_BASE ((uptr)fixture_tvram_text)
 #define TVRAM_ATTR ((uptr)fixture_tvram_attr)
+#include "../../platform/pc98/ime_display.c"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
