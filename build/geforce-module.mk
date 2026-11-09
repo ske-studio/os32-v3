@@ -86,12 +86,14 @@ $(error GF_ACCEPT_ID is required for acceptance builds)
 endif
 GFA_OUT := $(BUILD_OUT)/geforce-accept/$(GEFORCE_ACCEPT)
 GFA_MODE := $(if $(filter byte-uc,$(GEFORCE_ACCEPT)),0,$(if $(filter dword-uc,$(GEFORCE_ACCEPT)),1,2))
-GFA_OBJS := $(filter-out $(GEFORCE_OUT)/backend_geforce.o $(GEFORCE_OUT)/gf_present.o,$(GEFORCE_OBJS)) $(addprefix $(GFA_OUT)/,backend_geforce.o gf_present.o gf_accept.o)
+GFA_OBJS := $(filter-out $(GEFORCE_OUT)/backend_geforce.o $(GEFORCE_OUT)/gf_present.o,$(GEFORCE_OBJS)) $(addprefix $(GFA_OUT)/,backend_geforce.o gf_present.o gf_accept.o gf_accept_cpu.o)
 $(GFA_OUT)/build-id: FORCE
 	@mkdir -p $(@D)
 	@if [ "$$(cat $@ 2>/dev/null)" != '$(GF_ACCEPT_ID)' ]; then echo '$(GF_ACCEPT_ID)' > $@; fi
 $(GFA_OUT)/backend_geforce.o: private GFA_FLAGS = -Dgf_present_rect=gf_accept_transfer
 $(GFA_OUT)/gf_present.o: private GFA_FLAGS = $(if $(filter byte-uc,$(GEFORCE_ACCEPT)),-DGF_PRESENT_BYTE)
+$(GFA_OUT)/gf_accept_cpu.o: arch/$(ARCH)/video/gf_accept_cpu.c $(GEFORCE_GEN) $(GFA_OUT)/build-id build/config.mk build/geforce-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE -DGF_ACCEPT_MODE=$(GFA_MODE) -DGF_ACCEPT_ID='"$(GF_ACCEPT_ID)"' $(GEFORCE_INC) -c $< -o $@
 $(GFA_OUT)/gf_accept.o: private GFA_FLAGS = -DGF_ACCEPT_MODE=$(GFA_MODE) -DGF_ACCEPT_ID='"$(GF_ACCEPT_ID)"' -DGF_ACCEPT_PAIR=$$(python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); import mkmod; print(mkmod.pair_crc(Path("$(BUILD_OUT)/vmkernel.lz4").read_bytes()))')
 $(GFA_OUT)/gf_accept.o: $(BUILD_OUT)/vmkernel.lz4
 $(GFA_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) $(GFA_OUT)/build-id build/config.mk build/geforce-module.mk

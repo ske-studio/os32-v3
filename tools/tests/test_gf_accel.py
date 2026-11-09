@@ -6,7 +6,7 @@ CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=30.7,
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
             'tools/tests/test_gf_accel.py', 'tools/accept/gf_accel.py',
-            'drivers/video/geforce/gf_accept.c', 'drivers/video/geforce/gf_present.c',
+            'arch/x86/video/gf_accept_cpu.c', 'include/video_wc.h', 'drivers/video/geforce/gf_accept.c', 'drivers/video/geforce/gf_present.c',
             'drivers/video/geforce/geforce_module.h', 'hwdev/gf/production.h',
             'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs',
             'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'userland/lib/font/**',
@@ -545,8 +545,9 @@ def producer(mode, scenario=0, mutation=None, expected_exit=0):
         old, new = mutation
         assert source.count(old) == 1, old
         source = source.replace(old, new, 1)
-    a = source.index('/* Read-only CPU primitives begin.')
-    b = source.index('/* Read-only CPU primitives end. */')
+    cpu = (ROOT/'arch/x86/video/gf_accept_cpu.c').read_text()
+    a = cpu.index('/* Read-only CPU primitives begin.')
+    b = cpu.index('/* Read-only CPU primitives end. */')
     primitives = r'''
 static u32 model_flags, model_wc, ticks, timing, calls;
 static u32 flags(void) { return model_flags; }
@@ -566,7 +567,7 @@ static unsigned long long msr(u32 reg) {
     return 0;
 }
 '''
-    source = source[:a] + primitives + source[b:]
+    source = '#include "types.h"\n' + primitives + cpu[:a] + cpu[b:] + source
     harness = r'''
 #include "accept.c"
 static u8 client[GF_MODE_VRAM_BYTES], display[GF_MODE_VRAM_BYTES];
