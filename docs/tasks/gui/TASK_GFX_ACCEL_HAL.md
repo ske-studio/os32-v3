@@ -33,5 +33,5 @@ PEGC は資料どおり 16 ビットのバスで、dword と rep movsd が同じ
 | L1c・L2〜L7・U1・W4 (第 3 波) | 実装済み (Opus レビュー・直し済み)。L1c で確定設計に追記 4 |
 | H5・H6・W1・W2・W3 (第 4 波) | 実装済み (Opus レビュー・直し済み)。W3 で GUI proto 2 |
 | U2・U3+U4 | 実装済み (Opus レビュー・直し済み)。共有ライブラリの番号表に 122・123 |
-| G3・G3b | 実装中 (G3 で GeForce の既定が DIRECT になる。結線は L2〜L6 の後 — 第 2 波のレビュー F4) |
+| G3・G3b | **実機受入完了 (2026-11-09、main 13a4ffd、Ra266 の GeForce)** — GeForce の既定は DIRECT。初回 (6b7e301) は gfx_draw_font に DIRECT の振り分けが無く文字が出ず低いメモリを壊した → 直し (振り分けと直書きの守り) の後、文字・窓の移動・スクロール・CUI と GUI の行き来・全画面・leftover 0 を確認。証拠はノートの `~/os32-tmp/evidence/2026-11-09/gfdirect2/` |
 | H2a・S1・G4m・G5m | 未着手 (確定設計 §7 の依存の順) |
