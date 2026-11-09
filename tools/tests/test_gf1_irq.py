@@ -48,6 +48,12 @@ def main():
         if '--mutate' in sys.argv:
             original = SOURCE.read_text()
             mutants = [
+                ('irq_register(f->irq_line, gf_irq_handler, f, IRQ_F_SHARED)',
+                 'irq_register(6U, gf_irq_handler, f, IRQ_F_SHARED)', 'registration forced to IRQ 6'),
+                ('irq_unregister(f->irq_line, gf_irq_handler, f)',
+                 'irq_unregister(6U, gf_irq_handler, f)', 'unregister on different IRQ'),
+                ('if (!f->irq_line || f->irq_line >= IRQ_LINE_MAX)',
+                 'if (0)', 'invalid IRQ accepted'),
                 ('if (!f->stats.first.fifo_latched) {', 'if (1) {',
                  'first FIFO status overwritten'),
                 ('if (!f->stats.first.graph_latched) {', 'if (1) {',

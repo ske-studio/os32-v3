@@ -17,7 +17,7 @@ $(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_direct.o $(GEFORCE_OUT)/gf_present_m2
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)
-GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER2_SOURCES),$(wildcard hwdev/gf/*.c)) $(GEFORCE_LAYER2_SOURCES) $(wildcard hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
+GEFORCE_SOURCES := drivers/pci/pci_locate.c kdebug/recover_gf_locate.c  $(filter-out $(GEFORCE_LAYER2_SOURCES),$(wildcard hwdev/gf/*.c)) $(GEFORCE_LAYER2_SOURCES) $(wildcard hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
 GEFORCE_SERVICE_OBJS := $(patsubst %.c,$(GEFORCE_OUT)/%.o,$(GEFORCE_SOURCES))
 $(GEFORCE_SERVICE_OBJS): $(GEFORCE_OUT)/%.o: %.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	mkdir -p $(@D)
@@ -59,7 +59,7 @@ $(GEFORCE_DMA_KERNEL_OBJ) $(GEFORCE_DMA_R1_OBJ): $(LAYOUT_HEADER) build/kernel.m
 -include $(GEFORCE_DMA_KERNEL_OBJ:.o=.d) $(GEFORCE_DMA_R1_OBJ:.o=.d)
 
 # Identification is also needed before module loading / ledger freeze.
-GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o
+GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_locate.o $(GEFORCE_OUT)/boot_pci_locate.o  $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o
 $(GEFORCE_OUT)/geforce_tick.o: drivers/video/geforce/geforce_tick.c drivers/video/geforce/geforce_tick.h build/geforce-module.mk
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os $(GEFORCE_INC) -c $< -o $@
@@ -67,6 +67,12 @@ $(GEFORCE_OUT)/boot_resources.o: hwdev/gf/resources.c build/geforce-module.mk
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os -DGF_PRODUCTION $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/boot_scan.o: kdebug/gfinit_resources.c build/geforce-module.mk
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) -Os -DGF_PRODUCTION $(GEFORCE_INC) -c $< -o $@
+$(GEFORCE_OUT)/boot_locate.o: kdebug/recover_gf_locate.c build/geforce-module.mk
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) -Os -DGF_PRODUCTION $(GEFORCE_INC) -c $< -o $@
+$(GEFORCE_OUT)/boot_pci_locate.o: drivers/pci/pci_locate.c build/geforce-module.mk
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os -DGF_PRODUCTION $(GEFORCE_INC) -c $< -o $@
 C_KERNEL_OBJ += $(GEFORCE_BOOT_OBJS)

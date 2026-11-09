@@ -1,6 +1,6 @@
 """Unprepared production GF1 status must not call a missing MMIO callback."""
 CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=3.2,
-    covers=['tools/tests/test_gf_boot_status.py', 'tools/tests/gf_boot_status_host.c',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'tools/tests/test_gf_boot_status.py', 'tools/tests/gf_boot_status_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'kdebug/gf_foundation_test.c', 'kdebug/gf_foundation_test.h',
             'kdebug/gfinit_bus.h', 'kdebug/gf_stage_state.h', 'kdebug/recover*.h',
@@ -46,7 +46,7 @@ def main(mutate=False):
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                             '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
-                            '-Wl,--gc-sections', *include_flags(ROOT), str(tmp/'host.c'), str(tmp/'mc.c'),
+                            '-Wl,--gc-sections', *include_flags(ROOT), str(tmp/'host.c'), str(tmp/'mc.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'),
                             '-o', str(tmp/'host')], check=True)
             rc = host32.run([str(tmp/'host')], timeout=30).returncode
             assert (rc == 0 if name == 'control' else rc != 0), (name, rc)

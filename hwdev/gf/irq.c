@@ -9,7 +9,6 @@
 #include "../../drivers/pci/pci.h"
 #include "../../lib/serial_diag.h"
 
-#define GF_IRQ_LINE 6U
 #define GF_IRQ_ALL 0xffffffffU
 #define GF_IRQ_PMC_STATUS 0x000100U
 #define GF_IRQ_PMC_ENABLE 0x000140U
@@ -93,9 +92,13 @@ int gf_irq_attach(struct gf_foundation *f)
     if (unused_drain(f, true, &left)) goto io_error;
     f->irq_line = pci_cfg_read8(RECOVER_GF_BUS, RECOVER_GF_DEV,
                                RECOVER_GF_FN, PCI_CFG_INT_LINE);
-    int rc = irq_register(GF_IRQ_LINE, gf_irq_handler, f, IRQ_F_SHARED);
+    if (!f->irq_line || f->irq_line >= IRQ_LINE_MAX) {
+        log_irq(" invalid=", f->irq_line, GF1_EIRQ);
+        return f->last_rc = GF1_EIRQ;
+    }
+    int rc = irq_register(f->irq_line, gf_irq_handler, f, IRQ_F_SHARED);
     /* Foreground only: retain the original IRQ_ERR_* in the diagnostic. */
-    log_irq(" register(6)=", f->irq_line, rc);
+    log_irq(" register=", f->irq_line, rc);
     if (rc) return f->last_rc = GF1_EIRQ;
     f->registered = true;
     return f->last_rc = GF1_OK;
@@ -290,8 +293,8 @@ void gf_irq_snapshot(struct gf_foundation *f, struct gf_irq_stats *out)
 int gf_irq_detach(struct gf_foundation *f)
 {
     if (!f->registered) return GF1_OK;
-    int rc = irq_unregister(GF_IRQ_LINE, gf_irq_handler, f);
-    log_irq(" unregister(6)=", f->irq_line, rc);
+    int rc = irq_unregister(f->irq_line, gf_irq_handler, f);
+    log_irq(" unregister=", f->irq_line, rc);
     if (rc) return f->last_rc = GF1_EIRQ;
     f->registered = false;
     return f->last_rc = GF1_OK;

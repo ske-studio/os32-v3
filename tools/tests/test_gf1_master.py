@@ -1,6 +1,6 @@
 """Layer 1 PCI master and latency policy with a fake configuration space."""
 CHECK = dict(name='gf1-master-host', tier=1,
-    covers=['hwdev/gf/master.c', 'hwdev/gf/foundation.h', 'hwdev/gf/internal.h',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'hwdev/gf/master.c', 'hwdev/gf/foundation.h', 'hwdev/gf/internal.h',
             'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'kdebug/recover.h',
             'tools/tests/gf1_master_host.c', 'tools/tests/test_gf1_master.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
@@ -25,7 +25,7 @@ def main():
                             '-fno-pie', '-nostdlib', '-static', '-no-pie',
                             *include_flags(ROOT), '-I' + str(ROOT),
                             '-DMASTER_SOURCE="' + str(source) + '"',
-                            str(ROOT / 'tools/tests/gf1_master_host.c'), '-o', str(exe)], check=True)
+                            str(ROOT / 'tools/tests/gf1_master_host.c'), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)], check=True)
             return host32.run([str(exe)], cwd=ROOT, runner='qemu').returncode
         assert run(SOURCE) == 0
         print('PASS PCI master, latency and failures', flush=True)

@@ -122,7 +122,7 @@ static void prod_hal_cases(void)
     hal_backend.shutdown();hal_backend.init();prod_stop_fail=prod_stop_writes+1;
     CHECK(geforce_return(p)==-1 && !hal_route);
     /* Lost identity forbids MMIO/redraw but still tries route00. */
-    prod_cfg[13][0][0]^=1;u32 redraws=prod_redraws,reads=prod_mmio_calls;
+    prod_cfg[PROD_GF_DEV][0][0]^=1;u32 redraws=prod_redraws,reads=prod_mmio_calls;
     CHECK(geforce_return(p)==-1 && !hal_safe && !hal_route);
     CHECK(prod_mmio_calls==reads && prod_redraws==redraws);
     output("PASS P4/P5 ownerless platform: prepare-only, start/copy/cell/01, fixed reinit, stop/00/decode/redraw, reboot return failure\n");

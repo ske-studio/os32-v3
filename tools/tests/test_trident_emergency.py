@@ -6,7 +6,7 @@ The classifier, hook, rc handling and actual TVRAM calls remain product code.
 Hardware sequence assembly belongs to test_trident_lifecycle, in tri-life.
 """
 CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
             'gfx/gfx_core*.inc', 'drivers/video/cirrus/backend_cirrus.c',
             'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c',
             'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c',
