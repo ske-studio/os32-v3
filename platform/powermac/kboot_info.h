@@ -35,6 +35,14 @@ struct pm_kboot_info {
     struct pm_kboot_device escc, mpic;
 };
 const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci);
+/* Final snapshot only: after reserve, no OF allocation/map before detach. */
+void pm_kboot_refresh_available(struct pm_kboot_info *info);
+enum pm_kboot_reserve_result {
+    PM_KBOOT_RESERVE_OK, PM_KBOOT_RESERVE_RANGES, PM_KBOOT_RESERVE_IMAGE,
+    PM_KBOOT_RESERVE_IMAGE_AVAILABLE, PM_KBOOT_RESERVE_VECTOR,
+    PM_KBOOT_RESERVE_WINDOW, PM_KBOOT_RESERVE_HPT
+};
+int pm_kboot_reserve(struct pm_kboot_info *info);
 void pm_kernel_takeover(const struct pm_kboot_info *) __attribute__((noreturn));
 void ppc_kernel_main(void) __attribute__((noreturn));
 #endif

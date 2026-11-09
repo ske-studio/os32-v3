@@ -192,3 +192,18 @@ const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
         fail("FAIL:KBOOT:REQUIRED-NODE\r\n");
     return &info;
 }
+
+/* Reuse the exact B1 decoder for the last firmware-owned available snapshot.
+ * No claims/maps: image is already PT_LOAD-owned, other storage is untouched. */
+void pm_kboot_refresh_available(struct pm_kboot_info *dest)
+{
+    int root=ofw_finddevice(PM_ROOT), mem=ofw_finddevice(PM_MEMORY);
+    if (root==0 || root==-1 || mem==0 || mem==-1)
+        fail("FAIL:KBOOT:MEMORY\r\n");
+    int parent=ofw_parent(mem);
+    if (parent==0 || parent==-1) fail("FAIL:KBOOT:MEMORY-PARENT\r\n");
+    unsigned ac=cells(parent,"#address-cells",2,1,2);
+    unsigned sc=cells(parent,"#size-cells",1,1,2);
+    int mac=macrisc(root);
+    memory(mem,"available",mac?1:ac,mac?1:sc,&dest->available);
+}
