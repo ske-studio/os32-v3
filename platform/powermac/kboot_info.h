@@ -10,15 +10,21 @@ struct pm_kboot_property {
     unsigned present, bytes;
     unsigned char data[PM_KBOOT_PROP_BYTES];
 };
+/* KeyLargo family: NetBSD macppc/dev/obio.c:123-126,458.
+ * Identity selects later accessors; CPU byte order is not an MMIO rule.
+ * KeyLargo MPIC uses LE (NetBSD powerpc/include/openpic.h:41-53);
+ * ESCC uses byte registers (macppc/dev/zs.c:886-890,914-919). */
+enum pm_kboot_machine { PM_KBOOT_MACHINE_UNKNOWN, PM_KBOOT_MACHINE_KEYLARGO };
 struct pm_kboot_node {
     int node, parent;
     unsigned ac, sc;
     char path[PM_PATH_CAP];
-    struct pm_kboot_property reg, assigned, ranges;
+    struct pm_kboot_property reg, assigned, ranges, compatible;
 };
 /* Leaf first, ending at root; ESCC leaf is ch-a when present. */
 struct pm_kboot_device {
     unsigned count;
+    enum pm_kboot_machine machine;
     struct pm_kboot_node v[PM_KBOOT_ANCESTORS];
 };
 struct pm_kboot_info {

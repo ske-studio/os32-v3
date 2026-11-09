@@ -19,6 +19,10 @@ CHECK = dict(name='ppc-kboot-capture', tier=2, budget=60,
                      'include/types.h', 'include/callconv.h', 'lib/kstring.h',
                      'lib/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
+    ('compatible-only-mpic', 'compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||\n            compatible(node,"openpic")', '0'),
+    ('machine-identity', 'dest->machine=PM_KBOOT_MACHINE_KEYLARGO;', 'dest->machine=PM_KBOOT_MACHINE_UNKNOWN;'),
+    ('cpu-outside-cpus', 'ofw_parent(node)==ofw_finddevice("/cpus")', '1'),
+    ('ancestor-ranges', 'raw(node,"ranges",&v->ranges);', 'if (dest->count==1) raw(node,"ranges",&v->ranges);'),
     ('ignore-hole', 'r.start<=out->v[kept-1].start+out->v[kept-1].size', '1'),
     ('cell-count', 'unsigned stride=(ac+sc)*PM_CELL_BYTES;', 'unsigned stride=2*PM_CELL_BYTES;'),
     ('overflow', 'size>0xffffffffUL-start', '0'),
@@ -38,7 +42,7 @@ def exercise(directory, source):
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
-    for case in range(19):
+    for case in range(24):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
         if result.returncode:
             failed.append((case, result.returncode))
@@ -55,7 +59,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 19 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 24 firmware-tree cases (ILP32 product code)')
         if args.mutate:
             text = product.read_text()
             for name, old, new in MUTATIONS:

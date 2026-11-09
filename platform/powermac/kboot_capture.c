@@ -46,6 +46,31 @@ static int named(int node, const char *key, const char *value)
         !kstrncmp((const char *)property,value,len) &&
         (n==(int)len || property[len]==0);
 }
+/* OF compatible is a NUL-separated string list, not a single name.
+ * MPIC identities: NetBSD macppc/macppc/interrupts.c:58-88. */
+static int compatible(int node, const char *value)
+{
+    int n=read_property(node,"compatible"), found=0;
+    unsigned len=kstrlen(value);
+    for (int p=0; p<n;) {
+        int end=p;
+        while (end<n && property[end]) end++;
+        if (end==n) fail("FAIL:KBOOT:COMPATIBLE\r\n");
+        if ((unsigned)(end-p)==len &&
+            !kstrncmp((const char *)property+p,value,len)) found=1;
+        p=end+1;
+    }
+    return found;
+}
+static void compatible_copy(int node, struct pm_kboot_property *dest)
+{
+    /* Validate all list entries before retaining the bounded BSS copy. */
+    (void)compatible(node,"");
+    int n=read_property(node,"compatible");
+    dest->present=n!=-1;
+    dest->bytes=n==-1?0:(unsigned)n;
+    for (int i=0; i<n; i++) dest->data[i]=property[i];
+}
 static int macrisc(int root)
 {
     int n=read_property(root,"compatible");
@@ -103,6 +128,7 @@ static void raw(int node, const char *name, struct pm_kboot_property *dest)
 static void device(int node, struct pm_kboot_device *dest)
 {
     dest->count=0;
+    dest->machine=PM_KBOOT_MACHINE_UNKNOWN;
     while (node!=0 && node!=-1) {
         if (dest->count>=PM_KBOOT_ANCESTORS) fail("FAIL:KBOOT:ANCESTOR-LIMIT\r\n");
         struct pm_kboot_node *v=&dest->v[dest->count++];
@@ -115,6 +141,9 @@ static void device(int node, struct pm_kboot_device *dest)
         raw(node,"reg",&v->reg);
         raw(node,"assigned-addresses",&v->assigned);
         raw(node,"ranges",&v->ranges);
+        compatible_copy(node,&v->compatible);
+        if (compatible(node,"Keylargo") || compatible(node,"AAPL,Keylargo") ||
+            compatible(node,"K2-Keylargo")) dest->machine=PM_KBOOT_MACHINE_KEYLARGO;
         node=v->parent;
     }
 }
@@ -124,7 +153,8 @@ static void tree(int node, unsigned depth)
     while (node!=0 && node!=-1) {
         if (++visited>PM_KBOOT_TREE_LIMIT || depth>=PM_KBOOT_ANCESTORS)
             fail("FAIL:KBOOT:TREE-LIMIT\r\n");
-        if (!info.tb_hz && named(node,"device_type","cpu")) {
+        if (!info.tb_hz && ofw_parent(node)==ofw_finddevice("/cpus") &&
+            named(node,"device_type","cpu")) {
             int n=read_property(node,"timebase-frequency");
             if (n!=-1) {
                 if (n!=4 || !be32(property)) fail("FAIL:KBOOT:TIMEBASE\r\n");
@@ -134,7 +164,9 @@ static void tree(int node, unsigned depth)
         if (!info.escc.count && named(node,"name","ch-a") &&
             named(ofw_parent(node),"name","escc")) device(node,&info.escc);
         if (!info.mpic.count && (named(node,"device_type","open-pic") ||
-            named(node,"name","open-pic"))) device(node,&info.mpic);
+            named(node,"name","open-pic") ||
+            compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||
+            compatible(node,"openpic"))) device(node,&info.mpic);
         tree(ofw_child(node),depth+1);
         node=ofw_peer(node);
     }
