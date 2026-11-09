@@ -84,6 +84,12 @@ def run(folder, image=None, mode_c=False):
     names = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())['imports']
     core = {e['symbol'] for e in module.gen.slots() if e['group']=='core'} - {'kpeek_call', 'recover_hal_wait_frame'}
     source += '\nstatic void unused_import(void) { CHECK(0); }\n'
+    # The loaded image resolves its own GF location, independently of the host
+    # stub. Give its raw fn0 scan the same device as the bus fixture.
+    source += '''static u32 trace_pci_read32(u32 bus, u32 dev, u32 fn, u32 reg) {
+    CHECK(bus == RECOVER_GF_BUS && dev < 32 && fn == 0 && reg == 0);
+    return dev == GF_T_DEV ? RECOVER_GF_DEVICE : ~0U;
+}\n'''
     source += 'static int trace_production_selected(void) { return 0; }\n'
     source += 'extern void hwdev_trace_load(const unsigned *);\nvoid _start(void) {\n'
     replacements = {name: 'sequence_' + name for name in
@@ -94,6 +100,7 @@ def run(folder, image=None, mode_c=False):
         replacements['geforce_foundation_ops'] = 'sequence_foundation_ops'
         replacements['sys_time_now'] = 'sequence_sys_time_now'
     replacements['gf_production_selected'] = 'trace_production_selected'
+    replacements['pci_cfg_read32'] = 'trace_pci_read32'
     source += '    const unsigned imports[] = {\n' + ''.join(
         '        (unsigned)' + replacements.get(e['name'],
             e['name'] if e['name'] in core or e['name'] == 'kprintf' else 'unused_import') + ',\n'
