@@ -2,7 +2,8 @@
 /*  IME_RENDER_TVRAM.C — TVRAM用 IME 描画バックエンド実装                   */
 /* ======================================================================== */
 
-#include "ime_render.h"
+#include "kernel/ime/ime_render.h"
+#include "pc98.h"
 #include "tvram.h"
 #include "utf8.h"
 

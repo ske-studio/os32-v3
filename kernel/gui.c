@@ -11,7 +11,7 @@
 #include "gfx.h"
 #include "kstring.h"
 #include "input_service.h"      /* input_set_gui_mode (K2-B) */
-#include "ime/ime.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
+#include "ime_control.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
 
 /* res_owner_get() は fs/fd_redirect.c。FD と同じ「確保した実行レベル」。
  * K5b からは値の意味が **アプリ ID** (1 = シェル帯 / 2〜5 = アプリ) になった。

@@ -88,6 +88,7 @@ u32 kbd_inject_pending(void) { return injected_byte >= 0; }
 int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }
 void appslot_poll_yield_reset(void) {}
 #include "kbd_source.inc"
+#include "../../platform/pc98/ime_display.c"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "../../kernel/port_service.c"
@@ -157,7 +158,7 @@ static unsigned preedit_writes, preedit_clears;
 static void audit_ime_putc(int x, int y, char c, u8 color)
 {
     (void)color;
-    if (y == IME_PREEDIT_ROW) {
+    if (y == ime_display_preedit_row()) {
         preedit_writes++;
         preedit_cells[x] = (u8)c;
     }
@@ -165,7 +166,7 @@ static void audit_ime_putc(int x, int y, char c, u8 color)
 static int audit_ime_putw(int x, int y, u32 c, u8 color)
 {
     (void)color;
-    if (y == IME_PREEDIT_ROW) {
+    if (y == ime_display_preedit_row()) {
         preedit_writes++;
         preedit_cells[x] = c;
         preedit_cells[x + 1] = 0;
@@ -175,7 +176,7 @@ static int audit_ime_putw(int x, int y, u32 c, u8 color)
 static void audit_ime_clear_row(int y, u8 color)
 {
     (void)color;
-    if (y == IME_PREEDIT_ROW) {
+    if (y == ime_display_preedit_row()) {
         preedit_clears++;
         for (int x = 0; x < TVRAM_COLS; x++) preedit_cells[x] = ' ';
     }

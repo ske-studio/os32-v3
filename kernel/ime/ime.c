@@ -14,6 +14,8 @@
 #define IME_COUNT_TEXT_COLS ((int)sizeof("00/00)") - 1)
 #include "memmap.h"
 #include "ime.h"
+#include "ime_display_private.h"
+#include <ime_default_render.h>
 #include "../sqlite_engine.h"
 #include "../../drivers/input/kbd.h"
 #include "tvram.h"
@@ -74,8 +76,8 @@ void ime_init(void)
     g_ime.mode = IME_MODE_OFF;
     g_ime.dict_loaded = 0;
     g_ime.state = IME_ST_INPUT;
-    g_ime.per_page = IME_CAND_COLS * CANDLIST_SAVE_ROWS;
-    g_ime.render = &g_ime_render_tvram;
+    g_ime.per_page = IME_CAND_COLS * IME_CANDLIST_SAVE_ROWS;
+    g_ime.render = IME_DEFAULT_RENDER;
     ime_rk_init(&g_ime.rk);
 
 }
@@ -83,19 +85,13 @@ void ime_init(void)
 /* Dynamic FEP resources remain private until the shared service gate opens. */
 u32 ime_boot_bytes(void)
 {
-    return (g_cand_save_text ? kmalloc_block_size(g_cand_save_text) + BLK_HDR_SIZE : 0) +
-           (g_cand_save_attr ? kmalloc_block_size(g_cand_save_attr) + BLK_HDR_SIZE : 0);
+    return ime_display_bytes();
 }
 
 int ime_dict_boot(void)
 {
     if (g_ime.dict_loaded) return 0;
-    if (!g_cand_save_text && services_boot_fault != SERVICES_FAULT_FEP_TEXT)
-        g_cand_save_text = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u16));
-    if (!g_cand_save_text) return -1;
-    if (!g_cand_save_attr && services_boot_fault != SERVICES_FAULT_FEP_ATTR)
-        g_cand_save_attr = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u8));
-    if (!g_cand_save_attr) return -1;
+    if (ime_display_boot(services_boot_fault)) return -1;
     if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
         services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
     char user_path[OS32_MAX_PATH];
@@ -117,10 +113,7 @@ int ime_boot_abort(void)
     g_ime.mode = IME_MODE_OFF;
     if (fep_store_close(&g_ime.store)) return -1;
     g_ime.dict_loaded = 0;
-    if (g_cand_save_attr) kfree(g_cand_save_attr);
-    if (g_cand_save_text) kfree(g_cand_save_text);
-    g_cand_save_attr = 0;
-    g_cand_save_text = 0;
+    ime_display_abort();
     return 0;
 }
 
@@ -330,7 +323,7 @@ int ime_feed_key(int keydata)
 /* ======================================================================== */
 void ime_set_render(void *table)
 {
-    const IME_Render *next = table ? (const IME_Render *)table : &g_ime_render_tvram;
+    const IME_Render *next = table ? (const IME_Render *)table : IME_DEFAULT_RENDER;
     if (next != g_ime.render) {
         ime_cancel_input(); /* GUI/CUI input lifetime ends with its renderer. */
         g_ime_reader_owner = 0;
