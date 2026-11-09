@@ -236,7 +236,9 @@
     "drivers/video/pc98/splash_raster_play.c",
     "drivers/video/pc98/splash_raster_run.c",
     "arch/x86/kernel/exec_entry.c",
-    "arch/x86/kernel/exec_context.c"
+    "arch/x86/kernel/exec_context.c",
+    "arch/x86/kernel/kapi_call.c",
+    "arch/x86/kernel/syscall_entry.c"
   ],
   "ASM_KERNEL": [
     "arch/x86/kernel/kentry.asm",
