@@ -19,19 +19,19 @@ CHECK = dict(name='ppc-kboot-reserve', tier=2, budget=60, covers=[
     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
     'lib/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
-    ('ignore-hole', 'if (r->v[i].start>first) return 0;', 'if (0) return 0;'),
+    ('ignore-hole', 'if (r->v[i].start>first) return 0;', 'if (0) return 0;', {1: (77, 'CR0'), 6: (77, 'CR0'), 7: (77, 'CR0'), 11: (77, 'CR0')}),
     ('image-unowned', 'if (r->start<end && r->start+r->size>first)',
-     'if (0 && r->start<end && r->start+r->size>first)'),
+     'if (0 && r->start<end && r->start+r->size>first)', {2: (77, 'CR0')}),
     ('hpt-align-down', 'start=(start+PM_HPT_BYTES-1)&~(PM_HPT_BYTES-1);',
-     'start=start&~(PM_HPT_BYTES-1);'),
+     'start=start&~(PM_HPT_BYTES-1);', {3: (77, 'CR0'), 5: (78, 'CR0')}),
     ('window-end', '!covered(&info->available,end,PM_WINDOW_END)',
-     '!covered(&info->available,end,PM_WINDOW_END-1)'),
-    ('skip-vector', 'if (!covered(&info->ram,0,PM_VECTOR_END))', 'if (0)'),
-    ('stale-snapshot', 'pm_kboot_refresh_available(info);', '(void)info;'),
+     '!covered(&info->available,end,PM_WINDOW_END-1)', {6: (77, 'CR0')}),
+    ('skip-vector', 'if (!covered(&info->ram,0,PM_VECTOR_END))', 'if (0)', {7: (77, 'CR0')}),
+    ('stale-snapshot', 'pm_kboot_refresh_available(info);', '(void)info;', {11: (77, 'CR0')}),
 ]
 
 
-def exercise(directory, source):
+def exercise(directory, source, expected):
     fake = (ROOT / 'tools/ppc/kboot_capture_fake.c').read_text()
     anchor = 'static void test(void)\n{'
     if fake.count(anchor) != 1:
@@ -49,14 +49,21 @@ def exercise(directory, source):
                     '-Wl,--defsym,__kernel_image_start=0x100000',
                     '-Wl,--defsym,__kernel_resident_end=0x300000', '-o', str(exe)],
                    check=True, timeout=60)
-    failures = []
-    for case in range(13):
+    actual = {}
+    for case in range(14):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
-        if result.returncode == 77:
-            failures.append(case)
-        elif result.returncode:
-            raise RuntimeError(f'case {case}: unexpected exit {result.returncode}')
-    return failures
+        marks = result.stdout.decode('ascii')
+        if result.returncode or case in expected:
+            actual[case] = (result.returncode, marks)
+        elif marks != ('CR' + str([0, 5, 3, 6, 5, 0, 5, 4, 0, 2, 6, 5, 1, 0][case])
+                       if case != 8 else '') or result.stderr:
+            raise RuntimeError(f'case {case}: unexpected marks {marks!r} or stderr {result.stderr!r}')
+        if result.stderr:
+            raise RuntimeError(f'case {case}: unexpected stderr {result.stderr!r}')
+    print(f'expected={expected}, actual={actual}')
+    if actual != expected:
+        raise RuntimeError('case/exit/reached-marker mismatch')
+
 
 
 def main():
@@ -66,21 +73,18 @@ def main():
     product = ROOT / 'platform/powermac/kboot_reserve.c'
     with tempfile.TemporaryDirectory(prefix='kboot-reserve-') as temp:
         directory = Path(temp)
-        failures = exercise(directory, product)
-        if failures:
-            raise RuntimeError(f'baseline mismatch: {failures}')
-        print('GREEN: 13 ILP32 reserve/capture cases')
+        exercise(directory, product, {})
+        print('GREEN: 14 ILP32 reserve/capture cases')
         if args.mutate:
             original = product.read_text()
-            for name, old, new in MUTATIONS:
+            for name, old, new, expected in MUTATIONS:
                 if original.count(old) != 1:
                     raise RuntimeError(f'{name}: anchor not unique')
                 mutant = directory / 'kboot_reserve.c'
                 mutant.write_text(original.replace(old, new))
-                failures = exercise(directory, mutant)
-                if not failures:
-                    raise RuntimeError(f'{name}: survived')
-                print(f'RED: {name}: expected mismatch exit 77, cases {failures}')
+                print(f'mutation {name}: ', end='', flush=True)
+                exercise(directory, mutant, expected)
+                print(f'RED: {name}')
     return 0
 
 
