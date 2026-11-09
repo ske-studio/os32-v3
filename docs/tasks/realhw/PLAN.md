@@ -12,7 +12,7 @@
 | [TASK_TRIDENT_DRIVER.md](TASK_TRIDENT_DRIVER.md) | 内蔵 Trident の画面ドライバ (RA266 §7) |
 | `docs/archive/realhw/TASK_PEGC480_REALHW.md` | 実機の PEGC 640x480 のずれ — 受入完了 (2026-09-30)、アーカイブ。今の仕様は [05_drivers.md §5-5](../../05_drivers.md) |
 | [TASK_FD144.md](TASK_FD144.md) | 1.44MB フロッピー (RA266 §3) |
-| [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
+| [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (バス 0 の列挙で見つけた位置) |
 | [TASK_GF_DRIVER.md](TASK_GF_DRIVER.md) | GeForce 6200 の本番の画面ドライバ — 1 機能 1 ファイル + 抽象化の層 + HAL、計画 (2026-10-29) |
 | [TASK_GF_ACCEL.md](TASK_GF_ACCEL.md) | GeForce 6200 の画面の転送を速くする — 段 0 (dword の present + MTRR の WC)、足りなければ M2MF、設計確定 (2026-11-01) |
 | [TASK_GF_FEATURES.md](TASK_GF_FEATURES.md) | GeForce 6200 の機能を手本 nouveau と同じ範囲まで (土台・コマンド投入・2D・表示・その他、GUI へのつなぎ込みと 3D/Xv/MPEG は残タスク) — 実装中 (2026-11-04、層 1〜4 は main、層 5 は試行中、実機の受入は wt/gf-prodtime の後) |

@@ -79,9 +79,9 @@
 |---|---|---|---|
 | 82557 | `drivers/net/e82557/e82557.c:697` (dev->irq_line、SHARED) | `:416-440` SCB の STAT を読み、0 と 0xFF は NONE | 耐える |
 | CS4231 | `drivers/sound/cs4231/pcm_cs4231.c:548` (PCM_IRQ=10 固定 `pcm_cs4231.h:38`) | `:385-415` PI を見て ack したときだけ HANDLED。tick は `:423` | 耐える |
-| GeForce | `hwdev/gf/irq.c:96` (SHARED) | `:240-` PMC を読み、要因のある所だけ排出。tick は `:277` | 要因の確認は耐える。**ただし線は `GF_IRQ_LINE 6U` の固定 (`:12`) で、0x3C は `:94` で記録するだけ。BDF も固定** (`resources.c:18`・`bus.c:10`・`master.c:16`) → 前提の段 gf-bdf (IRQ の線は PM が足す) と段 9 |
+| GeForce | `hwdev/gf/irq.c:99` (0x3C の線、SHARED。解除は `:296`) | `:240-` PMC を読み、要因のある所だけ排出。tick は `:277` | 耐える (線・BDF とも見つけた値。線は `irq.c:93-101` で 0x3C を読み、BDF は `recover_gf_dev()`、`kdebug/recover.h:55-57`)。機器単位の口へは段 9 |
 | USB | 未実装。設計の `docs/decisions/usb/USB_DESIGN.md:215` は 0x3C の線を使い、`:234` の intr_collect が要因を返す | 設計上は耐える |
-| LGY-98 (C バス) | `drivers/net/ne2000/lgy98.c:69・145` (SHARED、IRQ はジャンパの 3・5・6 など) | `ne2000_irq.inc:25` で ISR の要因を確かめ、残件は `:88` の `ne2k_timer_tick` で定期回収 | 耐える。ただし **PCI の候補 3・5・6 と重なる**ので、振り直すと新しい共有の相手になり得る (§3-2 の reserved、§6) |
+| LGY-98 (C バス) | `drivers/net/ne2000/lgy98.c:145` (SHARED、IRQ はジャンパの 3・5・6 など) | `ne2000_irq.inc:25` で ISR の要因を確かめ、残件は `:88` の `ne2k_timer_tick` で定期回収 | 耐える。ただし **PCI の候補 3・5・6 と重なる**ので、振り直すと新しい共有の相手になり得る (§3-2 の reserved、§6) |
 | FDC | `drivers/block/fdc.c:278` (排他、IRQ11)。PCI の列挙より前に登録し、割込みも許可済み (`platform/pc98/boot.c:65`、`init/kernel.c:149・157`) | — | PCI の候補ではない。ただし §3-3 の「全部マスク済み」という前提を崩す |
 
 ## 3. 設計
@@ -95,7 +95,7 @@
 ### 3-0. 2 層の構造
 | 層 | 置き場 | 持ち物 |
 |---|---|---|
-| 共通 (CPU・機種に依らない) | `drivers/pci/pci_irq_plan.c` (純粋)・`drivers/pci/pci_irq.c` (つなぎ) | 機器ごとの登録の口、割り振りの方針 (§3-2)、一覧と診断、`pci_dev.irq` の更新 |
+| 共通 (CPU・機種に依らない) | `drivers/pci/pci_irq_plan.c` (純粋)・`drivers/pci/pci_irq.c` (つなぎ) | 機器ごとの登録の口、割り振りの方針 (§3-2)、一覧と診断、`pci_dev.irq_line` の更新 |
 | 契約 | `include/pci_irq_platform.h` | 表の型・能力の申告・2 つの口 (下の 3-1)。実装は置かない ([arch/README.md] の約束) |
 | backend PC-98 | `platform/pc98/pci_irq_pc98.c` | 起動時に 0:6.0 の 0x60〜0x63・各機能の 0x3D/0x3C・機種表を読んで表を作る。振り直しの書き込み・読み戻し・戻し。操作の口は既存の 8259 (`platform/pc98/pic.c`・`irq_complete.c`) |
 | backend G4 | `platform/powermac/pci_irq_ofw.c` (os32powerpc) | 早い段の OF の読み取りで表を作る (読むだけ)。操作の口は MPIC (`include/platform_irq.h` の mask・unmask・claim=IACK・complete=EOI、加えて優先度と宛先) |
@@ -132,11 +132,11 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
   - `QUIET_AFTER_DRIVER`: ドライバが自分で止めた後に静かになる機器。EHCI と OHCI (BIOS の引き継ぎ・SMI があり得る)、82557、GeForce。
   - `NEVER`: 対応表に無い機器。
   初版は `QUIET_AT_BOOT` を空にする (全部ドライバに止めさせる)。
-- 共通の層の流れ: `table` → plan (§3-2) で各 group の行き先の line を決める → group ごとに「移す・保留・固定」。**移すのは、その group の全機能が静止になった時点** (§3-3)。`pci_dev.irq` を書き換えるのは `route` が成功した後だけ (§3-4)。
+- 共通の層の流れ: `table` → plan (§3-2) で各 group の行き先の line を決める → group ごとに「移す・保留・固定」。**移すのは、その group の全機能が静止になった時点** (§3-3)。`pci_dev.irq_line` を書き換えるのは `route` が成功した後だけ (§3-4)。
 - ドライバの口: `pci_irq_settle(const struct pci_dev *d)` で「自分の機器を止めた」と告げ、続けて `pci_irq_attach(d, fn, arg)` / `pci_irq_detach`。attach は、引数 `d` の中の irq (呼び手のコピー) を**使わない**。`d` の BDF で共通の層の管理表を引き、その時点の線 (移した後の線) で `irq_register(line, fn, arg, IRQ_F_SHARED)` を呼ぶ。実際に登録した線は、機能ごとの登録の記録に保持し、`pci_irq_detach` はその記録の線で外す。理由: `pci_bind_all` は列挙表のローカルコピーをドライバへ渡す (`drivers/pci/pci_bind.c:51・62`)。そのコピーは settle の後も旧線のまま残る。保留中の group は、最後の機能の settle で移る。ただし、その group のどれかの機能が既に attach していれば移さない (凍結、§3-3)。結び直しはしない。
 - モジュールの登録管理との統合 (R2-03): 82557 の登録は、モジュールの包み `lan_module_irq_register` を通っている (`e82557.c:25`)。この包みが保持する線と解除先 (`lan_module.c:107・114・210`) は、モジュールの参照の勘定 (`MODULE_REF_IRQ`) と一緒に管理されている。そこで、包みを機器単位の口に合わせて `lan_module_pci_irq_attach/detach` に替える。包みは `pci_dev` と fn を保持し、`pci_irq_attach` が実際に結んだ線 (移した後の線) を記録する。解除・アンロード (`lan_detach`) はその記録した線で外す。82557 は段 8 と段 8b でこの口へ移す。GeForce は段 9 で移す。対応表にあってもドライバが読み込まれなければ、その group は settle しないので BIOS のまま残る。
-- 読むだけの backend (G4) も、OF で解いた line を `pci_irq_fn.line` に入れ、共通の層はそれを `pci_dev.irq` に写す (R1-09)。
-- `pci_dev.irq` は u8 (0xFF = 未割当)。MPIC の source (≤ 254) も収まる。
+- 読むだけの backend (G4) も、OF で解いた line を `pci_irq_fn.line` に入れ、共通の層はそれを `pci_dev.irq_line` に写す (R1-09)。
+- `pci_dev.irq_line` (u8、config 0x3C の写し、`include/pci_dev_contract.h:43`、0xFF = 未割当) を書き換える。欄は足さない。MPIC の source (≤ 254) も収まる。
 
 ### 3-2. 割り振り (共通の層、純粋な関数)
 | 種類 | 重み | 理由 |
@@ -176,9 +176,9 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 ### 3-4. 失敗したとき — 公開するのは成功した値だけ (R1-08)
 - 自己照合の不一致・候補の不足は、計画の段で「全部固定」にして何も書かない。
 - 失敗の種類は 2 つあり、区別して扱う。
-  - **初回の書き込みの失敗**: 移す途中で読み戻しが合わない場合。新しい値はまだ公開していない。その group の 0x6x と、書いた 0x3C を BIOS の値に戻して読み戻す。移す group には登録が無い (§3-3) ので、結び直しは要らない。列挙表 (`pci_dev.irq`) と owner は元のまま保つ。他の group には影響しない。ログは `[pci-irq] keep firmware: <理由>`。
-  - **移動成功後の復元**: 移した後の最初の attach が失敗した場合 (§3-3)。新しい線と owner = OS は既に公開している。0x6x と、その group の全機能の 0x3C を BIOS の値に書き戻して読み戻す。成功したら、**その group の全機能の公開線 (管理表と列挙表の `pci_dev.irq`) と owner も firmware の値へ戻す**。その後で、旧線で attach をやり直す。ログは `[pci-irq] group <n> restored to firmware: <理由>`。
-- 戻しの読み戻しも合わなければ、ハードの状態が分からないとみなす。その group の機能の `pci_dev.irq` を 0xFF (未割当) にする。**線はマスクしない** (R2-05)。旧線・新線にいる他の登録者 (IRQ10 の CS4231、IRQ3 の LAN など) は、残っている登録に従って今までどおり動く。その group の機能の割込み源は止める。機能は settle 済みで静かなはずなので、加えて、PCI の Command の bit10 (Interrupt Disable) が書けて読み戻せる機能ではそれを立てる。そのドライバは IRQ が無いものとして tick だけで動くか、使えないと報告する (`irq.h` の契約)。ログは `[pci-irq] group <n> lost: restore failed`。
+  - **初回の書き込みの失敗**: 移す途中で読み戻しが合わない場合。新しい値はまだ公開していない。その group の 0x6x と、書いた 0x3C を BIOS の値に戻して読み戻す。移す group には登録が無い (§3-3) ので、結び直しは要らない。列挙表 (`pci_dev.irq_line`) と owner は元のまま保つ。他の group には影響しない。ログは `[pci-irq] keep firmware: <理由>`。
+  - **移動成功後の復元**: 移した後の最初の attach が失敗した場合 (§3-3)。新しい線と owner = OS は既に公開している。0x6x と、その group の全機能の 0x3C を BIOS の値に書き戻して読み戻す。成功したら、**その group の全機能の公開線 (管理表と列挙表の `pci_dev.irq_line`) と owner も firmware の値へ戻す**。その後で、旧線で attach をやり直す。ログは `[pci-irq] group <n> restored to firmware: <理由>`。
+- 戻しの読み戻しも合わなければ、ハードの状態が分からないとみなす。その group の機能の `pci_dev.irq_line` を 0xFF (未割当) にする。**線はマスクしない** (R2-05)。旧線・新線にいる他の登録者 (IRQ10 の CS4231、IRQ3 の LAN など) は、残っている登録に従って今までどおり動く。その group の機能の割込み源は止める。機能は settle 済みで静かなはずなので、加えて、PCI の Command の bit10 (Interrupt Disable) が書けて読み戻せる機能ではそれを立てる。そのドライバは IRQ が無いものとして tick だけで動くか、使えないと報告する (`irq.h` の契約)。ログは `[pci-irq] group <n> lost: restore failed`。
 - **既定の段階** (R1-01): 実機で probe 試験 (§6) を通るまでは `pci_irq_route=plan` (計画を表示するだけで書かない) を既定にする。関門を通った線だけを機種表の `cand_mask` に入れ、既定を `on` にする。止め口は `pci_irq_route=0` (置き場は §7-3)。
 
 ### 3-5. 見える形
@@ -205,27 +205,27 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 ## 5. ファイルと段 (1 ファイル = 1 段)
 | 段 | ファイル | 中身 | 実装者 |
 |---|---|---|---|
-| 前提 | gf-bdf (`~/os32-tmp/run/gf-bdf/DESIGN.r2.md`) の着地 | GeForce の BDF を `pci_locate` から資源・検証・設定まで渡す。本書では重ねて設計しない。**PM の決定: gf-bdf の枝に、`hwdev/gf/irq.c:12・96・293` の `GF_IRQ_LINE 6U` をやめて、見つけた BDF の 0x3C の線で登録・解除する直しを PM が足す** | (gf-bdf の段、PM) |
+| 前提 (着地済み) | gf-bdf の着地 (c961d1cf) と PM の線の直し (b690586c・afe45f35) | GeForce の BDF は `pci_locate` から資源・検証・設定まで渡る。`GF_IRQ_LINE 6U` は消え、見つけた BDF の 0x3C の線で登録 (`hwdev/gf/irq.c:93-101`)・解除 (`:290-300`) する | (済み) |
 | 1 | `include/pci_irq_platform.h` | §3-1 の契約 | sol |
 | 2 | `drivers/pci/pci_irq_plan.c` (+`.h`) | §3-2 の純粋な関数 | terra |
 | 2b | `drivers/pci/pci_irq_kinds.c` | 対応表 (重み・静止の時機、§3-1) | terra |
 | 3 | `tools/tests/pci_irq_plan_host.c` | libc なし、モック backend 2 種 (振り直せる / 読むだけ。疎な source 20・25 の group を含む)、`make check-pci-irq-plan`、変異 | terra |
-| 4 | `drivers/pci/pci_irq.c` | つなぎ・`pci_irq_settle`・`pci_irq_attach`・結び直し・ログ・成功後だけの `pci_dev.irq` 更新 | sol |
+| 4 | `drivers/pci/pci_irq.c` | つなぎ・`pci_irq_settle`・`pci_irq_attach`・結び直し・ログ・成功後だけの `pci_dev.irq_line` の書き換え | sol |
 | 5 | `tools/check_pci_irq_portable.py` | 番人 (§3-0) | terra |
 | 6 | `platform/pc98/pci_irq_pc98.c` | PC-98 の backend (機種表・機能の分類・自己照合・group ごとの書き込み・戻し) | sol |
 | 6b | `tools/tests/pci_irq_pc98_host.c` | 段 6 を偽の config I/O で動かす。書き込みの位置ごとの失敗 (0x6x・各 0x3C・戻し)、0x3C が全部戻ること、列挙表との整合、固定の group が変わらないこと。`make check-pci-irq-pc98`、変異 | terra |
-| 7 | `userland/shell/pci_verbose.c` | lspci の共有の表示 | terra |
+| 7 | `userland/shell/pci_verbose.c` | lspci の共有の表示。`struct pci_dev` に欄を足すなら `userland/shell/cmd_pci.c` の `PciDev`・`tools/abi/record_layout_contract.c`・`test_record_layout.py` を同じ段で直す | terra |
 | 8 | `drivers/net/e82557/e82557.c` | `irq_register` を `pci_irq_settle` + `pci_irq_attach` に替え、開始時に要因を 1 回回収する。ISR から呼ばれた (irq ≠ 0) ときの SWI を、tick の回収 (irq = 0) とは別に数える (`E82557_ST_SWI_ISR`) | terra |
 | 8b | `drivers/net/e82557/lan_module.c` | 包みを `lan_module_pci_irq_attach/detach` に替える (R2-03)。参照の勘定・記録する線・`lan_detach` の解除先を機器単位の口に揃える | terra |
-| 9 | `hwdev/gf/irq.c` | GeForce を機器単位の口 (`pci_irq_settle`・`pci_irq_attach`・`pci_irq_detach`) に移す (R2-02)。前提の段 (gf-bdf と PM の直し) の後に行う | terra |
-| 10 | `kernel/irq/irq_math.c` (+ `irq.h` の読み口) | 線ごとの dispatch の計数 `ln->dispatch` を、登録者の数に関わらず増やす (R2-06。今の `shared_dispatch` は 2 人以上のときだけ増える、`irq_math.c:103`)。読み口は `irq_line_dispatch(irq)` | terra |
+| 9 | `hwdev/gf/irq.c` | GeForce を機器単位の口 (`pci_irq_settle`・`pci_irq_attach`・`pci_irq_detach`) に移す (R2-02)。起点は `irq.c:93-101`・`:290-300`。`:95` の「0 または `IRQ_LINE_MAX` (16) 以上は GF1_EIRQ」の検査は外し、線の判定は共通の層に任せる | terra |
+| 10 | `kernel/irq/irq_math.c` (+ `irq.h` の読み口) | 線ごとの dispatch の計数 `ln->dispatch` を、登録者の数に関わらず増やす (R2-06。今の `shared_dispatch` は 2 人以上のときだけ増える、`irq_math.c:103`)。読み口は `irq_line_dispatch(irq)`。`irq_math.c` は PPC の選択の成功集合なので、PPC のクロスコンパイルが通ることを完了条件に (x86 の asm・pc98 のヘッダを足さない) | terra |
 | P | `platform/powermac/pci_irq_ofw.c` | G4 の backend (§3-6)。前提は 0x500 と MPIC | os32powerpc |
 
 ## 6. 受入 → 試験
 | 受入 | 試験 |
 |---|---|
 | 割り振りの全分岐 (専用・基板の共有・まとめ・固定・不足・同じなら書かない・照合の不一致・UNKNOWN の固定・保留から settle で移る・読むだけで警告だけ) | 段 3 のホスト試験と変異 |
-| 共通の層が backend に依らない | 番人 (段 5)。モックの G4 型 (疎な source) で `route` が 1 回も呼ばれず、`pci_dev.irq` に OF の line が写ること |
+| 共通の層が backend に依らない | 番人 (段 5)。モックの G4 型 (疎な source) で `route` が 1 回も呼ばれず、`pci_dev.irq_line` に OF の line が写ること |
 | backend の部分書き込みと戻し | 段 6b。書き込みの位置ごとに失敗を注入し、戻した後の config・列挙表・owner・登録が元と一致すること。戻しも失敗したら、その group が 0xFF になり、他の group は変わらないこと |
 | NP21/W で何も変わらない | 起動ログに `[pci-irq]` が出ない、kselftest が全数通る |
 | 実機の R-1・R-4 (読むだけ) | 計画だけ表示する版で、構成 A・E の自己照合が通り、計画が §3-2 の例と一致する |
@@ -236,7 +236,7 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 | attach が今の線で登録される (R3-1、結合試験) | 段 4・8b のホスト試験: `pci_bind_all` と同じく、列挙表の**コピー**を probe へ渡す (モックで表そのものを渡さない)。settle で group を 3→5 に移した後、そのコピー (irq=3 のまま) で attach する。登録が 5 だけに作用し、detach も 5 だけを外し、3 の登録数・マスクが一度も変わらないこと |
 | 移動成功後の復元が全部を戻す (R3-2) | 段 6b: 移した後の最初の attach の失敗を注入し、復元の後に、config (0x6x と全機能の 0x3C)・列挙表・管理表の線・owner・登録した線が、すべて firmware の値と一致すること。初回の書き込みの失敗の場合 (公開前) と、別の case として分けて確かめる |
 | モジュールの解除が移した線で外れる (R2-03) | 段 8b のホスト試験と実機: probe で線を移した後に LAN モジュールをアンロードし、新しい線の登録が 0 に戻ること、`MODULE_REF_IRQ` が解放されること、旧線には何も触らないこと |
-| GeForce が見つけた線で登録される (R2-02) | 実機 E′ (GeForce 0:12.0、PIRQ0 = IRQ5): GPU が IRQ5 で登録され (起動ログ `[gf1] PCI IRQ=5 register(5)=0`)、VBLANK の計数が IRQ5 の `irq_line_dispatch` と一緒に増え、IRQ6 には登録されないこと |
+| GeForce が見つけた線で登録される (R2-02) | 実機 E′ (GeForce 0:12.0、PIRQ0 = IRQ5): GPU が IRQ5 で登録され (起動ログ `[gf1] PCI IRQ=5 register=0`)、VBLANK の計数が IRQ5 の `irq_line_dispatch` と一緒に増え、IRQ6 には登録されないこと |
 | 実機の書き込み (構成 A、USB の着地の後) | EHCI の settle の後に 0x62 ≠ 0x0a、USB の 0x3C が新しい線になっていること。CS4231 を鳴らしても IRQ10 に PCI 由来が乗らないこと。`irq_unexpected` の増えが移動の回数以下であること |
 | 実機で届くこと | 82557 の SWI、GeForce の VBLANK の計数、`irq_storm_masked` = 0 |
 | LGY-98 との共有 (板があるとき) | LGY-98 を PCI と同じ線 (3・5・6) に置き、82557 と LGY-98 で同時に通信する。両方の要因の判定と tick の回収で取りこぼしが無いこと。Ra266 は今 LGY-98 を持たない (RA266 §5) ので、板が手に入ったときに採る |
@@ -285,3 +285,10 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 - P2-1: 線の集合 (`cand_mask`・`reserved_mask` などの u32 の mask) は、共通の層では `PLATFORM_IRQ_LINES` の大きさの bitmap (u32 の配列) で持つ (§3-1 の「32 本超は将来に広げる」を今にする)。G4 は line = MPIC の source 番号で 32 以上が来る (source の数は OPENPIC_FEATURE から読む。NetBSD sys/arch/powerpc/pic/pic_openpic.c:63-68、KeyLargo の MPIC は 64 本の見込み [推])。PC-98 の動きは変わらない。段 2・4 の試験に 32 以上の線 (例 source 40) を含める。
 - P2-2: §3-6 の未確定に追加 — G4 の host bridge (UniNorth の AGP・PCI・内蔵) ごとの bus-range が重ならないこと (NetBSD sys/arch/macppc/pci/uninorth.c:115・160・165)。重なれば共通の PCI 層 (`pci_dev`・`pci_cfg_read32`) に domain を足し、IRQ の表はそれに従う。QuickSilver の実値は実機の OF の木で見る。
 - P3: §3-6 (b) MPIC の操作に — CPU ごとの current task priority を 0 に下げないと割込みが来ない / 宛先は CPU0 だけ (OS32 は 1 CPU) / spurious vector と IACK・EOI の順は FreeBSD の openpic_dispatch・openpic_eoi の手本どおり。sense は PCI の行だけ (level-low) で表の型で足りる、macio の子 (edge がある) は表の外で G4 の backend が MPIC に設定。UniNorth の config 空間は little-endian で G4 の pci_cfg_read32 の backend が byte を入れ替える (uninorth.c:144)、共通の層は値で受けるので影響なし。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **`pci_dev.irq` は `irq_line`**: `struct pci_dev` に `irq` の欄は無く、書き換えるのは `irq_line` (`include/pci_dev_contract.h:43`、offset 36、全体 40B)。第 4 段 C-layout (3c742321) が `tools/abi/record_layout_contract.c:8-21` で `struct pci_dev` とシェルの `PciDev` (`userland/shell/cmd_pci.c:43-47`) の大きさ・全欄の offset の一致を STATIC_ASSERT で縛っている。§3-1・§3-4・段 4 の「`pci_dev.irq`」は `irq_line` の書き換えに直した。欄を足す (irq・追記 1 P2-2 の domain) なら、`cmd_pci.c` の `PciDev`・`record_layout_contract.c`・`test_record_layout.py` (と段 7 の `pci_verbose.c`) を同じ段で直す。
+- **GeForce の前提は着地済み**: `GF_IRQ_LINE 6U` は消え (b690586c・afe45f35)、`hwdev/gf/irq.c:93-101` で 0x3C の線を読んで `IRQ_F_SHARED` で登録、解除は `:296`。BDF は `recover_gf_dev()` (`kdebug/recover.h:55-57`)。§2 の判定を「耐える」に、§5 の前提の行を着地済みに書き換えた。
+- **段 9**: 起点は `irq.c:93-101`・`:290-300`。`irq.c:95` の `!irq_line || irq_line >= IRQ_LINE_MAX` (16) を GF1_EIRQ で断る検査は、追記 1 P2-1 (G4 は 32 以上の線) とぶつかるので、段 9 で外して共通の層の判定に任せる。
+- **§6 の受入のログ**: 今の形は `[gf1] PCI IRQ=5 register=0` (線の数字は括弧に入らない、不正な線は ` invalid=`。`hwdev/gf/irq.c:80-81・:101`)。受入の文字列を直した。
+- **段 10**: `kernel/irq/irq_math.c`・`irq.c`・`tick.c`・`init/kernel.c` は `tools/ppc/selected_success.json` (PPC の初回成功集合、減ると check が非 0) に入っている。段 10 と段 4 の `init/kernel.c` 側の呼びは、PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを足さない)。

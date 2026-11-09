@@ -23,4 +23,4 @@ baseline 値採取と局所復元だけ必要範囲を共有化。診断 recover
 
 - MISC は専用 VGA_DIRECT target とし、ログの書込み先 C03C2 を保ちつつ bus の読取りだけ C03CC 別名へ写す（nouveau dispnv04/nvreg.h:129,137）；AR/DAC をこの型や通常 MMIO に置換しない。
 
-- gfinit_busはrecoverの解決済みtupleをdescriptorと照合し、0:13.0の生ID・Mem・全BAR一致後に窓へ渡す。
+- gfinit_busはrecoverの解決済みtupleをdescriptorと照合し、バス 0 の列挙で見つけた位置の生ID・Mem・全BAR一致後に窓へ渡す。
