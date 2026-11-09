@@ -1,9 +1,10 @@
 /* Internal logical KAPI values; native argument layout belongs to arch. */
 #ifndef OS32_KAPI_CALL_H
 #define OS32_KAPI_CALL_H
-#include "exec_arch.h"
+#include "types.h"
 #include "redir_access.h"
 #include "kapi_call_generated.h"
+struct arch_syscall;
 struct kapi_arg_source {
     const struct arch_syscall *call;
     struct caller_access caller;

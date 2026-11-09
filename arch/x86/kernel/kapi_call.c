@@ -1,5 +1,6 @@
 /* x86 cdecl argument extraction and invocation. */
 #include "kapi_call.h"
+#include "exec_arch.h"
 extern u32 kapi_invoke(void *, const void *, u32);
 
 void arch_kapi_source(struct kapi_arg_source *src, const struct arch_syscall *call)

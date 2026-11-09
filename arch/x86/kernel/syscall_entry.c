@@ -1,5 +1,6 @@
 /* VM frames and transitional raw cdecl consumers stay within x86. */
 #include "kapi_call.h"
+#include "exec_arch.h"
 #include "legacy_guest.h"
 #include "kapi_print.h"
 #include "kapi_strings.h"
