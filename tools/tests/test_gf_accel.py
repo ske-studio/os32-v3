@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=30.7,
-    covers=['gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
             'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
@@ -457,14 +457,14 @@ def component_build(host, source, directory, original_parent):
         subprocess.run(FLAGS + ['-Werror=vla', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', *include_flags(ROOT), '-I'+str(tree), '-I'+str(ROOT),
                        str(tree/'tools/tests'/host.name), str(tree/'hwdev/gf/accel_copy.c'),
-                       str(tree/'tools/tests/gf_accel_unbound_stubs.c'),
+                       str(tree/'tools/tests/gf_accel_unbound_stubs.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'),
                        '-o', str(exe)], cwd=ROOT, check=True)
         return exe
     exe = directory/'host'
     # check=True: compilation/link errors are suite failures, never runtime RED.
     subprocess.run(FLAGS + ['-Werror=vla', *include_flags(ROOT), '-I'+str(ROOT),
                            '-iquote', str(original_parent),
-                           str(host), str(source),
+                           str(host), str(source), str(ROOT/'tools/tests/recover_gf_dev_stub.c'),
                            *([str(ROOT/'tools/tests/gf_accel_unbound_stubs.c')]
                              if component == 'c0' else []), '-o', str(exe)],
                    cwd=ROOT, check=True)
@@ -619,7 +619,7 @@ void _start(void) {
         exe = tmp/'host'
         subprocess.run(FLAGS+(['-DGF_PRESENT_BYTE'] if mode == 0 else [])+include_flags(ROOT)+['-DOS32_GEFORCE_MODULE', f'-DGF_ACCEPT_MODE={mode}',
             '-DGF_ACCEPT_ID="fixture"', '-DGF_ACCEPT_PAIR=123', f'-DSCENARIO={scenario}', '-I'+str(ROOT/'drivers/video/geforce'),
-            str(tmp/'host.c'), str(ROOT/'drivers/video/geforce/gf_present.c'), '-o', str(exe)], check=True)
+            str(tmp/'host.c'), str(ROOT/'drivers/video/geforce/gf_present.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
         assert result.returncode == expected_exit, (mode, scenario, result.returncode, result.stderr)
         return result.stdout

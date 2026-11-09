@@ -57,7 +57,7 @@ void ring3_fault_kill(void) { longjmp(killed, 1); }
 u32 kapi_invoke(void *fn, const void *args, u32 n);
 /* This fixture uses a non-string slot to test caller identity and nesting.
  * String staging/output boundaries are exercised by db_caller/kapi_strings. */
-int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
+int kapi_print_call(struct kapi_arg_source *args) { (void)args; assert(0); return 0; }
 #define LEGACY_FAKE_TRAP_ENABLE
 #define LEGACY_FAKE_TRAP (( ((u32 *)frame)[V86I_EFLAGS] & EFLAGS_VM) ? (v86_int80(frame), 1) : 0)
 #define LEGACY_FAKE_DISPATCH_ENABLE

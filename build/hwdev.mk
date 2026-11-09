@@ -2,9 +2,13 @@
 HWDEV_OUT := $(BUILD_OUT)/hwdev
 GF_CALC_NAMES := calc timing format pitch start dac_format output cursor fifo extended pll_program
 GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(GF_CALC_NAMES)))
+HWDEV_SHARED := pci_locate recover_gf_locate
 HWDEV_GF := gf_load_state gf_stage_state gf_foundation_test gf_command_test gf_accel_test gf_prim_bench gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf calc timing format pitch start dac_format output cursor fifo extended pll_program
-HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
+HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_SHARED) $(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
+$(HWDEV_OUT)/pci_locate.o: drivers/pci/pci_locate.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -c $< -o $@
 # Normal and R1 share this decoder object; keep all other units at -O2.
 $(HWDEV_OUT)/gfinit_decode.o: private KERNEL_CFLAGS += -Os
 $(HWDEV_OUT)/%.o: kdebug/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
@@ -49,6 +53,12 @@ ifeq ($(GF_VPLL_PROBE),1)
 .PHONY: gf-vpll-probe vpll-force
 vpll-force:
 gf-vpll-probe: $(VPLL_OUT)/kdebug.bin $(VPLL_OUT)/hwdev.mod
+$(VPLL_OUT)/core/pci_locate.o: drivers/pci/pci_locate.c $(KDEBUG_GENERATED) $(HWDEV_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/hw/pci_locate.o: drivers/pci/pci_locate.c $(HWDEV_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -c $< -o $@
 $(VPLL_OUT)/core/%.o: kdebug/%.c $(KDEBUG_GENERATED) $(HWDEV_GENERATED) build/kdebug.mk build/hwdev.mk
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DGF_VPLL_PROBE=1 $(if $(filter recover_profile,$*),-DRECOVER_MODULE) -c $< -o $@

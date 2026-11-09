@@ -30,6 +30,7 @@ static int resource_memory_bar(struct recover_range *exclude, u32 *used,
         return resource_reject("memory_bar_length", dev, fn, reg, raw);
     if ((raw & PCI_BAR_MEM_ATTR_MASK) != (spec ? spec->attr : PCI_BAR_MEM_TYPE32))
         return resource_reject("memory_bar_attr", dev, fn, reg, raw);
+    if (resource_unassigned(spec, raw)) return 0;
     u32 cap = resource_cap(b, raw & PCI_BAR_MEM_ADDR_MASK);
     return resource_append(exclude, used, dev, fn, bar, raw,
                             spec ? spec->len : cap, cap, spec != 0);
