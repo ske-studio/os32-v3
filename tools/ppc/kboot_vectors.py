@@ -149,6 +149,11 @@ def observe(out, elf):
                 q.call('cont'); time.sleep(0.1)
             (out/'qmp.log').write_text(regs)
             serial=a.read_bytes()
+            if stable<1:
+                # No terminal PC within the deadline: a hang is a test failure,
+                # never a mutation RED (design §2).
+                (out/'result.log').write_bytes(serial)
+                raise TimeoutError('no terminal PC within 30s: '+regs+' '+repr(serial[-2000:]))
             (out/'result.log').write_bytes(serial)
             require(last==syms['fixture_done'] and stable>=1,
                     'runtime terminal/canary verdict: '+regs+' '+repr(serial[-2000:]))
