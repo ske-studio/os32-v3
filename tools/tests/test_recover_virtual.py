@@ -1,6 +1,6 @@
 """T4b-8: real dispatcher and virtual normal/fault/trial-expire/poll-stop/txbusy-stop trials, fake HAL, ILP32."""
 CHECK = dict(name='recover-virtual', tier=1,
-    covers=['kdebug/recover.c', 'kdebug/probe_wire.h', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'kdebug/recover_virtual.c', 'kdebug/recover_virtual.h', 'kdebug/recover_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'userland/shell/cmd_recover.c', 'tools/tests/recover_virtual_host.c', 'tools/tests/host32.py', 'tools/tests/recover_hostshim/io.h', 'tools/tests/mutpar.py', 'build/kdebug.mk', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'kernel/console/display_restore.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'tools/tests/recover_virtual_fixture_host.inc'],
+    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/probe_wire.h', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'kdebug/recover_virtual.c', 'kdebug/recover_virtual.h', 'kdebug/recover_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'userland/shell/cmd_recover.c', 'tools/tests/recover_virtual_host.c', 'tools/tests/host32.py', 'tools/tests/recover_hostshim/io.h', 'tools/tests/mutpar.py', 'build/kdebug.mk', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'kernel/console/display_restore.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'tools/tests/recover_virtual_fixture_host.inc'],
     needs=[], budget=5.5)
 
 from pathlib import Path
@@ -57,7 +57,7 @@ def build_cmd(temp, dispatch=None, expire=0):
             '-I'+str(temp), '-I'+str(ROOT / 'tools/tests/recover_hostshim'),
             '-I'+str(ROOT / 'include'),
             '-I'+str(ROOT / 'platform/pc98'),
-            str(ROOT / 'tools/tests/recover_virtual_host.c'), '-o', str(temp / ('virtual'+str(expire)))]
+            str(ROOT / 'tools/tests/recover_virtual_host.c'), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(temp / ('virtual'+str(expire)))]
 
 
 def one(item):

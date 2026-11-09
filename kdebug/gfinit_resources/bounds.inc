@@ -27,6 +27,20 @@ static u32 resource_function_count(u32 dev)
     return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;
 }
 
+static const struct resource_bar_spec *resource_spec(u32 id, u32 bar)
+{
+    for (u32 i = 0; i < sizeof(resource_bar_specs) / sizeof(resource_bar_specs[0]); i++)
+        if (resource_bar_specs[i].id == id && resource_bar_specs[i].bar == bar)
+            return &resource_bar_specs[i];
+    return 0;
+}
+
+static bool resource_unassigned(const struct resource_bar_spec *spec, u32 raw)
+{
+    return spec && (raw & PCI_BAR_MEM_ATTR_MASK) == spec->attr &&
+        (raw & PCI_BAR_MEM_ADDR_MASK) == (~(spec->len - 1U) & PCI_BAR_MEM_ADDR_MASK);
+}
+
 static int resource_collect_bounds(struct resource_bounds *b)
 {
     b->count = 0;
@@ -49,6 +63,8 @@ static int resource_collect_bounds(struct resource_bounds *b)
                 if (raw & PCI_BAR_MEM_TYPE) continue;
                 u32 base = raw & PCI_BAR_MEM_ADDR_MASK;
                 if (!base) continue;
+                if (header == PCI_HDR_LAYOUT_DEVICE &&
+                    resource_unassigned(resource_spec(id, bar), raw)) continue;
                 /* Every BDF/register is visited exactly once; equal bases here
                  * necessarily belong to different registers, never duplicates
                  * of the same register. ROMs and forwarding windows are not
@@ -72,12 +88,4 @@ static u32 resource_cap(const struct resource_bounds *b, u32 base)
         if (b->base[i] > base && b->base[i] - base < cap)
             cap = b->base[i] - base;
     return cap;
-}
-
-static const struct resource_bar_spec *resource_spec(u32 id, u32 bar)
-{
-    for (u32 i = 0; i < sizeof(resource_bar_specs) / sizeof(resource_bar_specs[0]); i++)
-        if (resource_bar_specs[i].id == id && resource_bar_specs[i].bar == bar)
-            return &resource_bar_specs[i];
-    return 0;
 }
