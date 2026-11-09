@@ -26,7 +26,7 @@ NV44A bus
 
 ## REALHW_RECOVER_ADDENDUM
 
-- gfinit_busはrecoverの解決済みtupleをdescriptorと照合し、0:13.0の生ID・Mem・全BAR一致後に窓へ渡す
+- gfinit_busはrecoverの解決済みtupleをdescriptorと照合し、バス 0 の列挙で見つけた位置の生ID・Mem・全BAR一致後に窓へ渡す
 
 - 局所cleanupは保存済みCR11→CR1F→CR44 DATA→元indexの順とする；RUN許可列はCR1Fの解錠を保持する。LOCAL/SAVED SELECTには保存DATAの対象index選択だけを追加許可し、COLD DATAは再生しない。成功後は局所保存件数を0にして二重再生を防ぐ。
 

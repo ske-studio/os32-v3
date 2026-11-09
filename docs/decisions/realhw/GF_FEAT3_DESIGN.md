@@ -14,7 +14,7 @@ r1→r2 の変更: ID別
 - ID 7: monoは128語ずつ詰めて送ると明記。
 - ID 8: CHECK・正常対照・GF-L3-Ra266台帳段を追加。
 - ID 9: r1の食い違い4件を訂正し、SIFM src_pointのy上位を明記。
-対象: OS32 / PC-9821 Ra266、10de:0221、PCI 0:13.0。設計のみ、2026-11-02。
+対象: OS32 / PC-9821 Ra266、10de:0221、PCI バス 0 の列挙で見つけた位置。設計のみ、2026-11-02。
 
 ## 1. 実物の確認 (file:line)
 - 略号: O=/home/hight/os32-v3、X=/home/hight/os32-tmp/refs/geforce6200/xf86-video-nouveau/src、V=/home/hight/os32-tmp/refs/geforce6200/nouveau-v6.1/drivers/gpu/drm/nouveau、N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau (c03c1a1)。A=X/nv_accel_common.c、E=X/nv04_exa.c、F=V/nv04_fbcon.c、H=X/hwdefs/nv01_2d.xml.h、M=X/hwdefs/nv_m2mf.xml.h。
