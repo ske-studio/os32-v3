@@ -75,6 +75,7 @@
     "kernel/console/console.c",
     "platform/pc98/console.c",
     "platform/pc98/display.c",
+    "platform/pc98/gfx_scroll.c",
     "kernel/console/con_sink.c",
     "init/bootlog.c",
     "init/bootlog_save.c",
