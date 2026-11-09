@@ -92,8 +92,10 @@ int gf_irq_attach(struct gf_foundation *f)
     if (unused_drain(f, true, &left)) goto io_error;
     f->irq_line = pci_cfg_read8(RECOVER_GF_BUS, RECOVER_GF_DEV,
                                RECOVER_GF_FN, PCI_CFG_INT_LINE);
-    if (!f->irq_line || f->irq_line >= IRQ_LINE_MAX)
+    if (!f->irq_line || f->irq_line >= IRQ_LINE_MAX) {
+        log_irq(" invalid=", f->irq_line, GF1_EIRQ);
         return f->last_rc = GF1_EIRQ;
+    }
     int rc = irq_register(f->irq_line, gf_irq_handler, f, IRQ_F_SHARED);
     /* Foreground only: retain the original IRQ_ERR_* in the diagnostic. */
     log_irq(" register=", f->irq_line, rc);
