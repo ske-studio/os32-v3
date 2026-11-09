@@ -21,7 +21,13 @@ NetBSD の macppc ブートでは両方の upper を無効化してから lower/
 通常の長さは 128 KiB〜256 MiB。BL は順に `0`〜`0x1ffc`。
 7455+ の拡張長は 512 MiB〜4 GiB として別に定義される
 (N/sys/arch/powerpc/include/oea/bat.h:128)。
-[未] 7450/7455 の BAT 本数・拡張を有効にする条件・優先順位はメーカー資料で確定する。
+MPC7450UM 5.3.1、表 2-6 (Rev 3.1) では 7450/7451 は各 4 エントリ、
+7455 は HID0[HIGH_BAT_EN] で追加の IBAT4〜7・DBAT4〜7 を有効にして各 8 エントリ。
+各エントリが upper/lower の 2 SPR を持つ。「BAT レジスタ数」とエントリ数を区別する。
+7455 の HID0[XBSEN] は拡張長 512 MiB・1/2/4 GiB を有効にする。
+起動時に設定したらクリアしない条件がある (MPC7450UM 表 2-6、5.3.2.1)。
+BAT の重複ヒットは優先順位で解決せずプログラミングエラー。
+変換無効時にも valid な重複を避け、初回設定前に全 valid を落とす (同 5.3)。
 
 ## セグメントと HPT
 
@@ -62,5 +68,25 @@ SDR1 (SPR `0x019`) は HPT の基底を指定する
 NetBSD の OEA 設定は表の基底に `(PTEG 数−1) >> 10` を OR し、
 `sync` → SDR1 書込み → `isync`、その後 TLB 無効化を行う
 (N/sys/arch/powerpc/oea/pmap.c:3570)。OEA64 分岐の式を流用しない。
-[未] SDR1 の予約ビット・許される表サイズと基底整列、PTE 更新と TLB 同期の全条件は
-CPU マニュアルの取得後に補う。本節だけで MMU 更新手順が完結するとはしない。
+通常の 32 ビット物理番地では SDR1 の仕様ビット 16〜22 は予約、
+HTABMASK は末尾だけ連続した 1。HPT は 64 KiB〜32 MiB の 2 の冪サイズで、
+基底も表サイズに整列する。例: 1 MiB は mask=15、基底 1 MiB 整列
+(PEM 7.7.1.1〜7.7.1.2、表 7-21/7-22)。
+36 ビット拡張時は HID0[XAEN] と HTABEXT/HTMEXT を含む別形式になるため、
+この予約ビット規則を流用しない (MPC7450UM 5.5.1)。
+
+## 更新時の同期条件 (MPC7450UM Rev 3.1)
+
+表 2-33 では SDR1・SR・DBAT の変更前に `dssall; sync`、
+変更後に `sync` と context synchronizing 命令 (例 `isync`) が必要。
+AltiVec data streaming を使用しない場合に限り dssall を省ける。
+IBAT の変更後にも context synchronization が必要。
+BSD の上記の短い列だけを CPU の全条件とせず、この表の条件を併記して採る。
+MSR[IR] 変更直後の同期命令は変換前後の両番地で実行可能でなければならない (同表)。
+
+局所 CPU の `tlbie` 完了には後続の `sync`、複数 CPU の TLB 無効化完了には
+`tlbsync` が必要。さらに `tlbsync` 後は `sync` が完了してから他 CPU が
+`tlbie/tlbsync` を行うよう直列化する。違反は livelock の危険がある
+(MPC7450UM 5.4.4.2.3)。ブロードキャストには HID1[ABE] も関係する (表 2-7)。
+[未] PTE の valid・R/C 更新と競合するハードウェア探索を含めた全更新プロトコル。
+以上のレジスタ/TLB 条件だけでは PTE 更新手順は完結しない。

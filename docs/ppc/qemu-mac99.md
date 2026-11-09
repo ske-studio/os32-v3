@@ -6,7 +6,7 @@ QEMU のソースは参照しない。以下はローカルの QEMU 8.2.2
 (Debian `1:8.2.2+ds-0ubuntu1.18`) の help を採取した結果。
 採取時の作業日は 2026-11-08、資料木の管理日付は依頼に合わせ 2026-11-09。
 指定された `/usr/share/doc/qemu-system-ppc/system/` 配下には通常ファイルが無く、
-`ppc/` も空だった。配布文書に基づく mac99 の構成確認は [未]。
+`ppc/` も空だった。今回追加の公式文書は後述のとおり別版である。
 
 ## 観測したコマンドと出力
 
@@ -38,6 +38,19 @@ QEMU のソースは参照しない。以下はローカルの QEMU 8.2.2
 QEMU で起動できた事実から、実機の clock/power・cache・DMA・電気配線の正しさを
 証明することはできない。
 
-[未] QEMU の同版の system/ppc/powermac 文書と一般 PowerPC 機種文書を
-取り寄せ、mac99 の via 選択・PIC・標準装置を資料だけで補う。
+[未] ローカル 8.2.2 と同版の文書で mac99 の via 選択・PIC・標準装置を照合する。
 実機との差の確定には Apple QuickSilver Developer Note と対象個体の OF tree が必要。
+
+## 追加した公式文書との比較
+
+QEMU-PM Supported devices は PowerMac family 全体について、UniNorth または Grackle、
+PCI VGA + VESA Bochs Extensions、PMAC IDE 2 系統、NE2000 PCI、NVRAM、
+VIA-CUDA + ADB keyboard/mouse を記す。Firmware は 0.9.1 以降 OpenBIOS と説明する。
+文書の参照にとどめ、OpenBIOS の GPL ソースは読まない。
+
+この文書は **11.1.50 (master)** で、ローカルの 8.2.2 と一致しない。
+g3beige/mac99 共通の一覧なので各機種の既定装置を分離する根拠にもならない。
+help の装置一覧に cuda が無いことと、文書の VIA-CUDA 記述は矛盾ではない。
+内蔵装置と -device で列挙できる型は別である。
+[未] この文書にも mac99 の via 選択・PIC の詳細・ESCC の配線は無く、上表の該当欄を
+確定できない。QEMU の版差による実際の変更はソースを読まずには今回確定しない。

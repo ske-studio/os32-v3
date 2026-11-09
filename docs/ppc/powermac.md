@@ -68,3 +68,25 @@ linebytes は行のバイト数で、width × depth / 8 と常に等しいとは
 (N/sys/arch/macppc/dev/ofb.c:202)。
 [未] QuickSilver の装着 GPU ごとの物理/仮想番地の対応、色順序、パレット、
 MMU 切替後の FB 継続利用。OF の address を無条件に物理番地とみなさない。
+
+## Apple MDD 資料で照合できた範囲
+
+APPLE-MDD Architecture は PowerMac3,6 を U2 memory controller/bus bridge と
+KeyLargo の構成として記す。U2 の仕様・帯域・DDR 構成を QuickSilver の UniNorth に
+そのまま移さない。UniNorth の発見は前述の BSD を正とする。
+**MDD の資料による [推]**: KeyLargo 系で内蔵装置・DMA・割込みを分けて調べる方針は
+QuickSilver 調査にも使えるが、各装置の接続・速度・番地は実機で確認する。
+
+| MDD の確認事項 | 根拠と QuickSilver への限界 |
+|---|---|
+| MPIC は KeyLargo 内にあり、内蔵・専用外部 pin・U2 serial stream の割込みを受ける | APPLE-MDD Architecture / Interrupt Support。BSD の OpenPIC 発見と矛盾しないが IRQ 配線表にはしない |
+| KeyLargo の ATA/66 と EIDE は DB-DMA 対応 | 同 / Ultra ATA/66 Interface、Enhanced IDE Interface。MDD の別 ATA/100 経路と分ける |
+| KeyLargo 内蔵の 2 USB root hub は MDD では未接続、USB は PCI controller を使う | 同 / USB Interface、PCI USB Controller。BSD の USB 入力対応は内蔵 hub の接続証拠にならない |
+| USB register set は OHCI、USB 1.1 | 同 / PCI USB Controller。QuickSilver の controller identity と配線は [未] |
+| AGP カードと ADC/DVI の表示経路 | APPLE-MDD Input-Output Devices / Graphics Cards。OF の FB address や pixel format は規定しない |
+
+MDD の USB 記述と一般の KeyLargo 機能一覧の差は搭載機能と実配線の違い。
+どちらも記し、QuickSilver の USB 経路は [未] とする。
+ESCC は今回の Apple 資料から実配線・クロック・電源制御を確定できず、BSD の発見方法まで。
+Cuda/PMU・外部 ADB の有無も QuickSilver の tree と基板資料が必要。
+MDD の GPU 出力仕様から OF の FB を物理番地と認定しない。

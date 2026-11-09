@@ -23,7 +23,8 @@ OS32 がどの機能をどう使うかの設計決定は `docs/decisions/ppc/`�
 
 ## 資料の扱い
 
-BSD 系の実装・ヘッダ・man を基本資料とする。メーカー仕様の未入手部分は断定しない。
+BSD 系の実装・ヘッダ・man を正とする。下記のメーカー・規格資料を事実の確定の根拠に併用する。
+食い違いは両方を記し、採用または [未] を明記する。
 BSD の記述は日本語で要約し、数値は意味を確認して表にする。長い文章や実装構造を写さない。
 QEMU は配布文書と help の出力だけを使う。QEMU・OpenBIOS・Linux 等の
 GPL/LGPL ソースは読まない・探さない・利用しない。
@@ -40,3 +41,26 @@ GPL/LGPL ソースは読まない・探さない・利用しない。
 
 [未] は資料不足・機種未確認、[推] は根拠からの推論を表す。
 BSD 固有の実装選択を CPU の必須仕様や OS32 の採用決定に読み替えない。
+
+### 追加資料の略号と版
+
+根拠は `<略号> <節または頁>`。取得一覧はリポジトリ外の
+`/home/hight/os32-tmp/ref/vendor/SOURCES.md`、検索用本文は同 `text/`。
+取得日は依頼の管理日付 2026-11-09。公開文書だけを読み、実装ソースは追加取得しない。
+
+| 略号 | 文書・版 | 取得元 |
+|---|---|---|
+| MPC7450UM | Motorola MPC7450 Family User's Manual Rev 3.1 (2004) | bitsavers の mirrorservice 鏡、components/motorola/PowerPC/ |
+| PEM | Motorola Programming Environments Manual for 32-Bit Microprocessors Rev 2 (2001) | 同鏡 |
+| MPC7455EC | Motorola MPC7455 Hardware Specifications Rev 4 (2003) | 同鏡 |
+| OF-PCI | PCI Bus Binding Rev 2.1 | devicetree.org/open-firmware/bindings/pci/pci2_1.pdf |
+| OF-PPC | PowerPC Processor Binding Rev 2.1 (1996-11-06) | public.dhe.ibm.com/rs6000/OpenFirmware/bindings/processor/ppc-2_1.html |
+| APPLE-MDD | Apple PowerMac G4 Developer Note、2003 年 MDD (PowerMac3,6) | developer.apple.com/library/archive/、Macintosh_CPUs-G4/PowerMacG4/ |
+| APPLE-MDD02 | Apple PowerMac G4 (Sept 2002) Developer Note、MDD (PowerMac3,6) | 同、PowerMacG4Sept02/ |
+| QEMU-PM | QEMU 11.1.50 (master) PowerMac family boards 文書、取得時点 | www.qemu.org/docs/master/system/ppc/powermac.html |
+
+MPC7450UM の数値・条件は **Rev 3.1 の値**。Rev 5 の訂正・CPU revision 別 errata は [未]。
+MPC7455EC は電気・タイミング仕様の資料で、命令規約の代用にはしない。
+Apple の 2 文書とも QuickSilver (PowerMac3,5) の資料ではない。
+QuickSilver に外挿する箇所は必ず「MDD の資料による [推]」とする。
+QEMU-PM はローカル 8.2.2 と版が違い、その構成の証明にはしない。
