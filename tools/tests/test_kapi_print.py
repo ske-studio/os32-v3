@@ -10,24 +10,36 @@ import test_access_walk as walk
 ROOT = walk.ROOT
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_print.c', 'lib/kprintf.c',
               'lib/kprintf_attr.c', 'platform/pc98/console_attr.c',
-              'include/console_attr.h', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+              'include/console_attr.h', 'include/kapi_call.h', 'arch/x86/kernel/kapi_call.c', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 MUTANTS = [
     ('format raw pointer', 'print',
      'format, sizeof(format))) return 0;',
      'format, sizeof(format))) return 0;\n    '
-     'for (u32 i = 0; i < sizeof(format); i++) { format[i] = ((const char *)(uptr)fixed[1])[i]; if (!format[i]) break; }'),
+     'for (u32 i = 0; i < sizeof(format); i++) { format[i] = ((const char *)(uptr)fixed.value[1])[i]; if (!format[i]) break; }'),
     ('string raw pointer', 'print',
      'args[count] = (u32)(uptr)strings[count];',
      'args[count] = args[count];'),
-    ('argument raw pointer', 'print',
-     'count++;',
-     'if (spec != \'s\') args[count] = ((const u32 *)(uptr)va)[2 + count];\n        count++;'),
-    ('window overrun', 'print', 'count == KAPI_PRINT_ARG_LIMIT',
-     'count > KAPI_PRINT_ARG_LIMIT'),
+    ('argument raw pointer', 'call', '*value = word.value[0];',
+     '*value = ((const u32 *)(uptr)(((const u32 *)src->call->native)[11] + sizeof(u32)))[src->next - 1];'),
+    ('pointer kind', 'print', "(spec == 's' || spec == 'p')", '0'),
+    ('cursor position +4', 'call',
+     'src->next, 1, &word', 'src->next + 1, 1, &word'),
+    ('unused word prefetch', 'call',
+     'if (src->next >= 16u) return 0;',
+     'if (src->next >= 16u) return 0;\n    '
+     'unsigned saved_next = src->next; struct kapi_values extra; '
+     'if (!arch_kapi_read_block(src, saved_next + 1, 1, &extra)) return 0; '
+     'src->next = saved_next;'),
+    ('cursor limit', 'call', 'src->next >= 16u', 'src->next > 16u'),
+    ('cursor failure advances', 'call',
+     'if (!arch_kapi_read_block(src, src->next, 1, &word)) return 0;',
+     'if (!arch_kapi_read_block(src, src->next, 1, &word)) { src->next++; return 0; }'),
+    ('window shortened', 'print', 'count == KAPI_PRINT_ARG_LIMIT',
+     'count == KAPI_PRINT_ARG_LIMIT - 1'),
     ('partial output before string validation', 'print',
      'strings[count], KAPI_PRINT_STRING_CAP)) goto out;',
      'strings[count], KAPI_PRINT_STRING_CAP)) { '
-     'kvprintf((u8)fixed[0], "early", args); goto out; }'),
+     'kvprintf((u8)fixed.value[0], "early", args); goto out; }'),
     ('staging leak', 'print', 'if (strings[i]) kfree(strings[i]);',
      'if (strings[i]) (void)strings[i];'),
 ]
@@ -45,9 +57,10 @@ def exercise(runner, mutant=None):
                       ('attr', 'lib/kprintf_attr.c'),
                       ('attr_backend', 'platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
-    dispatch = (ROOT / 'arch/x86/kernel/syscall_entry.c').read_text()
-    start = dispatch.index('    if (slot != KAPI_SLOT_KPRINTF) return 0;')
-    sources['dispatch'] = dispatch[start:dispatch.index('\n}', start)].replace('    u32 sp = ((const u32 *)call->native)[11];\n    const void *args = (const void *)(uptr)(sp + sizeof(u32));\n', '')
+    dispatch = (ROOT / 'exec/exec_syscall.inc').read_text()
+    start = dispatch.index('    if (!handled && slot == KAPI_SLOT_KPRINTF) {')
+    sources['dispatch'] = dispatch[start:dispatch.index('    if (!handled) handled = kapi_strings', start)]
+    sources['call'] = (ROOT / 'arch/x86/kernel/kapi_call.c').read_text()
     if mutant:
         name, key, old, new = mutant
         assert sources[key].count(old) == 1, name

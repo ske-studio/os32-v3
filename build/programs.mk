@@ -26,10 +26,10 @@ userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
 
-sdk/crt/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
+sdk/crt/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
+sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 CRT_SYSCALLS_DEPS = sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h
@@ -41,19 +41,19 @@ $(NANO_LIB) $(NANO_LIB:.a=.json) &: $(CRT_SYSCALLS_DEPS) sdk/allocator/build_nan
 	python3 sdk/allocator/build_nano.py $(LIBDIR)/nano --crt sdk/crt/syscalls.o
 	cp $(LIBDIR)/nano/libos32nano.a $(LIBDIR)/nano/libos32nano.json $(LIBDIR)/
 
-sdk/crt/resident/nano_adapter.o: $(CRT_SYSCALLS_DEPS) $(SDK_KAPI_HDR)
+sdk/crt/resident/nano_adapter.o: $(CRT_SYSCALLS_DEPS) $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(@D)
 	$(CC) $(PROGRAM_FLAGS) -DOS32_CRT_RESIDENT -c sdk/allocator/nano_adapter.c -o $@
 
-sdk/crt/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
+sdk/crt/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # Resident shell has a separate object and a fixed morecore backend.
-sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
+sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(@D)
 	$(CC) $(PROGRAM_FLAGS) -DOS32_CRT_RESIDENT -c $< -o $@
 
-userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
+userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # Default images retain the paths consumed by deployment; alternate builds stay isolated.
@@ -81,7 +81,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
 SHELL_DEPS = kdebug/probe_wire.h kdebug/hwb_wire.h userland/shell/hwb.h kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/block/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
-userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
+userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
 # PCI の純粋な復号 (drivers/pci/pci_decode.c) を `lspci` / `pcidump` からも使う。
@@ -90,14 +90,14 @@ userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 # 見張っているのはこの 1 本だけなので、CPL=3 側でも同じソースをもう一度
 # コンパイルして繋ぐ。I/O も静的配列も触らないのでそのまま通る。
 PCI_DECODE_USER_OBJ = userland/shell/pci_decode_user.o
-$(PCI_DECODE_USER_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h
+$(PCI_DECODE_USER_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pci/pci_decode.c -o $@
 
 # 区画表の共有部 (drivers/block/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
 # カーネル・ローダ・nhd_deploy.py と 1 バイトも違ってはいけない
 # (票 TASK_HDD_INSTALL 段 1-4)。
 PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
-$(PC98PT_USER_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h
+$(PC98PT_USER_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/block/pc98pt.c -o $@
 
 $(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
@@ -118,18 +118,18 @@ $(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_
 SH_OBJDIR = userland/shell/sh_obj
 SH_OBJ = $(patsubst userland/shell/%.c,$(SH_OBJDIR)/%.o,$(SHELL_SRC))
 
-$(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS)
+$(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
 # 常駐側と同じ drivers/pci/pci_decode.c を、sh.bin 用の出力先へ。
 SH_PCI_DECODE_OBJ = $(SH_OBJDIR)/pci_decode_user.o
-$(SH_PCI_DECODE_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h
+$(SH_PCI_DECODE_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pci/pci_decode.c -o $@
 
 SH_PC98PT_OBJ = $(SH_OBJDIR)/pc98pt_user.o
-$(SH_PC98PT_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h
+$(SH_PC98PT_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/block/pc98pt.c -o $@
 
@@ -200,14 +200,14 @@ clean-gshell:
 # そのオブジェクトを外部プログラムにリンクすると 1 つの .o が 2 つの
 # リンクドメインに跨ることになる。ユーザー空間用は _prog.o として
 # PROGRAM_FLAGS で別途ビルドする。
-lib/utf8_prog.o: lib/utf8.c lib/utf8.h $(SDK_KAPI_HDR)
+lib/utf8_prog.o: lib/utf8.c lib/utf8.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 # === LZ4 Command ===
-lib/lz4_prog.o: lib/lz4.c lib/lz4.h
+lib/lz4_prog.o: lib/lz4.c lib/lz4.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
-userland/system/lz4.o: userland/system/lz4.c
+userland/system/lz4.o: userland/system/lz4.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 userland/system/lz4.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/lz4.o lib/lz4_prog.o
@@ -216,10 +216,10 @@ userland/system/lz4.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/lz4.o lib/l
 lz4_cmd: $(CRT0_OBJ) userland/system/lz4.bin
 
 # === CD Installer (cdinst) ===
-userland/lib/rt/pkg.o: userland/lib/rt/pkg.c userland/lib/rt/pkg.h
+userland/lib/rt/pkg.o: userland/lib/rt/pkg.c userland/lib/rt/pkg.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userland/lib/rt/dbgserial.h
+userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userland/lib/rt/dbgserial.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # hd0 の規則は install と共有 (userland/system/inst_hdd.c / inst_disk.c)。区画表
@@ -228,15 +228,15 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 # (票 TASK_HDD_INSTALL 段 2-9)。
 INST_HDRS = userland/system/inst_hdd.h userland/system/inst_disk.h \
             userland/shell/hdprep_plan.h drivers/block/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
-userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS)
+userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS)
+userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/ext2_layout_user.o: fs/ext2/ext2_layout.c fs/ext2/ext2_layout.h
+userland/system/ext2_layout_user.o: fs/ext2/ext2_layout.c fs/ext2/ext2_layout.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/block/pc98pt.h
+userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/pc98pt_inst.o: drivers/block/pc98pt.c drivers/block/pc98pt.h
+userland/system/pc98pt_inst.o: drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c $< -o $@
 INST_OBJ = userland/system/inst_hdd.o userland/system/inst_disk.o \
            userland/system/hdprep_plan_inst.o userland/system/pc98pt_inst.o \
@@ -252,7 +252,7 @@ cdinst: $(CRT0_OBJ) userland/system/cdinst.bin
 BENCH_SRC = $(wildcard userland/tests/bench/*.c)
 BENCH_OBJ = $(BENCH_SRC:.c=.o)
 
-userland/tests/bench/%.o: userland/tests/bench/%.c
+userland/tests/bench/%.o: userland/tests/bench/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
 userland/tests/bench.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_OBJ) $(GFX_OBJ)
@@ -264,7 +264,7 @@ bench: $(CRT0_OBJ) userland/tests/bench.bin
 BENCH_S2X_SRC = userland/tests/bench_scale2x/main.c
 BENCH_S2X_OBJ = $(BENCH_S2X_SRC:.c=.o)
 
-userland/tests/bench_scale2x/%.o: userland/tests/bench_scale2x/%.c
+userland/tests/bench_scale2x/%.o: userland/tests/bench_scale2x/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
 userland/tests/bench_scale2x.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_S2X_OBJ) $(GFX_OBJ)
@@ -276,7 +276,7 @@ bench_scale2x: $(CRT0_OBJ) userland/tests/bench_scale2x.bin
 FAULTPROBE_SRC = userland/tests/faultprobe/main.c
 FAULTPROBE_OBJ = $(FAULTPROBE_SRC:.c=.o)
 
-userland/tests/faultprobe/%.o: userland/tests/faultprobe/%.c
+userland/tests/faultprobe/%.o: userland/tests/faultprobe/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/tests/faultprobe.elf: sdk/link/app.ld $(CRT0_OBJ) $(FAULTPROBE_OBJ)
@@ -300,7 +300,7 @@ userland/tests/nop.o userland/tests/ring3_hello.o userland/tests/ring3_fault.o u
 # 断る)。--api 39 は mkos32x が v3 の最低版 63 へ引き上げる (旧カーネルでは
 # 走らない = v3 の照合を持たないカーネルに載せない)。hello_r3 は
 # crt0 をリンクした ELF の流用なので crt0 の刻印をそのまま持つ。
-userland/tests/ring3_hello.o: userland/tests/ring3_hello.c
+userland/tests/ring3_hello.o: userland/tests/ring3_hello.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/tests/ring3_hello.elf: userland/tests/ring3_hello.o sdk/link/app.ld
@@ -317,7 +317,7 @@ ring3_hello: userland/tests/ring3_hello.bin
 # --- ring3_fault (CPL=3 フォールト kill 検証, v2 M1e) ---
 # ring3_hello と同形の crt0 非依存・--ring3 バイナリ。わざとカーネル帯域へ
 # 書き込み #PF させ、M1e の kill + fault_kill_count を検証する。
-userland/tests/ring3_fault.o: userland/tests/ring3_fault.c
+userland/tests/ring3_fault.o: userland/tests/ring3_fault.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/tests/ring3_fault.elf: userland/tests/ring3_fault.o sdk/link/app.ld
@@ -332,7 +332,7 @@ ring3_fault: userland/tests/ring3_fault.bin
 .PHONY: ring3_fault
 
 # --- ring3_guard (M3 ハードニング: heap/stack ガードページ検証) ---
-userland/tests/ring3_guard.o: userland/tests/ring3_guard.c
+userland/tests/ring3_guard.o: userland/tests/ring3_guard.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/tests/ring3_guard.elf: userland/tests/ring3_guard.o sdk/link/app.ld
@@ -367,7 +367,7 @@ hello_r3: userland/tests/hello_r3.bin
 # ---------------------------------------------------------------------------
 # $(4) = テストの所在ディレクトリ (userland/tests または game/tests)
 define DEFINE_TEST
-$(4)/$(1).o: $(4)/$(1).c
+$(4)/$(1).o: $(4)/$(1).c | $$(ABI_CONTRACT_ORDER)
 	$$(CC) $$(PROGRAM_FLAGS) $(3) -c $$< -o $$@
 
 $(4)/$(1).elf: sdk/link/app.ld $$(CRT0_OBJ) $(4)/$(1).o $(2)
@@ -405,7 +405,7 @@ $(eval $(call DEFINE_TEST,kbd_echo,,,userland/tests))
 # 標準アプリは別リポジトリ ske-studio/os32-apps (SDK 経由ビルド)。
 
 # libos32gfx/ui.o (gfx_demo が参照)
-userland/lib/gfx/ui.o: userland/lib/gfx/ui.c
+userland/lib/gfx/ui.o: userland/lib/gfx/ui.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
 # === SQLite Standalone Test ===
@@ -413,13 +413,13 @@ SQLITE_SA_DIR = userland/tests/sqlite_standalone
 SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Iinclude $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
 SQLITE_SA_CFLAGS += -include sdk/include/os32/os32_unit_stamp.h
 
-$(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h
+$(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
 
-$(SQLITE_SA_DIR)/sqlite_user_vfs.o: $(SQLITE_SA_DIR)/sqlite_user_vfs.c lib/sqlite3/os32_sqlite_config.h
+$(SQLITE_SA_DIR)/sqlite_user_vfs.o: $(SQLITE_SA_DIR)/sqlite_user_vfs.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
 
-$(SQLITE_SA_DIR)/sqlite_standalone.o: $(SQLITE_SA_DIR)/sqlite_standalone.c lib/sqlite3/os32_sqlite_config.h
+$(SQLITE_SA_DIR)/sqlite_standalone.o: $(SQLITE_SA_DIR)/sqlite_standalone.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
 
 SQLITE_SA_OBJ = $(CRT0_OBJ) $(DBG_OBJ) \
@@ -434,13 +434,13 @@ sqlite_standalone: $(CRT0_OBJ) $(SQLITE_SA_DIR)/sqlite_standalone.bin
 
 # === ベースプログラム パターンルール ===
 # .o を経ずに .elf を作るので、-MT $@ で .d の依存先を .elf にする (ヘッダ・.inc の変更で .elf を作り直す)。
-userland/cmds/%.elf: userland/cmds/%.c sdk/link/app.ld $(CRT0_OBJ)
+userland/cmds/%.elf: userland/cmds/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/cmds/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/$*.o -lc -lgcc
 
 # cfg — 設定レジストリの CUI (libos32cfg を静的リンク、票 S2-C)。既定の
 # cmds/%.elf パターンはライブラリを引けないので明示規則。
-userland/cmds/cfg.o: userland/cmds/cfg.c userland/lib/cfg/libos32cfg.h
+userland/cmds/cfg.o: userland/cmds/cfg.c userland/lib/cfg/libos32cfg.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32cfg) -c $< -o $@
 
 userland/cmds/cfg.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/cfg.o $(LIBCFG_OBJ)
@@ -449,7 +449,7 @@ userland/cmds/cfg.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/cfg.o $(LIBCFG_
 
 # cfg_bench — 設定レジストリの計測 (票 S5-C、libos32cfg を静的リンク)。明示規則は
 # 既定の tests/%.elf パターンに優先する。
-userland/tests/cfg_bench.o: userland/tests/cfg_bench.c userland/lib/cfg/libos32cfg.h
+userland/tests/cfg_bench.o: userland/tests/cfg_bench.c userland/lib/cfg/libos32cfg.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32cfg) -c $< -o $@
 
 userland/tests/cfg_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/tests/cfg_bench.o $(LIBCFG_OBJ)
@@ -477,13 +477,13 @@ userland/tests/kstr_asm_a.o: lib/kstring_asm.asm
 	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_a.txt userland/tests/kstr_asm_raw.o $@
 	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_ren_a.txt
 
-userland/tests/kstr_c_c.o: lib/kstring_c.c lib/kstring.h include/types.h include/callconv.h
+userland/tests/kstr_c_c.o: lib/kstring_c.c lib/kstring.h include/types.h include/callconv.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o userland/tests/kstr_c_raw.o
 	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f c_$$f"; done > userland/tests/kstr_ren_c.txt
 	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.o $@
 	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_c_raw.o userland/tests/kstr_c_raw.d userland/tests/kstr_ren_c.txt
 
-userland/tests/kstr_bench.o: userland/tests/kstr_bench.c
+userland/tests/kstr_bench.o: userland/tests/kstr_bench.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/tests/kstr_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/tests/kstr_bench.o \
@@ -497,10 +497,10 @@ kstr_bench: $(CRT0_OBJ) userland/tests/kstr_bench.bin
 # lib/microtar (rxi、MIT)。lib/lz4_prog.o と同じく、カーネル側とは別に
 # PROGRAM_FLAGS でビルドした _prog.o を明示規則でリンクする
 # (cmds/%.elf パターンはライブラリを引けない)。
-lib/microtar/microtar_prog.o: lib/microtar/microtar.c lib/microtar/microtar.h
+lib/microtar/microtar_prog.o: lib/microtar/microtar.c lib/microtar/microtar.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -DMTAR_NO_STDIO -Ilib/microtar -c $< -o $@
 
-userland/cmds/tar.o: userland/cmds/tar.c lib/microtar/microtar.h
+userland/cmds/tar.o: userland/cmds/tar.c lib/microtar/microtar.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -DMTAR_NO_STDIO -Ilib/microtar -c $< -o $@
 
 userland/cmds/tar.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/tar.o lib/microtar/microtar_prog.o
@@ -509,39 +509,39 @@ userland/cmds/tar.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/tar.o lib/micro
 
 # Host Services のコマンド (票 N3) — libos32host を静的リンク。既定の
 # cmds/%.elf パターンはライブラリを引けないので明示規則 (cfg.elf と同じ形)。
-userland/cmds/wget.o: userland/cmds/wget.c userland/lib/host/libos32host.h
+userland/cmds/wget.o: userland/cmds/wget.c userland/lib/host/libos32host.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32host) -c $< -o $@
 userland/cmds/wget.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/wget.o $(LIBHOST_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/wget.o \
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
-userland/cmds/lpr.o: userland/cmds/lpr.c userland/lib/host/libos32host.h
+userland/cmds/lpr.o: userland/cmds/lpr.c userland/lib/host/libos32host.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32host) -c $< -o $@
 userland/cmds/lpr.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/lpr.o $(LIBHOST_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/lpr.o \
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
-userland/cmds/hclip.o: userland/cmds/hclip.c userland/lib/host/libos32host.h
+userland/cmds/hclip.o: userland/cmds/hclip.c userland/lib/host/libos32host.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32host) -c $< -o $@
 userland/cmds/hclip.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/hclip.o $(LIBHOST_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/hclip.o \
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
-userland/cmds/hdate.o: userland/cmds/hdate.c userland/lib/host/libos32host.h
+userland/cmds/hdate.o: userland/cmds/hdate.c userland/lib/host/libos32host.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32host) -c $< -o $@
 userland/cmds/hdate.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/hdate.o $(LIBHOST_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/hdate.o \
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
-userland/tests/%.elf: userland/tests/%.c sdk/link/app.ld $(CRT0_OBJ)
+userland/tests/%.elf: userland/tests/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/$*.o -lc -lgcc
 
-userland/tests/bench/%.elf: userland/tests/bench/%.c sdk/link/app.ld $(CRT0_OBJ)
+userland/tests/bench/%.elf: userland/tests/bench/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/bench/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/bench/$*.o -lc -lgcc
 
-userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ)
+userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/system/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/$*.o -lc -lgcc
 
@@ -551,7 +551,7 @@ userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ)
 userland/system/install.elf: userland/system/install_recover.inc
 # install は hd0 の手順を cdinst と共有する (上の INST_OBJ)。パターン規則は
 # 自分の .o しか繋がないので、install だけ明示の規則で置き換える。
-userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) sdk/link/app.ld $(CRT0_OBJ)
+userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
 userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
@@ -763,7 +763,7 @@ h5-shapes: $(H5_SHAPE_BINS)
 # T2h h2: same guest, default 256KiB and explicit 512KiB; no public format change.
 H2_STACK512_BYTES := 524288
 userland/tests/h2_stack.elf: userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h
-userland/tests/h2_stack512.elf: userland/tests/h2_stack.c userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ)
+userland/tests/h2_stack512.elf: userland/tests/h2_stack.c userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -DH2_STACK_BYTES=$(H2_STACK512_BYTES) -c $< -o userland/tests/h2_stack512.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/h2_stack512.o -lc -lgcc
 userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2_stack512.elf sdk/mkos32x.py
