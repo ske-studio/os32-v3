@@ -1,3 +1,7 @@
+#ifdef OS32_SQLITE_TRACE
+#include "diag_stack.h"
+#endif
+#line 1
 /******************************************************************************
 ** This file is an amalgamation of many separate C source files from SQLite
 ** version 3.53.0.  By combining all the individual C code files into this
@@ -76619,7 +76623,7 @@ static int newDatabase(BtShared *pBt){
   {
     extern void kprintf(unsigned char attr, const char *fmt, ...);
     u32 _ndb_esp;
-    __asm__ volatile("mov %%esp, %0" : "=r"(_ndb_esp));
+    _ndb_esp = arch_diag_sp();
     kprintf(0x07, "[NDB] pre-PagerWrite esp=%x data=%x pDbPg=%x\n",
             _ndb_esp, (unsigned)(long)data, (unsigned)(long)pP1->pDbPage);
   }
@@ -76893,7 +76897,7 @@ static SQLITE_NOINLINE int btreeBeginTrans(
         {
           extern void kprintf(unsigned char attr, const char *fmt, ...);
           u32 _bt_esp;
-          __asm__ volatile("mov %%esp, %0" : "=r"(_bt_esp));
+          _bt_esp = arch_diag_sp();
           kprintf(0x07, "[BT] pre-PagerBegin esp=%x wrflag=%d\n", _bt_esp, wrflag);
         }
 #endif
@@ -97485,7 +97489,7 @@ SQLITE_PRIVATE int sqlite3VdbeExec(
       extern int memsys5_check_canary(void);
       u32 _esp;
       int _canary = memsys5_check_canary();
-      __asm__ volatile("mov %%esp, %0" : "=r"(_esp));
+      _esp = arch_diag_sp();
       if (_canary != 0) {
         kprintf(0x02, "[VDBE] CANARY BROKEN=%d op=%d pc=%d\n",
                 _canary, pOp->opcode, (int)(pOp - aOp));
@@ -100669,7 +100673,7 @@ case OP_Transaction: {
   {
     extern void kprintf(unsigned char attr, const char *fmt, ...);
     u32 _t_esp;
-    __asm__ volatile("mov %%esp, %0" : "=r"(_t_esp));
+    _t_esp = arch_diag_sp();
     kprintf(0x07, "[VDBE] ENTER OP_Transaction esp=%x p1=%d p2=%d\n",
             _t_esp, pOp->p1, pOp->p2);
   }
