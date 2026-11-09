@@ -1,10 +1,8 @@
-/* Preedit and candidate-list rendering and TVRAM preservation. */
+/* Preedit and candidate-list rendering through the private display provider. */
 
 /* ======================================================================== */
-/*  プリエディット表示 (TVRAM 25行目 = y=24)                                 */
+/*  プリエディット表示 (provider の末行)                                   */
 /* ======================================================================== */
-
-#define IME_PREEDIT_ROW  24   /* TVRAM最終行 (0始まり) */
 
 static int draw_utf8(int x, int y, const char *str, u8 col)
 {
@@ -16,7 +14,7 @@ static int draw_utf8(int x, int y, const char *str, u8 col)
         return 0;
     }
 
-    while (*p && cur_x < TVRAM_COLS) {
+    while (*p && cur_x < ime_display_cols()) {
         dec = utf8_decode(p);
         int w = g_ime.render->putw(cur_x, y, dec.codepoint, col);
         if (w <= 0) {
@@ -35,69 +33,41 @@ static int page_count(const IME_State *s)
     return (rem > s->per_page) ? s->per_page : rem;
 }
 
-#define CANDLIST_SAVE_ROWS  3
-
-static u16 *g_cand_save_text = NULL;
-static u8  *g_cand_save_attr = NULL;
 static int g_cand_has_saved = 0;
 
 static void candlist_save(void)
 {
-    int rows;
-    int top;
-    int y, x;
-
-    rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
-    top = IME_PREEDIT_ROW - rows;
+    int rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
+    int top = ime_display_preedit_row() - rows;
 
     if (g_cand_has_saved) return;
-    if (g_ime.render != &g_ime_render_tvram) {
+    if (g_ime.render != IME_DEFAULT_RENDER) {
         g_cand_has_saved = 1;
         return;
     }
-    if (!g_cand_save_text || !g_cand_save_attr) return;
-
-    for (y = 0; y < rows; y++) {
-        for (x = 0; x < TVRAM_COLS; x++) {
-            tvram_readchar_at(x, top + y,
-                              &g_cand_save_text[y * TVRAM_COLS + x],
-                              &g_cand_save_attr[y * TVRAM_COLS + x]);
-        }
-    }
-    g_cand_has_saved = 1;
+    g_cand_has_saved = ime_display_save(top, rows);
 }
 
 static void candlist_restore(void)
 {
     int rows;
     int top;
-    int y, x;
 
     if (!g_cand_has_saved) return;
-    if (!g_cand_save_text || !g_cand_save_attr) return;
-
     rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
-    top = IME_PREEDIT_ROW - rows;
-
-    for (y = 0; y < rows; y++) {
-        for (x = 0; x < TVRAM_COLS; x++) {
-            u32 offset = (u32)(top + y) * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-            *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = g_cand_save_text[y * TVRAM_COLS + x];
-            *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = g_cand_save_attr[y * TVRAM_COLS + x];
-        }
-    }
-    g_cand_has_saved = 0;
+    top = ime_display_preedit_row() - rows;
+    if (ime_display_restore(top, rows)) g_cand_has_saved = 0;
 }
 
 static void candlist_clear(void)
 {
     if (g_cand_has_saved) {
-        if (g_ime.render == &g_ime_render_tvram) {
+        if (g_ime.render == IME_DEFAULT_RENDER) {
             candlist_restore();
         } else {
             int rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
-            int top = IME_PREEDIT_ROW - rows;
-            for (int y = top; y < IME_PREEDIT_ROW; y++)
+            int top = ime_display_preedit_row() - rows;
+            for (int y = top; y < ime_display_preedit_row(); y++)
                 g_ime.render->clear_row(y, ATTR_WHITE);
             g_cand_has_saved = 0;
         }
@@ -107,7 +77,7 @@ static void candlist_clear(void)
 static void candlist_draw(void)
 {
     int rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
-    int top  = IME_PREEDIT_ROW - rows;
+    int top  = ime_display_preedit_row() - rows;
     int base = g_ime.page * g_ime.per_page;
     int n    = page_count(&g_ime);
     int i;
@@ -120,7 +90,7 @@ static void candlist_draw(void)
     }
 
     /* 描画前に一旦リスト表示領域をクリア */
-    for (y = top; y < IME_PREEDIT_ROW; y++) {
+    for (y = top; y < ime_display_preedit_row(); y++) {
         g_ime.render->clear_row(y, ATTR_WHITE);
     }
 
@@ -143,13 +113,13 @@ static void candlist_draw(void)
     pbuf[1] = '/';
     pbuf[2] = '0' + max_page;
     pbuf[3] = '\0';
-    draw_utf8(IME_PAGE_COL, IME_PREEDIT_ROW - 1, pbuf, ATTR_CYAN);
+    draw_utf8(IME_PAGE_COL, ime_display_preedit_row() - 1, pbuf, ATTR_CYAN);
 }
 
 static void preedit_clear(void)
 {
     if (g_ime.render) {
-        g_ime.render->clear_row(IME_PREEDIT_ROW, ATTR_WHITE);
+        g_ime.render->clear_row(ime_display_preedit_row(), ATTR_WHITE);
     }
 }
 
@@ -166,28 +136,28 @@ static void preedit_draw(void)
 
     /* モード表示 */
     if (g_ime.mode == IME_MODE_HIRAGANA) {
-        g_ime.render->putc(x++, IME_PREEDIT_ROW, '[', ATTR_CYAN);
-        x += g_ime.render->putw(x, IME_PREEDIT_ROW, 0x3042, ATTR_CYAN); /* あ */
-        g_ime.render->putc(x++, IME_PREEDIT_ROW, ']', ATTR_CYAN);
+        g_ime.render->putc(x++, ime_display_preedit_row(), '[', ATTR_CYAN);
+        x += g_ime.render->putw(x, ime_display_preedit_row(), 0x3042, ATTR_CYAN); /* あ */
+        g_ime.render->putc(x++, ime_display_preedit_row(), ']', ATTR_CYAN);
     } else if (g_ime.mode == IME_MODE_KATAKANA) {
-        g_ime.render->putc(x++, IME_PREEDIT_ROW, '[', ATTR_CYAN);
-        x += g_ime.render->putw(x, IME_PREEDIT_ROW, 0x30A2, ATTR_CYAN); /* ア */
-        g_ime.render->putc(x++, IME_PREEDIT_ROW, ']', ATTR_CYAN);
+        g_ime.render->putc(x++, ime_display_preedit_row(), '[', ATTR_CYAN);
+        x += g_ime.render->putw(x, ime_display_preedit_row(), 0x30A2, ATTR_CYAN); /* ア */
+        g_ime.render->putc(x++, ime_display_preedit_row(), ']', ATTR_CYAN);
     }
 
     if (g_ime.converting) {
         /* 変換候補表示 */
-        x += g_ime.render->putw(x, IME_PREEDIT_ROW, 0x25BC, ATTR_YELLOW); /* ▼ */
+        x += g_ime.render->putw(x, ime_display_preedit_row(), 0x25BC, ATTR_YELLOW); /* ▼ */
 
         if (g_ime.candidate_idx < g_ime.result_count) {
-            x += draw_utf8(x, IME_PREEDIT_ROW, g_ime.results[g_ime.candidate_idx].kanji, ATTR_WHITE);
+            x += draw_utf8(x, ime_display_preedit_row(), g_ime.results[g_ime.candidate_idx].kanji, ATTR_WHITE);
         }
 
         /* 候補番号表示 */
-        if (g_ime.result_count > 1 && x < TVRAM_COLS - IME_COUNT_TEXT_COLS) {
+        if (g_ime.result_count > 1 && x < ime_display_cols() - IME_COUNT_TEXT_COLS) {
             char nbuf[8];
             int ni;
-            g_ime.render->putc(x++, IME_PREEDIT_ROW, '(', ATTR_CYAN);
+            g_ime.render->putc(x++, ime_display_preedit_row(), '(', ATTR_CYAN);
             nbuf[0] = '0' + ((g_ime.candidate_idx + 1) / 10);
             nbuf[1] = '0' + ((g_ime.candidate_idx + 1) % 10);
             nbuf[2] = '/';
@@ -195,8 +165,8 @@ static void preedit_draw(void)
             nbuf[4] = '0' + (g_ime.result_count % 10);
             nbuf[5] = ')';
             nbuf[6] = '\0';
-            for (ni = 0; nbuf[ni] && x < TVRAM_COLS; ni++) {
-                g_ime.render->putc(x++, IME_PREEDIT_ROW, nbuf[ni], ATTR_CYAN);
+            for (ni = 0; nbuf[ni] && x < ime_display_cols(); ni++) {
+                g_ime.render->putc(x++, ime_display_preedit_row(), nbuf[ni], ATTR_CYAN);
             }
         }
 
@@ -206,12 +176,12 @@ static void preedit_draw(void)
         }
     } else if (g_ime.kana_len > 0 || g_ime.rk.preedit[0] != '\0') {
         /* かなバッファ + 未確定ローマ字 */
-        x += draw_utf8(x, IME_PREEDIT_ROW, g_ime.kana_buf, ATTR_GREEN);
+        x += draw_utf8(x, ime_display_preedit_row(), g_ime.kana_buf, ATTR_GREEN);
         
         /* 未確定ローマ字 */
         p = (const u8 *)g_ime.rk.preedit;
-        while (*p && x < TVRAM_COLS) {
-            g_ime.render->putc(x++, IME_PREEDIT_ROW, (char)*p, ATTR_YELLOW);
+        while (*p && x < ime_display_cols()) {
+            g_ime.render->putc(x++, ime_display_preedit_row(), (char)*p, ATTR_YELLOW);
             p++;
         }
     }
