@@ -246,3 +246,15 @@ void pm_log_write(const char *bytes, u32 n);
 - N1: §4 の起動順の注記「x86と同順」を事実に合わせて差し替え (x86 は kmalloc_init が paging より前、mm/shm は kmalloc を呼ばないので順は任意)。
 - N2: 検証窓を `[1MiB,15MiB)` に揃えた (geometry {15M,15M,16M,16M,16M} に合わせる)。
 - 未決: 「ユーザーランドの手前」= core-ready 境界 (VFS・root mount・exec_init・module 読込みを除く) の解釈はユーザーへ報告して確認中、推奨どおり進める。
+
+## 実装中の PM 決定 (2026-11-10)
+- **B3 の区間の一致** (astra 第 1 回 P2): high probe=0 では共通 mm の physmem は [15MiB,4GiB) が一続きの UNKNOWN (非 RAM)、ledger は [15,16)MiB と [16MiB,4GiB) の BACKGROUND になり、§4 の「ledger の BACKGROUND と physmem の除外が同じ区間で一致」は字面どおりには成り立たない。② では allocator が system も HPT も 16MiB 以上も渡さないことが成り立つので、**② の受入は「全ページの非 RAM の一致 + allocator の除外」で足りる**とする。共通 mm に high 登録と独立した除外の経路を足すと x86 の生成物が変わり NP21/W が要るので、16MiB を超える RAM を使う段 (② の後) へ送る。
+- **B3 で見つかった既存の x86 の試験の判定** (tools/tests/test_boot_readers.py:169、全 REQUIRE の失敗を exit=1 に畳む): B3 の範囲外。直すなら x86 本線の試験の整備として別に出す。
+- **E3 (IRQ の adapter) は ② の後へ**: 本線の PCI IRQ の共通部 (bitmap) はまだ main に無く、§6 の l.176 のとおり ② は E2 の 0x500 専用の dispatch で閉じる。E3 は本線の bitmap が入った後に出す。これで第 4 波は D3 と H1 になり、H1 は D3 の後に出せる。
+- **E1 の mac99 の互換**: QEMU mac99 の OF は macio の assigned-addresses と ranges の親で phys.hi の n を 0 のまま割当済みの番地を入れる。E1 は曖昧でない場合だけ受け入れ、BAR の候補が曖昧なら拒否する。G4 の OF が同じ形かは実機で確かめる。
+- **G2 の能力無しの値**: 画面の座標は -1、サイズは 0×0。戻り値の無い cursor/GDC の制御は何もしない。LF は変換しない (x86 の serial の出力の慣習に合わせる)。lib/kprintf_attr.c は kboot の profile で選ばず、属性の変換の口は G2 が出す。
+- **T3 の受入の台本を H3 より先に作った** (仮の像で自己試験)。本体の負像の FATAL と停止の symbol は H3 の後に表へ足す。
+- **試験の変異の判定**: 変異ごとに期待の停止 PC/終了コード/診断の行と到達の印を表に持ち、両方が一致したときだけ RED (決まりの全文は PPC_IMPL_RULES §3)。
+
+## 後続の題目
+- **PowerPC のブートスプラッシュ** (2026-11-10、os32-v3 の PM 経由のユーザー決定): 票 TASK_PPC_SPLASH。② の段の並びは変えない (② は画面を条件にしない)。実装は OF の FB を描く段の後。
