@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 sys.dont_write_bytecode = True
-from run import ROOT, ROM, QMP, command, require, CriterionFailure
+from run import ROOT, ROM, QMP, command, require
 
 CHECK = dict(name='ppc-kboot-entry', tier=2, budget=600,
              covers=['arch/ppc/kernel_entry.S', 'arch/ppc/kernel_entry.h',
@@ -32,6 +32,7 @@ CANARY = r'''
 #include "platform/powermac/kboot_layout.h"
 volatile unsigned captured[3] = {1,1,1};
 volatile unsigned char bss_canary[37];
+void entry_canary_fail(void);
 void observe(ppc_ci ci) {
     unsigned bad = 0;
     for (volatile char *p=__bss_start; p<__bss_end; ++p) bad |= *p;
@@ -39,6 +40,7 @@ void observe(ppc_ci ci) {
     unsigned ok = !bad && sp == (unsigned)__kernel_stack_top-PPC_KERNEL_ENTRY_FRAME
         && !(sp&15) && captured[1]==0 && captured[2]==(unsigned)ci
         && sp >= (unsigned)__kernel_stack_bottom;
+    if (!ok) entry_canary_fail();
     struct ofw_env e; struct pm_escc s;
     ofw_init(ci);
     if (ofw_setup(&e) || pm_escc_prepare(&e,&s)) for (;;) {}
@@ -52,6 +54,11 @@ OBSERVER = r'''
 .text
 .globl ppc_kernel_start
 ppc_kernel_start:
+ # The product entry leaves firmware's r5 intact: validate before calling CI.
+ cmpwi 3,0
+ beq entry_ci_fail
+ cmplw 3,5
+ bne entry_ci_fail
  lis 8,captured@ha
  addi 8,8,captured@l
  stw 1,0(8)
@@ -59,6 +66,12 @@ ppc_kernel_start:
  stw 9,4(8)
  stw 3,8(8)
  b observe
+.globl entry_ci_fail
+entry_ci_fail:
+ b entry_ci_fail
+.globl entry_canary_fail
+entry_canary_fail:
+ b entry_canary_fail
 .globl ppc_load8
 ppc_load8:
  lbz 3,0(3)
@@ -70,6 +83,10 @@ ppc_store8:
  eieio
  blr
 '''
+
+
+class RuntimeRed(AssertionError):
+    """A canary's dedicated failure stop was observed in the guest."""
 
 
 def build(work, source, static=False):
@@ -142,14 +159,23 @@ def guest(work, symbols):
             deadline=time.monotonic()+30
             q=QMP(p,deadline)
             stable=0
+            previous=None
+            stops={symbols[name]:name for name in
+                   ('ppc_kernel_entry_stop', 'entry_ci_fail', 'entry_canary_fail')}
             while time.monotonic()<deadline:
                 q.call('stop')
                 regs=q.call('human-monitor-command',{'command-line':'info registers'})
                 pc=re.search(r'NIP\s+([0-9a-fA-F]+)',regs)
-                stable=stable+1 if pc and int(pc[1],16)==symbols['ppc_kernel_entry_stop'] else 0
+                stop=stops.get(int(pc[1],16)) if pc else None
+                stable=stable+1 if stop and stop==previous else (1 if stop else 0)
+                previous=stop
                 if stable==2: break
                 q.call('cont'); time.sleep(0.1)
             (work/'qmp.log').write_text(regs)
+            if stable!=2:
+                raise RuntimeError('QEMU timeout: no designated stop reached')
+            if stop in ('entry_ci_fail', 'entry_canary_fail'):
+                raise RuntimeRed(f'{stop} PC=0x{symbols[stop]:08x} (stable twice)')
             serial=a.read_bytes().replace(b'\r\r\n',b'\r\n')
             require(stable==2 and serial.count(b'ENTRY: CI BSS STACK ALIGN PASS\r\n')==1
                     and b'ENTRY:' not in b.read_bytes(), 'runtime entry canary: '+repr(serial[-500:]))
@@ -179,8 +205,8 @@ def main():
             work=out/name; work.mkdir(exist_ok=True)
             symbols=build(work,source.replace(before,after))
             try: guest(work,symbols)
-            except CriterionFailure as exc:
-                (work/'red.txt').write_text(str(exc)); print('RED '+name+' (runtime; build rc=0)',flush=True)
+            except RuntimeRed as exc:
+                (work/'red.txt').write_text(str(exc)); print('RED '+name+' (runtime; build rc=0): '+str(exc),flush=True)
             else: raise AssertionError('SURVIVED '+name)
             guest(control,build(control,source))
     print(f'PASS elapsed={time.monotonic()-started:.2f}s')
