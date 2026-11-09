@@ -10,10 +10,12 @@ static void exit_code(int code)
 
 static u32 directory, leaf;
 static unsigned reads;
+static int lax_reads; /* unaligned-root case: count any read instead of aborting */
 static u32 read_word(u32 pa, void *context)
 {
     if (context != &reads) abort();
     ++reads;
+    if (lax_reads) return 0;
     /* Nonzero indices and high physical addresses catch shifted/truncated reads. */
     if (pa == 0xfffffabcU) return directory;
     if (pa == 0x12345d14U) return leaf;
@@ -60,7 +62,15 @@ int main(void)
             leaf != (0xfedcb060U | (t & 31) | ((t & 32) ? 128 : 0))) return 2;
         ++count;
     }
-    if (ppc_pd_lookup_read(1, 0, 0, 0, 0, read_word, &reads)) return 3;
+    {   /* unaligned root: rejected before any read, output untouched */
+        struct ppc_translation bad = {0xdeadbeef, 0xcafebabe};
+        reads = 0;
+        lax_reads = 1;
+        if (ppc_pd_lookup_read(0xfffff004U, 0xabf45123U, 0, 0, &bad,
+                               read_word, &reads) ||
+            reads != 0 || bad.pa != 0xdeadbeef || bad.attr != 0xcafebabe)
+            return 1;
+    }
     if (count != 16384) return 4;
     return 0;
 }

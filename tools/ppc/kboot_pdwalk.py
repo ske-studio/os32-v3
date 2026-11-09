@@ -17,6 +17,7 @@ MUTATIONS = [
     ('pp-encoding', 'PD_PP_USER_RW = 2', 'PD_PP_USER_RW = 3'),
     ('pat-accepted', 'if (pte & PTE_PS)', 'if (0)'),
     ('ps-accepted', 'if (pde & PTE_PS)', 'if (0)'),
+    ('root-unaligned-accepted', '(root & ~PTE_FRAME_MASK)', '0'),
 ]
 
 
