@@ -1,6 +1,8 @@
 [
   "arch/ppc/entry.S",
   "arch/ppc/ofw_note.S",
+  "arch/ppc/video_wc.c",
+  "drivers/video/geforce/gf_wc.c",
   "exec/access_walk.c",
   "exec/appmem.c",
   "exec/appmem_unmap.c",
