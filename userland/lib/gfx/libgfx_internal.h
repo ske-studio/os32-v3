@@ -34,6 +34,7 @@ extern void __cdecl asm_gfx_hline(u8 **planes, int base, int x, int x2, u8 color
  * asm_gfx_hline と同じ契約)。 */
 static inline void gfx_span_raw(int base, int x, int x2, u8 color)
 {
+    if (!gfx_fb.planes[0]) return;
     if (gfx_packed) {
         u8 *d = gfx_fb.planes[0] + base + x;
         int n = x2 - x + 1;
@@ -47,12 +48,14 @@ static inline void gfx_span_raw(int base, int x, int x2, u8 color)
 /* 画面 1 画素の書き/読み (クリップ込み)。パックド専用。 */
 static inline void gfx_p_put(int x, int y, u8 color)
 {
+    if (!gfx_fb.planes[0]) return;
     if (x < 0 || x >= gfx_fb.width || y < 0 || y >= gfx_fb.height) return;
     gfx_fb.planes[0][y * gfx_fb.pitch + x] = color;
 }
 
 static inline u8 gfx_p_get(int x, int y)
 {
+    if (!gfx_fb.planes[0]) return 0;
     if (x < 0 || x >= gfx_fb.width || y < 0 || y >= gfx_fb.height) return 0;
     return gfx_fb.planes[0][y * gfx_fb.pitch + x];
 }

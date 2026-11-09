@@ -108,6 +108,7 @@ void __cdecl gfx_save_rect(int x, int y, int w, int h, void *buf)
         gfx_api->mem_free(pixels);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
 
     if (gfx_packed) {
         gfx_packed_save_planar(sx, y, wb, h, dst_base, orig_wb);
@@ -163,6 +164,7 @@ void __cdecl gfx_restore_rect(int x, int y, int w, int h, const void *buf)
         gfx_api->mem_free(pixels);
         return;
     }
+    if (!gfx_fb.planes[0]) return;
 
     if (gfx_packed) {
         gfx_packed_restore_planar(sx, y, wb, h, src_base, orig_wb);

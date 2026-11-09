@@ -6,15 +6,19 @@ GFX_Framebuffer gfx_fb;
 int gfx_ready = 1, gfx_packed = 1, gfx_direct = 1, gfx_lost;
 u16 gfx_gen = 5;
 static GFX_Cmd seen[64];
-static int n, dirty, gets;
+static int n, dirty, gets, mono_bytes;
+static u8 mono_data[32];
 static int rects[128][4];
-static int submit(const GFX_Cmd *c, u32 count, u32 gen, u32 *done) { CHECK(gen == 5); for (u32 i=0;i<count;i++) seen[n++]=c[i]; *done=count; return 0; }
+static int submit(const GFX_Cmd *c, u32 count, u32 gen, u32 *done) { CHECK(gen == 5); for (u32 i=0;i<count;i++) { seen[n++]=c[i]; if (c[i].op==GFX_CMD_MONO) { mono_bytes=c[i].h*c[i].pitch; CHECK(mono_bytes<=32); for (int j=0;j<mono_bytes;j++) mono_data[j]=((u8 *)c[i].data)[j]; } } *done=count; return 0; }
 static int get(int x,int y,int w,int h,u8 *d,u32 pitch,u32 gen) { CHECK(x==2 && y==3 && w==1 && h==1 && pitch==1 && gen==5 && n==13); gets++; *d=91; return 0; }
 static void dirty_rect(int x,int y,int w,int h) { rects[dirty][0]=x; rects[dirty][1]=y; rects[dirty][2]=w; rects[dirty][3]=h; dirty++; }
 void asm_gfx_clear(u8 c,u8 **p) {(void)c;(void)p;}
 void asm_fill_plane_rect(u8 *s,int p,int r,int w,u8 c) {(void)s;(void)p;(void)r;(void)w;(void)c;}
 void asm_gfx_line(u8 **p,int pitch,int x,int y,int x1,int y1,u8 c) {(void)p;(void)pitch;(void)x;(void)y;(void)x1;(void)y1;(void)c;}
 void asm_gfx_hline(u8 **p,int b,int x,int x2,u8 c) {(void)p;(void)b;(void)x;(void)x2;(void)c;}
+void asm_kcg_draw_font(int x,int y,const u8 *p,int w,int h,u8 c,u8 **bb) {
+ (void)x;(void)y;(void)p;(void)w;(void)h;(void)c; CHECK(bb[0]);
+}
 void gfx_clear_rect(int, int, int, int, u8);
 static void check(int i,int x,int y,int w,int h,u32 color) { CHECK(seen[i].op==GFX_CMD_FILL && seen[i].rop==0 && seen[i].x==x && seen[i].y==y && seen[i].w==w && seen[i].h==h && seen[i].color==color && seen[i].data==0); }
 void _start(void) {
@@ -49,6 +53,35 @@ void _start(void) {
    gfx_direct=0; gfx_fb.planes[0]=fb; gfx_line(x0,y0,x1,y1,42);
    CHECK(dirty==2 && rx==rects[1][0] && ry==rects[1][1] && rw==rects[1][2] && rh==rects[1][3]);
    for (int i=0;i<80;i++) CHECK(actual[i]==fb[i]);
+  }
+ }
+ /* The framebuffer remains unmapped in DIRECT. The glyph is copied at enqueue. */
+ static u8 shadow[512];
+ gfx_direct=1; gfx_fb.planes[0]=0; gfx_fb.width=32; gfx_fb.height=16; gfx_fb.pitch=32;
+ {
+  u8 pat[]={0x81,0x42,0x24,0x18};
+  n=dirty=0; gfx_draw_font(3,4,pat,2,2,13); pat[0]=0;
+  CHECK(!gfx_flush() && n==1 && dirty==1);
+  CHECK(seen[0].op==GFX_CMD_MONO && seen[0].x==3 && seen[0].y==4 && seen[0].w==16 && seen[0].h==2);
+  CHECK(seen[0].color==13 && seen[0].key==-1 && seen[0].pitch==2 && mono_bytes==4);
+  CHECK(mono_data[0]==0x81 && mono_data[1]==0x42 && mono_data[2]==0x24 && mono_data[3]==0x18);
+  CHECK(rects[0][0]==3 && rects[0][1]==4 && rects[0][2]==16 && rects[0][3]==2);
+  gfx_fb.planes[0]=0; n=dirty=0; pat[0]=0x81; gfx_draw_font(3,4,pat,2,2,13);
+  CHECK(!gfx_flush() && n==1 && seen[0].op==GFX_CMD_MONO);
+  n=dirty=0; gfx_draw_font(-3,-1,pat,2,2,13); CHECK(!gfx_flush() && n==1);
+  CHECK(seen[0].x==0 && seen[0].y==0 && seen[0].w==13 && seen[0].h==1);
+  CHECK(rects[0][0]==-3 && rects[0][1]==-1 && rects[0][2]==16 && rects[0][3]==2);
+  /* The original packed SHADOW raster still writes only the set bits. */
+  gfx_direct=0; gfx_fb.planes[0]=shadow;
+  gfx_draw_font(3,4,pat,2,2,13); CHECK(shadow[4*32+3]==13 && shadow[4*32+4]==0 && shadow[4*32+10]==13);
+  /* A missing mapping is harmless for both packed and planar entry points. */
+  gfx_fb.planes[0]=0;
+  for (int mode=0;mode<2;mode++) {
+   gfx_packed=mode; n=dirty=0;
+   gfx_clear(1); gfx_clear_rect(0,0,4,4,1); gfx_pixel(1,1,1); gfx_pixel_nodirty(1,1,1);
+   CHECK(gfx_get_pixel(1,1)==0); gfx_hline(0,0,4,1); gfx_vline(0,0,4,1);
+   gfx_line(0,0,3,3,1); gfx_rect(0,0,4,4,1); gfx_fill_rect(0,0,4,4,1);
+   gfx_draw_font(0,0,pat,2,2,1); CHECK(n==0 && dirty==0);
   }
  }
  finish(0);

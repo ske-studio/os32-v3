@@ -199,5 +199,14 @@ void _start(void)
     static u8 invalid_mask[2000]; invalid.mask=invalid_mask;
     for(int p=0;p<4;p++) invalid.planes[p]=oversize->planes[p];
     gfx_draw_sprite(0,0,&invalid); CHECK(gfx_lost);
+    for(int packed=0;packed<2;packed++) {
+        static u8 backing[4*80*10];
+        reset(0,packed); gfx_fb.planes[0]=0;
+        gfx_blit(1,1,s,0); gfx_blit_colorkey(1,1,s,0,7); gfx_blit_transparent(1,1,s,0);
+        gfx_draw_sprite(1,1,spr); gfx_save_rect(0,0,24,10,backing);
+        gfx_restore_rect(0,0,24,10,backing); gfx_sprite_save_bg(0,0,spr);
+        CHECK(!count && !dirty_count);
+        gfx_sprite_restore_bg(0,0,spr); CHECK(!count && dirty_count==1);
+    }
     finish(0);
 }

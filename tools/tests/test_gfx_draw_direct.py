@@ -18,6 +18,8 @@ CHECK = dict(name='gfx-draw-direct-host', tier=1, needs=[], budget=15, covers=[
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_draw.c'
 MUTATIONS = (
+    ('draw-font-direct', SOURCE, 'if (gfx_direct) {\n        (void)gfx_cmd_enqueue_mono(x, y, w_bytes * 8,', 'if (0) {\n        (void)gfx_cmd_enqueue_mono(x, y, w_bytes * 8,'),
+    ('draw-font-color', SOURCE, 'fg, -1, 0, 0, gfx_fb.width, gfx_fb.height);', 'fg + 1, -1, 0, 0, gfx_fb.width, gfx_fb.height);'),
     ('line-unbatched', SOURCE, 'if (last || (dx >= dy ? y0 != oldy : x0 != oldx))', 'if (1)'),
     ('branch', SOURCE, 'void gfx_pixel(int x, int y, u8 color)\n{\n    if (!gfx_ready) return;\n    if (gfx_direct)', 'void gfx_pixel(int x, int y, u8 color)\n{\n    if (!gfx_ready) return;\n    if (1)'),
     ('coordinate', SOURCE, 'gfx_cmd_enqueue_fill(0, 0, gfx_fb.width, gfx_fb.height, color, 0)', 'gfx_cmd_enqueue_fill(1, 0, gfx_fb.width, gfx_fb.height, color, 0)'),

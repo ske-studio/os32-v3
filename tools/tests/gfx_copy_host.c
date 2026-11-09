@@ -18,6 +18,7 @@ void _start(void)
 {
     static KernelAPI api;
     api.gfx_add_dirty_rect = mark; api.gfx_hw_submit = submit; gfx_api = &api;
+    gfx_fb.planes[0] = &pixels[0][0];
     for (int y = 0; y < 6; y++) for (int x = 0; x < 8; x++) pixels[y][x] = expected[y][x] = y * 8 + x;
     for (int y = 1; y < 6; y++) for (int x = 1; x < 8; x++) expected[y][x] = (y - 1) * 8 + x - 1;
     CHECK(!gfx_copy_rect(1, 1, 0, 0, 8, 6));
@@ -29,7 +30,9 @@ void _start(void)
     CHECK(!gfx_copy_rect(1, 1, 0, 0, 8, 6));
     for (int y = 0; y < 6; y++) for (int x = 0; x < 8; x++) CHECK(pixels[y][x] == expected[y][x]);
     CHECK(dirty == 2); dirty = 1;
-    gfx_direct = 1; gfx_fb.planes[0] = 0;
+    gfx_fb.planes[0] = 0;
+    CHECK(gfx_copy_rect(1,1,0,0,4,4)==OS32_ERR_NOSYS && dirty==1);
+    gfx_direct = 1;
     CHECK(!gfx_copy_rect(0, 0, 0, 0, 0, 1));
     CHECK(!gfx_copy_rect(0, 0, 0, 0, 1, -1));
     CHECK(!gfx_copy_rect(3, 4, 1, 2, 5, 2));

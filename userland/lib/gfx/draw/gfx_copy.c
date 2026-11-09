@@ -11,7 +11,7 @@ int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)
             gfx_api->gfx_add_dirty_rect(dx, dy, w, h);
         return rc;
     }
-    if (!gfx_ready) return OS32_ERR_NOSYS;
+    if (!gfx_ready || !gfx_fb.planes[0]) return OS32_ERR_NOSYS;
     /* Clip both rectangles together, using wide arithmetic for the edges. */
     long long l = 0, t = 0, r = w, b = h;
     if (l < -(long long)dx) l = -(long long)dx;
