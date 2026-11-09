@@ -51,7 +51,7 @@ int pm_kboot_reserve(struct pm_kboot_info *info)
             return PM_KBOOT_RESERVE_IMAGE_AVAILABLE;
     }
     if (!covered(&info->ram,0,PM_VECTOR_END)) return PM_KBOOT_RESERVE_VECTOR;
-    if (!covered(&info->ram,PM_KERNEL_BASE,PM_ADMITTED_END) ||
+    if (!covered(&info->ram,PM_KERNEL_BASE,PM_WINDOW_END) ||
         !covered(&info->available,end,PM_WINDOW_END))
         return PM_KBOOT_RESERVE_WINDOW;
     u32 hpt=0;

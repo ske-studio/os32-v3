@@ -1,4 +1,9 @@
 /* Appended to B1's unchanged firmware fake by kboot_reserve.py. */
+static void reserve_mark(char mark)
+{
+    unsigned syscall=4;
+    __asm__ volatile("int $0x80" : "+a"(syscall) : "b"(1), "c"(&mark), "d"(1) : "memory");
+}
 static void reserve_test(void)
 {
     unsigned which=scenario;
@@ -24,7 +29,7 @@ static void reserve_test(void)
         expected=PM_KBOOT_RESERVE_HPT;
     }
     if (which==4) {
-        tuple(reg,1,1,0,0xffffff);
+        tuple(reg,1,1,0,0xefffff);
         expected=PM_KBOOT_RESERVE_WINDOW;
     }
     if (which==5) { /* alignment must round up, not down */
@@ -52,7 +57,12 @@ static void reserve_test(void)
         tuple(avail+16,1,1,0x2000000,0x20000); an=24;
         expected=PM_KBOOT_RESERVE_HPT;
     }
+    if (which==13) { /* the excluded [15MiB,16MiB) need not be RAM */
+        tuple(reg,1,1,0,0xf00000);
+        tuple(reg+8,1,1,0x1000000,0x7000000); rn=16;
+    }
     const struct pm_kboot_info *captured=pm_kboot_capture(0);
+    reserve_mark('C');
     struct pm_kboot_info copy=*captured;
     if (which==11) { /* late firmware change must invalidate old snapshot */
         tuple(avail+8,1,1,0x300001,0x7afffff);
@@ -63,12 +73,14 @@ static void reserve_test(void)
         expected=PM_KBOOT_RESERVE_RANGES;
     }
     int result=pm_kboot_reserve(&copy);
+    reserve_mark('R');
+    reserve_mark('0'+result);
     if (result!=expected) quit(77);
     if (result==PM_KBOOT_RESERVE_OK) {
         if (copy.admitted_end!=0x1000000 || copy.image_first!=0x100000 ||
             copy.image_end!=0x300000 || copy.hpt_bytes!=0x20000 ||
-            copy.hpt_pa!=(which==5?0x1020000:0x1000000)) quit(77);
+            copy.hpt_pa!=(which==5?0x1020000:0x1000000)) quit(78);
     } else if (copy.admitted_end || copy.image_first || copy.image_end ||
-               copy.hpt_pa || copy.hpt_bytes) quit(77);
+               copy.hpt_pa || copy.hpt_bytes) quit(79);
     quit(0);
 }
