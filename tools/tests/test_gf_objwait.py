@@ -18,6 +18,7 @@ def command(exe):
             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
             *include_flags(ROOT), '-I'+str(ROOT),
             str(ROOT/'tools/tests/gf_objwait_host.c'),
+            str(ROOT/'tools/tests/recover_gf_dev_stub.c'),
             str(ROOT/'hwdev/gf/accel_copy.c'),
             str(ROOT/'tools/tests/gf_accel_unbound_stubs.c'), '-o', str(exe)]
 

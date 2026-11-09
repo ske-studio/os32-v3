@@ -1,6 +1,6 @@
 """Boot-target A/B foreground commands, selection, availability and owner checks."""
 CHECK = dict(name='gf5-boot-target-diag', tier=1, needs=[], budget=4.1,
-             covers=['kdebug/gf5_test.c', 'kdebug/gf5_test.h',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/gf5_test.c', 'kdebug/gf5_test.h',
                      'kdebug/gf_command_wire.h', 'hwdev/gf/**',
                      'drivers/video/geforce/geforce_module.h',
                      'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
@@ -37,7 +37,7 @@ def command(exe):
             '-Wl,--gc-sections', *include_flags(ROOT),
             str(ROOT / 'tools/tests/gf5_boot_target_diag_host.c'),
             str(ROOT / 'hwdev/gf/state.c'),
-            str(ROOT / PRODUCT), '-o', str(exe)]
+            str(ROOT / PRODUCT), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)]
 
 
 def main():
