@@ -27,7 +27,7 @@ static u32 host_cr3;
 #include "exec.h"
 #include "ring3_str.h"
 #include "ring3_ls.h"
-int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
+int ring3_ls_dispatch(const struct kapi_values *values) { (void)values; __builtin_trap(); }
 #include "fd_redirect.h"
 #include "../drivers/input/kbd.h"
 #include "input_service.h"

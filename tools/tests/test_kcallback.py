@@ -15,6 +15,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTANTS = (
     # Both guards reject bad output. The mutant must kill in the collector,
     # then fail the assertion that the wrap rejected before collector entry.
+    ('private argument order', 'ls', 'values->value[0], values->value[1]',
+     'values->value[1], values->value[0]', 'FAIL:'),
     ('WM origin guard', 'ls',
      '!caller_access_get(&caller) || caller.origin != CALLER_USER',
      '!caller_access_get_user(&caller)', 'FAIL:'),
@@ -46,6 +48,7 @@ def run(args, mutant=None):
         'ext2_cb': function((ROOT / 'fs/ext2/ext2_vfs.c').read_text(),
                             'static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)'),
         'ls': (ROOT / 'exec/ring3_ls.c').read_text(),
+        'call': (ROOT / 'arch/x86/kernel/kapi_call.c').read_text(),
         'shim': (ROOT / 'arch/x86/kernel/ring3_ls.S').read_text(),
     }
     if mutant:
@@ -61,6 +64,7 @@ def run(args, mutant=None):
         (tmp / 'window.inc').write_text('struct vfs_ls_window_ctx {' + sources['window'])
         (tmp / 'ext2_cb.inc').write_text(sources['ext2_cb'])
         (tmp / 'ls_source.inc').write_text(sources['ls'])
+        (tmp / 'call_source.inc').write_text(sources['call'])
         (tmp / 'shim.S').write_text(sources['shim'])
         (tmp / 'client_source.inc').write_bytes((ROOT / 'userland/lib/rt/ls.c').read_bytes())
         offset = next(line for line in (ROOT / 'exec/ring3_str.h').read_text().splitlines()
@@ -68,6 +72,7 @@ def run(args, mutant=None):
         (tmp / 'trampoline.inc').write_text('#include "syscall_code.h"\n' + offset + '\n' + function(source, 'static void ring3_trampoline_init(void)'))
         exe = tmp / 'test'
         subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
+                        '-ffunction-sections', '-Wl,--gc-sections',
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
                         *include_flags(ROOT),
                         '-I' + str(tmp), str(ROOT / 'tools/tests/kcallback_host.c'),

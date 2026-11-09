@@ -6,6 +6,7 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 #include "appslot.h"
 #include <stdbool.h>
 /* Thermal dispatch is outside this fixture; keep its syscall gate idle. */
@@ -72,10 +73,11 @@ int kapi_strings_from_source(u32 slot, void *target, struct kapi_arg_source *src
 }
 #include "ring3_ls.h"
 static int ls_calls;
-int ring3_ls_dispatch(u32 user_esp)
+int ring3_ls_dispatch(const struct kapi_values *values)
 {
     struct caller_access a;
-    assert(user_esp == MEM_APP_BAND_BASE && ring3_in_syscall);
+    assert(values->value[0] == 11 && values->value[1] == 22 &&
+           values->value[2] == 33 && ring3_in_syscall);
     assert(caller_access_get_user(&a) && a.app_id == cur);
     ls_calls++;
     return 91;
@@ -235,6 +237,10 @@ int main(void)
         /* The kill fixture does not emulate d2 landing; reset only test state. */
         select_parent(); g_cur_frame = NULL;
     }
+    u32 *ls_args = mmap((void *)MEM_APP_BAND_BASE, PAGE_SIZE,
+                        PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    assert(ls_args == (void *)MEM_APP_BAND_BASE);
+    ls_args[1] = 11; ls_args[2] = 22; ls_args[3] = 33;
     u32 ls_frame[13] = {0};
     ls_frame[7] = RING3_LS_CALL;
     ls_frame[11] = MEM_APP_BAND_BASE;

@@ -4,6 +4,7 @@
 #include "os32_kapi_slots.h"
 #include "redir_access.h"
 #include "ls_source.inc"
+#include "call_source.inc"
 #include "window.inc"
 #include "ext2.h"
 
@@ -114,7 +115,14 @@ int host_dispatch(u32 esp)
 {
     assert(!user_call && !fs_active);
     user_call = 1;
-    int rc = ring3_ls_dispatch(esp);
+    u32 native[13] = {0};
+    native[11] = esp;
+    struct arch_syscall call = { native };
+    struct kapi_arg_source src;
+    struct kapi_values values;
+    arch_kapi_source(&src, &call);
+    if (!arch_kapi_read_block(&src, 0, 3, &values)) ring3_fault_kill();
+    int rc = ring3_ls_dispatch(&values);
     user_call = 0;
     return rc;
 }
@@ -215,9 +223,9 @@ int main(void)
     kill_at = 0;
     assert(run_shim(&calls) == 0 && calls == total); /* no leftover cursor */
     struct ring3_ls_packet out;
-    u32 request[] = {0, (u32)"/", 0, (u32)&out};
+    struct kapi_values request = {{(u32)"/", 0, (u32)&out}};
     user_call = 1;
-    assert(ring3_ls_dispatch((u32)request) == 0);
+    assert(ring3_ls_dispatch(&request) == 0);
     for (u32 i = 0; i < out.count; i++) {
         const u8 *p = (const u8 *)&out.entries[i];
         for (u32 j = 2; j < VFS_MAX_PATH; j++) assert(p[j] == 0);
@@ -252,14 +260,14 @@ int main(void)
         }
     }
     assert(output_checks == checks_before_bad); /* wrap rejected before collector */
-    request[1] = 0;
-    assert(ring3_ls_dispatch((u32)request) == 0 && out.count == RING3_LS_BATCH);
+    request.value[0] = 0;
+    assert(ring3_ls_dispatch(&request) == 0 && out.count == RING3_LS_BATCH);
     char long_path[VFS_MAX_PATH];
     kmemset(long_path, 'x', sizeof(long_path));
-    request[1] = (u32)long_path;
+    request.value[0] = (u32)long_path;
     int before_long = fs_calls;
     if (!__builtin_setjmp(killed)) {
-        ring3_ls_dispatch((u32)request);
+        ring3_ls_dispatch(&request);
         assert(0);
     }
     assert(fs_calls == before_long);
@@ -271,14 +279,15 @@ int main(void)
     read_end = (const u8 *)long_path + 1;
     assert(ls_copy_path(&access, (u32)long_path, staged));
     read_end = 0;
-    request[1] = (u32)"/";
-    request[2] = 0xffffffffu;
-    assert(ring3_ls_dispatch((u32)request) == 0 && !out.count && out.done);
+    request.value[0] = (u32)"/";
+    request.value[1] = 0xffffffffu;
+    assert(ring3_ls_dispatch(&request) == 0 && !out.count && out.done);
     for (int mode = 0; mode < 4; mode++) {
         int before = fs_calls;
         reject_input = mode == 0; reject_output = mode == 1; reject_copy = mode == 2;
         if (!__builtin_setjmp(killed)) {
-            ring3_ls_dispatch(mode == 3 ? 0xffffffffu : (u32)request);
+            if (mode == 3) { user_call = 0; host_dispatch(0xffffffffu); }
+            else ring3_ls_dispatch(&request);
             assert(0);
         }
         assert(!fs_active && fs_calls == before + (mode == 2));

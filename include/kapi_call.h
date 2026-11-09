@@ -20,6 +20,4 @@ int arch_kapi_read_block(struct kapi_arg_source *, unsigned first,
 u32 arch_kapi_invoke(void *, const struct kapi_values *, unsigned count);
 /* Reads only the requested word; failure preserves next. */
 int arch_kapi_va_next(struct kapi_arg_source *, enum kapi_value_kind, u32 *);
-/* Transitional raw adapters: removed by D2/D3/E3, in the existing gate order. */
-u32 arch_kapi_legacy_ls(const struct arch_syscall *);
 #endif

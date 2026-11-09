@@ -60,7 +60,7 @@ static u32 host_cr3;
 #include "exec_heap.h"
 #include "tss.h"
 #include "ring3_ls.h"
-int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
+int ring3_ls_dispatch(const struct kapi_values *values) { (void)values; __builtin_trap(); }
 #include "v86.h"
 void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 #define CHECK(x) do { if (!(x)) die(__LINE__); } while (0)

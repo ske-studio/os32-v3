@@ -3,7 +3,7 @@ CHECK = dict(name='kapi-call-host', tier=1,
     covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'kapi/kapi_generated.c', 'arch/x86/kernel/kapi_call.c', 'arch/x86/kernel/syscall_entry.c',
             'arch/x86/kernel/ring3_entry.asm', 'arch/x86/kernel/exec_context.c',
             'arch/x86/kernel/exec_entry.c', 'arch/x86/kernel/tss.h',
-            'include/kapi_call.h', 'include/kapi_call_generated.h', 'exec/redir_access.c', 'lib/kstring_asm.asm',
+            'exec/ring3_ls.h', 'include/kapi_call.h', 'include/kapi_call_generated.h', 'exec/redir_access.c', 'lib/kstring_asm.asm',
             'include/exec_arch.h', 'include/redir_access.h', 'exec/exec_syscall.inc',
             'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sdk/kapi.json',
             'tools/tests/test_kapi_call.py', 'tools/tests/host_exec_context.h',
@@ -56,7 +56,7 @@ static u32 *words=(u32 *)(argument_pages+4096-8), frame[13];
 static AppSlot caller_slot;
 static struct addrspace caller_as;
 static u32 expected[KAPI_FIXED_MAX];
-static unsigned calls, copies, captures, kills, parks, aborts;
+static unsigned calls, copies, captures, kills, parks, aborts, copied_bytes;
 static int identity=1, copy_ok=1, vm, legacy_result, strings_result, print_ok=1, abort_now;
 static void *abort_target[5];
 static u32 mapped_bytes;
@@ -89,7 +89,7 @@ int caller_access_get_user(struct caller_access *c) {
     captures++; return observed_caller_get_user(c);
 }
 int copy_caller_bytes(const struct caller_access *c, const void *p, void *out, u32 n) {
-    copies++; return observed_copy_caller_bytes(c,p,out,n);
+    copies++; copied_bytes=n; return observed_copy_caller_bytes(c,p,out,n);
 }
 void ring3_fault_kill(void) { kills++; } /* N3: deliberately returns. */
 static void exec_cui_display_abort(void) {}
@@ -113,7 +113,11 @@ int kapi_strings_from_source(u32 s, void *f, struct kapi_arg_source *a, unsigned
     if (strings_result) { *r=82; return strings_result; } return 0;
 }
 int kapi_print_call(struct kapi_arg_source *a) { (void)a; CHECK(!copies && legacy_fake.count==1); legacy_fake_note(14); return print_ok; }
-int ring3_ls_dispatch(u32 sp) { CHECK(sp==frame[11]); return 83; }
+int ring3_ls_dispatch(const struct kapi_values *values) {
+    CHECK(ring3_in_syscall && copies==1 && captures==1 && copied_bytes==3*sizeof(u32));
+    for (unsigned k=0;k<3;k++) CHECK(values->value[k]==expected[k]);
+    calls++; return 83;
+}
 static i32 typed(u8 a, i16 b, i32 c, const char *d) {
     CHECK(a==255 && b==-2 && c==-12345 && (u32)d==0x12345678);
     return -7;
@@ -170,7 +174,11 @@ void _start(void) {
     /* DISPATCH_CASES */
     reset(0); vm=1; dispatch(KAPI_FUNC_CAPACITY+1);
     CHECK(!kills && !copies && !captures && !aborts && !parks);
-    reset(0); dispatch(RING3_LS_CALL); CHECK(frame[7]==83 && !kills && !copies);
+    reset(0); dispatch(RING3_LS_CALL); CHECK(frame[7]==83 && !kills && copies==1 && calls==1);
+    reset(0); mapped_bytes=8; dispatch(RING3_LS_CALL);
+    CHECK(kills==1 && !calls && frame[7]==(u32)OS32_ERR_INVAL && parks==1 && !g_cur_frame && !ring3_in_syscall);
+    reset(0); frame[11]=U32_MAX; dispatch(RING3_LS_CALL);
+    CHECK(kills==1 && !calls && !copies && frame[7]==(u32)OS32_ERR_INVAL);
     reset(0); legacy_result=1; dispatch(0); CHECK(frame[7]==81 && !copies);
     reset(0); legacy_result=-1; dispatch(0); CHECK(kills==1 && frame[7]==(u32)OS32_ERR_INVAL && !calls);
     reset(0); strings_result=1; dispatch(0); CHECK(frame[7]==82 && !copies);
@@ -194,7 +202,9 @@ MUTATIONS = (
     ('consumer-order', 'dispatch', 'if (!handled && slot == KAPI_SLOT_KPRINTF) {', 'if (!handled) handled = kapi_strings_from_source(slot, wrapper, src, count, kapi_argptr[slot], result);\n    if (!handled && slot == KAPI_SLOT_KPRINTF) {'),
     ('entry-legacy-first', 'entry', 'if (legacy_trap(native)) return;', 'if (0 && legacy_trap(native)) return;'),
     ('abort-before-range', 'dispatch', '    ring3_abort_check();        /* 要求があれば longjmp して戻らない */', '    /* first abort omitted */'),
-    ('private-before-range', 'dispatch', 'slot == RING3_LS_CALL', '0 && slot == RING3_LS_CALL'),
+    ('private-before-range', 'dispatch', '/* 範囲外 slot', '/* 範囲外 slot'),
+    ('private-count', 'dispatch', 'arch_kapi_read_block(&src, 0, 3, &values)', 'arch_kapi_read_block(&src, 0, 4, &values)'),
+    ('private-copy-failure', 'dispatch', '!arch_kapi_read_block(&src, 0, 3, &values)', '(!arch_kapi_read_block(&src, 0, 3, &values) && 0)'),
 )
 
 
@@ -248,6 +258,14 @@ def main():
             if '--mutate' in sys.argv:
                 for name,key,old,new in MUTATIONS:
                     changed=dict(sources)
+                    if name=='private-before-range':
+                        old='    /* 範囲外 slot'
+                        start=changed[key].index('    if (slot == RING3_LS_CALL) {')
+                        end=changed[key].index(old,start)
+                        private=changed[key][start:end]
+                        changed[key]=changed[key][:start]+changed[key][end:]
+                        old='    /* 本物の表から'
+                        new=private+old
                     if name=='argument-order':
                         old='    src->next = first + count;'
                         new='    if (count > 1) { u32 v=out->value[0]; out->value[0]=out->value[1]; out->value[1]=v; }\n'+old
