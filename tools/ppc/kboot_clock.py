@@ -18,12 +18,12 @@ CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
                      'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [
-    ('retry-removed', 'while (upper != again)', 'while (0 && upper != again)'),
-    ('upper-comparison', 'while (upper != again)', 'while (upper == again)'),
-    ('rounding', '(delta / hz) * 1000000', '(delta / hz) * 1000000 + 1'),
-    ('ready-removed', 'if (!clock_state.ready)', 'if (0)'),
-    ('range-removed', 'bound_hz < 1000000 || bound_hz > 1000000000', '0'),
-    ('high-word', '*hi = (u32)(us >> 32);', '*hi = 0;'),
+    ('retry-removed', 'while (upper != again)', 'while (0 && upper != again)', 6),
+    ('upper-comparison', 'while (upper != again)', 'while (upper == again)', 3),
+    ('rounding', '(delta / hz) * 1000000', '(delta / hz) * 1000000 + 1', 6),
+    ('ready-removed', 'if (!clock_state.ready)', 'if (0)', 4),
+    ('range-removed', 'bound_hz < 1000000 || bound_hz > 1000000000', '0', 7),
+    ('high-word', '*hi = (u32)(us >> 32);', '*hi = 0;', 6),
 ]
 
 
@@ -41,7 +41,7 @@ def exercise(directory, source):
     try:
         return host32.run([str(exe)], capture_output=True, timeout=2).returncode
     except subprocess.TimeoutExpired:
-        return 'runtime timeout'
+        raise RuntimeError('test failure: runtime timeout; not RED') from None
 
 
 def main():
@@ -56,13 +56,15 @@ def main():
             raise RuntimeError(f'baseline: {result}')
         print('GREEN: ILP32 product TB retry/wrap/60 days/range/readiness')
         if args.mutate:
-            for name, old, new in MUTATIONS:
+            for name, old, new, expected in MUTATIONS:
                 if source.count(old) != 1:
                     raise RuntimeError(f'{name}: nonunique anchor')
                 result = exercise(directory, source.replace(old, new))
-                if not result:
-                    raise RuntimeError(f'{name}: survived')
-                print(f'RED: {name}: {result}')
+                if result == 0:
+                    raise RuntimeError(f'SURVIVED: {name}: expected={expected} actual=0')
+                if result != expected:
+                    raise RuntimeError(f'test failure: {name}: expected={expected} actual={result}; not RED')
+                print(f'RED: {name}: expected={expected} actual={result}')
     return 0
 
 
