@@ -80,7 +80,7 @@ static struct gfinit_owner *owner;
 /* Diagnostics claim only this fixed, stopped device. Production selection
  * rejects this owner; IDE, LAN/SerialFS and unknown inputs never claim. */
 static struct hwdev_device_owner gf_device = {
-    .bdf = RECOVER_GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
+    .bdf = 0, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
 };
 static struct hwdev_lease gf_lease;
 static struct gf_stage_state stage;
@@ -272,6 +272,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     if (!owner) return -1;
     struct gfinit_owner *g = owner;
     if (gf_release_rom(g)) return -1;
+    gf_device.bdf = RECOVER_GF_BDF;
     if (hwdev_claim(&gf_lease, &gf_device, r->token.session)) return -1;
     g->generation = gf_lease.generation;
     g->compiled = gf_alloc(sizeof(*g->compiled));

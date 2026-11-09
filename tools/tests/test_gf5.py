@@ -1,6 +1,6 @@
 """Layer 5 component hosts and the existing runner trace acceptance suite."""
 CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=87.8,
-             covers=['arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
                  'drivers/base/dev.c',
                  'fs/vfs.c',
                  'hwdev/gf_load_state.c',
@@ -325,6 +325,7 @@ MUTATIONS = [
     ('probe-latch', 'drivers/video/geforce/backend_geforce.c', 'if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;', 'if (false) ok=0;', 'foreground'),
     ('syscall-exit', 'exec/exec_syscall.inc', 'if (geforce_fg_due(tick_count)) geforce_foreground_poll();', 'if (0 && geforce_fg_due(tick_count)) geforce_foreground_poll();', 'foreground'),
     ('gpio-log', 'kdebug/gf5_test.c', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);\n        log[0] = 0; log[1] = 1;', 'foreground-gpio'),
+    ('bdf-display', 'kdebug/gf5_test.c', 'number("GF5 DATA stage=info target=0:", RECOVER_GF_DEV);', 'number("GF5 DATA stage=info target=0:", 13);', 'foreground-observe'),
     ('observation-read-error', 'kdebug/gf5_test.c', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);\n            if (status[i]) { status[i] = 0; value[i] = 0; }', 'foreground-observe'),
     ('heat-no-gui-session', 'drivers/video/geforce/geforce_module.c', '    if (con_sink_is_enabled()) gui_display_failed();', '    if (false) gui_display_failed();', 'foreground'),
     ('heat-no-notice', 'drivers/video/geforce/geforce_module.c', '    heat_notice_pending=true;', '    heat_notice_pending=false;', 'foreground'),
@@ -431,6 +432,7 @@ def command(tree, case, exe):
             '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__',
             *flags, *include_flags(tree), '-I' + str(tree),
             str(tree / ('tools/tests/gf5_' + fixture + '_host.c')),
+            *([] if case in ('foreground', 'foreground-reboot', 'foreground-stopfail') else [str(tree / 'tools/tests/recover_gf_dev_stub.c')]),
             *[str(tree / source) for source in sources], '-o', str(exe)]
 
 

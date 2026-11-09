@@ -1,7 +1,8 @@
 """KDEBUG=0 production startup, resource gate, cleanup and reboot order."""
+# B5 adds production fixtures; CI measured 77.81s for the expanded test.
 CHECK = dict(name='gf-production-host', tier=1,
-    covers=['include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=23.6)
+    covers=['drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c', 'hwdev/gf/master.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py', 'include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c'],
+    needs=[], budget=80.0)
 
 from kernel_includes import include_flags
 from gf_ownerless_fixture import ownerless_body
@@ -15,11 +16,16 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def main(override=None):
+def production_symbols_ok(symbols):
+    return (not any((' '+name) in symbols for name in ('kpeek_', 'trial_')) and
+            all(line.split()[-1] in ('recover_gf_dev', 'recover_gf_second')
+                for line in symbols.splitlines() if ' recover_' in line))
+
+def main(override=None, dev=13):
     flags = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
              '-Werror', '-Werror=vla', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-             '-DKDEBUG=0', '-DGF_PRODUCTION', '-DGF_WIDTH_TRACE',
+             '-DKDEBUG=0', '-DGF_PRODUCTION', '-DGF_WIDTH_TRACE', f'-DPROD_GF_DEV={dev}',
              *include_flags(ROOT)]
     with tempfile.TemporaryDirectory(prefix='gf-production-') as tmp:
         (Path(tmp)/'gf_ownerless_body.inc').write_text(ownerless_body(
@@ -58,7 +64,8 @@ def main(override=None):
         subprocess.run(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
                         str(ROOT/'drivers/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
         sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'kernel/sys.c',
-                   'hwdev/gf/bus.c', 'hwdev/gf/resources.c',
+                   'hwdev/gf/bus.c', 'hwdev/gf/resources.c', 'hwdev/gf/master.c',
+                   'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c',
                    'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
                    'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_resources.c']
         # Ownerless legacy display composition: F4-only lifecycle TUs must
@@ -71,10 +78,25 @@ def main(override=None):
         subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(devinit), str(mode), str(gamma), '-o', str(exe)], check=True)
         symbols = subprocess.check_output(['nm', '--defined-only', str(exe)], text=True)
-        assert not any(name in symbols for name in (' recover_', ' kpeek_', ' trial_'))
+        assert production_symbols_ok(symbols)
+        # Link a real unexpected recovery function to verify the nm guard.
+        unwanted = Path(tmp)/'unwanted.c'
+        unwanted.write_text('void recover_unwanted(void) {}\n')
+        contaminated = Path(tmp)/'contaminated'
+        subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie',
+                        '-Wl,--gc-sections', '-Wl,--undefined=recover_unwanted',
+                        *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],
+                        str(native), str(devinit), str(mode), str(gamma), str(unwanted),
+                        '-o', str(contaminated)], check=True)
+        contaminated_symbols = subprocess.check_output(['nm', '--defined-only', str(contaminated)], text=True)
+        assert not production_symbols_ok(contaminated_symbols)
         rc=host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
         if rc: return rc
         print('PASS production prepare -> foundation MMIO: byte/word/dword width/address/count, adjacent bytes and CR index/data', flush=True)
+        subprocess.run(['gcc', *flags, '-DPROD_ABSENT_TEST', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                        *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(devinit), str(mode), str(gamma), '-o', str(exe)], check=True)
+        if host32.run([str(exe)], cwd=ROOT, timeout=180).returncode: return 1
+        print('PASS absent GPU: no PCI writes', flush=True)
         subprocess.run(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
                         '-Wl,--gc-sections',*[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],str(native),str(devinit),str(mode),str(gamma),str(backend),
                         '-o',str(exe)],check=True)
@@ -83,6 +105,9 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/master.c',
+         'pci_cfg_write16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)',
+         'pci_cfg_write16(RECOVER_GF_BUS, 13, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)', 'M9 master destination'),
         ('hwdev/gf/native.c',
          'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
          'u32 part=us;', 'native wait passed unsplit'),
@@ -131,12 +156,14 @@ def mutations():
                           original.replace(old, new, 1))
             mutant = Path(td) / source.name
             mutant.write_text(text)
-            assert main((rel, mutant)) != 0, label
+            assert main((rel, mutant), dev=12 if label == 'M9 master destination' else 13) != 0, label
             print('MUTATE runtime RED: ' + label, flush=True)
 
 
 if __name__ == '__main__':
     rc = main()
+    if not rc:
+        rc = main(dev=12)
     if not rc and '--mutate' in sys.argv:
         mutations()
     raise SystemExit(rc)
