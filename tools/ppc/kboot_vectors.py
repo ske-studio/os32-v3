@@ -14,7 +14,7 @@ CHECK = dict(name='kboot-vectors', tier=2, budget=600,
              covers=['arch/ppc/kernel_vectors.S', 'arch/ppc/ppc_frame.h',
                      'tools/ppc/kboot_vectors*','arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'arch/ppc/mmu.S',
                      'arch/ppc/cache_copy.S', 'arch/ppc/kernel_hpt.c',
-                     'arch/ppc/pd_walk.c', 'arch/ppc/ppc_*.h', 'mm/paging.h',
+                     'arch/ppc/pd_walk.c', 'arch/ppc/kernel_trap.c', 'arch/ppc/ppc_*.h', 'mm/paging.h',
                      'platform/powermac/ofw.c', 'platform/powermac/escc*.c',
                      'platform/powermac/ofw.h', 'platform/powermac/ppc_layout.h',
                      'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'include/callconv.h',
@@ -28,7 +28,7 @@ FLAGS = ['-std=gnu11','-mcpu=7450','-m32','-mbig-endian','-msoft-float','-mno-al
          '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
          '-I'+str(ROOT/'include'),'-I'+str(ROOT/'lib')]
 PRODUCT = ['arch/ppc/entry.S','arch/ppc/ofw_note.S','arch/ppc/mmu.S',
-           'arch/ppc/cache_copy.S','arch/ppc/kernel_hpt.c','arch/ppc/pd_walk.c',
+           'arch/ppc/kernel_trap.c','arch/ppc/cache_copy.S','arch/ppc/kernel_hpt.c','arch/ppc/pd_walk.c',
            'platform/powermac/ofw.c','platform/powermac/escc_tree.c',
            'platform/powermac/escc.c','lib/kstring_c.c',
            'tools/ppc/kboot_vectors_fixture.S','tools/ppc/kboot_vectors_fixture.c']
@@ -41,6 +41,7 @@ def build(out, source):
         src=source if name.endswith('/kernel_vectors.S') else ROOT/name
         obj=out/f'{i}.o'; objects.append(obj)
         extra=['-Dppc_hpt_spill=fixture_hpt_spill'] if name.endswith('/kernel_hpt.c') else []
+        if name.endswith('/kernel_trap.c') and 'tools/ppc/kboot_vectors_fixture.c' in PRODUCT: extra += ['-Dppc_trap_dispatch=product_trap_dispatch']
         command([str(CROSS)+'gcc',*FLAGS,*extra,'-c',src,'-o',obj])
     ld=out/'fixture.ld'
     ld.write_text('''OUTPUT_FORMAT("elf32-powerpc")
@@ -118,7 +119,7 @@ def symbols(elf):
             if len(p:=line.split())==3}
 
 
-def observe(out, elf):
+def observe(out, elf, red=None):
     syms=symbols(elf)
     cd=out/'cd'; cd.mkdir(exist_ok=True)
     shutil.copyfile(elf,cd/'VECTORS.ELF')
@@ -155,13 +156,23 @@ def observe(out, elf):
                 (out/'result.log').write_bytes(serial)
                 raise TimeoutError('no terminal PC within 30s: '+regs+' '+repr(serial[-2000:]))
             (out/'result.log').write_bytes(serial)
-            require(last==syms['fixture_done'] and stable>=1,
-                    'runtime terminal/canary verdict: '+regs+' '+repr(serial[-2000:]))
-            for marker in [b'RETRY-CANARY-PASS',b'DISPATCH-CANARY-PASS',
-                           b'NESTED-SPILL-PASS',b'GUARD-PASS',b'VECTORS-PASS']:
-                require(serial.count(marker)==1,'runtime '+repr(marker)+' '+repr(serial[-2000:]))
-            require(b'FAIL' not in serial,'runtime FAIL')
+            if red is not None:
+                stop, markers=red
+                mark=q.call('human-monitor-command',{'command-line':'xp /1wx '+hex(syms['d1_reached'])})
+                require(mark.strip().endswith('0x00000001'),'missing D1 reach mark '+mark)
+                require(last==syms[stop], 'unexpected mutant terminal '+hex(last or 0)+' '+repr(serial))
+                for marker in markers:
+                    require(serial.count(marker)==1,'missing mutant reach/diagnostic '+repr(marker))
+                (out/'RED.log').write_text('expected/actual stop '+stop+' marks '+repr(markers))
+            else:
+                require(last==syms['fixture_done'] and stable>=1,
+                        'runtime terminal/canary verdict: '+regs+' '+repr(serial[-2000:]))
+                for marker in [b'RETRY-CANARY-PASS',b'DISPATCH-CANARY-PASS',
+                               b'NESTED-SPILL-PASS',b'GUARD-PASS',b'VECTORS-PASS']:
+                    require(serial.count(marker)==1,'runtime '+repr(marker)+' '+repr(serial[-2000:]))
+                require(b'FAIL' not in serial,'runtime FAIL')
             q.call('quit'); p.wait(timeout=2)
+            require(p.returncode==0,'unexpected QEMU exit '+str(p.returncode))
         finally:
             if q: q.close()
             if p.poll() is None:
@@ -189,10 +200,14 @@ def main():
             dest=out/name; dest.mkdir(parents=True,exist_ok=True)
             mutant=dest/'kernel_vectors.S'; mutant.write_text(text.replace(old,new))
             elf=build(dest,mutant)
-            try: observe(dest,elf)
-            except CriterionFailure as e:
-                (dest/'RED.log').write_text(str(e)); print(name+': runtime RED',flush=True)
-            else: raise CriterionFailure(name+': survived')
+            expected={
+                'r31-offset':('ppc_stop_loop',[b'D1-BEGIN',b'FAIL']),
+                'early-dr':('ppc_kernel_vector_stop',[]),
+                'srr0-plus4':('ppc_stop_loop',[b'D1-BEGIN',b'FAIL']),
+                'spill-dispatch':('ppc_kernel_vector_stop',[])}
+            observe(dest,elf,expected[name])
+            print(name+': runtime RED',flush=True)
+
 
 
 if __name__=='__main__': main()
