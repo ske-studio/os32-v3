@@ -111,6 +111,9 @@ def main():
                 'remove-budget-asserts': re.sub(r'    ASSERT\(__kernel_(?:resident_end - __kernel_image_start|chain_end).*?\)\n', '', script, flags=re.S),
                 'shift-base': script.replace('. = PM_KERNEL_BASE;', '. = PM_KERNEL_BASE + PM_KERNEL_PAGE_SIZE;'),
                 'shift-bss-end': script.replace('__bss_end = .;', '__bss_end = . + 4;'),
+                'ledger-size': script.replace('. += PM_KERNEL_LEDGER_SIZE;', '. += PM_KERNEL_LEDGER_SIZE + 4;'),
+                'ledger-unaligned': script.replace('        . = ALIGN(PM_KERNEL_PAGE_SIZE);\n        __ledger_fixed_start = .;', '        . += 4;\n        __ledger_fixed_start = .;'),
+                'stack-overlaps-bss': script.replace('__kernel_stack_bottom = .;', '__kernel_stack_bottom = . - 4;'),
             }
             for name, mutant in mutations.items():
                 assert mutant != script, name+' anchor'
@@ -119,7 +122,7 @@ def main():
                 except AssertionError:
                     print('RED '+name)
                 except RuntimeError as error:
-                    if 'ledger must terminate BSS' not in str(error):
+                    if not any(m in str(error) for m in ('ledger must terminate BSS', 'entry stack must be outside BSS')):
                         raise
                     print('RED '+name+' (linker ASSERT)')
                 else:
