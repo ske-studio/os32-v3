@@ -171,6 +171,9 @@ class ElfSymbols:
 
 
 
+R1_SUBDIR = 'r1'  # build/kernel-objects.mk: R1_OUT := $(BUILD_OUT)/r1
+
+
 class VerifiedSymbols:
     """Select a map/ELF pair by the running kernel's commit and image CRC.
 
@@ -194,9 +197,11 @@ class VerifiedSymbols:
         explicit = self.explicit or os.environ.get('OS32_KERNEL_MAP')
         if explicit:
             return [Path(explicit).expanduser().resolve()]
-        paths = [self.root / 'build' / 'out' / 'kernel.map',
-                 self.home / 'os32-v3' / 'build' / 'out' / 'kernel.map']
-        paths.extend(sorted((self.home / 'wt/os32-v3').glob('*/build/out/kernel.map')))
+        outs = [self.root / 'build' / 'out', self.home / 'os32-v3' / 'build' / 'out']
+        outs.extend(sorted((self.home / 'wt/os32-v3').glob('*/build/out')))
+        # The R1 image (make kernel-r1) has its own map/ELF/VK32 in out/r1/;
+        # identity validation below picks whichever image the guest booted.
+        paths = [out / sub / 'kernel.map' for out in outs for sub in ('.', R1_SUBDIR)]
         return list(dict.fromkeys(p.resolve() for p in paths))
 
     def select(self):
