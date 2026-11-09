@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gen_hwdev_contract as generator
 from build_profile import query
 ROOT = Path(__file__).resolve().parents[2]
+PPC_LAYOUT_CRC = 0x17d72be1  # manual/PM-only --ppc pin; x86 pins live in hwdev/generated/
 
 
 def rejected(call):
@@ -94,7 +95,11 @@ def main():
             print(key, rows[key])
         native_enums = [line for line in (ROOT/'hwdev/generated/hwdev_layout.txt').read_text().splitlines() if line.startswith('enum\t')]
         assert native_enums == [line for line in (out/'hwdev_layout.txt').read_text().splitlines() if line.startswith('enum\t')]
-        print('PPC measured layout CRC 0x%08x (review pending)' % zlib.crc32((out/'hwdev_layout.txt').read_bytes()))
+        # Pinned after independent review (2026-11-09, order-4 D): PPC layout CRC.
+        crc = zlib.crc32((out/'hwdev_layout.txt').read_bytes())
+        assert crc == PPC_LAYOUT_CRC, ('PPC layout CRC', hex(crc))
+        assert '#define HWDEV_LAYOUT_CRC 0x%08xU' % PPC_LAYOUT_CRC in (out/'hwdev_contract.h').read_text()
+        print('PPC layout CRC 0x%08x (pinned)' % crc)
         return
     fixtures(generator)
     with tempfile.TemporaryDirectory(prefix='hwdev-target-') as td:
