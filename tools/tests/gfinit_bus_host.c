@@ -10,13 +10,15 @@ static int bus_foundation_call(struct gf_foundation *f, const struct gf1_test_re
 { (void)reply;CHECK(q->op==GF1T_REVOKE);f->revoked=true;return 0; }
 static const struct gf1_test_ops bus_foundation_ops={.call=bus_foundation_call};
 const struct gf1_test_ops *geforce_foundation_ops(void) { return &bus_foundation_ops; }
+extern u32 recover_gf_test_dev;
+#define GF_T_DEV recover_gf_test_dev
 static u32 pci_id, pci_status, pci_writes, cfg_width, cfg_offset;
 static u32 pte, mapped_pa, mapped_flags, irq_state, maps, restores, fault;
 static struct gfinit_bus device;
 static const struct recover_bus_access *active;
 static u32 pci_read32(u32 bus,u32 dev,u32 fn,u32 off)
 {
-    CHECK(bus==0 && dev==13 && fn==0);
+    CHECK(bus==0 && dev==GF_T_DEV && fn==0);
     if(off==0)return pci_id;
     if(off==4)return (pci_status<<16)|rawcommand;
     if(off==8)return 0xa1;
@@ -28,13 +30,13 @@ static u16 pci_read16(u32 bus,u32 dev,u32 fn,u32 off)
 {return (u16)(pci_read32(bus,dev,fn,off&~3U)>>((off&2)*8));}
 static void pci_write32(u32 bus,u32 dev,u32 fn,u32 off,u32 value)
 {
-    CHECK(bus==0 && dev==13 && fn==0);pci_writes++;cfg_width=4;cfg_offset=off;
+    CHECK(bus==0 && dev==GF_T_DEV && fn==0);pci_writes++;cfg_width=4;cfg_offset=off;
     if(off==4){rawcommand=value&65535;pci_status&=~(value>>16);}
     if(off>=0x10 && off<=0x18)rawbars[(off-0x10)/4]=value;
 }
 static int pci_write16(u32 bus,u32 dev,u32 fn,u32 off,u16 value)
 {
-    CHECK(bus==0 && dev==13 && fn==0);pci_writes++;cfg_width=2;cfg_offset=off;
+    CHECK(bus==0 && dev==GF_T_DEV && fn==0);pci_writes++;cfg_width=2;cfg_offset=off;
     CHECK(off==4);rawcommand=value;return fault==4?-1:0;
 }
 static const struct gfinit_pci_ops pci_ops={pci_read32,pci_read16,pci_write32,pci_write16};
@@ -325,7 +327,7 @@ static void resource_tests(void)
 {
     struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=123;
     resource_setup();CHECK(resource_run(ranges,&n)<0 && n==0);
-    resource_cfg[13][0][0]=GF_RES_GPU_ID;
+    resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
     CHECK(resource_run(ranges,&n)==0 && n==0);
     resource_cfg[2][0][0]=0x12348086;
     resource_cfg[2][0][3]=PCI_HDR_MULTIFUNCTION<<16;
@@ -400,6 +402,32 @@ static void resource_usb_tests(void)
         CHECK(ranges[5+fn].base==0x20411000+fn*0x1000);
         CHECK(ranges[5+fn].len==(fn==2 ? 0x100 : 0x1000));
     }
+    /* Separate swap fixture: retain the measured GPU row, move USB to 13. */
+    resource_snapshot();
+    for (u32 r=0;r<16;r++) {
+        resource_cfg[12][0][r]=resource_cfg[13][0][r];
+        resource_cfg[13][0][r]=r ? 0 : ~0U;
+    }
+    for (u32 fn=0;fn<3;fn++) {
+        resource_cfg[13][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
+        resource_cfg[13][fn][1]=2;
+        resource_cfg[13][fn][4]=0x20411000 + fn*0x1000;
+    }
+    resource_cfg[13][0][3]=PCI_HDR_MULTIFUNCTION<<16;
+    GF_T_DEV=12;
+    CHECK(resource_run(ranges,&n)==0 && n==8);
+    for (u32 fn=0;fn<3;fn++) {
+        CHECK(ranges[5+fn].base==0x20411000+fn*0x1000);
+        CHECK(ranges[5+fn].len==(fn==2 ? 0x100 : 0x1000));
+    }
+    GF_T_DEV=13;
+    resource_snapshot();
+    for (u32 fn=0;fn<3;fn++) {
+        resource_cfg[12][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
+        resource_cfg[12][fn][1]=2;
+        resource_cfg[12][fn][4]=0x20411000 + fn*0x1000;
+    }
+    resource_cfg[12][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     resource_cfg[12][1][4]=0xfffff000;
     CHECK(resource_collect_bounds(&b)==0 && b.count==7);
     for (u32 i=0;i<b.count;i++) CHECK(b.base[i]!=0xfffff000);
@@ -480,7 +508,7 @@ static void resource_barlen_tests(void)
     resource_expect("memory_bar_bound",11,0,0x18,0x20500000);
     resource_snapshot();resource_cfg[11][0][6]=0x20580000;
     resource_expect("memory_bar_range",11,0,0x18,0x20580000);
-    resource_setup();resource_cfg[13][0][0]=GF_RES_GPU_ID;
+    resource_setup();resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
     resource_cfg[8][0][0]=GF_RES_TRIDENT_ID;resource_cfg[8][0][1]=2;
     resource_cfg[8][0][2]=0xd3;resource_cfg[8][0][4]=0x20000000;
     CHECK(resource_run(ranges,&n)==0 && n==1 && ranges[0].len==0x20000000);
@@ -492,12 +520,12 @@ static void resource_barlen_tests(void)
     resource_expect("memory_bar_type",8,0,0x10,0x20000004);
     resource_setup();u32 assigned=0;
     for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++){
-        if(d==13 && f==0)continue;
+        if(d==GF_T_DEV && f==0)continue;
         resource_cfg[d][f][0]=0x12348086;resource_cfg[d][f][1]=2;
         resource_cfg[d][0][3]=PCI_HDR_MULTIFUNCTION<<16;
         resource_cfg[d][f][4]=(++assigned)*0x1000;
     }
-    resource_cfg[13][0][0]=GF_RES_GPU_ID;
+    resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
     resource_cfg[0][0][5]=(++assigned)*0x1000;
     CHECK(resource_collect_bounds(&b)==0 && b.count==RECOVER_RANGE_MAX);
     resource_cfg[0][0][6]=(++assigned)*0x1000;
@@ -577,7 +605,7 @@ static void resource_probe_tests(void)
     resource_snapshot();resource_cfg[11][0][6]=0x24800000;resource_probe(true);
     resource_snapshot();resource_cfg[11][0][6]=0x23f00000;resource_probe(false);
     resource_snapshot();resource_cfg[11][0][6]=0x25000000;resource_probe(false);
-    resource_setup();resource_cfg[13][0][0]=GF_RES_GPU_ID;
+    resource_setup();resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
     resource_cfg[8][0][0]=GF_RES_TRIDENT_ID;resource_cfg[8][0][1]=2;
     resource_cfg[8][0][2]=0xd3;resource_cfg[8][0][4]=0x20000000;
     resource_probe(true); /* Lone Trident bound is 512 MiB and reaches the GPU. */
