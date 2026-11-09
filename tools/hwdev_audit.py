@@ -12,7 +12,7 @@ import re
 import struct
 import subprocess
 
-from gen_kdebug_imports import ABI_SYMBOL, declaration, symbols, hwdev_gf_objects
+from gen_kdebug_imports import ABI_SYMBOL, declaration, symbols, hwdev_gf_objects, hwdev_inventory
 from mkmod import Elf
 from module_schema import COMPONENTS, HEADER_FIELDS
 
@@ -49,7 +49,8 @@ def audit(out, cross):
     map_text = map_path.read_text()
     objects = [Path(p) for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
     require(objects and len(objects) == len(set(objects)), 'missing/duplicate map inputs')
-    gf_names = hwdev_gf_objects()
+    gf_names = hwdev_gf_objects() + hwdev_inventory('HWDEV_SHARED')
+    require(len(gf_names) == len(set(gf_names)), 'duplicate GF object inventory')
     def object_name(p):
         return p.resolve().relative_to((out/'hwdev').resolve()).with_suffix('').as_posix()
     gf = [p for p in objects if object_name(p) in gf_names]
