@@ -1,6 +1,22 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **実装中 (2026-11-09)** — 案 D を採用、MMU の外の 33 件を順に直す。第 1 段 (B1・B2・T1) は main acf3f3fc で受入完了 (--all と NP21/W は os32-v3 の PM、証拠はその ~/os32-tmp/evidence/2026-11-07/ppc-sep1/)、確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)。第 2 段 (A〜H2) は main 6ae60fc1 までに受入完了、確定設計は [PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)。第 3 段 (文脈・起動引数・syscall、E1〜E7・A1・A2) の確定設計は [PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md) (2026-11-08)。第 4 段 (型の幅・配置・モジュール、D1〜D4) の確定設計は [PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)、第 5 段 (描画・残る asm・SDK、V2〜V4・A3・A5・A7・K1・K2) の確定設計は [PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md) (どちらも 2026-11-09、実装は第 3 段の後)。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **実装中 (2026-11-10)** — 案 D を採用、MMU の外の 33 件を順に直す。第 1・2 段は受入完了、第 3〜5 段は下の「段の状態」の表。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+
+## 段の状態 (2026-11-10)
+
+受入の区分: x86 の生成物が不変の段は build_compare、変わる段は os32-v3 の PM の NP21/W。積んだ枝は main を取り込み直してから送る。
+
+| 段 | 中身 | 状態 |
+|---|---|---|
+| 第 1・2 段 | ツール・ソース・生成物の選択、起動・例外・IRQ・時計・V86 の口 | main (受入完了) |
+| 第 3 段 C1・C2・D1・D2・D3 | 文脈・起動引数・syscall | main |
+| 第 3 段 E2・E3 | syscall の番号と callback (E3 は E2 の上) | NP21/W の受入待ち (wt/ppc-sep3e2 e65c01ab、wt/ppc-sep3e3 2b5a291d、main df70a408 に合わせ済み) |
+| 第 3 段 F | 文書 | 未着手 |
+| 第 4 段 A・B・C・D・E | 型の幅・配置・モジュール、PPC の型・配置の検査の入口 (tools/ppc/check_layout.py) | main |
+| 第 4 段 F | 仕上げ | 未着手 |
+| 第 5 段 A・D1・D2・E・F | コピーの原始操作、WC と GeForce の受入の CPU 部、SQLite の診断、boot の拒否 | main |
+| 第 5 段 B1・C2・B2 | palette・IME の TVRAM・scroll を PC98 の表示 backend へ (C2・B2 は B1 の上) | NP21/W の受入待ち (wt/ppc-sep5b1 25421a17、wt/ppc-sep5c2 5e48b227、wt/ppc-sep5b2 ee363f18)。B2 は観測用アプリ userland/tests/hwscroll_probe 付き |
+| 第 5 段 B3〜B6・C1・C3・S1・S2・Z | 描画の init・provider・surfaces・present、console の backend、boot の IME の facade、SDK の target profile | 未着手 (CONSOLE_DUAL は Z の後と本線と合意) |
 
 **本体接続は案 D とし、案 B には着手しない。分離は実際に甘く、MMU 外の33件も直す。**
 今の ppc-mmu は案 C を続け、`include/cpu.h` は変えず、context 操作は `arch/ppc/ppc_pmap.h` の `ppc_*` に閉じる。
@@ -10,7 +26,7 @@
 |(a) 案 D を採用|「案Dで」(2026-11-07)。「OS32 のソフトの表の形式は x86 の2段の表と同じ」を受け入れ、既存 mm の方針・呼び手を保ち、PPC 側でハッシュ表へ変換する。実走の受入は別途行う|
 |(b) 33件の修正を今から始める|「2.は今から始められるなら今」(2026-11-07)。下表(1)の独立した小枝から段階着手し、重い(2)(3)の試験枠を先に確保する|
 |(c) 起動できたら LAN 経由のログを先に|「実機での実行にはシリアルが直接簡便に取り出せる経路が無いためLAN経由でのログの取得などが必要になります。ホストサービスやLANの機能が使えるようになれば問題がなくなると思いますのでブートできる段階に至った場合この点を早期に実現できるように優先してください。実機をリモート操作できるようになれば開発の障害が減ります」(2026-11-09)。決まっている分離の計画はそのまま進め、PowerPC でカーネルが起動できる段階に入ったら、画面や他の装置より先に内蔵 Ethernet の driver と Host Services の LAN 経由のログ取得・遠隔操作を置く。QEMU mac99 で先に通す|
-|(d) 本線の再開の条件は QEMU の ②|os32-v3 の PM 経由のユーザー選択「QEMU で初期化が通る」(2026-11-09)。QEMU mac99 で OF から入り MMU・例外・MPIC・tick が動いてカーネルの初期化をユーザーランドの手前まで通し、起動のログが出た時点で x86 本線の実装を再開する。G4 実機は後追い。段は票 [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)|
+|(d) 本線の再開の条件は QEMU の ②|os32-v3 の PM 経由のユーザー選択「QEMU で初期化が通る」(2026-11-09)。QEMU mac99 で OF から入り MMU・例外・MPIC・tick が動いてカーネルの初期化をユーザーランドの手前まで通し、起動のログが出た時点で x86 本線の実装を再開する。G4 実機は後追い。段は票 票 TASK_PPC_KBOOT|
 
 ppc の枝（分離の直しを含む）の x86 側の受入は NP21/W だけとし、実機の回は要求しない（os32-v3 の PM 経由のユーザー決定）。
 

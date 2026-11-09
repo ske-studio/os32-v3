@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H4 target decoding/gates and x86 byte stability; --ppc is manual/PM only."""
+"""H4 host decoding/gates and x86 bytes; real PPC probes live in check_layout.py."""
 CHECK = dict(name='hwdev-target-layout', tier=1, needs=['make:all'], budget=15,
     covers=['tools/tests/test_hwdev_target_layout.py', 'tools/gen_hwdev_contract.py',
             'tools/hwdev_layout.json', 'tools/gen_kdebug_imports.py',
@@ -13,12 +13,10 @@ import struct
 import subprocess
 import sys
 import tempfile
-import zlib
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gen_hwdev_contract as generator
 from build_profile import query
 ROOT = Path(__file__).resolve().parents[2]
-PPC_LAYOUT_CRC = 0x17d72be1  # manual/PM-only --ppc pin; x86 pins live in hwdev/generated/
 
 
 def rejected(call):
@@ -49,23 +47,14 @@ def fixtures(module):
     module.target_gate('ppc-powermac', True)
 
 
-def generate(module, out, ppc=False, **options):
-    profile = query(ROOT, ['ARCH=ppc', 'PLATFORM=powermac'] if ppc else [], config_only=True)
-    cc = profile['CC'][0]
-    if not ppc:
-        cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))/'bin'/cc)
+def generate(module, out, **options):
+    profile = query(ROOT, [], config_only=True)
+    cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))/'bin'/profile['CC'][0])
     prefix = Path(cc).parent
-    readelf = str(prefix/profile['READELF'][0])
-    objcopy = str(prefix/profile['OBJCOPY'][0])
-    flags = profile['CFLAGS_MACHINE'] + profile['CFLAGS_BASE']
-    module.generate(cc, flags, profile['INC_KERNEL'], out,
-                    target='ppc-powermac' if ppc else 'x86-pc98',
-                    readelf=readelf, objcopy=objcopy, layout_only=ppc, **options)
-    if ppc:
-        source = out/'asserts.c'
-        source.write_text('#include "' + str((out/'hwdev_contract.h').resolve()) + '"\n')
-        subprocess.run([cc, *flags, *profile['INC_KERNEL'], '-fsyntax-only', str(source)], cwd=ROOT, check=True)
-        source.unlink()
+    module.generate(cc, profile['CFLAGS_MACHINE'] + profile['CFLAGS_BASE'],
+                    profile['INC_KERNEL'], out, target='x86-pc98',
+                    readelf=str(prefix/profile['READELF'][0]),
+                    objcopy=str(prefix/profile['OBJCOPY'][0]), **options)
     return out
 
 
@@ -79,28 +68,7 @@ def byte_oracle(out):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
-    parser.add_argument('--ppc', action='store_true', help='manual/PM only; never CHECK')
     args = parser.parse_args()
-    if args.ppc:
-        out = generate(generator, ROOT/'build/out/ppc-powermac/hwdev-layout', True)
-        assert sorted(p.name for p in out.iterdir()) == ['hwdev_contract.h', 'hwdev_layout.txt']
-        rows = dict((kind+' '+name, int(value)) for kind, name, value in
-                    (line.split('\t') for line in (out/'hwdev_layout.txt').read_text().splitlines()))
-        expected = {'size struct gf5':1776, 'align struct gf5':8,
-                    'offset struct gf5.next_auto':272, 'offset struct gf5.next_step':280,
-                    'offset struct gf5.next_sensor':288, 'offset struct gf5.next_toggle':296,
-                    'offset struct gf_production.feature5':10936}
-        for key, value in expected.items():
-            assert rows[key] == value, (key, rows[key], value)
-            print(key, rows[key])
-        native_enums = [line for line in (ROOT/'hwdev/generated/hwdev_layout.txt').read_text().splitlines() if line.startswith('enum\t')]
-        assert native_enums == [line for line in (out/'hwdev_layout.txt').read_text().splitlines() if line.startswith('enum\t')]
-        # Pinned after independent review (2026-11-09, order-4 D): PPC layout CRC.
-        crc = zlib.crc32((out/'hwdev_layout.txt').read_bytes())
-        assert crc == PPC_LAYOUT_CRC, ('PPC layout CRC', hex(crc))
-        assert '#define HWDEV_LAYOUT_CRC 0x%08xU' % PPC_LAYOUT_CRC in (out/'hwdev_contract.h').read_text()
-        print('PPC layout CRC 0x%08x (pinned)' % crc)
-        return
     fixtures(generator)
     with tempfile.TemporaryDirectory(prefix='hwdev-target-') as td:
         byte_oracle(generate(generator, Path(td)/'control'))

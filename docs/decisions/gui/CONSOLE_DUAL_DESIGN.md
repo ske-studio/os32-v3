@@ -165,7 +165,7 @@ int pc98_route_to_gf(void)
 | D7 | 設定の説明 1 行 (文書) | +1 | PM |
 - 実装者は全部 terra (どれも 1,000 行未満)。D1・D1g の .h を先に固定し D2〜D5 を並列、**D1〜D6 を 1 本の統合の枝 (wt/int-*) で CI 1 回**の取り込みの単位にする (途中段は単独で main に入れない)。
 - HAL v2 との境目: gf_outputs.[ch] は HAL v2 C1 で消える暫定の口。C1 の票に「display_dual.c の GF の行を gfx2 の列挙に差し替え、gf_outputs を消す、CON_DUAL_MAX_* を GFX2 の定数に」の 1 行を足す (PM)。
-- PPC 第 5 段との衝突: C1 は console.c・console_backend.h・platform/pc98/console.c・include/tvram.h を触る。本票の論理は新ファイル、console.c は門の式と 1 関数だけ。console_dual.c は pc98.h・TVRAM の番地を include しない。D3 と C1 は先に入った方に後が載せ直す (推奨: D3 が先)。B3・C2 とは重ならない (F4、GUI 中は IME の TVRAM 描画を使わない)。
+- PPC 第 5 段との順: 本票が触るファイル (console.c・console_backend.h・platform/pc98/console.c・include/tvram.h・init/kernel.c ほか) は PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ (os32powerpc の指摘)。**実装は第 5 段 Z の後に出し、移った先の構成で本書の前提 (§1 の file:line と §7 の置き場) を見直してから**にする。本票の論理は新ファイル、console.c は門の式と 1 関数だけ、console_dual.c は pc98.h・TVRAM の番地を include しない、の方針は変えない。
 
 ## 8. 受入 → 試験と変異
 | 受入 | 試験 | 場所 |
@@ -191,3 +191,8 @@ int pc98_route_to_gf(void)
 - R3-1: 列挙は能力として GF の全 head を常に返す (98 と合わせて計 3 行)、停止中の head は running=0・NONE。A1g を揃えた。
 - R3-2: 接続 ON は edid_connector の一致 + edid.base_valid。値は起動・モード設定の時に検出して保存した情報、EDID の失敗のフォールバック (modes.c:321・442) を ON にしない試験と変異を足した。
 - R3-3: 抜き挿しのライブ検出はしない。暫定の口は保存された状態の列挙と明記、A6 から DVI の挿入で行が増える確認を外した。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/tvram.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
+- **D5 と PPC の選択集合**: `init/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
+- **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
