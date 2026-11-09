@@ -54,3 +54,19 @@ help の装置一覧に cuda が無いことと、文書の VIA-CUDA 記述は�
 内蔵装置と -device で列挙できる型は別である。
 [未] この文書にも mac99 の via 選択・PIC の詳細・ESCC の配線は無く、上表の該当欄を
 確定できない。QEMU の版差による実際の変更はソースを読まずには今回確定しない。
+
+## ゲストで観測した事実 (2026-11-10、到達点 ② の段の試験)
+
+QEMU 8.2.2 の mac99 (`-cpu 7450`/`7455`、`-m 128M`、OpenBIOS 1.1) で、OS32 の試験用の像を起動して観測した。
+QEMU と OpenBIOS のソースは読んでいない。実機の値ではない。証拠は各段の run の置き場
+(`~/os32-tmp/run/ppc-kb<段>/`、リポジトリの外)。
+
+| 項目 | 観測 | 段 |
+|---|---|---|
+| MPIC | macio の子に MPIC があり、TPR・IACK・EOI と自己 IPI (IPI0) の 2 回の配送が動く。内蔵 timer に切り替える必要は無かった | E2 |
+| assigned-addresses | macio の assigned-addresses は phys.hi の n (non-relocatable) が 0 のまま割当済みの番地を持つ。macio の ranges の親も BAR を指す形 (n=0) で、割当済みの番地を入れている | E1・E2 |
+| Time Base | timebase-frequency は 100MHz。ゲストの 2 秒で TB の差 200,008,406 に対し 1kHz の decrementer が 1,999 tick (誤差 −0.05%) | F2 |
+| BAT と HPT | C4 の BAT の撤去の後、HPT (128KiB、SDR1 の HTABMASK=1) の変換と guard の DSI が 7450/7455 の両方で働く | C4 |
+| 入口 | OF は ELF の PT_LOAD を 1MiB に置き、r5 に client interface を渡して入口へ来る | A2 |
+
+[未] G4 QuickSilver の OF が同じ n=0 の形を出すか、MPIC の窓と sense、TB の周波数は実機で確かめる。

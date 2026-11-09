@@ -87,3 +87,5 @@ DSI/ISI・alignment・非 FP の program 例外では原因命令、sc では次
 復帰は SRR0/SRR1 を用いる rfi だが、machine check は RI と原因・破損状態を確認し、
 通常例外と同様に無条件復帰しない (MPC7450UM 4.3.3〜4.3.4、4.6.2)。
 [未] 全例外の SRR1 原因ビットの一覧と CPU revision 別 errata。
+
+- MSR の IR/DR を変える `mtmsr` は前後に `sync`、後に context synchronizing 命令 (`isync`) を置く (MPC7450UM 表 2-33)。`isync` だけでは足りない — 到達点 ② の段 C3 のレビューで直した (`sync → mtmsr → sync → isync`)。
