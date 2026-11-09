@@ -13,7 +13,7 @@
 - F6: reference method0050のsubchannel=0を明記。
 - F7: BAR1部分extent・長さ検査・map状態と02_memoryのPT予算段を追加。
 - F8: RAMHT更新時のpause/start手順を具体化。
-- 作成: gpt-6-astra、2026-11-02。対象: Ra266 PCI 0:13.0、10de:0221、PCI 経由。GUI 接続なし。シングルタスク・協調切替、整数演算。
+- 作成: gpt-6-astra、2026-11-02。対象: Ra266 PCI バス 0 の列挙で見つけた位置、10de:0221、PCI 経由。GUI 接続なし。シングルタスク・協調切替、整数演算。
 - O=`/home/hight/os32-v3`、R=`/home/hight/os32-tmp/refs/geforce6200`、N=`R/nouveau/drivers/gpu/drm/nouveau` (指定 c03c1a1)、X=`R/xf86-video-nouveau/src`、L=`R/xf86-video-nv/src`。以下の番地・値は16進、サイズの KiB は1024B。
 - 表内の短縮 `fifo/`=`N/nvkm/engine/fifo/`、`gr/`=`N/nvkm/engine/gr/`、`fb/`=`N/nvkm/subdev/fb/`。§5の裸の `nv40.c` / `ctxnv40.c` / `ctxnv40.h` は同grディレクトリ。
 - F1=`O/docs/decisions/realhw/GF_FEAT1_DESIGN.md`。確定済みの関数・配置・停止順を使用する。層1への追加契約はない。本書は実装設計であり、実機確認済みという主張ではない。

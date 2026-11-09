@@ -108,8 +108,8 @@ wt/gf-usbbar (94f458ea) との重なり: scan.inc・bounds.inc・gfinit_resource
 | A7 | kdebug/gf5_test.c:504 | §2 の表示 |
 | B1 | tools/tests/recover_gf_dev_stub.c (新規) | `u32 recover_gf_test_dev = RECOVER_GF_DEV_FALLBACK; u32 recover_gf_dev(void){return recover_gf_test_dev;} u32 recover_gf_second(void){return U32_MAX;}` (偽 PCI が `dev==RECOVER_GF_DEV` を assert する試験向け。本物を入れると再帰する) |
 | B2 | tools/tests/test_*.py (§1 の利用ファイルを組む約 25 本のうち未定義参照が出るもの) | コンパイル行に B1 を足すだけ |
-| B3 | tools/tests/pci_locate_host.c・recover_gf_locate_host.c + test_pci_locate.py (新規) | 本物の A0・A1 を偽の config 空間 (bus×dev×fn) で試す (§5) |
-| B4 | tools/tests/gfinit_bus_host.c | `GF_T_DEV` (= `recover_gf_test_dev`) を入れ、:19,31,37 の `dev==13`、`resource_cfg[13]` の 4 か所、:465 の `d==13` を `GF_T_DEV` に。実測の `resource_ra266` (:374-376、GPU=13・別カード=12) はそのまま 13 で回す。12 番用は別の表 `resource_ra266_swap` (GPU=12、USB の OHCI/EHCI=13 fn0/fn1/fn2、usbbar の BAR 表を使う) を作って `GF_T_DEV=12` で回す |
+| B3 | tools/tests/pci_locate_host.c + test_pci_locate.py (新規) | 本物の A0・A1 (`pci_locate.c` と `recover_gf_locate.c` の両方を 1 本の host で組む) を偽の config 空間 (bus×dev×fn) で試す (§5) |
+| B4 | tools/tests/gfinit_bus_host.c | `GF_T_DEV` (= `recover_gf_test_dev`) を入れ、:19,31,37 の `dev==13`、`resource_cfg[13]` の 4 か所、:465 の `d==13` を `GF_T_DEV` に。実測の `resource_ra266` (:374-376、GPU=13・別カード=12) はそのまま 13 で回す。12 番用は名前の付いた表を作らず、同じ host の中で USB の OHCI/EHCI を 13 の fn0/fn1/fn2 に置いて `GF_T_DEV=12` に切り替えて回す (usbbar の BAR 表を使う) |
 | B5 | tools/tests/gf_production_host.c・test_gf_production.py | :112,122 の 13 を `PROD_GF_DEV` に。:187-190 の偽の `gf_master_enable` を外し、**hwdev/gf/master.c の実体**を組む。B1 でなく本物の A0・A1 を組み、fixture 3 つ: GPU=13 (今の実測)、GPU=12+USB=13 (identify・BAR の読み・master.c の Command (04h) と cache line / latency (0Ch・0Dh) の読み書きの宛先がすべて 0:12.0)、GPU 無し (identify が -1、`pci_cfg_write16`/`write32` が 0 回)。test_gf_production.py:73-74 の `nm` 検査は `recover_gf_dev`・`recover_gf_second` (と `pci_locate_fn0`) だけを許し、ほかの ` recover_`・` kpeek_`・` trial_` の混入の禁止はそのまま |
 | B6 | tools/tests/gfinit_owner_fixture_host.inc か test_gfinit_owner.py | claim の後の `gf_device.bdf` が `recover_gf_test_dev<<3` |
 | B7 | gf5 の表示の試験 (test_gf5.py) | `target=0:12.0` / `0:13.0` が dev に追従する |
@@ -118,7 +118,7 @@ wt/gf-usbbar (94f458ea) との重なり: scan.inc・bounds.inc・gfinit_resource
 実装者: A・B は機械的で小さい → terra (1 枝)。C は PM。
 
 ## 5. 受入 → 試験・変異
-host (B3、本物の A0・A1):
+host (B3、本物の A0・A1、`pci_locate_host.c`):
 
 | fixture | 期待 |
 |---|---|
@@ -130,7 +130,7 @@ host (B3、本物の A0・A1):
 | f. 10de:0221 が 0:12.1 か 1:0.0 にだけ居る | 見つからない (13) |
 | g. `pci_locate_fn0(1, id, …)` | バス 1 だけを読む (共通の口がバスの引数に従う) |
 
-結合 (必須、0:13.0 と 0:12.0 の両方): B4 の資源の門が実測 (13) と swap (12) で通る、B5 で本番の identify・読み・書きが dev 12 に行き、GPU が無ければ書きが 0 回、B6 の owner の bdf、B7 の表示。test_gf_production・test_recover_gf・test_gfinit_bus は既存の case も緑。
+結合 (必須、0:13.0 と 0:12.0 の両方): B4 の資源の門が実測 (13) と `GF_T_DEV=12` の切り替え (12) で通る、B5 で本番の identify・読み・書きが dev 12 に行き、GPU が無ければ書きが 0 回、B6 の owner の bdf、B7 の表示。test_gf_production・test_recover_gf・test_gfinit_bus は既存の case も緑。
 
 変異 (`--mutate`、それぞれ 1 つ以上の fixture が落ちること):
 
@@ -172,3 +172,9 @@ NP21/W: `make all` → 起動、`[pci] mech#1 absent`、`[geforce] boot_reserve 
 
 ## 確定の後の追記 1 (2026-11-09、os32powerpc の G4 の点検)
 - `pci_locate_fn0` は CPU・機種に依らず G4 でもそのまま使える (G4 の `pci_cfg_read32` の backend が bus → host bridge を引ければ)。ただし呼び手の `RECOVER_GF_BUS 0U` は PC-98 の値。G4 の GeForce は AGP の host bridge の下で bus 番号は bus-range から決まる (0 とは限らない [未])。G4 で GeForce を探す段では bus を OF (AGP の host の bus-range) から渡すか、全部の bus を順に探す呼び手にする。今の recover・kdebug の経路は PC-98 用なので本設計は変えない。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **B3 のファイル名**: `recover_gf_locate_host.c` は作らず、`tools/tests/pci_locate_host.c` が `kdebug/recover_gf_locate.c` も組んで試す (`tools/tests/test_pci_locate.py:11` の SOURCES、変異 M1〜M4 は `:12-16`)。§4 の B3 と §5 の host の行を実物に合わせた。
+- **B4 の表の名前**: 別の表 `resource_ra266_swap` は無く、`tools/tests/gfinit_bus_host.c:417` で `GF_T_DEV=12` に切り替えて回す。USB の未割当の BAR (0xfffff000) の fixture は `:431-435`。§4 の B4 と §5 の結合の行を実物に合わせた。
+- **A3 の像**: `build/hwdev.mk` の `HWDEV_SHARED` で VPLL probe の 2 像にも入った (設計より 1 か所多い)。記録だけ。
+- **段 C**: 2026-11-10 に §4 の C の一覧どおり、`docs/design/hwdev/gf/{production,resources,bus}.md`・`docs/design/kdebug/{gfinit_bus,recover_gf}.md`・`decisions/realhw/GF_FEAT1〜5・GF_ACCEL` の対象の行・`tasks/realhw/TASK_GEFORCE6200.md` の題・`TASK_HWDEV.md:55`・`tasks/realhw/PLAN.md:15` の「0:13.0」を「バス 0 の列挙で見つけた位置」に書き換えた。`DEFERRED_TESTS.md` の GF-L2・GF-L4-*・GF-L5 は合格済みの記録なので触らない。`TASK_GEFORCE6200.md:29` は 2026-10-15 の観測の事実、`RA266.md` §1-1 は構成の表の採取の後に PM、`drivers/video/geforce/gf_accept.c:177-178` の直値 0 (コード) は残り。

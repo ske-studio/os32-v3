@@ -15,7 +15,7 @@
 - ID 8: 層4→F2→F1→局所復元→PC-98の停止順、F1停止後の待ち禁止を明記。
 - ID 9: DDC低層の根拠を手元のMIT原典と行番号へ置換。
 - ID 10: head別snapshot変更先にkdebug/gfinit_*とVPLL probeを追加。
-対象: PC-9821 Ra266 / PCI 0:13.0 / 10de:0221 / LCD1770VM・D-SUB。設計のみ、2026-11-02。
+対象: PC-9821 Ra266 / PCI バス 0 の列挙で見つけた位置 / 10de:0221 / LCD1770VM・D-SUB。設計のみ、2026-11-02。
 
 ## 1. 実物の確認 (file:line)
 - O=/home/hight/os32-v3、R=/home/hight/os32-tmp/refs/geforce6200、N=R/nouveau/drivers/gpu/drm/nouveau (c03c1a1)、V=R/nouveau-v6.1/drivers/gpu/drm/nouveau。以下 C=N/dispnv04/crtc.c、H=同hw.c、I=同hw.h、D=同dac.c、F=同dfp.c、U=同cursor.c、REG=同nvreg.h。数値は特記以外16進、寸法/予算は10進。

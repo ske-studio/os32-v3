@@ -106,12 +106,12 @@ if (user && !ring3_user_range_writable((u32)done, sizeof(u32))) return OS32_ERR_
 *done = 0;
 if (g_backend->policy != GFX_POLICY_DIRECT) return OS32_ERR_NOSYS;
 if (gen != gfx_policy_gen) return OS32_ERR_STALE;
-if (n > GFX_CMD_MAX || (user && !ring3_user_range_readable((u32)cmds, n * sizeof(GFX_Cmd))))
+if (n > GFX_CMD_MAX || (user && !ring3_user_range_ok((u32)cmds, n * sizeof(GFX_Cmd))))
     return OS32_ERR_INVAL;
 for (u32 i = 0; i < n; i++) { int rc = submit_one(&cmds[i], user); if (rc) return rc; *done = i + 1; }
 return 0;
 ```
-- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。`ring3_user_range_readable` が無ければ、H2 で exec.c:454 の writable と対の口を足す。
+- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。読みの検査は既存の `ring3_user_range_ok` (exec/exec.c:467) を使う (H2 の着地、gfx/gfx_hw_submit.c:16-17)。
 - `*done` は全部終わった先頭の数。`cmds[*done]` は途中まで書いたかもしれないので、再送しない。
 
 ### 3-3. libos32gfx・libos32gui・WM の境目
@@ -290,7 +290,7 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | P0b | drivers/video/geforce/gf_accept_prim.c (新) | t_f・t_k・t_d、全面の fill/copy、mono、put を CPU と M2MF で | — | 150 |
 | H1 | include/gfx_hal.h、sdk/kapi.json と生成物、os32_kapi_shared.h、tools/hwdev_layout.json、tools/module_schema.py の版 | §3-1・§3-2・§3-7 の宣言だけ (os32-kapi-add) | — | 90 |
 | H2 | gfx/gfx_hw_submit.c (新) | §3-2 の入口の順と命令ごとの検査、gfx_hw_get | H1 | 220 |
-| H2a | exec/exec.c | 要れば `ring3_user_range_readable` (:454 の writable と対) | — | 20 |
+| H2a | exec/exec.c | 不要で閉じた (H2 が読みに既存の `ring3_user_range_ok` を使って着地) | — | 0 |
 | H3 | gfx/gfx_hw_mono_cpu.c (新) | 透過も不透明も小片にまとめて put | H1 | 80 |
 | H4 | gfx/gfx_policy.c (新) | §3-4 の `gfx_direct_wanted`・`gfx_policy_reeval`・hook の差し替え・世代 | H1 | 140 |
 | H5 | exec/surface_query.c:251・259、gfx_core_bridge.inc:9、gfx_core_framebuffer.inc:49 | `gfx_policy_blocks_map` (共通の認可には入れない) | H4 | 30 |
@@ -314,7 +314,7 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | W2 | gshell/src/input.rs:896-926、wm.rs:898・906・1180・1497-1512 | W1 を呼ぶ、flush_present の前と各周の頭で check → take_regen → 描き直し | W1・L0 | 50 |
 | W3 | gshell/src/scroll_op.rs (新)・handler.rs の表・reqs.rs、os32_gui_shared.h・proto.rs | §3-6 の WM の式、GUI の proto の版を上げる | W1 | 140 |
 | W4 | gshell/src/cursor.rs | DIRECT の下地は gfx_hw_get を 1 回 (160B) | L1 | 30 |
-| S1 | gfx/gfx_vram.c・gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く) | P0 | 未定 |
+| S1 | gfx/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
 | G4m | drivers/video/geforce/gf_hook_mono.c (新) | D4: 不透明の mono を gf3_mono で | G3 | 60 |
 | G5m | drivers/video/geforce/gf_put_m2mf.c (新) | D5: 不透明の大きい put・get を gf3_upload/download で。大きさは P0 から PM が決める | G3・P0 | 70 |
 - 並列: P0a・P0b・H1・H2a は最初に同時に出せる。H1 の後に H2・H3・H4・G1・G2・L0・L1 を同時に。H4 の後に H5・H6。L1 の後に L2〜L7・U1・W4 を同時に。W1 の後に W2・W3。U2 は L0 と W3 の後で、U3・U4 はその後。G4m・G5m は G3 の後。
@@ -433,3 +433,8 @@ void gfx_cmd_drop(void);
 - FILL は画面内に削ってから命令の範囲を検査する。COPY は書き先・読み元の両方を画面内に削り、片方の削りに合わせて他方もずらす。画面内に残らなければ命令を積まず成功とする。座標と寸法の計算で int をあふれさせない。
 - `libos32gfx_check` は `gfx_lost` が立っていた回に `gfx_regen` を立てる。方式や世代が変わらなくても、捨てられた命令の描き直しが必要である。
 - U1 の draw.rs は失敗時に窓 ID で INVALIDATE しない。失敗は `gfx_lost` に残り、次の check が `gfx_regen` を立てる。U2 の WAIT・POLL の戻りで check → take_regen → 自分の窓を全面 INVALIDATE の順に回復する。§7 の U1 の「失敗したら INVALIDATE」はこの意味に読み替える。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c:467`) を使って着地した (`gfx/gfx_hw_submit.c:16-17`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c:445`)。
+- **S1 と PPC**: `gfx/gfx_vram.c` は第 5 段で `tools/ppc/selected_success.json` の PPC の初回成功集合に入り、`:186-189` の `_memcpy_w` は `arch_copy16` 経由になった。`tools/ppc/known_header_dependencies.json` に `gfx/gfx_vram.c → drivers/video/pc98/splash_raster.h` が登録済み。S1 は gfx_vram.c を PPC でも組めるまま直す (asm・新しい pc98 のヘッダを足さない、足すなら既知の依存に登録)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c:177-178` の型を真似ない)。

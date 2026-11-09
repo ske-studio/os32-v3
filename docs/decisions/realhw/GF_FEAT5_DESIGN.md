@@ -25,7 +25,7 @@
 
 ## 1. 実物の確認
 - Ra266 vmap確認: 指定refs・作業資料・OのROM decoder/host試験に実ROMのBIT P値を確認できるデータは見つからず、有無は未確認。`N/nvkm/subdev/bios/vmap.c:29–53`のBIT P v2+20hのLE32ポインタと版10/20hを実装時のinfoで出す（v1/ポインタ0は不在）。合成ROM試験を実機の根拠にしない。
-- 対象: OS32 / PC-9821 Ra266、PCI 0:13.0、10de:0221、chipset=4ah。実機を今回測定したという意味ではない。
+- 対象: OS32 / PC-9821 Ra266、PCI バス 0 の列挙で見つけた位置、10de:0221、chipset=4ah。実機を今回測定したという意味ではない。
 - O=`/home/hight/os32-v3/`、N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/` (指定 c03c1a1)、E=`/home/hight/os32-tmp/refs/geforce6200/envytools/`。以下の file:line はこの取得物。
 - 票 `O/docs/tasks/realhw/TASK_GF_FEATURES.md`、比較 `O/docs/decisions/realhw/GF_FEATURE_COMPARE.md:52–55`、確定 F1=GF_FEAT1_DESIGN §2・3、F2=GF_FEAT2_DESIGN を前提とする。層3の窓/面台帳と層4の保存型を境界とし、容量は[共通合算表](GF_FEAT3_DESIGN.md#合算予算)に従う。
 - ユーザー決定: 「基本的にすべての機能が同じレベル（GUI以外）には用意されるべきです」「実際の動作確認は実装後のテストでもいいし実機でテストで動作チェックすればいい」。GUIから呼ばずカーネル試験入口まで作る。

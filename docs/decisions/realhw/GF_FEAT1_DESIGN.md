@@ -16,7 +16,7 @@ R9: latencyは0ChのWORD書込でcache lineを保持し、停止時復元を削�
 R10: PM判断に従い宣言だけの変更をA0に統合。
 
 # GeForce 6200 / NV44A 層1 詳細設計 r2
-2026-11-02。対象: Ra266、PCI 0:13.0、10de:0221、IRQ6、AGP→PCI ブリッジ。設計のみ。
+2026-11-02。対象: Ra266、PCI バス 0 の列挙で見つけた位置、10de:0221、IRQ6、AGP→PCI ブリッジ。設計のみ。
 `O/`=/home/hight/os32-v3/、`N/`=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/。
 手本は c03c1a14507dfaf8b856c2608f9ac216021fc222。以下の番地は特記なければ BAR0 相対、サイズは byte、区間は半開。
 シングルタスク・協調切替、整数、GNU11、既存 kstring/P2V 系、定数3層管理。[C1]〜[D4]/[HW3] を維持。MIT 部の移植には著作権・許諾を残す。GPL は写さない。

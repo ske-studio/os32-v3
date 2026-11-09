@@ -52,11 +52,11 @@ r4 で直した食い違い (現物 4f971604。上の表の該当の行もこの
 |---|---|---|---|
 | D1 | gfx_hw_submit.c:1-14 は NOSYS | gfx/gfx_hw_submit.c は実装済み (111 行、`submit_one`:20・`gfx_hw_submit`:70・`gfx_hw_get`:95)。H1〜H6・G1〜G3 は main に入った | §11 の着地の前提は満たした。C14 の呼ぶ行は `gfx_hw_submit`:70・`gfx_hw_get`:95 の入口 |
 | D2 | gfx_hal.h:181 は `const GfxBackend *` | `extern GfxBackend *g_backend` (gfx_hal.h:181、実体 gfx_core.c:56)。`gfx_policy_reeval` が `g_backend->fill_rect`・`blit` を書き換える (gfx_policy.c:47-48) | `struct gfx2_adapter.v1` は `GfxBackend *`。v1 の hook は呼ぶたびに `a->v1->` から読み、関数ポインタを写して持たない (§11-2) |
-| D3 | `gfx_scanout_gen_bump()` | 無い。走査の変化は `gfx_scan_changed = 1;` → `gfx_policy_reeval()` (gfx/gfx_policy.h:6-13) | §9-3 |
+| D3 | `gfx_scanout_gen_bump()` | 無い。走査の変化は `gfx_policy_scan_changed()` (gfx/gfx_policy.c:67-76、宣言 gfx_policy.h:14-16「Module-safe scan notification」。中身は `gfx_scan_changed = 1;` → `gfx_policy_reeval()`) | §9-3 |
 | D4 | gfx_screen_owner は gfx_core.c:457 | gfx_core.c:461 | §6-5 |
 | D5 | accel_copy.c:60-61 | accel_copy.c:61-62 (accel_fill.c:44・46 は同じ) | §1・§11-6 |
 | D6 | GfxBackend の末尾に足すだけ | 末尾は `shadow_fill_rect`・`shadow_blit` (gfx_hal.h:142-143)。tools/hwdev_layout.json:661 に `struct GfxBackend`、:1033 に `struct gf3_ctx` の配置 | A0 は 143 の後に足し、hwdev_layout.json の 2 表も直す (§11-6・§11-7) |
-| D7 | GF・Trident の表は module の物を指す | module の init が kernel 側の `candidate` を埋め、`geforce_start` (geforce_module.c:193-230) が module の init で kernel 側の `candidate` を埋めて hook ごとに `module_text_contains` を見る。公開 (`gfx_backend_geforce = candidate`) は load の成功の後の :307 で別に行う (既定の表は :144)。trident_module.c:22・31 も同形 | v2 の表も kernel 側へ写し、`v2_mod` を付ける (§11-7) |
+| D7 | GF・Trident の表は module の物を指す | module の init が kernel 側の `candidate` を埋め、`geforce_start` (geforce_module.c:193-241) が module の init で kernel 側の `candidate` を埋めて hook ごとに `module_text_contains` を見る (G3 で `direct_ok` の text の検査と、`direct_ops` の表が module の ro の中にあるかの検査 :216-241 が加わった)。公開 (`gfx_backend_geforce = candidate`) は load の成功の後の :334 で別に行う (既定の表は :144)。trident_module.c:22・31 も同形 | v2 の表も kernel 側へ写し、`v2_mod` を付ける (§11-7) |
 | D8 | 「module の .text の中」の検査を組込みにも使える | kernel の .text の境界の記号が無い (build/os32.ld:36-41 は `*(.text)` だけ、`_etext` を使うのは host 試験だけ) | A0 が `__os32_text_start`・`__os32_text_end` を足す (§11-7) |
 | D9 | v1 の GF の HW の 2D は v2 の番号を出す | v1 の GF の描画は同期 (`gf3_fill` は accel_fill.c:46 で待つ)。v1 の入口から出る GPU の仕事は戻る時に終わっている | `v1_bridge_end` の fence は今は常に 0、C14 は `gfx2_fence_note` を呼ばない (§6-5) |
 
@@ -415,7 +415,7 @@ rc = gfx2_surf_quiesce(s, GFX2_MODESET_DL);                     /* 0 / OS32_ERR_
 if (rc) return rc;                                              /* 表示・scan_ref・世代は無変更 */
 rc = a->be->mode_set(a->ctx, head, conn_mask, m, s);            /* 失敗時は backend が退避した状態へ戻す */
 if (rc) return rc;                                              /* 世代も scan_ref も変えない */
-gfx2_scan_ref_swap(a, head, s);  gfx_scan_changed = 1;  gfx_policy_reeval();   /* H4 の唯一の遷移の口 (gfx_policy.h:6-13、D3) */
+gfx2_scan_ref_swap(a, head, s);  gfx_policy_scan_changed();   /* H4 の唯一の遷移の口 (gfx_policy.h:14-16、D3)。module の側の G* から呼ぶ所も同じ口 */
 =====END
 
 if (fullscreen_app(caller)) a->restore_on_leave = 1;            /* 全画面を抜ける時に gshell の mode と走査面へ戻す */
@@ -792,7 +792,7 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
 | GfxBackend の末尾 (gfx_hal.h:143 の後) に `const struct GfxBackendV2 *v2; const struct module_record *v2_mod;` と hwdev_layout.json:661 | A0 | — |
 | kernel の .text の境界: build/os32.ld の `.text` に `__os32_text_start = .;` (kentry.o の前)・`__os32_text_end = .;` (`*(.text.*)` の後) | A0 | — |
 | GF の 1 表 (G1〜G9 の関数を並べる) と backend_geforce.c:719-734 の `.v2 = &gf_backend_v2` | G1 | `const GfxBackendV2 gf_backend_v2` (gf_v2_ops.c、module の中) |
-| GF の写し (D7): geforce_module.c の `geforce_start` (:193-232、今の hook の検査の後) に `if (candidate.v2) { gf_v2_kcopy = *candidate.v2; candidate.v2 = &gf_v2_kcopy; } candidate.v2_mod = r;` (module が v2_mod に何を書いても r で上書き)。停止の道に `gfx2_adapter_unregister(&gfx_backend_geforce)` | G1 (geforce_module.c の 2 か所) | `static GfxBackendV2 gf_v2_kcopy` (kernel) |
+| GF の写し (D7): geforce_module.c の `geforce_start` (:241 の `direct_ops` の検査の後、公開 :334 の前) に、`candidate.v2` の表が module の ro の中にあること (`direct_ops` と同じ :221-227 の型) と各 hook の `module_text_contains` を確かめてから `if (candidate.v2) { gf_v2_kcopy = *candidate.v2; candidate.v2 = &gf_v2_kcopy; } candidate.v2_mod = r;` (module が v2_mod に何を書いても r で上書き)。停止の道に `gfx2_adapter_unregister(&gfx_backend_geforce)` | G1 (geforce_module.c の 2 か所) | `static GfxBackendV2 gf_v2_kcopy` (kernel) |
 | PEGC の表 (caps・enum・heap_range=0・kva) と backend_pegc.c の `.v2` | P1 | `pegc_backend_v2` (pegc_v2.c) |
 | Trident: 表は作らない (`v2 = NULL`、中核が v1 から写す)。同期の bind は T1 | T1 | — |
 | 登録: gfx_core の backend の選択の直後に `gfx2_adapter_register(g_backend, kind, ACTIVE)`、他の probe が通った物と PC-98 の内蔵は `flags=0` (kind は gfx_core.c:146 と同じ形の pointer の比較) | C1 (gfx_core.c の呼ぶ行も C1) | — |
@@ -922,3 +922,10 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - F2 (P1、§9-1・C1、決定「AとC」の C): C は別票 CONSOLE_DUAL に切り出し、§9-1 は A と別票の受け持つ経路の列挙だけ。C1・I3・§13-3 から C の仕事を外した。
 - F3 (P2、§11-7・§12 T1): A0 の Trident の import の一覧と生成物に `gfx2_sync_publish` を足した。
 - F4 (P3、§1 D7): geforce_module.c の init と検査 (:193-230) と load の成功の後の公開 (:307) を分けて書いた。
+
+## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
+- **走査の変化の口 (§1 D3・§9-3)**: G3 (93f80764・6c8bc8d4) が `gfx_policy_scan_changed()` (`gfx/gfx_policy.c:67-76`、宣言 `gfx/gfx_policy.h:14-16`) と `gfx_policy_gen_get()` を足した。§9-3 の `gfx_scan_changed = 1; gfx_policy_reeval();` の 2 行はこの 1 口に書き換えた。module の側の G* から呼ぶ所も同じ口を使う。
+- **v2 の写しの位置と ro の検査 (§1 D7・§11-7)**: G3 が `geforce_start` に `direct_ok` の text の検査と `direct_ops` の表が module の ro の中にあるかの検査 (`drivers/video/geforce/geforce_module.c:216-241`) を足し、公開は `:334`。v2 の写しは `:241` の後・`:334` の前に置き、`candidate.v2` の表にも `direct_ops` と同じ「ro の中」の検査を掛ける (今は .text の検査だけの設計だった)。`backend_geforce.c` の表は `:749-767` に移った (行番号だけ)。
+- **同期層のコピー (§10・§11-5)**: 第 5 段 A (28b80560) が `gfx/gfx_internal.h:71-78` の `_memcpy_w/_memcpy_d` の rep movs を `include/copy_units.h` → `arch/{x86,ppc}/arch_copy.h` の `arch_copy16/32` に替えた。gfx/sync の新しい行コピーは `arch_copy*` を使い asm を書かない。gfx/sync・gfx/v2 の host 試験の写しの一覧には `include/copy_units.h`・`arch/*/arch_copy.h` を入れる (56b97fc3 の型)。
+- **PPC の選択集合 (C14・M1・M2)**: `gfx/gfx_hw_submit.c`・`mm/paging.c`・`mm/pgalloc.c` (と `gfx/gfx_vram.c`) は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている。C14・M1・M2 は PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを増やさない、増やすなら `tools/ppc/known_header_dependencies.json` に組を足す)。
+- **公開ヘッダの型の契約 (A0)**: 第 4 段 B の `build/abi_contract.mk:4-13` が公開ヘッダ単独の gnu89 の probe と全 C の規則の char/enum の旗の検査を持ち、第 4 段 A の `include/type_contract.h` が ILP32・enum 4B・u64 の member 整列 (x86 4・ppc 8) を固定した。A0 で `sdk/include/os32/os32_gfx2.h` を abi_contract.mk の gnu89 の probe に足す。GFX2_Caps (256B)・GFX2_Op (80B) は u64 を使わず u32 だけで組み、ppc の整列 8 と offset を両立させる。KAPI 83→84 は USB の `usb_stat_get` と先に入った方が 84 (後の方が上げる)。

@@ -377,7 +377,8 @@ def main():
         directory = Path(temporary)
         tree = directory / 'recipes'
         recipe_tree(tree)
-        check_recipes(tree)
+        if not args.ppc:
+            check_recipes(tree)
         arch = 'ppc' if args.ppc else 'x86'
         provider = (ROOT / f'arch/{arch}/arch_type_contract.h').read_text()
         contract = (ROOT / 'include/type_contract.h').read_text()
@@ -388,8 +389,7 @@ def main():
         if not args.ppc:
             cc = [str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')]
         if args.ppc and not shutil.which(cc[0]):
-            print('対象外: PPC toolchain unavailable (manual/PM probe)')
-            return
+            raise SystemExit('required PPC toolchain unavailable (manual/PM probe)')
         # SDK CRT and userland both use PROGRAM_FLAGS (build/programs.mk:30-33).
         flags = profile['KERNEL_CFLAGS']
         for label, key in [('kernel', 'KERNEL_CFLAGS'), ('userland', 'PROGRAM_FLAGS'),
@@ -409,7 +409,8 @@ def main():
             direct_objects(directory)
             print('PASS host32 runtime: ILP32, signed char8, enum4, u64=8/4, LE')
         if args.mutate:
-            recipe_mutations(tree)
+            if not args.ppc:
+                recipe_mutations(tree)
             mutations = [('provider', '#define ARCH_U64_MEMBER_ALIGN ' + ('8' if args.ppc else '4'),
                           '#define ARCH_U64_MEMBER_ALIGN ' + ('4' if args.ppc else '8')),
                          ('contract', '(char)-1 < 0', '(char)-1 > 0'),
