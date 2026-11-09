@@ -27,7 +27,21 @@ CHECK = dict(name='kboot-cpu', tier=2, budget=600, needs=[],
                      'lib/kstring*', 'build/arch/ppc.mk'])
 
 
-def host(out, source):
+# Expected verdict and already-reached marker for each product mutation.
+EXPECT = {
+    'ram-bat': (11, b'BAT-READY', b'LOW-BAT-FAIL', b'HPT-PASS'),
+    'upper-bats': (12, b'BAT-READY', b'HIGH-BAT-FAIL', b'LOW-BAT-GUARD-PASS'),
+    'sr-keys': (13, b'SR-READY', b'SR-KEYS-FAIL', b'SR-READY'),
+    'sdr1-isync': (14, b'SDR1-READY', b'SDR1-ISYNC-FAIL', b'SDR1-READY'),
+}
+
+
+def infrastructure_require(ok, message):
+    if not ok:
+        raise RuntimeError('QEMU TEST FAILURE: '+message)
+
+
+def host(out, source, mutation=None):
     out.mkdir(parents=True, exist_ok=True)
     flags=['-std=gnu11','-m32','-O2','-ffreestanding','-fno-pie','-no-pie',
            '-fno-stack-protector','-nostdlib','-static','-ffunction-sections',
@@ -36,11 +50,20 @@ def host(out, source):
     exe=out/'host'
     command(['gcc',*flags,*[x for x in FLAGS if x.startswith('-I')],source,
              ROOT/'arch/ppc/kernel_hpt.c',ROOT/'tools/ppc/kboot_cpu_host.c','-o',exe])
-    p=subprocess.run(['qemu-i386',str(exe)],timeout=10)
-    # Only the host assertion exit is RED; signals and hangs are infrastructure errors.
-    if p.returncode not in (0,1):
-        raise RuntimeError('host unexpected exit '+str(p.returncode))
-    require(p.returncode==0,'host privileged-operation runtime verdict')
+    p=subprocess.run(['qemu-i386',str(exe)],timeout=10,capture_output=True)
+    (out/'host-result.log').write_bytes(p.stdout)
+    if mutation:
+        code, marker, _, _ = EXPECT[mutation]
+        print(f'{mutation}: host expected exit={code} marker={marker!r}; '
+              f'actual exit={p.returncode} output={p.stdout!r}',flush=True)
+        if p.returncode == code and marker+b'\n' in p.stdout.splitlines(keepends=True):
+            print(mutation+': host runtime RED',flush=True)
+            return
+        if p.returncode == 0 and marker+b'\n' in p.stdout.splitlines(keepends=True):
+            raise CriterionFailure(mutation+': host SURVIVED')
+        raise RuntimeError(mutation+': host TEST FAILURE: unexpected exit/marker')
+    if p.returncode != 0:
+        raise RuntimeError('host TEST FAILURE: exit '+str(p.returncode))
     print('host product PVR/HID0/BAT/SR/SDR1/order PASS',flush=True)
 
 
@@ -90,7 +113,7 @@ def static(out, source):
     print('cross SPR/SR/order/readelf PASS',flush=True)
 
 
-def observe(out, elf, cpu):
+def observe(out, elf, cpu, mutation=None):
     out.mkdir(parents=True,exist_ok=True)
     syms=symbols(elf)
     cd=out/'cd'; cd.mkdir(exist_ok=True)
@@ -115,7 +138,7 @@ def observe(out, elf, cpu):
                 match=re.search(r'NIP\s+([0-9a-fA-F]+)',regs)
                 pc=int(match[1],16) if match else None
                 terminal=pc in [syms[x] for x in ['fixture_done','ppc_stop_loop',
-                                                 'ppc_kernel_vector_stop']]
+                                                 'ppc_kernel_vector_stop','fixture_mutation_stop']]
                 stable=stable+1 if terminal and pc==last else 0
                 last=pc
                 if stable>=1: break
@@ -124,12 +147,28 @@ def observe(out, elf, cpu):
             serial=a.read_bytes(); (out/'result.log').write_bytes(serial)
             if stable<1:
                 raise TimeoutError('no terminal PC within 30s: '+regs+' '+repr(serial[-2000:]))
-            require(last==syms['fixture_done'],'terminal verdict '+regs+' '+repr(serial[-2000:]))
+            if mutation:
+                _, _, diagnostic, marker = EXPECT[mutation]
+                expected_pc = syms['fixture_mutation_stop']
+                lines = serial.splitlines()
+                print(f'{mutation}: QEMU expected PC={expected_pc:#x} '
+                      f'line={diagnostic!r} marker={marker!r}; '
+                      f'actual PC={last:#x} lines={lines!r}',flush=True)
+                if (last == expected_pc and lines.count(diagnostic) == 1 and
+                        lines.count(marker) == 1 and lines.index(marker) < lines.index(diagnostic)):
+                    print(mutation+': QEMU runtime RED',flush=True)
+                    return
+                if last != syms['fixture_done']:
+                    raise RuntimeError(mutation+': QEMU TEST FAILURE: unexpected stop/markers')
+            verdict = require if mutation is None else infrastructure_require
+            verdict(last==syms['fixture_done'],'terminal verdict '+regs+' '+repr(serial[-2000:]))
             markers=[b'HPT-PASS',b'LOW-BAT-GUARD-PASS',b'CPU-PASS']
             if cpu=='7455': markers.append(b'HIGH-BAT-GUARD-PASS')
             for marker in markers:
-                require(serial.count(marker)==1,'runtime '+repr(marker)+' '+repr(serial[-2000:]))
-            require(b'FAIL' not in serial,'runtime FAIL')
+                verdict(serial.count(marker)==1,'runtime '+repr(marker)+' '+repr(serial[-2000:]))
+            verdict(b'FAIL' not in serial,'runtime FAIL')
+            if mutation:
+                raise CriterionFailure(mutation+': QEMU SURVIVED')
             q.call('quit'); p.wait(timeout=2)
         finally:
             if q: q.close()
@@ -161,15 +200,9 @@ def main():
             require(text.count(old)==1,'unique mutation anchor '+name)
             dest=out/name; dest.mkdir(parents=True,exist_ok=True)
             mutant=dest/'kernel_cpu.c'; mutant.write_text(text.replace(old,new))
-            try: host(dest,mutant)
-            except CriterionFailure as e:
-                (dest/'host-RED.log').write_text(str(e)); print(name+': host runtime RED',flush=True)
-            else: raise CriterionFailure(name+': host survived')
+            host(dest,mutant,name)
             elf=build(dest,mutant)
-            try: observe(dest/'7455',elf,'7455')
-            except CriterionFailure as e:
-                (dest/'qemu-RED.log').write_text(str(e)); print(name+': QEMU runtime RED',flush=True)
-            else: raise CriterionFailure(name+': QEMU survived')
+            observe(dest/'7455',elf,'7455',name)
 
 
 if __name__=='__main__': main()

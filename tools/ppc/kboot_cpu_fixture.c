@@ -26,6 +26,13 @@ static void say(const char *s)
     unsigned n=0; while (s[n]) ++n;
     pm_escc_write(&serial,s,n); pm_escc_drain(&serial);
 }
+static void mutation_stop(const char *line) __attribute__((noreturn));
+static void mutation_stop(const char *line)
+{
+    say(line);
+    __asm__ volatile(".globl fixture_mutation_stop\nfixture_mutation_stop: b fixture_mutation_stop");
+    __builtin_unreachable();
+}
 static void bad(void) { say("CPU-FAIL\r\n"); ppc_stop(); }
 int fixture_hpt_spill(struct ppc_frame *f);
 int ppc_hpt_spill(struct ppc_frame *f) { return fixture_hpt_spill(f); }
@@ -43,12 +50,12 @@ void fixture_main(void)
     say("HPT-PASS\r\n");
     expected=GUARD_LOW;
     fixture_guard(expected);
-    if (faults!=1) bad();
+    if (faults!=1) mutation_stop("LOW-BAT-FAIL\r\n");
     say("LOW-BAT-GUARD-PASS\r\n");
     if (pvr>>16==PPC_PVR_7455) {
         expected=GUARD_HIGH;
         fixture_guard(expected);
-        if (faults!=2) bad();
+        if (faults!=2) mutation_stop("HIGH-BAT-FAIL\r\n");
         say("HIGH-BAT-GUARD-PASS\r\n");
     }
     say("CPU-PASS\r\n");
@@ -78,19 +85,19 @@ void fixture_setup_real(void)
     u32 pa=serial.csr & ~4095U;
     io_pt[(IO_VA>>12)&1023]=pa|0x13;
     io_pt[((IO_VA>>12)&1023)+1]=(pa+4096)|0x13;
-    serial.data=IO_VA+(serial.data-pa);
-    serial.csr=IO_VA+(serial.csr-pa);
     page[0]=0x76543210;
     if (!ppc_hpt_init((u32)hpt,sizeof(hpt))) ppc_stop();
     ppc_cpu_load_segments();
+    say("SDR1-READY\r\n");
     u32 before=isyncs;
     ppc_cpu_load_sdr1(ppc_hpt_sdr1());
-    if (isyncs!=before+1) ppc_stop();
+    if (isyncs!=before+1) mutation_stop("SDR1-ISYNC-FAIL\r\n");
+    say("SR-READY\r\n");
     /* Check all actual SRs, including both key bits, before translation. */
     for (u32 i=0;i<16;++i) {
         u32 sr;
         __asm__ volatile("mfsrin %0,%1" : "=r"(sr) : "r"(i<<28));
-        if (sr!=(PPC_SR_KP|ppc_hpt_vsid(i))) ppc_stop();
+        if (sr!=(PPC_SR_KP|ppc_hpt_vsid(i))) mutation_stop("SR-KEYS-FAIL\r\n");
     }
     u32 sdr;
     __asm__ volatile("mfsdr1 %0" : "=r"(sdr));
@@ -100,6 +107,8 @@ void fixture_setup_real(void)
         if (!ppc_hpt_spill(&f)) ppc_stop();
     }
     ppc_cache_copy((void *)0,ppc_kernel_vectors.src,ppc_kernel_vectors.size);
+    serial.data=IO_VA+(serial.data-pa);
+    serial.csr=IO_VA+(serial.csr-pa);
     fixture_translated();
 }
 void powermac_boot(ppc_ci ci)
