@@ -136,7 +136,9 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     ppc_kernel_main();
 }
 
-/* D3 needs only the KeyLargo mac99 parent window, not E1's MPIC driver.
+/* TEMPORARY (2026-11-10, astra D3 P3): H2 replaces this with E1's
+ * pm_mpic_resolve() so one resolver owns the MPIC window (TASK_PPC_KBOOT §2).
+ * D3 needs only the KeyLargo mac99 parent window, not E1's MPIC driver.
  * Use the captured ranges and assigned BAR together; reject other layouts.
  * NetBSD macppc/dev/obio.c:214-234 (BAR); OpenBSD macppc/dev/openpic.c:224
  * adds the child reg to that BAR. The captured ranges must agree with it.
