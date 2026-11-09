@@ -221,7 +221,8 @@ void ppc_kernel_main(void)
     if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
     u32 want = (u32)((tb1 - tb0) * 1000000 / info->tb_hz), got = us_lo - us0;
     u32 error = got > want ? got - want : want - got;
-    if (want < 10000 || error * 50 > want + 2500)  /* 2% + the two-read skew */
+    /* 64-bit: a huge error must not wrap into a small one. 2% + two-read skew. */
+    if (want < 10000 || 50ULL * error > (unsigned long long)want + 2500)
         kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", pm_tick_hz(), ticks, us_lo);
 

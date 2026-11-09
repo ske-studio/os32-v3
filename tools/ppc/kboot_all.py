@@ -12,7 +12,7 @@ import time
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'build/out/ppc/kboot-all'
-EXCLUDE = {'kboot_run', 'kboot_mutations', 'kboot_all'}
+EXCLUDE = {'kboot_run', 'kboot_mutations', 'kboot_all', 'kboot_audit'}  # tools, not tests
 
 
 def main():

@@ -203,7 +203,7 @@ def api_rejection(root,cross):
         p=subprocess.run([str(cross/'bin/powerpc-elf-gcc'),'-nostdlib','-Wl,-e,_start',str(obj),'-o',str(exe)],cwd=root,capture_output=True,text=True,timeout=10)
         (out/f'{i}.log').write_text(p.stdout+p.stderr)
         provider = ('ppc_root_current' if call=='arch_mmu_current_root()' else
-                    'ppc_root_load' if call=='arch_mmu_load_root(0)' else 'not_available')
+                    'ppc_boot_load_root' if call=='arch_mmu_load_root(0)' else 'not_available')
         require(p.returncode!=0 and provider in p.stderr,'API linked or wrong refusal: '+call)
     return '10 standalone API link rejections (including kernel root providers) PASS\n'
 

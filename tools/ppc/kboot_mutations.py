@@ -63,6 +63,12 @@ KERNEL_MUTATIONS = (
     ('clock-half-scale', 'platform/powermac/clock.c',
      '((delta % hz) * 1000000) / hz', '((delta % hz) * 500000) / hz',
      'forbidden diagnostic', r'^FATAL kboot clock_rate$'),
+    # +85.9 s per read: 50*error would wrap to a tiny value in 32 bits.
+    ('clock-jump', 'platform/powermac/clock.c',
+     '    unsigned long long delta = read_tb() - origin;',
+     '    static unsigned long long skew;\n'
+     '    unsigned long long delta = read_tb() - origin + (skew += 8589934600ULL);',
+     'forbidden diagnostic', r'^FATAL kboot clock_rate$'),
     ('clock-frozen', 'platform/powermac/clock.c',
      '    unsigned long long delta = read_tb() - origin;',
      '    unsigned long long delta = 0;',
