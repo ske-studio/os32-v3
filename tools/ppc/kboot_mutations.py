@@ -16,7 +16,40 @@ class Negative:
 NEGATIVES = {
     'fixture-fatal': Negative('FATAL fixture', 'KBOOT OF-OFF calls=1',
                               'fixture_stop'),
+    # Real kernel images: make -f build/ppc-kboot.mk NEGATIVE=<n>.
+    # 1: unarmed supervisor load from the not-present low megabyte (reason 2 = DSI miss).
+    'kernel-dsi': Negative('FATAL trap vector=0x300 reason=0x2 addr=0x80000',
+                           'KBOOT MEMORY online=1 heap=1 shm=1', 'ppc_trap_stop'),
+    # 2: sc before any user ABI exists (reason 0x108 = SC | unsupported).
+    'kernel-sc': Negative('FATAL trap vector=0xc00 reason=0x108 addr=0x0',
+                          'KBOOT MEMORY online=1 heap=1 shm=1', 'ppc_trap_stop'),
 }
+KERNEL_NEGATIVES = {'kernel-dsi': 1, 'kernel-sc': 2}
+
+# Product mutations of the real kernel: (name, file, unique anchor, replacement,
+# exact meter verdict). The mutant must boot far enough to print the wrong
+# milestone; a build failure, timeout or any other verdict is a test error.
+KERNEL_MUTATIONS = (
+    ('ipi-masked', 'platform/powermac/mpic.c',
+     'write_reg(IPI_VECTOR, PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',
+     'write_reg(IPI_VECTOR, MASK | PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',
+     'milestone 6 order/format'),
+    ('tpr-high', 'platform/powermac/mpic.c',
+     '    write_reg(TPR, 0);\n    return PM_MPIC_INIT_OK;',
+     '    write_reg(TPR, 15);\n    return PM_MPIC_INIT_OK;',
+     'milestone 6 order/format'),
+    ('half-rate', 'arch/ppc/kernel_dec.c',
+     '    period = tb_hz / tick_hz;', '    period = tb_hz / tick_hz * 2;',
+     'ALIVE tick/TB mismatch'),
+    ('onfault-reason', 'arch/ppc/kernel_trap.c',
+     '            reason == probe.reason) {', '            reason != probe.reason) {',
+     'forbidden diagnostic'),
+    ('hpt-not-cleared', 'arch/ppc/kernel_mmu.S',
+     '    bl ppc_hpt_clear\n    sync\n', '    sync\n', 'milestone 5 order/format'),
+    ('guard-mapped', 'init/ppc_kernel.c',
+     '    int guard = probe_dsi(MEM_STACK_GUARD);',
+     '    int guard = probe_dsi((u32)flush_a);', 'milestone 5 order/format'),
+)
 
 # Mutate the meter's product lines, then exercise it with a guest that must be
 # rejected. Each row names the fixture and the exact outcome the mutant must

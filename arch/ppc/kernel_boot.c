@@ -10,6 +10,7 @@
 #include "kboot_info.h"
 #include "kboot_layout.h"
 #include "memory.h"
+#include "mpic_tree.h"
 #include "memory_boot.h"
 #include "paging.h"
 #include "boot_cpu.h"
@@ -21,6 +22,10 @@
 static const struct pm_kboot_info *boot_info;
 static struct ppc_boot_alias escc_alias, mpic_alias;
 static unsigned boot_root_ready;
+static struct ppc_boot_devices boot_devices;
+/* Valid after arch_boot_after_paging(): mapped I/G aliases and the snapshot. */
+const struct ppc_boot_devices *ppc_boot_devices(void) { return &boot_devices; }
+const struct pm_kboot_info *ppc_boot_info(void) { return boot_info; }
 void ppc_kernel_exception_enable(void);
 void ppc_boot_walk_stop(void) __attribute__((noreturn));
 
@@ -136,42 +141,6 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     ppc_kernel_main();
 }
 
-/* TEMPORARY (2026-11-10, astra D3 P3): H2 replaces this with E1's
- * pm_mpic_resolve() so one resolver owns the MPIC window (TASK_PPC_KBOOT §2).
- * D3 needs only the KeyLargo mac99 parent window, not E1's MPIC driver.
- * Use the captured ranges and assigned BAR together; reject other layouts.
- * NetBSD macppc/dev/obio.c:214-234 (BAR); OpenBSD macppc/dev/openpic.c:224
- * adds the child reg to that BAR. The captured ranges must agree with it.
- */
-static u32 be_word(const unsigned char *p)
-{
-    return (u32)p[0]<<24 | (u32)p[1]<<16 | (u32)p[2]<<8 | p[3];
-}
-static int mpic_window(struct pm_kboot_info *info)
-{
-    const struct pm_kboot_device *d = &info->mpic;
-    if (d->machine != PM_KBOOT_MACHINE_KEYLARGO || d->count < 2) return 0;
-    const struct pm_kboot_node *parent = &d->v[1];
-    const struct pm_kboot_property *reg = &d->v[0].reg;
-    const struct pm_kboot_property *bar = &parent->assigned;
-    const struct pm_kboot_property *r = &parent->ranges;
-    if (parent->ac != 1 || parent->sc != 1 ||
-        !reg->present || reg->bytes != 8 || !bar->present || bar->bytes != 20 ||
-        !r->present || r->bytes != 20 || be_word(bar->data+4) ||
-        be_word(bar->data+12) || be_word(r->data) ||
-        (be_word(r->data+4) & 0x03000000U) != 0x02000000U ||
-        (be_word(r->data+4) & 0x00ffffffU) !=
-            (be_word(bar->data) & 0x00ffffffU) || be_word(r->data+8) ||
-        be_word(r->data+12) != be_word(bar->data+8) ||
-        be_word(r->data+16) != be_word(bar->data+16)) return 0;
-    u32 base = be_word(bar->data+8), size = be_word(bar->data+16);
-    u32 off = be_word(reg->data), bytes = be_word(reg->data+4);
-    if (!size || size-1 > ~base || off >= size || !bytes || bytes > size-off)
-        return 0;
-    info->mpic_pa = base + off;
-    info->mpic_bytes = bytes;
-    return 1;
-}
 void ppc_kernel_start(ppc_ci ci)
 {
     struct ofw_env e;
@@ -179,11 +148,18 @@ void ppc_kernel_start(ppc_ci ci)
     ofw_init(ci);
     if (ofw_setup(&e) || pm_escc_prepare(&e, &s)) ppc_stop();
     struct pm_kboot_info *info = (struct pm_kboot_info *)pm_kboot_capture(ci);
-    if (!mpic_window(info)) ppc_stop();
+    /* E1 owns the MPIC window decoding (one resolver, H2). */
+    if (pm_mpic_resolve(info, &info->mpic_pa, &info->mpic_bytes,
+                        &boot_devices.mpic_order) != PM_MPIC_OK) ppc_stop();
+    if (s.data < s.csr || s.data - s.csr >= PM_ESCC_WINDOW) ppc_stop();
     info->escc_pa = s.csr;
     if (!ppc_boot_alias_plan(info->escc_pa, PM_ESCC_WINDOW, PPC_BOOT_ESCC_VA, &escc_alias) ||
         !ppc_boot_alias_plan(info->mpic_pa, info->mpic_bytes, PPC_BOOT_MPIC_VA, &mpic_alias))
         ppc_stop();
+    boot_devices.escc_csr_va = escc_alias.va;
+    boot_devices.escc_data_va = escc_alias.va + (s.data - s.csr);
+    boot_devices.mpic_va = mpic_alias.va;
+    boot_devices.mpic_bytes = info->mpic_bytes;
     if (pm_kboot_reserve(info) != PM_KBOOT_RESERVE_OK || !pm_memory_validate(info)) ppc_stop();
     static const char mark[] = "TAKEOVER\r\n";
     if (ofw_write(e.out, mark, sizeof(mark)-1) != sizeof(mark)-1 ||

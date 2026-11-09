@@ -24,6 +24,7 @@ PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeo
     'platform/powermac/ofw.c', 'platform/powermac/escc.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/kboot_reserve.c', 'platform/powermac/memory.c',
+    'platform/powermac/mpic_tree.c',
     'mm/memory_boot.c', 'mm/paging.c', 'mm/physmem.c', 'mm/pgalloc.c',
     'lib/kstring_c.c', 'tools/ppc/kboot_boot_guest.c']
 
