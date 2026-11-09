@@ -11,9 +11,13 @@ abi-contract-probe: | $(KAPI_GENERATED) $(LAYOUT_HEADER)
 	$(CC) $(PROGRAM_FLAGS) -std=gnu89 -Iarch/$(ARCH) -Iinclude -MF /dev/null -fsyntax-only -x c sdk/include/os32/os32_kapi_shared.h
 	$(CC) $(PROGRAM_FLAGS) -std=gnu89 -Iarch/$(ARCH) -Iinclude -MF /dev/null -fsyntax-only -x c sdk/include/os32/os32_gui_shared.h
 
-# Order-only edges avoid relinking unchanged products. Pattern rules cover
-# direct userland builds too; concrete object lists cover static/module rules.
-$(filter %.o,$(ALL_TARGET_OBJECTS)) $(BOOT_C_OBJ) $(BOOT_DBG_ALL_OBJ) \
-$(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf all kernel kernel-r1 programs sdk: | abi-contract-probe
-userland/%.elf userland/%.o sdk/crt/%.o: | abi-contract-probe
+# Order-only edges avoid relinking unchanged products. Concrete lists cover
+# kernel/module/boot rules; userland C rules carry their own order-only edge.
+# These objects are side outputs of the generic .elf rules, and can also
+# be requested directly through make's built-in C rule. Enumerate concrete
+# targets: a recipe-less pattern rule would not augment that rule.
+ABI_DIRECT_USER_OBJECTS := $(patsubst %.c,%.o,$(wildcard userland/cmds/*.c \
+    userland/tests/*.c userland/tests/bench/*.c userland/system/*.c))
+$(ABI_DIRECT_USER_OBJECTS) $(filter %.o,$(ALL_TARGET_OBJECTS)) $(BOOT_C_OBJ) $(BOOT_DBG_ALL_OBJ) \
+$(BUILD_OUT)/tickprobe.elf $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf all kernel kernel-r1 programs sdk: | abi-contract-probe
 endif

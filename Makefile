@@ -41,6 +41,9 @@ endif
 
 # === サブ Makefile のインクルード ===
 include build/config.mk
+ifeq ($(ARCH),x86)
+ABI_CONTRACT_ORDER := abi-contract-probe
+endif
 include build/targets/$(ARCH)-$(PLATFORM).mk
 include build/abi_contract.mk
 
