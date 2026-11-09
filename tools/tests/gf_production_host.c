@@ -12,6 +12,10 @@
 #include "gfinit_resources_ra266.h"
 #include "gf_foundation_width_host.h"
 
+#ifndef PROD_GF_DEV
+#define PROD_GF_DEV 13
+#endif
+
 struct prod_reg { u32 off,value; };
 static struct prod_reg prod_regs[4096];
 static u32 prod_reg_count,prod_index[6],prod_vga[6][256];
@@ -59,7 +63,7 @@ int gf_production_mmio(struct gf_production *p,u32 bar,u32 off,u32 width,bool wr
     CHECK(write || (off!=0x6013c0 && off!=0x6813c9));
     if (!p->prepared) {
         CHECK(!write && off==RECOVER_PMC_ENABLE && width==4);
-        CHECK(!(prod_cfg[13][0][1]&PCI_CMD_BUS_MASTER));
+        CHECK(!(prod_cfg[PROD_GF_DEV][0][1]&PCI_CMD_BUS_MASTER));
         CHECK(p->display.bar0_map==(void *)P2V_IO(prod_boot.bars[0].base) &&
               p->foundation.bar0==p->display.bar0_map);
         if (prod_prepare_read_fail) return -1;
@@ -109,17 +113,22 @@ u32 pci_cfg_read32(u32 b,u32 d,u32 f,u32 o)
 {
     prod_cfg_reads++;
     CHECK(b==0 && d<32 && f<8 && o<256 && !(o&3));
-    if(d==13 && (o==RECOVER_CFG50 || o==RECOVER_CFG54))
+    if(d==PROD_GF_DEV && (o==RECOVER_CFG50 || o==RECOVER_CFG54))
         return *prod_reg(o==RECOVER_CFG50?0x1850:0x1854);
     return prod_cfg[d][f][o/4];
 }
+u8 pci_cfg_read8(u32 b,u32 d,u32 f,u32 o)
+{ return (u8)(pci_cfg_read32(b,d,f,o&~3U)>>((o&3)*8)); }
 u16 pci_cfg_read16(u32 b,u32 d,u32 f,u32 o)
 { prod_reads16++;return (u16)(pci_cfg_read32(b,d,f,o&~3U)>>((o&2)*8)); }
 void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v)
 {(void)b;(void)d;(void)f;(void)o;(void)v;prod_other_cfg_writes++;}
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
-    CHECK(!b && d==13 && !f && o==4);
+    if (b || d!=PROD_GF_DEV || f || (o!=4 && o!=12)) {
+        __asm__ volatile("int $0x80"::"a"(1),"b"(1)); __builtin_unreachable();
+    }
+    if (o==12) { prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|v; return 0; }
     if (!prod.prepared) prod_prepare_writes++;
     else { CHECK(v==0x106);prod_event(4);prod_cmd_writes++; }
     prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
@@ -184,12 +193,6 @@ int gf2_stop(struct gf2_chan *ch)
 }
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
-int gf_master_enable(struct gf_foundation *f)
-{
-    if(pci_cfg_write16(0,13,0,4,RECOVER_COMMAND_RUN) ||
-       pci_cfg_read16(0,13,0,4)!=RECOVER_COMMAND_RUN)return GF1_EPCI;
-    f->expected_command=RECOVER_COMMAND_RUN;f->bm=true;return 0;
-}
 void gf_foundation_revoke(struct gf_foundation *f)
 { f->revoked=true;f->running=false; }
 int gf_foundation_start(struct gf_foundation *f)
@@ -212,7 +215,7 @@ int gf_foundation_stop(struct gf_foundation *f)
     /* This double owns no IRQ/map. Return to STOP while retaining the old
      * transport counters (which specifically count the N1 WORD write). */
     if(f->bm) {
-        prod_cfg[13][0][1]=(prod_cfg[13][0][1]&0xffff0000U)|RECOVER_COMMAND_STOP;
+        prod_cfg[PROD_GF_DEV][0][1]=(prod_cfg[PROD_GF_DEV][0][1]&0xffff0000U)|RECOVER_COMMAND_STOP;
         f->expected_command=RECOVER_COMMAND_STOP;f->bm=false;
     }
     f->expected_pmc=*prod_reg(RECOVER_PMC_ENABLE);
@@ -252,7 +255,16 @@ static void prod_reset(void)
     prod_pfb=0x10000000;prod_a2_done=prod_stopping=prod_faulted=false;
     for(u32 i=0;i<sizeof(resource_ra266)/sizeof(resource_ra266[0]);i++) {
         const struct resource_ra266_function *f=&resource_ra266[i];
-        for(u32 j=0;j<16;j++)prod_cfg[f->dev][f->fn][j]=f->cfg[j];
+        for(u32 j=0;j<16;j++)prod_cfg[(PROD_GF_DEV==12 && f->dev==13) ? 12 : (PROD_GF_DEV==12 && f->dev==12) ? 13 : f->dev][f->fn][j]=f->cfg[j];
+    }
+    if (PROD_GF_DEV==12) {
+        for (u32 fn=0;fn<3;fn++) {
+            for (u32 j=0;j<16;j++) prod_cfg[13][fn][j]=0;
+            prod_cfg[13][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
+            prod_cfg[13][fn][1]=2;
+            prod_cfg[13][fn][4]=0x20411000+fn*0x1000;
+        }
+        prod_cfg[13][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     }
     /* Native maps and complete decode reservations furnished by P5 at boot. */
     ledger_region_count=3;
@@ -275,7 +287,7 @@ static void prod_reset(void)
     *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U;
     CHECK(!gf_production_identify(&prod_boot));
     CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
-    CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[13][0][1]==0x02b00102U);
+    CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[PROD_GF_DEV][0][1]==0x02b00102U);
     CHECK(!prod_cmd_writes && prod_mmio_calls==1 && !prod_route_calls);
     CHECK(prod.foundation.expected_pmc==0x03010000U);
     foundation_width_cases(&prod.foundation);
@@ -416,11 +428,11 @@ static void prod_prepare_cases(void)
     const u16 commands[]={0x0106,0x0147,0x0105,0x0104,0x0102,0x0143};
     for(u32 i=0;i<sizeof(commands)/sizeof(commands[0]);i++) {
         prod_reset();kmemset(&prod,0,sizeof(prod));
-        prod_cfg[13][0][1]=0x02b00000U|commands[i];
+        prod_cfg[PROD_GF_DEV][0][1]=0x02b00000U|commands[i];
         prod_prepare_writes=prod_logs=prod_mmio_calls=0;
         *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U+i;
         CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
-        CHECK(prod_cfg[13][0][1]==(0x02b00000U|(commands[i]&~4U)));
+        CHECK(prod_cfg[PROD_GF_DEV][0][1]==(0x02b00000U|(commands[i]&~4U)));
         CHECK(prod_prepare_writes==((commands[i]&4U)?1U:0U));
         CHECK(prod_logs==prod_prepare_writes && !prod_cmd_writes && !prod_other_cfg_writes);
         CHECK(prod_mmio_calls==1 && !prod_route_calls);
@@ -434,10 +446,10 @@ static void prod_prepare_cases(void)
     CHECK(prod.foundation.expected_pmc==0x12345678U);
     /* A failed BAR/mapping gate must not write even a valid Command word. */
     prod_reset();kmemset(&prod,0,sizeof(prod));
-    prod_cfg[13][0][1]=0x02b00106U;prod_map_fail=1;
+    prod_cfg[PROD_GF_DEV][0][1]=0x02b00106U;prod_map_fail=1;
     prod_prepare_writes=prod_logs=0;
     CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
-    CHECK(!prod.prepared && !prod_prepare_writes && !prod_logs && prod_cfg[13][0][1]==0x02b00106U);
+    CHECK(!prod.prepared && !prod_prepare_writes && !prod_logs && prod_cfg[PROD_GF_DEV][0][1]==0x02b00106U);
     output("PASS production prepare: shared clock/wait and production opaque; BM-only WORD clear, no write if clear or invalid maps; PMC readback before start, read failure rejects prepare\n");
 }
 static int prod_start(void)
@@ -565,7 +577,7 @@ static void prod_cases(void)
     prod_script_loans();
     prod_reset();CHECK(!prod_start());prod_order();
     CHECK(prod_cmd_writes==2 && !prod_other_cfg_writes && prod_reads16 && !prod_live_pages);
-    CHECK((prod_cfg[13][0][1]&0xffff)==0x106 && (prod_cfg[13][0][1]>>16)==0x02b0);
+    CHECK((prod_cfg[PROD_GF_DEV][0][1]&0xffff)==0x106 && (prod_cfg[PROD_GF_DEV][0][1]>>16)==0x02b0);
     CHECK(!prod_return(&prod));prod_exit_order();
     CHECK(prod_index[0]==0x22 && prod_vga[0][0x11]==0x80 && prod_vga[0][0x1f]==0);
     u32 reads=prod_mmio_calls;
@@ -611,10 +623,10 @@ static void prod_cases(void)
     prod_exit_order();
     for(u32 fault=0;fault<6;fault++) {
         prod_reset();CHECK(!prod_start());
-        if(fault<3)prod_cfg[13][0][4+fault]^=0x1000000;
-        else if(fault==3)prod_cfg[13][0][0]^=1;
-        else if(fault==4)prod_cfg[13][0][11]^=1;
-        else prod_cfg[13][0][2]^=1;
+        if(fault<3)prod_cfg[PROD_GF_DEV][0][4+fault]^=0x1000000;
+        else if(fault==3)prod_cfg[PROD_GF_DEV][0][0]^=1;
+        else if(fault==4)prod_cfg[PROD_GF_DEV][0][11]^=1;
+        else prod_cfg[PROD_GF_DEV][0][2]^=1;
         reads=prod_mmio_calls;
         CHECK(prod_return(&prod)==-1 && prod.revoked && prod.foundation.revoked && !prod.foundation.running && prod.foundation.bm && prod_mmio_calls==reads && !prod_redraws);
         CHECK(prod_route_calls==2 && prod_start()==-1 && !prod.display.engaged);
@@ -625,10 +637,10 @@ static void prod_cases(void)
     CHECK(gf_production_read(&prod,1,GF_MODE_VRAM_BYTES,1,&value)==-1);
     CHECK(gf_production_read(&prod,2,0,4,&value)==-1);
     CHECK(gf_production_read(&prod,0,GF_PRODUCTION_BAR0_BYTES,4,&value)==-1);
-    prod_cfg[13][0][0]^=1;CHECK(gf_production_identify(&prod_boot)==-1 && !prod_boot.bars[0].valid);
+    prod_cfg[PROD_GF_DEV][0][0]^=1;CHECK(gf_production_identify(&prod_boot)==-1 && !prod_boot.bars[0].valid);
     prod_reset();prod_ram_fail=1;CHECK(gf_production_identify(&prod_boot)==-1);
-    prod_reset();prod_cfg[13][0][5]=prod_cfg[13][0][4]|8;CHECK(gf_production_identify(&prod_boot)==-1);
-    prod_reset();prod_cfg[13][0][4]=0x20000000;CHECK(gf_production_identify(&prod_boot)==-1);
+    prod_reset();prod_cfg[PROD_GF_DEV][0][5]=prod_cfg[PROD_GF_DEV][0][4]|8;CHECK(gf_production_identify(&prod_boot)==-1);
+    prod_reset();prod_cfg[PROD_GF_DEV][0][4]=0x20000000;CHECK(gf_production_identify(&prod_boot)==-1);
     /* astra P4 counterexample: another device's enabled expansion ROM makes
      * the resource gate reject. Production prints nothing (no 98 text VRAM
      * before decode is proven safe); the reject is kept in the failure record. */
@@ -678,7 +690,7 @@ static void prod_present_cases(void)
               gfx_counters.present_bytes==2U*(u32)h);
         for(int r=0;r<h;r++)CHECK(dst[r*GF_MODE_WIDTH]==src[r*GF_MODE_WIDTH] &&
                                   dst[r*GF_MODE_WIDTH+1]==src[r*GF_MODE_WIDTH+1]);
-        prod_cfg[13][0][4]^=0x01000000; /* BAR0 changed after a good display */
+        prod_cfg[PROD_GF_DEV][0][4]^=0x01000000; /* BAR0 changed after a good display */
         u32 reads=prod_mmio_calls;prod_points=0;gfx_counters=(GfxCounters){0};
         CHECK(gf_present_rect(src,GF_MODE_WIDTH,prod_unmapped,GF_MODE_WIDTH,prod_unmapped,
                               0,0,2,h,prod_present_point,&prod)==-1);
@@ -695,6 +707,12 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+#ifdef PROD_ABSENT_TEST
+    kmemset(prod_cfg,0xff,sizeof(prod_cfg));
+    CHECK(gf_production_identify(&prod_boot)==-1);
+    CHECK(prod_cmd_writes==0 && prod_other_cfg_writes==0 && prod_prepare_writes==0);
+    __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable();
+#endif
     prod_wait_cases();
     prod_modeload_cases();
     prod_prepare_cases();

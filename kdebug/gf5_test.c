@@ -501,7 +501,8 @@ static i32 info(bool *local)
     if (!o || o->ctx != owner) { *local = true; return GF5_ESTATE; }
     if (!serial_gate_active()) {
         const struct gf5 *g = o->ctx;
-        serial_puts_polled("GF5 DATA stage=info target=0:13.0/10de:0221");
+        number("GF5 DATA stage=info target=0:", RECOVER_GF_DEV);
+        serial_puts_polled(".0/10de:0221");
         number(" phase=", g->phase); number(" accepting=", g->accepting);
         number(" rom_bytes=", g->rom.size); number(" memory_pc=", g->rom.memory_pc);
         number(" fan_method=", g->fan.method); number(" fan_mode=", g->fan.mode);
