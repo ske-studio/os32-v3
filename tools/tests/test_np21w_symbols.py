@@ -40,8 +40,10 @@ class IdentityTests(unittest.TestCase):
         self.b = self.build(self.home / 'wt/os32-v3/deployed', 16)
         self.boot(self.b)
 
-    def build(self, root, padding):
+    def build(self, root, padding, sub=None):
         out = root / 'build' / 'out'
+        if sub:
+            out = out / sub
         out.mkdir(parents=True)
         asm = out / 'fixture.s'
         asm.write_text('''.text
@@ -112,6 +114,15 @@ probe: .long 7
         self.assertEqual(selected.info['path'], str(self.b))
         self.assertEqual(selected.info['commit'], 'abcdef0-dirty')
         self.assertEqual(selected.annotate(self.elf['probe'][0]), 'probe')
+
+    def test_discovery_selects_r1_image(self):
+        # The R1 map lives in build/out/r1/ beside its own kernel.elf/vmkernel.lz4.
+        r1 = self.build(self.home / 'wt/os32-v3/deployed', 32, sub='r1')
+        self.boot(r1)
+        selected = self.selector()
+        self.assertIn(r1.resolve(), selected.candidates())
+        self.assertEqual(selected.resolve('probe'), self.elf['probe'][0])
+        self.assertEqual(selected.info['path'], str(r1))
 
     def test_mismatch_refuses_symbols_but_keeps_numeric_access(self):
         selected = self.selector(explicit=str(self.a))
@@ -224,6 +235,7 @@ def mutate():
     source = SOURCE.read_text()
     cases = [
         ("if explicit:", "if False:", 'test_explicit_override_is_restricted_and_verified'),
+        ("for sub in ('.', R1_SUBDIR)]", "for sub in ('.',)]", 'test_discovery_selects_r1_image'),
         ("or boot[36] != 1", "or False", 'test_guest_commit_crc_and_validity_are_required'),
         ("struct.unpack_from('<II', boot, 40) != (crc, size)", "False", 'test_image_crc_is_checked_independently'),
         ("or self.read(commit_addr, commit_size) != commit", "or False", 'test_guest_commit_crc_and_validity_are_required'),
