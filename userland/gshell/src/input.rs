@@ -336,11 +336,6 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
     }
 
     loop {
-        /* モーダル中の X4 は取り込まない — 宛先はダイアログで、その状態機械を
-         * 進めてよいのは X3 だけ (契約 T8)。打鍵はカーネル待ち行列に残す。 */
-        if ctx == Ctx::Pump && (modal::is_open() || startmenu::is_open()) {
-            break;
-        }
         /* X4 は満杯に近ければ取り込まない。X3 は STOP を探して読み続ける。
          * FEP の確定文字列が続く可能性があるので 4 件分を見る。 */
         let space_ok = if modal::is_open() || startmenu::is_open() {
@@ -362,15 +357,13 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
          * 「SHIFT+SPACE → n i h o n g o」が X4 に来た場合、toggle 前の打鍵が FEP を
          * 素通りして先にアプリへ届く (2026-09-06 実測: 変換されず "nihongo" が入った)。
          *
-         * 退避先の空きは **カーネルから取り出す前に** 見る (レビュー #5 ①)。取り出した
-         * 後に満杯を知ると、その 1 件はカーネル待ち行列にも退避列にも残らず、dropped
-         * にも数えられずに消える。空きが無ければ読まずにカーネル側へ残す (契約 T3)。 */
+         * モーダルと Start メニューも X3 でだけ処理する。 */
+        let ui_defer = modal::is_open() || startmenu::is_open();
         let defer = ctx == Ctx::Pump
-            && (fep::is_on() || fep::toggle_pending() || st.pending_raw_n > 0);
-        /* WM のキー (票 KBD_NAV §1-4) かどうかは raw を**取り出した後**でないと
-         * 分からないので、X4 では退避先に空きが無ければ (退避しない種類の
-         * キーであっても) 読まずに止める。 */
-        if ctx == Ctx::Pump && st.pending_raw_n >= st.pending_raw.len() {
+            && (ui_defer || fep::is_on() || fep::toggle_pending() || st.pending_raw_n > 0);
+        /* 通常は満杯ならカーネル側に残す。WM UI 中は読み続け、あふれた
+         * 新しい raw を数える。古い退避済み raw の順序は保つ。 */
+        if ctx == Ctx::Pump && !ui_defer && st.pending_raw_n >= st.pending_raw.len() {
             break;
         }
         /* X3 は前の X4 が退避した raw を先に消費する (順序を保つ)。 */
@@ -408,9 +401,12 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
          * 実行する (票 KBD_NAV §1-4)。X4 で見つけたら FEP と同じく、この raw と
          * 以後を全部退避して次の X3 へ回す (順序を保つ)。 */
         if defer || (ctx == Ctx::Pump && kbdnav::is_wm_raw(st, raw)) {
-            /* 空きは取り出す前に確認済み。 */
-            st.pending_raw[st.pending_raw_n] = raw;
-            st.pending_raw_n += 1;
+            if st.pending_raw_n == st.pending_raw.len() {
+                st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(1);
+            } else {
+                st.pending_raw[st.pending_raw_n] = raw;
+                st.pending_raw_n += 1;
+            }
             continue;
         }
         /* X3 must reach STOP behind undeliverable input. Count every discarded

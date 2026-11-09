@@ -487,8 +487,9 @@ pub struct GuiState {
     pub launch_pending: bool,
     /* X4 (ポンプ) で FEP がオンのとき退避する raw 打鍵 (レビュー #4 ②)。FEP の
      * 変換 (辞書検索) は X3 でだけ行う。次の X3 が先頭から取り込む。 */
-    pub pending_raw: [i32; 32],
+    pub pending_raw: [i32; 128],
     pub pending_raw_n: usize,
+    pub pending_raw_dropped: u32,
     pub inj_lost: u32,
     pub gserial: crate::gserial::Serial,
     #[cfg(feature = "gf_accel_accept")]
@@ -546,8 +547,9 @@ impl GuiState {
         lease_dirty: false,
         quit: false,
         launch_pending: false,
-        pending_raw: [0; 32],
+        pending_raw: [0; 128],
         pending_raw_n: 0,
+        pending_raw_dropped: 0,
         inj_lost: 0,
         gserial: crate::gserial::Serial::NEW,
         #[cfg(feature = "gf_accel_accept")]

@@ -40,7 +40,11 @@ def main():
     declared = json.loads((ROOT / 'tools/prototypes/geforce_imports.def').read_text())['imports']
     assert [e['name'] for e in meta] == [e['symbol'] for e in declared]
     slots = {e['name']: e['index'] for e in meta}
-    assert [e['name'] for e in meta[-3:]] == list(NAMES)
+    # The guard trio stays consecutive; later append-only imports (G3's policy
+    # hooks) may follow it.
+    names = [e['name'] for e in meta]
+    first = names.index(NAMES[0])
+    assert names[first:first + len(NAMES)] == list(NAMES)
     resident = subprocess.check_output(['nm', '--defined-only', str(ROOT / 'build/out/kernel.elf')], text=True)
     for name in NAMES:
         assert ' T ' + name + '\n' in resident
