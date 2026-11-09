@@ -11,7 +11,8 @@ CHECK = dict(name='kboot-dec', tier=2, budget=600,
              covers=v.CHECK['covers']+['arch/ppc/kernel_dec.c','arch/ppc/arch_io.h',
                  'tools/ppc/kboot_dec*','platform/powermac/clock.c',
                  'kernel/time/tick.c','kernel/irq/tick.c'],
-             inputs=['include/kernel_tick.h','kernel/irq/tick.h',
+             inputs=['include/kernel_tick.h','kernel/irq/tick.h','kernel/irq/irq.h',
+                 'kernel/irq/irq_math.h','include/io.h',
                  'include/clock_source.h','include/platform_timer.h',
                  'platform/powermac/kboot_info.h','lib/divdi3.c'])
 # Expected runtime diagnostic and the last reached check are both mandatory.
@@ -21,6 +22,7 @@ MUTATIONS = [
     ('catchup', '++elapsed;', 'elapsed = 1;', 9),
     ('initial-dec', 'ppc_write_dec(next_period());', '(void)next_period();', 7),
     ('100hz', 'tick_hz != 1000', 'tick_hz != 100', 5),
+    ('irq-depth', '++kctx_irq_depth;', '(void)kctx_irq_depth;', 19),
     ('ready', 'ppc_write_dec(PPC_DEC_FAR);', 'ppc_write_dec(1);', 4),
 ]
 
@@ -32,7 +34,8 @@ def host(out, source, expected=0, idle=False):
              *(['-DDEC_IDLE_TEST'] if idle else []),
              '-I'+str(out),'-I'+str(v.ROOT),'-I'+str(v.ROOT/'include'),
              '-I'+str(v.ROOT/'arch/ppc'),'-I'+str(v.ROOT/'platform/powermac'),
-             source,v.ROOT/'kernel/time/tick.c',v.ROOT/'tools/ppc/kboot_dec_host.c',
+             source,v.ROOT/'kernel/time/tick.c',v.ROOT/'kernel/irq/tick.c',
+             v.ROOT/'tools/ppc/kboot_dec_host.c',
              '-o',exe])
     result=subprocess.run(['qemu-i386',exe],capture_output=True,timeout=5)
     (out/'host.log').write_bytes(result.stdout+result.stderr)

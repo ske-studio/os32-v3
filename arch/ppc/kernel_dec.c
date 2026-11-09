@@ -5,6 +5,7 @@
 #include "ppc_trap.h"
 #include "kernel_tick.h"
 #include "kernel/irq/tick.h"
+#include "kernel/irq/irq.h"
 
 static u32 period, remainder, fraction;
 static int ready;
@@ -52,10 +53,12 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
         ++elapsed;
     }
     ppc_write_dec((u32)remaining);
+    ++kctx_irq_depth;
     while (elapsed--) {
         ++tick_count;
         tick_dispatch();
     }
+    --kctx_irq_depth;
 }
 
 void arch_cpu_idle(void)
