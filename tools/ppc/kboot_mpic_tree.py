@@ -27,7 +27,7 @@ MUTATIONS = [
     ('length', 'n<MPIC_MIN_BYTES', '0'),
     ('order', '*order=PM_MPIC_MMIO_LE;', '*order=PM_MPIC_MMIO_BE;'),
     ('range-offset', 'next=dest+(a-child);', 'next=dest+a;'),
-    ('relocatable', '!(hi&PCI_ABSOLUTE)', '0'),
+    ('assigned-n-bit', '!address(p,3,&hi,&base)', '!(hi&PCI_ABSOLUTE) || !address(p,3,&hi,&base)'),
 ]
 
 
@@ -42,8 +42,10 @@ def exercise(directory, source):
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
-    for case in range(31):
+    for case in range(32):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
+        if result.stdout != b'EERT'+case.to_bytes(4, 'little'):
+            raise RuntimeError(f'case {case}: missing product-call reach marker')
         if result.returncode not in (0, 80, 81, 82):
             raise RuntimeError(f'case {case}: unexpected runtime status {result.returncode}')
         if result.returncode:
@@ -61,7 +63,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 31 MPIC window cases (ILP32 product code)')
+        print('GREEN: 32 MPIC window cases (ILP32 product code)')
         if args.mutate:
             text = product.read_text()
             for name, old, new in MUTATIONS:
@@ -70,8 +72,15 @@ def main():
                 mutant = directory / 'mpic_tree.c'
                 mutant.write_text(text.replace(old, new))
                 failures = exercise(directory, mutant)
-                if not failures:
-                    raise RuntimeError(f'{name}: survived')
+                witness = {
+                    'end-overflow': (28, 80), 'empty-width': (29, 80),
+                    'bar-relative': (23, 80), 'range-direction': (0, 80),
+                    'bar-choice': (0, 80), 'skip-parent': (0, 80),
+                    'length': (13, 80), 'order': (0, 81),
+                    'range-offset': (22, 81), 'assigned-n-bit': (10, 80),
+                }[name]
+                if witness not in failures:
+                    raise RuntimeError(f'{name}: missing expected runtime verdict {witness}: {failures}')
                 print(f'RED: {name}: {failures}')
     return 0
 

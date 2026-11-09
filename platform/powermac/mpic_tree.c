@@ -40,7 +40,10 @@ static int contains(u32 base, u32 size, u32 a, u32 n)
            n<=size && a-base<=size-n;
 }
 /* macio's primary memory BAR, not the first assigned entry. No guessing if
- * duplicated, relocatable, non-memory, high-cell, or outside its aperture. */
+ * duplicated, non-memory, high-cell, or outside its aperture.
+ * mac99 firmware leaves n=0 in assigned-addresses. The property already
+ * supplies the assigned base (PCI binding 2.1 section 11.2 steps 3-4);
+ * do not interpret its base as another BAR-relative offset. */
 static int macio_bar(const struct pm_kboot_node *v, u32 a, u32 n)
 {
     unsigned found=0;
@@ -49,7 +52,7 @@ static int macio_bar(const struct pm_kboot_node *v, u32 a, u32 n)
         const unsigned char *p=v->assigned.data+k;
         u32 hi=cell_at(p), base, size;
         if ((hi&0xff)!=PCI_BAR0) continue;
-        if (!(hi&PCI_ABSOLUTE) || !address(p,3,&hi,&base) ||
+        if (!address(p,3,&hi,&base) ||
             !number(p+12,2,&size) || !contains(base,size,a,n)) return 0;
         found++;
     }
@@ -66,10 +69,17 @@ static int parent_address(const struct pm_kboot_node *v, u32 hi, u32 *a)
         const unsigned char *p=v->assigned.data+k;
         u32 ah=cell_at(p), base, size;
         if ((ah&0x03ffffffUL)!=(hi&0x03ffffffUL)) continue;
-        if (!(ah&PCI_ABSOLUTE) || !address(p,3,&ah,&base) ||
-            !number(p+12,2,&size) || *a>=size || *a>0xffffffffUL-base)
-            return 0;
-        resolved=base+*a; found++;
+        if (!address(p,3,&ah,&base) ||
+            !number(p+12,2,&size)) return 0;
+        /* mac99 also emits a BAR-tagged ranges parent with n=0 but an
+         * already assigned address. Accept only an unambiguous choice. */
+        int relative=*a<size && *a<=0xffffffffUL-base;
+        int assigned=contains(base,size,*a,1);
+        if (relative && assigned && base) return 0;
+        if (relative) resolved=base+*a;
+        else if (assigned) resolved=*a;
+        else return 0;
+        found++;
     }
     if (found!=1) return 0;
     *a=resolved;

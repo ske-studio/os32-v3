@@ -36,7 +36,7 @@ void entry(unsigned *stack)
     if (which==7) { put(pci->ranges.data+12,0xffff0000); expected=PM_MPIC_BAD_ADDRESS; }
     if (which==8) { m->ranges.present=0; expected=PM_MPIC_BAD_PROPERTY; }
     if (which==9) { m->ranges.bytes--; expected=PM_MPIC_BAD_PROPERTY; }
-    if (which==10) { put(m->assigned.data,0x02008010); expected=PM_MPIC_BAD_ADDRESS; }
+    if (which==10) { put(m->assigned.data,0x02008010); /* mac99 assigned BAR, n=0 */ }
     if (which==11) { put(m->assigned.data+4,1); expected=PM_MPIC_BAD_ADDRESS; }
     if (which==12) { put(m->assigned.data+12,1); expected=PM_MPIC_BAD_ADDRESS; }
     if (which==13) { put(leaf->reg.data+4,0x200b0); expected=PM_MPIC_BAD_ADDRESS; }
@@ -91,6 +91,12 @@ void entry(unsigned *stack)
             put(pci->ranges.data+20,0); put(pci->ranges.data+24,0x10000000);
         }
     }
+    if (which==31) { /* observed mac99: assigned BAR and parent n=0 */
+        put(m->assigned.data,0x02008010);
+        put(m->ranges.data+4,0x02008010);
+    }
+    unsigned reach[2]={0x54524545,which};
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(reach), "d"(sizeof(reach)) : "memory");
     if (pm_mpic_resolve(&copy,&pa,&bytes,&order)!=(int)expected) quit(80);
     if (expected==PM_MPIC_OK) {
         if (pa!=want || bytes!=size || order!=PM_MPIC_MMIO_LE) quit(81);
