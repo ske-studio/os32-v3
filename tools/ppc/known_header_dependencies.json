@@ -3,21 +3,6 @@
   "source_profile": "selected",
   "dependencies": [
     {
-      "source": "kernel/gui.c",
-      "header": "kernel/ime/ime.h",
-      "survey_id": "V3"
-    },
-    {
-      "source": "kernel/gui.c",
-      "header": "kernel/ime/ime_render.h",
-      "survey_id": "V3"
-    },
-    {
-      "source": "kernel/gui.c",
-      "header": "kernel/ime/ime_store.h",
-      "survey_id": "V3"
-    },
-    {
       "source": "kernel/sys.c",
       "header": "drivers/video/geforce/geforce_module.h",
       "survey_id": "A5"

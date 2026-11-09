@@ -35,7 +35,7 @@ kdebug/selftest_exec.c:kst_exec_kapi_layout:KAPI / トランポリン / アプ�
 kdebug/selftest_exec.c:kst_exec_tramp_user:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_finish.inc:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_syscall.inc:exec_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/ring3_ls.c:ring3_ls_dispatch:USER ESP と引数は呼び手の仮想番地。caller access が所属・PTE を検証して物理へ変換する
+exec/ring3_ls.c:ring3_ls_dispatch:検証済みの論理値の path/out は USER 仮想番地。ring3_ls_window の caller access が所属・PTE を検証する
 exec/ring3_ls.c:ls_copy_path:USER パスの仮想番地の加算。copy_caller_bytes が所属・PTE を検証して物理へ変換する
 exec/exec_launch.inc:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_image.inc:exec_load_image:常駐 shell の BSS は ctx->load_addr の仮想番地。image の物理 backing は P2V

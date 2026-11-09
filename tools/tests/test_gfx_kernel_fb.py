@@ -16,7 +16,7 @@ from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
                'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
-               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
+               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c',
@@ -157,7 +157,10 @@ static inline void io_wait_n(int n) {(void)n;}
             if path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
                 (tmp/(pathlib.Path(path).stem+'_host_source.c')).write_text(body)
             else:
-                dest = tmp/(pathlib.Path(path).stem+'.c');dest.write_text(body);sources.append(dest)
+                # Preserve existing stage hooks' filenames; disambiguate the new provider.
+                dest = tmp/('pc98_gfx_scroll.c' if path == 'platform/pc98/gfx_scroll.c'
+                            else pathlib.Path(path).name)
+                dest.write_text(body);sources.append(dest)
         fixture = 'unsigned int host_arch_if = 0x202U;\n#include "gfx_kernel_fb_host.c"\n'
         (tmp/'fixture.c').write_text('#include "gfx_emergency.h"\n' + (fixture_body or fixture))
         sources.append(tmp/'fixture.c')

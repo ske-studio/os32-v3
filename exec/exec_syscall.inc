@@ -94,7 +94,12 @@ void exec_syscall_dispatch(struct arch_syscall *view)
      * address crosses this boundary; raw public slot 12 is guarded as well. */
     if (slot == RING3_LS_CALL) {
         ring3_in_syscall = 1;
-        result = (u32)arch_kapi_legacy_ls(&call);
+        if (!arch_kapi_read_block(&src, 0, 3, &values)) {
+            ring3_fault_kill();
+            result = OS32_ERR_INVAL;
+            goto syscall_complete;
+        }
+        result = (u32)ring3_ls_dispatch(&values);
         goto syscall_complete;
     }
 

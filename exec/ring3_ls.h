@@ -19,8 +19,9 @@
 #ifndef __ASSEMBLER__
 #include "types.h"
 #include "os32_ls.h"
+#include "kapi_call.h"
 int ring3_ls_window(const char *path, u32 skip, OS32_LsPacket *out);
-int ring3_ls_dispatch(u32 user_esp);
+int ring3_ls_dispatch(const struct kapi_values *values);
 extern const u8 ring3_ls_start[], ring3_ls_end[];
 #endif
 #endif

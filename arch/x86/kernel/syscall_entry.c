@@ -1,4 +1,4 @@
-/* VM frames and transitional raw cdecl consumers stay within x86. */
+/* Native VM/USER trap entry stays within x86. */
 #include "kapi_call.h"
 #include "exec_arch.h"
 #include "legacy_guest.h"
@@ -14,9 +14,4 @@ void __cdecl ring3_syscall_dispatch(u32 *native)
     if (legacy_trap(native)) return;
     struct arch_syscall call = { native };
     exec_syscall_dispatch(&call);
-}
-
-u32 arch_kapi_legacy_ls(const struct arch_syscall *call)
-{
-    return (u32)ring3_ls_dispatch(((const u32 *)call->native)[11]);
 }

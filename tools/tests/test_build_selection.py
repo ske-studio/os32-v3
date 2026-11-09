@@ -33,6 +33,8 @@ def check(root):
             continue
         assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
     assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
+    assert 'exec/ring3_ls.c' in ppc['C_KERNEL']
+    assert actual['C_KERNEL'].index('exec/ring3_ls.c') == expected['C_KERNEL'].index('exec/ring3_ls.c')
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'arch/x86/legacy/', 'platform/pc98/legacy/'))

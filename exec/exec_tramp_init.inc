@@ -1,4 +1,5 @@
 /* KAPI trampoline layout checks and initialization. Included by exec.c. */
+#include "syscall_code.h"
 /* 写し場 (票 T9 §12 R1) はスタブの後ろに置く。KAPI が増えて 1 ページに
  * 収まらなくなったら **ここでビルドが落ちる** — 実機では「cd の直後に
  * pwd が化ける」としか見えないので、静的に止める。 */
@@ -37,10 +38,12 @@ static void ring3_trampoline_init(void)
 {
     u32 page = exec_tramp_page_addr();
     u32 *tbl = (u32 *)P2V(page);
-    u32 stub_base = page + RING3_USTR_STUB_OFF;   /* 全 struct の後ろ */
+    struct syscall_layout layout;
     u32 i;
 
-    ring3_tramp_page = page;
+    if (!arch_syscall_layout(KAPI_FUNC_CAPACITY, &layout)) return;
+    if (!arch_syscall_emit(P2V(page), page, PAGE_SIZE, KAPI_FUNC_CAPACITY)) return;
+    arch_syscall_publish(P2V(page), layout.total_bytes);
 
     /* magic / version は本物と同じ値 */
     tbl[0] = kapi->magic;
@@ -51,29 +54,16 @@ static void ring3_trampoline_init(void)
      * とき 0 番地へ飛ぶ。スタブならディスパッチャが slot >= KAPI_FUNC_COUNT
      * でアプリだけ kill する。 */
     for (i = 0; i < KAPI_FUNC_CAPACITY; i++) {
-        u8 *st = (u8 *)P2V(stub_base + i * KAPI_STUB_SIZE);
-        /* ユーザ可視表: entry[i] = スタブ i の番地 (KernelAPI fn[i] と同一 offset) */
-        tbl[KAPI_FN_TABLE_FIRST + i] = stub_base + i * KAPI_STUB_SIZE;
-        /* スタブ: B8 <slot:imm32> CD 80 C3  (mov eax,slot; int 0x80; ret) */
-        st[0] = 0xB8;
-        st[1] = (u8)(i & 0xFF);
-        st[2] = (u8)((i >> 8) & 0xFF);
-        st[3] = (u8)((i >> 16) & 0xFF);
-        st[4] = (u8)((i >> 24) & 0xFF);
-        st[5] = 0xCD;   /* int */
-        st[6] = 0x80;   /* 0x80 */
-        st[7] = 0xC3;   /* ret */
+        tbl[KAPI_FN_TABLE_FIRST + i] = page + layout.stub_off + i * layout.stub_stride;
     }
-
-    kmemcpy(P2V(page + RING3_LS_SHIM_OFF), ring3_ls_start,
-            (u32)(ring3_ls_end - ring3_ls_start));
-    tbl[KAPI_FN_TABLE_FIRST + KAPI_SLOT_SYS_LS] = page + RING3_LS_SHIM_OFF;
+    tbl[KAPI_FN_TABLE_FIRST + KAPI_SLOT_SYS_LS] = page + layout.ls_off;
 
     /* データフィールド (値): KernelAPI 表と同一オフセット。v63 から
      * KAPI_DATA_FIELDS_OFF に固定 (関数の数ではなく容量の後ろ)。
      * sbrk_heap_limit は exec_run が launch 時に上書きする。 */
     tbl[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = 0;
     tbl[KAPI_DATA_IDX_SHM_BASE] = (u32)MEM_SHM_BASE;
+    ring3_tramp_page = page;
 
     /* boot 口が確定した全 PD 共有 RO+USER (kernel band PDE0)。i386 は NX なしなので
      * RO でも実行可能 (スタブ実行 OK)。ユーザは書けない = スタブ改竄不可。
