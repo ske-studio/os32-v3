@@ -12,6 +12,14 @@ static void finish(int status)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(status));
     __builtin_unreachable();
 }
+static void reached(const char *text, unsigned size)
+{
+    int written;
+    __asm__ volatile("int $0x80" : "=a"(written)
+                     : "a"(4), "b"(1), "c"(text), "d"(size) : "memory");
+    if (written != (int)size) finish(91);
+}
+#define REACHED(s) reached(s "\n", sizeof(s))
 #define REQUIRE(x) do { if (!(x)) finish(90); } while (0)
 unsigned ppc_load8(cell address)
 {
@@ -52,11 +60,14 @@ void _start(void)
     REQUIRE(!pm_log_add_sink(&queue));
     /* Embedded NUL, explicit length, and trailing sentinel. */
     console_write("A\0BC!", 4, 0xff);
+    REACHED("REACHED write-length");
     EXPECT("A\0BC", 41);
     shell_print("end", 0);
     shell_print("", 0xff);
+    REACHED("REACHED string-end");
     EXPECT("end", 42);
     shell_print("L\n\r\n", 1);
+    REACHED("REACHED lf-expansion");
     EXPECT("L\n\r\n", 43);
     console_write("ignored", 0, 0);
     shell_putchar('\0', 0);
@@ -76,6 +87,7 @@ void _start(void)
     console_text_gdc_stop();
     console_text_gdc_start();
     console_get_size(&w, &h);
+    REACHED("REACHED screen-success");
     if (console_get_cursor_x() != -1 || console_get_cursor_y() != -1 || w || h)
         finish(44);
     console_get_size(0, 0);
