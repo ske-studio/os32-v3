@@ -31,7 +31,7 @@ static u32 pm_mpic_bus_read(u32 address, int little)
     if (little)
         __asm__ volatile("lwbrx %0,0,%1; eieio" : "=r"(value) : "r"(address) : "memory");
     else
-        __asm__ volatile("lwz %0,0(%1); eieio" : "=r"(value) : "r"(address) : "memory");
+        __asm__ volatile("lwz %0,0(%1); eieio" : "=r"(value) : "b"(address) : "memory");
     return value;
 }
 static void pm_mpic_bus_write(u32 address, u32 value, int little)
@@ -39,7 +39,7 @@ static void pm_mpic_bus_write(u32 address, u32 value, int little)
     if (little)
         __asm__ volatile("stwbrx %0,0,%1; eieio" : : "r"(value), "r"(address) : "memory");
     else
-        __asm__ volatile("stw %0,0(%1); eieio" : : "r"(value), "r"(address) : "memory");
+        __asm__ volatile("stw %0,0(%1); eieio" : : "r"(value), "b"(address) : "memory");
 }
 #endif
 static u32 read_reg(u32 offset)
