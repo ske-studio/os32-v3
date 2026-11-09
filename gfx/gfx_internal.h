@@ -67,16 +67,13 @@ void gfx_clear_planar_pages(u32 plane_size);
 #define _out(port, val)  outp((port), (val))
 #define _in(port)        inp((port))
 
+#include "copy_units.h"
 static inline void _memcpy_w(void *dst, const void *src, unsigned int words) {
-    __asm__ volatile("rep movsw"
-                     : "+D"(dst), "+S"(src), "+c"(words)
-                     : : "memory");
+    arch_copy16(dst, src, words);
 }
 
 static inline void _memcpy_d(void *dst, const void *src, unsigned int dwords) {
-    __asm__ volatile("rep movsl"
-                     : "+D"(dst), "+S"(src), "+c"(dwords)
-                     : : "memory");
+    arch_copy32(dst, src, dwords);
 }
 
 #endif /* __GFX_INTERNAL_H */
