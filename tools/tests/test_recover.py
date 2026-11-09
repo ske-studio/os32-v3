@@ -3,7 +3,7 @@
 --mutate covers T1 plus ADDENDUM.r2 §3 T1b mutations; hardware PTE work is T2.
 """
 CHECK = dict(name='recover-host', tier=1,
-    covers=['kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'include/types.h', 'tools/tests/recover_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'include/memmap.h', 'tools/tests/recover_hostshim/io.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'platform/pc98/pit_math.h', 'platform/pc98/platform_io.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/pc98.h', 'mm/paging.h', 'include/io.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover_wire.h', 'drivers/pci/pci_decode.h', 'include/config.h', 'kdebug/recover_diag.h', 'kdebug/recover_cleanup.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h'],
+    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'include/types.h', 'tools/tests/recover_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'include/memmap.h', 'tools/tests/recover_hostshim/io.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'platform/pc98/pit_math.h', 'platform/pc98/platform_io.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/pc98.h', 'mm/paging.h', 'include/io.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover_wire.h', 'drivers/pci/pci_decode.h', 'include/config.h', 'kdebug/recover_diag.h', 'kdebug/recover_cleanup.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h'],
     needs=[], budget=6.7)
 
 import os
@@ -26,7 +26,7 @@ def host_cmd(exe):
             "-I" + str(ROOT / "tools/tests/recover_hostshim"),
             "-I" + str(ROOT / "include"),
             "-I" + str(ROOT / "platform/pc98"),
-            str(ROOT / "tools/tests/recover_host.c"), "-o", str(exe)]
+            str(ROOT / "tools/tests/recover_host.c"), str(ROOT / "tools/tests/recover_gf_dev_stub.c"), "-o", str(exe)]
 
 
 MUTATIONS = [

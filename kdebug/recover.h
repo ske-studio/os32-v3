@@ -47,11 +47,14 @@
 #define KPEEK_VGA_CR            0x3D5U      /* NV_PRMCIO_CR__COLOR */
 #define KPEEK_VGA_BYTE_LEN      1U
 
-/* Fixed NV44A at PCI 0:13.0; PCI IDs and bit layouts live in pci_decode.h.
+/* NV44A on PCI bus 0; PCI IDs and bit layouts live in pci_decode.h.
  * Keep RECOVER aliases used by the M5 script/PLL implementation. VGA/NV
  * addresses are canonical here, shared with the kpeek read allowlist. */
 #define RECOVER_GF_BUS 0U
-#define RECOVER_GF_DEV 13U
+#define RECOVER_GF_DEV_FALLBACK 13U
+u32 recover_gf_dev(void);
+u32 recover_gf_second(void);
+#define RECOVER_GF_DEV (recover_gf_dev())
 #define RECOVER_GF_FN 0U
 #define RECOVER_GF_BDF (RECOVER_GF_DEV << 3)
 #define RECOVER_GF_DEVICE ((PCI_DEVICE_NV44A << 16) | PCI_VENDOR_NVIDIA)

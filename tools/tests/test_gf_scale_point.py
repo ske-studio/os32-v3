@@ -1,6 +1,6 @@
 """CENTER point-sample oracle: fixed half-pixel fixtures, one mutation."""
 CHECK = dict(name='gf-scale-point-host', tier=1, needs=[], budget=3.4,
-    covers=['tools/tests/test_gf_scale_point.py', 'tools/tests/gf_scale_point_host.c',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'tools/tests/test_gf_scale_point.py', 'tools/tests/gf_scale_point_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
             'kdebug/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
@@ -29,7 +29,7 @@ def command(exe):
             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
             *include_flags(ROOT), '-I'+str(ROOT),
-            str(ROOT/'tools/tests/gf_scale_point_host.c'), '-o', str(exe)]
+            str(ROOT/'tools/tests/gf_scale_point_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)]
 
 
 def execute(exe, green, label):

@@ -86,6 +86,7 @@ static i32 calc(struct gf5 *ctx, const struct gf5_clock *c, struct gf5_plan *p)
 static i32 prog(struct gf5 *ctx, const struct gf5_plan *p)
 { (void)ctx; (void)p; ++progs; if (crc_test) vram[0] ^= 1; return 0; }
 const struct gf5_test_ops *geforce_feature5_ops(void) { return &ops; }
+extern u32 recover_gf_test_dev;
 static void observe(void)
 {
     host_serial_reset(); reads = 0;
@@ -93,6 +94,7 @@ static void observe(void)
     REQUIRE(!writes && !polls && !progs);
     REQUIRE(g.last_rc == GF5_ETIME && g.source_rc == -123);
     REQUIRE(g.plan_guard.valid && g.plan_guard.epoch == 7);
+    if (!host_serial_find(recover_gf_test_dev == 12 ? "target=0:12.0/10de:0221" : "target=0:13.0/10de:0221")) quit(1);
     REQUIRE(host_serial_find("last_rc=-506 source_rc=-123 boundary=original"));
 }
 void _start(void)
@@ -107,7 +109,8 @@ void _start(void)
     g.plan_guard.valid = true; g.plan_guard.epoch = 7;
     ops = (struct gf5_test_ops){.ctx=&g, .perf_count=count, .perf_get=entry,
         .service_poll=poll, .clock_calc=calc, .clock_prog=prog, .ram_prog=prog};
-    observe();
+    recover_gf_test_dev=12; observe();
+    recover_gf_test_dev=13; observe();
     REQUIRE(reads == 6);
     REQUIRE(host_serial_find("stage=decode domain=0 mux_source=3 khz=270000"));
     REQUIRE(host_serial_find("stage=decode domain=1 mux_source=2 khz=135000"));

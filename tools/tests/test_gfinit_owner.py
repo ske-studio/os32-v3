@@ -13,6 +13,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 MUTATIONS = [
+    ('bdf_claim', 'gf_device.bdf = RECOVER_GF_BDF;', 'gf_device.bdf = 0;'),
     ('feature_dispatch_range', 'q.test > GF6_PRIM', 'q.test > GF4_DISPLAY'),
     ('feature_dispatch_session', 'q.test != GF6_PRIM && q.session', 'q.session'),
 
@@ -68,7 +69,7 @@ MUTATIONS = [
 
 def command(exe, probe=False):
     return ['gcc', *FLAGS, *(['-DGF_VPLL_PROBE=1'] if probe else []), *INCLUDES, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-            str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'lib/kprintf.c'),
+            str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), str(ROOT/'lib/kprintf.c'),
             str(ROOT/'platform/pc98/console_attr.c'), str(ROOT/'platform/pc98/console.c'), '-o', str(exe)]
 
 def mutation(item):

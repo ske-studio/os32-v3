@@ -33,6 +33,8 @@ static struct reg regs[] = {
 static struct gf_foundation f;
 static u32 ops, writes, unknown, cfg_reads, logs, register_calls, unregister_calls;
 static int register_rc, unregister_rc;
+static u8 pci_irq_line;
+static unsigned registered_line;
 static u32 fault_off, ack_fifo, ack_graph, ack_head[2], sequence[1024], seq_count;
 static bool live, in_irq, aggregate_hidden;
 static irq_handler_fn registered_fn;
@@ -94,10 +96,11 @@ static int write_mmio(void *arg, u32 bar, u32 off, u32 width, u32 value)
     } else r->value = value;
     return 0;
 }
+u32 recover_gf_dev(void) { return 9; }
 u8 pci_cfg_read8(u32 bus, u32 dev, u32 fn, u32 off)
 {
-    CHECK(!in_irq && bus == 0 && dev == 13 && fn == 0 && off == 0x3c);
-    cfg_reads++; return 6;
+    CHECK(!in_irq && bus == 0 && dev == 9 && fn == 0 && off == 0x3c);
+    cfg_reads++; return pci_irq_line;
 }
 void serial_puts_polled(const char *s)
 { CHECK(!in_irq && s); logs++; }
@@ -105,17 +108,17 @@ int serial_gate_active(void)
 { CHECK(!in_irq); return 0; }
 int irq_register(unsigned irq, irq_handler_fn fn, void *arg, unsigned flags)
 {
-    CHECK(!in_irq && irq == 6 && fn == gf_irq_handler && arg == &f && flags == IRQ_F_SHARED);
+    CHECK(!in_irq && irq == pci_irq_line && fn == gf_irq_handler && arg == &f && flags == IRQ_F_SHARED);
     CHECK(!reg_at(0x140)->value && !reg_at(0x2140)->value && !reg_at(0x40013c)->value);
     CHECK(!reg_at(0x600140)->value && !reg_at(0x602140)->value);
     /* Another device is already on the line: shared registration is required. */
     register_calls++;
-    if (!register_rc) { registered_fn = fn; registered_arg = arg; }
+    if (!register_rc) { registered_fn = fn; registered_arg = arg; registered_line = irq; }
     return register_rc;
 }
 int irq_unregister(unsigned irq, irq_handler_fn fn, void *arg)
 {
-    CHECK(!in_irq && irq == 6 && fn == registered_fn && arg == registered_arg);
+    CHECK(!in_irq && irq == registered_line && fn == registered_fn && arg == registered_arg);
     CHECK(!f.running);
     unregister_calls++;
     if (!unregister_rc) { registered_fn = 0; registered_arg = 0; }
@@ -128,6 +131,7 @@ static void clear_state(void)
     f.io.opaque = &f; f.io.read = read_mmio; f.io.write = write_mmio;
     live = true; fault_off = ~0U; unknown = 0; aggregate_hidden = false;
     registered_fn = 0; registered_arg = 0; register_rc = unregister_rc = 0;
+    pci_irq_line = 6; registered_line = 0;
     register_calls = unregister_calls = cfg_reads = logs = ops = writes = 0;
     seq_count = 0; ack_fifo = ack_graph = ack_head[0] = ack_head[1] = 0;
 }
@@ -171,6 +175,17 @@ static void registration(void)
     unregister_rc = 0;
     CHECK(gf_irq_detach(&f) == GF1_OK && !f.registered);
     CHECK(gf_irq_detach(&f) == GF1_OK && unregister_calls == 2);
+    clear_state(); pci_irq_line = 5;
+    CHECK(gf_irq_attach(&f) == GF1_OK && f.registered && f.irq_line == 5);
+    CHECK(register_calls == 1 && registered_line == 5);
+    pci_irq_line = 6; /* PCI changes do not alter the registered line. */
+    CHECK(gf_irq_detach(&f) == GF1_OK && unregister_calls == 1);
+    const u8 invalid[] = {0, 16, 0xff};
+    for (u32 i = 0; i < sizeof(invalid); i++) {
+        clear_state(); pci_irq_line = invalid[i];
+        CHECK(gf_irq_attach(&f) == GF1_EIRQ && f.last_rc == GF1_EIRQ);
+        CHECK(!f.registered && !register_calls && cfg_reads == 1);
+    }
     clear_state(); register_rc = IRQ_ERR_BUSY;
     CHECK(gf_irq_attach(&f) == GF1_EIRQ && !f.registered && f.last_rc == GF1_EIRQ);
     clear_state(); fault_off = 0x140;

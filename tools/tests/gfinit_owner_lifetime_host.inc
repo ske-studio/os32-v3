@@ -1,6 +1,8 @@
 static void lifecycle(void)
 {
-    setup();CHECK(call(GF_OP_INSPECT,0,0)==0 && writes==0 && reads>0 && owner->inspected);
+    setup();recover_gf_test_dev=12;CHECK(call(GF_OP_INSPECT,0,0)==0 && writes==0 && reads>0 && owner->inspected);
+    CHECK(gf_device.bdf==(recover_gf_test_dev<<3));
+    recover_gf_test_dev=13;
     CHECK(core.ops==&base && core.opaque==0 && core.s0_profile==&s0);
     CHECK(call(GF_OP_SIZE_BARS,0,0)<0 && begins==0);
     struct gfinit_request q=request(GF_ALLOW_WRITE,0);q.session++;

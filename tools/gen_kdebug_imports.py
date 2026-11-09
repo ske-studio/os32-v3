@@ -46,13 +46,21 @@ SELFTEST_OBJECTS = ('selftest_kbd_inject',
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
 
-def hwdev_gf_objects(root=ROOT):
-    """Read the GF object inventory from its authoritative make definition."""
+def hwdev_inventory(name, root=ROOT):
+    """Read a literal object inventory from its authoritative make definition."""
     text = (Path(root) / 'build/hwdev.mk').read_text()
-    match = re.search(r'^HWDEV_GF := ([\w ]+)$', text, re.M)
+    match = re.search(r'^' + re.escape(name) + r' := ([\w ]+)$', text, re.M)
     if not match:
-        raise ValueError('missing HWDEV_GF literal inventory')
+        raise ValueError(f'missing {name} literal inventory')
     names = tuple(match[1].split())
+    if not names or len(names) != len(set(names)):
+        raise ValueError(f'empty/duplicate {name} inventory')
+    return names
+
+
+def hwdev_gf_objects(root=ROOT):
+    """Return the GF objects exclusive to hwdev."""
+    names = hwdev_inventory('HWDEV_GF', root)
     # P6 links the common runner and opcode implementations into HWDEV.
     names += ('gf/runner', 'gf/save', 'gf/pll') + tuple(
         'gf/op/' + p.stem for p in sorted((Path(root)/'hwdev/gf/op').glob('*.c')))
@@ -245,9 +253,14 @@ def check_nm(entries, nm=None, root=ROOT):
     expected = {e['name'] for e in entries}
     if refs - expected:
         raise ValueError('unexpected core references: ' + str(sorted(refs - expected)))
+    # The shared PCI locator legitimately reads config space in kdebug. Other
+    # core objects must still not acquire the GF-only import.
+    non_locator = [p for p in callers if p.stem != 'pci_locate']
+    non_locator_refs = symbols(nm, non_locator, True)
     for e in entries:
         if e['symbol'] in GF_ONLY_SYMBOLS:
-            if not e.get('retained') or e['name'] in refs:
+            core_refs = non_locator_refs if e['symbol'] == 'pci_cfg_read32' else refs
+            if not e.get('retained') or e['name'] in core_refs:
                 raise ValueError('GF-only slot must be retained without core callers: ' + e['name'])
     # S6 includes data accessors; compare generated names, retaining kind.
     missing_s6 = {e['name'] for e in entries if e['stage'] == 'S6' and not e.get('retained')} - refs

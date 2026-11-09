@@ -1,3 +1,4 @@
+extern unsigned int recover_gf_test_dev;
 #include "gfinit_owner_fixture_host.inc"
 #include "gfinit_owner_c_cases_host.inc"
 #include "gfinit_owner_lifetime_host.inc"

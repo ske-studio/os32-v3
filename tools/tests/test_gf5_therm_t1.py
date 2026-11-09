@@ -1,7 +1,7 @@
 """T1 continuous thermal samples, priority, pause edges and maximum fan."""
 CHECK = dict(name='gf5-therm-t1', tier=1, needs=['make:all'], budget=4.8,
              # Includes inputs reached through the shared test_gf5 runner.
-             covers=['arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
                  'hwdev/gf/**',
                  'tools/tests/gf5*',
                  'tools/tests/test_gf5_therm_t1.py',
