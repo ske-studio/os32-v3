@@ -39,6 +39,7 @@ ppc_root_flush:
     andc 6,5,6
     sync
     mtmsr 6
+    sync
     isync
     cmpwi 4,0
     beq .Lclear
@@ -70,7 +71,9 @@ ppc_root_flush:
     li 6,(PPC_MSR_IR|PPC_MSR_DR)
     andc 5,5,6
 .Lrestore:
+    sync
     mtmsr 5
+    sync
     isync
     lwz 0,36(1)
     mtlr 0

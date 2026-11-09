@@ -24,7 +24,9 @@ MUTATIONS = [
      '    lwz 6,.Lcurrent_root@l(5)\n    cmpw 3,6\n    beq .Lfinish\n    stw 3,.Lcurrent_root@l(5)'),
     ('no-hpt-clear', '    bl ppc_hpt_clear', '    nop'),
     ('no-tlb-completion', '    tlbsync\n    sync', '    nop\n    nop'),
-    ('no-msr-restore', '    mtmsr 5\n    isync', '    nop\n    isync'),
+    ('no-msr-restore', '    mtmsr 5\n    sync\n    isync', '    nop\n    sync\n    isync'),
+    ('no-post-mtmsr-sync', '    mtmsr 6\n    sync\n    isync',
+     '    mtmsr 6\n    isync'),
     ('no-tlbie', '    tlbie 3', '    nop'),
     ('short-tlb', '    li 4,PPC_TLB_COUNT', '    li 4,32'),
 ]
@@ -60,6 +62,11 @@ def host(dis):
         if m: ins[int(m[1],16)]=(m[2],m[3].split('#')[0].strip())
         m=re.match(r'\s*([0-9a-f]+): R_PPC_(\w+)\s+(.*)',line)
         if m: reloc[int(m[1],16)&~3]=(m[2],m[3])
+    for pc,(op,arg) in ins.items():
+        if op=='mtmsr':
+            require(ins.get(pc-4,('', ''))[0]=='hwsync' and
+                    [ins.get(pc+n,('', ''))[0] for n in (4,8)]==['hwsync','isync'],
+                    'MSR change requires sync / mtmsr / sync / isync')
     root_addr=0x200000
     def scenario(entry, current, new, saved):
         regs=[0]*32; regs[1]=0x100000; regs[3]=new
@@ -119,7 +126,7 @@ def host(dis):
         require(memory[root_addr]==expected,'root storage')
         require(cleared==1 and tlb==list(range(0,64*4096,4096)),'unconditional complete flush')
         last=max(i for i,e in enumerate(events) if e=='tlbie')
-        require(events[last+1:last+6]==['eieio','hwsync','tlbsync','hwsync',('msr',saved if expected else saved&~0x30)],'TLB completion then MSR restore')
+        require(events[last+1:last+9]==['eieio','hwsync','tlbsync','hwsync','hwsync',('msr',saved if expected else saved&~0x30),'hwsync','isync'],'TLB completion then MSR restore')
         require(msr==(saved if expected else saved&~0x30),'MSR restored')
         require(regs[1]==0x100000 and lr==0xabcdef,'ABI stack/LR restored')
         if entry=='ppc_root_load': require(events.index('root')<events.index('clear'),'root publication order')
