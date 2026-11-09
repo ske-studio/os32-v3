@@ -63,11 +63,11 @@ int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
 #define LEGACY_FAKE_DISPATCH_ENABLE
 #include "legacy_guest_fake.h"
 
-int kapi_strings_call(u32 slot, void *target, const void *args,
-                      u32 nbytes, u16 ptrmask, u32 *result)
+int kapi_strings_from_source(u32 slot, void *target, struct kapi_arg_source *src,
+                      unsigned count, u16 ptrmask, u32 *result)
 {
     assert(slot == 0);
-    (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
+    (void)target; (void)src; (void)count; (void)ptrmask; (void)result;
     return 0;
 }
 #include "ring3_ls.h"

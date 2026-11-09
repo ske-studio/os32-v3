@@ -31,6 +31,21 @@ static void exec_park_stop(struct arch_syscall *frame)
     exec_park_transfer(id, a, frame, appslot_park_stop_commit);
 }
 
+/* Keep the dispatcher's existing stack budget: five/six-argument consumers
+ * need a larger outgoing area than the transitional four-argument adapter.
+ * Values remain owned by each consumer, after its admission gates. */
+static __attribute__((noinline)) int exec_kapi_special(u32 slot, void *wrapper,
+                                                     struct kapi_arg_source *src,
+                                                     u32 *result)
+{
+    unsigned count = kapi_fixed_count[slot];
+    int handled = legacy_call_dispatch(slot, wrapper, src, count, result);
+    if (!handled) handled = arch_kapi_legacy_print(src->call, slot, result);
+    if (!handled) handled = kapi_strings_from_source(slot, wrapper,
+                                                    src, count, kapi_argptr[slot], result);
+    return handled;
+}
+
 void exec_syscall_dispatch(struct arch_syscall *view)
 {
     struct arch_syscall call = *view;
@@ -93,7 +108,7 @@ void exec_syscall_dispatch(struct arch_syscall *view)
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
 
-    int handled = arch_kapi_legacy_call(&call, slot, (void *)wrapptr, &result);
+    int handled = exec_kapi_special(slot, (void *)wrapptr, &src, &result);
     if (handled < 0) {
         ring3_fault_kill();
         result = OS32_ERR_INVAL;

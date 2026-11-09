@@ -114,7 +114,7 @@ int legacy_trap(void *frame)
 #ifndef LEGACY_FAKE_DISPATCH
 #define LEGACY_FAKE_DISPATCH legacy_fake.dispatch_result
 #endif
-int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u32 *result)
-{ legacy_fake_note(12); (void)slot; (void)fn; (void)args; (void)bytes; (void)result; return LEGACY_FAKE_DISPATCH; }
+int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count, u32 *result)
+{ legacy_fake_note(12); (void)slot; (void)fn; (void)src; (void)count; (void)result; return LEGACY_FAKE_DISPATCH; }
 #undef LEGACY_FAKE_DISPATCH_ENABLE
 #endif

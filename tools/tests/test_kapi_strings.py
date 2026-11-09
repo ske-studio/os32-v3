@@ -37,7 +37,7 @@ def guest_declarations():
     print('PASS guest declarations: kstr_boundary GUI / kstr_v86 CUI')
 
 
-def run(args, mutant=None):
+def exercise(args, mutant=None):
     sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
     setup = (ROOT / 'tools/tests/access_walk_host.c').read_text()
     setup = setup.replace('#include "pgalloc_host_fixture.h"',
@@ -46,11 +46,7 @@ def run(args, mutant=None):
     sources['setup'] = setup
     sources['strings'] = (ROOT / 'kapi/kapi_strings.c').read_text()
     dispatch = exec_source(ROOT)
-    adapter = (ROOT / 'arch/x86/kernel/syscall_entry.c').read_text()
-    start = adapter.index('    return kapi_strings_call(')
-    # Execute the actual forwarding expression; generic dispatch is covered by
-    # kapi-call-host, and string staging remains the product translation unit.
-    sources['dispatch'] = adapter[start:adapter.index('\n}', start)]
+    sources['call'] = (ROOT / 'arch/x86/kernel/kapi_call.c').read_text()
     cleanup = dispatch.index('static void exec_reclaim_resources(int id)\n{')
     sources['cleanup'] = dispatch[cleanup:dispatch.index('    /* (1)', cleanup)] + '    (void)id;\n}\n'
     sources['ls'] = (ROOT / 'exec/ring3_ls.c').read_text().split('static int ls_copy_path', 1)[1].split('static void ls_collect_entry', 1)[0]
@@ -80,6 +76,9 @@ def run(args, mutant=None):
 
 
 def mutants(args):
+    yield ('strings', '!arch_kapi_read_block(src, 0, count, &values)',
+           '(!arch_kapi_read_block(src, 0, count, &values) && (values.value[0] = 0, 0))',
+           'fixed copy failure ignored')
     names = GROUPS if args.group == 'all' else [args.group]
     if args.group in ('all', 'mount'):
         for slot, mask in (('SYS_MOUNT', 7), ('SYS_UMOUNT_CHECKED', 1)):
@@ -95,9 +94,9 @@ def mutants(args):
         yield ('strings', 'args[i] = (u32)(uptr)p;',
                f'if (slot != {slot}) args[i] = (u32)(uptr)p;', group + ' raw string pointer')
     yield ('strings', '/* Preserve the early pointer gate',
-           'for (u32 i = 0; i < nbytes / 4; i++) args[i] = ((const u32 *)user_args)[i];\n    /* Preserve the early pointer gate', 'raw argument words')
+           'for (unsigned i = 0; i < count; i++) args[i] = ((const u32 *)(uptr)(((const u32 *)src->call->native)[11] + 4))[i];\n    /* Preserve the early pointer gate', 'raw argument words')
     yield ('strings', 'p, input->cap)) goto out;',
-           'p, input->cap)) { *result = kapi_invoke(target, args, nbytes); goto out; }', 'side effect on refusal')
+           'p, input->cap)) { *result = arch_kapi_invoke(target, &values, count); goto out; }', 'side effect on refusal')
     yield ('cleanup', '    kapi_strings_cleanup_owned(id);',
            '    /* missing owner cleanup */', 'nonlocal owner cleanup hook')
     yield ('strings', 'if (p) kfree(p);', 'if (p) (void)p;', 'staging leak')
@@ -114,11 +113,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         guest_declarations()
-        run(args)
+        exercise(args)
         if args.mutate:
             all_mutants = list(mutants(args))
             for m in all_mutants:
-                run(args, m)
+                exercise(args, m)
             print(f'PASS {len(all_mutants)}/{len(all_mutants)} mutations runtime RED')
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')

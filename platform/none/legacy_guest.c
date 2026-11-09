@@ -15,10 +15,10 @@ void legacy_cleanup(void) {}
 void legacy_request_exit(void) {}
 int legacy_trap(void *frame) { (void)frame; return 0; }
 int legacy_kbd_push(u8 scancode) { (void)scancode; return 0; }
-int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes,
+int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count,
                          u32 *result)
 {
-    (void)fn; (void)args; (void)bytes;
+    (void)fn; (void)src; (void)count;
     switch (slot) {
     case KAPI_SLOT_V86_SELFTEST:
     case KAPI_SLOT_V86_DISKTEST:

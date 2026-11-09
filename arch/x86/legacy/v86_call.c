@@ -1,4 +1,5 @@
 #include "v86_call.h"
+#include "kapi_call.h"
 #include "appslot.h"
 #include "redir_access.h"
 #include "v86_mem.h"
@@ -14,7 +15,6 @@
 #define V86_CALL_MAX_PATHS 2
 
 extern volatile int ring3_in_syscall, ring3_wm_depth;
-extern u32 kapi_invoke(void *target, const void *args, u32 bytes);
 
 /* Allocated once at boot, retained by core outside the low guest area. */
 static void *mailbox;
@@ -75,10 +75,11 @@ void v86_call_cleanup(void)
     call.pinned = 0;
 }
 
-int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
+int v86_call_dispatch(u32 slot, void *target, struct kapi_arg_source *src, unsigned count,
                       u32 *result)
 {
-    u32 staged[V86_CALL_MAX_PATHS] = {0}, output = 0;
+    struct kapi_values values;
+    u32 *staged = values.value, output = 0;
     int paths = 0, capture = 0, handled = 1;
     switch (slot) {
     case KAPI_SLOT_V86_SELFTEST: break;
@@ -104,8 +105,8 @@ int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
     call.cr3 = paging_current_cr3();
     call.pinned = 1;
     *result = OS32_ERR_INVAL;
-    if (bytes != (u32)(capture ? 2 : paths) * sizeof(u32) ||
-        !copy_caller_bytes(&call.caller, args, staged, bytes)) {
+    if (count != (unsigned)(capture ? 2 : paths) ||
+        !arch_kapi_read_block(src, 0, count, &values)) {
         handled = -1;
         goto out;
     }
@@ -135,11 +136,11 @@ int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
     }
     /* int80 runs on the shared core stack. Its saved KAPI frame and ESP0
      * remain there while caller-private mappings are absent from master. */
-    if (!shared_stack((uptr)&staged) || !shared_stack(tss_get_esp0()))
+    if (!shared_stack((uptr)&values) || !shared_stack(tss_get_esp0()))
         goto out;
     paging_load_cr3(paging_kernel_pd_phys());
     *result = capture ? (u32)v86_gdc_capture((int)staged[0], call.capture)
-                      : kapi_invoke(target, staged, bytes);
+                      : arch_kapi_invoke(target, &values, count);
     paging_load_cr3(call.cr3);
     struct caller_access live;
     if (!caller_access_get_user(&live) || live.as != call.caller.as ||

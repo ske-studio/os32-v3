@@ -1,6 +1,7 @@
 #ifndef OS32_LEGACY_GUEST_H
 #define OS32_LEGACY_GUEST_H
 #include "types.h"
+struct kapi_arg_source;
 /* Link exactly one provider. State queries are independent: a pinned caller
  * need not have opened low mappings yet. End precedes normal-stack cleanup. */
 int legacy_init(void);
@@ -17,6 +18,6 @@ int legacy_trap(void *native_frame);
 void legacy_request_exit(void);
 int legacy_kbd_push(u8 scancode);
 /* Other slot=0, handled=1, bad caller=-1 (caller performs fault kill). */
-int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes,
+int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count,
                          u32 *result);
 #endif

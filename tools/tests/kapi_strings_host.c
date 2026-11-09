@@ -60,12 +60,16 @@ u32 kapi_invoke(void *target, const void *words, u32 bytes)
 #include "cleanup_host_source.c"
 
 void ring3_fault_kill(void) { __builtin_longjmp(killed, 1); }
+#include "call_host_source.c"
 static int forward_strings(u32 slot, void *wrapper, const void *args,
                            u32 bytes, u16 mask, u32 *result)
 {
-    u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
-    kapi_argptr[slot] = mask;
-#include "dispatch_host_source.c"
+    u32 frame[13] = {0};
+    frame[11] = (u32)(uptr)args - sizeof(u32);
+    struct arch_syscall call = {frame};
+    struct kapi_arg_source src;
+    arch_kapi_source(&src, &call);
+    return kapi_strings_from_source(slot, wrapper, &src, bytes / sizeof(u32), mask, result);
 }
 static int dispatch_strings(u32 slot, u32 va, u32 nbytes, u16 ptrmask)
 {
@@ -124,6 +128,7 @@ static void caller_copy_tests(void)
                 words[i] = expected[i] = c->mask & (1u << i) ? va + 512 :
                     c->pointers & (1u << i) ? va + 1024 : 0x99 + i;
             invoke(c, va, 1);
+            invoke(c, U32_MAX, 0); /* native SP/argument addition overflow */
             /* Every string argument independently ends on the final page byte.
              * Earlier arguments are valid when a later input fails. */
             for (u32 i = 0; i < c->bytes / 4; i++) {
@@ -168,7 +173,7 @@ static void caller_copy_tests(void)
              * staging; cleanup for a different app must leave it intact. */
             invoked_bytes = c->bytes; expected_mask = c->mask;
             nonlocal = expected_accept = 1;
-            if (!__builtin_setjmp(escape)) { u32 result; kapi_strings_call(c->slot, (void *)0x1234, (void *)(uptr)va, c->bytes, c->pointers, &result); CHECK(0); }
+            if (!__builtin_setjmp(escape)) { u32 result; forward_strings(c->slot, (void *)0x1234, (void *)(uptr)va, c->bytes, c->pointers, &result); CHECK(0); }
             nonlocal = 0;
             kapi_strings_cleanup_owned(3);
             CHECK(allocated[0]);

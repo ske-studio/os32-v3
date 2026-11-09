@@ -33,7 +33,7 @@ MUTANTS = [
 ]
 
 
-def run(runner, mutant=None):
+def exercise(runner, mutant=None):
     sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
     setup = (ROOT / 'tools/tests/access_walk_host.c').read_text()
     setup = setup.replace('void __cdecl kprintf(', 'void __cdecl host_log(')
@@ -46,9 +46,8 @@ def run(runner, mutant=None):
                       ('attr_backend', 'platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
     dispatch = (ROOT / 'arch/x86/kernel/syscall_entry.c').read_text()
-    start = dispatch.index('    if (slot == KAPI_SLOT_KPRINTF) {')
-    end = dispatch.index('    return kapi_strings_call(', start)
-    sources['dispatch'] = dispatch[start:end]
+    start = dispatch.index('    if (slot != KAPI_SLOT_KPRINTF) return 0;')
+    sources['dispatch'] = dispatch[start:dispatch.index('\n}', start)].replace('    u32 sp = ((const u32 *)call->native)[11];\n    const void *args = (const void *)(uptr)(sp + sizeof(u32));\n', '')
     if mutant:
         name, key, old, new = mutant
         assert sources[key].count(old) == 1, name
@@ -82,10 +81,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         inventory()
-        run(args.runner)
+        exercise(args.runner)
         if args.mutate:
             for mutant in MUTANTS:
-                run(args.runner, mutant)
+                exercise(args.runner, mutant)
             print(f'PASS {len(MUTANTS)}/{len(MUTANTS)} mutations runtime RED')
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')

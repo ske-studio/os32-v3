@@ -24,8 +24,8 @@ int legacy_trap(void *native_frame)
     v86_int80(frame);
     return 1;
 }
-int legacy_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes,
+int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count,
                          u32 *result)
 {
-    return v86_call_dispatch(slot, fn, args, bytes, result);
+    return v86_call_dispatch(slot, fn, src, count, result);
 }

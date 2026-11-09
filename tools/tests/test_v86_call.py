@@ -2,7 +2,7 @@
 Normal controls always run before compiled runtime-RED mutations.
 """
 CHECK = dict(name='v86-call-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'arch/x86/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'arch/x86/legacy/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['arch/x86/kernel/kapi_call.c', 'include/kapi_call.h', 'include/kapi_call_generated.h', 'include/v86_call.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'arch/x86/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'arch/x86/legacy/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=3.1)
 
 from kernel_includes import include_flags
@@ -15,6 +15,10 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('call', 'if (call.pinned) return 1;', 'if (0) return 1;', 'pin-gate'),
+    ('call', '    *result = OS32_ERR_BUSY;',
+     '    struct kapi_values early; arch_kapi_read_block(src, 0, count, &early);\n    *result = OS32_ERR_BUSY;', 'read-before-gate'),
+
     ('redir', 'if (!dst[i]) { ok = 1; break; }',
      'if (!dst[i] || i + 1 == cap) { ok = 1; break; }', 'missing-terminator'),
     ('call', 'call.path[i], VFS_MAX_PATH)) {',
@@ -31,15 +35,15 @@ MUTANTS = [
 
 
 def main():
-    sources = {'call': (ROOT / 'arch/x86/legacy/v86_call.c').read_text(),
+    sources = {'arch_call': (ROOT / 'arch/x86/kernel/kapi_call.c').read_text(), 'call': (ROOT / 'arch/x86/legacy/v86_call.c').read_text(),
                'redir': (ROOT / 'exec/redir_access.c').read_text(),
                'guest': (ROOT / 'userland/tests/kstr_v86.c').read_text().replace(
                    '#include <string.h>', '')}
     with tempfile.TemporaryDirectory(prefix='v86-call-') as td:
         folder = Path(td)
-        def run(parts, red=False):
+        def exercise(parts, red=False):
             for key, body in parts.items():
-                (folder / {'call': 'v86_call_source.c', 'redir': 'redir_source.c',
+                (folder / {'arch_call': 'arch_call_source.c', 'call': 'v86_call_source.c', 'redir': 'redir_source.c',
                            'guest': 'guest_host_source.c'}[key]).write_text(body)
             exe = folder / 'entry'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Os', '-Wall', '-Wextra',
@@ -57,13 +61,13 @@ def main():
                 else:
                     assert result.returncode == 0 and 'GREEN ' in result.stdout, result
                 print(runner, result.stdout.strip(), flush=True)
-        run(sources)
+        exercise(sources)
         if '--mutate' in sys.argv:
             for key, old, new, label in MUTANTS:
                 assert sources[key].count(old) == 1, old
                 changed = dict(sources)
                 changed[key] = changed[key].replace(old, new)
-                run(changed, red=True)
+                exercise(changed, red=True)
                 print('MUTATE RED (compiled runtime):', label, flush=True)
     return 0
 
