@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """H1: isolated type contract, real product flags, and libc-free ILP32 runtime."""
-CHECK = dict(name='type-contract', tier=1, needs=[], budget=25,
+CHECK = dict(name='type-contract', tier=1, needs=[], budget=180,
     covers=['include/type_contract.h', 'include/types.h', 'include/callconv.h',
             'arch/x86/arch_type_contract.h', 'tools/abi/type_contract.c',
             'tools/tests/test_type_contract.py', 'tools/tests/host32.py',
@@ -96,7 +96,7 @@ PRODUCT_GOALS = (
     ('GF_VPLL_PROBE=1', 'gf-vpll-probe'),
     *((f'GEFORCE_ACCEPT={mode}', 'GF_ACCEPT_ID=type-contract', 'geforce-accept', 'gshell')
       for mode in ('byte-uc', 'dword-uc', 'dword-wc')),
-    ('kernel-lgy98', 'kernel-lgy98-link', 'kernel-nolgy98'),
+    ('kernel-lgy98',), ('kernel-lgy98-link',), ('kernel-nolgy98',),
 )
 ABI_FLAGS = {'-fsigned-char', '-funsigned-char', '-fno-signed-char',
              '-fno-unsigned-char', '-fshort-enums', '-fno-short-enums'}
@@ -126,13 +126,21 @@ def compiler_commands(output):
         try:
             tokens = list(lexer)
         except ValueError:
-            continue  # e.g. make's human-readable directory messages
+            assert not re.search(r'i[3-6]86-elf-(?:gcc|clang)', line), line
+            continue  # make's human-readable directory messages
         command = []
         for token in [*tokens, ';']:
             if token and all(c in ';&|()' for c in token):
                 while command and (command[0] in ('env', 'ccache') or
                                    re.match(r'^[A-Za-z_][A-Za-z_0-9]*=', command[0])):
                     command.pop(0)
+                compiler_positions = [i for i, word in enumerate(command)
+                    if re.fullmatch(r'i[3-6]86-elf-(gcc|clang)(-[0-9.]+)?', Path(word).name)]
+                # This generator takes a compiler as data, like echo/printf.
+                generator = (command[:2] == ['python3', 'tools/' + 'gen_hwdev_contract.py']
+                             and '--cc' in command and '--flags' in command)
+                if command and command[0] not in ('echo', 'printf') and not generator:
+                    assert all(i == 0 for i in compiler_positions), command
                 if (command and re.fullmatch(r'i[3-6]86-elf-(gcc|clang)(-[0-9.]+)?',
                                              Path(command[0]).name)
                         and any(t.endswith('.c') for t in command[1:])):
@@ -143,10 +151,34 @@ def compiler_commands(output):
 
 
 def check_recipes(root, goals=PRODUCT_GOALS):
+    stamp = root / 'build/out/lgy98.flags'
+    saved = stamp.read_bytes() if stamp.exists() else None
+    try:
+        return inspect_recipes(root, goals)
+    finally:
+        if saved is None:
+            stamp.unlink(missing_ok=True)
+        else:
+            stamp.write_bytes(saved)
+
+
+def inspect_recipes(root, goals):
     counts = Counter()
     env = dict(os.environ, MAKEFLAGS='', MFLAGS='', MAKEOVERRIDES='', GNUMAKEFLAGS='')
+    stamp = root / 'build/out/lgy98.flags'
+    saved_stamp = stamp.read_bytes() if stamp.exists() else None
     for group in goals:
-        result = subprocess.run(['make', '-n', '-B', '--no-print-directory',
+        setting = {'kernel-lgy98': '5', 'kernel-lgy98-link': '9',
+                   'kernel-nolgy98': 'off'}.get(group[0])
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        if setting is not None:
+            stamp.write_text(setting + '\n')
+        elif saved_stamp is None:
+            stamp.unlink(missing_ok=True)
+        else:
+            stamp.write_bytes(saved_stamp)
+        # Recursive dry-runs must not interleave command lines in stdout.
+        result = subprocess.run(['make', '-j1', '-n', '-B', '--no-print-directory',
             'ARCH=x86', 'PLATFORM=pc98', 'CHECK_TIME_CHILD=1', 'DEPFILES=', *group],
             cwd=root, capture_output=True, text=True, env=env, timeout=1800)
         assert result.returncode == 0, (group, result.stderr)
@@ -172,10 +204,15 @@ def check_recipes(root, goals=PRODUCT_GOALS):
                 '-fsyntax-only' in command and
                 ('-Iboot' in command or 'lib/sqlite3/os32_sqlite_config.h' in command))
             flags = [t for t in command if t in ABI_FLAGS]
-            assert not any(t in flags for t in
-                ('-funsigned-char', '-fno-signed-char', '-fshort-enums')), command
+            char = [t in ('-fsigned-char', '-fno-unsigned-char') for t in flags
+                    if t in ('-fsigned-char', '-fno-unsigned-char',
+                             '-funsigned-char', '-fno-signed-char')]
+            enums = [t == '-fno-short-enums' for t in flags
+                     if t in ('-fshort-enums', '-fno-short-enums')]
+            assert not char or char[-1], command
+            assert not enums or enums[-1], command
             if not (boot or standalone or probe_defaults):
-                assert '-fsigned-char' in flags and '-fno-short-enums' in flags, command
+                assert char and enums, command
             label = ('probe' if '-fsyntax-only' in command else
                      'boot' if boot else 'SQLite standalone' if standalone else
                      'SQLite module' if '-std=gnu89' in command else
@@ -212,6 +249,51 @@ def recipe_mutations(tree):
             print('RED expanded C flags: ' + replacement)
         else:
             raise AssertionError('surviving recipe mutation: ' + replacement)
+        finally:
+            path.write_text(original)
+
+    path = tree / 'build/programs.mk'
+    original = path.read_text()
+    anchor = '$(CC) $(PROGRAM_FLAGS) -DOS32_CRT_RESIDENT -c sdk/allocator/nano_adapter.c -o $@'
+    assert original.count(anchor) == 1
+    for suffix, accepted in (
+            ('-funsigned-char -fsigned-char -fshort-enums -fno-short-enums', True),
+            ('-fno-signed-char -fno-unsigned-char -fno-short-enums', True),
+            ('-fsigned-char -funsigned-char', False),
+            ('-fno-short-enums -fshort-enums', False),
+            ('conditional', False)):
+        replacement = (('if true; then ' + anchor.replace('$(PROGRAM_FLAGS)',
+                       '$(PROGRAM_FLAGS) -funsigned-char') + '; fi')
+                       if suffix == 'conditional' else
+                       anchor.replace('$(PROGRAM_FLAGS)', '$(PROGRAM_FLAGS) ' + suffix))
+        path.write_text(original.replace(anchor, replacement))
+        try:
+            try:
+                check_recipes(tree, (PRODUCT_GOALS[0],))
+            except AssertionError as error:
+                assert not accepted and 'i386-elf-gcc' in str(error), error
+                print('RED ' + suffix)
+            else:
+                assert accepted, suffix
+                print('GREEN ' + suffix)
+        finally:
+            path.write_text(original)
+
+    path = tree / 'build/config.mk'
+    original = path.read_text()
+    for goal, condition in (('kernel-lgy98', 'ifeq ($(LGY98_FLAGS),5)'),
+                            ('kernel-lgy98-link', 'ifeq ($(LGY98_FLAGS),9)'),
+                            ('kernel-nolgy98', 'ifndef LGY98')):
+        path.write_text(original + '\n' + condition +
+                        '\nKERNEL_CFLAGS += -funsigned-char\nendif\n')
+        try:
+            try:
+                check_recipes(tree, ((goal,),))
+            except AssertionError as error:
+                assert 'i386-elf-gcc' in str(error), error
+                print('RED stamp profile ' + goal)
+            else:
+                raise AssertionError('surviving LGY98 mutation: ' + goal)
         finally:
             path.write_text(original)
 
