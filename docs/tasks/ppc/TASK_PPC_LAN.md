@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-11、LAN の実装は QEMU で到達。受入の自動化 P29〜P33 = 8 本目が残り)** — 段の状態は §2、残りの段の順と見込みは §3。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。実機で初めて確かめる物 (clock・PHY・DMA・cache) は設計の §8 の順で観測する。QEMU で確かめられる段から始める。
+> 状態: **受入完了・実機確認待ち (2026-11-11)** — QEMU 7450・7455 で受入済み。LAN (GMAC) で起動ログをホストへ保存し 5 診断が往復する。受入は kboot_run・kboot_accept・kboot_all に入った。実機の前の段 (UniNorth の clock の alias、実機の PHY、cache・DMA) は持越し台帳の PPC-LAN-RH。段の状態は §2。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。
 
 ## 0. ユーザー決定
 
@@ -45,8 +45,9 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P22a〜P22d・P22・P22e・P23 と各 H | main (2598c3fa)。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c (P22e で境目を単純化: PEEK は RAM の許可表 1 種で VA と PA を照らす)、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
 | P24a〜P24d・P24 と各 H | main (761ca15f)。gem_phy.c の DONE の link 観測、lan_log.c の統計の口、PPC の I/O の実体 lan_gem_io.c、診断の元 lan_diag.c、service lan_service.c (7 状態、件数の予算、印は LAN STATE と LAN OFF だけ)。新しい TU は PPC の像にまだ入らない (P26) |
 | P5b・P14b・P17c・P12b と各 H | main (761ca15f)。QEMU の先行スモーク S1 で見つけた core の直し (bdf の形、半分の reset の bit、AN の判定、descriptor の同期)。4 段を入れた S1 で 7450・7455 とも TX と RX の実 frame が往復した (設計の「S1 の観測」) |
-| P26・P25 | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint7 = 7 本目、LAN の実装の到達)。LAN の TU 15 本が PPC の像に入り、起動が ESCC の後に log を登録・GMAC を quiesce・CLOCK の後に pm_lan_start・READY 以後を pm_lan_poll で回す。PM の QEMU の実測で到達点を確認 (設計の「7 本目の実測」) |
-| P29〜P33 と各 H | 未着手 (8 本目 = LAN の最後、順と見込みは §3) |
+| P26・P25 | main (d50dfda0、7 本目、LAN の実装の到達)。LAN の TU 15 本が PPC の像に入り、起動が ESCC の後に log を登録・GMAC を quiesce・CLOCK の後に pm_lan_start・READY 以後を pm_lan_poll で回す。PM の QEMU の実測で到達点を確認 (設計の「7 本目の実測」) |
+| P29・P31+P32・P33 と H29 | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint8 = 8 本目 = LAN の最後)。P29: kboot_run.py が LAN を持つ像で UDP の netdev とホストの Host を使い、保存・5 診断・PEEK・MEMORY を照合 (sandbox では SKIP LAN socket rc=3)、--lan-off。P31+P32 (最小、1 段にまとめた): kboot_accept が SKIP を 3 で返し LAN 無効を両 CPU で 1 回、kboot_all が 3 を SKIP と数える。P33: PPC_KBOOT_DESIGN に LAN の起動の追記 |
+| P30・H30・H31・H32・H33 | やめた (2026-11-11、ユーザーの「過剰に防御してませんか？」を受けた PM 決定。故障の道筋は host の模型 H14・H17・H24 が持ち、QEMU で重ねない。設計 PPC_LAN_MARKS_DESIGN の末尾) |
 
 ## 3. 実装スケジュール (2026-11-11、fable 起案、PM 確認)
 

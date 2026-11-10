@@ -99,3 +99,9 @@
 - F11: kboot_all は 1 件でも FAIL/TIMEOUT があれば 1、そうでなく SKIP (rc=3) があれば 3。SKIP は --fail-fast で止めず、TOTAL 行と JSON に SKIP として数える。
 - PM 決定: service の enum は `OFF=0 … QUARANTINED=6` を明示して serial の契約を製品に残す (段 P24)。`link=` は DESIGN.final のとおり残す。保存待ち 5 秒は P29 の実測で調整してよい。
 - PM 決定 (2026-11-11、P24 のレビュー第 1 回の P2 への判断): 未知 PHY の guest 変異の契約は実装の順に合わせて `LAN STATE state=1 link=0` (start 時) → `LAN OFF code=-6` → ALIVE 継続とする (未知 PHY は段 P17 の決定どおり gem_mif_init が EUNSUPPORTED を返し RESETTING から OFF へ。PHY_WAIT へ判定を移さない)。上の F5 の例の `state=4` はこれに置き換える。
+
+## 実装で決めたこと (2026-11-11、段 P29・P31+P32 の取り込みで PM が決定。上の「確定」より優先)
+- QEMU の guest 変異 (F5・F10 の未知 PHY と停止確認不能の 2 件、段 P30・H30) は作らない。ユーザーの「過剰に防御してませんか？」を受け、シングルタスク前提で見直した: その故障の道筋は host の模型の試験 (H14 の reset の期限、H17 の未知 PHY、H24 の OFF と隔離への移り) が製品の TU のまま固定しており、QEMU で重ねる意味が無い。P31・P32 の H (H31・H32) と P33 の H も作らない。
+- P29 のレビュー第 1 回の P2 (STATUS の PHY ID の照合を足す) は採らない。PHY ID が採れていなければ RUNNING (`LAN STATE state=5 link=1`) に届かないので、state=5 の照合で足りる。
+- P31 と P32 は 1 段にまとめた (最小): kboot_accept は両 CPU の通常の像の LAN の受入が SKIP なら最後に `SKIP LAN socket rc=3` を出して 3、同じ像を `-nic none` で両 CPU 1 回ずつ (`LAN OFF code=-2`)。kboot_all は子の 3 を SKIP と数え、FAIL/TIMEOUT があれば 1、SKIP だけなら 3 (F11)。
+- 照合の peer は guest の既定どおり broadcast (READ_DIAG の 150..155 は ff:ff:ff:ff:ff:ff)。kboot_run.py は TMPDIR を要する (前からの形)。
