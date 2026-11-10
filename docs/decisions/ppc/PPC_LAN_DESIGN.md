@@ -308,7 +308,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - dst・src・boot・peer の照合、応答枠 1 個と満杯時の drop の計数は service (段 P24) が持つ。monitor は opcode・長さ・範囲・cache (送信元 MAC + nonce + request_id の 16 件) だけ。
 - PEEK の 1 byte の読みの PPC の実体 `pm_lan_copy8` は lan_monitor.c に置く (IRQ 保存 → `ppc_trap_onfault_data` → `ppc_probe_copy8` → clear → 復元)。PPC の managed RAM は恒等写像なので、PA も同じ peek_ok の区間で照らす。
 - `ppc_trap_onfault_data` は DSI の MISS・PROTECT・IO の集合だけを一回限り拾う。既存の exact reason の口 `ppc_trap_onfault` はそのまま (arm で data の印を落とす)。有効な PTE が MMIO の PA を指していても DSI_IO にはならないので、MMIO の拒否は monitor の I/G の検査と許可範囲で行う。
-- 単純化 (段 P22e で行う、2 回の往復の後に PM が決定): `peek_ig_ok`・`peek_deny`・I/G の判定・d の NULL と件数の検査はシングルタスク前提では要らない。PEEK は VA と PA を RAM の許可表 1 種で照らすだけで I/G MMIO を拒否できる (MMIO の PA は RAM の表に無く、DMA の descriptor の区画は像の予約の中)。N4 は service が許可の区間を RX buffer の前後に割って渡す。d は呼び手が保証するので monitor は検査しない。
+- 単純化 (段 P22e、P22 の 3 回の往復の後に PM が決定し同じ取り込みに入れた): `peek_ig_ok`・`peek_deny`・I/G の判定・d の NULL と件数の検査はシングルタスク前提では要らない。PEEK は VA と PA を RAM の許可表 1 種で照らすだけで I/G MMIO を拒否できる (MMIO の PA は RAM の表に無く、DMA の descriptor の区画は像の予約の中)。N4 は service が許可の区間を RX buffer の前後に割って渡す。d は呼び手が保証するので monitor は検査しない。
 - ホストの道具 tools/ppc_lan_host.py: `--udp` では自分の MAC を `--mac` で与え (REQ の送信元と宛先の検査に使う)、LOG・BEACON は自分宛か broadcast、RSP は自分宛だけを採る。保存の世代は BEACON の next_seq と LOG の seq+1 の最大で追跡し、巻戻りで切り替える (§3(a))。lint が tools/ 直下の .py に受け持つ検査を求めるので CI の検査 tools/checks/ppc-lan-p23.py (tier 1) を登録した。
 
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)

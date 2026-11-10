@@ -42,5 +42,5 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P4・P5・P12・P20・P21 と各 H | main (519a39b3)。P5 で gmac_tree.c が PPC の像に入った |
 | P9・P10・P13・P14 と各 H | main (7176c2be)。P9 で ② の起動が GMAC の先頭 64KiB と UniNorth の config の 2 page の alias を張る (QEMU で gmac_ready=1)。clock は手本 netbsd uninorth.c:135-142、reset は openbsd gem.c の各関数 |
 | P15〜P19 と各 H | main (a9d655bc)。GEM の core (ring・MAC・MIF と PHY・TX・RX)、手本は openbsd gem.c と sys/dev/mii、対応の PHY は BCM5201 だけ (実機の PHY は実機で採ってから足す) |
-| P22a〜P22d・P22・P23 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint5)。取り込み待ち。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
+| P22a〜P22d・P22・P22e・P23 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint5)。取り込み待ち。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c (P22e で境目を単純化: PEEK は RAM の許可表 1 種で VA と PA を照らす)、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
 | P24〜P33 と各 H | 未着手 |
