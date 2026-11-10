@@ -280,6 +280,14 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
   - R5 §4: PLN1 に認証は無い。既定では起動ログと BEACON を broadcast で流し、同じ L2 の誰でも PEEK でカーネルの RAM を 256B ずつ読める。開発用の LAN での診断という前提で、実機を共用の LAN につなぐときは peer を指定する。
   - 照合した引用 (合っていた): descriptor の形 (openbsd gemreg.h:529-532)、RX_KICK の 4 枚ごとの式 (freebsd if_gem.c:1581-1589)、UniNorth の GMAC の clock (netbsd uninorth.c:135-142)、RANDOM_SEED の式 (openbsd gem.c:888-889)。BAT は ② で全部無効 (PPC_KBOOT_DESIGN の ram_bat=0) なので、descriptor の区画の PTE の I/G は効く。EtherType 0x88B6 は既存の 0x88B5 (link・SFS) と重ならない。
 
+## 実装で決めたこと (2026-11-11、段 P0〜P11 の取り込みで PM が決定)
+- boot_id の生成は純粋な関数 `void pm_gmac_boot_id(struct pm_gmac_boot *b, u64 tb, u32 pvr)` に分けた (gmac_tree.c、host で試験するため PPC の命令を書かない)。TB と PVR を読んで呼ぶのは段 P5 (kboot_capture.c)。bootargs で上書きした印は struct pm_gmac_boot の `u32 override_flags` (bit0 = boot_id、bit1 = peer)。
+- 早い段階の bus master の解除に記録と PCI の口を渡すため `void pm_gmac_quiesce_setup(const struct pm_gmac_boot *, const struct pm_pci *)` を足した (pci_config.c、呼ぶのは段 P25)。`int pm_gmac_early_quiesce(void)` は 0 = 続けてよい、負 = 解除を書いたのに読み戻しが 1 (確定の N1)。DMA の profile の暫定値は定数 `PM_GMAC_PROFILE_UNINORTH` (= 1)。
+- UniNorth の親が `/` でない階層は、この段では祖先の ranges を順に変換せず LAN_EUNSUPPORTED で拒否する。
+- 宣言の段の変異 (P1・P2) は、製品の `_Static_assert` で compile が落ちるものを RED と数える (compile の終了値・期待の assert の文字列・変異を当てた後の到達の印を照合)。加えて host の runtime の照合だけで落ちる変異を 1 本ずつ持つ。
+- 実装者の sandbox は AF_INET の socket を作れない。UDP の netdev を付けた QEMU と UDP の loop の試験は PM が sandbox の外で回し、sandbox の中では rc=3 と別の行で知らせる形にした。
+- tools/ppc/kboot_boot.py は x86 の build の生成物 build/out/memmap_layout.h を要する (新しい作業木では x86 の make を先に済ませる)。
+
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
 - `info pci`: Bus 0 device 15 function 0 = Ethernet controller **106b:0021**、IRQ pin A、BAR0 = 32 bit memory、大きさ 0x200000 (2MiB、firmware が走る前なので番地は未割当)。host bridge は 106b:001f (dev 11) と 106b:001e (dev 14)、106b:0022 (dev 12)。

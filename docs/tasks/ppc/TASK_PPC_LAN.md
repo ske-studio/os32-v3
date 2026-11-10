@@ -38,5 +38,5 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 |---|---|
 | 調査 (x86 の LAN の層、GMAC の手順、PPC の PCI、案の比較) | 済 (2026-11-10、~/os32-tmp/run/ppc-lan-survey/SURVEY.md) |
 | 設計の往復 (起草 r1 → レビュー → r2 → レビュー → 確定) | 済 (2026-11-10) |
-| P0 (QEMU での採取、ホストの UDP 経路、資料の取り寄せ) | 一部 (QEMU 8.2.2 のモニタでの観測だけ: 既定の NIC は sungem 106b:0021、BAR0 は 2MiB、UDP の socket netdev の指定が通る。ゲストを走らせた採取と資料は未) |
-| P1〜P33・H* | 未着手 |
+| P0・P1・P2・P3・P8・P11 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint)。取り込み待ち。P0 の採取 (QEMU 8.2.2、OpenBIOS の対話): GMAC は /pci@f2000000/ethernet@f (compatible gmac、106b:0021)、BAR0 は PCI = CPU 0x82200000・2MiB、MAC 52:54:00:12:34:56、host bridge は uni-north・reg 0xf2000000 から 32MiB・ranges は io → 0xf2000000 (8MiB) と mem 0x80000000 → 0x80000000 (256MiB)。PHY の ID は未採取 (MIF の読出しに書込みが要る、段 P17 で) |
+| P4・P5・P9・P10・P12〜P33 と各 H | 未着手 (P21 は実装中) |
