@@ -33,7 +33,8 @@ def main():
         print('control OK')
         # The exit code identifies the precise assertion reached by each mutant.
         mutations = [
-            ('lane', 'p->data_va + (reg & 4u)', 'p->data_va + (reg & 0u)', 11),
+            ('lane-read', '*value = le_read(p->data_va + (reg & 4u));', '*value = le_read(p->data_va + (reg & 0u));', 10),
+            ('lane-write', 'le_write(p->data_va + (reg & 4u), *value);', 'le_write(p->data_va + (reg & 0u), *value);', 12),
             ('onehot', '(1u << dev) | (fn << 8) | reg', '(bus << 16) | (dev << 11) | (fn << 8) | reg | 1u', 11),
             ('le', 'return __builtin_bswap32(value);', 'return value;', 10),
             ('w1c', '*value &= 0xffffu;', '*value &= 0xffffffffu;', 12),
@@ -42,8 +43,7 @@ def main():
         ]
         if args.mutate:
             for name, old, new, expected in mutations:
-                # lane occurs twice: mutate read and write together.
-                if source.count(old) != (2 if name == 'lane' else 1):
+                if source.count(old) != 1:
                     raise RuntimeError(f'{name}: ambiguous anchor')
                 path.write_text(source.replace(old, new))
                 result = check()
