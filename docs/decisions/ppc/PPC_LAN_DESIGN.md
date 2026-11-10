@@ -294,6 +294,15 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - ログの待ち行列の送信の側の口: `int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq, u64 *records, u64 *bytes, u32 *status)` (閉じた最古の slot を静的な scratch で見せる。status の bit0 = 飽和。開いた slot を閉じるのは、それが唯一の slot のときだけ) と `void pm_lan_log_complete(int result)` (受理で取り除き、AGAIN で残す)。宣言は lan_boot.h。
 - DMA の pool は BSS (image の予約の中)。実際の像での収容の確認は段 P26 の link map。
 
+## 実装で決めたこと (2026-11-11、段 P15〜P19 の取り込みで PM が決定)
+- pool の配置の名前は gem.h の `GEM_POOL_TX_RING` 0・`GEM_POOL_RX_RING` 0x1000・`GEM_POOL_TX_BUF` 0x10000・`GEM_POOL_RX_BUF` 0x20000・`GEM_BUF_SIZE` 2048・`GEM_POOL_SIZE` 0x30000 (§3(d) の値)。gem_ring.c・gem_tx.c・gem_rx.c が共有する。
+- TX の完了の回収は gem_tx.c の `int gem_tx_reclaim(struct gem *, u64 now, u32 budget)` で、gem_poll の末尾から呼ぶ。
+- reset の入口は gem_reset.c の `void gem_enter_reset(struct gem *)` 1 つ (TX の誤り・RX の overflow の停止・TX の 5 秒の停止)。ここで `uncertain_tx += tx_pending` を 1 回だけ行い、tx_head・tx_tail・tx_pending を 0 に戻す (reset で NIC の TX の位置も 0 に戻り、ring を準備し直すため)。
+- 段 P24 の service の契約: ring を準備し直すときは ring_prepare_step・ring_cursor・ring_publish_step と rx_head を 0 に戻してから gem_ring_prepare を呼ぶ。gem_rx・gem_tx_reclaim の GEM_EIO は gem_enter_reset で reset に回す (gem_rx は EIO の後に RX_KICK を出さない)。
+- RX の準備し直しは OpenBSD gem_fill_rx_ring/gem_add_rxbuf の形: P15 は 0..27 の 28 枚だけ準備して RX_KICK=28 なので、使った枠 i ではなく枠 (i+28)%32 (生産側) をその枠の buffer で準備する。§5 の RX_KICK=(rxptr+32-4)&31 はこの形で OpenBSD の sc_rx_prod と同じ値になる (FreeBSD のように使った枠を戻すと、未準備の addr=0 の枠が NIC に渡る)。
+- PHY: QEMU の sungem の PHY を PM が採取した (QEMU 8.2.2 mac99 -cpu 7450、OpenBIOS の prompt で Forth の l!/l@ を使い BAR0 0x82200000 の MIF_FRAME を叩く。l@ は BE なので byte を入れ替える)。MIF_CONFIG の LE 値は 0x100 (MDI0 だけ)、MDI0 の address 0 だけが応え PHYID1=0x0040・PHYID2=0x6210・BMSR=0x402c。openbsd miivar.h:236-238 で OUI 0x001018 (miidevs:46 BROADCOM)・model 0x21 (miidevs:178 BCM5201)・rev 0、bmtphy.c:67-68 が扱い BCM5221 以外は mii_phy_reset だけ。gem_phy.c の対応の PHY の表はこの 1 行で始め、表に無い ID は何も書かずに EUNSUPPORTED (§8「未知IDを汎用PHYとみなさない」)。QuickSilver の PHY は §8 の順 2 で採ってから足す。
+- PHY の交渉の判定は BMSR の 2 回目 (今の状態、NetBSD ukphy_status) を使う。gem_phy_step が誤りを返すときは PHY_START に戻り、次の呼び出し (呼び手が 1 秒おき) で reset からやり直す。reset の待ちは NetBSD の 500ms (OpenBSD は 100ms)。
+
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
 - `info pci`: Bus 0 device 15 function 0 = Ethernet controller **106b:0021**、IRQ pin A、BAR0 = 32 bit memory、大きさ 0x200000 (2MiB、firmware が走る前なので番地は未割当)。host bridge は 106b:001f (dev 11) と 106b:001e (dev 14)、106b:0022 (dev 12)。
