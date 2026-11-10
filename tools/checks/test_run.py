@@ -721,6 +721,10 @@ class RunnerTest(unittest.TestCase):
         self.assertFalse((self.root / 'calls').exists())
         self.assertEqual(Path.cwd(), Path(__file__).resolve().parents[2])
 
+    def test_c_dialect_host_depends_on_production_scan(self):
+        checks = R.discover(Path(__file__).resolve().parents[2])
+        self.assertIn('check:c-dialect', checks['c-dialect-host'].needs)
+
     def test_static_entry_points_preserve_none_empty_and_original_files(self):
         actual = Path(__file__).resolve().parents[2]
         for name, scanner in (('p2v', 'check_p2v.py'), ('c-dialect', 'check_c_dialect.py'),
