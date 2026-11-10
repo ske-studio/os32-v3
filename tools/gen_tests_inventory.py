@@ -9,7 +9,7 @@ docs/archive/TEST_INVENTORY_2026-09-14.md は「`make check` は 31 ターゲッ
 人にしか書けない判断だけを手で持つ**という分け方にする。
 
   機械が書く: `check:` の列、各ターゲットのコマンド、対象ソース、対応する
-              RED→GREEN の記録 (`tools/tests/*_tdd.md`)、その記録が指す票、CI 被覆
+              RED→GREEN の記録 (`tools/tests/*_tdd.md`)、その記録が指す票、CI 被覆 (check.yml と build.yml の和集合)
   人が書く:   なぜその試験が弱いか、何を消すべきか、何が試験されていないか
               (docs/TESTS.md の `<!-- manual:… -->` 区間。生成器はここを保つ)
 
@@ -397,7 +397,11 @@ def ci_targets(rules, targets):
     text = read(CI_WORKFLOW)
     if text is None:
         return set()
-    covered = set()
+    build = read(".github/workflows/build.yml") or ""
+    # The matrix covers every registered check, including full AST scans removed
+    # from the cross-free static table. Standalone targets still need explicit CI.
+    covered = ({row['target'] for row in list_checks()} & set(targets)
+               if re.search(r'^\s*make\s+(?:-k\s+)?check-fast\b', build, re.M) else set())
     for t in targets:
         if re.search(r"\bmake\s+%s\b" % re.escape(t), text):
             covered.add(t)

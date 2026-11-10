@@ -3,7 +3,8 @@
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml', '.github/workflows/full-check.yml',
                      '.github/actions/build-setup/action.yml',
-                     'tools/ci_fetch.sh', 'tools/checks/run.py', 'tools/tests/test_ci_split.py',
+                     'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
+                     'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3)
 
@@ -15,6 +16,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import importlib.util
+from unittest.mock import patch
 
 import yaml
 
@@ -31,7 +34,6 @@ def workflow_cases(source):
     workflow = yaml.safe_load(source)
     jobs = workflow['jobs']
     assert set(jobs) == {'artifacts', 'check-fast'}, 'artifact job and check matrix'
-    prefixes = []
     for name, job in jobs.items():
         assert not job.get('needs'), 'jobs must run independently'
         runner = job['runs-on']
@@ -41,22 +43,23 @@ def workflow_cases(source):
         suffix = '-${{ matrix.shard }}' if name == 'check-fast' else ''
         assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name + suffix, 'separate concurrency groups'
         steps = job['steps']
-        core = next(i for i, step in enumerate(steps) if step.get('name') == 'Build core (make all)')
-        prefixes.append(steps[:core + 1])
-        assert any(step.get('uses') == './.github/actions/build-setup' for step in steps[:core])
+        assert any(step.get('uses') == './.github/actions/build-setup' for step in steps)
         checks = [s for s in steps if s.get('name') == 'make check-fast']
         uploads = [s for s in steps if s.get('uses') == 'actions/upload-artifact@v4']
         assert bool(checks) == (name == 'check-fast'), 'check placement'
         if name == 'check-fast':
-            assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2]}}, 'all three shards must finish'
+            assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3, 4, 5]}}, 'all six shards must finish'
             assert checks[0]['env']['OS32_CHECK_CACHE'] == '${{ runner.temp }}/check-cache', 'job-local result cache'
-            assert 'CHECK_SHARD=${{ matrix.shard }}/3' in checks[0]['run'], 'make receives shard'
+            assert 'CHECK_SHARD=${{ matrix.shard }}/6' in checks[0]['run'], 'make receives shard'
             assert not any('check-cache' in str(s.get('with', {})) for s in steps), 'result cache never persists'
             # 検査ごとの実時間だけを上げる (budget の棚卸、2026-11-08)。
             assert [u['with']['name'] for u in uploads] == ['check-times-${{ github.sha }}-${{ matrix.shard }}'], 'check-fast uploads only check times'
+            reuse_gate_cases(workflow, 'build.yml', name)
+            assert not any(' all ' in step.get('run', '') for step in steps), 'prepare selected needs only'
         else:
+            assert not any('prior' in str(step) for step in steps), 'artifacts always built on main'
+            assert any(step.get('name') == 'Build core (make all)' for step in steps)
             assert bool(uploads) == (name == 'artifacts'), 'upload placement'
-    assert prefixes[0] == prefixes[1], 'identical preparation and build'
     setup = yaml.safe_load(SETUP.read_text())
     assert setup['runs']['using'] == 'composite'
     steps = setup['runs']['steps']
@@ -64,6 +67,54 @@ def workflow_cases(source):
     assert {s.get('name') for s in steps} >= {'Host dependencies',
         'Rust toolchain (rust-toolchain.toml)', 'Cache i386-elf toolchain',
         'Cache IPAex fonts', 'Fetch JF Dot Shinonome16 (verify cached font and license)'}
+
+
+def reuse_gate_cases(workflow, filename, job):
+    assert workflow['permissions']['actions'] == 'read', 'API token permissions'
+    steps = workflow['jobs'][job]['steps']
+    gate = next(i for i, s in enumerate(steps) if s.get('id') == 'prior')
+    assert gate == 1 and steps[0]['uses'] == 'actions/checkout@v4', 'checkout before gate'
+    assert steps[gate]['env'] == {'GH_TOKEN': '${{ github.token }}', 'CI_WORKFLOW': filename}
+    assert steps[gate]['run'] == 'python3 -B tools/ci/reuse_success.py'
+    for step in steps[gate + 1:]:
+        assert step.get('if') in ("steps.prior.outputs.reuse != 'true'",
+                                  "always() && steps.prior.outputs.reuse != 'true'"), 'all expensive steps gated'
+
+
+def reuse_cases(path=None):
+    spec = importlib.util.spec_from_file_location('reuse', path or ROOT / 'tools/ci/reuse_success.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    env = dict(GITHUB_EVENT_NAME='push', GITHUB_REF='refs/heads/main', GITHUB_SHA=SHA,
+               GITHUB_REPOSITORY='fixture/repo', GITHUB_RUN_ID='99', CI_WORKFLOW='build.yml')
+    good = dict(head_sha=SHA, workflow_id=7, status='completed', conclusion='success',
+                event='push', head_branch='wt/int-test', head_repository=dict(full_name='fixture/repo'), id=42)
+    for workflow in ('build.yml', 'check.yml'):
+        with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [good]}]) as api:
+            assert module.reusable(dict(env, CI_WORKFLOW=workflow)), 'exact successful integration push'
+            assert api.call_args_list[0].args[0].endswith('/' + workflow)
+            assert 'head_sha=' + SHA in api.call_args_list[1].args[0]
+    for field, bad in [('head_sha', 'a'*39+'b'), ('workflow_id', 8), ('status', 'in_progress'),
+                       ('conclusion', 'failure'), ('conclusion', 'skipped'), ('event', 'pull_request'),
+                       ('head_branch', 'main'), ('head_branch', 'wt/feature'),
+                       ('head_repository', dict(full_name='fork/repo')), ('id', 99)]:
+        with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, **{field: bad})]}]):
+            assert not module.reusable(env), 'reject mismatch: ' + field
+    for field, bad in [('GITHUB_EVENT_NAME', 'workflow_dispatch'), ('GITHUB_EVENT_NAME', 'pull_request'),
+                       ('GITHUB_REF', 'refs/heads/wt/int-test'), ('GITHUB_SHA', 'aaaa'), ('CI_WORKFLOW', 'other.yml')]:
+        with patch.object(module, 'api', side_effect=AssertionError('unexpected API')):
+            assert not module.reusable(dict(env, **{field: bad})), 'only main push eligible'
+    failures = [OSError('offline'), subprocess.TimeoutExpired('gh', 20),
+                subprocess.CalledProcessError(1, 'gh'), ValueError('bad JSON')]
+    for response in ({'workflow_runs': []}, {}, {'workflow_runs': [{}]}, {'workflow_runs': None}):
+        failures.append([{'id': 7}, response])
+    for failure in failures:
+        with tempfile.TemporaryDirectory(prefix='reuse-') as tmp:
+            output = Path(tmp) / 'output'
+            with patch.dict(os.environ, dict(env, GITHUB_OUTPUT=str(output)), clear=True), \
+                    patch.object(module, 'api', side_effect=failure):
+                assert module.main() == 0
+            assert output.read_text() == 'reuse=false\n', 'errors and ambiguity execute checks'
 
 
 # These checks require build artifacts, unavailable in the cross-free static job.
@@ -79,9 +130,11 @@ DOC_EXCLUSIONS = {
 
 def document_cases(source):
     workflow = yaml.safe_load(source)
+    reuse_gate_cases(workflow, 'check.yml', 'static-check')
     runs = [step.get('run', '') for job in workflow['jobs'].values()
             for step in job['steps']]
     targets = set(re.findall(r'^\s*make\s+(check-[\w-]+)\s*$', '\n'.join(runs), re.M))
+    assert not {'check-arch-asm', 'check-le-access'} & targets, 'full AST runs in build only'
     assert all(DOC_EXCLUSIONS.values()), 'exclusions require reasons'
     for paths in (('docs/INDEX.md',), ('CLAUDE.md',), ('README.md',),
                   ('docs/INDEX.md', '.claude/skills/os32-land/SKILL.md')):
@@ -191,12 +244,12 @@ def fetch_cases(script):
         result, downloaded, _, _ = fetch_case(script, 'success', check=check)
         assert result.returncode == 0 and downloaded, 'successful artifacts must download: ' + result.stderr
         assert ('検査は失敗 (または実行中)' in result.stderr) == (check != 'success'), 'check status notice'
-    for states in (['success'] * 3, ['failure', 'success', 'success'],
-                   ['success', 'failure', 'success'], ['success', 'success', 'cancelled'],
-                   ['success', 'success', 'in_progress'], ['success', 'success']):
+    for states in (['success'] * 6, *[(['success'] * i + ['failure'] + ['success'] * (5-i))
+                                               for i in range(6)], ['success'] * 5,
+                   ['success'] * 5 + ['in_progress'], ['success'] * 5 + ['cancelled']):
         result, downloaded, _, _ = fetch_case(script, 'success', shard_states=states)
         assert result.returncode == 0 and downloaded, result.stderr
-        assert ('検査は失敗 (または実行中)' in result.stderr) == (states != ['success'] * 3), 'all shards required for success notice'
+        assert ('検査は失敗 (または実行中)' in result.stderr) == (states != ['success'] * 6), 'all shards required for success notice'
     for state in ('in_progress', 'failure'):
         result, downloaded, slept, calls = fetch_case(script, state)
         assert result.returncode == 1 and not downloaded and not slept, 'unfinished/failed artifacts must not download'
@@ -212,6 +265,7 @@ def fetch_cases(script):
 
 
 def main():
+    reuse_cases()
     source = WORKFLOW.read_text()
     workflow_cases(source)
     full_check_cases(FULL_CHECK.read_text())
@@ -220,10 +274,15 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('reuse', "r['head_sha'] == sha", 'True', 'reuse wrong SHA'),
+            ('reuse', "r['workflow_id'] == workflow_id", 'True', 'reuse wrong workflow'),
+            ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
+            ('reuse', "r['head_branch'].startswith('wt/int-')", 'True', 'reuse non integration run'),
+            ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
-            ('workflow', 'shard: [0, 1, 2]', 'shard: [0, 1]', 'lose shard'),
+            ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),
             ('workflow', 'fail-fast: false', 'fail-fast: true', 'cancel sibling shards'),
-            ('workflow', 'CHECK_SHARD=${{ matrix.shard }}/3', 'CHECK_SHARD=0/3', 'repeat first shard'),
+            ('workflow', 'CHECK_SHARD=${{ matrix.shard }}/6', 'CHECK_SHARD=0/6', 'repeat first shard'),
             ('workflow', 'name: check-times-${{ github.sha }}-${{ matrix.shard }}', 'name: check-times-${{ github.sha }}', 'artifact collision'),
             ('workflow', 'OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache', 'OS32_CHECK_CACHE: off', 'disable shared cache'),
             ('fetch', 'all(s == "success" for s in states)', 'any(s == "success" for s in states)', 'accept partial shards'),
@@ -234,7 +293,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text()}[kind]
+            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text()}[kind]
             # Runner occurs once per job; mutate only the check-fast job.
             if name == 'route to substream':
                 prefix, text = text.split('  check-fast:\n', 1)
@@ -244,12 +303,14 @@ def main():
                 assert text.count(old) == 1, name
                 changed = text.replace(old, new)
             with tempfile.TemporaryDirectory(prefix='ci_mut_') as tmp:
-                script = Path(tmp) / 'ci_fetch.sh'
+                script = Path(tmp) / ('reuse.py' if kind == 'reuse' else 'ci_fetch.sh')
                 script.write_text(changed)
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    if kind == 'workflow':
+                    if kind == 'reuse':
+                        reuse_cases(script)
+                    elif kind == 'workflow':
                         workflow_cases(changed)
                     elif kind == 'check':
                         document_cases(changed)

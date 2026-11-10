@@ -30,6 +30,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   artifacts:
@@ -153,7 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: [0, 1, 2, 3, 4, 5]
     runs-on: ubuntu-latest
     timeout-minutes: 150
     concurrency:
@@ -167,35 +168,35 @@ jobs:
           # test_h4_manifest の旧 hsync との互換の試験が `git show 0c71845:...` で旧版を取り出す (FDRECOV-1)。浅い clone では見つからない。
           fetch-depth: 0
 
-      - uses: ./.github/actions/build-setup
-
-      # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
-      #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
-      #    all は配備しない。配布用の FD / ISO は後段で HostDrv と同じ build に揃える。
-      - name: Build core (make all)
+      - name: Reuse successful integration checks
+        id: prior
         env:
-          OS32_ACCEPT_IPA_LICENSE: "1"
-        run: |
-          export PATH="$CROSS_DIR/bin:$PATH"
-          i386-elf-gcc --version | head -1
-          make -j"$(nproc)" all CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW: build.yml
+        run: python3 -B tools/ci/reuse_success.py
 
+      - uses: ./.github/actions/build-setup
+        if: steps.prior.outputs.reuse != 'true'
+
+      # check-prepare はこのシャードの needs だけを組む。
       # ④ 変異なしの全検査 (成果物を読む check-manifests / check-packages-host / check-memmap と、
       #    クロスコンパイルや rustc が要るホスト試験を含む)。
       - name: make check-fast
+        if: steps.prior.outputs.reuse != 'true'
         env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
           OS32_CLANG_CROSS_FREE: "0"
           OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
           test -x "$CROSS_DIR/bin/i386-elf-gcc"
           test -f "$CROSS_DIR/i386-elf/include/stdio.h"
-          make -k check-fast CHECK_SHARD=${{ matrix.shard }}/3 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+          make -k check-fast CHECK_SHARD=${{ matrix.shard }}/6 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
 
       # 検査ごとの実時間 (tools/check_time.py: 検査名・経過秒数・終了コード) を残し、
       # budget の棚卸の材料にする (2026-11-08、budget 超えは警告だけで結果は落とさない)。
       - name: Collect check times
-        if: always()
+        if: always() && steps.prior.outputs.reuse != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/check-times"
           if [ -f build/out/check_times.tsv ]; then
@@ -205,7 +206,7 @@ jobs:
           fi
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.prior.outputs.reuse != 'true'
         with:
           name: check-times-${{ github.sha }}-${{ matrix.shard }}
           path: ${{ runner.temp }}/check-times/

@@ -6,7 +6,7 @@ import argparse
 import ast
 from bisect import bisect_left
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import fnmatch
 from functools import lru_cache
 import importlib.util
@@ -576,6 +576,11 @@ class Check:
     tier: int = 1
     needs: tuple[str, ...] = ()
     mutate_tier: int = 2
+    weight: float | None = None
+
+    @property
+    def seconds(self):
+        return self.budget if self.weight is None else self.weight
 
 
 @dataclass(frozen=True)
@@ -607,7 +612,7 @@ def matches(path, patterns):
 
 def ordered(checks, names=None):
     return tuple(sorted(checks if names is None else names,
-                        key=lambda n: (-checks[n].budget, n)))
+                        key=lambda n: (-checks[n].seconds, n)))
 
 
 def shards(checks, count):
@@ -634,10 +639,10 @@ def shards(checks, count):
         remaining.difference_update(group)
         groups.append(tuple(sorted(group)))
     result, loads = [set() for _ in range(count)], [0.0] * count
-    for group in sorted(groups, key=lambda g: (-sum(checks[n].budget for n in g), g)):
+    for group in sorted(groups, key=lambda g: (-sum(checks[n].seconds for n in g), g)):
         index = min(range(count), key=lambda i: (loads[i], i))
         result[index].update(group)
-        loads[index] += sum(checks[n].budget for n in group)
+        loads[index] += sum(checks[n].seconds for n in group)
     return tuple(ordered(checks, names) for names in result)
 
 
@@ -701,6 +706,13 @@ def discover(root: Path) -> dict[str, Check]:
             reject("duplicate name: " + name)
         checks[name] = Check(name, rel, tuple(data["covers"]), float(data["budget"]),
                              data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2))
+    weights = root / "tools/checks/weights.json"
+    if weights.exists():
+        for name, seconds in json.loads(weights.read_text())["seconds"].items():
+            if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+                raise ValueError("invalid check weight: " + name)
+            if name in checks:
+                checks[name] = replace(checks[name], weight=float(seconds), budget=2 * seconds)
     return checks
 
 
@@ -1111,6 +1123,7 @@ def main(argv: list[str]) -> int:
     action.add_argument("--run", nargs="+")
     action.add_argument("--lint", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--needs", action="store_true", help="with --list: selected make prerequisites")
     parser.add_argument("--shard", help="zero-based index/count, with --list only")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--base")
@@ -1127,8 +1140,12 @@ def main(argv: list[str]) -> int:
             if index >= count:
                 raise ValueError("shard index must be less than count")
             names = shards(checks, count)[index]
+        if args.needs and (not args.list or args.json):
+            raise ValueError("--needs requires --list without --json")
         if args.list:
-            if args.json:
+            if args.needs:
+                print(" ".join(make_needs(checks, closure(checks, names))))
+            elif args.json:
                 print(json.dumps([dict(asdict(checks[n]), target="check-" + n) for n in names]))
             else:
                 print("\n".join("check-" + n for n in names), end="\n" if names else "")

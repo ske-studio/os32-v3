@@ -131,10 +131,10 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
 `sdk/kapi.json` からの生成物がコミット済みと一致すること ([ABI])、`check-kapi-out`、CONSTRAINTS ⇄ CLAUDE.md、
-`mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、`check-arch-asm` / `check-le-access`、
+`mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、
 対応表 (`check-map` / `check-check-select-host`)、文書 (lychee のリンク・孤児・状態行・試験一覧)、
-ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの検査が CI に載っているかは
-`build/out/TESTS.md` ([生成手順](INDEX.md#生成文書の見方)) の CI 列 (yml の `make <target>` 行から生成)。
+ne2000 リングと gcc + python3 だけで回るホスト試験。どの検査が CI に載っているかは
+`build/out/TESTS.md` ([生成手順](INDEX.md#生成文書の見方)) の CI 列 (`check.yml` の個別実行と `build.yml` の全検査の和集合から生成)。
 残り (末尾で `i386-elf-gcc` を使うホスト試験、rustc が要るもの、`check-manifests` / `check-packages-host` /
 `check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check-fast` が回す (§8-6)。
 
@@ -412,7 +412,7 @@ python3 tools/gen_memmap.py --manifest --check
 正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。
 
 検査は `tools/checks/` または `tools/tests/test_*.py` の `CHECK` と `run(ctx)` に置く。
-`build/sdk.mk` が `tools/checks/run.py --list` から通常列を取得し、budget の降順で並べる。
+`build/sdk.mk` が `tools/checks/run.py --list` から通常列を取得し、実測重みの降順で並べる。
 選択列の `make:` 前提を親 make で一度準備してから検査を回す。
 `check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
 保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
@@ -1109,15 +1109,34 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 
 ### §8-6 GitHub Actions での本体ビルド
 
-`.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
-FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) は、`artifacts` と `check-fast` の
-配布物1本と検査3シャード (`check-fast (0)`〜`check-fast (2)`) を依存関係なしで並列に動かす。全ジョブが同じ composite action で準備し、それぞれ core を完全ビルドする。
-`artifacts` は配布物を作って upload し、検査の各シャードは `make check-fast CHECK_SHARD=i/3` を回す。main へ入れる判定は
-配布物・検査3本と静的ゲートの `check.yml` がすべて合格すること (変異込みの `make check` は回さない)。
+`.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
+検査6シャード (`check-fast (0)`〜`check-fast (5)`) を依存関係なしで並列に動かす。
+共通の composite action で準備し、`artifacts` は core の完全ビルド・配布物の upload を行う。
+各検査シャードは `make -k check-fast CHECK_SHARD=i/6` を回し、そのシャードの CHECK needs
+(推移的な check 前提を含む) に必要な make 前提だけを `check-prepare` で組む。
+main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml` がすべて合格すること
+(変異込みの `make check` は回さない)。arch-asm と le-access は build の全範囲検査に集約し、
+クロス無しの静的ゲートからは実行しない。
 
-分割は `tools/checks/run.py --list --shard i/3` で再現する。check needs の連結成分をまとめ、budget 合計の降順 (同値は名前順) で最も軽いシャードへ割り当てる LPT。各検査は全体で1回、check 前提は同じシャードに入り、計時ターゲットの依存で前提の成功後に本体を実行する。matrix の fail-fast は無効で、1本が失敗しても残りの結果を集める。`check-times-<SHA>-<i>` の3 artifacts に各シャードの TSV を保存する。
+main への push では `tools/ci/reuse_success.py` が `gh api` と `GITHUB_TOKEN` で
+同じ workflow の統合枝 (`wt/int-*`) の push run を調べる。SHA の40桁完全一致・workflow ID 一致・
+同一リポジトリ・completed・conclusion=success が揃った場合だけ、検査とその準備を省略する。
+取得失敗・不明な応答・該当 run 無しでは通常どおり実行する。手動・PR・main 以外の push は
+省略しない。配布物は main でも必ず作るため、`tools/ci_fetch.sh` の既定の取得先は変わらない。
 
-budget は t27 (`27ec857fc553466407d08b160ac735c4d3f3ecea`) の check_times.tsv で測れた402本を0.1秒単位の切り上げで校正 (2026-11-08)。超過は従来どおり警告だけ。未計測の検査は宣言値を使う。
+分割は `tools/checks/run.py --list --shard i/6` で再現する。check needs の連結成分をまとめ、
+重み合計の降順 (同値は名前順) で最も軽いシャードへ割り当てる LPT。各検査は全体で1回、
+check 前提は同じシャードに入り、計時ターゲットの依存で前提の成功後に本体を実行する。
+matrix の fail-fast は無効で、1本が失敗しても残りの結果を集める。
+`check-times-<SHA>-<i>` の6 artifacts に各シャードの TSV を保存する (再利用時は新たな計測なし)。
+
+重みは `tools/checks/weights.json` に保存した成功計測値の中央値 (秒) を使う。
+同ファイルの sources に元の check-times artifact 名と TSV の SHA-256、samples に検査ごとの
+標本数を保存する。初期値は保存済みの t27・t3f・tb の5 TSV。
+`gh run download <RUN_ID> --pattern 'check-times-*' --dir <DIR>` で取得後、
+`python3 -B tools/checks/calibrate_weights.py <DIR>...` で指定した記録から更新する。
+budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK の宣言 budget を
+重み・警告閾値の既定値に使い、計測後の更新で分離する。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
 (小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
@@ -1126,15 +1145,15 @@ budget は t27 (`27ec857fc553466407d08b160ac735c4d3f3ecea`) の check_times.tsv 
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast` 3本: `make -j$(nproc) all` → `make check-fast CHECK_SHARD=i/3` |
-| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。全ジョブとも `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
+| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast` 6本: `make -k check-fast CHECK_SHARD=i/6` (必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
+| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物と検査ジョブは `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
-| 上限 | 両ジョブとも `timeout-minutes: 150` |
+| 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |
 
 **成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
 

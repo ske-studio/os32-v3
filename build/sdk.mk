@@ -178,7 +178,7 @@ CHECK_EDGES := $(shell python3 -B -c 'import json, subprocess; rows = json.loads
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py dependency listing failed)
 endif
-CHECK_ALL_NEEDS := $(shell python3 -B -c 'import json, subprocess; rows = json.loads(subprocess.check_output(["python3", "-B", "tools/checks/run.py", "--list", "--json"])); print(" ".join(sorted({n[5:] for c in rows for n in c["needs"] if n.startswith("make:")})))')
+CHECK_ALL_NEEDS := $(shell python3 -B tools/checks/run.py --list $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)) --needs)
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --list --json failed)
 endif

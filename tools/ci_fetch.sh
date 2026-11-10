@@ -101,7 +101,7 @@ while true; do
     read -r ART_STATE CHECK_STATE < <(printf '%s' "$JOBS" | python3 -c '
 import json, sys
 jobs = {j["name"]: j.get("conclusion") or j["status"] for j in json.load(sys.stdin)["jobs"]}
-states = [jobs.get("check-fast (" + str(i) + ")", "queued") for i in range(3)]
+states = [jobs.get("check-fast (" + str(i) + ")", "queued") for i in range(6)]
 state = ("success" if all(s == "success" for s in states) else
          next((s for s in states if s != "success"), "queued"))
 print(jobs.get("artifacts", "queued"), jobs.get("check-fast", state))')
