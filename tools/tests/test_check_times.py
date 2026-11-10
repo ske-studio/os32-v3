@@ -45,11 +45,10 @@ class CheckTimesTest(unittest.TestCase):
                           '    print("fake-b", file=__import__("sys").stderr, flush=True)\n'
                           '    return int(os.environ.get("FAIL", "0"))\n'))
         self.write('tools/' + 'check_tree_unchanged.py', '')
-        self.env = dict(os.environ)
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith('CHECK_')}
         # 呼び手の CHECK_TIMES・CHECK_TIME_CHILD を引き継ぐと、偽の木の表の置き場や前提が変わる。
-        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD', 'CC_FILES_JSON', 'CC_TIER',
-                    'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY',
-                    'CHECK_NEEDS', 'CHECK_PAR_TARGETS', 'CHECK_NO_NEEDS', 'CHECK_SHARD'):
+        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CC_FILES_JSON', 'CC_TIER',
+                    'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY'):
             self.env.pop(key, None)
 
     def write(self, path, text):
@@ -127,7 +126,7 @@ class CheckTimesTest(unittest.TestCase):
         self.write('tools/checks/a.py', 'CHECK = dict(name="a", covers=[], budget=False)\ndef run(ctx): return 0\n')
         result = self.make('check-par')
         self.assertEqual(result.returncode, 2)
-        self.assertIn('--list failed', result.stderr)
+        self.assertIn('tools/checks/run.py --make failed (make registration)', result.stderr)
         self.assertFalse((self.root / 'prepared').exists())
 
     def test_shard_make_dependencies(self):

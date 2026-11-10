@@ -10,6 +10,7 @@ import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_profile import query
+from build_fixture import copy_build_tree
 from ppc.check_compile import forbidden_dependencies
 from ppc.check_accept import REQUIRED, validate
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,7 +28,8 @@ def check(root):
     commands = query(root, assignments, commands=True)['argv']
     assert len(commands) == len(p['C_KERNEL']) + len(p['GAS_KERNEL'])
     for argv in commands:
-        assert argv[0].endswith('/powerpc-elf-gcc')
+        assert p['RAW_CC'][0].endswith('/powerpc-elf-gcc')
+        assert argv[:len(p['CC'])] == p['CC']
         assert '-march=i386' not in argv
         if argv[argv.index('-c') + 1].endswith('.S'):
             assert '-include' not in argv
@@ -94,7 +96,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out','sdk','__pycache__'))
+        copy_build_tree(root)
         (root / 'Makefile').write_text('include build/config.mk\ninclude build/kernel-objects.mk\n')
         check(root)
         dependency_checks(root, args.mutate)

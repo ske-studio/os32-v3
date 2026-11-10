@@ -35,7 +35,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 | 何を入れたか | 検査 |
 |---|---|
 | 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
-| 段・小さな取り込み | 作業木の枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast (0)・(1)・(2): **3本の合計で全部の検査、変異なし。3本とも成功が必要**) が通るのを待つ |
+| 段・小さな取り込み | 受入待ちの枝は統合の枝 `wt/int-<日付><記号>` にまとめて merge し ([ROLES §4-2](../../../docs/tasks/agents/ROLES.md#4-2-統合の枝と一括の受入-本線))、その枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / check-fast (0)〜(5): **6 本の合計で全部の検査、変異なし。6 本とも成功が必要**、分け方は [08_build §8-6](../../../docs/08_build.md#8-6-github-actions-での本体ビルド)) が通るのを待つ |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた) | GitHub の workflow `full-check` (変異込みの全体、`gh workflow run full-check.yml -f ref=<枝か SHA>`)。毎晩 main に対しても自動で回る |
 
 - 取り込みの検査は GitHub の CI。CI を待つときは push した最後の SHA で (`gh run list --branch wt/<名> --commit <SHA>`)、待ちには上限を付ける。
@@ -43,7 +43,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
 
-NP21/W の受入と実機の更新は、CI の artifacts のジョブが作った成果物を `tools/ci_fetch.sh --sha <SHA>` で取って配る (検査した版と配った版が一致する)。artifacts のジョブが成功していれば、check-fast の途中でも取れる (調べの版はこれで実機へ。main に入れるのは check-fast (0)・(1)・(2) の3本とも通ってから)。
+NP21/W の受入と実機の更新は、CI の artifacts のジョブが作った成果物を `tools/ci_fetch.sh --sha <SHA>` で取って配る (検査した版と配った版が一致する)。artifacts のジョブが成功していれば、check-fast の途中でも取れる (調べの版はこれで実機へ。main に入れるのは check-fast の 6 本とも通ってから)。
 
 ## 4. 落ちたとき
 
@@ -68,6 +68,7 @@ git merge --ff-only origin/wt/<名>                   # ff できなければ me
 git push -q origin main
 ```
 
+- main への push では、同じ SHA の統合の枝 (`wt/int-*`) の成功を `tools/ci/reuse_success.py` が確かめて検査を省く (配布物は毎回作る)。統合の枝から ff した main は検査を回し直さない。
 - main の CI の build が赤なら最優先で直す。
 - 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
 

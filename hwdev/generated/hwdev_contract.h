@@ -62,9 +62,9 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0xcf573c4aU
+#define HWDEV_CONTRACT_CRC 0x983092e9U
 #define HWDEV_LAYOUT_CRC 0x927d90afU
-#define HWDEV_IMPORT_COUNT 47U
+#define HWDEV_IMPORT_COUNT 48U
 #define HWDEV_CORE_SLOTS 26U
 STATIC_ASSERT((u32)(sizeof(BootImageInfo)) == 40U, hwdev_layout_0);
 STATIC_ASSERT((u32)(__alignof__(BootImageInfo)) == 4U, hwdev_layout_1);

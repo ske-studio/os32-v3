@@ -233,22 +233,22 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         arch_user_result(&a->frame, (u32)wait_ret);
     }
 
-    volatile int x87_depth = exec_nest_level;
+    volatile int fp_depth = exec_nest_level;
     volatile Ring3CallContext caller_context;
     ring3_context_save(&caller_context);
     if (exec_setjmp(a->jmpbuf) != 0) {
         ring3_context_clear();
         /* park / 終了 / fault / kill で戻ってきた。ローカルは当てにしない。 */
         exec_pending_finish();
-        x87_restore(&x87_parent[x87_depth]);
+        arch_fp_restore(&fp_parent[fp_depth]);
         ring3_context_restore(&caller_context);
         _enable();
         if (g_longjmp_reason == EXEC_LJ_PARK) return g_longjmp_id;
         return 0;
     }
 
-    x87_save(&x87_parent[x87_depth]);
-    x87_restore(&a->x87_state);
+    arch_fp_save(&fp_parent[fp_depth]);
+    arch_fp_restore(&a->fp_state);
 
 #ifdef OS32_R1_FIXTURE
     r1_fixture_resume((int)app_id);

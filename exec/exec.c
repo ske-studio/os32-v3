@@ -1,5 +1,4 @@
 #include "legacy_guest.h"
-#include "x87.h"
 #include "font_guard.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
@@ -124,7 +123,7 @@ void exec_init(void) {
  * 外 (drivers/input/kbd.c, arch/x86/kernel/isr_handlers.c) は「> 0 ならプログラムが走って
  * いる」としてしか見ないので意味は変わらない。 */
 volatile int exec_nest_level = 0;
-static X87State x87_parent[APP_SLOT_COUNT];
+static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
 volatile int exec_exit_status = EXEC_SUCCESS;
 
 /* ------------------------------------------------------------------------ */

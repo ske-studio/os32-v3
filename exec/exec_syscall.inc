@@ -7,7 +7,7 @@ STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS
 static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *frame, void (*commit)(void))
 {
     arch_user_save(&a->frame, frame);
-    x87_save(&a->x87_state);
+    arch_fp_save(&a->fp_state);
     exec_heap_save_state(&a->exec_heap_used);
     ring3_context_clear();     /* This syscall ends without passing the WM exit. */
     paging_load_cr3(paging_kernel_pd_phys());

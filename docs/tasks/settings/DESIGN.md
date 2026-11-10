@@ -40,6 +40,7 @@ Windows のレジストリに相当する「設定の置き場」を 1 つに決
 
 | キー | 読み手 | 意味 |
 |---|---|---|
+| `BOOTSERIAL=0/1` | kernel.c 起動処理 | 1 で root マウント後に起動ログをシリアルへ送る (既定 0) |
 | `GUI=0/1` | kernel.c 起動ループ | 次回起動の既定シェル |
 | `GFX=pc98\|pegc\|cirrus\|auto` | kernel.c → `gfx_set_backend_pref` | グラフィクスバックエンドの強制 |
 | (将来) `MOUSE=`、`KBD=` | ドライバ初期化 | 入力装置の種別 |

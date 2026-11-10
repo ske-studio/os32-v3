@@ -83,6 +83,9 @@ _start:
     bl powermac_boot
 #endif
     b ppc_stop
+    /* Independently reusable by the kernel entry, without the standalone
+     * bootstrap's BAT setup or its linker symbols. */
+    .section .text.ppc_primitives,"ax",@progbits
     .globl ppc_load8
 ppc_load8:
     lbz 3,0(3)

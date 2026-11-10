@@ -1,7 +1,8 @@
 {
   "source_revision": "b400acb6fcd9fb326c9bcf4b8acaff3ddfed37fa",
   "trace_sha256": "fd18c77f42fd084b55025a85d3dd8e59d7ea7f874fdcb8f6741e91cf8f01be6c",
-  "harness_sha256": "fde4f3a8ad8ee1dbaf568edbd78e455ac21ee4d7aa7ac7de0e2491554712aade",
+  "harness_sha256": "f733b76c83ee9ac3cbb30e97e9990077e8d886caae69c8a0dd35dae9a5ebeb40",
+  "harness_sha256_note": "第 5 段 C1 (2026-11-10): harness に #include \"tvram_private.h\" を 1 行足した (TVRAM_BASE・TVRAM_ATTR が include/tvram.h から PC-98 の private ヘッダへ移ったため)。trace は旧 harness fde4f3a8 で採った物のままで一致する。",
   "sources_sha256": {
     "init/boot_display.c": "f2c3b40e01848acfa3c3790d9d2c6f9186fc2dadf783366bce963b3d86c1bccc",
     "arch/x86/kernel/isr_handlers.c": "3f8fbd502efb97da04edef439124c2fbf89f661a7d780d6c450f94bc16c3e0c7",

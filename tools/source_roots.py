@@ -1,7 +1,7 @@
 """Source scan roots. Preserve each check's scope when directories move."""
 
 SCAN_ROOTS = {
-    'p2v': ('platform/pc98/gfx_scroll.c', 'arch/x86/legacy', 'platform/pc98/legacy', 'platform/pc98/bootinfo_capture.c', 'platform/pc98/bootinfo_check.c', 'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_report.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/boot_capture.c', 'init', 'mm', 'arch/x86/kernel', 'kernel', 'kdebug', 'drivers', 'gfx', 'fs', 'exec', 'kapi', 'lib', 'arch/x86/video', 'platform/pc98/ime_render_tvram.c', 'platform/pc98/ime_display.c'),
+    'p2v': ('platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'arch/x86/legacy', 'platform/pc98/legacy', 'platform/pc98/bootinfo_capture.c', 'platform/pc98/bootinfo_check.c', 'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_report.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/boot_capture.c', 'init', 'mm', 'arch/x86/kernel', 'kernel', 'kdebug', 'drivers', 'gfx', 'fs', 'exec', 'kapi', 'lib', 'arch/x86/video', 'platform/pc98/ime_render_tvram.c', 'platform/pc98/ime_display.c'),
     'arm_compile': ('init', 'mm', 'arch/x86/kernel', 'arch/x86/legacy', 'kernel', 'drivers', 'fs', 'exec', 'kapi', 'lib', 'net', 'gfx', 'arch/x86/video'),
     'arch_asm': ('init', 'mm', 'kernel', 'kdebug', 'drivers', 'exec', 'fs', 'kapi', 'lib',
                  'net', 'gfx', 'include', 'arch', 'platform'),

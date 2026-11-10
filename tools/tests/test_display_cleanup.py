@@ -3,7 +3,7 @@
 Record: tools/tests/display_cleanup_tdd.md
 """
 CHECK = dict(name='display-cleanup-host', tier=1,
-    covers=['hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'arch/x86/legacy/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'arch/x86/legacy/v86_gcap.c', 'kdebug/v86_gcap.c', 'platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/pc98.h', 'include/pegc.h', 'platform/pc98/legacy/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
+    covers=['hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'arch/x86/legacy/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'arch/x86/legacy/v86_gcap.c', 'kdebug/v86_gcap.c', 'platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/pc98.h', 'include/pegc.h', 'platform/pc98/legacy/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.h'],
     needs=[], budget=4.2)
 
@@ -17,7 +17,8 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('platform/pc98/legacy/v86_io.c', 'kdebug/v86_gcap.c', 'init/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c')
+TARGET_SRCS = ('platform/pc98/legacy/v86_io.c', 'kdebug/v86_gcap.c', 'init/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c',
+               'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c')  # [6]: planar の初期化の provider (第 5 段 B3)
 
 
 def function(text, name):
@@ -88,9 +89,9 @@ MUTATIONS = [
      '    v86_cui_display_restore();', 1, 'v86', 'FAIL: capture rebuild'),
     ('old-splash-cleanup', TARGET_SRCS[2], 'cleanup:\n    platform_splash_clear_pages();',
      'cleanup:\n    platform_splash_clear(0);\n    gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);\n    gfx_present();', 1, 'splash', 'FAIL: residual logo page=0'),
-    ('clear-page-zero-twice', TARGET_SRCS[3], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset',
+    ('clear-page-zero-twice', TARGET_SRCS[6], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset',
      '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset', 1, 'splash', 'FAIL: residual logo page=1'),
-    ('clear-page-one-twice', TARGET_SRCS[3], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset',
+    ('clear-page-one-twice', TARGET_SRCS[6], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset',
      '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', 1, 'splash', 'FAIL: residual logo page=0'),
     ('clear-half-plane', TARGET_SRCS[5], 'gfx_clear_planar_pages(GFX_PLANE_SZ);',
      'gfx_clear_planar_pages(GFX_PLANE_SZ_200);', 1, 'splash', 'FAIL: residual logo page=0'),
@@ -102,7 +103,7 @@ MUTATIONS += [
      '    if (!legacy200) gfx_clear_planar_pages(plane_sz);', 1, 'splash', 'FAIL: gfx_init_200 residual page=0'),
 ]
 for plane in 'BRGI':
-    MUTATIONS.append(('omit-plane-' + plane, TARGET_SRCS[3],
+    MUTATIONS.append(('omit-plane-' + plane, TARGET_SRCS[6],
                       f'    kmemset((u8 *)P2V(VRAM_PLANE_{plane}), 0, plane_size);', '', 2, 'splash',
                       'FAIL: residual logo page=0 plane=' + str('BRGI'.index(plane))))
 

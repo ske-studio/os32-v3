@@ -6,7 +6,7 @@
  * test_font_guard.py checks the guard object has no x87 instruction. */
 #include "font_guard.h"
 #include "appslot.h"
-void x87_save(X87State *p) { (void)p; }
+void arch_fp_save(struct arch_fp_context *p) { (void)p; }
 void geforce_foreground_poll(void) {}
 #include "exec.h"
 #include "io.h"

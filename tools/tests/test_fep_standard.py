@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T4c-3: app pressure at the product ILP32 cap and standard ext2 RW learning."""
+import sqlite_cc
 from kernel_includes import include_flags
 import argparse
 import os
@@ -79,7 +80,7 @@ def main():
         tmp = Path(directory)
         obj = tmp / 'sqlite.o'
         cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
-        host32.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
+        sqlite_cc.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
                       '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                       '-fsigned-char', '-fno-short-enums', '-include',
                       str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',

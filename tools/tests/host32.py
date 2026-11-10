@@ -4,6 +4,7 @@ signals are test failures: preserve the negative return code for the suite
 (including mutation checks), and report signal N (runner=...).
 """
 import os
+import cc_cache
 import functools
 import pathlib
 import shutil
@@ -205,7 +206,7 @@ def build(args, **kwargs):
     import re
     import tempfile
     if '-o' not in args or not any(str(a).endswith('.c') for a in args):
-        return subprocess.run(args, **kwargs)
+        return cc_cache.build(args, **kwargs)
     args = list(map(str, args))
     output = pathlib.Path(args[args.index('-o') + 1])
     cwd = pathlib.Path(kwargs.get('cwd') or os.getcwd())
@@ -216,7 +217,7 @@ def build(args, **kwargs):
     pre = subprocess.run(preprocess + ['-E', '-P'], capture_output=True,
                          cwd=kwargs.get('cwd'), timeout=RUN_TIMEOUT)
     if pre.returncode:
-        return subprocess.run(args, **kwargs)
+        return cc_cache.build(args, **kwargs)
     root = pathlib.Path(__file__).resolve().parents[2]
     # Normalize only temporary directory names, retaining filenames and flags.
     # The per-run directory may end the argument (-I<tmp>/x) or continue (<tmp>/x/a.c).
@@ -251,7 +252,7 @@ def build(args, **kwargs):
     compile_args = args.copy()
     compile_args[compile_args.index('-o') + 1] = str(pending)
     try:
-        result = subprocess.run(compile_args, **kwargs)
+        result = cc_cache.build(compile_args, **kwargs)
         if result.returncode == 0:
             with (cache / '.lock').open('a') as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX)
@@ -277,7 +278,7 @@ def prune_fixtures(cache, external=False):
     entries = []
     cutoff = time.time() - PENDING_MAX_AGE
     for path in cache.iterdir():
-        if path.name == '.lock':
+        if path.name == '.lock' or path.name.startswith('.write-test-'):
             continue
         if path.suffix == '.pending':
             try:
@@ -289,7 +290,10 @@ def prune_fixtures(cache, external=False):
         if path.suffix == '.lock':
             path.unlink(missing_ok=True)
             continue
-        stamp = path.stat()
+        try:
+            stamp = path.stat()
+        except FileNotFoundError:
+            continue  # A worker can remove a probe outside the cache lock.
         entries.append((stamp.st_mtime_ns, path, stamp.st_size))
     total = sum(size for _, _, size in entries)
     count = len(entries)

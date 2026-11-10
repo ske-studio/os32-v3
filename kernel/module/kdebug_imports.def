@@ -2640,6 +2640,15 @@
       "context_safe": true,
       "index": 323,
       "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "pci_bar_get",
+      "source": "drivers/pci/pci.h",
+      "context_safe": false,
+      "index": 324,
+      "retained": true
     }
   ]
 }

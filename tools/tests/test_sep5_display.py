@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """B1/B2: legacy palette/scroll state and fixed pre-separation PC-98 I/O trace."""
 CHECK = dict(name='sep5-display-host', tier=1, needs=[], budget=5,
-    covers=['gfx/palette.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'kernel/console/display_restore.h',
-            'platform/pc98/display.c', 'platform/powermac/display.c',
+    covers=['gfx/palette.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h',
+            'platform/pc98/display.c', 'platform/powermac/display.c', 'platform/powermac/display_provider.c',
             'build/platform/powermac.mk', 'tools/tests/sep5_display_host.c',
             'tools/tests/test_sep5_display.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',

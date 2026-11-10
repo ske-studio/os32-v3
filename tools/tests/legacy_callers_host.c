@@ -81,6 +81,7 @@ static int font_guard_active, cursor_x, cursor_y;
 static int sink, cursors, shapes;
 static int safe(void) { return 1; }
 static int (*pc98_console_safe)(void)=safe;
+static int con_backend_safe(void) { return !pc98_console_safe || pc98_console_safe(); }
 static int con_sink_is_enabled(void) { return sink; }
 static void gfx_policy_reeval(void) {}
 static void con_sink_enable(void) { sink=1; }

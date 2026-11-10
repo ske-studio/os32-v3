@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LB3 real driver injection. Record: tools/tests/e82557_drv_tdd.md"""
 CHECK = dict(name='e82557-drv-host', tier=1,
-    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'kernel/module/module.h', 'include/config.h', 'include/bootinfo.h', 'fs/vfs.h', 'tools/tests/e82557_drv_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.c', 'mm/dma_pool.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/cc_cache.py', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'kernel/module/module.h', 'include/config.h', 'include/bootinfo.h', 'fs/vfs.h', 'tools/tests/e82557_drv_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.c', 'mm/dma_pool.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=4.4)
 
 from kernel_includes import include_flags
@@ -9,6 +9,7 @@ import re
 import os
 import pathlib
 import subprocess
+import cc_cache
 import sys
 import tempfile
 import host32
@@ -443,7 +444,7 @@ def host_build(tmp, mutated=None):
         "#define pci_drivers ((const struct pci_driver *const[]){platform_test_selected()})\n" +
         "#define PCI_DRIVER_COUNT (sizeof(pci_drivers) / sizeof(pci_drivers[0]))\n")
     exe = pathlib.Path(tmp) / "drv-host"
-    subprocess.run(["gcc", *FLAGS,
+    cc_cache.build(["gcc", *FLAGS,
                     *include_flags(root),
                     *INCLUDES, "-I" + str(tmp), str(root / HARNESS.relative_to(ROOT)),
                     "-o", str(exe)], check=True)
@@ -466,7 +467,7 @@ def target_build(tmp):
         raise RuntimeError("production compiler barrier missing")
     cross = pathlib.Path(os.environ.get("CROSS_DIR", "/home/hight/opt/cross")) / "bin/i386-elf-gcc"
     for rel in TARGET_SRCS:
-        subprocess.run([str(cross), "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
+        cc_cache.build([str(cross), "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Wextra", "-Werror",
             "-D__KERNEL_BUILD__", *INCLUDES,
             *include_flags(ROOT),

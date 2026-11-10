@@ -27,6 +27,7 @@ B7 の検出漏れの原因だったので、種別の判定を**消費する側
 from kernel_includes import include_flags
 import pathlib
 import subprocess
+import cc_cache
 import sys
 import tempfile
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
         tmp = pathlib.Path(tmp)
 
         exe = tmp / "vfs-kind"
-        subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC,
+        cc_cache.build(["gcc", *HOST_FLAGS, *HOST_INC,
                         str(ROOT / "tools/tests/vfs_kind_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c)", flush=True)
@@ -64,7 +65,7 @@ if __name__ == "__main__":
 
         if "--target" in sys.argv:
             for src in ("fs/vfs.c", "fs/vfs_fd.c"):
-                subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
+                cc_cache.build(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)
                 print("TARGET i386-elf -Werror COMPILE PASS (%s)" % src,

@@ -125,6 +125,12 @@ void ppc_kernel_main(void) __attribute__((noreturn));
 - real takeover→全BAT無効/ベクタ導入→segments(no-op)/例外stack/ME・RI→`memory_boot_detect(16384)`→`paging_init(16384)`→`arch_boot_after_paging()`→ESCC sink→`memory_boot_init(16384)`→`shm_init()`→`kmalloc_init()`→MPIC→clock→EE→probe→READY→idle（kmalloc は mm/shm から呼ばれないので kmalloc_init の位置は任意。x86 は kmalloc_init を paging より前に呼ぶ: init/kernel.c:170・196）。
 - `paging_init`内部 `arch_mmu_load_root` の初回のみ、ESCC/MPIC用I/G aliasを `MEM_DEVICE_APERTURE_BASE` の静的PTへ追加する。HPTの恒等PTEは作らず、その物理範囲の既存恒等PTEもNPにする（spill/flushはrealアクセス）。0..1MiBの不要mappingもNP、guard/system除外を維持。image/stack/PD/PTとMMIO aliasをwalkで検証してからIR/DRを上げる。S/mm/paging_boot.inc:103,189を使い、共通mmの表形式・free/owner規則を変えない。
 - alias固定割当：aperture先頭4MiB内のoffset `[0x300000,0x340000)` をESCC、`[0x340000,0x380000)` をMPICへ予約（VA 0xFE300000/0xFE340000）。PAのpage内offsetを保持し、丸めた窓長が各256KiB以内か検査、超過は停止。arch/platform所有の静的予約でledgerのdevice記録は経ない。後のgfxのpaging_map_physはこの予約帯を避け、platform側で重複を拒否してから呼ぶ契約とし、gfx接続の受入に衝突負試験を置く。PM_IO_ALIAS=0xF0000000はkbootでは使わない。
+  | VA | 長さ上限 | 対象 |
+  |---|---:|---|
+  | 0xFE380000 | 64KiB | GMAC BAR0 先頭 |
+  | 0xFE3C0000 | 4KiB | PCI config address |
+  | 0xFE3C1000 | 4KiB | PCI config data |
+  | 0xFE3C2000 | 4KiB | clock（予約） |
 - ABIは全kernel TUにbuild/arch/ppc.mk:8の同一flags（-m32 -mbig-endian -msoft-float -mno-altivec -msdata=none）を適用。入口r2/r13を使用しない生成コードを確認し、C/ASM境界のstack16B整列・linkage領域とnative variadic出力をguest canaryで検証する。
 - 初期pagingはIR/DR=0で作るのでflushは準備済み空HPTを扱う。`pg_enabled`になる前のroot未設定を通常root切替と混同しない。未設定時に不用意なtranslated実行へ戻さない。
 
@@ -255,6 +261,12 @@ void pm_log_write(const char *bytes, u32 n);
 - **G2 の能力無しの値**: 画面の座標は -1、サイズは 0×0。戻り値の無い cursor/GDC の制御は何もしない。LF は変換しない (x86 の serial の出力の慣習に合わせる)。lib/kprintf_attr.c は kboot の profile で選ばず、属性の変換の口は G2 が出す。
 - **T3 の受入の台本を H3 より先に作った** (仮の像で自己試験)。本体の負像の FATAL と停止の symbol は H3 の後に表へ足す。
 - **試験の変異の判定**: 変異ごとに期待の停止 PC/終了コード/診断の行と到達の印を表に持ち、両方が一致したときだけ RED (決まりの全文は PPC_IMPL_RULES §3)。
+
+- **H1 の結果** (2026-11-10): 本体の閉包で未解決だった共通の symbol は 4 つ。sys_memory_bootstrap_model・sys_memory_stage_online (kernel/sys.c) と res_owner_get (fs/fd_redirect.c) は実体を無変更で link し、ring3_call_from_user (exec/exec.c) だけ「② に USER は無いので常に 0」を返す provider (arch/ppc/kboot_unavailable.c) にした。
+- **SHM の共有 USER の写像**: shm_free・shm_lock は paging_boot_user_shared() が作る共有 USER の写像の RW を切り替える (mm/paging_map.inc)。x86 は exec の trampoline の page を渡す。② は exec が無いので、実行しない RO の専用の 0 ページを渡して同じ契約を満たす。exec の段で差し替える。
+- **受入の観測 symbol**: kboot_ready_tb (READY の直前の TB、BE u64) と kboot_tick (= tick_count、link の defsym)。台本は READY の後 2 秒と、その後 200ms 以上の tick の増分を TB と ±5% で照合する。
+- **監査**: 未解決 0、全命令の mnemonic を FP/AltiVec の族と照合 (dssall だけ許可: データストリームの停止で vector の状態に触れない)、PIT_HZ は `gcc -E -dU` で展開された macro を見るのでマクロ経由 (TICK_MS) も検出する (tools/ppc/kboot_audit.py)。
+- **decrementer の例外は edge**: handler が 1 周期以上遅れたとき、負の DEC に周期を 1 回足すだけでは負のままになり、以後の例外が来なくなる (QEMU で観測、試験の仮の像で踏んだ)。製品の F2 は正になるまで足す。
 
 ## 後続の題目
 - **PowerPC のブートスプラッシュ** (2026-11-10、os32-v3 の PM 経由のユーザー決定): 票 TASK_PPC_SPLASH。② の段の並びは変えない (② は画面を条件にしない)。実装は OF の FB を描く段の後。

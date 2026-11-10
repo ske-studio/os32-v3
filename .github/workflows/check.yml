@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   static-check:
@@ -32,10 +33,20 @@ jobs:
       OS32_CLANG_CROSS_FREE: "1"
       # 静的ゲートは make の前提 (CHECK の needs) を組まない — クロス無しで旧と同じ振る舞い。
       CHECK_NO_NEEDS: "1"
+      LYCHEE_VERSION: "0.24.2"
+      LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
     steps:
       - uses: actions/checkout@v4
 
+      - name: Reuse successful integration checks
+        id: prior
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW: check.yml
+        run: python3 -B tools/ci/reuse_success.py
+
       - uses: actions/setup-python@v5
+        if: steps.prior.outputs.reuse != 'true'
         with:
           python-version: "3.12"
 
@@ -43,22 +54,51 @@ jobs:
       # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
       # Python は tools/mkvmkernel.py 系が lz4 を使う。
       - name: Host dependencies
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
+          sudo apt-get install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
           python3 -m pip install --quiet PyYAML lz4
+
+      - name: SQLite ccache setup
+        if: steps.prior.outputs.reuse != 'true'
+        id: sqlite-cache-key
+        run: |
+          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          host="$(gcc -dumpfullversion -dumpversion)"
+          cross=none
+          echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SQLite compilations
+        if: steps.prior.outputs.reuse != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sqlite-ccache
+          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-static
+          restore-keys: |
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
 
       # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
       # で通ってしまう。CI では必ず入れて実際に検査させる (版と sha256 を固定した prebuilt binary)。
+      - name: Cache lychee archive
+        if: steps.prior.outputs.reuse != 'true'
+        id: lychee-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/lychee.tar.gz
+          key: lychee-${{ env.LYCHEE_VERSION }}-${{ env.LYCHEE_SHA256 }}
+
       - name: Install lychee
-        env:
-          LYCHEE_VERSION: "0.24.2"
-          LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/lychee"
-          curl --fail --location --retry 3 \
+          if [ "${{ steps.lychee-cache.outputs.cache-hit }}" != "true" ]; then
+            curl --fail --location --retry 8 --retry-all-errors --retry-max-time 180 --connect-timeout 20 \
             "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-musl.tar.gz" \
-            -o "$RUNNER_TEMP/lychee.tar.gz"
+              -o "$RUNNER_TEMP/lychee.tar.gz"
+          fi
           echo "$LYCHEE_SHA256  $RUNNER_TEMP/lychee.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/lychee.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/lychee"
           echo "$RUNNER_TEMP/lychee" >> "$GITHUB_PATH"
@@ -66,6 +106,7 @@ jobs:
 
       # [ABI] 生成物を手で触らない: kapi.json から作り直してコミット済みと突き合わせる
       - name: KAPI (version, generated files, output guards)
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-kapi-version
           python3 sdk/gen_kapi.py
@@ -77,29 +118,34 @@ jobs:
                                  sdk/rust/os32api/src/kapi_generated.rs
           make check-kapi-out
 
-      - name: Source rules (constraints, shlib table, GUI protocol, arch/LE access)
+      - name: Source rules (constraints, shlib table, GUI protocol)
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-constraints
           make check-shlib
           make check-gui-proto
-          make check-arch-asm
-          make check-le-access
 
       - name: Check map (check-changed selection table)
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-map
           make check-check-select-host
+          make check-ci-split-host
 
       - name: Documents (links, orphans, status lines, test inventory)
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           lychee --version
           make check-docs-links
           make check-docs-orphans
+          make check-docs-tree
+          make check-docs-tree-host
           make check-docs-status
           make check-docs-status-host
           make check-tests-inventory
 
       - name: Host tests (gcc + python3 only)
+        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-ne2000-ring
           make check-boot-splash-host
@@ -114,3 +160,7 @@ jobs:
           make check-rshell-serial-host
           make check-serial-portc-host
           make check-vfs-fd-path-host
+
+      - name: SQLite ccache statistics
+        if: always() && steps.prior.outputs.reuse != 'true'
+        run: ccache -s

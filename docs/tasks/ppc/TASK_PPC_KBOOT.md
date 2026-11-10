@@ -1,8 +1,8 @@
 # TASK_PPC_KBOOT — PowerPC 移植: OS32 本体を QEMU mac99 で初期化まで通す (到達点 ②)
 
-> 上位: [TASK_PPC_SEP](TASK_PPC_SEP.md)。後続: [TASK_PPC_SPLASH](TASK_PPC_SPLASH.md)
+> 上位: [TASK_PPC_SEP](TASK_PPC_SEP.md)。後続: [TASK_PPC_SPLASH](TASK_PPC_SPLASH.md) (LAN の段は票 TASK_PPC_LAN、索引から辿る)
 
-> 状態: **実装中 (2026-11-10)** — ユーザーの指示で文書の整理のためいったん停止中。第 1〜3 波と D3・T3 (先行) まで実装 (下の §2)。次は H1 → H2 → H3 → 受入。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。
+> 状態: **受入完了・実機確認待ち (2026-11-10)** — QEMU mac99 (7450・7455) で ② を通過。統合の枝 wt/ppc-kbh eaca0e75、証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。実機は DEFERRED_TESTS の PPC-KBOOT-RH。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。
 
 ## 0. ユーザー決定
 
@@ -52,6 +52,16 @@
 | F2 | decrementer kernel_dec.c | e4a3dfb2 | QEMU で TB と −0.05% | 可 (2 回) |
 | G1 | log.c (ESCC と後段の sink) | e9cee64b | host | 可 |
 | G2 | 暫定の console kboot_console.c | b32818ee | host (lib/kprintf.c を組む) | 可 (2 回) |
-| T3 | 受入の台本 kboot_run.py (先行) | a8192320 (直し 1 回目まで) | 仮の像で自己試験 (3 回で判定一致) | 第 2 回で P2 が 2 件残り (停止の検出の変異を復元、最後の継続を tick 増分と経過時間の ±5% で照合して低速 tick の像を足す)。再開の最初に直す |
+| T3 | 受入の台本 kboot_run.py と自己試験 | f9513c5f | 仮の像で自己試験 (14 RED・4 GREEN・台本の変異 5) | 可 (3 回) |
+| H1 | 閉包の未解決の provider arch/ppc/kboot_unavailable.c (ring3_call_from_user の 1 件) | (kbh) | 本体の link | 可 (H2・H3 と一緒に 3 回) |
+| H2 | 本体の初期化 init/ppc_kernel.c、probe arch/ppc/kernel_probe.S | (kbh) | QEMU 7450/7455 | 同上 |
+| H3 | 本体の link build/ppc-kboot.mk、監査 tools/ppc/kboot_audit.py、受入 tools/ppc/kboot_accept.py | (kbh) | 負像 2・製品の変異 10・監査の変異 4 | 同上 |
+| T4 | 回帰の入口 tools/ppc/kboot_all.py | (kbh) | 20/20 | PM が読んで着地 |
 
-残り: H1 (閉包の未解決の分類と kboot 専用の provider) → H2 (init/ppc_kernel.c、各段の結線: D3 の仮の MPIC の解決を E1 に置き換える) → H3 (kboot の profile と本体の link、PIT_HZ の利用者の監査) → T1・T2・T4 → T3 で 7450/7455 の受入。E3 は本線の PCI IRQ の bitmap の後。
+H1〜H3・T4 は統合の枝 wt/ppc-kbh (全段を 1 本にまとめた枝) にある。
+
+## 3. 受入 (2026-11-10)
+
+合 — 証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。入口は `make -f build/ppc-kboot.mk` と `python3 -B tools/ppc/kboot_accept.py --mutate`、回帰は `python3 -B tools/ppc/kboot_all.py --mutate`。x86 の生成物は main 2259debc と全一致 (build_compare)。
+
+未確認・持越し: G4 実機 (PPC-KBOOT-RH)、E3 (本線の PCI IRQ の共通部の後)、16MiB を超える RAM と system の明示の予約、tick の単位 (PIT_HZ=100 の利用者は ② の閉包に無いことを監査で保証、③ の前に整合)、SHM の共有 USER の写像の trampoline (② は実行しない RO の 0 ページ、exec の段で差し替え)。次は決定 (c) の LAN (GMAC と Host Services)。

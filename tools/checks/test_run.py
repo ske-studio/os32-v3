@@ -52,6 +52,60 @@ class RunnerTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             R.shards(self.registry(), 3)
 
+    def test_weights_and_selected_make_needs(self):
+        self.check('a', budget=100, needs=['make:alpha'])
+        self.check('b', budget=1, needs=['make:beta'])
+        self.check('c', budget=1, needs=['check:b'])
+        self.write('tools/checks/weights.json', json.dumps({'seconds': {'a': 2, 'b': 20, 'c': 1}}))
+        checks = self.registry()
+        self.assertEqual((checks['a'].weight, checks['a'].budget), (2, 4))
+        self.assertEqual((checks['b'].weight, checks['b'].budget), (20, 40))
+        self.assertEqual(R.ordered(checks), ('b', 'a', 'c'))
+        self.assertEqual(R.shards(checks, 2), (('b', 'c'), ('a',)))
+        independent = dict(checks, c=replace(checks['c'], budget=10000))
+        self.assertEqual(R.ordered(independent), ('b', 'a', 'c'))
+        self.assertEqual(R.shards(independent, 2), R.shards(checks, 2))
+        for i, want in enumerate(('beta', 'alpha')):
+            rc, out, _ = self.cli('--list', '--shard', f'{i}/2', '--needs')
+            self.assertEqual((rc, out.strip()), (0, want))
+        self.assertEqual(self.cli('--list', '--needs')[1].strip(), 'alpha beta')
+        for args in (('--run', 'a', '--needs'), ('--list', '--json', '--needs')):
+            self.assertEqual(self.cli(*args)[0], 2)
+        for value in (-1, True, float('inf'), 'slow'):
+            self.write('tools/checks/weights.json', json.dumps({'seconds': {'a': value}}))
+            self.assertEqual(self.cli('--list')[0], 2)
+
+    def test_make_prepare_uses_only_shard_needs(self):
+        actual = Path(R.__file__).parents[2]
+        self.write('tools/checks/run.py', Path(R.__file__).read_text())
+        self.check('a', budget=10, needs=['make:alpha'])
+        self.check('b', budget=9, needs=['make:beta'])
+        self.check('c', budget=1, needs=['check:b'])
+        sdk = (actual / 'build/sdk.mk').read_text()
+        section = sdk[sdk.index('ifeq ($(CHECK_TIME_CHILD),1)'):sdk.index('CHECK_TIMES ?=')]
+        self.write('Makefile', section + '\nalpha beta:\n\t@echo $@ >> prepared\n')
+        for i, expected in enumerate(('alpha', 'beta')):
+            result = subprocess.run(['make', '--no-print-directory', 'check-prepare', f'CHECK_SHARD={i}/2'],
+                                    cwd=self.root, env=self.env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((self.root / 'prepared').read_text().splitlines(), [expected])
+            (self.root / 'prepared').unlink()
+
+    def test_weight_update_median_success_only(self):
+        spec = importlib.util.spec_from_file_location('weights', Path(R.__file__).with_name('calibrate_weights.py'))
+        updater = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(updater)
+        one = self.write('one/check_times.tsv', 'check-a\t2\t0\ncheck-a\t8\t0\ncheck-b\t3\t0\ncheck-a\t100\t1\n')
+        two = self.write('two/check_times.tsv', 'check-a\t9\t0\n')
+        result = updater.measurements([one, two])
+        self.assertEqual(result['seconds'], {'a': 8, 'b': 3})
+        self.assertEqual(result['samples'], {'a': 3, 'b': 1})
+        self.assertEqual(len(result['sources']), 2)
+        self.assertEqual(len(result['sources'][0]['sha256']), 64)
+        one.write_text('check-a\tnan\t0\n')
+        with self.assertRaises(ValueError):
+            updater.measurements([one])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='runner-fixture-')
         self.addCleanup(self.tmp.cleanup)
@@ -62,8 +116,9 @@ class RunnerTest(unittest.TestCase):
         self.write('.gitignore', '__pycache__/\nbuild/out/\n')
         self.write('drivers/video/a.c', 'int a;\n')
         self.commit()
-        self.env = {k: v for k, v in os.environ.items() if k not in (
-            'MUTATE', 'MUTATE_TARGETS', 'MUT', 'MUTS', 'CHECK_TIME_CHILD', 'CC_FILES_JSON',
+        # Parent check recipes export empty CHECK_NEEDS and timing/shard controls.
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith('CHECK_') and k not in (
+            'MUTATE', 'MUTATE_TARGETS', 'MUT', 'MUTS', 'CC_FILES_JSON',
             'CC_TIER', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES')}
         self.env['HOST32_RUNNERS'] = 'native qemu'
 
@@ -115,6 +170,55 @@ class RunnerTest(unittest.TestCase):
             row = json.loads(out)[0]
             self.assertEqual((rc, row['name'], row['target'], row['mutate_tier']), (0, 'slow', 'check-slow', 2))
         self.assertEqual(self.cli('--lint')[0], 0, self.cli('--lint')[2])
+
+    def test_index_invalidation_and_recovery(self):
+        self.check('a', needs=['make:shared'])
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        with patch.object(R, 'discover', side_effect=AssertionError('cache miss')):
+            self.assertEqual(set(R.indexed_discover(self.root)), {'a'})
+        self.check('b', budget=90)
+        self.assertEqual(set(R.indexed_discover(self.root)), {'a', 'b'})
+        path = self.root / 'tools/checks/a.py'
+        stamp = path.stat()
+        path.write_text(path.read_text().replace('shared', 'edited'))
+        os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+        self.assertEqual(R.indexed_discover(self.root)['a'].needs, ('make:edited',))
+        path.unlink()
+        self.assertEqual(set(R.indexed_discover(self.root)), {'b'})
+        self.write('tools/tests/test_new.py', 'pass\n')
+        R.indexed_discover(self.root)
+        self.write('tools/tests/test_new.py', 'CHECK = dict(name="new", covers=[], budget=1)\ndef run(ctx): return 0\n')
+        self.assertEqual(set(R.indexed_discover(self.root)), {'b', 'new'})
+        weights = self.write('tools/checks/weights.json', json.dumps({'seconds': {'b': 7}}))
+        self.assertEqual(R.indexed_discover(self.root)['b'].weight, 7)
+        weights.write_text(json.dumps({'seconds': {'b': 9}}))
+        self.assertEqual(R.indexed_discover(self.root)['b'].weight, 9)
+        weights.unlink()
+        self.assertIsNone(R.indexed_discover(self.root)['b'].weight)
+        cache = self.root / 'build/out/check-index.json'
+        cache.write_text('{broken')
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        with patch.object(R.tempfile, 'NamedTemporaryFile', side_effect=PermissionError):
+            cache.unlink()
+            self.assertEqual(R.indexed_discover(self.root), self.registry())
+
+    def test_make_registration(self):
+        self.check('z', budget=1)
+        self.check('a', needs=['make:shared', 'check:z'])
+        self.check('b', budget=90, needs=['check:a', 'make:all'])
+        checks = self.registry()
+        for shard in ('', '0/3', '1/3', '2/3'):
+            rc, out, err = self.cli('--make', *(['--shard', shard] if shard else []))
+            self.assertEqual(rc, 0, err)
+            makefile = self.write('fixture.mk', out + '\n'
+                'all:;@echo $(CHECK_NAMES); echo $(CHECK_SHARD_TARGETS); '
+                'echo $(CHECK_EDGES); echo $(CHECK_ALL_NEEDS)\n')
+            result = subprocess.check_output(['make', '--no-print-directory', '-f', str(makefile)],
+                                             text=True, env=self.env).splitlines()
+            names = R.shards(checks, 3)[int(shard[0])] if shard else R.ordered(checks)
+            self.assertEqual(result, ['check-b check-a check-z', ' '.join('check-' + n for n in names),
+                                     'check-time-check-b:check-time-check-a check-time-check-a:check-time-check-z',
+                                     ' '.join(R.make_needs(checks, R.closure(checks, names)))])
 
     def test_types_duplicates_and_outside(self):
         for name in R.OUTSIDE:
@@ -721,6 +825,10 @@ class RunnerTest(unittest.TestCase):
         self.assertFalse((self.root / 'calls').exists())
         self.assertEqual(Path.cwd(), Path(__file__).resolve().parents[2])
 
+    def test_c_dialect_host_depends_on_production_scan(self):
+        checks = R.discover(Path(__file__).resolve().parents[2])
+        self.assertIn('check:c-dialect', checks['c-dialect-host'].needs)
+
     def test_static_entry_points_preserve_none_empty_and_original_files(self):
         actual = Path(__file__).resolve().parents[2]
         for name, scanner in (('p2v', 'check_p2v.py'), ('c-dialect', 'check_c_dialect.py'),
@@ -744,6 +852,8 @@ class RunnerTest(unittest.TestCase):
         inventory = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(inventory)
         self.write('tools/checks/run.py', (actual / 'tools/checks/run.py').read_text())
+        self.check('b', covers=['drivers/video/a.c'])
+        self.write('.github/workflows/build.yml', 'run: |\n  make -k check-fast CHECK_SHARD=0/6\n')
         self.check('a', covers=['drivers/video/a.c'], body=
                    '    argv = ["python3", "tools/tests/test_probe.py"]\n    return 0\n')
         self.write('tools/tests/test_probe.py', '"""Log: tools/tests/probe_tdd.md"""\n')
@@ -753,11 +863,13 @@ class RunnerTest(unittest.TestCase):
         self.write('.github/workflows/check.yml', 'run: make check-a\n')
         with patch.object(inventory, 'ROOT', str(self.root)), \
                 patch.object(inventory, 'MK_FILES', ['build/local.mk']):
-            self.assertEqual([row['target'] for row in inventory.list_checks()], ['check-a'])
+            self.assertEqual(set(row['target'] for row in inventory.list_checks()), {'check-a', 'check-b'})
             for pattern in ('test_probe.py', "'test_probe.py'", '"test_probe.py"'):
                 self.assertEqual(inventory.runners_of(
                     'python3 -B -m unittest discover -s tools/tests -p ' + pattern),
                     ['tools/tests/test_probe.py'])
+            self.assertEqual(inventory.ci_targets({}, ['check-a', 'check-b', 'check-host-agent']),
+                             {'check-a', 'check-b'})
             text = inventory.render()
             self.assertIn('check-host-agent', text)
             self.assertIn('probe_tdd.md', text)
@@ -777,8 +889,19 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
-        ('shard-heaviest-last', '-sum(checks[n].budget for n in g)',
-         'sum(checks[n].budget for n in g)', 'test_shards'),
+        ('index-stale', 'if data["signature"] == signature:', 'if True:',
+         'test_index_invalidation_and_recovery'),
+        ('make-shard-lost', 'CHECK_SHARD_TARGETS=" ".join("check-" + n for n in names)',
+         'CHECK_SHARD_TARGETS=" ".join("check-" + n for n in ordered(checks))', 'test_make_registration'),
+        ('make-needs-all', 'make_needs(checks, selected)', 'make_needs(checks, checks)', 'test_make_registration'),
+        ('index-weights-lost', '({root / "tools/checks/weights.json"} if (root / "tools/checks/weights.json").exists() else set())',
+         'set()', 'test_index_invalidation_and_recovery'),
+        ('weight-budget', 'budget=2 * seconds', 'budget=seconds', 'test_weights_and_selected_make_needs'),
+        ('weight-order', '-checks[n].seconds, n', '-checks[n].budget if checks[n].weight is None else 0, n', 'test_weights_and_selected_make_needs'),
+        ('shard-needs-all', 'make_needs(checks, closure(checks, names))', 'make_needs(checks, closure(checks, checks))', 'test_weights_and_selected_make_needs'),
+        ('shard-heaviest-last', '-sum(checks[n].seconds for n in g)',
+         'sum(checks[n].seconds for n in g)', 'test_shards'),
+
         ('shard-most-loaded', '(loads[i], i)', '(-loads[i], i)', 'test_shards'),
         ('shard-dependency-split', 'pending.extend(neighbors[name] - group)',
          'pending.extend(())', 'test_shards'),

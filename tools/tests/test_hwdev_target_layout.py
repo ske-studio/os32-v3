@@ -49,7 +49,7 @@ def fixtures(module):
 
 def generate(module, out, **options):
     profile = query(ROOT, [], config_only=True)
-    cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))/'bin'/profile['CC'][0])
+    cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))/'bin'/profile['RAW_CC'][0])
     prefix = Path(cc).parent
     module.generate(cc, profile['CFLAGS_MACHINE'] + profile['CFLAGS_BASE'],
                     profile['INC_KERNEL'], out, target='x86-pc98',

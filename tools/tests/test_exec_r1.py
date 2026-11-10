@@ -26,7 +26,7 @@ def function(s, name):
 
 
 def landing(s, start, buf, name):
-    a = s.index('    volatile int x87_depth =', s.index(start))
+    a = s.index('    volatile int fp_depth =', s.index(start))
     jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
     b = s.index('\n    }', jump) + len('\n    }')
     return ('static int ' + name + '_body(void) {\n'
@@ -38,7 +38,7 @@ def landing(s, start, buf, name):
             '    u32 before = tss_get_esp0();\n'
             '    x87_restores = 0;\n'
             '    int rc = ' + name + '_body();\n'
-            '    CHECK(x87_restores == 1 && x87_last == &x87_parent[exec_nest_level]);\n'
+            '    CHECK(x87_restores == 1 && x87_last == &fp_parent[exec_nest_level]);\n'
             '    CHECK(tss_get_esp0() == before);\n'
             '    return rc;\n}\n')
 
@@ -90,12 +90,12 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 #include "legacy_guest_fake.h"
 
 static void exec_stop_mark(void) {}
-static X87State x87_parent[APP_SLOT_COUNT];
+static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
 static int x87_saves;
-void x87_save(X87State *p) { (void)p; x87_saves++; }
+void arch_fp_save(struct arch_fp_context *p) { (void)p; x87_saves++; }
 static int x87_restores;
-static const X87State *x87_last;
-void x87_restore(const X87State *p) { x87_restores++; x87_last = p; }
+static const struct arch_fp_context *x87_last;
+void arch_fp_restore(const struct arch_fp_context *p) { x87_restores++; x87_last = p; }
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int stdin_resume_test;
@@ -374,7 +374,7 @@ static int test(void) {
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
     CHECK(sizeof(VfsStdinRead) == 16);
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(X87State) + sizeof(struct arch_entry_context));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(struct arch_fp_context) + sizeof(struct arch_entry_context));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
@@ -667,11 +667,11 @@ class ExecR1(unittest.TestCase):
 
 MUTATIONS = (
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
-     '    x87_restore(&a->x87_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
-    ('x87-launch-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
-    ('x87-resume-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
-     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
+     '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
+    ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
+     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
+    ('x87-resume-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
+     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
     ('stdin-no-rewind', '    if (restart_stdin) arch_user_restart(&a->frame);', ''),
@@ -717,10 +717,10 @@ MUTATIONS = (
     ('landing-if-missing', '    _enable();\n    legacy_end();', '    legacy_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
-    ('resume-landing-missing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
-     '        x87_restore(&x87_parent[x87_depth]);\n        _enable();\n        if (g_longjmp_reason'),
-    ('launch-landing-missing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        x87_restore(&x87_parent[x87_depth]);\n        _enable();\n        /* 畳み'),
+    ('resume-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
+     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        if (g_longjmp_reason'),
+    ('launch-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
+     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        /* 畳み'),
 )
 
 if __name__ == '__main__':

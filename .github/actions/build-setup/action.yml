@@ -3,25 +3,80 @@ description: Host dependencies, Rust, cross toolchain and fonts for both build j
 runs:
   using: composite
   steps:
+      # Composite steps do not accept timeout-minutes: bound shell executions
+      # with timeout and cache downloads with the cache action's segment limit.
+      - name: Cache ccache binary
+        id: ccache-binary
+        uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ${{ runner.temp }}/ccache-bin
+          key: ccache-bin-4.14.1-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install ccache binary
+        shell: timeout 240 bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          archive="$RUNNER_TEMP/ccache-4.14.1-linux-x86_64-musl-static.tar.xz"
+          if [ ! -f "$RUNNER_TEMP/ccache-bin/ccache" ]; then
+            test "${{ runner.os }}/${{ runner.arch }}" = Linux/X64
+            curl -fL --connect-timeout 15 --max-time 60 --retry 8 --retry-all-errors --retry-max-time 180 \
+              -o "$archive" https://github.com/ccache/ccache/releases/download/v4.14.1/ccache-4.14.1-linux-x86_64-musl-static.tar.xz
+            echo "fa1443c9fbea879c9bff6619d1284eda3102992e91831b9f6e546879972195cc  $archive" | sha256sum -c -
+            mkdir -p "$RUNNER_TEMP/ccache-bin"
+            tar -xJf "$archive" --strip-components=1 -C "$RUNNER_TEMP/ccache-bin" --wildcards '*/ccache'
+          fi
+          "$RUNNER_TEMP/ccache-bin/ccache" --version
+          echo "$RUNNER_TEMP/ccache-bin" >> "$GITHUB_PATH"
       # Ubuntu の apt 依存 (Makefile / tools を grep して列挙、2026-09-30):
       #   nasm (boot/、カーネルの .asm)、genisoimage (build/image.mk の ISO)、
       #   build-essential (ホスト試験の gcc、ツールチェーンの構築)、e2fsprogs (ホスト試験の e2fsck / mke2fs)、
       #   libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex (build_cross.sh: GCC / binutils の構築)。
       #   FD イメージは tools/mkfat12.py (純 Python) なので mtools は要らない。
       # Python の依存は requirements.txt (ビルドの必須は lz4・PyYAML・fonttools (東雲 16 の束 .g16)、フォント生成に Pillow)。
-      - name: Host dependencies
-        shell: bash
+      - name: Apt cache key
+        id: apt-key
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang \
-            libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
-          python3 -m pip install --quiet -r requirements.txt
+          packages='build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex'
+          . /etc/os-release
+          # Image updates can change both installed dependencies and apt indexes.
+          test -n "$ImageVersion"
+          digest="$(printf '%s\n' "$packages" | sha256sum | cut -d ' ' -f 1)"
+          echo "key=apt-debs-v1-${ID}-${VERSION_ID}-${{ runner.arch }}-${ImageVersion}-${digest}" >> "$GITHUB_OUTPUT"
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt archives
+        id: apt-cache
+        uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.apt-key.outputs.key }}
+
+      - name: Host dependencies
+        shell: timeout 1200 bash --noprofile --norc -e -o pipefail {0}
+        env:
+          APT_PACKAGES: ${{ steps.apt-key.outputs.packages }}
+          APT_CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit }}
+        run: |
+          read -r -a packages <<< "$APT_PACKAGES"
+          mkdir -p "$RUNNER_TEMP/apt-archives"
+          # Keep the runner's default mirrors and let apt handle fallback.
+          # Stage debs before install: apt cleanup hooks may remove the originals.
+          if [ "$APT_CACHE_HIT" != 'true' ]; then
+            sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends --download-only "${packages[@]}"
+            find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t "$RUNNER_TEMP/apt-archives" {} +
+          fi
+          find "$RUNNER_TEMP/apt-archives" -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
+          sudo apt-get install -y --no-install-recommends --no-download "${packages[@]}"
+          python3 -m pip install --retries 8 --timeout 20 --quiet -r requirements.txt
 
       # ② rust-toolchain.toml (nightly + rust-src) を rustup に解決させる。
       #    rustup 1.28 以降は引数なしの install で toml を読む (古い rustup は `rustup show` で入る)。
       - name: Rust toolchain (rust-toolchain.toml)
-        shell: bash
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
           rustup toolchain install --no-self-update || rustup show
           rustup show active-toolchain
@@ -31,7 +86,7 @@ runs:
       #    キー = OS + gcc/newlib の版 + 構築入力 / builder hash / inventory名 (SDK入力は除外)。
       - name: Toolchain cache key
         id: crosskey
-        shell: bash
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
           echo "CROSS_DIR=$HOME/opt/cross" >> "$GITHUB_ENV"
           gcc="$(sed -n 's/^GCC_VER=//p' tools/ci/build_cross.sh)"
@@ -42,20 +97,22 @@ runs:
       - name: Cache i386-elf toolchain
         id: cross-cache
         uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
           path: ~/opt/cross
           key: ${{ steps.crosskey.outputs.key }}
 
       - name: Build i386-elf toolchain (cache miss only)
         if: steps.cross-cache.outputs.cache-hit != 'true'
-        shell: bash
+        shell: timeout 3600 bash --noprofile --norc -e -o pipefail {0}
         run: tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$RUNNER_TEMP/cross-work" --jobs "$(nproc)"
 
       # フォント。key = ipaex-<配布 zip の SHA-256 (fetch_fonts.py に固定)>。
       #    ヒットすれば fetch_fonts.py は SHA-256 を照合するだけで何も取らない。
       - name: Font cache key
         id: fontkey
-        shell: bash
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
           echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
           echo "jfdot=jfdot-shinonome16-$(python3 tools/fetch_fonts.py --family jfdot-shinonome16 --print-zip-sha256)" >> "$GITHUB_OUTPUT"
@@ -63,6 +120,8 @@ runs:
 
       - name: Cache IPAex fonts
         uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
           path: |
             assets/fonts/ipaexg.ttf
@@ -72,6 +131,8 @@ runs:
       # 欧文 (Inconsolata + OFL) は IPA と別の key にして、IPA の既存キャッシュを使い続ける。
       - name: Cache Inconsolata font
         uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
           path: |
             assets/fonts/Inconsolata-Regular.ttf
@@ -79,13 +140,15 @@ runs:
           key: ${{ steps.fontkey.outputs.latin }}
 
       - name: Fetch Inconsolata (verify cached font and OFL)
-        shell: bash
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: python3 tools/fetch_fonts.py --family inconsolata
 
       # 41MB の zip は保存せず、必要な TTF とライセンスだけを独立した key で保存する。
       # 束 (JF-Dot-Shinonome16.g16、TASK_FONTPERF) は cache せず make all が毎回 TTF から作る (1〜2 s)。
       - name: Cache JF Dot Shinonome16 font
         uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
           path: |
             assets/fonts/JF-Dot-Shinonome16.ttf
@@ -93,6 +156,6 @@ runs:
           key: ${{ steps.fontkey.outputs.jfdot }}
 
       - name: Fetch JF Dot Shinonome16 (verify cached font and license)
-        shell: bash
+        shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: python3 tools/fetch_fonts.py --family jfdot-shinonome16
 

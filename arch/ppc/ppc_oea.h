@@ -9,6 +9,17 @@
 #define PPC_MSR_IR 0x20
 #define PPC_MSR_DR 0x10
 #define PPC_MSR_RI 0x2
+#define PPC_SPR_SDR1 25
+#define PPC_SPR_IBAT0U 528
+#define PPC_SPR_IBAT1U 530
+#define PPC_SPR_IBAT2U 532
+#define PPC_SPR_IBAT3U 534
+#define PPC_SPR_DBAT0U 536
+#define PPC_SPR_DBAT1U 538
+#define PPC_SPR_DBAT2U 540
+#define PPC_SPR_DBAT3U 542
+#define PPC_HID_TBEN 0x04000000
+#define PPC_HID_STEN 0x01000000
 #define PPC_SPR_HID0 1008
 #define PPC_REV_7450_BTIC_MAX 0x0200
 /* MPC7450UM table 2-1: additional upper BAT SPRs, 7455 only. */
@@ -54,6 +65,12 @@
 #include "types.h"
 #include "ppc_boot.h"
 struct ppc_vector_image;
+/* Identify returns 0 for unknown PVR; caller must diagnose and stop.
+ * Remaining CPU functions require real mode with interrupts disabled. */
+int ppc_cpu_identify(u32 *pvr);
+void ppc_cpu_disable_bats(u32 pvr);
+void ppc_cpu_load_segments(void);
+void ppc_cpu_load_sdr1(u32 sdr1);
 void ppc_enable(void);
 u32 ppc_irq_save(void);
 void ppc_irq_restore(u32 saved_msr);

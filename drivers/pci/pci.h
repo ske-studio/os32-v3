@@ -2,9 +2,7 @@
 /*  PCI.H — PCI コンフィギュレーションメカニズム #1 と列挙                   */
 /*                                                                          */
 /*  PC-9821 の PCI バスを I/O 0CF8h / 0CFCh (メカニズム #1) で走査し、       */
-/*  見つけたデバイスを静的な表に記録する。**読むだけ** — BAR のサイズ判定    */
-/*  (全 1 を書いて読み戻す) も割り当てもしない。BIOS が付けた番地を壊さない  */
-/*  ことが、この段 (票 L-A) の唯一の仕事だから。                            */
+/*  発見した装置の BAR はデコードを止めて一度測定し、元の設定へ戻す。       */
 /*                                                                          */
 /*  ■ NP21/W には PCI が無い                                                */
 /*    エミュレータは 0CF8h を実装していないので、`pci_init()` は             */
@@ -41,8 +39,6 @@ u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg);
 u16 pci_cfg_read16(u32 bus, u32 dev, u32 fn, u32 reg);
 u8  pci_cfg_read8(u32 bus, u32 dev, u32 fn, u32 reg);
 
-/* 書きは列挙では**使わない**。L-B (82557 ドライバ) が Command レジスタの
- * Bus Master を立てるために要るので口だけ開けておく。BAR には書かない。 */
 void pci_cfg_write32(u32 bus, u32 dev, u32 fn, u32 reg, u32 value);
 
 /* Command (04h) だけのための 16 ビット書き。同じ DWORD の上位は Status で
@@ -69,5 +65,12 @@ int pci_get(u32 idx, void *out);
 
 /* vendor:device で探す。見つかれば記録の添字 (>= 0)、無ければ -1。 */
 int pci_find(u16 vendor, u16 device);
+
+/* Private kernel/module contract; pci_dev and the public KAPI stay unchanged.
+ * reg is a BAR offset or the header-specific ROM offset. len=0: unimplemented
+ * or invalid mask. Missing cache entries fail closed; getters never size. */
+int pci_bar_get(u32 bus, u32 dev, u32 fn, u32 reg, void *out);
+void pci_barsize_reset(void);
+void pci_barsize_record(u32 bus, u32 dev, u32 fn, u32 header);
 
 #endif /* PCI_H */

@@ -1,6 +1,6 @@
 """Layer 5 component hosts and the existing runner trace acceptance suite."""
 CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=87.8,
-             covers=['tools/tests/recover_gf_dev_stub.c', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
+             covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'tools/tests/recover_gf_dev_stub.c', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h',
                  'drivers/base/dev.c',
                  'fs/vfs.c',
                  'hwdev/gf_load_state.c',

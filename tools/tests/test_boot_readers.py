@@ -1,4 +1,4 @@
-"""Run PC98 boot capture without V86, and the none native provider."""
+"""Run PC98 boot capture without V86, and the PowerMac image provider."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -20,7 +20,7 @@ CHECK = dict(name='boot-readers-host', tier=1, covers=['tools/tests/test_module_
          'platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_capture.c',
          'platform/pc98/bootinfo_check.c', 'platform/pc98/bios_snapshot.c',
          'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c',
-         'platform/powermac/boot_capture.c', 'init/bootinfo.c',
+         'platform/powermac/boot_capture.c', 'platform/powermac/kboot_layout.h', 'init/bootinfo.c',
     'tools/tests/test_boot_readers.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'include/platform_boot.h',
     'include/memmap.h', 'include/types.h', 'include/build_id.h',
@@ -85,7 +85,7 @@ def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
         if none:
             paths+=['platform/powermac/boot_capture.c']
             body=BODY[BODY.index('void _start'):]
-            body='static int test(void) { const struct boot_common value={1,2,3}; boot_common_set(&value,1); platform_boot_capture(); REQUIRE(!boot_common_get()->image_valid && !boot_common_get()->image_crc && !boot_common_get()->image_size); return 0; }\n'+body
+            body='__asm__(".globl __kernel_image_start\\n.set __kernel_image_start, 0x100000\\n.globl __kernel_file_end\\n.set __kernel_file_end, 0x170000\\n");\nstatic int test(void) { const struct boot_common value={1,2,3}; boot_common_set(&value,1); platform_boot_capture(); REQUIRE(!boot_common_get()->image_valid && !boot_common_get()->image_crc && boot_common_get()->image_size==0x70000); return 0; }\n'+body
         else:
             paths+=['platform/pc98/bootinfo_check.c','platform/pc98/bootinfo_capture.c',
                     'platform/pc98/bios_snapshot.c','platform/pc98/boot_capture.c']
@@ -97,7 +97,7 @@ def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
             body=body.replace('v86_bios_real_lowmem()[0]==0 && boot_common_get()->image_valid', 'v86_bios_real_lowmem()[0]==0 && !boot_common_get()->image_valid')
         prelude=PRELUDE
         if none:
-            for line in ('#include "memmap.h"\n', '#include "paging.h"\n',
+            for line in ('#include "paging.h"\n',
                          '#include "bootinfo_native.h"\n',
                          'static u8 boot_wire[BOOTINFO_WIRE_SIZE], page0[PAGE_SIZE];\n'):
                 prelude=prelude.replace(line, '')
@@ -121,7 +121,7 @@ def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
         exe=tmp/'fixture'
         subprocess.run(['gcc','-m32','-march=i386','-std=gnu11','-D__cdecl=',
             '-MMD','-MF',str(tmp/'fixture.d'),'-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib','-static',
-            '-no-pie','-ffunction-sections','-Wl,--gc-sections', '-I'+str(ROOT),
+            '-no-pie','-ffunction-sections','-Wl,--gc-sections', '-I'+str(ROOT), *(['-I'+str(ROOT/'platform/powermac')] if none else []),
             *include_flags(ROOT),str(tmp/'fixture.c'),'-o',str(exe)],check=True,
             capture_output=True)
         assert not none or 'platform/pc98/' not in (tmp/'fixture.d').read_text()

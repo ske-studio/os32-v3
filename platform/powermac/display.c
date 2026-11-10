@@ -18,3 +18,13 @@ void display_scroll(int y, int height, int flip, int page)
     (void)flip;
     (void)page;
 }
+
+/* Unsupported compile-only planar bring-up ports; boot remains rejected. */
+void display_text_hide(void) { }
+void display_planar16(void) { }
+void display_planar_start(int legacy200) { (void)legacy200; }
+void display_flip_pages(int display, int access) { (void)display; (void)access; }
+void gfx_clear_planar_pages(u32 plane_size) { (void)plane_size; }
+/* Unsupported compile-only present ports (第 5 段 B6); boot remains rejected. */
+void display_wait_vsync(void) { }
+u8 *display_planar_plane(unsigned index) { (void)index; return 0; }

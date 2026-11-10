@@ -58,7 +58,7 @@
 #include "kstring.h"
 #include "kprintf.h"   /* kutoa_dec / kutoa_hex (状態行の数値) */
 #include "sys.h"
-#include "../kernel/ime/ime.h"
+#include "ime_boot.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "../drivers/sound/fm/snd_engine.h"
@@ -117,6 +117,7 @@ static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot);
 static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot);
 static int boot_legacy_started;
 static void kernel_gfx_config(void);
+static void kernel_boot_serial(void);
 static inline void kernel_shell_loop(void);
 static inline void kernel_mount_children(const char *root_dev);
 
@@ -201,6 +202,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* パイプバッファ初期化 */
     pipe_buffer_init();
 
+    kernel_boot_serial();
     kernel_gfx_config();
 
     /* ⑥ gfx の識別 → 候補の窓の一括予約 (owner = DEVICE gfx) → 写像 → PEGC の
@@ -293,6 +295,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
 #include "kernel_boot_cpu.inc"
 #include "kernel_boot_memory.inc"
+#include "boot_serial.inc"
 #include "kernel_gfx_config.inc"
 
 /* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは起動情報で選んだ名前

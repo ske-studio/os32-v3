@@ -109,7 +109,7 @@ YM2203 (OPN) FM音源チップ制御。FM 3ch + SSG 3ch。
 
 | 関数 | 説明 |
 |------|------|
-| `serial_init(baud)` | 初期化 (38400bps等) |
+| `serial_init(baud)` | 指定速度で初期化 (起動時の既定は 9600bps) |
 | `serial_putchar(c)` | 1文字送信 (TxRDY待ち+hltスリープ) |
 | `serial_puts(str)` | 文字列送信 (16Bごとにフロー制御) |
 | `serial_getchar()` | 1文字受信 (ブロッキング) |

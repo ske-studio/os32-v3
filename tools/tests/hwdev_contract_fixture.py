@@ -60,7 +60,7 @@ from gen_kdebug_imports import declaration
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
 # GFX_ACCEL_HAL H1 appends INDEX8 direct hooks and GFX_Cmd (32B); P0b appends enum GF6_PRIM=12.
 REVIEWED_LAYOUT_CRC = 0x927d90af
-REVIEWED_IMPORT_DECLARATIONS_SHA = '479579e77f4bd48360001cccbca42acc45fcb46d1ed3d64c6e6860f0f37cb156'
+REVIEWED_IMPORT_DECLARATIONS_SHA = '5572aaf2bc03507e123861472774838a7008894449792789780696b346ccbc9d'
 REVIEWED_INVENTORY_SHA = '1b5fe57d12d1adaf489c2c43f8dcd707842f99ef4181b1af65cca73ccdf65214'
 
 

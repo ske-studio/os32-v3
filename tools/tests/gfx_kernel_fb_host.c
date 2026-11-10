@@ -238,6 +238,7 @@ struct SplashRaster *pc98_splash_raster_state(void) { return 0; }
 int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t)
 { (void)s; (void)t; return SPLASH_RASTER_NO_SYNC; }
 
+void palette_shadow_reset(void) { }
 void palette_init(void) { }
 void palette_set(int i,u8 r,u8 g,u8 b) {(void)i;(void)r;(void)g;(void)b;}
 void palette_shadow_set(int i,u8 r,u8 g,u8 b) {(void)i;(void)r;(void)g;(void)b;}

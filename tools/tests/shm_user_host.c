@@ -6,6 +6,7 @@ static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "platform_emergency.h"
 #include "memmap.h"
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 /* Keep fault output in the fixture's mapped TVRAM, without normal console. */
 void platform_fault_cell(u32 pos, u16 code, u8 attr)
 {
@@ -127,7 +128,7 @@ static void consumers_equal(void)
     for (u32 i = 0; i < sizeof(flags) / sizeof(flags[0]); i++)
         CHECK(bios_flag(flags[i]) == v86_bios_real_lowmem()[flags[i]], "BIOS consumer immutable");
     CHECK(pegc_identify(), "BIOS PEGC candidate immutable");
-    CHECK(gfx_identify_candidates() == GFX_CAND_PEGC, "BIOS gfx candidate immutable");
+    CHECK(gfx_identify_candidates(g_backend_pref) == GFX_CAND_PEGC, "BIOS gfx candidate immutable");
 }
 void v86_gcap_release(void) {
     CHECK(!kctx_irq_depth && !kctx_exc_depth, "gcap release normal context");

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='fep-worst-load-host', tier=1,
-    covers=['tools/tests/test_fep_budget.py', 'tools/tests/fep_budget_host.c',
+    covers=['tools/tests/sqlite_cc.py', 'tools/tests/test_fep_budget.py', 'tools/tests/fep_budget_host.c',
             'tools/tests/fep_budget_linux.c', 'tools/tests/ime_dict_host.c',
             'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h',
             'tools/tests/fep_store_host.h', 'tools/tests/input_fixture_host.h',

@@ -192,9 +192,19 @@ static void caller_copy_tests(void)
     CHECK(lease_acquire(&space, &auth, input, 1, LEDGER_PERM_RO, &view) == LEASE_INVAL);
     CHECK(!paging_lease_pte(&space, MEM_LEASE_BASE));
     pd[MEM_LEASE_BASE >> 22] = d;
-    space.lease_pt_phys[0]++;
+    /* Use an empty, unused PT: shifted live PTEs would independently fail
+     * the content scan and hide a missing alignment guard. PTE_USER is
+     * masked by the PDE rights. The second zero page bounds the shifted read. */
+    u32 empty_pt = pgalloc_alloc_phys(space.owner, 2);
+    CHECK(empty_pt);
+    for (u32 i = 0; i < 2 * PTE_COUNT; i++) ((u32 *)P2V(empty_pt))[i] = 0;
+    CHECK(!space.lease_pt_phys[1] && !pd[(MEM_LEASE_BASE >> 22) + 1]);
+    space.lease_pt_phys[1] = empty_pt + PTE_USER;
+    pd[(MEM_LEASE_BASE >> 22) + 1] = empty_pt | PAGE_RW | PTE_USER;
     CHECK(lease_check(&space) == LEASE_INVAL);
-    space.lease_pt_phys[0]--;
+    space.lease_pt_phys[1] = 0;
+    pd[(MEM_LEASE_BASE >> 22) + 1] = 0;
+    CHECK(pgalloc_free_n_owner(space.owner, empty_pt / PAGE_SIZE, 2));
     /* PTE_USER is within the page: OR-ing rights hides this misalignment
      * from the exact PDE comparison, isolating each alignment guard. */
     space.lease_pt_phys[0] = own_pt + PTE_USER;

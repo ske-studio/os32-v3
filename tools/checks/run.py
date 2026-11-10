@@ -6,7 +6,7 @@ import argparse
 import ast
 from bisect import bisect_left
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import fnmatch
 from functools import lru_cache
 import importlib.util
@@ -26,6 +26,7 @@ BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 # Build/toolchain inputs and infrastructure used across check recipes.
 FULL = ("Makefile", "build/*.mk",
+    "tools/tests/cc_cache.py",
     '.gitmodules',
     'requirements.txt',
     'tools/check_tree_unchanged.py',
@@ -403,6 +404,7 @@ PATH_AUDIT_ALLOW = {
         "layout tests use private snapshot/object fixtures; main is never invoked",
     "tools/tests/test_build_compare.py": "all artifacts are created inside TemporaryDirectory",
     "tools/tests/test_build_profile.py": "make fixture lives inside TemporaryDirectory",
+    "tools/tests/build_fixture.py": "copies make inputs only, excluding out/sdk products, into private query fixtures",
     "tools/tests/test_target_toolchain.py": "only copied config is queried; no products are read",
 
     "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",
@@ -576,6 +578,11 @@ class Check:
     tier: int = 1
     needs: tuple[str, ...] = ()
     mutate_tier: int = 2
+    weight: float | None = None
+
+    @property
+    def seconds(self):
+        return self.budget if self.weight is None else self.weight
 
 
 @dataclass(frozen=True)
@@ -607,7 +614,7 @@ def matches(path, patterns):
 
 def ordered(checks, names=None):
     return tuple(sorted(checks if names is None else names,
-                        key=lambda n: (-checks[n].budget, n)))
+                        key=lambda n: (-checks[n].seconds, n)))
 
 
 def shards(checks, count):
@@ -634,17 +641,83 @@ def shards(checks, count):
         remaining.difference_update(group)
         groups.append(tuple(sorted(group)))
     result, loads = [set() for _ in range(count)], [0.0] * count
-    for group in sorted(groups, key=lambda g: (-sum(checks[n].budget for n in g), g)):
+    for group in sorted(groups, key=lambda g: (-sum(checks[n].seconds for n in g), g)):
         index = min(range(count), key=lambda i: (loads[i], i))
         result[index].update(group)
-        loads[index] += sum(checks[n].budget for n in group)
+        loads[index] += sum(checks[n].seconds for n in group)
     return tuple(ordered(checks, names) for names in result)
+
+
+def declaration_paths(root):
+    paths = set((root / "tools/checks").rglob("*.py"))
+    paths.update((root / "tools/tests").glob("test_*.py"))
+    return sorted(paths)
+
+
+def indexed_discover(root):
+    """Reuse declarations only while every candidate and the parser are unchanged.
+
+    Include undeclared candidates, additions, removals, and ctime (not just mtime).
+    Publication is atomic; concurrent readers never see an incomplete index.
+    An unwritable or damaged cache only costs a fresh discovery.
+    """
+    candidates = declaration_paths(root)
+    paths = sorted(set(candidates) | {Path(__file__).resolve()} |
+                   ({root / "tools/checks/weights.json"} if (root / "tools/checks/weights.json").exists() else set()))
+    signature = [[str(root.resolve()), sys.version]]
+    for path in paths:
+        stamp = path.stat()
+        signature.append([str(path), stamp.st_mtime_ns, stamp.st_ctime_ns,
+                          stamp.st_size, stamp.st_ino])
+    cache = root / "build/out/check-index.json"
+    try:
+        data = json.loads(cache.read_text())
+        if data["signature"] == signature:
+            return {row["name"]: Check(**dict(row, covers=tuple(row["covers"]),
+                                             needs=tuple(row["needs"]))) for row in data["checks"]}
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    checks = discover(root)
+    # Do not publish a discovery made across an edit. The next call retries.
+    after = []
+    for path in paths:
+        stamp = path.stat()
+        after.append([str(path), stamp.st_mtime_ns, stamp.st_ctime_ns,
+                      stamp.st_size, stamp.st_ino])
+    if signature[1:] == after and declaration_paths(root) == candidates:
+        pending = None
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(mode="w", dir=cache.parent,
+                                             prefix="check-index-", delete=False) as stream:
+                pending = Path(stream.name)
+                json.dump(dict(signature=signature, checks=[asdict(c) for c in checks.values()]), stream)
+            pending.replace(cache)
+        except OSError:
+            pass
+        finally:
+            if pending is not None:
+                pending.unlink(missing_ok=True)
+    return checks
+
+
+def emit_make(checks, names):
+    selected = closure(checks, names)
+    values = dict(
+        CHECK_NAMES=" ".join("check-" + n for n in ordered(checks)),
+        CHECK_SHARD_TARGETS=" ".join("check-" + n for n in names),
+        CHECK_EDGES=" ".join("check-time-check-" + c.name + ":check-time-check-" + n[6:]
+                             for name in ordered(checks) for c in (checks[name],)
+                             for n in c.needs if n.startswith("check:")),
+        CHECK_ALL_NEEDS=" ".join(make_needs(checks, selected)))
+    # Names and needs have already been restricted to make-safe characters.
+    # Nested eval preserves assignment boundaries after $(shell) folds newlines.
+    return " ".join("$(eval " + k + " := " + v + ")" for k, v in values.items())
 
 
 def discover(root: Path) -> dict[str, Check]:
     checks = {}
-    paths = set((root / "tools/checks").rglob("*.py"))
-    paths.update((root / "tools/tests").glob("test_*.py"))
+    paths = declaration_paths(root)
     for path in sorted(paths):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         declarations = [n.value for n in tree.body
@@ -701,6 +774,13 @@ def discover(root: Path) -> dict[str, Check]:
             reject("duplicate name: " + name)
         checks[name] = Check(name, rel, tuple(data["covers"]), float(data["budget"]),
                              data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2))
+    weights = root / "tools/checks/weights.json"
+    if weights.exists():
+        for name, seconds in json.loads(weights.read_text())["seconds"].items():
+            if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+                raise ValueError("invalid check weight: " + name)
+            if name in checks:
+                checks[name] = replace(checks[name], weight=float(seconds), budget=2 * seconds)
     return checks
 
 
@@ -1107,28 +1187,37 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--list", action="store_true")
+    action.add_argument("--make", action="store_true", help="emit all make registration variables")
     action.add_argument("--select", action="store_true")
     action.add_argument("--run", nargs="+")
     action.add_argument("--lint", action="store_true")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--shard", help="zero-based index/count, with --list only")
+    parser.add_argument("--needs", action="store_true", help="with --list: selected make prerequisites")
+    parser.add_argument("--shard", help="zero-based index/count, with --list or --make")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--base")
     source.add_argument("--files", nargs="*")
     parser.add_argument("--tier", type=int, choices=range(5), default=0)
     args = parser.parse_args(argv)
     try:
-        checks = discover(ROOT)
+        checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
         names = ordered(checks)
         if args.shard is not None:
-            if not args.list or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
-                raise ValueError("--shard requires --list and index/count")
+            if not (args.list or args.make) or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
+                raise ValueError("--shard requires --list or --make and index/count")
             index, count = map(int, args.shard.split("/"))
             if index >= count:
                 raise ValueError("shard index must be less than count")
             names = shards(checks, count)[index]
+        if args.needs and (not args.list or args.json):
+            raise ValueError("--needs requires --list without --json")
+        if args.make:
+            print(emit_make(checks, names))
+            return 0
         if args.list:
-            if args.json:
+            if args.needs:
+                print(" ".join(make_needs(checks, closure(checks, names))))
+            elif args.json:
                 print(json.dumps([dict(asdict(checks[n]), target="check-" + n) for n in names]))
             else:
                 print("\n".join("check-" + n for n in names), end="\n" if names else "")

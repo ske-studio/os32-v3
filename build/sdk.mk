@@ -45,8 +45,10 @@ sdk: $(ALL_LIB_ARCHIVES) $(CRT0_USER_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	cp sdk/allocator/nano.LICENSE $(SDK_OUT)/lib/
 	cp sdk/os32_generations.py          $(SDK_OUT)/bin/
 	cp sdk/target_profile.py             $(SDK_OUT)/bin/
+	@# example の Makefile と外部のビルドが target の値を引く口 (第 5 段 S2)
+	cp sdk/target_profile_cli.py         $(SDK_OUT)/bin/
 	cp sdk/os32x_hdr.py                  $(SDK_OUT)/bin/
-	cp sdk/rust/i686-os32-none.json      $(SDK_OUT)/rust/
+	cp $(SDK_TARGET_RUST)      $(SDK_OUT)/rust/
 	cp -r sdk/rust/os32api               $(SDK_OUT)/rust/
 	@rm -rf $(SDK_OUT)/rust/os32api/target
 	@# 動くサンプル。SDK だけでビルドできることの実証も兼ねる。
@@ -165,23 +167,12 @@ ifeq ($(CHECK_TIME_CHILD),1)
 CHECK_NAMES := $(filter check-%,$(MAKECMDGOALS))
 CHECK_ALL_NEEDS :=
 else
-CHECK_NAMES := $(shell python3 -B tools/checks/run.py --list)
-ifneq ($(.SHELLSTATUS),0)
-$(error tools/checks/run.py --list failed)
-endif
 CHECK_SHARD ?=
-CHECK_SHARD_TARGETS := $(shell python3 -B tools/checks/run.py --list $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
+CHECK_REGISTRATION := $(shell python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
 ifneq ($(.SHELLSTATUS),0)
-$(error tools/checks/run.py --list --shard failed)
+$(error tools/checks/run.py --make failed (make registration))
 endif
-CHECK_EDGES := $(shell python3 -B -c 'import json, subprocess; rows = json.loads(subprocess.check_output(["python3", "-B", "tools/checks/run.py", "--list", "--json"])); print(" ".join("check-time-" + c["target"] + ":check-time-check-" + n[6:] for c in rows for n in c["needs"] if n.startswith("check:")))')
-ifneq ($(.SHELLSTATUS),0)
-$(error tools/checks/run.py dependency listing failed)
-endif
-CHECK_ALL_NEEDS := $(shell python3 -B -c 'import json, subprocess; rows = json.loads(subprocess.check_output(["python3", "-B", "tools/checks/run.py", "--list", "--json"])); print(" ".join(sorted({n[5:] for c in rows for n in c["needs"] if n.startswith("make:")})))')
-ifneq ($(.SHELLSTATUS),0)
-$(error tools/checks/run.py --list --json failed)
-endif
+$(eval $(CHECK_REGISTRATION))
 endif
 CHECK_PAR_TARGETS ?= $(CHECK_SHARD_TARGETS)
 CHECK_NEEDS ?= $(CHECK_ALL_NEEDS)

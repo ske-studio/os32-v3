@@ -84,6 +84,12 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
    `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
    未実装の能力は入力を読む前に拒否する。
+   SDK の選択 (CRT・リンカスクリプト・Rust ターゲット・ELF emulation・呼出し規約) も
+   同じ profile の 1 組で、make は `build/sdk-target.mk` が `sdk/target_profile_cli.py` を
+   1 回呼んで引く (`build/config.mk` の CRT と `-T`、`build/programs.mk` の Rust の
+   ターゲット名、`build/sdk.mk` の配布物、`sdk/example/hello/Makefile`)。Rust のビルドは
+   `OS32_SDK_TARGET` を `sdk/rustc_stamp.py` に渡し、rustc の起動より前に確かめる。
+   新しい target の SDK を足すときは profile に 1 組を書き、ここに値を書き写さない。
 
 5. **選ばせる。** `make ARCH=<arch> PLATFORM=<platform> ...`。既定値は
    `build/config.mk` の `?=` なので、コマンドラインでも環境変数でも上書きできる。
@@ -124,8 +130,18 @@ ARM 実装は別票で行う。
 `make ARCH=ppc PLATFORM=powermac` は共通候補と既存 bootstrap の C/GAS を
 コンパイルする。出力は `build/out/ppc-powermac`、コンパイラは
 `PPC_CROSS_DIR`（既定 `/home/hight/opt/cross-ppc`）から選ぶ。
-原始命令ヘッダ等が未実装なので全 TU 成功・kernel リンク・起動は未達。
+この一覧 (selected) は全 TU 成功に達していない: 分離の第 5 段の後で 120 TU のうち 112 が成功し、
+残る 8 本は PC98・x86 の装置のヘッダを直に include する共通のソース
+(gfx_core.c、exec.c、kapi_generated.c、module.c、fatfs の 2 本、ext2_super.c、serialfs_session.c)。
 SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-only である。
+
+**本体のリンクと起動は別の入口で達している (到達点 ②、2026-11-10)**:
+`make -f build/ppc-kboot.mk` が `init/ppc_kernel.c` から到達する閉包
+(共通の mm・kprintf・tick と arch/ppc・platform/powermac) を
+`build/out/ppc-kboot/PPCKERN.ELF` にリンクし、QEMU mac99 で OF から入って
+案 D の paging・例外・MPIC・1kHz の decrementer まで初期化する
+(`python3 -B tools/ppc/kboot_accept.py`)。VFS・module・exec・USER・画面は含まない。
+票は docs/tasks/ppc/ の TASK_PPC_KBOOT。
 
 実測は `python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json`。
 必須 7 本、ELF32/BE/EM_PPC、実 `.d`、全 TU の試行と失敗分類を照合する。

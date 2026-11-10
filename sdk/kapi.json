@@ -546,7 +546,7 @@
       "args": [
         "int active"
       ],
-      "body": "if (ring3_call_from_user()) return;\nrshell_active = active;"
+      "body": "if (ring3_call_from_user()) return;\nrshell_active = active;\nif (active) boot_serial_mirror = 0;"
     },
     {
       "name": "ide_write_sector",

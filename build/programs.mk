@@ -159,8 +159,8 @@ clean-sh:
 # シェル帯へ直接ロードする (config.h SYS_GSHELL_BIN、K4)。
 GSHELL_DIR = userland/gshell
 # RUST_TARGET_JSON はこの後 (Rust 節) で定義されるので、ここでは前提の
-# 展開時に空にならないよう名前を直に書く。
-GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
+# 展開時に空にならないよう profile の値 (build/sdk-target.mk) から直に作る。
+GSHELL_LIB = $(GSHELL_DIR)/target/$(basename $(notdir $(SDK_TARGET_RUST)))/release/libgshell.a
 
 # GSHELL_FEATURES: ゲスト fixture の cargo feature (例 r1_fixture、T7b-b2 b2③)。
 # 既定は空 = 製品 build。fixture 版の配備は `make gshell GSHELL_FEATURES=r1_fixture`
@@ -168,7 +168,7 @@ GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 GSHELL_FEATURES ?=
 GSHELL_FEATURE_STAMP = $(GSHELL_DIR)/target/.os32-features
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
-	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release $(if $(GSHELL_FEATURES),--features $(GSHELL_FEATURES))
+	cd $(GSHELL_DIR) && OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release $(if $(GSHELL_FEATURES),--features $(GSHELL_FEATURES))
 	@# cargo は feature を切り替えると前の build の成果物を古い mtime のまま戻す
 	@# (hard link) ので、feature が前回と違うときだけ時刻を進めて gshell.elf を組み直す。
 	@if [ "$$(cat $(GSHELL_FEATURE_STAMP) 2>/dev/null)" != "[$(GSHELL_FEATURES)]" ]; then \
@@ -416,7 +416,7 @@ SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno
 SQLITE_SA_CFLAGS += -include sdk/include/os32/os32_unit_stamp.h
 
 $(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
+	$(SQLITE_CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
 
 $(SQLITE_SA_DIR)/sqlite_user_vfs.o: $(SQLITE_SA_DIR)/sqlite_user_vfs.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
@@ -609,7 +609,8 @@ fep_dic:
 # Rust プログラム ビルドルール
 # ============================================================================
 RUST_PROGRAMS_DIR = userland/rust
-RUST_TARGET_JSON = i686-os32-none
+# target の spec の名前は SDK の profile が持つ (sdk/target_profile.py の rust)。
+RUST_TARGET_JSON = $(basename $(notdir $(SDK_TARGET_RUST)))
 RUST_TARGET_DIR = $(RUST_PROGRAMS_DIR)/target/$(RUST_TARGET_JSON)/release
 RUST_KAPI_RS = sdk/rust/os32api/src/kapi_generated.rs
 
@@ -625,7 +626,7 @@ $(RUST_KAPI_RS): sdk/kapi.json sdk/kapi_rust_gen.py
 # ---------------------------------------------------------------------------
 define DEFINE_RUST_PROGRAM
 $(RUST_TARGET_DIR)/lib$(1).a: FORCE $(RUST_KAPI_RS)
-	cd $(RUST_PROGRAMS_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p $(1)
+	cd $(RUST_PROGRAMS_DIR) && OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p $(1)
 
 $(2)/$(1).elf: sdk/link/app.ld $$(CRT0_OBJ) $(RUST_TARGET_DIR)/lib$(1).a $(3)
 	$$(LD) $$(PROGRAM_LDFLAGS) --allow-multiple-definition \
@@ -674,7 +675,7 @@ $(eval $(call DEFINE_RUST_PROGRAM,gui_bench,userland/tests,))
 SHLIB_GUI_LIB = $(RUST_TARGET_DIR)/liblibos32gui.a
 
 $(SHLIB_GUI_LIB): FORCE $(RUST_KAPI_RS)
-	cd $(RUST_PROGRAMS_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p libos32gui
+	cd $(RUST_PROGRAMS_DIR) && OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p libos32gui
 
 # libos32host.a (票 N4) も静的リンク: 表 105..=110 の host_* が呼ぶ。`kapi` は
 # libos32cfg (cfg_backend.c) と共用で SHLIB_GUI_LIB (cfgro.rs) が供給する

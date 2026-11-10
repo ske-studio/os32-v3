@@ -41,7 +41,11 @@ static void outp(unsigned int port, unsigned int value);
 #include "os32_gui_shared.h"
 #undef i32
 #undef u32
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 #include "../../gfx/gfx_core.c"
+#include "../../platform/pc98/gfx_init.c"   /* 第 5 段 B3: planar の初期化の provider (製品) */
+#include "../../platform/pc98/gfx_selector.c"   /* 第 5 段 B4: backend の選択の provider (製品) */
+#include "../../platform/pc98/gfx_surfaces.c"   /* 第 5 段 B5: 起動時の SURFACE の予約の provider (製品) */
 #include "../../gfx/gfx_emergency.c"
 #include "../../drivers/video/pc98/backend_pc98.c"
 const u8 *v86_bios_real_lowmem(void)
@@ -214,6 +218,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int platform_splash_try_image(const char *path, u32 *end_tick)
 { (void)path; (void)end_tick; return PLATFORM_SPLASH_FALLBACK; }
 void palette_init(void) { }
+void palette_shadow_reset(void) { }
 void palette_set(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; }
 void gfx_scroll_init(void)

@@ -11,6 +11,16 @@ void display_palette4_write(int index, u8 r, u8 g, u8 b);
 /* Internal: normalized logical row, logical height and display page.
  * Caller retains scroll state and the no-backbuffer guard. */
 void display_scroll(int y, int height, int flip, int page);
+/* Standard planar bring-up, called by gfx_init in this order: text hide,
+ * (backbuffer clear), planar16, planar_start, (page clear), flip_pages. */
+void display_text_hide(void);   /* PC98: char=0/attr=0; not console_clear */
+void display_planar16(void);
+void display_planar_start(int legacy200);
+void display_flip_pages(int display, int access);
+/* 表示の垂直帰線の期間に入るまで待つ (present の同期。割り込みは触らない)。 */
+void display_wait_vsync(void);
+/* 標準 planar の表示メモリの index 番目 (0=B 1=R 2=G 3=I) のプレーンの先頭。 */
+u8 *display_planar_plane(unsigned index);
 void display_restore_98(void);
 int display_recover_ready(void);
 int display_recover_cell_read(u32 *value);

@@ -14,6 +14,7 @@ OS のソースツリーを持たなくても、この SDK だけでアプリを
 | `crt/` | スタートアップ (`crt0.o`, `crt0_c.o`, `syscalls.o`, `help.o`) |
 | `link/` | リンカスクリプト (`app.ld`) |
 | `bin/mkos32x.py` | OS32X 実行ファイルヘッダ (v4、60B) の付加。`bin/os32x_hdr.py` を同じ場所に置いて使う |
+| `bin/target_profile.py`・`bin/target_profile_cli.py` | この SDK が組める target と、その CRT・リンカスクリプト・Rust ターゲット・ELF emulation・呼出し規約の組 |
 | `rust/` | Rust ターゲット定義と `os32api` クレート |
 | `example/hello/` | 動く最小例 |
 | `KAPI_VERSION` | この SDK が対応する KernelAPI バージョン |
@@ -98,6 +99,20 @@ OS 側の `docs/KAPI_SPEC.md` の「API関数」の注記。)
 古い SDK のアプリが新しいカーネルで無条件に動くわけではありません。形式・KAPI 配置・ABI 世代・
 メモリ世代、および依存する共有ライブラリのプロトコルが一致する必要があります。
 世代が違う場合は現行 SDK で再構築します ([世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69))。
+
+## target の選択
+
+この SDK が組める target は `x86-pc98` だけです。CRT の並び・リンカスクリプト・Rust の
+ターゲット定義・ELF emulation・呼出し規約は、ばらばらに書き写さず `bin/target_profile.py`
+の 1 組から引きます。
+
+- make からは `python3 $(OS32_SDK)/bin/target_profile_cli.py --target <target> --make --root $(OS32_SDK)`
+  が `NAME=値` の列を出します (`example/hello/Makefile` がこの形)。組めない target は
+  標準出力が空・終了コード 3 で、コンパイラやリンカを起動する前に止まります。
+- Rust は `RUSTC_WRAPPER=$(OS32_SDK)/bin/rustc_stamp.py` が同じ profile を見ます。target は
+  環境変数 `OS32_SDK_TARGET` (既定 `x86-pc98`) で、profile に無いターゲット定義の JSON や
+  組めない target は rustc を起動する前に断ります。
+- `ppc-powermac` は未対応です (PowerPC のユーザープログラムの ABI は未確定)。
 
 ## T2c の世代契約
 

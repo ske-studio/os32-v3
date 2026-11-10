@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
+CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
+    covers=['gfx/palette.c', 'platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
+            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
+            'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
+            'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
+            'arch/x86/**', 'platform/pc98/**', 'lib/kstring.h', 'sdk/include/os32/**',
+            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'])
+import argparse
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+import host32
+from kernel_includes import include_flags
+ROOT = Path(__file__).resolve().parents[2]
+PROVIDER = 'platform/pc98/gfx_init.c'
+# (name, file, unique anchor, replacement): provider mutants must fail the host
+# trace at run time.
+MUTATIONS = (
+    ('ff2-omitted', PROVIDER, '    _out(MODE_FF2_PORT, MFF2_16COLOR);', '    (void)0;'),
+    ('start-first', PROVIDER,
+     '    _out(GDC_GFX_CMD, GDC_GFX_400LINE);\n', '    _out(GDC_GFX_CMD, GDC_CMD_START);\n    _out(GDC_GFX_CMD, GDC_GFX_400LINE);\n'),
+    ('200-param', PROVIDER, '_out(GDC_GFX_PARAM, legacy200 ? 0x01 : 0x00);', '_out(GDC_GFX_PARAM, 0x00);'),
+    ('200-ff1', PROVIDER, 'legacy200 ? MFF1_200LINE : MFF1_HIRES', 'MFF1_HIRES'),
+    ('flip-order', PROVIDER,
+     '    _out(GDC_DISP_PAGE, display ? GDC_PAGE_1 : GDC_PAGE_0);\n    _out(GDC_ACCESS_PAGE, access ? GDC_PAGE_1 : GDC_PAGE_0);',
+     '    _out(GDC_ACCESS_PAGE, access ? GDC_PAGE_1 : GDC_PAGE_0);\n    _out(GDC_DISP_PAGE, display ? GDC_PAGE_1 : GDC_PAGE_0);'),
+    ('flip-access', PROVIDER, 'access ? GDC_PAGE_1 : GDC_PAGE_0', 'access ? GDC_PAGE_0 : GDC_PAGE_1'),
+    ('hide-attr', PROVIDER, '        tvram_attr[i * 2] = 0x00;', '        tvram_attr[i] = 0x00;'),
+    ('hide-short', PROVIDER, 'i < TVRAM_COLS * TVRAM_ROWS; i++', 'i < TVRAM_COLS * (TVRAM_ROWS - 1); i++'),
+    ('vsync-inverted', PROVIDER, 'while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }', 'while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) != 0) { }'),
+    ('vsync-graphic-gdc', PROVIDER, '_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC', '_in(GDC_GFX_STAT) & GDC_STAT_VSYNC'),
+    ('plane-order', PROVIDER, 'VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I\n    };\n    return',
+     'VRAM_PLANE_B, VRAM_PLANE_G, VRAM_PLANE_R, VRAM_PLANE_I\n    };\n    return'),
+    ('clear-one-page', PROVIDER, '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset'),
+)
+CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'gfx/gfx_vram.c'}
+# The common callers are extracted from the product text and *executed* with
+# recording fakes; these mutants must fail that executed trace.
+CORE_MUTATIONS = (
+    ('palette-reset-omitted', 'init', '    palette_shadow_reset();', '    (void)0;'),
+    ('palette-reset-hardware', 'palette', 'void palette_shadow_reset(void)\n{',
+     'void palette_shadow_reset(void)\n{\n    display_palette4_write(0, 0, 0, 0);'),
+    ('hide-before-plane-check', 'core',
+     '    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n',
+     '    display_text_hide();\n    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n'),
+    ('hide-omitted', 'core', '    display_text_hide();\n\n', '\n'),
+    # A true move: the final memory state is unchanged, only the order differs.
+    ('hide-after-clear', 'core',
+     '    display_text_hide();\n\n    /* ゼロクリア (バックバッファ) — kmemset (rep stosd) で高速化 */\n    kmemset(bb_b, 0, plane_sz);\n    kmemset(bb_r, 0, plane_sz);\n    kmemset(bb_g, 0, plane_sz);\n    kmemset(bb_i, 0, plane_sz);\n',
+     '    kmemset(bb_b, 0, plane_sz);\n    kmemset(bb_r, 0, plane_sz);\n    kmemset(bb_g, 0, plane_sz);\n    kmemset(bb_i, 0, plane_sz);\n    display_text_hide();\n'),
+    ('ff2-before-clear', 'core',
+     '    display_text_hide();\n\n', '    display_text_hide();\n    display_planar16();\n\n'),
+    ('ff2-omitted-by-caller', 'core', '    kmemset(bb_i, 0, plane_sz);\n\n    display_planar16();\n',
+     '    kmemset(bb_i, 0, plane_sz);\n'),
+    ('flip-before-clear', 'init',
+     '    gfx_clear_planar_pages(plane_sz);\n\n    /* ページ0を表示、ページ1に描画 */\n    display_flip_pages(0, 1);\n',
+     '    display_flip_pages(0, 1);\n    gfx_clear_planar_pages(plane_sz);\n'),
+    ('start-after-clear', 'init',
+     '    display_planar_start(legacy200);\n\n    gfx_clear_planar_pages(plane_sz);\n',
+     '    gfx_clear_planar_pages(plane_sz);\n    display_planar_start(legacy200);\n'),
+    ('flip-pages-swapped', 'init', '    display_flip_pages(0, 1);', '    display_flip_pages(1, 0);'),
+    # B6: the present path of gfx/gfx_vram.c.
+    ('present-flip-swapped', 'vram', '    display_flip_pages(gfx_display_page, gfx_display_page ^ 1);',
+     '    display_flip_pages(gfx_display_page ^ 1, gfx_display_page);'),
+    ('present-flip-before-transfer', 'vram',
+     '        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n        _flip_page();\n    } else {\n        if (dirty_queue.count == 0) return;',
+     '        _flip_page();\n        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n    } else {\n        if (dirty_queue.count == 0) return;'),
+    ('present-flip-uncounted', 'vram', '    gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */\n', ''),
+    ('present-vsync-omitted', 'vram', '            display_wait_vsync();\n', '            (void)0;\n'),
+    ('present-vsync-always', 'vram', '        if (sync) {\n            /* VSYNC期間になるまで待つ */', '        if (sync || 1) {\n            /* VSYNC期間になるまで待つ */'),
+    ('200-clear-size', 'init', '    _gfx_common_init(plane_sz);', '    _gfx_common_init(GFX_PLANE_SZ);'),
+)
+
+
+def function(text, name):
+    start = re.search(r'^static void ' + name + r'\([^\n]*\)\n\{', text, re.M)
+    assert start, name
+    pos, depth = start.end(), 1
+    while depth:
+        depth += (text[pos] == '{') - (text[pos] == '}')
+        pos += 1
+    return text[start.start():pos] + '\n'
+
+
+def execute(texts, work):
+    (work / 'gfx_init_source.inc').write_text(texts['provider'])
+    (work / 'palette_source.inc').write_text(texts['palette'])
+    (work / 'gfx_core_slice.inc').write_text(
+        function(texts['core'], '_gfx_common_init') + function(texts['init'], 'gfx_init_mode'))
+    (work / 'gfx_vram_slice.inc').write_text(
+        function(texts['vram'], '_flip_page') + function(texts['vram'], '_present_dirty'))
+    exe = work / 'gfx_init'
+    subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
+        '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
+        '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+        '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+        *include_flags(ROOT), '-I' + str(work),
+        str(ROOT / 'tools/tests/sep5_gfx_init_host.c'), '-o', str(exe)], check=True)
+    return host32.run([str(exe)]).returncode
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mutate', action='store_true')
+    args = parser.parse_args()
+    texts = dict(provider=(ROOT / PROVIDER).read_text(),
+                 palette=(ROOT / 'gfx/palette.c').read_text(),
+                 **{key: (ROOT / path).read_text() for key, path in CORE.items()})
+    with tempfile.TemporaryDirectory(prefix='sep5-gfx-init-') as directory:
+        work = Path(directory)
+        assert execute(texts, work) == 0
+        print('PASS host32 provider trace (200/400 start, flip, FF2, text hide bounds, page clear) and '
+              'executed common bring-up order (400, 200, missing plane) and present path '
+              '(flip pages after transfer, VSYNC wait, plane addresses)', flush=True)
+        if args.mutate:
+            for name, unit, old, new in (*((n, 'provider', o, r) for n, _, o, r in MUTATIONS),
+                                         *CORE_MUTATIONS):
+                assert texts[unit].count(old) == 1, name
+                rc = execute(dict(texts, **{unit: texts[unit].replace(old, new)}), work)
+                assert rc == 1, (name, rc)
+                print('MUTATE runtime RED ' + name, flush=True)
+            assert execute(texts, work) == 0
+
+
+def run(ctx):
+    import os
+    env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    return subprocess.call(['python3', '-B', 'tools/tests/test_sep5_gfx_init.py',
+                            *(['--mutate'] if ctx.mutate else [])], cwd=ctx.root, env=env)
+
+
+if __name__ == '__main__':
+    main()

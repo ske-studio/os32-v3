@@ -1,6 +1,6 @@
 """Host fixture cache selection, cross-worktree keys, and mutation checks."""
 CHECK = dict(name='host32-cache-host', tier=1,
-             covers=['tools/tests/host32.py', 'tools/tests/test_host32_cache.py'],
+             covers=['tools/tests/cc_cache.py', 'tools/tests/host32.py', 'tools/tests/test_host32_cache.py'],
              needs=['make:all'], budget=3.0)
 
 import os
@@ -91,6 +91,38 @@ class CacheTests(unittest.TestCase):
         debug = ['gcc', '-g', '-c', 'a.c']
         self.assertNotEqual(key(root, debug, root), key(other, debug, other))
 
+    def test_prune_ignores_write_probe(self):
+        with tempfile.TemporaryDirectory() as td:
+            cache = pathlib.Path(td)
+            probe = cache / '.write-test-worker'
+            probe.touch()
+            stat = pathlib.Path.stat
+            def probe_stat(path, *args, **kwargs):
+                if path == probe:
+                    raise AssertionError('write probe must not be statted')
+                return stat(path, *args, **kwargs)
+            with patch.object(pathlib.Path, 'stat', probe_stat), \
+                 patch.object(host32, 'CACHE_ENTRIES', 0):
+                host32.prune_fixtures(cache)
+            self.assertTrue(probe.exists())
+
+    def test_prune_disappearing_entry(self):
+        with tempfile.TemporaryDirectory() as td:
+            cache = pathlib.Path(td)
+            vanished = cache / 'vanished'
+            vanished.touch()
+            retained = cache / 'retained'
+            retained.write_text('fixture')
+            stat = pathlib.Path.stat
+            def racing_stat(path, *args, **kwargs):
+                if path == vanished:
+                    path.unlink(missing_ok=True)
+                return stat(path, *args, **kwargs)
+            with patch.object(pathlib.Path, 'stat', racing_stat):
+                host32.prune_fixtures(cache)
+            self.assertFalse(vanished.exists())
+            self.assertEqual(retained.read_text(), 'fixture')
+
     def test_limits(self):
         with tempfile.TemporaryDirectory() as td:
             cache = pathlib.Path(td)
@@ -106,6 +138,8 @@ class CacheTests(unittest.TestCase):
 def mutations():
     source = pathlib.Path(host32.__file__).read_text()
     changes = [
+        (" or path.name.startswith('.write-test-')", ""),
+        ("except FileNotFoundError:\n            continue  # A worker can remove a probe outside the cache lock.", "except FileNotFoundError:\n            raise"),
         ("lambda arg: stable(\n        arg.replace(str(root), '<root>'))", "lambda arg: stable(arg)"),
         ("return ' '.join(preprocess) + ' cwd=' + str(cwd)", "pass"),
         ("arg if keep or arg.startswith(SPELLED_PREFIXES) else share(arg)", "share(arg)"),
@@ -123,6 +157,7 @@ def mutations():
             path = pathlib.Path(td)
             (path / 'host32.py').write_text(source.replace(old, new))
             shutil.copy2(__file__, path / 'test_host32_cache.py')
+            shutil.copy2(pathlib.Path(host32.__file__).with_name('cc_cache.py'), path / 'cc_cache.py')
             result = subprocess.run([sys.executable, '-B', str(path / 'test_host32_cache.py')],
                                     capture_output=True, text=True)
             red = result.returncode == 1 and ('FAIL:' in result.stderr or 'ERROR:' in result.stderr)

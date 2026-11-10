@@ -21,15 +21,15 @@ static struct addrspace spaces[APP_SLOT_COUNT];
 static KernelAPI api;
 static u32 tramp[KAPI_DATA_IDX_SHM_BASE+1];
 static int cur, trace_count, return_count, cleanup_count;
-static const X87State *trace_state[TRACE_MAX];
+static const struct arch_fp_context *trace_state[TRACE_MAX];
 static char trace_op[TRACE_MAX];
 static u8 stack_page[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static u8 allocation[MEM_EXEC_STACK_SIZE] __attribute__((aligned(PAGE_SIZE)));
-static void record(char op, const X87State *p) { CHECK(trace_count<TRACE_MAX); trace_op[trace_count]=op; trace_state[trace_count++]=p; }
-void x87_save(X87State *p) { record('S',p); }
-void x87_init(void) { record('I',0); }
-void x87_restore(const X87State *p) { record('R',p); }
-static void expect(int n, char op, const X87State *p) { CHECK(trace_count==n+1 && trace_op[n]==op && trace_state[n]==p); }
+static void record(char op, const struct arch_fp_context *p) { CHECK(trace_count<TRACE_MAX); trace_op[trace_count]=op; trace_state[trace_count++]=p; }
+void arch_fp_save(struct arch_fp_context *p) { record('S',p); }
+void arch_fp_init(void) { record('I',0); }
+void arch_fp_restore(const struct arch_fp_context *p) { record('R',p); }
+static void expect(int n, char op, const struct arch_fp_context *p) { CHECK(trace_count==n+1 && trace_op[n]==op && trace_state[n]==p); }
 void *kmemset(void *p,int c,u32 n) { u8 *b=p; while(n--) *b++=c; return p; }
 void *kmemcpy(void *p,const void *q,u32 n) { u8 *b=p; const u8 *a=q; while(n--) *b++=*a++; return p; }
 char *kstrncpy(char *p,const char *s,u32 n) { u32 i=0; while(i+1<n && s[i]) { p[i]=s[i]; i++; } if(n) p[i]=0; return p; }
@@ -147,15 +147,15 @@ static void user_main(void)
 {
     if (cur==2) {
         CHECK(exec_nest_level==A_DEPTH);
-        expect(1,'I',0); CHECK(trace_op[0]=='S' && trace_state[0]==&x87_parent[SHELL_DEPTH]);
+        expect(1,'I',0); CHECK(trace_op[0]=='S' && trace_state[0]==&fp_parent[SHELL_DEPTH]);
         /* A calls the real loader while its own launch frame remains live. */
         CHECK(exec_launch("/B",0)==EXEC_SUCCESS);
         CHECK(cur==2 && exec_nest_level==A_DEPTH && cleanup_count==1);
-        expect(4,'R',&x87_parent[A_DEPTH]);
+        expect(4,'R',&fp_parent[A_DEPTH]);
         CHECK(return_count==1);
     } else {
         CHECK(cur==3 && exec_nest_level==B_DEPTH);
-        expect(3,'I',0); CHECK(trace_op[2]=='S' && trace_state[2]==&x87_parent[A_DEPTH]);
+        expect(3,'I',0); CHECK(trace_op[2]=='S' && trace_state[2]==&fp_parent[A_DEPTH]);
         return_count++;
     }
     exec_exit(EXEC_SUCCESS,EXEC_KIND_EXITED);
@@ -166,7 +166,7 @@ static void user_main(void)
 static void resident_main(void)
 {
     CHECK(cur==APP_ID_SHELL && exec_nest_level==SHELL_DEPTH);
-    expect(1,'I',0); CHECK(trace_op[0]=='S' && trace_state[0]==&x87_parent[0]);
+    expect(1,'I',0); CHECK(trace_op[0]=='S' && trace_state[0]==&fp_parent[0]);
     return_count++;
 }
 static void map(u32 base,u32 size)
@@ -183,12 +183,12 @@ void _start(void)
     exec_nest_level=SHELL_DEPTH;
     CHECK(exec_launch("/A",0)==EXEC_SUCCESS);
     CHECK(cur==APP_ID_SHELL && exec_nest_level==SHELL_DEPTH && cleanup_count==2);
-    expect(5,'R',&x87_parent[SHELL_DEPTH]);
+    expect(5,'R',&fp_parent[SHELL_DEPTH]);
     say("PASS x87 nested: shell -> A -> B -> A -> shell, parent[2] then parent[1]\n");
     trace_count=return_count=cleanup_count=0; exec_nest_level=0;
     CHECK(exec_launch("/shell",0)==EXEC_SUCCESS);
     CHECK(return_count==1 && cleanup_count==1 && exec_nest_level==0);
-    expect(2,'R',&x87_parent[0]);
+    expect(2,'R',&fp_parent[0]);
     say("PASS x87 normal return: app main -> exec_exit -> launch landing -> parent[0]\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(0)); for (;;) {}
 }

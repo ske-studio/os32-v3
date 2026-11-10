@@ -31,6 +31,12 @@ static const PaletteEntry default_palette[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)] 
     { 15, 15, 15 },  /* 15: 白(明) */
 };
 
+void palette_shadow_reset(void)
+{
+    for (int i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); i++)
+        shadow[i] = default_palette[i];
+}
+
 void palette_init(void)
 {
     int i;

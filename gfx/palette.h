@@ -39,6 +39,9 @@ typedef struct {
 #define GFX_PALETTE_GRAY_STEP 10
 
 
+/* シャドウを既定の16色に戻す (ハードウェアには書かない)。 */
+void palette_shadow_reset(void);
+
 /* パレット初期化 (デフォルト16色セット) */
 void palette_init(void);
 

@@ -98,6 +98,11 @@ def parse_compile_lines(text, declared_cc=None):
         if declared_cc is None and "gcc" not in line:
             continue
         for seg in _segments(line):
+            # SQLite's optional cache wrapper is not a compiler flag.
+            if seg and os.path.basename(seg[0]) == 'ccache':
+                seg = seg[1:]
+                while seg and re.match(r'^[A-Za-z_][A-Za-z_0-9]*=', seg[0]):
+                    seg = seg[1:]
             if not seg or not (seg[0] == declared_cc if declared_cc is not None else _is_cross_cc(seg[0])) or "-c" not in seg[1:]:
                 continue
             sig = []
