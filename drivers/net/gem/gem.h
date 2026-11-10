@@ -210,6 +210,7 @@ struct gem {
     unsigned long long started, tx_started, rx_watch_started; /* TB deadlines. */
     unsigned long long tx_packets, rx_packets, rx_drops, uncertain_tx; /* Counters. */
 };
+void gem_enter_reset(struct gem *);
 int gem_reset_step(struct gem *, unsigned long long now);
 int gem_mac_init(struct gem *, const u8 mac[6]);
 int gem_mif_init(struct gem *);

@@ -12,7 +12,10 @@ CHECK = dict(name='ppc-lan-p18', tier=2, budget=60,
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('sync', 'if (g->io.sync(buf, length, DMA_PREWRITE)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:A4 dma-unpublished'),
-    ('pad', 'buf[i] = 0;', 'buf[i] = 1;', 'H:pad'),
+    ('early-sync', 'for (u32 i = 0; i < bytes; i++) buf[i] = src[i];\n    for (u32 i = bytes; i < length; i++) buf[i] = 0;\n    /* gem_start:1759-1780: publish buffer then LE address and flags. */\n    if (g->io.sync(buf, length, DMA_PREWRITE)) return GEM_EIO;', 'if (g->io.sync(buf, length, DMA_PREWRITE)) return GEM_EIO;\n    for (u32 i = 0; i < bytes; i++) buf[i] = src[i];\n    for (u32 i = bytes; i < length; i++) buf[i] = 0;', 'H:sync-copy'),
+    ('short-sync', 'g->io.sync(buf, length, DMA_PREWRITE)', 'g->io.sync(buf, 1, DMA_PREWRITE)', 'H:sync-range'),
+    ('postwrite', 'g->io.sync(base + GEM_POOL_TX_BUF + g->tx_tail * GEM_BUF_SIZE,\n                       GEM_BUF_SIZE, DMA_POSTWRITE)', '(base != 0 && 0)', 'H:postwrite'),
+    ('pad', 'buf[i] = 0;', 'buf[i] = 1;', 'H:sync-pad'),
     ('kick', 'GEM_TX_KICK, next);', 'GEM_TX_KICK, (next + 1) % GEM_RING_COUNT);', 'H:kick'),
     ('full', 'g->tx_pending >= 31', 'g->tx_pending >= 32', 'H:full'),
     ('overrun', 'if (count > g->tx_pending) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:overrun'),

@@ -58,8 +58,7 @@ int gem_tx_reclaim(struct gem *g, unsigned long long now, u32 budget)
     }
     /* gem_start:1802: five-second watchdog; retain uncertain packets on reset. */
     if (g->tx_pending && now - g->tx_started >= (unsigned long long)g->io.tb_hz * 5) {
-        g->uncertain_tx += g->tx_pending;
-        g->step = 0; g->state = GEM_STATE_RESETTING;
+        gem_enter_reset(g);
         return GEM_AGAIN;
     }
     return GEM_OK;
