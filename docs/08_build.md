@@ -1153,7 +1153,7 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
-| apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
+| apt | `build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。`.deb` を `actions/cache` に保存し、キーは OS の版・arch・runner image の版・パッケージ一覧の SHA-256。miss 時だけ既定ミラーから取得し、復元後は `/var/cache/apt/archives` から `--no-download` で入れる。Host dependencies の上限は 1200 秒、共通準備全体は 90 分。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |
 
 **成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):

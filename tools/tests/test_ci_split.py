@@ -44,7 +44,8 @@ def workflow_cases(source, setup_source=None):
         suffix = '-${{ matrix.shard }}' if name == 'check-fast' else ''
         assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name + suffix, 'separate concurrency groups'
         steps = job['steps']
-        assert any(step.get('uses') == './.github/actions/build-setup' for step in steps)
+        setup_step = next(step for step in steps if step.get('uses') == './.github/actions/build-setup')
+        assert setup_step['timeout-minutes'] >= 90, 'allow cold toolchain plus slow apt setup'
         checks = [s for s in steps if s.get('name') == 'make check-fast']
         uploads = [s for s in steps if s.get('uses') == 'actions/upload-artifact@v4']
         assert bool(checks) == (name == 'check-fast'), 'check placement'
@@ -99,9 +100,38 @@ def workflow_cases(source, setup_source=None):
     assert 'sha256sum -c -' in install, 'verify upstream binary'
     assert 'apt-get' not in install, 'ccache requires no apt'
     assert not any('apt-get update' in s.get('run', '') for s in steps), 'avoid apt index refresh'
-    host = next(s for s in steps if s['name'] == 'Host dependencies')['run']
-    assert "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt" in host, 'avoid stalled Azure mirror'
-
+    apt_key = next(s for s in steps if s.get('id') == 'apt-key')
+    apt_cache = next(s for s in steps if s.get('id') == 'apt-cache')
+    host_step = next(s for s in steps if s['name'] == 'Host dependencies')
+    assert steps.index(apt_key) < steps.index(apt_cache) < steps.index(host_step), 'restore debs before install'
+    assert apt_cache['uses'] == 'actions/cache@v4'
+    assert apt_cache['with'] == {'path': '${{ runner.temp }}/apt-archives',
+                                 'key': '${{ steps.apt-key.outputs.key }}'}, 'exact apt cache, no partial restore'
+    key = apt_key['run']
+    assert '. /etc/os-release' in key and '${ID}-${VERSION_ID}-${{ runner.arch }}-${ImageVersion}-${digest}' in key, 'apt cache isolates OS and runner image'
+    assert "printf '%s\\n' \"$packages\" | sha256sum" in key, 'apt cache hashes package list'
+    packages = shlex.split(next(line.strip() for line in key.splitlines()
+                               if line.strip().startswith('packages=')))[0].split('=', 1)[1].split()
+    assert packages == ('build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev '
+                        'llvm-dev python3-clang libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex').split(), 'complete host dependencies'
+    assert host_step['env'] == {'APT_PACKAGES': '${{ steps.apt-key.outputs.packages }}',
+                                 'APT_CACHE_HIT': '${{ steps.apt-cache.outputs.cache-hit }}'}
+    assert host_step['shell'].startswith('timeout 1200 '), 'allow slow apt downloads'
+    host = host_step['run']
+    commands = '\n'.join(s.get('run', '') for s in steps)
+    assert not any(path in commands for path in ('/etc/apt/apt-mirrors.txt', '/etc/apt/sources',
+                                                'archive.ubuntu.com')), 'preserve runner default mirrors'
+    assert 'read -r -a packages <<< "$APT_PACKAGES"' in host, 'install keyed package list'
+    gate = 'if [ "$APT_CACHE_HIT" != \'true\' ]; then\n'
+    assert gate in host, 'download on apt cache miss only'
+    cold = host.split(gate, 1)[1].split('\nfi', 1)[0]
+    assert '--download-only "${packages[@]}"' in cold, 'download only on cache miss'
+    save = 'find /var/cache/apt/archives -maxdepth 1 -name \'*.deb\' -exec cp -t "$RUNNER_TEMP/apt-archives" {} +'
+    restore = 'find "$RUNNER_TEMP/apt-archives" -maxdepth 1 -name \'*.deb\' -exec sudo cp -t /var/cache/apt/archives {} +'
+    offline = 'sudo apt-get install -y --no-install-recommends --no-download "${packages[@]}"'
+    assert save in cold and restore in host and offline in host, 'save and restore debs for offline install'
+    assert host.index(save) < host.index(restore) < host.index(offline), 'save debs before apt cleanup and restore for offline install'
+    assert len(re.findall(r'^\s*sudo apt-get ', host, re.M)) == 2, 'only cold download and offline install'
 
     assert {s.get('name') for s in steps} >= {'Host dependencies',
         'Rust toolchain (rust-toolchain.toml)', 'Cache i386-elf toolchain',
@@ -313,7 +343,16 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
-            ('setup', "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt", ':', 'apt mirror stall'),
+            ('setup', '# Keep the runner\'s default mirrors and let apt handle fallback.',
+             "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt", 'apt mirror override'),
+            ('setup', 'timeout 1200 bash', 'timeout 300 bash', 'apt download deadline'),
+            ('setup', '${ID}-${VERSION_ID}-${{ runner.arch }}-${ImageVersion}-${digest}', '${ID}-${digest}', 'apt OS cache collision'),
+            ('setup', '"$packages" | sha256sum', "constant | sha256sum", 'apt package cache collision'),
+            ('setup', '"$APT_CACHE_HIT" != \'true\'', '"$APT_CACHE_HIT" = \'true\'', 'apt download on cache hit'),
+            ('setup', '--no-download "${packages[@]}"', '"${packages[@]}"', 'apt network on cache hit'),
+            ('setup', '-exec cp -t "$RUNNER_TEMP/apt-archives" {} +', '-print', 'apt cache not populated'),
+            ('setup', '-exec sudo cp -t /var/cache/apt/archives {} +', '-print', 'apt cache not restored'),
+            ('setup', 'key: ${{ steps.apt-key.outputs.key }}', 'key: apt-fixed', 'apt cache key bypass'),
             ('setup', 'sha256sum -c -', 'cat', 'binary integrity'),
             ('setup', '--retry 8 --retry-all-errors --retry-max-time 180', '--retry 0', 'binary retries'),
 

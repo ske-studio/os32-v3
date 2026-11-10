@@ -34,17 +34,43 @@ runs:
       #   libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex (build_cross.sh: GCC / binutils の構築)。
       #   FD イメージは tools/mkfat12.py (純 Python) なので mtools は要らない。
       # Python の依存は requirements.txt (ビルドの必須は lz4・PyYAML・fonttools (東雲 16 の束 .g16)、フォント生成に Pillow)。
-      - name: Host dependencies
+      - name: Apt cache key
+        id: apt-key
         shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
-          # The hosted mirror list can spend minutes on Azure before falling
-          # back to archive.ubuntu.com. Use that canonical Ubuntu mirror first.
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          packages='build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex'
+          . /etc/os-release
+          # Image updates can change both installed dependencies and apt indexes.
+          test -n "$ImageVersion"
+          digest="$(printf '%s\n' "$packages" | sha256sum | cut -d ' ' -f 1)"
+          echo "key=apt-debs-v1-${ID}-${VERSION_ID}-${{ runner.arch }}-${ImageVersion}-${digest}" >> "$GITHUB_OUTPUT"
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt archives
+        id: apt-cache
+        uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.apt-key.outputs.key }}
+
+      - name: Host dependencies
+        shell: timeout 1200 bash --noprofile --norc -e -o pipefail {0}
+        env:
+          APT_PACKAGES: ${{ steps.apt-key.outputs.packages }}
+          APT_CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit }}
+        run: |
+          read -r -a packages <<< "$APT_PACKAGES"
+          mkdir -p "$RUNNER_TEMP/apt-archives"
+          # Keep the runner's default mirrors and let apt handle fallback.
+          # Stage debs before install: apt cleanup hooks may remove the originals.
+          if [ "$APT_CACHE_HIT" != 'true' ]; then
+            sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends --download-only "${packages[@]}"
+            find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t "$RUNNER_TEMP/apt-archives" {} +
           fi
-          sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends \
-            build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang \
-            libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
+          find "$RUNNER_TEMP/apt-archives" -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
+          sudo apt-get install -y --no-install-recommends --no-download "${packages[@]}"
           python3 -m pip install --retries 8 --timeout 20 --quiet -r requirements.txt
 
       # ② rust-toolchain.toml (nightly + rust-src) を rustup に解決させる。
