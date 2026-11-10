@@ -18,7 +18,7 @@
 | 第 5 段 B3・C3 | planar の初期化を PC98 の表示 provider へ、boot の IME の facade (include/ime_boot.h) | main (92cb185e、NP21/W の最小受入と B3 の 6 画面の比較は合格) |
 | 第 5 段 B4・S1 | 描画 backend の選択を platform の provider へ (include/display_provider.h、platform/pc98/gfx_selector.c)、SDK の target の選択を profile へ (sdk/target_profile.py・build/sdk-target.mk) | main (a4b3b6bf、NP21/W の最小受入と B4 の 3 点は合格) |
 | 第 5 段 C1・浮動小数点の保存域 | console の格子の寸法・既定の属性・表示の経路の確認を表示の backend へ (kernel/console/console_backend.h、TVRAM の番地は platform/pc98/tvram_private.h)。浮動小数点の保存域を arch の口の後ろへ (include/exec_arch.h の struct arch_fp_context と arch_fp_save・arch_fp_restore・arch_fp_init、PPC は arch/ppc/arch_exec_storage.h・arch_jmp_storage.h) | main (8a6096fc、C1 は NP21/W の最小受入と 4 点が合格、保存域は kernel.bin と全部品が一致)。**PPC の保存域の大きさは compile を通すための暫定** (USER の ABI と FPU・AltiVec の扱いは ③ の設計で確定) |
-| 第 5 段 B5・B6・S2 | 起動時の SURFACE の予約と表を provider へ (platform/pc98/gfx_surfaces.c)、present のページ切替・VSYNC 待ち・表示メモリの番地を provider へ (platform/pc98/gfx_init.c)、SDK の利用箇所 (example の Makefile・Rust の規則・rustc の wrapper・配布物) を profile へ | 実装・独立レビュー済 (2026-11-10、枝 wt/ppc-sep5b5・wt/ppc-sep5b6・wt/ppc-sep5s2)。取り込みと NP21/W の受入待ち (B5・B6 は区分 C、S2 は区分 I) |
+| 第 5 段 B5・B6・S2 | 起動時の SURFACE の予約と表を provider へ (platform/pc98/gfx_surfaces.c)、present のページ切替・VSYNC 待ち・表示メモリの番地を provider へ (platform/pc98/gfx_init.c、**B6 は部分完了** — 残件は下の「第 5 段で見送った物」)、SDK の利用箇所 (example の Makefile・Rust の規則・rustc の wrapper・配布物) を profile へ | 実装・独立レビュー済 (2026-11-10、枝 wt/ppc-sep5b5・wt/ppc-sep5b6・wt/ppc-sep5s2)。取り込みと NP21/W の受入待ち (B5・B6 は区分 C、S2 は区分 I) |
 | 第 5 段 Z | 全段の後の実測と記録 (製品コードは触らない) | 済 (2026-11-10、下の「実測 (第 5 段 Z)」)。CONSOLE_DUAL は Z の後と本線と合意 |
 
 ### 実測 (第 3 段 F・第 4 段 F、2026-11-10)
@@ -44,11 +44,18 @@
 | fs/fat/fatfs/diskio.c・fs/fat/fatfs_vfs.c・fs/ext2/ext2_super.c | fdc.h・pc98pt.h | ブロック装置と区画表を platform の口へ。③ の前 (mount は ② の境界の外) |
 | fs/serialfs/serialfs_session.c | serial.h | SerialFS の線を platform の口へ。LAN (Host Services) の段と同時 |
 
-第 5 段で見送った物 (設計 PPC_SEP5_DESIGN の B5・B6 の行のうち、この段では入れていない):
+第 5 段で見送った物 (設計 PPC_SEP5_DESIGN の B5・B6 の行のうち、この段では入れていない)。B6 は部分完了で、下の 1・2 が残件:
 
-- gfx/gfx.h・gfx/gfx_internal.h の `pc98.h` の include (GVRAM_PLANES・VRAM_PLANE_*・GDC の定数の利用者が広い)。gfx の共通のソースは PPC でも compile は通る (include/pc98.h は定数だけ)。
-- gfx/gfx_vram.c の gfx_diag_px (PEGC の窓を読む診断) と gfx_present_raster の pc98_splash_raster_table の呼出し、gfx/gfx_core.c の pc98_splash_raster_reset・pc98_route_safe・`g_backend == &gfx_backend_geforce/trident` の分岐、gfx/gfx_core_surface.inc の gfx_sf_backend、gfx/gfx_core_framebuffer.inc の backend の名前。
-- B5 は設計の「表だけ provider、手順は共通」ではなく ⑥ の手順ごと provider に置いた (順の保存のため、レビューで確認)。B6 の実体は platform/pc98/display.c ではなく platform/pc98/gfx_init.c に置いた (host の試験が既に link しているファイル)。
+| # | 残件 | 対象 | 後続の段 | 完了の条件 |
+|---|---|---|---|---|
+| 1 | 診断と raster の移設 | gfx/gfx_vram.c の gfx_diag_px (PEGC の窓を読む) と gfx_present_raster の pc98_splash_raster_table の呼出し、gfx/gfx_core.c の pc98_splash_raster_reset | PPC の FB の表示 backend を足す段の前 (② の後の FB の段) | gfx/gfx_vram.c が pegc.h・splash_raster.h を include しない。test_boot_splash_native の raster の変異 4 本が provider の実体を通って RED のまま |
+| 2 | gfx の共通ヘッダの pc98.h の依存 | gfx/gfx.h:11・gfx/gfx_internal.h:5 の `#include "pc98.h"` (GVRAM_PLANES・VRAM_PLANE_*・GDC の定数の利用者が広い) | 同上 | 2 つのヘッダが pc98.h を include せず、PC98 の定数は各実体が直に include。x86 は build_compare で不変 |
+| 3 | 共通の core に残る backend の名前 | gfx/gfx_core.c の pc98_route_safe・`g_backend == &gfx_backend_geforce/trident` の分岐、gfx/gfx_core_surface.inc の gfx_sf_backend、gfx/gfx_core_framebuffer.inc の backend の名前、PEGC の BIOS ワーク (v86_bios.h) | 同上 | gfx/gfx_core.c が PPC の selected で成功する (今は v86_bios.h で止まる) |
+
+設計からの配置の変更 (残件ではない):
+
+- B5 は「表だけ provider、手順は共通」ではなく ⑥ の手順ごと provider に置いた (順の保存のため、レビューで確認)。
+- B6 の実体は platform/pc98/display.c への集約ではなく platform/pc98/gfx_init.c に置いた (display_flip_pages の隣。gfx の host の試験が既に link しているファイルで、試験の fixture を増やさないため)。
 - S2 は app_sys.ld・shlib.ld の利用箇所 (resident の link、mkshlib) を profile の値に替えていない (生成物を変えない範囲)。
 
 x86 の受入で未確認のまま残る物: B2 の hardware scroll の +1 行 (上の表)、Cirrus・GeForce・Trident の選択と予約の経路 (NP21/W の標準構成では通らない。host の試験が見ている)、v86 の往復での console (C1)。
