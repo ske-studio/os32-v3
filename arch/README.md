@@ -84,6 +84,12 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
    `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
    未実装の能力は入力を読む前に拒否する。
+   SDK の選択 (CRT・リンカスクリプト・Rust ターゲット・ELF emulation・呼出し規約) も
+   同じ profile の 1 組で、make は `build/sdk-target.mk` が `sdk/target_profile_cli.py` を
+   1 回呼んで引く (`build/config.mk` の CRT と `-T`、`build/programs.mk` の Rust の
+   ターゲット名、`build/sdk.mk` の配布物、`sdk/example/hello/Makefile`)。Rust のビルドは
+   `OS32_SDK_TARGET` を `sdk/rustc_stamp.py` に渡し、rustc の起動より前に確かめる。
+   新しい target の SDK を足すときは profile に 1 組を書き、ここに値を書き写さない。
 
 5. **選ばせる。** `make ARCH=<arch> PLATFORM=<platform> ...`。既定値は
    `build/config.mk` の `?=` なので、コマンドラインでも環境変数でも上書きできる。

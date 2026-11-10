@@ -45,8 +45,10 @@ sdk: $(ALL_LIB_ARCHIVES) $(CRT0_USER_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	cp sdk/allocator/nano.LICENSE $(SDK_OUT)/lib/
 	cp sdk/os32_generations.py          $(SDK_OUT)/bin/
 	cp sdk/target_profile.py             $(SDK_OUT)/bin/
+	@# example の Makefile と外部のビルドが target の値を引く口 (第 5 段 S2)
+	cp sdk/target_profile_cli.py         $(SDK_OUT)/bin/
 	cp sdk/os32x_hdr.py                  $(SDK_OUT)/bin/
-	cp sdk/rust/i686-os32-none.json      $(SDK_OUT)/rust/
+	cp $(SDK_TARGET_RUST)      $(SDK_OUT)/rust/
 	cp -r sdk/rust/os32api               $(SDK_OUT)/rust/
 	@rm -rf $(SDK_OUT)/rust/os32api/target
 	@# 動くサンプル。SDK だけでビルドできることの実証も兼ねる。
