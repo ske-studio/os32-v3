@@ -256,5 +256,11 @@ void pm_log_write(const char *bytes, u32 n);
 - **T3 の受入の台本を H3 より先に作った** (仮の像で自己試験)。本体の負像の FATAL と停止の symbol は H3 の後に表へ足す。
 - **試験の変異の判定**: 変異ごとに期待の停止 PC/終了コード/診断の行と到達の印を表に持ち、両方が一致したときだけ RED (決まりの全文は PPC_IMPL_RULES §3)。
 
+- **H1 の結果** (2026-11-10): 本体の閉包で未解決だった共通の symbol は 4 つ。sys_memory_bootstrap_model・sys_memory_stage_online (kernel/sys.c) と res_owner_get (fs/fd_redirect.c) は実体を無変更で link し、ring3_call_from_user (exec/exec.c) だけ「② に USER は無いので常に 0」を返す provider (arch/ppc/kboot_unavailable.c) にした。
+- **SHM の共有 USER の写像**: shm_free・shm_lock は paging_boot_user_shared() が作る共有 USER の写像の RW を切り替える (mm/paging_map.inc)。x86 は exec の trampoline の page を渡す。② は exec が無いので、実行しない RO の専用の 0 ページを渡して同じ契約を満たす。exec の段で差し替える。
+- **受入の観測 symbol**: kboot_ready_tb (READY の直前の TB、BE u64) と kboot_tick (= tick_count、link の defsym)。台本は READY の後 2 秒と、その後 200ms 以上の tick の増分を TB と ±5% で照合する。
+- **監査**: 未解決 0、全命令の mnemonic を FP/AltiVec の族と照合 (dssall だけ許可: データストリームの停止で vector の状態に触れない)、PIT_HZ は `gcc -E -dU` で展開された macro を見るのでマクロ経由 (TICK_MS) も検出する (tools/ppc/kboot_audit.py)。
+- **decrementer の例外は edge**: handler が 1 周期以上遅れたとき、負の DEC に周期を 1 回足すだけでは負のままになり、以後の例外が来なくなる (QEMU で観測、試験の仮の像で踏んだ)。製品の F2 は正になるまで足す。
+
 ## 後続の題目
 - **PowerPC のブートスプラッシュ** (2026-11-10、os32-v3 の PM 経由のユーザー決定): 票 TASK_PPC_SPLASH。② の段の並びは変えない (② は画面を条件にしない)。実装は OF の FB を描く段の後。
