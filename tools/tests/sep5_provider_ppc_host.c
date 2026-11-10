@@ -10,6 +10,8 @@ static int select_mode(GfxBackend *backend, int legacy200)
     calls++; seen = backend; seen_legacy = legacy200;
     return 0;
 }
+static int binds;
+static void bind(void) { binds++; }
 int main(void)
 {
     GfxBackend *b = DISPLAY_FALLBACK_BACKEND;
@@ -21,5 +23,11 @@ int main(void)
         seen != b || seen_legacy != 1) return 4;
     if (display_provider_ledger(b) != 0) return 5;
     if (gfx_cirrus_probed()) return 6;
+    /* B5: nothing to reserve; the common client binding is not called. */
+    calls = 0;
+    display_provider_boot_reserve(GFX_PREF_AUTO, bind);
+    if (binds || calls) return 7;
+    if (display_provider_display_records(0) != 1 || display_provider_display_records(1) != 1 ||
+        display_provider_display_first(0) != 0) return 8;
     return 0;
 }

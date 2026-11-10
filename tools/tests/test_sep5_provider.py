@@ -69,6 +69,8 @@ UNLINKED_MUTATIONS = (
 # The PowerMac provider must stay inert: (name, anchor, replacement, exit code).
 PPC_MUTATIONS = (
     ('ppc-pref-kept', '    (void)pref;\n    return GFX_PREF_AUTO;', '    return pref;', 3),
+    ('ppc-boot-binds', '    (void)pref;\n    (void)bind_client;\n', '    (void)pref;\n    bind_client();\n', 7),
+    ('ppc-display-records', '    (void)ledger_backend;\n    return 1;', '    return ledger_backend + 1;', 8),
     ('ppc-mode-unreported', '    select_mode(&gfx_backend_unsupported, legacy200);\n', '    (void)select_mode; (void)legacy200;\n', 4),
 )
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',

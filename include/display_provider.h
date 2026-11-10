@@ -26,4 +26,14 @@ GfxBackend *display_provider_select(int pref, int legacy200,
 /* backend の台帳上の種別 (LEDGER_SF_*)。知らない backend は 0。 */
 u32 display_provider_ledger(const GfxBackend *backend);
 
+/* 起動時の ⑥ (識別 → 予約 → 写像 → BB → SURFACE の登録、TASK_T1_LEDGER §3-8)。
+ * probe は呼ばない。bind_client は CLIENT 面を共通の bb へ結ぶ共通側の関数で、
+ * CLIENT の登録の後・DISPLAY の登録の前に 1 回呼ばれる。 */
+void display_provider_boot_reserve(int pref, void (*bind_client)(void));
+
+/* 選択中の backend の DISPLAY が SURFACE の記録いくつで表されるか (1 以上) と、
+ * 複数のとき plane 番目の記録の先頭 PFN。 */
+u32 display_provider_display_records(u32 ledger_backend);
+u32 display_provider_display_first(u32 plane);
+
 #endif
