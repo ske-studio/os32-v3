@@ -29,7 +29,7 @@
 - PM決定3: QEMU/試験はUDP、実機はAF_PACKET、codec共通を確定。
 - P0観測: QEMU 8.2.2の既定sungem・106b:0021・2MiB BAR・UDP設定成功を採用。OF後tree/BAR・PHY・DMAは未確認のまま。
 ## 1. 実物の確認・適用範囲
-- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `platform/powermac/log.c:15,23` は同期sink登録/直呼び、`init/ppc_kernel.c:132,137,234,240` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py:83` はLOGを破棄、`fs/serialfs/sfs_proto.h:16,167` は片道seq=0/10ms時計、`tools/ppc/kboot_run.py:38–46` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補であり、該当実装前にメーカー資料と照合するまで該当ハード書込みを実装確定しない。
+- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `platform/powermac/log.c:15,23` は同期sink登録/直呼び、`init/ppc_kernel.c:132,137,234,240` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py:83` はLOGを破棄、`fs/serialfs/sfs_proto.h:16,167` は片道seq=0/10ms時計、`tools/ppc/kboot_run.py:38–46` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補。**QEMUで確かめる段はBSDの値のまま実装して進めてよい**が、実機（QuickSilver）に載せる前に、印の付く書込みをメーカー資料と実機のtreeの採取で照合する（照合できない書込みは実機のprofileで無効のままにする。R1）。
 ## 2. 層・所有・像
 |層|唯一の所有者/ファイル（新規名は本設計）|寿命・接続|
 |---|---|---|
@@ -63,7 +63,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - kboot_captureのtree walk（:153–192）の後、pm_gmac_captureでGMAC候補/祖先を追加採取・解釈する。raw propertyは既存512B/祖先8/探索1024の上限を継承。`reg / assigned-addresses / compatible / local-mac-address`とrootの`reg / bus-range / ranges / #*-cells`を値保存。候補0/複数はENODEV/EUNSUPPORTED。 OF-PCI §2.2.1.1/4.1.2/10/12（docs/ppc/open-firmware.md:81–100）通り3+2セルを検証、BAR0=reg 0x10で選択、ss=memory、各親ranges内に窓全体が収まることを確認。n=0だけを理由に拒否しない（qemu-mac99.md実測）。64bit上位非zero、桁あふれ、窓重複/8窓超過はERANGE。 UniNorth旧型profileだけ、U3/U4は非対応。MACは6B・非zero・unicast。IDはOF記録とPCI実読を照合。106b:0021は候補（F/if_gem_pci.c:80）、他IDはP0の証拠でprofileを追加するまで非対応。 boot_idはcapture時のTB64・MAC48・PVRの下位16bitをBE連結した16Bをゲストで生成（暗号的乱数/一意性保証ではない）。`os32-lan-boot=`32桁hexと`os32-lan-peer=`は任意上書き、peer既定broadcast。ホストはBEACON/seq巻戻りで保存世代を分け、同一IDの再起動疑いを表示する。初回BEACONはnext_seq=0、ログ送信前に1回試行、失敗でも待たない。再起動時に全初期frameを失った場合の識別不能は残る。 capture→既存reserve/最終available再取得→drain→ofw_detach（kernel_boot.c:163–167）→takeover。LAN追加領域をOF中に書かない。detach後は保存済み値だけ、OF呼出増分0を維持。
 ### (b) PCI設定口 [M2]
 - N/uninorth.c:165–168,191–271を採用：root reg+0x800000のaddress、+0xc00000のdata（8B）。bus=bus_firstならdev>=11かつ`1U<<dev | fn<<8 | reg`、下位busなら`bus<<16|dev<<11|fn<<8|reg|1`。regは4整列/<256、data offsetはreg&4。 clockが必要なprofileではalias導入後にpm_gmac_clockを先行（②のallocator開始前）。IRQ保存/禁止→LE address書込み/readback→data読書き→address=0/readback→IRQ復元。root範囲/target_bdf以外はEINVAL。32bitでcommand/statusへ書く場合はstatus上位16bit=0（W1Cを再書込みしない）、command低位を操作しreadback照合。ppc_kernel_mainがmemory_boot_initの直前で`pm_gmac_early_quiesce()`（platform/powermac/pci_config.c、段P8の中、呼出しの追加はP25）を1回呼ぶ：OF指定BDFのIDを照合→Masterをclearしてreadback。**継続の条件は「Master=0をreadbackで確かめた」だけ**（N1）。GMACがtreeに無い・profileが分からない・IDが違う場合はPCIに触らず`LAN OFF code=<数値>`で続ける。止めるのは「Master解除を書いたのにreadbackが1」のときだけ（既存の停止経路）。clockが必要なprofileでは同じ関数の中でpm_gmac_clockを先に呼ぶ（P9のkernel_boot.cはclockを呼ばない、N2）。Master再設定はreset完了・DMA同期・ring base設定後、DMA enableの直前だけ。BAR全1書込み/再割当なし。
-- OFが示す対象BDFだけを読む。全1/ID不一致はENODEV、走査・machine-check復帰は追加しない。無効NICではMaster解除済みのときだけ②継続可、解除不能は安全なboot継続を保証しない。
+- OFが示す対象BDFだけを読む。全1/ID不一致はENODEV、走査・machine-check復帰は追加しない。②を続ける条件は上の1文のとおり（GMACが無い・分からない・IDが違うときはMasterに触らず続ける。Master解除を書いて読み戻しが0なら続ける。読み戻しが1のときだけ止める。R2）。
 ### (c) MMIO・alias [M1,M2]
 |VA予約|長さ上限|対象・属性|
 |---|---:|---|
@@ -259,7 +259,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |4 cache|cache有効で複数wrap、異なるpayloadの連続往復、断線/再接続、queue overflow、診断応答とtick継続。QEMUのcoherentな成功で代用しない|
 - **QEMU合格から実機のclock・PHY・DMA・cacheの安全性を外挿しない。** 実機MMIO bus hangはTB期限でも救えないため、資料と順序確認を先行する。
 - PM取り寄せ一覧： [M1] Sun GEM/Apple GMAC当該revisionのregister/DMA descriptor仕様（bank、reset、mask、ring align、RX fetch/CRC/offset、Apple CONFIG bits）；[M2] QuickSilver Developer NoteとUniNorth当該revisionのclock gate/PCI config/host→PCI DMA窓・snoop/例外条件資料；[M3] 採取PHY IDのdatasheet/errata＋対応BSD MII実装の関数と行。MDDの資料で代用しない。
-- **ユーザー判断が要る未決：0件。** 決定済みのGMAC先行/届く分だけ/固定診断/②維持を変更しない。
+- **ユーザー判断が要る未決：1件**（PMの通読R1で数え直し）：メーカー資料が入手できない場合に、BSDだけを根拠に実機へ載せてよいか（[HW3]）。QEMUの段はこの判断を待たない。決定済みのGMAC先行/届く分だけ/固定診断/②維持は変更しない。
 - **PM決定の候補**：資料入手とP0採取の担当、実機の--iface接続先と任意peer MAC、100FDの受入相手、poolが既存image枠へ収まらない場合の配置調整。ハード資料未解決は技術ゲートでありユーザーへの仕様再決裁ではない。
 ## 反論
 - F8の実施時期/所有者/I-G化は採用するが、64KiBをpaging_set_pageループで変える案はmm/paging.h:99–105の必須規約に反するためpaging_map_rangeへ置換（反論1件）。
@@ -272,6 +272,13 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - N5 (P3) §7: UDP の port は固定しない。kboot_run が run ごとに空いている port の組を割り当て、QEMU の netdev とホストの道具 (--udp) に同じ値を渡す (7450 と 7455 を並べて回しても衝突しない)。本文の 18026/18027 は例。
 - 反論 (F8) は採用: descriptor の区画の I/G 化は paging_map_range (mm/paging.h:99-105 の規約)。
 - 第 1 回の F1〜F19 と PM 決定の 3 点は r2 で直り、第 2 回で確認された。ユーザー判断の未決 0 件。**資料 [M1] (GEM のレジスタと DMA descriptor の仕様)・[M2] (QuickSilver・UniNorth の clock gate と PCI・DMA の窓) は技術の入口の条件**で、PM が取り寄せる。届くまでに進めてよいのは QEMU で確かめられる段で、実機に載せる前に資料と実機の tree の採取で照合する。
+- PM の通読 (2026-11-10、ユーザーの指示で PM が確定版を通読し、手本の引用 4 点を抜き取りで照合):
+  - R1 §1: 「メーカー資料と照合するまで該当ハード書込みを実装確定しない」は、[M1] の印がほぼ全部の GEM のレジスタに付くので、文字どおりだと QEMU の段も止まる。QEMU の段は BSD の値のまま進め、実機に載せる前に照合する、に直した。**メーカー資料 (特に GEM のレジスタの仕様書) が手に入らない場合に BSD だけを根拠に実機へ載せてよいかは [HW3] の扱いで、ユーザーの判断を仰ぐ** (未決 1 件に数え直す)。
+  - R2 §3(b): 「無効 NIC では Master 解除済みのときだけ ② 継続可」が N1 の直しと矛盾していたので、N1 の条件に揃えた。
+  - R3 §6: 宣言・文書だけの段 (P4・P10・P22a・P22c・P33) の H 段は、それを使う段の H にまとめてよい (文書の変更に専用の試験ファイルを作らない)。
+  - R4 §3(f): 最後の idle は `for (;;) pm_lan_poll(tb_now())` で CPU を止めずに回り続ける (QEMU の host の CPU を 1 つ使い切る、実機は発熱)。この段ではそのままにし、NIC の割り込み (段 E3 の後) を入れる段で halt に戻す。
+  - R5 §4: PLN1 に認証は無い。既定では起動ログと BEACON を broadcast で流し、同じ L2 の誰でも PEEK でカーネルの RAM を 256B ずつ読める。開発用の LAN での診断という前提で、実機を共用の LAN につなぐときは peer を指定する。
+  - 照合した引用 (合っていた): descriptor の形 (openbsd gemreg.h:529-532)、RX_KICK の 4 枚ごとの式 (freebsd if_gem.c:1581-1589)、UniNorth の GMAC の clock (netbsd uninorth.c:135-142)、RANDOM_SEED の式 (openbsd gem.c:888-889)。BAT は ② で全部無効 (PPC_KBOOT_DESIGN の ram_bat=0) なので、descriptor の区画の PTE の I/G は効く。EtherType 0x88B6 は既存の 0x88B5 (link・SFS) と重ならない。
 
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
