@@ -77,7 +77,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 
 | 本 | 中身 | 像 | 統合の検査 (~/os32-tmp/run/ppc-lan0/int5.sh の形に足す物) |
 |---|---|---|---|
-| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変。PPC の像は S1 の直し 4 段 (像に入っている gem_reset・gem_phy・gmac_tree・gmac_dma・lan_gem_io) で変わる。新しい TU は ppc-kboot.mk に入らない | (1) 新しい H と直した段の H の --mutate (2) 像が変わるので kboot_all (9 印) と kboot の変異を sandbox の外で、PPCKERN.map に lan_service・lan_diag・lan_log が無いこと (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
+| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変。PPC の像は P5b (像に入っている gmac_tree.c の bdf) で変わる。P14b・P17c・P12b の TU (gem_reset・gem_phy・gmac_dma・lan_gem_io) と P24 の新しい TU は P26 まで ppc-kboot.mk に入らない | (1) 新しい H と直した段の H の --mutate (2) 像が変わるので kboot_all (9 印) と kboot の変異を sandbox の外で、PPCKERN.map に lan_service・lan_diag・lan_log が無いこと (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
 | 7 本目 = LAN の実装の到達 | P26 + P25 (同じ取り込み、D3)、QEMU の実測で出た直し、PM の実測の証拠 (起動ログがホストに届き 5 診断が往復、7450・7455) を票と設計の追記に。**これで本線は HAL へ進める** (ユーザー決定 2026-11-11: 7 本目を分ける) |
 | 8 本目 = LAN の最後 | P29〜P32 (受入の自動化)、P33、票を「実装済」に、実機前の段を DEFERRED_TESTS に | x86 不変、PPC の像が変わる | (1) kboot_all を sandbox の外で 7450・7455 (2) ホストの保存と serial の一致、欠落数、5 診断の応答 (3) link map (pool・サイズ・禁止 symbol) (4) LAN 無効の負経路 (5) build_compare --all (差は images/os32_install.iso の 1 件だけを許す、いつもの既知の差) (6) gcc の関門 |
 
