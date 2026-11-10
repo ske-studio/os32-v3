@@ -119,8 +119,10 @@ ALLOWED_TOOL_DIFFS = {
     'build/sdk/bin/link_guard.py': (
         '319f4e3fd31f4c12181966246f732b6824ee99fd644a0d72eecfd7967c85f92e',
         'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
+    # 第 5 段 S1: SDK の選択 (CRT・link script・Rust target) を profile に足した。
     'build/sdk/bin/target_profile.py': (
-        None, '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6'),
+        '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
+        '6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a'),
 }
 
 

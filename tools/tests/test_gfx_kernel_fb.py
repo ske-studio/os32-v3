@@ -16,11 +16,12 @@ from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
                'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
-               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c',
+               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c',
                'kernel/sys.c', 'mm/physmem.c']
+MUTABLE = ('gfx/gfx_core.c', 'platform/pc98/gfx_selector.c')
 MUTANTS = [
  ('geforce-leave-backend',
   'if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {',
@@ -36,8 +37,8 @@ MUTANTS = [
   'FAIL g_backend == &gfx_backend_pc98'),
 
  ('forced-cirrus-to-pegc',
-  '        gfx_select_mode(&gfx_backend_pc98, legacy200);\n        g_backend = &gfx_backend_pc98;\n        return;\n    }\n\n    for',
-  '        gfx_select_mode(&gfx_backend_pegc, legacy200);\n        g_backend = &gfx_backend_pegc;\n        return;\n    }\n\n    for',
+  '        select_mode(&gfx_backend_pc98, legacy200);\n        return &gfx_backend_pc98;\n    }\n\n    for',
+  '        select_mode(&gfx_backend_pegc, legacy200);\n        return &gfx_backend_pegc;\n    }\n\n    for',
   'FAIL expected[i] == mode_trace[i]'),  # 最初に落ちるのは強制 PEGC・PEGC 無しの行の init の記録 (Opus レビュー P2)
  ('last-plane-old', 'bb_i = bb[3];',
   'bb_i = P2V(0x6A000UL + 3 * GFX_PLANE_SZ);',
@@ -124,11 +125,13 @@ static inline void io_wait_n(int n) {(void)n;}
         sources = []
         for path in TARGET_SRCS:
             body = texts[path]
+            # 変異の目印は共通の core か PC-98 の provider (第 5 段 B4) のどちらか 1 か所。
+            if mutation and path in MUTABLE:
+                _, old, new, _ = mutation
+                hits = sum(texts[unit].count(old) for unit in MUTABLE)
+                assert hits == 1, (mutation[0], hits)
+                body = body.replace(old,new)
             if path == 'gfx/gfx_core.c':
-                if mutation:
-                    _, old, new, _ = mutation
-                    assert body.count(old) == 1, (mutation[0], body.count(old))
-                    body = body.replace(old,new)
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'drivers/video/pc98/backend_pegc.c':

@@ -11,8 +11,6 @@ def copy_build_tree(root):
                     ignore=shutil.ignore_patterns('out', 'sdk', '__pycache__'))
     for name in CONFIG_INPUTS:
         source = ROOT / name
-        # The CLI is introduced by PPC S1; older trees only have the library.
-        if source.is_file():
-            target = root / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)

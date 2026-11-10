@@ -92,6 +92,7 @@
   "platform/powermac/boot.c",
   "platform/powermac/boot_capture.c",
   "platform/powermac/display.c",
+  "platform/powermac/display_provider.c",
   "platform/powermac/escc.c",
   "platform/powermac/escc_tree.c",
   "platform/powermac/memory.c",

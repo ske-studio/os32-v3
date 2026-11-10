@@ -2,7 +2,6 @@
 """Toolchain selection and inherited command-line overrides without compilers."""
 import argparse
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile

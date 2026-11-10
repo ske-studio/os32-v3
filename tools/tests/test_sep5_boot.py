@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from build_fixture import copy_build_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 ENTRIES = ('boot sdk programs libs module modules deploy deploy-kernel kernel-r1 '
@@ -42,9 +43,7 @@ def main():
         assert (ROOT / name).read_bytes() == baseline, name
     with tempfile.TemporaryDirectory(prefix='sep5-boot-') as directory:
         root = Path(directory)
-        build_dir = Path('build/config.mk').parent
-        shutil.copytree(ROOT / build_dir, root / build_dir,
-                        ignore=shutil.ignore_patterns('out', 'sdk', '__pycache__'))
+        copy_build_tree(root)
         shutil.copy2(ROOT / 'Makefile', root / 'Makefile')
         # Existing make parse-time ownership stamp is fixture metadata.
         stamp = root / 'output/config/target'
