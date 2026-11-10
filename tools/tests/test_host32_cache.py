@@ -1,6 +1,6 @@
 """Host fixture cache selection, cross-worktree keys, and mutation checks."""
 CHECK = dict(name='host32-cache-host', tier=1,
-             covers=['tools/tests/host32.py', 'tools/tests/test_host32_cache.py'],
+             covers=['tools/tests/cc_cache.py', 'tools/tests/host32.py', 'tools/tests/test_host32_cache.py'],
              needs=['make:all'], budget=3.0)
 
 import os
@@ -157,6 +157,7 @@ def mutations():
             path = pathlib.Path(td)
             (path / 'host32.py').write_text(source.replace(old, new))
             shutil.copy2(__file__, path / 'test_host32_cache.py')
+            shutil.copy2(pathlib.Path(host32.__file__).with_name('cc_cache.py'), path / 'cc_cache.py')
             result = subprocess.run([sys.executable, '-B', str(path / 'test_host32_cache.py')],
                                     capture_output=True, text=True)
             red = result.returncode == 1 and ('FAIL:' in result.stderr or 'ERROR:' in result.stderr)

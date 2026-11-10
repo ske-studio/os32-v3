@@ -404,6 +404,7 @@ PATH_AUDIT_ALLOW = {
         "layout tests use private snapshot/object fixtures; main is never invoked",
     "tools/tests/test_build_compare.py": "all artifacts are created inside TemporaryDirectory",
     "tools/tests/test_build_profile.py": "make fixture lives inside TemporaryDirectory",
+    "tools/tests/build_fixture.py": "copies make inputs only, excluding out/sdk products, into private query fixtures",
     "tools/tests/test_target_toolchain.py": "only copied config is queried; no products are read",
 
     "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",

@@ -9,6 +9,7 @@ import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_profile import query
+from build_fixture import copy_build_tree
 ROOT = Path(__file__).resolve().parents[2]
 FEATURES = 'V86 X87 PC98_DEVICES GEFORCE TRIDENT CIRRUS PCM FM LAN KCG CD FEP SQLITE HWDEV KDEBUG'.split()
 
@@ -77,7 +78,7 @@ if __name__ == '__main__':
     # Copy only make inputs; compiler and generated products are unnecessary.
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out','sdk','__pycache__'))
+        copy_build_tree(root)
         (root / 'Makefile').write_text('include build/config.mk\n-include build/kernel-objects.mk\ninclude build/kernel.mk\n')
         # No libgcc invocation is allowed by these query-only tests.
         check(root)

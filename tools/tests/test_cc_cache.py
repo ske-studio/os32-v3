@@ -18,11 +18,14 @@ import cc_cache
 
 
 class Dispatch(unittest.TestCase):
-    def call(self, cache, disabled):
+    def call(self, cache, disabled, cache_override=None):
         args = ['gcc', '-c', 'sqlite3.c', '-o', 'sqlite.o']
         original = args.copy()
         result = subprocess.CompletedProcess(args, 7)
-        with patch.dict(os.environ, {'OS32_NO_CCACHE': disabled}), \
+        env = {'OS32_NO_CCACHE': disabled, 'CCACHE': cache_override or '/usr/bin/ccache'}
+        if cache_override == '':
+            env['CCACHE'] = ''
+        with patch.dict(os.environ, env), \
                 patch.object(cc_cache.shutil, 'which', return_value=cache), \
                 patch.object(cc_cache.subprocess, 'run', return_value=result) as run:
             self.assertIs(cc_cache.build(args, check=True, cwd='/work'), result)
@@ -42,6 +45,10 @@ class Dispatch(unittest.TestCase):
         got, args = self.call('/usr/bin/ccache', '1')
         self.assertEqual(got, args)
 
+    def test_make_disabled(self):
+        got, args = self.call('/usr/bin/ccache', '', cache_override='')
+        self.assertEqual(got, args)
+
     def test_failure(self):
         error = subprocess.CalledProcessError(2, ['gcc'])
         with patch.object(cc_cache.subprocess, 'run', side_effect=error):
@@ -50,6 +57,24 @@ class Dispatch(unittest.TestCase):
 
 
 class Runtime(unittest.TestCase):
+    def test_mixed_c_assembly_bytes_and_runtime(self):
+        with tempfile.TemporaryDirectory(prefix='cc-mixed-') as tmp:
+            root = Path(tmp)
+            c, asm, exe = root/'main.c', root/'value.S', root/'host'
+            c.write_text('int value(void); int main(void) {return value();}\n')
+            asm.write_text('.text\n.globl value\nvalue:\n xorl %eax, %eax\n ret\n'
+                           '.section .note.GNU-stack,"",@progbits\n')
+            args = ['gcc', str(c), str(asm), '-o', str(exe)]
+            subprocess.run(args, check=True)
+            expected = exe.read_bytes()
+            # Exercise dispatch even on machines without ccache: this mixed
+            # invocation must reach GCC intact, without invoking the cache.
+            with patch.dict(os.environ, OS32_NO_CCACHE='0', CCACHE='/unused/ccache'), \
+                    patch.object(cc_cache.shutil, 'which', return_value='/unused/ccache'):
+                cc_cache.build(args, check=True)
+            self.assertEqual(expected, exe.read_bytes())
+            self.assertEqual(subprocess.run([str(exe)]).returncode, 0)
+
     @unittest.skipUnless(shutil.which('ccache'), 'ccache is not installed')
     def test_bytes_and_mutation_hits(self):
         with tempfile.TemporaryDirectory(prefix='cc-dispatch-') as tmp:
@@ -57,7 +82,8 @@ class Runtime(unittest.TestCase):
             a, b, exe = root/'a.c', root/'b.c', root/'host'
             a.write_text('extern int value(void); const char *path=__FILE__; int main(void) {return value();}\n')
             b.write_text('int value(void) {return 0;}\n')
-            env = dict(os.environ, CCACHE_DIR=str(root/'cache'), OS32_NO_CCACHE='0')
+            env = dict(os.environ, CCACHE_DIR=str(root/'cache'), OS32_NO_CCACHE='0',
+                       CCACHE=shutil.which('ccache'))
             with patch.dict(os.environ, env):
                 args = ['gcc', '-O2', str(a), str(b), '-o', str(exe)]
                 subprocess.run(args, check=True)
@@ -114,6 +140,14 @@ if __name__ == '__main__':
         Dispatch('test_disabled').run(result)
         assert len(result.failures) == 1 and not result.errors
         print('RED runtime: ignored OS32_NO_CCACHE')
+        cc_cache = types.ModuleType('cc_cache_make_disabled')
+        anchor = "os.environ.get('CCACHE') == ''"
+        assert source.count(anchor) == 1
+        exec(compile(source.replace(anchor, 'False'), str(Path(__file__)), 'exec'), cc_cache.__dict__)
+        result = unittest.TestResult()
+        Dispatch('test_make_disabled').run(result)
+        assert len(result.failures) == 1 and not result.errors
+        print('RED runtime: ignored CCACHE=')
         # Disabling per-TU dispatch preserves bytes but must lose the hit on
         # the unchanged TU when its sibling is mutated.
         cc_cache = types.ModuleType('cc_cache_no_split')

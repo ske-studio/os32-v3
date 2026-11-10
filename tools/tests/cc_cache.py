@@ -17,7 +17,7 @@ def build(argv, **kwargs):
     if kwargs.get('shell') or isinstance(argv, (str, bytes)):
         return subprocess.run(argv, **kwargs)
     cache = shutil.which('ccache')
-    if os.environ.get('OS32_NO_CCACHE') == '1' or not cache:
+    if os.environ.get('OS32_NO_CCACHE') == '1' or os.environ.get('CCACHE') == '' or not cache:
         return subprocess.run(argv, **kwargs)
     argv = list(map(str, argv))
     prefix = [cache, 'compiler_check=content', 'base_dir=', 'sloppiness=', 'hash_dir=true']
@@ -26,7 +26,8 @@ def build(argv, **kwargs):
     # These modes can depend on the output name or on joint driver state.
     if (kwargs.get('shell') or '-o' not in argv or
             any(a.startswith(('-g', '-flto', '-save-temps', '@')) or
-                a in ('-E', '-S', '-x', '-MD', '-MMD', '-MF', '-MT', '-MQ') for a in argv)):
+                a in ('-E', '-S', '-x', '-MD', '-MMD', '-MF', '-MT', '-MQ') for a in argv) or
+            any(a.endswith(('.s', '.S', '.cc', '.cpp', '.cxx', '.C')) for a in argv)):
         return subprocess.run(argv, **kwargs)
     sources = [i for i, a in enumerate(argv) if a.endswith('.c') and
                not a.startswith('-') and argv[i-1] not in ('-include', '-imacros', '-o')]

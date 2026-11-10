@@ -147,7 +147,7 @@ def units(root=ROOT, source_profile='legacy-x86'):
         from build_profile import query
         profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], commands=True)
         return parse_compile_lines('\n'.join(shlex.join(argv) for argv in profile['argv']),
-                                   declared_cc=profile['CC'][0])
+                                   declared_cc=(profile.get('RAW_CC') or profile['CC'])[0])
     if source_profile != 'legacy-x86':
         raise ParseError('unknown source profile: ' + source_profile)
     rc, out, err = dry_run(root)

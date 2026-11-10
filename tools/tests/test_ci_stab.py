@@ -735,12 +735,12 @@ class InfrastructureTests(unittest.TestCase):
         import time
         self._check_build_compiles_outside_lock_and_keeps_pending(host32.build)
         source = inspect.getsource(host32.build)
-        original = '        result = subprocess.run(compile_args, **kwargs)\n'
+        original = '        result = cc_cache.build(compile_args, **kwargs)\n'
         self.assertEqual(source.count(original), 1)
         source = source.replace(original,
             "        with (cache / '.lock').open('a') as lock:\n"
             '            fcntl.flock(lock, fcntl.LOCK_EX)\n'
-            '            result = subprocess.run(compile_args, **kwargs)\n')
+            '            result = cc_cache.build(compile_args, **kwargs)\n')
         namespace = dict(vars(host32))
         exec(compile(source, host32.__file__, 'exec'), namespace)
         # 長時間ロックを保持する変異だけ専用キャッシュに隔離する。

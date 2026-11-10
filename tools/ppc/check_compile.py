@@ -42,7 +42,7 @@ def measure(root, assignments, source_profile='selected'):
         assignments = [*assignments, 'C_KERNEL=' + ' '.join(legacy['C_KERNEL']),
                        'KERNEL_SRC_DIRS=' + ' '.join(legacy['KERNEL_SRC_DIRS'])]
     profile = query(root, assignments, commands=True)
-    declared = profile['CC']
+    declared = profile.get('RAW_CC') or profile['CC']
     if len(declared) != 1 or Path(declared[0]).name != 'powerpc-elf-gcc':
         raise ValueError('selected compiler is not powerpc-elf-gcc')
     report = dict(target='ppc-powermac', source_profile=source_profile, cc=declared,
