@@ -24,7 +24,9 @@
 | 段 | 状態 |
 |---|---|
 | A0 (宣言だけ) | 未着手 |
-| C1〜C18・S1〜S11・M1〜M3・X1・Y1〜Y4・T1・P1・G1〜G9・U1・D1 | 未着手 (A0 の後に並列) |
+| C1〜C18・S1〜S11・M1〜M3・X1・Y1〜Y4・T1・P1・G1〜G9・U1・D1 | 未着手 (A0 の後に並列。C14 は M3 の後) |
 | K1 (CONSOLE_DUAL の gf_outputs の差し替え) | 未着手 (CONSOLE_DUAL の D2 と C1・C11 の後) |
 | I1 (面の道)・I2 (描画の道)・I3 (表示の道) | 未着手 |
 | CONSOLE_DUAL (決定 C) | 確定設計あり ([CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)、段は TASK_CONSOLE_DUAL) |
+
+注意: TASK_PPC_SEP の予定の段 3 番 (gfx/gfx_core.c の `g_backend == &gfx_backend_geforce/trident` の分岐を provider へ移す) と 1 番 (gfx/gfx_vram.c)、TASK_GFX_ACCEL_HAL の S1 (gfx/gfx_vram.c) は、C1・C14 と同じ所に触る。これらと C1・C14 を同時に走らせない。
