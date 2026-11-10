@@ -180,7 +180,7 @@ _Static_assert(GEM_DESC_SIZE == 16, "descriptor size");
 enum { GEM_OK = 0, GEM_AGAIN = 1, GEM_EINVAL = -1, GEM_ENODEV = -2,
        GEM_ERANGE = -3, GEM_ETIME = -4, GEM_EIO = -5,
        GEM_EUNSUPPORTED = -6, GEM_EBUSY = -7 };
-enum { GEM_STATE_OFF, GEM_STATE_RESETTING, GEM_STATE_QUARANTINED };
+enum { GEM_STATE_OFF, GEM_STATE_RESETTING, GEM_STATE_QUARANTINED, GEM_STATE_READY };
 enum dma_sync { DMA_PREWRITE, DMA_PREREAD, DMA_POSTREAD, DMA_POSTWRITE };
 struct gem_dma { void *cpu; u32 pa, bus, bytes; };
 struct gem_io {

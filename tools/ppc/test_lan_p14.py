@@ -12,6 +12,8 @@ CHECK = dict(name='ppc-lan-p14', tier=2, budget=60,
              inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('ready', 'g->state = GEM_STATE_READY;', 'g->state = GEM_STATE_RESETTING;', 0, 'H:ready-monitor'),
+    ('simultaneous', 'g->rx_status = g->io.read32(g->io.ctx, GEM_MAC_RX_STATUS);', 'g->rx_status = 0;', 6, 'H:simultaneous'),
     ('rx-stop', 'r = wait_clear(g, GEM_MAC_RX_CONFIG, GEM_MAC_RX_ENABLE, now);', 'r = GEM_OK;', 0, 'H:A5 reset-active'),
     ('delay', 'if (now - g->started < ticks(g->io.tb_hz, 5000U)) {\n            if (++g->polls >= GEM_WAIT_POLLS) { g->state = GEM_STATE_QUARANTINED; return GEM_ETIME; }\n            return GEM_AGAIN;\n        }\n        g->io.write32(g->io.ctx, GEM_RESET_REG, GEM_RESET_RX);', 'g->io.write32(g->io.ctx, GEM_RESET_REG, GEM_RESET_RX);', 0, 'H:delay'),
     ('timeout', 'now - g->started >= ticks(g->io.tb_hz, 1000000U)', '(now - g->started >= ticks(g->io.tb_hz, 1000000U) && 0)', 1, 'H:timeout'),
@@ -37,7 +39,7 @@ def main():
         temp = Path(directory)
         source = temp / 'gem_reset.c'
         source.write_text(original)
-        for case in range(6):
+        for case in range(8):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline %d: %s' % (case, result.stdout + result.stderr))

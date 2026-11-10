@@ -101,7 +101,7 @@ int gem_reset_step(struct gem *g, unsigned long long now)
         r = wait_clear(g, GEM_RESET_REG, GEM_RESET_RX | GEM_RESET_TX, now);
         if (r != GEM_OK) return r;
         g->io.write32(g->io.ctx, GEM_INTMASK, ~0U);
-        next(g, RESET_DONE, now); return GEM_OK;
+        next(g, RESET_DONE, now); g->state = GEM_STATE_READY; return GEM_OK;
     case RESET_DONE: return GEM_OK;
     default: return GEM_EINVAL;
     }
@@ -119,10 +119,6 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
         g->error_status = g->io.read32(g->io.ctx, GEM_PCI_BANK2_OFFSET + GEM_ERROR_STATUS);
     if (status & GEM_INTR_TX_MAC) {
         g->tx_status = g->io.read32(g->io.ctx, GEM_MAC_TX_STATUS);
-        if (g->tx_status & (GEM_MAC_TX_UNDERRUN | GEM_MAC_TX_PKT_TOO_LONG)) {
-            g->step = RESET_START; g->state = GEM_STATE_RESETTING;
-            return GEM_AGAIN;
-        }
     }
     if (status & GEM_INTR_RX_MAC) {
         g->rx_status = g->io.read32(g->io.ctx, GEM_MAC_RX_STATUS);
@@ -131,6 +127,11 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
             g->rx_watch_rd = g->io.read32(g->io.ctx, GEM_RX_FIFO_RD_PTR);
             g->rx_watch_started = now; g->rx_watching = 1;
         }
+    }
+    if ((status & GEM_INTR_TX_MAC) &&
+        (g->tx_status & (GEM_MAC_TX_UNDERRUN | GEM_MAC_TX_PKT_TOO_LONG))) {
+        g->step = RESET_START; g->state = GEM_STATE_RESETTING;
+        return GEM_AGAIN;
     }
     if (g->rx_watching && now - g->rx_watch_started >= ticks(g->io.tb_hz, 400000U)) {
         wr = g->io.read32(g->io.ctx, GEM_RX_FIFO_WR_PTR);
