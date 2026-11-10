@@ -80,7 +80,7 @@ int gem_ring_publish(struct gem *g)
         g->io.write32(g->io.ctx, GEM_TX_CONFIG, GEM_RING_SZ_32 | ((0x04ffu << 10) & GEM_TX_CONFIG_TXFIFO_TH) | GEM_TX_CONFIG_TXDMA_EN);
         g->io.write32(g->io.ctx, GEM_TX_KICK, 0);
         g->io.write32(g->io.ctx, GEM_RX_CONFIG, GEM_RING_SZ_32 | (GEM_THRSH_1024 << GEM_RX_CONFIG_FIFO_THRS_SHIFT) | (2u << GEM_RX_CONFIG_FBOFF_SHFT) | GEM_RX_CONFIG_RXDMA_EN);
-        fifo = g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE);
+        fifo = g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u;
         g->io.write32(g->io.ctx, GEM_RX_PAUSE_THRESH, (3 * fifo / 256) | ((fifo / 256) << 12));
         g->io.write32(g->io.ctx, GEM_RX_BLANKING, (6 << 12) | 6);
         g->ring_publish_step = 3;

@@ -11,6 +11,7 @@ CHECK = dict(name='ppc-lan-p15', tier=2, budget=60,
              inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('fifo-units', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE)', 'H:publish'),
     ('own', '| (u32)GEM_RD_OWN', '| 0', 'H:descriptor'),
     ('full', 'g->ring_cursor < GEM_RX_PUBLISHED', 'g->ring_cursor < GEM_RING_COUNT', 'H:sync'),
     ('sync', 'g->io.sync(base + RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)', '0', 'H:sync'),
