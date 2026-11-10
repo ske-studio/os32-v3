@@ -18,6 +18,13 @@ int main(void) {
     ppc_trap_set_reader(reader,0); ppc_trap_set_fatal_ready(1);
     for (u32 i=0;i<3;i++) { mark(10+i); f.dsisr=causes[i]; f.srr0=0x100;
         CHECK(ppc_trap_onfault_data(0x100,0x100,0x200)); ppc_trap_dispatch(&f); CHECK(f.srr0==0x200); }
+    mark(27); f.srr0=0x100; f.dsisr=PPC_DSISR_PROTECT;
+    CHECK(ppc_trap_onfault(0x100,0x100,PPC_TRAP_DSI_MISS,0x200));
+    fatal(&f,PPC_TRAP_DSI_PROTECT);
+    mark(28); CHECK(ppc_trap_onfault_data(0x100,0x100,0x200));
+    ppc_trap_onfault_clear(); f.dsisr=0x04000000;
+    CHECK(ppc_trap_onfault(0x100,0x100,PPC_TRAP_DSI_MISS,0x200));
+    fatal(&f,PPC_TRAP_DSI_IO);
     mark(20); f.srr0=0x100; f.vector=PPC_VECTOR_ISI; f.srr1=PPC_ISI_MISS;
     CHECK(ppc_trap_onfault_data(0x100,0x100,0x200)); fatal(&f,PPC_TRAP_ISI);
     mark(21); f.vector=PPC_VECTOR_DSI; f.srr1=0; f.dsisr=0;

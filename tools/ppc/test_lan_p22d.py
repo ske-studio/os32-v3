@@ -18,7 +18,7 @@ def check(s, expected=0):
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--mutate',action='store_true'); args=p.parse_args(); s=SOURCE.read_text(); check(s)
     if args.mutate:
-        changes=[('isi','reason == PPC_TRAP_DSI_IO) :','reason == PPC_TRAP_DSI_IO || reason == PPC_TRAP_ISI) :',20),('va','(f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&','1 &&',23),('consume','probe.active = 0;\n            f->srr0 = probe.resume;','f->srr0 = probe.resume;',11),('occupied','if (probe.active || ((pc | resume) & 3)) return 0;','if ((pc | resume) & 3) return 0;',24)]
+        changes=[('exact-clears-data','    probe.data = 0;\n','',27),('isi','reason == PPC_TRAP_DSI_IO) :','reason == PPC_TRAP_DSI_IO || reason == PPC_TRAP_ISI) :',20),('va','(f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&','1 &&',23),('consume','probe.active = 0;\n            f->srr0 = probe.resume;','f->srr0 = probe.resume;',11),('occupied','if (probe.active || ((pc | resume) & 3)) return 0;','if ((pc | resume) & 3) return 0;',24)]
         for name,old,new,code in changes:
             assert s.count(old)==1, name
             check(s.replace(old,new),code); print(name+': runtime RED with reach marker')
