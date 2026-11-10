@@ -124,8 +124,16 @@ ARM 実装は別票で行う。
 `make ARCH=ppc PLATFORM=powermac` は共通候補と既存 bootstrap の C/GAS を
 コンパイルする。出力は `build/out/ppc-powermac`、コンパイラは
 `PPC_CROSS_DIR`（既定 `/home/hight/opt/cross-ppc`）から選ぶ。
-原始命令ヘッダ等が未実装なので全 TU 成功・kernel リンク・起動は未達。
+この一覧 (selected) は全 TU 成功に達していない (未実装の原始命令ヘッダ等)。
 SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-only である。
+
+**本体のリンクと起動は別の入口で達している (到達点 ②、2026-11-10)**:
+`make -f build/ppc-kboot.mk` が `init/ppc_kernel.c` から到達する閉包
+(共通の mm・kprintf・tick と arch/ppc・platform/powermac) を
+`build/out/ppc-kboot/PPCKERN.ELF` にリンクし、QEMU mac99 で OF から入って
+案 D の paging・例外・MPIC・1kHz の decrementer まで初期化する
+(`python3 -B tools/ppc/kboot_accept.py`)。VFS・module・exec・USER・画面は含まない。
+票は docs/tasks/ppc/ の TASK_PPC_KBOOT。
 
 実測は `python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json`。
 必須 7 本、ELF32/BE/EM_PPC、実 `.d`、全 TU の試行と失敗分類を照合する。
