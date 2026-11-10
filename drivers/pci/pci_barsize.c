@@ -35,6 +35,7 @@
 #include "pci.h"
 #include "pci_barsize.h"
 #include "kprintf.h"
+#include "io.h"
 
 #define PCI_RESOURCE_SLOTS (PCI_CFG_BAR_COUNT + 1)
 #define PCI_ROM_ADDR_MASK 0xfffff800U
@@ -49,7 +50,7 @@ static u32 record_count;
 
 void pci_barsize_reset(void) { record_count = 0; }
 
-static void measure(u32 bus, u32 dev, u32 fn, u32 reg, bool rom,
+static void measure_locked(u32 bus, u32 dev, u32 fn, u32 reg, bool rom,
                     bool allow64, struct pci_bar_resource *r)
 {
     *r = (struct pci_bar_resource){0};
@@ -88,6 +89,16 @@ static void measure(u32 bus, u32 dev, u32 fn, u32 reg, bool rom,
     r->unassigned = !r->base || (r->raw == low && r->high == high);
 }
 
+/* Keep the entire save/probe/restore transaction atomic, including callers
+ * whose individual config accesses save and restore IRQ state themselves. */
+static void measure(u32 bus, u32 dev, u32 fn, u32 reg, bool rom,
+                    bool allow64, struct pci_bar_resource *r)
+{
+    unsigned int flags = irq_save();
+    measure_locked(bus, dev, fn, reg, rom, allow64, r);
+    irq_restore(flags);
+}
+
 void pci_barsize_record(u32 bus, u32 dev, u32 fn, u32 header)
 {
     struct pci_resource_record scratch = {0};
@@ -98,7 +109,13 @@ void pci_barsize_record(u32 bus, u32 dev, u32 fn, u32 header)
     u32 bars = layout == PCI_HDR_LAYOUT_DEVICE ? PCI_CFG_BAR_COUNT :
                layout == PCI_HDR_LAYOUT_BRIDGE ? PCI_BRIDGE_BAR_COUNT :
                layout == PCI_HDR_LAYOUT_CARDBUS ? 1U : 0U;
+    u32 class_rev = pci_cfg_read32(bus, dev, fn, PCI_CFG_REVISION_ID);
+    bool ide = (class_rev >> 16) == 0x0101U;
+    u32 progif = (class_rev >> 8) & 0xffU;
     for (u32 i = 0; i < bars; i++) {
+        /* FreeBSD pci_ata_maps: compatibility channels use fixed legacy
+         * ports, so their BAR pairs must not be probed. */
+        if (ide && i < 4 && !(progif & (i < 2 ? 1U : 4U))) continue;
         struct pci_bar_resource *r = &d->bars[i];
         measure(bus, dev, fn, PCI_CFG_BAR0 + i * PCI_CFG_BAR_STRIDE, false, i + 1 < bars, r);
         if (r->len) kprintf(KLOG_ATTR,
@@ -111,7 +128,9 @@ void pci_barsize_record(u32 bus, u32 dev, u32 fn, u32 header)
     }
     d->rom_reg = layout == PCI_HDR_LAYOUT_DEVICE ? PCI_CFG_ROM_ENDPOINT :
                  layout == PCI_HDR_LAYOUT_BRIDGE ? PCI_CFG_ROM_BRIDGE : 0;
-    if (d->rom_reg) measure(bus, dev, fn, d->rom_reg, true, false, &d->bars[PCI_CFG_BAR_COUNT]);
+    /* Probe only ROMs enabled by firmware; never write a disabled ROM. */
+    if (d->rom_reg && (pci_cfg_read32(bus, dev, fn, d->rom_reg) & 1U))
+        measure(bus, dev, fn, d->rom_reg, true, false, &d->bars[PCI_CFG_BAR_COUNT]);
 }
 
 int pci_bar_get(u32 bus, u32 dev, u32 fn, u32 reg, void *out)

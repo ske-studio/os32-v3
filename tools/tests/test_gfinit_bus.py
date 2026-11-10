@@ -43,6 +43,18 @@ SHARED_MUTATIONS = [
      'v->key == target && value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
+    ('kdebug/gfinit_resources/windows.inc', 'resource_window_len', 'len > 0xffffffffU', 'false'),
+    ('kdebug/gfinit_resources/windows.inc', 'resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_alignment', '(r.base & (r.len - 1U))', 'false'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_exclude_count', 'if (*used >= RECOVER_RANGE_MAX)', 'if (false)'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return PCI_FN_COUNT;'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_absent_fn0', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) return 0;', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) { (void)id; }'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_log_raw', 'reason, dev, fn, reg, raw);', 'reason, dev, fn, reg, raw ^ 1U);'),
+    ('kdebug/gfinit_resources/windows.inc', 'resource_window_granule', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
+    ('drivers/pci/pci_barsize.c', 'restore_order', 'pci_cfg_write32(bus, dev, fn, reg, r->raw);', 'if (!rom) pci_cfg_write16(bus, dev, fn, PCI_CFG_COMMAND, cmd);\n    pci_cfg_write32(bus, dev, fn, reg, r->raw);'),
+    ('drivers/pci/pci_barsize.c', 'measure_irq', 'unsigned int flags = irq_save();', 'unsigned int flags = irq_state;'),
+
     ('drivers/pci/pci_barsize.c', 'restore_decode', 'PCI_CFG_COMMAND, cmd);', 'PCI_CFG_COMMAND, cmd & ~3U);'),
     ('drivers/pci/pci_barsize.c', 'restore_bar', 'reg, r->raw);', 'reg, 0);'),
     ('drivers/pci/pci_barsize.c', 'restore_high', 'reg + PCI_CFG_BAR_STRIDE, r->high);', 'reg + PCI_CFG_BAR_STRIDE, 0);'),
@@ -52,7 +64,7 @@ RESOURCE_MUTATIONS = [
     ('kdebug/gfinit_resources/scan.inc', 'resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
     ('kdebug/gfinit_resources/scan.inc', 'resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
     ('kdebug/gfinit_resources/windows.inc', 'resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
-    ('kdebug/gfinit_resources/bars.inc', 'unassigned', 'if (r.unassigned || (!r.base && !raw))', 'if (false)'),
+    ('kdebug/gfinit_resources/bars.inc', 'unassigned', 'if (r.unassigned)', 'if (false)'),
 ]
 WINDOW_MUTATIONS = [
     ('window_busy', 'if (window_busy)', 'if (false)'),

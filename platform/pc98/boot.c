@@ -142,7 +142,7 @@ static void pc98_boot_dev_fs(const struct boot_context *ctx)
 static void pc98_boot_pci_enum(const struct boot_context *ctx)
 {
     (void)ctx;
-    /* PCI の列挙 (読むだけ)。**IDE より前**に置く: 実機 PC-9821Ra266 の
+    /* PCI の列挙 (BAR の長さを測り、設定を復元)。**IDE より前**に置く: 実機 PC-9821Ra266 の
      * 内蔵 LAN (Intel 82557) を見つけるのが目的で、IDE の probe ログに
      * 流される前に [pci] の行を出したい (票 TASK_LAN_82557 §2 L-A)。
      * NP21/W には 0CF8h が無いので「mech#1 absent」の 1 行で終わる —

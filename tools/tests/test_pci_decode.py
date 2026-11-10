@@ -29,9 +29,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pci_decode_host.c"
 SRC = ROOT / "drivers/pci/pci_decode.c"
-# カーネルと同じ i386-elf で通す実ソース。列挙側 (drivers/pci/pci.c) は I/O を
-# 触るのでホストでは回せないが、**コンパイルは通ることを見る** — 実機でしか
-# 走らせられないコードこそ、型とプロトタイプのずれを手元で捕まえておく。
+# カーネルと同じ i386-elf で型とプロトタイプのずれを検査する。
+# 列挙・記録の実行試験は test_pci_scan.py が fake I/O に対して行う。
 TARGET_SRCS = [
     ("drivers/pci/pci_decode.c", []),
     ("drivers/pci/pci.c", []),

@@ -17,11 +17,13 @@ BOOT_PCI_ENUM の列挙時に全装置の BAR を一度測り、GeForce の資�
 通常 BAR は元の値と COMMAND を保存し、該当する MEM または IO decode を WORD 書込みで止める。
 全ビット 1 を書き、mask を読み、元の BAR、64bit 上位、COMMAND の順に戻す。
 64bit は下位・上位の両方を書いてから上位・下位を読む。GeForce も同じ手順。
-Bus Master と Status は変更しない。測定・復元の間に yield しない。
+Bus Master と Status は変更しない。測定1回の保存から復元までを irq_save / irq_restore で囲み、yield しない。
 
 Type 0 は 6 本、Type 1 は 2 本、CardBus は 1 本を測定する。
 Type 1 のバス番号や転送窓に sizing 値を書かない。
-ROM は Type 0 の 0x30 / Type 1 の 0x38 を測る。手本どおり COMMAND は変えず、
+IDE (class 01.01) の互換モードのチャネルは BAR0〜3 の対応するペアを測らない
+(FreeBSD `pci_ata_maps`:3497-3553 の progif bit0 / bit2 判定)。
+ROM は Type 0 の 0x30 / Type 1 の 0x38 のうち、起動時に enable=1 のものだけ測る。手本どおり COMMAND は変えず、
 0xfffffffe を書いて enable を立てず、元の ROM 値へ戻す。
 
 mask の最下位の実装ビットから長さを求める。0 mask・不正な属性・最小長未満は長さ 0。
@@ -45,4 +47,6 @@ Type 1 の転送窓の検査は維持し、配下装置の領域を窓全体で�
 
 `tools/tests/gfinit_bus_host.c` は mask を返す fake config と実際の測定処理を組む。
 USB・SCSI 1000:000f・82557・Trident・GeForce、ROM、64bit、bridge、未割当てと
-全 config 復元を照合する。`test_gfinit_bus.py --mutate` は decode 復元漏れも実行時 RED にする。
+全 config 復元を照合する。書込み順と probe 中の decode 無効も照合する。`test_gfinit_bus.py --mutate` は decode 復元漏れも実行時 RED にする。
+`test_pci_scan.py` は本物の pci_init / pci_scan_bus / pci_record を fake I/O に対して実行し、
+再列挙・表の上限超過・function 数・ROM enable・IDE モードを検査する。

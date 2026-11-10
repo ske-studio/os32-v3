@@ -10,7 +10,10 @@ BOOT_PCI_ENUM の列挙時に、各装置の BAR を一度測り、設定を戻�
   Status の W1C ビットを含む DWORD RMW は使わない。
 - 64bit は上下とも全ビット 1 を書いてから読み、下位・上位・Command の順に戻す。
 - Type 0 / Type 1 / CardBus は 6 / 2 / 1 本。ブリッジの転送窓は sizing しない。
-- ROM は Type 0 の 0x30 / Type 1 の 0x38。enable を立てずに測定し、元に戻す。
+- ROM は Type 0 の 0x30 / Type 1 の 0x38。起動時に enable=1 のものだけ、enable を立てずに測定し、元に戻す。
+- 測定1回の保存から復元までを irq_save / irq_restore で囲む。
+- class 01.01 の IDE は progif の native bit が0のチャネルに対応する BAR0〜3 を測らない (FreeBSD pci_ata_maps)。
+- ブリッジの公開 `pci_dev.bar[2..5]` は転送窓などを BAR として返さず、0 を返す。
 - BIOS の割当てを維持する。表が満杯でも測定・復元を続け、保存できなかった記録の照会は失敗する。
 
 手順・FreeBSD の file:line・メーカー資料・GeForce の除外契約は

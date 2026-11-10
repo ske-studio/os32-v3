@@ -292,7 +292,10 @@ static void production_plan(u32 initial_lock)
 #include "../../kdebug/gfinit_resources.c"
 #include "gfinit_resources_ra266.h"
 static u32 resource_cfg[32][8][16], resource_masks[32][8][16];
-static u32 resource_writes, resource_sizing;
+static u32 resource_writes, resource_sizing, resource_extra_reads, resource_absent_reads;
+struct resource_write { u32 dev, fn, reg, value; };
+static u32 resource_pending[32][8], resource_write_count;
+static struct resource_write resource_write_order[8192];
 static const char *resource_reason;
 static u32 resource_logs, resource_dev, resource_fn, resource_reg, resource_raw;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
@@ -306,12 +309,17 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     __builtin_va_end(ap);
 }
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
-{CHECK(bus==0 && dev<32 && fn<8 && reg<64);return resource_cfg[dev&31][fn&7][(reg/4)&15];}
+{CHECK(bus==0 && dev<32 && fn<8 && reg<64);if(fn && !resource_sizing)resource_extra_reads++;if(!resource_sizing && reg==12 && (resource_cfg[dev][fn][0]&65535)==65535)resource_absent_reads++;return resource_cfg[dev&31][fn&7][(reg/4)&15];}
 u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
 {return (u16)(pci_cfg_read32(bus,dev,fn,reg&~3U)>>((reg&2)*8));}
 void pci_cfg_write32(u32 bus,u32 dev,u32 fn,u32 reg,u32 value)
 {
-    CHECK(!bus && resource_sizing);resource_writes++;
+    CHECK(!bus && resource_sizing && !irq_state);resource_writes++;
+    CHECK(resource_write_count<ARRAY_SIZE(resource_write_order));
+    if(resource_write_count<ARRAY_SIZE(resource_write_order))
+        resource_write_order[resource_write_count++]=(struct resource_write){dev,fn,reg,value};
+    if(value==U32_MAX || value==0xfffffffeU) resource_pending[dev][fn]|=1U<<(reg/4);
+    else resource_pending[dev][fn]&=~(1U<<(reg/4));
     if (value==U32_MAX || value==0xfffffffeU) {
         CHECK(reg>=0x10);
         if(reg==0x30 || reg==0x38) CHECK(!(value&1));
@@ -323,11 +331,17 @@ void pci_cfg_write32(u32 bus,u32 dev,u32 fn,u32 reg,u32 value)
 }
 int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
 {CHECK(!bus && reg==4 && resource_sizing);resource_writes++;
+ CHECK(!irq_state);
+ if(value&3U) CHECK(!resource_pending[dev][fn]);
+ CHECK(resource_write_count<ARRAY_SIZE(resource_write_order));
+ if(resource_write_count<ARRAY_SIZE(resource_write_order))
+     resource_write_order[resource_write_count++]=(struct resource_write){dev,fn,reg,value};
  resource_cfg[dev][fn][1]=(resource_cfg[dev][fn][1]&0xffff0000U)|value;return 0;}
 #include "../../drivers/pci/pci_barsize.c"
 static void resource_setup(void)
 {
-    resource_writes=resource_sizing=resource_logs=0;resource_reason=0;pci_barsize_reset();
+    resource_writes=resource_sizing=resource_logs=0;resource_reason=0;resource_extra_reads=resource_absent_reads=resource_write_count=0;irq_state=1;pci_barsize_reset();
+    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)resource_pending[d][f]=0;
     for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)for(u32 r=0;r<16;r++) {
         resource_cfg[d][f][r]=r?0:~0U;resource_masks[d][f][r]=0;
     }
@@ -346,12 +360,13 @@ static void resource_snapshot(void)
 static int resource_run(struct recover_range *ranges,u32 *n)
 {
     pci_barsize_reset();resource_sizing=1;
-    for(u32 d=0;d<32;d++)for(u32 f=0;f<resource_function_count(d);f++) {
+    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++) {
         if((resource_cfg[d][f][0]&65535)==65535)continue;
         u32 saved[16];for(u32 j=0;j<16;j++)saved[j]=resource_cfg[d][f][j];
         pci_barsize_record(0,d,f,resource_cfg[d][f][3]>>16);
         for(u32 j=0;j<16;j++)CHECK(saved[j]==resource_cfg[d][f][j]);
     }
+    CHECK(irq_state==1);
     resource_sizing=0;u32 before=resource_writes;
     int rc=gfinit_resources(ranges,n);CHECK(before==resource_writes);return rc;
 }
@@ -387,7 +402,7 @@ static void resource_tests(void)
     struct pci_bar_resource measured;
     CHECK(!pci_bar_get(0,13,0,PCI_CFG_BAR0,&measured) && measured.kind==PCI_BAR_IO &&
           measured.base==0x6100 && measured.len==0x100);
-    CHECK(!pci_bar_get(0,13,0,PCI_CFG_ROM_ENDPOINT,&measured) && measured.len==0x8000);
+    CHECK(!pci_bar_get(0,13,0,PCI_CFG_ROM_ENDPOINT,&measured) && measured.len==0);
     CHECK(pci_bar_get(1,13,0,PCI_CFG_BAR0,&measured)<0);
 
     resource_cfg[13][0][12]|=1;CHECK(resource_run(ranges,&n)==0 && n==11);
@@ -410,6 +425,53 @@ static void resource_tests(void)
     resource_cfg[7][0][9]=0x31f13001;resource_cfg[7][0][10]=1;
     CHECK(resource_run(ranges,&n)<0 && n==0);
     output("resources: measured unknown SCSI/USB, Intel/Trident/GPU, ROM, 64bit, bridge and restore PASS\n");
+}
+static bool resource_text(const char *a,const char *b)
+{
+    if(!a)return false;
+    while(*a && *a==*b){a++;b++;}
+    return *a==*b;
+}
+static void resource_guard_tests(void)
+{
+    /* Extra slot is a canary for mutations removing the capacity guards. */
+    struct recover_range ranges[RECOVER_RANGE_MAX+1];u32 n;
+    resource_snapshot();
+    for(u32 f=1;f<8;f++)for(u32 r=0;r<16;r++) {
+        resource_cfg[8][f][r]=resource_cfg[8][0][r];
+        resource_masks[8][f][r]=resource_masks[8][0][r];
+    }
+    CHECK(resource_run(ranges,&n)==0 && n==5 && !resource_extra_reads && !resource_absent_reads);
+    /* A ghost fn7 cannot make an absent fn0 into a present device. */
+    resource_cfg[2][7][0]=0x12348086;resource_cfg[2][7][1]=2;
+    resource_cfg[2][7][4]=0x23400000;resource_masks[2][7][4]=0xfffff000;
+    CHECK(resource_run(ranges,&n)==0 && n==5 && !resource_extra_reads && !resource_absent_reads);
+    resource_snapshot();resource_cfg[8][0][6]=0x20800010;
+    u32 logs=resource_logs;
+    CHECK(resource_run(ranges,&n)<0 && n==0 && resource_logs==logs+1);
+    CHECK(resource_text(resource_reason,"memory_bar_range") && resource_dev==8 &&
+          resource_fn==0 && resource_reg==0x18 && resource_raw==0x20800010);
+    resource_cfg[8][0][1]=0;CHECK(resource_run(ranges,&n)==0 && n==2);
+    resource_snapshot();resource_cfg[8][0][4]=0x6101;
+    resource_cfg[8][0][5]=resource_cfg[8][0][6]=0;
+    CHECK(resource_run(ranges,&n)==0 && n==2);
+
+    resource_snapshot();CHECK(resource_run(ranges,&n)==0);
+    n=RECOVER_RANGE_MAX-1;
+    CHECK(resource_memory_bar(ranges,&n,8,0,0x10,0x20000000)==0 && n==RECOVER_RANGE_MAX);
+    CHECK(ranges[n-1].base==0x20000000 && ranges[n-1].len==0x400000);
+    CHECK(resource_memory_bar(ranges,&n,8,0,0x10,0x20000000)<0 && n==RECOVER_RANGE_MAX);
+    CHECK(resource_text(resource_reason,"memory_bar_count"));
+    resource_cfg[2][7][8]=0x21f02000;
+    n=RECOVER_RANGE_MAX-1;
+    CHECK(resource_window(ranges,&n,2,7,0x20)==0 && n==RECOVER_RANGE_MAX);
+    CHECK(ranges[n-1].base==0x20000000 && ranges[n-1].len==0x2000000);
+    CHECK(resource_window(ranges,&n,2,7,0x20)<0 && n==RECOVER_RANGE_MAX);
+    resource_cfg[2][7][8]=0xfff00000;n=0;
+    CHECK(resource_window(ranges,&n,2,7,0x20)<0 && n==0);
+    CHECK(resource_text(resource_reason,"window_range") && resource_dev==2 &&
+          resource_fn==7 && resource_reg==0x20 && resource_raw==0xfff00000);
+    output("resources: alias/absent fn0, reject tuple, alignment, MEM/IO skip and count boundaries PASS\n");
 }
 static void resource_barlen_tests(void) { resource_tests(); }
 
@@ -478,7 +540,7 @@ static void resource_probe_tests(void)
 void GF_S5_ENTRY(void)
 {
     gf_fixture_init();
-    resource_tests();resource_barlen_tests();resource_probe_tests();accessor_tests();mode_read_row_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
+    resource_tests();resource_guard_tests();resource_barlen_tests();resource_probe_tests();accessor_tests();mode_read_row_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
     output(failures?"GF S5 FAIL\n":"GF S5 PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }
