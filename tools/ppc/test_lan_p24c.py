@@ -28,7 +28,7 @@ static struct ppc_boot_devices dev = { .gmac_va=0x123000, .pci_addr_va=0x456000,
 static struct pm_kboot_info info = { .tb_hz=12345 };
 const struct ppc_boot_devices *ppc_boot_devices(void) { return &dev; }
 const struct pm_kboot_info *ppc_boot_info(void) { return &info; }
-int ppc_dma_sync(void *p, u32 n, enum dma_sync op) { (void)p; (void)n; (void)op; return 0; }
+int pm_gmac_dma_sync(void *p, u32 n, enum dma_sync op) { (void)p; (void)n; (void)op; return 0; }
 int pm_pci_read32(struct pm_pci *p, u32 b, u32 r, u32 *v) {
     if (p->addr_va != 0x456000 || p->data_va != 0x457000 || p->bus_first != 2 || p->bus_last != 9 || p->target_bdf != 0x234 || b != 0x234 || r != 4) return -1;
     ++reads; if (mode == 1 || (mode == 3 && reads == 2)) return -1;
@@ -40,7 +40,7 @@ int pm_pci_write32(struct pm_pci *p, u32 b, u32 r, u32 v) {
 static int test(void) {
     struct pm_gmac_boot b = { .bus_first=2, .bus_last=9, .bdf=0x234 };
     struct gem_io io;
-    if (pm_lan_gem_io(&b, &io) || io.tb_hz != 12345 || io.sync != ppc_dma_sync || !io.ctx || !io.read32 || !io.write32 || !io.tb) return 10;
+    if (pm_lan_gem_io(&b, &io) || io.tb_hz != 12345 || io.sync != pm_gmac_dma_sync || !io.ctx || !io.read32 || !io.write32 || !io.tb) return 10;
     for (mode=0; mode<5; ++mode) {
         int rc; reads=0; writes=0; written=0;
         rc=io.master_enable(io.ctx);
@@ -84,7 +84,7 @@ def main():
             return require([str(PPC / 'powerpc-elf-objdump'), '-d', str(obj)])
         obj = cross(original)
         symbols = set(re.findall(r'\bU\s+(\w+)', require([str(PPC / 'powerpc-elf-nm'), '-u', str(obj)])))
-        expected = {'ppc_dma_sync', 'ppc_boot_info', 'ppc_boot_devices', 'pm_pci_read32', 'pm_pci_write32'}
+        expected = {'pm_gmac_dma_sync', 'ppc_boot_info', 'ppc_boot_devices', 'pm_pci_read32', 'pm_pci_write32'}
         if symbols != expected: raise RuntimeError(f'unexpected undefined symbols: {symbols}')
         dis = assembly(obj)
         def check_asm(text):

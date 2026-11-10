@@ -21,13 +21,14 @@ MUTATIONS = [
     ('ffff', 'a != 0xffff &&', '1 &&', 0, 'H:A6 phy-invalid'),
     ('unknown-write', 'if (!g || !supported(g->phy_id1, g->phy_id2))', 'if (!g)', 16, 'H:unknown-write'),
     ('current', 'status = v;', 'status |= v;', 17, 'H:current-status'),
-    ('retry', 'if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }', 'if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD)) { return GEM_EIO; }', 6, 'H:retry'),
+    ('retry', 'if (!(v & status & ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }', 'if (!(v & status & ANAR_TX_FD)) { return GEM_EIO; }', 6, 'H:retry'),
     ('startneg', 'BMCR_AUTOEN | BMCR_STARTNEG);', 'BMCR_AUTOEN);', 0, 'H:advertise'),
     ('gtcr', 'r = wr(g, GTCR, 0);', 'r = GEM_OK;', 0, 'H:advertise'),
     ('order', 'r = wr(g, ANAR, ANAR_CSMA | ANAR_TX_FD);', 'r = wr(g, BMCR, BMCR_AUTOEN | BMCR_STARTNEG);', 0, 'H:advertise'),
     ('done-read', 'r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) return r;', 'return GEM_OK;', 18, 'H:done-link'),
     ('done-restart', 'if (!(v & BMSR_LINK)) { g->phy_step = PHY_START; return GEM_EIO; }', 'if (!(v & BMSR_LINK)) { return GEM_EIO; }', 19, 'H:done-restart'),
-    ('partner', 'if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD))', 'if (0)', 6, 'H:partner'),
+    ('local', 'if (!(v & status & ANAR_TX_FD))', 'if (!(v & ANAR_TX_FD))', 22, 'H:partner'),
+    ('partner', 'if (!(v & status & ANAR_TX_FD))', 'if (0)', 6, 'H:partner'),
 ]
 
 def check(source, temp, case):
@@ -47,7 +48,7 @@ def main():
         temp = Path(d)
         source = temp / 'gem_phy.c'
         source.write_text(original)
-        for case in range(21):
+        for case in range(23):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline %d: %s' % (case, result.stdout + result.stderr))

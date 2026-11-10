@@ -138,7 +138,9 @@ int gem_phy_step(struct gem *g, unsigned long long now)
         status = v;
         if ((status & (BMSR_LINK | BMSR_ACOMP)) == (BMSR_LINK | BMSR_ACOMP)) {
             r = rd(g, g->phy_addr, ANLPAR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
-            if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }
+            /* OpenBSD ukphy_subr.c:90,104 intersects advertisements; QEMU BCM5201 reports ANLPAR 0x0100 without selector. */
+            r = rd(g, g->phy_addr, ANAR, &status); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+            if (!(v & status & ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }
             g->phy_step = PHY_DONE; return GEM_OK;
         }
         if (now - g->phy_started >= ticks(g->io.tb_hz, 5000000) || ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }

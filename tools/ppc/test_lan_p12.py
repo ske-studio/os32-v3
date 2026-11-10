@@ -14,7 +14,9 @@ CHECK = dict(name='ppc-lan-p12', tier=2, budget=60,
                      'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_layout.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ('sync', '    ppc_sync();', '    /* sync removed */', 0, 'H:A4 dma-unpublished'),
+    ('sync', '    ppc_sync();\n    if (paging_map_range', '    /* sync removed */\n    if (paging_map_range', 0, 'H:A4 dma-unpublished'),
+    ('descriptor-routing', 'if ((unsigned long)cpu - (unsigned long)pool < DMA_BLOCK)', 'if (0)', 6, 'H:descriptor'),
+    ('descriptor-boundary', 'if ((unsigned long)cpu - (unsigned long)pool < DMA_BLOCK)', 'if ((unsigned long)cpu - (unsigned long)pool < 0x20000u)', 6, 'H:boundary'),
     ('sync-order', '    for (u32 off = 0; off < DMA_BLOCK; off += PPC_CACHE_LINE)\n        ppc_dcbf_line(pool + off);\n    ppc_sync();', '    ppc_sync();\n    for (u32 off = 0; off < DMA_BLOCK; off += PPC_CACHE_LINE)\n        ppc_dcbf_line(pool + off);', 0, 'H:A4 dma-unpublished'),
     ('pcd', 'pa, PAGE_RW | PTE_PCD)', 'pa, PAGE_RW)', 0, 'H:pcd'),
     ('bus', 'address = saved.dma_bus_base + off;', 'address = off;', 1, 'H:bus'),
@@ -44,7 +46,7 @@ def main():
         temp = Path(directory)
         source = temp / 'gmac_dma.c'
         source.write_text(original)
-        for case in range(6):
+        for case in range(7):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline case %d: %s' % (case, result.stdout + result.stderr))
@@ -56,6 +58,8 @@ def main():
                 result = check(source, temp, case)
                 if result.returncode != 1 or diagnostic not in result.stdout.splitlines() or 'REACHED host' not in result.stdout.splitlines():
                     raise RuntimeError('mutation %s: %s' % (name, result.stdout + result.stderr))
+                if name == 'descriptor-boundary' and 'REACHED descriptor' not in result.stdout.splitlines():
+                    raise RuntimeError('mutation missing descriptor milestone: ' + name)
                 print('RED', name, diagnostic)
     print('PASS ppc-lan-p12')
 
