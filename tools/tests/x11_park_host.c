@@ -14,18 +14,18 @@
     __asm__ volatile("int $0x80" : : "a"(1), "b"(1) : "memory"); \
     __builtin_unreachable(); } } while (0)
 
-static X87State x87_parent[APP_SLOT_COUNT];
+static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
 enum { X87_SAVE = 1, X87_RESTORE = 2, X87_EVENT_CAPACITY = 8 };
-static const X87State *x87_events[X87_EVENT_CAPACITY];
+static const struct arch_fp_context *x87_events[X87_EVENT_CAPACITY];
 static int x87_kinds[X87_EVENT_CAPACITY], x87_count;
-static void record_x87(int kind, const X87State *p)
+static void record_x87(int kind, const struct arch_fp_context *p)
 {
     REQUIRE(x87_count < X87_EVENT_CAPACITY, "x87 event capacity");
     x87_kinds[x87_count] = kind;
     x87_events[x87_count++] = p;
 }
-void x87_save(X87State *p) { record_x87(X87_SAVE, p); }
-void x87_restore(const X87State *p) { record_x87(X87_RESTORE, p); }
+void arch_fp_save(struct arch_fp_context *p) { record_x87(X87_SAVE, p); }
+void arch_fp_restore(const struct arch_fp_context *p) { record_x87(X87_RESTORE, p); }
 static int g_cur, g_cur_op_is_wait, ring3_in_syscall;
 static AppSlot *g_cur_app;
 static struct arch_syscall *g_cur_frame;
@@ -156,7 +156,7 @@ static int park_lifetime(void)
               slots[2].state == APP_STATE_PARKED && slots[2].parked_from_wait,
               "real park reaches WM with saved frame");
         CHECK(x87_count == 1 && x87_kinds[0] == X87_SAVE &&
-              x87_events[0] == &slots[2].x87_state, "x87 first park saves slot");
+              x87_events[0] == &slots[2].fp_state, "x87 first park saves slot");
         CHECK(equal_state(&park_expected), "real park preserves candidate and dictionary");
         /* A management operation while parked is global, never rolled back by
          * resume. Already copied candidates and commit bytes stay valid. */
@@ -166,10 +166,10 @@ static int park_lifetime(void)
               owner == 1 && cr3 == 1 && slots[2].state == APP_STATE_PARKED,
               "real resume and second park complete round trip");
         CHECK(x87_count == 5 && x87_kinds[1] == X87_SAVE &&
-              x87_events[1] == &x87_parent[exec_nest_level] &&
-              x87_kinds[2] == X87_RESTORE && x87_events[2] == &slots[2].x87_state &&
-              x87_kinds[3] == X87_SAVE && x87_events[3] == &slots[2].x87_state &&
-              x87_kinds[4] == X87_RESTORE && x87_events[4] == &x87_parent[exec_nest_level],
+              x87_events[1] == &fp_parent[exec_nest_level] &&
+              x87_kinds[2] == X87_RESTORE && x87_events[2] == &slots[2].fp_state &&
+              x87_kinds[3] == X87_SAVE && x87_events[3] == &slots[2].fp_state &&
+              x87_kinds[4] == X87_RESTORE && x87_events[4] == &fp_parent[exec_nest_level],
               "x87 resume and park exchange slot and parent");
     }
     say("PASS X11 real exec park/resume candidate dictionary commit lifetime\n");

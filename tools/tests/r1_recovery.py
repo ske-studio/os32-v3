@@ -47,7 +47,7 @@ def recovery(tmp, function, runner, mutation=None):
     # Recovery probes enter the tail after a completed syscall, with no stdin replay.
     # The CUI display return is outside the R1 recovery probes.
     stage('tails_source.c', 'static void exec_cui_display_abort(void) {}\n'
-          'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int x87_depth=0;\n'
+          'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int fp_depth=0;\n'
           + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame }; u32 result = frame[7];\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
     stage('v86_source.c', read('arch/x86/legacy/v86_mem.c').replace(

@@ -7,4 +7,7 @@
 #define ARCH_PRIV_ALIGN 4
 #define ARCH_ENTRY_BYTES 16
 #define ARCH_ENTRY_ALIGN 4
+/* x87 FNSAVE 域。AppSlot の中の位置を動かさないため整列は 1。 */
+#define ARCH_FP_BYTES 108
+#define ARCH_FP_ALIGN 1
 #endif

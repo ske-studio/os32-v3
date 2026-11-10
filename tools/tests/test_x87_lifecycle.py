@@ -9,16 +9,16 @@ from exec_source import exec_source
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-RESTORE = '        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'
+RESTORE = '        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'
 MUTATIONS = (
-    ('nested-restore-zero', RESTORE, RESTORE.replace('[x87_depth]', '[0]')),
+    ('nested-restore-zero', RESTORE, RESTORE.replace('[fp_depth]', '[0]')),
     ('nested-restore-previous', RESTORE,
-     RESTORE.replace('[x87_depth]', '[x87_depth ? x87_depth - 1 : 0]')),
+     RESTORE.replace('[fp_depth]', '[fp_depth ? fp_depth - 1 : 0]')),
     ('normal-return-restore-missing', RESTORE,
-     RESTORE.replace('x87_restore(&x87_parent[x87_depth]);',
-                     'if (x87_depth) x87_restore(&x87_parent[x87_depth]);')),
-    ('nested-save-previous', '        x87_save(&x87_parent[x87_depth]);\n        x87_init();',
-     '        x87_save(&x87_parent[x87_depth ? x87_depth - 1 : 0]);\n        x87_init();'),
+     RESTORE.replace('arch_fp_restore(&fp_parent[fp_depth]);',
+                     'if (fp_depth) arch_fp_restore(&fp_parent[fp_depth]);')),
+    ('nested-save-previous', '        arch_fp_save(&fp_parent[fp_depth]);\n        arch_fp_init();',
+     '        arch_fp_save(&fp_parent[fp_depth ? fp_depth - 1 : 0]);\n        arch_fp_init();'),
 )
 
 
