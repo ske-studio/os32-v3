@@ -130,6 +130,7 @@ struct pm_lan_diag {
 int pm_lan_monitor(const struct lan_message *req, const u8 src_mac[6],
                    const struct pm_lan_diag *d, struct lan_message *rsp);
 int pm_lan_copy8(u32 va, u8 *out);
+const struct pm_lan_diag *pm_lan_diag_snapshot(const struct pm_gmac_boot *boot, const struct gem *g, u32 state, u64 request_drops);
 
 _Static_assert(LAN_OK == 0, "LAN_OK");
 _Static_assert(LAN_AGAIN == 1, "LAN_AGAIN");
