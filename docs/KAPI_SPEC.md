@@ -1,4 +1,4 @@
-# KernelAPI v83 仕様書
+# KernelAPI v84 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **83** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 261・予約 39) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **84** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 292・予約 8) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -1753,7 +1753,7 @@ B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存ア�
 
 ### 予約スロット (v63〜)
 
-0x424〜0x4B4 (slot 263〜299、37 本、v83 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x498〜0x4B4 (slot 292〜299、8 本、v84 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2132,6 +2132,35 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x418 | host_notice_serial | `u32(void)` |
 | 0x41C | gfx_hw_submit | `int(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done)` |
 | 0x420 | gfx_hw_get | `int(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)` |
+| 0x424 | gfx2_adapter_count | `int(void)` |
+| 0x428 | gfx2_adapter_info | `int(u32 a, GFX2_AdapterInfo *o)` |
+| 0x42C | gfx2_adapter_gen | `int(u32 a, u32 *gen)` |
+| 0x430 | gfx2_caps | `int(u32 a, GFX2_Caps *o, u32 size)` |
+| 0x434 | gfx2_check_op | `int(u32 a, const GFX2_Op *shape, u32 sfmt, u32 dfmt, u32 spool, u32 dpool, u32 *how)` |
+| 0x438 | gfx2_surface_create | `int(u32 a, u16 w, u16 h, u8 fmt, u8 pool, u8 usage, u32 *sid)` |
+| 0x43C | gfx2_surface_free | `int(u32 sid)` |
+| 0x440 | gfx2_surface_desc | `int(u32 sid, GFX2_SurfaceDesc *o)` |
+| 0x444 | gfx2_screen_surface | `int(u32 a, u32 head, u32 role, u32 *sid)` |
+| 0x448 | gfx2_lock | `int(u32 sid, u32 flags, void **va, u32 *pitch)` |
+| 0x44C | gfx2_unlock | `int(u32 sid)` |
+| 0x450 | gfx2_submit | `int(u32 a, const GFX2_Op *ops, u32 n, u32 gen, u32 *done, u32 *fence)` |
+| 0x454 | gfx2_fence_wait | `int(u32 a, u32 fence, u32 deadline_ms)` |
+| 0x458 | gfx2_fence_query | `int(u32 a, u32 *completed, u32 *failed_upto)` |
+| 0x45C | gfx2_head_info | `int(u32 a, u32 head, GFX2_HeadInfo *o)` |
+| 0x460 | gfx2_connector_info | `int(u32 a, u32 c, GFX2_ConnectorInfo *o)` |
+| 0x464 | gfx2_connector_edid | `int(u32 a, u32 c, u32 block, u8 *out128)` |
+| 0x468 | gfx2_mode_count | `int(u32 a, u32 head, u32 fmt)` |
+| 0x46C | gfx2_mode_get | `int(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o)` |
+| 0x470 | gfx2_mode_set | `int(u32 a, u32 head, u32 conn_mask, u32 mode_id, u32 sid)` |
+| 0x474 | gfx2_flip | `int(u32 a, u32 head, u32 sid, u32 flags, u32 deadline_ms)` |
+| 0x478 | gfx2_vblank_wait | `int(u32 a, u32 head, u32 after, u32 deadline_ms, u32 *seen)` |
+| 0x47C | gfx2_palette | `int(u32 a, u32 first, u32 count, const u32 *xrgb)` |
+| 0x480 | gfx2_gamma | `int(u32 a, u32 head, const u16 *rgb768)` |
+| 0x484 | gfx2_cursor_image | `int(u32 a, u32 head, u32 sid)` |
+| 0x488 | gfx2_cursor_move | `int(u32 a, u32 head, i32 x, i32 y)` |
+| 0x48C | gfx2_cursor_show | `int(u32 a, u32 head, u32 show)` |
+| 0x490 | gfx2_dpms | `int(u32 a, u32 head, u32 state)` |
+| 0x494 | gfx2_present | `int(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が
