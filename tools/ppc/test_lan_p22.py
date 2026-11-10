@@ -21,6 +21,8 @@ MUTATIONS = [
  ('length', 'if (q->payload_bytes != n)', 'if (0 && q->payload_bytes != n)', 22),
  ('diag-end', 'n > 256 - off', '0', 34),
  ('deny-half', 'r->base - base < len', '0', 14),
+ ('ig-allow', 'if (contains(&d->peek_ig_ok[j], va + i, 1)) break;', 'if (0) break;', 43),
+ ('ig-reject', 'if (j == d->peek_ig_ok_count) goto bad_range;', 'if (0) goto bad_range;', 16),
  ('clear', 'ppc_trap_onfault_clear();', '(void)0;', 31),
 ]
 def exercise(source, temp):
@@ -40,6 +42,6 @@ def main():
                 result=exercise(source.replace(old,new),temp)
                 marker = "reached=A10\n" if expected not in (22, 34) else ""
                 diagnostic = "H:A10 read-range\n" if expected == 12 else ""
-                if result.returncode != expected or result.stdout != f'REACHED\n{marker}{diagnostic}FAIL {expected:02d}\n': raise RuntimeError(f'{name}: unexpected {result.returncode} {result.stdout} {result.stderr}')
-                print(f'{name} RED (rc={expected}, REACHED, FAIL {expected:02d})')
+                if result.returncode != 1 or result.stdout != f'REACHED\n{marker}{diagnostic}FAIL {expected:02d}\n': raise RuntimeError(f'{name}: unexpected {result.returncode} {result.stdout} {result.stderr}')
+                print(f'{name} RED (rc=1, REACHED, FAIL {expected:02d})')
 if __name__ == '__main__': main()

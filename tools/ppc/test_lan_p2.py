@@ -90,6 +90,8 @@ typedef int (*translate_type)(void *, u32, u32 *, u32 *);
 typedef int (*copy8_type)(void *, u32, u8 *);
 CHECK_FIELD(pm_lan_range, base, u32);
 CHECK_FIELD(pm_lan_range, size, u32);
+CHECK_FIELD(pm_lan_diag, peek_ig_ok, const struct pm_lan_range *);
+CHECK_FIELD(pm_lan_diag, peek_ig_ok_count, u32);
 CHECK_FIELD(pm_lan_diag, clock, clock_type);
 CHECK_FIELD(pm_lan_diag, translate, translate_type);
 CHECK_FIELD(pm_lan_diag, copy8, copy8_type);

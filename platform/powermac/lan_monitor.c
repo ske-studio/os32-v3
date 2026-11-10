@@ -61,7 +61,7 @@ int pm_lan_copy8(void *ctx, u32 va, u8 *out)
 static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
                     struct lan_message *r)
 {
-    u32 i, n, off, va, pa, inhibited, tick, hz;
+    u32 i, j, n, off, va, pa, inhibited, tick, hz;
     u64 tb, us;
     const struct pm_lan_range *range = 0;
     const u32 *words;
@@ -94,6 +94,7 @@ static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
         va = get(q->payload, 4); n = get(q->payload + 4, 2);
         if (!n || n > 256 || get(q->payload + 6, 2) ||
             d->peek_ok_count > 8 || d->peek_deny_count > 4 ||
+            d->peek_ig_ok_count > 2 || !d->peek_ig_ok ||
             !d->translate || !d->copy8 || (d->peek_ok_count && !d->peek_ok) ||
             (d->peek_deny_count && !d->peek_deny)) goto bad_range;
         for (i = 0; i < d->peek_ok_count; ++i)
@@ -102,8 +103,13 @@ static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
         for (i = 0; i < d->peek_deny_count; ++i)
             if (overlaps(&d->peek_deny[i], va, n)) goto bad_range;
         for (i = 0; i < n; ++i) {
-            if (d->translate(d->ctx, va + i, &pa, &inhibited) || inhibited ||
+            if (d->translate(d->ctx, va + i, &pa, &inhibited) ||
                 !contains(range, pa, 1)) goto bad_range;
+            if (inhibited) {
+                for (j = 0; j < d->peek_ig_ok_count; ++j)
+                    if (contains(&d->peek_ig_ok[j], va + i, 1)) break;
+                if (j == d->peek_ig_ok_count) goto bad_range;
+            }
             if (d->copy8(d->ctx, va + i, &r->payload[i])) {
                 r->status = PLN1_STATUS_FAULT; return;
             }

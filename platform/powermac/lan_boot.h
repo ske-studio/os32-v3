@@ -118,6 +118,7 @@ struct pm_lan_diag {
     const u32 *memory; u32 memory_words;
     const u8 *diag;
     const struct pm_lan_range *peek_ok; u32 peek_ok_count;
+    const struct pm_lan_range *peek_ig_ok; u32 peek_ig_ok_count;
     const struct pm_lan_range *peek_deny; u32 peek_deny_count;
     void *ctx;
     void (*clock)(void *, u32 *, u32 *, u64 *, u64 *);
