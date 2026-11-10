@@ -128,7 +128,8 @@ int pm_gmac_capture(struct pm_gmac_boot *out)
     if (b.bus_first>b.bus_last || b.bus_last>255) { error=LAN_ERANGE; goto fail; }
     n=get(candidate,"reg");
     if (n<20 || n%20) { error=LAN_EINVAL; goto fail; }
-    b.bdf=(be32(prop)>>8)&0xffff;
+    /* Same form as pci_config.c address(): OF-PCI phys.hi bus/dev/fn positions. */
+    b.bdf = be32(prop) & 0x00ffff00u;
     int a,d; u32 vendor=scalar(candidate,"vendor-id",&a), device=scalar(candidate,"device-id",&d);
     if (error || !a || !d || vendor>0xffff || device>0xffff) { error=LAN_EINVAL; goto fail; }
     if (vendor!=0x106b || device!=0x21) { error=LAN_EUNSUPPORTED; goto fail; }

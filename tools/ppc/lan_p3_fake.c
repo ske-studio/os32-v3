@@ -2,6 +2,12 @@
 #include "ofw.h"
 #include "kstring.h"
 static unsigned scenario;
+static u32 pci_addr;
+u32 ppc_irq_save(void) { return 0; }
+void ppc_irq_restore(u32 flags) { (void)flags; }
+void pm_pci_mmio_write32(u32 va, u32 value) { if (va==0x1000) pci_addr=__builtin_bswap32(value); }
+u32 pm_pci_mmio_read32(u32 va) { return __builtin_bswap32(va==0x1000?pci_addr:pci_addr==(1u<<15)?0x0021106b:0xffffffffu); }
+
 static void put(u8 *p,u32 v) { p[0]=v>>24; p[1]=v>>16; p[2]=v>>8; p[3]=v; }
 static int property(int node,const char *name,u8 *p)
 {
@@ -66,6 +72,8 @@ void entry(unsigned *stack)
     if (rc!=expected[scenario]) { diagnostic(1001); quit(1); }
     if (rc) { const u8 *v=(const u8 *)&b; for (unsigned i=0;i<sizeof(b);i++) REQUIRE(!v[i]); quit(0); }
     REQUIRE(b.bar_pa==0x82200000 && b.bar_bytes==0x200000 && b.root_pa==0xf2000000 && b.nwin==2 && !b.bus_first && !b.bus_last);
+    struct pm_pci pci={0x1000,0x2000,b.bus_first,b.bus_last,b.bdf}; u32 id;
+    REQUIRE(b.bdf==0x7800 && pm_pci_read32(&pci,b.bdf,0,&id)==0 && id==b.vendor_device);
     REQUIRE(b.mac[0]==0x52 && b.mac[5]==0x56);
     if (b.peer_mac[0]!=(scenario==11?2:255)) { diagnostic(1002); quit(1); }
     REQUIRE(b.profile==1 && b.override_flags==(scenario==11?3u:0u));
