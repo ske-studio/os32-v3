@@ -1,9 +1,5 @@
 #include "gem.h"
 
-#define RX_RING 0x1000u
-#define RX_BUFFERS 0x20000u
-#define BUFFER_SIZE 2048u
-#define POOL_SIZE 0x30000u
 
 /* gemvar.h:213-216,260-271: PCI descriptors are little-endian. */
 static void put32(u8 *p, u32 v)
@@ -20,8 +16,8 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
 {
     u8 *base, *desc;
     u32 i;
-    if (!g || !d || !d->cpu || !g->io.sync || d->bytes < POOL_SIZE ||
-        (d->bus & 0xfffu) || d->bus > 0xffffffffu - (POOL_SIZE - 1))
+    if (!g || !d || !d->cpu || !g->io.sync || d->bytes < GEM_POOL_SIZE ||
+        (d->bus & 0xfffu) || d->bus > 0xffffffffu - (GEM_POOL_SIZE - 1))
         return GEM_EINVAL;
     if (g->ring_prepare_step && (g->dma.cpu != d->cpu || g->dma.bus != d->bus))
         return GEM_EINVAL;
@@ -30,7 +26,7 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
         g->dma = *d;
         /* OpenBSD gem_meminit:685-709: zero and sync TX and RX rings. */
         for (i = 0; i < GEM_RING_COUNT * GEM_DESC_SIZE; i++) {
-            base[i] = 0; base[RX_RING + i] = 0;
+            base[i] = 0; base[GEM_POOL_RX_RING + i] = 0;
         }
         g->ring_prepare_step = 1;
     }
@@ -41,15 +37,15 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
     /* gem_meminit:704-709; gemvar.h:260-271: buffer, address, OWN, sync. */
     while (g->ring_prepare_step == 2 && g->ring_cursor < GEM_RX_PUBLISHED) {
         i = g->ring_cursor;
-        if (g->io.sync(base + RX_BUFFERS + i * BUFFER_SIZE, BUFFER_SIZE, DMA_PREREAD)) return GEM_EIO;
-        desc = base + RX_RING + i * GEM_DESC_SIZE;
-        put64(desc + GEM_DESC_ADDR_OFFSET, d->bus + RX_BUFFERS + i * BUFFER_SIZE, 0);
-        put64(desc + GEM_DESC_FLAGS_OFFSET, (BUFFER_SIZE << GEM_RD_BUFSHIFT) | (u32)GEM_RD_OWN, 0);
+        if (g->io.sync(base + GEM_POOL_RX_BUF + i * GEM_BUF_SIZE, GEM_BUF_SIZE, DMA_PREREAD)) return GEM_EIO;
+        desc = base + GEM_POOL_RX_RING + i * GEM_DESC_SIZE;
+        put64(desc + GEM_DESC_ADDR_OFFSET, d->bus + GEM_POOL_RX_BUF + i * GEM_BUF_SIZE, 0);
+        put64(desc + GEM_DESC_FLAGS_OFFSET, (GEM_BUF_SIZE << GEM_RD_BUFSHIFT) | (u32)GEM_RD_OWN, 0);
         g->ring_cursor++;
     }
     if (g->ring_prepare_step == 2) g->ring_prepare_step = 3;
     if (g->ring_prepare_step == 3) {
-        if (g->io.sync(base + RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
+        if (g->io.sync(base + GEM_POOL_RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
         g->ring_prepare_step = 4;
     }
     return GEM_OK;
@@ -64,7 +60,7 @@ int gem_ring_publish(struct gem *g)
         g->io.write32(g->io.ctx, GEM_TX_RING_PTR_HI, 0);
         g->io.write32(g->io.ctx, GEM_TX_RING_PTR_LO, g->dma.bus);
         g->io.write32(g->io.ctx, GEM_RX_RING_PTR_HI, 0);
-        g->io.write32(g->io.ctx, GEM_RX_RING_PTR_LO, g->dma.bus + RX_RING);
+        g->io.write32(g->io.ctx, GEM_RX_RING_PTR_LO, g->dma.bus + GEM_POOL_RX_RING);
         g->io.write32(g->io.ctx, GEM_INTMASK, ~0u);
         g->io.write32(g->io.ctx, GEM_MAC_RX_MASK, GEM_MAC_RX_DONE | GEM_MAC_RX_FRAME_CNT);
         g->io.write32(g->io.ctx, GEM_MAC_TX_MASK, 0xffff);

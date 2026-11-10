@@ -14,7 +14,7 @@ MUTATIONS = [
     ('fifo-units', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE)', 'H:publish'),
     ('own', '| (u32)GEM_RD_OWN', '| 0', 'H:descriptor'),
     ('full', 'g->ring_cursor < GEM_RX_PUBLISHED', 'g->ring_cursor < GEM_RING_COUNT', 'H:sync'),
-    ('sync', 'g->io.sync(base + RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)', '0', 'H:sync'),
+    ('sync', 'g->io.sync(base + GEM_POOL_RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)', '0', 'H:sync'),
     ('order', 'GEM_TX_RING_PTR_HI, 0', 'GEM_TX_RING_PTR_LO, 0', 'H:publish'),
     ('fboff', '(2u << GEM_RX_CONFIG_FBOFF_SHFT)', '(0u << GEM_RX_CONFIG_FBOFF_SHFT)', 'H:publish'),
     ('master', 'if (g->io.master_enable(g->io.ctx)) return GEM_EIO;\n        g->ring_publish_step = 2;\n    }\n    /* gem_init:811-834: DMA enable follows master readback; MAC stays off. */\n    if (g->ring_publish_step == 2) {', 'g->ring_publish_step = 2;\n    }\n    if (g->ring_publish_step == 2) {\n        g->io.write32(g->io.ctx, GEM_TX_CONFIG, 1);\n        if (g->io.master_enable(g->io.ctx)) return GEM_EIO;', 'H:publish'),
