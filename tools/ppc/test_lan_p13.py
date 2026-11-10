@@ -2,6 +2,7 @@
 """Exercise the product clock gate against a fake native MMIO bus."""
 import argparse
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -32,6 +33,34 @@ def check(source, temp, case):
     return subprocess.run(['qemu-i386', str(exe)], cwd=ROOT, text=True, capture_output=True, timeout=30)
 
 
+def check_order(source, temp):
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
+    obj = temp / 'clock.o'
+    built = subprocess.run([str(cross / 'powerpc-elf-gcc'), '-O2', '-ffreestanding',
+                            '-Iinclude', '-Iplatform/powermac', '-c', str(source),
+                            '-o', str(obj)], cwd=ROOT, text=True, capture_output=True)
+    if built.returncode:
+        raise RuntimeError('PPC compile: ' + built.stderr)
+    dump = subprocess.run([str(cross / 'powerpc-elf-objdump'), '-d', str(obj)],
+                          cwd=ROOT, text=True, capture_output=True)
+    if dump.returncode:
+        raise RuntimeError('objdump: ' + dump.stderr)
+    instructions = re.findall(r'^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2}\s+){4}([a-z.]+)',
+                              dump.stdout, re.MULTILINE)
+    stores = [i for i, op in enumerate(instructions) if op == 'stwx']
+    if len(stores) != 1:
+        raise RuntimeError('objdump: expected one MMIO store')
+    start = stores[0]
+    try:
+        end = instructions.index('lwzx', start + 1)
+    except ValueError as exc:
+        raise RuntimeError('objdump: readback not reached') from exc
+    print('REACHED objdump store/readback')
+    if not any(op in ('sync', 'hwsync') for op in instructions[start + 1:end]):
+        return 'O:sync missing between store and readback'
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -41,6 +70,8 @@ def main():
         temp = Path(directory)
         source = temp / 'gmac_clock.c'
         source.write_text(original)
+        if check_order(source, temp):
+            raise RuntimeError('baseline: O:sync missing between store and readback')
         for case in range(4):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
@@ -54,6 +85,14 @@ def main():
                 if result.returncode != 1 or diagnostic not in result.stdout.splitlines() or 'REACHED host' not in result.stdout.splitlines():
                     raise RuntimeError('mutation %s: %s' % (name, result.stdout + result.stderr))
                 print('RED', name, diagnostic)
+            old = 'stwx %0,0,%1; eieio; sync'
+            if original.count(old) != 1:
+                raise RuntimeError('nonunique anchor: sync')
+            source.write_text(original.replace(old, 'stwx %0,0,%1; eieio', 1))
+            diagnostic = check_order(source, temp)
+            if diagnostic != 'O:sync missing between store and readback':
+                raise RuntimeError('mutation sync: unexpected ' + str(diagnostic))
+            print('RED sync', diagnostic)
     print('PASS ppc-lan-p13')
 
 

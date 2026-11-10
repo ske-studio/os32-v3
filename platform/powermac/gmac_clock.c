@@ -7,12 +7,14 @@ void pm_clock_write(u32 va, u32 value);
 #else
 static u32 pm_clock_read(u32 va)
 {
-    return *(volatile u32 *)va;
+    u32 value;
+    __asm__ volatile("lwzx %0,0,%1; eieio" : "=r"(value) : "r"(va) : "memory");
+    return value;
 }
 
 static void pm_clock_write(u32 va, u32 value)
 {
-    *(volatile u32 *)va = value;
+    __asm__ volatile("stwx %0,0,%1; eieio; sync" : : "r"(value), "r"(va) : "memory");
 }
 #endif
 
