@@ -31,5 +31,7 @@ void ppc_trap_set_fatal_ready(int ready);
 void ppc_trap_fatal_sink(const struct ppc_frame *frame, u32 reason);
 /* Returns 0 if occupied, unaligned, or not a supported negative probe kind. */
 int ppc_trap_onfault(u32 pc, u32 va, u32 reason, u32 resume);
+/* Diagnostic DSI recovery; returns 0 when occupied or unaligned. */
+int ppc_trap_onfault_data(u32 pc, u32 va, u32 resume);
 void ppc_trap_onfault_clear(void);
 #endif
