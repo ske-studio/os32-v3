@@ -57,7 +57,7 @@ MUTANTS = [
  ("seed", "((mac[5] << 8) | mac[4]) & 0x3ff", "mac[5] & 0x3ff", "FAIL trace 9", "REACHED enabled"),
  ("address", "(mac[4] << 8) | mac[5]", "(mac[0] << 8) | mac[1]", "FAIL trace 34", "REACHED enabled"),
  ("promisc", "GEM_MAC_RX_HASH_FILTER | GEM_MAC_RX_PROMISCUOUS | GEM_MAC_RX_PROMISC_GRP", "GEM_MAC_RX_HASH_FILTER | GEM_MAC_RX_PROMISC_GRP", "FAIL trace 53", "REACHED enabled"),
- ("wait", "now - g->started < ticks", "now - g->started < 0", "FAIL wait", "REACHED init"),
+ ("wait", "now - g->started < ticks", "now - g->started < ticks / 2", "FAIL wait", "REACHED init"),
  ("kick", "GEM_RX_KICK, GEM_RX_PUBLISHED", "GEM_RX_KICK, 32", "FAIL trace 59", "REACHED enabled"),
  ("poll-limit", "++g->polls >= GEM_WAIT_POLLS", "++g->polls > GEM_WAIT_POLLS", "FAIL stopped timeout", "REACHED stopped"),
  ("crc", "v | GEM_MAC_RX_ENABLE | GEM_MAC_RX_STRIP_CRC", "v | GEM_MAC_RX_ENABLE", "FAIL trace 58", "REACHED enabled"),
@@ -65,7 +65,7 @@ MUTANTS = [
 def check(source, directory):
     c = directory / 'mac.c'; h = directory / 'test.c'; exe = directory / 'test'
     c.write_text(source); h.write_text(HARNESS)
-    subprocess.run(['gcc','-std=gnu11','-Wall','-Wextra','-I'+str(ROOT/'include'), '-I'+str(ROOT/'drivers/net/gem'),str(c),str(h),'-o',str(exe)], check=True, capture_output=True)
+    subprocess.run(['gcc','-std=gnu11','-Wall','-Wextra','-Werror','-I'+str(ROOT/'include'), '-I'+str(ROOT/'drivers/net/gem'),str(c),str(h),'-o',str(exe)], check=True, capture_output=True)
     return subprocess.run([str(exe)], text=True, capture_output=True)
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true'); args = parser.parse_args()

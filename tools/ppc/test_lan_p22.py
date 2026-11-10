@@ -25,7 +25,7 @@ MUTATIONS = [
 def exercise(source, temp):
     path = pathlib.Path(temp); (path / 'monitor.c').write_text(source)
     binary = path / 'fixture'
-    subprocess.run(['gcc','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-fno-builtin','-std=gnu11','-I',str(ROOT),'-I',str(ROOT/'include'),'-I',str(ROOT/'platform/powermac'),str(path/'monitor.c'),str(ROOT/'platform/powermac/lan_wire.c'),str(ROOT/'tools/ppc/lan_p22_fixture.c'),'-o',str(binary)],check=True,timeout=60)
+    subprocess.run(['gcc','-Wall','-Wextra','-Werror','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-fno-builtin','-std=gnu11','-I',str(ROOT),'-I',str(ROOT/'include'),'-I',str(ROOT/'platform/powermac'),str(path/'monitor.c'),str(ROOT/'platform/powermac/lan_wire.c'),str(ROOT/'tools/ppc/lan_p22_fixture.c'),'-o',str(binary)],check=True,timeout=60)
     return subprocess.run(host32.command([str(binary)]),capture_output=True,text=True,timeout=60)
 def main():
     source=SOURCE.read_text()
