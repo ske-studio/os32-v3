@@ -32,6 +32,8 @@ enum pln1_status {
     PLN1_STATUS_FAULT = 7,
 };
 
+#define PM_GMAC_PROFILE_UNINORTH 1u
+
 #define PLN1_MAGIC 0x504c4e31u
 #define PLN1_VERSION 1
 #define PLN1_TYPE_BEACON 1
@@ -91,6 +93,7 @@ int pm_pci_write32(struct pm_pci *, u32 bdf, u32 reg, u32 value);
 /* Pointer is equivalent to the design's out[4], with an incomplete type. */
 int pm_gmac_alias_plan(const struct pm_gmac_boot *, struct ppc_boot_alias *out);
 /* 0: proceed (Master read back clear, or GMAC absent/unknown and PCI untouched); negative: Master remained set after clearing, stop. */
+void pm_gmac_quiesce_setup(const struct pm_gmac_boot *, const struct pm_pci *);
 int pm_gmac_early_quiesce(void);
 int pm_gmac_dma_init(const struct pm_gmac_boot *, struct gem_dma *out);
 int pm_dma_bus(u32 pa, u32 bytes, u32 *bus);
