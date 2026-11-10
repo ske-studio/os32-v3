@@ -1,6 +1,6 @@
 """Host dispatch regression: no emulator, shared build, or device access."""
 CHECK = dict(name='boot-splash-host', tier=1,
-    covers=['gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'gfx/gfx_vram.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_init.c', 'init/boot_splash.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'tools/tests/paging_source.py',
+    covers=['gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'gfx/gfx_vram.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'init/boot_splash.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'tools/tests/paging_source.py',
             'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.h', 'gfx/gfx_core_*.inc'],
     needs=[], budget=4.0)
 

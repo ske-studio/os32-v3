@@ -3,7 +3,7 @@
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
     covers=['platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
             'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_internal.h', 'gfx/gfx.h',
-            'platform/powermac/display.c', 'tools/tests/sep5_gfx_init_host.c',
+            'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
             'arch/x86/**', 'platform/pc98/**', 'lib/kstring.h', 'sdk/include/os32/**',

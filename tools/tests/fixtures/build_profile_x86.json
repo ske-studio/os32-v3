@@ -78,6 +78,7 @@
     "platform/pc98/display.c",
     "platform/pc98/gfx_scroll.c",
     "platform/pc98/gfx_init.c",
+    "platform/pc98/gfx_selector.c",
     "kernel/console/con_sink.c",
     "init/bootlog.c",
     "init/bootlog_save.c",
