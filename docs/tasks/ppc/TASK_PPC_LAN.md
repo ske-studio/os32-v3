@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-11)** — 段の状態は §2、残りの段の順と見込みは §3。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。実機で初めて確かめる物 (clock・PHY・DMA・cache) は設計の §8 の順で観測する。QEMU で確かめられる段から始める。
+> 状態: **実装中 (2026-11-11、LAN の実装は QEMU で到達。受入の自動化 P29〜P33 = 8 本目が残り)** — 段の状態は §2、残りの段の順と見込みは §3。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。実機で初めて確かめる物 (clock・PHY・DMA・cache) は設計の §8 の順で観測する。QEMU で確かめられる段から始める。
 
 ## 0. ユーザー決定
 
@@ -42,10 +42,11 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P4・P5・P12・P20・P21 と各 H | main (519a39b3)。P5 で gmac_tree.c が PPC の像に入った |
 | P9・P10・P13・P14 と各 H | main (7176c2be)。P9 で ② の起動が GMAC の先頭 64KiB と UniNorth の config の 2 page の alias を張る (QEMU で gmac_ready=1)。clock は手本 netbsd uninorth.c:135-142、reset は openbsd gem.c の各関数 |
 | P15〜P19 と各 H | main (a9d655bc)。GEM の core (ring・MAC・MIF と PHY・TX・RX)、手本は openbsd gem.c と sys/dev/mii、対応の PHY は BCM5201 だけ (実機の PHY は実機で採ってから足す) |
-| P22a〜P22d・P22・P22e・P23 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint5)。取り込み待ち。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c (P22e で境目を単純化: PEEK は RAM の許可表 1 種で VA と PA を照らす)、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
-| P24a〜P24d・P24 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint6)。取り込み待ち。gem_phy.c の DONE の link 観測、lan_log.c の統計の口、PPC の I/O の実体 lan_gem_io.c、診断の元 lan_diag.c、service lan_service.c (7 状態、件数の予算、印は LAN STATE と LAN OFF だけ)。新しい TU は PPC の像にまだ入らない (P26) |
-| P5b・P14b・P17c・P12b と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint6)。QEMU の先行スモーク S1 で見つけた core の直し (bdf の形、半分の reset の bit、AN の判定、descriptor の同期)。4 段を入れた S1 で 7450・7455 とも TX と RX の実 frame が往復した (設計の「S1 の観測」) |
-| P25・P26・P29〜P33 と各 H | 未着手 (順と見込みは §3) |
+| P22a〜P22d・P22・P22e・P23 と各 H | main (2598c3fa)。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c (P22e で境目を単純化: PEEK は RAM の許可表 1 種で VA と PA を照らす)、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
+| P24a〜P24d・P24 と各 H | main (761ca15f)。gem_phy.c の DONE の link 観測、lan_log.c の統計の口、PPC の I/O の実体 lan_gem_io.c、診断の元 lan_diag.c、service lan_service.c (7 状態、件数の予算、印は LAN STATE と LAN OFF だけ)。新しい TU は PPC の像にまだ入らない (P26) |
+| P5b・P14b・P17c・P12b と各 H | main (761ca15f)。QEMU の先行スモーク S1 で見つけた core の直し (bdf の形、半分の reset の bit、AN の判定、descriptor の同期)。4 段を入れた S1 で 7450・7455 とも TX と RX の実 frame が往復した (設計の「S1 の観測」) |
+| P26・P25 | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint7 = 7 本目、LAN の実装の到達)。LAN の TU 15 本が PPC の像に入り、起動が ESCC の後に log を登録・GMAC を quiesce・CLOCK の後に pm_lan_start・READY 以後を pm_lan_poll で回す。PM の QEMU の実測で到達点を確認 (設計の「7 本目の実測」) |
+| P29〜P33 と各 H | 未着手 (8 本目 = LAN の最後、順と見込みは §3) |
 
 ## 3. 実装スケジュール (2026-11-11、fable 起案、PM 確認)
 
