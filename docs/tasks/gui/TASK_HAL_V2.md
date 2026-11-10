@@ -1,6 +1,6 @@
 # 表示 HAL v2 (次の版の HAL の口)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定、実装を待つ ([HAL_V2_DESIGN](../../decisions/gui/HAL_V2_DESIGN.md))。段は A0 → 実装の段 (並列) → I1・I2・I3。
+> 状態: **設計中 (2026-11-09)** — 設計は確定 (2026-11-10 に Fable 5.2 のレビューを反映)、実装を待つ ([HAL_V2_DESIGN](../../decisions/gui/HAL_V2_DESIGN.md))。段は A0 → 実装の段 (並列) → I1・I2・I3。
 
 ## 0. ユーザー決定 (原文)
 - 2026-11-08 3D・浮動小数点: 「HALではCPUチェックを行いMMX Pentium以上から受け付けるのが現状良いと思います。それ以下は大きめのテーブルを用意して計算させるほうが実用的に思います。」
@@ -17,13 +17,14 @@
 
 ## 1. 要約
 - 全文は確定設計。段の表は §12、受入と試験は §13、未決は §14。
-- **C (ACTIVE でない側の TVRAM のコンソール) は HAL v2 の段に入れない** — 別の票 (仮名 CONSOLE_DUAL) で設計する (PM 決定、第 4 回のレビューの P1)。受け持つ経路は確定設計 §9-1。
+- **C (ACTIVE でない側の TVRAM のコンソール) は HAL v2 の段に入れない** — 別の票 TASK_CONSOLE_DUAL (確定設計 [CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)) が受け持つ (PM 決定、第 4 回のレビューの P1)。受け持つ経路は確定設計 §9-1、暫定の口 gf_outputs の差し替えは段 K1。
 - 描画の高速化 (票 TASK_GFX_ACCEL_HAL) の上に乗る。G3 (GeForce の DIRECT) までが入ってから A0 に着手する。
 
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
 | A0 (宣言だけ) | 未着手 |
-| C1〜C15・S1〜S11・M1〜M3・X1・Y1〜Y4・T1・P1・G1〜G9・U1・D1 | 未着手 (A0 の後に並列) |
+| C1〜C18・S1〜S11・M1〜M3・X1・Y1〜Y4・T1・P1・G1〜G9・U1・D1 | 未着手 (A0 の後に並列) |
+| K1 (CONSOLE_DUAL の gf_outputs の差し替え) | 未着手 (CONSOLE_DUAL の D2 と C1・C11 の後) |
 | I1 (面の道)・I2 (描画の道)・I3 (表示の道) | 未着手 |
-| CONSOLE_DUAL (決定 C) | 未設計 |
+| CONSOLE_DUAL (決定 C) | 確定設計あり ([CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)、段は TASK_CONSOLE_DUAL) |
