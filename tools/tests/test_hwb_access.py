@@ -21,6 +21,9 @@ FLAGS = ('-D__KERNEL_BUILD__', '-Wno-attributes')
 # Move the real dispatch below the full PAUSED guard (design §7).
 DISPATCH_PREFIX = '''static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+#ifdef TICK_PROBE
+    if (op == TP_OP) return tick_probe_call(buf, size);
+#endif
     if (op == HW_OP) return hwb_access(buf, size);
     if (op == PROBE_OP) return probe_call(buf, size);
     struct recover *r = recover_owner();

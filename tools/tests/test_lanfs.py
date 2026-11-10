@@ -639,7 +639,10 @@ def trial(exe, py_path, root, timeout=10):
 def run_mutations(tmp, root):
     mutations = [
         ("hello_limit", "fs/serialfs/sfs_client.c",
-         "        c->max_payload = SFS_MAX_PAYLOAD;", "        c->max_payload = SFS_LAN_MAX_PAYLOAD;"),
+         "        /* A smaller peer falls back to the serial wire limit. */\n"
+         "        c->max_payload = SFS_MAX_PAYLOAD;",
+         "        /* A smaller peer falls back to the serial wire limit. */\n"
+         "        c->max_payload = SFS_LAN_MAX_PAYLOAD;"),
         ("seq", "fs/serialfs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
