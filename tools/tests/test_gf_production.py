@@ -1,7 +1,7 @@
 """KDEBUG=0 production startup, resource gate, cleanup and reboot order."""
 # B5 adds production fixtures; CI measured 77.81s for the expanded test.
 CHECK = dict(name='gf-production-host', tier=1,
-    covers=['drivers/pci/pci_barsize.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c', 'hwdev/gf/master.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py', 'include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c'],
+    covers=['tools/tests/cc_cache.py', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c', 'hwdev/gf/master.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py', 'include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c'],
     needs=[], budget=80.0)
 
 from kernel_includes import include_flags
@@ -9,6 +9,7 @@ from gf_ownerless_fixture import ownerless_body
 from pathlib import Path
 import os
 import subprocess
+import cc_cache
 import tempfile
 import sys
 import host32
@@ -36,17 +37,17 @@ def main(override=None, dev=13):
         # with the actual cross compiler too, while that parallel wiring lands.
         cross = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
         for name in ('devinit', 'bus', 'native', 'resources'):
-            subprocess.run([str(cross), *flags, '-D__KERNEL_BUILD__', '-c',
+            cc_cache.build([str(cross), *flags, '-D__KERNEL_BUILD__', '-c',
                             str(ROOT / f'hwdev/gf/{name}.c'),
                             '-o', str(Path(tmp) / f'{name}-cross.o')], check=True)
         flags = ['-I'+str(ROOT/'tools/tests/host_arch'), *flags]
-        subprocess.run(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
+        cc_cache.build(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
                         '-Dgf_production_clock=gf_production_native_clock',
                         '-Dgf_production_wait=gf_production_native_wait',
                         '-c', str(override[1] if override and override[0]=='hwdev/gf/native.c' else ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
         devinit = Path(tmp) / 'devinit.o'
         devinit_source = override[1] if override and override[0]=='hwdev/gf/devinit.c' else ROOT/'hwdev/gf/devinit.c'
-        subprocess.run(['gcc', *flags, '-fsanitize=kernel-address', '-c',
+        cc_cache.build(['gcc', *flags, '-fsanitize=kernel-address', '-c',
                         str(devinit_source), '-o', str(devinit)], check=True)
         mode = Path(tmp) / 'mode.o'
         gamma = Path(tmp) / 'gamma.o'
@@ -54,14 +55,14 @@ def main(override=None, dev=13):
             source = ROOT / f'hwdev/gf/display/{name}.c'
             if override and str(source.relative_to(ROOT)) == override[0]:
                 source = override[1]
-            subprocess.run(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
+            cc_cache.build(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
                             '-Dgf_display_modeset=gf_unused_legacy_modeset',
                             '-c', str(source), '-o', str(obj)], check=True)
         module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)])
         backend=Path(tmp)/'backend.o'
-        subprocess.run(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
+        cc_cache.build(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
                         str(ROOT/'drivers/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
         sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'kernel/sys.c',
                    'hwdev/gf/bus.c', 'hwdev/gf/resources.c', 'hwdev/gf/master.c',
@@ -75,7 +76,7 @@ def main(override=None, dev=13):
         sources += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob('hwdev/gf/op/*.c'))]
         sources += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob('hwdev/gf/display/*.c'))
                     if p.stem not in f4_only]
-        subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+        cc_cache.build(['gcc', *flags, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(devinit), str(mode), str(gamma), '-o', str(exe)], check=True)
         symbols = subprocess.check_output(['nm', '--defined-only', str(exe)], text=True)
         assert production_symbols_ok(symbols)
@@ -83,7 +84,7 @@ def main(override=None, dev=13):
         unwanted = Path(tmp)/'unwanted.c'
         unwanted.write_text('void recover_unwanted(void) {}\n')
         contaminated = Path(tmp)/'contaminated'
-        subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie',
+        cc_cache.build(['gcc', *flags, '-nostdlib', '-static', '-no-pie',
                         '-Wl,--gc-sections', '-Wl,--undefined=recover_unwanted',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],
                         str(native), str(devinit), str(mode), str(gamma), str(unwanted),
@@ -93,11 +94,11 @@ def main(override=None, dev=13):
         rc=host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
         if rc: return rc
         print('PASS production prepare -> foundation MMIO: byte/word/dword width/address/count, adjacent bytes and CR index/data', flush=True)
-        subprocess.run(['gcc', *flags, '-DPROD_ABSENT_TEST', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+        cc_cache.build(['gcc', *flags, '-DPROD_ABSENT_TEST', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(devinit), str(mode), str(gamma), '-o', str(exe)], check=True)
         if host32.run([str(exe)], cwd=ROOT, timeout=180).returncode: return 1
         print('PASS absent GPU: no PCI writes', flush=True)
-        subprocess.run(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
+        cc_cache.build(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
                         '-Wl,--gc-sections',*[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],str(native),str(devinit),str(mode),str(gamma),str(backend),
                         '-o',str(exe)],check=True)
         return host32.run([str(exe)],cwd=ROOT,timeout=180).returncode

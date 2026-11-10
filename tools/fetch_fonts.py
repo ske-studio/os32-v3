@@ -51,6 +51,7 @@ import hashlib
 import io
 import os
 import sys
+import subprocess
 import urllib.request
 import zipfile
 
@@ -237,6 +238,11 @@ def confirm_license(font_dir, environ, stdin, stdout, stderr):
 def download(url, stderr, opener=None):
     """zip 等を丸ごとメモリに取る。urllib の既定 (プロキシ環境変数) に任せる。"""
     stderr.write("取得中: %s\n" % url)
+    if opener is None:
+        return subprocess.run(['curl', '-fL', '--connect-timeout', '15',
+                               '--max-time', '60', '--retry', '8', '--retry-all-errors',
+                               '--retry-max-time', '180', url],
+                              stdout=subprocess.PIPE, check=True, timeout=240).stdout
     req = urllib.request.Request(url, headers={"User-Agent": "os32-fetch-fonts/1"})
     open_fn = opener.open if opener is not None else urllib.request.urlopen
     with open_fn(req, timeout=120) as resp:

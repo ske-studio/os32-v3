@@ -226,6 +226,11 @@ HOSTDRV_DEPLOY = env HOSTDRV_DIR='$(HOSTDRV_DIR)' python3 tools/hostdrv_deploy.p
 
 CFLAGS_SQLITE += -include sdk/include/os32/os32_unit_stamp.h
 
-# Cache only the SQLite amalgamation; SQLITE_CCACHE= disables it.
-SQLITE_CCACHE ?= $(shell command -v ccache 2>/dev/null)
-SQLITE_CC = $(if $(strip $(SQLITE_CCACHE)),$(SQLITE_CCACHE) compiler_check=content base_dir=$(CURDIR)) $(CC)
+# Optional cache for all C compilations; CCACHE= forces direct compilation.
+# Keep path spelling/debug info intact (no base_dir rewriting or sloppiness).
+CCACHE ?= $(shell command -v ccache 2>/dev/null)
+RAW_CC := $(CC)
+ifneq ($(strip $(CCACHE)),)
+CC := $(CCACHE) compiler_check=content base_dir= sloppiness= hash_dir=true $(CC)
+endif
+SQLITE_CC = $(CC)

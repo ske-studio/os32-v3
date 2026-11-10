@@ -2,7 +2,7 @@
 """CI job independence and early artifact downloads, without GitHub access."""
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml', '.github/workflows/full-check.yml',
-                     '.github/actions/build-setup/action.yml',
+                     '.github/actions/build-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
                      'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
@@ -30,7 +30,7 @@ FETCH = ROOT / 'tools/ci_fetch.sh'
 SHA = 'a' * 40
 
 
-def workflow_cases(source):
+def workflow_cases(source, setup_source=None):
     workflow = yaml.safe_load(source)
     jobs = workflow['jobs']
     assert set(jobs) == {'artifacts', 'check-fast'}, 'artifact job and check matrix'
@@ -73,25 +73,36 @@ def workflow_cases(source):
             if name == 'artifacts':
                 assert 'if' not in step, 'artifact preparation always runs'
             step = {key: value for key, value in step.items() if key != 'if'}
-            if step.get('name') == 'Cache SQLite compilations':
+            if step.get('name') == 'Cache C compilations':
                 settings = dict(step['with'])
-                key = "sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-"
+                key = "c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-"
                 suffix = 'check-${{ matrix.shard }}' if name == 'check-fast' else 'artifacts'
                 assert settings['key'] == key + suffix, 'ccache key isolates every job and shard'
-                assert settings['path'] == '${{ runner.temp }}/sqlite-ccache'
+                assert settings['path'] == '${{ runner.temp }}/compiler-ccache'
                 assert settings['restore-keys'].splitlines() == [key,
-                    'sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-'], 'restore keeps compiler identity'
+                    'c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-'], 'restore keeps compiler identity'
                 step['with'] = dict(settings, key=key + 'JOB')
             prepared.append(step)
         assert [step.get('name', step.get('uses')) for step in prepared] == [
             'actions/checkout@v4', './.github/actions/build-setup',
-            'SQLite ccache setup', 'Cache SQLite compilations'], 'complete preparation in order'
+            'Compiler ccache setup', 'Cache C compilations'], 'complete preparation in order'
         prefixes.append(prepared)
     assert prefixes[0] == prefixes[1], 'identical preparation before build or selected needs'
-    setup = yaml.safe_load(SETUP.read_text())
+    setup = yaml.safe_load(SETUP.read_text() if setup_source is None else setup_source)
     assert setup['runs']['using'] == 'composite'
     steps = setup['runs']['steps']
-    assert all(s.get('shell') == 'bash' for s in steps if 'run' in s)
+    assert all(s.get('shell', '').startswith('timeout ') for s in steps if 'run' in s)
+    assert all(s.get('env', {}).get('SEGMENT_DOWNLOAD_TIMEOUT_MINS') == '2'
+               for s in steps if s.get('uses') == 'actions/cache@v4'), 'bounded cache downloads'
+    install = next(s for s in steps if s['name'] == 'Install ccache binary')['run']
+    assert '--retry 8 --retry-all-errors --retry-max-time 180' in install, 'retry binary download'
+    assert 'sha256sum -c -' in install, 'verify upstream binary'
+    assert 'apt-get' not in install, 'ccache requires no apt'
+    assert not any('apt-get update' in s.get('run', '') for s in steps), 'avoid apt index refresh'
+    host = next(s for s in steps if s['name'] == 'Host dependencies')['run']
+    assert "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt" in host, 'avoid stalled Azure mirror'
+
+
     assert {s.get('name') for s in steps} >= {'Host dependencies',
         'Rust toolchain (rust-toolchain.toml)', 'Cache i386-elf toolchain',
         'Cache IPAex fonts', 'Fetch JF Dot Shinonome16 (verify cached font and license)'}
@@ -302,6 +313,10 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('setup', "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt", ':', 'apt mirror stall'),
+            ('setup', 'sha256sum -c -', 'cat', 'binary integrity'),
+            ('setup', '--retry 8 --retry-all-errors --retry-max-time 180', '--retry 0', 'binary retries'),
+
             ('reuse', "r['head_sha'] == sha", 'True', 'reuse wrong SHA'),
             ('reuse', "r['workflow_id'] == workflow_id", 'True', 'reuse wrong workflow'),
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
@@ -310,10 +325,10 @@ def main():
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),
             ('workflow', "}}-check-${{ matrix.shard }}\n", "}}-check-0\n", 'ccache shard collision'),
-            ('workflow', '          sudo apt-get install -y --no-install-recommends ccache',
-             '          sudo apt-get install -y --no-install-recommends ccache make', 'preparation command drift'),
-            ('workflow', '            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-\n',
-             '            sqlite-${{ runner.os }}-\n', 'unsafe ccache restore'),
+            ('workflow', '          echo "CCACHE_MAXSIZE=1G"',
+             '          echo "CCACHE_MAXSIZE=2G"', 'preparation command drift'),
+            ('workflow', '            c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-\n',
+             '            c-v2-${{ runner.os }}-\n', 'unsafe ccache restore'),
             ('workflow', '      # check-prepare はこのシャードの needs だけを組む。',
              '      - name: Unexpected preparation\n        if: steps.prior.outputs.reuse != \'true\'\n        run: echo drift\n', 'unexpected preparation step'),
             ('workflow', 'fail-fast: false', 'fail-fast: true', 'cancel sibling shards'),
@@ -328,7 +343,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text()}[kind]
+            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
             # Runner occurs once per job; mutate only the check-fast job.
             if name in ('route to substream', 'preparation command drift', 'unsafe ccache restore'):
                 prefix, text = text.split('  check-fast:\n', 1)
@@ -343,7 +358,9 @@ def main():
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    if kind == 'reuse':
+                    if kind == 'setup':
+                        workflow_cases(source, changed)
+                    elif kind == 'reuse':
                         reuse_cases(script)
                     elif kind == 'workflow':
                         workflow_cases(changed)

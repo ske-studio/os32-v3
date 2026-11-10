@@ -1,12 +1,13 @@
 """Execute the x86 context provider with observable TSS/resume hooks (ILP32)."""
 CHECK = dict(name='exec-context-host', tier=1,
-    covers=['include/types.h', 'include/callconv.h',
+    covers=['tools/tests/cc_cache.py', 'include/types.h', 'include/callconv.h',
             'include/exec_arch.h', 'arch/x86/arch_exec_storage.h',
             'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h',
             'tools/tests/test_exec_context.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'], needs=[], budget=2.0)
 from pathlib import Path
 import subprocess
+import cc_cache
 import sys
 import tempfile
 import host32
@@ -80,7 +81,7 @@ def execute(source, folder):
     fixture = folder / 'context.c'
     fixture.write_text(HOST.replace('/* PROVIDER */', source))
     target = folder / 'context'
-    subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
+    cc_cache.build(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
                     '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                     '-nostdlib', '-static', '-no-pie', *include_flags(ROOT),
                     str(fixture), '-o', str(target)], check=True)

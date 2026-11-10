@@ -26,6 +26,7 @@ BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 # Build/toolchain inputs and infrastructure used across check recipes.
 FULL = ("Makefile", "build/*.mk",
+    "tools/tests/cc_cache.py",
     '.gitmodules',
     'requirements.txt',
     'tools/check_tree_unchanged.py',

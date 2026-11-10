@@ -48,26 +48,29 @@ jobs:
           fetch-depth: 0
 
       - uses: ./.github/actions/build-setup
+        timeout-minutes: 70
 
-      - name: SQLite ccache setup
-        id: sqlite-cache-key
+      - name: Compiler ccache setup
+        timeout-minutes: 1
+        id: compiler-cache-key
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ccache
-          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
-          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$RUNNER_TEMP/compiler-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
           host="$(gcc -dumpfullversion -dumpversion)"
           cross="$("$CROSS_DIR/bin/i386-elf-gcc" -dumpfullversion -dumpversion)"
           echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
 
-      - name: Cache SQLite compilations
+      - name: Cache C compilations
+        timeout-minutes: 5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/sqlite-ccache
-          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-artifacts
+          path: ${{ runner.temp }}/compiler-ccache
+          key: c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-artifacts
           restore-keys: |
-            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
-            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
+            c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-
+            c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
@@ -170,7 +173,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: SQLite ccache statistics
+      - name: Compiler ccache statistics
         if: always()
         run: ccache -s
 
@@ -200,29 +203,32 @@ jobs:
         run: python3 -B tools/ci/reuse_success.py
 
       - uses: ./.github/actions/build-setup
+        timeout-minutes: 70
         if: steps.prior.outputs.reuse != 'true'
 
-      - name: SQLite ccache setup
+      - name: Compiler ccache setup
+        timeout-minutes: 1
         if: steps.prior.outputs.reuse != 'true'
-        id: sqlite-cache-key
+        id: compiler-cache-key
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ccache
-          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
-          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$RUNNER_TEMP/compiler-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
           host="$(gcc -dumpfullversion -dumpversion)"
           cross="$("$CROSS_DIR/bin/i386-elf-gcc" -dumpfullversion -dumpversion)"
           echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
 
-      - name: Cache SQLite compilations
+      - name: Cache C compilations
+        timeout-minutes: 5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         if: steps.prior.outputs.reuse != 'true'
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/sqlite-ccache
-          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-check-${{ matrix.shard }}
+          path: ${{ runner.temp }}/compiler-ccache
+          key: c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-check-${{ matrix.shard }}
           restore-keys: |
-            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
-            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
+            c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-
+            c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-
 
       # check-prepare はこのシャードの needs だけを組む。
       # ④ 変異なしの全検査 (成果物を読む check-manifests / check-packages-host / check-memmap と、
@@ -259,6 +265,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: SQLite ccache statistics
+      - name: Compiler ccache statistics
         if: always() && steps.prior.outputs.reuse != 'true'
         run: ccache -s

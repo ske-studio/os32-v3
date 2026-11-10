@@ -475,7 +475,8 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
 - 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く。build の check-fast は `OS32_CHECK_CACHE=$RUNNER_TEMP/check-cache` を明示し、ジョブ内でだけ結果を共有する。actions/cache への保存・復元はせず、ジョブ終了で捨てる。c-dialect-host は check-c-dialect の完了を待って温めを再利用し、p2v は同じ検査内の2回の走査で共有する。full-check の既定は変えない。
 - 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
 - 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
-- ccache は使わない: host 試験の大半が 1 回でコンパイルとリンクをする (`gcc src.c -o exe`、ccache の対象外) うえ、PATH の包みは clang_ast の cross newlib の探し方 (`i386-elf-gcc` の置き場から引く) を壊す (2026-11-04 の実測)。
+- C のコンパイルは `tools/tests/cc_cache.py` で ccache を選択的に使う。host32 と対応する host/cross 試験では、通常のコンパイルとリンクを翻訳単位ごとに分け、変異で変わらない単位を再利用する。PATH は包まない。`OS32_NO_CCACHE=1` で無効。`-g` 付きのコンパイルとリンクなど、分割の影響があり得る呼び出しは直接実行する。`base_dir` のパス書き換えと sloppiness は使わず、`__FILE__`・デバッグ情報・cwd を保つ。
+- make 本体も ccache があれば `CC` に挟む (`CCACHE=` で無効)。CI は固定版の静的 ccache 本体を OS/arch 別に保存し、コンパイル結果はコンパイラ版・コミット・ジョブ/シャード別のキーで保存する (各ジョブ `CCACHE_MAXSIZE=1G`)。結果キャッシュと違い、試験実行は毎回行う。
 - 容量を見る・消す: `du -sh ~/.cache/os32/checks ~/.cache/os32/host32-fixtures`、消すときは各ディレクトリごと。
 
 <a id="kapi-v63-移行"></a>
