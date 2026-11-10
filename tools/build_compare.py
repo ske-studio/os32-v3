@@ -123,6 +123,13 @@ ALLOWED_TOOL_DIFFS = {
     'build/sdk/bin/target_profile.py': (
         '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
         '6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a'),
+    # 第 5 段 S2: Rust の wrapper が SDK の target を rustc の起動より前に確かめる。
+    'build/sdk/bin/rustc_stamp.py': (
+        'd5e0f249c10662334532b964a3c167e5f21fb189677520dbd9463f17307ecee7',
+        'f42c50c874066705d1bcabb66eb0588a46ef31346d42a227aaf783e74e23b9d2'),
+    # 第 5 段 S2: profile を make から引く口を SDK に配る (新規)。
+    'build/sdk/bin/target_profile_cli.py': (
+        None, '8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf'),
 }
 
 

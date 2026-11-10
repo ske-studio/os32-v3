@@ -22,6 +22,17 @@ APP      ?= hello
 API_VER   ?= $(shell cat $(OS32_SDK)/KAPI_VERSION)
 HEAP      ?= 262144
 
+# SDK の target (既定 x86-pc98)。CRT・link script・ELF emulation は SDK の profile
+# (bin/target_profile.py) からひと組で引く。この SDK で組めない target はここで
+# 止まり、コンパイラもリンカも起動しない (override: コマンド行ですり替えさせない)。
+OS32_TARGET ?= x86-pc98
+override OS32_TARGET_TOKENS := $(shell python3 -B $(OS32_SDK)/bin/target_profile_cli.py --target $(OS32_TARGET) --make --root $(OS32_SDK))
+ifneq ($(.SHELLSTATUS),0)
+$(error OS32 SDK: target $(OS32_TARGET) cannot be built with this SDK)
+endif
+override os32_comma := ,
+override os32_value = $(subst $(os32_comma), ,$(patsubst $(1)=%,%,$(filter $(1)=%,$(OS32_TARGET_TOKENS))))
+
 CC = i386-elf-gcc
 LD = python3 $(OS32_SDK)/bin/link_guard.py i386-elf-ld
 OBJCOPY = i386-elf-objcopy
@@ -33,13 +44,12 @@ CFLAGS = -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protecto
 
 CFLAGS += -include $(OS32_SDK)/include/os32/os32_unit_stamp.h
 
-LDFLAGS = -m elf_i386 -T $(OS32_SDK)/link/app.ld -nostdlib --nmagic --gc-sections \
+LDFLAGS = -m $(call os32_value,SDK_TARGET_ELF_EMULATION) -T $(call os32_value,SDK_TARGET_APP_LINK) -nostdlib --nmagic --gc-sections \
           -L$(OS32_SDK)/lib -L$(CROSS_DIR)/i386-elf/lib \
           -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0
 
-# crt は 4 つとも先頭にリンクする。
-CRT  = $(OS32_SDK)/crt/crt0.o $(OS32_SDK)/crt/crt0_c.o \
-       $(OS32_SDK)/crt/syscalls.o $(OS32_SDK)/crt/help.o
+# crt は profile の並びのまま、全部を先頭にリンクする (x86-pc98 は 4 つ)。
+CRT  = $(call os32_value,SDK_TARGET_CRT_USER)
 
 # 使う SDK ライブラリ。--start-group で囲むので並び順は問わない。
 LIBS = -los32gfx -los32math
