@@ -7,6 +7,7 @@
 typedef unsigned long long u64;
 struct gem;
 struct gem_dma;
+struct gem_io;
 struct ppc_boot_alias;
 
 enum lan_rc {
@@ -101,6 +102,7 @@ int pm_gmac_alias_plan(const struct pm_gmac_boot *, struct ppc_boot_alias *out);
 void pm_gmac_quiesce_setup(const struct pm_gmac_boot *, const struct pm_pci *);
 int pm_gmac_early_quiesce(void);
 int pm_gmac_dma_init(const struct pm_gmac_boot *, struct gem_dma *out);
+int pm_lan_gem_io(const struct pm_gmac_boot *, struct gem_io *out);
 int pm_dma_bus(u32 pa, u32 bytes, u32 *bus);
 int pm_lan_log_register(void);
 /* Scratch remains valid until the next peek; complete only after a peek.
