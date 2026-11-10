@@ -90,6 +90,18 @@ CHECK_FIELD(gem, tx_packets, unsigned long long);
 CHECK_FIELD(gem, rx_packets, unsigned long long);
 CHECK_FIELD(gem, rx_drops, unsigned long long);
 CHECK_FIELD(gem, uncertain_tx, unsigned long long);
+typedef void (*clock_type)(u32 *, u32 *, u64 *, u64 *);
+typedef int (*translate_type)(u32, u32 *);
+typedef int (*copy8_type)(u32, u8 *);
+CHECK_FIELD(pm_lan_range, base, u32);
+CHECK_FIELD(pm_lan_range, size, u32);
+CHECK_FIELD(pm_lan_diag, peek_ok, const struct pm_lan_range *);
+CHECK_FIELD(pm_lan_diag, peek_ok_count, u32);
+CHECK_FIELD(pm_lan_diag, clock, clock_type);
+CHECK_FIELD(pm_lan_diag, translate, translate_type);
+CHECK_FIELD(pm_lan_diag, copy8, copy8_type);
+int (*monitor_contract)(const struct lan_message *, const u8 *, const struct pm_lan_diag *, struct lan_message *) = pm_lan_monitor;
+int (*copy_contract)(u32, u8 *) = pm_lan_copy8;
 void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
     g->io = *io; g->dma = *d;
     g->state = g->step = g->cursor = g->polls = 0;

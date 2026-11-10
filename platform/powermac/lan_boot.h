@@ -112,7 +112,21 @@ int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
 int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m);
-int pm_lan_monitor(const struct lan_message *req, struct lan_message *rsp);
+struct pm_lan_range { u32 base, size; };
+/* The service supplies valid fields and excludes RX buffers from peek_ok. */
+struct pm_lan_diag {
+    const u32 *status; u32 status_words; /* <= 64 */
+    const u32 *memory; u32 memory_words; /* <= 64 */
+    const u8 *diag;                     /* 256 bytes */
+    const struct pm_lan_range *peek_ok; u32 peek_ok_count; /* <= 8 */
+    void (*clock)(u32 *tick, u32 *tb_hz, u64 *tb, u64 *us);
+    int (*translate)(u32 va, u32 *pa);
+    int (*copy8)(u32 va, u8 *out);
+};
+/* Call only with a free response slot and after validating the peer and request. */
+int pm_lan_monitor(const struct lan_message *req, const u8 src_mac[6],
+                   const struct pm_lan_diag *d, struct lan_message *rsp);
+int pm_lan_copy8(u32 va, u8 *out);
 
 _Static_assert(LAN_OK == 0, "LAN_OK");
 _Static_assert(LAN_AGAIN == 1, "LAN_AGAIN");
