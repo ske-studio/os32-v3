@@ -26,18 +26,13 @@ static void gfx_init_mode(int legacy200)
     if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
     _gfx_common_init(plane_sz);
 
-    /* GDC CSRFORM: L/R=1 のとき各ラインを2倍表示する。 */
-    _out(GDC_GFX_CMD, GDC_GFX_400LINE);
-    _out(GDC_GFX_PARAM, legacy200 ? 0x01 : 0x00);
-    _out(MODE_FF1_PORT, legacy200 ? MFF1_200LINE : MFF1_HIRES);
-
-    _out(GDC_GFX_CMD, GDC_CMD_START);
+    /* 200/400 行の表示を始める (PC-98 は GDC の CSRFORM・モード F/F1・START)。 */
+    display_planar_start(legacy200);
 
     gfx_clear_planar_pages(plane_sz);
 
     /* ページ0を表示、ページ1に描画 */
-    _out(GDC_DISP_PAGE, GDC_PAGE_0);
-    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
+    display_flip_pages(0, 1);
     gfx_flip_enabled = 1;
     if (legacy200) {
         gfx_display_page = 0;
