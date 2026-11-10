@@ -1,6 +1,6 @@
 # PPC_LAN_DESIGN — PowerPC の LAN の最初の到達点 (GMAC で起動ログをホストへ、固定の診断コマンド)
 
-> 状態: **現行 (2026-11-10)** — 内蔵 Ethernet (GMAC、QEMU の sungem と実機 QuickSilver で同じ core) を polling で動かし、到達点 ② の境界のまま起動ログを LAN でホストに保存し、固定の診断コマンド 5 個に答えるまでの層・境目・手順・段。段の状態は票 TASK_PPC_LAN が持つ。メーカー資料 [M1]・[M2] は未入手 (技術の入口の条件、末尾の「確定」)。
+> 状態: **現行 (2026-11-10)** — 内蔵 Ethernet (GMAC、QEMU の sungem と実機 QuickSilver で同じ core) を polling で動かし、到達点 ② の境界のまま起動ログを LAN でホストに保存し、固定の診断コマンド 5 個に答えるまでの層・境目・手順・段。段の状態は票 TASK_PPC_LAN が持つ。手本は BSD (ユーザー決定 2026-11-10)。メーカー資料 [M1]〜[M3] は未入手で、実機に載せる条件にはしない (末尾の「確定」)。
 
 > 出所: ~/os32-tmp/run/ppc-lan/DESIGN.final.md (調査 gpt-6.1-sol、gpt-6-astra 起草 r1→r2、Opus 5.5 第 2 回で条件付き可、PM が N1〜N5 を反映)。QEMU の観測は末尾の「P0 の観測」。
 
@@ -259,7 +259,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |4 cache|cache有効で複数wrap、異なるpayloadの連続往復、断線/再接続、queue overflow、診断応答とtick継続。QEMUのcoherentな成功で代用しない|
 - **QEMU合格から実機のclock・PHY・DMA・cacheの安全性を外挿しない。** 実機MMIO bus hangはTB期限でも救えないため、資料と順序確認を先行する。
 - PM取り寄せ一覧： [M1] Sun GEM/Apple GMAC当該revisionのregister/DMA descriptor仕様（bank、reset、mask、ring align、RX fetch/CRC/offset、Apple CONFIG bits）；[M2] QuickSilver Developer NoteとUniNorth当該revisionのclock gate/PCI config/host→PCI DMA窓・snoop/例外条件資料；[M3] 採取PHY IDのdatasheet/errata＋対応BSD MII実装の関数と行。MDDの資料で代用しない。
-- **ユーザー判断が要る未決：1件**（PMの通読R1で数え直し）：メーカー資料が入手できない場合に、BSDだけを根拠に実機へ載せてよいか（[HW3]）。QEMUの段はこの判断を待たない。決定済みのGMAC先行/届く分だけ/固定診断/②維持は変更しない。
+- **ユーザー判断が要る未決：0件**。メーカー資料が入手できない場合の扱いは 2026-11-10 にユーザーが決定：**「BSDを手本に」**（BSDの実装を根拠に実機へ載せてよい。メーカー資料は手に入れば照合に使うが条件にしない）。決定済みのGMAC先行/届く分だけ/固定診断/②維持は変更しない。
 - **PM決定の候補**：資料入手とP0採取の担当、実機の--iface接続先と任意peer MAC、100FDの受入相手、poolが既存image枠へ収まらない場合の配置調整。ハード資料未解決は技術ゲートでありユーザーへの仕様再決裁ではない。
 ## 反論
 - F8の実施時期/所有者/I-G化は採用するが、64KiBをpaging_set_pageループで変える案はmm/paging.h:99–105の必須規約に反するためpaging_map_rangeへ置換（反論1件）。
@@ -273,7 +273,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - 反論 (F8) は採用: descriptor の区画の I/G 化は paging_map_range (mm/paging.h:99-105 の規約)。
 - 第 1 回の F1〜F19 と PM 決定の 3 点は r2 で直り、第 2 回で確認された。ユーザー判断の未決 0 件。**資料 [M1] (GEM のレジスタと DMA descriptor の仕様)・[M2] (QuickSilver・UniNorth の clock gate と PCI・DMA の窓) は技術の入口の条件**で、PM が取り寄せる。届くまでに進めてよいのは QEMU で確かめられる段で、実機に載せる前に資料と実機の tree の採取で照合する。
 - PM の通読 (2026-11-10、ユーザーの指示で PM が確定版を通読し、手本の引用 4 点を抜き取りで照合):
-  - R1 §1: 「メーカー資料と照合するまで該当ハード書込みを実装確定しない」は、[M1] の印がほぼ全部の GEM のレジスタに付くので、文字どおりだと QEMU の段も止まる。QEMU の段は BSD の値のまま進め、実機に載せる前に照合する、に直した。**メーカー資料 (特に GEM のレジスタの仕様書) が手に入らない場合に BSD だけを根拠に実機へ載せてよいかは [HW3] の扱いで、ユーザーの判断を仰ぐ** (未決 1 件に数え直す)。
+  - R1 §1: 「メーカー資料と照合するまで該当ハード書込みを実装確定しない」は、[M1] の印がほぼ全部の GEM のレジスタに付くので、文字どおりだと QEMU の段も止まる。QEMU の段は BSD の値のまま進め、実機に載せる前に照合する、に直した。メーカー資料が手に入らない場合の扱いはユーザーに伺い、**「BSD を手本に」と決定 (2026-11-10)**: [M1]〜[M3] の印の付く書込みは BSD の実装を根拠に実機へ載せてよい。印は「BSD のどの行が根拠か」を示す目印として残し、実機で初めて確かめる物は §8 の順で観測する。
   - R2 §3(b): 「無効 NIC では Master 解除済みのときだけ ② 継続可」が N1 の直しと矛盾していたので、N1 の条件に揃えた。
   - R3 §6: 宣言・文書だけの段 (P4・P10・P22a・P22c・P33) の H 段は、それを使う段の H にまとめてよい (文書の変更に専用の試験ファイルを作らない)。
   - R4 §3(f): 最後の idle は `for (;;) pm_lan_poll(tb_now())` で CPU を止めずに回り続ける (QEMU の host の CPU を 1 つ使い切る、実機は発熱)。この段ではそのままにし、NIC の割り込み (段 E3 の後) を入れる段で halt に戻す。
