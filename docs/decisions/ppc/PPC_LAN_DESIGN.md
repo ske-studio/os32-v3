@@ -328,6 +328,15 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - 4 段を入れた S1 で reset・MIF・DMA・ring の準備と公開・MAC の初期化・PHY・MAC の有効化 (約 1 秒)・TX 1 枚 (TX_COMPLETION 1、ホストが nonce の frame を受けた)・RX 1 枚 (ホストの返信 94 バイトを受けた) が 7450・7455 の両方で通った。MAC の RX_CONFIG 0x25・TX_CONFIG 0x3f。A7 の実 frame の往復は QEMU で成立。
 - 実測していない物: 60B 未満の frame (PLN1 は 94B 以上なので不要、M1 F4)、QMP の set_link が BMSR に映るか (断線は H24 の模型だけで受ける)。
 
+## 7 本目の実測 (PM、2026-11-11、段 P26+P25 の取り込み。QEMU 8.2.2 mac99 -cpu 7450・7455、`-nic none -device sungem,netdev=n0,mac=52:54:00:12:34:56 -netdev socket,id=n0,udp=127.0.0.1:H,localaddr=127.0.0.1:G`、ホストは tools/ppc_lan_host.py の Host を UDP で、PM の一時の道具 ~/os32-tmp/run/ppc-lan25/m7.py)
+- 到達点 (起動ログがホストに届き 5 診断が往復) を両 CPU で確認した。結果は同じ。
+- 保存 (A8): ホストの .log は `K` で始まり、serial の `KBOOT OF-CAPTURE` から最後までの 553 バイトと完全に一致。LOG seq 0〜2・BEACON seq 0〜3、gap・重複・巻戻りなし、drop_records・drop_bytes は 0。起動の初めの OpenBIOS と TAKEOVER の行は log の登録の前なので保存に入らない (設計どおり)。
+- 診断 (A10): STATUS・CLOCK (tb_hz=100000000、tick と us が TB と合う)・MEMORY・READ_DIAG・PEEK が OK。MEMORY の 3 組は M1 F7 のとおり: base 0 の大きさ 0x01000000 = OF-CAPTURE の admitted、0x01000000+0x20000 = MMU-D の hpt・bytes、0x00130000+0x30000 = link map の DMA の pool (他に像の予約 0x00100000+0x78000)。PEEK の e_entry から 256B は ELF の PT_LOAD の bytes と一致。PEEK の 0x0 (low 1MiB は未 map) と 0x80000000 (MMIO) は RANGE。
+- 時間 (A11): ALIVE の tick_delta=2000・tb_us=2000000 で tick と TB の差 0%、of_calls_delta=0。READY〜ALIVE の 2 秒の間も poll を回す。
+- serial: 既存の 9 印はそのまま、LAN の行は `LAN STATE state=1 link=0` → 2 → 3 → 4 → `state=5 link=1` (RUNNING) だけ、禁止語なし。`-nic none` では `LAN OFF code=-2` と 9 印 (実装者が確認)。
+- 像: LAN の TU 15 本で `nm -u` は空、DMA の pool 0x130000+0x30000 は像の予約 0x100000〜0x178000 の中。entry.S の ppc_sync と重なる dma_cache.c の ppc_sync は weak にした (entry.S の強い定義が使われる)。
+- 実機の前の段 (UniNorth の clock の alias、実機の PHY) は入れていない (D1)。受入の自動化 (kboot_run の LAN の印、変異、受入、全体) は段 P29〜P32 で、今の実測はそれまで PM の一時の道具で行った。
+
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
 - `info pci`: Bus 0 device 15 function 0 = Ethernet controller **106b:0021**、IRQ pin A、BAR0 = 32 bit memory、大きさ 0x200000 (2MiB、firmware が走る前なので番地は未割当)。host bridge は 106b:001f (dev 11) と 106b:001e (dev 14)、106b:0022 (dev 12)。

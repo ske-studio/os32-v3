@@ -18,19 +18,26 @@ KB_ASM := arch/ppc/kernel_entry.S arch/ppc/entry.S arch/ppc/kernel_takeover.S \
  arch/ppc/mmu.S arch/ppc/cache_copy.S
 KB_ARCH := arch/ppc/kernel_boot.c arch/ppc/kernel_cpu.c arch/ppc/kernel_hpt.c \
  arch/ppc/kernel_trap.c arch/ppc/kernel_dec.c arch/ppc/pd_walk.c \
- arch/ppc/kboot_unavailable.c
+ arch/ppc/kboot_unavailable.c arch/ppc/dma_cache.c
 KB_PLATFORM := platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/escc_tree.c platform/powermac/kboot_capture.c \
  platform/powermac/gmac_tree.c \
  platform/powermac/kboot_reserve.c platform/powermac/memory.c \
  platform/powermac/mpic_tree.c platform/powermac/mpic.c \
  platform/powermac/clock.c platform/powermac/log.c \
- platform/powermac/kboot_console.c
+ platform/powermac/kboot_console.c platform/powermac/pci_config.c \
+ platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c \
+ platform/powermac/lan_log.c platform/powermac/lan_wire.c \
+ platform/powermac/lan_monitor.c platform/powermac/lan_diag.c \
+ platform/powermac/lan_service.c
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
  mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/time/tick.c \
  lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c fs/fd_redirect.c
-KB_C := $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON)
+KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
+ drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
+ drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
+KB_C := $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 
 # Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).
