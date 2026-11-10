@@ -218,6 +218,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int platform_splash_try_image(const char *path, u32 *end_tick)
 { (void)path; (void)end_tick; return PLATFORM_SPLASH_FALLBACK; }
 void palette_init(void) { }
+void palette_shadow_reset(void) { }
 void palette_set(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; }
 void gfx_scroll_init(void)
