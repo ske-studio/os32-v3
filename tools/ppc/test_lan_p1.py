@@ -59,14 +59,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    checks = [f'if ({k} != {v}) return {i};' for i, (k, v) in enumerate(VALUES.items(), 1)]
-    checks += ['if (sizeof(struct pm_pci_window) != 16) return 100;',
-               'if (sizeof(struct pm_pci) != 20) return 101;',
-               'if (__builtin_offsetof(struct pm_gmac_boot, win) != 76) return 102;',
-               'if (sizeof(struct pm_gmac_boot) != 220) return 103;',
-               'if (__builtin_offsetof(struct lan_message, payload) != 69) return 104;',
-               'if (sizeof(struct lan_message) != 328) return 105;']
-    source = '#include "lan_boot.h"\nint check(void) {\n' + '\n'.join(checks) + '\nreturn 0; }\n'
+    expressions = [(k, str(v)) for k, v in VALUES.items()]
+    expressions += [('sizeof(struct pm_pci_window)', '16'),
+                    ('sizeof(struct pm_pci)', '20'),
+                    ('__builtin_offsetof(struct pm_gmac_boot, win)', '76'),
+                    ('sizeof(struct pm_gmac_boot)', '220'),
+                    ('__builtin_offsetof(struct lan_message, payload)', '69'),
+                    ('sizeof(struct lan_message)', '328')]
+    assertions = [f'_Static_assert({expr} == {value}, "{expr}");'
+                  for expr, value in expressions]
+    checks = [f'if ({expr} != {value}) fail("mismatch: {expr}\\n", {len("mismatch: " + expr) + 1});'
+              for expr, value in expressions]
+    source = '#include "lan_boot.h"\n' + r'''
+static void fail(const char *s, int n) {
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(s), "d"(n));
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(1));
+    __builtin_unreachable();
+}
+''' + '\nint check(void) {\n' + '\n'.join(checks) + '\nreturn 0; }\n'
     source += 'void _start(void) { int r = check(); __asm__ volatile("int $0x80" : : "a"(1), "b"(r)); __builtin_unreachable(); }\n'
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         d = Path(tmp)
@@ -74,8 +84,7 @@ def main():
         (d / 'lan_boot.h').write_text(HEADER.read_text())
         include = ['-I' + str(d), '-Iinclude']
         ppc = '/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc'
-        # The runtime entry uses x86 assembly, so compile only check() for PPC.
-        (d / 'ppc.c').write_text(source.split('void _start')[0])
+        (d / 'ppc.c').write_text('#include "lan_boot.h"\n' + '\n'.join(assertions) + '\n')
         result = command([ppc, *PPC_FLAGS, *include, '-c', str(d / 'ppc.c'), '-o', str(d / 'ppc.o')])
         if result.returncode:
             raise RuntimeError(result.stderr)
@@ -95,12 +104,30 @@ def main():
                 if original.count(old) != 1:
                     raise RuntimeError(f'{name}: anchor is not unique')
                 (d / 'lan_boot.h').write_text(original.replace(old, new))
-                print(f'reached={name}', flush=True)
-                result = command(host)
+                # A child emits the marker immediately before replacing itself with gcc.
+                wrapper = ('import os, sys; print("reached=" + sys.argv[1], flush=True); '
+                           'os.execvp(sys.argv[2], sys.argv[2:])')
+                result = command(['python3', '-c', wrapper, name, *host])
                 expected = f'static assertion failed: "{diagnostic}"'
-                if result.returncode == 0 or expected not in result.stderr:
-                    raise RuntimeError(f'{name}: unexpected compiler result: {result.stderr}')
+                output = result.stdout + result.stderr
+                if (result.returncode == 0 or not result.stdout.startswith(f'reached={name}\n')
+                        or expected not in result.stderr):
+                    raise RuntimeError(f'{name}: unexpected compiler result: {output}')
+                print(output, end='', flush=True)
                 print(f'RED {name}: {expected}', flush=True)
+            old = '_Static_assert(LAN_AGAIN == 1, "LAN_AGAIN");'
+            new = '_Static_assert(LAN_AGAIN == 2, "LAN_AGAIN");'
+            if original.count(old) != 1:
+                raise RuntimeError('runtime: assertion anchor is not unique')
+            mutated = original.replace('LAN_AGAIN = 1,', 'LAN_AGAIN = 2,').replace(old, new)
+            (d / 'lan_boot.h').write_text(mutated)
+            result = command(host)
+            if result.returncode:
+                raise RuntimeError(f'runtime: compile failed: {result.stderr}')
+            result = command(['qemu-i386', str(d / 'test')])
+            if result.returncode != 1 or result.stderr != 'mismatch: LAN_AGAIN\n':
+                raise RuntimeError(f'runtime: unexpected result {result.returncode}: {result.stderr}')
+            print('RED runtime: mismatch: LAN_AGAIN (exit 1)', flush=True)
     return 0
 
 
