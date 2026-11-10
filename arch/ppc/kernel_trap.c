@@ -8,7 +8,7 @@ static void (*dec_handler)(struct ppc_frame *);
 static ppc_pd_read_fn table_reader;
 static void *table_context;
 static int fatal_ready;
-static struct { u32 pc, va, reason, resume; int active; } probe;
+static struct { u32 pc, va, reason, resume; int active, data; } probe;
 #ifdef PPC_TRAP_HOST_TEST
 u32 ppc_trap_msr(void);
 void ppc_trap_stop(void) __attribute__((noreturn));
@@ -44,6 +44,15 @@ int ppc_trap_onfault(u32 pc, u32 va, u32 reason, u32 resume)
          reason != PPC_TRAP_DSI_IO && reason != PPC_TRAP_ISI &&
          reason != PPC_TRAP_ISI_PROTECT && reason != PPC_TRAP_ISI_NOEXEC)) return 0;
     probe.pc = pc; probe.va = va; probe.reason = reason; probe.resume = resume;
+    probe.data = 0;
+    probe.active = 1;
+    return 1;
+}
+int ppc_trap_onfault_data(u32 pc, u32 va, u32 resume)
+{
+    if (probe.active || ((pc | resume) & 3)) return 0;
+    probe.pc = pc; probe.va = va; probe.resume = resume;
+    probe.data = 1;
     probe.active = 1;
     return 1;
 }
@@ -84,7 +93,9 @@ void ppc_trap_dispatch(struct ppc_frame *f)
         reason = fault_reason(f);
         if (probe.active && f->srr0 == probe.pc &&
             (f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&
-            reason == probe.reason) {
+            (probe.data ? (reason == PPC_TRAP_DSI_MISS ||
+                           reason == PPC_TRAP_DSI_PROTECT ||
+                           reason == PPC_TRAP_DSI_IO) : reason == probe.reason)) {
             probe.active = 0;
             f->srr0 = probe.resume;
             return;

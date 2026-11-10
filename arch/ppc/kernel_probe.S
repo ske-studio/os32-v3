@@ -14,6 +14,18 @@ ppc_probe_read_resume:
     li 3,1
     blr
 
+    .globl ppc_probe_copy8, ppc_probe_copy8_insn, ppc_probe_copy8_resume
+/* int ppc_probe_copy8(u32 va, u8 *out) */
+ppc_probe_copy8:
+ppc_probe_copy8_insn:
+    lbz 5,0(3)
+    stb 5,0(4)
+    li 3,0
+    blr
+ppc_probe_copy8_resume:
+    li 3,1
+    blr
+
     .globl ppc_probe_exec, ppc_probe_exec_resume
 /* int ppc_probe_exec(u32 target): fetch from target (ISI at srr0 == target).
  * LR still holds the caller's return address when onfault resumes. */
