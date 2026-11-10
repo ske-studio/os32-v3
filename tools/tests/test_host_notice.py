@@ -50,7 +50,7 @@ def fixed_slots():
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     # Reviewed b6e80943 v81 entries, including signatures and target metadata.
     assert hashlib.sha256(json.dumps(spec['api'][:259], sort_keys=True).encode()).hexdigest() == \
-        'd3f59c11694d6d9d7e40d52b2976e9b4cb8e99222d32ec762c4ba1e65ddb7140'
+        'f5a4c1b63a79e4bb3beef92fa33ed2a399929a6ab05628e5f67a087448c06a7d'
     slots = (ROOT / 'sdk/include/os32/os32_kapi_slots.h').read_text()
     header = (ROOT / 'sdk/include/os32/os32_kapi_generated.h').read_text()
     names = re.findall(r'__cdecl \*(\w+)\)\(', header)

@@ -34,6 +34,7 @@
 
 /* rshellフラグ (外部から設定可) */
 int rshell_active = 0;
+int boot_serial_mirror = 0;
 
 /* カーソル位置 */
 static int cursor_x = 0;
@@ -202,7 +203,7 @@ void shell_print(const char *str, u8 color)
     bootlog_push(str, kstrlen(str));  /* 起動ログ (色は捨てる) */
     while (*str) {
         if (render) putchar_raw(*str, color);
-        if (rshell_active) con_output_putchar(*str);
+        if (rshell_active || boot_serial_mirror) con_output_putchar(*str);
         str++;
     }
     if (render) console_hw_cursor_sync();
@@ -282,7 +283,7 @@ void shell_print_utf8(const char *utf8_str, u8 color)
 
     con_sink_push_print(utf8_str, kstrlen(utf8_str), color);
     bootlog_push(utf8_str, kstrlen(utf8_str));
-    if (rshell_active) {
+    if (rshell_active || boot_serial_mirror) {
         const char *s = utf8_str;
         while (*s) con_output_putchar(*s++);
     }
@@ -322,7 +323,7 @@ void console_write(const char *buf, u32 size, u8 color)
 
     con_sink_push_print(buf, size, color);
     bootlog_push(buf, size);
-    if (rshell_active) {
+    if (rshell_active || boot_serial_mirror) {
         u32 i;
         for (i = 0; i < size; i++) con_output_putchar(buf[i]);
     }

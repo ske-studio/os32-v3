@@ -32,13 +32,17 @@ KERNEL_SRC = ROOT / "kernel/console/con_sink.c"
 CONSOLE_SRC = ROOT / "kernel/console/console.c"
 
 
-def run(tmp, source, runner):
+def run(tmp, source, runner, console_source=None, boot_source=None):
     (tmp / "con_sink.c").write_text(source)
+    (tmp / "console.c").write_text(console_source or CONSOLE_SRC.read_text())
+    (tmp / "boot_serial.inc").write_text(boot_source or (ROOT / "init/boot_serial.inc").read_text())
+    fixture = HOST_SRC.read_text().replace('"../../kernel/console/console.c"', '"console.c"').replace('"../../init/boot_serial.inc"', '"boot_serial.inc"').replace('"../../platform/pc98/console.c"', '"' + str(ROOT / "platform/pc98/console.c") + '"')
+    (tmp / "fixture.c").write_text(fixture)
     exe = tmp / "con-sink"
     subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
-                    "-D__KERNEL_BUILD__", "-I" + str(tmp), *INCLUDES,
+                    "-D__KERNEL_BUILD__", "-I" + str(tmp), "-I" + str(ROOT / "tools/tests"), *INCLUDES,
                     "-nostdlib", "-static", "-no-pie",
-                    str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+                    str(tmp / "fixture.c"), "-o", str(exe)], cwd=ROOT, check=True)
     return host32.run([str(exe)], cwd=ROOT, runner=runner, timeout=30,
                       capture_output=True, text=True)
 
@@ -91,4 +95,21 @@ if __name__ == "__main__":
                 result = run(tmp, source.replace(old, new), args.runner)
                 assert result.returncode == 1 and expected in result.stdout, result.stdout
                 print('RED runtime:', expected, flush=True)
+            console = CONSOLE_SRC.read_text()
+            boot = (ROOT / "init/boot_serial.inc").read_text()
+            for label, old, new in [
+                ("print", "if (rshell_active || boot_serial_mirror) con_output_putchar(*str);", "if (rshell_active) con_output_putchar(*str);"),
+                ("utf8", "if (rshell_active || boot_serial_mirror) {\n        const char *s", "if (rshell_active) {\n        const char *s"),
+                ("write", "if (rshell_active || boot_serial_mirror) {\n        u32 i;", "if (rshell_active) {\n        u32 i;"),
+            ]:
+                assert console.count(old) == 1
+                result = run(tmp, source, args.runner, console_source=console.replace(old, new))
+                assert result.returncode == 1 and "boot serial backlog then live" in result.stdout, result.stdout
+                print("RED runtime: " + label, flush=True)
+            for label, old, new in [("default", '!= 1) return;', '== 1) return;'),
+                                    ("enable", 'boot_serial_mirror = 1;', 'boot_serial_mirror = 0;')]:
+                assert boot.count(old) == 1
+                result = run(tmp, source, args.runner, boot_source=boot.replace(old, new))
+                assert result.returncode == 1 and "boot serial" in result.stdout, result.stdout
+                print("RED runtime: " + label, flush=True)
         print("EXIT con_sink_host=0", flush=True)
