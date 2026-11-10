@@ -88,6 +88,7 @@ from clang_ast.build import parse_compile_lines, strip_jobserver, dry_run, depen
 import clang_ast as ast
 from clang_ast.dialect import findings as ast_findings
 from clang_ast.result_cache import get_or_compute
+from clang_ast.parallel_units import ordered_units
 
 
 def scan_c_text(text, root, words, headers, flags=("-std=gnu11", "-ffreestanding"), cc=None):
@@ -391,11 +392,31 @@ def _is_vendor(rel):
     return any(rel == v or rel.startswith(v + "/") for v in VENDOR_DIRS)
 
 
+def _check_internal_unit(item):
+    src, argv, root, vendor = item
+    def compute():
+        tu = ast.parse(src,argv,root)
+        unit_probs = set()
+        if not vendor:  # Vendor policy is exempt; parsing still fails closed.
+            words = set(INTERNAL_FORBIDDEN) | {'VLA','anonymous record','old-style definition'}
+            for f,ln,w in ast_findings(tu,root,words,{'threads.h','stdatomic.h'}):
+                if not _is_vendor(f):
+                    unit_probs.add('%s:%d: 内部実装に T0 で新規導入しない %s ([C1])' % (f,ln,w))
+        return sorted(unit_probs)
+
+    try:
+        return get_or_compute('c-dialect', src, argv, root, compute,
+                              variant=dict(vendor=vendor))
+    except ast.ParseError as e:
+        return ['%s: clang parse failure — %s' % (src,e)]
+
+
 def check_internal_units(units, root, jobs=None):
     root = pathlib.Path(root).absolute()
     probs = set()
     count = 0
     seen = set()
+    tasks = []
     for u in units:
         vendor = _is_vendor(source_identity(u['src']))
         src = u['src']
@@ -407,21 +428,9 @@ def check_internal_units(units, root, jobs=None):
             continue
         seen.add(key)
         count += not vendor
-        def compute():
-            tu = ast.parse(src,argv,root)
-            unit_probs = set()
-            if not vendor:  # Vendor policy is exempt; parsing still fails closed.
-                words = set(INTERNAL_FORBIDDEN) | {'VLA','anonymous record','old-style definition'}
-                for f,ln,w in ast_findings(tu,root,words,{'threads.h','stdatomic.h'}):
-                    if not _is_vendor(f):
-                        unit_probs.add('%s:%d: 内部実装に T0 で新規導入しない %s ([C1])' % (f,ln,w))
-            return sorted(unit_probs)
-
-        try:
-            probs.update(get_or_compute('c-dialect', src, argv, root, compute,
-                                       variant=dict(vendor=vendor)))
-        except ast.ParseError as e:
-            probs.add('%s: clang parse failure — %s' % (src,e))
+        tasks.append((src, argv, root, vendor))
+    for result in ordered_units(_check_internal_unit, tasks, jobs, module='check_c_dialect'):
+        probs.update(result)
     return sorted(probs),count
 
 

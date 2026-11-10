@@ -32,6 +32,99 @@ def limited_mode():
 
 
 class ClangTest(unittest.TestCase):
+    def test_parallel_limits_and_jobserver(self):
+        from clang_ast.parallel_units import worker_limit, worker_slots, ordered_units
+        with mock.patch.dict(os.environ, {'MAKEFLAGS': '', 'OS32_AST_JOBS': '3'}):
+            self.assertEqual(worker_limit(), 3)
+            with mock.patch('os.cpu_count', return_value=16):
+                with mock.patch.dict(os.environ, {}, clear=True):
+                    self.assertEqual(worker_limit(), 4)
+            for bad in ('0', '-1', 'bad'):
+                with mock.patch.dict(os.environ, OS32_AST_JOBS=bad):
+                    with self.assertRaises(ValueError):
+                        worker_limit()
+            self.assertEqual(list(ordered_units(abs, [-3, -1, -2])), [3, 1, 2])
+            results = ordered_units(int, ['3', 'bad', '5'])
+            self.assertEqual(next(results), 3)
+            with self.assertRaises(ValueError):
+                next(results)
+            read_fd, write_fd = os.pipe()
+            try:
+                os.write(write_fd, b'ab')
+                flags = '-j4 --jobserver-auth=%d,%d' % (read_fd, write_fd)
+                with mock.patch.dict(os.environ, MAKEFLAGS=flags):
+                    with self.assertRaisesRegex(RuntimeError, 'probe'):
+                        with worker_slots(4) as count:
+                            self.assertEqual(count, 3)
+                            raise RuntimeError('probe')
+                    self.assertEqual(os.read(read_fd, 2), b'ab')
+                    with worker_slots(4) as count:
+                        self.assertEqual(count, 1)
+                fifo = pathlib.Path(tempfile.mkdtemp()) / 'jobserver'
+                self.addCleanup(fifo.parent.rmdir)
+                os.mkfifo(fifo)
+                self.addCleanup(fifo.unlink)
+                fd = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+                try:
+                    os.write(fd, b'+')
+                    with mock.patch.dict(os.environ, MAKEFLAGS='-j4 --jobserver-auth=fifo:' + str(fifo)):
+                        with worker_slots(4) as count:
+                            self.assertEqual(count, 2)
+                        self.assertEqual(os.read(fd, 1), b'+')
+                finally:
+                    os.close(fd)
+                with mock.patch.dict(os.environ, MAKEFLAGS='-j4 --jobserver-auth=-1,-1'):
+                    with worker_slots(4) as count:
+                        self.assertEqual(count, 1)
+            finally:
+                os.close(read_fd)
+                os.close(write_fd)
+
+    def test_parallel_and_serial_checker_output(self):
+        # Real child interpreters, findings, duplicate cache writes, and parse
+        # failures. The invalid unit is last so earlier findings must survive.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'kernel').mkdir()
+            (root / 'tools').mkdir()
+            (root / 'tools/check_p2v_allow.txt').write_text('')
+            body = ('#define MEM_PROBE_BASE 0x100000u\n'
+                    'void f(int *restrict p) { char *q = (char *)MEM_PROBE_BASE; '
+                    '(void)q; (void)p; __asm__("cli"); }\n')
+            for name in ('a', 'b', 'c'):
+                (root / ('kernel/' + name + '.c')).write_text(body)
+            (root / 'kernel/z.c').write_text('this is not C;\n')
+            harness = root / 'probe.py'
+            harness.write_text("""
+import json, pathlib, sys
+from unittest import mock
+sys.path.insert(0, TOOLS)
+import clang_ast as ast
+import check_c_dialect as cd
+import check_p2v as p2v
+import check_arch_asm as arch
+if __name__ == '__main__':
+    root = pathlib.Path(__file__).parent
+    units = [dict(src='kernel/' + n + '.c', argv=['-std=gnu11', '-ffreestanding'])
+             for n in ('a', 'b', 'a', 'c', 'z')]
+    print(json.dumps(cd.check_internal_units(units, root), ensure_ascii=False))
+    with mock.patch.object(ast, 'units', return_value=units):
+        print(json.dumps(p2v.audit(root), ensure_ascii=False))
+        with mock.patch.object(sys, 'argv', ['check_arch_asm.py', '--root', str(root)]):
+            print('arch return:', arch.main())
+""".replace('TOOLS', repr(str(ROOT / 'tools'))))
+            for cache in ('off', str(root / 'cache')):
+                outputs = []
+                for jobs in ('1', '3'):
+                    env = dict(os.environ, OS32_AST_JOBS=jobs, MAKEFLAGS='', OS32_CHECK_CACHE=cache)
+                    result = subprocess.run([sys.executable, str(harness)], env=env,
+                                            text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    outputs.append((result.stdout, result.stderr))
+                self.assertEqual(outputs[0], outputs[1])
+                for expected in ('restrict', 'physical-cast', 'inline asm `cli`', 'clang parse failure'):
+                    self.assertIn(expected, outputs[0][0])
+
     def test_declared_powerpc_compiler_is_not_silently_dropped(self):
         from clang_ast.build import parse_compile_lines, dependency_files
         line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c lib/kstring_c.c -o out.o'

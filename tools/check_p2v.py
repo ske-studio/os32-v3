@@ -9,6 +9,7 @@ import re
 import clang_ast as ast
 from clang_ast.build import dependency_files, select_units
 from clang_ast.result_cache import get_or_compute
+from clang_ast.parallel_units import ordered_units
 
 ROOT = ast.ROOT
 ROOTS = SCAN_ROOTS['p2v']
@@ -207,6 +208,21 @@ def scan(source):
     return [(ln,f,rule) for _,ln,f,rule in findings(tu)[0]]
 
 
+def _check_unit(item):
+    u, root = item
+    def compute():
+        tu = ast.parse(u['src'],u['argv'],root)
+        scanned, includes = set(), set()
+        for include in tu.get_includes():
+            try:
+                includes.add(pathlib.Path(include.include.name).relative_to(root).as_posix())
+            except ValueError:
+                pass
+        hits, funcs = findings(tu,root,scanned)
+        return [hits, sorted(funcs), sorted(scanned, key=lambda x: x or ''), sorted(includes)]
+    return get_or_compute('p2v', u['src'], u['argv'], root, compute)
+
+
 def audit(root, changed=None):
     changed = dependency_files(changed)
     root = pathlib.Path(root).absolute()
@@ -227,19 +243,9 @@ def audit(root, changed=None):
         units = [u for u in ast.units(root)
                  if any(u['src'] == d or u['src'].startswith(d + '/') for d in ROOTS)
                  and not EXCLUDED.intersection(pathlib.Path(u['src']).parts)]
-        for u in select_units(units, root, changed):
-            def compute():
-                tu = ast.parse(u['src'],u['argv'],root)
-                scanned, includes = set(), set()
-                for include in tu.get_includes():
-                    try:
-                        includes.add(pathlib.Path(include.include.name).relative_to(root).as_posix())
-                    except ValueError:
-                        pass
-                hits, funcs = findings(tu,root,scanned)
-                return [hits, sorted(funcs), sorted(scanned, key=lambda x: x or ''), sorted(includes)]
-            hits, funcs, scanned, includes = get_or_compute(
-                'p2v', u['src'], u['argv'], root, compute)
+        selected = select_units(units, root, changed)
+        results = ordered_units(_check_unit, [(u, root) for u in selected], module='check_p2v')
+        for u, (hits, funcs, scanned, includes) in zip(selected, results):
             files.update(scanned)
             if changed is not None:
                 files.add(u['src'])

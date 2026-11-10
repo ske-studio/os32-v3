@@ -271,7 +271,7 @@ def compile_and_run(work, tree):
     src = work / 'contracts.c'
     body, checks = source()
     src.write_text(body)
-    inc = ['-I' + str(tree), *include_flags(ROOT)]
+    inc = ['-I' + str(tree), *include_flags(tree)]
     exe = work / 'contracts'
     subprocess.run(['gcc', *FLAGS, *inc, '-nostdlib', '-static', '-no-pie',
                     str(src), str(ROOT / 'tools/tests/hostsvc_fixture.c'), '-o', str(exe)], check=True, cwd=ROOT)
