@@ -1,7 +1,8 @@
 /* Actual kboot_capture.c with an ILP32, libc-free firmware tree fake. */
 #include "kboot_info.h"
 #include "kstring.h"
-static unsigned scenario, ac, sc, mac, expected_stop, wrote;
+static unsigned scenario, ac, sc, mac, expected_stop, wrote, lan_fail;
+static void emit(const char *s) { __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(kstrlen(s)) : "memory"); }
 static unsigned char reg[PM_KBOOT_PROP_BYTES], avail[PM_KBOOT_PROP_BYTES];
 static unsigned rn, an;
 static void quit(unsigned code) __attribute__((noreturn));
@@ -24,6 +25,20 @@ static int prop(int node, const char *name, unsigned char *p)
 {
     unsigned n=0;
     if (node==-17) node=1;
+    if (scenario==24 && (node==11 || node==12)) {
+        if (!kstrcmp(name,"compatible")) { const char *s=node==11?"uni-north":"gmac"; do { p[n]=s[n]; } while (s[n++]); return n; }
+        if (node==11 && !kstrcmp(name,"#address-cells")) { put(p,3); return 4; }
+        if (node==11 && !kstrcmp(name,"#size-cells")) { put(p,2); return 4; }
+        if (node==11 && !kstrcmp(name,"reg")) { put(p,0xf2000000); put(p+4,0x2000000); return 8; }
+        if (node==11 && !kstrcmp(name,"bus-range")) { put(p,0); put(p+4,0); return 8; }
+        if (node==11 && !kstrcmp(name,"ranges")) { for (n=0;n<48;n++) p[n]=0; put(p,0x01000000); put(p+12,0xf2000000); put(p+20,0x800000); put(p+24,0x02000000); put(p+32,0x80000000); put(p+36,0x80000000); put(p+44,0x10000000); return 48; }
+        if (node==12 && !kstrcmp(name,"vendor-id")) { put(p,0x106b); return 4; }
+        if (node==12 && !kstrcmp(name,"device-id")) { put(p,0x21); return 4; }
+        if (node==12 && !kstrcmp(name,"reg")) { for (n=0;n<40;n++) p[n]=0; put(p,0x7800); put(p+20,0x02007810); put(p+36,0x200000); return 40; }
+        if (node==12 && !kstrcmp(name,"assigned-addresses")) { for (n=0;n<20;n++) p[n]=0; put(p,0x02007810); put(p+8,0x82200000); put(p+16,0x200000); return 20; }
+        if (node==12 && !kstrcmp(name,"local-mac-address")) { const unsigned char m[]={0x52,0x54,0,0x12,0x34,0x56}; for (n=0;n<6;n++) p[n]=m[n]; return 6; }
+        return -1;
+    }
     const char *str=0;
     if ((node==1 || node==5) && !kstrcmp(name,"ranges")) return 0;
     if ((node==4 || node==9 || node==5) && !kstrcmp(name,"#address-cells")) {
@@ -98,10 +113,10 @@ int ofw_finddevice(const char *s) { return !kstrcmp(s,PM_ROOT)?(scenario==18?-17
 int ofw_parent(int n)
 {
     if (n==-17) n=1;
-    return n==1?0:n==6?5:n==5||n==7?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
+    return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
-int ofw_child(int n) { return n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==5?7:0; }
+int ofw_child(int n) { return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
+int ofw_peer(int n) { return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -121,9 +136,9 @@ int ofw_call(const char *s, unsigned ni, unsigned no, cell *args)
 }
 int ofw_write(int ih, const void *p, unsigned n)
 {
-    REQUIRE(ih==9 && n>10 && !kstrncmp(p,"FAIL:KBOOT:",11)); wrote=1; return n;
+    REQUIRE(ih==9 && n>10 && !kstrncmp(p,"FAIL:KBOOT:",11)); wrote=1; if (!kstrncmp(p,"FAIL:KBOOT:LAN",14)) lan_fail=1; return n;
 }
-void ppc_stop(void) { quit(expected_stop && wrote?0:2); }
+void ppc_stop(void) { if (lan_fail) { emit("H:A1 fatal-lan\n"); quit(41); } quit(expected_stop && wrote?0:2); }
 static void test(void)
 {
     ac=1+(scenario==1 || scenario==3 || scenario==4 || scenario==6);
@@ -148,8 +163,11 @@ static void test(void)
     }
     if (scenario==16) ac=3;
     if (scenario==17) tuple(reg,1,1,0,0);
+    emit("reached=A1\n");
     const struct pm_kboot_info *p=pm_kboot_capture(0);
     REQUIRE(!expected_stop);
+    if (p->gmac_rc!=(scenario==24?LAN_OK:LAN_ENODEV)) { emit("H:A1 gmac-rc\n"); quit(42); }
+    if (scenario==24 && !(p->gmac.bar_pa==0x82200000 && p->gmac.mac[0]==0x52 && p->gmac.mac[5]==0x56)) { emit("H:A1 gmac-data\n"); quit(43); }
     REQUIRE(p->ram.count==(scenario==9?PM_REGION_COUNT:1));
     REQUIRE(p->available.count==2);
     REQUIRE(p->available.v[0].start==0x1000 && p->available.v[0].size==0x4000);

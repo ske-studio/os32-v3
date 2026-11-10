@@ -28,22 +28,28 @@ MUTATIONS = [
     ('overflow', 'size>0xffffffffUL-start', '0'),
     ('limit-off-by-one', 'count>PM_REGION_COUNT', 'count>=PM_REGION_COUNT'),
     ('borrow-property', 'return &info;', 'return (const struct pm_kboot_info *)property;'),
+    ('omit-gmac', 'info.gmac_rc = pm_gmac_capture(&info.gmac);', 'info.gmac_rc = LAN_ENODEV;'),
+    ('fatal-gmac', 'info.gmac_rc = pm_gmac_capture(&info.gmac);', 'if (pm_gmac_capture(&info.gmac)) fail("FAIL:KBOOT:LAN\\r\\n");'),
+    ('discard-gmac-rc', 'info.gmac_rc = pm_gmac_capture(&info.gmac);', '(void)pm_gmac_capture(&info.gmac);'),
     ('high-cell', '(ac==2 && be32(p))', '(0)'),
 ]
 
 
-def exercise(directory, source):
+def exercise(directory, source, expected=None):
     exe = directory / 'capture'
     argv = ['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
             '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-            str(source), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
+            str(source), str(ROOT / 'platform/powermac/gmac_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
-    for case in range(24):
+    for case in range(26):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
+        if expected and case == expected[0]:
+            if result.returncode != expected[1] or result.stdout != expected[2]:
+                raise RuntimeError(f'unexpected mutation result: {case}, {result.returncode}, {result.stdout!r}')
         if result.returncode:
             failed.append((case, result.returncode))
     return failed
@@ -59,7 +65,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 24 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 26 firmware-tree cases (ILP32 product code)')
         if args.mutate:
             text = product.read_text()
             for name, old, new in MUTATIONS:
@@ -67,7 +73,12 @@ def main():
                     raise RuntimeError(f'{name}: anchor not unique')
                 mutant = directory / 'kboot_capture.c'
                 mutant.write_text(text.replace(old, new))
-                failures = exercise(directory, mutant)
+                expectations = {
+                    'omit-gmac': (24, 42, b'reached=A1\nH:A1 gmac-rc\n'),
+                    'fatal-gmac': (25, 41, b'reached=A1\nH:A1 fatal-lan\n'),
+                    'discard-gmac-rc': (25, 42, b'reached=A1\nH:A1 gmac-rc\n'),
+                }
+                failures = exercise(directory, mutant, expectations.get(name))
                 if not failures:
                     raise RuntimeError(f'{name}: survived')
                 print(f'RED: {name}: {failures}')
