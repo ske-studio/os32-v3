@@ -2,9 +2,11 @@
 #include "memmap.h"
 #include "types.h"
 #include "tvram.h"
+#include "tvram_private.h"
 #include "io.h"
 #include "pc98.h"
 #include "console_backend.h"
+#include "pc98_route.h"
 
 /* テキストVRAM定義 (tvram.hとpc98.hの定義を使用) */
 #define TVRAM_TEXT  TVRAM_BASE
@@ -17,6 +19,26 @@ STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_CG_WINDOW - TVRAM_ATTR_BASE,
 #ifndef ATTR_WHITE
 #define ATTR_WHITE   TATTR_WHITE
 #endif
+
+/* 標準の 80×25。console の折返し・scroll・console_get_size が同じ値を読む。 */
+static const struct con_geometry pc98_geometry = { TVRAM_COLS, TVRAM_ROWS };
+
+const struct con_geometry *con_backend_geometry(void)
+{
+    return &pc98_geometry;
+}
+
+/* 経路の番人が未リンク (weak) なら常に書いてよい。 */
+int con_backend_safe(void)
+{
+    return !pc98_console_safe || pc98_console_safe();
+}
+
+u8 con_backend_color(unsigned role)
+{
+    (void)role;   /* 役割は今は既定の 1 つ */
+    return ATTR_WHITE;
+}
 
 void con_backend_clear(void)
 {

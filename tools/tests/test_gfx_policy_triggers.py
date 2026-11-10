@@ -42,6 +42,7 @@ int con_sink_is_enabled(void) { return gui; }
 void con_sink_enable(void) { gui=1; }
 void con_sink_disable(void) { gui=0; }
 int pc98_console_safe(void) { return 1; }
+int con_backend_safe(void) { return 1; }
 int legacy_active(void) { return 0; }
 void con_backend_cursor_shape(int n) { (void)n; }
 void kbd_inject_discard(void) {}

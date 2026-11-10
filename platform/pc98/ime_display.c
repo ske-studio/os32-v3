@@ -2,6 +2,7 @@
 #include "kernel/ime/ime_display_private.h"
 #include "pc98.h"
 #include "tvram.h"
+#include "tvram_private.h"
 #include "memmap.h"
 #include "mm/kmalloc.h"
 #include "kernel/sqlite_engine.h"
