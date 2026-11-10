@@ -196,7 +196,9 @@ struct gem {
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
     u32 state, step, cursor, polls; /* Bounded state-machine progress. */
     u32 error_status, tx_status, rx_status; /* Captured fault registers. */
-    u32 phy_addr, phy_port; /* Selected PHY and MIF port. */
+    u32 phy_addr, phy_port, phy_id1, phy_id2; /* Selected PHY and MIF port. */
+    u32 phy_step, phy_polls;
+    unsigned long long phy_started;
     u32 tx_head, tx_tail, tx_pending, rx_head; /* Ring ownership indices. */
     u32 rx_watch_wr, rx_watch_rd, rx_watching; /* Overflow watchdog snapshot. */
     unsigned long long started, tx_started, rx_watch_started; /* TB deadlines. */
