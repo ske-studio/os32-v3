@@ -116,8 +116,9 @@ class RunnerTest(unittest.TestCase):
         self.write('.gitignore', '__pycache__/\nbuild/out/\n')
         self.write('drivers/video/a.c', 'int a;\n')
         self.commit()
-        self.env = {k: v for k, v in os.environ.items() if k not in (
-            'MUTATE', 'MUTATE_TARGETS', 'MUT', 'MUTS', 'CHECK_TIME_CHILD', 'CC_FILES_JSON',
+        # Parent check recipes export empty CHECK_NEEDS and timing/shard controls.
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith('CHECK_') and k not in (
+            'MUTATE', 'MUTATE_TARGETS', 'MUT', 'MUTS', 'CC_FILES_JSON',
             'CC_TIER', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES')}
         self.env['HOST32_RUNNERS'] = 'native qemu'
 
