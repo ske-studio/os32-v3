@@ -13,6 +13,14 @@ void _start(void)
       33,34,35,36,37,38,39,40, 0x31,0x32,0x33,0x34,
       0x41,0x42,0x51,0x52,0,3,0x61,0x62,0,0,0,0,
       0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0xaa,0xbb,0xcc };
+    u8 wire[336] = {
+      0x50,0x4c,0x4e,0x31,1,3,0,80,
+      0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
+      1,2,3,4,5,6,7,8, 17,18,19,20,21,22,23,24,
+      33,34,35,36,37,38,39,40, 0x31,0x32,0x33,0x34,
+      0x41,0x42,0x51,0x52,0,0,0x61,0x62,0,0,0,0,
+      0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,
+      0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f };
     u32 i, t, used;
     memset(&m,0,sizeof(m));
     for(i=0;i<16;i++) m.boot_id[i]=(u8)i;
@@ -46,5 +54,20 @@ void _start(void)
     b[7]=79; CHECK(pm_lan_decode(b,83,&d)<0,19); b[7]=80;
     b[60]=1; CHECK(pm_lan_decode(b,83,&d)<0,20); b[60]=0;
     b[56]=1; b[57]=1; CHECK(pm_lan_decode(b,400,&d)<0,21);
+    for(t=0;t<=5;t+=5) {
+        wire[5]=(u8)t; memset(&d,0xff,sizeof(d));
+        CHECK(pm_lan_decode(wire,80,&d)<0,22);
+        for(i=0;i<sizeof(d);i++) CHECK(((u8 *)&d)[i]==0,23);
+    }
+    wire[5]=3;
+    for(i=0;i<256;i++) wire[80+i]=(u8)(i^0xa5);
+    for(t=0;t<=256;t+=256) {
+        wire[56]=(u8)(t>>8); wire[57]=(u8)t;
+        memset(&d,0xff,sizeof(d));
+        CHECK(pm_lan_decode(wire,80+t,&d)==0,24);
+        CHECK(d.type==3 && d.seq==0x0102030405060708ULL && d.drop_records==0x1112131415161718ULL && d.drop_bytes==0x2122232425262728ULL && d.request_id==0x31323334 && d.opcode==0x4142 && d.status==0x5152 && d.payload_bytes==t && d.flags==0x6162,25);
+        for(i=0;i<16;i++) CHECK(d.boot_id[i]==i && d.host_nonce[i]==0x80+i,26);
+        for(i=0;i<256;i++) CHECK(d.payload[i]==(t ? (u8)(i^0xa5) : 0),27);
+    }
     out("PASS\n",5); __asm__ volatile("int $0x80" : : "a"(1), "b"(0)); __builtin_unreachable();
 }
