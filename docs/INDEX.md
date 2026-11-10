@@ -20,7 +20,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
 | 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-25.md](tasks/agents/HANDOVER_2026-10-25.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は `docs/archive/agents/HANDOVER_2026-10-08.md` |
 | 文書の書き方 (置くもの・置かないもの・正典の 1 か所) | [POLICY_DEV.md §9](POLICY_DEV.md) | CLAUDE.md (1 行) |
-| エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は `docs/archive/agents/ROLES_HISTORY_2026-10-06.md`、見直しの根拠は `docs/archive/agents/REVIEW_2026-10-06.md` |
+| エージェント運用体制 (役割・起動・規約・統合の枝と一括の受入) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表、統合の枝と一括の受入は §4-2。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は `docs/archive/agents/ROLES_HISTORY_2026-10-06.md`、見直しの根拠は `docs/archive/agents/REVIEW_2026-10-06.md` |
 | 機能ごとのブランチで並列に実装する (触るファイルの一覧・共有の登録ファイルの持ち主・上限の予算・結線は直列) | [tasks/agents/PARALLEL_BRANCHES.md](tasks/agents/PARALLEL_BRANCHES.md) | ROLES §0 (案内のみ) |
 | 手本がある移植の進め方 (コンパイルを全部の実装の後に・設計の段の点検・依頼に必ず書くこと・踏んだこと) | [tasks/agents/PORT_FLOW.md](tasks/agents/PORT_FLOW.md) | ROLES §0 (1 行)、スキル `os32-delegate` (案内のみ) |
 | PCI 装置の扱い (手本・不在・待ち・初期化・番地・PC-98・試験) | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | PORT_FLOW §4、WORK_GUIDE、POLICY_DEBUG §4、05_drivers (案内のみ) |

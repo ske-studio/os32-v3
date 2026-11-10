@@ -101,7 +101,7 @@ check-par の既存計時子は CHECK_TIME_CHILD=1 を渡す。子の --run は�
 直接 make check-X/CLI --run は同じ閉包の make needs をまとめて1回組んでから実行する。ver-info の前提は重複なく選択へ加える。
 BUILD_OUT/SQLITE_PROTO_OUT/CROSS_DIR 等は make の展開値を渡し、Python にパスの別定義を作らない。
 check-changed は CC_FILES_JSON を各 run の ctx.files へ渡す。空 stage は検査呼出しを省き、全列へ戻さない。親 make の -j/-k、計時、tree save/verify を維持する。
-CI の `.github/workflows/check.yml:68` 以降28入口と `build.yml:145` の check-fast は同じ名前。
+CI の `.github/workflows/check.yml` の `make check-*` の各入口と `build.yml` の `make check-fast CHECK_SHARD=i/6` は同じ名前・同じ列を使う。
 check-map は新 lint、check-check-select-host は新 test_run の入口。列挙失敗は空列として扱わない。
 
 ## 状態・失敗
