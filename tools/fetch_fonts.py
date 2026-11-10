@@ -239,10 +239,19 @@ def download(url, stderr, opener=None):
     """zip 等を丸ごとメモリに取る。urllib の既定 (プロキシ環境変数) に任せる。"""
     stderr.write("取得中: %s\n" % url)
     if opener is None:
-        return subprocess.run(['curl', '-fL', '--connect-timeout', '15',
-                               '--max-time', '60', '--retry', '8', '--retry-all-errors',
-                               '--retry-max-time', '180', url],
-                              stdout=subprocess.PIPE, check=True, timeout=240).stdout
+        # 1 回の取得ごとに curl を起こし直す。curl の --retry は標準出力に途中までの
+        # 本体を残したまま次を足すので、出力が連結されて SHA-256 が合わなくなる。
+        # 止まった転送は --speed-limit/--speed-time で切る (全体の時間では切らない)。
+        last = None
+        for _ in range(5):
+            try:
+                return subprocess.run(['curl', '-fL', '--connect-timeout', '15',
+                                       '--speed-limit', '1024', '--speed-time', '60', url],
+                                      stdout=subprocess.PIPE, check=True, timeout=600).stdout
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                last = exc
+                stderr.write("取得の再試行: %s\n" % exc)
+        raise last
     req = urllib.request.Request(url, headers={"User-Agent": "os32-fetch-fonts/1"})
     open_fn = opener.open if opener is not None else urllib.request.urlopen
     with open_fn(req, timeout=120) as resp:
