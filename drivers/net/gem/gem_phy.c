@@ -143,7 +143,11 @@ int gem_phy_step(struct gem *g, unsigned long long now)
         }
         if (now - g->phy_started >= ticks(g->io.tb_hz, 5000000) || ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }
         return GEM_AGAIN;
-    case PHY_DONE: return GEM_OK;
+    case PHY_DONE:
+        /* BMSR_LINK latches low until read (OpenBSD mii.h, ukphy_subr.c). */
+        r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) return r;
+        if (!(v & BMSR_LINK)) { g->phy_step = PHY_START; return GEM_EIO; }
+        return GEM_OK;
     default: return GEM_EINVAL;
     }
 }
