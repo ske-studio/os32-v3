@@ -3,8 +3,6 @@
 #include "arch/ppc/kernel_boot.h"
 #include "kboot_info.h"
 
-int ppc_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
-
 #define PCI_COMMAND 4u
 #define PCI_MASTER 4u
 
@@ -59,6 +57,6 @@ int pm_lan_gem_io(const struct pm_gmac_boot *b, struct gem_io *out)
                              b->bus_first, b->bus_last, b->bdf};
     *out = (struct gem_io){ .ctx = &hw, .read32 = rd, .write32 = wr,
         .tb = tb64, .tb_hz = ppc_boot_info()->tb_hz,
-        .sync = ppc_dma_sync, .master_enable = master };
+        .sync = pm_gmac_dma_sync, .master_enable = master };
     return GEM_OK;
 }

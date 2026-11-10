@@ -22,6 +22,16 @@ static int attempted, status;
 
 void ppc_dcbf_line(void *line);
 void ppc_sync(void);
+int ppc_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
+
+int pm_gmac_dma_sync(void *cpu, u32 bytes, enum dma_sync op)
+{
+    if ((unsigned long)cpu - (unsigned long)pool < DMA_BLOCK) {
+        ppc_sync();
+        return 0;
+    }
+    return ppc_dma_sync(cpu, bytes, op);
+}
 
 int pm_dma_bus(u32 pa, u32 bytes, u32 *bus)
 {
