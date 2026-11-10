@@ -4,6 +4,7 @@
 #include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
+#include "display_restore.h"
 #include "os32_kapi_shared.h"
 #include "../drivers/video/pc98/splash_raster.h"
 #include "io.h"
@@ -159,10 +160,11 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 static void _flush_dirty_queue(void)
 {
     int i, row;
-    u8 *vb_base = (u8 *)P2V(VRAM_PLANE_B);
-    u8 *vr_base = (u8 *)P2V(VRAM_PLANE_R);
-    u8 *vg_base = (u8 *)P2V(VRAM_PLANE_G);
-    u8 *vi_base = (u8 *)P2V(VRAM_PLANE_I);
+    /* 表示メモリの 4 プレーンの番地は platform の provider が持つ (第 5 段 B6)。 */
+    u8 *vb_base = display_planar_plane(0);
+    u8 *vr_base = display_planar_plane(1);
+    u8 *vg_base = display_planar_plane(2);
+    u8 *vi_base = display_planar_plane(3);
 
     for (i = 0; i < dirty_queue.count; i++) {
         GFX_Rect *r = &dirty_queue.rects[i];
@@ -218,8 +220,7 @@ static void _merge_prev_dirty(void)
 static void _flip_page(void)
 {
     gfx_display_page ^= 1;
-    _out(GDC_DISP_PAGE, gfx_display_page);
-    _out(GDC_ACCESS_PAGE, gfx_display_page ^ 1);
+    display_flip_pages(gfx_display_page, gfx_display_page ^ 1);
     gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */
 }
 
@@ -242,7 +243,7 @@ static void _present_dirty(int sync)
         gfx_counters.commits++;
         if (sync) {
             /* VSYNC期間になるまで待つ */
-            while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
+            display_wait_vsync();
         }
         _flush_dirty_queue();
     }

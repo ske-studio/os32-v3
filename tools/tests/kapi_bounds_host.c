@@ -54,6 +54,10 @@ GfxBackend gfx_backend_pc98 = {.query=host_query, .set_palette=host_palette};
 int vram_scroll_y;
 void cpu_delay_us(u32 n) { (void)n; }
 struct SplashRaster *pc98_splash_raster_state(void) { return 0; }
+/* 第 5 段 B6: present が呼ぶ表示の provider の口 (この fixture は境界だけを見る)。 */
+void display_flip_pages(int display, int access) { (void)display; (void)access; }
+void display_wait_vsync(void) { }
+u8 *display_planar_plane(unsigned index) { static u8 plane[4][32768]; return plane[index]; }
 int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t)
 { (void)s; (void)t; return SPLASH_RASTER_NO_SYNC; }
 

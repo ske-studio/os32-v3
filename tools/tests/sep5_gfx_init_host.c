@@ -47,6 +47,17 @@ static void *host_clear(void *dst, int value, u32 n)
 }
 #undef outp
 #define outp(p, v) event(EV_OUT, (p), (v))
+/* B6: the status port answers "not in vertical retrace" vsync_misses times first. */
+enum { EV_IN = 3 };
+static unsigned vsync_misses;
+static unsigned host_in(unsigned port)
+{
+    event(EV_IN, port, 0);
+    if (vsync_misses) { vsync_misses--; return 0xDF; }   /* every bit but VSYNC (bit 5) */
+    return 0x20;
+}
+#undef inp
+#define inp(p) host_in(p)
 #define P2V_IO(pa) host_io(pa)
 #define P2V(pa) host_plane(pa)
 #define kmemset(d, v, n) host_clear((d), (v), (n))
@@ -82,6 +93,52 @@ static void gfx_bind_client(void)
 void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
 #include "gfx_core_slice.inc"
+
+/* B6: the common present path (gfx/gfx_vram.c _flip_page and _present_dirty),
+ * extracted from the product text; transfer steps are recording fakes. */
+enum { F_MERGE = 20, F_FLUSH };
+GfxCounters gfx_counters;
+static int packed;
+static int _present_dirty_packed(void) { return packed; }
+static void _merge_prev_dirty(void) { event(EV_CALL, F_MERGE, 0); }
+static void _flush_dirty_queue(void) { event(EV_CALL, F_FLUSH, 0); dirty_queue.count = 0; }
+#include "gfx_vram_slice.inc"
+static void is(unsigned i, unsigned kind, unsigned a, unsigned b);
+static void present_case(void)
+{
+    bb_b = &planes_b[0]; packed = 0;
+    /* Flip mode: merge, transfer, then show the page just drawn and draw on the other. */
+    for (int start = 0; start < 2; start++) {
+        gfx_flip_enabled = 1; gfx_display_page = start; dirty_queue.count = 1; prev_dirty.count = 0;
+        count = 0;
+        _present_dirty(1);
+        expect(count == 4 && gfx_display_page == (start ^ 1));
+        is(0, EV_CALL, F_MERGE, 0); is(1, EV_CALL, F_FLUSH, 0);
+        is(2, EV_OUT, 0xA4, start ^ 1); is(3, EV_OUT, 0xA6, start);
+    }
+    /* No flip, sync: wait on the text GDC status until VSYNC, then transfer. */
+    gfx_flip_enabled = 0; dirty_queue.count = 1; vsync_misses = 2;
+    count = 0;
+    _present_dirty(1);
+    expect(count == 4);
+    for (unsigned i = 0; i < 3; i++) is(i, EV_IN, 0x60, 0);
+    is(3, EV_CALL, F_FLUSH, 0);
+    /* No flip, no sync: transfer at once. Nothing dirty: nothing at all. */
+    dirty_queue.count = 1; count = 0;
+    _present_dirty(0);
+    expect(count == 1); is(0, EV_CALL, F_FLUSH, 0);
+    count = 0;
+    _present_dirty(1);
+    expect(count == 0);
+    /* The provider's own primitives. */
+    vsync_misses = 0; count = 0;
+    display_wait_vsync();
+    expect(count == 1); is(0, EV_IN, 0x60, 0);
+    {
+        static const unsigned vram[4] = {0xA8000, 0xB0000, 0xB8000, 0xE0000};
+        for (unsigned p = 0; p < 4; p++) expect((unsigned)display_planar_plane(p) == vram[p]);
+    }
+}
 
 static void is(unsigned i, unsigned kind, unsigned a, unsigned b)
 {
@@ -150,6 +207,7 @@ static void no_plane_case(void)
 void _start(void)
 {
     init_case(0); init_case(1); no_plane_case();
+    present_case();
     start_case(0); start_case(1);
     for (int d = 0; d < 2; d++) for (int a = 0; a < 2; a++) flip_case(d, a);
 

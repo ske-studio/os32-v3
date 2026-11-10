@@ -2,7 +2,7 @@
 """B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
     covers=['platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
-            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_internal.h', 'gfx/gfx.h',
+            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
             'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
@@ -31,9 +31,13 @@ MUTATIONS = (
     ('flip-access', PROVIDER, 'access ? GDC_PAGE_1 : GDC_PAGE_0', 'access ? GDC_PAGE_0 : GDC_PAGE_1'),
     ('hide-attr', PROVIDER, '        tvram_attr[i * 2] = 0x00;', '        tvram_attr[i] = 0x00;'),
     ('hide-short', PROVIDER, 'i < TVRAM_COLS * TVRAM_ROWS; i++', 'i < TVRAM_COLS * (TVRAM_ROWS - 1); i++'),
+    ('vsync-inverted', PROVIDER, 'while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }', 'while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) != 0) { }'),
+    ('vsync-graphic-gdc', PROVIDER, '_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC', '_in(GDC_GFX_STAT) & GDC_STAT_VSYNC'),
+    ('plane-order', PROVIDER, 'VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I\n    };\n    return',
+     'VRAM_PLANE_B, VRAM_PLANE_G, VRAM_PLANE_R, VRAM_PLANE_I\n    };\n    return'),
     ('clear-one-page', PROVIDER, '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset'),
 )
-CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc'}
+CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'gfx/gfx_vram.c'}
 # The common callers are extracted from the product text and *executed* with
 # recording fakes; these mutants must fail that executed trace.
 CORE_MUTATIONS = (
@@ -56,6 +60,14 @@ CORE_MUTATIONS = (
      '    display_planar_start(legacy200);\n\n    gfx_clear_planar_pages(plane_sz);\n',
      '    gfx_clear_planar_pages(plane_sz);\n    display_planar_start(legacy200);\n'),
     ('flip-pages-swapped', 'init', '    display_flip_pages(0, 1);', '    display_flip_pages(1, 0);'),
+    # B6: the present path of gfx/gfx_vram.c.
+    ('present-flip-swapped', 'vram', '    display_flip_pages(gfx_display_page, gfx_display_page ^ 1);',
+     '    display_flip_pages(gfx_display_page ^ 1, gfx_display_page);'),
+    ('present-flip-before-transfer', 'vram',
+     '        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n        _flip_page();\n    } else {\n        if (dirty_queue.count == 0) return;',
+     '        _flip_page();\n        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n    } else {\n        if (dirty_queue.count == 0) return;'),
+    ('present-vsync-omitted', 'vram', '            display_wait_vsync();\n', '            (void)0;\n'),
+    ('present-vsync-always', 'vram', '        if (sync) {\n            /* VSYNC期間になるまで待つ */', '        if (sync || 1) {\n            /* VSYNC期間になるまで待つ */'),
     ('200-clear-size', 'init', '    _gfx_common_init(plane_sz);', '    _gfx_common_init(GFX_PLANE_SZ);'),
 )
 
@@ -74,6 +86,8 @@ def execute(texts, work):
     (work / 'gfx_init_source.inc').write_text(texts['provider'])
     (work / 'gfx_core_slice.inc').write_text(
         function(texts['core'], '_gfx_common_init') + function(texts['init'], 'gfx_init_mode'))
+    (work / 'gfx_vram_slice.inc').write_text(
+        function(texts['vram'], '_flip_page') + function(texts['vram'], '_present_dirty'))
     exe = work / 'gfx_init'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
@@ -94,7 +108,8 @@ def main():
         work = Path(directory)
         assert execute(texts, work) == 0
         print('PASS host32 provider trace (200/400 start, flip, FF2, text hide bounds, page clear) and '
-              'executed common bring-up order (400, 200, missing plane)', flush=True)
+              'executed common bring-up order (400, 200, missing plane) and present path '
+              '(flip pages after transfer, VSYNC wait, plane addresses)', flush=True)
         if args.mutate:
             for name, unit, old, new in (*((n, 'provider', o, r) for n, _, o, r in MUTATIONS),
                                          *CORE_MUTATIONS):
