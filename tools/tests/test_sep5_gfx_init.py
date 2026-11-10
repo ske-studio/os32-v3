@@ -40,6 +40,11 @@ CORE_MUTATIONS = (
     ('hide-before-plane-check', 'core',
      '    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n',
      '    display_text_hide();\n    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n'),
+    ('hide-omitted', 'core', '    display_text_hide();\n\n', '\n'),
+    # A true move: the final memory state is unchanged, only the order differs.
+    ('hide-after-clear', 'core',
+     '    display_text_hide();\n\n    /* ゼロクリア (バックバッファ) — kmemset (rep stosd) で高速化 */\n    kmemset(bb_b, 0, plane_sz);\n    kmemset(bb_r, 0, plane_sz);\n    kmemset(bb_g, 0, plane_sz);\n    kmemset(bb_i, 0, plane_sz);\n',
+     '    kmemset(bb_b, 0, plane_sz);\n    kmemset(bb_r, 0, plane_sz);\n    kmemset(bb_g, 0, plane_sz);\n    kmemset(bb_i, 0, plane_sz);\n    display_text_hide();\n'),
     ('ff2-before-clear', 'core',
      '    display_text_hide();\n\n', '    display_text_hide();\n    display_planar16();\n\n'),
     ('ff2-omitted-by-caller', 'core', '    kmemset(bb_i, 0, plane_sz);\n\n    display_planar16();\n',

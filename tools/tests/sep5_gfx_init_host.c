@@ -33,9 +33,15 @@ static volatile void *host_io(u32 pa)
     finish(2);
 }
 static void *host_plane(u32 pa) { return (void *)pa; }  /* identity token only */
+static int text_hidden_at_bb_clear = -1;
+static u8 planes_b[4];
 static void *host_clear(void *dst, int value, u32 n)
 {
     expect(value == 0);
+    /* Order of the memory-only step: text must already be hidden when the
+     * first backbuffer plane is cleared (a final-state check cannot see this). */
+    if (dst == (void *)&planes_b[0])
+        text_hidden_at_bb_clear = text_chars[1] == 0 && text_attrs[2] == 0;
     event(EV_CLEAR, (unsigned)dst, n);
     return dst;
 }
@@ -59,7 +65,7 @@ int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 DirtyRectQueue dirty_queue, prev_dirty;
 u32 gfx_init_gen;
 static int gfx_started;
-static u8 planes_b[4], planes_ok;
+static u8 planes_ok;
 static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
 static GfxMode host_mode = { .height = 400 };
 static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
@@ -107,8 +113,9 @@ static void init_case(int legacy200)
     static const unsigned vram[4] = {0xA8000, 0xB0000, 0xB8000, 0xE0000};
     bb_b = bb_r = bb_g = bb_i = bb[0] = 0; planes_ok = 1; gfx_started = 0;
     for (unsigned c = 0; c < CELLS; c++) { text_chars[1 + c] = 0x1234; text_attrs[2 + c * 2] = 0xE1; }
-    count = 0;
+    count = 0; text_hidden_at_bb_clear = -1;
     gfx_init_mode(legacy200);
+    expect(text_hidden_at_bb_clear == 1);
     is(i++, EV_CALL, F_SPLASH, 0); is(i++, EV_CALL, F_SELECT, legacy200);
     is(i++, EV_CALL, F_BIND, 0);
     /* _gfx_common_init: text hidden (memory), then the four backbuffer planes, then FF2. */
