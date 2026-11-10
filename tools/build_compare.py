@@ -122,7 +122,7 @@ ALLOWED_TOOL_DIFFS = {
     # 第 5 段 S1: SDK の選択 (CRT・link script・Rust target) を profile に足した。
     'build/sdk/bin/target_profile.py': (
         '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
-        'd8e731247c4f93e77cfc8dbc43d4f5fae2e3bd4d8e973b354095bea48a3174a5'),
+        '6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a'),
 }
 
 

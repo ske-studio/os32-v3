@@ -23,12 +23,16 @@ MESSAGES = dict(module_codec='module', layout='kernel layout', link_guard='guard
                 sdk='sdk')
 
 
+class Unsupported(ValueError):
+    """The target is unknown or lacks the capability (a refusal, not a defect)."""
+
+
 def require(target, capability):
     if target not in PROFILES:
-        raise ValueError('unknown target ' + target)
+        raise Unsupported('unknown target ' + target)
     profile = PROFILES[target]
     if not profile[capability]:
-        raise ValueError('unsupported ' + MESSAGES[capability] + ' target ' + target)
+        raise Unsupported('unsupported ' + MESSAGES[capability] + ' target ' + target)
     return profile
 
 

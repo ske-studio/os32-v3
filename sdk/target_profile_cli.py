@@ -5,9 +5,10 @@
   target_profile_cli.py --target T --make [--root DIR]
 
 --make prints one NAME=value token per SDK field (list items joined by commas,
-paths prefixed with DIR). A refusal (unsupported or unknown target, unknown
-capability) prints nothing on stdout, one line on stderr, and exits REFUSED --
-before any other work. Any other non-zero status is a broken query, not a refusal.
+paths prefixed with DIR). A refusal (unsupported or unknown target) prints
+nothing on stdout, one line on stderr, and exits REFUSED -- before any other
+work. Any other non-zero status is a broken query, not a refusal: an incomplete
+profile, an unprintable value or an unknown capability exits BROKEN.
 """
 import argparse
 import sys
@@ -19,6 +20,7 @@ MAKE_NAMES = dict(call_abi='SDK_TARGET_CALL_ABI', elf_emulation='SDK_TARGET_ELF_
                   app_link='SDK_TARGET_APP_LINK', app_sys_link='SDK_TARGET_APP_SYS_LINK',
                   shlib_link='SDK_TARGET_SHLIB_LINK', rust='SDK_TARGET_RUST')
 REFUSED = 3
+BROKEN = 2
 PATH_FIELDS = ('crt_user', 'crt_resident', 'app_link', 'app_sys_link', 'shlib_link', 'rust')
 
 
@@ -53,9 +55,12 @@ def main(argv=None):
             target_profile.require(args.target, args.require)
             return 0
         tokens = make_tokens(args.target, args.root)
-    except ValueError as error:
+    except target_profile.Unsupported as error:
         print(error, file=sys.stderr)
         return REFUSED
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return BROKEN
     print(' '.join(tokens))
     return 0
 

@@ -39,6 +39,10 @@ NAMES = ('SDK_TARGET_CALL_ABI SDK_TARGET_ELF_EMULATION SDK_TARGET_CRT_USER '
          'SDK_TARGET_SHLIB_LINK SDK_TARGET_RUST').split()
 EVIL = ['SDK_TARGET_SUPPORTED=1', 'SDK_TARGET_STATUS=0', 'SDK_TARGET_CRT_USER=evil.o',
         'SDK_TARGET_APP_LINK=evil.ld', 'SDK_TARGET_TOKENS=SDK_TARGET_RUST=evil.json']
+# The list and helpers of sdk-target.mk themselves must not be replaceable either.
+EVIL_LISTS = (['SDK_TARGET_NAMES=SDK_TARGET_SUPPORTED'], ['SDK_TARGET_NAMES='],
+              ['sdk_target_comma=;'], ['sdk_target_name=SDK_TARGET_SUPPORTED'],
+              ['sdk_target_value=evil.o'])
 # (name, file, unique anchor, replacement, label of the first check that must fail)
 MUTATIONS = (
     ('ppc-sdk-enabled', PROFILE, "sdk=False, **dict.fromkeys(SDK_FIELDS)", "sdk=True, **dict.fromkeys(SDK_FIELDS)", 'ppc-refused'),
@@ -55,8 +59,12 @@ MUTATIONS = (
      'override SDK_TARGET_SUPPORTED := $(if $(filter 0 3,$(SDK_TARGET_STATUS)),1,0)', 'ppc-make-empty'),
     ('value-overridable', MK, '    $(eval override $(call sdk_target_name,$(token)) := ',
      '    $(eval $(call sdk_target_name,$(token)) := ', 'x86-make'),
+    ('names-overridable', MK, 'override SDK_TARGET_NAMES := SDK_TARGET_CALL_ABI', 'SDK_TARGET_NAMES := SDK_TARGET_CALL_ABI', 'ppc-make-empty'),
+    ('helper-overridable', MK, 'override sdk_target_value = ', 'sdk_target_value = ', 'x86-override'),
+    ('crt-eager', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'CRT0_USER_OBJ := $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'x86-make'),
+    ('defect-as-refusal', CLI, '    except target_profile.Unsupported as error:', '    except ValueError as error:', 'ppc-refused'),
     ('elf-unchecked', MK, 'ifneq ($(SDK_TARGET_ELF_EMULATION),$(ELF_EMULATION))', 'ifneq (,)', 'elf-disagree'),
-    ('broken-query-tolerated', MK, 'ifeq ($(filter 0 3,$(SDK_TARGET_STATUS)),)', 'ifeq (x,)', 'query-broken'),
+    ('broken-query-tolerated', MK, 'ifeq ($(filter 0 3,$(SDK_TARGET_STATUS)),)', 'ifeq (x,)', 'defect-status'),
 )
 
 
@@ -76,15 +84,23 @@ def clean_env(root):
     return env
 
 
-def expand(root, variables, *args, target='x86-pc98'):
-    """Expand make variables through build/config.mk alone (no product graph)."""
+def expand(root, variables, *args, target='x86-pc98', via='argv', after=''):
+    """Expand make variables through build/config.mk alone (no product graph).
+    args reach make on the command line, through MAKEFLAGS, or as environment + -e."""
     arch, platform = target.split('-')
     recipe = ''.join('\t@$(info %s=$(%s))\n' % (name, name) for name in variables)
+    env, flags = clean_env(root), []
+    if via == 'MAKEFLAGS':
+        env['MAKEFLAGS'] = ' '.join(args)
+        args = ()
+    elif via == 'environment':
+        env.update(arg.split('=', 1) for arg in args)
+        args, flags = (), ['-e']
     result = subprocess.run(
-        ['make', '--no-print-directory', '-rRsf', '-', 'ARCH=' + arch, 'PLATFORM=' + platform,
-         'BUILD_OUT=output', *args, '__query'],
-        input='include build/config.mk\n.PHONY: __query\n__query:\n' + recipe + '\t@:\n',
-        cwd=root, env=clean_env(root), text=True, capture_output=True, timeout=60)
+        ['make', '--no-print-directory', '-rRsf', '-', *flags, 'ARCH=' + arch,
+         'PLATFORM=' + platform, 'BUILD_OUT=output', *args, '__query'],
+        input='include build/config.mk\n' + after + '.PHONY: __query\n__query:\n' + recipe + '\t@:\n',
+        cwd=root, env=env, text=True, capture_output=True, timeout=60)
     values = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
     return result, values
 
@@ -129,15 +145,17 @@ def checks(root):
     need((tokens.returncode, tokens.stdout, tokens.stderr) == (0, TOKENS, ''), 'cli-tokens', tokens)
     need(cli(root, '--target', 'x86-pc98', '--require', 'sdk').returncode == 0, 'cli-tokens')
 
+    # NANO_LIB is defined after the config (build/programs.mk): the CRT list must stay lazy.
     result, values = expand(root, ['CRT0_USER_OBJ', 'CRT0_RESIDENT_OBJ', 'CRT0_OBJ', 'NANO_LIB',
-                                   'PROGRAM_LDFLAGS', 'SDK_TARGET_SUPPORTED', *NAMES])
+                                   'PROGRAM_LDFLAGS', 'SDK_TARGET_SUPPORTED', *NAMES],
+                            after='NANO_LIB = output/lib/libos32nano.a\n')
     need(result.returncode == 0, 'x86-make', result.stderr)
     made = {name: value.replace(',', ' ') for name, value in
             (token.split('=') for token in TOKENS.split())}
     user = made['SDK_TARGET_CRT_USER']
     need(values['CRT0_USER_OBJ'].split() == (user + ' ' + values['NANO_LIB']).split() and
          values['CRT0_OBJ'] == values['CRT0_USER_OBJ'] and
-         values['CRT0_USER_OBJ'].startswith(user + ' ') and
+         values['CRT0_USER_OBJ'] == user + ' output/lib/libos32nano.a' and
          values['CRT0_RESIDENT_OBJ'] == made['SDK_TARGET_CRT_RESIDENT'] and
          values['PROGRAM_LDFLAGS'].startswith('-m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic ') and
          values['SDK_TARGET_SUPPORTED'] == '1' and
@@ -154,7 +172,7 @@ def checks(root):
             need((refused.returncode, refused.stdout, refused.stderr) == (3, '', message + '\n'),
                  'ppc-refused', refused)
     unknown = cli(root, '--target', 'x86-pc98', '--require', 'telepathy')
-    need((unknown.returncode, unknown.stdout) == (3, ''), 'ppc-refused', unknown)
+    need((unknown.returncode, unknown.stdout) == (2, ''), 'ppc-refused', unknown)
 
     partial = dict(profile.PROFILES['x86-pc98'], rust=None)
     profile.PROFILES['partial'] = partial
@@ -166,6 +184,11 @@ def checks(root):
     need(result.returncode == 0 and values.get('SDK_TARGET_SUPPORTED') == '0' and
          values.get('CRT0_RESIDENT_OBJ') == '' and all(values.get(name) == '' for name in NAMES),
          'ppc-make-empty', (result.stderr, values))
+    for extra in EVIL_LISTS:
+        result, values = expand(root, ['SDK_TARGET_SUPPORTED', *NAMES], *EVIL, *extra,
+                                target='ppc-powermac')
+        need(result.returncode == 0 and values.get('SDK_TARGET_SUPPORTED') == '0' and
+             all(values.get(name) == '' for name in NAMES), 'ppc-make-empty', (extra, values))
     for target in ('sdk', 'programs', 'libs', 'boot'):
         need(entry_rejected(root, target), 'ppc-entries', target)
 
@@ -175,9 +198,35 @@ def checks(root):
          values['SDK_TARGET_APP_LINK'] == 'sdk/link/app.ld' and
          values['SDK_TARGET_RUST'] == 'sdk/rust/i686-os32-none.json', 'x86-override', values)
 
+    for extra in EVIL_LISTS:
+        for via in ('argv', 'MAKEFLAGS', 'environment'):
+            result, values = expand(root, ['SDK_TARGET_SUPPORTED', *NAMES], *EVIL, *extra, via=via)
+            need(result.returncode == 0 and values.get('SDK_TARGET_SUPPORTED') == '1' and
+                 values.get('SDK_TARGET_CRT_USER') == user and
+                 values.get('SDK_TARGET_APP_LINK') == 'sdk/link/app.ld' and
+                 values.get('SDK_TARGET_RUST') == 'sdk/rust/i686-os32-none.json',
+                 'x86-override', (extra, via, result.stderr, values))
+
     result, _ = expand(root, ['CRT0_USER_OBJ'], 'ELF_EMULATION=elf32ppc')
     need(result.returncode != 0 and 'disagree on the ELF emulation' in result.stderr,
          'elf-disagree', result.stderr)
+
+    # A defect is not a refusal: status 2, and make stops instead of linking without a CRT.
+    bad_root = cli(root, '--target', 'x86-pc98', '--make', '--root', 'bad root')
+    need((bad_root.returncode, bad_root.stdout) == (2, ''), 'defect-status', bad_root)
+    intact = (root / PROFILE).read_text()
+    try:
+        hole = "shlib_link='link/shlib.ld', rust='rust/i686-os32-none.json')"
+        assert intact.count(hole) == 1
+        (root / PROFILE).write_text(intact.replace(hole, "shlib_link='link/shlib.ld', rust=None)"))
+        partial = cli(root, '--target', 'x86-pc98', '--make', '--root', 'sdk')
+        need((partial.returncode, partial.stdout, partial.stderr) ==
+             (2, '', 'incomplete sdk target x86-pc98\n'), 'defect-status', partial)
+        result, _ = expand(root, ['CRT0_USER_OBJ'])
+        need(result.returncode != 0 and 'sdk target profile query failed' in result.stderr,
+             'defect-status', result.stderr)
+    finally:
+        (root / PROFILE).write_text(intact)
 
     original = (root / CLI).read_text()
     try:
