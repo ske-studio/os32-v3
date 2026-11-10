@@ -277,7 +277,7 @@ def prune_fixtures(cache, external=False):
     entries = []
     cutoff = time.time() - PENDING_MAX_AGE
     for path in cache.iterdir():
-        if path.name == '.lock':
+        if path.name == '.lock' or path.name.startswith('.write-test-'):
             continue
         if path.suffix == '.pending':
             try:
@@ -289,7 +289,10 @@ def prune_fixtures(cache, external=False):
         if path.suffix == '.lock':
             path.unlink(missing_ok=True)
             continue
-        stamp = path.stat()
+        try:
+            stamp = path.stat()
+        except FileNotFoundError:
+            continue  # A worker can remove a probe outside the cache lock.
         entries.append((stamp.st_mtime_ns, path, stamp.st_size))
     total = sum(size for _, _, size in entries)
     count = len(entries)
