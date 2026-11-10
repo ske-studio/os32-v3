@@ -17,7 +17,7 @@ BSD = Path("/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/gemreg.h")
 LAN = ROOT / "platform/powermac/lan_boot.h"
 # Explicit product-to-reference mapping; offsets in OpenBSD are bank-relative.
 PAIRS = [(name, name) for name in """
-GEM_CONFIG GEM_INTMASK GEM_STATUS_ALIAS GEM_PCI_BANK2_OFFSET GEM_RESET GEM_CONFIG_BURST_INF GEM_CONFIG_TXDMA_LIMIT GEM_CONFIG_RXDMA_LIMIT GEM_CONFIG_RONPAULBIT GEM_CONFIG_BUG2FIX GEM_INTR_RX_TAG_ERR GEM_INTR_TX_MAC GEM_INTR_RX_MAC GEM_INTR_BERR GEM_RESET_TX GEM_RESET_RX GEM_TX_KICK GEM_TX_CONFIG GEM_TX_RING_PTR_LO GEM_TX_RING_PTR_HI GEM_TX_COMPLETION GEM_TX_CONFIG_TXDMA_EN GEM_TX_CONFIG_TXRING_SZ GEM_TX_CONFIG_TXFIFO_TH GEM_RING_SZ_32 GEM_TX_COMPLETION_MASK GEM_RX_CONFIG GEM_RX_RING_PTR_LO GEM_RX_RING_PTR_HI GEM_RX_FIFO_WR_PTR GEM_RX_FIFO_RD_PTR GEM_RX_PAUSE_THRESH GEM_RX_KICK GEM_RX_BLANKING GEM_RX_FIFO_SIZE GEM_RX_CONFIG_RXDMA_EN GEM_RX_CONFIG_RXRING_SZ GEM_RX_CONFIG_FBOFF GEM_RX_CONFIG_CXM_START GEM_RX_CONFIG_FIFO_THRS GEM_THRSH_1024 GEM_RX_CONFIG_FIFO_THRS_SHIFT GEM_RX_CONFIG_FBOFF_SHFT GEM_RX_PTH_XOFF_THRESH GEM_RX_PTH_XON_THRESH GEM_MAC_SEND_PAUSE_CMD GEM_MAC_TX_STATUS GEM_MAC_RX_STATUS GEM_MAC_TX_MASK GEM_MAC_RX_MASK GEM_MAC_CONTROL_MASK GEM_MAC_TX_CONFIG GEM_MAC_RX_CONFIG GEM_MAC_CONTROL_CONFIG GEM_MAC_XIF_CONFIG GEM_MAC_IPG0 GEM_MAC_IPG1 GEM_MAC_IPG2 GEM_MAC_MAC_MIN_FRAME GEM_MAC_MAC_MAX_FRAME GEM_MAC_PREAMBLE_LEN GEM_MAC_JAM_SIZE GEM_MAC_ATTEMPT_LIMIT GEM_MAC_CONTROL_TYPE GEM_MAC_ADR_FLT_MASK1_2 GEM_MAC_ADR_FLT_MASK0 GEM_MAC_NORM_COLL_CNT GEM_MAC_FIRST_COLL_CNT GEM_MAC_EXCESS_COLL_CNT GEM_MAC_LATE_COLL_CNT GEM_MAC_DEFER_TMR_CNT GEM_MAC_PEAK_ATTEMPTS GEM_MAC_RX_FRAME_COUNT GEM_MAC_RX_LEN_ERR_CNT GEM_MAC_RX_ALIGN_ERR GEM_MAC_RX_CRC_ERR_CNT GEM_MAC_RX_CODE_VIOL GEM_MAC_RANDOM_SEED GEM_MAC_MAC_STATE GEM_MAC_TX_UNDERRUN GEM_MAC_TX_PKT_TOO_LONG GEM_MAC_RX_DONE GEM_MAC_RX_OVERFLOW GEM_MAC_RX_FRAME_CNT GEM_MAC_XIF_TX_MII_ENA GEM_MAC_XIF_GMII_MODE GEM_MAC_XIF_LINK_LED GEM_MAC_XIF_FDPLX_LED GEM_MAC_TX_ENABLE GEM_MAC_TX_IGN_CARRIER GEM_MAC_TX_IGN_COLLIS GEM_MAC_TX_ENA_IPG0 GEM_MAC_TX_NGU GEM_MAC_TX_NGU_LIMIT GEM_MAC_RX_ENABLE GEM_MAC_RX_STRIP_CRC GEM_MAC_RX_PROMISCUOUS GEM_MAC_RX_PROMISC_GRP GEM_MAC_RX_HASH_FILTER GEM_MAC_CC_TX_PAUSE GEM_MAC_CC_RX_PAUSE GEM_MAC_STATE_OVERFLOW GEM_MIF_FRAME GEM_MIF_CONFIG GEM_MIF_FRAME_DATA GEM_MIF_FRAME_TA0 GEM_MIF_FRAME_READ GEM_MIF_FRAME_WRITE GEM_MIF_REG_SHIFT GEM_MIF_PHY_SHIFT GEM_MIF_CONFIG_PHY_SEL GEM_MIF_CONFIG_POLL_ENA GEM_MIF_CONFIG_BB_ENA GEM_MIF_CONFIG_MDI0 GEM_MIF_CONFIG_MDI1 GEM_TD_BUFSIZE GEM_TD_END_OF_PACKET GEM_TD_START_OF_PACKET GEM_RD_BUFSIZE GEM_RD_OWN GEM_RD_BAD_CRC GEM_RD_BUFSHIFT GEM_MAC_ADDR0 GEM_MAC_ADDR1 GEM_MAC_ADDR2 GEM_MAC_ADDR3 GEM_MAC_ADDR4 GEM_MAC_ADDR5 GEM_MAC_ADDR6 GEM_MAC_ADDR7 GEM_MAC_ADDR8 GEM_MAC_ADDR_FILTER0 GEM_MAC_ADDR_FILTER1 GEM_MAC_ADDR_FILTER2 GEM_MAC_HASH0 GEM_MAC_HASH1 GEM_MAC_HASH2 GEM_MAC_HASH3 GEM_MAC_HASH4 GEM_MAC_HASH5 GEM_MAC_HASH6 GEM_MAC_HASH7 GEM_MAC_HASH8 GEM_MAC_HASH9 GEM_MAC_HASH10 GEM_MAC_HASH11 GEM_MAC_HASH12 GEM_MAC_HASH13 GEM_MAC_HASH14 GEM_MAC_HASH15
+GEM_ERROR_STATUS GEM_ERROR_STAT_BADACK GEM_ERROR_STAT_DTRTO GEM_ERROR_STAT_OTHERS GEM_MII_CONFIG GEM_MII_DATAPATH_MODE GEM_MII_CONFIG_ENABLE GEM_MII_DATAPATH_SERIAL GEM_MII_DATAPATH_SERDES GEM_MII_DATAPATH_MII GEM_MII_DATAPATH_MIIOUT GEM_CONFIG GEM_INTMASK GEM_STATUS_ALIAS GEM_PCI_BANK2_OFFSET GEM_RESET GEM_CONFIG_BURST_INF GEM_CONFIG_TXDMA_LIMIT GEM_CONFIG_RXDMA_LIMIT GEM_CONFIG_RONPAULBIT GEM_CONFIG_BUG2FIX GEM_INTR_RX_TAG_ERR GEM_INTR_TX_MAC GEM_INTR_RX_MAC GEM_INTR_BERR GEM_RESET_TX GEM_RESET_RX GEM_TX_KICK GEM_TX_CONFIG GEM_TX_RING_PTR_LO GEM_TX_RING_PTR_HI GEM_TX_COMPLETION GEM_TX_CONFIG_TXDMA_EN GEM_TX_CONFIG_TXRING_SZ GEM_TX_CONFIG_TXFIFO_TH GEM_RING_SZ_32 GEM_TX_COMPLETION_MASK GEM_RX_CONFIG GEM_RX_RING_PTR_LO GEM_RX_RING_PTR_HI GEM_RX_FIFO_WR_PTR GEM_RX_FIFO_RD_PTR GEM_RX_PAUSE_THRESH GEM_RX_KICK GEM_RX_BLANKING GEM_RX_FIFO_SIZE GEM_RX_CONFIG_RXDMA_EN GEM_RX_CONFIG_RXRING_SZ GEM_RX_CONFIG_FBOFF GEM_RX_CONFIG_CXM_START GEM_RX_CONFIG_FIFO_THRS GEM_THRSH_1024 GEM_RX_CONFIG_FIFO_THRS_SHIFT GEM_RX_CONFIG_FBOFF_SHFT GEM_RX_PTH_XOFF_THRESH GEM_RX_PTH_XON_THRESH GEM_MAC_SEND_PAUSE_CMD GEM_MAC_TX_STATUS GEM_MAC_RX_STATUS GEM_MAC_TX_MASK GEM_MAC_RX_MASK GEM_MAC_CONTROL_MASK GEM_MAC_TX_CONFIG GEM_MAC_RX_CONFIG GEM_MAC_CONTROL_CONFIG GEM_MAC_XIF_CONFIG GEM_MAC_IPG0 GEM_MAC_IPG1 GEM_MAC_IPG2 GEM_MAC_MAC_MIN_FRAME GEM_MAC_MAC_MAX_FRAME GEM_MAC_PREAMBLE_LEN GEM_MAC_JAM_SIZE GEM_MAC_ATTEMPT_LIMIT GEM_MAC_CONTROL_TYPE GEM_MAC_ADR_FLT_MASK1_2 GEM_MAC_ADR_FLT_MASK0 GEM_MAC_NORM_COLL_CNT GEM_MAC_FIRST_COLL_CNT GEM_MAC_EXCESS_COLL_CNT GEM_MAC_LATE_COLL_CNT GEM_MAC_DEFER_TMR_CNT GEM_MAC_PEAK_ATTEMPTS GEM_MAC_RX_FRAME_COUNT GEM_MAC_RX_LEN_ERR_CNT GEM_MAC_RX_ALIGN_ERR GEM_MAC_RX_CRC_ERR_CNT GEM_MAC_RX_CODE_VIOL GEM_MAC_RANDOM_SEED GEM_MAC_MAC_STATE GEM_MAC_TX_UNDERRUN GEM_MAC_TX_PKT_TOO_LONG GEM_MAC_RX_DONE GEM_MAC_RX_OVERFLOW GEM_MAC_RX_FRAME_CNT GEM_MAC_XIF_TX_MII_ENA GEM_MAC_XIF_GMII_MODE GEM_MAC_XIF_LINK_LED GEM_MAC_XIF_FDPLX_LED GEM_MAC_TX_ENABLE GEM_MAC_TX_IGN_CARRIER GEM_MAC_TX_IGN_COLLIS GEM_MAC_TX_ENA_IPG0 GEM_MAC_TX_NGU GEM_MAC_TX_NGU_LIMIT GEM_MAC_RX_ENABLE GEM_MAC_RX_STRIP_CRC GEM_MAC_RX_PROMISCUOUS GEM_MAC_RX_PROMISC_GRP GEM_MAC_RX_HASH_FILTER GEM_MAC_CC_TX_PAUSE GEM_MAC_CC_RX_PAUSE GEM_MAC_STATE_OVERFLOW GEM_MIF_FRAME GEM_MIF_CONFIG GEM_MIF_FRAME_DATA GEM_MIF_FRAME_TA0 GEM_MIF_FRAME_READ GEM_MIF_FRAME_WRITE GEM_MIF_REG_SHIFT GEM_MIF_PHY_SHIFT GEM_MIF_CONFIG_PHY_SEL GEM_MIF_CONFIG_POLL_ENA GEM_MIF_CONFIG_BB_ENA GEM_MIF_CONFIG_MDI0 GEM_MIF_CONFIG_MDI1 GEM_TD_BUFSIZE GEM_TD_END_OF_PACKET GEM_TD_START_OF_PACKET GEM_RD_BUFSIZE GEM_RD_OWN GEM_RD_BAD_CRC GEM_RD_BUFSHIFT GEM_MAC_ADDR0 GEM_MAC_ADDR1 GEM_MAC_ADDR2 GEM_MAC_ADDR3 GEM_MAC_ADDR4 GEM_MAC_ADDR5 GEM_MAC_ADDR6 GEM_MAC_ADDR7 GEM_MAC_ADDR8 GEM_MAC_ADDR_FILTER0 GEM_MAC_ADDR_FILTER1 GEM_MAC_ADDR_FILTER2 GEM_MAC_HASH0 GEM_MAC_HASH1 GEM_MAC_HASH2 GEM_MAC_HASH3 GEM_MAC_HASH4 GEM_MAC_HASH5 GEM_MAC_HASH6 GEM_MAC_HASH7 GEM_MAC_HASH8 GEM_MAC_HASH9 GEM_MAC_HASH10 GEM_MAC_HASH11 GEM_MAC_HASH12 GEM_MAC_HASH13 GEM_MAC_HASH14 GEM_MAC_HASH15
 """.split()]
 EXTRA = {"GEM_DESC_FLAGS_OFFSET": 0, "GEM_DESC_ADDR_OFFSET": 8,
          "GEM_DESC_SIZE": 16, "GEM_RING_COUNT": 32,
@@ -40,6 +40,36 @@ FLAGS = """-std=gnu11 -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec
 -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=0 -MMD -MP""".split()
 
 
+CONTRACT = r"""
+void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
+    g->io = *io; g->dma = *d;
+    g->state = g->step = g->cursor = g->polls = 0;
+    g->phy_addr = g->phy_port = 0;
+    g->tx_head = g->tx_tail = g->tx_pending = g->rx_head = 0;
+    g->rx_watch_wr = g->rx_watch_rd = g->rx_watching = 0;
+    g->started = g->tx_started = g->rx_watch_started = 0;
+    g->tx_packets = g->rx_packets = g->rx_drops = g->uncertain_tx = 0;
+    d->cpu = io->ctx; d->pa = d->bus = d->bytes = io->tb_hz;
+    u32 (*read32)(void *, u32) = io->read32;
+    void (*write32)(void *, u32, u32) = io->write32;
+    unsigned long long (*tb)(void *) = io->tb;
+    int (*sync)(void *, u32, enum dma_sync) = io->sync;
+    int (*reset)(struct gem *, unsigned long long) = gem_reset_step;
+    int (*mac)(struct gem *, const u8 *) = gem_mac_init;
+    int (*mif)(struct gem *) = gem_mif_init;
+    int (*phy)(struct gem *, unsigned long long) = gem_phy_step;
+    int (*prepare)(struct gem *, struct gem_dma *) = gem_ring_prepare;
+    int (*publish)(struct gem *) = gem_ring_publish;
+    int (*enable)(struct gem *, unsigned long long) = gem_mac_enable_step;
+    int (*tx)(struct gem *, const void *, u32) = gem_tx;
+    int (*rx)(struct gem *, void *, u32, u32 *) = gem_rx;
+    int (*poll)(struct gem *, unsigned long long, u32) = gem_poll;
+    (void)read32; (void)write32; (void)tb; (void)sync;
+    (void)reset; (void)mac; (void)mif; (void)phy; (void)prepare;
+    (void)publish; (void)enable; (void)tx; (void)rx; (void)poll;
+}
+"""
+
 def execute(cmd):
     return subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
 
@@ -56,9 +86,11 @@ def check(header, directory, values):
     host = directory / "host.c"
     host.write_text("\n".join(lines) + "\n")
     cross = directory / "cross.c"
-    cross.write_text('#include "gem.h"\nint gem_contract(void) { return GEM_RING_COUNT; }\n')
+    cross.write_text('#include "gem.h"\n' + CONTRACT)
     includes = ["-I" + str(directory), "-I" + str(ROOT / "include")]
     for cmd in ([PPC, *FLAGS, *includes, "-c", str(cross), "-o", str(directory / "cross.o")],
+                ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", *includes,
+                 "-c", str(cross), "-o", str(directory / "host_contract.o")],
                 ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", *includes,
                  str(host), "-o", str(directory / "host")]):
         result = execute(cmd)
@@ -95,6 +127,17 @@ def main():
             return 1
         print(f"BSD definitions matched: {len(PAIRS)}; constants and errors matched")
         if args.mutate:
+            before = "int gem_reset_step(struct gem *, unsigned long long now);"
+            after = "int gem_reset_step(struct gem *, u32 now);"
+            if original.count(before) != 1:
+                raise RuntimeError("mutation anchor is not unique: signature")
+            (Path(tmp) / "gem.h").write_text(original.replace(before, after))
+            print("reached=signature-compile")
+            result = execute([PPC, *FLAGS, "-I" + tmp, "-I" + str(ROOT / "include"),
+                              "-c", str(Path(tmp) / "cross.c"), "-o", str(Path(tmp) / "cross.o")])
+            if result.returncode != 1 or "incompatible-pointer-types" not in result.stdout or "gem_reset_step" not in result.stdout:
+                raise RuntimeError(f"unexpected signature mutation: rc={result.returncode} {result.stdout}")
+            print("RED signature: reached=signature-compile incompatible-pointer-types gem_reset_step")
             for label, before, after, expected in MUTATIONS:
                 if original.count(before) != 1:
                     raise RuntimeError("mutation anchor is not unique: " + label)

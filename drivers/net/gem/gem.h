@@ -3,11 +3,12 @@
 
 #include "types.h"
 
-/* Register offsets are BAR-relative except RESET, which is bank2-relative. */
+/* Register offsets are BAR-relative except ERROR_STATUS and RESET, which are bank2-relative. */
 #define GEM_CONFIG 0x0004 /* openbsd gemreg.h:44 */
 #define GEM_INTMASK 0x0010 /* openbsd gemreg.h:47 */
 #define GEM_STATUS_ALIAS 0x001c /* openbsd gemreg.h:49 */
 #define GEM_PCI_BANK2_OFFSET 0x1000 /* openbsd gemreg.h:56 */
+#define GEM_ERROR_STATUS 0x0000 /* openbsd gemreg.h:59 */
 #define GEM_RESET 0x0010 /* openbsd gemreg.h:65 */
 #define GEM_CONFIG_BURST_INF 0x000000001 /* openbsd gemreg.h:80 */
 #define GEM_CONFIG_TXDMA_LIMIT 0x00000003e /* openbsd gemreg.h:81 */
@@ -18,6 +19,9 @@
 #define GEM_INTR_TX_MAC 0x000004000 /* openbsd gemreg.h:107 */
 #define GEM_INTR_RX_MAC 0x000008000 /* openbsd gemreg.h:108 */
 #define GEM_INTR_BERR 0x000040000 /* openbsd gemreg.h:111 */
+#define GEM_ERROR_STAT_BADACK 0x000000001 /* openbsd gemreg.h:119 */
+#define GEM_ERROR_STAT_DTRTO 0x000000002 /* openbsd gemreg.h:120 */
+#define GEM_ERROR_STAT_OTHERS 0x000000004 /* openbsd gemreg.h:121 */
 #define GEM_RESET_TX 0x000000001 /* openbsd gemreg.h:130 */
 #define GEM_RESET_RX 0x000000002 /* openbsd gemreg.h:131 */
 #define GEM_TX_KICK 0x2000 /* openbsd gemreg.h:135 */
@@ -119,6 +123,13 @@
 #define GEM_MIF_CONFIG_BB_ENA 0x00000004 /* openbsd gemreg.h:412 */
 #define GEM_MIF_CONFIG_MDI0 0x00000100 /* openbsd gemreg.h:414 */
 #define GEM_MIF_CONFIG_MDI1 0x00000200 /* openbsd gemreg.h:415 */
+#define GEM_MII_CONFIG 0x9010 /* openbsd gemreg.h:435 */
+#define GEM_MII_DATAPATH_MODE 0x9050 /* openbsd gemreg.h:438 */
+#define GEM_MII_CONFIG_ENABLE 0x00000001 /* openbsd gemreg.h:485 */
+#define GEM_MII_DATAPATH_SERIAL 0x00000001 /* openbsd gemreg.h:503 */
+#define GEM_MII_DATAPATH_SERDES 0x00000002 /* openbsd gemreg.h:504 */
+#define GEM_MII_DATAPATH_MII 0x00000004 /* openbsd gemreg.h:505 */
+#define GEM_MII_DATAPATH_MIIOUT 0x00000008 /* openbsd gemreg.h:506 */
 #define GEM_TD_BUFSIZE 0x0000000000007fffLL /* openbsd gemreg.h:536 */
 #define GEM_TD_END_OF_PACKET 0x0000000040000000LL /* openbsd gemreg.h:542 */
 #define GEM_TD_START_OF_PACKET 0x0000000080000000LL /* openbsd gemreg.h:543 */
