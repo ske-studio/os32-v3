@@ -95,6 +95,10 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out','sdk','__pycache__'))
+        # build/sdk-target.mk は config の読み込みで SDK の profile を引く (第 5 段 S1)。
+        (root / 'sdk').mkdir(exist_ok=True)
+        for name in ('sdk/target_profile.py', 'sdk/target_profile_cli.py'):
+            shutil.copy2(ROOT / name, root / name)
         (root / 'Makefile').write_text('include build/config.mk\ninclude build/kernel-objects.mk\n')
         check(root)
         dependency_checks(root, args.mutate)

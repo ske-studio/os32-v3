@@ -58,6 +58,8 @@ int caller_access_get_user(struct caller_access *c) { c->app_id=2; return 1; }
 void pc98_splash_raster_reset(void) {}
 void gfx_reinit_surfaces(int n) { (void)n; }
 int pc98_route_safe(void) { return 0; }
+/* <display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
+#define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
 void gfx_select_mode(Backend *b, int n) { (void)b; (void)n; }
 void gfx_bind_client(void) {}
 '''

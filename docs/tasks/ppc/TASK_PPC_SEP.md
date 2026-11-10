@@ -15,7 +15,9 @@
 | 第 4 段 A・B・C・D・E | 型の幅・配置・モジュール、PPC の型・配置の検査の入口 (tools/ppc/check_layout.py) | main |
 | 第 5 段 A・D1・D2・E・F | コピーの原始操作、WC と GeForce の受入の CPU 部、SQLite の診断、boot の拒否 | main |
 | 第 5 段 B1・C2・B2 | palette・IME の TVRAM・scroll を PC98 の表示 backend へ | main (一括受入、2259debc)。B2 の hardware scroll の +1 行の観測は未確認 (観測用アプリ hwscroll_probe が NP21/W で期待どおりに映らない、main でも同じ画面) |
-| 第 5 段 B3〜B6・C1・C3・S1・S2・Z | 描画の init・provider・surfaces・present、console の backend、boot の IME の facade、SDK の target profile | 未着手 (CONSOLE_DUAL は Z の後と本線と合意) |
+| 第 5 段 B3・C3 | planar の初期化を PC98 の表示 provider へ、boot の IME の facade (include/ime_boot.h) | main (92cb185e、NP21/W の最小受入と B3 の 6 画面の比較は合格) |
+| 第 5 段 B4・S1 | 描画 backend の選択を platform の provider へ (include/display_provider.h、platform/pc98/gfx_selector.c)、SDK の target の選択を profile へ (sdk/target_profile.py・build/sdk-target.mk) | 実装・独立レビュー済 (2026-11-10、枝 wt/ppc-sep5b4s1)。取り込みと NP21/W の受入待ち (B4 は区分 C、S1 は区分 I) |
+| 第 5 段 B5・B6・C1・S2・Z | surfaces・present、console の backend、SDK の接続、全段の後の実測 | 未着手 (CONSOLE_DUAL は Z の後と本線と合意) |
 
 ### 実測 (第 3 段 F・第 4 段 F、2026-11-10)
 
