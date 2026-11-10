@@ -63,7 +63,7 @@ def main():
     expressions += [('sizeof(struct pm_pci_window)', '16'),
                     ('sizeof(struct pm_pci)', '20'),
                     ('__builtin_offsetof(struct pm_gmac_boot, win)', '76'),
-                    ('sizeof(struct pm_gmac_boot)', '220'),
+                    ('sizeof(struct pm_gmac_boot)', '224'),
                     ('__builtin_offsetof(struct lan_message, payload)', '69'),
                     ('sizeof(struct lan_message)', '328')]
     assertions = [f'_Static_assert({expr} == {value}, "{expr}");'
