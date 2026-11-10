@@ -7,6 +7,15 @@
 enum { RESET_START, RX_MAC_WAIT, RX_DMA_WAIT, RX_DELAY, RX_RESET_WAIT,
        TX_MAC_WAIT, TX_DMA_WAIT, TX_DELAY, TX_RESET_WAIT, FULL_WAIT, RESET_DONE };
 
+void gem_enter_reset(struct gem *g)
+{
+    g->uncertain_tx += g->tx_pending;
+    /* Reset returns the NIC TX position to zero and the ring is rebuilt. */
+    g->tx_head = g->tx_tail = g->tx_pending = 0;
+    g->step = RESET_START;
+    g->state = GEM_STATE_RESETTING;
+}
+
 static unsigned long long ticks(u32 hz, u32 us)
 {
     /* Avoid a 64-bit division helper in the kernel. */
@@ -110,7 +119,6 @@ int gem_reset_step(struct gem *g, unsigned long long now)
 int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
 {
     u32 status, v, wr, rd;
-    (void)tx_budget; /* TX completion and RX delivery are added in later stages. */
     if (g->state == GEM_STATE_QUARANTINED) return GEM_ETIME;
     if (g->state == GEM_STATE_RESETTING) return gem_reset_step(g, now);
     /* gem_eint :1151-1197 and gem_rx_watchdog :1199-1235. */
@@ -130,7 +138,7 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
     }
     if ((status & GEM_INTR_TX_MAC) &&
         (g->tx_status & (GEM_MAC_TX_UNDERRUN | GEM_MAC_TX_PKT_TOO_LONG))) {
-        g->step = RESET_START; g->state = GEM_STATE_RESETTING;
+        gem_enter_reset(g);
         return GEM_AGAIN;
     }
     if (g->rx_watching && now - g->rx_watch_started >= ticks(g->io.tb_hz, 400000U)) {
@@ -139,11 +147,11 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
         v = g->io.read32(g->io.ctx, GEM_MAC_MAC_STATE);
         if ((v & GEM_MAC_STATE_OVERFLOW) != GEM_MAC_STATE_OVERFLOW) g->rx_watching = 0;
         else if (wr == rd || (wr == g->rx_watch_wr && rd == g->rx_watch_rd)) {
-            g->rx_watching = 0; g->step = RESET_START; g->state = GEM_STATE_RESETTING;
+            g->rx_watching = 0; gem_enter_reset(g);
             return GEM_AGAIN;
         } else {
             g->rx_watch_wr = wr; g->rx_watch_rd = rd; g->rx_watch_started = now;
         }
     }
-    return GEM_OK;
+    return gem_tx_reclaim(g, now, tx_budget);
 }

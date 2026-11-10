@@ -167,6 +167,12 @@
 #define GEM_MAC_HASH15 0x60fc /* openbsd gemreg.h:288 */
 
 #define GEM_MMIO_SPAN 0x10000
+#define GEM_POOL_TX_RING 0x0u
+#define GEM_POOL_RX_RING 0x1000u
+#define GEM_POOL_TX_BUF 0x10000u
+#define GEM_POOL_RX_BUF 0x20000u
+#define GEM_BUF_SIZE 2048u
+#define GEM_POOL_SIZE 0x30000u
 #define GEM_RING_COUNT 32
 #define GEM_RX_PUBLISHED 28
 /* Descriptors are little-endian bytes, never cast to a C structure. */
@@ -190,18 +196,23 @@ struct gem_io {
     unsigned long long (*tb)(void *);
     u32 tb_hz;
     int (*sync)(void *, u32, enum dma_sync);
+    int (*master_enable)(void *); /* PCI master set and readback, before DMA enable. */
 };
 struct gem {
     struct gem_io io; /* Platform-provided register, clock and DMA access. */
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
+    u32 ring_prepare_step, ring_cursor, ring_publish_step;
     u32 state, step, cursor, polls; /* Bounded state-machine progress. */
     u32 error_status, tx_status, rx_status; /* Captured fault registers. */
-    u32 phy_addr, phy_port; /* Selected PHY and MIF port. */
+    u32 phy_addr, phy_port, phy_id1, phy_id2; /* Selected PHY and MIF port. */
+    u32 phy_step, phy_polls;
+    unsigned long long phy_started;
     u32 tx_head, tx_tail, tx_pending, rx_head; /* Ring ownership indices. */
     u32 rx_watch_wr, rx_watch_rd, rx_watching; /* Overflow watchdog snapshot. */
     unsigned long long started, tx_started, rx_watch_started; /* TB deadlines. */
     unsigned long long tx_packets, rx_packets, rx_drops, uncertain_tx; /* Counters. */
 };
+void gem_enter_reset(struct gem *);
 int gem_reset_step(struct gem *, unsigned long long now);
 int gem_mac_init(struct gem *, const u8 mac[6]);
 int gem_mif_init(struct gem *);
@@ -210,6 +221,7 @@ int gem_ring_prepare(struct gem *, struct gem_dma *);
 int gem_ring_publish(struct gem *);
 int gem_mac_enable_step(struct gem *, unsigned long long now);
 int gem_tx(struct gem *, const void *frame, u32 bytes);
+int gem_tx_reclaim(struct gem *, unsigned long long now, u32 budget);
 int gem_rx(struct gem *, void *frame, u32 cap, u32 *bytes);
 int gem_poll(struct gem *, unsigned long long now, u32 tx_budget);
 #endif
