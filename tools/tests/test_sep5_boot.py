@@ -45,6 +45,10 @@ def main():
         build_dir = Path('build/config.mk').parent
         shutil.copytree(ROOT / build_dir, root / build_dir,
                         ignore=shutil.ignore_patterns('out', 'sdk', '__pycache__'))
+        # build/sdk-target.mk は config の読み込みで SDK の profile を引く (第 5 段 S1)。
+        (root / 'sdk').mkdir(exist_ok=True)
+        for name in ('sdk/target_profile.py', 'sdk/target_profile_cli.py'):
+            shutil.copy2(ROOT / name, root / name)
         shutil.copy2(ROOT / 'Makefile', root / 'Makefile')
         # Existing make parse-time ownership stamp is fixture metadata.
         stamp = root / 'output/config/target'

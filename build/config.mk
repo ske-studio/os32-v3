@@ -47,6 +47,7 @@ ifeq ($(filter $(ARCH),x86 ppc),)
 $(error unsupported ARCH $(ARCH))
 endif
 include build/arch/$(ARCH).mk
+include build/sdk-target.mk
 PROFILE_MAKEFILES = $(filter build/%.mk,$(MAKEFILE_LIST))
 
 # === インクルードパス (モジュール別) ===
@@ -204,7 +205,7 @@ LDFLAGS = -m $(ELF_EMULATION) -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.m
 # なったら、それは特権命令を呼ぼうとしている印なので、-I を足す前に
 # 「なぜ CPL=3 のコードが原始命令を要るのか」を先に疑うこと。
 PROGRAM_FLAGS = $(USER_CFLAGS) -I. -Iinclude $(SDK_INC) -Iuserland/lib -I$(CROSS_DIR)/i386-elf/include
-PROGRAM_LDFLAGS = -m $(ELF_EMULATION) -T sdk/link/app.ld -nostdlib --nmagic --gc-sections \
+PROGRAM_LDFLAGS = -m $(ELF_EMULATION) -T $(SDK_TARGET_APP_LINK) -nostdlib --nmagic --gc-sections \
 	-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0
 
 # ライブラリアーカイブは --start-group で囲む。アーカイブは左から順に
@@ -214,8 +215,9 @@ LGRP_BEG = --start-group
 LGRP_END = --end-group
 
 # === CRT0 / デバッグオブジェクト ===
-CRT0_USER_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/syscalls.o sdk/crt/help.o $(NANO_LIB)
-CRT0_RESIDENT_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/resident/syscalls.o sdk/crt/help.o sdk/crt/resident/nano_adapter.o
+# 並びと中身は sdk/target_profile.py の crt_user・crt_resident (build/sdk-target.mk が引く)。
+CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)
+CRT0_RESIDENT_OBJ = $(SDK_TARGET_CRT_RESIDENT)
 CRT0_OBJ = $(CRT0_USER_OBJ)
 DBG_OBJ  = userland/lib/rt/dbgserial.o
 

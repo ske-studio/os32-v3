@@ -1,11 +1,26 @@
 """Target capabilities; PowerPC currently supports object inspection only."""
+# The SDK selection is one set: C runtime objects, link scripts, the Rust target,
+# the linker emulation and the call ABI are chosen together (paths are relative
+# to the SDK root: sdk/ in the tree, $(OS32_SDK) in a staged SDK).
+SDK_FIELDS = ('call_abi', 'elf_emulation', 'crt_user', 'crt_resident',
+              'app_link', 'app_sys_link', 'shlib_link', 'rust')
+_X86_SDK = dict(
+    call_abi='i386-cdecl', elf_emulation='elf_i386',
+    crt_user=('crt/crt0.o', 'crt/crt0_c.o', 'crt/syscalls.o', 'crt/help.o'),
+    crt_resident=('crt/crt0.o', 'crt/crt0_c.o', 'crt/resident/syscalls.o',
+                  'crt/help.o', 'crt/resident/nano_adapter.o'),
+    app_link='link/app.ld', app_sys_link='link/app_sys.ld',
+    shlib_link='link/shlib.ld', rust='rust/i686-os32-none.json')
 PROFILES = {
     'x86-pc98': dict(elf_identity=(1, 1, 3), module_codec=True,
-                     layout=True, link_guard=True, ar='i386-elf-ar'),
+                     layout=True, link_guard=True, ar='i386-elf-ar',
+                     sdk=True, **_X86_SDK),
     'ppc-powermac': dict(elf_identity=(1, 2, 20), module_codec=False,
-                         layout=False, link_guard=False, ar='powerpc-elf-ar'),
+                         layout=False, link_guard=False, ar='powerpc-elf-ar',
+                         sdk=False, **dict.fromkeys(SDK_FIELDS)),
 }
-MESSAGES = dict(module_codec='module', layout='kernel layout', link_guard='guarded-link')
+MESSAGES = dict(module_codec='module', layout='kernel layout', link_guard='guarded-link',
+                sdk='sdk')
 
 
 def require(target, capability):
@@ -15,6 +30,16 @@ def require(target, capability):
     if not profile[capability]:
         raise ValueError('unsupported ' + MESSAGES[capability] + ' target ' + target)
     return profile
+
+
+def sdk_values(target):
+    """The SDK selection of a target. Call this before reading inputs, removing
+    outputs or starting a tool: an unsupported target is refused here."""
+    profile = require(target, 'sdk')
+    values = {field: profile[field] for field in SDK_FIELDS}
+    if not all(values.values()):
+        raise ValueError('incomplete sdk target ' + target)
+    return values
 
 
 def check_elf_identity(path, profile):
