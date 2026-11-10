@@ -8,6 +8,7 @@
 #ifndef __IME_H
 #define __IME_H
 
+#include "ime_boot.h"
 #include "types.h"
 #include "os32_kapi_shared.h"
 #include "ime_render.h"
@@ -107,7 +108,6 @@ typedef struct {
 /* ======================================================================== */
 
 /* 初期化 (ブート時に1回) */
-void ime_init(void);
 int ime_dict_boot(void);
 int ime_boot_abort(void);
 int ime_dict_suspend(int on);

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
-    covers=['tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
+    covers=['init/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
             'include/ime_control.h', 'platform/*/ime_default_render.h',
             'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',
@@ -28,6 +28,9 @@ CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budge
             'lib/sqlite3/os32_sqlite_vfs.c', 'sdk/kapi.json'])
 import argparse
 import json
+import os
+import subprocess
+from kernel_includes import include_flags
 from pathlib import Path
 import sys
 import tempfile
@@ -74,6 +77,27 @@ def main():
                 print('RED runtime ime_render.h one-character comment: real generated fingerprint', flush=True)
             else:
                 raise AssertionError('contract mutation survived')
+        boot = (ROOT / 'init/kernel.c').read_text()
+        anchor = '#include "ime_boot.h"'
+        assert boot.count(anchor) == 1
+        boot_source = work / 'kernel.c'
+        def boot_dependencies(text):
+            boot_source.write_text(text)
+            cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
+            return subprocess.check_output([cc, '-M', '-I' + str(ROOT / 'init'),
+                                            *include_flags(ROOT), str(boot_source)], text=True)
+        def check_boot(text):
+            deps = boot_dependencies(text)
+            assert 'kernel/ime/ime.h' not in deps, 'boot depends on ime.h'
+        check_boot(boot)
+        if args.mutate:
+            try:
+                check_boot(boot.replace(anchor, '#include "../kernel/ime/ime.h"'))
+            except AssertionError as error:
+                assert str(error) == 'boot depends on ime.h'
+                print('RED boot ime.h dependency', flush=True)
+            else:
+                raise AssertionError('boot dependency mutation survived')
         source = work / 'provider.c'
         source.write_text('''#include "include/ime_control.h"
 #include <ime_default_render.h>

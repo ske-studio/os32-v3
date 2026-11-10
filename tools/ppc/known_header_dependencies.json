@@ -74,21 +74,6 @@
     },
     {
       "source": "init/kernel.c",
-      "header": "kernel/ime/ime.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/ime/ime_render.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
-      "header": "kernel/ime/ime_store.h",
-      "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
-    },
-    {
-      "source": "init/kernel.c",
       "header": "platform/pc98/boot.h",
       "survey_id": "I2/B: newly compilable kernel boot caller; retained dependencies"
     },
