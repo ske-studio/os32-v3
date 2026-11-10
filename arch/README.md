@@ -130,7 +130,9 @@ ARM 実装は別票で行う。
 `make ARCH=ppc PLATFORM=powermac` は共通候補と既存 bootstrap の C/GAS を
 コンパイルする。出力は `build/out/ppc-powermac`、コンパイラは
 `PPC_CROSS_DIR`（既定 `/home/hight/opt/cross-ppc`）から選ぶ。
-この一覧 (selected) は全 TU 成功に達していない (未実装の原始命令ヘッダ等)。
+この一覧 (selected) は全 TU 成功に達していない: 分離の第 5 段の後で 120 TU のうち 112 が成功し、
+残る 8 本は PC98・x86 の装置のヘッダを直に include する共通のソース
+(gfx_core.c、exec.c、kapi_generated.c、module.c、fatfs の 2 本、ext2_super.c、serialfs_session.c)。
 SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-only である。
 
 **本体のリンクと起動は別の入口で達している (到達点 ②、2026-11-10)**:

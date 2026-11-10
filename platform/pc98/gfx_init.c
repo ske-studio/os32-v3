@@ -41,6 +41,21 @@ void display_flip_pages(int display, int access)
     _out(GDC_ACCESS_PAGE, access ? GDC_PAGE_1 : GDC_PAGE_0);
 }
 
+/* テキスト GDC の状態の VSYNC が立つまで回る (第 5 段 B6: gfx/gfx_vram.c から)。 */
+void display_wait_vsync(void)
+{
+    while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
+}
+
+/* 表示メモリの 4 プレーン (B・R・G・I)。A6h で選んだ書込先ページに届く。 */
+u8 *display_planar_plane(unsigned index)
+{
+    static const u32 planes[GVRAM_PLANES] = {
+        VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I
+    };
+    return (u8 *)P2V(planes[index]);
+}
+
 /* 標準 planar モード専用。CPU 直書きで両ページの表示領域を消す [HW1]。
  * UNDOCUMENTED io_disp.md「VRAMプレーン切り換え」: A6h が CPU の書込先。
  * 戻りは描画ページ1。呼び手は初期化を続けるか直ちに shutdown する。 */
