@@ -118,6 +118,12 @@ int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
     ppc_irq_restore(saved);
     return LAN_OK;
 }
+void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *status)
+{
+    u32 saved = ppc_irq_save();
+    *next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags;
+    ppc_irq_restore(saved);
+}
 void pm_lan_log_complete(int result)
 {
     u32 saved = ppc_irq_save();

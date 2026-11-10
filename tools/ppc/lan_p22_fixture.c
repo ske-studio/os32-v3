@@ -28,7 +28,7 @@ static const u8 golden4[] = {0x50,0x4c,0x4e,0x31,0x01,0x04,0x00,0x50,0x10,0x11,0
 static const u8 golden5[] = {0x50,0x4c,0x4e,0x31,0x01,0x04,0x00,0x50,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x00,0x05,0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x03,0x04,0x05};
 static void wire(const u8 *expected, u32 len) { u8 b[400]; u32 used, i; CHECK(!pm_lan_encode(b,sizeof(b),&r,&used) && used==len,32); for(i=0;i<len;i++) CHECK(b[i]==expected[i],33); }
 static void rd(u32 off,u32 len,u32 status) { q.payload[0]=off>>8; q.payload[1]=off; q.payload[2]=len>>8; q.payload[3]=len; req(4,4); CHECK(r.status==status && (status || r.payload_bytes==len),34); }
-void _start(void) { u32 i; u8 b[400]; u32 used; out("REACHED\n",8); q.type=3; for(i=0;i<256;i++) diag[i]=i;
+void _start(void) { u32 i; u8 b[400]; out("REACHED\n",8); q.type=3; for(i=0;i<256;i++) diag[i]=i;
  for(i=0;i<16;i++) { q.boot_id[i]=0x10+i; q.host_nonce[i]=0x30+i; } q.seq=0x2122232425262728ULL;
  req(1,0); wire(golden1,sizeof(golden1));
  req(2,0); wire(golden2,sizeof(golden2));
@@ -49,7 +49,8 @@ void _start(void) { u32 i; u8 b[400]; u32 used; out("REACHED\n",8); q.type=3; fo
  mode=3; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,17); mode=4; copies=0; peek(0x1000,5,0); CHECK(r.status==7 && !r.payload_bytes,18); mode=0;
  req(1,1); CHECK(r.status==2,19); req(2,1); CHECK(r.status==2,20); req(3,1); CHECK(r.status==2,21); req(4,3); CHECK(r.status==2,22); req(5,7); CHECK(r.status==2,23); req(99,0); CHECK(r.status==1,24);
  req(1,0); CHECK(!r.status,25); words[0]=0; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.payload[0]==0x12,26); q.opcode=2; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==4,27);
- for(i=0;i<17;i++) req(1,0); q.request_id-=17; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==5,28);
+ for(i=0;i<17;i++) req(1,0);
+ q.request_id-=17; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==5,28);
  q.host_nonce[0]++; CHECK(pm_lan_monitor(&q,mac,&d,&r) && !r.status && r.payload[0]==0,29); mac[0]++; q.request_id=1; CHECK(pm_lan_monitor(&q,mac,&d,&r) && !r.status,30);
  CHECK(!pm_lan_copy8(100,b) && b[0]==42 && events==1234,31);
  arm_fail=1; b[0]=0; CHECK(pm_lan_copy8(100,b)==1 && b[0]==0 && events==1234,48);

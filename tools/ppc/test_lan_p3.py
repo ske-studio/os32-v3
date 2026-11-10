@@ -15,10 +15,12 @@ CHECK = dict(name='ppc-lan-p3', tier=2, budget=60,
                      'tools/ppc/test_lan_p3.py'],
              inputs=['platform/powermac/lan_boot.h', 'platform/powermac/ofw.h',
                      'arch/ppc/ppc_boot.h', 'include/types.h', 'lib/kstring.h',
-                     'lib/kstring_c.c', 'tools/tests/host32.py'])
+                     'lib/kstring_c.c', 'tools/tests/host32.py',
+                     'platform/powermac/pci_config.c', 'arch/ppc/ppc_oea.h'])
 
 
 MUTATIONS = [
+    ('bdf', 'be32(prop) & 0x00ffff00u', '(be32(prop)>>8)&0xffff', 0, 'value'),
     ('bar', '(hi&255)==0x10', '(hi&255)==0x14', 0, 'capture'),
     ('unknown-id', 'vendor!=0x106b || device!=0x21', '0', 13, 'capture'),
     ('bar-order', '(hi&255)==0x10', 'i==0', 14, 'value'),
@@ -41,9 +43,10 @@ def exercise(source, directory, case=None):
     exe = directory / 'capture'
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
-                    '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=',
+                    '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=', '-DPM_PCI_FAKE_MMIO',
                     *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-                    str(source), str(ROOT / 'tools/ppc/lan_p3_fake.c'),
+                    str(source), str(ROOT / 'platform/powermac/pci_config.c'),
+                    str(ROOT / 'tools/ppc/lan_p3_fake.c'),
                     str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True, timeout=60)
     failures = []
     for index in (range(26) if case is None else [case]):

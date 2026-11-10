@@ -27,7 +27,7 @@ def exercise(source, directory):
     path = pathlib.Path(directory)
     (path / 'wire.c').write_text(source)
     binary = path / 'fixture'
-    subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-pie', '-no-pie',
+    subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-m32', '-ffreestanding', '-fno-pie', '-no-pie',
                     '-nostdlib', '-static', '-fno-builtin', '-std=gnu11',
                     '-I', str(ROOT), '-I', str(ROOT / 'include'),
                     '-I', str(ROOT / 'platform/powermac'), str(path / 'wire.c'),

@@ -115,6 +115,7 @@ void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
     void (*write32)(void *, u32, u32) = io->write32;
     unsigned long long (*tb)(void *) = io->tb;
     int (*sync)(void *, u32, enum dma_sync) = io->sync;
+    int (*platform_sync)(void *, u32, enum dma_sync) = pm_gmac_dma_sync;
     int (*reset)(struct gem *, unsigned long long) = gem_reset_step;
     int (*mac)(struct gem *, const u8 *) = gem_mac_init;
     int (*mif)(struct gem *) = gem_mif_init;
@@ -125,7 +126,9 @@ void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
     int (*tx)(struct gem *, const void *, u32) = gem_tx;
     int (*rx)(struct gem *, void *, u32, u32 *) = gem_rx;
     int (*poll)(struct gem *, unsigned long long, u32) = gem_poll;
-    (void)read32; (void)write32; (void)tb; (void)sync;
+    void (*stats)(u64 *, u64 *, u64 *, u32 *) = pm_lan_log_stats;
+    (void)stats;
+    (void)read32; (void)write32; (void)tb; (void)sync; (void)platform_sync;
     (void)reset; (void)mac; (void)mif; (void)phy; (void)prepare;
     (void)publish; (void)enable; (void)tx; (void)rx; (void)poll;
 }
