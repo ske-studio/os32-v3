@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """CI job independence and early artifact downloads, without GitHub access."""
 CHECK = dict(name='ci-split-host', tier=0,
-             covers=['.github/workflows/build.yml', '.github/workflows/full-check.yml',
+             covers=['.github/workflows/check.yml', '.github/workflows/build.yml', '.github/workflows/full-check.yml',
                      '.github/actions/build-setup/action.yml',
-                     'tools/ci_fetch.sh', 'tools/tests/test_ci_split.py'],
+                     'tools/ci_fetch.sh', 'tools/checks/run.py', 'tools/tests/test_ci_split.py',
+                     'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3)
 
 import json
 import os
+import re
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -17,6 +20,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/build.yml'
+CHECK_WORKFLOW = ROOT / '.github/workflows/check.yml'
 FULL_CHECK = ROOT / '.github/workflows/full-check.yml'
 SETUP = ROOT / '.github/actions/build-setup/action.yml'
 FETCH = ROOT / 'tools/ci_fetch.sh'
@@ -60,6 +64,34 @@ def workflow_cases(source):
     assert {s.get('name') for s in steps} >= {'Host dependencies',
         'Rust toolchain (rust-toolchain.toml)', 'Cache i386-elf toolchain',
         'Cache IPAex fonts', 'Fetch JF Dot Shinonome16 (verify cached font and license)'}
+
+
+# These checks require build artifacts, unavailable in the cross-free static job.
+DOC_EXCLUSIONS = {
+    'check-surface-lease-host': 'needs make:all',
+    'check-surface-bundle-host': 'needs make:all',
+    'check-manifests': 'needs make:all',
+    'check-deploy-set-host': 'needs make:all',
+    'check-disk-auth-host': 'needs make:all',
+    'check-ci-stab-host': 'needs make:all',
+}
+
+
+def document_cases(source):
+    workflow = yaml.safe_load(source)
+    runs = [step.get('run', '') for job in workflow['jobs'].values()
+            for step in job['steps']]
+    targets = set(re.findall(r'^\s*make\s+(check-[\w-]+)\s*$', '\n'.join(runs), re.M))
+    assert all(DOC_EXCLUSIONS.values()), 'exclusions require reasons'
+    for paths in (('docs/INDEX.md',), ('CLAUDE.md',), ('README.md',),
+                  ('docs/INDEX.md', '.claude/skills/os32-land/SKILL.md')):
+        result = subprocess.run([sys.executable, '-B', 'tools/checks/run.py',
+                                 '--select', '--files', *paths], cwd=ROOT,
+                                capture_output=True, text=True, check=True)
+        line = next(line for line in result.stdout.splitlines() if line.startswith('CC_STAGE1='))
+        selected = set(shlex.split(line.split('=', 1)[1])[0].split())
+        missing = selected - targets - DOC_EXCLUSIONS.keys()
+        assert not missing, f'{paths}: undocumented checks {sorted(missing)}'
 
 
 def full_check_cases(source):
@@ -183,10 +215,12 @@ def main():
     source = WORKFLOW.read_text()
     workflow_cases(source)
     full_check_cases(FULL_CHECK.read_text())
+    document_cases(CHECK_WORKFLOW.read_text())
     fetch_cases(FETCH)
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2]', 'shard: [0, 1]', 'lose shard'),
             ('workflow', 'fail-fast: false', 'fail-fast: true', 'cancel sibling shards'),
             ('workflow', 'CHECK_SHARD=${{ matrix.shard }}/3', 'CHECK_SHARD=0/3', 'repeat first shard'),
@@ -200,7 +234,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text()}[kind]
+            text = {'workflow': source, 'full-check': FULL_CHECK.read_text(), 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text()}[kind]
             # Runner occurs once per job; mutate only the check-fast job.
             if name == 'route to substream':
                 prefix, text = text.split('  check-fast:\n', 1)
@@ -217,6 +251,8 @@ def main():
                 try:
                     if kind == 'workflow':
                         workflow_cases(changed)
+                    elif kind == 'check':
+                        document_cases(changed)
                     elif kind == 'full-check':
                         full_check_cases(changed)
                     else:
