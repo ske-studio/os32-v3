@@ -43,13 +43,23 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core.c', 'mm/paging.c', 'mm/pgalloc.c',
+PROVIDER = 'platform/pc98/gfx_surfaces.c'   # ⑥ の表と手順 (第 5 段 B5 で gfx_core から移った)
+SOURCES = ('gfx/gfx_core.c', PROVIDER, 'mm/paging.c', 'mm/pgalloc.c',
            'kernel/sys.c',
            'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
 SLICE_BEGIN = 'enum { GFX_RES_PEGC'
 SLICE_END = '    kselftest_run_audit("gui");\n}'
+CORE_BEGIN = 'void gfx_boot_reserve(void)\n{\n    display_provider_boot_reserve('
+
+
+def gfx_text(core, provider):
+    """The slice's source: the provider's tables and ⑥, then the common code that
+    follows the gfx_boot_reserve wrapper (the pre-B5 order of one file)."""
+    if provider.count(SLICE_BEGIN) != 1 or core.count(CORE_BEGIN) != 1:
+        raise SystemExit('切り出しの目印が 1 個ずつではない (provider/core)')
+    return provider[provider.index(SLICE_BEGIN):] + '\n' + core[core.index(CORE_BEGIN):]
 # 切り出しの中だけ、台帳・写像の呼び出しを記録係へ付け替える。
 HOOKS = (
     ('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'host_bda(PEGC_BIOS_ARCH_FLAG)'),
@@ -94,6 +104,9 @@ def load(mutation=None):
     texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
+        if rel == 'gfx/gfx_core.c' and texts[rel].count(old) == 0:
+            # ⑥ の行は provider にある。希望の値は引数 pref で届く。
+            rel, old, new = PROVIDER, old.replace('g_backend_pref', 'pref'), new.replace('g_backend_pref', 'pref')
         if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
@@ -116,7 +129,7 @@ def build(texts, tmp):
         source = source.replace('irq_save()', 'host_irq_save()').replace(
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
-    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
+    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
     # Execute the real planar boot assertion before and after owner transfer.
     selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
@@ -152,7 +165,7 @@ def run_case(texts, name, defs):
 
 def text_problems():
     problems = []
-    core = paging_source(ROOT / 'gfx/gfx_core.c')
+    core = gfx_text(paging_source(ROOT / 'gfx/gfx_core.c'), paging_source(ROOT / PROVIDER))
     body = core.split(SLICE_BEGIN, 1)[-1].split(SLICE_END, 1)[0]
     for old, _ in HOOKS:
         if old not in body:
@@ -217,7 +230,7 @@ for _name, _defs in CASES:
 
 
 def _swap_reserve_and_map():
-    core = paging_source(ROOT / 'gfx/gfx_core.c')
+    core = paging_source(ROOT / PROVIDER)
     line = '    if (m && !ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)) m = 0;\n'
     start = core.index(line)
     end = core.index('    /* 4. BB', start)

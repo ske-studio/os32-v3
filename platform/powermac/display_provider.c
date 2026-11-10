@@ -29,3 +29,22 @@ int gfx_cirrus_probed(void)
 {
     return 0;
 }
+
+/* 予約する表示の資源は無い (描画は未実装)。bind_client は呼ばない。 */
+void display_provider_boot_reserve(int pref, void (*bind_client)(void))
+{
+    (void)pref;
+    (void)bind_client;
+}
+
+u32 display_provider_display_records(u32 ledger_backend)
+{
+    (void)ledger_backend;
+    return 1;
+}
+
+u32 display_provider_display_first(u32 plane)
+{
+    (void)plane;
+    return 0;
+}

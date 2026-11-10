@@ -45,6 +45,7 @@ static void outp(unsigned int port, unsigned int value);
 #include "../../gfx/gfx_core.c"
 #include "../../platform/pc98/gfx_init.c"   /* 第 5 段 B3: planar の初期化の provider (製品) */
 #include "../../platform/pc98/gfx_selector.c"   /* 第 5 段 B4: backend の選択の provider (製品) */
+#include "../../platform/pc98/gfx_surfaces.c"   /* 第 5 段 B5: 起動時の SURFACE の予約の provider (製品) */
 #include "../../gfx/gfx_emergency.c"
 #include "../../drivers/video/pc98/backend_pc98.c"
 const u8 *v86_bios_real_lowmem(void)

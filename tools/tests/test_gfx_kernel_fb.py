@@ -16,13 +16,22 @@ from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
                'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
-               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c',
+               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c',
                'kernel/sys.c', 'mm/physmem.c']
-MUTABLE = ('gfx/gfx_core.c', 'platform/pc98/gfx_selector.c')
+MUTABLE = ('gfx/gfx_core.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c')
 MUTANTS = [
+ # 第 5 段 B5: DISPLAY の記録の数と先頭は provider (platform/pc98/gfx_surfaces.c) が答える。
+ ('display-records-one', '    return ledger_backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1;',
+  '    return ledger_backend == LEDGER_SF_PC98 ? 1 : 1;',
+  'FAIL source.count == (backend == LEDGER_SF_PC98 ? 4U : 1U)'),
+ ('display-records-packed', '    return ledger_backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1;',
+  '    return ledger_backend ? GVRAM_PLANES : 1;', 'FAIL !rc && source.ready'),
+ ('display-first-swapped', '    return GFX_PFN(gfx_display_planes[plane]);',
+  '    return GFX_PFN(gfx_display_planes[plane ? 0 : 1]);',
+  'FAIL !surface_query_refs(&source,source.refs,source.count,LEDGER_PERM_RW)'),
  ('geforce-leave-backend',
   'if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {',
   'if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {',
