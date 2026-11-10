@@ -14,6 +14,8 @@ CHECK = dict(name='ppc-lan-p20', tier=1, budget=60, needs=[],
                      'platform/powermac/lan_boot.h', 'platform/powermac/kboot_log.h',
                      'arch/ppc/ppc_oea.h', 'include/types.h'])
 MUTATIONS = [
+    ('stats-consume', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags;', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags; if (count) { head = (head + 1) % LOG_SLOTS; count--; }', 'reached=stats-full', 'H:stats-preserve'),
+    ('stats-swap', '*records = drop_records; *bytes = drop_bytes; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', '*records = drop_bytes; *bytes = drop_records; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', 'reached=stats-full', 'H:stats-values'),
     ('peek-tail', 'if (count == 1) close_slot();', 'close_slot();', 'reached=alternating', 'H:alternating-packing'),
     ('saturation', 'if (n > ~(u64)0 - *v)', 'if (0)', 'reached=saturation', 'H:saturation-seq'),
     ('loss', 'add_sat(&drop_records, chunks);', '(void)chunks;', 'reached=full', 'H:A8 loss-count'),

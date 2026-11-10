@@ -107,6 +107,7 @@ int pm_lan_log_register(void);
  * LAN_OK removes the head, LAN_AGAIN retains it. status bit 0 means saturation. */
 int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
                     u64 *records, u64 *bytes, u32 *status);
+void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *flags);
 void pm_lan_log_complete(int result);
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);

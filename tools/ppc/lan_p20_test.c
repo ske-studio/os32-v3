@@ -33,7 +33,14 @@ static void test(void) {
         "KBOOT READY stage=pre-user\r\n", "KBOOT ALIVE tick_delta=", "2000", " tb_us=", "2000000", " of_calls_delta=", "0", "\r\n", "PHY waiting\r\n" };
     char expected[1024], input[16640]; u32 used = 0, got = 0;
     CHECK(pm_lan_log_register() == 0 && pm_lan_log_register() == 0 && registrations == 1, "register");
+    u64 next, sr, sb; u32 sf;
     installed->write(0, "", 0); CHECK(peek() == LAN_AGAIN, "empty");
+    pm_lan_log_stats(&next, &sr, &sb, &sf);
+    CHECK(next == 0 && sr == 0 && sb == 0 && sf == 0, "H:stats-empty");
+    installed->write(0, input, 256);
+    pm_lan_log_stats(&next, &sr, &sb, &sf);
+    CHECK(next == 1, "H:stats-next");
+    reset();
     for (u32 i = 0; i < sizeof(fragments)/sizeof(fragments[0]); i++) {
         const char *s = fragments[i]; for (u32 j = 0; s[j]; j++) expected[used++] = s[j]; write_text(s);
     }
@@ -45,6 +52,12 @@ static void test(void) {
     installed->write(0, input, sizeof(input)); out("reached=full\n");
     CHECK(count == 64 && drop_records == 1 && drop_bytes == 256 && next_seq == 65, "H:A8 loss-count");
     CHECK(peek() == LAN_OK && seq == 0 && p[0] == 0, "H:oldest");
+    out("reached=stats-full\n");
+    for (u32 i = 0; i < 2; i++) {
+        pm_lan_log_stats(&next, &sr, &sb, &sf);
+        CHECK(next == 65 && sr == records && sb == bytes && sf == status, "H:stats-values");
+        CHECK(peek() == LAN_OK && seq == 0 && len == 256 && p[0] == 0, "H:stats-preserve");
+    }
     pm_lan_log_complete(LAN_AGAIN); CHECK(peek() == LAN_OK && seq == 0 && p[0] == 0, "H:again");
     pm_lan_log_complete(LAN_OK); CHECK(peek() == LAN_OK && seq == 1 && p[0] == 1, "H:accepted");
     reset(); inject = 1; write_text("outer"); out("reached=reentry\n");
