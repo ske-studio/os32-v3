@@ -1,6 +1,6 @@
 # PPC_LAN_SERVICE_DESIGN — PowerPC の LAN の service (段 P24) と起動への結線 (段 P25・P26) の境目
 
-> 状態: **現行 (2026-11-11)** — 段 P24 (lan_service.c) とその前提・補助の段 (P24a〜P24d)、起動への結線 (P25・P26) の境目。全体の設計は [PPC_LAN_DESIGN](PPC_LAN_DESIGN.md)、LAN の印と受入の自動化は [PPC_LAN_MARKS_DESIGN](PPC_LAN_MARKS_DESIGN.md)。段の状態は票 TASK_PPC_LAN が持つ。
+> 状態: **現行 (2026-11-11)** — 段 P24 (lan_service.c) とその前提・補助の段 (P24a〜P24d)、起動への結線 (P25・P26) の境目。全体の設計は PPC_LAN_DESIGN、LAN の印と受入の自動化は PPC_LAN_MARKS_DESIGN。段の状態は票 TASK_PPC_LAN が持つ。
 
 > 出所: ~/os32-tmp/run/ppc-lan24d/DESIGN.final.md (gpt-6-astra 起草 r1→r2、Opus 5.5 第 1 回 D1〜D3 と第 2 回で条件付き可、PM が残り 1〜3 を反映)。中身は変えていない。
 

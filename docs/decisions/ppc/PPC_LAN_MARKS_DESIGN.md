@@ -1,6 +1,6 @@
 # PPC_LAN_MARKS_DESIGN — PowerPC の LAN の serial の印と受入の自動化 (段 P29〜P32)
 
-> 状態: **現行 (2026-11-11)** — serial に足す LAN の行 (`LAN STATE`・`LAN OFF code=`) と、QEMU の meter・変異・受入・全体 (段 P29〜P32) の形。全体の設計は [PPC_LAN_DESIGN](PPC_LAN_DESIGN.md)、service の境目は [PPC_LAN_SERVICE_DESIGN](PPC_LAN_SERVICE_DESIGN.md)。段の状態は票 TASK_PPC_LAN が持つ。末尾の「確定」の節が本文より優先。
+> 状態: **現行 (2026-11-11)** — serial に足す LAN の行 (`LAN STATE`・`LAN OFF code=`) と、QEMU の meter・変異・受入・全体 (段 P29〜P32) の形。全体の設計は PPC_LAN_DESIGN、service の境目は PPC_LAN_SERVICE_DESIGN。段の状態は票 TASK_PPC_LAN が持つ。末尾の「確定」の節が本文より優先。
 
 > 出所: ~/os32-tmp/run/ppc-lan-m1/M1.final.md (gpt-6-astra 起草、Opus 5.5 第 1 回で条件付き可、PM が F1〜F11 を反映)。中身は変えていない。
 
