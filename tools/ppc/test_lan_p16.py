@@ -41,7 +41,16 @@ int main(void) {
  puts("REACHED enabled");
  if (n != sizeof(expected)/sizeof(expected[0])) { puts("FAIL count"); return 1; }
  for (unsigned i=0;i<n;i++) if (trace[i].reg!=expected[i][0] || trace[i].val!=expected[i][1]) { printf("FAIL trace %u\n",i); return 1; }
- puts("PASS trace"); return 0;
+ puts("PASS trace");
+ struct gem stopped = {0};
+ stopped.io.read32=rd; stopped.io.write32=wr; stopped.io.tb_hz=10000;
+ stopped.polls=999999;
+ if (gem_mac_enable_step(&stopped,2000)!=GEM_AGAIN || stopped.polls!=0) { puts("FAIL stopped start"); return 1; }
+ puts("REACHED stopped");
+ for (unsigned i=0;i<999999;i++)
+  if (gem_mac_enable_step(&stopped,2000)!=GEM_AGAIN) { puts("FAIL stopped early"); return 1; }
+ if (gem_mac_enable_step(&stopped,2000)!=GEM_ETIME || stopped.state!=GEM_STATE_QUARANTINED) { puts("FAIL stopped timeout"); return 1; }
+ puts("PASS stopped"); return 0;
 }
 '''
 MUTANTS = [
@@ -50,6 +59,7 @@ MUTANTS = [
  ("promisc", "GEM_MAC_RX_HASH_FILTER | GEM_MAC_RX_PROMISCUOUS | GEM_MAC_RX_PROMISC_GRP", "GEM_MAC_RX_HASH_FILTER | GEM_MAC_RX_PROMISC_GRP", "FAIL trace 53", "REACHED enabled"),
  ("wait", "now - g->started < ticks", "now - g->started < 0", "FAIL wait", "REACHED init"),
  ("kick", "GEM_RX_KICK, GEM_RX_PUBLISHED", "GEM_RX_KICK, 32", "FAIL trace 59", "REACHED enabled"),
+ ("poll-limit", "++g->polls >= GEM_WAIT_POLLS", "++g->polls > GEM_WAIT_POLLS", "FAIL stopped timeout", "REACHED stopped"),
  ("crc", "v | GEM_MAC_RX_ENABLE | GEM_MAC_RX_STRIP_CRC", "v | GEM_MAC_RX_ENABLE", "FAIL trace 58", "REACHED enabled"),
 ]
 def check(source, directory):
@@ -62,7 +72,7 @@ def main():
     source = SOURCE.read_text()
     with tempfile.TemporaryDirectory() as temp:
         directory = Path(temp); result = check(source, directory)
-        if result.returncode or 'PASS trace' not in result.stdout: raise RuntimeError(result.stdout + result.stderr)
+        if result.returncode or 'PASS stopped' not in result.stdout: raise RuntimeError(result.stdout + result.stderr)
         print('PASS baseline')
         if args.mutate:
             for name, old, new, failure, reached in MUTANTS:

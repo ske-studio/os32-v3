@@ -1,5 +1,7 @@
 #include "gem.h"
 
+#define GEM_WAIT_POLLS 1000000U
+
 /* OpenBSD gem_init_regs :865-952, PCI Apple GEM. DMA and MAC are stopped. */
 int gem_mac_init(struct gem *g, const u8 mac[6])
 {
@@ -44,14 +46,17 @@ int gem_mac_enable_step(struct gem *g, unsigned long long now)
     if (!g || !g->io.read32 || !g->io.write32 || !g->io.tb_hz) return GEM_EINVAL;
     if (g->step == 0) {
         g->io.write32(g->io.ctx, GEM_MAC_TX_CONFIG, 0);
-        g->started = now; g->step = 1;
+        g->started = now; g->polls = 0; g->step = 1;
         return GEM_AGAIN;
     }
     if (g->step == 2) return GEM_OK;
     if (g->step != 1) return GEM_EINVAL;
     /* ceil(hz / 100), calculated in 32 bits without a 64-bit helper. */
     ticks = g->io.tb_hz / 100U + (g->io.tb_hz % 100U != 0);
-    if (now - g->started < ticks) return GEM_AGAIN;
+    if (now - g->started < ticks) {
+        if (++g->polls >= GEM_WAIT_POLLS) { g->state = GEM_STATE_QUARANTINED; return GEM_ETIME; }
+        return GEM_AGAIN;
+    }
     g->io.write32(g->io.ctx, GEM_MAC_TX_CONFIG, GEM_MAC_TX_ENA_IPG0 | GEM_MAC_TX_NGU |
                   GEM_MAC_TX_NGU_LIMIT | GEM_MAC_TX_ENABLE | GEM_MAC_TX_IGN_CARRIER | GEM_MAC_TX_IGN_COLLIS);
     g->io.write32(g->io.ctx, GEM_MAC_XIF_CONFIG, GEM_MAC_XIF_TX_MII_ENA | GEM_MAC_XIF_LINK_LED | GEM_MAC_XIF_FDPLX_LED);
