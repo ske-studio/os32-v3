@@ -102,6 +102,11 @@ int pm_gmac_early_quiesce(void);
 int pm_gmac_dma_init(const struct pm_gmac_boot *, struct gem_dma *out);
 int pm_dma_bus(u32 pa, u32 bytes, u32 *bus);
 int pm_lan_log_register(void);
+/* Scratch remains valid until the next peek; complete only after a peek.
+ * LAN_OK removes the head, LAN_AGAIN retains it. status bit 0 means saturation. */
+int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
+                    u64 *records, u64 *bytes, u32 *status);
+void pm_lan_log_complete(int result);
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
