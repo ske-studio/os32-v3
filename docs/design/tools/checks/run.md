@@ -129,4 +129,4 @@ check-map は新 lint、check-check-select-host は新 test_run の入口。列�
 fast/docs/full/段による旧方針との差は上の事例で見る。200件比較へ旧 STAGE1/MUT1 の再現器を足さない。
 通常系10秒以内の既存目標は測定で示し、超過を新たな失敗条件にしない。200件比較と長い実検査は毎回の test_run に入れない。
 
-重みは `tools/checks/weights.json` の成功計測の中央値を使い、budget はその2倍。未計測は CHECK の宣言 budget を既定とする。更新手順と出所は [08_build §8-6](../../../08_build.md#8-6-github-actions-での本体ビルド)。
+重みは `tools/checks/weights.json` の成功計測の中央値を使い、budget はその2倍。未計測は CHECK の宣言 budget を既定とする。更新手順と出所は docs/08_build.md §8-6 (GitHub Actions での本体ビルド)。
