@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 3478600778,
+  "module_abi_gen": 2553320169,
   "imports": [
     {
       "name": "trial_begin",
@@ -280,6 +280,12 @@
     {
       "name": "paging_device_unmap",
       "index": 46,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pci_bar_get",
+      "index": 47,
       "kind": 1,
       "type_ver": 1
     }

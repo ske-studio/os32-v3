@@ -17,8 +17,8 @@ DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
 OUT = ROOT / 'hwdev/generated'
 PPC_OUT = ROOT / 'build/out/ppc-powermac/hwdev-layout'
-# docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 21 kernel imports.
-HWDEV_IMPORT_SLOTS = 26 + 21
+# docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 22 kernel imports.
+HWDEV_IMPORT_SLOTS = 26 + 22
 
 
 def normalize(text):

@@ -1,6 +1,6 @@
 #include "hwdev_contract.h"
 #include "kernel/module/module_image.h"
-static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0};
+static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0};
 static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0x92f2e639U, 1, 1},
     {0xa2272b76U, 1, 1},
@@ -49,6 +49,7 @@ static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0x13aac9d0U, 1, 1},
     {0xd0d1dfc5U, 1, 1},
     {0x942474e8U, 1, 1},
+    {0x863d0062U, 1, 1},
 };
 static const struct module_symbol_contract hwdev_export_contracts[] = {
     {0xce92964bU, 1, 0},
@@ -102,4 +103,5 @@ static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {
     slots[44] = (u32)(uptr)geforce_resource_lookup;
     slots[45] = (u32)(uptr)paging_device_map;
     slots[46] = (u32)(uptr)paging_device_unmap;
+    slots[47] = (u32)(uptr)pci_bar_get;
 }

@@ -248,6 +248,12 @@
       "source": "gfx/gfx_osri_view.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "pci_bar_get",
+      "source": "drivers/pci/pci.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

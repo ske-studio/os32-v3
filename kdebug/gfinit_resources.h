@@ -4,8 +4,8 @@
 #define GF_RES_GPU_DEV RECOVER_GF_DEV
 #define GF_RES_GPU_ID RECOVER_GF_DEVICE /* NV44A, vendor 10de device 0221 */
 /* GPU is the bus-0 fn0 found by recover_gf_dev(). Returns complete bus-0 exclusions or fails with count=0.
- * No PCI data writes. Intel 82557 uses exact lengths; approved Trident
- * rev d3 uses conservative bounds. Unknown enabled memory BARs fail closed. */
+ * Collection only reads config and boot sizing records. Enabled memory BARs
+ * require matching measured lengths, alignment and representable ranges. */
 int gfinit_resources(struct recover_range *exclude, u32 *count);
 #ifdef GF_PRODUCTION
 /* struct gfinit_resource_reject: hwdev/gf/production.h. Production copies never print: the boot/acquire check runs before the 98

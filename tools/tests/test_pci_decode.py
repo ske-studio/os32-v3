@@ -17,7 +17,7 @@ I/O も静的配列も触らないので模型は要らない。
   python3 -B tools/tests/test_pci_decode.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pci-decode-host', tier=4,
-    covers=['drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
+    covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
     needs=[], budget=3.7)
 
 import pathlib
@@ -29,12 +29,12 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pci_decode_host.c"
 SRC = ROOT / "drivers/pci/pci_decode.c"
-# カーネルと同じ i386-elf で通す実ソース。列挙側 (drivers/pci/pci.c) は I/O を
-# 触るのでホストでは回せないが、**コンパイルは通ることを見る** — 実機でしか
-# 走らせられないコードこそ、型とプロトタイプのずれを手元で捕まえておく。
+# カーネルと同じ i386-elf で型とプロトタイプのずれを検査する。
+# 列挙・記録の実行試験は test_pci_scan.py が fake I/O に対して行う。
 TARGET_SRCS = [
     ("drivers/pci/pci_decode.c", []),
     ("drivers/pci/pci.c", []),
+    ("drivers/pci/pci_barsize.c", []),
     ("userland/shell/pci_verbose.c", []),
 ]
 

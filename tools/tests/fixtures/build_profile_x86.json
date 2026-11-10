@@ -128,6 +128,7 @@
     "drivers/dma/dma8237_math.c",
     "lib/dma_contract.c",
     "drivers/pci/pci.c",
+    "drivers/pci/pci_barsize.c",
     "drivers/pci/pci_hwb.c",
     "drivers/pci/pci_decode.c",
     "drivers/pci/pci_bind.c",
