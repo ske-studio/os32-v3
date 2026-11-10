@@ -46,6 +46,37 @@ static void *host_clear(void *dst, int value, u32 n)
 #define kmemset(d, v, n) host_clear((d), (v), (n))
 #include "gfx_init_source.inc"
 
+/* The common callers, extracted from the product text (gfx/gfx_core.c and
+ * gfx/gfx_core_init.inc) by the test driver: everything they call that is not
+ * the provider is a recording fake, so the *executed* order is observed. */
+#include "gfx_hal.h"
+#include "palette.h"
+#include "splash_raster.h"
+enum { EV_CALL = 2 };
+enum { F_SPLASH = 1, F_SELECT, F_REINIT, F_ENTER, F_DIAG, F_BIND, F_PALETTE, F_SCROLL };
+u8 *bb_b, *bb_r, *bb_g, *bb_i, *bb[GVRAM_PLANES];
+int gfx_current_height, gfx_flip_enabled, gfx_display_page;
+DirtyRectQueue dirty_queue, prev_dirty;
+u32 gfx_init_gen;
+static int gfx_started;
+static u8 planes_b[4], planes_ok;
+static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
+static GfxMode host_mode = { .height = 400 };
+static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
+GfxBackend *g_backend = &host_backend;
+void pc98_splash_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
+static int gfx_select_and_init_backend(int legacy200) { event(EV_CALL, F_SELECT, legacy200); return 0; }
+static void gfx_reinit_surfaces(int finish_arg) { event(EV_CALL, F_REINIT, finish_arg); }
+static void gfx_diag_init(void) { event(EV_CALL, F_DIAG, 0); }
+static void gfx_bind_client(void)
+{
+    event(EV_CALL, F_BIND, 0);
+    if (planes_ok) { bb_b = &planes_b[0]; bb_r = &planes_b[1]; bb_g = &planes_b[2]; bb_i = &planes_b[3]; bb[0] = bb_b; }
+}
+void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
+void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
+#include "gfx_core_slice.inc"
+
 static void is(unsigned i, unsigned kind, unsigned a, unsigned b)
 {
     expect(i < count && trace[i].kind == kind && trace[i].a == a && trace[i].b == b);
@@ -69,8 +100,49 @@ static void flip_case(int display, int access)
     is(0, EV_OUT, 0xA4, display ? 1 : 0);           /* display page first */
     is(1, EV_OUT, 0xA6, access ? 1 : 0);
 }
+/* Executed order of the common bring-up for one mode. */
+static void init_case(int legacy200)
+{
+    unsigned size = legacy200 ? 16000 : 32000, i = 0;
+    static const unsigned vram[4] = {0xA8000, 0xB0000, 0xB8000, 0xE0000};
+    bb_b = bb_r = bb_g = bb_i = bb[0] = 0; planes_ok = 1; gfx_started = 0;
+    for (unsigned c = 0; c < CELLS; c++) { text_chars[1 + c] = 0x1234; text_attrs[2 + c * 2] = 0xE1; }
+    count = 0;
+    gfx_init_mode(legacy200);
+    is(i++, EV_CALL, F_SPLASH, 0); is(i++, EV_CALL, F_SELECT, legacy200);
+    is(i++, EV_CALL, F_BIND, 0);
+    /* _gfx_common_init: text hidden (memory), then the four backbuffer planes, then FF2. */
+    expect(text_chars[1] == 0 && text_attrs[2] == 0);
+    for (unsigned p = 0; p < 4; p++) is(i++, EV_CLEAR, (unsigned)&planes_b[p], size);
+    is(i++, EV_OUT, 0x6A, 0x01);
+    is(i++, EV_OUT, 0xA2, 0x4B); is(i++, EV_OUT, 0xA0, legacy200 ? 1 : 0);
+    is(i++, EV_OUT, 0x68, legacy200 ? 0x09 : 0x08); is(i++, EV_OUT, 0xA2, 0x0D);
+    for (unsigned page = 0; page < 2; page++) {
+        is(i++, EV_OUT, 0xA6, page);
+        for (unsigned p = 0; p < 4; p++) is(i++, EV_CLEAR, vram[p], size);
+    }
+    is(i++, EV_OUT, 0xA4, 0); is(i++, EV_OUT, 0xA6, 1);
+    is(i++, EV_CALL, F_PALETTE, 0); is(i++, EV_CALL, F_SCROLL, 0);
+    is(i++, EV_CALL, F_REINIT, 1); is(i++, EV_CALL, F_ENTER, 0); is(i++, EV_CALL, F_DIAG, 0);
+    expect(count == i && gfx_started == 1 && gfx_flip_enabled == 1);
+}
+/* A missing plane must leave the text and the mode untouched. */
+static void no_plane_case(void)
+{
+    bb_b = bb_r = bb_g = bb_i = bb[0] = 0; planes_ok = 0;
+    text_chars[1] = 0x1234; text_attrs[2] = 0xE1;
+    count = 0;
+    gfx_init_mode(0);
+    for (unsigned i = 0; i < count; i++) expect(trace[i].kind == EV_CALL);
+    expect(text_chars[1] == 0x1234 && text_attrs[2] == 0xE1);
+    bb_b = &planes_b[0]; bb_r = &planes_b[1]; bb_g = &planes_b[2]; bb_i = 0;
+    count = 0;
+    _gfx_common_init(32000);
+    expect(count == 0 && text_chars[1] == 0x1234 && text_attrs[2] == 0xE1);
+}
 void _start(void)
 {
+    init_case(0); init_case(1); no_plane_case();
     start_case(0); start_case(1);
     for (int d = 0; d < 2; d++) for (int a = 0; a < 2; a++) flip_case(d, a);
 
