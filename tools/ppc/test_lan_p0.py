@@ -2,6 +2,8 @@
 """Offline OF parser, mutation, and UDP frame tests."""
 import argparse
 import errno
+import json
+import select
 import os
 import signal
 import time
@@ -43,8 +45,11 @@ MUTATIONS = [
     ('high-cell', 'if r[1] or r[4] or not r[5]', 'if not r[5]', 'high-cell', 'window bounds'),
     ('bar-bounds', 'address + size > 0x100000000', 'False', 'bar-bounds', 'BAR bounds'),
     ('phy', "'status': 'deferred'", "'status': 'collected'", 'phy', 'PHY evidence'),
-    ('ports', 'for attempt in range(8):', 'for attempt in range(1):', 'ports', 'port retry'),
-    ('sigterm', 'signal.signal(signal.SIGTERM, terminate)', 'pass', 'sigterm', 'SIGTERM cleanup'),
+    ('ports', 'for attempt in range(8):\n        try:', 'for attempt in range(1):\n        try:', 'ports', 'port retry'),
+    ('sigterm', 'signal.signal(signal.SIGTERM, terminate)', 'pass', 'stop-request', 'SIGTERM cleanup'),
+    ('bind-retry', "not any(re.search(r'(?:\\bid=n0\\b|\\budp=|\\blocaladdr=)', line, re.I) and re.search(r'(?:address already in use|failed to bind|bind failed)', line, re.I) for line in str(exc).removeprefix('QEMU exited: ').splitlines())", 'True', 'bind-retry', 'bind retry'),
+    ('sync-order', '            process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)\n            try:\n                response()', '            pending = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)\n            if args.no_netdev:\n                response()\n            process = pending\n            try:\n                response()', 'stop-request', 'sync notification'),
+    ('stop-request', 'if stop_requested:', 'if False:', 'stop-request', 'SIGTERM cleanup'),
     ('mac-invalid', 'if not any(mac) or mac[0] & 1:', 'if False:', 'mac-invalid', 'MAC invalid'),
 ]
 
@@ -144,8 +149,14 @@ def checks(p):
     with tempfile.TemporaryDirectory() as directory, mock.patch.object(p, 'free_ports', side_effect=OSError(errno.EADDRINUSE, 'busy')), mock.patch.object(p.subprocess, 'check_output', return_value='QEMU'), mock.patch.object(p, 'ROM', PRODUCT):
         args = argparse.Namespace(out=Path(directory), cpu='7450', no_netdev=False)
         assert p.capture(args) == 2, 'port exhaustion rc'
+    print('reached=bind-retry', flush=True)
+    bind_fixture(p)
+    print('reached=stop-request', flush=True)
+    signal_fixture(p)
     print('reached=sigterm', flush=True)
     signal_fixture(p)
+    print('reached=startup', flush=True)
+    signal_fixture(p, startup=True)
     print('reached=union', flush=True)
     other = {'properties': {'vendor-id': '0000106b', 'device-id': '00000021'}}
     expect_error('GMAC candidate count', lambda: p.choose_node([node, other]))
@@ -156,7 +167,7 @@ def checks(p):
 
 
 
-def signal_fixture(p):
+def signal_fixture(p, startup=False):
     # Run the real handler and capture cleanup around a stand-in child session.
     code = """import os, subprocess, sys
 from pathlib import Path
@@ -164,20 +175,51 @@ from unittest import mock
 import importlib.util
 spec = importlib.util.spec_from_file_location('product', sys.argv[1])
 p = importlib.util.module_from_spec(spec); spec.loader.exec_module(p)
+mode = sys.argv[3]
+directory = sys.argv[2]
 real = subprocess.Popen
 def spawn(*a, **kw):
     child = real(['sleep', '60'], start_new_session=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    print(child.pid, flush=True)
+    Path(directory, 'child.pid').write_text(str(child.pid))
+    if mode == 'startup':
+        print(child.pid, flush=True)
+        os.kill(os.getpid(), 15)
     return child
+real_select = p.select.select
+def ready(*args):
+    print(args[0][0].fileno(), flush=True) if False else None
+    print('ready', flush=True)
+    p.select.select = real_select
+    return real_select(*args)
 with mock.patch.object(p.subprocess, 'check_output', return_value='QEMU'), mock.patch.object(p, 'ROM', Path(sys.argv[1])), mock.patch.object(p.subprocess, 'Popen', side_effect=spawn):
     sys.argv = ['probe', '--cpu', '7450', '--out', sys.argv[2], '--no-netdev']
+    p.select.select = ready
     p.main()
 """
     with tempfile.TemporaryDirectory() as directory:
-        proc = subprocess.Popen([sys.executable, '-c', code, str(p.__file__), directory], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        pid = int(proc.stdout.readline())
-        os.kill(proc.pid, signal.SIGTERM)
-        proc.communicate(timeout=5)
+        proc = subprocess.Popen([sys.executable, '-c', code, str(p.__file__), directory, 'startup' if startup else 'waiting'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if startup:
+            pid = int(proc.stdout.readline())
+        else:
+            available = select.select([proc.stdout], [], [], 3)[0]
+            line = proc.stdout.readline().strip() if available else ''
+            if line != 'ready':
+                proc.kill() if proc.poll() is None else None
+                proc.communicate()
+                pidfile = Path(directory, 'child.pid')
+                if pidfile.exists():
+                    try:
+                        os.killpg(int(pidfile.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                raise AssertionError('sync notification')
+            pid = int(Path(directory, 'child.pid').read_text())
+            os.kill(proc.pid, signal.SIGTERM)
+        try:
+            proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
         try:
             os.killpg(pid, 0)
         except ProcessLookupError:
@@ -188,6 +230,45 @@ with mock.patch.object(p.subprocess, 'check_output', return_value='QEMU'), mock.
             except ProcessLookupError:
                 pass
         raise AssertionError('SIGTERM cleanup')
+
+
+def bind_fixture(p):
+    with tempfile.TemporaryDirectory() as directory:
+        args = argparse.Namespace(out=Path(directory), cpu='7450', no_netdev=False)
+        calls = []
+        real = subprocess.Popen
+        sample = FIXTURE.read_text()
+        sections = re.split(r'0 > dev (.+?) (ls|\.properties) *\n', sample)
+        replies = {f'dev {sections[i]} {sections[i + 1]}': sections[i + 2]
+                   for i in range(1, len(sections), 3)}
+        replies['dev / .properties'] = '#address-cells  1\n#size-cells  1\n'
+        # The stand-in responds to commands using the same fixed OF transcript.
+        script = """import sys, json
+replies = json.loads(sys.argv[1])
+sys.stdout.write('\\n0 > '); sys.stdout.flush()
+while True:
+    command = bytearray()
+    while True:
+        c = sys.stdin.buffer.read(1)
+        if not c: sys.exit(0)
+        if c == b'\\r': break
+        command.extend(c)
+    sys.stdout.write(replies.get(command.decode(), '') + '\\n0 > '); sys.stdout.flush()
+"""
+        def child(*a, **kw):
+            calls.append(1)
+            program = "import sys; print('socket,id=n0,udp=127.0.0.1:1: Address already in use', flush=True); sys.exit(1)" if len(calls) == 1 else script
+            return real([sys.executable, '-c', program, json.dumps(replies)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)
+        with mock.patch.object(p, 'allocate_ports', side_effect=[[1, 2], [3, 4]]), mock.patch.object(p.subprocess, 'check_output', return_value='QEMU'), mock.patch.object(p, 'ROM', PRODUCT), mock.patch.object(p.subprocess, 'Popen', side_effect=child):
+            rc = p.capture(args)
+        evidence = json.loads((args.out / 'lan_probe.json').read_text())
+        assert rc == 0 and len(calls) == 2 and evidence.get('interpreted', {}).get('bar0', {}).get('pci') == 0x82200000, 'bind retry'
+        calls.clear()
+        def failure(*a, **kw):
+            calls.append(1)
+            return real([sys.executable, '-c', "print('monitor: failed to bind: Address already in use')"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)
+        with mock.patch.object(p, 'allocate_ports', return_value=[1, 2]), mock.patch.object(p.subprocess, 'check_output', return_value='QEMU'), mock.patch.object(p, 'ROM', PRODUCT), mock.patch.object(p.subprocess, 'Popen', side_effect=failure):
+            assert p.capture(args) == 2 and len(calls) == 1, 'non-bind retry'
 
 
 def udp():

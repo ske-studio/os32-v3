@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 ROM = Path('/usr/share/qemu/openbios-ppc')
+stop_requested = False
 PROMPT = re.compile(rb'(?:^|[\r\n])\s*\d+ > $')
 
 
@@ -156,19 +157,17 @@ def capture(args):
         network = []
         device = 'sungem,mac=52:54:00:12:34:56'
         if not args.no_netdev:
-            a, b = allocate_ports()
             device = 'sungem,netdev=n0,mac=52:54:00:12:34:56'
-            network = ['-netdev', f'socket,id=n0,udp=127.0.0.1:{a},localaddr=127.0.0.1:{b}']
         command = ['qemu-system-ppc', '-M', 'mac99', '-cpu', args.cpu, '-m', '128M', '-smp', '1', '-accel', 'tcg', '-bios', str(ROM), '-nographic', '-prom-env', 'auto-boot?=false', '-nic', 'none', '-device', device, *network, '-serial', 'stdio', '-monitor', 'none', '-no-reboot']
-        evidence['argv'] = command
-        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)
         deadline = time.monotonic() + 45
         def response():
             start = len(log)
             end = min(deadline, time.monotonic() + 8)
             while time.monotonic() < end:
-                if not select.select([process.stdout], [], [], max(0, end-time.monotonic()))[0]:
-                    break
+                if stop_requested:
+                    raise RuntimeError('terminated by SIGTERM')
+                if not select.select([process.stdout], [], [], min(0.1, max(0, end-time.monotonic())))[0]:
+                    continue
                 data = os.read(process.stdout.fileno(), 4096)
                 if not data:
                     raise RuntimeError('QEMU exited: ' + bytes(log[start:]).decode(errors='replace').strip())
@@ -176,7 +175,24 @@ def capture(args):
                 if PROMPT.search(log[start:]):
                     return bytes(log[start:]).decode(errors='replace')
             raise RuntimeError('OF prompt deadline')
-        response()
+        for attempt in range(8):  # QEMU bind retries
+            network = []
+            if not args.no_netdev:
+                a, b = allocate_ports()
+                network = ['-netdev', f'socket,id=n0,udp=127.0.0.1:{a},localaddr=127.0.0.1:{b}']
+            command[command.index('-serial'):command.index('-serial')] = network
+            evidence['argv'] = command[:]
+            process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)
+            try:
+                response()
+                break
+            except RuntimeError as exc:
+                if args.no_netdev or attempt == 7 or not any(re.search(r'(?:\bid=n0\b|\budp=|\blocaladdr=)', line, re.I) and re.search(r'(?:address already in use|failed to bind|bind failed)', line, re.I) for line in str(exc).removeprefix('QEMU exited: ').splitlines()) or not str(exc).startswith('QEMU exited: '):
+                    raise
+                os.killpg(process.pid, signal.SIGKILL) if process.poll() is None else None
+                process.wait()
+                process = None
+                del command[command.index('-netdev'):command.index('-serial')]
         def execute(command):
             process.stdin.write((command+'\r').encode())
             output = response()
@@ -223,7 +239,8 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--no-netdev', action='store_true')
     def terminate(_signum, _frame):
-        raise RuntimeError('terminated by SIGTERM')
+        global stop_requested
+        stop_requested = True
     signal.signal(signal.SIGTERM, terminate)
     return capture(parser.parse_args())
 
