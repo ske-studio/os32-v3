@@ -10,13 +10,23 @@
 |---|---|---|
 | 第 1・2 段 | ツール・ソース・生成物の選択、起動・例外・IRQ・時計・V86 の口 | main (受入完了) |
 | 第 3 段 C1・C2・D1・D2・D3 | 文脈・起動引数・syscall | main |
-| 第 3 段 E2・E3 | syscall の番号と callback (E3 は E2 の上) | NP21/W の受入待ち (wt/ppc-sep3e2 e65c01ab、wt/ppc-sep3e3 2b5a291d、main df70a408 に合わせ済み) |
-| 第 3 段 F | 文書 | 未着手 |
+| 第 3 段 E2・E3 | syscall の番号と callback | main (一括受入、2259debc) |
+| 第 3 段 F・第 4 段 F | 全段の後の実測と記録 (製品コードは触らない) | 済 (2026-11-10、下の「実測」) |
 | 第 4 段 A・B・C・D・E | 型の幅・配置・モジュール、PPC の型・配置の検査の入口 (tools/ppc/check_layout.py) | main |
-| 第 4 段 F | 仕上げ | 未着手 |
 | 第 5 段 A・D1・D2・E・F | コピーの原始操作、WC と GeForce の受入の CPU 部、SQLite の診断、boot の拒否 | main |
-| 第 5 段 B1・C2・B2 | palette・IME の TVRAM・scroll を PC98 の表示 backend へ (C2・B2 は B1 の上) | NP21/W の受入待ち (wt/ppc-sep5b1 25421a17、wt/ppc-sep5c2 5e48b227、wt/ppc-sep5b2 ee363f18)。B2 は観測用アプリ userland/tests/hwscroll_probe 付き |
+| 第 5 段 B1・C2・B2 | palette・IME の TVRAM・scroll を PC98 の表示 backend へ | main (一括受入、2259debc)。B2 の hardware scroll の +1 行の観測は未確認 (観測用アプリ hwscroll_probe が NP21/W で期待どおりに映らない、main でも同じ画面) |
 | 第 5 段 B3〜B6・C1・C3・S1・S2・Z | 描画の init・provider・surfaces・present、console の backend、boot の IME の facade、SDK の target profile | 未着手 (CONSOLE_DUAL は Z の後と本線と合意) |
+
+### 実測 (第 3 段 F・第 4 段 F、2026-11-10)
+
+`python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json` (到達点 ② の枝の上、main 2259debc): 119 TU のうち 97 が成功、22 が失敗、受入の誤り 0。known_header_dependencies.json は 24 組。失敗は全部 missing-header で、原因は次の 2 つに分かれる。
+
+| 原因 | TU | 解く段 |
+|---|---:|---|
+| `exec/appslot.h:26` の `x87.h` (x86 の FPU の保存域の型を共通のヘッダが直に include) | 13 (exec 8、gfx 3、kapi 2、kernel/kbd_inject.c) | 未割当 — 文脈の保存域を arch の口の後ろへ (第 3 段の arch_exec_storage の続き)。**1 本のヘッダで 13 TU が通る** |
+| PC98・x86 の装置のヘッダ (pc98_route.h・v86_bios.h・fdc.h・pc98pt.h・serial.h・kdebug_imports.h・ime.h) | 9 | console.c は第 5 段 C1、gfx_core.c は B3〜B5、kapi_generated.c は C3。fs と serialfs と module は ③ の前の段 |
+
+PPC の型・配置は `python3 -B tools/ppc/check_layout.py` で確かめる (第 4 段 E)。本体の link と起動は selected とは別の入口 (票 TASK_PPC_KBOOT)。
 
 **本体接続は案 D とし、案 B には着手しない。分離は実際に甘く、MMU 外の33件も直す。**
 今の ppc-mmu は案 C を続け、`include/cpu.h` は変えず、context 操作は `arch/ppc/ppc_pmap.h` の `ppc_*` に閉じる。

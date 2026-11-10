@@ -91,7 +91,9 @@
   "platform/none/legacy_guest.c",
   "platform/powermac/boot.c",
   "platform/powermac/boot_capture.c",
+  "platform/powermac/display.c",
   "platform/powermac/escc.c",
   "platform/powermac/escc_tree.c",
+  "platform/powermac/memory.c",
   "platform/powermac/ofw.c"
 ]
