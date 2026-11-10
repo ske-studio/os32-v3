@@ -116,6 +116,49 @@ class RunnerTest(unittest.TestCase):
             self.assertEqual((rc, row['name'], row['target'], row['mutate_tier']), (0, 'slow', 'check-slow', 2))
         self.assertEqual(self.cli('--lint')[0], 0, self.cli('--lint')[2])
 
+    def test_index_invalidation_and_recovery(self):
+        self.check('a', needs=['make:shared'])
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        with patch.object(R, 'discover', side_effect=AssertionError('cache miss')):
+            self.assertEqual(set(R.indexed_discover(self.root)), {'a'})
+        self.check('b', budget=90)
+        self.assertEqual(set(R.indexed_discover(self.root)), {'a', 'b'})
+        path = self.root / 'tools/checks/a.py'
+        stamp = path.stat()
+        path.write_text(path.read_text().replace('shared', 'edited'))
+        os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+        self.assertEqual(R.indexed_discover(self.root)['a'].needs, ('make:edited',))
+        path.unlink()
+        self.assertEqual(set(R.indexed_discover(self.root)), {'b'})
+        self.write('tools/tests/test_new.py', 'pass\n')
+        R.indexed_discover(self.root)
+        self.write('tools/tests/test_new.py', 'CHECK = dict(name="new", covers=[], budget=1)\ndef run(ctx): return 0\n')
+        self.assertEqual(set(R.indexed_discover(self.root)), {'b', 'new'})
+        cache = self.root / 'build/out/check-index.json'
+        cache.write_text('{broken')
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        with patch.object(R.tempfile, 'NamedTemporaryFile', side_effect=PermissionError):
+            cache.unlink()
+            self.assertEqual(R.indexed_discover(self.root), self.registry())
+
+    def test_make_registration(self):
+        self.check('z', budget=1)
+        self.check('a', needs=['make:shared', 'check:z'])
+        self.check('b', budget=90, needs=['check:a', 'make:all'])
+        checks = self.registry()
+        for shard in ('', '0/3', '1/3', '2/3'):
+            rc, out, err = self.cli('--make', *(['--shard', shard] if shard else []))
+            self.assertEqual(rc, 0, err)
+            makefile = self.write('fixture.mk', out + '\n'
+                'all:;@echo $(CHECK_NAMES); echo $(CHECK_SHARD_TARGETS); '
+                'echo $(CHECK_EDGES); echo $(CHECK_ALL_NEEDS)\n')
+            result = subprocess.check_output(['make', '--no-print-directory', '-f', str(makefile)],
+                                             text=True, env=self.env).splitlines()
+            names = R.shards(checks, 3)[int(shard[0])] if shard else R.ordered(checks)
+            self.assertEqual(result, ['check-b check-a check-z', ' '.join('check-' + n for n in names),
+                                     'check-time-check-b:check-time-check-a check-time-check-a:check-time-check-z',
+                                     'all shared'])
+
     def test_types_duplicates_and_outside(self):
         for name in R.OUTSIDE:
             self.check(name)
@@ -781,6 +824,10 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
+        ('index-stale', 'if data["signature"] == signature:', 'if True:',
+         'test_index_invalidation_and_recovery'),
+        ('make-shard-lost', 'CHECK_SHARD_TARGETS=" ".join("check-" + n for n in names)',
+         'CHECK_SHARD_TARGETS=" ".join("check-" + n for n in ordered(checks))', 'test_make_registration'),
         ('shard-heaviest-last', '-sum(checks[n].budget for n in g)',
          'sum(checks[n].budget for n in g)', 'test_shards'),
         ('shard-most-loaded', '(loads[i], i)', '(-loads[i], i)', 'test_shards'),

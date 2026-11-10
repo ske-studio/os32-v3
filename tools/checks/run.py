@@ -641,10 +641,75 @@ def shards(checks, count):
     return tuple(ordered(checks, names) for names in result)
 
 
-def discover(root: Path) -> dict[str, Check]:
-    checks = {}
+def declaration_paths(root):
     paths = set((root / "tools/checks").rglob("*.py"))
     paths.update((root / "tools/tests").glob("test_*.py"))
+    return sorted(paths)
+
+
+def indexed_discover(root):
+    """Reuse declarations only while every candidate and the parser are unchanged.
+
+    Include undeclared candidates, additions, removals, and ctime (not just mtime).
+    Publication is atomic; concurrent readers never see an incomplete index.
+    An unwritable or damaged cache only costs a fresh discovery.
+    """
+    candidates = declaration_paths(root)
+    paths = sorted(set(candidates) | {Path(__file__).resolve()})
+    signature = [[str(root.resolve()), sys.version]]
+    for path in paths:
+        stamp = path.stat()
+        signature.append([str(path), stamp.st_mtime_ns, stamp.st_ctime_ns,
+                          stamp.st_size, stamp.st_ino])
+    cache = root / "build/out/check-index.json"
+    try:
+        data = json.loads(cache.read_text())
+        if data["signature"] == signature:
+            return {row["name"]: Check(**dict(row, covers=tuple(row["covers"]),
+                                             needs=tuple(row["needs"]))) for row in data["checks"]}
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    checks = discover(root)
+    # Do not publish a discovery made across an edit. The next call retries.
+    after = []
+    for path in paths:
+        stamp = path.stat()
+        after.append([str(path), stamp.st_mtime_ns, stamp.st_ctime_ns,
+                      stamp.st_size, stamp.st_ino])
+    if signature[1:] == after and declaration_paths(root) == candidates:
+        pending = None
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(mode="w", dir=cache.parent,
+                                             prefix="check-index-", delete=False) as stream:
+                pending = Path(stream.name)
+                json.dump(dict(signature=signature, checks=[asdict(c) for c in checks.values()]), stream)
+            pending.replace(cache)
+        except OSError:
+            pass
+        finally:
+            if pending is not None:
+                pending.unlink(missing_ok=True)
+    return checks
+
+
+def emit_make(checks, names):
+    values = dict(
+        CHECK_NAMES=" ".join("check-" + n for n in ordered(checks)),
+        CHECK_SHARD_TARGETS=" ".join("check-" + n for n in names),
+        CHECK_EDGES=" ".join("check-time-check-" + c.name + ":check-time-check-" + n[6:]
+                             for name in ordered(checks) for c in (checks[name],)
+                             for n in c.needs if n.startswith("check:")),
+        CHECK_ALL_NEEDS=" ".join(sorted({n[5:] for c in checks.values()
+                                        for n in c.needs if n.startswith("make:")})))
+    # Names and needs have already been restricted to make-safe characters.
+    # Nested eval preserves assignment boundaries after $(shell) folds newlines.
+    return " ".join("$(eval " + k + " := " + v + ")" for k, v in values.items())
+
+
+def discover(root: Path) -> dict[str, Check]:
+    checks = {}
+    paths = declaration_paths(root)
     for path in sorted(paths):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         declarations = [n.value for n in tree.body
@@ -1107,6 +1172,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--list", action="store_true")
+    action.add_argument("--make", action="store_true", help="emit all make registration variables")
     action.add_argument("--select", action="store_true")
     action.add_argument("--run", nargs="+")
     action.add_argument("--lint", action="store_true")
@@ -1118,15 +1184,18 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--tier", type=int, choices=range(5), default=0)
     args = parser.parse_args(argv)
     try:
-        checks = discover(ROOT)
+        checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
         names = ordered(checks)
         if args.shard is not None:
-            if not args.list or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
+            if not (args.list or args.make) or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
                 raise ValueError("--shard requires --list and index/count")
             index, count = map(int, args.shard.split("/"))
             if index >= count:
                 raise ValueError("shard index must be less than count")
             names = shards(checks, count)[index]
+        if args.make:
+            print(emit_make(checks, names))
+            return 0
         if args.list:
             if args.json:
                 print(json.dumps([dict(asdict(checks[n]), target="check-" + n) for n in names]))
