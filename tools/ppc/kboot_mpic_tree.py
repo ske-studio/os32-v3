@@ -14,6 +14,7 @@ CHECK = dict(name='ppc-kboot-mpic-tree', tier=2, budget=60,
              covers=['platform/powermac/mpic_tree.c', 'platform/powermac/mpic_tree.h',
                      'tools/ppc/kboot_mpic_tree.py', 'tools/ppc/kboot_mpic_tree_fake.c',
                      'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
+                     'platform/powermac/gmac_tree.c',
                      'tools/ppc/kboot_capture_fake.c', 'platform/powermac/*.h',
                      'arch/ppc/*.h', 'include/types.h', 'include/callconv.h',
                      'lib/kstring.h', 'lib/kstring_c.c', 'tools/tests/host32.py'])
@@ -38,6 +39,7 @@ def exercise(directory, source):
             '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
             str(source), str(ROOT / 'platform/powermac/kboot_capture.c'),
+            str(ROOT / 'platform/powermac/gmac_tree.c'),
             str(ROOT / 'tools/ppc/kboot_mpic_tree_fake.c'),
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
