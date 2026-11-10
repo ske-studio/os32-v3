@@ -112,7 +112,22 @@ int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
 int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m);
-int pm_lan_monitor(const struct lan_message *req, struct lan_message *rsp);
+struct pm_lan_range { u32 base, size; };
+struct pm_lan_diag {
+    const u32 *status; u32 status_words;
+    const u32 *memory; u32 memory_words;
+    const u8 *diag;
+    const struct pm_lan_range *peek_ok; u32 peek_ok_count;
+    const struct pm_lan_range *peek_ig_ok; u32 peek_ig_ok_count;
+    const struct pm_lan_range *peek_deny; u32 peek_deny_count;
+    void *ctx;
+    void (*clock)(void *, u32 *, u32 *, u64 *, u64 *);
+    int (*translate)(void *, u32, u32 *, u32 *);
+    int (*copy8)(void *, u32, u8 *);
+};
+int pm_lan_monitor(const struct lan_message *, const u8 src_mac[6],
+                   const struct pm_lan_diag *, struct lan_message *);
+int pm_lan_copy8(void *ctx, u32 va, u8 *out);
 
 _Static_assert(LAN_OK == 0, "LAN_OK");
 _Static_assert(LAN_AGAIN == 1, "LAN_AGAIN");
