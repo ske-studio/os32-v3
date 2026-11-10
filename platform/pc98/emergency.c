@@ -1,6 +1,7 @@
 /* Early boot and fault output; independent of the normal console. */
 #include "platform_emergency.h"
 #include "tvram.h"
+#include "tvram_private.h"
 #include "memmap.h"
 
 void platform_boot_puts(int x, int y, const char *str, u8 color)

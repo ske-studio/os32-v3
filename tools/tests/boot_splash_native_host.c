@@ -41,6 +41,7 @@ static void outp(unsigned int port, unsigned int value);
 #include "os32_gui_shared.h"
 #undef i32
 #undef u32
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 #include "../../gfx/gfx_core.c"
 #include "../../platform/pc98/gfx_init.c"   /* 第 5 段 B3: planar の初期化の provider (製品) */
 #include "../../platform/pc98/gfx_selector.c"   /* 第 5 段 B4: backend の選択の provider (製品) */

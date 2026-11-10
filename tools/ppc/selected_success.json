@@ -45,6 +45,7 @@
   "kapi/kapi_osri.c",
   "kapi/kapi_print.c",
   "kernel/console/con_sink.c",
+  "kernel/console/console.c",
   "kernel/console/font_guard.c",
   "kernel/console/font_source.c",
   "kernel/console/unicode_file.c",

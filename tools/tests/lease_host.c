@@ -1,5 +1,6 @@
 #include "types.h"
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 static u32 host_cr3;
 static void host_sync(u32 root);
 static void host_pte_clear(u32 va);

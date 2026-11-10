@@ -41,6 +41,7 @@ void res_owner_set(int owner) { g_owner = owner; }
 /* ======================================================================== */
 
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 /* tvram.h now includes the canonical pc98.h constants. */
 #include "pc98.h"
 #include "io.h"
