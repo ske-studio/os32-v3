@@ -1,3 +1,5 @@
 # ライセンス原文は上流のバイト列のまま保つ (改行コードも変換しない)
 assets/fonts/IPA_Font_License_Agreement_v1.0.txt -text
 assets/ipadic/COPYING -text
+# OpenBIOS の対話の生の応答 (行末の空白も応答のまま保つ、段 P0 の fixture)
+tools/ppc/fixtures/lan_of_sample.txt -whitespace
