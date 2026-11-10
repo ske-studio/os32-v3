@@ -1,5 +1,5 @@
 > 出所: `~/os32-tmp/run/hal-v2/DESIGN.final.md` (Claude 起草、codex astra のレビュー 4 回 (第 4 回はユーザー承認) で確定、2026-11-09)。段の状態は票 TASK_HAL_V2 が持つ。
-> 状態: **現行 (2026-11-09)** — 表示 HAL v2 (形式 u32×2・32bpp、DX9c 程度の能力、2D の口、fence、面、GPU から見える RAM、adapter/head の列挙、CPU 直描きの同期バックエンド層) の確定設計。
+> 状態: **現行 (2026-11-09、2026-11-10 に Fable 5.2 のレビューを反映、2026-11-11 に main 761ca15f の実装に合わせた)** — 表示 HAL v2 (形式 u32×2・32bpp、DX9c 程度の能力、2D の口、fence、面、GPU から見える RAM、adapter/head の列挙、CPU 直描きの同期バックエンド層) の確定設計。
 
 # 表示 HAL v2 の詳細設計 (確定)
 
@@ -11,7 +11,7 @@
 - P1-3 gart_range: `struct gf3_ctx` の末尾に範囲照会の callback と opaque を A0 が足し、設定 G1・実体 G5・利用 G8 (§11-6)。
 - P1-4 別名: C4 の `gfx2_surf_alias`・`gfx2_surf_alias_update` (backing を借りるだけ、解放しない、更新で gen+1) を A0 に。C14 はこれだけを呼ぶ (§6-5・§11-2)。
 - P1-5 unmap 失敗: C7 の `gfx2_map_detach`・`gfx2_vaspace_drop` を足し、unmap 失敗の面は backing を返さない (KEEP)。destroy・quarantine の失敗でも AS への参照は 0 (§7-3・§11-2)。
-- P1-6 .text の条件: 組込み backend は kernel の .text (A0 が build/os32.ld に境界の記号)、module は `GfxBackend.v2_mod` の module の .text。GF の v2 表は geforce_module.c が kernel 側へ写す (§11-7)。
+- P1-6 .text の条件: module の表は `GfxBackend.v2_mod` の module の .text で見る。組込みの表は abi と hook の非 NULL だけを見る (§11-7)。GF の v2 表は geforce_module.c が kernel 側へ写す (§11-7)。
 - P2-1 試験と I: §13 の全試験に I の列。I1 は新帯の往復と AS の回収の合格が必須 (§12・§13)。
 - P2-2 weak の検査: A0 が I ごとの対象関数の一覧 `tools/checks/gfx2_wiring.txt` を作り、`gfx2_no_weak.sh` が最終 ELF で型 T と a0_weak の外の番地を見る (§11)。
 - P3 (指摘外の整合): GART の不足の戻り値を NOSPC に統一 (§8・§14、`OS32_ERR_NOMEM` は os32_kapi_shared.h に無い)。
@@ -35,14 +35,21 @@
 | GF の color key | accel_objects.c:48・112 (NULL に結ぶ) | |
 | GF の RAM の DMA | command.h:64・66・138、geforce_dma.c | 1 頁の staging だけ |
 | GeForce 層 4 | hwdev/gf/display/api.h:19・87-97 | 列挙・表示の元 |
-| GF の登録 | backend_geforce.c:261-262・719-734 | |
-| Trident | trident.h:351-352・581、write_gap.c:4-21、regs.c:117-138、present.c:26-56、trident_module.c:198-200、backend_trident.c:96-98・144 | 同期層へ移す元 |
+| GF の登録 | backend_geforce.c:259・263-264 (mode の表を書く)・749-767 (表。module の組みでは `geforce_backend_ops`:749、組込みでは `gfx_backend_geforce`:751) | |
+| Trident | trident.h:351-352・581、write_gap.c:4-21、regs.c:117-138、present.c:26-56、trident_module.c:198-199、backend_trident.c:96-98・144 | 同期層へ移す元 |
 | mm | mm/dma_pool.h (64KB 固定)、pgalloc.h:227-235・191-197・116、pgalloc_owner.inc:216-231 (`ledger_transfer`)・233- (`ledger_reclaim_owner`)、pgalloc_resource.inc:37-38 (`ledger_device_map_prepare` は DEVICE owner だけ)、paging_map.inc:169-171 (supervisor の恒等 UC の写像) | 写像はユーザー向けでない |
 | ユーザーの写像 | mm/paging.h:286-317 (`map_user`・`map_user_range_phys`・`free_user_range` は頁を pgalloc へ返す)、paging.h:206 `lease_mapping`、exec/lease.c:40-60 (ledger_surfaces に縛られる)、memmap.h:465-468 (lease の帯 F0000000〜FE000000・8 本) | |
 | 写像の帯 | mm/paging_addrspace.inc:202-215 (`map_user_range_phys` は app_pde の外を拒む)、paging.h:216 (`lease_pt_phys[MEM_LEASE_MAX_PDES]`)、paging_lease.inc:5-11 (root の文脈)・135- (`paging_lease_unmap` は帯の中なら ledger に縛られない)、paging_addrspace.inc:115-120 (破棄で lease の PT を返す)、exec/lease.c:69 (確保の上限は `MEM_LEASE_END`) | 新しい帯は lease の PT を共用する |
 | AS の後片付け | exec/exec_finish.inc:33-34 (`lease_revoke_all`)・36 (poison なら私物を返さない)・55 (`paging_addrspace_destroy`)・62-64 (reclaim・retire)・69 (`kfree(a->as)`) | |
 | GF の同期 | hwdev/gf/accel_fill.c:44-46・accel_copy.c:61-62 (中で fence を待つ) | emit だけの口を足す |
-| g_backend | include/gfx_hal.h:181 は `GfxBackend *` (H4 が hook を書き換える) | `GfxBackendV2` は const、v1 は毎回 `a->v1->` から読む (D2) |
+| g_backend | include/gfx_hal.h:181 は `GfxBackend *` (H4 が hook を書き換える)、実体は gfx/gfx_core.c:58 で初期値は `DISPLAY_FALLBACK_BACKEND` | `GfxBackendV2` は const、v1 は毎回 `a->v1->` から読む (D2) |
+| backend の選択 (B4 の provider) | include/display_provider.h、platform/pc98/gfx_selector.c:53-108 `display_provider_select` (候補の表 :12-18、probe の判定 `gfx_probe_backend` :46-51)・:29-36 `display_provider_ledger` (backend → `LEDGER_SF_*`)、platform/powermac/display_provider.c (未対応の provider)。gfx/gfx_core.c:156-159 の `gfx_select_backend` は provider を呼ぶだけ | v2 は `&gfx_backend_*` を直に比べず、kind は `display_provider_ledger()` から取る。probe が通った物の列挙は provider に足す `display_provider_each` (§11-7) |
+| 台帳の種別 | mm/pgalloc.h:297-301 `LEDGER_SF_PC98 1・PEGC 2・CIRRUS 3・GEFORCE 4・TRIDENT 5` | `GFX2_KIND_*` は同じ値 (§11-2) |
+| gfx_init の流れ | gfx/gfx_core_init.inc:4 `palette_shadow_reset`・:8 `gfx_select_and_init_backend`・:9-16 早い戻り (init の失敗は :9、packed 系は :10-16)。gfx_core.c:203-238 の選択と init (init の失敗で pc98 へ落ちるのは :227-231)、`gfx_init`:295・`gfx_init_200`:300、`gfx_prepare_backend`:252-291 | 登録の時点は §11-7 |
+| gfx_shutdown | gfx/gfx_core.c:356-384 (GF → pc98 の切り替え :375-382、`g_backend = DISPLAY_FALLBACK_BACKEND` の代入 :380、`gfx_reinit_surfaces(1)` :383)、`gfx_screen_owner` :351-354 | §11-7 |
+| パレット | gfx/palette.c:34 `palette_shadow_reset` (16 色・4bit の影、既定は :14-31)、gfx/gfx_core_api.inc:50-59 `gfx_set_palette_hal`・:102-130 `gfx_lease_palette` (v1 の set_palette の経路、KAPI の成分は 0〜15、backend が ×17、backend_pegc.c:20-22・backend_geforce.c:717) | v2 は中核の `gfx2_pal[256]` を正にする (§9-2) |
+| TLB | arch/x86/arch_cpu.h:46-52 (`invlpg` は使わず CR3 の読み直し)、mm/paging_lease.inc:126 (`paging_current_cr3() == as->pd_phys` なら `paging_load_cr3`) | §7-4 |
+| build の一覧 | build/select.mk:243 が `C_KERNEL` を `C_COMMON` (build/sources/common.mk) と `C_ORDER_LEGACY` (build/sources/order.mk) から組む。geforce の module は build/geforce-module.mk | §11-7 |
 | module | tools/module_schema.py、build/out/trident/trident_imports.h:19 (`TRIDENT_MODULE_ABI_GEN`)、geforce_module.c:299 | |
 
 食い違い 2 件 (r1 から): (2) SURVEY §3-1 の GF の透過色は実物では未使用。(3) SURVEY §6 #8 に対し GF の中には `pci_dma` と 1 頁の staging がある。(1) H2 以降の未着地は解消 (D1)。
@@ -51,13 +58,13 @@ r4 で直した食い違い (現物 4f971604。上の表の該当の行もこの
 | ID | r3 の前提 | 現物 | 直した所 |
 |---|---|---|---|
 | D1 | gfx_hw_submit.c:1-14 は NOSYS | gfx/gfx_hw_submit.c は実装済み (111 行、`submit_one`:20・`gfx_hw_submit`:70・`gfx_hw_get`:95)。H1〜H6・G1〜G3 は main に入った | §11 の着地の前提は満たした。C14 の呼ぶ行は `gfx_hw_submit`:70・`gfx_hw_get`:95 の入口 |
-| D2 | gfx_hal.h:181 は `const GfxBackend *` | `extern GfxBackend *g_backend` (gfx_hal.h:181、実体 gfx_core.c:56)。`gfx_policy_reeval` が `g_backend->fill_rect`・`blit` を書き換える (gfx_policy.c:47-48) | `struct gfx2_adapter.v1` は `GfxBackend *`。v1 の hook は呼ぶたびに `a->v1->` から読み、関数ポインタを写して持たない (§11-2) |
+| D2 | gfx_hal.h:181 は `const GfxBackend *` | `extern GfxBackend *g_backend` (gfx_hal.h:181、実体 gfx_core.c:58、初期値 `DISPLAY_FALLBACK_BACKEND`)。`gfx_policy_reeval` が `g_backend->fill_rect`・`blit` を書き換える (gfx_policy.c:47-48) | `struct gfx2_adapter.v1` は `GfxBackend *`。v1 の hook は呼ぶたびに `a->v1->` から読み、関数ポインタを写して持たない (§11-2) |
 | D3 | `gfx_scanout_gen_bump()` | 無い。走査の変化は `gfx_policy_scan_changed()` (gfx/gfx_policy.c:67-76、宣言 gfx_policy.h:14-16「Module-safe scan notification」。中身は `gfx_scan_changed = 1;` → `gfx_policy_reeval()`) | §9-3 |
-| D4 | gfx_screen_owner は gfx_core.c:457 | gfx_core.c:461 | §6-5 |
+| D4 | gfx_screen_owner は gfx_core.c:457 | gfx_core.c:351-354 | §6-5 |
 | D5 | accel_copy.c:60-61 | accel_copy.c:61-62 (accel_fill.c:44・46 は同じ) | §1・§11-6 |
 | D6 | GfxBackend の末尾に足すだけ | 末尾は `shadow_fill_rect`・`shadow_blit` (gfx_hal.h:142-143)。tools/hwdev_layout.json:661 に `struct GfxBackend`、:1033 に `struct gf3_ctx` の配置 | A0 は 143 の後に足し、hwdev_layout.json の 2 表も直す (§11-6・§11-7) |
-| D7 | GF・Trident の表は module の物を指す | module の init が kernel 側の `candidate` を埋め、`geforce_start` (geforce_module.c:193-241) が module の init で kernel 側の `candidate` を埋めて hook ごとに `module_text_contains` を見る (G3 で `direct_ok` の text の検査と、`direct_ops` の表が module の ro の中にあるかの検査 :216-241 が加わった)。公開 (`gfx_backend_geforce = candidate`) は load の成功の後の :334 で別に行う (既定の表は :144)。trident_module.c:22・31 も同形 | v2 の表も kernel 側へ写し、`v2_mod` を付ける (§11-7) |
-| D8 | 「module の .text の中」の検査を組込みにも使える | kernel の .text の境界の記号が無い (build/os32.ld:36-41 は `*(.text)` だけ、`_etext` を使うのは host 試験だけ) | A0 が `__os32_text_start`・`__os32_text_end` を足す (§11-7) |
+| D7 | GF・Trident の表は module の物を指す | module の init が kernel 側の `candidate` を埋め、`geforce_start` (geforce_module.c:193-241) が module の init で kernel 側の `candidate` を埋めて hook ごとに `module_text_contains` を見る (G3 で `direct_ok` の text の検査 :217 と、`direct_ops` の表が module の ro の中にあるかの検査 :221-227・各 hook の検査 :228-238、表示の hook の検査 :240-253 が加わった)。公開 (`gfx_backend_geforce = candidate`) は load の成功の後の :334 で別に行う (既定の表は :144)。trident_module.c:22・31 も同形 | v2 の表も kernel 側へ写し、`v2_mod` を付ける (§11-7) |
+| D8 | 「module の .text の中」の検査を組込みにも使える | kernel の .text の境界の記号が無い (build/os32.ld:36-41 は `*(.text)` だけ、`_etext` を使うのは host 試験だけ) | 組込みの表は .text を検査しない (abi と hook の非 NULL だけ)。境界の記号は足さない (§11-7) |
 | D9 | v1 の GF の HW の 2D は v2 の番号を出す | v1 の GF の描画は同期 (`gf3_fill` は accel_fill.c:46 で待つ)。v1 の入口から出る GPU の仕事は戻る時に終わっている | `v1_bridge_end` の fence は今は常に 0、C14 は `gfx2_fence_note` を呼ばない (§6-5) |
 
 ## 2. 層の図
@@ -104,7 +111,7 @@ typedef struct { u32 v; u32 x; } GFX2_Color;   /* 8B。v = 値、x = 透過色�
 | 物 | 式 (整数) | HW に許す差 |
 |---|---|---|
 | 拡げ・縮め | 5→8 `x<<3\|x>>2`、6→8 `x<<2\|x>>4`、縮めは上位を採る。α の無い形式から読むと α=255、X の欄は 255 を書く | 0 |
-| INDEX8 → RGB | 今のパレット (`gfx_get_palette`) | 0 |
+| INDEX8 → RGB | 中核のパレットの写し `gfx2_pal[256]` (§9-2) | 0 |
 | YUV → RGB (BT.601、16〜235) | C=Y−16、D=U−128、E=V−128、R=clamp((298C+409E+128)>>8)、G=clamp((298C−100D−208E+128)>>8)、B=clamp((298C+516D+128)>>8)。YUY2 の 2 画素は U・V を共有 | 各成分 ±2 |
 | 最近点 | `sx = sr.x + ((2·i+1)·sr.w) / (2·dr.w)` (i は書き先の列、行も同じ) | 0 |
 | 双線形 | 中心合わせ `fx = ((2·i+1)·sr.w·65536)/(2·dr.w) − 32768` (負は 0)、`w = (fx>>8)&255`、成分ごとに `(a·(256−w)+b·w+128)>>8` を横 → 縦、端は複製 | 各成分 ±1 |
@@ -120,7 +127,7 @@ typedef struct { u32 v; u32 x; } GFX2_Color;   /* 8B。v = 値、x = 透過色�
 | offset | 欄 |
 |---|---|
 | 0 | `size, adapter, backend_kind, tier3d_now, tier3d_hw, overlay_now, overlay_hw, overlay_fmt` (tier3d_now・overlay_now は今は 0、hw は装置の世代 = GF T3・RV280 T2・RV515 T3・overlay_hw は RV が 1) |
-| 32 | `caps2d_hw, caps2d_sw, exact` (bit は §4-2 の op の番号。hw/sw は「どれかの形式で使える」の要約だけ) |
+| 32 | `caps2d_hw, caps2d_sw, exact` (op ごとに 1 bit: `GFX2_CAP2D(op) = 1u << op` (§11-1)、op は §5-2 の番号 1〜10、bit0 と 11 以上は 0。hw/sw は「どれかの形式・pool で使える」の要約だけで、形式・pool・flags ごとの可否は `gfx2_check_op`) |
 | 44 | `fmt_surface, fmt_render2d, fmt_scanout, fmt_src_stretch` |
 | 60 | `max_w, max_h, max_pitch, pitch_align, offset_align, scanout_align, stretch_min_q16, stretch_max_q16, max_cmds` |
 | 96 | `vram_bytes, vram_cpu_bytes, gart_bytes, gart_page, fence_hw, async` |
@@ -129,7 +136,20 @@ typedef struct { u32 v; u32 x; } GFX2_Color;   /* 8B。v = 値、x = 透過色�
 | 184 | 3D の段 (今は全部 0): `vs_version, ps_version, max_tex_w, max_tex_h, max_tex_aspect, max_tex_stages, max_streams, max_prim, max_index, max_rt, tex_caps, raster_caps, zcmp_caps, blend_caps` |
 | 240 | `reserved[4]` (0) |
 
-装置ごとの埋め方は r1 §4 の表のとおり。ただし GF の caps2d_hw の ROP3・PAT は G7 まで「パターンを使わない GX 相当の 16 種、32bpp は COPY だけ」、ALPHA は G6 で確かめるまで 0。
+装置ごとの埋め方 (数値は目安。実際の値は backend の `caps` が返し、試験は「返した値で動くこと」を見る。v2 の表の無い backend は C16 の shim の `caps` が C10 の `gfx2_caps_from_v1` で v1 の `GfxMode` から埋める):
+| 欄 | GeForce 6200 (G1) | PEGC (P1) | Trident (shim) | PC-98 内蔵 (shim) |
+|---|---|---|---|---|
+| caps2d_hw | FILL・COPY・STRETCH・MONO・HOSTDATA・READBACK (ROP は G7 まで「パターンを使わない GX 相当の 16 種、32bpp は COPY だけ」、ALPHA は G6 で確かめるまで 0、ROP4・LINE は 0) | 0 | 0 (v2 では GE を使わない、§6-4) | 0 |
+| caps2d_sw | op 1〜10 の全部 | 同 | 同 | 同 |
+| exact | STRETCH・ALPHA 以外の全部 (sw・hw とも) | 同 | 同 | 同 |
+| fmt_surface | 1〜4 (5〜10 は G* で確かめた物から足す) | 1〜4 (SYSMEM だけ) | 1〜4 (SYSMEM だけ) | 1〜4 (SYSMEM だけ) |
+| fmt_scanout | INDEX8・565・X888 | INDEX8 | INDEX8・565・X888 (backend_trident.c:96-98) | 0 (PLANAR4 は v1 だけ) |
+| max_w/max_h・pitch_align | 4096/4096・64 | 640/480・4 | 1024/768・4 | 640/400・4 |
+| fence_hw / async | 1 / 1 (gf2_fence) | 0 / 0 | 0 / 0 | 0 / 0 |
+| vram_bytes・gart_bytes | 装置の値・`GFX_GART_KB`×1024 (§8) | 0・0 | 0・0 | 0・0 |
+| heads・cursor | 2・64×64 ARGB | 1・0 (SW) | 1・0 | 1・0 |
+| tier3d_hw | 3 | 0 | 0 | 0 |
+| cpu_direct・sync_mode・sync_profile | 0・0・"" | 1・SHADOW・"pegc" | 1・sync.cfg の mode・"pci:1023:*" の当たった鍵 | 0・0・"" |
 
 ### 4-2. 操作ごとの可否
 ```c
@@ -139,7 +159,7 @@ typedef struct { u32 v; u32 x; } GFX2_Color;   /* 8B。v = 値、x = 透過色�
 int gfx2_check_op(u32 adapter, const GFX2_Op *op_shape, u32 src_fmt, u32 dst_fmt,
                   u32 src_pool, u32 dst_pool, u32 *how);  /* op・rop・flags と形式と pool で判定 */
 ```
-- 中核の判定の順: (1) 形式の組が規則で禁止 (RGB→INDEX8、PLANAR4、3D の形式) → NOSUPPORT、(2) 書き先が SHADOW の面 (§6-4) → SW、(3) backend の `check` が HW を返す → HW、(4) それ以外 → SW。submit は同じ関数で命令ごとに振り分ける (判定と実行が食い違わない)。
+- 中核の判定の順: (1) 形式の組が規則で禁止 (RGB→INDEX8、PLANAR4、3D の形式) → NOSUPPORT、(2) adapter が LOST・LOST_HELD (§6-3) → backend を呼ばず (5) の SW の判定へ、(3) 書き先が SHADOW の面 (§6-4) → SW、(4) backend の `check` が HW を返す → HW、(5) それ以外は、関わる面が全部 CPU から見える (`kva` が非 NULL、または GART の面で呼んだ AS に写像がある、§8 の「CPU から」) なら SW、見えない面があれば NOSUPPORT。submit は同じ関数で命令ごとに振り分ける (判定と実行が食い違わない)。
 
 ## 5. 2D の口
 
@@ -179,23 +199,25 @@ typedef struct {
 ```c
 int gfx2_submit(u32 adapter, const GFX2_Op *ops, u32 n, u32 gen, u32 *done, u32 *fence);
 /* gfx/v2/submit.c の順。k_ops は submit.c の static (GFX2_MAX_CMDS × 80B = 5,120B)。
- * シングルタスクなので入れ子は無いが、入れ子なら OS32_ERR_BUSY (in_submit の旗) */
+ * シングルタスク・協調切替なので入れ子は無い (旗は持たない) */
 if (user && (!writable(done, 4) || !writable(fence, 4))) return OS32_ERR_INVAL;   /* 何もしない */
 a = gfx2_adapter_get(adapter); if (!a) return OS32_ERR_INVAL;
+if (!(a->flags & GFX2_AF_ACTIVE)) return OS32_ERR_NOSYS;   /* §9-1: ACTIVE でない adapter には描かせない */
 if (gen != a->gen) return OS32_ERR_STALE;
 if (n > GFX2_MAX_CMDS || (user && !readable(ops, n * sizeof(GFX2_Op)))) return OS32_ERR_INVAL;
 copy_from(k_ops, ops, n * sizeof(GFX2_Op));                 /* 以後 ops は読まない */
 u32 k_done = 0, k_fence = a->fence.issued; int rc = 0;     /* n == 0 は 0・done=0・fence=発行済みの最新 */
 static struct gfx2_exec ex[GFX2_MAX_CMDS];
 for (i = 0; i < n; i++) { rc = check_one(a, &k_ops[i], &ex[i]); if (rc) goto out; }  /* 走査 1: 何も実行しない */
-for (i = 0; i < n; i++) { rc = run_one(a, &ex[i]); if (rc) break; k_done = i + 1; }  /* 走査 2 */
-if (k_done) { a->be->kick(a->ctx); }
+u32 k_hw = 0;
+for (i = 0; i < n; i++) { rc = run_one(a, &ex[i]); if (rc) break; k_done = i + 1; k_hw += ex[i].how == GFX2_HOW_HW; }  /* 走査 2 */
+if (k_hw) { a->be->kick(a->ctx); }                          /* a->be は常に非 NULL (§11-7、v1 だけの backend は shim) */
 k_fence = a->fence.issued;
 out:
 *done = k_done; *fence = k_fence;      /* 最後に書く。READBACK の先と重なっていてもこの値が残る */
 return rc;   /* 走査 2 の rc は装置の失敗だけ (§6-3)。k_ops[k_done] は途中まで行ったかもしれず、再送しない */
 ```
-- 検査 (走査 1): 面の sid の世代・持ち主 (呼んだ AS)・状態 (§7-1)、欄の表 (§5-2)、矩形とクリップのあふれ、data の範囲 (`(h−1)·pitch + 行のバイト` を u32 のあふれ込みで)、`gfx2_check_op` が NOSUPPORT でないこと。
+- 検査 (走査 1): 面の sid の世代・持ち主 (呼んだ者の ledger owner、§7-1)・状態 (§7-1)、欄の表 (§5-2)、矩形とクリップのあふれ、data の範囲 (`(h−1)·pitch + 行のバイト` を u32 のあふれ込みで)、`gfx2_check_op` が NOSUPPORT でないこと (NOSUPPORT の命令があれば束は `OS32_ERR_NOSYS` で、何も実行しない。INVAL は欄・範囲の誤りだけに使う)。
 - data の中身 (MONO・HOSTDATA・mask・パターン) は走査 2 で命令の順に読む。同じ束の前の READBACK がそこへ書いていれば、書いた後の値を読む (順に行う意味どおり)。範囲は走査 1 で確かめ済み。
 - **CPU の入出力は戻る前に終わる**: MONO・HOSTDATA・SET_PATTERN・ROP4 の mask は走査 2 でカーネルが読み切る (GF は push buffer への inline か staging に写し、staging の再利用ごとの待ちは層 3 の今の契約のまま)。READBACK は完了を待ってからユーザーの先に写して戻る。したがってアプリは戻った後に data を自由に使ってよい。
 - 非同期で残るのは FILL・COPY・STRETCH・ALPHA・LINE (面と面) だけ。`*fence` を待てば全部終わっている。
@@ -236,6 +258,7 @@ int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
 - GF の epoch が変わった (再初期化) ら、backend はそれまでに発行した v2 の番号を全部 `failed_upto` にする。中核は `failed_upto` 以下を待つ面のうち未完了だった書きの先を `LOST` にし、adapter の `gen` を上げる。`gen` が違う submit は STALE、LOST の面は `free` と `desc` だけ通り、lock は `OS32_ERR_STALE`。
 - 待ちの上限 (`GF3_TIMEOUT_US` 等) を越えたら `OS32_ERR_TIMEOUT`、adapter を `LOST` にして同じ処理。上限は物理の制約ではない (切れたらユーザーへ報告)。
 - 停止の確認に失敗した (`gf3_fini` が失敗し資源を保持する) 場合は adapter を `LOST_HELD` にする。この間は VRAM・GART の頁を一切返さない (§8 の回収も止める)。回復が成功して停止が確認できた時に初めて解放を進める。
+- **LOST の後は自動の回復をしない** (ユーザー判断 2026-11-10)。v1: `gfx2_adapter_lost` (C3) は最後に `gfx_policy_reeval()` を呼ぶ。GF の `geforce_direct_ok` (backend_geforce.c:121-124) は G1 が足す 1 行で `gf_v2` が LOST の間 0 を返し、`gfx_direct_wanted` (gfx/gfx_policy.c:17-23) が偽になって v1 の hook は SHADOW へ移る (gfx_policy.c:47-52)。v2: LOST の面 (失敗した書きの先) は free と desc だけ、それ以外の面は `gfx2_check_op` の (2) で SW に回り、`kva` のある面 (と持ち主の AS に写像のある GART の面) はそのまま描ける。HW の口 (`be->emit`・`kick`・`fence_*`) は呼ばない。復帰は次の mode_set (`gfx2_mode_set` §9-3、または gfx_init のやり直しで C1 の `gfx2_adapter_register` が呼ばれた時 §11-7) が装置の初期化に成功した時に C3 の `gfx2_adapter_recovered` を呼ぶか、再起動。
 
 ### 6-4. 正本と SHADOW
 | 面 | 正本 | HW の操作 | CPU の書き |
@@ -248,7 +271,8 @@ int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
 
 ### 6-5. v1 との境目 (gfx/v2/v1_bridge.c)
 - 起動時に v1 の DISPLAY と CLIENT を v2 の表に**別名の面** (`pool=VRAM か SYSMEM`、`usage=SCANOUT|V1`、`owner=GFX2_OWNER_SCREEN`、free と gfx2_lock は INVAL) として載せる。
-- 使える者: `gfx2_surf_get` は `owner == GFX2_OWNER_SCREEN` の面を、呼んだ者が `gfx_screen_owner()` (gfx_core.c:461) の持ち主の時だけ返す (持ち主の照合の唯一の例外)。sid の取得は `int gfx2_screen_surface(u32 adapter, u32 head, u32 role, u32 *sid)` (role = DISPLAY・CLIENT、持ち主でなければ BUSY)。
+- 呼んだ者の識別は 1 口 (R7): C1 の `gfx2_caller_get(struct gfx2_caller *c)` が `caller_access_get_user` (include/redir_access.h:11-16) の 1 回の値から `{app_id, as, owner}` を作り、公開の入口はこれだけを使う。面の持ち主の照合は `owner` (ledger の owner = `as->owner`)、画面の持ち主の照合は `app_id == gfx_screen_owner()` (gfx_core.c:351-354、`appslot_gfx_owner` の app_id) で、2 つを混ぜない。カーネルの中の呼び手 (C14・C15) は `gfx2_caller` を作らず `struct gfx2_surf *` を直に持つ。
+- 使える者: `gfx2_surf_get` は `owner == GFX2_OWNER_SCREEN` の面を、呼んだ者の `app_id` が `gfx_screen_owner()` の時だけ返す (持ち主の照合の唯一の例外)。sid の取得は `int gfx2_screen_surface(u32 adapter, u32 head, u32 role, u32 *sid)` (role = DISPLAY・CLIENT、持ち主でなければ BUSY)。
 - 作り直し: v1 の mode の変更・`ledger_surface_regen`・H4 の方式の切り替えの後に gfx_core が `v1_bridge_rebind()` を呼ぶ (C14 の担当、呼ぶ行は gfx_core.c の 3 か所も C14 が足す)。C14 は v1 の今の値から `struct gfx2_alias_desc` を作って C4 の `gfx2_surf_alias_update` を呼ぶだけで、sid・gen・形状・kva を自分では書かない (P1-4)。
 ```c
 /* gfx/v2/v1_bridge.c (C14)。起動時は gfx2_surf_alias で作り、以後は update だけ */
@@ -261,15 +285,14 @@ void v1_bridge_rebind(void)
             if (s) gfx2_surf_alias_update(s, NULL);    /* 0: 旧 sid は STALE、面は形を持たない (w=h=0) */
             continue;
         }
-        if (gfx2_surf_quiesce(s, GFX2_REBIND_DL))      /* TIMEOUT/STALE: 装置の失敗は C3 が LOST にした */
-            continue;                                  /* 別名は旧のまま (LOST なら free と desc だけ通る) */
-        (void)gfx2_surf_alias_update(s, &d);           /* 0 / BUSY (lock か lease 中、C14 が先に閉じる決まり) */
+        rc = gfx2_surf_quiesce(s, GFX2_REBIND_DL);     /* 0 / TIMEOUT / STALE (失敗の完了 = もう動いている物は無い) */
+        if (rc == OS32_ERR_TIMEOUT) continue;          /* 別名は旧のまま */
+        (void)gfx2_surf_alias_update(s, &d);           /* 0 / BUSY (lock か lease 中、C14 が先に閉じる決まり)。
+                                                          d.adapter は今の ACTIVE の adapter (R5: 付け替えで別名も移る) */
     }
 }
 ```
-- v1 の入口 (present_rect・fill_rect・blit・fill_rop・put・mono・get・gfx_hw_submit:70・gfx_hw_get:95・osri_show・set_mode・page_flip・DISPLAY の lease の開始と終わり) は全部 `v1_bridge_begin(alias, access)`/`end` を通す: CPU も v1 の HW も触る前に §6-2 の待ち (v2 の束が別名に書いた分を待つ)。v1 の GF の HW は同期なので (D9) `v1_bridge_end` の fence は 0 で、別名の面に番号を記録しない。v1 が非同期の HW を持つ時に初めて C3 に口を足す (A0 の版上げ)。
-=====END
-
+- v1 の入口 (present_rect (gfx/gfx_vram.c:55-63・:284-298)・fill_rect・blit (gfx/gfx_core_api.inc:66-78)・fill_rop・put・mono・get・gfx_hw_submit:70・gfx_hw_get:95・osri_show・set_mode・page_flip・DISPLAY の lease の開始と終わり (exec/lease.c の `surface_lease`:245-296・`surface_lease_bundle`:302-353)) は全部 `v1_bridge_begin(alias, access)`/`end` を通す: CPU も v1 の HW も触る前に §6-2 の待ち (v2 の束が別名に書いた分を待つ)。v1 の GF の HW は同期なので (D9) `v1_bridge_end` の fence は 0 で、別名の面に番号を記録しない。v1 が非同期の HW を持つ時に初めて C3 に口を足す (A0 の版上げ)。
 - lock か v1 の lease (全画面アプリの DISPLAY) が開いている面への投入は `OS32_ERR_BUSY` (読むだけの投入は READONLY の lock の間なら通す)。lease の終わり・unlock で `cpu_end` の吐き出し。
 
 ## 7. 面
@@ -288,13 +311,43 @@ int gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch);   int gfx2_unlock(u32 
 | LOCKED_RW | BUSY | 可 → IDLE (dirty・吐き出し) | BUSY / BUSY | BUSY | |
 | CLOSING | STALE | INVAL | STALE | INVAL | 条件が揃うと空 (§7-3) |
 | LOST | STALE | 可 (LOCKED のまま失われた時) | STALE | 可 | |
-- sid: 下位 10 bit = 表の位置 (1,024 面)、上位 22 bit = 世代 (解放で +1)。呼んだ AS の owner と面の持ち主が違えば INVAL。
+- sid: 下位 10 bit = 表の位置 (1,024 面)、上位 22 bit = 世代 (解放で +1)。呼んだ者の `gfx2_caller.owner` (§6-5 の 1 口) と面の持ち主が違えば INVAL。
 - lock の flags: READONLY・DISCARD・DONOTWAIT。**DISCARD でも待ちは同じ** (`wait(last_write)`・`wait(last_read)`)。DISCARD の効果は「中身を読まない」だけ: staging の面は lock の時の読みを省く。DONOTWAIT で未完了なら `OS32_ERR_BUSY`。
 
 ### 7-2. 確保と GF の予約
 - pool: VRAM・GART・SYSMEM (MANAGED は libos32gfx)。usage: RENDER2D・SCANOUT・CURSOR・STAGING・TEXTURE (欄だけ)。tiling は backend が選び、CPU から線形に見える物だけ。
 - VRAM の heap (gfx/v2/vram_heap.c) が置き場を決め、backend の `alloc` が装置の予約を作る。GF は `gf_vram_reserve(ch, surf, off, bytes, node)` を呼び、返った予約の id・世代を面の私物に持つ (`gf3_surface_check` がそのまま通る)。解放は GPU の使用の終わりと写像の解除の後に `gf_vram_release`。
 - GART の面を GF で描くため `gf3_surface` の末尾に `u32 dma` (VRAM_DMA か GART_DMA の handle) を足し、`gf3_surface_set`・`gf3_surface_check` を領域ごとに分ける (段 G8)。GART の面の検査は予約ではなく GART の表 (§8) の範囲で行う。
+- SYSMEM の面の backing (R2、§8 と同じ形。段 C18 `gfx/v2/sysmem.c`)。PEGC・Trident・PC-98 の adapter は SYSMEM だけを持つ:
+
+| 項目 | 決め |
+|---|---|
+| 取り方 | 作成の時に `pgalloc_alloc_n_owner(owner, n, MEM_PHYS_EXEC_FLOOR / PAGE_SIZE, pgalloc_arena_end(), 0, &pfn)` で**物理で連続**の n 頁 (mm/pgalloc.h:228、範囲は drivers/video/trident/resources.c:171 と同じ形)。持ち主は面の持ち主 (呼んだ者の ledger owner)。dma_pool は使わない。GPU は触らないので pin しない |
+| 上限 | 自前の上限は持たない。pgalloc の空き (アプリの私物と同じ) で、取れなければ `OS32_ERR_NOSPC`。1 面の大きさは caps の `max_w`・`max_h`・`max_pitch` まで |
+| kernel の写像 | `kva = P2V(pfn << 12)` (連続なので sw の `view.base` にそのまま使える)。cache は WB |
+| ユーザーの写像 | lock の時に C7 の `gfx2_map` が連続の 1 区間で張る (§7-4、PTE は `pa \| PAGE_RW \| PTE_USER`、WB) |
+| 解放 (destroy) | 写像を外す → `pgalloc_free_n_owner(owner, pfn, n)`。待つ fence は無い (SW だけ) |
+| 隔離 (§7-3 の (5)) | KEEP (写像を外せなかった) の時だけ来る。頁は動かさず `as->owner` のまま (poison された AS が保持し retire しない)。`gfx2_quarantine_drain` は KEEP を飛ばすので返さない |
+| AS の回収との順 | `gfx2_owner_release` が reclaim より前に返すので、`ledger_reclaim_owner` と二重に返さない (§7-3) |
+```c
+/* gfx/v2/sysmem.c (C18)。C4 の gfx2_surf_new・gfx2_surf_destroy だけが呼ぶ */
+int gfx2_sysmem_alloc(struct gfx2_surf *s, u32 owner)
+{
+    u32 n = (s->bytes + PAGE_SIZE - 1) / PAGE_SIZE, pfn;
+    if (!pgalloc_alloc_n_owner(owner, (int)n, MEM_PHYS_EXEC_FLOOR / PAGE_SIZE, pgalloc_arena_end(), 0, &pfn))
+        return OS32_ERR_NOSPC;
+    s->sys_pfn = pfn; s->sys_n = n; s->kva = (u8 *)P2V(pfn << 12);
+    kmemset(s->kva, 0, n * PAGE_SIZE);
+    return 0;
+}
+int gfx2_sysmem_free(struct gfx2_surf *s)      /* 前提: 写像は外れている (map_as == NULL)、KEEP でない */
+{
+    if (!pgalloc_free_n_owner(s->owner, s->sys_pfn, (int)s->sys_n)) return OS32_ERR_IO;   /* 他の owner の頁: 返さない */
+    s->sys_pfn = s->sys_n = 0; s->kva = 0;
+    return 0;
+}
+```
+- GART の面の CPU から (R3): GART の頁は連続でないので `kva` は NULL。作成の時に C4 が C7 の `gfx2_map` で持ち主の AS の gfx2 の帯へ連続の VA で張り (失敗なら面を返して NOSPC)、sw の `view.base = map_va`・`pitch` で見る。sw がこの base を使えるのは CR3 が持ち主の AS の時 (= 持ち主の KAPI の中の submit・lock) だけで、C9 は `gfx2_cpu_visible(s)` (C7: `kva` か `map_as == 今の AS`) が偽なら §4-2 の (5) で NOSUPPORT。present・v1 の橋・`gfx2_owner_release` は GART の面を sw で触らない。
 
 ### 7-3. 走査面の解放
 - 面は `scan_ref` を持つ: head の今の走査面で +1、保留中の flip の先で +1。flip の反映 (vblank の後に backend が報告) か head の停止で −1。
@@ -348,9 +401,43 @@ int gfx2_surf_quarantine(struct gfx2_surf *s)   /* 前提: s->map_as == NULL (�
 - 隔離の面は adapter の回復 (停止が確かめられた時、C3 の `gfx2_adapter_recovered`) と CLOSING の見回りで `gfx2_quarantine_drain` が返す。
 
 ### 7-4. ユーザーへの写像
-- 帯: lease の帯の上の方を使う。`MEM_GFX2_MAP_BASE 0xF8000000`・`MEM_GFX2_MAP_END 0xFE000000` (96MB) と、lease の確保の上限 `MEM_LEASE_ALLOC_END = MEM_GFX2_MAP_BASE` を memmap.h に足し、exec/lease.c:69 の上限を `MEM_LEASE_ALLOC_END` にする (M3)。帯の検査 (lease.c:176・paging_lease_unmap) は `MEM_LEASE_END` のままで新しい帯を含む。
+- 帯: lease の帯の上の方を使う。`MEM_GFX2_MAP_BASE 0xF8000000`・`MEM_GFX2_MAP_END 0xFE000000` (96MB) と、lease の確保の上限 `MEM_LEASE_ALLOC_END = MEM_GFX2_MAP_BASE` を memmap.h に足し、exec/lease.c:69 の上限を `MEM_LEASE_ALLOC_END` にする (M3)。`paging_lease_unmap` の帯の検査は `MEM_LEASE_END` のままで新しい帯を含む。
+- 監査との共存 (R1、M3 と C17): `lease_check` (exec/lease.c:167-231) は lease の PT の全部の PTE を lease の表と照らし (:212-229)、合わない PTE を `LEASE_INVAL` と数える。`lease_audit_all` (:363-、呼ぶのは :380、入口は kernel/kaudit.c:22 の `kselftest_run_audit`) がこれを全 AS に回すので、gfx2 の写像をそのまま置くと監査が失敗する。lease の照合は lease の帯 (`MEM_LEASE_BASE`〜`MEM_LEASE_ALLOC_END`) だけにし、gfx2 の帯は gfx2 が照らす:
+```c
+/* exec/lease.c (M3)。PDE の照合 (:191-200) は今どおり 56 本全部 (gfx2 の帯の PT も as->owner の物で同じ形) */
+#define MEM_LEASE_ALLOC_PDES ((MEM_LEASE_ALLOC_END - MEM_LEASE_BASE) >> MEM_PDE_SHIFT)   /* memmap.h (M3)、= 32 */
+/* :176-177 の lease の範囲の検査 */
+    l->base < MEM_LEASE_BASE || l->base >= MEM_LEASE_ALLOC_END ||
+    l->npages > (MEM_LEASE_ALLOC_END - l->base) / PAGE_SIZE) return LEASE_INVAL;
+/* :212 の PTE の走査 */
+for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) { ... 今の照合 ... }
+/* lease_audit_all の :380 の次の行 */
+bad += lease_check(a->as) != 0;
+bad += gfx2_map_audit(a->as) != 0;              /* C17。A0 の weak は 0 を返す (C17 の前に写像は無い) */
+
+/* gfx/v2/map_audit.c (C17)。lease_audit_all と同じ文脈 (CR3 = kernel、irq_save の中) */
+int gfx2_map_audit(const struct addrspace *as)
+{
+    u32 want = 0, have = 0, pa, attr;
+    for (u32 i = 0; i < GFX2_MAX_SURFACES; i++) {
+        const struct gfx2_surf *s = &gfx2_surfs[i];
+        if (s->map_as != as) continue;
+        if (s->map_va < MEM_GFX2_MAP_BASE || s->map_npages > (MEM_GFX2_MAP_END - s->map_va) / PAGE_SIZE) return -1;
+        for (u32 k = 0; k < s->map_npages; k++) {
+            if (gfx2_surf_page(s, k, &pa, &attr)) return -1;          /* C7: k 頁目の物理番地と cache の属性 */
+            if ((lease_pte_get(as, s->map_va + k * PAGE_SIZE) & ~(PTE_ACCESSED | PTE_DIRTY)) !=
+                (pa | PAGE_RW | PTE_USER | attr)) return -1;
+        }
+        want += s->map_npages;
+    }
+    for (u32 di = MEM_LEASE_ALLOC_PDES; di < MEM_LEASE_MAX_PDES; di++)  /* 帯の present の PTE は写像の分だけ */
+        if (as->lease_pt_phys[di]) have += pte_present_count(P2V(as->lease_pt_phys[di]));
+    return have == want ? 0 : -1;
+}
+```
+- 監査の時間: 面 1,024 個の走査と帯の PT 24 本 × 1,024 PTE の数え上げで、lease の照合の PTE × 8 本の形より軽い。`lease_pte_get`・`pte_present_count` は C17 の static (P2V で PT を読むだけ)。
 - PT: 新しい帯の PDE は今の `as->lease_pt_phys[k]` (k = (va − MEM_LEASE_BASE) >> 22) をそのまま使う。無ければ `paging_gfx2_map` が `pgalloc_alloc_phys(as->owner, 1)` で取り、0 で埋め、`pd[LEASE_PDE + k] = phys | PAGE_RW | PTE_USER` にする (lease_context の検査と同じ形)。AS の破棄 (paging_addrspace.inc:115-120) が今どおり返す。
-- 張る: `paging_gfx2_map(as, va, pa, npages, pte_flags)` (M2) を連続の区間ごとに。文脈は `paging_lease_root_context(as)` (CR3 が kernel かその AS、IRQ・例外の外) を要する。KAPI の中 (CR3 = その AS) から呼べる。PTE は `pa | PAGE_RW | PTE_USER | cache`、VRAM は exec/lease.c:26 `alias_cache` と同じ属性、GART は WB。区間の途中で失敗したら gfx2 が張った区間を `paging_lease_unmap` で外して INVAL (全部か無し)。新しく取った PT は空なら `paging_lease_unmap` が返す。TLB は 1 頁ずつ `invlpg` (CR3 がその AS の時)、kernel の CR3 の時は不要 (その AS の TLB は CR3 の切り替えで消える)。
+- 張る: `paging_gfx2_map(as, va, pa, npages, pte_flags)` (M2) を連続の区間ごとに。文脈は `paging_lease_root_context(as)` (CR3 が kernel かその AS、IRQ・例外の外) を要する。KAPI の中 (CR3 = その AS) から呼べる。PTE は `pa | PAGE_RW | PTE_USER | cache`、VRAM は exec/lease.c:26 `alias_cache` と同じ属性、GART は WB。区間の途中で失敗したら gfx2 が張った区間を `paging_lease_unmap` で外して INVAL (全部か無し)。新しく取った PT は空なら `paging_lease_unmap` が返す。TLB は `invlpg` を使わない (i386 互換、arch/x86/arch_cpu.h:46-52)。lease と同じく、張り終えた後に CR3 がその AS なら `paging_load_cr3(as->pd_phys)` で読み込み直す (mm/paging_lease.inc:126 の型)。kernel の CR3 の時は何もしない (その AS の TLB は CR3 の切り替えで消える)。
 - 外す: 今の `paging_lease_unmap(as, va, npages)` (帯の中なら ledger に縛られず、頁を返さない)。free・AS の終了・LOST で外す。VA は gfx/v2/lock.c の AS ごとの bitmap (§11-2 `struct gfx2_vaspace`) が配る。
 - 写像は lock をまたいで残すが、触ってよいのは lock の間だけ (シングルタスクなので PTE の付け外しで縛らない)。libos32gfx の wrapper は必ず lock を通す。
 
@@ -363,6 +450,7 @@ int gfx2_surf_quarantine(struct gfx2_surf *s)   /* 前提: s->map_as == NULL (�
 | pin | pgalloc に頁ごとの pin の数 (`u8 pin_map[PHYSMEM_MAX_PFN]`、pgalloc_owner.inc、M1) を足し、`pgalloc_free_n_owner`・`ledger_transfer`・`ledger_reclaim_owner` の**全部**で pin の頁があれば全件不変で拒否し `ledger_bad_free` に数える (reclaim は pin の頁を飛ばして返さず、戻り値 0)。pin の頁を動かせるのは `ledger_transfer_pinned` (隔離へ移すため) だけ |
 | 物理の表 | 中核が `u32 pfn[]` を持ち、backend の `gart_bind(pfn, n, *gpu_off)`・`gart_unbind`。GF6200 は NV44 の GART の頁表 (nouveau `nvkm/subdev/mmu/nv44.c`、MIT)、ATI は PCI GART (`r100_pci_gart_*`、MIT)。GF は GART の DMA の物 (新 handle) を作る |
 | cache | WB (bus master は snoop)、DMA_PHYS_LIMIT は `dma_range_ok` |
+| CPU から (R3) | `kva` は NULL。作成の時に持ち主の AS の gfx2 の帯へ連続の VA で張り (C7 の `gfx2_map`)、sw は `view.base = map_va` で見る。使えるのは CR3 が持ち主の AS の時だけ (`gfx2_cpu_visible`、§7-2)。張れなければ作成は NOSPC |
 | 解放 | fence を待つ → `gart_unbind` → 写像を外す → pin を外す → `pgalloc_free_n_owner` |
 | 回収の失敗 | GPU の待ちが終わらない GART の頁は §7-3 の (5) で隔離の owner (`GFX2_QUAR_OWNER`、gfx2 の初期化で `ledger_owner_new(LEDGER_KIND_PERSIST, 0, "gfx2-quar", &GFX2_QUAR_OWNER)`) へ移し、AS の回収と retire は今どおり進む。隔離の頁は adapter の停止が確かめられた時に `gfx2_quarantine_drain` が unpin → `pgalloc_free_n_owner(GFX2_QUAR_OWNER, pfn, n)` で返す。LOST_HELD の間は返さない |
 | GF の staging | `pci_dma` と 1 頁の staging は GF の中に残す |
@@ -386,11 +474,11 @@ int gfx2_mode_get(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o);  /* 40B */
 | ConnectorInfo | `u32 id, type, possible_heads, clone_mask, status, edid_blocks; char monitor_name[16]; u16 mm_w, mm_h; u32 preferred_mode_id, reserved[4]` (type: VGA・DVI_I・DVI_D・TV_COMPOSITE・TV_SVIDEO・PC98_ANALOG) |
 | ModeInfo | `u32 id; u16 w, h; u32 fmt, refresh_mhz, pixclk_khz; u16 htotal, vtotal; u32 hsync_khz10, flags; u8 source, scaling; u16 pad; u32 reserved` |
 - 列挙は probe が通った全部の adapter。机 (絵) を出すのは 1 adapter (flags の ACTIVE)、その adapter の 2 heads は使える。ACTIVE でない adapter の head 系の口 (head_info 以外の mode_set・flip・vblank_wait・palette・gamma・cursor_*・dpms・present・screen_surface) は `OS32_ERR_NOSYS`、`gfx2_surface_create` も NOSYS (描かせない)。口は adapter・head の番号を持つまま (同時出力へ広げても ABI は変えない)。ユーザー決定 #3「AとC」(DECISIONS.md 末尾) で確定。
-- C (ACTIVE でない側の TVRAM にコンソールを出し続ける) は HAL v2 の中で設計しない。別の票 **CONSOLE_DUAL** (仮名、「GUI の間も ACTIVE でない側の TVRAM にコンソールを出し続ける」) で設計する。HAL v2 の段 (C1 など) は C の仕事を持たない。PC-98 の adapter は `kind = GFX2_KIND_PC98`・`flags = 0` で登録するだけ (A の列挙)。
-- CONSOLE_DUAL が受け持つ経路 (第 4 回のレビューの指摘): gfx/gfx_core_init.inc:9-14 の GF/Trident の早い戻り / kernel/console/console.c:53-56・195-204 の GUI 中の TVRAM の出力の停止 / console.c:434-443 の復帰の時の消去 / init/kernel.c:473 などの切り替えの時の消去 (gfx_core.c:267-270 の `_gfx_common_init` の消去を含む)。
+- C (ACTIVE でない側の TVRAM にコンソールを出し続ける) は HAL v2 の中で設計しない。別の票 **CONSOLE_DUAL** (仮名、「GUI の間も ACTIVE でない側の TVRAM にコンソールを出し続ける」) で設計する (確定設計 [CONSOLE_DUAL_DESIGN](CONSOLE_DUAL_DESIGN.md))。HAL v2 の段 (C1 など) は C の仕事を持たない。ただし CONSOLE_DUAL の暫定の口 `gf_outputs` は HAL v2 の列挙に差し替える (CONSOLE_DUAL_DESIGN.md:67・167、段 K1 §12)。PC-98 の adapter は `kind = GFX2_KIND_PC98`・`flags = 0` で登録するだけ (A の列挙)。
+- CONSOLE_DUAL が受け持つ経路 (第 4 回のレビューの指摘): gfx/gfx_core_init.inc:9-16 の GF/Trident の早い戻り / kernel/console/console.c:53-56・195-204 の GUI 中の TVRAM の出力の停止 / console.c:434-443 の復帰の時の消去 / init/kernel.c:473 などの切り替えの時の消去 (`_gfx_common_init` の TVRAM の消去 `display_text_hide()` (gfx_core.c:178、実体は platform/pc98/gfx_init.c:10) を含む)。
 
 ### 9-2. 表示の口 (公開) と v1 への変換 (完全な署名は §11-1)
-| gfx2_* | GfxBackendV2 | v2 の無い backend (PEGC・Trident) の v1 の hook |
+| gfx2_* | GfxBackendV2 | v2 の表の無い backend (Trident・PC-98) で C16 の shim が呼ぶ v1 の hook |
 |---|---|---|
 | `gfx2_mode_set(a, head, conn_mask, mode_id, sid)` | `mode_set` | `set_mode(id)` (head=0 だけ、sid は v1 の DISPLAY の別名だけ) |
 | `gfx2_flip(a, head, sid, flags, deadline)` | `flip` | `page_flip(head, GfxScanout)` (sid の予約から GfxScanout を作る) |
@@ -401,6 +489,8 @@ int gfx2_mode_get(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o);  /* 40B */
 | `gfx2_dpms(a, head, state)` | `dpms` | `dpms` |
 | `gfx2_present(a, head, rect)` | — (中核) | SHADOW の表示面の dirty を `gfxsync_write_rows` で |
 | `gfx2_fence_wait(a, fence, deadline_ms)`・`gfx2_fence_query(a, *completed, *failed_upto)` | `fence_*` | 常に完了 |
+- `gfx2_cursor_image` の面の寿命 (R16): 呼んだ時に C13 が `gfx2_cpu_begin(s, R)` で sid の画素を読み、backend の cursor の記憶へ写し切って (GF は今の backend_geforce.c:336-347 と同じく写す) `gfx2_cpu_end` で戻る。面の参照 (scan_ref 等) は持たないので、呼んだ後に free してよい。cursor を消すのは `cursor_show(.., 0)`。
+- パレットの写し (C2・C9 の元): 中核は `u32 gfx2_pal[256]` (XRGB8888、実体は C13) を INDEX8 の色の正に持つ。palette.c の 16 色・4bit の影は元にしない。書く時は 3 つ: (1) `gfx2_palette` が `be->palette` の 0 の後に [first, first+count) を写す (C13)。(2) v1 の set_palette の経路 `gfx_set_palette_hal` (gfx/gfx_core_api.inc:50-59) と `gfx_lease_palette` (:102-130、成功の時だけ) が backend の set_palette を呼んだ後に、0〜15 の成分を backend と同じ ×17 で 8bit にして `gfx2_pal_set_v1` で写す (呼ぶ行は C14)。(3) gfx_init のたびに `palette_shadow_reset` (gfx/gfx_core_init.inc:4) の直後に `gfx2_pal_reset16` で 0〜15 番を既定の 16 色 (palette.c:14-31 を ×17) へ戻す。v1 と見え方をそろえるためで、16〜255 番は保つ (呼ぶ行は C1)。読む所は INDEX8 → RGB の変換 (C2 の `gfx2_to_argb` の `pal256`) と `gfx2_view.pal` (C9) だけ。
 - 表示を変える口 (mode_set・flip・palette・gamma・cursor・dpms) は画面の持ち主 (`gfx_screen_owner` の持ち主、GUI なら gshell、全画面アプリならそのアプリ) だけ。他は `OS32_ERR_BUSY`。
 
 ### 9-3. mode_set の境目 (gfx/v2/modeset.c)
@@ -413,18 +503,38 @@ if (s->adapter != a || !(s->usage & SCANOUT) || s->fmt != m->fmt || s->w < m->w 
     s->gpu_off % a->caps.scanout_align || s->pitch % a->caps.pitch_align) return OS32_ERR_INVAL;
 rc = gfx2_surf_quiesce(s, GFX2_MODESET_DL);                     /* 0 / OS32_ERR_TIMEOUT / OS32_ERR_STALE */
 if (rc) return rc;                                              /* 表示・scan_ref・世代は無変更 */
+if (a->state == GFX2_AD_LOST_HELD && a->be->stop(a->ctx))       /* 停止が確かめられない間は mode も変えない */
+    return OS32_ERR_STALE;
 rc = a->be->mode_set(a->ctx, head, conn_mask, m, s);            /* 失敗時は backend が退避した状態へ戻す */
 if (rc) return rc;                                              /* 世代も scan_ref も変えない */
+if (a->state != GFX2_AD_OK) gfx2_adapter_recovered(a);          /* §6-3: LOST からの復帰はここ (と C1 の再登録) だけ */
 gfx2_scan_ref_swap(a, head, s);  gfx_policy_scan_changed();   /* H4 の唯一の遷移の口 (gfx_policy.h:14-16、D3)。module の側の G* から呼ぶ所も同じ口 */
-=====END
-
 if (fullscreen_app(caller)) a->restore_on_leave = 1;            /* 全画面を抜ける時に gshell の mode と走査面へ戻す */
 return 0;
 ```
 
 ## 10. CPU 直描きの同期バックエンド層
 
-置き場: `/etc/gfx/sync.cfg` (`SYS_GFXSYNC_CFG`、[C4])。r1 §10 の書式・項目 (mode・unit・method・gap_ns・flush・read_ns・read) のまま。PM 決定 #2: `TRI_WRITE_GAP` はここへ移す (既定 80ns)。旧値の引き継ぎと「sync.cfg が system.cfg より優先」は配備の手順で保証し、カーネルは system.cfg の旧鍵を読まない。
+置き場: `/etc/gfx/sync.cfg`。定数 `SYS_GFXSYNC_CFG "/etc/gfx/sync.cfg"` は A0 が include/config.h の `SYS_SYSTEM_CFG` (:41) の次の行に足す ([C4])。区画は機器の鍵、値は整数と列挙だけ:
+```
+[pegc]
+mode=SHADOW        ; ユーザー決定: PEGC はバックバッファを維持 (DIRECT にしない)
+unit=4  method=PLAIN  flush=NONE  read_ns=0  read=SHADOW
+[pci:1023:*]       ; Trident (Ra266 内蔵)
+mode=SHADOW  unit=4  method=GAP  gap_ns=80  flush=NONE  read_ns=1500  read=SHADOW
+```
+| 項目 | 値 | 意味 |
+|---|---|---|
+| mode | SHADOW・DIRECT | 正本が RAM の影か VRAM か |
+| unit | 1・2・4 | 1 回の書きの幅 (バイト) |
+| method | PLAIN・GAP・SYNC_READ・WAIT_PORT | 書きの後の待ち。今の `TRI_PRESENT_*` (present.c:27・38-52) と 1 対 1 (BYTE は unit=1 + PLAIN) |
+| gap_ns | 0〜100000 | GAP の間隔。`cpu_loops_per_tick()` (kernel/time/cpu_calibrate.c:115) で回数に直す (write_gap.c の算数をそのまま移す) |
+| flush | NONE・READBACK・SERIALIZE | WC の吐き出し方 (UC の読み、または直列化の命令) |
+| read_ns・read | 整数・SHADOW/DIRECT | 読み出しの遅さと読む元。ROP・α・dst の鍵のように dst を読む sw の操作は read=SHADOW なら RAM から |
+- I/O 番地は設定に書かない。SYNC_READ・WAIT_PORT の実体は backend が `GfxSyncTarget` の hook で渡す (Trident の CR+6 の読み present.c:46-49、PC-98 の 5Fh present.c:50-52)。
+- 鍵の照合 (Y1): `pci:VVVV:DDDD` → `pci:VVVV:*` → 機種名 (`pegc`) の順。どれも無ければ組み込みの既定 (SHADOW・unit=1・PLAIN・flush=NONE)。
+
+PM 決定 #2: `TRI_WRITE_GAP` はここへ移す (既定 80ns)。旧値の引き継ぎと「sync.cfg が system.cfg より優先」は配備の手順で保証し、カーネルは system.cfg の旧鍵を読まない。
 ```c
 typedef struct GfxSyncTarget {           /* include/gfx_sync.h */
     volatile u8 *va; u32 bytes, pitch; u8 fmt, head;
@@ -450,16 +560,16 @@ int gfxsync_mode(const GfxSyncCtx *);    /* Y4。bind の後の実効の mode (�
 | method=SYNC_READ で `sync_read` が NULL、WAIT_PORT で `wait_port` が NULL、flush=READBACK で `flush` が NULL | その区画を捨て組み込みの既定 (SHADOW・unit=1・PLAIN・flush=NONE) + kprintf |
 | mode=DIRECT かつ read=SHADOW (影が無い) | 同上 |
 | read=DIRECT で `read32` が NULL | read=SHADOW に (mode=SHADOW の時)、DIRECT なら既定へ |
-| flush=SERIALIZE | 中核の `cpu_serialize()` (cpuid) を使う、hook 不要 |
+| flush=SERIALIZE | Y3 の sync_write.c が arch の口 `arch_cpu_serialize()` を呼ぶ、hook 不要。`#ifdef` で分けない。口は arch/x86/arch_cpu.h (`cpuid`) と arch/ppc/arch_cpu.h (`sync`) に置く (A0)。HAL の CPU の段の判定 (MMX Pentium 以上、ユーザー決定 2026-11-08) が使う `cpuid` も同じ所の口 `arch_cpu_has_mmx()` にし、arch/ppc は「MMX 相当なし」(0) を返す |
 - 端数: 行の先頭と末尾の unit に満たないバイト・未整列の部分は 1 バイトずつ (今の present.c:57 と同じ)、method の待ちは unit の書きのあとごと。境界の検査 (present.c:18-25 の相当) は bind の `bytes`・`pitch` で中で行う。
-- Trident の移し方は r1 §10 のとおり (write_gap.c → sync_gap.c、regs.c:117-138 と present.c:26-56 → sync_write.c、present.c は検査と呼び出しだけ、trident_module.c:198-200 を削除)。
+- Trident の移し方 (T1、Y2・Y3 が受け皿): (1) drivers/video/trident/write_gap.c (21 行) の算数を gfx/sync/sync_gap.c の `gfxsync_gap_loops(lpt, ns)` へ (Y2)、(2) regs.c:117-138 の `write_gap32` と present.c:26-56 の 3 方式 (GAP・SYNC・WAIT) を gfx/sync/sync_write.c へ (Y3)、(3) present.c は境界の検査 (:18-25) と `gfxsync_write_rows` の呼び出しだけに、(4) trident_module.c:198-199 の system.cfg の `TRI_WRITE_GAP` を読む 2 行を削除し sync.cfg の `gap_ns` に (既定 `TRI_WRITE_GAP_DEFAULT_NS` 80、trident.h:581 と同じ値)。host 試験 tools/tests/trident_module_host.c:268・328 の 65・7・38 の場合は sync の host 試験 (Y1・Y2) へ移す。write_gap.c を消すので、旧パスの .o・.d には空の規則を 1 本置く (96c5835e の ime_render_tvram.c と同じ型、次の大きな整理で消してよい)。
 
 ## 11. 今の版との関係と A0 (宣言だけを先に置く段)
 
 - 着地の前提: GFX_ACCEL_HAL の H1〜H6 と G1〜G3 が main に入っていること。v1 の INDEX8 の口・`GFX_ScreenInfo`・`GFX_CAP_*` は変えない。
 - 着地の前提は満たした (D1、4f971604)。
-- **A0 は宣言と仮の実体だけを置く段** (1 人、ほかの全段より先)。中身: §11-1〜11-7 の全部のヘッダ、kapi.json の末尾の gfx2_* (83→84、全部 NOSYS)、内部の全関数の **weak の仮の実体** (gfx/v2/a0_weak.c・gfx/sync/a0_weak.c・drivers/video/geforce/gf_v2_weak.c、全部 `return OS32_ERR_NOSYS;` か 0)、大きさと offset の検査、module_schema・hwdev_layout・build の登録。A0 の後は各段が単独で `make kernel` を通せる。**A0 以外の段はヘッダを編集しない** (足りなければ止めて PM へ)。
-- 仮の実体の掃除 (P2-2): weak の仮の実体は本来の関数名 (`gfx2_surf_new` 等) で置くので、記号名では見分けない。A0 が `tools/checks/gfx2_wiring.txt` (行 = `I1 kernel gfx2_surf_new` の形、I ごとの対象関数を §11-2〜11-7 の表から全部) と `tools/checks/gfx2_no_weak.sh <I>` を作る。検査は最終の build/out/os32.elf と geforce module の ELF に対し、対象の各記号が (a) `nm` の型が `T`/`t` (`W`・`V`・`U` は不合格)、(b) 番地が a0_weak.o の .text の区間 (build/out/os32.map の a0_weak.o の行から) の外、の両方。各 I の合格は「割り当てた §13 の試験の合格の記録 + `gfx2_no_weak.sh <I>` の 0」の両方 (§12)。
+- **A0 は宣言と仮の実体だけを置く段** (1 人、ほかの全段より先)。中身: §11-1〜11-7 の全部のヘッダ、kapi.json の末尾の gfx2_* (83→84、全部 NOSYS)、内部の全関数の **weak の仮の実体** (gfx/v2/a0_weak.c・gfx/sync/a0_weak.c・drivers/video/geforce/gf_v2_weak.c、全部 `return OS32_ERR_NOSYS;` か 0)、大きさと offset の検査、module_schema・hwdev_layout・build の登録、include/config.h の `SYS_GFXSYNC_CFG` (§10)。A0 の後は各段が単独で `make kernel` を通せる。**A0 以外の段はヘッダを編集しない** (足りなければ止めて PM へ)。
+- 仮の実体の掃除 (P2-2): weak の仮の実体は本来の関数名 (`gfx2_surf_new` 等) で置くので、記号名では見分けない。A0 が `tools/checks/gfx2_wiring.txt` (行 = `I1 kernel gfx2_surf_new` の形、I ごとの対象関数を §11-2〜11-7 の表から全部) と `tools/checks/gfx2_no_weak.sh <I>` を作る。検査は最終の build/out/kernel.elf (build/config.mk:190 の `-Map=$(BUILD_OUT)/kernel.map` と同じ組み) と geforce module の ELF に対し、対象の各記号が (a) `nm` の型が `T`/`t` (`W`・`V`・`U` は不合格)、(b) 番地が a0_weak.o の .text の区間 (build/out/kernel.map の a0_weak.o の行から) の外、の両方。各 I の合格は「割り当てた §13 の試験の合格の記録 + `gfx2_no_weak.sh <I>` の 0」の両方 (§12)。
 
 ### 11-1. 公開 (sdk/include/os32/os32_gfx2.h、C89、A0)
 ```c
@@ -468,6 +578,8 @@ int gfxsync_mode(const GfxSyncCtx *);    /* Y4。bind の後の実効の mode (�
 #define GFX2_OP_HOSTDATA 5  #define GFX2_OP_READBACK 6  #define GFX2_OP_ROP4 7  #define GFX2_OP_ALPHA 8
 #define GFX2_OP_LINE 9  #define GFX2_OP_SET_PATTERN 10  #define GFX2_OP_MAX 10
 #define GFX2_HOW_NOSUPPORT 0  #define GFX2_HOW_SW 1  #define GFX2_HOW_HW 2
+#define GFX2_CAP2D(op) (1UL << (op))   /* caps2d_hw・caps2d_sw・exact の bit (§4-1) */
+#define GFX2_AF_ACTIVE 1  #define GFX2_AF_ONBOARD 2   /* AdapterInfo.flags */
 #define GFX2_F_SRCKEY 0x01  #define GFX2_F_DSTKEY 0x02  #define GFX2_F_CLIP 0x04
 #define GFX2_F_FILTER 0x08  #define GFX2_F_ALPHA_PIXEL 0x10  #define GFX2_F_PAT 0x20  #define GFX2_F_PAT_COLOR 0x40
 #define GFX2_CX_TRANSPARENT 1
@@ -521,11 +633,16 @@ struct gfx2_rect { i32 x, y, w, h; };
 struct gfx2_head { u32 scan_sid, pend_sid, mode_id, conn_mask; };
 struct gfx2_heap { u32 base, size, n; struct { u32 off, bytes, used; } blk[GFX2_HEAP_BLOCKS /* 2048 */]; };
 struct gfx2_fence_st { u32 issued, reserved, completed, failed_upto, last_sweep; };  /* reserved: 予約済みで commit 前 (0 = 無し) */
+#define GFX2_AD_OK 0  #define GFX2_AD_LOST 1  #define GFX2_AD_LOST_HELD 2
+struct gfx2_caller { int app_id; struct addrspace *as; u32 owner; };   /* C1 の gfx2_caller_get (§6-5) */
 struct gfx2_adapter {
-    u32 index, gen, state;               /* C1 (登録)・C3 (喪失で gen+1・state) */
+    u32 index, gen, state;               /* C1 (登録)・C3 (喪失で gen+1・state = GFX2_AD_*)・C1 (ACTIVE を外す時に gen+1) */
+    u32 flags;                           /* C1 だけ (GFX2_AF_ACTIVE・ONBOARD。ACTIVE は全部の adapter で 1 つ) */
+    u32 vram_phys;                       /* C1 (be->heap_range の phys。VRAM の面の PTE の元) */
     GfxBackend *v1;                      /* C1。hook は呼ぶたびに a->v1-> から読む (H4 が書き換える、D2) */
-    const struct GfxBackendV2 *be; void *ctx;   /* C1 (be は kernel の中の表、§11-7) */
-    u32 kind;                            /* C1。GFX2_KIND_PC98 1・PEGC 2・TRIDENT 3・GEFORCE 4・CIRRUS 5 */
+    const struct GfxBackendV2 *be; void *ctx;   /* C1 (be は kernel の中の表、常に非 NULL: v2 の表・C16 の shim・C16 の lost の表のどれか、§11-7) */
+    u32 kind;                            /* C1。GFX2_KIND_PC98 1・PEGC 2・CIRRUS 3・GEFORCE 4・TRIDENT 5 (LEDGER_SF_* と同じ値、
+                                            display_provider_ledger(v1) の戻り値をそのまま入れる) */
     GFX2_Caps caps;                      /* C10 */
     struct gfx2_fence_st fence;          /* C3 だけが書く (reserved は reserve、issued は commit) */
     struct gfx2_heap heap;               /* C5 だけが書く */
@@ -533,6 +650,7 @@ struct gfx2_adapter {
     u32 restore_on_leave;                /* C12 */
 };   /* 同期層の ctx は持たない。gfx2_sync_get で毎回引く (P1-2) */
 struct gfx2_alias_desc {                 /* C14 が v1 の今の値から作り、C4 に渡す */
+    u32 adapter;                         /* ACTIVE の adapter (gfx2_active() の index) */
     u16 w, h; u8 fmt, pool, head, role; u32 pitch, bytes, gpu_off;
     u8 *kva;                             /* 借りる。C4 は解放しない */
 };
@@ -545,27 +663,35 @@ struct gfx2_surf {
     struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が読んで 0 に */
     struct addrspace *map_as; u32 map_va, map_npages; /* C7 だけ */
     u8 *staging; u32 staging_pitch;      /* C7 (同期の面の lock の写し) */
-    u8 *kva;                             /* C4 (作成の時に be->kva か SYSMEM の VA) */
+    u8 *kva;                             /* C4 (作成の時に be->kva)・C18 (SYSMEM の P2V)。GART の面は NULL (§7-2) */
     u32 heap_off;                        /* C5 (gfx2_heap_alloc の結果、C4 が格納) */
     u32 gart_first, gart_n, gart_moved; /* C6 だけ (gart_moved は隔離へ移せた頁数) */
+    u32 sys_pfn, sys_n;                  /* C18 だけ (SYSMEM の連続の頁、§7-2) */
     u32 priv[4];                         /* backend の私物 (GF: 予約の id・世代・node の番号、G9) */
 };
 struct gfx2_vaspace { u32 as_gen; u32 bits[(MEM_GFX2_MAP_END - MEM_GFX2_MAP_BASE) / 4096 / 32]; }; /* C7、4 本 */
 extern struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS /* 4 */];  /* 実体は C1 */
+extern u32 gfx2_pal[256];                                             /* 実体は C13 (§9-2 のパレットの写し) */
+/* GFX2_KIND_* は mm/pgalloc.h:297-301 の LEDGER_SF_* と同じ値。A0 が gfx2_int.h に置き、
+   _Static_assert で 5 つとも等しいことを確かめる */
 extern struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES /* 1024 */];     /* 実体は C4 */
 ```
 | 関数 (全部 gfx2_int.h に宣言) | 戻り値 | 実装の段 | 呼ぶ段 |
 |---|---|---|---|
 | `struct gfx2_adapter *gfx2_adapter_get(u32 a)` | NULL = 無い | C1 | 全部の公開の入口 |
-| `int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)` | 0/FULL/INVAL (abi 不一致・hook が .text の外・ACTIVE が 2 つ目) | C1 (§11-7 の検査) | gfx_core (C1 が呼ぶ行を足す) |
-| `void gfx2_adapter_unregister(GfxBackend *v1)` | — (adapter を LOST・held=0 に、be = NULL) | C1 | geforce_module.c・trident_module.c の停止の道 (G1・T1 が 1 行) |
+| `int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)` | 0/FULL/INVAL (abi 不一致・hook が NULL・module の表の hook が module の .text の外・生きた adapter の表の差し替え)。冪等 (同じ v1 は同じ adapter) | C1 (§11-7 のコード) | gfx_core (C1 が呼ぶ行を足す、§11-7) |
+| `void gfx2_adapter_activate(struct gfx2_adapter *)`・`struct gfx2_adapter *gfx2_active(void)` | — / ACTIVE の adapter (起動の後は常に非 NULL) | C1 (§11-7 のコード) | C1 (register)・C14 |
+| `void gfx2_adapter_unregister(GfxBackend *v1)` | — (adapter を LOST・held=0 に、`be = &gfx2_lost_be`・`ctx = a`) | C1 | geforce_module.c・trident_module.c の停止の道 (G1・T1 が 1 行) |
+| `int gfx2_caller_get(struct gfx2_caller *)` | 0/INVAL (USER の呼び手でない) | C1 | 全部の公開の入口 (§6-5) |
+| `extern const GfxBackendV2 gfx2_v1_shim, gfx2_lost_be` | — | C16 (§11-7 のコード) | C1 |
+| `int gfx2_caps_from_v1(struct gfx2_adapter *, GFX2_Caps *)` | 0 | C10 (§4-1 の表の shim の列) | C16 (shim の caps) |
 | `int gfx2_sync_publish(u32 kind, u32 head, GfxSyncCtx *ctx)` | 0/INVAL (kind・head の範囲外) | C1 (static `GfxSyncCtx *sync_tab[GFX2_KIND_MAX + 1][2]` を書くのはここだけ) | P1 (直接)・T1 (module の import)。bind の後・unbind の**前** (NULL を publish してから unbind) |
 | `int gfx2_sync_get(const struct gfx2_adapter *, u32 head, GfxSyncCtx **ctx, u32 *mode)` | 0 (mode = `gfxsync_mode(ctx)`) / OS32_ERR_NOTFOUND (同期層でない、*ctx = NULL) | C1 | C7・C8・C9・C13 (§6-4 の判定の唯一の口) |
 | `struct gfx2_surf *gfx2_surf_get(u32 sid, u32 caller_owner, int *rc)` | NULL + rc (INVAL/STALE) | C4 | C7・C9・C12・C13・C14 |
 | `int gfx2_surf_new(struct gfx2_adapter *, u16 w, u16 h, u8 fmt, u8 pool, u8 usage, u32 owner, struct gfx2_surf **out)` | 0/INVAL/NOSPC | C4 (heap は C5、GART は C6、予約は `be->alloc`) | 公開 create だけ |
 | `int gfx2_surf_alias(struct gfx2_adapter *, const struct gfx2_alias_desc *, struct gfx2_surf **out)` | 0/FULL/INVAL | C4: 表の空きに `owner = GFX2_OWNER_SCREEN`・`usage = SCANOUT\|V1`・`flags = ALIAS`、heap・GART・`be->alloc` は呼ばない | C14 (起動時) |
-| `int gfx2_surf_alias_update(struct gfx2_surf *, const struct gfx2_alias_desc * /* NULL = 形無し */)` | 0/BUSY (state が IDLE でない・`last_write`/`last_read` が未完了)/INVAL (ALIAS でない) | C4: 失敗時は何も変えない。成功時は gen+1 (旧 sid は STALE) → 形状・pitch・gpu_off・kva を写す。backing は解放も確保もしない | C14 (`v1_bridge_rebind`) |
-| `int gfx2_surf_destroy(struct gfx2_surf *)` | 0/BUSY/INVAL (ALIAS) | C4。順: `gfx2_unmap` (IO なら KEEP を立てて BUSY、backing は返さない) → `be->release` → C5/C6 → 表を空き (gen+1) | 公開 free・C15・見回り |
+| `int gfx2_surf_alias_update(struct gfx2_surf *, const struct gfx2_alias_desc * /* NULL = 形無し */)` | 0/BUSY (state が IDLE・LOST でない・`last_write`/`last_read` が未完了 (失敗の完了は完了に数える))/INVAL (ALIAS でない) | C4: 失敗時は何も変えない。成功時は gen+1 (旧 sid は STALE) → adapter・形状・pitch・gpu_off・kva を写し、`last_*` を 0、LOST は IDLE に (借りる backing が替わるため)。backing は解放も確保もしない | C14 (`v1_bridge_rebind`) |
+| `int gfx2_surf_destroy(struct gfx2_surf *)` | 0/BUSY/INVAL (ALIAS) | C4。順: `gfx2_unmap` (IO なら KEEP を立てて BUSY、backing は返さない) → `be->release` → C5 (VRAM)/C6 (GART)/C18 (SYSMEM) → 表を空き (gen+1) | 公開 free・C15・見回り |
 | `int gfx2_surf_state_set(struct gfx2_surf *, u32 st)` | 0/INVAL (§7-1 の表に無い遷移) | C4 | C3・C7・C15 |
 | `void gfx2_scan_ref_get/put(struct gfx2_surf *)`・`void gfx2_scan_ref_swap(struct gfx2_adapter *, u32 head, struct gfx2_surf *)` | — | C4 | C12・C13 |
 | `void gfx2_dirty_add(struct gfx2_surf *, const struct gfx2_rect *)` | — | C4 | C3 (cpu_end)・C9 |
@@ -583,12 +709,15 @@ extern struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES /* 1024 */];     /* 実体�
 | `int gfx2_heap_init(struct gfx2_heap *, u32 base, u32 size)`・`int gfx2_heap_alloc(struct gfx2_heap *, u32 bytes, u32 align, u32 *off)`・`int gfx2_heap_free(struct gfx2_heap *, u32 off)` | 0/NOSPC/INVAL | C5 | C1 (init)・C4 |
 | `int gfx2_gart_alloc(struct gfx2_adapter *, struct gfx2_surf *, u32 owner)`・`int gfx2_gart_free(struct gfx2_adapter *, struct gfx2_surf *)`・`int gfx2_gart_pfns(const struct gfx2_surf *, const u32 **pfn, u32 *n)`・`int gfx2_gart_quarantine(struct gfx2_surf *)` | 0/NOSPC/BUSY | C6 (pin は M1、`be->gart_bind`) | C4・C7・C15 |
 | `int gfx2_map(struct gfx2_surf *, struct addrspace *, u32 *va)`・`int gfx2_unmap(struct gfx2_surf *)` | 0/NOSPC/IO。unmap の IO は map_* を変えない | C7 (`paging_gfx2_map`・`paging_lease_unmap`) | C7 (lock)・C4・C15 |
+| `int gfx2_surf_page(const struct gfx2_surf *, u32 k, u32 *pa, u32 *attr)`・`int gfx2_cpu_visible(const struct gfx2_surf *)` | 0/INVAL (k 頁目の物理番地と PTE の cache の属性: VRAM は `vram_phys + gpu_off` から UC/WC、GART は pfn の表、SYSMEM は `sys_pfn` から WB) / 1/0 (`kva` か `map_as` が今の AS) | C7 | C7 (map)・C9・C17 |
+| `int gfx2_map_audit(const struct addrspace *)` | 0/-1 (§7-4 のコード) | C17 | exec/lease.c の `lease_audit_all` (M3 が 1 行) |
+| `int gfx2_sysmem_alloc(struct gfx2_surf *, u32 owner)`・`int gfx2_sysmem_free(struct gfx2_surf *)` | 0/NOSPC/IO (§7-2 のコード) | C18 | C4 |
+| `void gfx2_head_detach(struct gfx2_adapter *, u32 head)` | — (`scan_sid`・`pend_sid` の scan_ref を外す。装置には触らない) | C13 | C1 (ACTIVE を外す時)・gfx_core の `gfx_shutdown` (C1 が 1 行) |
 | `void gfx2_map_detach(struct gfx2_surf *)` | — (map_as = NULL・map_va = map_npages = 0。PTE と VA の bit には触らない) | C7 | C15・C4 (destroy の IO の後) |
 | `void gfx2_staging_drop(struct gfx2_surf *)`・`void gfx2_vaspace_drop(struct addrspace *)` | — (staging を kfree / as の枠の as_gen を 0、bit を全部 0) | C7 | C15 |
 | `int gfx2_head_restore_v1(struct gfx2_adapter *, u32 head)` | 0/IO | C13 | C15・C12 (全画面を抜ける) |
+| `void gfx2_pal_set(u32 first, u32 count, const u32 *xrgb)`・`void gfx2_pal_set_v1(int first, int count, const u8 *rgb)`・`void gfx2_pal_reset16(void)` | — (§9-2 のパレットの写し。v1 は 0〜15 の成分を ×17) | C13 | C13 (`gfx2_palette`)・gfx_core_api.inc の `gfx_set_palette_hal`・`gfx_lease_palette` (C14 が呼ぶ行)・gfx_core_init.inc:4 の後 (C1 が呼ぶ行) |
 | `int gfx2_surf_quarantine(struct gfx2_surf *)`・`void gfx2_quarantine_drain(struct gfx2_adapter *)` | 0/IO (§7-3 のコード。IO でも owner・state は隔離に済む) | C15 | C15・C3 (回復)。drain は KEEP の面を飛ばす |
-=====END
-
 | `int v1_bridge_begin(u32 role, u32 access)`・`void v1_bridge_end(u32 role, u32 access, u32 fence)`・`void v1_bridge_rebind(void)` | 0/BUSY/TIMEOUT | C14 | gfx_core・gfx_hw_submit・surface_query (C14 が呼ぶ行を足す) |
 
 fence の 3 段 (P1-1。C3 が実装、C9 の `run_one` の HW の道がこの順でだけ呼ぶ):
@@ -621,7 +750,7 @@ void gfx2_fence_commit_fail(struct gfx2_adapter *a, u32 f, struct gfx2_surf *dst
     gfx2_adapter_lost(a, 0);            /* gen+1・LOST の掃き出し・be->stop (stop の失敗で中が LOST_HELD に) */
 }
 ```
-- 束の終わり: C9 は `k_done` が 1 以上なら `be->kick`、`*fence = a->fence.issued`。sw の命令は `gfx2_cpu_begin` が前の HW の命令の commit 済みの番号を待つので、混在の束 (hw・sw・hw) で CPU が描画の前に触ることは無い。
+- 束の終わり: C9 は HW で行った命令が 1 つ以上なら `be->kick`、`*fence = a->fence.issued`。sw の命令は `gfx2_cpu_begin` が前の HW の命令の commit 済みの番号を待つので、混在の束 (hw・sw・hw) で CPU が描画の前に触ることは無い。
 
 ### 11-3. 形式と sw (gfx/v2/gfx2_sw.h、A0)
 ```c
@@ -634,7 +763,7 @@ u32  gfx2_yuv_argb(u8 y, u8 u, u8 v);  u32 gfx2_div255(u32 t);                  
 struct gfx2_pattern { u32 kind; /* 0=無し 1=mono 2=色 */ u8 mono[8]; u32 color[64]; GFX2_Color fg, bg; };
 struct gfx2_view {                    /* sw が見る面。C9 が作る */
     u8 *base; u32 pitch; u16 w, h; u8 fmt;
-    const u32 *pal;                   /* INDEX8 → ARGB (gfx_get_palette の写し) */
+    const u32 *pal;                   /* INDEX8 → ARGB。C9 が gfx2_pal (§9-2) を指す */
     GfxSyncCtx *sync;                 /* 非 NULL: 行の書き・読みは gfxsync_*、base は使わない */
 };
 struct gfx2_exec {                    /* 走査 1 が作り、走査 2・check・emit が同じ物を見る */
@@ -748,6 +877,7 @@ int gf3_alpha_set(struct gf3_ctx *, u32 const_a, bool per_pixel, u32 dl);     /*
 int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *, enum gf3_fmt, u32 dl); /* G7 */
 /* struct gf3_surface の末尾に u32 dma (0 = VRAM_DMA で今と同じ、GF3_HANDLE_GART_DMA) を A0 が足す。意味の実装は G8 */
 ```
+- channel の状態の戻し (R8): 色鍵・α・ROP3 のパターンは channel の物の状態で、v1 の DIRECT の blit (`gf3_copy`、hwdev/gf/accel_copy.c:54 は `gf3_rop_set` だけを結び直す) はこれを設定しない。G1 の `emit` はこれらを変えた命令の描画を積んだ後、同じ emit の中で既定 (`gf3_ckey_set(.., false, ..)`・`gf3_alpha_set(.., 255, false, ..)`・パターン全 1 の `gf3_rop3_set`) に戻してから返す。命令の間の channel は常に既定で、v1 の入口と v2 の束が交互でも互いの状態を見ない。戻しの積みに失敗したら emit は装置の失敗を返す (§11-2 の commit_fail → LOST)。
 
 ### 11-7. 表の組み立て・登録・module・build
 ```c
@@ -756,7 +886,7 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
     u32 abi; void *ctx;
     int (*caps)(void *, GFX2_Caps *);                                   /* 副作用なし */
     int (*check)(void *, const struct gfx2_exec *);                     /* 0 = HW でできる、NOSYS = できない */
-    int (*heap_range)(void *, u32 *base, u32 *size);                    /* heap に渡す VRAM の範囲 */
+    int (*heap_range)(void *, u32 *base, u32 *size, u32 *phys);         /* heap に渡す VRAM の範囲と VRAM の offset 0 の物理番地 (C17・C7 の PTE の元) */
     int (*alloc)(void *, struct gfx2_surf *);                           /* heap の置き場に装置の予約、priv を埋める */
     int (*release)(void *, struct gfx2_surf *);                         /* GPU の使用の終わりと写像の解除の後だけ */
     int (*kva)(void *, const struct gfx2_surf *, u8 **va);              /* CPU から触る kernel の VA。NOSYS → sw は NOSUPPORT */
@@ -790,17 +920,84 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
 | 何 | 担当の段 | 名前 |
 |---|---|---|
 | GfxBackend の末尾 (gfx_hal.h:143 の後) に `const struct GfxBackendV2 *v2; const struct module_record *v2_mod;` と hwdev_layout.json:661 | A0 | — |
-| kernel の .text の境界: build/os32.ld の `.text` に `__os32_text_start = .;` (kentry.o の前)・`__os32_text_end = .;` (`*(.text.*)` の後) | A0 | — |
-| GF の 1 表 (G1〜G9 の関数を並べる) と backend_geforce.c:719-734 の `.v2 = &gf_backend_v2` | G1 | `const GfxBackendV2 gf_backend_v2` (gf_v2_ops.c、module の中) |
-| GF の写し (D7): geforce_module.c の `geforce_start` (:241 の `direct_ops` の検査の後、公開 :334 の前) に、`candidate.v2` の表が module の ro の中にあること (`direct_ops` と同じ :221-227 の型) と各 hook の `module_text_contains` を確かめてから `if (candidate.v2) { gf_v2_kcopy = *candidate.v2; candidate.v2 = &gf_v2_kcopy; } candidate.v2_mod = r;` (module が v2_mod に何を書いても r で上書き)。停止の道に `gfx2_adapter_unregister(&gfx_backend_geforce)` | G1 (geforce_module.c の 2 か所) | `static GfxBackendV2 gf_v2_kcopy` (kernel) |
+| GF の 1 表 (G1〜G9 の関数を並べる) と backend_geforce.c:749-767 の `.v2 = &gf_backend_v2` | G1 | `const GfxBackendV2 gf_backend_v2` (gf_v2_ops.c、module の中) |
+| GF の写し (D7): geforce_module.c の `geforce_start` の :253 (表示の hook の検査) の後・公開 :334 の前に、`candidate.v2` の表が module の ro の中にあること (`direct_ops` と同じ :221-227 の型) と各 hook の `module_text_contains` を確かめてから `if (candidate.v2) { gf_v2_kcopy = *candidate.v2; candidate.v2 = &gf_v2_kcopy; } candidate.v2_mod = r;` (module が v2_mod に何を書いても r で上書き)。停止の道に `gfx2_adapter_unregister(&gfx_backend_geforce)` | G1 (geforce_module.c の 2 か所) | `static GfxBackendV2 gf_v2_kcopy` (kernel) |
 | PEGC の表 (caps・enum・heap_range=0・kva) と backend_pegc.c の `.v2` | P1 | `pegc_backend_v2` (pegc_v2.c) |
 | Trident: 表は作らない (`v2 = NULL`、中核が v1 から写す)。同期の bind は T1 | T1 | — |
-| 登録: gfx_core の backend の選択の直後に `gfx2_adapter_register(g_backend, kind, ACTIVE)`、他の probe が通った物と PC-98 の内蔵は `flags=0` (kind は gfx_core.c:146 と同じ形の pointer の比較) | C1 (gfx_core.c の呼ぶ行も C1) | — |
+| 登録: gfx_core の backend の選択の後 (下のコードの 2 か所) に `gfx2_adapter_register(g_backend, display_provider_ledger(g_backend), GFX2_AF_ACTIVE)`。最初の登録の時に 1 回だけ、`display_provider_each` で probe が通った他の backend と PC-98 の内蔵を `flags=0` で登録する。kind は常に `display_provider_ledger()` から取り、gfx/v2 は `&gfx_backend_*` を直に比べない (0 = 知らない backend は登録しない) | C1 (gfx_core.c・gfx_core_init.inc の呼ぶ行も C1) | — |
+| 列挙の口: include/display_provider.h に `void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg)` (候補の表 gfx_selector.c:12-18 の順に、未リンクの weak を飛ばし、`gfx_probe_backend` (:46-51) と同じ判定で probe が通った物ごとに fn を呼ぶ。ハードウェアの設定はしない。自動の選択で飛ばす明示の指定だけの backend (Trident・GeForce、候補の表 :13-14) は列挙で probe せず、その時に選ばれている backend のときだけ渡す。`cirrus_probed` の記録は選択の probe だけが立てる)。実体は platform/pc98/gfx_selector.c、platform/powermac/display_provider.c は空 (fn を呼ばない) | A0 (宣言と powermac の空の実装)・C1 (gfx_selector.c の実装) | — |
 | module: trident の import に `gfxsync_bind`・`gfxsync_write_rows`・`gfxsync_read_rows`・`gfxsync_flush`・`gfxsync_unbind`・`gfx2_sync_publish` (module_schema.py と生成物 build/out/trident/trident_imports.h の両方)。geforce は import 無し・export は今の backend の表 (中の `v2`)。両方の ABI の世代を上げる | A0 (module_schema.py と生成物) | `TRIDENT_MODULE_ABI_GEN`・`GEFORCE_MODULE_ABI_GEN` |
-| build: gfx/v2/*.c・gfx/sync/*.c を build/kernel.mk の C_KERNEL に、gf_v2_*.c を geforce module の一覧に、a0_weak.c を両方に | A0 (各段は自分のファイルが一覧にあることだけ前提) | — |
-| 登録の検査 (P1-6): `abi == GFX_HAL2_ABI`、全 hook が非 NULL、全 hook が「`v2_mod == NULL` なら kernel の `[__os32_text_start, __os32_text_end)`、非 NULL なら `module_text_contains(v2_mod, p)` (module_runtime.h:56)」の中。`v2 == NULL` (Trident・PC-98) は検査しない | C1 | — |
-=====END
+| build: gfx/v2/*.c・gfx/sync/*.c を build/sources/order.mk の `C_ORDER_LEGACY` と build/sources/common.mk の `C_COMMON` の両方に (`C_KERNEL` は build/select.mk:243 がこの 2 つから組む)、tools/tests/fixtures/build_profile_x86.json に同じ一覧、新しい根を足すなら tools/source_roots.py。gf_v2_*.c は build/geforce-module.mk の `GEFORCE_OBJS` (:8) に。a0_weak.c は両方に。手本は B4 の 989ba493 (order.mk・build_profile_x86.json・source_roots.py・tools/ppc/selected_success.json を同じ commit で直した形) | A0 (各段は自分のファイルが一覧にあることだけ前提) | — |
+| 登録の検査 (P1-6): `abi == GFX_HAL2_ABI`、全 hook が非 NULL、`v2_mod` が非 NULL なら全 hook が `module_text_contains(v2_mod, p)` (module_runtime.h:56) の中。`v2_mod == NULL` (組込みの PEGC) は abi と非 NULL だけ。`v2 == NULL` (Trident・PC-98) は C16 の shim を据え、検査しない | C1 | — |
 
+shim と登録 (R4・R5)。`a->be` はどの時点でも非 NULL で、中核は `a->be->` を NULL の検査なしに呼ぶ:
+```c
+/* gfx/v2/v1_shim.c (C16)。v2 の表の無い backend (Trident・PC-98、v2 == NULL) の代わり。ctx は struct gfx2_adapter * */
+static int shim_nosys_x(void *c, const struct gfx2_exec *e) { (void)c; (void)e; return OS32_ERR_NOSYS; }
+static int shim_ok(void *c) { (void)c; return 0; }
+static int shim_heap_range(void *c, u32 *b, u32 *n, u32 *p) { (void)c; *b = *n = *p = 0; return 0; }  /* VRAM の面は NOSPC */
+static int shim_fence_state(void *c, u32 *done, u32 *fail)
+{ const struct gfx2_adapter *a = c; *done = a->fence.issued; *fail = 0; return 0; }     /* 常に完了 (§9-2) */
+static int shim_mode_set(void *c, u32 head, u32 cm, const GFX2_ModeInfo *m, const struct gfx2_surf *s)
+{ struct gfx2_adapter *a = c; (void)cm; (void)s;
+  return head || !a->v1->set_mode ? OS32_ERR_NOSYS : a->v1->set_mode(m->id); }       /* hook は呼ぶたびに a->v1-> から (D2) */
+/* flip・vblank_wait・palette・gamma・cursor_*・dpms も同じ形で §9-2 の右の列の v1 の hook へ (NULL なら NOSYS)。
+ * enum_* は C11 の v1 の道、caps は C10 の gfx2_caps_from_v1 */
+const GfxBackendV2 gfx2_v1_shim = {
+    .abi = GFX_HAL2_ABI, .caps = shim_caps, .check = shim_nosys_x, .heap_range = shim_heap_range,
+    .alloc = shim_nospc, .release = shim_ok_s, .kva = shim_nosys_kva,
+    .gart_bind = shim_nosys_gb, .gart_unbind = shim_ok_gu,
+    .emit = shim_nosys_emit, .readback = shim_nosys_x2,        /* check が NOSYS なので呼ばれない */
+    .kick = shim_ok, .fence_emit = shim_ok_fe, .fence_state = shim_fence_state, .fence_wait = shim_ok_fw,
+    .enum_head = shim_enum_head, .enum_conn = shim_enum_conn, .enum_mode = shim_enum_mode, .edid = shim_edid,
+    .mode_set = shim_mode_set, .flip = shim_flip, .flip_done = shim_flip_done, .vblank_wait = shim_vblank_wait,
+    .palette = shim_palette, .gamma = shim_gamma, .cursor_image = shim_cursor_image,
+    .cursor_move = shim_cursor_move, .cursor_show = shim_cursor_show, .dpms = shim_dpms, .stop = shim_ok,
+};
+/* gfx2_lost_be: unregister の後の表。全 hook が OS32_ERR_STALE、kick・stop・release は 0、
+ * fence_state は completed = failed_upto = a->fence.issued (待つ物を全部「失敗の完了」にする) */
+
+/* gfx/v2/backend_reg.c (C1)。gfx_init のたびに呼ばれてよい (冪等) */
+int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)   /* kind = display_provider_ledger(v1) */
+{
+    struct gfx2_adapter *a = adapter_by_v1(v1);                 /* 渡された v1 の番地が同じなら同じ adapter (既知の backend の名前とは比べない) */
+    const GfxBackendV2 *be = v1->v2 ? v1->v2 : &gfx2_v1_shim;
+    u32 base, size;
+    if (v1->v2 && be_check(be, v1->v2_mod)) return OS32_ERR_INVAL;   /* abi・非 NULL・module の .text */
+    if (!a) {
+        if (!(a = adapter_slot_new())) return OS32_ERR_FULL;
+        a->v1 = v1; a->kind = kind;
+    } else if (a->be != be && a->be != &gfx2_lost_be) {
+        return OS32_ERR_INVAL;                                  /* 生きた adapter の表は替えない (module の入れ替えは unregister の後) */
+    }
+    if (a->be != be) {                                          /* 新規、または unregister の後の module の再 load */
+        a->be = be; a->ctx = v1->v2 ? be->ctx : a;
+        a->be->heap_range(a->ctx, &base, &size, &a->vram_phys); gfx2_heap_init(&a->heap, base, size);
+        gfx2_caps_refresh(a);                                   /* C10 */
+    }
+    if (flags & GFX2_AF_ACTIVE) {
+        if (a->state != GFX2_AD_OK && (a->state != GFX2_AD_LOST_HELD || !a->be->stop(a->ctx)))
+            gfx2_adapter_recovered(a);                          /* v1 の init が通った = 次の mode_set (§6-3) */
+        gfx2_adapter_activate(a);
+    }
+    return 0;
+}
+void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付け替え */
+{
+    for (u32 i = 0; i < GFX2_MAX_ADAPTERS; i++) {
+        struct gfx2_adapter *o = &gfx2_adapters[i];
+        if (o == a || !(o->flags & GFX2_AF_ACTIVE)) continue;
+        o->flags &= ~GFX2_AF_ACTIVE;
+        for (u32 h = 0; h < o->heads; h++) gfx2_head_detach(o, h);   /* C13。走査は v1 の切り替えが済ませた */
+        if (++o->gen == 0) o->gen = 1;                          /* 古い gen の束は STALE、以後は NOSYS (§5-3) */
+    }
+    a->flags |= GFX2_AF_ACTIVE;
+    v1_bridge_rebind();                                         /* C14: 別名を ACTIVE の adapter へ移す (§6-5) */
+}
+```
+- C1 が gfx_core に足す呼ぶ行: (1) gfx/gfx_core_init.inc:8 の `gfx_select_and_init_backend` の後、:9 の `initialized < 0` の戻りと :10 の間 (`initialized >= 0` の時。:10-16 の packed 系の早い戻りの道と :18 以降の道の両方が通る。init の失敗で pc98 へ落ちた場合 gfx_core.c:227-231 も、ここで `g_backend` = pc98 を ACTIVE にする)。(2) `gfx_shutdown` (gfx_core.c:356-384) の GF → pc98 の切り替え (:375-382) の中、`g_backend = DISPLAY_FALLBACK_BACKEND;` (:380) の後。(3) gfx_core_init.inc:4 の `palette_shadow_reset()` の直後に `gfx2_pal_reset16()` (§9-2)。`gfx_init`・`gfx_init_200` (gfx_core.c:295・300) が何度呼ばれても adapter は増えない。
+- `gfx_prepare_backend` (gfx_core.c:252-291) は登録しない。起動時の退避 (選択 → prepare か init → shutdown) の後は adapter を作らず、次の gfx_init の (1) で登録する。
+- `gfx_shutdown` の時の面と別名: v2 の面はそのまま残す (free・desc・lock は通る。ACTIVE でなくなった adapter への submit・create・head の口は NOSYS)。GF → pc98 の時は上の `gfx2_adapter_activate` が GF の heads を `gfx2_head_detach` し、別名は `v1_bridge_rebind` で pc98 の v1 の今の値へ移る。backend が替わらない時 (PEGC のままテキストへ戻る等) は C1 が `gfx_shutdown` の `gfx_reinit_surfaces(1)` (:383) の前に ACTIVE の adapter の全 head を `gfx2_head_detach` し、C14 の 3 か所の 1 つ (`gfx_reinit_surfaces` の後) の `v1_bridge_rebind` で別名は形無し (`alias_update(s, NULL)`) になる。
 
 ## 12. 段と順 (1 機能 1 ファイル、1 行 = 1 段 = 1 実装者)
 
@@ -808,32 +1005,35 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
 
 | 段 | ファイル | 呼ぶ (宣言の所) | 呼ばれる | 書く共有の状態 | 行 | I |
 |---|---|---|---|---|---|---|
-| A0 | §11 の全ヘッダ・kapi.json と生成物・a0_weak.c ×3・module_schema.py・hwdev_layout.json (GfxBackend・gf3_ctx)・build/kernel.mk・build/os32.ld (.text の境界)・tools/tests/gfx2_abi_host.c・tools/checks/gfx2_wiring.txt・gfx2_no_weak.sh | — | 全部 | — | 700 | — |
-| C1 | gfx/v2/backend_reg.c (+gfx_core.c の登録の行) | `be->caps`・`gfx2_heap_init`・`module_text_contains`・`gfxsync_mode` | 全部の公開の入口・P1・T1 (publish) | `gfx2_adapters[]` の index・v1・be・ctx・kind、`sync_tab` | 220 | I1 |
+| A0 | §11 の全ヘッダ・kapi.json と生成物・a0_weak.c ×3・module_schema.py・hwdev_layout.json (GfxBackend・gf3_ctx)・build の一覧 (build/sources/order.mk・common.mk・build/geforce-module.mk・tools/tests/fixtures/build_profile_x86.json・必要なら tools/source_roots.py、§11-7)・include/display_provider.h (`display_provider_each` の宣言)・platform/powermac/display_provider.c (空の `display_provider_each`)・arch/x86/arch_cpu.h・arch/ppc/arch_cpu.h (`arch_cpu_serialize`・`arch_cpu_has_mmx`、§10)・include/config.h (`SYS_GFXSYNC_CFG`)・tools/tests/gfx2_abi_host.c・tools/checks/gfx2_wiring.txt・gfx2_no_weak.sh | — | 全部 | — | 700 | — |
+| C1 | gfx/v2/backend_reg.c・platform/pc98/gfx_selector.c の `display_provider_each` (+gfx_core_init.inc:8 の後と gfx_core.c の `gfx_shutdown` の 2 か所の登録・head の切り離しの行、gfx_core_init.inc:4 の後の `gfx2_pal_reset16`、§11-7) | `be->heap_range`・`gfx2_heap_init`・C10・`module_text_contains`・`gfxsync_mode`・`caller_access_get_user`・`display_provider_ledger`・`display_provider_each`・C13 (`gfx2_head_detach`・`gfx2_pal_reset16`)・C14 (`v1_bridge_rebind`) | 全部の公開の入口・P1・T1 (publish)・gfx_core | `gfx2_adapters[]` の index・v1・be・ctx・kind・flags・vram_phys、`sync_tab` | 280 | I1 |
 | C2 | gfx/v2/format.c | — | C9・S*・U1 | — | 200 | I2 |
 | C3 | gfx/v2/fence.c | `be->fence_emit/state/wait`・`gfx2_surf_state_set`・`gfx2_quarantine_drain` | C4・C7・C9・C12〜C15 | `adapter.fence` (reserved・issued)・`gen`・`state`、`surf.last_*` | 220 | I1 |
-| C4 | gfx/v2/surface.c | C5・C6・C7 (`gfx2_unmap`・`gfx2_map_detach`)・`be->alloc/release/kva` | 公開・C7・C9・C12〜C15 | `gfx2_surfs[]` (§11-2 の C4 の欄、別名の作成と更新を含む) | 320 | I1 |
+| C4 | gfx/v2/surface.c | C5・C6・C7 (`gfx2_map`・`gfx2_unmap`・`gfx2_map_detach`)・C18・`be->alloc/release/kva` | 公開・C7・C9・C12〜C15 | `gfx2_surfs[]` (§11-2 の C4 の欄、別名の作成と更新を含む) | 320 | I1 |
 | C5 | gfx/v2/vram_heap.c | — | C1・C4 | `adapter.heap` | 150 | I1 |
 | C6 | gfx/v2/gart.c | `pgalloc_alloc_n_owner`・`pgalloc_pin/unpin`・`ledger_transfer_pinned`・`be->gart_bind/unbind` | C4・C7・C15 | `surf.gart_*`・pfn の表 (gart.c の static) | 200 | I1 |
 | C7 | gfx/v2/lock.c | `paging_gfx2_map`・`paging_lease_unmap`・C1 (`gfx2_sync_get`)・C3・C4・`gfxsync_read/write_rows` | 公開・C4・C15 | `surf.map_*`・`staging`、`gfx2_vaspace[4]` | 270 | I1 |
 | C8 | gfx/v2/check_op.c | C2・`be->check` | 公開・C9 | — | 150 | I2 |
-| C9 | gfx/v2/submit.c | C3・C4・C8・S*・`be->emit/readback/kick` | 公開 | `k_ops`・`ex`・パターン (static)、`gfx2_sw_table` | 260 | I2 |
-| C10 | gfx/v2/caps.c | `be->caps` (無ければ v1 の GfxMode から) | 公開・C1 | `adapter.caps` | 120 | I2 |
-| C11 | gfx/v2/enum.c | `be->enum_*`・`edid` (無ければ v1 から) | 公開・C12 | — | 200 | I3 |
+| C9 | gfx/v2/submit.c | C3・C4・C7 (`gfx2_cpu_visible`)・C8・S*・`be->emit/readback/kick` | 公開 | `k_ops`・`ex`・パターン (static)、`gfx2_sw_table` | 260 | I2 |
+| C10 | gfx/v2/caps.c | `be->caps` | 公開・C1・C16 (`gfx2_caps_from_v1`、§4-1 の shim の列) | `adapter.caps` | 140 | I2 |
+| C11 | gfx/v2/enum.c | `be->enum_*`・`edid` (v1 から作る列挙は C11 の関数で、C16 の shim が呼ぶ) | 公開・C12・C16 | — | 200 | I3 |
 | C12 | gfx/v2/modeset.c | C3・C4・C11・`be->mode_set`・`gfx_policy_reeval` (H4) | 公開 | `adapter.head[]`・`restore_on_leave` | 160 | I3 |
-| C13 | gfx/v2/display.c | `be->flip`・`flip_done`・`vblank_wait`・`palette`・`gamma`・`cursor_*`・`dpms` か v1 の hook・C4・`gfxsync_write_rows` | 公開・C15 | `adapter.head[].pend_sid`、`surf.dirty` を 0 に | 240 | I3 |
-| C14 | gfx/v2/v1_bridge.c (+gfx_core.c 3 か所・gfx_hw_submit.c:70・95・surface_query.c の呼ぶ行) | C3・C4 (`gfx2_surf_alias`・`alias_update`) | v1 の入口 | 別名の面 | 220 | I2 |
+| C13 | gfx/v2/display.c | `be->flip`・`flip_done`・`vblank_wait`・`palette`・`gamma`・`cursor_*`・`dpms` (v1 だけの backend は C16 の shim の中で v1 の hook へ)・C4・`gfxsync_write_rows` | 公開・C1 (`gfx2_head_detach`・`gfx2_pal_reset16`)・C14 (`gfx2_pal_set_v1`)・C15 | `adapter.head[].pend_sid`、`surf.dirty` を 0 に、`gfx2_pal` (§9-2) | 240 | I3 |
+| C14 | gfx/v2/v1_bridge.c (+gfx_core.c 3 か所・gfx_hw_submit.c:70・95・surface_query.c・gfx/gfx_vram.c (present_rect :55-63・:284-298)・gfx/gfx_core_api.inc (fill・blit :66-78、パレットの写しの `gfx2_pal_set_v1` を `gfx_set_palette_hal` :50-59・`gfx_lease_palette` :102-130)・exec/lease.c (DISPLAY の lease、`surface_lease`:245-296・`surface_lease_bundle`:302-353) の呼ぶ行)。exec/lease.c は M3 も触るので **M3 の後**に着手 | C3・C4 (`gfx2_surf_alias`・`alias_update`) | v1 の入口 | 別名の面 | 220 | I2 |
+| C16 | gfx/v2/v1_shim.c (R4、§11-7 のコード。`gfx2_v1_shim`・`gfx2_lost_be`) | C10 (`gfx2_caps_from_v1`)・C11 の v1 の列挙・v1 の hook | C1 | — | 180 | I1 |
+| C17 | gfx/v2/map_audit.c (R1、§7-4 のコード) | C7 (`gfx2_surf_page`) | M3 (`lease_audit_all`) | — | 70 | I1 |
+| C18 | gfx/v2/sysmem.c (R2、§7-2 の表とコード) | `pgalloc_alloc_n_owner`・`pgalloc_free_n_owner` | C4 | `surf.sys_pfn`・`sys_n`・`kva` | 60 | I1 |
 | C15 | gfx/v2/owner_release.c | C3・C4・C6・C7 (`map_detach`・`staging_drop`・`vaspace_drop`)・C13 | X1 | `surf.owner`・`flags` の KEEP (隔離) | 200 | I1 |
 | S1〜S11 | gfx/v2/sw_fill.c・sw_copy.c・sw_rop.c・sw_rop4.c・sw_mono.c・sw_hostdata.c・sw_readback.c・sw_stretch.c・sw_ckey.c・sw_alpha.c・sw_line.c | C2・`gfxsync_row_*` (view.sync の時) | C9 | — | 1450 | I2 |
 | M1 | mm/pgalloc_owner.inc | — | C6 | `pin_map[]` | 90 | I1 |
 | M2 | mm/paging_gfx2.inc (paging.c に include) | `pgalloc_alloc_phys` | C7 | `as->lease_pt_phys[]` | 80 | I1 |
-| M3 | include/memmap.h・exec/lease.c:69 | — | C7・lease | — | 10 | I1 |
+| M3 | include/memmap.h (`MEM_GFX2_MAP_*`・`MEM_LEASE_ALLOC_END`・`MEM_LEASE_ALLOC_PDES`)・exec/lease.c (:69 の上限、:176-177 の範囲、:212 の PTE の走査の範囲、:380 の次に `gfx2_map_audit`、§7-4) | C17 | C7・lease | — | 15 | I1 |
 | X1 | exec/exec_finish.inc:34 の後 | `gfx2_owner_release`・`paging_addrspace_poison` | — | `as->appmem_poisoned` (poison の口で) | 15 | I1 |
-| Y1〜Y4 | gfx/sync/sync_cfg.c・sync_gap.c・sync_write.c・sync_bind.c | `sysconfig` の読み・`cpu_loops_per_tick` | C7・C13・S*・T1・P1 | `gfxsync_ctx_pool` (Y4) | 500 | I3 |
-| T1 | drivers/video/trident/present.c・regs.c・trident_module.c (write_gap.c 削除、停止の道に `gfx2_adapter_unregister`) | `gfxsync_*`・`gfx2_sync_publish` (A0 が import の一覧と生成物に足した物) | v1 present | — | −50 | I3 |
+| Y1〜Y4 | gfx/sync/sync_cfg.c・sync_gap.c・sync_write.c・sync_bind.c | `sysconfig` の読み・`cpu_loops_per_tick`・`arch_cpu_serialize` (Y3) | C7・C13・S*・T1・P1 | `gfxsync_ctx_pool` (Y4) | 500 | I3 |
+| T1 | drivers/video/trident/present.c・regs.c・trident_module.c (write_gap.c 削除と旧パスの空の規則 (§10)、停止の道に `gfx2_adapter_unregister`) | `gfxsync_*`・`gfx2_sync_publish` (A0 が import の一覧と生成物に足した物) | v1 present | — | −50 | I3 |
 | P1 | drivers/video/pc98/pegc_v2.c (+backend_pegc.c の `.v2`) | `gfxsync_bind`・`gfx2_sync_publish` | C1 | — | 150 | I3 |
-| G1 | drivers/video/geforce/gf_v2_ops.c (+backend_geforce.c の `.v2`、geforce_module.c の写しと unregister の 2 か所) | gf3_*・G3〜G9・`gf3_range_query_set` | 中核 (表) | `struct gf_v2` の g3・ch、`gf_v2_kcopy` | 340 | I2 |
-| G2 | drivers/video/geforce/gf_v2_display.c | gf4_* | G1 の表 | — | 250 | I3 |
+| G1 | drivers/video/geforce/gf_v2_ops.c (+backend_geforce.c の `.v2` と `geforce_direct_ok` の LOST の 1 行 (§6-3)、geforce_module.c の写しと unregister の 2 か所)。emit は channel の状態を既定へ戻して返す (§11-6 の R8) | gf3_*・G3〜G9・`gf3_range_query_set` | 中核 (表) | `struct gf_v2` の g3・ch、`gf_v2_kcopy` | 340 | I2 |
+| G2 | drivers/video/geforce/gf_v2_display.c (LOST の間の `mode_set` は層 3 の再初期化を先に行い、成功で 0 を返す、§6-3) | gf4_*・gf3_init | G1 の表 | — | 260 | I3 |
 | G3 | hwdev/gf/accel_ckey.c (+accel_objects.c:112 の結び) | gf2_emit | G1 | — | 80 | I2 |
 | G4 | drivers/video/geforce/gf_v2_fence.c・hwdev/gf/accel_fill.c・accel_copy.c・accel_scale.c (*_emit の切り出し) | gf2_fence_* | G1・C3 経由 | `ring`・`completed`・`failed_upto` | 220 | I2 |
 | G5 | drivers/video/geforce/gf_v2_gart.c | gf2_dma_new・NV44 の頁表 | C6 経由・G8 | `gart_*` | 180 | I1 |
@@ -843,10 +1043,14 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
 | G9 | drivers/video/geforce/gf_v2_alloc.c | `gf_vram_reserve/release` | C4 経由 | `node[]`・`surf.priv` | 120 | I1 |
 | U1 | userland/lib/gfx/v2/*.c (format.c を共有) | 公開の gfx2_* | アプリ | — | 400 | I2 |
 | D1 | etc/gfx/sync.cfg・インストーラ | — | Y1 | — | 30 | I3 |
-| I1 | 面の道: C1・C3〜C7・C15・M1〜M3・X1・G5・G9 | 確保 → 写像 → lock → 解放 → AS の回収 (隔離を含む)。合格は §13 の I 列が I1 の試験全部 (**新帯の往復 `gfx2_map_selftest` と AS の回収を必ず含む**) + `gfx2_no_weak.sh I1` | | | 結線 | |
+| K1 | platform/pc98/display_dual.c の GF の行と gf_outputs.[ch] の削除 (CONSOLE_DUAL_DESIGN.md:67・167。CONSOLE_DUAL の D2 と C1・C11 が main に入った後): display_dual.c の GF の行を gfx2 の列挙 (`gfx2_adapter_count/info`・`gfx2_head_info`・`gfx2_connector_info`) に差し替え、gf_outputs を消し、`CON_DUAL_MAX_*` を GFX2 の定数に | C1・C11 | console_dual.c | — | −40 | I3 |
+| I1 | 面の道: C1・C3〜C7・C15〜C18・M1〜M3・X1・G5・G9 | 確保 → 写像 → lock → 解放 → AS の回収 (隔離を含む)。合格は §13 の I 列が I1 の試験全部 (**新帯の往復 `gfx2_map_selftest` と AS の回収を必ず含む**) + `gfx2_no_weak.sh I1` | | | 結線 | |
 | I2 | 描画の道: C2・C8〜C10・C14・S1〜S11・G1・G3・G4・G6・G7・G8・U1 | 混在の束・fence・v1 の橋・libos32gfx。合格は I 列が I2 の試験全部 + `gfx2_no_weak.sh I2` | | | 結線 | I1 の後 |
-| I3 | 表示の道: C11〜C13・G2・P1・T1・Y1〜Y4・D1 | 列挙・mode・flip・全画面の出入り・同期層。合格は I 列が I3 の試験全部 + `gfx2_no_weak.sh I3` | | | 結線 | I2 の後 |
-合計 カーネル約 6,800 行・ユーザーランド約 400 行。1,000 行を超えるファイルは無い。ATI の backend は別の設計。
+| I3 | 表示の道: C11〜C13・G2・P1・T1・Y1〜Y4・D1・K1 | 列挙・mode・flip・全画面の出入り・同期層。合格は I 列が I3 の試験全部 + `gfx2_no_weak.sh I3` | | | 結線 | I2 の後 |
+合計 カーネル約 7,200 行・ユーザーランド約 400 行。1,000 行を超えるファイルは無い。ATI の backend は別の設計。
+
+- **順の制約**: exec/lease.c は M3 と C14 の両方が触るので M3 → C14 の順にする (同時に走らせない)。
+- **PPC で組めること (完了条件)**: C14・M1・M2・M3 (exec/lease.c) と gfx/v2・gfx/sync の全 TU は PPC のクロスコンパイルが通ることを完了条件にする。`gfx/gfx_hw_submit.c`・`gfx/gfx_vram.c`・`mm/paging.c`・`mm/pgalloc.c`・`exec/lease.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っており、gfx/v2・gfx/sync の新しい TU も A0 がこの集合に足す。gfx/v2・gfx/sync は pc98 と x86 のヘッダを include しない (CPU に依る所は §10 の arch の口、表示の機種に依る所は provider と backend の表)。x86 の asm・pc98 のヘッダを既存の TU に増やさない、増やすなら `tools/ppc/known_header_dependencies.json` に組を足す。
 
 ## 13. 受入 → 試験
 
@@ -873,15 +1077,23 @@ typedef struct GfxBackendV2 {   /* include/gfx_hal2.h (A0)。戻り値は OS32_E
 | 同期の面の lock | DIRECT の面の lock の va が staging (VRAM の VA でない)、unlock で write_rows に lock の矩形 | lock.c の staging の分岐を外す | I3 |
 | check_op と submit | 全 op × 形式 × pool で how が同じ | submit.c が check_op でなく caps2d を見る | I2 |
 | 同期層 | 設定の欠け・範囲外・hook の欠けで既定、gap の回数が今の trident の値 (65・7・38 の場合) と同じ | sync_bind.c の組み合わせの拒否を 1 つずつ | I3 |
-| module | 古い世代の module を拒む・`v2=NULL` で動く・.text の外のポインタを拒む | backend_reg.c の abi の比較を外す | I1 |
+| module | 古い世代の module を拒む・`v2=NULL` で動く (shim)・module の表の .text の外のポインタを拒む | backend_reg.c の abi の比較を外す | I1 |
 | H1/H2 の回帰 | tools/tests/gfx_accel_hal_host.c が無変更で通る | — | I2 |
 | fence の順 (P1-1) | fake の backend が呼ばれた順を記録。FILL(hw) → 記録が `emit(f)` → `fence_emit(f)` の順、`issued` は fence_emit の 0 の後だけ f。続く SW の FILL の cpu_begin が f を待つ。emit が IO → `failed_upto = f`・書き先が LOST・`issued` 不変 | submit.c で commit を emit の前に動かす / fence.c の `issued = f` を fence_emit の前に | I2 |
 | sync の判定 (P1-2) | fake の ctx を DIRECT で publish → lock が staging・check_op が HW 可・present が NOP。SHADOW で publish し直す → lock は影・check_op が SW。publish(NULL) の後 → NOTFOUND で VRAM の面の扱い。C7・C8・C9・C13 の 4 か所が同じ答え | backend_reg.c の `gfx2_sync_get` が mode を写しの値で返す (publish し直しを見ない) | I3 |
 | GART の範囲 (P1-3) | `range_q` 未設定で GART の面の `gf3_surface_check` → EINVAL。設定後: bind 済みの [0,8KB) は 0、[4KB,12KB) は ERANGE、`off+bytes` のあふれ込みは ERANGE。VRAM の面は今の結果と同じ | accel_surface.c の GART の分岐を予約の照合へ戻す | I2 |
 | 別名の更新 (P1-4) | `gfx2_surf_alias_update` で gen+1・旧 sid が STALE・kva は渡した値・heap/GART/`be->alloc`/`be->release` の呼び出しが 0 回。lock 中は BUSY で何も変わらない。`gfx2_surface_free(別名)` は INVAL | surface.c の update で gen+1 を外す / destroy の ALIAS の拒否を外す | I2 |
 | unmap の失敗 (P1-5) | fake の `paging_lease_unmap` が失敗 + `be->release` が BUSY → owner_release は IO、全部の面で `map_as != as`・`owner != as->owner`・vaspace の枠が空、KEEP の面の backing が heap/GART に戻らない。その後 as を 0xCC で埋めて free し、CLOSING の見回りと drain を回しても as を読まない (host の番兵) | owner_release.c の `gfx2_map_detach` を外す / destroy の IO で KEEP を立てない | I1 |
-| .text の検査 (P1-6) | 組込みの表 (hook が host の `__os32_text_start`〜`end` の中) は 0。1 つを .data の番地にすると INVAL。module の表は fake の `module_record` の text の中で 0、外で INVAL。`v2_mod` が NULL の module の表 (写し忘れ) は kernel の区間で見るので INVAL | backend_reg.c の `v2_mod == NULL` の分岐を「検査しない」に | I1 |
-| weak の検査 (P2-2) | 対象の関数を weak だけの版でリンク → `gfx2_no_weak.sh I1` が 1、強い実体のある版で 0。weak の仮の実体と同じ名の強い実体が a0_weak.o の区間に来た版 (人工) も 1 | gfx2_no_weak.sh の型の検査を記号名の検査に戻す | I1 |
+| .text の検査 (P1-6) | module の表は fake の `module_record` の text の中で 0、1 つを外にすると INVAL。組込みの表 (`v2_mod == NULL`) は abi と非 NULL だけで 0、hook を 1 つ NULL にすると INVAL | backend_reg.c の `module_text_contains` の呼び出しを外す / 非 NULL の検査を外す | I1 |
+| 監査との共存 (R1) | fake の AS に lease 1 本と gfx2 の写像 (VRAM 2 頁・GART 3 頁) を張る → `lease_check` と `gfx2_map_audit` が 0。gfx2 の帯の PTE を 1 つ書き換え → `gfx2_map_audit` が −1・`lease_check` は 0。写像の無い PTE を帯に 1 つ足す → −1。lease の base を `MEM_LEASE_ALLOC_END` に → `lease_check` が INVAL | lease.c の PTE の走査の上限を `MEM_LEASE_MAX_PDES` に戻す / map_audit.c の数え上げの比較を外す | I1 |
+| SYSMEM の往復 (R2) | SYSMEM の 64×64 XRGB8888 を作る → 頁が持ち主の owner に連続で n 頁・`kva` が P2V・中身 0 → lock の va に書いて unlock → sw の READBACK が同じ値 → free で owner の頁数が元へ。pgalloc の空きを fake で 0 → NOSPC・表は不変。AS の回収 (unmap が IO) → KEEP・頁は `as->owner` のまま・drain で返らない | sysmem.c の free を外す / owner_release.c の KEEP の飛ばしを外す | I1 |
+| GART への SW (R3) | GART の面 (fake の pfn を飛び飛びに 3 頁) を作る → 持ち主の AS の文脈で SW の FILL が `map_va` 経由で 3 頁全部に正しく書く (pfn ごとの頁を直に見て確かめる)。別の AS の文脈 (`gfx2_cpu_visible` が 0) では check_op が NOSUPPORT・submit が NOSYS | check_op.c の (5) の可視の判定を外す (`kva` だけを見る) / sw の base を pfn[0] の P2V に | I1 |
+| shim (R4) | Trident・PC-98 の fake の v1 (v2 == NULL) を登録 → `a->be == &gfx2_v1_shim`。SYSMEM の面へ FILL の束 → SW で終わり `kick`・`emit` が呼ばれない、fence_query が completed == issued。unregister の後 → `a->be == &gfx2_lost_be`、submit は STALE、NULL の参照が無い (host の番兵) | backend_reg.c の shim の据え付けを外す (be = v1->v2 のまま) | I1 |
+| init の 2 回目 (R5) | `gfx2_adapter_register(GF, ACTIVE)` を 2 回 → adapter は 1 つ・gen と面は不変。GF の init の失敗を模して `register(pc98, ACTIVE)` → GF の ACTIVE が外れ gen+1・GF の heads の scan_ref が 0・別名が pc98 の adapter へ移り旧 sid は STALE・GF の面への submit は NOSYS、free は通る。`gfx_shutdown` の模し (GF → pc98) も同じ結果 | backend_reg.c の `adapter_by_v1` の照合を外す (毎回新しい枠) / activate の旧 ACTIVE の外しを外す | I1 |
+| LOST の後 (R6) | fake の装置の失敗で LOST → `gfx_policy_reeval` が 1 回呼ばれ、fake の `direct_ok` が 0 で v1 の hook が SHADOW。v2: SYSMEM と VRAM (kva あり) の面への FILL は SW で書け `be->emit` は 0 回。自動では戻らない (fence_query・vblank を回しても LOST)。`gfx2_mode_set` の成功で OK に戻る | fence.c の `gfx2_adapter_lost` の reeval を外す / check_op.c の (2) を外す (LOST でも backend の check を呼ぶ) | I2 |
+| channel の既定 (R8) | fake の GF の channel の記録で、v2 の SRCKEY の COPY → 続く v1 の `gf3_copy` の時の ckey が off・β が既定・パターン全 1 | G1 の emit の戻しを外す | I2 |
+| NOSUPPORT の戻り値 (R9) | RGB565 → INDEX8 の STRETCH を含む 3 本の束 → `OS32_ERR_NOSYS`・done=0・何も実行しない。欄の誤り (MONO に src) は INVAL | submit.c の NOSUPPORT を INVAL に返す |  I2 |
+| weak の検査 (P2-2) | 検査の対象は build/out/kernel.elf と kernel.map。対象の関数を weak だけの版でリンク → `gfx2_no_weak.sh I1` が 1、強い実体のある版で 0。weak の仮の実体と同じ名の強い実体が a0_weak.o の区間に来た版 (人工) も 1 | gfx2_no_weak.sh の型の検査を記号名の検査に戻す | I1 |
 
 sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手で出した値):
 | 段 | 入力 | 期待 | 変異 (その 1 行) | I |
@@ -900,6 +1112,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 
 ### 13-2. NP21/W (PEGC)
 - 列挙・能力の出力 (I3)、v2 の sw の 2D の画面の CRC (I2)、GUI ↔ 全画面アプリの出入りで v1 の DISPLAY の lease 中の v2 の投入が BUSY、抜けた後に gshell の画面が戻る (I3)、アプリの終了で面・写像・GART が回収される (台帳の自己検査、I1 の必須)。
+- 監査との共存 (R1): v2 の面を lock して写像を持ったアプリが動いている間に `kselftest_run_audit` (kernel/kaudit.c:17-40) を回し、`as_audit_fail` が増えないこと (I1 の必須)。
 - 新しい帯の写像の往復: カーネルの自己検査 `gfx2_map_selftest` (paging_map_user_keep_selftest と同じ形) が F8000000 に張り、アプリの文脈から読めて、外した後に PTE が 0・PT が AS の破棄で返ることを見る (I1 の必須。I1 の合格の前に通す)。
 - 実行時の RED: 橋 (C14) を外した版で v1 の present と v2 の sw の書きが混ざった時に画面の CRC が変わること (I2)。
 
@@ -908,10 +1121,8 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - Trident: sync.cfg の gap_ns=80 で欠けが 0 (11-08 の掃引と同じ台本)、sync.cfg が無い時は既定で動く (I3)。
 
 ## 14. 未決
-- 無し。PM 決定: #1 遅延確保の上限 8MB (`GFX_GART_KB`)、不足は NOSPC。#2 `TRI_WRITE_GAP` は /etc/gfx/sync.cfg へ (引き継ぎと優先順は配備の手順、既定 80ns)。#3 はユーザー決定「AとC」で確定 (§9-1)。
-- 将来 #3 を同時出力へ広げる時に直す所 (今は直さない、記録だけ): §9-1 の ACTIVE の 1 個の決まり / C1 の `gfx2_adapter_register` の ACTIVE の 1 個の検査と `gfx2_sync_publish` の kind ごと 1 つの表 / head 系の口の NOSYS の分岐 (C11〜C13) (C は別票 CONSOLE_DUAL)。
-=====END
-
+- 無し。ユーザー判断 (2026-11-10): LOST の後は自動の回復をしない (§6-3)、組込みの表の kernel .text の検査と in_submit の BUSY は持たない (§11-7・§5-3)。PM 決定: #1 遅延確保の上限 8MB (`GFX_GART_KB`)、不足は NOSPC。#2 `TRI_WRITE_GAP` は /etc/gfx/sync.cfg へ (引き継ぎと優先順は配備の手順、既定 80ns)。#3 はユーザー決定「AとC」で確定 (§9-1)。
+- 将来 #3 を同時出力へ広げる時に直す所 (今は直さない、記録だけ): §9-1 の ACTIVE の 1 個の決まり / C1 の `gfx2_adapter_activate` の ACTIVE を 1 個にする付け替えと `gfx2_sync_publish` の kind ごと 1 つの表 / head 系の口の NOSYS の分岐 (C11〜C13) (C は別票 CONSOLE_DUAL)。
 
 ## 反論
 - P1-5 の直し案「C7 の明示的な切離し口で map_as/VA 管理を隔離へ移す」のうち「VA 管理を隔離へ移す」は採らない: AS が消えた後の VA の bitmap は意味を持たないので、隔離へ移さず `gfx2_vaspace_drop(as)` で捨てる。backing を返さない (KEEP) ことで PTE が残っても安全側にした。
@@ -927,5 +1138,24 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **走査の変化の口 (§1 D3・§9-3)**: G3 (93f80764・6c8bc8d4) が `gfx_policy_scan_changed()` (`gfx/gfx_policy.c:67-76`、宣言 `gfx/gfx_policy.h:14-16`) と `gfx_policy_gen_get()` を足した。§9-3 の `gfx_scan_changed = 1; gfx_policy_reeval();` の 2 行はこの 1 口に書き換えた。module の側の G* から呼ぶ所も同じ口を使う。
 - **v2 の写しの位置と ro の検査 (§1 D7・§11-7)**: G3 が `geforce_start` に `direct_ok` の text の検査と `direct_ops` の表が module の ro の中にあるかの検査 (`drivers/video/geforce/geforce_module.c:216-241`) を足し、公開は `:334`。v2 の写しは `:241` の後・`:334` の前に置き、`candidate.v2` の表にも `direct_ops` と同じ「ro の中」の検査を掛ける (今は .text の検査だけの設計だった)。`backend_geforce.c` の表は `:749-767` に移った (行番号だけ)。
 - **同期層のコピー (§10・§11-5)**: 第 5 段 A (28b80560) が `gfx/gfx_internal.h:71-78` の `_memcpy_w/_memcpy_d` の rep movs を `include/copy_units.h` → `arch/{x86,ppc}/arch_copy.h` の `arch_copy16/32` に替えた。gfx/sync の新しい行コピーは `arch_copy*` を使い asm を書かない。gfx/sync・gfx/v2 の host 試験の写しの一覧には `include/copy_units.h`・`arch/*/arch_copy.h` を入れる (56b97fc3 の型)。
-- **PPC の選択集合 (C14・M1・M2)**: `gfx/gfx_hw_submit.c`・`mm/paging.c`・`mm/pgalloc.c` (と `gfx/gfx_vram.c`) は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている。C14・M1・M2 は PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを増やさない、増やすなら `tools/ppc/known_header_dependencies.json` に組を足す)。
+- **PPC の選択集合 (C14・M1〜M3・gfx/v2・gfx/sync)**: PPC のクロスコンパイルが通ることを完了条件にした。範囲と決まりは §12 の「PPC で組めること」。
 - **公開ヘッダの型の契約 (A0)**: 第 4 段 B の `build/abi_contract.mk:4-13` が公開ヘッダ単独の gnu89 の probe と全 C の規則の char/enum の旗の検査を持ち、第 4 段 A の `include/type_contract.h` が ILP32・enum 4B・u64 の member 整列 (x86 4・ppc 8) を固定した。A0 で `sdk/include/os32/os32_gfx2.h` を abi_contract.mk の gnu89 の probe に足す。GFX2_Caps (256B)・GFX2_Op (80B) は u64 を使わず u32 だけで組み、ppc の整列 8 と offset を両立させる。KAPI 83→84 は USB の `usb_stat_get` と先に入った方が 84 (後の方が上げる)。
+
+## 確定の後の追記 (2026-11-10、Fable 5.2 のレビュー、ユーザー判断 2 件と PM 決定)
+レビューは `~/os32-tmp/run/hal-v2/REVIEW.fable52.md` (main 2259debc)。ユーザー判断は DECISIONS.md の末尾 (「推奨で良い」)、他は直し案どおりの PM 決定。file:line は 2259debc で確かめた値。
+- **R1 (P1、監査との共存)**: `lease_check` (exec/lease.c:167-231) は lease の PT の全 PTE を lease の表と照らす (:212-229)。`lease_audit_all` (:363-、:380) と kernel/kaudit.c:22 から全 AS に回るので、gfx2 の写像は `LEASE_INVAL` に数えられる。M3 が lease の照合を `MEM_LEASE_ALLOC_END` までに縮め (:176-177・:212)、C17 の `gfx2_map_audit` が gfx2 の帯を面の表と照らす (§7-4 のコード、試験 §13-1・§13-2)。
+- **R2 (P1、SYSMEM の backing)**: 物理で連続の頁を `pgalloc_alloc_n_owner` (mm/pgalloc.h:228、範囲は drivers/video/trident/resources.c:171 の形) で持ち主の owner から取り、`kva = P2V`、自前の上限は持たず NOSPC。返し方・隔離は §7-2 の表、担当は新しい段 C18 (§12)。
+- **R3 (P1、GART の面の SW)**: 頁が不連続なので `kva` は NULL にし、作成の時に持ち主の AS へ連続の VA で張って `map_va` を sw の base にする (§7-2・§8)。CR3 が持ち主の AS でない時は `gfx2_cpu_visible` が偽で NOSUPPORT (§4-2 の (5))。NOSUPPORT にする案は採らない (SW で補う決定 2026-11-08 に合わせる)。
+- **R4 (P1、v2 の無い backend)**: `a->be` を常に非 NULL にする。v2 == NULL の backend (Trident・PC-98) は C16 の `gfx2_v1_shim`、unregister の後は `gfx2_lost_be` (§11-7 のコード)。submit の `kick` は HW の命令があった時だけ (§5-3)。
+- **R5 (P1、gfx_init のたびの選択)**: backend の選択は gfx_init のたびに走り (gfx/gfx_core_init.inc:8 → gfx_core.c:203-238 → provider の `display_provider_select` (platform/pc98/gfx_selector.c:53-108)、`gfx_init`:295・`gfx_init_200`:300)、init の失敗で pc98 へ落ちる (gfx_core.c:227-231)。`gfx2_adapter_register` は同じ v1 で冪等、ACTIVE の付け替えは `gfx2_adapter_activate` (旧の heads を切り離し gen+1、別名は `v1_bridge_rebind` で移る)。`gfx_shutdown` (gfx_core.c:356-384) の GF → pc98 の代入 (:380) の後にも呼ぶ (§11-7)。
+- **R6 (P2、LOST の後、ユーザー判断 1)**: 自動の回復はしない。v1 は `gfx2_adapter_lost` → `gfx_policy_reeval` (gfx/gfx_policy.c:30-59) で `geforce_direct_ok` (backend_geforce.c:121-124) が 0 → SHADOW、v2 は kva のある面を SW で続け、復帰は次の mode_set (§9-3・C1 の再登録) か再起動 (§6-3)。
+- **R7 (P2、呼び手の識別)**: `caller_access` (include/redir_access.h:11-16) の 1 回の値から `struct gfx2_caller {app_id, as, owner}` を作る `gfx2_caller_get` (C1) に寄せ、面は `owner`、画面の持ち主は `app_id == gfx_screen_owner()` (gfx_core.c:351-354) で照らす (§6-5・§7-1)。
+- **R8 (P2、channel の状態)**: v1 の DIRECT の blit は `gf3_rop_set` だけを結び直す (hwdev/gf/accel_copy.c:54)。G1 の emit は色鍵・α・パターンを変えた命令の後に既定へ戻して返す (§11-6)。
+- **R9 (P2)**: 走査 1 で NOSUPPORT の命令がある束は `OS32_ERR_NOSYS` (§5-3)。
+- **R10 (P2)**: `gfx2_no_weak.sh` の対象は build/out/kernel.elf と kernel.map (build/config.mk:190 の `-Map=$(BUILD_OUT)/kernel.map`、build/kdebug.mk:25)。
+- **R11 (P2)**: caps の装置ごとの埋め方 (§4-1)、sync.cfg の書式と項目と鍵の照合 (§10)、Trident の移し方 (§10) をリポジトリ外の r1 の参照から本文へ移した。Trident の行番号は drivers/video/trident/present.c:18-25・26-56、regs.c:117-138、trident_module.c:198-199、trident.h:581。
+- **R12 (P2、CONSOLE_DUAL)**: CONSOLE_DUAL_DESIGN.md:67・167 に合わせ、段 K1 (display_dual.c の GF の行を gfx2 の列挙に差し替え、gf_outputs を消す) を §12 に足し I3 に入れた。票 TASK_HAL_V2 の CONSOLE_DUAL は「確定設計あり」。
+- **R13 (P2)**: `SYS_GFXSYNC_CFG` は A0 が include/config.h:41 の次に足す。直列化は中核に置かず、Y3 が arch の口 `arch_cpu_serialize()` を呼ぶ (§10)。
+- **R14・R15・R16 (P3)**: 貼り込みの残り 5 か所を消した。backend_geforce.c の表は :749-767、geforce_module.c の検査は :217-253・公開 :334 に直した (§1・§11-7)。caps2d の bit は `GFX2_CAP2D(op) = 1u << op` (§4-1・§11-1)、`gfx2_cursor_image` は呼んだ時に写し切り面の参照を持たない (§9-2、backend_geforce.c:336-347 と同じ)、T1 は write_gap.c の旧パスに空の規則 (§10、96c5835e の型)。
+- **過剰 (ユーザー判断 2)**: 組込みの表の kernel .text の検査 (`__os32_text_start`/`end`) と submit の `in_submit` の BUSY は持たない。module の表の .text・ro の検査は残す (geforce_module.c:217-238 と同じ型)。`be->kick` と 4 重の回収は残す。
+- **試験の欠け**: §13-1 に R1 (監査との共存)・R2 (SYSMEM の往復)・R3 (GART への SW)・R4 (shim)・R5 (init の 2 回目)・R6 (LOST の後)・R8 (channel の既定)・R9 の行、§13-2 に監査の実行時の行を足した。
