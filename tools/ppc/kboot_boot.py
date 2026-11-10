@@ -174,13 +174,15 @@ def main():
         elf=build(directory,negative)
         for cpu in ['7450','7455']:
             observe(directory,elf,cpu,negative)
-    for case in range(5):
+    for case in range(6):
         lan_host(out/('lan-'+str(case)),case)
     host(out/'host',False)
     host(out/'host-bad',True)
     host(out/'host-order',2)
     if args.mutate:
         lan_mutations = [
+            (2, '        if (boot_devices.gmac_ready)\n            for (u32 i = 0; i < 3; i++) install_alias(root, &gmac_alias[i]);',
+             '        if (1)\n            for (u32 i = 0; i < 3; i++) install_alias(root, &gmac_alias[i]);', 43, 'FAIL:DISABLED-ALIAS'),
             (0, 'info->gmac.bar_pa, PPC_BOOT_GMAC_BYTES, PPC_BOOT_GMAC_VA',
              'info->gmac.bar_pa, info->gmac.bar_bytes, PPC_BOOT_GMAC_VA', 41, 'FAIL:READY'),
             (2, 'boot_devices.gmac_ready && !gmac_aliases_safe(root)',

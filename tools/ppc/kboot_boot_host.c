@@ -34,6 +34,14 @@ void ppc_root_load(u32 root)
             gmac_alias[0].pa != 0x90000000 || gmac_alias[1].pa != 0xf2800000 ||
             gmac_alias[2].pa != 0xf2c00000 || boot_devices.pci_addr_va != 0xfe3c0020 ||
             boot_devices.pci_data_va != 0xfe3c1020) { SAY("FAIL:ALIAS"); finish(42); }
+    } else {
+        const u32 starts[] = { PPC_BOOT_GMAC_VA, PPC_BOOT_PCI_ADDR_VA, PPC_BOOT_PCI_DATA_VA };
+        const u32 sizes[] = { PPC_BOOT_GMAC_BYTES, PAGE_SIZE, PAGE_SIZE };
+        for (u32 i = 0; i < 3; i++)
+            for (u32 off = 0; off < sizes[i]; off += PAGE_SIZE)
+                if (*leaf(root, starts[i] + off) & PTE_PRESENT) {
+                    SAY("FAIL:DISABLED-ALIAS"); finish(43);
+                }
     }
     SAY("REACHED:LAN");
 #endif
@@ -65,7 +73,7 @@ void _start(void)
     boot_info=&info;
 #if defined(LAN_CASE)
     info.gmac_rc = LAN_CASE == 1 ? -1 : 0;
-    info.gmac.bar_pa = LAN_CASE == 2 ? 0x100000 : LAN_CASE == 3 ? 0x1000000 : 0x90000000;
+    info.gmac.bar_pa = LAN_CASE == 2 ? 0x100000 : LAN_CASE == 3 ? 0x1000000 : LAN_CASE == 5 ? 0x90000001 : 0x90000000;
     info.gmac.bar_bytes = 0x200000;
     info.gmac.root_pa = 0xf2000020;
     info.ram.count = 1; info.ram.v[0].start = LAN_CASE == 4 ? 0x90000000 : 0;
