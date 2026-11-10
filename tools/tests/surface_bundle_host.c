@@ -11,6 +11,7 @@ static void bundle_root_check(unsigned long root);
 #include "platform_emergency.h"
 #include "memmap.h"
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 /* Keep fault output in the fixture's mapped TVRAM, without normal console. */
 void platform_fault_cell(u32 pos, u16 code, u8 attr)
 {

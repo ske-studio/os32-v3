@@ -2,6 +2,7 @@
  * No normal console, registration, allocation, or privileged instruction. */
 #include "types.h"
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 #include "memmap.h"
 #include "platform_emergency.h"
 #define PAGE_SIZE MEM_PAGE_SIZE

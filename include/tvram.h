@@ -6,11 +6,10 @@
 #define __TVRAM_H
 
 #include "types.h"
-#include "pc98.h"
 
-/* テキストVRAM定数 (PC-98) */
-#define TVRAM_BASE    TVRAM_CHAR_BASE
-#define TVRAM_ATTR    TVRAM_ATTR_BASE
+/* 既存の KAPI・import の利用者のための互換の入口 (宣言だけ)。生の JIS・属性の
+ * 値の契約は変えない。番地と寸法は PC-98 の実装 (platform/pc98/tvram_private.h・
+ * pc98.h) が持ち、格子の寸法は console_backend.h の con_backend_geometry()。 */
 
 /* 画面クリア */
 void tvram_clear(void);

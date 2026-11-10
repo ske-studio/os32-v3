@@ -8,6 +8,7 @@
 #include "boot_display.h"
 #include "pc98.h"
 #include "tvram.h"
+#include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 #include "fdc.h"
 #include "ide.h"
 #include "dev.h"

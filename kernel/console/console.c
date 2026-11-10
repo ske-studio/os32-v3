@@ -18,7 +18,6 @@
 #include "console.h"
 #include "console_backend.h"
 #include "kbd_inject.h"
-#include "pc98_route.h"
 
 /* V86 セッション中の画面描画抑止 (arch/x86/legacy/v86.c)。
  * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わる。
@@ -27,10 +26,10 @@
  * 描画だけを抑止し、シリアル出力 (rshell ログ) は通す。 */
 #include "legacy_guest.h"
 
-/* デフォルトの通常console属性。 */
-#ifndef ATTR_WHITE
-#define ATTR_WHITE TATTR_WHITE
-#endif
+/* 格子の寸法と既定の属性は表示の backend が持つ (第 5 段 C1)。 */
+#define CON_COLS (con_backend_geometry()->cols)
+#define CON_ROWS (con_backend_geometry()->rows)
+#define CON_ATTR_DEFAULT (con_backend_color(CON_COLOR_DEFAULT))
 
 /* rshellフラグ (外部から設定可) */
 int rshell_active = 0;
@@ -52,7 +51,7 @@ static int cursor_y = 0;
  * 論理位置だけ進むと、CUI 復帰時に食い違う。 */
 static int console_render_allowed(void)
 {
-    return (!pc98_console_safe || pc98_console_safe()) &&
+    return con_backend_safe() &&
            !legacy_active() && !con_sink_is_enabled();
 }
 
@@ -64,7 +63,7 @@ static int console_render_allowed(void)
  * 握っているので触らない。 */
 static void console_hw_cursor_sync(void)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     if (legacy_active()) return;
     con_backend_cursor_at(cursor_x, cursor_y);
 }
@@ -72,21 +71,21 @@ static void console_hw_cursor_sync(void)
 /* スクロール保護行数 (下から数えた固定行)。0=全行 */
 static int g_scroll_reserve = 0;
 
-#define CONSOLE_LAST_ROW  (TVRAM_ROWS - 1 - g_scroll_reserve)
+#define CONSOLE_LAST_ROW  (CON_ROWS - 1 - g_scroll_reserve)
 
 void tvram_set_scroll_reserve(int rows)
 {
     if (rows < 0) {
         rows = 0;
     }
-    if (rows >= TVRAM_ROWS) {
-        rows = TVRAM_ROWS - 1;
+    if (rows >= CON_ROWS) {
+        rows = CON_ROWS - 1;
     }
     /* When the IME first reserves the last row, move an existing input
      * line out of it before the preedit renderer overwrites that row. */
     if (g_scroll_reserve == 0 && rows == 1 &&
-        cursor_y == TVRAM_ROWS - 1 && console_render_allowed()) {
-        con_backend_scroll(TVRAM_ROWS);
+        cursor_y == CON_ROWS - 1 && console_render_allowed()) {
+        con_backend_scroll(CON_ROWS);
         cursor_y--;
         console_hw_cursor_sync();
     }
@@ -99,7 +98,7 @@ void tvram_set_scroll_reserve(int rows)
 
 void tvram_clear(void)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     con_sink_push_clear();      /* 票 K6C: 画面クリアの経路 (CLEAR レコード) */
     /* 票 K6C-2: GUI 中はテキスト面を消さない (消す相手が見えていない上に、
      * 論理カーソルだけ 0,0 に戻ると凍っている画面と食い違う)。 */
@@ -110,18 +109,18 @@ void tvram_clear(void)
     console_hw_cursor_sync();
 }
 
-/* The console uses the standard TVRAM_ROWS grid (also clear/scroll/cursor).
+/* The console uses the backend grid (also clear/scroll/cursor).
  * Reject before unsigned address arithmetic; a kanji must fit both cells. */
 void tvram_putchar_at(int x, int y, char ch, u8 color)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     con_backend_putchar(x, y, ch, color);
 }
 
 /* TVRAM 1セル読み取り (文字コード + 属性) */
 void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     con_backend_readchar(x, y, code, attr);
 }
 
@@ -131,21 +130,21 @@ void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
  * 戻り値: 反転したセル数 (1=ANK, 2=漢字) */
 int tvram_reverse_cell(int x, int y)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return 0;
+    if (!con_backend_safe()) return 0;
     return con_backend_reverse(x, y);
 }
 
 void tvram_scroll(void)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
-    con_backend_scroll(TVRAM_ROWS - g_scroll_reserve);
+    if (!con_backend_safe()) return;
+    con_backend_scroll(CON_ROWS - g_scroll_reserve);
 }
 
 /* 全角漢字1文字をTVRAMに書き込み
  * PC9800Bible §2-6-2 */
 void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     con_backend_putkanji(x, y, jis, color);
 }
 
@@ -164,14 +163,14 @@ static void putchar_raw(char ch, u8 color)
     } else if (ch == ASCII_BS) {
         if (cursor_x > 0) {
             cursor_x--;
-            tvram_putchar_at(cursor_x, cursor_y, ' ', ATTR_WHITE);
+            tvram_putchar_at(cursor_x, cursor_y, ' ', CON_ATTR_DEFAULT);
         }
         return;
     } else {
         tvram_putchar_at(cursor_x, cursor_y, ch, color);
         cursor_x++;
     }
-    if (cursor_x >= TVRAM_COLS) {
+    if (cursor_x >= CON_COLS) {
         cursor_x = 0;
         cursor_y++;
     }
@@ -244,34 +243,34 @@ static void console_render_codepoint(u32 cp, u8 color)
     if (ank) {
         tvram_putchar_at(cursor_x, cursor_y, (char)ank, color);
         cursor_x++;
-        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+        if (cursor_x >= CON_COLS) { cursor_x = 0; cursor_y++; }
         if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
         return;
     }
 
     jis = unicode_to_jis(cp);
     if (jis) {
-        if (cursor_x >= TVRAM_COLS - 1) {
+        if (cursor_x >= CON_COLS - 1) {
             cursor_x = 0;
             cursor_y++;
             if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
         }
         tvram_putkanji_at(cursor_x, cursor_y, jis, color);
-        cursor_x += TVRAM_WIDE_COLS;
-        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+        cursor_x += CON_WIDE_COLS;
+        if (cursor_x >= CON_COLS) { cursor_x = 0; cursor_y++; }
         if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
         return;
     }
 
     /* 変換不可: □を表示 */
-    if (cursor_x >= TVRAM_COLS - 1) {
+    if (cursor_x >= CON_COLS - 1) {
         cursor_x = 0;
         cursor_y++;
         if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
     }
-    tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
-    cursor_x += TVRAM_WIDE_COLS;
-    if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+    tvram_putkanji_at(cursor_x, cursor_y, CON_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
+    cursor_x += CON_WIDE_COLS;
+    if (cursor_x >= CON_COLS) { cursor_x = 0; cursor_y++; }
     if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
 }
 
@@ -378,9 +377,9 @@ void console_set_cursor(int x, int y)
 {
     /* Keep both the sink record and the next text/GDC operation in range. */
     if (x < 0) x = 0;
-    if (x >= TVRAM_COLS) x = TVRAM_COLS - 1;
+    if (x >= CON_COLS) x = CON_COLS - 1;
     if (y < 0) y = 0;
-    if (y >= TVRAM_ROWS) y = TVRAM_ROWS - 1;
+    if (y >= CON_ROWS) y = CON_ROWS - 1;
     con_sink_push_cursor(x, y);     /* 票 K6C: CURSOR レコード */
     /* 票 K6C-2: GUI 中は論理位置も GDC も動かさない。ここで
      * console_hw_cursor_enable() を通すと、console_text_gdc_stop() で消した
@@ -399,7 +398,7 @@ void console_set_cursor(int x, int y)
  * 起動時と V86 セッション終了時にも呼ぶ。 */
 void console_hw_cursor_enable(void)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     if (legacy_active()) return;
     con_backend_cursor_shape(1);
     console_hw_cursor_sync();
@@ -413,7 +412,7 @@ void console_hw_cursor_enable(void)
  * V86 セッション中は GDC をゲストが握っているので触らない。 */
 void console_text_gdc_stop(void)
 {
-    if (pc98_console_safe && !pc98_console_safe()) return;
+    if (!con_backend_safe()) return;
     /* 票 K6C §2-3: GUI へ入るときにシンクを空で始める。v86 のガードより
      * **前**に置く — GDC を触らない場合でも「テキスト面が見えない」ことは
      * 変わらないので、溜め始める側は抑止しない。 */
@@ -447,6 +446,6 @@ void console_text_gdc_start(void)
 /* コンソール画面サイズ取得 */
 void console_get_size(int *w, int *h)
 {
-    if (w) *w = TVRAM_COLS;
-    if (h) *h = TVRAM_ROWS;
+    if (w) *w = CON_COLS;
+    if (h) *h = CON_ROWS;
 }
