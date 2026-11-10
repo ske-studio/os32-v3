@@ -109,6 +109,7 @@ class Host:
         self.clock, self.output = clock, output
         self.next_id, self.pending = 1, {}
         self.high = None
+        self.max_next_seq = 0
         self.seen = set()
         self.generation = 0
 
@@ -155,17 +156,21 @@ class Host:
                     self.output(f'out of order: {seq}')
                 elif seq > self.high + 1:
                     self.output(f'gap: {seq - self.high - 1}')
+            self.max_next_seq = max(self.max_next_seq, seq + 1)
             self.seen.add(seq)
             self.high = seq if self.high is None else max(self.high, seq)
             with (self.storage(boot) / (boot.hex() + '.log')).open('ab') as f:
                 f.write(m['payload'])
-        elif self.high is not None and seq < self.high:
+        elif seq < self.max_next_seq:
             self.output('possible restart: sequence rollback')
             self.generation += 1
             self.high = None
+            self.max_next_seq = 0
             self.seen.clear()
         elif seq > (0 if self.high is None else self.high + 1):
             self.output(f'beacon gap: {seq - (0 if self.high is None else self.high + 1)}')
+        if m['kind'] == BEACON:
+            self.max_next_seq = max(self.max_next_seq, seq)
         self.output(f"{('beacon' if m['kind'] == BEACON else 'log')} seq={seq} drop_records={m['drop_records']} drop_bytes={m['drop_bytes']}; loss after last frame unknown until next beacon")
         metadata = dict(seq=seq, drop_records=m['drop_records'], drop_bytes=m['drop_bytes'],
                         time=time.time(), kind='beacon' if m['kind'] == BEACON else 'log')
@@ -250,6 +255,9 @@ class InputLines:
         self.buffer += chunk
         lines = self.buffer.split(b'\n')
         self.buffer = lines.pop()
+        if not chunk and self.buffer:
+            lines.append(self.buffer)
+            self.buffer = b''
         return chunk != b'', [line.decode('utf-8') for line in lines]
 
 

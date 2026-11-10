@@ -24,6 +24,8 @@ MUTATIONS = [
     ('destination', "frame[:6] not in (self.io.local_mac, b'\\xff' * 6)", 'False', 'H:destination'),
     ('response-destination', "frame[:6] != self.io.local_mac", 'False', 'H:response-destination'),
     ('deadline', 'self.clock() >= pending[0]', 'False', 'H:deadline'),
+    ('beacon-next', 'self.max_next_seq = max(self.max_next_seq, seq)', 'self.max_next_seq = self.max_next_seq', 'H:beacon restart'),
+    ('eof-tail', 'lines.append(self.buffer)', 'lines.clear()', 'H:eof command'),
     ('generation', 'self.generation += 1', 'self.generation += 0', 'H:generation'),
     ('duplicate', 'if seq in self.seen:', 'if seq == self.high:', 'H:sequence'),
     ('drop-swap', 'drop_bytes=dropped, request_id=request_id', 'drop_bytes=records, request_id=request_id', 'H:drop values'),
@@ -127,6 +129,22 @@ if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
     h.receive(frame(m.encode(m.LOG, boot, seq=0, payload=b'new')))
     generation = pathlib.Path(directory) / (boot.hex() + '.1')
     require((generation / (boot.hex() + '.log')).exists() and (generation / (boot.hex() + '.log')).read_bytes() == b'new' and (generation / (boot.hex() + '.jsonl')).exists(), 'H:generation')
+    separate = pathlib.Path(directory) / 'restart'
+    fresh = m.Host(fake, peer, separate, nonce=nonce, output=messages.append)
+    fresh.receive(frame(m.encode(m.BEACON, boot, seq=0)))
+    fresh.receive(frame(m.encode(m.LOG, boot, seq=0, payload=b'old')))
+    fresh.receive(frame(m.encode(m.BEACON, boot, seq=1)))
+    fresh.receive(frame(m.encode(m.BEACON, boot, seq=1)))
+    require(fresh.generation == 0, 'H:beacon repeat')
+    fresh.receive(frame(m.encode(m.BEACON, boot, seq=0)))
+    fresh.receive(frame(m.encode(m.LOG, boot, seq=0, payload=b'new')))
+    require((separate / (boot.hex() + '.log')).read_bytes() == b'old' and
+            (separate / (boot.hex() + '.1') / (boot.hex() + '.log')).read_bytes() == b'new',
+            'H:beacon restart')
+    beacon_only = m.Host(fake, peer, pathlib.Path(directory) / 'beacon-only', output=messages.append)
+    beacon_only.receive(frame(m.encode(m.BEACON, boot, seq=2)))
+    beacon_only.receive(frame(m.encode(m.BEACON, boot, seq=1)))
+    require(beacon_only.generation == 1, 'H:beacon restart')
     read_fd, write_fd = os.pipe()
     try:
         reader = m.InputLines(read_fd)
@@ -143,9 +161,20 @@ if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
         for line in lines:
             h.request(line)
         require(alive and lines == ['status', 'clock'] and len(fake.sent) == 5, 'H:multiple lines')
+        os.write(write_fd, b'status')
+        require(reader.read() == (True, []), 'H:eof partial')
+        os.close(write_fd)
+        write_fd = None
+        alive, lines = reader.read()
+        before = len(fake.sent)
+        for line in lines:
+            h.request(line)
+        require(not alive and lines == ['status'] and len(fake.sent) == before + 1 and
+                m.decode(fake.sent[-1][14:])['opcode'] == m.STATUS, 'H:eof command')
     finally:
         os.close(read_fd)
-        os.close(write_fd)
+        if write_fd is not None:
+            os.close(write_fd)
     print('PASS')
 
 
