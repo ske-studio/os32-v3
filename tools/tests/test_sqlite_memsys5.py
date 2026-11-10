@@ -4,6 +4,7 @@
 MUTATE=0 runs controls only. --mutate builds disposable prototype copies;
 compile errors, signals and timeouts are never counted as mutation detection.
 """
+import sqlite_cc
 import argparse
 import os
 from pathlib import Path
@@ -23,7 +24,7 @@ def build(tmp, source=PROTO, name='control', sqlite=None):
     cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
     if sqlite is None:
         sqlite = tmp / 'sqlite.o'
-        host32.build([cc, '-m32', '-std=gnu89', '-Os', '-fno-pie',
+        sqlite_cc.build([cc, '-m32', '-std=gnu89', '-Os', '-fno-pie',
                       '-include', str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'),
                       '-c', str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(sqlite)],
                      check=True)

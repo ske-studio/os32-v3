@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """DICT_META N: independent generator oracle and real core probe (no libc)."""
-CHECK = dict(name='fep-meta', tier=1, needs=[], budget=25.4, covers=[
+CHECK = dict(name='fep-meta', tier=1, needs=[], budget=25.4, covers=['tools/tests/sqlite_cc.py',
     'tools/fep_to_sqlite.py', 'assets/joyo_kanji.txt',
     'tools/tests/fep_host_build.py', 'tools/tests/fep_boundary_runtime.h',
     'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c',
