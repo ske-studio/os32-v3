@@ -99,7 +99,7 @@ int pm_gmac_capture(struct pm_gmac_boot *out)
     error=0; visited=found=0; candidate=0;
     int root=ofw_finddevice("/");
     if (!root || root==-1) { error=LAN_ENODEV; goto fail; }
-    walk(root,0);
+    walk(ofw_child(root),0);
     if (error) goto fail;
     if (!found) { error=LAN_ENODEV; goto fail; }
     if (found!=1) { error=LAN_EUNSUPPORTED; goto fail; }
@@ -109,6 +109,7 @@ int pm_gmac_capture(struct pm_gmac_boot *out)
         if (!error) error=LAN_EUNSUPPORTED;
         goto fail;
     }
+    if (parent!=root) { error=LAN_EUNSUPPORTED; goto fail; }
     b.root_node=(u32)bridge;
     if (scalar(bridge,"#address-cells",&present)!=3 || !present ||
         scalar(bridge,"#size-cells",&present)!=2 || !present) { error=LAN_EINVAL; goto fail; }
@@ -119,6 +120,8 @@ int pm_gmac_capture(struct pm_gmac_boot *out)
     if (n<(int)((ac+sc)*4) || n%(int)((ac+sc)*4)) { error=LAN_EINVAL; goto fail; }
     if (ac==2 && be32(prop)) { error=LAN_ERANGE; goto fail; }
     b.root_pa=be32(prop+(ac-1)*4);
+    if ((sc==2 && be32(prop+ac*4)) ||
+        be32(prop+(ac+sc-1)*4)>0xffffffffu-b.root_pa) { error=LAN_ERANGE; goto fail; }
     n=get(bridge,"bus-range");
     if (n!=8) { error=LAN_EINVAL; goto fail; }
     b.bus_first=be32(prop); b.bus_last=be32(prop+4);

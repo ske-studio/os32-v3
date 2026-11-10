@@ -26,6 +26,13 @@ MUTATIONS = [
     ('unique', 'found!=1', 'found>2', 2, 'capture'),
     ('multicast', '(b.mac[0]&1)', '0', 10, 'capture'),
     ('bridge', '!compat(bridge,"uni-north")', '0', 3, 'capture'),
+    ('parent', 'parent!=root', '0', 15, 'capture'),
+    ('bridge-size-high', 'sc==2 && be32(prop+ac*4)', '0', 16, 'capture'),
+    ('bridge-overflow', 'be32(prop+(ac+sc-1)*4)>0xffffffffu-b.root_pa', '0', 17, 'capture'),
+    ('size-high', 'be32(p+(3+ac)*4)', '0', 18, 'capture'),
+    ('pci-overflow', 'w->bytes>0xffffffffu-w->pci_base', '0', 19, 'capture'),
+    ('cpu-overflow', 'w->bytes>0xffffffffu-w->cpu_base', '0', 20, 'capture'),
+    ('cpu-high', 'ac==2 && be32(p+12)', '0', 21, 'capture'),
     ('peer', 'b->peer_mac[j]=val[j]', 'b->peer_mac[j]=0xff', 11, 'peer'),
 ]
 
@@ -39,7 +46,7 @@ def exercise(source, directory, case=None):
                     str(source), str(ROOT / 'tools/ppc/lan_p3_fake.c'),
                     str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True, timeout=60)
     failures = []
-    for index in (range(15) if case is None else [case]):
+    for index in (range(26) if case is None else [case]):
         result = host32.run([str(exe), str(index)], capture_output=True, timeout=10)
         if result.returncode:
             failures.append((index, result.returncode, result.stdout))
@@ -54,7 +61,7 @@ def main():
         failures = exercise(ROOT / 'platform/powermac/gmac_tree.c', Path(temp))
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 15 firmware-tree cases')
+        print('GREEN: 26 firmware-tree cases')
         if args.mutate:
             product = (ROOT / 'platform/powermac/gmac_tree.c').read_text()
             for name, old, new, case, diagnostic in MUTATIONS:
