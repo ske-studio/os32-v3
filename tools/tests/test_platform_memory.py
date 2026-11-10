@@ -70,7 +70,8 @@ def main(mutate=False):
         probe(work, MOCK, [11,22,33,44,55,1,2,3,4,5,6,7,8,9,10])
         if mutate:
             probe(work, MOCK, [11,22,33,44,55,1,2,3,4,5,6,7,8,9,10], True)
-        probe(work, (ROOT / 'platform/powermac/platform_memory_desc.h').read_text(), [0]*15)
+        probe(work, (ROOT / 'platform/powermac/platform_memory_desc.h').read_text(), [0xf00000, 0xf00000, 0x1000000, 0x1000000, 0x1000000,
+            0, 0, 0, 0, 0, 0, 0xa0000, 0x100000, 0xa0000, 0x100000])
         # PC98 values are also covered against actual memory users by
         # test_dep_dir_c_memory and the strict x86 artifact comparison.
 

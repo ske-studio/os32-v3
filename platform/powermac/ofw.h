@@ -7,6 +7,9 @@ struct ofw_env {
     unsigned ac, sc;
 };
 void ofw_init(ppc_ci ci);
+/* Irreversible for this boot, including ofw_init. Counts actual CI entries. */
+unsigned ofw_detach(void);
+unsigned ofw_call_count(void);
 /* 0 success, -1 console unavailable, -2 invalid environment. */
 int ofw_setup(struct ofw_env *e);
 int ofw_option_truefalse(const char *prop, int proplen);
