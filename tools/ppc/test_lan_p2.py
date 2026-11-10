@@ -41,6 +41,45 @@ FLAGS = """-std=gnu11 -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec
 
 
 CONTRACT = r"""
+#define CHECK_FIELD(s, field, type) \
+    _Static_assert(__builtin_types_compatible_p(__typeof__(((struct s *)0)->field), type), \
+                   "field type: " #s "." #field)
+typedef u32 (*read32_type)(void *, u32);
+typedef void (*write32_type)(void *, u32, u32);
+typedef unsigned long long (*tb_type)(void *);
+typedef int (*sync_type)(void *, u32, enum dma_sync);
+CHECK_FIELD(gem_dma, cpu, void *);
+CHECK_FIELD(gem_dma, pa, u32);
+CHECK_FIELD(gem_dma, bus, u32);
+CHECK_FIELD(gem_dma, bytes, u32);
+CHECK_FIELD(gem_io, ctx, void *);
+CHECK_FIELD(gem_io, read32, read32_type);
+CHECK_FIELD(gem_io, write32, write32_type);
+CHECK_FIELD(gem_io, tb, tb_type);
+CHECK_FIELD(gem_io, tb_hz, u32);
+CHECK_FIELD(gem_io, sync, sync_type);
+CHECK_FIELD(gem, io, struct gem_io);
+CHECK_FIELD(gem, dma, struct gem_dma);
+CHECK_FIELD(gem, state, u32);
+CHECK_FIELD(gem, step, u32);
+CHECK_FIELD(gem, cursor, u32);
+CHECK_FIELD(gem, polls, u32);
+CHECK_FIELD(gem, phy_addr, u32);
+CHECK_FIELD(gem, phy_port, u32);
+CHECK_FIELD(gem, tx_head, u32);
+CHECK_FIELD(gem, tx_tail, u32);
+CHECK_FIELD(gem, tx_pending, u32);
+CHECK_FIELD(gem, rx_head, u32);
+CHECK_FIELD(gem, rx_watch_wr, u32);
+CHECK_FIELD(gem, rx_watch_rd, u32);
+CHECK_FIELD(gem, rx_watching, u32);
+CHECK_FIELD(gem, started, unsigned long long);
+CHECK_FIELD(gem, tx_started, unsigned long long);
+CHECK_FIELD(gem, rx_watch_started, unsigned long long);
+CHECK_FIELD(gem, tx_packets, unsigned long long);
+CHECK_FIELD(gem, rx_packets, unsigned long long);
+CHECK_FIELD(gem, rx_drops, unsigned long long);
+CHECK_FIELD(gem, uncertain_tx, unsigned long long);
 void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
     g->io = *io; g->dma = *d;
     g->state = g->step = g->cursor = g->polls = 0;
@@ -127,6 +166,17 @@ def main():
             return 1
         print(f"BSD definitions matched: {len(PAIRS)}; constants and errors matched")
         if args.mutate:
+            before = "    u32 tb_hz;"
+            after = "    u16 tb_hz;"
+            if original.count(before) != 1:
+                raise RuntimeError("mutation anchor is not unique: field-type")
+            (Path(tmp) / "gem.h").write_text(original.replace(before, after))
+            print("reached=field-type-compile")
+            result = execute([PPC, *FLAGS, "-I" + tmp, "-I" + str(ROOT / "include"),
+                              "-c", str(Path(tmp) / "cross.c"), "-o", str(Path(tmp) / "cross.o")])
+            if result.returncode != 1 or 'static assertion failed: "field type: gem_io.tb_hz"' not in result.stdout:
+                raise RuntimeError(f"unexpected field type mutation: rc={result.returncode} {result.stdout}")
+            print('RED field-type: reached=field-type-compile static assertion failed: "field type: gem_io.tb_hz"')
             before = "int gem_reset_step(struct gem *, unsigned long long now);"
             after = "int gem_reset_step(struct gem *, u32 now);"
             if original.count(before) != 1:
