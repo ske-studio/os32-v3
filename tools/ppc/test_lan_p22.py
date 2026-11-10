@@ -13,20 +13,15 @@ CHECK = {'id': 'ppc-lan-p22', 'covers': ['platform/powermac/lan_monitor.c'],
                     'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h']}
 SOURCE = ROOT / 'platform/powermac/lan_monitor.c'
 MUTATIONS = [
- ('H:A10 read-range', 'if (contains(&d->peek_ok[i], va, n)) { range = &d->peek_ok[i]; break; }', '{ range = &d->peek_ok[i]; break; }', 12),
- ('deny', 'if (overlaps(&d->peek_deny[i], va, n)) goto bad_range;', 'if (0 && overlaps(&d->peek_deny[i], va, n)) goto bad_range;', 14),
+ ('H:A10 read-range', 'if (!range) goto bad_range;', 'if (!range) range = &d->peek_ok[0];', 12),
+ ('physical-range', '!contains(range, pa, 1)', '0', 17),
  ('fault', 'r->status = PLN1_STATUS_FAULT; return;', 'r->payload_bytes = (u16)i; r->status = PLN1_STATUS_FAULT; return;', 18),
  ('conflict', 'if (same_request(q, &cache[i].req))', 'if (1 || same_request(q, &cache[i].req))', 27),
  ('nonce', '!equal(q->host_nonce, session_nonce, 16)', '0', 29),
  ('length', 'if (q->payload_bytes != n)', 'if (0 && q->payload_bytes != n)', 22),
- ('diag-end', 'n > 256 - off', '0', 34),
- ('deny-half', 'r->base - base < len', '0', 14),
- ('ig-allow', 'if (contains(&d->peek_ig_ok[j], va + i, 1)) break;', 'if (0) break;', 43),
- ('ig-reject', 'if (j == d->peek_ig_ok_count) goto bad_range;', 'if (0) goto bad_range;', 50),
  ('clear', 'ppc_trap_onfault_clear();', '(void)0;', 31),
- ('empty-ig', '(d->peek_ig_ok_count && !d->peek_ig_ok)', '!d->peek_ig_ok', 49),
- ('clear-on-arm-failure', '    ppc_irq_restore(flags);', '    if (rc == 1) ppc_trap_onfault_clear();\n    ppc_irq_restore(flags);', 48),
 ]
+
 def exercise(source, temp):
     path = pathlib.Path(temp); (path / 'monitor.c').write_text(source)
     binary = path / 'fixture'

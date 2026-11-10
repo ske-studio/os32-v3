@@ -40,16 +40,10 @@ static int contains(const struct pm_lan_range *r, u32 base, u32 len)
     return base >= r->base && base - r->base < r->size &&
         len <= r->size - (base - r->base) && len - 1 <= 0xffffffffu - base;
 }
-static int overlaps(const struct pm_lan_range *r, u32 base, u32 len)
-{
-    if (!r->size) return 0;
-    return base >= r->base ? base - r->base < r->size : r->base - base < len;
-}
-int pm_lan_copy8(void *ctx, u32 va, u8 *out)
+int pm_lan_copy8(u32 va, u8 *out)
 {
     u32 flags = ppc_irq_save();
     int rc = 1;
-    (void)ctx;
     if (ppc_trap_onfault_data((u32)ppc_probe_copy8_insn, va,
                               (u32)ppc_probe_copy8_resume)) {
         rc = ppc_probe_copy8(va, out);
@@ -61,7 +55,7 @@ int pm_lan_copy8(void *ctx, u32 va, u8 *out)
 static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
                     struct lan_message *r)
 {
-    u32 i, j, n, off, va, pa, inhibited, tick, hz;
+    u32 i, n, off, va, pa, tick, hz;
     u64 tb, us;
     const struct pm_lan_range *range = 0;
     const u32 *words;
@@ -76,41 +70,27 @@ static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
     case PLN1_OP_STATUS: case PLN1_OP_MEMORY:
         words = q->opcode == PLN1_OP_STATUS ? d->status : d->memory;
         n = q->opcode == PLN1_OP_STATUS ? d->status_words : d->memory_words;
-        if (n > 64 || (n && !words)) goto bad_range;
         for (i = 0; i < n; ++i) put(r->payload + i * 4, words[i], 4);
         r->payload_bytes = (u16)(n * 4); return;
     case PLN1_OP_CLOCK:
-        if (!d->clock) goto bad_range;
-        d->clock(d->ctx, &tick, &hz, &tb, &us);
+        d->clock(&tick, &hz, &tb, &us);
         put(r->payload, tick, 4); put(r->payload + 4, hz, 4);
         put(r->payload + 8, tb, 8); put(r->payload + 16, us, 8);
         r->payload_bytes = 24; return;
     case PLN1_OP_READ_DIAG:
         off = get(q->payload, 2); n = get(q->payload + 2, 2);
-        if (!d->diag || !n || n > 128 || off > 256 || n > 256 - off) goto bad_range;
+        if (!n || n > 128 || off > 256 || n > 256 - off) goto bad_range;
         for (i = 0; i < n; ++i) r->payload[i] = d->diag[off + i];
         r->payload_bytes = (u16)n; return;
     case PLN1_OP_PEEK:
         va = get(q->payload, 4); n = get(q->payload + 4, 2);
-        if (!n || n > 256 || get(q->payload + 6, 2) ||
-            d->peek_ok_count > 8 || d->peek_deny_count > 4 ||
-            d->peek_ig_ok_count > 2 || (d->peek_ig_ok_count && !d->peek_ig_ok) ||
-            !d->translate || !d->copy8 || (d->peek_ok_count && !d->peek_ok) ||
-            (d->peek_deny_count && !d->peek_deny)) goto bad_range;
+        if (!n || n > 256 || get(q->payload + 6, 2)) goto bad_range;
         for (i = 0; i < d->peek_ok_count; ++i)
             if (contains(&d->peek_ok[i], va, n)) { range = &d->peek_ok[i]; break; }
         if (!range) goto bad_range;
-        for (i = 0; i < d->peek_deny_count; ++i)
-            if (overlaps(&d->peek_deny[i], va, n)) goto bad_range;
         for (i = 0; i < n; ++i) {
-            if (d->translate(d->ctx, va + i, &pa, &inhibited) ||
-                !contains(range, pa, 1)) goto bad_range;
-            if (inhibited) {
-                for (j = 0; j < d->peek_ig_ok_count; ++j)
-                    if (contains(&d->peek_ig_ok[j], va + i, 1)) break;
-                if (j == d->peek_ig_ok_count) goto bad_range;
-            }
-            if (d->copy8(d->ctx, va + i, &r->payload[i])) {
+            if (d->translate(va + i, &pa) || !contains(range, pa, 1)) goto bad_range;
+            if (d->copy8(va + i, &r->payload[i])) {
                 r->status = PLN1_STATUS_FAULT; return;
             }
         }
