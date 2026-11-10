@@ -66,11 +66,15 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     elf = build(work/'kernel')
+    skipped = False
     for cpu in cpus:
         evidence = meter.accept(elf, cpu, 60, work/('normal-'+cpu))
+        skipped |= (evidence/'lan-skip').exists()
         lines = [l for l in (evidence/'serial-a.log').read_text().replace('\r', '').splitlines()
                  if l.startswith('KBOOT ')]
         print('GREEN '+cpu+': '+lines[-1], flush=True)
+        meter.accept(elf, cpu, 60, work/('lan-off-'+cpu), lan_off=True)
+        print('GREEN LAN OFF '+cpu, flush=True)
     for name, number in KERNEL_NEGATIVES.items():
         negative = build(work/name, 'NEGATIVE='+str(number))
         for cpu in cpus:
@@ -109,7 +113,11 @@ def main():
             red += 1
     print(f'PASS kernel acceptance: {len(cpus)} CPU GREEN, {len(KERNEL_NEGATIVES)} negatives, '
           f'{red} product/audit RED, evidence={work} elapsed={time.monotonic()-started:.1f}s')
+    if skipped:
+        print('SKIP LAN socket rc=3')
+        return 3
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
