@@ -9,7 +9,7 @@ SQLITE_PROTO_OBJS := $(addprefix $(SQLITE_PROTO_OUT)/,sqlite3.o os32_sqlite_vfs.
 SQLITE_PROTO_INC := $(INC_SQLITE) -I. -I$(SQLITE_PROTO_OUT)
 $(SQLITE_PROTO_OUT)/sqlite3.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h build/config.mk build/sqlite-proto.mk
 	mkdir -p $(@D)
-	$(CC) $(CFLAGS_SQLITE) -include lib/sqlite3/os32_sqlite_config.h $(SQLITE_PROTO_INC) -c $< -o $@
+	$(SQLITE_CC) $(CFLAGS_SQLITE) -include lib/sqlite3/os32_sqlite_config.h $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/os32_sqlite_vfs.o: $(SQLITE_PROTO_OUT)/os32_sqlite_vfs.c $(SQLITE_PROTO_OUT)/sqlite_imports.h lib/sqlite3/os32_sqlite_vfs.h lib/sqlite3/os32_sqlite_config.h build/config.mk build/sqlite-proto.mk
 	$(CC) $(CFLAGS_SQLITE) -include lib/sqlite3/os32_sqlite_config.h $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite_module.o: lib/sqlite3/os32_sqlite_module.c lib/sqlite3/os32_sqlite_vfs.h build/config.mk build/sqlite-proto.mk

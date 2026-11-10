@@ -48,6 +48,26 @@ jobs:
 
       - uses: ./.github/actions/build-setup
 
+      - name: SQLite ccache setup
+        id: sqlite-cache-key
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache
+          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          host="$(gcc -dumpfullversion -dumpversion)"
+          cross="$("$CROSS_DIR/bin/i386-elf-gcc" -dumpfullversion -dumpversion)"
+          echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SQLite compilations
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sqlite-ccache
+          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-artifacts
+          restore-keys: |
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
+
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
       #    all は配備しない。配布用の FD / ISO は後段で HostDrv と同じ build に揃える。
@@ -149,6 +169,10 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: SQLite ccache statistics
+        if: always()
+        run: ccache -s
+
   check-fast:
     strategy:
       fail-fast: false
@@ -168,6 +192,26 @@ jobs:
           fetch-depth: 0
 
       - uses: ./.github/actions/build-setup
+
+      - name: SQLite ccache setup
+        id: sqlite-cache-key
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache
+          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          host="$(gcc -dumpfullversion -dumpversion)"
+          cross="$("$CROSS_DIR/bin/i386-elf-gcc" -dumpfullversion -dumpversion)"
+          echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SQLite compilations
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sqlite-ccache
+          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-check-${{ matrix.shard }}
+          restore-keys: |
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
@@ -211,3 +255,7 @@ jobs:
           path: ${{ runner.temp }}/check-times/
           retention-days: 30
           if-no-files-found: error
+
+      - name: SQLite ccache statistics
+        if: always()
+        run: ccache -s

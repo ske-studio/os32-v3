@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Real GNU89 SQLite TRACE, x86 object parity and provider runtime mutations."""
+import sqlite_cc
 import argparse
 import os
 import re
@@ -62,11 +63,13 @@ def compile_sql(tmp, source, provider, trace=True, assembly=False):
     src.write_text(source)
     obj = tmp / ('sqlite.s' if assembly else 'sqlite.o')
     cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
-    host32.build([cc, '-m32', '-std=gnu89', '-Os', '-fno-pie',
+    # Keep variant names relative to one temporary root so base_dir removes
+    # its random component across runs, including the fake provider include.
+    sqlite_cc.build([cc, '-m32', '-std=gnu89', '-Os', '-fno-pie',
         '-include', str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'),
         '-I' + str(ROOT / 'lib/sqlite3'), '-I' + str(ROOT / 'include'),
         '-I' + str(provider), *(['-DOS32_SQLITE_TRACE'] if trace else []),
-        '-S' if assembly else '-c', str(src), '-o', str(obj)], check=True)
+        '-S' if assembly else '-c', str(src), '-o', str(obj)], cwd=tmp.parent, check=True)
     return obj
 
 

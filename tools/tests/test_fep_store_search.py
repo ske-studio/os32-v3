@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Stage I real SQLite/VFS search merge and optional user connection."""
+import sqlite_cc
 CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=6.5,
-    covers=[
+    covers=['tools/tests/sqlite_cc.py',
         'kernel/ime/ime_dict.c',
         'kernel/ime/ime_conn.c',
         'kernel/ime/ime_user_store.c',
@@ -56,7 +57,7 @@ def main():
     cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
     with tempfile.TemporaryDirectory(prefix='fep-store-search-') as directory:
         work = Path(directory)
-        host32.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
+        sqlite_cc.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
                       '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-w',
                       '-fsigned-char', '-fno-short-enums', '-include',
                       str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',

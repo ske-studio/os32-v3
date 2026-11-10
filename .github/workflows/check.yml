@@ -47,8 +47,26 @@ jobs:
       - name: Host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
+          sudo apt-get install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
           python3 -m pip install --quiet PyYAML lz4
+
+      - name: SQLite ccache setup
+        id: sqlite-cache-key
+        run: |
+          echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          host="$(gcc -dumpfullversion -dumpversion)"
+          cross=none
+          echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SQLite compilations
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sqlite-ccache
+          key: sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-static
+          restore-keys: |
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
+            sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
 
       # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
       # で通ってしまう。CI では必ず入れて実際に検査させる (版と sha256 を固定した prebuilt binary)。
@@ -125,3 +143,7 @@ jobs:
           make check-rshell-serial-host
           make check-serial-portc-host
           make check-vfs-fd-path-host
+
+      - name: SQLite ccache statistics
+        if: always()
+        run: ccache -s

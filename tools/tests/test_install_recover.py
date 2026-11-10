@@ -7,8 +7,9 @@
 
   python3 -B tools/tests/test_install_recover.py [--target] [--sanitize] [case ...]
 """
+import sqlite_cc
 CHECK = dict(name='install-recover-host', tier=1,
-    covers=['fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    covers=['tools/tests/sqlite_cc.py', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
     needs=[], budget=8.2)
 
 import pathlib
@@ -57,7 +58,7 @@ def build(tmp, sanitize, recovery_source=None, kapi_source=None):
     exe = str(tmp / "recoverhost")
     san = (["-fsanitize=address", "-fno-omit-frame-pointer"]
            if sanitize else [])
-    subprocess.run(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
+    sqlite_cc.build(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
                     "-c", str(ROOT / "lib/sqlite3/sqlite3.c"), "-o", obj],
                    check=True)
     subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",

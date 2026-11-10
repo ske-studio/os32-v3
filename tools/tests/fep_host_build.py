@@ -1,4 +1,5 @@
 """Freestanding ILP32 real SQLite/VFS/IME fixture construction for N/O2."""
+import sqlite_cc
 import os
 from pathlib import Path
 import host32
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def prepare(work, probe=None, observe=False):
     cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
-    host32.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
+    sqlite_cc.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-w',
         '-fsigned-char', '-fno-short-enums', '-include',
         str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',

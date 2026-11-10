@@ -8,8 +8,9 @@ sudo・mount・配備・エミュレータには一切触らない (tsv fixture 
 
   python3 -B tools/tests/test_cfg.py [--target] [--sanitize] [case ...]
 """
+import sqlite_cc
 CHECK = dict(name='cfg-host', tier=1,
-    covers=['assets/settings/defaults.tsv', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/mk_settings_db.py', 'tools/tests/cfg_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/cmds/cfg.c', 'userland/lib/cfg/cfg_backend.c', 'userland/lib/cfg/cfg_enum.c', 'userland/lib/cfg/cfg_import.c', 'userland/lib/cfg/cfg_init.c', 'userland/lib/cfg/cfg_json.c', 'userland/lib/cfg/cfg_tsv.c', 'userland/lib/cfg/libos32cfg.c', 'userland/tests/cfg_bench.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    covers=['tools/tests/sqlite_cc.py', 'assets/settings/defaults.tsv', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/mk_settings_db.py', 'tools/tests/cfg_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/cmds/cfg.c', 'userland/lib/cfg/cfg_backend.c', 'userland/lib/cfg/cfg_enum.c', 'userland/lib/cfg/cfg_import.c', 'userland/lib/cfg/cfg_init.c', 'userland/lib/cfg/cfg_json.c', 'userland/lib/cfg/cfg_tsv.c', 'userland/lib/cfg/libos32cfg.c', 'userland/tests/cfg_bench.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
     needs=[], budget=14.0)
 
 import pathlib
@@ -181,7 +182,7 @@ def build(tmp, sanitize):
             "-fno-sanitize-recover=signed-integer-overflow",
             "-fno-omit-frame-pointer"]
            if sanitize else [])
-    subprocess.run(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
+    sqlite_cc.build(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
                     "-c", str(ROOT / "lib/sqlite3/sqlite3.c"), "-o", obj],
                    check=True)
     subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
