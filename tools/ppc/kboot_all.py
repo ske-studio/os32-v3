@@ -56,7 +56,7 @@ def main():
                 proc = subprocess.run(command, cwd=ROOT, env=env, stdout=log,
                                       stderr=subprocess.STDOUT, timeout=args.timeout_each)
                 rc = proc.returncode
-                status = 'PASS' if rc == 0 else 'FAIL'
+                status = 'PASS' if rc == 0 else 'SKIP' if rc == 3 else 'FAIL'
             except subprocess.TimeoutExpired:
                 rc, status = None, 'TIMEOUT'
         elapsed = time.monotonic() - start
@@ -65,7 +65,7 @@ def main():
         if status != 'PASS':
             print('\n'.join((OUT / (name + '.log')).read_text(
                 encoding='utf-8', errors='replace').splitlines()[-30:]), flush=True)
-            if args.fail_fast:
+            if args.fail_fast and status != 'SKIP':
                 break
     print('\nNAME RESULT RC SECONDS')
     for result in results:
@@ -73,13 +73,17 @@ def main():
     print(f"TOTAL {len(results)} PASS {sum(r['result'] == 'PASS' for r in results)} "
           f"FAIL {sum(r['result'] == 'FAIL' for r in results)} "
           f"TIMEOUT {sum(r['result'] == 'TIMEOUT' for r in results)} "
+          f"SKIP {sum(r['result'] == 'SKIP' for r in results)} "
           f"{sum(r['seconds'] for r in results):.2f}s")
     output = {'head': head, 'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              'mode': 'mutate' if args.mutate else 'normal', 'tests': results}
+              'mode': 'mutate' if args.mutate else 'normal', 'tests': results,
+              'skip': sum(r['result'] == 'SKIP' for r in results)}
     json_path = args.json if args.json.is_absolute() else ROOT / args.json
     json_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(output, indent=2) + '\n', encoding='utf-8')
-    return int(any(r['result'] != 'PASS' for r in results))
+    if any(r['result'] in ('FAIL', 'TIMEOUT') for r in results):
+        return 1
+    return 3 if any(r['result'] == 'SKIP' for r in results) else 0
 
 
 if __name__ == '__main__':
