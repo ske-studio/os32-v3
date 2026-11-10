@@ -13,4 +13,10 @@ static inline void arch_mmu_flush_tlb(void) { ppc_root_flush(); }
 static inline void arch_mmu_enable(void) { ppc_enable_translation(); }
 #define arch_enter_user(root,sp,entry) ppc_user_not_available(root,sp,entry)
 #define arch_call_on_stack(saved,sp,entry) ppc_stack_not_available(&(saved),sp,entry)
+static inline void arch_cpu_serialize(void)
+{
+    __asm__ volatile("sync" : : : "memory");
+}
+static inline int arch_cpu_has_mmx(void) { return 0; }
+
 #endif

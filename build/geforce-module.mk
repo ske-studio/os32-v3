@@ -5,7 +5,7 @@ GEFORCE_DEF_SOURCES := gfx/gfx_policy.h gfx/gfx_osri_view.h include/debug_probe.
 $(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 
-GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o gf_hook.o gf_direct.o gf_present_m2mf.o geforce_import_slots.o geforce_import_stubs.o)
+GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o gf_hook.o gf_direct.o gf_present_m2mf.o $(notdir $(patsubst %.c,%.o,$(wildcard drivers/video/geforce/gf_v2_*.c))) geforce_import_slots.o geforce_import_stubs.o)
 GEFORCE_INC := $(INC_KERNEL) -I. -I$(GEFORCE_OUT)
 $(GEFORCE_OUT)/geforce_body.o: drivers/video/geforce/geforce_body.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
@@ -13,7 +13,7 @@ $(GEFORCE_OUT)/backend_geforce.o: drivers/video/geforce/backend_geforce.c $(GEFO
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
-$(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_direct.o $(GEFORCE_OUT)/gf_present_m2mf.o: $(GEFORCE_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
+$(patsubst drivers/video/geforce/%.c,$(GEFORCE_OUT)/%.o,$(wildcard drivers/video/geforce/gf_v2_*.c)) $(GEFORCE_OUT)/gf_hook.o $(GEFORCE_OUT)/gf_direct.o $(GEFORCE_OUT)/gf_present_m2mf.o: $(GEFORCE_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)

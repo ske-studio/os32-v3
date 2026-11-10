@@ -38,6 +38,7 @@
 #define SYS_SPLASH_IMAGE      "/boot/splash.osri"
 #define SYS_SPLASH_USER_IMAGE "/boot/user.osri"
 #define SYS_NETCD_CFG         "/etc/netcd.cfg"     /* FD-only network CD boot settings */
+#define SYS_GFXSYNC_CFG "/etc/gfx/sync.cfg"
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
 #define SYS_UNICODE_BIN       "/sys/unicode.bin"   /* Unicodeテーブル */

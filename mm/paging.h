@@ -393,4 +393,6 @@ int paging_addrspace_protect_code_ro(struct addrspace *as, u32 base, u32 end);
  * HWDEV hashes the preprocessed order of the shared header declarations. */
 #include "physmem.h"
 
+int paging_gfx2_map(struct addrspace *as, u32 va, u32 pa, u32 npages, u32 pte_flags);
+
 #endif /* __PAGING_H */

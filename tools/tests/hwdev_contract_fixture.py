@@ -59,9 +59,11 @@ from gen_kdebug_imports import declaration
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
 # GFX_ACCEL_HAL H1 appends INDEX8 direct hooks and GFX_Cmd (32B); P0b appends enum GF6_PRIM=12.
-REVIEWED_LAYOUT_CRC = 0x927d90af
+# HAL v2 A0: public value records, GfxBackend.v2/v2_mod, gf3_ctx range
+# callback, gf3_surface.dma and gf3_pattern; import declarations unchanged.
+REVIEWED_LAYOUT_CRC = 0x4cc253c8
 REVIEWED_IMPORT_DECLARATIONS_SHA = '5572aaf2bc03507e123861472774838a7008894449792789780696b346ccbc9d'
-REVIEWED_INVENTORY_SHA = '1b5fe57d12d1adaf489c2c43f8dcd707842f99ef4181b1af65cca73ccdf65214'
+REVIEWED_INVENTORY_SHA = 'e658975285ab84b93310d435229cde2f8c9e3dad2c1819fcfcb6a08cff9aa3fb'
 
 
 def import_declarations(root):

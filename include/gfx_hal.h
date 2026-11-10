@@ -141,6 +141,8 @@ typedef struct GfxBackend {
     const GfxDirectOps *direct_ops;
     int (*shadow_fill_rect)(int, int, int, int, u8);
     int (*shadow_blit)(int, int, int, int, int, int);
+    const struct GfxBackendV2 *v2;
+    const struct module_record *v2_mod;
 } GfxBackend;
 
 static inline const GfxMode *gfx_mode_pick(const GfxBackend *be, int legacy200)

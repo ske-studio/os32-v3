@@ -133,6 +133,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 | v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
+| v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -299,7 +300,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 263〜299 (`kapi_reserved[37]`、v83 時点。v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 292〜299 (`kapi_reserved[8]`、v84 時点。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を

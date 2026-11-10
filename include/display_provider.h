@@ -36,4 +36,6 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void));
 u32 display_provider_display_records(u32 ledger_backend);
 u32 display_provider_display_first(u32 plane);
 
+void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg);
+
 #endif

@@ -353,4 +353,9 @@ int  pgalloc_range_has_ram(u32 first, u32 end);
 u32  pgalloc_total_pages(void);
 u32  pgalloc_free_pages(void);
 
+int pgalloc_pin(u32 pfn, u32 n, u32 owner);
+int pgalloc_unpin(u32 pfn, u32 n, u32 owner);
+int pgalloc_pinned(u32 pfn);
+int ledger_transfer_pinned(u32 pfn, int n, u32 from, u32 to);
+
 #endif /* __PGALLOC_H */

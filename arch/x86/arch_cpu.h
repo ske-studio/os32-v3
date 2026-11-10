@@ -59,4 +59,16 @@ static inline void arch_mmu_enable(void)
     __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
 }
 
+static inline void arch_cpu_serialize(void)
+{
+    u32 a = 0, b, c, d;
+    __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d) : : "memory");
+}
+static inline int arch_cpu_has_mmx(void)
+{
+    u32 a = 1, b, c, d;
+    __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d));
+    return (d & (1UL << 23)) != 0;
+}
+
 #endif /* ARCH_CPU_H */

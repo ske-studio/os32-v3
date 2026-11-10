@@ -6,7 +6,9 @@
     "include/gfx_hal.h",
     "include/gfx_mode.h",
     "gfx/palette.h",
-    "include/debug_probe.h"
+    "include/debug_probe.h",
+    "include/gfx_sync.h",
+    "gfx/v2/gfx2_int.h"
   ],
   "imports": [
     {
@@ -54,6 +56,42 @@
     {
       "symbol": "sys_time_now",
       "source": "include/sys.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_bind",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_write_rows",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_read_rows",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_flush",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_unbind",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx2_sync_publish",
+      "source": "gfx/v2/gfx2_int.h",
       "context": "normal",
       "irq": false
     }

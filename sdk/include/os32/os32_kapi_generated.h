@@ -268,15 +268,44 @@ typedef struct {
     u32 (__cdecl *host_notice_serial)(void);
     int (__cdecl *gfx_hw_submit)(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done);
     int (__cdecl *gfx_hw_get)(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen);
-    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、37 本)。末尾追記はここを削って使う */
-    i32 (__cdecl *kapi_reserved[37])(void);
+    int (__cdecl *gfx2_adapter_count)(void);
+    int (__cdecl *gfx2_adapter_info)(u32 a, GFX2_AdapterInfo *o);
+    int (__cdecl *gfx2_adapter_gen)(u32 a, u32 *gen);
+    int (__cdecl *gfx2_caps)(u32 a, GFX2_Caps *o, u32 size);
+    int (__cdecl *gfx2_check_op)(u32 a, const GFX2_Op *shape, u32 sfmt, u32 dfmt, u32 spool, u32 dpool, u32 *how);
+    int (__cdecl *gfx2_surface_create)(u32 a, u16 w, u16 h, u8 fmt, u8 pool, u8 usage, u32 *sid);
+    int (__cdecl *gfx2_surface_free)(u32 sid);
+    int (__cdecl *gfx2_surface_desc)(u32 sid, GFX2_SurfaceDesc *o);
+    int (__cdecl *gfx2_screen_surface)(u32 a, u32 head, u32 role, u32 *sid);
+    int (__cdecl *gfx2_lock)(u32 sid, u32 flags, void **va, u32 *pitch);
+    int (__cdecl *gfx2_unlock)(u32 sid);
+    int (__cdecl *gfx2_submit)(u32 a, const GFX2_Op *ops, u32 n, u32 gen, u32 *done, u32 *fence);
+    int (__cdecl *gfx2_fence_wait)(u32 a, u32 fence, u32 deadline_ms);
+    int (__cdecl *gfx2_fence_query)(u32 a, u32 *completed, u32 *failed_upto);
+    int (__cdecl *gfx2_head_info)(u32 a, u32 head, GFX2_HeadInfo *o);
+    int (__cdecl *gfx2_connector_info)(u32 a, u32 c, GFX2_ConnectorInfo *o);
+    int (__cdecl *gfx2_connector_edid)(u32 a, u32 c, u32 block, u8 *out128);
+    int (__cdecl *gfx2_mode_count)(u32 a, u32 head, u32 fmt);
+    int (__cdecl *gfx2_mode_get)(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o);
+    int (__cdecl *gfx2_mode_set)(u32 a, u32 head, u32 conn_mask, u32 mode_id, u32 sid);
+    int (__cdecl *gfx2_flip)(u32 a, u32 head, u32 sid, u32 flags, u32 deadline_ms);
+    int (__cdecl *gfx2_vblank_wait)(u32 a, u32 head, u32 after, u32 deadline_ms, u32 *seen);
+    int (__cdecl *gfx2_palette)(u32 a, u32 first, u32 count, const u32 *xrgb);
+    int (__cdecl *gfx2_gamma)(u32 a, u32 head, const u16 *rgb768);
+    int (__cdecl *gfx2_cursor_image)(u32 a, u32 head, u32 sid);
+    int (__cdecl *gfx2_cursor_move)(u32 a, u32 head, i32 x, i32 y);
+    int (__cdecl *gfx2_cursor_show)(u32 a, u32 head, u32 show);
+    int (__cdecl *gfx2_dpms)(u32 a, u32 head, u32 state);
+    int (__cdecl *gfx2_present)(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h);
+    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、8 本)。末尾追記はここを削って使う */
+    i32 (__cdecl *kapi_reserved[8])(void);
     u32 sbrk_heap_limit;  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     u32 shm_base;  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 } KernelAPI;
 
-#define KAPI_FUNC_COUNT 263
+#define KAPI_FUNC_COUNT 292
 #define KAPI_FUNC_CAPACITY 300
-#define KAPI_FUNC_RESERVED 37
+#define KAPI_FUNC_RESERVED 8
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 302
 #define KAPI_DATA_IDX_SHM_BASE 303

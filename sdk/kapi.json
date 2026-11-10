@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 5, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 83,
+  "version": 84,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -2005,6 +2005,35 @@
       "ret": "int",
       "args": ["int x", "int y", "int w", "int h", "u8 *dst", "u32 pitch", "u32 gen"],
       "out": "target"
-    }
+    },
+    {"name": "gfx2_adapter_count", "target": "gfx2_adapter_count", "ret": "int", "args": []},
+    {"name": "gfx2_adapter_info", "target": "gfx2_adapter_info", "ret": "int", "args": ["u32 a", "GFX2_AdapterInfo *o"], "out": "target"},
+    {"name": "gfx2_adapter_gen", "target": "gfx2_adapter_gen", "ret": "int", "args": ["u32 a", "u32 *gen"], "out": "target"},
+    {"name": "gfx2_caps", "target": "gfx2_caps", "ret": "int", "args": ["u32 a", "GFX2_Caps *o", "u32 size"], "out": "target"},
+    {"name": "gfx2_check_op", "target": "gfx2_check_op", "ret": "int", "args": ["u32 a", "const GFX2_Op *shape", "u32 sfmt", "u32 dfmt", "u32 spool", "u32 dpool", "u32 *how"], "out": "target", "in": [{"arg": "shape", "target": true}]},
+    {"name": "gfx2_surface_create", "target": "gfx2_surface_create", "ret": "int", "args": ["u32 a", "u16 w", "u16 h", "u8 fmt", "u8 pool", "u8 usage", "u32 *sid"], "out": "target"},
+    {"name": "gfx2_surface_free", "target": "gfx2_surface_free", "ret": "int", "args": ["u32 sid"]},
+    {"name": "gfx2_surface_desc", "target": "gfx2_surface_desc", "ret": "int", "args": ["u32 sid", "GFX2_SurfaceDesc *o"], "out": "target"},
+    {"name": "gfx2_screen_surface", "target": "gfx2_screen_surface", "ret": "int", "args": ["u32 a", "u32 head", "u32 role", "u32 *sid"], "out": "target"},
+    {"name": "gfx2_lock", "target": "gfx2_lock", "ret": "int", "args": ["u32 sid", "u32 flags", "void **va", "u32 *pitch"], "out": "target"},
+    {"name": "gfx2_unlock", "target": "gfx2_unlock", "ret": "int", "args": ["u32 sid"]},
+    {"name": "gfx2_submit", "target": "gfx2_submit", "ret": "int", "args": ["u32 a", "const GFX2_Op *ops", "u32 n", "u32 gen", "u32 *done", "u32 *fence"], "out": "target", "in": [{"arg": "ops", "target": true}]},
+    {"name": "gfx2_fence_wait", "target": "gfx2_fence_wait", "ret": "int", "args": ["u32 a", "u32 fence", "u32 deadline_ms"]},
+    {"name": "gfx2_fence_query", "target": "gfx2_fence_query", "ret": "int", "args": ["u32 a", "u32 *completed", "u32 *failed_upto"], "out": "target"},
+    {"name": "gfx2_head_info", "target": "gfx2_head_info", "ret": "int", "args": ["u32 a", "u32 head", "GFX2_HeadInfo *o"], "out": "target"},
+    {"name": "gfx2_connector_info", "target": "gfx2_connector_info", "ret": "int", "args": ["u32 a", "u32 c", "GFX2_ConnectorInfo *o"], "out": "target"},
+    {"name": "gfx2_connector_edid", "target": "gfx2_connector_edid", "ret": "int", "args": ["u32 a", "u32 c", "u32 block", "u8 *out128"], "out": "target"},
+    {"name": "gfx2_mode_count", "target": "gfx2_mode_count", "ret": "int", "args": ["u32 a", "u32 head", "u32 fmt"]},
+    {"name": "gfx2_mode_get", "target": "gfx2_mode_get", "ret": "int", "args": ["u32 a", "u32 head", "u32 fmt", "u32 i", "GFX2_ModeInfo *o"], "out": "target"},
+    {"name": "gfx2_mode_set", "target": "gfx2_mode_set", "ret": "int", "args": ["u32 a", "u32 head", "u32 conn_mask", "u32 mode_id", "u32 sid"]},
+    {"name": "gfx2_flip", "target": "gfx2_flip", "ret": "int", "args": ["u32 a", "u32 head", "u32 sid", "u32 flags", "u32 deadline_ms"]},
+    {"name": "gfx2_vblank_wait", "target": "gfx2_vblank_wait", "ret": "int", "args": ["u32 a", "u32 head", "u32 after", "u32 deadline_ms", "u32 *seen"], "out": "target"},
+    {"name": "gfx2_palette", "target": "gfx2_palette", "ret": "int", "args": ["u32 a", "u32 first", "u32 count", "const u32 *xrgb"], "in": [{"arg": "xrgb", "target": true}]},
+    {"name": "gfx2_gamma", "target": "gfx2_gamma", "ret": "int", "args": ["u32 a", "u32 head", "const u16 *rgb768"], "in": [{"arg": "rgb768", "target": true}]},
+    {"name": "gfx2_cursor_image", "target": "gfx2_cursor_image", "ret": "int", "args": ["u32 a", "u32 head", "u32 sid"]},
+    {"name": "gfx2_cursor_move", "target": "gfx2_cursor_move", "ret": "int", "args": ["u32 a", "u32 head", "i32 x", "i32 y"]},
+    {"name": "gfx2_cursor_show", "target": "gfx2_cursor_show", "ret": "int", "args": ["u32 a", "u32 head", "u32 show"]},
+    {"name": "gfx2_dpms", "target": "gfx2_dpms", "ret": "int", "args": ["u32 a", "u32 head", "u32 state"]},
+    {"name": "gfx2_present", "target": "gfx2_present", "ret": "int", "args": ["u32 a", "u32 head", "i16 x", "i16 y", "u16 w", "u16 h"]}
   ]
 }

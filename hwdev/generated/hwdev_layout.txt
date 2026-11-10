@@ -38,6 +38,324 @@ offset	DirEntry_Ext.size	256
 member_size	DirEntry_Ext.size	4
 offset	DirEntry_Ext.type	260
 member_size	DirEntry_Ext.type	1
+size	GFX2_AdapterInfo	128
+align	GFX2_AdapterInfo	4
+offset	GFX2_AdapterInfo.backend_kind	122
+member_size	GFX2_AdapterInfo.backend_kind	1
+offset	GFX2_AdapterInfo.bus	9
+member_size	GFX2_AdapterInfo.bus	1
+offset	GFX2_AdapterInfo.connectors	121
+member_size	GFX2_AdapterInfo.connectors	1
+offset	GFX2_AdapterInfo.dev	10
+member_size	GFX2_AdapterInfo.dev	1
+offset	GFX2_AdapterInfo.device	2
+member_size	GFX2_AdapterInfo.device	2
+offset	GFX2_AdapterInfo.driver	76
+member_size	GFX2_AdapterInfo.driver	32
+offset	GFX2_AdapterInfo.driver_ver	108
+member_size	GFX2_AdapterInfo.driver_ver	4
+offset	GFX2_AdapterInfo.flags	123
+member_size	GFX2_AdapterInfo.flags	1
+offset	GFX2_AdapterInfo.fn	11
+member_size	GFX2_AdapterInfo.fn	1
+offset	GFX2_AdapterInfo.gart_bytes	116
+member_size	GFX2_AdapterInfo.gart_bytes	4
+offset	GFX2_AdapterInfo.heads	120
+member_size	GFX2_AdapterInfo.heads	1
+offset	GFX2_AdapterInfo.name	12
+member_size	GFX2_AdapterInfo.name	64
+offset	GFX2_AdapterInfo.reserved	124
+member_size	GFX2_AdapterInfo.reserved	4
+offset	GFX2_AdapterInfo.revision	8
+member_size	GFX2_AdapterInfo.revision	1
+offset	GFX2_AdapterInfo.subsys	4
+member_size	GFX2_AdapterInfo.subsys	4
+offset	GFX2_AdapterInfo.vendor	0
+member_size	GFX2_AdapterInfo.vendor	2
+offset	GFX2_AdapterInfo.vram_bytes	112
+member_size	GFX2_AdapterInfo.vram_bytes	4
+size	GFX2_Caps	256
+align	GFX2_Caps	4
+offset	GFX2_Caps.adapter	4
+member_size	GFX2_Caps.adapter	4
+offset	GFX2_Caps.async	116
+member_size	GFX2_Caps.async	4
+offset	GFX2_Caps.backend_kind	8
+member_size	GFX2_Caps.backend_kind	4
+offset	GFX2_Caps.blend_caps	236
+member_size	GFX2_Caps.blend_caps	4
+offset	GFX2_Caps.caps2d_hw	32
+member_size	GFX2_Caps.caps2d_hw	4
+offset	GFX2_Caps.caps2d_sw	36
+member_size	GFX2_Caps.caps2d_sw	4
+offset	GFX2_Caps.connectors	124
+member_size	GFX2_Caps.connectors	4
+offset	GFX2_Caps.cpu_direct	160
+member_size	GFX2_Caps.cpu_direct	4
+offset	GFX2_Caps.cursor_fmt	144
+member_size	GFX2_Caps.cursor_fmt	4
+offset	GFX2_Caps.cursor_h	140
+member_size	GFX2_Caps.cursor_h	4
+offset	GFX2_Caps.cursor_w	136
+member_size	GFX2_Caps.cursor_w	4
+offset	GFX2_Caps.exact	40
+member_size	GFX2_Caps.exact	4
+offset	GFX2_Caps.fence_hw	112
+member_size	GFX2_Caps.fence_hw	4
+offset	GFX2_Caps.flip_vblank	148
+member_size	GFX2_Caps.flip_vblank	4
+offset	GFX2_Caps.fmt_render2d	48
+member_size	GFX2_Caps.fmt_render2d	4
+offset	GFX2_Caps.fmt_scanout	52
+member_size	GFX2_Caps.fmt_scanout	4
+offset	GFX2_Caps.fmt_src_stretch	56
+member_size	GFX2_Caps.fmt_src_stretch	4
+offset	GFX2_Caps.fmt_surface	44
+member_size	GFX2_Caps.fmt_surface	4
+offset	GFX2_Caps.gamma_bits	132
+member_size	GFX2_Caps.gamma_bits	4
+offset	GFX2_Caps.gart_bytes	104
+member_size	GFX2_Caps.gart_bytes	4
+offset	GFX2_Caps.gart_page	108
+member_size	GFX2_Caps.gart_page	4
+offset	GFX2_Caps.heads	120
+member_size	GFX2_Caps.heads	4
+offset	GFX2_Caps.max_cmds	92
+member_size	GFX2_Caps.max_cmds	4
+offset	GFX2_Caps.max_h	64
+member_size	GFX2_Caps.max_h	4
+offset	GFX2_Caps.max_index	216
+member_size	GFX2_Caps.max_index	4
+offset	GFX2_Caps.max_pitch	68
+member_size	GFX2_Caps.max_pitch	4
+offset	GFX2_Caps.max_prim	212
+member_size	GFX2_Caps.max_prim	4
+offset	GFX2_Caps.max_rt	220
+member_size	GFX2_Caps.max_rt	4
+offset	GFX2_Caps.max_streams	208
+member_size	GFX2_Caps.max_streams	4
+offset	GFX2_Caps.max_tex_aspect	200
+member_size	GFX2_Caps.max_tex_aspect	4
+offset	GFX2_Caps.max_tex_h	196
+member_size	GFX2_Caps.max_tex_h	4
+offset	GFX2_Caps.max_tex_stages	204
+member_size	GFX2_Caps.max_tex_stages	4
+offset	GFX2_Caps.max_tex_w	192
+member_size	GFX2_Caps.max_tex_w	4
+offset	GFX2_Caps.max_w	60
+member_size	GFX2_Caps.max_w	4
+offset	GFX2_Caps.offset_align	76
+member_size	GFX2_Caps.offset_align	4
+offset	GFX2_Caps.overlay_fmt	28
+member_size	GFX2_Caps.overlay_fmt	4
+offset	GFX2_Caps.overlay_hw	24
+member_size	GFX2_Caps.overlay_hw	4
+offset	GFX2_Caps.overlay_now	20
+member_size	GFX2_Caps.overlay_now	4
+offset	GFX2_Caps.palette_entries	128
+member_size	GFX2_Caps.palette_entries	4
+offset	GFX2_Caps.pitch_align	72
+member_size	GFX2_Caps.pitch_align	4
+offset	GFX2_Caps.ps_version	188
+member_size	GFX2_Caps.ps_version	4
+offset	GFX2_Caps.raster_caps	228
+member_size	GFX2_Caps.raster_caps	4
+offset	GFX2_Caps.reserved	240
+member_size	GFX2_Caps.reserved	16
+offset	GFX2_Caps.scanout_align	80
+member_size	GFX2_Caps.scanout_align	4
+offset	GFX2_Caps.size	0
+member_size	GFX2_Caps.size	4
+offset	GFX2_Caps.stretch_max_q16	88
+member_size	GFX2_Caps.stretch_max_q16	4
+offset	GFX2_Caps.stretch_min_q16	84
+member_size	GFX2_Caps.stretch_min_q16	4
+offset	GFX2_Caps.sync_mode	164
+member_size	GFX2_Caps.sync_mode	4
+offset	GFX2_Caps.sync_profile	168
+member_size	GFX2_Caps.sync_profile	16
+offset	GFX2_Caps.tex_caps	224
+member_size	GFX2_Caps.tex_caps	4
+offset	GFX2_Caps.thermal	156
+member_size	GFX2_Caps.thermal	4
+offset	GFX2_Caps.tier3d_hw	16
+member_size	GFX2_Caps.tier3d_hw	4
+offset	GFX2_Caps.tier3d_now	12
+member_size	GFX2_Caps.tier3d_now	4
+offset	GFX2_Caps.vblank_irq	152
+member_size	GFX2_Caps.vblank_irq	4
+offset	GFX2_Caps.vram_bytes	96
+member_size	GFX2_Caps.vram_bytes	4
+offset	GFX2_Caps.vram_cpu_bytes	100
+member_size	GFX2_Caps.vram_cpu_bytes	4
+offset	GFX2_Caps.vs_version	184
+member_size	GFX2_Caps.vs_version	4
+offset	GFX2_Caps.zcmp_caps	232
+member_size	GFX2_Caps.zcmp_caps	4
+size	GFX2_Color	8
+align	GFX2_Color	4
+offset	GFX2_Color.v	0
+member_size	GFX2_Color.v	4
+offset	GFX2_Color.x	4
+member_size	GFX2_Color.x	4
+size	GFX2_ConnectorInfo	64
+align	GFX2_ConnectorInfo	4
+offset	GFX2_ConnectorInfo.clone_mask	12
+member_size	GFX2_ConnectorInfo.clone_mask	4
+offset	GFX2_ConnectorInfo.edid_blocks	20
+member_size	GFX2_ConnectorInfo.edid_blocks	4
+offset	GFX2_ConnectorInfo.id	0
+member_size	GFX2_ConnectorInfo.id	4
+offset	GFX2_ConnectorInfo.mm_h	42
+member_size	GFX2_ConnectorInfo.mm_h	2
+offset	GFX2_ConnectorInfo.mm_w	40
+member_size	GFX2_ConnectorInfo.mm_w	2
+offset	GFX2_ConnectorInfo.monitor_name	24
+member_size	GFX2_ConnectorInfo.monitor_name	16
+offset	GFX2_ConnectorInfo.possible_heads	8
+member_size	GFX2_ConnectorInfo.possible_heads	4
+offset	GFX2_ConnectorInfo.preferred_mode_id	44
+member_size	GFX2_ConnectorInfo.preferred_mode_id	4
+offset	GFX2_ConnectorInfo.reserved	48
+member_size	GFX2_ConnectorInfo.reserved	16
+offset	GFX2_ConnectorInfo.status	16
+member_size	GFX2_ConnectorInfo.status	4
+offset	GFX2_ConnectorInfo.type	4
+member_size	GFX2_ConnectorInfo.type	4
+size	GFX2_HeadInfo	64
+align	GFX2_HeadInfo	4
+offset	GFX2_HeadInfo.attached	4
+member_size	GFX2_HeadInfo.attached	4
+offset	GFX2_HeadInfo.connector_mask	8
+member_size	GFX2_HeadInfo.connector_mask	4
+offset	GFX2_HeadInfo.fmt_scanout	32
+member_size	GFX2_HeadInfo.fmt_scanout	4
+offset	GFX2_HeadInfo.h	18
+member_size	GFX2_HeadInfo.h	2
+offset	GFX2_HeadInfo.head	0
+member_size	GFX2_HeadInfo.head	4
+offset	GFX2_HeadInfo.max_h	38
+member_size	GFX2_HeadInfo.max_h	2
+offset	GFX2_HeadInfo.max_w	36
+member_size	GFX2_HeadInfo.max_w	2
+offset	GFX2_HeadInfo.mode_id	24
+member_size	GFX2_HeadInfo.mode_id	4
+offset	GFX2_HeadInfo.reserved	40
+member_size	GFX2_HeadInfo.reserved	24
+offset	GFX2_HeadInfo.rotation	20
+member_size	GFX2_HeadInfo.rotation	4
+offset	GFX2_HeadInfo.scanout_sid	28
+member_size	GFX2_HeadInfo.scanout_sid	4
+offset	GFX2_HeadInfo.w	16
+member_size	GFX2_HeadInfo.w	2
+offset	GFX2_HeadInfo.x	12
+member_size	GFX2_HeadInfo.x	2
+offset	GFX2_HeadInfo.y	14
+member_size	GFX2_HeadInfo.y	2
+size	GFX2_ModeInfo	40
+align	GFX2_ModeInfo	4
+offset	GFX2_ModeInfo.flags	28
+member_size	GFX2_ModeInfo.flags	4
+offset	GFX2_ModeInfo.fmt	8
+member_size	GFX2_ModeInfo.fmt	4
+offset	GFX2_ModeInfo.h	6
+member_size	GFX2_ModeInfo.h	2
+offset	GFX2_ModeInfo.hsync_khz10	24
+member_size	GFX2_ModeInfo.hsync_khz10	4
+offset	GFX2_ModeInfo.htotal	20
+member_size	GFX2_ModeInfo.htotal	2
+offset	GFX2_ModeInfo.id	0
+member_size	GFX2_ModeInfo.id	4
+offset	GFX2_ModeInfo.pad	34
+member_size	GFX2_ModeInfo.pad	2
+offset	GFX2_ModeInfo.pixclk_khz	16
+member_size	GFX2_ModeInfo.pixclk_khz	4
+offset	GFX2_ModeInfo.refresh_mhz	12
+member_size	GFX2_ModeInfo.refresh_mhz	4
+offset	GFX2_ModeInfo.reserved	36
+member_size	GFX2_ModeInfo.reserved	4
+offset	GFX2_ModeInfo.scaling	33
+member_size	GFX2_ModeInfo.scaling	1
+offset	GFX2_ModeInfo.source	32
+member_size	GFX2_ModeInfo.source	1
+offset	GFX2_ModeInfo.vtotal	22
+member_size	GFX2_ModeInfo.vtotal	2
+offset	GFX2_ModeInfo.w	4
+member_size	GFX2_ModeInfo.w	2
+size	GFX2_Op	80
+align	GFX2_Op	4
+offset	GFX2_Op.bg	40
+member_size	GFX2_Op.bg	8
+offset	GFX2_Op.ch	78
+member_size	GFX2_Op.ch	2
+offset	GFX2_Op.cw	76
+member_size	GFX2_Op.cw	2
+offset	GFX2_Op.cx	72
+member_size	GFX2_Op.cx	2
+offset	GFX2_Op.cy	74
+member_size	GFX2_Op.cy	2
+offset	GFX2_Op.data	64
+member_size	GFX2_Op.data	4
+offset	GFX2_Op.dh	22
+member_size	GFX2_Op.dh	2
+offset	GFX2_Op.dkey	56
+member_size	GFX2_Op.dkey	8
+offset	GFX2_Op.dst	8
+member_size	GFX2_Op.dst	4
+offset	GFX2_Op.dw	20
+member_size	GFX2_Op.dw	2
+offset	GFX2_Op.dx	16
+member_size	GFX2_Op.dx	2
+offset	GFX2_Op.dy	18
+member_size	GFX2_Op.dy	2
+offset	GFX2_Op.fg	32
+member_size	GFX2_Op.fg	8
+offset	GFX2_Op.flags	4
+member_size	GFX2_Op.flags	4
+offset	GFX2_Op.op	0
+member_size	GFX2_Op.op	2
+offset	GFX2_Op.pitch	68
+member_size	GFX2_Op.pitch	4
+offset	GFX2_Op.rop	2
+member_size	GFX2_Op.rop	2
+offset	GFX2_Op.sh	30
+member_size	GFX2_Op.sh	2
+offset	GFX2_Op.skey	48
+member_size	GFX2_Op.skey	8
+offset	GFX2_Op.src	12
+member_size	GFX2_Op.src	4
+offset	GFX2_Op.sw	28
+member_size	GFX2_Op.sw	2
+offset	GFX2_Op.sx	24
+member_size	GFX2_Op.sx	2
+offset	GFX2_Op.sy	26
+member_size	GFX2_Op.sy	2
+size	GFX2_SurfaceDesc	32
+align	GFX2_SurfaceDesc	4
+offset	GFX2_SurfaceDesc.bytes	20
+member_size	GFX2_SurfaceDesc.bytes	4
+offset	GFX2_SurfaceDesc.fmt	12
+member_size	GFX2_SurfaceDesc.fmt	1
+offset	GFX2_SurfaceDesc.gen	4
+member_size	GFX2_SurfaceDesc.gen	4
+offset	GFX2_SurfaceDesc.gpu_off	24
+member_size	GFX2_SurfaceDesc.gpu_off	4
+offset	GFX2_SurfaceDesc.h	10
+member_size	GFX2_SurfaceDesc.h	2
+offset	GFX2_SurfaceDesc.pitch	16
+member_size	GFX2_SurfaceDesc.pitch	4
+offset	GFX2_SurfaceDesc.pool	13
+member_size	GFX2_SurfaceDesc.pool	1
+offset	GFX2_SurfaceDesc.sid	0
+member_size	GFX2_SurfaceDesc.sid	4
+offset	GFX2_SurfaceDesc.state	28
+member_size	GFX2_SurfaceDesc.state	4
+offset	GFX2_SurfaceDesc.tiling	15
+member_size	GFX2_SurfaceDesc.tiling	1
+offset	GFX2_SurfaceDesc.usage	14
+member_size	GFX2_SurfaceDesc.usage	1
+offset	GFX2_SurfaceDesc.w	8
+member_size	GFX2_SurfaceDesc.w	2
 size	GFX_Cmd	32
 align	GFX_Cmd	4
 offset	GFX_Cmd.color	16
@@ -414,6 +732,64 @@ offset	KernelAPI.font_source_read_at	1012
 member_size	KernelAPI.font_source_read_at	4
 offset	KernelAPI.get_tick	36
 member_size	KernelAPI.get_tick	4
+offset	KernelAPI.gfx2_adapter_count	1060
+member_size	KernelAPI.gfx2_adapter_count	4
+offset	KernelAPI.gfx2_adapter_gen	1068
+member_size	KernelAPI.gfx2_adapter_gen	4
+offset	KernelAPI.gfx2_adapter_info	1064
+member_size	KernelAPI.gfx2_adapter_info	4
+offset	KernelAPI.gfx2_caps	1072
+member_size	KernelAPI.gfx2_caps	4
+offset	KernelAPI.gfx2_check_op	1076
+member_size	KernelAPI.gfx2_check_op	4
+offset	KernelAPI.gfx2_connector_edid	1124
+member_size	KernelAPI.gfx2_connector_edid	4
+offset	KernelAPI.gfx2_connector_info	1120
+member_size	KernelAPI.gfx2_connector_info	4
+offset	KernelAPI.gfx2_cursor_image	1156
+member_size	KernelAPI.gfx2_cursor_image	4
+offset	KernelAPI.gfx2_cursor_move	1160
+member_size	KernelAPI.gfx2_cursor_move	4
+offset	KernelAPI.gfx2_cursor_show	1164
+member_size	KernelAPI.gfx2_cursor_show	4
+offset	KernelAPI.gfx2_dpms	1168
+member_size	KernelAPI.gfx2_dpms	4
+offset	KernelAPI.gfx2_fence_query	1112
+member_size	KernelAPI.gfx2_fence_query	4
+offset	KernelAPI.gfx2_fence_wait	1108
+member_size	KernelAPI.gfx2_fence_wait	4
+offset	KernelAPI.gfx2_flip	1140
+member_size	KernelAPI.gfx2_flip	4
+offset	KernelAPI.gfx2_gamma	1152
+member_size	KernelAPI.gfx2_gamma	4
+offset	KernelAPI.gfx2_head_info	1116
+member_size	KernelAPI.gfx2_head_info	4
+offset	KernelAPI.gfx2_lock	1096
+member_size	KernelAPI.gfx2_lock	4
+offset	KernelAPI.gfx2_mode_count	1128
+member_size	KernelAPI.gfx2_mode_count	4
+offset	KernelAPI.gfx2_mode_get	1132
+member_size	KernelAPI.gfx2_mode_get	4
+offset	KernelAPI.gfx2_mode_set	1136
+member_size	KernelAPI.gfx2_mode_set	4
+offset	KernelAPI.gfx2_palette	1148
+member_size	KernelAPI.gfx2_palette	4
+offset	KernelAPI.gfx2_present	1172
+member_size	KernelAPI.gfx2_present	4
+offset	KernelAPI.gfx2_screen_surface	1092
+member_size	KernelAPI.gfx2_screen_surface	4
+offset	KernelAPI.gfx2_submit	1104
+member_size	KernelAPI.gfx2_submit	4
+offset	KernelAPI.gfx2_surface_create	1080
+member_size	KernelAPI.gfx2_surface_create	4
+offset	KernelAPI.gfx2_surface_desc	1088
+member_size	KernelAPI.gfx2_surface_desc	4
+offset	KernelAPI.gfx2_surface_free	1084
+member_size	KernelAPI.gfx2_surface_free	4
+offset	KernelAPI.gfx2_unlock	1100
+member_size	KernelAPI.gfx2_unlock	4
+offset	KernelAPI.gfx2_vblank_wait	1144
+member_size	KernelAPI.gfx2_vblank_wait	4
 offset	KernelAPI.gfx_add_dirty_rect	372
 member_size	KernelAPI.gfx_add_dirty_rect	4
 offset	KernelAPI.gfx_get_framebuffer	368
@@ -528,8 +904,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1060
-member_size	KernelAPI.kapi_reserved	148
+offset	KernelAPI.kapi_reserved	1176
+member_size	KernelAPI.kapi_reserved	32
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1234,7 +1610,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	148
+size	struct GfxBackend	156
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1310,6 +1686,10 @@ offset	struct GfxBackend.shadow_fill_rect	140
 member_size	struct GfxBackend.shadow_fill_rect	4
 offset	struct GfxBackend.shutdown	16
 member_size	struct GfxBackend.shutdown	4
+offset	struct GfxBackend.v2	148
+member_size	struct GfxBackend.v2	4
+offset	struct GfxBackend.v2_mod	152
+member_size	struct GfxBackend.v2_mod	4
 offset	struct GfxBackend.vsync	96
 member_size	struct GfxBackend.vsync	4
 size	struct GfxCounters	16
@@ -1910,7 +2290,7 @@ offset	struct gf2_test_request.op	4
 member_size	struct gf2_test_request.op	4
 offset	struct gf2_test_request.size	0
 member_size	struct gf2_test_request.size	4
-size	struct gf3_ctx	7512
+size	struct gf3_ctx	7520
 align	struct gf3_ctx	4
 offset	struct gf3_ctx.ch	0
 member_size	struct gf3_ctx.ch	4
@@ -1926,6 +2306,10 @@ offset	struct gf3_ctx.notify_storage	292
 member_size	struct gf3_ctx.notify_storage	12
 offset	struct gf3_ctx.obj	4
 member_size	struct gf3_ctx.obj	288
+offset	struct gf3_ctx.range_opaque	7516
+member_size	struct gf3_ctx.range_opaque	4
+offset	struct gf3_ctx.range_q	7512
+member_size	struct gf3_ctx.range_q	4
 offset	struct gf3_ctx.ready	340
 member_size	struct gf3_ctx.ready	1
 offset	struct gf3_ctx.scratch	344
@@ -1946,6 +2330,18 @@ offset	struct gf3_format.sf_gdi	8
 member_size	struct gf3_format.sf_gdi	4
 offset	struct gf3_format.sifm	24
 member_size	struct gf3_format.sifm	4
+size	struct gf3_pattern	276
+align	struct gf3_pattern	4
+offset	struct gf3_pattern.bg	272
+member_size	struct gf3_pattern.bg	4
+offset	struct gf3_pattern.color	12
+member_size	struct gf3_pattern.color	256
+offset	struct gf3_pattern.fg	268
+member_size	struct gf3_pattern.fg	4
+offset	struct gf3_pattern.kind	0
+member_size	struct gf3_pattern.kind	4
+offset	struct gf3_pattern.mono	4
+member_size	struct gf3_pattern.mono	8
 size	struct gf3_ram	12
 align	struct gf3_ram	4
 offset	struct gf3_ram.bytes	4
@@ -1976,10 +2372,12 @@ offset	struct gf3_span.rowbytes	4
 member_size	struct gf3_span.rowbytes	4
 offset	struct gf3_span.rows	12
 member_size	struct gf3_span.rows	4
-size	struct gf3_surface	32
+size	struct gf3_surface	36
 align	struct gf3_surface	4
 offset	struct gf3_surface.bytes	4
 member_size	struct gf3_surface.bytes	4
+offset	struct gf3_surface.dma	32
+member_size	struct gf3_surface.dma	4
 offset	struct gf3_surface.fmt	20
 member_size	struct gf3_surface.fmt	4
 offset	struct gf3_surface.generation	28
@@ -2020,7 +2418,7 @@ offset	struct gf3_test_ops.unmap	44
 member_size	struct gf3_test_ops.unmap	4
 offset	struct gf3_test_ops.upload	24
 member_size	struct gf3_test_ops.upload	4
-size	struct gf4_ctx	6732
+size	struct gf4_ctx	6780
 align	struct gf4_ctx	4
 offset	struct gf4_ctx.accel	4
 member_size	struct gf4_ctx.accel	4
@@ -2028,9 +2426,9 @@ offset	struct gf4_ctx.accepting	41
 member_size	struct gf4_ctx.accepting	1
 offset	struct gf4_ctx.ch	0
 member_size	struct gf4_ctx.ch	4
-offset	struct gf4_ctx.changing	718
+offset	struct gf4_ctx.changing	734
 member_size	struct gf4_ctx.changing	1
-offset	struct gf4_ctx.cleanup_pending	6724
+offset	struct gf4_ctx.cleanup_pending	6772
 member_size	struct gf4_ctx.cleanup_pending	1
 offset	struct gf4_ctx.cursor	140
 member_size	struct gf4_ctx.cursor	48
@@ -2038,63 +2436,63 @@ offset	struct gf4_ctx.cursor_view	212
 member_size	struct gf4_ctx.cursor_view	192
 offset	struct gf4_ctx.data	12
 member_size	struct gf4_ctx.data	4
-offset	struct gf4_ctx.dcb	828
+offset	struct gf4_ctx.dcb	844
 member_size	struct gf4_ctx.dcb	748
 offset	struct gf4_ctx.deadline	32
 member_size	struct gf4_ctx.deadline	4
-offset	struct gf4_ctx.diagnostic_saved	1576
+offset	struct gf4_ctx.diagnostic_saved	1592
 member_size	struct gf4_ctx.diagnostic_saved	4
 offset	struct gf4_ctx.epoch	28
 member_size	struct gf4_ctx.epoch	4
 offset	struct gf4_ctx.exec	16
 member_size	struct gf4_ctx.exec	4
 offset	struct gf4_ctx.hold	404
-member_size	struct gf4_ctx.hold	152
-offset	struct gf4_ctx.hold_saved	1584
-member_size	struct gf4_ctx.hold_saved	5140
+member_size	struct gf4_ctx.hold	168
+offset	struct gf4_ctx.hold_saved	1600
+member_size	struct gf4_ctx.hold_saved	5172
 offset	struct gf4_ctx.last_rc	36
 member_size	struct gf4_ctx.last_rc	4
-offset	struct gf4_ctx.legacy	560
+offset	struct gf4_ctx.legacy	576
 member_size	struct gf4_ctx.legacy	4
-offset	struct gf4_ctx.limits	564
+offset	struct gf4_ctx.limits	580
 member_size	struct gf4_ctx.limits	152
-offset	struct gf4_ctx.limits_valid	716
+offset	struct gf4_ctx.limits_valid	732
 member_size	struct gf4_ctx.limits_valid	2
-offset	struct gf4_ctx.links	556
+offset	struct gf4_ctx.links	572
 member_size	struct gf4_ctx.links	4
-offset	struct gf4_ctx.memory_prepare_attempted	6725
+offset	struct gf4_ctx.memory_prepare_attempted	6773
 member_size	struct gf4_ctx.memory_prepare_attempted	1
-offset	struct gf4_ctx.memory_prepare_rc	6728
+offset	struct gf4_ctx.memory_prepare_rc	6776
 member_size	struct gf4_ctx.memory_prepare_rc	4
-offset	struct gf4_ctx.next_mode_id	724
+offset	struct gf4_ctx.next_mode_id	740
 member_size	struct gf4_ctx.next_mode_id	4
 offset	struct gf4_ctx.nroutes	24
 member_size	struct gf4_ctx.nroutes	4
 offset	struct gf4_ctx.ready	40
 member_size	struct gf4_ctx.ready	1
-offset	struct gf4_ctx.recovery_rc	720
+offset	struct gf4_ctx.recovery_rc	736
 member_size	struct gf4_ctx.recovery_rc	4
 offset	struct gf4_ctx.reusable	42
 member_size	struct gf4_ctx.reusable	1
 offset	struct gf4_ctx.routes	20
 member_size	struct gf4_ctx.routes	4
-offset	struct gf4_ctx.saved_closed	719
+offset	struct gf4_ctx.saved_closed	735
 member_size	struct gf4_ctx.saved_closed	1
 offset	struct gf4_ctx.scan	44
 member_size	struct gf4_ctx.scan	96
-offset	struct gf4_ctx.scan_bank	824
+offset	struct gf4_ctx.scan_bank	840
 member_size	struct gf4_ctx.scan_bank	2
-offset	struct gf4_ctx.scan_next	728
+offset	struct gf4_ctx.scan_next	744
 member_size	struct gf4_ctx.scan_next	96
 offset	struct gf4_ctx.state	8
 member_size	struct gf4_ctx.state	4
 offset	struct gf4_ctx.test	188
 member_size	struct gf4_ctx.test	24
-offset	struct gf4_ctx.tv_pin_mask	1580
+offset	struct gf4_ctx.tv_pin_mask	1596
 member_size	struct gf4_ctx.tv_pin_mask	1
-offset	struct gf4_ctx.tv_sense_valid	1582
+offset	struct gf4_ctx.tv_sense_valid	1598
 member_size	struct gf4_ctx.tv_sense_valid	1
-offset	struct gf4_ctx.tv_subconnector	1581
+offset	struct gf4_ctx.tv_subconnector	1597
 member_size	struct gf4_ctx.tv_subconnector	1
 size	struct gf4_cursor	28
 align	struct gf4_cursor	4
@@ -2186,18 +2584,18 @@ offset	struct gf4_exec_ops.tmds_script	0
 member_size	struct gf4_exec_ops.tmds_script	4
 offset	struct gf4_exec_ops.tv_gpio	16
 member_size	struct gf4_exec_ops.tv_gpio	4
-size	struct gf4_flip_hold	76
+size	struct gf4_flip_hold	84
 align	struct gf4_flip_hold	4
-offset	struct gf4_flip_hold.after	68
+offset	struct gf4_flip_hold.after	76
 member_size	struct gf4_flip_hold.after	4
-offset	struct gf4_flip_hold.base_verified	72
+offset	struct gf4_flip_hold.base_verified	80
 member_size	struct gf4_flip_hold.base_verified	1
 offset	struct gf4_flip_hold.base_written	1
 member_size	struct gf4_flip_hold.base_written	1
-offset	struct gf4_flip_hold.new_front	36
-member_size	struct gf4_flip_hold.new_front	32
+offset	struct gf4_flip_hold.new_front	40
+member_size	struct gf4_flip_hold.new_front	36
 offset	struct gf4_flip_hold.old_front	4
-member_size	struct gf4_flip_hold.old_front	32
+member_size	struct gf4_flip_hold.old_front	36
 offset	struct gf4_flip_hold.pending	0
 member_size	struct gf4_flip_hold.pending	1
 size	struct gf4_gpio_value	4
@@ -2208,47 +2606,47 @@ offset	struct gf4_gpio_value.log	2
 member_size	struct gf4_gpio_value.log	2
 offset	struct gf4_gpio_value.present	0
 member_size	struct gf4_gpio_value.present	1
-size	struct gf4_head_image	2484
+size	struct gf4_head_image	2492
 align	struct gf4_head_image	4
-offset	struct gf4_head_image.back	92
-member_size	struct gf4_head_image.back	32
+offset	struct gf4_head_image.back	96
+member_size	struct gf4_head_image.back	36
 offset	struct gf4_head_image.blank	1
 member_size	struct gf4_head_image.blank	1
-offset	struct gf4_head_image.cursor	124
+offset	struct gf4_head_image.cursor	132
 member_size	struct gf4_head_image.cursor	20
-offset	struct gf4_head_image.cursor_h	164
+offset	struct gf4_head_image.cursor_h	172
 member_size	struct gf4_head_image.cursor_h	4
-offset	struct gf4_head_image.cursor_valid	2480
+offset	struct gf4_head_image.cursor_valid	2488
 member_size	struct gf4_head_image.cursor_valid	1
 offset	struct gf4_head_image.cursor_visible	2
 member_size	struct gf4_head_image.cursor_visible	1
-offset	struct gf4_head_image.cursor_w	160
+offset	struct gf4_head_image.cursor_w	168
 member_size	struct gf4_head_image.cursor_w	4
-offset	struct gf4_head_image.dpms	172
+offset	struct gf4_head_image.dpms	180
 member_size	struct gf4_head_image.dpms	4
 offset	struct gf4_head_image.enabled	0
 member_size	struct gf4_head_image.enabled	1
-offset	struct gf4_head_image.fp_on	168
+offset	struct gf4_head_image.fp_on	176
 member_size	struct gf4_head_image.fp_on	4
 offset	struct gf4_head_image.front	60
-member_size	struct gf4_head_image.front	32
-offset	struct gf4_head_image.gamma	944
+member_size	struct gf4_head_image.front	36
+offset	struct gf4_head_image.gamma	952
 member_size	struct gf4_head_image.gamma	1536
-offset	struct gf4_head_image.hot_x	152
+offset	struct gf4_head_image.hot_x	160
 member_size	struct gf4_head_image.hot_x	4
-offset	struct gf4_head_image.hot_y	156
+offset	struct gf4_head_image.hot_y	164
 member_size	struct gf4_head_image.hot_y	4
 offset	struct gf4_head_image.lut_dirty	3
 member_size	struct gf4_head_image.lut_dirty	1
 offset	struct gf4_head_image.mode	4
 member_size	struct gf4_head_image.mode	36
-offset	struct gf4_head_image.palette	176
+offset	struct gf4_head_image.palette	184
 member_size	struct gf4_head_image.palette	768
 offset	struct gf4_head_image.route	40
 member_size	struct gf4_head_image.route	20
-offset	struct gf4_head_image.x	144
+offset	struct gf4_head_image.x	152
 member_size	struct gf4_head_image.x	4
-offset	struct gf4_head_image.y	148
+offset	struct gf4_head_image.y	156
 member_size	struct gf4_head_image.y	4
 size	struct gf4_i2c_port	2
 align	struct gf4_i2c_port	1
@@ -2314,12 +2712,12 @@ offset	struct gf4_route.tv_norm	16
 member_size	struct gf4_route.tv_norm	4
 offset	struct gf4_route.type	2
 member_size	struct gf4_route.type	1
-size	struct gf4_saved	5140
+size	struct gf4_saved	5172
 align	struct gf4_saved	4
 offset	struct gf4_saved.head	20
-member_size	struct gf4_saved.head	4968
-offset	struct gf4_saved.hold	4988
-member_size	struct gf4_saved.hold	152
+member_size	struct gf4_saved.head	4984
+offset	struct gf4_saved.hold	5004
+member_size	struct gf4_saved.hold	168
 offset	struct gf4_saved.size	4
 member_size	struct gf4_saved.size	4
 offset	struct gf4_saved.version	0
@@ -2330,35 +2728,35 @@ offset	struct gf4_saved.wanted_graph	12
 member_size	struct gf4_saved.wanted_graph	4
 offset	struct gf4_saved.wanted_heads	16
 member_size	struct gf4_saved.wanted_heads	4
-size	struct gf4_state	25212
+size	struct gf4_state	25276
 align	struct gf4_state	4
-offset	struct gf4_state.committed	22340
+offset	struct gf4_state.committed	22404
 member_size	struct gf4_state.committed	1632
 offset	struct gf4_state.edid	3564
 member_size	struct gf4_state.edid	824
 offset	struct gf4_state.edid_connector	4388
 member_size	struct gf4_state.edid_connector	4
 offset	struct gf4_state.head	4392
-member_size	struct gf4_state.head	4968
+member_size	struct gf4_state.head	4984
 offset	struct gf4_state.mode_connector	3468
 member_size	struct gf4_state.mode_connector	96
 offset	struct gf4_state.modes	12
 member_size	struct gf4_state.modes	3456
-offset	struct gf4_state.next	17372
-member_size	struct gf4_state.next	4968
+offset	struct gf4_state.next	17420
+member_size	struct gf4_state.next	4984
 offset	struct gf4_state.nmodes	8
 member_size	struct gf4_state.nmodes	4
-offset	struct gf4_state.rollback	12232
-member_size	struct gf4_state.rollback	5140
-offset	struct gf4_state.rollback_tv	23972
+offset	struct gf4_state.rollback	12248
+member_size	struct gf4_state.rollback	5172
+offset	struct gf4_state.rollback_tv	24036
 member_size	struct gf4_state.rollback_tv	1240
 offset	struct gf4_state.size	4
 member_size	struct gf4_state.size	4
-offset	struct gf4_state.tv	9360
+offset	struct gf4_state.tv	9376
 member_size	struct gf4_state.tv	1240
 offset	struct gf4_state.version	0
 member_size	struct gf4_state.version	4
-offset	struct gf4_state.work	10600
+offset	struct gf4_state.work	10616
 member_size	struct gf4_state.work	1632
 size	struct gf4_test_ops	68
 align	struct gf4_test_ops	4
@@ -2616,25 +3014,25 @@ offset	struct gf5_heat_state.entry_clock	12
 member_size	struct gf5_heat_state.entry_clock	12
 offset	struct gf5_heat_state.epoch	8
 member_size	struct gf5_heat_state.epoch	4
-size	struct gf5_image	5780
+size	struct gf5_image	5812
 align	struct gf5_image	4
 offset	struct gf5_image.bytes	4
 member_size	struct gf5_image.bytes	4
 offset	struct gf5_image.clock	16
 member_size	struct gf5_image.clock	12
-offset	struct gf5_image.clock_available	5763
+offset	struct gf5_image.clock_available	5795
 member_size	struct gf5_image.clock_available	1
-offset	struct gf5_image.clock_raw	5764
+offset	struct gf5_image.clock_raw	5796
 member_size	struct gf5_image.clock_raw	16
-offset	struct gf5_image.complete	5760
+offset	struct gf5_image.complete	5792
 member_size	struct gf5_image.complete	1
 offset	struct gf5_image.display	616
-member_size	struct gf5_image.display	5140
-offset	struct gf5_image.extent	5756
+member_size	struct gf5_image.display	5172
+offset	struct gf5_image.extent	5788
 member_size	struct gf5_image.extent	4
 offset	struct gf5_image.fan	36
 member_size	struct gf5_image.fan	136
-offset	struct gf5_image.fan_available	5761
+offset	struct gf5_image.fan_available	5793
 member_size	struct gf5_image.fan_available	1
 offset	struct gf5_image.nextent	8
 member_size	struct gf5_image.nextent	4
@@ -2652,7 +3050,7 @@ offset	struct gf5_image.version	0
 member_size	struct gf5_image.version	4
 offset	struct gf5_image.vid	32
 member_size	struct gf5_image.vid	1
-offset	struct gf5_image.volt_available	5762
+offset	struct gf5_image.volt_available	5794
 member_size	struct gf5_image.volt_available	1
 size	struct gf5_links	56
 align	struct gf5_links	4
@@ -3188,10 +3586,10 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	12708
+size	struct gf_production	12716
 align	struct gf_production	4
 offset	struct gf_production.accel	3420
-member_size	struct gf_production.accel	7512
+member_size	struct gf_production.accel	7520
 offset	struct gf_production.acquiring	1919
 member_size	struct gf_production.acquiring	1
 offset	struct gf_production.attempted	1917
@@ -3200,7 +3598,7 @@ offset	struct gf_production.chan	2376
 member_size	struct gf_production.chan	1044
 offset	struct gf_production.display	0
 member_size	struct gf_production.display	1896
-offset	struct gf_production.feature5	10932
+offset	struct gf_production.feature5	10940
 member_size	struct gf_production.feature5	1768
 offset	struct gf_production.foundation	2132
 member_size	struct gf_production.foundation	244
@@ -3208,9 +3606,9 @@ offset	struct gf_production.indexes	1940
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	2036
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	12700
+offset	struct gf_production.map_ops	12708
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	12704
+offset	struct gf_production.map_owner	12712
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1916
 member_size	struct gf_production.prepared	1

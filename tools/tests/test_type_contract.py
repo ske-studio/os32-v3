@@ -408,7 +408,7 @@ def main():
         if not args.ppc:
             result = syntax(cc, profile['SQLITE_SA_CFLAGS'], directory)
             assert result.returncode == 0, result.stderr
-            for header in ('os32_kapi_shared.h', 'os32_gui_shared.h'):
+            for header in ('os32_kapi_shared.h', 'os32_gui_shared.h', 'os32_gfx2.h'):
                 result = syntax(cc, ['-m32', '-std=gnu89', '-Werror', '-Isdk/include/os32'],
                                 directory, '#include "' + header + '"\n')
                 assert result.returncode == 0, result.stderr
