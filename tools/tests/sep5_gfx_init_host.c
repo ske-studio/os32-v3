@@ -110,17 +110,18 @@ static void present_case(void)
     /* Flip mode: merge, transfer, then show the page just drawn and draw on the other. */
     for (int start = 0; start < 2; start++) {
         gfx_flip_enabled = 1; gfx_display_page = start; dirty_queue.count = 1; prev_dirty.count = 0;
-        count = 0;
+        count = 0; gfx_counters.io_accesses = 0;
         _present_dirty(1);
         expect(count == 4 && gfx_display_page == (start ^ 1));
+        expect(gfx_counters.io_accesses == 2);          /* the two page writes are counted */
         is(0, EV_CALL, F_MERGE, 0); is(1, EV_CALL, F_FLUSH, 0);
         is(2, EV_OUT, 0xA4, start ^ 1); is(3, EV_OUT, 0xA6, start);
     }
     /* No flip, sync: wait on the text GDC status until VSYNC, then transfer. */
     gfx_flip_enabled = 0; dirty_queue.count = 1; vsync_misses = 2;
-    count = 0;
+    count = 0; gfx_counters.io_accesses = 0;
     _present_dirty(1);
-    expect(count == 4);
+    expect(count == 4 && gfx_counters.io_accesses == 0); /* no page write without flip */
     for (unsigned i = 0; i < 3; i++) is(i, EV_IN, 0x60, 0);
     is(3, EV_CALL, F_FLUSH, 0);
     /* No flip, no sync: transfer at once. Nothing dirty: nothing at all. */

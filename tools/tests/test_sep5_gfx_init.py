@@ -66,6 +66,7 @@ CORE_MUTATIONS = (
     ('present-flip-before-transfer', 'vram',
      '        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n        _flip_page();\n    } else {\n        if (dirty_queue.count == 0) return;',
      '        _flip_page();\n        _merge_prev_dirty();\n        _flush_dirty_queue();\n        prev_dirty = snapshot;\n    } else {\n        if (dirty_queue.count == 0) return;'),
+    ('present-flip-uncounted', 'vram', '    gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */\n', ''),
     ('present-vsync-omitted', 'vram', '            display_wait_vsync();\n', '            (void)0;\n'),
     ('present-vsync-always', 'vram', '        if (sync) {\n            /* VSYNC期間になるまで待つ */', '        if (sync || 1) {\n            /* VSYNC期間になるまで待つ */'),
     ('200-clear-size', 'init', '    _gfx_common_init(plane_sz);', '    _gfx_common_init(GFX_PLANE_SZ);'),
