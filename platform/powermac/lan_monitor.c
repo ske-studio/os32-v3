@@ -94,7 +94,7 @@ static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
         va = get(q->payload, 4); n = get(q->payload + 4, 2);
         if (!n || n > 256 || get(q->payload + 6, 2) ||
             d->peek_ok_count > 8 || d->peek_deny_count > 4 ||
-            d->peek_ig_ok_count > 2 || !d->peek_ig_ok ||
+            d->peek_ig_ok_count > 2 || (d->peek_ig_ok_count && !d->peek_ig_ok) ||
             !d->translate || !d->copy8 || (d->peek_ok_count && !d->peek_ok) ||
             (d->peek_deny_count && !d->peek_deny)) goto bad_range;
         for (i = 0; i < d->peek_ok_count; ++i)

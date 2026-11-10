@@ -22,8 +22,10 @@ MUTATIONS = [
  ('diag-end', 'n > 256 - off', '0', 34),
  ('deny-half', 'r->base - base < len', '0', 14),
  ('ig-allow', 'if (contains(&d->peek_ig_ok[j], va + i, 1)) break;', 'if (0) break;', 43),
- ('ig-reject', 'if (j == d->peek_ig_ok_count) goto bad_range;', 'if (0) goto bad_range;', 16),
+ ('ig-reject', 'if (j == d->peek_ig_ok_count) goto bad_range;', 'if (0) goto bad_range;', 50),
  ('clear', 'ppc_trap_onfault_clear();', '(void)0;', 31),
+ ('empty-ig', '(d->peek_ig_ok_count && !d->peek_ig_ok)', '!d->peek_ig_ok', 49),
+ ('clear-on-arm-failure', '    ppc_irq_restore(flags);', '    if (rc == 1) ppc_trap_onfault_clear();\n    ppc_irq_restore(flags);', 48),
 ]
 def exercise(source, temp):
     path = pathlib.Path(temp); (path / 'monitor.c').write_text(source)

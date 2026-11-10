@@ -10,7 +10,7 @@ u32 ppc_irq_save(void) { events=1; return 42; }
 void ppc_irq_restore(u32 f) { events = (events==123 || (arm_fail && events==12)) && f==42 ? 1234 : -1; }
 int ppc_trap_onfault_data(u32 pc,u32 va,u32 resume) { if(events==1 && pc==(u32)ppc_probe_copy8_insn && va==100 && resume==(u32)ppc_probe_copy8_resume) events=12; return !arm_fail; }
 int ppc_probe_copy8(u32 va,u8 *p) { if(events==12 && va==100) events=122; *p=42; return 0; }
-void ppc_trap_onfault_clear(void) { if(events==122) events=123; }
+void ppc_trap_onfault_clear(void) { events = events==122 && !arm_fail ? 123 : -1; }
 static void clock_cb(void *c,u32 *a,u32 *b,u64 *d,u64 *e) { (void)c; *a=0x01020304; *b=0x05060708; *d=0x090a0b0c0d0e0f10ULL; *e=0x1112131415161718ULL; }
 static int trans(void *c,u32 va,u32 *pa,u32 *ig) { (void)c; *pa=mode==3 && va==0x1002?0:va; *ig=mode==2 && va==0x1002; return mode==1 && va==0x1002; }
 static int copy(void *c,u32 va,u8 *p) { (void)c; ++copies; *p=(u8)va; return mode==4 && copies==3; }
@@ -44,6 +44,7 @@ void _start(void) { u32 i; u8 b[400]; u32 used; out("REACHED\n",8); q.type=3; fo
  out("reached=A10\n",12); copies=0; peek(0x10ff,2,0); CHECK(r.status==3 && copies==0,12);
  peek(0x0fff,1,0); CHECK(r.status==3,38); peek(0x11ff,2,0); CHECK(r.status==3,39); peek(0xffffffff,2,0); CHECK(r.status==3,13);
  d.peek_deny_count=1; peek(0x107f,1,0); CHECK(!r.status,40); peek(0x1090,1,0); CHECK(!r.status,41); peek(0x107f,2,0); CHECK(r.status==3,14); peek(0x108f,2,0); CHECK(r.status==3,42); d.peek_deny_count=0;
+ d.peek_ig_ok=0; d.peek_ig_ok_count=0; peek(0x1000,5,0); CHECK(!r.status && r.payload_bytes==5,49); mode=2; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,50); d.peek_ig_ok=ig_ok;
  mode=1; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,15); mode=2; d.peek_ig_ok_count=0; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,16); d.peek_ig_ok_count=1; peek(0x1000,5,0); CHECK(!r.status && r.payload_bytes==5,43); ig_ok[0].base=0x1003; peek(0x1000,5,0); CHECK(r.status==3,44); ig_ok[0].base=0x1001; ig_ok[0].size=1; peek(0x1000,5,0); CHECK(r.status==3,45); ig_ok[0].base=0x1002; ig_ok[0].size=2; d.peek_ig_ok_count=3; peek(0x1000,5,0); CHECK(r.status==3,46); d.peek_ig_ok_count=1; d.peek_ig_ok=0; peek(0x1000,5,0); CHECK(r.status==3,47); d.peek_ig_ok=ig_ok; mode=3; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,17); mode=4; copies=0; peek(0x1000,5,0); CHECK(r.status==7 && !r.payload_bytes,18); mode=0;
  req(1,1); CHECK(r.status==2,19); req(2,1); CHECK(r.status==2,20); req(3,1); CHECK(r.status==2,21); req(4,3); CHECK(r.status==2,22); req(5,7); CHECK(r.status==2,23); req(99,0); CHECK(r.status==1,24);
  req(1,0); CHECK(!r.status,25); words[0]=0; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.payload[0]==0x12,26); q.opcode=2; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==4,27);
