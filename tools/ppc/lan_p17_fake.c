@@ -1,6 +1,6 @@
 #include "gem.h"
 
-struct fake { u32 config, frame, regs[32], port, addr, id1, id2, pending, reads, no_ta, stuck, latch; unsigned long long tb; u32 delay, zeros, reset_reads, writes, order, bad_order, freeze_tb; u32 log_reg[16], log_val[16], first_frame, tb_calls; };
+struct fake { u32 config, frame, regs[32], port, addr, id1, id2, pending, reads, no_ta, stuck, latch; unsigned long long tb; u32 delay, zeros, reset_reads, writes, order, bad_order, freeze_tb; u32 log_reg[16], log_val[16], first_frame, tb_calls, bmsr_reads; };
 static u32 read32(void *p, u32 reg)
 {
     struct fake *f = p;
@@ -36,7 +36,7 @@ static void write32(void *p, u32 reg, u32 v)
 {
     struct fake *f = p;
     if (reg == 0x6210) f->config = v;
-    if (reg == 0x620c) { if (!f->first_frame) f->first_frame = v; f->frame = v; f->reads = 0; }
+    if (reg == 0x620c) { if (!f->first_frame) f->first_frame = v; if ((v & 0xf0000000U) == 0x60000000U && ((v >> 18) & 31) == 1) f->bmsr_reads++; f->frame = v; f->reads = 0; }
 }
 static unsigned long long tb(void *p) { struct fake *f = p; f->tb_calls++; return f->freeze_tb ? f->tb : ++f->tb; }
 static void say(const char *s) { unsigned n=0; while (s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
@@ -86,6 +86,18 @@ static int main_test(void)
     else if (c == 6 || c == 12 || c == 13) { if (r != GEM_EIO) fail("H:partner"); }
     else if (r != GEM_OK) fail("H:link");
     if (r == GEM_EIO || r == GEM_ETIME) { u32 n = f.writes; if (gem_phy_step(&g, 3) != GEM_AGAIN || f.writes != n + 1 || f.log_reg[n] != 0 || f.log_val[n] != 0x8000) fail("H:retry"); }
+    if (c >= 18) {
+        u32 reads = f.bmsr_reads, writes = f.writes;
+        if (c == 19) f.latch = 1;
+        if (c == 20) f.no_ta = 1;
+        r = gem_phy_step(&g, 3);
+        if (c == 18 && (r != GEM_OK || f.bmsr_reads != reads + 1)) fail("H:done-link");
+        if (c == 19) {
+            if (r != GEM_EIO || f.bmsr_reads != reads + 1) fail("H:done-down");
+            if (gem_phy_step(&g, 4) != GEM_AGAIN || f.writes != writes + 1 || f.log_reg[writes] != 0 || f.log_val[writes] != 0x8000) fail("H:done-restart");
+        }
+        if (c == 20 && (r != GEM_ETIME || f.bmsr_reads != reads + 1)) fail("H:done-mif");
+    }
     return 0;
 }
 
