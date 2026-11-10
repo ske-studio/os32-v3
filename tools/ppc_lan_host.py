@@ -2,6 +2,7 @@
 """Capture PLN1 Ethernet frames and issue read-only diagnostic requests."""
 import argparse
 import json
+import os
 import pathlib
 import secrets
 import select
@@ -64,12 +65,12 @@ def endpoint(value):
 
 
 class UDP:
-    def __init__(self, spec):
+    def __init__(self, spec, local_mac=bytes.fromhex("020000000001")):
         local, remote = spec.split(',')
         self.remote = endpoint(remote)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(endpoint(local))
-        self.local_mac = bytes.fromhex('525400123401')
+        self.local_mac = local_mac
 
     def fileno(self):
         return self.sock.fileno()
@@ -108,6 +109,8 @@ class Host:
         self.clock, self.output = clock, output
         self.next_id, self.pending = 1, {}
         self.high = None
+        self.seen = set()
+        self.generation = 0
 
     def receive(self, frame):
         if len(frame) < 14 or frame[6:12] != self.peer or frame[12:14] != struct.pack('!H', ETHERTYPE):
@@ -115,6 +118,10 @@ class Host:
         try:
             m = decode(frame[14:])
         except ValueError:
+            return
+        if m['kind'] in (LOG, BEACON) and frame[:6] not in (self.io.local_mac, b'\xff' * 6):
+            return
+        if m['kind'] == RSP and frame[:6] != self.io.local_mac:
             return
         boot = m['boot']
         if self.constraint is not None and boot != self.constraint:
@@ -129,6 +136,9 @@ class Host:
             pending = self.pending.get(m['request_id'])
             if m['nonce'] != self.nonce or pending is None or m['opcode'] != pending[1]:
                 return
+            if self.clock() >= pending[0]:
+                self.expire()
+                return
             del self.pending[m['request_id']]
             self.output(format_response(m))
             return
@@ -139,22 +149,35 @@ class Host:
             if self.high is None and seq > 0:
                 self.output(f'initial gap: {seq}')
             elif self.high is not None:
-                if seq == self.high:
+                if seq in self.seen:
                     self.output(f'duplicate: {seq}')
                 elif seq < self.high:
                     self.output(f'out of order: {seq}')
                 elif seq > self.high + 1:
                     self.output(f'gap: {seq - self.high - 1}')
+            self.seen.add(seq)
             self.high = seq if self.high is None else max(self.high, seq)
-            with (self.out / (boot.hex() + '.log')).open('ab') as f:
+            with (self.storage(boot) / (boot.hex() + '.log')).open('ab') as f:
                 f.write(m['payload'])
+        elif self.high is not None and seq < self.high:
+            self.output('possible restart: sequence rollback')
+            self.generation += 1
+            self.high = None
+            self.seen.clear()
         elif seq > (0 if self.high is None else self.high + 1):
             self.output(f'beacon gap: {seq - (0 if self.high is None else self.high + 1)}')
         self.output(f"{('beacon' if m['kind'] == BEACON else 'log')} seq={seq} drop_records={m['drop_records']} drop_bytes={m['drop_bytes']}; loss after last frame unknown until next beacon")
         metadata = dict(seq=seq, drop_records=m['drop_records'], drop_bytes=m['drop_bytes'],
                         time=time.time(), kind='beacon' if m['kind'] == BEACON else 'log')
-        with (self.out / (boot.hex() + '.jsonl')).open('a', encoding='utf-8') as f:
+        with (self.storage(boot) / (boot.hex() + '.jsonl')).open('a', encoding='utf-8') as f:
             f.write(json.dumps(metadata) + '\n')
+
+    def storage(self, boot):
+        if not self.generation:
+            return self.out
+        directory = self.out / f'{boot.hex()}.{self.generation}'
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
 
     def request(self, command):
         if self.boot is None:
@@ -216,11 +239,26 @@ def format_response(m):
     return result + ' ' + payload.hex()
 
 
+class InputLines:
+    def __init__(self, fd):
+        self.fd = fd
+        self.buffer = b''
+        os.set_blocking(fd, False)
+
+    def read(self):
+        chunk = os.read(self.fd, 4096)
+        self.buffer += chunk
+        lines = self.buffer.split(b'\n')
+        self.buffer = lines.pop()
+        return chunk != b'', [line.decode('utf-8') for line in lines]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--udp')
     group.add_argument('--iface')
+    parser.add_argument('--mac', default='02:00:00:00:00:01')
     parser.add_argument('--peer', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--boot-id')
@@ -230,18 +268,19 @@ def main():
         boot = bytes.fromhex(args.boot_id.replace('-', '')) if args.boot_id else None
         if boot is not None and len(boot) != 16:
             raise ValueError('boot-id must be 16 bytes')
-        io = UDP(args.udp) if args.udp else Packet(args.iface)
+        io = UDP(args.udp, mac(args.mac)) if args.udp else Packet(args.iface)
         host = Host(io, peer, args.out, boot)
-        stdin = sys.stdin
+        stdin = sys.stdin.fileno()
+        input_lines = InputLines(stdin)
         while True:
-            ready, _, _ = select.select([io] + ([stdin] if stdin else []), [], [], 0.1)
+            ready, _, _ = select.select([io] + ([stdin] if stdin is not None else []), [], [], 0.1)
             if io in ready:
                 host.receive(io.receive())
-            if stdin and stdin in ready:
-                line = stdin.readline()
-                if not line:
+            if stdin is not None and stdin in ready:
+                alive, lines = input_lines.read()
+                if not alive:
                     stdin = None
-                else:
+                for line in lines:
                     try:
                         host.request(line)
                     except ValueError as exc:

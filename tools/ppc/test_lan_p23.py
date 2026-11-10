@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Exercise host capture, request matching, and mutation detection."""
 import importlib.util
+import json
+import os
+import select
 import pathlib
 import socket
 import subprocess
@@ -18,6 +21,12 @@ MUTATIONS = [
     ('double-drop', "seq - self.high - 1}')", "seq - self.high - 1 + m['drop_records']}')", 'H:gap double-drop'),
     ('nonce', "m['nonce'] != self.nonce or pending is None", "False or pending is None", 'H:nonce mismatch'),
     ('extra', 'if len(data) != HEADER_BYTES + size:', 'if False:', 'H:extra bytes'),
+    ('destination', "frame[:6] not in (self.io.local_mac, b'\\xff' * 6)", 'False', 'H:destination'),
+    ('response-destination', "frame[:6] != self.io.local_mac", 'False', 'H:response-destination'),
+    ('deadline', 'self.clock() >= pending[0]', 'False', 'H:deadline'),
+    ('generation', 'self.generation += 1', 'self.generation += 0', 'H:generation'),
+    ('duplicate', 'if seq in self.seen:', 'if seq == self.high:', 'H:sequence'),
+    ('drop-swap', 'drop_bytes=dropped, request_id=request_id', 'drop_bytes=records, request_id=request_id', 'H:drop values'),
     ('request-id', 'self.next_id += 1', 'self.next_id += 0', 'H:request-id'),
 ]
 
@@ -57,9 +66,13 @@ def exercise(path, directory):
     h = m.Host(fake, peer, directory, nonce=nonce, clock=lambda: 10, output=messages.append)
     def frame(data, source=peer):
         return fake.local_mac + source + b'\x88\xb6' + data
+    print('reached=A9')
+    alien = bytes.fromhex('020000000099')
+    for kind in (m.BEACON, m.LOG, m.RSP):
+        h.receive(alien + peer + b'\x88\xb6' + m.encode(kind, boot))
+    require(h.boot is None, 'H:destination')
     beacon = m.encode(m.BEACON, boot)
     h.receive(frame(beacon))
-    print('reached=A9')
     h.receive(frame(m.encode(m.LOG, other, payload=b'foreign')))
     require(not (pathlib.Path(directory) / (other.hex() + '.log')).exists() and h.high is None, 'H:A9 foreign-boot')
     h.receive(frame(m.encode(m.LOG, boot, payload=b'bad'), b'123456'))
@@ -72,7 +85,7 @@ def exercise(path, directory):
     driver.write_text("""#include "lan_boot.h"
 extern long write(int, const void *, unsigned long);
 int main(void) { struct lan_message m = {0}; unsigned char b[400]; unsigned int n, i;
-for (i = 0; i < 16; i++) m.boot_id[i] = i; m.type = PLN1_TYPE_LOG; m.seq = 1;
+for (i = 0; i < 16; i++) m.boot_id[i] = i; m.type = PLN1_TYPE_LOG; m.seq = 1; m.drop_records = 7; m.drop_bytes = 19;
 m.payload_bytes = 2; m.payload[0] = 0xe3; m.payload[1] = 0x81;
 if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
 """)
@@ -83,11 +96,13 @@ if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
                    check=True, capture_output=True, timeout=60)
     guest_frame = subprocess.run([str(binary)], check=True, capture_output=True, timeout=60).stdout
     h.receive(frame(guest_frame))
+    metadata = json.loads((pathlib.Path(directory) / (boot.hex() + '.jsonl')).read_text().splitlines()[-1])
+    require(metadata['drop_records'] == 7 and metadata['drop_bytes'] == 19, 'H:drop values')
     h.receive(frame(m.encode(m.LOG, boot, seq=3, drop_records=2, payload=b'\x82')))
     require('gap: 1' in messages, 'H:gap double-drop')
-    h.receive(frame(m.encode(m.LOG, boot, seq=3, payload=b'D')))
+    h.receive(frame(m.encode(m.LOG, boot, seq=1, payload=b'D')))
     h.receive(frame(m.encode(m.LOG, boot, seq=2, payload=b'R')))
-    require('initial gap: 1' in messages and 'duplicate: 3' in messages and 'out of order: 2' in messages, 'H:sequence')
+    require('initial gap: 1' in messages and 'duplicate: 1' in messages and 'out of order: 2' in messages, 'H:sequence')
     require((pathlib.Path(directory) / (boot.hex() + '.log')).read_bytes() == b'\xe3\x81\x82DR', 'H:raw')
     h.request('read-diag 2 3')
     golden = bytes.fromhex('504c4e3101030050') + boot + bytes(24) + bytes.fromhex('00000001000400000004000000000000') + nonce + bytes.fromhex('00020003')
@@ -97,11 +112,40 @@ if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
     require(1 in h.pending, 'H:nonce mismatch')
     h.request('status')
     require(2 in h.pending and m.decode(fake.sent[-1][14:])['request_id'] == 2, 'H:request-id')
-    h.receive(frame(m.encode(m.RSP, boot, request_id=2, opcode=1, nonce=nonce, payload=bytes(4))))
+    response = m.encode(m.RSP, boot, request_id=2, opcode=1, nonce=nonce, payload=bytes(4))
+    h.receive(alien + peer + b'\x88\xb6' + response)
+    require(2 in h.pending, 'H:response-destination')
+    h.clock = lambda: 10.499
+    h.receive(frame(response))
     require(2 not in h.pending and any('response 2 OK' in x for x in messages), 'H:response')
-    h.clock = lambda: 10.5
+    h.clock = lambda: 10.501
+    h.receive(frame(m.encode(m.RSP, boot, request_id=1, opcode=4, nonce=nonce)))
     h.expire()
+    require(not any('response 1 ' in x for x in messages) and messages.count('request 1 timeout') == 1, 'H:deadline')
     require('request 1 timeout' in messages, 'H:timeout')
+    h.receive(frame(m.encode(m.BEACON, boot, seq=0)))
+    h.receive(frame(m.encode(m.LOG, boot, seq=0, payload=b'new')))
+    generation = pathlib.Path(directory) / (boot.hex() + '.1')
+    require((generation / (boot.hex() + '.log')).exists() and (generation / (boot.hex() + '.log')).read_bytes() == b'new' and (generation / (boot.hex() + '.jsonl')).exists(), 'H:generation')
+    read_fd, write_fd = os.pipe()
+    try:
+        reader = m.InputLines(read_fd)
+        os.write(write_fd, b'sta')
+        require(select.select([read_fd], [], [], 0)[0] and reader.read() == (True, []), 'H:partial input')
+        h.clock = lambda: 20
+        h.request('status')
+        h.clock = lambda: 20.501
+        h.receive(frame(m.encode(m.LOG, boot, seq=1, payload=b'live')))
+        h.expire()
+        require('request 3 timeout' in messages and h.high == 1, 'H:partial progress')
+        os.write(write_fd, b'tus\nclock\n')
+        alive, lines = reader.read()
+        for line in lines:
+            h.request(line)
+        require(alive and lines == ['status', 'clock'] and len(fake.sent) == 5, 'H:multiple lines')
+    finally:
+        os.close(read_fd)
+        os.close(write_fd)
     print('PASS')
 
 
