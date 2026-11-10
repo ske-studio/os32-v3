@@ -82,7 +82,32 @@ static GfxMode host_mode = { .height = 400 };
 static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
 GfxBackend *g_backend = &host_backend;
 void pc98_splash_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
-static int gfx_select_and_init_backend(int legacy200) { event(EV_CALL, F_SELECT, legacy200); return 0; }
+static int select_packed;
+static int palette_writes;
+void display_palette4_write(int idx, u8 r, u8 g, u8 b)
+{ (void)idx; (void)r; (void)g; (void)b; palette_writes++; }
+#define palette_init product_palette_init
+#include "palette_source.inc"
+#undef palette_init
+static int gfx_select_and_init_backend(int legacy200)
+{
+    event(EV_CALL, F_SELECT, legacy200);
+    if (select_packed) {
+        static const PaletteEntry expected[16] = {
+            {0,0,0}, {0,0,7}, {7,0,0}, {7,0,7},
+            {0,7,0}, {0,7,7}, {7,7,0}, {7,7,7},
+            {0,0,0}, {0,0,15}, {15,0,0}, {15,0,15},
+            {0,15,0}, {0,15,15}, {15,15,0}, {15,15,15}
+        };
+        const PaletteEntry *colors = palette_get_all();
+        expect(palette_writes == 0);
+        for (int i = 0; i < 16; i++)
+            expect(colors[i].r == expected[i].r && colors[i].g == expected[i].g && colors[i].b == expected[i].b);
+        bb[0] = &planes_b[0];
+        return 1;
+    }
+    return 0;
+}
 static void gfx_reinit_surfaces(int finish_arg) { event(EV_CALL, F_REINIT, finish_arg); }
 static void gfx_diag_init(void) { event(EV_CALL, F_DIAG, 0); }
 static void gfx_bind_client(void)
@@ -205,8 +230,17 @@ static void no_plane_case(void)
     _gfx_common_init(32000);
     expect(count == 0 && text_chars[1] == 0x1234 && text_attrs[2] == 0xE1);
 }
+static void packed_palette_case(int legacy200)
+{
+    for (int i = 0; i < 16; i++) palette_shadow_set(i, 3, 6, 9);
+    palette_writes = 0; select_packed = 1; count = 0;
+    gfx_init_mode(legacy200);
+    expect(gfx_started && palette_writes == 0);
+    select_packed = 0;
+}
 void _start(void)
 {
+    packed_palette_case(0); packed_palette_case(1);
     init_case(0); init_case(1); no_plane_case();
     present_case();
     start_case(0); start_case(1);

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
-    covers=['platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
+    covers=['gfx/palette.c', 'platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
             'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
             'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
@@ -41,6 +41,9 @@ CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'gfx/
 # The common callers are extracted from the product text and *executed* with
 # recording fakes; these mutants must fail that executed trace.
 CORE_MUTATIONS = (
+    ('palette-reset-omitted', 'init', '    palette_shadow_reset();', '    (void)0;'),
+    ('palette-reset-hardware', 'palette', 'void palette_shadow_reset(void)\n{',
+     'void palette_shadow_reset(void)\n{\n    display_palette4_write(0, 0, 0, 0);'),
     ('hide-before-plane-check', 'core',
      '    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n',
      '    display_text_hide();\n    if (!bb_b || !bb_r || !bb_g || !bb_i) return;\n    dirty_queue.count = 0;\n'),
@@ -85,6 +88,7 @@ def function(text, name):
 
 def execute(texts, work):
     (work / 'gfx_init_source.inc').write_text(texts['provider'])
+    (work / 'palette_source.inc').write_text(texts['palette'])
     (work / 'gfx_core_slice.inc').write_text(
         function(texts['core'], '_gfx_common_init') + function(texts['init'], 'gfx_init_mode'))
     (work / 'gfx_vram_slice.inc').write_text(
@@ -104,6 +108,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     texts = dict(provider=(ROOT / PROVIDER).read_text(),
+                 palette=(ROOT / 'gfx/palette.c').read_text(),
                  **{key: (ROOT / path).read_text() for key, path in CORE.items()})
     with tempfile.TemporaryDirectory(prefix='sep5-gfx-init-') as directory:
         work = Path(directory)

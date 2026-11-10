@@ -1,6 +1,7 @@
 /* 400/200 行の初期化。packed 系はどちらの入口でも native 解像度を使う。 */
 static void gfx_init_mode(int legacy200)
 {
+    palette_shadow_reset();
     pc98_splash_raster_reset();
     gfx_init_gen++;
     /* GDC 初期化より前にバックエンドを決める。 */
