@@ -3,19 +3,40 @@
 #include "kernel_boot_source.c"
 static unsigned expect_stop;
 static void emit(const char *s, u32 n)
-{ __asm__ volatile("int $0x80" :: "a"(4), "b"(1), "c"(s), "d"(n) : "memory"); }
+{ u32 result = 4; __asm__ volatile("int $0x80" : "+a"(result) : "b"(1), "c"(s), "d"(n) : "memory"); }
 #define SAY(s) emit(s "\n",sizeof(s "\n")-1)
 static void finish(unsigned code) __attribute__((noreturn));
 static void finish(unsigned code)
 { __asm__ volatile("int $0x80" :: "a"(1), "b"(code)); for (;;) {} }
-void ppc_stop(void) { if (expect_stop) { SAY("GREEN:REJECT"); finish(0); } finish(99); }
-void ppc_boot_walk_stop(void) { ppc_stop(); }
+void ppc_stop(void) { SAY("FAIL:STOP"); if (expect_stop) { SAY("GREEN:REJECT"); finish(0); } finish(99); }
+void ppc_boot_walk_stop(void)
+{
+#if defined(LAN_CASE)
+    if (!gmac_walk_valid(MEM_FIXED_PD_BASE) &&
+        range_valid(MEM_FIXED_PD_BASE, escc_alias.va & PTE_FRAME_MASK,
+                    (escc_alias.va & PTE_FRAME_MASK) + escc_alias.bytes,
+                    escc_alias.pa, PPC_BOOT_IO_ATTR)) SAY("FAIL:GMAC-WALK");
+#endif
+    SAY("STOP:WALK");
+    if (expect_stop) { SAY("GREEN:REJECT"); finish(0); }
+    finish(99);
+}
 u32 ppc_root_current(void) { return 0; }
 void ppc_root_load(u32 root)
 {
     (void)root;
     if (expect_stop) { SAY("FAIL:WALK-SKIPPED"); finish(31); }
     if (!boot_root_ready) finish(98);
+#if defined(LAN_CASE)
+    if ((LAN_CASE == 0) != boot_devices.gmac_ready) { SAY("FAIL:READY"); finish(41); }
+    if (LAN_CASE == 0) {
+        if (!gmac_walk_valid(root) || gmac_alias[0].bytes != 0x10000 ||
+            gmac_alias[0].pa != 0x90000000 || gmac_alias[1].pa != 0xf2800000 ||
+            gmac_alias[2].pa != 0xf2c00000 || boot_devices.pci_addr_va != 0xfe3c0020 ||
+            boot_devices.pci_data_va != 0xfe3c1020) { SAY("FAIL:ALIAS"); finish(42); }
+    }
+    SAY("REACHED:LAN");
+#endif
     SAY("GREEN:ROOT"); finish(0);
 }
 static struct pm_kboot_info info;
@@ -42,6 +63,16 @@ void _start(void)
     info.image_first=0x100000; info.image_end=0x120000;
     info.hpt_pa=0x1000000; info.hpt_bytes=0x20000;
     boot_info=&info;
+#if defined(LAN_CASE)
+    info.gmac_rc = LAN_CASE == 1 ? -1 : 0;
+    info.gmac.bar_pa = LAN_CASE == 2 ? 0x100000 : LAN_CASE == 3 ? 0x1000000 : 0x90000000;
+    info.gmac.bar_bytes = 0x200000;
+    info.gmac.root_pa = 0xf2000020;
+    info.ram.count = 1; info.ram.v[0].start = LAN_CASE == 4 ? 0x90000000 : 0;
+    info.ram.v[0].size = LAN_CASE == 4 ? 0x10000 : 0x800000;
+    plan_gmac(&info);
+    SAY("REACHED:PLAN");
+#endif
     ppc_boot_alias_plan(0x80013020,0x40,PPC_BOOT_ESCC_VA,&escc_alias);
     ppc_boot_alias_plan(0x80040000,0x40000,PPC_BOOT_MPIC_VA,&mpic_alias);
     for (u32 x=0xf00000;x<0x1000000;x+=PAGE_SIZE) *leaf(MEM_FIXED_PD_BASE,x)=0;

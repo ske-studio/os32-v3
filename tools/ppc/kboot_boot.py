@@ -137,6 +137,33 @@ def host(out, bad, mutant=False):
     print('RED: walk-skipped' if mutant else 'GREEN: host',p.stdout,flush=True)
 
 
+def lan_host(out, case, mutation=None):
+    out.mkdir(parents=True, exist_ok=True)
+    src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
+    if mutation:
+        require(src.count(mutation[0]) == 1, 'unique LAN mutation')
+        src=src.replace(mutation[0], mutation[1])
+    (out/'kernel_boot_source.c').write_text(src)
+    exe=out/'host'
+    command(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
+        '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector',
+        '-nostdlib','-static','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
+        '-D__cdecl=','-DBOOT_BAD_WALK=0','-DLAN_CASE='+str(case), '-I'+str(out),
+        '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
+        *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
+        ROOT/'arch/ppc/pd_walk.c','-o',exe])
+    p=subprocess.run(['qemu-i386',str(exe)],capture_output=True,text=True,timeout=30)
+    if mutation:
+        require(p.returncode == mutation[2] and mutation[3] in p.stdout and
+                'REACHED:PLAN' in p.stdout and 'REACHED:ROOT' in p.stdout,
+                'LAN mutant verdict '+str(p.returncode)+' '+p.stdout)
+    else:
+        require(p.returncode == 0 and 'REACHED:PLAN' in p.stdout and
+                'REACHED:LAN' in p.stdout and 'GREEN:ROOT' in p.stdout,
+                'LAN verdict '+str(p.returncode)+' '+p.stdout)
+    print('RED LAN' if mutation else 'GREEN LAN', case, p.stdout, flush=True)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate',action='store_true')
@@ -147,10 +174,25 @@ def main():
         elf=build(directory,negative)
         for cpu in ['7450','7455']:
             observe(directory,elf,cpu,negative)
+    for case in range(5):
+        lan_host(out/('lan-'+str(case)),case)
     host(out/'host',False)
     host(out/'host-bad',True)
     host(out/'host-order',2)
     if args.mutate:
+        lan_mutations = [
+            (0, 'info->gmac.bar_pa, PPC_BOOT_GMAC_BYTES, PPC_BOOT_GMAC_VA',
+             'info->gmac.bar_pa, info->gmac.bar_bytes, PPC_BOOT_GMAC_VA', 41, 'FAIL:READY'),
+            (2, 'boot_devices.gmac_ready && !gmac_aliases_safe(root)',
+             'boot_devices.gmac_ready && 0 && !gmac_aliases_safe(root)', 41, 'FAIL:READY'),
+            (2, 'boot_devices.gmac_ready = 0;', 'ppc_stop();', 99, 'FAIL:STOP'),
+            (0, 'for (u32 i = 0; i < 3; i++) install_alias(root, &gmac_alias[i]);',
+             'for (u32 i = 0; i < 3; i++) { install_alias(root, &gmac_alias[i]); *leaf(root, gmac_alias[i].va & PTE_FRAME_MASK) &= ~PTE_PCD; }', 99, 'FAIL:GMAC-WALK\nSTOP:WALK'),
+            (1, 'info->gmac_rc == 0 && info->gmac.bar_bytes',
+             'info->gmac.bar_bytes', 41, 'FAIL:READY'),
+        ]
+        for i, (case, old, new, code, marker) in enumerate(lan_mutations):
+            lan_host(out/('lan-mutant-'+str(i)),case,(old,new,code,marker))
         for m in MUTATIONS:
             directory=out/m[0]
             elf=build(directory,m[4],m)
