@@ -39,5 +39,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | 調査 (x86 の LAN の層、GMAC の手順、PPC の PCI、案の比較) | 済 (2026-11-10、~/os32-tmp/run/ppc-lan-survey/SURVEY.md) |
 | 設計の往復 (起草 r1 → レビュー → r2 → レビュー → 確定) | 済 (2026-11-10) |
 | P0・P1・P2・P3・P8・P11 と各 H | main (0c5ab75f)。P0 の採取 (QEMU 8.2.2、OpenBIOS の対話): GMAC は /pci@f2000000/ethernet@f (compatible gmac、106b:0021)、BAR0 は PCI = CPU 0x82200000・2MiB、MAC 52:54:00:12:34:56、host bridge は uni-north・reg 0xf2000000 から 32MiB・ranges は io → 0xf2000000 (8MiB) と mem 0x80000000 → 0x80000000 (256MiB)。PHY の ID は未採取 (MIF の読出しに書込みが要る、段 P17 で) |
-| P4・P5・P12・P20・P21 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint2)。取り込み待ち。P5 で gmac_tree.c が PPC の像に入った (② の受入 kboot_accept と kboot_all 20 本は PASS) |
-| P9・P10・P13〜P19・P22〜P33 と各 H | 未着手 |
+| P4・P5・P12・P20・P21 と各 H | main (519a39b3)。P5 で gmac_tree.c が PPC の像に入った |
+| P9・P10・P13・P14 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint3)。取り込み待ち。P9 で ② の起動が GMAC の先頭 64KiB と UniNorth の config の 2 page の alias を張る (QEMU で gmac_ready=1)。clock は手本 netbsd uninorth.c:135-142、reset は openbsd gem.c の各関数 |
+| P15・P16 | 実装中 |
+| P17〜P19・P22〜P33 と各 H | 未着手 |

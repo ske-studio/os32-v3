@@ -125,6 +125,12 @@ void ppc_kernel_main(void) __attribute__((noreturn));
 - real takeover→全BAT無効/ベクタ導入→segments(no-op)/例外stack/ME・RI→`memory_boot_detect(16384)`→`paging_init(16384)`→`arch_boot_after_paging()`→ESCC sink→`memory_boot_init(16384)`→`shm_init()`→`kmalloc_init()`→MPIC→clock→EE→probe→READY→idle（kmalloc は mm/shm から呼ばれないので kmalloc_init の位置は任意。x86 は kmalloc_init を paging より前に呼ぶ: init/kernel.c:170・196）。
 - `paging_init`内部 `arch_mmu_load_root` の初回のみ、ESCC/MPIC用I/G aliasを `MEM_DEVICE_APERTURE_BASE` の静的PTへ追加する。HPTの恒等PTEは作らず、その物理範囲の既存恒等PTEもNPにする（spill/flushはrealアクセス）。0..1MiBの不要mappingもNP、guard/system除外を維持。image/stack/PD/PTとMMIO aliasをwalkで検証してからIR/DRを上げる。S/mm/paging_boot.inc:103,189を使い、共通mmの表形式・free/owner規則を変えない。
 - alias固定割当：aperture先頭4MiB内のoffset `[0x300000,0x340000)` をESCC、`[0x340000,0x380000)` をMPICへ予約（VA 0xFE300000/0xFE340000）。PAのpage内offsetを保持し、丸めた窓長が各256KiB以内か検査、超過は停止。arch/platform所有の静的予約でledgerのdevice記録は経ない。後のgfxのpaging_map_physはこの予約帯を避け、platform側で重複を拒否してから呼ぶ契約とし、gfx接続の受入に衝突負試験を置く。PM_IO_ALIAS=0xF0000000はkbootでは使わない。
+  | VA | 長さ上限 | 対象 |
+  |---|---:|---|
+  | 0xFE380000 | 64KiB | GMAC BAR0 先頭 |
+  | 0xFE3C0000 | 4KiB | PCI config address |
+  | 0xFE3C1000 | 4KiB | PCI config data |
+  | 0xFE3C2000 | 4KiB | clock（予約） |
 - ABIは全kernel TUにbuild/arch/ppc.mk:8の同一flags（-m32 -mbig-endian -msoft-float -mno-altivec -msdata=none）を適用。入口r2/r13を使用しない生成コードを確認し、C/ASM境界のstack16B整列・linkage領域とnative variadic出力をguest canaryで検証する。
 - 初期pagingはIR/DR=0で作るのでflushは準備済み空HPTを扱う。`pg_enabled`になる前のroot未設定を通常root切替と混同しない。未設定時に不用意なtranslated実行へ戻さない。
 

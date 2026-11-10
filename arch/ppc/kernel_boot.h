@@ -4,12 +4,19 @@
 #include "memmap.h"
 #define PPC_BOOT_ALIAS_BYTES 0x40000U
 #define PPC_BOOT_ESCC_VA (MEM_DEVICE_APERTURE_BASE + 0x300000U)
+#define PPC_BOOT_GMAC_VA 0xFE380000U
+#define PPC_BOOT_PCI_ADDR_VA 0xFE3C0000U
+#define PPC_BOOT_PCI_DATA_VA 0xFE3C1000U
+#define PPC_BOOT_GMAC_CLOCK_VA 0xFE3C2000U
+#define PPC_BOOT_GMAC_BYTES 0x10000U
 #define PPC_BOOT_MPIC_VA (MEM_DEVICE_APERTURE_BASE + 0x340000U)
 struct ppc_boot_alias { u32 pa, bytes, va; };
 struct pm_kboot_info;
 /* Device VAs inside the static aperture slots (design section 4). */
 struct ppc_boot_devices {
     u32 escc_csr_va, escc_data_va, mpic_va, mpic_bytes;
+    u32 gmac_va, pci_addr_va, pci_data_va;
+    int gmac_ready;
     int mpic_order; /* enum pm_mpic_order from E1 */
 };
 const struct ppc_boot_devices *ppc_boot_devices(void);

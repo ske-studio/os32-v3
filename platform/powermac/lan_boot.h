@@ -91,6 +91,7 @@ struct lan_message {
 };
 
 int pm_gmac_capture(struct pm_gmac_boot *out);
+int pm_gmac_clock(const struct pm_gmac_boot *b, u32 clock_va);
 void pm_gmac_boot_id(struct pm_gmac_boot *b, u64 tb, u32 pvr);
 int pm_pci_read32(struct pm_pci *, u32 bdf, u32 reg, u32 *value);
 int pm_pci_write32(struct pm_pci *, u32 bdf, u32 reg, u32 value);
