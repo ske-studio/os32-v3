@@ -6,8 +6,6 @@ int gfinit_resources(struct recover_range *exclude, u32 *count)
     if (!count) return -1;
     *count = 0;
     if (!exclude) return -1;
-    struct resource_bounds bounds;
-    if (resource_collect_bounds(&bounds)) return -1;
     u32 used = 0;
     bool gpu = false;
     /* Read every present bus-0 function: the boot cache can be truncated/depth-limited.
@@ -31,13 +29,14 @@ int gfinit_resources(struct recover_range *exclude, u32 *count)
             for (u32 bar = 0; bar < bars; bar++) {
                 u32 raw = pci_cfg_read32(0, dev, fn, PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * bar);
                 if (raw && !(raw & PCI_BAR_SPACE_IO)) {
-                    if (resource_memory_bar(exclude, &used, &bounds, id, dev, fn, header, bar, raw))
+                    if (resource_memory_bar(exclude, &used, dev, fn, PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * bar, raw, false))
                         return -1;
                 }
+                if (!(raw & PCI_BAR_SPACE_IO) && (raw & PCI_BAR_MEM_TYPE) == PCI_BAR_MEM_TYPE64) bar++;
             }
             u32 rom = header == PCI_HDR_LAYOUT_BRIDGE ? PCI_CFG_ROM_BRIDGE : PCI_CFG_ROM_ENDPOINT;
             u32 rom_raw = pci_cfg_read32(0, dev, fn, rom);
-            if (rom_raw & 1U) return resource_reject("rom_length", dev, fn, rom, rom_raw);
+            if ((rom_raw & 1U) && resource_memory_bar(exclude, &used, dev, fn, rom, rom_raw, true)) return -1;
             if (header == PCI_HDR_LAYOUT_BRIDGE &&
                 (resource_window(exclude, &used, dev, fn, PCI_CFG_MEM_WINDOW) ||
                  resource_window(exclude, &used, dev, fn, PCI_CFG_PREF_WINDOW))) return -1;

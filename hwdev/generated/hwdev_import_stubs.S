@@ -236,4 +236,9 @@ paging_device_map:
 paging_device_unmap:
     jmp *hwdev_import_slots+184
 .size paging_device_unmap, .-paging_device_unmap
+.globl pci_bar_get
+.type pci_bar_get, @function
+pci_bar_get:
+    jmp *hwdev_import_slots+188
+.size pci_bar_get, .-pci_bar_get
 .section .note.GNU-stack,"",@progbits

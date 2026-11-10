@@ -4,12 +4,7 @@
 /*  契約は drivers/pci/pci.h。ビットの読み方は drivers/pci/pci_decode.c (ホストで   */
 /*  試験済み)。ここに残るのは **I/O と走査順と記録** だけ。                 */
 /*                                                                          */
-/*  ■ 読むだけ ■                                                           */
-/*    BAR のサイズ判定 (全 1 を書いて読み戻す) はしない。BIOS が割り当てた  */
-/*    番地を一瞬でも壊すと、同じバスに居る他のデバイス (グラフィックス・    */
-/*    C バスブリッヂ) を巻き込む。票 §5-2 R1 が実機で欲しいのは生値なので   */
-/*    読むだけで足りる。                                                    */
-/*                                                                          */
+/*  BAR は起動時に pci_barsize.c で測定し、設定を復元してから記録する。    */
 /*  ■ ハングしない ■                                                       */
 /*    NP21/W には 0CF8h が無い。読み戻しが一致しなければ**その場で**諦めて  */
 /*    「PCI 無し」を報告する。走査そのものも (a) デバイス 32 × ファンクション 8 */
@@ -165,6 +160,7 @@ static void pci_report(const struct pci_dev *d)
             kprintf(TATTR_WHITE, " bar%d io=0x%x", i, pci_bar_base(d->bar[i]));
         } else {
             kprintf(TATTR_WHITE, " bar%d mem=0x%x", i, pci_bar_base(d->bar[i]));
+            if (kind == PCI_BAR_MEM64) i++;
         }
     }
     kprintf(TATTR_WHITE, "\n");
@@ -176,6 +172,7 @@ static void pci_record(u32 bus, u32 dev, u32 fn, u16 vendor, u32 id_dword)
     u32 w;
     int i;
 
+    pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));
     g_pci_seen++;
     if (g_pci_count >= PCI_MAX_DEVS) return;   /* 溢れても走査は続ける */
 
@@ -198,13 +195,12 @@ static void pci_record(u32 bus, u32 dev, u32 fn, u16 vendor, u32 id_dword)
     w = pci_cfg_read32(bus, dev, fn, PCI_CFG_CACHE_LINE);
     d->header = pci_extract8(w, PCI_CFG_HEADER_TYPE);
 
-    /* BAR は**生値のまま**。票 §5-2 R1 が実機で見たいのは「BIOS が
-     * 割り当てたか」なので、復号も正規化もせずに持つ。
-     * Type 1 (ブリッヂ) の BAR は 2 本しか無いが、残りを読んでも
-     * 0 か未定義が返るだけで害は無い (**書かない**のが効いている)。 */
+    /* Keep public raw BAR records compatible; Type 1 has only two BARs. */
+    int bars = pci_header_layout(d->header) == PCI_HDR_LAYOUT_BRIDGE ?
+               PCI_BRIDGE_BAR_COUNT : PCI_CFG_BAR_COUNT;
     for (i = 0; i < PCI_CFG_BAR_COUNT; i++) {
-        d->bar[i] = pci_cfg_read32(bus, dev, fn,
-                                   (u32)(PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i));
+        d->bar[i] = i < bars ? pci_cfg_read32(bus, dev, fn,
+                           PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i) : 0;
     }
 
     w = pci_cfg_read32(bus, dev, fn, PCI_CFG_INT_LINE);
@@ -272,6 +268,7 @@ static void pci_scan_bus(u32 bus, int depth)
 /* ======================================================================== */
 int pci_init(void)
 {
+    pci_barsize_reset();
     g_pci_count = 0;
     g_pci_seen = 0;
     g_pci_present = 0;

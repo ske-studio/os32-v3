@@ -101,6 +101,7 @@ def run(folder, image=None, mode_c=False):
         replacements['sys_time_now'] = 'sequence_sys_time_now'
     replacements['gf_production_selected'] = 'trace_production_selected'
     replacements['pci_cfg_read32'] = 'trace_pci_read32'
+    replacements['pci_bar_get'] = 'pci_bar_get'
     source += '    const unsigned imports[] = {\n' + ''.join(
         '        (unsigned)' + replacements.get(e['name'],
             e['name'] if e['name'] in core or e['name'] == 'kprintf' else 'unused_import') + ',\n'

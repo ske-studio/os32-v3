@@ -24,6 +24,7 @@ static struct gf_production_resources prod_boot;
 static struct gf_production_scratch prod_scratch __attribute__((aligned(PAGE_SIZE)));
 static u8 prod_rom[GF_ROM_MAX],prod_rgb[VIDEO_PALETTE_BYTES];
 static u32 prod_cfg[32][8][64];
+static u32 prod_sizing, prod_masks[32][8][64];
 static u32 prod_now,prod_clock_step,prod_clock_fail,prod_clock_calls;
 static int prod_clock_error;
 static u32 prod_mmio_calls,prod_cmd_writes,prod_other_cfg_writes,prod_reads16,prod_live_pages;
@@ -36,7 +37,7 @@ static bool prod_a2_done,prod_stopping,prod_faulted;
 static int prod_foundation_fail,prod_prepare_read_fail;
 static u32 prod_logs,prod_cfg_reads,prod_prepare_writes;
 void kprintf(u8 attr,const char *format,...)
-{ (void)attr;(void)format;prod_logs++; }
+{ (void)attr;(void)format;if(!prod_sizing)prod_logs++; }
 #define PROD_ROUTE 0xfacU
 #define PROD_REDRAW 0xa8000U
 static void prod_event(u32 e)
@@ -122,9 +123,15 @@ u8 pci_cfg_read8(u32 b,u32 d,u32 f,u32 o)
 u16 pci_cfg_read16(u32 b,u32 d,u32 f,u32 o)
 { prod_reads16++;return (u16)(pci_cfg_read32(b,d,f,o&~3U)>>((o&2)*8)); }
 void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v)
-{(void)b;(void)d;(void)f;(void)o;(void)v;prod_other_cfg_writes++;}
+{
+    if(prod_sizing) {
+        CHECK(!b && o>=0x10);
+        prod_cfg[d][f][o/4]=(v==U32_MAX || v==0xfffffffeU)?prod_masks[d][f][o/4]:v;
+    } else prod_other_cfg_writes++;
+}
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
+    if(prod_sizing) {CHECK(!b && o==4);prod_cfg[d][f][1]=(prod_cfg[d][f][1]&0xffff0000U)|v;return 0;}
     if (b || d!=PROD_GF_DEV || f || (o!=4 && o!=12)) {
         __asm__ volatile("int $0x80"::"a"(1),"b"(1)); __builtin_unreachable();
     }
@@ -134,6 +141,7 @@ int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
     prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
     return 0;
 }
+#include "../../drivers/pci/pci_barsize.c"
 void *kmemset(void *p,int value,u32 n)
 {u8 *b=p;while(n--)*b++=(u8)value;return p;}
 int kstrcmp(const char *a,const char *b)
@@ -266,6 +274,24 @@ static void prod_reset(void)
         }
         prod_cfg[13][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     }
+    kmemset(prod_masks,0,sizeof(prod_masks));
+    prod_masks[8][0][4]=0xffc00000;prod_masks[8][0][5]=0xffff0000;
+    prod_masks[8][0][6]=0xff800000;prod_masks[11][0][4]=0xfffff008;
+    prod_masks[11][0][6]=0xfff00000;
+    for(u32 fn=0;fn<3;fn++)prod_masks[13][fn][4]=fn==2?0xffffff00:0xfffff000;
+    prod_masks[PROD_GF_DEV][0][4]=0xff000000;
+    prod_masks[PROD_GF_DEV][0][5]=0xf0000008;
+    prod_masks[PROD_GF_DEV][0][6]=0xff000000;
+    pci_barsize_reset();prod_sizing=1;
+    for(u32 d=0;d<32;d++) {
+        if((prod_cfg[d][0][0]&65535)==65535)continue;
+        u32 nf=(prod_cfg[d][0][3]&(PCI_HDR_MULTIFUNCTION<<16))?8:1;
+        for(u32 f=0;f<nf;f++) {
+            if((prod_cfg[d][f][0]&65535)==65535)continue;
+            pci_barsize_record(0,d,f,prod_cfg[d][f][3]>>16);
+        }
+    }
+    prod_sizing=0;
     /* Native maps and complete decode reservations furnished by P5 at boot. */
     ledger_region_count=3;
     const u32 bases[]={0x24000000,0x30000000,0x25000000};
@@ -646,12 +672,12 @@ static void prod_cases(void)
      * before decode is proven safe); the reject is kept in the failure record. */
     prod_reset();prod_logs=0;prod_cfg[11][0][12]|=1U;
     CHECK(gf_production_identify(&prod_boot)==-1 && !prod_logs);
-    CHECK(prod_boot.reject.reason && !kstrcmp(prod_boot.reject.reason,"rom_length") &&
+    CHECK(prod_boot.reject.reason && !kstrcmp(prod_boot.reject.reason,"memory_bar_changed") &&
           prod_boot.reject.dev==11 && !prod_boot.reject.fn &&
           prod_boot.reject.reg==PCI_CFG_ROM_ENDPOINT && prod_boot.reject.raw==prod_cfg[11][0][12]);
     CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes &&
           !prod_a2_writes && prod_stop_writes==3 && prod_route_calls==1);
-    CHECK(prod.reject.reason && !kstrcmp(prod.reject.reason,"rom_length") && prod.reject.dev==11);
+    CHECK(prod.reject.reason && !kstrcmp(prod.reject.reason,"memory_bar_changed") && prod.reject.dev==11);
     CHECK(prod.display.section==GF_DISPLAY_INIT && prod.display.last_rc==-1 &&
           prod.display.target==((11U<<3)<<8 | PCI_CFG_ROM_ENDPOINT) && !prod.display.reusable);
     prod_cfg[11][0][12]&=~1U;CHECK(!gf_production_identify(&prod_boot) && !prod_boot.reject.reason);

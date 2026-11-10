@@ -291,262 +291,127 @@ static void production_plan(u32 initial_lock)
 #define GFINIT_RESOURCES_HOST 1
 #include "../../kdebug/gfinit_resources.c"
 #include "gfinit_resources_ra266.h"
-static u32 resource_cfg[32][8][16];
-static u32 resource_writes, resource_extra_reads;
-void pci_cfg_write32(u32 bus,u32 dev,u32 fn,u32 reg,u32 value)
-{(void)bus;(void)dev;(void)fn;(void)reg;(void)value;resource_writes++;}
-int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
-{(void)bus;(void)dev;(void)fn;(void)reg;(void)value;resource_writes++;return 0;}
-static int resource_run(struct recover_range *ranges,u32 *n)
-{int rc=gfinit_resources(ranges,n);CHECK(resource_writes==0);return rc;}
-
+static u32 resource_cfg[32][8][16], resource_masks[32][8][16];
+static u32 resource_writes, resource_sizing;
 static const char *resource_reason;
-static u32 resource_logs;
-static u32 resource_dev, resource_fn, resource_reg, resource_raw;
+static u32 resource_logs, resource_dev, resource_fn, resource_reg, resource_raw;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
-    __builtin_va_list ap;
-    (void)attr; (void)fmt;
-    resource_logs++;
-    __builtin_va_start(ap, fmt);
-    resource_reason=__builtin_va_arg(ap,const char *);
+    (void)attr;
+    if (resource_sizing) return;
+    __builtin_va_list ap; __builtin_va_start(ap,fmt);
+    resource_logs++; resource_reason=__builtin_va_arg(ap,const char *);
     resource_dev=__builtin_va_arg(ap,u32);resource_fn=__builtin_va_arg(ap,u32);
     resource_reg=__builtin_va_arg(ap,u32);resource_raw=__builtin_va_arg(ap,u32);
     __builtin_va_end(ap);
 }
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
-{CHECK(bus==0 && dev<32 && fn<8 && reg<64);if(fn)resource_extra_reads++;return resource_cfg[dev&31U][fn&7U][(reg/4)&15U];}
+{CHECK(bus==0 && dev<32 && fn<8 && reg<64);return resource_cfg[dev&31][fn&7][(reg/4)&15];}
 u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
 {return (u16)(pci_cfg_read32(bus,dev,fn,reg&~3U)>>((reg&2)*8));}
+void pci_cfg_write32(u32 bus,u32 dev,u32 fn,u32 reg,u32 value)
+{
+    CHECK(!bus && resource_sizing);resource_writes++;
+    if (value==U32_MAX || value==0xfffffffeU) {
+        CHECK(reg>=0x10);
+        if(reg==0x30 || reg==0x38) CHECK(!(value&1));
+        else if (!(reg>0x10 && (resource_cfg[dev][fn][reg/4-1]&6)==4)) CHECK(!(resource_cfg[dev][fn][1] &
+            ((resource_cfg[dev][fn][reg/4]&1)?1:2)));
+        value=resource_masks[dev][fn][reg/4];
+    }
+    resource_cfg[dev][fn][reg/4]=value;
+}
+int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
+{CHECK(!bus && reg==4 && resource_sizing);resource_writes++;
+ resource_cfg[dev][fn][1]=(resource_cfg[dev][fn][1]&0xffff0000U)|value;return 0;}
+#include "../../drivers/pci/pci_barsize.c"
 static void resource_setup(void)
 {
-    CHECK(resource_writes==0);resource_writes=0;resource_reason=0;resource_extra_reads=0;
-    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)for(u32 r=0;r<16;r++)resource_cfg[d][f][r]=r?0:~0U;
-}
-static void resource_tests(void)
-{
-    struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=123;
-    resource_setup();CHECK(resource_run(ranges,&n)<0 && n==0);
-    resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
-    CHECK(resource_run(ranges,&n)==0 && n==0);
-    resource_cfg[2][0][0]=0x12348086;
-    resource_cfg[2][0][3]=PCI_HDR_MULTIFUNCTION<<16;
-    resource_cfg[2][7][0]=0x12298086;resource_cfg[2][7][1]=2;
-    resource_cfg[2][7][4]=0x20410000;
-    CHECK(resource_run(ranges,&n)<0 && n==0); /* Known ID, incorrect prefetch attribute. */
-    CHECK(resource_reason && resource_reason[0]=='m' && resource_dev==2 && resource_fn==7 &&
-          resource_reg==PCI_CFG_BAR0 && resource_raw==0x20410000);
-    resource_cfg[2][7][1]=0;CHECK(resource_run(ranges,&n)==0);
-    resource_cfg[2][7][1]=2;resource_cfg[2][7][4]=0x6001;
-    CHECK(resource_run(ranges,&n)==0);
-    resource_cfg[2][7][12]=1;CHECK(resource_run(ranges,&n)<0);
-    resource_cfg[2][7][12]=0;
-    resource_cfg[2][7][3]=1U<<16;
-    resource_cfg[2][7][8]=0x21f02000; /* [20000000,22000000) */
-    resource_cfg[2][7][9]=0x31f13001; /* 64-bit prefetch, zero upper halves */
-    CHECK(resource_run(ranges,&n)==0 && n==2);
-    CHECK(ranges[0].base==0x20000000 && ranges[0].len==0x2000000);
-    CHECK(ranges[1].base==0x30000000 && ranges[1].len==0x2000000);
-    resource_cfg[2][7][10]=1;
-    CHECK(resource_run(ranges,&n)<0 && n==0);
-    resource_cfg[2][7][10]=0;resource_cfg[2][7][9]=0x31f03001;
-    CHECK(resource_run(ranges,&n)<0 && n==0);
-    resource_cfg[2][7][9]=0x0000fff0; /* disabled */
-    CHECK(resource_run(ranges,&n)==0 && n==1);
-    resource_cfg[2][7][8]=0xfff00000; /* 4 GiB length cannot fit u32 */
-    CHECK(resource_run(ranges,&n)<0 && n==0);
-    resource_cfg[2][7][8]=0x21f02000;
-    n=RECOVER_RANGE_MAX-1U;
-    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)==0 && n==RECOVER_RANGE_MAX);
-    CHECK(ranges[RECOVER_RANGE_MAX-1U].base==0x20000000 &&
-          ranges[RECOVER_RANGE_MAX-1U].len==0x2000000);
-    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)<0 && n==RECOVER_RANGE_MAX);
-    output("resources: live scan, unknown BAR reject, disabled/IO skip, bridge windows and bounds PASS\n");
-}
-
-static bool resource_text(const char *a,const char *b)
-{
-    if(!a)return false;
-    while(*a && *a==*b){a++;b++;}
-    return *a==*b;
+    resource_writes=resource_sizing=resource_logs=0;resource_reason=0;pci_barsize_reset();
+    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)for(u32 r=0;r<16;r++) {
+        resource_cfg[d][f][r]=r?0:~0U;resource_masks[d][f][r]=0;
+    }
 }
 static void resource_snapshot(void)
 {
     resource_setup();
     for(u32 i=0;i<ARRAY_SIZE(resource_ra266);i++)
-        for(u32 r=0;r<16;r++)
-            resource_cfg[resource_ra266[i].dev][resource_ra266[i].fn][r]=resource_ra266[i].cfg[r];
+        for(u32 r=0;r<16;r++)resource_cfg[resource_ra266[i].dev][resource_ra266[i].fn][r]=resource_ra266[i].cfg[r];
+    resource_masks[8][0][4]=0xffc00000;resource_masks[8][0][5]=0xffff0000;
+    resource_masks[8][0][6]=0xff800000;resource_masks[11][0][4]=0xfffff008;
+    resource_masks[11][0][6]=0xfff00000;
+    resource_masks[13][0][4]=0xff000000;resource_masks[13][0][5]=0xf0000008;
+    resource_masks[13][0][6]=0xff000000;
 }
-static void resource_expect(const char *reason,u32 dev,u32 fn,u32 reg,u32 raw)
+static int resource_run(struct recover_range *ranges,u32 *n)
+{
+    pci_barsize_reset();resource_sizing=1;
+    for(u32 d=0;d<32;d++)for(u32 f=0;f<resource_function_count(d);f++) {
+        if((resource_cfg[d][f][0]&65535)==65535)continue;
+        u32 saved[16];for(u32 j=0;j<16;j++)saved[j]=resource_cfg[d][f][j];
+        pci_barsize_record(0,d,f,resource_cfg[d][f][3]>>16);
+        for(u32 j=0;j<16;j++)CHECK(saved[j]==resource_cfg[d][f][j]);
+    }
+    resource_sizing=0;u32 before=resource_writes;
+    int rc=gfinit_resources(ranges,n);CHECK(before==resource_writes);return rc;
+}
+static void resource_tests(void)
 {
     struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=123;
-    CHECK(resource_run(ranges,&n)<0 && n==0);
-    if(!resource_text(resource_reason,reason)){output("expected ");output(reason);output(" got ");output(resource_reason?resource_reason:"(none)");output("\n");}
-    CHECK(resource_text(resource_reason,reason));
-    CHECK(resource_dev==dev && resource_fn==fn && resource_reg==reg && resource_raw==raw);
-}
-static void resource_usb_tests(void)
-{
-    struct recover_range ranges[RECOVER_RANGE_MAX];
-    struct resource_bounds b;
-    u32 n;
-    resource_snapshot();
-    for (u32 fn=0;fn<3;fn++) {
-        resource_cfg[12][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
-        resource_cfg[12][fn][1]=2;
-        resource_cfg[12][fn][4]=0x20411000 + fn*0x1000;
+    resource_setup();CHECK(resource_run(ranges,&n)<0 && n==0);
+    resource_snapshot();CHECK(resource_run(ranges,&n)==0 && n==5);
+    const struct recover_range expected[]={{0x20000000,0x400000},{0x20400000,0x10000},
+        {0x20800000,0x800000},{0x20410000,0x1000},{0x20500000,0x100000}};
+    for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
+    for(u32 j=0;j<16;j++) {
+        resource_cfg[12][0][j]=resource_cfg[13][0][j];
+        resource_masks[12][0][j]=resource_masks[13][0][j];
+        resource_cfg[13][0][j]=0;resource_masks[13][0][j]=0;
     }
-    resource_cfg[12][0][3]=PCI_HDR_MULTIFUNCTION<<16;
-    CHECK(resource_run(ranges,&n)==0 && n==8);
-    for (u32 fn=0;fn<3;fn++) {
-        CHECK(ranges[5+fn].base==0x20411000+fn*0x1000);
-        CHECK(ranges[5+fn].len==(fn==2 ? 0x100 : 0x1000));
-    }
-    /* Separate swap fixture: retain the measured GPU row, move USB to 13. */
-    resource_snapshot();
-    for (u32 r=0;r<16;r++) {
-        resource_cfg[12][0][r]=resource_cfg[13][0][r];
-        resource_cfg[13][0][r]=r ? 0 : ~0U;
-    }
-    for (u32 fn=0;fn<3;fn++) {
-        resource_cfg[13][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
-        resource_cfg[13][fn][1]=2;
-        resource_cfg[13][fn][4]=0x20411000 + fn*0x1000;
-    }
-    resource_cfg[13][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     GF_T_DEV=12;
-    CHECK(resource_run(ranges,&n)==0 && n==8);
-    for (u32 fn=0;fn<3;fn++) {
-        CHECK(ranges[5+fn].base==0x20411000+fn*0x1000);
-        CHECK(ranges[5+fn].len==(fn==2 ? 0x100 : 0x1000));
+    /* Unknown SCSI alongside USB, Intel, Trident and GeForce. */
+    resource_cfg[13][0][0]=0x000f1000;resource_cfg[13][0][1]=0xa5a50007;
+    resource_cfg[13][0][4]=0x6101;resource_masks[13][0][4]=0xffffff01;
+    resource_cfg[13][0][5]=0x20411000;resource_masks[13][0][5]=0xfffffc00;
+    resource_cfg[13][0][6]=0x20412000;resource_masks[13][0][6]=0xfffff000;
+    resource_cfg[13][0][12]=0x26000000;resource_masks[13][0][12]=0xffff8000;
+    for(u32 f=0;f<3;f++) {
+        resource_cfg[10][f][0]=f==2?0x00e01033:0x00351033;resource_cfg[10][f][1]=2;
+        resource_cfg[10][f][4]=0x20900000+f*0x1000;
+        resource_masks[10][f][4]=f==2?0xffffff00:0xfffff000;
     }
-    GF_T_DEV=13;
-    resource_snapshot();
-    for (u32 fn=0;fn<3;fn++) {
-        resource_cfg[12][fn][0]=fn==2 ? 0x00e01033 : 0x00351033;
-        resource_cfg[12][fn][1]=2;
-        resource_cfg[12][fn][4]=0x20411000 + fn*0x1000;
-    }
-    resource_cfg[12][0][3]=PCI_HDR_MULTIFUNCTION<<16;
-    resource_cfg[12][1][4]=0xfffff000;
-    CHECK(resource_collect_bounds(&b)==0 && b.count==7);
-    for (u32 i=0;i<b.count;i++) CHECK(b.base[i]!=0xfffff000);
-    CHECK(resource_run(ranges,&n)==0 && n==7);
-    for (u32 i=0;i<n;i++) CHECK(ranges[i].base!=0xfffff000);
-    resource_cfg[12][2][4]=0x20413080;
-    resource_expect("memory_bar_range",12,2,PCI_CFG_BAR0,0x20413080);
-    resource_cfg[12][2][4]=0x20413000;
-    resource_cfg[12][2][0]=0x12341033;
-    resource_expect("memory_bar_length",12,2,PCI_CFG_BAR0,0x20413000);
-}
+    resource_cfg[10][0][3]=PCI_HDR_MULTIFUNCTION<<16;
+    CHECK(resource_run(ranges,&n)==0 && n==10);
+    CHECK(ranges[8].base==0x20411000 && ranges[8].len==0x400);
+    CHECK(ranges[9].base==0x20412000 && ranges[9].len==0x1000);
+    struct pci_bar_resource measured;
+    CHECK(!pci_bar_get(0,13,0,PCI_CFG_BAR0,&measured) && measured.kind==PCI_BAR_IO &&
+          measured.base==0x6100 && measured.len==0x100);
+    CHECK(!pci_bar_get(0,13,0,PCI_CFG_ROM_ENDPOINT,&measured) && measured.len==0x8000);
+    CHECK(pci_bar_get(1,13,0,PCI_CFG_BAR0,&measured)<0);
 
-static void resource_barlen_tests(void)
-{
-    struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=0;
-    resource_usb_tests();
-    const struct recover_range expected[]={
-        {0x20000000,0x400000},{0x20400000,0x10000},{0x20800000,0x800000},
-        {0x20410000,0x1000},{0x20500000,0x100000}};
-    resource_snapshot();CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
-    for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
-    /* astra P4 counterexample, diagnostic copy: an enabled expansion ROM on
-     * another device still prints one console line (production is silent). */
-    resource_logs=0;resource_cfg[11][0][12]|=1U;
-    resource_expect("rom_length",11,0,PCI_CFG_ROM_ENDPOINT,resource_cfg[11][0][12]);
-    CHECK(resource_logs==1);
-    resource_snapshot();
-    /* Ra266 single-function Trident aliases fn0 at every higher function.
-     * Both passes must skip those reads and preserve all BARLEN ranges. */
-    for(u32 f=1;f<PCI_FN_COUNT;f++)for(u32 r=0;r<16;r++)
-        resource_cfg[8][f][r]=resource_cfg[8][0][r];
-    resource_extra_reads=0;
-    CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
-    CHECK(resource_extra_reads==0);
-    for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
-    /* With bit7 set fn1 is real, and overlapping BARs still reject. */
-    resource_cfg[8][0][3]|=PCI_HDR_MULTIFUNCTION<<16;
-    resource_expect("memory_bar_alias",8,1,PCI_CFG_BAR0,0x20000000);
-    /* An absent fn0 skips even a responding higher function. */
-    resource_snapshot();resource_cfg[2][1][0]=0x12348086;
-    resource_cfg[2][1][1]=2;resource_cfg[2][1][4]=0x20000000;
-    resource_extra_reads=0;
-    CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
-    CHECK(resource_extra_reads==0);
-    output("resources: single-function aliases skipped, multifunction overlap rejected, absent fn0 skipped PASS\n");
-    resource_snapshot();
-    resource_cfg[8][0][1]=0; /* B2: only Command changes. */
-    CHECK(resource_run(ranges,&n)==0 && n==2);
-    for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i+3].base && ranges[i].len==expected[i+3].len);
-    struct resource_bounds b;
-    CHECK(resource_collect_bounds(&b)==0 && b.count==2);
-    resource_snapshot();CHECK(resource_collect_bounds(&b)==0 && b.count==5);
-    for(u32 i=0;i<b.count;i++)CHECK(b.base[i]!=0x21000000 && b.base[i]!=0x22000000 && b.base[i]!=0x24000000);
-    /* Disabled ROM and disabled device must never shrink the bound (C1). */
-    resource_cfg[8][0][12]=0x20800800;
-    resource_cfg[7][0][1]=0;resource_cfg[7][0][4]=0x20801000;
-    CHECK(resource_run(ranges,&n)==0 && ranges[2].len==0x800000);
-    resource_snapshot();resource_cfg[11][0][0]=0x12348086;
-    resource_expect("memory_bar_length",11,0,0x10,0x20410008);
-    resource_snapshot();resource_cfg[8][0][2]=0xd2;
-    resource_expect("memory_bar_length",8,0,0x10,0x20000000);
-    resource_snapshot();resource_cfg[8][0][7]=0x21000000;
-    resource_expect("memory_bar_length",8,0,0x1c,0x21000000);
-    resource_snapshot();resource_cfg[8][0][4]|=8;
-    resource_expect("memory_bar_attr",8,0,0x10,0x20000008);
-    for(u32 type=0;type<=6;type+=2){
-        resource_snapshot();resource_cfg[11][0][4]=0x20410000|type;
-        resource_expect(type?"memory_bar_type":"memory_bar_attr",11,0,0x10,0x20410000|type);
-    }
-    resource_snapshot();resource_cfg[11][0][7]=resource_cfg[11][0][6];resource_cfg[11][0][6]=0;
-    resource_expect("memory_bar_length",11,0,0x1c,0x20500000);
-    resource_snapshot();resource_cfg[11][0][6]=0x20400000;
-    resource_expect("memory_bar_alias",11,0,0x18,0x20400000);
-    resource_snapshot();resource_cfg[8][0][5]=resource_cfg[8][0][4];
-    resource_expect("memory_bar_alias",8,0,0x14,0x20000000);
-    /* C1 replaces the old ROM-bound contradiction with a live memory BAR. */
-    resource_snapshot();resource_cfg[8][0][6]=0x20580000;
-    resource_expect("memory_bar_bound",11,0,0x18,0x20500000);
-    resource_snapshot();resource_cfg[11][0][6]=0x20580000;
-    resource_expect("memory_bar_range",11,0,0x18,0x20580000);
-    resource_setup();resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
-    resource_cfg[8][0][0]=GF_RES_TRIDENT_ID;resource_cfg[8][0][1]=2;
-    resource_cfg[8][0][2]=0xd3;resource_cfg[8][0][4]=0x20000000;
-    CHECK(resource_run(ranges,&n)==0 && n==1 && ranges[0].len==0x20000000);
-    resource_cfg[8][0][4]=0xfffffff0;
-    CHECK(resource_run(ranges,&n)==0 && n==1 && ranges[0].len==16);
-    /* A 64-bit BAR's high half is not a second candidate. */
-    resource_cfg[8][0][4]=0x20000004;resource_cfg[8][0][5]=0x20000000;
-    CHECK(resource_collect_bounds(&b)==0 && b.count==0);
-    resource_expect("memory_bar_type",8,0,0x10,0x20000004);
-    resource_setup();u32 assigned=0;
-    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++){
-        if(d==GF_T_DEV && f==0)continue;
-        resource_cfg[d][f][0]=0x12348086;resource_cfg[d][f][1]=2;
-        resource_cfg[d][0][3]=PCI_HDR_MULTIFUNCTION<<16;
-        resource_cfg[d][f][4]=(++assigned)*0x1000;
-    }
-    resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
-    resource_cfg[0][0][5]=(++assigned)*0x1000;
-    CHECK(resource_collect_bounds(&b)==0 && b.count==RECOVER_RANGE_MAX);
-    resource_cfg[0][0][6]=(++assigned)*0x1000;
-    CHECK(resource_collect_bounds(&b)<0 && resource_text(resource_reason,"memory_bar_count"));
-    const u32 bad_len[]={0,3,0x2000};
-    for(u32 i=0;i<ARRAY_SIZE(bad_len);i++){
-        n=0;CHECK(resource_append(ranges,&n,1,0,0,0x1008,bad_len[i],0x10000,true)<0 && n==0);
-    }
-    n=0;CHECK(resource_append(ranges,&n,1,0,0,0xfffff008,0x1000,0x1000,true)==0 && n==1);
-    n=0;CHECK(resource_append(ranges,&n,1,0,0,0xfffff008,0x2000,0x2000,false)<0 && n==0);
-    n=0;CHECK(resource_append(ranges,&n,1,0,0,8,0x1000,0x1000,true)<0 && n==0);
-    n=RECOVER_RANGE_MAX;CHECK(resource_append(ranges,&n,1,0,0,0x1008,0x1000,0x1000,true)<0);
-    /* Table invariants: unique ID:BAR and nonzero, power-of-two exact lengths. */
-    for(u32 i=0;i<ARRAY_SIZE(resource_bar_specs);i++){
-        const struct resource_bar_spec *a=&resource_bar_specs[i];
-        CHECK(a->len && !(a->len&(a->len-1)) && a->bar<PCI_CFG_BAR_COUNT);
-        for(u32 j=0;j<i;j++)CHECK(a->id!=resource_bar_specs[j].id || a->bar!=resource_bar_specs[j].bar);
-    }
-    CHECK(resource_writes==0);
-    output("resources: BARLEN baseline/B2, C1-C3, exact lengths, bounds, aliases, trace and zero writes PASS\n");
+    resource_cfg[13][0][12]|=1;CHECK(resource_run(ranges,&n)==0 && n==11);
+    resource_cfg[10][1][4]=0xfffff000;CHECK(resource_run(ranges,&n)==0 && n==10);
+    /* Enabled unknown 64-bit prefetch BAR below 4 GiB, then above it. */
+    resource_cfg[13][0][5]=0x2200000c;resource_masks[13][0][5]=0xffe0000c;
+    resource_cfg[13][0][6]=0;resource_masks[13][0][6]=U32_MAX;
+    CHECK(resource_run(ranges,&n)==0 && n==9);
+    resource_cfg[13][0][6]=1;CHECK(resource_run(ranges,&n)<0 && n==0);
+    resource_masks[13][0][5]=0x0000000c;resource_masks[13][0][6]=0xfffffffe;
+    CHECK(resource_run(ranges,&n)<0 && n==0);
+    CHECK(!pci_bar_get(0,13,0,PCI_CFG_BAR0+PCI_CFG_BAR_STRIDE,&measured) &&
+          measured.kind==PCI_BAR_MEM64 && measured.prefetch && measured.len==0x200000000ULL);
+
+    GF_T_DEV=13;
+    resource_snapshot();resource_cfg[7][0][0]=0x56781234;resource_cfg[7][0][1]=2;
+    resource_cfg[7][0][3]=1U<<16;resource_cfg[7][0][8]=0x21f02000;
+    resource_cfg[7][0][9]=0x0000fff0;CHECK(resource_run(ranges,&n)==0 && n==6);
+    CHECK(ranges[0].base==0x20000000 && ranges[0].len==0x2000000);
+    resource_cfg[7][0][9]=0x31f13001;resource_cfg[7][0][10]=1;
+    CHECK(resource_run(ranges,&n)<0 && n==0);
+    output("resources: measured unknown SCSI/USB, Intel/Trident/GPU, ROM, 64bit, bridge and restore PASS\n");
 }
+static void resource_barlen_tests(void) { resource_tests(); }
 
 static struct recover_range probe_ranges[RECOVER_RANGE_MAX];
 static u32 probe_range_count;
@@ -594,7 +459,6 @@ static void resource_probe(bool collision)
      * incomplete BAR measurement. Successful measurement restores all BARs. */
     if(!collision)CHECK(rawcommand==0x102 && rawbars[0]==0x24000000 &&
         rawbars[1]==0x30000008 && rawbars[2]==0x26000000);
-    CHECK(resource_writes==0);
 }
 static void resource_probe_tests(void)
 {
@@ -605,13 +469,6 @@ static void resource_probe_tests(void)
     resource_snapshot();resource_cfg[11][0][6]=0x24800000;resource_probe(true);
     resource_snapshot();resource_cfg[11][0][6]=0x23f00000;resource_probe(false);
     resource_snapshot();resource_cfg[11][0][6]=0x25000000;resource_probe(false);
-    resource_setup();resource_cfg[GF_T_DEV][0][0]=GF_RES_GPU_ID;
-    resource_cfg[8][0][0]=GF_RES_TRIDENT_ID;resource_cfg[8][0][1]=2;
-    resource_cfg[8][0][2]=0xd3;resource_cfg[8][0][4]=0x20000000;
-    resource_probe(true); /* Lone Trident bound is 512 MiB and reaches the GPU. */
-    struct resource_bounds b={{0x11800},1};u32 n=0;
-    CHECK(resource_cap(&b,0x10000)==0x1800);
-    CHECK(resource_append(probe_ranges,&n,1,0,0,0x10000,0x1800,0x1800,false)==0);
     output("resources: real SIZE_BARS/probe, containment/adjacency, access_error cleanup and restoration PASS\n");
 }
 

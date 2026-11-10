@@ -17,7 +17,7 @@ I/O も静的配列も触らないので模型は要らない。
   python3 -B tools/tests/test_pci_decode.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pci-decode-host', tier=4,
-    covers=['drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
+    covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
     needs=[], budget=3.7)
 
 import pathlib
@@ -35,6 +35,7 @@ SRC = ROOT / "drivers/pci/pci_decode.c"
 TARGET_SRCS = [
     ("drivers/pci/pci_decode.c", []),
     ("drivers/pci/pci.c", []),
+    ("drivers/pci/pci_barsize.c", []),
     ("userland/shell/pci_verbose.c", []),
 ]
 

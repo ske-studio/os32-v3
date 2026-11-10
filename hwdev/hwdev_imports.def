@@ -328,6 +328,13 @@
       "source": "mm/paging.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pci_bar_get",
+      "source": "drivers/pci/pci.h",
+      "index": 47,
+      "group": "kernel"
     }
   ]
 }

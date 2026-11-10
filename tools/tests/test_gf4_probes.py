@@ -1,7 +1,7 @@
 """Stage D: concrete GF probe declarations and real start boundaries."""
 CHECK = dict(name='gf4-probes-host', tier=1, budget=16.3,
              needs=['make:build/out/geforce/geforce_imports.h'],
-             covers=['tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
+             covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
                      'include/**', 'kdebug/**', 'mm/pgalloc.h', 'mm/physmem.h',
                      'mm/paging.h', 'lib/kstring.h', 'lib/kstring_c.c', 'drivers/pci/pci.h',
                      'drivers/pci/pci_decode.h', 'drivers/char/serial.h',

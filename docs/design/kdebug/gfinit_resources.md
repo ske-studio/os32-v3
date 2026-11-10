@@ -1,60 +1,48 @@
 # kdebug/gfinit_resources.c — 設計
-> 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_resources.c`
+> 状態: **現行 (2026-11-10)**
+ソース: `kdebug/gfinit_resources.c`、`drivers/pci/pci_barsize.c`
 
-読取り検査を共有し、F6 の ID/定数長接続を加える。A1 sizing は診断専用。
+BOOT_PCI_ENUM の列挙時に全装置の BAR を一度測り、GeForce の資源除外に使う。
+公開 `pci_dev` と KAPI の配置は保ち、長さ・種類・prefetch・未割当状態を核の別表に保存する。
+`pci_bar_get(bus,dev,fn,reg,out)` は記録をコピーする私的な kernel/module import。
+記録が無い場合に再測定せず、資源収集を失敗させる。
 
-## BARLEN_DESIGN
+## 測定と復元
 
-| 実物と設計上の扱い |
-| --- |
-| resources は除外区間の収集。GPU 測定後の重なり検査は別関数 |
-| 82557 の通信・DMA・割込み・BAR を変更せず、Trident は保守的上限で照合 |
+手本は FreeBSD releng/14.3 `sys/dev/pci/pci.c:3117-3201` (`pci_read_bar`)、
+同 `:3320-3417` (`pci_add_map`) と `pcireg.h` / `pcivar.h`。
+仕様は PCI Local Bus 3.0 §6.2.5.1。メーカー資料は
+[Intel 8255x SDM rev.1.3 §4.1.10](https://www.intel.com/content/dam/doc/manual/8255x-10-100-mbps-ethernet-controller-software-dev-manual.pdf)。
 
-既知長を優先し、上限との矛盾は拒否
+通常 BAR は元の値と COMMAND を保存し、該当する MEM または IO decode を WORD 書込みで止める。
+全ビット 1 を書き、mask を読み、元の BAR、64bit 上位、COMMAND の順に戻す。
+64bit は下位・上位の両方を書いてから上位・下位を読む。GeForce も同じ手順。
+Bus Master と Status は変更しない。測定・復元の間に yield しない。
 
-| vendor:device / BAR | 長さ・属性 | 根拠と確度 |
-| --- | --- | --- |
-| 8086:1229 / 0 | **0x1000 B**、memory32、prefetchable | Intel rev.1.3 §4.1.10 Table 3、確認メモ `/home/hight/os32-tmp/run/barlen/sources/REFERENCES.txt:12` |
-| 8086:1229 / 2 | **0x100000 B**、memory32、non-prefetchable | 同 Table 3、`/home/hight/os32-tmp/run/barlen/sources/REFERENCES.txt:14`。Flash 実容量ではなく aperture |
-| 8086:1229 / 1 | I/O 32 B、メモリ除外には入れない | 同 Table 3、`/home/hight/os32-tmp/run/barlen/sources/REFERENCES.txt:13` |
+Type 0 は 6 本、Type 1 は 2 本、CardBus は 1 本を測定する。
+Type 1 のバス番号や転送窓に sizing 値を書かない。
+ROM は Type 0 の 0x30 / Type 1 の 0x38 を測る。手本どおり COMMAND は変えず、
+0xfffffffe を書いて enable を立てず、元の ROM 値へ戻す。
 
-- Intel の一次資料: [8255x Software Developer Manual](https://www.intel.com/content/dam/doc/manual/8255x-10-100-mbps-ethernet-controller-software-dev-manual.pdf)、印刷頁15–17。 BSD 対照: `/home/hight/os32-tmp/ref/freebsd-main/sys/dev/fxp/if_fxpreg.h:31` は MMBA=10h/IOBA=14h、同:37 は CSR。**このヘッダ単独では BAR 長を証明しない**。
+mask の最下位の実装ビットから長さを求める。0 mask・不正な属性・最小長未満は長さ 0。
+base=0、または元の値が mask と等しければ未割当てとして記録する。
+BIOS の割当てを保持し、FreeBSD の後段の再割当て・decode の有効化は行わない。
+静的表が満杯でも測定と復元は続けるが、保存できない装置の照会は失敗する。
+起動ログは実装された BAR ごとに BDF・種類・prefetch・長さ・base を出す。
 
-- `/home/hight/os32-tmp/ref/freebsd-main/sys/dev/fxp/if_fxp.c:310` は MMBA を memory resource として確保する。固定長の根拠は上の Intel Table 3。
+## GeForce の除外
 
-- Trident のメーカー資料所在は `/home/hight/os32-tmp/run/barlen/sources/REFERENCES.txt:17`。HTTP 403 で本文未確認。正確な長さの値の根拠が未取得。 `/home/hight/os32-tmp/run/barlen/sources/netbsd-trident.c:176` は同じ PCI ID を複数型で使う。ID だけで全系列の同一 aperture を保証しない。
+bus 0 の生 config を走査し、fn0 不在と multifunction に従って function 数を決める。
+GeForce 自身を除く MEM 有効装置の memory BAR と、有効な ROM を測定記録で除外する。
+未割当ては除外しない。64bit は 2 スロットを消費し、上位も記録と照合する。
+生値の変化、測定不能、4 GiB を超える範囲、不整列、件数超過は拒否する。
+Type 1 の転送窓の検査は維持し、配下装置の領域を窓全体で除外する。
 
-- 公開入口 `gfinit_resources(exclude,count)` は不変。成功時だけ count を確定し、失敗時 count=0。
+入口 `gfinit_resources(exclude,count)` は成功時だけ count を確定し、失敗時は 0。
+診断時は理由・BDF・reg・raw を表示し、production は reject 構造体に残す。
 
-- 既知長表と helper は `gfinit_resources.c` の static。新しい object・KAPI・core import slot は不要。
+## 試験
 
-- 下は境目の設計コード。数値定数は同ファイルの Local Layer に名称付きで定義する。
-
-```c
-/* id=device<<16|vendor、bar=0-based、len=正確長、attr=下位nibble */
-struct resource_bar_spec { u32 id, bar, len, attr; };
-static const struct resource_bar_spec resource_bar_specs[] = {
-    {GF_RES_FXP_ID, GF_RES_BAR0, GF_RES_FXP_CSR_LEN, PCI_BAR_MEM_PREFETCH},
-    {GF_RES_FXP_ID, GF_RES_BAR2, GF_RES_FXP_FLASH_LEN, GF_RES_ATTR_MEM32}
-    /* Trident は正確長の表に入れず、別の許可判定で上限を使用。 */
-};
-struct resource_bounds { u32 base[RECOVER_RANGE_MAX]; u32 count; };
-static int resource_collect_bounds(struct resource_bounds *b); /* 第1走査 */
-static u32 resource_cap(const struct resource_bounds *b, u32 base);
-static const struct resource_bar_spec *resource_spec(u32 id, u32 bar);
-static int resource_memory_bar(struct recover_range *exclude, u32 *used, const struct resource_bounds *b, u32 id, u32 dev, u32 fn, u32 header, u32 bar, u32 raw);
-```
-
-| 定数の置き場 | 内容 |
-| --- | --- |
-| `kdebug/gfinit_resources.c` Local | FXP_ID=0x12298086、BAR0=0、BAR2=2、CSR_LEN=0x1000、FLASH_LEN=0x100000 |
-| 同 Local | ATTR_MASK=0xf、ATTR_MEM32=0、BAR_STRIDE=4、TRIDENT_ID=0x96601023、REV=0xd3、ROM_ADDR_MASK=0xfffff800。revision offsetは既存PCI定義を利用 |
-
-既存 GPU ID/BDF と入口。
-
-- 境目の設計コード (`resource_bar_specs`) の `GF_RES_FXP_ID` は `((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL)`、`GF_RES_ATTR_MEM32` は `PCI_BAR_MEM_TYPE32` (どちらも `drivers/pci/pci_decode.h`) に置き換えた。値と動作は同じ。
-
-## HWDEV_DESIGN
-
-PCI 資源収集
+`tools/tests/gfinit_bus_host.c` は mask を返す fake config と実際の測定処理を組む。
+USB・SCSI 1000:000f・82557・Trident・GeForce、ROM、64bit、bridge、未割当てと
+全 config 復元を照合する。`test_gfinit_bus.py --mutate` は decode 復元漏れも実行時 RED にする。

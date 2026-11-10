@@ -1621,4 +1621,9 @@ legacy_lowmap_busy:
 v86_bios_real_lowmem:
     jmp *kdebug_import_slots+1292
 .size v86_bios_real_lowmem, .-v86_bios_real_lowmem
+.globl pci_bar_get
+.type pci_bar_get, @function
+pci_bar_get:
+    jmp *kdebug_import_slots+1296
+.size pci_bar_get, .-pci_bar_get
 .section .note.GNU-stack,"",@progbits
