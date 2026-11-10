@@ -4,6 +4,7 @@
 #include "gfx_policy.h"
 #include "gfx_hal.h"
 #include "gfx_emergency.h"
+#include "display_restore.h"
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "con_sink.h"     /* con_sink_is_enabled — GUI 中かどうか (票 T8) */
@@ -256,18 +257,12 @@ static void gfx_select_backend(int legacy200)
 /* 共通初期化処理 (テキストVRAMクリア + バックバッファゼロクリア) */
 static void _gfx_common_init(int plane_sz)
 {
-    int i;
-    volatile u16 *tvram_char = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
-    volatile u8  *tvram_attr = (volatile u8  *)P2V_IO(TVRAM_ATTR_BASE);
-
     if (!bb_b || !bb_r || !bb_g || !bb_i) return;
     dirty_queue.count = 0;
 
-    /* テキストVRAMクリア */
-    for (i = 0; i < TVRAM_COLS * TVRAM_ROWS; i++) {
-        tvram_char[i] = 0x0000;
-        tvram_attr[i * 2] = 0x00;
-    }
+    /* 順を保つ: 4 プレーンの確認の後にテキストを隠し、バックバッファを消してから
+     * 16 色モードにする (表示の実体は platform の provider、第 5 段 B3)。 */
+    display_text_hide();
 
     /* ゼロクリア (バックバッファ) — kmemset (rep stosd) で高速化 */
     kmemset(bb_b, 0, plane_sz);
@@ -275,7 +270,7 @@ static void _gfx_common_init(int plane_sz)
     kmemset(bb_g, 0, plane_sz);
     kmemset(bb_i, 0, plane_sz);
 
-    _out(MODE_FF2_PORT, MFF2_16COLOR);
+    display_planar16();
 }
 
 /* ======================================================================== */
@@ -380,24 +375,6 @@ void gfx_prepare_backend(void)
     if (g_backend->shutdown) g_backend->shutdown();
 done:
     gfx_reinit_surfaces(1);
-}
-
-/* 標準 planar モード専用。CPU 直書きで両ページの表示領域を消す [HW1]。
- * UNDOCUMENTED io_disp.md「VRAMプレーン切り換え」: A6h が CPU の書込先。
- * 戻りは描画ページ1。呼び手は初期化を続けるか直ちに shutdown する。 */
-void gfx_clear_planar_pages(u32 plane_size)
-{
-    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, plane_size);
-
-    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, plane_size);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, plane_size);
 }
 
 #include "gfx_core_init.inc"

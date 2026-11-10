@@ -11,6 +11,12 @@ void display_palette4_write(int index, u8 r, u8 g, u8 b);
 /* Internal: normalized logical row, logical height and display page.
  * Caller retains scroll state and the no-backbuffer guard. */
 void display_scroll(int y, int height, int flip, int page);
+/* Standard planar bring-up, called by gfx_init in this order: text hide,
+ * (backbuffer clear), planar16, planar_start, (page clear), flip_pages. */
+void display_text_hide(void);   /* PC98: char=0/attr=0; not console_clear */
+void display_planar16(void);
+void display_planar_start(int legacy200);
+void display_flip_pages(int display, int access);
 void display_restore_98(void);
 int display_recover_ready(void);
 int display_recover_cell_read(u32 *value);

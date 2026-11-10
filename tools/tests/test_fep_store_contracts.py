@@ -6,7 +6,7 @@ existing ILP32 VfsSqliteCookie/OS32_MAX_PATH. Regenerate expectations only when
 that contract changes. Mutants must compile and return a runtime failure.
 """
 CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
-    covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h',
+    covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h', 'include/ime_boot.h',
             'tools/tests/fep_store_fixture.h', 'tools/tests/fep_store_fixture.c',
             'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
@@ -249,7 +249,7 @@ def main():
             headers = subprocess.check_output(['git', 'ls-files', '*.h'], cwd=ROOT,
                                               text=True).splitlines()
             tree = work / 'overlay'
-            for rel in set(headers) | {HEADER, FIXTURE_H, FIXTURE_C}:
+            for rel in set(headers) | {HEADER, FIXTURE_H, FIXTURE_C, 'include/ime_boot.h'}:
                 target = tree / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / rel, target)
