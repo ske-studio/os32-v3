@@ -851,6 +851,33 @@ static void case_inject_discard_scope(void)
           "11g 読み手不在なら子らしき ID の退場でも捨てない");
 }
 
+static int boot_serial_config, boot_serial_inits;
+int sysconfig_get_int(const char *path, const char *key, int def)
+{ (void)path; (void)key; return boot_serial_config < 0 ? def : boot_serial_config; }
+static void capture_init(u32 baud) { if (baud == SYS_SERIAL_BAUD) boot_serial_inits++; }
+static const PortOps capture_port = { .init = capture_init };
+const char *bootlog_compose(const char *header, u32 *len)
+{ (void)header; *len = 4; return "old\n"; }
+#include "../../init/boot_serial.inc"
+
+static void case_boot_serial(void)
+{
+    reset_all(); g_v86 = 1; rshell_active = 0; boot_serial_mirror = 0;
+    copied_len = 0; boot_serial_inits = 0; boot_serial_config = -1;
+    port_register(&capture_port);
+    kernel_boot_serial(); console_write("x", 1, 7);
+    check(copied_len == 0 && boot_serial_inits == 0, "boot serial default off");
+    boot_serial_config = 1; kernel_boot_serial();
+    console_write("A", 1, 7); shell_print("B", 7); shell_print_utf8("C", 7);
+    check(boot_serial_inits == 1 && copied_len == 7 &&
+          copied[0] == 'o' && copied[3] == '\n' && copied[4] == 'A' &&
+          copied[5] == 'B' && copied[6] == 'C', "boot serial backlog then live");
+    rshell_active = 1; boot_serial_mirror = 0;
+    console_write("D", 1, 7);
+    check(copied_len == 8 && copied[7] == 'D', "boot serial handoff once");
+    rshell_active = 0; g_v86 = 0;
+}
+
 static void case_output_copy(void)
 {
     reset_all();
@@ -877,6 +904,7 @@ int main(void)
     con_output_register(&capture_output);
     failures = 0;
     report("con_sink ring (K6C)\n");
+    case_boot_serial();
     case_output_copy();
     case_disabled_is_silent();
     case_record_shape();

@@ -9,6 +9,7 @@
 
 /* rshellフラグ */
 extern int rshell_active;
+extern int boot_serial_mirror;
 
 /* コンソール出力 */
 void shell_putchar(char ch, u8 color);

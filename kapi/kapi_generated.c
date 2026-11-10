@@ -1074,6 +1074,7 @@ void __cdecl wrap_rshell_set_active(int active)
     KAPI_HIT(63);
     if (ring3_call_from_user()) return;
     rshell_active = active;
+    if (active) boot_serial_mirror = 0;
 }
 
 int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)

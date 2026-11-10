@@ -51,6 +51,7 @@ MUTATIONS += [
     ('ime OFF row guard', 5, 'if (g_ime.mode != IME_MODE_OFF) preedit_draw();', 'preedit_draw();'),
     ('ime ON mode redraw', 5, 'if (g_ime.mode != IME_MODE_OFF) preedit_draw();', 'if (g_ime.mode != IME_MODE_OFF) preedit_clear();'),
     ('rshell user', 3, 'if (ring3_call_from_user()) return;', ''),
+    ('boot serial handoff', 3, 'if (active) boot_serial_mirror = 0;', ''),
 ]
 
 # Public wrapper names are stable; provider names need not match them.

@@ -406,7 +406,7 @@ static int test(void)
         rshell_active=1; wrap_rshell_set_active(0);
         CHECK(rshell_active==1,"rshell user disable");
         user=0; wrap_rshell_set_active(0); CHECK(!rshell_active,"rshell trusted disable");
-        wrap_rshell_set_active(1); CHECK(rshell_active==1,"rshell trusted enable");
+        boot_serial_mirror=1; wrap_rshell_set_active(1); CHECK(rshell_active==1 && !boot_serial_mirror,"rshell trusted enable and boot handoff");
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 3) {
         /* STOP arrives during a sustained note/rest, or while scanning non-notes.
