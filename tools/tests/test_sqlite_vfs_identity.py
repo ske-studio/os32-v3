@@ -1,6 +1,7 @@
 """T4b-4: real SQLite callbacks/FD table; runtime mutation failures only."""
+import sqlite_cc
 CHECK = dict(name='sqlite-vfs-identity-host', tier=1,
-    covers=['tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/sqlite_cc.py', 'tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=8.3)
 
 from kernel_includes import include_flags
@@ -72,7 +73,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='sqlite-identity-') as tmp:
         work = pathlib.Path(tmp)
         obj, exe = work / 'sqlite.o', work / 'normal'
-        subprocess.run(['gcc', '-std=gnu89', '-O0', '-include',
+        sqlite_cc.build(['gcc', '-std=gnu89', '-O0', '-include',
                         str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',
                         str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(obj)], check=True)
         compile_host(ROOT, obj, exe)

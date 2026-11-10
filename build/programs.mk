@@ -416,7 +416,7 @@ SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno
 SQLITE_SA_CFLAGS += -include sdk/include/os32/os32_unit_stamp.h
 
 $(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
+	$(SQLITE_CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
 
 $(SQLITE_SA_DIR)/sqlite_user_vfs.o: $(SQLITE_SA_DIR)/sqlite_user_vfs.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@

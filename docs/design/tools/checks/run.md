@@ -29,14 +29,16 @@ def main(argv: list[str]) -> int: ...
 
 ## CLI
 
-- `--list`: 通常列を `check-<name>` で1行1本。budget 降順、同値は name 順。
-- `--list --shard i/n`: 0始まりのシャード列。check needs の無向連結成分ごとに budget 合計の降順で LPT 分割し、同値は名前・シャード番号順。列内は通常の budget 順。`--json` と併用可能。分母0・範囲外・ほかの action との併用はエラー。
+- `--list`: 通常列を `check-<name>` で1行1本。実測重み降順、同値は name 順。
+- `--list --shard i/n`: 0始まりのシャード列。check needs の無向連結成分ごとに 実測重み合計の降順で LPT 分割し、同値は名前・シャード番号順。列内は通常の重み順。`--json` と併用可能。分母0・範囲外・ほかの action との併用はエラー。
+- `--make [--shard i/n]`: make 読込1回につき1起動で全検査名・シャード列・依存辺・選択したシャードの make needs を登録する。
+- `--list --needs` (シャード指定可): 選んだ検査と推移的な check 前提の make needs だけを列挙。`--json` とは併用不可。
 - `--list --json`: 同じ列の name/target/path と CHECK の値。inventory が読む。
 - `--select [--base REF | --files PATH...] [--tier N]`: stdout は shell 代入、説明は stderr。明示空 --files と未指定を区別する。
 - `--run NAME... [--files PATH...]`: name/check-name を受け、明示された検査と check 前提の閉包を実行する。単独 CLI の make 前提はまとめて1回組む。
 - `--lint`: 宣言の型・名前・全ファイルの対象宣言漏れ・入力・既存の成果物読取監査。検査は実行せず、mutate_tier の省略を許す。
 
-`--pack`・`--inputs`・`--suggest` は移さない。`--list --make`・make 断片・`--prepared` は作らない。
+`--pack`・`--inputs`・`--suggest` は移さない。`--list --make`・登録用の別ファイル・`--prepared` は作らない。
 
 ## 選び方 (8規則)
 
@@ -81,7 +83,7 @@ CHECK 自身、covers と run が呼ぶスクリプトから旧 Extractor の静
 C/ハーネスを集めてから include を辿り、旧 `gcc -MM -MG -I.` と導出した -I の結果を合わせる (`:800,954,975`)。
 選択に自動追加するのは抽出した入力と `-MM` に出るリポジトリ内のファイル (`.h`・`.inc`・その他の C 断片を含む)。復元できない直接入力は covers に残す。
 文書以外の変更では compiler scan を使う。ソース単位の失敗は旧静的閉包へ戻し、gcc 起動失敗は非0。
-キャッシュは同一プロセス内の lru のみ。root・入力条件を分け、ディスクへ保存しない。--list では依存抽出をせず、--lint はヘッダ全件コンパイルをしない。静的抽出で導く `.h`・`.inc` は covers の重複を要求しない。
+入力抽出のキャッシュは同一プロセス内の lru のみ。root・入力条件を分け、ディスクへ保存しない (宣言索引は後述)。--list では依存抽出をせず、--lint はヘッダ全件コンパイルをしない。静的抽出で導く `.h`・`.inc` は covers の重複を要求しない。
 成果物読取監査は旧 `:1015,1150` と PATH_AUDIT_ALLOW を移す。実行追跡や Python の汎用解釈器を作らない。
 ランナーは変更ファイルをそのまま ctx.files へ渡す。翻訳単位の逆引きは P1b の各 checker 側が持つ。
 p2v/c-dialect/arch-asm の run だけが既存 --files 契約へ渡す。未着地なら旧全走査。privileged/kprintf-window は旧入口を維持する。
@@ -92,9 +94,9 @@ p2v/c-dialect/arch-asm の run だけが既存 --files 契約へ渡す。未着�
 MUTATE=0/1/sel、MUTATE_TARGETS、MUT/MUTS は `build/sdk.mk:114` と同じ。単独 CLI の既定も1。
 HOST32_RUNNERS の全列で正常対照、変異は先頭 runner だけ (`build/sdk.mk:156`)。host32 以外の処理は繰り返さない。
 旧 recipe の行順、環境、失敗中断を run に移す。旧 __main__/unittest は subprocess の argv で呼び、一律 main() 呼出しへ変えない。
-make は --list の名前に `.PHONY` と静的パターン `$(CHECK_NAMES): check-%:` を付ける。列外7入口は手書き make のまま。
+make は --make で得た全検査名に `.PHONY` と静的パターン `$(CHECK_NAMES): check-%:` を付ける。列外7入口は手書き make のまま。
 check-changed は CC_NEEDS を1回組み、tree save → check-par → verify の順。check/fast は全列の needs を同様に集める。
-親 make の準備対象は選択結果、全列時は --list --json の needs から得る。make 断片は作らず、JSON の check needs から check-time 間の依存辺を make 内で生成する。`CHECK_SHARD=i/n` があれば CHECK_PAR_TARGETS の既定をそのシャード列にする。全検査の登録・make 前提の準備は維持する。
+親 make の登録は --make 1起動で行う。CHECK_ALL_NEEDS は --list --needs と同じ選択結果の閉包から得て、check-time 間の依存辺も同時に登録する。宣言索引 (build/out/check-index.json) は宣言候補・parser・weights.json の変更で無効化する。`CHECK_SHARD=i/n` があれば CHECK_PAR_TARGETS の既定をそのシャード列にする。全検査の登録を維持し、make 前提は選んだシャードの分だけ準備する。
 check-par の既存計時子は CHECK_TIME_CHILD=1 を渡す。子の --run は指定名の本体だけを実行し、閉包の再展開・前提の再準備をしない (`build/sdk.mk:169,174`)。
 直接 make check-X/CLI --run は同じ閉包の make needs をまとめて1回組んでから実行する。ver-info の前提は重複なく選択へ加える。
 BUILD_OUT/SQLITE_PROTO_OUT/CROSS_DIR 等は make の展開値を渡し、Python にパスの別定義を作らない。
@@ -127,3 +129,5 @@ check-map は新 lint、check-check-select-host は新 test_run の入口。列�
 
 fast/docs/full/段による旧方針との差は上の事例で見る。200件比較へ旧 STAGE1/MUT1 の再現器を足さない。
 通常系10秒以内の既存目標は測定で示し、超過を新たな失敗条件にしない。200件比較と長い実検査は毎回の test_run に入れない。
+
+重みは `tools/checks/weights.json` の成功計測の中央値を使い、budget はその2倍。未計測は CHECK の宣言 budget を既定とする。更新手順と出所は docs/08_build.md §8-6 (GitHub Actions での本体ビルド)。

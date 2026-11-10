@@ -6,6 +6,7 @@ uses deterministic adversarial S/M/L fixtures, explicitly labelled synthetic.
 Python SQLite builds disposable input files only; all measurements run the
 bundled SQLite and real kernel IME under the selected host32 runner.
 """
+import sqlite_cc
 from kernel_includes import include_flags
 import argparse
 import hashlib
@@ -177,7 +178,7 @@ def main():
         max_file = max(Path(data[i]).stat().st_size for i in range(0, len(data), 3))
         obj = tmp / 'sqlite.o'
         cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
-        host32.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os',
+        sqlite_cc.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os',
                       '-DNDEBUG', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                       '-fsigned-char', '-fno-short-enums', '-include',
                       str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',

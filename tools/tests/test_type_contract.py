@@ -131,7 +131,7 @@ def compiler_commands(output):
         command = []
         for token in [*tokens, ';']:
             if token and all(c in ';&|()' for c in token):
-                while command and (command[0] in ('env', 'ccache') or
+                while command and (Path(command[0]).name in ('env', 'ccache') or
                                    re.match(r'^[A-Za-z_][A-Za-z_0-9]*=', command[0])):
                     command.pop(0)
                 compiler_positions = [i for i, word in enumerate(command)
@@ -368,7 +368,15 @@ def probe_artifacts(directory, profile, mutate):
         print('RED build_compare: syntax-only removed, extra object detected')
 
 
+def check_compiler_wrappers():
+    command = 'i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o'
+    for prefix in ('ccache ', '/usr/bin/ccache compiler_check=content base_dir=/repo '):
+        assert list(compiler_commands(prefix + command)) == list(compiler_commands(command))
+    assert list(compiler_commands('echo /usr/bin/ccache ' + command)) == []
+
+
 def main():
+    check_compiler_wrappers()
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--ppc', action='store_true', help='manual/PM only; never used by CHECK')

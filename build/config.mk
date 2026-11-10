@@ -225,3 +225,7 @@ NHD_DEPLOY = env NP21W_DIR='$(NP21W_DIR)' python3 tools/nhd_deploy.py
 HOSTDRV_DEPLOY = env HOSTDRV_DIR='$(HOSTDRV_DIR)' python3 tools/hostdrv_deploy.py
 
 CFLAGS_SQLITE += -include sdk/include/os32/os32_unit_stamp.h
+
+# Cache only the SQLite amalgamation; SQLITE_CCACHE= disables it.
+SQLITE_CCACHE ?= $(shell command -v ccache 2>/dev/null)
+SQLITE_CC = $(if $(strip $(SQLITE_CCACHE)),$(SQLITE_CCACHE) compiler_check=content base_dir=$(CURDIR)) $(CC)

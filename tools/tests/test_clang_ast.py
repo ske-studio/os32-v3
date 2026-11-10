@@ -125,6 +125,13 @@ if __name__ == '__main__':
                 for expected in ('restrict', 'physical-cast', 'inline asm `cli`', 'clang parse failure'):
                     self.assertIn(expected, outputs[0][0])
 
+    def test_ccache_compile_lines(self):
+        from clang_ast.build import parse_compile_lines
+        command = 'i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o'
+        for prefix in ('ccache ', '/usr/bin/ccache compiler_check=content base_dir=/repo '):
+            self.assertEqual(parse_compile_lines(prefix + command), parse_compile_lines(command))
+        self.assertEqual(parse_compile_lines('echo /usr/bin/ccache ' + command), [])
+
     def test_declared_powerpc_compiler_is_not_silently_dropped(self):
         from clang_ast.build import parse_compile_lines, dependency_files
         line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c lib/kstring_c.c -o out.o'

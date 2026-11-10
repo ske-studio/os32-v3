@@ -168,7 +168,7 @@ else
 CHECK_SHARD ?=
 CHECK_REGISTRATION := $(shell python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
 ifneq ($(.SHELLSTATUS),0)
-$(error tools/checks/run.py --list failed (make registration))
+$(error tools/checks/run.py --make failed (make registration))
 endif
 $(eval $(CHECK_REGISTRATION))
 endif
