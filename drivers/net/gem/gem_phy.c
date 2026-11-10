@@ -20,6 +20,22 @@
 
 enum { PHY_START, PHY_RESET_WAIT, PHY_AN_WAIT, PHY_DONE };
 
+/* OpenBSD miidevs:46,178 and bmtphy.c:67-68; miivar.h:236-238,
+ * mii.h:103-104 define the OUI/model extraction. BCM5201 needs only
+ * mii_phy_reset (bmtphy.c:236-). Add QuickSilver PHY after hardware identification. */
+static const struct { u32 oui, model; const char *name; } supported_phys[] = {
+    { 0x001018, 0x21, "BCM5201" },
+};
+
+static int supported(u32 id1, u32 id2)
+{
+    u32 oui = (id1 << 6) | (id2 >> 10);
+    u32 model = (id2 & 0x03f0) >> 4;
+    for (u32 i = 0; i < sizeof(supported_phys) / sizeof(supported_phys[0]); ++i)
+        if (oui == supported_phys[i].oui && model == supported_phys[i].model) return 1;
+    return 0;
+}
+
 static unsigned long long ticks(u32 hz, u32 us)
 {
     unsigned long long n = (unsigned long long)hz * us + 999999U, q = 0;
@@ -76,7 +92,7 @@ int gem_mif_init(struct gem *g)
                 if (a && a != 0xffff && b && b != 0xffff) {
                     g->phy_addr = addr; g->phy_port = port;
                     g->phy_id1 = a; g->phy_id2 = b; g->phy_step = PHY_START;
-                    return GEM_OK;
+                    return supported(a, b) ? GEM_OK : GEM_EUNSUPPORTED;
                 }
             }
         }
@@ -92,39 +108,40 @@ int gem_phy_step(struct gem *g, unsigned long long now)
 {
     u32 v, status;
     int r;
-    if (!g || !g->phy_id1 || g->phy_id1 == 0xffff || !g->phy_id2 || g->phy_id2 == 0xffff)
+    if (!g || !supported(g->phy_id1, g->phy_id2))
         return GEM_EUNSUPPORTED;
     switch (g->phy_step) {
     case PHY_START:
         /* OpenBSD mii_physubr.c:282-307 mii_phy_reset; NetBSD mii_physubr.c:396-415.
          * Use steps to avoid blocking; NetBSD permits 500ms, OpenBSD waits 100ms. */
-        r = wr(g, BMCR, BMCR_RESET); if (r != GEM_OK) return r;
+        r = wr(g, BMCR, BMCR_RESET); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
         next(g, PHY_RESET_WAIT, now); return GEM_AGAIN;
     case PHY_RESET_WAIT:
-        r = rd(g, g->phy_addr, BMCR, &v); if (r != GEM_OK) return r;
+        r = rd(g, g->phy_addr, BMCR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
         if (v & BMCR_RESET) {
-            if (now - g->phy_started >= ticks(g->io.tb_hz, 500000) || ++g->phy_polls >= PHY_POLLS) return GEM_ETIME;
+            if (now - g->phy_started >= ticks(g->io.tb_hz, 500000) || ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }
             return GEM_AGAIN;
         }
         /* OpenBSD mii_physubr.c:148-176 and NetBSD mii_physubr.c:198-264 mii_phy_auto.
          * OS32 advertises no pause or gigabit: only 100TX full is supported. */
-        r = wr(g, ANAR, ANAR_CSMA | ANAR_TX_FD); if (r != GEM_OK) return r;
-        r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) return r;
-        if (v & BMSR_EXTSTAT) { r = wr(g, GTCR, 0); if (r != GEM_OK) return r; }
-        r = wr(g, BMCR, BMCR_AUTOEN | BMCR_STARTNEG); if (r != GEM_OK) return r;
+        r = wr(g, ANAR, ANAR_CSMA | ANAR_TX_FD); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+        r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+        if (v & BMSR_EXTSTAT) { r = wr(g, GTCR, 0); if (r != GEM_OK) { g->phy_step = PHY_START; return r; } }
+        r = wr(g, BMCR, BMCR_AUTOEN | BMCR_STARTNEG); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
         next(g, PHY_AN_WAIT, now); return GEM_AGAIN;
     case PHY_AN_WAIT:
         /* OpenBSD ukphy_subr.c:64-94 and NetBSD ukphy_subr.c:57-119 ukphy_status.
+         * NetBSD uses the second read; OpenBSD ORs the latched first read.
          * Steps bound the wait without blocking; only 100TX full is accepted. */
-        r = rd(g, g->phy_addr, BMSR, &status); if (r != GEM_OK) return r;
-        r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) return r;
-        status |= v;
+        r = rd(g, g->phy_addr, BMSR, &status); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+        r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+        status = v;
         if ((status & (BMSR_LINK | BMSR_ACOMP)) == (BMSR_LINK | BMSR_ACOMP)) {
-            r = rd(g, g->phy_addr, ANLPAR, &v); if (r != GEM_OK) return r;
-            if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD)) return GEM_EIO;
+            r = rd(g, g->phy_addr, ANLPAR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }
+            if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }
             g->phy_step = PHY_DONE; return GEM_OK;
         }
-        if (now - g->phy_started >= ticks(g->io.tb_hz, 5000000) || ++g->phy_polls >= PHY_POLLS) return GEM_ETIME;
+        if (now - g->phy_started >= ticks(g->io.tb_hz, 5000000) || ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }
         return GEM_AGAIN;
     case PHY_DONE: return GEM_OK;
     default: return GEM_EINVAL;

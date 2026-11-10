@@ -15,10 +15,16 @@ MUTATIONS = [
     ('ta0', 'if (v & GEM_MIF_FRAME_TA0)', 'if (!(v & GEM_MIF_FRAME_TA0))', 2, 'H:A6 phy-invalid'),
     ('poll', 'GEM_MIF_CONFIG_BB_ENA | GEM_MIF_CONFIG_POLL_ENA', 'GEM_MIF_CONFIG_BB_ENA', 0, 'H:config'),
     ('half', 'ANAR_CSMA | ANAR_TX_FD);', 'ANAR_CSMA | ANAR_TX_FD | 0x80);', 0, 'H:advertise'),
-    ('latch', 'r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) return r;\n        status |= v;', 'v = status;\n        status |= v;', 7, 'H:link'),
-    ('poll-limit', '|| ++g->phy_polls >= PHY_POLLS) return GEM_ETIME;\n        return GEM_AGAIN;\n    case PHY_DONE', ') return GEM_ETIME;\n        return GEM_AGAIN;\n    case PHY_DONE', 8, 'H:an-timeout'),
-    ('reset-limit', '|| ++g->phy_polls >= PHY_POLLS) return GEM_ETIME;\n            return GEM_AGAIN;', ') return GEM_ETIME;\n            return GEM_AGAIN;', 11, 'H:reset-poll-limit'),
+    ('latch', 'r = rd(g, g->phy_addr, BMSR, &v); if (r != GEM_OK) { g->phy_step = PHY_START; return r; }\n        status = v;', 'v = status;\n        status = v;', 7, 'H:link'),
+    ('poll-limit', '|| ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }\n        return GEM_AGAIN;\n    case PHY_DONE', ') { g->phy_step = PHY_START; return GEM_ETIME; }\n        return GEM_AGAIN;\n    case PHY_DONE', 8, 'H:an-timeout'),
+    ('reset-limit', '|| ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }\n            return GEM_AGAIN;', ') { g->phy_step = PHY_START; return GEM_ETIME; }\n            return GEM_AGAIN;', 11, 'H:reset-poll-limit'),
     ('ffff', 'a != 0xffff &&', '1 &&', 0, 'H:A6 phy-invalid'),
+    ('unknown-write', 'if (!g || !supported(g->phy_id1, g->phy_id2))', 'if (!g)', 16, 'H:unknown-write'),
+    ('current', 'status = v;', 'status |= v;', 17, 'H:current-status'),
+    ('retry', 'g->phy_step = PHY_START; return GEM_EIO;', 'return GEM_EIO;', 6, 'H:retry'),
+    ('startneg', 'BMCR_AUTOEN | BMCR_STARTNEG);', 'BMCR_AUTOEN);', 0, 'H:advertise'),
+    ('gtcr', 'r = wr(g, GTCR, 0);', 'r = GEM_OK;', 0, 'H:advertise'),
+    ('order', 'r = wr(g, ANAR, ANAR_CSMA | ANAR_TX_FD);', 'r = wr(g, BMCR, BMCR_AUTOEN | BMCR_STARTNEG);', 0, 'H:advertise'),
     ('partner', 'if ((v & (ANAR_CSMA | ANAR_TX_FD)) != (ANAR_CSMA | ANAR_TX_FD))', 'if (0)', 6, 'H:partner'),
 ]
 
@@ -39,7 +45,7 @@ def main():
         temp = Path(d)
         source = temp / 'gem_phy.c'
         source.write_text(original)
-        for case in range(14):
+        for case in range(18):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline %d: %s' % (case, result.stdout + result.stderr))
