@@ -11,14 +11,14 @@ void ppc_irq_restore(u32 f) { events = (events==123 || (arm_fail && events==12))
 int ppc_trap_onfault_data(u32 pc,u32 va,u32 resume) { if(events==1 && pc==(u32)ppc_probe_copy8_insn && va==100 && resume==(u32)ppc_probe_copy8_resume) events=12; return !arm_fail; }
 int ppc_probe_copy8(u32 va,u8 *p) { if(events==12 && va==100) events=122; *p=42; return 0; }
 void ppc_trap_onfault_clear(void) { events = events==122 && !arm_fail ? 123 : -1; }
-static void clock_cb(void *c,u32 *a,u32 *b,u64 *d,u64 *e) { (void)c; *a=0x01020304; *b=0x05060708; *d=0x090a0b0c0d0e0f10ULL; *e=0x1112131415161718ULL; }
-static int trans(void *c,u32 va,u32 *pa,u32 *ig) { (void)c; *pa=mode==3 && va==0x1002?0:va; *ig=mode==2 && va==0x1002; return mode==1 && va==0x1002; }
-static int copy(void *c,u32 va,u8 *p) { (void)c; ++copies; *p=(u8)va; return mode==4 && copies==3; }
+static void clock_cb(u32 *a,u32 *b,u64 *d,u64 *e) { *a=0x01020304; *b=0x05060708; *d=0x090a0b0c0d0e0f10ULL; *e=0x1112131415161718ULL; }
+static int trans(u32 va,u32 *pa) { *pa=mode==3 && va==0x1002?0:va; return mode==1 && va==0x1002; }
+static int copy(u32 va,u8 *p) { ++copies; *p=(u8)va; return mode==4 && copies==3; }
 static struct lan_message q,r;
 static u8 mac[6], diag[257];
 static u32 words[]={0x12345678,0xaabbccdd,0x87654321};
-static struct pm_lan_range ok[]={{0x1000,256},{0x1100,256}}, deny[]={{0x1080,16}}, ig_ok[]={{0x1002,2}};
-static struct pm_lan_diag d={words,3,words,3,diag,ok,2,ig_ok,1,deny,1,0,clock_cb,trans,copy};
+static struct pm_lan_range ok[]={{0x1000,128},{0x1090,368}};
+static struct pm_lan_diag d={words,3,words,3,diag,ok,2,clock_cb,trans,copy};
 static void req(int op,int len) { q.request_id++; q.opcode=op; q.payload_bytes=len; CHECK(pm_lan_monitor(&q,mac,&d,&r)==1,1); }
 static void peek(u32 va,u32 len,u32 reserved) { q.payload[0]=va>>24; q.payload[1]=va>>16; q.payload[2]=va>>8; q.payload[3]=va; q.payload[4]=len>>8; q.payload[5]=len; q.payload[6]=reserved>>8; q.payload[7]=reserved; req(5,8); }
 static const u8 golden1[] = {0x50,0x4c,0x4e,0x31,0x01,0x04,0x00,0x50,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x00,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x12,0x34,0x56,0x78,0xaa,0xbb,0xcc,0xdd,0x87,0x65,0x43,0x21};
@@ -34,22 +34,23 @@ void _start(void) { u32 i; u8 b[400]; u32 used; out("REACHED\n",8); q.type=3; fo
  req(2,0); wire(golden2,sizeof(golden2));
  req(3,0); wire(golden3,sizeof(golden3));
  q.payload[0]=0; q.payload[1]=32; q.payload[2]=0; q.payload[3]=3; req(4,4); wire(golden4,sizeof(golden4));
- d.peek_deny_count=0; peek(0x1003,3,0); wire(golden5,sizeof(golden5));
+ peek(0x1003,3,0); wire(golden5,sizeof(golden5));
  rd(0,1,0); rd(0,128,0); rd(128,128,0); rd(255,1,0);
  rd(0,0,3); rd(0,129,3); rd(129,128,3); rd(256,1,3); rd(255,2,3); rd(0xffff,1,3);
  req(4,3); CHECK(r.status==2,22); req(4,5); CHECK(r.status==2,35);
- d.peek_deny_count=0; peek(0x1000,256,0); CHECK(!r.status && r.payload_bytes==256 && r.payload[255]==255,8);
+ peek(0x1100,256,0); CHECK(!r.status && r.payload_bytes==256 && r.payload[255]==255,8);
  peek(0x1000,0,0); CHECK(r.status==3,9); peek(0x1000,257,0); CHECK(r.status==3,10); peek(0x1000,1,1); CHECK(r.status==3,11);
- peek(0x10ff,1,0); CHECK(!r.status,36); peek(0x1001,255,0); CHECK(!r.status,37);
- out("reached=A10\n",12); copies=0; peek(0x10ff,2,0); CHECK(r.status==3 && copies==0,12);
+ peek(0x107f,1,0); CHECK(!r.status,36); peek(0x1090,1,0); CHECK(!r.status,37);
+ out("reached=A10\n",12); copies=0; peek(0x107f,2,0); CHECK(r.status==3 && copies==0,12);
  peek(0x0fff,1,0); CHECK(r.status==3,38); peek(0x11ff,2,0); CHECK(r.status==3,39); peek(0xffffffff,2,0); CHECK(r.status==3,13);
- d.peek_deny_count=1; peek(0x107f,1,0); CHECK(!r.status,40); peek(0x1090,1,0); CHECK(!r.status,41); peek(0x107f,2,0); CHECK(r.status==3,14); peek(0x108f,2,0); CHECK(r.status==3,42); d.peek_deny_count=0;
- d.peek_ig_ok=0; d.peek_ig_ok_count=0; peek(0x1000,5,0); CHECK(!r.status && r.payload_bytes==5,49); mode=2; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,50); d.peek_ig_ok=ig_ok;
- mode=1; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,15); mode=2; d.peek_ig_ok_count=0; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,16); d.peek_ig_ok_count=1; peek(0x1000,5,0); CHECK(!r.status && r.payload_bytes==5,43); ig_ok[0].base=0x1003; peek(0x1000,5,0); CHECK(r.status==3,44); ig_ok[0].base=0x1001; ig_ok[0].size=1; peek(0x1000,5,0); CHECK(r.status==3,45); ig_ok[0].base=0x1002; ig_ok[0].size=2; d.peek_ig_ok_count=3; peek(0x1000,5,0); CHECK(r.status==3,46); d.peek_ig_ok_count=1; d.peek_ig_ok=0; peek(0x1000,5,0); CHECK(r.status==3,47); d.peek_ig_ok=ig_ok; mode=3; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,17); mode=4; copies=0; peek(0x1000,5,0); CHECK(r.status==7 && !r.payload_bytes,18); mode=0;
+ peek(0x1080,16,0); CHECK(r.status==3,14);
+ peek(0x1008,16,0); CHECK(!r.status && r.payload_bytes==16,40); /* descriptor */
+ mode=1; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,15);
+ mode=3; peek(0x1000,5,0); CHECK(r.status==3 && !r.payload_bytes,17); mode=4; copies=0; peek(0x1000,5,0); CHECK(r.status==7 && !r.payload_bytes,18); mode=0;
  req(1,1); CHECK(r.status==2,19); req(2,1); CHECK(r.status==2,20); req(3,1); CHECK(r.status==2,21); req(4,3); CHECK(r.status==2,22); req(5,7); CHECK(r.status==2,23); req(99,0); CHECK(r.status==1,24);
  req(1,0); CHECK(!r.status,25); words[0]=0; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.payload[0]==0x12,26); q.opcode=2; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==4,27);
  for(i=0;i<17;i++) req(1,0); q.request_id-=17; CHECK(pm_lan_monitor(&q,mac,&d,&r) && r.status==5,28);
  q.host_nonce[0]++; CHECK(pm_lan_monitor(&q,mac,&d,&r) && !r.status && r.payload[0]==0,29); mac[0]++; q.request_id=1; CHECK(pm_lan_monitor(&q,mac,&d,&r) && !r.status,30);
- CHECK(!pm_lan_copy8(0,100,b) && b[0]==42 && events==1234,31);
- arm_fail=1; b[0]=0; CHECK(pm_lan_copy8(0,100,b)==1 && b[0]==0 && events==1234,48);
+ CHECK(!pm_lan_copy8(100,b) && b[0]==42 && events==1234,31);
+ arm_fail=1; b[0]=0; CHECK(pm_lan_copy8(100,b)==1 && b[0]==0 && events==1234,48);
  out("PASS\n",5); __asm__ volatile("int $0x80" : : "a"(1),"b"(0)); __builtin_unreachable(); }
