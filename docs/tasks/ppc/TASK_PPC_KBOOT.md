@@ -1,6 +1,6 @@
 # TASK_PPC_KBOOT — PowerPC 移植: OS32 本体を QEMU mac99 で初期化まで通す (到達点 ②)
 
-> 上位: [TASK_PPC_SEP](TASK_PPC_SEP.md)。後続: [TASK_PPC_LAN](TASK_PPC_LAN.md)、[TASK_PPC_SPLASH](TASK_PPC_SPLASH.md)
+> 上位: [TASK_PPC_SEP](TASK_PPC_SEP.md)。後続: [TASK_PPC_SPLASH](TASK_PPC_SPLASH.md) (LAN の段は票 TASK_PPC_LAN、索引から辿る)
 
 > 状態: **受入完了・実機確認待ち (2026-11-10)** — QEMU mac99 (7450・7455) で ② を通過。統合の枝 wt/ppc-kbh eaca0e75、証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。実機は DEFERRED_TESTS の PPC-KBOOT-RH。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。
 
