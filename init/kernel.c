@@ -58,7 +58,7 @@
 #include "kstring.h"
 #include "kprintf.h"   /* kutoa_dec / kutoa_hex (状態行の数値) */
 #include "sys.h"
-#include "../kernel/ime/ime.h"
+#include "ime_boot.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "../drivers/sound/fm/snd_engine.h"
