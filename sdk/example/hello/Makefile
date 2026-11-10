@@ -55,7 +55,7 @@ CFLAGS += -include $(OS32_SDK)/include/os32/os32_unit_stamp.h
 override OS32_SDK_LINK := -nostdlib --nmagic --gc-sections \
           -L$(OS32_SDK)/lib -L$(CROSS_DIR)/i386-elf/lib \
           -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0
-LDFLAGS ?=
+LDFLAGS =
 
 # crt (上の CRT) は profile の並びのまま、全部を先頭にリンクする (x86-pc98 は 4 つ)。
 

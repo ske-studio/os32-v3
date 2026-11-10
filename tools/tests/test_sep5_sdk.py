@@ -76,6 +76,7 @@ MUTATIONS = (
     ('hello-link-overridable', HELLO, 'override OS32_TARGET_LINK := ', 'OS32_TARGET_LINK := ', 'hello-override'),
     ('hello-flags-replace', HELLO, '$(strip $(OS32_TARGET_LINK) $(OS32_SDK_LINK) $(LDFLAGS))', '$(strip $(OS32_TARGET_LINK) $(if $(LDFLAGS),$(LDFLAGS),$(OS32_SDK_LINK)))', 'hello-flags'),
     ('hello-sdk-link-overridable', HELLO, 'override OS32_SDK_LINK := ', 'OS32_SDK_LINK := ', 'hello-override'),
+    ('hello-env-ldflags', HELLO, 'LDFLAGS =\n', 'LDFLAGS ?=\n', 'hello-env'),
     ('hello-clean-queries', HELLO, 'ifneq ($(MAKECMDGOALS),clean)', 'ifneq ($(MAKECMDGOALS),never)', 'hello-clean'),
     ('stamp-argfile-unread', STAMP, "        if arg.startswith('@'):", "        if False:", 'stamp-spec'),
     ('rust-target-dir', 'build/programs.mk', 'RUST_TARGET_JSON = $(basename $(notdir $(SDK_TARGET_RUST)))', 'RUST_TARGET_JSON = $(basename $(SDK_TARGET_RUST))', 'rust-rules'),
@@ -102,7 +103,8 @@ def need(ok, label, detail=''):
 
 def clean_env(root):
     env = dict(os.environ, CROSS_DIR=str(root / 'cross'))
-    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS'):
+    # LDFLAGS・CFLAGS: ホストの環境 (conda・Homebrew など) の値を試験に持ち込まない。
+    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'LDFLAGS', 'CFLAGS'):
         env.pop(name, None)
     return env
 
@@ -335,6 +337,13 @@ def checks_s2(root):
     paths = ' -L%s/lib -L%s/cross/i386-elf/lib -L%s/cross/lib/gcc/i386-elf/13.2.0' % (prefix, root, root)
     need(result.returncode == 0 and link + paths + ' -Map=hello.map -o hello.elf ' in result.stdout,
          'hello-flags', result.stdout)
+    # An exported LDFLAGS of the host (for another toolchain) is not picked up.
+    polluted = dict(clean_env(root), LDFLAGS='-Wl,-O1 -L/usr/lib')
+    result = subprocess.run(['make', '--no-print-directory', '-n', 'OS32_SDK=' + str(sdk),
+                             'CROSS_DIR=' + str(root / 'cross')], cwd=sdk / 'example/hello',
+                            env=polluted, text=True, capture_output=True, timeout=60)
+    need(result.returncode == 0 and link + paths + ' -o hello.elf ' in result.stdout and
+         '-Wl,-O1' not in result.stdout, 'hello-env', result.stdout)
     result = hello(root, sdk, 'OS32_SDK_LINK=-nostdlib')
     need(result.returncode == 0 and link + paths + ' -o hello.elf ' in result.stdout,
          'hello-override', result.stdout)
