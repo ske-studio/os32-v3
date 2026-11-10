@@ -86,17 +86,24 @@ def exercise(path, directory):
     driver = pathlib.Path(directory) / 'driver.c'
     driver.write_text("""#include "lan_boot.h"
 extern long write(int, const void *, unsigned long);
-int main(void) { struct lan_message m = {0}; unsigned char b[400]; unsigned int n, i;
+int main(void) { struct lan_message m = {0}; u8 b[400]; u32 n, i;
 for (i = 0; i < 16; i++) m.boot_id[i] = i; m.type = PLN1_TYPE_LOG; m.seq = 1; m.drop_records = 7; m.drop_bytes = 19;
 m.payload_bytes = 2; m.payload[0] = 0xe3; m.payload[1] = 0x81;
-if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != n; }
+if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != (long)n; }
 """)
     binary = pathlib.Path(directory) / 'driver'
-    subprocess.run(['gcc', '-fno-builtin', '-I', str(ROOT), '-I', str(ROOT / 'include'),
-                    '-I', str(ROOT / 'platform/powermac'), str(driver),
-                    str(ROOT / 'platform/powermac/lan_wire.c'), '-o', str(binary)],
-                   check=True, capture_output=True, timeout=60)
-    guest_frame = subprocess.run([str(binary)], check=True, capture_output=True, timeout=60).stdout
+    def checked(command):
+        result = subprocess.run(command, capture_output=True, timeout=60)
+        if result.returncode:
+            sys.stderr.buffer.write(result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, command)
+        return result.stdout
+    checked(['gcc', '-fno-builtin', '-Wall', '-Werror=incompatible-pointer-types',
+             '-Werror=implicit-function-declaration', '-Werror=int-conversion',
+             '-I', str(ROOT), '-I', str(ROOT / 'include'),
+             '-I', str(ROOT / 'platform/powermac'), str(driver),
+             str(ROOT / 'platform/powermac/lan_wire.c'), '-o', str(binary)])
+    guest_frame = checked([str(binary)])
     h.receive(frame(guest_frame))
     metadata = json.loads((pathlib.Path(directory) / (boot.hex() + '.jsonl')).read_text().splitlines()[-1])
     require(metadata['drop_records'] == 7 and metadata['drop_bytes'] == 19, 'H:drop values')
