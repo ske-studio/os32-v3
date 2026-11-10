@@ -68,6 +68,8 @@ enum pln1_status {
 #define PLN1_REQ_PEEK_BYTES 8
 
 struct pm_pci_window { u32 ss, pci_base, cpu_base, bytes; };
+#define PM_GMAC_BOOT_ID_OVERRIDE 1u
+#define PM_GMAC_PEER_OVERRIDE 2u
 struct pm_gmac_boot {
     u32 root_node, node, root_pa, bus_first, bus_last;
     u32 bdf, bar_reg, bar_bus, bar_pa, bar_bytes, vendor_device;
@@ -75,6 +77,7 @@ struct pm_gmac_boot {
     u32 nwin;
     struct pm_pci_window win[8];
     u32 dma_cpu_base, dma_bus_base, dma_bytes, profile;
+    u32 override_flags;
 };
 struct pm_pci { u32 addr_va, data_va, bus_first, bus_last, target_bdf; };
 struct lan_message {
@@ -86,6 +89,7 @@ struct lan_message {
 };
 
 int pm_gmac_capture(struct pm_gmac_boot *out);
+void pm_gmac_boot_id(struct pm_gmac_boot *b, u64 tb, u32 pvr);
 int pm_pci_read32(struct pm_pci *, u32 bdf, u32 reg, u32 *value);
 int pm_pci_write32(struct pm_pci *, u32 bdf, u32 reg, u32 value);
 /* Pointer is equivalent to the design's out[4], with an incomplete type. */
