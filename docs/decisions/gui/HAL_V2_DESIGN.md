@@ -1171,3 +1171,4 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **帯の定数 (§7-4・§11-2・§11-4・§12)**: `MEM_GFX2_MAP_BASE 0xF8000000UL`・`MEM_GFX2_MAP_END 0xFE000000UL` は A0 が include/memmap.h に置く (`gfx2_vaspace` を A0 だけで組むため)。M3 は `MEM_LEASE_ALLOC_END`・`MEM_LEASE_ALLOC_PDES` と exec/lease.c の書き換え。生成の地図は変えず、A0 は check_p2v.py の `USER` に帯を足す。
 - **v1 の列挙 (§11-2・§11-7)**: C11 の `gfx2_v1_enum_head/conn/mode` を gfx2_int.h (A0) に宣言。引数は `be->enum_*` の ctx を `const GfxBackend *v1` に替えた形で、C16 の `shim_enum_*` は `a->v1` を渡して呼ぶだけ。
 - **caps の入れ直し (§11-2・§11-7)**: `void gfx2_caps_refresh(struct gfx2_adapter *a)` を gfx2_int.h (A0) に宣言、実体は C10。`be->caps` が 0 の時だけ `a->caps` を入れ直し、失敗では変えない。
+- `shim_edid` (C16 の static) は v1 に EDID の hook が無いので `OS32_ERR_NOSYS` を返す (§11-7 の「NULL なら NOSYS」と同じ形)。
