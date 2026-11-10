@@ -21,7 +21,9 @@ GEM_ERROR_STATUS GEM_ERROR_STAT_BADACK GEM_ERROR_STAT_DTRTO GEM_ERROR_STAT_OTHER
 """.split()]
 EXTRA = {"GEM_DESC_FLAGS_OFFSET": 0, "GEM_DESC_ADDR_OFFSET": 8,
          "GEM_DESC_SIZE": 16, "GEM_RING_COUNT": 32,
-         "GEM_RX_PUBLISHED": 28, "GEM_MMIO_SPAN": 0x10000}
+         "GEM_RX_PUBLISHED": 28, "GEM_MMIO_SPAN": 0x10000,
+         "GEM_STATE_OFF": 0, "GEM_STATE_RESETTING": 1,
+         "GEM_STATE_QUARANTINED": 2, "GEM_STATE_READY": 3}
 ERRORS = {"OK": 0, "AGAIN": 1, "EINVAL": -1, "ENODEV": -2,
           "ERANGE": -3, "ETIME": -4, "EIO": -5, "EUNSUPPORTED": -6,
           "EBUSY": -7}
@@ -73,6 +75,9 @@ CHECK_FIELD(gem, rx_head, u32);
 CHECK_FIELD(gem, rx_watch_wr, u32);
 CHECK_FIELD(gem, rx_watch_rd, u32);
 CHECK_FIELD(gem, rx_watching, u32);
+CHECK_FIELD(gem, error_status, u32);
+CHECK_FIELD(gem, tx_status, u32);
+CHECK_FIELD(gem, rx_status, u32);
 CHECK_FIELD(gem, started, unsigned long long);
 CHECK_FIELD(gem, tx_started, unsigned long long);
 CHECK_FIELD(gem, rx_watch_started, unsigned long long);
