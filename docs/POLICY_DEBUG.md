@@ -40,7 +40,7 @@ newlib をリンクする `userland/tests/klibc_test` はカーネル側の検�
 部品の形式は [08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1)、理由コードは [KAPI_SPEC](KAPI_SPEC.md) の MemStat v75 欄。
 OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 
-実機で流れた起動出力は `cat /var/log/boot.log` で読む。`/etc/system.cfg` に `BOOTSERIAL=1` を設定すると、次回起動時に root マウント後、蓄積分と以後の出力をシリアルに送る (既定は無効、9600bps)。
+実機で流れた起動出力は `cat /var/log/boot.log` で読む。`/etc/system.cfg` に `BOOTSERIAL=1` を設定すると、次回起動時に root マウント後、蓄積分と以後の出力をシリアルに送る (既定は無効、9600bps)。送る分だけ起動が延びる (実機 Ra266 で 56.1 → 63.5 秒、行の重複なし、2026-11-10)。
 末尾の `dropped` が 0 でなければ後ろが切れている。保存失敗後は前回分が残りうる。
 `boot.new` の残存は保存途中で止まった印であり、完全なログの証拠ではない。
 保存・世代交代の詳細は [bootlog の設計](design/init/bootlog.md#落とし穴)、配備の詳細は [nhd_deploy の設計](design/tools/nhd_deploy.md#落とし穴)。

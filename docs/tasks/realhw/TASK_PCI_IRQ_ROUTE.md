@@ -1,6 +1,6 @@
 # PCI の IRQ を機器の種類で振り直す (共通の層と PC-98・PowerMac G4 の backend)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定、実装を待つ ([PCI_IRQ_ROUTE_DESIGN](../../decisions/realhw/PCI_IRQ_ROUTE_DESIGN.md))。前提は GeForce の位置の直し (票 TASK_GF_BDF)。PM は設計に専念中のため実装の着手はユーザーの解除の後。
+> 状態: **設計中 (2026-11-09)** — 設計は確定、実装を待つ ([PCI_IRQ_ROUTE_DESIGN](../../decisions/realhw/PCI_IRQ_ROUTE_DESIGN.md))。前提の GeForce の位置の直し (票 TASK_GF_BDF) は受入完了 (2026-11-10)。PM は設計に専念中のため実装の着手はユーザーの解除の後。
 
 ## 0. ユーザー決定 (原文)
 - 2026-11-09 (実機ノート経由):「デバイスの種類で IRQ を振り直す実装があったほうが良い」
@@ -15,3 +15,12 @@
 - 段 1〜10 (共通・PC-98・lspci・82557・GeForce・dispatch の計数) は本線、段 P (G4 の backend) は os32powerpc。
 - PM 決定: 候補の線は BIOS が使った {3,5,6} から / 挿し場所は決めず構成の表で受入 / 止め口は起動設定 `pci_irq_route=0` / G4 は初版は同じ優先度。
 - 受入は構成の表 (HighPoint+GeForce・USB+GeForce の 2 通りの並び・USB と HighPoint の差し替え) を実機で。抜き差しはユーザー、採取は実機ノート。
+
+## 2. 実機の組み合わせの記録 (2026-11-10、Ra266、事実だけ)
+記録の全体は `~/os32-tmp/run/pci-combos/COMBOS.md`、証拠はノートの `~/os32-tmp/evidence/2026-11-10/`。0:6.0 の 0x60〜0x63 (PIRQ0〜3) は BIOS が書いた値。
+| 0:12.x | 0:13.x | 0x60〜0x63 | IRQ の共有 | 結果 |
+|---|---|---|---|---|
+| HighPoint irq5 | GeForce irq6 | 05 06 80 03 | なし | 正常 (基準) |
+| USB (OHCI irq5・OHCI irq6・EHCI irq10) | GeForce irq6 | 05 06 0a 03 | 0:12.1 と GeForce が 6、EHCI と CS4231 が 10 | 起動・GUI 正常 (USB のドライバは無い) |
+| GeForce irq5 | USB (OHCI irq6・OHCI irq10・EHCI irq3) | 05 06 0a 03 | 0:13.1 と CS4231 が 10、EHCI と 82557 が 3 | 起動・GUI 正常 |
+| GeForce irq5 | SCSI 1000:000f irq6 | 05 06 80 03 | なし | 起動・GUI 正常 (BAR の測定の後の dd1ddae。前の 53f95dd では GeForce が資源の検査で降りた) |

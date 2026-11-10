@@ -412,7 +412,8 @@ python3 tools/gen_memmap.py --manifest --check
 正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。
 
 検査は `tools/checks/` または `tools/tests/test_*.py` の `CHECK` と `run(ctx)` に置く。
-`build/sdk.mk` が `tools/checks/run.py --list` から通常列を取得し、実測重みの降順で並べる。
+`build/sdk.mk` は make の読み込みごとに `tools/checks/run.py --make` を 1 回だけ起動し、全検査名・通常列 (実測重みの降順)・シャード列・依存辺・make 前提を登録する。
+宣言の索引 `build/out/check-index.json` を `--list`・`--make`・`--run` が共有し、宣言のファイル・run.py・`weights.json` が変わると作り直す (消してよい)。
 選択列の `make:` 前提を親 make で一度準備してから検査を回す。
 `check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
 保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
@@ -476,7 +477,7 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
 - 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
 - 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
 - C のコンパイルは `tools/tests/cc_cache.py` で ccache を選択的に使う。host32 と対応する host/cross 試験では、通常のコンパイルとリンクを翻訳単位ごとに分け、変異で変わらない単位を再利用する。PATH は包まない。`OS32_NO_CCACHE=1` で無効。`-g` 付きのコンパイルとリンクなど、分割の影響があり得る呼び出しは直接実行する。`base_dir` のパス書き換えと sloppiness は使わず、`__FILE__`・デバッグ情報・cwd を保つ。
-- make 本体も ccache があれば `CC` に挟む (`CCACHE=` で無効)。CI は固定版の静的 ccache 本体を OS/arch 別に保存し、コンパイル結果はコンパイラ版・コミット・ジョブ/シャード別のキーで保存する (各ジョブ `CCACHE_MAXSIZE=1G`)。結果キャッシュと違い、試験実行は毎回行う。
+- make 本体も ccache があれば `CC` に挟む (`CC` = `ccache <gcc>`、`CCACHE=` で無効。Python の道具も `CCACHE=` を尊重する)。`CC` を 1 つの実行ファイルとして渡す所 (`gen_hwdev_contract.py --cc`・ビルド選択と PPC の計測・AST の道具) は ccache を挟まない `RAW_CC` を使う。make の写しの木を組む試験は `tools/tests/build_fixture.py` の `copy_build_tree` を使い、`build/` の外で make が読むファイルは同じファイルの `CONFIG_INPUTS` に足す。CI は固定版の静的 ccache 本体を OS/arch 別に保存し、コンパイル結果はコンパイラ版・コミット・ジョブ/シャード別のキーで保存する (各ジョブ `CCACHE_MAXSIZE=1G`)。結果キャッシュと違い、試験実行は毎回行う。
 - 容量を見る・消す: `du -sh ~/.cache/os32/checks ~/.cache/os32/host32-fixtures`、消すときは各ディレクトリごと。
 
 <a id="kapi-v63-移行"></a>
@@ -1147,7 +1148,7 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
 | ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast` 6本: `make -k check-fast CHECK_SHARD=i/6` (必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
-| 準備・runner | `.github/actions/build-setup/action.yml` が apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物と検査ジョブは `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
+| 準備・runner | `.github/actions/build-setup/action.yml` が ccache の静的本体 (版と SHA-256 を固定)・apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物と検査ジョブは `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
