@@ -30,6 +30,17 @@ def check_target(args):
         spec = pathlib.PurePosixPath(target_profile.sdk_values(target)['rust']).name
     except ValueError as error:
         raise SystemExit('rustc_stamp: ' + str(error))
+    # rustc reads `@path` as one argument per line; look inside before it does.
+    expanded = []
+    for arg in args:
+        if arg.startswith('@'):
+            try:
+                expanded += pathlib.Path(arg[1:]).read_text().splitlines()
+            except (OSError, UnicodeDecodeError) as error:
+                raise SystemExit('rustc_stamp: unreadable argument file %s: %s' % (arg[1:], error))
+        else:
+            expanded.append(arg)
+    args = expanded
     for i, arg in enumerate(args):
         value = None
         if arg == '--target' and i + 1 < len(args):

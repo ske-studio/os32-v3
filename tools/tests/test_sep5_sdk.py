@@ -67,11 +67,18 @@ MUTATIONS = (
     ('helper-overridable', MK, 'override sdk_target_value = ', 'sdk_target_value = ', 'x86-override'),
     ('crt-eager', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'CRT0_USER_OBJ := $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'x86-make'),
     ('defect-as-refusal', CLI, '    except target_profile.Unsupported as error:', '    except ValueError as error:', 'ppc-refused'),
-    ('hello-crt-literal', HELLO, 'CRT  = $(call os32_value,SDK_TARGET_CRT_USER)', 'CRT  = $(call os32_value,SDK_TARGET_CRT_RESIDENT)', 'hello-x86'),
-    ('hello-link-sys', HELLO, '-T $(call os32_value,SDK_TARGET_APP_LINK) -nostdlib', '-T $(call os32_value,SDK_TARGET_APP_SYS_LINK) -nostdlib', 'hello-x86'),
+    ('hello-crt-literal', HELLO, 'override CRT := $(call os32_value,SDK_TARGET_CRT_USER)', 'override CRT := $(call os32_value,SDK_TARGET_CRT_RESIDENT)', 'hello-x86'),
+    ('hello-link-sys', HELLO, '-T $(call os32_value,SDK_TARGET_APP_LINK)\n', '-T $(call os32_value,SDK_TARGET_APP_SYS_LINK)\n', 'hello-x86'),
     ('hello-refusal-ignored', HELLO, 'ifneq ($(.SHELLSTATUS),0)', 'ifneq (0,0)', 'hello-ppc'),
     ('hello-tokens-overridable', HELLO, 'override OS32_TARGET_TOKENS := ', 'OS32_TARGET_TOKENS := ', 'hello-override'),
     ('hello-helper-overridable', HELLO, 'override os32_comma := ,', 'os32_comma := ,', 'hello-override'),
+    ('hello-crt-overridable', HELLO, 'override CRT := ', 'CRT := ', 'hello-override'),
+    ('hello-link-overridable', HELLO, 'override OS32_TARGET_LINK := ', 'OS32_TARGET_LINK := ', 'hello-override'),
+    ('hello-clean-queries', HELLO, 'ifneq ($(MAKECMDGOALS),clean)', 'ifneq ($(MAKECMDGOALS),never)', 'hello-clean'),
+    ('stamp-argfile-unread', STAMP, "        if arg.startswith('@'):", "        if False:", 'stamp-spec'),
+    ('rust-target-dir', 'build/programs.mk', 'RUST_TARGET_JSON = $(basename $(notdir $(SDK_TARGET_RUST)))', 'RUST_TARGET_JSON = $(basename $(SDK_TARGET_RUST))', 'rust-rules'),
+    ('gshell-target-dir', 'build/programs.mk', 'GSHELL_LIB = $(GSHELL_DIR)/target/$(basename $(notdir $(SDK_TARGET_RUST)))/release/libgshell.a', 'GSHELL_LIB = $(GSHELL_DIR)/target/$(basename $(notdir $(SDK_TARGET_RUSTY)))/release/libgshell.a', 'rust-rules'),
+    ('cargo-target-env', 'build/programs.mk', 'OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p $(1)', 'RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p $(1)', 'rust-rules'),
     ('stamp-unchecked', STAMP, '    check_target(args)\n', '', 'stamp-spec'),
     ('stamp-any-json', STAMP, "value.endswith('.json') and pathlib.PurePath(value).name != spec", "value.endswith('.json') and not value", 'stamp-spec'),
     ('stamp-equals-form-missed', STAMP, "        elif arg.startswith('--target='):\n            value = arg.split('=', 1)[1]\n", '', 'stamp-spec'),
@@ -273,10 +280,10 @@ def staged_sdk(root):
     return sdk
 
 
-def hello(root, sdk, *args, dry=True):
+def hello(root, sdk, *args, dry=True, cwd=None):
     return subprocess.run(['make', '--no-print-directory', *(['-n'] if dry else []),
                            'OS32_SDK=' + str(sdk), 'CROSS_DIR=' + str(root / 'cross'), *args],
-                          cwd=sdk / 'example/hello', env=clean_env(root), text=True,
+                          cwd=cwd or sdk / 'example/hello', env=clean_env(root), text=True,
                           capture_output=True, timeout=60)
 
 
@@ -316,9 +323,36 @@ def checks_s2(root):
         after = {p.relative_to(root) for p in root.rglob('*') if p.is_file()}
         need(result.returncode != 0 and 'cannot be built with this SDK' in result.stderr and
              not (root / 'calls').exists() and after == before, 'hello-ppc', (extra, result.stderr))
-    result = hello(root, sdk, 'OS32_TARGET_TOKENS=SDK_TARGET_CRT_USER=evil.o', 'os32_comma=;')
+    result = hello(root, sdk, 'OS32_TARGET_TOKENS=SDK_TARGET_CRT_USER=evil.o', 'os32_comma=;',
+                   'CRT=evil.o', 'OS32_TARGET_LINK=-m evil -T evil.ld')
     need(result.returncode == 0 and crt in result.stdout and 'evil' not in result.stdout,
          'hello-override', (result.stdout, result.stderr))
+
+    # Extra flags are the user's; the target's own link arguments stay in front.
+    result = hello(root, sdk, 'LDFLAGS=-Map=hello.map')
+    need(result.returncode == 0 and link.split(' -nostdlib')[0] + ' -Map=hello.map -o hello.elf ' in result.stdout,
+         'hello-override', result.stdout)
+    # Cleaning needs no SDK at all.
+    result = hello(root, root / 'no-such-sdk', 'clean', dry=False, cwd=sdk / 'example/hello')
+    need(result.returncode == 0, 'hello-clean', result.stderr)
+
+    # The Rust rules, as make expands them: paths and the wrapper's environment.
+    made, values = expand(root, ['GSHELL_LIB', 'RUST_TARGET_JSON', 'RUST_TARGET_DIR', 'SHLIB_GUI_LIB'],
+                          after='include build/programs.mk\n')
+    need(made.returncode == 0 and values.get('RUST_TARGET_JSON') == 'i686-os32-none' and
+         values.get('GSHELL_LIB') == 'userland/gshell/target/i686-os32-none/release/libgshell.a' and
+         values.get('RUST_TARGET_DIR') == 'userland/rust/target/i686-os32-none/release' and
+         values.get('SHLIB_GUI_LIB') == 'userland/rust/target/i686-os32-none/release/liblibos32gui.a',
+         'rust-rules', (made.stderr, values))
+    # RUST_KAPI_RS= : the generated binding is not part of this fixture.
+    dry = subprocess.run(['make', '--no-print-directory', '-rRnf', '-', 'BUILD_OUT=output', 'RUST_KAPI_RS=',
+                          values['GSHELL_LIB'], values['RUST_TARGET_DIR'] + '/libfiler.a', values['SHLIB_GUI_LIB']],
+                         input='include build/config.mk\ninclude build/programs.mk\n', cwd=root,
+                         env=clean_env(root), text=True, capture_output=True, timeout=60)
+    cargo = [line for line in dry.stdout.splitlines() if ' cargo build ' in line]
+    need(dry.returncode == 0 and len(cargo) == 3 and all(
+        ' && OS32_SDK_TARGET=x86-pc98 RUSTC_WRAPPER=' in line and '/sdk/rustc_stamp.py cargo build --release' in line
+        for line in cargo), 'rust-rules', (dry.stderr, cargo))
 
     spec = '/elsewhere/sdk/rust/i686-os32-none.json'
     for target in (None, 'x86-pc98'):
@@ -330,8 +364,13 @@ def checks_s2(root):
     for args in (('-vV',), ('--target', 'x86_64-unknown-linux-gnu', '-vV')):
         result, count = stamp(root, sdk, 'x86-pc98', *args)
         need(result.returncode == 0 and count == 1, 'stamp-host', result.stderr)
+    (root / 'rustc.args').write_text('--edition=2021\n--target=/elsewhere/powerpc-os32-none.json\n')
+    (root / 'good.args').write_text('--target\n' + spec + '\n')
+    result, count = stamp(root, sdk, 'x86-pc98', '@good.args', '--print=cfg')
+    need(result.returncode == 0 and count == 1, 'stamp-x86', result.stderr)
     for args in (('--target', '/elsewhere/powerpc-os32-none.json', '-vV'),
-                 ('--target=/elsewhere/powerpc-os32-none.json', '-vV')):
+                 ('--target=/elsewhere/powerpc-os32-none.json', '-vV'),
+                 ('@rustc.args', '--print=cfg')):
         result, count = stamp(root, sdk, 'x86-pc98', *args)
         need(result.returncode != 0 and count == 0 and 'is not the x86-pc98 SDK target' in result.stderr,
              'stamp-spec', (args, result.stderr))
