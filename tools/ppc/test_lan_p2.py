@@ -113,6 +113,8 @@ void gem_contract(struct gem *g, struct gem_io *io, struct gem_dma *d) {
     int (*tx)(struct gem *, const void *, u32) = gem_tx;
     int (*rx)(struct gem *, void *, u32, u32 *) = gem_rx;
     int (*poll)(struct gem *, unsigned long long, u32) = gem_poll;
+    void (*stats)(u64 *, u64 *, u64 *, u32 *) = pm_lan_log_stats;
+    (void)stats;
     (void)read32; (void)write32; (void)tb; (void)sync;
     (void)reset; (void)mac; (void)mif; (void)phy; (void)prepare;
     (void)publish; (void)enable; (void)tx; (void)rx; (void)poll;
