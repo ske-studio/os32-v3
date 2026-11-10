@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='sep5-boot-host', tier=1,
-    covers=['tools/tests/test_sep5_boot.py', 'tools/checks/sep5-boot-host.py',
+    covers=['sdk/target_profile.py', 'sdk/target_profile_cli.py', 'tools/tests/test_sep5_boot.py', 'tools/checks/sep5-boot-host.py',
             'build/**/*.mk', 'boot/*', 'Makefile', 'build/config.mk'],
     needs=[], budget=10)
 
