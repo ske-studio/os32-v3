@@ -66,7 +66,8 @@ static int main_test(void)
     if (c == 3) { g.phy_id1 = 0; if (gem_phy_step(&g, 0) != GEM_EUNSUPPORTED) fail("H:unknown"); g.phy_id1 = 0xffff; if (gem_phy_step(&g, 0) != GEM_EUNSUPPORTED) fail("H:unknown"); return 0; }
     if (c == 4 || c == 11) f.stuck = 1;
     if (c == 5 || c == 8) f.regs[1] = 0x100;
-    if (c == 6) f.regs[5] = 0x81;
+    if (c == 6) f.regs[5] = 0x80;
+    if (c == 21) f.regs[5] = 0x100;
     if (c == 12) f.regs[5] = 0x41;
     if (c == 13) f.regs[5] = 1;
     if (c == 7) f.latch = 1;
@@ -79,14 +80,15 @@ static int main_test(void)
     if (r != GEM_AGAIN || f.writes != 4 || f.log_reg[0] != 0 || f.log_val[0] != 0x8000 || f.log_reg[1] != 4 || f.log_val[1] != 0x101 || f.log_reg[2] != 9 || f.log_val[2] != 0 || f.log_reg[3] != 0 || f.log_val[3] != 0x1200) fail("H:advertise");
     if (c == 7) f.latch = 1;
     if (c == 17) f.latch = 2;
+    if (c == 22) f.regs[4] = 1;
     r = gem_phy_step(&g, c == 5 ? 5000001 : 2);
     if (c == 8) { for (u32 i = 1; i < 1000000 && r == GEM_AGAIN; ++i) r = gem_phy_step(&g, 2); }
     if (c == 17) { if (r != GEM_AGAIN) fail("H:current-status"); return 0; }
     if (c == 5 || c == 8) { if (r != GEM_ETIME) fail("H:an-timeout"); }
-    else if (c == 6 || c == 12 || c == 13) { if (r != GEM_EIO) fail("H:partner"); }
+    else if (c == 6 || c == 12 || c == 13 || c == 22) { if (r != GEM_EIO) fail("H:partner"); }
     else if (r != GEM_OK) fail("H:link");
     if (r == GEM_EIO || r == GEM_ETIME) { u32 n = f.writes; if (gem_phy_step(&g, 3) != GEM_AGAIN || f.writes != n + 1 || f.log_reg[n] != 0 || f.log_val[n] != 0x8000) fail("H:retry"); }
-    if (c >= 18) {
+    if (c >= 18 && c <= 20) {
         u32 reads = f.bmsr_reads, writes = f.writes;
         if (c == 19) f.latch = 1;
         if (c == 20) f.no_ta = 1;
