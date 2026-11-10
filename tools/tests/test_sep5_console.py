@@ -41,6 +41,10 @@ MUTATIONS = (
     ('erase-caller-colour', "' ', CON_ATTR_DEFAULT);", "' ', color);", 80),
     ('render-ungated', '    return con_backend_safe() &&\n', '    return 1 &&\n', 94),
     ('clear-ungated', 'void tvram_clear(void)\n{\n    if (!con_backend_safe()) return;\n', 'void tvram_clear(void)\n{\n', 90),
+    ('read-ungated', '    if (!con_backend_safe()) return;\n    con_backend_readchar(x, y, code, attr);', '    con_backend_readchar(x, y, code, attr);', 90),
+    ('reverse-ungated', '    if (!con_backend_safe()) return 0;\n    return con_backend_reverse(x, y);', '    return con_backend_reverse(x, y);', 90),
+    ('cursor-enable-ungated', 'void console_hw_cursor_enable(void)\n{\n    if (!con_backend_safe()) return;\n', 'void console_hw_cursor_enable(void)\n{\n', 90),
+    ('gdc-stop-ungated', 'void console_text_gdc_stop(void)\n{\n    if (!con_backend_safe()) return;\n', 'void console_text_gdc_stop(void)\n{\n', 90),
     ('scroll-ungated', 'void tvram_scroll(void)\n{\n    if (!con_backend_safe()) return;\n', 'void tvram_scroll(void)\n{\n', 90),
 )
 # The PC-98 backend: (name, anchor, replacement, exit code, built without the guard?)

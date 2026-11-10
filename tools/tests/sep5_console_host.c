@@ -134,6 +134,12 @@ static void run(int g, int cols, int rows)
     at(1, 1);
     shell_print("zz", 0x21); shell_putchar('q', 0x21); shell_print_utf8("\xE3\x81\x82", 0x41);
     tvram_clear(); tvram_scroll(); tvram_putchar_at(0, 0, 'x', 1); tvram_putkanji_at(0, 0, 0x2422, 1);
+    {
+        u16 code = 0x1234; u8 attr = 0x56;
+        tvram_readchar_at(0, 0, &code, &attr);
+        if (code != 0x1234 || attr != 0x56 || tvram_reverse_cell(0, 0) != 0) finish(90 + g);
+    }
+    console_hw_cursor_enable(); console_text_gdc_stop();
     safe = 1;
     if (backend_calls != before) finish(90 + g);
     /* ...and the logical cursor did not advance behind the frozen screen. */
