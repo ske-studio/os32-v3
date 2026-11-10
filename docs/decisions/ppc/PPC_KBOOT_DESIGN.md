@@ -270,3 +270,18 @@ void pm_log_write(const char *bytes, u32 n);
 
 ## 後続の題目
 - **PowerPC のブートスプラッシュ** (2026-11-10、os32-v3 の PM 経由のユーザー決定): 票 TASK_PPC_SPLASH。② の段の並びは変えない (② は画面を条件にしない)。実装は OF の FB を描く段の後。
+
+## LAN の起動の追記 (2026-11-11、PowerPC の LAN の段 P9・P12・P25 の取り込みで決まったこと)
+- §4 の ESCC・MPIC に続く alias は次の固定 VA を使う (arch/ppc/kernel_boot.h:7)。
+- GMAC BAR の先頭 64KiB: `0xFE380000`、64KiB、supervisor RW・I/G (arch/ppc/kernel_boot.c:65,197)。
+- UniNorth PCI config address: `0xFE3C0000`、1 page、root PA + `0x800000` の 8 byte を含む I/G (arch/ppc/kernel_boot.c:39,198)。
+- UniNorth PCI config data: `0xFE3C1000`、1 page、root PA + `0xC00000` の 8 byte を含む I/G (arch/ppc/kernel_boot.c:40,199)。
+- OF tree の BAR と ranges から CPU 側 PA を決め (platform/powermac/gmac_tree.c:137,166)、各窓は PA の page 内 offset を保持する (arch/ppc/kernel_boot.c:42)。
+- tree の取得成功・BAR 長・加算・3 窓の計画が成立すると `gmac_ready=1`、初回 root で RAM・既存 alias 等との衝突や恒等写像を検査して不安全なら 0 に戻し、安全なら静的 PT に張って walk で検証する (arch/ppc/kernel_boot.c:96,118,148,193)。
+- `memory_boot_init` より前に `gmac_ready` なら `pm_gmac_quiesce_setup` → `pm_gmac_early_quiesce` を呼ぶ (init/ppc_kernel.c:149)。
+- 対象 ID を確認して PCI Master を解除し読み戻す。Master が 1 のままか読み戻しが失敗した場合は停止し、対象外や解除前のアクセス失敗は続行する (platform/powermac/pci_config.c:82,89)。
+- 像の予約内にある DMA pool は `0x30000` byte、その先頭 64KiB の descriptor 区画は cache を flush 後に I/G の恒等写像へ変更し、各 page を検査する (platform/powermac/gmac_dma.c:7,18,62)。
+- `pm_gmac_dma_sync` は descriptor 区画に `sync` だけを使い、buffer は `ppc_dma_sync` の cache 同期へ渡す (platform/powermac/gmac_dma.c:27)。
+- ESCC sink の直後、最初の起動ログの前に LAN log を登録する (init/ppc_kernel.c:134,137)。
+- CLOCK の後、GMAC と log が利用可能なら `pm_lan_start`、READY 以後は 2 秒の観測中もその後も `pm_lan_poll` を回す (init/ppc_kernel.c:238,240,251)。
+- 既存の 9 印と EE=1 の契約は維持する。UniNorth の clock の alias はまだ導入しておらず、実機の前の段に残す (arch/ppc/kernel_boot.c:193、init/ppc_kernel.c:251)。
