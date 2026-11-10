@@ -1,6 +1,6 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **実装中 (2026-11-10)** — 案 D を採用、MMU の外の 33 件を順に直す。第 1・2 段は受入完了、第 3〜5 段は下の「段の状態」の表。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **実装中 (2026-11-10)** — 案 D を採用、MMU の外の 33 件を順に直す。計画の段 (第 1〜5 段) は Z まで main (b98087e8、2026-11-10)。残るのは PPC で組めない 8 TU と第 5 段で見送った 3 点 (下の「実測 (第 5 段 Z)」) で、② の後の段の中で解く。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
 
 ## 段の状態 (2026-11-10)
 
@@ -18,7 +18,7 @@
 | 第 5 段 B3・C3 | planar の初期化を PC98 の表示 provider へ、boot の IME の facade (include/ime_boot.h) | main (92cb185e、NP21/W の最小受入と B3 の 6 画面の比較は合格) |
 | 第 5 段 B4・S1 | 描画 backend の選択を platform の provider へ (include/display_provider.h、platform/pc98/gfx_selector.c)、SDK の target の選択を profile へ (sdk/target_profile.py・build/sdk-target.mk) | main (a4b3b6bf、NP21/W の最小受入と B4 の 3 点は合格) |
 | 第 5 段 C1・浮動小数点の保存域 | console の格子の寸法・既定の属性・表示の経路の確認を表示の backend へ (kernel/console/console_backend.h、TVRAM の番地は platform/pc98/tvram_private.h)。浮動小数点の保存域を arch の口の後ろへ (include/exec_arch.h の struct arch_fp_context と arch_fp_save・arch_fp_restore・arch_fp_init、PPC は arch/ppc/arch_exec_storage.h・arch_jmp_storage.h) | main (8a6096fc、C1 は NP21/W の最小受入と 4 点が合格、保存域は kernel.bin と全部品が一致)。**PPC の保存域の大きさは compile を通すための暫定** (USER の ABI と FPU・AltiVec の扱いは ③ の設計で確定) |
-| 第 5 段 B5・B6・S2 | 起動時の SURFACE の予約と表を provider へ (platform/pc98/gfx_surfaces.c)、present のページ切替・VSYNC 待ち・表示メモリの番地を provider へ (platform/pc98/gfx_init.c、**B6 は部分完了** — 残件は下の「第 5 段で見送った物」)、SDK の利用箇所 (example の Makefile・Rust の規則・rustc の wrapper・配布物) を profile へ | 実装・独立レビュー済 (2026-11-10、枝 wt/ppc-sep5b5・wt/ppc-sep5b6・wt/ppc-sep5s2)。取り込みと NP21/W の受入待ち (B5・B6 は区分 C、S2 は区分 I) |
+| 第 5 段 B5・B6・S2 | 起動時の SURFACE の予約と表を provider へ (platform/pc98/gfx_surfaces.c)、present のページ切替・VSYNC 待ち・表示メモリの番地を provider へ (platform/pc98/gfx_init.c、**B6 は部分完了** — 残件は下の「第 5 段で見送った物」)、SDK の利用箇所 (example の Makefile・Rust の規則・rustc の wrapper・配布物) を profile へ | main (b98087e8)。B5・B6 は NP21/W の一括受入 (30/30、B6 の 5 枚は画素差 0)、S2 は build_compare で配布物 4 件と ISO だけの差 (区分 I)。flip を使わない同期の present (VSYNC 待ち) の経路は NP21/W では未確認 (host の試験 sep5-gfx-init-host が見ている) |
 | 第 5 段 Z | 全段の後の実測と記録 (製品コードは触らない) | 済 (2026-11-10、下の「実測 (第 5 段 Z)」)。CONSOLE_DUAL は Z の後と本線と合意 |
 
 ### 実測 (第 3 段 F・第 4 段 F、2026-11-10)
@@ -58,7 +58,7 @@
 - B6 の実体は platform/pc98/display.c への集約ではなく platform/pc98/gfx_init.c に置いた (display_flip_pages の隣。gfx の host の試験が既に link しているファイルで、試験の fixture を増やさないため)。
 - S2 は app_sys.ld・shlib.ld の利用箇所 (resident の link、mkshlib) を profile の値に替えていない (生成物を変えない範囲)。
 
-x86 の受入で未確認のまま残る物: B2 の hardware scroll の +1 行 (上の表)、Cirrus・GeForce・Trident の選択と予約の経路 (NP21/W の標準構成では通らない。host の試験が見ている)、v86 の往復での console (C1)。
+x86 の受入で未確認のまま残る物: B2 の hardware scroll の +1 行 (上の表)、flip を使わない同期の present (B6)、Cirrus・GeForce・Trident の選択と予約の経路 (NP21/W の標準構成では通らない。host の試験が見ている)、v86 の往復での console (C1)。
 
 PPC の型・配置は `python3 -B tools/ppc/check_layout.py` で確かめる (第 4 段 E)。本体の link と起動は selected とは別の入口 (票 TASK_PPC_KBOOT)。
 
