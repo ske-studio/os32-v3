@@ -1,7 +1,7 @@
 #include "drivers/net/gem/gem.h"
 #define RESET_REG (GEM_PCI_BANK2_OFFSET + GEM_RESET)
 static u32 regs[0x10000 / 4], writes, last_rx_dma, last_tx_dma, tick;
-static u32 pending[0x10000 / 4], stuck, target[0x10000 / 4];
+static u32 pending[0x10000 / 4], stuck, target[0x10000 / 4], reset_mode;
 static u32 log_reg[16], log_val[16];
 static int failure;
 static void say(const char *s) { unsigned n = 0; while (s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
@@ -17,7 +17,7 @@ static u32 rd(void *ctx, u32 reg) {
 }
 static void wr(void *ctx, u32 reg, u32 val) {
     (void)ctx; if (writes < 16) { log_reg[writes] = reg; log_val[writes] = val; } writes++;
-    if (pending[RESET_REG/4]) fail("H:reset-pending\n");
+    if (pending[RESET_REG/4] && reset_mode == 0) fail("H:reset-pending\n");
     if (reg == GEM_RX_CONFIG && (regs[GEM_MAC_RX_CONFIG/4] & 1)) fail("H:A5 reset-active\n");
     if (reg == GEM_TX_CONFIG && (regs[GEM_MAC_TX_CONFIG/4] & 1)) fail("H:A5 reset-active\n");
     if (reg == RESET_REG) {
@@ -25,7 +25,9 @@ static void wr(void *ctx, u32 reg, u32 val) {
         if ((val & GEM_RESET_TX) && (regs[GEM_TX_CONFIG/4] & 1)) fail("H:dma-active\n");
         if (val == GEM_RESET_RX && tick - last_rx_dma < 5) fail("H:delay\n");
         if (val == GEM_RESET_TX && tick - last_tx_dma < 5) fail("H:delay\n");
-        regs[reg/4] = val; target[reg/4] = 0; pending[reg/4] = 2; return;
+        regs[reg/4] = val; target[reg/4] = 0;
+        pending[reg/4] = ((reset_mode == 1 && val != (GEM_RESET_RX | GEM_RESET_TX)) ||
+                          (reset_mode == 2 && val == (GEM_RESET_RX | GEM_RESET_TX))) ? 0 : 2; return;
     }
     if (reg == GEM_MAC_RX_CONFIG || reg == GEM_MAC_TX_CONFIG || reg == GEM_RX_CONFIG || reg == GEM_TX_CONFIG) {
         u32 old = regs[reg/4];
@@ -44,7 +46,7 @@ static int main_test(void) {
     struct gem g; int r __attribute__((unused)); init(&g); say("REACHED host\n");
 #if CASE == 0
     for (tick=0; tick<100; tick++) { r=gem_reset_step(&g,tick); if (r==GEM_OK) break; }
-    if (tick==100 || writes!=9) fail("H:sequence\n");
+    if (tick==100 || writes!=9 || g.half_reset_timeouts!=0) fail("H:sequence\n");
     { static const u32 expected_reg[] = { GEM_INTMASK, GEM_MAC_RX_CONFIG, GEM_RX_CONFIG, RESET_REG, GEM_MAC_TX_CONFIG, GEM_TX_CONFIG, RESET_REG, RESET_REG, GEM_INTMASK };
       static const u32 expected_val[] = { ~0U, 0, 0, GEM_RESET_RX, 0, 0, GEM_RESET_TX, GEM_RESET_RX | GEM_RESET_TX, ~0U };
       for (u32 i=0; i<9; i++) if (log_reg[i]!=expected_reg[i] || log_val[i]!=expected_val[i]) fail("H:sequence\n"); }
@@ -78,9 +80,14 @@ static int main_test(void) {
     regs[GEM_RX_FIFO_WR_PTR/4]=3; gem_poll(&g,400,0); if (!g.rx_watching || g.state==GEM_STATE_RESETTING) fail("H:progress\n");
     regs[GEM_MAC_MAC_STATE/4]=0; regs[GEM_STATUS_ALIAS/4]=0; gem_poll(&g,800,0); if (g.rx_watching) fail("H:resolved\n");
 #elif CASE == 5
-    { static const u32 steps[] = {1,2,4,5,6,8,9};
-      static const u32 reg[] = {GEM_MAC_RX_CONFIG,GEM_RX_CONFIG,RESET_REG,GEM_MAC_TX_CONFIG,GEM_TX_CONFIG,RESET_REG,RESET_REG};
-      for (u32 i=0; i<7; i++) { init(&g); g.step=steps[i]; stuck=reg[i]; regs[stuck/4]=3; pending[stuck/4]=2; r=gem_reset_step(&g,1000); if (r!=GEM_ETIME || g.state!=GEM_STATE_QUARANTINED) fail("H:bit-timeout\n"); } }
+    { static const u32 steps[] = {1,2,5,6,9};
+      static const u32 reg[] = {GEM_MAC_RX_CONFIG,GEM_RX_CONFIG,GEM_MAC_TX_CONFIG,GEM_TX_CONFIG,RESET_REG};
+      for (u32 i=0; i<5; i++) { init(&g); g.step=steps[i]; stuck=reg[i]; regs[stuck/4]=3; pending[stuck/4]=2; r=gem_reset_step(&g,1000); if (r!=GEM_ETIME || g.state!=GEM_STATE_QUARANTINED) fail("H:bit-timeout\n"); } }
+#elif CASE == 8 || CASE == 9
+    reset_mode = CASE == 8 ? 1 : 2;
+    for (tick=0; tick<4000; tick++) { r=gem_reset_step(&g,tick); if (r!=GEM_AGAIN) break; }
+    if (CASE == 8 && (r!=GEM_OK || g.state!=GEM_STATE_READY || g.half_reset_timeouts!=2)) fail("H:half-timeout\n");
+    if (CASE == 9 && (r!=GEM_ETIME || g.state!=GEM_STATE_QUARANTINED)) fail("H:full-timeout\n");
 #elif CASE == 4
     regs[GEM_STATUS_ALIAS/4]=GEM_INTR_BERR; regs[(GEM_PCI_BANK2_OFFSET+GEM_ERROR_STATUS)/4]=7; gem_poll(&g,0,0); if (g.error_status!=7) fail("H:berr\n");
 #endif

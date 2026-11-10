@@ -12,6 +12,8 @@ CHECK = dict(name='ppc-lan-p14', tier=2, budget=60,
              inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('half-timeout', 'if (r == GEM_ETIME) { g->state = GEM_STATE_RESETTING; g->half_reset_timeouts++; }\n        /* gem_disable_tx', 'if (r == GEM_ETIME) return r;\n        /* gem_disable_tx', 8, 'H:half-timeout'),
+    ('full-timeout', 'r = wait_clear(g, GEM_RESET_REG, GEM_RESET_RX | GEM_RESET_TX, now);\n        if (r != GEM_OK) return r;', 'r = wait_clear(g, GEM_RESET_REG, GEM_RESET_RX | GEM_RESET_TX, now);\n        if (r == GEM_AGAIN) return r;', 9, 'H:full-timeout'),
     ('ready', 'g->state = GEM_STATE_READY;', 'g->state = GEM_STATE_RESETTING;', 0, 'H:ready-monitor'),
     ('simultaneous', 'g->rx_status = g->io.read32(g->io.ctx, GEM_MAC_RX_STATUS);', 'g->rx_status = 0;', 6, 'H:simultaneous'),
     ('rx-stop', 'r = wait_clear(g, GEM_MAC_RX_CONFIG, GEM_MAC_RX_ENABLE, now);', 'r = GEM_OK;', 0, 'H:A5 reset-active'),
@@ -39,7 +41,7 @@ def main():
         temp = Path(directory)
         source = temp / 'gem_reset.c'
         source.write_text(original)
-        for case in range(8):
+        for case in range(10):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline %d: %s' % (case, result.stdout + result.stderr))

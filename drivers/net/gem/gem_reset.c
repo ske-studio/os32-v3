@@ -77,9 +77,11 @@ int gem_reset_step(struct gem *g, unsigned long long now)
         }
         g->io.write32(g->io.ctx, GEM_RESET_REG, GEM_RESET_RX);
         next(g, RX_RESET_WAIT, now); return GEM_AGAIN;
+    /* OpenBSD gem.c:486-502,583-607,615-640; QEMU half-reset bits do not self-clear. */
     case RX_RESET_WAIT:
         r = wait_clear(g, GEM_RESET_REG, GEM_RESET_RX, now);
-        if (r != GEM_OK) return r;
+        if (r == GEM_AGAIN) return r;
+        if (r == GEM_ETIME) { g->state = GEM_STATE_RESETTING; g->half_reset_timeouts++; }
         /* gem_disable_tx :666-678, gem_reset_tx :615-640. */
         v = g->io.read32(g->io.ctx, GEM_MAC_TX_CONFIG);
         g->io.write32(g->io.ctx, GEM_MAC_TX_CONFIG, v & ~GEM_MAC_TX_ENABLE);
@@ -102,7 +104,8 @@ int gem_reset_step(struct gem *g, unsigned long long now)
         next(g, TX_RESET_WAIT, now); return GEM_AGAIN;
     case TX_RESET_WAIT:
         r = wait_clear(g, GEM_RESET_REG, GEM_RESET_TX, now);
-        if (r != GEM_OK) return r;
+        if (r == GEM_AGAIN) return r;
+        if (r == GEM_ETIME) { g->state = GEM_STATE_RESETTING; g->half_reset_timeouts++; }
         /* gem_reset :486-501: full reset follows both halves. */
         g->io.write32(g->io.ctx, GEM_RESET_REG, GEM_RESET_RX | GEM_RESET_TX);
         next(g, FULL_WAIT, now); return GEM_AGAIN;

@@ -203,6 +203,7 @@ struct gem {
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
     u32 ring_prepare_step, ring_cursor, ring_publish_step;
     u32 state, step, cursor, polls; /* Bounded state-machine progress. */
+    u32 half_reset_timeouts; /* Half-reset waits that reached their deadline. */
     u32 error_status, tx_status, rx_status; /* Captured fault registers. */
     u32 phy_addr, phy_port, phy_id1, phy_id2; /* Selected PHY and MIF port. */
     u32 phy_step, phy_polls;
