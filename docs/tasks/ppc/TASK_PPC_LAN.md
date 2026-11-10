@@ -24,7 +24,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 
 ## 1. 詳細設計 (確定) の要約
 
-全文は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。
+全文は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。service (段 P24) と起動への結線 (P25・P26) の境目は [PPC_LAN_SERVICE_DESIGN](../../decisions/ppc/PPC_LAN_SERVICE_DESIGN.md)、serial の LAN の印と受入の自動化 (P29〜P32) は [PPC_LAN_MARKS_DESIGN](../../decisions/ppc/PPC_LAN_MARKS_DESIGN.md)。
 
 - 層: OF の tree の採取 (takeover の前) → UniNorth の PCI の設定空間 (OF が示す 1 つの BDF だけ) → MMIO の alias (BAR 2MiB のうち 64KiB を I/G で) → DMA の pool (像の予約の中、descriptor は I/G、buffer は cache の同期) → GEM の core (reset・MIF/PHY・ring・MAC・tx・rx、レジスタも descriptor も LE) → ログの sink (byte 詰めの待ち行列) と線の上の形式 → 診断 monitor → ホストの道具。
 - 置き場: drivers/net/gem/ (core)、platform/powermac/ (tree・PCI・DMA・clock・ログ・線・monitor・service)、arch/ppc/ (alias・cache・probe)、tools/ (ホストの道具と meter)。x86 の生成物は変えない (全段 I、build_compare で確かめる)。
@@ -43,12 +43,13 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P9・P10・P13・P14 と各 H | main (7176c2be)。P9 で ② の起動が GMAC の先頭 64KiB と UniNorth の config の 2 page の alias を張る (QEMU で gmac_ready=1)。clock は手本 netbsd uninorth.c:135-142、reset は openbsd gem.c の各関数 |
 | P15〜P19 と各 H | main (a9d655bc)。GEM の core (ring・MAC・MIF と PHY・TX・RX)、手本は openbsd gem.c と sys/dev/mii、対応の PHY は BCM5201 だけ (実機の PHY は実機で採ってから足す) |
 | P22a〜P22d・P22・P22e・P23 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint5)。取り込み待ち。PEEK の下回り (ppc_probe_copy8・ppc_trap_onfault_data)、診断の応答 lan_monitor.c (P22e で境目を単純化: PEEK は RAM の許可表 1 種で VA と PA を照らす)、ホストの道具 tools/ppc_lan_host.py (CI の検査 ppc-lan-p23 を登録) |
-| P24a・P24b と各 H | 実装済・レビュー中 (2026-11-11、P24 の前提: gem_phy.c の DONE の link 観測、lan_log.c の統計の口) |
-| P24c〜P24・P25・P26・P29〜P33 と各 H | 未着手 (順と見込みは §3) |
+| P24a〜P24d・P24 と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint6)。取り込み待ち。gem_phy.c の DONE の link 観測、lan_log.c の統計の口、PPC の I/O の実体 lan_gem_io.c、診断の元 lan_diag.c、service lan_service.c (7 状態、件数の予算、印は LAN STATE と LAN OFF だけ)。新しい TU は PPC の像にまだ入らない (P26) |
+| P5b・P14b・P17c・P12b と各 H | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint6)。QEMU の先行スモーク S1 で見つけた core の直し (bdf の形、半分の reset の bit、AN の判定、descriptor の同期)。4 段を入れた S1 で 7450・7455 とも TX と RX の実 frame が往復した (設計の「S1 の観測」) |
+| P25・P26・P29〜P33 と各 H | 未着手 (順と見込みは §3) |
 
 ## 3. 実装スケジュール (2026-11-11、fable 起案、PM 確認)
 
-到達点: QEMU (7450・7455) で起動ログがホストに届き 5 診断が往復する。実機の前の段 (UniNorth の clock の alias、実機の PHY) は入れない ([DEFERRED_TESTS](../DEFERRED_TESTS.md))。段の表と受入は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md) §6・§7、P24/P25 の境目は ~/os32-tmp/run/ppc-lan24d/DESIGN.final.md (6 本目の取り込みで設計の追記に写す)。P6・P7・P27・P28 は削除段 (設計 §6 の表の下)。
+到達点: QEMU (7450・7455) で起動ログがホストに届き 5 診断が往復する。実機の前の段 (UniNorth の clock の alias、実機の PHY) は入れない ([DEFERRED_TESTS](../DEFERRED_TESTS.md))。段の表と受入は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md) §6・§7、P24/P25 の境目は [PPC_LAN_SERVICE_DESIGN](../../decisions/ppc/PPC_LAN_SERVICE_DESIGN.md)。P6・P7・P27・P28 は削除段 (設計 §6 の表の下)。
 
 ### 3.1 段の依存と担当 (Codex は同時 3 本、差分のレビューは全部 astra)
 
@@ -76,7 +77,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 
 | 本 | 中身 | 像 | 統合の検査 (~/os32-tmp/run/ppc-lan0/int5.sh の形に足す物) |
 |---|---|---|---|
-| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変、PPC の像も不変 (新しい TU は ppc-kboot.mk に入らない) | (1) 新しい H の --mutate (2) PPCKERN.ELF の sha が統合の前後で一致 (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
+| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変。PPC の像は S1 の直し 4 段 (像に入っている gem_reset・gem_phy・gmac_tree・gmac_dma・lan_gem_io) で変わる。新しい TU は ppc-kboot.mk に入らない | (1) 新しい H と直した段の H の --mutate (2) 像が変わるので kboot_all (9 印) と kboot の変異を sandbox の外で、PPCKERN.map に lan_service・lan_diag・lan_log が無いこと (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
 | 7 本目 = LAN の実装の到達 | P26 + P25 (同じ取り込み、D3)、QEMU の実測で出た直し、PM の実測の証拠 (起動ログがホストに届き 5 診断が往復、7450・7455) を票と設計の追記に。**これで本線は HAL へ進める** (ユーザー決定 2026-11-11: 7 本目を分ける) |
 | 8 本目 = LAN の最後 | P29〜P32 (受入の自動化)、P33、票を「実装済」に、実機前の段を DEFERRED_TESTS に | x86 不変、PPC の像が変わる | (1) kboot_all を sandbox の外で 7450・7455 (2) ホストの保存と serial の一致、欠落数、5 診断の応答 (3) link map (pool・サイズ・禁止 symbol) (4) LAN 無効の負経路 (5) build_compare --all (差は images/os32_install.iso の 1 件だけを許す、いつもの既知の差) (6) gcc の関門 |
 

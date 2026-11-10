@@ -311,6 +311,23 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - 単純化 (段 P22e、P22 の 3 回の往復の後に PM が決定し同じ取り込みに入れた): `peek_ig_ok`・`peek_deny`・I/G の判定・d の NULL と件数の検査はシングルタスク前提では要らない。PEEK は VA と PA を RAM の許可表 1 種で照らすだけで I/G MMIO を拒否できる (MMIO の PA は RAM の表に無く、DMA の descriptor の区画は像の予約の中)。N4 は service が許可の区間を RX buffer の前後に割って渡す。d は呼び手が保証するので monitor は検査しない。
 - ホストの道具 tools/ppc_lan_host.py: `--udp` では自分の MAC を `--mac` で与え (REQ の送信元と宛先の検査に使う)、LOG・BEACON は自分宛か broadcast、RSP は自分宛だけを採る。保存の世代は BEACON の next_seq と LOG の seq+1 の最大で追跡し、巻戻りで切り替える (§3(a))。lint が tools/ 直下の .py に受け持つ検査を求めるので CI の検査 tools/checks/ppc-lan-p23.py (tier 1) を登録した。
 
+## 実装で決めたこと (2026-11-11、段 P24a〜P24d・P24 と QEMU の先行スモーク S1 の直し P5b・P14b・P17c・P12b の取り込みで PM が決定)
+- service (段 P24) と起動への結線 (段 P25・P26) の境目は [PPC_LAN_SERVICE_DESIGN](PPC_LAN_SERVICE_DESIGN.md)、serial の LAN の印と受入の自動化 (段 P29〜P32) は [PPC_LAN_MARKS_DESIGN](PPC_LAN_MARKS_DESIGN.md) に分けた。
+- 前提と補助の段: gem_phy.c の PHY_DONE は BMSR を 1 回読み、link が無ければ PHY_START に戻して EIO (P24a)。lan_log.c に統計の口 `void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *flags)` (P24b)。PPC の I/O の実体 lan_gem_io.c の `int pm_lan_gem_io(const struct pm_gmac_boot *, struct gem_io *out)` (P24c、clock は呼ばない = レビューの D1)。診断の元 lan_diag.c の `const struct pm_lan_diag *pm_lan_diag_snapshot(const struct pm_gmac_boot *, const struct gem *, u32 state, u64 request_drops)` (P24d、PEEK の許可は RX buffer の前後の 2 区間)。
+- P24 のレビュー第 1 回の P2 2 件は PM が閉じた: 未知 PHY の guest 変異の契約は実装の順 (`LAN STATE state=1 link=0` → `LAN OFF code=-6` → ALIVE) に M1 を直した。H24 の translate は観測口の置換のままにし、実際のページ表での PA は段 P29 の QEMU の受入 (e_entry の 256B と objcopy の bytes の照合) で確かめる。
+- reset (P14b): §5 の「BSDとの差: resetエラー時…OS32は即隔離」は手本どおりに戻した。RX・TX の半分の reset の bit の待ちは期限が来ても隔離せず `g->half_reset_timeouts` を数えて先へ進み (openbsd gem.c:486-502・583-640)、全体の reset (RX|TX) の期限切れだけ隔離する。DMA 無効・MAC 無効の待ちは今のまま。
+- bdf (P5b): `pm_gmac_boot.bdf` は pci_config.c の address() と同じ形 (OF-PCI の phys.hi & 0x00ffff00、QEMU の GMAC は 0x7800)。
+- PHY の交渉 (P17c): AN の成否は ANAR と ANLPAR の共通の 100TX full で決める (openbsd ukphy_subr.c:90,104 の共通の能力)。ANLPAR の selector の bit は見ない。
+- 同期 (P12b): gmac_dma.c の `int pm_gmac_dma_sync(void *cpu, u32 bytes, enum dma_sync op)` が descriptor の区画 (pool の先頭 64KiB、I/G) は `sync` だけ、他は ppc_dma_sync に渡す (§3(d) の「I/G descriptorはsyncだけ」)。lan_gem_io の .sync はこれ。ppc_dma_sync は POSTREAD で cache line の境界に合わない範囲を断るので、16B の descriptor に直接使えない。
+
+## S1 の観測 (PM、2026-11-11、QEMU 8.2.2 mac99 -cpu 7450・7455、取り込まない patch で gem の core を ② の起動の後に 1 回ずつ呼ぶ。UDP の socket netdev とホストの道具)
+- QEMU の sungem は bank2 の GEM_RESET に RX (2) だけ・TX (1) だけを書くと bit が消えない (reset は効く)。RX|TX (3) は直後に消える。→ P14b。S1 では half_reset_timeouts=2 で reset は成功。
+- OF-PCI の bdf を `>>8` した 0x78 は pm_pci_read32 に EINVAL で断られ、0x7800 で ID が読めた → P5b。PCI の command の読みは 0x2a00003。
+- PHY は MDI0 の address 0 の BCM5201 (0x0040/0x6210)。AN の後に BMSR 0x402c、ANAR 0x0100 (書いた値)、ANLPAR 0x0100 (selector の bit が無い) → P17c。reg 24 だけ 3、他の 6・16〜31 は 0。
+- gem_rx の最初の descriptor の POSTREAD が ppc_dma_sync に断られて EIO → P12b。
+- 4 段を入れた S1 で reset・MIF・DMA・ring の準備と公開・MAC の初期化・PHY・MAC の有効化 (約 1 秒)・TX 1 枚 (TX_COMPLETION 1、ホストが nonce の frame を受けた)・RX 1 枚 (ホストの返信 94 バイトを受けた) が 7450・7455 の両方で通った。MAC の RX_CONFIG 0x25・TX_CONFIG 0x3f。A7 の実 frame の往復は QEMU で成立。
+- 実測していない物: 60B 未満の frame (PLN1 は 94B 以上なので不要、M1 F4)、QMP の set_link が BMSR に映るか (断線は H24 の模型だけで受ける)。
+
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
 - `info pci`: Bus 0 device 15 function 0 = Ethernet controller **106b:0021**、IRQ pin A、BAR0 = 32 bit memory、大きさ 0x200000 (2MiB、firmware が走る前なので番地は未割当)。host bridge は 106b:001f (dev 11) と 106b:001e (dev 14)、106b:0022 (dev 12)。
