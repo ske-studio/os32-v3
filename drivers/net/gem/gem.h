@@ -190,10 +190,12 @@ struct gem_io {
     unsigned long long (*tb)(void *);
     u32 tb_hz;
     int (*sync)(void *, u32, enum dma_sync);
+    int (*master_enable)(void *); /* PCI master set and readback, before DMA enable. */
 };
 struct gem {
     struct gem_io io; /* Platform-provided register, clock and DMA access. */
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
+    u32 ring_prepare_step, ring_cursor, ring_publish_step;
     u32 state, step, cursor, polls; /* Bounded state-machine progress. */
     u32 error_status, tx_status, rx_status; /* Captured fault registers. */
     u32 phy_addr, phy_port; /* Selected PHY and MIF port. */
