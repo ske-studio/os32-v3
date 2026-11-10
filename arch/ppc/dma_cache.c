@@ -16,7 +16,7 @@ int ppc_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
 void ppc_dcbst_line(void *line) { __asm__ volatile("dcbst 0,%0" : : "r"(line) : "memory"); }
 void ppc_dcbf_line(void *line) { __asm__ volatile("dcbf 0,%0" : : "r"(line) : "memory"); }
 void ppc_dcbi_line(void *line) { __asm__ volatile("dcbi 0,%0" : : "r"(line) : "memory"); }
-void ppc_sync(void) { __asm__ volatile("sync" : : : "memory"); }
+void __attribute__((weak)) ppc_sync(void) { __asm__ volatile("sync" : : : "memory"); }
 #endif
 
 int ppc_dma_sync(void *cpu, u32 bytes, enum dma_sync op)

@@ -15,6 +15,7 @@
 #include "kernel_probe.h"
 #include "kboot_info.h"
 #include "kboot_log.h"
+#include "lan_boot.h"
 #include "mpic.h"
 #include "ppc_trap.h"
 #include "ppc_oea.h"
@@ -37,6 +38,7 @@
 /* Observation ABI for the acceptance meter (big-endian, always mapped). */
 volatile unsigned long long kboot_ready_tb;
 
+static struct pm_gmac_boot lan_boot;
 static volatile u32 ipi_seen;
 static unsigned char flush_a[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static unsigned char flush_b[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
@@ -132,6 +134,8 @@ void ppc_kernel_main(void)
     if (!info || pm_log_escc_init(dev->escc_csr_va, dev->escc_data_va) != 0)
         arch_cpu_stop();   /* no sink: nothing may be printed */
 
+    int lan_log_rc = pm_lan_log_register();
+
     unsigned long long ram = 0;
     for (u32 i = 0; i < info->ram.count; i++) ram += info->ram.v[i].size;
     kprintf(KBOOT_ATTR, "KBOOT OF-CAPTURE ram=%u admitted=%u tb_hz=%u\r\n",
@@ -142,6 +146,13 @@ void ppc_kernel_main(void)
 
     /* Common mm: allocator/ledger, shared region, kernel heap (x86 order of
      * memory_boot_init -> shm_init; kmalloc is independent of both). */
+    lan_boot = info->gmac;
+    if (dev->gmac_ready) {
+        struct pm_pci pci = {dev->pci_addr_va, dev->pci_data_va,
+                             lan_boot.bus_first, lan_boot.bus_last, lan_boot.bdf};
+        pm_gmac_quiesce_setup(&lan_boot, &pci);
+        if (pm_gmac_early_quiesce() < 0) kboot_stop("gmac_quiesce");
+    }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
     shm_init();
     /* Same contract as x86 kernel_boot_memory(): shm_free/shm_lock toggle RW
@@ -226,16 +237,24 @@ void ppc_kernel_main(void)
         kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", pm_tick_hz(), ticks, us_lo);
 
+    if (dev->gmac_ready && lan_log_rc == 0) {
+        pm_gmac_boot_id(&lan_boot, tb_now(), ppc_read_pvr());
+        (void)pm_lan_start(&lan_boot);
+    } else {
+        kprintf(KBOOT_ATTR, "LAN OFF code=%d\r\n",
+                dev->gmac_ready ? lan_log_rc : LAN_ENODEV);
+    }
+
     unsigned long long start = tb_now();
     u32 tick0 = tick_count;
     kboot_ready_tb = start;
     kprintf(KBOOT_ATTR, "KBOOT READY stage=pre-user\r\n");
     unsigned long long now;
-    do now = tb_now(); while (now - start < 2ULL * info->tb_hz);
+    do { now = tb_now(); pm_lan_poll(now); } while (now - start < 2ULL * info->tb_hz);
     u32 tick_delta = tick_count - tick0;
     unsigned long long delta = now - start;
     u32 tb_us = (u32)(delta / info->tb_hz * 1000000 + delta % info->tb_hz * 1000000 / info->tb_hz);
     kprintf(KBOOT_ATTR, "KBOOT ALIVE tick_delta=%u tb_us=%u of_calls_delta=%u\r\n",
             tick_delta, tb_us, ofw_call_count() - info->of_calls_at_detach);
-    arch_cpu_idle();
+    for (;;) pm_lan_poll(tb_now());
 }
