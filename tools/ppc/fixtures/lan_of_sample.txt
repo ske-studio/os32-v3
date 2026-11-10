@@ -1,0 +1,77 @@
+ =============================================================
+>> OpenBIOS 1.1 [Jun 24 2026 08:28]
+>> Configuration device id QEMU version 1 machine id 1
+>> CPUs: 1
+>> Memory: 128M
+>> UUID: 00000000-0000-0000-0000-000000000000
+>> CPU type PowerPC,G4
+milliseconds isn't unique.
+Welcome to OpenBIOS v1.1 built on Jun 24 2026 08:28
+
+0 > dev / ls 
+fff55e44 aliases
+fff55ee8 openprom
+fff56090 options
+fff56108 chosen
+fff561b8 builtin
+fff5be1c packages
+fff5eb8c cpus
+fff5ec8c memory@0
+fff5ed54 rom@ff800000
+fff61bf0 nvram@fff04000
+fff61e88 pci@f2000000
+fff662a4 uni-n@f8000000
+ ok
+0 > dev /pci@f2000000 ls 
+fff623b0 mac-io@c
+fff64d70 usb@d
+fff650bc QEMU,VGA@e
+fff65d20 ethernet@f
+ ok
+0 > dev /pci@f2000000/ethernet@f .properties 
+name                      "ethernet"
+vendor-id                 106b 
+device-id                 21 
+revision-id               1 
+class-code                20000 
+interrupts                1 
+min-grant                 40 
+max-latency               40 
+devsel-speed              0 
+fast-back-to-back         <empty>
+66mhz-capable             <empty>
+cache-line-size           0 
+device_type               "network"
+compatible                "gmac"
+assigned-addresses        02007810 00000000 82200000   00000000 00200000
+reg                       00007800 00000000 00000000   00000000 00000000
+                          02007810 00000000 00000000   00000000 00200000
+local-mac-address         -- 6 : 52 54 00 12 34 56 
+ ok
+0 > dev /pci@f2000000 .properties 
+name                      "pci"
+vendor-id                 106b 
+device-id                 1f 
+revision-id               0 
+class-code                60000 
+min-grant                 0 
+max-latency               0 
+devsel-speed              0 
+subsystem-vendor-id       1af4 
+subsystem-id              1100 
+cache-line-size           1000 
+device_type               "pci"
+model                     "AAPL,UniNorth"
+compatible                "uni-north"
+#address-cells            3 
+#size-cells               2 
+#interrupt-cells          1 
+reg                       f2000000   02000000
+ranges                    -- 30 : 01 00 00 00 00 00 00 00 00 00 00 00 f2 00 00 00 00 00 00 00 00 80 00 00 02 00 00 00 00 00 00 00 80 00 00 00 80 00 00 00 00 00 00 00 10 00 00 00 
+bus-range                 -- 8 : 00 00 00 00 00 00 00 00 
+available                 -- 28 : 02 00 00 00 00 00 00 00 82 40 00 00 00 00 00 00 8d c0 00 00 01 00 00 00 00 00 00 00 00 00 10 00 00 00 00 00 00 7f f0 00 
+interrupt-parent          fff64b20 
+interrupt-map             -- 38 : 00 00 68 00 00 00 00 00 00 00 00 00 00 00 00 01 ff f6 4b 20 00 00 00 1c 00 00 00 01 00 00 78 00 00 00 00 00 00 00 00 00 00 00 00 01 ff f6 4b 20 00 00 00 1e 00 00 00 01 
+interrupt-map-mask        -- 10 : 00 ff f8 00 00 00 00 00 00 00 00 00 00 00 00 07 
+ ok
+0 > 
