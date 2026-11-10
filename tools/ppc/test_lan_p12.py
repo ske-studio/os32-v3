@@ -15,6 +15,7 @@ CHECK = dict(name='ppc-lan-p12', tier=2, budget=60,
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('sync', '    ppc_sync();', '    /* sync removed */', 0, 'H:A4 dma-unpublished'),
+    ('sync-order', '    for (u32 off = 0; off < DMA_BLOCK; off += PPC_CACHE_LINE)\n        ppc_dcbf_line(pool + off);\n    ppc_sync();', '    ppc_sync();\n    for (u32 off = 0; off < DMA_BLOCK; off += PPC_CACHE_LINE)\n        ppc_dcbf_line(pool + off);', 0, 'H:A4 dma-unpublished'),
     ('pcd', 'pa, PAGE_RW | PTE_PCD)', 'pa, PAGE_RW)', 0, 'H:pcd'),
     ('bus', 'address = saved.dma_bus_base + off;', 'address = off;', 1, 'H:bus'),
     ('window', 'off >= saved.dma_bytes || bytes > saved.dma_bytes - off ||', '0 ||', 1, 'H:window'),
@@ -43,7 +44,7 @@ def main():
         temp = Path(directory)
         source = temp / 'gmac_dma.c'
         source.write_text(original)
-        for case in range(5):
+        for case in range(6):
             result = check(source, temp, case)
             if result.returncode or 'REACHED host' not in result.stdout.splitlines():
                 raise RuntimeError('baseline case %d: %s' % (case, result.stdout + result.stderr))
