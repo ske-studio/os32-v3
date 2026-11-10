@@ -288,6 +288,12 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - 実装者の sandbox は AF_INET の socket を作れない。UDP の netdev を付けた QEMU と UDP の loop の試験は PM が sandbox の外で回し、sandbox の中では rc=3 と別の行で知らせる形にした。
 - tools/ppc/kboot_boot.py は x86 の build の生成物 build/out/memmap_layout.h を要する (新しい作業木では x86 の make を先に済ませる)。
 
+## 実装で決めたこと (2026-11-11、段 P4・P5・P12・P20・P21 の取り込みで PM が決定)
+- boot_id は capture (kboot_capture.c、host で試験する) では作らない。TB と PVR を読んで `pm_gmac_boot_id` を呼ぶのは LAN の service を始める直前の段 P25 (init/ppc_kernel.c)。
+- struct pm_kboot_info に `struct pm_gmac_boot gmac` と `int gmac_rc` を足し、kboot_capture.c は tree walk の後に pm_gmac_capture を 1 回呼ぶ。LAN の失敗で起動を止めない。kboot_capture.c が gmac_tree.c を要するので、像の段 P26 の一部 (build/ppc-kboot.mk の明示の TU に gmac_tree.c) と、kboot_capture.c を組む既存の試験 4 本の TU の追従を前倒しした。
+- ログの待ち行列の送信の側の口: `int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq, u64 *records, u64 *bytes, u32 *status)` (閉じた最古の slot を静的な scratch で見せる。status の bit0 = 飽和。開いた slot を閉じるのは、それが唯一の slot のときだけ) と `void pm_lan_log_complete(int result)` (受理で取り除き、AGAIN で残す)。宣言は lan_boot.h。
+- DMA の pool は BSS (image の予約の中)。実際の像での収容の確認は段 P26 の link map。
+
 ## P0 の観測 (PM、2026-11-10、QEMU 8.2.2 Debian 1:8.2.2+ds-0ubuntu1.18、ゲストは走らせていない: -S と monitor だけ)
 - `qemu-system-ppc -M mac99 -S -monitor stdio` の `info network`: **既定の NIC は sungem** (`hub0port0: sungem.0 … model=sungem,macaddr=52:54:00:12:34:56`、相手は user (slirp) net 10.0.2.0)。
 - `info pci`: Bus 0 device 15 function 0 = Ethernet controller **106b:0021**、IRQ pin A、BAR0 = 32 bit memory、大きさ 0x200000 (2MiB、firmware が走る前なので番地は未割当)。host bridge は 106b:001f (dev 11) と 106b:001e (dev 14)、106b:0022 (dev 12)。

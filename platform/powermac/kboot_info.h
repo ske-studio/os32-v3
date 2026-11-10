@@ -1,6 +1,7 @@
 #ifndef OS32_POWERMAC_KBOOT_INFO_H
 #define OS32_POWERMAC_KBOOT_INFO_H
 #include "ofw.h"
+#include "lan_boot.h"
 #include "ppc_pmap.h"
 /* Native platform-owned snapshot. Raw properties below retain BE encoding. */
 #define PM_KBOOT_PROP_BYTES 512
@@ -33,6 +34,8 @@ struct pm_kboot_info {
     u32 tb_hz, escc_pa, mpic_pa, mpic_bytes;
     u32 of_calls_at_detach;
     struct pm_kboot_device escc, mpic;
+    struct pm_gmac_boot gmac;
+    int gmac_rc;
 };
 /* Boot foreground, EE=0: copy CPU TB frequency before clock init. */
 void pm_clock_bind(const struct pm_kboot_info *info);
