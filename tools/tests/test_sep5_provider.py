@@ -51,7 +51,20 @@ MUTATIONS = (
     ('trident-rc-zero', '            if (!rc) rc = OS32_ERR_INVAL; /* probe/layout rejection */\n', '', 41),
     ('trident-query-rc-lost', 'int rc = want && want->query ? want->query(&info) : OS32_ERR_NOSYS;',
      'int rc = want && want->query ? (want->query(&info), 0) : OS32_ERR_NOSYS;', 42),
-    ('cirrus-flag-never', 'cirrus_probed = 1;', '(void)0;', 40),
+    ('cirrus-flag-never', 'cirrus_probed = 1;', '(void)0;', 18),
+    ('cirrus-flag-on-success-only', 'if (backend == &gfx_backend_cirrus && backend->init) cirrus_probed = 1;',
+     'if (backend == &gfx_backend_cirrus && backend->init && available[C]) cirrus_probed = 1;', 18),
+)
+# 部品が未リンクの構成 (weak の番地が 0) だけで落ちる変異: (name, anchor, replacement, exit code)。
+# NULL の guard を外すと NULL を読むので、SEGV = host32 の実行が signal で終わること。
+SEGV = 'SEGV'
+UNLINKED_MUTATIONS = (
+    ('unlinked-forced-probed', '            if (!g_backend_list[i]) continue;\n', '', SEGV),
+    ('unlinked-trident-prepared', 'if (want == &gfx_backend_trident && want && want->prepare) want->prepare();',
+     'if (want == &gfx_backend_trident && want->prepare) want->prepare();', SEGV),
+    ('unlinked-trident-queried', 'int rc = want && want->query ? want->query(&info) : OS32_ERR_NOSYS;',
+     'int rc = want->query ? want->query(&info) : OS32_ERR_NOSYS;', SEGV),
+    ('unlinked-trident-unlogged', '        if (pref == GFX_PREF_TRIDENT) {', '        if (pref == GFX_PREF_TRIDENT && want) {', 54),
 )
 # The PowerMac provider must stay inert: (name, anchor, replacement, exit code).
 PPC_MUTATIONS = (
@@ -62,13 +75,16 @@ FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '
          '-fno-stack-protector', '-no-pie']
 
 
-def execute(text, work):
+def execute(text, work, unlinked=False):
     (work / 'gfx_selector_source.inc').write_text(text)
     exe = work / 'provider'
     subprocess.run(['gcc', '-m32', '-march=i386', *FLAGS, '-nostdlib', '-static',
+        *(['-DNO_OPTIONAL', '-Wno-address', '-Wno-unused-function', '-Wno-unused-const-variable',
+           '-Wno-unused-variable'] if unlinked else []),
         '-I' + str(work), *include_flags(ROOT),
         str(ROOT / 'tools/tests/sep5_provider_host.c'), '-o', str(exe)], check=True)
-    return host32.run([str(exe)]).returncode
+    rc = host32.run([str(exe)]).returncode
+    return SEGV if rc in (-11, 139) else rc
 
 
 def execute_ppc(text, work):
@@ -98,15 +114,22 @@ def main():
     with tempfile.TemporaryDirectory(prefix='sep5-provider-') as directory:
         work = Path(directory)
         assert execute(text, work) == 0
+        assert execute(text, work, unlinked=True) == 0
         assert execute_ppc(ppc, work) == 0
         print('PASS host32 provider selection table (auto, forced, fallback, Trident retry/log, '
-              'Cirrus probe flag, pref, ledger kind) and the inert PowerMac provider', flush=True)
+              'Cirrus probe flag, pref, ledger kind), the same with optional backends unlinked, '
+              'and the inert PowerMac provider', flush=True)
         if args.mutate:
             for name, old, new, code in MUTATIONS:
                 assert text.count(old) == 1, (name, text.count(old))
                 rc = execute(text.replace(old, new), work)
                 assert rc == code, (name, rc, code)
                 print('MUTATE runtime RED %s (exit %d)' % (name, code), flush=True)
+            for name, old, new, code in UNLINKED_MUTATIONS:
+                assert text.count(old) == 1, (name, text.count(old))
+                rc = execute(text.replace(old, new), work, unlinked=True)
+                assert rc == code, (name, rc, code)
+                print('MUTATE runtime RED %s (unlinked, exit %s)' % (name, code), flush=True)
             for name, old, new, code in PPC_MUTATIONS:
                 assert ppc.count(old) == 1, (name, ppc.count(old))
                 rc = execute_ppc(ppc.replace(old, new), work)

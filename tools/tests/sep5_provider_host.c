@@ -35,12 +35,18 @@ static void prepare_t(void) { event('R', 't'); }
 static int query_t(GFX_ScreenInfo *info) { (void)info; event('Q', 't'); return query_rc; }
 static void init_c(void) { finish(3); }   /* selection must never set hardware up */
 static const GfxMode modes[1];
+#ifndef NO_OPTIONAL
 GfxBackend gfx_backend_trident = { .name = "t", .probe = probe_t, .prepare = prepare_t,
                                    .query = query_t, .modes = modes };
 GfxBackend gfx_backend_geforce = { .name = "g", .probe = probe_g, .modes = modes };
 GfxBackend gfx_backend_cirrus = { .name = "c", .probe = probe_c, .init = init_c, .modes = modes };
 GfxBackend gfx_backend_pegc = { .name = "p", .probe = probe_p, .modes = modes };
+#endif
 GfxBackend gfx_backend_pc98 = { .name = "9", .probe = probe_n, .modes = modes };
+#ifdef NO_OPTIONAL
+/* 部品が未リンク: weak の番地は 0 で、表の要素も希望の backend も NULL になる。 */
+static void unlinked(void) __attribute__((noreturn));
+#endif
 static GfxBackend *const backends[BACKENDS] = { &gfx_backend_trident, &gfx_backend_geforce,
     &gfx_backend_cirrus, &gfx_backend_pegc, &gfx_backend_pc98 };
 
@@ -105,8 +111,35 @@ static void reset(void)
     count = 0; trace[0] = 0; logged_rc = 12345; seen_legacy = -1;
 }
 
+#ifdef NO_OPTIONAL
+static GfxBackend *pick(int pref)
+{
+    reset();
+    return display_provider_select(pref, 0, select_mode);
+}
+static void unlinked(void)
+{
+    available[N] = mode_ok[N] = 1;
+    if (&gfx_backend_trident || &gfx_backend_geforce || &gfx_backend_cirrus || &gfx_backend_pegc)
+        finish(50);
+    if (pick(GFX_PREF_AUTO) != &gfx_backend_pc98 || !same(trace, "P9S9")) finish(51);
+    if (pick(GFX_PREF_PEGC) != &gfx_backend_pc98 || !same(trace, "S9")) finish(52);
+    if (pick(GFX_PREF_CIRRUS) != &gfx_backend_pc98 || !same(trace, "S9") ||
+        pick(GFX_PREF_GEFORCE) != &gfx_backend_pc98 || !same(trace, "S9") ||
+        gfx_cirrus_probed()) finish(53);
+    /* Trident 未リンク: prepare も probe も query もせず、NOSYS を記録して 9801。 */
+    if (pick(GFX_PREF_TRIDENT) != &gfx_backend_pc98 || !same(trace, "KtS9") ||
+        logged_rc != OS32_ERR_NOSYS) finish(54);
+    if (display_provider_ledger(&gfx_backend_pc98) != LEDGER_SF_PC98) finish(55);
+    finish(0);
+}
+#endif
+
 void _start(void)
 {
+#ifdef NO_OPTIONAL
+    unlinked();
+#else
     unsigned i, b;
     static const int prefs[] = { GFX_PREF_AUTO, GFX_PREF_PC98, GFX_PREF_PEGC, GFX_PREF_CIRRUS,
                                  GFX_PREF_GEFORCE, GFX_PREF_TRIDENT };
@@ -141,6 +174,12 @@ void _start(void)
     if (display_provider_select(GFX_PREF_AUTO, 0, select_mode) != &gfx_backend_pegc ||
         !same(trace, "PpSp") || gfx_cirrus_probed()) finish(17);
     gfx_backend_cirrus.modes = modes;
+    /* The flag records that a real Cirrus probe ran, even when it found nothing. */
+    for (b = 0; b < BACKENDS; b++) available[b] = b != C;
+    reset();
+    if (display_provider_select(GFX_PREF_CIRRUS, 0, select_mode) != &gfx_backend_pc98 ||
+        !gfx_cirrus_probed()) finish(18);
+    if (!same(trace, "PcS9")) finish(19);
 
     for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
         const struct scenario *s = &table[i];
@@ -153,7 +192,6 @@ void _start(void)
         if (display_provider_select(s->pref, s->legacy200, select_mode) != backends[s->want] ||
             !same(trace, s->trace) || seen_legacy != s->legacy200) finish(s->code);
     }
-    if (!gfx_cirrus_probed()) finish(40);
 
     /* Trident rejection: rc 0 from query still reports a failure; others pass through. */
     for (b = 0; b < BACKENDS; b++) { available[b] = b == N; mode_ok[b] = 1; }
@@ -168,4 +206,5 @@ void _start(void)
     display_provider_select(GFX_PREF_TRIDENT, 0, select_mode);
     if (logged_rc != OS32_ERR_NOSYS || !same(trace, "RtPtKtS9")) finish(43);
     finish(0);
+#endif
 }
