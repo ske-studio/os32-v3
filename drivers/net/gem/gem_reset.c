@@ -110,7 +110,6 @@ int gem_reset_step(struct gem *g, unsigned long long now)
 int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
 {
     u32 status, v, wr, rd;
-    (void)tx_budget; /* TX completion and RX delivery are added in later stages. */
     if (g->state == GEM_STATE_QUARANTINED) return GEM_ETIME;
     if (g->state == GEM_STATE_RESETTING) return gem_reset_step(g, now);
     /* gem_eint :1151-1197 and gem_rx_watchdog :1199-1235. */
@@ -145,5 +144,5 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
             g->rx_watch_wr = wr; g->rx_watch_rd = rd; g->rx_watch_started = now;
         }
     }
-    return GEM_OK;
+    return gem_tx_reclaim(g, now, tx_budget);
 }

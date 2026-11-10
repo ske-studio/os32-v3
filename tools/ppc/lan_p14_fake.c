@@ -87,3 +87,7 @@ static int main_test(void) {
     return failure;
 }
 void _start(void) { int code=main_test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
+
+/* P14 isolates reset monitoring from the P18 completion implementation. */
+int gem_tx_reclaim(struct gem *g, unsigned long long now, u32 budget)
+{ (void)g; (void)now; (void)budget; return GEM_OK; }
