@@ -8,6 +8,7 @@ import clang_ast as ast
 from clang_ast.asm import templates
 from clang_ast.build import select_units
 from clang_ast.result_cache import get_or_compute
+from clang_ast.parallel_units import ordered_units
 K = ast.K
 SCAN_DIRS = SCAN_ROOTS['arch_asm']
 ALLOW_RE = re.compile(r'^arch/[^/]+/arch_[A-Za-z0-9_]+\.h$')
@@ -53,6 +54,13 @@ def findings(tu, root=ast.ROOT):
     return sorted(hits)
 
 
+def _check_unit(item):
+    u, root = item
+    def compute():
+        return findings(ast.parse(u['src'],u['argv'],root),root)
+    return get_or_compute('arch-asm', u['src'], u['argv'], root, compute)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',default=ast.ROOT)
@@ -64,10 +72,10 @@ def main():
         units = [u for u in ast.units(root)
                  if u['src'].split('/')[0] in SCAN_DIRS
                  and not u['src'].startswith('lib/sqlite3/')]
-        for u in select_units(units, root, args.files):
-            def compute():
-                return findings(ast.parse(u['src'],u['argv'],root),root)
-            hits.update(map(tuple, get_or_compute('arch-asm', u['src'], u['argv'], root, compute)))
+        selected = select_units(units, root, args.files)
+        for result in ordered_units(_check_unit, [(u, root) for u in selected],
+                                    module='check_arch_asm'):
+            hits.update(map(tuple, result))
     except RuntimeError as e:
         errors.append('clang parse failure: ' + str(e))
     for rel,ln,mn in sorted(hits):
