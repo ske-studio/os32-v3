@@ -54,6 +54,22 @@ static void test(void) {
     CHECK(drop_bytes == 17 && drop_records == 0, "partial-before");
     CHECK(peek() == LAN_OK, "partial-peek"); pm_lan_log_complete(LAN_OK); write_text("x");
     CHECK(drop_records == 1 && drop_bytes == 17 && next_seq == 65, "partial-recovery");
+    reset(); installed->write(0, input, 256);
+    for (u32 i = 0; i < 63; i++) {
+        write_text("x"); CHECK(peek() == LAN_OK && seq == 0, "alternating-peek");
+        pm_lan_log_complete(LAN_AGAIN);
+    }
+    out("reached=alternating\n");
+    CHECK(count == 2 && slots[1].len == 63 && !drop_bytes, "H:alternating-packing");
+    reset(); next_seq = ~(u64)0 - 1; installed->write(0, input, 512);
+    out("reached=saturation\n");
+    CHECK(peek() == LAN_OK && next_seq == ~(u64)0 && (status & 1), "H:saturation-seq");
+    reset(); installed->write(0, input, 16384); drop_records = ~(u64)0 - 1;
+    installed->write(0, input, 512);
+    CHECK(peek() == LAN_OK && records == ~(u64)0 && (status & 1), "H:saturation-records");
+    reset(); installed->write(0, input, 16384); drop_bytes = ~(u64)0 - 1;
+    installed->write(0, input, 2);
+    CHECK(peek() == LAN_OK && bytes == ~(u64)0 && (status & 1), "H:saturation-bytes");
     out("PASS\n");
 }
 void _start(void) { test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(0)); __builtin_unreachable(); }

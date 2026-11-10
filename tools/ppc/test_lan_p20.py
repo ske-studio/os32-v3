@@ -14,6 +14,8 @@ CHECK = dict(name='ppc-lan-p20', tier=1, budget=60, needs=[],
                      'platform/powermac/lan_boot.h', 'platform/powermac/kboot_log.h',
                      'arch/ppc/ppc_oea.h', 'include/types.h'])
 MUTATIONS = [
+    ('peek-tail', 'if (count == 1) close_slot();', 'close_slot();', 'reached=alternating', 'H:alternating-packing'),
+    ('saturation', 'if (n > ~(u64)0 - *v)', 'if (0)', 'reached=saturation', 'H:saturation-seq'),
     ('loss', 'add_sat(&drop_records, chunks);', '(void)chunks;', 'reached=full', 'H:A8 loss-count'),
     ('packing', 'if (s->len == LOG_BYTES) close_slot();', 'close_slot();', 'reached=fixture', 'H:packing'),
     ('oldest', 'if (n) { close_slot(); discard(n); }', 'if (n) { head = (head + 1) % LOG_SLOTS; close_slot(); discard(n); }', 'reached=full', 'H:oldest'),

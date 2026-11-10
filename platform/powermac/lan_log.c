@@ -109,7 +109,7 @@ int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
     struct log_slot *s;
     if (!data || !len || !seq || !records || !bytes || !status) return LAN_EINVAL;
     saved = ppc_irq_save();
-    close_slot();
+    if (count == 1) close_slot();
     if (!count) { ppc_irq_restore(saved); return LAN_AGAIN; }
     s = &slots[head];
     for (u32 i = 0; i < s->len; i++) scratch[i] = s->data[i];
