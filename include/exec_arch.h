@@ -15,6 +15,11 @@ struct arch_priv_context {
 struct arch_entry_context {
     unsigned char opaque[ARCH_ENTRY_BYTES];
 } __attribute__((aligned(ARCH_ENTRY_ALIGN)));
+/* Floating-point (and vector) state of one USER context; opaque outside arch.
+ * The kernel itself is integer-only: this is saved/restored only around USER. */
+struct arch_fp_context {
+    unsigned char opaque[ARCH_FP_BYTES];
+} __attribute__((aligned(ARCH_FP_ALIGN)));
 struct exec_entry_args { u32 argc, argv, api, aux; };
 /* Returns nonzero on arithmetic or store failure; complete before commit.
  * store returns zero on success. owner remains borrowed for this call only. */
@@ -35,4 +40,8 @@ void arch_user_result(struct arch_user_context *, u32);
 void arch_user_restart(struct arch_user_context *);
 /* Atomic privileged transition; does not return. */
 void arch_user_resume(const struct arch_user_context *, u32 address_space);
+/* No-ops when the CPU has no such state. init = the state a new program starts with. */
+void arch_fp_save(struct arch_fp_context *);
+void arch_fp_restore(const struct arch_fp_context *);
+void arch_fp_init(void);
 #endif

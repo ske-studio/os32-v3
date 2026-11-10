@@ -54,9 +54,9 @@ static int contains(const char *s) {
     }
     return 0;
 }
-static X87State x87_parent[APP_SLOT_COUNT];
-void x87_save(X87State *p) { (void)p; }
-void x87_restore(const X87State *p) { (void)p; }
+static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
+void arch_fp_save(struct arch_fp_context *p) { (void)p; }
+void arch_fp_restore(const struct arch_fp_context *p) { (void)p; }
 static AppSlot g_slot[APP_SLOT_COUNT], *g_cur_app;
 static int g_cur=APP_ID_SHELL, g_cur_op_is_wait, res_owner=APP_ID_SHELL;
 volatile u32 ring3_switch_count, ring3_transition_count;

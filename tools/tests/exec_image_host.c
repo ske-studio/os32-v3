@@ -26,10 +26,10 @@ enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, R
 static int failure, is_user, opened, closed, aborted, reads, maps, jump_ready;
 static int last_slot_id;
 static int x87_calls, x87_entry_depth, x87_init_after_save;
-static X87State *x87_saved;
-void x87_save(X87State *p) { x87_saved = p; x87_calls++; }
-void x87_restore(const X87State *p) { (void)p; x87_calls++; }
-void x87_init(void) { x87_init_after_save = x87_calls == 1; x87_calls++; }
+static struct arch_fp_context *x87_saved;
+void arch_fp_save(struct arch_fp_context *p) { x87_saved = p; x87_calls++; }
+void arch_fp_restore(const struct arch_fp_context *p) { (void)p; x87_calls++; }
+void arch_fp_init(void) { x87_init_after_save = x87_calls == 1; x87_calls++; }
 static u32 image_size, bss_size, copied;
 static int protected, image_mapped;
 static char events[32];
@@ -213,7 +213,7 @@ void shell_service_retire(void) { CHECK(0); }
 void shell_service_publish(u32 base, u32 size) { (void)base; (void)size; CHECK(0); }
 void appslot_start_commit(int id, int gui, u32 pages) {
     (void)id; (void)gui; (void)pages;
-    CHECK(x87_entry_depth && x87_calls == 2 && x87_init_after_save && x87_saved == &x87_parent[x87_entry_depth]);
+    CHECK(x87_entry_depth && x87_calls == 2 && x87_init_after_save && x87_saved == &fp_parent[x87_entry_depth]);
     argv_done();
 }
 void appslot_mark_scheduled(int id, u32 tick) { (void)id; (void)tick; CHECK(0); }
