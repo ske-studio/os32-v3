@@ -74,6 +74,8 @@ MUTATIONS = (
     ('hello-helper-overridable', HELLO, 'override os32_comma := ,', 'os32_comma := ,', 'hello-override'),
     ('hello-crt-overridable', HELLO, 'override CRT := ', 'CRT := ', 'hello-override'),
     ('hello-link-overridable', HELLO, 'override OS32_TARGET_LINK := ', 'OS32_TARGET_LINK := ', 'hello-override'),
+    ('hello-flags-replace', HELLO, '$(strip $(OS32_TARGET_LINK) $(OS32_SDK_LINK) $(LDFLAGS))', '$(strip $(OS32_TARGET_LINK) $(if $(LDFLAGS),$(LDFLAGS),$(OS32_SDK_LINK)))', 'hello-flags'),
+    ('hello-sdk-link-overridable', HELLO, 'override OS32_SDK_LINK := ', 'OS32_SDK_LINK := ', 'hello-override'),
     ('hello-clean-queries', HELLO, 'ifneq ($(MAKECMDGOALS),clean)', 'ifneq ($(MAKECMDGOALS),never)', 'hello-clean'),
     ('stamp-argfile-unread', STAMP, "        if arg.startswith('@'):", "        if False:", 'stamp-spec'),
     ('rust-target-dir', 'build/programs.mk', 'RUST_TARGET_JSON = $(basename $(notdir $(SDK_TARGET_RUST)))', 'RUST_TARGET_JSON = $(basename $(SDK_TARGET_RUST))', 'rust-rules'),
@@ -330,7 +332,11 @@ def checks_s2(root):
 
     # Extra flags are the user's; the target's own link arguments stay in front.
     result = hello(root, sdk, 'LDFLAGS=-Map=hello.map')
-    need(result.returncode == 0 and link.split(' -nostdlib')[0] + ' -Map=hello.map -o hello.elf ' in result.stdout,
+    paths = ' -L%s/lib -L%s/cross/i386-elf/lib -L%s/cross/lib/gcc/i386-elf/13.2.0' % (prefix, root, root)
+    need(result.returncode == 0 and link + paths + ' -Map=hello.map -o hello.elf ' in result.stdout,
+         'hello-flags', result.stdout)
+    result = hello(root, sdk, 'OS32_SDK_LINK=-nostdlib')
+    need(result.returncode == 0 and link + paths + ' -o hello.elf ' in result.stdout,
          'hello-override', result.stdout)
     # Cleaning needs no SDK at all.
     result = hello(root, root / 'no-such-sdk', 'clean', dry=False, cwd=sdk / 'example/hello')

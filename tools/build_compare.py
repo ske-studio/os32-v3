@@ -133,7 +133,7 @@ ALLOWED_TOOL_DIFFS = {
     # 第 5 段 S2: 例の Makefile は CRT・link script・ELF emulation を profile から引く。
     'build/sdk/example/hello/Makefile': (
         '9e35704167f6fbddaceec6f2d08a140a61a54ad3742ad6e27f3eaee4d0deceaf',
-        '6b3dde940834097f18a190e94df587830ec7db0e1da1e5ed929748b113bdc81b'),
+        'b4ecd0a45d205e3eeb6024b3d97c17f2ad63fb1929764d8481433accad8c5483'),
     # 第 5 段 S2: target の選択の節を足した。
     'build/sdk/README.md': (
         'c5ee0362cbb6683e1377ca3b1a54754c084bad14ac33fd61509b4707e5d50637',
