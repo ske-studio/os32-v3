@@ -17,6 +17,7 @@ HARNESS = r'''
 static int lost, fed;
 void pm_terminal_feed(const u8 *p, u32 n) { (void)p; fed += n; }
 void pm_terminal_line_lost(void) { ++lost; }
+void pm_terminal_open(void) { ++lost; }
 static void msg(const char *s, int n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(s), "d"(n)); }
 static void fail(int code) { if (code == 11) msg("gap\n", 4); else if (code == 12) msg("drop\n", 5); __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
 void _start(void) {
