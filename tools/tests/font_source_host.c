@@ -34,6 +34,7 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
 #define __GUI_H
 #define GUI_SHELL_OWNER HOST_GUI_SHELL_OWNER
 #include "../../kernel/console/font_source.c"
+#include "exec_font_lease.h"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \

@@ -16,6 +16,7 @@ static void check_cr3(u32 root);
 #include "appslot.h"
 #include "exec.h"
 #include "r1_fixture.h"
+#include "exec_r1.h"
 #include "v86.h"
 #include "v86_mem.h"
 #include "tvram.h"

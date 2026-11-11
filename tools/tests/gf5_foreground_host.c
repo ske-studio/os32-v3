@@ -50,6 +50,7 @@ static bool u6_safe=true, u6_emergency_halt;
 static u32 u6_notifications,u6_aborts,u6_syncs,u6_halts,u6_resets;
 static bool u6_gui, u6_caller, u6_wm;
 static int ring3_in_syscall,font_guard_active;
+static inline u32 exec_font_guard_active(void) { return (u32)font_guard_active; }
 static AppSlot u6_app, u6_owner_app, *g_cur_app;
 static struct arch_syscall *g_cur_frame;
 volatile u32 ring3_park_reject_count;

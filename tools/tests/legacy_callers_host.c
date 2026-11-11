@@ -129,6 +129,8 @@ static inline void exec_legacy_abort_begin(void) { legacy_abort_begin(); }
 static inline void exec_legacy_end(void) { legacy_end(); }
 static inline void exec_legacy_cleanup(void) { legacy_cleanup(); }
 #include "exec_surface.h"
+static inline int exec_font_guard_active(void) { return font_guard_active; }
+static inline void exec_font_guard_fault(u32 v, u32 p, u32 a) { font_guard_fault(v, p, a); }
 #include "callers.inc"
 
 static inline int none_exec_legacy_pinned(void) { return none_pinned(); }

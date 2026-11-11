@@ -12,7 +12,7 @@
 static void ring3_kill_kind(int kind) __attribute__((noinline));
 static void ring3_kill_kind(int kind)
 {
-    if (font_guard_active) font_guard_fault(0, 0, 0);
+    if (exec_font_guard_active()) exec_font_guard_fault(0, 0, 0);
     fault_kill_count++;
     if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {
         ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */

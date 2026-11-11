@@ -61,17 +61,17 @@ MUTATIONS = [
     (SRC, "    if (ring3_in_syscall != 0 || ring3_wm_depth != 0) return 0;\n",
      "    if (ring3_in_syscall != 0) return 0;\n", "段 B open が WM 中を断らない"),
     (SRC, "    if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);\n"
-          "    r = font_lease_shell_open(",
-     "    r = font_lease_shell_open(", "open の段 B を外す"),
+          "    r = exec_font_lease_shell_open(",
+     "    r = exec_font_lease_shell_open(", "open の段 B を外す"),
     (SRC, "    return slot && !slot->cpl3 && res_owner_get() == GUI_SHELL_OWNER &&\n",
      "    return slot && !slot->cpl3 &&\n", "段 B が res_owner を見ない"),
     (SRC, "    if (g_shell_active) ring3_wm_shell_gen = g_shell_service.generation;\n",
      "    (void)0;\n", "b2③ enter で印を立てない"),
-    (SRC, "    font_lease_close_shell();\n    g_shell_active = 0;",
+    (SRC, "    exec_font_lease_close_shell();\n    g_shell_active = 0;",
      "    g_shell_active = 0;", "b2⑥ retire が shell lease を閉じない"),
     (SRC, "    g_shell_service.generation++;\n", "", "b2⑥ publish が generation を進めない"),
-    (SRC, "    r = font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);",
-     "    r = font_lease_shell_read_at(id, 1, offset, dst, len);",
+    (SRC, "    r = exec_font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);",
+     "    r = exec_font_lease_shell_read_at(id, 1, offset, dst, len);",
      "段 C へ現 generation を渡さない"),
     # ---- T7b-b3 S2: version 2 の font_guard_run (段 A/B)、F6 で x87 無しの NOSYS は撤去 ----
     (SRC, "    if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))\n"
@@ -84,8 +84,8 @@ MUTATIONS = [
     (SRC, "    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
      "    if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
      "b3 S2 guard wrapper の段 B を open の文脈にする (WM 中の handler/pump を断る)"),
-    (SRC, "    r = font_guard_run(call, ctx);\n",
-     "    r = font_guard_run(call, ctx);\n    if (r < 0) r = 0;\n",
+    (SRC, "    r = exec_font_guard_run(call, ctx);\n",
+     "    r = exec_font_guard_run(call, ctx);\n    if (r < 0) r = 0;\n",
      "b3 S2 guard の BUSY を握りつぶす"),
     (SRC, "    g_shell_service.font_guard_run = shell_svc_font_guard_run;\n", "",
      "b3 S2 publish が font_guard_run を埋めない"),
@@ -200,8 +200,8 @@ def static_checks(root, quiet=False):
     if "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;" not in ex:
         bad.append("shell aux selection missing")
     reclaim = _func_body(ex, "static void exec_reclaim_resources(int id)")
-    if "    font_lease_close_owned(id);\n    vfs_close_owned(id);" not in reclaim:
-        bad.append("exec_reclaim_resources: font_lease_close_owned が vfs_close_owned の直前に無い")
+    if "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);" not in reclaim:
+        bad.append("exec_reclaim_resources: exec_font_lease_close_owned が vfs_close_owned の直前に無い")
     if not quiet:
         for b in bad:
             print("  FAIL static: " + b)

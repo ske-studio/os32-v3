@@ -139,11 +139,11 @@ MUTATIONS = [
     (LEASE, "        if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);\n",
      "        if (0) (void)font_lease_release(s);\n", "close_shell が閉じない"),
     # ---- S3b: exec/exec.c の回収 hook ----
-    ('exec/exec_finish.inc', "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
-     "    vfs_close_owned(id);\n", "b1⑤ exec_reclaim_resources の font_lease_close_owned 呼出を外す"),
-    ('exec/exec_finish.inc', "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
-     "    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n    font_lease_close_owned(id);\n",
-     "font_lease_close_owned を回収の後ろへずらす"),
+    ('exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
+     "    vfs_close_owned(id);\n", "b1⑤ exec_reclaim_resources の exec_font_lease_close_owned 呼出を外す"),
+    ('exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
+     "    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n    exec_font_lease_close_owned(id);\n",
+     "exec_font_lease_close_owned を回収の後ろへずらす"),
 ]
 
 
