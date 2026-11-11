@@ -143,7 +143,7 @@ static void exec_reclaim_resources(int id)
      * (3a) その直前に app の font lease 表を畳む (T7b-b1 §2-4)。vfs_close_owned
      * も FONT の FD を閉じるが lease 表は知らないので、表の枠を先に返す
      * (shell の lease は kind が違い、protect なのでどちらにも掛からない)。 */
-    font_lease_close_owned(id);
+    exec_font_lease_close_owned(id);
     vfs_close_owned(id);
     /* (4) パイプバッファ自動解放 */
     pipe_free_owned(id);
@@ -310,7 +310,7 @@ static void exec_finish(int id, int status, int kind)
         shell_service_retire();
     } else {
 #ifdef OS32_R1_FIXTURE
-        r1_fixture_parent(id);
+        exec_r1_fixture_parent(id);
 #endif
         parent = appslot_return_target(id);
         /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
@@ -327,7 +327,7 @@ static void exec_finish(int id, int status, int kind)
 
 void exec_exit(int status, int kind)
 {
-    if (font_guard_active) font_guard_fault(0, 0, 0);
+    if (exec_font_guard_active()) exec_font_guard_fault(0, 0, 0);
     /* A fault during teardown must not jump over an unfinished unmap. */
     if (exec_legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
     exec_legacy_abort_begin();
@@ -343,7 +343,7 @@ void exec_exit(int status, int kind)
 /* IRQ/例外では資源に触れず、対象と種別を控えて trusted stack へ移譲。 */
 static void exec_pending_transfer(int kind)
 {
-    if (font_guard_active) font_guard_fault(0, 0, 0);
+    if (exec_font_guard_active()) exec_font_guard_fault(0, 0, 0);
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }

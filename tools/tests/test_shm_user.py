@@ -107,7 +107,7 @@ def wiring(sources):
         start = body.index('\n{')
         # Both refusals precede any state change; font was added in T7b-a2.
         first = [line.strip() for line in body[start:].split('\n')[2:4]]
-        assert first == ['if (font_guard_active) return OS32_ERR_BUSY;', guard], 'FAIL session exec gate'
+        assert first == ['if (exec_font_guard_active()) return OS32_ERR_BUSY;', guard], 'FAIL session exec gate'
     k = kernel_source(ROOT, sources)
     boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kdebug.ops.selftest_run();'), 'FAIL boot before AS'

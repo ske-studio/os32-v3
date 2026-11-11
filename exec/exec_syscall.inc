@@ -22,7 +22,7 @@ static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *fr
  * No cleanup here; the existing WM top-level selects the owner to kill. */
 static void exec_park_stop(struct arch_syscall *frame)
 {
-    if (font_guard_active) return;
+    if (exec_font_guard_active()) return;
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     if (!a || !appslot_stop_pending() || !a->gui || !a->cpl3 ||

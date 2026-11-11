@@ -69,6 +69,8 @@ static void sputs(const char *s) { (void)s; }
 static void sput_hex32(u32 v) { (void)v; }
 #include "exec_legacy.h"
 #include "exec_gfx_poll.h"
+static inline int exec_font_guard_active(void) { return font_guard_active; }
+static inline void exec_font_guard_fault(u32 v, u32 p, u32 a) { font_guard_fault(v, p, a); }
 #include "exec.inc"
 #include "fault.inc"
 static int unexpected_callback(void *context) { (void)context; calls++; return 123; }

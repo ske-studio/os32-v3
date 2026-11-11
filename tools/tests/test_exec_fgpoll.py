@@ -51,6 +51,7 @@ static AppSlot app, other, *g_cur_app;
 static u32 frame[APP_FRAME_WORDS];
 static struct arch_syscall call = { frame }, *g_cur_frame;
 static int font_guard_active, gui, reject, bad_slot, polls, halts, transfers;
+static inline int exec_font_guard_active(void) { return font_guard_active; }
 volatile u32 ring3_park_reject_count;
 void geforce_foreground_poll(void) { polls++; }
 #include "exec_gfx_poll.h"

@@ -119,7 +119,7 @@ int ring3_wait_pending(void)
 /* ======================================================================== */
 void ring3_abort_check(void)
 {
-    if (font_guard_active) return;
+    if (exec_font_guard_active()) return;
     AppSlot *a = appslot_get(appslot_cur());
     if (!a || !a->abort_req) return;
     a->abort_req = 0;
@@ -172,7 +172,7 @@ static void ring3_gui_pump(void)
      * 立てる (ポンプの位置が動いても 3 つの門の判定が変わらないように)。 */
     ring3_wm_enter();
 #ifdef OS32_R1_FIXTURE
-    font_guard_fixture();
+    exec_font_guard_fixture();
 #endif
     pump();
     ring3_wm_leave();

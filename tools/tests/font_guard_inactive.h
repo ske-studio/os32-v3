@@ -9,4 +9,6 @@ static inline void font_guard_fault(unsigned long vector, unsigned long pc,
     (void)vector; (void)pc; (void)address;
     __builtin_trap();
 }
+static inline unsigned long exec_font_guard_active(void) { return font_guard_active; }
+static inline void exec_font_guard_fault(unsigned long v, unsigned long p, unsigned long a) { font_guard_fault(v, p, a); }
 #endif
