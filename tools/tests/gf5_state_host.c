@@ -303,12 +303,13 @@ static void restore_failures(void)
     static const struct { enum gf5_host_op op; u32 nth; } failures[]={
         {F5_MATCH,1},{F5_RESTART,1},{F5_CALC,1},{F5_RAM,1},
         {F5_FAN,1},{F5_VOLT,1},{F5_VOLT,2},{F5_PROG,1},
-        {F5_FAN,2},{F5_FAN,3},{F5_PROG,2},{F5_COPY,2},{F5_RESTORE,1},{F5_ADMIT,1}
+        {F5_FAN,3},{F5_PROG,2},{F5_COPY,2},{F5_RESTORE,1},{F5_ADMIT,1}
     };
     for (u32 i=0;i<sizeof(failures)/sizeof(failures[0]);++i) {
         reset(); struct gf5_image *image=save(); begin_restore();
         enum gf5_host_op op=failures[i].op;
         nested_error=op==F5_RAM;
+        if (op==F5_CALC || op==F5_RAM || op==F5_PROG) current_uv=BOOT_UV+100000U;
         gf5_host_fail_at(&h,op,failures[i].nth,LOWER_ERROR);
         assert(gf5_state_restore(&h.ctx,image)==GF5_EIO);
         assert(h.ctx.source_rc==LOWER_ERROR && h.ctx.phase==GF5_FAULT);
@@ -317,8 +318,21 @@ static void restore_failures(void)
         if (op!=F5_ADMIT) assert(!h.calls[F5_ADMIT]);
         if (op!=F5_ADMIT && op!=F5_RESTORE) assert(!h.calls[F5_RESTORE]);
         if (op!=F5_COPY && op!=F5_RESTORE && op!=F5_ADMIT) assert(!h.calls[F5_COPY]);
-        if (op==F5_RAM) assert(!h.calls[F5_FAN] && !h.calls[F5_VOLT] && !h.calls[F5_PROG]);
+        if (op==F5_RAM) assert(h.calls[F5_FAN]==1 && h.calls[F5_VOLT]==2 && !h.calls[F5_PROG]);
         gf5_state_free(&h.ctx,image); assert(!h.live_allocs && !h.ctx.image);
+    }
+
+    /* Lower failures do not replace a successful core result or suppress fan. */
+    for (u32 primary=0;primary<2;++primary) {
+        reset(); struct gf5_image *image=save(); begin_restore();
+        current_uv=BOOT_UV+100000U;
+        if (primary) gf5_host_fail_at(&h,F5_PROG,1,GF5_ETIME);
+        gf5_host_fail_at(&h,F5_VOLT,2,LOWER_ERROR);
+        gf5_host_fail_at(&h,F5_FAN,2,LOWER_ERROR);
+        assert(gf5_state_restore(&h.ctx,image)==(primary ? GF5_ETIME : 0));
+        assert(h.calls[F5_FAN]>=2 && h.calls[F5_VOLT]==2);
+        if (primary) assert(h.ctx.source_rc==GF5_ETIME);
+        gf5_state_free(&h.ctx,image); assert(!h.live_allocs);
     }
 
 }

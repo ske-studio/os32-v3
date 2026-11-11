@@ -193,20 +193,36 @@ i32 gf5_state_save(struct gf5 *g, struct gf5_image **out)
 static i32 state_performance(struct gf5 *g, const struct gf5_image *image)
 {
     u32 previous=0;
+    bool have_previous=false;
     i32 rc=0;
     struct gf5_plan plan;
     if (image->clock_available) {
         rc=gf5_clock_calc(g,&image->clock,&plan);
         if (!rc) rc=gf5_ram_prog(g,&plan);
     }
-    if (!rc && image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
-    if (!rc && image->volt_available) rc=gf5_volt_get(g,&previous);
+    if (rc) goto lower;
+    if (image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,1);
+    if (rc) return rc;
+    if (!rc && image->volt_available) {
+        rc=gf5_volt_get(g,&previous);
+        have_previous=!rc;
+    }
+    if (rc) return rc;
     if (!rc && image->volt_available && image->requested_uv>=previous)
         rc=gf5_volt_set(g,image->requested_uv);
-    if (!rc && image->clock_available) rc=gf5_clock_raw_restore(g,&image->clock_raw);
-    if (!rc && image->volt_available && image->requested_uv<previous)
-        rc=gf5_volt_set(g,image->requested_uv);
-    if (!rc && image->fan_available) rc=gf5_fan_cstate(g,(u8)image->fan.cstate,-1);
+    if (rc) return rc;
+    if (image->clock_available) rc=gf5_clock_raw_restore(g,&image->clock_raw);
+lower:;
+    /* clk/base.c:201-216: always attempt both lowers after calc/prog.
+     * Preserve the original operation and source rc across cleanup. */
+    i32 saved_source=g->source_rc;
+    if (image->volt_available) {
+        if (!have_previous) have_previous=!gf5_volt_get(g,&previous);
+        if (have_previous && image->requested_uv<previous)
+            (void)gf5_volt_set(g,image->requested_uv);
+    }
+    if (image->fan_available) (void)gf5_fan_cstate(g,(u8)image->fan.cstate,-1);
+    g->source_rc=saved_source;
     if (!rc && image->fan_available) rc=gf5_therm_resume(g,&image->fan);
     return rc;
 }

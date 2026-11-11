@@ -220,8 +220,7 @@ static i32 heat_decode(const struct gf5_plan *p,struct gf5_clock *c)
  * PM decision 15: clock_calc fills mc/mn too; RAM only programs the plan.
  * PM decision 21: RAM owns its pause/unpause and admission preservation.
  * In particular, nested restore must keep admission closed until publication.
- * Ordering: nouveau nvkm/subdev/clk/base.c:159-215,266-305; OS32 aborts
- * on intermediate error instead of following the reference's lower path. */
+ * Ordering: nouveau nvkm/subdev/clk/base.c:159-215,266-305. */
 i32 gf5_perf_select(struct gf5 *g,u8 index)
 {
     if (!g) return GF5_EINVAL;
@@ -237,11 +236,10 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     if (rc) {
         g->last_rc=gf5_rc_map(rc);
         if (!g->source_rc) g->source_rc=rc;
-        return g->last_rc; /* No hardware change or FAULT on calc failure. */
+        goto lower;
     }
     rc=gf5_plan_ceiling(g,&plan);
     if (rc) return finish(g,rc);
-#define STEP(call) do { g->source_rc=0; rc=(call); if (rc) goto fault; } while (0)
 #define OPTIONAL(call) do { \
     g->source_rc=0; rc=(call); \
     if (gf5_rc_map(rc)==GF5_ENODEV) { absent=g->source_rc ? g->source_rc : rc; } \
@@ -252,14 +250,20 @@ i32 gf5_perf_select(struct gf5 *g,u8 index)
     OPTIONAL(gf5_fan_check_cstate(g,e.fanspeed));
     OPTIONAL(gf5_volt_check_id(g,e.voltage,e.voltage));
     programming=true;
-    STEP(gf5_ram_prog(g,&plan));
+    g->source_rc=0; rc=gf5_ram_prog(g,&plan);
+    if (rc) goto lower;
     OPTIONAL(gf5_fan_cstate(g,e.fanspeed,+1));
     OPTIONAL(gf5_volt_id(g,e.voltage,e.voltage,+1));
-    STEP(gf5_clock_prog(g,&plan));
-    OPTIONAL(gf5_volt_id(g,e.voltage,e.voltage,-1));
-    OPTIONAL(gf5_fan_cstate(g,e.fanspeed,-1));
+    g->source_rc=0; rc=gf5_clock_prog(g,&plan);
+lower: {
+    i32 saved_rc=rc, saved_source=g->source_rc;
+    /* clk/base.c:201-216: lowering errors do not replace calc/prog rc. */
+    (void)gf5_volt_id(g,e.voltage,e.voltage,-1);
+    (void)gf5_fan_cstate(g,e.fanspeed,-1);
+    rc=saved_rc; g->source_rc=saved_source;
+    if (rc) goto fault;
+}
 #undef OPTIONAL
-#undef STEP
     /* Keep absence visible while returning success for available features. */
     (void)finish(g,absent);
     return GF5_OK;
