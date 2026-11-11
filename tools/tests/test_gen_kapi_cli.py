@@ -37,7 +37,7 @@ class KapiCli(unittest.TestCase):
                 result = subprocess.run([sys.executable, '-B', str(SCRIPT), '--check', str(path)], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0, declaration)
                 self.assertIn('unsupported x86 by-value', result.stderr)
-            result = subprocess.run([sys.executable, '-B', str(SCRIPT), '--check', '--target', 'ppc-powermac'], cwd=ROOT, capture_output=True, text=True)
+            result = subprocess.run([sys.executable, '-B', str(SCRIPT), '--check', '--target', 'unsupported-target'], cwd=ROOT, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('unsupported', result.stderr)
 

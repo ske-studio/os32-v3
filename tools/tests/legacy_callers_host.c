@@ -121,14 +121,20 @@ static void kstrncpy(char *d,const char *s,u32 n) { while(n-- && (*d++=*s++)) {}
 static int serial_gate_active(void) { return 1; }
 static void serial_puts_polled(const char *s) { (void)s; }
 static int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
-#define exec_legacy_pinned legacy_pinned
-#define exec_legacy_closing legacy_closing
-#define exec_legacy_lowmap_busy legacy_lowmap_busy
-#define exec_legacy_abort_begin legacy_abort_begin
-#define exec_legacy_end legacy_end
-#define exec_legacy_cleanup legacy_cleanup
-#define exec_legacy_call_dispatch legacy_call_dispatch
+static inline int exec_legacy_pinned(void) { return legacy_pinned(); }
+static inline int exec_legacy_closing(void) { return legacy_closing(); }
+static inline int exec_legacy_lowmap_busy(void) { return legacy_lowmap_busy(); }
+static inline void exec_legacy_abort_begin(void) { legacy_abort_begin(); }
+static inline void exec_legacy_end(void) { legacy_end(); }
+static inline void exec_legacy_cleanup(void) { legacy_cleanup(); }
 #include "callers.inc"
+
+static inline int none_exec_legacy_pinned(void) { return none_pinned(); }
+static inline int none_exec_legacy_closing(void) { return none_closing(); }
+static inline int none_exec_legacy_lowmap_busy(void) { return none_lowmap(); }
+static inline void none_exec_legacy_abort_begin(void) { none_abort(); }
+static inline void none_exec_legacy_end(void) { none_end(); }
+static inline void none_exec_legacy_cleanup(void) { none_cleanup(); }
 
 /* Link the same caller slices to none as well as the native provider. */
 #define legacy_init none_init
@@ -152,7 +158,7 @@ static int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
 #define console_text_gdc_stop none_console_text_gdc_stop
 #define lease_audit_all none_lease_audit_all
 #define kselftest_run_audit none_kselftest_run_audit
-#include "callers.inc"
+#include "none_callers.inc"
 #undef legacy_init
 #undef legacy_active
 #undef legacy_session_open

@@ -64,6 +64,7 @@ def main():
         def exercise(parts, red=False):
             for key, body in parts.items():
                 (work / (key + '.inc')).write_text(body)
+            (work / 'none_callers.inc').write_text(parts['callers'].replace('exec_legacy_', 'none_exec_legacy_'))
             exe = work / 'entry'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
                 '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
