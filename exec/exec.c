@@ -26,7 +26,7 @@
 #include "kapi_strings.h"
 #include "paging.h"
 #include "pgalloc.h"
-#include "shlib.h"
+#include "exec_shlib.h"
 #include "lease.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"

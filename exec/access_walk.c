@@ -2,7 +2,7 @@
  * T2c keeps table/data backing in the supervisor identity map; no CR3 switch. */
 #include "paging.h"
 #include "pgalloc.h"
-#include "shlib.h"
+#include "exec_shlib.h"
 #include "exec.h"
 
 int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa)
@@ -61,7 +61,7 @@ shared:
                 if (frame == as->lease_pt_phys[i]) return 0;
             goto allowed;
         }
-        if (!write && shlib_read_page(va, frame)) goto allowed;
+        if (!write && exec_shlib_read_page(va, frame)) goto allowed;
         return 0;
     }
     if (result != va) return 0;

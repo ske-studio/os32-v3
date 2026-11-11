@@ -37,7 +37,7 @@ static void exec_teardown_app(AppSlot *a)
         paging_addrspace_poison(a->as);
     /* Revoke foreign leases even when private pages are quarantined. */
     if (a->as->appmem_poisoned) goto poisoned;
-    shlib_addrspace_detach(a->as);
+    exec_shlib_addrspace_detach(a->as);
     for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
         const struct appmem_extent *e = &a->as->appmem.e[i];
         if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE) {

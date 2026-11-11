@@ -144,8 +144,8 @@ MUTANTS = [
      'unmap empty PT untouched before TLB'),
 
     ('teardown-ANON-loop', 5, 'if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE) {', 'if (0) {', 'teardown R5 no leftover'),
-    ('teardown-entry-poison', 5, '    if (a->as->appmem_poisoned) goto poisoned;\n    shlib_addrspace_detach',
-     '    shlib_addrspace_detach', 'poison quarantined'),
+    ('teardown-entry-poison', 5, '    if (a->as->appmem_poisoned) goto poisoned;\n    exec_shlib_addrspace_detach',
+     '    exec_shlib_addrspace_detach', 'poison quarantined'),
     ('free-range-no-break', 4, '                paging_addrspace_poison(as);\n                break;',
      '                paging_addrspace_poison(as);\n                continue;', 'free range poison stops'),
     ('poison-no-abort', 4, '    exec_addrspace_abort(as);', '    (void)as;', 'poison owner abort requested'),
