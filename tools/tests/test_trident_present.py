@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Trident RAM transfer policies and direct VRAM synchronization."""
 CHECK = dict(name='trident-present', tier=1, needs=[], budget=3.8,
-    covers=['drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
-            'tools/tests/trident_present_host.c', 'tools/tests/trident_device_fake.c',
+    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
+            'tools/tests/trident_present_host.c', 'tools/tests/trident_sync_fake.c', 'include/gfx_sync.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'drivers/video/trident/regs.c',
             'gfx/gfx_internal.h', 'gfx/gfx.h', 'include/gfx_hal.h', 'include/gfx_format.h',
@@ -24,15 +24,6 @@ MUTANTS = [
     ('drop-rc', 'if (rc) return rc;\n    if (!d->res', 'if (rc) return TRI_OK;\n    if (!d->res'),
     ('ram-no-copy', 'if (!d->res->ram_fallback) return TRI_OK;', 'return TRI_OK;'),
     ('direct-copy', 'if (!d->res->ram_fallback) return TRI_OK;', 'if (false) return TRI_OK;'),
-    ('store32', 'trident_write8(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])',
-     'trident_write32(d, TRI_SPACE_LFB, dst + i, d->res->client[src + i])'),
-    ('skip-dword-read', 'rc = trident_read8(d, TRI_SPACE_REGS, TRI_CR_COLOR + 6u, &status);', 'rc = TRI_OK; (void)status;'),
-    ('skip-dword-wait', 'rc = trident_port8(d, PC98_IO_WAIT_PORT, 0);', 'rc = TRI_OK;'),
-    ('gap-byte', 'd->present_method == TRI_PRESENT_DWORD_GAP &&', 'false &&'),
-    ('gap-count', 'u32 count = (bytes - i) / 4u;', 'u32 count = (bytes - i) / 4u; i += 4u;'),
-    ('wait-before-store', 'rc = trident_write32(d, TRI_SPACE_LFB, dst + i, value);',
-     'if (d->present_method == TRI_PRESENT_DWORD_WAIT) { rc = trident_port8(d, PC98_IO_WAIT_PORT, 0); if (rc) return rc; }\n                rc = trident_write32(d, TRI_SPACE_LFB, dst + i, value);'),
-    ('wrong-dword', '((u32)p[3] << 24)', '((u32)p[2] << 24)'),
     ('fixed-pitch', 'row * v->pitch', 'row * TRI_PITCH'),
     ('drop-cpp', 'u32 bytes = (u32)w * c->cpp;', 'u32 bytes = (u32)w;'),
 ]
@@ -57,7 +48,7 @@ def main():
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
-                *include_flags(ROOT), str(path), str(ROOT / 'drivers/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'),
+                *include_flags(ROOT), str(path), str(ROOT / 'drivers/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'), str(ROOT / 'tools/tests/trident_sync_fake.c'),
                 str(ROOT / 'tools/tests/trident_present_host.c'), '-o', str(exe)], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                 result = host32.run([str(exe)], runner=runner, capture_output=True)

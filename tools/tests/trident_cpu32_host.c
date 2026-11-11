@@ -217,6 +217,9 @@ static int copy(struct trident_device *d, const struct tri_surface *src,
         for (u32 i=0;i<count;++i) memory[count+i]=memory[i];
     return 0;
 }
+static int set_present(struct trident_device *d, u32 method, u32 ns)
+{ d->present_method = (enum tri_present_method)method; d->write_gap_ns = ns; return 0; }
+static void clear_present(struct trident_device *d) { (void)d; }
 static int test(void)
 {
     struct trident_resources r = {.ready=true, .client=(u8 *)memory,
@@ -319,7 +322,7 @@ static int test(void)
     d.mode.client=(struct tri_surface){.width=3,.height=2,.cpp=1,.pitch=5,.bytes=10};
     d.mode.display=(struct tri_surface){.off=16,.pitch=7};
     const struct trident_io bench_io={.read8=bench_read};
-    d.io=&bench_io; o.present=bench_present;
+    d.io=&bench_io; o.present=bench_present; o.set_present=set_present; o.clear_present=clear_present;
     for (bench_fault=0; bench_fault<=5; ++bench_fault) {
         bench_calls=bench_reads=bench_clock=bench_lines=bench_method=bench_fields=0;
         bench_field=0; ram_phase=false; ram_lines=ram_method=allocs=frees=0;

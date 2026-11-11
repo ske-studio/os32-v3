@@ -59,6 +59,7 @@ static void pegc_shutdown(void)
 {
     u8 hs;
 
+    pegc_sync_drop();
     if (!s_active) return;
 
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_OFF);
@@ -100,6 +101,7 @@ static void pegc_shutdown(void)
 /* ------------------------------------------------------------------------ */
 void pegc_restore_text_sync(int hsync31)
 {
+    pegc_sync_drop();
     /* 09A0h と 6Ah・6Eh は PEGC の probe が通った機種の値。9801 で ROM の戻しに
      * 失敗してここへ来ても書かない (代行レビュー P3-2。6Ah・6Eh は
      * pegc_apply_timing が t.pegc = s_hw_ok で見る)。480 ラインの利用可否とは別。 */

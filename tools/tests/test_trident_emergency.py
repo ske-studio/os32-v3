@@ -6,7 +6,7 @@ The classifier, hook, rc handling and actual TVRAM calls remain product code.
 Hardware sequence assembly belongs to test_trident_lifecycle, in tri-life.
 """
 CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
+    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
             'gfx/gfx_core*.inc', 'drivers/video/cirrus/backend_cirrus.c',
             'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c',
             'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c',
@@ -22,7 +22,7 @@ CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
             'drivers/video/trident/trident_module.h', 'lib/kstring.h',
             'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'lib/serial_diag.h',
             'mm/kmalloc.h', 'drivers/char/serial.h', 'userland/tests/hw/trident_mode.hwb',
-            'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
+            'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h',
             'drivers/video/trident/trident.h', 'tools/tests/test_gfx_kernel_fb.py',
             'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py',
@@ -145,6 +145,7 @@ def core(runner, mutation):
         changes = [('gfx/gfx_core.c' if path.endswith('.inc') else path, old, new)]
     def stage(tmp, sources):
         sources.append(ROOT / 'tools/tests/trident_device_fake.c')
+        sources.append(ROOT / 'tools/tests/trident_sync_fake.c')
     fixture = 'unsigned int host_arch_if = 0x202U;\n#include "trident_core_host.c"\n'
     return run_case(None, runner, changes, fixture, stage=stage)
 
@@ -158,7 +159,7 @@ def lifetime(runner, mutation=None, fallback=1):
         directory = ROOT / 'drivers/video/trident'
         for stem in ('resources', 'lifecycle', 'regs', 'probe', 'state_save',
                      'pc98_init', 'mode_640', 'route_ra266', 'vram', 'default_dac',
-                     'state_restore', 'present', 'write_gap', 'palette', 'screen', 'video',
+                     'state_restore', 'present',  'palette', 'screen', 'video',
                      'dpms', 'accel', 'cursor', 'backend_trident'):
             body = source('drivers/video/trident/' + stem + '.c', mutation)
             if stem == 'resources':
@@ -174,6 +175,7 @@ def lifetime(runner, mutation=None, fallback=1):
                 path.write_text(body)
                 sources.append(path)
         sources.append(ROOT / 'tools/tests/trident_device_fake.c')
+        sources.append(ROOT / 'tools/tests/trident_sync_fake.c')
     fixture = f'#define TRI_RAM_FALLBACK_DEFAULT {fallback}\n' + 'unsigned int host_arch_if = 0x202U;\n#include "trident_surface_lifetime_host.c"\n'
     return run_case(None, runner, (), fixture, stage=stage)
 

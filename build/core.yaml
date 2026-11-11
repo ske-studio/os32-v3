@@ -36,6 +36,9 @@ filesystem:
 
   # ファイルデプロイ定義
   files:
+    - host: assets/gfx/sync.cfg
+      guest: /etc/gfx/sync.cfg
+      tags: [gui]
     # Local image is optional; user.osri is never deployed.
     - type: glob  # An exact pattern: no local image means no deployment entry.
       host: assets/splash/splash.osri

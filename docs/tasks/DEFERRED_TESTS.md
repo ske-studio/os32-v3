@@ -31,6 +31,7 @@
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
 | HALV2-I1-GUEST | 新帯の起動自己試験・`gfx2_i1.bin` の lock 中監査と終了時回収、R1 のゲスト回帰 | I1 実装者の依頼はホストまで。NP21/W は PM が操作する | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、I1 のゲスト受入。手順と証拠の所在は `~/os32-tmp/run/halv2-i1/RESULT.md` |
+| HALV2-I3-GUEST | `gfx2_i3.bin` の PEGC での列挙・同期層・DISPLAY lease の往復、I1/I2 のゲスト回帰 | I3 実装者は NP21/W を操作しない。GeForce module の容量超過で make all は失敗中 | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、容量方針の確定と CI build 成功後の I3 一括受入。手順 `~/os32-tmp/run/halv2-i3/RUNBOOK.md` |
 | HALV2-I1-DRAW | §13-1 の R2・R3・R4 の公開 submit による FILL/READBACK | I1 で CPU 写像・backing・回収を結線。C9/S 群の描画製品は I2 の担当で未実装 | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §14 の先行依存の扱い、I2 の完了前に必ず実行 |
 | HALV2-RH-I2 | 実機で I2 の残り (11-11 に gfx2_i2 は GeForce・Trident とも PASS 済み、残りは G4 の fence の輪、G7 の ROP3 とパターンの値、G8、G1 の v2 の表、混在の束) | 同上。G7 の色パターンの値は envytools 由来で実機での確認が前提 | [TASK_HAL_V2](gui/TASK_HAL_V2.md) §3 |
 | HALV2-RH-I3 | 実機で I3 のゲスト試験 (G2 の mode・flip・LOST の後の再初期化、T1 の Trident、Y1〜Y4 の同期の待ち時間) とカメラでの画面の確認 | 同上 | [TASK_HAL_V2](gui/TASK_HAL_V2.md) §3 |

@@ -3,7 +3,8 @@
 #include "os32_kapi_shared.h"
 
 #define T(x) do { if (!(x)) return __LINE__; } while (0)
-static struct gfx2_adapter adapter;
+struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS];
+#define host_adapter gfx2_adapters[0]
 static GfxBackend backend;
 GfxBackend *g_backend = &backend;
 static u32 begin_roles, end_roles;
@@ -23,11 +24,11 @@ static int pending;
 static struct addrspace *current;
 void *kmemset(void *p, int c, unsigned int n)
 { u8 *b = p; while (n--) *b++ = c; return p; }
-struct gfx2_adapter *gfx2_adapter_get(u32 i) { return i > 1 ? 0 : &adapter; }
+struct gfx2_adapter *gfx2_adapter_get(u32 i) { return i > 1 ? 0 : &host_adapter; }
 int gfx2_caller_get(struct gfx2_caller *c)
 { c->as = current; c->owner = current->owner; c->app_id = 1; return 0; }
 int gfx2_sync_get(const struct gfx2_adapter *a, u32 head, GfxSyncCtx **ctx, u32 *mode)
-{ (void)a; (void)head; *mode = sync_mode; *ctx = sync_mode ? (GfxSyncCtx *)&adapter : 0; return sync_mode ? 0 : OS32_ERR_NOTFOUND; }
+{ (void)a; (void)head; *mode = sync_mode; *ctx = sync_mode ? (GfxSyncCtx *)&host_adapter : 0; return sync_mode ? 0 : OS32_ERR_NOTFOUND; }
 int gfx2_cpu_begin(struct gfx2_surf *s, u32 access, u32 dl)
 { (void)dl; begin_roles |= 1u << s->role; begin_calls++; begin_access = access; return begin_fail; }
 void gfx2_cpu_end(struct gfx2_surf *s, u32 access, const struct gfx2_rect *r)
@@ -81,7 +82,7 @@ int gfxsync_write_rows(GfxSyncCtx *ctx, u32 x, u32 y, u32 w, u32 h, const u8 *sr
     return write_fail ? OS32_ERR_IO : 0;
 }
 
-struct gfx2_adapter *gfx2_active(void) { return &adapter; }
+struct gfx2_adapter *gfx2_active(void) { return &host_adapter; }
 i32 gfx_screen_owner(void) { return 1; }
 struct ledger_surface *ledger_surface_find(u32 backend, u32 role)
 {
@@ -95,7 +96,7 @@ static int tests(void)
 {
     u32 sid, old, pitch; void *va;
     current = &spaces[0]; current->owner = 7; current->generation = 1; current->pd_phys = PAGE_SIZE;
-    adapter.v1 = &backend; adapter.kind = GFX2_KIND_PEGC; adapter.heads = 1; adapter.flags = GFX2_AF_ACTIVE;
+    host_adapter.v1 = &backend; host_adapter.kind = GFX2_KIND_PEGC; host_adapter.heads = 1; host_adapter.flags = GFX2_AF_ACTIVE;
     ledger_surfaces[LEDGER_ROLE_DISPLAY] = (struct ledger_surface){
         .first = 0x100, .npages = 2, .width = 64, .height = 128, .pitch = 64,
         .format = GFX2_FMT_INDEX8, .backing = LEDGER_SB_VRAM};
@@ -129,7 +130,7 @@ static int tests(void)
     ledger_surfaces[LEDGER_ROLE_DISPLAY].lease_count = 0;
     begin_fail = OS32_ERR_TIMEOUT;
     T(v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W) == OS32_ERR_TIMEOUT);
-    begin_fail = 0; sync_mode = GFXSYNC_SHADOW; adapter.index = 1;
+    begin_fail = 0; sync_mode = GFXSYNC_SHADOW; host_adapter.index = 1;
     v1_bridge_rebind(); T(surf.adapter == 1 && surf.kva == (u8 *)0x200000 && surf.pool == GFX2_POOL_SYSMEM);
     backend.fill_rect = fill_hook; backend.blit = blit_hook;
     begin_fail = OS32_ERR_TIMEOUT;

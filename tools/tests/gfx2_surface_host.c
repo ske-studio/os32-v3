@@ -145,8 +145,14 @@ static int test_alias(void)
     T(gfx2_surf_alias_update(s,&d)==OS32_ERR_BUSY && s->sid==sid);
     T(!gfx2_surf_state_set(s,GFX2_ST_IDLE)); s->last_write=1;
     T(gfx2_surf_alias_update(s,&d)==OS32_ERR_BUSY && s->sid==sid);
+    gfx2_scan_ref_swap(&gfx2_adapters[0], 0, s);
+    gfx2_scan_ref_swap(&gfx2_adapters[1], 1, s);
     completed=1; d.kva=ram+1; T(!gfx2_surf_alias_update(s,&d));
     T(s->sid!=sid && s->gen==2 && s->kva==ram+1 && !s->last_write && !nt);
+    T(gfx2_adapters[0].head[0].scan_sid == s->sid && gfx2_adapters[1].head[1].scan_sid == s->sid);
+    gfx2_scan_ref_swap(&gfx2_adapters[0], 0, 0);
+    gfx2_scan_ref_swap(&gfx2_adapters[1], 1, 0);
+    T(!s->scan_ref);
     T(!gfx2_surf_get(sid,caller.owner,&rc) && rc==OS32_ERR_STALE);
     T(!gfx2_surf_state_set(s,GFX2_ST_LOST)); T(!gfx2_surf_alias_update(s,0));
     T(s->state==GFX2_ST_IDLE && !s->w && !s->h && !s->kva);

@@ -49,6 +49,7 @@ CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('v2-lost', ' && !gf_v2_inst.lost;', ';'),
+    ('v2-scan-guard', '    if (gf_v2_owns(front)) return;', '    (void)front;'),
     ('scan-notify', '    gfx_policy_scan_changed();', '    (void)0;'),
     ('stop-reeval', '    gfx_policy_reeval();\n#endif\n    int rc = stop_device', '    (void)0;\n#endif\n    int rc = stop_device'),
     ('enter-reeval', '    gfx_policy_reeval();\n#endif\n}\nstatic void geforce_leave', '    (void)0;\n#endif\n}\nstatic void geforce_leave'),

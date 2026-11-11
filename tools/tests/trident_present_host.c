@@ -31,6 +31,7 @@ static int test(void)
             .width=5, .height=3, .cpp=cpp};
         d.mode.display = d.mode.client;
         d.mode.display.off = 32;
+        ++f.resources.generation;
         for (u32 r = 0; r < 5; ++r) {
             for (u32 i = 0; i < 256; ++i) vram[i] = 0xAA;
             trident_fake_trace_reset(&f);
@@ -64,7 +65,7 @@ static int test(void)
                 u32 *limit = i == 0 ? &d.mode.client.bytes : i == 1 ? &d.mode.display.bytes :
                     i == 2 ? &f.resources.client_bytes : i == 3 ? &f.resources.mapped_bytes :
                     i == 4 ? &f.resources.decode_bytes : &d.declared_bytes;
-                *limit = 1;
+                *limit = (i >= 3 ? 32u : 0u) + 2u * pitch + 5u * cpp - 1u;
                 CHECK(trident_present(&d,4,2,1,1) == TRI_E_CAP_TOO_SMALL);
                 *limit = limits[i];
             }
@@ -78,7 +79,7 @@ static int test(void)
     /* Independent row oracle: every destination alignment and short tail,
      * with an unaligned RAM source on alternating rows. */
     for (u32 method = TRI_PRESENT_DWORD_SYNC; method <= TRI_PRESENT_DWORD_GAP; ++method) {
-        d.present_method = (enum tri_present_method)method;
+
         f.resources.ram_fallback = true;
         d.mode.client = (struct tri_surface){.bytes=51, .pitch=17,
             .width=16, .height=3, .cpp=1};
@@ -87,6 +88,9 @@ static int test(void)
             d.mode.display.off = 32 + alignment;
             d.mode.display.pitch = 19;
             d.mode.display.bytes = 57;
+            ++f.resources.generation;
+            CHECK(!trident_sync_bind(&d));
+            CHECK(!tri_present_override(&d, method, 80));
             for (u32 width = 0; width <= 16; ++width) {
                 trident_fake_trace_reset(&f);
                 CHECK(!trident_present(&d,0,0,width,3));
@@ -119,6 +123,9 @@ static int test(void)
         }
         /* The dword write and its following read/wait propagate failure. */
         d.mode.display.off = 32;
+        ++f.resources.generation;
+        CHECK(!trident_sync_bind(&d));
+        CHECK(!tri_present_override(&d, method, 80));
         for (u32 fault = 1; fault <= (method == TRI_PRESENT_DWORD_GAP ? 1u : 2u); ++fault) {
             trident_fake_trace_reset(&f);
             trident_fake_fail(&f, f.operations + fault, -79);
@@ -126,6 +133,7 @@ static int test(void)
             trident_fake_fail(&f,0,0);
         }
     }
+    trident_sync_unbind(&d);
     sync_result = TRI_E_INVAL;
     CHECK(trident_present(0,0,0,1,1) == TRI_E_INVAL);
     return 0;

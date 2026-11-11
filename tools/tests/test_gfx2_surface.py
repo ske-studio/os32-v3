@@ -32,6 +32,7 @@ def main():
         ('locked transition', 'old == GFX2_ST_LOCKED_RO || old == GFX2_ST_LOCKED_RW', 'old == GFX2_ST_LOCKED_RW'),
         ('scan reference', 'if (s->scan_ref || !surf_done(s)) {', 'if (!surf_done(s)) {'),
         ('alias generation', 'surf_generation(s, s->gen + 1);', 'surf_generation(s, s->gen);'),
+        ('alias scan sid', 'gfx2_adapters[i].head[h].scan_sid = s->sid;', 'gfx2_adapters[i].head[h].scan_sid = old_sid;'),
         ('screen owner', 'c.owner != owner || c.app_id != gfx_screen_owner()', 'c.owner != owner'),
         ('alias free', 'if (s->flags & GFX2_SF_ALIAS) return OS32_ERR_INVAL; /* borrowed backing */', 'if (0) return OS32_ERR_INVAL;'),
         ('KEEP on failure', 's->flags |= GFX2_SF_KEEP;\n    /* C7', 's->flags |= 0;\n    /* C7'),

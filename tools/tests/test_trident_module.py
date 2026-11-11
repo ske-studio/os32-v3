@@ -3,9 +3,9 @@
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
 CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
-    covers=['tools/tests/gfx2_bridge_fake.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
+    covers=['tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
-            'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
+            'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
             'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py',
             'tools/tests/module_image_host.c', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py',
@@ -38,8 +38,6 @@ ROOT = Path(__file__).resolve().parents[2]
 DIR = 'drivers/video/trident/'
 # Unique anchors; all mutants compile and fail a normal runtime assertion.
 MUTATIONS = (
- ('M_GAP_CONFIG', 'trident_module.c', 'context.write_gap_ns = gap_ns < 0 ? TRI_WRITE_GAP_DEFAULT_NS : (u32)gap_ns;', 'context.write_gap_ns = TRI_WRITE_GAP_DEFAULT_NS; (void)gap_ns;', 'boot config reaches module'),
- ('M_GAP_BOOT', 'backend_trident.c', 'tri_write_gap_set(&device, c->write_gap_ns);', 'tri_write_gap_set(&device, 0);', 'boot gap reaches first present'),
  ('M_PROBE_REGISTER', 'trident_module.c', 'debug_probe_register(handle, probe_table, probe_count)', '0', 'register before prepare'),
  ('M_PROBE_UNREGISTER', 'trident_module.c', 'if (debug_probe_unregister(handle)) return 0;', '(void)0;', 'unregister before rollback'),
  ('M_PUBLIC_CONTEXT', 'trident_module.c', 'context.backend = &gfx_backend_trident;', 'context.backend = &candidate;', 'runtime publication reaches core'),
@@ -75,10 +73,10 @@ def build(work, changed=None):
     from mutpar import build_in_tree
     exe=work/'module'
     sources=[DIR+n+'.c' for n in ('backend_trident','probe','regs','default_dac',
-        'state_save','state_restore','pc98_init','vram','accel','cursor','ddc1','mode_640','route_ra266','present','write_gap','palette','screen','video','dpms','lifecycle')]
+        'state_save','state_restore','pc98_init','vram','accel','cursor','ddc1','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
     cmd=['gcc',*FLAGS,'-I.','-I'+DIR,'-Ibuild/out/trident',
          *include_flags(ROOT),'-nostdlib','-static','-no-pie',
-         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','tools/tests/trident_device_fake.c','-Wl,--wrap=trident_regs_bind','-o',str(exe)]
+         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c','-Wl,--wrap=trident_regs_bind','-o',str(exe)]
     changes={}
     if changed:
         path,old,new=changed; original=(ROOT/path).read_text()

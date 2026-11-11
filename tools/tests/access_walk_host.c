@@ -1,5 +1,8 @@
 #include "gfx2_bridge_fake.h"
 #include "types.h"
+#include "../../gfx/v2/gfx2_int.h"
+__attribute__((weak)) struct gfx2_adapter *gfx2_active(void) { return 0; }
+__attribute__((weak)) int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; return 0; }
 __attribute__((weak)) int gfx_policy_blocks_map(u32 role) { (void)role; return 0; }
 static u32 host_cr3;
 #include "paging_host_source.c"

@@ -68,4 +68,10 @@ void gf_v2_fence_reset(struct gf_v2 *);
 u32 gf_v2_route_index(const struct gf4_ctx *, const struct gf4_route *);
 int gf_v2_owns(const struct gf3_surface *);
 
+struct gf4_ctx; struct gf4_route; struct gf4_test_ops;
+const struct gf4_test_ops *gf_v2_disp(void);
+int gf_v2_deadline(struct gf2_chan *, u32, u32 *);
+int gf_v2_rc(int);
+u32 gf_v2_route_index(const struct gf4_ctx *, const struct gf4_route *);
+
 #endif

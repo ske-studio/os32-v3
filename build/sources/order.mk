@@ -13,7 +13,7 @@ C_ORDER_LEGACY = arch/x86/kernel/boot_cpu.c arch/x86/kernel/boot_after_paging.c 
     drivers/video/trident/trident_module.c drivers/video/trident/resources.c \
     drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/geforce/gf_wc.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c net/link_notify.c net/host_mailbox.c net/nic.c net/nic_rx.c net/nic_lgy98.c \
-    gfx/gfx_core.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c $(filter-out gfx/v2/a0_weak.c gfx/sync/a0_weak.c,$(wildcard gfx/v2/*.c gfx/sync/*.c)) gfx/gfx_policy.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pc98_osri.c drivers/video/pc98/backend_pegc.c \
+    gfx/gfx_core.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c $(filter-out gfx/v2/a0_weak.c gfx/sync/a0_weak.c,$(wildcard gfx/v2/*.c gfx/sync/*.c)) gfx/gfx_policy.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pc98_osri.c drivers/video/pc98/backend_pegc.c drivers/video/pc98/pegc_v2.c \
     gfx/gfx_emergency.c \
     fs/fat/fatfs/ff.c fs/fat/fatfs/diskio.c fs/fat/fatfs_vfs.c \
     fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c fs/serialfs/serialfs_persistent.c \

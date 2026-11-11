@@ -161,10 +161,15 @@ int gfx2_surf_alias(struct gfx2_adapter *a, const struct gfx2_alias_desc *d,
 
 int gfx2_surf_alias_update(struct gfx2_surf *s, const struct gfx2_alias_desc *d)
 {
+    u32 old_sid = s->sid;
     if (!(s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;
     if ((s->state != GFX2_ST_IDLE && s->state != GFX2_ST_LOST) || !surf_done(s) ||
         s->map_as) return OS32_ERR_BUSY;
     surf_generation(s, s->gen + 1);
+    for (u32 i = 0; i < GFX2_MAX_ADAPTERS; i++)
+        for (u32 h = 0; h < 2; h++)
+            if (gfx2_adapters[i].head[h].scan_sid == old_sid)
+                gfx2_adapters[i].head[h].scan_sid = s->sid;
     surf_alias_shape(s, d);
     s->state = GFX2_ST_IDLE;
     return 0;

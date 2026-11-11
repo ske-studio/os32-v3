@@ -17,6 +17,9 @@
 
 filesystem:
   files:
+    - host: userland/tests/gfx2_i3.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/gfx2_i2.bin
       guest: /usr/bin/
       tags: [test]
