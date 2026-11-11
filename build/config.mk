@@ -216,7 +216,7 @@ LGRP_END = --end-group
 
 # === CRT0 / デバッグオブジェクト ===
 # 並びと中身は sdk/target_profile.py の crt_user・crt_resident (build/sdk-target.mk が引く)。
-CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)
+CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(SDK_USER_LIBC)
 CRT0_RESIDENT_OBJ = $(SDK_TARGET_CRT_RESIDENT)
 CRT0_OBJ = $(CRT0_USER_OBJ)
 DBG_OBJ  = userland/lib/rt/dbgserial.o
