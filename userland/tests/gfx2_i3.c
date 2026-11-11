@@ -1,6 +1,5 @@
 /* I3 guest acceptance. Run from CUI; GeForce exercises VRAM scanout. */
 #include "os32api.h"
-#include <string.h>
 
 #define ATTR 7
 #define WAIT_MS 1000u
@@ -52,6 +51,8 @@ static int exercise(KernelAPI *api, u32 a, const GFX2_AdapterInfo *info)
     api->kprintf(ATTR, "gfx2_i3 sync=%u profile=%s cpu=%u\n", caps.sync_mode, caps.sync_profile, caps.cpu_direct);
     if (info->backend_kind == OS32_SURFACE_PEGC || info->backend_kind == OS32_SURFACE_TRIDENT)
         REQUIRE("sync-bound", caps.cpu_direct && caps.sync_mode == 1 && caps.sync_profile[0]);
+    else if (info->backend_kind == OS32_SURFACE_GEFORCE)
+        REQUIRE("sync-unbound", !caps.cpu_direct && !caps.sync_mode && !caps.sync_profile[0]);
     u32 conn_mask = 0;
     for (u32 c=0; c<info->connectors; c++) {
         GFX2_ConnectorInfo ci;
@@ -88,8 +89,8 @@ static int exercise(KernelAPI *api, u32 a, const GFX2_AdapterInfo *info)
     CALL("front-fill", api->gfx2_submit(a, &fill, 1, gen, &done, &fence));
     fill.dst = next; fill.fg.v = 2;
     CALL("next-fill", api->gfx2_submit(a, &fill, 1, gen, &done, &fence));
-    rc = api->gfx2_mode_set(a, 0, conn_mask, mode.id, front);
     if (info->backend_kind == OS32_SURFACE_GEFORCE) {
+        rc = api->gfx2_mode_set(a, 0, conn_mask, mode.id, front);
         if (rc) { fail(api, "mode-set", rc); goto out; }
         switched = 1;
         CALL("scanout-head", api->gfx2_head_info(a, 0, &head));
@@ -102,11 +103,34 @@ static int exercise(KernelAPI *api, u32 a, const GFX2_AdapterInfo *info)
         CALL("flipped-head", api->gfx2_head_info(a, 0, &head));
         REQUIRE("next-sid", head.scanout_sid == next);
     } else {
-        REQUIRE("mode-nosys", rc == OS32_ERR_NOSYS);
+        /* C16 forwards set_mode when provided (Trident), whereas PEGC has
+         * no mode hook. The shim uses v1 DISPLAY storage, not our front.
+         * A v1 mode change revokes leases and regenerates alias identities. */
+        int found = 0;
+        count = api->gfx2_mode_count(a, 0, desc.fmt);
+        for (int i=0; i<count; i++) {
+            CALL("shim-mode", api->gfx2_mode_get(a, 0, desc.fmt, i, &mode));
+            if (mode.w == desc.w && mode.h == desc.h) { found = 1; break; }
+        }
+        REQUIRE("shim-current-mode", found);
+        CALL("before-mode-unlease", api->surface_unlease(token)); token = 0;
+        rc = api->gfx2_mode_set(a, 0, conn_mask, mode.id, display);
+        if (info->backend_kind == OS32_SURFACE_TRIDENT) {
+            if (rc) { fail(api, "shim-mode-set", rc); goto out; }
+            CALL("shim-display", api->gfx2_screen_surface(a, 0, GFX2_ROLE_DISPLAY, &display));
+            CALL("shim-display-desc", api->gfx2_surface_desc(display, &desc));
+            CALL("mode-query", api->surface_query(OS32_SURFACE_DISPLAY, &query));
+            REQUIRE("mode-one-display", query.count == 1);
+            CALL("mode-lease", api->surface_lease(OS32_SURFACE_DISPLAY, &query.desc[0].ref, OS32_SURFACE_RW, &lease));
+            token = lease.token;
+        } else {
+            REQUIRE("mode-nosys", rc == OS32_ERR_NOSYS);
+        }
         REQUIRE("flip-nosys", api->gfx2_flip(a, 0, next, 0, WAIT_MS) == OS32_ERR_NOSYS);
-        api->kprintf(ATTR, "gfx2_i3 mode/flip NOSYS (backend contract); full path requires GeForce\n");
+        api->kprintf(ATTR, "gfx2_i3 mode=%s flip=NOSYS (backend contract)\n",
+                     info->backend_kind == OS32_SURFACE_TRIDENT ? "v1" : "NOSYS");
     }
-    CALL("fullscreen-leave", api->surface_unlease(token)); token = 0;
+    if (token) { CALL("fullscreen-leave", api->surface_unlease(token)); token = 0; }
     if (switched) {
         CALL("restored-head", api->gfx2_head_info(a, 0, &head));
         REQUIRE("restored-display", head.scanout_sid == display);

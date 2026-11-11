@@ -9,6 +9,8 @@ from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
 MUTATIONS = (
+    ('alias-destination', 'rc = surface(g, ex->dst, &dst);', 'dst = (struct gf3_surface){ex->dst->gpu_off, ex->dst->bytes, ex->dst->pitch, ex->dst->w, ex->dst->h, (enum gf3_fmt)(ex->dst->fmt - GFX2_FMT_INDEX8), ex->dst->priv[0], ex->dst->priv[1], 0}; rc = 0;'),
+    ('alias-source', 'rc = surface(g, ex->src, &src);', 'src = dst; src.reservation_id = 0; rc = 0;'),
     ('stopped-unregister', 'if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)', 'if (0)'),
     ('lost-check', 'if (g->lost || !g->g3) return OS32_ERR_NOSYS;', 'if (g->lost && !g->g3) return OS32_ERR_NOSYS;'),
     ('restore-error', 'if (restore) return OS32_ERR_IO;', '(void)restore;'),
@@ -28,7 +30,7 @@ def observe(work, mutation=None):
     work.mkdir()
     exe = work / 'ops'
     sources = ['tools/tests/gf_v2_ops_host.c', 'drivers/video/geforce/gf_v2_weak.c',
-               'drivers/video/geforce/gf_v2_fence.c', 'drivers/video/geforce/gf_v2_life.c', 'hwdev/gf/accel_rop3.c', 'hwdev/gf/accel_rop.c']
+               'drivers/video/geforce/gf_v2_fence.c', 'drivers/video/geforce/gf_v2_life.c', 'hwdev/gf/accel_rop3.c', 'hwdev/gf/accel_rop.c', 'hwdev/gf/vram_view.c']
     build_in_tree(ROOT, work, edits, [['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
         '-I'+str(ROOT), *include_flags(ROOT), *[str(ROOT / p) for p in sources], '-o', str(exe)]])
