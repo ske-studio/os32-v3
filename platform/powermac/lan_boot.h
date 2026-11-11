@@ -126,6 +126,10 @@ void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
 int pm_term_state(struct lan_message *out);
 void pm_terminal_feed(const u8 *bytes, u32 len);
 void pm_terminal_line_lost(void);
+void pm_terminal_open(void);
+int pm_terminal_trygetkey(void);
+int pm_terminal_getkey(void);
+void pm_terminal_poll(void);
 struct pm_lan_range { u32 base, size; };
 /* The service supplies valid fields and excludes RX buffers from peek_ok. */
 struct pm_lan_diag {

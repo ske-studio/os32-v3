@@ -33,7 +33,7 @@ void pm_term_receive(const struct lan_message *m, const u8 src[6])
         head = count = 0;
         out_next = out_drop = out_bytes = 0;
         connected = 1;
-        pm_terminal_line_lost();
+        pm_terminal_open();
         return;
     }
     if (!connected || m->type != PLN1_TERM_IN ||
