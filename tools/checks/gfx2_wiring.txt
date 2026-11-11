@@ -2,6 +2,8 @@
 I1 geforce gf_v2_alloc
 I1 geforce gf_v2_gart_bind
 I1 geforce gf_v2_gart_range
+I1 geforce gf_v2_gart_reset
+I1 geforce gf_v2_gart_start
 I1 geforce gf_v2_gart_unbind
 I1 geforce gf_v2_release
 I1 kernel gfx2_active
