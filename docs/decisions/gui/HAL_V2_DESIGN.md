@@ -1380,6 +1380,8 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - GF の HW の色鍵の COPY と α は、nouveau の NV40 と同じく 3D (curie 0x4497、xf86-video-nouveau の nv40_exa.c) で行う別の設計にする (§11-6 の「色鍵・α」)。それまでは sw。
 - 将来 #3 を同時出力へ広げる時に直す所 (今は直さない、記録だけ): §9-1 の ACTIVE の 1 個の決まり / C1 の `gfx2_adapter_activate` の ACTIVE を 1 個にする付け替えと `gfx2_sync_publish` の kind ごと 1 つの表 / head 系の口の NOSYS の分岐 (C11〜C13) (C は別票 CONSOLE_DUAL)。
 
+- MONO・HOSTDATA の非同期化は後の最適化。G1 は既存の同期の層 3 の口を呼び、emit の中で完了を待つ (PM 決定 2026-11-11)。
+
 ## 反論
 - P1-5 の直し案「C7 の明示的な切離し口で map_as/VA 管理を隔離へ移す」のうち「VA 管理を隔離へ移す」は採らない: AS が消えた後の VA の bitmap は意味を持たないので、隔離へ移さず `gfx2_vaspace_drop(as)` で捨てる。backing を返さない (KEEP) ことで PTE が残っても安全側にした。
 - P1-1 の「途中失敗の扱い」で、emit が装置の失敗を返した命令も予約の番号を `failed_upto` にして書き先を LOST にする (描画が途中まで積まれた可能性を消せないため)。検査の食い違い (INVAL・NOSYS) だけは何も積んでいない決まりにして番号を捨てる。

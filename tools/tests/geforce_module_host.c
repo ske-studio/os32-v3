@@ -12,6 +12,9 @@
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg)-1) : "memory"); \
     finish(1); \
 } } while (0)
+static u32 v2_unregisters;
+void gfx2_adapter_unregister(GfxBackend *v)
+{ CHECK(v==&gfx_backend_geforce); v2_unregisters++; }
 static const struct gf3_test_ops accel_ops_a, accel_ops_b;
 struct gf1_test_ops gf1_module_ops;
 static struct gf_foundation *bound_foundation;
@@ -140,6 +143,7 @@ void _start(void)
     CHECK(!geforce_accel_ops()); /* Hidden until registration succeeds. */
     production.foundation.registered=true;
     CHECK(!geforce_detach(0) && !unbinds);
+    CHECK(v2_unregisters==1);
     CHECK(!accel_slot && !geforce_accel_ops());
     production.foundation.registered=false;
     production.foundation.bm=true;CHECK(!geforce_detach(0) && !unbinds);
@@ -196,6 +200,33 @@ void _start(void)
         CHECK(!probe_decl_calls && !registered && !r->registration_refs);
     }
     geforce_backend_ops.direct_ops=0; geforce_backend_ops.direct_ok=0;
+    /* HAL v2: reject a foreign table, ABI, and every NULL/foreign hook.
+     * A successful validation copies the table before registration. */
+    static GfxBackendV2 v2;
+    geforce_backend_ops.v2 = &v2;
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED);
+    r->ro=(u32)(uptr)&v2; r->ro_size=sizeof(v2);
+    v2.abi=GFX_HAL2_ABI+1;
+    CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED);
+    v2.abi=GFX_HAL2_ABI;
+    for (u32 i=2;i<sizeof(v2)/sizeof(u32);i++) {
+        for (u32 j=2;j<sizeof(v2)/sizeof(u32);j++) {
+            u32 good=(u32)(uptr)probe;
+            kmemcpy((u8 *)&v2+j*sizeof(good),&good,sizeof(good));
+        }
+        u32 bad=0;
+        kmemcpy((u8 *)&v2+i*sizeof(bad),&bad,sizeof(bad));
+        CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED);
+        bad=r->text+r->text_size;
+        kmemcpy((u8 *)&v2+i*sizeof(bad),&bad,sizeof(bad));
+        CHECK(geforce_start(r,r->init,r->exports)==MODULE_INIT_FAILED);
+    }
+    u32 good=(u32)(uptr)probe;
+    kmemcpy((u8 *)&v2+sizeof(v2)-sizeof(good),&good,sizeof(good));
+    CHECK(geforce_start(r,r->init,0)==MODULE_INIT_FAILED);
+    CHECK(candidate.v2==&gf_v2_kcopy && candidate.v2!=&v2 && candidate.v2_mod==r);
+    CHECK(gf_v2_kcopy.abi==GFX_HAL2_ABI && gf_v2_kcopy.caps==v2.caps);
+    geforce_backend_ops.v2=0;
     r->ro=saved_ro; r->ro_size=saved_size;
     r->exports[2]=(u32)(uptr)fixture_probe_decls;
     if (input[1]==3 || input[1]==4) r->exports[2]=(u32)(uptr)failing_probe_decls;

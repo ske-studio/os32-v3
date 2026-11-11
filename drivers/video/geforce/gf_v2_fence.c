@@ -6,7 +6,7 @@ static int gf_v2_fail(struct gf_v2 *g, int rc)
     struct gf_v2_ring *r = &g->ring;
     if (r->count)
         g->failed_upto = r->e[(r->head + GF_V2_RING - 1) % GF_V2_RING].v2;
-    return rc == GF2_ETIME ? OS32_ERR_TIMEOUT : OS32_ERR_IO;
+    return rc;
 }
 
 int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
