@@ -32,6 +32,8 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 int shlib_read_page(u32 va, u32 frame) { (void)va; (void)frame; return 0; }
 #include "lease_host_source.c"
+struct gfx2_adapter *gfx2_active(void) { return 0; }
+int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; return 0; }
 #include "lease_selftest_host.h"
 void *kmemcpy(void *dst, const void *src, u32 n) {
     u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst;

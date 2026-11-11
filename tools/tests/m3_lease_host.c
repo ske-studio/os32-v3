@@ -32,6 +32,11 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 int shlib_read_page(u32 va, u32 frame) { (void)va; (void)frame; return 0; }
 #include "lease_host_source.c"
+static struct gfx2_adapter restore_adapter;
+static u32 restore_calls;
+struct gfx2_adapter *gfx2_active(void) { return &restore_adapter; }
+int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 head)
+{ CHECK(a == &restore_adapter && head < 2); restore_calls++; return 0; }
 int legacy_lowmap_busy(void) { return 0; }
 static AppSlot m3_slot;
 static int m3_audit_result;
@@ -298,9 +303,12 @@ void _start(void) {
     CHECK(!lease_check(&a)); CHECK(paging_current_cr3()==a.pd_phys);
     CHECK(ledger_surface_release(sid));
     CHECK(ledger_surfaces[sid].closing && ledger_surfaces[sid].lease_count == 1);
+    ledger_surfaces[sid].role = LEDGER_ROLE_DISPLAY;
+    restore_adapter.heads = 2; restore_adapter.restore_on_leave = 1;
     watch_pt = a.lease_pt_phys[1] / PAGE_SIZE; watch_backing = pa / PAGE_SIZE;
     event_count = 0; watching = stale_translation = 1;
     CHECK(!lease_release(&a,v[0].token)); CHECK(paging_current_cr3()==a.pd_phys);
+    CHECK(restore_calls == 2 && !restore_adapter.restore_on_leave);
     watching = 0;
     CHECK(event_count == PTE_COUNT + 4);
     for (i = 0; i < PTE_COUNT + 1; i++) {

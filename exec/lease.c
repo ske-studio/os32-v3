@@ -115,14 +115,24 @@ int lease_release(struct addrspace *as, u32 token)
     for (i = 0; i < MEM_LEASE_MAX; i++) if (as->leases[i].token == token) {
         struct as_lease *l = &as->leases[i];
         struct ledger_surface *sf = &ledger_surfaces[l->sid];
+        int restore;
         saved = irq_save();
         if (paging_lease_unmap(as, l->base, l->npages)) {
             irq_restore(saved); return LEASE_INVAL;
         }
+        restore = sf->role == LEDGER_ROLE_DISPLAY && sf->lease_count == 1;
         l->token = 0;
         sf->lease_count--;
         if (sf->closing && !sf->lease_count) (void)ledger_surface_release(l->sid);
         irq_restore(saved);
+        if (restore) {
+            struct gfx2_adapter *a = gfx2_active();
+            if (a && a->restore_on_leave) {
+                a->restore_on_leave = 0;
+                for (u32 h = 0; h < a->heads; h++)
+                    (void)gfx2_head_restore_v1(a, h);
+            }
+        }
         return 0;
     }
     return LEASE_INVAL;
