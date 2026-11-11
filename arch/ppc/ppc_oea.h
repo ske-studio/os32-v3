@@ -4,7 +4,9 @@
 #ifndef OS32_PPC_OEA_H
 #define OS32_PPC_OEA_H
 #define PPC_MSR_EE 0x8000
+#define PPC_MSR_PR 0x4000
 #define PPC_MSR_ME 0x1000
+#define PPC_MSR_BE 0x200
 #define PPC_MSR_IP 0x40
 #define PPC_MSR_IR 0x20
 #define PPC_MSR_DR 0x10
