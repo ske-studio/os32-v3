@@ -62,6 +62,7 @@ struct gfx2_surf {
     struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が読んで 0 に */
     struct addrspace *map_as; u32 map_va, map_npages; /* C7 だけ */
     u8 *staging; u32 staging_pitch;      /* C7 (同期の面の lock の写し) */
+    u32 staging_pfn, staging_n, staging_owner; /* C7 (staging の連続の頁と持ち主、§7-5) */
     u8 *kva;                             /* C4 (作成の時に be->kva)・C18 (SYSMEM の P2V)。GART の面は NULL (§7-2) */
     u32 heap_off;                        /* C5 (gfx2_heap_alloc の結果、C4 が格納) */
     u32 gart_first, gart_n, gart_moved; /* C6 だけ (gart_moved は隔離へ移せた頁数) */
