@@ -21,6 +21,14 @@ static int run(void)
     set("[pegc]\ngap_ns=100001\n");
     if (gfxsync_cfg_lookup("pegc", &c) != OS32_ERR_NOTFOUND) return 6;
     set(0); if (gfxsync_cfg_lookup("pegc", &c) != OS32_ERR_NOTFOUND || c.mode != GFXSYNC_SHADOW) return 7;
+    /* T1: former module boot cases now exercise the real sync.cfg parser. */
+    set("[pci:1023:*]\ngap_ns=1250\n");
+    if (gfxsync_cfg_lookup("pci:1023:9660", &c) || c.gap_ns != 1250) return 8;
+    set("[pci:1023:*]\ngap_ns=0\n");
+    if (gfxsync_cfg_lookup("pci:1023:9660", &c) || c.gap_ns) return 9;
+    set("[pci:1023:*]\ngap_ns=-1\n");
+    if (gfxsync_cfg_lookup("pci:1023:9660", &c) != OS32_ERR_NOTFOUND ||
+        c.mode != GFXSYNC_SHADOW || c.unit != 1 || c.method != GFXSYNC_M_PLAIN) return 10;
     return 0;
 }
 void _start(void) { int rc = run(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); for (;;) {} }
