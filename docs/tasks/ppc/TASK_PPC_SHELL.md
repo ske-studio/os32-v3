@@ -32,5 +32,7 @@
 |---|---|
 | 棚卸し (sol) | 済 (2026-11-11、~/os32-tmp/run/ppc-shell/SURVEY.md) |
 | 計画と S-A の詳細設計の往復 | 済 (2026-11-11、r1 → r2 → final) |
-| W0〜W3 (S-A) | 未着手 |
+| W0 (宣言)・C2 (fs/vfs_fd.c の 1 行) | main (7e255783)。fs/vfs.h の VFS_DEV_RAM は x86 の生成物が変わる (CD module の契約値の入力) ので、iso9660_mount に rdN を受けさせる x86 の変わる段へ移した |
+| W1 (A06+A07 LAN の端末、A08 ホストの端末モード、A10 RAM の装置 rd0、A11 root の image を作る道具、A12 開発用の小さな CLI、A27 /tmp の ramfs) | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-shint2)。x86 のビルドには入らない。PPC の像は lan_wire.c (端末の型を通す) の分だけ変わる |
+| W2〜W3 (S-A) | 未着手 |
 | W4〜W9 | 未着手 |
