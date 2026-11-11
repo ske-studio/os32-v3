@@ -22,6 +22,7 @@ void *kmemcpy(void *p, const void *q, u32 n) { return memcpy(p,q,n); }
 static u32 fed, lost;
 void pm_terminal_feed(const u8 *p, u32 n) { (void)p; fed += n; }
 void pm_terminal_line_lost(void) { lost++; }
+void pm_terminal_open(void) { pm_terminal_line_lost(); }
 void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 static u32 regs[0x8000/4], phy[32], mif, completion, hold, down, freeze, tb_calls;
 static u32 dma_calls, dma_first, copies, postwrites, sends[9], nic_rx;
