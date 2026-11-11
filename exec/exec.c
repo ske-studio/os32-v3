@@ -17,8 +17,7 @@
 #include "console.h"
 #include "kstring.h"
 #include "vfs.h"
-#include "gfx.h"
-#include "gfx_hal.h"   /* gfx_bb_phys_range: CPL=3 へ USER マップする範囲 */
+#include "exec_gfx.h"
 #include "input_service.h"
 #include "ime.h"
 #include "kmalloc.h"
