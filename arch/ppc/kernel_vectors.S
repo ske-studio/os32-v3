@@ -288,6 +288,7 @@ ppc_kernel_fatal_stack:
     .space PPC_KERNEL_FATAL_STACK_SIZE
 .Lfatal_top:
 .text
+.weak ppc_exec_kernel_sp
 .globl ppc_kernel_vector_entry
 ppc_kernel_vector_entry:
     lis 1,.Lscratch@ha
@@ -307,6 +308,9 @@ ppc_kernel_vector_entry:
     mfdsisr 30
     stw 30,PPC_SAVE_DSISR(1)
     mr 31,1
+    lwz 30,PPC_SAVE_SRR1(31)
+    andi. 30,30,PPC_MSR_PR
+    bne .Luser_frame
     mfsprg3 30
     cmpwi 30,PPC_VECTOR_DSI
     beq .Lspill_slot
@@ -332,6 +336,14 @@ ppc_kernel_vector_entry:
     li 29,0
     stw 29,0(1)
     stw 28,PPC_CALL_SIZE+KFRAME_BUSY(1)
+    b .Lsave_frame
+.Luser_frame:
+    lis 1,ppc_exec_kernel_sp@ha
+    lwz 1,ppc_exec_kernel_sp@l(1)
+    addi 1,1,-(PPC_FRAME_SIZE+PPC_CALL_SIZE)
+    li 29,0
+    stw 29,0(1)
+.Lsave_frame:
     stw 0,PPC_CALL_SIZE(1)
     mfsprg1 30
     stw 30,PPC_CALL_SIZE+4(1)
@@ -403,6 +415,9 @@ ppc_kernel_frame_complete:
     bl ppc_hpt_spill
     cmpwi 3,1
     beq ppc_kernel_vector_return
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    andi. 3,3,PPC_MSR_PR
+    bne .Ldispatch
 /* Failed spill moves the complete frame off the spill stack before dispatch.
  * An unresolved nested fault cannot overwrite the active trap frame. */
     lis 4,.Ltrap_busy@ha
@@ -451,9 +466,13 @@ ppc_kernel_vector_return:
     andc 3,3,4
     mtmsr 3
     isync
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    andi. 3,3,PPC_MSR_PR
+    bne .Lrestore_frame
     lwz 3,PPC_CALL_SIZE+KFRAME_BUSY(1)
     li 4,0
     stw 4,0(3)
+.Lrestore_frame:
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
     mtsrr0 3
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
