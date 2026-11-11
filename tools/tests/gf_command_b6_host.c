@@ -9,6 +9,7 @@ void _start(void)
     struct gf_foundation f = {0};
     struct gf2_chan ch = {0};
     struct gf2_fence fence = {0}, saved;
+    int done = -1;
     ch.f = &f; ch.epoch = 7;
     f.io.read = read_stub; f.io.timing.clock_us = clock_stub;
     f.io.timing.wait_us = wait_stub;
@@ -33,7 +34,12 @@ void _start(void)
     complete_after = 0; reference = 0;
     fence.seq = U32_MAX;
     assert(gf2_fence_wait(&ch, fence, 90) == GF2_OK);
-    fence.seq = 0; fence.epoch--;
+    fence.seq = 0; reference = U32_MAX;
+    assert(gf2_fence_poll(&ch, fence, &done) == GF2_OK && !done);
+    reference = 0;
+    assert(gf2_fence_poll(&ch, fence, &done) == GF2_OK && done);
+    fence.epoch--;
+    assert(gf2_fence_poll(&ch, fence, &done) == GF2_EFAULT);
     assert(gf2_fence_wait(&ch, fence, 90) == GF2_EFAULT);
     fence.epoch = ch.epoch;
     fault_after = faults + 1; reads = 0;

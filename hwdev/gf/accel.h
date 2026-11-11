@@ -243,10 +243,11 @@ int gf3_scale_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf
 void gf3_range_query_set(struct gf3_ctx *, gf3_range_fn, void *opaque);
 /* Pattern data for monochrome or color ROP3 operations. */
 struct gf3_pattern { u32 kind; u32 mono[2]; u32 color[64]; u32 fg, bg; };
+#define GF3_PAT_MONO 1
+#define GF3_PAT_COLOR 2
+#define GF3_ALU_KEEP 0xffu
 /* Configure the source color key. */
-int gf3_ckey_set(struct gf3_ctx *, bool on, u32 key, enum gf3_fmt, u32 dl);
 /* Configure constant and per-pixel alpha. */
-int gf3_alpha_set(struct gf3_ctx *, u32 const_a, bool per_pixel, u32 dl);
 /* Configure ternary raster operation and its pattern. */
 int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *, enum gf3_fmt, u32 dl);
 

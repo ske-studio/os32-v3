@@ -83,6 +83,11 @@ static void run(void)
     n1.value=(struct gf_vram_reservation){&h,0,2048,1,1};
     n2.value=(struct gf_vram_reservation){&h,2048,2048,2,1};
     n1.next=&n2; h.reservations=&n1;
+    clear();
+    expected_src = expected_dst = &a; saved_src = saved_dst = a;
+    assert(!gf3_copy_emit(&h.ctx, &a, &a, (struct gf3_rect){0,0,8,2}, 1, 1, GF3_ALU_KEEP, 0, DL));
+    assert(!h.calls[H_ROP] && h.calls[H_EMIT] == 1);
+    clear();
     struct gf3_surface b = {0,768,256,16,3,GF3_INDEX8,1,1, 0};
     assert(copy(&a,&b,(struct gf3_rect){0,0,8,2},1,1)==0);
     packet(0,0x00010001,0x00020008);
@@ -94,6 +99,10 @@ static void run(void)
         assert(copy(&a,&a,(struct gf3_rect){4,1,4,2},p&65535,p>>16)==0);
         packet(0x00010004,p,0x00020004);
     }
+    b = (struct gf3_surface){0,256,64,16,4,GF3_INDEX8,1,1,GF3_HANDLE_GART_DMA};
+    clear(); assert(copy(&a,&b,(struct gf3_rect){0,0,8,1},0,0)==0); packet(0,0,0x00010008);
+    b.dma = GF3_HANDLE_VRAM_DMA;
+    rejected(b, GF3_EUNSUPPORTED);
     /* Aligned aliases still overlap real payload rows; padding alone
      * does not make them aliases (nouveau_exa.c:434-435). */
     rejected((struct gf3_surface){256,768,256,15,3,GF3_INDEX8,1,1,0},GF3_EUNSUPPORTED);

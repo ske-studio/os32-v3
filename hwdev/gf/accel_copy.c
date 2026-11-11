@@ -19,13 +19,12 @@ static bool copy_overlap(const struct gf3_span *a, const struct gf3_span *b)
     return false;
 }
 
-int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
+int gf3_copy_emit(struct gf3_ctx *c, const struct gf3_surface *src,
              const struct gf3_surface *dst, struct gf3_rect sr,
              u32 dx, u32 dy, u8 alu, u32 mask, u32 dl)
 {
     struct gf3_format sf, df;
     struct gf3_span ss, ds, full;
-    struct gf2_fence fence;
     int rc;
     if (!c) return GF3_EINVAL;
     if (!c->ch || !src || !dst) { rc = GF3_EINVAL; goto out; }
@@ -46,21 +45,34 @@ int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_check(c, dst, (struct gf3_rect){dx, dy, sr.w, sr.h}, GF3_USE_2D, &df, &ds);
     if (rc) goto out;
     if (src->fmt != dst->fmt) { rc = GF3_EFORMAT; goto out; }
-    if (copy_overlap(&ss, &ds) &&
+    if ((src->dma ? src->dma : GF3_HANDLE_VRAM_DMA) ==
+        (dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA) && copy_overlap(&ss, &ds) &&
         (src->reservation_id != dst->reservation_id || src->generation != dst->generation ||
          src->off != dst->off || src->pitch != dst->pitch || src->fmt != dst->fmt)) {
         rc = GF3_EUNSUPPORTED; goto out;
     }
-    rc = gf3_rop_set(c, GF3_SUBC_BLIT, alu, mask, dst->fmt, dl);
-    if (rc) goto out;
+    if (alu != GF3_ALU_KEEP) {
+        rc = gf3_rop_set(c, GF3_SUBC_BLIT, alu, mask, dst->fmt, dl);
+        if (rc) goto out;
+    }
     rc = gf3_surface_set(c, src, dst, false, dl);
     if (rc) goto out;
     u32 words[3] = { (sr.y << 16) | sr.x, (dy << 16) | dx, (sr.h << 16) | sr.w };
     rc = gf2_emit(c->ch, GF3_SUBC_BLIT, GF3_BLIT_POINT_IN, false, words, 3, dl);
     if (rc) goto out;
-    rc = gf2_fence_emit(c->ch, &fence, dl);
-    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
 out:
     c->last_rc = rc;
     return rc;
+}
+
+int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
+             const struct gf3_surface *dst, struct gf3_rect sr,
+             u32 dx, u32 dy, u8 alu, u32 mask, u32 dl)
+{
+    int rc = gf3_copy_emit(c, src, dst, sr, dx, dy, alu, mask, dl);
+    struct gf2_fence fence;
+    if (rc || !sr.w || !sr.h) return rc;
+    rc = gf2_fence_emit(c->ch, &fence, dl);
+    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
+    return c->last_rc = rc;
 }
