@@ -15,7 +15,7 @@ CASES = [
     ('shutdown', 'gfx/gfx_core.c', '    gfx_policy_reeval();\n    gfx_reinit_surfaces(0);'),
     ('gui-enter', 'kernel/console/console.c', '    gfx_policy_reeval();\n    if (legacy_active()) return;'),
     ('gui-exit', 'kernel/console/console.c', '    gfx_policy_reeval();\n    /* 票 K7'),
-    ('owner-exit', 'exec/appslot.c', '        gfx_policy_reeval();'),
+    ('owner-exit', 'exec/appslot.c', '        exec_surface_policy_reeval();'),
 ]
 
 def function(source, signature):
@@ -53,7 +53,7 @@ void shell_print(const char *s, int n) { (void)s; (void)n; }
 void kapi_sys_exit(int n) { (void)n; }
 int appslot_gfx_claim(int n) { (void)n; g_gfx_owner=2; return 0; }
 int appslot_gfx_owner(void) { return g_gfx_owner; }
-void gf_display_owner_exit(int id) { (void)id; }
+void gf_display_owner_exit(int id) __attribute__((weak));
 int ring3_call_from_user(void) { return 0; }
 int caller_access_get_user(struct caller_access *c) { c->app_id=2; return 1; }
 void pc98_splash_raster_reset(void) {}
@@ -87,8 +87,8 @@ def run_case(runner, mutation):
     if mutation:
         name, path, anchor = mutation
         assert sources[path].count(anchor) == 1, name
-        sources[path] = sources[path].replace(anchor, anchor.replace('gfx_policy_reeval();', '(void)0;', 1), 1)
-    code = PRELUDE + '\n' + '\n'.join([
+        sources[path] = sources[path].replace(anchor, anchor.replace('exec_surface_policy_reeval();', '(void)0;', 1).replace('gfx_policy_reeval();', '(void)0;', 1), 1)
+    code = PRELUDE + '\n' + function((ROOT / 'arch/x86/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
         function(sources['gfx/gfx_core.c'], 'static int gfx_kapi_claim(void)'),
         function(sources['gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
         function(sources['kernel/console/console.c'], 'void console_text_gdc_stop(void)'),
@@ -98,7 +98,7 @@ def run_case(runner, mutation):
     with tempfile.TemporaryDirectory(prefix='gfx-policy-triggers-') as td:
         src = Path(td) / 'test.c'; exe = Path(td) / 'test'
         src.write_text(code)
-        subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', str(src), '-o', str(exe)], check=True)
+        subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', str(src), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner=runner)
         expected = {'claim': 1, 'shutdown': 6, 'gui-enter': 4, 'gui-exit': 5, 'owner-exit': 3}
         assert result.returncode == (expected[mutation[0]] if mutation else 0), (mutation, result.returncode)

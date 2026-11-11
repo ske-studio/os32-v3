@@ -10,8 +10,7 @@
 #include "io.h"
 #include "surface_query.h"
 #include "appslot.h"
-#include "../gfx/gfx.h"
-#include "../gfx/v2/gfx2_int.h"
+#include "exec_surface.h"
 #include "os32_kapi_shared.h"
 static u32 lease_next_token = 1;
 u32 lease_selftest_result;
@@ -55,7 +54,7 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
     for (i = 0; i < count; i++) {
         const struct ledger_surface *sf;
         if (refs[i].sid >= LEDGER_MAX_SURFACES) return LEASE_INVAL;
-        sf = &ledger_surfaces[refs[i].sid];
+        sf = exec_surface_at(refs[i].sid);
         if (!sf->npages || sf->gen != refs[i].generation || sf->closing)
             return LEASE_STALE;
         if (sf->backend != auth->backend || sf->role != auth->role ||
@@ -98,7 +97,7 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
     if (!rc) lease_next_token += count;
     if (rc) return rc;
     for (i = 0; i < count; i++) {
-        const struct ledger_surface *sf = &ledger_surfaces[refs[i].sid];
+        const struct ledger_surface *sf = exec_surface_at(refs[i].sid);
         out[i].token = as->leases[slots[i]].token;
         out[i].base = maps[i].base;
         out[i].bytes = maps[i].npages * PAGE_SIZE;
@@ -114,18 +113,18 @@ int lease_release(struct addrspace *as, u32 token)
     if (!context(as) || !token) return LEASE_INVAL;
     for (i = 0; i < MEM_LEASE_MAX; i++) if (as->leases[i].token == token) {
         struct as_lease *l = &as->leases[i];
-        struct ledger_surface *sf = &ledger_surfaces[l->sid];
+        struct ledger_surface *sf = exec_surface_at(l->sid);
         saved = irq_save();
         if (paging_lease_unmap(as, l->base, l->npages)) {
             irq_restore(saved); return LEASE_INVAL;
         }
-        u32 bridge_access = GFX2_CPU_R | ((l->flags & PTE_RW) ? GFX2_CPU_W : 0);
+        u32 bridge_access = exec_surface_bridge_access(l->flags);
         int display = sf->role == LEDGER_ROLE_DISPLAY;
         l->token = 0;
         sf->lease_count--;
         if (sf->closing && !sf->lease_count) (void)ledger_surface_release(l->sid);
         irq_restore(saved);
-        if (display) v1_bridge_end(GFX2_ROLE_DISPLAY, bridge_access, 0);
+        if (display) exec_surface_bridge_end(bridge_access);
         return 0;
     }
     return LEASE_INVAL;
@@ -179,7 +178,7 @@ int lease_check(const struct addrspace *as)
         if (l->sid >= LEDGER_MAX_SURFACES || !l->npages || l->base % PAGE_SIZE ||
             l->base < MEM_LEASE_BASE || l->base >= MEM_LEASE_ALLOC_END ||
             l->npages > (MEM_LEASE_ALLOC_END - l->base) / PAGE_SIZE) return LEASE_INVAL;
-        const struct ledger_surface *sf = &ledger_surfaces[l->sid];
+        const struct ledger_surface *sf = exec_surface_at(l->sid);
         u32 flags = l->flags & ~AS_LEASE_GFX_COMPAT;
         u32 cache = sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0;
         if (l->npages != sf->npages || !ledger_surface_validate(sf) ||
@@ -207,8 +206,8 @@ int lease_check(const struct addrspace *as)
     for (i = 0; i < MEM_LEASE_MAX; i++) {
         const struct as_lease *l = &as->leases[i];
         if (!l->token) continue;
-        if (l->generation != ledger_surfaces[l->sid].gen ||
-            !ledger_surfaces[l->sid].lease_count) return LEASE_INVAL;
+        if (l->generation != exec_surface_at(l->sid)->gen ||
+            !exec_surface_at(l->sid)->lease_count) return LEASE_INVAL;
         u32 first = (l->base - MEM_LEASE_BASE) >> PDE_SHIFT;
         u32 last = (l->base + (l->npages - 1) * PAGE_SIZE - MEM_LEASE_BASE) >> PDE_SHIFT;
         for (u32 di = first; di <= last; di++)
@@ -223,7 +222,7 @@ int lease_check(const struct addrspace *as)
             for (i = 0; i < MEM_LEASE_MAX; i++) {
                 const struct as_lease *l = &as->leases[i];
                 if (l->token && va >= l->base && (va - l->base) / PAGE_SIZE < l->npages) {
-                    const struct ledger_surface *sf = &ledger_surfaces[l->sid];
+                    const struct ledger_surface *sf = exec_surface_at(l->sid);
                     if (!sf->npages || l->generation != sf->gen || !sf->lease_count) return LEASE_INVAL;
                     expected = sf->first * PAGE_SIZE + va - l->base;
                     expected |= l->flags & ~AS_LEASE_GFX_COMPAT;
@@ -270,7 +269,7 @@ int surface_lease(const struct surface_query_source *source,
         return OS32_ERR_INVAL;
     flags = irq_save();
     rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
-          source->backend != gfx_sf_backend()) ? OS32_ERR_INVAL :
+          source->backend != exec_surface_backend()) ? OS32_ERR_INVAL :
          surface_query_authorize(source, &caller);
     if (!rc) rc = surface_query_refs(source, &ref, 1, access);
     irq_restore(flags);
@@ -279,8 +278,7 @@ int surface_lease(const struct surface_query_source *source,
     kmemcpy(old, caller.as->leases, sizeof(old));
     next = lease_next_token;
     if (source->role == LEDGER_ROLE_DISPLAY)
-        (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R |
-                              (access == LEDGER_PERM_RW ? GFX2_CPU_W : 0));
+        exec_surface_bridge_begin(access);
     rc = lease_acquire(caller.as, &auth, &ref, 1, access, &view);
     if (rc) return surface_query_error(rc);
     if (!copy_to_caller(&caller, user_out, &view, sizeof(view))) {
@@ -328,11 +326,10 @@ int surface_lease_bundle(const struct surface_query_source *source,
     if (rc || !copy_caller_bytes(&caller, user_refs, refs, sizeof(refs)) ||
         !check_caller_write_range(&caller, user_out, sizeof(result)))
         return OS32_ERR_INVAL;
-    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R |
-                          (access == LEDGER_PERM_RW ? GFX2_CPU_W : 0));
+    exec_surface_bridge_begin(access);
     saved = irq_save();
     rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
-          source->backend != gfx_sf_backend()) ? OS32_ERR_INVAL :
+          source->backend != exec_surface_backend()) ? OS32_ERR_INVAL :
          surface_query_authorize(source, &caller);
     if (!rc) rc = surface_query_refs(source, refs, count, access);
     if (!rc) {
@@ -387,7 +384,7 @@ int lease_audit_all(void)
         paging_load_cr3(paging_kernel_pd_phys());
         bad += paging_as_audit(a->as, shlib_read_page) != 0;
         bad += lease_check(a->as) != 0;
-        bad += gfx2_map_audit(a->as) != 0;
+        bad += exec_surface_map_audit(a->as) != 0;
         for (u32 i = 0; i < MEM_LEASE_MAX; i++) {
             const struct as_lease *l = &a->as->leases[i];
             if (l->token && l->sid < LEDGER_MAX_SURFACES) refs[l->sid]++;
@@ -397,12 +394,12 @@ int lease_audit_all(void)
     }
     /* Alias/descriptor reads need no root switch or long IRQ exclusion. */
     for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
-        const struct ledger_surface *sf = &ledger_surfaces[i];
-        if (sf->npages && (!ledger_surface_validate(sf) || !alias_cache(sf))) bad++;
+        const struct ledger_surface *sf = exec_surface_at(i);
+        if (sf && sf->npages && (!ledger_surface_validate(sf) || !alias_cache(sf))) bad++;
     }
     flags = irq_save();
     for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++)
-        if (ledger_surfaces[i].lease_count != refs[i]) bad++;
+        if (exec_surface_at(i) && exec_surface_at(i)->lease_count != refs[i]) bad++;
     irq_restore(flags);
     return bad;
 }

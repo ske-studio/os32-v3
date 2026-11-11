@@ -14,7 +14,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
 SOURCES = ('mm/paging.c', 'mm/pgalloc.c', 'exec/lease.c')
 MUTANTS = [
     ('allocation boundary', 2, 'base >= MEM_LEASE_ALLOC_END || sf->npages > (MEM_LEASE_ALLOC_END - base)', 'base >= MEM_LEASE_END || sf->npages > (MEM_LEASE_END - base)'),
-    ('gfx2 audit call', 2, 'bad += gfx2_map_audit(a->as) != 0;', '(void)a;'),
+    ('gfx2 audit call', 2, 'bad += exec_surface_map_audit(a->as) != 0;', '(void)a;'),
     ('PTE audit boundary', 2, 'for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {', 'for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {'),
 ]
 

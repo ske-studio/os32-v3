@@ -125,7 +125,11 @@ def entries(work, runner, mutation):
     pf = function(isr, 'page_fault_handler')
     pf = pf[:pf.index('    sputs("\\n\\n==== PAGE FAULT')] + '}\n'
     finish = function(source(EXIT, mutation), 'exec_notify_owned')
-    (work / 'trident_emergency_entries.inc').write_text(general + pf + finish)
+    wrappers = ''.join(next(line for line in (ROOT / path).read_text().splitlines(True)
+                            if line.startswith('static inline void ' + name))
+                       for path, name in (('arch/x86/exec_ime.h', 'exec_ime_owner_exit'),
+                                          ('arch/x86/exec_reclaim.h', 'exec_host_owner_exit')))
+    (work / 'trident_emergency_entries.inc').write_text(wrappers + general + pf + finish)
     product = work / 'gfx_emergency.c'
     product.write_text(source(DISPATCH, mutation).replace('"../exec/appslot.h"', '"' + str(ROOT / 'exec/appslot.h') + '"'))
     exe = work / 'emergency'

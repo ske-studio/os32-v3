@@ -83,7 +83,7 @@ static int safe(void) { return 1; }
 static int (*pc98_console_safe)(void)=safe;
 static int con_backend_safe(void) { return !pc98_console_safe || pc98_console_safe(); }
 static int con_sink_is_enabled(void) { return sink; }
-static void gfx_policy_reeval(void) {}
+void gfx_policy_reeval(void) {}
 static void con_sink_enable(void) { sink=1; }
 static void con_backend_cursor_at(int x,int y) { CHECK(!x&&!y); cursors++; }
 static void con_backend_cursor_shape(int show) { shapes+=show?1:10; }
@@ -128,6 +128,7 @@ static int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
 #define exec_legacy_end legacy_end
 #define exec_legacy_cleanup legacy_cleanup
 #define exec_legacy_call_dispatch legacy_call_dispatch
+#include "exec_surface.h"
 #include "callers.inc"
 
 /* Link the same caller slices to none as well as the native provider. */

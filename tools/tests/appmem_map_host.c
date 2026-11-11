@@ -672,6 +672,7 @@ static u32 diagnostic_field(const char *key)
     }
     return ~0U;
 }
+#include "exec_surface.h"
 #include "lease_revoke_source.c"
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; detached++; }
 void kfree(void *p) { CHECK("teardown AS control", p == &a); }
