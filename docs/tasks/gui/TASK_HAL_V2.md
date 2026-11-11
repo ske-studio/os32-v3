@@ -1,6 +1,6 @@
 # 表示 HAL v2 (次の版の HAL の口)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定 (2026-11-10 に Fable 5.2 のレビューを反映)、実装を待つ ([HAL_V2_DESIGN](../../decisions/gui/HAL_V2_DESIGN.md))。段は A0 → 実装の段 (並列) → I1・I2・I3。
+> 状態: **実装中 (2026-11-11)** — 設計は確定 (2026-11-10 に Fable 5.2 のレビューを反映、11-11 に実装の欠けを追記) ([HAL_V2_DESIGN](../../decisions/gui/HAL_V2_DESIGN.md))。段は A0 → 実装の段 (並列) → I1・I2・I3。
 
 ## 0. ユーザー決定 (原文)
 - 2026-11-08 3D・浮動小数点: 「HALではCPUチェックを行いMMX Pentium以上から受け付けるのが現状良いと思います。それ以下は大きめのテーブルを用意して計算させるほうが実用的に思います。」
@@ -23,10 +23,26 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| A0 (宣言だけ) | 未着手 |
-| C1〜C18・S1〜S11・M1〜M3・X1・Y1〜Y4・T1・P1・G1〜G9・U1・D1 | 未着手 (A0 の後に並列。C14 は M3 の後) |
+| A0 (宣言だけ) | main (e00f3ce2、NP21/W 40/40) |
+| I1 の材料 C1・C3〜C7・C15〜C18・M1〜M3・X1・G5・G9 | 実装・host 試験済み (wt/halv2-i1) |
+| I2 の材料 C2・C8〜C10・C14・S1〜S11・G1・G4・G7・G8・U1 (G3・G6 は廃止、色鍵と α は sw) | 実装中 |
+| I3 の材料 C11〜C13・G2・P1・T1・Y1〜Y4・D1 | 未着手 (G2・D1 は設計の往復が先) |
 | K1 (CONSOLE_DUAL の gf_outputs の差し替え) | 未着手 (CONSOLE_DUAL の D2 と C1・C11 の後) |
-| I1 (面の道)・I2 (描画の道)・I3 (表示の道) | 未着手 |
+| I1 (面の道) | 結線済み・NP21/W の一括受入は合。ゲスト試験 gfx2_i1 が FAIL で調べ中 |
+| I2 (描画の道)・I3 (表示の道) | 未着手 |
 | CONSOLE_DUAL (決定 C) | 確定設計あり ([CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)、段は TASK_CONSOLE_DUAL) |
 
 注意: TASK_PPC_SEP の予定の段 3 番 (gfx/gfx_core.c の `g_backend == &gfx_backend_geforce/trident` の分岐を provider へ移す) と 1 番 (gfx/gfx_vram.c)、TASK_GFX_ACCEL_HAL の S1 (gfx/gfx_vram.c) は、C1・C14 と同じ所に触る。これらと C1・C14 を同時に走らせない。
+
+## 3. 受入の仕分け (ユーザー決定 2026-11-11「はい、その形で進めて」)
+NP21/W に GeForce・Trident は無く PEGC だけなので、段ごとに確かめる場所を分ける。
+
+| 区分 | 段 | 確かめる場所 |
+|---|---|---|
+| E (NP21/W で足りる) | 中核の C・SW の S・M・X・U1・P1 (PEGC)・KAPI の道 | NP21/W の一括受入 |
+| R (実機だけ) | G1・G2・G4・G5・G7・G8・G9 (GeForce 6200 = NV44A)、T1 (Trident)、Y1〜Y4 の待ち時間、bus master の PCI のブリッジ越えの到達 | 実機 Ra266 |
+| E+R | 結線 I1〜I3 のゲスト試験 | NP21/W は PEGC で、実機は `GFX=geforce` と `GFX=trident` で同じ試験を回す |
+
+- 実機の受入は段ごとにせず、I1・I2・I3 が main に入るたびに 1 回まとめて回す。ノートのセッションに頼み、判定はシリアル (ゲスト試験の PASS/FAIL・mem・起動ログ) と、画面はカメラで PM が見る。
+- R の項目は延期の台帳 DEFERRED_TESTS の HALV2-RH-* の行で持ち、節目ごとに閉じる。
+
