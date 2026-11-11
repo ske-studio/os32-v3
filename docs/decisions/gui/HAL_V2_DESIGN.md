@@ -1,5 +1,5 @@
 > 出所: `~/os32-tmp/run/hal-v2/DESIGN.final.md` (Claude 起草、codex astra のレビュー 4 回 (第 4 回はユーザー承認) で確定、2026-11-09)。段の状態は票 TASK_HAL_V2 が持つ。
-> 状態: **現行 (2026-11-09、2026-11-10 に Fable 5.2 のレビューを反映、2026-11-11 に main 761ca15f の実装に合わせ、実装の第 1 波の設計の欠けを埋めた)** — 表示 HAL v2 (形式 u32×2・32bpp、DX9c 程度の能力、2D の口、fence、面、GPU から見える RAM、adapter/head の列挙、CPU 直描きの同期バックエンド層) の確定設計。
+> 状態: **現行 (2026-11-09、2026-11-10 に Fable 5.2 のレビューを反映、2026-11-11 に main 761ca15f の実装に合わせ、実装の第 1 波の設計の欠けを埋め、G5 の GART を NV44A の nouveau の経路 (nv04 の頁表付きの PCI の DMA の物) に決めた)** — 表示 HAL v2 (形式 u32×2・32bpp、DX9c 程度の能力、2D の口、fence、面、GPU から見える RAM、adapter/head の列挙、CPU 直描きの同期バックエンド層) の確定設計。
 
 # 表示 HAL v2 の詳細設計 (確定)
 
@@ -509,7 +509,7 @@ int gfx2_map_audit(const struct addrspace *as)
 | C6 の作成の順と失敗 (`gfx2_gart_alloc`) | (1) pfn の表 (gart.c の static、`GFX2_GART_KB / 4` 本、上限の 8MB で 2,048 本) に連続の n 本を first-fit で取る。無ければ NOSPC → (2) n 頁を 1 頁ずつ取る。途中で取れなければ取った頁を返して NOSPC → (3) `pgalloc_pin(pfn, 1, owner)` を各頁。失敗 (起きないはず) は pin を外し頁を返して IO → (4) `be->gart_bind`。失敗は (3)〜(1) を逆に戻してその rc (NOSPC・IO) を返す。どの失敗でも面は作られず、表・頁・pin は元のまま |
 | 上限 (PM 決定 #1) | **遅延確保の上限 8MB** (gart.c の定数 `GFX2_GART_KB 8192`。system.cfg の設定は持たない)。予約はしない。越えれば `OS32_ERR_NOSPC` (`OS32_ERR_NOMEM` は無い) |
 | pin | pgalloc に頁ごとの pin の数 (`u8 pin_map[PHYSMEM_MAX_PFN]`、pgalloc_owner.inc、M1) を足し、`pgalloc_free_n_owner`・`ledger_transfer`・`ledger_reclaim_owner` の**全部**で pin の頁があれば全件不変で拒否し `ledger_bad_free` に数える (reclaim は pin の頁を飛ばして返さず、戻り値 0)。pin の頁を動かせるのは `ledger_transfer_pinned` (隔離へ移すため) だけ |
-| 物理の表 | 中核が `u32 pfn[]` を持ち、backend の `gart_bind(pfn, n, *gpu_off)`・`gart_unbind`。`gart_bind` は全部か無し: 途中で失敗したら backend が自分の書いた頁表の項目を消してから失敗を返す (中核は巻き戻さない。nouveau の `nvkm_vmm_ptes_get` が失敗の時に取った分を自分で外すのと同じ、nvkm/subdev/mmu/vmm.c:750-755。`nouveau_sgdma_bind` も自分で `nouveau_mem_fini` して返す、nouveau_sgdma.c:45-50)。GART の空きが足りなければ NOSPC。`gart_unbind` は頁表の項目を消すだけで失敗しない。TLB の flush の時間切れは nouveau どおり記録だけして 0 を返す (nv44_vmm_flush は待ちが切れても続ける、nvkm/subdev/mmu/vmmnv44.c:185-194)。0 以外を返すのは bind していない範囲 (呼び手の誤り) だけ。GF6200 は NV44 の GART の頁表 (nouveau `nvkm/subdev/mmu/nv44.c`、MIT)、ATI は PCI GART (`r100_pci_gart_*`、MIT)。GF は GART の DMA の物 (新 handle) を作る |
+| 物理の表 | 中核が `u32 pfn[]` を持ち、backend の `gart_bind(pfn, n, *gpu_off)`・`gart_unbind(gpu_off, n)`。`pfn` の n 本は `gart_unbind` までの間、場所も中身も変えない (C6 の static の表。backend は借りて持ち、装置の再初期化の時に頁表を書き直す、§11-6 の「GART (G5)」)。`gpu_off` は GART の DMA の物の中のバイトの offset (頁の境界)。`gart_bind` は全部か無し: 途中で失敗したら backend が自分の書いた頁表の項目を消してから失敗を返す (中核は巻き戻さない。nouveau の `nvkm_vmm_ptes_get` が失敗の時に取った分を自分で外すのと同じ、nvkm/subdev/mmu/vmm.c:750-755。`nouveau_sgdma_bind` も自分で `nouveau_mem_fini` して返す、nouveau_sgdma.c:45-50)。GART の空きが足りなければ NOSPC。`gart_unbind` は頁表の項目を消すだけで失敗しない (nouveau の `nv04_vmm_pgt_unmap` は 0 を書くだけで戻り値が無い、nvkm/subdev/mmu/vmmnv04.c:59-64)。0 以外を返すのは bind していない範囲 (呼び手の誤り) だけ。GF6200 (Ra266 の 10de:0221 = NV44A) は nouveau の `nv4a_chipset` が `.mmu = nv04_mmu_new` (nvkm/engine/device/base.c:677-688) で、GART は nv04 の「頁表付きの PCI の DMA の物」(nvkm/subdev/mmu/vmmnv04.c、MIT)。nv44 の専用 GART (mmu/nv44.c・vmmnv44.c の 0x1008xx の設定と flush) は NV44A では使わない。細目は §11-6 の「GART (G5)」。ATI は PCI GART (`r100_pci_gart_*`、MIT) |
 | cache | WB (bus master は snoop)、DMA_PHYS_LIMIT は `dma_range_ok` |
 | CPU から (R3) | `kva` は NULL。作成の時に持ち主の AS の gfx2 の帯へ連続の VA で張り (C7 の `gfx2_map`)、sw は `view.base = map_va` で見る。使えるのは CR3 が持ち主の AS の時だけ (`gfx2_cpu_visible`、§7-2)。張れなければ作成は NOSPC |
 | 解放 | 順は §7-3 の表 (fence の完了 → CPU の写像の解除 → `be->release` → `gfx2_gart_free`)。`gfx2_gart_free` の中は `gart_unbind` → `pgalloc_unpin` → `pgalloc_free_n_owner` → pfn の表の n 本を空き。LOST_HELD の間は何もせず BUSY (§6-3)。`gart_unbind` が 0 以外なら unpin も解放もせず IO を返し、C4 は KEEP を立てる (§7-3、頁は pin のまま隔離へ行き再起動まで返さない)。C4 と C6 の口は `gfx2_gart_alloc`・`gfx2_gart_free` の 2 つだけで、unbind と unpin を分けた口は持たない |
@@ -893,12 +893,22 @@ extern GfxSyncCtx gfxsync_ctx_pool[4];                                     /* �
 #define GF_V2_RING 256
 struct gf_v2_ring_e { u32 v2; struct gf2_fence f; };
 struct gf_v2_ring { u32 head, tail, count; struct gf_v2_ring_e e[GF_V2_RING]; };
+#define GF_V2_GART_PAGES 32768u                  /* nv04 の頁表の PTE の数 (vmmnv04.c:75 の bits 15)、128MB */
+#define GF_V2_GART_PT_BYTES (8u + 4u * GF_V2_GART_PAGES) /* 見出し 8 + PTE (vmm.c:1158)、0x20008 */
+#define GF_V2_GART_BINDS GFX2_MAX_SURFACES      /* bind の記録の枠 (GART の面 1 つに 1 件) */
+struct gf_v2_gart_bind { u32 first, n; const u32 *pfn; }; /* first は頁の番号。pfn は C6 の表を unbind まで借りる */
+struct gf_v2_gart {
+    struct gf2_object obj;                       /* GART の ctxdma = 頁表の物 (obj.inst が頁表)。動かさない */
+    u32 epoch;                                   /* obj を作った F2 の epoch。0 = 無い */
+    u32 count;                                   /* bind[] の件数、first の昇順 */
+    struct gf_v2_gart_bind bind[GF_V2_GART_BINDS];
+};
 struct gf_v2 {                                   /* 実体は G1 (gf_v2_ops.c の static 1 つ) */
     struct gf3_ctx *g3; struct gf2_chan *ch;
     struct gf_v2_ring ring;                      /* G4 だけが書く */
     u32 completed, failed_upto;                  /* G4 */
     struct gf_vram_reservation_node node[GFX2_MAX_SURFACES]; /* G9 (surf の priv[2] が番号) */
-    u32 gart_handle, gart_base, gart_pages;      /* G5 */
+    struct gf_v2_gart gart;                      /* G5 だけが書く */
 };
 int gf_v2_fence_emit(struct gf_v2 *, u32 v2, u32 dl);            /* G4、§6-3 のコード */
 int gf_v2_fence_state(struct gf_v2 *, u32 *completed, u32 *failed_upto); /* G4 */
@@ -910,6 +920,8 @@ int gf_v2_gart_unbind(struct gf_v2 *, u32 gpu_off, u32 n);       /* G5 */
 int gf_v2_gart_range(void *opaque, u32 handle, u32 off, u32 bytes);  /* G5。opaque は struct gf_v2 *。
                                                     handle が GART_DMA でなければ EINVAL、[off, off+bytes) が bind 済みの
                                                     頁に収まれば 0、外は ERANGE (u32 のあふれ込み)。G8 が callback 経由で呼ぶ */
+int gf_v2_gart_start(struct gf_v2 *, u32 dl);    /* G5。v2 で層 3 が ready になった直後に G1・G2 が呼ぶ */
+void gf_v2_gart_reset(struct gf_v2 *);           /* G5。unregister の道で F2 が OFF になった後に G1 が呼ぶ */
 /* G2 (gf_v2_display.c)。GfxBackendV2 の同名の hook の型そのもので、ctx は struct gf_v2 * */
 int gf_v2_enum_head(void *, u32 head, GFX2_HeadInfo *);
 int gf_v2_enum_conn(void *, u32 conn, GFX2_ConnectorInfo *);
@@ -935,7 +947,8 @@ int gf3_scale_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf
 typedef int (*gf3_range_fn)(void *opaque, u32 handle, u32 off, u32 bytes);
 /*  struct gf3_ctx { ...; gf3_range_fn range_q; void *range_opaque; };   0 初期化 = GART の面を全部拒む */
 void gf3_range_query_set(struct gf3_ctx *, gf3_range_fn, void *opaque);  /* G8 が実装 (accel_surface.c)。G1 が v2 の初期化で
-                                                    gf3_range_query_set(g->g3, gf_v2_gart_range, &gf_v2_inst) を呼ぶ */
+                                                    gf3_range_query_set(g->g3, gf_v2_gart_range, &gf_v2_inst) → gf_v2_gart_start の順に呼ぶ */
+#define GF3_HANDLE_GART_DMA (GF2_HANDLE_LAYER3_FIRST + GF3_OBJECT_COUNT + 1) /* accel.h の GF3_HANDLE_NOTIFY の次。G5 の頁表の物 */
 /* G8 の gf3_surface_check: s->dma == GF3_HANDLE_GART_DMA なら
  *   c->range_q ? c->range_q(c->range_opaque, s->dma, s->off, s->bytes) : -EINVAL
  * を予約の照合 (gf_vram_match) の代わりに使う。VRAM_DMA (dma == 0) は今のまま */
@@ -946,6 +959,28 @@ int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *,
 /* struct gf3_surface の末尾に u32 dma (0 = VRAM_DMA で今と同じ、GF3_HANDLE_GART_DMA) を A0 が足す。意味の実装は G8 */
 ```
 - channel の状態の戻し (R8): 色鍵・α・ROP3 のパターンは channel の物の状態で、v1 の DIRECT の blit (`gf3_copy`、hwdev/gf/accel_copy.c:54 は `gf3_rop_set` だけを結び直す) はこれを設定しない。G1 の `emit` はこれらを変えた命令の描画を積んだ後、同じ emit の中で既定 (`gf3_ckey_set(.., false, ..)`・`gf3_alpha_set(.., 255, false, ..)`・パターン全 1 の `gf3_rop3_set`) に戻してから返す。命令の間の channel は常に既定で、v1 の入口と v2 の束が交互でも互いの状態を見ない。戻しの積みに失敗したら emit は装置の失敗を返す (§11-2 の commit_fail → LOST)。
+
+- **GART (G5)**: NV44A の GART は nouveau の nv04 の経路をそのまま移す。G5 が書くのは instmem (PRAMIN) の頁表と RAMHT だけで、MMIO のレジスタは 1 つも書かない (0x100800・0x100850 は今の `gf2_fb_init` (hwdev/gf/fifo.c:98-104、nvkm/subdev/fb/nv44.c:50-55 と同じ) のまま。NV44A は `.fb = nv44_fb_new`・`.mmu = nv04_mmu_new`、device/base.c:683・688 で、nv44_mmu_init の 0x1008xx は走らない)。
+
+| 項目 | 決め | nouveau (drivers/gpu/drm/nouveau/) |
+|---|---|---|
+| 方式 | 頁表は instmem の 1 つの物で、先頭 8 バイトが DMA の物の見出し、続けて 4 バイトの PTE が `GF_V2_GART_PAGES` (32,768) 本 = 128MB。GART の ctxdma は頁表の物そのもの (16B の別の DMA の物を作らない。`gf2_dma_new` は使わない) | nvkm/subdev/mmu/nv04.c:29-35 (`.vmm` の global)、nvkm/engine/dma/usernv04.c:51-55・97-101 (TARGET_VM は clone、start 0 は頁表を wrap) |
+| 確保・配置・容量 | `gf_inst_alloc(f, GF_V2_GART_PT_BYTES, 0x1000, true, &gart.obj.inst)` (0x20008 バイト、整列 0x1000、0 で埋める)。instmem の予約 `GF_INSTMEM_BYTES` の `GF_RESERVE_BASE_BYTES 0x100000` (頁表 512KB + 物 512KB、hwdev/gf/vram_layout.h:13-17) の中。取れなければ `GF2_ENOSPC` | nvkm/subdev/mmu/vmmnv04.c:73-77 (bits 15・4 バイト・整列 0x1000)、vmm.c:1158-1159 (pd_header 8 + 4×2^15、0 で埋める)、mmu/base.c:207 (INST に置く)、instmem/nv40.c:175 (頁表の 512KB) |
+| 見出し | +0 に `0x0002103d` (IN_MEMORY・PCI・RW・頁表あり・線形でない)、+4 に `0x07ffffff` (limit − 1、limit = 1 << 27) | vmmnv04.c:135-139、vmm.c:1206-1207 (size 0 で limit = 1 << bits) |
+| PTE | 頁 i は +8+4i に `pfn << 12` と 3 (PRESENT・RW) の OR。外すときは 0 | vmmnv04.c:45-57 (dma)・59-64 (unmap) |
+| 書きの吐き出し・flush | 見出しと PTE は `gf_inst_write32` (書いた後に読み返す、hwdev/gf/instmem.c:68-77) で書き、それ以上の待ちと TLB の flush はしない | instmem/nv40.c:68-71 (release は wmb だけ)、vmmnv04.c:92-99 (nv04 の vmm に `.flush` が無い)、vmm.c:127-135 (flush は hook がある時だけ) |
+| DMA の物の登録 | `gf2_ramht_add(ch, GF3_HANDLE_GART_DMA, GF2_RAMHT_ENGINE_DMA, gart.obj.inst.off, &gart.obj.cookie)`、`gart.obj.handle = GF3_HANDLE_GART_DMA`・`class_id = GF2_DMA_IN_MEMORY`。登録は drain と FIFO の pause の間だけ (hwdev/gf/command.h:180-183) | nouveau_chan.c:420-432 (AGP でない時の GART の ctxdma は TARGET_VM・start 0・limit = vmm の limit − 1) |
+| 番地の割り当て | `gart.bind[]` (first の昇順) の隙間のうち、n 頁が入る最も小さい隙間 (同じ大きさなら番地の小さい方) の先頭。`*gpu_off = first << 12` | vmm.c:1773-1786 (大きさ順の空きの木で最小の空き)、nouveau_ttm.c:126-154 (GART の資源を取る時に `nvif_vmm_get`)、nouveau_sgdma.c:30-55 (bind で写像) |
+| 停止の時の解放 | G5 は自分で頁表の物を消さない。F2 の停止 (`gf2_stop` → `command_stop` の `release_instances`、hwdev/gf/command.c:44-59・61-72) が drain・FIFO の停止・engine の停止の後に RAMHT の全項目と可変の inst を全部消し、頁表もそこで消える。nouveau では GART の ctxdma は channel と一緒に消え、頁表は装置の破棄まで残る。OS32 は instmem を F1 の停止で手放すので、頁表を channel より長く持たない | nouveau_chan.c:109 (chan->gart の dtor)、mmu/base.c:378-383・402 (頁表は oneinit で 1 度作り dtor で破棄) |
+
+- 状態: `gart.epoch` は頁表の物を作った F2 の epoch (0 = 無い)。「生きている」は `gart.epoch != 0 && gart.epoch == g->ch->epoch && g->ch->state == GF2_RUN`。`gart.bind[]` (`count` 件) は bind ごとの `{first, n, pfn}` で、epoch と無関係に unbind か reset まで残る。
+- `gf_v2_gart_start(g, dl)`: 生きていれば 0。`g->ch->state != GF2_RUN` は `GF3_ESTATE`。順は gf3_init と同じ形 (hwdev/gf/accel_objects.c:200-245): `gart.obj = {0}` (前の epoch の物は F2 の停止が消している) → drain (`gf2_fence_emit` → `gf2_fence_wait`) → `gf2_fifo_pause` → 確保 → 見出し → 記録のある頁の PTE を全部書き直す → RAMHT に登録 → resume (`ch->last_rc = 0; gf2_fifo_resume(ch);` の後に `last_rc` と RUN を見る、accel_objects.c:157-163) → `gart.epoch = ch->epoch`。確保から登録までの失敗は、取った inst を `gf_inst_free` して `gart.obj = {0}` に戻し、resume してから rc を返す (resume の失敗はその rc)。drain・pause の失敗は rc をそのまま返す (門は閉じたまま、後始末は F2 の停止)。書き直しの理由: F2 の recover (epoch が変わる) で頁表は消えるが、LOST にならなかった GART の面は回復の後も HW で描く (§6-3)。nouveau の頁表は channel を作り直しても残り写像が続くので、借りた pfn から書き直して同じ状態にする。
+- 呼ぶ所: v2 で層 3 が ready になった直後に必ず呼ぶ。G1 の v2 の初期化 (`gf3_range_query_set` の直後) と、G2 の LOST の間の mode_set の層 3 の再初期化の成功の直後 (0 を返す前、§6-3)。0 以外はどちらも gf3_init の失敗と同じ扱い (G1 は v2 の初期化の失敗、G2 は mode_set の失敗)。
+- `gf_v2_gart_bind(g, pfn, n, *gpu_off)`: `pfn == NULL`・`n == 0` は `OS32_ERR_INVAL`。生きていなければ `OS32_ERR_IO`。`n > GF_V2_GART_PAGES`・入る隙間が無い・`count == GF_V2_GART_BINDS` は `OS32_ERR_NOSPC`。PTE を n 本書き、途中の `gf_inst_write32` の失敗は書いた分に 0 を書いて (その書きの rc は見ない) `OS32_ERR_IO`。成功で記録を昇順の位置に挿し `*gpu_off` を書いて 0。FIFO は止めない (nouveau も写像の書きで channel を止めない)。
+- `gf_v2_gart_unbind(g, gpu_off, n)`: `gpu_off` が頁の境界で `first = gpu_off >> 12` と `n` が記録の 1 件と一致しなければ `OS32_ERR_INVAL` で何も変えない。一致すれば、生きている時だけ n 本の PTE に 0 を書き (書きの rc は見ない。nouveau の unmap も戻り値が無い)、記録を外して 0。生きていない時は書かずに外して 0 (頁表は F2 の停止で消えている)。中核が呼ぶのは fence の完了の後 (§7-3 の順)。
+- `gf_v2_gart_range(opaque, handle, off, bytes)`: `handle != GF3_HANDLE_GART_DMA` は `GF3_EINVAL`。生きていないか、`off >= first << 12 && bytes <= ((first + n) << 12) − off` を満たす記録が無ければ `GF3_ERANGE`、あれば 0 (面は 1 回の bind なので、1 つの記録の中に収まること)。
+- `gf_v2_gart_reset(g)`: `gart` を全部 0 にする (物・epoch・記録)。G1 が unregister の道で、F2 の停止が `GF2_OFF` を確かめた後にだけ呼ぶ。unregister の後の中核は `gfx2_lost_be` の `gart_unbind` (0) を呼び G5 に来ないので、ここで捨てないと、C6 が再利用した pfn の枠を次の start が張ってしまう。OFF にならなかった時 (ESTOP・LOST_HELD) は呼ばない (頁は中核が返さない、§6-3)。
+- 分担: G5 = `struct gf_v2` の `gart` の全部と上の 5 つの関数。G1 = `gf_v2` の実体、表の `.gart_bind`・`.gart_unbind` (ctx を `struct gf_v2 *` にして G5 を呼ぶだけ)、v2 の初期化の `gf3_range_query_set` → `gf_v2_gart_start`、unregister の `gf_v2_gart_reset`、GART の面の `gf3_surface` を `dma = GF3_HANDLE_GART_DMA`・`off = gpu_off` で作ること。G2 = LOST の再初期化の後の `gf_v2_gart_start`。G8 = `gf3_surface_check` の GART の分岐で `range_q` を呼ぶこと (上のまま) と、`gf3_surface_set` で `dma` が 0 でない面の DMA の handle に `dma` を結ぶこと (§7-2)。C6 = pfn の表を unbind まで変えない (今の gart.c のまま)。
 
 ### 11-7. 表の組み立て・登録・module・build
 ```c
@@ -1106,14 +1141,14 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | Y1〜Y4 | gfx/sync/sync_cfg.c・sync_gap.c・sync_write.c・sync_bind.c | `sysconfig` の読み・`cpu_loops_per_tick`・`arch_cpu_serialize` (Y3) | C7・C13・S*・T1・P1 | `gfxsync_ctx_pool` (Y4) | 500 | I3 |
 | T1 | drivers/video/trident/present.c・regs.c・trident_module.c (write_gap.c 削除と旧パスの空の規則 (§10)、停止の道に `gfx2_adapter_unregister`) | `gfxsync_*`・`gfx2_sync_publish` (A0 が import の一覧と生成物に足した物) | v1 present | — | −50 | I3 |
 | P1 | drivers/video/pc98/pegc_v2.c (+backend_pegc.c の `.v2`) | `gfxsync_bind`・`gfx2_sync_publish` | C1 | — | 150 | I3 |
-| G1 | drivers/video/geforce/gf_v2_ops.c (+backend_geforce.c の `.v2` と `geforce_direct_ok` の LOST の 1 行 (§6-3)、geforce_module.c の写しと unregister の 2 か所)。emit は channel の状態を既定へ戻して返す (§11-6 の R8) | gf3_*・G3〜G9・`gf3_range_query_set` | 中核 (表) | `struct gf_v2` の g3・ch、`gf_v2_kcopy` | 340 | I2 |
-| G2 | drivers/video/geforce/gf_v2_display.c (LOST の間の `mode_set` は層 3 の再初期化を先に行い、成功で 0 を返す、§6-3) | gf4_*・gf3_init | G1 の表 | — | 260 | I3 |
+| G1 | drivers/video/geforce/gf_v2_ops.c (+backend_geforce.c の `.v2` と `geforce_direct_ok` の LOST の 1 行 (§6-3)、geforce_module.c の写しと unregister の 2 か所)。emit は channel の状態を既定へ戻して返す (§11-6 の R8)。v2 の初期化で `gf3_range_query_set` → `gf_v2_gart_start`、unregister で F2 が OFF の後に `gf_v2_gart_reset` (§11-6 の「GART (G5)」) | gf3_*・G3〜G9・`gf3_range_query_set` | 中核 (表) | `struct gf_v2` の g3・ch、`gf_v2_kcopy` | 340 | I2 |
+| G2 | drivers/video/geforce/gf_v2_display.c (LOST の間の `mode_set` は層 3 の再初期化を先に行い、続けて `gf_v2_gart_start`、成功で 0 を返す、§6-3・§11-6 の「GART (G5)」) | gf4_*・gf3_init・`gf_v2_gart_start` | G1 の表 | — | 260 | I3 |
 | G3 | hwdev/gf/accel_ckey.c (+accel_objects.c:112 の結び) | gf2_emit | G1 | — | 80 | I2 |
 | G4 | drivers/video/geforce/gf_v2_fence.c・hwdev/gf/accel_fill.c・accel_copy.c・accel_scale.c (*_emit の切り出し) | gf2_fence_* | G1・C3 経由 | `ring`・`completed`・`failed_upto` | 220 | I2 |
-| G5 | drivers/video/geforce/gf_v2_gart.c | gf2_dma_new・NV44 の頁表 | C6 経由・G8 | `gart_*` | 180 | I1 |
+| G5 | drivers/video/geforce/gf_v2_gart.c (§11-6 の「GART (G5)」) | `gf_inst_alloc/free/write32`・`gf2_ramht_add`・`gf2_fence_emit/wait`・`gf2_fifo_pause/resume` | C6 経由 (G1 の表)・G8 (`range_q`)・G1 と G2 (`gf_v2_gart_start`)・G1 (`gf_v2_gart_reset`) | `struct gf_v2` の `gart` | 200 | I1 |
 | G6 | hwdev/gf/accel_alpha.c | gf2_emit | G1 | — | 100 | I2 |
 | G7 | hwdev/gf/accel_rop3.c | gf2_emit | G1 | — | 180 | I2 |
-| G8 | hwdev/gf/accel_surface.c (`gf3_surface_check` の GART の分岐と `gf3_range_query_set`) | `c->range_q` (G5 の `gf_v2_gart_range` を G1 が設定) | gf3_* | `gf3_ctx.range_q`・`range_opaque` | 110 | I2 |
+| G8 | hwdev/gf/accel_surface.c (`gf3_surface_check` の GART の分岐と `gf3_range_query_set`、`gf3_surface_set` の DMA の handle の結び) | `c->range_q` (G5 の `gf_v2_gart_range` を G1 が設定) | gf3_* | `gf3_ctx.range_q`・`range_opaque` | 110 | I2 |
 | G9 | drivers/video/geforce/gf_v2_alloc.c | `gf_vram_reserve/release` | C4 経由 | `node[]`・`surf.priv` | 120 | I1 |
 | U1 | userland/lib/gfx/v2/*.c (format.c を共有) | 公開の gfx2_* | アプリ | — | 400 | I2 |
 | D1 | etc/gfx/sync.cfg・インストーラ | — | Y1 | — | 30 | I3 |
@@ -1159,7 +1194,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | G1・G3・G6・G7 | emit の中の状態の設定の失敗は装置の失敗 (§11-6 の R8) | — | channel の既定・fence の順 |
 | G2 | mode_set の失敗は backend が退避した状態へ戻す (§9-3) | — | mode_set の途中の失敗 |
 | G4 | §6-3 (元から足りていた) | — | 輪の満杯 |
-| G5 | `gart_bind`・`gart_unbind` は §8 の「物理の表」 | `n == 0` は INVAL。GART の空間に連続の n 頁が無ければ NOSPC | GART の範囲・gart_bind の巻き戻し |
+| G5 | bind・unbind は §8 の「物理の表」と §11-6 の「GART (G5)」。start の途中の失敗は取った inst を返し resume してから rc (全部か無し)。reset は失敗しない | `pfn == NULL`・`n == 0` は INVAL。`n > GF_V2_GART_PAGES`・入る隙間が無い・記録の枠の満杯は NOSPC。unbind は記録と完全に一致する時だけ。range は 1 つの bind の中、`off + bytes` のあふれ込みは ERANGE | GART の範囲・GART の頁表 |
 | G8 | §11-6 (元から足りていた) | `off + bytes` のあふれ込みは ERANGE | GART の範囲 |
 | G9 | `gf_vram_reserve` の失敗は rc をそのまま返し `priv` を変えない。release の知らない予約は INVAL | — | 状態遷移 (C4 の作成の途中の失敗で見る) |
 | U1 | 中核の rc をそのまま返す。format.c は C2 と同じファイル | C2 と同じ | 形式の式 (元から足りていた) |
@@ -1199,7 +1234,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | heap (C5) | init(0x1000, 0x10000) → alloc(0x1000, 0x1000) = 0x1000、alloc(0x100, 0x4000) = 0x4000 (頭の端数 0x2000〜0x4000 が空き)、全部 free → `n == 1` で全体。align 0・3 と bytes 0 → INVAL。同じ off の 2 回目の free・使用中でない off → INVAL で不変。区間が 2048 に届く分割 → NOSPC で不変。init(0xFFFFF000, 0x2000) → INVAL、init(x, 0) → alloc が NOSPC | vram_heap.c の後ろとの結合を外す / 二重の free の検査を外す / 上限の先の数え上げを外す | I1 |
 | GART の作成の失敗 (C6) | fake の pgalloc が 3 頁目で 0 → 取った 2 頁が返り owner の頁数が元へ、NOSPC。fake の `gart_bind` が NOSPC → pin が全部 0・頁が返る・pfn の表が元のまま | gart.c の bind の失敗の巻き戻しから unpin を外す | I1 |
 | unbind の失敗 (C6) | fake の `gart_unbind` が INVAL → `gfx2_gart_free` が IO・pin と頁は不変、destroy が KEEP を立てて BUSY、C15 で隔離・drain が返さない | gart.c の unbind の rc を見ずに進める | I1 |
-| gart_bind の巻き戻し (G5) | fake の NV44 の頁表で 4 頁の bind の 3 頁目を失敗させる → 頁表の項目が全部 0 に戻り rc は NOSPC。unbind の flush の待ちが切れても 0 | gf_v2_gart.c の失敗の時の項目の消去を外す | I1 |
+| GART の頁表 (G5) | fake の instmem (配列) と fake の F2 (RUN・epoch 1)。start → +0 が `0x0002103d`・+4 が `0x07ffffff`、RAMHT に `GF3_HANDLE_GART_DMA` が inst の off で 1 件、pause と resume が 1 回ずつ。A (4 頁、pfn 0x111・0x222・0x333・0x444) の bind → `gpu_off == 0`・+8〜+20 が `pfn << 12` と 3 の OR。B (1 頁)・C (2 頁)・D (1 頁) を続けて bind → 4・5・7 頁目。A と C を unbind して 2 頁の bind → 小さい隙間の 5 頁目 (`gpu_off == 0x5000`)。4 頁の bind の 3 頁目の書きを fake で失敗 → 書いた 2 本が 0・記録が増えない・rc は IO。unbind の `gpu_off` か `n` の違いは INVAL で PTE と記録が不変。range: 1 つの bind の中は 0、2 つの bind にまたがる・`off+bytes` のあふれ込みは ERANGE、handle が VRAM_DMA は EINVAL。fake の F2 を epoch 2 に → range が ERANGE・bind が IO・unbind は書かずに 0。もう一度 start → 新しい頁表に残りの記録の PTE が全部書かれる。reset → 記録 0 件・epoch 0 | gf_v2_gart.c の失敗の時の項目の消去を外す / 最小の隙間の選びを最初の隙間に / start の書き直しを外す / 生きているかの判定から epoch の比べを外す | I1 |
 | staging の失敗 (C7) | DIRECT の別名の lock: fake の pgalloc が 0 → NOSPC・IDLE・写像なし。DISCARD の lock の staging が全部 0 (前に 0xCC を置いた頁)。unlock で fake の unmap が IO → IO・IDLE・staging の欄が 0・頁は caller の owner のまま。正常の unlock の後、caller の owner の頁数が lock の前と同じ | lock.c の DISCARD の 0 埋めを外す / unlock の `gfx2_staging_drop` を外す | I1 |
 | staging の回収 (C15) | 画面の持ち主の AS が DIRECT の別名を lock したまま終わる → owner_release が別名を拾い、`map_as != as`・staging の頁が返り・別名は IDLE で KEEP が無い。unmap が IO → 頁は返らず rc は IO | owner_release.c の `s->map_as == as` の拾いを外す | I1 |
 | caps の size (C10) | size 8 → 8 バイトだけ書き残りは番兵のまま、size 3 → INVAL、size 300 → 256 バイト | caps.c の `min(size, 256)` を 256 固定に | I2 |
@@ -1247,7 +1282,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - 実行時の RED: 橋 (C14) を外した版で v1 の present と v2 の sw の書きが混ざった時に画面の CRC が変わること (I2)。
 
 ### 13-3. 実機 (Ra266、GeForce 6200・Trident)
-- GF: op ごとに hw と sw の READBACK を比べる (exact は一致、他は最大差 ≤ §3-3)、混在の束 (hw・sw・hw) (I2)、走査中の面の free の後に表示が乱れない (カメラ、I3)、fence の待ちの時間 (I2)。
+- GF: op ごとに hw と sw の READBACK を比べる (exact は一致、他は最大差 ≤ §3-3。GART の面 (飛び飛びの pfn) を書き先と読み元にした FILL・COPY と、unbind・再 bind の後の同じ比べを含む、I1・I2)、混在の束 (hw・sw・hw) (I2)、走査中の面の free の後に表示が乱れない (カメラ、I3)、fence の待ちの時間 (I2)。
 - Trident: sync.cfg の gap_ns=80 で欠けが 0 (11-08 の掃引と同じ台本)、sync.cfg が無い時は既定で動く (I3)。
 
 ## 14. 未決
@@ -1301,7 +1336,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **C1 隔離の owner**: 最初の `gfx2_adapter_register` で `ledger_owner_new(LEDGER_KIND_MODULE, 0, "gfx2-quar", …)`。DEVICE は `owner_ram` (mm/pgalloc_owner.inc:14) が拒み RAM を移せないので MODULE。失敗しても登録は 0・ACTIVE は成り立ち、次の登録で取り直す。0 の間の隔離は移さず IO → 既存の poison の道 (§8)。
 - **C3 CPU の書きの吐き出し**: backend の hook は足さない。`gfx2_cpu_end` が VRAM の面は `arch_cpu_serialize()` (nouveau_dma.h:82-85 の `mb()` に当たる)、DIRECT の別名は `gfxsync_flush`、SHADOW は dirty、SYSMEM・GART は何もしない (§6-2)。
 - **C4・C6 解放の順と分担**: TTM の `ttm_bo_release` の順 (fence → CPU の写像 → GPU の写像 → GART の unbind → 頁) に 1 つにした。C4 の destroy が `gfx2_unmap` → `be->release` → `gfx2_gart_free` を呼び、C6 の `gfx2_gart_free` が中で `gart_unbind` → unpin → 解放 (§7-3 の表・§8)。口は分けない。
-- **C6 bind・unbind の失敗**: `gart_bind` は backend の全部か無し (nvkm/subdev/mmu/vmm.c:750-755)、中核は pin・頁・表を戻してその rc。`gart_unbind` は失敗しない (vmmnv44.c:185-194 の flush の時間切れは記録だけ)、0 以外は呼び手の誤りで IO → KEEP → 隔離 (§8)。`gfx2_lost_be` の `gart_unbind` は 0。
+- **C6 bind・unbind の失敗**: `gart_bind` は backend の全部か無し (nvkm/subdev/mmu/vmm.c:750-755)、中核は pin・頁・表を戻してその rc。`gart_unbind` は失敗しない (nouveau の nv04 の unmap は 0 を書くだけ、vmmnv04.c:59-64)、0 以外は呼び手の誤りで IO → KEEP → 隔離 (§8)。`gfx2_lost_be` の `gart_unbind` は 0。
 - **C7 DIRECT の staging**: kmalloc でなく呼び手の owner の連続の頁 (§7-2 の SYSMEM と同じ形)、lock から unlock までだけ gfx2 の帯へ張る。unlock は write_rows → cpu_end → unmap → staging_drop (§7-5)。§6-5 の別名の lock の禁止は DIRECT の別名を除く形に書き換え、C15 は `map_as == as` の別名も拾う (§7-3)。`struct gfx2_surf` に `staging_pfn, staging_n, staging_owner` (A0 の追補)。
 - **C5 heap**: nvkm_mm の head 側 (nvkm/core/mm.c:47-158) の first-fit・分割・結合。align は 2 の冪、0 の bytes・二重の free は INVAL、区間の上限は先に数えて NOSPC、失敗で不変 (§7-6)。
 - **M2 paging_gfx2_map**: `paging_lease_map` (mm/paging_lease.inc:59-133) と同じ検査と全部か無し。flags は PRESENT・USER・RW・PCD・PWT だけ、既存の PTE は −1、PT が取れなければ −2 (§7-4)。
@@ -1311,3 +1346,48 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **C6 の上限と隔離の後始末 (PM 決定、C6 の第 2 回の欠け)**: 上限は gart.c の定数 `GFX2_GART_KB 8192` (表は static の 2,048 本、system.cfg の設定は持たない。要れば後で足す)。隔離へ移すのは割当の全部の頁 (頁は不連続なので、先に全頁の持ち主と pin を確かめ、通ったら 1 頁ずつ `ledger_transfer_pinned(pfn, 1, from, quar)` を呼ぶ。シングルタスクで確かめた後に状態は変わらないので、確かめの後の 1 頁ずつの移しは失敗しない。確かめで落ちたら 1 頁も移さずに IO)。C15 の drain は、fence の完了を見てから同じ handle で `gfx2_gart_free` を呼ぶだけで、C6 の free は表に記録した持ち主 (隔離の後は `gfx2_quar_owner`) で unbind → unpin → free → 表の枠を返す。drain のための別の口は作らない。
 - **C3 の access と EMIT の期限 (PM 決定、C3 の第 2 回の欠け)**: `gfx2_cpu_begin/end` の `access` は bit で、`GFX2_CPU_R 1u`・`GFX2_CPU_W 2u` (読み書きは 3)。gfx/v2/gfx2_int.h に置く (A0 の追補、C3 が入れる)。`GFX2_EMIT_DL` は fence.c の中だけの定数で、1,000,000µs (1 秒、FIFO の空き待ちの上限。GF の既存の待ちの 1000µs の上限で実機が次々に -1 になった前例があるので短くしない)。ほかの `GFX2_*_DL` (REBIND・RELEASE・MODESET) も、使う段の中だけの定数で同じ 1 秒にする。
 - **C4 の SYSMEM と destroy の IO (PM 決定、C4 の第 2 回の欠け)**: SYSMEM の面は backend の `alloc`・`release` を呼ばない (backend が知る必要の無い RAM の面。shim の `alloc = shim_nospc` は VRAM と GART の面だけに効く)。`be->alloc`・`be->release` を呼ぶのは pool が VRAM か GART のときだけ。destroy で `gfx2_unmap` が IO のときは、C4 は KEEP を立てて BUSY で戻るだけで `map_detach` を呼ばない (map_as を残し、C15 が `map_as == as` を見て unmap の再試行と poison を行う)。
+
+## 確定の後の追記 (2026-11-11、G5 の設計の欠け、設計者決定)
+実装者の報告は `~/os32-tmp/run/halv2-g5/RESULT.md`。nouveau の file:line は `~/os32-tmp/ref/linux/drivers/gpu/drm/nouveau/` の写し。細目は §11-6 の「GART (G5)」。
+- **手本の経路 (前提の直し)**: Ra266 の GF6200 は 10de:0221 = NV44A で、nouveau の `nv4a_chipset` は `.mmu = nv04_mmu_new` (nvkm/engine/device/base.c:677-688)。NV44 の専用 GART (mmu/nv44.c・vmmnv44.c) ではなく、nv04 の頁表付きの PCI の DMA の物を移す (docs/decisions/realhw/GF_FEATURE_COMPARE.md の 5 の行と同じ)。G5 は MMIO を書かず、`gf2_fb_init` の 0x100800・0x100850 との共存の問題は起きない。§8 の「物理の表」・§12・§12-1・§13-1 と、上の C6 の行の flush の記述を書き換えた。
+- **欠け 1 (DMA の物の保持と寿命)**: GART の ctxdma は頁表の物そのもの (usernv04.c:51-55)。`gf2_dma_new` は使わず、`struct gf_v2` の `gart.obj` (A0 の追補) に頁表の inst を持ち、`gf2_ramht_add` で `GF3_HANDLE_GART_DMA` を登録する。作るのは G5 の `gf_v2_gart_start` で、呼ぶのは G1 (v2 の初期化) と G2 (LOST の再初期化)。消すのは F2 の停止 (command.c:44-59) で、G5 は消す口を持たない。unregister で F2 が OFF になった後に G1 が `gf_v2_gart_reset` で記録を捨てる。
+- **欠け 2 (頁表)**: instmem に 0x20008 バイト・整列 0x1000・0 埋め (vmmnv04.c:73-77、vmm.c:1158-1159)。見出し `0x0002103d`・`0x07ffffff` (vmmnv04.c:135-139)、PTE `(pfn << 12) | 3`、外すときは 0 (vmmnv04.c:45-64)。装置への設定のレジスタは無い。flush は無い (vmmnv04.c:92-99・vmm.c:127-135)、書きは `gf_inst_write32` の読み返しまで。bind の書きの失敗は書いた分を 0 に戻して IO、unbind の書きは rc を見ない。停止の時の解放は F2 の停止。
+- **欠け 3 (範囲の持ち方)**: A0 の `gart_handle/base/pages` を `struct gf_v2_gart gart` に置き換える。bind ごとの記録 `{first, n, pfn}` を first の昇順に `GF_V2_GART_BINDS` (= `GFX2_MAX_SURFACES`) 件まで持ち、割り当ては最小の隙間 (vmm.c:1773-1786)。unbind は記録との完全な一致だけ、range は 1 つの記録の中だけを 0。pfn は C6 の static の表を unbind まで借りる (§8 の「物理の表」に契約を足した、今の gart.c が満たす)。F2 の recover の後の start は記録から PTE を書き直す。
+- **A0 の追補 (G5 の段で入れる)**:
+  - drivers/video/geforce/gf_v2.h: `struct gf_v2 {` の前に次を足し、`u32 gart_handle, gart_base, gart_pages;      /* G5 */` の行を `struct gf_v2_gart gart;                      /* G5 だけが書く */` に替え、`gf_v2_gart_range` の宣言の後に 2 行を足す。
+    ```c
+    #define GF_V2_GART_PAGES 32768u                  /* nv04 の頁表の PTE の数 (vmmnv04.c:75 の bits 15)、128MB */
+    #define GF_V2_GART_PT_BYTES (8u + 4u * GF_V2_GART_PAGES) /* 見出し 8 + PTE (vmm.c:1158)、0x20008 */
+    #define GF_V2_GART_BINDS GFX2_MAX_SURFACES      /* bind の記録の枠 (GART の面 1 つに 1 件) */
+    struct gf_v2_gart_bind { u32 first, n; const u32 *pfn; }; /* first は頁の番号。pfn は C6 の表を unbind まで借りる */
+    struct gf_v2_gart {
+        struct gf2_object obj;                       /* GART の ctxdma = 頁表の物 (obj.inst が頁表)。動かさない */
+        u32 epoch;                                   /* obj を作った F2 の epoch。0 = 無い */
+        u32 count;                                   /* bind[] の件数、first の昇順 */
+        struct gf_v2_gart_bind bind[GF_V2_GART_BINDS];
+    };
+    ```
+    ```c
+    int gf_v2_gart_start(struct gf_v2 *, u32 dl);    /* G5。v2 で層 3 が ready になった直後に G1・G2 が呼ぶ */
+    void gf_v2_gart_reset(struct gf_v2 *);           /* G5。unregister の道で F2 が OFF になった後に G1 が呼ぶ */
+    ```
+  - hwdev/gf/accel.h: `#define GF3_HANDLE_NOTIFY ...` の次の行に足す。
+    ```c
+    #define GF3_HANDLE_GART_DMA (GF2_HANDLE_LAYER3_FIRST + GF3_OBJECT_COUNT + 1)
+    ```
+  - drivers/video/geforce/gf_v2_weak.c: `gf_v2_gart_range` の weak の後に足す (G1・G2 が G5 より先に入っても組めるように)。
+    ```c
+    __attribute__((weak)) int gf_v2_gart_start(struct gf_v2 * a0, u32 dl)
+    {
+        (void)a0;
+        (void)dl;
+        return OS32_ERR_NOSYS;
+    }
+    __attribute__((weak)) void gf_v2_gart_reset(struct gf_v2 * a0)
+    {
+        (void)a0;
+    }
+    ```
+  - tools/checks/gfx2_wiring.txt: `I1 geforce gf_v2_gart_range` の次に `I1 geforce gf_v2_gart_reset`、`I1 geforce gf_v2_gart_start` の 2 行。
+- **G1・G2・G8 との分担**: §11-6 の「GART (G5)」の「分担」の行が正。G1 の行・G2 の行・G8 の行 (§12) にも書いた。
+- **実機でしか確かめられない点** (NP21/W に GeForce は無い): Ra266 の PCI のブリッジを通した bus master の到達性と番地の対応 (GF_FEATURE_COMPARE の U3)、頁表付きの ctxdma で GART の面への 2D と M2MF が正しい頁に届くこと (飛び飛びの pfn で)、flush 無しで bind の直後の描画と unbind・再 bind の後の描画が古い頁を見ないこと、instmem の予約に頁表 (0x20008) が収まり `gf_inst_alloc` が通ること。§13-3 の GF の行の GART の面の READBACK の比べで見る。
