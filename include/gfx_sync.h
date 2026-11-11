@@ -20,4 +20,6 @@ void gfxsync_unbind(GfxSyncCtx *);
 #define GFXSYNC_DIRECT 2
 int gfxsync_mode(const GfxSyncCtx *);    /* Y4。bind の後の実効の mode (既定へ落ちた後の値)。NULL は 0 */
 
+void gfxsync_profile(const GfxSyncCtx *, char out[16]);
+
 #endif
