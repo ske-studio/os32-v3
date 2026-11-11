@@ -39,3 +39,8 @@ int main(void) {
     return 0;
 }
 void _start(void) { int r=main(); __asm__ volatile("int $0x80" : : "a"(1),"b"(r)); __builtin_unreachable(); }
+
+/* The fixture never enters an exec user context. */
+struct arch_syscall;
+void exec_syscall_dispatch(struct arch_syscall *call) { (void)call; }
+void ring3_fault_kill(void) { }

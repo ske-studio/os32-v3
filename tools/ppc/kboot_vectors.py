@@ -190,7 +190,20 @@ def main():
     elf=build(out/'normal',src)
     static(out/'normal',elf); observe(out/'normal',elf)
     if a.mutate:
-        changes=[('r31-offset','lwz 31,PPC_CALL_SIZE+124(1)','lwz 31,PPC_CALL_SIZE+120(1)'),
+        restore_prefix = ('.Lrestore_frame:\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)\n'
+                          '    mtsrr0 3\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)\n'
+                          '    mtsrr1 3\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_LR(1)\n'
+                          '    mtlr 3\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CTR(1)\n'
+                          '    mtctr 3\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_XER(1)\n'
+                          '    mtxer 3\n'
+                          '    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CR(1)\n'
+                          '    mtcr 3\n    lwz 31,PPC_CALL_SIZE+')
+        changes=[('r31-offset',restore_prefix+'124(1)',restore_prefix+'120(1)'),
                  ('early-dr','    mr 31,1','    mfmsr 30\n    ori 30,30,0x30\n    mtmsr 30\n    isync\n    mr 31,1'),
                  ('srr0-plus4','    mtsrr0 3','    addi 3,3,4\n    mtsrr0 3'),
                  ('spill-dispatch','    beq ppc_kernel_vector_return','    bne ppc_kernel_vector_return')]
