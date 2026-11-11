@@ -74,6 +74,14 @@ def execute(source):
 
 def resume_check(source):
     # Interpret the actual restore instructions against a distinct saved frame.
+    stop_translation = '''    mfmsr 3
+    li 4,(PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
+    andc 3,3,4
+    mtmsr 3
+    isync'''
+    if (source.count(stop_translation) != 1 or
+            not source.index('bl ppc_boot_load_root') < source.index(stop_translation) < source.index('mtsprg1')):
+        return False
     regs = [0] * 32
     regs[30] = 0x1000
     frame = [0x2000 + i for i in range(44)]

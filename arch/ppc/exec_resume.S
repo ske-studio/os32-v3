@@ -1,5 +1,6 @@
 /* Restore a saved USER frame after loading its address space. */
 #include "ppc_frame.h"
+#include "ppc_oea.h"
 .text
 .align 2
 .globl arch_user_resume
@@ -12,6 +13,12 @@ arch_user_resume:
     stw 1,ppc_exec_kernel_sp@l(3)
     mr 3,31
     bl ppc_boot_load_root
+    /* Identity code/frame; stop translation before restoring the frame. */
+    mfmsr 3
+    li 4,(PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
+    andc 3,3,4
+    mtmsr 3
+    isync
     lwz 0,PPC_FRAME_LR(30)
     mtlr 0
     lwz 0,PPC_FRAME_CR(30)
