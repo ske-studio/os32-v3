@@ -93,7 +93,7 @@ int gf5_perf_select(struct gf5 *, u8 index); /* 表・fan・電圧・両clockを
 - 差分: 手本のvblank待ち結果は戻り値にしていない。OS32では試験の失敗を成功扱いしないためETIMEを返す。新しいPLL lock poll/独自の待ち時間は足さない。
 - RAM区間: calc成功後にCPUのVRAM操作を閉じ、F2 drain_pause→ram_prog全体→成功時unpause/CPU受付再開。RAM区間はCPU窓/present/描画/flipの受付を閉じる。現行referenceはMMIO読出し (fence.c:57) でIRQにVRAM fence読出しは無く、架空の抑止hookは作らない。F1 MMIO ACKは継続する。clock/fan/voltまで停止を広げない（PM決定）。
 - BIT M scriptは切替前に全decodeし、呼出先を含め既存runnerで実行可能か確認。固定main全体の再実行で代替しない。未登録spanの登録/試験がB2の必須作業（D2）。
-- calc失敗は無変更。self-refresh以後のEIOでは旧4020/4024とc040を同じ切替順で戻す試行を1回行い、必ずself-refresh解除/auto-refresh復旧まで進む。再失敗はFAULT、F2停止へ渡す。これは手本に無い試験adapter失敗の後始末であり自動再試行ループは作らない。
+- calc失敗は無変更。prog の失敗の後始末は手本どおり (PM 決定 2026-11-11、手本に寄せる): 手本に無い旧 4020/4024・c040 の戻しの書きはしない。手本の ram prog の失敗の道 (N/nvkm/subdev/fb/ramnv40.c:67–175 nv40_ram_prog と N/nvkm/subdev/clk/base.c:159–216,293–304 の失敗の扱い) と同じ書きだけを行い、self-refresh の解除と auto-refresh の復旧が手本の列に含まれる所はその順のまま。自動再試行ループは作らない。
 
 ## 4. 温度・ファン
 | 手本/資料 | OS32の列 | 誤り |
@@ -145,7 +145,7 @@ int gf5_volt_get(struct gf5 *, u32 *requested_uv);
 int gf5_volt_set(struct gf5 *, u32 requested_uv); /* 要求以上で最も近い表値 */
 ```
 - 性能状態統括: 表/span/対応確認→RAM calc→drain_pause→RAM prog→unpause→fan上げ→電圧上げ→core/shader calc/prog→電圧下げ→fan下げ。手本`N/nvkm/subdev/clk/base.c:159–215,266–305`の順。PCI版Ra266にPCIe link切替は不要。手本の-ENODEV相当はENOTSUPとして機能不在を記録し、利用可能な操作を継続する。
-- 差分: 中途失敗は後続の降圧/ファン下げを行わずFAULTへ渡し、最後に成功した設定を記録する。手本はcalc/prog失敗後も下げ経路へ進むが、OS32の偽MMIO失敗で部分書込後のクロックを確定できないため。RAM失敗は§3の復旧列。
+- 中途の失敗は手本どおり (PM 決定 2026-11-11): calc/prog の失敗の後も手本 `N/nvkm/subdev/clk/base.c:195–216` と同じく下げの道 (電圧下げ・fan 下げ) へ進み、失敗は rc で返して記録する。
 - 本体は上記MIT列で実装し、暫定ENOTSUPのstubではB3/B4を完了しない。実ROMに対応GPIO/表が無い場合のENOTSUPは正常な機能不在として別に記録する。
 
 ## 6. タイリング

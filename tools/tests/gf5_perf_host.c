@@ -306,8 +306,8 @@ static void selection(void)
             h.ctx.accepting==!nested_restore && h.display.ctx.saved_closed==nested_restore &&
             h.ctx.busy==nested_restore && !h.display.nevents);
     }
-    /* Each failed dependency is the last call, including during restore.
-     * B0 marks FAULT/closed locally; no later lowering or adapter is allowed. */
+    /* calc/RAM/core errors still lower voltage then fan. Up/check errors
+     * return immediately, and lower errors never replace the primary rc. */
     for (u32 closed=0;closed<2;++closed) for (u32 i=0;i<count;++i) {
         fresh(); nested_restore=closed!=0;
         h.ctx.busy=nested_restore;
@@ -318,10 +318,18 @@ static void selection(void)
         u32 nth=1;
         for (u32 j=0;j<i;++j) if (golden[j].op==golden[i].op) ++nth;
         gf5_host_fail_at(&h,golden[i].op,nth,GF5_EIO);
-        assert(gf5_perf_select(&h.ctx,0)==GF5_EIO); prefix(i+1);
-        assert(h.nevents==i+1 && h.ctx.last_rc==GF5_EIO && h.ctx.source_rc==GF5_EIO);
-        assert(h.ctx.phase==(i<3 ? phase : GF5_FAULT) &&
-            h.ctx.accepting==(i<3 && !nested_restore));
+        bool lower=i==0 || i==3 || i==6;
+        i32 expected=i>=7 ? 0 : GF5_EIO;
+        assert(gf5_perf_select(&h.ctx,0)==expected); prefix(i+1);
+        u32 total=lower ? i+3 : (i>=7 ? count : i+1);
+        assert(h.nevents==total && h.ctx.last_rc==expected && h.ctx.source_rc==expected);
+        if (lower) {
+            assert(events[i+1].op==F5_VOLT && (i32)events[i+1].a[3]==-1);
+            assert(events[i+2].op==F5_FAN && (i32)events[i+2].a[2]==-1);
+        }
+        bool fault=i>=3 && i<7;
+        assert(h.ctx.phase==(fault ? GF5_FAULT : phase) &&
+            h.ctx.accepting==(!fault && !nested_restore));
         assert(!h.calls[F5_PAUSE] && !h.calls[F5_RESUME] && !h.calls[F5_ADMIT] &&
             !h.display.base.paused && h.display.ctx.saved_closed==nested_restore);
         assert(h.ctx.image==&image && h.ctx.rom.bytes==rom &&
@@ -330,17 +338,17 @@ static void selection(void)
     }
     /* EBIOS from calc (including Ra266 separate shader) never pauses. */
     fresh(); gf5_host_fail_at(&h,F5_CALC,1,GF5_EBIOS);
-    assert(gf5_perf_select(&h.ctx,0)==GF5_EBIOS && h.nevents==1 && h.ctx.phase==GF5_RUN);
+    assert(gf5_perf_select(&h.ctx,0)==GF5_EBIOS && h.nevents==3 && h.ctx.phase==GF5_RUN);
     /* PM22: classify at the public boundary while retaining the lower rc. */
     fresh(); gf5_host_fail_at(&h,F5_RAM,1,GF2_ETIME);
     assert(gf5_perf_select(&h.ctx,0)==GF5_ETIME && h.ctx.source_rc==GF2_ETIME);
     assert(h.calls[F5_CALC]==1 && h.calls[F5_RAM]==1 &&
         h.nevents==h.calls[F5_CALC]+h.calls[F5_RAM]+
-            h.calls[F5_FAN_CHECK]+h.calls[F5_VOLT_CHECK] && !h.calls[F5_ADMIT] &&
+            h.calls[F5_FAN_CHECK]+h.calls[F5_VOLT_CHECK]+2 && !h.calls[F5_ADMIT] &&
         h.ctx.last_rc==GF5_ETIME && h.ctx.phase==GF5_FAULT && !h.ctx.accepting);
     fresh(); lower_source=GF2_ETIME; gf5_host_fail_at(&h,F5_CALC,1,GF5_ETIME);
     assert(gf5_perf_select(&h.ctx,0)==GF5_ETIME && h.ctx.source_rc==GF2_ETIME &&
-        h.ctx.last_rc==GF5_ETIME && h.nevents==1 && h.ctx.phase==GF5_RUN && h.ctx.accepting);
+        h.ctx.last_rc==GF5_ETIME && h.nevents==3 && h.ctx.phase==GF5_RUN && h.ctx.accepting);
     fresh(); lower_source=GF2_EIO; gf5_host_fail_at(&h,F5_PROG,1,GF5_EIO);
     assert(gf5_perf_select(&h.ctx,0)==GF5_EIO && h.ctx.source_rc==GF2_EIO);
     /* nouveau clk/base.c:178-213: only confirmed absence is optional. */
