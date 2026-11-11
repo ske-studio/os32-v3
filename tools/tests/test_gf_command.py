@@ -153,7 +153,8 @@ MUTATIONS = {
     ],
     'b6': [
         ('deadline-wrap', '(now - deadline_us)', '(deadline_us - now)'),
-        ('seq-wrap', '(observed - fence.seq)', '(fence.seq - observed)'),
+        ('seq-wrap', 'if ((i32)(observed - fence.seq) >= 0) return GF2_OK;', 'if ((i32)(fence.seq - observed) >= 0) return GF2_OK;'),
+        ('poll-seq', '*done = (i32)(observed - fence.seq) >= 0;', '*done = (i32)(fence.seq - observed) >= 0;'),
         ('reference-method', 'GF2_REFERENCE_METHOD,', '0x0054U,'),
         ('no-kick', 'rc = gf2_kick(ch);', 'rc = GF2_OK;'),
         ('init-routing', 'if (ch->state == GF2_RUN)',
