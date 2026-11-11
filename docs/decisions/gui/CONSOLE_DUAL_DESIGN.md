@@ -153,19 +153,19 @@ int pc98_route_to_gf(void)
 | MINIMAL・起動 FD の構成 | 0 ファイル | packages.yaml 不変 |
 
 ## 7. ファイルごとの変更一覧 (1 ファイル = 1 段 = 1 実装者)
-| 段 | ファイル | 量 | 前提 |
+| 段 | ファイル | 前提 | 見込み |
 |---|---|---|---|
-| D1 | kernel/console/console_dual.h・.c (新) + 結線 (build/sources/order.mk・tools/tests/fixtures/build_profile_x86.json の C_KERNEL) | +35 / +70 / 各 +1 | なし |
-| D1g | drivers/video/geforce/gf_outputs.h・.c (新、カーネル側) + 結線 (geforce_module.c と同じ一覧・build_profile_x86.json) | +20 / +50 / 各 +1 | D1 の .h (CON_DUAL_MAX_HEADS) |
-| D2 | platform/pc98/display_dual.c (新) + 結線 (build/platform/pc98.mk・build_profile_x86.json) | +70 / 各 +1 | D1・D1g の .h |
-| D3 | kernel/console/console.c (§3-2) | ±18 | D1 |
-| D4 | drivers/video/pc98/pc98_route.c (§3-3) | +4 | D1 |
-| D5 | init/kernel.c (412・473) + init/kernel_gfx_config.inc (1 行) | ±8 | D1・D3 |
-| D6 | tools/tests/console_dual_host.c (新) + tools/checks/console-dual-host.py (新、`make check-console-dual-host`) | +240 / +20 | D1〜D4 |
-| D7 | 設定の説明 1 行 (文書) | +1 | PM |
-- 実装者は全部 terra (どれも 1,000 行未満)。D1・D1g の .h を先に固定し D2〜D5 を並列、**D1〜D6 を 1 本の統合の枝 (wt/int-*) で CI 1 回**の取り込みの単位にする (途中段は単独で main に入れない)。
-- HAL v2 との境目: gf_outputs.[ch] は HAL v2 C1 で消える暫定の口。C1 の票に「display_dual.c の GF の行を gfx2 の列挙に差し替え、gf_outputs を消す、CON_DUAL_MAX_* を GFX2 の定数に」の 1 行を足す (PM)。
-- PPC 第 5 段との順: 本票が触るファイル (console.c・console_backend.h・platform/pc98/console.c・include/tvram.h・init/kernel.c ほか) は PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ (os32powerpc の指摘)。**実装は第 5 段 Z の後に出し、移った先の構成で本書の前提 (§1 の file:line と §7 の置き場) を見直してから**にする。本票の論理は新ファイル、console.c は門の式と 1 関数だけ、console_dual.c は pc98.h・TVRAM の番地を include しない、の方針は変えない。
+| H0 | gfx/v2/enum.c (gfx2_head_info の上書きの直し) + 既存の enum の host 試験 | なし | ±3、試験 +20 |
+| D1 | kernel/console/console_dual.h・.c (新) + order.mk・build_profile_x86.json | なし | +30 / +60 |
+| D2 | platform/pc98/display_dual.c (新: gfx2 の列挙・key・text_on・診断) + pc98.mk・order.mk・build_profile_x86.json | D1 の .h・H0 | +110 |
+| D3 | kernel/console/console.c (門 4 か所 + console_session_clear) + host の stub 3 本 | D1 | ±20、各 +3 |
+| D4 | drivers/video/pc98/pc98_route.c | D1 | +4 |
+| D5 | init/kernel.c (423・484) + init/kernel_gfx_config.inc | D1・D3 | ±8 |
+| D6 | tools/tests/console_dual_host.c + tools/checks/console-dual-host.py | H0・D1〜D5 | +240 / +20 (400 行を超えたら、判定と列挙 (A1・A1g・A2) と門・経路 (A3・A4) の 2 本に分ける) |
+| D7 | 設定の説明 1 行 (文書) | PM | +1 |
+- 実装者は全部 terra。H0・D1 の .h を先に固定し D2〜D5 を並列、**H0・D1〜D6 を 1 本の統合の枝 (wt/int-*) で CI 1 回**の取り込みの単位にする。
+- HAL v2 との境目: GF の行は最初から gfx2 の列挙 (HAL v2 の K1 を D2 に吸収、末尾の 2026-11-12 の追記)。
+- PPC 第 5 段との順: 第 5 段 C1 は main にあり、D3 はその上に載せる。
 
 ## 8. 受入 → 試験と変異
 | 受入 | 試験 | 場所 |
@@ -196,3 +196,31 @@ int pc98_route_to_gf(void)
 - **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/tvram.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
 - **D5 と PPC の選択集合**: `init/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
 - **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
+
+## 確定の後の追記 (2026-11-12、main 15738b50 との照らし直し、PM 決定)
+- **D1g を廃止し、HAL v2 の K1 を D2 に吸収する**: HAL v2 の C1・C11・G10 が main にあり、I3 は実機で PASS しているので、gf_outputs.[ch] は作らない。display_dual.c は最初から gfx2 の列挙で表を作る。HAL_V2_DESIGN §12 の K1 の行 (:1228) は「CONSOLE_DUAL の D2 に吸収」で閉じる。
+  - 対象の判定: `gfx2_active()` (gfx/v2/gfx2_int.h:88) の adapter が `kind == GFX2_KIND_GEFORCE` で、かつ `gfx_is_started()`。adapter が 0 なら GF の行を出さない (HAL_V2_DESIGN:1276)。
+  - 行の作り方: 98 の TEXT の行を 1 行目に置き、続けて `h < a->heads` の各 head を 1 行ずつ足す。head の欄は `gfx2_head_info(a->index, h, &v)` (gfx/v2/enum.c:28-40、I/O なし) から取る。
+    - running = `v.attached`。dpms は gfx2 から見えないので、attached をそのまま使う。
+    - connector = `v.connector_mask` の最下位 bit。
+  - 役割: DESK は `a->state == GFX2_AD_OK` で、かつ attached な head。v2 のアプリが head 1 に mode_set した時もこの規則に従う。ほかは NONE。
+  - conn_type・conn_status: GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c:71-73) ので、判定の道では UNKNOWN のままにする。`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` (enum.c:42-52) で埋める。base_valid による判定 (R3-2) はこれに置き換える。抜き挿しのライブ検出をしない方針 (R3-3) は変えない。
+- **HAL v2 の公開の口の直し (段 H0)**: `gfx2_head_info` (enum.c:37) は connector_mask を中核の `a->head[h].conn_mask` で上書きしている。conn_mask を書くのは `gfx2_mode_set` (modeset.c:59) だけなので、v1 で始めた机の head は attached=1・connector_mask=0 を返す。これは backend の値 (HAL_V2_DESIGN:1663 の `1 << route`) を捨てる欠けなので、`conn_mask` が 0 の時は backend の値を残すように直す (1 行)。host 試験に「v1 の机 (conn_mask=0) の head は backend の connector_mask を返す、mode_set の後は conn_mask を返す」を足す。変異は上書きを無条件に戻す形で、RED になること。
+- **鍵は display_dual.c へ**: console_dual.c と console.c は PPC の成功集合に入る (tools/ppc/selected_success.json:98) が、g_backend は gfx_core.c (PPC の外) にある。そこで §2-2 の更新条件 4 つを、弱いシンボル `u32 display_dual_key(void)` 1 つに畳む (I/O なし)。
+  - 畳む欄: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid。畳み方は `k = k*31 + 欄`。
+  - gfx_shutdown の GF→PC98 では ACTIVE が付け替わる (gfx/gfx_core.c:408) ので、鍵が変わる。
+  - console_dual.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (PPC では行が 0)。
+- **定数**: console_dual.h は gfx2_int.h を include せず、`#define CON_OUT_MAX 9  /* 1 + GFX2_MAX_ADAPTERS(4) × head[2] */` を置く。display_dual.c で `_Static_assert(CON_OUT_MAX >= 1 + GFX2_MAX_ADAPTERS * (sizeof gfx2_adapters[0].head / sizeof gfx2_adapters[0].head[0]))` を確かめる。§2-1 の CON_DUAL_MAX_* は使わない。
+- **text_on の手本**: platform/pc98/display.c:23-34 の display_text_start のうち 28-33 (GDC STOP・FF1 DISP ON・TEXT START) だけを写す。26-27 の gfx_current_height・gfx_flip_enabled は書かない (A2)。
+- **file:line の更新**:
+  - init/kernel.c の 412・473・435-436 は 423・484・446-447 に。
+  - backend_geforce.c の 618・627・728・483 は 643・655・756・491 に。
+  - gfx_shutdown は gfx/gfx_core.c:383-414、パニックの直書きは platform/pc98/emergency.c:20-24。
+  - 設定の読み込みは init/kernel_gfx_config.inc:17 の後に入れる。
+  - console.c の門 (53-57・106・388・428-445) と pc98_route.c (22-25・39-42・44-57) はそのまま。
+- **D3 の付帯**: console.c を組む host 試験 3 本 (tools/tests/con_sink_host.c・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py:44 の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (platform/pc98/console.c:32-35)。D3 はその上に載せる。
+- **§4 に足す**: GF の LOST (gfx/v2/fence.c:25-43) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。
+- **§8 の直し**:
+  - A1g は「偽の gfx2_adapters[] と backend の enum_head で、v1 の机 (conn_mask=0) でも connector が backend の値から決まる」に替える。
+  - 変異の「base_valid を見ない」は「判定の道で enum_conn を呼ぶ (I/O が 0 回でなくなる)」に替える。
+- **段の表**: §7 を書き換えた (H0 を足し D1g を削除)。

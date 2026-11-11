@@ -1225,7 +1225,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | G9 | drivers/video/geforce/gf_v2_alloc.c | `gf_vram_reserve/release` | C4 経由 | `node[]`・`surf.priv` | 120 | I1 |
 | U1 | userland/lib/gfx/v2/*.c (format.c を共有) | 公開の gfx2_* | アプリ | — | 400 | I2 |
 | D1 | assets/gfx/sync.cfg (新規) と build/core.yaml の 1 項目 (guest `/etc/gfx/sync.cfg`、tags `[gui]`)、既定の中身の host 試験 (末尾の追記の D1) | — (Y1 の sync_cfg.c を host で組む) | Y1 | — | 30 | I3 |
-| K1 | platform/pc98/display_dual.c の GF の行と gf_outputs.[ch] の削除 (CONSOLE_DUAL_DESIGN.md:67・167。CONSOLE_DUAL の D2 と C1・C11 が main に入った後): display_dual.c の GF の行を gfx2 の列挙 (`gfx2_adapter_count/info`・`gfx2_head_info`・`gfx2_connector_info`) に差し替え、gf_outputs を消し、`CON_DUAL_MAX_*` を GFX2 の定数に | C1・C11 | console_dual.c | — | −40 | I3 |
+| K1 | CONSOLE_DUAL の D2 に吸収 (2026-11-12、CONSOLE_DUAL_DESIGN の末尾の追記): display_dual.c は最初から gfx2 の列挙 (`gfx2_active`・`gfx2_head_info`・`gfx2_connector_info`) で GF の行を作り、gf_outputs は作らない | — | — | — | — | — |
 | I1 | 面の道: C1・C3〜C7・C15〜C18・M1〜M3・X1・G5・G9 | 確保 → 写像 → lock → 解放 → AS の回収 (隔離を含む)。合格は §13 の I 列が I1 の試験全部 (**新帯の往復 `gfx2_map_selftest` と AS の回収を必ず含む**) + `gfx2_no_weak.sh I1` | | | 結線 | |
 | I2 | 描画の道: C2・C8〜C10・C14・S1〜S11・G1・G4・G7・G8・G11・U1 | 混在の束・fence・v1 の橋・libos32gfx。合格は I 列が I2 の試験全部 + `gfx2_no_weak.sh I2` | | | 結線 | I1 の後 |
 | I3 | 表示の道: C11〜C13・G2・G10・P1・T1・Y1〜Y4・D1・K1 | 列挙・mode・flip・全画面の出入り・同期層。合格は I 列が I3 の試験全部 + `gfx2_no_weak.sh I3` | | | 結線 | I2 の後 |

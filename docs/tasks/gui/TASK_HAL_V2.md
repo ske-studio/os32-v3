@@ -27,7 +27,7 @@
 | I1 の材料 C1・C3〜C7・C15〜C18・M1〜M3・X1・G5・G9 | 実装・host 試験済み (wt/halv2-i1) |
 | I2 の材料 C2・C8〜C10・C14・S1〜S11・G1・G4・G7・G8・U1 (G3・G6 は廃止、色鍵と α は sw) | 実装中 |
 | I3 の材料 C11〜C13・G2・P1・T1・Y1〜Y4・D1 | 未着手 (G2・D1 は設計の往復が先) |
-| K1 (CONSOLE_DUAL の gf_outputs の差し替え) | 未着手 (CONSOLE_DUAL の D2 と C1・C11 の後) |
+| K1 (CONSOLE_DUAL の gf_outputs の差し替え) | CONSOLE_DUAL の D2 に吸収 (2026-11-12、gf_outputs は作らない、CONSOLE_DUAL_DESIGN の末尾の追記) |
 | I1 (面の道) | 結線済み・NP21/W の一括受入は合。ゲスト試験 gfx2_i1 が FAIL で調べ中 |
 | I2 (描画の道)・I3 (表示の道) | 未着手 |
 | CONSOLE_DUAL (決定 C) | 確定設計あり ([CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)、段は TASK_CONSOLE_DUAL) |
@@ -45,5 +45,5 @@ NP21/W に GeForce・Trident は無く PEGC だけなので、段ごとに確か
 
 - 実機の受入は段ごとにせず、I1・I2・I3 が main に入るたびに 1 回まとめて回す。ノートのセッションに頼み、判定はシリアル (ゲスト試験の PASS/FAIL・mem・起動ログ) と、画面はカメラで PM が見る。
 - R の項目は延期の台帳 DEFERRED_TESTS の HALV2-RH-* の行で持ち、節目ごとに閉じる。
-- 2026-11-12: I1〜I3 の R の項目は実機 (main ee876302) で GeForce・Trident とも gfx2_i1〜i3・gfx2_rh が PASS し、HALV2-RH-I2・RH-I3 を閉じた (証拠はノートの ~/os32-tmp/evidence/2026-11-12/halv2-i2-idle/ ほか)。残るのは K1 (CONSOLE_DUAL の D2 の後)。
+- 2026-11-12: I1〜I3 の R の項目は実機 (main ee876302) で GeForce・Trident とも gfx2_i1〜i3・gfx2_rh が PASS し、HALV2-RH-I2・RH-I3 を閉じた (証拠はノートの ~/os32-tmp/evidence/2026-11-12/halv2-i2-idle/ ほか)。K1 は CONSOLE_DUAL の D2 に吸収した。
 
