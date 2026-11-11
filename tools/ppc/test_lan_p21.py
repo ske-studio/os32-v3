@@ -18,7 +18,7 @@ MUTATIONS = [
     ('header', 'get_be(src + PLN1_OFF_HEADER_BYTES, 2) != PLN1_HEADER_BYTES ||', '0 ||', 19),
     ('limit', 'len > PLN1_PAYLOAD_MAX || len > bytes - PLN1_HEADER_BYTES)', 'len > bytes - PLN1_HEADER_BYTES)', 21),
     ('reserved', 'get_be(src + PLN1_OFF_RESERVED, 4) != 0 ||', '0 ||', 20),
-    ('clear', 'memset(m, 0, sizeof(*m));', '(void)m;', 17),
+    ('clear', 'kmemset(m, 0, sizeof(*m));', '(void)m;', 17),
     ('nonce', 'if (m->host_nonce[i]) return LAN_EINVAL;', 'if (0) return LAN_EINVAL;', 11),
 ]
 
