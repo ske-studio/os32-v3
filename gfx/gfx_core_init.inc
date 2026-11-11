@@ -2,11 +2,13 @@
 static void gfx_init_mode(int legacy200)
 {
     palette_shadow_reset();
+    gfx2_pal_reset16();
     pc98_splash_raster_reset();
     gfx_init_gen++;
     /* GDC 初期化より前にバックエンドを決める。 */
     int initialized = gfx_select_and_init_backend(legacy200);
     if (initialized < 0) return;
+    gfx2_register_selected();
     if (initialized) {
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
