@@ -1,11 +1,14 @@
-/* PowerPC kernel jump context storage: compile-only, provisional.
- * exec_setjmp/exec_longjmp are not implemented for PPC yet (② stops with
- * UNSUPPORTED on that path, PPC_KBOOT_DESIGN §5). The size covers the SysV
- * callee-saved set used by the probe recovery record (arch/ppc/ppc_frame.h
- * struct ppc_onfault: pc, sp, cr, r13-r31 = 22 words) plus the two saved
- * IRQ/exception depths that include/ksetjmp.h promises. Final in the ③ design. */
+/* PowerPC kernel jump context (PPC_SHELL_EXEC_DESIGN §5). */
 #ifndef OS32_PPC_ARCH_JMP_STORAGE_H
 #define OS32_PPC_ARCH_JMP_STORAGE_H
-#define ARCH_JMP_BYTES 96
+/* r13-r31 occupy 19 consecutive words beginning at PPC_JMP_R13_OFFSET. */
+#define PPC_JMP_R1_OFFSET 0
+#define PPC_JMP_R2_OFFSET 4
+#define PPC_JMP_R13_OFFSET 8
+#define PPC_JMP_LR_OFFSET 84
+#define PPC_JMP_CR_OFFSET 88
+#define PPC_JMP_IRQ_DEPTH_OFFSET 92
+#define PPC_JMP_EXCEPTION_DEPTH_OFFSET 96
+#define ARCH_JMP_BYTES 100
 #define ARCH_JMP_ALIGN 4
 #endif
