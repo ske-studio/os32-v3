@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **設計中 (2026-11-11)** — 計画と中間の到達点 S-A の詳細設計は確定 ([PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md))、実装待ち。最終の到達点 S-B (USER ABI・syscall・exec・OS32X の BE の読み) は別の往復で詳細設計する。前提は LAN ([TASK_PPC_LAN](TASK_PPC_LAN.md)、main)。
+> 状態: **設計中 (2026-11-11)** — 計画と中間の到達点 S-A の詳細設計は確定 ([PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md))、実装待ち。最終の到達点 S-B (USER ABI・syscall・exec・OS32X の BE の読み) は別の往復で詳細設計する。前提は LAN (票 TASK_PPC_LAN、main)。
 
 ## 0. ユーザー決定 (2026-11-11)
 
