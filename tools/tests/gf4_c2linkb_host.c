@@ -42,7 +42,7 @@ enum {
     /* CR44 index/data; one TMDS pair; one CR index/data; SEL_CLK cleanup.
      * nouveau_bios.c:93-106,673-677; init.c:1121-1143,1196-1208. */
     OWNER_WRITES=2, GROUP_WRITES=2, CR_WRITES=2, CLEANUP_WRITES=1,
-    CALLBACK_WRITES=OWNER_WRITES+GROUP_WRITES+CR_WRITES+CLEANUP_WRITES,
+    BIND_WRITES=4, CALLBACK_WRITES=OWNER_WRITES+GROUP_WRITES+CR_WRITES+BIND_WRITES+CLEANUP_WRITES,
     VGA_WIDTH=640, XRGB_CPP=4, INJECT=-733
 };
 static struct gf4_host h;
@@ -276,11 +276,11 @@ static void callback(void)
         write_is(3,bases[n],4,SCRIPT_INDEX);
         write_is(4,CR_PORT+head*STRIDE,1,0x11);
         write_is(5,CR_PORT+head*STRIDE+1,1,n ? 9 : 7);
-        write_is(6,SEL_CLK,4,SEL_INITIAL);
+        write_is(10,SEL_CLK,4,SEL_INITIAL);
     }
     fixture(); route.or_mask=1;
     assert(!run(HIGH_KHZ-1,DEADLINE));
-    assert(pc_at_release==PC_LOW && h.calls[D_WRITE]==OWNER_WRITES+GROUP_WRITES+CLEANUP_WRITES);
+    assert(pc_at_release==PC_LOW && h.calls[D_WRITE]==OWNER_WRITES+GROUP_WRITES+BIND_WRITES+CLEANUP_WRITES);
     /* selector81 uses OR1's other bank: init.c:539-572. */
     write_is(2,TMDS_B+TMDS_DATA_DELTA,4,OTHER_VALUE);
     write_is(3,TMDS_B,4,SCRIPT_INDEX);
@@ -297,7 +297,7 @@ static void binding_and_repeat(void)
     assert(!run(HIGH_KHZ,DEADLINE));
     assert(register_value(SEL_CLK)==SEL_RESTORED);
     assert(tracked_owner_writes==1 && h.ctx.reusable && legacy.reusable);
-    write_is(2,SEL_CLK,4,SEL_SCRIPT); write_is(3,SEL_CLK,4,SEL_RESTORED);
+    write_is(2,SEL_CLK,4,SEL_SCRIPT); write_is(7,SEL_CLK,4,SEL_RESTORED);
     assert(!run(HIGH_KHZ,DEADLINE));
     assert(loans==2 && returns==2 && restores==2);
     assert(register_value(SEL_CLK)==SEL_RESTORED);
@@ -351,7 +351,7 @@ static void failures(void)
         }
         /* Preparation/opcode origins start a fresh operation. Rejection
          * inside an operation permits only the binding cleanup write. */
-        assert(h.calls[D_WRITE]==(expiry_origin ? OWNER_WRITES+CLEANUP_WRITES :
+        assert(h.calls[D_WRITE]==(expiry_origin ? OWNER_WRITES+BIND_WRITES+CLEANUP_WRITES :
                writes_at_expiry+(n>2 ? CLEANUP_WRITES : 0U)));
     }
     for (u32 n=1;n<=clocks;n++) {
@@ -366,7 +366,7 @@ static void failures(void)
 static void b10(void)
 {
     const u32 clocks[]={DUAL_EDGE-1,DUAL_EDGE,DUAL_EDGE+1};
-    const u32 counts[]={1,1,2}; /* Approved >165000 rule, dfp.c:68-90 difference. */
+    const u32 counts[]={1,2,2}; /* nouveau_bios.c:674 */
     for (u32 n=0;n<sizeof(clocks)/sizeof(clocks[0]);n++) {
         fixture();
         struct gf4_head_image *image=&s.head[route.head];
@@ -381,7 +381,7 @@ static void b10(void)
         for (u32 i=0;i<h.nevents;i++) if (trace[i].op==D_WRITE &&
             trace[i].a[2]==4 && trace[i].a[3]==BIND_INDEX &&
             (trace[i].a[1]==TMDS_C || trace[i].a[1]==TMDS_C+8U)) {
-            assert(i && i<events_at_acquire && trace[i-1].op==D_WRITE);
+            assert(i>events_at_acquire && trace[i-1].op==D_WRITE);
             const struct gf4_host_event *data=&trace[i-1];
             assert(data->a[1]==(binds ? TMDS_C+12U : TMDS_C+4U));
             assert(data->a[3]==(binds ? BIND_VALUE_A : BIND_VALUE_C));
@@ -390,8 +390,24 @@ static void b10(void)
         assert(binds==counts[n] && tracked_owner_writes==1);
     }
 }
+static void lvds_binding(void)
+{
+    const u32 clocks[]={DUAL_EDGE-1,DUAL_EDGE+1};
+    for (u32 n=0;n<2;n++) for (u32 dual=0;dual<2;dual++) {
+        fixture(); route.type=GF4_LVDS; route.dual_link=dual!=0;
+        loaned=true;
+        assert(!links_bind_head(&legacy.io,&route,clocks[n]));
+        assert(h.calls[D_WRITE]==(dual ? 4U : 2U));
+        write_is(0,TMDS_C+4U,4,BIND_VALUE_C|1U);
+        write_is(1,TMDS_C,4,BIND_INDEX);
+        if (dual) {
+            write_is(2,TMDS_C+12U,4,BIND_VALUE_A|1U);
+            write_is(3,TMDS_C+8U,4,BIND_INDEX);
+        }
+    }
+}
 void _start(void)
 {
-    selection(); callback(); binding_and_repeat(); failures(); b10();
+    selection(); callback(); binding_and_repeat(); failures(); b10(); lvds_binding();
     gf2_host_exit(0);
 }

@@ -102,13 +102,6 @@
 #define FP_MARGIN 0x68084cU
 #define FP_PATTERN 0x680850U
 #define FP_DEBUG 0x680880U
-#define FP_TMDS_CONTROL 0x6808b0U
-#define FP_TMDS_DATA 0x6808b4U
-#define FP_LINK_STRIDE 8U
-#define FP_BIND_INDEX 4U
-#define FP_BIND_BASE 0x80U
-#define FP_BIND_OTHER 8U
-#define FP_BIND_LVDS 1U
 #define FP_OR_A 1U
 #define FP_OR_B 2U
 #define FP_OR_C 4U
@@ -179,7 +172,7 @@ static void fp_calc(const struct gf4_head_image *image,const struct gf4_route *r
     if (!(t->flags&GF4_NEG_H)) out->fp_control|=1U<<4;
     if (!(t->flags&GF4_NEG_V)) out->fp_control|=1U;
     if (boot&FP_BOOT_12BIT) out->fp_control|=FP_WIDE;
-    if (route->type==GF4_LVDS ? route->dual_link : t->khz>FP_DUAL_KHZ)
+    if (route->type==GF4_LVDS ? route->dual_link : t->khz>FP_DUAL_KHZ) /* dfp.c:343-358 */
         out->fp_control|=FP_DUAL;
     out->fp_debug[0]=FP_DEBUG_DEFAULT;
     out->fp_debug[1]=out->fp_debug[2]=out->fp_margin=0;
@@ -254,15 +247,6 @@ i32 gf4_tmds_load(struct gf4_ctx *ctx,const struct gf4_route *route,
         if (!rc) rc=fp_write(io,FP_SEL_CLK,4,result.sel_clk);
         if (!rc) rc=fp_index(io,FP_CR+delta,FP_PIXEL,result.cr[FP_PIXEL]);
         if (!rc) rc=fp_index(io,FP_CR+delta,FP_LCD,result.cr[FP_LCD]);
-        u32 ramdac=(route->or_mask&FP_OR_C)>>2;
-        u32 bind=FP_BIND_BASE|(route->head!=ramdac ? FP_BIND_OTHER : 0)|
-            (route->type==GF4_LVDS ? FP_BIND_LVDS : 0);
-        bool dual=route->type==GF4_LVDS ? route->dual_link : t->khz>FP_DUAL_KHZ;
-        for (u32 bank=0;!rc && bank<(dual ? 2U : 1U);++bank) {
-            u32 off=ramdac*FP_STRIDE+bank*FP_LINK_STRIDE;
-            rc=fp_write(io,FP_TMDS_DATA+off,4,bind^(bank ? FP_BIND_OTHER : 0));
-            if (!rc) rc=fp_write(io,FP_TMDS_CONTROL+off,4,FP_BIND_INDEX);
-        }
         if (!rc) rc=fp_load(io,route->head,&result);
         /* dfp.c:446-480: C2 owns init-context head/output/deadline and ROM
          * acquire/script/release; do not retain its borrowed ROM here. */

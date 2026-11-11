@@ -526,14 +526,8 @@ GF4_MUTATIONS = [
   'u32 delta=head*FP_STRIDE;',
   'u32 delta=0;',
   'loads/golden: head B FP列'),
- ('b10',
-  'b10-data-control-order',
-  'hwdev/gf/display/tmds.c',
-  'rc=fp_write(io,FP_TMDS_DATA+off,4,bind^(bank ? FP_BIND_OTHER : 0));\n'
-  '            if (!rc) rc=fp_write(io,FP_TMDS_CONTROL+off,4,FP_BIND_INDEX);',
-  'rc=fp_write(io,FP_TMDS_CONTROL+off,4,FP_BIND_INDEX);\n'
-  '            if (!rc) rc=fp_write(io,FP_TMDS_DATA+off,4,bind^(bank ? FP_BIND_OTHER : 0));',
-  'loads/golden: DATA→CONTROL'),
+ ('b10', 'dual-threshold', 'hwdev/gf/display/tmds.c',
+  't->khz>FP_DUAL_KHZ', 't->khz>=FP_DUAL_KHZ', 'loads/boundary'),
  ('b10',
   'b10-vcrtc',
   'hwdev/gf/display/tmds.c',
@@ -1178,6 +1172,10 @@ GF4_MUTATIONS = [
   'gf_init_run_script(l->init,l->program,pc,route->head,route->or_mask,dl)',
   'gf_init_run_script(l->init,l->program,pc,route->head,1,dl)',
   'callback'),
+ ('c2linkb', 'dual-threshold', 'hwdev/gf/display/links.c',
+  'route->dual_link : khz>=LINKS_DUAL_KHZ', 'route->dual_link : khz>LINKS_DUAL_KHZ', 'b10'),
+ ('c2linkb', 'lvds-dual-link', 'hwdev/gf/display/links.c',
+  'route->dual_link : khz>=LINKS_DUAL_KHZ', 'khz>=LINKS_DUAL_KHZ : khz>=LINKS_DUAL_KHZ', 'lvds_binding'),
  ('c2linkb',
   'clock-reversed',
   'hwdev/gf/display/links.c',
@@ -2152,6 +2150,15 @@ def gf4_case(tree, case, directory):
         kwargs['input'] = struct.pack('<II', 0, 0)+image()
     return host32.run([str(exe)], timeout=180, capture_output=True, **kwargs)
 
+
+# Move the one bind call ahead of the script for an ordering mutant.
+_order_source = (ROOT/'hwdev/gf/display/links.c').read_text()
+_order_start = _order_source.index('        int run=gf_init_run_script(')
+_order_end = _order_source.index('    if (saved) {', _order_start)
+_order_span = _order_source[_order_start:_order_end]
+_bind_call = '    if (!rc) rc=links_bind_head(io,route,khz);\n'
+GF4_MUTATIONS.append(('c2linkb', 'bind-before-script', 'hwdev/gf/display/links.c',
+    _order_span, '        rc=links_bind_head(io,route,khz);\n'+_order_span.replace(_bind_call, ''), 'b10'))
 
 def gf4_main(mutate=False, selected=None):
     cases = list(GF4_COMPONENTS)+list(GF4_LIFECYCLE)
