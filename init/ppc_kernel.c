@@ -29,6 +29,12 @@
 #include "clock_source.h"
 #include "kernel_tick.h"
 
+#if KBOOT_SHELL
+#include "root_boot.h"
+#include "cli_boot.h"
+void pm_root_image(struct boot_root_image *out);
+#endif
+
 #ifndef KBOOT_NEGATIVE
 #define KBOOT_NEGATIVE 0
 #endif
@@ -256,5 +262,10 @@ void ppc_kernel_main(void)
     u32 tb_us = (u32)(delta / info->tb_hz * 1000000 + delta % info->tb_hz * 1000000 / info->tb_hz);
     kprintf(KBOOT_ATTR, "KBOOT ALIVE tick_delta=%u tb_us=%u of_calls_delta=%u\r\n",
             tick_delta, tb_us, ofw_call_count() - info->of_calls_at_detach);
+#if KBOOT_SHELL
+    struct boot_root_image img;
+    pm_root_image(&img);
+    if (pm_root_boot(&img) == 0) pm_cli_boot();
+#endif
     for (;;) pm_lan_poll(tb_now());
 }

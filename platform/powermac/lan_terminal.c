@@ -33,7 +33,7 @@ void pm_term_receive(const struct lan_message *m, const u8 src[6])
         head = count = 0;
         out_next = out_drop = out_bytes = 0;
         connected = 1;
-        pm_terminal_line_lost();
+        pm_terminal_open();
         return;
     }
     if (!connected || m->type != PLN1_TERM_IN ||
@@ -50,7 +50,20 @@ void pm_term_receive(const struct lan_message *m, const u8 src[6])
 void pm_term_write(const u8 *data, u32 bytes)
 {
     while (bytes) {
-        u32 n = bytes > PLN1_PAYLOAD_MAX ? PLN1_PAYLOAD_MAX : bytes;
+        u32 n;
+        if (count) {
+            struct term_chunk *tail = &fifo[(head + count - 1) % 16];
+            n = PLN1_PAYLOAD_MAX - tail->len;
+            if (n > bytes) n = bytes;
+            if (n) {
+                kmemcpy(tail->data + tail->len, data, n);
+                tail->len += (u16)n;
+                data += n;
+                bytes -= n;
+                continue;
+            }
+        }
+        n = bytes > PLN1_PAYLOAD_MAX ? PLN1_PAYLOAD_MAX : bytes;
         if (count == 16) {
             out_next++;
             out_drop++;
@@ -104,4 +117,9 @@ void pm_term_tx_complete(void)
 {
     head = (head + 1) % 16;
     --count;
+}
+
+const u8 *pm_term_peer(void)
+{
+    return mac;
 }

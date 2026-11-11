@@ -12,7 +12,7 @@ PRODUCTS = ['drivers/net/gem/gem_' + name + '.c'
             for name in ('reset', 'ring', 'mac', 'phy', 'tx', 'rx')]
 PRODUCTS += ['platform/powermac/gmac_dma.c']
 PRODUCTS += ['platform/powermac/lan_' + name + '.c'
-             for name in ('log', 'wire', 'monitor', 'diag')]
+             for name in ('log', 'wire', 'monitor', 'diag', 'terminal')]
 CHECK = dict(name='ppc-lan-p24', tier=2, budget=60,
              covers=['platform/powermac/lan_service.c', 'tools/ppc/test_lan_p24.py',
                      'tools/ppc/lan_p24_fake.c'],
@@ -22,6 +22,7 @@ CHECK = dict(name='ppc-lan-p24', tier=2, budget=60,
                      'drivers/net/gem/gem_tx.c', 'drivers/net/gem/gem_rx.c',
                      'platform/powermac/lan_log.c', 'platform/powermac/lan_wire.c',
                      'platform/powermac/lan_monitor.c', 'platform/powermac/lan_diag.c',
+                     'platform/powermac/lan_terminal.c',
                      'platform/powermac/lan_boot.h',
                      'drivers/net/gem/gem.h', 'include/*.h',
                      'arch/ppc/*.h', 'lib/kstring.h', 'sdk/include/os32/*.h',
