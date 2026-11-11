@@ -19,14 +19,14 @@
 #include "exec.h"           /* ring3_wm_depth / ring3_call_from_user / OS32_ERR_* */
 #include "gui.h"            /* GUI_SHELL_OWNER */
 #include "fd_redirect.h"    /* res_owner_get */
-#include "font_source.h"    /* font_lease_shell_* / font_lease_close_shell (段 C / D) */
+#include "exec_font_lease.h"    /* font_lease_shell_* / exec_font_lease_close_shell (段 C / D) */
 #include "font_guard.h"     /* font_guard_run (version 2) */
 
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
 
 /* 段 C / 段 D の実体と署名は kernel/console/font_source.h (font_lease_shell_* /
- * font_lease_close_shell)。 */
+ * exec_font_lease_close_shell)。 */
 
 ShellService g_shell_service;
 volatile u32 ring3_wm_shell_gen = 0;
@@ -89,7 +89,7 @@ shell_svc_font_source_open(const char *path, u32 *out_id, u32 *out_size)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);
-    r = font_lease_shell_open(path, g_shell_service.generation, out_id, out_size);
+    r = exec_font_lease_shell_open(path, g_shell_service.generation, out_id, out_size);
     return r;
 }
 
@@ -101,7 +101,7 @@ shell_svc_font_source_read_at(u32 id, u32 offset, void *dst, u32 len)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_READ);
-    r = font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);
+    r = exec_font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);
     return r;
 }
 
@@ -113,7 +113,7 @@ shell_svc_font_source_validate(u32 id)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_READ);
-    r = font_lease_shell_validate(id, g_shell_service.generation);
+    r = exec_font_lease_shell_validate(id, g_shell_service.generation);
     return r;
 }
 
@@ -125,7 +125,7 @@ shell_svc_font_source_close(u32 id)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);
-    r = font_lease_shell_close(id, g_shell_service.generation);
+    r = exec_font_lease_shell_close(id, g_shell_service.generation);
     return r;
 }
 
@@ -168,7 +168,7 @@ void shell_service_publish(u32 load_addr, u32 text_size)
 
 void shell_service_retire(void)
 {
-    font_lease_close_shell();
+    exec_font_lease_close_shell();
     g_shell_active = 0;
     g_shell_text_lo = g_shell_text_hi = 0;
 }

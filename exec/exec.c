@@ -46,7 +46,7 @@
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"
 #include "shell_service.h" /* T7b-b2: 常駐 shell の内部入口 (publish / retire / WM の印) */
-#include "font_source.h"   /* T7b-b1: app の font lease の回収 (font_lease_close_owned) */
+#include "exec_font_lease.h"   /* T7b-b1: app の font lease の回収 (exec_font_lease_close_owned) */
 
 extern void shell_print(const char *s, u8 attr);
 extern void shell_print_dec(u32 val, u8 color);
