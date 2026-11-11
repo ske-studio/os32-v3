@@ -127,6 +127,8 @@ fd:
       reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で FEP を使わない。FD インストール後は実機の更新 (hsync boot) で入れる
     - guest: /bin/hexdump.bin
       reason: 2026-11-08 ユーザー決定「FD から何本か外す (推奨)」、候補は PM が選んだ。アプリの .text を読み取り専用にして (ヘッダ v5) .text の末尾をページの境目に揃えた分、2HD の空きが 54KB になり下限 64KB を割った。hexdump はレスキュー兼インストーラの FD では使わない診断の道具。FD インストール後は実機の更新 (hsync) で入る
+    - guest: /bin/less.bin
+      reason: 2026-11-11 ユーザー決定 (推奨の「less.bin を FD から外す」)。HAL v2 の面の道 (I1) で圧縮した kernel が約 12KB 増え、2HD の空きが 52KB になり下限 64KB を割った。less はレスキュー兼インストーラの FD では使わない閲覧の道具。FD インストール後は実機の更新 (hsync) で入る
   rename:
     - guest: /boot/vmkernel.lz4
       fd: /VMKRNL.LZ4
