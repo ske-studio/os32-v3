@@ -178,6 +178,7 @@
     "gfx/v2/owner_release.c",
     "gfx/v2/palette_state.c",
     "gfx/v2/surface.c",
+    "gfx/v2/sw_copy.c",
     "gfx/v2/sw_table.c",
     "gfx/v2/sysmem.c",
     "gfx/v2/v1_shim.c",
