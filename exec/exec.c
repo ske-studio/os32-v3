@@ -19,7 +19,7 @@
 #include "vfs.h"
 #include "exec_gfx.h"
 #include "input_service.h"
-#include "ime.h"
+#include "exec_ime.h"
 #include "kmalloc.h"
 #include "kprintf.h"
 #include "kapi_print.h"
