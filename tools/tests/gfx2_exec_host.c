@@ -15,12 +15,12 @@ static int lease_revoke_all(struct addrspace *as) { (void)as; if (order != 0) fa
 static int gfx2_owner_release(struct addrspace *as) { (void)as; if (order != 1) failed=1; order=2; return release_rc; }
 static void paging_addrspace_poison(struct addrspace *as) { if (order != 2) failed=1; as->appmem_poisoned=1; }
 static void kprintf(int attr, const char *s) { (void)attr; (void)s; }
-static void shlib_addrspace_detach(struct addrspace *as) { (void)as; if (order != 2) failed=1; }
+static void exec_shlib_addrspace_detach(struct addrspace *as) { (void)as; if (order != 2) failed=1; }
 static u32 paging_addrspace_free_user_range(struct addrspace *as, u32 a, u32 b) { (void)as; return (b-a)/PAGE_SIZE; }
 static void paging_addrspace_destroy(struct addrspace *as) { (void)as; }
 static int ledger_reclaim_owner(u32 owner, u32 *left) { (void)owner; reclaim++; *left=0; return 1; }
 static int ledger_owner_retire(u32 owner) { (void)owner; retire++; return 0; }
-static void serial_puts_polled(const char *s) { (void)s; }
+static void exec_serial_puts_polled(const char *s) { (void)s; }
 static void exec_owner_diag(AppSlot *a, int b, u32 c, u32 d) { (void)a; (void)b; (void)c; (void)d; }
 static void kfree(void *p) { (void)p; freed++; }
 #include "teardown.inc"
