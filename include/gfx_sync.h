@@ -15,9 +15,17 @@ int gfxsync_bind(const char *key, const GfxSyncTarget *t, GfxSyncCtx **out); /* 
 int gfxsync_write_rows(GfxSyncCtx *, u32 x, u32 y, u32 w, u32 h, const u8 *src, u32 pitch);
 int gfxsync_read_rows(GfxSyncCtx *, u32 x, u32 y, u32 w, u32 h, u8 *dst, u32 pitch);
 int gfxsync_flush(GfxSyncCtx *);
+#define GFXSYNC_M_PLAIN 0
+#define GFXSYNC_M_GAP 1
+#define GFXSYNC_M_SYNC_READ 2
+#define GFXSYNC_M_WAIT_PORT 3
+int gfxsync_override(GfxSyncCtx *, u32 method, u32 unit, u32 gap);
+void gfxsync_override_clear(GfxSyncCtx *);
 void gfxsync_unbind(GfxSyncCtx *);
 #define GFXSYNC_SHADOW 1
 #define GFXSYNC_DIRECT 2
 int gfxsync_mode(const GfxSyncCtx *);    /* Y4。bind の後の実効の mode (既定へ落ちた後の値)。NULL は 0 */
+
+void gfxsync_profile(const GfxSyncCtx *, char out[16]);
 
 #endif

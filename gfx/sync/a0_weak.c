@@ -79,3 +79,13 @@ __attribute__((weak)) int gfxsync_row_read(GfxSyncCtx * a0, u32 off, u8 *dst, u3
 }
 
 __attribute__((weak)) GfxSyncCtx gfxsync_ctx_pool[4];
+
+__attribute__((weak)) int gfxsync_override(GfxSyncCtx *ctx, u32 method, u32 unit, u32 gap)
+{
+    (void)ctx; (void)method; (void)unit; (void)gap;
+    return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) void gfxsync_override_clear(GfxSyncCtx *ctx)
+{
+    (void)ctx;
+}
