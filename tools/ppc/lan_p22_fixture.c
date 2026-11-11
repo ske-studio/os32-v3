@@ -1,6 +1,7 @@
 #include "platform/powermac/lan_boot.h"
 static void out(const char *s, int n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
 void *memset(void *p,int c,u32 n) { u8 *x=p; while(n--) *x++=c; return p; }
+void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 void *memcpy(void *p,const void *q,u32 n) { u8 *x=p; const u8 *y=q; while(n--) *x++=*y++; return p; }
 static void fail(int n) { if (n==12) out("H:A10 read-range\n",17); char s[]="FAIL 00\n"; s[5]+=(n/10); s[6]+=(n%10); out(s,8); __asm__ volatile("int $0x80" : : "a"(1),"b"(1)); __builtin_unreachable(); }
 #define CHECK(x,n) do { if (!(x)) fail(n); } while (0)

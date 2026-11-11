@@ -25,7 +25,7 @@ int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used)
     if (!dst || !m || !used)
         return LAN_EINVAL;
     *used = 0;
-    if (m->type < PLN1_TYPE_BEACON || m->type > PLN1_TYPE_RSP)
+    if (m->type < PLN1_TYPE_BEACON || m->type > PLN1_TERM_STATE)
         return LAN_EINVAL;
     if (m->payload_bytes > PLN1_PAYLOAD_MAX)
         return LAN_ERANGE;
@@ -58,13 +58,13 @@ int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m)
 {
     u32 i, len;
     if (!m) return LAN_EINVAL;
-    memset(m, 0, sizeof(*m));
+    kmemset(m, 0, sizeof(*m));
     if (!src || bytes < PLN1_HEADER_BYTES) return LAN_EINVAL;
     len = (u32)get_be(src + PLN1_OFF_PAYLOAD_BYTES, 2);
     if (get_be(src + PLN1_OFF_MAGIC, 4) != PLN1_MAGIC ||
         src[PLN1_OFF_VERSION] != PLN1_VERSION ||
         get_be(src + PLN1_OFF_HEADER_BYTES, 2) != PLN1_HEADER_BYTES ||
-        src[PLN1_OFF_TYPE] < PLN1_TYPE_BEACON || src[PLN1_OFF_TYPE] > PLN1_TYPE_RSP ||
+        src[PLN1_OFF_TYPE] < PLN1_TYPE_BEACON || src[PLN1_OFF_TYPE] > PLN1_TERM_STATE ||
         get_be(src + PLN1_OFF_RESERVED, 4) != 0 ||
         len > PLN1_PAYLOAD_MAX || len > bytes - PLN1_HEADER_BYTES)
         return LAN_EINVAL;

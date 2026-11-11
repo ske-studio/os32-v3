@@ -18,6 +18,7 @@ static void die(const char *p) {
 #define CHECK(x,m) do { if (!(x)) die("H:" m); } while(0)
 void *memcpy(void *p,const void *q,u32 n) { u8 *a=p; const u8 *b=q; while(n--) *a++=*b++; return p; }
 void *memset(void *p,int v,u32 n) { u8 *a=p; while(n--) *a++=(u8)v; return p; }
+void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 static u32 regs[0x8000/4], phy[32], mif, completion, hold, down, freeze, tb_calls;
 static u32 dma_calls, dma_first, copies, postwrites, sends[5], nic_rx;
 static u64 clock_tb, now;

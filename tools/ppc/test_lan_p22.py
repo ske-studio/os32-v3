@@ -10,7 +10,7 @@ import host32
 CHECK = {'id': 'ppc-lan-p22', 'covers': ['platform/powermac/lan_monitor.c'],
          'inputs': ['tools/ppc/lan_p22_fixture.c', 'platform/powermac/lan_wire.c',
                     'platform/powermac/lan_boot.h', 'arch/ppc/kernel_probe.h',
-                    'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h']}
+                    'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h', 'lib/kstring.h']}
 SOURCE = ROOT / 'platform/powermac/lan_monitor.c'
 MUTATIONS = [
  ('H:A10 read-range', 'if (!range) goto bad_range;', 'if (!range) range = &d->peek_ok[0];', 12),

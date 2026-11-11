@@ -86,6 +86,7 @@ def exercise(path, directory):
     driver = pathlib.Path(directory) / 'driver.c'
     driver.write_text("""#include "lan_boot.h"
 extern long write(int, const void *, unsigned long);
+void *kmemset(void *p, int c, u32 n) { u8 *q = p; while (n--) *q++ = (u8)c; return p; }
 int main(void) { struct lan_message m = {0}; u8 b[400]; u32 n, i;
 for (i = 0; i < 16; i++) m.boot_id[i] = i; m.type = PLN1_TYPE_LOG; m.seq = 1; m.drop_records = 7; m.drop_bytes = 19;
 m.payload_bytes = 2; m.payload[0] = 0xe3; m.payload[1] = 0x81;
