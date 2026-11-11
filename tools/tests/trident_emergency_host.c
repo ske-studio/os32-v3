@@ -69,6 +69,8 @@ void appslot_gfx_owner_exit(int id)
 }
 static void kprintf(u8 a, const char *s, ...) { (void)a; (void)s; }
 static int exec_gfx_return_emergency(u32 owner_id, int reason) { return gfx_return_emergency(owner_id, reason); }
+static inline int exec_font_guard_active(void) { return font_guard_active; }
+static inline void exec_font_guard_fault(u32 v, u32 p, u32 a) { font_guard_fault(v, p, a); }
 #include "trident_emergency_entries.inc"
 
 static void faults(int pf, int user, int syscall, int error)

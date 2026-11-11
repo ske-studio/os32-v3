@@ -20,7 +20,7 @@ PATHS = ('kernel/console/font_guard.c', 'exec/exec.c', 'arch/x86/kernel/isr_hand
 MUTATIONS = [
     ('reentry', 0, 'font_guard_active || kctx_irq_depth', 'kctx_irq_depth', 'reentry'),
     ('active-kept', 0, '    font_guard_active = 0;\n', '', 'active cleared'),
-    ('STOP', 1, '    if (font_guard_active) return;', '', 'STOP after leave'),
+    ('STOP', 1, '    if (exec_font_guard_active()) return;', '', 'STOP after leave'),
     ('fault', 2, '    if (font_guard_active) font_guard_fault', '    if (0) font_guard_fault', 'font before app kill'),
     ('x87-back', 0, '    font_guard_active = 1;\n', '    font_guard_active = 1;\n    __asm__ volatile("fninit");\n',
      'no x87 in the guard'),
@@ -51,7 +51,7 @@ def run(parts, work, name, expected=None):
     subprocess.run(cmd,check=True)
     # G-4: the guard object itself holds no x87 instruction (by mnemonic).
     obj=work/'guard.o'
-    subprocess.run(['gcc','-m32','-march=i386','-std=gnu11','-O2','-ffreestanding','-fno-builtin',
+    subprocess.run(['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror','-ffreestanding','-fno-builtin',
                     '-fno-pie','-fno-stack-protector','-c',*inc,str(work/'guard.c'),'-o',str(obj)],check=True)
     dis=subprocess.run(['objdump','-d',str(obj)],text=True,capture_output=True,check=True).stdout
     found=sorted(set(X87.findall(dis)))

@@ -1,6 +1,6 @@
 #include "legacy_guest.h"
 #ifdef OS32_R1_FIXTURE
-#include "r1_fixture.h"
+#include "exec_r1.h"
 #endif
 #include "shlib.h"
 /* Private SURFACE leases and the v70 single-surface USER entry. */
@@ -91,7 +91,7 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
     }
     /* No scheduling/callback in preparation. One short publication interval. */
 #ifdef OS32_R1_FIXTURE
-    if (r1_fixture_lease(as, auth->role)) return LEASE_FULL;
+    if (exec_r1_fixture_lease(as, auth->role)) return LEASE_FULL;
 #endif
     rc = paging_lease_map(as, maps, count);
     if (!rc) lease_next_token += count;

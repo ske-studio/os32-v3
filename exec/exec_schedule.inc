@@ -13,7 +13,7 @@
 /* ======================================================================== */
 i32 exec_park(void)
 {
-    if (font_guard_active) return OS32_ERR_BUSY;
+    if (exec_font_guard_active()) return OS32_ERR_BUSY;
     if (exec_legacy_pinned()) return OS32_ERR_BUSY;
     int id = appslot_cur();
     AppSlot *a;
@@ -52,7 +52,7 @@ i32 exec_park(void)
 /* ======================================================================== */
 int exec_park_kbd(void)
 {
-    if (font_guard_active) return 0;
+    if (exec_font_guard_active()) return 0;
     int id;
     AppSlot *a;
 
@@ -95,7 +95,7 @@ int exec_park_kbd(void)
 /* ======================================================================== */
 int exec_park_poll(u32 now_tick)
 {
-    if (font_guard_active) return 0;
+    if (exec_font_guard_active()) return 0;
     int id;
     AppSlot *a;
 
@@ -141,7 +141,7 @@ int exec_park_poll(u32 now_tick)
 /* ======================================================================== */
 i32 exec_sys_yield(void)
 {
-    if (font_guard_active) return OS32_ERR_BUSY;
+    if (exec_font_guard_active()) return OS32_ERR_BUSY;
     int id;
     AppSlot *a;
 
@@ -183,7 +183,7 @@ i32 exec_sys_yield(void)
 /* ======================================================================== */
 i32 exec_resume(i32 app_id, i32 wait_ret)
 {
-    if (font_guard_active) return OS32_ERR_BUSY;
+    if (exec_font_guard_active()) return OS32_ERR_BUSY;
     if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;
     if (exec_legacy_pinned()) return OS32_ERR_BUSY;
     AppSlot *a;
@@ -251,7 +251,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     arch_fp_restore(&a->fp_state);
 
 #ifdef OS32_R1_FIXTURE
-    r1_fixture_resume((int)app_id);
+    exec_r1_fixture_resume((int)app_id);
 #endif
     appslot_resume_commit((int)app_id);
     appslot_mark_scheduled((int)app_id, tick_count);   /* 票 T9 §12 S6 */
@@ -296,7 +296,7 @@ static void exec_kill_one(int id)
 
 i32 exec_kill(i32 app_id)
 {
-    if (font_guard_active) return OS32_ERR_BUSY;
+    if (exec_font_guard_active()) return OS32_ERR_BUSY;
     int chain[APP_MAX_APPS];
     int n;
     int i;
@@ -344,6 +344,6 @@ i32 exec_stop_culprit(void)
 
 i32 exec_abort_clear(void)
 {
-    if (font_guard_active) return OS32_ERR_BUSY;
+    if (exec_font_guard_active()) return OS32_ERR_BUSY;
     return appslot_abort_clear();
 }

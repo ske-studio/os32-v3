@@ -1,7 +1,7 @@
 #include "exec_legacy.h"
-#include "font_guard.h"
+#include "exec_font_guard.h"
 #ifdef OS32_R1_FIXTURE
-#include "r1_fixture.h"
+#include "exec_r1.h"
 #endif
 #include "exec_serial_diag.h"
 #include "appmem.h"

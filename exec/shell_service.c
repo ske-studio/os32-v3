@@ -20,7 +20,7 @@
 #include "gui.h"            /* GUI_SHELL_OWNER */
 #include "fd_redirect.h"    /* res_owner_get */
 #include "font_source.h"    /* font_lease_shell_* / font_lease_close_shell (段 C / D) */
-#include "font_guard.h"     /* font_guard_run (version 2) */
+#include "exec_font_guard.h"     /* font_guard_run (version 2) */
 
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
@@ -140,7 +140,7 @@ shell_svc_font_guard_run(int (*call)(void *), void *ctx)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);
-    r = font_guard_run(call, ctx);
+    r = exec_font_guard_run(call, ctx);
     return r;
 }
 
