@@ -16,12 +16,18 @@ struct gf_v2_gart {
     u32 count;
     struct gf_v2_gart_bind bind[GF_V2_GART_BINDS]; /* Sorted by first. */
 };
-struct gf_v2 {                                   /* 実体は G1 (gf_v2_ops.c の static 1 つ) */
-    struct gf3_ctx *g3; struct gf2_chan *ch;
+struct gf_v2_head { u32 scan_sid, pend_sid, retired_sid; };
+struct gf_v2_home { u32 valid, conn, mode_id; struct gf3_surface front; u8 pal[768]; };
+struct gf_v2 {                                   /* 実体は G1 */
+    struct gf3_ctx *g3; struct gf2_chan *ch;     /* G11 */
     struct gf_v2_ring ring;                      /* G4 だけが書く */
     u32 completed, failed_upto;                  /* G4 */
     struct gf_vram_reservation_node node[GFX2_MAX_SURFACES]; /* G9 (surf の priv[2] が番号) */
     struct gf_v2_gart gart;                      /* G5 only */
+    u32 epoch, lost;                             /* G11 */
+    struct gf_v2_head head[2];                   /* G2 */
+    struct gf_v2_home home;                      /* G2 */
+    u32 pal_set; u8 pal[768];                    /* G2 */
 };
 int gf_v2_fence_emit(struct gf_v2 *, u32 v2, u32 dl);            /* G4、§6-3 のコード */
 int gf_v2_fence_state(struct gf_v2 *, u32 *completed, u32 *failed_upto); /* G4 */
@@ -50,5 +56,16 @@ int gf_v2_cursor_image(void *, u32 head, const struct gfx2_surf *);
 int gf_v2_cursor_move(void *, u32 head, i32 x, i32 y);
 int gf_v2_cursor_show(void *, u32 head, u32 show);
 int gf_v2_dpms(void *, u32 head, u32 state);
+
+extern struct gf_v2 gf_v2_inst;
+struct gf4_test_ops; struct gf4_ctx; struct gf4_route;
+int gf_v2_start(struct gf_v2 *, u32 dl);
+int gf_v2_stop(void *ctx);
+const struct gf4_test_ops *gf_v2_disp(void);
+int gf_v2_deadline(struct gf2_chan *, u32 us, u32 *dl);
+int gf_v2_rc(int gf_rc);
+void gf_v2_fence_reset(struct gf_v2 *);
+u32 gf_v2_route_index(const struct gf4_ctx *, const struct gf4_route *);
+int gf_v2_owns(const struct gf3_surface *);
 
 #endif
