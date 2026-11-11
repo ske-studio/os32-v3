@@ -56,6 +56,7 @@ void __cdecl gfx_set_palette_hal(int idx, u8 r, u8 g, u8 b)
     } else {
         palette_set(idx, r, g, b);   /* 保険 */
     }
+    gfx2_pal_set_v1(idx, 1, rgb);
 }
 
 /* ======================================================================== */
@@ -65,15 +66,35 @@ void __cdecl gfx_set_palette_hal(int idx, u8 r, u8 g, u8 b)
 /* ======================================================================== */
 int __cdecl gfx_hw_fill_rect(int x, int y, int w, int h, u8 color)
 {
-    if (g_backend && g_backend->fill_rect)
-        return g_backend->fill_rect(x, y, w, h, color);
+    if (g_backend && g_backend->fill_rect) {
+        u32 role = g_backend->policy == GFX_POLICY_DIRECT ? GFX2_ROLE_DISPLAY : GFX2_ROLE_CLIENT;
+        /* SHADOW's DISPLAY alias can borrow the same RAM as CLIENT. */
+        if (role == GFX2_ROLE_CLIENT)
+            (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W);
+        (void)v1_bridge_begin(role, GFX2_CPU_R | GFX2_CPU_W);
+        int rc = g_backend->fill_rect(x, y, w, h, color);
+        v1_bridge_end(role, GFX2_CPU_R | GFX2_CPU_W, 0);
+        if (role == GFX2_ROLE_CLIENT)
+            v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W, 0);
+        return rc;
+    }
     return OS32_ERR_NOSYS;
 }
 
 int __cdecl gfx_hw_blit(int dx, int dy, int sx, int sy, int w, int h)
 {
-    if (g_backend && g_backend->blit)
-        return g_backend->blit(dx, dy, sx, sy, w, h);
+    if (g_backend && g_backend->blit) {
+        u32 role = g_backend->policy == GFX_POLICY_DIRECT ? GFX2_ROLE_DISPLAY : GFX2_ROLE_CLIENT;
+        /* SHADOW's DISPLAY alias can borrow the same RAM as CLIENT. */
+        if (role == GFX2_ROLE_CLIENT)
+            (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W);
+        (void)v1_bridge_begin(role, GFX2_CPU_R | GFX2_CPU_W);
+        int rc = g_backend->blit(dx, dy, sx, sy, w, h);
+        v1_bridge_end(role, GFX2_CPU_R | GFX2_CPU_W, 0);
+        if (role == GFX2_ROLE_CLIENT)
+            v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W, 0);
+        return rc;
+    }
     return OS32_ERR_NOSYS;
 }
 
@@ -126,6 +147,7 @@ int __cdecl gfx_lease_palette(int first, int count, const u8 *rgb)
     }
 
     g_backend->set_palette(first, count, rgb);
+    gfx2_pal_set_v1(first, count, rgb);
     return 0;
 }
 

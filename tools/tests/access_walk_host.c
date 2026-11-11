@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 #include "types.h"
 __attribute__((weak)) int gfx_policy_blocks_map(u32 role) { (void)role; return 0; }
 static u32 host_cr3;

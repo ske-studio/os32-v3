@@ -1,6 +1,7 @@
 /* INDEX8 DIRECT commands. User ranges are checked before synchronous hooks. */
 #include "gfx_internal.h"
 #include "gfx_hal.h"
+#include "v2/gfx2_int.h"
 #include "gfx_policy.h"
 #include "gfx_hw_mono_cpu.h"
 #include "../exec/exec.h"
@@ -84,12 +85,14 @@ int gfx_hw_submit(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done)
     if (!n) return 0;
     rc = g_backend->query(&info);
     if (rc) return rc;
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W);
     for (u32 i = 0; i < n; i++) {
         rc = submit_one(&cmds[i], user, info.width, info.height);
-        if (rc) return rc;
+        if (rc) break;
         *done = i + 1;
     }
-    return 0;
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W, 0);
+    return rc;
 }
 
 int gfx_hw_get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)
@@ -107,5 +110,8 @@ int gfx_hw_get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)
     if (rc) return rc;
     if (!gfx_clip_screen(&x, &y, &w, &h, info.width, info.height)) return 0;
     offset = ((u32)y - (u32)oy) * pitch + ((u32)x - (u32)ox);
-    return g_backend->get(x, y, w, h, dst + offset, pitch);
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R);
+    rc = g_backend->get(x, y, w, h, dst + offset, pitch);
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R, 0);
+    return rc;
 }

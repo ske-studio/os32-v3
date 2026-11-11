@@ -1,6 +1,7 @@
 #include "gfx_policy.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
+#include "v2/gfx2_int.h"
 #include "con_sink.h"
 #include "pgalloc.h"
 #include "kprintf.h"
@@ -52,6 +53,7 @@ void gfx_policy_reeval(void)
         g_backend->get = want ? d->get : 0;
         g_backend->policy = want;
         gfx_policy_gen_bump();
+        v1_bridge_rebind();
     } else if (gfx_scan_changed) {
         gfx_policy_gen_bump();
     }

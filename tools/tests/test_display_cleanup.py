@@ -136,7 +136,8 @@ def main():
         for name in ('surface_query.h', 'surface_limits.h', 'lease.h', 'appslot.h', 'exec.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)
         (tree / 'tools/tests').mkdir(parents=True)
-        for name in ('display_cleanup_host.c', 'boot_splash_native_host.c', 'serial_diag_host.h'):
+        for name in ('display_cleanup_host.c', 'boot_splash_native_host.c', 'serial_diag_host.h',
+                     'gfx2_core_fake.h', 'gfx2_bridge_fake.h'):
             shutil.copyfile(ROOT / 'tools/tests' / name, tree / 'tools/tests' / name)
         for name, path, old, new, hits, kind, expected_fail in MUTATIONS:
             if compile_only and name not in ('old-splash-cleanup', 'clear-half-plane'):

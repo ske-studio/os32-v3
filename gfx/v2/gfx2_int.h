@@ -133,6 +133,7 @@ int gfx2_sysmem_free(struct gfx2_surf *);
 void gfx2_head_detach(struct gfx2_adapter *, u32 head);
 void gfx2_map_detach(struct gfx2_surf *);
 void gfx2_staging_drop(struct gfx2_surf *);
+int gfx2_lock_revoke(struct gfx2_surf *s);   /* C7. C14 only; 0/IO/INVAL. */
 void gfx2_vaspace_drop(struct addrspace *);
 int gfx2_head_restore_v1(struct gfx2_adapter *, u32 head);
 void gfx2_pal_set(u32 first, u32 count, const u32 *xrgb);
