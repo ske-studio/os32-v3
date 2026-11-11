@@ -5,6 +5,7 @@
 #include "geforce_module.h"
 #include "display_restore.h"
 #include "console.h"
+#include "console_dual.h"
 #include "memmap.h"
 #include "display_private.h"
 #include "../../../gfx/gfx_internal.h"
@@ -38,6 +39,10 @@ int pc98_route_cell_check(void)
 }
 int pc98_route_to_gf(void)
 {
+    if (con_dual_cfg()) {
+        pc98_console_set_safe(pc98_route_safe());
+        return 0;
+    }
     return route_set(PC98_ROUTE_GF);
 }
 int pc98_route_select_98(void) { return route_set(PC98_ROUTE_98); }
