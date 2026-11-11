@@ -21,7 +21,7 @@ MUTATIONS = [
     ('reclaim', 'if (page_owned(p, owner) && pin_map[p])', 'if (0)'),
 ]
 
-def run(mutation=None):
+def run_case(mutation=None):
     with tempfile.TemporaryDirectory(prefix='pin-') as tmp:
         tmp = pathlib.Path(tmp)
         for path in (ROOT / 'mm').glob('pgalloc*.inc'):
@@ -46,12 +46,18 @@ def run(mutation=None):
         return host32.run([str(tmp / 'test')], timeout=60).returncode
 
 if __name__ == '__main__':
-    if run() != 0:
+    if run_case() != 0:
         raise SystemExit('baseline failed')
     print('baseline GREEN', flush=True)
     if '--mutate' in sys.argv:
         for mutation in MUTATIONS:
-            rc = run(mutation)
+            rc = run_case(mutation)
             if rc == 0:
                 raise SystemExit(mutation[0] + ' survived')
             print(mutation[0] + ' RED rc=' + str(rc), flush=True)
+
+
+def run(ctx):
+    import os
+    env = dict(os.environ, HOST32_RUNNERS=" ".join(ctx.runners))
+    return subprocess.call([sys.executable, __file__, *(["--mutate"] if ctx.mutate else [])], cwd=ctx.root, env=env)
