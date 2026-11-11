@@ -105,3 +105,8 @@ void pm_term_tx_complete(void)
     head = (head + 1) % 16;
     --count;
 }
+
+const u8 *pm_term_peer(void)
+{
+    return mac;
+}
