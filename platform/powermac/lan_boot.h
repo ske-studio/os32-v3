@@ -123,6 +123,9 @@ void pm_term_receive(const struct lan_message *, const u8 src[6]);
 void pm_term_write(const u8 *, u32 bytes);
 int pm_term_tx_peek(struct lan_message *);
 void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
+int pm_term_state(struct lan_message *out);
+void pm_terminal_feed(const u8 *bytes, u32 len);
+void pm_terminal_line_lost(void);
 struct pm_lan_range { u32 base, size; };
 /* The service supplies valid fields and excludes RX buffers from peek_ok. */
 struct pm_lan_diag {
