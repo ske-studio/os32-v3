@@ -84,7 +84,6 @@
 extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
-extern void console_session_clear(void);      /* console.c (D3) */
 
 #include "../platform/pc98/boot.h"
 #include "boot_platform.h"
