@@ -129,6 +129,7 @@ int gfx2_cpu_visible(const struct gfx2_surf *);
 int gfx2_map_audit(const struct addrspace *);
 int gfx2_sysmem_alloc(struct gfx2_surf *, u32 owner);
 int gfx2_sysmem_free(struct gfx2_surf *);
+void gfx2_flip_poll(struct gfx2_adapter *);
 void gfx2_head_detach(struct gfx2_adapter *, u32 head);
 void gfx2_map_detach(struct gfx2_surf *);
 void gfx2_staging_drop(struct gfx2_surf *);
