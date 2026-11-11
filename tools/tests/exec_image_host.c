@@ -505,3 +505,5 @@ void _start(void)
 }
 
 int gfx_return_emergency(u32 owner, int reason) { (void)owner; (void)reason; __builtin_trap(); }
+
+int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
