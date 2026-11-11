@@ -181,6 +181,7 @@
     "gfx/v2/submit.c",
     "gfx/v2/surface.c",
     "gfx/v2/sw_copy.c",
+    "gfx/v2/sw_mono.c",
     "gfx/v2/sw_table.c",
     "gfx/v2/sysmem.c",
     "gfx/v2/v1_bridge.c",
