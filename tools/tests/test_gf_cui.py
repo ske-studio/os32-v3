@@ -50,7 +50,7 @@ static int calls, last_id, g_gfx_owner;
 #define GFX_OWNER_WM 1
 void gf_display_owner_exit(int id) { ++calls; last_id = id; }
 void gfx_policy_reeval(void) {}
-void appslot_gfx_owner_exit(int id)
+'''+'static inline void exec_surface_policy_reeval' + (root/'arch/x86/exec_surface.h').read_text().split('static inline void exec_surface_policy_reeval', 1)[1].split('\n', 1)[0] + '\n'+'''void appslot_gfx_owner_exit(int id)
 '''+body+'''
 void _start(void) {
     g_gfx_owner=2;appslot_gfx_owner_exit(3);

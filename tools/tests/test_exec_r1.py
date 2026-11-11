@@ -179,7 +179,7 @@ static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
 void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
-static void gui_owner_exit(int id, int kind) {
+static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
     CHECK(id == 2 && cleanup == 7 && teardown == 1);
@@ -243,6 +243,7 @@ volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow, ring3_park_rej
 static u32 tick_count;
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
+static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
 #define RING3_ARG_WINDOW 64u
 const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
@@ -601,7 +602,7 @@ def run(source=None, irq=None, provider=None):
         if provider is not None:
             (tmp / 'provider.c').write_text(provider)
             code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(tmp / 'provider.c') + '"\n' + code
-        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nint appslot_gfx_owner(void) { return 2; }\n' + code)
+        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nstatic inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }\nint appslot_gfx_owner(void) { return 2; }\n' + code)
         asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 's.asm'), '-o', str(tmp / 's.o')],
@@ -685,7 +686,7 @@ MUTATIONS = (
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
     ('ime-owner-exit', '    exec_ime_owner_exit(id);', ''),
-    ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
+    ('exit-kind-lost', '    exec_gui_owner_exit(id, kind);', '    exec_gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('launch-save-after-setjmp', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',

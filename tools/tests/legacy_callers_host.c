@@ -83,7 +83,7 @@ static int safe(void) { return 1; }
 static int (*pc98_console_safe)(void)=safe;
 static int con_backend_safe(void) { return !pc98_console_safe || pc98_console_safe(); }
 static int con_sink_is_enabled(void) { return sink; }
-static void gfx_policy_reeval(void) {}
+void gfx_policy_reeval(void) {}
 static void con_sink_enable(void) { sink=1; }
 static void con_backend_cursor_at(int x,int y) { CHECK(!x&&!y); cursors++; }
 static void con_backend_cursor_shape(int show) { shapes+=show?1:10; }
@@ -127,6 +127,7 @@ static inline int exec_legacy_lowmap_busy(void) { return legacy_lowmap_busy(); }
 static inline void exec_legacy_abort_begin(void) { legacy_abort_begin(); }
 static inline void exec_legacy_end(void) { legacy_end(); }
 static inline void exec_legacy_cleanup(void) { legacy_cleanup(); }
+#include "exec_surface.h"
 #include "callers.inc"
 
 static inline int none_exec_legacy_pinned(void) { return none_pinned(); }

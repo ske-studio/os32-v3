@@ -123,6 +123,7 @@ void ime_set_render(void *p) { CHECK(!p);ime_reset++; }
 #include "exec_legacy.h"
 #include "exec_ime.h"
 #include "exec_reclaim.h"
+static inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }
 #include "gf_wc_fault_path.inc"
 static i32 shell_notice(u32 op,u32 arg,int owner)
 { CHECK(op==GUI_OP_OWNER_EXIT && owner==APP_ID_SHELL && arg==EXEC_KIND_FAULT);return 0; }

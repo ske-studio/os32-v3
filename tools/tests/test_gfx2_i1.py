@@ -55,6 +55,9 @@ def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=(), stage=None)
     arch = (ROOT / 'tools/tests/host_arch/arch_cpu.h').read_text()
     arch = arch.replace('#define ARCH_CPU_H', '#define ARCH_CPU_H\nextern u32 host_cr3;\nstatic inline void arch_cpu_serialize(void) {}')
     (work / 'arch_cpu.h').write_text(arch)
+    for source, replacement in overrides.items():
+        if source.endswith('.h'):  # a mutated header shadows the tree copy ("" include, -I work first)
+            (work / Path(source).name).write_text(replacement)
     sources = []
     for path in [*['gfx/v2/' + n + '.c' for n in UNITS], 'exec/lease.c',
                  'gfx/v2/palette_state.c', 'gfx/v2/sw_table.c', 'gfx/palette.c',

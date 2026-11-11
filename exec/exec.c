@@ -26,12 +26,13 @@
 #include "kapi_strings.h"
 #include "paging.h"
 #include "pgalloc.h"
-#include "shlib.h"
+#include "exec_shlib.h"
+#include "exec_kapi.h"
 #include "lease.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "shm.h"
-#include "gui.h"
+#include "exec_gui.h"
 #include "exec_snd.h"
 #include "exec_reclaim.h"
 #include "con_sink.h"
@@ -80,7 +81,7 @@ void ring3_abort_kill(void);
 void exec_exit(int status, int kind);
 
 void exec_init(void) {
-    kapi = (KernelAPI *)KAPI_ADDR;
+    kapi = (KernelAPI *)exec_kapi_table();
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
     appslot_init();

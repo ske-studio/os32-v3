@@ -53,7 +53,7 @@ static void tvram_puts_at(int r, int c, const char *s, u8 a)
 }
 static void input_discard_stop(void) { }
 static void exec_ime_owner_exit(int id) { (void)id; }
-static void gui_owner_exit(int id, int kind) { (void)id; (void)kind; }
+static void exec_gui_owner_exit(int id, int kind) { (void)id; (void)kind; }
 static void kbd_inject_owner_exit(int id) { (void)id; }
 static int con_sink_is_enabled(void) { return 0; }
 static int con_sink_reader_get(void) { return 0; }
@@ -68,6 +68,7 @@ void appslot_gfx_owner_exit(int id)
     if (id == owner) { CHECK(!device.active); owner = 1; transferred++; }
 }
 static void kprintf(u8 a, const char *s, ...) { (void)a; (void)s; }
+static int exec_gfx_return_emergency(u32 owner_id, int reason) { return gfx_return_emergency(owner_id, reason); }
 #include "trident_emergency_entries.inc"
 
 static void faults(int pf, int user, int syscall, int error)

@@ -2,7 +2,7 @@
 /* shlib の私有 data/BSS も起動時の物理予算に含める。 */
 static u32 exec_ring3_extra_pages(void)
 {
-    return shlib_data_pages();
+    return exec_shlib_data_pages();
 }
 
 static u32 exec_ring3_pages(u32 load_base, u32 sbrk_end, u32 exec_heap_size,
@@ -78,7 +78,7 @@ static const char *exec_image_reject_reason(const OS32Header *hdr, int is_shell,
         reason = "Error: invalid image code range\n";
     else if (is_shell && hdr->shlib_protocol)
         reason = "Error: resident shell must have shlib_protocol=0\n";
-    else if (hdr->shlib_protocol && !shlib_loaded())
+    else if (hdr->shlib_protocol && !exec_shlib_loaded())
         reason = "Error: required shared library is not loaded\n";
     return reason;
 }

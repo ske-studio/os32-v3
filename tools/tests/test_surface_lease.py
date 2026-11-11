@@ -21,7 +21,7 @@ from mutpar import run_ordered
 
 ROOT = walk.ROOT
 MUTANTS = [
-    ('lease', 'source->backend != gfx_sf_backend()', '0', 'selected backend mismatch'),
+    ('lease', 'source->backend != exec_surface_backend()', '0', 'selected backend mismatch'),
     ('paging', 'if (phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||',
      'if (0 || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||', 'map PT alignment'),
     ('paging', 'if (!phys || phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner))',
@@ -149,7 +149,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                 if fixture_name == 'surface_lease_host.c' and unit == 'lease':
                     body, tail = body.split('/* PC98 DISPLAY bundle;', 1)
                     tail = '/* PC98 DISPLAY bundle;' + tail
-                if fixture_name == 'surface_bundle_host.c' and unit == 'lease' and old == 'source->backend != gfx_sf_backend()':
+                if fixture_name == 'surface_bundle_host.c' and unit == 'lease' and old == 'source->backend != exec_surface_backend()':
                     head, body = body.split('/* PC98 DISPLAY bundle;', 1)
                     body = '/* PC98 DISPLAY bundle;' + body
                 else:
