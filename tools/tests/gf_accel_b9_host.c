@@ -20,8 +20,8 @@ static struct gf3_host_event events[128];
 static struct gf3_host_packet packets[16];
 static u32 words[64];
 static struct gf_vram_reservation_node a, b;
-static struct gf3_surface src = {0x1000, 0x1000, 64, 16, 16, GF3_XRGB8888, 1, 1};
-static struct gf3_surface dst = {0x3000, 0x1000, 64, 16, 16, GF3_XRGB8888, 2, 1};
+static struct gf3_surface src = {0x1000, 0x1000, 64, 16, 16, GF3_XRGB8888, 1, 1, 0};
+static struct gf3_surface dst = {0x3000, 0x1000, 64, 16, 16, GF3_XRGB8888, 2, 1, 0};
 
 static void observe(struct gf3_host *host, const struct gf3_host_event *e)
 {

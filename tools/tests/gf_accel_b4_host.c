@@ -7,7 +7,7 @@ static struct gf3_host_event events[128];
 static struct gf3_host_packet packets[8];
 static u32 words[32];
 static struct gf_vram_reservation_node n1, n2;
-static struct gf3_surface a = {0,1024,256,16,4,GF3_INDEX8,1,1};
+static struct gf3_surface a = {0,1024,256,16,4,GF3_INDEX8,1,1, 0};
 static const struct gf3_surface *expected_src, *expected_dst;
 static struct gf3_surface saved_src, saved_dst;
 #define DL 1000U
@@ -83,7 +83,7 @@ static void run(void)
     n1.value=(struct gf_vram_reservation){&h,0,2048,1,1};
     n2.value=(struct gf_vram_reservation){&h,2048,2048,2,1};
     n1.next=&n2; h.reservations=&n1;
-    struct gf3_surface b = {0,768,256,16,3,GF3_INDEX8,1,1};
+    struct gf3_surface b = {0,768,256,16,3,GF3_INDEX8,1,1, 0};
     assert(copy(&a,&b,(struct gf3_rect){0,0,8,2},1,1)==0);
     packet(0,0x00010001,0x00020008);
     /* Explicit destination payloads: the eight neighbours and the origin. */
@@ -96,19 +96,19 @@ static void run(void)
     }
     /* Aligned aliases still overlap real payload rows; padding alone
      * does not make them aliases (nouveau_exa.c:434-435). */
-    rejected((struct gf3_surface){256,768,256,15,3,GF3_INDEX8,1,1},GF3_EUNSUPPORTED);
-    rejected((struct gf3_surface){256,768,256,16,3,GF3_INDEX8,1,1},GF3_EUNSUPPORTED);
-    rejected((struct gf3_surface){0,256,64,15,4,GF3_INDEX8,1,1},GF3_EUNSUPPORTED);
-    rejected((struct gf3_surface){0,960,320,16,3,GF3_INDEX8,1,1},GF3_EUNSUPPORTED);
-    b=(struct gf3_surface){256,768,256,15,3,GF3_INDEX8,1,1};
+    rejected((struct gf3_surface){256,768,256,15,3,GF3_INDEX8,1,1,0},GF3_EUNSUPPORTED);
+    rejected((struct gf3_surface){256,768,256,16,3,GF3_INDEX8,1,1,0},GF3_EUNSUPPORTED);
+    rejected((struct gf3_surface){0,256,64,15,4,GF3_INDEX8,1,1,0},GF3_EUNSUPPORTED);
+    rejected((struct gf3_surface){0,960,320,16,3,GF3_INDEX8,1,1,0},GF3_EUNSUPPORTED);
+    b=(struct gf3_surface){256,768,256,15,3,GF3_INDEX8,1,1,0};
     clear(); assert(copy(&a,&b,(struct gf3_rect){0,0,1,1},0,0)==0); packet(0,0,0x00010001);
     /* Two payloads touch at x=8 without overlapping; distinct pitches
      * ensure an overly inclusive overlap test would reject this copy. */
-    b=(struct gf3_surface){0,256,64,16,4,GF3_INDEX8,1,1};
+    b=(struct gf3_surface){0,256,64,16,4,GF3_INDEX8,1,1,0};
     clear(); assert(copy(&a,&b,(struct gf3_rect){0,0,8,1},8,0)==0); packet(0,8,0x00010008);
-    b=(struct gf3_surface){1024,960,320,16,3,GF3_INDEX8,1,1};
+    b=(struct gf3_surface){1024,960,320,16,3,GF3_INDEX8,1,1,0};
     clear(); assert(copy(&a,&b,(struct gf3_rect){0,0,8,2},0,0)==0); packet(0,0,0x00020008);
-    b=(struct gf3_surface){2048,1024,256,16,4,GF3_INDEX8,2,1};
+    b=(struct gf3_surface){2048,1024,256,16,4,GF3_INDEX8,2,1,0};
     clear(); assert(copy(&a,&b,(struct gf3_rect){0,0,8,2},0,0)==0); packet(0,0,0x00020008);
     clear(); assert(copy(&a,&a,(struct gf3_rect){15,3,1,1},14,3)==0); packet(0x0003000f,0x0003000e,0x00010001);
     clear(); assert(copy(&a,&a,(struct gf3_rect){16,3,1,1},0,0)==GF3_ERANGE); no_submit();

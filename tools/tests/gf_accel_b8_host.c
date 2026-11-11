@@ -73,7 +73,7 @@ static void setup(enum gf3_fmt fmt, u32 width, u32 height, u32 pitch,
     host.f.imem.reserved = MEM_PAGE_SIZE;
     u32 cpp = gf3_host_cpp(fmt);
     surface = (struct gf3_surface){MEM_PAGE_SIZE,
-        (height - 1U) * pitch + width * cpp, pitch, width, height, fmt, 1, 1};
+        (height - 1U) * pitch + width * cpp, pitch, width, height, fmt, 1, 1,0};
     assert(surface.bytes <= sizeof(vram) - surface.off);
     reservation = (struct gf_vram_reservation_node){
         {&host, surface.off, surface.bytes, surface.reservation_id, surface.generation}, 0};
