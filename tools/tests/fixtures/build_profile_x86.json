@@ -74,6 +74,7 @@
     "platform/pc98/boot_names.c",
     "mm/kmalloc.c",
     "kernel/console/console.c",
+    "kernel/console/console_dual.c",
     "platform/pc98/console.c",
     "platform/pc98/display.c",
     "platform/pc98/gfx_scroll.c",
