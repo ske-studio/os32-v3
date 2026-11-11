@@ -20,7 +20,7 @@ for line in manifest.read_text().splitlines():
     if not line:
         continue
     fields = line.split()
-    if len(fields) != 3 or fields[0] not in ('I1', 'I2', 'I3') or fields[1] not in ('kernel', 'geforce'):
+    if len(fields) != 3 or fields[0] not in ('I1', 'I2', 'I3') or fields[1] not in ('kernel', 'geforce', 'kernel-data'):
         sys.exit('invalid wiring row: ' + line)
     if fields[0] == stage:
         rows.append(fields[1:])
@@ -28,7 +28,7 @@ if not rows or len({tuple(r) for r in rows}) != len(rows):
     sys.exit('empty or duplicate wiring stage')
 failed = False
 for target, elf, mapfile in [('kernel', ke, km), ('geforce', ge, gm)]:
-    names = [n for t, n in rows if t == target]
+    names = [(t, n) for t, n in rows if t.split('-')[0] == target]
     if not names:
         continue
     symbols = {}
@@ -40,19 +40,20 @@ for target, elf, mapfile in [('kernel', ke, km), ('geforce', ge, gm)]:
             symbols[name] = (int(address, 16), kind)
     text = mapfile.read_text()
     # GNU ld splits long input section names over two lines. Whitespace spans
-    # both forms; only input .text sections with an object path are intervals.
+    # both forms; input code/data sections with an object path are intervals.
     ranges = []
-    for match in re.finditer(r'^\s+\.text(?:\.\S+)?\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(\S+\.o)\s*$', text, re.M):
+    for match in re.finditer(r'^\s+\.(?:text|rodata|data|bss)(?:\.\S+)?\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(\S+\.o)\s*$', text, re.M):
         start, size, obj = match.groups()
         if re.search(r'(?:a0_weak|gf_v2_weak)\.o$', obj):
             ranges.append((int(start, 16), int(start, 16) + int(size, 16)))
-    for name in names:
+    for category, name in names:
+        allowed = ('R', 'D', 'B', 'r', 'd', 'b') if category.endswith('-data') else ('T', 't')
         symbol = symbols.get(name)
-        if (symbol is None or symbol[1] not in ('T', 't') or
+        if (symbol is None or symbol[1] not in allowed or
                 any(lo <= symbol[0] < hi for lo, hi in ranges)):
             print(f'FAIL {stage} {target} {name}: {symbol}')
             failed = True
 if failed:
     sys.exit(1)
-print('PASS ' + stage + ' strong symbols outside A0 text')
+print('PASS ' + stage + ' strong symbols outside A0 sections')
 PY

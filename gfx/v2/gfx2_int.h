@@ -68,6 +68,11 @@ struct gfx2_surf {
 };
 struct gfx2_vaspace { u32 as_gen; u32 bits[(MEM_GFX2_MAP_END - MEM_GFX2_MAP_BASE) / 4096 / 32]; }; /* C7、4 本。帯の定数は include/memmap.h (A0、§11-4) */
 extern struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS /* 4 */];  /* 実体は C1 */
+/* C1 allocates the persistent quarantine owner during gfx2 initialization. */
+extern u32 gfx2_quar_owner;
+#define GFX2_QUAR_OWNER gfx2_quar_owner
+/* C4 alias sentinel: never a ledger-allocated owner. */
+#define GFX2_OWNER_SCREEN 0xffffffffUL
 extern u32 gfx2_pal[256];                                             /* 実体は C13 (§9-2 のパレットの写し) */
 /* GFX2_KIND_* は mm/pgalloc.h:297-301 の LEDGER_SF_* と同じ値。A0 が gfx2_int.h に置き、
    _Static_assert で 5 つとも等しいことを確かめる */

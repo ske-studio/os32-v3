@@ -2606,30 +2606,59 @@ int __cdecl wrap_gfx2_adapter_count(void)
 int __cdecl wrap_gfx2_adapter_info(u32 a, GFX2_AdapterInfo *o)
 {
     KAPI_HIT(264);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(GFX2_AdapterInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_adapter_info(a, o);
 }
 
 int __cdecl wrap_gfx2_adapter_gen(u32 a, u32 *gen)
 {
     KAPI_HIT(265);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)gen, KAPI_OUT_LEN(gen, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_adapter_gen(a, gen);
 }
 
 int __cdecl wrap_gfx2_caps(u32 a, GFX2_Caps *o, u32 size)
 {
     KAPI_HIT(266);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, size),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_caps(a, o, size);
 }
 
 int __cdecl wrap_gfx2_check_op(u32 a, const GFX2_Op *shape, u32 sfmt, u32 dfmt, u32 spool, u32 dpool, u32 *how)
 {
     KAPI_HIT(267);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)how, KAPI_OUT_LEN(how, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)shape, KAPI_OUT_LEN(shape, sizeof(GFX2_Op)))) {
+        ring3_fault_kill();
+    }
     return gfx2_check_op(a, shape, sfmt, dfmt, spool, dpool, how);
 }
 
 int __cdecl wrap_gfx2_surface_create(u32 a, u16 w, u16 h, u8 fmt, u8 pool, u8 usage, u32 *sid)
 {
     KAPI_HIT(268);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)sid, KAPI_OUT_LEN(sid, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_surface_create(a, w, h, fmt, pool, usage, sid);
 }
 
@@ -2642,18 +2671,33 @@ int __cdecl wrap_gfx2_surface_free(u32 sid)
 int __cdecl wrap_gfx2_surface_desc(u32 sid, GFX2_SurfaceDesc *o)
 {
     KAPI_HIT(270);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(GFX2_SurfaceDesc)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_surface_desc(sid, o);
 }
 
 int __cdecl wrap_gfx2_screen_surface(u32 a, u32 head, u32 role, u32 *sid)
 {
     KAPI_HIT(271);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)sid, KAPI_OUT_LEN(sid, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_screen_surface(a, head, role, sid);
 }
 
 int __cdecl wrap_gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch)
 {
     KAPI_HIT(272);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)va, KAPI_OUT_LEN(va, sizeof(void *)),
+                                    (u32)pitch, KAPI_OUT_LEN(pitch, sizeof(u32)))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_lock(sid, flags, va, pitch);
 }
 
@@ -2666,6 +2710,15 @@ int __cdecl wrap_gfx2_unlock(u32 sid)
 int __cdecl wrap_gfx2_submit(u32 a, const GFX2_Op *ops, u32 n, u32 gen, u32 *done, u32 *fence)
 {
     KAPI_HIT(274);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)done, KAPI_OUT_LEN(done, sizeof(u32)),
+                                    (u32)fence, KAPI_OUT_LEN(fence, sizeof(u32)))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)ops, kapi_out_mul(KAPI_OUT_LEN(ops, n), (u32)(sizeof(GFX2_Op))))) {
+        ring3_fault_kill();
+    }
     return gfx2_submit(a, ops, n, gen, done, fence);
 }
 
@@ -2678,24 +2731,44 @@ int __cdecl wrap_gfx2_fence_wait(u32 a, u32 fence, u32 deadline_ms)
 int __cdecl wrap_gfx2_fence_query(u32 a, u32 *completed, u32 *failed_upto)
 {
     KAPI_HIT(276);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)completed, KAPI_OUT_LEN(completed, sizeof(u32)),
+                                    (u32)failed_upto, KAPI_OUT_LEN(failed_upto, sizeof(u32)))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_fence_query(a, completed, failed_upto);
 }
 
 int __cdecl wrap_gfx2_head_info(u32 a, u32 head, GFX2_HeadInfo *o)
 {
     KAPI_HIT(277);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(GFX2_HeadInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_head_info(a, head, o);
 }
 
 int __cdecl wrap_gfx2_connector_info(u32 a, u32 c, GFX2_ConnectorInfo *o)
 {
     KAPI_HIT(278);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(GFX2_ConnectorInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_connector_info(a, c, o);
 }
 
 int __cdecl wrap_gfx2_connector_edid(u32 a, u32 c, u32 block, u8 *out128)
 {
     KAPI_HIT(279);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out128, KAPI_OUT_LEN(out128, 128u),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_connector_edid(a, c, block, out128);
 }
 
@@ -2708,6 +2781,11 @@ int __cdecl wrap_gfx2_mode_count(u32 a, u32 head, u32 fmt)
 int __cdecl wrap_gfx2_mode_get(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o)
 {
     KAPI_HIT(281);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(GFX2_ModeInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_mode_get(a, head, fmt, i, o);
 }
 
@@ -2726,18 +2804,31 @@ int __cdecl wrap_gfx2_flip(u32 a, u32 head, u32 sid, u32 flags, u32 deadline_ms)
 int __cdecl wrap_gfx2_vblank_wait(u32 a, u32 head, u32 after, u32 deadline_ms, u32 *seen)
 {
     KAPI_HIT(284);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)seen, KAPI_OUT_LEN(seen, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
     return gfx2_vblank_wait(a, head, after, deadline_ms, seen);
 }
 
 int __cdecl wrap_gfx2_palette(u32 a, u32 first, u32 count, const u32 *xrgb)
 {
     KAPI_HIT(285);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)xrgb, kapi_out_mul(KAPI_OUT_LEN(xrgb, count), 4u))) {
+        ring3_fault_kill();
+    }
     return gfx2_palette(a, first, count, xrgb);
 }
 
 int __cdecl wrap_gfx2_gamma(u32 a, u32 head, const u16 *rgb768)
 {
     KAPI_HIT(286);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)rgb768, KAPI_OUT_LEN(rgb768, 1536u))) {
+        ring3_fault_kill();
+    }
     return gfx2_gamma(a, head, rgb768);
 }
 

@@ -682,7 +682,7 @@ __attribute__((weak)) int gfx2_sw_line(const struct gfx2_exec * a0, struct gfx2_
 __attribute__((weak)) int gfx2_owner_release(struct addrspace *as)
 {
     (void)as;
-    return OS32_ERR_NOSYS;
+    return 0;
 }
 __attribute__((weak)) int pgalloc_pin(u32 pfn, u32 n, u32 owner)
 {
@@ -724,6 +724,7 @@ __attribute__((weak)) int paging_gfx2_map(struct addrspace *as, u32 va, u32 pa, 
 __attribute__((weak)) struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS];
 __attribute__((weak)) struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES];
 __attribute__((weak)) u32 gfx2_pal[256];
+__attribute__((weak)) u32 gfx2_quar_owner;
 __attribute__((weak)) const GfxBackendV2 gfx2_v1_shim, gfx2_lost_be;
 __attribute__((weak)) const gfx2_sw_fn gfx2_sw_table[GFX2_OP_MAX + 1];
 

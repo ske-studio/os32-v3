@@ -234,24 +234,19 @@ struct gf3_test_ops {
     __typeof__(&gf_vram_view_map) map;
     __typeof__(&gf_vram_view_unmap) unmap;
 };
-/* hwdev/gf/accel.h への追記 (A0)。今の同期の gf3_fill・gf3_copy・gf3_scale は意味を変えない */
+/* Emit drawing commands without inserting or waiting for a fence. */
 int gf3_fill_emit(struct gf3_ctx *, const struct gf3_surface *, struct gf3_rect, u32 color, u8 alu, u32 mask, u32 dl);
 int gf3_copy_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf3_surface *, struct gf3_rect, u32 dx, u32 dy, u8 alu, u32 mask, u32 dl);
 int gf3_scale_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf3_surface *, struct gf3_rect, struct gf3_rect, struct gf3_rect, bool, u32 dl);
-    /* G4: accel_fill.c:44-46・accel_copy.c:61-62・accel_scale.c の fence の前までを *_emit に切り出し、
-       今の gf3_fill 等は「*_emit → gf2_fence_emit → gf2_fence_wait」に書き換える (動きは同じ) */
-/* struct gf3_ctx (accel.h:94-105) の末尾 (scratch の後) に A0 が足す。hwdev_layout.json:1033 も A0 (P1-3) */
-
-/*  struct gf3_ctx { ...; gf3_range_fn range_q; void *range_opaque; };   0 初期化 = GART の面を全部拒む */
-void gf3_range_query_set(struct gf3_ctx *, gf3_range_fn, void *opaque);  /* G8 が実装 (accel_surface.c)。G1 が v2 の初期化で
-                                                    gf3_range_query_set(g->g3, gf_v2_gart_range, &gf_v2_inst) を呼ぶ */
-/* G8 の gf3_surface_check: s->dma == GF3_HANDLE_GART_DMA なら
- *   c->range_q ? c->range_q(c->range_opaque, s->dma, s->off, s->bytes) : -EINVAL
- * を予約の照合 (gf_vram_match) の代わりに使う。VRAM_DMA (dma == 0) は今のまま */
+/* Install the GART range validator; NULL rejects all GART surfaces. */
+void gf3_range_query_set(struct gf3_ctx *, gf3_range_fn, void *opaque);
+/* Pattern data for monochrome or color ROP3 operations. */
 struct gf3_pattern { u32 kind; u32 mono[2]; u32 color[64]; u32 fg, bg; };
-int gf3_ckey_set(struct gf3_ctx *, bool on, u32 key, enum gf3_fmt, u32 dl);   /* G3 */
-int gf3_alpha_set(struct gf3_ctx *, u32 const_a, bool per_pixel, u32 dl);     /* G6 */
-int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *, enum gf3_fmt, u32 dl); /* G7 */
-/* struct gf3_surface の末尾に u32 dma (0 = VRAM_DMA で今と同じ、GF3_HANDLE_GART_DMA) を A0 が足す。意味の実装は G8 */
+/* Configure the source color key. */
+int gf3_ckey_set(struct gf3_ctx *, bool on, u32 key, enum gf3_fmt, u32 dl);
+/* Configure constant and per-pixel alpha. */
+int gf3_alpha_set(struct gf3_ctx *, u32 const_a, bool per_pixel, u32 dl);
+/* Configure ternary raster operation and its pattern. */
+int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *, enum gf3_fmt, u32 dl);
 
 #endif

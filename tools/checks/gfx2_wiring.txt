@@ -154,3 +154,13 @@ I3 kernel gfxsync_row_read
 I3 kernel gfxsync_row_write
 I3 kernel gfxsync_unbind
 I3 kernel gfxsync_write_rows
+
+# Data definitions must also be strong outside A0 placeholder objects.
+I1 kernel-data gfx2_v1_shim
+I1 kernel-data gfx2_lost_be
+I1 kernel-data gfx2_sw_table
+I1 kernel-data gfx2_adapters
+I1 kernel-data gfx2_surfs
+I1 kernel-data gfx2_pal
+I1 kernel-data gfxsync_ctx_pool
+I1 kernel-data gfx2_quar_owner
