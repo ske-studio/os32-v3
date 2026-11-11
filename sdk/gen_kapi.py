@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--check", "--check-only", dest="check_only", action="store_true",
                     help="validate KAPI declarations without writing generated files")
 parser.add_argument("--target", default="x86-pc98")
+parser.add_argument("--out-dir", help="root directory for generated files")
 parser.add_argument("json", nargs="?", default="sdk/kapi.json",
                     help="KAPI JSON input (default: sdk/kapi.json)")
 args = parser.parse_args()
@@ -326,12 +327,14 @@ LAYOUT_SECTION = ".os32_kapi_layout"
 # Validate logical kinds before writing any output, including --check.
 try:
     from target_profile import require
-    require(args.target, 'layout')
+    require(args.target, 'sdk_user')
+    if args.target != 'x86-pc98' and not args.out_dir:
+        raise ValueError('non-x86 target requires --out-dir')
     for api in data['api']:
-        fixed_arg_bytes(api.get('args', []), args.target)
+        fixed_arg_bytes(api.get('args', []))
         result = api.get('ret', 'void')
         if result != 'void':
-            fixed_arg_bytes([result + ' result'], args.target)
+            fixed_arg_bytes([result + ' result'])
 except ValueError as error:
     sys.stderr.write('ERROR: ' + str(error) + '\n')
     sys.exit(1)
@@ -340,6 +343,14 @@ if CHECK_ONLY:
     print("check-kapi-out: %s の \"out\" 記述 OK (%d エントリ)"
           % (JSON_PATH, len(data.get("api", []))))
     sys.exit(0)
+
+# The input is read before changing directory. Target output trees are isolated;
+# architecture-specific adapters and bindings are supplied by later stages.
+if args.out_dir:
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
+    os.chdir(args.out_dir)
+    for directory in ('include', 'sdk/include/os32', 'kapi', 'exec'):
+        Path(directory).mkdir(parents=True, exist_ok=True)
 
 # Internal logical metadata; public declarations and argsize stay byte identical.
 fixed_args = [[a for a in api.get('args', []) if a != '...'] for api in data['api']]
