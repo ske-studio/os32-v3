@@ -704,7 +704,7 @@ static void host_caller_access_leave(int *prev) { (void)prev; }
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; entered_user++; }
 #define caller_access_leave host_caller_access_leave
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
-static int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
+static int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }
 #include "exec_source.c"
 #undef caller_access_leave
 #include "abort_clear_source.c"

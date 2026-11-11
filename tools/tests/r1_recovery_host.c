@@ -119,7 +119,7 @@ static void exec_reclaim_resources(int id) {
 static void exec_notify_owned(int id,int kind) { (void)id; last_kind=kind; finished++; }
 static void exec_reclaim_owned(int id,int kind) { (void)id; (void)kind; CHECK(0); }
 int lease_revoke_all(struct addrspace *as) { (void)as; return 0; }
-int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
+int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 #include "exec_shlib.h"
 #include "exec_legacy.h"

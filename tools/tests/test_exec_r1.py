@@ -601,7 +601,7 @@ def run(source=None, irq=None, provider=None):
         if provider is not None:
             (tmp / 'provider.c').write_text(provider)
             code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(tmp / 'provider.c') + '"\n' + code
-        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nint appslot_gfx_owner(void) { return 2; }\n' + code)
+        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nstatic inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }\nint appslot_gfx_owner(void) { return 2; }\n' + code)
         asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 's.asm'), '-o', str(tmp / 's.o')],

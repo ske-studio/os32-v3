@@ -68,6 +68,7 @@ void appslot_gfx_owner_exit(int id)
     if (id == owner) { CHECK(!device.active); owner = 1; transferred++; }
 }
 static void kprintf(u8 a, const char *s, ...) { (void)a; (void)s; }
+static int exec_gfx_return_emergency(u32 owner_id, int reason) { return gfx_return_emergency(owner_id, reason); }
 #include "trident_emergency_entries.inc"
 
 static void faults(int pf, int user, int syscall, int error)

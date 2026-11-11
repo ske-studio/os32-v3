@@ -103,7 +103,7 @@ AppSlot *appslot_at(int id) { (void)id; return 0; }
 #include "exec_shlib.h"
 #include "exec_serial_diag.h"
 #include "owner_diag.h"
-static int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
+static int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }
 #include "exec_bb_overlap.inc"
 static u8 heap[192 * 1024];
 static u32 pte(struct addrspace *as, u32 va) {

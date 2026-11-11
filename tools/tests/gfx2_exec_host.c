@@ -12,7 +12,7 @@ static u32 exec_as_leftover_pages;
 static int release_rc, order, failed, reclaim, retire, freed;
 static u32 ledger_owner_pages(u32 owner) { (void)owner; return 3; }
 static int lease_revoke_all(struct addrspace *as) { (void)as; if (order != 0) failed=1; order=1; return 0; }
-static int gfx2_owner_release(struct addrspace *as) { (void)as; if (order != 1) failed=1; order=2; return release_rc; }
+static int exec_gfx_owner_release(struct addrspace *as) { (void)as; if (order != 1) failed=1; order=2; return release_rc; }
 static void paging_addrspace_poison(struct addrspace *as) { if (order != 2) failed=1; as->appmem_poisoned=1; }
 static void kprintf(int attr, const char *s) { (void)attr; (void)s; }
 static void exec_shlib_addrspace_detach(struct addrspace *as) { (void)as; if (order != 2) failed=1; }
