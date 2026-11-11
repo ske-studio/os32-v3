@@ -11,3 +11,5 @@ const gfx2_sw_fn gfx2_sw_table[GFX2_OP_MAX + 1]
     [GFX2_OP_ALPHA] = gfx2_sw_alpha,
     [GFX2_OP_LINE] = gfx2_sw_line,
 };
+
+u8 gfx2_sw_rowbuf[2][GFX2_SW_ROW_BYTES];
