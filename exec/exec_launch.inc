@@ -18,8 +18,8 @@ static int exec_entry_store(void *owner, u32 va, const void *src, u32 bytes)
 static int exec_launch(const char *cmdline, int gui_arg)
 {
     if (font_guard_active) return OS32_ERR_BUSY;
-    if (legacy_lowmap_busy()) return EXEC_ERR_INVALID;
-    if (legacy_pinned()) return EXEC_ERR_INVALID;
+    if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;
+    if (exec_legacy_pinned()) return EXEC_ERR_INVALID;
     /* longjmp 復帰側で読む gui。caller_context は setjmp 前の値から不変。
      * volatile でフレーム上に固定する
      * — レジスタに置かれると longjmp で失われる (他は全部グローバルで判断)。 */
