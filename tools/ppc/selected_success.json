@@ -43,6 +43,8 @@
   "gfx/gfx_scroll.c",
   "gfx/gfx_vram.c",
   "gfx/palette.c",
+  "gfx/sync/a0_weak.c",
+  "gfx/v2/a0_weak.c",
   "init/bootinfo.c",
   "init/bootlog.c",
   "init/bootlog_save.c",

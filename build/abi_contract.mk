@@ -10,6 +10,7 @@ abi-contract-probe: | $(KAPI_GENERATED) $(LAYOUT_HEADER)
 	$(CC) $(CFLAGS_BOOT) -Iarch/$(ARCH) -Iinclude -fsyntax-only tools/abi/type_contract.c
 	$(CC) $(PROGRAM_FLAGS) -std=gnu89 -Iarch/$(ARCH) -Iinclude -MF /dev/null -fsyntax-only -x c sdk/include/os32/os32_kapi_shared.h
 	$(CC) $(PROGRAM_FLAGS) -std=gnu89 -Iarch/$(ARCH) -Iinclude -MF /dev/null -fsyntax-only -x c sdk/include/os32/os32_gui_shared.h
+	$(CC) $(PROGRAM_FLAGS) -std=gnu89 -Iarch/$(ARCH) -Iinclude -MF /dev/null -fsyntax-only -x c sdk/include/os32/os32_gfx2.h
 
 # Order-only edges avoid relinking unchanged products. Concrete lists cover
 # kernel/module/boot rules; userland C rules carry their own order-only edge.

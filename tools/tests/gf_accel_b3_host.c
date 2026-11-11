@@ -6,7 +6,7 @@ static struct gf3_host_event events[64];
 static struct gf3_host_packet packets[8];
 static u32 words[16];
 static struct gf_vram_reservation_node reservation;
-static const struct gf3_surface surface = {0x1000, 4096, 64, 64, 64, GF3_INDEX8, 1, 1};
+static const struct gf3_surface surface = {0x1000, 4096, 64, 64, 64, GF3_INDEX8, 1, 1, 0};
 static const struct gf3_rect rect = {7, 11, 13, 17};
 #define DEADLINE 500U
 /* Independent method and format expectations: nv04_exa.c:118-129,153-157;

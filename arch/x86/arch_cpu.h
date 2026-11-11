@@ -59,4 +59,32 @@ static inline void arch_mmu_enable(void)
     __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
 }
 
+/* Restore all flags after probing EFLAGS.ID, including on pre-CPUID CPUs. */
+static inline int arch_cpu_has_cpuid(void)
+{
+    u32 old, changed;
+    __asm__ volatile("pushfl; popl %0" : "=r"(old));
+    u32 probe = old ^ (1UL << 21);
+    __asm__ volatile("pushl %0; popfl; pushfl; popl %1; pushl %2; popfl"
+                     : "+r"(probe), "=&r"(changed) : "r"(old) : "cc", "memory");
+    return ((old ^ changed) & (1UL << 21)) != 0;
+}
+
+static inline void arch_cpu_serialize(void)
+{
+    if (!arch_cpu_has_cpuid()) return;
+    u32 a = 0, b, c, d;
+    __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d) : : "memory");
+}
+static inline int arch_cpu_has_mmx(void)
+{
+    if (!arch_cpu_has_cpuid()) return 0;
+    u32 a = 0, b, c, d;
+    __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d));
+    if (a < 1) return 0;
+    a = 1;
+    __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d));
+    return (d & (1UL << 23)) != 0;
+}
+
 #endif /* ARCH_CPU_H */

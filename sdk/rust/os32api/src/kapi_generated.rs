@@ -272,17 +272,46 @@ pub struct KernelAPI {
     /* idx 262 */ pub host_notice_serial: unsafe extern "C" fn() -> u32,
     /* idx 263 */ pub gfx_hw_submit: unsafe extern "C" fn(cmds: *const u8, n: u32, gen: u32, done: *mut u32) -> i32,
     /* idx 264 */ pub gfx_hw_get: unsafe extern "C" fn(x: i32, y: i32, w: i32, h: i32, dst: *mut u8, pitch: u32, gen: u32) -> i32,
-    /* idx 265..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 37],
+    /* idx 265 */ pub gfx2_adapter_count: unsafe extern "C" fn() -> i32,
+    /* idx 266 */ pub gfx2_adapter_info: unsafe extern "C" fn(a: u32, o: *mut u8) -> i32,
+    /* idx 267 */ pub gfx2_adapter_gen: unsafe extern "C" fn(a: u32, gen: *mut u32) -> i32,
+    /* idx 268 */ pub gfx2_caps: unsafe extern "C" fn(a: u32, o: *mut u8, size: u32) -> i32,
+    /* idx 269 */ pub gfx2_check_op: unsafe extern "C" fn(a: u32, shape: *mut u8, sfmt: u32, dfmt: u32, spool: u32, dpool: u32, how: *mut u32) -> i32,
+    /* idx 270 */ pub gfx2_surface_create: unsafe extern "C" fn(a: u32, w: u16, h: u16, fmt: u8, pool: u8, usage: u8, sid: *mut u32) -> i32,
+    /* idx 271 */ pub gfx2_surface_free: unsafe extern "C" fn(sid: u32) -> i32,
+    /* idx 272 */ pub gfx2_surface_desc: unsafe extern "C" fn(sid: u32, o: *mut u8) -> i32,
+    /* idx 273 */ pub gfx2_screen_surface: unsafe extern "C" fn(a: u32, head: u32, role: u32, sid: *mut u32) -> i32,
+    /* idx 274 */ pub gfx2_lock: unsafe extern "C" fn(sid: u32, flags: u32, va: *mut u8, pitch: *mut u32) -> i32,
+    /* idx 275 */ pub gfx2_unlock: unsafe extern "C" fn(sid: u32) -> i32,
+    /* idx 276 */ pub gfx2_submit: unsafe extern "C" fn(a: u32, ops: *mut u8, n: u32, gen: u32, done: *mut u32, fence: *mut u32) -> i32,
+    /* idx 277 */ pub gfx2_fence_wait: unsafe extern "C" fn(a: u32, fence: u32, deadline_ms: u32) -> i32,
+    /* idx 278 */ pub gfx2_fence_query: unsafe extern "C" fn(a: u32, completed: *mut u32, failed_upto: *mut u32) -> i32,
+    /* idx 279 */ pub gfx2_head_info: unsafe extern "C" fn(a: u32, head: u32, o: *mut u8) -> i32,
+    /* idx 280 */ pub gfx2_connector_info: unsafe extern "C" fn(a: u32, c: u32, o: *mut u8) -> i32,
+    /* idx 281 */ pub gfx2_connector_edid: unsafe extern "C" fn(a: u32, c: u32, block: u32, out128: *mut u8) -> i32,
+    /* idx 282 */ pub gfx2_mode_count: unsafe extern "C" fn(a: u32, head: u32, fmt: u32) -> i32,
+    /* idx 283 */ pub gfx2_mode_get: unsafe extern "C" fn(a: u32, head: u32, fmt: u32, i: u32, o: *mut u8) -> i32,
+    /* idx 284 */ pub gfx2_mode_set: unsafe extern "C" fn(a: u32, head: u32, conn_mask: u32, mode_id: u32, sid: u32) -> i32,
+    /* idx 285 */ pub gfx2_flip: unsafe extern "C" fn(a: u32, head: u32, sid: u32, flags: u32, deadline_ms: u32) -> i32,
+    /* idx 286 */ pub gfx2_vblank_wait: unsafe extern "C" fn(a: u32, head: u32, after: u32, deadline_ms: u32, seen: *mut u32) -> i32,
+    /* idx 287 */ pub gfx2_palette: unsafe extern "C" fn(a: u32, first: u32, count: u32, xrgb: *mut u8) -> i32,
+    /* idx 288 */ pub gfx2_gamma: unsafe extern "C" fn(a: u32, head: u32, rgb768: *mut u8) -> i32,
+    /* idx 289 */ pub gfx2_cursor_image: unsafe extern "C" fn(a: u32, head: u32, sid: u32) -> i32,
+    /* idx 290 */ pub gfx2_cursor_move: unsafe extern "C" fn(a: u32, head: u32, x: i32, y: i32) -> i32,
+    /* idx 291 */ pub gfx2_cursor_show: unsafe extern "C" fn(a: u32, head: u32, show: u32) -> i32,
+    /* idx 292 */ pub gfx2_dpms: unsafe extern "C" fn(a: u32, head: u32, state: u32) -> i32,
+    /* idx 293 */ pub gfx2_present: unsafe extern "C" fn(a: u32, head: u32, x: i16, y: i16, w: u16, h: u16) -> i32,
+    /* idx 294..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 8],
     pub sbrk_heap_limit: u32,  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     pub shm_base: u32,  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 }
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 83;
+pub const KAPI_VERSION: u32 = 84;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
-pub const KAPI_FUNC_COUNT: u32 = 263;
+pub const KAPI_FUNC_COUNT: u32 = 292;
 pub const KAPI_FUNC_CAPACITY: u32 = 300;
 pub const KAPI_DATA_FIELDS_OFF: u32 = 0x4B8;
 /// データ欄が固定になった KAPI 版 (= C の OS32X_HDR_V3_MIN_API)。これ未満の

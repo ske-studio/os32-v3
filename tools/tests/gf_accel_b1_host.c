@@ -41,7 +41,7 @@ static int test(void)
     REQUIRE(gf3_ram_check(&ram,4,2,&p)==GF3_EINVAL);
     ram.ptr=&owner;
     REQUIRE(!gf3_ram_check(&ram,4,2,&p) && p.bytes==12);
-    struct gf3_surface s={0x1000,512,64,8,8,GF3_RGB565,7,3};
+    struct gf3_surface s={0x1000,512,64,8,8,GF3_RGB565,7,3, 0};
     struct gf3_rect r={2,1,3,2};
     REQUIRE(!gf3_surface_check(&h.ctx,&s,r,GF3_USE_2D,&f,&p));
     REQUIRE(p.off==0x1044 && p.rowbytes==6 && p.pitch==64 && p.rows==2 && p.bytes==70);
@@ -74,7 +74,7 @@ static int test(void)
     REQUIRE(gf3_surface_check(&h.ctx,&s,r,GF3_USE_SIFM_SRC,&f,&p)==GF3_ERANGE);
     REQUIRE(gf3_surface_check(&h.ctx,&s,r,GF3_USE_2D,&f,&p)==GF3_EFORMAT);
     s.fmt=GF3_ARGB8888; s.pitch=64; s.bytes=512;
-    struct gf3_surface dst={0x2000,1024,128,8,8,GF3_ARGB8888,7,3};
+    struct gf3_surface dst={0x2000,1024,128,8,8,GF3_ARGB8888,7,3, 0};
     gf3_host_trace_clear(&h);
     REQUIRE(!gf3_surface_set(&h.ctx,&s,&dst,true,123));
     REQUIRE(h.npackets==1 && packets[0].subc==GF3_SUBC_SURFACE2D && packets[0].method==0x300 &&

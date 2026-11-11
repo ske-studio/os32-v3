@@ -3,6 +3,7 @@
   "contracts": [
     "drivers/video/geforce/geforce_module.h",
     "include/gfx_hal.h",
+    "include/gfx_hal2.h",
     "include/video_service.h",
     "hwdev/gf/production.h",
     "hwdev/gf/foundation.h",

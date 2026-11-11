@@ -398,7 +398,7 @@ static int geforce_page_flip(u8 head, const struct GfxScanout *s, int sync, u32 
     rc = gf_vram_match(c->ch, key.owner, s->reservation_id, key.generation,
         s->offset, s->bytes, &key);
     struct gf3_surface front = {s->offset, s->bytes, s->pitch, s->width, s->height,
-        fmt, s->reservation_id, key.generation};
+        fmt, s->reservation_id, key.generation, 0};
     if (!rc) rc = ops->flip(c, head, &front, sync != 0, dl);
     return display_result(c, rc);
 }

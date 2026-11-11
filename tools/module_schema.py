@@ -181,6 +181,8 @@ COMPONENTS = (
          reloc_max=16384, export_max=2,
          init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
          ops_symbol='hwdev_ops', ops_names=('initialize', 'get_probe_decls')),
+    # HAL v2 A0 changes MODULE_ABI_GEN through the facade contract hash.
+    # The ops slot layout/version stays unchanged (v2 is inside GfxBackend).
     dict(name='GEFORCE', path='/boot/geforce.mod', dependencies=(), required=False,
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],

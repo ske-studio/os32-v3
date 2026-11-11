@@ -1,4 +1,4 @@
-# KernelAPI v83 仕様書
+# KernelAPI v84 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **83** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 261・予約 39) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **84** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 292・予約 8) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -133,6 +133,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 | v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
+| v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -299,7 +300,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 263〜299 (`kapi_reserved[37]`、v83 時点。v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 292〜299 (`kapi_reserved[8]`、v84 時点。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1752,7 +1753,7 @@ B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存ア�
 
 ### 予約スロット (v63〜)
 
-0x424〜0x4B4 (slot 263〜299、37 本、v83 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x498〜0x4B4 (slot 292〜299、8 本、v84 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2131,6 +2132,35 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x418 | host_notice_serial | `u32(void)` |
 | 0x41C | gfx_hw_submit | `int(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done)` |
 | 0x420 | gfx_hw_get | `int(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen)` |
+| 0x424 | gfx2_adapter_count | `int(void)` |
+| 0x428 | gfx2_adapter_info | `int(u32 a, GFX2_AdapterInfo *o)` |
+| 0x42C | gfx2_adapter_gen | `int(u32 a, u32 *gen)` |
+| 0x430 | gfx2_caps | `int(u32 a, GFX2_Caps *o, u32 size)` |
+| 0x434 | gfx2_check_op | `int(u32 a, const GFX2_Op *shape, u32 sfmt, u32 dfmt, u32 spool, u32 dpool, u32 *how)` |
+| 0x438 | gfx2_surface_create | `int(u32 a, u16 w, u16 h, u8 fmt, u8 pool, u8 usage, u32 *sid)` |
+| 0x43C | gfx2_surface_free | `int(u32 sid)` |
+| 0x440 | gfx2_surface_desc | `int(u32 sid, GFX2_SurfaceDesc *o)` |
+| 0x444 | gfx2_screen_surface | `int(u32 a, u32 head, u32 role, u32 *sid)` |
+| 0x448 | gfx2_lock | `int(u32 sid, u32 flags, void **va, u32 *pitch)` |
+| 0x44C | gfx2_unlock | `int(u32 sid)` |
+| 0x450 | gfx2_submit | `int(u32 a, const GFX2_Op *ops, u32 n, u32 gen, u32 *done, u32 *fence)` |
+| 0x454 | gfx2_fence_wait | `int(u32 a, u32 fence, u32 deadline_ms)` |
+| 0x458 | gfx2_fence_query | `int(u32 a, u32 *completed, u32 *failed_upto)` |
+| 0x45C | gfx2_head_info | `int(u32 a, u32 head, GFX2_HeadInfo *o)` |
+| 0x460 | gfx2_connector_info | `int(u32 a, u32 c, GFX2_ConnectorInfo *o)` |
+| 0x464 | gfx2_connector_edid | `int(u32 a, u32 c, u32 block, u8 *out128)` |
+| 0x468 | gfx2_mode_count | `int(u32 a, u32 head, u32 fmt)` |
+| 0x46C | gfx2_mode_get | `int(u32 a, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *o)` |
+| 0x470 | gfx2_mode_set | `int(u32 a, u32 head, u32 conn_mask, u32 mode_id, u32 sid)` |
+| 0x474 | gfx2_flip | `int(u32 a, u32 head, u32 sid, u32 flags, u32 deadline_ms)` |
+| 0x478 | gfx2_vblank_wait | `int(u32 a, u32 head, u32 after, u32 deadline_ms, u32 *seen)` |
+| 0x47C | gfx2_palette | `int(u32 a, u32 first, u32 count, const u32 *xrgb)` |
+| 0x480 | gfx2_gamma | `int(u32 a, u32 head, const u16 *rgb768)` |
+| 0x484 | gfx2_cursor_image | `int(u32 a, u32 head, u32 sid)` |
+| 0x488 | gfx2_cursor_move | `int(u32 a, u32 head, i32 x, i32 y)` |
+| 0x48C | gfx2_cursor_show | `int(u32 a, u32 head, u32 show)` |
+| 0x490 | gfx2_dpms | `int(u32 a, u32 head, u32 state)` |
+| 0x494 | gfx2_present | `int(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

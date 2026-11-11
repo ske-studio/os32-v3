@@ -136,7 +136,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
 | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | **PCI デバイス開発の注意点** — 手本のある移植で守る装置の扱い |
 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | **実行形式が変わる版を実機に入れる** — 古い cp で /boot と /sys を写して再起動、新しい hsync を配備元から動かす |
-| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v83 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 261) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
+| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v84 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 292) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — §0 は版数の対応表と fork の決定 ([decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2) への案内、v1.x GUI の記録、v3 以降の長期項目 |

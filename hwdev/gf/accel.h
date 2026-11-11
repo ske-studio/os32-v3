@@ -86,11 +86,13 @@ struct gf3_surface {
     u32 off, bytes, pitch, width, height;
     enum gf3_fmt fmt;
     u32 reservation_id, generation;
+    u32 dma;
 };
 struct gf3_rect { u32 x, y, w, h; };
 struct gf3_ram { void *ptr; u32 bytes, pitch; }; /* borrowed kernel RAM */
 /* Production owns one immovable context. Inst nodes must never be copied.
  * Failed stop retains ownership; recover rebuilds objects for the new epoch. */
+typedef int (*gf3_range_fn)(void *opaque, u32 handle, u32 off, u32 bytes);
 struct gf3_ctx {
     struct gf2_chan *ch;
     struct gf2_object obj[GF3_OBJECT_COUNT];
@@ -101,6 +103,8 @@ struct gf3_ctx {
     int last_rc;
     bool ready;
     u32 scratch[GF3_SCRATCH_WORDS];
+    gf3_range_fn range_q;
+    void *range_opaque;
 };
 
 /* G2 addendum: B1 owns the seven-row format table; callers receive copies.
@@ -230,4 +234,19 @@ struct gf3_test_ops {
     __typeof__(&gf_vram_view_map) map;
     __typeof__(&gf_vram_view_unmap) unmap;
 };
+/* Emit drawing commands without inserting or waiting for a fence. */
+int gf3_fill_emit(struct gf3_ctx *, const struct gf3_surface *, struct gf3_rect, u32 color, u8 alu, u32 mask, u32 dl);
+int gf3_copy_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf3_surface *, struct gf3_rect, u32 dx, u32 dy, u8 alu, u32 mask, u32 dl);
+int gf3_scale_emit(struct gf3_ctx *, const struct gf3_surface *, const struct gf3_surface *, struct gf3_rect, struct gf3_rect, struct gf3_rect, bool, u32 dl);
+/* Install the GART range validator; NULL rejects all GART surfaces. */
+void gf3_range_query_set(struct gf3_ctx *, gf3_range_fn, void *opaque);
+/* Pattern data for monochrome or color ROP3 operations. */
+struct gf3_pattern { u32 kind; u32 mono[2]; u32 color[64]; u32 fg, bg; };
+/* Configure the source color key. */
+int gf3_ckey_set(struct gf3_ctx *, bool on, u32 key, enum gf3_fmt, u32 dl);
+/* Configure constant and per-pixel alpha. */
+int gf3_alpha_set(struct gf3_ctx *, u32 const_a, bool per_pixel, u32 dl);
+/* Configure ternary raster operation and its pattern. */
+int gf3_rop3_set(struct gf3_ctx *, u8 subc, u8 rop3, const struct gf3_pattern *, enum gf3_fmt, u32 dl);
+
 #endif

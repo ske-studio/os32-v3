@@ -370,7 +370,7 @@ static void surfaces(void)
     fresh(1);
     node=(struct gf_vram_reservation_node){.value={&h.ctx,0,B0_VGA32_BYTES,7,3}};
     h.base.reservations=&node;
-    struct gf3_surface s={0,B0_VGA8_BYTES,640,640,480,GF3_INDEX8,7,3};
+    struct gf3_surface s={0,B0_VGA8_BYTES,640,640,480,GF3_INDEX8,7,3, 0};
     struct gf4_mode m={.t=vga,.fmt=GF3_INDEX8,.pitch=640};
     assert(!gf4_surface_check(&h.ctx,&s,&m));
     struct gf_vram_reservation before=node.value;

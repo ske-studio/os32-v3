@@ -15,7 +15,7 @@ ROOT = ast.ROOT
 ROOTS = SCAN_ROOTS['p2v']
 EXCLUDED = {'third_party', 'sqlite', 'sqlite3', 'fatfs', 'zlib', 'microtar', 'os32_lz4'}
 PHYS = re.compile(r'^(?:MEM_\w*(?:BASE|ADDR)|TVRAM_\w+|VRAM_PLANE_\w+|PEGC_\w*_BASE|BIOS_WORK_\w+|KHEAP_BASE|KAPI_ADDR|V86_(?:TEST_\w+_ADDR|IPL_ADDR|REMAP_START)|DB_SHM_PTR|\w*_phys|phys|pa|paddr|pfn)$')
-USER = re.compile(r'^(?:RING3_\w+|MEM_EXEC_LOAD_ADDR|MEM_APP_BAND_\w+|MEM_LEASE_\w+|uva|user_\w+)$')
+USER = re.compile(r'^(?:RING3_\w+|MEM_EXEC_LOAD_ADDR|MEM_APP_BAND_\w+|MEM_LEASE_\w+|MEM_GFX2_MAP_\w+|uva|user_\w+)$')
 OTHER_PHYS = {'addr','addr0','addr1','ebp','aligned','base','page','load_base','stack_top',
               'new_esp','u_esp','user_esp','ring3_tramp_page','guest','ivt18','dst','src'}
 HOST = re.compile(r'^g_(?:invoke|stack|iostatus|databuf|sop|fsctx|fobj|namebuf|secctx)$')

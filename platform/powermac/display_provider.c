@@ -48,3 +48,9 @@ u32 display_provider_display_first(u32 plane)
     (void)plane;
     return 0;
 }
+
+void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg)
+{
+    (void)fn;
+    (void)arg;
+}

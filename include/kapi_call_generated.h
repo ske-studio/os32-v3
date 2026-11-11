@@ -268,6 +268,35 @@ static const u8 kapi_fixed_count[] = {
     0, /* host_notice_serial */
     4, /* gfx_hw_submit */
     7, /* gfx_hw_get */
+    0, /* gfx2_adapter_count */
+    2, /* gfx2_adapter_info */
+    2, /* gfx2_adapter_gen */
+    3, /* gfx2_caps */
+    7, /* gfx2_check_op */
+    7, /* gfx2_surface_create */
+    1, /* gfx2_surface_free */
+    2, /* gfx2_surface_desc */
+    4, /* gfx2_screen_surface */
+    4, /* gfx2_lock */
+    1, /* gfx2_unlock */
+    6, /* gfx2_submit */
+    3, /* gfx2_fence_wait */
+    3, /* gfx2_fence_query */
+    3, /* gfx2_head_info */
+    3, /* gfx2_connector_info */
+    4, /* gfx2_connector_edid */
+    3, /* gfx2_mode_count */
+    5, /* gfx2_mode_get */
+    5, /* gfx2_mode_set */
+    5, /* gfx2_flip */
+    5, /* gfx2_vblank_wait */
+    4, /* gfx2_palette */
+    3, /* gfx2_gamma */
+    3, /* gfx2_cursor_image */
+    4, /* gfx2_cursor_move */
+    3, /* gfx2_cursor_show */
+    3, /* gfx2_dpms */
+    6, /* gfx2_present */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -533,5 +562,34 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* host_notice_serial */
     { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx_hw_submit */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx_hw_get */
+    { 0 }, /* gfx2_adapter_count */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_adapter_info */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_adapter_gen */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* gfx2_caps */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_check_op */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_surface_create */
+    { KAPI_VALUE_INTEGER }, /* gfx2_surface_free */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_surface_desc */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_screen_surface */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* gfx2_lock */
+    { KAPI_VALUE_INTEGER }, /* gfx2_unlock */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* gfx2_submit */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_fence_wait */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* gfx2_fence_query */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_head_info */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_connector_info */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_connector_edid */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_mode_count */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_mode_get */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_mode_set */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_flip */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_vblank_wait */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_palette */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* gfx2_gamma */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_cursor_image */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_cursor_move */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_cursor_show */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_dpms */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_present */
 };
 #endif

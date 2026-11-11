@@ -13,9 +13,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
-    ('cursor x high', 0, 'if (x >= TVRAM_COLS) x = TVRAM_COLS - 1;', ''),
+    ('cursor x high', 0, 'if (x >= CON_COLS) x = CON_COLS - 1;', ''),
     ('cursor y low', 0, 'if (y < 0) y = 0;', ''),
-    ('cursor y high', 0, 'if (y >= TVRAM_ROWS) y = TVRAM_ROWS - 1;', ''),
+    ('cursor y high', 0, 'if (y >= CON_ROWS) y = CON_ROWS - 1;', ''),
 ]
 for func in ('fm_set_tone', 'fm_note_on', 'fm_note_off', 'ssg_tone', 'ssg_volume'):
     for bound in ('ch < 0', 'ch >= OPN_CHANNEL_COUNT'):

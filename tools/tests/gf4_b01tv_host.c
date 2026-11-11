@@ -79,7 +79,7 @@ static void timing_and_surface(void)
     enum { LD_PITCH=768, LD_BYTES=LD_PITCH*480 };
     node=(struct gf_vram_reservation_node){.value={&h.ctx,0,LD_BYTES,7,3}};
     h.base.reservations=&node;
-    struct gf3_surface s={0,LD_BYTES,LD_PITCH,720,480,GF3_INDEX8,7,3};
+    struct gf3_surface s={0,LD_BYTES,LD_PITCH,720,480,GF3_INDEX8,7,3, 0};
     assert(!gf4_surface_check(&h.ctx,&s,&state.modes[0]));
     admitted(HD720P,ctv720);
     assert(!gf4_timing_calc(&state.modes[0],&out));
@@ -89,7 +89,7 @@ static void timing_and_surface(void)
     enum { HD_PITCH=1280, HD_BYTES=HD_PITCH*720 };
     node=(struct gf_vram_reservation_node){.value={&h.ctx,0,HD_BYTES,7,3}};
     h.base.reservations=&node;
-    s=(struct gf3_surface){0,HD_BYTES,HD_PITCH,1280,720,GF3_INDEX8,7,3};
+    s=(struct gf3_surface){0,HD_BYTES,HD_PITCH,1280,720,GF3_INDEX8,7,3,0};
     assert(!gf4_surface_check(&h.ctx,&s,&state.modes[0]));
     struct gf4_mode bad=state.modes[0];
     bad.t.vs=bad.t.vd-1U;

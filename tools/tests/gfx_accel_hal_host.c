@@ -209,7 +209,7 @@ void _start(void)
     CHECK(__builtin_offsetof(GfxBackend, osri_show) == 108);
     CHECK(__builtin_offsetof(GfxBackend, policy) == 112);
     CHECK(__builtin_offsetof(GfxBackend, shadow_blit) == 144);
-    CHECK(sizeof(GfxBackend) == 148 && sizeof(GfxDirectOps) == 24);
+    CHECK(sizeof(GfxBackend) == 156 && sizeof(GfxDirectOps) == 24);
     CHECK(backend.policy == GFX_POLICY_SHADOW && !backend.direct_ops && !backend.direct_ok);
     CHECK(gfx_hw_submit(&cmd, 1, 0, &done) == OS32_ERR_NOSYS);
     CHECK(done == 0);
