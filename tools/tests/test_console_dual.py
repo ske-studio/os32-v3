@@ -49,8 +49,8 @@ MUTANTS = [
     ('clear gate', 'console.c', 'if (con_sink_is_enabled()) return;', 'if (con_sink_is_enabled() && !con_dual_active()) return;', 'A3'),
     ('session cfg', 'console.c', 'con_dual_was_live() || con_dual_cfg()', 'con_dual_was_live()', 'A3'),
     ('loading cfg', 'kernel.c', 'if (con_dual_cfg())\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'if (0)\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'A3'),
-    ('DPMS call', 'gfx_core.c', '(void)a->be->dpms(a->ctx, h, state);', '(void)state;', 'A3'),
-    ('DPMS GF', 'gfx_core.c', 'a->kind == GFX2_KIND_GEFORCE && ', '', 'A3'),
+    ('DPMS call', 'display_dual.c', '(void)a->be->dpms(a->ctx, h, state);', '(void)state;', 'A3'),
+    ('DPMS GF', 'display_dual.c', 'a->kind == GFX2_KIND_GEFORCE && ', '', 'A3'),
     ('session CLEAR', 'console.c',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        con_sink_push_clear();\n        return;',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        return;', 'A3'),
@@ -85,7 +85,6 @@ def build_run(tmp, sources, runner):
     start = source.index('                static const char loading[] = "Loading shell...";')
     end = source.index('\n            }', start)
     (tmp / 'loading_cui.inc').write_text(source[start:end])
-    (tmp / 'dpms.inc').write_text(function(sources['gfx_core.c'], 'static void gfx_dual_dpms(u32 state)'))
     fixture = ROOT / 'tools/tests/console_dual_host.c'
     exe = tmp / 'console-dual'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-ffreestanding',

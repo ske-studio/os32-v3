@@ -180,7 +180,7 @@ def grid_build(work, replacement=None, omit_header=False):
         path, old, new = replacement
         dest = work / path
         dest.write_text(once(dest.read_text(), old, new))
-    (work / 'console_source.inc').write_text('void gfx_policy_reeval(void) {}\n' + grid_instrument((work / GRID_KERNEL).read_text()))
+    (work / 'console_source.inc').write_text('int con_dual_cfg(void) { return 0; }\nvoid gfx_policy_reeval(void) {}\n' + grid_instrument((work / GRID_KERNEL).read_text()))
     (work / GRID).write_text(grid_instrument((work / GRID).read_text()))
     if omit_header:
         (work / GRID_HEADER).unlink()

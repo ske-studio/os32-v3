@@ -121,7 +121,7 @@ static void gfx_bind_client(void)
 }
 void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
-static void gfx_dual_dpms(u32 state) { (void)state; }
+void display_dual_dpms(u32 state) __attribute__((weak));
 #include "gfx_core_slice.inc"
 
 /* B6: the common present path (gfx/gfx_vram.c _flip_page and _present_dirty),

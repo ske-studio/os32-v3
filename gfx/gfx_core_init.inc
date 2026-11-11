@@ -13,7 +13,7 @@ static void gfx_init_mode(int legacy200)
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
-        if (gfx_started) gfx_dual_dpms(0);
+        if (gfx_started && display_dual_dpms) display_dual_dpms(0);
         gfx_diag_init();
         return;   /* packed 系はモード設定もバックバッファも init() が済ませた */
     }

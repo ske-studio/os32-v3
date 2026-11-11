@@ -89,7 +89,6 @@ static void loading_cui(void)
 {
 #include "loading_cui.inc"
 }
-#include "dpms.inc"
 static int dpms_calls[2], dpms_state;
 static int fake_dpms(void *ctx, u32 head, u32 state)
 { (void)ctx; dpms_calls[head]++; dpms_state=state; return 0; }
@@ -219,7 +218,7 @@ static int a3_a4(void)
     for (int cfg0=0; cfg0<2; cfg0++) for (int gf=0; gf<2; gf++) {
         con_dual_configure(cfg0); active=&adapters[1];
         active->kind=gf ? GFX2_KIND_GEFORCE : GFX2_KIND_PC98;
-        dpms_calls[0]=dpms_calls[1]=0; gfx_dual_dpms(3);
+        dpms_calls[0]=dpms_calls[1]=0; display_dual_dpms(3);
         CHECK(dpms_calls[0]==(cfg0 && gf) && !dpms_calls[1] &&
               (!(cfg0 && gf) || dpms_state==3), "A3 DPMS");
     }

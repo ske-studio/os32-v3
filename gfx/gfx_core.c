@@ -310,18 +310,6 @@ done:
     gfx_reinit_surfaces(1);
 }
 
-static void gfx_dual_dpms(u32 state)
-{
-    struct gfx2_adapter *a = gfx2_active();
-    if (con_dual_cfg() && a && a->kind == GFX2_KIND_GEFORCE && a->be && a->be->dpms) {
-        for (u32 h = 0; h < a->heads; h++) {
-            GFX2_HeadInfo info;
-            if (!gfx2_head_info(a->index, h, &info) && info.attached)
-                (void)a->be->dpms(a->ctx, h, state);
-        }
-    }
-}
-
 #include "gfx_core_init.inc"
 
 void gfx_init(void)
@@ -403,7 +391,7 @@ void gfx_shutdown(void)
         if (!caller_access_get_user(&caller) ||
             caller.app_id != appslot_gfx_owner()) return;
     }
-    gfx_dual_dpms(3);
+    if (display_dual_dpms) display_dual_dpms(3);
     pc98_splash_raster_reset();
     gfx_started = 0;
     gfx_policy_reeval();
