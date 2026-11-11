@@ -122,11 +122,30 @@ static int release(void *c, struct gfx2_surf *s) { return reservation_rc(gf_v2_r
 static int gart_bind(void *c, const u32 *p, u32 n, u32 *off) { return gf_v2_gart_bind(c, p, n, off); }
 static int gart_unbind(void *c, u32 off, u32 n) { return gf_v2_gart_unbind(c, off, n); }
 
-static struct gf3_surface surface(const struct gfx2_surf *s)
+/* C14 aliases borrow v1 storage, bypassing G9. Resolve the current reservation
+ * for every HW operand; never cache an identity across a v1 rebind. Ordinary
+ * allocations retain their own identity, and layer 3 still validates both. */
+static int surface(struct gf_v2 *g, const struct gfx2_surf *in, struct gf3_surface *out)
 {
-    return (struct gf3_surface){s->gpu_off, s->bytes, s->pitch, s->w, s->h,
-        (enum gf3_fmt)(s->fmt - GFX2_FMT_INDEX8), s->priv[0], s->priv[1],
-        s->pool == GFX2_POOL_GART ? GF3_HANDLE_GART_DMA : 0};
+    struct gf3_surface s = {in->gpu_off, in->bytes, in->pitch, in->w, in->h,
+        (enum gf3_fmt)(in->fmt - GFX2_FMT_INDEX8), in->priv[0], in->priv[1],
+        in->pool == GFX2_POOL_GART ? GF3_HANDLE_GART_DMA : 0};
+    if ((in->flags & GFX2_SF_ALIAS) && in->pool == GFX2_POOL_VRAM) {
+        struct gf_vram_reservation v;
+        u32 cursor = 0;
+        int rc;
+        while ((rc = gf_vram_next(g->ch, &cursor, &v)) > 0) {
+            if (s.off >= v.off && s.off - v.off <= v.bytes &&
+                s.bytes && s.bytes <= v.bytes - (s.off - v.off)) {
+                s.reservation_id = v.reservation_id;
+                s.generation = v.generation;
+                break;
+            }
+        }
+        if (rc <= 0) return rc ? rc : GF3_ESTATE;
+    }
+    *out = s;
+    return 0;
 }
 static struct gf3_rect rect(struct gfx2_rect r)
 { return (struct gf3_rect){r.x, r.y, r.w, r.h}; }
@@ -154,10 +173,14 @@ static int emit(void *ctx, const struct gfx2_exec *ex, u32 fence)
     if (ex->clip.w <= 0 || ex->clip.h <= 0) return 0;
     int rc = gf_v2_deadline(g->ch, GF3_TIMEOUT_US, &dl);
     if (rc) return gf_v2_rc(rc);
-    dst = surface(ex->dst);
+    rc = surface(g, ex->dst, &dst);
+    if (rc) return gf_v2_rc(rc);
     struct gf3_rect r = rect(ex->clip);
     struct gf3_rect sr = {op->sx + ex->clip.x - op->dx, op->sy + ex->clip.y - op->dy, r.w, r.h};
-    if (ex->src) src = surface(ex->src);
+    if (ex->src) {
+        rc = surface(g, ex->src, &src);
+        if (rc) return gf_v2_rc(rc);
+    }
     if (op->op == GFX2_OP_FILL || op->op == GFX2_OP_COPY) {
         u8 alu = 3, subc = op->op == GFX2_OP_FILL ? GF3_SUBC_GDI : GF3_SUBC_BLIT;
         bool custom = (op->flags & GFX2_F_PAT) || op->rop != (op->op == GFX2_OP_FILL ? 0xf0 : 0xcc);
@@ -200,25 +223,11 @@ static int readback(void *ctx, const struct gfx2_exec *ex, u8 *buf)
     u32 dl;
     int rc = gf_v2_deadline(g->ch, GF3_TIMEOUT_US, &dl);
     if (rc) return gf_v2_rc(rc);
-    struct gf3_surface s = surface(ex->src);
-    /* C14 aliases borrow v1 storage and never pass through gf_v2_alloc.
-     * Resolve their current backing without reserving it a second time or
-     * caching an identity across a v1 rebind. Layer 3 still validates it.
-     * The download remains VRAM -> PCI staging M2MF, as in MIT
+    struct gf3_surface s;
+    rc = surface(g, ex->src, &s);
+    if (rc) return gf_v2_rc(rc);
+    /* VRAM -> PCI staging M2MF, as in MIT
      * xf86-video-nouveau/src/nouveau_exa.c:256-280. */
-    if ((ex->src->flags & GFX2_SF_ALIAS) && ex->src->pool == GFX2_POOL_VRAM) {
-        struct gf_vram_reservation v;
-        u32 cursor = 0;
-        while ((rc = gf_vram_next(g->ch, &cursor, &v)) > 0) {
-            if (s.off >= v.off && s.off - v.off <= v.bytes &&
-                s.bytes && s.bytes <= v.bytes - (s.off - v.off)) {
-                s.reservation_id = v.reservation_id;
-                s.generation = v.generation;
-                break;
-            }
-        }
-        if (rc <= 0) return gf_v2_rc(rc ? rc : GF3_ESTATE);
-    }
     const GFX2_Op *op = ex->op;
     struct gf3_ram ram = {buf, op->pitch * op->sh, op->pitch};
     return gf_v2_rc(gf3_download(g->g3, &s, (struct gf3_rect){op->sx, op->sy, op->sw, op->sh}, &ram, dl));

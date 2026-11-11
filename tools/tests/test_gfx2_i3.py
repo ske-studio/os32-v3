@@ -16,6 +16,14 @@ CHECK = dict(name='gfx2-i3-host', tier=2, needs=['make:all'], budget=120,
 EXTRA = ['gfx/v2/' + n + '.c' for n in ['enum', 'modeset', 'display', 'v1_bridge', 'format', 'check_op', 'submit', 'sw_fill']]
 EXTRA += ['gfx/sync/' + n + '.c' for n in ['sync_cfg', 'sync_gap', 'sync_bind', 'sync_write']]
 MUTATIONS = [
+    ('shim-live-mode', 'gfx/v2/v1_shim.c',
+     'OS32_ERR_NOSYS : a->v1->set_mode(m->id);', 'OS32_ERR_NOSYS : (m->id ? OS32_ERR_NOSYS : 0);'),
+    ('shim-nosys-flip', 'gfx/v2/v1_shim.c',
+     'if (!a->v1->page_flip) return OS32_ERR_NOSYS;', 'if (!a->v1->page_flip) return 0;'),
+    ('mode-restore-flag', 'gfx/v2/modeset.c',
+     'if (gfx_fullscreen_owner()) a->restore_on_leave = 1;', 'if (0) a->restore_on_leave = 1;'),
+    ('alias-scan-sid', 'gfx/v2/surface.c',
+     'gfx2_adapters[i].head[h].scan_sid = s->sid;', 'gfx2_adapters[i].head[h].scan_sid = old_sid;'),
     ('shipped-gap', 'assets/gfx/sync.cfg', 'gap_ns=80', 'gap_ns=8'),
     ('scanout-retained', 'gfx/v2/surface.c',
      'if (s->scan_ref || !surf_done(s)) {', 'if (!surf_done(s)) {'),

@@ -40,6 +40,19 @@ static int flip_done(void *c, u32 h, u32 *sid)
 { struct gfx2_adapter *a = c; CHECK(!h); *sid = flip_ready ? a->head[h].scan_sid : 0; return flip_ready ? 0 : OS32_ERR_BUSY; }
 static int vblank(void *c, u32 h, u32 after, u32 dl, u32 *seen)
 { (void)c; CHECK(!h && dl == 1000000); *seen = after + 1; return 0; }
+static struct gfx2_surf *tri_alias;
+static struct gfx2_alias_desc tri_desc;
+static u32 tri_modes;
+static int tri_mode(u32 id)
+{
+    CHECK(id == 7);
+    tri_modes++;
+    /* Model resources.configure's device edge with real lease revoke and
+     * alias regeneration. Even a same-mode set invalidates the old token. */
+    CHECK(!lease_revoke_sid(&as, 0));
+    CHECK(!gfx2_surf_alias_update(tri_alias, &tri_desc));
+    return 0;
+}
 void _start(void)
 {
     u32 args[6] = {KERNEL_LOAD_ADDR, MEM_POOL_BASE + 0x4000000 - KERNEL_LOAD_ADDR,
@@ -166,6 +179,29 @@ void _start(void)
     missing = 1;
     CHECK(!gfxsync_bind("pegc", &target, &ctx) && ctx->cfg.unit == 1 && ctx->cfg.mode == GFXSYNC_SHADOW);
     gfxsync_unbind(ctx);
+    /* C12/C13/C16: real Trident shim mode -> revoke -> NOSYS flip ->
+     * fresh lease -> restore, including the old I3 cleanup failure. */
+    a->be = &gfx2_v1_shim; a->ctx = a; v1.set_mode = tri_mode;
+    tri_alias = alias; tri_desc = ad;
+    u32 old_alias = alias->sid;
+    map.token = 44;
+    CHECK(!paging_lease_map(&as, &map, 1));
+    CHECK(!gfx2_mode_set(0, 0, 1, 7, alias->sid));
+    CHECK(tri_modes == 1 && a->restore_on_leave && alias->sid != old_alias);
+    /* C12 also calls the v1 bridge after binding the scanout. */
+    u32 bound_alias = alias->sid;
+    CHECK(!gfx2_surf_alias_update(alias, &tri_desc));
+    CHECK(alias->sid != bound_alias && a->head[0].scan_sid == alias->sid);
+    CHECK(lease_release(&as, 44) == LEASE_INVAL);
+    CHECK(gfx2_surface_desc(old_alias, &desc) == OS32_ERR_STALE);
+    CHECK(a->head[0].scan_sid == alias->sid && alias->scan_ref == 1);
+    CHECK(gfx2_flip(0, 0, next->sid, 0, 1000) == OS32_ERR_NOSYS);
+    CHECK(!a->head[0].pend_sid && !next->scan_ref);
+    map.token = 45;
+    CHECK(!paging_lease_map(&as, &map, 1));
+    CHECK(!lease_release(&as, 45));
+    CHECK(tri_modes == 2 && !a->restore_on_leave && a->head[0].scan_sid == alias->sid);
+    gfx2_head_detach(a, 0);
     kmemset(&ledger_surfaces[0], 0, sizeof(ledger_surfaces[0]));
     CHECK(!gfx2_surface_free(next->sid));
     finish();
