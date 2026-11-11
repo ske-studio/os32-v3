@@ -151,6 +151,7 @@ I3 kernel gfxsync_cfg_lookup
 I3 kernel gfxsync_flush
 I3 kernel gfxsync_gap_loops
 I3 kernel gfxsync_mode
+I3 kernel gfxsync_profile
 I3 kernel gfxsync_read_rows
 I3 kernel gfxsync_row_read
 I3 kernel gfxsync_row_write
