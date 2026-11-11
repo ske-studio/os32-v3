@@ -155,7 +155,7 @@ int gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch)
     struct gfx2_adapter *a;
     GfxSyncCtx *ctx = 0;
     u32 mode = 0, addr, pfn, n;
-    u32 access = flags & GFX2_LOCK_READONLY ? LEDGER_PERM_RO : LEDGER_PERM_RW;
+    u32 access = flags & GFX2_LOCK_READONLY ? GFX2_CPU_R : (GFX2_CPU_R | GFX2_CPU_W);
     int rc;
     if (!va || !pitch || flags & ~(GFX2_LOCK_READONLY | GFX2_LOCK_DISCARD | GFX2_LOCK_DONOTWAIT))
         return OS32_ERR_INVAL;
@@ -172,7 +172,7 @@ int gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch)
     }
     if ((flags & GFX2_LOCK_DONOTWAIT) &&
         (!gfx2_fence_done(a, s->last_write) ||
-         (access == LEDGER_PERM_RW && !gfx2_fence_done(a, s->last_read)))) return OS32_ERR_BUSY;
+         ((access & GFX2_CPU_W) && !gfx2_fence_done(a, s->last_read)))) return OS32_ERR_BUSY;
     rc = gfx2_cpu_begin(s, access, GFX2_LOCK_DL_US); /* DISCARD still waits. */
     if (rc) return rc;
     if (ctx) {
@@ -212,7 +212,7 @@ int gfx2_unlock(u32 sid)
     if (!s) return lookup_rc;
     if (s->state != GFX2_ST_LOCKED_RO && s->state != GFX2_ST_LOCKED_RW &&
         !(s->state == GFX2_ST_LOST && s->map_as == c.as)) return OS32_ERR_INVAL;
-    access = s->state == GFX2_ST_LOCKED_RO ? LEDGER_PERM_RO : LEDGER_PERM_RW;
+    access = s->state == GFX2_ST_LOCKED_RO ? GFX2_CPU_R : (GFX2_CPU_R | GFX2_CPU_W);
     all = (struct gfx2_rect){0, 0, s->w, s->h};
     if (s->staging) {
         if (gfx2_sync_get(gfx2_adapter_get(s->adapter), s->head, &ctx, &mode) ||

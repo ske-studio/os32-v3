@@ -123,13 +123,13 @@ static int tests(void)
     reset(); surf.last_write = 42; pending = 1;
     T(gfx2_lock(1, GFX2_LOCK_DONOTWAIT, &ptr, &pitch) == OS32_ERR_BUSY && !begin_calls);
     T(!gfx2_lock(1, GFX2_LOCK_DISCARD, &ptr, &pitch));
-    T(begin_calls == 1 && begin_access == LEDGER_PERM_RW);
+    T(begin_calls == 1 && begin_access == (GFX2_CPU_R | GFX2_CPU_W));
     T(surf.state == GFX2_ST_LOCKED_RW && (u32)(uptr)ptr == MEM_GFX2_MAP_BASE);
     T(gfx2_lock(1, 0, &ptr, &pitch) == OS32_ERR_BUSY);
     T(!gfx2_unlock(1) && surf.state == GFX2_ST_IDLE && surf.map_as == current);
     T(gfx2_unlock(1) == OS32_ERR_INVAL);
     T(gfx2_lock(1, 8, &ptr, &pitch) == OS32_ERR_INVAL);
-    T(!gfx2_lock(1, GFX2_LOCK_READONLY, &ptr, &pitch)); T(begin_access == LEDGER_PERM_RO);
+    T(!gfx2_lock(1, GFX2_LOCK_READONLY, &ptr, &pitch)); T(begin_access == GFX2_CPU_R);
     T(!gfx2_unlock(1));
     reset(); begin_fail = OS32_ERR_TIMEOUT;
     T(gfx2_lock(1, 0, &ptr, &pitch) == OS32_ERR_TIMEOUT && surf.state == GFX2_ST_IDLE && !surf.map_as);
