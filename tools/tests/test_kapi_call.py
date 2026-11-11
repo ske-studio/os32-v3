@@ -28,6 +28,8 @@ static u32 host_cr3;
 #include "ring3_str.h"
 #include "appslot.h"
 #include "kapi_call.h"
+#include "exec_legacy.h"
+#include "exec_gfx_poll.h"
 #include "kapi_print.h"
 #include "kapi_strings.h"
 #include "ring3_ls.h"
@@ -97,7 +99,7 @@ static void ring3_abort_check(void) { aborts++; if (abort_now) __builtin_longjmp
 static void ring3_gui_pump(void) {}
 int ring3_ptr_ok(u32 p) { return p==0 || p>=0x1000000; }
 static void exec_park_stop(struct arch_syscall *c) { CHECK(c->native==frame); parks++; }
-int geforce_fg_due(u32 now) { (void)now; return 0; }
+bool geforce_fg_due(u32 now) { (void)now; return 0; }
 void geforce_foreground_poll(void) { CHECK(0); }
 int legacy_trap(void *native) { (void)native; return vm; }
 static int legacy_observe(struct kapi_arg_source *src, u32 *result) {

@@ -77,6 +77,7 @@ void exec_longjmp(k_jmpbuf buf) {
 #define LEGACY_FAKE_CLEANUP_ENABLE
 #define LEGACY_FAKE_CLEANUP v86_call_cleanup()
 #include "legacy_guest_fake.h"
+#include "exec_legacy.h"
 #include "kill.inc"
 /* Only kernel-context faults during the capture syscall reach these handlers.
  * Guest VM faults go through the V86 decoder, not the app kill dispatcher. */

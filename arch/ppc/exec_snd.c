@@ -1,6 +1,6 @@
 #include "exec_snd.h"
 
-void snd_owner_exit(int owner)
+void exec_snd_owner_exit(int owner)
 {
     (void)owner;
 }

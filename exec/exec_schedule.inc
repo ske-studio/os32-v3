@@ -1,5 +1,5 @@
 /* Cooperative park, resume and parked-application termination. Included by exec.c. */
-#include "../drivers/video/geforce/geforce_module.h"
+#include "exec_gfx_poll.h"
 /* ======================================================================== */
 /*  exec_park — 走っているアプリを OP_WAIT の中で止め、WM へ戻す (KAPI v44)  */
 /*                                                                          */
@@ -105,7 +105,7 @@ int exec_park_poll(u32 now_tick)
     if (!g_cur_app || !g_cur_app->cpl3 || g_cur_frame == 0) return 0;
 
     /* 前景の周期処理は park の tick 間引き・可否に依存させない。 */
-    geforce_foreground_poll();
+    exec_gfx_poll();
 
     id = appslot_cur();
     /* 間引き (tick) → 表の検査。順番は appslot_park_poll_check の中で固定。 */
@@ -146,7 +146,7 @@ i32 exec_sys_yield(void)
     AppSlot *a;
 
     /* CUI / CPL=0 を含む各 halt と GUI の park より前に 1 回。 */
-    geforce_foreground_poll();
+    exec_gfx_poll();
 
     /* CUI 中は協調型の相手 (WM) が居ない。従来どおり 1 回 hlt して戻る。 */
     if (!con_sink_is_enabled()) { _halt(); return 0; }

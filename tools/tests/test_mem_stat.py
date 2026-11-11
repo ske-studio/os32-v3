@@ -8,7 +8,7 @@ CHECK = dict(name='mem-stat-host', tier=1,
     covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sys.c', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'init/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=6.6)
 
-from exec_source import exec_source
+from exec_source import exec_fixture_preamble, exec_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -94,7 +94,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     dispatch = function(exe, 'void exec_syscall_dispatch(')
     tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
-    (tmp / 'exec_source.c').write_text('#include "owner_diag.h"\n' + '\n'.join(parts))
+    (tmp / 'exec_source.c').write_text(exec_fixture_preamble() + '\n'.join(parts))
     (tmp / 'abort_clear_source.c').write_text(function(slot, 'int appslot_abort_clear('))
     lease = read('exec/lease.c')
     (tmp / 'lease_revoke_source.c').write_text(

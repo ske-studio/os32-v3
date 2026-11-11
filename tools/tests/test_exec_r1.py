@@ -172,7 +172,8 @@ static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
-static void snd_owner_exit(int id) { resource(id, 5); }
+void snd_owner_exit(int id) { resource(id, 5); }
+#include "exec_snd.h"
 static void exec_pcm_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
@@ -240,8 +241,6 @@ static void simulate_action(void);
 static void _halt(void) { die(__LINE__); }
 volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow, ring3_park_reject_count;
 static u32 tick_count;
-static int exec_gfx_poll_due(u32 now) { (void)now; return 0; }
-static void exec_gfx_poll(void) {}
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP

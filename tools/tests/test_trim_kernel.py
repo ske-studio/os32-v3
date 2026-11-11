@@ -104,7 +104,7 @@ void fd_redirect_restore(const FdRedirectState *s) { (void)s; }
     heap = heap.replace(fn(heap, 'AppSlot *appslot_at('), '')
     (tmp / 'exec_heap_host.h').write_text(heap)
     (tmp / 'trim_slot_source.c').write_text(sources['exec/appslot.c'])
-    (tmp / 'trim_exec_source.c').write_text(fn(sources['exec/exec.c'], 'i32 exec_trim_done('))
+    (tmp / 'trim_exec_source.c').write_text('#include "exec_legacy.h"\n' + fn(sources['exec/exec.c'], 'i32 exec_trim_done('))
     (tmp / 'trim_gui_source.c').write_text(sources['kernel/gui.c'])
     stat = sources['kapi/kapi_sys.c']
     (tmp / 'mem_stat_source.c').write_text(stat[stat.index('STATIC_ASSERT(sizeof(MemStat)'):stat.index('static void build_time_copy(')])

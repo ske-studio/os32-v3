@@ -27,3 +27,10 @@ def read_text(path, **kwargs):
     if path.as_posix().endswith('/exec/exec.c'):
         return exec_source(path.parent.parent)
     return path.read_text(**kwargs)
+
+
+def exec_fixture_preamble():
+    """Declarations for extracted exec bodies and their diagnostics."""
+    return ('#include "exec_serial_diag.h"\n'
+            '#include "exec_gfx_poll.h"\n'
+            '#include "owner_diag.h"\n')
