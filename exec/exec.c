@@ -32,7 +32,7 @@
 #include "pipe_buffer.h"
 #include "shm.h"
 #include "gui.h"
-#include "snd_engine.h"
+#include "exec_snd.h"
 #include "pcm_contract.h"   /* pcm_reclaim (票 TASK_PCM_CS4231 §2-1) */
 #include "con_sink.h"
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */
