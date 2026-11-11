@@ -43,8 +43,10 @@ int gf3_scale_emit(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_check(c, dst, dr, GF3_USE_2D, &df, &ds); if (rc) goto done;
     rc = gf3_surface_check(c, dst, clip, GF3_USE_2D, &cf, &cs); if (rc) goto done;
     if (dst->fmt == GF3_INDEX8) { rc = GF3_EFORMAT; goto done; }
-    if ((src->off <= dst->off && dst->off - src->off < src->bytes) ||
-        (dst->off < src->off && src->off - dst->off < dst->bytes)) {
+    if ((src->dma ? src->dma : GF3_HANDLE_VRAM_DMA) ==
+        (dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA) &&
+        ((src->off <= dst->off && dst->off - src->off < src->bytes) ||
+         (dst->off < src->off && src->off - dst->off < dst->bytes))) {
         rc = GF3_EUNSUPPORTED; goto done;
     }
     rc = scale_ratio(sr.w, dr.w, &du); if (rc) goto done;
@@ -52,7 +54,7 @@ int gf3_scale_emit(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_set(c, dst, dst, false, dl); if (rc) goto done;
     v[0] = c->obj[GF3_OBJ_SIFM].handle;
     rc = gf2_emit(c->ch, GF3_SUBC_MISC, SIFM_BIND, false, v, 1, dl); if (rc) goto done;
-    v[0] = GF3_HANDLE_VRAM_DMA;
+    v[0] = src->dma ? src->dma : GF3_HANDLE_VRAM_DMA;
     rc = gf2_emit(c->ch, GF3_SUBC_MISC, SIFM_DMA_IMAGE, false, v, 1, dl); if (rc) goto done;
     v[0] = sf.sifm; v[1] = SIFM_SRCCOPY; /* nv04_xv_blit.c:115-117 SRCCOPY */
     rc = gf2_emit(c->ch, GF3_SUBC_MISC, SIFM_COLOR_FORMAT, false, v, 2, dl); if (rc) goto done;

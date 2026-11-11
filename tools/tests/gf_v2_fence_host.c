@@ -23,6 +23,7 @@ void _start(void)
     wait_rc = 0;
     CHECK(!gf_v2_fence_emit(&g, 257, 9));
     CHECK(g.completed == 1 && g.ring.count == GF_V2_RING && g.ring.e[g.ring.tail].v2 == 2);
+    CHECK(!gf_v2_fence_wait(&g, 999, 9));
     poll_done = 0; CHECK(!gf_v2_fence_state(&g, &completed, &failed));
     CHECK(completed == 1 && failed == 256 && g.ring.count == GF_V2_RING);
     poll_done = 1; CHECK(!gf_v2_fence_state(&g, &completed, &failed));

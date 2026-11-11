@@ -48,6 +48,14 @@ void _start(void)
     assert(!gf3_fill_emit(&host.ctx, &surface, rect, TEST_COLOR, GX_COPY, 0xff, DEADLINE));
     assert(host.npackets == 3 && !host.calls[H_FENCE] && !host.calls[H_WAIT]);
     setup();
+    assert(!gf3_fill_emit(&host.ctx, &surface, rect, TEST_COLOR, GF3_ALU_KEEP, 0, DEADLINE));
+    assert(!host.calls[H_ROP] && host.npackets == 3);
+    for (u8 alu = 0; alu < 16; ++alu) {
+        setup();
+        assert(!gf3_fill_emit(&host.ctx, &surface, rect, TEST_COLOR, alu, 0xff, DEADLINE));
+        assert(host.calls[H_ROP] == 1);
+    }
+    setup();
     assert(fill() == 0 && host.ctx.last_rc == 0);
     assert(host.npackets == 3 && host.nwords == 4);
     packet(0, EXPECT_GDI_FORMAT_METHOD, 1, EXPECT_GDI_INDEX8, 0);

@@ -33,6 +33,11 @@ def main():
             assert source.count(anchor) == 1
             assert observe(work, source.replace(anchor, 'if (r->count > GF_V2_RING) {')) > 0
             print('RED full ring guard')
+            missing = '    return 0;\n}\n'
+            source_wait = source.rsplit(missing, 1)
+            assert len(source_wait) == 2
+            assert observe(work, source_wait[0] + '    return OS32_ERR_INVAL;\n}\n' + source_wait[1]) > 0
+            print('RED absent fence wait')
             assert observe(work, source) == 0
             print('GREEN restored source')
 

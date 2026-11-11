@@ -26,8 +26,10 @@ int gf3_fill_emit(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rec
 
     rc = gf3_surface_check(c, s, r, GF3_USE_GDI, &fmt, &span);
     if (rc) return c->last_rc = rc;
-    rc = gf3_rop_set(c, GF3_SUBC_GDI, alu, mask, s->fmt, dl);
-    if (rc) return c->last_rc = rc;
+    if (alu != GF3_ALU_KEEP) {
+        rc = gf3_rop_set(c, GF3_SUBC_GDI, alu, mask, s->fmt, dl);
+        if (rc) return c->last_rc = rc;
+    }
     rc = gf3_surface_set(c, s, s, true, dl);
     if (rc) return c->last_rc = rc;
     v[0] = fmt.gdi;

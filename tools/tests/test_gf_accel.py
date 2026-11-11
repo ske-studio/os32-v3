@@ -131,6 +131,7 @@ MUTATIONS = {
          'mask |= 0U;', 'tools/tests/gf_accel_b2_host.c'),
     ],
     'b3': [
+        ('keep-fill', 'hwdev/gf/accel_fill.c', 'if (alu != GF3_ALU_KEEP) {', 'if (alu == GF3_ALU_KEEP) {', 'tools/tests/gf_accel_b3_host.c'),
         ('fill_gdi_constant', 'hwdev/gf/accel_fill.c',
          'v[0] = fmt.gdi;',
          'v[0] = 3;', 'tools/tests/gf_accel_b3_host.c'),
@@ -154,6 +155,8 @@ MUTATIONS = {
     # B4 report2: packed coordinate/size anchors follow IMAGE_BLIT's 16-bit
     # fields (xf86-video-nouveau/src/nv04_exa.c:255-258).
     'b4': [
+        ('keep-copy', 'hwdev/gf/accel_copy.c', 'if (alu != GF3_ALU_KEEP) {', 'if (alu == GF3_ALU_KEEP) {', 'tools/tests/gf_accel_b4_host.c'),
+        ('dma-copy', 'hwdev/gf/accel_copy.c', '(dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA) && copy_overlap', '(src->dma ? src->dma : GF3_HANDLE_VRAM_DMA) && copy_overlap', 'tools/tests/gf_accel_b4_host.c'),
         ('b4_alias_off', 'hwdev/gf/accel_copy.c',
          'src->off != dst->off',
          'src->off == dst->off', 'tools/tests/gf_accel_b4_host.c'),
@@ -256,6 +259,8 @@ MUTATIONS = {
          '0, off, bytes, vr.pitch, bytes, rows, dl + GF3_TIMEOUT_US);', 'tools/tests/gf_accel_b8_host.c'),
     ],
     'b9': [
+        ('overlap-scale', 'hwdev/gf/accel_scale.c', '(dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA) &&', '(src->dma ? src->dma : GF3_HANDLE_VRAM_DMA) &&', 'tools/tests/gf_accel_b9_host.c'),
+        ('dma-scale', 'hwdev/gf/accel_scale.c', 'v[0] = src->dma ? src->dma : GF3_HANDLE_VRAM_DMA;', 'v[0] = GF3_HANDLE_VRAM_DMA;', 'tools/tests/gf_accel_b9_host.c'),
         ('scale_surface_src', 'hwdev/gf/accel_scale.c',
          'gf3_surface_set(c, dst, dst, false, dl)',
          'gf3_surface_set(c, src, dst, false, dl)', 'tools/tests/gf_accel_b9_host.c'),

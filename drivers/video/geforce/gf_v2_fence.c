@@ -62,5 +62,5 @@ int gf_v2_fence_wait(struct gf_v2 *g, u32 v2, u32 dl)
             return 0;
         }
     }
-    return OS32_ERR_INVAL;
+    return 0;
 }

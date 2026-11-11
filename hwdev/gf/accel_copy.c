@@ -45,13 +45,16 @@ int gf3_copy_emit(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_check(c, dst, (struct gf3_rect){dx, dy, sr.w, sr.h}, GF3_USE_2D, &df, &ds);
     if (rc) goto out;
     if (src->fmt != dst->fmt) { rc = GF3_EFORMAT; goto out; }
-    if (copy_overlap(&ss, &ds) &&
+    if ((src->dma ? src->dma : GF3_HANDLE_VRAM_DMA) ==
+        (dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA) && copy_overlap(&ss, &ds) &&
         (src->reservation_id != dst->reservation_id || src->generation != dst->generation ||
          src->off != dst->off || src->pitch != dst->pitch || src->fmt != dst->fmt)) {
         rc = GF3_EUNSUPPORTED; goto out;
     }
-    rc = gf3_rop_set(c, GF3_SUBC_BLIT, alu, mask, dst->fmt, dl);
-    if (rc) goto out;
+    if (alu != GF3_ALU_KEEP) {
+        rc = gf3_rop_set(c, GF3_SUBC_BLIT, alu, mask, dst->fmt, dl);
+        if (rc) goto out;
+    }
     rc = gf3_surface_set(c, src, dst, false, dl);
     if (rc) goto out;
     u32 words[3] = { (sr.y << 16) | sr.x, (dy << 16) | dx, (sr.h << 16) | sr.w };
