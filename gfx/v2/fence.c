@@ -190,6 +190,7 @@ int gfx2_fence_query(u32 adapter, u32 *completed, u32 *failed_upto)
     struct gfx2_adapter *a = gfx2_adapter_get(adapter);
     int rc = 0;
     if (!a || !completed || !failed_upto) return OS32_ERR_INVAL;
+    gfx2_flip_poll(a);
     if (a->state == GFX2_AD_OK) rc = refresh(a);
     if (rc) return rc;
     sweep(a);
