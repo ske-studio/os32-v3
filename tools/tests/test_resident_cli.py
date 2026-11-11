@@ -21,9 +21,15 @@ static jmp_buf done;
 static const char *input;
 static char out[4096], path[256], data[256];
 static unsigned pos, used, size;
-static int getkey(void) { if (!input[pos]) longjmp(done, 1); return (unsigned char)input[pos++]; }
+static int special, polled;
+static int getkey(void) {
+    if (special && pos == 8) { special = 0; return RESIDENT_CLI_KEY_CANCEL; }
+    if (polled == -1) { polled = 0; return -2; }
+    if (!input[pos]) longjmp(done, 1);
+    return (unsigned char)input[pos++];
+}
 static void write_out(const void *p, u32 n) { memcpy(out + used, p, n); used += n; out[used] = 0; }
-static void poll_key(void) { }
+static void poll_key(void) { polled++; }
 static int cat_file(const char *p) { (void)p; return 0; }
 static int put_file(const char *p, const void *d, u32 n) {
     strcpy(path, p); memcpy(data, d, n); size = n; return 0;
@@ -46,6 +52,9 @@ int main(void) {
     if (!check("echo a > /tmp/f\n", "os32> echo a > /tmp/f\nos32> ") ||
         strcmp(path, "/tmp/f") || size != 2 || memcmp(data, "a\n", 2)) return 5;
     if (!check("nope\n", "os32> nope\nunknown command\nos32> ")) return 6;
+    special = 1; polled = -1;
+    if (!check("echo badecho good\n", "os32> echo bad\nos32> echo good\ngood\nos32> ") ||
+        polled != 1) return 7;
     return 0;
 }
 '''

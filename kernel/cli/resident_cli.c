@@ -1,7 +1,6 @@
 #include "resident_cli.h"
 
 #define LINE_SIZE 256
-#define CANCELLED (-2)
 
 static void output(const struct resident_cli_ops *ops, const char *s)
 {
@@ -81,9 +80,9 @@ void resident_cli_run(const struct resident_cli_ops *ops)
             continue;
         }
         if (key == 3) {
-            key = CANCELLED;
+            key = RESIDENT_CLI_KEY_CANCEL;
         }
-        if (key == CANCELLED) {
+        if (key == RESIDENT_CLI_KEY_CANCEL) {
             output(ops, "\n");
             length = 0;
             output(ops, "os32> ");
