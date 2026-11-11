@@ -77,11 +77,13 @@ static int test(void)
     struct gf3_surface dst={0x2000,1024,128,8,8,GF3_ARGB8888,7,3, 0};
     gf3_host_trace_clear(&h);
     REQUIRE(!gf3_surface_set(&h.ctx,&s,&dst,true,123));
-    REQUIRE(h.npackets==1 && packets[0].subc==GF3_SUBC_SURFACE2D && packets[0].method==0x300 &&
-            !packets[0].noninc && packets[0].count==4 && packets[0].deadline==123);
-    REQUIRE(words[0]==11 && words[1]==0x00800040 && words[2]==0x1000 && words[3]==0x2000);
+    REQUIRE(h.npackets==2 && packets[0].method==0x184 && packets[0].count==2 &&
+            packets[1].subc==GF3_SUBC_SURFACE2D && packets[1].method==0x300 &&
+            !packets[1].noninc && packets[1].count==4 && packets[1].deadline==123);
+    REQUIRE(words[0]==GF3_HANDLE_VRAM_DMA && words[1]==GF3_HANDLE_VRAM_DMA &&
+            words[2]==11 && words[3]==0x00800040 && words[4]==0x1000 && words[5]==0x2000);
     gf3_host_trace_clear(&h);
-    REQUIRE(!gf3_surface_set(&h.ctx,&s,&s,false,124) && words[0]==10);
+    REQUIRE(!gf3_surface_set(&h.ctx,&s,&s,false,124) && words[2]==10);
     gf3_host_trace_clear(&h);
     gf3_host_fail_at(&h,H_MATCH,1,GF3_ESTATE);
     REQUIRE(gf3_surface_set(&h.ctx,&s,&s,false,124)==GF3_ESTATE && !h.npackets);
