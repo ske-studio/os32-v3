@@ -143,7 +143,7 @@ static void exec_reclaim_resources(int id)
      * (3a) その直前に app の font lease 表を畳む (T7b-b1 §2-4)。vfs_close_owned
      * も FONT の FD を閉じるが lease 表は知らないので、表の枠を先に返す
      * (shell の lease は kind が違い、protect なのでどちらにも掛からない)。 */
-    font_lease_close_owned(id);
+    exec_font_lease_close_owned(id);
     vfs_close_owned(id);
     /* (4) パイプバッファ自動解放 */
     pipe_free_owned(id);
