@@ -48,6 +48,8 @@ static int g_pending_id, g_pending_kind, g_longjmp_reason;
 #define EXEC_LJ_PENDING 3
 static void ring3_context_clear(void) { fail(__LINE__); }
 void exec_longjmp(k_jmpbuf buf) { (void)buf; fail(__LINE__); }
+#include "exec_legacy.h"
+#include "exec_serial_diag.h"
 #include "exec_stop_source.c"
 static void ring3_fault_kill(void) { exec_pending_transfer(EXEC_KIND_FAULT); }
 volatile int ring3_in_syscall = 1;

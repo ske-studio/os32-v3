@@ -120,8 +120,9 @@ static void test(void)
         }
     }
     HWB_TEST("gui-shell");
-    appslot_init(); gui_mode = 1;
+    appslot_init(); gui_mode = 1; tick_count = 0;
     for (u32 i = 0; i < APP_SLOT_COUNT; i++) before[i] = g_slot[i];
+    before[APP_ID_SHELL].stop_wm_req = 1;
     ring3_abort_request(); take_check(0); same_slots(before);
     hwb_test_write("PASS exec HW abort: CUI shell, take/IF, GUI/app controls\n");
 }

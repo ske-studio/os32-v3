@@ -57,7 +57,7 @@ static void gcap_rom(V86Gcap *g) {
         __builtin_longjmp(jump,1);
     }
 }
-static void serial_puts_polled(const char *s) { CHECK(s && *s); polled++; }
+static void exec_serial_puts_polled(const char *s) { CHECK(s && *s); polled++; }
 #include "gcap_slice.inc"
 #include "stop_slice.inc"
 static void run(void) __attribute__((used));

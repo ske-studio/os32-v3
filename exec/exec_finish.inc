@@ -65,7 +65,7 @@ static void exec_teardown_app(AppSlot *a)
     (void)ledger_owner_retire(a->as->owner);
     goto done;
 poisoned:
-    serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
+    exec_serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
     exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
 done:
     exec_owner_diag(a, 1, owner_pages_before, exec_as_leftover_pages - before);
@@ -135,7 +135,7 @@ static void exec_reclaim_resources(int id)
      * FD が生きていなければならない。ここを (6) に置いていた間は、
      * vfs_close_owned が先に FD を閉じ、SQLite が閉じた FD 番号へ遅延 close /
      * rollback を投げる形になっていた。他の相対順は 1 つも動かさない。 */
-    db_cleanup_owned(id);
+    exec_db_cleanup_owned(id);
     /* (2) 標準FDのリダイレクト解除 (ファイルFDも自動クローズ)。
      * 表は FD 0/1/2 の 3 本しかないので、2 本のアプリが同時に stdout を
      * リダイレクトすることはできない (D3 の限界。GUI アプリは使わない)。 */
@@ -153,11 +153,11 @@ static void exec_reclaim_resources(int id)
     shm_free_owned(id);
     /* (6) サウンド: この ID の退避済み音だけを捨てる (D9-4)。
      * 鳴っているのがこの ID なら止める。他のアプリの音は無事。 */
-    snd_owner_exit(id);
+    exec_snd_owner_exit(id);
     /* (6b) PCM: この ID が鳴らしていれば待たずに止めて資源を返す
      * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
      * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
-    pcm_reclaim(id);
+    exec_pcm_reclaim(id);
 }
 
 static void exec_notify_owned(int id, int kind)
@@ -166,7 +166,7 @@ static void exec_notify_owned(int id, int kind)
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
-    ime_owner_exit(id);
+    exec_ime_owner_exit(id);
     gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、
      * 畳んだのがその 1 本なら溜まっている打鍵を捨てる。**con_sink の所有を
@@ -207,7 +207,7 @@ static void exec_notify_owned(int id, int kind)
      * 畳まれたハンドルを内部解放する — RELEASE も送るので、Agent 側の受付枠
      * (ACTIVE は rid ごと 2 件) が埋まったままにならない。公開 API を通さず
      * ID を指定して解放する。 */
-    host_owner_exit(id);
+    exec_host_owner_exit(id);
     /* (10) console シンクの読み手 (票 K6C)。読み手は 1 本だけなので、畳んだ
      * のがその 1 本なら所有を返す — 返さないと次の端末アプリが永久に
      * OS32_ERR_EXIST を食う。リングの中身は捨てない (GUI は続いており、
@@ -262,7 +262,7 @@ volatile u32 exec_stop_count;
 static void exec_stop_mark(void)
 {
     exec_stop_count++;
-    serial_puts_polled("OS32: exec teardown stopped\r\n");
+    exec_serial_puts_polled("OS32: exec teardown stopped\r\n");
 }
 
 /* ======================================================================== */
@@ -331,11 +331,11 @@ void exec_exit(int status, int kind)
 {
     if (font_guard_active) font_guard_fault(0, 0, 0);
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
-    legacy_abort_begin();
-    legacy_end();
+    if (exec_legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    exec_legacy_abort_begin();
+    exec_legacy_end();
     ring3_context_clear();
-    legacy_cleanup();
+    exec_legacy_cleanup();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
@@ -350,9 +350,9 @@ static void exec_pending_transfer(int kind)
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
-    legacy_abort_begin();
-    legacy_end();
+    if (exec_legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    exec_legacy_abort_begin();
+    exec_legacy_end();
     ring3_context_clear();
     g_pending_id = id;
     g_pending_kind = kind;
@@ -375,8 +375,8 @@ static void exec_pending_finish(void)
     g_longjmp_id = 0;
     paging_load_cr3(paging_kernel_pd_phys());
     _enable();
-    legacy_end();
-    legacy_cleanup();
+    exec_legacy_end();
+    exec_legacy_cleanup();
     exec_finish(id, EXEC_ERR_FAULT, kind);
 }
 

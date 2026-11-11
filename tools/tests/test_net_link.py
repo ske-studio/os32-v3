@@ -145,8 +145,8 @@ def check_reclaim_has_host_owner_exit():
     m = re.search(r"static void exec_notify_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)
     assert m, "exec_notify_owned が見つからない"
     body = m.group(1)
-    assert "host_owner_exit(id);" in body, "exec_notify_owned に host_owner_exit が無い"
-    assert body.index("launch_owner_exit(id);") < body.index("host_owner_exit(id);") \
+    assert "exec_host_owner_exit(id);" in body, "exec_notify_owned に host_owner_exit が無い"
+    assert body.index("launch_owner_exit(id);") < body.index("exec_host_owner_exit(id);") \
         < body.index("con_sink_owner_exit(id);"), \
         "host_owner_exit は launch_owner_exit と con_sink_owner_exit の間に置く"
     print("ORDER SOURCE: host_owner_exit between launch/con_sink PASS", flush=True)

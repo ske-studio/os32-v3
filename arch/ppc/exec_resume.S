@@ -1,0 +1,73 @@
+/* Restore a saved USER frame after loading its address space. */
+#include "ppc_frame.h"
+#include "ppc_oea.h"
+.text
+.align 2
+.globl arch_user_resume
+.type arch_user_resume,@function
+arch_user_resume:
+    mr 30,3
+    mr 31,4
+    bl ppc_irq_save
+    lis 3,ppc_exec_kernel_sp@ha
+    stw 1,ppc_exec_kernel_sp@l(3)
+    mr 3,31
+    bl ppc_boot_load_root
+    /* Identity code/frame; stop translation before restoring the frame. */
+    mfmsr 3
+    li 4,(PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
+    andc 3,3,4
+    mtmsr 3
+    isync
+    lwz 0,PPC_FRAME_LR(30)
+    mtlr 0
+    lwz 0,PPC_FRAME_CR(30)
+    mtcr 0
+    lwz 0,PPC_FRAME_CTR(30)
+    mtctr 0
+    lwz 0,PPC_FRAME_XER(30)
+    mtxer 0
+    lwz 0,120(30)
+    mtsprg1 0
+    lwz 0,124(30)
+    mtsprg2 0
+    lwz 31,PPC_FRAME_SRR0(30)
+    lwz 0,PPC_FRAME_SRR1(30)
+    mtsprg3 0
+    lwz 0,0(30)
+    lwz 1,4(30)
+    lwz 2,8(30)
+    lwz 3,12(30)
+    lwz 4,16(30)
+    lwz 5,20(30)
+    lwz 6,24(30)
+    lwz 7,28(30)
+    lwz 8,32(30)
+    lwz 9,36(30)
+    lwz 10,40(30)
+    lwz 11,44(30)
+    lwz 12,48(30)
+    lwz 13,52(30)
+    lwz 14,56(30)
+    lwz 15,60(30)
+    lwz 16,64(30)
+    lwz 17,68(30)
+    lwz 18,72(30)
+    lwz 19,76(30)
+    lwz 20,80(30)
+    lwz 21,84(30)
+    lwz 22,88(30)
+    lwz 23,92(30)
+    lwz 24,96(30)
+    lwz 25,100(30)
+    lwz 26,104(30)
+    lwz 27,108(30)
+    lwz 28,112(30)
+    lwz 29,116(30)
+    mtsrr0 31
+    mfsprg3 31
+    mtsrr1 31
+    mfsprg1 30
+    mfsprg2 31
+    rfi
+.size arch_user_resume,.-arch_user_resume

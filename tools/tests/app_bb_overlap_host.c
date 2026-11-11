@@ -100,6 +100,7 @@ static int __attribute__((unused)) launch_map_attempt(struct addrspace *as, u32 
 #ifndef APP_BB_SLOT_LOOKUP
 AppSlot *appslot_at(int id) { (void)id; return 0; }
 #endif
+#include "exec_serial_diag.h"
 #include "owner_diag.h"
 static int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
 #include "exec_bb_overlap.inc"

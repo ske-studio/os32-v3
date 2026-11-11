@@ -18,3 +18,15 @@ int ring3_call_from_user(void)
 {
     return 0;
 }
+
+/* This image has no exec closure or user context. */
+struct arch_syscall;
+void exec_syscall_dispatch(struct arch_syscall *call)
+{
+    (void)call;
+    for (;;) __asm__ volatile("b .");
+}
+void ring3_fault_kill(void)
+{
+    for (;;) __asm__ volatile("b .");
+}

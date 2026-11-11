@@ -1,14 +1,14 @@
-#include "legacy_guest.h"
+#include "exec_legacy.h"
 #include "font_guard.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
-#include "serial_diag.h"
+#include "exec_serial_diag.h"
 #include "appmem.h"
 #include "memmap.h"
 #include "exec.h"
 #include "kselftest.h"
-#include "kselftest_probe.h"
+#include "exec_selftest.h"
 #include "config.h"
 #include "os32x_hdr.h"
 #include "appslot.h"
@@ -17,10 +17,9 @@
 #include "console.h"
 #include "kstring.h"
 #include "vfs.h"
-#include "gfx.h"
-#include "gfx_hal.h"   /* gfx_bb_phys_range: CPL=3 へ USER マップする範囲 */
+#include "exec_gfx.h"
 #include "input_service.h"
-#include "ime.h"
+#include "exec_ime.h"
 #include "kmalloc.h"
 #include "kprintf.h"
 #include "kapi_print.h"
@@ -33,14 +32,13 @@
 #include "pipe_buffer.h"
 #include "shm.h"
 #include "gui.h"
-#include "snd_engine.h"
-#include "pcm_contract.h"   /* pcm_reclaim (票 TASK_PCM_CS4231 §2-1) */
+#include "exec_snd.h"
+#include "exec_reclaim.h"
 #include "con_sink.h"
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */
 #include "launch.h"      /* T9: 起動要求表 (GUI 中の起動を WM が仲介する) */
 #include "ring3_str.h"   /* ring3_pte_writable_ok / ring3_range_overlaps (往復 10) */
-#include "kapi_host.h"   /* N1: Host Services のハンドル回収 (host_owner_exit) */
-#include "kapi_db.h"
+#include "exec_kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"
 #include "kapi_call.h"
@@ -448,7 +446,7 @@ int ring3_user_range_writable(u32 p, u32 len)
 
 i32 exec_trim_done(u32 epoch)
 {
-    if (legacy_pinned()) return OS32_ERR_BUSY;
+    if (exec_legacy_pinned()) return OS32_ERR_BUSY;
     struct caller_access c;
     AppSlot *slot;
     u32 pages;

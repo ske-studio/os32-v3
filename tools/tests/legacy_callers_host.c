@@ -121,6 +121,13 @@ static void kstrncpy(char *d,const char *s,u32 n) { while(n-- && (*d++=*s++)) {}
 static int serial_gate_active(void) { return 1; }
 static void serial_puts_polled(const char *s) { (void)s; }
 static int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
+#define exec_legacy_pinned legacy_pinned
+#define exec_legacy_closing legacy_closing
+#define exec_legacy_lowmap_busy legacy_lowmap_busy
+#define exec_legacy_abort_begin legacy_abort_begin
+#define exec_legacy_end legacy_end
+#define exec_legacy_cleanup legacy_cleanup
+#define exec_legacy_call_dispatch legacy_call_dispatch
 #include "callers.inc"
 
 /* Link the same caller slices to none as well as the native provider. */
