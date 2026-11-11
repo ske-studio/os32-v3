@@ -15,6 +15,9 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('ppc-accepted', 'layout', '(hdr->flags & OS32X_FLAG_PPC32)', '0'),
+    ('decode-bypassed', 'source', 'int decode_rc = os32x_decode(hdr, hdrbuf, (u32)sz);',
+     'int decode_rc = OS32X_LAYOUT_OK; hdr = (OS32Header *)hdrbuf;'),
     ('old-format-accepted', 'layout', 'hdr->version != OS32X_HDR_VERSION',
      '(hdr->version != OS32X_HDR_VERSION && hdr->version != 4)'),
     ('code-protect-omitted', 'source',

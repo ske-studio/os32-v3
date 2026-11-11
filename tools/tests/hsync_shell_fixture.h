@@ -20,12 +20,27 @@ static OS32Header fixture_shell_header(void)
     return h;
 }
 
+static void fixture_shell_wire(u8 *wire, const OS32Header *h)
+{
+    const u32 fields[] = {h->magic, h->header_size, h->version, h->flags,
+        h->entry_offset, h->text_size, h->bss_size, h->heap_size, h->stack_size,
+        h->min_api_ver, h->load_addr, h->kapi_data_off, h->kapi_abi_generation,
+        h->memory_layout_generation, h->shlib_protocol, h->code_size};
+    unsigned i;
+    for (i = 0; i < 16; i++) {
+        wire[4*i] = (u8)fields[i]; wire[4*i+1] = (u8)(fields[i] >> 8);
+        wire[4*i+2] = (u8)(fields[i] >> 16); wire[4*i+3] = (u8)(fields[i] >> 24);
+    }
+}
+
 static int fixture_shell_read(void *buf, u32 size)
 {
     OS32Header h = fixture_shell_header();
-    u32 n = sizeof(h) - fixture_shell_pos;
+    u8 wire[OS32X_HDR_SIZE];
+    u32 n = sizeof(wire) - fixture_shell_pos;
+    fixture_shell_wire(wire, &h);
     if (n > size) n = size;
-    memcpy(buf, (u8 *)&h + fixture_shell_pos, n);
+    memcpy(buf, wire + fixture_shell_pos, n);
     fixture_shell_pos += n;
     return (int)n;
 }

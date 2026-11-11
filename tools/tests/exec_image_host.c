@@ -5,7 +5,13 @@
 #include "host_exec_context.h"
 static u32 host_cr3;
 #include "host_exec_entry.h"
+#include "os32x_hdr.h"
+static int decode_calls;
+static int observed_decode(OS32Header *h, const u8 *wire, u32 len)
+{ decode_calls++; return os32x_decode(h, wire, len); }
+#define os32x_decode observed_decode
 #include "exec.c"
+#undef os32x_decode
 #include "os32x_hdr.c"
 
 static void say(const char *s)
@@ -103,6 +109,7 @@ int vfs_read(const char *path, void *buf, u32 n)
 }
 int vfs_open(const char *path, int mode)
 {
+    CHECK(decode_calls > 0);
     CHECK(jump_ready && !opened && (argv_mode || !kstrcmp(path, "/fixture")) && mode == 0);
     event('O');
     if (failure == OPEN_FAIL) return -1;
@@ -474,7 +481,9 @@ static void image_range_tests(void)
     h.kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
-    h.header_size = 60;
+    h.version = OS32X_HDR_VERSION; h.flags = OS32X_FLAG_PPC32;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
+    h.flags = 0; h.version = 4; h.header_size = 60;
     CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
 }
 void _start(void)

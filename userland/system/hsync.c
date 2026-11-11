@@ -95,6 +95,7 @@
  * KAPI は増やさない — カーネル内の crc32_calc を番地で呼ぶのでもなく、
  * 同じ .inc をこちら側でもコンパイルして同じ値を得る。 */
 #include "lib/crc32_core.inc"
+#include "exec/os32x_hdr.c"
 
 /* `/boot/vmkernel.old` を作ってよいかの純規則 (票 TASK_SERIAL_HOSTFS §1-v3)。
  * ホスト試験は tools/tests/test_serialfs.py (hsync_bootold)。 */
@@ -2543,6 +2544,7 @@ static int dst_on_floppy(const char *dst, const char **devout)
 static int running_generation_gate(void)
 {
     OS32Header hdr;
+    u8 wire[OS32X_HDR_SIZE];
     const char *why = "shell_header_unconfirmed";
     u32 host = 0, running = 0;
     u32 known = OS32X_FLAG_GFX | OS32X_FLAG_RING3 | OS32X_FLAG_SHLIB |
@@ -2550,10 +2552,11 @@ static int running_generation_gate(void)
     int fd = api->sys_open(HS_SOURCE_SHELL, KAPI_O_RDONLY);
     int n = -1;
     if (fd >= 0) {
-        n = read_fill(fd, (u8 *)&hdr, (int)sizeof(hdr));
+        n = read_fill(fd, wire, (int)sizeof(wire));
         api->sys_close(fd);
     }
-    if (n == (int)sizeof(hdr) && hdr.magic == OS32X_MAGIC &&
+    if (n == (int)sizeof(wire) &&
+        os32x_decode(&hdr, wire, (u32)n) == OS32X_LAYOUT_OK && hdr.magic == OS32X_MAGIC &&
         hdr.header_size == OS32X_HDR_SIZE && hdr.version == OS32X_HDR_VERSION &&
         !(hdr.flags & ~known)) {
         if (hdr.memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION) {

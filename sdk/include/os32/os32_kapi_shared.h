@@ -226,6 +226,7 @@ typedef enum {
  * 持つバイナリだけ — 認証ではなく協調的な宣言で、任意のアプリが端末経由の
  * 非同期起動を使えてしまう穴を塞ぐためのもの (票 §5 blocker 2)。 */
 #define OS32X_FLAG_LAUNCHER 0x0020
+#define OS32X_FLAG_PPC32 0x0040 /* PPC32 BE 整数 ABI ppc32-sysv-soft-v1 */
 
 typedef struct {
     u32 magic;            /* 0x00: OS32X_MAGIC */
