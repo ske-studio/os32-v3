@@ -77,7 +77,7 @@ def case_check_fn(tmp):
     exe = tmp / "os32x-layout"
     r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
              "-D__cdecl=",
-             "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "sdk/include/os32"),
+             "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
              str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(exe)])
     check(r.returncode == 0, "ホスト GNU11 -Werror でコンパイルできる")
     if r.returncode != 0:
@@ -88,7 +88,7 @@ def case_check_fn(tmp):
     check(r.returncode == 0, "os32x_layout_host が全部通る")
     old_exe = tmp / "os32x-layout-old-shlib"
     r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
-             "-DOS32_TEST_OLD_SHLIB", "-I" + str(ROOT / "exec"),
+             "-DOS32_TEST_OLD_SHLIB", "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"),
              "-I" + str(ROOT / "sdk/include/os32"),
              str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(old_exe)])
     check(r.returncode == 0, "旧 shlib protocol 1 の同じ loader 判定を組める")
@@ -621,6 +621,9 @@ def case_rename(tmp):
 # --------------------------------------------------------------------------
 
 MUTATIONS = [
+    ("exec/os32x_hdr.c", "decode_magic_be",
+     "h->magic = le32_rd(wire + 0);",
+     "h->magic = ((u32)wire[0] << 24) | ((u32)wire[1] << 16) | ((u32)wire[2] << 8) | wire[3];"),
     ("sdk/mkos32x.py", "missing_text_end_allowed",
      "    if text_end is None:", "    if text_end is None:\n        return 4096\n    if False:"),
     ("sdk/mkos32x.py", "code_zero_allowed", "    code_size = text_end - base", "    code_size = text_end - base\n    if code_size == 0:\n        return 0"),
