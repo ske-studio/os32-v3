@@ -287,3 +287,9 @@ int main(int argc, char **argv)
 void host_start(unsigned int *sp) { finish(main((int)sp[0], (char **)(sp + 1))); }
 __asm__(".global _start\n_start:\nmov %esp, %eax\nand $-16, %esp\n"
         "sub $12, %esp\npush %eax\ncall host_start\n");
+
+int con_dual_active(void) { return 0; }
+int con_dual_was_live(void) { return 0; }
+void con_dual_configure(int on) { (void)on; }
+void console_session_clear(void) { tvram_clear(); }
+void shell_print(const char *str, u8 color) { (void)str; (void)color; }

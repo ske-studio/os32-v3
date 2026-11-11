@@ -8,7 +8,7 @@
 #include "kprintf.h"
 
 _Static_assert(CON_OUT_MAX >= 1 + GFX2_MAX_ADAPTERS *
-               (sizeof gfx2_adapters[0].head / sizeof gfx2_adapters[0].head[0]),
+               (sizeof(((struct gfx2_adapter *)0)->head) / sizeof(((struct gfx2_adapter *)0)->head[0])),
                "console output table too small");
 _Static_assert(CON_CONN_UNKNOWN == GFX2_CONN_UNKNOWN &&
                CON_CONN_ON == GFX2_CONN_ON && CON_CONN_OFF == GFX2_CONN_OFF,
