@@ -32,6 +32,7 @@
 #include "hwdev/gf/foundation.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "geforce_module.h"
+#include "gf_v2.h"
 #include "hwdev/gf/display/api.h"
 #include "hwdev/gf/feature5.h"
 #include "hwdev/gf/production.h"
@@ -250,6 +251,7 @@ static u8 display_format(enum gf3_fmt fmt)
 void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)
 {
     if (head || !front) return;
+    if (gf_v2_owns(front)) return;
     selected_front = *front;
     selected_scan_mode = (GfxMode){front->width, front->height,
         display_format(front->fmt), VIDEO_RGB_BITS, 0, 0, front->pitch};

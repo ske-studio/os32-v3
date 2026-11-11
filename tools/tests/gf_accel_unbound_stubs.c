@@ -95,3 +95,6 @@ __attribute__((weak)) struct gf_v2 gf_v2_inst;
 __attribute__((weak)) void gf_v2_stopped(void) {}
 
 __attribute__((weak)) void gfx2_adapter_unregister(GfxBackend *v) { (void)v; }
+/* No v2 reservation is owned by these legacy-only fixtures. */
+__attribute__((weak)) int gf_v2_owns(const struct gf3_surface *s)
+{ (void)s; return 0; }
