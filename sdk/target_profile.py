@@ -1,9 +1,10 @@
-"""Target capabilities; PowerPC currently supports object inspection only."""
+"""Target capabilities and SDK selections."""
 # The SDK selection is one set: C runtime objects, link scripts, the Rust target,
 # the linker emulation and the call ABI are chosen together (paths are relative
 # to the SDK root: sdk/ in the tree, $(OS32_SDK) in a staged SDK).
 SDK_FIELDS = ('call_abi', 'elf_emulation', 'crt_user', 'crt_resident',
               'app_link', 'app_sys_link', 'shlib_link', 'rust')
+USER_SDK_FIELDS = ('call_abi', 'elf_emulation', 'crt_user', 'app_link')
 _X86_SDK = dict(
     call_abi='i386-cdecl', elf_emulation='elf_i386',
     crt_user=('crt/crt0.o', 'crt/crt0_c.o', 'crt/syscalls.o', 'crt/help.o'),
@@ -14,13 +15,17 @@ _X86_SDK = dict(
 PROFILES = {
     'x86-pc98': dict(elf_identity=(1, 1, 3), module_codec=True,
                      layout=True, link_guard=True, ar='i386-elf-ar',
-                     sdk=True, **_X86_SDK),
+                     sdk=True, sdk_user=True, **_X86_SDK),
     'ppc-powermac': dict(elf_identity=(1, 2, 20), module_codec=False,
                          layout=False, link_guard=False, ar='powerpc-elf-ar',
                          sdk=False, **dict.fromkeys(SDK_FIELDS)),
 }
+PROFILES['ppc-powermac'].update(
+    sdk_user=True, call_abi='powerpc-sysv', elf_emulation='elf32ppc',
+    crt_user=('crt/ppc/crt0.o', 'crt/ppc/crt0_c.o'),
+    app_link='link/ppc/app.ld')
 MESSAGES = dict(module_codec='module', layout='kernel layout', link_guard='guarded-link',
-                sdk='sdk')
+                sdk='sdk', sdk_user='user sdk')
 
 
 class Unsupported(ValueError):
@@ -43,6 +48,15 @@ def sdk_values(target):
     values = {field: profile[field] for field in SDK_FIELDS}
     if not all(values.values()):
         raise ValueError('incomplete sdk target ' + target)
+    return values
+
+
+def sdk_user_values(target):
+    """Select only the fields needed to build a USER C application."""
+    profile = require(target, 'sdk_user')
+    values = {field: profile[field] for field in USER_SDK_FIELDS}
+    if not all(values.values()):
+        raise ValueError('incomplete user sdk target ' + target)
     return values
 
 
