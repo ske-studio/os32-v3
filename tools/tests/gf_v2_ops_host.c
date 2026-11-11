@@ -12,7 +12,7 @@ static const GeforceModuleContext context = {.display_out = &display_slot};
 const GeforceModuleContext *geforce_context = &context;
 int gf2_fault_check(struct gf2_chan *c) { (void)c; return 0; }
 static u32 count, select_kind, bits[2], draw_at, mark_at, last_dl, clock_calls;
-static int draw_rc, io_rc, restore_fail, gart_calls;
+static int draw_rc, io_rc, restore_fail, gart_calls, reverse_gart, m2mf_calls;
 static struct gf3_rect last_rect;
 static struct gf3_surface last_surface;
 static struct gf_vram_reservation_node backing;
@@ -49,7 +49,9 @@ int gf3_fill_emit(struct gf3_ctx *c,const struct gf3_surface *s,struct gf3_rect 
     draw_at=++count; return draw_rc;
 }
 int gf3_copy_emit(struct gf3_ctx *c,const struct gf3_surface *s,const struct gf3_surface *d,struct gf3_rect r,u32 x,u32 y,u8 alu,u32 mask,u32 dl)
-{ if (valid_surface(s)) return GF3_ESTATE; CHECK((alias_test || s->dma == GF3_HANDLE_GART_DMA) && x==2 && y==3 && r.x==6 && r.y==8); return gf3_fill_emit(c,d,r,0,alu,mask,dl); }
+{ if (valid_surface(s)) return GF3_ESTATE; CHECK(x==2 && y==3 && r.x==6 && r.y==8); return gf3_fill_emit(c,d,r,0,alu,mask,dl); }
+int gf3_m2mf(struct gf3_ctx *c,u32 ih,u32 oh,u32 io,u32 oo,u32 ip,u32 op,u32 bytes,u32 rows,u32 dl)
+{ (void)c; m2mf_calls++; CHECK(ih==(reverse_gart?GF3_HANDLE_GART_DMA:GF3_HANDLE_VRAM_DMA) && oh==(reverse_gart?GF3_HANDLE_VRAM_DMA:GF3_HANDLE_GART_DMA)); CHECK(io==8*64+6*2 && oo==3*64+2*2 && ip==64 && op==64 && bytes==8 && rows==5); last_dl=dl; draw_at=++count; return draw_rc; }
 int gf3_scale_emit(struct gf3_ctx *c,const struct gf3_surface *s,const struct gf3_surface *d,struct gf3_rect sr,struct gf3_rect dr,struct gf3_rect cl,bool b,u32 dl)
 { (void)c;(void)sr;(void)dr;(void)cl;(void)b;(void)dl; return valid_surface(s) ? GF3_ESTATE : valid_surface(d); }
 int gf3_mono(struct gf3_ctx *c,const struct gf3_surface *s,struct gf3_rect r,const struct gf3_ram *b,u32 fg,u32 bg,struct gf3_rect clip,u32 dl)
@@ -69,7 +71,7 @@ int gf2_fence_poll(struct gf2_chan *c,struct gf2_fence mark,int *done)
 void _start(void)
 {
     struct gfx2_surf d={.w=32,.h=32,.pitch=64,.bytes=2048,.fmt=GFX2_FMT_RGB565,.pool=GFX2_POOL_VRAM,.priv={7,9}};
-    struct gfx2_surf s=d; s.pool=GFX2_POOL_GART;
+    struct gfx2_surf s=d;
     GFX2_Op op={.op=GFX2_OP_FILL,.rop=0xf0,.dx=1,.dy=1,.dw=8,.dh=8,.fg={.v=0x1234}};
     struct gfx2_pattern p={.kind=2,.mono={0x80,0,0,0,0,0,0,1}};
     struct gfx2_exec ex={.op=&op,.dst=&d,.src=&s,.pat=&p,.clip={2,3,4,5}};
@@ -107,9 +109,23 @@ void _start(void)
     op.flags=GFX2_F_SRCKEY; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
     op.flags=GFX2_F_DSTKEY; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
     op.flags=0; op.op=GFX2_OP_ALPHA; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
-    op.op=GFX2_OP_READBACK; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
+    s.pool=GFX2_POOL_GART; op.op=GFX2_OP_READBACK; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
     s.pool=GFX2_POOL_VRAM; op.pitch=16; op.sx=4; op.sy=5;
     CHECK(!gf_backend_v2.check(g,&ex) && !gf_backend_v2.readback(g,&ex,0));
+    d.pool=GFX2_POOL_GART; op.op=GFX2_OP_COPY; op.sx=5; op.sy=6; op.dx=1; op.dy=1; op.rop=0xcc;
+    CHECK(!gf_backend_v2.check(g,&ex) && !gf_backend_v2.emit(g,&ex,7) && m2mf_calls==1);
+    s.pool=GFX2_POOL_GART; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); s.pool=GFX2_POOL_VRAM;
+    d.pool=GFX2_POOL_VRAM; s.pool=GFX2_POOL_GART; reverse_gart=1;
+    CHECK(!gf_backend_v2.check(g,&ex) && !gf_backend_v2.emit(g,&ex,7) && m2mf_calls==2);
+    op.rop=0x66; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); op.rop=0xcc;
+    op.flags=GFX2_F_PAT; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); op.flags=0;
+    op.op=GFX2_OP_STRETCH; CHECK(!gf_backend_v2.check(g,&ex));
+    op.op=GFX2_OP_COPY; reverse_gart=0; d.pool=GFX2_POOL_GART; s.pool=GFX2_POOL_VRAM;
+    s.fmt=GFX2_FMT_INDEX8; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); s.fmt=d.fmt;
+    op.rop=0x66; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); op.rop=0xcc;
+    op.flags=GFX2_F_PAT; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); op.flags=0;
+    const u32 no_gart[] = {GFX2_OP_FILL,GFX2_OP_STRETCH,GFX2_OP_MONO,GFX2_OP_HOSTDATA};
+    for (u32 i=0;i<sizeof(no_gart)/sizeof(no_gart[0]);i++) { op.op=no_gart[i]; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS); }
     op.op=GFX2_OP_HOSTDATA; d.pool=GFX2_POOL_GART; CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
     d.pool=GFX2_POOL_VRAM; op.dx=2; op.dy=3; op.pitch=ex.cpu_pitch=16;
     CHECK(!gf_backend_v2.emit(g,&ex,4));

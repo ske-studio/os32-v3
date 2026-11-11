@@ -123,6 +123,24 @@ static void unsubmitted(int rc, int expected)
     assert(!h.npackets && !h.calls[H_FENCE] && !h.calls[H_WAIT]);
 }
 
+static int gart_range(void *opaque, u32 handle, u32 off, u32 bytes)
+{
+    assert(opaque == &h && handle == GF3_HANDLE_GART_DMA);
+    return off <= 8192 && bytes <= 8192-off ? 0 : GF3_ERANGE;
+}
+static void gart(void)
+{
+    for (u32 dir=0; dir<2; dir++) {
+        u32 ih=dir ? GF3_HANDLE_GART_DMA : GF3_HANDLE_VRAM_DMA;
+        u32 oh=dir ? GF3_HANDLE_VRAM_DMA : GF3_HANDLE_GART_DMA;
+        setup(); unsubmitted(transfer(ih,oh,0,0,64,64,8,2), GF3_EINVAL);
+        setup(); h.ctx.range_q=gart_range; h.ctx.range_opaque=&h;
+        assert(!transfer(ih,oh,0,0,64,64,8,2));
+        chunk(0,ih,oh,0,0,64,64,8,2); synchronous(1);
+        setup(); h.ctx.range_q=gart_range; h.ctx.range_opaque=&h;
+        unsubmitted(transfer(ih,oh,dir ? 8190 : 0,dir ? 0 : 8190,64,64,8,2), GF3_ERANGE);
+    }
+}
 static void validation(void)
 {
     setup(); assert(gf3_m2mf(0, 0, 0, 0, 0, 0, 0, 1, 1, DEADLINE) == GF3_EINVAL);
@@ -206,6 +224,6 @@ static void failures(void)
 
 void _start(void)
 {
-    split_packets(); validation(); failures();
+    split_packets(); validation(); gart(); failures();
     gf2_host_exit(0);
 }

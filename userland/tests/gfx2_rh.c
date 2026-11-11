@@ -54,7 +54,7 @@ static void put(u8 *p, u32 i, u32 cpp, u32 v)
 { p[i*cpp]=v; if (cpp==2) p[i*cpp+1]=v>>8; }
 static u32 get(const u8 *p, u32 i, u32 cpp)
 { return p[i*cpp] | (cpp==2 ? (u32)p[i*cpp+1]<<8 : 0); }
-static u8 buf[256*64], data[256*64], source[64*16*2];
+static u8 buf[1024*64], data[1024*64], source[64*16*2];
 static int submit(KernelAPI *api, u32 a, u32 gen, GFX2_Op *ops, u32 n, u32 *fence)
 {
     u32 done=0; int rc=api->gfx2_submit(a,ops,n,gen,&done,fence);
@@ -181,6 +181,22 @@ static int exercise(KernelAPI *api, u32 a, GFX2_AdapterInfo *info)
             for (u32 i=0;i<256*64;i++) REQUIRE("gart-vram-pixel",buf[i]==0x44);
             CALL("gart-free",api->gfx2_surface_free(ids[0])); ids[0]=0;
         }
+        CALL("gart-large-g",api->gfx2_surface_create(a,1024,64,GFX2_FMT_INDEX8,GFX2_POOL_GART,GFX2_USE_RENDER2D,&ids[0]));
+        CALL("gart-large-v",api->gfx2_surface_create(a,1024,64,GFX2_FMT_INDEX8,GFX2_POOL_VRAM,GFX2_USE_RENDER2D,&ids[3]));
+        for (u32 i=0;i<1024*64;i++) data[i]=(i ^ (i>>8) ^ (i>>12))&255;
+        CALL("gart-large-upload",transfer(api,a,gen,ids[0],1024,64,1,data,0));
+        GFX2_Op large={.op=GFX2_OP_COPY,.rop=0xcc,.src=ids[0],.dst=ids[3],.sw=1024,.sh=64,.dw=1024,.dh=64};
+        CALL("gart-large-to-v",submit(api,a,gen,&large,1,&fence));
+        CALL("gart-large-read-v",transfer(api,a,gen,ids[3],1024,64,1,buf,1));
+        for (u32 i=0;i<1024*64;i++) REQUIRE("gart-large-v-pixel",buf[i]==data[i]);
+        for (u32 i=0;i<1024*64;i++) data[i]^=0xa5;
+        CALL("gart-large-upload-v",transfer(api,a,gen,ids[3],1024,64,1,data,0));
+        large.src=ids[3]; large.dst=ids[0];
+        CALL("gart-large-to-g",submit(api,a,gen,&large,1,&fence));
+        CALL("gart-large-read-g",transfer(api,a,gen,ids[0],1024,64,1,buf,1));
+        for (u32 i=0;i<1024*64;i++) REQUIRE("gart-large-g-pixel",buf[i]==data[i]);
+        CALL("gart-large-free-g",api->gfx2_surface_free(ids[0])); ids[0]=0;
+        CALL("gart-large-free-v",api->gfx2_surface_free(ids[3])); ids[3]=0;
         CALL("gart-free-v",api->gfx2_surface_free(ids[1])); ids[1]=0;
         CALL("gart-free-v2",api->gfx2_surface_free(ids[2])); ids[2]=0;
     } else api->kprintf(ATTR,"gfx2_rh g8=n/a gart=0\n");
