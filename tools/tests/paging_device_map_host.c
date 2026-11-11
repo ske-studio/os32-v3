@@ -11,7 +11,7 @@ static void host_irq_boundary(void);
 #include "pgalloc_host_fixture.h"
 __asm__(".globl __bss_end\n.set __bss_end, 0x180000\n"
         ".globl __kernel_resident_end\n.set __kernel_resident_end, 0x261000\n"
-        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
+        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17D000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");
 static void say(const char *s, u32 n)
 {

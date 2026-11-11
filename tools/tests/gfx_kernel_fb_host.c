@@ -128,7 +128,7 @@ static void boot(void)
         l.kind = PGALLOC_BACKING_FIXED;
         l.metadata_first = MEM_LEDGER_META_BASE / PAGE_SIZE;
         l.metadata = (void *)MEM_LEDGER_META_BASE;
-        l.workspace_first = l.metadata_first + 1;
+        l.workspace_first = l.metadata_first + l.capacity / PAGE_SIZE;
         l.workspace_end = MEM_LEDGER_META_END / PAGE_SIZE;
         arena_top_pfn = top;
     }

@@ -15,17 +15,17 @@
  * PTs. FIXED low-memory boots retain their one-page workspace. */
 #define MEMORY_BOOT_WORKSPACE_PAGES 1UL
 /* FIXED 型の置き場 (TASK_T1_LEDGER §3-3): [MEM_LEDGER_META_BASE,
- * MEM_LEDGER_META_END) = metadata 1 ページ + workspace 1 ページ。低位 RAM の
+ * MEM_LEDGER_META_END) = metadata 2 ページ + workspace 1 ページ。低位 RAM の
  * 末尾に metadata + workspace を置くと下端が MEM_PHYS_WORKSPACE_FLOOR を割る構成
  * (低位 RAM の上端が MEMORY_BOOT_FIXED_MAX_TOP 以下 = 8MB・9MB・12MB) だけが
  * ここを使う。高位 RAM は無い (低位が 15MB 未満なら高位は存在しない)。 */
-#define MEMORY_BOOT_FIXED_META_PAGES 1UL
+#define MEMORY_BOOT_FIXED_META_PAGES 2UL
 #define MEMORY_BOOT_FIXED_FIRST      (MEM_LEDGER_META_BASE / PAGE_SIZE)
 #define MEMORY_BOOT_FIXED_WS_FIRST   (MEMORY_BOOT_FIXED_FIRST + \
                                       MEMORY_BOOT_FIXED_META_PAGES)
 #define MEMORY_BOOT_FIXED_WS_END     (MEM_LEDGER_META_END / PAGE_SIZE)
 /* FIXED になる低位上端 (PFN) の最大。1 つ上から ARENA_TOP に入る
- * (3,073 / 3,074 PFN の境界、§3-3)。 */
+ * (3,074 / 3,075 PFN の境界、§3-3)。 */
 #define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE + \
                                       MEMORY_BOOT_FIXED_META_PAGES + \
                                       MEMORY_BOOT_WORKSPACE_PAGES - 1)
@@ -34,8 +34,8 @@
 STATIC_ASSERT(MEM_LEDGER_META_SIZE ==
               (MEMORY_BOOT_FIXED_META_PAGES + MEMORY_BOOT_WORKSPACE_PAGES) * PAGE_SIZE,
               ledger_backing_is_meta_plus_ws);
-/* 8MB 型の metadata (L1 の bitmap 2 面 + L2 の owner 1B/PFN) は常に 1 ページ
- * に入る (T1-R2、上端 3,073 PFN で 776 + 3,073 = 3,849B)。式は
+/* 低メモリ型の metadata (L1 の bitmap 2 面 + owner と pin 各 1B/PFN) は
+ * 常に 2 ページに入る (上端 3,074 PFN で 776 + 6,148 = 6,924B)。式は
  * pgalloc_metadata_bytes と同じ PGALLOC_META_BYTES。 */
 STATIC_ASSERT(PGALLOC_META_BYTES(MEMORY_BOOT_FIXED_MAX_TOP) <=
               MEMORY_BOOT_FIXED_META_PAGES * PAGE_SIZE,
@@ -73,7 +73,7 @@ static u32 memory_boot_workspace_pages(u32 limit)
     return pages;
 }
 
-/* 表 (L1 の bitmap 2 面 + L2 の owner + workspace) が要るページ数の合計。 */
+/* 表 (L1 の bitmap 2 面 + L2 の owner + pin + workspace) が要るページ数の合計。 */
 static u32 memory_boot_table_pages(u32 limit)
 {
     u32 pages;
@@ -85,9 +85,9 @@ static u32 memory_boot_table_pages(u32 limit)
  * 空間より下」の低位 RAM だけ (workspace >= MEM_PHYS_WORKSPACE_FLOOR は、2 枚
  * PDE のアプリが master のページテーブルを USER で恒等マップして任意物理を
  * 書けてしまうのを防ぐ不変条件)。この帯の広さが、表で覆える RAM の量を
- * 決める。現行のレイアウト (3MB の帯) で約 2.3GB まで覆える (T1b で L2 の
- * 1B/PFN が載った後の値) ので、登録上限 MEM_PHYS_RAM_CEILING (2GB、D11) の
- * 方が先に効く。 */
+ * 決める。owner・pin 各 1B/PFN と恒等 PT、デバイス窓 PT を含むため、
+ * 登録上限 MEM_PHYS_RAM_CEILING (2GB、D11) より先にこの帯が満杯に
+ * なりうる。置ける量を超えた RAM は登録しない。 */
 static u32 memory_boot_high_fit(u32 high_end, u32 top)
 {
     u32 room, base;

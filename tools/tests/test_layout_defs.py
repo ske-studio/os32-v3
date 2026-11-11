@@ -52,7 +52,7 @@ def check_fixture(work):
             lo, hi = ('__bss_start', '__bss_end')
             assert syms[lo] <= s['start'] <= s['end'] <= syms[hi]
     assert syms['__bss_end'] == syms['__ledger_fixed_end']
-    assert syms['__ledger_fixed_end'] - syms['__ledger_fixed_start'] == 8192
+    assert syms['__ledger_fixed_end'] - syms['__ledger_fixed_start'] == 12288
     assert syms['__kernel_resident_end'] == syms['__bss_end']
     assert syms['__kernel_resident_end'] % 4096 == 0
     assert m.get('KHEAP_BASE') == syms['__kernel_resident_end']

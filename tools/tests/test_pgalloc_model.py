@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Unit models use an empty SLACK; memory_boot_host covers the real provider.
 LAYOUT_FLAGS = [
                 '-Wl,--defsym=__kernel_resident_end=0x375000',
-                '-Wl,--defsym=__ledger_fixed_start=0x17e000',
+                '-Wl,--defsym=__ledger_fixed_start=0x17d000',
                 '-Wl,--defsym=__ledger_fixed_end=0x180000']
 
 class Integration(unittest.TestCase):
@@ -109,24 +109,24 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_metadata_failure_transactions(self):
         self.run_c('''
     struct physmem m, before;
-    /* L1 (2 bitmap) + L2 (1B/PFN) for the 4GiB model: 1,310,720B = 320 pages. */
-    static u32 backing[327680 + 1] __attribute__((aligned(4096)));
+    /* L1 (2 bitmap) + owner/pin (2B/PFN) for the 4GiB model: 2,359,296B = 576 pages. */
+    static u32 backing[589824 + 1] __attribute__((aligned(4096)));
     unsigned char *a, *b;
     u32 i, bytes, first;
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
     bytes = pgalloc_metadata_bytes(&m);
-    CHECK(bytes == 1310720UL);
+    CHECK(bytes == 2359296UL);
     first = 4096 - bytes / PAGE_SIZE;
     before = m;
-    for (i = 0; i < 327681; i++) backing[i] = 0xace01234UL;
+    for (i = 0; i < 589825; i++) backing[i] = 0xace01234UL;
     CHECK(!pgalloc_init_model(&m, backing, bytes - 1, first, verified));
     CHECK(!pgalloc_init_model(&m, backing, bytes, 4096, verified));
     CHECK(!pgalloc_init_model(&m, backing, bytes, 1024, verified));
     CHECK(!pgalloc_init_model(&m, backing, bytes, first, denied));
     a = (unsigned char *)&m; b = (unsigned char *)&before;
     for (i = 0; i < sizeof(m); i++) CHECK(a[i] == b[i]);
-    for (i = 0; i < 327681; i++) CHECK(backing[i] == 0xace01234UL);
+    for (i = 0; i < 589825; i++) CHECK(backing[i] == 0xace01234UL);
     /* 窓の撤去 (2026-09-09) で bootstrap の区間が 1 つ減った。容量ちょうどに
      * するのは分割 1 回あたり 2 区間なので、29 + 末尾 1 本 (= 63) ではなく
      * 30 回で 64 に届く。狙いは「容量いっぱいのモデルでは init_model が
@@ -137,16 +137,16 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     before = m;
     CHECK(!pgalloc_init_model(&m, backing, bytes, first - 100, verified));
     for (i = 0; i < sizeof(m); i++) CHECK(a[i] == b[i]);
-    for (i = 0; i < 327681; i++) CHECK(backing[i] == 0xace01234UL);
+    for (i = 0; i < 589825; i++) CHECK(backing[i] == 0xace01234UL);
     physmem_bootstrap_legacy((struct physmem *)backing, 16384);
-    CHECK(!pgalloc_init_model((struct physmem *)backing, backing, 262144, 4094, verified));
+    CHECK(!pgalloc_init_model((struct physmem *)backing, backing, 262144, 4093, verified));
     /* 窓の撤去で bootstrap の区間は 3 本 (旧 4 本)。 */
     CHECK(((struct physmem *)backing)->count == 3);
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(pgalloc_init_model(&m, backing, 262144, 4094, verified));
-    CHECK(backing[327680] == 0xace01234UL);
-    /* 4,096 PFN: L1 1,024B + L2 4,096B = 2 pages (T1b). */
-    CHECK(pgalloc_metadata_bytes(&m) == 2 * PAGE_SIZE);
+    CHECK(pgalloc_init_model(&m, backing, 262144, 4093, verified));
+    CHECK(backing[589824] == 0xace01234UL);
+    /* 4,096 PFN: L1 1,024B + owner/pin 8,192B = 3 pages. */
+    CHECK(pgalloc_metadata_bytes(&m) == 3 * PAGE_SIZE);
     CHECK(pgalloc_limit_pfn() == 4096);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
 
@@ -155,14 +155,14 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
                       ('-D__KERNEL_BUILD__', '-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1')):
             self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[3072] __attribute__((aligned(4096)));
     physmem_bootstrap_legacy(&m, 16384);
     m.ranges[1].sources = PHYSMEM_SOURCE_SYNTHETIC;
     CHECK(pgalloc_metadata_bytes(&m) == 0);
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 4094, verified));
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 4093, verified));
     m.ranges[1].sources = PHYSMEM_SOURCE_LEGACY;
-    CHECK(pgalloc_metadata_bytes(&m) == 2 * PAGE_SIZE);
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 4094, verified));
+    CHECK(pgalloc_metadata_bytes(&m) == 3 * PAGE_SIZE);
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 4093, verified));
     CHECK(pgalloc_total_pages() == 0);
 ''', flags=flags)
 
@@ -170,18 +170,21 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
         for end in (8192, 16384):
             self.run_c('''
     struct physmem m;
-    static u32 backing[5120 + 1] __attribute__((aligned(4096)));
+    static u32 backing[9216 + 1] __attribute__((aligned(4096)));
     u32 bytes, first, p, before;
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 4096, END, PHYSMEM_SOURCE_SYNTHETIC));
     bytes = pgalloc_metadata_bytes(&m);
-    /* L1 2 bitmap + L2 1B/PFN (T1b) */
-    CHECK(bytes == ((END / 32 * 8 + END + 4095) & ~4095UL));
+    /* L1 2 bitmap + owner/pin 2B/PFN */
+    CHECK(bytes == ((END / 32 * 8 + END * 2 + 4095) & ~4095UL));
     first = 4096 - bytes / PAGE_SIZE;
     backing[bytes / 4] = 0x12345678UL;
     CHECK(pgalloc_init_model(&m, backing, bytes, first, verified));
     @ONLINE@
     CHECK(pgalloc_limit_pfn() == END);
+    CHECK(pin_map == owner_map + END);
+    CHECK(pin_map + END == (u8 *)backing + PGALLOC_META_BYTES(END));
+    CHECK(PGALLOC_PIN_BYTES(END) == END);
     before = pgalloc_free_pages();
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, END - 4096, 4096, END, LEDGER_BOTTOM_UP, &p) && p == 4096);
     CHECK(pgalloc_free_pages() == before - (END - 4096));
@@ -197,7 +200,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_generic_never_returns_unmapped_machine_ram(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[1024] __attribute__((aligned(4096)));
+    static u32 backing[2048] __attribute__((aligned(4096)));
     u32 p;
     physmem_bootstrap_legacy(&m, 8192);
     CHECK(physmem_add_trusted(&m, 3072, 3073, PHYSMEM_SOURCE_MACHINE));
@@ -211,36 +214,36 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_sys_model_handoff(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[327680] __attribute__((aligned(4096)));
+    static u32 backing[589824] __attribute__((aligned(4096)));
     u32 p;
     CHECK(sys_memory_init_model != 0);
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
-    /* metadata (L1 + L2) of the 4GiB model is 320 pages: [3776, 4096). */
-    CHECK(sys_memory_init_model(&m, backing, sizeof(backing), 3776, verified));
+    /* metadata (L1 + owner + pin) of the 4GiB model is 576 pages: [3520, 4096). */
+    CHECK(sys_memory_init_model(&m, backing, sizeof(backing), 3520, verified));
     /* Before ONLINE, explicit high-PFN allocation is still gated. */
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
     @ONLINE@
-    CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
+    CHECK(sys_usable_mem_end() == 3520 * PAGE_SIZE);
     sys_mem_kb = 65536;
-    CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
+    CHECK(sys_usable_mem_end() == 3520 * PAGE_SIZE);
     /* sys_reserve_top was retired in T1e (TASK_T1_LEDGER §3-6): the usable
        end is min(frozen exec ceiling, ledger_arena_top()), and the arena top
        is the lowest PERSIST page inside [MEM_PHYS_EXEC_FLOOR, arena end),
        frozen once at step 6. Before the freeze it is the arena end. */
-    CHECK(ledger_arena_top() == 3776);
-    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3775, 3776, LEDGER_TOP_DOWN, &p));
-    CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);   /* not frozen yet */
+    CHECK(ledger_arena_top() == 3520);
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3519, 3520, LEDGER_TOP_DOWN, &p));
+    CHECK(sys_usable_mem_end() == 3520 * PAGE_SIZE);   /* not frozen yet */
     ledger_arena_freeze();
-    CHECK(ledger_arena_top() == 3775);
-    CHECK(sys_usable_mem_end() == 3775 * PAGE_SIZE);
+    CHECK(ledger_arena_top() == 3519);
+    CHECK(sys_usable_mem_end() == 3519 * PAGE_SIZE);
     /* frozen once: a later PERSIST page lower in the arena changes nothing */
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3000, 3001, LEDGER_TOP_DOWN, &p));
     ledger_arena_freeze();
-    CHECK(ledger_arena_top() == 3775 && sys_usable_mem_end() == 3775 * PAGE_SIZE);
-    CHECK(owner_map[3775] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
-    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 3775, 3776, LEDGER_BOTTOM_UP, &p));
-    CHECK(!sys_memory_init_model(&m, backing, sizeof(backing), 3776, verified));
+    CHECK(ledger_arena_top() == 3519 && sys_usable_mem_end() == 3519 * PAGE_SIZE);
+    CHECK(owner_map[3519] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 3519, 3520, LEDGER_BOTTOM_UP, &p));
+    CHECK(!sys_memory_init_model(&m, backing, sizeof(backing), 3520, verified));
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
 
     def test_sys_low_stable(self):
@@ -266,21 +269,25 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_dynamic_sparse_final(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[327680] __attribute__((aligned(4096)));
+    static u32 backing[589824] __attribute__((aligned(4096)));
     u32 p, before;
     CHECK(pgalloc_init_model != 0);
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 4096, 8192, PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(physmem_add_trusted(&m, 12288, 16384, PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing) - 1, 3776, verified));
-    CHECK(!pgalloc_init_model(&m, backing + 1, sizeof(backing), 3776, verified));
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3777, verified));
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3776, 0));
-    CHECK(pgalloc_init_model(&m, backing, sizeof(backing), 3776, verified));
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing) - 1, 3520, verified));
+    CHECK(!pgalloc_init_model(&m, backing + 1, sizeof(backing), 3520, verified));
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3521, verified));
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3520, 0));
+    CHECK(pgalloc_init_model(&m, backing, sizeof(backing), 3520, verified));
     @ONLINE@
     CHECK(pgalloc_limit_pfn() == 1048576);
+    CHECK(pgalloc_pinned(1048575) == 0);
     CHECK(pgalloc_alloc_n_owner(K, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p) && p == 1048575);
+    CHECK(pgalloc_pin(p, 1, K) && pgalloc_pinned(p) == 1);
+    CHECK(!pgalloc_free_n_owner(K, p, 1));
+    CHECK(pgalloc_unpin(p, 1, K));
     CHECK(pgalloc_free_n_owner(K, p, 1));
     CHECK(pgalloc_alloc_n_owner(K, 4096, 4096, 8192, LEDGER_BOTTOM_UP, &p) && p == 4096);
     CHECK(pgalloc_free_n_owner(K, p, 4096));
@@ -290,7 +297,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(!pgalloc_alloc_n_owner(K, 0, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, -1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 2147483647, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
-    CHECK(!pgalloc_alloc_n_owner(K, 1, 3776, 4096, LEDGER_BOTTOM_UP, &p));
+    CHECK(!pgalloc_alloc_n_owner(K, 1, 3520, 4096, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 8192, 12288, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 8192, 12288, LEDGER_TOP_DOWN, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 1048575, 1048576, 7, &p)); /* unknown direction */
@@ -300,8 +307,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(!pgalloc_alloc_n_owner(K, 4097, 8191, 12289, LEDGER_TOP_DOWN, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 1048575, 1048577, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 0xfffff, 0, LEDGER_BOTTOM_UP, &p));
-    CHECK(!pgalloc_free_n_owner(K, 3776, 64));
-    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3776, verified));
+    CHECK(!pgalloc_free_n_owner(K, 3520, 64));
+    CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3520, verified));
     CHECK(pgalloc_free_pages() == before);
     CHECK(host_if == 0x202 && saves == restores);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
@@ -389,20 +396,20 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_mark_metadata_and_final_page(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[327680] __attribute__((aligned(4096)));
+    static u32 backing[589824] __attribute__((aligned(4096)));
     u32 baseline, total, p;
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(pgalloc_init_model(&m, backing, sizeof(backing), 3776, verified));
+    CHECK(pgalloc_init_model(&m, backing, sizeof(backing), 3520, verified));
     baseline = pgalloc_free_pages();
     total = pgalloc_total_pages();
-    /* metadata (L1 + L2、T1b) は [3776, 4096)。 */
-    CHECK(ledger_claim_fixed(K, 3775, 3775 + 65)); /* live + metadata */
+    /* metadata (L1 + owner + pin、T1b) は [3520, 4096)。 */
+    CHECK(ledger_claim_fixed(K, 3519, 3519 + 65)); /* live + metadata */
     CHECK(ledger_claim_fixed(K, 8192, 8193)); /* UNKNOWN below high-water */
     CHECK(pgalloc_free_pages() == baseline - 1);
-    CHECK(!pgalloc_free_n_owner(K, 3775, 65));
-    CHECK(!pgalloc_free_n_owner(K, 3776, 64));
-    CHECK(pgalloc_free_n_owner(K, 3775, 1));
+    CHECK(!pgalloc_free_n_owner(K, 3519, 65));
+    CHECK(!pgalloc_free_n_owner(K, 3520, 64));
+    CHECK(pgalloc_free_n_owner(K, 3519, 1));
     CHECK(ledger_claim_fixed(K, 1048575, 1048576));
     CHECK(ledger_claim_fixed(K, 1048575, 1048576));
     CHECK(pgalloc_free_pages() == baseline - 1);
@@ -410,7 +417,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(pgalloc_free_pages() == baseline);
     CHECK(pgalloc_total_pages() == total);
     p = 99;
-    CHECK(!pgalloc_alloc_n_owner(K, 1, 3776, 4096, LEDGER_BOTTOM_UP, &p));
+    CHECK(!pgalloc_alloc_n_owner(K, 1, 3520, 4096, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 8192, 8193, LEDGER_BOTTOM_UP, &p));
     CHECK(p == 99);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))

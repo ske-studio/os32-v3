@@ -73,7 +73,7 @@ static void *host_boot_ptr(u32 addr)
 #define HOST_RESIDENT_END 0x261000
 #endif
 __asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, " HOST_QUOTE(HOST_RESIDENT_END) "\n"
-        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
+        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17D000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");
 __asm__(".globl __bss_end\n.set __bss_end, 0x180000\n");
 static void die(int code)
@@ -384,13 +384,13 @@ void _start(void)
         /* 表は RAM の外に出ない。かつ置ける限りは目一杯まで取る。 */
         CHECK(memory_boot_table_pages(fit) <= room);
         CHECK(memory_boot_table_pages(fit + PTE_COUNT) > room);
-        /* 2GiB 超を覆える = 人為的に小さい上限は残っていない。 */
-        CHECK(fit > 0x80000);
+        /* owner + pin と PT が置ける最大量で頭打ちになる。 */
+        CHECK(fit < MEM_PHYS_RAM_CEILING / PAGE_SIZE);
         /* 置き場所が無い構成は 0 (高位 RAM は登録しない — 表は FIXED 型の
          * 固定区間に置くが、そこは高位を覆えない)。でっち上げはしない。 */
         CHECK(memory_boot_high_fit(huge, MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) == 0);
-        /* FIXED / ARENA_TOP の境界 (§3-3): 3,073 PFN までが FIXED。 */
-        CHECK(MEMORY_BOOT_FIXED_MAX_TOP == 3073UL);
+        /* FIXED / ARENA_TOP の境界 (§3-3): 3,074 PFN までが FIXED。 */
+        CHECK(MEMORY_BOOT_FIXED_MAX_TOP == 3074UL);
         /* D11: 0594h の申告は 2GB で頭打ち (16MB から 2032MB)。 */
         CHECK(MEM_PHYS_RAM_CEILING == 0x80000000UL);
         CHECK((MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB == 2032UL);
@@ -422,7 +422,7 @@ void _start(void)
         physmem_bootstrap_legacy(&m, TEST_KB);
         CHECK(paging_map_ledger_backing());
         l.capacity = pgalloc_metadata_bytes(&m);
-        CHECK(l.capacity == PAGE_SIZE);
+        CHECK(l.capacity == 2 * PAGE_SIZE);
 #define TRY(mf, wf, we, k, expect) do { \
             l.kind = (k); l.metadata_first = (mf); \
             l.metadata = (void *)((mf) * PAGE_SIZE); \
@@ -431,15 +431,15 @@ void _start(void)
             if (!(expect)) CHECK(!initialized && !sys_model_staged && !sys_frozen_end); \
         } while (0)
         /* RAM 側 (低位 RAM の末尾) に置いた FIXED は拒否 */
-        TRY(top - 1, meta + 1, meta + 2, PGALLOC_BACKING_FIXED, 0);
+        TRY(top - 1, meta + 2, meta + 3, PGALLOC_BACKING_FIXED, 0);
         /* 範囲外: 下のガード 0x2F8000、上のカーネルスタックガード */
-        TRY(meta - 1, meta + 1, meta + 2, PGALLOC_BACKING_FIXED, 0);
-        TRY(meta, meta + 1, meta + 3, PGALLOC_BACKING_FIXED, 0);
+        TRY(meta - 1, meta + 2, meta + 3, PGALLOC_BACKING_FIXED, 0);
+        TRY(meta, meta + 2, meta + 4, PGALLOC_BACKING_FIXED, 0);
         TRY(meta, meta - 1, meta, PGALLOC_BACKING_FIXED, 0);
         /* metadata と workspace の重なり */
-        TRY(meta, meta, meta + 1, PGALLOC_BACKING_FIXED, 0);
+        TRY(meta, meta, meta + 2, PGALLOC_BACKING_FIXED, 0);
         /* 知らない種類 */
-        TRY(meta, meta + 1, meta + 2, 7, 0);
+        TRY(meta, meta + 2, meta + 3, 7, 0);
         /* 8MB で ARENA_TOP は通らない (workspace が MEM_PHYS_WORKSPACE_FLOOR 未満) */
         TRY(top - 1, top - 2, top - 1, PGALLOC_BACKING_ARENA_TOP, 0);
         /* 置き場の番地は正しくても、模型でそこが RAM なら拒否 (RESERVED で
@@ -450,23 +450,23 @@ void _start(void)
             /* k = 0: metadata のページだけ RAM、k = 1: workspace のページだけ RAM */
             for (k = 0; k < 2; k++) {
                 m.count = saved.count + 2;
-                m.ranges[0].first = 0; m.ranges[0].end = meta + k;
+                m.ranges[0].first = 0; m.ranges[0].end = meta + k * 2;
                 m.ranges[0].kind = PHYSMEM_RESERVED; m.ranges[0].sources = 0;
-                m.ranges[1].first = meta + k; m.ranges[1].end = meta + k + 1;
+                m.ranges[1].first = meta + k * 2; m.ranges[1].end = meta + k * 2 + 1;
                 m.ranges[1].kind = PHYSMEM_RAM;
                 m.ranges[1].sources = PHYSMEM_SOURCE_LEGACY;
-                m.ranges[2].first = meta + k + 1;
+                m.ranges[2].first = meta + k * 2 + 1;
                 m.ranges[2].end = saved.ranges[0].end;
                 m.ranges[2].kind = PHYSMEM_RESERVED; m.ranges[2].sources = 0;
                 for (u32 j = 1; j < saved.count; j++) m.ranges[j + 2] = saved.ranges[j];
                 CHECK(m.ranges[3].kind == PHYSMEM_RAM);
-                CHECK(pgalloc_metadata_bytes(&m) == PAGE_SIZE);
-                TRY(meta, meta + 1, meta + 2, PGALLOC_BACKING_FIXED, 0);
+                CHECK(pgalloc_metadata_bytes(&m) == 2 * PAGE_SIZE);
+                TRY(meta, meta + 2, meta + 3, PGALLOC_BACKING_FIXED, 0);
                 m = saved;
             }
         }
         /* 正しい FIXED は通る。exec の上端は低位 RAM の上端 (B2)。 */
-        TRY(meta, meta + 1, meta + 2, PGALLOC_BACKING_FIXED, 1);
+        TRY(meta, meta + 2, meta + 3, PGALLOC_BACKING_FIXED, 1);
 #undef TRY
         CHECK(pgalloc_arena_end() == top);
         CHECK(sys_usable_mem_end() == top * PAGE_SIZE);
@@ -474,15 +474,15 @@ void _start(void)
         die(0);
     }
 #endif
-/* 15MiB clamp なので legacy 上端は 0xF00。T1b で metadata に L2 (1B/PFN) が
- * 載って 2 ページ [0xEFE, 0xF00) になり、workspace は 0xEFD (旧: 0xEFF / 0xEFE)。 */
+/* 15MiB clamp: metadata は owner + pin を含む 3 頁 [0xEFD, 0xF00)、
+ * workspace は 0xEFC。 */
 #if defined(TEST_METADATA_PTE) || defined(TEST_WORKSPACE_PTE)
     *(u32 *)0xEFF000 = 0xA55AA55A;
 #ifdef TEST_METADATA_PTE
     page_tables[3][0xEFF % PTE_COUNT] |= PTE_USER;
 #endif
 #ifdef TEST_WORKSPACE_PTE
-    page_tables[3][0xEFD % PTE_COUNT] &= ~PTE_PRESENT;
+    page_tables[3][0xEFC % PTE_COUNT] &= ~PTE_PRESENT;
 #endif
     CHECK(!memory_boot_init(TEST_KB));
     CHECK(bootstrap_calls == 1 && !stage_calls);
@@ -695,16 +695,18 @@ die(0);
      * 来ても memory_boot_init が同じ上限で切る。[2GB, 4GB) は RAM ではない。 */
     {
         u32 ceil = MEM_PHYS_RAM_CEILING / PAGE_SIZE;
+        u32 fit = memory_boot_high_fit(ceil, HOST_LEGACY_END / PAGE_SIZE);
         CHECK(boot_high_end > ceil);
         CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
-        CHECK(pgalloc_limit_pfn() == ceil);
+        CHECK(pgalloc_limit_pfn() == fit && fit < ceil);
         CHECK(physmem_count(&device_boot_map, ceil, PHYSMEM_MAX_PFN,
                             PHYSMEM_MMIO, &count));
         CHECK(count == PHYSMEM_MAX_PFN - ceil);
         CHECK(!pgalloc_range_has_ram(ceil, PHYSMEM_MAX_PFN));
-        CHECK(pgalloc_range_has_ram(ceil - 1, ceil));
+        CHECK(!pgalloc_range_has_ram(fit, ceil));
+        CHECK(pgalloc_range_has_ram(fit - 1, fit));
         CHECK(memory_boot_ram_kb() == HOST_LEGACY_END / 1024UL +
-              (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / 1024UL);
+              (fit * PAGE_SIZE - MEM_HIGH_RAM_BASE) / 1024UL);
         CHECK(pgalloc_arena_end() == workspace_first);
         CHECK(sys_usable_mem_end() == workspace_first * PAGE_SIZE);
         CHECK(host_if == 0x202U);
@@ -767,7 +769,7 @@ die(0);
     }
 #endif
 #if defined(TEST_FIXED)
-    /* 8MB・9MB・12MB (低位の上端 <= 3,073 PFN): FIXED 型 (§3-3)。legacy は
+    /* 8MB・9MB・12MB (低位の上端 <= 3,074 PFN): FIXED 型 (§3-3)。legacy は
      * もう無いので、ここもモデル経路で ONLINE になる (D32)。 */
     {
         u32 top = TEST_KB / (PAGE_SIZE / 1024UL);
@@ -777,11 +779,11 @@ die(0);
         CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
         CHECK(ledger_backing_mapped);
         CHECK((u32)eligible == MEM_LEDGER_META_BASE);
-        CHECK(workspace_first == meta + 1);
+        CHECK(workspace_first == meta + 2);
         CHECK(workspace_end == MEM_LEDGER_META_END / PAGE_SIZE);
         /* backing は L0 で RESERVED (RAM から 1 ページも取っていない) */
         CHECK(physmem_count(&device_boot_map, meta, workspace_end,
-                            PHYSMEM_RESERVED, &count) && count == 2);
+                            PHYSMEM_RESERVED, &count) && count == 3);
         CHECK(pgalloc_total_pages() == top - MEM_POOL_BASE / PAGE_SIZE +
               ((MEM_SHM_RESV_END + 1 - MEM_SHM_RESV_START) / PAGE_SIZE -
                (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0)));
@@ -792,20 +794,20 @@ die(0);
         CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
         CHECK(sys_usable_mem_end() >= MEM_EXEC_BOOT_MIN);
         /* backing は present / supervisor / RW、下のガードは NP のまま */
-        CHECK(paging_verify_identity(meta, 2, (void *)MEM_LEDGER_META_BASE));
+        CHECK(paging_verify_identity(meta, 3, (void *)MEM_LEDGER_META_BASE));
         CHECK(!!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE) == 1);
         CHECK(!!paging_is_present(MEM_LEDGER_META_END) == 1);
         /* 8MiB 構成では上端と実 RAM 合計が一致する (穴が上端より上にある) */
         CHECK(memory_boot_ram_kb() == TEST_KB && sys_mem_kb == TEST_KB);
-        /* master PT の workspace は backing の 2 ページ目 */
-        CHECK(pgalloc_alloc_pt() == MEM_LEDGER_META_BASE + PAGE_SIZE);
+        /* master PT の workspace は backing の 3 ページ目 */
+        CHECK(pgalloc_alloc_pt() == MEM_LEDGER_META_BASE + 2 * PAGE_SIZE);
         CHECK(pgalloc_alloc_pt() == 0);
-        pgalloc_free_pt(MEM_LEDGER_META_BASE + PAGE_SIZE);
+        pgalloc_free_pt(MEM_LEDGER_META_BASE + 2 * PAGE_SIZE);
         CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) ==
               MEM_SHM_RESV_START);
     }
 #elif defined(TEST_ARENA)
-    /* 低位の上端が 3,074 PFN 以上 (12MB + 8KB〜15MB)、高位 RAM なし:
+    /* 低位の上端が 3,075 PFN 以上 (12MB + 12KB〜15MB)、高位 RAM なし:
      * ARENA_TOP 型。置き場は今と同じ低位 RAM の末尾 (回帰なし)。 */
     {
         u32 top = (TEST_KB < HOST_LEGACY_END / 1024UL ? TEST_KB :
@@ -815,7 +817,7 @@ die(0);
         CHECK(!ledger_backing_mapped);
         CHECK(!!paging_is_present(MEM_LEDGER_META_BASE) == 1);
         {
-            /* metadata = L1 + L2 (T1b): 3,074 PFN は 1 ページ、15MB は 2 ページ */
+            /* metadata = L1 + owner + pin: 3,075 PFN は 2 ページ、15MB は 3 ページ */
             u32 mp = pgalloc_metadata_bytes(&device_boot_map) / PAGE_SIZE;
             CHECK(mp == (PGALLOC_META_BYTES(top) + PAGE_SIZE - 1) / PAGE_SIZE);
             CHECK(workspace_end == top - mp && workspace_first == top - mp - 1);
@@ -828,11 +830,11 @@ die(0);
     }
 #else
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
-    /* metadata (L1 + L2) は 960 + 3,840 = 4,800B = 2 ページ (T1b)。 */
-    CHECK(sys_usable_mem_end() == 0xEFD000);
-    CHECK(pgalloc_arena_end() == 0xEFD);
-    CHECK(workspace_first == 0xEFD && workspace_end == 0xEFE);
-    CHECK((u32)eligible == 0xEFE000);
+    /* metadata は 960 + 3,840 * 2 = 8,640B = 3 ページ。 */
+    CHECK(sys_usable_mem_end() == 0xEFC000);
+    CHECK(pgalloc_arena_end() == 0xEFC);
+    CHECK(workspace_first == 0xEFC && workspace_end == 0xEFD);
+    CHECK((u32)eligible == 0xEFD000);
     CHECK(!ledger_backing_mapped);
     CHECK(physmem_count(&device_boot_map, 0xF00, 0x100000, PHYSMEM_UNKNOWN, &count));
     CHECK(count == 0x100000 - 0xF00);

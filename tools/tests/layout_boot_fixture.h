@@ -9,7 +9,7 @@ static const struct layout_fixture layout_fixtures[] = {
     { 0x2F9000, 0x200000, 0x3F0000,
       0x3F1000, 0x3FC000, 0x2FB000,
       0x2FC000, 0x300000, 0x2E8000, 0, 0 },
-    { 0x17E000, 0x3E0000, 0x3E0000, 0x3E1000, 0x3FB000,
+    { 0x17D000, 0x3E0000, 0x3E0000, 0x3E1000, 0x3FB000,
       0x3FB000, 0x3FC000, 0x400000, 0x7F0000, 1, 1 },
 };
 /* Detected top in KiB, backing policy, and expected device activation.
@@ -80,8 +80,10 @@ static void layout_boot_fixture(u32 kb)
         const struct layout_fixture *f = &layout_fixtures[n];
         struct physmem supply;
         u32 first, pages, i, p, hits, before;
+        u32 meta_pages = f->resident_meta ? MEM_LEDGER_META_SIZE / LF_PAGE : 2;
+        u32 meta_end = f->meta + meta_pages * LF_PAGE;
         struct layout_boot_decision decision = layout_decide_boot(f, kb);
-        int fixed = kb <= 12292, dma = decision.dma;
+        int fixed = kb <= (f->resident_meta ? 12296 : 12292), dma = decision.dma;
         int expected_dma;
         /* Only replace the region manifest being exercised. The initialized
          * allocator is retained; this fixture runs last in each process. */
@@ -101,19 +103,19 @@ static void layout_boot_fixture(u32 kb)
         CHECK(physmem_add_trusted(&supply, 0, kb / 4, PHYSMEM_SOURCE_MACHINE));
         if (f->resident_meta) {
             CHECK(layout_region(0x100000, f->meta, LEDGER_R_FIXED));
-            CHECK(layout_region(f->meta + 2 * LF_PAGE, LF_CORE_END, LEDGER_R_FIXED));
+            CHECK(layout_region(meta_end, LF_CORE_END, LEDGER_R_FIXED));
         } else {
             CHECK(layout_region(0x100000, LF_CORE_END, LEDGER_R_FIXED));
         }
-        CHECK(layout_region(f->meta, f->meta + 2 * LF_PAGE, LEDGER_R_FIXED));
-        /* The dynamic backing is distinct from the core's spare two pages. */
+        CHECK(layout_region(f->meta, meta_end, LEDGER_R_FIXED));
+        /* The dynamic backing is distinct from the core's fixed backing. */
         if (!fixed)
             CHECK(layout_region((kb < 15360 ? kb : 15360) * 1024 -
                                 ((PGALLOC_META_BYTES(kb / 4) + LF_PAGE - 1) / LF_PAGE +
                                  1 + (kb > 32768 ? kb / 4096 - 8 : 0)) * LF_PAGE,
                                 (kb < 15360 ? kb : 15360) * 1024,
                                 LEDGER_R_FIXED));
-        for (p = f->meta / LF_PAGE; p < f->meta / LF_PAGE + 2; p++) {
+        for (p = f->meta / LF_PAGE; p < meta_end / LF_PAGE; p++) {
             hits = 0;
             for (i = 0; i < ledger_region_count; i++)
                 if (ledger_regions[i].first <= p && ledger_regions[i].end > p) hits++;
@@ -171,15 +173,15 @@ static void layout_boot_fixture(u32 kb)
         CHECK(paging_map_range(f->stack, f->stack_end, f->stack, PAGE_RW) == 0);
         CHECK(paging_set_not_present(f->guard_lo, f->guard_lo + LF_PAGE - 1) == 0);
         CHECK(paging_set_not_present(f->guard_hi, f->guard_hi + LF_PAGE - 1) == 0);
-        CHECK(paging_map_range(f->meta, f->meta + 2 * LF_PAGE, f->meta, PAGE_RW) == 0);
+        CHECK(paging_map_range(f->meta, meta_end, f->meta, PAGE_RW) == 0);
         if (!f->resident_meta && !fixed)
-            CHECK(paging_set_not_present(f->meta, f->meta + 2 * LF_PAGE - 1) == 0);
+            CHECK(paging_set_not_present(f->meta, meta_end - 1) == 0);
         layout_pte(first, f->slack_end, f->slack_rw);
         layout_pte(f->pt, f->pt_end, 1);
         layout_pte(f->guard_lo, f->guard_lo + LF_PAGE, 0);
         layout_pte(f->guard_hi, f->guard_hi + LF_PAGE, 0);
         layout_pte(f->stack, f->stack_end, 1);
-        layout_pte(f->meta, f->meta + 2 * LF_PAGE, f->resident_meta || fixed);
+        layout_pte(f->meta, meta_end, f->resident_meta || fixed);
         if (dma) CHECK(paging_map_range(f->dma, f->dma + LF_DMA_SIZE, f->dma, PAGE_RW) == 0);
         else CHECK(paging_set_not_present(f->dma, f->dma + LF_DMA_SIZE - 1) == 0);
         layout_pte(f->dma, f->dma + LF_DMA_SIZE, dma);

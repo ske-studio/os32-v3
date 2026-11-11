@@ -34,7 +34,7 @@
  *    - 写像: 写像範囲だけ (PEGC 512KB、Xe10 は 2MB で decode 4MB の残りは
  *      張らない)、失敗した窓の PTE は変わらない、模擬選択後も PTE は残る
  *    - BB: 量は候補の最大 (PEGC が残れば 300KB、無ければ 0)、アリーナ内の
- *      上端 (8MB 0x7B5000 / 17MB 0xEB2000 / 64MB も低位、X14)、0 で埋まる、
+ *      上端 (8MB 0x7B5000 / 17MB 0xEB1000 / 64MB も低位、X14)、0 で埋まる、
  *      owner = boot。sys_usable_mem_end() は BB の下端 (§3-6)、BB が無ければ
  *      凍結した exec 上端のまま (ledger_arena_top() = pgalloc_arena_end())
  *    - SURFACE: planar は常に、PEGC の CLIENT (RAM)、Cirrus の CLIENT +
@@ -287,7 +287,7 @@ static void boot(void)
         l.kind = PGALLOC_BACKING_FIXED;
         l.metadata_first = MEM_LEDGER_META_BASE / PAGE_SIZE;
         l.metadata = (void *)MEM_LEDGER_META_BASE;
-        l.workspace_first = l.metadata_first + 1;
+        l.workspace_first = l.metadata_first + l.capacity / PAGE_SIZE;
         l.workspace_end = MEM_LEDGER_META_END / PAGE_SIZE;
         arena_top_pfn = top;
     }
@@ -503,7 +503,7 @@ void _start(void)
         /* アリーナ内の上端 (旧 sys_reserve_top と同じ区間、X14) */
         CHECK(bb_first == bb_top_pfn - 75);
         CHECK(CFG_KB != 8192 || bb_first * PAGE_SIZE == MEM_DMA_POOL_BASE - 75 * PAGE_SIZE);
-        CHECK(CFG_KB != 17408 || bb_first * PAGE_SIZE == 0xEB2000UL);
+        CHECK(CFG_KB != 17408 || bb_first * PAGE_SIZE == 0xEB1000UL);
         CHECK(bb_first * PAGE_SIZE + MEM_GFX_BB8_SIZE <= MEM_SYSTEM_SPACE_BASE);
         CHECK(se->npages == 75 && se->backing == LEDGER_SB_RAM &&
               se->owner == LEDGER_OWNER_BOOT && se->cache == LEDGER_CACHE_WB);
