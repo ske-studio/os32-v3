@@ -1,3 +1,5 @@
+#include "../../gfx/v2/gfx2_int.h"
+#include "gfx2_bridge_fake.h"
 /* B3: real PC-98 planar bring-up provider; replace only port I/O and the
  * three memory windows it touches (text VRAM, attribute VRAM, graphics planes). */
 #include "types.h"
@@ -76,7 +78,7 @@ int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 DirtyRectQueue dirty_queue, prev_dirty;
 u32 gfx_init_gen;
 static void gfx2_register_selected(void) { }
-static void gfx2_pal_reset16(void) { }
+void gfx2_pal_reset16(void) { }
 static int gfx_started;
 static u8 planes_ok;
 static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }

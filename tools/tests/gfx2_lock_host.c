@@ -157,6 +157,20 @@ static int tests(void)
     sync_mode = 0; T(gfx2_lock(1, 0, &ptr, &pitch) == OS32_ERR_INVAL);
     reset(); direct(); T(!gfx2_lock(1, 0, &ptr, &pitch)); surf.flags |= GFX2_SF_KEEP;
     gfx2_staging_drop(&surf); T(allocated == 2 && !surf.staging && !frees);
+    reset(); direct(); T(!gfx2_lock(1, 0, &ptr, &pitch));
+    T(!gfx2_lock_revoke(&surf));
+    T(!surf.map_as && !surf.staging && !allocated && frees == 1);
+    T(surf.state == GFX2_ST_IDLE && !writes && !end_calls);
+    reset(); direct(); T(!gfx2_lock(1, GFX2_LOCK_READONLY, &ptr, &pitch));
+    unmap_fail = 1;
+    T(gfx2_lock_revoke(&surf) == OS32_ERR_IO);
+    T(!surf.map_as && !surf.staging && allocated == 2 && !frees);
+    T(surf.state == GFX2_ST_IDLE && !writes && !end_calls);
+    reset(); direct(); T(!gfx2_lock(1, 0, &ptr, &pitch)); surf.state = GFX2_ST_LOST;
+    T(!gfx2_lock_revoke(&surf) && surf.state == GFX2_ST_LOST && !allocated);
+    reset(); T(!gfx2_lock(1, 0, &ptr, &pitch));
+    T(gfx2_lock_revoke(&surf) == OS32_ERR_INVAL);
+    T(surf.map_as == current && surf.state == GFX2_ST_LOCKED_RW && !unmap_calls);
     return 0;
 }
 void _start(void)

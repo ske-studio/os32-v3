@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 /* G3: real scan publication, eligibility, policy, query and present; fake GPU. */
 #define OS32_GEFORCE_MODULE
 #include "../../drivers/video/geforce/backend_geforce.c"

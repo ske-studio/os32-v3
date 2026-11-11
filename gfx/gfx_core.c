@@ -313,12 +313,20 @@ done:
 
 void gfx_init(void)
 {
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W);
+    (void)v1_bridge_begin(GFX2_ROLE_CLIENT, GFX2_CPU_W);
     gfx_init_mode(0);
+    v1_bridge_end(GFX2_ROLE_CLIENT, GFX2_CPU_W, 0);
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);
 }
 
 void gfx_init_200(void)
 {
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W);
+    (void)v1_bridge_begin(GFX2_ROLE_CLIENT, GFX2_CPU_W);
     gfx_init_mode(1);
+    v1_bridge_end(GFX2_ROLE_CLIENT, GFX2_CPU_W, 0);
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);
 }
 
 /* ======================================================================== */

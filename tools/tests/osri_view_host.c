@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 /* Real entry/loader/service/backend/control; deterministic scan and OS stubs. */
 #define _start raster_original_start
 #include "splash_raster_host.c"

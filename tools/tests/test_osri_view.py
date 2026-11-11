@@ -10,7 +10,7 @@ from kernel_includes import include_flags
 from test_splash_wire import osri
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ['tools/tests/osri_view_host.c', 'tools/tests/splash_raster_host.c',
+SOURCES = ['tools/tests/gfx2_bridge_fake.h', 'tools/tests/osri_view_host.c', 'tools/tests/splash_raster_host.c',
            'gfx/gfx_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h', 'gfx/gfx_internal.h',
            'exec/appslot.h', 'exec/exec.h',
            'kapi/kapi_osri.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pc98_osri.c',

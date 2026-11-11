@@ -25,7 +25,7 @@ MUTANTS = [
      '((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] =\n            (maps[i].phys',
      'page_tables[0][(va >> PAGE_SHIFT) % PTE_COUNT] =\n            (maps[i].phys'),
     ('PCD lost', 2, '(sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0)', '0'),
-    ('rollback leaked PT', 0, 'pgalloc_free_n_owner(as->owner, pending[k] / PAGE_SIZE, 1);', '(void)pending[k];'),
+    ('rollback leaked PT', 0, 'pgalloc_free_n_owner(as->owner, pending[k] / PAGE_SIZE, 1);\n    return rc;\n}\n\nint paging_lease_unmap', '(void)pending[k];\n    return rc;\n}\n\nint paging_lease_unmap'),
     ('generation ignored', 2, 'sf->gen != refs[i].generation', '0'),
     ('plane end unchecked', 1, 'plane_bytes > bytes - sf->plane_offset[i]', 'plane_bytes > bytes'),
     ('permission ignored', 2, '(access == LEDGER_PERM_RW && sf->perm_max != LEDGER_PERM_RW)', '0'),

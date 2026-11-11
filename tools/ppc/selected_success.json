@@ -57,6 +57,7 @@
   "gfx/v2/surface.c",
   "gfx/v2/sw_table.c",
   "gfx/v2/sysmem.c",
+  "gfx/v2/v1_bridge.c",
   "gfx/v2/v1_shim.c",
   "gfx/v2/vram_heap.c",
   "init/bootinfo.c",

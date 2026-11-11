@@ -45,6 +45,7 @@ I1 kernel gfx2_scan_ref_get
 I1 kernel gfx2_scan_ref_put
 I1 kernel gfx2_scan_ref_swap
 I1 kernel gfx2_staging_drop
+I2 kernel gfx2_lock_revoke
 I1 kernel gfx2_surf_alias
 I1 kernel gfx2_surf_alias_update
 I1 kernel gfx2_surf_destroy
