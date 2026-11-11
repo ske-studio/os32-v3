@@ -30,6 +30,7 @@ int gfx2_heap_init(struct gfx2_heap *h, u32 base, u32 size)
     return 0;
 }
 void gfx2_caps_refresh(struct gfx2_adapter *a) { a->caps.heads = 2; refreshes++; }
+void gfx2_caps_refresh(struct gfx2_adapter *a) { a->caps.heads = 3; refreshes++; }
 void gfx2_head_detach(struct gfx2_adapter *a, u32 head)
 { detaches++; a->head[head].scan_sid = a->head[head].pend_sid = 0; }
 void v1_bridge_rebind(void) { EXPECT(gfx2_active() != NULL); rebinds++; }
