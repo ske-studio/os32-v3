@@ -15,6 +15,7 @@ SOURCES = {
     'console.c': 'kernel/console/console.c',
     'route.c': 'drivers/video/pc98/pc98_route.c',
     'kernel.c': 'init/kernel.c',
+    'gfx_core.c': 'gfx/gfx_core.c',
 }
 # Each anchor must occur exactly once in the real source. Compile failures do
 # not count as RED; every mutant must reach a named runtime assertion.
@@ -45,10 +46,14 @@ MUTANTS = [
     ('text height', 'display_dual.c', '    outp(GDC_GFX_CMD, GDC_CMD_STOP);',
      '    gfx_current_height = 400;\n    outp(GDC_GFX_CMD, GDC_CMD_STOP);', 'A2'),
     ('CUI clear', 'console.c', 'was_gui && !con_dual_was_live()', 'was_gui', 'A3'),
-    ('loading sticky', 'kernel.c', 'con_dual_active() || con_dual_was_live()', 'con_dual_active()', 'A3'),
+    ('clear gate', 'console.c', 'if (con_sink_is_enabled()) return;', 'if (con_sink_is_enabled() && !con_dual_active()) return;', 'A3'),
+    ('session cfg', 'console.c', 'con_dual_was_live() || con_dual_cfg()', 'con_dual_was_live()', 'A3'),
+    ('loading cfg', 'kernel.c', 'if (con_dual_cfg())\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'if (0)\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'A3'),
+    ('DPMS call', 'gfx_core.c', '(void)a->be->dpms(a->ctx, h, state);', '(void)state;', 'A3'),
+    ('DPMS GF', 'gfx_core.c', 'a->kind == GFX2_KIND_GEFORCE && ', '', 'A3'),
     ('session CLEAR', 'console.c',
-     '    if (con_dual_was_live()) {\n        con_sink_push_clear();\n        return;',
-     '    if (con_dual_was_live()) {\n        return;', 'A3'),
+     '    if (con_dual_was_live() || con_dual_cfg()) {\n        con_sink_push_clear();\n        return;',
+     '    if (con_dual_was_live() || con_dual_cfg()) {\n        return;', 'A3'),
     ('dual route', 'route.c',
      '    if (con_dual_cfg()) {\n        pc98_console_set_safe(pc98_route_safe());\n        return 0;\n    }', '', 'A4'),
 ]
@@ -73,12 +78,14 @@ def build_run(tmp, sources, runner):
     (tmp / 'route.inc').write_text(
         function(sources['route.c'], 'static int route_set(u8 value)') +
         function(sources['route.c'], 'int pc98_route_to_gf(void)'))
-    pattern = (r'if \(con_dual_active\(\)(?: \|\| con_dual_was_live\(\))?\)\s*'
-               r'shell_print\("Loading gshell\.\.\.\\n", TATTR_GRAY\);\s*else\s*'
-               r'tvram_print\(0, 0, "Loading gshell\.\.\.", TATTR_GRAY\);')
-    matches = re.findall(pattern, sources['kernel.c'])
-    assert len(matches) == 1, 'kernel loading branch anchor'
-    (tmp / 'loading.inc').write_text(matches[0] + '\n')
+    source = sources['kernel.c']
+    start = source.rindex('                if (', 0, source.index('                    shell_print("Loading gshell'))
+    end = source.index('            } else {', start)
+    (tmp / 'loading.inc').write_text(source[start:end])
+    start = source.index('                static const char loading[] = "Loading shell...";')
+    end = source.index('\n            }', start)
+    (tmp / 'loading_cui.inc').write_text(source[start:end])
+    (tmp / 'dpms.inc').write_text(function(sources['gfx_core.c'], 'static void gfx_dual_dpms(u32 state)'))
     fixture = ROOT / 'tools/tests/console_dual_host.c'
     exe = tmp / 'console-dual'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-ffreestanding',

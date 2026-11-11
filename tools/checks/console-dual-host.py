@@ -2,7 +2,7 @@
 CHECK = dict(name='console-dual-host', tier=1, needs=[], budget=8,
     covers=['kernel/console/console_dual.c', 'kernel/console/console_dual.h',
             'platform/pc98/display_dual.c', 'kernel/console/console.c',
-            'drivers/video/pc98/pc98_route.c', 'init/kernel.c',
+            'drivers/video/pc98/pc98_route.c', 'init/kernel.c', 'gfx/gfx_core.c',
             'tools/tests/console_dual_host.c', 'tools/tests/test_console_dual.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'tools/tests/legacy_guest_fake.h', 'kernel/console/console_backend.h',

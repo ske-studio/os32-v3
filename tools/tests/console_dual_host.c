@@ -85,6 +85,15 @@ static void loading(void)
 {
 #include "loading.inc"
 }
+static void loading_cui(void)
+{
+#include "loading_cui.inc"
+}
+#include "dpms.inc"
+static int dpms_calls[2], dpms_state;
+static int fake_dpms(void *ctx, u32 head, u32 state)
+{ (void)ctx; dpms_calls[head]++; dpms_state=state; return 0; }
+static const struct GfxBackendV2 fake_be = {.dpms=fake_dpms};
 
 static void say(const char *s)
 {
@@ -185,20 +194,35 @@ static int a3_a4(void)
     console_set_cursor(4,2); CHECK(cursor_x==4 && cursor_y==2, "A3 cursor gate");
     int shape=cursor_shapes; console_set_cursor(3,2);
     CHECK(cursor_shapes==shape, "A3 hidden cursor");
-    tvram_clear(); CHECK(backend_clears==1 && cursor_x==0 && cursor_y==0, "A3 clear gate");
-    shell_print("history\n",7); CHECK(plane[0]=='h', "A3 history");
+    int before=clears; tvram_clear(); CHECK(backend_clears==0 && clears==before+1 && plane[0]=='A', "A3 clear gate");
+    shell_print("history\n",7); CHECK(plane[0]=='A', "A3 history");
     started=0; active=&adapters[0]; CHECK(!con_dual_active() && con_dual_was_live(), "A3 shutdown");
     int c=clears; console_session_clear();
-    CHECK(clears==c+1 && backend_clears==1 && plane[0]=='h', "A3 session CLEAR");
+    CHECK(clears==c+1 && backend_clears==0 && plane[0]=='A', "A3 session CLEAR");
     c=prints; loading();
-    CHECK(prints==c+1 && plane[0]=='h', "A3 loading append");
+    CHECK(prints==c+1 && plane[0]=='A', "A3 loading append");
     started=1; active=&adapters[1]; CHECK(con_dual_active(), "A3 GF resume");
     console_text_gdc_start();
-    CHECK(!sink && !con_dual_was_live() && plane[0]=='h' && backend_clears==1, "A3 CUI keep");
+    CHECK(!sink && !con_dual_was_live() && plane[0]=='A' && backend_clears==0, "A3 CUI keep");
     con_dual_configure(0); console_text_gdc_stop();
     int x=cursor_x,y=cursor_y; shell_print("X",7); console_set_cursor(9,9); tvram_clear();
-    CHECK(cursor_x==x && cursor_y==y && plane[0]=='h' && backend_clears==1, "A3 ordinary GUI");
-    console_text_gdc_start(); CHECK(backend_clears==2 && plane[0]==' ', "A3 ordinary CUI");
+    CHECK(cursor_x==x && cursor_y==y && plane[0]=='A' && backend_clears==0, "A3 ordinary GUI");
+    console_text_gdc_start(); CHECK(backend_clears==1 && plane[0]==' ', "A3 ordinary CUI");
+    setup(); sink=0; started=0; con_dual_session_end();
+    cursor_x=0; cursor_y=0; con_backend_clear(); backend_clears=0;
+    shell_print("boot\n",7); console_session_clear(); loading();
+    started=1; active=&adapters[1]; shell_print("next",7);
+    CHECK(plane[0]=='b' && plane[80]=='L' && plane[160]=='n' && !backend_clears, "A3 CUI GUI append");
+    console_text_gdc_start(); loading_cui();
+    CHECK(plane[0]=='b', "A3 CUI loading append");
+    adapters[1].be=&fake_be;
+    for (int cfg0=0; cfg0<2; cfg0++) for (int gf=0; gf<2; gf++) {
+        con_dual_configure(cfg0); active=&adapters[1];
+        active->kind=gf ? GFX2_KIND_GEFORCE : GFX2_KIND_PC98;
+        dpms_calls[0]=dpms_calls[1]=0; gfx_dual_dpms(3);
+        CHECK(dpms_calls[0]==(cfg0 && gf) && !dpms_calls[1] &&
+              (!(cfg0 && gf) || dpms_state==3), "A3 DPMS");
+    }
     for (int cfg0=0; cfg0<2; cfg0++) for (route=0; route<2; route++) {
         con_dual_configure(cfg0);
         for (gf_safe=0; gf_safe<2; gf_safe++) {

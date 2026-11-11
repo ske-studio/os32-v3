@@ -62,6 +62,7 @@ static void host_outp(unsigned int port, unsigned int value)
 /* console.c が引く外部シンボル (カーネル側の本物の代わり) */
 int con_dual_active(void) { return 0; }
 int con_dual_was_live(void) { return 0; }
+int con_dual_cfg(void) { return 0; }
 void con_dual_session_end(void) { }
 static int g_v86;
 #define LEGACY_FAKE_ACTIVE_ENABLE

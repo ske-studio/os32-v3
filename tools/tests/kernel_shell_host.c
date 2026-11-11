@@ -290,6 +290,7 @@ __asm__(".global _start\n_start:\nmov %esp, %eax\nand $-16, %esp\n"
 
 int con_dual_active(void) { return 0; }
 int con_dual_was_live(void) { return 0; }
+int con_dual_cfg(void) { return 0; }
 void con_dual_configure(int on) { (void)on; }
 void console_session_clear(void) { tvram_clear(); }
 void shell_print(const char *str, u8 color) { (void)str; (void)color; }

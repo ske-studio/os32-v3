@@ -104,7 +104,7 @@ void tvram_clear(void)
     con_sink_push_clear();      /* 票 K6C: 画面クリアの経路 (CLEAR レコード) */
     /* 票 K6C-2: GUI 中はテキスト面を消さない (消す相手が見えていない上に、
      * 論理カーソルだけ 0,0 に戻ると凍っている画面と食い違う)。 */
-    if (con_sink_is_enabled() && !con_dual_active()) return;
+    if (con_sink_is_enabled()) return;
     con_backend_clear();
     cursor_x = 0;
     cursor_y = 0;
@@ -113,7 +113,7 @@ void tvram_clear(void)
 
 void console_session_clear(void)
 {
-    if (con_dual_was_live()) {
+    if (con_dual_was_live() || con_dual_cfg()) {
         con_sink_push_clear();
         return;
     }

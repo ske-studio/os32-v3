@@ -53,6 +53,7 @@ void con_backend_cursor_shape(int visible) { (void)visible; backend_calls++; }
 /* The rest of the console's world: inert. */
 int con_dual_active(void) { return 0; }
 int con_dual_was_live(void) { return 0; }
+int con_dual_cfg(void) { return 0; }
 void con_dual_session_end(void) { }
 int con_sink_is_enabled(void) { return 0; }
 void con_sink_enable(void) { }

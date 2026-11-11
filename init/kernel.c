@@ -421,10 +421,10 @@ static inline void kernel_shell_loop(void)
                 /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
                  * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
                 gfx_client_to_gshell();
-                console_text_gdc_stop();
-                if (con_dual_active() || con_dual_was_live())
+                if (con_dual_cfg())
                     shell_print("Loading gshell...\n", TATTR_GRAY);
-                else
+                console_text_gdc_stop();
+                if (!con_dual_cfg())
                     tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
             } else {
                 /* prepare が TVRAM を消さなくなった (PEGC、2026-09-24) ので、
@@ -432,9 +432,13 @@ static inline void kernel_shell_loop(void)
                 static const char loading[] = "Loading shell...";
                 int col;
                 console_text_gdc_start();
-                tvram_print(0, 0, loading, TATTR_GRAY);
-                for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
-                    tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
+                if (con_dual_cfg()) {
+                    shell_print("Loading shell...\n", TATTR_GRAY);
+                } else {
+                    tvram_print(0, 0, loading, TATTR_GRAY);
+                    for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
+                        tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
+                }
             }
 
             if (!is_gui) geforce_heat_notice();
