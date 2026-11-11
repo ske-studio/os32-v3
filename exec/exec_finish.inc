@@ -167,7 +167,7 @@ static void exec_notify_owned(int id, int kind)
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
     exec_ime_owner_exit(id);
-    gui_owner_exit(id, kind);
+    exec_gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、
      * 畳んだのがその 1 本なら溜まっている打鍵を捨てる。**con_sink の所有を
      * 返す前**に呼ぶこと — 照合に g_reader を使うため。 */

@@ -179,7 +179,7 @@ static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
 void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
-static void gui_owner_exit(int id, int kind) {
+static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
     CHECK(id == 2 && cleanup == 7 && teardown == 1);
@@ -685,7 +685,7 @@ MUTATIONS = (
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
     ('ime-owner-exit', '    exec_ime_owner_exit(id);', ''),
-    ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
+    ('exit-kind-lost', '    exec_gui_owner_exit(id, kind);', '    exec_gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('launch-save-after-setjmp', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
