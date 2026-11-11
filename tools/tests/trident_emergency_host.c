@@ -53,7 +53,7 @@ static void tvram_puts_at(int r, int c, const char *s, u8 a)
 }
 static void input_discard_stop(void) { }
 static void exec_ime_owner_exit(int id) { (void)id; }
-static void gui_owner_exit(int id, int kind) { (void)id; (void)kind; }
+static void exec_gui_owner_exit(int id, int kind) { (void)id; (void)kind; }
 static void kbd_inject_owner_exit(int id) { (void)id; }
 static int con_sink_is_enabled(void) { return 0; }
 static int con_sink_reader_get(void) { return 0; }

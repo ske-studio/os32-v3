@@ -31,7 +31,7 @@
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "shm.h"
-#include "gui.h"
+#include "exec_gui.h"
 #include "exec_snd.h"
 #include "exec_reclaim.h"
 #include "con_sink.h"
