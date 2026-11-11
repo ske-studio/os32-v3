@@ -146,7 +146,7 @@ typedef struct { u32 v; u32 x; } GFX2_Color;   /* 8B。v = 値、x = 透過色�
 | fmt_scanout | INDEX8・565・X888 | INDEX8 | INDEX8・565・X888 (backend_trident.c:96-98) | 0 (PLANAR4 は v1 だけ) |
 | max_w/max_h・pitch_align | 4096/4096・64 | 640/480・4 | 1024/768・4 | 640/400・4 |
 | fence_hw / async | 1 / 1 (gf2_fence) | 0 / 0 | 0 / 0 | 0 / 0 |
-| vram_bytes・gart_bytes | 装置の値・`GFX_GART_KB`×1024 (§8) | 0・0 | 0・0 | 0・0 |
+| vram_bytes・gart_bytes | 装置の値・`GFX2_GART_KB`×1024 (§8) | 0・0 | 0・0 | 0・0 |
 | heads・cursor | 2・64×64 ARGB | 1・0 (SW) | 1・0 | 1・0 |
 | tier3d_hw | 3 | 0 | 0 | 0 |
 | cpu_direct・sync_mode・sync_profile | 0・0・"" | 1・SHADOW・"pegc" | 1・sync.cfg の mode・"pci:1023:*" の当たった鍵 | 0・0・"" |
@@ -506,8 +506,8 @@ int gfx2_map_audit(const struct addrspace *as)
 | 項目 | 決め |
 |---|---|
 | 取り方 | 必要な時に `pgalloc_alloc_n_owner` で 4KB 頁ごと (連続でなくてよい)。持ち主は面の AS の owner。dma_pool は使わない。`n = (bytes + PAGE_SIZE − 1) / PAGE_SIZE`、`n == 0` は INVAL |
-| C6 の作成の順と失敗 (`gfx2_gart_alloc`) | (1) pfn の表 (gart.c の static、`GFX_GART_KB / 4` 本、上限の 8MB で 2,048 本) に連続の n 本を first-fit で取る。無ければ NOSPC → (2) n 頁を 1 頁ずつ取る。途中で取れなければ取った頁を返して NOSPC → (3) `pgalloc_pin(pfn, 1, owner)` を各頁。失敗 (起きないはず) は pin を外し頁を返して IO → (4) `be->gart_bind`。失敗は (3)〜(1) を逆に戻してその rc (NOSPC・IO) を返す。どの失敗でも面は作られず、表・頁・pin は元のまま |
-| 上限 (PM 決定 #1) | **遅延確保の上限 8MB** (`GFX_GART_KB=8192`、system.cfg)。予約はしない。越えれば `OS32_ERR_NOSPC` (`OS32_ERR_NOMEM` は無い) |
+| C6 の作成の順と失敗 (`gfx2_gart_alloc`) | (1) pfn の表 (gart.c の static、`GFX2_GART_KB / 4` 本、上限の 8MB で 2,048 本) に連続の n 本を first-fit で取る。無ければ NOSPC → (2) n 頁を 1 頁ずつ取る。途中で取れなければ取った頁を返して NOSPC → (3) `pgalloc_pin(pfn, 1, owner)` を各頁。失敗 (起きないはず) は pin を外し頁を返して IO → (4) `be->gart_bind`。失敗は (3)〜(1) を逆に戻してその rc (NOSPC・IO) を返す。どの失敗でも面は作られず、表・頁・pin は元のまま |
+| 上限 (PM 決定 #1) | **遅延確保の上限 8MB** (gart.c の定数 `GFX2_GART_KB 8192`。system.cfg の設定は持たない)。予約はしない。越えれば `OS32_ERR_NOSPC` (`OS32_ERR_NOMEM` は無い) |
 | pin | pgalloc に頁ごとの pin の数 (`u8 pin_map[PHYSMEM_MAX_PFN]`、pgalloc_owner.inc、M1) を足し、`pgalloc_free_n_owner`・`ledger_transfer`・`ledger_reclaim_owner` の**全部**で pin の頁があれば全件不変で拒否し `ledger_bad_free` に数える (reclaim は pin の頁を飛ばして返さず、戻り値 0)。pin の頁を動かせるのは `ledger_transfer_pinned` (隔離へ移すため) だけ |
 | 物理の表 | 中核が `u32 pfn[]` を持ち、backend の `gart_bind(pfn, n, *gpu_off)`・`gart_unbind`。`gart_bind` は全部か無し: 途中で失敗したら backend が自分の書いた頁表の項目を消してから失敗を返す (中核は巻き戻さない。nouveau の `nvkm_vmm_ptes_get` が失敗の時に取った分を自分で外すのと同じ、nvkm/subdev/mmu/vmm.c:750-755。`nouveau_sgdma_bind` も自分で `nouveau_mem_fini` して返す、nouveau_sgdma.c:45-50)。GART の空きが足りなければ NOSPC。`gart_unbind` は頁表の項目を消すだけで失敗しない。TLB の flush の時間切れは nouveau どおり記録だけして 0 を返す (nv44_vmm_flush は待ちが切れても続ける、nvkm/subdev/mmu/vmmnv44.c:185-194)。0 以外を返すのは bind していない範囲 (呼び手の誤り) だけ。GF6200 は NV44 の GART の頁表 (nouveau `nvkm/subdev/mmu/nv44.c`、MIT)、ATI は PCI GART (`r100_pci_gart_*`、MIT)。GF は GART の DMA の物 (新 handle) を作る |
 | cache | WB (bus master は snoop)、DMA_PHYS_LIMIT は `dma_range_ok` |
@@ -1136,7 +1136,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | C3 | `cpu_begin`・`quiesce`・`fence_wait_k` の TIMEOUT・STALE は面を変えない (TIMEOUT の後の LOST は §6-3)。commit の失敗は §11-2 のコード | 折り返しは §6-1 | fence の折り返し・失敗の完了・fence の順・cpu_end の吐き出し |
 | C4 | `gfx2_surf_new` は作った順の逆に戻す (heap か GART か SYSMEM → `be->alloc` → `be->kva` → GART の写像 (§8 の「CPU から」))。表が満杯は NOSPC。destroy は §7-3 の表 | `w`・`h` は 1〜caps の `max_w`・`max_h`。`pitch = (w·cpp + pitch_align − 1) & ~(pitch_align − 1)` と `bytes = pitch·h` が u32 であふれる・`pitch > max_pitch` は INVAL。`fmt` は caps の `fmt_surface`、`pool` は 1〜3、`usage` の未定義の bit は INVAL | 状態遷移・作成の途中の失敗・解放の順 |
 | C5 | §7-6 | §7-6 | heap |
-| C6 | §8 の「C6 の作成の順と失敗」「解放」 | `n == 0` は INVAL、上限は `GFX_GART_KB` | GART の作成の失敗・unbind の失敗 |
+| C6 | §8 の「C6 の作成の順と失敗」「解放」 | `n == 0` は INVAL、上限は `GFX2_GART_KB` | GART の作成の失敗・unbind の失敗 |
 | C7 | `gfx2_map`・`gfx2_unmap` は §11-2 の行。lock は失敗で IDLE のまま (staging は §7-5) | lock の flags は READONLY・DISCARD・DONOTWAIT の外の bit が INVAL | 写像・DISCARD・同期の面の lock・staging の失敗 |
 | C8 | 判定だけで状態は無い | `op` が 0 か `GFX2_OP_MAX` を越える・形式の番号が範囲外は INVAL。規則で禁止の組は NOSUPPORT (§4-2) | check_op と submit・GART への SW・LOST の後 |
 | C9 | §5-3 (元から足りていた) | §5-3 | 束の写し・submit の検査・パターン・R9 |
@@ -1308,3 +1308,4 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **全段の洗い直し**: §12-1 に段ごとの失敗・入力の境界・試験の表を置き、§13-1 に足りない試験の行 (隔離の owner・cpu_end・作成の途中の失敗・解放の順・heap・GART の失敗・staging・caps・列挙・palette・行の範囲・pin の上限・paging_gfx2_map) を足した。
 - **C1 の heap の失敗 (PM 決定)**: 登録で `be->heap_range` が 0 以外を返すか、`gfx2_heap_init` が INVAL を返したときは、`base = size = vram_phys = 0` で `gfx2_heap_init(&a->heap, 0, 0)` をやり直して空の heap にし、登録はそのまま成り立たせる (VRAM の面の確保が NOSPC になるだけ、shim と同じ扱い)。kprintf を 1 回出す。再試行は次の登録 (gfx_init のたび) で自然に行われる。
 - **別名の面の lock (ユーザー決定 2026-11-11)**: 「directx9cの段階でそういう仕様であればそれで」。DirectX 9c の実行環境では、DirectDraw 7 の primary surface の Lock と、Direct3D 9 の lockable な back buffer (D3DPRESENTFLAG_LOCKABLE_BACKBUFFER) の LockRect が使える。これに合わせ、DIRECT の別名の lock は許す (§7-5)。
+- **C6 の上限と隔離の後始末 (PM 決定、C6 の第 2 回の欠け)**: 上限は gart.c の定数 `GFX2_GART_KB 8192` (表は static の 2,048 本、system.cfg の設定は持たない。要れば後で足す)。隔離へ移すのは割当の全部の頁をまとめて (`ledger_transfer_pinned` を割当の全範囲に 1 回、一部だけは移さない)。C15 の drain は、fence の完了を見てから同じ handle で `gfx2_gart_free` を呼ぶだけで、C6 の free は表に記録した持ち主 (隔離の後は `gfx2_quar_owner`) で unbind → unpin → free → 表の枠を返す。drain のための別の口は作らない。
