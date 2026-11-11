@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gf-v2-ops-host', tier=1, needs=[], budget=15,
     covers=['drivers/video/geforce/gf_v2*.c', 'drivers/video/geforce/gf_v2.h',
+        'drivers/video/geforce/geforce_module.h', 'hwdev/gf/display/*.h',
         'hwdev/gf/accel_rop*.c', 'hwdev/gf/*.h', 'gfx/v2/*.h', 'include/*.h',
         'arch/*/arch_copy.h', 'sdk/include/os32/*.h', 'tools/tests/gf_v2_ops_host.c',
         'tools/tests/test_gf_v2_ops.py', 'tools/tests/host32.py',

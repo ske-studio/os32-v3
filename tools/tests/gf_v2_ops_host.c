@@ -1,8 +1,16 @@
 /* G1: real adapter, real ROP3/GX state setters and real G4 fence ring. */
 #include "../../drivers/video/geforce/gf_v2_ops.c"
+#include "drivers/video/geforce/geforce_module.h"
+#include "hwdev/gf/display/api.h"
 static struct gf_foundation f;
 static struct gf2_chan ch = {.f = &f, .state = GF2_RUN, .epoch = 1};
 static struct gf3_ctx g3 = {.ch = &ch, .ready = true, .epoch = 1};
+static struct gf4_ctx display = {.ch = &ch, .accel = &g3, .ready = true, .accepting = true};
+static const struct gf4_test_ops display_ops = {.ctx = &display};
+static const struct gf4_test_ops *display_slot = &display_ops;
+static const GeforceModuleContext context = {.display_out = &display_slot};
+const GeforceModuleContext *geforce_context = &context;
+int gf2_fault_check(struct gf2_chan *c) { (void)c; return 0; }
 static u32 count, select_kind, bits[2], draw_at, mark_at, last_dl, clock_calls;
 static int draw_rc, io_rc, restore_fail, gart_calls;
 static struct gf3_rect last_rect;
@@ -60,7 +68,10 @@ void _start(void)
     struct gfx2_exec ex={.op=&op,.dst=&d,.src=&s,.pat=&p,.clip={2,3,4,5}};
     void *g=gf_backend_v2.ctx;
     f.io.timing.clock_us=clock_us;
-    CHECK(!gf_v2_start(&g3) && gart_calls==1);
+    u32 start_dl;
+    CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
+    CHECK(!gf_v2_deadline(&ch, GF3_TIMEOUT_US, &start_dl));
+    CHECK(!gf_v2_start(g,start_dl) && gart_calls==1);
     u32 base,size,phys; ch.B=16384; ch.bar1.base=0x10000000;
     CHECK(!gf_backend_v2.heap_range(g,&base,&size,&phys));
     CHECK(base==4096 && size==12288 && phys==0x10000000);
@@ -97,11 +108,12 @@ void _start(void)
     draw_rc=GF2_ETIME; CHECK(gf_backend_v2.emit(g,&ex,6)==OS32_ERR_TIMEOUT); draw_rc=0;
     const int errors[]={GF2_ETIME,GF2_ENOSPC,GF2_EINVAL,GF3_EINVAL,GF3_ERANGE,GF3_EFORMAT,GF3_EUNSUPPORTED,GF2_EFAULT};
     const int expected[]={OS32_ERR_TIMEOUT,OS32_ERR_NOSPC,OS32_ERR_INVAL,OS32_ERR_INVAL,OS32_ERR_INVAL,OS32_ERR_INVAL,OS32_ERR_NOSYS,OS32_ERR_IO};
-    for (u32 i=0;i<sizeof(errors)/sizeof(errors[0]);i++) CHECK(map_rc(errors[i])==expected[i]);
+    for (u32 i=0;i<sizeof(errors)/sizeof(errors[0]);i++) CHECK(gf_v2_rc(errors[i])==expected[i]);
     io_rc=GF2_ETIME; CHECK(gf_backend_v2.fence_emit(g,7,3)==OS32_ERR_TIMEOUT); io_rc=0;
-    CHECK(!gf_backend_v2.stop(g) && gf_v2_lost());
+    CHECK(!gf_backend_v2.stop(g) && gf_v2_inst.lost);
+    CHECK(gf_backend_v2.check(g,&ex)==OS32_ERR_NOSYS);
     gf_v2_stopped(); CHECK(gart_calls==1); ch.state=GF2_OFF;
     gf_v2_stopped(); CHECK(gart_calls==2 && clock_calls>0);
-    io_rc=GF2_ETIME; CHECK(!gf_backend_v2.stop(g) && gart_calls==3);
+    io_rc=GF2_ETIME; CHECK(!gf_backend_v2.stop(g) && gart_calls==2);
     die(0);
 }

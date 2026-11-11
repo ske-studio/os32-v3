@@ -88,10 +88,10 @@ __attribute__((weak)) int gf_direct_ok(void) { __builtin_trap(); }
 __attribute__((weak)) const GfxDirectOps gf_direct_ops = {0};
 
 /* Legacy HAL fixtures do not exercise v2; its contract has a separate host. */
-#include "gfx_hal2.h"
+#include "drivers/video/geforce/gf_v2.h"
 __attribute__((weak)) const GfxBackendV2 gf_backend_v2 = {0};
-__attribute__((weak)) int gf_v2_start(struct gf3_ctx *c) { (void)c; return 0; }
-__attribute__((weak)) int gf_v2_lost(void) { return 0; }
+__attribute__((weak)) int gf_v2_start(struct gf_v2 *g, u32 dl) { (void)g; (void)dl; return 0; }
+__attribute__((weak)) struct gf_v2 gf_v2_inst;
 __attribute__((weak)) void gf_v2_stopped(void) {}
 
 __attribute__((weak)) void gfx2_adapter_unregister(GfxBackend *v) { (void)v; }

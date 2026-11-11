@@ -9,13 +9,12 @@ from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
 MUTATIONS = (
-    ('stopped-unregister', 'if (g->ch && g->ch->state == GF2_OFF) {', 'if (0) {'),
+    ('stopped-unregister', 'if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)', 'if (0)'),
+    ('lost-check', 'if (g->lost || !g->g3) return OS32_ERR_NOSYS;', 'if (g->lost && !g->g3) return OS32_ERR_NOSYS;'),
     ('restore-error', 'if (restore) return OS32_ERR_IO;', '(void)restore;'),
     ('restore', 'int restore = gf3_rop3_set(g->g3, subc, 0xcc, 0, dst.fmt, dl);', 'int restore = 0;'),
     ('restore-on-error', 'if (custom) {\n            int restore', 'if (custom && !rc) {\n            int restore'),
     ('pack-mono', '((i % 4) * 8)', '((3 - i % 4) * 8)'),
-    ('deadline', '*dl = now + us;', '*dl = us;'),
-    ('raw-timeout', 'case GF2_ETIME: return OS32_ERR_TIMEOUT;', 'case GF2_ETIME: return OS32_ERR_IO;'),
     ('key', 'GFX2_F_SRCKEY | GFX2_F_DSTKEY | GFX2_F_ALPHA_PIXEL', 'GFX2_F_ALPHA_PIXEL'),
 )
 def observe(work, mutation=None):
@@ -29,7 +28,7 @@ def observe(work, mutation=None):
     work.mkdir()
     exe = work / 'ops'
     sources = ['tools/tests/gf_v2_ops_host.c', 'drivers/video/geforce/gf_v2_weak.c',
-               'drivers/video/geforce/gf_v2_fence.c', 'hwdev/gf/accel_rop3.c', 'hwdev/gf/accel_rop.c']
+               'drivers/video/geforce/gf_v2_fence.c', 'drivers/video/geforce/gf_v2_life.c', 'hwdev/gf/accel_rop3.c', 'hwdev/gf/accel_rop.c']
     build_in_tree(ROOT, work, edits, [['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
         '-I'+str(ROOT), *include_flags(ROOT), *[str(ROOT / p) for p in sources], '-o', str(exe)]])

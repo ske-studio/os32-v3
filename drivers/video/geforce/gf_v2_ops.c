@@ -3,60 +3,18 @@
  * 141-160. Hardware methods remain in hwdev/gf; no MMIO here. */
 #include "gf_v2.h"
 
-static struct gf_v2 gf_v2_inst;
-static bool closed;
+struct gf_v2 gf_v2_inst;
 #define GFX2_GART_KB 8192u
 #define GF_V2_MAX_DIM 4096u
 #define GF_V2_PITCH_ALIGN 64u
 #define GF_V2_FMT_MASK 0x1eu
 #define GF_V2_OP_MASK 0x7feu
 
-static int map_rc(int rc)
-{
-    switch (rc) {
-    case 0: return 0;
-    case GF2_ETIME: return OS32_ERR_TIMEOUT;
-    case GF2_ENOSPC: return OS32_ERR_NOSPC;
-    case GF2_EINVAL: case GF3_EINVAL: case GF3_ERANGE: case GF3_EFORMAT:
-        return OS32_ERR_INVAL;
-    case GF3_EUNSUPPORTED: return OS32_ERR_NOSYS;
-    default: return OS32_ERR_IO;
-    }
-}
-
-static int deadline(struct gf_v2 *g, u32 us, u32 *dl)
-{
-    u32 now;
-    if (!g->ch || !g->ch->f) return GF2_EIO;
-    struct gf_io *io = &g->ch->f->io;
-    if (!io->timing.clock_us) return GF2_EIO;
-    int rc = io->timing.clock_us(io->opaque, &now);
-    if (!rc) *dl = now + us;
-    return rc;
-}
-
-int gf_v2_start(struct gf3_ctx *g3)
-{
-    struct gf_v2 *g = &gf_v2_inst;
-    u32 dl;
-    if (!g3 || !g3->ready) return OS32_ERR_IO;
-    g->g3 = g3; g->ch = g3->ch;
-    int rc = deadline(g, GF3_TIMEOUT_US, &dl);
-    if (rc) return map_rc(rc);
-    gf3_range_query_set(g3, gf_v2_gart_range, g);
-    rc = gf_v2_gart_start(g, dl);
-    if (!rc) closed = false;
-    return map_rc(rc);
-}
-
 void gf_v2_stopped(void)
 {
     if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)
         gf_v2_gart_reset(&gf_v2_inst);
 }
-
-int gf_v2_lost(void)
-{ return closed; }
 
 static int caps(void *ctx, GFX2_Caps *o)
 {
@@ -94,7 +52,8 @@ static int supported_surface(const struct gfx2_surf *s)
 
 static int check(void *ctx, const struct gfx2_exec *ex)
 {
-    (void)ctx;
+    const struct gf_v2 *g = ctx;
+    if (g->lost || !g->g3) return OS32_ERR_NOSYS;
     const GFX2_Op *op = ex->op;
     const struct gfx2_surf *d = ex->dst, *s = ex->src;
     if (op->flags & (GFX2_F_SRCKEY | GFX2_F_DSTKEY | GFX2_F_ALPHA_PIXEL)) return OS32_ERR_NOSYS;
@@ -141,7 +100,7 @@ static int heap_range(void *ctx, u32 *base, u32 *size, u32 *phys)
                 if (last > occupied) occupied = last;
             } else if (r.off > at && r.off < next) next = r.off;
         }
-        if (rc < 0) return map_rc(rc);
+        if (rc < 0) return gf_v2_rc(rc);
         if (occupied > at) { at = occupied; continue; }
         if (next - at > *size) { *base = at; *size = next - at; }
         at = next;
@@ -156,7 +115,7 @@ static int kva(void *ctx, const struct gfx2_surf *s, u8 **va)
 static int reservation_rc(int rc)
 {
     if (rc == OS32_ERR_INVAL || rc == OS32_ERR_NOSPC || rc == OS32_ERR_NOSYS) return rc;
-    return map_rc(rc);
+    return gf_v2_rc(rc);
 }
 static int alloc(void *c, struct gfx2_surf *s) { return reservation_rc(gf_v2_alloc(c, s)); }
 static int release(void *c, struct gfx2_surf *s) { return reservation_rc(gf_v2_release(c, s)); }
@@ -193,8 +152,8 @@ static int emit(void *ctx, const struct gfx2_exec *ex, u32 fence)
     (void)fence;
     if (check(ctx, ex)) return OS32_ERR_NOSYS;
     if (ex->clip.w <= 0 || ex->clip.h <= 0) return 0;
-    int rc = deadline(g, GF3_TIMEOUT_US, &dl);
-    if (rc) return map_rc(rc);
+    int rc = gf_v2_deadline(g->ch, GF3_TIMEOUT_US, &dl);
+    if (rc) return gf_v2_rc(rc);
     dst = surface(ex->dst);
     struct gf3_rect r = rect(ex->clip);
     struct gf3_rect sr = {op->sx + ex->clip.x - op->dx, op->sy + ex->clip.y - op->dy, r.w, r.h};
@@ -215,10 +174,10 @@ static int emit(void *ctx, const struct gfx2_exec *ex, u32 fence)
             int restore = gf3_rop3_set(g->g3, subc, 0xcc, 0, dst.fmt, dl);
             if (restore) return OS32_ERR_IO;
         }
-        return map_rc(rc);
+        return gf_v2_rc(rc);
     }
     if (op->op == GFX2_OP_STRETCH)
-        return map_rc(gf3_scale_emit(g->g3, &src, &dst,
+        return gf_v2_rc(gf3_scale_emit(g->g3, &src, &dst,
             (struct gf3_rect){op->sx, op->sy, op->sw, op->sh},
             (struct gf3_rect){op->dx, op->dy, op->dw, op->dh}, r, !!(op->flags & GFX2_F_FILTER), dl));
     struct gf3_ram ram = {(void *)ex->cpu, ex->cpu_pitch * op->dh, ex->cpu_pitch};
@@ -226,53 +185,39 @@ static int emit(void *ctx, const struct gfx2_exec *ex, u32 fence)
         /* Layer 3 clips mono while preserving its original bit origin. */
         if (op->dx < 0 || op->dy < 0 || (u32)op->dx + op->dw > dst.width || (u32)op->dy + op->dh > dst.height)
             return OS32_ERR_NOSYS;
-        return map_rc(gf3_mono(g->g3, &dst, (struct gf3_rect){op->dx, op->dy, op->dw, op->dh},
+        return gf_v2_rc(gf3_mono(g->g3, &dst, (struct gf3_rect){op->dx, op->dy, op->dw, op->dh},
             &ram, op->fg.v, op->bg.v, r, dl));
     }
     u32 cpp = dst.fmt == GF3_INDEX8 ? 1 : dst.fmt == GF3_RGB565 ? 2 : 4;
     ram.ptr = (void *)(ex->cpu + (r.y - op->dy) * ex->cpu_pitch + (r.x - op->dx) * cpp);
     ram.bytes -= (const u8 *)ram.ptr - ex->cpu;
-    return map_rc(gf3_upload(g->g3, &dst, r, &ram, false, dl));
+    return gf_v2_rc(gf3_upload(g->g3, &dst, r, &ram, false, dl));
 }
 
 static int readback(void *ctx, const struct gfx2_exec *ex, u8 *buf)
 {
     struct gf_v2 *g = ctx;
     u32 dl;
-    int rc = deadline(g, GF3_TIMEOUT_US, &dl);
-    if (rc) return map_rc(rc);
+    int rc = gf_v2_deadline(g->ch, GF3_TIMEOUT_US, &dl);
+    if (rc) return gf_v2_rc(rc);
     struct gf3_surface s = surface(ex->src);
     const GFX2_Op *op = ex->op;
     struct gf3_ram ram = {buf, op->pitch * op->sh, op->pitch};
-    return map_rc(gf3_download(g->g3, &s, (struct gf3_rect){op->sx, op->sy, op->sw, op->sh}, &ram, dl));
+    return gf_v2_rc(gf3_download(g->g3, &s, (struct gf3_rect){op->sx, op->sy, op->sw, op->sh}, &ram, dl));
 }
-static int kick(void *c) { return map_rc(gf2_kick(((struct gf_v2 *)c)->ch)); }
+static int kick(void *c) { return gf_v2_rc(gf2_kick(((struct gf_v2 *)c)->ch)); }
 static int fence_emit(void *c, u32 f, u32 us)
 {
-    u32 dl; int rc = deadline(c, us, &dl);
-    return map_rc(rc ? rc : gf_v2_fence_emit(c, f, dl));
+    u32 dl; int rc = gf_v2_deadline(((struct gf_v2 *)c)->ch, us, &dl);
+    return gf_v2_rc(rc ? rc : gf_v2_fence_emit(c, f, dl));
 }
 static int fence_wait(void *c, u32 f, u32 us)
 {
-    u32 dl; int rc = deadline(c, us, &dl);
-    return map_rc(rc ? rc : gf_v2_fence_wait(c, f, dl));
+    u32 dl; int rc = gf_v2_deadline(((struct gf_v2 *)c)->ch, us, &dl);
+    return gf_v2_rc(rc ? rc : gf_v2_fence_wait(c, f, dl));
 }
 static int fence_state(void *c, u32 *done, u32 *failed)
-{ return map_rc(gf_v2_fence_state(c, done, failed)); }
-static int stop(void *c)
-{
-    struct gf_v2 *g = c;
-    u32 dl;
-    closed = true;
-    /* Unregister may follow the production owner's F2 stop. No hardware
-     * access (including the clock) is needed once OFF is confirmed. */
-    if (g->ch && g->ch->state == GF2_OFF) {
-        gf_v2_gart_reset(g);
-        return 0;
-    }
-    int rc = deadline(g, GF3_TIMEOUT_US, &dl);
-    return map_rc(rc ? rc : gf3_fini(g->g3, dl));
-}
+{ return gf_v2_rc(gf_v2_fence_state(c, done, failed)); }
 const GfxBackendV2 gf_backend_v2 = {
     .abi = GFX_HAL2_ABI, .ctx = &gf_v2_inst,
     .caps = caps, .check = check, .heap_range = heap_range,
@@ -282,5 +227,5 @@ const GfxBackendV2 gf_backend_v2 = {
     .enum_head = gf_v2_enum_head, .enum_conn = gf_v2_enum_conn, .enum_mode = gf_v2_enum_mode, .edid = gf_v2_edid,
     .mode_set = gf_v2_mode_set, .flip = gf_v2_flip, .flip_done = gf_v2_flip_done, .vblank_wait = gf_v2_vblank_wait,
     .palette = gf_v2_palette, .gamma = gf_v2_gamma, .cursor_image = gf_v2_cursor_image,
-    .cursor_move = gf_v2_cursor_move, .cursor_show = gf_v2_cursor_show, .dpms = gf_v2_dpms, .stop = stop
+    .cursor_move = gf_v2_cursor_move, .cursor_show = gf_v2_cursor_show, .dpms = gf_v2_dpms, .stop = gf_v2_stop
 };

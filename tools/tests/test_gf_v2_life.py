@@ -34,6 +34,8 @@ def main():
         assert observe(work, source) == 0
         if args.mutate:
             for anchor, replacement in [
+                ('*dl = now + us;', '*dl = us;'),
+                ('case GF2_ETIME: case GF4_ETIME: return OS32_ERR_TIMEOUT;', 'case GF2_ETIME: case GF4_ETIME: return OS32_ERR_IO;'),
                 ('if (!rc) return 0;', 'if (!rc) rc = GF2_ETIME;'),
                 ('if (g->epoch != c->ch->epoch) gf_v2_fence_reset(g);', '(void)g->epoch;'),
             ]:

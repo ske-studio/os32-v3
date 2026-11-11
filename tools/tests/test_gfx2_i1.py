@@ -35,7 +35,7 @@ MUTATIONS = [
     ('sw-dispatch', 'gfx/v2/sw_table.c', '[GFX2_OP_FILL] = gfx2_sw_fill,', '[GFX2_OP_FILL] = gfx2_sw_copy,'),
 ]
 
-def observe(work, mutation=None):
+def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=()):
     # Read includes through the same source view used by existing MM fixtures.
     overrides = {}
     if mutation:
@@ -58,7 +58,7 @@ def observe(work, mutation=None):
     sources = []
     for path in [*['gfx/v2/' + n + '.c' for n in UNITS], 'exec/lease.c',
                  'gfx/v2/palette_state.c', 'gfx/v2/sw_table.c', 'gfx/palette.c',
-                 'gfx/sync/a0_weak.c', 'gfx/sync/sync_storage.c']:
+                 'gfx/sync/a0_weak.c', 'gfx/sync/sync_storage.c', *extra]:
         target = work / path.replace('/', '_')
         target.write_text(overrides.get(path, (ROOT / path).read_text()))
         sources.append(str(target))
@@ -69,8 +69,8 @@ def observe(work, mutation=None):
            '-nostdlib', '-static', '-DPHYSMEM_HOST_TEST=1', '-Wl,--gc-sections',
            *linker_flags(), '-I' + str(work),
            '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'gfx/v2'),
-           '-I' + str(ROOT / 'gfx/sync'),
-           *include_flags(ROOT), str(ROOT / 'tools/tests/gfx2_i1_host.c'),
+           '-I' + str(ROOT / 'gfx/sync'), '-I' + str(ROOT / 'userland/lib/gfx/v2'),
+           *include_flags(ROOT), str(ROOT / 'tools/tests' / fixture),
            *sources, str(ROOT / 'mm/physmem.c'), str(ROOT / 'lib/kstring_c.c'),
            str(ROOT / 'lib/dma_contract.c'), '-o', str(exe)]
     subprocess.run(cmd, check=True)

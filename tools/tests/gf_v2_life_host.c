@@ -12,6 +12,9 @@ static GeforceModuleContext context;
 const GeforceModuleContext *geforce_context = &context;
 static int seq, ranges, garts, failures, wait_rc, off;
 static int clock_now(void *opaque, u32 *out) { (void)opaque; *out = 42; return 0; }
+int gf2_kick(struct gf2_chan *c) { (void)c; return 0; }
+int gf2_fence_poll(struct gf2_chan *c, struct gf2_fence f, int *done)
+{ (void)c; (void)f; *done = 1; return 0; }
 int gf2_fault_check(struct gf2_chan *c) { (void)c; return 0; }
 int gf2_fence_emit(struct gf2_chan *c, struct gf2_fence *f, u32 dl) { (void)c; (void)f; (void)dl; return 0; }
 int gf2_fence_wait(struct gf2_chan *c, struct gf2_fence f, u32 dl) { (void)c; (void)f; (void)dl; return wait_rc; }
@@ -26,6 +29,8 @@ static int test(void)
     display.ready = display.accepting = 1; display.links = &links;
     ch.f = &foundation; ch.state = GF2_RUN; ch.epoch = 2; accel.ready = 1; accel.epoch = 2;
     foundation.io.timing.clock_us = clock_now;
+    u32 deadline;
+    if (gf_v2_deadline(&ch, 100, &deadline) || deadline != 142) return 9;
     g.epoch = 1; g.ring.count = 1; g.ring.head = 1; g.ring.e[0].v2 = 7;
     if (gf_v2_start(&g, 100) || g.lost || g.ring.count || g.failed_upto != 7 || ranges != 1 || garts != 2) return 1;
     accel.ready = 0; garts = 0;
