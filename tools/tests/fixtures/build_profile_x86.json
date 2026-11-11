@@ -171,6 +171,7 @@
     "gfx/sync/a0_weak.c",
     "gfx/v2/backend_reg.c",
     "gfx/v2/caps.c",
+    "gfx/v2/enum.c",
     "gfx/v2/fence.c",
     "gfx/v2/gart.c",
     "gfx/v2/lock.c",

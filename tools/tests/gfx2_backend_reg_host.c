@@ -29,7 +29,7 @@ int gfx2_heap_init(struct gfx2_heap *h, u32 base, u32 size)
     h->base = base; h->size = size; h->n = size ? 1 : 0;
     return 0;
 }
-void gfx2_caps_refresh(struct gfx2_adapter *a) { (void)a; refreshes++; }
+void gfx2_caps_refresh(struct gfx2_adapter *a) { a->caps.heads = 3; refreshes++; }
 void gfx2_head_detach(struct gfx2_adapter *a, u32 head)
 { detaches++; a->head[head].scan_sid = a->head[head].pend_sid = 0; }
 void v1_bridge_rebind(void) { EXPECT(gfx2_active() != NULL); rebinds++; }
@@ -277,7 +277,7 @@ static void test_registry(void)
     /* Every real callback is in this broad fake text interval. */
     EXPECT(gfx2_adapter_register(&v1[0], 4, GFX2_AF_ACTIVE) == 0);
     a = gfx2_adapter_get(0);
-    EXPECT(a && a->index == 0 && a->gen == 1 && a->kind == 4 && a->be == &ops);
+    EXPECT(a && a->index == 0 && a->gen == 1 && a->kind == 4 && a->be == &ops && a->heads == 2);
     EXPECT(gfx2_active() == a && !gfx2_quar_owner && owner_calls == 1 && warnings == 1);
     EXPECT(a->heap.base == 0x1000 && a->heap.size == 0x2000 && a->vram_phys == 0xe0000000);
     a->heads = 2; a->head[0].scan_sid = 19; a->head[1].pend_sid = 20;
