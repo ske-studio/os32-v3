@@ -70,7 +70,7 @@ def contracts():
     assert 'np2sysp.h' not in spec['includes']
     assert '#include "platform_host.h"' in text
     reclaim = function(exec_source(ROOT), 'exec_notify_owned')
-    assert reclaim.index('launch_owner_exit(id);') < reclaim.index('host_owner_exit(id);') < reclaim.index('con_sink_owner_exit(id);')
+    assert reclaim.index('launch_owner_exit(id);') < reclaim.index('exec_host_owner_exit(id);') < reclaim.index('con_sink_owner_exit(id);')
     # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
     print('PASS baseline public ABI/generated files, NP2 guards, host validation/copy order, owner cleanup position, current hwdev pair')

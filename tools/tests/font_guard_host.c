@@ -67,6 +67,8 @@ static u32 sqlite_engine_active;
 static void sqlite_engine_fault(u32 v,u32 e,u32 a) { (void)v;(void)e;(void)a; CHECK(0,"sqlite attribution"); }
 static void sputs(const char *s) { (void)s; }
 static void sput_hex32(u32 v) { (void)v; }
+#include "exec_legacy.h"
+#include "exec_gfx_poll.h"
 #include "exec.inc"
 #include "fault.inc"
 static int unexpected_callback(void *context) { (void)context; calls++; return 123; }

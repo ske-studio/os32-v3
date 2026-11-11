@@ -705,6 +705,9 @@ void pipe_free_owned(int id)
 void shm_free_owned(int id) { (void)id; reclaim_steps++; }
 void snd_owner_exit(int id) { (void)id; reclaim_steps++; }
 void pcm_reclaim(int id) { (void)id; reclaim_steps++; }
+#include "exec_snd.h"
+#include "exec_kapi_db.h"
+#include "exec_reclaim.h"
 #include "exec_reclaim.inc"
 
 static void lease_reclaim(void)

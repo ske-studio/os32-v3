@@ -95,7 +95,7 @@ def check_reclaim_order():
                   src, re.S)
     assert m, "exec_reclaim_resources が見つからない"
     body = m.group(1)
-    db = body.index("db_cleanup_owned(id);")
+    db = body.index("exec_db_cleanup_owned(id);")
     fd = body.index("vfs_close_owned(id);")
     assert db < fd, "exec_reclaim_resources: db_cleanup_owned は vfs_close_owned より先"
     m = re.search(r"static void exec_reclaim_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)

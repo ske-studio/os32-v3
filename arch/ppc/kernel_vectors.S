@@ -288,6 +288,7 @@ ppc_kernel_fatal_stack:
     .space PPC_KERNEL_FATAL_STACK_SIZE
 .Lfatal_top:
 .text
+.weak ppc_exec_kernel_sp
 .globl ppc_kernel_vector_entry
 ppc_kernel_vector_entry:
     lis 1,.Lscratch@ha
@@ -307,6 +308,9 @@ ppc_kernel_vector_entry:
     mfdsisr 30
     stw 30,PPC_SAVE_DSISR(1)
     mr 31,1
+    lwz 30,PPC_SAVE_SRR1(31)
+    andi. 30,30,PPC_MSR_PR
+    bne .Luser_frame
     mfsprg3 30
     cmpwi 30,PPC_VECTOR_DSI
     beq .Lspill_slot
@@ -332,6 +336,14 @@ ppc_kernel_vector_entry:
     li 29,0
     stw 29,0(1)
     stw 28,PPC_CALL_SIZE+KFRAME_BUSY(1)
+    b .Lsave_frame
+.Luser_frame:
+    lis 1,ppc_exec_kernel_sp@ha
+    lwz 1,ppc_exec_kernel_sp@l(1)
+    addi 1,1,-(PPC_FRAME_SIZE+PPC_CALL_SIZE)
+    li 29,0
+    stw 29,0(1)
+.Lsave_frame:
     stw 0,PPC_CALL_SIZE(1)
     mfsprg1 30
     stw 30,PPC_CALL_SIZE+4(1)
@@ -403,6 +415,9 @@ ppc_kernel_frame_complete:
     bl ppc_hpt_spill
     cmpwi 3,1
     beq ppc_kernel_vector_return
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    andi. 3,3,PPC_MSR_PR
+    bne .Ldispatch
 /* Failed spill moves the complete frame off the spill stack before dispatch.
  * An unresolved nested fault cannot overwrite the active trap frame. */
     lis 4,.Ltrap_busy@ha
@@ -451,9 +466,13 @@ ppc_kernel_vector_return:
     andc 3,3,4
     mtmsr 3
     isync
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    andi. 3,3,PPC_MSR_PR
+    bne .Lrestore_user
     lwz 3,PPC_CALL_SIZE+KFRAME_BUSY(1)
     li 4,0
     stw 4,0(3)
+.Lrestore_frame:
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
     mtsrr0 3
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
@@ -498,6 +517,59 @@ ppc_kernel_vector_return:
     lwz 2,PPC_CALL_SIZE+8(1)
     lwz 0,PPC_CALL_SIZE+0(1)
     lwz 1,PPC_CALL_SIZE+4(1)
+    rfi
+.Lrestore_user:
+    lwz 0,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    mtsprg3 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_LR(1)
+    mtlr 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CTR(1)
+    mtctr 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_XER(1)
+    mtxer 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CR(1)
+    mtcr 3
+    lwz 31,PPC_CALL_SIZE+124(1)
+    lwz 30,PPC_CALL_SIZE+120(1)
+    lwz 29,PPC_CALL_SIZE+116(1)
+    lwz 28,PPC_CALL_SIZE+112(1)
+    lwz 27,PPC_CALL_SIZE+108(1)
+    lwz 26,PPC_CALL_SIZE+104(1)
+    lwz 25,PPC_CALL_SIZE+100(1)
+    lwz 24,PPC_CALL_SIZE+96(1)
+    lwz 23,PPC_CALL_SIZE+92(1)
+    lwz 22,PPC_CALL_SIZE+88(1)
+    lwz 21,PPC_CALL_SIZE+84(1)
+    lwz 20,PPC_CALL_SIZE+80(1)
+    lwz 19,PPC_CALL_SIZE+76(1)
+    lwz 18,PPC_CALL_SIZE+72(1)
+    lwz 17,PPC_CALL_SIZE+68(1)
+    lwz 16,PPC_CALL_SIZE+64(1)
+    lwz 15,PPC_CALL_SIZE+60(1)
+    lwz 14,PPC_CALL_SIZE+56(1)
+    lwz 13,PPC_CALL_SIZE+52(1)
+    lwz 12,PPC_CALL_SIZE+48(1)
+    lwz 11,PPC_CALL_SIZE+44(1)
+    lwz 10,PPC_CALL_SIZE+40(1)
+    lwz 9,PPC_CALL_SIZE+36(1)
+    lwz 8,PPC_CALL_SIZE+32(1)
+    lwz 7,PPC_CALL_SIZE+28(1)
+    lwz 6,PPC_CALL_SIZE+24(1)
+    lwz 5,PPC_CALL_SIZE+20(1)
+    lwz 4,PPC_CALL_SIZE+16(1)
+    lwz 3,PPC_CALL_SIZE+12(1)
+    lwz 2,PPC_CALL_SIZE+8(1)
+    lwz 3,PPC_CALL_SIZE+0(1)
+    mtsprg1 3
+    lwz 3,PPC_CALL_SIZE+4(1)
+    mtsprg2 3
+    lwz 3,PPC_CALL_SIZE+12(1)
+    mfsprg3 1
+    mtsrr0 0
+    mtsrr1 1
+    mfsprg1 0
+    mfsprg2 1
     rfi
 /* No MMIO, C, or writes through a potentially exhausted stack on reentry. */
 .globl ppc_kernel_vector_fatal

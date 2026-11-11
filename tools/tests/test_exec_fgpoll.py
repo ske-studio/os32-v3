@@ -53,6 +53,7 @@ static struct arch_syscall call = { frame }, *g_cur_frame;
 static int font_guard_active, gui, reject, bad_slot, polls, halts, transfers;
 volatile u32 ring3_park_reject_count;
 void geforce_foreground_poll(void) { polls++; }
+#include "exec_gfx_poll.h"
 static void _halt(void) { CHECK(polls == 1); halts++; }
 int con_sink_is_enabled(void) { CHECK(polls == 1); return gui; }
 int appslot_cur(void) { CHECK(polls == 1); return 2; }
@@ -148,7 +149,7 @@ def main():
         if args.mutate:
             for name in ('exec_park_poll', 'exec_sys_yield'):
                 original = function(source, name)
-                anchor = '    geforce_foreground_poll();\n'
+                anchor = '    exec_gfx_poll();\n'
                 assert original.count(anchor) == 1, name
                 assert source.count(original) == 1, name
                 changed = source.replace(original, original.replace(anchor, '', 1), 1)

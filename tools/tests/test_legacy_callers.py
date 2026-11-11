@@ -47,11 +47,11 @@ MUTANTS = [
     ('on', 'return v86_session.open;', 'return v86_is_active();', 'open-independent'),
     ('off', 'int legacy_session_open(void) { return 0; }',
      'int legacy_session_open(void) { return 1; }', 'none-open'),
-    ('callers', 'if (legacy_pinned()) return EXEC_ERR_INVALID;',
+    ('callers', 'if (exec_legacy_pinned()) return EXEC_ERR_INVALID;',
      'if (0) return EXEC_ERR_INVALID;', 'pin-ignored'),
-    ('callers', 'if (legacy_closing())', 'if (0)', 'closing-ignored'),
-    ('callers', '    legacy_end();\n    ring3_context_clear();\n    legacy_cleanup();',
-     '    legacy_cleanup();\n    ring3_context_clear();\n    legacy_end();', 'cleanup-before-end'),
+    ('callers', 'if (exec_legacy_closing())', 'if (0)', 'closing-ignored'),
+    ('callers', '    exec_legacy_end();\n    ring3_context_clear();\n    exec_legacy_cleanup();',
+     '    exec_legacy_cleanup();\n    ring3_context_clear();\n    exec_legacy_end();', 'cleanup-before-end'),
     ('off', '(void)fn; (void)src; (void)count;',
      '(void)fn; (void)count; (void)*(volatile const u32 *)src;', 'none-reads-args'),
 ]
@@ -64,6 +64,7 @@ def main():
         def exercise(parts, red=False):
             for key, body in parts.items():
                 (work / (key + '.inc')).write_text(body)
+            (work / 'none_callers.inc').write_text(parts['callers'].replace('exec_legacy_', 'none_exec_legacy_'))
             exe = work / 'entry'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
                 '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',

@@ -1,4 +1,4 @@
-#include "../drivers/video/geforce/geforce_module.h"
+#include "exec_gfx_poll.h"
 /* Ring3 syscall dispatch and completed-syscall STOP parking. Included by exec.c. */
 #define RING3_ARG_WINDOW  64u
 STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
@@ -39,7 +39,7 @@ static __attribute__((noinline)) int exec_kapi_special(u32 slot, void *wrapper,
                                                      u32 *result)
 {
     unsigned count = kapi_fixed_count[slot];
-    int handled = legacy_call_dispatch(slot, wrapper, src, count, result);
+    int handled = exec_legacy_call_dispatch(slot, wrapper, src, count, result);
     if (!handled && slot == KAPI_SLOT_KPRINTF) {
         if (!kapi_print_call(src)) return -1;
         *result = 0;
@@ -163,7 +163,7 @@ syscall_complete:
 
     /* Resident deadline/pending check only; F5 work runs at a due foreground
      * point after caller restoration and before the resulting abort check. */
-    if (geforce_fg_due(tick_count)) geforce_foreground_poll();
+    if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();

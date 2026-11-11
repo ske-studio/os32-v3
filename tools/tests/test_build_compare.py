@@ -86,13 +86,14 @@ def check():
                 assert str(rel) in B.compare(left, right)
             (right / rel).write_bytes(archive(members, 123))
             assert not B.compare(left, right)
-            for name in ('link_guard.py', 'target_profile.py'):
+            for name in ('link_guard.py', 'target_profile.py', 'target_profile_cli.py'):
                 rel = Path('build/sdk/bin') / name
                 a, b = left / rel, right / rel
                 b.parent.mkdir(parents=True, exist_ok=True)
                 b.write_bytes((B.ROOT / 'sdk' / name).read_bytes())
                 # 承認済みの差の旧側: 道具ごとに pin した基点の字面。
-                base = {'link_guard.py': '6d44e368', 'target_profile.py': '4ee26eee'}[name]
+                base = {'link_guard.py': '6d44e368', 'target_profile.py': '4ee26eee',
+                        'target_profile_cli.py': 'ecdc2075'}[name]
                 a.parent.mkdir(parents=True, exist_ok=True)
                 a.write_bytes(B.git(B.ROOT, 'show', base + ':sdk/' + name))
                 output = io.StringIO()

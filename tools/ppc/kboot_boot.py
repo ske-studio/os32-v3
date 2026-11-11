@@ -20,6 +20,7 @@ CHECK = dict(name='ppc-kboot-boot', tier=2, budget=600, covers=[
 PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeover.S',
     'arch/ppc/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
     'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_hpt.c', 'arch/ppc/kernel_trap.c',
+    'arch/ppc/kboot_unavailable.c',
     'arch/ppc/pd_walk.c', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
     'platform/powermac/ofw.c', 'platform/powermac/escc.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',

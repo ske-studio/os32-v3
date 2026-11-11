@@ -9,16 +9,16 @@ static void __attribute__((cold)) exec_owner_diag(AppSlot *a, int exiting, u32 p
     if (kctx_irq_depth || kctx_exc_depth) return;
     for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++)
         if (appslot_at(id) == a) values[0] = id;
-    serial_puts_polled(exiting ? "OS32: owner-exit" : "OS32: owner-start");
+    exec_serial_puts_polled(exiting ? "OS32: owner-exit" : "OS32: owner-start");
     for (u32 i = 0; i < (exiting ? 7U : 3U); i++) {
         char buf[11], *p = buf + sizeof(buf) - 1;
         u32 n = values[i];
         *p = 0;
         do { *--p = '0' + n % 10; n /= 10; } while (n);
-        serial_puts_polled(label);
+        exec_serial_puts_polled(label);
         while (*label++) {}
-        serial_puts_polled(p);
+        exec_serial_puts_polled(p);
     }
-    serial_puts_polled("\r\n");
+    exec_serial_puts_polled("\r\n");
 }
 #endif

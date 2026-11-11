@@ -323,7 +323,7 @@ MUTATIONS = [
     ('shutdown-route', 'drivers/video/geforce/backend_geforce.c', 'int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;', 'int route_rc = ((void)was_routed, (void)forced_stop, (void)pc98_route_to_98, 0);', 'foreground'),
     ('fault-monitor', 'hwdev/gf/feature5_service.c', 'if (!g || g!=service_ctx ||', 'if (!g || (g->ch && g->ch->fault.latched) || g!=service_ctx ||', 'foreground'),
     ('probe-latch', 'drivers/video/geforce/backend_geforce.c', 'if (geforce_context->heat && geforce_context->heat->stop_state.state!=GF5_STOP_NORMAL) ok=0;', 'if (false) ok=0;', 'foreground'),
-    ('syscall-exit', 'exec/exec_syscall.inc', 'if (geforce_fg_due(tick_count)) geforce_foreground_poll();', 'if (0 && geforce_fg_due(tick_count)) geforce_foreground_poll();', 'foreground'),
+    ('syscall-exit', 'exec/exec_syscall.inc', 'if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();', 'if (0 && exec_gfx_poll_due(tick_count)) exec_gfx_poll();', 'foreground'),
     ('gpio-log', 'kdebug/gf5_test.c', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);', 'rc = o->gpio_find(owner, (u8)a[0], &line, log);\n        log[0] = 0; log[1] = 1;', 'foreground-gpio'),
     ('bdf-display', 'kdebug/gf5_test.c', 'number("GF5 DATA stage=info target=0:", RECOVER_GF_DEV);', 'number("GF5 DATA stage=info target=0:", 13);', 'foreground-observe'),
     ('observation-read-error', 'kdebug/gf5_test.c', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);', 'status[i] = io->read(io->opaque, 0, regs[i], sizeof(u32), &value[i]);\n            if (status[i]) { status[i] = 0; value[i] = 0; }', 'foreground-observe'),
@@ -362,7 +362,7 @@ def foreground_header(tree):
                 ('exec/appslot.c', 'appslot_abort_request'))]
     source = (tree / 'exec/exec_syscall.inc').read_text()
     tail = source.split('syscall_complete:', 1)[1]
-    pieces.append('static void u6_syscall_tail(u32 *frame) {\n    struct arch_syscall call = { frame }; u32 result = frame[7];\n'
+    pieces.append('#include "exec_gfx_poll.h"\nstatic void u6_syscall_tail(u32 *frame) {\n    struct arch_syscall call = { frame }; u32 result = frame[7];\n'
                   'int prev_caller=0, prev_in_syscall=0;\nstruct arch_syscall *prev_frame=0;\n' + tail)
     (tree / 'tools/tests/gf5_foreground_entries.h').write_text(
         '\n'.join(pieces).replace('_halt();', 'u6_halt();'))

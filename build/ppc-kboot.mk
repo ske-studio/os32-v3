@@ -49,7 +49,8 @@ endif
 KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c fs/isofs/iso9660.c \
  fs/isofs/iso9660_media.c drivers/block/ram_ro.c init/boot_root.c \
  fs/ramfs/ramfs.c platform/powermac/root_boot.c platform/powermac/root_image.c \
- platform/powermac/console_stream.c platform/powermac/cli_boot.c kernel/cli/resident_cli.c
+ platform/powermac/console_stream.c platform/powermac/shell_putchar.c \
+ platform/powermac/cli_boot.c kernel/cli/resident_cli.c
 KB_EXTRA := $(KB_OUT)/root_image_blob.o
 KB_INC_EXTRA := -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif

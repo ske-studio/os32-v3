@@ -88,6 +88,7 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 #define LEGACY_FAKE_LOWMAP_ENABLE
 #define LEGACY_FAKE_DISPATCH_ENABLE
 #include "legacy_guest_fake.h"
+#include "exec_legacy.h"
 
 static void exec_stop_mark(void) {}
 static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
@@ -166,17 +167,18 @@ void kapi_strings_cleanup_owned(int id) {
     CHECK(id == 2 && cleanup == 0 && !teardown && host_if && cr3 == 1);
     CHECK(!kctx_irq_depth && !kctx_exc_depth);
 }
-static void db_cleanup_owned(int id) { resource(id, 0); }
+static void exec_db_cleanup_owned(int id) { resource(id, 0); }
 static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
-static void snd_owner_exit(int id) { resource(id, 5); }
-static void pcm_reclaim(int id) { resource(id, 6); }
+void snd_owner_exit(int id) { resource(id, 5); }
+#include "exec_snd.h"
+static void exec_pcm_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
-void ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
+void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
 static void gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
@@ -192,7 +194,7 @@ static void con_sink_push_exit(int id) { CHECK(id == 2); }
 static int launch_child(int id) { (void)id; return 0; }
 static void kbd_inject_discard(void) {}
 static void launch_owner_exit(int id) { CHECK(id == 2); }
-static void host_owner_exit(int id) { CHECK(id == 2); }
+static void exec_host_owner_exit(int id) { CHECK(id == 2); }
 static void con_sink_owner_exit(int id) { CHECK(id == 2); }
 void appslot_gfx_owner_exit(int id) { CHECK(id == 2); }
 static void poison_landing(void);
@@ -607,7 +609,7 @@ def run(source=None, irq=None, provider=None):
         if r.returncode:
             return 'compile', r.stderr
         inc = (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
-        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
+        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
                             *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
@@ -682,7 +684,7 @@ MUTATIONS = (
     ('stdin-ignore-empty', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
-    ('ime-owner-exit', '    ime_owner_exit(id);', ''),
+    ('ime-owner-exit', '    exec_ime_owner_exit(id);', ''),
     ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
@@ -696,8 +698,8 @@ MUTATIONS = (
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('resume-landing-invalidate', '    if (exec_setjmp(a->jmpbuf) != 0) {\n        ring3_context_clear();',
      '    if (exec_setjmp(a->jmpbuf) != 0) {'),
-    ('exit-invalidation', '    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish(appslot_cur()',
-     '    legacy_cleanup();\n    exec_finish(appslot_cur()'),
+    ('exit-invalidation', '    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish(appslot_cur()',
+     '    exec_legacy_cleanup();\n    exec_finish(appslot_cur()'),
     ('pending-invalidation', '    ring3_context_clear();\n    g_pending_id = id;',
      '    g_pending_id = id;'),
     ('landing-restore', '        ring3_context_restore(&caller_context);',
@@ -714,7 +716,7 @@ MUTATIONS = (
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
-    ('landing-if-missing', '    _enable();\n    legacy_end();', '    legacy_end();'),
+    ('landing-if-missing', '    _enable();\n    exec_legacy_end();', '    exec_legacy_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
