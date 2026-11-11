@@ -43,6 +43,11 @@ __attribute__((weak)) int gfxsync_mode(const GfxSyncCtx * a0)
     (void)a0;
     return 0;
 }
+__attribute__((weak)) void gfxsync_profile(const GfxSyncCtx *a0, char out[16])
+{
+    (void)a0;
+    out[0] = 0;
+}
 __attribute__((weak)) int gfxsync_cfg_lookup(const char *key, struct gfxsync_cfg *out)
 {
     (void)key;

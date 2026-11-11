@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 #include "types.h"
 #include "tvram.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */

@@ -16,6 +16,7 @@ CHECK = dict(name='gfx-policy-host', tier=1, needs=[], budget=15, covers=[
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('bridge-rebind', '        v1_bridge_rebind();', '        (void)0;'),
     ('active-hooks', 'd && d->fill_rect', 'd && g_backend->fill_rect'),
     ('required-fill', ' && d->fill_rect', ''),
     ('fullscreen', 'con_sink_is_enabled() && !gfx_fullscreen_owner() &&', 'con_sink_is_enabled() && 1 &&'),

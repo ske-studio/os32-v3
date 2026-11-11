@@ -35,6 +35,9 @@
 #include "hwdev/gf/display/api.h"
 #include "hwdev/gf/feature5.h"
 #include "hwdev/gf/production.h"
+#include "gf_v2.h"
+extern const GfxBackendV2 gf_backend_v2;
+void gf_v2_stopped(void);
 #include "leave_log.h"
 #include "../../../gfx/gfx_internal.h"
 #include "../../../gfx/gfx_policy.h"
@@ -120,7 +123,7 @@ static int failed, active, routed;
 #ifdef OS32_GEFORCE_MODULE
 static int geforce_direct_ok(void)
 {
-    return active && gfx_is_started() && gf_direct_ok();
+    return active && gfx_is_started() && gf_direct_ok() && !gf_v2_inst.lost;
 }
 #endif
 static int (*stop_device)(void);
@@ -478,6 +481,7 @@ static int geforce_stop_common(bool force)
 #endif
     /* Sample stopped GF state before route_to_98 performs the final redraw. */
 #ifdef OS32_GEFORCE_MODULE
+    gf_v2_stopped();
     geforce_leave_log(leave_io, rc);
 #endif
     int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;
@@ -601,11 +605,28 @@ static int geforce_transfer(int x, int y, int w, int h)
                            x, y, w, h, interrupt_point, interrupt_context);
 }
 
+#ifdef OS32_GEFORCE_MODULE
+static void geforce_v2_start(void)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    u32 dl = 0;
+    if (ops && ops->ctx && ops->ctx->ch && ops->ctx->ch->f)
+        (void)display_deadline(ops->ctx, &dl);
+    int rc = gf_v2_start(&gf_v2_inst, dl);
+    if (rc) kprintf(KLOG_ATTR, "[gf_v2] start rc=%d\n", rc);
+}
+#endif
+
 static void geforce_init(void)
 {
     struct video_mode mode;
     if (!geforce_probe()) return;
-    if (active) return; /* gfx_init -> gfx_init_200 preserves the current scan. */
+    if (active) {
+#ifdef OS32_GEFORCE_MODULE
+        geforce_v2_start();
+#endif
+        return; /* gfx_init -> gfx_init_200 preserves the current scan. */
+    }
 #ifdef OS32_GEFORCE_MODULE
     scanout_logged = false;
 #endif
@@ -618,6 +639,9 @@ static void geforce_init(void)
     pc98_console_set_safe(0);
     int rc = video_start(device, mode.id, initial_palette);
     if (rc) { geforce_start_fail("video_start", rc); return; }
+#ifdef OS32_GEFORCE_MODULE
+    geforce_v2_start();
+#endif
     rc = start_wc ? start_wc() : 0;
     if (rc < 0) { geforce_start_fail("wc", rc); return; }
     rc = geforce_transfer(0, 0, GF_WIDTH, GF_HEIGHT);
@@ -756,6 +780,7 @@ GfxBackend gfx_backend_geforce = {
     .enter = geforce_enter, .leave = geforce_leave,
 #ifdef OS32_GEFORCE_MODULE
     .direct_ok = geforce_direct_ok, .direct_ops = &gf_direct_ops,
+    .v2 = &gf_backend_v2,
     .set_mode = geforce_set_mode, .dpms = geforce_dpms,
     .cursor_image = geforce_cursor_image, .cursor_move = geforce_cursor_move,
     .cursor_show = geforce_cursor_show, .vsync = geforce_vsync,

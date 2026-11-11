@@ -16,6 +16,20 @@ static void finish(int rc)
 } } while (0)
 
 #include "os32_kapi_slots.h"
+#include "../../gfx/v2/gfx2_int.h"
+static u32 bridge_access;
+static int bridge_active, bridge_begins, bridge_ends;
+int v1_bridge_begin(u32 role, u32 access)
+{
+    CHECK(role == GFX2_ROLE_DISPLAY && !bridge_active);
+    bridge_active = 1; bridge_access = access; bridge_begins++;
+    return bridge_begins & 1 ? OS32_ERR_BUSY : OS32_ERR_TIMEOUT;
+}
+void v1_bridge_end(u32 role, u32 access, u32 fence)
+{
+    CHECK(role == GFX2_ROLE_DISPLAY && bridge_active && access == bridge_access && !fence);
+    bridge_active = 0; bridge_ends++;
+}
 
 static GfxBackend selected;
 GfxBackend *g_backend = &selected;
@@ -43,6 +57,7 @@ static int query(GFX_ScreenInfo *info)
 }
 static int fill(int x, int y, int w, int h, u8 color, u8 rop)
 {
+    CHECK(bridge_active);
     calls++; ax = x; ay = y; aw = w; ah = h; acolor = color; arop = rop;
     return hook_rc;
 }
@@ -217,5 +232,6 @@ void _start(void)
     CHECK(gfx_hw_get(0, 0, 1, 1, &pixel, 1, 0) == OS32_ERR_NOSYS);
     CHECK(pixel == 7);
     commands();
+    CHECK(bridge_begins && bridge_begins == bridge_ends && !bridge_active);
     finish(0);
 }

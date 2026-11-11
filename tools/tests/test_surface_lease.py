@@ -46,8 +46,8 @@ MUTANTS = [
      'if (k != count) { lease_next_token++; return LEASE_FULL; }', 'FULL token mutation'),
     ('lease', 'if (rc) return surface_query_error(rc);',
      'if (rc) { lease_next_token++; return surface_query_error(rc); }', 'PT failure token mutation'),
-    ('paging', 'if (!pending[k]) { rc = -2; goto fail; }',
-     'if (!pending[k]) { as->leases[m->slot].token = m->token; rc = -2; goto fail; }', 'PT failure slot mutation'),
+    ('paging', '                if (!pending[k]) { rc = -2; goto fail; }',
+     '                if (!pending[k]) { as->leases[m->slot].token = m->token; rc = -2; goto fail; }', 'PT failure slot mutation'),
     ('paging', '            (d & ~(PTE_ACCESSED | PTE_DIRTY)) != (phys | PAGE_RW | PTE_USER))',
      '            (d & ~(PTE_ACCESSED | PTE_DIRTY | PTE_PS)) != (phys | PAGE_RW | PTE_USER))', 'managed PDE PS'),
 ]

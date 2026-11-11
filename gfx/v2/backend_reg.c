@@ -136,6 +136,7 @@ int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)
     }
     if (heap_retry[a->index]) adapter_heap_init(a);
     if (rebound) gfx2_caps_refresh(a);
+    a->heads = a->caps.heads < 2 ? a->caps.heads : 2;
     if (flags & GFX2_AF_ACTIVE) {
         if (a->state != GFX2_AD_OK &&
             (a->state != GFX2_AD_LOST_HELD || !a->be->stop(a->ctx)))

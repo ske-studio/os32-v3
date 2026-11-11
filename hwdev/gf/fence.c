@@ -64,3 +64,15 @@ int gf2_fence_wait(struct gf2_chan *ch, struct gf2_fence fence, u32 deadline_us)
         if (io->timing.wait_us(io->opaque, delay)) return GF2_EIO;
     }
 }
+
+int gf2_fence_poll(struct gf2_chan *ch, struct gf2_fence fence, int *done)
+{
+    u32 observed;
+    int rc = fence_state(ch);
+    if (rc) return rc;
+    if (fence.epoch != ch->epoch) return GF2_EFAULT;
+    if (ch->f->io.read(ch->f->io.opaque, GF2_FENCE_BAR, GF2_FENCE_REFERENCE,
+                       GF2_FENCE_WIDTH, &observed)) return GF2_EIO;
+    *done = (i32)(observed - fence.seq) >= 0;
+    return GF2_OK;
+}

@@ -64,6 +64,13 @@ static void shadow_hooks(void)
     CHECK(be.fill_rect == be.shadow_fill_rect && be.blit == be.shadow_blit);
     CHECK(!be.fill_rop && !be.put && !be.mono && !be.get);
 }
+static int rebinds;
+void v1_bridge_rebind(void)
+{
+    if (be.policy == GFX_POLICY_DIRECT) direct_hooks(be.direct_ops);
+    else shadow_hooks();
+    rebinds++;
+}
 void _start(void)
 {
     GfxDirectOps d = {fill,copy,rop,put,mono,get};
@@ -136,5 +143,6 @@ void _start(void)
     ok = 1; be.policy = GFX_POLICY_DIRECT; be.direct_ops = 0;
     gfx_policy_reeval(); shadow_hooks(); CHECK(gfx_policy_gen == 6 && logs == 1);
     gfx_policy_reeval(); CHECK(logs == 1);
+    CHECK(rebinds == 7);
     finish(0);
 }

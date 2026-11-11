@@ -5,6 +5,7 @@
 
 /* xf86-video-nouveau/src/nv04_exa.c:193-200: SF2D FORMAT method. */
 #define GF3_SF2D_FORMAT 0x0300U
+#define GF3_SF2D_DMA_SOURCE 0x0184U
 
 /* nouveau_exa.c:434-435; nouveau_xv.c:929-942 (linear NV4x).
  * These are drawing contracts, independent of M2MF and scanout. */
@@ -38,6 +39,12 @@ int gf3_span_check(u32 off, u32 capacity, u32 pitch, u32 rowbytes,
     *out = (struct gf3_span){off, rowbytes, pitch, rows, bytes};
     return 0;
 }
+void gf3_range_query_set(struct gf3_ctx *c, gf3_range_fn query, void *opaque)
+{
+    if (!c) return;
+    c->range_q = query;
+    c->range_opaque = opaque;
+}
 int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s,
                       struct gf3_rect r, enum gf3_surface_use use,
                       struct gf3_format *fmt, struct gf3_span *span)
@@ -47,7 +54,13 @@ int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s,
     struct gf3_span full, part;
     if (!c || !c->ch || !s || !fmt || !span || (unsigned)use > GF3_USE_SIFM_SRC)
         return GF3_EINVAL;
-    int rc = gf_vram_match(c->ch, 0, s->reservation_id, s->generation,
+    int rc;
+    if (s->dma == GF3_HANDLE_GART_DMA)
+        rc = c->range_q ? c->range_q(c->range_opaque, s->dma, s->off, s->bytes) : GF3_EINVAL;
+    else if (s->dma)
+        return GF3_EINVAL;
+    else
+        rc = gf_vram_match(c->ch, 0, s->reservation_id, s->generation,
                            s->off, s->bytes, &key);
     if (rc) return rc;
     rc = gf3_format_get(s->fmt, &f);
@@ -102,6 +115,10 @@ int gf3_surface_set(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_check(c, dst, (struct gf3_rect){0,0,dst->width,dst->height}, use, &df, &ds);
     if (rc) return rc;
     if (src->fmt != dst->fmt) return GF3_EFORMAT;
+    u32 dma[2] = {src->dma ? src->dma : GF3_HANDLE_VRAM_DMA,
+                  dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA};
+    rc = gf2_emit(c->ch, GF3_SUBC_SURFACE2D, GF3_SF2D_DMA_SOURCE, false, dma, 2, dl);
+    if (rc) return rc;
     /* nv04_exa.c:118-129,180-200: SF format, packed pitches, offsets. */
     u32 values[4] = {gdi ? sf.sf_gdi : sf.sf,
                      (dst->pitch << 16) | src->pitch, src->off, dst->off};
