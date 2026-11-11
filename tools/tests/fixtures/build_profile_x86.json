@@ -199,6 +199,7 @@
     "drivers/video/pc98/backend_pc98.c",
     "drivers/video/pc98/backend_pc98_osri.c",
     "drivers/video/pc98/backend_pegc.c",
+    "drivers/video/pc98/pegc_v2.c",
     "gfx/gfx_emergency.c",
     "fs/fat/fatfs/ff.c",
     "fs/fat/fatfs/diskio.c",
