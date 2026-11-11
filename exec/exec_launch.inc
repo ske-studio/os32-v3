@@ -311,7 +311,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
          * 原本 g_data_master は共有ライブラリ帯の末尾 = アプリ固有 PDE の
          * 中にあり、アプリ CR3 の下では別物を指す (I11)。 */
-        if (shlib_addrspace_attach(ctx->as) < 0) {
+        if (exec_shlib_addrspace_attach(ctx->as) < 0) {
             shell_print("Error: shlib data attach failed (out of memory)\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }

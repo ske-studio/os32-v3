@@ -59,7 +59,7 @@ MUTANTS = [
     ('access_walk', '!(l->flags & PTE_RW)', '0', 'RO lease authority'),
     ('access_walk', 'frame != (sf->first + (va - l->base) / PAGE_SIZE) * PAGE_SIZE', '0', 'lease PFN'),
     ('shlib', 'g_pages[page] == frame', '1', 'shlib exact backing'),
-    ('access_walk', '!write && shlib_read_page(va, frame)', 'shlib_read_page(va, frame)', 'shlib output'),
+    ('access_walk', '!write && exec_shlib_read_page(va, frame)', 'exec_shlib_read_page(va, frame)', 'shlib output'),
     ('redir_access', 'if (write) kmemcpy(P2V(pa), bytes, n);', 'if (write) { }', 'boot copyout moves bytes'),
 ]
 

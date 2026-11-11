@@ -116,7 +116,7 @@ def wiring(sources):
     # f12 removed the tier bookkeeping after the three private mappings.
     # Keep checking that interval through the shlib attach, using live calls.
     start = e.index('        if (app_map_region(ctx->as, load_base, sbrk_end)')
-    launch = e[start:e.index('        if (shlib_addrspace_attach(ctx->as) < 0)', start)]
+    launch = e[start:e.index('        if (exec_shlib_addrspace_attach(ctx->as) < 0)', start)]
     assert 'TVRAM_CHAR_BASE' not in launch, 'FAIL launch TVRAM removed'
     assert '0x01000UL' not in launch, 'FAIL launch font removed'
     assert 'MEM_SHM_BASE' not in launch, 'FAIL launch SHM removed'
