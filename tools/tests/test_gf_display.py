@@ -218,6 +218,8 @@ GF4_MUTATIONS = [
  ('b0', 'detect-image-owner', 'hwdev/gf/display/modes.c',
   'c->state->edid_connector=(u8)connector;',
   'c->state->edid_connector=0;', 'last connector owns the retained image'),
+ ('c2log', 'detect-state-dacclk', 'hwdev/gf/display/service.c',
+  'SVC_DACCLK+delta,4,&value);', 'SVC_DACCLK+delta+4U,4,&value);', 'observe DAC clock address'),
  ('c2log', 'detect-state-owner', 'hwdev/gf/display/service.c',
   'if (!rc) rc=svc_index(io,SVC_CR,RECOVER_CR44,&cr44,false);',
   'if (!rc) cr44=0;', 'observe the live owner before detect'),

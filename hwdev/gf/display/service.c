@@ -409,6 +409,30 @@ static i32 svc_start_failure(struct gf4_ctx *c,const char *stage,i32 rc)
 #define SVC_DDC_DRIVE0 0x3fU
 #define SVC_DDC_SENSE1 0x36U
 #define SVC_DDC_DRIVE1 0x37U
+/* nouveau dispnv04/hw.c:46-52, hw.h:119-140: head-indexed VGA reads;
+ * dac.c:478-495, dfp.c:97 and nvreg.h:329,384: DACCLK and FP_TG_CONTROL. */
+#define SVC_DACCLK 0x68052cU
+#define SVC_FP_TG 0x680848U
+static void svc_diag_hex(char out[9],u32 value,i32 rc)
+{
+    static const char hex[]="0123456789abcdef";
+    if (rc) { out[0]='?'; out[1]=0; return; }
+    u32 shift=28,n=0;
+    while (shift && !(value>>shift)) shift-=4;
+    do { out[n++]=hex[(value>>shift)&15U]; if (!shift) break; shift-=4; } while (true);
+    out[n]=0;
+}
+static void svc_diag_index(struct gf_io *io,u32 port,u32 reg,char out[9])
+{
+    u32 index=0,value=0;
+    i32 rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,port,1,&index);
+    if (!rc) {
+        rc=svc_index(io,port,reg,&value,false);
+        i32 restore=io->write(io->opaque,GF_MODE_REGISTER_BAR,port,1,index);
+        if (!rc) rc=restore;
+    }
+    svc_diag_hex(out,value,rc);
+}
 static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
 {
     struct gf_io *io=&c->ch->f->io;
@@ -431,10 +455,23 @@ static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
     for (u32 h=0;!mmio_rc && h<GF4_HEADS;++h)
         mmio_rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,
                          SVC_ENGINE_CTRL+h*RECOVER_HEAD_STRIDE,4,&engine[h]);
-    kprintf(KLOG_ATTR,"[gf4] detect state cr1f=%x cr44=%x read_rc=%d m_attempted=%u m_rc=%d f5_rc=%d source_rc=%d cr11=%x cr3e=%x cr3f=%x cr36=%x cr37=%x pmc=%x ec0=%x ec1=%x mmio_rc=%d\n",
+    char sr01[GF4_HEADS][9],cr17[GF4_HEADS][9],cr1a[GF4_HEADS][9];
+    char dacclk[GF4_HEADS][9],fptg[GF4_HEADS][9];
+    for (u32 h=0;h<GF4_HEADS;++h) {
+        u32 delta=h*RECOVER_HEAD_STRIDE,value=0;
+        svc_diag_index(io,SVC_SR+delta,SVC_CLOCK,sr01[h]);
+        svc_diag_index(io,SVC_CR+delta,SVC_CONTROL,cr17[h]);
+        svc_diag_index(io,SVC_CR+delta,SVC_RPC,cr1a[h]);
+        i32 status=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_DACCLK+delta,4,&value);
+        svc_diag_hex(dacclk[h],value,status);
+        status=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_FP_TG+delta,4,&value);
+        svc_diag_hex(fptg[h],value,status);
+    }
+    kprintf(KLOG_ATTR,"[gf4] detect state cr1f=%x cr44=%x read_rc=%d m_attempted=%u m_rc=%d f5_rc=%d source_rc=%d cr11=%x cr3e=%x cr3f=%x cr36=%x cr37=%x pmc=%x ec0=%x ec1=%x mmio_rc=%d sr01_0=%s cr17_0=%s cr1a_0=%s sr01_1=%s cr17_1=%s cr1a_1=%s dacclk0=%s dacclk1=%s fptg0=%s fptg1=%s\n",
             cr1f,cr44,rc,c->memory_prepare_attempted,c->memory_prepare_rc,
             g->last_rc,g->source_rc,cr11,cr3e,cr3f,cr36,cr37,pmc,
-            engine[0],engine[1],mmio_rc);
+            engine[0],engine[1],mmio_rc,sr01[0],cr17[0],cr1a[0],sr01[1],cr17[1],cr1a[1],
+            dacclk[0],dacclk[1],fptg[0],fptg[1]);
     for (u32 i=0;i<c->nroutes;++i) {
         const struct gf4_route *r=&c->routes[i];
         if (r->type==GF4_TV || r->i2c_index==U8_MAX) continue;

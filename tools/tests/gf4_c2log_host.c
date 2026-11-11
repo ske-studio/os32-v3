@@ -276,13 +276,24 @@ static void test_detect_state(void)
     assert(!io->write(io->opaque,0,SVC_ENGINE_CTRL,4,0x10));
     assert(!io->write(io->opaque,0,SVC_ENGINE_CTRL+RECOVER_HEAD_STRIDE,4,0x1000));
     assert(!io->write(io->opaque,0,SVC_CR,1,index));
+    for (u32 h=0;h<GF4_HEADS;++h) {
+        u32 delta=h*RECOVER_HEAD_STRIDE, v=0x11+h;
+        assert(!svc_index(io,SVC_SR+delta,SVC_CLOCK,&v,true));
+        v=0x81+h; assert(!svc_index(io,SVC_CR+delta,SVC_CONTROL,&v,true));
+        v=0x41+h; assert(!svc_index(io,SVC_CR+delta,SVC_RPC,&v,true));
+        assert(!io->write(io->opaque,0,SVC_DACCLK+delta,4,0x12340000+h));
+        assert(!io->write(io->opaque,0,SVC_FP_TG+delta,4,0x56780000+h));
+    }
+    assert(!io->write(io->opaque,0,SVC_CR,1,index));
     svc_ctx.dcb.routes[0].connector=7;
     svc_ctx.dcb.routes[0].i2c_index=2;
     svc_ctx.dcb.i2c[2]=(struct gf4_i2c_port){.drive=0x51,.sense=0x50};
     svc_ctx.last_rc=GF4_EDDC;
     svc_detect_diagnostic(&svc_ctx,&cint_prod.feature5);
     assert(startlog_equal("[gf4] detect state cr1f=99 cr44=3 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1"
-        " cr11=80 cr3e=c cr3f=31 cr36=4 cr37=21 pmc=12345679 ec0=10 ec1=1000 mmio_rc=0\n"
+        " cr11=80 cr3e=c cr3f=31 cr36=4 cr37=21 pmc=12345679 ec0=10 ec1=1000 mmio_rc=0"
+        " sr01_0=11 cr17_0=81 cr1a_0=41 sr01_1=12 cr17_1=82 cr1a_1=42"
+        " dacclk0=12340000 dacclk1=12340001 fptg0=56780000 fptg1=56780001\n"
         "[gf4] detect port conn=7 bus=2 port_rc=0 drive_cr=51 drive=11 sense_cr=50 sense=8 read_rc=0\n"));
     assert(svc_ctx.last_rc==GF4_EDDC);
     for (u32 i=0;i<sizeof(regs);++i) assert(svc_host.cr[0][regs[i]]==values[i]);
