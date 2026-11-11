@@ -45,4 +45,5 @@ NP21/W に GeForce・Trident は無く PEGC だけなので、段ごとに確か
 
 - 実機の受入は段ごとにせず、I1・I2・I3 が main に入るたびに 1 回まとめて回す。ノートのセッションに頼み、判定はシリアル (ゲスト試験の PASS/FAIL・mem・起動ログ) と、画面はカメラで PM が見る。
 - R の項目は延期の台帳 DEFERRED_TESTS の HALV2-RH-* の行で持ち、節目ごとに閉じる。
+- 2026-11-12: I1〜I3 の R の項目は実機 (main ee876302) で GeForce・Trident とも gfx2_i1〜i3・gfx2_rh が PASS し、HALV2-RH-I2・RH-I3 を閉じた (証拠はノートの ~/os32-tmp/evidence/2026-11-12/halv2-i2-idle/ ほか)。残るのは K1 (CONSOLE_DUAL の D2 の後)。
 
