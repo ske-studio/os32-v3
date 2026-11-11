@@ -1306,3 +1306,4 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - **C5 heap**: nvkm_mm の head 側 (nvkm/core/mm.c:47-158) の first-fit・分割・結合。align は 2 の冪、0 の bytes・二重の free は INVAL、区間の上限は先に数えて NOSPC、失敗で不変 (§7-6)。
 - **M2 paging_gfx2_map**: `paging_lease_map` (mm/paging_lease.inc:59-133) と同じ検査と全部か無し。flags は PRESENT・USER・RW・PCD・PWT だけ、既存の PTE は −1、PT が取れなければ −2 (§7-4)。
 - **全段の洗い直し**: §12-1 に段ごとの失敗・入力の境界・試験の表を置き、§13-1 に足りない試験の行 (隔離の owner・cpu_end・作成の途中の失敗・解放の順・heap・GART の失敗・staging・caps・列挙・palette・行の範囲・pin の上限・paging_gfx2_map) を足した。
+- **C1 の heap の失敗 (PM 決定)**: 登録で `be->heap_range` が 0 以外を返すか、`gfx2_heap_init` が INVAL を返したときは、`base = size = vram_phys = 0` で `gfx2_heap_init(&a->heap, 0, 0)` をやり直して空の heap にし、登録はそのまま成り立たせる (VRAM の面の確保が NOSPC になるだけ、shim と同じ扱い)。kprintf を 1 回出す。再試行は次の登録 (gfx_init のたび) で自然に行われる。
