@@ -238,11 +238,10 @@ class Terminal:
         self.connected = False
         self.in_seq = 0
         self.out_next = 0
-        self.state_next = 0
 
     def open(self):
         self.connected = False
-        self.in_seq = self.out_next = self.state_next = 0
+        self.in_seq = self.out_next = 0
         self.host.nonce = secrets.token_bytes(16)
         self.send(TERM_OPEN)
 
@@ -273,16 +272,13 @@ class Terminal:
         if m['kind'] == TERM_STATE and len(m['payload']) == 24:
             self.connected = True
             in_next, in_drop, in_bytes = struct.unpack('!QQQ', m['payload'])
-            if m['seq'] > max(self.out_next, self.state_next):
-                self.diagnostic(f"output gap: {m['seq'] - max(self.out_next, self.state_next)}")
-            self.state_next = max(self.state_next, m['seq'])
             self.diagnostic(f"state: in_next={in_next} in_drop_frames={in_drop} in_drop_bytes={in_bytes} output_drop_frames={m['drop_records']} output_drop_bytes={m['drop_bytes']}")
         elif m['kind'] == TERM_OUT and self.connected:
             seq = m['seq']
             if seq < self.out_next:
                 return
-            if seq > max(self.out_next, self.state_next):
-                self.diagnostic(f'output gap: {seq - max(self.out_next, self.state_next)}')
+            if seq > self.out_next:
+                self.diagnostic(f'output gap: {seq - self.out_next}')
             self.out_next = seq + 1
             self.display.write(m['payload'])
             self.display.flush()

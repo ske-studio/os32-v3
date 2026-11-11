@@ -14,7 +14,7 @@ CHECK = dict(name='ppc-lan-terminal-host', tier=1, budget=60, needs=[],
              covers=['tools/ppc_lan_host.py'], inputs=['tools/ppc/test_lan_terminal_host.py'])
 MUTATIONS = [
     ('split', 'range(0, len(data), PAYLOAD_MAX)', 'range(0, len(data), PAYLOAD_MAX + 1)', 'split'),
-    ('gap', "self.diagnostic(f'output gap: {seq - max(self.out_next, self.state_next)}')", 'pass', 'gap'),
+    ('gap', "self.diagnostic(f'output gap: {seq - self.out_next}')", 'pass', 'gap'),
 ]
 
 
@@ -42,21 +42,23 @@ def exercise(path, directory):
     assert len(fake.sent) == 1
     term.receive(frame(m.TERM_STATE, nonce=b'x' * 16, payload=bytes(24)))
     assert not term.connected
-    term.receive(frame(m.TERM_STATE, payload=struct.pack('!QQQ', 0, 2, 0), drop_records=3, drop_bytes=4))
+    term.receive(frame(m.TERM_STATE, seq=2, payload=struct.pack('!QQQ', 0, 2, 0), drop_records=3, drop_bytes=4))
     assert term.connected and 'in_drop_frames=2' in diagnostics[-1] and 'output_drop_bytes=4' in diagnostics[-1]
     term.send_bytes(b'a' * 255 + b'\r' + b'b' * 257)
     messages = [m.decode(f[14:]) for f in fake.sent[1:]]
     if [len(x['payload']) for x in messages] != [256, 256, 1] or b''.join(x['payload'] for x in messages) != b'a' * 255 + b'\n' + b'b' * 257 or [x['seq'] for x in messages] != [0, 1, 2]:
         print('split'); return 1
     term.receive(frame(m.TERM_OUT, seq=0, payload=b'hello'))
-    term.receive(frame(m.TERM_OUT, seq=2, payload=b' world'))
+    term.receive(frame(m.TERM_OUT, seq=1, payload=b' world'))
+    assert not any('output gap:' in message for message in diagnostics)
+    term.receive(frame(m.TERM_OUT, seq=3, payload=b'!'))
     if 'output gap: 1' not in diagnostics:
         print('gap'); return 1
-    term.receive(frame(m.TERM_OUT, nonce=b'x' * 16, seq=3, payload=b'bad'))
+    term.receive(frame(m.TERM_OUT, nonce=b'x' * 16, seq=4, payload=b'bad'))
     term.receive(frame(m.TERM_STATE, seq=5, payload=bytes(24)))
-    assert diagnostics.count('output gap: 2') == 1
-    assert display.getvalue() == b'hello world'
-    assert (pathlib.Path(directory) / (boot.hex() + '.terminal')).read_bytes() == b'hello world'
+    assert diagnostics.count('output gap: 1') == 1
+    assert display.getvalue() == b'hello world!'
+    assert (pathlib.Path(directory) / (boot.hex() + '.terminal')).read_bytes() == b'hello world!'
     print('PASS')
     return 0
 
