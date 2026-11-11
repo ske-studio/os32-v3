@@ -220,6 +220,9 @@ MUTATIONS = {
          'v[0] = (r.h << IFC_FIELD_SHIFT) | r.w;\n    v[1] = (r.y << IFC_FIELD_SHIFT) | r.x;', 'tools/tests/gf_accel_b6_host.c'),
     ],
     'b7': [
+        ('gart-range', 'hwdev/gf/accel_m2mf.c',
+         'return c->range_q ? c->range_q(c->range_opaque, handle, off, span->bytes) : GF3_EINVAL;',
+         'return 0;', 'tools/tests/gf_accel_b7_host.c'),
         ('rows-2048', 'hwdev/gf/accel_m2mf.c',
          'u32 n = rows > GF3_M2MF_MAX_ROWS ? GF3_M2MF_MAX_ROWS : rows;',
          'u32 n = rows > 2048U ? 2048U : rows;', 'tools/tests/gf_accel_b7_host.c'),

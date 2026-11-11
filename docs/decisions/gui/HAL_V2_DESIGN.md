@@ -1737,3 +1737,11 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 - 担当は include/gfx_sync.h・gfx/sync/sync_int.h・sync_bind.c・a0_weak.c と tools/checks/gfx2_wiring.txt (I3 kernel)、使い手は T1 の診断。host 試験で切替・復元・無効値を検査する。
 
 - **I3 の容量 (PM 決定 2026-11-11)**: GeForce module の mem_max は実測 305,616 B に余裕を持たせ 393,216 B (384 KiB)、load_span_max は従来の prefix の余裕 64 KiB を加え 458,752 B (448 KiB)、image_max は 262,144 B を維持する。kernel は固定帯を持たず pgalloc から確保する。値の正・生成の表・manifest・固定値の試験・[容量の台帳](../../08_build.md#起動時に読む部品の大きさの上限と由来) を追従する。
+
+## 確定の後の追記 (2026-11-11、実機の G8 の GART への 2D の書き、PM 決定)
+- **実機の結果**: GeForce 6200 で gfx2_rh の G8 が落ちた。VRAM から GART の面 (256x64 INDEX8、4 頁) への 2D の COPY の後に CPU で読むと、48〜63 行目 (4 頁目) の全部が元の値のままだった。0.5 秒待って読み直しても変わらず、fence は進み、failed は 0 だった。逆向き (GART が元で VRAM が書き先) と M2MF の読み戻しは通る。§7-2 の追記の「G8 の DMA の結び」は、SF2D の書き先を GART にする組み合わせに nouveau の手本が無いことを §13-3 の比べで確かめる前提だったが、その比べが落ちた。
+- **決定 (手本に寄せる)**: SF2D の書き先 (0x0188) は VRAM だけにする。GPU から GART への書きは、xf86-video-nouveau (nv04_exa.c:412-426) と nouveau (nouveau_bo0039.c:38-63) と同じく M2MF だけで行う。元 (0x0184) の GART は今のまま。
+  - `check` (drivers/video/geforce/gf_v2_ops.c): 書き先が GART の op は、次の 1 つだけを HW にする。COPY・rop 0xCC・F_PAT と色鍵の flag なし・元が VRAM・元と書き先の fmt が同じ。ほかは NOSYS を返す (GART は CPU から見えるので core が SW で描く)。STRETCH・FILL・MONO・HOSTDATA の書き先が GART なら NOSYS。
+  - `emit` の上の COPY: `gf3_m2mf(VRAM_DMA → GART_DMA)` で矩形を写す。in_off = 元の off + sy*pitch + sx*cpp、out_off = 書き先の off + dy*pitch + dx*cpp、rowbytes = w*cpp、rows = h。gf3_m2mf は中で fence を待つ (読み戻しと同じ)。
+  - `gf3_m2mf` (hwdev/gf/accel_m2mf.c): handle に `GF3_HANDLE_GART_DMA` を許す。範囲の検査は `m2mf_span` で、`gf3_surface_check` の GART の分岐と同じく `c->range_q` (G5 の `gf_v2_gart_range`) を引く。range_q が無ければ EINVAL。VRAM の重なりの検査は VRAM 同士のときだけ (今のまま)。
+- **試験**: host 試験 gf_v2_ops (check の表で GART の書き先の行)・gf_g8 (SF2D の 0x0188 が GART にならない)・M2MF の host 試験 (GART の handle の範囲内・外)。実機の受入は gfx2_rh の G8 (HALV2-RH-I2)。
