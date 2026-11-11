@@ -37,3 +37,10 @@ GeForce push/view の起動時 PT 予算更新 (7→70頁) は manifest.json の
 `gf_push_workspace_update` に記録。依頼基点 df383c60 の元ソースで旧24列が
 すべて一致することを確認し、その元ソースの予算定数だけを70頁へ変更して
 期待列を更新した。製品の修正後ソースからは再採取せず、低RAMの列は不変。
+
+pin metadata の動的化では、依頼基点 f934341d と元の harness で旧24列の一致を確認した。
+その基点の metadata 式へ 1B/PFN を加え、固定領域を3頁、固定 metadata を2頁に
+する定数だけを変えた版から期待列を更新した。pin 自体は基点の静的配列のままで、
+新しいポインタと初期化の実装は採取に用いていない。固定記号は追従した harness の
+値を使う。ハッシュと旧列は manifest.json の `pin_metadata_update`、
+照合・採取ログは同項の `evidence` を参照する。

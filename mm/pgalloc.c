@@ -25,6 +25,8 @@ static u32 workspace_used[WORKSPACE_WORDS];
 static struct physmem device_boot_map;
 /* L2: PFN ごとの owner 番号 (metadata の 2 bitmap の直後、1B/PFN)。 */
 static u8 *owner_map;
+/* M1: owner の直後、検出した PFN 範囲だけ pin 数を保持する。 */
+static u8 *pin_map;
 
 /* 台帳の固定表 (BSS、§3-1)。資源と SURFACE は T1d / T1e が登録する。 */
 struct ledger_owner ledger_owners[LEDGER_MAX_OWNERS];
@@ -79,10 +81,14 @@ static void init_core(const struct physmem *m, u32 *storage, u32 limit)
     eligible = storage;
     bitmap = storage + words;
     owner_map = (u8 *)(storage + words * PGALLOC_L1_BITMAPS);
+    pin_map = owner_map + PGALLOC_OWNER_BYTES(limit);
     limit_pfn = limit;
     total_pages = used_pages = 0;
     for (i = 0; i < words * PGALLOC_L1_BITMAPS; i++) storage[i] = 0;
-    for (p = 0; p < limit; p++) owner_map[p] = 0;
+    for (p = 0; p < limit; p++) {
+        owner_map[p] = 0;
+        pin_map[p] = 0;
+    }
     /* 固定の owner (§3-1)。kernel〜staging は PERSIST、gfx は DEVICE。 */
     for (i = 0; i < LEDGER_MAX_OWNERS; i++) {
         struct ledger_owner *o = &ledger_owners[i];

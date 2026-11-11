@@ -1,4 +1,13 @@
 #include "gfx2_core_fake.h"
+/* P1 is covered by pegc-v2-host; v1 lifecycle tests fake C1/Y4 and the table. */
+const GfxBackendV2 pegc_backend_v2 = {.abi = GFX_HAL2_ABI};
+static u8 pegc_sync_fake;
+__attribute__((weak)) int gfxsync_bind(const char *key, const GfxSyncTarget *t, GfxSyncCtx **out)
+{ (void)key; (void)t; *out = (GfxSyncCtx *)&pegc_sync_fake; return 0; }
+int gfxsync_mode(const GfxSyncCtx *ctx) { return ctx ? GFXSYNC_SHADOW : 0; }
+__attribute__((weak)) void gfxsync_unbind(GfxSyncCtx *ctx) { (void)ctx; }
+__attribute__((weak)) int gfx2_sync_publish(u32 kind, u32 head, GfxSyncCtx *ctx)
+{ (void)kind; (void)head; (void)ctx; return 0; }
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}
 /* T2e e4: real gfx lifecycle/three backends and ledger/query/lease/B1.
@@ -119,7 +128,7 @@ static void boot(void)
         l.kind = PGALLOC_BACKING_FIXED;
         l.metadata_first = MEM_LEDGER_META_BASE / PAGE_SIZE;
         l.metadata = (void *)MEM_LEDGER_META_BASE;
-        l.workspace_first = l.metadata_first + 1;
+        l.workspace_first = l.metadata_first + l.capacity / PAGE_SIZE;
         l.workspace_end = MEM_LEDGER_META_END / PAGE_SIZE;
         arena_top_pfn = top;
     }

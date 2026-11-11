@@ -1,5 +1,4 @@
 #include "debug_probe.h"
-#include "init/sysconfig.h"
 #include "kernel/time/cpu_calibrate.h"
 /* Resident loans and pin precede prepare/arm; no hardware initialization here. */
 #include "trident_module.h"
@@ -10,6 +9,7 @@
 #include "os32_generations.h"
 #include "gfx_internal.h"
 #include "gfx/gfx_emergency.h"
+#include "gfx/v2/gfx2_int.h"
 #include "exec/appslot.h"
 #include "kprintf.h"
 #include "lib/kstring.h"
@@ -114,7 +114,7 @@ static int diagnostics_valid(const struct module_record *r)
         (u32)(uptr)d->video_set_key, (u32)(uptr)d->video_stop,
         (u32)(uptr)d->poll, (u32)(uptr)d->video_surface_alloc,
         (u32)(uptr)d->video_surface_display, (u32)(uptr)d->video_surface_stop,
-        (u32)(uptr)d->video_surface_free, (u32)(uptr)d->present, (u32)(uptr)d->set_gap
+        (u32)(uptr)d->video_surface_free, (u32)(uptr)d->present, (u32)(uptr)d->set_present, (u32)(uptr)d->clear_present
     };
     for (u32 i = 0; i < sizeof(entries)/sizeof(entries[0]); ++i)
         if (entries[i] && !module_text_contains(r, entries[i])) return 0;
@@ -178,6 +178,7 @@ static int detach(struct module_record *r)
     (void)r;
     if (debug_probe_unregister(handle)) return 0;
     if (armed) return 0;
+    gfx2_adapter_unregister(&gfx_backend_trident);
     diagnostic_candidate = diagnostic_slot = NULL;
     gfx_backend_trident = (GfxBackend){.name="trident-unavailable", .probe=missing_probe};
     if (pinned) {
@@ -195,8 +196,6 @@ int trident_module_load(void)
         kprintf(KLOG_ATTR, "[trident] stage=resources rc=%d\n", TRI_E_RESOURCE);
         return TRI_E_RESOURCE;
     }
-    int gap_ns = sysconfig_get_int(SYS_SYSTEM_CFG, "TRI_WRITE_GAP", TRI_WRITE_GAP_DEFAULT_NS);
-    context.write_gap_ns = gap_ns < 0 ? TRI_WRITE_GAP_DEFAULT_NS : (u32)gap_ns;
     context.write_gap_lpt = cpu_loops_per_tick();
     const struct boot_common *bi = boot_common_get();
     const struct module_request request = {

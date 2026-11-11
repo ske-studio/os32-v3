@@ -28,7 +28,7 @@
 #define HOST_POOL_IRQ_RESTORE(f) irq_restore(f)
 #endif
 
-/* L1 (2 bitmap) + L2 (owner 1B/PFN、T1b) の置き場。 */
+/* L1 (2 bitmap) + L2 (owner) + pin (各 1B/PFN) の置き場。 */
 static u32 host_pool_storage[(PGALLOC_META_BYTES(PHYSMEM_LEGACY_MAX_PFN) + 3) / 4];
 
 static void __attribute__((unused)) host_pool_boot_ws(u32 kb, u32 ws_first,

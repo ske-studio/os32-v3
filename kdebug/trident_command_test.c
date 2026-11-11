@@ -354,18 +354,19 @@ static int ram_compare(const struct TridentDiagnosticOps *o)
 static int present_compare(const struct TridentDiagnosticOps *o)
 {
     struct trident_device *d = o->context;
-    if (!d->res->ram_fallback || !o->present || !d->io || !d->io->read8)
+    if (!d->res->ram_fallback || !o->present || !o->set_present ||
+        !o->clear_present || !d->io || !d->io->read8)
         return optional(o, "present_precheck", TRI_E_NOSYS);
     enum tri_present_method saved = d->present_method;
+    u32 saved_ns = d->write_gap_ns, saved_loops = d->write_gap_loops;
     static const char *const names[] = {"byte", "dword_sync", "dword_wait", "dword_gap"};
     int result = 0;
     for (u32 method = TRI_PRESENT_BYTE; method <= TRI_PRESENT_DWORD_GAP; ++method) {
         const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
         u32 minimum = (u32)-1, maximum = 0, count = 0, mismatches = 0;
         unsigned long long total = 0;
-        int rc = 0;
-        d->present_method = (enum tri_present_method)method;
-        for (u32 run = 0; run < TRI_PRESENT_RUNS; ++run) {
+        int rc = o->set_present(d, method, saved_ns);
+        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS; ++run) {
             u32 before, after, hi;
             rc = sys_time_now(&before, &hi);
             if (rc) break;
@@ -405,7 +406,9 @@ static int present_compare(const struct TridentDiagnosticOps *o)
         serial_puts_polled("\r\n");
         remember(&result, rc);
     }
+    o->clear_present(d);
     d->present_method = saved;
+    d->write_gap_ns = saved_ns; d->write_gap_loops = saved_loops;
     remember(&result, ram_compare(o));
     return result;
 }
@@ -424,29 +427,29 @@ static int gap_command(const struct TridentDiagnosticOps *o, const struct tri_re
     struct trident_device *d = o->context;
     if (q->test == TRI_TEST_GAP || q->test == TRI_TEST_GAP_SET) {
         if (q->test == TRI_TEST_GAP_SET) {
-            if (!o->set_gap) return optional(o, "gap", TRI_E_NOSYS);
-            o->set_gap(d, q->arg);
+            if (!o->set_present || !o->clear_present) return optional(o, "gap", TRI_E_NOSYS);
+            int rc = o->set_present(d, TRI_PRESENT_DWORD_GAP, q->arg);
+            if (rc) return optional(o, "gap", rc);
         }
         ++result_count;
         number("TRI phase=gap gap_ns=", d->write_gap_ns);
         number(" loops=", d->write_gap_loops);
         serial_puts_polled(" rc=0\r\n");
+        if (q->test == TRI_TEST_GAP_SET) o->clear_present(d);
         return TRI_OK;
     }
-    if (!o->set_gap || !o->present || !d->res->ram_fallback ||
+    if (!o->set_present || !o->clear_present || !o->present || !d->res->ram_fallback ||
         !d->io || !d->io->read8) return optional(o, "gap_precheck", TRI_E_NOSYS);
-    u32 saved_ns = d->write_gap_ns;
+    u32 saved_ns = d->write_gap_ns, saved_loops = d->write_gap_loops;
     enum tri_present_method saved_method = d->present_method;
     int result = 0;
-    d->present_method = TRI_PRESENT_DWORD_GAP;
     for (u32 ns = q->arg;;) {
-        o->set_gap(d, ns);
+        int rc = o->set_present(d, TRI_PRESENT_DWORD_GAP, ns);
         const struct tri_surface *c = &d->mode.client, *v = &d->mode.display;
         u32 minimum = (u32)-1, maximum = 0, count = 0, bad = 0;
         unsigned long long total = 0;
-        int rc = 0;
         bool inverted = false;
-        for (u32 frame = 0; frame < TRI_PRESENT_RUNS; ++frame) {
+        for (u32 frame = 0; !rc && frame < TRI_PRESENT_RUNS; ++frame) {
             gap_invert(d);
             inverted = !inverted;
             u32 before, after, hi;
@@ -488,7 +491,8 @@ static int gap_command(const struct TridentDiagnosticOps *o, const struct tri_re
         if (q->end_ns - ns < q->step_ns) break;
         ns += q->step_ns;
     }
-    o->set_gap(d, saved_ns);
+    o->clear_present(d);
+    d->write_gap_ns = saved_ns; d->write_gap_loops = saved_loops;
     d->present_method = saved_method;
     return result;
 }

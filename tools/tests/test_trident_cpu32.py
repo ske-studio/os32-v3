@@ -18,9 +18,9 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'kdebug/trident_command_test.c'
 MUTATIONS = [
-    ('ram-count', '!rc && run < TRI_PRESENT_RUNS', '!rc && run < TRI_PRESENT_RUNS - 1u'),
+    ('ram-count', 'int rc = setup;\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS; ++run)', 'int rc = setup;\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS - 1u; ++run)'),
     ('present-stop-on-mismatch', 'if (!rc && mismatches) rc = TRI_E_ACCESS;', 'if (!rc && mismatches) { d->present_method = saved; return TRI_E_ACCESS; }'),
-    ('present-count', 'for (u32 run = 0; run < TRI_PRESENT_RUNS; ++run)', 'for (u32 run = 0; run < TRI_PRESENT_RUNS - 1u; ++run)'),
+    ('present-count', 'int rc = o->set_present(d, method, saved_ns);\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS; ++run)', 'int rc = o->set_present(d, method, saved_ns);\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS - 1u; ++run)'),
     ('present-restore', 'd->present_method = saved;', 'd->present_method = TRI_PRESENT_BYTE; (void)saved;'),
     ('present-readback', 'if (actual != d->res->client[row * c->pitch + i]) ++mismatches;', 'if (actual == d->res->client[row * c->pitch + i]) ++mismatches;'),
     ('skip-no-ge', '    write_row(d, count, false, TRI_TEST_STRIDE);', '    return TRI_E_NOSYS;'),

@@ -125,6 +125,8 @@ fd:
       reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で 音は要らない。FD インストール後は実機の更新 (hsync boot) で入れる
     - guest: /boot/fep.mod
       reason: 2026-11-05 ユーザー決定 (推奨の「fm.mod と pcm.mod を外す」に「fepも。cliでは使わない。」)。HW-BASIC がシェルに入り 2HD の空きが下限 64KB ちょうどになった。FD はレスキュー兼インストーラの CUI で FEP を使わない。FD インストール後は実機の更新 (hsync boot) で入れる
+    - guest: /boot/sqlite.mod
+      reason: 2026-11-11 ユーザー決定 (推奨の「sqlite.mod を FD から外す」)。fep.mod を 11-05 に FD から外して以来、起動の必須の部品の確かめ (kernel/sqlite_engine.c:452-456) で MINIMAL に落ち、FD の sqlite.mod は読まれていなかった。HAL v2 の I3 で 2HD の空きが 56KB になり下限 64KB を割った。FD インストール後は fep.mod と同じく実機の更新 (hsync boot) で入れる。fep.mod を FD に戻すときは sqlite.mod も戻す
     - guest: /bin/hexdump.bin
       reason: 2026-11-08 ユーザー決定「FD から何本か外す (推奨)」、候補は PM が選んだ。アプリの .text を読み取り専用にして (ヘッダ v5) .text の末尾をページの境目に揃えた分、2HD の空きが 54KB になり下限 64KB を割った。hexdump はレスキュー兼インストーラの FD では使わない診断の道具。FD インストール後は実機の更新 (hsync) で入る
     - guest: /bin/less.bin

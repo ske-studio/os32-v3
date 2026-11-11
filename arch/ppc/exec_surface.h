@@ -9,4 +9,5 @@ void exec_surface_bridge_begin(u32 access);
 void exec_surface_bridge_end(u32 access);
 int exec_surface_map_audit(struct addrspace *as);
 void exec_surface_policy_reeval(void);
+void exec_surface_restore_on_leave(void);
 #endif

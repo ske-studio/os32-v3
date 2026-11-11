@@ -52,6 +52,7 @@
  */
 #include "trident_module.h"
 #include "gfx/gfx_internal.h"
+#include "gfx/v2/gfx2_int.h"
 #include "lib/serial_diag.h"
 
 /* D:3637-3719, A:141,226-277; C:1046-1214. Register sequences remain
@@ -193,9 +194,10 @@ int trident_backend_prepare(void)
     int rc = trident_pci_validate(&r->pci);
     if (rc) return display_rc = remember(TRI_STEP_RESOURCES, rc);
     device.settings.ram_fallback = r->ram_fallback;
-    device.present_method = TRI_PRESENT_DWORD_GAP;
+    device.present_method = TRI_PRESENT_DWORD_GAP; /* diagnostic choice only */
+    device.write_gap_ns = TRI_WRITE_GAP_DEFAULT_NS;
     device.write_gap_lpt = c->write_gap_lpt;
-    tri_write_gap_set(&device, c->write_gap_ns);
+
     if (!device.active) {
         struct tri_mode provisional = tri_modes[TRI_MODE_DEFAULT_ID - 1u];
         if (r->ram_fallback || device.settings.no_accel)
@@ -239,6 +241,7 @@ static void finish(u32 stage, int rc, bool recover)
     display_rc = rc;
     remember(stage, rc);
     if (recover) {
+        trident_sync_unbind(&device);
         int recovery = trident_restore98(&device);
         /* Restore/Disable outcomes are retained separately by lifecycle. */
         if (recovery && !device.last_rc) remember(TRI_STEP_RESTORE, recovery);
@@ -247,6 +250,7 @@ static void finish(u32 stage, int rc, bool recover)
 }
 static void init(void)
 {
+    trident_sync_unbind(&device);
     if (device.active) {
         int close_rc = trident_close(&device);
         if (close_rc) { finish(TRI_STEP_RESTORE, close_rc, false); return; }
@@ -266,6 +270,8 @@ static void init(void)
     rc = trident_screen_init(&device);
     accel_counters(ops, accesses);
     if (rc) { finish(device.failed_step, rc, true); return; }
+    rc = trident_sync_bind(&device);
+    if (rc) { finish(TRI_STEP_CLIENT, rc, true); return; }
     build_modes();
     publish_mode();
     /* Optional component errors remain visible without blocking display. */
@@ -298,12 +304,14 @@ static void enter(void)
     u32 ops = device.accel.hw_ops, accesses = device.accel.io_accesses;
     int rc = trident_enter(&device);
     accel_counters(ops, accesses);
+    if (!rc) rc = trident_sync_bind(&device);
     finish(device.failed_step ? device.failed_step : TRI_STEP_MODE, rc, true);
     publish_mode();
 }
 /* No serial/console output inside the emergency callback trident_restore98. */
 static void leave(void)
 {
+    trident_sync_unbind(&device);
     u32 ops = device.accel.hw_ops, accesses = device.accel.io_accesses;
     int rc = trident_leave(&device);
     accel_counters(ops, accesses);
@@ -312,6 +320,8 @@ static void leave(void)
 }
 static void shutdown(void)
 {
+    gfx2_adapter_unregister(trident_context->backend);
+    trident_sync_unbind(&device);
     u32 ops = device.accel.hw_ops, accesses = device.accel.io_accesses;
     int rc = trident_close(&device);
     accel_counters(ops, accesses);
@@ -533,6 +543,7 @@ int tri_hal_mode(u32 id)
      * new scanout. configure performs no hardware access. */
     rc = device.res->configure(&prepared, device.vram.first_off, true);
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
+    trident_sync_unbind(&device);
     u32 video_feature = device.mode.features & TRI_CAP_VIDEO;
     device.screen_ready = false;
     rc = tri_mode_set(&device, &prepared);
@@ -545,6 +556,8 @@ int tri_hal_mode(u32 id)
     device.mode.display = device.res->display;
     device.mode.client = device.res->client_surface;
     device.mode.generation = device.res->generation;
+    rc = trident_sync_bind(&device);
+    if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
     optional_components();
     rc = tri_palette_reload(&device);
     if (rc) return mode_failure(TRI_STEP_CLIENT, rc);
@@ -578,7 +591,8 @@ static const struct TridentDiagnosticOps diagnostics = {
     .video_surface_display = tri_video_surface_display,
     .video_surface_stop = tri_video_surface_stop,
     .video_surface_free = tri_video_surface_free,
-    .present = trident_present, .set_gap = tri_write_gap_set
+    .present = trident_present, .set_present = tri_present_override,
+    .clear_present = tri_present_clear
 };
 
 GfxBackend trident_backend_ops = {

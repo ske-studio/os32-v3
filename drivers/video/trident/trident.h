@@ -297,7 +297,7 @@ struct GfxCursorImage;
  * Offsets are relative to the resource, except PORT8 uses a real I/O port.
  * Failed reads leave *value unchanged. No retries, readback or waiting.
  * regs.c owns the production implementation, fake uses exactly this seam.
- * All product register/LFB/port accesses, including present, use this seam. */
+ * Register and port hooks use this seam; sync owns present stores. */
 enum trident_space { TRI_SPACE_REGS = 0, TRI_SPACE_LFB = 1 };
 struct trident_io {
     int (*read8)(void *, enum trident_space, u32, u8 *);
@@ -310,8 +310,6 @@ struct trident_io {
     /* One LFB row span: aligned offset/source, count in dwords; validate the
      * whole range before writing. No readback. Scalar write8 handles edges. */
     int (*write_span32)(void *, u32 off, const u32 *src, u32 count);
-    /* Unaligned RAM source is allowed; destination/count are dwords. */
-    int (*write_gap32)(void *, u32 off, const u8 *src, u32 count, u32 loops);
 };
 struct trident_pci_info {
     u16 vendor, device, command;
@@ -389,8 +387,10 @@ struct trident_device {
      * が未設定 (ゼロ初期化で未設定になる)。 */
     u8 overscan;
     bool overscan_valid;
-    enum tri_present_method present_method; /* boot defaults to dword_gap */
+    enum tri_present_method present_method; /* diagnostic override only */
     u32 write_gap_ns, write_gap_loops, write_gap_lpt;
+    struct GfxSyncCtx *sync_ctx;
+    u32 sync_generation;
 };
 
 /* F3: prepare constructs the register/PLL inputs without programming ModeInit;
@@ -571,16 +571,14 @@ int trident_dpms_set(struct trident_device *, enum trident_dpms);
 int trident_mode_640(struct trident_device *d);
 int trident_route_enable(struct trident_device *d);
 int trident_route_disable(struct trident_device *d);
-/* Direct VRAM CLIENT (accel and NoAccel): synchronization only, no transfer.
- * Boot-wide RAM fallback only: clip and validate both source/destination ends,
- * use selected cpp and independent client/display byte pitches, then copy
- * with byte stores or aligned dword stores and byte edges. Dword policies:
- * sync reads VGA status, wait writes the PC-98 wait port, gap uses calibrated loops.
- * write_gap32 transfers each aligned row interior; no VRAM readback.
- * The S3 implementation is migrated by F7; API remains unchanged. */
+/* Direct VRAM CLIENT synchronizes only. RAM fallback clips and checks both
+ * extents, then sends rows through gfxsync. The backend owns the binding;
+ * initial lifecycle presents refresh it after configure changes generation. */
 #define TRI_WRITE_GAP_DEFAULT_NS 80u /* Ra266 2026-11-08 sweep: 60ns lost 48 bytes, 70ns 0; +10ns margin (user: the spin gap blocks the CPU, keep it short) */
-#define TRI_WRITE_GAP_TICK_NS 10000000u
-void tri_write_gap_set(struct trident_device *, u32 ns);
+int tri_present_override(struct trident_device *, u32 method, u32 ns);
+void tri_present_clear(struct trident_device *);
+int trident_sync_bind(struct trident_device *);
+void trident_sync_unbind(struct trident_device *);
 int trident_present(struct trident_device *, int x, int y, int w, int h);
 /* HAL RGB components use GFX_PALETTE_COMPONENT_BITS (currently 4, up to 8
  * per component for 32bit color), not a backend-fixed input width.

@@ -5,7 +5,7 @@
  * Slot expectations follow GF_FEAT4_DESIGN C3-slot/X3/N1/A0z, not nouveau:
  * the dispatch boundary is OS32-specific and introduces no HW sequence.
  * Independent wire expectations: Context v5, one initialize export; limits
- * 160/160/208 KiB from the C3-ABI card. Run after PM schema/import generation.
+ * 256/384/448 KiB from the HAL v2 I3 PM decision. Run after PM schema/import generation.
  */
 #define _start unused_runtime_start
 #include "module_runtime_host.c"
@@ -118,10 +118,10 @@ static void start_failures(void)
  * No body CRC needs recomputing for the read-only header allocation check. */
 #define C3_CONTEXT_VERSION 7U
 #define C3_OLD_CONTEXT_VERSION 6U
-/* PM decision 23: GEFORCE budgets, docs/08_build.md:202. */
+/* HAL v2 I3 PM decision: GEFORCE budgets, docs/08_build.md. */
 #define C3_IMAGE_LIMIT (256U * 1024U)
-#define C3_MEM_LIMIT (256U * 1024U)
-#define C3_SPAN_LIMIT (320U * 1024U)
+#define C3_MEM_LIMIT (384U * 1024U)
+#define C3_SPAN_LIMIT (448U * 1024U)
 static void header_word(u8 *h, u32 word, u32 value)
 {
     for (u32 b=0; b<sizeof(value); b++)

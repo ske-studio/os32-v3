@@ -32,6 +32,7 @@ MUTATIONS = (
     ('heap-failure', REG, 'heap_retry[a->index] = rc != 0;', 'heap_retry[a->index] = 0;'),
     ('heap-empty', REG, '(void)gfx2_heap_init(&a->heap, 0, 0);', '(void)gfx2_heap_init(&a->heap, 0, 1);'),
     ('caller-failure', REG, '!c || !caller_access_get_user(&caller)', '!c || (caller_access_get_user(&caller), 0)'),
+    ('heads-cap', REG, 'a->heads = a->caps.heads < 2 ? a->caps.heads : 2;', 'a->heads = 0;'),
     ('caller-owner', REG, 'c->owner = caller.owner;', 'c->owner = 0;'),
     ('sync-mode', REG, '*mode = (u32)gfxsync_mode(*ctx);', '*mode = GFXSYNC_DIRECT;'),
     ('sync-publish', REG, 'sync_tab[kind][head] = ctx;', 'if (!sync_tab[kind][head]) sync_tab[kind][head] = ctx;'),

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Calibrated spacing, MMIO write ordering, live command updates and sweep."""
 CHECK = dict(name='trident-gap', tier=1, needs=[], budget=4.6,
-    covers=['drivers/video/trident/regs.c', 'drivers/video/trident/present.c',
-            'drivers/video/trident/write_gap.c', 'drivers/video/trident/*.h',
+    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'drivers/video/trident/regs.c', 'drivers/video/trident/present.c',
+            'tools/tests/trident_sync_fake.c', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'drivers/video/trident/*.h',
             'kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',
             'kdebug/tri_command_wire.h', 'kdebug/generated/**',
             'tools/tests/trident_gap_host.c', 'tools/tests/test_trident_gap.py',
@@ -21,29 +21,16 @@ import host32
 from kernel_includes import include_flags
 from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
-GAP = 'drivers/video/trident/write_gap.c'
+GAP = 'drivers/video/trident/present.c'
 REGS = 'drivers/video/trident/regs.c'
 CMD = 'kdebug/trident_command_test.c'
-STORE = '''        dst[i] = (u32)p[0] | ((u32)p[1] << 8) |
-                 ((u32)p[2] << 16) | ((u32)p[3] << 24);
-'''
-LOOP = '''        u32 remaining = loops;
-        while (remaining > 0) {
-            __asm__ volatile("nop" ::: "memory");
-            --remaining;
-        }
-'''
 MUTATIONS = [
-    ('conversion-scale', GAP, 'TRI_WRITE_GAP_TICK_NS << bit', '(TRI_WRITE_GAP_TICK_NS / 10u) << bit'),
-    ('conversion-drop', GAP, 'd->write_gap_loops = loops;', 'd->write_gap_loops = 0; (void)loops;'),
-    ('wait-before-write', REGS, STORE+LOOP, LOOP+STORE),
-    ('skip-wait', REGS, 'u32 remaining = loops;', 'u32 remaining = 0; (void)loops;'),
-    ('command-update', CMD, 'o->set_gap(d, q->arg);', 'o->set_gap(d, 0);'),
+    ('command-update', CMD, 'o->set_present(d, TRI_PRESENT_DWORD_GAP, q->arg)', 'o->set_present(d, TRI_PRESENT_DWORD_GAP, 0)'),
     ('sweep-pattern', CMD, '            gap_invert(d);', '            (void)d;'),
     ('sweep-client-restore', CMD, 'if (inverted) gap_invert(d);', 'if (inverted) (void)d;'),
     ('sweep-count', CMD, 'frame < TRI_PRESENT_RUNS', 'frame < TRI_PRESENT_RUNS - 1u'),
     ('sweep-stop', CMD, 'if (!rc && bad) rc = TRI_E_ACCESS;', 'if (!rc && bad) return TRI_E_ACCESS;'),
-    ('sweep-restore', CMD, 'o->set_gap(d, saved_ns);', 'o->set_gap(d, 0); (void)saved_ns;'),
+    ('sweep-restore', CMD, '    o->clear_present(d);\n    d->write_gap_ns = saved_ns;', '    d->write_gap_ns = saved_ns;'),
     ('sweep-readback', CMD, 'if (actual != d->res->client[row * c->pitch + i]) ++bad;', 'if (actual == d->res->client[row * c->pitch + i]) ++bad;'),
 ]
 def main():
@@ -55,18 +42,12 @@ def main():
             if old:
                 s=(ROOT/path).read_text(); assert s.count(old)==1,(name,s.count(old))
                 changes[path]=s.replace(old,new)
-            # Observe each NOP at its production position; real volatile RAM
-            # stores stay untouched. This makes a pre-store wait runtime RED.
-            regs=changes.get(REGS,(ROOT/REGS).read_text())
-            nop='__asm__ volatile("nop" ::: "memory");'
-            assert regs.count(nop)==1
-            changes[REGS]='extern void gap_observe(void);\n'+regs.replace(nop,'gap_observe();')
             exe=work/name
             command=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
                 '-ffreestanding','-fno-pie','-fno-stack-protector','-ffunction-sections',
                 '-fdata-sections','-nostdlib','-static','-no-pie','-Wl,--gc-sections',
                 '-I.','-Ikdebug',*include_flags(ROOT),
-                'tools/tests/trident_gap_host.c',GAP,REGS,'drivers/video/trident/present.c',
+                'tools/tests/trident_gap_host.c',GAP,REGS,'tools/tests/trident_sync_fake.c',
                 '-o',str(exe)]
             build_in_tree(ROOT,work/(name+'-tree'),changes,[command],capture_output=True)
             for runner in os.environ.get('HOST32_RUNNERS','qemu').split():

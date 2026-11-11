@@ -89,6 +89,7 @@ MOVED_TO_NORMAL_CMDS = ['more', 'find', 'sort', 'head', 'tail', 'wc', 'tee', 'to
                         'sleep', 'diff', 'du', 'cal', 'man', 'sndctl']
 FONT_GUEST = '/sys/font/default.kcgfont'
 GUI_FILES = ['/boot/trident.mod', '/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
+             '/etc/gfx/sync.cfg',
              '/usr/bin/filer.bin', '/usr/bin/edit_gui.bin', '/usr/bin/about.bin',
              # T7b-b3: GUI の標準 font set (取得物、userland/deploy.yaml)
              '/usr/share/fonts/JF-Dot-Shinonome16.ttf',
@@ -801,8 +802,8 @@ def case_install(plan, resolved):
     fd_files.append(('/ETC/NETCD.CFG', 67))
     exclude = {e['guest'] for e in fd.get('exclude') or []}
     check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod', '/boot/geforce.mod',
-                      '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod', '/bin/hexdump.bin', '/bin/less.bin'},
-          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod、fm.mod、pcm.mod、fep.mod、hexdump.bin、less.bin {sorted(exclude)}")
+                      '/boot/fm.mod', '/boot/pcm.mod', '/boot/fep.mod', '/boot/sqlite.mod', '/bin/hexdump.bin', '/bin/less.bin'},
+          f"fd.exclude は kdebug.bin、hwdev.mod、geforce.mod、fm.mod、pcm.mod、fep.mod、sqlite.mod、hexdump.bin、less.bin {sorted(exclude)}")
     minimal = {g: os.path.getsize(h) for n, _, _, fs in resolved
                if n.startswith('minimal') for g, h in fs if g not in exclude}
     got = run_install_fdset(src, fd_files)

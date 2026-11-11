@@ -114,32 +114,10 @@ static int write_span32(void *opaque, u32 off, const u32 *src, u32 count)
     for (u32 i = 0; i < count; ++i) dst[i] = src[i];
     return 0;
 }
-static int write_gap32(void *opaque, u32 off, const u8 *src, u32 count, u32 loops)
-{
-    const struct trident_resources *r = opaque;
-    if (!src || !count) return TRI_E_ACCESS;
-    int rc = range(r, TRI_SPACE_LFB, off, 4);
-    if (rc) return rc;
-    u32 limit = r->mapped_bytes;
-    if (limit > r->decode_bytes) limit = r->decode_bytes;
-    if (count > (limit - off) / 4u) return TRI_E_ACCESS;
-    volatile u32 *dst = (volatile u32 *)(r->lfb + off);
-    for (u32 i = 0; i < count; ++i) {
-        const u8 *p = src + i * 4u;
-        dst[i] = (u32)p[0] | ((u32)p[1] << 8) |
-                 ((u32)p[2] << 16) | ((u32)p[3] << 24);
-        u32 remaining = loops;
-        while (remaining > 0) {
-            __asm__ volatile("nop" ::: "memory");
-            --remaining;
-        }
-    }
-    return TRI_OK;
-}
 static const struct trident_io mmio_io = {
     .read8 = mmio_read8, .read16 = mmio_read16, .read32 = mmio_read32,
     .write8 = mmio_write8, .write16 = mmio_write16, .write32 = mmio_write32,
-    .port8 = port8, .write_span32 = write_span32, .write_gap32 = write_gap32
+    .port8 = port8, .write_span32 = write_span32
 };
 int trident_regs_bind(struct trident_device *d)
 {

@@ -18,13 +18,15 @@ static u32 g_reject_min_api;
 int shlib_init(void)
 {
     OS32Header oh;
+    u8 wire[OS32X_HDR_SIZE];
     OS32ShlibHeader *sh;
     u32 pages, i, size;
     int fd;
     if (g_loaded) return 0;
     fd = vfs_open(SYS_SHLIB_GUI, 0);
     if (fd < 0) return -1;
-    if (vfs_read_fd(fd, &oh, sizeof(oh)) != sizeof(oh)) goto fail;
+    if (vfs_read_fd(fd, wire, sizeof(wire)) != sizeof(wire)) goto fail;
+    if (os32x_decode(&oh, wire, sizeof(wire)) != OS32X_LAYOUT_OK) goto fail;
     if (oh.min_api_ver > KAPI_VERSION) {
         g_reject = SHLIB_REJECT_MIN_API;
         g_reject_min_api = oh.min_api_ver;

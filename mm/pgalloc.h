@@ -153,10 +153,13 @@ u32 pgalloc_arena_end(void);
 #define LEDGER_OP_CLAIM      5
 #define LEDGER_OP_RESERVE    6
 
-/* L1 (2 bitmap) + L2 (1B/PFN) のバイト数。pgalloc_metadata_bytes (ページへ
+/* L1 (2 bitmap) + L2 (owner) + pin (各 1B/PFN) のバイト数。pgalloc_metadata_bytes (ページへ
  * 切り上げ)・memory_boot の置き場の計算・STATIC_ASSERT が同じ式を使う。 */
+#define PGALLOC_OWNER_BYTES(limit) ((u32)(limit) * sizeof(u8))
+#define PGALLOC_PIN_BYTES(limit)   ((u32)(limit) * sizeof(u8))
 #define PGALLOC_META_BYTES(limit) \
-    (BITMAP_WORDS(limit) * PGALLOC_L1_BITMAPS * sizeof(u32) + (u32)(limit))
+    (BITMAP_WORDS(limit) * PGALLOC_L1_BITMAPS * sizeof(u32) + \
+     PGALLOC_OWNER_BYTES(limit) + PGALLOC_PIN_BYTES(limit))
 
 struct ledger_owner {          /* 24B */
     u8  kind, id;

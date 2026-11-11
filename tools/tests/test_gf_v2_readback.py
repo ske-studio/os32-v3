@@ -19,8 +19,8 @@ MUTATIONS = (
     ('alias-identity', 's.reservation_id = v.reservation_id;', 's.reservation_id = 0;'),
     ('alias-generation', 's.generation = v.generation;', 's.generation = 0;'),
     ('alias-range', 's.bytes && s.bytes <= v.bytes - (s.off - v.off)', 's.bytes'),
-    ('alias-only', '(ex->src->flags & GFX2_SF_ALIAS) && ex->src->pool == GFX2_POOL_VRAM',
-                   'ex->src->pool == GFX2_POOL_VRAM'),
+    ('alias-only', '(in->flags & GFX2_SF_ALIAS) && in->pool == GFX2_POOL_VRAM',
+                   'in->pool == GFX2_POOL_VRAM'),
 )
 
 

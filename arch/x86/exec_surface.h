@@ -11,4 +11,13 @@ static inline void exec_surface_bridge_begin(u32 access) { (void)v1_bridge_begin
 static inline void exec_surface_bridge_end(u32 access) { v1_bridge_end(GFX2_ROLE_DISPLAY, access, 0); }
 static inline int exec_surface_map_audit(struct addrspace *as) { return gfx2_map_audit(as); }
 static inline void exec_surface_policy_reeval(void) { gfx_policy_reeval(); }
+static inline void exec_surface_restore_on_leave(void)
+{
+    struct gfx2_adapter *a = gfx2_active();
+    if (a && a->restore_on_leave) {
+        a->restore_on_leave = 0;
+        for (u32 h = 0; h < a->heads; h++)
+            (void)gfx2_head_restore_v1(a, h);
+    }
+}
 #endif

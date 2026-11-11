@@ -33,10 +33,6 @@ static int write8(void *o, enum trident_space space, u32 off, u8 v) {
     if (space == TRI_SPACE_LFB) ++lfb8;
     return trident_fake_io.write8(o,space,off,v);
 }
-static int write_gap32(void *o, u32 off, const u8 *src, u32 n, u32 loops) {
-    lfb32 += n;
-    return trident_fake_io.write_gap32(o,off,src,n,loops);
-}
 static int write32(void *o, enum trident_space space, u32 off, u32 v) {
     if (space == TRI_SPACE_LFB) ++lfb32;
     return trident_fake_io.write32(o,space,off,v);
@@ -148,7 +144,7 @@ static int test(void) {
     CHECK(!trident_fake_reset(&f,memory,sizeof(memory),trace,32768));
     f.resources.ready=true;f.resources.client=memory;f.resources.client_bytes=TRI_DISPLAY_BYTES;
     f.resources.configure=configure;
-    io=trident_fake_io;io.read8=read8;io.write8=write8;io.write32=write32;io.write_gap32=write_gap32;
+    io=trident_fake_io;io.read8=read8;io.write8=write8;io.write32=write32;
     static TridentModuleContext context;
     context=(TridentModuleContext){&backend,&counters,&f.resources,arm,&height,&flip,&page,owner,TRIDENT_MODULE_CONTEXT_SIZE,&diagnostic,300,1000000};
     trident_context=&context;
@@ -258,6 +254,19 @@ static int test(void) {
     CHECK(trident_screen_init(&device)==-74);
     trident_fake_fail(&f,0,0);
     CHECK(!trident_screen_init(&device) && !device.last_rc);
+    extern int tri_test_bind_rc;
+    extern u32 tri_test_unregisters;
+    u32 unregisters = tri_test_unregisters;
+    shutdown(); count=0;
+    CHECK(tri_test_unregisters == unregisters + 1);
+    tri_test_bind_rc = OS32_ERR_FULL;
+    init(); count=0;
+    GFX_ScreenInfo failed_info;
+    CHECK(display_rc == OS32_ERR_FULL && !device.active && !device.sync_ctx);
+    CHECK(query(&failed_info) != 0);
+    tri_test_bind_rc = 0;
+    init(); count=0;
+    CHECK(!display_rc && device.active && device.sync_ctx);
     return 0;
 }
 static int fallback_test(void) {
@@ -276,8 +285,8 @@ static int fallback_test(void) {
     CHECK(device.settings.ram_fallback && device.mode.no_accel && f.cr_color[0x36]==0);
     CHECK(device.mode.client.pitch==640 && backend.bb_base==ram_client && backend.bb_pitch==640);
     CHECK(!device.accel.initialized && !device.accel.pattern.allocated && !(device.mode.features&TRI_CAP_GE));
-    /* dword_sync present (default since 2026-11-08): 32-bit stores only. */
-    CHECK(!backend.fill_rect && !backend.blit && !lfb8 && lfb32==307200/4);
+    /* No sync.cfg: the common binding defaults to byte/plain. */
+    CHECK(!backend.fill_rect && !backend.blit && lfb8==307200 && !lfb32);
     for(u32 i=0;i<307200;++i) CHECK(!memory[i] && !ram_client[i]);
     CHECK(memory[1228800]==0xA5);
     /* CPU dirty drawing reaches DISPLAY through the HAL present counter. */

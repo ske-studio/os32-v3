@@ -46,6 +46,7 @@ static volatile void *host_pegc_window(u32 pa)
 #define P2V_IO(pa) host_pegc_window(pa)
 
 #include "../../drivers/video/pc98/backend_pegc.c"
+#include "../../drivers/video/pc98/pegc_v2.c"
 #include "../../drivers/char/np2sysp.c"
 #include "../../drivers/input/mouse_seamless.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
@@ -83,6 +84,47 @@ static void fail(const char *message, int line)
     finish(1);
 }
 #define CHECK(c) do { if (!(c)) fail(#c, __LINE__); } while (0)
+
+/* C11/Y4/C1 are separate stages: record calls rather than implementing them. */
+static u8 sync_token;
+static GfxSyncCtx *published_sync;
+static int sync_bind_rc, sync_publish_rc, sync_mode = GFXSYNC_SHADOW;
+static int sync_events[32], sync_event_n;
+static GfxSyncTarget sync_target;
+static void sync_event(int e)
+{
+    if (sync_event_n < 32) sync_events[sync_event_n++] = e;
+}
+int gfxsync_bind(const char *key, const GfxSyncTarget *t, GfxSyncCtx **out)
+{
+    CHECK(key[0] == 'p' && key[1] == 'e' && key[2] == 'g' && key[3] == 'c' && !key[4]);
+    CHECK(!published_sync);
+    sync_event(3);
+    sync_target = *t;
+    if (sync_bind_rc) return sync_bind_rc;
+    *out = (GfxSyncCtx *)&sync_token;
+    return 0;
+}
+void gfxsync_unbind(GfxSyncCtx *ctx)
+{
+    CHECK(!published_sync);
+    if (ctx) { CHECK(ctx == (GfxSyncCtx *)&sync_token); sync_event(2); }
+}
+int gfxsync_mode(const GfxSyncCtx *ctx) { return ctx ? sync_mode : 0; }
+int gfx2_sync_publish(u32 kind, u32 head, GfxSyncCtx *ctx)
+{
+    CHECK(kind == GFX2_KIND_PEGC && head == 0);
+    sync_event(ctx ? 4 : 1);
+    if (ctx && sync_publish_rc) return sync_publish_rc;
+    published_sync = ctx;
+    return 0;
+}
+int gfx2_v1_enum_head(const GfxBackend *v1, u32 h, GFX2_HeadInfo *o)
+{ (void)o; return v1 == &gfx_backend_pegc && h == 0 ? 31 : OS32_ERR_INVAL; }
+int gfx2_v1_enum_conn(const GfxBackend *v1, u32 c, GFX2_ConnectorInfo *o)
+{ (void)o; return v1 == &gfx_backend_pegc && c == 0 ? 32 : OS32_ERR_INVAL; }
+int gfx2_v1_enum_mode(const GfxBackend *v1, u32 h, u32 f, u32 i, GFX2_ModeInfo *o)
+{ (void)o; return v1 == &gfx_backend_pegc && h == 0 && f == 1 && i == 0 ? 33 : OS32_ERR_INVAL; }
 
 /* ---- 偽の I/O ---- */
 #define EV_IN     0
@@ -1668,6 +1710,85 @@ static void case_seamless_exchange(void)
     output("PASS seamless_exchange (init/poll mode=0, 4 OUT before command, drain, replies)\n");
 }
 
+static void case_v2(void)
+{
+    const GfxBackendV2 *b = gfx_backend_pegc.v2;
+    void *c = b->ctx;
+    GFX2_Caps caps;
+    struct gfx2_surf surf = {0};
+    GFX2_ModeInfo mode = {0};
+    u32 base = 9, size = 9, phys = 9, done = 9, fail_value = 9;
+    u8 *va = (u8 *)1;
+    const u32 pal = 0x001080ff;
+    s_case = "P1 v2 table";
+    CHECK(b == &pegc_backend_v2 && b->abi == GFX_HAL2_ABI);
+    CHECK(b->caps(c, &caps) == 0);
+    CHECK(caps.size == 256 && caps.backend_kind == GFX2_KIND_PEGC);
+    CHECK(caps.caps2d_hw == 0 && caps.caps2d_sw == 0x7fe);
+    CHECK(caps.exact == (0x7fe & ~((1u << GFX2_OP_STRETCH) | (1u << GFX2_OP_ALPHA))));
+    CHECK(caps.fmt_surface == 30 && caps.fmt_render2d == 30 && caps.fmt_src_stretch == 30);
+    CHECK(caps.fmt_scanout == 2 && caps.max_w == 640 && caps.max_h == 480);
+    CHECK(caps.max_pitch == 2560 && caps.pitch_align == 4 && caps.offset_align == 4 && caps.scanout_align == 4);
+    CHECK(caps.heads == 1 && caps.connectors == 1 && caps.palette_entries == 256);
+    CHECK(!caps.vram_bytes && !caps.gart_bytes && !caps.fence_hw && !caps.async);
+    CHECK(!caps.cpu_direct && !caps.sync_mode && !caps.sync_profile[0]);
+    CHECK(b->heap_range(c, &base, &size, &phys) == 0 && !base && !size && !phys);
+    CHECK(b->check(c, 0) == OS32_ERR_NOSYS && b->alloc(c, &surf) == OS32_ERR_NOSPC);
+    CHECK(b->kva(c, &surf, &va) == OS32_ERR_NOSYS && va == (u8 *)1);
+    surf.kva = (u8 *)&sync_token;
+    CHECK(b->kva(c, &surf, &va) == 0 && va == surf.kva);
+    CHECK(b->release(c, &surf) == 0 && b->gart_unbind(c, 0, 1) == 0);
+    CHECK(b->gart_bind(c, 0, 1, &base) == OS32_ERR_NOSYS);
+    CHECK(b->emit(c, 0, 1) == OS32_ERR_NOSYS && b->readback(c, 0, 0) == OS32_ERR_NOSYS);
+    CHECK(b->kick(c) == 0 && b->stop(c) == 0);
+    CHECK(b->fence_emit(c, 1, 5) == 0 && b->fence_wait(c, 1, 5) == 0);
+    CHECK(b->fence_state(c, &done, &fail_value) == 0 && !done && !fail_value);
+    CHECK(b->enum_head(c, 0, 0) == 31 && b->enum_head(c, 1, 0) == OS32_ERR_INVAL);
+    CHECK(b->enum_conn(c, 0, 0) == 32 && b->enum_conn(c, 1, 0) == OS32_ERR_INVAL);
+    CHECK(b->enum_mode(c, 0, 1, 0, 0) == 33 && b->enum_mode(c, 0, 2, 0, 0) == OS32_ERR_INVAL);
+    CHECK(b->edid(c, 0, 0, 0) == OS32_ERR_NOSYS && b->mode_set(c, 0, 1, &mode, &surf) == OS32_ERR_NOSYS);
+    CHECK(b->flip(c, 0, &surf, 0, 1) == OS32_ERR_NOSYS && b->flip_done(c, 0, &base) == OS32_ERR_NOSYS);
+    CHECK(b->vblank_wait(c, 0, 0, 1, &base) == OS32_ERR_NOSYS);
+    CHECK(b->gamma(c, 0, 0) == OS32_ERR_NOSYS && b->cursor_image(c, 0, &surf) == OS32_ERR_NOSYS);
+    CHECK(b->cursor_move(c, 0, 1, 2) == OS32_ERR_NOSYS && b->cursor_show(c, 0, 1) == OS32_ERR_NOSYS);
+    CHECK(b->dpms(c, 0, 0) == OS32_ERR_NOSYS);
+    ev_n = 0;
+    CHECK(b->palette(c, 16, 1, &pal) == 0 && ev_n == 4);
+    CHECK(ev_val[0] == 16 && ev_val[1] == 136 && ev_val[2] == 17 && ev_val[3] == 255);
+
+    s_case = "P1 sync lifecycle";
+    world_reset(); s_bb_phys = 0x6a000;
+    s_sync = published_sync = NULL;
+    sync_event_n = 0;
+    pegc_init();
+    CHECK(s_active && published_sync == s_sync && s_sync);
+    CHECK(sync_event_n == 3 && sync_events[0] == 1 && sync_events[1] == 3 && sync_events[2] == 4);
+    CHECK(sync_target.va == P2V_IO(s_window_base) && sync_target.bytes == PEGC_LINEAR_SIZE);
+    CHECK(sync_target.pitch == 640 && sync_target.fmt == 1 && !sync_target.head);
+    CHECK(!sync_target.sync_read && !sync_target.wait_port && !sync_target.flush && !sync_target.read32);
+    sync_event_n = 0;
+    pegc_init();
+    CHECK(sync_event_n == 4 && sync_events[0] == 1 && sync_events[1] == 2 && sync_events[2] == 3 && sync_events[3] == 4);
+    sync_event_n = 0;
+    pegc_shutdown();
+    CHECK(!s_active && !s_sync && !published_sync);
+    CHECK(sync_event_n == 2 && sync_events[0] == 1 && sync_events[1] == 2);
+    pegc_init();
+    CHECK(s_sync && published_sync);
+    pegc_restore_text_sync(1);
+    CHECK(!s_active && !s_sync && !published_sync);
+    for (int scenario = 0; scenario < 3; ++scenario) {
+        world_reset(); s_bb_phys = 0x6a000;
+        sync_bind_rc = scenario == 0 ? OS32_ERR_FULL : 0;
+        sync_publish_rc = scenario == 1 ? OS32_ERR_INVAL : 0;
+        sync_mode = scenario == 2 ? GFXSYNC_DIRECT : GFXSYNC_SHADOW;
+        pegc_init();
+        CHECK(!pegc_probe() && !s_active && !s_sync && !published_sync);
+    }
+    sync_bind_rc = sync_publish_rc = 0; sync_mode = GFXSYNC_SHADOW;
+    output("PASS P1 (all hooks, caps, shadow bind, rebind, shutdown, failure fallback)\n");
+}
+
 void _start(void)
 {
     con_output_register(&capture_output);
@@ -1684,6 +1805,7 @@ void _start(void)
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();
     case_mode_layout();
+    case_v2();
     case_diag_alias();
     case_io_counts();
     case_probe_missing_client();

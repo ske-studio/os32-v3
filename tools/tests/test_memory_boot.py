@@ -50,11 +50,11 @@ MUTATIONS = [
      "    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
      "    sys_frozen_exec = l->workspace_first * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
      ("fixed", 8192)),
-    # FIXED / ARENA_TOP の境界を 1 PFN ずらす (3,074 PFN が FIXED に落ちる)。
+    # FIXED / ARENA_TOP の境界を 1 PFN ずらす (3,075 PFN が FIXED に落ちる)。
     ("arena-boundary", "mm/memory_boot.c",
      "        top - pages - ws_pages >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
      "        top - pages - ws_pages > MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
-     ("arena", 12296)),
+     ("arena", 12300)),
     # D11 (T1a の Codex P3、T1b で追加): プローブの上限を外す (2GB を越えて数える)。
     ("detect-cap-removed", "platform/pc98/memory.c",
      "    if (reported > (platform_memory_geometry.ram_ceiling - platform_memory_geometry.high_first) / MEM_1MB)\n"
@@ -298,14 +298,14 @@ class MemoryBoot(unittest.TestCase):
         self.run_case('default', 16384)
 
     def test_fixed_backing_small_configs(self):
-        # 8MB (ram-8mb)・9MB (np21x64w-9mb)・12MB・3,073 PFN (境界の FIXED 側)
-        for kb in (8192, 9216, 12288, 3073 * 4):
+        # 8MB (ram-8mb)・9MB (np21x64w-9mb)・12MB・3,074 PFN (境界の FIXED 側)
+        for kb in (8192, 9216, 12288, 3074 * 4):
             with self.subTest(kb=kb):
                 self.run_case('fixed', kb)
 
     def test_arena_top_low_configs(self):
-        # 3,074 PFN (境界の ARENA_TOP 側)・15MB
-        for kb in (3074 * 4, 15360):
+        # 3,075 PFN (境界の ARENA_TOP 側)・15MB
+        for kb in (3075 * 4, 15360):
             with self.subTest(kb=kb):
                 self.run_case('arena', kb)
 

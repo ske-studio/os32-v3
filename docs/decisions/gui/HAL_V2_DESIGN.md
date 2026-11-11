@@ -1732,3 +1732,8 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 
 **ユーザーの判断が要る分岐**: 固い LOST (drain も通らない) の後、GF は再起動まで戻らない (v1 の `failed` と同じ)。ユーザー判断 2026-11-10 の「復帰は次の mode_set か再起動」のうち、mode_set で戻るのは柔らかい LOST だけになる。mode_set で層 4 の recover (`gf4_service_recover` の停止 → 再開、recover.c:314-337) まで行う案もあるが、v1 は既に PC-98 へ落ちているので v2 だけが GF を取り直す形になり、別の設計が要る。推奨は今の形 (再起動)。
 - **固い LOST の後 (ユーザー決定 2026-11-11)**: 推奨の「固い LOST は再起動で戻す」。柔らかい LOST (drain が通った) は次の mode_set で戻る。固い LOST は v1 の failed と同じく PC-98 の表示に落ち、GF は再起動まで戻らない。
+## 確定の後の追記 (2026-11-11、T1 の診断の上書き、PM 決定)
+- Y4 の追補: `gfxsync_override(ctx, method, unit, gap)` はその ctx の方式・単位・間隔を一時変更し 0/INVAL、`gfxsync_override_clear(ctx)` は bind 時の値に戻す。§10 の範囲と hook の検査を適用し、失敗時は変更しない。方式定数は include/gfx_sync.h に置く。
+- 担当は include/gfx_sync.h・gfx/sync/sync_int.h・sync_bind.c・a0_weak.c と tools/checks/gfx2_wiring.txt (I3 kernel)、使い手は T1 の診断。host 試験で切替・復元・無効値を検査する。
+
+- **I3 の容量 (PM 決定 2026-11-11)**: GeForce module の mem_max は実測 305,616 B に余裕を持たせ 393,216 B (384 KiB)、load_span_max は従来の prefix の余裕 64 KiB を加え 458,752 B (448 KiB)、image_max は 262,144 B を維持する。kernel は固定帯を持たず pgalloc から確保する。値の正・生成の表・manifest・固定値の試験・[容量の台帳](../../08_build.md#起動時に読む部品の大きさの上限と由来) を追従する。

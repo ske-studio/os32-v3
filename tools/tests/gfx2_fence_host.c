@@ -16,6 +16,7 @@ static void zero(void *p, u32 n)
     while (n--) *b++ = 0;
 }
 
+void gfx2_flip_poll(struct gfx2_adapter *a) { (void)a; }
 void test_serialize(void) { serials++; }
 struct gfx2_adapter *gfx2_adapter_get(u32 n) { return n == 0 ? &adapter : NULL; }
 int gfx2_surf_state_set(struct gfx2_surf *s, u32 st) { s->state = st; return 0; }

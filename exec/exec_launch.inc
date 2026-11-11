@@ -37,7 +37,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     u32 need_pages;
 
     u8 *load_addr;
-    OS32Header *hdr;
+    OS32Header decoded_hdr, *hdr = &decoded_hdr;
     int sz;
     u32 text_sz, bss_sz, heap_sz, entry_off;
     u32 entry;
@@ -150,7 +150,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         return EXEC_ERR_NOT_FOUND;
     }
 
-    hdr = (OS32Header *)hdrbuf;
+    int decode_rc = os32x_decode(hdr, hdrbuf, (u32)sz);
 
     /* ---- KAPI データ欄の配置の照合 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3) ----
      * v62 以前のバイナリはデータ欄 (sbrk_heap_limit / shm_base) を別の
@@ -158,7 +158,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
      * 番地を取り違えたりするので、**常駐シェルも含めて**ここで断る
      * (シェルの停止と案内は kernel.c が exec_layout_rejected() を見て出す)。 */
     {
-        int lrc = os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
+        int lrc = decode_rc != OS32X_LAYOUT_OK ? decode_rc :
+                  os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
         if (lrc != OS32X_LAYOUT_OK) {
             if (is_shell) g_layout_reject = 1;
             kprintf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,

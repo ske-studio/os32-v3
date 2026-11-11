@@ -94,6 +94,30 @@
       "source": "gfx/v2/gfx2_int.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "gfxsync_override",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_override_clear",
+      "source": "include/gfx_sync.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfxsync_gap_loops",
+      "source": "gfx/sync/sync_int.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx2_adapter_unregister",
+      "source": "gfx/v2/gfx2_int.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }
