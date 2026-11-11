@@ -3,7 +3,10 @@
 
 #include "types.h"
 
+#define RESIDENT_CLI_KEY_CANCEL 0x100
+
 struct resident_cli_ops {
+    /* 0..255 = byte, RESIDENT_CLI_KEY_CANCEL = line cancel, negative = no input. */
     int (*getkey)(void);
     void (*write)(const void *, u32);
     void (*poll)(void);

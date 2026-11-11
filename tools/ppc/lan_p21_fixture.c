@@ -1,6 +1,7 @@
 #include "platform/powermac/lan_boot.h"
 static void out(const char *s, int n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
 void *memset(void *p, int c, u32 n) { u8 *q=p; while(n--) *q++=(u8)c; return p; }
+void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 static void fail(int n) { char s[]="FAIL 00\n"; s[5]='0'+n/10; s[6]='0'+n%10; out(s,8); __asm__ volatile("int $0x80" : : "a"(1), "b"(n)); __builtin_unreachable(); }
 #define CHECK(x,n) do { if (!(x)) fail(n); } while (0)
 void _start(void)
@@ -41,7 +42,7 @@ void _start(void)
     }
     CHECK(pm_lan_encode(b,79,&m,&used)<0 && pm_lan_encode(b,82,&m,&used)<0,7);
     m.type=0; CHECK(pm_lan_encode(b,400,&m,&used)<0,8);
-    m.type=5; CHECK(pm_lan_encode(b,400,&m,&used)<0,9);
+    m.type=9; CHECK(pm_lan_encode(b,400,&m,&used)<0,9);
     m.type=3; m.payload_bytes=257; CHECK(pm_lan_encode(b,400,&m,&used)<0,10);
     m.payload_bytes=3; m.type=1; CHECK(pm_lan_encode(b,400,&m,&used)<0,11);
     m.type=3; CHECK(pm_lan_encode(b,400,&m,&used)==0,12);
@@ -54,7 +55,7 @@ void _start(void)
     b[7]=79; CHECK(pm_lan_decode(b,83,&d)<0,19); b[7]=80;
     b[60]=1; CHECK(pm_lan_decode(b,83,&d)<0,20); b[60]=0;
     b[56]=1; b[57]=1; CHECK(pm_lan_decode(b,400,&d)<0,21);
-    for(t=0;t<=5;t+=5) {
+    for(t=0;t<=9;t+=9) {
         wire[5]=(u8)t; memset(&d,0xff,sizeof(d));
         CHECK(pm_lan_decode(wire,80,&d)<0,22);
         for(i=0;i<sizeof(d);i++) CHECK(((u8 *)&d)[i]==0,23);
