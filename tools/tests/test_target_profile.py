@@ -17,6 +17,15 @@ def command(*args):
 
 
 def check(root):
+    assert T.sdk_values('x86-pc98') == T._X86_SDK
+    assert T.sdk_user_values('x86-pc98') == {
+        key: T._X86_SDK[key] for key in T.USER_SDK_FIELDS}
+    assert T.sdk_user_values('ppc-powermac') == dict(
+        call_abi='powerpc-sysv', elf_emulation='elf32ppc',
+        crt_user=('crt/ppc/crt0.o', 'crt/ppc/crt0_c.o'),
+        app_link='link/ppc/app.ld')
+    assert all(T.PROFILES['ppc-powermac'][key] is None
+               for key in ('crt_resident', 'app_sys_link', 'shlib_link', 'rust'))
     assert T.require('x86-pc98', 'module_codec')['elf_identity'] == (1,1,3)
     for name in ('ppc-powermac', 'unknown'):
         for capability in ('module_codec','layout','link_guard'):
@@ -63,14 +72,14 @@ if __name__ == '__main__':
             shutil.copyfile(ROOT/'sdk'/name,root/'sdk'/name)
         check(root)
         if args.mutate:
-            original=T.PROFILES['ppc-powermac']['module_codec']
-            T.PROFILES['ppc-powermac']['module_codec']=True
+            original=T.PROFILES['ppc-powermac']['sdk_user']
+            T.PROFILES['ppc-powermac']['sdk_user']=False
             try:
                 check(root)
-            except AssertionError:
-                print('RED: unsupported PPC module capability rejected at runtime')
+            except T.Unsupported:
+                print('RED: PPC USER capability disabled at runtime')
             else:
                 raise SystemExit('mutation survived')
             finally:
-                T.PROFILES['ppc-powermac']['module_codec']=original
+                T.PROFILES['ppc-powermac']['sdk_user']=original
     print('PASS target profile')
