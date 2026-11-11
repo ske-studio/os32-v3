@@ -266,9 +266,9 @@ MUTATIONS = [
      r"cd_device.total_sects = rc \? 0 : cap.total_sectors;",
      "cd_device.total_sects = cap.total_sectors;", "T5b5: 無媒体でも自動 mount する容量を残す"),
     ("fs/isofs/iso9660.c",
-     r"if \(type != VFS_DEV_CD\) return \(void \*\)0;\n    devname\[0\] = 'c';\n    devname\[1\] = 'd';",
-     "if (type != VFS_DEV_CD && type != VFS_DEV_HD) return (void *)0;\n"
-     "    devname[0] = type == VFS_DEV_CD ? 'c' : 'h';\n"
+     r"if \(type != VFS_DEV_CD && type != VFS_DEV_RAM\) return \(void \*\)0;\n    devname\[0\] = type == VFS_DEV_RAM \? 'r' : 'c';\n    devname\[1\] = 'd';",
+     "if (type != VFS_DEV_CD && type != VFS_DEV_RAM && type != VFS_DEV_HD) return (void *)0;\n"
+     "    devname[0] = type == VFS_DEV_HD ? 'h' : (type == VFS_DEV_RAM ? 'r' : 'c');\n"
      "    devname[1] = 'd';", "T5b5: HD 上の ISO を受付"),
     ("fs/isofs/iso9660_media.c",
      r"pvd\[6\] != ISO_PVD_VERSION", "0", "T5b5: 壊れた PVD を公開"),
