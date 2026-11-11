@@ -3,6 +3,9 @@
  * No demand paging, x86 frame handlers, or implicit platform dependencies. */
 #include "ppc_trap.h"
 #include "ppc_hpt.h"
+#include "exec_arch.h"
+
+extern void ring3_fault_kill(void);
 static void (*external_handler)(struct ppc_frame *);
 static void (*dec_handler)(struct ppc_frame *);
 static ppc_pd_read_fn table_reader;
@@ -87,7 +90,18 @@ void ppc_trap_dispatch(struct ppc_frame *f)
     int translated = (msr & (PPC_MSR_IR | PPC_MSR_DR | PPC_MSR_EE)) ==
                      (PPC_MSR_IR | PPC_MSR_DR);
     if (!f || !translated) goto fatal;
-    if (f->srr1 & 0x4000) {
+    if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
+        void (*handler)(struct ppc_frame *) =
+            f->vector == 0x500 ? external_handler : dec_handler;
+        if (handler) { handler(f); return; }
+        reason = PPC_TRAP_UNREGISTERED;
+    } else if (f->srr1 & PPC_MSR_PR) {
+        if (f->vector == 0xc00) {
+            struct arch_syscall call = { f };
+            exec_syscall_dispatch(&call);
+            return;
+        }
+        ring3_fault_kill();
         reason = PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
     } else if (f->vector == PPC_VECTOR_DSI || f->vector == PPC_VECTOR_ISI) {
         reason = fault_reason(f);
@@ -100,11 +114,6 @@ void ppc_trap_dispatch(struct ppc_frame *f)
             f->srr0 = probe.resume;
             return;
         }
-    } else if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
-        void (*handler)(struct ppc_frame *) =
-            f->vector == 0x500 ? external_handler : dec_handler;
-        if (handler) { handler(f); return; }
-        reason = PPC_TRAP_UNREGISTERED;
     } else if (f->vector == 0x700) {
         /* PEM table 6-16: preserve the program exception cause. */
         u32 cause = f->srr1 & 0x001e0000;
