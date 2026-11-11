@@ -141,7 +141,7 @@ def test_fixtures(tmp):
                    '__builtin_unreachable(); }\n')
     exe = tmp / 'admit'
     r = run(['gcc', '-m32', '-std=gnu11', '-O2', '-ffreestanding', '-fno-pie', '-no-pie',
-             '-fno-stack-protector', '-nostdlib', '-I.', '-Isdk/include/os32', src, '-o', exe])
+             '-fno-stack-protector', '-nostdlib', '-I.', '-Iinclude', '-Isdk/include/os32', src, '-o', exe])
     require(r.returncode == 0, r.stderr)
     r = host32.run([str(exe)], capture_output=True, text=True)
     require(r.returncode == 0, 'serialized fixture admission reasons: ' + str(r.returncode))

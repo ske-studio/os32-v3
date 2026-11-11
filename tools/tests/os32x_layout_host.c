@@ -24,6 +24,29 @@ int main(void)
 {
     OS32Header h = valid();
     u32 i;
+    {
+        u8 wire[OS32X_HDR_SIZE + 1];
+        OS32Header decoded;
+        for (i = 0; i < OS32X_HDR_SIZE; i++) wire[i + 1] = (u8)(i + 1);
+        CHECK(os32x_decode(&decoded, wire + 1, OS32X_HDR_SIZE - 1) == OS32X_LAYOUT_SHORT);
+        CHECK(os32x_decode(&decoded, wire + 1, OS32X_HDR_SIZE) == OS32X_LAYOUT_OK);
+        CHECK(decoded.magic == 0x04030201u);
+        CHECK(decoded.header_size == 0x08070605u);
+        CHECK(decoded.version == 0x0c0b0a09u);
+        CHECK(decoded.flags == 0x100f0e0du);
+        CHECK(decoded.entry_offset == 0x14131211u);
+        CHECK(decoded.text_size == 0x18171615u);
+        CHECK(decoded.bss_size == 0x1c1b1a19u);
+        CHECK(decoded.heap_size == 0x201f1e1du);
+        CHECK(decoded.stack_size == 0x24232221u);
+        CHECK(decoded.min_api_ver == 0x28272625u);
+        CHECK(decoded.load_addr == 0x2c2b2a29u);
+        CHECK(decoded.kapi_data_off == 0x302f2e2du);
+        CHECK(decoded.kapi_abi_generation == 0x34333231u);
+        CHECK(decoded.memory_layout_generation == 0x38373635u);
+        CHECK(decoded.shlib_protocol == 0x3c3b3a39u);
+        CHECK(decoded.code_size == 0x403f3e3du);
+    }
     CHECK(OS32X_HDR_VERSION == 5);
     CHECK(OS32X_HDR_SIZE == 64 && sizeof(h) == 16 * sizeof(u32));
 #if __SIZEOF_LONG__ == 4

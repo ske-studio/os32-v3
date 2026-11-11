@@ -10,6 +10,9 @@
 #define OS32X_LAYOUT_OLD       2   /* unknown format/header size/flags */
 #define OS32X_LAYOUT_MISMATCH  3   /* generation/layout/feature mismatch */
 
+/* Decode a complete little-endian wire header into native fields. */
+int os32x_decode(OS32Header *h, const u8 *wire, u32 len);
+
 /* hdr      : ファイル先頭 (read_len バイトが有効)
  * read_len : 実際に読めたバイト数 (ヘッダを読んだ vfs_read の戻り値)
  * kernel_off : 動いているカーネルの KAPI_DATA_FIELDS_OFF

@@ -1,5 +1,29 @@
 /* D35: reject incompatible images before entry or AS allocation. */
 #include "os32x_hdr.h"
+#include "endian_le.h"
+
+int os32x_decode(OS32Header *h, const u8 *wire, u32 len)
+{
+    if (len < OS32X_HDR_SIZE) return OS32X_LAYOUT_SHORT;
+    h->magic = le32_rd(wire + 0);
+    h->header_size = le32_rd(wire + 4);
+    h->version = le32_rd(wire + 8);
+    h->flags = le32_rd(wire + 12);
+    h->entry_offset = le32_rd(wire + 16);
+    h->text_size = le32_rd(wire + 20);
+    h->bss_size = le32_rd(wire + 24);
+    h->heap_size = le32_rd(wire + 28);
+    h->stack_size = le32_rd(wire + 32);
+    h->min_api_ver = le32_rd(wire + 36);
+    h->load_addr = le32_rd(wire + 40);
+    h->kapi_data_off = le32_rd(wire + 44);
+    h->kapi_abi_generation = le32_rd(wire + 48);
+    h->memory_layout_generation = le32_rd(wire + 52);
+    h->shlib_protocol = le32_rd(wire + 56);
+    h->code_size = le32_rd(wire + 60);
+    return OS32X_LAYOUT_OK;
+}
+
 
 int os32x_layout_check(const OS32Header *hdr, u32 read_len, u32 kernel_off)
 {
