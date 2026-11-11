@@ -13,7 +13,8 @@ static struct {
     u8 tx[14 + PLN1_HEADER_BYTES + PLN1_PAYLOAD_MAX], rx[1514];
     struct lan_message response;
     u8 response_dst[6], enabling;
-    u64 beacon_at, poll_at, phy_retry_at, request_drops;
+    u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops;
+    u8 out_turn, state_due;
 } s;
 
 static int same(const u8 *a, const u8 *b, u32 n)
@@ -41,7 +42,7 @@ static int send(const u8 *dst, const struct lan_message *m)
     if (pm_lan_encode(s.tx + 14, sizeof(s.tx) - 14, m, &used)) return GEM_EINVAL;
     return gem_tx(&s.g, s.tx, used + 14);
 }
-static void beacon(u64 now)
+static int beacon(u64 now)
 {
     struct lan_message m = {0};
     const struct pm_lan_diag *d = pm_lan_diag_snapshot(s.boot, &s.g, s.state, s.request_drops);
@@ -52,24 +53,43 @@ static void beacon(u64 now)
     m.flags = (u16)flags;
     if (!s.beacon_at) m.seq = 0;
     copy(m.payload, d->diag, 68);
-    (void)send(s.boot->peer_mac, &m);
+    int r = send(s.boot->peer_mac, &m);
     s.beacon_at = now + s.g.io.tb_hz;
+    return r;
 }
 static int logs(void)
 {
     for (u32 i = 0; i < 4; ++i) {
-        struct lan_message m = {0};
+        struct lan_message m = {0}, out;
         const u8 *data;
         u32 len, flags;
-        int r = pm_lan_log_peek(&data, &len, &m.seq, &m.drop_records, &m.drop_bytes, &flags);
-        if (r != LAN_OK) break;
-        m.type = PLN1_TYPE_LOG; m.payload_bytes = (u16)len; m.flags = (u16)flags;
-        copy(m.boot_id, s.boot->boot_id, 16); copy(m.payload, data, len);
-        r = send(s.boot->peer_mac, &m);
-        pm_lan_log_complete(r);
+        int have_out = pm_term_tx_peek(&out);
+        int have_log = pm_lan_log_peek(&data, &len, &m.seq, &m.drop_records, &m.drop_bytes, &flags) == LAN_OK;
+        int use_out = have_out && (s.out_turn || !have_log);
+        int r;
+        if (!have_out && !have_log) break;
+        if (use_out) {
+            r = send(pm_term_peer(), &out);
+            if (r == GEM_OK) pm_term_tx_complete();
+        } else {
+            m.type = PLN1_TYPE_LOG; m.payload_bytes = (u16)len; m.flags = (u16)flags;
+            copy(m.boot_id, s.boot->boot_id, 16); copy(m.payload, data, len);
+            r = send(s.boot->peer_mac, &m);
+            pm_lan_log_complete(r);
+        }
+        s.out_turn = !use_out;
         if (r != GEM_OK) return r;
     }
     return GEM_OK;
+}
+static int term_state(u64 now)
+{
+    struct lan_message m;
+    int r = GEM_OK;
+    if (pm_term_state(&m) == 1) r = send(pm_term_peer(), &m);
+    s.state_due = 0;
+    s.state_at = now + s.g.io.tb_hz;
+    return r;
 }
 static int receive(void)
 {
@@ -83,8 +103,14 @@ static int receive(void)
     for (u32 i = 0; i < 6; ++i) nonzero |= s.rx[6 + i];
     if (!nonzero || (s.rx[6] & 1)) return GEM_OK;
     if (s.rx[12] != (PLN1_ETHERTYPE >> 8) || s.rx[13] != (PLN1_ETHERTYPE & 255)) return GEM_OK;
-    if (pm_lan_decode(s.rx + 14, n - 14, &req) || req.type != PLN1_TYPE_REQ ||
-        !same(req.boot_id, s.boot->boot_id, 16) ||
+    if (pm_lan_decode(s.rx + 14, n - 14, &req) ||
+        !same(req.boot_id, s.boot->boot_id, 16)) return GEM_OK;
+    if (req.type == PLN1_TERM_OPEN || req.type == PLN1_TERM_IN) {
+        pm_term_receive(&req, s.rx + 6);
+        if (req.type == PLN1_TERM_OPEN && !req.payload_bytes && !req.seq) s.state_due = 1;
+        return GEM_OK;
+    }
+    if (req.type != PLN1_TYPE_REQ ||
         (!same(s.boot->peer_mac, broadcast, 6) && !same(s.rx + 6, s.boot->peer_mac, 6))) return GEM_OK;
     if (s.response.type) { ++s.request_drops; return GEM_OK; }
     d = pm_lan_diag_snapshot(s.boot, &s.g, s.state, s.request_drops);
@@ -160,17 +186,21 @@ void pm_lan_poll(u64 now)
             if (r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
             if (r < 0) break;
         }
-        if (!s.beacon_at) beacon(now);
+        if (!s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
         r = receive();
         if (r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
         if (s.response.type) {
             r = send(s.response_dst, &s.response);
             if (r == GEM_OK) s.response.type = 0;
-            else if (r != GEM_AGAIN) break;
+            else break;
         }
         r = logs();
-        if (r != GEM_OK && r != GEM_AGAIN) break;
-        if (s.beacon_at && now >= s.beacon_at) beacon(now);
+        if (r != GEM_OK) break;
+        if (s.state_due || now >= s.state_at) {
+            r = term_state(now);
+            if (r != GEM_OK) break;
+        }
+        if (s.beacon_at && now >= s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
         r = GEM_AGAIN;
         break;
     default: break;

@@ -116,35 +116,38 @@ def artifacts(root, all_products=False):
 # Approved B1/B2/T1 SDK tool changes, pinned to both reviewed contents.
 # A path alone never permits an arbitrary tool change or a missing target.
 ALLOWED_TOOL_DIFFS = {
-    'build/sdk/bin/link_guard.py': (
+    'build/sdk/bin/link_guard.py': ((
         '319f4e3fd31f4c12181966246f732b6824ee99fd644a0d72eecfd7967c85f92e',
-        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
+        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),),
     # 第 5 段 S1: SDK の選択 (CRT・link script・Rust target) を profile に足した。
-    'build/sdk/bin/target_profile.py': (
+    'build/sdk/bin/target_profile.py': ((
         '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
         '6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a'),
+        # PowerPC シェル S-B B05: USER の能力の分離、本線の承認 2026-11-11
+        ('6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a',
+         'ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9'),),
     # 第 5 段 S2: Rust の wrapper が SDK の target を rustc の起動より前に確かめる。
-    'build/sdk/bin/rustc_stamp.py': (
+    'build/sdk/bin/rustc_stamp.py': ((
         'd5e0f249c10662334532b964a3c167e5f21fb189677520dbd9463f17307ecee7',
-        'c75b669a285ef524450d283991b3a37480e5c67d5417d2e197290e2a36ea2ef1'),
+        'c75b669a285ef524450d283991b3a37480e5c67d5417d2e197290e2a36ea2ef1'),),
     # 第 5 段 S2: profile を make から引く口を SDK に配る (新規)。
-    'build/sdk/bin/target_profile_cli.py': (
-        None, '8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf'),
+    'build/sdk/bin/target_profile_cli.py': ((
+        None, '8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf'),),
     # 第 5 段 S2: 例の Makefile は CRT・link script・ELF emulation を profile から引く。
-    'build/sdk/example/hello/Makefile': (
+    'build/sdk/example/hello/Makefile': ((
         '9e35704167f6fbddaceec6f2d08a140a61a54ad3742ad6e27f3eaee4d0deceaf',
-        '3d7cd5d25413c5280dc3fd0a97c3a9ad7463011bbadcc2b69625c99304e9acc4'),
+        '3d7cd5d25413c5280dc3fd0a97c3a9ad7463011bbadcc2b69625c99304e9acc4'),),
     # 第 5 段 S2: target の選択の節を足した。
-    'build/sdk/README.md': (
+    'build/sdk/README.md': ((
         'c5ee0362cbb6683e1377ca3b1a54754c084bad14ac33fd61509b4707e5d50637',
-        'c8f6063748bc57dd6590455cb1c22dd70da2eb806602162084cca4ea7fc80788'),
+        'c8f6063748bc57dd6590455cb1c22dd70da2eb806602162084cca4ea7fc80788'),),
 }
 
 
 def allowed_tool_difference(rel, a, b):
     approved = ALLOWED_TOOL_DIFFS.get(str(rel))
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
-    return approved is not None and (digest(a), digest(b)) == approved
+    return approved is not None and (digest(a), digest(b)) in approved
 
 
 # H2: explicit old/new object paths; final images remain byte comparisons.

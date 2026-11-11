@@ -17,6 +17,7 @@ HARNESS = r'''
 static int lost, fed;
 void pm_terminal_feed(const u8 *p, u32 n) { (void)p; fed += n; }
 void pm_terminal_line_lost(void) { ++lost; }
+void pm_terminal_open(void) { ++lost; }
 static void msg(const char *s, int n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(s), "d"(n)); }
 static void fail(int code) { if (code == 11) msg("gap\n", 4); else if (code == 12) msg("drop\n", 5); __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
 void _start(void) {
@@ -34,6 +35,12 @@ void _start(void) {
     if (pm_lan_encode(buf, sizeof(buf), &out, &used) || pm_lan_decode(buf, used, &decoded) || decoded.type != PLN1_TERM_OUT || decoded.payload[0] != 3) fail(4);
     for (i = 0; i < 16; ++i) { if (!pm_term_tx_peek(&out) || out.seq != (u64)i) fail(5); pm_term_tx_complete(); }
     if (pm_term_tx_peek(&out) || !pm_term_state(&out) || out.type != PLN1_TERM_STATE || out.seq != 17 || out.payload[7] != 3 || out.payload[15] != 1 || out.payload[16] || out.payload[17] || out.payload[18] || out.payload[19] || out.payload[20] || out.payload[21] || out.payload[22] || out.payload[23]) fail(12);
+    m.type = PLN1_TERM_OPEN; m.payload_bytes = 0; m.seq = 0; pm_term_receive(&m, mac);
+    for (i = 0; i < 20; ++i) pm_term_write(data, 1);
+    if (!pm_term_tx_peek(&out) || out.payload_bytes != 20 || out.drop_records || out.drop_bytes) fail(6);
+    for (i = 0; i < 20; ++i) if (out.payload[i] != 3) fail(6);
+    pm_term_tx_complete();
+    if (pm_term_tx_peek(&out)) fail(6);
     msg("drop-ok\n", 8); fail(0);
 }
 '''

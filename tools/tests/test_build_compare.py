@@ -92,7 +92,7 @@ def check():
                 b.parent.mkdir(parents=True, exist_ok=True)
                 b.write_bytes((B.ROOT / 'sdk' / name).read_bytes())
                 # 承認済みの差の旧側: 道具ごとに pin した基点の字面。
-                base = {'link_guard.py': '6d44e368', 'target_profile.py': '92cb185e'}[name]
+                base = {'link_guard.py': '6d44e368', 'target_profile.py': '4ee26eee'}[name]
                 a.parent.mkdir(parents=True, exist_ok=True)
                 a.write_bytes(B.git(B.ROOT, 'show', base + ':sdk/' + name))
                 output = io.StringIO()
