@@ -19,13 +19,12 @@ static bool copy_overlap(const struct gf3_span *a, const struct gf3_span *b)
     return false;
 }
 
-int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
+int gf3_copy_emit(struct gf3_ctx *c, const struct gf3_surface *src,
              const struct gf3_surface *dst, struct gf3_rect sr,
              u32 dx, u32 dy, u8 alu, u32 mask, u32 dl)
 {
     struct gf3_format sf, df;
     struct gf3_span ss, ds, full;
-    struct gf2_fence fence;
     int rc;
     if (!c) return GF3_EINVAL;
     if (!c->ch || !src || !dst) { rc = GF3_EINVAL; goto out; }
@@ -58,9 +57,19 @@ int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
     u32 words[3] = { (sr.y << 16) | sr.x, (dy << 16) | dx, (sr.h << 16) | sr.w };
     rc = gf2_emit(c->ch, GF3_SUBC_BLIT, GF3_BLIT_POINT_IN, false, words, 3, dl);
     if (rc) goto out;
-    rc = gf2_fence_emit(c->ch, &fence, dl);
-    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
 out:
     c->last_rc = rc;
     return rc;
+}
+
+int gf3_copy(struct gf3_ctx *c, const struct gf3_surface *src,
+             const struct gf3_surface *dst, struct gf3_rect sr,
+             u32 dx, u32 dy, u8 alu, u32 mask, u32 dl)
+{
+    int rc = gf3_copy_emit(c, src, dst, sr, dx, dy, alu, mask, dl);
+    struct gf2_fence fence;
+    if (rc || !sr.w || !sr.h) return rc;
+    rc = gf2_fence_emit(c->ch, &fence, dl);
+    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
+    return c->last_rc = rc;
 }

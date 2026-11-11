@@ -24,13 +24,12 @@ static int scale_ratio(u32 n, u32 d, u32 *out)
     return *out ? 0 : GF3_ERANGE;
 }
 
-int gf3_scale(struct gf3_ctx *c, const struct gf3_surface *src,
+int gf3_scale_emit(struct gf3_ctx *c, const struct gf3_surface *src,
               const struct gf3_surface *dst, struct gf3_rect sr,
               struct gf3_rect dr, struct gf3_rect clip, bool bilinear, u32 dl)
 {
     struct gf3_format sf, df, cf;
     struct gf3_span ss, ds, cs;
-    struct gf2_fence fence;
     u32 du, dv, v[6];
     int rc;
     if (!c) return GF3_EINVAL;
@@ -67,9 +66,19 @@ int gf3_scale(struct gf3_ctx *c, const struct gf3_surface *src,
     v[1] = src->pitch | SIFM_ORIGIN_CENTER | (bilinear ? SIFM_FILTER_BILINEAR : 0);
     v[2] = src->off; v[3] = ((sr.y << 4) << 16) | (sr.x << 4);
     rc = gf2_emit(c->ch, GF3_SUBC_MISC, SIFM_SIZE, false, v, 4, dl); if (rc) goto done;
-    rc = gf2_fence_emit(c->ch, &fence, dl); if (rc) goto done;
-    rc = gf2_fence_wait(c->ch, fence, dl);
 done:
     c->last_rc = rc;
     return rc;
+}
+
+int gf3_scale(struct gf3_ctx *c, const struct gf3_surface *src,
+              const struct gf3_surface *dst, struct gf3_rect sr,
+              struct gf3_rect dr, struct gf3_rect clip, bool bilinear, u32 dl)
+{
+    int rc = gf3_scale_emit(c, src, dst, sr, dr, clip, bilinear, dl);
+    struct gf2_fence fence;
+    if (rc || !sr.w || !sr.h || !dr.w || !dr.h || !clip.w || !clip.h) return rc;
+    rc = gf2_fence_emit(c->ch, &fence, dl);
+    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
+    return c->last_rc = rc;
 }

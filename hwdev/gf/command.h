@@ -210,6 +210,7 @@ int gf2_gr_object_new(struct gf2_chan *, u32 handle, u16 class_id,
  * Old epoch EFAULT, expired absolute deadline ETIME, failed clock EIO. */
 int gf2_fence_emit(struct gf2_chan *, struct gf2_fence *out, u32 deadline_us);
 int gf2_fence_wait(struct gf2_chan *, struct gf2_fence, u32 deadline_us);
+int gf2_fence_poll(struct gf2_chan *, struct gf2_fence, int *done);
 
 /* B7 / fault.c. Foreground API entry, each wait iteration and before kick:
  * snapshot FIFO/GR count differences, capture first fault, close IRQ requests

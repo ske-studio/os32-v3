@@ -45,6 +45,9 @@ static void packet(u32 i, u16 method, u16 count, u32 first, u32 second)
 void _start(void)
 {
     setup();
+    assert(!gf3_fill_emit(&host.ctx, &surface, rect, TEST_COLOR, GX_COPY, 0xff, DEADLINE));
+    assert(host.npackets == 3 && !host.calls[H_FENCE] && !host.calls[H_WAIT]);
+    setup();
     assert(fill() == 0 && host.ctx.last_rc == 0);
     assert(host.npackets == 3 && host.nwords == 4);
     packet(0, EXPECT_GDI_FORMAT_METHOD, 1, EXPECT_GDI_INDEX8, 0);

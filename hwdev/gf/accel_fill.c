@@ -7,12 +7,11 @@
 #define GF3_GDI_COLOR        0x03fcU
 #define GF3_GDI_RECTANGLE    0x0400U
 
-int gf3_fill(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rect r,
+int gf3_fill_emit(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rect r,
              u32 color, u8 alu, u32 mask, u32 dl)
 {
     struct gf3_format fmt;
     struct gf3_span span;
-    struct gf2_fence fence;
     u32 v[2];
     int rc;
 
@@ -41,8 +40,16 @@ int gf3_fill(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rect r,
     v[1] = (r.w << 16) | r.h;
     rc = gf2_emit(c->ch, GF3_SUBC_GDI, GF3_GDI_RECTANGLE, false, v, 2, dl);
     if (rc) return c->last_rc = rc;
+    return c->last_rc = GF3_OK;
+}
+
+int gf3_fill(struct gf3_ctx *c, const struct gf3_surface *s, struct gf3_rect r,
+             u32 color, u8 alu, u32 mask, u32 dl)
+{
+    int rc = gf3_fill_emit(c, s, r, color, alu, mask, dl);
+    struct gf2_fence fence;
+    if (rc || !r.w || !r.h) return rc;
     rc = gf2_fence_emit(c->ch, &fence, dl);
-    if (rc) return c->last_rc = rc;
-    rc = gf2_fence_wait(c->ch, fence, dl);
+    if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);
     return c->last_rc = rc;
 }
