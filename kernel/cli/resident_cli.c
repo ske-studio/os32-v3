@@ -71,6 +71,13 @@ void resident_cli_run(const struct resident_cli_ops *ops)
     for (;;) {
         int key = ops->getkey();
         if (key < 0) { ops->poll(); continue; }
+        if (key == 3 || key == RESIDENT_CLI_KEY_CANCEL) {
+            output(ops, "\n");
+            length = 0;
+            discard = 0;
+            output(ops, "os32> ");
+            continue;
+        }
         if (discard) {
             if (key == '\n' || key == '\r') {
                 output(ops, "\nline too long\nos32> ");
@@ -79,17 +86,12 @@ void resident_cli_run(const struct resident_cli_ops *ops)
             }
             continue;
         }
-        if (key == 3) {
-            key = RESIDENT_CLI_KEY_CANCEL;
-        }
-        if (key == RESIDENT_CLI_KEY_CANCEL) {
-            output(ops, "\n");
-            length = 0;
-            output(ops, "os32> ");
-        } else if (key == '\n' || key == '\r') {
+        if (key == '\n' || key == '\r') {
             output(ops, "\n");
             line[length] = 0;
+            ops->poll();
             execute(ops, line);
+            ops->poll();
             length = 0;
             output(ops, "os32> ");
         } else if (key == 8 || key == 127) {

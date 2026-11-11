@@ -54,13 +54,17 @@ int main(void) {
     if (!check("nope\n", "os32> nope\nunknown command\nos32> ")) return 6;
     special = 1; polled = -1;
     if (!check("echo badecho good\n", "os32> echo bad\nos32> echo good\ngood\nos32> ") ||
-        polled != 1) return 7;
+        polled != 3) return 7;
+    memset(longline, 'x', 256); strcpy(longline + 256, "\003echo z\n");
+    strcpy(expected, "os32> "); memset(expected + 6, 'x', 255);
+    strcpy(expected + 261, "\nos32> echo z\nz\nos32> ");
+    if (!check(longline, expected)) return 8;
     return 0;
 }
 '''
 MUTATIONS = [
-    ('reset', '            execute(ops, line);\n            length = 0;',
-     '            execute(ops, line);\n            /* missing reset */', 1),
+    ('reset', '            ops->poll();\n            length = 0;',
+     '            ops->poll();\n            /* missing reset */', 1),
     ('space', 'char *path = spaces(redirect + 1), *end = redirect;',
      'char *path = redirect + 1, *end = redirect;', 5),
 ]
