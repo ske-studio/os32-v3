@@ -213,3 +213,20 @@ int pc98_route_to_gf(void)
 - **§4 に足す**: GF の LOST (gfx/v2/fence.c:25-43) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。
 - **§2-1・§2-2・§6・§8 を書き換えた** (gf_outputs と sig を消し、gfx2 の列挙と display_dual_key に)。
 - **段の表**: §7 を書き換えた (H0 を足し D1g を削除)。
+
+## 確定の後の追記 (2026-11-12、実機の A6 のずれ、ユーザー決定と PM 決定)
+実機 (main 6f20388f、98 は左、GF の D-SUB は右の別のモニター) の A6 で、次の 3 つが期待と違った。A7 (Trident) は合。
+- **CUI から GUI に入ると 98 の起動の記録が消えた** (原因は確定)。
+  - `os32gui` で sh が終わると、kernel.c の再起動の区切り `console_session_clear()` (CUI なので was_live=0) が `tvram_clear()` で 25 行を消していた。
+  - 次の周の GUI の分岐では gshell の gfx_init 前で started=0、active=0 なので、`tvram_print(0,0,"Loading gshell...")` が 0 行目に置かれ、その後の kprintf が 0,0 から上書きした。
+  - §3-4 は GUI→GUI の再起動しか書いておらず、CUI→GUI の入口が抜けていた。
+- **GUI の間の消去の要求で 98 を消す**: §3-2 の 106 行の門は、active の間の `tvram_clear` で 98 を消していた。ユーザー決定 (2026-11-12、問い「GUI の間に端末の clear・less・more などが画面の消去を求めたとき、左の 98 の画面を消しますか?」): 「消さない (推奨)」。
+- **CUI に戻ると右の GF に机が止まって映り続けた**。dual では 0FACh が最初から 98 なので、route_to_98 で何も替わらず、`geforce_stop_common` は quiesce だけで blank も DPMS もしないため。ユーザー決定 (2026-11-12、問い「GUI から CUI に戻ったとき、右の GeForce のモニターをどうしますか?」): 「DPMS で切る (推奨)」。
+
+決定 (§3-2・§3-4 を次のとおりに読む):
+- **tvram_clear の門**: GUI の間 (sink が有効) は dual でも TVRAM を消さない (`if (con_sink_is_enabled()) return;` に戻す。sink への CLEAR はこれまでどおり積む)。
+- **console_session_clear**: `con_dual_was_live() || con_dual_cfg()` なら sink の CLEAR だけ積み、TVRAM を消さない。
+- **CUI→GUI の入口** (kernel.c の GUI の分岐): `con_dual_cfg()` なら `console_text_gdc_stop()` より前に `shell_print("Loading gshell...\n")` で追記する。CUI の分岐の "Loading shell..." も、cfg なら 0 行目に書かず追記する。
+- **CUI へ戻る時の GF の head**: `gfx_shutdown` で、`con_dual_cfg()` かつ ACTIVE の adapter が GeForce なら、leave の前に attached な各 head を DPMS off (3) にする (backend の `dpms` を中核から直接呼ぶ、owner の検査は通さない)。GUI に戻る時に DPMS が on に戻ることを確かめ、戻らなければ GF の開始の後に on (0) にする。
+- **端末の出力** (§3-1): sh の出力は KAPI の kprintf → console_write で sink と TEXT の出力先の両方に出る。端末アプリ自身のローカルな出力 (打った行のエコー・"command not found:") は kernel を通らず、98 には出ない (対象外)。
+- **§8 に足す**: A3 の通しに CUI→`os32gui`→GUI (was_live=0、started=0) の場合を足す。A3 の "clear gate" は「GUI の間は dual でも TVRAM を消さない」に替える。A6 の受入に「CUI へ戻ると右のモニターが DPMS で切れ、GUI に戻ると点く」と「端末の sh の ver の結果が 98 にも出る」を足す。
