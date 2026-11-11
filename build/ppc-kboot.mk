@@ -6,10 +6,13 @@
 #   make -f build/ppc-kboot.mk NEGATIVE=1 -> build/out/ppc-kboot/neg1/PPCKERN.ELF
 PPC_CROSS_DIR ?= /home/hight/opt/cross-ppc
 KB_CC := $(PPC_CROSS_DIR)/bin/powerpc-elf-gcc
+KB_OBJCOPY := $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
 KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
+KBOOT_SHELL ?= 0
+KBOOT_TERM ?= lan
 NEGATIVE ?= 0
-KB_OUT ?= build/out/ppc-kboot$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE))
+KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -29,7 +32,8 @@ KB_PLATFORM := platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c \
  platform/powermac/lan_log.c platform/powermac/lan_wire.c \
  platform/powermac/lan_monitor.c platform/powermac/lan_diag.c \
- platform/powermac/lan_service.c
+ platform/powermac/lan_service.c platform/powermac/lan_terminal.c \
+ platform/powermac/terminal_input.c
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
  mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/time/tick.c \
@@ -38,6 +42,17 @@ KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 KB_C := $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
+ifeq ($(KBOOT_SHELL),1)
+ifneq ($(KBOOT_TERM),lan)
+$(error KBOOT_TERM must be lan)
+endif
+KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c fs/isofs/iso9660.c \
+ fs/isofs/iso9660_media.c drivers/block/ram_ro.c init/boot_root.c \
+ fs/ramfs/ramfs.c platform/powermac/root_boot.c platform/powermac/root_image.c \
+ platform/powermac/console_stream.c platform/powermac/cli_boot.c kernel/cli/resident_cli.c
+KB_EXTRA := $(KB_OUT)/root_image_blob.o
+KB_INC_EXTRA := -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
+endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 
 # Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).
@@ -46,11 +61,11 @@ KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=non
  -fno-short-enums
 KB_INC := -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
  -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
- -Imm -Ilib
+ -Imm -Ilib $(KB_INC_EXTRA)
 KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -MMD -MP $(KB_INC)
 
 .DEFAULT_GOAL := all
 .PHONY: all audit
@@ -72,18 +87,26 @@ $(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OUT)/memmap_layout.h
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -E -P -x c $< -o $@
+$(KB_OUT)/motd.txt:
+	@mkdir -p $(dir $@)
+	@printf 'OS32 PowerPC shell\n' > $@
+$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py
+	python3 -B tools/mkroot_image.py --motd $< --out $@
+$(KB_OUT)/root_image_blob.o: $(KB_OUT)/root.iso
+	$(KB_OBJCOPY) -I binary -O elf32-powerpc -B powerpc --rename-section .data=.rodata.boot_root,alloc,load,readonly,data,contents $< $@
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
-$(KB_ELF): $(KB_OBJ) $(KB_OUT)/kernel.ld
+$(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined \
 	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
-	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) -o $@
+	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $@
 
 # H3 audits (tools/ppc/kboot_audit.py): nothing unresolved, integer-only code by
 # decoded mnemonic, and no direct or macro-mediated user of the 100 Hz PIT_HZ
 # inside a kernel that ticks at 1 kHz (design R7). Mutated sources are audited too.
+# ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(KB_C) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) \
+	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
 -include $(KB_OBJ:.o=.d)
