@@ -92,7 +92,9 @@ LIBMATH_OBJ = $(LIBDIR)/libos32math.a
 GFX_SRC = $(wildcard userland/lib/gfx/*.c) \
           $(wildcard userland/lib/gfx/draw/*.c) \
           $(wildcard userland/lib/gfx/text/*.c) \
-          $(wildcard userland/lib/gfx/geom/*.c)
+          $(wildcard userland/lib/gfx/geom/*.c) \
+          $(wildcard userland/lib/gfx/v2/*.c) \
+          gfx/v2/format.c
 ASM_GFX_SRC = $(wildcard userland/lib/gfx/asm/*.asm)
 ASM_GFX_OBJ = $(ASM_GFX_SRC:.asm=.o)
 # lib/utf8_prog.o もここに入れる。ユーザー空間で utf8 を引くのは gfx の
@@ -116,6 +118,10 @@ userland/lib/gfx/text/%.o: userland/lib/gfx/text/%.c | $(ABI_CONTRACT_ORDER)
 
 userland/lib/gfx/geom/%.o: userland/lib/gfx/geom/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
+
+# Separate from build/out/obj/gfx/v2/format.o (the kernel copy).
+gfx/v2/format.o: gfx/v2/format.c gfx/v2/gfx2_fmt.h | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/lib/gfx/asm/%.o: userland/lib/gfx/asm/%.asm userland/lib/gfx/asm/gfx_const.inc
 	$(AS) -p sdk/crt/generations.inc -f elf32 -Iuserland/lib/gfx/asm/ $< -o $@
@@ -292,6 +298,7 @@ clean-libs:
 	rm -f userland/lib/ecs/*.o userland/lib/ui/*.o
 	rm -f userland/lib/gfx/*.o userland/lib/gfx/asm/*.o
 	rm -f userland/lib/gfx/draw/*.o userland/lib/gfx/text/*.o userland/lib/gfx/geom/*.o
+	rm -f userland/lib/gfx/v2/*.o gfx/v2/format.o
 	rm -f userland/lib/tilemap/*.o
 	rm -f userland/lib/db/*.o userland/lib/snd/*.o
 	rm -f userland/lib/md/*.o userland/lib/filer/*.o
