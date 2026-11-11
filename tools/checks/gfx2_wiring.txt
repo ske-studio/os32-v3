@@ -76,6 +76,9 @@ I2 geforce gf3_fill_emit
 I2 geforce gf3_range_query_set
 I2 geforce gf3_rop3_set
 I2 geforce gf3_scale_emit
+I2 geforce gf_v2_deadline
+I2 geforce gf_v2_disp
+I2 geforce gf_v2_rc
 I2 geforce gf_v2_fence_emit
 I2 geforce gf_v2_fence_state
 I2 geforce gf_v2_fence_wait
@@ -105,6 +108,7 @@ I2 kernel gfx2_yuv_argb
 I2 kernel v1_bridge_begin
 I2 kernel v1_bridge_end
 I2 kernel v1_bridge_rebind
+I3 geforce gf_v2_route_index
 I3 geforce gf_v2_cursor_image
 I3 geforce gf_v2_cursor_move
 I3 geforce gf_v2_cursor_show

@@ -277,3 +277,4 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a)
 {
     (void)a; return 0;
 }
+
