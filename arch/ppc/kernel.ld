@@ -16,6 +16,11 @@ SECTIONS
     . = PM_KERNEL_BASE;
     __kernel_image_start = .;
     .text : { KEEP(*(.text.entry)) *(.text .text.*) } :image
+    .rodata.boot_root : {
+        __root_image_start = .;
+        KEEP(*(.rodata.boot_root))
+        __root_image_end = .;
+    } :image
     .rodata : { *(.rodata .rodata.*) } :image
     .data : { *(.data .data.* .sdata .sdata.*) } :image
     /* OF-PPC binding:333-346: these describe firmware memory, not the
