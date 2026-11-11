@@ -166,7 +166,7 @@ static void exec_notify_owned(int id, int kind)
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
-    ime_owner_exit(id);
+    exec_ime_owner_exit(id);
     gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、
      * 畳んだのがその 1 本なら溜まっている打鍵を捨てる。**con_sink の所有を
@@ -331,11 +331,11 @@ void exec_exit(int status, int kind)
 {
     if (font_guard_active) font_guard_fault(0, 0, 0);
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
-    legacy_abort_begin();
-    legacy_end();
+    if (exec_legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    exec_legacy_abort_begin();
+    exec_legacy_end();
     ring3_context_clear();
-    legacy_cleanup();
+    exec_legacy_cleanup();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
@@ -350,9 +350,9 @@ static void exec_pending_transfer(int kind)
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
-    legacy_abort_begin();
-    legacy_end();
+    if (exec_legacy_closing()) { exec_stop_mark(); for (;;) { _stop(); } }
+    exec_legacy_abort_begin();
+    exec_legacy_end();
     ring3_context_clear();
     g_pending_id = id;
     g_pending_kind = kind;
@@ -375,8 +375,8 @@ static void exec_pending_finish(void)
     g_longjmp_id = 0;
     paging_load_cr3(paging_kernel_pd_phys());
     _enable();
-    legacy_end();
-    legacy_cleanup();
+    exec_legacy_end();
+    exec_legacy_cleanup();
     exec_finish(id, EXEC_ERR_FAULT, kind);
 }
 

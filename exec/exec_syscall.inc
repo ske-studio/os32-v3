@@ -39,7 +39,7 @@ static __attribute__((noinline)) int exec_kapi_special(u32 slot, void *wrapper,
                                                      u32 *result)
 {
     unsigned count = kapi_fixed_count[slot];
-    int handled = legacy_call_dispatch(slot, wrapper, src, count, result);
+    int handled = exec_legacy_call_dispatch(slot, wrapper, src, count, result);
     if (!handled && slot == KAPI_SLOT_KPRINTF) {
         if (!kapi_print_call(src)) return -1;
         *result = 0;

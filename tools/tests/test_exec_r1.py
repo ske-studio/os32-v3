@@ -88,6 +88,7 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 #define LEGACY_FAKE_LOWMAP_ENABLE
 #define LEGACY_FAKE_DISPATCH_ENABLE
 #include "legacy_guest_fake.h"
+#include "exec_legacy.h"
 
 static void exec_stop_mark(void) {}
 static struct arch_fp_context fp_parent[APP_SLOT_COUNT];
@@ -176,7 +177,7 @@ static void pcm_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
-void ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
+void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
 static void gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
@@ -239,6 +240,8 @@ static void simulate_action(void);
 static void _halt(void) { die(__LINE__); }
 volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow, ring3_park_reject_count;
 static u32 tick_count;
+static int exec_gfx_poll_due(u32 now) { (void)now; return 0; }
+static void exec_gfx_poll(void) {}
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
@@ -682,7 +685,7 @@ MUTATIONS = (
     ('stdin-ignore-empty', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
-    ('ime-owner-exit', '    ime_owner_exit(id);', ''),
+    ('ime-owner-exit', '    exec_ime_owner_exit(id);', ''),
     ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
@@ -696,8 +699,8 @@ MUTATIONS = (
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('resume-landing-invalidate', '    if (exec_setjmp(a->jmpbuf) != 0) {\n        ring3_context_clear();',
      '    if (exec_setjmp(a->jmpbuf) != 0) {'),
-    ('exit-invalidation', '    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish(appslot_cur()',
-     '    legacy_cleanup();\n    exec_finish(appslot_cur()'),
+    ('exit-invalidation', '    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish(appslot_cur()',
+     '    exec_legacy_cleanup();\n    exec_finish(appslot_cur()'),
     ('pending-invalidation', '    ring3_context_clear();\n    g_pending_id = id;',
      '    g_pending_id = id;'),
     ('landing-restore', '        ring3_context_restore(&caller_context);',
@@ -714,7 +717,7 @@ MUTATIONS = (
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
-    ('landing-if-missing', '    _enable();\n    legacy_end();', '    legacy_end();'),
+    ('landing-if-missing', '    _enable();\n    exec_legacy_end();', '    exec_legacy_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',

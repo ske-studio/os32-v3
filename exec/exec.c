@@ -447,7 +447,7 @@ int ring3_user_range_writable(u32 p, u32 len)
 
 i32 exec_trim_done(u32 epoch)
 {
-    if (legacy_pinned()) return OS32_ERR_BUSY;
+    if (exec_legacy_pinned()) return OS32_ERR_BUSY;
     struct caller_access c;
     AppSlot *slot;
     u32 pages;
