@@ -21,11 +21,6 @@ void console_write(const char *buf, u32 size, u8 color)
     pm_log_write(buf, size);
 }
 
-void shell_putchar(char ch, u8 color)
-{
-    console_write(&ch, 1, color);
-}
-
 void shell_print(const char *str, u8 color)
 {
     console_write(str, kstrlen(str), color);
