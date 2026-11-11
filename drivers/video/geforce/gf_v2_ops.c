@@ -201,6 +201,24 @@ static int readback(void *ctx, const struct gfx2_exec *ex, u8 *buf)
     int rc = gf_v2_deadline(g->ch, GF3_TIMEOUT_US, &dl);
     if (rc) return gf_v2_rc(rc);
     struct gf3_surface s = surface(ex->src);
+    /* C14 aliases borrow v1 storage and never pass through gf_v2_alloc.
+     * Resolve their current backing without reserving it a second time or
+     * caching an identity across a v1 rebind. Layer 3 still validates it.
+     * The download remains VRAM -> PCI staging M2MF, as in MIT
+     * xf86-video-nouveau/src/nouveau_exa.c:256-280. */
+    if ((ex->src->flags & GFX2_SF_ALIAS) && ex->src->pool == GFX2_POOL_VRAM) {
+        struct gf_vram_reservation v;
+        u32 cursor = 0;
+        while ((rc = gf_vram_next(g->ch, &cursor, &v)) > 0) {
+            if (s.off >= v.off && s.off - v.off <= v.bytes &&
+                s.bytes && s.bytes <= v.bytes - (s.off - v.off)) {
+                s.reservation_id = v.reservation_id;
+                s.generation = v.generation;
+                break;
+            }
+        }
+        if (rc <= 0) return gf_v2_rc(rc ? rc : GF3_ESTATE);
+    }
     const GFX2_Op *op = ex->op;
     struct gf3_ram ram = {buf, op->pitch * op->sh, op->pitch};
     return gf_v2_rc(gf3_download(g->g3, &s, (struct gf3_rect){op->sx, op->sy, op->sw, op->sh}, &ram, dl));
