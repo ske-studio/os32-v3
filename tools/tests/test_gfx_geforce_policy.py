@@ -51,7 +51,7 @@ MUTATIONS = (
     ('v2-lost', ' && !gf_v2_inst.lost;', ';'),
     ('v2-scan-guard', '    if (gf_v2_owns(front)) return;', '    (void)front;'),
     ('scan-notify', '    gfx_policy_scan_changed();', '    (void)0;'),
-    ('stop-reeval', '    gfx_policy_reeval();\n#endif\n    int rc = stop_device', '    (void)0;\n#endif\n    int rc = stop_device'),
+    ('stop-reeval', '    gfx_policy_reeval();\n    (void)gf_v2_idle();\n#endif\n    int rc = stop_device', '    (void)0;\n    (void)gf_v2_idle();\n#endif\n    int rc = stop_device'),
     ('enter-reeval', '    gfx_policy_reeval();\n#endif\n}\nstatic void geforce_leave', '    (void)0;\n#endif\n}\nstatic void geforce_leave'),
     ('direct-failure', '            geforce_fail(); /* DIRECT device failure */', '            (void)0; /* DIRECT device failure */'),
     ('started', 'active && gfx_is_started() && gf_direct_ok()', 'active && gf_direct_ok()'),

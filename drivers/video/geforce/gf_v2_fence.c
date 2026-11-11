@@ -9,6 +9,21 @@ static int gf_v2_fail(struct gf_v2 *g, int rc)
     return rc;
 }
 
+int gf_v2_fence_idle(struct gf_v2 *g, u32 dl)
+{
+    struct gf_v2_ring *r = &g->ring;
+    u32 at;
+    int rc;
+    if (!r->count || !g->ch || g->ch->state != GF2_RUN || g->ch->epoch != g->epoch) return 0;
+    at = (r->head + GF_V2_RING - 1) % GF_V2_RING;
+    rc = gf2_kick(g->ch);
+    if (!rc) rc = gf2_fence_wait(g->ch, r->e[at].f, dl);
+    if (rc) return gf_v2_fail(g, rc);
+    g->completed = r->e[at].v2;
+    r->tail = r->head; r->count = 0;
+    return 0;
+}
+
 int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
 {
     struct gf_v2_ring *r = &g->ring;

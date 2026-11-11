@@ -10,6 +10,16 @@ struct gf_v2 gf_v2_inst;
 #define GF_V2_FMT_MASK 0x1eu
 #define GF_V2_OP_MASK 0x7feu
 
+int gf_v2_idle(void)
+{
+    struct gf_v2 *g = &gf_v2_inst;
+    u32 dl;
+    int rc;
+    if (!g->ch) return 0;
+    rc = gf_v2_deadline(g->ch, GF_V2_STOP_US, &dl);
+    return rc ? rc : gf_v2_fence_idle(g, dl);
+}
+
 void gf_v2_stopped(void)
 {
     if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)

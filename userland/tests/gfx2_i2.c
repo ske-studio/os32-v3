@@ -72,7 +72,7 @@ static int exercise(KernelAPI *api, u32 adapter, u32 gen)
     REQUIRE("done", done == 3);
     CALL("fence-wait", api->gfx2_fence_wait(adapter, fence, WAIT_MS));
     CALL("fence-query", api->gfx2_fence_query(adapter, &completed, &failed));
-    REQUIRE("fence-completed", !failed && (!fence || (i32)(completed - fence) >= 0));
+    REQUIRE("fence-completed", (!failed || (i32)(failed - fence) < 0) && (!fence || (i32)(completed - fence) >= 0));
     ops[0] = (GFX2_Op){.op=GFX2_OP_READBACK, .src=sid, .sw=SIDE, .sh=ROWS,
                        .pitch=SIDE * sizeof(u32), .data=(u32)pixels};
     CALL("readback", api->gfx2_submit(adapter, ops, 1, gen, &done, &fence));

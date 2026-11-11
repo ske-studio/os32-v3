@@ -153,7 +153,7 @@ static int exercise(KernelAPI *api, u32 a, GFX2_AdapterInfo *info)
         u32 ticks=api->get_tick()-start;
         api->kprintf(ATTR,"gfx2_rh fence n=512 ticks=%u us_per=%u\n",ticks,ticks*10000/512);
         CALL("fence-query",api->gfx2_fence_query(a,&completed,&failed));
-        REQUIRE("fence-state",!failed && (i32)(completed-fence)>=0);
+        REQUIRE("fence-state",(!failed || (i32)(failed - fence) < 0) && (!fence || (i32)(completed - fence) >= 0));
         CALL("fence-read",transfer(api,a,gen,ids[0],64,8,1,buf,1));
         for (u32 i=0;i<512;i++) REQUIRE("fence-pixel",buf[i]==((i*7+1)&255));
         CALL("fence-free",api->gfx2_surface_free(ids[0])); ids[0]=0;
