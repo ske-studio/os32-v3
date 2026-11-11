@@ -43,6 +43,7 @@ Windows のレジストリに相当する「設定の置き場」を 1 つに決
 | `BOOTSERIAL=0/1` | kernel.c 起動処理 | 1 で root マウント後に起動ログをシリアルへ送る (既定 0) |
 | `GUI=0/1` | kernel.c 起動ループ | 次回起動の既定シェル |
 | `GFX=pc98\|pegc\|cirrus\|auto` | kernel.c → `gfx_set_backend_pref` | グラフィクスバックエンドの強制 |
+| `CONSOLE_DUAL=0/1` | kernel_gfx_config.inc → `con_dual_configure` | 1 で GeForce の D-SUB を別のモニターに直結した構成と宣言し、GUI の間も 98 の文字画面にコンソールを出し続ける (既定 0、[CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md) §5) |
 | (将来) `MOUSE=`、`KBD=` | ドライバ初期化 | 入力装置の種別 |
 
 ---
