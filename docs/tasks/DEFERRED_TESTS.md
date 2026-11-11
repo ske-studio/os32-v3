@@ -30,6 +30,8 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| HALV2-I1-GUEST | 新帯の起動自己試験・`gfx2_i1.bin` の lock 中監査と終了時回収、R1 のゲスト回帰 | I1 実装者の依頼はホストまで。NP21/W は PM が操作する | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、I1 のゲスト受入。手順と証拠の所在は `~/os32-tmp/run/halv2-i1/RESULT.md` |
+| HALV2-I1-DRAW | §13-1 の R2・R3・R4 の公開 submit による FILL/READBACK | I1 で CPU 写像・backing・回収を結線。C9/S 群の描画製品は I2 の担当で未実装 | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §14 の先行依存の扱い、I2 の完了前に必ず実行 |
 | TICK-A-MEASURE | A0/A1 の NP21/W・実機の負荷実測、IRQ 要求/配送の外部突合、raw ASM/モジュールを含む非 IRQ IF=0 の全区間 | 段 A1 の依頼は計測の道具と host 検証のみ。TSC 不可機の時間・IRQ1/IRQ10 遅延・外部要求欠落は未測定、常駐 C の IF=0 計測だけで全区間の合格にはしない | [TASK_TICK_1KHZ](v3/TASK_TICK_1KHZ.md) 段 A の実測・ゲート、B より前 |
 | PPC-BOOT-RH | ppc-boot の実機確認: QuickSilver と Apple OF 4.x での ELF・NOTE の受理、0x20000 の非衝突、stdout=screen の OF 行、`map` の可否 (窓 0x20 は PA がページ境界でない)、ch-a の open | 実機が動くか未確認 (ユーザー 2026-11-07)。QEMU では `map` の効果を証明できない | [TASK_PPC_BOOT](ppc/TASK_PPC_BOOT.md) §3、実機が動くと分かった時 |
 | PPC-MMU-RH | ppc-mmu の実機確認: 7450/7455 の HIGH_BAT と HID0 の手順、実機の DEC の pending、キャッシュと WIMG、OF の後の ESCC の配線。切り離しの後の観測路 (FB) が先に要る | 実機が動くか未確認 (ユーザー 2026-11-07)、QEMU はキャッシュと送信の律を測れない | [TASK_PPC_MMU](ppc/TASK_PPC_MMU.md)、実機が動くと分かった時 |

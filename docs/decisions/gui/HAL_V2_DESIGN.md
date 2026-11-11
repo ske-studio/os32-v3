@@ -1286,6 +1286,9 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 - Trident: sync.cfg の gap_ns=80 で欠けが 0 (11-08 の掃引と同じ台本)、sync.cfg が無い時は既定で動く (I3)。
 
 ## 14. 未決
+- I1 結線時の先行依存: C4 の作成に必須の C10 の能力初期化・照会、C13 のパレットの影、C9 の SW 関数表、Y4 の ctx の記憶域は I1 で強い実体を置く。能力の shim は現在の GfxMode から面の上限を作り、未実装の描画能力は広告しない。描画能力の合成は C10/I2、head の能力は I3 で完成させる。
+- I1 の R2・R3・R4 の host 結線は、実際の SYSMEM/GART backing・写像・CPU の読み書き・shim の fence・AS 回収までを組む。表の SW の hook と公開 submit の描画部分は I2 の部品なので、束の FILL/READBACK そのものの受入は I2 に残る。I1 の CPU の道の観測は `test_gfx2_i1.py`、ゲストは `gfx2_i1.bin`。
+- `gfx2_map_selftest` は kdebug の有無によらず exec_init の後で一度呼び、結果・回数を kernel.map の同名変数で公開し audit_fail に加える。既存の `paging_lease_unmap` は空の追加 PT をその場で返すため、PTE=0 または PDE/PT が既に除去済みを確認し、AS 破棄後の owner と空き頁数まで照合する。
 - 無し。ユーザー判断 (2026-11-10): LOST の後は自動の回復をしない (§6-3)、組込みの表の kernel .text の検査と in_submit の BUSY は持たない (§11-7・§5-3)。PM 決定: #1 遅延確保の上限 8MB (`GFX_GART_KB`)、不足は NOSPC。#2 `TRI_WRITE_GAP` は /etc/gfx/sync.cfg へ (引き継ぎと優先順は配備の手順、既定 80ns)。#3 はユーザー決定「AとC」で確定 (§9-1)。
 - 将来 #3 を同時出力へ広げる時に直す所 (今は直さない、記録だけ): §9-1 の ACTIVE の 1 個の決まり / C1 の `gfx2_adapter_activate` の ACTIVE を 1 個にする付け替えと `gfx2_sync_publish` の kind ごと 1 つの表 / head 系の口の NOSYS の分岐 (C11〜C13) (C は別票 CONSOLE_DUAL)。
 

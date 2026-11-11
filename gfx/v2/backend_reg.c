@@ -23,6 +23,14 @@ struct gfx2_adapter *gfx2_adapter_get(u32 index)
     return &gfx2_adapters[index];
 }
 
+int gfx2_adapter_gen(u32 index, u32 *gen)
+{
+    struct gfx2_adapter *a = gfx2_adapter_get(index);
+    if (!a || !gen) return OS32_ERR_INVAL;
+    *gen = a->gen;
+    return 0;
+}
+
 struct gfx2_adapter *gfx2_active(void)
 {
     for (u32 i = 0; i < GFX2_MAX_ADAPTERS; i++)

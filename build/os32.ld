@@ -43,12 +43,15 @@ SECTIONS
     .data : {
         *(.data)
         *(.data.*)
+        /* I1 shared tables survive until I2/I3 add their consumers. */
+        KEEP(*(.rodata.gfx2_sw_table))
         *(.rodata)
         *(.rodata.*)
     }
 
     .bss ALIGN(4) : {
         __bss_start = .;
+        KEEP(*(.bss.gfxsync_ctx_pool))
         *(.bss)
         *(.bss.*)
         *(COMMON)
