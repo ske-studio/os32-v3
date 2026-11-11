@@ -42,6 +42,8 @@ enum pln1_status {
 #define PLN1_TYPE_LOG 2
 #define PLN1_TYPE_REQ 3
 #define PLN1_TYPE_RSP 4
+enum { PLN1_TERM_OPEN = 5, PLN1_TERM_IN = 6,
+       PLN1_TERM_OUT = 7, PLN1_TERM_STATE = 8 };
 #define PLN1_HEADER_BYTES 80
 #define PLN1_ETHERTYPE 0x88b6
 #define PLN1_PAYLOAD_MAX 256
@@ -117,6 +119,10 @@ int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
 int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m);
+void pm_term_receive(const struct lan_message *, const u8 src[6]);
+void pm_term_write(const u8 *, u32 bytes);
+int pm_term_tx_peek(struct lan_message *);
+void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
 struct pm_lan_range { u32 base, size; };
 /* The service supplies valid fields and excludes RX buffers from peek_ok. */
 struct pm_lan_diag {
