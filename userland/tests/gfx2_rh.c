@@ -69,6 +69,26 @@ static int transfer(KernelAPI *api,u32 a,u32 gen,u32 sid,u32 w,u32 h,u32 cpp,u8 
     op.pitch=w*cpp; op.data=(u32)p;
     return submit(api,a,gen,&op,1,&fence);
 }
+/* Diagnostic for gart-fill-pixel: classify the bytes read back from GART. */
+static void gart_diag(KernelAPI *api,u32 a,u32 gen,u32 sid,const u8 *old,u32 round)
+{
+    for (u32 pass=0;pass<2;pass++) {
+        u32 bad=0, same=0, zero=0, first=0xffffffffu, last=0, done=0, failed=0;
+        if (pass) {
+            u32 t0=api->get_tick();
+            for (u32 k=0;k<50000000u && api->get_tick()-t0<50;k++) { }
+            if (transfer(api,a,gen,sid,256,64,1,buf,1)) { api->kprintf(ATTR,"gfx2_rh diag reread failed\n"); return; }
+        }
+        for (u32 i=0;i<256*64;i++) if (buf[i]!=0x44) {
+            bad++; same+=buf[i]==old[i]; zero+=!buf[i];
+            if (first==0xffffffffu) first=i;
+            last=i;
+        }
+        (void)api->gfx2_fence_query(a,&done,&failed);
+        api->kprintf(ATTR,"gfx2_rh diag round=%u pass=%u bad=%u old=%u zero=%u first=%u got=%x last=%u got=%x fence=%u failed=%u\n",
+            round,pass,bad,same,zero,first,first<256*64?buf[first]:0,last,buf[last],done,failed);
+    }
+}
 #define CALL(stage, expr) do { rc=(expr); if (rc) { fail(api,stage,rc); goto out; } } while (0)
 #define REQUIRE(stage, cond) do { if (!(cond)) { fail(api,stage,1); goto out; } } while (0)
 static const struct { u8 op,rop,flags,fmt,pool,expected_gf,expected_tr; } check_cases[]={
@@ -174,7 +194,7 @@ static int exercise(KernelAPI *api, u32 a, GFX2_AdapterInfo *info)
             op=(GFX2_Op){.op=GFX2_OP_COPY,.rop=0xcc,.src=ids[1],.dst=ids[0],.sw=256,.sh=64,.dw=256,.dh=64};
             CALL("gart-from-vram",submit(api,a,gen,&op,1,&fence));
             CALL("gart-read-g",transfer(api,a,gen,ids[0],256,64,1,buf,1));
-            for (u32 i=0;i<256*64;i++) REQUIRE("gart-fill-pixel",buf[i]==0x44);
+            for (u32 i=0;i<256*64;i++) if (buf[i]!=0x44) { gart_diag(api,a,gen,ids[0],data,round); REQUIRE("gart-fill-pixel",0); }
             op.dst=ids[2];
             CALL("gart-rebind-vram",submit(api,a,gen,&op,1,&fence));
             CALL("gart-read-v2",transfer(api,a,gen,ids[2],256,64,1,buf,1));
