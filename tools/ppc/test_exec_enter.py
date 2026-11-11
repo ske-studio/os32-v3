@@ -35,6 +35,13 @@ def inspect(source):
         if not re.search(r'lwz\s+r?' + operand.replace(',', r',\s*') + r'\(r?30\)', joined):
             raise RuntimeError('entry load missing: ' + operand)
     srr0 = next(i for i, line in enumerate(instructions) if line.startswith('mtsrr0'))
+    lr_clear = next((i for i, line in enumerate(instructions[:srr0])
+                     if re.fullmatch(r'li\s+r?0,\s*0', line)
+                     and i + 1 < srr0
+                     and re.fullmatch(r'mtlr\s+r?0', instructions[i + 1])), None)
+    if lr_clear is None or any(re.match(r'bl(?:\s|$)', line)
+                               for line in instructions[lr_clear + 2:srr0]):
+        raise RuntimeError('LR not cleared after last call')
     if not instructions[srr0 + 1].startswith('mtsrr1') or instructions[srr0 + 2] != 'rfi':
         raise RuntimeError('SRR transition sequence incorrect')
     match = re.search(r'ori\s+r?8,r?8,(\d+)', joined)

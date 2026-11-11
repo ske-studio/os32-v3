@@ -13,6 +13,8 @@ arch_entry_enter:
     stw 1,ppc_exec_kernel_sp@l(3)
     mr 3,31
     bl ppc_boot_load_root
+    li 0,0
+    mtlr 0
     lwz 7,0(30)
     lwz 1,4(30)
     lwz 3,8(30)
