@@ -1519,3 +1519,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 
 **ユーザーの判断が要る分岐**: GF の色鍵の COPY と α の HW 化。nouveau の手本に従うと NV44A の 2D には無く、3D (curie) の別設計になる。今回は sw (Win32・DirectX の互換で色鍵の blit が多いアプリは CPU の負荷になる)。
 - **GF の色鍵の COPY と α (ユーザー決定 2026-11-11)**: 推奨の「今は sw、HW は後で 3D で」。NV44A の 2D に手本が無いので、HAL v2 では sw で行い (段 G3・G6 は廃止)、HW 化は nouveau の 3D (curie) を手本にした別の設計として後の票に残す。
+
+## 確定の後の追記 (2026-11-11、T1 の診断の上書き、PM 決定)
+- Y4 の追補: `gfxsync_override(ctx, method, unit, gap)` はその ctx の方式・単位・間隔を一時変更し 0/INVAL、`gfxsync_override_clear(ctx)` は bind 時の値に戻す。§10 の範囲と hook の検査を適用し、失敗時は変更しない。方式定数は include/gfx_sync.h に置く。
+- 担当は include/gfx_sync.h・gfx/sync/sync_int.h・sync_bind.c・a0_weak.c と tools/checks/gfx2_wiring.txt (I3 kernel)、使い手は T1 の診断。host 試験で切替・復元・無効値を検査する。

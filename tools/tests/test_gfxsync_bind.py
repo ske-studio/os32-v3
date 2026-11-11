@@ -32,9 +32,10 @@ def main():
             for anchor in ['(c->method == GFXSYNC_M_SYNC_READ && !t->sync_read)',
                            '(c->method == GFXSYNC_M_WAIT_PORT && !t->wait_port)',
                            '(c->flush == GFXSYNC_F_READBACK && !t->flush)',
-                           'c->read == GFXSYNC_R_SHADOW || !t->read32']:
+                           'c->read == GFXSYNC_R_SHADOW || !t->read32',
+                           'ctx->cfg = ctx->bind_cfg;']:
                 assert source.count(anchor) == 1
-                rc = observe(work, source.replace(anchor, '0'))
+                rc = observe(work, source.replace(anchor, '(void)0;' if anchor.endswith(';') else '0'))
                 assert rc != 0, (anchor, rc)
                 print(f'RED runtime rc={rc}: {anchor}')
     print('PASS Y4 bind')

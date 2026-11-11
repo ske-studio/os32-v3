@@ -36,6 +36,24 @@ static int run(void)
     t.sync_read=hook; t.wait_port=hook; t.flush=hook;
     config.mode=GFXSYNC_SHADOW; t.read32=0;
     if (gfxsync_bind("x", &t, &c[0]) || c[0]->cfg.read != GFXSYNC_R_SHADOW) return 11;
+    if (gfxsync_override(c[0], GFXSYNC_M_GAP, 4, 80) ||
+        c[0]->cfg.method != GFXSYNC_M_GAP || c[0]->cfg.unit != 4 ||
+        c[0]->gap_loops != 87) return 13;
+    if (gfxsync_override(c[0], 256, 1, 0) != OS32_ERR_INVAL ||
+        gfxsync_override(c[0], GFXSYNC_M_PLAIN, 3, 0) != OS32_ERR_INVAL ||
+        gfxsync_override(c[0], GFXSYNC_M_PLAIN, 1, 100001) != OS32_ERR_INVAL ||
+        c[0]->cfg.method != GFXSYNC_M_GAP || c[0]->gap_loops != 87) return 14;
+    if (gfxsync_override(c[0], GFXSYNC_M_SYNC_READ, 2, 20)) return 15;
+    gfxsync_override_clear(c[0]);
+    if (c[0]->cfg.method != config.method || c[0]->cfg.unit != config.unit ||
+        c[0]->cfg.gap_ns != config.gap_ns || c[0]->gap_loops != 7 + config.gap_ns) return 16;
+    t.sync_read = 0;
+    gfxsync_unbind(c[0]);
+    if (gfxsync_override(c[0], 0, 1, 0) != OS32_ERR_INVAL ||
+        gfxsync_override(0, 0, 1, 0) != OS32_ERR_INVAL) return 17;
+    gfxsync_override_clear(c[0]); gfxsync_override_clear(0);
+    if (gfxsync_bind("x", &t, &c[0])) return 18;
+    if (gfxsync_override(c[0], GFXSYNC_M_SYNC_READ, 1, 0) != OS32_ERR_INVAL) return 19;
     gfxsync_unbind(c[0]); t.va=0;
     if (gfxsync_bind("x", &t, &c[0]) != OS32_ERR_INVAL) return 12;
     return 0;
