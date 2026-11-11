@@ -11,6 +11,8 @@ struct addrspace;
 #define GFX2_MAX_ADAPTERS 4
 #define GFX2_MAX_SURFACES 1024
 #define GFX2_HEAP_BLOCKS 2048
+#define GFX2_CPU_R 1u
+#define GFX2_CPU_W 2u
 #define GFX2_SF_ALIAS 1
 #define GFX2_SF_KEEP 2
 #define GFX2_KIND_PC98 1
