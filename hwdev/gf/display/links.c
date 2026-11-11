@@ -265,14 +265,34 @@ static i32 links_tv_gpio(void *owner,bool on,u32 dl)
     return 0;
 }
 /* nouveau-v6.1 nouveau_bios.c:93-106,673-677: raw CR44 head select,
- * save only SEL_CLK binding bits. B10 owns bind and CR44 owner restoration;
- * its script-before/khz>165000 policy is the approved nouveau difference. */
-enum { LINKS_SEL_CLK=0x680524U, LINKS_BINDING=0x50000U };
+ * save SEL_CLK binding bits; bind after the script and before restoring them. */
+enum { LINKS_SEL_CLK=0x680524U, LINKS_BINDING=0x50000U,
+       LINKS_OR_C=4U, LINKS_STRIDE=0x2000U, LINKS_BANK_STRIDE=8U,
+       LINKS_TMDS_DATA=0x6808b4U, LINKS_TMDS_CONTROL=0x6808b0U,
+       LINKS_BIND_BASE=0x80U, LINKS_BIND_OTHER=8U, LINKS_BIND_LVDS=1U,
+       LINKS_BIND_INDEX=4U, LINKS_DUAL_KHZ=165000U };
 static i32 links_script_deadline(struct gf_io *io,u32 dl,u8 head,const char *stage)
 {
     u32 now;
     if (io->timing.clock_us(io->opaque,&now)) return -1;
     return (i32)(now-dl)>=0 ? gf4_timeout(stage,head,dl,now,0,0) : 0;
+}
+static i32 links_bind_head(struct gf_io *io,const struct gf4_route *route,u32 khz)
+{
+    i32 rc=0;
+    {
+        u32 ramdac=(route->or_mask&LINKS_OR_C)>>2;
+        u32 bind=LINKS_BIND_BASE|(route->head!=ramdac ? LINKS_BIND_OTHER : 0U)|
+            (route->type==GF4_LVDS ? LINKS_BIND_LVDS : 0U);
+        /* nouveau_bios.c:120,205 LVDS uses fp.dual_link; :674 TMDS pxclk>=165000. */
+        bool dual=route->type==GF4_LVDS ? route->dual_link : khz>=LINKS_DUAL_KHZ;
+        for (u32 bank=0;!rc && bank<(dual ? 2U : 1U);++bank) {
+            u32 off=ramdac*LINKS_STRIDE+bank*LINKS_BANK_STRIDE;
+            rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,LINKS_TMDS_DATA+off,4,bind^(bank ? LINKS_BIND_OTHER : 0U)) ? -1 : 0;
+            if (!rc) rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,LINKS_TMDS_CONTROL+off,4,LINKS_BIND_INDEX) ? -1 : 0;
+        }
+    }
+    return rc;
 }
 static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u32 dl)
 {
@@ -334,6 +354,7 @@ static i32 links_tmds_script(void *owner,const struct gf4_route *route,u32 khz,u
             if (!rc) rc=-1;
         }
     }
+    if (!rc) rc=links_bind_head(io,route,khz);
     if (saved) {
         int cleanup=io->read(io->opaque,GF_MODE_REGISTER_BAR,LINKS_SEL_CLK,4,&value);
         if (!cleanup) cleanup=io->write(io->opaque,GF_MODE_REGISTER_BAR,LINKS_SEL_CLK,4,
