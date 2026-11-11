@@ -784,7 +784,7 @@ i32 gf4_tmds_script_select(const u8 *rom, u32 size,
 - fake の owner/io に窓の貸出し/返却・PC/head/OR/dl 観測、ROM 範囲と clock 閾値の fixture、途中失敗を足す。head0 強制、OR取り違え、閾値比較逆転、期限更新、DATA/address逆転、cleanup脱落の各変異に正常対照を置く。再 acquire で A2/main/PC-98 切替なし、窓外参照なしも照合する。start → TMDS 設定 → release → TMDS 設定で expected_pmc が保たれ、2 回目の validate が通ることを確認する。
 - 表選択: V/nouveau_bios.c:66–91,627–680,904–962。head/outp: N/dispnv04/disp.h:175–184、N/dispnv04/dfp.c:446–460。head binding/CR44/SEL_CLK: V/nouveau_bios.c:93–106,673–677、N/dispnv04/dfp.c:68–90。
 - 表参照/命令: N/nvkm/subdev/bios/init.c:359–424,539–572,1093–1143,1663–1682,1727–1744。nouveau の outp 全体に代えて必要な OR を値渡しし、head は独立して渡す。
-- 差分理由（ID 1/8）: nouveau の script 後 bind・khz>=165000 に対し、PM 決定により B10 の script 前 bind・khz>165000 を保持し C2 では bind しない。未知 selector は nouveau の無書込み継続と異なり、既存 decoder の未知操作拒否に合わせ -1 で止める。SUB 表の値 0 は手本どおりスキップ。
+- head の bind は手本どおり (PM 決定 2026-11-11、手本に寄せる): TMDS の script の**後**に bind する (V/nouveau_bios.c:93–106・673–677 の `nv04_dfp_bind_head`、script の前後で SEL_CLK を戻す所も含む)。dual-link の閾値は手本どおり `khz >= 165000` (V/nouveau_bios.c:674)。未知 selector は nouveau の無書込み継続と異なり、既存 decoder の未知操作拒否に合わせ -1 で止める。SUB 表の値 0 は手本どおりスキップ。
 - 差分理由: OS32 は既存の有限 scratch・命令上限・絶対期限・負rc・一時 ROM 借用を持つため、その契約へ接続する。nouveau に無い再入監視・能力bit・別 interpreter・常駐コピーは追加しない。ROM 境界検査は既存 decoder の責務の延長。
 - 未決（ユーザー判断）0件。今回は静的照合のみ。ビルド・試験・実機確認は未実施で、上記は各実装段の受入条件。
 - 反論: 0件。
