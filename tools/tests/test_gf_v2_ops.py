@@ -9,6 +9,7 @@ from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
 MUTATIONS = (
+    ('gart-to-2d', 'if (op->op == GFX2_OP_COPY && ex->dst->pool == GFX2_POOL_GART) {', 'if (0) {'),
     ('alias-destination', 'rc = surface(g, ex->dst, &dst);', 'dst = (struct gf3_surface){ex->dst->gpu_off, ex->dst->bytes, ex->dst->pitch, ex->dst->w, ex->dst->h, (enum gf3_fmt)(ex->dst->fmt - GFX2_FMT_INDEX8), ex->dst->priv[0], ex->dst->priv[1], 0}; rc = 0;'),
     ('alias-source', 'rc = surface(g, ex->src, &src);', 'src = dst; src.reservation_id = 0; rc = 0;'),
     ('stopped-unregister', 'if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)', 'if (0)'),
