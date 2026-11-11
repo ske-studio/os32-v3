@@ -223,7 +223,7 @@ def main():
             def heap_context_parts(source):
                 body = function(source, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')
                 start = source.index('        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);')
-                end = source.index('        if (want_ring3) kselftest_run_audit', start)
+                end = source.index('        if (want_ring3) exec_selftest_run_audit', start)
                 return body + '\nstatic void heap_init_context(AppSlot *ctx, int want_ring3, u32 exec_heap_base, u32 exec_heap_size) {\n' + source[start:end] + '}\n'
 
             def public_parts(source):

@@ -376,7 +376,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         if (want_ring3) exec_heap_user_init(ctx->as);
         else if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
 
-        if (want_ring3) kselftest_run_audit("AS-launch");
+        if (want_ring3) exec_selftest_run_audit("AS-launch");
 
         arch_fp_save(&fp_parent[fp_depth]);
         arch_fp_init();

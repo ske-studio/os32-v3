@@ -108,7 +108,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     (tmp / 'heap_source.c').write_text(read('exec/exec_heap.c'))
     context = function(exe, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')
     a = exe.index('        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);')
-    b = exe.index('        if (want_ring3) kselftest_run_audit', a)
+    b = exe.index('        if (want_ring3) exec_selftest_run_audit', a)
     (tmp / 'heap_context_source.c').write_text(context +
         '\nstatic void heap_init_context(AppSlot *ctx, int want_ring3, u32 exec_heap_base, u32 exec_heap_size) {\n' + exe[a:b] + '}\n')
     (tmp / 'wm_source.c').write_text('volatile u32 ring3_wm_depth_underflow;\n' +

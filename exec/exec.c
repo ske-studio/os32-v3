@@ -8,7 +8,7 @@
 #include "memmap.h"
 #include "exec.h"
 #include "kselftest.h"
-#include "kselftest_probe.h"
+#include "exec_selftest.h"
 #include "config.h"
 #include "os32x_hdr.h"
 #include "appslot.h"
