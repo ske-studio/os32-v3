@@ -337,6 +337,10 @@ def product():
     print('PASS paired GF product: P2/P3 symbols, independent of KDEBUG, relocation',flush=True)
 
 MUTATIONS = {
+    'v2-unregister': ('gfx2_adapter_unregister(&gfx_backend_geforce);', '(void)0;'),
+    'v2-hooks': ('if (!module_text_contains(r, v2_entries[i])) {', 'if (false) {'),
+    'v2-copy': ('candidate.v2 = &gf_v2_kcopy;', 'candidate.v2 = v;'),
+    'v2-module': ('candidate.v2_mod = r;', 'candidate.v2_mod = 0;'),
     'getter-registration': ('return registered ? accel_slot : 0;', 'return accel_slot;'),
     'start-slot-clear': ('failed:\n    accel_slot=0;', 'failed:\n    (void)accel_slot;'),
     'detach-slot-clear': ('/* Close admission even when the module must retain its resources. */\n    accel_slot=0;', '/* Close admission even when the module must retain its resources. */\n    (void)accel_slot;'),

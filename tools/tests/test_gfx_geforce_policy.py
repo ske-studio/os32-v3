@@ -48,6 +48,7 @@ CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('v2-lost', '    if (gf_v2_lost()) return 0;', '    (void)gf_v2_lost;'),
     ('scan-notify', '    gfx_policy_scan_changed();', '    (void)0;'),
     ('stop-reeval', '    gfx_policy_reeval();\n#endif\n    int rc = stop_device', '    (void)0;\n#endif\n    int rc = stop_device'),
     ('enter-reeval', '    gfx_policy_reeval();\n#endif\n}\nstatic void geforce_leave', '    (void)0;\n#endif\n}\nstatic void geforce_leave'),
