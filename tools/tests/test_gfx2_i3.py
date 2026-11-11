@@ -9,7 +9,7 @@ from test_gfx2_i1 import observe
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='gfx2-i3-host', tier=2, needs=['make:all'], budget=120,
-    covers=['tools/tests/test_gfx2_i1.py', 'tools/tests/gfx2_i1_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py', 'tools/tests/paging_source.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/**', 'gfx/v2/**', 'gfx/sync/**', 'gfx/gfx.h', 'gfx/gfx_policy.h', 'gfx/palette.c', 'gfx/palette.h', 'mm/**', 'include/**', 'sdk/include/**', 'lib/kstring.h', 'lib/kstring_c.c', 'lib/dma_contract.c', 'kernel/module/**', 'kernel/console/display_restore.h', 'exec/lease.c', 'exec/lease.h', 'exec/appslot.h', 'init/kernel.c', 'build/os32.ld', 'userland/tests/gfx2_i1.c', 'userland/deploy.yaml', 'tools/tests/test_gfx2_i3.py',
+    covers=['tools/tests/test_gfx2_i1.py', 'tools/tests/gfx2_i1_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py', 'tools/tests/paging_source.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/**', 'gfx/v2/**', 'gfx/sync/**', 'gfx/gfx.h', 'gfx/gfx_core.c', 'gfx/gfx_policy.h', 'gfx/palette.c', 'gfx/palette.h', 'mm/**', 'include/**', 'sdk/include/**', 'lib/kstring.h', 'lib/kstring_c.c', 'lib/dma_contract.c', 'kernel/module/**', 'kernel/console/display_restore.h', 'exec/lease.c', 'exec/lease.h', 'exec/appslot.h', 'init/kernel.c', 'build/os32.ld', 'userland/tests/gfx2_i1.c', 'userland/deploy.yaml', 'tools/tests/test_gfx2_i3.py',
             'tools/tests/gfx2_i3_host.c', 'assets/gfx/sync.cfg', 'build/core.yaml',
             'userland/tests/gfx2_i3.c', 'build/app.conf', 'build/programs.mk',
             'fs/vfs.h', 'kernel/time/cpu_calibrate.h'])
