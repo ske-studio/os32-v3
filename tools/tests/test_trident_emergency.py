@@ -6,7 +6,7 @@ The classifier, hook, rc handling and actual TVRAM calls remain product code.
 Hardware sequence assembly belongs to test_trident_lifecycle, in tri-life.
 """
 CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
-    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
+    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
             'gfx/gfx_core*.inc', 'drivers/video/cirrus/backend_cirrus.c',
             'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c',
             'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c',

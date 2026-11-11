@@ -27,6 +27,5 @@ void gfxsync_unbind(GfxSyncCtx *);
 int gfxsync_mode(const GfxSyncCtx *);    /* Y4。bind の後の実効の mode (既定へ落ちた後の値)。NULL は 0 */
 
 void gfxsync_profile(const GfxSyncCtx *, char out[16]);   /* Y4: matched sync.cfg section, or empty */
-void gfxsync_profile(const GfxSyncCtx *, char out[16]);
 
 #endif

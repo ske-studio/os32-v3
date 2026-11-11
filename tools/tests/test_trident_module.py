@@ -3,7 +3,7 @@
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
 CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
-    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
+    covers=['tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
             'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
             'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py',

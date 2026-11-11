@@ -258,10 +258,10 @@ enum module_field {
         .ops_version = 7U, \
         .ops_slots = 2U, \
         .image_max = 262144U, \
-        .mem_max = 262144U, \
+        .mem_max = 393216U, \
         .reloc_max = 8192U, \
         .export_max = 2U, \
-        .load_span_max = 327680U, \
+        .load_span_max = 458752U, \
     }, \
     { \
         .module_id = 13U, \

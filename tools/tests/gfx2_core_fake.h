@@ -7,6 +7,8 @@
 int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)
 { (void)v1; (void)kind; (void)flags; return OS32_ERR_NOSYS; }
 struct gfx2_adapter *gfx2_active(void) { return NULL; }
+int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 head)
+{ (void)a; (void)head; return OS32_ERR_NOSYS; }
 void gfx2_head_detach(struct gfx2_adapter *a, u32 head) { (void)a; (void)head; }
 void gfx2_pal_reset16(void) { }
 void gfx2_pal_set_v1(int first, int count, const u8 *rgb)

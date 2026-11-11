@@ -1735,3 +1735,5 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 ## 確定の後の追記 (2026-11-11、T1 の診断の上書き、PM 決定)
 - Y4 の追補: `gfxsync_override(ctx, method, unit, gap)` はその ctx の方式・単位・間隔を一時変更し 0/INVAL、`gfxsync_override_clear(ctx)` は bind 時の値に戻す。§10 の範囲と hook の検査を適用し、失敗時は変更しない。方式定数は include/gfx_sync.h に置く。
 - 担当は include/gfx_sync.h・gfx/sync/sync_int.h・sync_bind.c・a0_weak.c と tools/checks/gfx2_wiring.txt (I3 kernel)、使い手は T1 の診断。host 試験で切替・復元・無効値を検査する。
+
+- **I3 の容量 (PM 決定 2026-11-11)**: GeForce module の mem_max は実測 305,616 B に余裕を持たせ 393,216 B (384 KiB)、load_span_max は従来の prefix の余裕 64 KiB を加え 458,752 B (448 KiB)、image_max は 262,144 B を維持する。kernel は固定帯を持たず pgalloc から確保する。値の正・生成の表・manifest・固定値の試験・[容量の台帳](../../08_build.md#起動時に読む部品の大きさの上限と由来) を追従する。
