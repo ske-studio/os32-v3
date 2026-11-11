@@ -11,6 +11,7 @@
 #include "surface_query.h"
 #include "appslot.h"
 #include "../gfx/gfx.h"
+#include "../gfx/v2/gfx2_int.h"
 #include "os32_kapi_shared.h"
 static u32 lease_next_token = 1;
 u32 lease_selftest_result;
@@ -66,7 +67,7 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
         /* First-fit whole-page span; previous prepared spans are below base. */
         for (;;) {
             u32 next = base;
-            if (base >= MEM_LEASE_END || sf->npages > (MEM_LEASE_END - base) / PAGE_SIZE)
+            if (base >= MEM_LEASE_ALLOC_END || sf->npages > (MEM_LEASE_ALLOC_END - base) / PAGE_SIZE)
                 return LEASE_FULL;
             for (j = 0; j < MEM_LEASE_MAX; j++) {
                 const struct as_lease *l = &as->leases[j];
@@ -173,8 +174,8 @@ int lease_check(const struct addrspace *as)
         const struct as_lease *l = &as->leases[i];
         if (!l->token) continue;
         if (l->sid >= LEDGER_MAX_SURFACES || !l->npages || l->base % PAGE_SIZE ||
-            l->base < MEM_LEASE_BASE || l->base >= MEM_LEASE_END ||
-            l->npages > (MEM_LEASE_END - l->base) / PAGE_SIZE) return LEASE_INVAL;
+            l->base < MEM_LEASE_BASE || l->base >= MEM_LEASE_ALLOC_END ||
+            l->npages > (MEM_LEASE_ALLOC_END - l->base) / PAGE_SIZE) return LEASE_INVAL;
         const struct ledger_surface *sf = &ledger_surfaces[l->sid];
         u32 flags = l->flags & ~AS_LEASE_GFX_COMPAT;
         u32 cache = sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0;
@@ -210,7 +211,7 @@ int lease_check(const struct addrspace *as)
         for (u32 di = first; di <= last; di++)
             if (!as->lease_pt_phys[di]) return LEASE_INVAL;
     }
-    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {
+    for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {
         if (!as->lease_pt_phys[di]) continue;
         const u32 *pt = P2V(as->lease_pt_phys[di]);
         for (u32 ti = 0; ti < PTE_COUNT; ti++) {
@@ -378,6 +379,7 @@ int lease_audit_all(void)
         paging_load_cr3(paging_kernel_pd_phys());
         bad += paging_as_audit(a->as, shlib_read_page) != 0;
         bad += lease_check(a->as) != 0;
+        bad += gfx2_map_audit(a->as) != 0;
         for (u32 i = 0; i < MEM_LEASE_MAX; i++) {
             const struct as_lease *l = &a->as->leases[i];
             if (l->token && l->sid < LEDGER_MAX_SURFACES) refs[l->sid]++;
