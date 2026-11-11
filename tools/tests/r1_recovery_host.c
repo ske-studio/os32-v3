@@ -121,6 +121,9 @@ static void exec_reclaim_owned(int id,int kind) { (void)id; (void)kind; CHECK(0)
 int lease_revoke_all(struct addrspace *as) { (void)as; return 0; }
 int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
+#include "exec_legacy.h"
+#include "exec_gfx_poll.h"
+#include "exec_serial_diag.h"
 #include "owner_diag.h"
 /* R1 recovery runs outside SQLite; the engine fixture tests active faults. */
 static volatile u32 sqlite_engine_active;

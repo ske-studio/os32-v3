@@ -21,7 +21,7 @@ MUTANTS = [
  ('gcap-ops',PATHS[0],'    gcap_ops = 0;','    (void)0;','FAIL !gcap_owned'),
  ('gcap-TV',PATHS[0],'    tv_restore(tv);','    (void)tv;','FAIL freed == 2 && restored == 1 && cursor == 1'),
  ('stop-mark','exec/exec.c','    exec_stop_count++;','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
- ('stop-serial','exec/exec.c','    serial_puts_polled("OS32: exec teardown stopped\\r\\n");','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
+ ('stop-serial','exec/exec.c','    exec_serial_puts_polled("OS32: exec teardown stopped\\r\\n");','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
  ('VM-gate',PATHS[2],'        jnz     .dispatch','        nop','FAIL host_vm_gate(0x20000) == 0'),
  ('probe-before-only',PATHS[3],'    kaudit_post_probe();','','FAIL audit after probe'),
 ]

@@ -36,21 +36,21 @@ MUTATIONS = (
     ('return-gfx', 'arch/x86/legacy/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
     ('kill-gcap-release', 'arch/x86/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
     ('end-guest-iopl', 'arch/x86/legacy/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
-    ('direct-kill-no-end', 'exec/exec.c', '    legacy_end();\n    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish', '    ring3_context_clear();\n    legacy_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
+    ('direct-kill-no-end', 'exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', '    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
     ('end-reentry', 'arch/x86/legacy/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
-    ('landing-if', 'exec/exec.c', '    _enable();\n    legacy_end();', '    legacy_end();\n    _enable();', 'FAIL release IF enabled'),
+    ('landing-if', 'exec/exec.c', '    _enable();\n    exec_legacy_end();', '    exec_legacy_end();\n    _enable();', 'FAIL release IF enabled'),
     ('restore-flush', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
     ('restore-current-pde', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
     ('int80-offset', 'arch/x86/legacy/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
 
-    ('exec-gate', 'exec/exec.c', '    if (legacy_lowmap_busy()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
-    ('resume-gate', 'exec/exec.c', '    if (legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
-    ('kill-no-release', 'exec/exec.c', '    legacy_end();\n    legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
+    ('exec-gate', 'exec/exec.c', '    if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
+    ('resume-gate', 'exec/exec.c', '    if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
+    ('kill-no-release', 'exec/exec.c', '    exec_legacy_end();\n    exec_legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'arch/x86/legacy/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
     ('page0-forget', 'platform/pc98/bios_snapshot.c', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);\n    real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'platform/pc98/gfx_surfaces.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'platform/pc98/bios_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
-    ('kill-no-end', 'exec/exec.c', '    legacy_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
+    ('kill-no-end', 'exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
     ('fixed-restore', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
     ('active-pde', 'mm/paging.c', '    ((u32 *)P2V(s->root))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
     ('session-gate', 'mm/paging.c', '!lowmap_token || lowmap_token != s || base >= end', 'base >= end', 'FAIL V86 outside session unchanged'),
@@ -101,8 +101,8 @@ MUTATIONS = (
 
 def wiring(sources):
     e = sources['exec/exec.c']
-    for name, guard in (('exec_launch', 'if (legacy_lowmap_busy()) return EXEC_ERR_INVALID;'),
-                        ('exec_resume', 'if (legacy_lowmap_busy()) return OS32_ERR_BUSY;')):
+    for name, guard in (('exec_launch', 'if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;'),
+                        ('exec_resume', 'if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;')):
         body = function(e, name)
         start = body.index('\n{')
         # Both refusals precede any state change; font was added in T7b-a2.

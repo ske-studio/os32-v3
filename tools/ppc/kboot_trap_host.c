@@ -100,7 +100,7 @@ int main(void)
         fatal(&f,PPC_TRAP_UNREGISTERED);
     }
     assert(handled==2 && f.gpr[3]==2);
-    f.srr1=0x4000; fatal(&f,0x100|PPC_TRAP_USER); f.srr1=0;
+    f.vector=PPC_VECTOR_DSI; f.srr1=0x4000; fatal(&f,0x100|PPC_TRAP_USER); f.srr1=0;
     for(u32 i=0;i<3;++i) {
         checkpoint(80+i);
         u32 before=dumps;
@@ -113,3 +113,8 @@ int main(void)
 }
 
 void _start(void) { int rc=main(); __asm__ volatile("movl $1,%%eax; int $0x80" : : "b"(rc) : "eax"); __builtin_unreachable(); }
+
+/* The fixture never enters an exec user context. */
+struct arch_syscall;
+void exec_syscall_dispatch(struct arch_syscall *call) { (void)call; }
+void ring3_fault_kill(void) { }

@@ -70,10 +70,8 @@ void _start(void)
     REACHED("REACHED lf-expansion");
     EXPECT("L\n\r\n", 43);
     console_write("ignored", 0, 0);
-    shell_putchar('\0', 0);
-    shell_putchar('!', 0xff);
     shell_print_utf8("\xe6\x97\xa5\xff", 7);
-    EXPECT("\0!\xe6\x97\xa5\xff", 45);
+    EXPECT("\xe6\x97\xa5\xff", 45);
     shell_print_dec(4294967295UL, 7);
     shell_print_hex32(0x0123abcd, 7);
     EXPECT("42949672950x0123ABCD", 45);

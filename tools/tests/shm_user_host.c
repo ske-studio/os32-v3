@@ -201,6 +201,7 @@ void exec_longjmp(k_jmpbuf buf) {
 #define LEGACY_FAKE_CLEANUP_ENABLE
 #define LEGACY_FAKE_CLEANUP do { (void)0; } while (0)
 #include "legacy_guest_fake.h"
+#include "exec_legacy.h"
 static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
     CHECK(!v86_session.release_pending, "kill release before owner reclaim");

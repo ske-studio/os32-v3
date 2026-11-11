@@ -6,7 +6,7 @@ CHECK = dict(name='appmem-map-host', tier=1,
     covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=5.9)
 
-from exec_source import read_text
+from exec_source import exec_fixture_preamble, read_text
 from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
@@ -218,12 +218,12 @@ def main():
                 dispatch = function(source, 'void exec_syscall_dispatch(')
                 tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
                 parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int prev_caller = 0, prev_in_syscall = 0; struct arch_syscall *prev_frame = 0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
-                return '#include "owner_diag.h"\n' + '\n'.join(parts)
+                return exec_fixture_preamble() + '\n'.join(parts)
 
             def heap_context_parts(source):
                 body = function(source, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')
                 start = source.index('        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);')
-                end = source.index('        if (want_ring3) kselftest_run_audit', start)
+                end = source.index('        if (want_ring3) exec_selftest_run_audit', start)
                 return body + '\nstatic void heap_init_context(AppSlot *ctx, int want_ring3, u32 exec_heap_base, u32 exec_heap_size) {\n' + source[start:end] + '}\n'
 
             def public_parts(source):

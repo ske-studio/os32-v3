@@ -117,6 +117,7 @@ void ring3_wm_leave(void) { assert(u6_wm); u6_wm=false; }
 /* Actual sys_halt/reboot, yield/poll, syscall completion, display_failed,
  * gui_display_failed and appslot_abort_request bodies, extracted verbatim.
  * CPU halt alone is substituted by the driver. */
+#include "exec_gfx_poll.h"
 #include "gf5_foreground_entries.h"
 
 static i32 u6_session_request(u32 op,u32 action,int owner)

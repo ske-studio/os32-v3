@@ -41,7 +41,7 @@ def exec_sources(sources):
                      source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
     constants = '\n'.join(line for line in source.splitlines() if
                           line.startswith(('#define EXEC_LJ_', 'static volatile int g_longjmp_')))
-    sources['exec_source.inc'] = constants + '\n' + context + '\n' + '\n'.join(
+    sources['exec_source.inc'] = '#include "exec_legacy.h"\n' + constants + '\n' + context + '\n' + '\n'.join(
         function(source, name) for name in (
             'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
             'exec_restore_context', 'exec_park_transfer', 'exec_park', 'exec_resume'))

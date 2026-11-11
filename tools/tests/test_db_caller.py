@@ -37,7 +37,7 @@ def sources():
         start = generated.index('int __cdecl ' + name + '(')
         result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2] + '\n'
     start = src.index('void exec_syscall_dispatch(')
-    result['dispatch'] = 'static void exec_cui_display_abort(void) {}\n' + syscall_providers(walk.ROOT) + src[start:src.index('\n}', start) + 2]
+    result['dispatch'] = '#include "exec_legacy.h"\n#include "exec_gfx_poll.h"\nstatic void exec_cui_display_abort(void) {}\n' + syscall_providers(walk.ROOT) + src[start:src.index('\n}', start) + 2]
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
     result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
     guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()

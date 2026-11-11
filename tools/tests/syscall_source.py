@@ -22,6 +22,6 @@ def syscall_providers(root, read=None):
             ''.join('#define arch_kapi_' + n + ' host_arch_kapi_' + n + '\n'
                     for n in ('source', 'read_block', 'invoke', 'va_next')) +
             '#define ring3_syscall_dispatch host_ring3_syscall_dispatch\n'
-            '#endif\n#include "kapi_call.h"\n' +
+            '#endif\n#include "kapi_call.h"\n#include "exec_legacy.h"\n#include "exec_gfx_poll.h"\n' +
             read('arch/x86/kernel/kapi_call.c') + '\n' +
             read('arch/x86/kernel/syscall_entry.c') + '\n' + special)

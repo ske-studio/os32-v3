@@ -132,7 +132,10 @@ ALLOWED_TOOL_DIFFS = {
         'c75b669a285ef524450d283991b3a37480e5c67d5417d2e197290e2a36ea2ef1'),),
     # 第 5 段 S2: profile を make から引く口を SDK に配る (新規)。
     'build/sdk/bin/target_profile_cli.py': ((
-        None, '8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf'),),
+        None, '8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf'),
+        # PowerPC シェル S-B B06: 能力単位の選択、本線の承認 2026-11-11
+        ('8e2601ba7327d684644837b1717b29f2240e7c94357b17ed7260d47128d6e8cf',
+         'bef3123738a377de72c1ebd753d6014d76722cfb46183b874353c6bedaa02217'),),
     # 第 5 段 S2: 例の Makefile は CRT・link script・ELF emulation を profile から引く。
     'build/sdk/example/hello/Makefile': ((
         '9e35704167f6fbddaceec6f2d08a140a61a54ad3742ad6e27f3eaee4d0deceaf',

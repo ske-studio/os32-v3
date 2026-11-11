@@ -120,6 +120,9 @@ static void *g_gui_pump;
 static int ime_reset,gui_input;
 void input_set_gui_mode(int on) { gui_input=on; }
 void ime_set_render(void *p) { CHECK(!p);ime_reset++; }
+#include "exec_legacy.h"
+#include "exec_ime.h"
+#include "exec_reclaim.h"
 #include "gf_wc_fault_path.inc"
 static i32 shell_notice(u32 op,u32 arg,int owner)
 { CHECK(op==GUI_OP_OWNER_EXIT && owner==APP_ID_SHELL && arg==EXEC_KIND_FAULT);return 0; }

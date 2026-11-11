@@ -22,7 +22,7 @@ aux の選択は実物 exec_launch の runtime 試験で確認する。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/build_fixture.py', 'build/sdk-target.mk', 'sdk/target_profile_cli.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=2.9)
 
 from exec_source import exec_source
@@ -45,6 +45,7 @@ EXEC = "exec/exec.c"
 import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from build_profile import query
+from build_fixture import copy_build_tree
 
 KERNEL_MK = "build/kernel-objects.mk"
 
@@ -251,12 +252,7 @@ def mutate():
             for d in INC_DIRS + ("tools/tests",):
                 shutil.copytree(ROOT / d, copy / d, dirs_exist_ok=True,
                                 ignore=shutil.ignore_patterns("target"))
-            (copy / KERNEL_MK).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / KERNEL_MK, copy / KERNEL_MK)
-            for directory in ('arch', 'sources', 'platform', 'features'):
-                shutil.copytree(ROOT / 'build' / directory, copy / 'build' / directory, dirs_exist_ok=True)
-            for name in ('config.mk', 'select.mk'):
-                shutil.copy2(ROOT / 'build' / name, copy / 'build' / name)
+            copy_build_tree(copy)
             # exec/ は INC_DIRS で写る (exec.c を含む)
             src = copy / rel
             text = src.read_text(encoding="utf-8")

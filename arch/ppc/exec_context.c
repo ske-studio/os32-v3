@@ -1,6 +1,7 @@
 /* Parent root and USER exception entry stack, on the surviving kernel stack. */
 #include "exec_arch.h"
 #include "arch_cpu.h"
+#include "kstring.h"
 
 /* Set by the USER entry path; USER exceptions use this stack. */
 u32 ppc_exec_kernel_sp;
@@ -28,3 +29,30 @@ void arch_priv_restore(const volatile struct arch_priv_context *saved)
     arch_mmu_load_root(root);
     ppc_exec_kernel_sp = sp;
 }
+
+/* The saved image has the same layout as the USER exception frame. */
+#include "ppc_frame.h"
+STATIC_ASSERT(ARCH_USER_BYTES == PPC_FRAME_SIZE, user_frame_size);
+STATIC_ASSERT(__builtin_offsetof(struct ppc_frame, srr0) == PPC_FRAME_SRR0, user_srr0_offset);
+
+void arch_user_save(struct arch_user_context *out, const struct arch_syscall *call)
+{
+    kmemcpy(out->opaque, call->native, ARCH_USER_BYTES);
+}
+
+void arch_user_result(struct arch_user_context *saved, u32 result)
+{
+    __builtin_memcpy(saved->opaque + 3 * sizeof(u32), &result, sizeof(result));
+}
+
+void arch_user_restart(struct arch_user_context *saved)
+{
+    u32 pc;
+    __builtin_memcpy(&pc, saved->opaque + PPC_FRAME_SRR0, sizeof(pc));
+    pc -= 4;
+    __builtin_memcpy(saved->opaque + PPC_FRAME_SRR0, &pc, sizeof(pc));
+}
+
+void arch_fp_save(struct arch_fp_context *saved) { (void)saved; }
+void arch_fp_restore(const struct arch_fp_context *saved) { (void)saved; }
+void arch_fp_init(void) { }
