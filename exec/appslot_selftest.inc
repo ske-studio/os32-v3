@@ -11,8 +11,7 @@ u32 appslot_resume_mark_selftest(void)
 /*                                                                          */
 /*  ブート時に踏むのは 2 つ:                                                 */
 /*    (0) 遷移: 宣言のある CPL=3 アプリの gfx_init で所有者がその ID へ移り、 */
-/*        回収 (appslot_gfx_owner_exit) で WM (1) へ戻る。CUI 中 (gui_mode   */
-/*        = 0) は 1 のまま動かない。                                         */
+/*        回収 (appslot_gfx_owner_exit) で WM (1) へ戻る。CUI 中も記録する。  */
 /*    (1) 拒否: GUI 中に宣言の無い CPL=3 が呼んだら OS32_ERR_INVAL で、       */
 /*        所有者は動かず gfx_init_reject_count だけが 1 増える。              */
 /*                                                                          */
@@ -97,10 +96,10 @@ u32 appslot_gfx_owner_selftest(void)
     res_owner_set(id);
     g_gfx_owner = GFX_OWNER_WM;
 
-    /* (0) 遷移: 宣言ありなら取り、回収で WM へ戻る。CUI 中は動かない。 */
+    /* (0) 遷移: 宣言ありなら取り、回収で WM へ戻る。CUI 中も所有者を記録する。 */
     g_slot[id].hdr_flags = OS32X_FLAG_GFX;
     if (appslot_gfx_claim(0) != 0) bad |= 1u << 0;
-    if (g_gfx_owner != GFX_OWNER_WM) bad |= 1u << 0;   /* CUI は触らない */
+    if (g_gfx_owner != id) bad |= 1u << 0;
     if (appslot_gfx_claim(1) != 0) bad |= 1u << 0;
     if (g_gfx_owner != id) bad |= 1u << 0;
     appslot_gfx_owner_exit(GFX_OWNER_WM);              /* 他人の回収では戻らない */
@@ -117,6 +116,7 @@ u32 appslot_gfx_owner_selftest(void)
     if (!g_slot[id].abort_req) bad |= 1u << 1;
     g_slot[id].abort_req = 0;
     if (appslot_gfx_claim(0) != 0) bad |= 1u << 1;     /* CUI 中は通す */
+    if (g_gfx_owner != id) bad |= 1u << 1;
     if (gfx_init_reject_count != saved_reject + 1) bad |= 1u << 1;
     if (g_slot[id].abort_req) bad |= 1u << 1;          /* 素通しは畳まない */
 

@@ -849,9 +849,9 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   誰でも呼べる (所有権は要らない)。WM (gshell) は `exec_start` / `exec_resume` から戻った
   直後にこれを見て、1 以外なら全画面モードに入り (合成も present もしない)、1 に戻っていれば
   復帰の描き直しに入る。実体は `exec/appslot.c` の `g_gfx_owner`。
-- **取る**のは `gfx_init` / `gfx_init_200` の KAPI ラッパだけ。GUI 中 (console シンクが有効な間)
-  に CPL=3 の非シェルが呼ぶと、所有者がその ID へ移る。CUI 中は所有者を触らない (常に 1) —
-  gshell が居らず、全画面は従来どおり誰でも取れる。gshell 配下の GUI アプリは
+- **取る**のは `gfx_init` / `gfx_init_200` の KAPI ラッパだけ。CPL=3 の非シェルが呼ぶと、
+  GUI / CUI とも所有者がその ID へ移る。CUI でも HAL v2 の画面の別名の取得・操作は
+  この所有者と照合する (HAL_V2_DESIGN §6-5)。gshell 配下の GUI アプリは
   `libos32gfx_attach()` で取り付くだけで `gfx_init` を呼ばないので、所有者にはならない。
 - **返す**のは回収 (`exec_reclaim_owned`) だけ。正常終了 / `exec_kill` / fault / CTRL+STOP の
   どの経路で畳まれても、所有者がその ID なら 1 (WM) へ戻る。FD / SHM / DB / GUI 窓と同じ並び。

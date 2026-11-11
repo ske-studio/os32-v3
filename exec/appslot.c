@@ -502,18 +502,17 @@ int appslot_state(int id)
 /* ======================================================================== */
 int appslot_gfx_claim_check(int gui_mode, int caller, int cpl3, u32 hdr_flags)
 {
-    /* CUI 中 (con_sink 無効) は所有者を触らない。gshell は居らず、
-     * 全画面は従来どおり誰でも取れる (票 D1a「CUI 中は何でも通す」)。 */
-    if (!gui_mode) return 0;
     /* WM 自身 (シェル帯) と、表に無い ID は素通し。復帰の gfx_init は
      * ここを通る。 */
     if (caller < APP_ID_MIN || caller > APP_ID_MAX) return 0;
     /* CPL=0 の子 (--cpl0) は所有者を取らない。GUI からの起動は
      * 非シェルはローダが CPL=3 のみ許可する。 */
     if (!cpl3) return 0;
-    /* 宣言 (mkos32x --gfx) が無ければ画面を渡さない (D1a)。黙って
+    /* GUI 中は宣言 (mkos32x --gfx) が無ければ画面を渡さない (D1a)。黙って
      * 画面を壊させるより、gfx_init を呼ばずに断る。 */
-    if ((hdr_flags & OS32X_FLAG_GFX) == 0) return OS32_ERR_INVAL;
+    /* CUI keeps accepting legacy apps without --gfx, but HAL v2 aliases
+     * still require the caller to become the fullscreen owner. */
+    if (gui_mode && (hdr_flags & OS32X_FLAG_GFX) == 0) return OS32_ERR_INVAL;
     return caller;
 }
 

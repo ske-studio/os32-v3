@@ -18,6 +18,9 @@ static void host_sync(u32 root);
 #include "appslot.h"
 #include "lease.h"
 
+#ifndef I1_APP_ID
+#define I1_APP_ID APP_ID_SHELL
+#endif
 static AppSlot slot;
 static struct addrspace as;
 static u32 mirror[16], mirror_n, bind_n, timeout;
@@ -54,14 +57,14 @@ static void host_sync(u32 root)
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int legacy_lowmap_busy(void) { return 0; }
 void exec_addrspace_abort(struct addrspace *space) { (void)space; }
-AppSlot *appslot_at(int id) { return id == APP_ID_SHELL ? &slot : NULL; }
+AppSlot *appslot_at(int id) { return id == I1_APP_ID ? &slot : NULL; }
 int shlib_read_page(u32 va, u32 frame) { (void)va; (void)frame; return 0; }
 u32 exec_tramp_page_addr(void) { return 0; }
-i32 gfx_screen_owner(void) { return APP_ID_SHELL; }
+i32 gfx_screen_owner(void) { return I1_APP_ID; }
 void gfx_policy_reeval(void) {}
 int caller_access_get_user(struct caller_access *out)
 {
-    *out = (struct caller_access){ .origin = CALLER_USER, .app_id = APP_ID_SHELL,
+    *out = (struct caller_access){ .origin = CALLER_USER, .app_id = I1_APP_ID,
         .as = &as, .owner = as.owner, .pd_phys = as.pd_phys, .generation = as.generation };
     return as.pd_phys != 0;
 }

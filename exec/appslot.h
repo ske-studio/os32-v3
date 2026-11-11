@@ -381,8 +381,8 @@ int appslot_state(int id);
  *   cpl3      : 呼び手が CPL=3 で走っているか
  *   hdr_flags : 呼び手の OS32X ヘッダ flags
  * 戻り値: >0 = その ID を所有者にして gfx_init を通す
- *          0 = 所有者は触らずに通す (CUI 中 / WM 自身 / CPL=0 の子)
- *         OS32_ERR_INVAL = 宣言が無いので拒否 (D1a。gfx_init を呼ばない) */
+ *          0 = 所有者は触らずに通す (WM 自身 / CPL=0 の子)
+ *         OS32_ERR_INVAL = GUI 中に宣言が無いので拒否 (D1a。gfx_init を呼ばない) */
 int appslot_gfx_claim_check(int gui_mode, int caller, int cpl3, u32 hdr_flags);
 
 /* 上を「いま走っている ID」に対して適用し、結果を反映する。

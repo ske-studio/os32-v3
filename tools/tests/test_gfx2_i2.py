@@ -2,6 +2,7 @@
 """I2 composition with real lifecycle, drawing, synchronization and U1."""
 import argparse
 import json
+import re
 from pathlib import Path
 import tempfile
 from test_gfx2_i1 import observe
@@ -10,8 +11,12 @@ from test_gfx2_i1 import observe
 ROOT = Path(__file__).resolve().parents[2]
 EXTRA = ['gfx/v2/' + p.name for p in (ROOT / 'gfx/v2').glob('sw_*.c') if p.stem != 'sw_table']
 EXTRA += ['gfx/v2/' + n + '.c' for n in ['format', 'check_op', 'submit', 'v1_bridge']]
+EXTRA += ['gfx/gfx_core.c']
 EXTRA += ['userland/lib/gfx/v2/color.c', 'lib/divdi3.c']
 MUTATIONS = [
+    ('cui-owner', 'exec/appslot.c',
+     '    if (gui_mode && (hdr_flags & OS32X_FLAG_GFX) == 0) return OS32_ERR_INVAL;',
+     '    if (!gui_mode) return 0;\n    if ((hdr_flags & OS32X_FLAG_GFX) == 0) return OS32_ERR_INVAL;'),
     ('gart-view', 'gfx/v2/submit.c',
      'v->base = s->kva ? s->kva : (u8 *)(uptr)s->map_va;',
      'v->base = s->kva ? s->kva : (u8 *)(uptr)(s->map_va + MEM_PAGE_SIZE);'),
@@ -26,6 +31,21 @@ MUTATIONS = [
      '[GFX2_OP_LINE] = gfx2_sw_line,', '[GFX2_OP_LINE] = gfx2_sw_fill,'),
 ]
 
+def stage_core(work, overrides):
+    path = 'exec/appslot.c'
+    body = overrides.get(path, (ROOT / path).read_text())
+    functions = []
+    for name in ['appslot_gfx_claim_check', 'appslot_gfx_claim', 'appslot_gfx_owner']:
+        match = re.search(r'^int ' + name + r'\([^\n]*?\)\s*\{', body, re.M)
+        assert match, name
+        end, depth = match.end(), 1
+        while depth:
+            depth += (body[end] == '{') - (body[end] == '}')
+            end += 1
+        functions.append(body[match.start():end])
+    (work / 'gfx2_i2_claim.inc').write_text('\n'.join(functions))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -34,7 +54,7 @@ def main():
     assert any(entry['guest'] == '/usr/bin/gfx2_i2.bin' for entry in deployment['files'])
     for mutation in [None, *MUTATIONS, None] if args.mutate else [None]:
         with tempfile.TemporaryDirectory(prefix='gfx2-i2-') as td:
-            observe(Path(td), mutation, fixture='gfx2_i2_host.c', extra=EXTRA)
+            observe(Path(td), mutation, fixture='gfx2_i2_host.c', extra=EXTRA, stage=stage_core)
 
 def run(ctx):
     import subprocess

@@ -1,6 +1,10 @@
 /* Real allocator, surfaces, submit, SW, fence and v1 bridge in one image. */
+#define I1_APP_ID APP_ID_MIN
 #define _start i1_start
+#define gfx_screen_owner i1_screen_owner
 #include "gfx2_i1_host.c"
+#undef gfx_screen_owner
+#include "gfx2_i2_core_host.h"
 #undef _start
 #include "os32gfx2u.h"
 static u32 completed, waited, emitted, kicked;
@@ -32,7 +36,8 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == MEM_GFX2_MAP_BASE);
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
-    CHECK(!gfx2_adapter_register(&v1, GFX2_KIND_PC98, GFX2_AF_ACTIVE));
+    gfx_backend_pc98 = v1;
+    CHECK(!gfx2_adapter_register(&gfx_backend_pc98, GFX2_KIND_PC98, GFX2_AF_ACTIVE));
     struct gfx2_adapter *a = gfx2_adapter_get(0);
     begin();
     be = gfx2_v1_shim; be.check = choose; be.emit = draw; be.fence_emit = mark;
@@ -57,10 +62,26 @@ void _start(void)
     /* The bridge must wait for the same real fence as a v1 present. */
     ledger_surfaces[0] = (struct ledger_surface){.backend=GFX2_KIND_PC98,
         .role=LEDGER_ROLE_CLIENT, .first=s->sys_pfn, .npages=s->sys_n,
-        .width=64, .height=4, .pitch=s->pitch, .format=s->fmt, .backing=LEDGER_SB_RAM};
-    v1_bridge_rebind();
+        .width=64, .height=4, .pitch=s->pitch, .format=s->fmt, .backing=LEDGER_SB_RAM,
+        .owner=as.owner, .planes=1, .perm_max=LEDGER_PERM_RW};
+    slot.cpl3 = 1; /* CUI permits legacy apps without --gfx. */
     u32 alias_sid; int rc;
+    /* Restore the registered backend while exercising the real init/registry
+     * path; the mixed HW fixture below resumes with its custom hooks. */
+    a->be = &gfx2_v1_shim;
+    gfx_init(); /* Internal init creates aliases but does not claim for USER. */
+    CHECK(gfx2_screen_surface(0, 0, GFX2_ROLE_CLIENT, &alias_sid) == OS32_ERR_BUSY);
+    gfx_kapi_init(); /* Same entry used by the guest's api->gfx_init(). */
+    CHECK(!gfx_reinit_fail_count && gfx_is_started());
     CHECK(!gfx2_screen_surface(0, 0, GFX2_ROLE_CLIENT, &alias_sid));
+    GFX2_SurfaceDesc previous;
+    u32 old_sid = alias_sid;
+    g_gfx_owner = GFX_OWNER_WM;
+    gfx_kapi_init_200(); /* Packed backend uses native geometry at both entries. */
+    CHECK(gfx2_surface_desc(old_sid, &previous) == OS32_ERR_STALE);
+    CHECK(!gfx2_screen_surface(0, 0, GFX2_ROLE_CLIENT, &alias_sid));
+    CHECK(!gfx_reinit_fail_count && gfx2_active() == a);
+    a->be = &be;
     struct gfx2_surf *alias = gfx2_surf_get(alias_sid, as.owner, &rc);
     CHECK(alias && !rc);
     alias->last_write = a->fence.issued = 3;
@@ -101,6 +122,6 @@ void _start(void)
         for (u32 i = 0; i < PAGE_SIZE / sizeof(u32); i++)
             CHECK(((u32 *)P2V(pfns[p] * PAGE_SIZE))[i] == packed);
     CHECK(!gfx2_surface_free(s->sid)); finish();
-    SAY("GREEN I2 mixed HW/SW/HW, real fence waits, pixels, U1, v1 bridge, stale alias and GART submit");
+    SAY("GREEN I2 CUI gfx_init/CLIENT ownership, mixed HW/SW/HW, real fence waits, pixels, U1, v1 bridge, stale alias and GART submit");
     die(0);
 }
