@@ -3,6 +3,7 @@
 #include "gfx_internal.h"
 #include "gfx_policy.h"
 #include "gfx_hal.h"
+#include "v2/gfx2_int.h"
 #include "gfx_emergency.h"
 #include "display_restore.h"
 #include "display_provider.h"
@@ -56,6 +57,24 @@ int gfx_display_page = 0;
 GfxCounters gfx_counters = { 0, 0, 0, 0 };
 
 GfxBackend *g_backend = DISPLAY_FALLBACK_BACKEND;
+
+static void gfx2_register_other(GfxBackend *be, void *arg)
+{
+    (void)arg;
+    u32 kind = display_provider_ledger(be);
+    if (kind && be != g_backend) (void)gfx2_adapter_register(be, kind, 0);
+}
+
+static void gfx2_register_selected(void)
+{
+    static int enumerated;
+    u32 kind = display_provider_ledger(g_backend);
+    if (!kind || gfx2_adapter_register(g_backend, kind, GFX2_AF_ACTIVE)) return;
+    if (!enumerated) {
+        enumerated = 1;
+        display_provider_each(gfx2_register_other, NULL);
+    }
+}
 
 static int gfx_started;
 int gfx_is_started(void) { return gfx_started; }
@@ -378,8 +397,11 @@ void gfx_shutdown(void)
         /* The selected output is now 98 even while GeForce remains usable. */
         gfx_select_mode(DISPLAY_FALLBACK_BACKEND, 0);
         g_backend = DISPLAY_FALLBACK_BACKEND;
+        gfx2_register_selected();
         gfx_bind_client();
     }
+    struct gfx2_adapter *a = gfx2_active();
+    if (a) for (u32 h = 0; h < a->heads; h++) gfx2_head_detach(a, h);
     gfx_reinit_surfaces(1);
 }
 

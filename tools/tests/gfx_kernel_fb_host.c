@@ -1,3 +1,4 @@
+#include "gfx2_core_fake.h"
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}
 /* T2e e4: real gfx lifecycle/three backends and ledger/query/lease/B1.

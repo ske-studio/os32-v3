@@ -50,6 +50,20 @@ static int gfx_probe_backend(const GfxBackend *backend)
     return backend->probe();
 }
 
+void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg)
+{
+    for (u32 i = 0; i < sizeof(g_backend_list) / sizeof(g_backend_list[0]); i++) {
+        GfxBackend *be = g_backend_list[i];
+        if (!be) continue;
+        if (be == &gfx_backend_trident || be == &gfx_backend_geforce) {
+            if (be == g_backend) fn(be, arg);
+            continue;
+        }
+        /* Enumeration must not set cirrus_probed or configure hardware. */
+        if (be->modes && be->probe && be->probe()) fn(be, arg);
+    }
+}
+
 GfxBackend *display_provider_select(int pref, int legacy200,
                                     display_select_mode_fn select_mode)
 {
