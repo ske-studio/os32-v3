@@ -34,7 +34,7 @@ int gfx2_head_info(u32 index, u32 head, GFX2_HeadInfo *out)
     rc = a->be->enum_head(a->ctx, head, &v);
     if (rc) return rc;
     v.mode_id = a->head[head].mode_id; v.scanout_sid = a->head[head].scan_sid;
-    v.connector_mask = a->head[head].conn_mask;
+    if (a->head[head].conn_mask) v.connector_mask = a->head[head].conn_mask;
     *out = v;
     return 0;
 }
