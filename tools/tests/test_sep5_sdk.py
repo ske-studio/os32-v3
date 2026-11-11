@@ -42,7 +42,7 @@ NAMES = ('SDK_TARGET_CALL_ABI SDK_TARGET_ELF_EMULATION SDK_TARGET_CRT_USER '
          'SDK_TARGET_CRT_RESIDENT SDK_TARGET_APP_LINK SDK_TARGET_APP_SYS_LINK '
          'SDK_TARGET_SHLIB_LINK SDK_TARGET_RUST').split()
 EVIL = ['SDK_TARGET_SUPPORTED=1', 'SDK_TARGET_STATUS=0', 'SDK_TARGET_CRT_USER=evil.o',
-        'SDK_TARGET_APP_LINK=evil.ld', 'SDK_TARGET_TOKENS=SDK_TARGET_RUST=evil.json']
+        'SDK_TARGET_APP_LINK=evil.ld', 'SDK_TARGET_RUST=evil.json', 'SDK_TARGET_TOKENS=SDK_TARGET_RUST=evil.json']
 # The list and helpers of sdk-target.mk themselves must not be replaceable either.
 EVIL_LISTS = (['SDK_TARGET_NAMES=SDK_TARGET_SUPPORTED'], ['SDK_TARGET_NAMES='],
               ['sdk_target_comma=;'], ['sdk_target_name=SDK_TARGET_SUPPORTED'],
@@ -53,19 +53,19 @@ MUTATIONS = (
     ('crt-order', PROFILE, "crt_user=('crt/crt0.o', 'crt/crt0_c.o',", "crt_user=('crt/crt0_c.o', 'crt/crt0.o',", 'x86-profile'),
     ('app-link-sys', PROFILE, "app_link='link/app.ld'", "app_link='link/app_sys.ld'", 'x86-profile'),
     ('rust-target', PROFILE, "rust='rust/i686-os32-none.json'", "rust='rust/i686-unknown-none.json'", 'x86-profile'),
-    ('incomplete-accepted', PROFILE, '    if not all(values.values()):\n', '    if False:\n', 'incomplete'),
+    ('incomplete-accepted', PROFILE, "    if not all(values.values()):\n        raise ValueError('incomplete sdk target ' + target)", "    if False:\n        raise ValueError('incomplete sdk target ' + target)", 'incomplete'),
     ('cli-refusal-status', CLI, '        return REFUSED\n', '        return 0\n', 'ppc-refused'),
     ('cli-root-dropped', CLI, '            items = [prefix + item for item in items]\n', '            pass\n', 'cli-tokens'),
-    ('make-crt-resident', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_RESIDENT) $(NANO_LIB)', 'x86-make'),
+    ('make-crt-resident', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(SDK_USER_LIBC)', 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_RESIDENT) $(SDK_USER_LIBC)', 'x86-make'),
     ('make-link-sys', CONFIG, '-T $(SDK_TARGET_APP_LINK) -nostdlib', '-T $(SDK_TARGET_APP_SYS_LINK) -nostdlib', 'x86-make'),
     ('clear-overridable', MK, '$(eval override $(name) :=)', '$(eval $(name) :=)', 'ppc-make-empty'),
     ('refusal-as-support', MK, 'override SDK_TARGET_SUPPORTED := $(if $(filter 0,$(SDK_TARGET_STATUS)),1,0)',
      'override SDK_TARGET_SUPPORTED := $(if $(filter 0 3,$(SDK_TARGET_STATUS)),1,0)', 'ppc-make-empty'),
     ('value-overridable', MK, '    $(eval override $(call sdk_target_name,$(token)) := ',
      '    $(eval $(call sdk_target_name,$(token)) := ', 'x86-make'),
-    ('names-overridable', MK, 'override SDK_TARGET_NAMES := SDK_TARGET_CALL_ABI', 'SDK_TARGET_NAMES := SDK_TARGET_CALL_ABI', 'ppc-make-empty'),
-    ('helper-overridable', MK, 'override sdk_target_value = ', 'sdk_target_value = ', 'x86-override'),
-    ('crt-eager', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'CRT0_USER_OBJ := $(SDK_TARGET_CRT_USER) $(NANO_LIB)', 'x86-make'),
+    ('names-overridable', MK, 'override SDK_TARGET_NAMES := $(SDK_USER_NAMES)', 'SDK_TARGET_NAMES := $(SDK_USER_NAMES)', 'ppc-make-empty'),
+    ('helper-overridable', MK, 'override sdk_target_value = ', 'sdk_target_value = ', 'ppc-make-empty'),
+    ('crt-eager', CONFIG, 'CRT0_USER_OBJ = $(SDK_TARGET_CRT_USER) $(SDK_USER_LIBC)', 'CRT0_USER_OBJ := $(SDK_TARGET_CRT_USER) $(SDK_USER_LIBC)', 'x86-make'),
     ('defect-as-refusal', CLI, '    except target_profile.Unsupported as error:', '    except ValueError as error:', 'ppc-refused'),
     ('hello-crt-literal', HELLO, 'override CRT := $(call os32_value,SDK_TARGET_CRT_USER)', 'override CRT := $(call os32_value,SDK_TARGET_CRT_RESIDENT)', 'hello-x86'),
     ('hello-link-sys', HELLO, '-T $(call os32_value,SDK_TARGET_APP_LINK)\n', '-T $(call os32_value,SDK_TARGET_APP_SYS_LINK)\n', 'hello-x86'),
@@ -203,17 +203,20 @@ def checks(root):
     profile.PROFILES['partial'] = partial
     need(refuse(lambda: profile.sdk_values('partial'), 'incomplete sdk target partial'), 'incomplete')
 
-    # The unsupported target carries no SDK value, whatever the command line says.
+    # PPC exposes USER values but no full SDK values, regardless of overrides.
+    ppc_user = dict(SDK_TARGET_CALL_ABI='powerpc-sysv', SDK_TARGET_ELF_EMULATION='elf32ppc',
+                    SDK_TARGET_CRT_USER='sdk/crt/ppc/crt0.o sdk/crt/ppc/crt0_c.o',
+                    SDK_TARGET_APP_LINK='sdk/link/ppc/app.ld')
     result, values = expand(root, ['SDK_TARGET_SUPPORTED', 'CRT0_RESIDENT_OBJ', *NAMES], *EVIL,
                             target='ppc-powermac')
     need(result.returncode == 0 and values.get('SDK_TARGET_SUPPORTED') == '0' and
-         values.get('CRT0_RESIDENT_OBJ') == '' and all(values.get(name) == '' for name in NAMES),
+         values.get('CRT0_RESIDENT_OBJ') == '' and all(values.get(name) == ppc_user.get(name, '') for name in NAMES),
          'ppc-make-empty', (result.stderr, values))
     for extra in EVIL_LISTS:
         result, values = expand(root, ['SDK_TARGET_SUPPORTED', *NAMES], *EVIL, *extra,
                                 target='ppc-powermac')
         need(result.returncode == 0 and values.get('SDK_TARGET_SUPPORTED') == '0' and
-             all(values.get(name) == '' for name in NAMES), 'ppc-make-empty', (extra, values))
+             all(values.get(name) == ppc_user.get(name, '') for name in NAMES), 'ppc-make-empty', (extra, values))
     for target in ('sdk', 'programs', 'libs', 'boot'):
         need(entry_rejected(root, target), 'ppc-entries', target)
 

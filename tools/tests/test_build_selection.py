@@ -49,6 +49,19 @@ def check(root):
             raise AssertionError(assignments)
 
 
+def check_user_selection(root):
+    (root / 'user-query.mk').write_text(
+        'include build/config.mk\n.PHONY: user-query\n'
+        'user-query:; @echo "USER=$(SDK_TARGET_CRT_USER)|$(SDK_TARGET_APP_LINK)|$(SDK_USER_LIBC)"\n')
+    def selected(*args):
+        return subprocess.check_output(['make', '-s', '-f', 'user-query.mk', 'user-query', *args],
+                                       cwd=root, text=True).strip()
+    assert selected('ARCH=ppc', 'PLATFORM=powermac') == (
+        'USER=sdk/crt/ppc/crt0.o sdk/crt/ppc/crt0_c.o|sdk/link/ppc/app.ld|')
+    assert selected('NANO_LIB=nano.a') == (
+        'USER=sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/syscalls.o sdk/crt/help.o|sdk/link/app.ld|nano.a')
+
+
 def check_archives(root):
     # Query the complete product graph without traversing or building products.
     (root / 'archive-query.mk').write_text('$(info QUERY_ARCHIVES=$(ALL_LIB_ARCHIVES))\n.PHONY: archive-query\narchive-query:; @:\n')
@@ -82,7 +95,20 @@ if __name__ == '__main__':
         (root / 'Makefile').write_text('include build/config.mk\n-include build/kernel-objects.mk\ninclude build/kernel.mk\n')
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
+        check_user_selection(root)
         if args.mutate:
+            target = root / 'build/sdk-target.mk'
+            source = target.read_text()
+            anchor = '--make-user --root sdk'
+            assert source.count(anchor) == 1
+            target.write_text(source.replace(anchor, '--make --root sdk'))
+            try:
+                check_user_selection(root)
+            except AssertionError:
+                print('RED: USER capability selection rejected at runtime')
+            else:
+                raise SystemExit('USER selection mutation survived')
+            target.write_text(source)
             order = root / 'build/sources/order.mk'
             source = order.read_text()
             anchor = 'kdebug/gf5_test.c kdebug/gf_display_test.c'

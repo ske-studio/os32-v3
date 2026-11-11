@@ -24,11 +24,12 @@ BROKEN = 2
 PATH_FIELDS = ('crt_user', 'crt_resident', 'app_link', 'app_sys_link', 'shlib_link', 'rust')
 
 
-def make_tokens(target, root):
-    values = target_profile.sdk_values(target)
+def make_tokens(target, root, user=False):
+    values = (target_profile.sdk_user_values(target) if user
+              else target_profile.sdk_values(target))
     prefix = root.rstrip('/') + '/' if root else ''
     tokens = []
-    for field in target_profile.SDK_FIELDS:
+    for field in (target_profile.USER_SDK_FIELDS if user else target_profile.SDK_FIELDS):
         value = values[field]
         items = list(value) if isinstance(value, (tuple, list)) else [value]
         if field in PATH_FIELDS:
@@ -46,6 +47,7 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--require')
     mode.add_argument('--make', action='store_true')
+    mode.add_argument('--make-user', action='store_true')
     parser.add_argument('--root', default='')
     args = parser.parse_args(argv)
     try:
@@ -54,7 +56,7 @@ def main(argv=None):
                 raise ValueError('unknown capability ' + args.require)
             target_profile.require(args.target, args.require)
             return 0
-        tokens = make_tokens(args.target, args.root)
+        tokens = make_tokens(args.target, args.root, args.make_user)
     except target_profile.Unsupported as error:
         print(error, file=sys.stderr)
         return REFUSED
