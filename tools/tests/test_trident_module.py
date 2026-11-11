@@ -3,7 +3,7 @@
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
 CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
-    covers=['init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
+    covers=['tools/tests/gfx2_bridge_fake.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
             'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py',
@@ -84,7 +84,7 @@ def build(work, changed=None):
         path,old,new=changed; original=(ROOT/path).read_text()
         assert original.count(old)==1,(path,old)
         changes[path]=original.replace(old,new)
-    tree=build_in_tree(ROOT,work/'tree',changes,[cmd],capture_output=True)
+    tree=build_in_tree(ROOT,work/'tree',changes,[cmd])
     return exe,tree
 
 def execute(exe,runners,red=False):

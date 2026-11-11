@@ -1361,8 +1361,8 @@ static void case_gfx_screen_owner(void)
     check(appslot_gfx_owner() == GFX_OWNER_WM,
           "20c 起動しただけでは画面は WM のまま (gfx_init を呼んでいない)");
 
-    check(appslot_gfx_claim(0) == 0 && appslot_gfx_owner() == GFX_OWNER_WM,
-          "20d CUI 中 (con_sink 無効) は所有者を触らない");
+    check(appslot_gfx_claim(0) == 0 && appslot_gfx_owner() == id,
+          "20d CUI 中 (con_sink 無効) も gfx_init で所有者を記録する");
 
     check(appslot_gfx_claim(1) == 0, "20e GUI 中の gfx_init は通る");
     check(appslot_gfx_owner() == id,
@@ -1417,10 +1417,12 @@ static void case_gfx_screen_owner(void)
           "20t 拒否で画面は WM のまま (gfx_init は呼ばれない)");
     check(gfx_init_reject_count == rej0 + 1,
           "20u 拒否は gfx_init_reject_count に載る");
-    check(appslot_gfx_claim(0) == 0 && appslot_gfx_owner() == GFX_OWNER_WM,
+    check(appslot_gfx_claim(0) == 0 && appslot_gfx_owner() == id,
           "20v CUI 中は宣言が無くても従来どおり通る");
     check(gfx_init_reject_count == rej0 + 1,
           "20w CUI 中の素通しは拒否として数えない");
+
+    appslot_gfx_owner_exit(id);
 
     /* CPL=0 の子 (--cpl0) は宣言の有無に関わらず所有者を取らない。 */
     appslot_at(id)->cpl3 = 0;

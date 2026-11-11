@@ -4,10 +4,21 @@
 #include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
+#include "v2/gfx2_int.h"
 #include "display_restore.h"
 #include "os32_kapi_shared.h"
 #include "../drivers/video/pc98/splash_raster.h"
 #include "io.h"
+
+/* Present reads the CLIENT and writes the DISPLAY synchronously. */
+static void gfx_v1_present_rect(int x, int y, int w, int h)
+{
+    (void)v1_bridge_begin(GFX2_ROLE_CLIENT, GFX2_CPU_R);
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W);
+    g_backend->present_rect(x, y, w, h);
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);
+    v1_bridge_end(GFX2_ROLE_CLIENT, GFX2_CPU_R, 0);
+}
 
 /* Compare with the last printed sample; a closed serial gate cannot consume it. */
 static void __attribute__((cold)) gfx_diag_px(void)
@@ -60,7 +71,7 @@ static int _present_dirty_packed(void)
     commits_before = gfx_counters.commits;
     for (i = 0; i < dirty_queue.count; i++) {
         GFX_Rect *r = &dirty_queue.rects[i];
-        g_backend->present_rect(r->x, r->y, r->w, r->h);
+        gfx_v1_present_rect(r->x, r->y, r->w, r->h);
     }
     gfx_counters.commits = commits_before + 1;
 
@@ -219,8 +230,10 @@ static void _merge_prev_dirty(void)
 /* ======================================================================== */
 static void _flip_page(void)
 {
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R);
     gfx_display_page ^= 1;
     display_flip_pages(gfx_display_page, gfx_display_page ^ 1);
+    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R, 0);
     gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */
 }
 
@@ -283,7 +296,7 @@ void __cdecl gfx_present(void)
     if (!bb_b) goto diag;
     /* HAL バックエンド経由 (契約 G4 の present_rect)。全画面 present。 */
     if (g_backend && g_backend->present_rect)
-        g_backend->present_rect(0, 0, GFX_WIDTH, gfx_current_height);
+        gfx_v1_present_rect(0, 0, GFX_WIDTH, gfx_current_height);
 diag:
     gfx_diag_first_present(before);
     gfx_diag_px();
@@ -294,7 +307,7 @@ void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
     u32 before = gfx_counters.present_bytes;
     if (!bb_b) goto diag;
     if (g_backend && g_backend->present_rect)
-        g_backend->present_rect(rx, ry, rw, rh);
+        gfx_v1_present_rect(rx, ry, rw, rh);
 diag:
     gfx_diag_first_present(before);
     gfx_diag_px();

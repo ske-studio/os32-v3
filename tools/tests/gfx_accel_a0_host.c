@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 /* Declaration checks evaluate types at runtime so type mutants compile RED. */
 #include "gfx_hal.h"
 #include "gfx_internal.h"

@@ -119,10 +119,13 @@ int lease_release(struct addrspace *as, u32 token)
         if (paging_lease_unmap(as, l->base, l->npages)) {
             irq_restore(saved); return LEASE_INVAL;
         }
+        u32 bridge_access = GFX2_CPU_R | ((l->flags & PTE_RW) ? GFX2_CPU_W : 0);
+        int display = sf->role == LEDGER_ROLE_DISPLAY;
         l->token = 0;
         sf->lease_count--;
         if (sf->closing && !sf->lease_count) (void)ledger_surface_release(l->sid);
         irq_restore(saved);
+        if (display) v1_bridge_end(GFX2_ROLE_DISPLAY, bridge_access, 0);
         return 0;
     }
     return LEASE_INVAL;
@@ -275,6 +278,9 @@ int surface_lease(const struct surface_query_source *source,
     auth = (struct lease_authority){caller.owner, source->backend, source->role};
     kmemcpy(old, caller.as->leases, sizeof(old));
     next = lease_next_token;
+    if (source->role == LEDGER_ROLE_DISPLAY)
+        (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R |
+                              (access == LEDGER_PERM_RW ? GFX2_CPU_W : 0));
     rc = lease_acquire(caller.as, &auth, &ref, 1, access, &view);
     if (rc) return surface_query_error(rc);
     if (!copy_to_caller(&caller, user_out, &view, sizeof(view))) {
@@ -322,6 +328,8 @@ int surface_lease_bundle(const struct surface_query_source *source,
     if (rc || !copy_caller_bytes(&caller, user_refs, refs, sizeof(refs)) ||
         !check_caller_write_range(&caller, user_out, sizeof(result)))
         return OS32_ERR_INVAL;
+    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R |
+                          (access == LEDGER_PERM_RW ? GFX2_CPU_W : 0));
     saved = irq_save();
     rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
           source->backend != gfx_sf_backend()) ? OS32_ERR_INVAL :

@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 /* G3: real scan publication, eligibility, policy, query and present; fake GPU. */
 #define OS32_GEFORCE_MODULE
 #include "../../drivers/video/geforce/backend_geforce.c"
@@ -11,6 +12,7 @@
 #undef gfx_counters
 
 static int started = 1, gui = 1, owner = GFX_OWNER_WM, revokes;
+struct gf_v2 gf_v2_inst;
 static int failures, point_rc, draw_rc;
 static struct gf_foundation foundation;
 static struct gf2_chan channel = {.f=&foundation, .state=GF2_RUN};
@@ -85,6 +87,8 @@ void _start(void)
     active = routed = 1;
     gf_hook_scan_changed(0, &front, 0);
     check_policy(1); CHECK(revokes == 1);
+    gf_v2_inst.lost=1; gfx_policy_reeval(); check_policy(0);
+    gf_v2_inst.lost=0; gfx_policy_reeval(); check_policy(1);
     u16 gen = gfx_policy_gen_get();
     gf_hook_scan_changed(0, &front, 0);
     CHECK(gfx_policy_gen_get() != gen); check_policy(1);

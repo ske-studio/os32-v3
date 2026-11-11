@@ -143,6 +143,7 @@ void gfx_reinit_surface_roles(int finish, int display_only)
     if (finish) {
         gfx_reinit_pending = 0;
         gfx_bind_client();
+        v1_bridge_rebind();
     }
 }
 
@@ -245,6 +246,7 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
         paging_load_cr3(cr3);
         irq_restore(flags);
     }
+    v1_bridge_rebind();
     gfx_diag_client(sf, owner, gen, failures, revoke, transfer, regen);
     gfx_reinit_tvram();
     kselftest_run_audit("gui");

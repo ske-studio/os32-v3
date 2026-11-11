@@ -217,23 +217,6 @@ __attribute__((weak)) void gf3_range_query_set(struct gf3_ctx * a0, gf3_range_fn
     (void)a1;
     (void)opaque;
 }
-__attribute__((weak)) int gf3_ckey_set(struct gf3_ctx * a0, bool on, u32 key, enum gf3_fmt format, u32 dl)
-{
-    (void)a0;
-    (void)on;
-    (void)key;
-    (void)format;
-    (void)dl;
-    return OS32_ERR_NOSYS;
-}
-__attribute__((weak)) int gf3_alpha_set(struct gf3_ctx * a0, u32 const_a, bool per_pixel, u32 dl)
-{
-    (void)a0;
-    (void)const_a;
-    (void)per_pixel;
-    (void)dl;
-    return OS32_ERR_NOSYS;
-}
 __attribute__((weak)) int gf3_rop3_set(struct gf3_ctx * a0, u8 subc, u8 rop3, const struct gf3_pattern * a3, enum gf3_fmt format, u32 dl)
 {
     (void)a0;
@@ -243,4 +226,37 @@ __attribute__((weak)) int gf3_rop3_set(struct gf3_ctx * a0, u8 subc, u8 rop3, co
     (void)format;
     (void)dl;
     return OS32_ERR_NOSYS;
+}
+
+__attribute__((weak)) int gf_v2_start(struct gf_v2 *a, u32 dl)
+{
+    (void)a; (void)dl; return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) int gf_v2_stop(void *a)
+{
+    (void)a; return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) const struct gf4_test_ops *gf_v2_disp(void)
+{
+    return NULL;
+}
+__attribute__((weak)) int gf_v2_deadline(struct gf2_chan *a, u32 us, u32 *dl)
+{
+    (void)a; (void)us; (void)dl; return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) int gf_v2_rc(int rc)
+{
+    (void)rc; return OS32_ERR_IO;
+}
+__attribute__((weak)) void gf_v2_fence_reset(struct gf_v2 *a)
+{
+    (void)a;
+}
+__attribute__((weak)) u32 gf_v2_route_index(const struct gf4_ctx *a, const struct gf4_route *b)
+{
+    (void)a; (void)b; return 0;
+}
+__attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a)
+{
+    (void)a; return 0;
 }

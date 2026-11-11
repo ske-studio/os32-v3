@@ -1,3 +1,4 @@
+#include "gfx/v2/gfx2_int.h"
 #include "debug_probe.h"
 #include "geforce_module.h"
 #include "geforce_imports.h"
@@ -190,6 +191,8 @@ static int geforce_return(void *opaque)
     if (pc98_route_to_98()) rc = -1;
     return rc;
 }
+static GfxBackendV2 gf_v2_kcopy;
+
 static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
 {
     int (*init)(GfxBackend *, const GeforceModuleContext *) =
@@ -251,6 +254,55 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
             rc=MODULE_INIT_FAILED;
             goto failed;
         }
+    if (candidate.v2) {
+        u32 address = (u32)(uptr)candidate.v2;
+        if (address < r->ro || sizeof(GfxBackendV2) > r->ro_size ||
+            address - r->ro > r->ro_size - sizeof(GfxBackendV2) ||
+            candidate.v2->abi != GFX_HAL2_ABI) {
+            rc = MODULE_INIT_FAILED;
+            goto failed;
+        }
+        const GfxBackendV2 *v = candidate.v2;
+        const u32 v2_entries[] = {
+            (u32)(uptr)v->caps,
+            (u32)(uptr)v->check,
+            (u32)(uptr)v->heap_range,
+            (u32)(uptr)v->alloc,
+            (u32)(uptr)v->release,
+            (u32)(uptr)v->kva,
+            (u32)(uptr)v->gart_bind,
+            (u32)(uptr)v->gart_unbind,
+            (u32)(uptr)v->emit,
+            (u32)(uptr)v->readback,
+            (u32)(uptr)v->kick,
+            (u32)(uptr)v->fence_emit,
+            (u32)(uptr)v->fence_state,
+            (u32)(uptr)v->fence_wait,
+            (u32)(uptr)v->enum_head,
+            (u32)(uptr)v->enum_conn,
+            (u32)(uptr)v->enum_mode,
+            (u32)(uptr)v->edid,
+            (u32)(uptr)v->mode_set,
+            (u32)(uptr)v->flip,
+            (u32)(uptr)v->flip_done,
+            (u32)(uptr)v->vblank_wait,
+            (u32)(uptr)v->palette,
+            (u32)(uptr)v->gamma,
+            (u32)(uptr)v->cursor_image,
+            (u32)(uptr)v->cursor_move,
+            (u32)(uptr)v->cursor_show,
+            (u32)(uptr)v->dpms,
+            (u32)(uptr)v->stop,
+        };
+        for (u32 i = 0; i < sizeof(v2_entries) / sizeof(v2_entries[0]); i++)
+            if (!module_text_contains(r, v2_entries[i])) {
+                rc = MODULE_INIT_FAILED;
+                goto failed;
+            }
+        gf_v2_kcopy = *v;
+        candidate.v2 = &gf_v2_kcopy;
+    }
+    candidate.v2_mod = r;
     if (!exports || !module_text_contains(r, exports[2])) {
         rc=MODULE_INIT_FAILED;
         goto failed;
@@ -282,6 +334,7 @@ static int geforce_detach(struct module_record *r)
 {
     (void)r;
     if (geforce_handle.generation && debug_probe_unregister(geforce_handle)) return 0;
+    gfx2_adapter_unregister(&gfx_backend_geforce);
     /* Close admission even when the module must retain its resources. */
     accel_slot=0;
     display_slot=0;

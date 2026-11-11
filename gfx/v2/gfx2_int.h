@@ -126,12 +126,14 @@ int gfx2_map(struct gfx2_surf *, struct addrspace *, u32 *va);
 int gfx2_unmap(struct gfx2_surf *);
 int gfx2_surf_page(const struct gfx2_surf *, u32 k, u32 *pa, u32 *attr);
 int gfx2_cpu_visible(const struct gfx2_surf *);
+int gfx2_check_exec(struct gfx2_adapter *a, const struct gfx2_exec *ex, u32 *how);   /* C8 */
 int gfx2_map_audit(const struct addrspace *);
 int gfx2_sysmem_alloc(struct gfx2_surf *, u32 owner);
 int gfx2_sysmem_free(struct gfx2_surf *);
 void gfx2_head_detach(struct gfx2_adapter *, u32 head);
 void gfx2_map_detach(struct gfx2_surf *);
 void gfx2_staging_drop(struct gfx2_surf *);
+int gfx2_lock_revoke(struct gfx2_surf *s);   /* C7. C14 only; 0/IO/INVAL. */
 void gfx2_vaspace_drop(struct addrspace *);
 int gfx2_head_restore_v1(struct gfx2_adapter *, u32 head);
 void gfx2_pal_set(u32 first, u32 count, const u32 *xrgb);

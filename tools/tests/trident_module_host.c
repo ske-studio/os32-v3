@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 #include "bootinfo_native.h"
 /* Actual loader/body/HAL assembly; case 65 initializes the real device over
  * fake hardware and calls the core drawing entrypoints and public cursor hooks. */

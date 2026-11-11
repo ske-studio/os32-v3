@@ -45,6 +45,7 @@ I1 kernel gfx2_scan_ref_get
 I1 kernel gfx2_scan_ref_put
 I1 kernel gfx2_scan_ref_swap
 I1 kernel gfx2_staging_drop
+I2 kernel gfx2_lock_revoke
 I1 kernel gfx2_surf_alias
 I1 kernel gfx2_surf_alias_update
 I1 kernel gfx2_surf_destroy
@@ -69,8 +70,6 @@ I1 kernel paging_gfx2_map
 I1 kernel pgalloc_pin
 I1 kernel pgalloc_pinned
 I1 kernel pgalloc_unpin
-I2 geforce gf3_alpha_set
-I2 geforce gf3_ckey_set
 I2 geforce gf3_copy_emit
 I2 geforce gf3_fill_emit
 I2 geforce gf3_range_query_set
@@ -82,6 +81,7 @@ I2 geforce gf_v2_fence_wait
 I2 kernel gfx2_caps
 I2 kernel gfx2_caps_from_v1
 I2 kernel gfx2_caps_refresh
+I2 kernel gfx2_check_exec
 I2 kernel gfx2_check_op
 I2 kernel gfx2_div255
 I2 kernel gfx2_fmt_info
@@ -151,6 +151,7 @@ I3 kernel gfxsync_cfg_lookup
 I3 kernel gfxsync_flush
 I3 kernel gfxsync_gap_loops
 I3 kernel gfxsync_mode
+I3 kernel gfxsync_profile
 I3 kernel gfxsync_read_rows
 I3 kernel gfxsync_row_read
 I3 kernel gfxsync_row_write
@@ -166,3 +167,12 @@ I1 kernel-data gfx2_surfs
 I1 kernel-data gfx2_pal
 I1 kernel-data gfxsync_ctx_pool
 I1 kernel-data gfx2_quar_owner
+
+I2 geforce gf_v2_deadline
+I2 geforce gf_v2_disp
+I2 geforce gf_v2_fence_reset
+I2 geforce gf_v2_rc
+I2 geforce gf_v2_start
+I2 geforce gf_v2_stop
+I3 geforce gf_v2_owns
+I3 geforce gf_v2_route_index

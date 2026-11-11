@@ -11,7 +11,7 @@ from mutpar import build_in_tree
 
 CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers=[
     'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_direct.c',
-    'drivers/video/geforce/gf_hook.c',
+    'drivers/video/geforce/gf_hook.c', 'drivers/video/geforce/gf_v2.h', 'gfx/v2/*.h', 'sdk/include/os32/os32_gfx2.h',
     'drivers/video/geforce/geforce_module.h', 'tools/tests/gfx_geforce_policy_host.c',
     'tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/test_gfx_geforce_policy.py',
     'drivers/video/pc98/pc98_route.h', 'hwdev/gf/**', 'hwdev/gfinit_mode.h', 'gfx/palette.h',
@@ -48,6 +48,7 @@ CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('v2-lost', ' && !gf_v2_inst.lost;', ';'),
     ('scan-notify', '    gfx_policy_scan_changed();', '    (void)0;'),
     ('stop-reeval', '    gfx_policy_reeval();\n#endif\n    int rc = stop_device', '    (void)0;\n#endif\n    int rc = stop_device'),
     ('enter-reeval', '    gfx_policy_reeval();\n#endif\n}\nstatic void geforce_leave', '    (void)0;\n#endif\n}\nstatic void geforce_leave'),

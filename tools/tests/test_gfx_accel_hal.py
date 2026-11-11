@@ -20,6 +20,14 @@ CHECK = dict(name='gfx-accel-hal-host', tier=1, needs=[], budget=10, covers=[
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('bridge-submit-begin', 'gfx/gfx_hw_submit.c',
+     '(void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W);', '(void)0;'),
+    ('bridge-submit-end', 'gfx/gfx_hw_submit.c',
+     'v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R | GFX2_CPU_W, 0);', '(void)0;'),
+    ('bridge-get-begin', 'gfx/gfx_hw_submit.c',
+     '(void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_R);', '(void)0;'),
+    ('bridge-get-end', 'gfx/gfx_hw_submit.c',
+     'v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_R, 0);', '(void)0;'),
     ('batch-limit', 'sdk/include/os32/os32_kapi_shared.h',
      '#define GFX_CMD_MAX  64', '#define GFX_CMD_MAX  63'),
     ('signed-coordinates', 'sdk/include/os32/os32_kapi_shared.h',

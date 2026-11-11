@@ -16,7 +16,7 @@ CHECK = dict(name='gfx2-i1-host', tier=2, needs=['make:all'], budget=60,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'tools/tests/kernel_layout.py', 'tools/tests/paging_source.py',
             'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/**',
-            'gfx/v2/**', 'gfx/sync/**', 'gfx/gfx.h', 'gfx/gfx_policy.h', 'gfx/palette.c', 'gfx/palette.h',
+            'gfx/gfx_core.c', 'gfx/gfx_core_*.inc', 'gfx/v2/**', 'gfx/sync/**', 'gfx/gfx.h', 'gfx/gfx_policy.h', 'gfx/palette.c', 'gfx/palette.h',
             'mm/**', 'include/**', 'sdk/include/**', 'lib/kstring.h',
             'lib/kstring_c.c', 'lib/dma_contract.c', 'kernel/module/**',
             'kernel/console/display_restore.h',
@@ -35,7 +35,7 @@ MUTATIONS = [
     ('sw-dispatch', 'gfx/v2/sw_table.c', '[GFX2_OP_FILL] = gfx2_sw_fill,', '[GFX2_OP_FILL] = gfx2_sw_copy,'),
 ]
 
-def observe(work, mutation=None):
+def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=(), stage=None):
     # Read includes through the same source view used by existing MM fixtures.
     overrides = {}
     if mutation:
@@ -58,10 +58,13 @@ def observe(work, mutation=None):
     sources = []
     for path in [*['gfx/v2/' + n + '.c' for n in UNITS], 'exec/lease.c',
                  'gfx/v2/palette_state.c', 'gfx/v2/sw_table.c', 'gfx/palette.c',
-                 'gfx/sync/a0_weak.c', 'gfx/sync/sync_storage.c']:
+                 'gfx/sync/a0_weak.c', 'gfx/sync/sync_storage.c', *extra]:
         target = work / path.replace('/', '_')
-        target.write_text(overrides.get(path, (ROOT / path).read_text()))
+        body = paging_source(ROOT / path) if path == 'gfx/gfx_core.c' else (ROOT / path).read_text()
+        target.write_text(overrides.get(path, body))
         sources.append(str(target))
+    if stage:
+        stage(work, overrides)
     exe = work / 'i1'
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O1', '-Wall', '-Wextra',
            '-Werror', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
@@ -69,8 +72,8 @@ def observe(work, mutation=None):
            '-nostdlib', '-static', '-DPHYSMEM_HOST_TEST=1', '-Wl,--gc-sections',
            *linker_flags(), '-I' + str(work),
            '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'gfx/v2'),
-           '-I' + str(ROOT / 'gfx/sync'),
-           *include_flags(ROOT), str(ROOT / 'tools/tests/gfx2_i1_host.c'),
+           '-I' + str(ROOT / 'gfx/sync'), '-I' + str(ROOT / 'userland/lib/gfx/v2'),
+           *include_flags(ROOT), str(ROOT / 'tools/tests' / fixture),
            *sources, str(ROOT / 'mm/physmem.c'), str(ROOT / 'lib/kstring_c.c'),
            str(ROOT / 'lib/dma_contract.c'), '-o', str(exe)]
     subprocess.run(cmd, check=True)

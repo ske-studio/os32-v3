@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REG = 'gfx/v2/backend_reg.c'
 PROVIDER = 'platform/pc98/gfx_selector.c'
 MUTATIONS = (
+    ('head-count', REG, 'a->heads = a->caps.heads < 2 ? a->caps.heads : 2;', 'a->heads = a->caps.heads;'),
     ('abi', REG, 'be->abi != GFX_HAL2_ABI', '0'),
     ('null-hook', REG, 'if (!be->hook)', 'if (0)'),
     ('module-text', REG, 'mod && !module_text_contains', '0 && mod && !module_text_contains'),

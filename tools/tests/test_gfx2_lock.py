@@ -34,6 +34,8 @@ def main():
     args = parser.parse_args()
     source = (ROOT / 'gfx/v2/lock.c').read_text()
     mutations = [
+        ('revoke-unmap', 'if (s->staging || s->map_as) rc = staging_unmap(s);', '(void)0;'),
+        ('revoke-alias', 'if (!(s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;', '(void)0;'),
         ('rollback', 'if (mapped && paging_lease_unmap(as, base, mapped))', 'if (0)'),
         ('discard-wait', 'rc = gfx2_cpu_begin(s, access, GFX2_LOCK_DL_US);',
          'rc = flags & GFX2_LOCK_DISCARD ? 0 : gfx2_cpu_begin(s, access, GFX2_LOCK_DL_US);'),

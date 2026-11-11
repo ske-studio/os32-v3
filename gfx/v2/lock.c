@@ -148,6 +148,16 @@ static int staging_unmap(struct gfx2_surf *s)
     return rc;
 }
 
+int gfx2_lock_revoke(struct gfx2_surf *s)
+{
+    int rc = 0;
+    if (!(s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;
+    if (s->staging || s->map_as) rc = staging_unmap(s);
+    if (s->state == GFX2_ST_LOCKED_RO || s->state == GFX2_ST_LOCKED_RW)
+        (void)gfx2_surf_state_set(s, GFX2_ST_IDLE);
+    return rc;
+}
+
 int gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch)
 {
     struct gfx2_caller c;
