@@ -1,4 +1,5 @@
 # file:function:reason (function-scoped; line numbers intentionally omitted)
+gfx/v2/lock.c:gfx2_lock:gfx2_map が返す AS 私有の USER 仮想番地を公開 lock の出力にする。物理番地ではない
 kdebug/kselftest/heap.inc:test_heap:無効な仮想ポインタを渡すヒープ否定試験
 arch/x86/legacy/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
 arch/x86/legacy/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)

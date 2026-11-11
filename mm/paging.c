@@ -511,6 +511,8 @@ int paging_memmap_selftest(u32 tramp_page)
 }
 
 #include "paging_lease.inc"
+#include "paging_gfx2.inc"
+#include "paging_gfx2_selftest.inc"
 
 /* T2e e10c (a). Return -1 only for the explicit V86 skip. Counters are
  * accumulated by the lifecycle caller, so deliberate test corruptions do not

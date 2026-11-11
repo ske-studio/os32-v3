@@ -218,6 +218,14 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* トランポリンページができてからでないと踏めない自己診断 (票 T9 §12 R1)。
      * kselftest_run() はここより前に走っている。 */
     kaudit_post_exec();
+    {
+        int rc = gfx2_map_selftest();
+        kprintf(KLOG_ATTR, "[gfx2] map selftest rc=%d\n", rc);
+        audit_runs++;
+        if (rc && !audit_fail)
+            kstrncpy(audit_first_fail_tag, "gfx2-map", sizeof(audit_first_fail_tag));
+        audit_fail += rc != 0;
+    }
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_exec();
     tvram_print(56, 2, "OK", TATTR_WHITE);
 

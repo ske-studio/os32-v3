@@ -468,5 +468,7 @@ static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
 #define MEM_LEASE_MAX         8
 #define MEM_GFX2_MAP_BASE 0xF8000000UL
 #define MEM_GFX2_MAP_END  0xFE000000UL
+#define MEM_LEASE_ALLOC_END   MEM_GFX2_MAP_BASE
+#define MEM_LEASE_ALLOC_PDES  ((MEM_LEASE_ALLOC_END - MEM_LEASE_BASE) >> MEM_PDE_SHIFT)
 
 #endif /* MEMMAP_H */

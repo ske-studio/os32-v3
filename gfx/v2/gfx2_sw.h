@@ -34,5 +34,7 @@ int gfx2_sw_ckey(const struct gfx2_exec *, struct gfx2_rect *touched);      /* S
 int gfx2_sw_alpha(const struct gfx2_exec *, struct gfx2_rect *touched);     /* S10 */
 int gfx2_sw_line(const struct gfx2_exec *, struct gfx2_rect *touched);      /* S11 */
 extern const gfx2_sw_fn gfx2_sw_table[GFX2_OP_MAX + 1];   /* 実体は C9 (submit.c)。CKEY 付きの COPY は sw_ckey */
+#define GFX2_SW_ROW_BYTES 16384u                          /* sync の面の行の作業 (I2 の追記) */
+extern u8 gfx2_sw_rowbuf[2][GFX2_SW_ROW_BYTES];       /* S* が共有。実体は sw_table.c */
 
 #endif

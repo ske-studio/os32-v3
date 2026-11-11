@@ -56,6 +56,16 @@ __attribute__((weak)) int gf_v2_gart_range(void *opaque, u32 handle, u32 off, u3
     (void)bytes;
     return OS32_ERR_NOSYS;
 }
+__attribute__((weak)) int gf_v2_gart_start(struct gf_v2 * a0, u32 dl)
+{
+    (void)a0;
+    (void)dl;
+    return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) void gf_v2_gart_reset(struct gf_v2 * a0)
+{
+    (void)a0;
+}
 __attribute__((weak)) int gf_v2_enum_head(void * a0, u32 head, GFX2_HeadInfo * a2)
 {
     (void)a0;

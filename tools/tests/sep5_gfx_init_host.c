@@ -75,6 +75,8 @@ u8 *bb_b, *bb_r, *bb_g, *bb_i, *bb[GVRAM_PLANES];
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 DirtyRectQueue dirty_queue, prev_dirty;
 u32 gfx_init_gen;
+static void gfx2_register_selected(void) { }
+static void gfx2_pal_reset16(void) { }
 static int gfx_started;
 static u8 planes_ok;
 static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
