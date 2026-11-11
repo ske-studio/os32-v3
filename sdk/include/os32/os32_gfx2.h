@@ -13,6 +13,8 @@
 #define GFX2_OP_LINE 9
 #define GFX2_OP_SET_PATTERN 10
 #define GFX2_OP_MAX 10
+#define GFX2_ROP_SRCCOPY 0xCC
+#define GFX2_ROP_PATCOPY 0xF0
 #define GFX2_HOW_NOSUPPORT 0
 #define GFX2_HOW_SW 1
 #define GFX2_HOW_HW 2
