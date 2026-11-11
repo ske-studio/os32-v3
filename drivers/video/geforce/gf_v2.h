@@ -51,4 +51,10 @@ int gf_v2_cursor_move(void *, u32 head, i32 x, i32 y);
 int gf_v2_cursor_show(void *, u32 head, u32 show);
 int gf_v2_dpms(void *, u32 head, u32 state);
 
+struct gf4_ctx; struct gf4_route; struct gf4_test_ops;
+const struct gf4_test_ops *gf_v2_disp(void);
+int gf_v2_deadline(struct gf2_chan *, u32, u32 *);
+int gf_v2_rc(int);
+u32 gf_v2_route_index(const struct gf4_ctx *, const struct gf4_route *);
+
 #endif

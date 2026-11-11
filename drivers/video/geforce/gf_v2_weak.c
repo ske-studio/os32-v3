@@ -244,3 +244,20 @@ __attribute__((weak)) int gf3_rop3_set(struct gf3_ctx * a0, u8 subc, u8 rop3, co
     (void)dl;
     return OS32_ERR_NOSYS;
 }
+
+__attribute__((weak)) const struct gf4_test_ops *gf_v2_disp(void)
+{
+    return 0;
+}
+__attribute__((weak)) int gf_v2_deadline(struct gf2_chan *c, u32 us, u32 *dl)
+{
+    (void)c; (void)us; (void)dl; return OS32_ERR_NOSYS;
+}
+__attribute__((weak)) int gf_v2_rc(int rc)
+{
+    (void)rc; return OS32_ERR_IO;
+}
+__attribute__((weak)) u32 gf_v2_route_index(const struct gf4_ctx *c, const struct gf4_route *r)
+{
+    (void)c; (void)r; return 0;
+}
