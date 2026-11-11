@@ -374,8 +374,8 @@ static void *iso9660_mount(int dev_id)
     char devname[ISO_DEVICE_NAME_CAP];
 
     int type = VFS_MOUNT_DEV_TYPE(dev_id);
-    if (type != VFS_DEV_CD) return (void *)0;
-    devname[0] = 'c';
+    if (type != VFS_DEV_CD && type != VFS_DEV_RAM) return (void *)0;
+    devname[0] = type == VFS_DEV_RAM ? 'r' : 'c';
     devname[1] = 'd';
     devname[2] = '0' + (char)VFS_MOUNT_DEV_ID(dev_id);
     devname[3] = '\0';
