@@ -71,6 +71,7 @@ static int select_mode(GfxBackend *backend, int legacy200)
     return mode_ok[i];
 }
 
+GfxBackend *g_backend = &gfx_backend_pc98;
 #include "gfx_selector_source.inc"
 
 struct scenario {

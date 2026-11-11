@@ -120,6 +120,7 @@ int ledger_selfcheck(const char *tag) { (void)tag;return 1; }
 static void kstrncpy(char *d,const char *s,u32 n) { while(n-- && (*d++=*s++)) {} }
 static int serial_gate_active(void) { return 1; }
 static void serial_puts_polled(const char *s) { (void)s; }
+static int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
 #include "callers.inc"
 
 /* Link the same caller slices to none as well as the native provider. */
