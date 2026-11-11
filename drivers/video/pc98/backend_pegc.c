@@ -47,6 +47,10 @@
 #include "os32_kapi_shared.h"
 #include "cpu_calibrate.h"   /* cpu_delay_us (GDC の FIFO 待ち) */
 #include "console.h"         /* console_hw_cursor_enable (CUI へ戻った後のカーソル) */
+#include "../../../gfx/v2/gfx2_int.h"
+
+extern const GfxBackendV2 pegc_backend_v2;
+
 #include "con_sink.h"        /* con_sink_is_enabled (GUI 中はカーソルを出さない) */
 
 /* アプリ帯 (mm/paging.c) がリニア窓を踏まないための照合 ([C4] 三層定数)。
@@ -433,10 +437,47 @@ static void pegc_enter_480_ports(void)
 
 #include "backend_pegc_diag.inc"
 
+/* Publish only live SHADOW contexts; remove the old publication before unbind. */
+static GfxSyncCtx *s_sync;
+static void pegc_sync_drop(void)
+{
+    gfx2_sync_publish(GFX2_KIND_PEGC, 0, NULL);
+    gfxsync_unbind(s_sync);
+    s_sync = NULL;
+}
+
+static int pegc_sync_bind(void)
+{
+    const GfxSyncTarget target = {
+        .va = P2V_IO(s_window_base), .bytes = PEGC_LINEAR_SIZE,
+        .pitch = PEGC_PITCH, .fmt = GFX2_FMT_INDEX8, .head = 0,
+    };
+    int rc = gfxsync_bind("pegc", &target, &s_sync);
+    if (rc) return rc;
+    if (gfxsync_mode(s_sync) != GFXSYNC_SHADOW) {
+        gfxsync_unbind(s_sync);
+        s_sync = NULL;
+        return OS32_ERR_INVAL;
+    }
+    rc = gfx2_sync_publish(GFX2_KIND_PEGC, 0, s_sync);
+    if (rc) {
+        gfxsync_unbind(s_sync);
+        s_sync = NULL;
+    }
+    return rc;
+}
+
 static void pegc_init(void)
 {
     const GfxMode *mode = gfx_backend_mode(&gfx_backend_pegc);
+    pegc_sync_drop();
     if (!pegc_probe()) return;
+    if (pegc_sync_bind()) {
+        /* init is void: withdrawing probe selects the existing pc98 fallback. */
+        gfx_backend_pegc.shutdown();
+        s_probe_ok = 0;
+        return;
+    }
 
     /* prepare を経ずに来た場合 (今の経路には無いが) も起動時の状態を先に
      * 記録しておく — 31kHz を書いた後では読み戻しが意味を失う。 */
@@ -527,5 +568,6 @@ GfxBackend gfx_backend_pegc = {
     sizeof(pegc_modes) / sizeof(pegc_modes[0]),
     0,                        /* default_mode */
     (const GfxMode *)0         /* selected_mode */,
-    .set_mode = 0             /* optional display hooks default to unavailable */
+    .set_mode = 0,            /* optional display hooks default to unavailable */
+    .v2 = &pegc_backend_v2
 };
