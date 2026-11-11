@@ -253,7 +253,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_LAYOUT_LOAD_END MEM_FIXED_PAGING_GUARD_BASE
 #define MEM_FIXED_PAGING_USED_END MEM_FIXED_PAGING_END
 #define MEM_FIXED_PAGING_USED_PAGES 11UL
-#define MEM_LEDGER_META_SIZE 0x2000UL
+#define MEM_LEDGER_META_SIZE 0x3000UL
 #define MEM_KSTACK_SIZE 0x4000UL
 
 
@@ -273,8 +273,8 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /*                                                                          */
 /*  低位 RAM の末尾に metadata + workspace を置くと下端がアプリ帯の最大上端 */
 /*  (MEM_APP_BAND_MAX_TOP) を割る構成 (8MB・9MB・12MB。高位 RAM は無い) は、 */
-/*  ここ [BASE, END) に置く: metadata 1 ページ + workspace 1 ページ。       */
-/*  core BSS 内の 2 頁を全構成で恒久保持し、present / supervisor / R/W。    */
+/*  ここ [BASE, END) に置く: metadata 2 ページ + workspace 1 ページ。       */
+/*  core BSS 内の 3 頁を全構成で恒久保持し、present / supervisor / R/W。    */
 /*  ARENA_TOP でも池に戻さない。END は排他 (半開区間)。                     */
 /* ---------------------------------------------------------------------- */
 #define MEM_LEDGER_META_BASE ((u32)&__ledger_fixed_start)

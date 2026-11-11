@@ -48,7 +48,7 @@ CLEAN = 0x280000         # 予算内。重なりも逆転も無い
 
 def map_symbols(resident):
     return {'__bss_end': resident, '__kernel_resident_end': resident,
-            '__ledger_fixed_start': resident - 8192, '__ledger_fixed_end': resident}
+            '__ledger_fixed_start': resident - 12288, '__ledger_fixed_end': resident}
 
 
 MUTATIONS = {
@@ -76,7 +76,7 @@ def _unused_mirrors(root, m):"""),
     "guess-map": ("""    if not os.path.isfile(map_path):
         raise MissingMap(""",
                   """    if not os.path.isfile(map_path):
-        return {"__bss_end": 0x280000, "__kernel_resident_end": 0x280000, "__ledger_fixed_start": 0x27e000, "__ledger_fixed_end": 0x280000}
+        return {"__bss_end": 0x280000, "__kernel_resident_end": 0x280000, "__ledger_fixed_start": 0x27d000, "__ledger_fixed_end": 0x280000}
     if False:
         raise MissingMap("""),
 }

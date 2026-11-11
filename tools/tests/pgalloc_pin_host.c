@@ -11,7 +11,15 @@ void kprintf(unsigned char a, const char *f, ...) { (void)a; (void)f; }
 static int test(void)
 {
     u32 owner, quar, p, before, out = 99, bad, i;
+    for (i = 0; i < sizeof(host_pool_storage) / sizeof(host_pool_storage[0]); i++)
+        host_pool_storage[i] = 0xa5a5a5a5;
+    CHECK(!pgalloc_pinned(0) && !pgalloc_pinned(PHYSMEM_MAX_PFN - 1));
     host_pool_boot(16384);
+    CHECK(pin_map == owner_map + PGALLOC_OWNER_BYTES(limit_pfn));
+    CHECK(pin_map + PGALLOC_PIN_BYTES(limit_pfn) ==
+          (u8 *)host_pool_storage + PGALLOC_META_BYTES(limit_pfn));
+    for (i = 0; i < limit_pfn; i++) CHECK(!pgalloc_pinned(i));
+    CHECK(!pgalloc_pinned(limit_pfn));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 1, "as", &owner));
     CHECK(ledger_owner_new(LEDGER_KIND_DEVICE, 2, "quar", &quar));
     CHECK(pgalloc_alloc_n_owner(owner, 3, MEM_POOL_BASE / PAGE_SIZE, limit_pfn, 0, &p));

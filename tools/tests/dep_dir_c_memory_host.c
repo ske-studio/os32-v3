@@ -112,7 +112,7 @@ static int observe_online(void)
 
 /* Fixed symbol scenario, separate from numeric machine boundaries. */
 __asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, 0x261000\n"
-        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17e000\n"
+        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17d000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n"
         ".globl __bss_end\n.set __bss_end, 0x180000\n");
 void kprintf(u8 color, const char *format, ...) { (void)color; (void)format; }
@@ -211,7 +211,7 @@ void _start(void)
     sys_mem_kb = detected;
     u32 ok = memory_boot_init(detected);
     record('I', ok, sys_mem_kb, memory_boot_ram_kb(), pgalloc_model_state());
-    record('S', 0x261000, 0x17e000, 0x180000, memory_boot_slack_first());
+    record('S', 0x261000, 0x17d000, 0x180000, memory_boot_slack_first());
     record('M', boot_meta_first, boot_meta_end, workspace_first, workspace_end);
     dump_model('m', &boot_memory);
     dump_model('n', &device_boot_map);

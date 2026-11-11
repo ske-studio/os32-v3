@@ -58,7 +58,7 @@ SECTIONS
         . = ALIGN(4);
     }
 
-    /* 台帳の FIXED 型 backing (2 頁)。core BSS の末尾、__bss_end まで。 */
+    /* 台帳の FIXED 型 backing (3 頁)。core BSS の末尾、__bss_end まで。 */
     .ledger_fixed ALIGN(LAYOUT_MEM_PAGE_SIZE) (NOLOAD) : {
         __ledger_fixed_start = .;
         . += LAYOUT_MEM_LEDGER_META_SIZE;
@@ -72,7 +72,7 @@ SECTIONS
     ASSERT(__ledger_fixed_start % LAYOUT_MEM_PAGE_SIZE == 0 &&
            __ledger_fixed_end - __ledger_fixed_start == LAYOUT_MEM_LEDGER_META_SIZE &&
            __bss_start <= __ledger_fixed_start && __ledger_fixed_end == __bss_end,
-           "ledger backing must be two pages inside core BSS")
+           "ledger backing must be three pages inside core BSS")
     /* ==================================================================== */
     /*  カーネル本体の予算 (2026-09-17 決裁 D2、票                            */
     /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                          */
