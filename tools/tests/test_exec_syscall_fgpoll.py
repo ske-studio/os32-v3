@@ -47,6 +47,7 @@ void geforce_foreground_poll(void) {
     polls++;
     if (stop_pending) aborts++;
 }
+#include "exec_gfx_poll.h"
 static void ring3_abort_check(void) {
     CHECK(checks==1 && polls==(int)due);
     if (stop_pending) CHECK(aborts==1);
@@ -100,10 +101,10 @@ def main():
         folder = Path(td)
         run_case(folder, source, 'syscall-tail')
         if args.mutate:
-            old = 'if (geforce_fg_due(tick_count)) geforce_foreground_poll();'
+            old = 'if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();'
             assert source.count(old) == 1
             run_case(folder, source.replace(old,
-                     'if (geforce_fg_due(tick_count) && 0) geforce_foreground_poll();'),
+                     'if (exec_gfx_poll_due(tick_count) && 0) exec_gfx_poll();'),
                      'syscall-poll', True)
             run_case(folder, source, 'syscall-poll-restored')
 
