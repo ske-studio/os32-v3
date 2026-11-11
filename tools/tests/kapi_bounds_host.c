@@ -1,3 +1,4 @@
+#include "gfx2_bridge_fake.h"
 #define OS32_SQLITE_DIRECT_TEST 1
 /* Real target bodies; only MMIO and unused dependencies are substituted. */
 #include "serial_diag_host.h"
@@ -37,6 +38,8 @@ int res_owner_get(void) { return 1; }
 #include "db_source.inc"
 #include "gfx_core_source.inc"
 #include "gfx_vram_source.inc"
+void gfx2_pal_set_v1(int first, int count, const u8 *rgb)
+{ (void)first; (void)count; (void)rgb; }
 /* Only the palette boundary is hardware-independent here. */
 static unsigned palette_calls;
 static int packed;
