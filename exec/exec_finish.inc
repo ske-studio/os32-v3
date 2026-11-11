@@ -65,7 +65,7 @@ static void exec_teardown_app(AppSlot *a)
     (void)ledger_owner_retire(a->as->owner);
     goto done;
 poisoned:
-    serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
+    exec_serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
     exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
 done:
     exec_owner_diag(a, 1, owner_pages_before, exec_as_leftover_pages - before);
@@ -135,7 +135,7 @@ static void exec_reclaim_resources(int id)
      * FD が生きていなければならない。ここを (6) に置いていた間は、
      * vfs_close_owned が先に FD を閉じ、SQLite が閉じた FD 番号へ遅延 close /
      * rollback を投げる形になっていた。他の相対順は 1 つも動かさない。 */
-    db_cleanup_owned(id);
+    exec_db_cleanup_owned(id);
     /* (2) 標準FDのリダイレクト解除 (ファイルFDも自動クローズ)。
      * 表は FD 0/1/2 の 3 本しかないので、2 本のアプリが同時に stdout を
      * リダイレクトすることはできない (D3 の限界。GUI アプリは使わない)。 */
@@ -262,7 +262,7 @@ volatile u32 exec_stop_count;
 static void exec_stop_mark(void)
 {
     exec_stop_count++;
-    serial_puts_polled("OS32: exec teardown stopped\r\n");
+    exec_serial_puts_polled("OS32: exec teardown stopped\r\n");
 }
 
 /* ======================================================================== */

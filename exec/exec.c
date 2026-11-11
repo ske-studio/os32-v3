@@ -3,7 +3,7 @@
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
-#include "serial_diag.h"
+#include "exec_serial_diag.h"
 #include "appmem.h"
 #include "memmap.h"
 #include "exec.h"
@@ -38,7 +38,7 @@
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */
 #include "launch.h"      /* T9: 起動要求表 (GUI 中の起動を WM が仲介する) */
 #include "ring3_str.h"   /* ring3_pte_writable_ok / ring3_range_overlaps (往復 10) */
-#include "kapi_db.h"
+#include "exec_kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"
 #include "kapi_call.h"

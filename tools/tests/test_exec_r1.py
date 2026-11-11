@@ -167,7 +167,7 @@ void kapi_strings_cleanup_owned(int id) {
     CHECK(id == 2 && cleanup == 0 && !teardown && host_if && cr3 == 1);
     CHECK(!kctx_irq_depth && !kctx_exc_depth);
 }
-static void db_cleanup_owned(int id) { resource(id, 0); }
+static void exec_db_cleanup_owned(int id) { resource(id, 0); }
 static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
