@@ -284,10 +284,10 @@ static void run(void)
     host_slots[3].as = &space; /* second AS scan must get a distinct IRQ interval */
     reset_scans();
     CHECK(!lease_audit_all());
-    CHECK(scan_max[0] == 122880U);
-    CHECK(scan_max[0] == (MEM_APP_BAND_MAX_PDES + MEM_LEASE_MAX_PDES) * PTE_COUNT);
+    CHECK(scan_max[0] == 98304U);
+    CHECK(scan_max[0] == (MEM_APP_BAND_MAX_PDES + MEM_LEASE_ALLOC_PDES) * PTE_COUNT);
     host_slots[3].as = 0;
-    u32 *tail = P2V(space.lease_pt_phys[MEM_LEASE_MAX_PDES-1]);
+    u32 *tail = P2V(space.lease_pt_phys[MEM_LEASE_ALLOC_PDES-1]);
     tail[PTE_COUNT-1] = PAGE_RO | PTE_USER;
     CHECK(lease_check(&space) == LEASE_INVAL);
     tail[PTE_COUNT-1] = 0;

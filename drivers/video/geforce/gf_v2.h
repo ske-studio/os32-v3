@@ -6,12 +6,22 @@
 #define GF_V2_RING 256
 struct gf_v2_ring_e { u32 v2; struct gf2_fence f; };
 struct gf_v2_ring { u32 head, tail, count; struct gf_v2_ring_e e[GF_V2_RING]; };
+#define GF_V2_GART_PAGES 32768u
+#define GF_V2_GART_PT_BYTES (8u + 4u * GF_V2_GART_PAGES)
+#define GF_V2_GART_BINDS GFX2_MAX_SURFACES
+struct gf_v2_gart_bind { u32 first, n; const u32 *pfn; };
+struct gf_v2_gart {
+    struct gf2_object obj;                       /* Linked inst: never move. */
+    u32 epoch;                                  /* 0 = no live page table. */
+    u32 count;
+    struct gf_v2_gart_bind bind[GF_V2_GART_BINDS]; /* Sorted by first. */
+};
 struct gf_v2 {                                   /* 実体は G1 (gf_v2_ops.c の static 1 つ) */
     struct gf3_ctx *g3; struct gf2_chan *ch;
     struct gf_v2_ring ring;                      /* G4 だけが書く */
     u32 completed, failed_upto;                  /* G4 */
     struct gf_vram_reservation_node node[GFX2_MAX_SURFACES]; /* G9 (surf の priv[2] が番号) */
-    u32 gart_handle, gart_base, gart_pages;      /* G5 */
+    struct gf_v2_gart gart;                      /* G5 only */
 };
 int gf_v2_fence_emit(struct gf_v2 *, u32 v2, u32 dl);            /* G4、§6-3 のコード */
 int gf_v2_fence_state(struct gf_v2 *, u32 *completed, u32 *failed_upto); /* G4 */
@@ -23,6 +33,8 @@ int gf_v2_gart_unbind(struct gf_v2 *, u32 gpu_off, u32 n);       /* G5 */
 int gf_v2_gart_range(void *opaque, u32 handle, u32 off, u32 bytes);  /* G5。opaque は struct gf_v2 *。
                                                     handle が GART_DMA でなければ EINVAL、[off, off+bytes) が bind 済みの
                                                     頁に収まれば 0、外は ERANGE (u32 のあふれ込み)。G8 が callback 経由で呼ぶ */
+int gf_v2_gart_start(struct gf_v2 *, u32 dl);    /* G1/G2: after layer 3 ready. */
+void gf_v2_gart_reset(struct gf_v2 *);           /* G1: only after F2 OFF. */
 /* G2 (gf_v2_display.c)。GfxBackendV2 の同名の hook の型そのもので、ctx は struct gf_v2 * */
 int gf_v2_enum_head(void *, u32 head, GFX2_HeadInfo *);
 int gf_v2_enum_conn(void *, u32 conn, GFX2_ConnectorInfo *);

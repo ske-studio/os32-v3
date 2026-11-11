@@ -1,3 +1,4 @@
+#include "gfx2_core_fake.h"
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}
 /* T2e e4: real gfx lifecycle/three backends and ledger/query/lease/B1.
@@ -209,6 +210,9 @@ int appslot_cur(void) { return 2; }
 int res_owner_get(void) { return 2; }
 static int host_user = 1, host_gui, host_gfx_owner = 2;
 int ring3_call_from_user(void) { return host_user; }
+#ifdef E10C_REAL_AUDIT
+int gfx2_map_audit(const struct addrspace *as) { (void)as; return 0; }
+#endif
 AppSlot *appslot_at(int id) { return id >= 0 && id < APP_SLOT_COUNT ? &host_slots[id] : 0; }
 AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return host_gfx_owner; }

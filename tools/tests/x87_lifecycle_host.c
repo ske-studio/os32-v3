@@ -196,3 +196,5 @@ void _start(void)
 int as_va_to_pa_read(u32 pd,u32 va,u32 *pa) { (void)pd; *pa=va; return 0; }
 int shlib_loaded(void) { return 0; }
 u32 shlib_data_pages(void) { return 0; }
+
+int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }

@@ -1,5 +1,6 @@
 /* Application teardown, resource reclaim and exit landing. Included by exec.c. */
 #include "../gfx/gfx_emergency.h"
+#include "../gfx/v2/gfx2_exec.h"
 /* ======================================================================== */
 /*  exec_teardown_app — CPL=3 アプリの物理とアドレス空間を返す (D1/D4)       */
 /*                                                                          */
@@ -32,6 +33,8 @@ static void exec_teardown_app(AppSlot *a)
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
         kprintf(ATTR_RED, "lease revoke failed during teardown\n");
+    if (gfx2_owner_release(a->as))
+        paging_addrspace_poison(a->as);
     /* Revoke foreign leases even when private pages are quarantined. */
     if (a->as->appmem_poisoned) goto poisoned;
     shlib_addrspace_detach(a->as);

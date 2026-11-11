@@ -4,6 +4,8 @@
 /*                                                                          */
 /*  L2 の更新は必ず L1 と同じ IRQ 保存区間で、全部検査してから行う。         */
 /* ======================================================================== */
+static u8 pin_map[PHYSMEM_MAX_PFN];
+
 static int owner_ok(u32 owner)
 {
     return owner && owner < LEDGER_MAX_OWNERS && ledger_owners[owner].kind;
@@ -30,6 +32,44 @@ int pgalloc_page_owned(u32 pfn, u32 owner)
 static int __attribute__((noinline)) pfn_span_ok(u32 pfn, int n)
 {
     return initialized && n > 0 && pfn < limit_pfn && (u32)n <= limit_pfn - pfn;
+}
+
+int pgalloc_pin(u32 pfn, u32 n, u32 owner)
+{
+    unsigned int flags = irq_save();
+    u32 i;
+    int ok = 0;
+    if (!owner_ok(owner) || n > 0x7fffffffU || !pfn_span_ok(pfn, (int)n)) goto done;
+    for (i = 0; i < n; i++)
+        if (!page_owned(pfn + i, owner) || pin_map[pfn + i] == 255) goto done;
+    for (i = 0; i < n; i++) pin_map[pfn + i]++;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+int pgalloc_unpin(u32 pfn, u32 n, u32 owner)
+{
+    unsigned int flags = irq_save();
+    u32 i;
+    int ok = 0;
+    if (!owner_ok(owner) || n > 0x7fffffffU || !pfn_span_ok(pfn, (int)n)) goto done;
+    for (i = 0; i < n; i++)
+        if (!page_owned(pfn + i, owner) || !pin_map[pfn + i]) goto done;
+    for (i = 0; i < n; i++) pin_map[pfn + i]--;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+int pgalloc_pinned(u32 pfn)
+{
+    unsigned int flags = irq_save();
+    int count = initialized && pfn < limit_pfn ? pin_map[pfn] : 0;
+    irq_restore(flags);
+    return count;
 }
 
 static void note_last(u32 *last, u32 op, u32 owner, void *eip)
@@ -200,7 +240,7 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
             sf->first < pfn + (u32)n) goto bad;
     }
     for (i = 0; i < (u32)n; i++)
-        if (!page_owned(pfn + i, owner)) goto bad;
+        if (!page_owned(pfn + i, owner) || pin_map[pfn + i]) goto bad;
     for (i = 0; i < (u32)n; i++) give_page(pfn + i);
     used_pages -= (u32)n;
     ledger_owners[owner].pages -= (u32)n;
@@ -213,7 +253,7 @@ done:
     return ok;
 }
 
-int ledger_transfer(u32 pfn, int n, u32 from, u32 to)
+static int transfer_owner(u32 pfn, int n, u32 from, u32 to, int pinned)
 {
     u32 i;
     unsigned int flags;
@@ -221,9 +261,10 @@ int ledger_transfer(u32 pfn, int n, u32 from, u32 to)
     flags = irq_save();
     ledger_note(LEDGER_OP_TRANSFER, from, LEDGER_CALLER());
     ok = 0;
-    if (!owner_ok(from) || !owner_ram(to) || !pfn_span_ok(pfn, n)) goto done;
+    if (!owner_ok(from) || !(pinned ? owner_ok(to) : owner_ram(to)) || !pfn_span_ok(pfn, n)) goto done;
     for (i = 0; i < (u32)n; i++)
         if (!page_owned(pfn + i, from)) goto done;
+        else if (!pinned && pin_map[pfn + i]) { ledger_bad_free++; goto done; }
     for (i = 0; i < (u32)n; i++) owner_map[pfn + i] = (u8)to;
     ledger_owners[from].pages -= (u32)n;
     ledger_owners[to].pages += (u32)n;
@@ -231,6 +272,16 @@ int ledger_transfer(u32 pfn, int n, u32 from, u32 to)
 done:
     irq_restore(flags);
     return ok;
+}
+
+int ledger_transfer(u32 pfn, int n, u32 from, u32 to)
+{
+    return transfer_owner(pfn, n, from, to, 0);
+}
+
+int ledger_transfer_pinned(u32 pfn, int n, u32 from, u32 to)
+{
+    return transfer_owner(pfn, n, from, to, 1);
 }
 
 int ledger_reclaim_owner(u32 owner, u32 *pages)
@@ -251,6 +302,8 @@ int ledger_reclaim_owner(u32 owner, u32 *pages)
     }
     /* 返し忘れが無ければ (pages == 0) 走査しない。AS / MODULE の L2 の
      * ページは全部 eligible かつ allocated。 */
+    for (p = 0; ledger_owners[owner].pages && p < limit_pfn; p++)
+        if (page_owned(p, owner) && pin_map[p]) { ledger_bad_free++; goto done; }
     n = 0;
     for (p = 0; ledger_owners[owner].pages && p < limit_pfn; p++) {
         if (!page_owned(p, owner)) continue;

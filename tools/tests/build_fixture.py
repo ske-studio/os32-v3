@@ -9,6 +9,9 @@ CONFIG_INPUTS = ('sdk/target_profile.py', 'sdk/target_profile_cli.py')
 def copy_build_tree(root):
     shutil.copytree(ROOT / 'build', root / 'build',
                     ignore=shutil.ignore_patterns('out', 'sdk', '__pycache__'))
+    # Kernel source lists use wildcards for these directories.
+    for name in ('gfx/v2', 'gfx/sync'):
+        shutil.copytree(ROOT / name, root / name)
     for name in CONFIG_INPUTS:
         source = ROOT / name
         target = root / name
