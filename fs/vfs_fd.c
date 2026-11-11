@@ -820,6 +820,7 @@ int vfs_fd_pinned_busy(void *fs_ctx, int has_ino, u32 ino, const char *rel)
 /* レガシー shell_print 互換ラッパー (Phase 2) */
 void vfs_sys_compat_shell_print(const char *s, u8 attr)
 {
+    (void)attr;
     /* 互換機能として常に FD=1(標準出力) へ流し込む。色指定は無視される */
     if (!s) return;
     vfs_write_fd(1, s, kstrlen(s));
