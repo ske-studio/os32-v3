@@ -23,7 +23,7 @@ def main():
     def create(staging):
         cmd = [tool]
         if Path(tool).name == 'xorriso':
-            cmd += ['-as', 'mkisofs']
+            cmd += ['-as', 'mkisofs', '--norock']
         cmd += ['-iso-level', '1', '-no-pad', '-o', str(args.out.resolve()), str(staging)]
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         size = args.out.stat().st_size
