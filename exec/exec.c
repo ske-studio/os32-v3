@@ -1,4 +1,4 @@
-#include "legacy_guest.h"
+#include "exec_legacy.h"
 #include "font_guard.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
