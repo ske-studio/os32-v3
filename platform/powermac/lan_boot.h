@@ -124,6 +124,7 @@ void pm_term_write(const u8 *, u32 bytes);
 int pm_term_tx_peek(struct lan_message *);
 void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
 int pm_term_state(struct lan_message *out);
+const u8 *pm_term_peer(void);
 void pm_terminal_feed(const u8 *bytes, u32 len);
 void pm_terminal_line_lost(void);
 void pm_terminal_open(void);

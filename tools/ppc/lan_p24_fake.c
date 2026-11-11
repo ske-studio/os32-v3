@@ -18,16 +18,24 @@ static void die(const char *p) {
 #define CHECK(x,m) do { if (!(x)) die("H:" m); } while(0)
 void *memcpy(void *p,const void *q,u32 n) { u8 *a=p; const u8 *b=q; while(n--) *a++=*b++; return p; }
 void *memset(void *p,int v,u32 n) { u8 *a=p; while(n--) *a++=(u8)v; return p; }
+void *kmemcpy(void *p, const void *q, u32 n) { return memcpy(p,q,n); }
+static u32 fed, lost;
+void pm_terminal_feed(const u8 *p, u32 n) { (void)p; fed += n; }
+void pm_terminal_line_lost(void) { lost++; }
 void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 static u32 regs[0x8000/4], phy[32], mif, completion, hold, down, freeze, tb_calls;
-static u32 dma_calls, dma_first, copies, postwrites, sends[5], nic_rx;
+static u32 dma_calls, dma_first, copies, postwrites, sends[9], nic_rx;
 static u64 clock_tb, now;
 static const u8 host_mac[6]={2,0,0,0,0,2};
 static u8 *pool;
 static u8 last_dst[6], log_bytes[20000];
 static u32 cache_lines, pte_flags;
 static u32 log_used;
-static struct lan_message last[5];
+#ifdef TERM_TEST
+static u8 order[64], term_dst[6];
+static u32 order_n;
+#endif
+static struct lan_message last[9];
 static struct pm_kboot_info info;
 static struct pm_gmac_boot boot;
 static const struct pm_log_sink *sink;
@@ -97,8 +105,12 @@ static void wr(void *ctx,u32 reg,u32 v) {
         u32 len=(u32)d[0]|((u32)d[1]<<8);
         struct lan_message m;
         CHECK(!pm_lan_decode(b+14,len-14,&m),"tx-codec");
-        CHECK(m.type<5,"tx-type"); last[m.type]=m; sends[m.type]++;
+        CHECK(m.type<9,"tx-type"); last[m.type]=m; sends[m.type]++;
         if(m.type==PLN1_TYPE_RSP) memcpy(last_dst,b,6);
+#ifdef TERM_TEST
+        if (m.type==PLN1_TERM_OUT || m.type==PLN1_TERM_STATE) memcpy(term_dst,b,6);
+        if ((m.type==PLN1_TYPE_LOG || m.type==PLN1_TERM_OUT) && order_n<64) order[order_n++]=m.type;
+#endif
         if(m.type==PLN1_TYPE_LOG) { CHECK(log_used+m.payload_bytes<=sizeof(log_bytes),"log-size"); memcpy(log_bytes+log_used,m.payload,m.payload_bytes); log_used+=m.payload_bytes; }
         if(!hold) completion=v;
     }
@@ -149,6 +161,24 @@ static void scenario(void) {
     CHECK(mark_count==5,"state-count"); for(u32 i=0;i<5;i++) CHECK(marks[i]==i+1 && links[i]==(i==4),"state-sequence");
     poll_once(); CHECK(sends[1]==1 && last[1].seq==0,"beacon-first");
     CHECK(log_used==15 && same(log_bytes,(const u8 *)"KBOOT fixture\r\n",15),"boot-raw");
+#ifdef TERM_TEST
+    { struct lan_message t={0}; t.type=PLN1_TERM_OPEN; memcpy(t.boot_id,boot.boot_id,16); t.host_nonce[0]=7;
+      boot.peer_mac[5]=3; inject(&t,0,0); poll_once();
+      CHECK(sends[PLN1_TERM_STATE]==1 && lost==1 && same(term_dst,host_mac,6),"term-open");
+      t.type=PLN1_TERM_IN; t.payload_bytes=1; t.payload[0]='a'; inject(&t,0,0); poll_once();
+      CHECK(fed==1,"term-input");
+      static u8 data[1024]; pm_term_write(data,sizeof(data));
+      CHECK(!sink->write(sink->ctx,(const char *)data,sizeof(data)),"term-log");
+      order_n=0; out("reached=alternate\n"); poll_once();
+      CHECK(order_n==4 && order[0]!=order[1] && order[0]==order[2] && order[1]==order[3],"alternate");
+      while (pm_term_tx_peek(&t)) poll_once();
+      while (pm_lan_log_peek((const u8 **)&(const u8 *){0}, &(u32){0}, &(u64){0}, &(u64){0}, &(u64){0}, &(u32){0})==LAN_OK) poll_once();
+      out("reached=state-interval\n"); term_state(now); u32 states=sends[PLN1_TERM_STATE];
+      now+=1000; clock_tb=now; pm_lan_poll(now); CHECK(sends[PLN1_TERM_STATE]==states,"state-interval");
+      now=s.state_at; clock_tb=now; pm_lan_poll(now); CHECK(sends[PLN1_TERM_STATE]==states+1,"state-due");
+      boot.peer_mac[5]=2;
+    }
+#endif
     out("reached=filters\n");
     for(u32 f=1;f<=5;f++) {
         struct lan_message q=request(1); if(f==4) q.boot_id[0]^=1;
