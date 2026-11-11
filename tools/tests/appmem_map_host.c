@@ -1,3 +1,5 @@
+#include "gfx2_bridge_fake.h"
+#include "gfx/v2/gfx2_int.h"
 #include "host_exec_context.h"
 #include "font_guard_inactive.h"
 /* Real paging/pgalloc/physmem/appmem; Linux/MMU/IRQ are the only host boundary. */

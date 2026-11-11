@@ -9,6 +9,7 @@ TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pg
 import argparse
 import hashlib
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import time
@@ -82,6 +83,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                 assert body.count(old) == 1, (old, body.count(old))
                 body = body.replace(old, new)
             (tmp / (key + '_host_source.c')).write_text(body)
+        shutil.copyfile(ROOT / 'tools/tests/gfx2_bridge_fake.h', tmp / 'gfx2_bridge_fake.h')
         exe = tmp / 'walk'
         cmd = ['gcc', *linker_flags(), '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
