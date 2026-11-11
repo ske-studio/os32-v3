@@ -77,6 +77,7 @@
     "kernel/console/console_dual.c",
     "platform/pc98/console.c",
     "platform/pc98/display.c",
+    "platform/pc98/display_dual.c",
     "platform/pc98/gfx_scroll.c",
     "platform/pc98/gfx_init.c",
     "platform/pc98/gfx_selector.c",
