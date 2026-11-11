@@ -468,7 +468,7 @@ ppc_kernel_vector_return:
     isync
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
     andi. 3,3,PPC_MSR_PR
-    bne .Lrestore_frame
+    bne .Lrestore_user
     lwz 3,PPC_CALL_SIZE+KFRAME_BUSY(1)
     li 4,0
     stw 4,0(3)
@@ -517,6 +517,59 @@ ppc_kernel_vector_return:
     lwz 2,PPC_CALL_SIZE+8(1)
     lwz 0,PPC_CALL_SIZE+0(1)
     lwz 1,PPC_CALL_SIZE+4(1)
+    rfi
+.Lrestore_user:
+    lwz 0,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    mtsprg3 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_LR(1)
+    mtlr 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CTR(1)
+    mtctr 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_XER(1)
+    mtxer 3
+    lwz 3,PPC_CALL_SIZE+PPC_FRAME_CR(1)
+    mtcr 3
+    lwz 31,PPC_CALL_SIZE+124(1)
+    lwz 30,PPC_CALL_SIZE+120(1)
+    lwz 29,PPC_CALL_SIZE+116(1)
+    lwz 28,PPC_CALL_SIZE+112(1)
+    lwz 27,PPC_CALL_SIZE+108(1)
+    lwz 26,PPC_CALL_SIZE+104(1)
+    lwz 25,PPC_CALL_SIZE+100(1)
+    lwz 24,PPC_CALL_SIZE+96(1)
+    lwz 23,PPC_CALL_SIZE+92(1)
+    lwz 22,PPC_CALL_SIZE+88(1)
+    lwz 21,PPC_CALL_SIZE+84(1)
+    lwz 20,PPC_CALL_SIZE+80(1)
+    lwz 19,PPC_CALL_SIZE+76(1)
+    lwz 18,PPC_CALL_SIZE+72(1)
+    lwz 17,PPC_CALL_SIZE+68(1)
+    lwz 16,PPC_CALL_SIZE+64(1)
+    lwz 15,PPC_CALL_SIZE+60(1)
+    lwz 14,PPC_CALL_SIZE+56(1)
+    lwz 13,PPC_CALL_SIZE+52(1)
+    lwz 12,PPC_CALL_SIZE+48(1)
+    lwz 11,PPC_CALL_SIZE+44(1)
+    lwz 10,PPC_CALL_SIZE+40(1)
+    lwz 9,PPC_CALL_SIZE+36(1)
+    lwz 8,PPC_CALL_SIZE+32(1)
+    lwz 7,PPC_CALL_SIZE+28(1)
+    lwz 6,PPC_CALL_SIZE+24(1)
+    lwz 5,PPC_CALL_SIZE+20(1)
+    lwz 4,PPC_CALL_SIZE+16(1)
+    lwz 3,PPC_CALL_SIZE+12(1)
+    lwz 2,PPC_CALL_SIZE+8(1)
+    lwz 3,PPC_CALL_SIZE+0(1)
+    mtsprg1 3
+    lwz 3,PPC_CALL_SIZE+4(1)
+    mtsprg2 3
+    lwz 3,PPC_CALL_SIZE+12(1)
+    mfsprg3 1
+    mtsrr0 0
+    mtsrr1 1
+    mfsprg1 0
+    mfsprg2 1
     rfi
 /* No MMIO, C, or writes through a potentially exhausted stack on reentry. */
 .globl ppc_kernel_vector_fatal

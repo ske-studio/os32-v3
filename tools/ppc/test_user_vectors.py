@@ -14,7 +14,7 @@ SOURCE = ROOT / 'arch/ppc/kernel_vectors.S'
 
 
 def inspect(source):
-    for label in ('user_frame', 'save_frame', 'dispatch', 'restore_frame'):
+    for label in ('user_frame', 'save_frame', 'dispatch', 'restore_frame', 'restore_user'):
         source = source.replace('.L' + label, 'test_' + label)
     with tempfile.TemporaryDirectory(prefix='ppc-user-vectors-') as directory:
         asm = Path(directory) / 'vectors.S'
@@ -27,11 +27,16 @@ def inspect(source):
     entry = text.split('<ppc_kernel_vector_entry>:', 1)[1].split('<test_user_frame>:', 1)[0]
     user = text.split('<test_user_frame>:', 1)[1].split('<test_save_frame>:', 1)[0]
     ret = text.split('<ppc_kernel_vector_return>:', 1)[1].split('<test_restore_frame>:', 1)[0]
+    restore = text.split('<test_restore_user>:', 1)[1].split('<ppc_kernel_vector_fatal>:', 1)[0]
+    tail = restore.split('mtsrr0', 1)[1] if 'mtsrr0' in restore else ''
     spill = text.split('<ppc_kernel_frame_complete>:', 1)[1].split('<test_dispatch>:', 1)[0]
     return (all(x in entry for x in ('andi.', '16384', '<test_user_frame>'))
             and 'ppc_exec_kernel_sp' in user and user.count('stw ') == 1
             and '0(r1)' in user and '<test_dispatch>' in spill
-            and 'andi.' in spill and '<test_restore_frame>' in ret and 'andi.' in ret)
+            and 'andi.' in spill and '<test_restore_user>' in ret and 'andi.' in ret
+            and 'mtsrr1' in tail and 'rfi' in tail
+            and not any(line.split('\t')[-1].strip().startswith(('lw', 'lm', 'lh', 'lb'))
+                        for line in tail.splitlines()))
 
 
 def main():
@@ -41,10 +46,15 @@ def main():
     if '--mutate' in sys.argv:
         anchor = '.Luser_frame:\n    lis 1,ppc_exec_kernel_sp@ha'
         assert source.count(anchor) == 1
-        mutant = source.replace(anchor, '.Luser_frame:\n    stw 29,0(28)\n    lis 1,ppc_exec_kernel_sp@ha')
+        mutant = source.replace(anchor, '.Luser_frame:\n    lis 1,.Ltrap_busy@ha\n    li 29,1\n    stw 29,.Ltrap_busy@l(1)\n    lis 1,ppc_exec_kernel_sp@ha')
         if inspect(mutant):
             raise RuntimeError('busy-word mutation survived')
         print('USER busy-word store: RED (1)')
+        anchor = '    mtsrr1 1\n    mfsprg1 0'
+        assert source.count(anchor) == 1
+        if inspect(source.replace(anchor, '    mtsrr1 1\n    lwz 0,0(1)\n    mfsprg1 0')):
+            raise RuntimeError('late load mutation survived')
+        print('USER late load: RED (1)')
     return 0
 
 
