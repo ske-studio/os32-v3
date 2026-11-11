@@ -126,6 +126,7 @@ int gfx2_map(struct gfx2_surf *, struct addrspace *, u32 *va);
 int gfx2_unmap(struct gfx2_surf *);
 int gfx2_surf_page(const struct gfx2_surf *, u32 k, u32 *pa, u32 *attr);
 int gfx2_cpu_visible(const struct gfx2_surf *);
+int gfx2_check_exec(struct gfx2_adapter *a, const struct gfx2_exec *ex, u32 *how);   /* C8 */
 int gfx2_map_audit(const struct addrspace *);
 int gfx2_sysmem_alloc(struct gfx2_surf *, u32 owner);
 int gfx2_sysmem_free(struct gfx2_surf *);

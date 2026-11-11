@@ -82,6 +82,7 @@ I2 geforce gf_v2_fence_wait
 I2 kernel gfx2_caps
 I2 kernel gfx2_caps_from_v1
 I2 kernel gfx2_caps_refresh
+I2 kernel gfx2_check_exec
 I2 kernel gfx2_check_op
 I2 kernel gfx2_div255
 I2 kernel gfx2_fmt_info

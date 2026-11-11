@@ -61,6 +61,8 @@ def main():
         for path in ('gfx/v2/a0_weak.c', 'gfx/sync/a0_weak.c', 'drivers/video/geforce/gf_v2_weak.c'):
             target = 'geforce' if 'gf_v2_weak' in path else 'kernel'
             actual.update((target, n) for n in re.findall(r'^__attribute__\(\(weak\)\).*?\b(\w+)\([^;]*?\)\n\{', (ROOT / path).read_text(), re.M))
+        # C8 adds a strong internal entry with no A0 placeholder.
+        actual.add(('kernel', 'gfx2_check_exec'))
         actual.update(('kernel-data', n) for n in ('gfx2_v1_shim', 'gfx2_lost_be', 'gfx2_sw_table', 'gfx2_adapters', 'gfx2_surfs', 'gfx2_pal', 'gfxsync_ctx_pool', 'gfx2_quar_owner'))
         assert len(rows) == len(actual)
         assert {(target, name) for _, target, name in rows} == actual
