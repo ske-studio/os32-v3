@@ -23,6 +23,8 @@
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
+#include "console.h"
+#include "../kernel/console/console_dual.h"
 #ifdef TICK_PROBE
 #include "tick_probe.h"
 #endif
@@ -82,6 +84,7 @@
 extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
+extern void console_session_clear(void);      /* console.c (D3) */
 
 #include "../platform/pc98/boot.h"
 #include "boot_platform.h"
@@ -420,7 +423,10 @@ static inline void kernel_shell_loop(void)
                  * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
                 gfx_client_to_gshell();
                 console_text_gdc_stop();
-                tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
+                if (con_dual_active() || con_dual_was_live())
+                    shell_print("Loading gshell...\n", TATTR_GRAY);
+                else
+                    tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
             } else {
                 /* prepare が TVRAM を消さなくなった (PEGC、2026-09-24) ので、
                  * 0 行目には起動ログが残っている。文言の後ろを空白で消す。 */
@@ -481,7 +487,7 @@ static inline void kernel_shell_loop(void)
                     _halt();
                 }
             }
-            tvram_clear();
+            console_session_clear();
         }
     }
 }
