@@ -27,7 +27,7 @@ static int exec_launch_abort(int launcher, int id, int rc) {
     exec_teardown_app(&slots[id]); exec_restore_context(launcher); return rc;
 }
 static void *budget_kmalloc(u32 bytes) { return fail_kheap ? 0 : kmalloc(bytes); }
-static u32 shlib_data_pages(void) { return extra_pages; }
+u32 shlib_data_pages(void) { return extra_pages; }
 static u32 g_loaded, g_text_pages, g_data_pages, g_data_vaddr;
 static u32 g_pages[5];
 #include "budget_shlib.inc"

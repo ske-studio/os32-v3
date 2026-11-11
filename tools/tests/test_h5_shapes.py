@@ -174,7 +174,7 @@ def preentry(tmp, headers, runner):
 static int g_cur=APP_ID_SHELL, entered, errors, restored;
 static u32 available;
 static int appslot_alloc_id(void) { return 2; }
-static u32 shlib_data_pages(void) { return 10; }
+static u32 exec_shlib_data_pages(void) { return 10; }
 static u32 pgalloc_free_pages(void) { return available; }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; errors++; }
 static void shell_print_dec(u32 n, u8 attr) { (void)n; (void)attr; }

@@ -9,7 +9,7 @@ TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/exec.c',
               'arch/x86/legacy/v86_mem.c', 'mm/paging.c', 'mm/pgalloc.c',
               'tools/tests/surface_bundle_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 MUTANTS = [
-    ('lease', 'source->backend != gfx_sf_backend()', '0', 'active backend mismatch'),
+    ('lease', 'source->backend != exec_surface_backend()', '0', 'active backend mismatch'),
     ('lease', '!check_caller_write_range(&caller, user_out, sizeof(result))', '0', 'bundle output preflight'),
     ('lease', 'kctx_irq_depth || kctx_exc_depth || !source ||', '!source ||', 'bundle entry context'),
     ('surface_query', 'refs[i].generation != snap.desc[i].ref.generation', '0',

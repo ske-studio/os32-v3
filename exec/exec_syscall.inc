@@ -111,7 +111,7 @@ void exec_syscall_dispatch(struct arch_syscall *view)
     }
 
     /* 本物の表から wrap_<slot> を取得 ([magic][version] の後が fn 表)。 */
-    wrapptr = ((const u32 *)KAPI_ADDR)[KAPI_FN_TABLE_FIRST + slot];
+    wrapptr = exec_kapi_table()[KAPI_FN_TABLE_FIRST + slot];
     unsigned count = kapi_fixed_count[slot];
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */

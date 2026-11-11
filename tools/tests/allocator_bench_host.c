@@ -214,7 +214,7 @@ static u32 exec_as_leftover_pages, exit_diagnostics, exit_before;
 static int retired, destroyed;
 static u32 ledger_owner_pages(u32 owner) { CHECK(owner == 2); return owner_pages; }
 static int lease_revoke_all(struct addrspace *as) { (void)as; return 0; }
-static void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
+static void exec_shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 u32 paging_addrspace_free_user_range(struct addrspace *as, u32 base, u32 end)
 {
     CHECK(as->owner == 2 && end >= base);
@@ -235,7 +235,7 @@ static void exec_owner_diag(AppSlot *a, int exiting, u32 pages, u32 leftover)
 static void kfree(void *p) { CHECK(p != NULL); }
 void serial_puts_polled(const char *s) { (void)s; CHECK(0); }
 #define kprintf print
-static int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
+static int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }
 #include "exec_serial_diag.h"
 #include "allocator_teardown.inc"
 #undef kprintf

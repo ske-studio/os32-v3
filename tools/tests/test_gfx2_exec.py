@@ -9,13 +9,13 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'exec/exec_finish.inc'
-ANCHOR = '    if (gfx2_owner_release(a->as))\n        paging_addrspace_poison(a->as);'
+ANCHOR = '    if (exec_gfx_owner_release(a->as))\n        paging_addrspace_poison(a->as);'
 
 def run_case(tmp, mutate, failure):
     src = SOURCE.read_text()
     assert src.count(ANCHOR) == 1
     if mutate:
-        src = src.replace(ANCHOR, '    (void)gfx2_owner_release(a->as);')
+        src = src.replace(ANCHOR, '    (void)exec_gfx_owner_release(a->as);')
     start = src.index('static void exec_teardown_app(')
     end = src.index('\n}\n', start) + 2
     (tmp / 'teardown.inc').write_text(src[start:end])

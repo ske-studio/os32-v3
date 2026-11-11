@@ -150,15 +150,15 @@ void ring3_abort_check(void)
 /* ======================================================================== */
 static void ring3_gui_pump(void)
 {
-    GuiPump pump;
+    ExecGuiPump pump;
     u32 now;
 
     if (g_gui_pump_busy) return;             /* 再入防止 (票 K2-3) */
 
-    pump = (GuiPump)gui_get_pump();
+    pump = exec_gui_pump();
     if (pump == 0) return;                   /* WM 未登録 (CUI) */
 
-    if (res_owner_get() == GUI_SHELL_OWNER) return;  /* WM 自身の syscall */
+    if (res_owner_get() == APP_ID_SHELL) return;  /* WM 自身の syscall */
 
     now = tick_count;
     if (g_gui_pump_tick_valid && now == g_gui_pump_tick) {
