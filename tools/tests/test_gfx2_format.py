@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise HAL v2 packed formats without libc."""
 CHECK = dict(name='gfx2-format-host', tier=1, needs=[], budget=10,
-    covers=['gfx/v2/format.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
+    covers=['gfx/v2/gfx2_fmt.h', 'gfx/v2/format.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_format_host.c', 'tools/tests/test_gfx2_format.py',
             'tools/tests/host32.py'])
 from pathlib import Path

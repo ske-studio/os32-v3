@@ -1,5 +1,6 @@
 /* HAL v2 packed pixel formats. Pixel bytes are little endian on every CPU. */
-#include "gfx2_sw.h"
+#include "gfx2_fmt.h"
+#include "os32_kapi_shared.h" /* OS32_ERR_* for both kernel and userland. */
 
 int gfx2_fmt_info(u32 fmt, struct gfx2_fmt_info *o)
 {
