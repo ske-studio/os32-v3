@@ -243,6 +243,7 @@ volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow, ring3_park_rej
 static u32 tick_count;
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
+static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
 #define RING3_ARG_WINDOW 64u
 const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
