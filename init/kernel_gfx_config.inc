@@ -15,6 +15,7 @@ static void kernel_gfx_config(void)
     char gfmode[16] = {0};
     (void)sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfmode, sizeof(gfmode));
     gf_production_configure(gfmode, sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0));
+    con_dual_configure(sysconfig_get_int(SYS_SYSTEM_CFG, "CONSOLE_DUAL", 0));
     if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0) {
         gfx_diag_stripes = kstrcmp(gfxmode, "stripes") == 0;
         gfx_diag_altwin = kstrcmp(gfxmode, "altwin") == 0;

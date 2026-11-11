@@ -18,6 +18,7 @@ void shell_print_dec(u32 val, u8 color);
 void shell_print_hex32(u32 val, u8 color);
 void shell_print_utf8(const char *utf8_str, u8 color);
 void console_write(const char *buf, u32 size, u8 color);
+void console_session_clear(void);
 
 /* カーソル制御 */
 int  console_get_cursor_x(void);

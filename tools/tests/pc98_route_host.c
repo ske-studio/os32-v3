@@ -13,6 +13,7 @@ static void outp(unsigned int port, unsigned int value)
 #define P2V_IO(p) ((void *)(uptr)(&fake_cell_word))
 int gfx_current_height=480, gfx_flip_enabled, gfx_display_page;
 int geforce_pc98_safe(void) { return safe; }
+int con_dual_cfg(void) { return 0; }
 void display_restore_98(void) { restored++; gfx_current_height=400; }
 void console_hw_cursor_enable(void) { redrawn++; }
 #include "../../drivers/video/pc98/pc98_route.c"
