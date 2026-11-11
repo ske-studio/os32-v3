@@ -33,12 +33,11 @@
 #include "shm.h"
 #include "gui.h"
 #include "exec_snd.h"
-#include "pcm_contract.h"   /* pcm_reclaim (票 TASK_PCM_CS4231 §2-1) */
+#include "exec_reclaim.h"
 #include "con_sink.h"
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */
 #include "launch.h"      /* T9: 起動要求表 (GUI 中の起動を WM が仲介する) */
 #include "ring3_str.h"   /* ring3_pte_writable_ok / ring3_range_overlaps (往復 10) */
-#include "kapi_host.h"   /* N1: Host Services のハンドル回収 (host_owner_exit) */
 #include "kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"

@@ -86,7 +86,7 @@ def run(source=None, image=None, argv=None, layout=None):
         (tmp / 'exec_argv.inc').write_text(argv)
         exe = tmp / 'test'
         result = subprocess.run([
-            'gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Werror',
+            'gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             # host_arch's stack-switch macro only assigns the saved ESP slot.
             '-Wno-unused-function', '-Wno-unused-but-set-variable',
             '-D__KERNEL_BUILD__', '-ffunction-sections', '-fdata-sections',

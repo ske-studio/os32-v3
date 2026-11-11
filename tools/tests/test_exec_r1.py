@@ -173,7 +173,7 @@ static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void snd_owner_exit(int id) { resource(id, 5); }
-static void pcm_reclaim(int id) { resource(id, 6); }
+static void exec_pcm_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
@@ -193,7 +193,7 @@ static void con_sink_push_exit(int id) { CHECK(id == 2); }
 static int launch_child(int id) { (void)id; return 0; }
 static void kbd_inject_discard(void) {}
 static void launch_owner_exit(int id) { CHECK(id == 2); }
-static void host_owner_exit(int id) { CHECK(id == 2); }
+static void exec_host_owner_exit(int id) { CHECK(id == 2); }
 static void con_sink_owner_exit(int id) { CHECK(id == 2); }
 void appslot_gfx_owner_exit(int id) { CHECK(id == 2); }
 static void poison_landing(void);
@@ -610,7 +610,7 @@ def run(source=None, irq=None, provider=None):
         if r.returncode:
             return 'compile', r.stderr
         inc = (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
-        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
+        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
                             *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],

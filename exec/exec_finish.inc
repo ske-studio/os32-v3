@@ -157,7 +157,7 @@ static void exec_reclaim_resources(int id)
     /* (6b) PCM: この ID が鳴らしていれば待たずに止めて資源を返す
      * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
      * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
-    pcm_reclaim(id);
+    exec_pcm_reclaim(id);
 }
 
 static void exec_notify_owned(int id, int kind)
@@ -207,7 +207,7 @@ static void exec_notify_owned(int id, int kind)
      * 畳まれたハンドルを内部解放する — RELEASE も送るので、Agent 側の受付枠
      * (ACTIVE は rid ごと 2 件) が埋まったままにならない。公開 API を通さず
      * ID を指定して解放する。 */
-    host_owner_exit(id);
+    exec_host_owner_exit(id);
     /* (10) console シンクの読み手 (票 K6C)。読み手は 1 本だけなので、畳んだ
      * のがその 1 本なら所有を返す — 返さないと次の端末アプリが永久に
      * OS32_ERR_EXIST を食う。リングの中身は捨てない (GUI は続いており、
