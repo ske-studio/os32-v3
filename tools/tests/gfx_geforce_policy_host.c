@@ -10,6 +10,8 @@
 #include "../../drivers/video/geforce/gf_hook.c"
 #undef gfx_counters
 
+static int v2_owned;
+int gf_v2_owns(const struct gf3_surface *front) { (void)front; return v2_owned; }
 static int started = 1, gui = 1, owner = GFX_OWNER_WM, revokes;
 static int failures, point_rc, draw_rc;
 static struct gf_foundation foundation;
@@ -86,6 +88,10 @@ void _start(void)
     gf_hook_scan_changed(0, &front, 0);
     check_policy(1); CHECK(revokes == 1);
     u16 gen = gfx_policy_gen_get();
+    v2_owned = 1; front.off = GF_MODE_VRAM_BYTES;
+    gf_hook_scan_changed(0, &front, 0);
+    CHECK(selected_front.off == 0 && gfx_policy_gen_get() == gen);
+    v2_owned = 0; front.off = 0;
     gf_hook_scan_changed(0, &front, 0);
     CHECK(gfx_policy_gen_get() != gen); check_policy(1);
     geforce_present(0,0,1,1);

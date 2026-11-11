@@ -86,3 +86,6 @@ __attribute__((weak)) u16 gfx_policy_gen_get(void) { __builtin_trap(); }
 __attribute__((weak)) int gfx_is_started(void) { return 0; }
 __attribute__((weak)) int gf_direct_ok(void) { __builtin_trap(); }
 __attribute__((weak)) const GfxDirectOps gf_direct_ops = {0};
+/* No v2 reservation is owned by these legacy-only fixtures. */
+__attribute__((weak)) int gf_v2_owns(const struct gf3_surface *s)
+{ (void)s; return 0; }

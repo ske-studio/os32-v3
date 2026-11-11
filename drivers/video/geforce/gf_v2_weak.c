@@ -1,5 +1,7 @@
 /* A0 placeholders; replaced by strong definitions in the owning stages. */
 #include "gf_v2.h"
+/* G1 replaces this placeholder with the adapter instance. */
+__attribute__((weak)) struct gf_v2 gf_v2_inst;
 __attribute__((weak)) int gf_v2_fence_emit(struct gf_v2 * a0, u32 v2, u32 dl)
 {
     (void)a0;
