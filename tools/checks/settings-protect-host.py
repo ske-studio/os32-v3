@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='settings-protect-host', tier=1,
-    covers=['build/core.yaml', 'tools/deploy_manifests.py', 'tools/deploy_protect.py', 'tools/hostdrv_deploy.py', 'tools/nhd_deploy.py', 'tools/np21w_ctl.py', 'tools/pc98pt.py', 'tools/prune_stale.py', 'tools/tests/hsync_protect_host.c', 'tools/tests/test_deploy_protect.py', 'tools/tests/test_hsync_protect.py', 'userland/deploy.yaml', 'userland/system/hsync.c', 'tools/nhd_profile.py', 'tools/gen_deploy_set.py', 'build/os32.ld', 'include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
+    covers=['exec/os32x_hdr.c', 'build/core.yaml', 'tools/deploy_manifests.py', 'tools/deploy_protect.py', 'tools/hostdrv_deploy.py', 'tools/nhd_deploy.py', 'tools/np21w_ctl.py', 'tools/pc98pt.py', 'tools/prune_stale.py', 'tools/tests/hsync_protect_host.c', 'tools/tests/test_deploy_protect.py', 'tools/tests/test_hsync_protect.py', 'userland/deploy.yaml', 'userland/system/hsync.c', 'tools/nhd_profile.py', 'tools/gen_deploy_set.py', 'build/os32.ld', 'include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py'],
     needs=['make:all'], budget=6.1)
 
 

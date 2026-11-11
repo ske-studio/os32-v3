@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run real FEP suspension and hsync main on freestanding ILP32 fixtures."""
 CHECK = dict(name='hsync-fep-host', tier=1,
-    covers=['tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
+    covers=['exec/os32x_hdr.c', 'tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
             'tools/tests/ime_suspend_host.c', 'tools/tests/fep_suspend_owner_host.c', 'tools/tests/hsync_h2_host.c',
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'tools/gen_sqlite_imports.py',

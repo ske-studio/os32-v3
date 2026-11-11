@@ -2,7 +2,8 @@
 static void fdrecov_setup(int header_case, int other)
 {
     OS32Header h = fixture_shell_header();
-    u32 len = sizeof(h);
+    u8 wire[OS32X_HDR_SIZE];
+    u32 len = sizeof(wire);
     int n;
     setup_tree();
     fixture_shell_enabled = 0;
@@ -32,8 +33,9 @@ static void fdrecov_setup(int header_case, int other)
     case 12: h.min_api_ver = KAPI_VERSION + 1; break;
     default: break;
     }
+    fixture_shell_wire(wire, &h);
     if (header_case != 10)
-        fs_add_file("/host/sys/shell.bin", (const u8 *)&h, len);
+        fs_add_file("/host/sys/shell.bin", wire, len);
     if (other) {
         n = fs_add_dir("/hd0");
         fs_nodes[n].ino = HS_EXT2_ROOT_INO;

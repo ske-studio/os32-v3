@@ -69,6 +69,7 @@ void appslot_mark_scheduled(int id,u32 t) { (void)t; CHECK(id==cur); }
 int appslot_return_target(int id) { CHECK(id==cur); return slots[id].parent; }
 void appslot_switch_to(int id) { cur=id; }
 u32 appslot_reclaim(int id) { CHECK(id==cur); slots[id].state=APP_STATE_FREE; return 0; }
+int os32x_decode(OS32Header *h,const u8 *wire,u32 n) { if (n < OS32X_HDR_SIZE) return OS32X_LAYOUT_SHORT; kmemcpy(h,wire,OS32X_HDR_SIZE); return OS32X_LAYOUT_OK; }
 int os32x_layout_check(const OS32Header *h,u32 n,u32 off) { (void)h; (void)n; (void)off; return OS32X_LAYOUT_OK; }
 const char *os32x_layout_reason(int rc) { (void)rc; CHECK(0); return 0; }
 u32 pgalloc_free_pages(void) { return 1000; }

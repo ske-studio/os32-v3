@@ -28,10 +28,11 @@ int os32x_decode(OS32Header *h, const u8 *wire, u32 len)
 int os32x_layout_check(const OS32Header *hdr, u32 read_len, u32 kernel_off)
 {
     u32 known = OS32X_FLAG_GFX | OS32X_FLAG_RING3 | OS32X_FLAG_SHLIB |
-                OS32X_FLAG_CUI_ONLY | OS32X_FLAG_LAUNCHER;
+                OS32X_FLAG_CUI_ONLY | OS32X_FLAG_LAUNCHER | OS32X_FLAG_PPC32;
     if (!hdr || read_len < OS32X_HDR_SIZE) return OS32X_LAYOUT_SHORT;
     if (hdr->magic != OS32X_MAGIC || hdr->version != OS32X_HDR_VERSION ||
-        hdr->header_size != OS32X_HDR_SIZE || (hdr->flags & ~known))
+        hdr->header_size != OS32X_HDR_SIZE || (hdr->flags & ~known) ||
+        (hdr->flags & OS32X_FLAG_PPC32))
         return OS32X_LAYOUT_OLD;
     if (hdr->kapi_data_off != kernel_off ||
         hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION ||
