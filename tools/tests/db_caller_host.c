@@ -82,6 +82,7 @@ u32 kapi_invoke(void *fn, const void *args, u32 n) {
 #include "strings_host_source.c"
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
+static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
 #define RING3_ARG_WINDOW 64u
 /* This suite exercises DB slots; V86 admission has its own entry fixture. */
 #define LEGACY_FAKE_TRAP_ENABLE

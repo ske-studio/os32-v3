@@ -92,6 +92,7 @@ static void ring3_gui_pump(void) {}
 void ring3_fault_kill(void) { die(__LINE__); }
 static u32 table[KAPI_FUNC_COUNT+2];
 #define KAPI_ADDR table
+static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
 #define RING3_ARG_WINDOW 64u
 const u16 kapi_argsize[KAPI_FUNC_COUNT]={0}, kapi_argptr[KAPI_FUNC_COUNT]={0};

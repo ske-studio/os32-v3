@@ -52,6 +52,7 @@ void ring3_resume(const u32 *f, u32 pd, void *t) { (void)f; (void)pd; (void)t; C
 static u32 table[KAPI_FUNC_CAPACITY+2];
 #undef KAPI_ADDR
 #define KAPI_ADDR table
+static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
 /* TABLES */
 static u8 argument_pages[8192] __attribute__((aligned(4096)));
 static u32 *words=(u32 *)(argument_pages+4096-8), frame[13];
