@@ -96,6 +96,7 @@
   "kapi/kapi_sys.c",
   "kernel/console/con_sink.c",
   "kernel/console/console.c",
+  "kernel/console/console_dual.c",
   "kernel/console/font_guard.c",
   "kernel/console/font_source.c",
   "kernel/console/unicode_file.c",
