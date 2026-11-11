@@ -166,3 +166,12 @@ I1 kernel-data gfx2_surfs
 I1 kernel-data gfx2_pal
 I1 kernel-data gfxsync_ctx_pool
 I1 kernel-data gfx2_quar_owner
+
+I2 geforce gf_v2_deadline
+I2 geforce gf_v2_disp
+I2 geforce gf_v2_fence_reset
+I2 geforce gf_v2_rc
+I2 geforce gf_v2_start
+I2 geforce gf_v2_stop
+I3 geforce gf_v2_owns
+I3 geforce gf_v2_route_index
