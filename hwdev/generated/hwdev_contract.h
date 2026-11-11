@@ -62,7 +62,7 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0xe4178498U
+#define HWDEV_CONTRACT_CRC 0xd3986dd8U
 #define HWDEV_LAYOUT_CRC 0x4cc253c8U
 #define HWDEV_IMPORT_COUNT 48U
 #define HWDEV_CORE_SLOTS 26U

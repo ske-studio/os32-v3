@@ -70,8 +70,6 @@ I1 kernel paging_gfx2_map
 I1 kernel pgalloc_pin
 I1 kernel pgalloc_pinned
 I1 kernel pgalloc_unpin
-I2 geforce gf3_alpha_set
-I2 geforce gf3_ckey_set
 I2 geforce gf3_copy_emit
 I2 geforce gf3_fill_emit
 I2 geforce gf3_range_query_set

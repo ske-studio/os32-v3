@@ -217,23 +217,6 @@ __attribute__((weak)) void gf3_range_query_set(struct gf3_ctx * a0, gf3_range_fn
     (void)a1;
     (void)opaque;
 }
-__attribute__((weak)) int gf3_ckey_set(struct gf3_ctx * a0, bool on, u32 key, enum gf3_fmt format, u32 dl)
-{
-    (void)a0;
-    (void)on;
-    (void)key;
-    (void)format;
-    (void)dl;
-    return OS32_ERR_NOSYS;
-}
-__attribute__((weak)) int gf3_alpha_set(struct gf3_ctx * a0, u32 const_a, bool per_pixel, u32 dl)
-{
-    (void)a0;
-    (void)const_a;
-    (void)per_pixel;
-    (void)dl;
-    return OS32_ERR_NOSYS;
-}
 __attribute__((weak)) int gf3_rop3_set(struct gf3_ctx * a0, u8 subc, u8 rop3, const struct gf3_pattern * a3, enum gf3_fmt format, u32 dl)
 {
     (void)a0;
