@@ -20,7 +20,7 @@ static u32 paging_addrspace_free_user_range(struct addrspace *as, u32 a, u32 b) 
 static void paging_addrspace_destroy(struct addrspace *as) { (void)as; }
 static int ledger_reclaim_owner(u32 owner, u32 *left) { (void)owner; reclaim++; *left=0; return 1; }
 static int ledger_owner_retire(u32 owner) { (void)owner; retire++; return 0; }
-static void serial_puts_polled(const char *s) { (void)s; }
+static void exec_serial_puts_polled(const char *s) { (void)s; }
 static void exec_owner_diag(AppSlot *a, int b, u32 c, u32 d) { (void)a; (void)b; (void)c; (void)d; }
 static void kfree(void *p) { (void)p; freed++; }
 #include "teardown.inc"
