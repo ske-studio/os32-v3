@@ -81,7 +81,8 @@ void pm_usb_boot(u32 tb_hz)
                     if ((bar & 15) || !(bar & ~15u)) continue;
                     hc->pci.bar_base[0] = bar; hc->pci.bar_size[0] = PM_USB_PAGE;
                     if (usbp_cfg_cmd(&hc->pci, 2, 0) ||
-                        usbp_mmio_map(&hc->pci, 0, &hc->regs) || takeover(hc)) continue;
+                        usbp_mmio_map(&hc->pci, 0, &hc->regs)) continue;
+                    if (takeover(hc)) { usbp_mmio_unmap(&hc->pci, 0); continue; }
                     hc->ops = &ohci_ops;
                     if (hc->ops->start(hc)) {
                         /* A dead HC owns quarantined DMA until reboot. */

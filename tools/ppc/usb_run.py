@@ -246,6 +246,13 @@ def lan_accept(elf, cpu, out, mode):
         s.start(1)
         deadline = time.monotonic()+10
         while 'protocol=02' not in serial(s.a) or 'protocol=01' not in serial(s.a):
+            if mode != 'normal' and time.monotonic() >= deadline:
+                # The regressed clock stalls across EE=0 syscalls before the
+                # RPC is even reached: enumeration never completes. Also RED.
+                require('USB KEY' not in serial(s.a), 'clock mutant delivered key')
+                s.stop()
+                print('RED LAN '+mode+' '+cpu+': HID enumeration stalled (no clock across EE=0)', flush=True)
+                return
             require(time.monotonic() < deadline, 'HID enumeration before RPC')
             # Complete USER syscalls so DEC can dispatch while warming up,
             # including when the clock source is deliberately regressed.
