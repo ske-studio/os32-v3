@@ -93,6 +93,16 @@ def plan_exercise(directory):
         assert 'collision' in str(exc)
     else:
         raise AssertionError('collision survived')
+    # A-B.BIN and A_B.BIN pass a plain upper-case check, but the ISO tool would
+    # silently rename one of them: names outside the d-characters are refused.
+    seen = set()
+    mod.check_collision('BIN/A_B.BIN', seen)
+    try:
+        mod.check_collision('BIN/A-B.BIN', seen)
+    except ValueError as exc:
+        assert 'ISO 9660 level 1' in str(exc)
+    else:
+        raise AssertionError('non-ISO name accepted')
     assert mod.fd_free_bytes('2hd', 0, 0) > 64 * 1024
     assert mod.fd_free_bytes('144', 0, 0) > 64 * 1024
     out = directory / 'plan.iso'
@@ -155,6 +165,14 @@ def main():
             except ValueError:
                 raise AssertionError('collision mutant failed to mutate')
             print('RED runtime: collision survived (1)')
+            anchor = '        if not _D_NAME.fullmatch(part):'
+            assert source.count(anchor) == 1
+            mutant.write_text(source.replace(anchor, '        if False:'))
+            spec = importlib.util.spec_from_file_location('mutant_root2', mutant)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            mod.check_collision('BIN/A-B.BIN', set())
+            print('RED runtime: non-ISO name accepted (1)')
     print('PASS mkroot image')
     return 0
 

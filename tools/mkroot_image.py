@@ -20,7 +20,14 @@ def fd_free_bytes(geometry, iso_size, loader_size):
     return mkfat12.TOTAL_DATA_CLUSTERS * unit - rounded(iso_size) - rounded(loader_size)
 
 
+# ISO 9660 level 1 d-characters: anything else would be renamed by the tool.
+_D_NAME = __import__('re').compile(r'[A-Z0-9_]{1,8}(\.[A-Z0-9_]{0,3})?')
+
+
 def check_collision(target, seen):
+    for part in target.split('/'):
+        if not _D_NAME.fullmatch(part):
+            raise ValueError(f'not an ISO 9660 level 1 name: {target}')
     if target in seen:
         raise ValueError(f'ISO name collision: {target}')
     seen.add(target)
