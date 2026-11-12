@@ -654,14 +654,18 @@ static void test_hw_restore(void)
             }
         } else assert(!stop_order[0] && !stop_order[1] && !stop_order[2]);
         u8 index[2]={0};
+        bool unlocked=false,extended=false;
         for (u32 i=0;i<svc_host.nevents;++i) {
             const struct gf4_host_event *e=&svc_events[i];
             if (e->op!=D_WRITE) continue;
             for (u32 h=0;h<2;++h) {
                 if (e->a[1]==0x6013d4U+h*0x2000) index[h]=e->a[3];
+                if (e->a[1]==0x6013d5U+h*0x2000 && h==0 && index[h]==0x1f && e->a[3]==0x57) unlocked=true;
+                if (e->a[1]==0x6013d5U+h*0x2000 && index[h]==0x1a) { assert(unlocked); extended=true; }
                 if (e->a[1]==0x6013d5U+h*0x2000 && index[h]==0x17) assert(!(e->a[3]&0x80));
             }
         }
+        if (valid) assert(unlocked && extended);
         saved->fonts=0; saved->fonts_valid=false; svc_ctx.diagnostic_saved=0; svc_finish();
     }
 }

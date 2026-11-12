@@ -185,6 +185,12 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('c2svc', 'stop-unlock', 'hwdev/gf/display/service.c',
+  'i32 unlock_rc=svc_index(&l->io,SVC_CR,RECOVER_CR1F,&unlock,true);',
+  'i32 unlock_rc=0; (void)unlock;', 'unlock before CRTC restore'),
+ ('c2stop', 'clock-stop-unlock', 'hwdev/gf/display/hw_state.c',
+  'if (!first) first=io->write(io->opaque,GF_MODE_REGISTER_BAR,0x6013d5U,1,RECOVER_CR1F_UNLOCK);',
+  'if (!first) first=0;', 'unlock before no-clock CRTC restore'),
  ('c2log', 'probe-after-mode-line', 'hwdev/gf/display/service.c',
   '[gf4] probe-after-mode conn=%u rc=%d', '[gfX] probe-after-mode conn=%u rc=%d',
   'post-mode probe line includes connector and actual rc'),
