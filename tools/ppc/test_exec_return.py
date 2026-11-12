@@ -138,7 +138,9 @@ def main():
     if '--mutate' in sys.argv:
         old = '    ppc_exec_kernel_sp = sp;'
         assert source.count(old) == 1
-        result = execute(source.replace(old, '    u32 stale_root;\n'
+        # The mutant reloads a saved root, so it needs the MMU declaration the
+        # product no longer includes after the P04 cleanup.
+        result = execute('#include "arch_cpu.h"\n' + source.replace(old, '    u32 stale_root;\n'
                                         '    __builtin_memcpy(&stale_root, (const void *)saved->opaque, sizeof(stale_root));\n'
                                         '    arch_mmu_load_root(stale_root);\n' + old))
         if result.returncode != 5 or result.stdout != 'reached=parent\nFAIL: root\n':
