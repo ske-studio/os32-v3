@@ -117,7 +117,7 @@ static i32 rec_suspend(struct gf4_ctx *c,struct gf3_service *s,u32 dl,bool *old_
     c->deadline=dl; c->accepting=false;
     i32 rc=c->links->admission(c->links->owner,false);
     if (rc) return rc;
-    /* N3: snapshot before pending convergence or physical hide. */
+    /* N3: snapshot before pending convergence. */
     rec_capture(c);
     i32 first=0;
     if (!fault) {
@@ -130,10 +130,7 @@ static i32 rec_suspend(struct gf4_ctx *c,struct gf3_service *s,u32 dl,bool *old_
         if (!rc) rc=gf2_fence_wait(c->ch,fence,dl);
         if (rc && !first) first=rc;
     }
-    for (u8 h=0;h<GF4_HEADS;++h) if (c->state->head[h].enabled) {
-        rc=gf4_cursor_apply(c,h,false);
-        if (rc && !first) first=rc;
-    }
+    /* V/disp.c:56-96: suspend does not hide the cursor. */
     rc=gf3_service_close(s);
     bool closed=!rc;
     if (rc && !first) first=rc;

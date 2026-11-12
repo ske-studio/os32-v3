@@ -330,6 +330,7 @@ static void test_suspend_restart(void)
             dac[h]=dacclk(h);
             cr_index[h]=host.index[h][0]; sr_index[h]=host.index[h][1];
         }
+        gf4_host_trace_clear(&host);
         assert(!gf4_service_suspend(&host.ctx,deadline));
         assert(!cint_prod.accel.ready && !host.ctx.ready && cint_prod.chan.state==GF2_OFF);
         assert(host.ctx.hold_saved.version==GF4_SAVED_VERSION);
@@ -353,7 +354,8 @@ static void test_suspend_restart(void)
                 if (e->a[1]==GF4_HOST_CR+d) cr_index[h]=(u8)e->a[3];
                 if (e->a[1]==GF4_HOST_SR+d+1U) assert(sr_index[h]!=T_CLOCK);
                 if (e->a[1]==GF4_HOST_CR+d+1U)
-                    assert(cr_index[h]!=T_MODE && cr_index[h]!=T_SYNC);
+                    assert(cr_index[h]!=T_MODE && cr_index[h]!=T_SYNC &&
+                           cr_index[h]!=0x31U && cr_index[h]!=0x30U && cr_index[h]!=0x2fU);
             }
         }
         assert(!host.calls[D_SLEEP] && !publish_calls);
@@ -430,12 +432,6 @@ static void test_fault_recover(void)
 }
 static void test_restore_and_publication_failure(void)
 {
-    recover_setup(GF3_INDEX8);
-    gf4_host_fail_at(&host,D_WRITE,1,T_FAILURE);
-    assert(gf4_service_suspend(&host.ctx,deadline)==T_FAILURE);
-    assert(host.ctx.last_rc==T_FAILURE && cint_prod.chan.state==GF2_OFF && !publish_calls);
-    retained(); finish();
-
     recover_setup(GF3_INDEX8); fail_restore=true;
     assert(gf4_service_recover(&host.ctx,deadline)==T_FAILURE);
     assert(host.ctx.ready && cint_prod.accel.ready && !host.ctx.accepting && !cint_slot);

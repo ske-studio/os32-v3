@@ -411,8 +411,19 @@ static void test_stopped_cursor(void)
     assert(!gf4_cursor_apply(&svc_ctx,0,true));
     assert(!gf2_stop(svc_ctx.ch));
     svc_ctx.ready=false;
+    gf4_host_trace_clear(&svc_host);
+    u8 index[GF4_HEADS]={svc_host.index[0][0],svc_host.index[1][0]};
     svc_finish();
-    assert(!(svc_host.cr[0][0x31] & 1U));
+    assert(svc_host.cr[0][0x31] & 1U);
+    for (u32 i=0;i<svc_host.nevents;++i) {
+        const struct gf4_host_event *e=&svc_host.events[i];
+        if (e->op!=D_WRITE) continue;
+        for (u32 h=0;h<GF4_HEADS;++h) {
+            u32 d=h*GF4_HOST_STRIDE;
+            if (e->a[1]==GF4_HOST_CR+d) index[h]=(u8)e->a[3];
+            if (e->a[1]==GF4_HOST_CR+d+1U) assert(index[h]!=0x31U);
+        }
+    }
 }
 static void test_slow_start(void)
 {
@@ -628,7 +639,7 @@ static void test_hw_restore(void)
         stop_fonts_logged=false;
 #endif
         if (no_f) svc_ctx.ch->f=0;
-        assert(gf4_service_stop(&svc_ctx,cint_deadline())==(no_f ? GF4_EINVAL : 0));
+        assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
 #ifndef GF_STARTLOG_HOST_H
         assert(stop_fonts_logged==diagnostic);
 #endif

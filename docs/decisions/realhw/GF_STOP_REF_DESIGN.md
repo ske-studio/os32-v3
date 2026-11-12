@@ -59,7 +59,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 |---|---|---|---|
 | 1 | 受付を閉じる (:618-627) | fbcon 停止・flip event block (V/disp.c:63) | 一致 (役割) |
 | 2 | pending の flip 収束 (:642-646) | 無し | OS32 の追加 (X1-X4)。触らない |
-| 3 | cursor hide (:649) | 無し。cursor のレジスタは #8 で保存値に戻る | **手本に無い**。今回は残す (§9) |
+| 3 | cursor hide (:649) | 無し。cursor のレジスタは #8 で保存値に戻る | **手本に無い**。外した (末尾の追記) |
 | 4 | **DPMS ON** (:651-655) | 無い | **外す** (ユーザー決定) |
 | 5 | (無い) | エンコーダー dpms(OFF) (force_disable_all) | **足す** |
 | 6 | (無い) | PCRTC_INTR_EN_0=0 (V/disp.c:66-69) | 順が違う。このレジスタは F1 の IRQ 層が持ち、F2/F1 の停止で 0 にする (hwdev/gf/irq.c:91・226-234)。F4 から書くと F1 の wanted_heads と食い違うので変えない |
@@ -79,7 +79,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 | 2 | `rec_capture` (:179) | 非 atomic では drm core の状態が残る | 一致 (写し方が OS32 流) |
 | 3 | flip 収束 (:182-185) | 無し | OS32 の追加 |
 | 4 | fence (:186-189) | `nouveau_channel_idle` (N/nouveau_drm.c:966-976) | 一致 |
-| 5 | cursor hide (:192) | 無し (unpin だけ、V/disp.c:85-92) | **手本に無い**。今回は残す (§9) |
+| 5 | cursor hide (:192) | 無し (unpin だけ、V/disp.c:85-92) | **手本に無い**。外した (末尾の追記) |
 | 6 | **DPMS ON** (:194) | 無い (F7) | **外す** |
 | 7 | close・fini・F2 stop・foundation_stop (:197-215) | fence suspend・`nvif_client_suspend` (:980-990) | 一致 |
 
@@ -314,7 +314,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - PLL も 1 回目の 51104/80000e02 に戻っていること。
   - 違う欄が出たら、その欄の restore の漏れとして記録する。
 - **R2**: `gfx2_rh` を 2 回続けて回し、PASS と描画を確かめる (カメラ)。
-- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c:152-165) と、診断の STOP→START (command_test.c:195-213) を各 1 回。机が戻ること。STANDBY から STOP→START して STANDBY のままであること。
+- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c:152-165) と、診断の STOP→START (command_test.c:195-213) を各 1 回。机が戻ること。(STANDBY のままかの確かめは外した。GUI の間に STANDBY に入れる口が無い、ユーザー決定 2026-11-12「R3 から外す」。)
 - **R4**: 停止の時、98 に替わる前に変な表示が一瞬出るかを見る (カメラの連写、記録だけ)。
 - **R5'**: 診断の保存 (diagnostic_saved) を持ったまま停止 → 開始 → 診断の restore で画が戻ること。シリアルに `fonts skipped` が出ること。
 
@@ -405,3 +405,9 @@ R1 の `[gf4] detect state` の比べ:
   - **ec1 (I2C の bit)**: §7 の R1 で除くと決めた ENGINE_CTRL の I2C bit。
   - **cr44 (3→0)**・**cr11 (20/ab)**: 記録した。結果 (右が無信号・98 に戻る) には効いていない。
   - **cr1a_0 (3f のほか 2c・ec のことがある)**: 結果 (右が無信号) には効いていないが、restore の漏れの候補。追って調べる。
+
+## 確定の後の追記 (2026-11-12、停止・suspend の cursor hide、ユーザー決定)
+- 停止 (D/service.c の gf4_service_stop の cursor hide、:695) と suspend (D/recover.c の rec_suspend の cursor hide、:134) でカーソルを隠す処理は、手本に無い (nouveau の nv04_display_fini、V/disp.c:56-96 は割り込みを止め、suspend の時は FB とカーソルの BO の pin を外すだけで、カーソルを隠さない)。
+- ユーザー決定 (2026-11-12、問い「止めるときにカーソルを消す処理をどうするか。手本どおり外す (起動時の値への復元でカーソルも元に戻る) / 今のまま残す」): 「手本どおり外す」。
+- 決定: 停止と suspend の両方から cursor hide を外す。停止ではカーソルのレジスタも crtc_restore が保存値に戻す (§3-2)。suspend はレジスタを書かない (§3-4) ので、カーソルは suspend の前の状態のまま残る (手本と同じ)。
+- 実機の受入: 1 画面と 2 画面 (CONSOLE_DUAL=1) で GUI→CUI を各 2 回。CUI に戻った後の右に、カーソルの残りが出ないこと (2 画面では右は無信号)。GUI に戻った時にカーソルが出て動くこと。
