@@ -33,6 +33,8 @@
 #include "root_boot.h"
 #include "cli_boot.h"
 #include "exec_boot.h"
+#include "exec.h"
+extern u32 sys_mem_kb;
 void pm_root_image(struct boot_root_image *out);
 #endif
 
@@ -49,7 +51,9 @@ static struct pm_gmac_boot lan_boot;
 static volatile u32 ipi_seen;
 static unsigned char flush_a[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static unsigned char flush_b[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+#if !KBOOT_SHELL
 static unsigned char user_gate[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+#endif
 
 static void kboot_stop(const char *why) __attribute__((noreturn));
 static void kboot_stop(const char *why)
@@ -167,7 +171,13 @@ void ppc_kernel_main(void)
      * (mm/paging_map.inc). Its second argument is exec's trampoline page on
      * x86; milestone 2 has no exec, so a dedicated, never-executed, read-only
      * zero page stands in until exec/ provides the real one (milestone 3). */
+#if KBOOT_SHELL
+    /* S-B: the shared USER page is exec's KAPI trampoline, as on x86. */
+    sys_mem_kb = KBOOT_MEM_KB;
+    int shared_user = paging_boot_user_shared(exec_tramp_page_addr()) == 0;
+#else
     int shared_user = paging_boot_user_shared((u32)user_gate) == 0;
+#endif
     kmalloc_init((void *)KHEAP_BASE, KHEAP_SIZE);
     void *heap = kmalloc(256);
     int heap_ok = heap && kmalloc_used() >= 256;

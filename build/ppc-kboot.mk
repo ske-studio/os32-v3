@@ -95,8 +95,9 @@ $(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_targ
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
-$(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h
+$(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk
 	$(KB_CC) $(KB_FLAGS) -c $(KB_GEN)/kapi/kapi_generated.c -o $@
+-include $(KB_OUT)/gen/kapi/kapi_generated.d
 endif
 # Mutation testing (tools/ppc/kboot_accept.py): compile KB_MUT_FILE in place of
 # the product source KB_MUT_SRC, into a separate KB_OUT. Never set otherwise.
