@@ -3,16 +3,18 @@
 extern KernelAPI *kapi;
 static KernelAPI runtime_api;
 
+static void put_terminal(void *ctx, size_t index, char ch)
+{
+    (void)index;
+    runtime_api.shell_putchar(ch, *(const u8 *)ctx);
+}
+
 static void runtime_kprintf(u8 attr, const char *fmt, ...)
 {
-    char buffer[1024];
     va_list args;
-    const char *p;
     va_start(args, fmt);
-    sh_vsnprintf(buffer, sizeof(buffer), fmt, args);
+    sh_vformat(put_terminal, &attr, fmt, args);
     va_end(args);
-    for (p = buffer; *p; ++p)
-        runtime_api.shell_putchar(*p, attr);
 }
 
 static void runtime_print_utf8(const char *text, u8 color)

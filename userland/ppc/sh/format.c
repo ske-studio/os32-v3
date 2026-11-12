@@ -1,22 +1,25 @@
 #include "runtime.h"
 
-static void emit(char *out, size_t size, size_t *count, char ch)
+struct sink { sh_put_fn put; void *ctx; size_t count; };
+
+static void emit(struct sink *k, char ch)
 {
-    if (*count + 1 < size)
-        out[*count] = ch;
-    ++*count;
+    k->put(k->ctx, k->count, ch);
+    ++k->count;
 }
 
-int sh_vsnprintf(char *out, size_t size, const char *fmt, va_list args)
+/* Stream every formatted byte to put (no length limit, like the kernel kprintf). */
+int sh_vformat(sh_put_fn put, void *ctx, const char *fmt, va_list args)
 {
-    size_t count = 0;
+    struct sink sink = { put, ctx, 0 };
+    struct sink *k = &sink;
     while (*fmt) {
         unsigned int value, base, width = 0, n = 0;
         char digits[32];
         int negative = 0;
         char spec;
         if (*fmt != '%') {
-            emit(out, size, &count, *fmt++);
+            emit(k, *fmt++);
             continue;
         }
         ++fmt;
@@ -28,11 +31,11 @@ int sh_vsnprintf(char *out, size_t size, const char *fmt, va_list args)
         spec = *fmt ? *fmt++ : '\0';
         if (spec == 's') {
             const char *s = va_arg(args, const char *);
-            while (*s) emit(out, size, &count, *s++);
+            while (*s) emit(k, *s++);
             continue;
         }
         if (spec == 'c' || spec == '%') {
-            emit(out, size, &count, spec == 'c' ? (char)va_arg(args, int) : '%');
+            emit(k, spec == 'c' ? (char)va_arg(args, int) : '%');
             continue;
         }
         if (spec != 'u' && spec != 'd' && spec != 'x') continue;
@@ -46,13 +49,28 @@ int sh_vsnprintf(char *out, size_t size, const char *fmt, va_list args)
             digits[n++] = "0123456789abcdef"[value % base];
             value /= base;
         } while (value);
-        if (negative) emit(out, size, &count, '-');
+        if (negative) emit(k, '-');
         while (n + (unsigned int)negative < width) {
-            emit(out, size, &count, '0');
+            emit(k, '0');
             --width;
         }
-        while (n) emit(out, size, &count, digits[--n]);
+        while (n) emit(k, digits[--n]);
     }
-    if (size) out[count < size ? count : size - 1] = '\0';
-    return (int)count;
+    return (int)k->count;
+}
+
+struct buffer { char *out; size_t size; };
+
+static void put_buffer(void *ctx, size_t index, char ch)
+{
+    struct buffer *b = ctx;
+    if (index + 1 < b->size) b->out[index] = ch;
+}
+
+int sh_vsnprintf(char *out, size_t size, const char *fmt, va_list args)
+{
+    struct buffer b = { out, size };
+    int count = sh_vformat(put_buffer, &b, fmt, args);
+    if (size) out[(size_t)count < size ? (size_t)count : size - 1] = '\0';
+    return count;
 }

@@ -15,7 +15,7 @@ HARNESS = r'''
 #include <string.h>
 #include "runtime.h"
 KernelAPI *kapi;
-static char output[2048];
+static char output[4096];
 static int pos, writes;
 static void put(char ch, u8 attr) { (void)attr; output[pos++] = ch; output[pos] = 0; }
 static int write_fd(int fd, const void *buf, u32 size) {
@@ -32,6 +32,13 @@ int main(void) {
     if (writes || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z %")) return 2;
     api->shell_print_utf8(" UTF8", 9);
     if (writes || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z % UTF8")) return 3;
+    {   /* help.c passes unbounded lines through "    %s\n": nothing may be cut. */
+        static char line[1500];
+        memset(line, 'a', sizeof line - 1);
+        pos = 0; output[0] = 0;
+        api->kprintf(7, "    %s\n", line);
+        if (pos != 4 + (int)(sizeof line - 1) + 1 || output[pos - 1] != '\n') return 4;
+    }
     return 0;
 }
 '''
@@ -73,10 +80,11 @@ def main():
         folder = pathlib.Path(temp)
         exercise(folder)
         if args.mutate:
-            exercise(folder, ('runtime', 'runtime_api.shell_putchar(*p, attr);',
-                              '(void)attr, runtime_api.sys_write(1, p, 1);', 2))
-            exercise(folder, ('format', "emit(out, size, &count, '0');",
-                              "emit(out, size, &count, ' ');", 2))
+            exercise(folder, ('runtime', 'runtime_api.shell_putchar(ch, *(const u8 *)ctx);',
+                              '(void)ctx, runtime_api.sys_write(1, &ch, 1);', 2))
+            exercise(folder, ('format', "emit(k, '0');", "emit(k, ' ');", 2))
+            exercise(folder, ('format', "    k->put(k->ctx, k->count, ch);",
+                              "    if (k->count < 1023) k->put(k->ctx, k->count, ch);", 4))
     print('ppc sh runtime PASS')
 
 
