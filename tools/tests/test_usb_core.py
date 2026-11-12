@@ -36,7 +36,7 @@ def build(tmp, swap=False, mutation=None):
     command(['gcc', *FLAGS, *(['-DUSB_TEST_SWAP'] if swap else []), *paths,
              'tools/tests/usb_fake_dev.c', '-o', str(exe)])
     return exe
-def execute(exe, cases=range(1,35), red=False):
+def execute(exe, cases=range(1,36), red=False):
     failures=[]
     for case in cases:
         p=host32.run([str(exe),str(case)],capture_output=True,timeout=20)
@@ -46,6 +46,7 @@ def execute(exe, cases=range(1,35), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
+ ('usb_req','x->deadline_ms = old_deadline;', 'x->deadline_ms = 0; (void)old_deadline;'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->sc && f->cls && f->cls->tick'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->attached && f->cls && f->cls->tick'),
  ('usb_enum','f->attached = 1;', 'f->attached = 0;'),
