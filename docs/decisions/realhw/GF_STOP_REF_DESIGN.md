@@ -405,3 +405,9 @@ R1 の `[gf4] detect state` の比べ:
   - **ec1 (I2C の bit)**: §7 の R1 で除くと決めた ENGINE_CTRL の I2C bit。
   - **cr44 (3→0)**・**cr11 (20/ab)**: 記録した。結果 (右が無信号・98 に戻る) には効いていない。
   - **cr1a_0 (3f のほか 2c・ec のことがある)**: 結果 (右が無信号) には効いていないが、restore の漏れの候補。追って調べる。
+
+## 確定の後の追記 (2026-11-12、停止・suspend の cursor hide、ユーザー決定)
+- 停止 (D/service.c の gf4_service_stop の cursor hide、:695) と suspend (D/recover.c の rec_suspend の cursor hide、:134) でカーソルを隠す処理は、手本に無い (nouveau の nv04_display_fini、V/disp.c:56-96 は割り込みを止め、suspend の時は FB とカーソルの BO の pin を外すだけで、カーソルを隠さない)。
+- ユーザー決定 (2026-11-12、問い「止めるときにカーソルを消す処理をどうするか。手本どおり外す (起動時の値への復元でカーソルも元に戻る) / 今のまま残す」): 「手本どおり外す」。
+- 決定: 停止と suspend の両方から cursor hide を外す。停止ではカーソルのレジスタも crtc_restore が保存値に戻す (§3-2)。suspend はレジスタを書かない (§3-4) ので、カーソルは suspend の前の状態のまま残る (手本と同じ)。
+- 実機の受入: 1 画面と 2 画面 (CONSOLE_DUAL=1) で GUI→CUI を各 2 回。CUI に戻った後の右に、カーソルの残りが出ないこと (2 画面では右は無信号)。GUI に戻った時にカーソルが出て動くこと。
