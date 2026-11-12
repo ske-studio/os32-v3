@@ -559,7 +559,8 @@ userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) 
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
 userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
-userland/system/hsync.elf: lib/crc32_core.inc exec/os32x_hdr.c exec/os32x_hdr.h include/endian_le.h
+userland/system/hsync.elf: PROGRAM_FLAGS += -Iarch/$(ARCH)
+userland/system/hsync.elf: lib/crc32_core.inc exec/os32x_hdr.c exec/os32x_hdr.h include/endian_le.h arch/$(ARCH)/arch_exec_image.h
 
 # === ELF → RAW → OS32X BIN 変換 ===
 # ユーザーランドぶん。ゲームは game/Makefile が自前で持つ。
