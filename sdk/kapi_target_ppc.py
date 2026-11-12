@@ -120,6 +120,8 @@ PROVIDER_GROUPS = {
         'sfs_end',
     }), frozenset(['serialfs.h'])),
     'path': (frozenset({
+        'path_get_drive',
+        'path_get_cwd',
         'path_set_drive',
         'path_set_cwd',
         'path_parse',
@@ -259,6 +261,8 @@ ZERO_SLOTS = frozenset({
     'serial_is_initialized',
     'gfx2_adapter_count',
     'db_mem_used',
+    'unicode_to_jis',
+    'host_notice_serial',
 })
 
 def absent_result(api):

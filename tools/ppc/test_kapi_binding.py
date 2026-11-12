@@ -86,8 +86,6 @@ launch_take
 memory_boot_ram_kb
 paging_enabled
 paging_is_present
-path_get_cwd_user
-path_get_drive_user
 pipe_alloc
 pipe_clear
 pipe_free
@@ -180,7 +178,7 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 190
+    assert len(entries) == 192
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
