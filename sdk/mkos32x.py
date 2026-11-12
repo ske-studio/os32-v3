@@ -36,6 +36,7 @@ import os
 # このファイルと同じディレクトリに置く。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import os32x_hdr as H  # noqa: E402
+from target_profile import PROFILES, check_elf_identity
 
 OS32X_FLAG_GFX = H.OS32X_FLAG_GFX
 OS32X_FLAG_RING3 = H.OS32X_FLAG_RING3
@@ -107,6 +108,7 @@ def main():
     load_addr = 0
     flags = 0
     elf_path = None
+    target = 'x86-pc98'
 
     i = 3
     while i < len(sys.argv):
@@ -127,6 +129,9 @@ def main():
             i += 1
         elif sys.argv[i] == '--entry' and i + 1 < len(sys.argv):
             entry_offset = int(sys.argv[i + 1], 0)
+            i += 2
+        elif sys.argv[i] == '--target' and i + 1 < len(sys.argv):
+            target = sys.argv[i + 1]
             i += 2
         elif sys.argv[i] == '--elf' and i + 1 < len(sys.argv):
             elf_path = sys.argv[i + 1]
@@ -162,7 +167,17 @@ def main():
         sys.exit(1)
 
     try:
+        if target not in PROFILES:
+            raise H.HeaderError('unknown target ' + target)
+        if target == 'ppc-powermac':
+            try:
+                check_elf_identity(elf_path, PROFILES[target])
+            except ValueError as e:
+                raise H.HeaderError(str(e)) from e
+            flags |= H.OS32X_FLAG_PPC32
         elf = H.Elf32(elf_path)
+        if target != 'ppc-powermac' and elf.endian != '<':
+            raise H.HeaderError(f"{elf_path} は 32bit LE の ELF ではない")
 
         # ELF から BSS サイズ (--bss 手動指定より優先)
         if elf.bss_size() > 0:

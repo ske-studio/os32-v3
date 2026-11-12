@@ -54,6 +54,7 @@ OS32X_FLAG_RING3 = 0x0002
 OS32X_FLAG_SHLIB = 0x0008
 OS32X_FLAG_CUI_ONLY = 0x0010
 OS32X_FLAG_LAUNCHER = 0x0020
+OS32X_FLAG_PPC32 = 0x0040
 
 KAPI_LAYOUT_SECTION = '.os32_kapi_layout'
 
@@ -68,7 +69,7 @@ class HeaderError(Exception):
 
 
 class Elf32:
-    """32bit LE の ELF の最小リーダ (セクションとシンボル)。"""
+    """32bit ELF の最小リーダ (セクションとシンボル)。"""
 
     def __init__(self, path):
         self.path = path
@@ -77,16 +78,17 @@ class Elf32:
         d = self.data
         if len(d) < 52 or d[:4] != b'\x7fELF':
             raise HeaderError(f"{path} は ELF ではない")
-        if d[4] != 1 or d[5] != 1:
-            raise HeaderError(f"{path} は 32bit LE の ELF ではない")
-        (self.e_entry,) = struct.unpack_from('<I', d, 24)
-        (self.e_phoff,) = struct.unpack_from('<I', d, 28)
-        (self.e_shoff,) = struct.unpack_from('<I', d, 32)
-        (self.e_phentsize,) = struct.unpack_from('<H', d, 42)
-        (self.e_phnum,) = struct.unpack_from('<H', d, 44)
-        (self.e_shentsize,) = struct.unpack_from('<H', d, 46)
-        (self.e_shnum,) = struct.unpack_from('<H', d, 48)
-        (self.e_shstrndx,) = struct.unpack_from('<H', d, 50)
+        if d[4] != 1 or d[5] not in (1, 2):
+            raise HeaderError(f"{path} は 32bit ELF ではない")
+        self.endian = '<' if d[5] == 1 else '>'
+        (self.e_entry,) = struct.unpack_from(self.endian + 'I', d, 24)
+        (self.e_phoff,) = struct.unpack_from(self.endian + 'I', d, 28)
+        (self.e_shoff,) = struct.unpack_from(self.endian + 'I', d, 32)
+        (self.e_phentsize,) = struct.unpack_from(self.endian + 'H', d, 42)
+        (self.e_phnum,) = struct.unpack_from(self.endian + 'H', d, 44)
+        (self.e_shentsize,) = struct.unpack_from(self.endian + 'H', d, 46)
+        (self.e_shnum,) = struct.unpack_from(self.endian + 'H', d, 48)
+        (self.e_shstrndx,) = struct.unpack_from(self.endian + 'H', d, 50)
         # プログラムヘッダ (PT_LOAD の中身を .raw と突き合わせる)
         self.segments = []
         for i in range(self.e_phnum):
@@ -94,7 +96,7 @@ class Elf32:
             if off + 32 > len(d):
                 raise HeaderError(f"{path} のプログラムヘッダが切れている")
             (ptype, poff, pvaddr, ppaddr, pfilesz, pmemsz, pflags, palign) = \
-                struct.unpack_from('<8I', d, off)
+                struct.unpack_from(self.endian + '8I', d, off)
             self.segments.append(dict(type=ptype, offset=poff, vaddr=pvaddr,
                                       paddr=ppaddr, filesz=pfilesz,
                                       memsz=pmemsz))
@@ -102,7 +104,7 @@ class Elf32:
         for i in range(self.e_shnum):
             off = self.e_shoff + i * self.e_shentsize
             (nm, ty, fl, addr, foff, size, link, info, align, entsz) = \
-                struct.unpack_from('<10I', d, off)
+                struct.unpack_from(self.endian + '10I', d, off)
             self.sections.append(dict(name_off=nm, type=ty, flags=fl, addr=addr,
                                       offset=foff, size=size, link=link,
                                       entsize=entsz))
@@ -122,7 +124,7 @@ class Elf32:
             for i in range(n):
                 off = s['offset'] + i * 16
                 (st_name, st_value, st_size, st_info, st_other, st_shndx) = \
-                    struct.unpack_from('<IIIBBH', d, off)
+                    struct.unpack_from(self.endian + 'IIIBBH', d, off)
                 nm = self._str(strtab, st_name)
                 if nm:
                     self.symbols[nm] = st_value
@@ -190,7 +192,7 @@ def read_kapi_layout(elf):
     if s['type'] == SHT_NOBITS or s['size'] % 4:
         raise HeaderError(f"{elf.path}: {KAPI_LAYOUT_SECTION} の大きさが不正 ({s['size']})")
     body = elf.section_bytes(s)
-    vals = [struct.unpack_from('<I', body, i)[0] for i in range(0, len(body), 4)]
+    vals = [struct.unpack_from(elf.endian + 'I', body, i)[0] for i in range(0, len(body), 4)]
     uniq = sorted(set(vals))
     if len(uniq) != 1:
         raise HeaderError(
