@@ -34,6 +34,8 @@ int pm_hfs_set_clock(u32 tb_hz)
 static u32 pm_hfs_now(void *ctx)
 {
     struct pm_hfs_transport *t = ctx;
+    /* TB, not tick_clock jiffies: USER syscalls run with EE=0, so the DEC
+     * tick does not advance while an RPC waits. */
     /* lib/divdi3.c supplies the PPC division; never link libgcc. */
     return (u32)(pm_hfs_tb() / (t->tb_hz / 100u));
 }

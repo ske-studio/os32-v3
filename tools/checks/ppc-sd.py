@@ -1,5 +1,5 @@
 """Register S-D LAN acceptance; sandbox without AF_INET explicitly skips."""
-CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=['make:ppc-boot'],
+CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=['make:all'],
              covers=['arch/ppc/entry.S',
                      'arch/ppc/exec_context.c',
                      'arch/ppc/kapi_call.c',
