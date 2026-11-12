@@ -1,9 +1,9 @@
 # tick-arch: 1kHz tick を arch に依らない tick_clock の口に直す
 
 > 出所: ~/os32-tmp/run/tick-arch/DESIGN_ADD.md (Claude 起草、本線の独立レビューと os32powerpc のレビューを反映、PM が確定)。
-> 状態: **確定 (2026-11-12、独立レビューと os32powerpc のレビュー、ユーザー決定)** — 段の状態は票 [TASK_TICK_1KHZ](../../tasks/v3/TASK_TICK_1KHZ.md) が持つ。
+> 状態: **確定 (2026-11-12、独立レビューと os32powerpc のレビュー、ユーザー決定)** — 段の状態は票 `TASK_TICK_1KHZ` が持つ。
 
-本稿は [TICK_1KHZ_DESIGN](TICK_1KHZ_DESIGN.md) (以下 T1K) と [TICK_1KHZ_NEXT_DESIGN](TICK_1KHZ_NEXT_DESIGN.md) (以下 NEXT) への**差分**。食い違う所は本稿を優先する。
+本稿は `TICK_1KHZ_DESIGN` (以下 T1K) と `TICK_1KHZ_NEXT_DESIGN` (以下 NEXT) への**差分**。食い違う所は本稿を優先する。
 基点 main `170723d0`。file:line はこのツリー相対。
 前提 (議論しない): シングルタスク・協調切替、整数演算が第一、[C1]〜[D3]・[ABI]・[L1]、1 機能 1 ファイル、段は 400 行以下・1〜3 ファイル。
 
