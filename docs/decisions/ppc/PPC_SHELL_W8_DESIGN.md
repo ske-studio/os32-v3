@@ -323,3 +323,10 @@ r1→r2 の変更の数 8 / 反論の数 0
 - R2-2 (P3): 起動の後、FS_OPEN より先に HELLO が出るとその応答の nonce が最初の観測になり、次の操作で HELLO が 1 回余分に出る。害は無く想定どおり。T02 で回数を数えるなら期待値は 2。
 - R2-3 (P3、PM 決定): P11 は新しい私有の depth を作らず、既存の kctx_irq_depth を DEC と外部割り込みの分岐で増減させて流用する (exec_longjmp で戻されるので安全)。can_wait は kctx_irq_depth == 0。
 - 共通の場所: 共通の serialfs の 4 実装をそのまま link し、VFS・kernel・SDK・共通の sh は変えない。全段 x86 不変。PC-98 の後の段 (起動の後の mount の結線、FD・HDD・Host Services の保存・再起動の NP21/W の受入) は本線が起こす。
+
+## 実装で決めたこと (2026-11-12、PM)
+- 段の分け方: A (P02・P03・T01) → C (H01・H02・T04) → B (P01・P04・P11・P12・T02・T03) → D (P05〜P10) → E (T05・D02)。T05 の置き場は sb_run・sc_run と並べて `tools/ppc/sd_run.py` (表の tools/accept/ppc_sd.py から変更)、検査名 ppc-sd。T01 は検査 ppc-hostfs-wire、T02/T03 は ppc-hostfs-io。
+- P11: kctx_irq_depth の定義を持たない試験の fixture 4 本 (kboot_vectors_fixture.c・kboot_trap_host.c・test_user_trap_host.c・test_lan_p22d_host.c) には試験の側に定義を足した。製品の共有の所は変えない。P12 は変更なし。
+- 共通の fs/serialfs/sfs_proto.h の `SFS_TICK_MS` を `TICK_MS` から `10u` に (SfsIo.now の 10ms の約束)。PowerPC の像の監査 (PIT_HZ の利用者の禁止) に当たったため。本線 PM 了承、x86 の生成物は不変。x86 の SfsIo.now の供給元は tick_count (serialfs_session.c の sio_now、kernel_boot_memory.inc の boot_sfs_now)。TICK_MS・PIT_HZ のほかの利用者は本線の段 L。
+- P06・P07: lan_service.c・root_boot.c の追加は KBOOT_SH の像だけに入れ、診断・CLI の像を不変に保つ。hostfs.h に pm_hostfs_boot・pm_hfs_bind_peer・pm_hfs_peer を足した。FS_REQ の宛先は最後に観測した FS の peer、未観測なら boot の peer_mac。
+- T05 の変異 no-boot-follow は「ホストは boot2 を採用するが FS の Server/adapter と FS の nonce を持ち越す」形 (レビュー第 1 回の指摘で変更)。不在の時のエラーまで約 1.0 秒。
