@@ -1,6 +1,6 @@
 # サウンド・入力の HAL (DirectSound・XInput 相当の土台)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定・ユーザー承認済み ([AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md))、実装を待つ。前提は HAL v2 の A0 (ユーザーの確認待ち) と、音の段は 1kHz tick の段 B の合格。PM は設計に専念中のため実装の着手はユーザーの解除の後。
+> 状態: **設計中 (2026-11-09)** — 設計は確定・ユーザー承認済み ([AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md))、実装を待つ。前提は HAL v2 の A0 (ユーザーの確認待ち) と、音の段は 1kHz tick の段 B の合格。設計に専念する期間は 2026-11-11 に解除済み。
 
 ## 0. ユーザー決定 (原文)
 決定の全文の原文は確定設計の冒頭が参照する記録 (~/os32-tmp/run/hal-av/DECISIONS.md) にある。主なもの:
