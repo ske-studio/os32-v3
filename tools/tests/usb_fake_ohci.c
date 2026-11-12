@@ -52,6 +52,7 @@ static u32 rget(u32 h, u32 off) { return usb_fake_native_rd((u8 *)regs[h] + off)
 static void rput(u32 h, u32 off, u32 v) { usb_fake_native_wr((u8 *)regs[h] + off, v); }
 #ifdef USB_STACK
 static u32 controller_reads[2], controller_writes[2];
+static u32 port_reset_writes[2];
 #endif
 static int which(const volatile void *p)
 {
@@ -125,6 +126,7 @@ void mmio_wr32_le(volatile void *p, u32 v)
         if (v & OHCI_PORT_PPS) old |= OHCI_PORT_PPS;
         if (v & OHCI_PORT_PRS) {
 #ifdef USB_STACK
+            ++port_reset_writes[h];
             old |= OHCI_PORT_PES | (1u << USB_C_PORT_RESET);
 #else
             old |= OHCI_PORT_PRS;

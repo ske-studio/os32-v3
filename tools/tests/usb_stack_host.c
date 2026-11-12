@@ -286,11 +286,13 @@ static void fault(u32 mode)
         rput(0,OHCI_RH_PORT_STATUS(1),OHCI_PORT_CCS|OHCI_PORT_CSC|OHCI_PORT_PPS);
         for(u32 i=0;i<1400;i++) {
             tick(); d=root(0,1);
-            if((mode==0 && hcs[0].explore.step==EX_R2) ||
+            if((mode==0 && port_reset_writes[0] && hcs[0].explore.step==EX_R2) ||
                (mode==1 && hcs[0].explore.step==EX_A4 && d->ctrl.state==XS_ACTIVE) ||
                (mode==8 && d && d->ifs[0].sc && !d->ifs[0].attached)) break;
         }
-        REQUIRE(mode==0 ? hcs[0].explore.step==EX_R2 :
+        /* R2 must have issued reset and entered its 10ms polling wait. */
+        REQUIRE(mode==0 ? port_reset_writes[0]==1 && hcs[0].explore.step==EX_R2 &&
+                (rget(0,OHCI_RH_PORT_STATUS(1)) & (1u<<USB_C_PORT_RESET)) :
                 mode==1 ? hcs[0].explore.step==EX_A4 : root(0,1)->ifs[0].sc!=0);
     }
     if(mode==8) {
