@@ -38,6 +38,9 @@ static unsigned int ready_after[2], expected_len;
 static int expected_write;
 static u8 buffer[1516];
 static int device_mode, reset_fails, dma_fails;
+#ifdef NE2K_BH_TEST
+static int instant_tx, sticky_cnt;
+#endif
 static unsigned int dma_fail_countdown;
 static u8 regs[2][16], command, txp, tx_status, ram[65536];
 static unsigned int reset_count, device_pios, tx_starts, overwrite_writes, ovw_delays;
@@ -73,7 +76,11 @@ static void finish(unsigned int rc)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     for (;;) {}
 }
+#ifdef NE2K_BH_TEST
+#define CHECK(x) do { if (!(x)) finish(1); } while (0)
+#else
 #define CHECK(x) do { if (!(x)) finish(__LINE__ % 200 + 1); } while (0)
+#endif
 
 static void record(unsigned int kind, unsigned int port, unsigned int value)
 {
@@ -96,7 +103,12 @@ static unsigned int device_read(unsigned int port)
     if (page == NE2K_CR_PAGE1) return regs[1][reg];
     if (page == NE2K_CR_PAGE2) return regs[0][reg];
     if (reg == NE2K_P0_TSR) return tx_status;
-    if (reg >= NE2K_P0_CNTR0) return 0;
+    if (reg >= NE2K_P0_CNTR0) {
+#ifdef NE2K_BH_TEST
+        if (sticky_cnt && reg == NE2K_P0_CNTR2) sticky_cnt = 0;
+#endif
+        return 0;
+    }
     return regs[0][reg];
 }
 
@@ -119,10 +131,18 @@ static void outp(unsigned int port, unsigned int value)
         if (reg == NE2K_CR) {
             command = (u8)(value & ~NE2K_CR_TXP);
             if (value & NE2K_CR_STP) txp = 0;
-            if (value & NE2K_CR_TXP) { txp = NE2K_CR_TXP; tx_starts++; }
+            if (value & NE2K_CR_TXP) {
+                txp = NE2K_CR_TXP; tx_starts++;
+#ifdef NE2K_BH_TEST
+                if (instant_tx) { txp = 0; tx_status = NE2K_TSR_PTX; regs[0][NE2K_P0_ISR] |= NE2K_ISR_PTX; }
+#endif
+            }
         } else if ((command & NE2K_CR_PAGE_MASK) == NE2K_CR_PAGE1) {
             regs[1][reg] = (u8)value;
         } else if (reg == NE2K_P0_ISR) {
+#ifdef NE2K_BH_TEST
+            if (sticky_cnt) value &= ~NE2K_ISR_CNT;
+#endif
             regs[0][reg] &= (u8)~value;
         } else {
             regs[0][reg] = (u8)value;
@@ -321,7 +341,7 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
     ne2k_poll(4);
     ne2k_bh();
     CHECK(nic.rx_backlog && nic.rx_next != regs[1][NE2K_P1_CURR]);
-    CHECK(nic.imr_written == 0);
+    CHECK(nic.imr_written == NE2K_IMR_MASK);
     txp = 0;
     tx_status = completion == NE2K_ISR_PTX ? NE2K_TSR_PTX : NE2K_TSR_ABT;
     regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW | completion;
@@ -334,9 +354,13 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
     CHECK(nic.state == NE2K_STATE_OVW_WAIT && tx_starts == 1);
     tick_count++;
     ne2k_timer_tick();
-    ne2k_bh();
+    /* Observe OVW recovery before a later BH round drains its backlog. */
+    ne2k_enter();
+    service(NE2K_IRQ_BUDGET);
+    ne2k_leave();
     CHECK(nic.state == NE2K_STATE_RUNNING);
     u8 recovered_backlog = nic.rx_backlog;
+    if (nic.rx_backlog) ne2k_bh();
     /* Deliberately test A/B first so the pre-fix RED is the TX corruption. */
     CHECK(ne2k_send(buffer, 61) == NE2K_OK);
     ne2k_bh();
@@ -344,9 +368,9 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
     CHECK(ne2k_send(buffer, 60) == NE2K_OK);
     ne2k_bh();
     CHECK(device_pios == before && overwrite_writes == 0 && tx_starts == 2);
-    CHECK(recovered_backlog == (frames > 4 + NE2K_OVW_DRAIN_BUDGET));
+    CHECK(recovered_backlog == (frames > NE2K_BH_ROUNDS * NE2K_IRQ_BUDGET + NE2K_OVW_DRAIN_BUDGET));
     CHECK((nic.rx_next != regs[1][NE2K_P1_CURR]) == (nic.rx_backlog != 0));
-    CHECK(nic.imr_written == (nic.rx_backlog ? 0 : NE2K_IMR_MASK));
+    CHECK(nic.imr_written == NE2K_IMR_MASK);
     CHECK(!(regs[0][NE2K_P0_ISR] & (NE2K_ISR_PTX | NE2K_ISR_TXE)));
     CHECK(nic.st.tx_ok == (completion == NE2K_ISR_PTX));
     CHECK(nic.st.tx_err == (completion == NE2K_ISR_TXE));
@@ -430,10 +454,10 @@ static void run_init_failure(void)
 void _start(void)
 {
     if (TEST_GROUP == 0 || TEST_GROUP == 2) {
-        run_ovw_completion(NE2K_ISR_PTX, 5);
-        run_ovw_completion(NE2K_ISR_TXE, 5);
-        run_ovw_completion(NE2K_ISR_PTX, 70);
-        run_ovw_completion(NE2K_ISR_TXE, 70);
+        run_ovw_completion(NE2K_ISR_PTX, 33);
+        run_ovw_completion(NE2K_ISR_TXE, 33);
+        run_ovw_completion(NE2K_ISR_PTX, 100);
+        run_ovw_completion(NE2K_ISR_TXE, 100);
     }
     if (TEST_GROUP == 0 || TEST_GROUP == 3) run_reinit_limit();
     if (TEST_GROUP == 0 || TEST_GROUP == 4) {
