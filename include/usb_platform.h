@@ -17,8 +17,9 @@ enum { USBP_TO_DEV, USBP_TO_CPU };
 /* Transfer ownership for this range. ED/TD are 16B and may share a PPC 32B
  * cache line. Common code must not assume partial-line invalidation works.
  * Platform supplies coherent USB DMA mappings (uncached or hardware snooped),
- * with sync acting only as a barrier. Otherwise it must align allocation
- * blocks to cache-line size. Architecture LE accessors own no cache policy. */
+ * with sync acting only as a barrier. Stage 1 requires such a coherent
+ * mapping; non-coherent machines are out of scope (common usb_dmamem carves
+ * fixed 16B blocks). Architecture LE accessors own no cache policy. */
 void usbp_dma_sync(struct usb_dma *d, u32 off, u32 len, int dir);
 void *usbp_mem_alloc(u32 bytes);
 void usbp_mem_free(void *p);

@@ -118,6 +118,7 @@ struct usb_hc {
     volatile u32 isr_pending;
     struct usb_xfer *active, *scan_next;
     struct usb_dev *devices[USB_DEV_MAX + 1];
+    /* Root ports are 1-based: index = port - 1. */
     struct usb_dev *root_child[USB_RH_PORTS_MAX];
     u8 root_restart[USB_RH_PORTS_MAX];
     u8 explored; /* First root-port scan has completed (§4-4-1 P0). */
