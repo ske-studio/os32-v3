@@ -209,3 +209,7 @@ NEXT §5 の B・A2・S1・G・W を、次の差し替えで後に回す。中�
 
 ## 反論
 なし (本線の独立レビュー R1〜R5 と os32powerpc のレビューの指摘は、すべて直し案どおりに反映した)。
+
+## 実装の後の追記 (2026-11-12、段 P、PM 決定)
+- 段 P (main dabcb2cc) で、既存の単体の診断用の `PM_DEC_HZ=100` (platform/powermac/ppc_layout.h・arch/ppc/decrementer.c) が §3 の `PM_DEC_HZ` (kboot_info.h、1000) と名前でぶつかるので、診断の側を `PM_DIAG_DEC_HZ` に改名した。診断は 100Hz のまま。
+- QEMU (7450・7455) で decrementer ≈ 1000Hz・論理 ≈ 99Hz、dec_rate の差 0。half-rate と DEC 100Hz の変異は `FATAL kboot dec_rate` で RED。G4 実機の受入と U3 の閾値は後 (§7)。
