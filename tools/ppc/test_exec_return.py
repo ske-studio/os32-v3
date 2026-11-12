@@ -26,13 +26,16 @@ static void say(const char *s, int n) {
 }
 static int check(void) {
     volatile struct arch_priv_context parent;
-    root = 0x1234; ppc_exec_kernel_sp = 0x5678;
+    /* launch snapshots the kernel root, not the parent USER root. */
+    root = 0xaaaa; ppc_exec_kernel_sp = 0x5678;
     arch_priv_save(&parent);
     if (!__builtin_setjmp(landing)) {
         root = 0xaaaa; ppc_exec_kernel_sp = 0xbbbb;
         __builtin_longjmp(landing, 1);
     }
     say("reached=parent\n", 15);
+    /* exec_restore_context selects the parent before private restoration. */
+    root = 0x1234;
     arch_priv_restore(&parent);
     if (root != 0x1234) { say("FAIL: root\n", 11); return 5; }
     if (ppc_exec_kernel_sp != 0x5678) return 6;
@@ -133,9 +136,11 @@ def main():
         print('resume baseline failed')
         return 1
     if '--mutate' in sys.argv:
-        old = '    arch_mmu_load_root(root);'
+        old = '    ppc_exec_kernel_sp = sp;'
         assert source.count(old) == 1
-        result = execute(source.replace(old, '    (void)root;'))
+        result = execute(source.replace(old, '    u32 stale_root;\n'
+                                        '    __builtin_memcpy(&stale_root, (const void *)saved->opaque, sizeof(stale_root));\n'
+                                        '    arch_mmu_load_root(stale_root);\n' + old))
         if result.returncode != 5 or result.stdout != 'reached=parent\nFAIL: root\n':
             print('mutation unexpected:', result.returncode, result.stdout, result.stderr)
             return 1

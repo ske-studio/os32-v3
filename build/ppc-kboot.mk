@@ -11,6 +11,8 @@ KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_SHELL ?= 0
 KBOOT_TERM ?= lan
+# Extra applications belong to an explicitly separate test image.
+KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
 NEGATIVE ?= 0
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
@@ -120,12 +122,12 @@ $(KB_OUT)/motd.txt:
 	@printf 'OS32 PowerPC shell\n' > $@
 .PHONY: kb-user
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) hello ppc-fault
+	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(KB_ROOT_BINS)
 
-build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin: kb-user
+$(KB_ROOT_BINS): kb-user
 
-$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
-	python3 -B tools/mkroot_image.py --motd $< --bin build/out/ppc-user/hello.bin --bin build/out/ppc-user/fault.bin --out $@
+$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py $(KB_ROOT_BINS)
+	python3 -B tools/mkroot_image.py --motd $< $(foreach bin,$(KB_ROOT_BINS),--bin $(bin)) --out $@
 $(KB_OUT)/root_image_blob.o: $(KB_OUT)/root.iso
 	$(KB_OBJCOPY) -I binary -O elf32-powerpc -B powerpc --rename-section .data=.rodata.boot_root,alloc,load,readonly,data,contents $< $@
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
