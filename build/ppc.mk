@@ -17,7 +17,7 @@ PPC_FLAGS := -D__cdecl= $(COMMON) $(INCLUDES) -mcpu=7450 -m32 -mbig-endian \
  -msoft-float -mno-altivec -msdata=none -nostdlib
 HOST_FLAGS := $(COMMON) $(INCLUDES) -Itools/ppc -m32 -nostdlib -nostdinc \
  -isystem $(shell $(HOST_CC) -print-file-name=include) -no-pie
-PRODUCT := platform/powermac/ofw.c platform/powermac/escc_tree.c \
+PRODUCT := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc_tree.c \
  platform/powermac/escc.c platform/powermac/boot.c lib/kstring_c.c
 ASSEMBLY := arch/ppc/entry.S arch/ppc/ofw_note.S
 HEADERS := arch/ppc/ppc_boot.h platform/powermac/ppc_layout.h \
@@ -49,7 +49,7 @@ check: all
 	python3 tools/ppc/run.py --cross-dir $(CROSS_DIR) --runner $(HOST32_RUNNERS)
 
 # Independent MMU image; old bootstrap objects and acceptance remain separate.
-MMU_C := platform/powermac/ofw.c platform/powermac/escc_tree.c \
+MMU_C := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc_tree.c \
  platform/powermac/escc.c platform/powermac/mmu_boot.c \
  platform/powermac/mmu_start.c platform/powermac/dump.c \
  arch/ppc/cpu_setup.c arch/ppc/pmap.c arch/ppc/exception.c arch/ppc/decrementer.c lib/kstring_c.c
@@ -77,9 +77,9 @@ $(OUT)/PPCMMU.ELF: $(MMU_OBJECTS) $(OUT)/mmu.ld mmu-force
 	 -Wl,-T,$(OUT)/mmu.ld -Wl,-Map,$(OUT)/mmu.map $(MMU_OBJECTS) -o $@
 $(OUT)/mmu-fake: tools/ppc/mmu_fake.c tools/ppc/mmu_fixture.h $(MMU_C) $(MMU_HEADERS)
 	@mkdir -p $(dir $@)
-	$(HOST_CC) $(HOST_FLAGS) -DDIAGNOSTIC tools/ppc/mmu_fake.c lib/kstring_c.c -o $@
+	$(HOST_CC) $(HOST_FLAGS) -ffunction-sections -fdata-sections -Wl,--gc-sections -DDIAGNOSTIC tools/ppc/mmu_fake.c lib/kstring_c.c -o $@
 
 $(OUT)/mmu-flow: tools/ppc/mmu_flow_fake.c tools/ppc/flow_fixture.h $(MMU_C) $(MMU_HEADERS)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(HOST_FLAGS) -DPPC_MMU tools/ppc/mmu_flow_fake.c platform/powermac/mmu_boot.c \
-	 platform/powermac/ofw.c platform/powermac/escc_tree.c platform/powermac/escc.c lib/kstring_c.c -o $@
+	 platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc_tree.c platform/powermac/escc.c lib/kstring_c.c -o $@

@@ -138,7 +138,7 @@ def host(dis):
 
 
 def build_guest(out):
-    c=['platform/powermac/ofw.c','platform/powermac/escc_tree.c',
+    c=['platform/powermac/rh_observe.c','platform/powermac/ofw.c','platform/powermac/escc_tree.c',
        'platform/powermac/escc.c','platform/powermac/mmu_boot.c',
        'arch/ppc/cpu_setup.c','arch/ppc/pmap.c','arch/ppc/kernel_hpt.c',
        'arch/ppc/pd_walk.c','lib/kstring_c.c','tools/ppc/kboot_mmu_guest.c']

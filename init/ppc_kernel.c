@@ -23,6 +23,7 @@
 #include "ppc_hpt.h"
 #include "arch_cpu.h"
 #include "paging.h"
+#include "rh_observe.h"
 #include "memory_boot.h"
 #include "pgalloc.h"
 #include "kmalloc.h"
@@ -150,8 +151,13 @@ void ppc_kernel_main(void)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
     const struct pm_kboot_info *info = ppc_boot_info();
+    pm_rh_bind(dev->fb_va);
+    pm_rh_stage(1);
     if (!info || pm_log_escc_init(dev->escc_csr_va, dev->escc_data_va) != 0)
-        arch_cpu_stop();   /* no sink: nothing may be printed */
+    {
+        pm_rh_stage(PM_RH_ESCC_INIT);
+        arch_cpu_stop();
+    }
 
     int lan_log_rc = pm_lan_log_register();
 
