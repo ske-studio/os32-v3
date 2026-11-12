@@ -1750,10 +1750,14 @@ GF4_MUTATIONS += [
     ('a3', 'fragment-budget', 'kdebug/gf_display_test.c',
      'i32 rc = display_transfer_deadline(a->ctx, &dl);',
      'i32 rc = 0;', 'operation_budgets: upload starts after earlier work'),
-    ('c2svc', 'stopped-cursor-hide', 'hwdev/gf/display/service.c',
-     'rc=gf4_cursor_apply(c,h,false);',
-     'rc=running ? gf4_cursor_apply(c,h,false) : 0;',
-     'test_stopped_cursor: F2 OFF must still hide the hardware cursor'),
+    ('c2svc', 'stop-cursor-hide', 'hwdev/gf/display/service.c',
+     '    /* V/disp.c:56-96: display fini does not hide the cursor. */',
+     '    for (u8 h=0;h<GF4_HEADS;++h) (void)gf4_cursor_apply(c,h,false);',
+     'test_stopped_cursor: stop must not hide the cursor'),
+    ('c2rec', 'suspend-cursor-hide', 'hwdev/gf/display/recover.c',
+     '    /* V/disp.c:56-96: suspend does not hide the cursor. */',
+     '    for (u8 h=0;h<GF4_HEADS;++h) if (c->state->head[h].enabled) (void)gf4_cursor_apply(c,h,false);',
+     'test_suspend_restart: suspend must not hide the cursor'),
 ]
 
 GF4_MUTATIONS += [

@@ -59,7 +59,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 |---|---|---|---|
 | 1 | 受付を閉じる (:618-627) | fbcon 停止・flip event block (V/disp.c:63) | 一致 (役割) |
 | 2 | pending の flip 収束 (:642-646) | 無し | OS32 の追加 (X1-X4)。触らない |
-| 3 | cursor hide (:649) | 無し。cursor のレジスタは #8 で保存値に戻る | **手本に無い**。今回は残す (§9) |
+| 3 | cursor hide (:649) | 無し。cursor のレジスタは #8 で保存値に戻る | **手本に無い**。外した (末尾の追記) |
 | 4 | **DPMS ON** (:651-655) | 無い | **外す** (ユーザー決定) |
 | 5 | (無い) | エンコーダー dpms(OFF) (force_disable_all) | **足す** |
 | 6 | (無い) | PCRTC_INTR_EN_0=0 (V/disp.c:66-69) | 順が違う。このレジスタは F1 の IRQ 層が持ち、F2/F1 の停止で 0 にする (hwdev/gf/irq.c:91・226-234)。F4 から書くと F1 の wanted_heads と食い違うので変えない |
@@ -79,7 +79,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 | 2 | `rec_capture` (:179) | 非 atomic では drm core の状態が残る | 一致 (写し方が OS32 流) |
 | 3 | flip 収束 (:182-185) | 無し | OS32 の追加 |
 | 4 | fence (:186-189) | `nouveau_channel_idle` (N/nouveau_drm.c:966-976) | 一致 |
-| 5 | cursor hide (:192) | 無し (unpin だけ、V/disp.c:85-92) | **手本に無い**。今回は残す (§9) |
+| 5 | cursor hide (:192) | 無し (unpin だけ、V/disp.c:85-92) | **手本に無い**。外した (末尾の追記) |
 | 6 | **DPMS ON** (:194) | 無い (F7) | **外す** |
 | 7 | close・fini・F2 stop・foundation_stop (:197-215) | fence suspend・`nvif_client_suspend` (:980-990) | 一致 |
 
@@ -314,7 +314,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - PLL も 1 回目の 51104/80000e02 に戻っていること。
   - 違う欄が出たら、その欄の restore の漏れとして記録する。
 - **R2**: `gfx2_rh` を 2 回続けて回し、PASS と描画を確かめる (カメラ)。
-- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c:152-165) と、診断の STOP→START (command_test.c:195-213) を各 1 回。机が戻ること。STANDBY から STOP→START して STANDBY のままであること。
+- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c:152-165) と、診断の STOP→START (command_test.c:195-213) を各 1 回。机が戻ること。(STANDBY のままかの確かめは外した。GUI の間に STANDBY に入れる口が無い、ユーザー決定 2026-11-12「R3 から外す」。)
 - **R4**: 停止の時、98 に替わる前に変な表示が一瞬出るかを見る (カメラの連写、記録だけ)。
 - **R5'**: 診断の保存 (diagnostic_saved) を持ったまま停止 → 開始 → 診断の restore で画が戻ること。シリアルに `fonts skipped` が出ること。
 

@@ -690,11 +690,8 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
             if (!rc) rc=gf4_flip_complete(c,h,dl);
             if (rc && !first) first=rc;
         }
-        /* Cursor MMIO does not need a live push channel. Hide even after
-         * failed recovery stopped F2; the owner bus still rejects revocation. */
-        rc=gf4_cursor_apply(c,h,false);
-        if (rc && !first) first=rc;
     }
+    /* V/disp.c:56-96: display fini does not hide the cursor. */
     struct gf4_hw_saved *saved=gf4_hw_saved_get();
     if (saved->valid) {
         /* drm_helper_force_disable_all, then dispnv04/disp.c:196-200. */
