@@ -4,6 +4,7 @@
 #include "ppc_trap.h"
 #include "ppc_hpt.h"
 #include "exec_arch.h"
+#include "kernel/irq/irq.h"
 
 extern void ring3_fault_kill(void);
 static void (*external_handler)(struct ppc_frame *);
@@ -93,7 +94,12 @@ void ppc_trap_dispatch(struct ppc_frame *f)
     if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
         void (*handler)(struct ppc_frame *) =
             f->vector == 0x500 ? external_handler : dec_handler;
-        if (handler) { handler(f); return; }
+        if (handler) {
+            ++kctx_irq_depth;
+            handler(f);
+            --kctx_irq_depth;
+            return;
+        }
         reason = PPC_TRAP_UNREGISTERED;
     } else if (f->srr1 & PPC_MSR_PR) {
         if (f->vector == 0xc00) {

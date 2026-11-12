@@ -8,6 +8,8 @@ static void checkpoint(unsigned n)
 #define setjmp(x) __builtin_setjmp(x)
 #define longjmp(x,n) __builtin_longjmp(x,n)
 #include "ppc_trap.h"
+/* Fixture owns IRQ context storage; no shared product definition. */
+volatile u32 kctx_irq_depth;
 static void *stopped[5];
 static u32 machine=0x30, reason, dumps, reads, handled, root=0x1000, leaf;
 u32 ppc_trap_msr(void) { return machine; }

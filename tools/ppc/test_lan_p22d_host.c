@@ -1,4 +1,6 @@
 #include "ppc_trap.h"
+/* Fixture owns IRQ context storage; no shared product definition. */
+volatile u32 kctx_irq_depth;
 static void *stop[5];
 static u32 last, marks;
 u32 ppc_trap_msr(void) { return 0x30; }

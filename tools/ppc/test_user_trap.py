@@ -19,7 +19,8 @@ def check(source, expected):
                         '-nostdlib', '-static', '-std=gnu11', '-O2', '-Wall',
                         '-Wextra', '-Werror', '-DPPC_TRAP_HOST_TEST',
                         '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
-                        '-I' + str(ROOT), str(path / 'trap.c'),
+                        '-I' + str(ROOT), '-I' + str(ROOT / 'platform/powermac'),
+                        str(path / 'trap.c'),
                         str(ROOT / 'arch/ppc/pd_walk.c'),
                         str(ROOT / 'tools/ppc/test_user_trap_host.c'),
                         '-o', str(path / 'host')], check=True)
