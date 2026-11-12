@@ -67,7 +67,6 @@ int pc98_route_safe(void) { return 0; }
 void gfx_select_mode(Backend *b, int n) { (void)b; (void)n; }
 void gfx_bind_client(void) {}
 typedef unsigned long u32;
-void display_dual_dpms(u32 state) __attribute__((weak));
 struct gfx2_adapter { u32 heads; };
 struct gfx2_adapter *gfx2_active(void) { return (void *)0; }
 void gfx2_head_detach(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; }

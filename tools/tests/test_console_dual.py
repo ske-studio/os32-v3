@@ -49,8 +49,6 @@ MUTANTS = [
     ('clear gate', 'console.c', 'if (con_sink_is_enabled()) return;', 'if (con_sink_is_enabled() && !con_dual_active()) return;', 'A3'),
     ('session cfg', 'console.c', 'con_dual_was_live() || con_dual_cfg()', 'con_dual_was_live()', 'A3'),
     ('loading cfg', 'kernel.c', 'if (con_dual_cfg())\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'if (0)\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'A3'),
-    ('DPMS call', 'display_dual.c', '(void)a->be->dpms(a->ctx, h, state);', '(void)state;', 'A3'),
-    ('DPMS GF', 'display_dual.c', 'a->kind == GFX2_KIND_GEFORCE && ', '', 'A3'),
     ('session CLEAR', 'console.c',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        con_sink_push_clear();\n        return;',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        return;', 'A3'),

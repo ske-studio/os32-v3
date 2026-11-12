@@ -21,6 +21,5 @@ const struct con_out *con_dual_outputs(int *n);
 
 int display_dual_outputs(struct con_out *o, int max) __attribute__((weak));
 u32 display_dual_key(void) __attribute__((weak));
-void display_dual_dpms(u32 state) __attribute__((weak));
 
 #endif

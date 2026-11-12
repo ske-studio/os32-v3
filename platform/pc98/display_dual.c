@@ -24,18 +24,6 @@ static void display_dual_text_on(void)
     io_wait();
 }
 
-void display_dual_dpms(u32 state)
-{
-    struct gfx2_adapter *a = gfx2_active();
-    if (con_dual_cfg() && a && a->kind == GFX2_KIND_GEFORCE && a->be && a->be->dpms) {
-        for (u32 h = 0; h < a->heads; h++) {
-            GFX2_HeadInfo info;
-            if (!gfx2_head_info(a->index, h, &info) && info.attached)
-                (void)a->be->dpms(a->ctx, h, state);
-        }
-    }
-}
-
 u32 display_dual_key(void)
 {
     struct gfx2_adapter *a = gfx2_active();

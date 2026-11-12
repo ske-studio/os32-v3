@@ -470,7 +470,6 @@ static void gfx_clear_planar_pages(int size) { (void)size; }
 static void display_flip_pages(int d, int a) { (void)d; (void)a; }
 static void palette_init(void) { }
 static void gfx_scroll_init(void) { }
-void display_dual_dpms(u32 state) __attribute__((weak));
 #include "gfx2_core_calls.inc"
 static void test_core_calls(void)
 {

@@ -89,11 +89,6 @@ static void loading_cui(void)
 {
 #include "loading_cui.inc"
 }
-static int dpms_calls[2], dpms_state;
-static int fake_dpms(void *ctx, u32 head, u32 state)
-{ (void)ctx; dpms_calls[head]++; dpms_state=state; return 0; }
-static const struct GfxBackendV2 fake_be = {.dpms=fake_dpms};
-
 static void say(const char *s)
 {
     u32 n = kstrlen(s);
@@ -214,14 +209,6 @@ static int a3_a4(void)
     CHECK(plane[0]=='b' && plane[80]=='L' && plane[160]=='n' && !backend_clears, "A3 CUI GUI append");
     console_text_gdc_start(); loading_cui();
     CHECK(plane[0]=='b', "A3 CUI loading append");
-    adapters[1].be=&fake_be;
-    for (int cfg0=0; cfg0<2; cfg0++) for (int gf=0; gf<2; gf++) {
-        con_dual_configure(cfg0); active=&adapters[1];
-        active->kind=gf ? GFX2_KIND_GEFORCE : GFX2_KIND_PC98;
-        dpms_calls[0]=dpms_calls[1]=0; display_dual_dpms(3);
-        CHECK(dpms_calls[0]==(cfg0 && gf) && !dpms_calls[1] &&
-              (!(cfg0 && gf) || dpms_state==3), "A3 DPMS");
-    }
     for (int cfg0=0; cfg0<2; cfg0++) for (route=0; route<2; route++) {
         con_dual_configure(cfg0);
         for (gf_safe=0; gf_safe<2; gf_safe++) {

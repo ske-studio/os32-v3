@@ -391,7 +391,6 @@ void gfx_shutdown(void)
         if (!caller_access_get_user(&caller) ||
             caller.app_id != appslot_gfx_owner()) return;
     }
-    if (display_dual_dpms) display_dual_dpms(3);
     pc98_splash_raster_reset();
     gfx_started = 0;
     gfx_policy_reeval();
