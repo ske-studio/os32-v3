@@ -144,6 +144,11 @@ struct usb_dev {
  * upper-layer state; it must not free sc or touch xfers after HC death. */
 struct usb_class {
     int (*match)(struct usb_dev *, struct usb_iface *);
+    /* Resumable (§4-4-1 A6): -USB_E_BUSY = still in progress, the core calls
+     * attach again on its next explore step (progress lives in sc); 0 = done;
+     * other negative = failed, the class has begun unsetup of its own xfers
+     * and ep0 requests, and the core waits usb_class_unsetup_done, then
+     * release, then empties that iface (R2-10). The scan waits on BUSY. */
     int (*attach)(struct usb_dev *, struct usb_iface *);
     void (*detach)(struct usb_dev *, struct usb_iface *);
     void (*gone)(struct usb_dev *, struct usb_iface *);
