@@ -12,6 +12,7 @@ struct resident_cli_ops {
     void (*poll)(void);
     int (*cat)(const char *path);
     int (*put)(const char *path, const void *data, u32 size);
+    int (*run)(const char *line);
 };
 void resident_cli_run(const struct resident_cli_ops *ops);
 

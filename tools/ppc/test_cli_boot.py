@@ -13,7 +13,7 @@ CHECK = dict(name='ppc-cli-boot', tier=1, budget=60, needs=[],
                      'tools/ppc/test_cli_boot.py'],
              inputs=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
                      'platform/powermac/lan_boot.h', 'kernel/console/console_stream.h',
-                     'fs/vfs.h', 'include/types.h'])
+                     'fs/vfs.h', 'include/types.h', 'exec/exec.h', 'lib/kstring_c.c', 'lib/kstring.h'])
 
 HARNESS = r'''
 #include <setjmp.h>
@@ -33,6 +33,7 @@ void console_stream_write(const void *p, u32 n) {
     if (used + n >= sizeof(output)) longjmp(done, 2);
     memcpy(output + used, p, n); used += n; output[used] = 0;
 }
+int exec_run(const char *line) { (void)line; return 7; }
 int vfs_read(const char *p, void *buf, u32 max) {
     strcpy(path, p); reads++;
     if (max != 1024) return -1;
@@ -78,7 +79,7 @@ def main():
                             '-I', str(ROOT), '-I', str(ROOT / 'include'),
                             '-I', str(ROOT / 'sdk/include'), '-I', str(ROOT / 'sdk/include/os32'),
                             '-I', str(ROOT / 'platform/powermac'), str(d / 'cli_boot.c'),
-                            str(ROOT / 'kernel/cli/resident_cli.c'), str(d / 'harness.c'),
+                            str(ROOT / 'kernel/cli/resident_cli.c'), str(ROOT / 'lib/kstring_c.c'), str(d / 'harness.c'),
                             '-o', str(d / 'test')], check=True)
             result = subprocess.run([str(d / 'test')], timeout=10, check=False)
             if result.returncode != expected:
