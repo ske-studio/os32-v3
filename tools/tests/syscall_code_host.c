@@ -53,6 +53,7 @@ void arch_syscall_publish(void *d, u32 bytes) {
     backend_publish(d, bytes);
     published++;
 }
+#define arch_exec_publish(dst, bytes) ((void)0)
 #include "trampoline.inc"
 void _start(void) {
     struct syscall_layout l;

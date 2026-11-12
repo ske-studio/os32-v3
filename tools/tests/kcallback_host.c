@@ -106,6 +106,7 @@ static int run_client(void *ctx)
 }
 static u32 ring3_tramp_page;
 u32 exec_tramp_page_addr(void) { return (u32)tramp; }
+#define arch_exec_publish(dst, bytes) ((void)0)
 #include "trampoline.inc"
 
 /* The test substitutes only the interrupt instruction. The complete real

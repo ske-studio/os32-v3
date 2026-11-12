@@ -15,6 +15,7 @@ static int exec_load_image(AppSlot *ctx, const char *path, const OS32Header *hdr
             if (as_va_to_pa(ctx->as->pd_phys, ctx->load_addr + pos, &pa)) break;
         } else pa = ctx->load_addr + pos;
         if (vfs_read_fd(fd, P2V(pa), n) != (int)n) break;
+        arch_exec_publish(P2V(pa), n);
         pos += n;
     }
     vfs_close(fd);

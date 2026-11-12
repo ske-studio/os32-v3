@@ -42,6 +42,7 @@
 #include "exec_kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"
+#include "exec_cache.h"
 #include "kapi_call.h"
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"

@@ -64,6 +64,7 @@ static void ring3_trampoline_init(void)
     tbl[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = 0;
     tbl[KAPI_DATA_IDX_SHM_BASE] = (u32)MEM_SHM_BASE;
     ring3_tramp_page = page;
+    arch_exec_publish(P2V(page), PAGE_SIZE);
 
     /* boot 口が確定した全 PD 共有 RO+USER (kernel band PDE0)。i386 は NX なしなので
      * RO でも実行可能 (スタブ実行 OK)。ユーザは書けない = スタブ改竄不可。
