@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-lan-p8', tier=1, budget=60, needs=[],
              covers=['platform/powermac/pci_config.c'],
              inputs=['tools/ppc/test_lan_p8.py', 'tools/ppc/test_lan_p8_fake.c',
-                     'platform/powermac/lan_boot.h', 'arch/ppc/ppc_oea.h'])
+                     'platform/powermac/lan_boot.h', 'arch/ppc/ppc_oea.h',
+                     'arch/ppc/kernel_boot.h', 'arch/ppc/ppc_boot.h',
+                     'drivers/net/gem/gem.h'])
 
 def main():
     parser = argparse.ArgumentParser()
@@ -22,7 +24,7 @@ def main():
         path.write_text(source)
         cmd = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
                '-nostdlib', '-static', '-Wall', '-Wextra', '-Werror', '-DPM_PCI_FAKE_MMIO',
-               '-Iplatform/powermac', '-Iarch/ppc', '-Iinclude', str(path),
+               '-I.', '-Iplatform/powermac', '-Iarch/ppc', '-Iinclude', str(path),
                'tools/ppc/test_lan_p8_fake.c', '-o', tmp + '/test']
         def check():
             subprocess.run(cmd, cwd=ROOT, check=True, timeout=60)

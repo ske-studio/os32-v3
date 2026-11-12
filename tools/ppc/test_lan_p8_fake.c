@@ -39,3 +39,5 @@ void _start(void)
     sticky=4; cmd|=4; n=0; CHECK(pm_gmac_early_quiesce()==LAN_EIO,18);
     die(0);
 }
+
+int pm_gmac_clock(const struct pm_gmac_boot *b, u32 va) { (void)b; (void)va; return LAN_EUNSUPPORTED; }

@@ -39,7 +39,7 @@ static void write32(void *p, u32 reg, u32 v)
     if (reg == 0x620c) { if (!f->first_frame) f->first_frame = v; if ((v & 0xf0000000U) == 0x60000000U && ((v >> 18) & 31) == 1) f->bmsr_reads++; f->frame = v; f->reads = 0; }
 }
 static unsigned long long tb(void *p) { struct fake *f = p; f->tb_calls++; return f->freeze_tb ? f->tb : ++f->tb; }
-static void say(const char *s) { unsigned n=0; while (s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
+static __attribute__((noinline)) void say(const char *s) { unsigned n=0; while (s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory"); }
 static void fail(const char *s) { say(s); say("\n"); __asm__ volatile("int $0x80" : : "a"(1), "b"(1)); __builtin_unreachable(); }
 static int main_test(void)
 {
@@ -54,12 +54,55 @@ static int main_test(void)
     if (c == 10) f.delay = 99;
     if (c == 14) f.delay = 100;
     if (c == 15) f.freeze_tb = 1;
-    if (c == 16) { f.id1 = 0x1234; f.id2 = 0x5678; }
+    if (c == 16 || c >= 23) { f.id1 = 0x1234; f.id2 = 0x5678; }
     if (c == 2) f.no_ta = 1;
     int r = gem_mif_init(&g);
     if (f.first_frame != (0x60020000U | (0U << 23) | (2U << 18))) fail("H:frame");
     if (c == 15 && f.tb_calls > 3000000U) fail("H:spin");
-    if (c == 16) { if (r != GEM_EUNSUPPORTED || g.phy_id1 != f.id1 || g.phy_id2 != f.id2) fail("H:unknown-init"); if (gem_phy_step(&g, 0) != GEM_EUNSUPPORTED || f.writes) fail("H:unknown-write"); return 0; }
+    if (c >= 30) {
+        if (r != GEM_OK) fail("H:unknown-init");
+        f.regs[9] = 0x1b00; /* master configuration plus both gigabit modes */
+        if (c == 31) f.regs[1] &= ~0x100U;
+        if (c == 32) f.regs[9] = 0xffff;
+        r = gem_phy_step(&g, 0);
+        if (r != GEM_AGAIN) fail("H:gigabit-start");
+        if (c == 31 || c == 32) {
+            if (f.writes) fail("H:gigabit-unavailable");
+            return 0;
+        }
+        if (f.writes != 3 || f.log_reg[0] != 9 || f.log_val[0] != 0x1800)
+            fail("H:gigabit-advertise");
+        if (f.log_reg[1] != 4 || f.log_val[1] != 0x1e1 ||
+            f.log_reg[2] != 0 || f.log_val[2] != 0x1200) fail("H:gigabit-restart");
+        /* Negotiation completes at 100FD. Further polls must not restart it. */
+        f.order = 3; f.bad_order = 0; f.regs[0] = 0x1000;
+        for (u32 n = 0; n < 3; ++n)
+            if (gem_phy_step(&g, n + 1) != GEM_OK || f.writes != 3)
+                fail("H:gigabit-complete");
+        return 0;
+    }
+    if (c >= 23) {
+        if (r != GEM_OK) fail("H:unknown-init");
+        g.phy_step = 2; /* sample the already negotiated standard registers */
+        f.order = 3; f.regs[0] = 0x1000; f.regs[4] = 0x101;
+        f.regs[9] = f.regs[10] = 0;
+        if (c == 24) f.latch = 1;
+        if (c == 25) f.regs[4] = f.regs[5] = 0x41;
+        if (c == 26) { f.regs[9] = 0x200; f.regs[10] = 0x800; }
+        if (c == 27) f.regs[1] = 0x100;
+        if (c == 28) f.regs[0] = 0x2100;
+        if (c == 29) f.regs[9] = f.regs[10] = 0xffff;
+        struct gem_phy_sample sample;
+        if (gem_phy_sample(&g, &sample) || sample.id1 != f.id1 || sample.id2 != f.id2 ||
+            sample.port != f.port || sample.addr != f.addr || f.writes) fail("H:sample");
+        u32 speed = c == 25 ? 10 : c == 26 ? 1000 : c == 27 ? 0 : 100;
+        if (sample.link != (c != 27) || sample.speed != speed ||
+            sample.full_duplex != (c != 27) || sample.gigabit_valid != (c != 29)) fail("H:standard-link");
+        r = gem_phy_step(&g, 0);
+        if (r != ((speed == 100) ? GEM_OK : GEM_AGAIN) || f.writes) fail("H:unknown-write");
+        return 0;
+    }
+    if (c == 16) { if (r != GEM_OK || g.phy_id1 != f.id1 || g.phy_id2 != f.id2) fail("H:unknown-init"); if (gem_phy_step(&g, 0) != GEM_AGAIN || f.writes) fail("H:unknown-write"); return 0; }
     if (c == 2) { if (r != GEM_ETIME) fail("H:A6 phy-invalid"); return 0; }
     if (r != GEM_OK || g.phy_addr != 5 || g.phy_port != f.port || g.phy_id1 != f.id1 || g.phy_id2 != f.id2) fail("H:A6 phy-invalid");
     if (f.config & (0x4 | 0x2)) fail("H:config");

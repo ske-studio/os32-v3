@@ -198,7 +198,12 @@ struct gem_io {
     int (*sync)(void *, u32, enum dma_sync);
     int (*master_enable)(void *); /* PCI master set and readback, before DMA enable. */
 };
+struct gem_phy_sample {
+    u32 port, addr, id1, id2, bmcr, bmsr, anar, anlpar, gtcr, gtsr;
+    u32 gigabit_valid, link, speed, full_duplex;
+};
 struct gem {
+    struct gem_phy_sample phy_sample;
     struct gem_io io; /* Platform-provided register, clock and DMA access. */
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
     u32 ring_prepare_step, ring_cursor, ring_publish_step;
@@ -217,6 +222,7 @@ void gem_enter_reset(struct gem *);
 int gem_reset_step(struct gem *, unsigned long long now);
 int gem_mac_init(struct gem *, const u8 mac[6]);
 int gem_mif_init(struct gem *);
+int gem_phy_sample(struct gem *, struct gem_phy_sample *);
 int gem_phy_step(struct gem *, unsigned long long now);
 int gem_ring_prepare(struct gem *, struct gem_dma *);
 int gem_ring_publish(struct gem *);

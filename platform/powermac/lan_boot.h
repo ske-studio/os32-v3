@@ -9,6 +9,7 @@ enum dma_sync;
 struct gem;
 struct gem_dma;
 struct gem_io;
+struct gem_phy_sample;
 struct ppc_boot_alias;
 
 enum lan_rc {
@@ -116,6 +117,9 @@ int pm_pci_write32(struct pm_pci *, u32 bdf, u32 reg, u32 value);
 int pm_gmac_alias_plan(const struct pm_gmac_boot *, struct ppc_boot_alias *out);
 /* 0: proceed (Master read back clear, or GMAC absent/unknown and PCI untouched); negative: Master remained set after clearing, stop. */
 void pm_gmac_quiesce_setup(const struct pm_gmac_boot *, const struct pm_pci *);
+int pm_gmac_quiesce_setup_rh(const struct pm_gmac_boot *, const struct pm_pci *, u32 clock_va);
+struct pm_gmac_rh_sample { u32 command, tx_enable, rx_enable, valid; int clock_rc; };
+const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void);
 int pm_gmac_early_quiesce(void);
 int pm_gmac_dma_init(const struct pm_gmac_boot *, struct gem_dma *out);
 int pm_gmac_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
@@ -128,6 +132,7 @@ int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
                     u64 *records, u64 *bytes, u32 *status);
 void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *flags);
 void pm_lan_log_complete(int result);
+void pm_lan_phy_observer(void (*notify)(const struct gem_phy_sample *, int));
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
 int pm_lan_decode_header(const u8 *src, u32 n, struct lan_header *h);

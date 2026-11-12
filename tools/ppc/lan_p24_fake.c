@@ -45,6 +45,7 @@ volatile u32 tick_count;
 static void decimal(u32 v) { char b[12]; u32 n=0; do { b[n++]=(char)('0'+v%10); v/=10; } while(v); while(n) { char a[2]={b[--n],0}; out(a); } }
 void kprintf(u8 attr,const char *fmt,...) {
     va_list ap; (void)attr; va_start(ap,fmt);
+    if (fmt[0]=='R' && fmt[1]=='H') { va_end(ap); return; }
     if (fmt[4]=='S') {
         u32 a=va_arg(ap,u32), b=va_arg(ap,u32);
         CHECK(mark_count<40,"marks-overflow"); marks[mark_count]=a; links[mark_count++]=b;
@@ -272,3 +273,5 @@ static void scenario(void) {
     out("PASS\n");
 }
 void _start(void) { scenario(); __asm__ volatile("int $0x80"::"a"(1),"b"(0)); __builtin_unreachable(); }
+
+const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void) { static const struct pm_gmac_rh_sample q; return &q; }

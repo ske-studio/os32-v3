@@ -19,7 +19,7 @@ MUTATIONS = [
     ('poll-limit', '|| ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }\n        return GEM_AGAIN;\n    case PHY_DONE', ') { g->phy_step = PHY_START; return GEM_ETIME; }\n        return GEM_AGAIN;\n    case PHY_DONE', 8, 'H:an-timeout'),
     ('reset-limit', '|| ++g->phy_polls >= PHY_POLLS) { g->phy_step = PHY_START; return GEM_ETIME; }\n            return GEM_AGAIN;', ') { g->phy_step = PHY_START; return GEM_ETIME; }\n            return GEM_AGAIN;', 11, 'H:reset-poll-limit'),
     ('ffff', 'a != 0xffff &&', '1 &&', 0, 'H:A6 phy-invalid'),
-    ('unknown-write', 'if (!g || !supported(g->phy_id1, g->phy_id2))', 'if (!g)', 16, 'H:unknown-write'),
+    ('unknown-write', 'if (!supported(g->phy_id1, g->phy_id2)) {', 'if (supported(g->phy_id1, g->phy_id2) && 0) {', 16, 'H:unknown-write'),
     ('current', 'status = v;', 'status |= v;', 17, 'H:current-status'),
     ('retry', 'if (!(v & status & ANAR_TX_FD)) { g->phy_step = PHY_START; return GEM_EIO; }', 'if (!(v & status & ANAR_TX_FD)) { return GEM_EIO; }', 6, 'H:retry'),
     ('startneg', 'BMCR_AUTOEN | BMCR_STARTNEG);', 'BMCR_AUTOEN);', 0, 'H:advertise'),
