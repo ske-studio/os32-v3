@@ -1,6 +1,36 @@
-#include <stdlib.h>
-#include <string.h>
 #include "drivers/usb/usb_core.h"
+/* No libc (CI has no 32-bit libc/crt), as tick_probe_host.c: a zeroing bump
+ * pool, local mem*, and exit through the i386 Linux syscall. */
+static unsigned char heap[65536] __attribute__((aligned(16)));
+static unsigned heap_used;
+static void *calloc(unsigned n, unsigned size)
+{
+    unsigned bytes = (n * size + 15u) & ~15u, i;
+    unsigned char *p;
+    if (bytes > sizeof(heap) - heap_used) return 0;
+    p = heap + heap_used; heap_used += bytes;
+    for (i = 0; i < bytes; ++i) p[i] = 0;
+    return p;
+}
+static void free(void *p) { (void)p; }
+void *memcpy(void *d, const void *s, unsigned n)
+{
+    unsigned char *a = d; const unsigned char *b = s;
+    while (n--) *a++ = *b++;
+    return d;
+}
+void *memset(void *d, int c, unsigned n)
+{
+    unsigned char *a = d;
+    while (n--) *a++ = (unsigned char)c;
+    return d;
+}
+static void sys_exit(int code)
+{
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(code));
+    for (;;) {}
+}
+static void abort(void) { sys_exit(99); }
 u8 hid_kbd_sc(u8 usage);
 #define REQUIRE(c) do { if (!(c)) return __LINE__; } while (0)
 struct event { int kind, src, a, b, c; };
@@ -81,7 +111,7 @@ static int attach(struct usb_dev *d, unsigned i, const struct usb_class *c)
     REQUIRE(c->attach(d,f)==0);
     return 0;
 }
-int main(void)
+static int run(void)
 {
     struct usb_dev d={.cfg=cfg,.cfg_len=sizeof(cfg)};
     struct usb_iface *k=&d.ifs[0], *m=&d.ifs[1];
@@ -152,3 +182,5 @@ int main(void)
     finish_unsetup(xf[0]); hid_kbd_class.release(&d,k);
     return 0;
 }
+
+void _start(void) { sys_exit(run()); }

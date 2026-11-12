@@ -21,6 +21,7 @@ CHECK = dict(name='usb-hid', tier=1, needs=[], budget=10, covers=[
 
 def check(mutate):
     flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wvla', '-Iinclude', '-I.']
+    bare = ['-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static']
     with tempfile.TemporaryDirectory(prefix='usb-hid-') as directory:
         tmp = Path(directory)
         for env, target in (('CROSS_DIR', 'i386-elf-gcc'),
@@ -35,9 +36,9 @@ def check(mutate):
                                 '-o', str(tmp/'unit.o')], cwd=ROOT, check=True)
         for swap in ([], ['-DUSB_TEST_SWAP']):
             exe = tmp/'hid'
-            subprocess.run(['gcc', '-m32', *flags, *swap, 'tools/tests/usb_hid_host.c',
+            subprocess.run(['gcc', '-m32', *bare, *flags, *swap, 'tools/tests/usb_hid_host.c',
                             *SOURCES, '-o', str(exe)], cwd=ROOT, check=True)
-            result = host32.run([str(exe)])
+            result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, result.returncode
             print('HID runtime OK', swap)
         if mutate:
@@ -57,10 +58,10 @@ def check(mutate):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_text(original.replace(anchor, replacement))
                 srcs = [str(dest) if s == rel else s for s in SOURCES]
-                subprocess.run(['gcc', '-m32', '-I'+str(tmp), *flags,
+                subprocess.run(['gcc', '-m32', *bare, '-I'+str(tmp), *flags,
                                 'tools/tests/usb_hid_host.c', *srcs, '-o', str(tmp/'bad')],
                                cwd=ROOT, check=True)
-                result = host32.run([str(tmp/'bad')])
+                result = host32.run([str(tmp/'bad')], runner='qemu')
                 assert result.returncode != 0, anchor
                 print('RED runtime:', anchor, 'rc=', result.returncode)
                 dest.unlink()
