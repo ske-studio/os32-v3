@@ -1,7 +1,7 @@
 # P3: 1kHz IRQ0 tick の実測計画と切り替え設計 r3
 
 > 出所: ~/os32-tmp/run/tick1k-design/DESIGN.final.md (astra 起草 r1〜r3、Opus レビュー 3 回、PM が確定)
-> 状態: **現行 (2026-11-05)** — 段の状態は票 TASK_TICK_1KHZ が持つ。
+> 状態: **現行 (2026-11-05)** — 段の状態は票 TASK_TICK_1KHZ が持つ。 tick_clock の口と段の順は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) (2026-11-12) が本稿より優先。
 
 ## r2→r3 の変更
 - N1: スプラッシュ再生は作り直さず契約外とする決定を D8・A1・B1・§4〜§8・旧 P1-1 に反映し、A2 の再生変更案を削除。
@@ -72,9 +72,9 @@ B1でもスプラッシュ区間を除く窓で実測CPU占有5%以下、IRQ0最
 | 定数層 | 正典と役割 |
 |---|---|
 | Shared | `sdk/include/os32/os32_kapi_shared.h` に `OS32_TICK_HZ=100`（既存公開tickの意味を明文化）。公開ヘッダはC89、構造体/slot/引数単位を変更しない。 |
-| Subsystem | `include/memmap.h` の `PIT_HZ=100` と `TICK_MS=1000u/PIT_HZ` は論理値として維持。新設 `PIT_IRQ_HZ` だけを物理要求100→1000とする。`pit_setup.clk_hz/reload` が実周期の正典。 |
+| Subsystem | `include/memmap.h` の `PIT_HZ=100` と `TICK_MS=1000u/PIT_HZ` は論理値として維持。新設 `PIT_IRQ_HZ` だけを x86 の物理要求100→1000とする (PowerPC は `PM_DEC_HZ`)。`pit_setup.clk_hz/reload` が x86 の実周期の正典で、共通の tick_clock には num/den で渡す ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2・§3)。 |
 | Local | PCM/FDC/serial等の機構時間・回数・境界余裕は各所有ファイル。物理period_usを論理TICK_MSの代用にしない。同じ意味の新たな写しは増やさない。 |
-依存確認: SDK sharedヘッダ:192-195 の `__KERNEL_BUILD__` 分岐が memmap.h を読む。逆向きincludeは追加しない。memmap.h側を100の正典とし、SDK側の同分岐でinclude後に `STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match)` を置く。外部SDKのC89経路には内部GNU11のassertを出さない。
+依存確認: SDK sharedヘッダ:192-195 の `__KERNEL_BUILD__` 分岐が memmap.h を読み、PowerPC の像も同じ分岐を通る。逆向きincludeは追加しない。SDK には `OS32_TICK_HZ` をリテラルの 100 で置くだけにし、`STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match)` は x86 だけの `platform/pc98/clock_source.c` に置く (PowerPC の PIT_HZ 監査を通すため、[TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) X4)。
 物理要求の参照は pit_init・pit_mathの物理設定/検査・recover_profile・kselftest に限定し、物理計算自体は実clock/reloadを使う。論理消費者のPIT_HZ→OS32_TICK_HZ一括置換は不要。`tools/tests/gfinit_budget_host.c:169,210-211`、`pegc_mode_host.c:1415,1423,1443`、`recover_t2_host.inc:113`、`dep_dir_b_timer_host.c:95` もPIT_HZ=100のままで10倍化を防ぐ。
 `pit_compute` は測定/比較の100と1000を扱う。未知clock/無効周波数を既存のPIT_ERR_CLOCK/HZで返すのは装置仕様の範囲でありソース許可リストではない。
 divisorは最近接整数 `reload=(clk_hz + hz/2)/hz`。1.9968MHz→1997（1000.100160µs、約−100ppm）、2.4576MHz→2458（1000.162760µs、約−163ppm）。
@@ -83,19 +83,9 @@ divisorは最近接整数 `reload=(clk_hz + hz/2)/hz`。1.9968MHz→1997（1000.
 KAPIの意味/配置は維持するため版上げ不要。変更が必要になった場合はsdk/kapi.jsonを正として末尾追加・版上げ・再生成・clean buildを別段にし、生成ファイルを手編集しない。
 
 ## 4. 状態・関数・IRQ手順・周回
-新しい `kernel/time/tick_clock.c` が物理カウント上位/下位と論理位相を所有。既存tick_countの定義はidt.cに残し、更新者だけを集約する。
-```c
-/* tick_clock.h: 内部GNU11、IRQ0/IF=0専用。sampleは同じIF=0内でコピー */
-struct tick_clock_sample { unsigned int lo, hi; };
-int tick_clock_step(unsigned int reload, unsigned int clk_hz); /* 論理tick発生=1 */
-void tick_clock_sample(struct tick_clock_sample *out);
-/* step: ++raw_lo; if (!raw_lo) ++raw_hi;
- * phase += reload * OS32_TICK_HZ;
- * if (phase >= clk_hz) { phase -= clk_hz; ++tick_count; return 1; }
- * return 0;  初期phase=0。対応する2周波数では1IRQで高々1論理tick。 */
-```
+`kernel/time/tick.c` (tick_count の定義の所) が両 arch 共通の tick_clock として物理カウント上位/下位と論理位相を所有し、tick_count を進めるのは `tick_clock_step` だけにする。口・検査・呼び手は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2 が正 (`tick_clock_config(period_num, period_den)` で物理の周期を num/den 秒で受け、step は位相 `phase += num * OS32_TICK_HZ` が den を越えたら論理 tick)。
 1kHzでの論理tickは主に10IRQごと、位相補正時は9IRQ間隔となる。実時間との遅れは物理1周期未満。単純な10分周の−100/−163ppm累積を避ける。
-ASMは既存 `inc tick_count` をstep呼出しへ置換、戻りを保存し、論理tick時のみtimer_handlerを呼ぶ。EOIは全IRQで従来位置、V86_REFLECT 0とv86_tick_and_check_timeoutは論理tick時だけ。
+x86 のASMは既存 `inc tick_count` をstep呼出しへ置換、戻りを保存し、論理tick時のみtimer_handlerを呼ぶ。PowerPC は `arch/ppc/kernel_dec.c` の経過周期の loop で step を呼び、論理tick時のみ tick_dispatch を呼ぶ。EOIは全IRQで従来位置、V86_REFLECT 0とv86_tick_and_check_timeoutは論理tick時だけ。
 これでV86のINT08h反射・#GP予算リセット・300×100の5分・GCAP300の3秒を保つ。例外脱出とIRQ深度の片付けは現在の順を保持し、分岐でEOIを飛ばさない。
 7slotの順・登録/解除・ownerは変えない。FM減衰、PCM停止state、NIC受信budget、GF共有IRQ救済pollは100Hzで継続。全slotの集中最大を測るので平均の間引きで重い1回を隠せない。
 `ktime.c` はIF保存後にp1/count/p2とraw_hi/loを採り、pendingなら**64bitで**raw+1、境界不確定なら既存3回retry。論理tick_countを補間に混ぜない。
@@ -154,8 +144,7 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | kernel/time/pit_math.h | 変12 | 有理周期と表示値の契約 |
 | kernel/time/pit_math.c | 変15 | 100/1000と最近接divisor |
 | kernel/time/pit.c | 変10 | 初期化の要求にPIT_IRQ_HZ、設定値/注記 |
-| kernel/time/tick_clock.h | 新35 | 状態境界、B先行 |
-| kernel/time/tick_clock.c | 新90 | 位相と物理epoch、型確定後 |
+| kernel/time/tick_clock.h・kernel/time/tick.c | 新45・変80 | 両 arch 共通の tick_clock、段 C1 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5) |
 | kernel/time/time_math.h | 変15 | 64bit snapshot引数 |
 | kernel/time/time_math.c | 変40 | 有理周期変換/pending carry、並列可 |
 | kernel/time/ktime.c | 変35 | raw snapshotとfallback時刻の接続、算数後 |

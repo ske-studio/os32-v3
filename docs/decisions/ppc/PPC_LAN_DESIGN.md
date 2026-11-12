@@ -82,7 +82,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - 同期口：TX PREWRITE=各32B dcbst→sync、RX PREREAD=dcbf→sync、POSTREAD=dcbi→sync、POSTWRITE=sync。I/G descriptorはsyncだけ。CPUはNIC所有中にbufferへ触らず、invalidateで他のdirtyデータを失わない。32B幅/PVRはCPU資料で照合してprofile化。BSDのcoherent control/bus_dmamap_sync（O/gem.c:146–175,977–988,1082）を実現するarch providerであり、BSDにこのOS32固定pool配置は無い。
 ### (e,j) core・時計
 - GEM registerはLE32 accessor（PPC lwbrx/stwbrx相当＋eieio、doorbell前sync）、descriptorはLE64をbyte/32bit2語で読み書き。64bit MMIOは禁止。状態所有者はservice、gemは手順内の進捗を持つ。gem_pollはgem_reset.cで有界な状態監視を統括、TX回収はgem_tx.c、RX watchdogはgem_rx.c。prepare/publishも内部cursorでstep化し、完了済みsubstepを再実行しない。異常はOFF/QUARANTINED（印は数値）。
-- TBはTBU/TBL/TBU一致読みによるu64、tb_hzはOF取得値。期限は`ceil(us*tb_hz/1000000)`をu64で計算、now-start差で判定。tickは1kHzの観測のみ、SFS/linkの100Hz時計を渡さない。
+- TBはTBU/TBL/TBU一致読みによるu64、tb_hzはOF取得値。期限は`ceil(us*tb_hz/1000000)`をu64で計算、now-start差で判定。tick_count は論理 10ms (DEC は物理 1kHz、[TICK_ARCH_DESIGN](../time/TICK_ARCH_DESIGN.md)) で観測だけに使い、LAN の期限には使わない。
 - reset/PHY待ちはstep関数のLAN_AGAINで返す。各stepの内部ループは有限、TB期限に加えてpoll回数上限を置く。TB停止も無期限待ちにしない。tick IRQでNICへ入らない。
 |service状態→呼ぶ順（成功で次へ、AGAINなら同状態、負値は停止/隔離）|次状態|
 |---|---|

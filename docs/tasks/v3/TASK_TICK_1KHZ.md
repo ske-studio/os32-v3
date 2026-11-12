@@ -1,6 +1,6 @@
 # TASK_TICK_1KHZ — P3 の 1kHz IRQ0 tick
 
-> 状態: **実装中 (2026-11-08)** — 段 A の計測の道具。実測・採否は未判定。
+> 状態: **実装中 (2026-11-08)** — 段 A の計測の道具。実測・採否は未判定。2026-11-12 に tick_clock を arch に依らない口に直し、段の順を 段 C → 段 P と A2 → 段 L → B14 にした ([TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md))。
 
 ## 0. ユーザー決定 (原文)
 
@@ -9,19 +9,24 @@
 - 設計を回す指示: 「実装はとりあえず良いですが、設計は回してください。」(2026-11-05)
 - 1kHz tick の票を P3 に起こす、実機と NP21/W で割り込み負荷を実測してから (V3_PLAN D16)。
 - 2026-11-09 題目: 「次に詰める設計の題目。推奨は、1kHz tick の次の段と winmm のタイマです。…詰めて」
+- 2026-11-12 (選択「設計を直して共通部分を先に (推奨)」): 1. TICK_1KHZ の設計を、arch に依らない tick_clock の口に直す。2. 段 B の共通部分 (tick_clock) を先に入れる。x86 の物理 1kHz への切り替えは最後。3. PowerPC は decrementer を物理 1kHz に戻し、tick_clock_step で論理 100Hz を作る。
+- 2026-11-12 (問い「10ms をベースに、は (a) 内部と公開の tick は 10ms、割り込みだけ物理 1kHz か、(b) 全部 10ms か」の答え): 「(a) 内部は 10ms、割り込みは 1kHz」。U1 のまま。
+- PM 決定 (2026-11-12): U3 の閾値は今は PowerPC の DEC 1kHz に掛けない。QEMU では論理の rate と raw と TB の照合を受入にし、閾値は G4 実機の段で決める。
 - 2026-11-09 合成器の起こし (11-05 の PIT ワンショットの置き換え、選択): 「1ms ごとの期限照合 (推奨)」 — PC-98 で IRQ に繋がるのは PIT #0 だけで 1kHz の周期と µs 時計に使うため。CS4231 のタイマが使えないときは毎 1ms の IRQ0 で期限を照らすだけ、起こすのは配り点。
 
 ## 1. 詳細設計 (確定) の要約
 
-全文: [TICK_1KHZ_DESIGN](../../decisions/time/TICK_1KHZ_DESIGN.md) (確定の節が本文より優先)。
+全文: [TICK_1KHZ_DESIGN](../../decisions/time/TICK_1KHZ_DESIGN.md) (確定の節が本文より優先)、[TICK_1KHZ_NEXT_DESIGN](../../decisions/time/TICK_1KHZ_NEXT_DESIGN.md)、[TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md) (tick_clock の口と段の順、前 2 つより優先)。
 
 | 段 | 中身 | 状態 |
 |---|---|---|
 | A | 周波数を変える前の実測 (診断像のみ: `tick_probe`、`isr_stub.asm` の計測点、スプラッシュ区間は別集計) | 実装 (計測の道具)。実測は未着手 |
-| A2 | 測定で見つかった NIC など阻害区間の解消 (スプラッシュ区間を除く、削減値は A 実測後) | 未着手 |
+| C | 両 arch 共通の tick_clock (C1: `kernel/time/tick_clock.h`・`tick.c`・SDK の `OS32_TICK_HZ`)、x86 の 100Hz のままの結線 (C2: `isr_stub.asm`・`clock_source.c`)、host 試験 (C3)。C1・C2 は 1 本の枝 | 設計は確定 (2026-11-12)、実装は未着手 |
+| P | PowerPC の B29 の戻し: DEC を物理 1kHz (`PM_DEC_HZ`)、論理 100Hz は tick_clock_step、起動の `dec_rate` (raw と TB)、kboot の試験 (P1〜P3、os32powerpc)。C1 の後、A2 と並列 | 設計は確定 (2026-11-12)、実装は未着手 |
+| A2 | NIC など阻害区間の解消: 計測 a・IRQ0 の予算 b・NE2K の重い所を協調処理へ c (スプラッシュ区間を除く、削減値は A2-a の実測後)。P と並列 | 設計は確定 (2026-11-09)、実装は未着手 |
 | 再測定 | A 再測定とゲート (閾値一式は全文 §2・§7、承認済み) | 未着手 |
-| B | 100Hz 統合: `PIT_IRQ_HZ` の追加・`pit_math`・`tick_clock`・`time_math`・`ktime`・PCM の fallback 時計・復旧の検査 | 未着手。物理既定値の切替は最後 |
-| A2・B・winmm (続き) | 段 A2 (計測 a・IRQ0 の予算 b・NE2K の重い所を協調処理へ c)、段 B の詳細 (二周期・µs 時計・PCM の fallback・100Hz 前提の利用者・合成器の 1ms の期限照合 S1)、GUI の 1ms 再開 (G1・G2)、winmm のタイマ libmmtime (W1〜W8、KAPI の追加なし)。全文 [TICK_1KHZ_NEXT_DESIGN](../../decisions/time/TICK_1KHZ_NEXT_DESIGN.md) | 設計は確定 (2026-11-09)、実装は未着手 |
+| L | x86 の物理 1kHz の準備: `PIT_IRQ_HZ` (B1)・`pit_math` (B5)・µs 時計 (B6・B7')・復旧の検査 (B9〜B10)・周回比較 (B11)・1kHz の結線の試験 (B12)・注記 (B13)・PCM の fallback (B15〜B16)・1000Hz の試験像 (B17)・合成器の 1ms の期限照合 (S1)。GUI の 1ms 再開 (G1・G2) と winmm のタイマ libmmtime (W1〜W8、KAPI の追加なし) は並列 | 設計は確定、実装は未着手 |
+| B14 | x86 の物理の既定値 100→1000 (memmap.h の 1 行)。B17 の像で T1K §7 の全受入の後、PM | 未着手 |
 
 - 入口: 段 A。現時点で合格とは扱わない。
 - PM 決定 (確定の節): 各受入行は無変異の正常対照が exit 0・各変異が exit 1。スプラッシュ中の CTRL+STOP の取りこぼしが 100Hz 像でも出たら、1kHz の採否とは別の既存不具合の票にする。
