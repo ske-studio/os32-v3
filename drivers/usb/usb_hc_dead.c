@@ -15,6 +15,7 @@ void usb_hc_dead(struct usb_hc *hc, u32 why)
         d->state = DEV_DETACHED;
         for (j = 0; j < USB_DEV_IFACE_MAX; ++j) {
             struct usb_iface *iface = &d->ifs[j];
+            iface->attached = 0;
             if (iface->cls && iface->cls->gone) iface->cls->gone(d, iface);
         }
     }

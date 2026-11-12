@@ -31,7 +31,12 @@ static void say(const char *s)
 {
     u32 n = 0;
     while (s[n]) ++n;
-    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
+#if defined(__i386__)
+    u32 syscall = 4;
+    __asm__ volatile("int $0x80" : "+a"(syscall) : "b"(1), "c"(s), "d"(n) : "memory");
+#else
+    (void)s; (void)n;
+#endif
 }
 static void number(u32 v)
 {
@@ -45,6 +50,9 @@ static void number(u32 v)
 static void zero(void *v, u32 n) { u8 *p = v; while (n--) *p++ = 0; }
 static u32 rget(u32 h, u32 off) { return usb_fake_native_rd((u8 *)regs[h] + off); }
 static void rput(u32 h, u32 off, u32 v) { usb_fake_native_wr((u8 *)regs[h] + off, v); }
+#ifdef USB_STACK
+static u32 controller_reads[2], controller_writes[2];
+#endif
 static int which(const volatile void *p)
 {
     u32 i;
@@ -86,6 +94,10 @@ static int is_retained(u32 bus)
 u32 mmio_rd32_le(const volatile void *p)
 {
     ++actual_reads;
+#ifdef USB_STACK
+    int h = which(p);
+    if (h >= 0) ++controller_reads[h];
+#endif
     return usb_fake_native_rd(p);
 }
 void mmio_wr32_le(volatile void *p, u32 v)
@@ -95,6 +107,9 @@ void mmio_wr32_le(volatile void *p, u32 v)
     if (h < 0) { bad_dma = 1; return; }
     off = (u32)((volatile u8 *)p - (volatile u8 *)regs[h]);
     ++writes;
+#ifdef USB_STACK
+    ++controller_writes[h];
+#endif
     if (off == OHCI_INTERRUPT_ENABLE && (v & OHCI_INTR_MIE) &&
         hcs[h].state == HC_STARTING) ++early_mie;
     if (off == OHCI_INTERRUPT_STATUS) rput((u32)h, off, rget((u32)h, off) & ~v);
@@ -108,7 +123,13 @@ void mmio_wr32_le(volatile void *p, u32 v)
         if (v & OHCI_PORT_CCS) { if (!no_pes) old &= ~OHCI_PORT_PES; }
         if (v & OHCI_PORT_PES) old |= OHCI_PORT_PES;
         if (v & OHCI_PORT_PPS) old |= OHCI_PORT_PPS;
-        if (v & OHCI_PORT_PRS) old |= OHCI_PORT_PRS;
+        if (v & OHCI_PORT_PRS) {
+#ifdef USB_STACK
+            old |= OHCI_PORT_PES | (1u << USB_C_PORT_RESET);
+#else
+            old |= OHCI_PORT_PRS;
+#endif
+        }
         rput((u32)h, off, old);
     } else {
         rput((u32)h, off, v);
@@ -259,9 +280,17 @@ static void frame_begin(u32 h)
         fetch_list(dma_le32_get(&a->interrupt[rget(h, OHCI_FM_NUMBER) & 31u]));
     }
 }
+#ifdef USB_STACK
+/* Device model sees only hardware ED flags, SETUP bytes and DMA bus ranges.
+ * Negative means NAK; otherwise return transferred bytes (including short). */
+static int stack_td(u32 h, u32 ed_flags, u32 td_flags, u32 bus, u32 len);
+#endif
 static void frame_end(u32 h)
 {
-    u32 i, ordinal = 0;
+    u32 i;
+#ifndef USB_STACK
+    u32 ordinal = 0;
+#endif
     /* Stop writes retire the fetched list; software state alone cannot. */
     if ((rget(h, OHCI_CONTROL) & OHCI_CTL_HCFS_MASK) != OHCI_CTL_OPERATIONAL ||
         (rget(h, OHCI_COMMAND_STATUS) & OHCI_CMD_HCR)) held_count = 0;
@@ -277,7 +306,15 @@ static void frame_end(u32 h)
             u32 f = dma_le32_get(&td->flags), cbp = dma_le32_get(&td->cbp);
             u32 be = dma_le32_get(&td->be), next = dma_le32_get(&td->nexttd);
             u32 len = cbp ? be - cbp + 1u : 0, cc = 0;
+#ifndef USB_STACK
             int setup = (f & (3u << 19)) == 0;
+#endif
+#ifdef USB_STACK
+            int got = stack_td(h, dma_le32_get(&ed->flags), f, cbp, len);
+            if (got < 0) break;
+            cbp = (u32)got < len ? cbp + (u32)got : 0;
+            if (cbp && !(f & OHCI_TD_ROUND)) cc = OHCI_CC_DATA_UNDERRUN;
+#else
             ++ordinal;
             if (!len && !setup) { ++status_count; cc = event_status_cc; }
             if (ordinal == event_td) {
@@ -293,6 +330,7 @@ static void frame_end(u32 h)
                 data_bytes += done;
                 for (u32 j = 0; j < done; ++j) *(u8 *)bus_va(start + j) = 0x5a;
             }
+#endif
             for (u32 page = 0; page < NPAGES; ++page)
                 if (bus >= page_bus(page) && bus - page_bus(page) < PAGE &&
                     page_state[page] == 2) bad_dma = 1;
@@ -323,6 +361,7 @@ static void frame_end(u32 h)
 }
 static void frame(u32 h) { frame_begin(h); frame_end(h); }
 
+#ifndef USB_STACK
 /* Minimal 1C stand-ins. They maintain core-owned active/notification/delay
  * state through the exact fixed API. Integration with real 1C is a PM gate. */
 int usb_xfer_start(struct usb_xfer *x)
@@ -472,7 +511,13 @@ static void transfer(u8 type, u32 len, u32 at, u32 cc, u32 got, int shrt,
     u32 i;
     fresh(); REQUIRE(ohci_start(&hcs[0]) == 0);
     init_x(&x, &d, type, len, shrt);
-    REQUIRE(ohci_xfer_alloc(&hcs[0], &x) == 0);
+    /* ep0 is allocated without a buffer, then borrows a request buffer. */
+    if (type == USB_EP_CONTROL) {
+        struct usb_dma borrowed = x.buf;
+        zero(&x.buf, sizeof(x.buf));
+        REQUIRE(ohci_xfer_alloc(&hcs[0], &x) == 0);
+        x.buf = borrowed;
+    } else REQUIRE(ohci_xfer_alloc(&hcs[0], &x) == 0);
     REQUIRE(usb_xfer_start(&x) == 0);
     event_td = at; event_cc = cc; event_len = got; event_status_cc = status_cc;
     for (i = 0; i < 4 && !notifications; ++i) { frame(0); service(&hcs[0]); }
@@ -622,3 +667,5 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failure) : "memory");
     __builtin_unreachable();
 }
+
+#endif /* !USB_STACK */

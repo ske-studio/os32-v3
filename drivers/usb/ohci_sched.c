@@ -34,7 +34,7 @@ int ohci_xfer_alloc(struct usb_hc *hc, struct usb_xfer *x)
     if (x->pipe.type != USB_EP_CONTROL && x->pipe.type != USB_EP_INTERRUPT &&
         x->pipe.type != USB_EP_BULK) return -USB_E_INVAL;
     if (control && x->buf.size > USB_CFG_MAX) return -USB_E_INVAL;
-    n = control ? (x->buf.size ? 3u : 2u) :
+    n = control ? 3u :
         (x->buf.size ? ((x->buf.bus & (USB_DMA_PAGE_SIZE - 1u)) +
                        x->buf.size + USB_DMA_PAGE_SIZE - 1u) / USB_DMA_PAGE_SIZE : 1u);
     if (n > USB_DMA_BLOCK_MAX / USB_DMA_SETS) return -USB_E_NOMEM;

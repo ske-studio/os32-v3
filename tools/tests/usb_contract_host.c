@@ -34,7 +34,8 @@ STATIC_ASSERT(OHCI_FMI_FI(0xffff2edfu) == 0x2edfu &&
               OHCI_TD_CC(0x9abcdef0u) == 9, ohci_extract);
 /* Runtime checks use known device bytes independently of the accessor pair:
  * inverse but equally broken get/put implementations must not pass. */
-static int run(void)
+int usb_contract_run(void);
+int usb_contract_run(void)
 {
     const u32 values[] = { 0, 1, 0x12345678u, 0x80000000u, 0xffffffffu };
     struct ohci_ed_hw ed;
@@ -60,9 +61,13 @@ static int run(void)
 }
 
 /* No libc: exit through the i386 Linux syscall, as tick_probe_host.c. */
+/* x86 only: the PPC cross compile is -c of the accessors and run(). */
+#if defined(__i386__)
 void _start(void)
 {
-    int r = run();
+    int r = usb_contract_run();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(r));
     for (;;) {}
 }
+
+#endif /* __i386__ */
