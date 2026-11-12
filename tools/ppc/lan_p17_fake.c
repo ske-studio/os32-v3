@@ -59,8 +59,31 @@ static int main_test(void)
     int r = gem_mif_init(&g);
     if (f.first_frame != (0x60020000U | (0U << 23) | (2U << 18))) fail("H:frame");
     if (c == 15 && f.tb_calls > 3000000U) fail("H:spin");
+    if (c >= 30) {
+        if (r != GEM_OK) fail("H:unknown-init");
+        f.regs[9] = 0x1b00; /* master configuration plus both gigabit modes */
+        if (c == 31) f.regs[1] &= ~0x100U;
+        if (c == 32) f.regs[9] = 0xffff;
+        r = gem_phy_step(&g, 0);
+        if (r != GEM_AGAIN) fail("H:gigabit-start");
+        if (c == 31 || c == 32) {
+            if (f.writes) fail("H:gigabit-unavailable");
+            return 0;
+        }
+        if (f.writes != 3 || f.log_reg[0] != 9 || f.log_val[0] != 0x1800)
+            fail("H:gigabit-advertise");
+        if (f.log_reg[1] != 4 || f.log_val[1] != 0x1e1 ||
+            f.log_reg[2] != 0 || f.log_val[2] != 0x1200) fail("H:gigabit-restart");
+        /* Negotiation completes at 100FD. Further polls must not restart it. */
+        f.order = 3; f.bad_order = 0; f.regs[0] = 0x1000;
+        for (u32 n = 0; n < 3; ++n)
+            if (gem_phy_step(&g, n + 1) != GEM_OK || f.writes != 3)
+                fail("H:gigabit-complete");
+        return 0;
+    }
     if (c >= 23) {
         if (r != GEM_OK) fail("H:unknown-init");
+        g.phy_step = 2; /* sample the already negotiated standard registers */
         f.order = 3; f.regs[0] = 0x1000; f.regs[4] = 0x101;
         f.regs[9] = f.regs[10] = 0;
         if (c == 24) f.latch = 1;

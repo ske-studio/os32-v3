@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RH2 product capture/clock/PCI ordering and read-only unknown PHY, ILP32."""
+"""RH2 product capture/clock/PCI ordering and standard unknown PHY, ILP32."""
 import os
 from pathlib import Path
 import subprocess
@@ -56,10 +56,14 @@ def main():
         assert tree.count(anchor) == 1
         approved = tree.replace(anchor, 'static const char clock_model[] = "fixture,QuickSilver";')
         tree_case(approved, range(26, 33))
-        for case in range(23, 30):
+        for case in range(23, 33):
             phy_case(phy, case)
         print('GREEN RH2: empty/unknown/QEMU/model/reg gates; native clock -> PCI -> Master clear; snapshot; unknown PHY 10/100/1000/latch/no writes', flush=True)
         if '--mutate' in sys.argv:
+            old = 'v & ~GTCR_1000_ADV'
+            assert phy.count(old) == 1
+            phy_case(phy.replace(old, 'v'), 30, 'H:gigabit-advertise')
+            print('RED gigabit advertisement: REACHED host H:gigabit-advertise exit=1', flush=True)
             old = 'if (!((n == (int)len || (n == (int)len + 1 && !prop[len])) &&\n          !kstrncmp((char *)prop, clock_model, len)))'
             assert approved.count(old) == 1
             tree_case(approved.replace(old, 'if (n < 0)'), [27], True)

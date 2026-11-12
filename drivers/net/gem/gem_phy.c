@@ -17,6 +17,8 @@
 #define BMSR_LINK 0x0004
 #define ANAR_CSMA 0x0001
 #define ANAR_TX_FD 0x0100
+#define ANAR_10_100 0x01e0
+#define GTCR_1000_ADV 0x0300
 #define PHY_POLLS 1000000U
 
 enum { PHY_START, PHY_RESET_WAIT, PHY_AN_WAIT, PHY_DONE };
@@ -108,7 +110,7 @@ int gem_mif_init(struct gem *g)
 }
 
 /* NetBSD sys/dev/mii/ukphy_subr.c:68-119: current BMSR, BMCR and
- * intersection of advertisements. Unknown PHYs receive no MII writes. */
+ * intersection of advertisements. Sampling performs no MII writes. */
 int gem_phy_sample(struct gem *g, struct gem_phy_sample *out)
 {
     if (!out || !valid_id(g)) return GEM_EUNSUPPORTED;
@@ -155,6 +157,21 @@ int gem_phy_step(struct gem *g, unsigned long long now)
     int r;
     if (!valid_id(g)) return GEM_EUNSUPPORTED;
     if (!supported(g->phy_id1, g->phy_id2)) {
+        /* OpenBSD mii_physubr.c:80-123,148-178 and brgphy.c:726-743:
+         * keep the standard advertisement within the MAC's 10/100 limit.
+         * Preserve GTCR's unrelated bits; no vendor-specific PHY writes. */
+        if (g->phy_step == PHY_START) {
+            r = rd(g, g->phy_addr, BMSR, &status); if (r) return r;
+            if ((status & BMSR_EXTSTAT) &&
+                rd(g, g->phy_addr, GTCR, &v) == GEM_OK && v != 0xffff) {
+                r = wr(g, GTCR, v & ~GTCR_1000_ADV); if (r) return r; /* RH_PHY_LIMIT_GIGABIT */
+                r = wr(g, ANAR, ANAR_CSMA | ANAR_10_100); if (r) return r;
+                r = wr(g, BMCR, (BMCR_AUTOEN | BMCR_STARTNEG)); if (r) return r;
+                next(g, PHY_AN_WAIT, now);
+                return GEM_AGAIN;
+            }
+            next(g, PHY_AN_WAIT, now);
+        }
         struct gem_phy_sample sample;
         r = gem_phy_sample(g, &sample);
         if (r) return r;
