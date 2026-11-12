@@ -24,6 +24,7 @@
 #include "arch_cpu.h"
 #include "paging.h"
 #include "rh_observe.h"
+#include "drivers/net/gem/gem.h"
 #include "memory_boot.h"
 #include "pgalloc.h"
 #include "kmalloc.h"
@@ -147,6 +148,13 @@ static int wait_until(volatile u32 *value, u32 target, u32 tb_hz, u32 ms)
     return 1;
 }
 
+/* RH2: show the sampled PHY ID on the FB band (real G4 PHY unknown until sampled). */
+static void rh_phy_notify(const struct gem_phy_sample *p, int rc)
+{
+    (void)rc;
+    pm_rh_phy(p->port, p->addr, p->id1, p->id2);
+}
+
 void ppc_kernel_main(void)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
@@ -172,10 +180,11 @@ void ppc_kernel_main(void)
     /* Common mm: allocator/ledger, shared region, kernel heap (x86 order of
      * memory_boot_init -> shm_init; kmalloc is independent of both). */
     lan_boot = info->gmac;
+    pm_lan_phy_observer(rh_phy_notify);
     if (dev->gmac_ready) {
         struct pm_pci pci = {dev->pci_addr_va, dev->pci_data_va,
                              lan_boot.bus_first, lan_boot.bus_last, lan_boot.bdf};
-        pm_gmac_quiesce_setup(&lan_boot, &pci);
+        (void)pm_gmac_quiesce_setup_rh(&lan_boot, &pci, dev->clock_va);
         if (pm_gmac_early_quiesce() < 0) kboot_stop("gmac_quiesce");
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
