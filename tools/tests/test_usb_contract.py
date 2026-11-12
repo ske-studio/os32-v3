@@ -45,6 +45,9 @@ def check(mutate):
         ppc = Path(os.environ.get('USB_PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
         for cc, arch in [(str(cross / 'bin/i386-elf-gcc'), 'x86'),
                          (str(ppc / 'bin/powerpc-elf-gcc'), 'ppc'), ('gcc', 'x86')]:
+            if arch == 'ppc' and not Path(cc).is_file():
+                print('SKIP compile:', cc, 'not present (CI has no PPC toolchain)')
+                continue
             extra = ['-m32'] if cc == 'gcc' else []
             command([cc, *flags, *extra, '-Iarch/' + arch, '-O2', '-c', src,
                  '-o', str(tmp / (arch + '-' + Path(cc).name + '.o'))])
