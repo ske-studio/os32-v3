@@ -38,7 +38,7 @@ void usb_class_tick(u32 now)
             if (!d || d->state == DEV_DETACHED) continue;
             for (i = 0; i < USB_DEV_IFACE_MAX; i++) {
                 struct usb_iface *f = &d->ifs[i];
-                if (f->cls && f->cls->tick) f->cls->tick(d, f, now);
+                if (f->attached && f->sc && f->cls && f->cls->tick) f->cls->tick(d, f, now);
                 if (r->hc->state != HC_RUNNING) break;
             }
             if (r->hc->state != HC_RUNNING) break;

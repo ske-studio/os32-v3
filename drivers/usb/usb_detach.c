@@ -16,6 +16,7 @@ int usb_free_device_step(struct usb_dev *d)
     case FD_D1:
         if (c->iface == USB_DEV_IFACE_MAX) { c->step = FD_D2; return 0; }
         f = &d->ifs[c->iface];
+        f->attached = 0;
         if (f->cls) {
             if (!c->child_port) { f->cls->detach(d, f); c->child_port = 1; }
             if (!usb_class_unsetup_done(d, f)) return 0;

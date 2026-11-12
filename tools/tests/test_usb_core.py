@@ -36,7 +36,7 @@ def build(tmp, swap=False, mutation=None):
     command(['gcc', *FLAGS, *(['-DUSB_TEST_SWAP'] if swap else []), *paths,
              'tools/tests/usb_fake_dev.c', '-o', str(exe)])
     return exe
-def execute(exe, cases=range(1,32), red=False):
+def execute(exe, cases=range(1,35), red=False):
     failures=[]
     for case in cases:
         p=host32.run([str(exe),str(case)],capture_output=True,timeout=20)
@@ -46,7 +46,16 @@ def execute(exe, cases=range(1,32), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
- ('usb_req','if (usb_busy) return -USB_E_CTX;', 'if (0) return -USB_E_CTX;'),
+ ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->sc && f->cls && f->cls->tick'),
+ ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->attached && f->cls && f->cls->tick'),
+ ('usb_enum','f->attached = 1;', 'f->attached = 0;'),
+ ('usb_detach','f->attached = 0;', 'f->attached = 1;'),
+ ('usb_req','u32 flags = usbp_irq_save();','u32 flags = 0;'),
+ ('usb_req','x->deadline_ms = 0;', 'x->deadline_ms = 1;'),
+ ('usb_req','? 0 : -USB_E_INVAL;', '? 0 : -USB_E_HC;'),
+ ('usb_xfer','if ((u16)(hc->ops->frame(hc) - x->unsetup_frame) < USB_DMA_DELAY_FRAMES)', 'if (0)'),
+ ('usb_enum','if (!usb_class_unsetup_done(d, f)) return 0;', 'if (0) return 0;'),
+ ('usb_req','if (usb_busy) { usbp_irq_restore(flags); return -USB_E_CTX; }', 'if (0) { usbp_irq_restore(flags); return -USB_E_CTX; }'),
  ('usb_cfgparse','if (!valid) { d->ifs[current].num = 255; current = -1; }', 'if (!valid && 0) { d->ifs[current].num = 255; current = -1; }'),
 
  ('usb_explore','if (!usb_port_op(w, USB_RH_STATUS)) return; /* fresh after free */', '(void)w;'),
@@ -75,7 +84,7 @@ MUTATIONS = [
  ('usb_xfer','x->did_dma_delay = 0;', 'x->did_dma_delay = 1;'),
  ('usb_xfer','x->did_dma_delay = 1; x->state = XS_DMA_DELAY;', 'x->did_dma_delay = 1; x->state = XS_CB_PENDING;'),
  ('usb_service','if (hc->state != HC_RUNNING) continue; /* delay fault */', 'if (0) continue;'),
- ('usb_req','if (x->dev->hc->state == HC_DEAD) return -USB_E_HC;', 'if (x->dev->hc->state == HC_DEAD) return 0;'),
+ ('usb_req','if (x->dev->hc->state == HC_DEAD) { rc = -USB_E_HC; break; }', 'if (x->dev->hc->state == HC_DEAD) { rc = 0; break; }'),
  ('usb_hub','usb_free_device_begin(s->free_child);', 'return 1;'),
 ]
 def main(mutate):

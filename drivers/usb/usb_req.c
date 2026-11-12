@@ -91,13 +91,19 @@ void usb_ctrl_cancel_owner(struct usb_dev *d, struct usb_iface *owner)
 int usb_xfer_sync(struct usb_xfer *x, u32 timeout_ms)
 {
     int rc;
-    if (usb_busy) return -USB_E_CTX;
+    u32 flags = usbp_irq_save();
+    if (usb_busy) { usbp_irq_restore(flags); return -USB_E_CTX; }
     x->deadline_ms = usbp_ms() + timeout_ms;
     rc = usb_xfer_start(x);
-    if (rc < 0) return rc;
-    for (;;) {
-        if (x->dev->hc->state == HC_DEAD) return -USB_E_HC;
-        if (usb_xfer_drained(x)) return x->error ? -(int)x->error : 0;
+    usbp_irq_restore(flags);
+    if (rc >= 0) for (;;) {
+        if (x->dev->hc->state == HC_DEAD) { rc = -USB_E_HC; break; }
+        if (usb_xfer_drained(x)) {
+            rc = (x->error == USB_X_OK || (x->error == USB_X_SHORT && x->short_ok)) ? 0 : -USB_E_INVAL;
+            break;
+        }
         usb_service();
     }
+    x->deadline_ms = 0;
+    return rc;
 }

@@ -27,7 +27,8 @@ struct fake_xp { u32 entered, held[2]; u8 linked; };
 static struct usb_hc hc;
 static struct usb_dev direct;
 static struct usb_xfer *pending_at_deadline;
-static u32 free_at_frame, swap_on_reset;
+static u32 free_at_frame, swap_on_reset, irq_disabled, sync_probe, forced_error;
+static u32 ticks, attach_pending, failure_notified;
 void *kmemset(void *p, int v, u32 n) { u8 *b = p; while (n--) *b++ = v; return p; }
 void *kmemcpy(void *p, const void *s, u32 n) { u8 *b = p; const u8 *a = s; while (n--) *b++ = *a++; return p; }
 void *usbp_mem_alloc(u32 n)
@@ -61,8 +62,8 @@ void usb_dmamem_free(struct usb_hc *h, struct usb_dma *d)
 void usbp_dma_sync(struct usb_dma *d, u32 off, u32 len, int dir)
 { REQUIRE(off <= d->size && len <= d->size - off); (void)dir; }
 u32 usbp_ms(void) { return now; }
-u32 usbp_irq_save(void) { return 0; }
-void usbp_irq_restore(u32 f) { (void)f; }
+u32 usbp_irq_save(void) { u32 old=irq_disabled; irq_disabled=1; return old; }
+void usbp_irq_restore(u32 f) { irq_disabled=f; }
 void usbp_log(const char *fmt, ...) { (void)fmt; }
 void usbp_input_release(int kind, u8 src) { (void)kind; (void)src; }
 static struct node *node_for(struct usb_dev *d)
@@ -120,10 +121,11 @@ static int fake_enter(struct usb_hc *h, struct usb_xfer *x)
 {
     struct fake_xp *p=x->hcpriv;
     REQUIRE(h->state==HC_RUNNING); REQUIRE(frame >= p->held[x->curr_set]);
+    if(sync_probe) REQUIRE(irq_disabled && x->deadline_ms==now+100);
     p->linked=1; p->entered=now; p->held[x->curr_set]=frame+2; return 0;
 }
 static void fake_close(struct usb_hc *h, struct usb_xfer *x)
-{ struct fake_xp *p=x->hcpriv; REQUIRE(h->state==HC_RUNNING); p->linked=0; }
+{ struct fake_xp *p=x->hcpriv; REQUIRE(h->state==HC_RUNNING); p->linked=0; p->held[x->curr_set]=frame+2; }
 static void configuration(struct node *n, u8 *b, u32 len)
 {
     u32 total=n->total ? n->total : n->kind==3 ? 59 : 34;
@@ -190,7 +192,7 @@ static void fake_scan(struct usb_hc *h, u32 budget)
         struct usb_xfer *next=x->next;
         struct fake_xp *p=x->hcpriv;
         if (x->state==XS_ACTIVE && p->linked && p->entered<now && x->pipe.type==USB_EP_CONTROL) {
-            x->actual=0; x->error=USB_X_OK; execute_control(x); fake_close(h,x); usb_xfer_notify(x);
+            x->actual=0; x->error=USB_X_OK; execute_control(x); if(forced_error)x->error=forced_error; fake_close(h,x); usb_xfer_notify(x);
         }
         x=next;
     }
@@ -203,10 +205,11 @@ void usb_hc_dead(struct usb_hc *h, u32 why)
     for(u32 a=1;a<=USB_DEV_MAX;a++)if(h->devices[a])
         for(u32 i=0;i<USB_DEV_IFACE_MAX;i++) {
             struct usb_iface *f=&h->devices[a]->ifs[i];
+            f->attached=0;
             if(f->cls)f->cls->gone(h->devices[a],f);
         }
 }
-struct class_sc { struct usb_xfer x; u32 attempts; u8 started; };
+struct class_sc { struct usb_xfer x; struct usb_dma ctrlbuf; u32 attempts; u8 started, failing; };
 static int class_match(struct usb_dev *d, struct usb_iface *f)
 {
     for(u32 off=0;off+9<=d->cfg_len;off+=d->cfg[off]) {
@@ -229,28 +232,52 @@ static void owner_done(struct usb_ctrl_req *r)
 static void restart_done(struct usb_xfer *x) { callbacks++; if(callbacks==1)REQUIRE(usb_xfer_start(x)==0); }
 static void class_detach(struct usb_dev *d, struct usb_iface *f)
 {
-    struct class_sc *s=f->sc; detached++;
+    struct class_sc *s=f->sc; REQUIRE(!f->attached); detached++;
     if(s && s->x.open)usb_xfer_unsetup_begin(&s->x);
     usb_ctrl_cancel_owner(d,f);
 }
+static void failed_owner_done(struct usb_ctrl_req *r)
+{ REQUIRE(r->owner && r->owner->sc); failure_notified++; }
 static int class_attach(struct usb_dev *d, struct usb_iface *f)
 {
     struct class_sc *s=f->sc;
     u8 ep[]={7,5,0x81,3,8,0,10};
     if(!s) { s=usbp_mem_alloc(sizeof(*s));f->sc=s; }
-    if(s->attempts++<busy_attach)return -USB_E_BUSY;
-    if(fail_attach && f->num==1) { if(fail_attach==2)node_for(d)->conn=0; class_detach(d,f);return -USB_E_INVAL; }
+    if(s->attempts++<busy_attach){attach_pending++;return -USB_E_BUSY;}
+
     if(!s->started) {
         if(usb_xfer_setup(d,f,ep,64,&s->x)<0)return -USB_E_NOMEM;
         s->x.len=8;s->x.done=class_done;s->started=1;
-        REQUIRE(usb_xfer_start(&s->x)==0);attached++;
+        REQUIRE(usb_xfer_start(&s->x)==0);
+        if(fail_attach && f->num==1) {
+            struct usb_setup req={0};
+            s->failing=1;
+            REQUIRE(usb_dmamem_alloc(d->hc,64,16,&s->ctrlbuf)==0);
+            req.type=USB_DIR_IN;req.request=USB_REQ_GET_DESCRIPTOR;
+            le16_wr(req.value,USB_DESC_DEVICE<<8);le16_wr(req.length,18);
+            REQUIRE(usb_ctrl_async(d,f,&req,&s->ctrlbuf,0,failed_owner_done,0)==0);
+            if(fail_attach==2)node_for(d)->conn=0;
+            class_detach(d,f);return -USB_E_INVAL;
+        }
+        attached++;
     }
     return 0;
 }
 static void class_release(struct usb_dev *d, struct usb_iface *f)
-{ (void)d;released++;usbp_mem_free(f->sc);f->sc=0; }
+{
+    struct class_sc *s=f->sc;
+    REQUIRE(!f->attached && usb_class_unsetup_done(d,f));
+    if(s->failing) { REQUIRE(failure_notified==1);usb_dmamem_free(d->hc,&s->ctrlbuf); }
+    released++;usbp_mem_free(f->sc);f->sc=0;
+}
 static void class_gone(struct usb_dev *d, struct usb_iface *f) { (void)d;(void)f;gone++; }
-const struct usb_class hid_kbd_class={class_match,class_attach,class_detach,class_gone,0,class_release};
+static void class_tick(struct usb_dev *d, struct usb_iface *f, u32 ms)
+{
+    struct class_sc *s=f->sc;(void)d;(void)ms;
+    REQUIRE(f->attached && s && s->started && !s->failing && s->x.open);
+    ticks++;
+}
+const struct usb_class hid_kbd_class={class_match,class_attach,class_detach,class_gone,class_tick,class_release};
 static int never_match(struct usb_dev *d, struct usb_iface *f) { (void)d;(void)f;return 0; }
 const struct usb_class hid_mouse_class={never_match,0,0,0,0,0};
 static void pump(u32 n) { while(n-- && !failed)usb_service(); }
@@ -302,7 +329,7 @@ static int scenario(int c)
         struct usb_xfer x;u8 ep[]={7,5,0x81,3,8,0,10};
         direct.hc=&hc;direct.ep0_mps=8;
         REQUIRE(usb_xfer_setup(&direct,0,ep,64,&x)==0);x.len=8;inject=now+5;
-        REQUIRE(usb_xfer_sync(&x,100)==-USB_E_HC && x.dev==&direct && x.hcpriv);
+        REQUIRE(usb_xfer_sync(&x,100)==-USB_E_HC && x.dev==&direct && x.hcpriv && !x.deadline_ms);
     } else if(c==10) { /* F8r: descriptor fallback and re-enumeration. */
         plug(0,1);nodes[0].desc_fail=4;pump(1600);REQUIRE(devices()==1 && attached==1 && nodes[0].resets>=2);
     } else if(c==11) { /* F8l malformed descriptor boundary: no class. */
@@ -376,6 +403,34 @@ static int scenario(int c)
         struct usb_hc second={0};second.ops=&ops;second.state=HC_RUNNING;
         REQUIRE(usb_hc_register(&second)==0);inject=now+2;pump(20);u32 old=frame;pump(20);
         REQUIRE(hc.state==HC_DEAD && second.state==HC_RUNNING && frame>old);
+    } else if(c==32) { /* F9x: normal completion followed immediately by unsetup. */
+        struct usb_xfer x;direct.hc=&hc;direct.ep0_mps=8;direct.addr=1;
+        nodes[0].conn=1;nodes[0].addr=1;now=frame=100;
+        REQUIRE(usb_xfer_setup(&direct,0,0,0,&x)==0);
+        x.setup.request=USB_REQ_GET_CONFIGURATION;
+        REQUIRE(usb_xfer_start(&x)==0);pump(1);REQUIRE(usb_xfer_drained(&x));
+        u32 completed=frame;
+        usb_xfer_unsetup_begin(&x);usb_xfer_unsetup_step(&x);
+        REQUIRE(!usb_xfer_unsetup_done(&x));pump(1);REQUIRE(!usb_xfer_unsetup_done(&x));
+        pump(1);REQUIRE(usb_xfer_unsetup_done(&x) && free_at_frame>=completed+2);
+    } else if(c==33) { /* Sync errors, IRQ exclusion and deadline cleanup. */
+        struct usb_xfer x;direct.hc=&hc;direct.ep0_mps=8;direct.addr=1;
+        nodes[0].conn=1;nodes[0].addr=1;now=frame=100;
+        REQUIRE(usb_xfer_setup(&direct,0,0,0,&x)==0);x.setup.request=USB_REQ_GET_CONFIGURATION;
+        i8 errors[]={USB_X_OK,USB_X_SHORT,USB_X_SHORT,USB_X_STALL,USB_X_TIMEOUT,USB_X_SHORT_NG};
+        for(u32 i=0;i<6;i++) {
+            forced_error=errors[i];x.short_ok=(i==2);sync_probe=1;
+            REQUIRE(usb_xfer_sync(&x,100)==((i==0 || i==2)?0:-USB_E_INVAL));
+            REQUIRE(x.error==errors[i] && !x.deadline_ms && !irq_disabled);pump(2);
+        }
+        x.open=0;REQUIRE(usb_xfer_sync(&x,100)==-USB_E_BUSY && !x.deadline_ms);
+    } else if(c==34) { /* Tick gates: BUSY, failed, teardown and NULL sc. */
+        plug(0,3);busy_attach=10;fail_attach=1;pump(1000);
+        REQUIRE(attach_pending && ticks && failure_notified==1 && released==1);
+        struct usb_iface *f=&hc.root_child[0]->ifs[0];void *saved=f->sc;u32 old=ticks;
+        f->sc=0;usb_class_tick(now);REQUIRE(ticks==old);f->sc=saved;
+        nodes[0].conn=0;nodes[0].connect_change=1;hc.needs_explore=1;pump(300);
+        REQUIRE(devices()==0 && released==2);
     } else return 2;
     return failed;
 }

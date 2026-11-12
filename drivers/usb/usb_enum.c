@@ -167,6 +167,7 @@ int usb_enum_step(struct usb_walk *w)
                 return 0;
             }
             if (w->attach_failed) {
+                f->attached = 0;
                 if (!usb_class_unsetup_done(d, f)) return 0;
                 if (f->cls->release) f->cls->release(d, f);
                 f->cls = 0; f->sc = 0; w->attach_failed = 2; return 0;
@@ -179,6 +180,7 @@ int usb_enum_step(struct usb_walk *w)
             rc = f->cls->attach(d, f);
             if (rc == -USB_E_BUSY) return 0;
             if (rc < 0) { w->attach_failed = 1; return 0; }
+            f->attached = 1;
             w->iface++; return 0;
         }
     default: return 0;

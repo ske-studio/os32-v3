@@ -125,7 +125,7 @@ struct usb_hc {
     struct usb_explore explore;
     struct usb_dma dma[USB_HC_DMA_MAX];
 };
-struct usb_iface { u8 num, alt, src; const struct usb_class *cls; void *sc; };
+struct usb_iface { u8 num, alt, src; u8 attached; /* attach succeeded; clear before teardown/gone. */ const struct usb_class *cls; void *sc; };
 struct usb_free_ctx { u8 step, iface, child_port; };
 struct usb_dev {
     struct usb_hc *hc;
@@ -182,7 +182,9 @@ int usb_dmamem_init(struct usb_hc *hc);
 int usb_dmamem_alloc(struct usb_hc *hc, u32 size, u32 align, struct usb_dma *out);
 void usb_dmamem_free(struct usb_hc *hc, struct usb_dma *d);
 /* Foreground only: -USB_E_CTX when usb_busy (inside usb_service, the USB tick or
- * a done callback). Single task: no other tick calls it, so no platform query. */
+ * a done callback). Single task: no other tick calls it, so no platform query.
+ * Returns 0 for OK/allowed SHORT, -USB_E_HC for HC_DEAD, and -USB_E_INVAL
+ * for transfer errors (details in x->error); start errors propagate. */
 int usb_xfer_sync(struct usb_xfer *x, u32 timeout_ms);
 void usb_explore_step(struct usb_hc *hc);
 void usb_free_device_begin(struct usb_dev *);
