@@ -77,7 +77,7 @@ def case_check_fn(tmp):
     exe = tmp / "os32x-layout"
     r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
              "-D__cdecl=",
-             "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
+             "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"), "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "sdk/include/os32"),
              str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(exe)])
     check(r.returncode == 0, "ホスト GNU11 -Werror でコンパイルできる")
     if r.returncode != 0:
@@ -88,7 +88,7 @@ def case_check_fn(tmp):
     check(r.returncode == 0, "os32x_layout_host が全部通る")
     old_exe = tmp / "os32x-layout-old-shlib"
     r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
-             "-DOS32_TEST_OLD_SHLIB", "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"),
+             "-DOS32_TEST_OLD_SHLIB", "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "include"), "-I" + str(ROOT / "arch/x86"),
              "-I" + str(ROOT / "sdk/include/os32"),
              str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(old_exe)])
     check(r.returncode == 0, "旧 shlib protocol 1 の同じ loader 判定を組める")
@@ -99,7 +99,7 @@ def case_check_fn(tmp):
     r = run([TCC, "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-O2", "-Wall", "-Wextra", "-Werror",
              "-D__KERNEL_BUILD__",
-             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
+             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "sdk/include/os32"),
              "-I" + str(ROOT / "exec"),
              "-c", str(ROOT / "exec/os32x_hdr.c"), "-o", str(tmp / "os32x_hdr.o")])
     check(r.returncode == 0, "カーネルと同じ i386-elf-gcc -Werror でも通る")

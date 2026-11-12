@@ -1,6 +1,7 @@
 /* D35: reject incompatible images before entry or AS allocation. */
 #include "os32x_hdr.h"
 #include "endian_le.h"
+#include "arch_exec_image.h"
 
 int os32x_decode(OS32Header *h, const u8 *wire, u32 len)
 {
@@ -32,7 +33,7 @@ int os32x_layout_check(const OS32Header *hdr, u32 read_len, u32 kernel_off)
     if (!hdr || read_len < OS32X_HDR_SIZE) return OS32X_LAYOUT_SHORT;
     if (hdr->magic != OS32X_MAGIC || hdr->version != OS32X_HDR_VERSION ||
         hdr->header_size != OS32X_HDR_SIZE || (hdr->flags & ~known) ||
-        (hdr->flags & OS32X_FLAG_PPC32))
+        !arch_exec_image_accept(hdr->flags))
         return OS32X_LAYOUT_OLD;
     if (hdr->kapi_data_off != kernel_off ||
         hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION ||
