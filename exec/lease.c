@@ -5,6 +5,7 @@
 #include "shlib.h"
 /* Private SURFACE leases and the v70 single-surface USER entry. */
 #include "lease.h"
+#include "paging_app.h"
 #include "kselftest_probe.h"
 #include "kstring.h"
 #include "io.h"
@@ -373,16 +374,19 @@ int lease_audit_all(void)
 {
     u32 refs[LEDGER_MAX_SURFACES] = {0};
     unsigned int flags;
-    u32 cr3;
+    u32 cr3, paging_ops, ledger_ops;
     int bad = 0;
     if (legacy_lowmap_busy()) return -1;
     if (kctx_irq_depth || kctx_exc_depth) return 1;
-    /* Normal context has no scheduling/reclamation point here. IRQ handlers
-     * cannot change AS/lease ownership. Restore IF and CR3 between ASes. */
+    /* IRQs cannot change AS, lease, surface or CR3: mapping entry points
+     * reject and count IRQ attempts. Check the counters around the scan. */
+    flags = irq_save();
+    paging_ops = paging_irq_ops;
+    ledger_ops = ledger_irq_ops;
+    irq_restore(flags);
     for (int id = APP_ID_SHELL; id <= APP_ID_MAX; id++) {
         AppSlot *a = appslot_at(id);
         if (!a || !a->as || !a->as->pd_phys) continue;
-        flags = irq_save();
         cr3 = paging_current_cr3();
         paging_load_cr3(paging_kernel_pd_phys());
         bad += paging_as_audit(a->as, shlib_read_page) != 0;
@@ -393,8 +397,10 @@ int lease_audit_all(void)
             if (l->token && l->sid < LEDGER_MAX_SURFACES) refs[l->sid]++;
         }
         paging_load_cr3(cr3);
-        irq_restore(flags);
     }
+    flags = irq_save();
+    if (paging_ops != paging_irq_ops || ledger_ops != ledger_irq_ops) bad++;
+    irq_restore(flags);
     /* Alias/descriptor reads need no root switch or long IRQ exclusion. */
     for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
         const struct ledger_surface *sf = exec_surface_at(i);

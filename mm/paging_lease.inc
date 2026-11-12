@@ -4,10 +4,13 @@
 /* Shared root/normal-context predicate; lease_context adds PT checks. */
 int paging_lease_root_context(const struct addrspace *as)
 {
+    /* Even read-only queries such as paging_lease_pte count here in IRQ;
+     * callers must not invoke them from IRQ context. */
+    if (kctx_irq_depth || kctx_exc_depth) { paging_irq_ops++; return 0; }
     return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&
         pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
         (paging_current_cr3() == paging_kernel_pd_phys() ||
-         paging_current_cr3() == as->pd_phys) && !kctx_irq_depth && !kctx_exc_depth;
+         paging_current_cr3() == as->pd_phys);
 }
 
 static int lease_context(const struct addrspace *as)

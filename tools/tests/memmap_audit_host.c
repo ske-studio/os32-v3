@@ -4,6 +4,7 @@ unsigned int host_arch_if = 0x202U;
 #define HOST_SERIAL_CUSTOM
 #define run e4_run
 #include "gfx_kernel_fb_host.c"
+#include "paging_app.h"
 #define LEASE_SELFTEST_AS (&space)
 #include "lease_selftest_host.h"
 #undef run
@@ -28,10 +29,18 @@ char *kstrncpy(char *d, const char *s, u32 n)
 #include "system_surface.h"
 #include "shlib.h"
 int host_map_fail;
-static u32 scan_total[2], scan_interval[2], scan_max[2];
-static int inject_ledger_op;
+static u32 scan_total[2], scan_interval[2], scan_max[2], lease_scan_total;
+static int inject_ledger_op, audit_probe, audit_if_seen[2], inject_paging_op;
 void host_scan(int kind)
 {
+    if (kind == 4) { lease_scan_total++; kind = 0; }
+    if (kind >= 2) {
+        if (audit_probe) {
+            audit_if_seen[kind - 2] = !!(host_arch_if & 0x200U);
+            if (inject_paging_op) { paging_irq_ops++; inject_paging_op = 0; }
+        }
+        return;
+    }
     scan_total[kind]++;
     if (!(host_arch_if & 0x200U)) scan_interval[kind]++;
     if (kind == 1 && inject_ledger_op) {
@@ -51,6 +60,7 @@ void host_irq_end(unsigned int flags)
 static void reset_scans(void)
 {
     for (int i = 0; i < 2; i++) scan_total[i] = scan_interval[i] = scan_max[i] = 0;
+    lease_scan_total = 0;
 }
 /* GF lifetime design §2 / A1,A2: synthetic DISPLAY, BAR2, push and two
  * separate views. Use real M1 registration and real PTEs; M2/production
@@ -272,7 +282,18 @@ static void run(void)
     SAY("PASS AS-launch SQLite guard: SLACK boundaries/interior/high pool; unexpected NP/attributes/frame rejected");
     reset_scans();
     CHECK(!lease_audit_all());
-    CHECK(scan_max[0] == PTE_COUNT); /* empty AS has only the mandatory lease PT */
+    CHECK(scan_max[0] == 0);
+    audit_probe = 1; audit_if_seen[0] = audit_if_seen[1] = 0;
+    CHECK(!lease_audit_all());
+    CHECK(audit_if_seen[0] && audit_if_seen[1]);
+    inject_paging_op = 1; CHECK(lease_audit_all() > 0);
+    audit_probe = 0;
+    u32 paging_before = paging_irq_ops;
+    kctx_irq_depth = 1; CHECK(!paging_lease_root_context(&space)); kctx_irq_depth = 0;
+    CHECK(paging_irq_ops == paging_before + 1);
+    paging_before = paging_irq_ops;
+    kctx_exc_depth = 1; CHECK(!paging_lease_root_context(&space)); kctx_exc_depth = 0;
+    CHECK(paging_irq_ops == paging_before + 1);
     /* Exercise all allocated PTs, including unexpected PTEs outside a lease. */
     u32 *allpd = P2V(space.pd_phys);
     for (u32 i = 0; i < MEM_APP_BAND_MAX_PDES; i++) {
@@ -287,11 +308,11 @@ static void run(void)
         kmemset(P2V(space.lease_pt_phys[i]), 0, PAGE_SIZE);
         allpd[(MEM_LEASE_BASE >> 22)+i] = space.lease_pt_phys[i] | PAGE_RW | PTE_USER;
     }
-    host_slots[3].as = &space; /* second AS scan must get a distinct IRQ interval */
+    host_slots[3].as = &space; /* exercise two AS scans */
     reset_scans();
     CHECK(!lease_audit_all());
-    CHECK(scan_max[0] == 98304U);
-    CHECK(scan_max[0] == (MEM_APP_BAND_MAX_PDES + MEM_LEASE_ALLOC_PDES) * PTE_COUNT);
+    CHECK(scan_max[0] == 0);
+    CHECK(lease_scan_total == 2 * MEM_LEASE_ALLOC_PDES * PTE_COUNT);
     host_slots[3].as = 0;
     u32 *tail = P2V(space.lease_pt_phys[MEM_LEASE_ALLOC_PDES-1]);
     tail[PTE_COUNT-1] = PAGE_RO | PTE_USER;
