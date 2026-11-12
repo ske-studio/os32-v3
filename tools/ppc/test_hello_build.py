@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build the PPC USER acceptance application through its make entry point."""
-CHECK = dict(covers=['build/ppc-user.mk', 'userland/tests/ppc_hello.c', 'userland/tests/ppc_fault.c',
+CHECK = dict(covers=['build/ppc-user.mk', 'userland/ppc/hello.c', 'userland/ppc/fault.c',
                      'tools/ppc/test_hello_build.py'],
-             inputs=['Makefile', 'build/**', 'sdk/**', 'userland/tests/ppc_hello.c', 'userland/tests/ppc_fault.c',
+             inputs=['Makefile', 'build/**', 'sdk/**', 'userland/ppc/hello.c', 'userland/ppc/fault.c',
                      'tools/ppc/test_hello_build.py'])
 from pathlib import Path
 import shutil
@@ -45,9 +45,9 @@ def main():
         shutil.copy(ROOT / 'Makefile', root)
         shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out'))
         shutil.copytree(ROOT / 'sdk', root / 'sdk')
-        (root / 'userland/tests').mkdir(parents=True)
+        (root / 'userland/ppc').mkdir(parents=True)
         for app in ('hello', 'fault'):
-            shutil.copy(ROOT / f'userland/tests/ppc_{app}.c', root / 'userland/tests')
+            shutil.copy(ROOT / f'userland/ppc/{app}.c', root / 'userland/ppc')
         exercise(root)
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'

@@ -21,7 +21,7 @@ $(PPC_USER_OUT)/crt0.o: sdk/crt/ppc/crt0.S sdk/os32x_hdr.py | $(PPC_USER_OUT)
 $(PPC_USER_OUT)/crt0_c.o: sdk/crt/ppc/start.c | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/tests/ppc_%.c | $(PPC_USER_OUT)
+$(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 $(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py

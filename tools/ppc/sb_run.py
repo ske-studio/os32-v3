@@ -16,11 +16,11 @@ import shell_run
 CHECK = dict(name='ppc-sb', tier=2, budget=900, needs=[],
              covers=['tools/ppc/sb_run.py', 'tools/ppc/shell_run.py',
                      'tools/mkroot_image.py', 'build/ppc-user.mk',
-                     'userland/tests/ppc_fault.c'],
+                     'userland/ppc/fault.c'],
              inputs=['build/ppc-kboot.mk', 'platform/powermac/cli_boot.c',
                      'arch/ppc/kapi_call.c', 'arch/ppc/kernel_trap.c',
                      'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
-                     'tools/ppc/run.py', 'userland/tests/ppc_hello.c'])
+                     'tools/ppc/run.py', 'userland/ppc/hello.c'])
 
 # Substitute only the input device; parsing, exec_run, output and reclamation
 # are the product paths. READY gives the parent time to eject before execution.

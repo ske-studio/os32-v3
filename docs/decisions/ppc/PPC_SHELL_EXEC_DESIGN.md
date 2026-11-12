@@ -329,7 +329,7 @@ make ARCH=ppc PLATFORM=powermac hello
 |B30|PPC exec 初期化 TU：既存サービス初期化の接続|B18・B22・B24・F15|不変|
 |B31|`build/ppc-kboot.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
 |B32|resident CLI の `.h/.c`＋`cli_boot.c`：run callback|S-A・B31|共・不変|
-|B33|`userland/tests/ppc_hello.c`：受入アプリ|B28|不変|
+|B33|`userland/ppc/hello.c`：受入アプリ|B28|不変|
 |B34|PPC root image 入力：hello 同梱|B33|不変|
 |B35|PPC S-B runner：最小通し試験|B32・B34|不変|
 |B36|`docs/09_exec.md`：ABI・終了値|統合後|共・不変|
