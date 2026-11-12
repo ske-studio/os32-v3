@@ -51,7 +51,7 @@ TARGET_USER = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-O2",
                "-Wall", "-Wextra", "-Werror",
-               "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
+               "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Iarch/x86", "-Isdk/include",
                "-Isdk/include/os32", "-Iuserland/lib",
                "-I" + str(CROSS_DIR / "i386-elf/include")]
 
