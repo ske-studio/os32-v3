@@ -103,6 +103,14 @@ def plan_exercise(directory):
         assert 'ISO 9660 level 1' in str(exc)
     else:
         raise AssertionError('non-ISO name accepted')
+    for bad in ('ABCDEFGH.ABC/X.BIN', 'ABCDEFGHI/X.BIN', 'BIN/ABCDEFGHI.BIN', 'BIN/A.BINX'):
+        try:
+            mod.check_collision(bad, set())
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('non-ISO name accepted: ' + bad)
+    mod.check_collision('ABCDEFGH/ABCDEFGH.ABC', set())
     assert mod.fd_free_bytes('2hd', 0, 0) > 64 * 1024
     assert mod.fd_free_bytes('144', 0, 0) > 64 * 1024
     out = directory / 'plan.iso'
@@ -165,9 +173,9 @@ def main():
             except ValueError:
                 raise AssertionError('collision mutant failed to mutate')
             print('RED runtime: collision survived (1)')
-            anchor = '        if not _D_NAME.fullmatch(part):'
+            anchor = '    if not _D_NAME.fullmatch(leaf):'
             assert source.count(anchor) == 1
-            mutant.write_text(source.replace(anchor, '        if False:'))
+            mutant.write_text(source.replace(anchor, '    if False:'))
             spec = importlib.util.spec_from_file_location('mutant_root2', mutant)
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
