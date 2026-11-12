@@ -3,6 +3,9 @@
 #include "drivers/net/gem/gem.h"
 #include "arch/ppc/kernel_boot.h"
 #include "kprintf.h"
+#if KBOOT_SH
+#include "hostfs.h"
+#endif
 
 enum service_state { OFF = 0, RESETTING = 1, PREPARE = 2, PUBLISH = 3,
                      PHY_WAIT = 4, RUNNING = 5, QUARANTINED = 6 };
@@ -10,7 +13,11 @@ static struct {
     enum service_state state;
     struct gem g;
     const struct pm_gmac_boot *boot;
+#if KBOOT_SH
+    u8 tx[14 + PLN1_HEADER_BYTES + PLN1_FS_FRAME_MAX], rx[1514];
+#else
     u8 tx[14 + PLN1_HEADER_BYTES + PLN1_PAYLOAD_MAX], rx[1514];
+#endif
     struct lan_message response;
     u8 response_dst[6], enabling;
     u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops;
@@ -42,6 +49,26 @@ static int send(const u8 *dst, const struct lan_message *m)
     if (pm_lan_encode(s.tx + 14, sizeof(s.tx) - 14, m, &used)) return GEM_EINVAL;
     return gem_tx(&s.g, s.tx, used + 14);
 }
+#if KBOOT_SH
+int pm_lan_fs_running(void) { return s.state == RUNNING; }
+int pm_lan_fs_send(const u8 *frame, u32 len)
+{
+    struct lan_header h = {.type = PLN1_FS_REQ, .payload_bytes = (u16)len};
+    const u8 *dst;
+    u32 used;
+    int r;
+    if (!pm_lan_fs_running()) return LAN_ENODEV;
+    dst = pm_hfs_peer();
+    if (!dst) dst = s.boot->peer_mac;
+    copy(s.tx, dst, 6); copy(s.tx + 6, s.boot->mac, 6);
+    s.tx[12] = PLN1_ETHERTYPE >> 8; s.tx[13] = PLN1_ETHERTYPE & 255;
+    copy(h.boot_id, s.boot->boot_id, 16);
+    r = pm_lan_encode_payload(s.tx + 14, sizeof(s.tx) - 14, &h, frame, len, &used);
+    if (r) return r;
+    r = gem_tx(&s.g, s.tx, used + 14);
+    return r == GEM_AGAIN ? LAN_EBUSY : r;
+}
+#endif
 static int beacon(u64 now)
 {
     struct lan_message m = {0};
@@ -103,6 +130,15 @@ static int receive(void)
     for (u32 i = 0; i < 6; ++i) nonzero |= s.rx[6 + i];
     if (!nonzero || (s.rx[6] & 1)) return GEM_OK;
     if (s.rx[12] != (PLN1_ETHERTYPE >> 8) || s.rx[13] != (PLN1_ETHERTYPE & 255)) return GEM_OK;
+#if KBOOT_SH
+    struct lan_header h;
+    if (pm_lan_decode_header(s.rx + 14, n - 14, &h) ||
+        !same(h.boot_id, s.boot->boot_id, 16)) return GEM_OK;
+    if (h.type >= PLN1_FS_OPEN) {
+        pm_hfs_receive(&h, s.rx + 6, s.rx + 14 + PLN1_HEADER_BYTES);
+        return GEM_OK;
+    }
+#endif
     if (pm_lan_decode(s.rx + 14, n - 14, &req) ||
         !same(req.boot_id, s.boot->boot_id, 16)) return GEM_OK;
     if (req.type == PLN1_TERM_OPEN || req.type == PLN1_TERM_IN) {
@@ -132,6 +168,9 @@ int pm_lan_start(const struct pm_gmac_boot *boot)
         off(LAN_ENODEV); return LAN_ENODEV;
     }
     s.boot = boot;
+#if KBOOT_SH
+    pm_hfs_bind_peer(boot->peer_mac);
+#endif
     r = pm_lan_gem_io(boot, &s.g.io);
     if (r != LAN_OK) { off(r); return r; }
     gem_enter_reset(&s.g); s.state = RESETTING;

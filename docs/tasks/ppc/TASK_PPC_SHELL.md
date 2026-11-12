@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-12)** — S-C (W7) は QEMU で受入に到達し main (2d102e30)、W6 の共通部品は main (170723d0)。PC-98 の FD 側は本線、W8 は詳細設計を確定、W9 は [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に記録。
+> 状態: **実装中 (2026-11-12)** — S-C (W7) は QEMU で受入に到達し main (2d102e30)、W6 の共通部品は main (170723d0)。PC-98 の FD 側は本線、W8 (S-D) は QEMU で受入に到達し取り込み待ち (枝 wt/ppc-w8e)、W9 は [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に記録。
 
 ## 0. ユーザー決定 (2026-11-11)
 
@@ -40,5 +40,5 @@
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
 | W7 (S-C、既存のシェルを USER の sh.bin として起動) | 済 (QEMU、sc_run.py、7450・7455 の LAN)。設計は [PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md) |
 | W6 (PC-98 の FD 起動から共通の RAM root) | 計画確定 (2026-11-12、[PPC_RAM_ROOT_W6_PLAN](../../decisions/ppc/PPC_RAM_ROOT_W6_PLAN.md))。**ユーザー決定 (2026-11-12): 案 B** (kernel は ISO の中に 1 回だけ)。共通の部品の段 C1〜C4 は PowerPC 側が先に出す、PC-98 の FD 側の段は本線が起こす |
-| W8 (書ける媒体の後 mount、S-D) | 詳細設計は確定 (2026-11-12、[PPC_SHELL_W8_DESIGN](../../decisions/ppc/PPC_SHELL_W8_DESIGN.md))。PowerPC は LAN の `/host` (既存の SerialFS を PLN1 に載せる)、共通の場所は変えない。PC-98 の側は本線 |
+| W8 (書ける媒体の後 mount、S-D) | **QEMU で受入 (2026-11-12)**、取り込み待ち (枝 wt/ppc-w8e)。設計 [PPC_SHELL_W8_DESIGN](../../decisions/ppc/PPC_SHELL_W8_DESIGN.md)。PowerPC は LAN の `/host` (既存の SerialFS を PLN1 に載せる)。段 A (wire)・C (ホスト)・B (SfsIo・割り込みの深さ)・D (観測・結線)・E (受入 `tools/ppc/sd_run.py`、7450・7455 PASS、変異 2 件 RED)。共通の場所の変更は fs/serialfs/sfs_proto.h の SFS_TICK_MS=10u だけ (本線 PM 了承)。G4 実機は後追い。PC-98 の側は本線 |
 | W9 (立ち上げの順) | 済 ([ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md)) |

@@ -35,6 +35,7 @@
 #if KBOOT_SH
 #include "shell_boot.h"
 #include "input_boot.h"
+#include "hostfs.h"
 #else
 #include "cli_boot.h"
 #endif
@@ -298,6 +299,7 @@ void ppc_kernel_main(void)
     pm_root_image(&img);
     if (pm_root_boot(&img) == 0) {
 #if KBOOT_SH
+        (void)pm_hostfs_boot(info->tb_hz);
         pm_input_boot();
 #endif
         pm_exec_boot();

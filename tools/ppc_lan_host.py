@@ -13,6 +13,7 @@ import time
 import termios
 import tty
 
+
 MAGIC = 0x504c4e31
 VERSION = 1
 ETHERTYPE = 0x88b6
@@ -20,6 +21,8 @@ HEADER_BYTES = 80
 PAYLOAD_MAX = 256
 BEACON, LOG, REQ, RSP = 1, 2, 3, 4
 TERM_OPEN, TERM_IN, TERM_OUT, TERM_STATE = 5, 6, 7, 8
+FS_OPEN, FS_REQ, FS_RSP = 9, 10, 11
+FS_FRAME_MAX = 1044
 STATUS, CLOCK, MEMORY, READ_DIAG, PEEK = 1, 2, 3, 4, 5
 STATUS_NAMES = ('OK', 'UNSUPPORTED', 'BAD_LENGTH', 'RANGE', 'CONFLICT', 'STALE', 'BUSY', 'FAULT')
 HEADER = struct.Struct('!IBBH16sQQQIHHHHI16s')
@@ -34,8 +37,10 @@ def mac(text):
 
 def encode(kind, boot, *, seq=0, drop_records=0, drop_bytes=0, request_id=0,
            opcode=0, status=0, flags=0, nonce=bytes(16), payload=b''):
-    if kind not in (BEACON, LOG, REQ, RSP, TERM_OPEN, TERM_IN, TERM_OUT, TERM_STATE) or len(payload) > PAYLOAD_MAX:
+    if kind not in range(1, 12) or len(payload) > (FS_FRAME_MAX if kind in (FS_REQ, FS_RSP) else PAYLOAD_MAX):
         raise ValueError('invalid message')
+    if kind >= FS_OPEN and (seq or drop_records or drop_bytes or request_id or opcode or status or flags or (kind == FS_OPEN and payload)):
+        raise ValueError('invalid FS fields')
     if kind in (BEACON, LOG) and nonce != bytes(16):
         raise ValueError('unexpected nonce')
     return HEADER.pack(MAGIC, VERSION, kind, HEADER_BYTES, boot, seq,
@@ -49,9 +54,11 @@ def decode(data):
     (magic, version, kind, header, boot, seq, records, dropped, request_id,
      opcode, status, size, flags, reserved, nonce) = HEADER.unpack_from(data)
     if (magic != MAGIC or version != VERSION or header != HEADER_BYTES or
-            kind not in (BEACON, LOG, REQ, RSP, TERM_OPEN, TERM_IN, TERM_OUT, TERM_STATE) or reserved or size > PAYLOAD_MAX or
+            kind not in range(1, 12) or reserved or size > (FS_FRAME_MAX if kind in (FS_REQ, FS_RSP) else PAYLOAD_MAX) or
             size > len(data) - HEADER_BYTES):
         raise ValueError('invalid header')
+    if kind >= FS_OPEN and (seq or records or dropped or request_id or opcode or status or flags or (kind == FS_OPEN and size)):
+        raise ValueError('invalid FS fields')
     # A PLN1 header alone exceeds the minimum Ethernet payload, so no padding is due.
     if len(data) != HEADER_BYTES + size:
         raise ValueError('extra bytes')
@@ -104,7 +111,7 @@ class Packet:
 
 
 class Host:
-    def __init__(self, io, peer, out, boot=None, *, nonce=None, clock=time.monotonic, output=print):
+    def __init__(self, io, peer, out, boot=None, *, nonce=None, clock=time.monotonic, output=print, root=None, allow_write=()):
         self.io, self.peer, self.out = io, peer, pathlib.Path(out)
         self.out.mkdir(parents=True, exist_ok=True)
         self.boot, self.constraint = None, boot
@@ -115,6 +122,13 @@ class Host:
         self.max_next_seq = 0
         self.seen = set()
         self.generation = 0
+        self.retired = set()
+        self.terminal = None
+        self.fs = None
+        if root is not None:
+            import ppc_hostfs
+            self.fs = ppc_hostfs.HostFS(root, allow_write, io.local_mac, peer)
+        self.fs_nonce = secrets.token_bytes(16)
 
     def receive(self, frame):
         if len(frame) < 14 or frame[6:12] != self.peer or frame[12:14] != struct.pack('!H', ETHERTYPE):
@@ -125,7 +139,7 @@ class Host:
             return
         if m['kind'] in (LOG, BEACON) and frame[:6] not in (self.io.local_mac, b'\xff' * 6):
             return
-        if m['kind'] == RSP and frame[:6] != self.io.local_mac:
+        if m['kind'] in (RSP, FS_REQ) and frame[:6] != self.io.local_mac:
             return
         boot = m['boot']
         if self.constraint is not None and boot != self.constraint:
@@ -135,6 +149,16 @@ class Host:
                 return
             self.boot = boot
         if boot != self.boot:
+            if m['kind'] != BEACON or boot in self.retired:
+                return
+            self.retired.add(self.boot)
+            self.boot = boot
+            self.reset_boot()
+        if m['kind'] == FS_REQ:
+            if self.fs is not None:
+                response = self.fs.handle_complete_sfs(m['payload'], frame[6:12])
+                if response is not None:
+                    self.send_fs(FS_RSP, response)
             return
         if m['kind'] == RSP:
             pending = self.pending.get(m['request_id'])
@@ -167,18 +191,40 @@ class Host:
         elif seq < self.max_next_seq:
             self.output('possible restart: sequence rollback')
             self.generation += 1
+            if self.fs is not None:
+                self.fs.reset()
             self.high = None
             self.max_next_seq = 0
             self.seen.clear()
         elif seq > (0 if self.high is None else self.high + 1):
             self.output(f'beacon gap: {seq - (0 if self.high is None else self.high + 1)}')
         if m['kind'] == BEACON:
+            if self.fs is not None:
+                self.send_fs(FS_OPEN)
             self.max_next_seq = max(self.max_next_seq, seq)
         self.output(f"{('beacon' if m['kind'] == BEACON else 'log')} seq={seq} drop_records={m['drop_records']} drop_bytes={m['drop_bytes']}; loss after last frame unknown until next beacon")
         metadata = dict(seq=seq, drop_records=m['drop_records'], drop_bytes=m['drop_bytes'],
                         time=time.time(), kind='beacon' if m['kind'] == BEACON else 'log')
         with (self.storage(boot) / (boot.hex() + '.jsonl')).open('a', encoding='utf-8') as f:
             f.write(json.dumps(metadata) + '\n')
+
+    def send_fs(self, kind, payload=b''):
+        message = encode(kind, self.boot, nonce=self.fs_nonce, payload=payload)
+        self.io.send(self.peer + self.io.local_mac + struct.pack('!H', ETHERTYPE) + message)
+
+    def reset_boot(self):
+        self.pending.clear()
+        self.next_id = 1
+        self.high = None
+        self.max_next_seq = 0
+        self.seen.clear()
+        self.generation = 0
+        self.nonce = secrets.token_bytes(16)
+        self.fs_nonce = secrets.token_bytes(16)
+        if self.fs is not None:
+            self.fs.reset()
+        if self.terminal is not None:
+            self.terminal.open()
 
     def storage(self, boot):
         if not self.generation:
@@ -323,6 +369,7 @@ class InputLines:
 
 def terminal_loop(host, stdin):
     terminal = Terminal(host)
+    host.terminal = terminal
     saved = termios.tcgetattr(stdin) if os.isatty(stdin) else None
     try:
         if saved is not None:
@@ -332,10 +379,8 @@ def terminal_loop(host, stdin):
             ready, _, _ = select.select([host.io, stdin], [], [], 0.1)
             if host.io in ready:
                 frame = host.io.receive()
-                if host.boot is None:
-                    host.receive(frame)
-                else:
-                    terminal.receive(frame)
+                host.receive(frame)
+                terminal.receive(frame)
                 if host.boot is not None and not opened:
                     terminal.open()
                     opened = True
@@ -361,6 +406,8 @@ def main():
     parser.add_argument('--out', required=True)
     parser.add_argument('--boot-id')
     parser.add_argument('--terminal', action='store_true')
+    parser.add_argument('--root')
+    parser.add_argument('--allow-write', action='append', default=[])
     args = parser.parse_args()
     try:
         peer = mac(args.peer)
@@ -368,7 +415,7 @@ def main():
         if boot is not None and len(boot) != 16:
             raise ValueError('boot-id must be 16 bytes')
         io = UDP(args.udp, mac(args.mac)) if args.udp else Packet(args.iface)
-        host = Host(io, peer, args.out, boot, output=(lambda text: print(text, file=sys.stderr)) if args.terminal else print)
+        host = Host(io, peer, args.out, boot, output=(lambda text: print(text, file=sys.stderr)) if args.terminal else print, root=args.root, allow_write=args.allow_write)
         stdin = sys.stdin.fileno()
         if args.terminal:
             return terminal_loop(host, stdin)

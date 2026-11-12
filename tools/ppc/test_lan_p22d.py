@@ -10,7 +10,7 @@ SOURCE=ROOT/'arch/ppc/kernel_trap.c'
 def check(s, expected=0):
     with tempfile.TemporaryDirectory() as d:
         p=Path(d); (p/'trap.c').write_text(s)
-        subprocess.run(['gcc','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-std=gnu11','-O2','-Wall','-Wextra','-Werror','-DPPC_TRAP_HOST_TEST','-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'include'),'-I'+str(ROOT),str(p/'trap.c'),str(ROOT/'arch/ppc/pd_walk.c'),str(ROOT/'tools/ppc/test_lan_p22d_host.c'),'-o',str(p/'host')],check=True)
+        subprocess.run(['gcc','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-std=gnu11','-O2','-Wall','-Wextra','-Werror','-DPPC_TRAP_HOST_TEST','-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'include'),'-I'+str(ROOT),'-I'+str(ROOT/'platform/powermac'),str(p/'trap.c'),str(ROOT/'arch/ppc/pd_walk.c'),str(ROOT/'tools/ppc/test_lan_p22d_host.c'),'-o',str(p/'host')],check=True)
         result=subprocess.run(['qemu-i386',str(p/'host')],capture_output=True)
         assert result.returncode==expected, (expected,result.returncode,result.stdout)
         if expected: assert result.stdout[-4:]==expected.to_bytes(4,'little'), 'missing reach marker'

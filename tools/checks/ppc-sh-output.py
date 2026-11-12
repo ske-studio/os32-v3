@@ -1,6 +1,6 @@
 """Register the PowerPC fd1 stream acceptance."""
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=['make:all'],
-             covers=['build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c',
+             covers=['tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c',
                      'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
