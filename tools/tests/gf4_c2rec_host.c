@@ -5,12 +5,13 @@
  * GF_PRODUCTION_MODULE, -m32 -nostdlib -ffunction-sections/--gc-sections.
  * A2 owns registration. No new service API or F4 operation is stubbed.
  * Oracle: MIT nouveau c03c1a1 nouveau_drm.c:944-1027, fifo/uchan.c:272-298;
- * DPMS bits/order independently from dispnv04/crtc.c:198-233, hw.h:238-240.
+ * Suspend leaves DPMS registers untouched (nouveau_display_fini).
  * Reservation identity and publication predicates are OS32 X1-X4/N2/N3. */
 #define GF3_CINT_C2
 #include "gf_accel_c1_host.c"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
+#include "../../hwdev/gf/display/hw_state.h"
 
 /* Rebooted fixture storage needs the real F5 binding before stop retires
  * tiles (GF_GUARD_LIFETIME_DESIGN section 4). No thermal policy is faked. */
@@ -41,13 +42,10 @@ static u32 stage_clocks;
 static enum { STAGE_NORMAL, OBJECTS_CLOCK_FAIL, OBJECTS_EXPIRE,
               RESTORE_CLOCK_FAIL, RESTORE_EXPIRE, RESTORE_FENCE_EXPIRE } stage_fault;
 /* Hardware oracle, not values read from the product. crtc.c:198-233. */
-#define T_SCREEN_OFF 0x20U
 #define T_CLOCK 1U
 #define T_MODE 0x17U
 #define T_SYNC 0x1aU
-#define T_CRTC_ENABLE 0x80U
-#define T_SYNC_MASK 0xc0U
-#define T_SETTLE_US 10000U
+#define T_DACCLK 0x68052cU
 #define T_DIAGNOSTIC_PATTERN 0xa5U /* caller-owned saved-image sentinel */
 /* nvreg.h:129-153,433-437: VGA and display alias range boundaries. */
 #define T_DISPLAY_BASE 0x600000U
@@ -219,6 +217,7 @@ static void retained(void)
 static void recover_setup(enum gf3_fmt fmt)
 {
     cint_reset();
+    gf4_hw_state_reset();
     gf2_host_memset(&state,0,sizeof(state));
     gf4_host_init(&host,&state);
     host.events=events; host.cevents=sizeof(events)/sizeof(events[0]);
@@ -309,6 +308,12 @@ static void finish(void)
     assert(cint_prod.chan.state==GF2_OFF && !registry.head && !views);
     cint_no_resources();
 }
+static u32 dacclk(u32 head)
+{
+    u32 value=0,off=T_DACCLK+head*GF4_HOST_STRIDE;
+    for (u32 b=0;b<4U;++b) value|=gf4_host_reg_byte(&host,0,off+b)<<(b*8U);
+    return value;
+}
 static void test_suspend_restart(void)
 {
     const enum gf3_fmt formats[]={GF3_INDEX8,GF3_RGB565,GF3_XRGB8888};
@@ -316,6 +321,15 @@ static void test_suspend_restart(void)
         recover_setup(formats[f]);
         u32 epoch=cint_prod.chan.epoch;
         host.ctx.saved_closed=true;
+        u8 sr[GF4_HEADS],mode[GF4_HEADS],sync[GF4_HEADS];
+        u32 dac[GF4_HEADS];
+        u8 cr_index[GF4_HEADS],sr_index[GF4_HEADS];
+        for (u32 h=0;h<GF4_HEADS;++h) {
+            sr[h]=host.sr[h][T_CLOCK]; mode[h]=host.cr[h][T_MODE];
+            sync[h]=host.cr[h][T_SYNC];
+            dac[h]=dacclk(h);
+            cr_index[h]=host.index[h][0]; sr_index[h]=host.index[h][1];
+        }
         assert(!gf4_service_suspend(&host.ctx,deadline));
         assert(!cint_prod.accel.ready && !host.ctx.ready && cint_prod.chan.state==GF2_OFF);
         assert(host.ctx.hold_saved.version==GF4_SAVED_VERSION);
@@ -324,13 +338,29 @@ static void test_suspend_restart(void)
         assert(host.ctx.hold_saved.wanted_graph==original_graph);
         assert(host.ctx.hold_saved.wanted_heads==original_heads);
         assert(!gf2_host_memcmp(original,host.ctx.hold_saved.head,sizeof(original)));
-        assert(host.sr[0][T_CLOCK]&T_SCREEN_OFF);
-        assert(host.cr[0][T_MODE]&T_CRTC_ENABLE);
-        assert(!(host.cr[0][T_SYNC]&T_SYNC_MASK));
-        assert(host.local_now>=T_SETTLE_US && !publish_calls);
+        for (u32 h=0;h<GF4_HEADS;++h) {
+            assert(host.sr[h][T_CLOCK]==sr[h] && host.cr[h][T_MODE]==mode[h]);
+            assert(host.cr[h][T_SYNC]==sync[h]);
+            assert(dacclk(h)==dac[h]);
+        }
+        for (u32 i=0;i<host.nevents;++i) {
+            const struct gf4_host_event *e=&host.events[i];
+            if (e->op!=D_WRITE) continue;
+            for (u32 h=0;h<GF4_HEADS;++h) {
+                u32 d=h*GF4_HOST_STRIDE;
+                assert(e->a[1]!=T_DACCLK+d);
+                if (e->a[1]==GF4_HOST_SR+d) sr_index[h]=(u8)e->a[3];
+                if (e->a[1]==GF4_HOST_CR+d) cr_index[h]=(u8)e->a[3];
+                if (e->a[1]==GF4_HOST_SR+d+1U) assert(sr_index[h]!=T_CLOCK);
+                if (e->a[1]==GF4_HOST_CR+d+1U)
+                    assert(cr_index[h]!=T_MODE && cr_index[h]!=T_SYNC);
+            }
+        }
+        assert(!host.calls[D_SLEEP] && !publish_calls);
         assert(cint_owner_stops==1 && !cint_restore_calls);
         retained();
         assert(!gf4_service_restart(&host.ctx,deadline));
+        assert(!gf4_hw_saved_get()->valid);
         assert(cint_prod.chan.epoch==epoch+1U && host.ctx.epoch==cint_prod.chan.epoch);
         assert(cint_prod.accel.ready && host.ctx.ready && !host.ctx.accepting && !cint_slot);
         assert(host.ctx.saved_closed && !publish_calls);
@@ -401,7 +431,7 @@ static void test_fault_recover(void)
 static void test_restore_and_publication_failure(void)
 {
     recover_setup(GF3_INDEX8);
-    gf4_host_fail_at(&host,D_SLEEP,1,T_FAILURE);
+    gf4_host_fail_at(&host,D_WRITE,1,T_FAILURE);
     assert(gf4_service_suspend(&host.ctx,deadline)==T_FAILURE);
     assert(host.ctx.last_rc==T_FAILURE && cint_prod.chan.state==GF2_OFF && !publish_calls);
     retained(); finish();
