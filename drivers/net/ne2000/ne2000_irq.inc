@@ -22,10 +22,10 @@ void ne2k_poll(unsigned int budget)
  *  相方の要因が残ったまま線が上がり続ける)。
  *
  *    IRQ_NONE     : 自分の要因ではない
- *    IRQ_HANDLED  : 要因を落とし、残件も無い
- *    IRQ_DEFERRED : 自分の要因だが残件がある。**装置はマスクしてある** —
- *                   watchdog が印を補い、協調処理 ne2k_bh が回収し、
- *                   回収し終えたら ne2k_imr_sync でマスクを外す。
+ *    IRQ_HANDLED  : 要因を受け付け、IMR は開いている
+ *    IRQ_DEFERRED : 自分の要因で、装置はマスク中。
+ *                   協調処理 ne2k_bh が回収する。RUNNING 中は ACK 後に
+ *                   IMR を開け、送信完了が次の bh を起こせるようにする。
  * ======================================================================== */
 int ne2k_irq_shared(unsigned int irq, void *arg)
 {
@@ -57,7 +57,7 @@ int ne2k_irq_shared(unsigned int irq, void *arg)
 
     /* **判定は imr_written (実 IMR)**。imr_mask は「戻したい値」なので、
      * OVW 復旧待ちや FAILED で 0 を書いた直後でも非 0 のまま = 誤判定になる。 */
-    return (nic.rx_backlog || nic.imr_written == 0) ? IRQ_DEFERRED : IRQ_HANDLED;
+    return nic.imr_written == 0 ? IRQ_DEFERRED : IRQ_HANDLED;
 }
 
 void ne2k_irq_enable(void)
@@ -65,7 +65,7 @@ void ne2k_irq_enable(void)
     if (nic.state == NE2K_STATE_OFF) return;
     nic.imr_mask = NE2K_IMR_MASK;
     nic.irq_on = 1;
-    /* 既着分は印を立てて bh に渡し、残件が無ければ leave が IMR を戻す。 */
+    /* 既着分は印を立てて ACK し、leave が IMR を戻す。 */
     ne2k_poll(NE2K_IRQ_BUDGET);
 }
 

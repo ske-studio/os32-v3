@@ -27,7 +27,7 @@ static void run_entry(unsigned int entry, int reset_fault)
     host_if_mask = 0;
     kctx_irq_depth = entry == 3 ? 0 : 1;
     switch (entry) {
-    case 0: CHECK(ne2k_irq_shared(5, 0) == IRQ_DEFERRED); break;
+    case 0: CHECK(ne2k_irq_shared(5, 0) == IRQ_HANDLED); break;
     case 1: ne2k_timer_tick(); break;
     case 2: case 3: CHECK(net_tx(buffer, 60) == NE2K_OK); break;
     case 4:
@@ -85,6 +85,79 @@ static void queue_capacity(void)
     CHECK(nic.st.tx_ok == NE2K_TXQ_SLOTS && !nic.txq_count && !nic.tx_busy);
 }
 
+static void bounded_work(void)
+{
+    device_init();
+    queue_frames(NE2K_BH_ROUNDS * NE2K_IRQ_BUDGET + 1);
+    ne2k_poll(4);
+    CHECK(!(regs[0][NE2K_P0_ISR] & NE2K_IMR_MASK));
+    CHECK(regs[0][NE2K_P0_IMR] == NE2K_IMR_MASK);
+    u32 before = nic.st.rx_frames + nic.st.rx_dropped;
+    ne2k_bh();
+    CHECK(nic.st.rx_frames + nic.st.rx_dropped - before == NE2K_BH_ROUNDS * NE2K_IRQ_BUDGET);
+    CHECK(nic.rx_backlog && nic.imr_written == NE2K_IMR_MASK);
+    CHECK(!(regs[0][NE2K_P0_ISR] & NE2K_IMR_MASK));
+    CHECK(ne2k_irq_shared(5, 0) == IRQ_HANDLED);
+}
+
+static void pending_causes(void)
+{
+    device_init();
+    sticky_cnt = 1;
+    regs[0][NE2K_P0_ISR] |= NE2K_ISR_CNT;
+    ne2k_poll(4);
+    CHECK(regs[0][NE2K_P0_ISR] & NE2K_ISR_CNT);
+    CHECK(nic.need_rx & NE2K_ISR_CNT);
+    CHECK(nic.imr_written == (NE2K_IMR_MASK & ~NE2K_ISR_CNT));
+    ne2k_bh();
+    CHECK(!sticky_cnt && !(regs[0][NE2K_P0_ISR] & NE2K_ISR_CNT));
+    CHECK(nic.imr_written == NE2K_IMR_MASK);
+    regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW;
+    ne2k_poll(4);
+    CHECK(nic.imr_written == (NE2K_IMR_MASK & ~NE2K_ISR_OVW));
+    ne2k_bh();
+    CHECK(nic.state == NE2K_STATE_OVW_WAIT && nic.imr_written == 0);
+}
+
+static void ovw_recovery_sends(void)
+{
+    device_init();
+    CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW;
+    ne2k_poll(4);
+    ne2k_bh();
+    CHECK(nic.state == NE2K_STATE_OVW_WAIT);
+    unsigned int starts = tx_starts;
+    tick_count += NE2K_OVW_WAIT_TICKS;
+    ne2k_bh();
+    CHECK(nic.state == NE2K_STATE_RUNNING && tx_starts == starts + 1);
+    CHECK(nic.txq_count == 0 && nic.tx_busy);
+}
+
+static void transmit_rounds(void)
+{
+    device_init();
+    instant_tx = 1;
+    for (unsigned int i = 0; i < NE2K_TXQ_SLOTS; i++)
+        CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    unsigned int starts = tx_starts;
+    ne2k_bh();
+    CHECK(tx_starts - starts == NE2K_TXQ_SLOTS && nic.txq_count == 0);
+    instant_tx = 0;
+    device_init();
+    for (unsigned int i = 0; i < NE2K_TXQ_SLOTS; i++)
+        CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    starts = tx_starts;
+    unsigned int old_waits = waits, old_resets = reset_count;
+    ne2k_bh();
+    CHECK(tx_starts - starts == 1 && nic.txq_count == NE2K_TXQ_SLOTS - 1);
+    /* The only wait is the successful DMA of the first frame. */
+    CHECK(waits == old_waits + 1 && reset_count == old_resets);
+    old_waits = waits;
+    ne2k_bh();
+    CHECK(waits == old_waits && reset_count == old_resets && tx_starts - starts == 1);
+}
+
 void _start(void)
 {
     for (unsigned int entry = 0; entry < 5; entry++)
@@ -101,5 +174,9 @@ void _start(void)
     idle_work_run();
     CHECK(nic.state == NE2K_STATE_RUNNING);
     queue_capacity();
+    bounded_work();
+    transmit_rounds();
+    pending_causes();
+    ovw_recovery_sends();
     finish(0);
 }

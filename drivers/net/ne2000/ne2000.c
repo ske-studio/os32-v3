@@ -63,6 +63,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #define NE2K_TX_REINIT_MAX   3      /* 連続タイムアウトでの再初期化上限 */
 #define NE2K_BAD_HDR_MAX     4      /* 連続する不整合ヘッダで再初期化 */
 #define NE2K_OVW_DRAIN_BUDGET 64    /* OVW 復旧時のリング回収上限 (16KB なら十分) */
+#define NE2K_BH_ROUNDS       8      /* 最大 32 受信件で協調処理を他の仕事に戻す */
 #define NE2K_IRQ_BUDGET      4      /* IRQ 1 回 / タイマ補助 1 回で回収する受信フレーム数 (§5) */
 #define NE2K_WATCHDOG_BUDGET 4      /* 100Hz ウォッチドッグ 1 回で回収する上限 (取りこぼし自己回復, M4) */
 #define NE2K_WORK_WATCHDOG  0x80   /* software tag; RST is not in NE2K_IMR_MASK */
@@ -92,7 +93,7 @@ struct ne2k_dev {
                               * (票 TASK_HAL_WIRING §1-1 の R1 / 1-6 の往復 7 B3)。 */
     u8  irq_on;              /* IRQ 駆動 (IDT 登録 + IMR 有効化済み) */
     u8  in_irq;              /* reserved: diagnostic layout compatibility; never context */
-    u8  rx_backlog;          /* 予算を使い切り、リングに未回収が残っている (IMR はマスク中) */
+    u8  rx_backlog;          /* 予算を使い切り、リングに未回収が残っている (bh が回収) */
 
     /* TX */
     u8  tx_busy;
@@ -220,9 +221,11 @@ static void ne2k_leave(void)
         nic.irq_pending = 0;
         mark_work();
     }
+    /* CNT may remain asserted until counters are read; OVW needs recovery.
+     * Mask those pending causes while allowing PTX to wake the next bh. */
     ne2k_imr_sync((nic.irq_on && nic.state == NE2K_STATE_RUNNING &&
-                   !nic.rx_backlog && !nic.need_rx && !nic.need_reinit)
-                  ? nic.imr_mask : 0);
+                   !nic.need_reinit)
+                  ? (u8)(nic.imr_mask & ~(nic.need_rx & (NE2K_ISR_CNT | NE2K_ISR_OVW))) : 0);
     nic.busy = 0;
     irq_restore(f);
 }
@@ -506,6 +509,7 @@ static void diag_dma_test(void)
 static void ne2k_bh(void)
 {
     u32 before;
+    unsigned int round;
     int watchdog;
     if (!wait_allowed()) return;
     if (nic.busy || nic.state == NE2K_STATE_OFF ||
@@ -519,10 +523,19 @@ static void ne2k_bh(void)
         nic.need_reinit = 0;
         reinit_or_fail();
     } else {
-        service(NE2K_IRQ_BUDGET);
+        for (round = 0; round < NE2K_BH_ROUNDS; round++) {
+            u32 rx_before = nic.st.rx_frames + nic.st.rx_dropped;
+            int sent = 0;
+            service(NE2K_IRQ_BUDGET);
+            if (nic.state != NE2K_STATE_RUNNING || nic.need_reinit) break;
+            if (!nic.tx_busy && nic.txq_count) {
+                tx_dequeue();
+                sent = 1;
+            }
+            if (nic.need_reinit || (nic.tx_busy && (rd(NE2K_CR) & NE2K_CR_TXP))) break;
+            if (!sent && rx_before == nic.st.rx_frames + nic.st.rx_dropped) break;
+        }
     }
-    if (nic.state == NE2K_STATE_RUNNING && !nic.tx_busy && nic.txq_count)
-        tx_dequeue();
     nic.need_tx = nic.tx_busy || nic.txq_count;
     if (watchdog) {
         u32 frames = nic.st.rx_frames + nic.st.rx_dropped - before;

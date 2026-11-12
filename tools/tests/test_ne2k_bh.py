@@ -45,8 +45,12 @@ def main():
             print(f'GREEN all IF=0 entries, faults, recovery and TX FIFO ({runner})', flush=True)
         if args.mutate:
             for label, old, new in [
-                ('leave-service', '        mark_work();\n    }\n    ne2k_imr_sync',
-                 '        service(NE2K_IRQ_BUDGET);\n    }\n    ne2k_imr_sync'),
+                ('leave-service', '        mark_work();\n    }\n    /* CNT may remain',
+                 '        service(NE2K_IRQ_BUDGET);\n    }\n    /* CNT may remain'),
+                ('backlog-mask', '!nic.need_reinit)', '!nic.rx_backlog && !nic.need_reinit)'),
+                ('cnt-mask', 'NE2K_ISR_CNT | NE2K_ISR_OVW', 'NE2K_ISR_OVW'),
+                ('one-round', 'round < NE2K_BH_ROUNDS', 'round < 1'),
+                ('unbounded', 'round < NE2K_BH_ROUNDS', '1'),
                 ('obsolete-in-irq', 'if (!eflags_if() || kctx_irq_depth != 0)',
                  'if (!eflags_if() || nic.in_irq)'),
             ]:
