@@ -1,6 +1,6 @@
 # PPC_SHELL_EXEC_DESIGN — PowerPC の最終の到達点 S-B (外部の USER アプリを起動し終了して呼び手へ戻る) の詳細設計
 
-> 状態: **確定 (2026-11-11)** — USER の ABI (入口・sc の syscall・rfi と例外・子だけの終了)、OS32X の LE の wire を BE の CPU で読む直し、命令の公開の cache 同期、KAPI の 8B の stub、PPC の SDK (crt0・link・libgcc を link しない)、既存の exec の経路を PPC でも通すための facade の段 (F01〜F20)。全体の計画と中間 S-A は PPC_SHELL_DESIGN。段の状態は票 TASK_PPC_SHELL が持つ。
+> 状態: **確定 (2026-11-11)・実装済み (2026-11-12、QEMU の受入に到達、末尾に追記 1)** — USER の ABI (入口・sc の syscall・rfi と例外・子だけの終了)、OS32X の LE の wire を BE の CPU で読む直し、命令の公開の cache 同期、KAPI の 8B の stub、PPC の SDK (crt0・link・libgcc を link しない)、既存の exec の経路を PPC でも通すための facade の段 (F01〜F20)。全体の計画と中間 S-A は PPC_SHELL_DESIGN。段の状態は票 TASK_PPC_SHELL が持つ。
 
 > 出所: ~/os32-tmp/run/ppc-shellb/DESIGN.final.md (gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き Approve、PM が N1〜N4 を反映。R4 は PM 決定 (a) = 既存の exec の閉包を facade で切る、本線 PM も賛成)。中身は変えていない。
 
@@ -380,3 +380,20 @@ make ARCH=ppc PLATFORM=powermac hello
 - N2: exec_finish.inc と lease.c に触る段すべてに「HAL v2 の I1 の後の main を基点」。
 - N3: 生成器に触る段は直列、kapi_generated.c は A0 の後を基点。
 - N4: PPC の KAPI_ADDR は platform/powermac の配置の header、memmap.h には触らない。
+
+## 確定の後の追記 1 (2026-11-12、S-B の実装と受入で決めたこと、PM)
+
+S-B の受入は QEMU 7450・7455 で到達 (tools/ppc/sb_run.py、LAN 端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を 2 回、USER text への store → `exit=-2` → その後の hello も `exit=7`)。段の状態は票 TASK_PPC_SHELL が持つ。
+
+- **B21 はやめた**: USER の番地の copy は共通の exec/redir_access.c (ページ表で引いた PA を P2V で写す) をそのまま使う。PPC の copy の backend は作らない。
+- **B03**: target の判定の口は `arch/<arch>/arch_exec_image.h` の `arch_exec_image_accept(flags)` (`exec_arch.h` は既存の include/exec_arch.h と名前がぶつかるのでやめた)。x86 は関数形式の macro (static inline だと GCC の局所記号の名前が変わり os32x_hdr.o が変わる)。
+- **B04**: ELF の識別 (CLASS=1・DATA=2・machine=20) の照合は `--target ppc-powermac` のときだけ。x86 は B04 前と同じ (CLASS=1・DATA=1、machine は不問)。
+- **B29**: PowerMac の tick は共通の単位 10ms (100Hz)。KAPI の tick_count と exec の閉包がこの単位で書かれている。細かい時間は timebase。起動の時計の検査は 3 tick の間隔 (1ms の検査はシェル像で境目の読み違いにより揺らいだ)。
+- **F14・B31 の KAPI の振り分け**: `sdk/kapi_target_ppc.py` の群で、PowerMac の像に無い provider の slot を型付きの不在 (取得 0・照会 0・操作 OS32_ERR_NOSYS・void は何もしない) にする。B31 の link で sys (buz_on/off・sys_reboot/halt) と surface (query/lease/unlease) の 8 slot を足した。kernel/sys.c・exec/surface_query.c は共通のソースのまま link し、--gc-sections で PC-98 の参照が落ちる。
+- **B31 の link**: 共通の部品 (input_service・kbd_inject・con_sink・pipe_buffer・fd_redirect・kapi_strings・kapi_print・kstring・paging_app・clock_service・os_time・sys) は facade を作らずそのまま link。シェル像だけ arch/ppc/kboot_unavailable.c を外す (exec の本物と重なる)。今の像 (KBOOT_SHELL なし) は sha256 不変。resident は 716KiB (§10 の暫定 +64〜192KiB の範囲)、予約の残り 1800KiB。
+- **B30**: PowerMac の exec の初期化 `pm_exec_boot` (platform/powermac/exec_boot.c) は fd_redirect → pipe_buffer → exec_init。シェル像の USER 共有ページは exec のトランポリン (x86 と同じ、memory_boot の直後)、sys_mem_kb は 16MB。**常駐 CLI が親 (ID 1) を占めるので exec_nest_level = 1** (B35 の実行で見つかった。0 のままだと子をシェルの番地に読み込もうとする)。
+- **B32**: `resident_cli_ops.run`。組み込みでない行は分割前の写しを run へ、戻り値を `exit=<値>` で出す。run が NULL なら従来の `unknown command`。
+- **B33・B35**: 受入のアプリは userland/ppc/{hello,fault}.c (userland/tests/*.c は x86 の build が wildcard で拾う)。build は build/ppc-user.mk (`make ARCH=ppc PLATFORM=powermac hello`)。root の像には tools/mkroot_image.py の `--bin` で入れる。
+- **B27**: link_guard の PPC の検査は世代の刻印を ELF の endian で比べ、nano の検査は x86 の app.ld だけ。`-lc`・`-lm`・`-lgcc` を断る (別表記まで断る指摘は過剰防御として不採用)。
+- **F16**: PPC の `exec_font_guard_run` は callback を直接呼ぶ (PPC には保護区間の仕組みが無い、NOSYS にする指摘は不採用)。
+- **本線との約束**: 共通のソースに include・依存を足す段は、そのソースを covers に持つ tools/checks の check を全部 `make check-<name> MUTATE=0` で回してから送る。統合の枝の先頭の commit には `[skip ci]` を付けない。

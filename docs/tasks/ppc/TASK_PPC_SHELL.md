@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **設計中 (2026-11-11)** — 計画と中間の到達点 S-A の詳細設計は確定 ([PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md))、実装待ち。最終の到達点 S-B (USER ABI・syscall・exec・OS32X の BE の読み) は別の往復で詳細設計する。前提は LAN (票 TASK_PPC_LAN、main)。
+> 状態: **実装中 (2026-11-12)** — 中間の到達点 S-A は main。最終の到達点 S-B は全段実装・独立レビュー済みで、**QEMU 7450・7455 で受入に到達** (LAN 端末から /bin/hello.bin ok → exit=7、tools/ppc/sb_run.py)。S-B の段の取り込みは本線の統合の枝で CI 中。次は W6 (PC-98 の FD 起動から共通 RAM root、本線) と W7 (sh.bin)。設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md) (S-A) と [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md) (S-B、実装で決めたことは末尾の「確定の後の追記 1」)。
 
 ## 0. ユーザー決定 (2026-11-11)
 
@@ -37,4 +37,5 @@
 | W2〜W3 (S-A) | 実装・独立レビュー済 (2026-11-11、作業の枝 wt/ppc-shw3、X1 の後に取り込み)。**中間の到達点 S-A に QEMU で到達** (7450・7455、CD を eject した後に LAN の端末から echo・診断の CLOCK・cat /etc/motd・echo a > /tmp/f・cat /tmp/f、tools/ppc/shell_run.py)。開発用の像は KBOOT_SHELL=1、今の像は LAN の端末だけ増える |
 | X1 (★ fs/vfs.h の VFS_DEV_RAM、iso9660_mount が rdN を受ける) | 実装・独立レビュー済 (wt/ppc-shint3)、本線で HAL v2 の I1 と一緒に NP21/W の受入待ち |
 | W4 (S-B の詳細設計の往復) | 済 (2026-11-11、PPC_SHELL_EXEC_DESIGN)。exec の facade の段 (F) は HAL v2 の I1 が main に入った後の main を基点 |
-| W5〜W9 | 未着手 |
+| W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
+| W6〜W9 | 未着手 |
