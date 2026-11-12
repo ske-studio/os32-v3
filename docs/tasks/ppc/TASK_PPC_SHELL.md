@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-12)** — 中間の到達点 S-A は main。最終の到達点 S-B は全段実装・独立レビュー済みで、**QEMU 7450・7455 で受入に到達** (LAN 端末から /bin/hello.bin ok → exit=7、tools/ppc/sb_run.py)。S-B の段は全部 main (61276d39、2026-11-12)。次は W6 (PC-98 の FD 起動から共通 RAM root、本線) と W7 (sh.bin)。設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md) (S-A) と [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md) (S-B、実装で決めたことは末尾の「確定の後の追記 1」)。
+> 状態: **実装中 (2026-11-12)** — S-C (W7) は QEMU で受入に到達し main (2d102e30)、W6 の共通部品は main (170723d0)。PC-98 の FD 側は本線、W8 は未着手、W9 は [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に記録。
 
 ## 0. ユーザー決定 (2026-11-11)
 
@@ -38,6 +38,7 @@
 | X1 (★ fs/vfs.h の VFS_DEV_RAM、iso9660_mount が rdN を受ける) | 実装・独立レビュー済 (wt/ppc-shint3)、本線で HAL v2 の I1 と一緒に NP21/W の受入待ち |
 | W4 (S-B の詳細設計の往復) | 済 (2026-11-11、PPC_SHELL_EXEC_DESIGN)。exec の facade の段 (F) は HAL v2 の I1 が main に入った後の main を基点 |
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
-| W7 (S-C、既存のシェルを USER の sh.bin として起動) | 詳細設計は確定 (2026-11-12、[PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md))。製品の経路は第 3 の像 KBOOT_SH=1、既定の診断の像と KBOOT_SHELL=1 の像は不変。段 N01 (USER の入れ子の先行確認) から |
+| W7 (S-C、既存のシェルを USER の sh.bin として起動) | 済 (QEMU、sc_run.py、7450・7455 の LAN)。設計は [PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md) |
 | W6 (PC-98 の FD 起動から共通の RAM root) | 計画確定 (2026-11-12、[PPC_RAM_ROOT_W6_PLAN](../../decisions/ppc/PPC_RAM_ROOT_W6_PLAN.md))。**ユーザー決定 (2026-11-12): 案 B** (kernel は ISO の中に 1 回だけ)。共通の部品の段 C1〜C4 は PowerPC 側が先に出す、PC-98 の FD 側の段は本線が起こす |
-| W8・W9 | 未着手 |
+| W8 (書ける媒体の後 mount) | 未着手 |
+| W9 (立ち上げの順) | 済 ([ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md)) |

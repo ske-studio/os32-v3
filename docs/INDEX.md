@@ -225,6 +225,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | Ra266 の機体構成・基準構成と実機の方針。 |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) | 復帰の保証範囲、配線・電源操作・書込み承認の方針。 |
 | [decisions/sound/SYNTH_OPNA_DESIGN.md](decisions/sound/SYNTH_OPNA_DESIGN.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) の確定設計。 |
+| [decisions/ppc/ARCH_BRINGUP_ORDER.md](decisions/ppc/ARCH_BRINGUP_ORDER.md) | 新アーキテクチャの起動から USER sh までの順と開発用 CLI の扱い。 |
 | [decisions/time/TICK_1KHZ_DESIGN.md](decisions/time/TICK_1KHZ_DESIGN.md) | 1kHz IRQ0 tick (物理 1kHz・論理 100Hz の二周期) の実測計画と切り替えの確定設計。 |
 | [decisions/time/TICK_ARCH_DESIGN.md](decisions/time/TICK_ARCH_DESIGN.md) | 1kHz tick の arch に依らない tick_clock の口 (x86 の PIT・PowerPC の DEC)、PowerPC の B29 の戻し、段の順の確定設計。 |
 
