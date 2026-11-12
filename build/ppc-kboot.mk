@@ -50,7 +50,7 @@ KB_ARCH := arch/ppc/kernel_boot.c arch/ppc/kernel_cpu.c arch/ppc/kernel_hpt.c \
  arch/ppc/kboot_unavailable.c arch/ppc/dma_cache.c
 KB_PLATFORM := platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/escc_tree.c platform/powermac/kboot_capture.c \
- platform/powermac/gmac_tree.c \
+ platform/powermac/gmac_tree.c platform/powermac/gmac_clock.c \
  platform/powermac/kboot_reserve.c platform/powermac/memory.c \
  platform/powermac/mpic_tree.c platform/powermac/mpic.c \
  platform/powermac/clock.c platform/powermac/log.c \

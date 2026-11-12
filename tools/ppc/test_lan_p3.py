@@ -16,7 +16,9 @@ CHECK = dict(name='ppc-lan-p3', tier=2, budget=60,
              inputs=['platform/powermac/lan_boot.h', 'platform/powermac/ofw.h',
                      'arch/ppc/ppc_boot.h', 'include/types.h', 'lib/kstring.h',
                      'lib/kstring_c.c', 'tools/tests/host32.py',
-                     'platform/powermac/pci_config.c', 'arch/ppc/ppc_oea.h'])
+                     'platform/powermac/pci_config.c', 'arch/ppc/ppc_oea.h',
+                     'arch/ppc/kernel_boot.h', 'arch/ppc/ppc_boot.h',
+                     'drivers/net/gem/gem.h'])
 
 
 MUTATIONS = [
@@ -44,7 +46,7 @@ def exercise(source, directory, case=None):
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=', '-DPM_PCI_FAKE_MMIO',
-                    *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
+                    '-I'+str(ROOT), *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
                     str(source), str(ROOT / 'platform/powermac/pci_config.c'),
                     str(ROOT / 'tools/ppc/lan_p3_fake.c'),
                     str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True, timeout=60)

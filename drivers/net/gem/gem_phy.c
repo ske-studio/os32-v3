@@ -8,6 +8,7 @@
 #define ANAR 4
 #define ANLPAR 5
 #define GTCR 9
+#define GTSR 10
 #define BMCR_RESET 0x8000
 #define BMCR_AUTOEN 0x1000
 #define BMCR_STARTNEG 0x0200
@@ -35,6 +36,11 @@ static int supported(u32 id1, u32 id2)
         if (oui == supported_phys[i].oui && model == supported_phys[i].model) return 1;
     return 0;
 }
+/* BCM54xx profile slot: add ID/revision and the measured chip's fixups only
+ * after RH2's first sample. OpenBSD sys/dev/mii/brgphy.c:764-782,1002;
+ * FreeBSD sys/dev/mii/brgphy.c (brgphy_reset). No guessed BCM54xx writes. */
+static int valid_id(const struct gem *g)
+{ return g && g->phy_id1 && g->phy_id1 != 0xffff && g->phy_id2 && g->phy_id2 != 0xffff; }
 
 static unsigned long long ticks(u32 hz, u32 us)
 {
@@ -92,13 +98,52 @@ int gem_mif_init(struct gem *g)
                 if (a && a != 0xffff && b && b != 0xffff) {
                     g->phy_addr = addr; g->phy_port = port;
                     g->phy_id1 = a; g->phy_id2 = b; g->phy_step = PHY_START;
-                    return supported(a, b) ? GEM_OK : GEM_EUNSUPPORTED;
+                    return GEM_OK; /* RH_PHY_ACCEPT: unknown IDs remain readable. */
                 }
             }
         }
         if (!port) break;
     }
     return GEM_EUNSUPPORTED;
+}
+
+/* NetBSD sys/dev/mii/ukphy_subr.c:68-119: current BMSR, BMCR and
+ * intersection of advertisements. Unknown PHYs receive no MII writes. */
+int gem_phy_sample(struct gem *g, struct gem_phy_sample *out)
+{
+    if (!out || !valid_id(g)) return GEM_EUNSUPPORTED;
+    struct gem_phy_sample v = {.port=g->phy_port, .addr=g->phy_addr,
+                              .id1=g->phy_id1, .id2=g->phy_id2};
+    int r;
+    r = rd(g, g->phy_addr, BMCR, &v.bmcr); if (r) goto done;
+    r = rd(g, g->phy_addr, BMSR, &v.bmsr); if (r) goto done;
+    r = rd(g, g->phy_addr, BMSR, &v.bmsr); if (r) goto done; /* RH_PHY_SECOND */
+    r = rd(g, g->phy_addr, ANAR, &v.anar); if (r) goto done;
+    r = rd(g, g->phy_addr, ANLPAR, &v.anlpar); if (r) goto done;
+    if (v.bmsr & BMSR_EXTSTAT) {
+        if (rd(g, g->phy_addr, GTCR, &v.gtcr) == GEM_OK &&
+            rd(g, g->phy_addr, GTSR, &v.gtsr) == GEM_OK &&
+            v.gtcr != 0xffff && v.gtsr != 0xffff) v.gigabit_valid = 1;
+    }
+    v.link = !!(v.bmsr & BMSR_LINK) && !(v.bmcr & (BMCR_RESET | 0x0c00));
+    if (!v.link) goto done;
+    if (v.bmcr & BMCR_AUTOEN) {
+        if (!(v.bmsr & BMSR_ACOMP)) goto done;
+        u32 common = v.anar & v.anlpar;
+        if (v.gigabit_valid && (v.gtcr & 0x200) && (v.gtsr & 0x800)) {
+            v.speed = 1000; v.full_duplex = 1;
+        } else if (v.gigabit_valid && (v.gtcr & 0x100) && (v.gtsr & 0x400)) v.speed = 1000;
+        else if (common & ANAR_TX_FD) { v.speed = 100; v.full_duplex = 1; }
+        else if (common & (0x200 | 0x80)) v.speed = 100;
+        else if (common & 0x40) { v.speed = 10; v.full_duplex = 1; }
+        else if (common & 0x20) v.speed = 10;
+    } else {
+        v.speed = (v.bmcr & 0x40) ? 1000 : (v.bmcr & 0x2000) ? 100 : 10;
+        v.full_duplex = !!(v.bmcr & 0x100);
+    }
+done:
+    g->phy_sample = *out = v;
+    return r;
 }
 
 static void next(struct gem *g, u32 step, unsigned long long now)
@@ -108,8 +153,14 @@ int gem_phy_step(struct gem *g, unsigned long long now)
 {
     u32 v, status;
     int r;
-    if (!g || !supported(g->phy_id1, g->phy_id2))
-        return GEM_EUNSUPPORTED;
+    if (!valid_id(g)) return GEM_EUNSUPPORTED;
+    if (!supported(g->phy_id1, g->phy_id2)) {
+        struct gem_phy_sample sample;
+        r = gem_phy_sample(g, &sample);
+        if (r) return r;
+        /* The existing MAC contract is 100TX full; other speeds remain diagnostic. */
+        return sample.link && sample.speed == 100 && sample.full_duplex ? GEM_OK : GEM_AGAIN;
+    }
     switch (g->phy_step) {
     case PHY_START:
         /* OpenBSD mii_physubr.c:282-307 mii_phy_reset; NetBSD mii_physubr.c:396-415.

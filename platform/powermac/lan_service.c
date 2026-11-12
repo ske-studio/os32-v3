@@ -24,6 +24,22 @@ static struct {
     u8 out_turn, state_due;
 } s;
 
+static void (*phy_notify)(const struct gem_phy_sample *, int);
+static struct gem_phy_sample phy_sample;
+static int phy_rc;
+static u8 rh_logged;
+void pm_lan_phy_observer(void (*notify)(const struct gem_phy_sample *, int))
+{ phy_notify = notify; }
+static void rh_log(void)
+{
+    if (rh_logged) return;
+    rh_logged = 1;
+    const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
+    if (q->valid)
+        kprintf(0x07, "RH QUIESCE command=%x tx=%u rx=%u\r\n", q->command, q->tx_enable, q->rx_enable);
+    kprintf(0x07, "RH PHY port=%u addr=%u id1=%x id2=%x bmsr=%x rc=%d\r\n",
+            phy_sample.port, phy_sample.addr, phy_sample.id1, phy_sample.id2, phy_sample.bmsr, phy_rc);
+}
 static int same(const u8 *a, const u8 *b, u32 n)
 {
     for (u32 i = 0; i < n; ++i) if (a[i] != b[i]) return 0;
@@ -157,6 +173,11 @@ static int receive(void)
 }
 int pm_lan_start(const struct pm_gmac_boot *boot)
 {
+    const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
+    if (q->clock_rc) {
+        kprintf(0x07, "RH CLOCK rc=%d\r\n", q->clock_rc);
+        off(q->clock_rc); return q->clock_rc;
+    }
     const struct ppc_boot_devices *dev = ppc_boot_devices();
     struct pm_pci pci = {dev->pci_addr_va, dev->pci_data_va,
                          boot->bus_first, boot->bus_last, boot->bdf};
@@ -167,6 +188,7 @@ int pm_lan_start(const struct pm_gmac_boot *boot)
         pm_pci_read32(&pci, boot->bdf, 4, &command) || (command & 4)) {
         off(LAN_ENODEV); return LAN_ENODEV;
     }
+    rh_logged = 0;
     s.boot = boot;
 #if KBOOT_SH
     pm_hfs_bind_peer(boot->peer_mac);
@@ -191,6 +213,11 @@ void pm_lan_poll(u64 now)
         if (r == GEM_OK) {
             s.g.ring_prepare_step = s.g.ring_cursor = s.g.ring_publish_step = s.g.rx_head = 0;
             r = gem_mif_init(&s.g);
+            phy_sample = (struct gem_phy_sample){.port=s.g.phy_port, .addr=s.g.phy_addr,
+                                                .id1=s.g.phy_id1, .id2=s.g.phy_id2};
+            phy_rc = r;
+            if (r == GEM_OK) phy_rc = gem_phy_sample(&s.g, &phy_sample);
+            if (phy_notify) phy_notify(&phy_sample, phy_rc);
             if (r == GEM_OK) s.state = PREPARE;
         }
         break;
@@ -212,7 +239,7 @@ void pm_lan_poll(u64 now)
         }
         if (s.enabling) {
             r = gem_mac_enable_step(&s.g, now);
-            if (r == GEM_OK) { s.state = RUNNING; s.phy_retry_at = now + s.g.io.tb_hz; }
+            if (r == GEM_OK) { s.state = RUNNING; rh_log(); s.phy_retry_at = now + s.g.io.tb_hz; }
         }
         break;
     case RUNNING:
