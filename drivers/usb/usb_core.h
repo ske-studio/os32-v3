@@ -148,6 +148,10 @@ struct usb_class {
     void (*detach)(struct usb_dev *, struct usb_iface *);
     void (*gone)(struct usb_dev *, struct usb_iface *);
     void (*tick)(struct usb_dev *, struct usb_iface *, u32 now_ms); /* NULL allowed */
+    /* Core calls once after usb_class_unsetup_done (a hub also after all its
+     * children returned); the class frees sc and its own resources. Never
+     * called after gone (R7-02: gone keeps memory alive). */
+    void (*release)(struct usb_dev *, struct usb_iface *);
 };
 /* Nonblocking except sync (foreground only). Reject submissions to detached
  * devices or non-running HCs. drained includes notification; unsetup_done
@@ -172,6 +176,8 @@ void usb_class_tick(u32 now_ms);
 int usb_dmamem_init(struct usb_hc *hc);
 int usb_dmamem_alloc(struct usb_hc *hc, u32 size, u32 align, struct usb_dma *out);
 void usb_dmamem_free(struct usb_hc *hc, struct usb_dma *d);
+/* Foreground only: -USB_E_CTX when usb_busy (inside usb_service, the USB tick or
+ * a done callback). Single task: no other tick calls it, so no platform query. */
 int usb_xfer_sync(struct usb_xfer *x, u32 timeout_ms);
 void usb_explore_step(struct usb_hc *hc);
 void usb_free_device_begin(struct usb_dev *);

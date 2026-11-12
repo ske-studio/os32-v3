@@ -824,3 +824,4 @@ void usb_service(void)
 - 担当: PowerPC の PM が 1A〜1C・1D の HID の class・1P (PowerMac の殻と QEMU の受入)、本線が 1D の drivers/input/ の側と 1E (ユーザー了承 2026-11-12・11-13)。
 - usb_early_quiesce.c は usbp_* を使わない殻 (番人の SHELLS)、kernel の pci_cfg_*・pci_mmio を直に呼び、include は ohci_regs.h (段 2 で ehci_regs.h) だけ。pc98 だけの殻のヘッダ (usb_resident.h など) は platform/pc98/ に置く。
 - PowerPC の道 (§813 の対): G4 の Open Firmware は USB キーボードのために OHCI を動かしたまま (InterruptRouting・ownership を持ったまま) 渡し得る。1P の殻は FreeBSD の ohci の takeover (OwnershipChangeRequest → IR が落ちるまで待つ) に当たる静止を、start の前に行う。
+- 1C・1D の着手で見つかった欠け (PM 決定、2026-11-13): (1) `usb_xfer_sync` の `-USB_E_CTX` は `usb_busy != 0` (usb_service・USB の tick・done の内側) のときだけ。シングルタスクでほかの tick からは呼ばれないので、platform に文脈の照会の口は足さない。(2) `struct usb_class` に `release(dev, iface)` を足す。中核が `usb_class_unsetup_done` の後 (ハブは子が全部返った後) に 1 回呼び、class が sc と自分の資源を返す。gone の後は呼ばない (R7-02)。
