@@ -162,7 +162,7 @@ def nest_main(args):
 
 
 # The same commands run against the real USER image on both transports.
-COMMANDS = (b'help\npwd\nls /bin\necho sc-ok > /tmp/sc\ncat /tmp/sc\n'
+COMMANDS = (b'help\necho $PATH\necho $HOME\necho $SHELL\npwd\nls /bin\necho sc-ok > /tmp/sc\ncat /tmp/sc\n'
             b'cat /nofile > /tmp/e\ncat /tmp/e\n/bin/hello.bin ok\necho $?\n'
             b'cd /tmp\nset SC_PARENT=kept\n/bin/hello.bin ok\necho $?\npwd\necho $SC_PARENT\n'
             b'echo again\n\x1b[A\necho echo script-ok > /tmp/test.sh\n'
@@ -174,20 +174,47 @@ def check_shell(text, fd1=True, restart=True):
     """Check results between prompts, never accepting command echo as output."""
     text = text.replace('\r', '')
     require('OS32 External Shell Started' in text and 'sh> ' in text, 'sh startup')
-    require('SH.BIN' in text.upper() and 'HELLO.BIN' in text.upper(), 'bin listing')
-    for value in ('hello ok\n', '\n7\n', 'kept\n', 'edit-ok\n',
-                  'again\n', 'script-ok\n', 'pipe-ok\n', 'sh exited=3\n'):
-        require(value in text, 'missing shell result '+repr(value)+': '+repr(text))
-    require(text.count('hello ok\n') == 2, 'hello repeat')
-    require(text.count('\nagain\n') == 2, 'history repeat')
-    require('pwd\n/\nsh> ' in text and 'pwd\n/tmp/\nsh> ' in text, 'cwd preserved')
+    # Split at prompts, then discard the echoed input line in each interval.
+    results = {}
+    for interval in text.split('sh> ')[1:]:
+        echo, newline, output = interval.partition('\n')
+        if newline:
+            results.setdefault(echo, []).append(output)
+
+    def outputs(cmd, expected):
+        require(results.get(cmd) == expected,
+                'shell output '+repr(cmd)+': '+repr(results.get(cmd)))
+
+    help_output = results.get('help', [''])[0]
+    names = {line.strip() for line in help_output.splitlines()}
+    registered = set('help ? clear cls tick uptime time exit cp mv rm cat cat2 '
+                     'echo ls cd pwd mkdir rmdir env set export unset source . '
+                     'ask if goto return'.split())
+    require(registered <= names, 'help registered commands')
+    require(not names.intersection('ver uname date beep np2 mnt sys pci hdprep filer rshell'.split()),
+            'help excluded commands')
+    outputs('echo $PATH', ['/bin\n'])
+    outputs('echo $HOME', ['/tmp\n'])
+    outputs('echo $SHELL', ['/bin/sh.bin\n'])
+    outputs('pwd', ['/\n', '/tmp/\n'])
+    listing = results.get('ls /bin', [''])[0].upper().split()
+    require('SH.BIN' in listing and 'HELLO.BIN' in listing, 'bin listing')
+    outputs('echo sc-ok > /tmp/sc', [''])
+    outputs('cat /tmp/sc', ['sc-ok\n'] if fd1 else [''])
+    diagnostic = results.get('cat /nofile > /tmp/e', [''])[0]
+    require('cat: /nofile: No such file or directory\n' == diagnostic,
+            'diagnostic missing from terminal')
+    outputs('cat /tmp/e', [''])
+    outputs('/bin/hello.bin ok', ['hello ok\n', 'hello ok\n'])
+    outputs('echo $?', ['7\n', '7\n'])
+    outputs('echo $SC_PARENT', ['kept\n'])
+    outputs('echo again', ['again\n', 'again\n'])
+    outputs('source /tmp/test.sh', ['script-ok\n'])
+    outputs('echo pipe-ok | cat', ['pipe-ok\n'])
+    require('edit-ok\n' in text and 'sh exited=3\n' in text, 'edit/exit result')
     require(text.count('OS32 External Shell Started') == (2 if restart else 1), 'sh restart')
     require(('sc-ok\n' in text) == fd1, 'fd1 redirect/cat routing')
     require('\ncancel-me\n' not in text, 'cancelled command executed')
-    # An empty cat of /tmp/e must return directly to the next prompt.
-    require('cat /tmp/e\nsh> ' in text, 'diagnostic leaked into redirect')
-    require('nofile' in text.partition('cat /nofile > /tmp/e\n')[2].partition('sh> ')[0],
-            'diagnostic missing from terminal')
 
 
 def shell_serial(work, cpus, mutate):
@@ -300,6 +327,8 @@ def main():
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    if args.mutate and not args.serial:
+        parser.error('--mutate requires --serial')
     rc = nest_main(args)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     work = Path(tempfile.mkdtemp(prefix='shell-', dir=Path(os.environ['TMPDIR'])/'sc-run'))
