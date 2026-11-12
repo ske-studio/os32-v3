@@ -1,6 +1,6 @@
 # GF の表示の停止・suspend を手本 nouveau に寄せる — 設計 確定 (2026-11-12、main eebdafaa + S0 7eee4b40)
 
-> 状態: **確定 (2026-11-12、独立レビュー 2 回、PM 決定)**。第 1 回 (A1〜A9)・第 2 回 (B1〜B5) の指摘、S0 の実機の値、PM の決定を入れた。第 1 版・第 2 版はリポジトリの外 (~/os32-tmp/run/gf-stop-ref/)。
+> 状態: **実装・実機の受入済み (2026-11-12、main d93f0279、R3・R5'・R6 は延期の台帳へ)**。設計は 2026-11-12 に確定 (独立レビュー 2 回、PM 決定)。第 1 回 (A1〜A9)・第 2 回 (B1〜B5) の指摘、S0 の実機の値、PM の決定を入れた。第 1 版・第 2 版はリポジトリの外 (~/os32-tmp/run/gf-stop-ref/)。
 > 手本: nouveau c03c1a1 (MIT)。`N/` = `/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`、`V/` = `N/dispnv04`、`DI/` = `N/nvkm/subdev/devinit`。refs に無い upstream の関数は名前で示す (`nouveau_display_fini`・`nouveau_display_suspend` は `nouveau_display.c`、`drm_helper_force_disable_all`・`__drm_helper_disable_unused_functions`・`drm_helper_resume_force_mode` は `drm_crtc_helper.c`)。
 > OS32: `D/` = `hwdev/gf/display`。前提: シングルタスク・協調切替。GF は 1 枚。
 
@@ -382,3 +382,26 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 
 ## 実装の後の追記 (2026-11-12、S4a、PM 決定)
 - module の終了での `gf4_hw_state_reset` の呼び出しは置かない。geforce.mod の口は initialize・get_probe_decls だけで、kernel が動いている間 module を外す道が無い (geforce_body.c・tools/module_schema.py)。valid・fonts_valid は kernel の寿命で 1 つになる。reset 自体 (ページの返却・valid の解除) は host 試験で確かめてある。
+
+## 実機の受入の結果 (2026-11-12)
+
+Ra266・31kHz・main d93f0279。証拠はノートの ~/os32-tmp/evidence/2026-11-12/gf-stopref/。S5 (`display_dual_dpms` を外す) は main への取り込み待ちなので、R5 は S4 の後・S5 の前の回だけ。
+
+| 項目 | 結果 |
+|---|---|
+| R1 | 合。3 回の出入りで毎回 98 に戻り、右は CUI で黒、モニターに省電力の表示 |
+| R2 | 合。gfx2_rh ×2・gfx2_i2・gfx2_i1 が PASS |
+| R3 | 未実施 (起こすコマンドが分からない)。延期の台帳 GF-STOPREF-R3 |
+| R4 | 記録のみ |
+| R5' | 未実施 (同上)。延期の台帳 GF-STOPREF-R5D |
+| R5 | 合。2 画面で、CUI では右が無信号 (LED 橙)、GUI では点く。3 回とも同じ |
+| R6 | 未実施 (同上)。延期の台帳 GF-STOPREF-R6 |
+| R8 | 合。CONSOLE_DUAL の 98 の記録と、端末の sh の ver が左に出る |
+
+R1 の `[gf4] detect state` の比べ:
+- 前の版で 2 回目に残っていた GUI の値 (cr17_0=c3・vpll1=21a07 など) は、1 回目の値に戻った。
+- 2 回目以降も 1 回目と違って残った欄と、その説明:
+  - **PLL の b2 (e02→80000e02)・ext (1f0001f→11f0001f)**: 手本どおり。`setPLL_double_highregs` が pll2 に 1<<31 を常に立て (nvkm devinit/nv04.c:209)、single stage の 0x680580 の bit を立てる (同 :184-195) ため。
+  - **ec1 (I2C の bit)**: §7 の R1 で除くと決めた ENGINE_CTRL の I2C bit。
+  - **cr44 (3→0)**・**cr11 (20/ab)**: 記録した。結果 (右が無信号・98 に戻る) には効いていない。
+  - **cr1a_0 (3f のほか 2c・ec のことがある)**: 結果 (右が無信号) には効いていないが、restore の漏れの候補。追って調べる。

@@ -227,6 +227,6 @@ int pc98_route_to_gf(void)
 - **tvram_clear の門**: GUI の間 (sink が有効) は dual でも TVRAM を消さない (`if (con_sink_is_enabled()) return;` に戻す。sink への CLEAR はこれまでどおり積む)。
 - **console_session_clear**: `con_dual_was_live() || con_dual_cfg()` なら sink の CLEAR だけ積み、TVRAM を消さない。
 - **CUI→GUI の入口** (kernel.c の GUI の分岐): `con_dual_cfg()` なら `console_text_gdc_stop()` より前に `shell_print("Loading gshell...\n")` で追記する。CUI の分岐の "Loading shell..." も、cfg なら 0 行目に書かず追記する。
-- **CUI へ戻る時の GF の head**: `gfx_shutdown` で、`con_dual_cfg()` かつ ACTIVE の adapter が GeForce なら、leave の前に attached な各 head を DPMS off (3) にする (backend の `dpms` を中核から直接呼ぶ、owner の検査は通さない)。GUI に戻る時に DPMS が on に戻ることを確かめ、戻らなければ GF の開始の後に on (0) にする。
+- **CUI へ戻る時の GF の head**: 中核から DPMS を呼ばない。停止の restore が起動時の値 (devinit の後の CR17=0、無信号) に戻すので、右のモニターは無信号になる (実機 S0、2026-11-12。[GF_STOP_REF_DESIGN](../realhw/GF_STOP_REF_DESIGN.md) §4)。GUI に戻る時は GF の開始の初期 mode (DPMS ON) が点けるので、開始の後の dpms(0) も置かない。`display_dual_dpms` は持たない。
 - **端末の出力** (§3-1): sh の出力は KAPI の kprintf → console_write で sink と TEXT の出力先の両方に出る。端末アプリ自身のローカルな出力 (打った行のエコー・"command not found:") は kernel を通らず、98 には出ない (対象外)。
-- **§8 に足す**: A3 の通しに CUI→`os32gui`→GUI (was_live=0、started=0) の場合を足す。A3 の "clear gate" は「GUI の間は dual でも TVRAM を消さない」に替える。A6 の受入に「CUI へ戻ると右のモニターが DPMS で切れ、GUI に戻ると点く」と「端末の sh の ver の結果が 98 にも出る」を足す。
+- **§8 に足す**: A3 の通しに CUI→`os32gui`→GUI (was_live=0、started=0) の場合を足す。A3 の "clear gate" は「GUI の間は dual でも TVRAM を消さない」に替える。A6 の受入に「CUI へ戻ると右のモニターが無信号になり、GUI に戻ると点く」と「端末の sh の ver の結果が 98 にも出る」を足す。
