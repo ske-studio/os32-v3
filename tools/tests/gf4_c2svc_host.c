@@ -617,6 +617,12 @@ static void test_stop_guard(void)
 }
 #endif
 static u32 stop_fonts[65536];
+static i32 stop_tmds_relock(void *owner,const struct gf4_route *route,u32 khz,u32 dl)
+{
+    (void)owner; (void)route; (void)khz; (void)dl;
+    assert(!svc_write(&cint_host,GF_MODE_REGISTER_BAR,0x6013d4U,1,0x1f));
+    return svc_write(&cint_host,GF_MODE_REGISTER_BAR,0x6013d5U,1,0x99);
+}
 static void test_hw_restore(void)
 {
     for (u32 variant=0;variant<5;++variant) {
@@ -625,7 +631,10 @@ static void test_hw_restore(void)
         if (!no_f) assert(!gf4_service_start(&svc_ctx,cint_deadline()));
         else cint_prod.display.engaged=true;
         struct gf4_hw_saved *saved=gf4_hw_saved_get();
-        saved->valid=valid; saved->nroutes=1; saved->output[0].output=1;
+        saved->valid=valid; saved->nroutes=2; saved->output[0].output=1;
+        svc_ctx.dcb.nroutes=2;
+        svc_ctx.dcb.routes[1]=(struct gf4_route){.type=GF4_TMDS,.or_mask=2};
+        svc_exec.tmds_script=stop_tmds_relock;
         saved->fonts=stop_fonts; saved->fonts_valid=fonts;
         struct gf4_saved image={0};
         if (diagnostic) svc_ctx.diagnostic_saved=&image;
@@ -654,18 +663,23 @@ static void test_hw_restore(void)
             }
         } else assert(!stop_order[0] && !stop_order[1] && !stop_order[2]);
         u8 index[2]={0};
-        bool unlocked=false,extended=false;
+        u32 cr1f=0, extended=0; bool relocked=false;
         for (u32 i=0;i<svc_host.nevents;++i) {
             const struct gf4_host_event *e=&svc_events[i];
             if (e->op!=D_WRITE) continue;
             for (u32 h=0;h<2;++h) {
                 if (e->a[1]==0x6013d4U+h*0x2000) index[h]=e->a[3];
-                if (e->a[1]==0x6013d5U+h*0x2000 && h==0 && index[h]==0x1f && e->a[3]==0x57) unlocked=true;
-                if (e->a[1]==0x6013d5U+h*0x2000 && index[h]==0x1a) { assert(unlocked); extended=true; }
+                if (e->a[1]==0x6013d5U+h*0x2000 && h==0 && index[h]==0x1f) {
+                    cr1f=e->a[3]; if (cr1f==0x99) relocked=true;
+                }
+                if (e->a[1]==0x6013d5U+h*0x2000 &&
+                    (index[h]==0x1a || index[h]==0x21 || index[h]==0x44)) {
+                    assert(cr1f==0x57); ++extended;
+                }
                 if (e->a[1]==0x6013d5U+h*0x2000 && index[h]==0x17) assert(!(e->a[3]&0x80));
             }
         }
-        if (valid) assert(unlocked && extended);
+        if (valid) assert(relocked && extended);
         saved->fonts=0; saved->fonts_valid=false; svc_ctx.diagnostic_saved=0; svc_finish();
     }
 }

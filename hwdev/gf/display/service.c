@@ -694,11 +694,6 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
     /* V/disp.c:56-96: display fini does not hide the cursor. */
     struct gf4_hw_saved *saved=gf4_hw_saved_get();
     if (saved->valid) {
-        /* devinit/base.c:94,117 keeps extended CR unlocked until destruction.
-         * OS32 restores local owner state at leave, so renew the unlock. */
-        u32 unlock=RECOVER_CR1F_UNLOCK;
-        i32 unlock_rc=svc_index(&l->io,SVC_CR,RECOVER_CR1F,&unlock,true);
-        if (unlock_rc && !first) first=unlock_rc;
         /* drm_helper_force_disable_all, then dispnv04/disp.c:196-200. */
         for (u8 h=0;c->ch->f && h<GF4_HEADS;++h) {
             const struct gf4_head_image *image=&c->state->head[h];
@@ -716,6 +711,11 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
         }
         i32 rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);
         if (rc && !first) first=rc;
+        /* TMDS script cleanup can relock CR1F. Renew immediately before CRTC
+         * restore: dispnv04/crtc.c:692-706; devinit/base.c:94,117. */
+        u32 unlock=RECOVER_CR1F_UNLOCK;
+        i32 unlock_rc=svc_index(&l->io,SVC_CR,RECOVER_CR1F,&unlock,true);
+        if (unlock_rc && !first) first=unlock_rc;
         for (u8 h=0;h<GF4_HEADS;++h) {
             rc=gf4_hw_crtc_restore(&l->io,h,saved);
             if (rc && !first) first=rc;
