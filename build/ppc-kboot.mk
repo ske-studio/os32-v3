@@ -97,6 +97,12 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Igfx/sync -Igfx/v2
 KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
+ifeq ($(KBOOT_SH),1)
+KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c \
+ platform/powermac/hostfs_boot.c fs/serialfs/serialfs.c \
+ fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c \
+ fs/serialfs/sfs_proto.c lib/crc32.c
+endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 
 # Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).

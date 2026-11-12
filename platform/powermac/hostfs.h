@@ -13,6 +13,11 @@ struct pm_hfs_transport {
 extern struct pm_hfs_transport pm_hostfs_transport;
 extern const SfsIo pm_hostfs_io;
 
+int pm_hostfs_boot(u32 tb_hz);
+/* Boot policy and last observed FS destination (NULL before observation). */
+void pm_hfs_bind_peer(const u8 peer[6]);
+const u8 *pm_hfs_peer(void);
+
 int pm_hfs_set_clock(u32 tb_hz);
 /* Exactly one complete SFS frame within the PLN1 declared payload length.
  * Reject malformed frames and preserve an unread response. */

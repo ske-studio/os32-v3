@@ -3,13 +3,19 @@
 #include "os32_kapi_shared.h"
 #include "arch/ppc/ppc_trap.h"
 #include "exec_arch.h"
+#include "fs/serialfs/serialfs.h"
+#include "fs/vfs_device.h"
+#include "net/host_mailbox.h"
 
 volatile u32 kctx_irq_depth;
 static u64 tb;
 static u32 polls, sends, mark, busy_left;
 static int state, gmac, send_rc, drop_state, reply_mode;
 static u8 reply[PLN1_FS_FRAME_MAX];
-static u32 reply_len;
+static u32 reply_len, hellos;
+static int observe_reply;
+static u8 host_mac[6] = {2, 3, 4, 5, 6, 7};
+static struct lan_header outer = {.type = PLN1_FS_RSP, .host_nonce = {1}};
 static void *ctx = &pm_hostfs_transport;
 
 static void output(const char *s, u32 n)
@@ -37,7 +43,10 @@ void pm_lan_poll(u64 now)
     tb += pm_hostfs_transport.tb_hz / 100u;
     if (drop_state) state = 6;
     if (reply_len) {
-        CHECK(pm_hfs_rx_frame(reply, reply_len) == 0);
+        if (observe_reply) {
+            outer.payload_bytes = (u16)reply_len;
+            pm_hfs_receive(&outer, host_mac, reply);
+        } else CHECK(pm_hfs_rx_frame(reply, reply_len) == 0);
         reply_len = 0;
     }
     /* A stopped clock is detected by an explicit reached runtime verdict,
@@ -52,6 +61,7 @@ int pm_lan_fs_send(const u8 *frame, u32 len)
     if (reply_mode) {
         u8 body[SFS_HELLO_RSP_LEN] = {0};
         CHECK(frame[SFS_OFF_TYPE] == SFS_T_HELLO);
+        ++hellos;
         sfs_put16(body + SFS_HELLO_RSP_VER, SFS_VERSION);
         sfs_put16(body + SFS_HELLO_RSP_MAX, SFS_LAN_MAX_PAYLOAD);
         sfs_put32(body + SFS_HELLO_RSP_NONCE,
@@ -126,6 +136,64 @@ static void receive_tests(void)
     frame[n] = 0;
     CHECK(pm_hfs_rx_frame(frame, n + 1) < 0);
 }
+static void peer_tests(void)
+{
+    struct HostAlive a, b;
+    struct lan_header h = {.type = PLN1_FS_OPEN, .host_nonce = {1}};
+    const u8 broadcast[6] = {255, 255, 255, 255, 255, 255};
+    const u8 other[6] = {2, 8, 9, 10, 11, 12};
+    const struct vfs_device_name names[] = {
+        {"COM1", VFS_NAME_EXACT, VFS_DEV_SERIAL, 0, 1}
+    };
+    checkpoint(60);
+    host_alive_snapshot(&a);
+    CHECK(!a.valid && !pm_hfs_peer());
+    pm_hfs_bind_peer(host_mac);
+    reset(); reply_mode = observe_reply = 1; hellos = 0;
+    vfs_device_names_register(names, sizeof(names) / sizeof(names[0]));
+    CHECK(pm_hostfs_boot(1000000) == 0);
+    CHECK(vfs_is_mounted("/host") && hellos == 0);
+    CHECK(sfs_ensure_session(100) == 0);
+    host_alive_snapshot(&a);
+    CHECK(a.valid && a.host_generation == 1 && a.observation == 1);
+    CHECK(sfs_persistent_client()->sid == 7 && hellos == 1);
+    CHECK(sfs_ensure_session(100) == 0);
+    CHECK(sfs_ensure_session(100) == 0 && hellos == 2);
+    CHECK(sfs_persistent_generation() == 1);
+    pm_hfs_receive(&h, host_mac, 0);
+    host_alive_snapshot(&b);
+    CHECK(b.observation == a.observation && b.host_generation == a.host_generation);
+    h.host_nonce[0] = 2;
+    pm_hfs_receive(&h, other, 0);
+    h.type = PLN1_FS_REQ;
+    pm_hfs_receive(&h, host_mac, 0);
+    host_alive_snapshot(&b);
+    CHECK(b.observation == a.observation);
+    h.type = PLN1_FS_OPEN; h.payload_bytes = 1;
+    pm_hfs_receive(&h, host_mac, 0);
+    h.payload_bytes = 0; h.host_nonce[0] = 0;
+    pm_hfs_receive(&h, host_mac, 0);
+    host_alive_snapshot(&b);
+    CHECK(b.observation == a.observation);
+    h.host_nonce[0] = 2;
+    pm_hfs_receive(&h, host_mac, 0);
+    host_alive_snapshot(&b);
+    CHECK(b.observation == a.observation + 1 && b.host_generation == a.host_generation + 1);
+    outer.host_nonce[0] = 2;
+    CHECK(sfs_ensure_session(100) == 0);
+    CHECK(sfs_persistent_generation() == 2 && hellos == 3);
+    pm_hfs_bind_peer(broadcast);
+    pm_hfs_receive(&h, other, 0); /* Same nonce never changes destination. */
+    CHECK(pm_hfs_peer()[1] == host_mac[1]);
+    h.host_nonce[0] = 3;
+    pm_hfs_receive(&h, broadcast, 0);
+    host_alive_snapshot(&a);
+    CHECK(a.observation == b.observation);
+    pm_hfs_receive(&h, other, 0);
+    host_alive_snapshot(&a);
+    CHECK(a.observation == b.observation + 1 && pm_hfs_peer()[1] == other[1]);
+}
+void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 static int exercise(void)
 {
     u8 frame[16] = {0};
@@ -212,6 +280,7 @@ static int exercise(void)
     CHECK(sfs_client_hello_deadline(&client, 0x12345678, 100) == 0);
     CHECK(client.sid == 7 && client.max_payload == SFS_LAN_MAX_PAYLOAD);
     CHECK(sends == 1 && polls == 1 && client.resends == 0);
+    peer_tests();
     output("PASS\n", 5);
     return 0;
 }
