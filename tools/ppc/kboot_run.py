@@ -3,7 +3,7 @@
 
 Observation symbols required of positive images (not extra KBOOT log lines):
   kboot_ready_tb: big-endian u64 TB sampled immediately before emitting READY.
-  kboot_tick: big-endian u32 live 100 Hz interrupt count, including during idle.
+  kboot_tick: big-endian u32 live logical 100 Hz tick_count (physical DEC 1 kHz), including idle.
 Both must remain mapped/readable at each QMP stop. H3 must provide these symbols.
 """
 import argparse

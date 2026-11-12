@@ -34,7 +34,7 @@
 static u32 period, count;
 void ppc_dec_init(u32 tb_hz)
 {
-    period=tb_hz/PM_DEC_HZ;
+    period=tb_hz/PM_DIAG_DEC_HZ;
     count=0;
     ppc_write_dec(period);
 }

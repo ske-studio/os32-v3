@@ -11,7 +11,8 @@ CHECK = dict(name='kboot-dec', tier=2, budget=600,
              covers=v.CHECK['covers']+['arch/ppc/kernel_dec.c','arch/ppc/arch_io.h',
                  'tools/ppc/kboot_dec*','platform/powermac/clock.c',
                  'kernel/time/tick.c','kernel/irq/tick.c'],
-             inputs=['include/kernel_tick.h','kernel/irq/tick.h','kernel/irq/irq.h',
+             inputs=['kernel/time/tick_clock.h','sdk/include/os32/os32_kapi_shared.h',
+                 'include/kernel_tick.h','kernel/irq/tick.h','kernel/irq/irq.h',
                  'kernel/irq/irq_math.h','include/io.h',
                  'include/clock_source.h','include/platform_timer.h',
                  'platform/powermac/kboot_info.h','lib/divdi3.c'])
@@ -19,10 +20,14 @@ CHECK = dict(name='kboot-dec', tier=2, budget=600,
 MUTATIONS = [
     ('reload', 'ppc_write_dec((u32)remaining);', '(void)remaining;', 8),
     ('fraction', 'fraction += remainder;', 'fraction += 0;', 13),
-    ('catchup', '++elapsed;', 'elapsed = 1;', 9),
+    ('catchup', '++elapsed;', 'elapsed = 1;', 24),
     ('initial-dec', 'ppc_write_dec(next_period());', '(void)next_period();', 7),
-    ('100hz', 'tick_hz != 100', 'tick_hz != 1000', 5),
-    ('irq-depth', '++kctx_irq_depth;', '(void)kctx_irq_depth;', 19),
+    ('1khz', 'tick_hz != PM_DEC_HZ', 'tick_hz != 100', 5),
+    ('jiffy-gate', 'if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();',
+     '{ (void)tick_clock_step(); tick_dispatch(); }', 3),
+    ('step-call', 'if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();',
+     'if (0) tick_dispatch();', 24),
+    ('irq-depth', '++kctx_irq_depth;', '(void)kctx_irq_depth;', 20),
     ('ready', 'ppc_write_dec(PPC_DEC_FAR);', 'ppc_write_dec(1);', 4),
 ]
 
@@ -34,9 +39,10 @@ def host(out, source, expected=0, idle=False):
              *(['-DDEC_IDLE_TEST'] if idle else []),
              '-I'+str(out),'-I'+str(v.ROOT),'-I'+str(v.ROOT/'include'),
              '-I'+str(v.ROOT/'arch/ppc'),'-I'+str(v.ROOT/'platform/powermac'),
+             '-I'+str(v.ROOT/'sdk/include/os32'),
              source,v.ROOT/'kernel/time/tick.c',v.ROOT/'kernel/irq/tick.c',
              v.ROOT/'tools/ppc/kboot_dec_host.c',
-             '-o',exe])
+             '-Wl,--wrap=tick_clock_config','-o',exe])
     result=subprocess.run(['qemu-i386',exe],capture_output=True,timeout=5)
     (out/'host.log').write_bytes(result.stdout+result.stderr)
     mark=expected if expected else (18 if idle else 17)
@@ -122,9 +128,9 @@ def main():
             host(dest,mutant,expected)
             # Lost rearm and lost first DEC must reach a bounded TB-based verdict,
             # rather than relying on a QEMU timeout as RED.
-            if name in ('reload','initial-dec','100hz'):
+            if name in ('reload','initial-dec','1khz'):
                 elf=image(dest/'qemu',mutant)
-                diagnostic=b'F2-START-FAIL' if name=='100hz' else b'F2-RATE-FAIL'
+                diagnostic=b'F2-START-FAIL' if name=='1khz' else b'F2-RATE-FAIL'
                 observe(dest/'qemu',elf,('ppc_stop_loop',[b'F2-BEGIN',diagnostic]))
         dest=out/'idle-noop'; dest.mkdir(parents=True,exist_ok=True)
         header=(v.ROOT/'arch/ppc/arch_io.h').read_text()

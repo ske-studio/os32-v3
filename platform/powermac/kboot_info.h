@@ -39,7 +39,8 @@ struct pm_kboot_info {
 };
 /* Boot foreground, EE=0: copy CPU TB frequency before clock init. */
 void pm_clock_bind(const struct pm_kboot_info *info);
-u32 pm_tick_hz(void);
+#define PM_DEC_HZ 1000u
+u32 pm_tick_hz(void); /* Physical DEC Hz. */
 const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci);
 /* Final snapshot only: after reserve, no OF allocation/map before detach. */
 void pm_kboot_refresh_available(struct pm_kboot_info *info);

@@ -5,7 +5,7 @@
   2. integer-only: every decoded instruction of the ELF is checked against the
      floating-point and AltiVec mnemonic families of the 7450/7455;
   3. no translation unit *uses* PIT_HZ, directly or through another macro
-     (e.g. TICK_MS): the kernel ticks at 1 kHz, PIT_HZ is the 100 Hz PC-98 rate.
+     (e.g. TICK_MS): PIT_HZ is a PC-98 name; common code uses OS32_TICK_HZ.
 
 Called by build/ppc-kboot.mk. Any tool failure is a failed audit.
 """

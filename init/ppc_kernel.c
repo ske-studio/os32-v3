@@ -8,6 +8,7 @@
  *
  * Not PC-98 init/kernel.c: no VFS, root mount, module load, exec_init or
  * user entry (those are milestone 3). Nothing here claims those services. */
+#include "kernel/time/tick_clock.h"
 #include "types.h"
 #include "memmap.h"
 #include "kprintf.h"
@@ -239,8 +240,10 @@ void ppc_kernel_main(void)
     /* The clock provider must advance with the time base: read it twice
      * at least ~20 ms apart and compare its microseconds with the TB interval. */
     u32 us0 = 0, us_lo = 0, us_hi = 0, hi0 = 0;
+    u32 raw0_lo, raw0_hi, raw1_lo, raw1_hi;
     u32 saved = ppc_irq_save();                 /* contract: read with IF=0 */
     unsigned long long tb0_a = tb_now();
+    tick_clock_raw(&raw0_lo, &raw0_hi);
     int clock_ok = platform_clock_read_us(&us0, &hi0) == 0;
     unsigned long long tb0_b = tb_now();
     ppc_irq_restore(saved);
@@ -249,10 +252,17 @@ void ppc_kernel_main(void)
         kboot_stop("no tick");
     saved = ppc_irq_save();
     unsigned long long tb1_a = tb_now();
+    tick_clock_raw(&raw1_lo, &raw1_hi);
     clock_ok = platform_clock_read_us(&us_lo, &us_hi) == 0 && clock_ok;
     unsigned long long tb1_b = tb_now();
     u32 ticks = tick_count;
     ppc_irq_restore(saved);
+    unsigned long long raw0 = ((unsigned long long)raw0_hi << 32) | raw0_lo;
+    unsigned long long raw1 = ((unsigned long long)raw1_hi << 32) | raw1_lo;
+    unsigned long long dec_want = (tb1_a - tb0_a) * PM_DEC_HZ / info->tb_hz;
+    unsigned long long dec_got = raw1 - raw0;
+    unsigned long long dec_error = dec_got > dec_want ? dec_got - dec_want : dec_want - dec_got;
+    if (dec_error > dec_want / 50 + 2) kboot_stop("dec_rate");
     if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
     u32 want = (u32)((tb1_b - tb0_a) * 1000000 / info->tb_hz);
     unsigned long long lower = (tb1_a - tb0_b) * 1000000 / info->tb_hz;
@@ -262,7 +272,7 @@ void ppc_kernel_main(void)
     if (want < 10000 || (unsigned long long)got + 1 < lower ||
         (unsigned long long)got > upper + 1)
         kboot_stop("clock_rate");
-    kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", pm_tick_hz(), ticks, us_lo);
+    kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", OS32_TICK_HZ, ticks, us_lo);
 
     if (dev->gmac_ready && lan_log_rc == 0) {
         pm_gmac_boot_id(&lan_boot, tb_now(), ppc_read_pvr());

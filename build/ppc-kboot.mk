@@ -156,7 +156,7 @@ kb-user:
 $(ROOT_BINS): kb-user
 
 
-# kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
+# kboot_tick is the acceptance meter's name for the logical 100 Hz tick_count (physical DEC is 1 kHz).
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined \
 	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
@@ -164,7 +164,7 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 
 # H3 audits (tools/ppc/kboot_audit.py): nothing unresolved, integer-only code by
 # decoded mnemonic, and no direct or macro-mediated user of the 100 Hz PIT_HZ
-# inside a kernel that ticks at 1 kHz (design R7). Mutated sources are audited too.
+# inside the PPC closure: common code uses OS32_TICK_HZ (design R7). Mutated sources are audited too.
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \

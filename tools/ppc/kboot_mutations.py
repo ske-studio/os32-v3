@@ -43,7 +43,45 @@ KERNEL_MUTATIONS = (
      'milestone 6 order/format', r'^KBOOT MPIC sources=\d+ priority=0 cpu=0 delivery=bad$'),
     ('half-rate', 'arch/ppc/kernel_dec.c',
      '    period = tb_hz / tick_hz;', '    period = tb_hz / tick_hz * 2;',
-     'ALIVE tick/TB mismatch', r'^KBOOT ALIVE tick_delta=(9\d|10\d) tb_us=20000\d\d of_calls_delta=0$'),
+     'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
+    ('dec-100hz', 'arch/ppc/kernel_dec.c',
+     '''    if (fraction >= PM_DEC_HZ) {
+        fraction -= PM_DEC_HZ;
+        ++value;
+    }
+    return value;
+}
+
+int ppc_dec_start(u32 tb_hz, u32 tick_hz)
+{
+    /* Keep every period positive, and signed DEC additions in range.
+     * Match the F1 admission bounds; DEC is 1ms, logical ticks are 10ms. */
+    if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
+        tick_hz != PM_DEC_HZ) return -1;
+    if (tick_clock_config(1, tick_hz)) return -1;
+    ready = 0;
+    period = tb_hz / tick_hz;
+    remainder = tb_hz % tick_hz;
+''',
+     '''    if (fraction >= 100) {
+        fraction -= 100;
+        ++value;
+    }
+    return value;
+}
+
+int ppc_dec_start(u32 tb_hz, u32 tick_hz)
+{
+    /* Keep every period positive, and signed DEC additions in range.
+     * Match the F1 admission bounds; DEC is 1ms, logical ticks are 10ms. */
+    if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
+        tick_hz != PM_DEC_HZ) return -1;
+    if (tick_clock_config(1, tick_hz)) return -1;
+    ready = 0;
+    period = tb_hz / 100;
+    remainder = tb_hz % 100;
+''',
+     'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
     ('onfault-reason', 'arch/ppc/kernel_trap.c',
      'reason == PPC_TRAP_DSI_IO) : reason == probe.reason)',
      'reason == PPC_TRAP_DSI_IO) : reason != probe.reason)',

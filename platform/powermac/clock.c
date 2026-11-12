@@ -44,7 +44,8 @@ void pm_clock_bind(const struct pm_kboot_info *info)
     bound_hz = info ? info->tb_hz : 0;
 }
 
-u32 pm_tick_hz(void) { return 100; }
+/* Physical DEC Hz; the public tick remains OS32_TICK_HZ. */
+u32 pm_tick_hz(void) { return PM_DEC_HZ; }
 
 int platform_clock_init(u32 tick_hz)
 {

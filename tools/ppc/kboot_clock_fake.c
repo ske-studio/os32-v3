@@ -52,11 +52,11 @@ void _start(void)
     REQUIRE(lo==123 && hi==456);
     platform_clock_info(&state);
     REQUIRE(!state.ready);
-    REQUIRE_CODE(platform_clock_init(100)<0, RANGE_ACCEPTED);
+    REQUIRE_CODE(platform_clock_init(1000)<0, RANGE_ACCEPTED);
     u32 invalid[]={0,999999,1000000001,0xffffffffUL};
     for (unsigned i=0;i<4;i++) {
         info.tb_hz=invalid[i]; pm_clock_bind(&info);
-        REQUIRE_CODE(platform_clock_init(100)<0, RANGE_ACCEPTED);
+        REQUIRE_CODE(platform_clock_init(1000)<0, RANGE_ACCEPTED);
         REQUIRE(platform_clock_read_us(&lo,&hi)<0);
         REQUIRE(lo==123 && hi==456);
     }
@@ -64,11 +64,11 @@ void _start(void)
     for (unsigned i=0;i<4;i++) {
         info.tb_hz=rates[i]; pm_clock_bind(&info);
         REQUIRE(platform_clock_init(0)<0);
-        REQUIRE(platform_clock_init(1000)<0);
+        REQUIRE(platform_clock_init(100)<0);
         now=0x7fffffff0ULL;
         REQUIRE(platform_clock_init(pm_tick_hz())==0);
         platform_clock_info(&state);
-        REQUIRE(state.ready && state.tick_hz==100 && state.counter_hz==rates[i]);
+        REQUIRE(state.ready && state.tick_hz==1000 && state.counter_hz==rates[i]);
         platform_clock_read(&value);
         REQUIRE(value.hz==rates[i] && value.is_8mhz==0);
         now+=17; expect(17000000ULL/rates[i]);
@@ -79,13 +79,13 @@ void _start(void)
         expect((d/rates[i])*1000000+(d%rates[i])*1000000/rates[i]);
     }
     info.tb_hz=1000000; pm_clock_bind(&info);
-    now=0; REQUIRE(platform_clock_init(100)==0);
+    now=0; REQUIRE(platform_clock_init(1000)==0);
     now=0x800000003ULL; rollover=1; upper_calls=lower_calls=0;
     expect(now);
     REQUIRE_CODE(upper_calls==4 && lower_calls==2, RETRY_COUNT);
     rollover=0;
     /* Unsigned full TB wrap relative to a nonzero origin. */
-    now=~0ULL-9; REQUIRE(platform_clock_init(100)==0);
+    now=~0ULL-9; REQUIRE(platform_clock_init(1000)==0);
     now=10; expect(20);
     pm_clock_bind(0);
     REQUIRE(platform_clock_read_us(&lo,&hi)<0);

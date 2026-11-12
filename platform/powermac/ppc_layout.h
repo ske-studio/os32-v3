@@ -72,7 +72,7 @@
 #define PM_REGION_COUNT 35
 #define PM_MEMORY_REGIONS 32
 #define PM_PTEG_INITIAL 0x1000
-#define PM_DEC_HZ 100
+#define PM_DIAG_DEC_HZ 100
 #define PM_DEC_DUMP_N 2
 #define PM_MEMORY "/memory"
 #define PM_ROOT "/"
