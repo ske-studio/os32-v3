@@ -1,4 +1,5 @@
 #include "resident_cli.h"
+#include "lib/kstring.h"
 
 #define LINE_SIZE 256
 
@@ -21,9 +22,25 @@ static char *spaces(char *s)
     return s;
 }
 
+static void output_exit(const struct resident_cli_ops *ops, int result)
+{
+    char buf[12];
+    unsigned int value = (unsigned int)result;
+    int pos = sizeof(buf) - 1;
+    buf[pos] = 0;
+    if (result < 0) value = 0u - value;
+    do { buf[--pos] = (char)('0' + value % 10); value /= 10; } while (value);
+    output(ops, "exit=");
+    if (result < 0) output(ops, "-");
+    output(ops, buf + pos);
+    output(ops, "\n");
+}
+
 static void execute(const struct resident_cli_ops *ops, char *line)
 {
+    char original[LINE_SIZE];
     char *cmd = spaces(line), *arg = cmd;
+    kstrncpy(original, line, sizeof(original));
     while (*arg && *arg != ' ') arg++;
     if (*arg) *arg++ = 0;
     arg = spaces(arg);
@@ -58,7 +75,8 @@ static void execute(const struct resident_cli_ops *ops, char *line)
     } else if (equal(cmd, "cat")) {
         if (!*arg || ops->cat(arg) < 0) output(ops, "cat failed\n");
     } else {
-        output(ops, "unknown command\n");
+        if (ops->run) output_exit(ops, ops->run(original));
+        else output(ops, "unknown command\n");
     }
 }
 

@@ -1,6 +1,7 @@
 #include "cli_boot.h"
 #include "lan_boot.h"
 #include "fs/vfs.h"
+#include "exec/exec.h"
 #include "kernel/cli/resident_cli.h"
 #include "kernel/console/console_stream.h"
 
@@ -18,8 +19,9 @@ static int cli_cat(const char *path)
 void pm_cli_boot(void)
 {
     static const struct resident_cli_ops ops = {
-        pm_terminal_getkey, console_stream_write, pm_terminal_poll,
-        cli_cat, vfs_write
+        .getkey = pm_terminal_getkey, .write = console_stream_write,
+        .poll = pm_terminal_poll, .cat = cli_cat, .put = vfs_write,
+        .run = exec_run
     };
     resident_cli_run(&ops);
 }

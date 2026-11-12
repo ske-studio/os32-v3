@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/cli/resident_cli.c'
 CHECK = dict(name='resident-cli', tier=1, budget=60, needs=[],
              covers=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
-                     'include/types.h', 'tools/tests/test_resident_cli.py'])
+                     'include/types.h', 'tools/tests/test_resident_cli.py',
+                     'lib/kstring_c.c', 'lib/kstring.h'])
 
 HARNESS = r'''
 #include <setjmp.h>
@@ -34,7 +35,11 @@ static int cat_file(const char *p) { (void)p; return 0; }
 static int put_file(const char *p, const void *d, u32 n) {
     strcpy(path, p); memcpy(data, d, n); size = n; return 0;
 }
-static const struct resident_cli_ops ops = { getkey, write_out, poll_key, cat_file, put_file };
+static char invoked[256];
+static int calls;
+static int run_line(const char *line) { strcpy(invoked, line); calls++; return calls == 1 ? 7 : -42; }
+static const struct resident_cli_ops ops = { getkey, write_out, poll_key, cat_file, put_file, 0 };
+static const struct resident_cli_ops run_ops = { getkey, write_out, poll_key, cat_file, put_file, run_line };
 static int check(const char *s, const char *expected) {
     input = s; pos = used = size = 0; out[0] = path[0] = 0;
     if (!setjmp(done)) resident_cli_run(&ops);
@@ -59,10 +64,19 @@ int main(void) {
     strcpy(expected, "os32> "); memset(expected + 6, 'x', 255);
     strcpy(expected + 261, "\nos32> echo z\nz\nos32> ");
     if (!check(longline, expected)) return 8;
+    calls = 0; input = "  /bin/hello.bin  ok \nmissing arg\nhelp\necho hi\ncat /x\necho a > /tmp/f\n";
+    pos = used = 0; out[0] = 0;
+    if (!setjmp(done)) resident_cli_run(&run_ops);
+    if (calls != 2 || strcmp(invoked, "missing arg") ||
+        !strstr(out, "exit=7\nos32> ") || !strstr(out, "exit=-42\nos32> ")) return 9;
+    calls = 0; input = "  /bin/hello.bin  ok \n"; pos = used = 0; out[0] = 0;
+    if (!setjmp(done)) resident_cli_run(&run_ops);
+    if (calls != 1 || strcmp(invoked, "  /bin/hello.bin  ok ")) return 10;
     return 0;
 }
 '''
 MUTATIONS = [
+    ('split-line', 'ops->run(original)', 'ops->run(line)', 9),
     ('reset', '            ops->poll();\n            length = 0;',
      '            ops->poll();\n            /* missing reset */', 1),
     ('space', 'char *path = spaces(redirect + 1), *end = redirect;',
@@ -89,7 +103,7 @@ def main():
             subprocess.run([os.environ.get('CC', 'gcc'), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-I', str(ROOT), '-I', str(ROOT / 'include'),
                             '-I', str(ROOT / 'kernel/cli'), str(d / 'resident_cli.c'),
-                            str(d / 'harness.c'), '-o', str(d / 'test')], check=True)
+                            str(d / 'harness.c'), str(ROOT / 'lib/kstring_c.c'), '-o', str(d / 'test')], check=True)
             result = subprocess.run([str(d / 'test')], timeout=10, check=False)
             if result.returncode != expected:
                 raise RuntimeError(f'{name}: expected {expected}, got {result.returncode}')
