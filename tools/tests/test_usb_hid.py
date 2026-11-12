@@ -3,6 +3,7 @@
 import argparse
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,10 +23,15 @@ def check(mutate):
     flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wvla', '-Iinclude', '-I.']
     with tempfile.TemporaryDirectory(prefix='usb-hid-') as directory:
         tmp = Path(directory)
-        for prefix in ('/home/hight/opt/cross/bin/i386-elf-',
-                       '/home/hight/opt/cross-ppc/bin/powerpc-elf-'):
+        for env, target in (('CROSS_DIR', 'i386-elf-gcc'),
+                            ('PPC_CROSS_DIR', 'powerpc-elf-gcc')):
+            cross = os.environ.get(env)
+            compiler = shutil.which(str(Path(cross)/'bin'/target) if cross else target)
+            if not compiler:
+                print('SKIP cross compile:', target)
+                continue
             for src in SOURCES:
-                subprocess.run([prefix+'gcc', *flags, '-ffreestanding', '-c', src,
+                subprocess.run([compiler, *flags, '-ffreestanding', '-c', src,
                                 '-o', str(tmp/'unit.o')], cwd=ROOT, check=True)
         for swap in ([], ['-DUSB_TEST_SWAP']):
             exe = tmp/'hid'
@@ -36,6 +42,9 @@ def check(mutate):
             print('HID runtime OK', swap)
         if mutate:
             mutations = [
+                ('drivers/usb/hid_kbd.c', 'i = (order + 0x70) & 127;', 'i = order;'),
+                ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
+                ('drivers/usb/hid_kbd_map.c', 'case 0x47: return 0xff;', 'case 0x47: return 0x46;'),
                 ('drivers/usb/hid_kbd.c', '!!s->prev[i] != !!now[i]', 's->prev[i] != now[i]'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, b->iface->src);', '(void)b;'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, f->src);', '(void)b;'),

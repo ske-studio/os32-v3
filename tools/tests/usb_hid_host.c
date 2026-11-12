@@ -54,7 +54,10 @@ static void finish_unsetup(struct usb_xfer *x) { free(x->buf.va); x->unsetup=UNS
 static void report(unsigned iface, const u8 *r, unsigned n, int error)
 {
     struct usb_xfer *x=xf[iface];
-    memcpy(x->buf.va,r,n); x->actual=n; x->error=error; x->done(x);
+    memcpy(x->buf.va,r,n); x->actual=n; x->error=error;
+    if (error == USB_X_OK && n < x->len)
+        x->error = x->short_ok ? USB_X_SHORT : USB_X_SHORT_NG;
+    x->done(x);
 }
 static u8 cfg[] = {
     9,2,41,0,2,1,0,0x80,50,
@@ -89,6 +92,7 @@ int main(void)
     REQUIRE(hid_kbd_sc(0x87)==0x33 && hid_kbd_sc(0x89)==0x0d);
     REQUIRE(hid_kbd_sc(0x88)==0x72 && hid_kbd_sc(0x8a)==0x35 && hid_kbd_sc(0x8b)==0x51);
     REQUIRE(hid_kbd_sc(0x44)==0x52 && hid_kbd_sc(0x45)==0x53 && hid_kbd_sc(0xe3)==0xff);
+    REQUIRE(hid_kbd_sc(0x47)==0xff);
     m->num=1;
     REQUIRE(!hid_mouse_class.match(&d,k) && !hid_kbd_class.match(&d,m));
     rc=attach(&d,0,&hid_kbd_class); REQUIRE(!rc);
@@ -106,14 +110,25 @@ int main(void)
     hid_kbd_class.tick(&d,k,629); REQUIRE(ne==4);
     hid_kbd_class.tick(&d,k,630); REQUIRE(ne==5);
     r[2]=1; report(0,r,8,USB_X_OK); REQUIRE(ne==5); /* rollover preserves state */
-    r[2]=0; report(0,r,7,USB_X_OK); REQUIRE(ne==5);
+    n=starts;
+    r[2]=0; report(0,r,7,USB_X_OK); REQUIRE(ne==5 && starts==n+1);
     report(0,r,8,USB_X_OK); REQUIRE(ne==6 && events[5].b==0);
     hid_kbd_class.tick(&d,k,1000); REQUIRE(ne==6);
-    report(1,mouse,2,USB_X_SHORT); REQUIRE(ne==6);
+    n=starts;
+    report(1,mouse,2,USB_X_OK); REQUIRE(ne==6 && starts==n+1);
     report(1,mouse,3,USB_X_OK);
     REQUIRE(ne==7 && events[6].kind==2 && events[6].src==2 &&
             events[6].a==-128 && events[6].b==127 && events[6].c==5);
-    r[2]=4; report(0,r,8,USB_X_OK); n=ne;
+    n=ne;
+    r[0]=2; r[2]=4; report(0,r,8,USB_X_OK);
+    REQUIRE(ne==n+2 && events[n].a==0x70 && events[n].b==1 &&
+            events[n+1].a==0x1d && events[n+1].b==1);
+    n=ne;
+    r[0]=0; r[2]=5; report(0,r,8,USB_X_OK);
+    REQUIRE(ne==n+3 && events[n].a==0x70 && events[n].b==0 &&
+            events[n+1].a==0x1d && events[n+1].b==0 &&
+            events[n+2].a==0x2d && events[n+2].b==1);
+    n=ne;
     hid_kbd_class.detach(&d,k); hid_kbd_class.detach(&d,k);
     REQUIRE(ne==n+1 && events[n].kind==3 && events[n].a==USBP_INPUT_KBD);
     hid_kbd_class.tick(&d,k,2000); REQUIRE(ne==n+1 && !frees && stops==1);

@@ -61,6 +61,7 @@ static int hid_progress(struct hid_boot *b, u8 proto, void (*done)(struct usb_xf
         b->x.done = done;
         b->x.ctx = b;
         b->x.len = proto == 1 ? 8 : 3;
+        b->x.short_ok = 1;
         rc = usb_xfer_start(&b->x);
         if (rc < 0) { hid_stop(b); return rc; }
     }

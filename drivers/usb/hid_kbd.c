@@ -9,7 +9,7 @@ static void kbd_done(struct usb_xfer *x)
     struct hid_kbd *s = x->ctx;
     const u8 *r = x->buf.va;
     u8 now[128] = {0};
-    unsigned int i;
+    unsigned int i, order;
     if (s->boot.stopped) return;
     if (x->error == USB_X_OK && x->actual >= 8) {
         for (i = 2; i < 8; ++i) if (r[i] >= 1 && r[i] <= 3) goto restart;
@@ -22,7 +22,9 @@ static void kbd_done(struct usb_xfer *x)
             u8 sc = hid_kbd_sc(r[i]);
             if (sc < 128) ++now[sc];
         }
-        for (i = 0; i < 128; ++i) {
+        /* Notify modifiers before ordinary keys, for both make and break. */
+        for (order = 0; order < 128; ++order) {
+            i = (order + 0x70) & 127;
             if (!!s->prev[i] != !!now[i]) { /* A5: compare presence, not counts. */
                 usbp_input_key(s->boot.iface->src, i, now[i] != 0);
                 if (now[i] && i < 0x70) {
