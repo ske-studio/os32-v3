@@ -235,22 +235,27 @@ void ppc_kernel_main(void)
      * at least ~20 ms apart and compare its microseconds with the TB interval. */
     u32 us0 = 0, us_lo = 0, us_hi = 0, hi0 = 0;
     u32 saved = ppc_irq_save();                 /* contract: read with IF=0 */
+    unsigned long long tb0_a = tb_now();
     int clock_ok = platform_clock_read_us(&us0, &hi0) == 0;
-    unsigned long long tb0 = tb_now();
+    unsigned long long tb0_b = tb_now();
     ppc_irq_restore(saved);
     u32 after = tick_count + 3;
     if (!wait_until((volatile u32 *)&tick_count, after, info->tb_hz, 1000))
         kboot_stop("no tick");
     saved = ppc_irq_save();
-    clock_ok = clock_ok && platform_clock_read_us(&us_lo, &us_hi) == 0;
-    unsigned long long tb1 = tb_now();
+    unsigned long long tb1_a = tb_now();
+    clock_ok = platform_clock_read_us(&us_lo, &us_hi) == 0 && clock_ok;
+    unsigned long long tb1_b = tb_now();
     u32 ticks = tick_count;
     ppc_irq_restore(saved);
     if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
-    u32 want = (u32)((tb1 - tb0) * 1000000 / info->tb_hz), got = us_lo - us0;
-    u32 error = got > want ? got - want : want - got;
-    /* 64-bit: a huge error must not wrap into a small one. 2% + two-read skew. */
-    if (want < 10000 || 50ULL * error > (unsigned long long)want + 2500)
+    u32 want = (u32)((tb1_b - tb0_a) * 1000000 / info->tb_hz);
+    unsigned long long lower = (tb1_a - tb0_b) * 1000000 / info->tb_hz;
+    unsigned long long upper = (tb1_b - tb0_a) * 1000000 / info->tb_hz;
+    u32 got = us_lo - us0;
+    /* Each endpoint's conversion can round down by one microsecond. */
+    if (want < 10000 || (unsigned long long)got + 1 < lower ||
+        (unsigned long long)got > upper + 1)
         kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", pm_tick_hz(), ticks, us_lo);
 
