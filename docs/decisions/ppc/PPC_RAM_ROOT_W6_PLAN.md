@@ -1,6 +1,6 @@
 # PPC_RAM_ROOT_W6_PLAN — 段 W6 (PC-98 の FD 起動を、PowerPC と共通の読み取り専用の RAM root へ) の計画
 
-> 状態: **計画確定 (2026-11-12)・本線 PM のレビュー待ち** — 共通の部品の段 (C1〜C4、PowerPC 側) と PC-98 の FD 側の段 (P1〜P4・PB、本線が手すきの時に起こす) に分け、案 B (root を別置きの RAM へ運ぶ) を推奨。A か B か・pair の契約・CdModuleApi の版上げは本線 PM、FD の中身を削るかはユーザー (2HD の実測で分かれる条件付き)。段の状態は票 TASK_PPC_SHELL が持つ。
+> 状態: **計画確定 (2026-11-12)・本線のレビューと決定を反映 (末尾、ユーザー決定は案 B)** — 共通の部品の段 (C1〜C4、PowerPC 側) と PC-98 の FD 側の段 (P1〜P4・PB、本線が手すきの時に起こす) に分け、案 B (root を別置きの RAM へ運ぶ) を推奨。A か B か・pair の契約・CdModuleApi の版上げは本線 PM、FD の中身を削るかはユーザー (2HD の実測で分かれる条件付き)。段の状態は票 TASK_PPC_SHELL が持つ。
 
 > 出所: ~/os32-tmp/run/ppc-w6/PLAN.final.md (gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き Approve、PM が C3・C4 と N1〜N3 を反映)。前提は [PPC_SHELL_DESIGN](PPC_SHELL_DESIGN.md) の末尾の確定 (P1-1・P1-2・P2-1〜P2-3)。
 
@@ -226,3 +226,25 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 - N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (platform/pc98/bootinfo_wire.h:34) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
 - N3 (P3): MEM_BOOT_BUNDLE (include/memmap.h:388-396) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c:401-407 を追従させる。
 - 未決の振り分け: 本線 PM 3 件 (A か B か、pair の契約、CdModuleApi の版上げ。推奨は B・pair は今のまま・fs を外して版上げ)。B はローダと boot 情報 v3 で範囲が広がるので、本線 PM が B を採る時点でユーザーに知らせる (スコープの拡大)。ユーザー 1 件 (FD の中身を削るか、N2 の条件付き)。
+
+## 本線のレビューと決定 (2026-11-12)
+
+**ユーザーの決定** (2026-11-12、本線 PM が諮った。原文の選択肢「案 B で進める (推奨)」): 案 B で進める。共通の部品 (C1〜C4) は PowerPC 側が先に出す。PC-98 の FD 側の段は本線が手すきの時に起こす。kernel は ISO の中に 1 回だけ持つ形を基本にする。実機の FD の起動の受入は、FD の作成と差し替えをユーザーが行う。
+
+**本線 PM の決定**:
+- (1) A か B か: **B**。
+- (2) pair の契約: **今のまま** (最終の VK32 の CRC との pair)。
+- (3) CdModuleApi: **版を上げる** (CD_MODULE_OPS_VERSION 1→2)。iso9660 を kernel 常駐にし、cd.mod から fs を外す。kernel が登録する FS は ext2・fat・hostdrv・serialfs・iso9660・ramfs の 6 個 (VFS_MAX_FS=8 に収まる)。
+- (4) FD の中身: **今は削らない**。2HD の実測で 64KB の下限を割ったら、容量と失う機能を示してユーザーに諮る。
+
+**本線の独立レビュー (Approve 条件付き、P1 なし) の指摘で、段を出す前に計画に入れる物**:
+- R-1 (P2): 1MB より上への転送は **(c) PM の往復**を採る。boot/loader_hdd.asm:186-270 に実機で使っている往復 (pm16_trampoline・rm_trampoline、INT 1Bh) がある。(a) INT 1Fh AH=90h はミラーの Bible・UNDOCUMENTED で確かめられないので採らない ([HW3])。(b) unreal mode は推測に頼るので採らない。FD のローダを HDD と同じ形 (C を PM で動かし、INT 1Bh を往復で呼ぶ) に寄せる案も比べる。
+- R-2 (P2): 今の vmkernel.lz4 は約 330KiB で、2HD の空き約 443KB から 2 つ目の kernel を引くと 64KB の下限を割る見込み。**kernel を 2 回持たない形を前提**にする。候補: ローダが ROOT.ISO を高位へ運び、PM で ISO の root から VMKRNL.LZ4 の extent を探し、pm_vk32_boot の file 引数 (boot/loader_fat_new.asm:337) に高位の番地を渡す。
+- R-3 (P2): 今の bundle の予約 (mm/memory_boot.c:175・242) は中身を後で ledger_transfer で部品へ渡す契約 (:169・:349)。一生残る root の帯には専用の定数 (例 MEM_BOOT_ROOT_*) と owner を作り、LEDGER_RF_PERMANENT を付ける。申告は bootinfo v3 から渡す。T6b の同梱域とは別に置き、票 TASK_T4_T6_MODULES の 261 行目付近に依存を 1 行書く。(確定の N3 はこれに置き換える。)
+- R-4 (P3): kernel が FAT から ROOT.ISO を 0x600000 へ読む案も比較表に 1 行足す (install 用の kernel が 2 回になるので落とす)。
+- R-5 (P3): HDD は bootinfo v2 のままで、配置の世代 (--layout-gen) も実機の HDD の配置も変わらない。
+- R-6 (P3): ramfs の上限 16 ファイル × 1KiB (fs/ramfs/ramfs.h:6-7) は FD 起動の /tmp (リダイレクト・エディタ) に足りない。PC-98 側の P3 で洗い出して上限を決め直す段を足す。
+- R-7 (P3): 実機の受入は「FD の作成と抜き差しはユーザー、シリアルでの判定はノートのセッション」。
+- R-8 (P3): ★は「x86 の vmkernel.lz4 や FD の像のバイト列が変わる段」だけに付ける。
+
+**共通の部品の段 C1〜C4 の出し方**: この文書を main に入れた後に出す。fs/・drivers/block/・include/ と x86 の生成物に触る段は、covers を持つ check を全部 `make check-<name> MUTATE=0` で回し、x86 の生成物の比較を添えて送る。
