@@ -11,3 +11,5 @@ module modules sdk programs libs boot deploy deploy-kernel kernel-r1 sqlite-modu
 %-module deploy-%:
 	@echo 'unsupported product target ppc-powermac: $@' >&2; exit 1
 -include $(C_KERNEL_OBJ:.o=.d) $(GAS_KERNEL_OBJ:.o=.d)
+
+include build/ppc-user.mk
