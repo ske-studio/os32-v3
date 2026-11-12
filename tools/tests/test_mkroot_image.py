@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Exercise root images through the ISO9660 directory records."""
-CHECK = dict(name='mkroot-image-host', tier=1, needs=[], budget=10,
-    covers=['tools/mkroot_image.py', 'tools/tests/test_mkroot_image.py'])
+CHECK = dict(name='mkroot-image-host', tier=1, needs=['make:all'], budget=10,
+    covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'tools/mkroot_image.py', 'tools/tests/test_mkroot_image.py',
+            'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml'])
 
 from pathlib import Path
 import shutil
+import os
 import subprocess
 import sys
 import tempfile
@@ -77,6 +79,46 @@ def exercise(script, directory):
     assert image[start:start + size] == payload
 
 
+def plan_exercise(directory):
+    import importlib.util
+    sys.path.insert(0, str(ROOT / 'tools'))
+    spec = importlib.util.spec_from_file_location('root_image', SOURCE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    seen = set()
+    mod.check_collision('SYS/SHELL.BIN', seen)
+    try:
+        mod.check_collision('SYS/SHELL.BIN', seen)
+    except ValueError as exc:
+        assert 'collision' in str(exc)
+    else:
+        raise AssertionError('collision survived')
+    assert mod.fd_free_bytes('2hd', 0, 0) > 64 * 1024
+    assert mod.fd_free_bytes('144', 0, 0) > 64 * 1024
+    out = directory / 'plan.iso'
+    proc = subprocess.run([sys.executable, '-B', str(SOURCE), '--plan',
+                           'build/packages.yaml', '--fd', '--out', str(out)],
+                          cwd=ROOT, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert f"ISO: {out.stat().st_size} bytes; contents:" in proc.stdout
+    assert '2048-rounded contents:' in proc.stdout
+    image = out.read_bytes()
+    root = entries(image, image[16 * BLOCK + 156:])
+    assert 'VMKRNL.LZ4' in root and 'LOADER.BIN' not in root
+    assert 'SHELL.BIN' in entries(image, root['SYS'])
+    assert 'FILETYPE' in entries(image, root['ETC'])
+    for geometry, loader in [('2hd', 'boot/loader_fat_new.bin'),
+                             ('144', 'boot/loader_fat144.bin')]:
+        free = mod.fd_free_bytes(geometry, len(image), (ROOT / loader).stat().st_size)
+        print(f'FD {geometry}: estimated free {free} bytes ({free // 1024} KB)')
+        assert free >= mod.FD_MIN_FREE_KB * 1024, 'FD estimate below 64 KB'
+    print(proc.stdout.strip())
+    no_tool = subprocess.run([sys.executable, '-B', str(SOURCE), '--plan',
+                              'build/packages.yaml', '--fd', '--out', str(out)],
+                             cwd=ROOT, env={'PATH': ''}, capture_output=True, text=True)
+    assert no_tool.returncode == 1
+
+
 def main():
     if not (shutil.which('genisoimage') or shutil.which('xorriso')):
         print('SKIP: genisoimage or xorriso required')
@@ -84,12 +126,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='test-mkroot-') as tmp:
         directory = Path(tmp)
         exercise(SOURCE, directory)
+        plan_exercise(directory)
         if '--mutate' in sys.argv:
             source = SOURCE.read_text()
             anchor = "'-no-pad'"
             assert source.count(anchor) == 1
             mutant = directory / 'mutant.py'
             mutant.write_text(source.replace(anchor, "'-pad'"))
+            os.environ['PYTHONPATH'] = str(ROOT / 'tools')
             try:
                 verify_mutant(mutant, directory)
             except AssertionError as exc:
@@ -97,6 +141,20 @@ def main():
                 print('RED runtime: padding detected (1)')
             else:
                 raise AssertionError('padding mutant survived')
+            anchor = '    if target in seen:'
+            assert source.count(anchor) == 1
+            mutant.write_text(source.replace(anchor, '    if False:'))
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('mutant_root', mutant)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            seen = set()
+            mod.check_collision('SYS/SHELL.BIN', seen)
+            try:
+                mod.check_collision('SYS/SHELL.BIN', seen)
+            except ValueError:
+                raise AssertionError('collision mutant failed to mutate')
+            print('RED runtime: collision survived (1)')
     print('PASS mkroot image')
     return 0
 

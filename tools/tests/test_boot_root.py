@@ -5,8 +5,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=[],
-             covers=['init/boot_root.c', 'platform/powermac/root_boot.[ch]',
+CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=['make:all'],
+             covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'init/boot_root.c', 'platform/powermac/root_boot.[ch]',
                      'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
                      'include/boot_root.h', 'drivers/block/ram_ro.[ch]',
                      'drivers/base/dev.[ch]', 'fs/vfs*', 'fs/isofs/**',
