@@ -12,14 +12,14 @@ import os32x_hdr as H
 from target_profile import require as require_target, check_elf_identity
 
 
-def checked_elf(path):
-    check_elf_identity(path, require_target('x86-pc98', 'link_guard'))
+def checked_elf(path, profile):
+    check_elf_identity(path, profile)
     return H.Elf32(path)
 
 
 def check_note(elf):
     s = elf.section('.os32_generations')
-    expected = __import__('struct').pack('<4I', H.OS32X_HDR_VERSION, H.OS32_KAPI_ABI_GENERATION,
+    expected = __import__('struct').pack(elf.endian + '4I', H.OS32X_HDR_VERSION, H.OS32_KAPI_ABI_GENERATION,
                                         H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL)
     if not s or not s['size'] or s['size'] % len(expected):
         raise H.HeaderError(f'{elf.path}: missing per-unit generations; rebuild')
@@ -75,6 +75,13 @@ def main():
         return 1
     if not any('app.ld' in a or 'app_sys.ld' in a or 'shlib.ld' in a or 'os32.ld' in a for a in args):
         return subprocess.call([linker, *args])
+    if target == 'ppc-powermac':
+        libs = [args[i + 1] for i, arg in enumerate(args[:-1]) if arg == '-l']
+        libs += [arg[2:] for arg in args if arg.startswith('-l') and arg != '-l']
+        if any(lib in ('c', 'm', 'gcc') for lib in libs) or any(
+                pathlib.Path(arg).name in ('libc.a', 'libm.a', 'libgcc.a') for arg in args):
+            print('link_guard: PPC USER does not support libc, libm or libgcc', file=sys.stderr)
+            return 1
     out = pathlib.Path(args[args.index('-o') + 1])
     # The exact vendor inputs are recorded; a basename alone is not an exemption.
     exempt = set()
@@ -91,7 +98,7 @@ def main():
             return r.returncode
         try:
             nano_vendor = set()
-            if any(pathlib.Path(a).name == 'app.ld' for a in args):
+            if target == 'x86-pc98' and any(pathlib.Path(a).name == 'app.ld' for a in args):
                 module = pathlib.Path(__file__).parent / 'allocator/check_link.py'
                 if not module.exists():
                     module = pathlib.Path(__file__).parent / 'nano_check_link.py'
@@ -121,10 +128,10 @@ def main():
                 if match:
                     member = pathlib.Path(tmp) / 'member.o'
                     member.write_bytes(subprocess.check_output([ar, 'p', str(path), match[2]]))
-                    check_note(checked_elf(member))
+                    check_note(checked_elf(member, profile))
                 else:
-                    check_note(checked_elf(path))
-            check_note(checked_elf(out))
+                    check_note(checked_elf(path, profile))
+            check_note(checked_elf(out, profile))
             # Evidence for wrapping and the build manifest, including used/exempt inputs.
             out.with_suffix('.inputs.json').write_text(__import__('json').dumps(
                 {'selected': sorted(selected), 'vendor': sorted(exempt),
