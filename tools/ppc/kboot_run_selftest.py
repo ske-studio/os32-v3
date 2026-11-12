@@ -22,7 +22,7 @@ LINES = [
  'OF-CAPTURE ram=134217728 admitted=67108864 tb_hz=100000000',
  'OF-OFF calls=1', 'MMU-D root=2097152 hpt=1048576 bytes=1048576 ram_bat=0',
  'MEMORY online=1 heap=1 shm=1', 'TRAP dsi=pass isi=pass guard=pass flush=pass',
- 'MPIC sources=64 priority=0 cpu=0 delivery=pass', 'CLOCK hz=1000 tick=1 us=1000',
+ 'MPIC sources=64 priority=0 cpu=0 delivery=pass', 'CLOCK hz=100 tick=1 us=10000',
  'READY stage=pre-user']
 SOURCE = r'''
 #include "kernel_entry.h"
@@ -30,7 +30,7 @@ SOURCE = r'''
 static struct pm_escc sink;
 volatile unsigned long long kboot_ready_tb;
 volatile unsigned kboot_tick;
-volatile unsigned kboot_reload = 100000;
+volatile unsigned kboot_reload = 1000000;
 extern unsigned irq_start[], irq_end[];
 static void clock_init(void) {
  unsigned old, real;
@@ -40,7 +40,7 @@ static void clock_init(void) {
  while(s<irq_end) *p++=*s++;
  __asm__ volatile("sync; icbi 0,%0; sync; isync"::"r"(0x900):"memory");
  __asm__ volatile("mtmsr %0; isync"::"r"(old):"memory");
- unsigned dec=100000, msr;
+ unsigned dec=1000000, msr;
  __asm__ volatile("mtdec %0; mfmsr %1":"=r"(dec),"=r"(msr):"0"(dec));
  msr=(msr & ~0x40u)|0x8000u;
  __asm__ volatile("mtmsr %0; isync"::"r"(msr):"memory");
@@ -112,7 +112,7 @@ def main():
     import argparse
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true'); args=parser.parse_args()
     started=time.monotonic(); out=Path(tempfile.mkdtemp(prefix='kboot-selftest-', dir=os.environ['TMPDIR']))
-    good='KBOOT ALIVE tick_delta=2200 tb_us=2200000 of_calls_delta=0'
+    good='KBOOT ALIVE tick_delta=220 tb_us=2200000 of_calls_delta=0'
     elf=fixture(out/'good', LINES, good)
     normal = {}
     for cpu in ('7450','7455'):
@@ -122,10 +122,10 @@ def main():
     cases=[('order', [LINES[1],LINES[0],*LINES[2:]],good,False, 'milestone 1 order/format'),
            ('missing', LINES[:3]+LINES[4:],good,False,'milestone 4 order/format'),
            ('fatal', LINES+['FATAL fixture'],good,False,'forbidden diagnostic'),
-           ('tick', LINES,good.replace('2200 tb','1 tb'),False,'ALIVE tick/TB mismatch'),
+           ('tick', LINES,good.replace('220 tb','1 tb'),False,'ALIVE tick/TB mismatch'),
            ('stop',LINES,good,True,'stopped after READY'),
            ('duplicate',LINES+[LINES[-1]],good,False,'duplicate/extra milestone'),
-           ('duration',LINES,good.replace('tick_delta=2200','tick_delta=1000').replace('2200000','1000000'),False,'ALIVE duration')]
+           ('duration',LINES,good.replace('tick_delta=220','tick_delta=100').replace('2200000','1000000'),False,'ALIVE duration')]
     images = {}
     for name,lines,alive,stop,reason in cases:
         elf=fixture(out/name,lines,alive,stop=stop)
@@ -152,7 +152,7 @@ def main():
     assert retained == {p.name:p.read_bytes() for p in normal['7450'].iterdir() if p.is_file()}
     print('GREEN negative contract and retained evidence',flush=True)
     # Correct ALIVE immediately after exactly two guest seconds must pass.
-    elf=fixture(out/'exact',LINES,good.replace('2200','2000'),immediate=True)
+    elf=fixture(out/'exact',LINES,good.replace('tick_delta=220','tick_delta=200').replace('2200000','2000000'),immediate=True)
     meter.accept(elf,'7450',60,out/'exact-guest')
     print('GREEN exact READY duration',flush=True)
     # EE-enabled self branch resumes via the decrementer handler.

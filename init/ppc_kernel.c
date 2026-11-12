@@ -218,16 +218,16 @@ void ppc_kernel_main(void)
     kprintf(KBOOT_ATTR, "KBOOT MPIC sources=%u priority=0 cpu=0 delivery=%s\r\n",
             pm_mpic_source_count(), delivered ? "pass" : "bad");
 
-    if (!wait_until((volatile u32 *)&tick_count, 10, info->tb_hz, 1000))
+    if (!wait_until((volatile u32 *)&tick_count, 1, info->tb_hz, 1000))
         kboot_stop("no tick");
     /* The clock provider must advance with the time base: read it twice
-     * ~20 ms apart and compare its microseconds with the TB interval. */
+     * at least ~20 ms apart and compare its microseconds with the TB interval. */
     u32 us0 = 0, us_lo = 0, us_hi = 0, hi0 = 0;
     u32 saved = ppc_irq_save();                 /* contract: read with IF=0 */
     int clock_ok = platform_clock_read_us(&us0, &hi0) == 0;
     unsigned long long tb0 = tb_now();
     ppc_irq_restore(saved);
-    u32 after = tick_count + 20;
+    u32 after = tick_count + 3;
     if (!wait_until((volatile u32 *)&tick_count, after, info->tb_hz, 1000))
         kboot_stop("no tick");
     saved = ppc_irq_save();

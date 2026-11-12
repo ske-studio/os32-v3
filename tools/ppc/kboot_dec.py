@@ -21,7 +21,7 @@ MUTATIONS = [
     ('fraction', 'fraction += remainder;', 'fraction += 0;', 13),
     ('catchup', '++elapsed;', 'elapsed = 1;', 9),
     ('initial-dec', 'ppc_write_dec(next_period());', '(void)next_period();', 7),
-    ('100hz', 'tick_hz != 1000', 'tick_hz != 100', 5),
+    ('100hz', 'tick_hz != 100', 'tick_hz != 1000', 5),
     ('irq-depth', '++kctx_irq_depth;', '(void)kctx_irq_depth;', 19),
     ('ready', 'ppc_write_dec(PPC_DEC_FAR);', 'ppc_write_dec(1);', 4),
 ]
@@ -83,7 +83,7 @@ def observe(out, elf, red=None):
                 metrics[name]=int(value.split()[-1],16)
             (out/'metrics.log').write_text(repr(metrics))
             if red is None:
-                ratio=metrics['f2_ticks']*metrics['f2_hz']/(metrics['f2_delta']*1000)
+                ratio=metrics['f2_ticks']*metrics['f2_hz']/(metrics['f2_delta']*100)
                 require(0.95<=ratio<=1.05,'independent TB/tick ratio '+str(ratio))
                 require(last==syms['fixture_done'],'unexpected baseline stop '+repr(serial))
                 require(serial[serial.index(b'F2-BEGIN'):]==b'F2-BEGIN\\r\\nF2-ARMED\\r\\nF2-PASS\\r\\n',

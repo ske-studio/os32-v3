@@ -14,8 +14,8 @@ static u32 next_period(void)
 {
     u32 value = period;
     fraction += remainder;
-    if (fraction >= 1000) {
-        fraction -= 1000;
+    if (fraction >= 100) {
+        fraction -= 100;
         ++value;
     }
     return value;
@@ -24,9 +24,9 @@ static u32 next_period(void)
 int ppc_dec_start(u32 tb_hz, u32 tick_hz)
 {
     /* Keep every period positive, and signed DEC additions in range.
-     * Match the F1 admission bounds; the public tick unit is always 1ms. */
+     * Match the F1 admission bounds; the public tick unit is always 10ms. */
     if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
-        tick_hz != 1000) return -1;
+        tick_hz != 100) return -1;
     ready = 0;
     period = tb_hz / tick_hz;
     remainder = tb_hz % tick_hz;
