@@ -14,6 +14,17 @@ KBOOT_TERM ?= lan
 NEGATIVE ?= 0
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
+.DEFAULT_GOAL := all
+
+ROOT_ISO := $(KB_OUT)/root.iso
+ROOT_BLOB := $(KB_OUT)/root_image_blob.o
+ROOT_MOTD := $(KB_OUT)/motd.txt
+KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
+ROOT_BINS = $(KB_ROOT_BINS)
+ROOT_OBJCOPY := $(KB_OBJCOPY)
+ROOT_ELF_FORMAT := elf32-powerpc
+ROOT_CPU := powerpc
+include build/ram-root.mk
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := arch/ppc/kernel_entry.S arch/ppc/entry.S arch/ppc/kernel_takeover.S \
@@ -46,9 +57,8 @@ ifeq ($(KBOOT_SHELL),1)
 ifneq ($(KBOOT_TERM),lan)
 $(error KBOOT_TERM must be lan)
 endif
-KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c fs/isofs/iso9660.c \
- fs/isofs/iso9660_media.c drivers/block/ram_ro.c init/boot_root.c \
- fs/ramfs/ramfs.c platform/powermac/root_boot.c platform/powermac/root_image.c \
+KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c $(RAM_ROOT_C) \
+ platform/powermac/root_boot.c platform/powermac/root_image.c \
  platform/powermac/console_stream.c platform/powermac/shell_putchar.c \
  platform/powermac/cli_boot.c kernel/cli/resident_cli.c
 KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
@@ -82,7 +92,6 @@ KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-table
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
  -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -MMD -MP $(KB_INC)
 
-.DEFAULT_GOAL := all
 .PHONY: all audit
 all: $(KB_ELF) audit
 
@@ -124,10 +133,6 @@ kb-user:
 
 build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin: kb-user
 
-$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
-	python3 -B tools/mkroot_image.py --motd $< --bin build/out/ppc-user/hello.bin --bin build/out/ppc-user/fault.bin --out $@
-$(KB_OUT)/root_image_blob.o: $(KB_OUT)/root.iso
-	$(KB_OBJCOPY) -I binary -O elf32-powerpc -B powerpc --rename-section .data=.rodata.boot_root,alloc,load,readonly,data,contents $< $@
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined \
