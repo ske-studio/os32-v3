@@ -29,10 +29,16 @@ char *kstrncpy(char *d, const char *s, u32 n)
 #include "shlib.h"
 int host_map_fail;
 static u32 scan_total[2], scan_interval[2], scan_max[2];
+static int inject_ledger_op;
 void host_scan(int kind)
 {
     scan_total[kind]++;
     if (!(host_arch_if & 0x200U)) scan_interval[kind]++;
+    if (kind == 1 && inject_ledger_op) {
+        if (inject_ledger_op == 1) ledger_irq_ops++;
+        else ledger_exc_ops++;
+        inject_ledger_op = 0;
+    }
 }
 void host_irq_end(unsigned int flags)
 {
@@ -293,7 +299,17 @@ static void run(void)
     tail[PTE_COUNT-1] = 0;
     reset_scans();
     CHECK(ledger_selfcheck("bounded"));
-    CHECK(scan_max[1] == pgalloc_limit_pfn() && scan_max[1] <= PHYSMEM_MAX_PFN);
+    CHECK(scan_total[1] == pgalloc_limit_pfn() && scan_max[1] == 0);
+    u32 check_fail = ledger_check_fail, old_irq_ops = ledger_irq_ops;
+    u32 old_exc_ops = ledger_exc_ops;
+    const char *check_tag = "scan-R1";
+    inject_ledger_op = 1;
+    CHECK(!ledger_selfcheck(check_tag));
+    CHECK(ledger_check_fail == check_fail + 1 && ledger_check_tag == check_tag);
+    inject_ledger_op = 2;
+    CHECK(!ledger_selfcheck(check_tag));
+    CHECK(ledger_check_fail == check_fail + 2 && ledger_check_tag == check_tag);
+    ledger_irq_ops = old_irq_ops; ledger_exc_ops = old_exc_ops;
     CHECK(paging_addrspace_map_user_range(&space, PAGE_SIZE,
           MEM_CONV_END, PAGE_RW | PTE_USER) == -1);
     CHECK(!paging_master_audit(exec_tramp_page_addr()));

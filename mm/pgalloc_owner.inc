@@ -390,17 +390,20 @@ done:
     return ok;
 }
 
-/* Counts and owner totals must describe one instant: IRQ allocations/frees
- * prevent a safe chunked snapshot. Lifecycle callers are limited to boot,
- * launch, GUI handoff and V86 return; never poll/yield/resume. */
+/* R1 stops IRQ/exception ledger operations before they change the ledger.
+ * Cooperative lifecycle callers never yield during this scan, so counts and
+ * owner totals remain consistent with interrupts enabled. */
 int ledger_selfcheck(const char *tag)
 {
     u32 counts[LEDGER_MAX_OWNERS];
     const struct ledger_region *r, *g;
-    u32 p, i, j, o, live;
+    u32 p, i, j, o, live, irq_ops, exc_ops;
     unsigned int flags;
     int ok;
     flags = irq_save();
+    irq_ops = ledger_irq_ops;
+    exc_ops = ledger_exc_ops;
+    irq_restore(flags);
     ok = initialized;
     for (i = 0; i < LEDGER_MAX_OWNERS; i++) counts[i] = 0;
     live = 0;
@@ -434,6 +437,8 @@ int ledger_selfcheck(const char *tag)
     for (i = 0; ok && i < LEDGER_MAX_SURFACES; i++)
         if (ledger_surfaces[i].npages && !owner_ok(ledger_surfaces[i].owner))
             ok = 0;
+    flags = irq_save();
+    if (irq_ops != ledger_irq_ops || exc_ops != ledger_exc_ops) ok = 0;
     if (!ok) {
         ledger_check_fail++;
         ledger_check_tag = tag;
