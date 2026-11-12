@@ -36,6 +36,7 @@
 #include "shell_boot.h"
 #include "input_boot.h"
 #include "hostfs.h"
+#include "usb_boot.h"
 #else
 #include "cli_boot.h"
 #endif
@@ -300,6 +301,7 @@ void ppc_kernel_main(void)
     if (pm_root_boot(&img) == 0) {
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
+        pm_usb_boot(info->tb_hz);
         pm_input_boot();
 #endif
         pm_exec_boot();

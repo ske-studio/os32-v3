@@ -826,3 +826,9 @@ void usb_service(void)
 - PowerPC の道 (§813 の対): G4 の Open Firmware は USB キーボードのために OHCI を動かしたまま (InterruptRouting・ownership を持ったまま) 渡し得る。1P の殻は FreeBSD の ohci の takeover (OwnershipChangeRequest → IR が落ちるまで待つ) に当たる静止を、start の前に行う。
 - 1C・1D の着手で見つかった欠け (PM 決定、2026-11-13): (1) `usb_xfer_sync` の `-USB_E_CTX` は `usb_busy != 0` (usb_service・USB の tick・done の内側) のときだけ。シングルタスクでほかの tick からは呼ばれないので、platform に文脈の照会の口は足さない。(2) `struct usb_class` に `release(dev, iface)` を足す。中核が `usb_class_unsetup_done` の後 (ハブは子が全部返った後) に 1 回呼び、class が sc と自分の資源を返す。gone の後は呼ばない (R7-02)。
 - (3) class の attach は呼び直せる形 (PM 決定、2026-11-13、1C・1D が同じ欠けで停止): 戻り値 `-USB_E_BUSY` = 進行中 (中核は次の探索の段で同じ attach を呼び直す、進み具合は class の sc が持つ — HID の SET_PROTOCOL → SET_IDLE → 割込み IN、ハブの記述子 → 給電 → 給電待ち → 割込み pipe)、`0` = 完了、ほかの負 = 失敗 (class が自分の xfer・ep0 の要求の unsetup を始めた状態で返す。中核は `usb_class_unsetup_done` → `release` → その iface を空に、R2-10)。A6 の「走査は attach が終わるまで待つ」は BUSY の間は次のポートへ進まないこと。FB の usb_probe_and_attach (usb_device.c:1450-1456) の同期の結果を、シングルタスクの段に分けた形。
+
+### 1P の PowerMac の実装
+
+- sh 像だけに PowerMac の殻と共通 USB をリンクする。OF の間に UniNorth の PCI root・ranges を保存し、GMAC の有無や初期化に依存せず config と OHCI BAR の I/G alias を作る。DMA は GMAC と同じ先頭 16MB の恒等 bus 窓を使う専用 64KB 整列の池を I/G に写し、sync は障壁だけ。根拠は Open Firmware PCI Binding 2.1、MPC7450UM 第5章、FreeBSD の controller/ohci.c:183-214・ohci_pci.c と既存の PowerMac の口。
+- IRQ は付けず、PowerMac の tick slot 0 で service と装置の変化の観測を行う。入力はログだけ。USER syscall 内の入力待ちは EE=0 なので、sh の terminal poll は期限を過ぎた DEC を既存の decrementer handler に渡し、同じ tick_dispatch を協調して進める (割込みのネストはしない)。診断・CLI 像の poll は変えない。
+- tools/ppc/usb_run.py は serial 版の S-C と同じ外部接続・入力境界の代替で USER sh を起動し、QMP から実際の USB 装置に入力・抜去する。tick 登録除去と key down 反転の変異は、到達印・専用停止 PC・正確な serial の結果・QEMU の正常終了を全部確かめる。

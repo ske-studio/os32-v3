@@ -1,5 +1,8 @@
 /* Foreground-only LAN input for the resident CLI. */
 #include "lan_boot.h"
+#if KBOOT_SH
+#include "usb_boot.h"
+#endif
 #include "kernel/cli/resident_cli.h"
 
 enum { INPUT_CAPACITY = 1024 };
@@ -69,6 +72,9 @@ static u64 pm_terminal_tb(void)
 
 void pm_terminal_poll(void)
 {
+#if KBOOT_SH
+    pm_usb_poll();
+#endif
     pm_lan_poll(pm_terminal_tb());
 }
 

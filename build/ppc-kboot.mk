@@ -98,6 +98,8 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
 KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
 ifeq ($(KBOOT_SH),1)
+KB_C += platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c \
+ $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
 KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c \
  platform/powermac/hostfs_boot.c fs/serialfs/serialfs.c \
  fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c \

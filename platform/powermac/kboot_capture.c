@@ -4,6 +4,9 @@
  * OF-PPC binding 8.2.1: use the existing client-interface wrapper. */
 #include "kboot_info.h"
 #include "kstring.h"
+#if KBOOT_SH
+#include "usb_boot.h"
+#endif
 static struct pm_kboot_info info;
 static unsigned char property[PM_KBOOT_PROP_BYTES];
 static int output;
@@ -191,6 +194,9 @@ const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
     if (!info.tb_hz || !info.escc.count || !info.mpic.count)
         fail("FAIL:KBOOT:REQUIRED-NODE\r\n");
     info.gmac_rc = pm_gmac_capture(&info.gmac);
+#if KBOOT_SH
+    pm_usb_capture();
+#endif
     return &info;
 }
 
