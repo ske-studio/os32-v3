@@ -3,7 +3,7 @@
 
 Observation symbols required of positive images (not extra KBOOT log lines):
   kboot_ready_tb: big-endian u64 TB sampled immediately before emitting READY.
-  kboot_tick: big-endian u32 live 1 kHz interrupt count, including during idle.
+  kboot_tick: big-endian u32 live 100 Hz interrupt count, including during idle.
 Both must remain mapped/readable at each QMP stop. H3 must provide these symbols.
 """
 import argparse
@@ -34,7 +34,7 @@ PATTERNS = [
     r'MEMORY online=1 heap=1 shm=1',
     r'TRAP dsi=pass isi=pass guard=pass flush=pass',
     r'MPIC sources=(\d+) priority=0 cpu=0 delivery=pass',
-    r'CLOCK hz=1000 tick=(\d+) us=(\d+)',
+    r'CLOCK hz=100 tick=(\d+) us=(\d+)',
     r'READY stage=pre-user',
     r'ALIVE tick_delta=(\d+) tb_us=(\d+) of_calls_delta=0',
 ]
@@ -64,7 +64,7 @@ def validate(a, b, complete=False):
     if len(values) == 9:
         ticks, us = map(int, values[8])
         require(us >= 2000000, 'ALIVE duration')
-        require(abs(ticks*1000-us)*100 <= us*5, 'ALIVE tick/TB mismatch')
+        require(abs(ticks*10000-us)*100 <= us*5, 'ALIVE tick/TB mismatch')
     if complete:
         require(len(values) == 9, 'missing milestone')
     return len(values) == 9
@@ -178,7 +178,7 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False):
     (out/'metadata.json').write_text(json.dumps(metadata, indent=2))
     if elf.with_suffix('.map').exists():
         shutil.copyfile(elf.with_suffix('.map'), out/'kernel.map')
-    # H3 observation ABI: big-endian u64 READY TB, and live u32 millisecond tick.
+    # H3 observation ABI: big-endian u64 READY TB, and live u32 10ms tick.
     if not contract:
         for name in ('kboot_ready_tb', 'kboot_tick'):
             require(name in symbols, 'missing observation symbol '+name)
@@ -273,12 +273,12 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False):
                             require(elapsed < hz, 'interrupts disabled after READY')
                             if time.monotonic() >= deadline:
                                 raise RuntimeError('QEMU timeout: continuation window')
-                        # Design §2: the 1 kHz tick must *continue*, not merely advance.
+                        # Design §2: the 100 Hz tick must *continue*, not merely advance.
                         # Guest TB is the reference (never wall time); 2 ticks of slack
                         # cover the sampling edges of the >=200 ms window.
                         tick_delta = (word('kboot_tick')-ticks_before) & 0xffffffff
                         snapshots.append(f'rate: tick_delta={tick_delta} elapsed={elapsed} hz={hz}')
-                        require(abs(tick_delta*hz-elapsed*1000)*100 <= elapsed*1000*5+2*hz*100, 'QMP tick rate')
+                        require(abs(tick_delta*hz-elapsed*100)*100 <= elapsed*100*5+2*hz*100, 'QMP tick rate')
                         validate(serial(a), serial(b), True)
                         observed = True
                 if observed:

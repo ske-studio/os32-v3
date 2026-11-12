@@ -43,7 +43,7 @@ KERNEL_MUTATIONS = (
      'milestone 6 order/format', r'^KBOOT MPIC sources=\d+ priority=0 cpu=0 delivery=bad$'),
     ('half-rate', 'arch/ppc/kernel_dec.c',
      '    period = tb_hz / tick_hz;', '    period = tb_hz / tick_hz * 2;',
-     'ALIVE tick/TB mismatch', r'^KBOOT ALIVE tick_delta=(99\d|100\d) tb_us=20000\d\d of_calls_delta=0$'),
+     'ALIVE tick/TB mismatch', r'^KBOOT ALIVE tick_delta=(9\d|10\d) tb_us=20000\d\d of_calls_delta=0$'),
     ('onfault-reason', 'arch/ppc/kernel_trap.c',
      'reason == PPC_TRAP_DSI_IO) : reason == probe.reason)',
      'reason == PPC_TRAP_DSI_IO) : reason != probe.reason)',
@@ -94,9 +94,9 @@ AUDIT_MUTATIONS = (
 # reason of the next guard in depth. An unchanged reason, a timeout or any other
 # failure is a test error, never a RED.
 METER_MUTATIONS = (
-    ('tick-check', 'abs(ticks*1000-us)*100 <= us*5', 'True', 'tick', 'ACCEPT'),
+    ('tick-check', 'abs(ticks*10000-us)*100 <= us*5', 'True', 'tick', 'ACCEPT'),
     ('duration-check', "us >= 2000000", 'True', 'duration', 'ACCEPT'),
-    ('tick-rate', 'abs(tick_delta*hz-elapsed*1000)*100 <= elapsed*1000*5+2*hz*100',
+    ('tick-rate', 'abs(tick_delta*hz-elapsed*100)*100 <= elapsed*100*5+2*hz*100',
      'True', 'slow-tick', 'ACCEPT'),
     ('ready-stop', "require(not halted or bool(msr & 0x8000), 'stopped after READY')",
      "require(True, 'stopped after READY')", 'stop', 'interrupts disabled after READY'),

@@ -92,7 +92,7 @@ def old_admission(tmp):
     # Reuse the existing real predicate fixture, including old memory generation.
     exe = tmp / 'admission'
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
-                    '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'include'),
+                    '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/x86'),
                     str(ROOT / 'tools/tests/os32x_layout_host.c'), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
     print('PASS existing admission fixture: old shell/shlib generation rejected, current accepted')
