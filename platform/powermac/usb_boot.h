@@ -1,10 +1,10 @@
 #ifndef PM_USB_BOOT_H
 #define PM_USB_BOOT_H
 #include "lan_boot.h"
+#include "arch/ppc/kernel_boot.h"
 #define PM_USB_ROOTS 3u
 #define PM_USB_CONTROLLERS 3u
 #define PM_USB_PAGE 4096u
-#define PM_USB_ALIAS 0xfe3d0000u
 #define PM_USB_DMA_BYTES 0x10000u
 #define PM_USB_DMA_WINDOW 0x1000000u
 #define PM_TICK_USB 0u

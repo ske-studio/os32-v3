@@ -106,7 +106,7 @@ int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va)
             if (maps[slot].used && maps[slot].bdf == bdf(f)) { *va = (volatile void *)maps[slot].va; return 0; }
         for (slot = 0; slot < PM_USB_CONTROLLERS && maps[slot].used; slot++) {}
         if (slot == PM_USB_CONTROLLERS) return -1;
-        u32 address = PM_USB_ALIAS + (2 + slot) * PM_USB_PAGE;
+        u32 address = PPC_BOOT_USB_VA + (2 + slot) * PM_USB_PAGE;
         if (pa & (PM_USB_PAGE - 1)) return -1;
         if (paging_map_phys(address, pa, 1, PAGE_RW | PTE_PCD)) return -1;
         maps[slot].used = 1; maps[slot].bdf = bdf(f); maps[slot].va = address;
@@ -128,7 +128,6 @@ int usbp_irq_attach(const struct usb_pci_fn *f, int (*isr)(void *), void *arg)
 { (void)f; (void)isr; (void)arg; return -1; }
 void usbp_irq_detach(const struct usb_pci_fn *f) { (void)f; }
 int usbp_tick_attach(void (*fn)(void)) { return tick_register(PM_TICK_USB, fn); }
-u32 usbp_ms(void) { return tick_clock_ms(); }
 static u64 tb(void)
 {
     u32 hi, lo, again;
@@ -139,6 +138,8 @@ static u64 tb(void)
     } while (hi != again);
     return ((u64)hi << 32) | lo;
 }
+/* lib/divdi3.c supplies the integer division, as in hostfs_io.c. */
+u32 usbp_ms(void) { return (u32)(tb() / (tb_frequency / 1000u)); }
 void usbp_udelay(u32 us)
 {
     if (us > 100000) us = 100000;

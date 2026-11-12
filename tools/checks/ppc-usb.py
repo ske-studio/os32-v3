@@ -1,4 +1,4 @@
-"""Serial-only PowerMac USB guest acceptance."""
+"""PowerMac USB serial acceptance and optional LAN RPC-stall regression."""
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:all'],
              covers=['tools/checks/ppc-usb.py', 'tools/ppc/usb_run.py',
                      'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
@@ -25,7 +25,8 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:all'],
                      'tools/ppc/kboot_mutations.py',
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
-                     'tools/serialfs_host.py'])
+                     'tools/serialfs_host.py', 'tools/ppc/sd_run.py',
+                     'arch/ppc/kernel_boot.h'])
 
 
 def run(ctx):

@@ -7,14 +7,13 @@
 #include "endian_dma.h"
 #include "mm/paging.h"
 #include "kstring.h"
-#include "ppc_trap.h"
-#include "ppc_oea.h"
 extern const struct usb_hc_ops ohci_ops;
 static struct usb_hc controllers[PM_USB_CONTROLLERS];
 static u8 observed[PM_USB_CONTROLLERS][USB_DEV_MAX + 1];
-static u32 count;
+static u32 count, active, last_service_ms;
 static void service(void)
 {
+    last_service_ms = usbp_ms();
     usb_service();
     for (u32 i = 0; i < count; i++) {
         struct usb_hc *hc = &controllers[i];
@@ -61,19 +60,22 @@ static int takeover(struct usb_hc *hc)
 void pm_usb_boot(u32 tb_hz)
 {
     pm_usb_platform_init(tb_hz);
-    for (u32 root = 0; root < pm_usb_root_count && !count; root++) {
+    for (u32 root = 0; root < pm_usb_root_count && !active; root++) {
         pm_usb_root = &pm_usb_roots[root];
-        if (paging_map_phys(PM_USB_ALIAS, pm_usb_root->pa + 0x800000, 1, PAGE_RW | PTE_PCD) ||
-            paging_map_phys(PM_USB_ALIAS + PM_USB_PAGE, pm_usb_root->pa + 0xc00000, 1, PAGE_RW | PTE_PCD)) continue;
-        pm_usb_pci = (struct pm_pci){PM_USB_ALIAS, PM_USB_ALIAS + PM_USB_PAGE,
+        if (paging_map_phys(PPC_BOOT_USB_VA, pm_usb_root->pa + 0x800000, 1, PAGE_RW | PTE_PCD) ||
+            paging_map_phys(PPC_BOOT_USB_VA + PM_USB_PAGE, pm_usb_root->pa + 0xc00000, 1, PAGE_RW | PTE_PCD)) continue;
+        pm_usb_pci = (struct pm_pci){PPC_BOOT_USB_VA, PPC_BOOT_USB_VA + PM_USB_PAGE,
                                     pm_usb_root->first, pm_usb_root->last, 0};
         for (u32 bus = pm_usb_root->first; bus <= pm_usb_root->last; bus++)
             for (u32 dev = bus == pm_usb_root->first ? 11 : 0; dev < 32; dev++)
                 for (u32 fn = 0; fn < 8 && count < PM_USB_CONTROLLERS; fn++) {
                     struct usb_hc *hc = &controllers[count];
                     hc->pci = (struct usb_pci_fn){.bus = bus, .dev = dev, .fn = fn};
+                    struct usb_pci_fn first = {.bus = bus, .dev = dev, .fn = 0};
+                    if (fn && !(usbp_cfg_read32(&first, 0x0c) & 0x00800000u)) break;
                     u32 id = usbp_cfg_read32(&hc->pci, 0);
-                    if ((id & 0xffff) == 0xffff || (usbp_cfg_read32(&hc->pci, 8) >> 8) != 0x0c0310) continue;
+                    if ((id & 0xffff) == 0xffff) { if (!fn) break; continue; }
+                    if ((usbp_cfg_read32(&hc->pci, 8) >> 8) != 0x0c0310) continue;
                     hc->pci.vendor = id; hc->pci.device = id >> 16;
                     u32 bar = usbp_cfg_read32(&hc->pci, 0x10);
                     if ((bar & 15) || !(bar & ~15u)) continue;
@@ -81,23 +83,29 @@ void pm_usb_boot(u32 tb_hz)
                     if (usbp_cfg_cmd(&hc->pci, 2, 0) ||
                         usbp_mmio_map(&hc->pci, 0, &hc->regs) || takeover(hc)) continue;
                     hc->ops = &ohci_ops;
-                    if (hc->ops->start(hc) || usb_hc_register(hc)) {
+                    if (hc->ops->start(hc)) {
+                        /* A dead HC owns quarantined DMA until reboot. */
+                        if (hc->state == HC_DEAD) count++;
                         usbp_log("USB START error"); continue;
                     }
                     count++;
+                    if (usb_hc_register(hc)) {
+                        usb_hc_dead(hc, USB_WHY_START);
+                        usbp_log("USB REGISTER error"); continue;
+                    }
+                    active++;
                     usbp_log("USB HC bdf=%02x:%02x.%u ports=%u", bus, dev, fn, hc->nports);
                 }
     }
-    if (count && usbp_tick_attach(service)) usbp_log("USB TICK error");
+    last_service_ms = usbp_ms();
+    if (active && usbp_tick_attach(service)) usbp_log("USB TICK error");
 }
 
-/* Blocking input runs inside a USER syscall with EE clear. Consume an overdue
- * DEC cooperatively through the same clock/tick handler, without nesting an
- * interrupt on the syscall frame. A later pending DEC with positive counter
- * contributes no invented ticks (kernel_dec.c's existing contract). */
+/* USER syscalls keep EE clear. Poll only USB at real 10ms intervals;
+ * DEC alone owns tick_count and its catch-up dispatch. */
 void pm_usb_poll(void)
 {
     u32 flags = usbp_irq_save();
-    if (ppc_read_dec() <= 0) ppc_decrementer_interrupt(0);
+    if (active && (u32)(usbp_ms() - last_service_ms) >= 10) service();
     usbp_irq_restore(flags);
 }

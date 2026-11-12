@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""PowerMac USB acceptance over serial only (no LAN socket)."""
+"""PowerMac USB acceptance over serial, with optional LAN RPC-stall regression."""
 import argparse
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -38,24 +39,57 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:all'],
                      'tools/ppc/kboot_mutations.py',
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
-                     'tools/serialfs_host.py'])
+                     'tools/serialfs_host.py'],
+             inputs=['tools/ppc/sd_run.py', 'arch/ppc/kernel_boot.h'])
 
 PROBE = r"""
+#include "clock_source.h"
 #include "kernel_tick.h"
+#include "usb_platform.h"
 #include "kprintf.h"
 static int usb_probe_input(void)
 {
-    static u32 start;
-    if (!start) start = tick_count;
-    if ((u32)(tick_count - start) >= 1200) {
+    static u32 start, stalled, returned;
+    u32 now, hi;
+    platform_clock_read_us(&now, &hi);
+    if (!start) start = now;
+    if (!stalled && (u32)(now - start) >= 3000000) {
+        stalled = 1;
+        /* Input boundary of a real USER syscall: EE=0 for one second.
+         * Returning a newline lets the pending DEC run on syscall return. */
+        u32 ticks = tick_count;
+        for (u32 i = 0; i < 10; i++) usbp_udelay(100000);
+        kprintf(7, "USB STALL ticks=%u\n", (u32)(tick_count - ticks));
+        kprintf(7, "USB STALL END\n");
+        return '\n';
+    }
+    if ((u32)(now - start) >= 12000000) {
         kprintf(7, "USB ACCEPT END\n");
         __asm__ volatile("mfmsr 3; rlwinm 3,3,0,17,15; mtmsr 3; isync" ::: "r3", "memory");
         __asm__ volatile(".global usb_accept_stop\nusb_accept_stop: b usb_accept_stop");
         __builtin_unreachable();
     }
+    if ((u32)(now - returned) >= 10000) {
+        returned = now;
+        return '\n';
+    }
     return -1;
 }
 """
+
+
+def mutation(work, mode):
+    src = 'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c'
+    content = (ROOT/src).read_text()
+    before, after = {
+        'no-service': ('    usb_service();', '    /* mutation: omit USB service */'),
+        'invert-key': ('src, sc, down);', 'src, sc, !down);'),
+        'tick-clock': ('return (u32)(tb() / (tb_frequency / 1000u));', 'return tick_clock_ms();'),
+    }[mode]
+    require(content.count(before) == 1, 'unique USB mutation anchor')
+    dest = work/(mode+'-'+Path(src).name)
+    dest.write_text(content.replace(before, after))
+    return src, dest
 
 
 def settings(work, mode):
@@ -74,15 +108,7 @@ def settings(work, mode):
         dest.write_text(content)
         result += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(dest)]
     if mode != 'normal':
-        src = 'platform/powermac/usb_platform.c'
-        content = (ROOT/src).read_text()
-        before, after = {
-            'no-tick': ('return tick_register(PM_TICK_USB, fn);', '(void)fn; return 0;'),
-            'invert-key': ('src, sc, down);', 'src, sc, !down);'),
-        }[mode]
-        require(content.count(before) == 1, 'unique USB mutation anchor')
-        dest = work/(mode+'-usb_platform.c')
-        dest.write_text(content.replace(before, after))
+        src, dest = mutation(work, mode)
         result += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(dest)]
     return result
 
@@ -114,7 +140,7 @@ def accept(elf, cpu, out, mode):
                 ready = 'sh> ' in text
                 keyboard = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=01', text)
                 mouse = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02', text)
-                if phase == 0 and ready and ((keyboard and mouse) or mode == 'no-tick'):
+                if phase == 0 and ready and ((keyboard and mouse) or mode == 'no-service') and 'USB STALL END' in text:
                     q.call('send-key', {'keys': [{'type': 'qcode', 'data': 'a'}], 'hold-time': 100})
                     phase = 1; sent_at = time.monotonic()
                 elif phase == 1 and time.monotonic()-sent_at > .4:
@@ -149,16 +175,20 @@ def accept(elf, cpu, out, mode):
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
                     require(pc and int(pc[1], 16) == address, 'USB exact stop PC')
                     validate(text, serial(b), True)
-                    require(ready and phase == 6 and 'USB HC bdf=' in text and 'USB TAKEOVER quiet' in text,
+                    require(ready and phase == 6 and 'USB STALL END' in text and 'USB STALL ticks=0' in text and 'USB HC bdf=' in text and 'USB TAKEOVER quiet' in text,
                             'USB startup/reached markers: '+text)
                     keys = [(int(sc, 16), int(down)) for sc, down in
                             re.findall(r'USB KEY src=1 sc=([0-9a-f]+) down=(\d)', text)]
                     expected = [(0x1d, 1), (0x1d, 0), (0x70, 1), (0x1d, 1),
                                 (0x1d, 0), (0x70, 0), (0x1c, 1), (0x1c, 0), (0x1d, 1)]
-                    if mode == 'no-tick':
+                    if mode == 'tick-clock':
+                        require(keyboard and mouse and not keys and 'usb: HC dead why=2' in text,
+                                'tick-clock exact HC clock death after EE=0 stall: '+text)
+                    elif mode == 'no-service':
                         require(not keyboard and not mouse and not keys and 'USB MOUSE' not in text,
                                 'no-tick exact missing enumeration/input verdict')
                     else:
+                        require('usb: HC dead' not in text, 'healthy HC after stall')
                         require(keyboard and mouse, 'HID identities: '+text)
                         if mode == 'invert-key': expected = [(sc, 1-down) for sc, down in expected]
                         require(keys == expected, 'PC98 make/break order: '+repr(keys))
@@ -192,21 +222,92 @@ def accept(elf, cpu, out, mode):
                 except subprocess.TimeoutExpired: p.kill(); p.wait()
 
 
+def lan_accept(elf, cpu, out, mode):
+    # Reuse S-D's real host/transport and FS_REQ drop boundary.
+    from sd_run import Session, result
+
+    class USBSession(Session):
+        def start(self, number):
+            original = subprocess.Popen
+            def launch(argv, *args, **kwargs):
+                argv = list(argv) + ['-usb', '-device', 'usb-kbd,id=kbd',
+                                     '-device', 'usb-mouse,id=mouse']
+                (self.out/'argv.json').write_text(json.dumps(argv, indent=2))
+                return original(argv, *args, **kwargs)
+            subprocess.Popen = launch
+            try:
+                super().start(number)
+            finally:
+                subprocess.Popen = original
+
+    s = USBSession(elf, cpu, out, mode)
+    try:
+        (s.root/'f').write_text('usb-rpc\n')
+        s.start(1)
+        deadline = time.monotonic()+10
+        while 'protocol=02' not in serial(s.a) or 'protocol=01' not in serial(s.a):
+            require(time.monotonic() < deadline, 'HID enumeration before RPC')
+            # Complete USER syscalls so DEC can dispatch while warming up,
+            # including when the clock source is deliberately regressed.
+            s.check('echo warm', 'warm\n')
+        s.drop = True
+        started = time.monotonic()
+        failure = result(s.cmd('cat /host/f', 5), 'cat /host/f')
+        require(failure.startswith('cat: /host/f: '), 'RPC absence diagnostic')
+        require(s.saved is not None, 'FS_REQ reached drop boundary')
+        s.q.call('send-key', {'keys': [{'type': 'qcode', 'data': 'a'}], 'hold-time': 100})
+        if mode == 'normal':
+            s.wait(lambda: 'USB KEY src=1 sc=1d down=0' in serial(s.a), 5, 'post-RPC key')
+            require('USB KEY src=1 sc=1d down=1' in serial(s.a) and
+                    'usb: HC dead' not in serial(s.a), 'healthy HC after RPC')
+        else:
+            s.wait(lambda: 'usb: HC dead why=2' in serial(s.a), 5, 'exact clock death')
+            require('USB KEY' not in serial(s.a), 'clock mutant delivered key')
+        s.drop = False
+        s.check('echo alive', 'alive\n')
+        validate(serial(s.a), serial(s.b), True)
+        require('USB HC bdf=' in serial(s.a), 'HC startup marker')
+        s.stop()
+        print(('GREEN' if mode == 'normal' else 'RED')+' LAN '+mode+' '+cpu+
+              ': RPC error, post-RPC verdict, live sh, QEMU rc=0 elapsed=%.3fs' %
+              (time.monotonic()-started), flush=True)
+    finally:
+        s.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--lan', action='store_true', help='real hostfs RPC absence with EE=0')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
         print('SKIP ppc-usb: PPC toolchain/QEMU/OpenBIOS unavailable')
         return 0
+    if args.lan:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.bind(('127.0.0.1', 0))
+        except PermissionError:
+            print('SKIP ppc-usb LAN: AF_INET unavailable; rc=0')
+            return 0
     base = Path(os.environ.get('TMPDIR', '/tmp'))/'usb-run'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     print('evidence='+str(work), flush=True)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    for mode in ['normal'] + (['no-tick', 'invert-key'] if args.mutate else []):
+    if args.lan:
+        for mode in ['normal'] + (['tick-clock'] if args.mutate else []):
+            opts = ['KBOOT_SH=1', 'PPC_CROSS_DIR='+str(cross)]
+            if mode != 'normal':
+                src, dest = mutation(work, mode)
+                opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
+            elf = build(work/('lan-'+mode), *opts)
+            for cpu in cpus if mode == 'normal' else cpus[:1]:
+                lan_accept(elf, cpu, work/('lan-'+mode+'-'+cpu), mode)
+        return 0
+    for mode in ['normal'] + (['no-service', 'invert-key', 'tick-clock'] if args.mutate else []):
         elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *settings(work, mode))
         for cpu in cpus if mode == 'normal' else cpus[:1]:
             accept(elf, cpu, work/(mode+'-'+cpu), mode)

@@ -830,5 +830,5 @@ void usb_service(void)
 ### 1P の PowerMac の実装
 
 - sh 像だけに PowerMac の殻と共通 USB をリンクする。OF の間に UniNorth の PCI root・ranges を保存し、GMAC の有無や初期化に依存せず config と OHCI BAR の I/G alias を作る。DMA は GMAC と同じ先頭 16MB の恒等 bus 窓を使う専用 64KB 整列の池を I/G に写し、sync は障壁だけ。根拠は Open Firmware PCI Binding 2.1、MPC7450UM 第5章、FreeBSD の controller/ohci.c:183-214・ohci_pci.c と既存の PowerMac の口。
-- IRQ は付けず、PowerMac の tick slot 0 で service と装置の変化の観測を行う。入力はログだけ。USER syscall 内の入力待ちは EE=0 なので、sh の terminal poll は期限を過ぎた DEC を既存の decrementer handler に渡し、同じ tick_dispatch を協調して進める (割込みのネストはしない)。診断・CLI 像の poll は変えない。
-- tools/ppc/usb_run.py は serial 版の S-C と同じ外部接続・入力境界の代替で USER sh を起動し、QMP から実際の USB 装置に入力・抜去する。tick 登録除去と key down 反転の変異は、到達印・専用停止 PC・正確な serial の結果・QEMU の正常終了を全部確かめる。
+- IRQ は付けず、PowerMac の tick slot 0 で service と装置の変化の観測を行う。入力はログだけ。USER syscall 内の入力待ちは EE=0 なので、sh の terminal poll は timebase で前回から 10ms 以上過ぎていれば USB の service だけを協調して進める。tick_count は DEC だけが更新する。usbp_ms も timebase の ms を使い、DEC の catch-up で HC の時計停止を誤判定しない。診断・CLI 像の poll は変えない。
+- tools/ppc/usb_run.py は serial 版の S-C と同じ外部接続・入力境界の代替で USER sh を起動し、QMP から実際の USB 装置に入力・抜去する。service 除去・key down 反転・tick_clock_ms への時刻源の逆戻りの変異は、到達印・専用停止 PC・正確な serial の結果・QEMU の正常終了を全部確かめる。serial の実 USER syscall 入力境界で EE=0 の 1 秒待ちを作り、戻った後のキーを照合する。--lan は S-D の FS_REQ 破棄を使い、cat /host/f の期限切れ後のキーと HC の生存を照合する (AF_INET 不可なら SKIP)。
