@@ -27,6 +27,11 @@ void ppc_root_load(u32 root)
     (void)root;
     if (expect_stop) { SAY("FAIL:WALK-SKIPPED"); finish(31); }
     if (!boot_root_ready) finish(98);
+    if (!observe_walk_valid(root, &fb_alias) || !observe_walk_valid(root, &clock_alias) ||
+        fb_alias.bytes != PM_RH_FB_LIMIT || fb_alias.va != PPC_BOOT_FB_VA + 4 ||
+        clock_alias.bytes != PAGE_SIZE || clock_alias.va != PPC_BOOT_GMAC_CLOCK_VA + 0x20)
+        finish(44);
+    SAY("REACHED:FB-CLOCK-IG");
 #if defined(LAN_CASE)
     if ((LAN_CASE == 0) != boot_devices.gmac_ready) { SAY("FAIL:READY"); finish(41); }
     if (LAN_CASE == 0) {
@@ -57,6 +62,10 @@ void _start(void)
         ppc_boot_alias_plan(0x80000001,PPC_BOOT_ALIAS_BYTES,PPC_BOOT_ESCC_VA,&a) ||
         ppc_boot_alias_plan(0,0,PPC_BOOT_ESCC_VA,&a) ||
         !ppc_boot_alias_plan(0x80000000,PPC_BOOT_ALIAS_BYTES,PPC_BOOT_MPIC_VA,&a)) finish(20);
+    if (!ppc_boot_alias_plan(0xa0000004, PM_RH_FB_LIMIT - 4, PPC_BOOT_FB_VA, &fb_alias) ||
+        ppc_boot_alias_plan(0xa0000004, PM_RH_FB_LIMIT, PPC_BOOT_FB_VA, &a) ||
+        !ppc_boot_alias_plan(0xf8000020, 4, PPC_BOOT_GMAC_CLOCK_VA, &clock_alias) ||
+        ppc_boot_alias_plan(0xf8000020, PAGE_SIZE, PPC_BOOT_GMAC_CLOCK_VA, &a)) finish(21);
     SAY("REACHED:ALIAS");
     u32 args[6]={0x100000,0x2000000,3,0x32,~0U,0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");

@@ -1,4 +1,5 @@
 #include "ppc_pmap.h"
+#include "rh_observe.h"
 #include "ppc_frame.h"
 #include "ppc_memmap.h"
 #include "arch_io.h"
@@ -47,8 +48,17 @@ void pm_mmu_start(const struct pm_boot_info *info)
     if (ppc_pmap_enter(PM_IO_ALIAS,page,PPC_ATTR_IO_RW)) ppc_stop();
     if ((info->escc_pa & ~PPC_PAGE_MASK)+PM_ESCC_WINDOW>PPC_PAGE_SIZE)
         if (ppc_pmap_enter(PM_IO_ALIAS+PPC_PAGE_SIZE,page+PPC_PAGE_SIZE,PPC_ATTR_IO_RW)) ppc_stop();
+    const struct pm_rh_fb *fb = pm_rh_framebuffer();
+    u32 offset = fb->pa & ~PPC_PAGE_MASK;
+    u32 bytes = (offset + fb->bytes + PPC_PAGE_SIZE - 1) & PPC_PAGE_MASK;
+    if (fb->bytes)
+        for (u32 off = 0; off < bytes; off += PPC_PAGE_SIZE)
+            if (ppc_pmap_enter(PM_RH_FB_ALIAS + off,
+                    (fb->pa & PPC_PAGE_MASK) + off, PPC_ATTR_IO_RW)) ppc_stop();
     ppc_select_context(ppc_current_context());
     arch_mmu_enable();
+    pm_rh_bind(fb->bytes ? PM_RH_FB_ALIAS + offset : 0);
+    pm_rh_stage(1);
     pm_mmu_console_bind(info->escc_pa);
     pm_mmu_dump("OWN-VECTORS",0);
     pm_mmu_dump("OWN-MMU",0);

@@ -80,7 +80,9 @@ enum { PLN1_TERM_OPEN = 5, PLN1_TERM_IN = 6,
 struct pm_pci_window { u32 ss, pci_base, cpu_base, bytes; };
 #define PM_GMAC_BOOT_ID_OVERRIDE 1u
 #define PM_GMAC_PEER_OVERRIDE 2u
+struct pm_clock_boot { u32 pa, mask, valid; };
 struct pm_gmac_boot {
+    struct pm_clock_boot clock;
     u32 root_node, node, root_pa, bus_first, bus_last;
     u32 bdf, bar_reg, bar_bus, bar_pa, bar_bytes, vendor_device;
     u8 mac[6], peer_mac[6], boot_id[16];

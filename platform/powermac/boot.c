@@ -1,6 +1,7 @@
 /* Independent ppc-boot: firmware owns console and mapping until the direct
  * ESCC phase. No firmware call is made after successful direct output. */
 #include "ofw.h"
+#include "rh_observe.h"
 #include "kstring.h"
 static void append(char *text, unsigned cap, const char *part)
 {
@@ -33,15 +34,21 @@ void powermac_boot(ppc_ci ci)
         ofw_exit();
         ppc_stop();
     }
+    pm_rh_of_mark(0);
+    int fb_rc = pm_rh_capture(e.out);
+    if (fb_rc < 0) ppc_stop();
+    pm_rh_of_mark(1);
     static const char greeting[] = "OF: os32 ppc-boot\r\n";
     if (ofw_write(e.out,greeting,sizeof(greeting)-1) != sizeof(greeting)-1) {
         fail(e.out,"stdout",-1); ppc_stop();
     }
     rc = pm_escc_prepare(&e,&s);
     if (rc) {
+        pm_rh_of_mark(PM_RH_ESCC_PREPARE);
         fail(e.out,rc == -1 ? "tree" : rc == -2 ? "open" : "map",rc);
         ppc_stop();
     }
+    pm_rh_of_mark(2);
     ppc_disable();
     ppc_sync();
     static const char direct[] = "ESCC-A: os32 ppc-boot\r\n";

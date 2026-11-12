@@ -22,6 +22,7 @@ PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeo
     'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_hpt.c', 'arch/ppc/kernel_trap.c',
     'arch/ppc/kboot_unavailable.c',
     'arch/ppc/pd_walk.c', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
+    'platform/powermac/rh_observe.c',
     'platform/powermac/ofw.c', 'platform/powermac/escc.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/gmac_tree.c',

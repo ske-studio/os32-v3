@@ -15,12 +15,14 @@
 #include "paging.h"
 #include "boot_cpu.h"
 #include "platform_memory.h"
+#include "rh_observe.h"
 
 #define PPC_BOOT_MEM_KB 16384U
 #define PPC_BOOT_RAM_ATTR 0x10U
 #define PPC_BOOT_IO_ATTR 0x28U
 static const struct pm_kboot_info *boot_info;
 static struct ppc_boot_alias escc_alias, mpic_alias, gmac_alias[3];
+static struct ppc_boot_alias fb_alias, clock_alias;
 static unsigned boot_root_ready;
 static struct ppc_boot_devices boot_devices;
 /* Valid after arch_boot_after_paging(): mapped I/G aliases and the snapshot. */
@@ -33,6 +35,8 @@ int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
                         struct ppc_boot_alias *out)
 {
     static const struct { u32 va, limit; } slots[] = {
+        { PPC_BOOT_FB_VA, PM_RH_FB_LIMIT },
+        { PPC_BOOT_GMAC_CLOCK_VA, PAGE_SIZE },
         { PPC_BOOT_ESCC_VA, PPC_BOOT_ALIAS_BYTES },
         { PPC_BOOT_MPIC_VA, PPC_BOOT_ALIAS_BYTES },
         { PPC_BOOT_GMAC_VA, PPC_BOOT_GMAC_BYTES },
@@ -40,8 +44,12 @@ int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
         { PPC_BOOT_PCI_DATA_VA, PAGE_SIZE },
     };
     u32 offset = pa & (PAGE_SIZE - 1), limit = 0;
-    for (u32 i = 0; i < sizeof(slots) / sizeof(slots[0]); i++)
+    for (u32 i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
         if (slots[i].va == va) limit = slots[i].limit;
+        for (u32 j = 0; j < i; j++)
+            if (slots[i].va < slots[j].va + slots[j].limit &&
+                slots[j].va < slots[i].va + slots[i].limit) return 0;
+    }
     if (!out || !limit || !bytes || bytes - 1 > ~pa ||
         offset > limit || bytes > limit - offset) return 0;
     out->pa = pa & PTE_FRAME_MASK;
@@ -124,11 +132,36 @@ static int gmac_walk_valid(u32 root)
     }
     return 1;
 }
+static int observe_alias_safe(u32 root, const struct ppc_boot_alias *a)
+{
+    if (!a->bytes) return 1;
+    u32 va = a->va & PTE_FRAME_MASK;
+    if (!absent(root, va, va + a->bytes) ||
+        !absent(root, a->pa, a->pa + a->bytes) ||
+        overlap(a->pa, a->bytes, escc_alias.pa, escc_alias.bytes) ||
+        overlap(a->pa, a->bytes, mpic_alias.pa, mpic_alias.bytes) ||
+        overlap(a->pa, a->bytes, boot_info->hpt_pa, boot_info->hpt_bytes) ||
+        overlap(a->pa, a->bytes, boot_info->image_first,
+                boot_info->image_end - boot_info->image_first)) return 0;
+    for (u32 i = 0; i < boot_info->ram.count; i++)
+        if (overlap(a->pa, a->bytes, boot_info->ram.v[i].start,
+                    boot_info->ram.v[i].size)) return 0;
+    for (u32 i = 0; i < 3; i++)
+        if (overlap(a->pa, a->bytes, gmac_alias[i].pa, gmac_alias[i].bytes)) return 0;
+    return 1;
+}
+static int observe_walk_valid(u32 root, const struct ppc_boot_alias *a)
+{
+    u32 va = a->va & PTE_FRAME_MASK;
+    return !a->bytes || range_valid(root, va, va + a->bytes, a->pa, PPC_BOOT_IO_ATTR);
+}
 static int boot_walk_valid(u32 root)
 {
     u32 image = boot_info->image_first;
     u32 end = (boot_info->image_end + PAGE_SIZE - 1) & PTE_FRAME_MASK;
-    return (!boot_devices.gmac_ready || gmac_walk_valid(root)) &&
+    return observe_walk_valid(root, &fb_alias) &&
+        observe_walk_valid(root, &clock_alias) &&
+        (!boot_devices.gmac_ready || gmac_walk_valid(root)) &&
         range_valid(root, image, end, image, PPC_BOOT_RAM_ATTR) &&
         range_valid(root, MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,
                     MEM_FIXED_PAGING_BASE, PPC_BOOT_RAM_ATTR) &&
@@ -151,6 +184,12 @@ void ppc_boot_load_root(u32 root)
         if (ppc_root_current() || root != MEM_FIXED_PD_BASE) ppc_stop();
         install_alias(root, &escc_alias);
         install_alias(root, &mpic_alias);
+        if (!observe_alias_safe(root, &fb_alias) ||
+            !observe_alias_safe(root, &clock_alias) ||
+            overlap(fb_alias.pa, fb_alias.bytes, clock_alias.pa, clock_alias.bytes))
+            ppc_boot_walk_stop();
+        install_alias(root, &fb_alias);
+        install_alias(root, &clock_alias);
         if (boot_devices.gmac_ready && !gmac_aliases_safe(root))
             boot_devices.gmac_ready = 0;
         if (boot_devices.gmac_ready)
@@ -209,7 +248,15 @@ void ppc_kernel_start(ppc_ci ci)
     struct ofw_env e;
     struct pm_escc s;
     ofw_init(ci);
-    if (ofw_setup(&e) || pm_escc_prepare(&e, &s)) ppc_stop();
+    if (ofw_setup(&e)) ppc_stop();
+    pm_rh_of_mark(0);
+    int fb_rc = pm_rh_capture(e.out);
+    if (fb_rc < 0) ppc_stop();
+    pm_rh_of_mark(1);
+    if (pm_escc_prepare(&e, &s)) {
+        pm_rh_of_mark(PM_RH_ESCC_PREPARE);
+        ppc_stop();
+    }
     struct pm_kboot_info *info = (struct pm_kboot_info *)pm_kboot_capture(ci);
     /* E1 owns the MPIC window decoding (one resolver, H2). */
     if (pm_mpic_resolve(info, &info->mpic_pa, &info->mpic_bytes,
@@ -220,11 +267,22 @@ void ppc_kernel_start(ppc_ci ci)
         !ppc_boot_alias_plan(info->mpic_pa, info->mpic_bytes, PPC_BOOT_MPIC_VA, &mpic_alias))
         ppc_stop();
     plan_gmac(info);
+    const struct pm_rh_fb *fb = pm_rh_framebuffer();
+    if (fb->bytes) {
+        if (!ppc_boot_alias_plan(fb->pa, fb->bytes, PPC_BOOT_FB_VA, &fb_alias)) ppc_stop();
+        boot_devices.fb_va = fb_alias.va;
+    }
+    if (info->gmac.clock.valid) {
+        if (!ppc_boot_alias_plan(info->gmac.clock.pa, sizeof(u32),
+                    PPC_BOOT_GMAC_CLOCK_VA, &clock_alias)) ppc_stop();
+        boot_devices.clock_va = clock_alias.va;
+    }
     boot_devices.escc_csr_va = escc_alias.va;
     boot_devices.escc_data_va = escc_alias.va + (s.data - s.csr);
     boot_devices.mpic_va = mpic_alias.va;
     boot_devices.mpic_bytes = info->mpic_bytes;
     if (pm_kboot_reserve(info) != PM_KBOOT_RESERVE_OK || !pm_memory_validate(info)) ppc_stop();
+    pm_rh_of_mark(2);
     static const char mark[] = "TAKEOVER\r\n";
     if (ofw_write(e.out, mark, sizeof(mark)-1) != sizeof(mark)-1 ||
         pm_escc_drain(&s)) ppc_stop();
