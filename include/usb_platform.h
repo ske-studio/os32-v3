@@ -23,6 +23,7 @@ enum { USBP_TO_DEV, USBP_TO_CPU };
 void usbp_dma_sync(struct usb_dma *d, u32 off, u32 len, int dir);
 void *usbp_mem_alloc(u32 bytes);
 void usbp_mem_free(void *p);
+/* Map uncached: x86 UC (PCD=1, never the video WC map); PPC cache-inhibited and guarded. */
 int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va);
 void usbp_mmio_unmap(const struct usb_pci_fn *f, u32 bar);
 u32 usbp_cfg_read32(const struct usb_pci_fn *f, u32 reg);
@@ -36,6 +37,7 @@ void usbp_irq_detach(const struct usb_pci_fn *f);
 int usbp_tick_attach(void (*fn)(void));
 u32 usbp_ms(void);
 /* Foreground startup/stop only; never from tick. Common code assumes no IF state. */
+/* One call waits at most 100ms (x86 cpu_delay_us); common code splits longer waits. */
 void usbp_udelay(u32 us);
 u32 usbp_irq_save(void);
 void usbp_irq_restore(u32 f);

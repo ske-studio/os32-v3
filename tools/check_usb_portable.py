@@ -6,7 +6,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIXES = ('usb_', 'ohci_', 'ehci_', 'hid_', 'umass_', 'scsi_')
-SHELLS = {'usb_module.c', 'usb_resident.c'}
+SHELLS = {'usb_module.c', 'usb_resident.c', 'usb_early_quiesce.c'}  # early_quiesce: resident, no usbp_* (1E)
 ALLOWED = {'usb_platform.h', 'endian_dma.h', 'endian_le.h', 'lib/kstring.h'}
 
 
