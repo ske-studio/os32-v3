@@ -404,7 +404,7 @@ R1 の `[gf4] detect state` の比べ:
   - **PLL の b2 (e02→80000e02)・ext (1f0001f→11f0001f)**: 手本どおり。`setPLL_double_highregs` が pll2 に 1<<31 を常に立て (nvkm devinit/nv04.c:209)、single stage の 0x680580 の bit を立てる (同 :184-195) ため。
   - **ec1 (I2C の bit)**: §7 の R1 で除くと決めた ENGINE_CTRL の I2C bit。
   - **cr44 (3→0)**・**cr11 (20/ab)**: 記録した。結果 (右が無信号・98 に戻る) には効いていない。
-  - **cr1a_0 (3f のほか 2c・ec のことがある)**: 結果 (右が無信号) には効いていないが、restore の漏れの候補。追って調べる。
+  - **cr1a_0 (同じ起動の 2 回目の開始で 2c)**: 起動後の最初の停止で、エンコーダーの復元の TMDS の ROM スクリプトの後始末 (hwdev/gf/bus.c の gf_production_restore) が起動時に記録した CR1F のロックを書き戻し、続く crtc_restore の拡張 CR (CR1A・CR21・CR44) が捨てられていた。停止で CR1F の解錠を crtc_restore の直前に取り直す形に直した (main 9a7e2739、手本 dispnv04/crtc.c:692-706・devinit/base.c:94,117 は解錠のまま restore する)。実機 (2026-11-12、Ra266) で同じ起動の中の 3 回とも cr1a_0=3f、2 画面も合。cr44 (3→0)・ec1 (I2C の bit)・cr11 は §7 の R1 で除く欄。
 
 ## 確定の後の追記 (2026-11-12、停止・suspend の cursor hide、ユーザー決定)
 - 停止 (D/service.c の gf4_service_stop の cursor hide、:695) と suspend (D/recover.c の rec_suspend の cursor hide、:134) でカーソルを隠す処理は、手本に無い (nouveau の nv04_display_fini、V/disp.c:56-96 は割り込みを止め、suspend の時は FB とカーソルの BO の pin を外すだけで、カーソルを隠さない)。

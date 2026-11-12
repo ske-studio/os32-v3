@@ -41,6 +41,11 @@ int gf4_hw_restore_nodeadline(struct gf4_ctx *c)
     if (!hw_saved.valid) return 0;
     struct gf_io *io=&c->legacy->io;
     int first=gf4_hw_enc_restore(c,io,c->dcb.routes,c->dcb.nroutes,&hw_saved,false,0);
+    /* Match the normal stop order: script cleanup can relock CR1F.
+     * dispnv04/crtc.c:692-706; devinit/base.c:94,117. */
+    int unlock_rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,0x6013d4U,1,RECOVER_CR1F);
+    if (!unlock_rc) unlock_rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,0x6013d5U,1,RECOVER_CR1F_UNLOCK);
+    if (!first) first=unlock_rc;
     for (u8 h=0;h<GF4_HEADS;++h) {
         int rc=gf4_hw_crtc_restore(io,h,&hw_saved);
         if (!first && rc) first=rc;

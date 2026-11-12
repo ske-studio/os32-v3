@@ -185,6 +185,12 @@ def run(ctx) -> int:
 
 # Per-stage runtime mutations collected from the reviewed implementation reports.
 GF4_MUTATIONS = [
+ ('c2svc', 'stop-unlock', 'hwdev/gf/display/service.c',
+  'i32 unlock_rc=svc_index(&l->io,SVC_CR,RECOVER_CR1F,&unlock,true);',
+  'i32 unlock_rc=0; (void)unlock;', 'unlock before CRTC restore'),
+ ('c2stop', 'clock-stop-unlock', 'hwdev/gf/display/hw_state.c',
+  'if (!unlock_rc) unlock_rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,0x6013d5U,1,RECOVER_CR1F_UNLOCK);',
+  'if (!unlock_rc) unlock_rc=0;', 'unlock before no-clock CRTC restore'),
  ('c2log', 'probe-after-mode-line', 'hwdev/gf/display/service.c',
   '[gf4] probe-after-mode conn=%u rc=%d', '[gfX] probe-after-mode conn=%u rc=%d',
   'post-mode probe line includes connector and actual rc'),
@@ -2089,6 +2095,9 @@ _s4a_move('hwstate','fonts-first','hwdev/gf/display/hw_state.c',
 _s4a_move('c2svc','encoder-before-crtc','hwdev/gf/display/service.c',
     '        i32 rc=gf4_hw_enc_restore(c,&l->io', '    i32 rc=gf3_service_close(s);',
     lambda t: t.replace('i32 rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);','i32 rc=0;').replace('    }\n','        rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);\n    }\n',1))
+_s4a_move('c2svc','unlock-before-encoder','hwdev/gf/display/service.c',
+    '        i32 rc=gf4_hw_enc_restore(c,&l->io', '        for (u8 h=0;h<GF4_HEADS;++h) {\n            rc=gf4_hw_crtc_restore',
+    lambda t: t[t.index('        /* TMDS script'):]+t[:t.index('        /* TMDS script')])
 
 def _s4a_early_fonts(text):
     a=text.index('        if (!rc && saved->fonts_valid) {')
