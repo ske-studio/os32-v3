@@ -12,7 +12,7 @@ CHECK = dict(name='ppc-sh-input', tier=1, budget=60, needs=[],
                      'platform/powermac/input_decode.c'],
              inputs=['tools/tests/ppc_sh_input.py', 'platform/powermac/terminal_input.c',
                      'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
-                     'include/input_service.h', 'include/kernel_tick.h', 'include/types.h'])
+                     'include/input_service.h', 'include/clock_source.h', 'include/types.h'])
 HARNESS = r'''
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +20,8 @@ HARNESS = r'''
 #include "input_service.h"
 #include "lan_boot.h"
 volatile u32 tick_count;
+static u32 clock_us, clock_step;
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = clock_us; *hi = 0; clock_us += clock_step; return 0; }
 static const InputOps *ops;
 void input_register(const InputOps *p) { ops = p; }
 u64 pm_terminal_tb(void) { return 0; }
@@ -42,8 +44,12 @@ int main(void) {
     feed("B", 1); check(ops->getkey() == 0x3D00, 11, "arrows-fail");
     fprintf(stderr, "arrows-ok\n");
     feed("\033", 1); check(ops->trygetkey() == -1, 13, "timeout-fail");
-    tick_count += 5; check(ops->getkey() == 27, 13, "timeout-fail");
-    fprintf(stderr, "timeout-ok\n"); return 0;
+    clock_step = 10000; check(ops->getkey() == 27 && tick_count == 0, 13, "timeout-fail");
+    clock_step = 0; fprintf(stderr, "timeout-ok\n");
+    feed("\033", 1); check(ops->trygetkey() == -1, 14, "late-fail");
+    clock_us += 50000; feed("[A", 2);
+    check(ops->getkey() == 27 && ops->getkey() == '[' && ops->getkey() == 'A', 14, "late-fail");
+    fprintf(stderr, "late-ok\n"); return 0;
 }
 '''
 
@@ -54,8 +60,9 @@ def main():
     args = parser.parse_args()
     source = (ROOT / 'platform/powermac/input_decode.c').read_text()
     mutations = [('arrows', "byte == 'A' ? 0x3A00 : 0x3D00", "byte == 'A' ? 0x3D00 : 0x3A00", 11, 'cancel-ok\narrows-fail\n'),
-                 ('cancel', '        return ESC;\n    }\n    if (byte < 0)', '        return -1;\n    }\n    if (byte < 0)', 12, 'cancel-fail\n')]
-    cases = [('normal', source, 0, 'cancel-ok\narrows-ok\ntimeout-ok\n')]
+                 ('cancel', '        d->state = d->after_cr = 0;\n        return ESC;', '        d->state = d->after_cr = 0;\n        return -1;', 12, 'cancel-fail\n')]
+    mutations.append(('late', '    if (d->state && (u32)(now - d->started) >= ESC_TIMEOUT_US)', '    if (byte < 0 && d->state && (u32)(now - d->started) >= ESC_TIMEOUT_US)', 14, 'cancel-ok\narrows-ok\ntimeout-ok\nlate-fail\n'))
+    cases = [('normal', source, 0, 'cancel-ok\narrows-ok\ntimeout-ok\nlate-ok\n')]
     for name, old, new, code, marker in mutations:
         if source.count(old) != 1:
             raise RuntimeError(f'{name}: mutation anchor is not unique')

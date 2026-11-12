@@ -1,7 +1,7 @@
 /* Foreground LAN terminal provider; all readers share one cooked lookahead. */
 #include "input_boot.h"
 #include "input_service.h"
-#include "kernel_tick.h"
+#include "clock_source.h"
 #include "lan_boot.h"
 
 static PmInputDecoder decoder = { .pending = -1 };
@@ -10,6 +10,7 @@ static int lookahead = -1;
 static int peek(void)
 {
     int c;
+    u32 now, hi;
     if (lookahead >= 0) return lookahead;
     pm_terminal_poll();
     for (;;) {
@@ -17,7 +18,8 @@ static int peek(void)
             c = decoder.pending;
             decoder.pending = -1;
         } else c = pm_terminal_trygetkey();
-        lookahead = pm_input_decode(&decoder, c, tick_count);
+        platform_clock_read_us(&now, &hi);
+        lookahead = pm_input_decode(&decoder, c, now);
         if (lookahead >= 0 || c < 0) return lookahead;
     }
 }
