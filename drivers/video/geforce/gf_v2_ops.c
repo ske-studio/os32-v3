@@ -10,6 +10,16 @@ struct gf_v2 gf_v2_inst;
 #define GF_V2_FMT_MASK 0x1eu
 #define GF_V2_OP_MASK 0x7feu
 
+int gf_v2_idle(void)
+{
+    struct gf_v2 *g = &gf_v2_inst;
+    u32 dl;
+    int rc;
+    if (!g->ch) return 0;
+    rc = gf_v2_deadline(g->ch, GF_V2_STOP_US, &dl);
+    return rc ? rc : gf_v2_fence_idle(g, dl);
+}
+
 void gf_v2_stopped(void)
 {
     if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)
@@ -60,6 +70,15 @@ static int check(void *ctx, const struct gfx2_exec *ex)
     if (op->op == GFX2_OP_READBACK)
         return supported_surface(s) && s->pool == GFX2_POOL_VRAM ? 0 : OS32_ERR_NOSYS;
     if (!supported_surface(d)) return OS32_ERR_NOSYS;
+    if (d->pool == GFX2_POOL_GART)
+        return op->op == GFX2_OP_COPY && op->rop == 0xcc &&
+            !(op->flags & (GFX2_F_PAT | GFX2_F_FILTER)) &&
+            supported_surface(s) && s->pool == GFX2_POOL_VRAM && s->fmt == d->fmt
+            ? 0 : OS32_ERR_NOSYS;
+    if (s && s->pool == GFX2_POOL_GART && op->op != GFX2_OP_STRETCH)
+        return op->op == GFX2_OP_COPY && op->rop == 0xcc &&
+            !(op->flags & (GFX2_F_PAT | GFX2_F_FILTER)) &&
+            d->pool == GFX2_POOL_VRAM && s->fmt == d->fmt ? 0 : OS32_ERR_NOSYS;
     switch (op->op) {
     case GFX2_OP_COPY: case GFX2_OP_STRETCH:
         if (!supported_surface(s) || s->fmt != d->fmt) return OS32_ERR_NOSYS;
@@ -180,6 +199,15 @@ static int emit(void *ctx, const struct gfx2_exec *ex, u32 fence)
     if (ex->src) {
         rc = surface(g, ex->src, &src);
         if (rc) return gf_v2_rc(rc);
+    }
+    if (op->op == GFX2_OP_COPY &&
+        (ex->src->pool == GFX2_POOL_GART || ex->dst->pool == GFX2_POOL_GART)) {
+        u32 cpp = dst.fmt == GF3_INDEX8 ? 1 : dst.fmt == GF3_RGB565 ? 2 : 4;
+        return gf_v2_rc(gf3_m2mf(g->g3, src.dma ? src.dma : GF3_HANDLE_VRAM_DMA,
+            dst.dma ? dst.dma : GF3_HANDLE_VRAM_DMA,
+            src.off + sr.y * src.pitch + sr.x * cpp,
+            dst.off + r.y * dst.pitch + r.x * cpp, src.pitch, dst.pitch,
+            r.w * cpp, r.h, dl));
     }
     if (op->op == GFX2_OP_FILL || op->op == GFX2_OP_COPY) {
         u8 alu = 3, subc = op->op == GFX2_OP_FILL ? GF3_SUBC_GDI : GF3_SUBC_BLIT;

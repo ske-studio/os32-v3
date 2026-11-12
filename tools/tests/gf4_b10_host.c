@@ -117,7 +117,7 @@
 #define T_DUAL (8U<<28)
 #define T_SAVED_BITS ((1U<<26)|(1U<<20))
 #define T_DEBUG_VALUE ((1U<<24)|(1U<<20)|(1U<<12)|(1U<<8)|(8U<<4)|(1U<<4)|1U)
-#define T_LIMIT_KHZ 165000U /* dfp.c:343-358: >, not >=. */
+#define T_LIMIT_KHZ 165000U /* TMDS dual-link boundary. */
 /* Distinct seed values reveal damage to unrelated registers and state. */
 #define T_OLD_OWNER 4U
 #define T_OWNER_HEAD_B 3U
@@ -220,7 +220,7 @@ static void write_expected(u32 off,u32 width,u32 value)
 }
 static int golden(u32 model,u32 flags,bool dual,bool wide)
 {
-    u32 d=route.head*T_STRIDE,ramdac=(route.or_mask&T_OR_C) ? 1U : 0;
+    u32 d=route.head*T_STRIDE;
     u32 select_bit=route.or_mask==T_OR_A ? T_SEL_A : T_SEL_C;
     u32 select=T_SEL_SEED;
     if (route.head) select|=select_bit; else select&=~select_bit;
@@ -241,13 +241,6 @@ static int golden(u32 model,u32 flags,bool dual,bool wide)
     write_expected(T_CR+d,1,T_PIXEL); write_expected(T_CR+d+1U,1,T_PIXEL_32|T_PIXEL_SLAVED);
     write_expected(T_CR+d,1,T_LCD);
     write_expected(T_CR+d+1U,1,T_LCD_KEEP|T_LCD_DIGITAL|(route.head ? 0 : T_LCD_HEAD_A));
-    u32 bind=route.head==ramdac ? T_BIND_LOCAL : T_BIND_CROSS;
-    if (route.type==GF4_LVDS) bind|=T_LVDS;
-    for (u32 bank=0;bank<(dual ? 2U : 1U);++bank) {
-        u32 off=ramdac*T_STRIDE+bank*T_BANK;
-        write_expected(T_DATA+off,4,bank ? bind^T_BIND_XOR : bind);
-        write_expected(T_CONTROL+off,4,T_BIND_INDEX);
-    }
     for (u32 i=0;i<COUNT(golden_v[model]);++i) {
         write_expected(T_V+d+i*4U,4,golden_v[model][i]);
         write_expected(T_H+d+i*4U,4,golden_h[model][i]);
@@ -310,11 +303,11 @@ static int loads(void)
                     REQUIRE(!golden(model,flags,false,false));
                 }
     for (u32 type=GF4_TMDS;type<=GF4_LVDS;++type)
-        for (u32 dual=0;dual<2U;++dual) {
-            setup(0,T_OR_C,(u8)type,true,0,0,T_LIMIT_KHZ+dual,dual!=0,T_BOOT_WIDE);
+        for (u32 dual=0;dual<3U;++dual) {
+            setup(0,T_OR_C,(u8)type,true,0,0,T_LIMIT_KHZ-1U+dual,dual==2U,T_BOOT_WIDE);
             script_off=true;
             REQUIRE(!gf4_tmds_load(&host.ctx,&route,&input,T_DEADLINE));
-            REQUIRE(!golden(0,0,dual!=0,true));
+            REQUIRE(!golden(0,0,dual==2U,true));
         }
     /* dfp.c:236-241: alternate saved spread pair is shifted once. */
     for (u8 head=0;head<GF4_HEADS;++head) {

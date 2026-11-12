@@ -22,8 +22,8 @@
  * Authors: Ben Skeggs
  */
 /* NV4a single-partition RAM reclocking, nouveau c03c1a1
- * nvkm/subdev/fb/ramnv40.c:78-175. GF_FEAT5_DESIGN section 3 adds
- * one rollback attempt; waits retain the reference budgets. BIT M is prepared. */
+ * nvkm/subdev/fb/ramnv40.c:67-175. Fixed waits retain the reference budgets.
+ * BIT M is prepared. */
 #include "feature5.h"
 
 /* Addresses/masks/waits: ramnv40.c:78-175 (all accesses BAR0). */
@@ -110,36 +110,6 @@ static i32 sr_write(struct gf_io *io, u32 head, u32 v)
     i32 rc = wr(io, RAM_SR_INDEX + head * RAM_STRIDE, RAM_BYTE, RAM_SR1);
     return rc ? rc : wr(io, RAM_SR_DATA + head * RAM_STRIDE, RAM_BYTE, v);
 }
-/* One best-effort old-PLL pass. No deadline may suppress self/auto cleanup.
- * This is the design's adapter-error cleanup, not a retry of the script. */
-static i32 cleanup_delay(struct gf_io *io)
-{
-    for (u32 left = RAM_SETTLE_US; left;) {
-        u32 n = left > GF2_WAIT_MAX_US ? GF2_WAIT_MAX_US : left;
-        i32 rc = io->timing.wait_us(io->opaque, n);
-        if (rc) return rc;
-        left -= n;
-    }
-    return 0;
-}
-static i32 rollback(struct gf_io *io, u32 ctrl, u32 coef, u32 mux)
-{
-    /* ramnv40.c:115-120: prepare again after normal refresh / BIT M. */
-    i32 rc = wr(io, RAM_PRECHARGE, RAM_WORD, 1);
-    first(&rc, wr(io, RAM_REFRESH, RAM_WORD, 1)); /* rollback refresh first */
-    first(&rc, wr(io, RAM_REFRESH, RAM_WORD, 1)); /* rollback refresh second */
-    first(&rc, mask(io, RAM_AUTO, RAM_AUTO_BIT, 0));
-    first(&rc, wr(io, RAM_SELF, RAM_WORD, 1));
-    first(&rc, mask(io, RAM_MUX, RAM_MUX_MASK, 0));
-    first(&rc, wr(io, RAM_CTRL, RAM_WORD, ctrl));
-    first(&rc, wr(io, RAM_COEF, RAM_WORD, coef));
-    first(&rc, cleanup_delay(io));
-    first(&rc, mask(io, RAM_MUX, RAM_MUX_MASK, mux & RAM_MUX_MASK));
-    first(&rc, wr(io, RAM_SELF, RAM_WORD, 0));
-    first(&rc, mask(io, RAM_AUTO, RAM_AUTO_BIT, RAM_AUTO_BIT));
-    first(&rc, cleanup_delay(io));
-    return rc;
-}
 static i32 finish(struct gf5 *g, i32 rc)
 {
     if (g) { g->source_rc = rc; g->last_rc = gf5_rc_map(rc); }
@@ -149,8 +119,8 @@ static i32 finish(struct gf5 *g, i32 rc)
 i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
 {
     struct gf_io *io;
-    u32 ctrl, coef, mux, sr[RAM_HEADS] = {0}, active = 0, blanked = 0;
-    bool touched = false, rolled_back = false, reopen;
+    u32 sr[RAM_HEADS] = {0}, active = 0, blanked = 0;
+    bool touched = false, reopen;
     i32 rc;
     if (!g || !plan) return finish(g, GF5_EINVAL);
     if (!g->ch || !g->ch->f || !g->links.owner || !g->links.drain_pause ||
@@ -170,11 +140,6 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
     if (rc) return finish(g,rc);
     /* ramnv40.c:115-147 uses private coefficients; consume before any MMIO. */
     g->plan_guard.ram_used = true;
-    /* Snapshot before any destructive writes. B1 already calculated mc/mn. */
-    rc = rd(io, RAM_CTRL, RAM_WORD, &ctrl);
-    if (!rc) rc = rd(io, RAM_COEF, RAM_WORD, &coef);
-    if (!rc) rc = rd(io, RAM_MUX, RAM_WORD, &mux);
-    if (rc) return finish(g, rc);
     reopen = g->accepting;
     rc = g->links.drain_pause(g->links.owner);
     g->accepting = false;
@@ -222,34 +187,20 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
     if (!rc) rc = mask(io, RAM_MUX, RAM_MUX_MASK, RAM_MUX_MASK);
     if (!rc) rc = wr(io, RAM_SELF, RAM_WORD, 0);
     if (!rc) rc = mask(io, RAM_AUTO, RAM_AUTO_BIT, RAM_AUTO_BIT);
+    if (!rc) touched = false; /* Normal refresh restored; no repeat after BIT M. */
     if (!rc) rc = delay(io, RAM_SETTLE_US);
     if (!rc && g->rom.memory_program)
         rc = g->links.memory_script(g->links.owner, g->rom.memory_pc);
 cleanup:
     if (rc && touched) {
-        (void)rollback(io, ctrl, coef, mux);
-        rolled_back = true;
+        first(&rc, wr(io, RAM_SELF, RAM_WORD, 0));
+        first(&rc, mask(io, RAM_AUTO, RAM_AUTO_BIT, RAM_AUTO_BIT));
     }
     /* ramnv40.c:161-175: even timeout must attempt every saved SR1. */
     for (u32 h = 0; h < RAM_HEADS; ++h) {
         if (!(blanked & (1U << h))) continue;
         if (!rc) first(&rc, vblank(io, h, true));
         first(&rc, sr_write(io, h, sr[h]));
-    }
-    /* SR1/vblank can fail after the first rollback decision. Preserve rc,
-     * and include this late failure in the same single old-PLL attempt. */
-    if (rc && touched && !rolled_back) {
-        /* ramnv40.c:98-120: disable head memory access before reclocking,
-         * including heads already reopened by the SR1 cleanup above. */
-        for (u32 h = 0; h < RAM_HEADS; ++h) {
-            if (blanked & (1U << h))
-                (void)sr_write(io, h, sr[h] | RAM_BLANK);
-        }
-        (void)rollback(io, ctrl, coef, mux);
-        /* ramnv40.c:161-175: restore every saved head after reclocking. */
-        for (u32 h = 0; h < RAM_HEADS; ++h) {
-            if (blanked & (1U << h)) (void)sr_write(io, h, sr[h]);
-        }
     }
     if (rc) goto failed;
     rc = g->links.unpause(g->links.owner);

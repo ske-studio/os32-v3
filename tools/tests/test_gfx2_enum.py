@@ -29,6 +29,11 @@ def main():
             rc = observe(work, source.replace(old, 'if (i > (u32)count) return OS32_ERR_INVAL;'))
             assert rc > 0, rc
             print(f'RED boundary: rc={rc}', flush=True)
+            old = 'if (a->head[head].conn_mask) v.connector_mask = a->head[head].conn_mask;'
+            assert source.count(old) == 1
+            rc = observe(work, source.replace(old, 'v.connector_mask = a->head[head].conn_mask;'))
+            assert rc > 0, rc
+            print(f'RED connector mask: rc={rc}', flush=True)
             assert observe(work, source) == 0
             print('GREEN restored', flush=True)
 if __name__ == '__main__': main()

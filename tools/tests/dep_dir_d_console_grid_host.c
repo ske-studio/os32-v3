@@ -44,6 +44,9 @@ static void port(unsigned p, unsigned v) { event(2, p, v); }
 #define LEGACY_FAKE_ACTIVE active
 #include "legacy_guest_fake.h"
 
+int con_dual_active(void) { return 0; }
+int con_dual_was_live(void) { return 0; }
+void con_dual_session_end(void) { }
 int con_sink_is_enabled(void) { return gui; }
 void con_sink_enable(void) { event(3,0,0); gui=1; }
 void con_sink_disable(void) { event(4,0,0); gui=0; }

@@ -40,10 +40,16 @@ static int m2mf_result(struct gf3_ctx *c, int rc)
 
 /* G3: reservation identity and lifetime belong to the caller. Only the
  * selected DMA object's byte envelope is checked here, without lookup. */
-static int m2mf_span(struct gf2_chan *ch, u32 handle, u32 off,
+static int m2mf_span(struct gf3_ctx *c, u32 handle, u32 off,
                      u32 pitch, u32 rowbytes, u32 rows, struct gf3_span *span)
 {
+    struct gf2_chan *ch = c->ch;
     u32 capacity;
+    if (handle == GF3_HANDLE_GART_DMA) {
+        int rc = gf3_span_check(off, U32_MAX, pitch, rowbytes, rows, span);
+        if (rc) return rc;
+        return c->range_q ? c->range_q(c->range_opaque, handle, off, span->bytes) : GF3_EINVAL;
+    }
     if (handle == GF3_HANDLE_VRAM_DMA) {
         if (ch->f->imem.reserved > ch->f->imem.vram_bytes)
             return GF3_ERANGE;
@@ -69,14 +75,14 @@ int gf3_m2mf(struct gf3_ctx *c, u32 in_handle, u32 out_handle, u32 in_off,
     if (!c->ready || c->epoch != ch->epoch || ch->state != GF2_RUN)
         return m2mf_result(c, GF3_ESTATE);
     if (!rowbytes || !rows) return m2mf_result(c, GF3_OK);
-    if ((in_handle != GF3_HANDLE_VRAM_DMA && in_handle != GF3_HANDLE_PCI_DMA) ||
-        (out_handle != GF3_HANDLE_VRAM_DMA && out_handle != GF3_HANDLE_PCI_DMA))
+    if ((in_handle != GF3_HANDLE_VRAM_DMA && in_handle != GF3_HANDLE_PCI_DMA && in_handle != GF3_HANDLE_GART_DMA) ||
+        (out_handle != GF3_HANDLE_VRAM_DMA && out_handle != GF3_HANDLE_PCI_DMA && out_handle != GF3_HANDLE_GART_DMA))
         return m2mf_result(c, GF3_EINVAL);
 
     struct gf3_span in, out;
-    rc = m2mf_span(ch, in_handle, in_off, in_pitch, rowbytes, rows, &in);
+    rc = m2mf_span(c, in_handle, in_off, in_pitch, rowbytes, rows, &in);
     if (rc) return m2mf_result(c, rc);
-    rc = m2mf_span(ch, out_handle, out_off, out_pitch, rowbytes, rows, &out);
+    rc = m2mf_span(c, out_handle, out_off, out_pitch, rowbytes, rows, &out);
     if (rc) return m2mf_result(c, rc);
     if (in_handle == GF3_HANDLE_VRAM_DMA && out_handle == GF3_HANDLE_VRAM_DMA &&
         (in_off <= out_off ? out_off - in_off < in.bytes :

@@ -83,6 +83,7 @@ static int safe(void) { return 1; }
 static int (*pc98_console_safe)(void)=safe;
 static int con_backend_safe(void) { return !pc98_console_safe || pc98_console_safe(); }
 static int con_sink_is_enabled(void) { return sink; }
+static int con_dual_active(void) { return 0; }
 void gfx_policy_reeval(void) {}
 static void con_sink_enable(void) { sink=1; }
 static void con_backend_cursor_at(int x,int y) { CHECK(!x&&!y); cursors++; }

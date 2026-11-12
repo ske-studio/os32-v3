@@ -134,6 +134,9 @@ int kbd_inject_take(u8 *b) {
 #define LEGACY_FAKE_ACTIVE 0
 #include "legacy_guest_fake.h"
 
+int con_dual_active(void) { return 0; }
+int con_dual_was_live(void) { return 0; }
+void con_dual_session_end(void) { }
 int con_sink_is_enabled(void) { return sink; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
 void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

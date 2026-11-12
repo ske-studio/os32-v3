@@ -38,6 +38,9 @@ Backend gfx_backend_geforce, gfx_backend_pc98, *g_backend;
 int gfx_started, gfx_current_height, gfx_flip_enabled, gfx_display_page;
 int gui, g_gfx_owner, calls, observed_gui, observed_owner, observed_started;
 void gfx_policy_reeval(void) { calls++; observed_gui=gui; observed_owner=g_gfx_owner; observed_started=gfx_started; }
+int con_dual_active(void) { return 0; }
+int con_dual_was_live(void) { return 0; }
+void con_dual_session_end(void) { }
 int con_sink_is_enabled(void) { return gui; }
 void con_sink_enable(void) { gui=1; }
 void con_sink_disable(void) { gui=0; }
@@ -64,6 +67,7 @@ int pc98_route_safe(void) { return 0; }
 void gfx_select_mode(Backend *b, int n) { (void)b; (void)n; }
 void gfx_bind_client(void) {}
 typedef unsigned long u32;
+void display_dual_dpms(u32 state) __attribute__((weak));
 struct gfx2_adapter { u32 heads; };
 struct gfx2_adapter *gfx2_active(void) { return (void *)0; }
 void gfx2_head_detach(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; }

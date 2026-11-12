@@ -85,7 +85,7 @@ MUTANTS = [
  ('AS-PDE0', 'mm/paging.c', 'if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) !=\n                (page_directory[di]', 'if (di != 0 && (d & ~(PTE_ACCESSED | PTE_DIRTY)) !=\n                (page_directory[di]', 'FAIL lease_audit_all() > 0'),
  ('TVRAM-revoke', 'gfx/gfx_core.c', '        (void)lease_revoke_surface(sid);\n        if (ledger_surface_regen(sid, 0))', '        if (ledger_surface_regen(sid, 0))', 'FAIL tv->gen == ref.generation + 1 && !tv->lease_count'),
  ('DISPLAY-revoke', 'gfx/gfx_core.c', '    gfx_reinit_surface_roles(0, 1);\n    gfx_reinit_surface_roles(1, 1);\n    gfx_reinit_tvram();', '    gfx_reinit_tvram();', 'FAIL tv->gen == ref.generation + 1 && !tv->lease_count && display->gen == gen + 1'),
- ('alias-cache', 'exec/lease.c', 'if (sf->npages && (!ledger_surface_validate(sf) || !alias_cache(sf))) bad++;', 'if (sf->npages && (!ledger_surface_validate(sf))) bad++;', 'FAIL lease_audit_all() > 0'),
+ ('alias-cache', 'exec/lease.c', 'if (sf && sf->npages && (!ledger_surface_validate(sf) || !alias_cache(sf))) bad++;', 'if (sf && sf->npages && (!ledger_surface_validate(sf))) bad++;', 'FAIL lease_audit_all() > 0'),
 ]
 
 def stage(tmp, sources, changes=()):

@@ -262,7 +262,8 @@ int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
     return 0;
 }
 ```
-- GF の epoch が変わった (再初期化) ら、backend はそれまでに発行した v2 の番号を全部 `failed_upto` にする。中核は `failed_upto` 以下を待つ面のうち未完了だった書きの先を `LOST` にし、adapter の `gen` を上げる。`gen` が違う submit は STALE、LOST の面は `free` と `desc` だけ通り、lock は `OS32_ERR_STALE`。
+- 正常な停止 (`gfx_shutdown` → `geforce_stop_common`) では、channel を止める前に backend が輪を idle にする (nouveau_drm.c:356-363 の `nouveau_accel_gr_fini` が `nouveau_channel_idle` → `nouveau_channel_del` の順、idle は nouveau_chan.c:66-85 で新しい fence を出して待つ、del の `nouveau_fence_context_del` は nouveau_fence.c:97-100 で `context_kill(fctx, 0)` = 残りを error 無しで signal)。GF は `gf_v2_fence_idle`: 輪が空でなく channel が RUN で epoch が同じなら kick と輪の最新の印の `gf2_fence_wait`、通れば `completed` = 輪の最新の v2 にして輪を空にする。失敗なら `gf_v2_fail` (下の行の異常の道)。`gf_v2_stop` の drain が通った時も同じ関数で輪を消化する。
+- GF の epoch が変わった (再初期化) 時に輪に残りがあれば (idle できなかった分、nouveau_chan.c:44-48 の `nouveau_channel_kill` の `-ENODEV` に当たる)、backend はそれまでに発行した v2 の番号を全部 `failed_upto` にする。中核は `failed_upto` 以下を待つ面のうち未完了だった書きの先を `LOST` にし、adapter の `gen` を上げる。`gen` が違う submit は STALE、LOST の面は `free` と `desc` だけ通り、lock は `OS32_ERR_STALE`。
 - 待ちの上限 (`GF3_TIMEOUT_US` 等) を越えたら `OS32_ERR_TIMEOUT`、adapter を `LOST` にして同じ処理。上限は物理の制約ではない (切れたらユーザーへ報告)。
 - 停止の確認に失敗した (`gf3_fini` が失敗し資源を保持する) 場合は adapter を `LOST_HELD` にする。この間は VRAM・GART の頁を一切返さない (§8 の回収も止める)。回復が成功して停止が確認できた時に初めて解放を進める。
 - **LOST の後は自動の回復をしない** (ユーザー判断 2026-11-10)。v1: `gfx2_adapter_lost` (C3) は最後に `gfx_policy_reeval()` を呼ぶ。GF の `geforce_direct_ok` (backend_geforce.c:121-124) は G1 が足す 1 行で `gf_v2` が LOST の間 0 を返し、`gfx_direct_wanted` (gfx/gfx_policy.c:17-23) が偽になって v1 の hook は SHADOW へ移る (gfx_policy.c:47-52)。v2: LOST の面 (失敗した書きの先) は free と desc だけ、それ以外の面は `gfx2_check_op` の (2) で SW に回り、`kva` のある面 (と持ち主の AS に写像のある GART の面) はそのまま描ける。HW の口 (`be->emit`・`kick`・`fence_*`) は呼ばない。復帰は次の mode_set (`gfx2_mode_set` §9-3、または gfx_init のやり直しで C1 の `gfx2_adapter_register` が呼ばれた時 §11-7) が装置の初期化に成功した時に C3 の `gfx2_adapter_recovered` を呼ぶか、再起動。GF の `be->stop` と再開の中身 (channel が止まらなければ層 4 の失敗の道へ渡し、その後は再起動でだけ戻る) は末尾の「確定の後の追記 (2026-11-11、I3 の G2・D1、設計者決定)」の G11。
@@ -1224,7 +1225,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | G9 | drivers/video/geforce/gf_v2_alloc.c | `gf_vram_reserve/release` | C4 経由 | `node[]`・`surf.priv` | 120 | I1 |
 | U1 | userland/lib/gfx/v2/*.c (format.c を共有) | 公開の gfx2_* | アプリ | — | 400 | I2 |
 | D1 | assets/gfx/sync.cfg (新規) と build/core.yaml の 1 項目 (guest `/etc/gfx/sync.cfg`、tags `[gui]`)、既定の中身の host 試験 (末尾の追記の D1) | — (Y1 の sync_cfg.c を host で組む) | Y1 | — | 30 | I3 |
-| K1 | platform/pc98/display_dual.c の GF の行と gf_outputs.[ch] の削除 (CONSOLE_DUAL_DESIGN.md:67・167。CONSOLE_DUAL の D2 と C1・C11 が main に入った後): display_dual.c の GF の行を gfx2 の列挙 (`gfx2_adapter_count/info`・`gfx2_head_info`・`gfx2_connector_info`) に差し替え、gf_outputs を消し、`CON_DUAL_MAX_*` を GFX2 の定数に | C1・C11 | console_dual.c | — | −40 | I3 |
+| K1 | CONSOLE_DUAL の D2 に吸収 (2026-11-12、CONSOLE_DUAL_DESIGN の末尾の追記): display_dual.c は最初から gfx2 の列挙 (`gfx2_active`・`gfx2_head_info`・`gfx2_connector_info`) で GF の行を作り、gf_outputs は作らない | — | — | — | — | — |
 | I1 | 面の道: C1・C3〜C7・C15〜C18・M1〜M3・X1・G5・G9 | 確保 → 写像 → lock → 解放 → AS の回収 (隔離を含む)。合格は §13 の I 列が I1 の試験全部 (**新帯の往復 `gfx2_map_selftest` と AS の回収を必ず含む**) + `gfx2_no_weak.sh I1` | | | 結線 | |
 | I2 | 描画の道: C2・C8〜C10・C14・S1〜S11・G1・G4・G7・G8・G11・U1 | 混在の束・fence・v1 の橋・libos32gfx。合格は I 列が I2 の試験全部 + `gfx2_no_weak.sh I2` | | | 結線 | I1 の後 |
 | I3 | 表示の道: C11〜C13・G2・G10・P1・T1・Y1〜Y4・D1・K1 | 列挙・mode・flip・全画面の出入り・同期層。合格は I 列が I3 の試験全部 + `gfx2_no_weak.sh I3` | | | 結線 | I2 の後 |
@@ -1737,3 +1738,17 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 - 担当は include/gfx_sync.h・gfx/sync/sync_int.h・sync_bind.c・a0_weak.c と tools/checks/gfx2_wiring.txt (I3 kernel)、使い手は T1 の診断。host 試験で切替・復元・無効値を検査する。
 
 - **I3 の容量 (PM 決定 2026-11-11)**: GeForce module の mem_max は実測 305,616 B に余裕を持たせ 393,216 B (384 KiB)、load_span_max は従来の prefix の余裕 64 KiB を加え 458,752 B (448 KiB)、image_max は 262,144 B を維持する。kernel は固定帯を持たず pgalloc から確保する。値の正・生成の表・manifest・固定値の試験・[容量の台帳](../../08_build.md#起動時に読む部品の大きさの上限と由来) を追従する。
+
+## 確定の後の追記 (2026-11-11、実機の G8 の GART への 2D の書き、PM 決定)
+- **実機の結果**: GeForce 6200 で gfx2_rh の G8 が落ちた。VRAM から GART の面 (256x64 INDEX8、4 頁) への 2D の COPY の後に CPU で読むと、48〜63 行目 (4 頁目) の全部が元の値のままだった。0.5 秒待って読み直しても変わらず、fence は進み、failed は 0 だった。§7-2 の追記の「G8 の DMA の結び」は、SF2D に GART を結ぶ組み合わせに手本が無いまま実機の比べに回していた。
+- **決定 (手本に寄せる)**: SF2D (0x0184 の元と書き先の 2 語) は VRAM だけにする。xf86-video-nouveau (nv04_exa.c:121-127・193-200)・mesa nv30 (nv30_transfer.c:413-416・466-468) と同じ。GART と VRAM の間の GPU の転送は M2MF だけ (xf86 nv04_exa.c:412-426、nouveau nouveau_bo0039.c:38-63、mesa nv30_transfer.c:539-541・730-732)。GART を GPU が読むもう 1 つの手本の道は SIFM の元 (xf86 nv04_xv_blit.c:110-113、mesa nv30_transfer.c:487-488) で、これは今のまま。
+  - `check` (drivers/video/geforce/gf_v2_ops.c): 元か書き先が GART の op で HW にするのは次の 2 つだけ。(1) COPY・rop 0xCC・F_PAT と色鍵と F_FILTER の flag なし・fmt が同じ・元と書き先の一方が VRAM で他方が GART (M2MF)。(2) STRETCH の元が GART で書き先が VRAM (SIFM、今の条件のまま)。ほかは NOSYS (core が SW で描く。VRAM が絡んで CPU から見えなければ NOSUPPORT)。
+  - `emit` の (1): `gf3_m2mf(in, out)` で矩形を写す。in_off = 元の off + sy*pitch + sx*cpp、out_off = 書き先の off + dy*pitch + dx*cpp、rowbytes = w*cpp、rows = h。gf3_m2mf は中で fence を待つ (読み戻しと同じ)。
+  - `gf3_m2mf` (hwdev/gf/accel_m2mf.c): handle に `GF3_HANDLE_GART_DMA` を許す。範囲の検査は `m2mf_span` で `c->range_q` (G5 の `gf_v2_gart_range`) を引き、range_q が無ければ EINVAL。VRAM の重なりの検査は VRAM 同士のときだけ。
+  - 層 3 (hwdev/gf/accel_surface.c の `gf3_surface_check`・`gf3_surface_set`): SF2D に結ぶ面 (FILL・COPY・MONO・IFC の元と書き先、SIFM の書き先) は `dma == GF3_HANDLE_GART_DMA` なら EUNSUPPORTED で積まずに返す。SIFM の元の GART は今のまま通す (SIFM の元の DMA は SF2D ではなく SIFM の method で結ぶ)。SF2D の 0x0184 の 2 語は常に VRAM_DMA。
+- **試験**: host 試験 gf_v2_ops (check の表で GART の元・書き先の行)・gf_g8 (SF2D の 0x0184 の 2 語が GART にならない、層 3 が GART の SF2D の面を EUNSUPPORTED で返す)・M2MF の host 試験 (GART の handle の範囲内・外)。実機の受入は gfx2_rh の G8 (HALV2-RH-I2)。gfx2_rh の G8 に GART→VRAM・VRAM→GART を 16 頁以上 (例 1024x64 INDEX8 = 64KB) で足す。
+
+## 確定の後の追記 (2026-11-12、実機の正常な停止の後の failed_upto、PM 決定)
+- 実機 (main 40074740、GF): `gfx2_rh` (fence 512 回と gfx_shutdown→gfx_init) の後、次のプロセスの `gfx2_i2` が fence-completed で FAIL し、再起動まで続いた。起動直後・i1 の後の i2 は PASS。原因は、正常な停止の道 (`geforce_stop_common`) が `gf_v2` の輪を idle にせず、次の `gf_v2_start` の `gf_v2_fence_reset` が HW で終わっていた項目まで `failed_upto` に入れ、中核の `failed_upto` (累積、戻さない) が 0 でなくなったこと。
+- 決定: §6-3 の正常な停止の行のとおり nouveau の idle → del (kill 0) に寄せる (`gf_v2_fence_idle` を `geforce_stop_common` の `stop_device` の前で呼ぶ)。中核 (gfx/v2/fence.c) と `gf_v2_fence_reset` は変えない。
+- 試験の期待: `failed_upto` は設計どおり累積なので、ゲスト試験 (gfx2_i2 の fence-completed、gfx2_rh の fence-state) は「自分の fence が失敗の範囲に入っていない」を見る: `(!failed || (i32)(failed - fence) < 0) && (!fence || (i32)(completed - fence) >= 0)`。正常な停止で failed が 0 のまま残ることは host 試験 gf_v2_life で押さえる (輪 3 件 → idle → count 0・completed が最新・failed_upto 0、続けて epoch を進めて `gf_v2_start` → failed_upto 0)。

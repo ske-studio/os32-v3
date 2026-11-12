@@ -38,6 +38,7 @@
 #include "hwdev/gf/production.h"
 #include "gf_v2.h"
 extern const GfxBackendV2 gf_backend_v2;
+int gf_v2_idle(void);
 void gf_v2_stopped(void);
 #include "leave_log.h"
 #include "../../../gfx/gfx_internal.h"
@@ -470,6 +471,7 @@ static int geforce_stop_common(bool force)
     active = routed = 0;
 #ifdef OS32_GEFORCE_MODULE
     gfx_policy_reeval();
+    (void)gf_v2_idle();
 #endif
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
 #ifdef OS32_GEFORCE_MODULE

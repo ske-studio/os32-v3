@@ -54,6 +54,8 @@ int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s,
     struct gf3_span full, part;
     if (!c || !c->ch || !s || !fmt || !span || (unsigned)use > GF3_USE_SIFM_SRC)
         return GF3_EINVAL;
+    if (s->dma == GF3_HANDLE_GART_DMA && use != GF3_USE_BYTES &&
+        use != GF3_USE_SIFM_SRC) return GF3_EUNSUPPORTED;
     int rc;
     if (s->dma == GF3_HANDLE_GART_DMA)
         rc = c->range_q ? c->range_q(c->range_opaque, s->dma, s->off, s->bytes) : GF3_EINVAL;
@@ -115,8 +117,7 @@ int gf3_surface_set(struct gf3_ctx *c, const struct gf3_surface *src,
     rc = gf3_surface_check(c, dst, (struct gf3_rect){0,0,dst->width,dst->height}, use, &df, &ds);
     if (rc) return rc;
     if (src->fmt != dst->fmt) return GF3_EFORMAT;
-    u32 dma[2] = {src->dma ? src->dma : GF3_HANDLE_VRAM_DMA,
-                  dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA};
+    u32 dma[2] = {GF3_HANDLE_VRAM_DMA, GF3_HANDLE_VRAM_DMA};
     rc = gf2_emit(c->ch, GF3_SUBC_SURFACE2D, GF3_SF2D_DMA_SOURCE, false, dma, 2, dl);
     if (rc) return rc;
     /* nv04_exa.c:118-129,180-200: SF format, packed pitches, offsets. */

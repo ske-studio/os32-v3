@@ -774,17 +774,17 @@ i32 gf4_tmds_script_select(const u8 *rom, u32 size,
 - 既存 devinit.c:136–166 の acquire は起動専用なので、そのまま再呼出しは不可。C2-links-init が `c->initialized` の稼働中分岐を同じ acquire/release に追加する。validate → 同じ scratch の一時借用・ROM 読取/既存検証だけを行い、attempted の起動拒否、route98、master enable、A2、main0〜4 を再実行しない。稼働中の release は expected_pmc に触れず、validate は PMC と稼働中 expected_pmc（mc.c の 0xffffffff）との照合を維持する。未初期化側は従来どおり。
 - 稼働中 PROM 読取は起動 A2/RESET 後の PBUS1850=0 が前提。validate 内の gf_production_decode_safe（bus.c:117）がこれを読取前に検査し、非零なら -1、再設定や A2 再実行はしない。
 - acquire は署名に dl が無いので前後で外側 dl を検査し、返却後に新入口へそのまま渡す。借用内の既存有限読取上限は維持する（X4 と同じく全壁時計時間を dl 内とは保証しない）。失敗した acquire の部分借用も既存 cleanup/release へ渡す。
-- 窓内の順序は SEL_CLK の binding bits 0x50000 保存 → CR44 生書きで対象 head 選択 → run_script →（成功時だけ）io.restore → SEL_CLK の binding bits だけ復元 → release。C2 は bind しない。B10 の script 前 bind と dual 判定 khz>165000 を維持する。
+- 窓内の順序は SEL_CLK の binding bits 0x50000 保存 → CR44 生書きで対象 head 選択 → run_script →（成功時だけ）io.restore → head bind → SEL_CLK の binding bits だけ復元 → release。bind の dual 判定は khz>=165000。
 - 失敗時も保存済 binding を復元して release。run_script 失敗時の io.restore は runner が一度行い、callback は重ねず、run_script 前の失敗でも B10 が CR44 owner を復元する。release は現宣言が void なので架空の戻り値を読まない。cleanup 失敗は既存 reusable/所有状態に記録し、元エラーが無いときは -1、あるときは元値を返す。ROM/PC を指す work は release 後に保持しない。
 - callback は run_script の GF_SCRIPT_ETIME→GF4_ETIME、それ以外の実行失敗は -1。select の上記 GF4 エラーは保持し、acquire/bus の失敗は -1、外側期限は GF4_ETIME とする。新口を呼ばず gf_init_run を代用することは禁止。
 
 ### 試験の土台・出典と差分
 - C2-links-init は gf_runner_host.c/test_gf_runner.py に合成 ROM と実 decoder/runner/0x4f/0x50 を結合。head1・OR別/0x81・SUB/DIRECT・REPEAT・skip・未知/切断・期限と待ち・元rc/restore失敗を正常対照付きで確認。旧 S1 CRC 不一致拒否と main0〜4 の trace と共用 decoder の gfinit-host 系を回帰対象に残す。
-- C2-links-b は gf4_c2links_host.c を追加、A1 の既存 UNIT14 に実 select/runner を結合し A2 が依存登録。UNIT10 の B10 用 script stub は維持し、別の結合ケースで B10 と実 callback を接続して khz=165000 とその前後の bind 回数（single 1 回 / dual 各 bank 1 回、C2 の追加0回）を照合する。新 UNIT 番号・ROM_COPY/RELEASE の製品 event は作らない。
+- C2-links-b は gf4_c2links_host.c を追加、A1 の既存 UNIT14 に実 select/runner を結合し A2 が依存登録。UNIT10 の B10 用 script stub は維持し、別の結合ケースで B10 と実 callback を接続して khz=165000 とその前後の bind 回数（single 1 回 / dual 各 bank 1 回）を照合する。新 UNIT 番号・ROM_COPY/RELEASE の製品 event は作らない。
 - fake の owner/io に窓の貸出し/返却・PC/head/OR/dl 観測、ROM 範囲と clock 閾値の fixture、途中失敗を足す。head0 強制、OR取り違え、閾値比較逆転、期限更新、DATA/address逆転、cleanup脱落の各変異に正常対照を置く。再 acquire で A2/main/PC-98 切替なし、窓外参照なしも照合する。start → TMDS 設定 → release → TMDS 設定で expected_pmc が保たれ、2 回目の validate が通ることを確認する。
 - 表選択: V/nouveau_bios.c:66–91,627–680,904–962。head/outp: N/dispnv04/disp.h:175–184、N/dispnv04/dfp.c:446–460。head binding/CR44/SEL_CLK: V/nouveau_bios.c:93–106,673–677、N/dispnv04/dfp.c:68–90。
 - 表参照/命令: N/nvkm/subdev/bios/init.c:359–424,539–572,1093–1143,1663–1682,1727–1744。nouveau の outp 全体に代えて必要な OR を値渡しし、head は独立して渡す。
-- 差分理由（ID 1/8）: nouveau の script 後 bind・khz>=165000 に対し、PM 決定により B10 の script 前 bind・khz>165000 を保持し C2 では bind しない。未知 selector は nouveau の無書込み継続と異なり、既存 decoder の未知操作拒否に合わせ -1 で止める。SUB 表の値 0 は手本どおりスキップ。
+- head の bind は手本どおり (PM 決定 2026-11-11、手本に寄せる): TMDS の script の**後**に bind する (V/nouveau_bios.c:93–105・673–676、F:68–90 の `nv04_dfp_bind_head`、script の前後で SEL_CLK を戻す所も含む)。bind の dual-link は TMDS では `khz >= 165000`、LVDS では `route->dual_link` (V/nouveau_bios.c:120・205・674)。FP の `fp_control` は手本どおり TMDS では `khz > 165000` のまま (F:343–358)。未知 selector は nouveau の無書込み継続と異なり、既存 decoder の未知操作拒否に合わせ -1 で止める。SUB 表の値 0 は手本どおりスキップ。
 - 差分理由: OS32 は既存の有限 scratch・命令上限・絶対期限・負rc・一時 ROM 借用を持つため、その契約へ接続する。nouveau に無い再入監視・能力bit・別 interpreter・常駐コピーは追加しない。ROM 境界検査は既存 decoder の責務の延長。
 - 未決（ユーザー判断）0件。今回は静的照合のみ。ビルド・試験・実機確認は未実施で、上記は各実装段の受入条件。
 - 反論: 0件。

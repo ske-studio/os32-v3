@@ -29,6 +29,9 @@ struct gf_v2 {                                   /* 実体は G1 */
     struct gf_v2_home home;                      /* G2 */
     u32 pal_set; u8 pal[768];                    /* G2 */
 };
+#define GF_V2_STOP_US 1000000u
+
+int gf_v2_fence_idle(struct gf_v2 *, u32 dl);
 int gf_v2_fence_emit(struct gf_v2 *, u32 v2, u32 dl);            /* G4、§6-3 のコード */
 int gf_v2_fence_state(struct gf_v2 *, u32 *completed, u32 *failed_upto); /* G4 */
 int gf_v2_fence_wait(struct gf_v2 *, u32 v2, u32 dl);            /* G4 */

@@ -23,6 +23,8 @@
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
+#include "console.h"
+#include "../kernel/console/console_dual.h"
 #ifdef TICK_PROBE
 #include "tick_probe.h"
 #endif
@@ -419,17 +421,24 @@ static inline void kernel_shell_loop(void)
                 /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
                  * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
                 gfx_client_to_gshell();
+                if (con_dual_cfg())
+                    shell_print("Loading gshell...\n", TATTR_GRAY);
                 console_text_gdc_stop();
-                tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
+                if (!con_dual_cfg())
+                    tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
             } else {
                 /* prepare が TVRAM を消さなくなった (PEGC、2026-09-24) ので、
                  * 0 行目には起動ログが残っている。文言の後ろを空白で消す。 */
                 static const char loading[] = "Loading shell...";
                 int col;
                 console_text_gdc_start();
-                tvram_print(0, 0, loading, TATTR_GRAY);
-                for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
-                    tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
+                if (con_dual_cfg()) {
+                    shell_print("Loading shell...\n", TATTR_GRAY);
+                } else {
+                    tvram_print(0, 0, loading, TATTR_GRAY);
+                    for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
+                        tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
+                }
             }
 
             if (!is_gui) geforce_heat_notice();
@@ -481,7 +490,7 @@ static inline void kernel_shell_loop(void)
                     _halt();
                 }
             }
-            tvram_clear();
+            console_session_clear();
         }
     }
 }

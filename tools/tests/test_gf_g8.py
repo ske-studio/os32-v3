@@ -37,9 +37,9 @@ def main():
         assert observe(work, source) == 0
         if args.mutate:
             for old, new in [
-                ('if (s->dma == GF3_HANDLE_GART_DMA)', 'if (0)'),
-                ('src->dma ? src->dma : GF3_HANDLE_VRAM_DMA', 'GF3_HANDLE_VRAM_DMA'),
-                ('dst->dma ? dst->dma : GF3_HANDLE_VRAM_DMA', 'GF3_HANDLE_VRAM_DMA'),
+                ('s->dma == GF3_HANDLE_GART_DMA && use != GF3_USE_BYTES &&', '0 &&'),
+                ('u32 dma[2] = {GF3_HANDLE_VRAM_DMA, GF3_HANDLE_VRAM_DMA};', 'u32 dma[2] = {GF3_HANDLE_GART_DMA, GF3_HANDLE_VRAM_DMA};'),
+                ('u32 dma[2] = {GF3_HANDLE_VRAM_DMA, GF3_HANDLE_VRAM_DMA};', 'u32 dma[2] = {GF3_HANDLE_VRAM_DMA, GF3_HANDLE_GART_DMA};'),
             ]:
                 assert source.count(old) == 1
                 rc = observe(work, source.replace(old, new))

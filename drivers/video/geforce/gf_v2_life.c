@@ -2,8 +2,6 @@
 #include "geforce_module.h"
 #include "hwdev/gf/display/api.h"
 
-#define GF_V2_STOP_US 1000000u
-
 const struct gf4_test_ops *gf_v2_disp(void)
 {
     return geforce_context && geforce_context->display_out ? *geforce_context->display_out : NULL;
@@ -61,6 +59,7 @@ int gf_v2_stop(void *ctx)
     if (!g->ch || g->ch->state == GF2_OFF || g->ch->epoch != g->epoch) return 0;
     rc = gf2_fault_check(g->ch);
     if (!rc) rc = gf_v2_deadline(g->ch, GF_V2_STOP_US, &dl);
+    if (!rc) rc = gf_v2_fence_idle(g, dl);
     if (!rc) rc = gf2_fence_emit(g->ch, &f, dl);
     if (!rc) rc = gf2_fence_wait(g->ch, f, dl);
     if (!rc) return 0;

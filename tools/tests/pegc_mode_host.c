@@ -267,6 +267,10 @@ void cpu_delay_us(u32 us)
     ev_add(EV_DELAY, 0, us);
 }
 
+int con_dual_active(void) { return 0; }
+int con_dual_was_live(void) { return 0; }
+int con_dual_cfg(void) { return 0; }
+void con_dual_session_end(void) { }
 int con_sink_is_enabled(void) { return fake_con_sink; }
 /* console.c が参照するもの (カーソル復帰の経路では呼ばれないか無害) */
 void bootlog_push(const char *buf, u32 len) { (void)buf; (void)len; }

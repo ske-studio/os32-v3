@@ -13,6 +13,7 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"
+#include "console_dual.h"
 #include "gfx_policy.h"
 #include "bootlog.h"
 #include "console.h"
@@ -42,7 +43,7 @@ static int cursor_y = 0;
 /* テキスト面へ描いてよいか。GF の decode 未確認時も同じ描画抑止を使う。
  * 描かないのは次の場合:
  *   - V86 セッション中 (上の extern のとおり、画面はゲストのもの)。
- *   - GUI モード中 = con_sink 有効 (console_text_gdc_stop 以降)。gshell が
+ *   - dual が無効な GUI モード中 = con_sink 有効。gshell が
  *     全画面 GFX を握っている間、テキスト面は gfx_init が一度消したまま
  *     誰も描き直さない。そこへ CUI プログラムの出力を書くと、表示されたままの
  *     テキスト面 (text_disp=1) の画素がグラフィックの上に残る (票 K6C-2、
@@ -53,7 +54,7 @@ static int cursor_y = 0;
 static int console_render_allowed(void)
 {
     return con_backend_safe() &&
-           !legacy_active() && !con_sink_is_enabled();
+           !legacy_active() && (!con_sink_is_enabled() || con_dual_active());
 }
 
 /* GDC (テキスト) のハードウェアカーソルを論理カーソルへ追従させる。
@@ -108,6 +109,15 @@ void tvram_clear(void)
     cursor_x = 0;
     cursor_y = 0;
     console_hw_cursor_sync();
+}
+
+void console_session_clear(void)
+{
+    if (con_dual_was_live() || con_dual_cfg()) {
+        con_sink_push_clear();
+        return;
+    }
+    tvram_clear();
 }
 
 /* The console uses the backend grid (also clear/scroll/cursor).
@@ -385,10 +395,11 @@ void console_set_cursor(int x, int y)
     /* 票 K6C-2: GUI 中は論理位置も GDC も動かさない。ここで
      * console_hw_cursor_enable() を通すと、console_text_gdc_stop() で消した
      * テキストカーソルが GFX 画面の上でまた点滅しはじめる。 */
-    if (con_sink_is_enabled()) return;
+    if (con_sink_is_enabled() && !con_dual_active()) return;
     cursor_x = x;
     cursor_y = y;
-    console_hw_cursor_enable();
+    if (con_sink_is_enabled()) console_hw_cursor_sync();
+    else console_hw_cursor_enable();
 }
 
 /* GDC (テキスト) カーソルを表示にして論理位置へ同期する。
@@ -440,8 +451,9 @@ void console_text_gdc_start(void)
      * 再び正になる今ここで一度消すと、画面と論理位置 (0,0) が必ず一致する。
      * 消すのは GUI から戻ったときだけ — 起動直後の CUI では kernel.c の
      * ブートメッセージが残ってよい (従来どおり)。 */
-    if (was_gui) tvram_clear();
+    if (was_gui && !con_dual_was_live()) tvram_clear();
     console_hw_cursor_enable();
+    con_dual_session_end();
 }
 
 /* コンソール画面サイズ取得 */

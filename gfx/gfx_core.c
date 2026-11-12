@@ -9,6 +9,7 @@
 #include "display_provider.h"
 #include "os32_kapi_shared.h"
 #include "kstring.h"
+#include "console_dual.h"
 #include "con_sink.h"     /* con_sink_is_enabled — GUI 中かどうか (票 T8) */
 #include "console.h"      /* shell_print — 拒否を端末へ (票 T8-2) */
 #include "pgalloc.h"      /* 台帳: 予約・BB・SURFACE (TASK_T1_LEDGER §3-8) */
@@ -390,6 +391,7 @@ void gfx_shutdown(void)
         if (!caller_access_get_user(&caller) ||
             caller.app_id != appslot_gfx_owner()) return;
     }
+    if (display_dual_dpms) display_dual_dpms(3);
     pc98_splash_raster_reset();
     gfx_started = 0;
     gfx_policy_reeval();
