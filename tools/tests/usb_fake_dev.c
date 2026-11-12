@@ -431,6 +431,18 @@ static int scenario(int c)
         f->sc=0;usb_class_tick(now);REQUIRE(ticks==old);f->sc=saved;
         nodes[0].conn=0;nodes[0].connect_change=1;hc.needs_explore=1;pump(300);
         REQUIRE(devices()==0 && released==2);
+    } else if(c==35) { /* Failed sync preserves an active async transfer's timeout. */
+        const u8 ep[]={7,5,0x81,3,8,0,10};
+        struct usb_xfer x;direct.hc=&hc;direct.ep0_mps=8;now=frame=100;
+        REQUIRE(usb_xfer_setup(&direct,0,ep,8,&x)==0);
+        u32 deadline=now+10;
+        x.deadline_ms=deadline;
+        REQUIRE(usb_xfer_start(&x)==0 && x.state==XS_ACTIVE);
+        REQUIRE(usb_xfer_sync(&x,100)==-USB_E_BUSY);
+        REQUIRE(x.deadline_ms==deadline && x.state==XS_ACTIVE && !irq_disabled);
+        pump(9);REQUIRE(x.state==XS_ACTIVE && now<deadline);
+        pump(1);REQUIRE(now==deadline && x.error==USB_X_TIMEOUT && x.state!=XS_ACTIVE);
+        pump(2);REQUIRE(usb_xfer_drained(&x) && x.error==USB_X_TIMEOUT);
     } else return 2;
     return failed;
 }
