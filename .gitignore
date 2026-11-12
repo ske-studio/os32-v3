@@ -135,3 +135,8 @@ tools/emu_agent/logs/
 # Local splash image and generation record (never publish)
 /assets/splash/splash.osri
 /assets/splash/splash.manifest.json
+
+# graphify の出力 (レポートと HTML だけ追跡する)
+/graphify-out/*
+!/graphify-out/GRAPH_REPORT.md
+!/graphify-out/graph.html
