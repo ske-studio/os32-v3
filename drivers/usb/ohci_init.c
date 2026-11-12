@@ -28,8 +28,7 @@ void ohci_kill(struct usb_hc *hc)
 {
     /* No readback or waiting, even if hardware no longer responds. */
     ohci_wr(hc, OHCI_INTERRUPT_DISABLE, OHCI_INTR_ALL);
-    ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_RESET);
-    ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_HCR);
+    ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_RESET); ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_HCR);
     usbp_cfg_cmd(&hc->pci, 0, OHCI_BM);
 }
 
@@ -93,7 +92,7 @@ int ohci_start(struct usb_hc *hc)
         return start_fail(hc);
     ohci_wr(hc, OHCI_INTERRUPT_DISABLE, OHCI_INTR_ALL);
     ohci_wr(hc, OHCI_INTERRUPT_ENABLE,
-            OHCI_WATCH | (hc->has_irq ? OHCI_INTR_MIE : 0));
+            OHCI_WATCH);
     hc->started |= OHCI_STARTED_BM; /* a failed readback may follow a successful BM write */
     if (usbp_cfg_cmd(&hc->pci, OHCI_BM, 0) < 0) return start_fail(hc);
     ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_CBSR_1_4 | OHCI_CTL_PLE |
@@ -115,6 +114,7 @@ int ohci_start(struct usb_hc *hc)
     hc->stop_frame = ohci_frame(hc);
     hc->stop_deadline_ms = usbp_ms() + USB_DMA_DELAY_MS;
     hc->state = HC_RUNNING;
+    if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
     return 0;
 }
 

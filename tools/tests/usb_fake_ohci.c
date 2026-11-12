@@ -13,7 +13,7 @@ static u8 mem[MEM_BYTES] __attribute__((aligned(16)));
 static u32 mem_top, mem_frees, page_frees, quarantines, now_us;
 static u8 page_state[NPAGES];
 static u32 page_limit, bad_boundary, fail_mem, bm_fail, fail_after_bm;
-static u32 writes, dead_writes, gone_count, notifications, status_count;
+static u32 writes, early_mie, gone_count, notifications, status_count;
 static u32 data_bytes;
 static u32 alloc_off[512], alloc_size[512], alloc_count;
 static u8 alloc_freed[512];
@@ -85,9 +85,7 @@ static int is_retained(u32 bus)
 
 u32 mmio_rd32_le(const volatile void *p)
 {
-    int h = which(p);
     ++actual_reads;
-    if (h >= 0 && hcs[h].state == HC_DEAD) ++dead_writes;
     return usb_fake_native_rd(p);
 }
 void mmio_wr32_le(volatile void *p, u32 v)
@@ -97,8 +95,8 @@ void mmio_wr32_le(volatile void *p, u32 v)
     if (h < 0) { bad_dma = 1; return; }
     off = (u32)((volatile u8 *)p - (volatile u8 *)regs[h]);
     ++writes;
-    /* kill is allowed exactly once after setting HC_DEAD. */
-    if (hcs[h].state == HC_DEAD && hcs[h].dead_why == 0) ++dead_writes;
+    if (off == OHCI_INTERRUPT_ENABLE && (v & OHCI_INTR_MIE) &&
+        hcs[h].state == HC_STARTING) ++early_mie;
     if (off == OHCI_INTERRUPT_STATUS) rput((u32)h, off, rget((u32)h, off) & ~v);
     else if (off == OHCI_INTERRUPT_DISABLE)
         rput((u32)h, OHCI_INTERRUPT_ENABLE, rget((u32)h, OHCI_INTERRUPT_ENABLE) & ~v);
@@ -264,6 +262,9 @@ static void frame_begin(u32 h)
 static void frame_end(u32 h)
 {
     u32 i, ordinal = 0;
+    /* Stop writes retire the fetched list; software state alone cannot. */
+    if ((rget(h, OHCI_CONTROL) & OHCI_CTL_HCFS_MASK) != OHCI_CTL_OPERATIONAL ||
+        (rget(h, OHCI_COMMAND_STATUS) & OHCI_CMD_HCR)) held_count = 0;
     for (i = 0; i < held_count; ++i) {
         struct ohci_ed_hw *ed = bus_va(held_bus[i]);
         u32 head = dma_le32_get(&ed->headp), count = 0;
@@ -292,6 +293,9 @@ static void frame_end(u32 h)
                 data_bytes += done;
                 for (u32 j = 0; j < done; ++j) *(u8 *)bus_va(start + j) = 0x5a;
             }
+            for (u32 page = 0; page < NPAGES; ++page)
+                if (bus >= page_bus(page) && bus - page_bus(page) < PAGE &&
+                    page_state[page] == 2) bad_dma = 1;
             dma_le32_put(&td->cbp, cbp);
             dma_le32_put(&td->flags, (f & ~OHCI_TD_CC_MASK) | (cc << OHCI_TD_CC_SHIFT));
             /* Real OHCI replaces NextTD with the done-list link. */
@@ -382,7 +386,7 @@ static void fresh(void)
     bad_boundary = fail_mem = bm_fail = fail_after_bm = 0;
     no_hcr = no_ownership = no_pes = no_clock = 0;
     event_td = event_cc = event_len = event_status_cc = event_no_response = 0;
-    notifications = status_count = gone_count = writes = dead_writes = data_bytes = 0;
+    notifications = status_count = gone_count = writes = early_mie = data_bytes = 0;
     actual_reads = sync_dev = sync_cpu = op_seen = 0;
     held_count = 0; hold_active = bad_dma = 0; page_limit = NPAGES;
     for (u32 i = 0; i < 2; ++i) {
@@ -444,12 +448,15 @@ static void startup_pool(void)
     fresh(); no_hcr = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
     REQUIRE(hcs[0].state == HC_OFF && page_frees == 2 && !quarantines);
+    fresh(); bm_fail = 1;
+    REQUIRE(ohci_start(&hcs[0]) < 0);
+    REQUIRE(hcs[0].state == HC_DEAD && quarantines == 2 && !page_frees);
     fresh(); fail_after_bm = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
     REQUIRE(hcs[0].state == HC_DEAD && quarantines == 2 && !page_frees);
     fresh(); hcs[0].has_irq = 1;
     REQUIRE(ohci_start(&hcs[0]) == 0);
-    REQUIRE(rget(0, OHCI_INTERRUPT_ENABLE) & OHCI_INTR_MIE);
+    REQUIRE(!early_mie && (rget(0, OHCI_INTERRUPT_ENABLE) & OHCI_INTR_MIE));
     REQUIRE(ohci_intr_collect(&hcs[0]) == 0); /* shared IRQ belongs to another device */
     rput(0, OHCI_INTERRUPT_STATUS, OHCI_INTR_WDH | OHCI_INTR_RHSC);
     REQUIRE(ohci_intr_collect(&hcs[0]) == (OHCI_INTR_WDH | OHCI_INTR_RHSC));
@@ -539,13 +546,14 @@ static void delay_unlink(void)
 static void faults(void)
 {
     struct usb_dev d; struct usb_xfer x; struct usb_dma out;
-    u32 oldwrites, frees, oldsync;
+    u32 oldwrites, frees, oldsync, oldreads;
     for (u32 mode = 0; mode < 4; ++mode) {
         fresh(); REQUIRE(ohci_start(&hcs[0]) == 0); REQUIRE(ohci_start(&hcs[1]) == 0);
         init_x(&x, &d, USB_EP_INTERRUPT, 8, 1);
         d.ifs[0].cls = &cls; hcs[0].devices[d.addr] = &d;
         REQUIRE(ohci_xfer_alloc(&hcs[0], &x) == 0); REQUIRE(usb_xfer_start(&x) == 0);
-        event_no_response = 1; frees = mem_frees;
+        frame_begin(0); REQUIRE(held_count != 0);
+        frees = mem_frees;
         if (mode == 0) {
             rput(0, OHCI_INTERRUPT_STATUS, OHCI_INTR_UE); service(&hcs[0]);
         } else if (mode == 1) {
@@ -554,7 +562,9 @@ static void faults(void)
             x.state = XS_CB_PENDING; usb_hc_dead(&hcs[0], USB_WHY_UNSETUP);
         } else usb_hc_dead(&hcs[0], USB_WHY_ABORT);
         REQUIRE(hcs[0].state == HC_DEAD && gone_count == 1 && quarantines == 2);
-        oldwrites = writes; oldsync = sync_dev;
+        frame_end(0); REQUIRE(!bad_dma);
+        frame(0); REQUIRE(!bad_dma);
+        oldwrites = writes; oldsync = sync_dev; oldreads = actual_reads;
         usb_hc_dead(&hcs[0], USB_WHY_UE); service(&hcs[0]);
         ohci_scan(&hcs[0], 32); ohci_xfer_close(&hcs[0], &x);
         ohci_xfer_free(&hcs[0], &x); usb_xfer_notify(&x);
@@ -563,6 +573,7 @@ static void faults(void)
         REQUIRE(usb_dmamem_alloc(&hcs[0], 16, 16, &out) == -USB_E_HC);
         REQUIRE(usb_xfer_start(&x) == -USB_E_HC);
         REQUIRE(writes == oldwrites && sync_dev == oldsync && gone_count == 1 && notifications == 0);
+        REQUIRE(actual_reads == oldreads);
         REQUIRE(mem_frees == frees && page_frees == 0 && x.hcpriv);
         REQUIRE(hcs[1].state == HC_RUNNING && !bad_dma);
         frame(1); REQUIRE(ohci_frame(&hcs[1]) == 1);
