@@ -1,6 +1,7 @@
 """Register N01 guest acceptance."""
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=['make:all'],
-             covers=['tools/ppc/sc_run.py', 'userland/ppc/nest.c',
+             covers=['build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
+                     'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'build/ppc-user.mk', 'build/ppc-kboot.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',

@@ -192,15 +192,20 @@ static void failed_clock_cleanup(void)
         assert(!display.accepting && !display.reusable);
         u32 dacclk; assert(!gf3_host_read(&cint_host,0,0x68052c,4,&dacclk) && dacclk==0x123401);
         /* The no-clock branch loads both CRTCs before lower stop. */
-        u32 origins=0;
+        u32 origins=0, index=0;
+        u32 cr1f=0, extended=0;
         for (u32 i=0;i<cint_host.nevents;++i) {
             const struct gf3_host_event *e=&cint_host.events[i];
+            if (e->op==H_WRITE && e->a[1]==0x6013d4) index=e->a[3];
+            if (e->op==H_WRITE && e->a[1]==0x6013d5 && index==0x1f) cr1f=e->a[3];
+            if (e->op==H_WRITE && e->a[1]==0x6013d5 &&
+                (index==0x1a || index==0x21 || index==0x44)) { assert(cr1f==0x57); ++extended; }
             if (e->op==H_WRITE && (e->a[1]==0x600800 || e->a[1]==0x602800) &&
                 (e->a[3]==0x1110 || e->a[3]==0x2220)) ++origins;
             assert(!(e->op==H_WRITE && e->a[0]==GF_MODE_VRAM_BAR));
             assert(!(e->op==H_WRITE && e->a[1]==0x6808b0));
         }
-        assert(origins==2);
+        assert(origins==2 && cr1f==0x57 && extended);
         gf4_hw_state_reset();
         assert(cint_prod.chan.state==GF2_OFF && cint_prod.display.engaged);
         assert(cint_prod.display.display4==&display);

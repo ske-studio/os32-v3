@@ -30,6 +30,16 @@ ifeq ($(KB_FD1_STREAM)$(KBOOT_SH),10)
 KB_OUT := $(KB_OUT)/fd1-stream
 endif
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
+.DEFAULT_GOAL := all
+
+ROOT_ISO := $(KB_OUT)/root.iso
+ROOT_BLOB := $(KB_OUT)/root_image_blob.o
+ROOT_MOTD := $(KB_OUT)/motd.txt
+ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),build/out/ppc-user/sh.bin)
+ROOT_OBJCOPY := $(KB_OBJCOPY)
+ROOT_ELF_FORMAT := elf32-powerpc
+ROOT_CPU := powerpc
+include build/ram-root.mk
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := arch/ppc/kernel_entry.S arch/ppc/entry.S arch/ppc/kernel_takeover.S \
@@ -62,16 +72,13 @@ ifneq ($(KB_EXEC),)
 ifneq ($(KBOOT_TERM),lan)
 $(error KBOOT_TERM must be lan)
 endif
-KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c fs/isofs/iso9660.c \
- fs/isofs/iso9660_media.c drivers/block/ram_ro.c init/boot_root.c \
- fs/ramfs/ramfs.c platform/powermac/root_boot.c platform/powermac/root_image.c \
+KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c $(RAM_ROOT_C) platform/powermac/root_boot.c platform/powermac/root_image.c \
  platform/powermac/console_stream.c platform/powermac/shell_putchar.c
 ifeq ($(KBOOT_SHELL),1)
 KB_C += platform/powermac/cli_boot.c kernel/cli/resident_cli.c
 else
 KB_C += platform/powermac/shell_boot.c platform/powermac/input_boot.c \
  platform/powermac/input_decode.c
-KB_ROOT_BINS += build/out/ppc-user/sh.bin
 endif
 KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
@@ -104,7 +111,6 @@ KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-table
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
  -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -MMD -MP $(KB_INC)
 
-.DEFAULT_GOAL := all
 .PHONY: all audit
 all: $(KB_ELF) audit
 
@@ -145,14 +151,11 @@ $(KB_OUT)/motd.txt:
 	@printf 'OS32 PowerPC shell\n' > $@
 .PHONY: kb-user
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(KB_ROOT_BINS)
+	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(ROOT_BINS)
 
-$(KB_ROOT_BINS): kb-user
+$(ROOT_BINS): kb-user
 
-$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py $(KB_ROOT_BINS)
-	python3 -B tools/mkroot_image.py --motd $< $(foreach bin,$(KB_ROOT_BINS),--bin $(bin)) --out $@
-$(KB_OUT)/root_image_blob.o: $(KB_OUT)/root.iso
-	$(KB_OBJCOPY) -I binary -O elf32-powerpc -B powerpc --rename-section .data=.rodata.boot_root,alloc,load,readonly,data,contents $< $@
+
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined \

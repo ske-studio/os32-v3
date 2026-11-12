@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""S-C N01: real USER -> USER exec twice, with the parent's stack intact."""
+"""S-C: USER nesting and direct shell acceptance on mac99."""
 import argparse
 import io
 import os
@@ -95,7 +95,7 @@ def lan_accept(elf, cpu, out, shell=False):
                 elif shell and phase == 5 and display.getvalue().count(b'OS32 External Shell Started') == 2 and display.getvalue().endswith(b'sh> '):
                     actual = display.getvalue().decode()
                     check_shell(actual)
-                    require('discarded\n' not in actual.replace('\r', ''), 'reconnect failed to cancel line')
+                    require('\ndiscarded\n' not in actual.replace('\r', ''), 'reconnect failed to cancel line')
                     require('KBOOT READY' not in actual, 'kernel log leaked to terminal')
                     require(not any('gap' in x or 'timeout' in x for x in lines), 'terminal loss')
                     (out/'terminal.log').write_text(actual)
@@ -146,9 +146,7 @@ def nest_main(args):
     if args.mutate:
         # Lose only the second result read. First child and final CLI return
         # must still be observed, so unrelated faults/timeouts cannot be RED.
-        extra = mutant_settings(work, 'parent-result', 'arch/ppc/kapi_call.c', 'platform/powermac/shell_boot.c',
-                     'platform/powermac/input_boot.c', 'platform/powermac/input_decode.c',
-                     'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
+        extra = mutant_settings(work, 'parent-result', 'arch/ppc/kapi_call.c',
                                 'return ppc_kapi_invoke(&api, current_slot, values);',
                                 'static unsigned reads;\n'
                                 '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
@@ -166,7 +164,7 @@ def nest_main(args):
 # The same commands run against the real USER image on both transports.
 COMMANDS = (b'help\npwd\nls /bin\necho sc-ok > /tmp/sc\ncat /tmp/sc\n'
             b'cat /nofile > /tmp/e\ncat /tmp/e\n/bin/hello.bin ok\necho $?\n'
-            b'cd /tmp\nset SC_PARENT=kept\n/bin/hello.bin ok\necho $?\npwd\n'
+            b'cd /tmp\nset SC_PARENT=kept\n/bin/hello.bin ok\necho $?\npwd\necho $SC_PARENT\n'
             b'echo again\n\x1b[A\necho echo script-ok > /tmp/test.sh\n'
             b'source /tmp/test.sh\necho pipe-ok | cat\n'
             b'echo cancel-me\x03\necho edit-x\x7fok\nexit 3\n')
@@ -176,13 +174,16 @@ def check_shell(text, fd1=True, restart=True):
     """Check results between prompts, never accepting command echo as output."""
     text = text.replace('\r', '')
     require('OS32 External Shell Started' in text and 'sh> ' in text, 'sh startup')
-    for value in ('sh.bin', 'hello.bin', 'hello ok\n', '\n7\n',
+    require('SH.BIN' in text.upper() and 'HELLO.BIN' in text.upper(), 'bin listing')
+    for value in ('hello ok\n', '\n7\n', 'kept\n', 'edit-ok\n',
                   'again\n', 'script-ok\n', 'pipe-ok\n', 'sh exited=3\n'):
         require(value in text, 'missing shell result '+repr(value)+': '+repr(text))
     require(text.count('hello ok\n') == 2, 'hello repeat')
+    require(text.count('\nagain\n') == 2, 'history repeat')
+    require('pwd\n/\nsh> ' in text and 'pwd\n/tmp/\nsh> ' in text, 'cwd preserved')
     require(text.count('OS32 External Shell Started') == (2 if restart else 1), 'sh restart')
     require(('sc-ok\n' in text) == fd1, 'fd1 redirect/cat routing')
-    require('cancel-me\n' not in text, 'cancelled command executed')
+    require('\ncancel-me\n' not in text, 'cancelled command executed')
     # An empty cat of /tmp/e must return directly to the next prompt.
     require('cat /tmp/e\nsh> ' in text, 'diagnostic leaked into redirect')
     require('nofile' in text.partition('cat /nofile > /tmp/e\n')[2].partition('sh> ')[0],

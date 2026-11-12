@@ -711,6 +711,11 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
         }
         i32 rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);
         if (rc && !first) first=rc;
+        /* TMDS script cleanup can relock CR1F. Renew immediately before CRTC
+         * restore: dispnv04/crtc.c:692-706; devinit/base.c:94,117. */
+        u32 unlock=RECOVER_CR1F_UNLOCK;
+        i32 unlock_rc=svc_index(&l->io,SVC_CR,RECOVER_CR1F,&unlock,true);
+        if (unlock_rc && !first) first=unlock_rc;
         for (u8 h=0;h<GF4_HEADS;++h) {
             rc=gf4_hw_crtc_restore(&l->io,h,saved);
             if (rc && !first) first=rc;
