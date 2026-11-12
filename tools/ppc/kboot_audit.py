@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--nm', required=True)
     parser.add_argument('--objdump', required=True)
     parser.add_argument('--sources', nargs='+', required=True)
-    parser.add_argument('--mutant', nargs=2, metavar=('SOURCE', 'FILE'),
+    parser.add_argument('--mutant', nargs=2, action='append', metavar=('SOURCE', 'FILE'),
                         help='audit FILE in place of product SOURCE (mutation builds)')
     parser.add_argument('cc', nargs=argparse.REMAINDER,
                         help='-- compiler and the exact flags used for kernel TUs')
@@ -71,9 +71,11 @@ def main():
     # through another macro (TICK_MS -> PIT_HZ) is reported like a direct one.
     for source in args.sources:
         extra = []
-        if args.mutant and source == args.mutant[0]:
-            extra = ['-I'+os.path.dirname(source)]
-            source = args.mutant[1]
+        for original, replacement in args.mutant or []:
+            if source == original:
+                extra = ['-I'+os.path.dirname(source)]
+                source = replacement
+                break
         used = run([*args.cc, *extra, '-E', '-dU', '-MF', '/dev/null', source, '-o', '-'])
         for name in POISON:
             if re.search(r'^#define '+name+r'\b', used, re.M):

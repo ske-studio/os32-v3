@@ -63,6 +63,19 @@ def exercise(script, directory):
         assert proc.stdout.strip() == str(len(image))
         verify(image, motd)
 
+    app = directory / 'hello.bin'
+    payload = b'OS32X app\x00'
+    app.write_bytes(payload)
+    out = directory / 'apps.iso'
+    subprocess.run([sys.executable, '-B', str(script), '--motd', str(directory / 'motd'),
+                    '--bin', str(app), '--out', str(out)], check=True, capture_output=True)
+    image = out.read_bytes()
+    root = entries(image, image[16 * BLOCK + 156:])
+    rec = entries(image, root['BIN'])['HELLO.BIN']
+    start = int.from_bytes(rec[2:6], 'little') * BLOCK
+    size = int.from_bytes(rec[10:14], 'little')
+    assert image[start:start + size] == payload
+
 
 def main():
     if not (shutil.which('genisoimage') or shutil.which('xorriso')):
