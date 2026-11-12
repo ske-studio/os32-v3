@@ -26,7 +26,7 @@ SOURCES = ('kernel/time/sysclk.c', 'platform/pc98/pit.c', 'kernel/time/ktime.c',
            'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
 HEADERS = ('include/platform_timer.h', 'include/clock_source.h', 'platform/pc98/pit_time.h', 'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h',
            'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'platform/pc98/pit_math.h', 'kernel/time/time_math.h',
-           'kernel/time/ktime.h',
+           'kernel/time/ktime.h', 'kernel/time/tick_clock.h',
            'kernel/time/sysclk.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/bios_snapshot.h')
 MUTATIONS = (
     ('platform/pc98/clock.c',

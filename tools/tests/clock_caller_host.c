@@ -33,6 +33,8 @@ void irq_restore(unsigned int old)
 }
 const struct pit_setup *pit_get_setup(void) { return &setup; }
 int pit_init(unsigned int hz) { check(hz == 100); return 0; }
+int tick_clock_config(u32 num, u32 den)
+{ check(num == setup.reload && den == setup.clk_hz); return 0; }
 void platform_timer_sample(struct platform_timer_sample *out)
 {
     check(!enabled); samples++;
