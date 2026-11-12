@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-12)** — 中間の到達点 S-A は main。最終の到達点 S-B は全段実装・独立レビュー済みで、**QEMU 7450・7455 で受入に到達** (LAN 端末から /bin/hello.bin ok → exit=7、tools/ppc/sb_run.py)。S-B の段の取り込みは本線の統合の枝で CI 中。次は W6 (PC-98 の FD 起動から共通 RAM root、本線) と W7 (sh.bin)。設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md) (S-A) と [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md) (S-B、実装で決めたことは末尾の「確定の後の追記 1」)。
+> 状態: **実装中 (2026-11-12)** — 中間の到達点 S-A は main。最終の到達点 S-B は全段実装・独立レビュー済みで、**QEMU 7450・7455 で受入に到達** (LAN 端末から /bin/hello.bin ok → exit=7、tools/ppc/sb_run.py)。S-B の段は全部 main (61276d39、2026-11-12)。次は W6 (PC-98 の FD 起動から共通 RAM root、本線) と W7 (sh.bin)。設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md) (S-A) と [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md) (S-B、実装で決めたことは末尾の「確定の後の追記 1」)。
 
 ## 0. ユーザー決定 (2026-11-11)
 
