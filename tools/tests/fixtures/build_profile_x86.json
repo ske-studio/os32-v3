@@ -87,6 +87,7 @@
     "init/bootlog_save.c",
     "kernel/kbd_inject.c",
     "kernel/sys.c",
+    "kernel/idle_work.c",
     "platform/pc98/system.c",
     "platform/pc98/pic.c",
     "platform/pc98/irq_policy.c",
