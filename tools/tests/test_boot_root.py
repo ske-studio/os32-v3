@@ -14,7 +14,7 @@ CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=[],
 
 
 def main():
-    source = (ROOT / 'platform/powermac/root_boot.c').read_text()
+    source = (ROOT / 'init/boot_root.c').read_text()
     anchor = 'return vfs_mount("/tmp", "rd1", "ramfs");'
     if source.count(anchor) != 1:
         raise RuntimeError('mutation anchor is not unique')
@@ -25,12 +25,13 @@ def main():
                         '--out', str(d / 'root.iso')], cwd=ROOT, check=True)
         for mutant in range(1 + int('--mutate' in sys.argv)):
             modified = source.replace(anchor, 'return 0;') if mutant else source
-            (d / 'root_boot.c').write_text(modified)
+            (d / 'boot_root.c').write_text(modified)
             cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                    '-D__cdecl=', '-I.', '-Iinclude', '-Isdk/include/os32', '-Ifs',
                    '-Ifs/isofs', '-Idrivers/base', '-Idrivers/ata', '-Imm', '-Ilib',
-                   '-Iplatform/powermac', str(d / 'root_boot.c'), 'init/boot_root.c',
+                   '-Iplatform/powermac', 'platform/powermac/root_boot.c', str(d / 'boot_root.c'),
+                   '-Wl,--wrap=vfs_register_fs', '-Wl,--wrap=vfs_mount',
                    'drivers/block/ram_ro.c', 'drivers/base/dev.c', 'fs/vfs.c',
                    'fs/isofs/iso9660.c', 'fs/isofs/iso9660_media.c', 'fs/ramfs/ramfs.c',
                    'lib/kstring_c.c', 'tools/tests/boot_root_host.c', '-o', str(d / 'test')]
