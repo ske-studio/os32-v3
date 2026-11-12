@@ -38,4 +38,5 @@
 | X1 (★ fs/vfs.h の VFS_DEV_RAM、iso9660_mount が rdN を受ける) | 実装・独立レビュー済 (wt/ppc-shint3)、本線で HAL v2 の I1 と一緒に NP21/W の受入待ち |
 | W4 (S-B の詳細設計の往復) | 済 (2026-11-11、PPC_SHELL_EXEC_DESIGN)。exec の facade の段 (F) は HAL v2 の I1 が main に入った後の main を基点 |
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
-| W6〜W9 | 未着手 |
+| W7 (S-C、既存のシェルを USER の sh.bin として起動) | 詳細設計は確定 (2026-11-12、[PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md))。製品の経路は第 3 の像 KBOOT_SH=1、既定の診断の像と KBOOT_SHELL=1 の像は不変。段 N01 (USER の入れ子の先行確認) から |
+| W6・W8・W9 | 未着手 (W6 は共通の部品の段と PC-98 の FD 側の段に分け、後者は本線が起こす) |
