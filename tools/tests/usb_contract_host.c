@@ -34,7 +34,7 @@ STATIC_ASSERT(OHCI_FMI_FI(0xffff2edfu) == 0x2edfu &&
               OHCI_TD_CC(0x9abcdef0u) == 9, ohci_extract);
 /* Runtime checks use known device bytes independently of the accessor pair:
  * inverse but equally broken get/put implementations must not pass. */
-int main(void)
+static int run(void)
 {
     const u32 values[] = { 0, 1, 0x12345678u, 0x80000000u, 0xffffffffu };
     struct ohci_ed_hw ed;
@@ -57,4 +57,12 @@ int main(void)
     if (dma_le32_get(&ed.headp) != 0x89abcdefu) return 3;
     if (mmio_rd32_le(&reg) != 0x76543210u) return 4;
     return 0;
+}
+
+/* No libc: exit through the i386 Linux syscall, as tick_probe_host.c. */
+void _start(void)
+{
+    int r = run();
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(r));
+    for (;;) {}
 }

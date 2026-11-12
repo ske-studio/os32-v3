@@ -8,6 +8,9 @@ import subprocess
 import sys
 import tempfile
 
+# Host runs are libc-free like test_tick_probe.py: CI has no 32-bit libc/crt.
+BARE = ['-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static']
+
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,8 +58,8 @@ def check(mutate):
         for arch in ('x86', 'ppc'):
             exe = tmp / arch
             swap = ['-DUSB_TEST_SWAP'] if arch == 'ppc' else []
-            command(['gcc', *flags, '-m32', '-Iarch/x86', *swap, '-O2', src, '-o', str(exe)])
-            result = host32.run([str(exe)])
+            command(['gcc', *flags, '-m32', *BARE, '-Iarch/x86', *swap, '-O2', src, '-o', str(exe)])
+            result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, (arch, result.returncode)
             print('runtime:', arch, 'OK')
         guard(tmp, '#include "usb_platform.h"\n#include "drivers/usb/ohci_regs.h"\n', 0)
@@ -88,10 +91,10 @@ def check(mutate):
                 header.write_text(original.replace(anchor, replacement))
                 exe = tmp / 'bad-accessor'
                 command(['gcc', '-I' + str(copy / 'include'),
-                         '-I' + str(copy / 'arch/x86'), *flags, '-m32', '-O2',
+                         '-I' + str(copy / 'arch/x86'), *flags, '-m32', *BARE, '-O2',
                          *(['-DUSB_TEST_SWAP'] if arch == 'ppc' else []),
                          src, '-o', str(exe)])
-                result = host32.run([str(exe)])
+                result = host32.run([str(exe)], runner='qemu')
                 assert result.returncode in (1, 2, 3, 4), (anchor, result.returncode)
                 print('RED runtime:', arch, anchor, 'rc=' + str(result.returncode))
                 header.write_text(original)
