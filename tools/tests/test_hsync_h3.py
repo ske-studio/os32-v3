@@ -43,7 +43,7 @@ HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-D__cdecl=", "-D__OS32_USERLAND__"]
 HOST_INC = ["-I" + str(ROOT / p) for p in
             (".", "include", "sdk/include", "sdk/include/os32",
-             "userland/lib", "userland/system", "lib")]
+             "userland/lib", "userland/system", "lib", "arch/x86")]
 
 CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", "/usr/local/cross"))
 if not CROSS_DIR.exists():
@@ -56,7 +56,7 @@ TARGET_COMMON = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                  "-mno-red-zone", "-fcommon", "-O2",
                  "-Wall", "-Wextra", "-Werror"]
 TARGET_USER = TARGET_COMMON + [
-    "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
+    "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Iarch/x86", "-Isdk/include",
     "-Isdk/include/os32", "-Iuserland/lib",
     "-I" + str(CROSS_DIR / "i386-elf/include")]
 TARGET_KERNEL = TARGET_COMMON + [

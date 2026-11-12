@@ -29,6 +29,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-mno-red-zone", "-fcommon", "-O2", "-Wall",
                 "-D__OS32_USERLAND__"]
 TARGET_INCLUDES = ["-I" + str(ROOT), "-I" + str(ROOT / "include"),
+                   "-I" + str(ROOT / "arch/x86"),
                    "-I" + str(ROOT / "sdk/include"),
                    "-I" + str(ROOT / "sdk/include/os32"),
                    "-I" + str(ROOT / "userland/lib"),
