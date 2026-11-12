@@ -255,11 +255,19 @@ static void test_cold_start(void)
     log_expect("detect",LOG_INJECT);
     svc_finish();
 }
+/* Emulate owner-controlled head banking for diagnostic VGA data reads. */
+static int log_banked_read(void *owner,u32 bar,u32 off,u32 width,u32 *out)
+{
+    if ((off==SVC_SR+1U || off==SVC_SR+RECOVER_HEAD_STRIDE+1U ||
+         off==SVC_CR+1U+RECOVER_HEAD_STRIDE) && svc_host.cr[0][SVC_OWNER]!=3)
+        off-=off>=SVC_CR+RECOVER_HEAD_STRIDE || off==SVC_SR+RECOVER_HEAD_STRIDE+1U ? RECOVER_HEAD_STRIDE : 0;
+    return svc_read(owner,bar,off,width,out);
+}
 static void test_detect_state(void)
 {
     log_fixture();
     struct gf_io *io=&cint_prod.foundation.io;
-    u32 lock=0x99,owner=3,index=0x28;
+    u32 lock=0x99,owner=1,index=0x28;
     assert(!svc_index(io,SVC_CR,RECOVER_CR1F,&lock,true));
     assert(!svc_index(io,SVC_CR,RECOVER_CR44,&owner,true));
     assert(!io->write(io->opaque,0,SVC_CR,1,index));
@@ -288,14 +296,24 @@ static void test_detect_state(void)
     svc_ctx.dcb.routes[0].connector=7;
     svc_ctx.dcb.routes[0].i2c_index=2;
     svc_ctx.dcb.i2c[2]=(struct gf4_i2c_port){.drive=0x51,.sense=0x50};
+    svc_host.cr[0][0x21]=0x31; svc_host.cr[1][0x21]=0x32;
+    svc_host.ar[0][0x10]=0x51; svc_host.ar[1][0x10]=0x52;
+    svc_host.index[0][3]=0x25; svc_host.index[1][3]=0x06;
+    svc_host.ar_data[0]=svc_host.ar_data[1]=true;
+    io->read=log_banked_read;
     svc_ctx.last_rc=GF4_EDDC;
     svc_detect_diagnostic(&svc_ctx,&cint_prod.feature5);
-    assert(startlog_equal("[gf4] detect state cr1f=99 cr44=3 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1"
+    assert(startlog_equal("[gf4] detect state cr1f=99 cr44=1 read_rc=0 m_attempted=1 m_rc=-1 f5_rc=-503 source_rc=-1"
         " cr11=80 cr3e=c cr3f=31 cr36=4 cr37=21 pmc=12345679 ec0=10 ec1=1000 mmio_rc=0"
         " sr01_0=11 cr17_0=81 cr1a_0=41 sr01_1=12 cr17_1=82 cr1a_1=42"
         " dacclk0=12340000 dacclk1=12340001 fptg0=56780000 fptg1=56780001\n"
+        "[gf4] detect hw h=0 cr21=31 ar10=51 config=0\n"
+        "[gf4] detect hw h=1 cr21=32 ar10=52 config=0\n"
+        "[gf4] detect pll vpll1=0 vpll2=0 b1=0 b2=0 ext=0 pllsel=0 sel_clk=0\n"
         "[gf4] detect port conn=7 bus=2 port_rc=0 drive_cr=51 drive=11 sense_cr=50 sense=8 read_rc=0\n"));
     assert(svc_ctx.last_rc==GF4_EDDC);
+    assert(svc_host.index[0][3]==0x25 && svc_host.index[1][3]==0x06);
+    io->read=svc_read;
     for (u32 i=0;i<sizeof(regs);++i) assert(svc_host.cr[0][regs[i]]==values[i]);
     u32 value;
     assert(!io->read(io->opaque,0,SVC_CR,1,&value) && value==index);

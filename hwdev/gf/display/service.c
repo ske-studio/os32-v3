@@ -433,6 +433,30 @@ static void svc_diag_index(struct gf_io *io,u32 port,u32 reg,char out[9])
     }
     svc_diag_hex(out,value,rc);
 }
+/* hw.h:194-235: preserve the AR index and palette gate across reads. */
+#define SVC_AR 0x6013c0U
+#define SVC_STATUS 0x6013daU
+#define SVC_CONFIG 0x600804U /* nvreg.h:154, hw.c:636 */
+static void svc_diag_attr(struct gf_io *io,u32 delta,char out[9])
+{
+    u32 saved=0,value=0,dummy=0;
+    i32 rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_AR+delta,1,&saved);
+    if (!rc) {
+        rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_STATUS+delta,1,&dummy);
+        if (!rc) rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_AR+delta,1,(saved&0x20U)|0x10U);
+        if (!rc) rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_AR+delta+1U,1,&value);
+        i32 restore=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_STATUS+delta,1,&dummy);
+        if (!restore) restore=io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_AR+delta,1,saved);
+        if (!rc) rc=restore;
+    }
+    svc_diag_hex(out,value,rc);
+}
+static void svc_diag_mmio(struct gf_io *io,u32 reg,char out[9])
+{
+    u32 value=0;
+    i32 rc=io->read(io->opaque,GF_MODE_REGISTER_BAR,reg,4,&value);
+    svc_diag_hex(out,value,rc);
+}
 static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
 {
     struct gf_io *io=&c->ch->f->io;
@@ -457,21 +481,48 @@ static void svc_detect_diagnostic(struct gf4_ctx *c,struct gf5 *g)
                          SVC_ENGINE_CTRL+h*RECOVER_HEAD_STRIDE,4,&engine[h]);
     char sr01[GF4_HEADS][9],cr17[GF4_HEADS][9],cr1a[GF4_HEADS][9];
     char dacclk[GF4_HEADS][9],fptg[GF4_HEADS][9];
+    char cr21[GF4_HEADS][9],ar10[GF4_HEADS][9],config[GF4_HEADS][9];
+    /* crtc.c:680-681 and hw.c:85-104 (NVSetOwner): select on CR44
+     * of head 0 before reading each head; restore the original owner. */
     for (u32 h=0;h<GF4_HEADS;++h) {
-        u32 delta=h*RECOVER_HEAD_STRIDE,value=0;
+        u32 delta=h*RECOVER_HEAD_STRIDE,value=0,owner=h ? 3U : 0;
+        i32 selected=cr44==U32_MAX ? -1 : svc_index(io,SVC_CR,SVC_OWNER,&owner,true);
+        if (selected) {
+            svc_diag_hex(sr01[h],0,selected); svc_diag_hex(cr17[h],0,selected);
+            svc_diag_hex(cr1a[h],0,selected); svc_diag_hex(cr21[h],0,selected);
+            svc_diag_hex(ar10[h],0,selected);
+        } else {
         svc_diag_index(io,SVC_SR+delta,SVC_CLOCK,sr01[h]);
         svc_diag_index(io,SVC_CR+delta,SVC_CONTROL,cr17[h]);
         svc_diag_index(io,SVC_CR+delta,SVC_RPC,cr1a[h]);
+        svc_diag_index(io,SVC_CR+delta,0x21U,cr21[h]);
+        svc_diag_attr(io,delta,ar10[h]);
+        }
+        svc_diag_mmio(io,SVC_CONFIG+delta,config[h]);
         i32 status=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_DACCLK+delta,4,&value);
         svc_diag_hex(dacclk[h],value,status);
         status=io->read(io->opaque,GF_MODE_REGISTER_BAR,SVC_FP_TG+delta,4,&value);
         svc_diag_hex(fptg[h],value,status);
     }
+    if (cr44!=U32_MAX) {
+        (void)svc_index(io,SVC_CR,SVC_OWNER,&cr44,true);
+        (void)io->write(io->opaque,GF_MODE_REGISTER_BAR,SVC_CR,1,index);
+    }
+    /* nvreg.h:308-311,326-338; hw.c:131-202: VPLL coefficients,
+     * B coefficients and NV40 580 control, followed by PLLSEL and SEL_CLK. */
+    static const u32 pll_regs[]={0x680508U,0x680520U,0x680578U,0x68057cU,
+                                 0x680580U,0x68050cU,0x680524U};
+    char pll[7][9];
+    for (u32 i=0;i<7;++i) svc_diag_mmio(io,pll_regs[i],pll[i]);
     kprintf(KLOG_ATTR,"[gf4] detect state cr1f=%x cr44=%x read_rc=%d m_attempted=%u m_rc=%d f5_rc=%d source_rc=%d cr11=%x cr3e=%x cr3f=%x cr36=%x cr37=%x pmc=%x ec0=%x ec1=%x mmio_rc=%d sr01_0=%s cr17_0=%s cr1a_0=%s sr01_1=%s cr17_1=%s cr1a_1=%s dacclk0=%s dacclk1=%s fptg0=%s fptg1=%s\n",
             cr1f,cr44,rc,c->memory_prepare_attempted,c->memory_prepare_rc,
             g->last_rc,g->source_rc,cr11,cr3e,cr3f,cr36,cr37,pmc,
             engine[0],engine[1],mmio_rc,sr01[0],cr17[0],cr1a[0],sr01[1],cr17[1],cr1a[1],
             dacclk[0],dacclk[1],fptg[0],fptg[1]);
+    for (u32 h=0;h<GF4_HEADS;++h)
+        kprintf(KLOG_ATTR,"[gf4] detect hw h=%u cr21=%s ar10=%s config=%s\n",h,cr21[h],ar10[h],config[h]);
+    kprintf(KLOG_ATTR,"[gf4] detect pll vpll1=%s vpll2=%s b1=%s b2=%s ext=%s pllsel=%s sel_clk=%s\n",
+            pll[0],pll[1],pll[2],pll[3],pll[4],pll[5],pll[6]);
     for (u32 i=0;i<c->nroutes;++i) {
         const struct gf4_route *r=&c->routes[i];
         if (r->type==GF4_TV || r->i2c_index==U8_MAX) continue;
