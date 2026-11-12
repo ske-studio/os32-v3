@@ -151,14 +151,16 @@ def accept(elf, cpu, out, mutation='normal'):
         if mutation != 'tmp-target':
             s.check('cat /host/f', 'x\n')
             require((s.root/'f').read_bytes() == b'x\n', 'first host f bytes')
-        s.check('echo t > /tmp/t')
+        s.check('echo t > /tmp/t'); s.check('cat /tmp/t', 't\n')
         s.check('echo z > /f', 'redirect: cannot open /f\n')
         s.check('cat /host/big > /host/big2')
         require((s.root/'big2').read_bytes() == (s.root/'big').read_bytes(), '64KiB copy')
         if mutation != 'tmp-target':
             s.check('echo y >> /host/f')
             require((s.root/'f').read_bytes() == b'x\ny\n', 'append host bytes')
-        for value in ('s', 'ss', 's'): s.check('echo '+value+' > /host/g')
+        s.check('echo s > /host/g'); s.check('echo ss > /host/g')
+        require((s.root/'g').read_bytes() == b'ss\n', 'long overwrite host bytes')
+        s.check('echo s > /host/g')
         require((s.root/'g').read_bytes() == b's\n', 'short overwrite truncation')
         listing = result(s.cmd('ls /host'), 'ls /host').split()
         require(set(['big', 'big2', 'g'] + ([] if mutation == 'tmp-target' else ['f'])) <= set(listing), 'host listing')
@@ -179,14 +181,14 @@ def accept(elf, cpu, out, mutation='normal'):
         s.previous = s.display.getvalue()
         s.stop()
         if mutation == 'no-boot-follow':
-            # Pin only the FS receive boundary to boot1, keeping TERM usable so
-            # the boot2 read must return a diagnostic, never count a timeout RED.
-            receive = s.host.receive
-            def pinned(frame):
-                m = lan.decode(frame[14:])
-                if m['kind'] == lan.FS_REQ and m['boot'] != old_boot: return
-                receive(frame)
-            s.host.receive = pinned
+            # The host still adopts boot2 (TERM stays usable) but carries the
+            # boot1 FS Server/adapter state and FS nonce across the switch.
+            s.host.fs.reset = lambda: None
+            fs_nonce = s.host.fs_nonce
+            reset_boot = s.host.reset_boot
+            def keep_fs():
+                reset_boot(); s.host.fs_nonce = fs_nonce
+            s.host.reset_boot = keep_fs
         s.start(2)
         readback = result(s.cmd('cat /host/f'), 'cat /host/f')
         if mutation != 'normal':
@@ -196,7 +198,8 @@ def accept(elf, cpu, out, mutation='normal'):
             print('RED '+mutation+': boot2 USER shell, cat diagnostic, alive, QEMU rc=0', flush=True)
             return
         require(readback == 'x\ny\n', 'boot2 persisted cat: '+repr(readback))
-        require('t' not in result(s.cmd('ls /tmp'), 'ls /tmp').split(), 'tmp survived restart')
+        tmp = result(s.cmd('ls /tmp'), 'ls /tmp')
+        require(not tmp.startswith('ls:') and 't' not in tmp.split(), 'tmp survived restart: '+repr(tmp))
         require(s.host.boot != old_boot and old_boot in s.host.retired, 'host did not retire old boot')
         # Observe the real execution boundary: a rejected old request must never reach adapter.
         calls = []
