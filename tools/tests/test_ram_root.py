@@ -57,6 +57,11 @@ void _start(void) {
     fd = vfs_open("/tmp/new", O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0 || vfs_write_fd(fd, out, 1024) != 1024 || vfs_write_fd(fd, out, 1) != VFS_ERR_NOSPC) fail(11);
     vfs_close(fd);
+    /* A zero-length write past the end must not grow the file. */
+    fd = vfs_open("/tmp/z", O_RDWR | O_CREAT | O_TRUNC);
+    if (fd < 0 || vfs_seek(fd, 8, SEEK_SET) != 8 || vfs_write_fd(fd, "", 0) != 0) fail(12);
+    vfs_close(fd);
+    if (vfs_stat("/tmp/z", &st) || st.st_size != 0) fail(13);
     vfs_umount("/tmp"); fail(0);
 }
 '''

@@ -110,6 +110,7 @@ static int ramfs_write_stream(void *ctx, const char *path, const void *buf, u32 
     const char *name = file_name(path);
     RamFile *file = name ? find_file(ctx, name) : 0;
     if (!file) return VFS_ERR_NOTFOUND;
+    if (!size) return 0;  /* a zero-length write must not move the end */
     if (offset > RAMFS_FILE_MAX || size > RAMFS_FILE_MAX - offset) return VFS_ERR_NOSPC;
     if (offset > file->size) kmemset(file->data + file->size, 0, offset - file->size);
     kmemcpy(file->data + offset, buf, size);
