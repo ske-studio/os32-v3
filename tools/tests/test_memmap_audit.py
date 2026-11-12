@@ -19,6 +19,24 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
+ ('ledger-scan-irq-disabled', 'mm/pgalloc.c',
+  '    for (p = 0; ok && p < limit_pfn; p++) {\n        o = owner_map[p];\n'
+  '        if (bit(bitmap, p)) {\n            live++;\n'
+  '            if (!bit(eligible, p) || !o) ok = 0;\n'
+  '        } else if (o && bit(eligible, p)) ok = 0;\n'
+  '        if (o) {\n            if (!owner_ok(o)) ok = 0;\n'
+  '            counts[o]++;\n        }\n    }',
+  '    flags = irq_save();\n'
+  '    for (p = 0; ok && p < limit_pfn; p++) {\n        o = owner_map[p];\n'
+  '        if (bit(bitmap, p)) {\n            live++;\n'
+  '            if (!bit(eligible, p) || !o) ok = 0;\n'
+  '        } else if (o && bit(eligible, p)) ok = 0;\n'
+  '        if (o) {\n            if (!owner_ok(o)) ok = 0;\n'
+  '            counts[o]++;\n        }\n    }\n    irq_restore(flags);',
+  'FAIL scan_total[1] == pgalloc_limit_pfn() && scan_max[1] == 0'),
+ ('ledger-ops-unchecked', 'mm/pgalloc.c',
+  '    if (irq_ops != ledger_irq_ops || exc_ops != ledger_exc_ops) ok = 0;',
+  '    (void)irq_ops; (void)exc_ops;', 'FAIL !ledger_selfcheck(check_tag)'),
  # GF lifetime A1/A2: losing dynamic membership or accepting the decode hull
  # must fail at runtime, while the helper still compiles in the real MM unit.
  ('device-static-only', 'mm/paging.c',
