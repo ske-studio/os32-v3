@@ -1,3 +1,5 @@
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 /* ======================================================================== */
 /*  KBD_DLOG_HOST.C — キーボードの受信記録 (KAPI v67 kbd_diag_log) と        */
 /*  `kbdstat -w` の行をそのままホストで回す                                 */

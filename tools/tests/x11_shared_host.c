@@ -13,6 +13,8 @@
 
 int services_public = 1;
 void geforce_foreground_poll(void) { }
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 volatile u32 services_boot_fault;
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;

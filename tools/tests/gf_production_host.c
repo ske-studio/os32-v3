@@ -1,3 +1,5 @@
+/* This boundary fixture registers no cooperative device callbacks. */
+void idle_work_run(void) { }
 /* KDEBUG=0 production path. Only PCI, MMIO, RAM, PTE and the clock are fake.
  * The real decoder, runner, bus, owner, service and required CHECK execute.
  * No recover executor/kpeek calls survive section GC in the linked test. */

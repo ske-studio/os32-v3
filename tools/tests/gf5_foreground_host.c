@@ -1,3 +1,5 @@
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 #include "host_exec_context.h"
 /* U6: production service -> resident poll -> backend stop -> recovery.
  * Build with the scanlog source set and the extracted foreground entries

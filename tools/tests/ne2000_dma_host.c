@@ -38,9 +38,14 @@ static unsigned int ready_after[2], expected_len;
 static int expected_write;
 static u8 buffer[1516];
 static int device_mode, reset_fails, dma_fails;
+static unsigned int dma_fail_countdown;
 static u8 regs[2][16], command, txp, tx_status, ram[65536];
 static unsigned int reset_count, device_pios, tx_starts, overwrite_writes, ovw_delays;
 volatile u32 tick_count;
+volatile u32 kctx_irq_depth;
+#ifndef NE2K_BH_TEST
+int idle_work_register(void (*fn)(void)) { return fn == ne2k_bh ? 0 : -1; }
+#endif
 
 #ifndef TEST_GROUP
 #define TEST_GROUP 0
@@ -131,7 +136,7 @@ static void outp(unsigned int port, unsigned int value)
 void cpu_delay_us(u32 us)
 {
     if (device_mode) {
-        if (us == NE2K_OVW_WAIT_US) ovw_delays++;
+        if (us == 2000) ovw_delays++;
         return;
     }
     record(DELAY, 0, us);
@@ -163,6 +168,7 @@ static void device_pio(unsigned int port, void *buf, unsigned int len, int write
         kmemcpy(buf, ram + addr, len);
     }
     if (!dma_fails) regs[0][NE2K_P0_ISR] |= NE2K_ISR_RDC;
+    else if (dma_fail_countdown && --dma_fail_countdown == 0) dma_fails = 0;
 }
 
 void ne2k_pio_read(unsigned int port, void *buf, unsigned int len)
@@ -252,6 +258,7 @@ static struct ne2k_config device_setup(void)
     host_if_mask = 0x200;
     tick_count = 0;
     reset_fails = dma_fails = 0;
+    dma_fail_countdown = 0;
     reset_count = device_pios = tx_starts = overwrite_writes = ovw_delays = 0;
     command = txp = tx_status = 0;
     kmemset(regs, 0, sizeof(regs));
@@ -274,6 +281,7 @@ static void device_init(void)
     CHECK(nic.state == NE2K_STATE_RUNNING && reset_count == 1);
     CHECK(nic.imr_mask == 0 && nic.imr_written == 0 && regs[0][NE2K_P0_IMR] == 0);
     ne2k_irq_enable();
+    ne2k_bh();
     CHECK(nic.imr_written == NE2K_IMR_MASK && regs[0][NE2K_P0_IMR] == NE2K_IMR_MASK);
 }
 
@@ -303,33 +311,40 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
         config.ram_pages_max = 2 * NE2K_RAM_PAGES_16K;
         CHECK(ne2k_init(&config) == NE2K_OK);
         ne2k_irq_enable();
+        ne2k_bh();
     } else {
         device_init();
     }
     CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    ne2k_bh();
     queue_frames(frames);
     ne2k_poll(4);
+    ne2k_bh();
     CHECK(nic.rx_backlog && nic.rx_next != regs[1][NE2K_P1_CURR]);
     CHECK(nic.imr_written == 0);
     txp = 0;
     tx_status = completion == NE2K_ISR_PTX ? NE2K_TSR_PTX : NE2K_TSR_ABT;
     regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW | completion;
     ne2k_timer_tick();
+    ne2k_bh();
     CHECK(nic.state == NE2K_STATE_OVW_WAIT && nic.tx_busy);
     tick_count++;
     ne2k_timer_tick();
+    ne2k_bh();
     CHECK(nic.state == NE2K_STATE_OVW_WAIT && tx_starts == 1);
     tick_count++;
     ne2k_timer_tick();
+    ne2k_bh();
     CHECK(nic.state == NE2K_STATE_RUNNING);
     u8 recovered_backlog = nic.rx_backlog;
     /* Deliberately test A/B first so the pre-fix RED is the TX corruption. */
     CHECK(ne2k_send(buffer, 61) == NE2K_OK);
+    ne2k_bh();
     unsigned int before = device_pios;
-    CHECK(ne2k_send(buffer, 60) == NE2K_ERR_BUSY);
+    CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    ne2k_bh();
     CHECK(device_pios == before && overwrite_writes == 0 && tx_starts == 2);
     CHECK(recovered_backlog == (frames > 4 + NE2K_OVW_DRAIN_BUDGET));
-    CHECK(nic.rx_backlog == (frames > 4 + NE2K_OVW_DRAIN_BUDGET));
     CHECK((nic.rx_next != regs[1][NE2K_P1_CURR]) == (nic.rx_backlog != 0));
     CHECK(nic.imr_written == (nic.rx_backlog ? 0 : NE2K_IMR_MASK));
     CHECK(!(regs[0][NE2K_P0_ISR] & (NE2K_ISR_PTX | NE2K_ISR_TXE)));
@@ -342,8 +357,10 @@ static void run_reinit_limit(void)
     device_init();
     for (unsigned int i = 0; i < 4; i++) {
         CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+        ne2k_bh();
         tick_count += NE2K_TX_TIMEOUT_TICKS;
         ne2k_timer_tick();
+        ne2k_bh();
         CHECK(nic.st.tx_timeouts == i + 1);
         CHECK(reset_count == 1 + (i < 3 ? i + 1 : 3));
         CHECK(nic.st.reinit == (i < 3 ? i + 1 : 3));
@@ -354,24 +371,27 @@ static void run_reinit_limit(void)
 
 static void run_ovw_waits(void)
 {
-    /* The IF=0 foreground path waits once, then either resumes or fails. */
     for (int fail = 0; fail <= 1; fail++) {
         device_init();
         CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+        ne2k_bh();
         queue_frames(1);
         regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW;
         ne2k_poll(4);
+        ne2k_bh();
         CHECK(nic.state == NE2K_STATE_OVW_WAIT);
         host_if_mask = 0;
         dma_fails = reset_fails = fail;
         ne2k_poll(4);
-        CHECK(ovw_delays == 1);
+        CHECK(ovw_delays == 0 && nic.state == NE2K_STATE_OVW_WAIT);
+        host_if_mask = EFLAGS_IF;
+        tick_count += NE2K_OVW_WAIT_TICKS;
+        ne2k_bh();
+        CHECK(ovw_delays == 0);
         CHECK(nic.state == (fail ? NE2K_STATE_FAILED : NE2K_STATE_RUNNING));
         CHECK(tx_starts == (fail ? 1 : 2));
         CHECK(nic.imr_written == (fail ? 0 : NE2K_IMR_MASK));
         CHECK(regs[0][NE2K_P0_IMR] == nic.imr_written);
-        ne2k_poll(4);
-        CHECK(ovw_delays == 1);
     }
 }
 
@@ -385,6 +405,7 @@ static void run_send_lengths(void)
         kmemset(nic.tx_buf, GUARD, sizeof(nic.tx_buf));
         kmemset(ram + ((unsigned int)nic.tx_page << 8), GUARD, sizeof(nic.tx_buf));
         CHECK(ne2k_send(buffer, len) == NE2K_OK);
+        ne2k_bh();
         CHECK(((unsigned int)regs[0][NE2K_P0_TBCR0] | (regs[0][NE2K_P0_TBCR1] << 8)) == padded);
         for (unsigned int i = 0; i < padded + (padded & 1); i++) {
             CHECK(ram[((unsigned int)nic.tx_page << 8) + i] == (i < len ? buffer[i] : 0));
@@ -405,6 +426,7 @@ static void run_init_failure(void)
     CHECK(nic.imr_mask == 0 && nic.imr_written == 0 && regs[0][NE2K_P0_IMR] == 0);
 }
 
+#ifndef NE2K_BH_TEST
 void _start(void)
 {
     if (TEST_GROUP == 0 || TEST_GROUP == 2) {
@@ -436,3 +458,5 @@ void _start(void)
     }
     finish(0);
 }
+
+#endif

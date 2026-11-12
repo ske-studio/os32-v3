@@ -1,8 +1,10 @@
+#include "kernel/idle_work.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
 /* Shared NIC lifetime and dispatch; NET_HOSTSVC_DESIGN §2, addenda #1/#2. */
 #include "nic.h"
+#include "irq.h"
 #include "nic_rx.h"
 #include "link.h"
 #include "io.h"
@@ -122,6 +124,7 @@ int net_tx(const void *frame, u32 len)
     unsigned int flags = irq_save();
     int rc = bound ? bound->tx(frame, len) : OS32_ERR_HOSTDOWN;
     irq_restore(flags);
+    if (kctx_irq_depth == 0) idle_work_run();
     return rc;
 }
 

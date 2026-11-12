@@ -44,6 +44,8 @@ static void program_ring(void)
 static void reset_soft_state(void)
 {
     nic.tx_busy = 0;
+    nic.need_rx = nic.need_tx = nic.need_reinit = 0;
+    nic.txq_head = nic.txq_tail = nic.txq_count = 0;
     nic.bad_hdr_run = 0;
     nic.rxq_head = nic.rxq_tail = nic.rxq_count = 0;
     nic.irq_pending = 0;
@@ -90,6 +92,9 @@ int ne2k_init(const struct ne2k_config *config)
     if (config->ram_page_first == 0 || config->ram_pages_max < NE2K_RAM_PAGES_16K) return NE2K_ERR_INVAL;
 
     if (tick_register(PC98_TICK_NE2K, ne2k_timer_tick) != 0) return NE2K_ERR_IO;
+
+    rc = idle_work_register(ne2k_bh);
+    if (rc && rc != OS32_ERR_EXIST) return NE2K_ERR_IO;
 
     kmemset(&nic, 0, sizeof(nic));
     nic.cfg = *config;

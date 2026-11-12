@@ -133,3 +133,6 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
+
+/* Device work is covered by ne2k_bh_host; this fixture supplies no callbacks. */
+void idle_work_run(void) { }
