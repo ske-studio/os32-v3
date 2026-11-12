@@ -169,13 +169,15 @@ def main():
     try:
         if target not in PROFILES:
             raise H.HeaderError('unknown target ' + target)
-        try:
-            check_elf_identity(elf_path, PROFILES[target])
-        except ValueError as e:
-            raise H.HeaderError(str(e)) from e
-        elf = H.Elf32(elf_path)
         if target == 'ppc-powermac':
+            try:
+                check_elf_identity(elf_path, PROFILES[target])
+            except ValueError as e:
+                raise H.HeaderError(str(e)) from e
             flags |= H.OS32X_FLAG_PPC32
+        elf = H.Elf32(elf_path)
+        if target != 'ppc-powermac' and elf.endian != '<':
+            raise H.HeaderError(f"{elf_path} は 32bit LE の ELF ではない")
 
         # ELF から BSS サイズ (--bss 手動指定より優先)
         if elf.bss_size() > 0:

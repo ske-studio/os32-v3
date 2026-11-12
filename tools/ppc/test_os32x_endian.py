@@ -58,7 +58,7 @@ def exercise(tmp, sdk, mutant=False):
     cmd[cmd.index(x86)] = elf
     cmd[-1] = 'x86-pc98'
     result = subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
-    assert result.returncode != 0 and 'ELF target mismatch' in result.stderr
+    assert result.returncode != 0 and '32bit LE' in result.stderr
 
 
 def main():
