@@ -21,7 +21,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /*     DMA idle を保証する。                                                 */
 /*   - busy 中に来た IRQ は pending を立てるだけで NIC レジスタを変えない。   */
 /*   - 長い完了待ち (reset / RDC) は校正済み cpu_delay_us と有限回ポーリング。 */
-/*     PIT tick だけに頼る上限は置かない (割り込み禁止中に進まない)。          */
+/*     IF=1・IRQ の外でだけ待つ。IRQ の中は印を立てて bh に渡す。           */
 /* ======================================================================== */
 
 #include "ne2000.h"
@@ -34,6 +34,8 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "kstring.h"
 #include "cpu_calibrate.h"
 #include "cpu.h"
+#include "kernel/idle_work.h"
+#include "os32_kapi_shared.h"
 
 /* ====================================================================== */
 /*  ローカル定数                                                            */
@@ -46,6 +48,8 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #define NE2K_TX_PAGES        6      /* 1536B = 1 スロット。TX 二重化はしない */
 #define NE2K_TX_BUF_LEN      (NE2K_ETH_MAX_LEN + NE2K_PIO_PAD_BYTES)     /* 偶数丸めの余白 */
 
+#define NE2K_TXQ_SLOTS       4
+
 #define NE2K_RXQ_SLOTS       8
 #define NE2K_RXQ_SLOT_BYTES  (NE2K_ETH_MAX_LEN + NE2K_PIO_PAD_BYTES)     /* 奇数末尾 word の余白 */
 
@@ -54,7 +58,6 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #define NE2K_RESET_POLL_US   100
 #define NE2K_RDC_WAIT_US     4000   /* 1536B の 16bit PIO 後に RDC が立つまで */
 #define NE2K_RDC_POLL_US     4
-#define NE2K_OVW_WAIT_US     2000   /* DP8390D §7: STP 後 1.6ms 以上待つ */
 #define NE2K_OVW_WAIT_TICKS  2      /* 同じ待ちを tick で数える場合 (IF=1) */
 #define NE2K_TX_TIMEOUT_TICKS 5     /* 50ms。1514B @10Mbps は 1.2ms + 衝突退避 */
 #define NE2K_TX_REINIT_MAX   3      /* 連続タイムアウトでの再初期化上限 */
@@ -62,7 +65,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #define NE2K_OVW_DRAIN_BUDGET 64    /* OVW 復旧時のリング回収上限 (16KB なら十分) */
 #define NE2K_IRQ_BUDGET      4      /* IRQ 1 回 / タイマ補助 1 回で回収する受信フレーム数 (§5) */
 #define NE2K_WATCHDOG_BUDGET 4      /* 100Hz ウォッチドッグ 1 回で回収する上限 (取りこぼし自己回復, M4) */
-#define NE2K_IRQ_RECHECK     4      /* ACK 後の ISR / CURR 再確認の上限 (NP21/W の 2ms 再アサート抑制対策) */
+#define NE2K_WORK_WATCHDOG  0x80   /* software tag; RST is not in NE2K_IMR_MASK */
 #define NE2K_IMR_MASK        (NE2K_ISR_PRX | NE2K_ISR_PTX | NE2K_ISR_RXE | NE2K_ISR_TXE | \
                               NE2K_ISR_OVW | NE2K_ISR_CNT)   /* RDC は同期待ちなので割り込みにしない */
 
@@ -88,7 +91,7 @@ struct ne2k_dev {
                               * こちら — imr_mask は「戻したい値」であって実状態ではない
                               * (票 TASK_HAL_WIRING §1-1 の R1 / 1-6 の往復 7 B3)。 */
     u8  irq_on;              /* IRQ 駆動 (IDT 登録 + IMR 有効化済み) */
-    u8  in_irq;              /* IRQ / タイマ文脈で処理中 (待ちを tick で数える) */
+    u8  in_irq;              /* reserved: diagnostic layout compatibility; never context */
     u8  rx_backlog;          /* 予算を使い切り、リングに未回収が残っている (IMR はマスク中) */
 
     /* TX */
@@ -112,6 +115,12 @@ struct ne2k_dev {
     u8  tx_buf[NE2K_TX_BUF_LEN];
 
     struct ne2k_stats st;
+
+    /* ISR bits survive the short ACK path until the cooperative pass. */
+    u8 need_rx, need_tx, need_reinit;
+    u8 txq_head, txq_tail, txq_count;
+    u16 txq_len[NE2K_TXQ_SLOTS];
+    u8 txq_buf[NE2K_TXQ_SLOTS][NE2K_TX_BUF_LEN];
 };
 
 /* static にするとホストから読めない (kernel.map に載らない) ので意図的にグローバル。
@@ -190,38 +199,42 @@ static void ne2k_enter(void)
 static void service(unsigned int budget);
 static u8 read_curr(void);
 
-/* 出るときは page0・DMA idle。busy 中の IRQ (pending) と、ACK 後に到着した分
- * (ISR に残ったビット、CURR と rx_next の差) を有限回だけ処理してから IMR を戻す。
- * 予算超過 (rx_backlog) のときは IMR をマスクしたままにし、タイマ補助か次の poll が
- * 続きを回収して戻す (§5)。 */
+static void ne2k_bh(void);
+
+/* Only latch/ACK here: leave holds IF=0, including when called by bh. */
+static void mark_work(void)
+{
+    u8 isr = rd(NE2K_P0_ISR) & NE2K_IMR_MASK;
+    nic.need_rx |= isr;
+    if (isr) wr(NE2K_P0_ISR, isr);
+    if (read_curr() != nic.rx_next) nic.need_rx |= NE2K_ISR_PRX;
+    if (nic.tx_busy || nic.txq_count) nic.need_tx = 1;
+}
+
 static void ne2k_leave(void)
 {
-    unsigned int f;
-    int pass;
-
-    /* **irq_pending の処理 → IMR 復帰 → busy = 0 を 1 つの irq_save で**
-     * (往復 5 B2)。分かれていたころは「IMR は戻したが busy はまだ 1」の窓で
-     * 来た IRQ が DEFERRED になり、誰も回収しなかった。
-     * 残件 (W6): この区間が IF=0 なので、service() の失敗分岐から RDC 待ち・
-     * 再初期化が IF=0 で回る。L-C で foreground に分ける対象。 */
-    f = irq_save();
+    unsigned int f = irq_save();
     cr_page0_idle();
-    for (pass = 0; pass < NE2K_IRQ_RECHECK; pass++) {
-        int need = nic.irq_pending;
-        if (!need && nic.state == NE2K_STATE_RUNNING && !nic.rx_backlog) {
-            if (rd(NE2K_P0_ISR) & NE2K_IMR_MASK) need = 1;
-            else if (read_curr() != nic.rx_next) need = 1;
-        }
-        if (!need) break;
+    if (nic.state == NE2K_STATE_RUNNING || nic.state == NE2K_STATE_OVW_WAIT) {
+        if (nic.irq_pending) nic.st.irq_rechecks++;
         nic.irq_pending = 0;
-        nic.st.irq_rechecks++;
-        service(NE2K_IRQ_BUDGET);
-        cr_page0_idle();
+        mark_work();
     }
     ne2k_imr_sync((nic.irq_on && nic.state == NE2K_STATE_RUNNING &&
-                   !nic.rx_backlog) ? nic.imr_mask : 0);
+                   !nic.rx_backlog && !nic.need_rx && !nic.need_reinit)
+                  ? nic.imr_mask : 0);
     nic.busy = 0;
     irq_restore(f);
+}
+
+/* Defensive boundary for every synchronous hardware wait. */
+static int wait_allowed(void)
+{
+    if (!eflags_if() || kctx_irq_depth != 0) {
+        nic.need_reinit = 1;
+        return 0;
+    }
+    return 1;
 }
 
 /* ====================================================================== */
@@ -232,6 +245,7 @@ static void ne2k_leave(void)
 static int wait_rdc(void)
 {
     unsigned int waited = 0;
+    if (!wait_allowed()) return NE2K_ERR_TIMEOUT;
     for (;;) {
         if (rd(NE2K_P0_ISR) & NE2K_ISR_RDC) {
             wr(NE2K_P0_ISR, NE2K_ISR_RDC);
@@ -307,6 +321,7 @@ static int dma_write(u16 addr, const void *buf, u16 len)
 static int hw_reset(void)
 {
     unsigned int waited = 0;
+    if (!wait_allowed()) return NE2K_ERR_TIMEOUT;
 
     if (nic.cfg.reset_port) {
         (void)inp(nic.cfg.reset_port);  /* LGY-98: 読み出しで reset */
@@ -487,6 +502,35 @@ static void diag_dma_test(void)
 #include "ne2000_data.inc"
 
 #include "ne2000_irq.inc"
+
+static void ne2k_bh(void)
+{
+    u32 before;
+    int watchdog;
+    if (!wait_allowed()) return;
+    if (nic.busy || nic.state == NE2K_STATE_OFF ||
+        nic.state == NE2K_STATE_STOPPED || nic.state == NE2K_STATE_FAILED) return;
+    if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
+        !nic.rx_backlog && nic.state != NE2K_STATE_OVW_WAIT) return;
+    ne2k_enter();
+    before = nic.st.rx_frames + nic.st.rx_dropped;
+    watchdog = (nic.need_rx & NE2K_WORK_WATCHDOG) != 0;
+    if (nic.need_reinit) {
+        nic.need_reinit = 0;
+        reinit_or_fail();
+    } else {
+        service(NE2K_IRQ_BUDGET);
+    }
+    if (nic.state == NE2K_STATE_RUNNING && !nic.tx_busy && nic.txq_count)
+        tx_dequeue();
+    nic.need_tx = nic.tx_busy || nic.txq_count;
+    if (watchdog) {
+        u32 frames = nic.st.rx_frames + nic.st.rx_dropped - before;
+        nic.st.watchdog_frames += frames;
+        if (frames) nic.st.watchdog_hits++;
+    }
+    ne2k_leave();
+}
 
 /* ---- リンク層が Credit を作るための空き容量 (LINK_PLAN.md §2-2)。
  * ドライバは空きを返すだけで Credit は計算しない。NIC には触れず、

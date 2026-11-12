@@ -147,6 +147,7 @@ i32 exec_sys_yield(void)
 
     /* CUI / CPL=0 を含む各 halt と GUI の park より前に 1 回。 */
     exec_gfx_poll();
+    idle_work_run();
 
     /* CUI 中は協調型の相手 (WM) が居ない。従来どおり 1 回 hlt して戻る。 */
     if (!con_sink_is_enabled()) { _halt(); return 0; }

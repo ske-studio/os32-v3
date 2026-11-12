@@ -124,18 +124,13 @@ static void ovw_begin(u8 isr)
     nic.state = NE2K_STATE_OVW_WAIT;
 }
 
-/* 1.6ms 以上経ったら復旧を完了する。IF=0 なら校正済み delay で待つ。 */
+/* Recovery advances on later cooperative passes, never a disabled-IF delay. */
 static void ovw_continue(void)
 {
     int resend, r;
     u8 isr;
 
-    if (eflags_if() || nic.in_irq) {
-        /* tick は IF=1 の foreground でもタイマ文脈 (tick を数えた直後) でも進む */
-        if ((u32)(tick_count - nic.ovw_tick) < NE2K_OVW_WAIT_TICKS) return;
-    } else {
-        cpu_delay_us(NE2K_OVW_WAIT_US);
-    }
+    if ((u32)(tick_count - nic.ovw_tick) < NE2K_OVW_WAIT_TICKS) return;
 
     wr(NE2K_P0_RBCR0, 0);
     wr(NE2K_P0_RBCR1, 0);
@@ -150,7 +145,8 @@ static void ovw_continue(void)
     }
     nic.rx_backlog = (u8)(r == 1);
     /* 旧送信の完了を、新しい送信を受け付ける前に回収する。 */
-    isr = rd(NE2K_P0_ISR);
+    isr = rd(NE2K_P0_ISR) | nic.need_rx;
+    nic.need_rx = 0;
     if (isr & (NE2K_ISR_PTX | NE2K_ISR_TXE)) {
         tx_complete(isr);
         resend = 0;
@@ -204,7 +200,7 @@ static void tx_check_timeout(void)
         tx_complete(rd(NE2K_P0_ISR));
         return;
     }
-    if (!eflags_if() && !nic.in_irq) return;    /* IF=0 の診断ループでは tick が進まない */
+    if (!eflags_if() || kctx_irq_depth != 0) return;
     if ((u32)(tick_count - nic.tx_start_tick) >= NE2K_TX_TIMEOUT_TICKS) {
         nic.st.tx_timeouts++;
         reinit_or_fail();
@@ -222,8 +218,10 @@ static void service(unsigned int budget)
     }
     if (nic.state != NE2K_STATE_RUNNING) return;
 
-    isr = rd(NE2K_P0_ISR);
+    isr = rd(NE2K_P0_ISR) | nic.need_rx;
+    nic.need_rx = 0;
     if (isr & NE2K_ISR_OVW) {
+        nic.need_rx |= isr & (NE2K_ISR_PTX | NE2K_ISR_TXE);
         ovw_begin(isr);
         return;
     }
@@ -252,40 +250,47 @@ static void service(unsigned int budget)
 /*  公開 API                                                               */
 /* ====================================================================== */
 
+/* The caller may hold IF=0 or be slot4: copying to four software slots only. */
 #ifdef TICK_PROBE
 #define ne2k_send ne2k_send_impl
 #endif
 int ne2k_send(const void *frame, unsigned int length)
 {
-    u16 padded;
-    int rc;
-
+    unsigned int f;
     if (!frame) return NE2K_ERR_INVAL;
     if (length < NE2K_ETH_HDR_LEN || length > NE2K_ETH_MAX_LEN) return NE2K_ERR_INVAL;
     if (nic.state == NE2K_STATE_OVW_WAIT) return NE2K_ERR_BUSY;
     if (nic.state != NE2K_STATE_RUNNING) return NE2K_ERR_STOPPED;
-
-    ne2k_enter();
-    if (nic.tx_busy) {
-        service(0);                             /* 完了済みなら回収 */
-        if (nic.tx_busy || nic.state != NE2K_STATE_RUNNING) {
-            ne2k_leave();
-            return (nic.state == NE2K_STATE_RUNNING) ? NE2K_ERR_BUSY : NE2K_ERR_STOPPED;
-        }
+    f = irq_save();
+    if (nic.txq_count == NE2K_TXQ_SLOTS) {
+        irq_restore(f);
+        return NE2K_ERR_BUSY;
     }
+    kmemcpy(nic.txq_buf[nic.txq_tail], frame, length);
+    nic.txq_len[nic.txq_tail] = (u16)length;
+    nic.txq_tail = (u8)((nic.txq_tail + 1) % NE2K_TXQ_SLOTS);
+    nic.txq_count++;
+    nic.need_tx = 1;
+    nic.st.tx_accepted++;
+    nic.st.tx_bytes += length;
+    irq_restore(f);
+    return NE2K_OK;
+}
 
-    /* 呼び出し元長 (length)、padding 後 (padded)、DMA の偶数丸めは dma_write 内で別 */
-    kmemcpy(nic.tx_buf, frame, length);
-    padded = (u16)length;
+/* bh owns NIC RAM; leave the software slot occupied while interrupts run. */
+static void tx_dequeue(void)
+{
+    u16 length = nic.txq_len[nic.txq_head];
+    u16 padded = length;
+    unsigned int f;
+    kmemcpy(nic.tx_buf, nic.txq_buf[nic.txq_head], length);
     if (padded < NE2K_ETH_MIN_LEN) {
         kmemset(nic.tx_buf + padded, 0, NE2K_ETH_MIN_LEN - padded);
         padded = NE2K_ETH_MIN_LEN;
     }
-
-    rc = dma_write((u16)nic.tx_page << 8, nic.tx_buf, padded);
-    if (rc) {
-        ne2k_leave();
-        return NE2K_ERR_IO;
+    if (dma_write((u16)nic.tx_page << 8, nic.tx_buf, padded)) {
+        nic.need_reinit = 1;
+        return;
     }
     wr(NE2K_P0_TPSR, nic.tx_page);
     wr(NE2K_P0_TBCR0, (u8)(padded & 0xFF));
@@ -293,10 +298,10 @@ int ne2k_send(const void *frame, unsigned int length)
     wr(NE2K_CR, NE2K_CR_PAGE0 | NE2K_CR_RD2 | NE2K_CR_STA | NE2K_CR_TXP);
     nic.tx_busy = 1;
     nic.tx_start_tick = tick_count;
-    nic.st.tx_accepted++;
-    nic.st.tx_bytes += length;
-    ne2k_leave();
-    return NE2K_OK;
+    f = irq_save();
+    nic.txq_head = (u8)((nic.txq_head + 1) % NE2K_TXQ_SLOTS);
+    nic.txq_count--;
+    irq_restore(f);
 }
 
 #ifdef TICK_PROBE

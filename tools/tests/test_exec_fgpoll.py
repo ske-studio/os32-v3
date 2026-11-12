@@ -4,7 +4,7 @@ The scheduler and resident poll are boundary stubs. Full thermal/module
 composition belongs to U6; no sensor timing or IRQ execution is modeled here.
 """
 CHECK = dict(name='exec-fgpoll-host', tier=1, budget=2.7,
-             covers=['tools/tests/test_exec_fgpoll.py',
+             covers=['kernel/idle_work.h', 'tools/tests/test_exec_fgpoll.py',
                      'exec/exec_schedule.inc', 'exec/appslot.h', 'exec/exec.h',
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
@@ -33,6 +33,7 @@ def function(source, name):
 
 
 HOST = r'''
+void idle_work_run(void) { }
 #include "appslot.h"
 #include "host_exec_context.h"
 #include "exec.h"

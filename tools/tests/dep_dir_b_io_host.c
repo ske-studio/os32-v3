@@ -1,3 +1,5 @@
+/* This boundary fixture registers no cooperative device callbacks. */
+void idle_work_run(void) { }
 /* L11: real control functions, with reset returning and halt waking once. */
 #include "io.h"
 static unsigned int enabled = TEST_IF;

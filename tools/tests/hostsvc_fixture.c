@@ -52,3 +52,7 @@ void hs_copyout_run_hook(void)
     copy_hook = 0;
     if (hook) hook();
 }
+
+/* These protocol fixtures register no cooperative device work. */
+volatile u32 kctx_irq_depth;
+void idle_work_run(void) { }

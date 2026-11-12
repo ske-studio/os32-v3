@@ -1,3 +1,4 @@
+#include "kernel/idle_work.h"
 /* ======================================================================== */
 /*  KBD.C — PC-98 キーボードドライバ                                       */
 /*                                                                          */
@@ -731,6 +732,7 @@ static int kbd_gui_getbyte(int interruptible)
         /* 成立すれば戻らない。戻ってきたのは止められなかったときだけ。 */
         (void)exec_park_kbd();
         if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */
+        idle_work_run();
         _halt();
     }
 }
@@ -767,6 +769,7 @@ static int kbd_getchar_wait(int interruptible)
             }
 
             if (interruptible && ring3_wait_pending()) return -1;
+            idle_work_run();
             _halt();
 
             /* rshellタイムアウト: スペースキーを自動返却 */
@@ -789,6 +792,7 @@ int kbd_getkey_wait(int interruptible)
     while (kbd_count == 0) {
         kbd_foreground_poll();
         if (interruptible && ring3_wait_pending()) return -1;
+        idle_work_run();
         _halt();
     }
 

@@ -1,6 +1,6 @@
 """D04: execute real NE2000 DMA, OVW, TX timeout and initialization paths."""
 CHECK = dict(name='ne2000-dma-host', tier=4,
-    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/net_m2_test.py', 'tools/net_m4_test.py', 'tools/net_l1_test.py', 'tools/net_l2_test.py'],
+    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/net_m2_test.py', 'tools/net_m4_test.py', 'tools/net_l1_test.py', 'tools/net_l2_test.py'],
     needs=['make:all'], budget=3.4)
 
 import os
@@ -45,7 +45,6 @@ MUTATIONS = [
      '    nic.st.reinit += 2;\n    rc = bring_up();'),
     ('OVW tick wait', '(u32)(tick_count - nic.ovw_tick) < NE2K_OVW_WAIT_TICKS',
      '(u32)(tick_count - nic.ovw_tick) < 1'),
-    ('OVW IF0 delay', 'cpu_delay_us(NE2K_OVW_WAIT_US);', ''),
     ('OVW resend', 'resend = nic.ovw_txp_was && !nic.ovw_tx_done;', 'resend = 0;'),
     ('send padding', 'kmemset(nic.tx_buf + padded, 0, NE2K_ETH_MIN_LEN - padded);', ''),
     ('init clear', 'kmemset(&nic, 0, sizeof(nic));', ''),

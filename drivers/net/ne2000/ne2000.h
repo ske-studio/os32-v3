@@ -17,7 +17,7 @@
 #define NE2K_ERR_INVAL     -1   /* 引数・設定が不正 */
 #define NE2K_ERR_NODEV     -2   /* カード応答なし / PROM 署名不一致 */
 #define NE2K_ERR_IO        -3   /* NIC RAM 試験や Remote DMA の不一致 */
-#define NE2K_ERR_BUSY      -4   /* 送信中 */
+#define NE2K_ERR_BUSY      -4   /* 送信列満杯、または OVW 復旧中 */
 #define NE2K_ERR_AGAIN     -5   /* 受信フレームなし */
 #define NE2K_ERR_NOSPACE   -6   /* 容量不足 (*length に必要長、フレームは残す) */
 #define NE2K_ERR_STOPPED   -7   /* 停止状態 (未初期化 / stop 後 / 復旧失敗) */
@@ -27,7 +27,7 @@
 /* ---- 状態 (ne2k_state) ---- */
 #define NE2K_STATE_OFF      0   /* 未初期化 */
 #define NE2K_STATE_RUNNING  1
-#define NE2K_STATE_OVW_WAIT 2   /* overwrite 復旧の待機中 (poll が進める) */
+#define NE2K_STATE_OVW_WAIT 2   /* overwrite 復旧の待機中 (協調処理が進める) */
 #define NE2K_STATE_STOPPED  3   /* ne2k_stop 後 */
 #define NE2K_STATE_FAILED   4   /* 有限回の再初期化に失敗、NIC だけ停止 */
 
@@ -76,7 +76,7 @@ struct ne2k_stats {
     u32 diag_dma_errors; /* NE2K_CFG_DIAG_DMA の失敗ケース数 */
     u32 irq_rechecks;    /* ACK 後の再確認で追加処理した回数 (M3) */
     u32 rx_backlog_events; /* 予算超過で IMR をマスクしたまま返した回数 (M3) */
-    u32 watchdog_frames; /* 100Hz ウォッチドッグが回収した (= IRQ が取りこぼした) フレーム数 (M4) */
+    u32 watchdog_frames; /* watchdog が印を立てた後、bh が回収したフレーム数 */
     u32 watchdog_hits;   /* ウォッチドッグが 1 フレーム以上回収した tick 数 (M4) */
     u32 rx_pages_total;  /* 受信フレームがリングで消費した総ページ数 (§2-3 の実測用) */
     u32 rdc_retry;       /* Remote DMA の RDC 再発行回数 (一過性ハズレの吸収, M4/L1) */
@@ -93,21 +93,22 @@ void ne2k_stop(void);
 
 /* 送信。frame は Ethernet ヘッダ込み・FCS 無し、14〜1514 バイト。
  * 60 バイト未満はゼロで padding する。戻れば frame は再利用できる。
- * 成功 = NIC RAM へのコピーと送信受付。回線上の完了は統計で見る。 */
+ * 成功 = 4 枠のソフト送信列へのコピー。満杯なら BUSY。
+ * padding・NIC RAM への転送と送信は IF=1 の協調処理が行う。完了は統計で見る。 */
 int  ne2k_send(const void *frame, unsigned int length);
 
 /* 受信。ホストキューから 1 フレームをコピーする。
  * AGAIN = 無し。NOSPACE = capacity 不足 (*length = 必要長、フレームは残る)。 */
 int  ne2k_recv(void *frame, unsigned int capacity, unsigned int *length);
 
-/* NIC の状態を進める: 送信完了の記録、受信リングの回収 (budget フレームまで)、
- * カウンタ、OVW 復旧、送信タイムアウト。M2 までは診断ループが頻繁に呼ぶ。 */
+/* ISR を ACK し、CURR と送信残件を見て協調処理の印を立てる。
+ * budget は互換のため残す。回収・復旧は idle_work_run() が駆動する。 */
 void ne2k_poll(unsigned int budget);
 
 /* 共有 IRQ の口 (kernel/irq/irq.c の表から呼ばれる。票 TASK_HAL_WIRING §1-1)。
  * busy 中は NIC レジスタに触らず pending を立てて IRQ_DEFERRED。要因が無ければ
- * IRQ_NONE。それ以外は NE2K_IRQ_BUDGET フレームまで回収し、ACK 後に ISR / CURR を
- * 再確認する。予算超過は IMR をマスクしたまま IRQ_DEFERRED (回収は ne2k_timer_tick)。
+ * IRQ_NONE。それ以外は ISR を ACK して印を保持し、IMR をマスクしたまま
+ * IRQ_DEFERRED。回収後に協調処理が IMR を戻す。
  * 専用スタブ irq_stub_nic_* とそれを呼んでいた ne2k_irq() は廃止した。 */
 int ne2k_irq_shared(unsigned int irq, void *arg);
 
@@ -115,8 +116,8 @@ int ne2k_irq_shared(unsigned int irq, void *arg);
  * (PIC のマスクは登録数が持つ)、この後で IMR を開ける。 */
 void ne2k_irq_enable(void);
 
-/* 100Hz タイマ補助 (arch/x86/kernel/isr_handlers.c)。予算超過の残り・OVW 復旧・送信
- * タイムアウトだけを進める。busy なら延期して再入しない。プロトコル処理はしない。 */
+/* 100Hz watchdog。取りこぼした受信や送信残件の印を補う。
+ * busy 中は pending だけを立てる。重い待ちと回収は協調処理が行う。 */
 void ne2k_timer_tick(void);
 
 /* リンク層が Credit を作るための空き容量 (LINK_PLAN.md §2-2)。ドライバは空きを

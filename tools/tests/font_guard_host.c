@@ -1,3 +1,5 @@
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 #include "host_exec_context.h"
 /* Product guard and exec/ISR slices. IRQ/CR3 and nonreturning kernel
  * transitions are modeled; no signal/alternate stack is claimed to model
