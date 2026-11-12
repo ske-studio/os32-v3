@@ -22,11 +22,12 @@ void arch_priv_save(volatile struct arch_priv_context *out)
 
 void arch_priv_restore(const volatile struct arch_priv_context *saved)
 {
-    u32 root, sp;
+    u32 sp;
 
-    __builtin_memcpy(&root, (const void *)(saved->opaque + PPC_PRIV_ROOT_OFFSET), sizeof(root));
     __builtin_memcpy(&sp, (const void *)(saved->opaque + PPC_PRIV_KERNEL_SP_OFFSET), sizeof(sp));
-    arch_mmu_load_root(root);
+    /* exec_restore_context already selected the parent AS. The snapshot is
+     * taken after launch switched to the kernel root for child allocation;
+     * reloading that root here would erase the parent USER mapping. */
     ppc_exec_kernel_sp = sp;
 }
 

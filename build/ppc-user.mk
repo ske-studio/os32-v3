@@ -4,11 +4,12 @@ PPC_USER_OUT := build/out/ppc-user
 PPC_USER_CRT := $(addprefix $(PPC_USER_OUT)/,$(notdir $(SDK_TARGET_CRT_USER)))
 PPC_USER_FLAGS := $(USER_CFLAGS) -fno-common -mcall-sysv -mno-eabi -I sdk/include/os32 -Wno-attributes
 
-PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault)
+PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest)
 
-.PHONY: hello ppc-fault
+.PHONY: hello ppc-fault ppc-nest
 hello: $(PPC_USER_OUT)/hello.bin
 ppc-fault: $(PPC_USER_OUT)/fault.bin
+ppc-nest: $(PPC_USER_OUT)/nest.bin
 
 $(PPC_USER_OUT):
 	mkdir -p $@
@@ -33,5 +34,5 @@ $(addsuffix .raw,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.raw: $(PPC_USER_OUT)/%.elf
 $(addsuffix .bin,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw $(PPC_USER_OUT)/%.elf sdk/mkos32x.py
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/$*.elf
 
--include $(PPC_USER_CRT:.o=.d) $(PPC_USER_OUT)/hello.d $(PPC_USER_OUT)/fault.d
+-include $(PPC_USER_CRT:.o=.d) $(addsuffix .d,$(PPC_USER_APPS))
 endif
