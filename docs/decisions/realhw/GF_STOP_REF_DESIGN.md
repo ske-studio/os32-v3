@@ -379,3 +379,6 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 - B3 → §3-1 (エンコーダーの保存は c->dcb.routes/nroutes、svc_feature5 の前)・§5-2 の変異。
 - B4 → §3-1・§3-2 (restore も l->io)・§5-2 (g) と変異。
 - B5 → §3-5 の NV44A の値・§5-2 の head ごとの PLL の期待値と変異。0x1584 は DI/nv04.c:120-137 の計算で head 0・1 とも書かない (head 0 も shift=8>4 で -4)。
+
+## 実装の後の追記 (2026-11-12、S4a、PM 決定)
+- module の終了での `gf4_hw_state_reset` の呼び出しは置かない。geforce.mod の口は initialize・get_probe_decls だけで、kernel が動いている間 module を外す道が無い (geforce_body.c・tools/module_schema.py)。valid・fonts_valid は kernel の寿命で 1 つになる。reset 自体 (ページの返却・valid の解除) は host 試験で確かめてある。
