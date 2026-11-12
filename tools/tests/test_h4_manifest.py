@@ -39,7 +39,7 @@ HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-D__cdecl=", "-D__OS32_USERLAND__"]
 HOST_INC = ["-I" + str(ROOT / p) for p in
             (".", "include", "sdk/include", "sdk/include/os32",
-             "userland/lib", "userland/system", "lib")]
+             "userland/lib", "userland/system", "lib", "arch/x86")]
 
 CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", "/usr/local/cross"))
 if not CROSS_DIR.exists():
