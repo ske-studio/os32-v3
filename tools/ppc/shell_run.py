@@ -18,7 +18,7 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
 ELF = ROOT / 'build/out/ppc-kboot/shell/PPCKERN.ELF'
 
 
-def accept(cpu, timeout):
+def accept(cpu, timeout, sb=False):
     base = Path(os.environ['TMPDIR']) / 'shell-run'
     base.mkdir(parents=True, exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix=cpu+'-', dir=base))
@@ -86,9 +86,22 @@ def accept(cpu, timeout):
                     offset += match.end(); terminal.send_bytes(b'echo a > /tmp/f\n'); phase = 5
                 elif phase == 5 and (match := re.search(rb'os32> ', display.getvalue()[offset:])):
                     offset += match.end(); terminal.send_bytes(b'cat /tmp/f\n'); phase = 6
-                elif phase == 6 and re.search(rb'\na\r?\n.*?os32> ', display.getvalue()[offset:], re.S):
+                elif phase == 6 and (match := re.search(rb'\na\r?\n.*?os32> ', display.getvalue()[offset:], re.S)):
+                    offset += match.end()
+                    if sb:
+                        terminal.send_bytes(b'/bin/hello.bin ok\n'); phase = 7
+                        continue
                     require(not any('gap' in x or 'timeout' in x for x in lines), 'terminal or diagnostic loss')
                     break
+                elif phase in (7, 8, 10) and (match := re.search(rb'\nhello ok\r?\nexit=7\r?\nos32> ', display.getvalue()[offset:])):
+                    offset += match.end()
+                    if phase == 10:
+                        require(not any('gap' in x or 'timeout' in x for x in lines), 'terminal or diagnostic loss')
+                        break
+                    terminal.send_bytes(b'/bin/hello.bin ok\n' if phase == 7 else b'/bin/fault.bin\n')
+                    phase += 1
+                elif phase == 9 and (match := re.search(rb'\nexit=-2\r?\nos32> ', display.getvalue()[offset:])):
+                    offset += match.end(); terminal.send_bytes(b'/bin/hello.bin ok\n'); phase = 10
                 time.sleep(0.01)
             else:
                 raise RuntimeError(f'{cpu}: shell acceptance timeout phase={phase}; serial={serial(a)!r}; terminal={display.getvalue()!r}; host={lines!r}')
@@ -109,11 +122,12 @@ def accept(cpu, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
+    parser.add_argument('--sb', action='store_true', help='also accept S-B Q1/Q2')
     parser.add_argument('--timeout', type=float, default=60)
     args = parser.parse_args()
     skipped = False
     for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]):
-        skipped |= accept(cpu, args.timeout)
+        skipped |= accept(cpu, args.timeout, args.sb)
     if skipped:
         print('SKIP LAN socket rc=3')
         return 3

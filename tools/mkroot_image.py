@@ -13,8 +13,11 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument('--staging', type=Path)
     source.add_argument('--motd', type=Path)
+    parser.add_argument('--bin', type=Path, action='append', default=[])
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
+    if args.bin and args.motd is None:
+        parser.error("--bin requires --motd")
     tool = shutil.which('genisoimage') or shutil.which('xorriso')
     if tool is None:
         print('SKIP: genisoimage or xorriso required', file=sys.stderr)
@@ -43,6 +46,10 @@ def main():
                 (staging / 'etc').mkdir()
                 (staging / 'tmp').mkdir()
                 (staging / 'etc' / 'motd').write_bytes(motd)
+                if args.bin:
+                    (staging / 'bin').mkdir()
+                    for app in args.bin:
+                        shutil.copyfile(app, staging / 'bin' / app.name)
                 create(staging)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f'mkroot_image: {exc}', file=sys.stderr)

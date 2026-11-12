@@ -103,11 +103,14 @@ endif
 # the product source KB_MUT_SRC, into a separate KB_OUT. Never set otherwise.
 KB_MUT_SRC ?=
 KB_MUT_FILE ?=
-kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$1)
-$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE)
+# A serial input substitution may accompany one product mutation.
+KB_MUT_EXTRA_SRC ?=
+KB_MUT_EXTRA_FILE ?=
+kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$1))
+$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE)
+$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OUT)/memmap_layout.h
@@ -115,8 +118,14 @@ $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OU
 $(KB_OUT)/motd.txt:
 	@mkdir -p $(dir $@)
 	@printf 'OS32 PowerPC shell\n' > $@
-$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py
-	python3 -B tools/mkroot_image.py --motd $< --out $@
+.PHONY: kb-user
+kb-user:
+	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) hello ppc-fault
+
+build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin: kb-user
+
+$(KB_OUT)/root.iso: $(KB_OUT)/motd.txt tools/mkroot_image.py build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
+	python3 -B tools/mkroot_image.py --motd $< --bin build/out/ppc-user/hello.bin --bin build/out/ppc-user/fault.bin --out $@
 $(KB_OUT)/root_image_blob.o: $(KB_OUT)/root.iso
 	$(KB_OBJCOPY) -I binary -O elf32-powerpc -B powerpc --rename-section .data=.rodata.boot_root,alloc,load,readonly,data,contents $< $@
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
@@ -131,7 +140,7 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) \
+	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
 -include $(KB_OBJ:.o=.d)
