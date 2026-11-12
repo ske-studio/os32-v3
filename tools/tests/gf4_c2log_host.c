@@ -15,6 +15,10 @@ static i32 log_before_probe_rc;
 static u32 log_port_calls;
 static void log_detect_ready(void);
 struct gf4_ctx;
+struct gf_io;
+static bool log_fail_hw;
+static u32 log_hw_calls;
+static void log_hw_save(struct gf4_ctx *,struct gf_io *);
 static i32 log_detect(struct gf4_ctx *,u32);
 static i32 log_probe(struct gf4_ctx *,u8,u32);
 static int log_same(const char *a,const char *b)
@@ -34,9 +38,23 @@ static int log_gate(const char *stage)
 #define _start c2svc_unused_start
 #include "gf4_c2svc_host.c"
 #undef _start
+static void log_hw_save(struct gf4_ctx *c,struct gf_io *io)
+{
+    ++log_hw_calls;
+    if (log_fail_hw) gf4_host_fail_at(&svc_host,D_READ,0,GF2_EIO);
+    gf4_hw_save(c,io);
+    svc_host.fail_rc[D_READ]=0;
+}
 static struct gf4_state log_detected;
 static i32 log_detect(struct gf4_ctx *c,u32 dl)
 {
+    if (log_fail_hw) {
+        /* This synthetic ROM has no DCB; supply the fixture's known DAC
+         * connector after exercising svc_rom/save, before real detect. */
+        c->dcb.nroutes=c->nroutes=1; c->routes=c->dcb.routes;
+        c->dcb.routes[0]=(struct gf4_route){.type=GF4_ANALOG,.head_mask=1,
+            .or_mask=1,.i2c_index=U8_MAX};
+    }
     i32 rc=gf4_detect(c,dl);
     if (log_probe_check) {
         log_detected=*c->state;
@@ -157,7 +175,7 @@ static u8 log_palette[VIDEO_PALETTE_BYTES];
 static struct video_device log_device;
 static void log_fixture_state(bool cold)
 {
-    log_inject_stage=0; log_cold_devinit=false;
+    log_inject_stage=0; log_cold_devinit=false; log_fail_hw=false; log_hw_calls=0;
     svc_fixture_state(cold);
     log_after_pll=log_after_lut=false;
     cint_prod.foundation.io.timing.clock_us=log_clock;
@@ -221,6 +239,8 @@ static void log_expect(const char *stage,int rc)
     char actual[sizeof(startlog)];
     for (u32 i=0;i<sizeof(actual);++i) actual[i]=startlog[i];
     startlog_clear();
+    if (log_same(stage,"detect") && log_cold_devinit)
+        kprintf(0,"[gf4] hw save fonts skipped rc=%d\n",GF4_ENOSPC);
     kprintf(0,"[gf4] start fail stage=%s rc=%d\n",stage,rc);
     assert(startlog_equal(actual));
     assert(svc_ctx.last_rc==rc && cint_prod.display.last_rc==rc);
@@ -321,8 +341,24 @@ static void test_detect_state(void)
     assert(!svc_index(io,SVC_CR,RECOVER_CR44,&value,false) && value==owner);
     svc_finish();
 }
+static void test_failed_save_start(void)
+{
+    log_fixture_state(true); log_rom_fixture();
+    cint_prod.display.io.point=log_point;
+    log_init.io=cint_prod.display.io; log_init.started_us=cint_host.now;
+    cint_prod.display.baseline_valid=false;
+    log_cold_devinit=true; log_fail_hw=true;
+    assert(!log_start());
+    assert(log_hw_calls==1 && !gf4_hw_saved_get()->valid);
+    assert(!video_stop(&log_device));
+    startlog_clear();
+    assert(!log_start());
+    assert(log_hw_calls==1 && !gf4_hw_saved_get()->valid);
+    assert(!video_stop(&log_device)); svc_finish();
+}
 void _start(void)
 {
+    test_failed_save_start();
     /* Non-default buses distinguish connectors from I2C indices. Detect
      * falls back; a later ACK must not rebuild its modes or hide its rc. */
     log_fixture();

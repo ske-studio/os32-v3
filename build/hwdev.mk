@@ -130,7 +130,7 @@ $(GF_CALC_OBJS): $(HWDEV_OUT)/%.o: hwdev/gf/display/%.c $(HWDEV_GENERATED) build
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -Werror -c $< -o $@
 # F4 transaction/lifecycle and new MMIO components belong only to geforce.mod.
-GF_MODULE_DISPLAY_NAMES := dcb ddc dpms flip gamma tmds tv heads transaction service save recover scan links
+GF_MODULE_DISPLAY_NAMES := dcb ddc dpms flip gamma tmds tv heads transaction service save recover scan links hw_state hw_state_crtc hw_fonts hw_load hw_pll enc_state
 GF_DISPLAY_SOURCES := hwdev/gf/service.c $(filter-out $(addprefix hwdev/gf/display/,$(addsuffix .c,$(GF_CALC_NAMES) $(GF_MODULE_DISPLAY_NAMES))),$(wildcard hwdev/gf/display/*.c))
 GF_DISPLAY_OBJS := $(patsubst hwdev/%.c,$(HWDEV_OUT)/%.o,$(GF_DISPLAY_SOURCES))
 $(HWDEV_OUT)/hwdev.elf: $(GF_DISPLAY_OBJS)

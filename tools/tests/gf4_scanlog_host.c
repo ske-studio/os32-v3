@@ -42,10 +42,14 @@ int scanlog_devinit(struct gf_init_context *ctx,struct gf_init_program *work)
     return 0;
 }
 /* Kernel page allocator/time are host boundaries; production F5 adapters stay real. */
+static u8 scanlog_font_pages[0x40000] __attribute__((aligned(4096)));
 static u8 scanlog_pages[0x20000] __attribute__((aligned(4096)));
 u32 pgalloc_alloc_phys(u32 owner,int pages)
 {
-    (void)owner; if (scanlog_rom_fail) return 0; assert(pages>0 && (u32)pages*4096<=sizeof(scanlog_pages));
+    (void)owner;
+    if (pages==64) return (u32)(uptr)scanlog_font_pages;
+    if (scanlog_rom_fail) return 0;
+    assert(pages>0 && (u32)pages*4096<=sizeof(scanlog_pages));
     return (u32)(uptr)scanlog_pages;
 }
 int pgalloc_free_n_owner(u32 owner,u32 pfn,int pages)

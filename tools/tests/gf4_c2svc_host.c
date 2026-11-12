@@ -11,6 +11,21 @@
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 
+static u32 stop_order[8],stop_tick;
+#ifndef GF_STARTLOG_HOST_H
+static bool stop_fonts_logged;
+void __cdecl kprintf(u8 attr,const char *fmt,...)
+{
+    const char *expected="[gf4] stop fonts skipped diagnostic_saved\n";
+    (void)attr;
+    while (*expected && *expected==*fmt) { ++expected; ++fmt; }
+    if (!*expected && !*fmt) stop_fonts_logged=true;
+}
+#endif
+static void svc_mark(u32 step) { if (!stop_order[step]) stop_order[step]=++stop_tick; }
+#define gf3_service_close(s) (svc_mark(3),gf3_service_close(s))
+#define gf3_service_fini(s,dl) (svc_mark(4),gf3_service_fini(s,dl))
+#define gf2_stop(ch) (svc_mark(6),gf2_stop(ch))
 static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #ifndef GF4_SERVICE_SOURCE
 #define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
@@ -18,6 +33,9 @@ static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #endif
 #include GF4_SERVICE_SOURCE
 #undef gf4_detect
+#undef gf3_service_close
+#undef gf3_service_fini
+#undef gf2_stop
 /* Include the real module service so a fixture reboot can forget its empty
  * publication binding before invoking the production initializer again. */
 #define service_check guard_f5_check
@@ -71,12 +89,18 @@ static bool svc_display_reg(u32 off)
 static int svc_read(void *owner,u32 bar,u32 off,u32 width,u32 *out)
 {
     assert(owner==&cint_host);
+    /* The font plane window is separate from the F2 register oracle. The
+     * focused hwstate fixture checks plane contents and selection. */
+    if (bar==GF_MODE_VRAM_BAR) { assert(width==4 && off<65536U); *out=0; return 0; }
     return svc_display_reg(off) ? gf4_host_read(&svc_host,bar,off,width,out) :
                                  gf3_host_read(owner,bar,off,width,out);
 }
 static int svc_write(void *owner,u32 bar,u32 off,u32 width,u32 value)
 {
     assert(owner==&cint_host);
+    if (bar==GF_MODE_VRAM_BAR) { svc_mark(5); return 0; }
+    if (off==0x68052cU) svc_mark(value==1U ? 1 : 0);
+    if (off==0x6013d5U && svc_host.index[0][0]==0x44U) svc_mark(2);
     return svc_display_reg(off) ? gf4_host_write(&svc_host,bar,off,width,value) :
                                  gf3_host_write(owner,bar,off,width,value);
 }
@@ -192,6 +216,7 @@ static const struct gf4_data_ops svc_data={GF4_DATA_VERSION,sizeof(svc_data),
 
 static void svc_fixture_state(bool cold)
 {
+    gf4_hw_state_reset();
     if (cold) cint_reset_cold();
     else cint_reset(); /* real F1/F2 RUN, no F3 objects/reservations yet. */
     gf2_host_memset(&svc_state,0,sizeof(svc_state));
@@ -336,8 +361,8 @@ static void test_cleanup_failures(void)
     svc_keys_live(&old); svc_finish();
 
     svc_fixture(); assert(!gf4_service_start(&svc_ctx,cint_deadline()));
-    /* Saved physical blank skips DPMS settling. The first lower clock is
-     * therefore real F3 fini's fence clock; later F2 clocks still succeed. */
+    /* Stop has no DPMS ON settle. With no valid hardware snapshot,
+     * the first lower clock is real F3 fini; later F2 clocks succeed. */
     svc_ctx.saved_closed=true;
     gf3_host_trace_clear(&cint_host);
     gf3_host_fail_at(&cint_host,H_CLOCK,1,SVC_INJECT);
@@ -354,7 +379,7 @@ static void test_diagnostic_roundtrip(void)
     const struct gf3_service_owner *table=gf4_service_owner_table();
     assert(gf3_service_start(cint_service,cint_deadline())==GF3_ESTATE);
     assert(gf3_service_stop(cint_service)==GF3_ESTATE);
-    /* N3 normal contrast: retain a non-ON request before suspend sets ON. */
+    /* N3: retain a non-ON request; suspend does not write DPMS (S4b). */
     assert(!gf4_dpms_set(&svc_ctx,0,GF4_STANDBY,cint_deadline()));
     struct gf3_surface front=svc_state.head[0].front;
     u32 id=svc_state.head[0].mode.id,epoch=svc_ctx.epoch;
@@ -580,8 +605,58 @@ static void test_stop_guard(void)
     svc_finish(); guard_reenter();
 }
 #endif
+static u32 stop_fonts[65536];
+static void test_hw_restore(void)
+{
+    for (u32 variant=0;variant<5;++variant) {
+        bool no_f=variant==1,diagnostic=variant==2,valid=variant!=3,fonts=variant!=3 && variant!=4;
+        svc_fixture_state(no_f);
+        if (!no_f) assert(!gf4_service_start(&svc_ctx,cint_deadline()));
+        else cint_prod.display.engaged=true;
+        struct gf4_hw_saved *saved=gf4_hw_saved_get();
+        saved->valid=valid; saved->nroutes=1; saved->output[0].output=1;
+        saved->fonts=stop_fonts; saved->fonts_valid=fonts;
+        struct gf4_saved image={0};
+        if (diagnostic) svc_ctx.diagnostic_saved=&image;
+        for (u32 h=0;h<2;++h) {
+            saved->crtc[h].cr[0x1a]=0x3f; saved->crtc[h].cr[0x21]=0xfa;
+            svc_host.cr[h][0x17]=0; /* stop must never assert sync */
+        }
+        gf4_host_trace_clear(&svc_host);
+        gf2_host_memset(stop_order,0,sizeof(stop_order)); stop_tick=0;
+#ifndef GF_STARTLOG_HOST_H
+        stop_fonts_logged=false;
+#endif
+        if (no_f) svc_ctx.ch->f=0;
+        assert(gf4_service_stop(&svc_ctx,cint_deadline())==(no_f ? GF4_EINVAL : 0));
+#ifndef GF_STARTLOG_HOST_H
+        assert(stop_fonts_logged==diagnostic);
+#endif
+        if (valid) {
+            assert(stop_order[1] && stop_order[2]>stop_order[1]);
+            assert(stop_order[3]>stop_order[2] && stop_order[4]>stop_order[3]);
+            if (diagnostic || !fonts) assert(!stop_order[5]);
+            else assert(stop_order[5]>stop_order[4] && stop_order[6]>stop_order[5]);
+            if (!no_f) assert(stop_order[0] && stop_order[1]>stop_order[0]);
+            for (u32 h=0;h<2;++h) {
+                assert(svc_host.cr[h][0x17]==0 && svc_host.cr[h][0x1a]==0x3f && svc_host.cr[h][0x21]==0xfa);
+            }
+        } else assert(!stop_order[0] && !stop_order[1] && !stop_order[2]);
+        u8 index[2]={0};
+        for (u32 i=0;i<svc_host.nevents;++i) {
+            const struct gf4_host_event *e=&svc_events[i];
+            if (e->op!=D_WRITE) continue;
+            for (u32 h=0;h<2;++h) {
+                if (e->a[1]==0x6013d4U+h*0x2000) index[h]=e->a[3];
+                if (e->a[1]==0x6013d5U+h*0x2000 && index[h]==0x17) assert(!(e->a[3]&0x80));
+            }
+        }
+        saved->fonts=0; saved->fonts_valid=false; svc_ctx.diagnostic_saved=0; svc_finish();
+    }
+}
 void _start(void)
 {
+    test_hw_restore();
 #ifdef GF4_GUARD_LIFETIME
     test_terminal_guard(); test_stop_guard();
 #endif

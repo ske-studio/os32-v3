@@ -173,6 +173,14 @@ static void failed_clock_cleanup(void)
         struct gf4_ctx display={.ready=true,.accepting=true,.reusable=true};
         const struct gf4_links links={.owner=cint_service,.admission=clock_admission};
         display.links=&links;
+        display.legacy=&cint_prod.display;
+        display.dcb.nroutes=2;
+        display.dcb.routes[0]=(struct gf4_route){.type=GF4_ANALOG,.or_mask=1};
+        display.dcb.routes[1]=(struct gf4_route){.type=GF4_TMDS,.or_mask=2};
+        gf4_hw_state_reset();
+        struct gf4_hw_saved *saved=gf4_hw_saved_get();
+        saved->valid=true; saved->nroutes=2; saved->output[0].output=0x123401;
+        saved->crtc[0].fb_start=0x1110; saved->crtc[1].fb_start=0x2220;
         cint_prod.display.display4=&display;
         struct gf_vram_reservation scan=cint_service->scan_node.value;
         cint_trace_clear();
@@ -182,6 +190,18 @@ static void failed_clock_cleanup(void)
         assert(gf_display_stop(&cint_prod.display)==-1);
         assert(cint_prod.display.last_rc==GF2_EIO && display.last_rc==GF2_EIO);
         assert(!display.accepting && !display.reusable);
+        u32 dacclk; assert(!gf3_host_read(&cint_host,0,0x68052c,4,&dacclk) && dacclk==0x123401);
+        /* The no-clock branch loads both CRTCs before lower stop. */
+        u32 origins=0;
+        for (u32 i=0;i<cint_host.nevents;++i) {
+            const struct gf3_host_event *e=&cint_host.events[i];
+            if (e->op==H_WRITE && (e->a[1]==0x600800 || e->a[1]==0x602800) &&
+                (e->a[3]==0x1110 || e->a[3]==0x2220)) ++origins;
+            assert(!(e->op==H_WRITE && e->a[0]==GF_MODE_VRAM_BAR));
+            assert(!(e->op==H_WRITE && e->a[1]==0x6808b0));
+        }
+        assert(origins==2);
+        gf4_hw_state_reset();
         assert(cint_prod.chan.state==GF2_OFF && cint_prod.display.engaged);
         assert(cint_prod.display.display4==&display);
         assert(!gf2_host_memcmp(&scan,&cint_service->scan_node.value,sizeof(scan)));

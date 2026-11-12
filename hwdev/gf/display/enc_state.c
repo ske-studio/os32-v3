@@ -122,7 +122,7 @@ int gf4_hw_enc_restore(struct gf4_ctx *c,struct gf_io *io,const struct gf4_route
                 if (!rc) rc=tv_rc;
             }
         } else if (r->type==GF4_TMDS && clock_ok) {
-            if (!c || !c->exec || !c->exec->tmds_script || out->head<0 || out->head>=GF4_HEADS)
+            if (!c || !c->exec || !c->exec->tmds_script || out->head<0 || (u32)out->head>=GF4_HEADS)
                 rc=GF4_ESTATE;
             else {
                 struct gf4_route bound=*r;

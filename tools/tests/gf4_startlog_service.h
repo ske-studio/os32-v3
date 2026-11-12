@@ -19,7 +19,9 @@ static i32 log_surfaces(struct gf3_service *s,const struct gf3_surface *scan,
 #define gf4_detect(...) (log_gate("detect") ? LOG_INJECT : log_detect(__VA_ARGS__))
 #define gf4_ddc_probe(...) log_probe(__VA_ARGS__)
 #define gf3_service_surfaces(...) (log_gate("surfaces") ? LOG_INJECT : log_surfaces(__VA_ARGS__))
+#define gf4_hw_save(...) log_hw_save(__VA_ARGS__)
 #include "../../hwdev/gf/display/service.c"
+#undef gf4_hw_save
 #undef gf_master_enable
 #undef gf4_dcb_parse
 #undef gfinit_pll_parse

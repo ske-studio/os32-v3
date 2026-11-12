@@ -31,6 +31,7 @@
  * for DRM BOs. No hardware register/method is introduced in this adapter. */
 #include "api.h"
 #include "stage.h"
+#include "hw_state.h"
 #include "probes.h"
 #include "../../../include/kprintf.h"
 #include "../internal.h"
@@ -114,21 +115,12 @@ void gf4_service_cleanup_reset(struct gf4_ctx *c)
     c->legacy->stop_ok=true;
 }
 
-/* crtc.c:175-233; hw.h:119-140,238-240; nvreg.h:129-139.
- * Stop must not use the public DPMS transaction: its successful end could
- * reopen slots and restore cursor visibility. Only the physical ON column
- * is needed here, with the old independent blank demand preserved. */
 #define SVC_CR 0x6013d4U
 #define SVC_SR 0x0c03c4U
 #define SVC_OWNER 0x44U
-#define SVC_RPC 0x1aU
-#define SVC_CONTROL 0x17U
-#define SVC_RESET 0U
 #define SVC_CLOCK 1U
-#define SVC_SCREEN_OFF 0x20U
-#define SVC_CONTROL_ON 0x80U
-#define SVC_SYNC_MASK 0xc0U
-#define SVC_SETTLE_US 10000U
+#define SVC_CONTROL 0x17U
+#define SVC_RPC 0x1aU
 static i32 svc_index(struct gf_io *io,u32 port,u32 index,u32 *value,bool write)
 {
     i32 rc=io->write(io->opaque,GF_MODE_REGISTER_BAR,port,1,index);
@@ -136,41 +128,6 @@ static i32 svc_index(struct gf_io *io,u32 port,u32 index,u32 *value,bool write)
     return write ? io->write(io->opaque,GF_MODE_REGISTER_BAR,port+1U,1,*value) :
                    io->read(io->opaque,GF_MODE_REGISTER_BAR,port+1U,1,value);
 }
-static i32 svc_dpms_on(struct gf4_ctx *c,u8 head,u32 dl)
-{
-    struct gf_io *io=&c->ch->f->io;
-    const struct gf4_head_image *h=&c->state->head[head];
-    u32 cr=SVC_CR+head*RECOVER_HEAD_STRIDE,sr=SVC_SR+head*RECOVER_HEAD_STRIDE;
-    u32 owner=head ? 3U : 0,rpc,clock,control,reset=1,now;
-    i32 rc=svc_index(io,SVC_CR,SVC_OWNER,&owner,true);
-    if (!rc) rc=svc_index(io,cr,SVC_RPC,&rpc,false);
-    if (!rc) rc=svc_index(io,sr,SVC_RESET,&reset,true);
-    if (!rc) rc=svc_index(io,sr,SVC_CLOCK,&clock,false);
-    if (!rc) {
-        clock=(clock&~SVC_SCREEN_OFF)|(h->blank ? SVC_SCREEN_OFF : 0);
-        rc=svc_index(io,sr,SVC_CLOCK,&clock,true);
-    }
-    if (!rc) rc=svc_index(io,cr,SVC_CONTROL,&control,false);
-    if (!rc) rc=io->timing.clock_us(io->opaque,&now);
-    if (!rc && ((i32)(now-dl)>=0 || dl-now<SVC_SETTLE_US)) rc=GF4_ETIME;
-    if (!rc) rc=io->timing.wait_us(io->opaque,SVC_SETTLE_US);
-    if (!rc) rc=io->timing.clock_us(io->opaque,&now);
-    if (!rc && (i32)(now-dl)>=0) rc=GF4_ETIME;
-    if (!rc) {
-        control|=SVC_CONTROL_ON; reset=3; rpc&=~SVC_SYNC_MASK;
-        rc=svc_index(io,cr,SVC_CONTROL,&control,true);
-    }
-    if (!rc) rc=svc_index(io,sr,SVC_RESET,&reset,true);
-    if (!rc) rc=svc_index(io,cr,SVC_RPC,&rpc,true);
-    if (!rc) switch (h->route.type) {
-    case GF4_ANALOG: rc=gf4_analog_dpms(c,&h->route,GF4_ON,dl); break;
-    case GF4_TMDS: case GF4_LVDS: rc=gf4_tmds_dpms(c,&h->route,GF4_ON,dl); break;
-    case GF4_TV: rc=gf4_tv_dpms(c,&h->route,GF4_ON,dl); break;
-    default: rc=GF4_EUNSUPPORTED; break;
-    }
-    return rc;
-}
-
 static i32 svc_check(struct gf4_ctx *c,struct gf3_service **out)
 {
     if (!c || !c->legacy || !c->ch || !c->accel || !c->state ||
@@ -312,6 +269,7 @@ static i32 svc_rom(struct gf4_ctx *c,struct gf_foundation *f,const char **stage)
         }
         if (!rc) { *stage="devinit"; rc=gf_init_run(l->init,l->program); }
         if (!rc) { *stage="baseline"; rc=gf_display_baseline(l); }
+        if (!rc) gf4_hw_save(c,&l->io);
         if (!rc) {
             *stage="feature5_deadline";
             rc=gf4_stage_deadline(c,f,&c->deadline);
@@ -736,9 +694,28 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
          * failed recovery stopped F2; the owner bus still rejects revocation. */
         rc=gf4_cursor_apply(c,h,false);
         if (rc && !first) first=rc;
-        if (running && c->state->head[h].enabled && !c->saved_closed) {
+    }
+    struct gf4_hw_saved *saved=gf4_hw_saved_get();
+    if (saved->valid) {
+        /* drm_helper_force_disable_all, then dispnv04/disp.c:196-200. */
+        for (u8 h=0;c->ch->f && h<GF4_HEADS;++h) {
+            const struct gf4_head_image *image=&c->state->head[h];
+            i32 rc=0;
+            if (!image->enabled || image->dpms==GF4_OFF) continue;
             rc=gf4_stage_deadline(c,f,&dl);
-            if (!rc) rc=svc_dpms_on(c,h,dl);
+            if (!rc) switch (image->route.type) {
+            case GF4_ANALOG: rc=gf4_analog_dpms(c,&image->route,GF4_OFF,dl); break;
+            case GF4_TMDS: case GF4_LVDS:
+                rc=gf4_tmds_dpms(c,&image->route,GF4_OFF,dl); break;
+            case GF4_TV: rc=gf4_tv_dpms(c,&image->route,GF4_OFF,dl); break;
+            default: rc=GF4_EUNSUPPORTED; break;
+            }
+            if (rc && !first) first=rc;
+        }
+        i32 rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);
+        if (rc && !first) first=rc;
+        for (u8 h=0;h<GF4_HEADS;++h) {
+            rc=gf4_hw_crtc_restore(&l->io,h,saved);
             if (rc && !first) first=rc;
         }
     }
@@ -750,6 +727,14 @@ i32 gf4_service_stop(struct gf4_ctx *c,u32 dl)
         rc=gf4_stage_deadline(c,f,&dl);
         if (!rc) rc=gf3_service_fini(s,dl);
         if (rc && !first) first=rc;
+        if (!rc && saved->fonts_valid) {
+            if (c->diagnostic_saved)
+                kprintf(KLOG_ATTR,"[gf4] stop fonts skipped diagnostic_saved\n");
+            else {
+                rc=gf4_hw_fonts_restore(&l->io,saved);
+                if (rc && !first) first=rc;
+            }
+        }
     }
     rc=gf2_stop(c->ch);
     if (rc && !first) first=rc;

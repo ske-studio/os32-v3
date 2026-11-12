@@ -17,7 +17,8 @@ $(patsubst drivers/video/geforce/%.c,$(GEFORCE_OUT)/%.o,$(wildcard drivers/video
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)
-GEFORCE_SOURCES := drivers/pci/pci_locate.c kdebug/recover_gf_locate.c  $(filter-out $(GEFORCE_LAYER2_SOURCES),$(wildcard hwdev/gf/*.c)) $(GEFORCE_LAYER2_SOURCES) $(wildcard hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
+GEFORCE_DISPLAY_STATE_SOURCES := $(addprefix hwdev/gf/display/,hw_state.c hw_state_crtc.c hw_fonts.c hw_load.c hw_pll.c enc_state.c)
+GEFORCE_SOURCES := drivers/pci/pci_locate.c kdebug/recover_gf_locate.c  $(filter-out $(GEFORCE_LAYER2_SOURCES),$(wildcard hwdev/gf/*.c)) $(GEFORCE_LAYER2_SOURCES) $(filter-out $(GEFORCE_DISPLAY_STATE_SOURCES),$(wildcard hwdev/gf/display/*.c hwdev/gf/op/*.c)) $(GEFORCE_DISPLAY_STATE_SOURCES) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
 GEFORCE_SERVICE_OBJS := $(patsubst %.c,$(GEFORCE_OUT)/%.o,$(GEFORCE_SOURCES))
 $(GEFORCE_SERVICE_OBJS): $(GEFORCE_OUT)/%.o: %.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	mkdir -p $(@D)

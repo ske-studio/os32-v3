@@ -17,6 +17,9 @@ FEATURES = 'V86 X87 PC98_DEVICES GEFORCE TRIDENT CIRRUS PCM FM LAN KCG CD FEP SQ
 def check(root):
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_x86.json').read_text())
     actual = query(root)
+    # The minimal kernel query omits the independently linked GPU module.
+    actual['GEFORCE_DISPLAY_STATE_SOURCES'] = query(
+        root, ['-f', 'build/geforce-module.mk'])['GEFORCE_DISPLAY_STATE_SOURCES']
     for name, value in expected.items():
         assert actual[name] == value, name
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']

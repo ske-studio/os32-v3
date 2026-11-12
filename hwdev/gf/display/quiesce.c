@@ -30,6 +30,7 @@
 #include "../quiesce_rows.h"
 #ifdef GF_PRODUCTION_MODULE
 #include "api.h"
+#include "hw_state.h"
 #endif
 /* Keep the first failing target/rc; later successful cleanup must not
  * overwrite it (docs/design/hwdev/gf/display/quiesce.md). */
@@ -114,6 +115,7 @@ int gf_display_stop(void *v)
             return gf4_service_stop(c->display4,now+GF3_TIMEOUT_US);
         /* X4: no valid deadline means no fini fence. Still attempt the
          * existing lower stop/cleanup, retaining F4 reservations and loan. */
+        (void)gf4_hw_restore_nodeadline(c->display4);
         first_rc=GF2_EIO;clock_failed=true;
         c->display4->accepting=false;c->display4->reusable=false;
         c->display4->last_rc=first_rc;

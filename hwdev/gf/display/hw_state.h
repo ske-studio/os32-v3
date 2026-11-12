@@ -26,6 +26,7 @@ struct gf4_hw_saved {
 void gf4_hw_save(struct gf4_ctx *,struct gf_io *);
 struct gf4_hw_saved *gf4_hw_saved_get(void);
 void gf4_hw_state_reset(void);
+int gf4_hw_restore_nodeadline(struct gf4_ctx *);
 int gf4_hw_crtc_save(struct gf_io *,u8,u32,struct gf4_hw_saved *);
 /* S1b: fonts_save allocates; fonts_reset releases the pages. */
 int gf4_hw_fonts_save(struct gf_io *,struct gf4_hw_saved *);

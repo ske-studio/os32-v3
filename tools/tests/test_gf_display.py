@@ -1825,6 +1825,7 @@ GF4_MUTATIONS += [
 ]
 
 GF4_COMPONENTS = {
+    'hwstate': ['hwdev/gf/display/'+n+'.c' for n in ('hw_state', 'hw_state_crtc', 'hw_fonts', 'hw_load', 'hw_pll', 'enc_state')],
     'b0': ['hwdev/gf/display/modes.c', 'drivers/video/geforce/edid.c'],
     'b01tv': ['hwdev/gf/display/modes.c', 'hwdev/gf/display/timing.c', 'tools/tests/gf4_modeload_print_host.c'],
     'b1': ['hwdev/gf/display/'+n+'.c' for n in ('timing', 'format', 'fifo')],
@@ -2036,6 +2037,61 @@ GF4_MUTATIONS += [
      'if (false && c->baseline_valid) for (u32 h=0;h<2U;h++) {',
      'both scan origins restored even after lower-stop failure'),
 ]
+
+# GF_STOP_REF_DESIGN §5-2, S4a: every mutation must fail at runtime.
+GF4_MUTATIONS += [
+ ('hwstate','unprotect','hwdev/gf/display/hw_load.c','on ? v|0x20U : v&~0x20U','on ? v|0x20U : v','SR01 bit5'),
+ ('hwstate','cr11-unlock','hwdev/gf/display/hw_load.c','if (!rc) rc=idx_wr(io,port,0x11U,v&~0x80U);','if (!rc) rc=0;','CR11 unlock order'),
+ ('hwstate','pll-already','hwdev/gf/display/hw_pll.c','if (old1==pll1 && old2==pll2) return 0;','if (false && old1==pll1 && old2==pll2) return 0;','already set writes none'),
+ ('hwstate','pll-order','hwdev/gf/display/hw_pll.c','if (!rc) rc=pll_write(io,reg2,pll2);\n    if (!rc) rc=pll_write(io,reg1,pll1);','if (!rc) rc=pll_write(io,reg1,pll1);\n    if (!rc) rc=pll_write(io,reg2,pll2);','reg2 before reg1'),
+ ('hwstate','pll-save','hwdev/gf/display/hw_pll.c','rc=pll_read(io,PLL_POWERCTRL_2,&savedc040);','rc=pll_read(io,PLL_POWERCTRL_2,&savedc040); savedc040=0;','c040 retained'),
+ ('hwstate','pll-shift','hwdev/gf/display/hw_pll.c','shift=head ? 18U : 16U;','shift=16U;','head1 shift'),
+ ('hwstate','pll-1584','hwdev/gf/display/hw_pll.c','rc=pll_write(io,PLL_POWERCTRL_2,savedc040&~(3U<<shift));','rc=pll_write(io,0x1584U,0); if (!rc) rc=pll_write(io,PLL_POWERCTRL_2,savedc040&~(3U<<shift));','no 1584'),
+ ('hwstate','save-routes','hwdev/gf/display/hw_state.c','gf4_hw_enc_save(io,c->dcb.routes,c->dcb.nroutes,&hw_saved);','gf4_hw_enc_save(io,c->routes,c->nroutes,&hw_saved);','DCB before publication'),
+ ('hwstate','pvideo','hwdev/gf/display/hw_load.c','if (!rc) rc=wr(io,0x8704U,4,1);','if (!rc) rc=0;','PVIDEO stop'),
+ ('hwstate','900-hsync','hwdev/gf/display/hw_load.c','p->crtc_cfg==2U ?','p->crtc_cfg!=2U ?','900 bit16'),
+ ('hwstate','cursor-fix','hwdev/gf/display/hw_load.c','if (!rc) rc=wr(io,ram+0x300U,4,v);','if (!rc) rc=0;','cursor position rewrite'),
+ ('hwstate','owner','hwdev/gf/display/hw_load.c','int rc=idx_wr(io,CR,0x44U,h ? 3U : 0U);','int rc=idx_wr(io,CR,0x44U,0U);','head1 owner'),
+ ('hwstate','cr21','hwdev/gf/display/hw_load.c','if (!rc) rc=idx_wr(io,CR+h*STRIDE,0x21U,s->crtc[h].cr[0x21]);','if (!rc) rc=0;','CR21 restored'),
+ ('hwstate','font-graphics','hwdev/gf/display/hw_fonts.c','if (rc || (mode&1U)) return rc;\n    phys=','if (rc) return rc;\n    phys=','graphics no allocation'),
+ ('c2stop','clock-restore','hwdev/gf/display/quiesce.c','(void)gf4_hw_restore_nodeadline(c->display4);','(void)0;','no-clock DAC and both heads restored'),
+ ('c2svc','restore-production','hwdev/gf/display/service.c','gf4_hw_enc_restore(c,&l->io,c->dcb.routes','gf4_hw_enc_restore(c,&c->ch->f->io,c->dcb.routes','no F1 loan during failed start'),
+ ('c2svc','encoder-off','hwdev/gf/display/service.c','if (!image->enabled || image->dpms==GF4_OFF) continue;','if (true) continue;','encoder OFF precedes restore'),
+ ('c2svc','font-diagnostic','hwdev/gf/display/service.c','if (c->diagnostic_saved)\n                kprintf','if (false)\n                kprintf','diagnostic retains VRAM'),
+ ('c2svc','restore-valid','hwdev/gf/display/service.c','if (saved->valid) {','if (true) {','invalid state untouched'),
+]
+
+GF4_MUTATIONS += [
+ ('c2log','save-failure-start','hwdev/gf/display/service.c',
+  'if (!rc) gf4_hw_save(c,&l->io);',
+  'if (!rc) { gf4_hw_save(c,&l->io); if (!gf4_hw_saved_get()->valid) rc=GF4_ESTATE; }','failed save still starts'),
+ ('c2log','save-again','hwdev/gf/display/service.c',
+  'rc=l->initialized ? l->owner->validate(l) : svc_rom(c,f,&stage);',
+  'rc=l->initialized ? l->owner->validate(l) : svc_rom(c,f,&stage); if (l->initialized) gf4_hw_save(c,&l->io);','only first start saves'),
+]
+
+# Move complete call blocks so declarations remain valid in each mutant.
+def _s4a_move(case, name, rel, start, end, transform):
+    text = (ROOT/rel).read_text()
+    old = text[text.index(start):text.index(end, text.index(start))]
+    GF4_MUTATIONS.append((case,name,rel,old,transform(old),name))
+
+_s4a_move('hwstate','engine-order','hwdev/gf/display/hw_load.c',
+    '    int rc=wr(io,base+0x860U,4,p->crtc_eng_ctrl);', '    /* hw.c:732-733;',
+    lambda t: t.replace('int rc=wr(io,base+0x860U,4,p->crtc_eng_ctrl);','int rc=0;')+'    if (!rc) rc=wr(io,base+0x860U,4,p->crtc_eng_ctrl);\n')
+_s4a_move('hwstate','fonts-first','hwdev/gf/display/hw_state.c',
+    '    rc=gf4_hw_fonts_save(io,&hw_saved);', '    rc=gf4_hw_enc_save',
+    lambda t: t[t.index('    for (u8 h='):]+t[:t.index('    for (u8 h=')])
+_s4a_move('c2svc','encoder-before-crtc','hwdev/gf/display/service.c',
+    '        i32 rc=gf4_hw_enc_restore(c,&l->io', '    i32 rc=gf3_service_close(s);',
+    lambda t: t.replace('i32 rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);','i32 rc=0;').replace('    }\n','        rc=gf4_hw_enc_restore(c,&l->io,c->dcb.routes,c->dcb.nroutes,saved,true,dl);\n    }\n',1))
+
+def _s4a_early_fonts(text):
+    a=text.index('        if (!rc && saved->fonts_valid) {')
+    b=text.rfind('    }\n')
+    return text[a:b]+text[:a]+text[b:]
+_s4a_move('c2svc','fonts-after-fence','hwdev/gf/display/service.c',
+    '    if (closed) {\n        rc=gf4_stage_deadline', '    rc=gf2_stop(c->ch);', _s4a_early_fonts)
 
 GF4_LIFECYCLE = ('c1', 'c2f3', 'c2stop', 'c2svc', 'c2init', 'c2rec',
                  'c2scan', 'c2links', 'c2linkb', 'c2save', 'diag', 'c3', 'c2linit', 'c2log', 'scanlog')

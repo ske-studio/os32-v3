@@ -43,6 +43,9 @@ void _start(void)
     /* After STOP, a restart through the service records no further hits. */
     assert(!gf4_service_stop(&svc_ctx,cint_deadline()));
     assert(!concrete_stop());
+    /* S0 detect diagnostics belong to each start; the preceding phase
+     * has already checked its output and probe records. */
+    startlog_clear();
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));
     assert(records[0] == 1 && records[1] == 1);
     scanlog_finish();

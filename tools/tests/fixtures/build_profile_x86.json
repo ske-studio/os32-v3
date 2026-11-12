@@ -497,5 +497,13 @@
     "drivers/block/fdc.o",
     "fs/serialfs/serialfs_session.o",
     "lib/sqlite3/os32_sqlite_test.o"
+  ],
+  "GEFORCE_DISPLAY_STATE_SOURCES": [
+    "hwdev/gf/display/hw_state.c",
+    "hwdev/gf/display/hw_state_crtc.c",
+    "hwdev/gf/display/hw_fonts.c",
+    "hwdev/gf/display/hw_load.c",
+    "hwdev/gf/display/hw_pll.c",
+    "hwdev/gf/display/enc_state.c"
   ]
 }

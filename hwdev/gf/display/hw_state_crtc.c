@@ -2,7 +2,7 @@
  * 393-465, 540-560, 590-661, 776-791, 814-824; hw.h:158-163,194-236. */
 #include "hw_state.h"
 #include "../internal.h"
-#define BAR 0U
+#define BAR GF_MODE_REGISTER_BAR
 #define STRIDE 0x2000U
 #define CR 0x6013d4U
 #define SR 0x0c03c4U
