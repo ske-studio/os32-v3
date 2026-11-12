@@ -14,8 +14,11 @@ int usbp_dma_alloc(u32 size, u32 align, struct usb_dma *out);
 int usbp_dma_free(struct usb_dma *d);
 int usbp_dma_quarantine(struct usb_dma *d);
 enum { USBP_TO_DEV, USBP_TO_CPU };
-/* Transfer ownership for this range: pc98 barriers; PPC platform must supply
- * cache flush/invalidate unless hardware coherency has been established. */
+/* Transfer ownership for this range. ED/TD are 16B and may share a PPC 32B
+ * cache line. Common code must not assume partial-line invalidation works.
+ * Platform supplies coherent USB DMA mappings (uncached or hardware snooped),
+ * with sync acting only as a barrier. Otherwise it must align allocation
+ * blocks to cache-line size. Architecture LE accessors own no cache policy. */
 void usbp_dma_sync(struct usb_dma *d, u32 off, u32 len, int dir);
 void *usbp_mem_alloc(u32 bytes);
 void usbp_mem_free(void *p);
@@ -24,6 +27,9 @@ void usbp_mmio_unmap(const struct usb_pci_fn *f, u32 bar);
 u32 usbp_cfg_read32(const struct usb_pci_fn *f, u32 reg);
 int usbp_cfg_write8(const struct usb_pci_fn *f, u32 reg, u8 v);
 int usbp_cfg_cmd(const struct usb_pci_fn *f, u16 set, u16 clear);
+#define USBP_IRQ_NONE 0
+#define USBP_IRQ_HANDLED 1
+/* ISR returns USBP_IRQ_NONE or USBP_IRQ_HANDLED. */
 int usbp_irq_attach(const struct usb_pci_fn *f, int (*isr)(void *), void *arg);
 void usbp_irq_detach(const struct usb_pci_fn *f);
 int usbp_tick_attach(void (*fn)(void));
@@ -38,5 +44,7 @@ int usbp_input_src_alloc(int kind);
 void usbp_input_key(u8 src, u8 sc, int down);
 void usbp_input_key_repeat(u8 src, u8 sc);
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons);
-void usbp_input_release(u8 src);
+void usbp_input_release(int kind, u8 src);
+/* One-line startup/change diagnostics, also used by usbstat. */
+void usbp_log(const char *fmt, ...);
 #endif

@@ -7,6 +7,7 @@
 #define USB_DEV_MAX 127u
 #define USB_DEV_IFACE_MAX 4u
 #define USB_HUB_PORT_MAX 8u
+#define USB_RH_PORTS_MAX 15u
 #define USB_HUB_DEPTH_MAX 5u
 #define USB_IFACE_EP_MAX 4u
 #define USB_HC_DMA_MAX 2u
@@ -17,7 +18,9 @@
 #define USB_CTRL_BUF_SIZE 64u
 #define USB_CTRL_BUF_MAX 8u
 #define USB_CFG_MAX 512u
-#define USB_CFG_BUF_MAX 1u
+#define USB_CFG_BUF_MAX 2u
+#define USB_CLASS_BUF_SIZE 64u
+#define USB_CLASS_BUF_MAX (USB_KBD_MAX + USB_MOUSE_MAX)
 #define USB_KBD_MAX 4u
 #define USB_MOUSE_MAX 4u
 #define USB_RESTART_MAX 5u
@@ -45,14 +48,18 @@ enum usb_rh_op { USB_RH_STATUS, USB_RH_SET_ENABLE, USB_RH_CLEAR_ENABLE,
     USB_RH_SET_POWER, USB_RH_RESET, USB_RH_CLEAR_CONNECT,
     USB_RH_CLEAR_ENABLE_CHANGE, USB_RH_CLEAR_RESET, USB_RH_CLEAR_OVER_CURRENT };
 /* One cooperative exploration per HC; waits resume at a deadline. */
-enum usb_explore_state { X0, P0, R0, R0B, R1, R2, R2B, R3,
-    A0, A1, A2, A4, A5, A6, RE1, RE2, RE3, RE4, RE_WAIT, ERR, X9 };
-enum usb_free_state { D0, D1, D2, D3, D4, D5 };
+enum usb_explore_state { EX_X0, EX_P0, EX_R0, EX_R0B, EX_R1, EX_R2, EX_R2B, EX_R3,
+    EX_A0, EX_A1, EX_A2, EX_A4, EX_A5, EX_A6, EX_RE1, EX_RE2, EX_RE3, EX_RE4, EX_RE_WAIT, EX_ERR, EX_X9 };
+enum usb_free_state { FD_IDLE, FD_D0, FD_D1, FD_D2, FD_D3, FD_D4, FD_D5 };
 struct usb_pipe { u8 ep, type, interval, toggle; u16 mps; };
 struct usb_xfer {
     struct usb_dev *dev;
     struct usb_iface *owner;
     struct usb_pipe pipe;
+    /* CONTROL data direction is bmRequestType (setup.type) bit 7;
+     * length is wLength (LE setup.length).
+     * xfer_enter copies these eight bytes into the SETUP TD buffer. */
+    struct usb_setup setup;
     struct usb_dma buf;
     u32 len, actual;
     i8 error;
@@ -102,6 +109,7 @@ struct usb_hc_ops {
 struct usb_hc {
     const struct usb_hc_ops *ops;
     volatile void *regs;
+    void *hcpriv; /* HCD-owned state, e.g. ohci_dmamem. */
     struct usb_pci_fn pci;
     u8 nports, state, has_irq, started, needs_explore;
     u32 dead_why;
@@ -110,6 +118,9 @@ struct usb_hc {
     volatile u32 isr_pending;
     struct usb_xfer *active, *scan_next;
     struct usb_dev *devices[USB_DEV_MAX + 1];
+    struct usb_dev *root_child[USB_RH_PORTS_MAX];
+    u8 root_restart[USB_RH_PORTS_MAX];
+    u8 explored; /* First root-port scan has completed (§4-4-1 P0). */
     struct usb_explore explore;
     struct usb_dma dma[USB_HC_DMA_MAX];
 };
@@ -125,7 +136,7 @@ struct usb_dev {
     struct usb_xfer ctrl;
     struct usb_ctrl_req *ctrl_q;
     struct usb_iface ifs[USB_DEV_IFACE_MAX];
-    struct usb_free_ctx *freeing;
+    struct usb_free_ctx freeing; /* FD_IDLE when inactive. */
     u8 tt_hub_addr, tt_port;
 };
 /* detach begins unsetup and cancels owner control requests. gone only releases
@@ -135,6 +146,7 @@ struct usb_class {
     int (*attach)(struct usb_dev *, struct usb_iface *);
     void (*detach)(struct usb_dev *, struct usb_iface *);
     void (*gone)(struct usb_dev *, struct usb_iface *);
+    void (*tick)(struct usb_dev *, struct usb_iface *, u32 now_ms); /* NULL allowed */
 };
 /* Nonblocking except sync (foreground only). Reject submissions to detached
  * devices or non-running HCs. drained includes notification; unsetup_done
@@ -151,7 +163,14 @@ void usb_xfer_notify(struct usb_xfer *x);
 int usb_ctrl_async(struct usb_dev *, struct usb_iface *owner, const struct usb_setup *s,
                    struct usb_dma *b, u32 off, void (*done)(struct usb_ctrl_req *), void *ctx);
 void usb_ctrl_cancel_owner(struct usb_dev *, struct usb_iface *owner);
+int usb_hc_register(struct usb_hc *hc); /* Add to usb_service targets (1E/1P -> 1C). */
 void usb_service(void);
+extern const struct usb_class *const usb_classes[]; /* NULL-terminated; defined in 1C. */
+extern const struct usb_class hid_kbd_class, hid_mouse_class;
+void usb_class_tick(u32 now_ms);
+int usb_dmamem_init(struct usb_hc *hc);
+int usb_dmamem_alloc(struct usb_hc *hc, u32 size, u32 align, struct usb_dma *out);
+void usb_dmamem_free(struct usb_hc *hc, struct usb_dma *d);
 int usb_xfer_sync(struct usb_xfer *x, u32 timeout_ms);
 void usb_explore_step(struct usb_hc *hc);
 void usb_free_device_begin(struct usb_dev *);

@@ -92,6 +92,12 @@ def check(mutate):
                 assert result.returncode in (1, 2, 3, 4), (anchor, result.returncode)
                 print('RED runtime:', arch, anchor, 'rc=' + str(result.returncode))
                 header.write_text(original)
+            header = tmp / 'drivers/usb/ohci_priv.h'
+            header.write_text('#include "drivers/usb/usb_core.h"\n')
+            guard(tmp, '', 0)
+            header.write_text('#include "mm/dma_pool.h"\n')
+            guard(tmp, '', 1)  # A2: headers also enforce the boundary
+            header.unlink()
             guard(tmp, '#include "mm/dma_pool.h"\n', 1)  # A2
             guard(tmp, 'void f(void) { ed->headp.raw = x; }\n', 1)  # A1
             guard(tmp, 'void f(void) { p->raw = 0; }\n', 1)

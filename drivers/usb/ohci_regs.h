@@ -29,6 +29,8 @@
 #define OHCI_RH_DESCRIPTOR_B 0x4cu
 #define OHCI_RH_STATUS 0x50u
 #define OHCI_RH_PORT_STATUS(p) (0x50u + 4u * (p)) /* ports are 1-based */
+#define OHCI_CTL_CBSR_MASK 3u
+#define OHCI_CTL_CBSR_1_4 3u
 #define OHCI_CTL_PLE (1u << 2)
 #define OHCI_CTL_IE (1u << 3)
 #define OHCI_CTL_CLE (1u << 4)
@@ -53,6 +55,13 @@
 #define OHCI_INTR_OC (1u << 30)
 #define OHCI_INTR_MIE (1u << 31)
 #define OHCI_INTR_ALL 0xc000007fu
+#define OHCI_RHS_LPS 1u
+#define OHCI_RHS_LPSC (1u << 16)
+#define OHCI_FMI_FI_MASK 0x3fffu
+#define OHCI_FMI_FI(v) ((v) & OHCI_FMI_FI_MASK)
+#define OHCI_FMI_FSMPS_SHIFT 16u
+#define OHCI_FMI_FSMPS_MASK (0x7fffu << OHCI_FMI_FSMPS_SHIFT)
+#define OHCI_FMI_FSMPS(v) (((v) & OHCI_FMI_FSMPS_MASK) >> OHCI_FMI_FSMPS_SHIFT)
 #define OHCI_RHA_NDP_MASK 0xffu
 #define OHCI_RHA_PSM (1u << 8)
 #define OHCI_RHA_NPS (1u << 9)
@@ -90,6 +99,8 @@
 #define OHCI_TD_DATA0 (2u << 24)
 #define OHCI_TD_DATA1 (3u << 24)
 #define OHCI_TD_CC_SHIFT 28u
+#define OHCI_TD_CC_MASK (15u << OHCI_TD_CC_SHIFT)
+#define OHCI_TD_CC(v) (((v) & OHCI_TD_CC_MASK) >> OHCI_TD_CC_SHIFT)
 #define OHCI_CC_NO_ERROR 0u
 #define OHCI_CC_STALL 4u
 #define OHCI_CC_DATA_UNDERRUN 9u

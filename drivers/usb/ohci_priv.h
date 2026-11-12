@@ -5,7 +5,6 @@
 #define OHCI_TREE_EDS 63u
 #define OHCI_SENTINEL_EDS 3u
 #define OHCI_FIXED_BYTES 1312u
-#define OHCI_BUFFER_CFG_SLOTS 2u
 /* Hardware records stay exactly 16 bytes; CPU-only shadows are ordinary
  * memory. No pointer or CPU metadata is embedded in a device descriptor. */
 enum ohci_td_stage { TD_SETUP, TD_DATA, TD_STATUS };
@@ -40,13 +39,15 @@ struct ohci_dmamem {
     struct ohci_ed tree[OHCI_TREE_EDS], sentinel[OHCI_SENTINEL_EDS];
     struct ohci_block blocks[USB_DMA_BLOCK_MAX];
     struct ohci_block control[USB_CTRL_BUF_MAX];
-    struct ohci_block config[OHCI_BUFFER_CFG_SLOTS];
+    struct ohci_block reports[USB_CLASS_BUF_MAX];
+    struct ohci_block config[USB_CFG_BUF_MAX];
 };
 STATIC_ASSERT(OHCI_FIXED_BYTES + USB_DMA_BLOCK_MAX * USB_DMA_BLOCK_SIZE ==
               USB_DMA_PAGE_SIZE, ohci_page_a_budget);
-int usb_dmamem_init(struct usb_hc *hc);
-int usb_dmamem_alloc(struct usb_hc *hc, u32 size, u32 align, struct usb_dma *out);
-void usb_dmamem_free(struct usb_hc *hc, struct usb_dma *d);
+STATIC_ASSERT(USB_CFG_MAX * USB_CFG_BUF_MAX +
+              USB_CTRL_BUF_SIZE * USB_CTRL_BUF_MAX +
+              USB_CLASS_BUF_SIZE * USB_CLASS_BUF_MAX <= USB_DMA_PAGE_SIZE,
+              ohci_page_b_budget);
 int ohci_start(struct usb_hc *hc);
 void ohci_kill(struct usb_hc *hc);
 u32 ohci_intr_collect(struct usb_hc *hc);

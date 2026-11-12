@@ -29,8 +29,9 @@ def check(root):
             continue
         source = uncomment(path.read_text())
         rel = path.relative_to(root).as_posix()
-        if (path.suffix == '.c' and path.name.startswith(PREFIXES)
-                and path.name not in SHELLS):
+        if (path.suffix == '.h' or
+                (path.suffix == '.c' and path.name.startswith(PREFIXES)
+                 and path.name not in SHELLS)):
             for match in re.finditer(r'^\s*#\s*include\b([^\n]*)', source, re.M):
                 operand = match[1].strip()
                 header = re.fullmatch(r'["<]([^">]+)[">]', operand)
