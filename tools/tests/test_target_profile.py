@@ -27,8 +27,11 @@ def check(root):
     assert all(T.PROFILES['ppc-powermac'][key] is None
                for key in ('crt_resident', 'app_sys_link', 'shlib_link', 'rust'))
     assert T.require('x86-pc98', 'module_codec')['elf_identity'] == (1,1,3)
+    assert T.require('ppc-powermac', 'link_guard')['elf_identity'] == (1,2,20)
     for name in ('ppc-powermac', 'unknown'):
         for capability in ('module_codec','layout','link_guard'):
+            if name == 'ppc-powermac' and capability == 'link_guard':
+                continue
             try:
                 T.require(name,capability)
             except ValueError:
@@ -42,8 +45,9 @@ def check(root):
         assert result.returncode and 'target' in result.stderr and 'No such file' not in result.stderr
         result = command(ROOT/'tools/gen_memmap.py','--target',name,'--layout-header',output)
         assert result.returncode and 'target' in result.stderr
-        result = command(root/'sdk/link_guard.py','--target',name,'absent-linker','-o',output)
-        assert result.returncode and 'target' in result.stderr and 'Traceback' not in result.stderr
+        if name != 'ppc-powermac':  # B27: PPC USER links are guarded
+            result = command(root/'sdk/link_guard.py','--target',name,'absent-linker','-o',output)
+            assert result.returncode and 'target' in result.stderr and 'Traceback' not in result.stderr
         assert not output.exists()
     for machine,endian in ((20,1),(3,2)):
         elf = bytearray(52)

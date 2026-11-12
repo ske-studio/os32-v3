@@ -118,14 +118,20 @@ def artifacts(root, all_products=False):
 ALLOWED_TOOL_DIFFS = {
     'build/sdk/bin/link_guard.py': ((
         '319f4e3fd31f4c12181966246f732b6824ee99fd644a0d72eecfd7967c85f92e',
-        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),),
+        'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
+        # PowerPC シェル S-B B27: PPC の USER の guarded link (本線の承認 2026-11-12)
+        ('b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4',
+         '0396d6c3319deacfed94f116547d4ebcf1a7b7c9eef37bf5ec18274256c5da06'),),
     # 第 5 段 S1: SDK の選択 (CRT・link script・Rust target) を profile に足した。
     'build/sdk/bin/target_profile.py': ((
         '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
         '6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a'),
         # PowerPC シェル S-B B05: USER の能力の分離、本線の承認 2026-11-11
         ('6835c50b1236b84ca6dec2ab6810d06bcb45eb4bc064548c31687561c536198a',
-         'ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9'),),
+         'ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9'),
+        # PowerPC シェル S-B B27: ppc-powermac の link_guard を有効に
+        ('ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9',
+         '320df99981648c9b8d8140d9b4f9e1c98d9eed3404e8a121baca98a89f55a31d'),),
     # 第 5 段 S2: Rust の wrapper が SDK の target を rustc の起動より前に確かめる。
     'build/sdk/bin/rustc_stamp.py': ((
         'd5e0f249c10662334532b964a3c167e5f21fb189677520dbd9463f17307ecee7',

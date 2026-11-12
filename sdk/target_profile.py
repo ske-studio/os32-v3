@@ -17,7 +17,7 @@ PROFILES = {
                      layout=True, link_guard=True, ar='i386-elf-ar',
                      sdk=True, sdk_user=True, **_X86_SDK),
     'ppc-powermac': dict(elf_identity=(1, 2, 20), module_codec=False,
-                         layout=False, link_guard=False, ar='powerpc-elf-ar',
+                         layout=False, link_guard=True, ar='powerpc-elf-ar',
                          sdk=False, **dict.fromkeys(SDK_FIELDS)),
 }
 PROFILES['ppc-powermac'].update(

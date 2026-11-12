@@ -26,11 +26,11 @@ def exercise(tmp, sdk, mutant=False):
                    'int data = 7; int bss;\n'
                    '__attribute__((section(".os32_kapi_layout"),used)) const unsigned stamp=0x1234;\n'
                    '__attribute__((section(".os32_generations"),used)) const unsigned char note[] = {' +
-                   ','.join(str(x) for x in struct.pack('<4I', 5, 1, 1, 2)) + '};\n')
+                   ','.join(str(x) for x in struct.pack('>4I', 5, 1, 1, 2)) + '};\n')
     # Obtain the current generation values instead of assuming their versions.
     sys.path.insert(0, str(ROOT / 'sdk'))
     import os32x_hdr as h
-    note = struct.pack('<4I', h.OS32X_HDR_VERSION, h.OS32_KAPI_ABI_GENERATION,
+    note = struct.pack('>4I', h.OS32X_HDR_VERSION, h.OS32_KAPI_ABI_GENERATION,
                        h.OS32_MEMORY_LAYOUT_GENERATION, h.OS32_SHLIB_PROTOCOL)
     s = src.read_text(); s = s[:s.index('__attribute__((section(".os32_generations"),used))')]
     src.write_text(s + '__attribute__((section(".os32_generations"),used)) const unsigned char note[] = {' + ','.join(str(x) for x in note) + '};\n')
