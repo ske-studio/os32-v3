@@ -9,18 +9,33 @@ KB_CC := $(PPC_CROSS_DIR)/bin/powerpc-elf-gcc
 KB_OBJCOPY := $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
 KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
-KBOOT_SHELL ?= 0
-KBOOT_TERM ?= lan
 NEGATIVE ?= 0
-KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
+KBOOT_SHELL ?= 0
+KBOOT_SH ?= 0
+ifeq ($(KBOOT_SH),1)
+ifeq ($(KBOOT_SHELL),1)
+$(error KBOOT_SH and KBOOT_SHELL are mutually exclusive)
+endif
+ifneq ($(NEGATIVE),0)
+$(error KBOOT_SH does not support NEGATIVE)
+endif
+endif
+KBOOT_TERM ?= lan
+KB_FD1_STREAM ?= $(KBOOT_SH)
+# Extra applications belong to an explicitly separate test image.
+KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
+KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
+KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE))))
+ifeq ($(KB_FD1_STREAM)$(KBOOT_SH),10)
+KB_OUT := $(KB_OUT)/fd1-stream
+endif
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
 .DEFAULT_GOAL := all
 
 ROOT_ISO := $(KB_OUT)/root.iso
 ROOT_BLOB := $(KB_OUT)/root_image_blob.o
 ROOT_MOTD := $(KB_OUT)/motd.txt
-KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
-ROOT_BINS = $(KB_ROOT_BINS)
+ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),build/out/ppc-user/sh.bin)
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
@@ -53,14 +68,18 @@ KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 KB_C := $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
-ifeq ($(KBOOT_SHELL),1)
+ifneq ($(KB_EXEC),)
 ifneq ($(KBOOT_TERM),lan)
 $(error KBOOT_TERM must be lan)
 endif
-KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c $(RAM_ROOT_C) \
- platform/powermac/root_boot.c platform/powermac/root_image.c \
- platform/powermac/console_stream.c platform/powermac/shell_putchar.c \
- platform/powermac/cli_boot.c kernel/cli/resident_cli.c
+KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c $(RAM_ROOT_C) platform/powermac/root_boot.c platform/powermac/root_image.c \
+ platform/powermac/console_stream.c platform/powermac/shell_putchar.c
+ifeq ($(KBOOT_SHELL),1)
+KB_C += platform/powermac/cli_boot.c kernel/cli/resident_cli.c
+else
+KB_C += platform/powermac/shell_boot.c platform/powermac/input_boot.c \
+ platform/powermac/input_decode.c
+endif
 KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
  kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
@@ -84,13 +103,13 @@ KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none \
  -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon -fsigned-char \
  -fno-short-enums
-KB_INC := $(if $(filter 1,$(KBOOT_SHELL)),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
+KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
  -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
  -Imm -Ilib $(KB_INC_EXTRA)
 KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -MMD -MP $(KB_INC)
 
 .PHONY: all audit
 all: $(KB_ELF) audit
@@ -98,7 +117,7 @@ all: $(KB_ELF) audit
 $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)
 	python3 -B tools/gen_memmap.py --layout-header $@
-ifeq ($(KBOOT_SHELL),1)
+ifneq ($(KB_EXEC),)
 $(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
@@ -115,11 +134,14 @@ KB_MUT_FILE ?=
 # A serial input substitution may accompany one product mutation.
 KB_MUT_EXTRA_SRC ?=
 KB_MUT_EXTRA_FILE ?=
-kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$1))
-$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
+KB_MUT_THIRD_SRC ?=
+KB_MUT_THIRD_FILE ?=
+kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+$(KB_OUT)/fs/vfs_fd.o: KB_TU_FLAGS = $(if $(filter 1,$(KB_FD1_STREAM)),-Dconsole_write=pm_fd1_write)
+$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
-	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
+	$(KB_CC) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
+$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OUT)/memmap_layout.h
@@ -129,9 +151,10 @@ $(KB_OUT)/motd.txt:
 	@printf 'OS32 PowerPC shell\n' > $@
 .PHONY: kb-user
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) hello ppc-fault
+	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(ROOT_BINS)
 
-build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin: kb-user
+$(ROOT_BINS): kb-user
+
 
 # kboot_tick is the acceptance meter's name for the live 1 kHz tick counter.
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
@@ -145,7 +168,7 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) \
+	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
 -include $(KB_OBJ:.o=.d)

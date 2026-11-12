@@ -86,7 +86,10 @@ static int try_exec_len(const char *bin_path, int argc, char **argv)
     return total;
 }
 
-#ifndef SHELL_AS_APP
+#if !defined(SHELL_AS_APP) || defined(SH_LAUNCH_SYNC)
+#ifdef SHELL_AS_APP
+#define sh_exec_result sh_exec_sync_result
+#endif
 /* ------------------------------------------------------------------------ */
 /*  sh_exec_result (常駐) — 票 TASK_EXIT_STATUS §2-2                         */
 /*                                                                          */
@@ -110,7 +113,10 @@ int sh_exec_result(const char *cmdline, int *kind, int *code)
     if (code) *code = c;
     return rc;
 }
-#endif /* !SHELL_AS_APP */
+#ifdef SHELL_AS_APP
+#undef sh_exec_result
+#endif
+#endif /* !SHELL_AS_APP || SH_LAUNCH_SYNC */
 
 /* try_exec の戻り値は従来どおり EXEC_* (印字と既存の分岐のため)。
  * **起動の成否の判断は *kind だけ** で行う (票 §2-2)。断って起動しなかった

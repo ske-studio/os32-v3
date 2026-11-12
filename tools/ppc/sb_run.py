@@ -29,7 +29,9 @@ INPUT = r'''
 #include "kernel_tick.h"
 __attribute__((noinline, noreturn)) void sb_done(void)
 {
-    __asm__ volatile(".globl sb_stop\nsb_stop: b sb_stop");
+    /* MSR[EE]=0 first: a decrementer interrupt must not move the stop PC. */
+    __asm__ volatile("mfmsr 3\n rlwinm 3,3,0,17,15\n mtmsr 3\n isync\n"
+                     ".globl sb_stop\nsb_stop: b sb_stop" ::: "r3", "memory");
     __builtin_unreachable();
 }
 static int sb_getkey(void)

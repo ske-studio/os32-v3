@@ -7,6 +7,10 @@
 #include "os32/help.h"
 #include <stdio.h>
 
+#ifdef SH_REGISTER_COMMANDS
+#include "../ppc/sh/runtime.h"
+#endif
+
 KernelAPI *g_api;
 
 /* ------------------------------------------------------------------------ */
@@ -94,7 +98,11 @@ const char *cmd_names[MAX_CMDS + 1];
 /* ======================================================================== */
 int main(int argc, char **argv, KernelAPI *api)
 {
+#ifdef SH_REGISTER_COMMANDS
+    g_api = sh_runtime_init(api);
+#else
     g_api = api;
+#endif
 
     /* stdout は常に行バッファ。newlib は最初の出力時に isatty で
      * バッファ方式を一度だけ決めるので、最初の printf がリダイレクト中に
@@ -105,6 +113,11 @@ int main(int argc, char **argv, KernelAPI *api)
     env_init();
 
     /* 各モジュールのコマンド登録 */
+#ifdef SH_REGISTER_COMMANDS
+#define SH_REGISTER(name) shell_cmd_##name##_init();
+    SH_REGISTER_COMMANDS(SH_REGISTER)
+#undef SH_REGISTER
+#else
     shell_cmd_base_init();
     shell_cmd_file_init();
     shell_cmd_dir_init();
@@ -120,6 +133,7 @@ int main(int argc, char **argv, KernelAPI *api)
     shell_cmd_env_init();
     shell_cmd_script_init();
     shell_cmd_filer_init();
+#endif
 
     /* メインループ開始 (ui.c) */
     shell_run(argc > 1 && str_eq(argv[1], "--kcg-unavailable")

@@ -8,6 +8,15 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "kboot_log.h"
+#if KBOOT_SHELL || KBOOT_SH
+#include "kernel/console/console_stream.h"
+
+void pm_fd1_write(const char *buf, u32 size, u8 color)
+{
+    (void)color;
+    console_stream_write(buf, size);
+}
+#endif
 
 int rshell_active;
 
