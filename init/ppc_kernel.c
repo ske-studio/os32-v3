@@ -29,9 +29,14 @@
 #include "clock_source.h"
 #include "kernel_tick.h"
 
-#if KBOOT_SHELL
+#if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
+#if KBOOT_SH
+#include "shell_boot.h"
+#include "input_boot.h"
+#else
 #include "cli_boot.h"
+#endif
 #include "exec_boot.h"
 #include "exec.h"
 extern u32 sys_mem_kb;
@@ -51,7 +56,7 @@ static struct pm_gmac_boot lan_boot;
 static volatile u32 ipi_seen;
 static unsigned char flush_a[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static unsigned char flush_b[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-#if !KBOOT_SHELL
+#if !KBOOT_SHELL && !KBOOT_SH
 static unsigned char user_gate[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 #endif
 
@@ -171,7 +176,7 @@ void ppc_kernel_main(void)
      * (mm/paging_map.inc). Its second argument is exec's trampoline page on
      * x86; milestone 2 has no exec, so a dedicated, never-executed, read-only
      * zero page stands in until exec/ provides the real one (milestone 3). */
-#if KBOOT_SHELL
+#if KBOOT_SHELL || KBOOT_SH
     /* S-B: the shared USER page is exec's KAPI trampoline, as on x86. */
     sys_mem_kb = KBOOT_MEM_KB;
     int shared_user = paging_boot_user_shared(exec_tramp_page_addr()) == 0;
@@ -278,12 +283,19 @@ void ppc_kernel_main(void)
     u32 tb_us = (u32)(delta / info->tb_hz * 1000000 + delta % info->tb_hz * 1000000 / info->tb_hz);
     kprintf(KBOOT_ATTR, "KBOOT ALIVE tick_delta=%u tb_us=%u of_calls_delta=%u\r\n",
             tick_delta, tb_us, ofw_call_count() - info->of_calls_at_detach);
-#if KBOOT_SHELL
+#if KBOOT_SHELL || KBOOT_SH
     struct boot_root_image img;
     pm_root_image(&img);
     if (pm_root_boot(&img) == 0) {
+#if KBOOT_SH
+        pm_input_boot();
+#endif
         pm_exec_boot();
+#if KBOOT_SH
+        pm_shell_boot();
+#else
         pm_cli_boot();
+#endif
     }
 #endif
     for (;;) pm_lan_poll(tb_now());
