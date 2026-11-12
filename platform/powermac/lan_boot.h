@@ -44,6 +44,10 @@ enum pln1_status {
 #define PLN1_TYPE_RSP 4
 enum { PLN1_TERM_OPEN = 5, PLN1_TERM_IN = 6,
        PLN1_TERM_OUT = 7, PLN1_TERM_STATE = 8 };
+#define PLN1_FS_OPEN 9
+#define PLN1_FS_REQ 10
+#define PLN1_FS_RSP 11
+#define PLN1_FS_FRAME_MAX 1044
 #define PLN1_HEADER_BYTES 80
 #define PLN1_ETHERTYPE 0x88b6
 #define PLN1_PAYLOAD_MAX 256
@@ -86,6 +90,13 @@ struct pm_gmac_boot {
     u32 override_flags;
 };
 struct pm_pci { u32 addr_va, data_va, bus_first, bus_last, target_bdf; };
+struct lan_header {
+    u8 boot_id[16], host_nonce[16];
+    u64 seq, drop_records, drop_bytes;
+    u32 request_id;
+    u16 opcode, status, payload_bytes, flags;
+    u8 type;
+};
 struct lan_message {
     u8 boot_id[16], host_nonce[16];
     u64 seq, drop_records, drop_bytes;
@@ -117,6 +128,9 @@ void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *flags);
 void pm_lan_log_complete(int result);
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
+int pm_lan_decode_header(const u8 *src, u32 n, struct lan_header *h);
+int pm_lan_encode_payload(u8 *dst, u32 cap, const struct lan_header *h,
+                          const u8 *payload, u32 len, u32 *used);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
 int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m);
 void pm_term_receive(const struct lan_message *, const u8 src[6]);
