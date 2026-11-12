@@ -4,6 +4,16 @@
 #include "shell.h"
 #include "config.h"
 
+#ifndef SH_DEFAULT_PATH
+#define SH_DEFAULT_PATH SYS_DEFAULT_PATH
+#endif
+#ifndef SH_DEFAULT_HOME
+#define SH_DEFAULT_HOME SYS_DEFAULT_HOME
+#endif
+#ifndef SH_DEFAULT_SHELL
+#define SH_DEFAULT_SHELL SYS_DEFAULT_SHELL
+#endif
+
 /* ======================================================================== */
 /*  環境変数テーブル                                                         */
 /* ======================================================================== */
@@ -49,9 +59,9 @@ void env_init(void)
     int i;
     for (i = 0; i < MAX_ENV_VARS; i++) env_vars[i].used = 0;
 
-    env_set("PATH",  SYS_DEFAULT_PATH);
-    env_set("HOME",  SYS_DEFAULT_HOME);
-    env_set("SHELL", SYS_DEFAULT_SHELL);
+    env_set("PATH",  SH_DEFAULT_PATH);
+    env_set("HOME",  SH_DEFAULT_HOME);
+    env_set("SHELL", SH_DEFAULT_SHELL);
     env_set("USER",  "user");
 }
 
