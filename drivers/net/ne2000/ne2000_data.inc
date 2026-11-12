@@ -22,6 +22,9 @@ static void ring_resync(u8 curr)
 }
 
 /* リングから 1 フレーム分をホストキューへ。戻り値: 1 = 進んだ, 0 = 空, -1 = 再初期化要 */
+#ifdef TICK_PROBE
+#define rx_one rx_one_impl
+#endif
 static int rx_one(u8 curr)
 {
     u8 raw[NE2K_RX_HDR_LEN];
@@ -78,6 +81,18 @@ static int rx_one(u8 curr)
     wr(NE2K_P0_BNRY, ne2k_ring_bnry_for(nic.rx_start, nic.rx_stop, nic.rx_next));
     return 1;
 }
+
+#ifdef TICK_PROBE
+#undef rx_one
+static int rx_one(u8 curr)
+{
+    struct tp_device_mark m = tick_probe_device_start();
+    unsigned int before = nic.st.rx_bytes;
+    int rc = rx_one_impl(curr);
+    tick_probe_device_end(TP_RX, m, nic.st.rx_bytes - before);
+    return rc;
+}
+#endif
 
 /* budget フレームまで回収。戻り値 -1 = 再初期化要、1 = 予算を使い切り未回収が残る、0 = 空 */
 static int rx_drain(unsigned int budget)
@@ -237,6 +252,9 @@ static void service(unsigned int budget)
 /*  公開 API                                                               */
 /* ====================================================================== */
 
+#ifdef TICK_PROBE
+#define ne2k_send ne2k_send_impl
+#endif
 int ne2k_send(const void *frame, unsigned int length)
 {
     u16 padded;
@@ -280,6 +298,17 @@ int ne2k_send(const void *frame, unsigned int length)
     ne2k_leave();
     return NE2K_OK;
 }
+
+#ifdef TICK_PROBE
+#undef ne2k_send
+int ne2k_send(const void *frame, unsigned int length)
+{
+    struct tp_device_mark m = tick_probe_device_start();
+    int rc = ne2k_send_impl(frame, length);
+    tick_probe_device_end(TP_TX, m, length);
+    return rc;
+}
+#endif
 
 int ne2k_recv(void *frame, unsigned int capacity, unsigned int *length)
 {

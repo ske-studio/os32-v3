@@ -1,6 +1,8 @@
 """A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
 CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
     covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h',
+            'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
+            'drivers/net/ne2000/ne2000_data.inc',
             'init/kernel.c', 'tools/tests/tick_probe_host.c',
             'arch/x86/kernel/isr_stub.asm', 'kernel/irq/tick.c',
             'arch/x86/arch_io.h', 'kdebug/tick_probe.c',
@@ -23,17 +25,20 @@ def main():
     begin = kernel.index('#ifdef TICK_PROBE\n    tick_probe_boot();')
     end = kernel.index('#endif', kernel.index('    tick_probe_splash(0);', begin))
     boundary = kernel[begin:end + len('#endif')] + '\n'
+    link_source = (ROOT / 'net/link.c').read_text()
+    link = link_source[link_source.index('void link_tick(void)'):link_source.index('\n}', link_source.index('void link_tick(void)')) + 2]
     with tempfile.TemporaryDirectory(prefix='tick-probe-') as td:
         work = Path(td)
-        def run(source, body):
+        def run(source, body, link_body=link):
             src = work / 'tick_probe.c'; src.write_text(source)
             inc = work / 'boundary.inc'; inc.write_text(body)
+            link_inc = work / 'link.inc'; link_inc.write_text(link_body)
             exe = work / 'probe'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall',
                 '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin',
                 '-fno-pie', '-no-pie', '-nostdlib', '-static',
                 '-I' + str(ROOT / 'kernel/time'), '-DTP_SOURCE="' + str(src) + '"',
-                '-DTP_BOUNDARY="' + str(inc) + '"',
+                '-DTP_BOUNDARY="' + str(inc) + '"', '-DTP_LINK="' + str(link_inc) + '"',
                 str(ROOT / 'tools/tests/tick_probe_host.c'), '-o', str(exe)], check=True)
             return host32.run([str(exe)], runner='qemu').returncode
         assert run(original, boundary) == 0
@@ -49,6 +54,13 @@ def main():
                 ('entry mark', '    tick_probe_splash(1);', '    tick_probe_splash(0);', True),
                 ('return mark', '    tick_probe_splash(0);', '    tick_probe_splash(1);', True),
             ]
+            assert link.count('    tick_probe_net_end(TP_NET2);') == 1
+            assert run(original, boundary, link.replace('    tick_probe_net_end(TP_NET2);', '')) == 1
+            print('RED runtime exit=1 missing TP_NET2 end', flush=True)
+            address = '(unsigned long)__builtin_return_address(0)'
+            assert original.count(address) == 1
+            assert run(original.replace(address, '0'), boundary) == 1
+            print('RED runtime exit=1 zero caller', flush=True)
             for label, old, new, boot in mutants:
                 text = boundary if boot else original
                 assert text.count(old) == 1, (label, text.count(old))

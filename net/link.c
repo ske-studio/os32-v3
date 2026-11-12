@@ -1,3 +1,6 @@
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+#endif
 /* ======================================================================== */
 /*  LINK.C — OS32 リンクプロトコル v2 (非ブロッキング)                        */
 /*                                                                          */
@@ -508,11 +511,41 @@ void link_tick(void)
 {
     if (!link_ready) return;
     /* net_tick owns the bound-NIC/reentry guards and invokes us with IF=0. */
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET1);
+#endif
     link_rx_pump();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET1);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET2);
+#endif
     link_host_deadlines();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET2);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET3);
+#endif
     link_timers();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET3);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET4);
+#endif
     link_tx_round();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET4);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET5);
+#endif
     link_notify_tick(tick_count);
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET5);
+#endif
 }
 
 /* ======================================================================== */

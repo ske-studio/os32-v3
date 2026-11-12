@@ -1,3 +1,6 @@
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+#endif
 /* Shared NIC lifetime and dispatch; NET_HOSTSVC_DESIGN §2, addenda #1/#2. */
 #include "nic.h"
 #include "nic_rx.h"
@@ -180,8 +183,18 @@ void net_tick(void)
     unsigned int flags = irq_save();
     if (bound && !ticking) {
         ticking = 1;
+#ifdef TICK_PROBE
+        tick_probe_net_start();
+        tick_probe_net_begin(TP_NET0);
+#endif
         poll_once_locked();
+#ifdef TICK_PROBE
+        tick_probe_net_end(TP_NET0);
+#endif
         link_tick();
+#ifdef TICK_PROBE
+        tick_probe_net_finish();
+#endif
         ticking = 0;
     }
     irq_restore(flags);

@@ -41,6 +41,22 @@ int tick_probe_call(void *buf, unsigned int size)
             for (unsigned int i = 0; i < TP_BINS; i++) kprintf(7, " %u", v->hist[i]);
             kprintf(7, "\n");
         }
+        cycles("net-worst", s->net[bank].total);
+        for (unsigned int i = 0; i < TP_NET_COUNT; i++)
+            cycles((const char *const[]){"demux", "rx-pump", "deadlines", "timers", "tx-round", "notify"}[i], s->net[bank].part[i]);
+        kprintf(7, "\nif0-worst-caller=0x%08x\n", (unsigned int)s->if0_caller[bank]);
+        for (unsigned int i = 0; i < TP_DEVICE_COUNT; i++)
+            for (unsigned int j = 0; j < TP_CONTEXTS; j++) {
+                const struct tp_device *d = &s->device[bank][i][j];
+                kprintf(7, "ne2k=%s context=%s count=%u ",
+                        (const char *const[]){"rx-one", "send", "dma"}[i],
+                        (const char *const[]){"foreground", "irq0", "irq5"}[j], d->full.count);
+                cycles("bytes", d->bytes);
+                cycles("full-worst", d->full.worst); cycles("full-p99", d->full.p99_upper);
+                cycles("full-total", d->full.total); cycles("pio-worst", d->pio.worst);
+                cycles("pio-p99", d->pio.p99_upper); cycles("pio-total", d->pio.total);
+                kprintf(7, "\n");
+            }
         /* Exact occupancy ratio, no TSC frequency guess or 64bit division. */
         cycles("irq0-occupancy-numerator", s->bank[bank][TP_IRQ0].total);
         cycles("occupancy-denominator", s->elapsed[bank]); kprintf(7, "\n");

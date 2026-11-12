@@ -463,6 +463,7 @@ irq_stub_common_%1:
         push    dword %1                ;; IRQ 番号 (ベクタではない)
         call    irq_dispatch
         add     esp, ABI_WORD_BYTES
+        TP_LEAVE %1
         IRQ_LEAVE
         popad
         IRETD_USER

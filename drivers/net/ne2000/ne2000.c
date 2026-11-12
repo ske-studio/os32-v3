@@ -1,3 +1,6 @@
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+#endif
 #include "tick.h"
 #include "tick_order.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
@@ -247,6 +250,9 @@ static int wait_rdc(void)
  * len が奇数でも RBCR は偶数丸め、PIO は末尾を安全に扱う。
  * RDC が期限内に立たない一過性のハズレは、リング全体を捨てる reinit ではなく
  * ここで 1 回だけ Remote DMA を再発行して吸収する (M4/L1 の堅牢性)。 */
+#ifdef TICK_PROBE
+#define dma_transfer dma_transfer_impl
+#endif
 static int dma_transfer(u16 addr, void *buf, u16 len, int write)
 {
     u16 n = (u16)((len + 1) & ~1);
@@ -260,12 +266,29 @@ static int dma_transfer(u16 addr, void *buf, u16 len, int write)
         wr(NE2K_P0_RSAR0, (u8)(addr & 0xFF));
         wr(NE2K_P0_RSAR1, (u8)(addr >> 8));
         wr(NE2K_CR, NE2K_CR_PAGE0 | (write ? NE2K_CR_RD1 : NE2K_CR_RD0) | NE2K_CR_STA); /* STA で発行 */
+#ifdef TICK_PROBE
+        tick_probe_pio_begin();
+#endif
         if (write) ne2k_pio_write(nic.cfg.data_port, buf, len);
         else ne2k_pio_read(nic.cfg.data_port, buf, len);
+#ifdef TICK_PROBE
+        tick_probe_pio_end();
+#endif
         if (wait_rdc() == NE2K_OK) return NE2K_OK;
     }
     return NE2K_ERR_TIMEOUT;
 }
+
+#ifdef TICK_PROBE
+#undef dma_transfer
+static int dma_transfer(u16 addr, void *buf, u16 len, int write)
+{
+    struct tp_device_mark m = tick_probe_device_start();
+    int rc = dma_transfer_impl(addr, buf, len, write);
+    tick_probe_device_end(TP_DMA, m, len);
+    return rc;
+}
+#endif
 
 static int dma_read(u16 addr, void *buf, u16 len)
 {
