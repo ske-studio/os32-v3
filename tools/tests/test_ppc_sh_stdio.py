@@ -32,7 +32,7 @@ int main(void) {
     api.shell_putchar = put;
     kapi = &api;
     if (printf("%s %03u", "hello", 7u) != 9) return 1;
-    if (terminal || wrong_fd || pos != 9 || memcmp(output, "hello 007", 9)) return 2;
+    if (terminal || wrong_fd || pos != 9 || strncmp(output, "hello 007", 9)) return 2;
     if (setvbuf(stdout, 0, _IOLBF, BUFSIZ) || fflush(stdout)) return 3;
     if (snprintf(buf, 5, "%s", "hello") != 5 || strcmp(buf, "hell")) return 4;
     if (sprintf(buf, "%d", -42) != 3 || strcmp(buf, "-42")) return 5;
