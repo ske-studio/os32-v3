@@ -23,8 +23,6 @@ ALLOWED_UNDEFINED = frozenset("""
 appmem_error_public
 appmem_map
 appmem_unmap
-buz_off
-buz_on
 caller_access_get
 caller_identity_get
 con_sink_read
@@ -98,13 +96,7 @@ ring3_user_range_ok
 ring3_user_ranges_writable
 shell_print_utf8
 shell_putchar
-surface_api_bundle
-surface_api_lease
-surface_api_query
-surface_api_unlease
 sys_get_mem_kb
-sys_halt
-sys_reboot
 sys_time
 tick_count
 vfs_chdir
@@ -178,7 +170,7 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 192
+    assert len(entries) == 200
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()

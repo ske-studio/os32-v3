@@ -32,6 +32,7 @@
 #if KBOOT_SHELL
 #include "root_boot.h"
 #include "cli_boot.h"
+#include "exec_boot.h"
 void pm_root_image(struct boot_root_image *out);
 #endif
 
@@ -265,7 +266,10 @@ void ppc_kernel_main(void)
 #if KBOOT_SHELL
     struct boot_root_image img;
     pm_root_image(&img);
-    if (pm_root_boot(&img) == 0) pm_cli_boot();
+    if (pm_root_boot(&img) == 0) {
+        pm_exec_boot();
+        pm_cli_boot();
+    }
 #endif
     for (;;) pm_lan_poll(tb_now());
 }

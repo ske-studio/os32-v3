@@ -51,8 +51,22 @@ KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c fs/isofs/iso9660.c \
  fs/ramfs/ramfs.c platform/powermac/root_boot.c platform/powermac/root_image.c \
  platform/powermac/console_stream.c platform/powermac/shell_putchar.c \
  platform/powermac/cli_boot.c kernel/cli/resident_cli.c
-KB_EXTRA := $(KB_OUT)/root_image_blob.o
-KB_INC_EXTRA := -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
+KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
+ arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
+ kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
+ fs/pipe_buffer.c kapi/kapi_strings.c kapi/kapi_print.c lib/kstring.c mm/paging_app.c \
+ kernel/time/clock_service.c lib/os_time.c
+KB_C := $(filter-out arch/ppc/kboot_unavailable.c,$(KB_C))
+KB_ASM += arch/ppc/exec_resume.S arch/ppc/exec_enter.S arch/ppc/setjmp.S
+KB_EXTRA := $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o
+KB_GEN := $(KB_OUT)/gen
+KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
+ -Ikapi -Idrivers -Inet -Igfx -Iexec \
+ -Idrivers/char -Idrivers/net -Idrivers/dma -Idrivers/input -Idrivers/pci \
+ -Idrivers/sound -Idrivers/video -Ifs/fat -Ifs/ext2 -Ifs/ramfs \
+ -Ifs/serialfs -Ifs/hostdrv -Ikernel/module -Ikernel/v86 -Ikernel/ime \
+ -Igfx/sync -Igfx/v2
+KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 
@@ -60,7 +74,7 @@ KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none \
  -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon -fsigned-char \
  -fno-short-enums
-KB_INC := -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
+KB_INC := $(if $(filter 1,$(KBOOT_SHELL)),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
  -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
  -Imm -Ilib $(KB_INC_EXTRA)
 KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
@@ -75,6 +89,15 @@ all: $(KB_ELF) audit
 $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)
 	python3 -B tools/gen_memmap.py --layout-header $@
+ifeq ($(KBOOT_SHELL),1)
+$(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
+	@mkdir -p $(KB_GEN)
+	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
+	@touch $@
+$(KB_OBJ): $(KB_GEN)/stamp
+$(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h
+	$(KB_CC) $(KB_FLAGS) -c $(KB_GEN)/kapi/kapi_generated.c -o $@
+endif
 # Mutation testing (tools/ppc/kboot_accept.py): compile KB_MUT_FILE in place of
 # the product source KB_MUT_SRC, into a separate KB_OUT. Never set otherwise.
 KB_MUT_SRC ?=
