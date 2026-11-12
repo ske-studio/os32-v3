@@ -16,6 +16,7 @@
 | USER アプリ 1 本 | hello を起動し出力と exit 値を観測、fault 後も復帰する | `tools/ppc/sb_run.py` | W5、S-B |
 | USER の入れ子 | USER の親から子を起動し終了して親へ戻る | `tools/ppc/sc_run.py` の N01 | W7、N01 (`nest`) |
 | USER の sh | root mount 後、kernel から sh を製品の経路で直接起動し端末で使える | `tools/ppc/sc_run.py` | W7、S-C (`KBOOT_SH=1`) |
+| 保存先の後 mount | ホスト稼働のままゲスト再起動後も保存を読め、root は書込み拒否、tmp は消える | `tools/ppc/sd_run.py` | W8、S-D (`KBOOT_SH=1`) |
 
 ## 各段で用意するもの
 
@@ -55,7 +56,10 @@ CLI を消すかは次のアーキテクチャの着手時に決める。
 
 受入の試験名は PowerPC の例であり、新アーキテクチャでは同じ条件を観測する試験を用意する。
 RAM root は起動後に元の媒体を必要としないことも確認する。
-`/tmp` は揮発性であり、永続化する媒体の後 mount は別の段で扱う。
+`/tmp` は揮発性であり、S-D で保存先 `/host` の後 mount と区別する。
+S-D は CD 切離し後の作成・追記・短い上書き・64KiB 複写・列挙と、FS 不在時の期限・端末継続・再開を確認する。
+入口は `tools/ppc/sd_run.py --cpu both --mutate`。AF_INET の無い環境は SKIP とし、実行済みとは数えない。
+境界の単体検査は T02/T03 `ppc-hostfs-io`、T04 `ppc-hostfs-server`、T01 `ppc-hostfs-wire`。
 開発用 CLI の端末と poll は platform 側に閉じ、CPU 依存を共通 CLI に持ち込まない。
 USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測する。
 製品の sh の受入では、直接起動と端末入出力に加え子の終了からの復帰を確認する。
