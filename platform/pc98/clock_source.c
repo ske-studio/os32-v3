@@ -5,8 +5,17 @@
 #include "platform_timer.h"
 #include "os32_kapi_shared.h"
 #include "../../kernel/time/ktime.h"
+#include "tick_clock.h"
 
-int platform_clock_init(u32 tick_hz) { return pit_init((unsigned int)tick_hz); }
+STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
+
+int platform_clock_init(u32 tick_hz)
+{
+    int rc = pit_init((unsigned int)tick_hz);
+    const struct pit_setup *ps = pit_get_setup();
+    if (ps->valid) (void)tick_clock_config(ps->reload, ps->clk_hz);
+    return rc;
+}
 void platform_clock_info(struct clock_info *out)
 {
     const struct pit_setup *ps = pit_get_setup();

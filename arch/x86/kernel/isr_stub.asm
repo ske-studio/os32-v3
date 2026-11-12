@@ -108,7 +108,7 @@ extern page_fault_handler
 extern timer_handler
 extern kbd_irq_handler
 extern serial_irq_handler
-extern tick_count
+extern tick_clock_step
 extern mouse_irq_handler
 extern v86_reflect_irq
 extern v86_tick_and_check_timeout
@@ -489,8 +489,9 @@ irq_stub_0:
         RESTORE_KSEG
         cld                     ;; 割り込みの入口は DF を消さない (往復 3 B3)
 
-        ;; tick_count をインクリメント
-        inc     dword [tick_count]
+        call    tick_clock_step
+        test    eax, 1          ;; TICK_STEP_JIFFY
+        jz      .phys_only
 
         ;; Cハンドラを呼び出し
         TP_BEGIN 1
@@ -521,7 +522,13 @@ irq_stub_0:
         call    v86_exit_to_kernel              ;; longjmp するので戻らない
 .no_timeout:
         TP_END 11
-
+        jmp     .done
+.phys_only:
+        TP_BEGIN 9
+        mov     al, OCW2_EOI
+        out     PIC1_CMD, al
+        TP_END 9
+.done:
         IRQ_LEAVE
         TP_LEAVE 0
         popad
