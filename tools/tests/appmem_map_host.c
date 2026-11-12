@@ -350,7 +350,9 @@ static void reject_cases(u32 owner) {
         u32 owner_saved = a.owner;
         if (variant == 4) a.owner = b.owner;
         u32 root_before = host_cr3; int if_before = _irq_enabled();
+        u32 paging_before = paging_irq_ops;
         CHECK("context rejected", map(PAGE_SIZE, base, APPMEM_MAP_EXACT, &out) == APPMEM_EINVAL);
+        if (variant < 2) CHECK("paging IRQ counted", paging_irq_ops == paging_before + 1);
         CHECK("reject IF CR3 unchanged", host_cr3 == root_before && _irq_enabled() == if_before);
         a.owner = owner_saved; kctx_irq_depth = kctx_exc_depth = 0; host_cr3 = roots[0]; _enable();
         CHECK("context no allocation", !calls && out == 0x12345678);

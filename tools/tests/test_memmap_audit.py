@@ -88,8 +88,10 @@ MUTANTS = [
  ('audit-no-mark', 'kernel/kaudit.c', '    if (bad && !audit_fail) {', '    if (0) {', 'FAIL audit_first_fail_tag[0]'),
  ('audit-every-failure', 'kernel/kaudit.c', '    if (bad && !audit_fail) {', '    if (bad) {', 'FAIL serial_len == first_len'),
 
- ('lease-scan-duplicate', 'exec/lease.c', '    for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {', '    for (u32 repeat = 0; repeat < 2; repeat++)\n    for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {', 'FAIL scan_max[0] == PTE_COUNT'),
- ('AS-IRQ-unbounded', 'exec/lease.c', '        irq_restore(flags);\n    }\n    /* Alias/descriptor', '        (void)flags;\n    }\n    /* Alias/descriptor', 'FAIL scan_max[0] == PTE_COUNT'),
+ ('lease-scan-duplicate', 'exec/lease.c', '    for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {', '    for (u32 repeat = 0; repeat < 2; repeat++)\n    for (u32 di = 0; di < MEM_LEASE_ALLOC_PDES; di++) {', 'FAIL lease_scan_total == 2 * MEM_LEASE_ALLOC_PDES * PTE_COUNT'),
+ ('AS-IRQ-disabled', 'exec/lease.c', '        cr3 = paging_current_cr3();', '        flags = irq_save(); cr3 = paging_current_cr3();', 'FAIL audit_if_seen[0] && audit_if_seen[1]'),
+ ('paging-ops-unchecked', 'exec/lease.c', '    if (paging_ops != paging_irq_ops || ledger_ops != ledger_irq_ops) bad++;', '    (void)paging_ops; (void)ledger_ops;', 'FAIL lease_audit_all() > 0'),
+ ('paging-irq-uncounted', 'mm/paging.c', '    if (kctx_irq_depth || kctx_exc_depth) { paging_irq_ops++; return 0; }', '    if (kctx_irq_depth || kctx_exc_depth) { return 0; }', 'FAIL paging_irq_ops == paging_before + 1'),
  ('v86-client-revoke', 'gfx/gfx_core.c', '    gfx_reinit_surface_roles(0, 1);', '    gfx_reinit_surface_roles(0, 0);', 'FAIL client->gen == cref.generation && client->lease_count == 1'),
  ('tvram-unready', 'exec/system_surface.c', '!(gfx_surface_unready & (1U << (sf - ledger_surfaces)))', '1', 'FAIL !system_surface_source(LEDGER_ROLE_TVRAM, &tvsrc) && !tvsrc.ready'),
  ('aperture-user', 'mm/paging.c', '    if (entry & PTE_USER) return 0;', '', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
@@ -130,9 +132,15 @@ def stage(tmp, sources, changes=()):
         s = path.read_text()
         body = function(s, name)
         assert old in body, (name, old)
-        kind = 1 if name == 'ledger_selfcheck' else 0
+        kind = 1 if name == 'ledger_selfcheck' else 4 if name == 'lease_check' else 0
         instrumented = body.replace(old, f'        host_scan({kind});\n'+old)
         path.write_text('extern void host_scan(int);\n' + s.replace(body, instrumented))
+    for filename, name, kind in (('lease.c', 'lease_check', 2), ('paging_host_source.c', 'paging_as_audit', 3)):
+        path = tmp/filename
+        s = path.read_text()
+        body = function(s, name)
+        pos = body.index('{') + 1
+        path.write_text(s.replace(body, body[:pos] + f'\n    host_scan({kind});' + body[pos:]))
     path = tmp/'paging_host_source.c'
     s = path.read_text()
     body = function(s, 'paging_map_phys')

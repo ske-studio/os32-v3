@@ -39,6 +39,7 @@
 /* ======================================================================== */
 
 #include "paging.h"
+#include "paging_app.h"
 
 #include "io.h"
 #include "legacy_lowmap.h"
@@ -62,6 +63,7 @@ static u32 native_cache_bits(u32 a)
     return 0;
 }
 
+u32 paging_irq_ops;
 u32 paging_sqlite_stack_guard;
 
 /* カーネルスタック帯のレイアウト不変条件。

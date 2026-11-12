@@ -3,6 +3,8 @@
 #define PAGING_APP_H
 #include "paging.h"
 
+extern u32 paging_irq_ops;
+
 /* Stack-local, never embedded in AS/AppSlot. PFNs of staged data live in NP PTEs. */
 struct paging_app_stage {
     u32 pending[MEM_APP_BAND_MAX_PDES];
