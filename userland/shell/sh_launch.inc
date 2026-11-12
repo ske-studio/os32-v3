@@ -29,7 +29,9 @@
  * **票 TASK_EXIT_STATUS R1b で走査が止まる形になった** ので、同じ行が候補の
  * 数だけ出ることはもう無い。それでも `exec` / `if` / スクリプトから何度も
  * 来たときに同じ理由を並べないよう、印は残してある。 */
+#ifndef SH_LAUNCH_SYNC
 static int sh_launch_nogui = 0;
+#endif
 
 /* B4: パイプの段を回している間だけ立つ入れ子カウンタ。execute_command の
  * パイプライン経路が段ループの前後で増減させる (source / exec 経由の入れ子
@@ -51,6 +53,7 @@ static int sh_redirect_active = 0;
 void sh_redirect_mark(void)  { sh_redirect_active = 1; }
 void sh_redirect_clear(void) { sh_redirect_active = 0; }
 
+#ifndef SH_LAUNCH_SYNC
 static void sh_launch_name(const char *cmdline, char *out, int max)
 {
     int i = 0;
@@ -60,6 +63,8 @@ static void sh_launch_name(const char *cmdline, char *out, int max)
     }
     out[i] = '\0';
 }
+
+#endif
 
 /* ------------------------------------------------------------------------ */
 /*  sh_exec_result (sh.bin) — 票 TASK_EXIT_STATUS §2-2                       */
@@ -73,15 +78,20 @@ static void sh_launch_name(const char *cmdline, char *out, int max)
 /*  「起こせなかった」= NOMEM 相当 で、**走査を止める** (R1b)。               */
 /* ------------------------------------------------------------------------ */
 static int sh_launch_kind = EXEC_KIND_NONE;
+#ifdef SH_LAUNCH_SYNC
+static int sh_launch_code;
+#endif
 
 int sh_launch(const char *cmdline)
 {
+    #ifndef SH_LAUNCH_SYNC
     char name[SH_LAUNCH_NAME_MAX];
     /* token / status は KAPI の i32 (= long)。int で受けると -Wincompatible-
      * pointer-types になるので型をそろえ、印字のときだけ int へ落とす。 */
     i32 token, st, rc;
 
     sh_launch_name(cmdline, name, SH_LAUNCH_NAME_MAX);
+    #endif
 
     /* T11: カーネルの要求表が受け取るのは NUL 終端 1〜LAUNCH_CMDLINE_MAX-1
      * バイトだけ (exec/launch.c の len 検査)。超えたまま launch_req を呼ぶと
@@ -119,6 +129,9 @@ int sh_launch(const char *cmdline)
         return EXEC_ERR_GENERAL;
     }
 
+#ifdef SH_LAUNCH_SYNC
+    return EXEC_SUCCESS; /* 拒否を通過。同期起動は sh_exec_result が行う。 */
+#else
     token = g_api->launch_req(cmdline);
     if (token <= 0) {
         if (token == OS32_ERR_INVAL) {
@@ -183,6 +196,7 @@ int sh_launch(const char *cmdline)
         }
         /* PENDING / TAKEN / RUNNING: まだ終わっていない */
     }
+#endif
 }
 
 /* sh_launch の**後ろ**に置く: tools/tests/sh_launch_host.c はこの .inc だけを
@@ -192,8 +206,19 @@ int sh_exec_result(const char *cmdline, int *kind, int *code)
     int rc;
 
     sh_launch_kind = EXEC_KIND_NONE;
+#ifdef SH_LAUNCH_SYNC
+    sh_launch_code = 0;
+#endif
     rc = sh_launch(cmdline);
+#ifdef SH_LAUNCH_SYNC
+    if (sh_launch_kind == EXEC_KIND_NONE && rc == EXEC_SUCCESS)
+        rc = sh_exec_sync_result(cmdline, &sh_launch_kind, &sh_launch_code);
+#endif
     if (kind) *kind = sh_launch_kind;
+#ifdef SH_LAUNCH_SYNC
+    if (code) *code = sh_launch_code;
+#else
     if (code) *code = 0;
+#endif
     return rc;
 }
