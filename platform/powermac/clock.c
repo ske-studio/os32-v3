@@ -44,7 +44,7 @@ void pm_clock_bind(const struct pm_kboot_info *info)
     bound_hz = info ? info->tb_hz : 0;
 }
 
-u32 pm_tick_hz(void) { return 1000; }
+u32 pm_tick_hz(void) { return 100; }
 
 int platform_clock_init(u32 tick_hz)
 {

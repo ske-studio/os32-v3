@@ -23,7 +23,7 @@ void fixture_main(void)
     f2_delta=delta; f2_ticks=elapsed; f2_hz=info.counter_hz;
     /* 2s is bounded below 2^32 TB counts at F1's maximum 1GHz. */
     unsigned long long scaled=(unsigned long long)elapsed*info.counter_hz;
-    unsigned long long expected=(unsigned long long)delta*1000;
+    unsigned long long expected=(unsigned long long)delta*100;
     if (scaled<expected*95/100 || scaled>expected*105/100) rate_fail();
     u32 lo=0, hi=0;
     if (platform_clock_read_us(&lo,&hi) || hi || lo<2000000) bad();

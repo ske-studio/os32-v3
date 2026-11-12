@@ -15,7 +15,7 @@ enum ppc_trap_reason {
 };
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
 /* Boot CPU, EE=0. Success arms DEC before the caller may enable EE.
- * tick_hz must be 1000 (1ms); failure leaves existing clock untouched. */
+ * tick_hz must be 100 (10ms); failure leaves existing clock untouched. */
 int ppc_dec_start(u32 tb_hz, u32 tick_hz);
 void ppc_decrementer_interrupt(struct ppc_frame *frame);
 void arch_cpu_idle(void) __attribute__((noreturn));
