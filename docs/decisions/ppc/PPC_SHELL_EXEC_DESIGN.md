@@ -325,7 +325,7 @@ make ARCH=ppc PLATFORM=powermac hello
 |B26|PPC `app.ld`：USER 配置|B04・B25|不変|
 |B27|`sdk/link_guard.py`：PPC USER 検証接続|B05・B26|共・不変|
 |B28|PPC target build：USER 入口・libgcc 非リンク|B06・B27|不変|
-|B29|PPC clock provider：共通 tick 単位|統合前必須|不変|
+|B29|PPC clock provider：共通 tick 単位 (論理 10ms、DEC は物理 1kHz)|統合前必須|不変|
 |B30|PPC exec 初期化 TU：既存サービス初期化の接続|B18・B22・B24・F15|不変|
 |B31|`build/ppc-kboot.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
 |B32|resident CLI の `.h/.c`＋`cli_boot.c`：run callback|S-A・B31|共・不変|
@@ -388,7 +388,7 @@ S-B の受入は QEMU 7450・7455 で到達 (tools/ppc/sb_run.py、LAN 端末か
 - **B21 はやめた**: USER の番地の copy は共通の exec/redir_access.c (ページ表で引いた PA を P2V で写す) をそのまま使う。PPC の copy の backend は作らない。
 - **B03**: target の判定の口は `arch/<arch>/arch_exec_image.h` の `arch_exec_image_accept(flags)` (`exec_arch.h` は既存の include/exec_arch.h と名前がぶつかるのでやめた)。x86 は関数形式の macro (static inline だと GCC の局所記号の名前が変わり os32x_hdr.o が変わる)。
 - **B04**: ELF の識別 (CLASS=1・DATA=2・machine=20) の照合は `--target ppc-powermac` のときだけ。x86 は B04 前と同じ (CLASS=1・DATA=1、machine は不問)。
-- **B29**: PowerMac の tick は共通の単位 10ms (100Hz)。KAPI の tick_count と exec の閉包がこの単位で書かれている。細かい時間は timebase。起動の時計の検査は 3 tick の間隔 (1ms の検査はシェル像で境目の読み違いにより揺らいだ)。
+- **B29**: PowerMac の tick_count は共通の単位 10ms (論理 100Hz)。KAPI の tick_count と exec の閉包がこの単位で書かれている。DEC は物理 1kHz で、論理 tick は共通の `tick_clock_step` が作る (2026-11-12 のユーザー決定、[TICK_ARCH_DESIGN](../time/TICK_ARCH_DESIGN.md) §4)。細かい時間は timebase。起動の時計の検査は論理 3 tick の間隔に、raw と TB の照合 (`dec_rate`) を加える。
 - **F14・B31 の KAPI の振り分け**: `sdk/kapi_target_ppc.py` の群で、PowerMac の像に無い provider の slot を型付きの不在 (取得 0・照会 0・操作 OS32_ERR_NOSYS・void は何もしない) にする。B31 の link で sys (buz_on/off・sys_reboot/halt) と surface (query/lease/unlease) の 8 slot を足した。kernel/sys.c・exec/surface_query.c は共通のソースのまま link し、--gc-sections で PC-98 の参照が落ちる。
 - **B31 の link**: 共通の部品 (input_service・kbd_inject・con_sink・pipe_buffer・fd_redirect・kapi_strings・kapi_print・kstring・paging_app・clock_service・os_time・sys) は facade を作らずそのまま link。シェル像だけ arch/ppc/kboot_unavailable.c を外す (exec の本物と重なる)。今の像 (KBOOT_SHELL なし) は sha256 不変。resident は 716KiB (§10 の暫定 +64〜192KiB の範囲)、予約の残り 1800KiB。
 - **B30**: PowerMac の exec の初期化 `pm_exec_boot` (platform/powermac/exec_boot.c) は fd_redirect → pipe_buffer → exec_init。シェル像の USER 共有ページは exec のトランポリン (x86 と同じ、memory_boot の直後)、sys_mem_kb は 16MB。**常駐 CLI が親 (ID 1) を占めるので exec_nest_level = 1** (B35 の実行で見つかった。0 のままだと子をシェルの番地に読み込もうとする)。

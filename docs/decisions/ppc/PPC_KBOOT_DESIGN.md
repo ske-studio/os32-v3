@@ -88,7 +88,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |E2 MPIC駆動|E1/D2、mask/priority/IACK/EOI|platform/powermac/mpic.c ＋190、mpic.h ＋55|P|
 |E3 IRQ adapter|E2、本線bitmap着後なら接続|platform/powermac/irq.c ＋95、platform_irq_limits.h Δ8|P|
 |F1 時計provider|B1、TB読み・周波数・us|platform/powermac/clock.c ＋110、kboot_info.h Δ5|P|
-|F2 DEC|F1/D2、1000Hz再装填とtick|arch/ppc/kernel_dec.c ＋85、ppc_trap.h Δ8|P|
+|F2 DEC|F1/D2、1000Hz再装填と tick_clock_step (論理 100Hz の tick)|arch/ppc/kernel_dec.c ＋85、ppc_trap.h Δ8|P|
 |G1 log|独立、bounded ESCC＋後続sink|platform/powermac/log.c ＋110、kboot_log.h ＋25|P|
 |G2 console provider|G1、console TUを除外し直接互換口を提供|platform/powermac/kboot_console.c ＋120|P|
 |H1 非対応provider|D3/E3/G2、閉包の未解決のみ分類・専用providerで充足|arch/ppc/kboot_unavailable.c ＋120、arch_exec_storage.h ＋25、arch_io.h Δ8|P|
@@ -171,7 +171,8 @@ struct arch_syscall view = { .native = frame }; /* nativeはPPC入口だけが�
 void platform_boot_irq_controller(void);
 int platform_irq_claim(unsigned native_token, struct irq_claim *out);
 void platform_irq_complete(const struct irq_claim *claim);
-u32 pm_tick_hz(void); /* 1000。共通initにPIT_HZを書かない */
+#define PM_DEC_HZ 1000u /* 物理 DEC の Hz */
+u32 pm_tick_hz(void); /* PM_DEC_HZ。共通は OS32_TICK_HZ (論理 100Hz) と tick_clock の口を使い、PIT_HZ を書かない */
 int platform_clock_init(u32 tick_hz);
 void ppc_decrementer_interrupt(struct ppc_frame *f);
 /* console/log：同期sink。LANは後段でenqueue-only sinkとして追加する */
@@ -186,7 +187,7 @@ void pm_log_write(const char *bytes, u32 n);
 - 配送試験はMPIC IPI0をIPI(0,0)へ宛先CPU0のbit 0を書き、CPU0自身へ2回送る専用probe（SMPを実装する意味ではない）。異なるvectorを予約し、0x500/frame/EOI/再配送を実測。IPI経路はE2内、普通のsource bitmapへ偽の線番号を足さない。QEMUでIPI未対応ならMPIC内蔵timerによる配送試験へ変更し、readbackのみで合格に格下げしない（PM）。
 - 本線bitmap未着時はE2の0x500専用dispatchで②を閉じる。共通irq.cを改造して並行実装しない。本線着後E3はIACK済tokenを既存claim形へ渡し、line=sourceで登録。32以上のsourceは本線bitmap受入が前提、段Pの装置IRQは②後。
 - F1はCPU timebase-frequency検証、TB上/下/上retry、起点差からu64 us変換。必要な整数除算helperはPPC libgccの必要symbolだけlink監査（FP命令無し）。ready前readは失敗して出力未変更。`kernel/time/ktime.c`のclampを維持。
-- F2はperiod=TB_HZ/1000、余りはfraction accumulatorで配る。負DECへ次periodを加え正へ戻して再装填、経過period数をtick_countへ加算。②には待機サービスが無いが後段でもtick単位を1msに固定。EE前にready/初回DECを設定、IRQ内で通常ログを出さない。
+- F2はperiod=TB_HZ/1000、余りはfraction accumulatorで配る。負DECへ次periodを加え正へ戻して再装填、経過period数だけ共通の `tick_clock_step` を呼び、論理 tick (tick_count、10ms) は step が 10 period ごとに進める ([TICK_ARCH_DESIGN](../time/TICK_ARCH_DESIGN.md))。内部と公開の tick 単位は 10ms、割り込みは物理 1kHz。EE前にready/初回DECを設定、IRQ内で通常ログを出さない。
 - busy idleはEE=1のbranch loop。`_idle`はenableしてbusy loopへ入るのでwake eventを消費するsleep窓無し、`_halt`は割込み状態を保つ軽い待ち、`_stop`はEE=0で停止。省電力は後段。
 - G2はkboot profileから既存consoleのTUを選ばず、console_write/shell_printを直接提供する暫定stream provider。既存 `lib/kprintf.c:283–306` のnative va_list経路→互換口→pm_log_write→ESCCを接続する。画面座標APIはcapability無し、UTF-8はbyte列、属性は無視。分離5 C1〜C3/Zの着地後に正式providerへ差し替え、両providerを同時選択しない。第5段のcon_backend/gate分離を重ねて作らない。
 - sinkはstatic所有・初期化時登録、最大2、早期ESCC＋後段LAN queue。bounded poll、失敗/drop数を保持、LANの接続待ちをkprintf/IRQで行わない。fatal時はregistry/heapを使わずESCC PAへ最小hex dump。既存GUI `con_sink` は別の画面record APIなので転用しない。
@@ -238,12 +239,12 @@ void pm_log_write(const char *bytes, u32 n);
 ## 10. 危険・未確認・PM推奨
 |区分|残る危険と扱い|
 |---|---|
-|QEMUで判定する|OF大きいELF load、固定窓available、IPI実装、HPT/flush再miss、stack/frame、1000Hz継続、selected未解決一覧。初回H3のmapとT3ログが出るまで成功を断言しない|
+|QEMUで判定する|OF大きいELF load、固定窓available、IPI実装、HPT/flush再miss、stack/frame、DEC 1000Hz と論理 tick 100Hz の継続 (QMP は論理の rate、起動の `dec_rate` は raw と TB の照合)、selected未解決一覧。初回H3のmapとT3ログが出るまで成功を断言しない|
 |QEMUでも保証しない|cache/WIMG/orderingの実機時間、HPT更新競合・745x errata、実clock精度。host列＋メーカー条件を併用し、QEMU成功から安全性を外挿しない| realデータアクセスのWIMG=0011はcache有効（PEM本文12910–12914、7450UM本文13357）。G4のESCC・MPIC IACK/EOIはframe完成後DR=1・aperture I/G必須で、QEMU通過だけではこの条件を保証しない。
 |G4実機で後追い|QuickSilverのPVR/OF tree、RAM穴、ESCC配線/電源、MPIC窓とsense、OF virtual address、DMA/cache。G4の確認を②の条件に追加しない|
 |資料不足|SysV/EABI全仕様、IEEE1275本体、QuickSilver Developer Note、UM Rev5/errataは未入手。整数kernelのコンパイラABIを一致させ、USER/module ABIは③へ残す|
 |最短経路の制限|16MiB管理・画面無し・root無し・USER未準備をログとprofile名に明示。既存PC98の全services-readyと同一だと報告しない|
-|③前の負債：tick単位|共通PIT_HZ=100（memmap.h:437、bootlog.h:72、kbd.c/iso9660.h/fdc.h）と1kHz DECの整合は③前に解消。H3で閉包内にPIT_HZ利用者が無いことを推移的header依存・生成物も含め監査し、あれば②は未受入とする|
+|tick単位|DEC は物理 1kHz、tick_count は共通の `tick_clock_step` が作る論理 100Hz (10ms) で、共通の tick 単位と一致する ([TICK_ARCH_DESIGN](../time/TICK_ARCH_DESIGN.md))。PIT_HZ は PC-98 の名前なので、H3 で閉包内に PIT_HZ 利用者が無いことを推移的header依存・生成物も含め監査し、あれば②は未受入とする。共通のコードは OS32_TICK_HZ を使う|
 - ユーザー判断が必要な未決：**0件**。②定義、案D、整数のみ、LAN優先は既決。新たな承認質問を増やさない。
 - PM推奨：core-ready境界／16MiB限定／busy idle／OF FB後段／新受入台本を採用。QEMU IPI不可時の内蔵timer probe、容量超過時の配置修正は観測後PMが処理する。
 - ②合格直後はGMAC→Host Services LAN log/遠隔操作、必要なPCI段Pをその前提に置く。今回のsinkはenqueueを追加できる契約に留め、画面や他装置を先行させない。

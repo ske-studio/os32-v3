@@ -1,5 +1,5 @@
 > 出所: ~/os32-tmp/run/tick-b/DESIGN.final.md (2026-11-09、Claude 起草・codex astra の 3 回のレビュー)。
-> 状態: **現行 (2026-11-09)** — 1kHz tick の段 A2・B と winmm のタイマの確定設計 (TICK_1KHZ_DESIGN の続き)。段の状態は票 TASK_TICK_1KHZ が持つ。
+> 状態: **現行 (2026-11-09)** — 1kHz tick の段 A2・B と winmm のタイマの確定設計 (TICK_1KHZ_DESIGN の続き)。段の状態は票 TASK_TICK_1KHZ が持つ。 tick_clock の口と段の順は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) (2026-11-12) が本稿より優先。
 
 # tick-b r3: 1kHz tick の次の段 (A2・B) と winmm のタイマ
 
@@ -16,7 +16,7 @@
 - P1-予算の開始: 予算の開始は `tick_dispatch` の 1 か所だけ (slot2〜4 で共有)。IRQ5 と foreground では掛けない (§2-3)。
 - P1-最低進捗: 予算を越えて進めてよいのは 1 ジフィに 1 単位まで (全 slot で共有)。RX は予算の前半、TX は全体まで使う。保証の 1 単位は RX と TX がジフィの偶奇で交代する。合否は slot2〜4 の合計で 200µs を判定する (§2-3・§6)。
 - P1-異常復旧: RDC 待ち 4ms・reset 待ち 20ms を含む NE2K の重い所は協調処理に移す (U4 = b)。故障の注入を受入に加える (§2-4・§6)。
-- P1-B4 単独: 未 config の step は旧動作 (毎 IRQ でジフィ +1) にする。B3・B4・B7・B8 は 1 つの統合の枝で一緒に入れる (§3-2・§5)。
+- P1-B4 単独: 未 config の step は旧動作 (毎 IRQ でジフィ +1) にする。tick_clock の段 C1・C2 は 1 つの統合の枝で一緒に入れる (§3-2・§5)。
 - P1-U4: (b) を採る。契約は緩めない (§2-4)。
 - P2-R6: 「ワンショット自体が不可能」を「固定周期・補間時計との併用が不可」に限定した (R6)。
 - P2-fast_fn: U3 はユーザー決定 (b)。fast_fn は照合と通知だけに限る。所有者・解除・周回比較・V86 中の挙動・負荷試験を定めた (§3-5)。
@@ -108,33 +108,35 @@ int net_tx(const void *frame, u32 len);  /* irq_restore の後、kctx_irq_depth=
 | 名前 | 中身 | 使ってよい所 |
 |---|---|---|
 | **ジフィ** | `tick_count`・`get_tick`・`PIT_HZ`=`OS32_TICK_HZ`=100・`TICK_MS`=10 | 既存のすべて。新しいコードの期限も原則これ |
-| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` | tick.c・pit*.c・recover_profile.c・kselftest だけ。時刻として数えない |
+| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` (x86)・`PM_DEC_HZ` (PowerPC) | tick.c・pit*.c・clock_source.c・recover_profile.c・kselftest、PowerPC の `kernel_dec.c`・`platform/powermac/clock.c`・`init/ppc_kernel.c` の起動の照合だけ。時刻として数えない |
 | ms 時計 | `tick_clock_ms()`、u32 | 入力の時刻印・合成器の期限 |
 | µs 時計 | `sys_time_now` (公開) | 互換層・計測・WM の再開の印 |
-### 3-2. 状態と関数 (kernel/time/tick.c、新しい tick_clock.h)
+### 3-2. 状態と関数 (両 arch 共通の kernel/time/tick.c、新しい kernel/time/tick_clock.h)
+口・検査・呼び手は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2 が正。物理の周期は num/den 秒で受ける。
 ```c
 #define TICK_STEP_JIFFY 1u
-void tick_clock_config(u32 reload, u32 clk_hz); /* pit_init の後に 1 回、IF=0 */
+int  tick_clock_config(u32 period_num, u32 period_den); /* 物理の時計を設定する側が起動中に、IF=0/EE=0。x86 は reload/clk_hz、PowerPC は 1/PM_DEC_HZ */
 u32  tick_clock_step(void);   /* ASM から毎 IRQ、IF=0。bit0 = ジフィが進んだ */
 void tick_clock_raw(u32 *lo, u32 *hi);          /* IF=0 の呼び手だけ */
 u32  tick_clock_ms(void);
 void tick_clock_jiffy64(u32 *lo, u32 *hi);      /* 周回しないジフィ (PCM の fallback 用) */
-volatile u32 tick_count; static u32 tick_hi, raw_lo, raw_hi, jif_phase, ms_phase, ms_now, step_jif, step_ms, clk;
+volatile u32 tick_count; static u32 tick_hi, raw_lo, raw_hi, jif_phase, ms_phase, ms_now, step_jif, step_ms, clk; /* clk = period_den、step_jif = num*OS32_TICK_HZ、step_ms = num*1000 */
 /* step: if (!clk) { if (!++tick_count) ++tick_hi; return 1; }    ← 未 config は旧動作 (P1-B4)
  *       if (!++raw_lo) ++raw_hi;
  *       ms_phase += step_ms;  while (ms_phase >= clk) { ms_phase -= clk; ++ms_now; }
  *       jif_phase += step_jif; if (jif_phase >= clk) { jif_phase -= clk; if (!++tick_count) ++tick_hi; r = 1; }
  *       if (fast_fn) fast_fn(ms_now);  return r;   (step_ms = reload*1000 ≤ 24576000 で溢れない) */
 ```
-- ISR (`isr_stub.asm:493`): `inc` を `call tick_clock_step; test eax,1; jz .phys_only` に置き換える。ジフィの回は今の順 (timer_handler → EOI → V86_REFLECT → timeout) のまま。`.phys_only` は EOI だけを出して `.leave` へ。
-- `pit_math.c:49` は 100 と 1000 を受け、reload は最近接 `(clk + hz/2)/hz`。`kernel_boot_cpu.inc:55` は `platform_clock_init(PIT_IRQ_HZ)` の後に `tick_clock_config` を呼ぶ。
-- 有効化の単位: B3 (tick.c)・B4 (ISR)・B7 (clock_source)・B8 (boot) は 1 本の統合の枝で一緒に入れる。途中の像でも、未 config の分岐と旧 tick_count の読み出しが両立するので起動する。
+- x86 の ISR (`isr_stub.asm:493`): `inc` を `call tick_clock_step; test eax,1; jz .phys_only` に置き換える。ジフィの回は今の順 (timer_handler → EOI → V86_REFLECT → timeout) のまま。`.phys_only` は EOI だけを出して `.leave` へ。
+- PowerPC の DEC (`arch/ppc/kernel_dec.c:56-61`): 経過周期の loop で `if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();` ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2-2)。
+- `pit_math.c:49` は 100 と 1000 を受け、reload は最近接 `(clk + hz/2)/hz`。`kernel_boot_cpu.inc:55` は `platform_clock_init(PIT_IRQ_HZ)` を呼ぶ。`tick_clock_config` は物理の時計を設定する側が呼ぶ: x86 は `platform/pc98/clock_source.c` の `platform_clock_init`、PowerPC は `ppc_dec_start`。
+- 有効化の単位: 段 C1 (tick_clock.h・tick.c)・C2 (ISR・clock_source) は 1 本の統合の枝で一緒に入れる ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5-1)。途中の像でも、未 config の分岐と旧 tick_count の読み出しが両立するので起動する。
 ### 3-3. µs 時計と PCM の fallback
 ```c
 void time_us_from64(u32 raw_lo, u32 raw_hi, unsigned count, unsigned reload, u32 clk_hz, u32 *lo, u32 *hi);
 /* cycles = raw*reload + (reload - count); us = cycles/clk*1e6 + (cycles%clk)*1e6/clk */
 ```
-- `clock_source.c:37` は `tick_clock_raw` を読む。pending の加算は 64bit にする。period_us は表示だけに使う。
+- x86 の `clock_source.c:37` は `tick_clock_raw` を読む (B7')。PowerPC の µs 時計は TB のまま (`platform/powermac/clock.c:72-84`)。pending の加算は 64bit にする。period_us は表示だけに使う。
 - PCM: `pcm_cs4231.c:187` の `tick_count * PCM_US_PER_TICK` を `tick_clock_jiffy64` × 10000 にする (497 日で戻らない)。`tools/prototypes/pcm_imports.def` に import を足し、生成器で追従させる。
 ### 3-4. 100Hz 前提の利用者 (T1K §5 + R5)
 | 所 | 処置 |
@@ -216,20 +218,19 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 | A2-c7 | net/link.c (`LINK_IDLE`) | 変 | +2 | c2 |
 | A2-c8 | net/nic.c (`net_tx` の後の idle_work_run) | 変 | +2 | c2 |
 | A2-t1〜t2 | tools/tests/tick_budget_host.c・ne2k_bh_host.c (故障注入) | 新 | 130・150 | b2・c4 |
-| B1 | include/memmap.h (`#ifndef PIT_IRQ_HZ` → 100) + sdk の assert | 変 | +8 | 先 |
-| B2〜B3 | kernel/time/tick_clock.h・tick.c | 新・変 | 35・+80 | B1 |
-| B4 | arch/x86/kernel/isr_stub.asm | 変 | +12 | B3 (同じ枝) |
+| C1〜C3 | tick_clock の口・x86 の 100Hz の結線・host 試験 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5-1) | 新・変 | — | 先 |
+| B1 | include/memmap.h (`#ifndef PIT_IRQ_HZ` → 100)。`OS32_TICK_HZ` と assert は C1・C2 | 変 | +3 | C2 |
 | B5 | platform/pc98/pit_math.c + `test_pit_clock.py:52-56` のアンカー | 変 | +15・+6 | B1 |
-| B6 | platform/pc98/pit_time.c・.h + 変更する式を参照する全アンカー (`test_time_math.py:53-63`・`:70-77` ほか)・fixture・期待値・tdd (time_math_host.c・pit_clock_host.c・dep_dir_b_timer_host.c・recover_t2_host.inc・splash_probe_host.c・time_math_tdd.md・pit_clock_tdd.md)。旧式のアンカーが 0 件で、全変異が実行時に RED になることを確かめる | 変 | +35・+40 | B2 |
-| B7〜B8 | platform/pc98/clock_source.c・init/kernel_boot_cpu.inc | 変 | +10・+3 | B3 (同じ枝) |
+| B6 | platform/pc98/pit_time.c・.h + 変更する式を参照する全アンカー (`test_time_math.py:53-63`・`:70-77` ほか)・fixture・期待値・tdd (time_math_host.c・pit_clock_host.c・dep_dir_b_timer_host.c・recover_t2_host.inc・splash_probe_host.c・time_math_tdd.md・pit_clock_tdd.md)。旧式のアンカーが 0 件で、全変異が実行時に RED になることを確かめる | 変 | +35・+40 | C1 |
+| B7' | platform/pc98/clock_source.c (`tick_clock_raw` を読む・64bit の pending) | 変 | +6 | B6 (同じ枝) |
 | B9〜B10 | kdebug/recover_profile.c・kselftest/pit_setup.inc | 変 | +40・+15 | B5 |
 | B11 | rshell.c・hello/main.c | 変 | +8・+2 | 独立 |
-| B12 | tools/tests/tick_clock_host.c・test_tick_clock.py | 新 | 240・160 | B3・B6 |
+| B12 | 1kHz の結線の試験 (EOI 全 IRQ、V86 反射・timeout はジフィだけ)。純関数の試験は C3 | 新 | 80 | B6 |
 | B13 | 注記 4 件 + session.rs:41 | 変 | +5 | 独立 |
-| B15〜B16 | drivers/sound/cs4231/pcm_cs4231.c・tools/prototypes/pcm_imports.def | 変 | +3・+2 | B3 |
+| B15〜B16 | drivers/sound/cs4231/pcm_cs4231.c・tools/prototypes/pcm_imports.def | 変 | +3・+2 | C1 |
 | B17 | build/select.mk (`TICK1K=1` で -DPIT_IRQ_HZ=1000 の試験像を build/out/tick1k/ に)。独自の C の recipe を持つなら profile の旗と `\| $(ABI_CONTRACT_ORDER)`、受入に `check-type-contract` (末尾の追記) | 変 | +10 | B1 |
 | B14 | include/memmap.h の既定 100→1000 | 変 | 1 | B17 の像で全受入の後、PM |
-| S1 | drivers/sound/snd_wake_tick.c (§3-5) | 新 | 50 | B3、hal-av の V0 |
+| S1 | drivers/sound/snd_wake_tick.c (§3-5) | 新 | 50 | C1、hal-av の V0 |
 | G1〜G2 | userland/gshell/src/poll_clock.rs・multiapp.rs | 新・変 | 25・+4 | 独立 |
 | W1〜W4 | userland/lib/mmtime/mmtime.h・mmtime_clock.c・mmtime_event.c・mmtime_sleep.c | 新 | 50・70・170・45 | W1 が先 |
 | W5〜W7 | build/libs.mk・sdk.mk / tools/tests/mmtime_host.c・test_mmtime.py / userland/diag/mmtimetest.c。libmmtime・mmtimetest の規則は profile の旗と `\| $(ABI_CONTRACT_ORDER)`、W5 の受入に `check-type-contract` (末尾の追記) | 変・新 | 12 / 260・150 / 120 | W2〜W4 |
@@ -263,7 +264,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 | kill・再利用 | host: 追いつきの途中で自分を kill すると止まる / ONESHOT のコールバックの中で set すると新しい ID になり、この配りでは呼ばない / 再入 0 / hold>0 で 0 | 確かめ直しを消す / born_pass を消す |
 | 大きさ | CI の `make all`・`make fd144` | — |
 
-段の順: A2-a → 測る (PM) → A2-b・A2-c → A の再測定とゲート → B1〜B13・B15〜B17 → B17 像で C (T1K §7) → B14。W と G は B と並列で進め、1ms の受入は B17 の像で行う。
+段の順 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5): 段 C (C1〜C3) → 段 P (PowerPC) と A2-a を並列 → 測る (PM) → A2-b・A2-c → A の再測定とゲート → B1・B5・B6・B7'・B9〜B13・B15〜B17・S1 → B17 像で T1K §7 → B14。W と G は B と並列で進め、1ms の受入は B17 の像で行う。
 
 ## 7. 未決
 なし。U1・U2・U4 は PM が決め、U3 はユーザーが決めた (2026-11-09)。
@@ -276,4 +277,4 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **第 4 段 B の型の契約 (§5 の W5・W7・B17)**: `build/abi_contract.mk:18-22` が probe の order-only を製品の object 一覧と `userland/{cmds,tests,system}` の直の object に付け、`build/libs.mk:66・70` の共通の規則・各ライブラリの規則に `| $(ABI_CONTRACT_ORDER)` が付いた。`tools/tests/test_type_contract.py:153-226` は `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (covers `build/**/*.mk`、解析できない呼出しは fail closed)。W5 の libmmtime の規則・W7 の mmtimetest・B17 の `TICK1K=1` の別像は、既存の macro の規則を使えば自動で掛かる。手書きの recipe なら profile の旗と `| $(ABI_CONTRACT_ORDER)` を付ける。`check-type-contract` を W5・B17 の受入に加える。
-- **PPC の選択集合 (§5 の B2〜B3・A2-b3・A2-c6)**: `kernel/time/tick.c`・`kernel/irq/tick.c`・`kernel/sys.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。新しいヘッダ `tick_clock.h`・`tick_budget.h`・`idle_work.h` は `include/`・`kernel/` に置き、`platform/pc98/*`・`drivers/*` への新しい依存を作らない (pc98 の値は `include/memmap.h` 経由)。作るなら `tools/ppc/known_header_dependencies.json` に組を足す (足さないと os32powerpc の `check_compile.py --accept` が落ちる)。
+- **PPC の選択集合 (§5 の C1・A2-b3・A2-c6)**: `kernel/time/tick.c`・`kernel/irq/tick.c`・`kernel/sys.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`tools/ppc/check_accept.py:11-18` の禁止の接頭辞 (`platform/pc98/*`・`drivers/*` ほか) を include しない。よって `tools/ppc/known_header_dependencies.json` は変えない (組を足すと `check_accept.py:54-55` で stale になる)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
