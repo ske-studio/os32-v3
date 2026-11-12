@@ -1,6 +1,6 @@
 # PPC_SHELL_SC_DESIGN — PowerPC の到達点 S-C (既存の OS32 のシェルを USER の sh.bin として起動し、LAN の端末で使う、段 W7) の詳細設計
 
-> 状態: **確定 (2026-11-12)** — 製品の経路 (第 3 の像 KBOOT_SH=1) で RAM root の mount の後に kernel が /bin/sh.bin を USER として直接起動、fd1 を端末へ、LAN の端末の InputOps、USER の入れ子の先行確認、共通の sh のソースは選択の口だけ (x86 不変)。段の状態は票 TASK_PPC_SHELL が持つ。
+> 状態: **確定 (2026-11-12)・実装済み (2026-11-12、QEMU の受入に到達)** — 製品の経路 (第 3 の像 KBOOT_SH=1) で RAM root の mount の後に kernel が /bin/sh.bin を USER として直接起動、fd1 を端末へ、LAN の端末の InputOps、USER の入れ子の先行確認、共通の sh のソースは選択の口だけ (x86 不変)。段の状態は票 TASK_PPC_SHELL が持つ。
 
 > 出所: ~/os32-tmp/run/ppc-shellc/DESIGN.final.md (gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き確定、PM が未決・#1・#5・#10・#12 と N2〜N6 を反映)。前提の設計は [PPC_SHELL_DESIGN](PPC_SHELL_DESIGN.md) (S-A と段の計画) と [PPC_SHELL_EXEC_DESIGN](PPC_SHELL_EXEC_DESIGN.md) (S-B)。
 
@@ -281,3 +281,14 @@ r1→r2 の変更の数 13 / 反論の数 0
 - N4 (P3): N01 を前提にするのは S02・B01・B02 だけ。P01・P02・U01〜U03 は依存なしで並列に出せる (§7 の表を直した)。
 - N5 (P3): SH_LAUNCH_SYNC の選択は sh_exec.inc:89 の `#ifndef SHELL_AS_APP` と sh_launch.inc 末尾の sh_exec_result の 2 か所。既定値は userland/ppc/sh/profile.h (P01) が与え、shell.h には置かない (x86 は未定義 = 今の展開)。
 - N6 (P3): 端末の接続の判定は、platform/powermac の中に「接続しているか」を返す小さな関数を置く (pm_term_state は STATE の message を組み立てる関数なので使わない)。P04 に含める。
+
+
+## 確定の後の追記 1 (実装と受入で決めたこと)
+
+- N01 で見つかった USER の入れ子の不具合を `arch/ppc/exec_context.c` で修正。
+- R01 で ramfs の FD の口を用意。
+- P03 の fd1 の結び替えは `fs/vfs_fd.o` の 1 か所 (`KB_FD1_STREAM`)。
+- 受入アプリは 8.3 名 `outprobe` を使う。
+- serial 版の試験は停止の前に EE=0 とする。
+- K01 の時計の検査は TB の読み 2 回で挟み、周期は変えない。
+- S01 の `SH_CLEAR_TERMINAL` は clear の方式と ver 等の除外を兼ねる (P3、後で macro を分ける)。
