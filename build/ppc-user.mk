@@ -4,7 +4,7 @@ PPC_USER_OUT := build/out/ppc-user
 PPC_USER_CRT := $(addprefix $(PPC_USER_OUT)/,$(notdir $(SDK_TARGET_CRT_USER)))
 PPC_USER_FLAGS := $(USER_CFLAGS) -fno-common -mcall-sysv -mno-eabi -I sdk/include/os32 -Wno-attributes
 
-PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest)
+PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe)
 
 .PHONY: hello ppc-fault ppc-nest
 hello: $(PPC_USER_OUT)/hello.bin

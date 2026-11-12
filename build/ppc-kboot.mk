@@ -11,10 +11,14 @@ KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_SHELL ?= 0
 KBOOT_TERM ?= lan
+KB_FD1_STREAM ?= 0
 # Extra applications belong to an explicitly separate test image.
 KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
 NEGATIVE ?= 0
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
+ifeq ($(KB_FD1_STREAM),1)
+KB_OUT := $(KB_OUT)/fd1-stream
+endif
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -108,11 +112,14 @@ KB_MUT_FILE ?=
 # A serial input substitution may accompany one product mutation.
 KB_MUT_EXTRA_SRC ?=
 KB_MUT_EXTRA_FILE ?=
-kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$1))
-$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
+KB_MUT_THIRD_SRC ?=
+KB_MUT_THIRD_FILE ?=
+kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+$(KB_OUT)/fs/vfs_fd.o: KB_TU_FLAGS = $(if $(filter 1,$(KB_FD1_STREAM)),-Dconsole_write=pm_fd1_write)
+$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
-	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE)
+	$(KB_CC) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
+$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OUT)/memmap_layout.h
@@ -142,7 +149,7 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) \
+	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
 -include $(KB_OBJ:.o=.d)
