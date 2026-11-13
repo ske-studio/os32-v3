@@ -15,6 +15,10 @@ SOURCES = {
     'pc98_console_source.inc': 'platform/pc98/console.c',
 }
 MUTANTS = [
+    ('shell requires sink', 'console_source.inc',
+     'void shell_putchar(char ch, u8 color)\n{',
+     'void shell_putchar(char ch, u8 color)\n{\n'
+     '    if (!con_sink_is_enabled()) return;', 'CUI shell character'),
     ('safe requires cached TEXT', 'pc98_console_source.inc',
      '    return !pc98_console_safe || pc98_console_safe();',
      '    int n; const struct con_out *o = con_dual_outputs(&n);\n'

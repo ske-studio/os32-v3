@@ -124,9 +124,16 @@ static void cui(void)
         int n = -1; con_dual_outputs(&n);
         CHECK(n==0 && !con_dual_active(), "CUI empty cached table");
         no_display();
+        shell_putchar('S', TATTR_WHITE);
+        CHECK(text[3]=='t' && text[4]=='S' && text[5]=='#', "CUI shell character");
+        CHECK(attrs[4]==TATTR_WHITE && attrs[5]==0, "CUI shell attrs");
+        CHECK(cursor_x==5 && cursor_y==0, "CUI shell cursor");
+        CHECK(text_access==5 && attr_access==5 && cursor_io==6 && boot_bytes==5 &&
+              !sink_prints, "CUI shell counts");
+        no_display();
         /* Starting CUI for the first time must preserve the boot log. */
         console_text_gdc_start();
-        CHECK(text[0]=='b' && text_access==4 && cursor_io==10, "CUI first start keeps log");
+        CHECK(text[0]=='b' && text[4]=='S' && text_access==5 && cursor_io==13, "CUI first start keeps log");
         no_display();
     }
     say("PASS pre-gfx / DUAL=0 / no-GF / CUI TVRAM only\n");
