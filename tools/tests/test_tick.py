@@ -82,7 +82,7 @@ def main():
             original = (ROOT / 'kernel/irq/tick.c').read_text()
             mutants = [
                 ('        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();', '', 'budget begin omitted'),
-                ('    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
+                ('    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {\n#ifdef TICK_PROBE\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_probe_extra_begin(TP_BUDGET);\n#endif\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
                  '    tick_budget_begin();\n    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {', 'budget begin before loop'),
                 ('if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
                  'if (slot == ARCH_TICK_BUDGET_FIRST_SLOT && slots[slot].fn) tick_budget_begin();', 'budget begin only with callback'),

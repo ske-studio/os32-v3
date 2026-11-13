@@ -25,6 +25,9 @@ int tick_register(unsigned int slot, tick_fn fn)
 void tick_dispatch(void)
 {
     for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {
+#ifdef TICK_PROBE
+        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_probe_extra_begin(TP_BUDGET);
+#endif
         if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();
         if (slots[slot].fn) {
 #ifdef TICK_PROBE
@@ -37,4 +40,7 @@ void tick_dispatch(void)
         }
     }
     tick_budget_end();
+#ifdef TICK_PROBE
+    tick_probe_extra_end(TP_BUDGET);
+#endif
 }

@@ -9,6 +9,8 @@ CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
             'userland/diag/tickprobe.c', 'build/kernel.mk',
             'build/kernel-objects.mk', 'build/select.mk', 'build/kdebug.mk',
             'kernel/module/debug_probe.c', 'kdebug/kdebug_main.c',
+            'platform/pc98/pit.c', 'arch/x86/kernel/mtrr_wc.c',
+            'drivers/net/e82557/e82557.c',
             'tools/tests/host32.py'])
 import os
 from pathlib import Path
@@ -27,28 +29,40 @@ def main():
     boundary = kernel[begin:end + len('#endif')] + '\n'
     link_source = (ROOT / 'net/link.c').read_text()
     link = link_source[link_source.index('void link_tick(void)'):link_source.index('\n}', link_source.index('void link_tick(void)')) + 2]
+    tick_source = (ROOT / 'kernel/irq/tick.c').read_text()
+    tick = tick_source[tick_source.index('void tick_dispatch(void)'):]
     with tempfile.TemporaryDirectory(prefix='tick-probe-') as td:
         work = Path(td)
-        def run(source, body, link_body=link):
+        def run(source, body, link_body=link, tick_body=tick):
             src = work / 'tick_probe.c'; src.write_text(source)
             inc = work / 'boundary.inc'; inc.write_text(body)
             link_inc = work / 'link.inc'; link_inc.write_text(link_body)
+            tick_inc = work / 'tick.inc'; tick_inc.write_text(tick_body)
             exe = work / 'probe'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall',
                 '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin',
                 '-fno-pie', '-no-pie', '-nostdlib', '-static',
                 '-I' + str(ROOT / 'kernel/time'), '-DTP_SOURCE="' + str(src) + '"',
                 '-DTP_BOUNDARY="' + str(inc) + '"', '-DTP_LINK="' + str(link_inc) + '"',
+                '-DTP_TICK="' + str(tick_inc) + '"',
                 str(ROOT / 'tools/tests/tick_probe_host.c'), '-o', str(exe)], check=True)
             return host32.run([str(exe)], runner='qemu').returncode
         assert run(original, boundary) == 0
         print('GREEN aggregate/histogram/p99/u64/splash returns/crossing/IF0/IRQ/short/lost', flush=True)
         if '--mutate' in sys.argv:
+            budget_end = '    tick_probe_extra_end(TP_BUDGET);'
+            assert tick.count(budget_end) == 1
+            assert run(original, boundary, tick_body=tick.replace(budget_end, '')) == 1
+            print('RED runtime exit=1 missing budget end', flush=True)
+            hist_shift = 'id == TP_INTERVAL ? 8 : 0'
+            assert original.count(hist_shift) == 2
+            assert run(original.replace(hist_shift, '0'), boundary) == 1
+            print('RED runtime exit=1 interval histogram upper bound', flush=True)
             mutants = [
                 ('worst', 'if (d > s->worst) s->worst = d;', 's->worst = d;', False),
                 ('histogram', 's->hist[bin]++;', 's->hist[0]++;', False),
                 ('p99', 's->count - s->count / 100', 's->count', False),
-                ('crossing', 'm.epoch != epoch', '0', False),
+                ('crossing', 'm.splash || splash || m.epoch != epoch;\n    add_stat_shift', 'm.splash || splash || 0;\n    add_stat_shift', False),
                 ('total', 's->total += d;', 's->total += (unsigned int)d;', False),
                 ('IF nesting', '(flags & (1U << 9)) && if0.valid', 'if0.valid && (flags || !flags)', False),
                 ('entry mark', '    tick_probe_splash(1);', '    tick_probe_splash(0);', True),
