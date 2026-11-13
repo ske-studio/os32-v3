@@ -3,7 +3,8 @@ CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
     covers=['net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
             'net/rx_work.c', 'net/rx_work.h', 'net/link.h',
             'kernel/idle_work.c', 'kernel/idle_work.h', 'kernel/irq/tick.h',
-            'kernel/irq/tick_budget.h', 'kernel/irq/irq.h',
+            'kernel/irq/tick_budget.h', 'kernel/irq/tick_budget.c',
+            'arch/x86/arch_tick_budget.h', 'kernel/irq/irq.h',
             'include/kernel_tick.h', 'include/clock_source.h', 'include/types.h',
             'include/net_eth.h', 'include/kprintf.h', 'lib/kstring.h',
             'platform/pc98/tick_order.h', 'sdk/include/os32/os32_kapi_shared.h',
@@ -34,7 +35,8 @@ MUTATIONS = (
     ('net/nic.c', 'last_idle_jiffy = tick_count;\n            bound = ops;',
      'last_idle_jiffy = 0;\n            bound = ops;'),
     ('net/nic.c', 'if (ticking) {\n        unbind_due = 1;', 'if (0) {\n        unbind_due = 1;'),
-    ('net/nic_rx.c', 'if (!tick_budget_take(', 'if (0 && !tick_budget_take('),
+    ('net/nic_rx.c', 'if (!(tick_budget_peek(', 'if (0 && !(tick_budget_peek('),
+    ('net/nic.c', 'tick_budget_peek(', 'tick_budget_take('),
 )
 
 

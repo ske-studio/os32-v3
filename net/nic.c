@@ -297,7 +297,7 @@ void net_jiffy(void)
             ticking = 1;
             if (owner && owner == adapters[NET_NIC_E82557] &&
                 (u32)(tick_count - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES &&
-                tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
                                  tick_budget_cnt(NET_TAIL_RX_US))) {
                 struct rx_work_budget b;
                 pending = 0;

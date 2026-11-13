@@ -46,3 +46,13 @@ int tick_budget_take(u32 share_cnt, u32 tail_cnt)
     }
     return 0;
 }
+
+/* Optional work must leave the first-unit guarantee to its actual consumer. */
+int tick_budget_peek(u32 share_cnt, u32 tail_cnt)
+{
+    if (active) {
+        u32 elapsed = arch_tick_budget_elapsed(base);
+        return elapsed < share_cnt && share_cnt - elapsed > tail_cnt;
+    }
+    return 1;
+}

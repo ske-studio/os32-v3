@@ -39,10 +39,12 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
     static const u8 broadcast[ETH_ALEN] = {255, 255, 255, 255, 255, 255};
     u32 count = 0;
     for (;;) {
-        /* Rescue clock reads also consume the active IRQ0 RX allowance. */
+        /* Include clock costs, preserving the guarantee if rescue cannot run. */
         if (!rx_work_take(b)) { net_rx_schedule(); break; }
-        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
-                              tick_budget_cnt(NET_TAIL_RX_US))) {
+        if (!(tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                               tick_budget_cnt(NET_TAIL_RX_US)) &&
+              tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                               tick_budget_cnt(NET_TAIL_RX_US)))) {
             net_rx_schedule(); break;
         }
         u32 len = 0;

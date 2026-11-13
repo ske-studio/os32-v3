@@ -10,6 +10,8 @@ void tick_budget_begin(void);
 void tick_budget_end(void);
 /* RX uses B/2, TX uses B; one shared first unit, even RX / odd TX. */
 int tick_budget_take(u32 share_cnt, u32 tail_cnt);
+/* Check ordinary allowance without consuming the first-unit guarantee. */
+int tick_budget_peek(u32 share_cnt, u32 tail_cnt);
 /* Only B/2, B, NET_TAIL_RX_US and NET_TAIL_TX_US are supported. */
 u32 tick_budget_cnt(u32 us);
 #endif

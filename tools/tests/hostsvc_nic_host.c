@@ -305,3 +305,5 @@ volatile u32 tick_count;
 static void (*rx_idle)(void);
 int idle_work_register(void (*fn)(void)) { rx_idle = fn; return 0; }
 int nic_test_irq_enabled(void) { return hs_if(); }
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

@@ -12,6 +12,7 @@ static int _irq_enabled(void) { return enabled != 0; }
 #include "net/nic_rx.c"
 #include "net/rx_work.c"
 #include "kernel/idle_work.c"
+#include "kernel/irq/tick_budget.c"
 #include <stdarg.h>
 
 #define CHECK(e) do { if (!(e)) finish(1); } while (0)
@@ -25,6 +26,8 @@ u32 link_hello_ok;
 u8 link_peer_mac[6];
 static u32 now, step, clock_cost, frames, reads, polls, links, released;
 static int clock_fail, allowance = 1, hook, rescue, idle_error, recv_reentry, valid_frame, copy_action;
+static u32 irq_elapsed, link_received;
+static int pump_link;
 static tick_fn callback;
 static const u8 hw_mac[6] = {2,3,4,5,6,7};
 static int tx(const void *p, u32 n) { (void)p; (void)n; return 0; }
@@ -69,7 +72,9 @@ static void irq_tick(void)
 {
     unsigned int f = irq_save();
     kctx_irq_depth++;
+    if (rescue) { tick_budget_begin(); now += irq_elapsed; }
     callback();
+    if (rescue) tick_budget_end();
     kctx_irq_depth--;
     irq_restore(f);
 }
@@ -77,6 +82,16 @@ void link_tick(void)
 {
     CHECK(!enabled);
     links++;
+    /* Same queued-frame/take ordering as link_rx_pump. */
+    if (pump_link) {
+        u8 frame[60]; u32 len;
+        while (net_rx_queued(NET_RX_LINK) &&
+               tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                                tick_budget_cnt(NET_TAIL_RX_US))) {
+            CHECK(net_rx_take(NET_RX_LINK, frame, sizeof(frame), &len) == 0);
+            link_received++;
+        }
+    }
     u32 before = reads;
     CHECK(net_nic_poll_once() == 0 && reads == before);
 }
@@ -112,15 +127,16 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
     *lo = now; *hi = 0;
     return 0;
 }
-u32 tick_budget_cnt(u32 us) { return us; }
-int tick_budget_take(u32 share, u32 tail)
+u32 arch_tick_budget_cnt(u32 us) { return us; }
+u32 arch_tick_budget_base(void) { return now; }
+u32 arch_tick_budget_elapsed(u32 origin)
 {
-    CHECK(share == IRQ0_SLOT_BUDGET_US / 2 && tail == NET_TAIL_RX_US);
-    return allowance && (!rescue || now < 37);
+    return allowance ? (u32)(now - origin) : IRQ0_SLOT_BUDGET_US;
 }
 static void idle_other(void) {}
 static void run_tests(void)
 {
+    tick_budget_config();
     CHECK(net_adapter_register(NET_NIC_E82557, &e_adapter) == 0);
     CHECK(net_adapter_register(NET_NIC_LGY98, &n_adapter) == 0);
     /* No bound NIC may be published without its permanent idle slot. */
@@ -168,6 +184,23 @@ static void run_tests(void)
     /* Clock read costs must be included in the IRQ RX allowance. */
     now = 0; clock_cost = 20; frames = 2;
     irq_tick(); CHECK(frames == 2 && pending);
+    clock_cost = 0;
+    /* RX turn: entrance at 30us, two 4us reads cross 60-23us.
+     * Optional NIC rescue must preserve the queued LINK first unit. */
+    rescue = 0; valid_frame = 1; frames = 1;
+    CHECK(net_rx_service() == 1 && net_rx_queued(NET_RX_LINK) == 1);
+    valid_frame = 0; frames = 1; rescue = 1; pump_link = 1;
+    tick_count = (last_idle_jiffy + 3u) & ~1u;
+    irq_elapsed = 30; clock_cost = 4; before = reads;
+    irq_tick();
+    CHECK(reads == before && frames == 1 && link_received == 1);
+    CHECK(!net_rx_queued(NET_RX_LINK));
+    /* Entrance already beyond the budget also preserves the guarantee. */
+    rescue = 0; clock_cost = 0; valid_frame = 1;
+    CHECK(net_rx_service() == 1 && net_rx_queued(NET_RX_LINK) == 1);
+    valid_frame = 0; frames = 1; rescue = 1; irq_elapsed = 120;
+    irq_tick(); CHECK(frames == 1 && link_received == 2);
+    pump_link = 0; irq_elapsed = 0;
     clock_cost = 0; now = 0; frames = 9;
     irq_tick(); CHECK(frames == 1 && pending);
     rescue = 0; idle_work_run(); CHECK(!frames);

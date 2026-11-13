@@ -131,3 +131,5 @@ u32 tick_budget_cnt(u32 us) { return us; }
 int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 void net_rx_schedule(void) {}
 int net_rx_defer_reset(u16 protocol) { (void)protocol; return 0; }
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

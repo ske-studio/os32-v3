@@ -270,3 +270,5 @@ static void same_bh_demux(void)
 }
 void net_rx_reset(u16 protocol) { (void)protocol; }
 void link_tick(void) {}
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
