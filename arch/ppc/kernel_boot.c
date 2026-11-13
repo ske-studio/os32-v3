@@ -251,6 +251,33 @@ static void kb_stop(int out, const char *why)
     ppc_stop();
 }
 
+static void kb_hex(int out, u32 v)
+{
+    char t[9];
+    for (int i = 0; i < 8; i++) t[i] = "0123456789abcdef"[(v >> (28 - 4*i)) & 15];
+    t[8] = ' ';
+    (void)ofw_write(out, t, 9);
+}
+static void kb_regions(int out, const char *name, const struct pm_regions *r)
+{
+    (void)ofw_write(out, name, kstrlen(name));
+    kb_hex(out, r->count);
+    for (u32 i = 0; i < r->count && i < 8; i++) { kb_hex(out, r->v[i].start); kb_hex(out, r->v[i].size); }
+    (void)ofw_write(out, "\r\n", 2);
+}
+/* Real-hardware triage: reserve code, image bounds and both firmware maps. */
+static void kb_reserve_stop(int out, int rc, const struct pm_kboot_info *info)
+{
+    (void)ofw_write(out, "FAIL:KB:RESERVE ", 16);
+    kb_hex(out, (u32)rc);
+    kb_hex(out, (u32)__kernel_image_start);
+    kb_hex(out, (u32)&__kernel_resident_end);
+    (void)ofw_write(out, "\r\n", 2);
+    kb_regions(out, "RAM ", &info->ram);
+    kb_regions(out, "AVL ", &info->available);
+    ppc_stop();
+}
+
 void ppc_kernel_start(ppc_ci ci)
 {
     struct ofw_env e;
@@ -289,7 +316,8 @@ void ppc_kernel_start(ppc_ci ci)
     boot_devices.escc_data_va = escc_alias.va + (s.data - s.csr);
     boot_devices.mpic_va = mpic_alias.va;
     boot_devices.mpic_bytes = info->mpic_bytes;
-    if (pm_kboot_reserve(info) != PM_KBOOT_RESERVE_OK) kb_stop(e.out, "FAIL:KB:RESERVE\r\n");
+    int reserve_rc = pm_kboot_reserve(info);
+    if (reserve_rc != PM_KBOOT_RESERVE_OK) kb_reserve_stop(e.out, reserve_rc, info);
     if (!pm_memory_validate(info)) kb_stop(e.out, "FAIL:KB:MEMORY-VALIDATE\r\n");
     pm_rh_of_mark(2);
     static const char mark[] = "TAKEOVER\r\n";
