@@ -124,7 +124,7 @@ static void tests(void)
         for (u32 us = 180000; us <= 220000; us += 40000) {
             ready();
             unsigned long long p = (unsigned long long)setup.reload * 1000000u;
-            u32 limit = 8u + (550u * us + 999999u) / 1000000u;
+            u32 limit = 2u * TSC_ENDPOINT_US + (550u * us + 999999u) / 1000000u;
             for (u32 k = 1; k <= 2; ++k) {
                 CHECK(missing_window((p*k + setup.clk_hz-1)/setup.clk_hz + limit-1, us));
                 CHECK(missing_window(p*k/setup.clk_hz - limit+1, us));
@@ -133,6 +133,17 @@ static void tests(void)
             CHECK(!missing_window(300, us));
         }
     }
+    /* A 20us endpoint and 150us distance from one PIT period require
+     * the two-endpoint allowance; the old 8us allowance misses it. */
+    ready(); struct window costly_suspect = make_window(200000, 1150);
+    costly_suspect.cost = 20u * 100u;
+    monitor(&costly_suspect);
+    CHECK(diag.rejected[REJECT_MISSING] == 1 && state == TSC_READY);
+    ready(); struct window cost_boundary = make_window(200000, 0);
+    cost_boundary.cost = ((unsigned long long)TSC_ENDPOINT_US << epoch.shift) / epoch.mult;
+    CHECK(valid_cost(&cost_boundary, epoch.mult, epoch.shift));
+    ++cost_boundary.cost;
+    CHECK(!valid_cost(&cost_boundary, epoch.mult, epoch.shift));
     ready(); epoch.mult = 1u << 31; epoch.shift = 32;
     struct window boundary = {400400, 1, 200000};
     monitor(&boundary); monitor(&boundary); CHECK(state == TSC_READY && !diag.abnormal);
@@ -145,13 +156,13 @@ static void tests(void)
     monitor(&suspect); CHECK(state == TSC_READY && !diag.abnormal && diag.degraded);
     monitor(&bad); CHECK(state == TSC_READY && diag.abnormal == 1);
     reject(REJECT_READ); monitor(&bad); CHECK(state == TSC_READY && diag.abnormal == 1);
-    bad.cost = 401; monitor(&bad); CHECK(!diag.abnormal && state == TSC_READY);
-    /* Old 100MHz coefficient rejects 3us endpoints after a jump to 200MHz.
+    bad.cost = ((unsigned long long)TSC_ENDPOINT_US << epoch.shift) / epoch.mult + 1; monitor(&bad); CHECK(!diag.abnormal && state == TSC_READY);
+    /* Old 100MHz coefficient rejects 20us endpoints after a jump to 200MHz.
      * Drive the actual cooperative scheduler at its one-second monitor cadence. */
-    reset(); endpoint_cycles = 300; pc98_tsc_calibrate_work();
+    reset(); endpoint_cycles = 20u * 100u; pc98_tsc_calibrate_work();
     for (u32 i = 0; i < 5; ++i) advance(200000, 0);
     CHECK(state == TSC_READY);
-    endpoint_cycles = 600;
+    endpoint_cycles = 20u * 200u;
     advance(1000000, 100000000);
     for (u32 i = 0; i < 10; ++i) {
         advance(200000, 20000000);
@@ -184,7 +195,7 @@ static void tests(void)
     reset(); pc98_tsc_calibrate_work();
     pit_us += 170000; fake_ms += 200; counter += 20000000;
     pc98_tsc_calibrate_work(); CHECK(diag.rejected[REJECT_LENGTH] && !collected);
-    reset(); endpoint_cycles = 501; pc98_tsc_calibrate_work();
+    reset(); endpoint_cycles = (TSC_ENDPOINT_US + 1u) * 100u; pc98_tsc_calibrate_work();
     for (u32 i = 0; i < 5; ++i) advance(200000, 0);
     CHECK(state != TSC_READY && diag.rejected[REJECT_COST]);
     reset(); pc98_tsc_calibrate_work(); pit_rc = -1; advance(200000, 0);

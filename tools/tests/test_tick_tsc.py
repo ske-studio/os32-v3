@@ -26,6 +26,8 @@ MUTATIONS = (
     ('platform/pc98/tsc_clock.c', 'if (++diag.missing == 1)', 'if (1)'),
     ('platform/pc98/tsc_clock.c', 'diag.abnormal = 0;\n    if (reason', '(void)0;\n    if (reason'),
     ('platform/pc98/tsc_clock.c', 't > w->us && missing_window(d, w->us)', 'missing_window(d, w->us)'),
+    ('platform/pc98/tsc_clock.c', '2u * TSC_ENDPOINT_US + (550ULL * us', '8u + (550ULL * us'),
+    ('platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost < allowance'),
     ('platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost <= allowance * 2'),
     ('platform/pc98/tsc_clock.c', 'high - low > low / 2000u', 'high - low > low'),
     ('platform/pc98/tsc_clock.c', 'elapsed > TSC_WINDOW_MAX_US', 'elapsed > TSC_BOOT_LIMIT_US'),
