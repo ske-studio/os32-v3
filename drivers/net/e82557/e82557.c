@@ -157,19 +157,48 @@ static void scb_mask(u16 base, int on)
     outp(base + E82557_SCB_INTCTL, on ? E82557_SCB_M : 0);
 }
 
+#ifdef TICK_PROBE
+/* Module-local lifetime counters: no diagnostic imports or module ABI changes. */
+static unsigned long long scb_polls_total;
+static u32 scb_polls_max;
+static void scb_probe(u32 polls)
+{
+    scb_polls_total += polls;
+    if (polls > scb_polls_max) scb_polls_max = polls;
+}
+#endif
 static int scb_wait(u16 base)
 {
     u32 elapsed = 0;
+#ifdef TICK_PROBE
+    u32 polls = 0;
+#endif
     for (;;) {
-        if (inp(base + E82557_SCB_COMMAND) == 0) return 1;
-        if (elapsed == E82557_SCB_WAIT_US) return 0;
+#ifdef TICK_PROBE
+        polls++;
+#endif
+        if (inp(base + E82557_SCB_COMMAND) == 0) {
+#ifdef TICK_PROBE
+            scb_probe(polls);
+#endif
+            return 1;
+        }
+        if (elapsed == E82557_SCB_WAIT_US) {
+#ifdef TICK_PROBE
+            scb_probe(polls);
+#endif
+            return 0;
+        }
         cpu_delay_us(E82557_SCB_POLL_US);
         elapsed += E82557_SCB_POLL_US;
     }
 }
 
 /* Caller holds irq_save. Do not touch pointer while a command is outstanding.
- * The byte write never changes M at +3. ISSUE_OK means accepted, not queued. */
+ * Unlike fxp, do not write after timeout, to preserve the previous command POINTER.
+ * The byte write never changes M at +3. ISSUE_OK means issued; a stuck
+ * command is counted by the wait before the next issue. The 100us limit
+ * remains short because callers can run in IRQ context (fxp waits longer). */
 static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after)
 {
     *after = 0;
@@ -177,9 +206,7 @@ static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after
     if (need_ptr) outpd(base + E82557_SCB_POINTER, ptr);
     outp(base + E82557_SCB_COMMAND, e82557_scb_cmd(cuc, ruc));
     *after = 1;
-    if (scb_wait(base)) return ISSUE_OK;
-    nic.stats[E82557_ST_SCB_STUCK]++;
-    return ISSUE_TIMEOUT;
+    return ISSUE_OK;
 }
 
 static void ee_write(void *ctx, u8 value)
@@ -639,7 +666,14 @@ u32 e82557_rx_free(void)
     return free;
 }
 int e82557_loopback(int on) { (void)on; return OS32_ERR_NOSYS; }
-u32 e82557_stat(u32 idx) { return idx < E82557_ST_COUNT ? nic.stats[idx] : 0; }
+u32 e82557_stat(u32 idx) {
+#ifdef TICK_PROBE
+    if (idx == E82557_ST_COUNT) return scb_polls_max;
+    if (idx == E82557_ST_COUNT + 1) return (u32)scb_polls_total;
+    if (idx == E82557_ST_COUNT + 2) return (u32)(scb_polls_total >> 32);
+#endif
+    return idx < E82557_ST_COUNT ? nic.stats[idx] : 0;
+}
 
 static int probe_ru(void)
 {

@@ -1,4 +1,5 @@
 #include "kernel/idle_work.h"
+#include "kernel/irq/tick_budget.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
@@ -90,6 +91,7 @@ static u32 link_agent_nonce = 0;
 static u16 link_syn_sess = 0;       /* 最後に送った SYN の sess (写しの照合用) */
 static u16 link_syn_epoch = 0;
 static u32 link_hs_tick = 0;
+static int link_hello_idle = 0;
 static u32 link_hs_tries = 0;
 static int link_hs_due = 0;         /* 1 = SYN を送る / 2 = CONFIRM を送る */
 static u32 link_next_rid = 1;       /* セッション内で単調増加、0 は使わない */
@@ -339,7 +341,8 @@ static void link_timers(void)
     if (link_state != LINK_S_UP) {
         /* 出す印が立っている間 (= まだ NIC が受けていない) は期限を数えない。
          * RTO は **NIC が送信を受理した tick から** (往復 2 の R9)。 */
-        if (!link_hs_due && since(link_hs_tick) >= LINK_RTO_TICKS) {
+        if (!link_hs_due && since(link_hs_tick) >=
+            (link_state == LINK_S_SYN && link_hello_idle ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS)) {
             if (link_hs_tries >= LINK_TRIES) {
                 /* CONFIRM が通らない → SYN からやり直す */
                 link_start_hello(link_syn_sess, link_syn_epoch);
@@ -420,6 +423,8 @@ static int link_tx_control(void)
             ok = link_send(LINK_OP_HELLO, LINK_HS_CONFIRM, link_nonce,
                            link_agent_nonce, 0, 0, 0);
         if (!ok) return -1;
+        if (link_state == LINK_S_SYN && link_hs_tries >= LINK_TRIES - 1)
+            link_hello_idle = 1;
         link_hs_tick = tick_count;
         link_hs_due = 0;
         return 1;
@@ -493,11 +498,27 @@ static int link_tx_normal(void)
     return 0;
 }
 
+static int link_tx_pending(void)
+{
+    if (link_hs_due) return 1;
+    if (link_state != LINK_S_UP) return 0;
+    for (int i = 0; i < LINK_HANDLES; i++) {
+        struct link_handle *e = &link_h[i];
+        if (e->rel_due || e->want_ack || e->want_window || e->want_status) return 1;
+        if (e->state != LINK_H_FREE && e->state != LINK_H_STALE &&
+            (e->req_due || (e->w_due && e->wlen))) return 1;
+    }
+    return 0;
+}
+
 static void link_tx_round(void)
 {
     int idle = 0;
     int budget = LINK_TX_CLASS_COUNT * (LINK_HANDLES * LINK_CTRL_KIND_COUNT + LINK_HANDSHAKE_BUDGET);
     while (budget-- > 0 && idle < LINK_TX_CLASS_COUNT) {
+        if (!link_tx_pending()) break;
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US),
+                              tick_budget_cnt(NET_TAIL_TX_US))) break;
         int rc = link_tx_turn ? link_tx_normal() : link_tx_control();
         if (rc < 0) { link_tx_deferred++; return; } /* NIC busy → 位置を進めず次の周回へ */
         link_tx_turn ^= 1;                          /* 送れた / 空のときだけ次の種類へ */
@@ -563,6 +584,7 @@ void link_init(const u8 my_mac[ETH_ALEN])
     link_epoch = 0;
     link_agent_gen = 0;
     link_state = LINK_S_DOWN;
+    link_hello_idle = 0;
     link_hello_ok = 0;
     link_next_rid = 1;
     link_ring_owner = -1;

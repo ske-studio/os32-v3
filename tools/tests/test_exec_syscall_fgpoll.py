@@ -92,6 +92,31 @@ def run_case(folder, source, label, mutant=False):
     print(('MUTATE runtime RED: ' if mutant else 'GREEN: ') + label, flush=True)
 
 
+def run_entry(folder, source, mutant=False):
+    start = source.index('    ring3_gui_pump();')
+    end = source.index('    arch_kapi_source(', start)
+    entry = source[start:end]
+    fixture = folder / 'entry.c'
+    fixture.write_text(r"""
+static int pumps, work;
+static void ring3_gui_pump(void) { pumps++; }
+static __attribute__((unused)) void idle_work_run(void) { work++; }
+void _start(void) {
+""" + entry + r"""
+    int rc = !(pumps == 1 && work == 1);
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
+    __builtin_unreachable();
+}
+""")
+    exe = folder / 'entry'
+    subprocess.run(['gcc', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
+                    '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                    '-nostdlib', '-static', '-no-pie', str(fixture), '-o', str(exe)], check=True)
+    rc = host32.run([str(exe)]).returncode
+    assert rc == (1 if mutant else 0), rc
+    print(('MUTATE runtime RED: ' if mutant else 'GREEN: ') + 'syscall-idle', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -100,7 +125,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix='syscall-fgpoll-') as td:
         folder = Path(td)
         run_case(folder, source, 'syscall-tail')
+        run_entry(folder, source)
         if args.mutate:
+            assert source.count('    idle_work_run();') == 1
+            run_entry(folder, source.replace('    idle_work_run();', ''), True)
             old = 'if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();'
             assert source.count(old) == 1
             run_case(folder, source.replace(old,

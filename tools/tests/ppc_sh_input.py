@@ -5,20 +5,28 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-sh-input', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
+             covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
                      'platform/powermac/input_decode.c'],
              inputs=['tools/tests/ppc_sh_input.py', 'platform/powermac/terminal_input.c',
                      'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
                      'include/input_service.h', 'include/clock_source.h', 'include/types.h'])
 HARNESS = r'''
-#include <stdio.h>
-#include <stdlib.h>
+static void exit(int code) __attribute__((noreturn));
+static void exit(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
+static void message(const char *s) { unsigned n=0; while(s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(s), "d"(n) : "memory"); }
+#define fprintf(fd, fmt, ...) message(fmt)
+
 #include "input_boot.h"
 #include "input_service.h"
 #include "lan_boot.h"
+int pm_input_usb_take(void) { return -1; }
+u32 pm_input_usb_dropped(void) { return 0; }
 volatile u32 tick_count;
 static u32 clock_us, clock_step;
 int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = clock_us; *hi = 0; clock_us += clock_step; return 0; }
@@ -27,8 +35,8 @@ void input_register(const InputOps *p) { ops = p; }
 u64 pm_terminal_tb(void) { return 0; }
 void pm_lan_poll(u64 now) { (void)now; }
 static void feed(const char *s, u32 n) { pm_terminal_feed((const u8 *)s, n); }
-static void check(int ok, int code, const char *msg) { if (!ok) { fprintf(stderr, "%s\n", msg); exit(code); } }
-int main(void) {
+static void check(int ok, int code, const char *msg) { if (!ok) { message(msg); message("\n"); exit(code); } }
+static int test_main(void) {
     pm_input_boot(); pm_terminal_open();
     check(ops->trygetkey() == 27, 12, "cancel-fail");
     feed("\n\r\n\177\003", 5);
@@ -51,6 +59,7 @@ int main(void) {
     check(ops->getkey() == 27 && ops->getkey() == '[' && ops->getkey() == 'A', 14, "late-fail");
     fprintf(stderr, "late-ok\n"); return 0;
 }
+void _start(void) { exit(test_main()); }
 '''
 
 
@@ -73,11 +82,11 @@ def main():
         (d / 'harness.c').write_text(HARNESS)
         for name, code, expected, marker in cases:
             (d / 'decode.c').write_text(code)
-            subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
+            subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
                             '-I.', '-Iinclude', '-Isdk/include/os32', '-Idrivers/input', '-Iplatform/powermac',
                             str(d / 'harness.c'), str(d / 'decode.c'), 'platform/powermac/input_boot.c',
                             'platform/powermac/terminal_input.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
-            result = subprocess.run([str(d / 'test')], capture_output=True, text=True, timeout=10)
+            result = host32.run([str(d / 'test')], runner='qemu', capture_output=True, text=True, timeout=10)
             if result.returncode != expected or result.stderr != marker:
                 raise RuntimeError(f'{name}: exit {result.returncode}: {result.stderr!r}')
             print(('OK ' if name == 'normal' else 'RED ') + name, flush=True)

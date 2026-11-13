@@ -75,6 +75,7 @@ static void foreground_deadline_update(const struct gf5_test_ops *ops)
     if ((g->fan.sensor_poll && !g->next_sensor) ||
         (g->fan.mode==GF5_FAN_AUTO && !g->next_auto)) next=now;
     u32 delay=next>now ? (u32)(next-now) : 0;
+    /* tick_count は物理 IRQ と独立した 100Hz のジフィ。 */
     foreground_next_tick=tick+delay/(USEC_PER_SEC/PIT_HZ);
     foreground_deadline_valid=true;
 }

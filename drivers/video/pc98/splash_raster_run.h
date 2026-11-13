@@ -4,6 +4,7 @@
 #include "splash_raster_image.h"
 #include "splash_raster_play.h"
 
+/* 描画の時刻は 100Hz のジフィで数える。 */
 #define PL_RUN_TICK_US (TICK_MS * SPLASH_RASTER_US_PER_MS)
 /* All rational times are microseconds * divisor. Rebase at every extension;
  * good is session-wide. No 64-bit division or adjustment of the PIT clock. */

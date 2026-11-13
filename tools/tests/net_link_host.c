@@ -154,6 +154,8 @@ int net_tx(const void *frame, u32 length)
     return NE2K_OK;
 }
 
+u32 net_rx_queued(u16 protocol) { return protocol == NET_RX_LINK && nic_rxh != nic_rxt; }
+
 int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length)
 {
     unsigned int n;
@@ -1000,6 +1002,27 @@ static void r4_R4_resync_during_user_copy_keeps_the_return_value(void)
     link_host_close(h, host_owner);
 }
 
+static void hello_idle_retry(void)
+{
+    const u8 synack[LINK_HELLO_SA_LEN] = {0};
+    ticks(1);
+    for (int i = 1; i < LINK_TRIES; i++) {
+        ticks(LINK_RTO_TICKS);
+        check(tx_count(LINK_OP_HELLO) == i + 1, "initial SYN interval");
+    }
+    ticks(LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES, "idle SYN sent too early");
+    ticks(LINK_HELLO_IDLE_TICKS - LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 1, "idle SYN missing");
+    inject(LINK_OP_HELLO, LINK_HS_SYN, 0, 0, 0, 0, 0, 0, 0);
+    host_tick();
+    ticks(LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 1, "SYN restored RTO");
+    inject(LINK_OP_HELLO, LINK_HS_SYNACK, 0, 0, 0, 0, 0, synack, sizeof(synack));
+    host_tick();
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 2, "receive did not restore RTO");
+}
+
 /* HELLO 各段階の消失: SYN / SYN-ACK / CONFIRM / ESTABLISHED */
 static void r4_hello_stage_losses(void)
 {
@@ -1778,6 +1801,7 @@ static struct testcase cases[] = {
     { "r3_B8_dispatcher_kill_and_wrapper_inval",    r3_B8_dispatcher_kill_and_wrapper_inval },
     { "r4_R4_resync_during_user_copy_keeps_the_return_value",
       r4_R4_resync_during_user_copy_keeps_the_return_value },
+    { "hello_idle_retry", hello_idle_retry },
     { "r4_hello_stage_losses",                      r4_hello_stage_losses },
     { "r4_cpl0_open_close",                         r4_cpl0_open_close },
     { "r6_agent_silence_expires_then_resync_stales_handles", r6_agent_silence_expires_then_resync_stales_handles },
@@ -1834,3 +1858,7 @@ void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
 void link_notify_rx(u32 s, const u8 *p, u16 n) { (void)s; (void)p; (void)n; }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

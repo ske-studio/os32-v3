@@ -49,9 +49,9 @@
 //!
 //! - [`should_park`] の (a) と [`pick_poll`] の門に `launch_pending()` を足した
 //!   (`launch_take` も owner 1 専用なので、譲らないと取りに行けない)。
-//! - `WAIT_POLL` 群は **巡回 + 同じ tick に 1 回** ([`pick_poll`])。模型
+//! - `WAIT_POLL` 群は **巡回 + 同じ ms に 1 回** ([`pick_poll`])。模型
 //!   `ma_pick_poll` (`tools/tests/multiapp_model_host.c`) はまだ T8 の
-//!   「ID 昇順」のままで、この 1 点だけ 1 対 1 ではない — 巡回と tick の
+//!   「ID 昇順」のままで、この 1 点だけ 1 対 1 ではない — 巡回と ms の
 //!   検査は `userland/gshell/host/wm_tests.rs` の T9-W 検査 6 / 7 が持つ。
 //! - CTRL+STOP は STOP park の張本人を優先し、居なければ要求表の連鎖の**末尾** ([`abort_target`] / [`chain_tail`])。
 
@@ -133,13 +133,13 @@ struct App {
     deadline: u32,
     /// top-level で `exec_kill` する予約 (止めてあるアプリを畳む、D4)。
     kill_req: bool,
-    /// **この 1 本を最後にポーリング群から起こした tick** (票 T9 D5、
+    /// **この 1 本を最後にポーリング群から起こした ms** (票 T9 D5、
     /// 実装レビュー 1 の blocker 2)。`pick` の時刻ではなく
-    /// [`mark_resumed`] が `get_tick` を読んだ時刻 = **実際に再開した tick**
+    /// [`mark_resumed`] が `poll_now` を読んだ時刻 = **実際に再開した ms**
     /// を持つ。選んでから再開するまでに PIT が進んでも、記録はその周に
-    /// 紐づくので、同じ tick の 2 回目が通らない。
+    /// 紐づくので、同じ ms の 2 回目が通らない。
     poll_tick: u32,
-    /// [`App::poll_tick`] が有効か (tick 0 と「まだ起こしていない」を分ける)。
+    /// [`App::poll_tick`] が有効か (ms 0 と「まだ起こしていない」を分ける)。
     poll_tick_valid: bool,
 }
 
@@ -188,7 +188,7 @@ pub struct Multi {
     /// 巡回と起点を共有すると互いの順を乱す。
     poll_last: i32,
     /// 直前の [`pick`] が**ポーリング群から**選んだ ID (0 = それ以外)。
-    /// [`mark_resumed`] が「この起床を tick の数えに載せるか」を決める材料で、
+    /// [`mark_resumed`] が「この起床を ms の数えに載せるか」を決める材料で、
     /// [`pick`] の入口で必ず 0 に戻すので前の周の残骸は効かない。
     poll_choice: i32,
     /// Successful WM injections, indexed by their original fullscreen owner.
@@ -352,16 +352,16 @@ pub fn on_owner_exit(id: i32) {
          * 扱いになると 1 個ずれるので落とす。 */
         mm.last_run = 0;
     }
-    /* ポーリング群の控えも同じ理由で落とす (票 T9 D5)。「この tick で
-     * 起こし済み」を残すと、再利用された同じ ID が 1 tick 飛ばされる。 */
+    /* ポーリング群の控えも同じ理由で落とす (票 T9 D5)。「この ms で
+     * 起こし済み」を残すと、再利用された同じ ID が 1 ms 飛ばされる。 */
     if mm.poll_last == id {
         mm.poll_last = 0;
     }
     if mm.poll_choice == id {
         mm.poll_choice = 0;
     }
-    /* 「最後に起こした tick」は `App::NEW` で一緒に落ちている (上の 1 行)。
-     * 再利用された同じ ID が 1 tick 飛ばされないための後始末。 */
+    /* 「最後に起こした ms」は `App::NEW` で一緒に落ちている (上の 1 行)。
+     * 再利用された同じ ID が 1 ms 飛ばされないための後始末。 */
 }
 
 /// 止めてあるアプリを top-level で畳む予約 (D4 の「止めてあるアプリの Quit」)。
@@ -567,15 +567,6 @@ fn launch_work_pending() -> bool {
     /* SAFETY: KAPI の関数表は `os32_init` が入口で据えた有効なポインタ。
      * 引数も戻りもポインタを持たず、`launch_pending` は誰でも呼べる。 */
     unsafe { (os32api::api().launch_pending)() > 0 }
-}
-
-/// いまの tick (`get_tick`)。ポーリング群の「同じ tick に 2 回起こさない」
-/// (票 T9 D5) の基準にだけ使う — 待ちは従来どおり `sys_halt` で、
-/// ここで回して待つことはしない ([V3] の get_tick スピン禁止と同じ線)。
-#[inline]
-fn tick_now() -> u32 {
-    /* SAFETY: 同上。`get_tick` は引数なし・戻りは値。 */
-    unsafe { (os32api::api().get_tick)() }
 }
 
 /// Remember only successful injection. No new KAPI or per-target pending query.
@@ -835,14 +826,14 @@ fn pick_group(st: &GuiState, want_input: bool) -> i32 {
 /// 子の `kbd_trygetchar` が同時に `WAIT_POLL` のとき若い方だけが走り続ける):
 ///
 /// 1. **巡回**: 前回起こした ID ([`Multi::poll_last`]) の次から探す。
-/// 2. **同じ tick に同じアプリを 2 回起こさない**: 1 本ごとに
-///    [`App::poll_tick`] (最後に起こした tick) を持ち、それが今の tick と
+/// 2. **同じ ms に同じアプリを 2 回起こさない**: 1 本ごとに
+///    [`App::poll_tick`] (最後に起こした ms) を持ち、それが今の ms と
 ///    同じ相手は飛ばす。起こせる相手が全員起こし済みなら 0 を返し、呼ぶ側
 ///    (単独ループ) が `sys_halt` で次の tick を待つ。
 ///
 /// 印を付けるのは [`mark_resumed`] (実際に `exec_resume` する直前) なので、
 /// `pick` を 2 度呼んでも答えは変わらず、**選んでから再開するまでに PIT が
-/// 進んでも**記録は実際に走った tick に付く (実装レビュー 1 の blocker 2)。
+/// 進んでも**記録は実際に走った ms に付く (実装レビュー 1 の blocker 2)。
 fn pick_poll(st: &GuiState) -> i32 {
     let mm = m();
     if session::ready_to_run(st)
@@ -853,11 +844,11 @@ fn pick_poll(st: &GuiState) -> i32 {
     {
         return 0;
     }
-    /* 「この tick で起こし済み」は **1 本ごと**に持つ (実装レビュー 1 の
-     * blocker 2)。集合を一括で捨てる形だと、選んだ tick と実際に再開した
-     * tick がずれた周で消去が 1 回よけいに走り、同じ 1 本が同じ tick に
+    /* 「この ms で起こし済み」は **1 本ごと**に持つ (実装レビュー 1 の
+     * blocker 2)。集合を一括で捨てる形だと、選んだ ms と実際に再開した
+     * ms がずれた周で消去が 1 回よけいに走り、同じ 1 本が同じ ms に
      * 2 回走れてしまう。 */
-    let now = tick_now();
+    let now = crate::poll_clock::poll_now();
     let start = if mm.poll_last >= APP_ID_MIN && mm.poll_last <= APP_ID_MAX {
         (mm.poll_last - APP_ID_MIN + 1) as usize
     } else {
@@ -872,7 +863,7 @@ fn pick_poll(st: &GuiState) -> i32 {
             continue;
         }
         if mm.apps[i].poll_tick_valid && mm.apps[i].poll_tick == now {
-            continue; /* この tick では走り終えている */
+            continue; /* この ms では走り終えている */
         }
         if poll_ready(id) {
             mm.poll_choice = id;
@@ -935,14 +926,14 @@ pub fn mark_resumed(id: i32) {
     mm.last_run = id;
     mm.input_streak = 0;
     mm.running = id;
-    /* ポーリング群から選ばれた 1 本だけを巡回と tick の数えに載せる
+    /* ポーリング群から選ばれた 1 本だけを巡回と ms の印に載せる
      * (票 T9 D5)。入力群 / 導出群の起床は従来どおり `last_run` の巡回。 */
     if mm.poll_choice == id {
         mm.poll_choice = 0;
         mm.poll_last = id;
-        /* **ここで** tick を読む (実装レビュー 1 の blocker 2)。`pick` の
-         * 時点ではなく、実際に `exec_resume` する直前の tick に紐づける。 */
-        mm.apps[i].poll_tick = tick_now();
+        /* **ここで** ms を読む (実装レビュー 1 の blocker 2)。`pick` の
+         * 時点ではなく、実際に `exec_resume` する直前の ms に紐づける。 */
+        mm.apps[i].poll_tick = crate::poll_clock::poll_now();
         mm.apps[i].poll_tick_valid = true;
     }
 }

@@ -1,4 +1,5 @@
 #include "shell_boot.h"
+#include "input_usb.h"
 #include "lan_boot.h"
 #include "exec.h"
 #include "kprintf.h"
@@ -26,7 +27,7 @@ static void report(int kind, int code)
 void pm_shell_boot(void)
 {
     int kind, code;
-    while (!pm_term_connected()) pm_terminal_poll();
+    while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();
     (void)pm_terminal_trygetkey(); /* Consume the first OPEN cancellation. */
     for (;;) {
         (void)exec_run("/bin/sh.bin");

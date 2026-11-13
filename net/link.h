@@ -110,6 +110,9 @@
 
 /* ---- タイマ定数 (100Hz tick 基準) -------------------------------------- */
 #define LINK_RTO_TICKS      20      /* 再送間隔 (200ms)。NIC 受理 tick から */
+/* 1s reduces absent-peer broadcasts; a late host may wait up to 1s. */
+#define LINK_HELLO_IDLE_MS  1000
+#define LINK_HELLO_IDLE_TICKS (LINK_HELLO_IDLE_MS / 10)
 #define LINK_TRIES          5       /* 再送上限。超えたら再同期 */
 #define LINK_PROBE_TICKS    100     /* T_probe = 1 秒 */
 #define LINK_PROBE_MAX      5       /* STATUS が k 回無応答 → 再同期 */

@@ -3,6 +3,7 @@
  * BSD references: macppc/clock.c (OpenBSD) 119-129,251-261;
  * powerpc/clock.c (NetBSD) 108-116,139-159. DEC programming belongs to F2. */
 #include "clock_source.h"
+#include "kernel/irq/tick_budget.h"
 #include "platform_timer.h"
 #include "kboot_info.h"
 #include "os32_kapi_shared.h"
@@ -59,6 +60,7 @@ int platform_clock_init(u32 tick_hz)
     clock_state.tick_hz = tick_hz;
     clock_state.counter_hz = bound_hz;
     clock_state.ready = 1;
+    tick_budget_config();
     return 0;
 }
 

@@ -1,5 +1,9 @@
 #include "pit.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 #include "sysclk.h"
+#include "io.h"
 #include "../../include/platform_timer.h"
 
 /* ======================================================================== */
@@ -13,7 +17,7 @@
 /*  なっていた。NP21/W は 1.9968MHz 設定なので**ここは踏めない**            */
 /*  (docs/POLICY_DEBUG.md#4-54-pit-の実時間)。                                          */
 /*                                                                          */
-/*  hz: 割り込み周波数。いまは PIT_HZ のみ。                                */
+/*  hz: 割り込み周波数。100 (製品) と 1000 (TICK1K の試験像)。            */
 /*  戻り: 0 = 頼まれたとおり / 負 = 出せないので既定 PIT_HZ を積んだ         */
 /* ======================================================================== */
 static struct pit_setup s_pit = { 0, 0, 0, 0, 0, 0 };
@@ -21,6 +25,21 @@ static struct pit_setup s_pit = { 0, 0, 0, 0, 0, 0 };
 const struct pit_setup *pit_get_setup(void)
 {
     return &s_pit;
+}
+
+unsigned int pit_read_count(void)
+{
+    u8 lo, hi;
+#ifdef TICK_PROBE
+    tick_probe_extra_begin(TP_PIT);
+#endif
+    outp(PIT_MODE, PIT_LATCH_TIMER0);
+    lo = (u8)inp(PIT_CNTR0);
+    hi = (u8)inp(PIT_CNTR0);
+#ifdef TICK_PROBE
+    tick_probe_extra_end(TP_PIT);
+#endif
+    return ((unsigned int)hi << 8) | lo;
 }
 
 int pit_init(unsigned int hz)

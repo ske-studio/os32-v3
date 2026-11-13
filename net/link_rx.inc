@@ -157,6 +157,8 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     if (!link_paylen_ok(op, flags, plen)) { link_rx_dropped++; return; }
     pl = h + LINK_HDR_LEN;
     link_rx_frames++;
+    if (op != LINK_OP_HELLO || flags == LINK_HS_SYNACK || flags == LINK_HS_ESTAB)
+        link_hello_idle = 0;
 
     if (op == LINK_OP_HELLO) {
         link_on_hello(f + ETH_ALEN, flags, epoch, seq, ack, sess, pl, plen);
@@ -255,6 +257,9 @@ static void link_rx_pump(void)
     int n;
     for (n = 0; n < LINK_RX_BUDGET; n++) {
         u32 len = 0;
+        if (!net_rx_queued(NET_RX_LINK)) break;
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                              tick_budget_cnt(NET_TAIL_RX_US))) break;
         if (net_rx_take(NET_RX_LINK, link_rxbuf, sizeof(link_rxbuf), &len) != 0) break;
         link_dispatch(link_rxbuf, len);
     }

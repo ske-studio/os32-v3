@@ -256,6 +256,14 @@ volatile u32 tick_count;
  * 起動 35 分 48 秒 (2^31 µs) や 71 分 (2^32 µs) を跨ぐ試験に要る。 */
 static unsigned long long sim_now_us;
 static int sim_time_fail;
+static u32 sim_jiffy_hi;
+
+void tick_clock_jiffy64(u32 *lo, u32 *hi)
+{
+    CHECK(pcm_shim_irq_depth > 0);
+    *lo = tick_count;
+    *hi = sim_jiffy_hi;
+}
 
 int sys_time_now(u32 *lo, u32 *hi)
 {
@@ -410,6 +418,7 @@ static void reset_all(void)
     tick_count = 0;
     sim_now_us = 0;
     sim_time_fail = 0;
+    sim_jiffy_hi = 0;
     sim_owner = 1;
     pcm_shim_irq_depth = 0;
 
@@ -1616,6 +1625,11 @@ static void case_clock(void)
     sim_time_fail = 1;                       /* 代用は tick × 10ms = 0 */
     step(100, 0);
     CHECK(g_pcm.now == 5000U);               /* 戻らない */
+    tick_count = 0xffffffffU;
+    CHECK(pcm_clock_us() == 0xffffffffULL * PCM_US_PER_TICK);
+    tick_count = 0;
+    sim_jiffy_hi = 1;
+    CHECK(pcm_clock_us() == 0x100000000ULL * PCM_US_PER_TICK);
     sim_time_fail = 0;
 }
 

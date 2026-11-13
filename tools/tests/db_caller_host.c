@@ -52,6 +52,7 @@ static u32 tick_count;
 volatile u32 ring3_caller_reject_count;
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
 static int stop_park_calls;
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 /* kprintf is outside this fixture; sys_stat uses the real string staging. */

@@ -7,7 +7,7 @@
 /*  見るのは **NP21/W では一度も通らない** 分岐 (記録: pit_clock_tdd.md):   */
 /*    (a) 2.4576MHz 系 (実機 PC-9821Ra266) のリロード値 24576               */
 /*    (b) どちらのクロックでも周期がちょうど 10000µs                        */
-/*    (c) 100Hz 以外と未知のクロックを**既定へ倒さずに断る**                */
+/*    (c) 100 / 1000Hz 以外と未知のクロックを**既定へ倒さずに断る**                */
 /*    (d) 中間積が 32bit に収まること (ホストの long は 64bit なので、       */
 /*        溢れそのものは踏めない — 上限と比べて確かめる)                    */
 /* ======================================================================== */
@@ -15,12 +15,49 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../platform/pc98/pit_math.c"
+#include "../../platform/pc98/pit.h"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
 } } while (0)
 
 static int failed;
+
+static struct pit_setup self_setup;
+static unsigned long self_clock;
+static unsigned int self_rate;
+const struct pit_setup *pit_get_setup(void) { return &self_setup; }
+static int sysclk_detected(void) { return 1; }
+static unsigned long sysclk_hz(void) { return self_clock; }
+static void check(int ok, const char *why) { if (!ok) { fprintf(stderr, "FAIL %s\n", why); failed++; } }
+#undef PIT_IRQ_HZ
+#define PIT_IRQ_HZ self_rate
+#include "../../kdebug/kselftest/pit_setup.inc"
+
+static void selftest_setup(void)
+{
+    const unsigned long clocks[] = { SYSCLK_1997, SYSCLK_2458 };
+    const unsigned int rates[] = { 100, 1000 };
+    for (unsigned int i=0; i<2; i++) for (unsigned int j=0; j<2; j++) {
+        self_clock=clocks[i]; self_rate=rates[j];
+        CHECK(!pit_compute(self_clock, self_rate, &self_setup));
+        self_setup.mode=PIT_MODE_TIMER0;
+        test_pit_setup();
+        CHECK(failed == 0);
+        self_setup.period_us++;
+        int before=failed;
+        test_pit_setup();
+        CHECK(failed > before);
+        failed=before;
+        self_setup.period_us--;
+        self_setup.reload--;
+        before=failed;
+        test_pit_setup();
+        CHECK(failed > before);
+        failed=before;
+    }
+}
+
 
 /* 期待するリロード値。**式ではなく数で書く** — 実装と同じ式で期待値を作ると
  * 両方が同じだけずれたときに気づけない。 */
@@ -60,19 +97,16 @@ static void both_clocks(void)
 }
 
 /* ------------------------------------------------------------------ */
-/*  (c) 100Hz 以外を断る                                               */
+/*  (c) 100 / 1000Hz 以外を断る                                               */
 /* ------------------------------------------------------------------ */
 static void reject_hz(void)
 {
     struct pit_setup s;
 
-    /* 1kHz は §5-5 の別票。ここで受けると**汎用の式を持たないまま**
-     * 1996 / 2457 という端数のリロード値が積まれ、周期が µs でずれる。 */
-    CHECK(pit_compute(SYSCLK_1997, 1000, &s) < 0);
-    CHECK(s.valid == 0);
-    CHECK(s.reload == 0);
-    CHECK(pit_compute(SYSCLK_2458, 1000, &s) < 0);
-    CHECK(s.valid == 0);
+    CHECK(pit_compute(SYSCLK_1997, 1000, &s) == 0);
+    CHECK(s.valid == 1 && s.hz == 1000 && s.reload == 1997);
+    CHECK(pit_compute(SYSCLK_2458, 1000, &s) == 0);
+    CHECK(s.valid == 1 && s.hz == 1000 && s.reload == 2458);
 
     /* 0Hz は 0 除算になるので必ず断る。 */
     CHECK(pit_compute(SYSCLK_1997, 0, &s) < 0);
@@ -85,7 +119,7 @@ static void reject_hz(void)
     CHECK(pit_compute(SYSCLK_1997, 101, &s) < 0);
 
     /* 断り方は「種別の分かる負」で、成功の 0 とは別。 */
-    CHECK(pit_compute(SYSCLK_1997, 1000, &s) == PIT_ERR_HZ);
+    CHECK(pit_compute(SYSCLK_1997, 101, &s) == PIT_ERR_HZ);
 }
 
 /* ------------------------------------------------------------------ */
@@ -183,7 +217,8 @@ int main(int argc, char **argv)
 {
     if (argc != 2) return 2;
     failed = 0;
-    if (!strcmp(argv[1], "both_clocks")) both_clocks();
+    if (!strcmp(argv[1], "selftest_setup")) selftest_setup();
+    else if (!strcmp(argv[1], "both_clocks")) both_clocks();
     else if (!strcmp(argv[1], "reject_hz")) reject_hz();
     else if (!strcmp(argv[1], "reject_clock")) reject_clock();
     else if (!strcmp(argv[1], "no_overflow")) no_overflow();

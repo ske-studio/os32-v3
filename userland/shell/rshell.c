@@ -309,8 +309,8 @@ static int cmd_terminal(int argc, char **argv)
              * get_tick の連打で 1 tick を潰していたが、リング 3 では
              * KAPI 1 回 6us でアイドルが CPU を振り切る。sys_halt なら
              * 待ち時間 (~1 tick) を保ったまま get_tick 呼び出しがゼロになる。 */
-            u32 w = g_api->get_tick() + 1;
-            while (g_api->get_tick() < w) g_api->sys_halt();
+            u32 w = g_api->get_tick();
+            while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
         }
     }
     g_api->kprintf(ATTR_CYAN, "%s", "\n[Terminal closed]\n");
@@ -324,8 +324,8 @@ static void rshell_end_reply(void)
 {
     g_api->buz_off();
     {
-        u32 wait_end = g_api->get_tick() + 1;
-        while (g_api->get_tick() < wait_end) g_api->sys_halt();
+        u32 wait_start = g_api->get_tick();
+        while ((u32)(g_api->get_tick() - wait_start) < 1) g_api->sys_halt();
     }
     /* **EOT を送れたかは診断に出すだけ** (往復 4)。番犬の解除は
      * `serial ack` だけが決めるので、ここの成否は解除に関与しない。
@@ -352,9 +352,9 @@ static unsigned long rsh_io_tick(void *ctx)
 
 static void rsh_io_idle(void *ctx)
 {
-    u32 w = g_api->get_tick() + 1;
+    u32 w = g_api->get_tick();
     (void)ctx;
-    while (g_api->get_tick() < w) g_api->sys_halt();
+    while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
 }
 
 static const struct rsh_io rsh_io_real = {
@@ -403,8 +403,8 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
             {
                 /* rshell コマンド待ち。sys_halt でアイドル時の get_tick
                  * 連打 (実測 311k/s) を止める。SER 受信 IRQ でも起きる。 */
-                u32 w = g_api->get_tick() + 1;
-                while (g_api->get_tick() < w) g_api->sys_halt();
+                u32 w = g_api->get_tick();
+                while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
             }
         }
 

@@ -380,6 +380,8 @@ endef
 
 # --- テストプログラム登録 ---
 
+$(eval $(call DEFINE_TEST,mmtimetest,$$(LIBMMTIME_OBJ),$$(INC_libmmtime),userland/diag))
+
 $(eval $(call DEFINE_TEST,gfx2_i2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
 
 $(eval $(call DEFINE_TEST,hwscroll_probe,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
@@ -718,7 +720,7 @@ programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN) $(BUILD_OUT)/int80.img
 $(BUILD_OUT)/int80.img: tools/gen_v86_int80.py
 	python3 $< --out $@
 
-programs: gfx2_i2 hwscroll_probe libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
+programs: mmtimetest gfx2_i2 hwscroll_probe libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
 
 # === KAPI ヘッダ依存 ===
 userland/%.o: $(SDK_KAPI_HDR)
@@ -727,6 +729,7 @@ $(shell find userland -name '*.o' 2>/dev/null): $(SDK_KAPI_HDR)
 # === プログラムクリーン ===
 clean-programs: clean-rust clean-gshell
 	rm -f $(FAULTPROBE_OBJ)
+	rm -f userland/diag/mmtimetest.o userland/diag/mmtimetest.elf userland/diag/mmtimetest.raw userland/diag/mmtimetest.bin
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
 	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
 	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d

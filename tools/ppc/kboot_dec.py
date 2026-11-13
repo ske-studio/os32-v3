@@ -70,7 +70,8 @@ def image(out, source):
     v.FLAGS=previous_flags+['-I'+str(v.ROOT/'sdk/include/os32')]
     v.PRODUCT=[p for p in previous if p!='tools/ppc/kboot_vectors_fixture.c']+[
         str(fixture),str(source),'platform/powermac/clock.c',
-        'kernel/time/tick.c','kernel/irq/tick.c','lib/divdi3.c']
+        'kernel/time/tick.c','kernel/irq/tick.c','kernel/irq/tick_budget.c',
+        'platform/powermac/tick_budget.c','lib/divdi3.c']
     try: return v.build(out,v.ROOT/'arch/ppc/kernel_vectors.S')
     finally: v.PRODUCT=previous; v.FLAGS=previous_flags
 

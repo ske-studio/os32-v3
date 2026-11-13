@@ -24,7 +24,7 @@ FIXTURE = ROOT / 'tools/tests/dep_dir_b_l13_baseline.json'
 SOURCES = ('kernel/time/sysclk.c', 'platform/pc98/pit.c', 'kernel/time/ktime.c', 'platform/pc98/clock_source.c', 'platform/pc98/pit_time.c',
            'platform/pc98/pit_math.c', 'kernel/time/time_math.c',
            'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
-HEADERS = ('include/platform_timer.h', 'include/clock_source.h', 'platform/pc98/pit_time.h', 'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h',
+HEADERS = ('kernel/irq/tick_budget.h', 'include/platform_timer.h', 'include/clock_source.h', 'platform/pc98/pit_time.h', 'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h',
            'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'platform/pc98/pit_math.h', 'kernel/time/time_math.h',
            'kernel/time/ktime.h', 'kernel/time/tick_clock.h',
            'kernel/time/sysclk.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/bios_snapshot.h')
@@ -40,7 +40,7 @@ MUTATIONS = (
      '    out->p1 = platform_irq_timer_pending();\n    out->p2 = platform_irq_timer_pending();'),
     ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
     ('platform/pc98/clock_source.c', '        platform_timer_sample(&hw);',
-     '        t = (unsigned int)tick_count;\n        platform_timer_sample(&hw);'),
+     '        tick_clock_raw(&raw_lo, &raw_hi);\n        platform_timer_sample(&hw);'),
     ('platform/pc98/clock_source.c', '*lo = out_lo;', '*lo = out_lo ^ (attempt == 1);'),
     ('platform/pc98/clock_source.c', '*hi = out_hi;', '*hi = out_hi ^ (attempt == 1);'),
     ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
@@ -50,7 +50,7 @@ MUTATIONS = (
 )
 # Relocations remove the old operation, rather than adding another sample.
 REMOVALS = {2: '    out->p2 = platform_irq_timer_pending();',
-            4: '        t = (unsigned int)tick_count;'}
+            4: '        tick_clock_raw(&raw_lo, &raw_hi);'}
 
 
 def build(work, clock_byte, mutation=None, baseline=None, retry_value=False):

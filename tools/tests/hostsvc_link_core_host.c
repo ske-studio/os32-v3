@@ -39,6 +39,7 @@ int net_mac(u8 out[6])
 static u8 rx_frame[1520];
 static u32 rx_length;
 static int rx_calls, mailbox_calls, mailbox_alive;
+u32 net_rx_queued(u16 protocol) { return protocol == NET_RX_LINK && rx_length != 0; }
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 {
     rx_calls++;
@@ -356,3 +357,10 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+#ifndef TICK_BUDGET_REAL
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+#endif

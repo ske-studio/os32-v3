@@ -14,6 +14,16 @@ static void cycles(const char *name, unsigned long long value)
     kprintf(7, "%s=0x%08x%08x ", name,
             (unsigned int)(value >> 32), (unsigned int)value);
 }
+/* Bitwise division avoids a libgcc dependency in this module. */
+static unsigned long long average(unsigned long long total, unsigned int count)
+{
+    unsigned long long q = 0, remainder = 0;
+    for (int bit = 63; bit >= 0; bit--) {
+        remainder = (remainder << 1) | ((total >> bit) & 1);
+        if (remainder >= count) { remainder -= count; q |= 1ULL << bit; }
+    }
+    return q;
+}
 int tick_probe_call(void *buf, unsigned int size)
 {
     if (!buf || size != sizeof(struct tp_request) || !_irq_enabled()) return -1;
@@ -41,6 +51,15 @@ int tick_probe_call(void *buf, unsigned int size)
             for (unsigned int i = 0; i < TP_BINS; i++) kprintf(7, " %u", v->hist[i]);
             kprintf(7, "\n");
         }
+        kprintf(7, "interval-over-2^22=%u (bins start at 2^8)\n", s->bank[bank][TP_INTERVAL].hist[15]);
+        for (unsigned int id = 0; id < TP_EXTRA_COUNT; id++) {
+            const struct tp_stat *v = &s->extra[bank][id];
+            kprintf(7, "%s count=%u ", (const char *const[]){"mtrr-wc", "irq3", "irq5", "slot-budget", "pit-read"}[id], v->count);
+            cycles("worst", v->worst); cycles("total", v->total);
+            if (id == TP_PIT && v->count) cycles("average", average(v->total, v->count));
+            kprintf(7, "\n");
+        }
+        kprintf(7, "mtrr-last-caller=0x%08x\n", (unsigned int)s->wc_caller[bank]);
         cycles("net-worst", s->net[bank].total);
         for (unsigned int i = 0; i < TP_NET_COUNT; i++)
             cycles((const char *const[]){"demux", "rx-pump", "deadlines", "timers", "tx-round", "notify"}[i], s->net[bank].part[i]);
@@ -61,6 +80,8 @@ int tick_probe_call(void *buf, unsigned int size)
         cycles("irq0-occupancy-numerator", s->bank[bank][TP_IRQ0].total);
         cycles("occupancy-denominator", s->elapsed[bank]); kprintf(7, "\n");
     }
+    cycles("scb-polls-total-module-lifetime", s->scb_polls_total);
+    kprintf(7, "scb-polls-max=%u\n", s->scb_polls_max);
     kprintf(7, "IRQ1 count=%u IRQ10 count=%u\n", s->arrivals[0], s->arrivals[1]);
     cycles("irq1-last-arrival", s->arrival[0]);
     cycles("irq10-last-arrival", s->arrival[1]);

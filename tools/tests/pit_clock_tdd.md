@@ -97,3 +97,10 @@ MUTATION 5 RED (2 件): 断ったのに valid を立てる (呼び出し側が�
 / `mode == PIT_MODE_TIMER0` / `sysclk_detected()`)。
 実時間そのものの照合は、実機で `tick_count` を 60 秒ぶん読んでホストの単調時計と
 突き合わせる ([POLICY_DEBUG §4-54](../../docs/POLICY_DEBUG.md#4-54-pit-の実時間))。
+
+## 段 L B6・B7' の境界
+
+`pit_clock_host.c` は分周値と表示用 `period_us` の試験なので100Hzの期待値を保つ。
+µs補間は `time_us_from64` の raw・reload・clk_hz の有理式に移り、
+`period_us` は計算に使わない。100Hzの両クロックの互換性と1000Hzの
+精度・単調性は `test_clock_caller.py`、純粋な算数は `test_time_math.py` で見る。

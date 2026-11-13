@@ -21,7 +21,7 @@ static void ring_resync(u8 curr)
     wr(NE2K_P0_BNRY, ne2k_ring_bnry_for(nic.rx_start, nic.rx_stop, curr));
 }
 
-/* リングから 1 フレーム分をホストキューへ。戻り値: 1 = 進んだ, 0 = 空, -1 = 再初期化要 */
+/* リングから 1 フレーム分をホストキューへ。戻り値: 1 = 進んだ, 0 = 空, 2 = キュー満杯, -1 = 再初期化要 */
 #ifdef TICK_PROBE
 #define rx_one rx_one_impl
 #endif
@@ -34,6 +34,7 @@ static int rx_one(u8 curr)
     int fcs_in_count = (nic.cfg.flags & NE2K_CFG_RX_COUNT_NO_FCS) ? 0 : 1;
 
     if (nic.rx_next == curr) return 0;
+    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;
 
     if (dma_read((u16)nic.rx_next << 8, raw, NE2K_RX_HDR_LEN)) return -1;
     ne2k_ring_decode_hdr(raw, &h);
@@ -49,8 +50,6 @@ static int rx_one(u8 curr)
 
     if (chk == NE2K_RING_RX_ERROR) {
         nic.st.rx_err++;
-    } else if (nic.rxq_count >= NE2K_RXQ_SLOTS) {
-        nic.st.rx_dropped++;
     } else {
         u8 *dst = nic.rxq_buf[nic.rxq_tail];
         u16 addr = (u16)(((u16)nic.rx_next << 8) + NE2K_RX_HDR_LEN);
@@ -94,14 +93,14 @@ static int rx_one(u8 curr)
 }
 #endif
 
-/* budget フレームまで回収。戻り値 -1 = 再初期化要、1 = 予算を使い切り未回収が残る、0 = 空 */
+/* budget フレームまで回収。戻り値 -1 = 再初期化要、1 = 予算を使い切り未回収が残る、2 = キュー満杯、0 = 空 */
 static int rx_drain(unsigned int budget)
 {
     while (budget > 0) {
         u8 curr = read_curr();
         int r = rx_one(curr);
         if (r < 0) return -1;
-        if (r == 0) return 0;
+        if (r == 0 || r == 2) return r;
         budget--;
     }
     return (read_curr() != nic.rx_next) ? 1 : 0;
@@ -143,7 +142,7 @@ static void ovw_continue(void)
         reinit_or_fail();
         return;
     }
-    nic.rx_backlog = (u8)(r == 1);
+    nic.rx_backlog = (u8)(r > 0);
     /* 旧送信の完了を、新しい送信を受け付ける前に回収する。 */
     isr = rd(NE2K_P0_ISR) | nic.need_rx;
     nic.need_rx = 0;
@@ -208,22 +207,22 @@ static void tx_check_timeout(void)
 }
 
 /* NIC を触る共通の 1 サイクル。呼び出し側が busy を握っていること。 */
-static void service(unsigned int budget)
+static int service(unsigned int budget)
 {
     u8 isr;
 
     if (nic.state == NE2K_STATE_OVW_WAIT) {
         ovw_continue();
-        return;
+        return 0;
     }
-    if (nic.state != NE2K_STATE_RUNNING) return;
+    if (nic.state != NE2K_STATE_RUNNING) return 0;
 
     isr = rd(NE2K_P0_ISR) | nic.need_rx;
     nic.need_rx = 0;
     if (isr & NE2K_ISR_OVW) {
         nic.need_rx |= isr & (NE2K_ISR_PTX | NE2K_ISR_TXE);
         ovw_begin(isr);
-        return;
+        return 0;
     }
     if (isr & (NE2K_ISR_PTX | NE2K_ISR_TXE)) tx_complete(isr);
     if (isr & (NE2K_ISR_PRX | NE2K_ISR_RXE)) {
@@ -238,12 +237,13 @@ static void service(unsigned int budget)
         int r = rx_drain(budget);
         if (r < 0) {
             reinit_or_fail();
-            return;
+            return 0;
         }
-        if (r == 1 && !nic.rx_backlog) nic.st.rx_backlog_events++;
-        nic.rx_backlog = (u8)(r == 1);
+        if (r > 0 && !nic.rx_backlog) nic.st.rx_backlog_events++;
+        nic.rx_backlog = (u8)(r > 0);
+        tx_check_timeout();
+        return r == 2;
     }
-    tx_check_timeout();
 }
 
 /* ====================================================================== */

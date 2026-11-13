@@ -53,7 +53,7 @@ KB_PLATFORM := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/p
  platform/powermac/gmac_tree.c platform/powermac/gmac_clock.c \
  platform/powermac/kboot_reserve.c platform/powermac/memory.c \
  platform/powermac/mpic_tree.c platform/powermac/mpic.c \
- platform/powermac/clock.c platform/powermac/log.c \
+ platform/powermac/clock.c platform/powermac/tick_budget.c platform/powermac/log.c \
  platform/powermac/kboot_console.c platform/powermac/pci_config.c \
  platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c \
  platform/powermac/lan_log.c platform/powermac/lan_wire.c \
@@ -62,7 +62,7 @@ KB_PLATFORM := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/p
  platform/powermac/terminal_input.c
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
- mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/time/tick.c \
+ mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/irq/tick_budget.c kernel/time/tick.c \
  lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c kernel/idle_work.c fs/fd_redirect.c
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
@@ -98,6 +98,7 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
 KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
 ifeq ($(KBOOT_SH),1)
+KB_C += platform/powermac/input_usb.c platform/powermac/input_keymap.c
 KB_C += platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c \
  $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
 KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c \

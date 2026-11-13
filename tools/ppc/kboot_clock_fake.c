@@ -92,3 +92,5 @@ void _start(void)
     REQUIRE(lo==123 && hi==456);
     quit(0);
 }
+
+void tick_budget_config(void) { }

@@ -7,6 +7,7 @@
 #ifndef TICK_PROBE_HOST
 #include "io.h"
 #include "irq.h"
+#include "lan_contract.h"
 #include "kstring.h"
 #else
 extern void *kmemset(void *, int, unsigned int);
@@ -16,6 +17,8 @@ extern unsigned int kctx_irq_depth;
 static struct tp_snapshot data;
 static struct tp_mark pending[TP_METRICS], interval, if0;
 static unsigned int splash, epoch;
+static struct tp_mark extra_pending[TP_EXTRA_COUNT];
+static unsigned long wc_caller;
 static unsigned long long window;
 static struct tp_mark net_start, net_part[TP_NET_COUNT], pio_mark;
 static unsigned long long net_values[TP_NET_COUNT], pio_cycles[TP_CONTEXTS];
@@ -39,34 +42,67 @@ static struct tp_mark mark(void)
 {
     return (struct tp_mark){now(), epoch, splash, 1};
 }
-static void add_stat(struct tp_stat *s, unsigned long long d)
+static void add_stat_shift(struct tp_stat *s, unsigned long long d, unsigned int shift)
 {
-    unsigned long long bound = 1;
+    unsigned long long bound = 1ULL << shift;
     unsigned int bin = 0;
     while (bin < TP_BINS - 1 && d > bound) { bin++; bound <<= 1; }
     if (s->count == ~0U || ~0ULL - s->total < d) { data.lost++; return; }
     s->count++; s->hist[bin]++; s->total += d;
     if (d > s->worst) s->worst = d;
 }
+static void add_stat(struct tp_stat *s, unsigned long long d)
+{
+    add_stat_shift(s, d, 0);
+}
 static void add(unsigned int id, struct tp_mark m, unsigned long long end)
 {
     if (!m.valid || end < m.t) { data.lost++; return; }
     unsigned int bank = m.splash || splash || m.epoch != epoch;
-    add_stat(&data.bank[bank][id], end - m.t);
+    add_stat_shift(&data.bank[bank][id], end - m.t, id == TP_INTERVAL ? 8 : 0);
 }
-unsigned long long tick_probe_p99(const struct tp_stat *s)
+static unsigned long long p99_shift(const struct tp_stat *s, unsigned int shift)
 {
     if (!s->count) return 0;
     unsigned int rank = s->count - s->count / 100, n = 0;
     for (unsigned int i = 0; i < TP_BINS; i++) {
         n += s->hist[i];
         if (n >= rank) {
-            unsigned long long upper = 1ULL << i;
+            unsigned long long upper = 1ULL << (i + shift);
             return upper < s->worst && i < TP_BINS - 1 ? upper : s->worst;
         }
     }
     return s->worst;
 }
+unsigned long long tick_probe_p99(const struct tp_stat *s)
+{
+    return p99_shift(s, 0);
+}
+void tick_probe_extra_begin(unsigned int id)
+{
+    if (!data.running) return;
+    if (extra_pending[id].valid) data.lost++;
+    extra_pending[id] = mark();
+}
+void tick_probe_extra_end(unsigned int id)
+{
+    if (!data.running) return;
+    struct tp_mark m = extra_pending[id];
+    unsigned long long t = now();
+    if (!m.valid || t < m.t) data.lost++;
+    else {
+        unsigned int bank = m.splash || splash || m.epoch != epoch;
+        if (id == TP_WC) data.wc_caller[bank] = wc_caller;
+        add_stat(&data.extra[bank][id], t - m.t);
+    }
+    extra_pending[id].valid = 0;
+}
+void tick_probe_wc_begin(unsigned long caller)
+{
+    wc_caller = caller;
+    tick_probe_extra_begin(TP_WC);
+}
+void tick_probe_wc_end(void) { tick_probe_extra_end(TP_WC); }
 void tick_probe_begin(unsigned int id)
 {
     if (!data.running) return;
@@ -85,6 +121,7 @@ void tick_probe_irq_enter(unsigned int irq)
 {
     if (!data.running) return;
     if (irq == 5) irq5_active = 1;
+    if (irq == 3 || irq == 5) tick_probe_extra_begin(irq == 3 ? TP_IRQ3 : TP_IRQ5);
     if (irq == 0) {
         unsigned long long t = now();
         if (pending[TP_IRQ0].valid) data.lost++;
@@ -99,7 +136,11 @@ void tick_probe_irq_enter(unsigned int irq)
 }
 void tick_probe_irq_leave(unsigned int irq)
 {
-    if (irq == 5) { irq5_active = 0; return; }
+    if (irq == 3 || irq == 5) {
+        tick_probe_extra_end(irq == 3 ? TP_IRQ3 : TP_IRQ5);
+        if (irq == 5) irq5_active = 0;
+        return;
+    }
     if (!data.running || irq != 0) return;
     /* Short path excludes timer AND separately charged logical work. */
     unsigned int bank = pending[TP_IRQ0].splash || splash ||
@@ -255,6 +296,7 @@ int tick_probe_control(struct tp_control *c)
         unsigned long long cost = data.empty_cost;
         kmemset(&data, 0, sizeof(data));
         kmemset(pending, 0, sizeof(pending));
+        kmemset(extra_pending, 0, sizeof(extra_pending));
         interval.valid = if0.valid = net_start.valid = pio_mark.valid = 0;
         kmemset(net_part, 0, sizeof(net_part));
         kmemset(pio_cycles, 0, sizeof(pio_cycles));
@@ -271,6 +313,8 @@ int tick_probe_control(struct tp_control *c)
             data.elapsed[splash] += now() - window;
             for (unsigned int i = 0; i < TP_METRICS; i++)
                 if (pending[i].valid) data.lost++;
+            for (unsigned int i = 0; i < TP_EXTRA_COUNT; i++)
+                if (extra_pending[i].valid) data.lost++;
             if (if0.valid) data.lost++;
             if (net_start.valid || pio_mark.valid) data.lost++;
         }
@@ -282,7 +326,7 @@ int tick_probe_control(struct tp_control *c)
     if (data.running) return -1; /* never scan mutable statistics with IF=0 */
     for (unsigned int bank = 0; bank < 2; bank++)
         for (unsigned int id = 0; id < TP_METRICS; id++)
-            data.bank[bank][id].p99_upper = tick_probe_p99(&data.bank[bank][id]);
+            data.bank[bank][id].p99_upper = p99_shift(&data.bank[bank][id], id == TP_INTERVAL ? 8 : 0);
     for (unsigned int b = 0; b < 2; b++)
         for (unsigned int i = 0; i < TP_DEVICE_COUNT; i++)
             for (unsigned int j = 0; j < TP_CONTEXTS; j++) {
@@ -290,6 +334,14 @@ int tick_probe_control(struct tp_control *c)
                 d->full.p99_upper = tick_probe_p99(&d->full);
                 d->pio.p99_upper = tick_probe_p99(&d->pio);
             }
+#ifndef TICK_PROBE_HOST
+    /* Existing resident LAN facade queries the currently loaded module. */
+    unsigned int flags = irq_save();
+    data.scb_polls_max = e82557_stat(E82557_ST_COUNT);
+    data.scb_polls_total = e82557_stat(E82557_ST_COUNT + 1);
+    data.scb_polls_total |= (unsigned long long)e82557_stat(E82557_ST_COUNT + 2) << 32;
+    irq_restore(flags);
+#endif
     c->snapshot = &data;
     return 0;
 }

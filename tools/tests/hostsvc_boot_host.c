@@ -111,6 +111,7 @@ void link_notify_tick(u32 now) { (void)now; }
 void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
 { (void)s; (void)e; (void)x; (void)g; (void)a; }
 void link_notify_rx(u32 seq, const u8 *p, u16 n) { (void)seq; (void)p; (void)n; }
+u32 net_rx_queued(u16 protocol) { (void)protocol; return 0; }
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 { (void)protocol; (void)out; (void)cap; (void)len; return OS32_ERR_AGAIN; }
 #define LINK_HOST_TEST
@@ -195,3 +196,7 @@ const struct boot_common *boot_common_get(void) {
     info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
     return &info;
 }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

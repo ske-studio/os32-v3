@@ -16,7 +16,7 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
 from sb_run import INPUT, serial_accept
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
-             covers=['tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
+             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
              inputs=['build/ppc-user.mk', 'build/ppc-kboot.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
@@ -78,6 +78,9 @@ def lan_accept(elf, cpu, out, shell=False):
                 if phase == 0 and ready and (shell or 'os32> ' in aa) and host.boot:
                     validate(aa, bb, True)
                     q.call('eject', {'device': 'bootcd', 'force': True})
+                    if shell:
+                        require('OS32 External Shell Started' not in aa and b'sh> ' not in display.getvalue(),
+                                'LAN-only sh waits for first OPEN')
                     terminal.open(); phase = 1
                 elif phase == 1 and terminal.connected and (not shell or b'sh> ' in display.getvalue()):
                     if shell:
@@ -235,7 +238,9 @@ static int sc_connected(void)
 }
 '''
     boot = boot.replace('static void report', helper+'\nstatic void report')
+    require(boot.count('pm_term_connected()') == 1, 'unique SC replacement anchor: pm_term_connected()')
     boot = boot.replace('pm_term_connected()', 'sc_connected()')
+    require(boot.count('for (;;) pm_terminal_poll();') == 1, 'unique SC replacement anchor: for (;;) pm_terminal_poll();')
     boot = boot.replace('for (;;) pm_terminal_poll();', 'kprintf(7, "SB DONE\\n"); sb_done();')
     input_src = 'platform/powermac/input_boot.c'
     inp = (ROOT/input_src).read_text()
@@ -248,6 +253,7 @@ static int sc_connected(void)
 }
 '''
     inp = inp.replace('static PmInputDecoder', feeder+'\nstatic PmInputDecoder')
+    require(inp.count('pm_terminal_trygetkey()') == 1, 'unique SC replacement anchor: pm_terminal_trygetkey()')
     inp = inp.replace('pm_terminal_trygetkey()', 'sc_byte()')
     stream_src = 'platform/powermac/console_stream.c'
     stream = (ROOT/stream_src).read_text()
@@ -329,6 +335,11 @@ def main():
     args = parser.parse_args()
     if args.mutate and not args.serial:
         parser.error('--mutate requires --serial')
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
+            shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
+        print('SKIP ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable')
+        return 0
     rc = nest_main(args)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     work = Path(tempfile.mkdtemp(prefix='shell-', dir=Path(os.environ['TMPDIR'])/'sc-run'))

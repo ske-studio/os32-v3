@@ -17,6 +17,7 @@
 #include "dma_pool.h"
 #include "kmalloc.h"     /* ステージングは DMA しないので KHEAP から */
 #include "irq.h"
+#include "tick_clock.h"  /* tick_clock_jiffy64 */
 #ifdef OS32_PCM_MODULE
 #include "pcm_module.h"
 extern u32 ktime_ticks(void);
@@ -183,8 +184,12 @@ static unsigned long long pcm_clock_us(void)
 {
     u32 lo = 0, hi = 0;
 
-    if (sys_time_now(&lo, &hi) != 0)
-        return (unsigned long long)tick_count * PCM_US_PER_TICK;
+    if (sys_time_now(&lo, &hi) != 0) {
+        unsigned int flags = irq_save();
+        tick_clock_jiffy64(&lo, &hi);
+        irq_restore(flags);
+        return (((unsigned long long)hi << BITS_PER_U32) | lo) * PCM_US_PER_TICK;
+    }
     return ((unsigned long long)hi << BITS_PER_U32) | (unsigned long long)lo;
 }
 
