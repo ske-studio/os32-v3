@@ -23,10 +23,10 @@ r1→r2 の変更
 | LAN bytes の取り出し | `platform/powermac/input_boot.c:15` が terminal poll、`:20` が `pm_terminal_trygetkey()`。通信側の内部は今回の読取範囲外 |
 | bytes → sh 用キー | 同 `:22` が `pm_input_decode(&decoder,c,now)` を呼ぶ。`:8` の先読みを peek / try / blocking で共有 |
 | Enter・BS・取消 | `platform/powermac/input_decode.c:14` は取消通知・Ctrl-C→ESC、`:41` は CRLF 統合、`:42` は LF→CR、`:43` は DEL→BS |
-| 履歴 | 同 `:24` は端末の ESC [ A/B を `0x3A00/0x3D00` にする。文字は下位 byte、特殊キーは上位 byte |
+| 履歴 | 同 `:24` は端末の ESC ` A/B を `0x3A00/0x3D00` にする。文字は下位 byte、特殊キーは上位 byte |
 | provider の登録 | `platform/powermac/input_boot.c:41` の InputOps を `:53` で登録。`:26` はキー、`:28` は下位8bitを返す |
 | kernel の中継 | `kernel/input_service.c:49` が provider を選択、`:50`〜`:58` が getchar/getkey/KAPI/wait をそのまま委譲。変換器もキューも持たない |
-| USER sh 側の契約 | [docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md:138](PPC_SHELL_SC_DESIGN.md)〜`:146` はキー形式／文字形式を provider が供給、既存 USER sh を使う契約。syscall 内部の行は今回未調査 |
+| USER sh 側の契約 | `docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md:138`〜`:146` はキー形式／文字形式を provider が供給、既存 USER sh を使う契約。syscall 内部の行は今回未調査 |
 | kbd_inject の形 | `kernel/kbd_inject.c:186` は UTF-8 bytes を受ける。`:196`〜`:205` は reader / owner を照合、`:210` は宛先付き byte ring へ格納 |
 | kbd_inject の読出し | 同 `:248` は reader 指定で1 byte、`:272` は現在の reader。scan・make/break・修飾の解読はしない |
 | PPC の現経路 | `platform/powermac/input_boot.c:10`〜`:29` に kbd_inject の呼出しはない。LAN→decoder→InputOps→既存 sh 入力契約が接続点 |
@@ -42,7 +42,7 @@ r1→r2 の変更
 実物との食い違いは次の4件（未調査箇所は件数に含めない）。
 - D1: PACK の「kbd_inject を経由」は現 PowerMac provider には当てはまらない。ここへ scan を注入する案は採らない。
 - D2: USB 設計 §3 の release は1引数だが、現在は `usbp_input_release(int kind,u8 src)`。1A 追記 [USB_DESIGN.md:823](../usb/USB_DESIGN.md) と実装 `usb_platform.c:162` を採用する。
-- D3: USB だけで入力するには、従来の TERM_OPEN 待ち（[PPC_SHELL_SC_DESIGN.md:97](PPC_SHELL_SC_DESIGN.md)、試験の置換 `usb_run.py:99`）も製品で解消する必要がある。
+- D3: USB だけで入力するには、従来の TERM_OPEN 待ち（`PPC_SHELL_SC_DESIGN.md:97`、試験の置換 `usb_run.py:99`）も製品で解消する必要がある。
 - D4: 現 USB 受入の成功は sh の入力成功を意味しない。置換なしの製品像で文字列の実行結果を別に判定する。
 
 ## 2. つなぎ方
@@ -139,8 +139,8 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 | ＋tools/tests/ppc_input_usb_host.c | 状態・変換・FIFO・provider 合流の host 試験（製品関数を実行） |
 | ＋tools/checks/ver-ppc-input-usb.py | host の実行と一意な変異。CHECK に全製品入力・header・試験本体を列挙 |
 | tools/ppc/usb_run.py / sc_run.py | 製品像の sh 受入を追加、既存 probe と LAN 遅延起動受入を保持。下記4本の anchor と件数検査を追従。CHECK の入力・covers を追従 |
-| [docs/tasks/DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) | §6のカナ・IME延期行を実装時に登録 |
-| [docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md](PPC_SHELL_SC_DESIGN.md) | 入力・起動待ち・受入の正本を本設計へ更新（実装時） |
+| `docs/tasks/DEFERRED_TESTS.md` | §6のカナ・IME延期行を実装時に登録 |
+| `docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md` | 入力・起動待ち・受入の正本を本設計へ更新（実装時） |
 
 - 4本の置換 anchor は各対象で必ず1箇所を保ち、`.replace` 前に `count == 1` を検査する。`sc_run.py:238` の `pm_term_connected()`、`:251` と `usb_run.py:103` の `pm_terminal_trygetkey()`、`usb_run.py:99` の待ち1行が対象。最後は§2の新しい待ち1行へ追従する。製品受入にはこれらの入力・起動置換を適用しない。
 - この段で共通 USB/HID、kbd_inject、input_service、drivers/input、USER sh、SDK/KAPI の変更は予定しない。
@@ -173,7 +173,7 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 
 - PM決定: 初版は ASCII・JIS記号・CapsLock・Ctrl-C・矢印・HOME・DEL・履歴まで。カナ文字・IMEは後の段とし、KANA の make/break 追跡のみ行う。
 - 理由: 既存 PC-98 カナ変換器はリンクされていない。後段で UTF-8 のキュー形式・文字変換・IME の契約を設計する。
-- 実装時に [docs/tasks/DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) に載せる行: 「PowerMac USB カナ・IME入力 | PM決定で初版はASCII/JIS記号と行編集まで、カナ変換・IME契約は未実装 | PowerMacカナ・IME対応段の受入完了前に文字化・UTF-8キュー・IME接続・製品sh入力を検証する」。本設計では台帳自体を編集しない。
+- 実装時に `docs/tasks/DEFERRED_TESTS.md` に載せる行: 「PowerMac USB カナ・IME入力 | PM決定で初版はASCII/JIS記号と行編集まで、カナ変換・IME契約は未実装 | PowerMacカナ・IME対応段の受入完了前に文字化・UTF-8キュー・IME接続・製品sh入力を検証する」。本設計では台帳自体を編集しない。
 - sh の起動条件は LAN OPEN または USB の最初のキー、公開の3照会は0のまま。追加のユーザー判断は不要。
 
 反論: 0件。
