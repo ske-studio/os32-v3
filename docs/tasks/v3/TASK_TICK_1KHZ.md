@@ -1,6 +1,6 @@
 # TASK_TICK_1KHZ — P3 の 1kHz IRQ0 tick
 
-> 状態: **実装中 (2026-11-13)** — x86 の物理 1kHz を既定にした (B14)。段 A のゲートは実機 Ra266 と NP21/W で満たした (§2)。残りは §3。tick_clock は arch に依らない口 ([TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md))。
+> 状態: **実装中 (2026-11-14)** — x86 の物理 1kHz を既定にした (B14)。T1〜T3 (時計を TSC に・NE2K の受信を有限の demux に・PCM の補充を IRQ10 に) は NP21/W と実機 Ra266 で受入して main。段 A のゲートは実機 Ra266 と NP21/W で満たした (§2)。残りは §3。tick_clock は arch に依らない口 ([TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md))。
 
 ## 0. ユーザー決定 (原文)
 
@@ -32,7 +32,7 @@
 | A3 | 実機で見つかった阻害の解消: 計測点 (A3m)、相手不在の HELLO を 5 回の後 1 秒おきに (A3l)、e82557 の SCB の待ちを発行の前だけに (A3e)、GeForce の WC の lease を起動中保持 (A3w)、WC の取得を module の読み込みの時に (A3w2)。WM の全周をジフィの刻みに・Quit の猶予を 300 ジフィに (G3) | 済 (2026-11-13) |
 | L | x86 の物理 1kHz の準備: `PIT_IRQ_HZ` (B1)・`pit_math` (B5)・µs 時計 (B6・B7')・復旧の検査 (B9〜B10)・周回比較 (B11)・1kHz の結線の試験 (B12)・注記 (B13)・PCM の fallback (B15〜B16)・1000Hz の試験像 (B17)・合成器の 1ms の期限照合 (S1)。GUI の 1ms 再開 (G1・G2) と winmm のタイマ libmmtime (W1〜W8、KAPI の追加なし) は並列 | 設計は確定、実装は未着手 |
 | B14 | x86 の物理の既定値 100→1000 (memmap.h の 1 行) | 済 (2026-11-13)。取り込みの条件はユーザー決定 (§0) |
-| T1〜T3 | 続き ([TICK_T123_DESIGN](../../decisions/time/TICK_T123_DESIGN.md)): T1 時計を TSC に (x86、PowerPC は timebase で既に同じ形)、T2 NE2K の受信を来たら同じ協調の文脈で demux まで・NIC 共通の net_rx_idle (e82557 は 2 ジフィ走らなければ IRQ0 の予算で救う)、T3 期限まで遠いうちは IRQ0 で pcm_obs を呼ばず CS4231 の IRQ のコピーに任せる。PowerPC の受信は変更なし。FM の slot0 は対象外 (PM 決定) | 設計は確定 (2026-11-13)、実装は未着手 |
+| T1〜T3 | 続き ([TICK_T123_DESIGN](../../decisions/time/TICK_T123_DESIGN.md)): T1 時計を TSC に (x86、PowerPC は timebase で既に同じ形)、T2 NE2K の受信を来たら同じ協調の文脈で demux まで・NIC 共通の net_rx_idle (e82557 は 2 ジフィ走らなければ IRQ0 の予算で救う)、T3 期限まで遠いうちは IRQ0 で pcm_obs を呼ばず CS4231 の IRQ のコピーに任せる。PowerPC の受信は変更なし。FM の slot0 は対象外 (PM 決定) | **済 (2026-11-14)**。T1b (端点の費用の上限 32µs、NP21/W 18µs・実機 14µs) と T1c (監視の窓の遅れを故障に数えない、実機の 9600bps の serial の busy 待ちで FAILED になっていた) を足した。NP21/W: TSC READY・LAN 4MB は main 並み・Sleep(1) 1.91ms。実機: TSC は 600 秒の放置まで READY、sleep 600 の誤差は rshell の往復の定数 0.45 秒だけ、LAN 4MB 8.5〜8.8 秒、pcm 0、Sleep(1) の 99% 1.97ms、CPU を回すアプリの下でも e82557 の link は続く。証拠は ~/os32-tmp/evidence/2026-11-14/ の tk-t123-np21w・tk-t123-realhw・tk-t1c-realhw |
 
 - PM 決定 (確定の節): 各受入行は無変異の正常対照が exit 0・各変異が exit 1。スプラッシュ中の CTRL+STOP の取りこぼしが 100Hz 像でも出たら、1kHz の採否とは別の既存不具合の票にする。
 - 公開の `PIT_HZ=100` と ABI は変えない。
@@ -57,5 +57,4 @@
 - Sleep(1) の受入 W7 (中央値・99% とも ≤2.2ms、ユーザー決定 2026-11-13): 実機の 1kHz の製品像で中央値 1954µs・99% 1970µs。GUI での mmtimetest は未実施。
 - Quit の猶予の 3 秒の打ち切りは host 試験だけ (NP21/W では Quit に応じないアプリを起動できず、観測していない)。
 - 受信列が満杯でリングに残した回数が、NP21/W の 1kHz の像で iso・hostdrv の時に約 8 倍 (溢れは 0)。T2 で直す。
-- 余裕の小さい所: pcm の IRQ0 は最大 184.7µs (slot1 が最大 120µs)、pit_read_count は 1 回 3.8µs。T3 と T1 で直す。
 - hsync は大きさと mtime だけで差し替えを判定する (中身だけ違う部品を見落とす)。
