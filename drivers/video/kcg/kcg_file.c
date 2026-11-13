@@ -5,6 +5,7 @@
 #include "../../../mm/kmalloc.h"
 #include "../../../lib/kstring.h"
 #include "os32_kapi_shared.h"
+#include "../../../lib/lz4.h"
 
 #define KCG_FILE_HEADER 16u
 #define KCG_FILE_KANJI_COUNT (94u * 94u)
@@ -12,6 +13,7 @@
 #define KCG_FILE_ANK_BYTES (256u * 16u)
 #define KCG_FILE_ANK_OFFSET (KCG_FILE_KANJI_BYTES + KCG_FILE_KANJI_COUNT)
 #define KCG_FILE_PAYLOAD (KCG_FILE_ANK_OFFSET + KCG_FILE_ANK_BYTES + 256u)
+#define KCG_FILE_COMPRESSED_MAX (KCG_FILE_PAYLOAD + KCG_FILE_PAYLOAD / 255u + 16u)
 
 static u8 *resident;
 static KcgCacheStats counters;
@@ -24,25 +26,36 @@ static u32 read_le32(const u8 *p)
 static int load_guarded(void *arg)
 {
     const char *path = arg;
-    u32 id, size, i;
+    u32 id, size, i, flags, compressed;
     u8 header[KCG_FILE_HEADER];
-    u8 *data = 0;
+    u8 *data = 0, *input = 0;
     int rc = font_lease_resident_open(path, &id, &size);
     if (rc) return rc;
     rc = OS32_ERR_INVAL;
-    if (size != KCG_FILE_HEADER + KCG_FILE_PAYLOAD ||
-        font_lease_resident_read_at(id, 0, header, sizeof(header)) != (i32)sizeof(header) ||
+    if (size < KCG_FILE_HEADER) goto done;
+    if (font_lease_resident_read_at(id, 0, header, sizeof(header)) != (i32)sizeof(header) ||
         header[0] != 'K' || header[1] != 'C' || header[2] != 'G' || header[3] != '1' ||
-        read_le32(header + 4) != KCG_FILE_PAYLOAD || read_le32(header + 8) != 0 ||
+        read_le32(header + 4) != KCG_FILE_PAYLOAD ||
         read_le32(header + 12) != 0) goto done;
+    flags = read_le32(header + 8);
+    compressed = size - KCG_FILE_HEADER;
+    if (flags > 1) goto done;
+    if (flags == 0 && compressed != KCG_FILE_PAYLOAD) goto done;
+    if (flags == 1 && (compressed == 0 || compressed > KCG_FILE_COMPRESSED_MAX)) goto done;
     data = kmalloc(KCG_FILE_PAYLOAD);
     if (!data) { rc = OS32_ERR_NOSPC; goto done; }
-    if (font_lease_resident_read_at(id, KCG_FILE_HEADER, data, KCG_FILE_PAYLOAD) != (i32)KCG_FILE_PAYLOAD ||
+    if (flags == 1) {
+        input = kmalloc(compressed);
+        if (!input) { rc = OS32_ERR_NOSPC; goto done; }
+    }
+    if (font_lease_resident_read_at(id, KCG_FILE_HEADER, input ? input : data, compressed) != (i32)compressed ||
         font_lease_resident_validate(id)) goto done;
+    if (flags == 1 && lz4_decode(input, (int)compressed, data, KCG_FILE_PAYLOAD) != (int)KCG_FILE_PAYLOAD) goto done;
     for (i = 0; i < KCG_FILE_KANJI_COUNT; i++)
         if (data[KCG_FILE_KANJI_BYTES + i] != 1) goto done;
     for (i = 0; i < 256; i++)
         if (data[KCG_FILE_ANK_OFFSET + KCG_FILE_ANK_BYTES + i] != 1) goto done;
+    if (input) { kfree(input); input = 0; }
     rc = font_lease_resident_close(id);
     if (rc) { kfree(data); return rc; }
     if (resident) kfree(resident);
@@ -50,6 +63,7 @@ static int load_guarded(void *arg)
     counters.hits = counters.misses = 0;
     return 0;
 done:
+    if (input) kfree(input);
     if (data) kfree(data);
     (void)font_lease_resident_close(id);
     return rc;
