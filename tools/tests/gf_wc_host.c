@@ -72,7 +72,7 @@ struct ledger_surface *ledger_surface_find(u32 backend,u32 role)
 { CHECK(backend==LEDGER_SF_GEFORCE && role==LEDGER_ROLE_DISPLAY);return &ledger_surfaces[0]; }
 int x86_wc_acquire(u32 base,u32 bytes,struct x86_wc_lease *l)
 {
-    CHECK(started && base==DISPLAY && bytes==0x80000);
+    CHECK(plat.identify && plat.identify() && base==DISPLAY && bytes==0x80000);
     acquire_calls++;
     /* The architecture API requires inactive input, and loses old ownership
      * on reacquire. Catch the caller error before it can hide behind BIOS WC. */
@@ -92,7 +92,6 @@ int x86_wc_release(struct x86_wc_lease *l)
 void serial_puts(const char *s) { CHECK(s[0]=='R');reported++; }
 #include "gf_wc_source.inc"
 
-static int prepare_identity(void) { return identity; }
 int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *r,
                          int (*route)(void *),void *o)
 { (void)r;(void)route;(void)o;p->prepared=true;return 0; }
@@ -198,10 +197,18 @@ static void setup(int bios)
         .bus=LEDGER_BUS_PCI,.bdf=RECOVER_GF_BDF,.bar=1};
     ledger_surfaces[0]=(struct ledger_surface){.first=DISPLAY/PAGE_SIZE,.npages=75,.cache=LEDGER_CACHE_UC,.backing=LEDGER_SB_MMIO};
     plat=(struct geforce_platform){.resources=&resources,.bar0_phys=REGS,.display_phys=DISPLAY,
-        .identify=prepare_identity,.wc_start=geforce_wc_start,.wc_stop=geforce_wc_stop,.report=geforce_wc_report};
+        .wc_start=geforce_wc_start,.wc_stop=geforce_wc_stop,.report=geforce_wc_report};
+}
+static void load(void)
+{
+    CHECK(!started && !presented && !acquire_calls);
+    snapshot();
+    CHECK(!plat.identify);
     CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
-    CHECK(!production.display.display4);
-    gfx_backend_geforce.bb_base=client;snapshot();
+    CHECK(plat.identify && plat.identify());
+    wc_registered_start();
+    CHECK(!started && !presented && !production.display.display4);
+    gfx_backend_geforce.bb_base=client;unchanged();
 }
 static void restored(void) { CHECK(!lease.active && effective==baseline);unchanged(); }
 static void retained(void) { CHECK(lease.active && effective==1);unchanged(); }
@@ -213,13 +220,14 @@ static void lose_identity(void)
 }
 void _start(void)
 {
-    setup(0);intel=0;CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);intel=1;
-    setup(0);cpu_features=0;CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);
+    setup(0);intel=0;load();CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);intel=1;
+    setup(0);cpu_features=0;load();CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);
     setup(0);CHECK(arch_video_wc_eligible(DISPLAY,GF_MODE_VRAM_BYTES,GEFORCE_WC_BYTES,REGS,0x1000000));
     CHECK(flags==0x202);
 
     for(int bios=0;bios<2;bios++) {
-        setup(bios);gfx_backend_geforce.init();CHECK(active && acquire_calls==1 && presented==1);
+        setup(bios);load();CHECK(acquire_calls==1 && !release_calls && lease.active);
+        gfx_backend_geforce.init();CHECK(active && acquire_calls==1 && presented==1);
         gfx_backend_geforce.init();CHECK(acquire_calls==1 && presented==1);
         CHECK(geforce_wc_start()==1 && acquire_calls==1); /* Opus A: direct same-mode init too. */
         gfx_backend_geforce.leave();retained();CHECK(!release_calls);
@@ -230,19 +238,22 @@ void _start(void)
         CHECK(!plat.stop());retained(); /* abort/module recovery uses this same callback */
         lose_identity();
         for(int f=1;f<=4;f++) {
-            setup(bios);fault=f;if(f==2) result=-1;
+            setup(bios);fault=f;if(f==2) result=-1;load();
+            CHECK(acquire_calls==1 && !release_calls);
             gfx_backend_geforce.init();CHECK(failed && !active);unchanged();
-            if(f==1) restored();else { retained();lose_identity(); }
-            CHECK(acquire_calls==(f==1 ? 0 : 1));
-            CHECK(release_calls==(f==1 ? 0 : 1));
+            retained();lose_identity();
+            CHECK(acquire_calls==1 && release_calls==1);
         }
-        setup(bios);gfx_backend_geforce.init();identity=0;
+        setup(bios);load();gfx_backend_geforce.init();identity=0;
         gfx_backend_geforce.present_rect(0,0,1,1);CHECK(failed);restored();
     }
-    setup(0);result=0;gfx_backend_geforce.init();CHECK(active && !lease.active);
+    setup(0);result=0;load();CHECK(acquire_calls==1 && !lease.active);
+    gfx_backend_geforce.init();CHECK(active && !lease.active && acquire_calls==2);
+    gfx_backend_geforce.shutdown();restored();
+    gfx_backend_geforce.init();CHECK(active && acquire_calls==3 && !release_calls);
     gfx_backend_geforce.shutdown();restored();
     for(int gate=0;gate<15;gate++) {
-        setup(0);started=1;
+        setup(0);
         if(gate==0) ram=1;
         if(gate==1) resources.bars[1].raw&=~8U;
         if(gate==2) resources.bars[1].length=0x40000;
@@ -258,13 +269,16 @@ void _start(void)
         if(gate==12) has_id=0;
         if(gate==13) cpu_features=0;
         if(gate==14) ledger_surfaces[0].npages=128;
+        load();
         CHECK(!geforce_wc_start() && !acquire_calls && !lease.active);
         if(gate==12 || gate==13) CHECK(!msr_reads);
         CHECK(flags==0x202);
     }
-    setup(0);max_ext=0x80000008U;gfx_backend_geforce.init();CHECK(active);
+    setup(0);max_ext=0x80000008U;load();gfx_backend_geforce.init();CHECK(active);
     gfx_backend_geforce.shutdown();retained();lose_identity();
-    setup(0);result=-1;restore_fail=1;gfx_backend_geforce.init();
+    setup(0);result=-1;restore_fail=1;load();
+    CHECK(lease.active && acquire_calls==1 && !quiesces && !presented);
+    gfx_backend_geforce.init();
     CHECK(failed && lease.active && quiesces==1 && !presented);
     CHECK(geforce_wc_start()<0 && acquire_calls==1);CHECK(!release_calls);CHECK(!plat.stop());
     CHECK(geforce_wc_start()<0 && acquire_calls==1 && !release_calls);

@@ -5,7 +5,8 @@
 #include "rh_observe.h"
 #include "ofw.h"
 #include "kstring.h"
-static struct pm_rh_fb fb;
+static struct pm_rh_fb fb, full_fb;
+static u32 fb_va, fb_mmu;
 static volatile u8 *pixels;
 static int output;
 static u32 reached;
@@ -41,6 +42,7 @@ int pm_rh_capture(int stdout_ih)
     cell node[2] = {(cell)stdout_ih, 0};
     char type[16];
     fb = (struct pm_rh_fb){0};
+    full_fb = (struct pm_rh_fb){0};
     pixels = 0;
     output = stdout_ih;
     reached = 0;
@@ -75,12 +77,38 @@ int pm_rh_capture(int stdout_ih)
         if (!translate(mmu, va - offset + off, &next) || next != base + off)
             return -1;
     }
+    fb_va = va;
+    fb_mmu = mmu;
     fb.pa = pa;
     fb.bytes = bytes;
     /* height is the captured firmware height; rendering uses bytes/stride. */
     return 1;
 }
 const struct pm_rh_fb *pm_rh_framebuffer(void) { return &fb; }
+int pm_rh_capture_full(void)
+{
+    full_fb = (struct pm_rh_fb){0};
+    if (!fb.bytes) return PM_RH_FULL_ABSENT;
+    u32 offset = fb_va & (PM_RH_FB_PAGE - 1);
+    if (fb.height > ~0U / fb.stride) return PM_RH_FULL_SIZE;
+    u32 bytes = fb.stride * fb.height;
+    if (bytes > PM_RH_FB_FULL_LIMIT - offset) return PM_RH_FULL_SIZE;
+    u32 rounded = (offset + bytes + PM_RH_FB_PAGE - 1) & ~(PM_RH_FB_PAGE - 1);
+    u32 base = fb.pa - offset;
+    if (rounded > PM_RH_FB_FULL_LIMIT || fb_va - offset > ~0U - rounded ||
+        base > ~0U - rounded) return PM_RH_FULL_SIZE;
+    for (u32 off = 0; off < rounded; off += PM_RH_FB_PAGE) {
+        u32 next;
+        if (!translate(fb_mmu, fb_va - offset + off, &next) || next != base + off)
+            return PM_RH_FULL_TRANSLATE;
+    }
+    full_fb = fb;
+    full_fb.bytes = bytes;
+    return PM_RH_FULL_OK;
+}
+void pm_rh_discard_full(void) { full_fb = (struct pm_rh_fb){0}; }
+const struct pm_rh_fb *pm_rh_full_framebuffer(void) { return &full_fb; }
+
 int pm_rh_of_mark(unsigned stage)
 {
     if (stage > 15) return -1;
