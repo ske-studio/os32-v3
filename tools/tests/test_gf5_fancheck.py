@@ -99,7 +99,7 @@ import test_gf5 as suite
 
 MUTATIONS = [
     ('fancheck-write', 'hwdev/gf/therm.c',
-     'rc=th_policy(g,&policy);', 'rc=th_init(g); if (!rc) rc=th_policy(g,&policy);', 'fancheck'),
+     'rc=th_policy(g,&policy);', 'rc=th_init(g); if (!rc) rc=th_policy(g,&policy); else policy.trip=0;', 'fancheck'),
     ('fancheck-absence', 'hwdev/gf/therm.c',
      'if (rc==GF5_ENODEV) { rc=0; g->source_rc=0; }',
      'if (false && rc==GF5_ENODEV) { rc=0; g->source_rc=0; }', 'fancheck'),
