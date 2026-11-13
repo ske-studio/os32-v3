@@ -10,7 +10,7 @@ SDK_OUT = build/sdk
 
 # 公開ヘッダを SDK に載せるプラットフォームライブラリ。
 # rt/ は "rt/dbgserial.h" 形式で引くので別扱い (下のルール参照)。
-SDK_LIB_HEADER_DIRS = math gfx db ui input asset snd tilemap md filer mgx save ecs cfg
+SDK_LIB_HEADER_DIRS = math gfx db ui input asset snd tilemap md filer mgx save ecs cfg mmtime
 
 # kapi.json の version が KAPI バージョンの唯一の情報源。
 # ヘッダ・Rust バインディング・ドキュメントはすべてここから導出する。
