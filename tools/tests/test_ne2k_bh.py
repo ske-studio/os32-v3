@@ -44,24 +44,28 @@ def main():
             assert rc == 0, (runner, rc)
             print(f'GREEN all IF=0 entries, faults, recovery and TX FIFO ({runner})', flush=True)
         if args.mutate:
-            for label, old, new in [
-                ('leave-service', '        mark_work();\n    }\n    /* CNT may remain',
+            for label, filename, old, new in [
+                ('drop-full', 'ne2000_data.inc', '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;', '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) { nic.st.rx_dropped++; return 1; }'),
+                ('full-after-dma', 'ne2000_data.inc',
+                 '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;\n\n    if (dma_read((u16)nic.rx_next << 8, raw, NE2K_RX_HDR_LEN)) return -1;',
+                 '    if (dma_read((u16)nic.rx_next << 8, raw, NE2K_RX_HDR_LEN)) return -1;\n    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;'),
+                ('count-blocked', 'ne2000.c', '            if (blocked) break;', '            (void)blocked;'),
+                ('leave-service', 'ne2000.c', '        mark_work();\n    }\n    /* CNT may remain',
                  '        service(NE2K_IRQ_BUDGET);\n    }\n    /* CNT may remain'),
-                ('backlog-mask', '!nic.need_reinit)', '!nic.rx_backlog && !nic.need_reinit)'),
-                ('cnt-mask', 'NE2K_ISR_CNT | NE2K_ISR_OVW', 'NE2K_ISR_OVW'),
-                ('one-round', 'round < NE2K_BH_ROUNDS', 'round < 1'),
-                ('unbounded', 'round < NE2K_BH_ROUNDS', '1'),
-                ('obsolete-in-irq', 'if (!eflags_if() || kctx_irq_depth != 0)',
+                ('backlog-mask', 'ne2000.c', '!nic.need_reinit)', '!nic.rx_backlog && !nic.need_reinit)'),
+                ('cnt-mask', 'ne2000.c', 'NE2K_ISR_CNT | NE2K_ISR_OVW', 'NE2K_ISR_OVW'),
+                ('one-round', 'ne2000.c', 'round < NE2K_BH_ROUNDS', 'round < 1'),
+                ('obsolete-in-irq', 'ne2000.c', 'if (!eflags_if() || kctx_irq_depth != 0)',
                  'if (!eflags_if() || nic.in_irq)'),
             ]:
-                original = originals['ne2000.c']
+                original = originals[filename]
                 assert original.count(old) == 1, label
-                (work / 'ne2000.c').write_text(original.replace(old, new))
+                (work / filename).write_text(original.replace(old, new))
                 build()
                 rc = host32.run([str(exe)], runner='qemu').returncode
                 assert rc == 1, (label, rc)
                 print(f'MUTATE RED {label}: rc={rc}', flush=True)
-                (work / 'ne2000.c').write_text(original)
+                (work / filename).write_text(original)
 
 
 def run(ctx):

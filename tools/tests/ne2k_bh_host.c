@@ -94,10 +94,47 @@ static void bounded_work(void)
     CHECK(regs[0][NE2K_P0_IMR] == NE2K_IMR_MASK);
     u32 before = nic.st.rx_frames + nic.st.rx_dropped;
     ne2k_bh();
-    CHECK(nic.st.rx_frames + nic.st.rx_dropped - before == NE2K_BH_ROUNDS * NE2K_IRQ_BUDGET);
+    CHECK(nic.st.rx_frames + nic.st.rx_dropped - before == NE2K_RXQ_SLOTS);
     CHECK(nic.rx_backlog && nic.imr_written == NE2K_IMR_MASK);
     CHECK(!(regs[0][NE2K_P0_ISR] & NE2K_IMR_MASK));
     CHECK(ne2k_irq_shared(5, 0) == IRQ_HANDLED);
+}
+
+static void full_queue_backpressure(void)
+{
+    device_init();
+    queue_frames(NE2K_RXQ_SLOTS + 2);
+    u8 page = nic.rx_next;
+    for (unsigned int i = 0; i < NE2K_RXQ_SLOTS + 2; i++) {
+        ram[((unsigned int)page << 8) + NE2K_RX_HDR_LEN] = (u8)i;
+        page = ne2k_ring_advance(nic.rx_start, nic.rx_stop, page, 1);
+    }
+    ne2k_poll(4);
+    ne2k_bh();
+    u8 retained = nic.rx_next;
+    u32 dropped = nic.st.rx_dropped;
+    CHECK(nic.rxq_count == NE2K_RXQ_SLOTS && nic.rx_backlog);
+    unsigned int before_pios = device_pios;
+    CHECK(rx_one(regs[1][NE2K_P1_CURR]) == 2 && device_pios == before_pios);
+    instant_tx = 1;
+    CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    CHECK(ne2k_send(buffer, 60) == NE2K_OK);
+    unsigned int starts = tx_starts;
+    ne2k_bh();
+    CHECK(nic.rx_next == retained && nic.st.rx_dropped == dropped && nic.rx_backlog);
+    CHECK(tx_starts == starts + 1 && nic.txq_count == 1);
+    instant_tx = 0;
+    unsigned int len;
+    for (unsigned int i = 0; i < NE2K_RXQ_SLOTS; i++) {
+        CHECK(ne2k_recv(buffer, sizeof(buffer), &len) == NE2K_OK);
+        CHECK(buffer[0] == i);
+    }
+    ne2k_bh();
+    CHECK(!nic.rx_backlog && nic.rx_next == regs[1][NE2K_P1_CURR]);
+    for (unsigned int i = NE2K_RXQ_SLOTS; i < NE2K_RXQ_SLOTS + 2; i++) {
+        CHECK(ne2k_recv(buffer, sizeof(buffer), &len) == NE2K_OK);
+        CHECK(buffer[0] == i);
+    }
 }
 
 static void pending_causes(void)
@@ -175,6 +212,7 @@ void _start(void)
     CHECK(nic.state == NE2K_STATE_RUNNING);
     queue_capacity();
     bounded_work();
+    full_queue_backpressure();
     transmit_rounds();
     pending_causes();
     ovw_recovery_sends();

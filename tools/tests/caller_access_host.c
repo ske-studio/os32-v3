@@ -52,6 +52,7 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
 const u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
 static int stop_park_calls;
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }

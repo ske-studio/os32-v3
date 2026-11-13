@@ -93,7 +93,7 @@ struct ne2k_dev {
                               * (票 TASK_HAL_WIRING §1-1 の R1 / 1-6 の往復 7 B3)。 */
     u8  irq_on;              /* IRQ 駆動 (IDT 登録 + IMR 有効化済み) */
     u8  in_irq;              /* reserved: diagnostic layout compatibility; never context */
-    u8  rx_backlog;          /* 予算を使い切り、リングに未回収が残っている (bh が回収) */
+    u8  rx_backlog;          /* 予算切れか受信列満杯でリングに未回収が残る */
 
     /* TX */
     u8  tx_busy;
@@ -197,7 +197,7 @@ static void ne2k_enter(void)
     irq_restore(f);
 }
 
-static void service(unsigned int budget);
+static int service(unsigned int budget);
 static u8 read_curr(void);
 
 static void ne2k_bh(void);
@@ -516,6 +516,9 @@ static void ne2k_bh(void)
         nic.state == NE2K_STATE_STOPPED || nic.state == NE2K_STATE_FAILED) return;
     if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
         !nic.rx_backlog && nic.state != NE2K_STATE_OVW_WAIT) return;
+    if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
+        nic.rx_backlog && nic.rxq_count >= NE2K_RXQ_SLOTS &&
+        nic.state != NE2K_STATE_OVW_WAIT) return;
     ne2k_enter();
     before = nic.st.rx_frames + nic.st.rx_dropped;
     watchdog = (nic.need_rx & NE2K_WORK_WATCHDOG) != 0;
@@ -526,13 +529,14 @@ static void ne2k_bh(void)
         for (round = 0; round < NE2K_BH_ROUNDS; round++) {
             u32 rx_before = nic.st.rx_frames + nic.st.rx_dropped;
             int sent = 0;
-            service(NE2K_IRQ_BUDGET);
+            int blocked = service(NE2K_IRQ_BUDGET);
             if (nic.state != NE2K_STATE_RUNNING || nic.need_reinit) break;
             if (!nic.tx_busy && nic.txq_count) {
                 tx_dequeue();
                 sent = 1;
             }
             if (nic.need_reinit || (nic.tx_busy && (rd(NE2K_CR) & NE2K_CR_TXP))) break;
+            if (blocked) break;
             if (!sent && rx_before == nic.st.rx_frames + nic.st.rx_dropped) break;
         }
     }
