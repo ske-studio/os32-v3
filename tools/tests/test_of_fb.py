@@ -22,11 +22,18 @@ CHECK = dict(name='of-fb-host', tier=1, needs=[], budget=30, covers=[
     'platform/powermac/display_fallback.h', 'tools/tests/of_fb_host.c',
     'tools/tests/test_of_fb.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-    'gfx/v2/caps.c', 'gfx/v2/enum.c', 'gfx/v2/gfx2_int.h',
+    'gfx/v2/caps.c', 'gfx/v2/enum.c', 'gfx/v2/backend_reg.c', 'gfx/v2/gfx2_int.h',
+    'platform/powermac/display_text.h',
     'include/gfx_hal.h', 'include/gfx_hal2.h', 'include/gfx_mode.h',
     'include/display_provider.h', 'platform/powermac/rh_observe.h',
     'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'])
 MUTATIONS = (
+    ('text-ready', 'platform/powermac/display_dual.c',
+     'pm_console_text_ready() && of_fb_ready()', 'of_fb_ready()'),
+    ('text-generation', 'platform/powermac/display_dual.c',
+     'text_gen == a->gen', '1'),
+    ('unverified-colors', 'platform/powermac/display_provider.c',
+     'pm_rh_full_colors()->rc != PM_RH_COLOR_OK ||', ''),
     ('pref', 'platform/powermac/display_provider.c',
      'int display_provider_pref(int pref) { (void)pref; return GFX_PREF_AUTO; }',
      'int display_provider_pref(int pref) { return pref; }'),
@@ -42,7 +49,7 @@ MUTATIONS = (
     ('surface-connect', V2, 'return surface_copy(c, head, s);\n}\nstatic int shim_flip', '(void)head; (void)s; return 0;\n}\nstatic int shim_flip'),
     ('bound', BACKEND, 'if (right > fb.width) right = fb.width;', 'if (right > fb.width) right = fb.width + 4;'),
     ('protected-band', BACKEND, 'if (y < (int)fb.protected_rows) y = fb.protected_rows;', 'if (y < 0) y = 0;'),
-    ('lost', V2, 'a->state != GFX2_AD_OK || !of_fb_ready()', '!of_fb_ready()'),
+    ('lost', V2, '!a || a->state != GFX2_AD_OK || !of_fb_ready()', '!a || !of_fb_ready()'),
 )
 
 
@@ -60,7 +67,7 @@ def observe(folder, mutation=None):
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
                str(ROOT / 'tools/tests/of_fb_host.c'),
                *(str(ROOT / path) for path in SOURCES),
-               str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
+               str(ROOT / 'gfx/v2/backend_reg.c'), str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])
     result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True)
     assert result.returncode == (1 if mutation else 0), (mutation, result)

@@ -54,7 +54,8 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void))
     u32 pfn, rid, bytes, pages, offset;
     (void)pref;
     if (saved.display || !fb || !dev || dev->fb_full_rc != PM_RH_FULL_OK ||
-        !dev->fb_va || fb->depth != 8 || !fb->width || (fb->width & 3) ||
+        !dev->fb_va || fb->depth != 8 ||
+        pm_rh_full_colors()->rc != PM_RH_COLOR_OK || !fb->width || (fb->width & 3) ||
         fb->width > 65535 || !fb->height || fb->height > 65535 ||
         fb->stride < fb->width || fb->stride > 65535 || (fb->stride & 3) ||
         (dev->fb_va & 3) || (fb->pa & 3) ||
