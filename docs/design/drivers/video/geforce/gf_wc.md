@@ -2,7 +2,10 @@
 > 状態: **現行 (2026-11-01)** — GF_ACCEL_DESIGN §3–4 の S10
 ソース: `drivers/video/geforce/gf_wc.c`
 
-kernel に lease を 1 個、最初の取得から起動中保持する。GeForce module と本番 context は起動中 pin され、通常の停止・CUI 復帰・再開始では解放しない。platform の `wc_start` は起動時の module 初期化で、BAR・台帳資源/領域・DISPLAY surface・PTE 写像が存在し、production の prepare と identify の結線が済んだ直後に呼ぶ。描画開始でも video_start 後、初回 present 前に呼ぶ。active 時は前回結果を返して acquire を繰り返さない。復元未確認の負値も保持する。能力・適用条件不足は 0 (UC)、成功は 1、復元未確認は負値 (GF 起動失敗)。共通 stop は identity 喪失時だけ `wc_stop` を呼ぶ。受入版は比較のため明示的に `wc_stop`/`wc_start` を呼ぶ。`wc_stop` は CPU 側排出・復元を x86_wc_release に委譲し、identity 失敗後も装置へアクセスしない。
+起動中、割り込み有効化とスプラッシュの後に GFX が GeForce の場合だけ、GUI=0 の起動でも取得を 1 回試み、その 1 回は割り込みを約 2ms 停止する。
+登録が失敗した時は lease を取得せず、取得後の loader 失敗では解放を試み、復元失敗時は lease を保持する。
+
+kernel に lease を 1 個、最初の取得から起動中保持する。GeForce module と本番 context は起動中 pin され、通常の停止・CUI 復帰・再開始では解放しない。platform の `wc_start` は起動時の module 登録と復帰 callback の設定が成功した直後に呼ぶ。描画開始でも video_start 後、初回 present 前に呼ぶ。active 時は前回結果を返して acquire を繰り返さない。復元未確認の負値も保持する。能力・適用条件不足は 0 (UC)、成功は 1、復元未確認は負値 (GF 起動失敗)。共通 stop は identity 喪失時だけ `wc_stop` を呼ぶ。受入版は比較のため明示的に `wc_stop`/`wc_start` を呼ぶ。`wc_stop` は CPU 側排出・復元を x86_wc_release に委譲し、identity 失敗後も装置へアクセスしない。
 
 初期化時の負値は module 読込みを中断せず、active lease に保持した結果で後の描画開始を失敗させる。0 は UC 継続であり、描画開始で適用条件と acquire を再試行する。能力不足等は MTRR を書かないが、MTRR 書戻し不一致から保存値の復元に成功して 0 を返す場合は、再試行でも wc_begin/wc_end を通り得る。
 

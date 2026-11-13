@@ -169,6 +169,8 @@ static void wc_recovery_run(void)
         .platform=p,.accel_out=&accel,.foundation_out=&foundation};
     bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;
     CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
+    /* Model the kernel registration completion before recovery exercises. */
+    CHECK(p->wc_start && p->wc_start()==1);
     CHECK(lease.active && wc_acquires==1 && !wc_releases);
     CHECK(!production.display.display4 && !gf3_service_get(&production.chan));
     wc_snapshot();

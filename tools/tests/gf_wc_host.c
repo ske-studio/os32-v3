@@ -92,7 +92,6 @@ int x86_wc_release(struct x86_wc_lease *l)
 void serial_puts(const char *s) { CHECK(s[0]=='R');reported++; }
 #include "gf_wc_source.inc"
 
-static int prepare_identity(void) { return identity; }
 int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *r,
                          int (*route)(void *),void *o)
 { (void)r;(void)route;(void)o;p->prepared=true;return 0; }
@@ -198,13 +197,16 @@ static void setup(int bios)
         .bus=LEDGER_BUS_PCI,.bdf=RECOVER_GF_BDF,.bar=1};
     ledger_surfaces[0]=(struct ledger_surface){.first=DISPLAY/PAGE_SIZE,.npages=75,.cache=LEDGER_CACHE_UC,.backing=LEDGER_SB_MMIO};
     plat=(struct geforce_platform){.resources=&resources,.bar0_phys=REGS,.display_phys=DISPLAY,
-        .identify=prepare_identity,.wc_start=geforce_wc_start,.wc_stop=geforce_wc_stop,.report=geforce_wc_report};
+        .wc_start=geforce_wc_start,.wc_stop=geforce_wc_stop,.report=geforce_wc_report};
 }
 static void load(void)
 {
     CHECK(!started && !presented && !acquire_calls);
     snapshot();
+    CHECK(!plat.identify);
     CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(plat.identify && plat.identify());
+    wc_registered_start();
     CHECK(!started && !presented && !production.display.display4);
     gfx_backend_geforce.bb_base=client;unchanged();
 }

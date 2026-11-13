@@ -2,10 +2,13 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `drivers/video/geforce/geforce_module.c`
 
+起動中、割り込み有効化とスプラッシュの後に GFX が GeForce の場合だけ、GUI=0 の起動でも取得を 1 回試み、その 1 回は割り込みを約 2ms 停止する。
+登録が失敗した時は lease を取得せず、取得後の loader 失敗では解放を試み、復元失敗時は lease を保持する。
+
 RAM CLIENT 300 KiB と BAR1+[0,4B000h) の DISPLAY を SURFACE 台帳へ別登録し、`bb_base/bb_size/bb_pitch` と framebuffer API は CLIENT を返す。**PEGC と GF の CLIENT は一方だけ予約**し、600 KiB の二重確保を避ける（F10）。
 既存 loader/Cirrus 登録を使い、NULL 加速 callback と非NULL prepare を許す（`O/drivers/video/cirrus/cirrus_module.c:22–43`）。kdebug 依存の hwdev.mod を名称変更するだけでは済ませない（`O/kernel/module/hwdev_module.c:87–96`）。
 本番 context/復帰 callback は起動中保持して module を pin し、正常終了後も予約は保持する。owner の核移設、共通装置 registry、N1 lease の再設計は行わない。
-起動予約は BAR の台帳資源/領域と UC の PTE 写像を作り、DISPLAY surface を登録する。起動時の module_load→module_start→geforce_module_init は production の prepare と identify の結線直後に wc_start を呼び、最初の描画開始より前に WC を取得する。通常停止と再開始は取得済みの lease を使う。
+起動予約は BAR の台帳資源/領域と UC の PTE 写像を作り、DISPLAY surface を登録する。起動時の module_load→module_start は登録と復帰 callback の設定が成功した後に wc_start を呼び、最初の描画開始より前に WC を取得する。通常停止と再開始は取得済みの lease を使う。
 再起動時は WC を解放してから停止し、leave_log と 98 復帰を行う。
 CLIENT は PEGC/GF のどちらか一つの 300 KiB。BAR1 の DISPLAY は MMIO で RAM の CLIENT と別。
 

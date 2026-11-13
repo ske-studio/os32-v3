@@ -6,7 +6,7 @@ CHECK = dict(name='sep5-wc-host', tier=1,
             'tools/tests/gf_wc_host.c', 'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
             'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_startlog_host.h',
             'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h',
-            'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/backend_geforce.c',
+            'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/backend_geforce.c',
             'hwdev/gf/accel.h', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h',
             'arch/x86/kernel/mtrr_wc.c', 'arch/x86/kernel/mtrr_wc.h',
             'tools/tests/test_mtrr_wc.py', 'tools/tests/host32.py'],
@@ -29,9 +29,10 @@ def wc_lifecycle(mutation=None):
     source=(ROOT/'arch/x86/kernel/video_wc.c').read_text()
     gpu=(ROOT/'drivers/video/geforce/gf_wc.c').read_text()
     body=(ROOT/'drivers/video/geforce/geforce_body.c').read_text()
+    module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
     backend=(ROOT/'drivers/video/geforce/backend_geforce.c').read_text()
     targets={
-        'wc-load': ('body', '    if (p->wc_start) (void)p->wc_start();', ''),
+        'wc-load': ('module', '    if (context.platform && context.platform->wc_start) (void)context.platform->wc_start();', ''),
         'wc-stop': ('body', 'int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = 0; (void)p;'),
         'wc-stop-normal': ('body', 'int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = p && p->wc_stop ? p->wc_stop() : 0;'),
         'wc-repeat': ('source', 'if (lease.active) return wc_result;', 'if (0) return wc_result;'),
@@ -43,10 +44,10 @@ def wc_lifecycle(mutation=None):
     }
     if mutation:
         name,old,new=targets[mutation]
-        values=dict(source=source,body=body,backend=backend)
+        values=dict(source=source,body=body,backend=backend,module=module)
         assert values[name].count(old)==1,(mutation,old)
         values[name]=values[name].replace(old,new,1)
-        source,body,backend=(values[n] for n in ('source','body','backend'))
+        source,body,backend,module=(values[n] for n in ('source','body','backend','module'))
     a=source.index('/* Read-only CPU primitives begin.')
     b=source.index('/* Read-only CPU primitives end. */')
     source=source[:a]+source[b:]
@@ -57,6 +58,11 @@ def wc_lifecycle(mutation=None):
         (tmp/'geforce_body.inc').write_text(ownerless_body(body, bind_f3=False))
         (tmp/'backend.inc').write_text(backend.replace('"../../../gfx/', '"gfx/'))
         harness='#include "'+str(ROOT/'tools/tests/gf_startlog_host.h')+'"\n'+(ROOT/'tools/tests/gf_wc_host.c').read_text()
+        start=module.index('    if (context.platform) gf_production_set_return(geforce_return, context.platform);')
+        start=module.index('\n', start)+1
+        end=module.index('    return 0;', start)
+        call=module[start:end].replace('context.platform', 'ctx.platform')
+        harness=harness.replace('static void load(void)', 'static void wc_registered_start(void)\n{\n'+call+'\n}\nstatic void load(void)')
         harness=harness.replace('"../../drivers/video/geforce/geforce_body.c"','"geforce_body.inc"')
         harness=harness.replace('"../../drivers/video/geforce/backend_geforce.c"','"backend.inc"')
         (tmp/'host.c').write_text(harness)

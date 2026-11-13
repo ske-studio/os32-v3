@@ -38,9 +38,6 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
     p->point = gf_production_point;
     p->opaque = &production;
     p->stop = stop;
-    /* Boot reservations, DISPLAY and PTEs already exist; identity is now bound.
-     * Keep a fatal recovery lease for wc_start to reject later display starts. */
-    if (p->wc_start) (void)p->wc_start();
     geforce_backend_bind(p->device, p->identify, p->bar0_phys, p->point, p->opaque);
     geforce_backend_stop_bind(p->stop);
     geforce_backend_wc_bind(p->wc_start);
