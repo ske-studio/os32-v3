@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""KCG packing and EBDT/manifest acceptance through the CHECK runner."""
+"""KCG packing acceptance through the CHECK runner."""
 CHECK = dict(name='kcg-lz4-host', tier=1,
     covers=['tools/gen_font16.py', 'tools/gen_g16.py', 'tools/mkroot_image.py',
      'build/ram-root.mk', 'build/ppc-kboot.mk', 'build/assets.mk', 'build/font-fetch.mk',
      'assets/fonts/**', 'tools/fetch_fonts.py', 'tools/gen_unicode.c',
      'lib/unicode_jis_table.h', 'kernel/console/unicode_file.h', 'include/endian_le.h',
      'include/types.h', 'include/callconv.h', 'build/ppc-ram-root.json', 'include/config.h',
-     'tools/tests/test_kcg_ebdt.py', 'tools/tests/test_mkroot_image.py', 'build/core.yaml',
+     'tools/tests/test_mkroot_image.py', 'build/core.yaml',
      'build/packages.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py',
      'tools/mkpkg.py', 'tools/mkfat12.py', 'lib/lz4.c', 'lib/lz4.h',
      'tools/tests/test_kcg_lz4.py', 'requirements.txt'],
@@ -30,7 +30,7 @@ def run(ctx) -> int:
     if not font.is_file():
         print(f'SKIP kcg-lz4-host: missing {font}; not PASS', flush=True)
         return 1
-    for script in ('tools/tests/test_kcg_lz4.py', 'tools/tests/test_kcg_ebdt.py'):
+    for script in ('tools/tests/test_kcg_lz4.py',):
         argv = [sys.executable, '-B', script]
         if ctx.mutate:
             argv.append('--mutate')

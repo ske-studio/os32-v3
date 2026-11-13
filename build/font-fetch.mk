@@ -38,6 +38,6 @@ $(JFDOT_FILES) &: tools/fetch_fonts.py
 	  echo "*** JF ドット東雲16 取得失敗 (tools/fetch_fonts.py rc=$$rc): オフラインなら FONT_FETCH_JFDOT_FLAGS=\"--zip PATH\"" >&2; exit $$rc; }
 
 
-# PPC RAM root product: original 16px dots, uncompressed KCG1.
+# PPC RAM root product: original 16px dots, raw LZ4 KCG1.
 $(FONT_DIR)/shino16.kcgfont: $(FONT_DIR)/JF-Dot-Shinonome16.ttf tools/gen_font16.py tools/gen_g16.py
-	python3 tools/gen_font16.py --ebdt $< $@
+	python3 tools/gen_font16.py --ebdt $< $@ --lz4

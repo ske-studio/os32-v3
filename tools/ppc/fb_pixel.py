@@ -64,21 +64,33 @@ def read_ppm(path):
 
 
 class Font:
-    """Uncompressed KCG1 reader, independent of the C loader/generator."""
+    """KCG1 reader, independent of the C loader/generator."""
     def __init__(self, path):
         data = Path(path).read_bytes()
         size = 94 * 94 * 33 + 256 * 17
-        if len(data) != 16 + size:
+        if len(data) < 16:
             raise ValueError('KCG1 length')
-        if struct.unpack('<4sIII', data[:16]) != (b'KCG1', size, 0, 0):
-            raise ValueError('KCG1 header (compressed fonts unsupported)')
-        self.kanji = data[16:16 + 8836 * 32]
-        off = 16 + 8836 * 32
-        if any(v not in (0, 1) for v in data[off:off + 8836] + data[-256:]):
+        magic, payload_size, flags, reserved = struct.unpack('<4sIII', data[:16])
+        if magic != b'KCG1' or payload_size != size or flags not in (0, 1) or reserved:
+            raise ValueError('KCG1 header')
+        body = data[16:]
+        if flags == 1:
+            import lz4.block
+            if not 0 < len(body) <= size + size // 255 + 16:
+                raise ValueError('KCG1 compressed length')
+            try:
+                body = lz4.block.decompress(body, uncompressed_size=size)
+            except lz4.block.LZ4BlockError as exc:
+                raise ValueError('KCG1 compressed payload') from exc
+        if len(body) != size:
+            raise ValueError('KCG1 payload length')
+        self.kanji = body[:8836 * 32]
+        off = 8836 * 32
+        if any(v not in (0, 1) for v in body[off:off + 8836] + body[-256:]):
             raise ValueError('KCG1 fetched flags')
-        self.kf = data[off:off + 8836]
-        self.ank = data[off + 8836:-256]
-        self.af = data[-256:]
+        self.kf = body[off:off + 8836]
+        self.ank = body[off + 8836:-256]
+        self.af = body[-256:]
 
     def glyph(self, char):
         if len(char) != 1:
