@@ -161,7 +161,11 @@ static void scenario(void) {
     u64 boot_seq; log_head(&boot_seq); CHECK(boot_seq==0,"boot-seq");
     CHECK(pm_lan_start(&boot)==0,"start"); until(RUNNING);
     CHECK(mark_count==5,"state-count"); for(u32 i=0;i<5;i++) CHECK(marks[i]==i+1 && links[i]==(i==4),"state-sequence");
-    poll_once(); CHECK(sends[1]==1 && last[1].seq==0,"beacon-first");
+    out("reached=tx-hold\n");
+    now=s.tx_at-1; clock_tb=now; pm_lan_poll(now);
+    for (u32 i=0;i<9;i++) CHECK(sends[i]==0,"tx-hold");
+    now=s.poll_at; clock_tb=now; pm_lan_poll(now);
+    CHECK(sends[1]==1 && last[1].seq==0,"beacon-first");
     CHECK(log_used==15 && same(log_bytes,(const u8 *)"KBOOT fixture\r\n",15),"boot-raw");
 #ifdef TERM_TEST
     { struct lan_message t={0}; t.type=PLN1_TERM_OPEN; memcpy(t.boot_id,boot.boot_id,16); t.host_nonce[0]=7;
@@ -247,7 +251,10 @@ static void scenario(void) {
     CHECK(!s.g.ring_prepare_step && !s.g.ring_cursor && !s.g.ring_publish_step && !s.g.rx_head,"reset-cursors");
     down=0; until(RUNNING);
     out("reached=beacon-reconnect\n");
-    u32 beacons=sends[1]; poll_once();
+    u32 beacons=sends[1];
+    now=s.tx_at-1; clock_tb=now; pm_lan_poll(now);
+    CHECK(sends[1]==beacons && sends[2]==sent,"reconnect-hold");
+    now=s.poll_at; clock_tb=now; pm_lan_poll(now);
     CHECK(sends[1]==beacons || last[1].seq>0,"beacon-reconnect");
     CHECK(dma_calls==2 && dma_first==1 && cache_lines==2048 && s.g.rx_head==0 && s.g.ring_cursor==28,"dma-reuse");
     CHECK(sends[2]>sent,"reconnect-log");

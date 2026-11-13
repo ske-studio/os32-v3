@@ -29,11 +29,12 @@ CHECK = dict(name='ppc-lan-p24', tier=2, budget=60,
                      'platform/powermac/kboot_info.h',
                      'platform/powermac/kboot_log.h'])
 MUTATIONS = [
+    ('tx-hold', 'now < s.tx_at', '0', 'tx-hold', 'H:tx-hold'),
     ('log-again', 'pm_lan_log_complete(r);', 'pm_lan_log_complete(GEM_OK);',
      'log-again', 'H:A8 loss-count'),
     ('response-full', 'if (s.response.type) { ++s.request_drops; return GEM_OK; }',
      'if (s.response.type) { ++s.request_drops; }', 'response-full', 'H:A10 response-full'),
-    ('rx-budget', 'r = receive();', 'r = receive(); r = receive();',
+    ('rx-budget', '        r = receive();\n        if (r == GEM_EIO)', '        r = receive(); r = receive();\n        if (r == GEM_EIO)',
      'rx-budget', 'H:A11 budget'),
     ('reset-cursors', 's.g.ring_prepare_step = s.g.ring_cursor = s.g.ring_publish_step = s.g.rx_head = 0;',
      '(void)0;', 'reset-cursors', 'H:reset-cursors'),
