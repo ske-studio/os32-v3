@@ -16,6 +16,7 @@
 #include "boot_cpu.h"
 #include "platform_memory.h"
 #include "rh_observe.h"
+#include "kstring.h"
 
 #define PPC_BOOT_MEM_KB 16384U
 #define PPC_BOOT_RAM_ATTR 0x10U
@@ -243,6 +244,13 @@ static void plan_gmac(const struct pm_kboot_info *info)
     }
 }
 
+/* Real-hardware triage: name every pre-takeover stop on the OF console. */
+static void kb_stop(int out, const char *why)
+{
+    (void)ofw_write(out, why, kstrlen(why));
+    ppc_stop();
+}
+
 void ppc_kernel_start(ppc_ci ci)
 {
     struct ofw_env e;
@@ -251,7 +259,7 @@ void ppc_kernel_start(ppc_ci ci)
     if (ofw_setup(&e)) ppc_stop();
     pm_rh_of_mark(0);
     int fb_rc = pm_rh_capture(e.out);
-    if (fb_rc < 0) ppc_stop();
+    if (fb_rc < 0) kb_stop(e.out, "FAIL:KB:FB\r\n");
     pm_rh_of_mark(1);
     if (pm_escc_prepare(&e, &s)) {
         pm_rh_of_mark(PM_RH_ESCC_PREPARE);
@@ -260,28 +268,29 @@ void ppc_kernel_start(ppc_ci ci)
     struct pm_kboot_info *info = (struct pm_kboot_info *)pm_kboot_capture(ci);
     /* E1 owns the MPIC window decoding (one resolver, H2). */
     if (pm_mpic_resolve(info, &info->mpic_pa, &info->mpic_bytes,
-                        &boot_devices.mpic_order) != PM_MPIC_OK) ppc_stop();
-    if (s.data < s.csr || s.data - s.csr >= PM_ESCC_WINDOW) ppc_stop();
+                        &boot_devices.mpic_order) != PM_MPIC_OK) kb_stop(e.out, "FAIL:KB:MPIC\r\n");
+    if (s.data < s.csr || s.data - s.csr >= PM_ESCC_WINDOW) kb_stop(e.out, "FAIL:KB:ESCC-WINDOW\r\n");
     info->escc_pa = s.csr;
     if (!ppc_boot_alias_plan(info->escc_pa, PM_ESCC_WINDOW, PPC_BOOT_ESCC_VA, &escc_alias) ||
         !ppc_boot_alias_plan(info->mpic_pa, info->mpic_bytes, PPC_BOOT_MPIC_VA, &mpic_alias))
-        ppc_stop();
+        kb_stop(e.out, "FAIL:KB:ALIAS-ESCC-MPIC\r\n");
     plan_gmac(info);
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
     if (fb->bytes) {
-        if (!ppc_boot_alias_plan(fb->pa, fb->bytes, PPC_BOOT_FB_VA, &fb_alias)) ppc_stop();
+        if (!ppc_boot_alias_plan(fb->pa, fb->bytes, PPC_BOOT_FB_VA, &fb_alias)) kb_stop(e.out, "FAIL:KB:ALIAS-FB\r\n");
         boot_devices.fb_va = fb_alias.va;
     }
     if (info->gmac.clock.valid) {
         if (!ppc_boot_alias_plan(info->gmac.clock.pa, sizeof(u32),
-                    PPC_BOOT_GMAC_CLOCK_VA, &clock_alias)) ppc_stop();
+                    PPC_BOOT_GMAC_CLOCK_VA, &clock_alias)) kb_stop(e.out, "FAIL:KB:ALIAS-CLOCK\r\n");
         boot_devices.clock_va = clock_alias.va;
     }
     boot_devices.escc_csr_va = escc_alias.va;
     boot_devices.escc_data_va = escc_alias.va + (s.data - s.csr);
     boot_devices.mpic_va = mpic_alias.va;
     boot_devices.mpic_bytes = info->mpic_bytes;
-    if (pm_kboot_reserve(info) != PM_KBOOT_RESERVE_OK || !pm_memory_validate(info)) ppc_stop();
+    if (pm_kboot_reserve(info) != PM_KBOOT_RESERVE_OK) kb_stop(e.out, "FAIL:KB:RESERVE\r\n");
+    if (!pm_memory_validate(info)) kb_stop(e.out, "FAIL:KB:MEMORY-VALIDATE\r\n");
     pm_rh_of_mark(2);
     static const char mark[] = "TAKEOVER\r\n";
     if (ofw_write(e.out, mark, sizeof(mark)-1) != sizeof(mark)-1 ||
