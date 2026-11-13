@@ -15,12 +15,49 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../platform/pc98/pit_math.c"
+#include "../../platform/pc98/pit.h"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
 } } while (0)
 
 static int failed;
+
+static struct pit_setup self_setup;
+static unsigned long self_clock;
+static unsigned int self_rate;
+const struct pit_setup *pit_get_setup(void) { return &self_setup; }
+static int sysclk_detected(void) { return 1; }
+static unsigned long sysclk_hz(void) { return self_clock; }
+static void check(int ok, const char *why) { if (!ok) { fprintf(stderr, "FAIL %s\n", why); failed++; } }
+#undef PIT_IRQ_HZ
+#define PIT_IRQ_HZ self_rate
+#include "../../kdebug/kselftest/pit_setup.inc"
+
+static void selftest_setup(void)
+{
+    const unsigned long clocks[] = { SYSCLK_1997, SYSCLK_2458 };
+    const unsigned int rates[] = { 100, 1000 };
+    for (unsigned int i=0; i<2; i++) for (unsigned int j=0; j<2; j++) {
+        self_clock=clocks[i]; self_rate=rates[j];
+        CHECK(!pit_compute(self_clock, self_rate, &self_setup));
+        self_setup.mode=PIT_MODE_TIMER0;
+        test_pit_setup();
+        CHECK(failed == 0);
+        self_setup.period_us++;
+        int before=failed;
+        test_pit_setup();
+        CHECK(failed > before);
+        failed=before;
+        self_setup.period_us--;
+        self_setup.reload--;
+        before=failed;
+        test_pit_setup();
+        CHECK(failed > before);
+        failed=before;
+    }
+}
+
 
 /* 期待するリロード値。**式ではなく数で書く** — 実装と同じ式で期待値を作ると
  * 両方が同じだけずれたときに気づけない。 */
@@ -180,7 +217,8 @@ int main(int argc, char **argv)
 {
     if (argc != 2) return 2;
     failed = 0;
-    if (!strcmp(argv[1], "both_clocks")) both_clocks();
+    if (!strcmp(argv[1], "selftest_setup")) selftest_setup();
+    else if (!strcmp(argv[1], "both_clocks")) both_clocks();
     else if (!strcmp(argv[1], "reject_hz")) reject_hz();
     else if (!strcmp(argv[1], "reject_clock")) reject_clock();
     else if (!strcmp(argv[1], "no_overflow")) no_overflow();

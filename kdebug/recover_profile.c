@@ -17,6 +17,8 @@
 #endif
 
 #define RECOVER_WAIT_SAMPLES 1048576U
+/* The alternate physical PIT rate is 1 ms per interrupt. */
+#define RECOVER_PIT_FAST_HZ 1000u
 
 /* The cell round trip is shared by S0 and the output-time CHECK. S0 keeps
  * its step numbers/clock; RUN defers safe points until the cell is restored. */
@@ -125,7 +127,7 @@ int recover_budget_apply(struct recover_profile *p, u32 kind, u32 hz,
     return 0;
 }
 
-/* PIT mode 2 is already running at 100Hz. Read only the latch, never
+/* PIT mode 2 is already running at 100Hz or 1000Hz. Read only the latch, never
  * reprogram it or consult PIC/tick_count. The read sequence is identical to
  * kernel/time/ktime.c; the short modulo difference avoids its 10ms IRR/clamp
  * ambiguity. At both supported input clocks one count is <1us. */
@@ -144,14 +146,15 @@ int recover_hal_wait_frame(void *opaque, u32 frame_us)
     const struct pit_setup *ps=pit_get_setup();
     if (!ps || !ps->valid || ps->mode != PIT_MODE_TIMER0 || !ps->reload ||
         (ps->clk_hz != SYSCLK_1997 && ps->clk_hz != SYSCLK_2458) ||
-        !frame_us || frame_us >= ps->period_us) return REC_TX_PIT_CONFIG;
+        !frame_us || frame_us >= RECOVER_UART_US/PIT_HZ) return REC_TX_PIT_CONFIG;
     /* Max accepted frame <10000us, clock <=2457600Hz. Split the
      * product to keep i386 arithmetic in u32 and round UP, never truncate. */
-    if (ps->hz != PIT_HZ || ps->period_us != RECOVER_UART_US/PIT_HZ ||
-        ps->reload != ps->clk_hz/PIT_HZ) return REC_TX_PIT_CONFIG;
+    if ((ps->hz != PIT_HZ && ps->hz != RECOVER_PIT_FAST_HZ) ||
+        ps->reload != (ps->clk_hz + ps->hz/2)/ps->hz) return REC_TX_PIT_CONFIG;
     u32 scaled=frame_us*(ps->clk_hz/PIT_CLOCK_DIV);
     u32 counts=scaled/PIT_PERIOD_SCALE+(scaled%PIT_PERIOD_SCALE!=0);
-    if (!counts || counts >= ps->reload) return REC_TX_PIT_CONFIG;
+    if (!counts) return REC_TX_PIT_CONFIG;
+    /* Each pair of samples must be less than one physical period apart. */
     u32 previous=recover_pit_count(), elapsed=0;
     if (previous > ps->reload) return REC_TX_PIT_COUNT;
     for (u32 i=0;i<RECOVER_WAIT_SAMPLES;i++) {

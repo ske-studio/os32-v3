@@ -162,6 +162,7 @@ MUTATIONS += [
     ("t2_restore_reextended", "u32 limit = cb.ticks;", "r->restore_tick = r->ops->ticks(r->opaque); u32 limit = cb.ticks;", "kdebug/recover_common/clock.inc"),
     ("t2_failed_verified", "state(r, r->failed ? REC_FAILED : REC_VERIFIED);", "r->failed = false; state(r, REC_VERIFIED);", "kdebug/recover_common/s0.inc"),
     ("t2_restore_wrap_inverted", "r->restore_tick) < limit", "r->restore_tick) > limit", "kdebug/recover_common/clock.inc"),
+    ("t2_pit_no_accumulation", "elapsed+=delta; previous=current;", "elapsed=delta; previous=current;", "kdebug/recover_profile.c"),
     ("t2_pit_round_down", "+(scaled%PIT_PERIOD_SCALE!=0)", "", "kdebug/recover_profile.c"),
     ("t2_pit_irq_lost", "    irq_restore(flags);\n    return low", "    (void)flags;\n    return low", "kdebug/recover_profile.c"),
     ("t2_pte_restore_removed", "w->ops->unmap(w->opaque, w->va + i * MEM_PAGE_SIZE, w->raw[i])", "0", "kdebug/kdebug_window.c"),

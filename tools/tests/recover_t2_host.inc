@@ -109,9 +109,10 @@ u32 recover_test_inp(u32 port)
 static void frame_clock(void)
 {
     const u32 clocks[]={SYSCLK_1997,SYSCLK_2458};
-    for(u32 i=0;i<2;i++) for(u32 irq=0;irq<2;irq++) {
-        pit_fake=(struct pit_setup){.clk_hz=clocks[i],.hz=PIT_HZ,.reload=clocks[i]/PIT_HZ,
-            .period_us=10000,.mode=PIT_MODE_TIMER0,.valid=1};
+    for(u32 i=0;i<2;i++) for(u32 irq=0;irq<2;irq++) for(u32 rate=0;rate<2;rate++) {
+        u32 hz=rate ? 1000 : PIT_HZ;
+        pit_fake=(struct pit_setup){.clk_hz=clocks[i],.hz=hz,.reload=(clocks[i]+hz/2)/hz,
+            .period_us=rate ? 1000 : 10000,.mode=PIT_MODE_TIMER0,.valid=1};
         pit_count_fake=3; pit_step=1; pit_reads=pit_elapsed=0; pit_irq=irq;
         CHECK(!recover_hal_wait_frame(0,1042));
         u32 needed=(1042*(clocks[i]/100)+9999)/10000;
@@ -122,6 +123,8 @@ static void frame_clock(void)
         CHECK((needed-1)*10000 < 1042*(clocks[i]/100));
         CHECK(needed*10000 >= 1042*(clocks[i]/100));
         CHECK(1000000/clocks[i]+(1000000%clocks[i]!=0)==1);
+        pit_count_fake=3; pit_elapsed=0;
+        CHECK(!recover_hal_wait_frame(0,87)); /* 115200 baud */
     }
     pit_step=0; pit_reads=0;
     CHECK(recover_hal_wait_frame(0,1042)<0 && pit_reads==2*(RECOVER_WAIT_SAMPLES+1));
