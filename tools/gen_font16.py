@@ -277,7 +277,47 @@ def preview(ank_cache, kanji_cache, out_png, scale=3):
     print(f"プレビュー: {out_png}  (上=実寸 {w}x{h} / 下={scale} 倍)")
 
 
+def build_ebdt(path):
+    """Build the KCG1 cache directly from the font's 16px embedded strike."""
+    from fontTools.ttLib import TTFont
+    from gen_g16 import strike_cells, G16Error
+    font = TTFont(path)
+    cell = strike_cells(font)
+    cmap = font.getBestCmap()
+    strike = next(i for i, item in enumerate(font['EBLC'].strikes)
+                  if item.bitmapSizeTable.ppemX == 16 and item.bitmapSizeTable.ppemY == 16
+                  and item.bitmapSizeTable.bitDepth == 1)
+    available = font['EBDT'].strikeData[strike]
+    def glyph(ch, width):
+        if ch is None:
+            return bytes(width * 2)
+        name = cmap.get(ord(ch))
+        gid = font.getGlyphID(name) if name in available else 0
+        raw = cell(gid)
+        if gid == 0 and width == 8 and raw is not None:
+            raw = b''.join((((raw[i] << 8) | raw[i + 1]) << 4 & 0xffff).to_bytes(2, 'big')
+                           for i in range(0, 32, 2))
+        if raw is None or (width == 8 and any(raw[1::2])):
+            raise G16Error(5, 'glyph outside %dx16 cell: U+%04X' % (width, ord(ch)))
+        return raw[::2] if width == 8 else raw
+    kanji = b''.join(glyph(jis_to_unicode(hi, lo), 16)
+                     for hi in range(0x21, 0x7f) for lo in range(0x21, 0x7f))
+    ank = b''.join(glyph(ank_to_unicode(code), 8) for code in range(256))
+    payload = kanji + b'\1' * KANJI_COUNT + ank + b'\1' * ANK_COUNT
+    return struct.pack('<4sIII', MAGIC, len(payload), 0, 0) + payload
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == '--ebdt':
+        from gen_g16 import G16Error
+        try:
+            data = build_ebdt(sys.argv[2])
+            with open(sys.argv[3], 'wb') as output:
+                output.write(data)
+        except (G16Error, OSError, ValueError) as exc:
+            print('gen_font16: %s' % exc, file=sys.stderr)
+            sys.exit(getattr(exc, 'rc', 2))
+        return
     if len(sys.argv) < 3:
         print(__doc__)
         sys.exit(1)

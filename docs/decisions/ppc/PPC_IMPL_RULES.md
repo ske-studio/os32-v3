@@ -4,6 +4,8 @@
 
 > 出所: ~/os32-tmp/run/ppc-common/CI_LESSONS.md (2026-11-09〜10、PowerPC の PM が段ごとに足した 16 項目) を整理して写した。以後はこの文書を正とする。
 
+PowerPC に固有の注意事項 (実機・QEMU・root・フォント) は同じ置き場の PPC_NOTES.md に集める。共通の文書には書かない。
+
 CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の枝では**手元の検査が CI の代わり**。前の段で CI を落とした型を全部洗ってから push する。
 
 ## 1. CI を落とした型 (push の前に洗う)
@@ -54,3 +56,4 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 - **積む枝は、土台の枝の「直しの後」の先端から切る。統合の前に祖先の照合をする** (2026-11-10): 到達点 ② の B3 を B2 の直しの前の版から枝分けしていて、統合の枝に B2 の直しが入っていなかった。統合の枝を作ったら、含めるはずの全部の枝について `git merge-base --is-ancestor origin/<枝> HEAD` を回す。
 - **統合で初めて出る食い違いは回帰の入口で拾う** (2026-11-10): 後の段が共有ファイル (ofw.c・arch_cpu.h・kernel_trap.c) を変えると、前の段の試験の link の一覧が合わなくなる (4 本で起きた)。段を 1 本にまとめたら `python3 -B tools/ppc/kboot_all.py --mutate` と単体像 (build/ppc.mk・run.py・mmu_run.py) を回す。
 - **検査を止めたら子のプロセスも止める** (2026-11-10): 裏の検査の script だけを kill すると、子の試験 (QEMU) が残って同じ TMPDIR を使い、次の回の試験を落とす。`pgrep -af 'kboot_|qemu-system-ppc'` が 0 になってから回し直す。
+- **並列で走らせた段はまとめて CI** (ユーザー指示・本線 PM 合意 2026-11-13): 段ごとに CI を回さず、PM が `wt/int-ppc-<日付><記号>` に束ねて [skip ci] のまま本線 PM に渡す (本線 PM が `wt/int-*` として push し CI を起動、本線の束と合わせるかは本線 PM が決める)。束ねる前に段ごとの対象の check、文書の 4 検査 (links・orphans・status・tree)、doc_graph を手元で通す。x86 の生成物が変わる段を含む時は build_compare と中身を添えて承認を求める。単独の段は従来どおり。
