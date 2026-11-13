@@ -277,7 +277,35 @@ def preview(ank_cache, kanji_cache, out_png, scale=3):
     print(f"プレビュー: {out_png}  (上=実寸 {w}x{h} / 下={scale} 倍)")
 
 
+def pack_kcg(payload, compression):
+    """Pack one raw KCG payload; explicit LZ4 requires the dependency."""
+    if len(payload) != PAYLOAD_SIZE:
+        raise ValueError('invalid KCG payload size')
+    if compression not in ('none', 'lz4', 'auto'):
+        raise ValueError('invalid KCG compression')
+    body = bytes(payload)
+    flags = 0
+    if compression != 'none':
+        try:
+            import lz4.block
+        except ImportError:
+            if compression == 'lz4':
+                raise
+            print("警告: lz4 が無いので無圧縮で書き出す")
+        else:
+            compressed = lz4.block.compress(body, store_size=False)
+            if len(compressed) < len(body):
+                body = compressed
+                flags = FLAG_LZ4
+    return struct.pack('<4sIII', MAGIC, PAYLOAD_SIZE, flags, 0) + body
+
+
 def build_ebdt(path):
+    """Compatibility API: return the complete uncompressed KCG1 file."""
+    return pack_kcg(build_ebdt_payload(path), 'none')
+
+
+def build_ebdt_payload(path):
     """Build the KCG1 cache directly from the font's 16px embedded strike."""
     from fontTools.ttLib import TTFont
     from gen_g16 import strike_cells, G16Error
@@ -304,20 +332,27 @@ def build_ebdt(path):
                      for hi in range(0x21, 0x7f) for lo in range(0x21, 0x7f))
     ank = b''.join(glyph(ank_to_unicode(code), 8) for code in range(256))
     payload = kanji + b'\1' * KANJI_COUNT + ank + b'\1' * ANK_COUNT
-    return struct.pack('<4sIII', MAGIC, len(payload), 0, 0) + payload
+    return payload
 
 
 def main():
-    if len(sys.argv) == 4 and sys.argv[1] == '--ebdt':
+    args = sys.argv[1:]
+    if args and args[0] == '--ebdt':
         from gen_g16 import G16Error
+        if len(args) not in (3, 4) or (len(args) == 4 and
+                args[3] not in ('--lz4', '--no-lz4')):
+            print('usage: gen_font16.py --ebdt INPUT OUTPUT [--lz4|--no-lz4]',
+                  file=sys.stderr)
+            return 2
+        compression = 'lz4' if len(args) == 4 and args[3] == '--lz4' else 'none'
         try:
-            data = build_ebdt(sys.argv[2])
-            with open(sys.argv[3], 'wb') as output:
+            data = pack_kcg(build_ebdt_payload(args[1]), compression)
+            with open(args[2], 'wb') as output:
                 output.write(data)
-        except (G16Error, OSError, ValueError) as exc:
+        except (G16Error, OSError, ValueError, ImportError) as exc:
             print('gen_font16: %s' % exc, file=sys.stderr)
-            sys.exit(getattr(exc, 'rc', 2))
-        return
+            return getattr(exc, 'rc', 2)
+        return 0
     if len(sys.argv) < 3:
         print(__doc__)
         sys.exit(1)
@@ -348,7 +383,8 @@ def main():
         return
 
     out_path = sys.argv[2]
-    use_lz4 = "--no-lz4" not in sys.argv
+    compression = ('none' if "--no-lz4" in sys.argv else
+                   'lz4' if "--lz4" in sys.argv else 'auto')
 
     payload = bytearray()
     payload.extend(kanji_cache)
@@ -357,26 +393,16 @@ def main():
     payload.extend(b'\x01' * ANK_FETCHED_SIZE)
     assert len(payload) == PAYLOAD_SIZE, (len(payload), PAYLOAD_SIZE)
 
-    flags = 0
-    body = bytes(payload)
-    if use_lz4:
-        try:
-            import lz4.block
-            body = lz4.block.compress(body, store_size=False)
-            flags |= FLAG_LZ4
-            print(f"LZ4: {PAYLOAD_SIZE} -> {len(body)} bytes")
-        except ImportError:
-            print("警告: lz4 が無いので無圧縮で書き出す")
-
-    with open(out_path, 'wb') as f:
-        f.write(MAGIC)
-        f.write(struct.pack('<I', PAYLOAD_SIZE))
-        f.write(struct.pack('<I', flags))
-        f.write(struct.pack('<I', 0))
-        f.write(body)
-
-    print(f"出力: {out_path}  ({16 + len(body)} bytes)")
+    try:
+        data = pack_kcg(payload, compression)
+        with open(out_path, 'wb') as f:
+            f.write(data)
+    except (OSError, ValueError, ImportError) as exc:
+        print('gen_font16: %s' % exc, file=sys.stderr)
+        return 2
+    print(f"出力: {out_path}  ({len(data)} bytes)")
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
