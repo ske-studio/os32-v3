@@ -12,7 +12,7 @@
 void main(int argc, char **argv, KernelAPI *api)
 {
     int i;
-    u32 until;
+    u32 start;
     (void)argc; (void)argv;
 
     api->kprintf(KLOG_ATTR, "hello3p: start\n");
@@ -31,9 +31,9 @@ void main(int argc, char **argv, KernelAPI *api)
     api->gfx_present_dirty();
     api->kprintf(KLOG_ATTR, "hello3p: presented\n");
 
-    /* 5 秒表示を保持 (PIT 100Hz) */
-    until = api->get_tick() + 500;
-    while (api->get_tick() < until) {
+    /* 5 秒表示を保持 (ジフィ 100Hz) */
+    start = api->get_tick();
+    while ((u32)(api->get_tick() - start) < 500) {
         /* 保持 */
     }
 

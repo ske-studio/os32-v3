@@ -106,6 +106,12 @@
       "irq": true
     },
     {
+      "symbol": "tick_clock_jiffy64",
+      "source": "kernel/time/tick_clock.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
       "symbol": "ktime_ticks",
       "context": "normal",
       "irq": true,

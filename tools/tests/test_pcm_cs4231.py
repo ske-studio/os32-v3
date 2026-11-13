@@ -21,7 +21,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['include/time_units.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5)
 
 from kernel_includes import include_flags
@@ -171,6 +171,9 @@ MUTATIONS = [
 # なることを見る。1 本に複数の置き換えを持てる (修正が 2 重の守りのとき)。
 DRIVER = "drivers/sound/cs4231/pcm_cs4231.c"
 DRIVER_MUTATIONS = [
+    ([(r"return \(\(\(unsigned long long\)hi << BITS_PER_U32\) \| lo\) \* PCM_US_PER_TICK;",
+       "return (unsigned long long)tick_count * PCM_US_PER_TICK;")],
+     "fallback の上位ジフィを捨てる (497 日境界で巻き戻る)"),
     ([(r"    if \(s_claimed \|\| s_mce_busy\) return IRQ_NONE;",
        "    if (s_mce_busy) return IRQ_NONE;"),
       (r"    if \(evid\) g_pcm.state = PCM_ST_STOP_DONE;\n"
