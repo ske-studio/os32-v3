@@ -1,4 +1,7 @@
 #include "pit.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 #include "sysclk.h"
 #include "io.h"
 #include "../../include/platform_timer.h"
@@ -27,9 +30,15 @@ const struct pit_setup *pit_get_setup(void)
 unsigned int pit_read_count(void)
 {
     u8 lo, hi;
+#ifdef TICK_PROBE
+    tick_probe_extra_begin(TP_PIT);
+#endif
     outp(PIT_MODE, PIT_LATCH_TIMER0);
     lo = (u8)inp(PIT_CNTR0);
     hi = (u8)inp(PIT_CNTR0);
+#ifdef TICK_PROBE
+    tick_probe_extra_end(TP_PIT);
+#endif
     return ((unsigned int)hi << 8) | lo;
 }
 
