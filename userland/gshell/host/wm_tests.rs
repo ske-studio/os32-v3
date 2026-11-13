@@ -2205,7 +2205,7 @@ fn a_running_app_yields_to_a_parked_app_that_has_a_deliverable_paint() {
 /*      `op_wait` の中では**予約するだけ**で、park で top-level へ    */
 /*      戻ったところで実行する。                                     */
 /*  A3: `SWITCH_CUI` / `SHUTDOWN` で Quit に応答しないアプリは        */
-/*      `QUIT_GRACE_CYCLES` 周待ってから畳む。                       */
+/*      `QUIT_GRACE_TICKS` ジフィ (3 秒) 待ってから畳む。                       */
 /* ================================================================ */
 
 /// アプリ 2 本 (owner 2, 3) をグローバルの `GuiState` に載せる。
@@ -2323,54 +2323,45 @@ fn ctrl_stop_with_focus_on_another_app_clears_the_abort_and_kills_the_focused_on
     wm::g().inited = false;
 }
 
-/* ---- (c) SWITCH_CUI: Quit に応答しないアプリは N 周後に畳む ---- */
+/* ---- (c) Quit の猶予はジフィで測る (u32 の周回も含む) ---- */
 #[test]
-fn switch_cui_folds_an_app_that_ignores_quit_after_the_grace_cycles() {
+fn switch_cui_grace_ticks() {
     use crate::{mocks, multiapp, session, wm};
     use os32api::gui::proto::GUI_SESSION_SWITCH_CUI;
-    mocks::init();
-    session::clear(); /* 前の試験の SessionAction を持ち越さない */
-    let shm = mocks::Shm::new();
-    two_app_global(&shm);
+    for start in [100u32, u32::MAX - 149] {
+        mocks::init();
+        session::clear();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        mocks::set_tick(start);
+        wm::g().now = start;
+        assert_eq!(session::set_wm(wm::g(), GUI_SESSION_SWITCH_CUI, b"\0"), 0);
+        assert_eq!(session::quit_grace_left(), session::QUIT_GRACE_TICKS);
+        wm::g().reclaim_owner(3);
+        session::reclaim_owner(3);
+        multiapp::on_owner_exit(3);
 
-    /* 全アプリへ Quit を配る (契約 S5)。 */
-    assert_eq!(session::set_wm(wm::g(), GUI_SESSION_SWITCH_CUI, b"\0"), 0);
-    assert_eq!(
-        session::quit_grace_left(),
-        session::QUIT_GRACE_CYCLES,
-        "Quit を配ったのに猶予が始まっていない"
-    );
-
-    /* アプリ 3 は Quit に応じて終了した (回収は `gui_owner_exit` 経由)。 */
-    wm::g().reclaim_owner(3);
-    session::reclaim_owner(3);
-    multiapp::on_owner_exit(3);
-
-    /* アプリ 2 は Quit を無視して待ち続ける。N-1 周ではまだ畳まない。 */
-    let mut n = 0;
-    while n < session::QUIT_GRACE_CYCLES - 1 {
+        // 1 kHz の像や WAIT_POLL による多数の周でも時刻が同じなら切れない。
+        for _ in 0..1000 { session::x3_cycle(wm::g()); }
+        assert!(!multiapp::pending_top_level_work(), "同じジフィで切れた");
+        assert_eq!(session::quit_grace_left(), session::QUIT_GRACE_TICKS);
+        let before = start.wrapping_add(session::QUIT_GRACE_TICKS - 1);
+        mocks::set_tick(before);
+        wm::g().now = before;
         session::x3_cycle(wm::g());
-        n += 1;
+        assert_eq!(session::quit_grace_left(), 1);
+        assert!(!multiapp::pending_top_level_work(), "期限前に切れた");
+        let deadline = before.wrapping_add(1);
+        mocks::set_tick(deadline);
+        wm::g().now = deadline;
+        session::x3_cycle(wm::g());
+        assert_eq!(session::quit_grace_left(), 0);
+        assert!(multiapp::pending_top_level_work(), "期限で kill が予約されない");
+        assert!(multiapp::resume_one(wm::g()));
+        assert_eq!(mocks::kill_calls(), vec![2]);
+        assert_eq!(multiapp::live_count(), 0);
+        wm::g().inited = false;
     }
-    assert!(
-        !multiapp::pending_top_level_work(),
-        "猶予が切れる前に畳もうとした ({n} 周)"
-    );
-
-    /* N 周目で打ち切り。 */
-    session::x3_cycle(wm::g());
-    assert!(
-        multiapp::pending_top_level_work(),
-        "N 周待っても応答しないアプリが畳まれない (SWITCH_CUI が永久に成立しない)"
-    );
-    assert!(multiapp::resume_one(wm::g()), "top-level が kill を実行しない");
-    assert_eq!(
-        mocks::kill_calls(),
-        vec![2],
-        "応答したアプリまで畳んだ / 相手が違う"
-    );
-    assert_eq!(multiapp::live_count(), 0, "全回収になっていない");
-    wm::g().inited = false;
 }
 
 /* ---- (c') 全員が応答したら誰も畳まない ---- */
@@ -2392,7 +2383,7 @@ fn switch_cui_kills_nobody_when_every_app_answers_the_quit() {
         id += 1;
     }
     let mut n = 0;
-    while n < session::QUIT_GRACE_CYCLES + 2 {
+    while n < session::QUIT_GRACE_TICKS + 2 {
         session::x3_cycle(wm::g());
         n += 1;
     }

@@ -34,18 +34,11 @@ use os32api::gui::proto::{
 /// LAUNCH の絶対パスに載る最大バイト数 (契約 S4 の `GuiString`)。
 pub const PATH_MAX: usize = 255;
 
-/// `Quit` を配ってから応答しないアプリを打ち切るまでの **WM の周回数**
-/// (決裁 A3、2026-09-11)。
-///
-/// 待機中は halt 復帰後、ジフィが進むか物理キー (raw リング) が届くと WM の全周を回す。
-/// キー以外の IRQ (マウスの IRQ13・シリアル・NIC・ディスク) がジフィの途中で
-/// 起こした周は全周を省く。1 ジフィに少なくとも 1 周なので、**300 周は最大
-/// 約 3 秒** (物理 IRQ が 1kHz の像でも同じ)。アプリの再開とキーで周が増える分
-/// だけ短くなる (WAIT_POLL のアプリが居る 1kHz の像では約 0.3 秒まで)。
-///
-/// 確認ダイアログが既に「保存していない内容は失われます」と警告しているので、
+/// `Quit` を配ってから応答しないアプリを打ち切るまでの猶予。
+/// 100 Hz の論理 tick で 300 ジフィ = 3 秒 (決裁 A3)。WM の周回数や
+/// 物理割り込みの周波数には依らない。確認ダイアログで警告済みなので
 /// 打ち切りに追加の UI は要らない。
-pub const QUIT_GRACE_CYCLES: u32 = 300;
+pub const QUIT_GRACE_TICKS: u32 = 300;
 
 /* ================================================================ */
 /*  状態                                                             */
@@ -72,9 +65,9 @@ pub struct Session {
     path: [u8; PATH_MAX + 1],
     path_len: usize,
     quit: [QuitPend; GUI_SLOT_MAX],
-    /// `Quit` を配ってから打ち切るまでに残っている WM の周回数
-    /// (0 = 猶予を数えていない)。[`QUIT_GRACE_CYCLES`] から減る。
-    quit_grace: u32,
+    /// 猶予の期限と、期限が有効かどうか。
+    quit_deadline: u32,
+    quit_grace_active: bool,
 }
 
 impl Session {
@@ -83,7 +76,8 @@ impl Session {
         path: [0; PATH_MAX + 1],
         path_len: 0,
         quit: [QuitPend::NEW; GUI_SLOT_MAX],
-        quit_grace: 0,
+        quit_deadline: 0,
+        quit_grace_active: false,
     };
 }
 
@@ -108,13 +102,17 @@ pub fn clear() {
     st.action = 0;
     st.path_len = 0;
     st.path[0] = 0;
-    st.quit_grace = 0;
+    st.quit_grace_active = false;
 }
 
-/// 打ち切りまでに残っている周回数 (試験と診断用。0 = 数えていない)。
+/// 打ち切りまでに残っているジフィ数 (0 = 数えていないか期限到達)。
 #[allow(dead_code)] /* 試験・診断用 (ゲストからは呼ばない) */
 pub fn quit_grace_left() -> u32 {
-    s().quit_grace
+    let session = s();
+    if !session.quit_grace_active { return 0; }
+    let now = unsafe { (os32api::api().get_tick)() };
+    if now.wrapping_sub(session.quit_deadline) < 0x8000_0000 { 0 }
+    else { session.quit_deadline.wrapping_sub(now) }
 }
 
 /// 保留中の LAUNCH パスを NUL 終端で `out` へ写す。戻り値はバイト数
@@ -239,23 +237,25 @@ fn arm_quit(st: &mut GuiState, reason: u8) {
      * 「全アプリへ Quit → 待ち → 残りを kill → 全回収 → SessionAction 実行」。
      * 最後の 2 つは `ready_to_run` (全回収の確認) と top-level の
      * `multiapp::resume_one` (予約の実行) が担う。 */
-    s().quit_grace = QUIT_GRACE_CYCLES;
+    let now = unsafe { (os32api::api().get_tick)() };
+    s().quit_deadline = now.wrapping_add(QUIT_GRACE_TICKS);
+    s().quit_grace_active = true;
     retry_all(st);
 }
 
-/// 猶予を 1 周ぶん進める (決裁 A3)。切れたら生きているアプリ全部に
+/// 猶予の期限を調べる (決裁 A3)。切れたら生きているアプリ全部に
 /// `exec_kill` を予約する — 実行は top-level (`multiapp::resume_one`)。
 fn tick_quit_grace(st: &GuiState) {
-    if s().quit_grace == 0 {
+    if !s().quit_grace_active {
         return;
     }
-    /* action を実行した / 全員が Quit に応じて回収された。数える必要はない。 */
+    /* action を実行した / 全員が Quit に応じて回収された。 */
     if s().action == 0 || !owner_active(st) {
-        s().quit_grace = 0;
+        s().quit_grace_active = false;
         return;
     }
-    s().quit_grace -= 1;
-    if s().quit_grace == 0 {
+    if st.now.wrapping_sub(s().quit_deadline) < 0x8000_0000 {
+        s().quit_grace_active = false;
         crate::multiapp::request_kill_all();
     }
 }

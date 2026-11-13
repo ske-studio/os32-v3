@@ -404,7 +404,7 @@ pub fn slotless_live(st: &GuiState) -> bool {
 /// スロットを持たない被追跡アプリ全部に `exec_kill` を予約する (票 K7 受入 I3)。
 /// 戻り値は新しく予約した本数。
 ///
-/// 決裁 A3 の「`Quit` を配ってから `QUIT_GRACE_CYCLES` 周待って kill」は
+/// 決裁 A3 の「`Quit` を配ってから `QUIT_GRACE_TICKS` ジフィ (3 秒) 待って kill」は
 /// **配れる相手** (= スロットのある GUI アプリ) の話。スロットが無い 1 本には
 /// `Quit` を積む先が無いので待っても何も起きない — 猶予を待たずに畳む。
 /// 実行は top-level の [`drain_top_level`] で、成功した ID はそこで
