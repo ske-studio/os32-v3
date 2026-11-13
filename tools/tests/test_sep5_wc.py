@@ -31,7 +31,8 @@ def wc_lifecycle(mutation=None):
     body=(ROOT/'drivers/video/geforce/geforce_body.c').read_text()
     backend=(ROOT/'drivers/video/geforce/backend_geforce.c').read_text()
     targets={
-        'wc-stop': ('body', 'int rc = p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = 0; (void)p;'),
+        'wc-stop': ('body', 'int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = 0; (void)p;'),
+        'wc-stop-normal': ('body', 'int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = p && p->wc_stop ? p->wc_stop() : 0;'),
         'wc-repeat': ('source', 'if (lease.active) return wc_result;', 'if (0) return wc_result;'),
         'wc-start': ('backend', 'rc = start_wc ? start_wc() : 0;', 'rc = 0;'),
         'wc-flags': ('source', 'gf_wc_set_flags(flags);', '(void)flags;'),
@@ -68,7 +69,7 @@ def wc_lifecycle(mutation=None):
 if __name__ == '__main__':
     wc_lifecycle()
     if '--mutate' in sys.argv:
-        for mutation in ('wc-repeat', 'wc-alias', 'wc-flags', 'wc-capability', 'wc-vendor'):
+        for mutation in ('wc-stop', 'wc-stop-normal', 'wc-repeat', 'wc-alias', 'wc-flags', 'wc-capability', 'wc-vendor'):
             wc_lifecycle(mutation)
 
 

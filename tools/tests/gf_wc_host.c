@@ -99,7 +99,7 @@ int gf_production_prepare(struct gf_production *p,const struct gf_production_res
 int gf_production_identity(struct gf_production *p) { (void)p;return identity ? 0 : -1; }
 int gf_production_decode_safe(struct gf_production *p) { (void)p;return 0; }
 int gf_production_quiesce(struct gf_production *p)
-{ (void)p;CHECK(!lease.active || restore_fail);quiesces++;started=0;return 0; }
+{ (void)p;CHECK(identity || !lease.active || restore_fail);quiesces++;started=0;return 0; }
 int gf_production_point(void *p) { (void)p;return identity ? 0 : -1; }
 int pc98_route_select_98(void) { return 0; }
 #include "../../hwdev/gf/accel.h"
@@ -136,7 +136,7 @@ static int fake_present(const u8 *s,u32 sp,volatile u8 *d,u32 dp,volatile u8 *r,
 void pc98_console_set_safe(int safe) { (void)safe; }
 int pc98_route_cell_check(void) { return 0; }
 int pc98_route_to_gf(void) { return fault==4; }
-int pc98_route_to_98(void) { CHECK(!lease.active || restore_fail);return 0; }
+int pc98_route_to_98(void) { CHECK(identity || !lease.active || restore_fail);return 0; }
 #define palette_get_all fake_colors
 #define palette_shadow_set fake_shadow
 #define video_mode_info fake_mode
@@ -204,6 +204,13 @@ static void setup(int bios)
     gfx_backend_geforce.bb_base=client;snapshot();
 }
 static void restored(void) { CHECK(!lease.active && effective==baseline);unchanged(); }
+static void retained(void) { CHECK(lease.active && effective==1);unchanged(); }
+static void lose_identity(void)
+{
+    int released=release_calls;
+    identity=0;
+    CHECK(!plat.stop());restored();CHECK(release_calls==released+1);
+}
 void _start(void)
 {
     setup(0);intel=0;CHECK(!geforce_wc_start() && !msr_reads && flags==0x202);intel=1;
@@ -215,15 +222,17 @@ void _start(void)
         setup(bios);gfx_backend_geforce.init();CHECK(active && acquire_calls==1 && presented==1);
         gfx_backend_geforce.init();CHECK(acquire_calls==1 && presented==1);
         CHECK(geforce_wc_start()==1 && acquire_calls==1); /* Opus A: direct same-mode init too. */
-        gfx_backend_geforce.leave();restored();CHECK(release_calls==1);
-        CHECK(!plat.stop());restored();CHECK(release_calls==1); /* double stop */
-        gfx_backend_geforce.enter();CHECK(active && acquire_calls==2);
-        gfx_backend_geforce.shutdown();restored();CHECK(release_calls==2);
-        gfx_backend_geforce.init();CHECK(active && acquire_calls==3);
-        CHECK(!plat.stop());restored(); /* abort/module recovery uses this same callback */
+        gfx_backend_geforce.leave();retained();CHECK(!release_calls);
+        CHECK(!plat.stop());retained();CHECK(!release_calls); /* double stop */
+        gfx_backend_geforce.enter();CHECK(active && acquire_calls==1);
+        gfx_backend_geforce.shutdown();retained();CHECK(acquire_calls==1 && !release_calls);
+        gfx_backend_geforce.init();CHECK(active && acquire_calls==1);
+        CHECK(!plat.stop());retained(); /* abort/module recovery uses this same callback */
+        lose_identity();
         for(int f=1;f<=4;f++) {
             setup(bios);fault=f;if(f==2) result=-1;
-            gfx_backend_geforce.init();CHECK(failed && !active);restored();
+            gfx_backend_geforce.init();CHECK(failed && !active);unchanged();
+            if(f==1) restored();else { retained();lose_identity(); }
             CHECK(acquire_calls==(f==1 ? 0 : 1));
             CHECK(release_calls==(f==1 ? 0 : 1));
         }
@@ -254,10 +263,15 @@ void _start(void)
         CHECK(flags==0x202);
     }
     setup(0);max_ext=0x80000008U;gfx_backend_geforce.init();CHECK(active);
-    gfx_backend_geforce.shutdown();restored();
+    gfx_backend_geforce.shutdown();retained();lose_identity();
     setup(0);result=-1;restore_fail=1;gfx_backend_geforce.init();
     CHECK(failed && lease.active && quiesces==1 && !presented);
-    CHECK(geforce_wc_start()<0 && acquire_calls==1);restore_fail=0;CHECK(!plat.stop());restored();
+    CHECK(geforce_wc_start()<0 && acquire_calls==1);CHECK(!release_calls);CHECK(!plat.stop());
+    CHECK(geforce_wc_start()<0 && acquire_calls==1 && !release_calls);
+    identity=0;int stopped=quiesces;
+    CHECK(plat.stop()<0 && lease.active && release_calls==1 && quiesces==stopped+1);
+    CHECK(geforce_wc_start()<0 && acquire_calls==1);
+    restore_fail=0;lose_identity();
     plat.report("R record\n");CHECK(reported==1);
     __asm__ volatile("int $0x80" : : "a"(1),"b"(0) : "memory");
     __builtin_unreachable();

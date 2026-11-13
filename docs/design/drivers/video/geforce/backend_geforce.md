@@ -11,7 +11,7 @@ route01 とセルは上層の切替後に判定し、共有列の終了条件に
 
 GUI=1拒否・GUI≠1許可（省略時0）、GUI 起動・CUI 描画アプリ起動の各場合で、起動 1 回につき最初の gfx_init で 1 回だけ devinit、dirty/pitch/palette、CLIENT は PEGC/GF 一方だけ、pc98 fallback、decode不明時98無書込み、shutdown→再init、部品欠落/KDEBUG=0。NP21/W は GF 無し拒否と98/PEGC/Cirrus退行
 
-GF_ACCEL S11: video_start 成功→wc_start→初回転送。wc_start=0 は UC 継続、負は共通失敗出口。同一 active init は無操作。停止では active/routed を落としてから共通 stop を呼ぶ。最後の正常 present は既存 BAR0 drain を完了済みであり、identity/point 失敗後の追加 BAR0 read は行わない。
+GF_ACCEL S11: video_start 成功→wc_start→初回転送。wc_start=0 は UC 継続、負は共通失敗出口。同一 active init は無操作。停止では active/routed を落としてから共通 stop を呼ぶ。identity が一致する通常停止では WC lease を起動中保持し、再開始の wc_start は前回結果を返して再取得しない。最後の正常 present は既存 BAR0 drain を完了済みであり、identity/point 失敗後の追加 BAR0 read は行わない。
 
 再 init の probe で稼働中の identity 不一致を発見した場合も、failed を立てて共通 stop を完了してから false を返す。HAL が PC98 へ選択を切り替える前に WC lease と MTRR を戻す。gfx_core と他の backend の選択処理は変更しない。
 

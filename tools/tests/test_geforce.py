@@ -626,7 +626,8 @@ def wc_recovery(path, bios=0, old=False, mutation=None):
     expected=1 if old or mutation else 0
     assert result.returncode==expected,(path,bios,old,mutation,result.returncode,result.stdout,result.stderr)
     if expected:
-        assert 'FAIL !lease.active && wc_effective==bios_wc' in result.stdout,(path,result.stdout)
+        failure = 'FAIL !lease.active && wc_effective==bios_wc' if path < 2 else 'FAIL !route && console_safe'
+        assert failure in result.stdout,(path,result.stdout)
         print(f'RED WC recovery path={path} BIOS={bios} '+result.stdout.strip(),flush=True)
     else: print(result.stdout,end='',flush=True)
 
@@ -654,7 +655,7 @@ def main():
         core(diagnostic=True,mutation='gui-boot-reserve')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
         wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
-        for mutation in ('wc-stop','wc-repeat','wc-start','wc-alias','wc-flags','wc-capability','wc-vendor'): wc_lifecycle(mutation)
+        for mutation in ('wc-stop','wc-stop-normal','wc-repeat','wc-start','wc-alias','wc-flags','wc-capability','wc-vendor'): wc_lifecycle(mutation)
         for mutation in ('bounds', 'point'): present_trace(mutation)
         for mutation in ('alignment', 'tail'):
             present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
