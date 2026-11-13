@@ -31,7 +31,7 @@ static int firmware(void *ptr)
         v[4] = 4;
         if (!kstrcmp(p,"device_type")) {
             kmemcpy(out, scenario == 1 ? "serial\0" : "display", 7); v[4]=7;
-        } else if (!kstrcmp(p,"address")) put(out, scenario == 8 ? 0xfffffff0U : scenario >= 12 && scenario != 15 ? 0x90000000U : 0x90000004U);
+        } else if (!kstrcmp(p,"address")) put(out, scenario == 18 ? 0xfffe0000U : scenario == 8 ? 0xfffffff0U : scenario >= 12 && scenario != 15 ? 0x90000000U : 0x90000004U);
         else if (!kstrcmp(p,"width")) put(out, scenario == 3 ? 0xffffffffU : scenario == 13 ? 800 : 640);
         else if (!kstrcmp(p,"height")) put(out, scenario == 4 ? 1 : scenario == 12 ? 480 : scenario == 13 ? 600 : scenario == 16 ? 0xffffffffU : scenario == 17 ? 3000 : 480);
         else if (!kstrcmp(p,"depth")) put(out, scenario == 2 ? 24 : scenario == 10 ? 16 : scenario >= 11 ? 8 : 32);
@@ -48,7 +48,7 @@ static int firmware(void *ptr)
         v[3] = 0; /* catch */
         v[4] = scenario == 7 ? 0 : ~0U; /* true */
         v[5] = 0x2a; /* mode */
-        v[6] = 0xa0000000U + (va-0x90000000U);
+        v[6] = (scenario == 18 ? 0xa0000000U + (va-0xfffe0000U) : scenario == 19 ? 0xfffe0000U + (va-0x90000000U) : 0xa0000000U + (va-0x90000000U));
         if ((scenario == 9 && va == 0x90001000U) || (scenario == 14 && va == 0x90059000U)) v[6] += 4096;
         return 0;
     }
@@ -83,13 +83,13 @@ void _start(void)
         for (unsigned i=16+fb->bytes;i<sizeof(guarded);i++) CHECK(guarded[i]==0xa5);
         CHECK(ofw_call_count()==count);
     }
-    for (scenario=12; scenario<=17; scenario++) {
+    for (scenario=12; scenario<=19; scenario++) {
         CHECK(pm_rh_capture(8)==1);
         u32 band = pm_rh_framebuffer()->bytes;
         translations=0;
         int rc=pm_rh_capture_full();
         if (scenario==14) CHECK(rc==PM_RH_FULL_TRANSLATE);
-        else if ((scenario==16 || scenario==17)) CHECK(rc==PM_RH_FULL_SIZE);
+        else if ((scenario>=16)) CHECK(rc==PM_RH_FULL_SIZE);
         else {
             CHECK(rc==PM_RH_FULL_OK);
             CHECK(pm_rh_full_framebuffer()->bytes == (scenario==13 ? 480000U : 368640U));
