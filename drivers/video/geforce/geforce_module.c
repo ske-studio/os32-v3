@@ -324,6 +324,7 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
     }
     registered=1;
     if (context.platform) gf_production_set_return(geforce_return, context.platform);
+    if (context.platform && context.platform->wc_start) (void)context.platform->wc_start();
     return 0;
 failed:
     accel_slot=0;
@@ -388,6 +389,9 @@ int geforce_module_load(void)
     if (!rc && !module_exports(geforce_handle)) rc=MODULE_INIT_FAILED;
     if (!rc) gfx_backend_geforce=candidate;
     else {
+        /* module_start can fail after registration, as can module_exports. */
+        if (registered && context.platform && context.platform->wc_stop)
+            (void)context.platform->wc_stop();
         foundation_slot=0;accel_slot=0;
         display_slot=0;display_restore_slot=0;feature5_slot=0;
     }
