@@ -29,6 +29,8 @@ static int different(const char *a, const char *b) { while (*a && *a==*b) { a++;
 static int polls, calls, pending, writes, cancel;
 static void fail(int code, const char *msg) { message(msg); message("\n"); exit(code); }
 int pm_input_usb_has_key(void) { return 0; }
+int pm_console_text_ready(void) { return 0; }
+void shell_print(const char *str, u8 color) { (void)str; (void)color; if (pending) fail(13, "order-fail"); }
 int pm_term_connected(void) { if (pending) fail(13, "order-fail"); return polls >= 2; }
 void pm_terminal_poll(void) {
     if (pending) fail(13, "order-fail");
