@@ -7,6 +7,8 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('colors swapped', '? c->fg : c->bg;', '? c->bg : c->fg;'),
+    ('scroll redraw removed', 'redraw(c, 0, 0, cols, rows);', '(void)cols;'),
     ('width fixed', 'cols = t->width / 8;', 'cols = 80;'),
     ('top ignored', 'c->top = top_pixels;', 'c->top = 0;'),
     ('wide trailing cell', 'if (wide) c->cells[y * c->geometry.cols + x + 1] =', 'if (0) c->cells[y * c->geometry.cols + x + 1] ='),

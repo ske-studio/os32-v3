@@ -63,6 +63,11 @@ static void make_font(void) {
     for(int i=0;i<256;i++) fixture[ank_offset+256*16+i]=1;
     for(int i=0;i<16;i++) {
         fixture[ank_offset+'A'*16+i]=ascii[i];
+        fixture[ank_offset+'1'*16+i]=ascii[i];
+        fixture[ank_offset+'2'*16+i]=kana[i];
+        fixture[ank_offset+'3'*16+i]=ascii[15-i];
+        fixture[ank_offset+'Z'*16+i]=kana[15-i];
+        fixture[ank_offset+'R'*16+i]=ascii[i];
         fixture[ank_offset+0xb1*16+i]=kana[i];
     }
     for(int i=0;i<32;i++) fixture[16+((0x24-0x21)*94+0x22-0x21)*32+i]=jis[i];
@@ -70,10 +75,12 @@ static void make_font(void) {
 }
 static void cell(int x,int y,u16 expected) { u16 code=0; con_backend_readchar(x,y,&code,0); CHECK(code==expected); }
 static u8 pixel(struct gfx_console_target *t,int x,int y) { return pixels[y*t->pitch+x]; }
+static u8 fg=0, bg=255;
+static const u8 blank[16]={0};
 static void mask(struct gfx_console_target *t,int x,int y,const u8 *data,int width) {
     for(int row=0;row<16;row++) for(int col=0;col<width;col++) {
         unsigned expected=(data[row*(width/8)+col/8]/(128u>>(col%8)))%2;
-        CHECK(pixel(t,x+col,y+row)==(expected?15:0));
+        CHECK(pixel(t,x+col,y+row)==(expected?fg:bg));
     }
 }
 static void scenario(unsigned w,unsigned h) {
@@ -85,23 +92,23 @@ static void scenario(unsigned w,unsigned h) {
     int cols=w/8, rows=(h-64)/16;
     CHECK(con_backend_geometry()->cols==cols && con_backend_geometry()->rows==rows);
     con_backend_putchar(0,0,'A',0xe1);
-    CHECK(pixel(&t,0,64)==15 && pixel(&t,7,64)==0);
-    CHECK(pixel(&t,1,65)==15 && pixel(&t,6,65)==15);
+    CHECK(pixel(&t,0,64)==fg && pixel(&t,7,64)==bg);
+    CHECK(pixel(&t,1,65)==fg && pixel(&t,6,65)==fg);
     con_backend_putchar(1,0,(char)0xb1,0xe1);
-    CHECK(pixel(&t,10,64)==15 && pixel(&t,8,64)==0);
+    CHECK(pixel(&t,10,64)==fg && pixel(&t,8,64)==bg);
     mask(&t,0,64,ascii,8); mask(&t,8,64,kana,8);
     con_backend_putkanji(2,0,0x2422,0xe1);
     mask(&t,16,64,jis,16);
     cell(2,0,0x2422); cell(3,0,0x2422);
-    CHECK(pixel(&t,16,64)==15 && pixel(&t,31,64)==15);
+    CHECK(pixel(&t,16,64)==fg && pixel(&t,31,64)==fg);
     CHECK(con_backend_reverse(3,0)==2);
-    CHECK(pixel(&t,16,64)==0 && pixel(&t,17,64)==15 && pixel(&t,31,64)==0);
+    CHECK(pixel(&t,16,64)==bg && pixel(&t,17,64)==fg && pixel(&t,31,64)==bg);
     CHECK(con_backend_reverse(2,0)==2);
     con_backend_cursor_at(0,0); con_backend_cursor_shape(1);
-    CHECK(pixel(&t,0,78)==15);
+    CHECK(pixel(&t,0,78)==fg);
     con_backend_cursor_at(1,1);
-    CHECK(pixel(&t,0,78)==0 && pixel(&t,8,94)==15);
-    con_backend_cursor_shape(0); CHECK(pixel(&t,8,94)==0);
+    CHECK(pixel(&t,0,78)==bg && pixel(&t,8,94)==fg);
+    con_backend_cursor_shape(0); CHECK(pixel(&t,8,94)==bg);
     con_backend_putchar(3,0,' ',0xe1); cell(2,0,' '); cell(3,0,' ');
     tvram_clear(); console_set_cursor(0,0); con_backend_cursor_shape(0);
     shell_print("AA\b\rA\nA",0xe1);
@@ -116,9 +123,17 @@ static void scenario(unsigned w,unsigned h) {
     con_backend_putchar(0,3,'3',0xe1);
     con_backend_putchar(0,rows-2,'Z',0xe1);
     console_set_cursor(0,rows-2); shell_print("\n\n",0xe1);
-    CHECK(pixel(&t,0,64+(rows-2)*16+14)==15);
+    CHECK(pixel(&t,0,64+(rows-2)*16+14)==fg);
     cell(0,rows-4,'Z'); cell(0,0,'2'); cell(0,1,'3'); cell(0,rows-2,' '); cell(0,rows-1,'R');
     con_backend_cursor_shape(0);
+    u8 reversed_ascii[16], reversed_kana[16];
+    for(int i=0;i<16;i++) { reversed_ascii[i]=ascii[15-i]; reversed_kana[i]=kana[15-i]; }
+    mask(&t,0,64,kana,8);
+    mask(&t,0,80,reversed_ascii,8);
+    mask(&t,0,64+(rows-4)*16,reversed_kana,8);
+    for(int x=0;x<cols;x++) mask(&t,x*8,64+(rows-2)*16,blank,8);
+    mask(&t,0,64+(rows-1)*16,ascii,8);
+    for(int x=1;x<cols;x++) mask(&t,x*8,64+(rows-1)*16,blank,8);
     /* Reserved band, pitch padding and incomplete bottom scanlines stay intact. */
     for(unsigned y=0;y<h;y++) for(unsigned x=0;x<t.pitch;x++)
         if(y<64 || y>=64+(unsigned)rows*16 || x>=w) CHECK(pixel(&t,x,y)==0x55);
@@ -127,4 +142,22 @@ static void scenario(unsigned w,unsigned h) {
     fail_lock=1; con_backend_putchar(0,0,'A',0xe1); CHECK(!con_backend_safe()); fail_lock=0;
     pm_console_detach(); CHECK(!con_backend_safe());
 }
-void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); say("PASS fbcon R1 R2\n"); finish(0); }
+static void fake_pc98_colors(void) {
+    struct fbcon c={0};
+    struct gfx_console_target t={.width=640,.height=400,.pitch=653};
+    CHECK(!fbcon_attach(&c,&t,&kcg_file_api,64));
+    CHECK(c.fg==15 && c.bg==0);
+    fg=6; bg=9;
+    fbcon_set_colors(&c,fg,bg);
+    mask(&t,0,64,blank,8);
+    fbcon_putchar(&c,0,0,'A',0xe1,0); mask(&t,0,64,ascii,8);
+    CHECK(fbcon_reverse(&c,0,0)==1);
+    CHECK(pixel(&t,0,64)==bg && pixel(&t,1,64)==fg);
+    fbcon_reverse(&c,0,0);
+    fbcon_cursor_shape(&c,1); CHECK(pixel(&t,0,78)==fg);
+    fbcon_cursor_at(&c,1,0); CHECK(pixel(&t,0,78)==bg && pixel(&t,8,78)==fg);
+    fbcon_cursor_shape(&c,0); CHECK(pixel(&t,8,78)==bg);
+    fbcon_clear(&c); mask(&t,0,64,blank,8);
+    fbcon_detach(&c);
+}
+void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); fake_pc98_colors(); say("PASS fbcon R1 R2\n"); finish(0); }

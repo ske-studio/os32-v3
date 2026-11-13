@@ -13,9 +13,11 @@ struct fbcon {
     struct fbcon_cell *cells;
     struct con_geometry geometry;
     unsigned top;
+    u8 fg, bg;
     int cursor_x, cursor_y, visible, ready;
 };
 int fbcon_attach(struct fbcon *, struct gfx_console_target *, const KcgModuleApi *, unsigned);
+void fbcon_set_colors(struct fbcon *, u8, u8);
 void fbcon_detach(struct fbcon *);
 void fbcon_clear(struct fbcon *);
 void fbcon_scroll(struct fbcon *, int);

@@ -21,7 +21,7 @@ static void paint(struct fbcon *c, int x, int y, u8 *pixels)
         for (bit = 0; bit < 8; bit++) {
             int ink = !!(mask & (0x80u >> bit));
             pixels[(c->top + y * 16 + row) * c->target->pitch + x * 8 + bit] =
-                (s->attr & 1) && (ink ^ inverse ^ cursor) ? 15 : 0;
+                (s->attr & 1) && (ink ^ inverse ^ cursor) ? c->fg : c->bg;
         }
     }
 }
@@ -54,10 +54,17 @@ int fbcon_attach(struct fbcon *c, struct gfx_console_target *t,
     c->geometry = (struct con_geometry){cols, rows};
     c->top = top_pixels;
     c->cursor_x = c->cursor_y = c->visible = 0;
+    c->fg = 15; c->bg = 0;
     c->ready = 1;
     fbcon_clear(c);
     if (!c->ready) { fbcon_detach(c); return -1; }
     return 0;
+}
+
+void fbcon_set_colors(struct fbcon *c, u8 fg, u8 bg)
+{
+    c->fg = fg; c->bg = bg;
+    redraw(c, 0, 0, c->geometry.cols, c->geometry.rows);
 }
 
 void fbcon_detach(struct fbcon *c)

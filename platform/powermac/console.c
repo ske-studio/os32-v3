@@ -1,7 +1,11 @@
 #include "pm_console.h"
 static struct fbcon terminal;
 int pm_console_attach(struct gfx_console_target *t, const KcgModuleApi *font, unsigned top)
-{ return fbcon_attach(&terminal, t, font, top); }
+{
+    int rc = fbcon_attach(&terminal, t, font, top);
+    if (!rc) fbcon_set_colors(&terminal, 0, 255);
+    return rc;
+}
 void pm_console_detach(void) { fbcon_detach(&terminal); }
 const struct con_geometry *con_backend_geometry(void) { return &terminal.geometry; }
 int con_backend_safe(void) { return terminal.ready; }
