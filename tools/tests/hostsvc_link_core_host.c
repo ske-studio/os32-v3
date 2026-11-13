@@ -39,6 +39,7 @@ int net_mac(u8 out[6])
 static u8 rx_frame[1520];
 static u32 rx_length;
 static int rx_calls, mailbox_calls, mailbox_alive;
+u32 net_rx_queued(u16 protocol) { return protocol == NET_RX_LINK && rx_length != 0; }
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 {
     rx_calls++;

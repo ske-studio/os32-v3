@@ -60,6 +60,12 @@ void net_rx_demux(const struct NetNicOps *ops, const u8 local[6], const u8 peer[
     }
 }
 
+u32 net_rx_queued(u16 protocol)
+{
+    struct RxQueue *q = rx_queue(protocol);
+    return q ? q->count : 0;
+}
+
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 {
     struct RxQueue *q = rx_queue(protocol);
