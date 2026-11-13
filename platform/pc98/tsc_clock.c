@@ -28,7 +28,7 @@ static enum tsc_state state;
 static struct tsc_epoch epoch;
 static u32 epoch_fraction;
 static unsigned long long last_us;
-static volatile struct { u32 rejected[8], degraded, abnormal, missing; } diag;
+static volatile struct { u32 rejected[8], degraded, abnormal, missing, late, last_late_us; } diag;
 struct endpoint { unsigned long long tsc, pit, cost; };
 struct window { unsigned long long cycles, cost; u32 us; };
 static struct endpoint start;
@@ -204,7 +204,11 @@ void pc98_tsc_calibrate_work(void)
     if (end.pit < start.pit) { reject(REJECT_ORDER); have_start = 0; return; }
     unsigned long long elapsed = end.pit - start.pit;
     if (elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_WINDOW_MAX_US) {
-        reject(REJECT_LENGTH); start = end; return;
+        if (state == TSC_READY && elapsed > TSC_WINDOW_MAX_US) {
+            ++diag.late;
+            diag.last_late_us = (u32)elapsed;
+        } else reject(REJECT_LENGTH);
+        start = end; return;
     }
     struct window w = {end.tsc - start.tsc,
                        end.cost > start.cost ? end.cost : start.cost, (u32)elapsed};

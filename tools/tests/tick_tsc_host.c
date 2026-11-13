@@ -170,6 +170,34 @@ static void tests(void)
         CHECK(state == (i == 9 ? TSC_FAILED : TSC_READY));
         if (i != 9) advance(800000, 80000000);
     }
+    /* Late READY windows are discarded without changing monitor diagnostics. */
+    ready(); advance(1000000, 0);
+    diag.degraded = 1; diag.abnormal = 1; diag.missing = 1;
+    for (u32 i = 0; i < 20; ++i) {
+        advance(221000, 0);
+        CHECK(state == TSC_READY && diag.late == i + 1 && diag.last_late_us == 221000);
+        CHECK(!consecutive_rejects && !diag.rejected[REJECT_LENGTH]);
+        CHECK(diag.degraded == 1 && diag.abnormal == 1 && diag.missing == 1);
+    }
+    advance(200000, 0);
+    CHECK(state == TSC_READY && !diag.abnormal && !diag.missing && !have_start);
+    ready(); advance(1000000, 0);
+    for (u32 i = 0; i < 10; ++i) {
+        pit_us += 170000; fake_ms += 200; counter += 20000000;
+        pc98_tsc_calibrate_work();
+        CHECK(diag.rejected[REJECT_LENGTH] == i + 1);
+        CHECK(state == (i == 9 ? TSC_FAILED : TSC_READY));
+    }
+    ready(); endpoint_cycles = (TSC_ENDPOINT_US + 1u) * 100u;
+    advance(1000000, 0);
+    for (u32 i = 0; i < 9; ++i) {
+        advance(200000, 0); advance(800000, 0);
+    }
+    CHECK(consecutive_rejects == 9 && state == TSC_READY);
+    advance(221000, 0);
+    CHECK(diag.late == 1 && consecutive_rejects == 9 && state == TSC_READY);
+    advance(200000, 0);
+    CHECK(diag.rejected[REJECT_COST] == 10 && state == TSC_FAILED);
     /* Any rejection reason contributes; an accepted window breaks the streak. */
     ready();
     for (u32 i = 0; i < 9; ++i) reject(i & 1 ? REJECT_READ : REJECT_LENGTH);
