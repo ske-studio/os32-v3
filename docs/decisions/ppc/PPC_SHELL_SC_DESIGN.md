@@ -293,4 +293,4 @@ r1→r2 の変更の数 13 / 反論の数 0
 - 受入アプリは 8.3 名 `outprobe` を使う。
 - serial 版の試験は停止の前に EE=0 とする。
 - K01 の時計の検査は TB の読み 2 回で挟み、周期は変えない。
-- S01 の `SH_CLEAR_TERMINAL` は clear の方式と ver 等の除外を兼ねる (P3、後で macro を分ける)。
+- S01 の clear は、SH_CLEAR_TERMINAL を廃して tvram_clear の KAPI の口 (PowerPC では pm_console_clear: 画面は共通の消去、ESC[2J ESC[H は stream だけ) に変えた (2026-11-13、FB 端末 段 H)。
