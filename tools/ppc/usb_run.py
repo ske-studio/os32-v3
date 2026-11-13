@@ -14,6 +14,10 @@ import time
 from kboot_accept import build
 from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, PREFIX
 
+# Keep TB reads and OHCI timers on instruction-counted virtual time. With
+# host-paced TCG, device_add can leave frames stale for >20ms of guest TB.
+USB_QEMU_CLOCK = ['-icount', 'shift=auto']
+
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
              covers=['platform/powermac/console_stream.c', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
@@ -136,6 +140,7 @@ def accept(elf, cpu, out, mode):
             '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
             '-nic', 'none', '-usb', '-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse']
+    args += USB_QEMU_CLOCK
     (out/'argv.json').write_text(json.dumps(args, indent=2))
     deadline = time.monotonic()+60
     q = None
@@ -261,7 +266,7 @@ def stream_payload(text):
         pos = start + size
 
 
-def product_settings(work, mode):
+def product_settings(work, mode, late=False):
     src = 'platform/powermac/console_stream.c'
     text = (ROOT/src).read_text()
     anchor = '(void)pm_escc_write(&serial, bytes, len);'
@@ -284,11 +289,28 @@ def product_settings(work, mode):
                             else '/* omitted callback forwarding */')
         file = work/(mode+'-platform.c'); file.write_text(text)
         opts += ['KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(file)]
+    if late:
+        src = 'platform/powermac/shell_boot.c'
+        text = (ROOT/src).read_text()
+        anchor = 'while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();'
+        require(text.count(anchor) == 1, 'unique mouse-only startup wait anchor')
+        text = '#include "usb_platform.h"\n' + text
+        text = text.replace(anchor, r'''u32 start = usbp_ms();
+    int reported = 0;
+    while (!pm_term_connected() && !pm_input_usb_has_key()) {
+        pm_terminal_poll();
+        if (!reported && (u32)(usbp_ms() - start) >= 3000) {
+            reported = 1;
+            kprintf(7, "USB MOUSE WAIT END\n");
+        }
+    }''')
+        file = work/(mode+'-mouse-wait.c'); file.write_text(text)
+        opts += ['KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(file)]
     return opts
 
 
-def product_accept(elf, cpu, out, mode):
-    """No boot/input replacement: real sh, USB only, local console stream."""
+def product_accept(elf, cpu, out, mode, late=False):
+    """Real sh/input; late observes three seconds inside the startup wait."""
     out.mkdir()
     cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
     iso = out/'boot.iso'
@@ -300,6 +322,10 @@ def product_accept(elf, cpu, out, mode):
             '-prom-env','auto-boot?=true','-nographic','-serial','file:'+str(a),
             '-serial','file:'+str(b),'-monitor','none','-qmp','stdio','-no-reboot',
             '-nic','none','-usb','-device','usb-kbd,id=kbd','-device','usb-mouse,id=mouse']
+    if late:
+        slot = argv.index('usb-kbd,id=kbd')
+        del argv[slot-1:slot+1]
+    argv += USB_QEMU_CLOCK
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
     deadline = time.monotonic()+60
     q = None
@@ -310,6 +336,7 @@ def product_accept(elf, cpu, out, mode):
             def output():
                 text = serial(a)
                 validate(text, serial(b))
+                require('usb: HC dead' not in text, 'healthy product HC: '+str(out))
                 return stream_payload(text).replace('\r','')
             def wait_for(predicate, label):
                 while time.monotonic() < deadline:
@@ -339,6 +366,12 @@ def product_accept(elf, cpu, out, mode):
                 lines = block.splitlines()[1:]  # discard the echoed command line
                 require(expected in lines, 'product command output '+repr((text, block, expected)))
                 return block
+            if late:
+                wait_for(lambda: 'USB MOUSE WAIT END' in serial(a), 'three-second mouse-only wait')
+                require('protocol=02' in serial(a) and 'sh> ' not in output(),
+                        'mouse enumerated while real sh startup waits')
+                require('usb: HC dead' not in serial(a), 'healthy mouse-only wait')
+                q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
             wait_for(lambda: 'protocol=01' in serial(a), 'keyboard enumeration')
             require('sh> ' not in output(), 'USB sh still waits before first key')
             if mode == 'no-forward':
@@ -390,7 +423,7 @@ def product_accept(elf, cpu, out, mode):
             (out/'registers.txt').write_text(q.call('human-monitor-command', {'command-line':'info registers'}))
             (out/'stream.txt').write_text(output())
             q.call('quit'); p.wait(timeout=2); require(p.returncode==0, 'product QEMU rc=0')
-            print(('GREEN' if mode=='normal' else 'RED')+' product-sh '+mode+' '+cpu+
+            print(('GREEN' if mode=='normal' else 'RED')+' product-sh '+('mouse-wait ' if late else '')+mode+' '+cpu+
                   ': reached HID/command boundary, exact stream verdict, QEMU rc=0', flush=True)
         finally:
             if q: q.close()
@@ -407,7 +440,7 @@ def lan_accept(elf, cpu, out, mode):
         def start(self, number):
             original = subprocess.Popen
             def launch(argv, *args, **kwargs):
-                argv = list(argv) + ['-usb', '-device', 'usb-mouse,id=mouse']
+                argv = list(argv) + USB_QEMU_CLOCK + ['-usb', '-device', 'usb-mouse,id=mouse']
                 (self.out/'argv.json').write_text(json.dumps(argv, indent=2))
                 return original(argv, *args, **kwargs)
             subprocess.Popen = launch
@@ -424,12 +457,14 @@ def lan_accept(elf, cpu, out, mode):
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
         deadline = time.monotonic()+10
         while 'protocol=02' not in serial(s.a) or 'protocol=01' not in serial(s.a):
-            if mode != 'normal' and time.monotonic() >= deadline:
-                # The regressed clock stalls across EE=0 syscalls before the
-                # RPC is even reached: enumeration never completes. Also RED.
-                require('USB KEY' not in serial(s.a), 'clock mutant delivered key')
+            if mode != 'normal' and 'usb: HC dead why=2' in serial(s.a):
+                # A timeout alone is never RED: require the exact clock fault
+                # after HC startup, and prove the LAN sh remains responsive.
+                require('USB HC bdf=' in serial(s.a) and 'USB KEY' not in serial(s.a),
+                        'clock mutant startup/input markers')
+                s.check('echo alive', 'alive\n')
                 s.stop()
-                print('RED LAN '+mode+' '+cpu+': HID enumeration stalled (no clock across EE=0)', flush=True)
+                print('RED LAN '+mode+' '+cpu+': exact HC clock death, live sh, QEMU rc=0', flush=True)
                 return
             require(time.monotonic() < deadline, 'HID enumeration before RPC')
             # Complete USER syscalls so DEC can dispatch while warming up,
@@ -518,6 +553,10 @@ def main():
         elf = build(work/('product-'+mode), 'PPC_CROSS_DIR='+str(cross), *product_settings(work, mode))
         for cpu in cpus if mode == 'normal' else cpus[:1]:
             product_accept(elf, cpu, work/('product-'+mode+'-'+cpu), mode)
+    elf = build(work/'mouse-wait', 'PPC_CROSS_DIR='+str(cross),
+                *product_settings(work, 'mouse-wait', late=True))
+    for cpu in cpus:
+        product_accept(elf, cpu, work/('mouse-wait-'+cpu), 'normal', late=True)
     for mode in ['normal'] + (['no-service', 'tick-clock'] if args.mutate else []):
         elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *settings(work, mode))
         for cpu in cpus if mode == 'normal' else cpus[:1]:
