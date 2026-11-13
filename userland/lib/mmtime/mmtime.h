@@ -13,6 +13,7 @@
 #define MMT_PERIODIC 1u
 
 typedef void (*MMT_CB)(u32 id, u32 msg, u32 user, u32 dw1, u32 dw2);
+/* missed counts skipped periods modulo 2^32; wrapping is permitted. */
 typedef struct {
     u32 id, delay_us, next_lo, next_hi;
     MMT_CB cb;

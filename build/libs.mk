@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------------
 
 # 依存なし (KAPI の共有ヘッダだけで完結する)
+INC_libmmtime       = -Iuserland/lib/mmtime
 INC_libos32math     = -Iuserland/lib/math
 INC_libos32db       = -Iuserland/lib/db
 INC_libos32asset    = -Iuserland/lib/asset
@@ -84,6 +85,9 @@ endef
 ALL_LIB_OBJ :=
 
 # === 各ライブラリの登録 ===
+$(eval $(call DEFINE_LIB,libmmtime,userland/lib/mmtime,,))
+LIBMMTIME_OBJ = $(LIBDIR)/libmmtime.a
+
 # libos32math — 整数数学ライブラリ (最も基底)
 $(eval $(call DEFINE_LIB,libos32math,userland/lib/math,,))
 LIBMATH_OBJ = $(LIBDIR)/libos32math.a
@@ -271,7 +275,7 @@ $(LIBDIR)/libos32filer.a: $(FILER_ARCHIVE_OBJ)
 # === ライブラリ全ビルドターゲット ===
 # 全ライブラリのアーカイブを作る。SDK 切り出し時はこの LIBDIR がそのまま
 # sysroot の lib/ になる。
-ALL_LIB_ARCHIVES = $(LIBDIR)/libos32math.a \
+ALL_LIB_ARCHIVES = $(LIBDIR)/libmmtime.a $(LIBDIR)/libos32math.a \
                    $(LIBDIR)/libos32gfx.a \
                    $(LIBDIR)/libos32db.a \
                    $(LIBDIR)/libos32asset.a \
@@ -306,5 +310,6 @@ clean-libs:
 	rm -f userland/lib/mgx/*.o lib/zlib/*.o
 	rm -f userland/lib/cfg/*.o
 	rm -f userland/lib/host/*.o
+	rm -f userland/lib/mmtime/*.o
 
 .PHONY: libs clean-libs
