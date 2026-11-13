@@ -61,11 +61,18 @@ static void reserve_test(void)
         tuple(reg,1,1,0,0xf00000);
         tuple(reg+8,1,1,0x1000000,0x7000000); rn=16;
     }
+    if (which==14) { /* G4: firmware keeps 32KiB claimed after the image */
+        tuple(avail+8,1,1,0x308000,0x7af8000);
+    }
+    if (which==15) { /* a gap beyond the slack still fails */
+        tuple(avail+8,1,1,0x310001,0x7aeffff);
+        expected=PM_KBOOT_RESERVE_WINDOW;
+    }
     const struct pm_kboot_info *captured=pm_kboot_capture(0);
     reserve_mark('C');
     struct pm_kboot_info copy=*captured;
     if (which==11) { /* late firmware change must invalidate old snapshot */
-        tuple(avail+8,1,1,0x300001,0x7afffff);
+        tuple(avail+8,1,1,0x310001,0x7aeffff);
         expected=PM_KBOOT_RESERVE_WINDOW;
     }
     if (which==12) {
@@ -78,7 +85,7 @@ static void reserve_test(void)
     if (result!=expected) quit(77);
     if (result==PM_KBOOT_RESERVE_OK) {
         if (copy.admitted_end!=0x1000000 || copy.image_first!=0x100000 ||
-            copy.image_end!=0x300000 || copy.hpt_bytes!=0x20000 ||
+            copy.image_end!=(which==14?0x308000:0x300000) || copy.hpt_bytes!=0x20000 ||
             copy.hpt_pa!=(which==5?0x1020000:0x1000000)) quit(78);
     } else if (copy.admitted_end || copy.image_first || copy.image_end ||
                copy.hpt_pa || copy.hpt_bytes) quit(79);

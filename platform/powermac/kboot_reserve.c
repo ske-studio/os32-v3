@@ -10,6 +10,9 @@
 #define PM_VECTOR_END 0x00003000U
 #define PM_HPT_LIMIT 0x02000000U
 #define PM_HPT_BYTES 0x00020000U
+/* Apple OF 4.2.1f2 (G4 PowerMac3,5) keeps 32KiB claimed right after the
+ * loaded image; the kernel runs on its own stack, so the gap is left unused. */
+#define PM_IMAGE_SLACK 0x00010000U
 
 static int valid(const struct pm_regions *r)
 {
@@ -51,8 +54,15 @@ int pm_kboot_reserve(struct pm_kboot_info *info)
             return PM_KBOOT_RESERVE_IMAGE_AVAILABLE;
     }
     if (!covered(&info->ram,0,PM_VECTOR_END)) return PM_KBOOT_RESERVE_VECTOR;
+    u32 window=end;
+    for (unsigned i=0; i<info->available.count; i++) {
+        const struct pm_region *r=&info->available.v[i];
+        if (r->start+r->size<=end) continue;
+        if (r->start>end && r->start-end<=PM_IMAGE_SLACK) window=r->start;
+        break;
+    }
     if (!covered(&info->ram,PM_KERNEL_BASE,PM_WINDOW_END) ||
-        !covered(&info->available,end,PM_WINDOW_END))
+        !covered(&info->available,window,PM_WINDOW_END))
         return PM_KBOOT_RESERVE_WINDOW;
     u32 hpt=0;
     for (unsigned i=0; i<info->available.count; i++) {
@@ -67,7 +77,7 @@ int pm_kboot_reserve(struct pm_kboot_info *info)
     }
     if (!hpt) return PM_KBOOT_RESERVE_HPT;
     info->admitted_end=PM_ADMITTED_END;
-    info->image_first=first; info->image_end=end;
+    info->image_first=first; info->image_end=window;
     info->hpt_pa=hpt; info->hpt_bytes=PM_HPT_BYTES;
     return PM_KBOOT_RESERVE_OK;
 }
