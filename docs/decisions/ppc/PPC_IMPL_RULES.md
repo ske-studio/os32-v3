@@ -4,6 +4,8 @@
 
 > 出所: ~/os32-tmp/run/ppc-common/CI_LESSONS.md (2026-11-09〜10、PowerPC の PM が段ごとに足した 16 項目) を整理して写した。以後はこの文書を正とする。
 
+PowerPC に固有の注意事項 (実機・QEMU・root・フォント) は [PPC_NOTES](PPC_NOTES.md) に集める。共通の文書には書かない。
+
 CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の枝では**手元の検査が CI の代わり**。前の段で CI を落とした型を全部洗ってから push する。
 
 ## 1. CI を落とした型 (push の前に洗う)

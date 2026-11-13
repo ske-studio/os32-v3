@@ -35,7 +35,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
   `python3 tools/fetch_fonts.py --force`、オフラインのホストは手で取った zip を `--zip PATH` で渡す。
 - **`make clean` (と `clean-assets`) は ttf も `.license_accepted` も消さない** — 同意を聞くのは初回
   ビルドの 1 回だけ。消したいときだけ `make fonts-clean` (ttf 2 本と同意の記録を消す)。
-- IPAex の ttf と旧 `.kcgfont` はゲストに配らない。PPC RAM root の東雲由来 KCG1 は [§5-9](05_drivers.md) を参照。`make all` は旧 font を生成せず、KCG 部品が ROM を読む。
+- ttf と旧 `.kcgfont` はゲストに配らない。`make all` は旧 font を生成せず、KCG 部品が ROM を読む。
   host 試験 fixture のライセンス条件は `assets/fonts/README.OS32`。
 
 試験: `tools/tests/test_fetch_fonts.py` (`make check-tools-host` の 1 行。ネットワーク無し)。
