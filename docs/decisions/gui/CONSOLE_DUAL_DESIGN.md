@@ -47,7 +47,7 @@ int  con_dual_was_live(void);      /* この GUI の間に 1 度でも active (s
 void con_dual_session_end(void);   /* sticky を下ろす (gdc_start の最後) */
 const struct con_out *con_dual_outputs(int *n);   /* 診断・試験用 */
 
-/* platform/pc98/display_dual.c — 弱いシンボル (PPC は実体なし = 0 個) */
+/* platform/pc98/display_dual.c — 弱いシンボル (PowerPC は platform/powermac/display_dual.c に実体、2026-11-13 訂正) */
 int display_dual_outputs(struct con_out *o, int max) __attribute__((weak));
 u32 display_dual_key(void) __attribute__((weak));   /* I/O なし。表を作り直すべき変化の畳み込み */
 ```

@@ -8,6 +8,7 @@ CHECK = dict(name='fb-pixel', tier=1, needs=[], budget=12,
 import argparse
 import importlib.util
 import os
+import lz4.block
 from pathlib import Path
 import struct
 import subprocess
@@ -28,7 +29,9 @@ def load(path):
 
 
 def suite(m, fontpath, work):
-    raw = fontpath.read_bytes()[16:]
+    data = fontpath.read_bytes()
+    raw = (lz4.block.decompress(data[16:], uncompressed_size=295940)
+           if struct.unpack_from('<I', data, 8)[0] == 1 else data[16:])
 
     # Raster reference does not use Font.glyph or any oracle drawing logic.
     def glyph(ch):
@@ -118,7 +121,9 @@ def suite(m, fontpath, work):
         diff = m.Terminal(m.Image(width, height, bytes(buf), pitch), font, FG, BG).compare_text(2, 3, 'A')
         assert diff is not None and (diff.row, diff.column) == (2, 3) and diff.different_pixels
     for broken in (b'', fontpath.read_bytes()[:-1],
-                   fontpath.read_bytes()[:8] + struct.pack('<I', 1) + fontpath.read_bytes()[12:]):
+                   fontpath.read_bytes()[:8] + struct.pack('<I', 2) + fontpath.read_bytes()[12:],
+                   data[:12] + struct.pack('<I', 1) + data[16:],
+                   data[:4] + struct.pack('<I', 295939) + data[8:]):
         path = work / 'bad.kcg'; path.write_bytes(broken)
         try:
             m.Font(path)
@@ -132,6 +137,8 @@ def suite(m, fontpath, work):
 
 
 MUTATIONS = (
+    ('compressed-disabled', 'if flags == 1:', 'if False:'),
+    ('payload-size', 'if len(body) != size:', 'if False:'),
     ('cursor-shape', 'self.cursor_top = cursor_top', 'self.cursor_top = 0'),
     ('colors', 'self.fg, self.bg = bytes(fg), bytes(bg)', 'self.fg, self.bg = bytes(bg), bytes(fg)'),
     ('top-zero', 'self.top = top  # mutation anchor: reserved scanlines', 'self.top = 0'),
@@ -156,6 +163,11 @@ def main():
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/gen_font16.py'),
                         '--ebdt', str(ttf), str(fontpath)], check=True)
         suite(load(SOURCE), fontpath, work)
+        compressed = work / 'compressed.kcg'
+        raw = fontpath.read_bytes()
+        compressed.write_bytes(raw[:8] + struct.pack('<II', 1, 0) +
+                               lz4.block.compress(raw[16:], store_size=False))
+        suite(load(SOURCE), compressed, work)
         print('PASS fb-pixel: 800x600, 640x480, padded pitch, text/clear/cursor/scroll')
         if args.mutate:
             source = SOURCE.read_text()
@@ -165,6 +177,7 @@ def main():
                 mutant.write_text(source.replace(old, new))
                 try:
                     suite(load(mutant), fontpath, work)
+                    suite(load(mutant), compressed, work)
                 except (AssertionError, ValueError):
                     print('RED fb-pixel:', name)
                 else:

@@ -36,7 +36,7 @@ def build_run(tmp, source):
         '-I'+str(tmp), '-I'+str(ROOT), '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT),
         str(ROOT/'tools/tests/fbcon_host.c'), str(ROOT/'platform/powermac/console.c'),
         str(ROOT/'kernel/console/console.c'), str(ROOT/'lib/utf8.c'), str(ROOT/'lib/kstring_c.c'),
-        str(ROOT/'drivers/video/kcg/kcg_file.c'), '-o',str(exe)],check=True)
+        str(ROOT/'drivers/video/kcg/kcg_file.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
     return host32.run([str(exe)], runner='qemu', capture_output=True,text=True)
 def cross_compile(tmp):
     cc = Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc')

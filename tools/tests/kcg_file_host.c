@@ -27,7 +27,9 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
 #include "../../kernel/console/font_source.c"
 #include "exec_font_lease.h"
 
-#define MOCK_FILE_SIZE 295956u
+#define MOCK_FILE_SIZE 297133u
+#define RAW_FILE_SIZE 295956u
+#include "kcg_fixtures.h"
 #define CHECK(x) do { if (!(x)) die(__LINE__ % 250 + 1); } while (0)
 #define MOCK_INO       42u
 #define SHELL_OWNER    1
@@ -36,7 +38,7 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
 static int current_owner = 7;     /* res_owner_get() — font open は見ない */
 static int kind_rc = VFS_KIND_FILE, size_rc = VFS_OK, read_mode;
 static int read_calls;
-static u32 actual_size = MOCK_FILE_SIZE;
+static u32 actual_size = RAW_FILE_SIZE;
 static int stale_read;
 static u32 last_off, last_len;
 static u8 file_data[MOCK_FILE_SIZE];
@@ -138,18 +140,42 @@ static void as_app(int owner, u32 gen)
 
 void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d,s,n); }
 void *kmemset(void *d, int c, u32 n) { u8 *p=d; while(n--) *p++=(u8)c; return d; }
-static u8 heap[295940];
-static int allocated, irq, guards;
-void *kmalloc(u32 n) { CHECK(n == sizeof(heap) && !allocated); allocated=1; return heap; }
-void kfree(void *p) { CHECK(p == heap && allocated); allocated=0; }
+static u8 heap[3][297116];
+static int allocated, irq, guards, alloc_calls, fail_alloc;
+static int in_use[3];
+void *kmalloc(u32 n) {
+    int i; CHECK(n <= sizeof(heap[0]));
+    if (++alloc_calls == fail_alloc) return 0;
+    for (i=0;i<3;i++) if (!in_use[i]) { in_use[i]=1; allocated++; kmemset(heap[i],1,n); return heap[i]; }
+    die(249);
+}
+void kfree(void *p) {
+    int i; for(i=0;i<3;i++) if(p==heap[i]) { CHECK(in_use[i]); in_use[i]=0; allocated--; return; }
+    die(248);
+}
+#include "../../lib/lz4.c"
 int font_guard_run(int (*fn)(void *), void *arg) { guards++; if(irq) return OS32_ERR_BUSY; return fn(arg); }
+static int fail_close, lease_reads;
+static int test_resident_read(u32 id, u32 off, void *buf, u32 n) {
+    lease_reads++;
+    return font_lease_resident_read_at(id,off,buf,n);
+}
+#define font_lease_resident_read_at test_resident_read
+static int test_resident_close(u32 id) {
+    int rc=font_lease_resident_close(id);
+    return fail_close ? OS32_ERR_IO : rc;
+}
+#define font_lease_resident_close test_resident_close
 #include "../../drivers/video/kcg/kcg_file.c"
+#undef font_lease_resident_close
+#undef font_lease_resident_read_at
 static void fixture(void) {
+    actual_size=RAW_FILE_SIZE;
     kmemset(file_data,0,sizeof(file_data));
     file_data[0]='K'; file_data[1]='C'; file_data[2]='G'; file_data[3]='1';
     file_data[4]=4; file_data[5]=0x84; file_data[6]=4;
     kmemset(file_data+16+94*94*32,1,94*94);
-    kmemset(file_data+MOCK_FILE_SIZE-256,1,256);
+    kmemset(file_data+RAW_FILE_SIZE-256,1,256);
     file_data[16]=0xa5;
     file_data[16+KCG_FILE_ANK_OFFSET+65*16]=0x5a;
 }
@@ -161,6 +187,81 @@ static void glyphs(void) {
     CHECK(read_calls==calls); irq=0;
 }
 static void no_fds(void) { int i; for(i=3;i<VFS_MAX_OPEN_FILES;i++) CHECK(!open_files[i].in_use); }
+static void packed(const u8 *src, u32 n) {
+    fixture(); file_data[8]=1; memcpy(file_data+16,src,n); actual_size=n+16;
+}
+static void rejected(void) {
+    u8 *old=resident;
+    CHECK(kcg_file_load("/fonts/test.kcg")<0);
+    CHECK(resident==old); CHECK(allocated==1); no_fds(); glyphs();
+}
+/* Logical bounds sit inside real arrays: mutants may touch the sentinel
+ * padding, but never leave the C objects (including pointer arithmetic). */
+static void decoder_bounds_tests(void) {
+    u8 input[32], output[32];
+    int rc;
+    kmemset(input, 0xcc, sizeof(input));
+    kmemset(output, 0xcc, sizeof(output));
+    input[8]=0x20; input[9]='A'; input[10]='B';
+    rc=lz4_decode(input+8,2,output+8,8); /* second literal truncated */
+    CHECK(rc==-1);
+    CHECK(input[10]== 'B' && output[7]==0xcc && output[16]==0xcc);
+
+    input[8]=0x10; input[9]='A'; input[10]=1; input[11]=0;
+    rc=lz4_decode(input+8,3,output+8,8); /* offset high byte truncated */
+    CHECK(rc==-1);
+    CHECK(input[11]==0 && output[7]==0xcc && output[16]==0xcc);
+
+    kmemset(output, 0xcc, sizeof(output));
+    rc=lz4_decode(input+8,4,output+8,4); /* 1 literal + 4 match bytes */
+    CHECK(output[7]==0xcc && output[12]==0xcc);
+    CHECK(rc==LZ4_ERR_OUTPUT);
+
+    input[8]=0x20; input[9]='A'; input[10]='B';
+    kmemset(output, 0xcc, sizeof(output));
+    rc=lz4_decode(input+8,3,output+8,1); /* two literals, capacity one */
+    CHECK(output[7]==0xcc && output[9]==0xcc);
+    CHECK(rc==LZ4_ERR_OUTPUT);
+}
+static void compressed_tests(void) {
+    u32 i; u8 *old;
+    u8 decode_buf[32]={0};
+    const u8 zero[]={0x10,0x41,0,0};
+    const u8 beyond[]={0x10,0x41,2,0};
+    const u8 overlap[]={0x24,'A','B',2,0,0x50,'1','2','3','4','5'};
+    CHECK(lz4_decode(overlap,sizeof(overlap),decode_buf,32)==15);
+    for(i=0;i<10;i++) CHECK(decode_buf[i]==(i%2 ? 'B' : 'A'));
+    CHECK(lz4_decode(zero,sizeof(zero),decode_buf+8,16)<0);
+    CHECK(lz4_decode(beyond,sizeof(beyond),decode_buf+8,16)<0);
+    fixture(); CHECK(kcg_file_load("/fonts/test.kcg")==0);
+    old=resident;
+    packed(packed_good,sizeof(packed_good));
+    CHECK(kcg_file_load("/fonts/test.kcg")==0); CHECK(resident!=old);
+    CHECK(allocated==1); no_fds(); glyphs();
+    for(i=0;i<KCG_FILE_PAYLOAD;i++) CHECK(resident[i]==expected_payload[i]);
+    packed(packed_expanded,sizeof(packed_expanded));
+    CHECK(kcg_file_load("/fonts/test.kcg")==0);
+    for(i=0;i<KCG_FILE_PAYLOAD;i++) CHECK(resident[i]==expected_payload[i]);
+    packed(packed_short,sizeof(packed_short)); rejected();
+    packed(packed_long,sizeof(packed_long)); rejected();
+    packed(packed_bad_fetched,sizeof(packed_bad_fetched)); rejected();
+    packed(packed_bad_ank,sizeof(packed_bad_ank)); rejected();
+    packed(packed_good,sizeof(packed_good)); file_data[16]=0; file_data[17]=0; file_data[18]=0; actual_size=19; rejected();
+    file_data[17]=1; rejected();
+    packed(packed_good,sizeof(packed_good)); actual_size=16; i=alloc_calls; rejected(); CHECK((u32)alloc_calls==i);
+    actual_size=16+KCG_FILE_COMPRESSED_MAX+1; i=alloc_calls; rejected(); CHECK((u32)alloc_calls==i);
+    actual_size=15; i=lease_reads; rejected(); CHECK((u32)lease_reads==i);
+    fixture(); file_data[8]=2; rejected();
+    packed(packed_good,sizeof(packed_good)); file_data[12]=1; rejected();
+    packed(packed_good,sizeof(packed_good)); file_data[4]++; rejected();
+    for(i=1;i<=2;i++) {
+        packed(packed_good,sizeof(packed_good)); fail_alloc=alloc_calls+i; rejected(); fail_alloc=0;
+    }
+    packed(packed_good,sizeof(packed_good)); read_mode=3; rejected(); read_mode=0;
+    packed(packed_good,sizeof(packed_good)); stale_read=1; rejected(); stale_read=0;
+    packed(packed_good,sizeof(packed_good)); fail_close=1; rejected(); fail_close=0;
+    kcg_file_unload(); CHECK(!allocated);
+}
 void _start(void) {
     u32 id,size,other; u8 buf[32]; int fd; FontLease *slot;
     mock_ops.get_file_size=mock_size; mock_ops.read_stream=mock_read_stream;
@@ -192,8 +293,10 @@ void _start(void) {
     file_data[12]=1; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
     file_data[4]++; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
     file_data[16+94*94*32]=0; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
-    file_data[MOCK_FILE_SIZE-1]=2; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
+    file_data[RAW_FILE_SIZE-1]=2; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
     size_rc=VFS_ERR_NOTFOUND; CHECK(kcg_file_load("/fonts/missing.kcg")<0); size_rc=VFS_OK;
     irq=1; CHECK(kcg_file_load("/fonts/test.kcg")==OS32_ERR_BUSY); irq=0;
+    decoder_bounds_tests();
+    compressed_tests();
     CHECK(guards>0); no_fds(); CHECK(!allocated); die(0);
 }

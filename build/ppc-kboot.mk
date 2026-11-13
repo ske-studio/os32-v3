@@ -76,7 +76,7 @@ KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
-KB_C := $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
+KB_C := lib/lz4.c $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
 ifneq ($(KB_EXEC),)
 ifneq ($(KBOOT_TERM),lan)
 $(error KBOOT_TERM must be lan)
@@ -164,6 +164,7 @@ KB_MUT_EXTRA_FILE ?=
 KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+$(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 ifneq ($(KB_EXEC),)
 $(KB_OUT)/platform/powermac/usb_platform.o: KB_TU_FLAGS += -Dkvprintf=pm_log_kvprintf
 $(KB_OUT)/platform/powermac/cli_boot.o: KB_TU_FLAGS += -Dconsole_stream_write=pm_cli_write

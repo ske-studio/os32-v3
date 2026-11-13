@@ -9,9 +9,10 @@ CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:all', 'make:assets/fonts/shin
                      'build/ppc-ram-root.json', 'include/config.h',
                      'tools/tests/test_kcg_ebdt.py', 'tools/tests/test_mkroot_image.py',
                      'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml',
-                     'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py'])
+                     'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'requirements.txt'])
 import argparse
 import json
+import lz4.block
 import os
 from pathlib import Path
 import struct
@@ -87,7 +88,9 @@ def check():
     assert set(manifest) == {'/fonts/shino16.kcg', '/fonts/shino16.txt', '/sys/unicode.bin'}
     config = (ROOT / 'include/config.h').read_text()
     assert all(path in config for path in manifest)
-    assert (ROOT / manifest['/fonts/shino16.kcg']).read_bytes() == data
+    product = (ROOT / manifest['/fonts/shino16.kcg']).read_bytes()
+    assert struct.unpack_from('<4sIII', product) == (b'KCG1', 295940, 1, 0)
+    assert lz4.block.decompress(product[16:], uncompressed_size=295940) == data[16:]
     from test_mkroot_image import entries
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         tmp = Path(tmp)
