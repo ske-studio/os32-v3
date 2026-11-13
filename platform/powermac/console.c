@@ -6,6 +6,7 @@ int pm_console_attach(struct gfx_console_target *t, const KcgModuleApi *font, un
     if (!rc) fbcon_set_colors(&terminal, 0, 255);
     return rc;
 }
+void pm_console_set_colors(u8 fg, u8 bg) { fbcon_set_colors(&terminal, fg, bg); }
 void pm_console_detach(void) { fbcon_detach(&terminal); }
 const struct con_geometry *con_backend_geometry(void) { return &terminal.geometry; }
 int con_backend_safe(void) { return terminal.ready; }

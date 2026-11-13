@@ -27,6 +27,7 @@
 #include "drivers/net/gem/gem.h"
 #include "memory_boot.h"
 #include "pgalloc.h"
+#include "physmem.h"
 #include "kmalloc.h"
 #include "shm.h"
 #include "clock_source.h"
@@ -34,6 +35,17 @@
 
 #if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
+#include "pm_console.h"
+#include "console_backend.h"
+#include "unicode_file.h"
+#include "display_text.h"
+#include "drivers/video/kcg/kcg_file.h"
+#include "gfx/gfx.h"
+#include "gfx/gfx_console.h"
+#include "gfx/v2/gfx2_int.h"
+#include "config.h"
+#include "console.h"
+#include "tvram.h"
 #if KBOOT_SH
 #include "shell_boot.h"
 #include "input_boot.h"
@@ -167,6 +179,9 @@ void ppc_kernel_main(void)
         arch_cpu_stop();
     }
 
+#if KBOOT_SHELL || KBOOT_SH
+    pm_console_stream_init();
+#endif
     int lan_log_rc = pm_lan_log_register();
 
     unsigned long long ram = 0;
@@ -201,7 +216,17 @@ void ppc_kernel_main(void)
 #else
     int shared_user = paging_boot_user_shared((u32)user_gate) == 0;
 #endif
-    kmalloc_init((void *)KHEAP_BASE, KHEAP_SIZE);
+#if KBOOT_SHELL || KBOOT_SH
+    /* The fixed 192 KiB heap cannot hold the 296 KiB resident font. Reserve
+     * a separate RAM arena before any heap clients exist; leave KAPI/SHM's
+     * fixed layout intact. Allocation failure retains the stream-only path. */
+    u32 heap_pfn;
+    if (pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, PM_CONSOLE_HEAP_BYTES / PAGE_SIZE,
+            MEM_POOL_BASE / PAGE_SIZE, pgalloc_arena_end(), LEDGER_TOP_DOWN, &heap_pfn))
+        kmalloc_init(P2V(heap_pfn * PAGE_SIZE), PM_CONSOLE_HEAP_BYTES);
+    else
+#endif
+        kmalloc_init((void *)KHEAP_BASE, KHEAP_SIZE);
     void *heap = kmalloc(256);
     int heap_ok = heap && kmalloc_used() >= 256;
     if (heap) { *(volatile u32 *)heap = 0x4b424f54; kfree(heap); }
@@ -311,9 +336,50 @@ void ppc_kernel_main(void)
     kprintf(KBOOT_ATTR, "KBOOT ALIVE tick_delta=%u tb_us=%u of_calls_delta=%u\r\n",
             tick_delta, tb_us, ofw_call_count() - info->of_calls_at_detach);
 #if KBOOT_SHELL || KBOOT_SH
+    kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
+            dev->fb_full_rc, dev->fb_color_rc);
     struct boot_root_image img;
     pm_root_image(&img);
     if (pm_root_boot(&img) == 0) {
+        static struct gfx_console_target target;
+        int rc = kcg_file_load(SYS_FB_FONT);
+        const char *step = "font";
+        if (!rc) {
+            step = "unicode";
+            unicode_file_load();
+            if (!unicode_file_debug_phys()) rc = -1;
+        }
+        if (!rc) {
+            step = "target";
+            gfx_boot_reserve();
+            gfx_init();
+            struct gfx2_adapter *a = gfx2_active();
+            rc = a ? gfx_console_open(a->index, 0, &target) : -1;
+        }
+        if (!rc) {
+            step = "attach";
+            rc = pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS);
+            if (!rc && !con_backend_safe()) rc = -1;
+        }
+        if (!rc) {
+            const struct pm_rh_colors *colors = pm_rh_full_colors();
+            pm_console_set_colors(colors->foreground, colors->background);
+            step = "clear";
+            if (con_backend_safe()) {
+                pm_console_text_state(1, 1, 1, target.generation);
+                tvram_clear();
+                console_hw_cursor_enable();
+            }
+            if (!con_backend_safe()) rc = -1;
+            else kprintf(KBOOT_ATTR, "FB text ready generation=%u\r\n", target.generation);
+        }
+        if (rc) {
+            pm_console_text_state(1, 0, 0, 0);
+            pm_console_detach();
+            if (target.sid) (void)gfx_console_close(&target);
+            kcg_file_unload();
+            kprintf(KBOOT_ATTR, "FB off step=%s rc=%d\r\n", step, rc);
+        }
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
         pm_usb_boot(info->tb_hz);

@@ -196,6 +196,7 @@ void shell_putchar(char ch, u8 color)
 {
     con_sink_push_print(&ch, 1, color);
     bootlog_push(&ch, 1);             /* 起動ログ (色は捨てる) */
+    if (rshell_active || boot_serial_mirror) con_output_putchar(ch);
     if (!console_render_allowed()) return;   /* 票 K6C-2 / V86: 描画抑止 */
     putchar_raw(ch, color);
     console_hw_cursor_sync();

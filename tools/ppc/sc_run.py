@@ -56,10 +56,10 @@ def lan_accept(elf, cpu, out, shell=False):
         iso = out/'boot.iso'
         command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
         a, b = out/'serial-a.log', out/'serial-b.log'
-        args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+        args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
                 '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
                 '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+                '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
                 '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
                 '-nic', 'none', '-device', 'sungem,netdev=n0,mac=52:54:00:12:34:56',
                 '-netdev', f'socket,id=n0,udp=127.0.0.1:{transport.sock.getsockname()[1]},localaddr=127.0.0.1:{port}']
@@ -258,21 +258,25 @@ static int sc_connected(void)
     stream_src = 'platform/powermac/console_stream.c'
     stream = (ROOT/stream_src).read_text()
     # Tag the stream mirror separately from log writes, even on serial.
-    stream = stream.replace('(void)pm_escc_write(&serial, bytes, len);',
-                            '(void)pm_escc_write(&serial, "~", 1);\n'
-                            '    (void)pm_escc_write(&serial, bytes, len);')
+    stream = stream.replace('(void)pm_escc_write(&serial, bytes, len);', r'''
+    char frame[] = "~USBSTREAM:00000000:";
+    static const char hex[] = "0123456789abcdef";
+    for (unsigned i = 0; i < 8; i++) frame[11+i] = hex[(len >> (28-4*i)) & 15];
+    (void)pm_escc_write(&serial, frame, sizeof(frame)-1);
+    (void)pm_escc_write(&serial, bytes, len);''')
     for name in ['normal'] + (['fd1-log', 'no-restart'] if mutate else []):
         settings = ['KBOOT_SH=1']
         for slot, src, text in [('', boot_src, boot), ('EXTRA_', input_src, inp),
                                 ('THIRD_', stream_src, stream)]:
+            if name == 'fd1-log' and src == stream_src:
+                text = text.replace('    console_write(buf, size, color);',
+                                    '    (void)color; pm_log_write(buf, size);')
             if name == 'no-restart' and src == boot_src:
                 anchor = 'if (kind != EXEC_KIND_EXITED) break;'
                 require(text.count(anchor) == 1, 'restart anchor')
                 text = text.replace(anchor, 'break;')
             file = work/(name+'-'+Path(src).name); file.write_text(text)
             settings += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(file)]
-        if name == 'fd1-log':
-            settings += ['KB_FD1_STREAM=0']
         elf = build(work/name, *settings)
         symbols = command([PREFIX+'nm', '-n', elf])
         require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in sh image')
@@ -282,10 +286,10 @@ static int sc_connected(void)
             iso = out/'boot.iso'
             command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
             a, b = out/'serial-a.log', out/'serial-b.log'
-            args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+            args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
                     '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
                     '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                    '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+                    '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
                     '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
             deadline = time.monotonic()+60
             q = None
@@ -309,10 +313,17 @@ static int sc_connected(void)
                             require(pc and int(pc[1], 16) == address, 'unexpected SC stop PC')
                             validate(aa, bb, True); require(ejected, 'CD not ejected')
                             actual = aa.partition('SB READY\n')[2].partition('SB DONE\n')[0]
-                            # Every stream chunk begins with ~; fd1 log mutation
-                            # loses that marker for the cat result only.
-                            require(('~sc-ok' in actual) == (name != 'fd1-log'), 'fd1 stream marker')
-                            check_shell(actual.replace('~', ''), restart=name != 'no-restart')
+                            terminal, pos = '', 0
+                            while match := re.search(r'~USBSTREAM:([0-9a-f]{8}):', actual[pos:]):
+                                start = pos + match.end()
+                                pos = start + int(match[1], 16)
+                                require(pos <= len(actual), 'complete SC stream frame')
+                                terminal += actual[start:pos]
+                            require(('sc-ok\n' in terminal) == (name != 'fd1-log'), 'fd1 stream marker')
+                            # The mutation deliberately routes fd1 to LOG. Keep
+                            # checking its content independently of the channel.
+                            merged = re.sub(r'~USBSTREAM:[0-9a-f]{8}:', '', actual)
+                            check_shell(merged, restart=name != 'no-restart')
                             q.call('quit'); p.wait(timeout=2); require(p.returncode == 0, 'QEMU exit')
                             print(('GREEN ' if name == 'normal' else 'RED ')+name+' '+cpu+
                                   ': exact stop PC, results, QEMU rc=0', flush=True)

@@ -63,10 +63,10 @@ def serial_accept(elf, cpu, out, expected):
     symbols = {p[2]: int(p[0], 16) for line in command([PREFIX+'nm', '-n', elf]).splitlines()
                if len(p := line.split()) == 3}
     a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
             '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
     deadline = time.monotonic()+60
     q = None

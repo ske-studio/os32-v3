@@ -134,10 +134,10 @@ def accept(elf, cpu, out, mode):
     iso = out/'boot.iso'
     command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
     a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
             '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
             '-nic', 'none', '-usb', '-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse']
     args += USB_QEMU_CLOCK
@@ -316,10 +316,10 @@ def product_accept(elf, cpu, out, mode, late=False):
     iso = out/'boot.iso'
     command(['genisoimage','-quiet','-hfs','-r','-part','-no-desktop','-o',iso,cd])
     a, b = out/'serial-a.log', out/'serial-b.log'
-    argv = ['qemu-system-ppc','-M','mac99','-cpu',cpu,'-m','128M','-smp','1',
+    argv = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []),'-M','mac99','-cpu',cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-drive',f'file={iso},media=cdrom',
             '-boot','d','-prom-env','boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env','auto-boot?=true','-nographic','-serial','file:'+str(a),
+            '-prom-env','auto-boot?=true',*(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']),'-serial','file:'+str(a),
             '-serial','file:'+str(b),'-monitor','none','-qmp','stdio','-no-reboot',
             '-nic','none','-usb','-device','usb-kbd,id=kbd','-device','usb-mouse,id=mouse']
     if late:
@@ -420,6 +420,9 @@ def product_accept(elf, cpu, out, mode, late=False):
                     execute('echo alive', 'alive')
             require('USB HC bdf=' in serial(a) and 'usb: HC dead' not in serial(a), 'healthy HC reached')
             q.call('stop')
+            if os.environ.get('PPC_FB') == '1':
+                q.call('screendump', {'filename': str(out/'screen.ppm')})
+                require('FB text ready' in serial(a), 'INDEX8 console attached')
             (out/'registers.txt').write_text(q.call('human-monitor-command', {'command-line':'info registers'}))
             (out/'stream.txt').write_text(output())
             q.call('quit'); p.wait(timeout=2); require(p.returncode==0, 'product QEMU rc=0')

@@ -88,10 +88,10 @@ class Session:
         self.display.seek(0); self.display.truncate()
         self.terminal.connected = False
         self.a, self.b = [self.out/f'boot{number}-serial-{x}.log' for x in ('a', 'b')]
-        args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', self.cpu, '-m', '128M', '-smp', '1',
+        args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', self.cpu, '-m', '128M', '-smp', '1',
                 '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={self.iso},media=cdrom,id=bootcd',
                 '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(self.a),
+                '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(self.a),
                 '-serial', 'file:'+str(self.b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
                 '-nic', 'none', '-device', 'sungem,netdev=n0,mac=52:54:00:12:34:56',
                 '-netdev', f'socket,id=n0,udp=127.0.0.1:{self.transport.sock.getsockname()[1]},localaddr=127.0.0.1:{self.port}']

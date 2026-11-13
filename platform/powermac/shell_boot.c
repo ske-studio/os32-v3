@@ -1,4 +1,6 @@
 #include "shell_boot.h"
+#include "console.h"
+#include "display_text.h"
 #include "input_usb.h"
 #include "lan_boot.h"
 #include "exec.h"
@@ -27,6 +29,7 @@ static void report(int kind, int code)
 void pm_shell_boot(void)
 {
     int kind, code;
+    if (pm_console_text_ready()) shell_print("Press a USB key or connect LAN to start sh\n", 1);
     while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();
     (void)pm_terminal_trygetkey(); /* Consume the first OPEN cancellation. */
     for (;;) {

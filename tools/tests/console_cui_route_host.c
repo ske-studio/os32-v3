@@ -60,7 +60,14 @@ void con_sink_push_print(const char *s, u32 n, u8 c)
 void con_sink_push_clear(void) { if (sink) sink_clears++; }
 void con_sink_push_cursor(int x, int y) { (void)x; (void)y; }
 void bootlog_push(const char *s, u32 n) { (void)s; boot_bytes += n; }
-int con_output_putchar(char c) { (void)c; return 0; }
+static char mirror[128];
+static unsigned mirror_n;
+int con_output_putchar(char c)
+{
+    CHECK(mirror_n < sizeof(mirror), "mirror bounds");
+    mirror[mirror_n++] = c;
+    return 0;
+}
 void gfx_policy_reeval(void) {}
 void kbd_inject_discard(void) {}
 #define LEGACY_FAKE_ACTIVE_ENABLE
@@ -179,4 +186,27 @@ static void gui(void)
     no_display();
     say("PASS GF GUI TEXT / GUI clear and cursor gates\n");
 }
-void _start(void) { cui(); gui(); finish(0); }
+static void stream_routes(void)
+{
+    for (int boot = 0; boot < 2; boot++)
+    for (int remote = 0; remote < 2; remote++)
+    for (int render = 0; render < 2; render++) {
+        setup(0, 0, 0);
+        safe = render;
+        boot_serial_mirror = boot; rshell_active = remote;
+        mirror_n = 0;
+        shell_putchar('A', TATTR_WHITE);
+        shell_print("BC", TATTR_WHITE);
+        console_write("D\0E", 3, TATTR_WHITE);
+        kprintf(KLOG_ATTR, "F:%u/%s", 7u, "G");
+        const char expected[] = "ABCD\0EF:7/G";
+        unsigned want = boot || remote ? sizeof(expected) - 1 : 0;
+        CHECK(mirror_n == want, "mirror exactly once");
+        for (unsigned i = 0; i < want; i++)
+            CHECK(mirror[i] == expected[i], "mirror bytes");
+        if (!render) CHECK(!text_access && !cursor_io, "mirror render disabled");
+    }
+    boot_serial_mirror = rshell_active = 0;
+    say("PASS mirror routes / render disabled / exact bytes\n");
+}
+void _start(void) { cui(); gui(); stream_routes(); finish(0); }

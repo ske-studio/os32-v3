@@ -15,6 +15,18 @@ SOURCES = {
     'pc98_console_source.inc': 'platform/pc98/console.c',
 }
 MUTANTS = [
+    ('character mirror missing', 'console_source.inc',
+     'if (rshell_active || boot_serial_mirror) con_output_putchar(ch);',
+     '(void)ch;', 'mirror exactly once'),
+    ('character mirror doubled', 'console_source.inc',
+     'if (rshell_active || boot_serial_mirror) con_output_putchar(ch);',
+     'if (rshell_active || boot_serial_mirror) { con_output_putchar(ch); con_output_putchar(ch); }', 'mirror exactly once'),
+    ('string mirror missing', 'console_source.inc',
+     'if (rshell_active || boot_serial_mirror) con_output_putchar(*str);',
+     '(void)str;', 'mirror exactly once'),
+    ('write mirror missing', 'console_source.inc',
+     'for (i = 0; i < size; i++) con_output_putchar(buf[i]);',
+     'for (i = size; i < size; i++) con_output_putchar(buf[i]);', 'mirror exactly once'),
     ('shell requires sink', 'console_source.inc',
      'void shell_putchar(char ch, u8 color)\n{',
      'void shell_putchar(char ch, u8 color)\n{\n'

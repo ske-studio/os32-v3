@@ -82,7 +82,7 @@ ifneq ($(KBOOT_TERM),lan)
 $(error KBOOT_TERM must be lan)
 endif
 KB_C += fs/vfs.c fs/vfs_fd.c drivers/base/dev.c $(RAM_ROOT_C) platform/powermac/root_boot.c platform/powermac/root_image.c \
- platform/powermac/console_stream.c platform/powermac/shell_putchar.c
+ platform/powermac/console_stream.c platform/powermac/console_log.c
 ifeq ($(KBOOT_SHELL),1)
 KB_C += platform/powermac/cli_boot.c kernel/cli/resident_cli.c
 else
@@ -94,16 +94,25 @@ KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
  fs/pipe_buffer.c kapi/kapi_strings.c kapi/kapi_print.c lib/kstring.c mm/paging_app.c \
  kernel/time/clock_service.c lib/os_time.c
-KB_C := $(filter-out arch/ppc/kboot_unavailable.c,$(KB_C))
+KB_C := $(filter-out arch/ppc/kboot_unavailable.c platform/powermac/kboot_console.c,$(KB_C))
+KB_C += kernel/console/console.c kernel/console/console_dual.c kernel/console/fbcon.c \
+ kernel/console/font_source.c kernel/console/font_guard.c kernel/console/unicode_file.c \
+ init/bootlog.c kernel/port_service.c kernel/serial_diag.c lib/utf8.c lib/kprintf_attr.c \
+ platform/powermac/console.c platform/powermac/display.c \
+ platform/powermac/display_provider.c platform/powermac/display_dual.c \
+ drivers/video/kcg/kcg_file.c drivers/video/of_fb/backend_of_fb.c drivers/video/of_fb/of_fb_v2.c \
+ platform/none/legacy_guest.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c \
+ gfx/gfx_core.c gfx/gfx_console.c gfx/gfx_policy.c gfx/palette.c gfx/gfx_scroll.c \
+ $(filter-out gfx/v2/a0_weak.c gfx/sync/a0_weak.c,$(wildcard gfx/v2/*.c gfx/sync/*.c))
 KB_ASM += arch/ppc/exec_resume.S arch/ppc/exec_enter.S arch/ppc/setjmp.S
-KB_EXTRA := $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o
+KB_EXTRA := $(KB_OUT)/pm_log_printf.o $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o
 KB_GEN := $(KB_OUT)/gen
 KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Ikapi -Idrivers -Inet -Igfx -Iexec \
  -Idrivers/char -Idrivers/net -Idrivers/dma -Idrivers/input -Idrivers/pci \
  -Idrivers/sound -Idrivers/video -Ifs/fat -Ifs/ext2 -Ifs/ramfs \
  -Ifs/serialfs -Ifs/hostdrv -Ikernel/module -Ikernel/v86 -Ikernel/ime \
- -Igfx/sync -Igfx/v2
+ -Igfx/sync -Igfx/v2 -Idrivers/video/geforce -Idrivers/video/kcg
 KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
 ifeq ($(KBOOT_SH),1)
@@ -155,6 +164,19 @@ KB_MUT_EXTRA_FILE ?=
 KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+ifneq ($(KB_EXEC),)
+$(KB_OUT)/platform/powermac/usb_platform.o: KB_TU_FLAGS += -Dkvprintf=pm_log_kvprintf
+$(KB_OUT)/platform/powermac/cli_boot.o: KB_TU_FLAGS += -Dconsole_stream_write=pm_cli_write
+# Existing boot diagnostics retain their LAN LOG channel. Terminal kprintf
+# still uses lib/kprintf.o and the ordinary console mirror.
+$(addprefix $(KB_OUT)/,$(filter init/ppc_kernel.o arch/ppc/%.o platform/powermac/%.o drivers/%.o gfx/%.o mm/%.o fs/%.o kernel/%.o,$(KB_C:.c=.o))): KB_TU_FLAGS += -Dkprintf=pm_log_printf
+$(KB_OUT)/pm_log_printf.o: lib/kprintf.c build/ppc-kboot.mk $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h
+	$(KB_CC) $(KB_FLAGS) -Dkprintf=pm_log_printf -Dkvprintf=pm_log_kvprintf \
+	 -Dkutoa_dec=pm_log_dec -Dkutoa_hex=pm_log_hex -Dkprintf_spec=pm_log_spec \
+	 -Dconsole_write=pm_diag_write -Dshell_print=pm_diag_print \
+	 -Dshell_print_utf8=pm_diag_print_utf8 -c $< -o $@
+endif
+$(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/fs/vfs_fd.o: KB_TU_FLAGS = $(if $(filter 1,$(KB_FD1_STREAM)),-Dconsole_write=pm_fd1_write)
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
@@ -189,4 +211,4 @@ audit: $(KB_ELF)
 	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
--include $(KB_OBJ:.o=.d)
+-include $(KB_OBJ:.o=.d) $(if $(KB_EXEC),$(KB_OUT)/pm_log_printf.d)
