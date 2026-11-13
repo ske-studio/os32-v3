@@ -20,6 +20,7 @@
 | RH4 | uPD720101 のカードで USB | 内蔵 USB のキーボード → sh は実機で通過 (§2)。カードは未 |
 
 ## 2. 実機の結果 (2026-11-13)
+PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ・LAN・QEMU) のまとめは [PPC_NOTES](../../decisions/ppc/PPC_NOTES.md)。
 証拠はノートの `~/os32-tmp/evidence/2026-11-13/ppc-rh/` (rh2・rh3・rh4)。起動は `boot enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12` (この OF は `;` も区切りに数え、4 つ目がゲートウェイ、5 つ目が bootp-retries)。OF は引数付きでも BOOTP/BSDP を先に出すので、ノートに G4 の MAC だけに答える返事役を置いた。
 
 | 段 | 結果 |

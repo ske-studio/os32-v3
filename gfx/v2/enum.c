@@ -12,7 +12,7 @@ int gfx2_adapter_count(void)
 
 int gfx2_adapter_info(u32 index, GFX2_AdapterInfo *out)
 {
-    static const char *const names[] = { "", "pc98", "pegc", "cirrus", "geforce", "trident" };
+    static const char *const names[] = { "", "pc98", "pegc", "cirrus", "geforce", "trident", "of_fb" };
     struct gfx2_adapter *a = gfx2_adapter_get(index);
     GFX2_AdapterInfo v = {0};
     if (!a || !out) return OS32_ERR_INVAL;

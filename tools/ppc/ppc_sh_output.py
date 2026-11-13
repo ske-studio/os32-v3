@@ -109,8 +109,7 @@ def main():
     injected = work / 'console_stream.c'
     if args.serial:
         # Mark only the probe's stream write; ordinary CLI output stays intact.
-        replacement = ('    if (len == 10 && ((const char *)bytes)[0] == 70 && '
-                       '((const char *)bytes)[1] == 68)\n'
+        replacement = ('    if (len == 1 && ((const char *)bytes)[0] == 70)\n'
                        '        (void)pm_escc_write(&serial, "STREAM ", 7);\n' + before)
         injected.write_text(text.replace(before, replacement))
         cli = 'platform/powermac/cli_boot.c'
@@ -134,9 +133,9 @@ def main():
     else:
         skipped = lan_accept(elf, '7450', work / 'normal-guest')
     if args.mutate:
-        mutation = mutant_settings(work, 'fd1-log', 'platform/powermac/kboot_console.c',
-                                   '    console_stream_write(buf, size);',
-                                   '    pm_log_write(buf, size);')
+        mutation = mutant_settings(work, 'fd1-log', 'platform/powermac/console_stream.c',
+                                   '    console_write(buf, size, color);',
+                                   '    (void)color; pm_log_write(buf, size);')
         elf = build(work / 'fd1-log', *settings, *mutation)
         if args.serial:
             serial_accept(elf, '7450', work / 'fd1-log-guest', expected.replace('STREAM FD1 PROBE', 'FD1 PROBE'))

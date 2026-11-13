@@ -38,4 +38,14 @@ u32 display_provider_display_first(u32 plane);
 
 void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg);
 
+/* Platform lifecycle policy. Common core retains mode selection and binding.
+ * client_before_init: the backend consumes ledger CLIENT during init. */
+int display_provider_client_before_init(const GfxBackend *backend);
+int display_provider_init_failed(GfxBackend *backend);
+int display_provider_idle_safe(int pref);
+void display_provider_prepare_failed(GfxBackend *backend);
+void display_provider_raster_reset(void);
+int display_provider_restore_fallback(GfxBackend *backend);
+u32 display_provider_ver_kind(const GfxBackend *backend);
+
 #endif

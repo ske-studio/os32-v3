@@ -63,10 +63,10 @@ def serial_accept(elf, cpu, out, expected):
     symbols = {p[2]: int(p[0], 16) for line in command([PREFIX+'nm', '-n', elf]).splitlines()
                if len(p := line.split()) == 3}
     a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
             '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
     deadline = time.monotonic()+60
     q = None
@@ -87,7 +87,12 @@ def serial_accept(elf, cpu, out, expected):
                     regs = q.call('human-monitor-command', {'command-line': 'info registers'})
                     (out/'registers.txt').write_text(regs)
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                    require(pc and int(pc[1], 16) == symbols['sb_stop'], 'unexpected stop PC')
+                    # Serial bytes precede the local framebuffer redraw. The
+                    # DONE marker is not the stop boundary until that returns.
+                    if not pc or int(pc[1], 16) != symbols['sb_stop']:
+                        q.call('cont')
+                        time.sleep(.01)
+                        continue
                     validate(aa, bb, True)
                     require(ejected, 'CD not ejected')
                     actual = aa.split('SB READY\n', 1)[1]

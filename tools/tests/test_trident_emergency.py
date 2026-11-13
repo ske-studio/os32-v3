@@ -10,7 +10,7 @@ CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
             'gfx/gfx_core*.inc', 'drivers/video/cirrus/backend_cirrus.c',
             'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c',
             'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c',
-            'exec/redir_access.c', 'exec/surface_query.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h',
+            'exec/redir_access.c', 'exec/surface_query.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h',
             'gfx/gfx_vram.c', 'kernel/sys.c', 'mm/paging.c', 'mm/pgalloc.c',
             'mm/physmem.c', 'mm/shlib.c', 'tools/tests/mutpar.py', 'include/gfx_hal.h', 'build/kernel.mk',
             'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/idt.h',
@@ -37,6 +37,7 @@ import subprocess
 import tempfile
 
 import host32
+from paging_source import paging_source
 from kernel_includes import include_flags
 from test_gfx_kernel_fb import run_case
 
@@ -82,19 +83,19 @@ MUTATIONS = [
     ('boot-hook', 'platform/pc98/gfx_surfaces.c',
      'if (pref == GFX_PREF_TRIDENT && trident_boot_reserve)',
      'if (pref == GFX_PREF_AUTO && trident_boot_reserve)', 'core'),
-    ('sf5', 'gfx/gfx_core_surface.inc',
-     'if (g_backend == &gfx_backend_trident) return LEDGER_SF_TRIDENT;',
-     'if (g_backend == &gfx_backend_trident) return LEDGER_SF_PC98;', 'core'),
+    ('sf5', 'platform/pc98/gfx_selector.c',
+     'be == &gfx_backend_trident ? LEDGER_SF_TRIDENT :',
+     'be == &gfx_backend_trident ? LEDGER_SF_PC98 :', 'core'),
     ('client-binding', 'gfx/gfx_core_framebuffer.inc',
-     'gfx_sf_backend() == LEDGER_SF_TRIDENT ? &gfx_backend_trident :',
-     'gfx_sf_backend() == LEDGER_SF_TRIDENT ? &gfx_backend_pc98 :', 'core'),
+     'GfxBackend *backend = g_backend;',
+     'GfxBackend *backend = DISPLAY_FALLBACK_BACKEND;', 'core'),
     ('auto-probe', 'platform/pc98/gfx_selector.c',
      'g_backend_list[i] == &gfx_backend_trident) continue;',
      'g_backend_list[i] == &gfx_backend_pc98) continue;', 'core'),
-    ('drop-init-recovery', 'gfx/gfx_core.c',
+    ('drop-init-recovery', 'platform/pc98/gfx_selector.c',
      'int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, rc);',
      'int restore_rc = rc ? 0 : rc;', 'core'),
-    ('unsafe-fallback', 'gfx/gfx_core.c',
+    ('unsafe-fallback', 'platform/pc98/gfx_selector.c',
      'if (restore_rc || (pc98_route_safe && !pc98_route_safe())) return -1;',
      'if (restore_rc && pc98_route_safe && pc98_route_safe()) return -1;', 'core'),
 ]
@@ -110,7 +111,7 @@ def function(text, name):
 
 
 def source(path, mutation):
-    text = (ROOT / path).read_text()
+    text = paging_source(ROOT / path)
     if mutation and mutation[1] == path:
         _, _, old, new, _ = mutation
         assert text.count(old) == 1, (mutation[0], text.count(old))

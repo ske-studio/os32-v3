@@ -15,7 +15,7 @@ static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
     u8 *base;
     u32 i;
     if (!out) return OS32_ERR_INVAL;
-    sf = ledger_surface_find(selected ? gfx_sf_backend() : LEDGER_SF_PC98,
+    sf = ledger_surface_find(selected ? gfx_sf_backend() : display_provider_ledger(DISPLAY_FALLBACK_BACKEND),
                              LEDGER_ROLE_CLIENT);
     fb.width = GFX_WIDTH;
     fb.height = GFX_HEIGHT;
@@ -64,10 +64,7 @@ void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
 static void gfx_bind_client(void)
 {
     const struct ledger_surface *sf = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
-    GfxBackend *backend = gfx_sf_backend() == LEDGER_SF_TRIDENT ? &gfx_backend_trident :
-                          gfx_sf_backend() == LEDGER_SF_GEFORCE ? &gfx_backend_geforce :
-                          gfx_sf_backend() == LEDGER_SF_PEGC ? &gfx_backend_pegc :
-                          gfx_sf_backend() == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus : &gfx_backend_pc98;
+    GfxBackend *backend = g_backend;
     u8 *base = 0;
     u32 i;
     if (gfx_mode_ready && sf && !sf->closing)

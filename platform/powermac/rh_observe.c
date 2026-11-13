@@ -7,6 +7,7 @@
 #include "kstring.h"
 static struct pm_rh_fb fb, full_fb;
 static u32 fb_va, fb_mmu;
+static struct pm_rh_colors colors;
 static volatile u8 *pixels;
 static int output;
 static u32 reached;
@@ -43,6 +44,7 @@ int pm_rh_capture(int stdout_ih)
     char type[16];
     fb = (struct pm_rh_fb){0};
     full_fb = (struct pm_rh_fb){0};
+    colors = (struct pm_rh_colors){0};
     pixels = 0;
     output = stdout_ih;
     reached = 0;
@@ -85,8 +87,32 @@ int pm_rh_capture(int stdout_ih)
     return 1;
 }
 const struct pm_rh_fb *pm_rh_framebuffer(void) { return &fb; }
+/* IEEE 1275 display color@: (index -- r g b). Wrapper returns bottom first.
+ * Sum compares brightness without assuming a firmware palette ordering. */
+static void capture_colors(void)
+{
+    cell lo[3] = {0}, hi[3] = {255};
+    colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_FAILED};
+    if (ofw_call_method("color@", output, 1, 3, lo) ||
+        ofw_call_method("color@", output, 1, 3, hi)) {
+        /* IEEE 1275 display color!: (r g b index --). Set only the
+         * terminal endpoints while firmware calls are still available. */
+        cell black[4] = {0, 0, 0, 0}, white[4] = {255, 255, 255, 255};
+        if (ofw_call_method("color!", output, 4, 0, black) ||
+            ofw_call_method("color!", output, 4, 0, white)) return;
+        colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_WRITTEN,
+            .foreground = 255, .background = 0};
+        return;
+    }
+    u32 a = lo[0] + lo[1] + lo[2], b = hi[0] + hi[1] + hi[2];
+    if (a == b) { colors.rc = PM_RH_COLOR_EQUAL; return; }
+    colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_OK,
+        .foreground = a > b ? 0 : 255, .background = a > b ? 255 : 0};
+}
+const struct pm_rh_colors *pm_rh_full_colors(void) { return &colors; }
 int pm_rh_capture_full(void)
 {
+    colors = (struct pm_rh_colors){0};
     full_fb = (struct pm_rh_fb){0};
     if (!fb.bytes) return PM_RH_FULL_ABSENT;
     u32 offset = fb_va & (PM_RH_FB_PAGE - 1);
@@ -102,11 +128,13 @@ int pm_rh_capture_full(void)
         if (!translate(fb_mmu, fb_va - offset + off, &next) || next != base + off)
             return PM_RH_FULL_TRANSLATE;
     }
+    if (fb.depth == 8) capture_colors();
     full_fb = fb;
     full_fb.bytes = bytes;
     return PM_RH_FULL_OK;
 }
-void pm_rh_discard_full(void) { full_fb = (struct pm_rh_fb){0}; }
+void pm_rh_discard_full(void)
+{ full_fb = (struct pm_rh_fb){0}; colors = (struct pm_rh_colors){0}; }
 const struct pm_rh_fb *pm_rh_full_framebuffer(void) { return &full_fb; }
 
 int pm_rh_of_mark(unsigned stage)

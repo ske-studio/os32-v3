@@ -19,7 +19,8 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, PREFIX
 USB_QEMU_CLOCK = ['-icount', 'shift=auto']
 
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
-             covers=['platform/powermac/console_stream.c', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
+             covers=['platform/powermac/console_stream.c', 'platform/powermac/console_log.c',
+                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
                      'include/usb_platform.h', 'include/endian_dma.h',
                      'arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
@@ -51,6 +52,7 @@ PROBE = r"""
 #include "kernel_tick.h"
 #include "usb_platform.h"
 #include "kprintf.h"
+int usb_accept_wrong_clock;
 static int usb_probe_input(void)
 {
     static u32 start, stalled, returned;
@@ -59,6 +61,7 @@ static int usb_probe_input(void)
     if (!start) start = now;
     if (!stalled && (u32)(now - start) >= 3000000) {
         stalled = 1;
+        usb_accept_wrong_clock = 1;
         /* Input boundary of a real USER syscall: EE=0 for one second.
          * Returning a newline lets the pending DEC run on syscall return. */
         u32 ticks = tick_count;
@@ -82,7 +85,7 @@ static int usb_probe_input(void)
 """
 
 
-def mutation(work, mode):
+def mutation(work, mode, after_stall=False):
     src = 'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c'
     content = (ROOT/src).read_text()
     before, after = {
@@ -90,6 +93,13 @@ def mutation(work, mode):
         'invert-key': ('pm_input_usb_key(src, sc, down);', 'pm_input_usb_key(src, sc, !down);'),
         'tick-clock': ('return (u32)(tb() / (tb_frequency / 1000u));', 'return tick_clock_ms();'),
     }[mode]
+    if mode == 'tick-clock' and after_stall:
+        # Activate at the designated EE=0 stall, after healthy HID startup.
+        # A live FB makes USER startup itself long enough to expose the wrong
+        # clock; that earlier death would miss this probe's intended boundary.
+        after = ('extern int usb_accept_wrong_clock;\n'
+                 '    return usb_accept_wrong_clock ? tick_clock_ms() : '
+                 '(u32)(tb() / (tb_frequency / 1000u));')
     require(content.count(before) == 1, 'unique USB mutation anchor')
     dest = work/(mode+'-'+Path(src).name)
     dest.write_text(content.replace(before, after))
@@ -118,7 +128,7 @@ def settings(work, mode):
         dest.write_text(content)
         result += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(dest)]
     if mode != 'normal':
-        src, dest = mutation(work, mode)
+        src, dest = mutation(work, mode, after_stall=True)
         result += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(dest)]
     else:
         # Normal stall acceptance also observes the real sh execution result.
@@ -134,10 +144,10 @@ def accept(elf, cpu, out, mode):
     iso = out/'boot.iso'
     command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
     a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
             '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
             '-nic', 'none', '-usb', '-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse']
     args += USB_QEMU_CLOCK
@@ -155,7 +165,12 @@ def accept(elf, cpu, out, mode):
                 ready = 'sh> ' in (stream_payload(text) if mode == 'normal' else text)
                 keyboard = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=01', text)
                 mouse = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02', text)
-                if phase == 0 and ready and ((keyboard and mouse) or mode == 'no-service') and 'USB STALL END' in text:
+                # Clock-negative input is sent only after its explicit HC clock
+                # fault: a final in-flight HID make before the clock check is
+                # valid and must not make the negative meter timing-dependent.
+                if (phase == 0 and ready and ((keyboard and mouse) or mode == 'no-service')
+                        and 'USB STALL END' in text
+                        and (mode != 'tick-clock' or 'usb: HC dead why=2' in text)):
                     q.call('send-key', {'keys': [{'type': 'qcode', 'data': 'a'}], 'hold-time': 100})
                     phase = 1; sent_at = time.monotonic()
                 elif phase == 1 and time.monotonic()-sent_at > .4:
@@ -195,7 +210,10 @@ def accept(elf, cpu, out, mode):
                     address = next(int(l.split()[0], 16) for l in symbols.splitlines()
                                    if l.endswith(' usb_accept_stop'))
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                    require(pc and int(pc[1], 16) == address, 'USB exact stop PC')
+                    if not pc or int(pc[1], 16) != address:
+                        q.call('cont')
+                        time.sleep(.01)
+                        continue
                     validate(text, serial(b), True)
                     require(ready and phase == 6 and 'USB STALL END' in text and 'USB STALL ticks=0' in text and 'USB HC bdf=' in text and 'USB TAKEOVER quiet' in text,
                             'USB startup/reached markers: '+text)
@@ -316,10 +334,10 @@ def product_accept(elf, cpu, out, mode, late=False):
     iso = out/'boot.iso'
     command(['genisoimage','-quiet','-hfs','-r','-part','-no-desktop','-o',iso,cd])
     a, b = out/'serial-a.log', out/'serial-b.log'
-    argv = ['qemu-system-ppc','-M','mac99','-cpu',cpu,'-m','128M','-smp','1',
+    argv = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []),'-M','mac99','-cpu',cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-drive',f'file={iso},media=cdrom',
             '-boot','d','-prom-env','boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env','auto-boot?=true','-nographic','-serial','file:'+str(a),
+            '-prom-env','auto-boot?=true',*(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']),'-serial','file:'+str(a),
             '-serial','file:'+str(b),'-monitor','none','-qmp','stdio','-no-reboot',
             '-nic','none','-usb','-device','usb-kbd,id=kbd','-device','usb-mouse,id=mouse']
     if late:
@@ -327,7 +345,8 @@ def product_accept(elf, cpu, out, mode, late=False):
         del argv[slot-1:slot+1]
     argv += USB_QEMU_CLOCK
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
-    deadline = time.monotonic()+60
+    # The live FB renders the full editing/hotplug transcript as well as ESCC.
+    deadline = time.monotonic()+(180 if os.environ.get('PPC_FB') == '1' else 60)
     q = None
     with (out/'qemu.stderr').open('w') as err:
         p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
@@ -398,7 +417,11 @@ def product_accept(elf, cpu, out, mode, late=False):
                     require('cancelled' not in output()[start:].splitlines()[1:], 'Ctrl-C cancellation')
                     execute('echo history', 'history')
                     start=len(output()); key('up'); key('down'); key('up'); key('ret')
-                    wait_for(lambda: output()[start:].endswith('sh> '), 'history prompt')
+                    # DOWN can redraw an empty 'sh> ' before UP/Enter is
+                    # consumed, especially while the framebuffer is drawing.
+                    # Require the fd1 result as well as the final prompt.
+                    wait_for(lambda: output()[start:].endswith('sh> ') and
+                             'history' in output()[start:].splitlines()[1:], 'history result prompt')
                     require('history' in output()[start:].splitlines()[1:], 'history result')
                     start=len(output()); text_keys('echo hxi'); key('left'); key('left'); key('right');
                     key('home');
@@ -420,6 +443,9 @@ def product_accept(elf, cpu, out, mode, late=False):
                     execute('echo alive', 'alive')
             require('USB HC bdf=' in serial(a) and 'usb: HC dead' not in serial(a), 'healthy HC reached')
             q.call('stop')
+            if os.environ.get('PPC_FB') == '1':
+                q.call('screendump', {'filename': str(out/'screen.ppm')})
+                require('FB text ready' in serial(a), 'INDEX8 console attached')
             (out/'registers.txt').write_text(q.call('human-monitor-command', {'command-line':'info registers'}))
             (out/'stream.txt').write_text(output())
             q.call('quit'); p.wait(timeout=2); require(p.returncode==0, 'product QEMU rc=0')

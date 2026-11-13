@@ -30,4 +30,5 @@ typedef struct {
 typedef struct { unsigned long token, base, bytes, planes[OS32_SURFACE_MAX]; } OS32_LeaseView;
 typedef struct { unsigned long count; OS32_LeaseView views[OS32_SURFACE_MAX]; } OS32_LeaseResult;
 #define OS32_SURFACE_TRIDENT 5
+#define OS32_SURFACE_OF_FB 6
 #endif

@@ -60,7 +60,14 @@ void con_sink_push_print(const char *s, u32 n, u8 c)
 void con_sink_push_clear(void) { if (sink) sink_clears++; }
 void con_sink_push_cursor(int x, int y) { (void)x; (void)y; }
 void bootlog_push(const char *s, u32 n) { (void)s; boot_bytes += n; }
-int con_output_putchar(char c) { (void)c; return 0; }
+static char mirror[128];
+static unsigned mirror_n;
+int con_output_putchar(char c)
+{
+    CHECK(mirror_n < sizeof(mirror), "mirror bounds");
+    mirror[mirror_n++] = c;
+    return 0;
+}
 void gfx_policy_reeval(void) {}
 void kbd_inject_discard(void) {}
 #define LEGACY_FAKE_ACTIVE_ENABLE
@@ -179,4 +186,49 @@ static void gui(void)
     no_display();
     say("PASS GF GUI TEXT / GUI clear and cursor gates\n");
 }
-void _start(void) { cui(); gui(); finish(0); }
+static void stream_routes(void)
+{
+    for (int boot = 0; boot < 2; boot++)
+    for (int remote = 0; remote < 2; remote++)
+    for (int render = 0; render < 2; render++) {
+        setup(0, 0, 0);
+        safe = render;
+        boot_serial_mirror = boot; rshell_active = remote;
+        mirror_n = 0;
+        shell_putchar('A', TATTR_WHITE);
+        CHECK(mirror_n == (EXPECT_PUTCHAR_MIRROR && (boot || remote) ? 1u : 0u),
+              "character mirror policy");
+        mirror_n = 0;
+        shell_print("BC", TATTR_WHITE);
+        console_write("D\0E", 3, TATTR_WHITE);
+        kprintf(KLOG_ATTR, "F:%u/%s", 7u, "G");
+        const char expected[] = "BCD\0EF:7/G";
+        unsigned want = boot || remote ? sizeof(expected) - 1 : 0;
+        CHECK(mirror_n == want, "mirror exactly once");
+        for (unsigned i = 0; i < want; i++)
+            CHECK(mirror[i] == expected[i], "mirror bytes");
+        if (!render) CHECK(!text_access && !cursor_io, "mirror render disabled");
+    }
+    boot_serial_mirror = rshell_active = 0;
+    say("PASS mirror routes / render disabled / exact bytes\n");
+}
+static void serial_clear(void)
+{
+    setup(0, 0, 0);
+    boot_serial_mirror = 1; rshell_active = 0; mirror_n = 0;
+    cursor_x = 7; cursor_y = 3;
+    const char sequence[] = "\033[2J\033[H";
+    for (unsigned i = 0; i < sizeof(sequence)-1; i++)
+        shell_putchar(sequence[i], TATTR_WHITE);
+    CHECK(cursor_x == 14 && cursor_y == 3, "literal escape cursor");
+    for (unsigned i = 0; i < sizeof(sequence)-1; i++)
+        CHECK(text[3 * 80 + 7 + i] == (u8)sequence[i], "literal escape bytes");
+    CHECK(mirror_n == (EXPECT_PUTCHAR_MIRROR ? sizeof(sequence)-1 : 0), "serial clear stream");
+    for (unsigned i = 0; i < mirror_n; i++)
+        CHECK(mirror[i] == sequence[i], "serial clear stream");
+    shell_putchar('Z', TATTR_WHITE);
+    CHECK(text[3 * 80 + 14] == 'Z' && cursor_x == 15 && cursor_y == 3, "literal escape origin");
+    boot_serial_mirror = 0;
+    say("PASS serial clear / local origin / exact mirrored escapes\n");
+}
+void _start(void) { cui(); gui(); stream_routes(); serial_clear(); finish(0); }

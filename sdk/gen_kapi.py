@@ -653,6 +653,9 @@ for slot, api in enumerate(data["api"]):
     if not args_str: args_str = "void"
 
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
+    if TARGET == "ppc-powermac" and name == "tvram_clear":
+        c_content += "    extern void pm_console_clear(void);\n    pm_console_clear();\n}\n\n"
+        continue
     if TARGET == "ppc-powermac" and name in ABSENT_PROVIDER_SLOTS:
         for arg in get_arg_names(api.get("args", [])):
             c_content += f"    (void){arg};\n"

@@ -29,11 +29,11 @@ def accept(cpu, timeout, sb=False):
     command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
     a, b = out / 'serial-a.log', out / 'serial-b.log'
     a.touch(); b.touch()
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M',
             '-smp', '1', '-accel', 'tcg', '-bios', str(ROM),
             '-drive', f'file={iso},media=cdrom,id=bootcd', '-boot', 'd',
             '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot']
     reservation = transport = host = None
     lines = []

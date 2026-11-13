@@ -44,6 +44,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 CONSTANTS = {
     'MEM_TRIDENT_LFB_VA': 0x20000000, 'MEM_TRIDENT_REGS_VA': 0x20400000,
     'LEDGER_SF_TRIDENT': 5, 'OS32_SURFACE_TRIDENT': 5,
+    'LEDGER_SF_OF_FB': 6, 'OS32_SURFACE_OF_FB': 6,
     'PEGC_PAL_KAPI_BITS': 4, 'GFX_PALETTE_COMPONENT_BITS': 4,
     'GFX_PALETTE_COMPONENT_MASK': 15,
     'TRI_PCI_VENDOR': 0x1023, 'TRI_PCI_DEVICE': 0x9660, 'TRI_CHIP_9682': 0x10,
@@ -324,15 +325,15 @@ def build(work, tree):
     return exe
 
 
-def surface_abi(work, compiler, surface_id=5, expected_failure=False):
+def surface_abi(work, compiler, surface_id=5, expected_failure=False, backend="TRIDENT"):
     # Preinclude the copied public header so the product TU uses that value.
     # This negative compile test is explicitly required by PACK.fix3 N1;
     # it is separate from the executable mutants below.
     header = work / 'os32_surface.h'
     original = (ROOT / 'sdk/include/os32/os32_surface.h').read_text()
-    old = '#define OS32_SURFACE_TRIDENT 5'
+    old = f'#define OS32_SURFACE_{backend} {5 if backend == "TRIDENT" else 6}'
     assert original.count(old) == 1
-    header.write_text(original.replace(old, f'#define OS32_SURFACE_TRIDENT {surface_id}'))
+    header.write_text(original.replace(old, f'#define OS32_SURFACE_{backend} {surface_id}'))
     public = work / 'public.c'
     public.write_text(f'#include "{header}"\n')
     subprocess.run([compiler, '-m32', '-std=c89', '-pedantic-errors',
@@ -344,7 +345,7 @@ def surface_abi(work, compiler, surface_id=5, expected_failure=False):
                              *include_flags(ROOT), '-fsyntax-only', str(src)],
                             capture_output=True, text=True)
     if expected_failure:
-        assert result.returncode != 0 and 'abi_surface_trident' in result.stderr, result
+        assert result.returncode != 0 and ('abi_surface_' + backend.lower()) in result.stderr, result
         print(f'MUTATE RED surface SDK/backend mismatch (compile assertion, {compiler})', flush=True)
     else:
         assert result.returncode == 0, result.stderr
@@ -362,6 +363,7 @@ def main():
             surface_abi(work, compiler)
             if args.mutate:
                 surface_abi(work, compiler, surface_id=6, expected_failure=True)
+                surface_abi(work, compiler, surface_id=5, expected_failure=True, backend="OF_FB")
             for header in HEADERS:
                 src = work / 'standalone.c'
                 src.write_text(f'#include "{header}"\n')

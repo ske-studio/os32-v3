@@ -25,7 +25,9 @@ _Static_assert(GFX2_KIND_CIRRUS == LEDGER_SF_CIRRUS, "gfx2 kind CIRRUS");
 _Static_assert(GFX2_KIND_GEFORCE == LEDGER_SF_GEFORCE, "gfx2 kind GEFORCE");
 #define GFX2_KIND_TRIDENT 5
 _Static_assert(GFX2_KIND_TRIDENT == LEDGER_SF_TRIDENT, "gfx2 kind TRIDENT");
-#define GFX2_KIND_MAX GFX2_KIND_TRIDENT
+#define GFX2_KIND_OF_FB 6
+_Static_assert(GFX2_KIND_OF_FB == LEDGER_SF_OF_FB, "gfx2 kind OF_FB");
+#define GFX2_KIND_MAX GFX2_KIND_OF_FB
 struct gfx2_rect { i32 x, y, w, h; };
 struct gfx2_head { u32 scan_sid, pend_sid, mode_id, conn_mask; };
 struct gfx2_heap { u32 base, size, n; struct { u32 off, bytes, used; } blk[GFX2_HEAP_BLOCKS /* 2048 */]; };

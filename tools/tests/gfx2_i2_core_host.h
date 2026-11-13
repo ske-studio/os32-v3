@@ -16,7 +16,10 @@ u32 display_provider_ledger(const GfxBackend *backend)
 { return backend == &gfx_backend_pc98 ? GFX2_KIND_PC98 : 0; }
 void display_provider_each(void (*fn)(GfxBackend *, void *), void *arg)
 { fn(&gfx_backend_pc98, arg); }
-void pc98_splash_raster_reset(void) {}
+void display_provider_raster_reset(void) {}
+int display_provider_client_before_init(const GfxBackend *be) { (void)be; return 0; }
+int display_provider_init_failed(GfxBackend *be) { (void)be; return 0; }
+int display_provider_idle_safe(int pref) { (void)pref; return 1; }
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
 void serial_diag_u32(u32 x) { (void)x; }

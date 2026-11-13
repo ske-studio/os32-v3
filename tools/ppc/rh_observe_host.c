@@ -3,7 +3,7 @@
 #include "rh_observe.h"
 #include "kstring.h"
 static u8 guarded[PM_RH_FB_LIMIT + 32];
-static unsigned scenario, synced, writes, translations;
+static unsigned scenario, synced, writes, translations, color_case, color_calls, color_writes;
 static void finish(unsigned rc) __attribute__((noreturn));
 static void finish(unsigned rc)
 {
@@ -42,6 +42,27 @@ static int firmware(void *ptr)
         return 0;
     }
     if (!kstrcmp(name,"call-method")) {
+        if (!kstrcmp(ppc_cell_ptr(v[0]), "color@")) {
+            CHECK(v[1] == 8 && a[1] == 3 && a[2] == 4);
+            u32 index = v[2];
+            CHECK(index == 0 || index == 255);
+            color_calls++;
+            if (color_case == 6) return 0; /* exception left catch untouched */
+            if (color_case == 7) { v[3] = 0; return -33; } /* CI failure, not method catch */
+            v[3] = color_case >= 3 ? 1 : 0;
+            u32 bright = color_case == 2 ? 127 :
+                ((index == 0) == (color_case == 0) ? 255 : 0);
+            v[4] = v[5] = v[6] = bright;
+            return 0;
+        }
+        if (!kstrcmp(ppc_cell_ptr(v[0]), "color!")) {
+            CHECK(v[1] == 8 && a[1] == 6 && a[2] == 1);
+            CHECK(color_case >= 3 && color_writes < 2);
+            u32 value = color_writes++ ? 255 : 0;
+            CHECK(v[2] == value && v[3] == value && v[4] == value && v[5] == value);
+            v[6] = color_case == 4 || (color_case == 5 && value == 255) ? 1 : 0;
+            return 0;
+        }
         CHECK(!kstrcmp(ppc_cell_ptr(v[0]),"translate") && v[1]==9 && a[1]==3 && a[2]==4);
         u32 va = v[2];
         translations++;
@@ -97,6 +118,25 @@ void _start(void)
         }
         CHECK(pm_rh_framebuffer()->bytes==band);
         if (rc!=PM_RH_FULL_OK) CHECK(!pm_rh_full_framebuffer()->bytes);
+    }
+    scenario = 12;
+    for (color_case = 0; color_case < 8; color_case++) {
+        CHECK(pm_rh_capture(8) == 1);
+        CHECK(pm_rh_full_colors()->rc == PM_RH_COLOR_UNCHECKED);
+        color_calls = color_writes = 0;
+        CHECK(pm_rh_capture_full() == PM_RH_FULL_OK);
+        const struct pm_rh_colors *c = pm_rh_full_colors();
+        CHECK(color_calls == (color_case >= 3 ? 1 : 2));
+        if (color_case < 2) {
+            CHECK(c->rc == PM_RH_COLOR_OK);
+            CHECK(c->foreground == (color_case == 0 ? 0U : 255U));
+            CHECK(c->background == (color_case == 0 ? 255U : 0U));
+        } else if (color_case == 3 || color_case >= 6) {
+            CHECK(c->rc == PM_RH_COLOR_WRITTEN && c->foreground == 255 && c->background == 0);
+        } else CHECK(c->rc == (color_case == 2 ? PM_RH_COLOR_EQUAL : PM_RH_COLOR_FAILED));
+        CHECK(color_writes == (color_case < 3 ? 0 : color_case == 4 ? 1 : 2));
+        pm_rh_discard_full();
+        CHECK(pm_rh_full_colors()->rc == PM_RH_COLOR_UNCHECKED);
     }
     unsigned count = ofw_detach();
     pm_rh_stage(2); pm_rh_phy(3,4,5,6);

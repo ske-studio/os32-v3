@@ -92,6 +92,43 @@ class PreflightTest(unittest.TestCase):
                          (self.fonts / 'ipaexg.ttf').read_bytes())
         self.assertFalse((self.work / 'assets/fonts/ipaexm.ttf').exists())
 
+    def test_gui_fonts_and_license(self):
+        # Inconsolata + OFL and Shinonome 16 + the license text kept in fetch_fonts.py.
+        lic = '東雲ライセンス\n'
+        gui = {'Inconsolata-Regular.ttf': b'inconsolata', 'Inconsolata-OFL.txt': b'ofl',
+               'JF-Dot-Shinonome16.ttf': b'shinonome',
+               'JF-Dot-Shinonome16-LICENSE.txt': lic.encode('utf-8')}
+        for name, data in gui.items():
+            (self.fonts / name).write_bytes(data)
+        h = lambda name: hashlib.sha256(gui[name]).hexdigest()
+        ipa = {n: (n, self.digest) for n in ('ipaexg.ttf', 'ipaexm.ttf')}
+        (self.work / 'tools/fetch_fonts.py').write_text(
+            'MEMBERS = ' + repr(ipa) + '\n'
+            'INCONSOLATA_MEMBERS = ' + repr({'x': ('Inconsolata-Regular.ttf', h('Inconsolata-Regular.ttf'))}) + '\n'
+            'OFL_NAME = "Inconsolata-OFL.txt"\nOFL_SHA256 = ' + repr(h('Inconsolata-OFL.txt')) + '\n'
+            'JFDOT_MEMBERS = ' + repr({'y': ('JF-Dot-Shinonome16.ttf', h('JF-Dot-Shinonome16.ttf'))}) + '\n'
+            'JFDOT_LICENSE_NAME = "JF-Dot-Shinonome16-LICENSE.txt"\n'
+            'JFDOT_LICENSE_TEXT = """' + lic + '""".encode("utf-8")\n')
+        result = self.run_preflight()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('NG フォント: Inconsolata-Regular.ttf 無し', result.stdout)
+        (self.fonts / 'JF-Dot-Shinonome16.ttf').write_bytes(b'wrong hash')
+        result = self.run_preflight('--fix-fonts')
+        self.assertEqual(result.returncode, 1)
+        for name in ('ipaexg.ttf', 'Inconsolata-Regular.ttf', 'Inconsolata-OFL.txt',
+                     'JF-Dot-Shinonome16-LICENSE.txt'):
+            self.assertTrue((self.work / 'assets/fonts' / name).exists(), name)
+        self.assertFalse((self.work / 'assets/fonts/JF-Dot-Shinonome16.ttf').exists())
+        (self.fonts / 'JF-Dot-Shinonome16.ttf').write_bytes(gui['JF-Dot-Shinonome16.ttf'])
+        result = self.run_preflight('--fix-fonts')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_unreadable_font_list(self):
+        (self.work / 'tools/fetch_fonts.py').write_text('MEMBERS = (')
+        result = self.run_preflight('--fix-fonts')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('取得物の一覧を読めない', result.stdout)
+
     def test_all_ok_and_base(self):
         result = self.run_preflight('--base', 'HEAD', '--fix-fonts')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

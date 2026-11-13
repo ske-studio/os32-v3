@@ -44,7 +44,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROVIDER = 'platform/pc98/gfx_surfaces.c'   # ⑥ の表と手順 (第 5 段 B5 で gfx_core から移った)
-SOURCES = ('gfx/gfx_core.c', PROVIDER, 'mm/paging.c', 'mm/pgalloc.c',
+SELECTOR = 'platform/pc98/gfx_selector.c'
+SOURCES = ('gfx/gfx_core.c', PROVIDER, SELECTOR, 'mm/paging.c', 'mm/pgalloc.c',
            'kernel/sys.c',
            'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
@@ -129,7 +130,11 @@ def build(texts, tmp):
         source = source.replace('irq_save()', 'host_irq_save()').replace(
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
-    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
+    selector = texts[SELECTOR]
+    start = selector.index('u32 display_provider_ledger(')
+    end = selector.index('\n}', start) + 2
+    (tmp / 'gfx_boot_slice.inc').write_text(
+        selector[start:end] + '\n' + slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
     # Execute the real planar boot assertion before and after owner transfer.
     selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
