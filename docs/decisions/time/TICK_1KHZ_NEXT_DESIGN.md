@@ -259,7 +259,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 | 時刻差 0.1% | B17 像 (NP21/W・実機) で外部 60 秒基準と比較 | ms_phase を捨てる |
 | 期限照合 | host: 期限の前は印 0、期限で 1 回、周回の前後、解除後は 0。NP21/W: 登録したまま 60 秒で IRQ0 の短経路の worst の増分 ≤2µs、V86 中に印が立つ | 符号付きの差を `<` に / 解除を消す |
 | 既存の時間の契約 | T1K §7 のまま (B17 像) | T1K のまま |
-| Sleep(1) | W7: 中央値 ≤1.2ms・99% ≤2.2ms (B17 像、CUI と GUI、NP21/W・実機) | G2 の印をジフィに戻す |
+| Sleep(1) | W7: 中央値・99% とも ≤2.2ms (B17 像、CUI と GUI、NP21/W・実機。目標はユーザー決定 2026-11-13 で Windows 並み) | G2 の印をジフィに戻す |
 | 時計の連続 | host: 成功 → 失敗 3 回 → 復帰で単調、逆行 0、復帰の後に追いつく | `max` を外す |
 | 周期・追いつき | host: 1ms ずつ 1000ms 進めて 100 回 / 95ms 跳ばすと 8 回と missed=式どおり、next は t0 + k×delay | `next = now + delay` / 上限を外す |
 | kill・再利用 | host: 追いつきの途中で自分を kill すると止まる / ONESHOT のコールバックの中で set すると新しい ID になり、この配りでは呼ばない / 再入 0 / hold>0 で 0 | 確かめ直しを消す / born_pass を消す |

@@ -59,6 +59,9 @@ void io_wait(void) { event('T', 0, 0); }
 void io_wait_n(int n) { event('T', 0, (unsigned int)n); }
 #include "clock_source.inc"
 #include "pit_source.inc"
+int pc98_tsc_init(void) { return -1; }
+int pc98_tsc_ready(void) { return 0; }
+int pc98_tsc_read_us(u32 *lo, u32 *hi) { (void)lo; (void)hi; return -1; }
 #include "ktime_source.inc"
 static void samples(unsigned int p1, unsigned int count, unsigned int p2, unsigned int n)
 {
