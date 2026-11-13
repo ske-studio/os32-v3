@@ -1136,7 +1136,9 @@ static void step(u32 pos_frames, u32 ticks)
 {
     sim_set_pos(pos_frames);
     sim_advance_time(ticks);
-    run_isr(pcm_tick);                   /* ISR と同じく IF=0 で */
+    unsigned int f = irq_save();
+    (void)pcm_irq(PCM_IRQ, 0);           /* 通常補充は IRQ10 */
+    irq_restore(f);
 }
 
 static void case_close(void)
@@ -1252,7 +1254,7 @@ static void case_guard(void)
         pcm_tick();
         CHECK(IO_ACCESSES == 0);
         CHECK(trace_n == 0);
-        CHECK(pcm_advance() == IRQ_NONE);
+        CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
         CHECK(IO_ACCESSES == 0);
     }
 
@@ -1269,11 +1271,11 @@ static void case_guard(void)
     CHECK(open_ok(PCM_RATE_44100) == 0);
     g_pcm.state = PCM_ST_OPEN;
     dev_reg[PCM_I_ALTSTAT] = 0;
-    CHECK(pcm_advance() == IRQ_NONE);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
     dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
-    CHECK(pcm_advance() == IRQ_HANDLED);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_HANDLED);
     CHECK((dev_reg[PCM_I_ALTSTAT] & PCM_ALT_PI) == 0);   /* 消した */
-    CHECK(pcm_advance() == IRQ_NONE);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
 }
 
 /* reclaim は**どの状態からでも 1 度だけ**解放する */
