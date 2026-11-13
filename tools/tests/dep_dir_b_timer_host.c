@@ -25,10 +25,10 @@ const u8 *v86_bios_real_lowmem(void)
 {
     clocks++; event('B', BIOS_WORK_SYSCLK, lowmem[BIOS_WORK_SYSCLK]); return lowmem;
 }
-static volatile u32 tick_storage;
-static volatile u32 *read_tick(void)
+void tick_clock_raw(u32 *lo, u32 *hi)
 {
-    event('K', 0, tick_value); tick_storage = tick_value; return &tick_storage;
+    check(!enabled);
+    event('K', 0, tick_value); *lo = tick_value; *hi = 0;
 }
 void outp(unsigned int port, unsigned int value)
 {
@@ -57,10 +57,7 @@ void io_wait(void) { event('T', 0, 0); }
 void io_wait_n(int n) { event('T', 0, (unsigned int)n); }
 #include "clock_source.inc"
 #include "pit_source.inc"
-/* Instrument the real volatile tick read, after idt.h has declared its symbol. */
-#define tick_count (*read_tick())
 #include "ktime_source.inc"
-#undef tick_count
 static void samples(unsigned int p1, unsigned int count, unsigned int p2, unsigned int n)
 {
     unsigned int i;

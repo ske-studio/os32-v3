@@ -32,8 +32,8 @@ HARNESS = ROOT / "tools/tests/time_math_host.c"
 SRC = ROOT / "kernel/time/time_math.c"
 
 # カーネルと同じ i386-elf で通す実ソース。ktime.c まで入れるのは、
-# スナップショットの採り方が time_decide / time_us_from を**実際に**呼ぶ形を
-# 固定するため (u64 が libgcc 経由で解けることもここで分かる)。
+# スナップショットの採り方が time_decide / time_us_from64 を**実際に**呼ぶ形を
+# 固定するため (64bit 除算は lib/divdi3.c の自前 helper で解く)。
 TARGET_SRCS = [
     ("kernel/time/time_math.c", []),
     ("platform/pc98/pit_time.c", []),
@@ -59,23 +59,26 @@ MUTATIONS = [
      "        return TIME_DECIDE_OK;",
      "p1 = 0 / p2 = 1 を**やり直さずに採用する** (境界のどちら側か分からない "
      "count を採るので最大 1 周期ずれる)"),
-    (r"    us = \(unsigned long long\)tick \* \(unsigned long long\)period_us \+\n"
-     r"         \(unsigned long long\)frac;",
-     "    us = (unsigned long long)(tick * period_us + frac);",
-     "tick との積を u32 で組む (**71 分で時刻が 0 に戻る**。起動から 71 分は "
-     "エミュレータでも実機でも回していない)"),
-    (r"        unsigned int elapsed = \(count <= reload\) \? \(reload - count\) : 0;",
-     "        unsigned int elapsed = count;",
+    (r"    unsigned long long cycles = raw \* reload \+ elapsed;",
+     "    unsigned long long cycles = (unsigned int)raw * reload + elapsed;",
+     "raw と reload の積を u32 に潰す"),
+    (r"    unsigned int elapsed = \(count <= reload\) \? \(reload - count\) : 0;",
+     "    unsigned int elapsed = count;",
      "経過ぶんを reload − count ではなく count そのものにする (時計が逆走する)"),
     (r"    if \(p1\) \{",
      "    if (p1 && p2) {",
      "p1 だけでは tick を足さない (p2 も 1 のときだけ足す。境界の直前で "
      "読んで p2 が 0 に落ち着いた場合に 1 周期ぶん戻る)"),
-    (r"        frac = \(unsigned int\)\(\(\(unsigned long long\)elapsed \*\n"
-     r"                               \(unsigned long long\)period_us\) / reload\);",
-     "        frac = (unsigned int)(elapsed / (reload / period_us));",
-     "端数の割り算を先に約分する (reload / period_us = 1 か 2 に潰れ、"
-     "補間が µs ではなく 5〜10ms 刻みになる)"),
+    (r"             \(cycles % clk_hz\) \* 1000000ULL / clk_hz;",
+     "             (cycles % clk_hz) / clk_hz * 1000000ULL;",
+     "剰余を先に割り端数を失う"),
+    (r"    unsigned long long raw = \(\(unsigned long long\)raw_hi << BITS_PER_U32\) \| raw_lo;",
+     "    unsigned long long raw = raw_lo; (void)raw_hi;",
+     "raw の上位32bitを捨てる"),
+    (r"        us = \(cycles / clk_hz\) \* 1000000ULL \+\n"
+     r"             \(cycles % clk_hz\) \* 1000000ULL / clk_hz;",
+     "        us = cycles * 1000000ULL / clk_hz;",
+     "商・剰余に分けず中間積を64bitで溢れさせる"),
     (r"    if \(us < last\) \{\n        if \(out\) \*out = last;",
      "    if (us < last) {\n        if (out) *out = us;",
      "巻き戻りを数えるだけで**押さえない** (NP21/W は 8254 の再ロードと 8259 の "
@@ -132,7 +135,7 @@ def mutate(tmp):
 
     bad = 0
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
-        rel = "platform/pc98/pit_time.c" if i <= 6 else "kernel/time/time_math.c"
+        rel = "platform/pc98/pit_time.c" if i <= 8 else "kernel/time/time_math.c"
         original = (ROOT / rel).read_text()
         mutated, n = re.subn(pattern, repl, original)
         if n != 1:

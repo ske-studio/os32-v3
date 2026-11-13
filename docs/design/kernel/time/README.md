@@ -12,7 +12,7 @@
 |所有者／文脈|契約|
 |---|---|
 |platform/pc98/clock_source.c、IF=0、出力は kernel 局所変数|PIT valid/mode/reload 検査、最大3回の sample → tick → decide → us_from。未設定 NOSYS、上限 AGAIN|
-|platform/pc98/pit_time.c/.h|time_decide/time_us_from、退役した time_branch_hits/reset の互換保存域。判定は計数を更新しない|
+|platform/pc98/pit_time.c/.h|time_decide/time_us_from64、退役した time_branch_hits/reset の互換保存域。判定は計数を更新しない|
 |platform/pc98/pit.c・pit_math.c/.h|PIT 設定と純粋整数演算。100Hz: reload 19968/24576、period_us=10000|
 
 退役した time_test_feed の保存域と clear は共通側で保持するが、時計の読取りには使わない。

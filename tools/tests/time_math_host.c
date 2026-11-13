@@ -28,6 +28,8 @@ static int failed;
 #define RELOAD_1997   19968U
 #define RELOAD_2458   24576U
 #define PERIOD_100HZ  10000U
+#define CLK_1997 1996800U
+#define CLK_2458 2457600U
 
 /* ------------------------------------------------------------------ */
 /*  (a) p1 / p2 の判定表                                               */
@@ -73,42 +75,46 @@ static void us_math(void)
     unsigned int lo, hi;
 
     /* 周期のはじめ (count == reload): 端数 0 */
-    time_us_from(0, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(lo == 0 && hi == 0);
-    time_us_from(3, RELOAD_2458, RELOAD_2458, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(3, 0, RELOAD_2458, RELOAD_2458, CLK_2458, &lo, &hi);
     CHECK(lo == 30000 && hi == 0);
 
     /* 真ん中 (どちらのクロックでも 5000µs) */
-    time_us_from(0, RELOAD_1997 / 2, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, RELOAD_1997 / 2, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(lo == 5000 && hi == 0);
-    time_us_from(0, RELOAD_2458 / 2, RELOAD_2458, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, RELOAD_2458 / 2, RELOAD_2458, CLK_2458, &lo, &hi);
     CHECK(lo == 5000 && hi == 0);
 
     /* 周期の終わり (count == 1): 端数は period 未満のまま */
-    time_us_from(0, 1, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, 1, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(lo == 9999 && hi == 0);
-    time_us_from(0, 1, RELOAD_2458, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, 1, RELOAD_2458, CLK_2458, &lo, &hi);
     CHECK(lo == 9999 && hi == 0);
 
     /* count == 0 は 1 周期ぶん。**tick と足して次の tick を越えない**
      * (越えると単調性が壊れる) — ちょうど period になる。 */
-    time_us_from(0, 0, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, 0, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(lo == PERIOD_100HZ && hi == 0);
 
     /* 100 tick = 1 秒 */
-    time_us_from(100, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(100, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(lo == 1000000 && hi == 0);
 
     /* reload = 0 (PIT 未初期化の値が漏れた) でも 0 除算しない */
-    time_us_from(5, 123, 0, PERIOD_100HZ, &lo, &hi);
-    CHECK(lo == 50000 && hi == 0);
+    time_us_from64(5, 0, 123, 0, CLK_1997, &lo, &hi);
+    CHECK(lo == 0 && hi == 0);
 
     /* 範囲外の count でも巻き込まない (注入試験が渡し得る) */
-    time_us_from(0, RELOAD_1997 + 100, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(0, 0, RELOAD_1997 + 100, RELOAD_1997, CLK_1997, &lo, &hi);
+    CHECK(lo == 0 && hi == 0);
+
+    /* clock 未設定でも 0 除算しない。 */
+    time_us_from64(5, 0, 1, RELOAD_1997, 0, &lo, &hi);
     CHECK(lo == 0 && hi == 0);
 
     /* NULL は書かないだけ */
-    time_us_from(1, 1, RELOAD_1997, PERIOD_100HZ, 0, 0);
+    time_us_from64(1, 0, 1, RELOAD_1997, CLK_1997, 0, 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -122,12 +128,12 @@ static void no_u32_overflow(void)
     /* 2^32 µs = 4294.967296 秒 = 71.58 分。tick にすると 429496.7295。
      * **u32 で組むとここで時刻が 0 に戻る。** */
     CHECK(429496U * PERIOD_100HZ < 0xFFFFFFFFU);      /* 直前はまだ収まる */
-    time_us_from(429496U, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(429496U, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(hi == 0);
     CHECK(lo == 4294960000U);
 
     /* 1 tick 先で溢れる */
-    time_us_from(429497U, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(429497U, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
     CHECK(hi == 1);
     CHECK(lo == 4294970000U - 4294967296U);           /* = 2704 */
 
@@ -136,10 +142,15 @@ static void no_u32_overflow(void)
     CHECK(us == 4294970000ULL);
 
     /* さらに先 (497 日ではなく 1 日ぶん) でも単調 */
-    time_us_from(8640000U, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+    time_us_from64(8640000U, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
     us = ((unsigned long long)hi << 32) | lo;
     CHECK(us == 86400000000ULL);
     CHECK(hi == 20);
+
+    /* raw 自体が32bitを越え、cycles * 10^6 も64bitを越える。 */
+    time_us_from64(0, 1, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
+    us = ((unsigned long long)hi << 32) | lo;
+    CHECK(us == 42949672960000ULL);
 }
 
 /* ------------------------------------------------------------------ */
@@ -155,7 +166,7 @@ static void monotonic(void)
         /* mode 2 は reload から 1 へ減る */
         for (count = RELOAD_2458; count >= 1; count -= 1024) {
             unsigned long long us;
-            time_us_from(tick, count, RELOAD_2458, PERIOD_100HZ, &lo, &hi);
+            time_us_from64(tick, 0, count, RELOAD_2458, CLK_2458, &lo, &hi);
             us = ((unsigned long long)hi << 32) | lo;
             if (us < prev) back++;
             prev = us;
@@ -169,9 +180,9 @@ static void monotonic(void)
      * (t+1, count=reload)。ここが逆転すると 1 万回読みで逆行が出る。 */
     {
         unsigned long long a, b;
-        time_us_from(50, 1, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+        time_us_from64(50, 0, 1, RELOAD_1997, CLK_1997, &lo, &hi);
         a = ((unsigned long long)hi << 32) | lo;
-        time_us_from(51, RELOAD_1997, RELOAD_1997, PERIOD_100HZ, &lo, &hi);
+        time_us_from64(51, 0, RELOAD_1997, RELOAD_1997, CLK_1997, &lo, &hi);
         b = ((unsigned long long)hi << 32) | lo;
         CHECK(b > a);
     }

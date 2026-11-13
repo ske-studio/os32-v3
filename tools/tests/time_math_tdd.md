@@ -1,7 +1,8 @@
 # time_math — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-5
-対象: `kernel/time/time_math.c` (判定と算数) / `kernel/time/ktime.c` (スナップショット) /
+対象: `platform/pc98/pit_time.c` (判定と算数) / `platform/pc98/clock_source.c` (スナップショット) /
+`kernel/time/time_math.c` (クランプ) / `kernel/time/ktime.c` (呼出し側) /
 `kapi/kapi_sys.c` (CPL=3 の検証)
 試験: `tools/tests/test_time_math.py` + `tools/tests/time_math_host.c`
 実行: `make check-time-math-host` (`check-par` の列)
@@ -32,7 +33,7 @@ IRR bit0 (= IRQ0 が立っているか) で挟んで読む。
   `test_dep_dir_b_timer.py` は実 `sys_time_now` を模擬 I/O で実行し、再試行後の
   lo/hi の値・失敗時の出力不変・IF 復元を見る。起動時の人工入力・分岐計数・
   位相探索は E08 段1で外した。カーネルの注入口そのものは段2まで残る。
-- **71 分の桁あふれ**。`tick × period_us` を u32 で組むと 429496 tick
+- **71 分の桁あふれ**。64bit の cycles を u32 に潰すと時刻が戻る。100Hz の 429496 tick
   (= 71.58 分) で時刻が 0 に戻る。起動から 71 分は NP21/W でも実機でも
   1 度も回していない。
 
@@ -74,14 +75,13 @@ tools/tests/time_math_host.c:(.text+0x10a8): undefined reference to `time_clamp'
 ```
 
 実装を足してから、**「数えるだけで押さえない」** に変異させると
-`clamp` が落ちる (変異 7)。これが NP21/W の FAIL そのもの。
+`clamp` が落ちる (現行の変異 9)。これが NP21/W の FAIL そのもの。
 
 ## GREEN
 
 ```
-$ python3 -B tools/tests/test_time_math.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/time/time_math.c)
-TARGET i386-elf GNU89 -Werror PASS
+$ python3 -B tools/tests/test_time_math.py --mutate
+HOST GNU11 -Werror compile PASS (real kernel/time/time_math.c)
 EXIT decide_table=0
 EXIT us_math=0
 EXIT no_u32_overflow=0
@@ -90,13 +90,17 @@ EXIT clamp=0
 SUMMARY 5/5 PASS
 MUTATION 1 RED (1 件): p1 = 1 で tick を足さない (新しい周期の count を古い tick と組ませ、時刻が 1 周期ぶん戻る = 往復 2 の反例 1)
 MUTATION 2 RED (1 件): p1 = 0 / p2 = 1 を**やり直さずに採用する** (境界のどちら側か分からない count を採るので最大 1 周期ずれる)
-MUTATION 3 RED (1 件): tick との積を u32 で組む (**71 分で時刻が 0 に戻る**。起動から 71 分は エミュレータでも実機でも回していない)
+MUTATION 3 RED (1 件): raw と reload の積を u32 に潰す
 MUTATION 4 RED (3 件): 経過ぶんを reload − count ではなく count そのものにする (時計が逆走する)
 MUTATION 5 RED (1 件): p1 だけでは tick を足さない (p2 も 1 のときだけ足す。境界の直前で 読んで p2 が 0 に落ち着いた場合に 1 周期ぶん戻る)
-MUTATION 6 RED (2 件): 端数の割り算を先に約分する (reload / period_us = 1 か 2 に潰れ、補間が µs ではなく 5〜10ms 刻みになる)
-MUTATION 7 RED (1 件): 巻き戻りを数えるだけで**押さえない** (NP21/W は 8254 の再ロードと 8259 の IRR を原子的に模擬しないので、判定表を正しく通しても 1 万回読みが逆行する)
-MUTATION 8 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数える (回数が「模擬の粗さ」の指標にならなくなる)
+MUTATION 6 RED (3 件): 剰余を先に割り端数を失う
+MUTATION 7 RED (1 件): raw の上位32bitを捨てる
+MUTATION 8 RED (1 件): 商・剰余に分けず中間積を64bitで溢れさせる
+MUTATION 9 RED (1 件): 巻き戻りを数えるだけで**押さえない** (NP21/W は 8254 の再ロードと 8259 の IRR を原子的に模擬しないので、判定表を正しく通しても 1 万回読みが逆行する)
+MUTATION 10 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数える (回数が「模擬の粗さ」の指標にならなくなる)
 ```
+
+i386-elf の `--target` も GNU11 -Werror で通過。
 
 ## 何を見ているか
 
@@ -130,3 +134,22 @@ CPL0 の1範囲・2範囲の素通しは `test_kapi_ranges.py` の実範囲関�
 私有 import の6枠 (127/128/174/175/181/182) は `retained` とし、番号・型・実体を保持する。
 `tick_count` の枠132も S2 の参照がなくなるため `retained` とするが、kpeek 等では現役のまま。
 この指定による私有ABI印の変更は kernel/kdebug の対ビルドで反映する。公開KAPIは不変。
+
+## 段 L B6・B7': raw の有理式
+
+算数は `platform/pc98/pit_time.c` の `time_us_from64`。
+`cycles = raw * reload + (reload - count)` を 64bit で求め、
+`us = cycles / clk * 1000000 + (cycles % clk) * 1000000 / clk` とする。
+`count > reload` は経過0、`clk == 0` は時刻0。period_us は表示用だけ。
+`time_decide` の t=0 の結果 (pending の0/1) を raw に64bitで足す。
+
+`test_clock_caller.py` は実 `sys_time_now` と PC98 reader を組み、
+19968/1996800・24576/2457600 では旧100Hz式と完全一致を確認する。
+1997/1996800・2458/2457600 も60秒の範囲の周期先頭・中間・末尾を読み、
+独立な積→除算の参照値と一致 (許容1µs以内)、単調性、clampなしを確認する。
+period_us=17 のfixtureでも結果が変わらず、raw とジフィを取り違える変異、
+pending の下位語周回を繰り上げない変異を実行時に検出する。
+上位語付きrawは cycles×1000000 が64bitを超える値でも確認する。
+L13の固定traceは同じ100Hz値を保持し、tickの読取りをraw口のfixtureで観測する。
+recover_t2_host.inc・splash_probe_host.c・pit_clock_host.c はこの式を呼ばず、
+100Hzの表示用period_usのfixtureと期待値を維持する。

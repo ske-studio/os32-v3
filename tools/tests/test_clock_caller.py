@@ -5,7 +5,7 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'kernel/time/time_math.h', 'platform/pc98/clock_source.c',
             'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h',
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
-            'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
+            'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=2.9)
 from pathlib import Path
@@ -16,6 +16,11 @@ from kernel_includes import include_flags
 from host32 import run as host_run
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/clock_source.c', '        tick_clock_raw(&raw_lo, &raw_hi);',
+     '        raw_lo = tick_count; raw_hi = 0;'),
+    ('platform/pc98/clock_source.c', '            raw += snap.tick;',
+     '            raw = (raw & ~0xffffffffULL) | (unsigned int)((unsigned int)raw + snap.tick);'),
+
     ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt < 1;'),
     ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)time_clamp;'),
