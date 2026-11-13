@@ -176,7 +176,7 @@ $(KB_OUT)/pm_log_printf.o: lib/kprintf.c build/ppc-kboot.mk $(KB_GEN)/stamp $(KB
 	 -Dconsole_write=pm_diag_write -Dshell_print=pm_diag_print \
 	 -Dshell_print_utf8=pm_diag_print_utf8 -c $< -o $@
 endif
-$(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
+$(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare -DCONSOLE_PUTCHAR_MIRROR=1
 $(KB_OUT)/fs/vfs_fd.o: KB_TU_FLAGS = $(if $(filter 1,$(KB_FD1_STREAM)),-Dconsole_write=pm_fd1_write)
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)

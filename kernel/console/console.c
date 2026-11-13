@@ -5,6 +5,12 @@
 /*  shell.cから分離。外部プログラム(shell.bin含む)はKernelAPI経由で利用。    */
 /* ======================================================================== */
 
+/* PowerPC mirrors shell characters to its stream; x86 cmd_terminal sends
+ * its own serial characters. */
+#ifndef CONSOLE_PUTCHAR_MIRROR
+#define CONSOLE_PUTCHAR_MIRROR 0
+#endif
+
 #define CONSOLE_TAB_COLS 4
 #include "types.h"
 #include "console_output.h"
@@ -196,7 +202,7 @@ void shell_putchar(char ch, u8 color)
 {
     con_sink_push_print(&ch, 1, color);
     bootlog_push(&ch, 1);             /* 起動ログ (色は捨てる) */
-    if (rshell_active || boot_serial_mirror) con_output_putchar(ch);
+    if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);
     if (!console_render_allowed()) return;   /* 票 K6C-2 / V86: 描画抑止 */
     putchar_raw(ch, color);
     console_hw_cursor_sync();

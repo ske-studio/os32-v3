@@ -15,12 +15,15 @@ SOURCES = {
     'pc98_console_source.inc': 'platform/pc98/console.c',
 }
 MUTANTS = [
+    ('x86 default mirror enabled', 'console_source.inc',
+     '#define CONSOLE_PUTCHAR_MIRROR 0',
+     '#define CONSOLE_PUTCHAR_MIRROR 1', 'character mirror policy'),
     ('character mirror missing', 'console_source.inc',
-     'if (rshell_active || boot_serial_mirror) con_output_putchar(ch);',
-     '(void)ch;', 'mirror exactly once'),
+     'if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);',
+     '(void)ch;', 'character mirror policy'),
     ('character mirror doubled', 'console_source.inc',
-     'if (rshell_active || boot_serial_mirror) con_output_putchar(ch);',
-     'if (rshell_active || boot_serial_mirror) { con_output_putchar(ch); con_output_putchar(ch); }', 'mirror exactly once'),
+     'if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);',
+     'if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) { con_output_putchar(ch); con_output_putchar(ch); }', 'character mirror policy'),
     ('string mirror missing', 'console_source.inc',
      'if (rshell_active || boot_serial_mirror) con_output_putchar(*str);',
      '(void)str;', 'mirror exactly once'),
@@ -55,7 +58,7 @@ MUTANTS = [
 ]
 
 
-def build_run(tmp, sources):
+def build_run(tmp, sources, ppc):
     for name, source in sources.items():
         (tmp / name).write_text(source)
     exe = tmp / 'console-cui-route'
@@ -64,6 +67,8 @@ def build_run(tmp, sources):
         '-fno-pie', '-no-pie', '-fno-stack-protector', '-nostdlib', '-static',
         '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
         '-Wall', '-Wextra', '-Werror', '-Wno-sign-compare',
+        '-DEXPECT_PUTCHAR_MIRROR=' + str(ppc),
+        *(['-DCONSOLE_PUTCHAR_MIRROR=1'] if ppc else []),
         '-D__KERNEL_BUILD__', '-I' + str(tmp), '-I' + str(ROOT),
         '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
         str(ROOT / 'tools/tests/console_cui_route_host.c'),
@@ -80,18 +85,24 @@ def main():
     sources = {name: (ROOT / path).read_text() for name, path in SOURCES.items()}
     with tempfile.TemporaryDirectory(prefix='console-cui-route-') as directory:
         tmp = Path(directory)
-        result = build_run(tmp, sources)
-        print(result.stdout, end='', flush=True)
-        assert result.returncode == 0, (result.returncode, result.stderr)
-        if args.mutate:
-            for label, name, old, new, assertion in MUTANTS:
-                assert sources[name].count(old) == 1, (label, 'anchor missing/ambiguous')
-                mutated = dict(sources)
-                mutated[name] = sources[name].replace(old, new)
-                result = build_run(tmp, mutated)
-                assert result.returncode == 1 and 'FAIL ' + assertion in result.stdout, (
-                    label, result.returncode, result.stdout, result.stderr)
-                print('RED runtime: ' + label + ': ' + result.stdout.strip(), flush=True)
+        for ppc in (0, 1):
+            print('configuration: ' + ('PowerPC' if ppc else 'x86'), flush=True)
+            result = build_run(tmp, sources, ppc)
+            print(result.stdout, end='', flush=True)
+            assert result.returncode == 0, (result.returncode, result.stderr)
+            if args.mutate:
+                for label, name, old, new, assertion in MUTANTS:
+                    if label.startswith('x86') and ppc:
+                        continue
+                    if label.startswith('character mirror') and not ppc:
+                        continue
+                    assert sources[name].count(old) == 1, (label, 'anchor missing/ambiguous')
+                    mutated = dict(sources)
+                    mutated[name] = sources[name].replace(old, new)
+                    result = build_run(tmp, mutated, ppc)
+                    assert result.returncode == 1 and 'FAIL ' + assertion in result.stdout, (
+                        label, result.returncode, result.stdout, result.stderr)
+                    print('RED runtime: ' + label + ': ' + result.stdout.strip(), flush=True)
     print('EXIT console_cui_route_host=0')
 
 

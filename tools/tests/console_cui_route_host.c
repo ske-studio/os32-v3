@@ -196,10 +196,13 @@ static void stream_routes(void)
         boot_serial_mirror = boot; rshell_active = remote;
         mirror_n = 0;
         shell_putchar('A', TATTR_WHITE);
+        CHECK(mirror_n == (EXPECT_PUTCHAR_MIRROR && (boot || remote) ? 1u : 0u),
+              "character mirror policy");
+        mirror_n = 0;
         shell_print("BC", TATTR_WHITE);
         console_write("D\0E", 3, TATTR_WHITE);
         kprintf(KLOG_ATTR, "F:%u/%s", 7u, "G");
-        const char expected[] = "ABCD\0EF:7/G";
+        const char expected[] = "BCD\0EF:7/G";
         unsigned want = boot || remote ? sizeof(expected) - 1 : 0;
         CHECK(mirror_n == want, "mirror exactly once");
         for (unsigned i = 0; i < want; i++)
@@ -220,7 +223,7 @@ static void serial_clear(void)
     CHECK(cursor_x == 14 && cursor_y == 3, "literal escape cursor");
     for (unsigned i = 0; i < sizeof(sequence)-1; i++)
         CHECK(text[3 * 80 + 7 + i] == (u8)sequence[i], "literal escape bytes");
-    CHECK(mirror_n == sizeof(sequence)-1, "serial clear stream");
+    CHECK(mirror_n == (EXPECT_PUTCHAR_MIRROR ? sizeof(sequence)-1 : 0), "serial clear stream");
     for (unsigned i = 0; i < mirror_n; i++)
         CHECK(mirror[i] == sequence[i], "serial clear stream");
     shell_putchar('Z', TATTR_WHITE);

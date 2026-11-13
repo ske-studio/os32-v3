@@ -206,7 +206,7 @@ MUTATIONS = [
     ('top', 'init/ppc_kernel.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
      'pm_console_attach(&target, &kcg_file_api, 0)'),
     ('mirror', 'kernel/console/console.c',
-     '    if (rshell_active || boot_serial_mirror) con_output_putchar(ch);', ''),
+     '    if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);', ''),
     ('scroll-minus', 'kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
     ('scroll-plus', 'kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows + 1, 1);'),
     ('start-consumed', 'platform/powermac/shell_boot.c',
