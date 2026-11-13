@@ -26,6 +26,7 @@ struct ppc_boot_devices {
     u32 gmac_va, pci_addr_va, pci_data_va;
     u32 fb_va, clock_va;
     int fb_full_rc;
+    int fb_color_rc; /* enum pm_rh_color_result; indices via pm_rh_full_colors */
     int gmac_ready;
     int mpic_order; /* enum pm_mpic_order from E1 */
 };

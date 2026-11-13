@@ -317,6 +317,7 @@ void ppc_kernel_start(ppc_ci ci)
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
 #if KBOOT_SHELL || KBOOT_SH
     boot_devices.fb_full_rc = pm_rh_capture_full();
+    boot_devices.fb_color_rc = pm_rh_full_colors()->rc;
     if (boot_devices.fb_full_rc == PM_RH_FULL_OK) fb = pm_rh_full_framebuffer();
 #endif
     if (fb->bytes) {

@@ -33,6 +33,9 @@ def main():
         print('GREEN absent/16/32bpp/overflow/stride/translate/continuity/guards/history/OF-off',flush=True)
         if '--mutate' in sys.argv:
             for name, old, new in [
+                ('color-order', 'a > b ? 0 : 255', 'a > b ? 255 : 0'),
+                ('color-equal', 'if (a == b)', 'if (0)'),
+                ('color-failed', '.rc = PM_RH_COLOR_FAILED', '.rc = PM_RH_COLOR_OK'),
                 ('full-va-end', 'fb_va - offset > ~0U - rounded', '0'),
                 ('full-pa-end', 'base > ~0U - rounded) return PM_RH_FULL_SIZE;', '0) return PM_RH_FULL_SIZE;'),
                 ('full-bytes', 'full_fb.bytes = bytes;', 'full_fb.bytes = fb.bytes;'),

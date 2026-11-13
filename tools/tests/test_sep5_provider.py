@@ -2,10 +2,9 @@
 """B4: the display provider keeps the pre-separation backend selection table."""
 CHECK = dict(name='sep5-provider-host', tier=1, needs=[], budget=5,
     covers=['platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/display_fallback.h',
-            'platform/powermac/display_provider.c', 'platform/powermac/display_fallback.h',
             'include/display_provider.h', 'include/gfx_hal.h', 'gfx/gfx_core.c',
             'gfx/gfx_core_framebuffer.inc', 'gfx/gfx_core_surface.inc', 'gfx/gfx_internal.h',
-            'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c', 'tools/tests/sep5_provider_ppc_host.c',
+            'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c',
             'tools/tests/test_sep5_provider.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
             'arch/x86/**', 'platform/pc98/**', 'mm/pgalloc.h', 'sdk/include/os32/**'])
@@ -17,7 +16,6 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 PROVIDER = 'platform/pc98/gfx_selector.c'
-PPC = 'platform/powermac/display_provider.c'
 CORE = 'gfx/gfx_core.c'
 # (name, unique anchor, replacement, exit code of the first expectation that
 # must fail). Any other exit code is a test error, not a kill.
@@ -67,13 +65,7 @@ UNLINKED_MUTATIONS = (
      'int rc = want->query ? want->query(&info) : OS32_ERR_NOSYS;', SEGV),
     ('unlinked-trident-unlogged', '        if (pref == GFX_PREF_TRIDENT) {', '        if (pref == GFX_PREF_TRIDENT && want) {', 54),
 )
-# The PowerMac provider must stay inert: (name, anchor, replacement, exit code).
-PPC_MUTATIONS = (
-    ('ppc-pref-kept', '    (void)pref;\n    return GFX_PREF_AUTO;', '    return pref;', 3),
-    ('ppc-boot-binds', '    (void)pref;\n    (void)bind_client;\n', '    (void)pref;\n    bind_client();\n', 7),
-    ('ppc-display-records', '    (void)ledger_backend;\n    return 1;', '    return ledger_backend + 1;', 8),
-    ('ppc-mode-unreported', '    select_mode(&gfx_backend_unsupported, legacy200);\n', '    (void)select_mode; (void)legacy200;\n', 4),
-)
+# PowerMac OF behavior and its mutations now live in test_of_fb.py (stage E).
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin', '-fno-pie',
          '-fno-stack-protector', '-no-pie']
 
@@ -88,16 +80,6 @@ def execute(text, work, unlinked=False):
         str(ROOT / 'tools/tests/sep5_provider_host.c'), '-o', str(exe)], check=True)
     rc = host32.run([str(exe)]).returncode
     return SEGV if rc in (-11, 139) else rc
-
-
-def execute_ppc(text, work):
-    """The PowerMac provider on the host: platform/powermac must win the include race."""
-    (work / 'display_provider_ppc.inc').write_text(text)
-    exe = work / 'provider-ppc'
-    subprocess.run(['gcc', *FLAGS, '-fhosted', '-I' + str(work), '-I' + str(ROOT / 'platform/powermac'),
-        *include_flags(ROOT), str(ROOT / 'tools/tests/sep5_provider_ppc_host.c'),
-        '-o', str(exe)], check=True)
-    return subprocess.run([str(exe)]).returncode
 
 
 def execute_client(work, mutation=None):
@@ -130,17 +112,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    text, ppc = (ROOT / PROVIDER).read_text(), (ROOT / PPC).read_text()
+    text = (ROOT / PROVIDER).read_text()
     core_delegates()
     with tempfile.TemporaryDirectory(prefix='sep5-provider-') as directory:
         work = Path(directory)
         assert execute_client(work) == 0
         assert execute(text, work) == 0
         assert execute(text, work, unlinked=True) == 0
-        assert execute_ppc(ppc, work) == 0
         print('PASS host32 provider selection table (auto, forced, fallback, Trident retry/log, '
               'Cirrus probe flag, pref, ledger kind), the same with optional backends unlinked, '
-              'and the inert PowerMac provider', flush=True)
+              'including OF CLIENT binding', flush=True)
         if args.mutate:
             for old, new, code in [
                 ('GfxBackend *backend = g_backend;', 'GfxBackend *backend = DISPLAY_FALLBACK_BACKEND;', 2),
@@ -159,12 +140,8 @@ def main():
                 rc = execute(text.replace(old, new), work, unlinked=True)
                 assert rc == code, (name, rc, code)
                 print('MUTATE runtime RED %s (unlinked, exit %s)' % (name, code), flush=True)
-            for name, old, new, code in PPC_MUTATIONS:
-                assert ppc.count(old) == 1, (name, ppc.count(old))
-                rc = execute_ppc(ppc.replace(old, new), work)
-                assert rc == code, (name, rc, code)
-                print('MUTATE runtime RED %s (exit %d)' % (name, code), flush=True)
-            assert execute(text, work) == 0 and execute_ppc(ppc, work) == 0
+            assert execute(text, work) == 0
+
 
 
 def run(ctx):
