@@ -7,7 +7,7 @@
 static unsigned owners, modes, flips, locks, ends;
 static int mode_rc, flip_rc;
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *out)
-{ (void)id; (void)name; if (kind != LEDGER_KIND_PERSIST) return 0; *out = 21; owners++; return 1; }
+{ (void)id; (void)name; if (!out || (kind != LEDGER_KIND_AS && kind != LEDGER_KIND_MODULE && kind != LEDGER_KIND_DEVICE)) return 0; *out = 21; owners++; return 1; }
 int ledger_owner_retire(u32 owner) { if (owner != 21 || sys_used) return 0; owners--; return 1; }
 int gfx2_cpu_begin(struct gfx2_surf *s, u32 access, u32 dl)
 { (void)access; (void)dl; locks++; return s->state == GFX2_ST_LOST ? OS32_ERR_STALE : 0; }
@@ -47,7 +47,7 @@ static int test_console(void)
     reset(); a->be = &console_be; a->gen=9; a->heads=1;
     T(gfx_console_open(0, 1, &t) == OS32_ERR_INVAL);
     mode_rc = OS32_ERR_NOSYS;
-    T(gfx_console_open(0, 0, &t) == OS32_ERR_NOSYS && !owners && !sys_used);
+    T(gfx_console_open(0, 0, &t) == OS32_ERR_NOSYS && owners==1 && !sys_used);
     mode_rc = 0;
     T(!gfx_console_open(0, 0, &t) && owners==1 && modes==2);
     T(t.width==7 && t.height==4 && t.pitch==64 && t.sid);
@@ -66,10 +66,10 @@ static int test_console(void)
     T(gfx_console_lock(&t, &pixels)==OS32_ERR_STALE && gfx_console_present(&t)==OS32_ERR_STALE);
     a->state=GFX2_AD_OK; a->gen++;
     T(gfx_console_present(&t)==OS32_ERR_STALE);
-    T(!gfx_console_close(&t) && !owners && !sys_used && !a->head[0].scan_sid);
+    T(!gfx_console_close(&t) && owners==1 && !sys_used && !a->head[0].scan_sid);
     T(!gfx_console_open(0, 0, &t));
     T(!gfx_console_lock(&t, &pixels));
-    T(!gfx_console_close(&t) && !owners && !sys_used);
+    T(!gfx_console_close(&t) && owners==1 && !sys_used);
     T(!gfx_console_open(0, 0, &t));
     gfx2_surfs[t.sid&1023].state=GFX2_ST_LOST;
     T(gfx_console_lock(&t, &pixels)==OS32_ERR_STALE);
@@ -83,6 +83,7 @@ static int test_console(void)
     gfx2_scan_ref_swap(a, 0, alias);
     T(!gfx_console_open(0, 0, &t) && !alias->scan_ref);
     T(!gfx_console_close(&t));
+    T(owners==1);
     return 0;
 }
 void _start(void)

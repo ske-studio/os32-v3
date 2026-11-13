@@ -15,6 +15,7 @@ import tempfile
 import host32
 ROOT=Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('owner kind', 'ledger_owner_new(LEDGER_KIND_MODULE,', 'ledger_owner_new(LEDGER_KIND_PERSIST,'),
     ('surface connection', '    gfx2_scan_ref_swap(a, head, s);', '    (void)0;'),
     ('boundary guard', 'w > s->w - x || h > s->h - y', '0'),
     ('generation', 'a->gen != t->generation ||', ''),
