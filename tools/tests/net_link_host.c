@@ -1834,3 +1834,7 @@ void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
 void link_notify_rx(u32 s, const u8 *p, u16 n) { (void)s; (void)p; (void)n; }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

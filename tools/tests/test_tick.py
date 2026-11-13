@@ -81,6 +81,7 @@ def main():
         if '--mutate' in sys.argv:
             original = (ROOT / 'kernel/irq/tick.c').read_text()
             mutants = [
+                ('    tick_budget_begin();', '', 'budget begin omitted'),
                 ('kctx_irq_depth != 0', 'kctx_irq_depth > 1', 'IRQ registration accepted'),
                 ('slots[slot].fn != fn', 'slots[slot].fn == fn', 'duplicate/competition reversed'),
                 ('else slots[slot].fn = fn;', 'else slots[slot].fn = 0;', 'registration lost'),

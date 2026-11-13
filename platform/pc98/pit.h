@@ -25,6 +25,9 @@
  * 以外を受けない (票 TASK_HAL_WIRING §1-0)。 */
 int pit_init(unsigned int hz);
 
+/* PIT #0 の現在値だけをラッチして読む。 */
+unsigned int pit_read_count(void);
+
 /* platform/pc98/pit.c が所有する、直前の pit_init が積んだ設定。valid = 0 なら一度も積んでいない。 */
 const struct pit_setup *pit_get_setup(void);
 

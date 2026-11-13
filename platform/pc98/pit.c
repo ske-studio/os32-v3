@@ -1,5 +1,6 @@
 #include "pit.h"
 #include "sysclk.h"
+#include "io.h"
 #include "../../include/platform_timer.h"
 
 /* ======================================================================== */
@@ -21,6 +22,15 @@ static struct pit_setup s_pit = { 0, 0, 0, 0, 0, 0 };
 const struct pit_setup *pit_get_setup(void)
 {
     return &s_pit;
+}
+
+unsigned int pit_read_count(void)
+{
+    u8 lo, hi;
+    outp(PIT_MODE, PIT_LATCH_TIMER0);
+    lo = (u8)inp(PIT_CNTR0);
+    hi = (u8)inp(PIT_CNTR0);
+    return ((unsigned int)hi << 8) | lo;
 }
 
 int pit_init(unsigned int hz)
