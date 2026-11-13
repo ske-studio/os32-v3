@@ -94,7 +94,7 @@
 診断像：現行の初期化 → 現行の診断／LAN poll
 CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 第3像 ：RAM root → pm_input_boot → pm_exec_boot
-       → LAN poll で TERM_OPEN を待つ → pm_shell_boot
+       → LAN OPEN または USB の最初のキーを待つ → pm_shell_boot
 ```
 
 - `pm_exec_boot()` は kernel 起動文脈を親とし、深さ1を設定する。
@@ -104,7 +104,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - ロード失敗は表示後に LAN poll で待つ。CLI へ切り替えない。
 - fault 等の正常終了以外も、結果を表示して待機する。
 - 接続確認には既存 `pm_term_state()` の成立を使い、LAN protocol に新しい状態を足さない。
-- TERM_OPEN が出力 FIFO を捨てるため、初回の sh 起動は接続成立後とする。
+- TERM_OPEN が出力 FIFO を捨てるため、LAN のみでは初回 OPEN を待つ。USB は変換済み FIFO の非空で起動し、最初のキーを残す。
 - 初回 OPEN の取消通知は起動前の入力初期化で消費し、その後の入力は捨てない。
 - 再接続では既存の行取消を使う。ESC 自体にプロンプト再発行を追加せず、Enter で復帰する。
 
@@ -135,13 +135,15 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 
 |入力の範囲|PowerMac provider の契約|
 |---|---|
-|getkey/getchar・KAPI版・wait|LAN poll を進め、キー形式／文字形式に合わせて返す|
+|getkey/getchar・KAPI版・wait|terminal poll を進め、LAN と USB を交互に試し、キー形式／文字形式に合わせて返す|
 |try・peek・has_key|先読み1要素を共有し、二重消費しない|
 |Enter・BS・取消|LF→CR、DEL→BS、Ctrl-C・行喪失→ESC、CRLF は1回|
 |上下履歴|`ESC [ A/B` → `0x3A00/0x3D00`|
 |単独 ESC|decoder の期限で取消として確定|
 |raw・押下・修飾・GUI・診断|既存契約の空値・無操作・未対応値|
 
+- USB の文字化・FIFO・起動待ち・受入の正本は [PPC_USB_KBD_DESIGN](PPC_USB_KBD_DESIGN.md)。USB の修飾は文字化の内部だけに使い、公開の押下・修飾・shift_state は0、drop 照会は USB FIFO の値を返す。
+- LAN の行喪失・OPEN の取消は USB で編集中の行にも作用する。USB 先行起動後の LAN OPEN で過去の案内の再送は保証せず、Enter で次のプロンプトを得る。
 - InputOps は19本すべてを定義する。1024B ring と LAN protocol は変更しない。
 - scan 値の変換は platform 内に置き、sh に PowerPC 分岐を加えない。
 

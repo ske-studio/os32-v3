@@ -30,6 +30,8 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
+| PPC-USB-LAN | PowerMac USB と LAN の併用・RPC stall 後の製品 sh 入力、後付け USB・抜去後 LAN 入力・USB 行の OPEN 取消 | 実装 sandbox は AF_INET を使用不可 | PM が sandbox 外で `tools/ppc/usb_run.py --lan --cpu both --mutate` と `tools/ppc/sc_run.py --cpu both` を取り込み前に実行する |
 | HALV2-I1-GUEST | 新帯の起動自己試験・`gfx2_i1.bin` の lock 中監査と終了時回収、R1 のゲスト回帰 | I1 実装者の依頼はホストまで。NP21/W は PM が操作する | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、I1 のゲスト受入。手順と証拠の所在は `~/os32-tmp/run/halv2-i1/RESULT.md` |
 | HALV2-I3-GUEST | `gfx2_i3.bin` の PEGC での列挙・同期層・DISPLAY lease の往復、I1/I2 のゲスト回帰 | I3 実装者は NP21/W を操作しない。GeForce module の容量超過で make all は失敗中 | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、容量方針の確定と CI build 成功後の I3 一括受入。手順 `~/os32-tmp/run/halv2-i3/RUNBOOK.md` |
 | HALV2-I1-DRAW | §13-1 の R2・R3・R4 の公開 submit による FILL/READBACK | I1 で CPU 写像・backing・回収を結線。C9/S 群の描画製品は I2 の担当で未実装 | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §14 の先行依存の扱い、I2 の完了前に必ず実行 |
@@ -90,6 +92,7 @@
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
+| PPC-USB-KANA | PowerMac USB カナ・IME入力 | PM決定で初版はASCII/JIS記号と行編集まで、カナ変換・IME契約は未実装 | PowerMacカナ・IME対応段の受入完了前に文字化・UTF-8キュー・IME接続・製品sh入力を検証する |
 | H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめた。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) 以後、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される** (旧 shlib の拒否は R1c-2 で実証)。外部の Makefile は T2c 以後の `link_guard.py` 経由のリンクにも未追随 (2026-10-08 の `make external` で mkos32x が拒否)。f7 以後は SDK の CRT が `libos32nano.a` を要るので、外部 Makefile のリンクに `-los32nano` を `-lc` より前に足す (f7 レビュー P2-1)。**端末アプリに依る未実施をここに束ねる**: E11-5 の端末の子・隠れた sh、E11-9 の GUI 端末の tvdump 0 埋め (元の行 1113、1248、1810–1826、1868、3463) | 再開時ゲート | apps / game の再開時 |
 | S-4 | 外部 apps / game の再結線 | 適用外 → = H-7 | 同上 |
 | E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。旧「端末由来は全員が読める」はGUIRUNKEY-1 (2026-10-18) で変更済み。読み手とslot/launchの起動連鎖だけが取得する。全画面の起床手がかりの残件は維持。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない**、**U6 (ユーザー決定 2026-10-10): 足さない** — 全画面への矢印・機能キーの配送は E11-5 の実測で判断 (残り 2 点は E11-5 行) | 改善 (決定による持越し) | 全画面の入力に不足が出たとき |

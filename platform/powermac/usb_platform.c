@@ -2,6 +2,7 @@
  * DMA is remapped cache-inhibited before use, like gmac_dma.c's control page.
  * UniNorth's identity 16MB DMA window is the same as gmac_tree.c/pm_dma_bus. */
 #include "usb_boot.h"
+#include "input_usb.h"
 #include "usb_platform.h"
 #include "ppc_memmap.h"
 #include "mm/paging.h"
@@ -154,13 +155,18 @@ int usbp_input_src_alloc(int kind)
     return -1;
 }
 void usbp_input_key(u8 src, u8 sc, int down)
-{ kprintf(7, "USB KEY src=%u sc=%02x down=%u\n", src, sc, down); }
+{
+    pm_input_usb_key(src, sc, down);
+    kprintf(7, "USB KEY src=%u sc=%02x down=%u\n", src, sc, down); }
 void usbp_input_key_repeat(u8 src, u8 sc)
-{ kprintf(7, "USB REPEAT src=%u sc=%02x\n", src, sc); }
+{
+    pm_input_usb_repeat(src, sc);
+    kprintf(7, "USB REPEAT src=%u sc=%02x\n", src, sc); }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
 { kprintf(7, "USB MOUSE src=%u dx=%d dy=%d b=%x\n", src, dx, dy, buttons); }
 void usbp_input_release(int kind, u8 src)
 {
+    if (kind == 0) pm_input_usb_release(src);
     kprintf(7, "USB RELEASE kind=%d src=%u\n", kind, src);
     if ((unsigned)kind < 2 && src >= 1 && src <= 4) sources[kind] &= ~(1u << (src - 1));
 }
