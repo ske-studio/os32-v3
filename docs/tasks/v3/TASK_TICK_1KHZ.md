@@ -1,6 +1,6 @@
 # TASK_TICK_1KHZ — P3 の 1kHz IRQ0 tick
 
-> 状態: **x86 の物理 1kHz を既定にした (B14、2026-11-13)** — 段 A のゲートは実機 Ra266 と NP21/W で満たした (§2)。残りは §3。tick_clock は arch に依らない口 ([TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md))。
+> 状態: **実装中 (2026-11-13)** — x86 の物理 1kHz を既定にした (B14)。段 A のゲートは実機 Ra266 と NP21/W で満たした (§2)。残りは §3。tick_clock は arch に依らない口 ([TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md))。
 
 ## 0. ユーザー決定 (原文)
 
