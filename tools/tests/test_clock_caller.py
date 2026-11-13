@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('platform/pc98/clock_source.c', 'ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h)',
      'ready ? pc98_pit_read_us(&l, &h) : pc98_pit_read_us(&l, &h)'),
-    ('platform/pc98/clock_source.c', 'offset = last - us;', 'offset = 0;'),
+    ('platform/pc98/clock_source.c', 'if (pit_rebased) us = public_origin + (us - pit_origin);',
+     '(void)public_origin; (void)pit_origin;'),
     ('platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
      'out->ready = ps->valid;'),
     ('platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',

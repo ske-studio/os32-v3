@@ -45,10 +45,11 @@ void platform_timer_sample(struct platform_timer_sample *out)
     out->p1 = pending; out->p2 = samples <= retry_n; out->count = sample_count;
 }
 static int tsc_ready, tsc_rc;
+static unsigned long long fake_tsc_us = (0x10000000ULL << 32) | 123;
 int pc98_tsc_init(void) { return -1; }
 int pc98_tsc_ready(void) { return tsc_ready; }
 int pc98_tsc_read_us(u32 *lo, u32 *hi)
-{ if (tsc_rc) return tsc_rc; *lo = 123; *hi = 0x10000000; return 0; }
+{ if (tsc_rc) return tsc_rc; *lo = (u32)fake_tsc_us; *hi = (u32)(fake_tsc_us >> 32); return 0; }
 #include "../../platform/pc98/clock_source.c"
 #include "../../kernel/time/ktime.c"
 static void call(int rc, unsigned int n, unsigned int old)
@@ -134,8 +135,30 @@ void _start(void)
         raw_lo = 0; raw_hi = 3; pending = 0;
         call(0, 1, 0); check(ktime_clamp_count == 0);
     }
+    /* Failure after slowing, stopping, or accelerating preserves the last
+     * public value even when PIT is ahead, then advances by PIT elapsed time. */
+    setup = (struct pit_setup){1996800, 100, 19968, 10000, PIT_MODE_TIMER0, 1};
+    for (u32 scenario = 0; scenario < 3; ++scenario) {
+        raw_hi = 4 + scenario; raw_lo = 10;
+        pending = 0; sample_count = setup.reload; retry_n = 0;
+        unsigned long long pit_base = (((unsigned long long)raw_hi << 32) + raw_lo) * 10000;
+        fake_tsc_us = scenario == 2 ? pit_base + 1000000 : pit_base - 1000000;
+        tsc_ready = 1; s_last_us = 0;
+        call(0, 0, 1);
+        raw_lo++;
+        fake_tsc_us += scenario == 0 ? 5000 : scenario == 1 ? 0 : 20000;
+        call(0, 0, 0);
+        check((((unsigned long long)user_page[1] << 32) | user_page[0]) == fake_tsc_us);
+        raw_lo++; tsc_ready = 0;
+        call(0, 1, 1);
+        check((((unsigned long long)user_page[1] << 32) | user_page[0]) == fake_tsc_us);
+        raw_lo++; call(0, 1, 0);
+        check((((unsigned long long)user_page[1] << 32) | user_page[0]) == fake_tsc_us + 10000);
+    }
+    fake_tsc_us = (0x10000000ULL << 32) | 123;
+    setup = (struct pit_setup){2457600, 1000, 2458, 17, PIT_MODE_TIMER0, 1};
     /* READY bypasses PIT; failed read keeps outputs; failure switches with
-     * an offset so the PIT fallback progresses from the last public value. */
+     * a reference pair so the PIT fallback progresses from the last public value. */
     tsc_ready = 1; s_last_us = 0;
     call(0, 0, 1); check(user_page[0] == 123 && user_page[1] == 0x10000000);
     tsc_rc = OS32_ERR_AGAIN; call(OS32_ERR_AGAIN, 0, 0);

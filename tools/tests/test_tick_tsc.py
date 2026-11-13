@@ -15,6 +15,8 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/tsc_clock.c', '++consecutive_rejects >= TSC_REJECT_LIMIT',
+     'consecutive_rejects >= TSC_REJECT_LIMIT'),
     ('platform/pc98/tsc_math.c', '(delta >> 32) * mult', '0ULL * mult'),
     ('platform/pc98/tsc_clock.c', 'epoch_fraction = fraction;', 'epoch_fraction = 0;'),
     ('platform/pc98/tsc_clock.c', 'if (!arch_cpu_has_tsc())', 'if (0)'),

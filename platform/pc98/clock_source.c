@@ -77,18 +77,20 @@ int pc98_pit_read_us(u32 *lo, u32 *hi)
  * Like the original PIT reader this boundary is called with IF=0. */
 int platform_clock_read_us(u32 *lo, u32 *hi)
 {
-    static unsigned long long last, offset;
-    static int was_tsc;
+    static unsigned long long last, pit_origin, public_origin;
+    static int was_tsc, pit_rebased;
     u32 l, h;
     int ready = pc98_tsc_ready();
     int rc = ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h);
     if (rc) return rc;
     unsigned long long us = ((unsigned long long)h << 32) | l;
     if (!ready) {
-        if (was_tsc && us + offset < last) offset = last - us;
-        us += offset;
+        if (was_tsc) {
+            pit_origin = us; public_origin = last; pit_rebased = 1;
+        }
+        if (pit_rebased) us = public_origin + (us - pit_origin);
     }
-    if ((ready || was_tsc || offset) && us < last) us = last;
+    if ((ready || pit_rebased) && us < last) us = last;
     last = us; was_tsc = ready;
     *lo = (u32)us; *hi = (u32)(us >> 32);
     return 0;

@@ -13,6 +13,9 @@
 #define TSC_BOOT_LIMIT_US 2000000u
 #define TSC_MONITOR_US 1000000u
 #define TSC_ENDPOINT_US 4u
+/* Ten rejected one-second monitor windows bound loss of supervision (~10s).
+ * Endpoint/read failures may retry sooner and reach this limit earlier. */
+#define TSC_REJECT_LIMIT 10u
 #define TSC_EPOCH_CYCLES 0x40000000u
 #define TSC_WINDOWS 5u
 #define TSC_ATTEMPTS 10u
@@ -32,7 +35,7 @@ static struct window windows[TSC_WINDOWS];
 static unsigned long long boot_start, next_monitor;
 static u32 collected, attempts, next_work_ms;
 static int registered, have_start, work_started;
-static u32 boot_ms;
+static u32 boot_ms, consecutive_rejects;
 
 static unsigned long long rdtsc(void)
 {
@@ -48,6 +51,8 @@ static void reject(enum tsc_reject reason)
     diag.degraded = 1;
     diag.abnormal = 0;
     if (reason != REJECT_MISSING) diag.missing = 0;
+    if (state == TSC_READY && ++consecutive_rejects >= TSC_REJECT_LIMIT)
+        state = TSC_FAILED;
 }
 int pc98_tsc_ready(void) { return state == TSC_READY; }
 
@@ -166,6 +171,7 @@ static void monitor(const struct window *w)
         if (d * 1000u > w->us) ++diag.abnormal;
         else diag.abnormal = 0;
     }
+    consecutive_rejects = 0;
     if (diag.abnormal >= 2) { diag.degraded = 1; state = TSC_FAILED; }
 }
 void pc98_tsc_calibrate_work(void)
@@ -218,7 +224,7 @@ int pc98_tsc_init(void)
 {
     state = TSC_OFF;
     collected = attempts = have_start = work_started = 0; boot_start = 0;
-    diag.abnormal = diag.missing = 0;
+    diag.abnormal = diag.missing = consecutive_rejects = 0;
     next_work_ms = tick_clock_ms();
     if (!arch_cpu_has_tsc()) return OS32_ERR_NOSYS;
     const struct pit_setup *ps = pit_get_setup();

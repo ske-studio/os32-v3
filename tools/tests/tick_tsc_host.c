@@ -146,6 +146,27 @@ static void tests(void)
     monitor(&bad); CHECK(state == TSC_READY && diag.abnormal == 1);
     reject(REJECT_READ); monitor(&bad); CHECK(state == TSC_READY && diag.abnormal == 1);
     bad.cost = 401; monitor(&bad); CHECK(!diag.abnormal && state == TSC_READY);
+    /* Old 100MHz coefficient rejects 3us endpoints after a jump to 200MHz.
+     * Drive the actual cooperative scheduler at its one-second monitor cadence. */
+    reset(); endpoint_cycles = 300; pc98_tsc_calibrate_work();
+    for (u32 i = 0; i < 5; ++i) advance(200000, 0);
+    CHECK(state == TSC_READY);
+    endpoint_cycles = 600;
+    advance(1000000, 100000000);
+    for (u32 i = 0; i < 10; ++i) {
+        advance(200000, 20000000);
+        CHECK(diag.rejected[REJECT_COST] == i + 1);
+        CHECK(state == (i == 9 ? TSC_FAILED : TSC_READY));
+        if (i != 9) advance(800000, 80000000);
+    }
+    /* Any rejection reason contributes; an accepted window breaks the streak. */
+    ready();
+    for (u32 i = 0; i < 9; ++i) reject(i & 1 ? REJECT_READ : REJECT_LENGTH);
+    CHECK(state == TSC_READY);
+    monitor(&good);
+    for (u32 i = 0; i < 9; ++i) reject(i & 1 ? REJECT_COST : REJECT_MISSING);
+    CHECK(state == TSC_READY);
+    reject(REJECT_READ); CHECK(state == TSC_FAILED);
     /* Calibration drops isolated missing periods, then obtains replacements. */
     reset(); pc98_tsc_calibrate_work();
     advance(200000, 100000); /* apparent +1P */
