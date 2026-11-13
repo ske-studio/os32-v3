@@ -4,7 +4,7 @@ CHECK = dict(name='pcm-e4-host', tier=1, covers=[
     'tools/tests/pcm_hostshim/io.h', 'tools/tests/kernel_includes.py',
     'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/platform_irq.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/irq/tick.c',
     'kernel/module/kdebug_call.c', 'drivers/sound/cs4231/pcm_module.c',
-    'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c',
+    'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c',
     'drivers/sound/cs4231/pcm_e4_*.c', 'drivers/sound/cs4231/pcm_e4_*.h',
     'userland/tests/pcm_test.c', 'build/kernel.mk'], needs=[], budget=3.4)
 
