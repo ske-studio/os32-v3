@@ -34,8 +34,8 @@ static int firmware(void *ptr)
         } else if (!kstrcmp(p,"address")) put(out, scenario == 8 ? 0xfffffff0U : 0x90000004U);
         else if (!kstrcmp(p,"width")) put(out, scenario == 3 ? 0xffffffffU : 640);
         else if (!kstrcmp(p,"height")) put(out, scenario == 4 ? 1 : 480);
-        else if (!kstrcmp(p,"depth")) put(out, scenario == 2 ? 8 : scenario == 10 ? 16 : 32);
-        else if (!kstrcmp(p,"linebytes")) put(out, scenario == 5 ? 1 : scenario == 6 ? 0xffffffffU : 2560);
+        else if (!kstrcmp(p,"depth")) put(out, scenario == 2 ? 24 : scenario == 10 ? 16 : scenario == 11 ? 8 : 32);
+        else if (!kstrcmp(p,"linebytes")) put(out, scenario == 5 ? 1 : scenario == 6 ? 0xffffffffU : scenario == 11 ? 768 : 2560);
         else if (!kstrcmp(p,"mmu")) put(out, 9);
         else if (!kstrcmp(p,"stdout")) put(out, 8);
         else finish(98);
@@ -57,13 +57,13 @@ void _start(void)
 {
     ofw_init(firmware);
     CHECK(pm_rh_of_mark(0)==0 && writes==1);
-    for (scenario=0; scenario<=10; scenario++) {
+    for (scenario=0; scenario<=11; scenario++) {
         int rc = pm_rh_capture(8);
         if (scenario==1) { CHECK(rc==0); continue; }
         if (scenario>=2 && scenario<=9) { CHECK(rc==-1); continue; }
         CHECK(rc==1);
         const struct pm_rh_fb *fb = pm_rh_framebuffer();
-        CHECK(fb->pa==0xa0000004U && fb->bytes==2560*64 && fb->height==480);
+        CHECK(fb->pa==0xa0000004U && fb->bytes==fb->stride*64 && fb->height==480);
         for (unsigned i=0; i<sizeof(guarded); i++) guarded[i]=0xa5;
         unsigned count = ofw_call_count();
         pm_rh_bind((u32)(guarded+16));

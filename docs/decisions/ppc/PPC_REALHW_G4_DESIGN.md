@@ -165,7 +165,7 @@ void pm_rh_phy(u32 port, u32 addr, u32 id1, u32 id2); /* 大きい ID ページ 
 
 - OF の stdout が display か確認し address/width/height/depth/linebytes を保存。address を無条件に PA としない。
 - OF MMU の translate で上端の帯だけ PA/連続性を解決。stride×表示行数と範囲の桁溢れを検査し、PA の頁内 offset を加えた頁丸め長 ≤256KiB とする（全画面は写さない）。
-- 最初は既知の 16/32bpp のみ。未知形式では OF 段印と採取値を残して停止、GPU モード設定は足さない。
+- 最初は既知の 8/16/32bpp のみ (8bpp は G4 実機の OF の画面、640×480・linebytes 768、11-13 に確認)。未知形式では OF 段印と採取値を残して停止、GPU モード設定は足さない。
 - `kernel_boot.c:212` の ESCC 準備前に OF 印 0、capture 後に 1、reserve 後に 2、既存 TAKEOVER を最後に出す。
 - `kernel_boot.h` に `PPC_BOOT_FB_VA=(MEM_DEVICE_APERTURE_BASE + 0x200000U)` (=0xFE200000〜0xFE23FFFF、静的な PT がある先頭の 4MiB の中の空き。既存の別名は 0xFE300000 から上)、`kernel_boot.c:35` の slot 表に同 VA/256KiB を追加し、既存窓との非重複を検査して I/G 写像。devices に fb_va/clock_va を渡し、`init/ppc_kernel.c` の paging 後・ESCC 初期化前で bind→stage(1)、OF 呼出し増分は 0。
 - detach〜paging の間に停止した場合は TAKEOVER が最後。FB 段 1 を偽造せず、その区間を未通過と扱う。

@@ -54,7 +54,7 @@ int pm_rh_capture(int stdout_ih)
         !prop(node[1], "height", &fb.height) ||
         !prop(node[1], "linebytes", &fb.stride) ||
         !prop(node[1], "depth", &fb.depth)) return -1;
-    if ((fb.depth != 16 && fb.depth != 32) || fb.width < 320 ||
+    if ((fb.depth != 8 && fb.depth != 16 && fb.depth != 32) || fb.width < 320 ||
         fb.width > ~0U / (fb.depth / 8) ||
         fb.stride < fb.width * (fb.depth / 8) || !fb.stride ||
         !prop(chosen, "mmu", &mmu)) return -1;
@@ -111,7 +111,10 @@ static void pixel(u32 x, u32 y, int ink, int error)
     if (x >= fb.width || y >= fb.bytes / fb.stride) return;
     u32 off = y * fb.stride + x * (fb.depth / 8);
     /* White/black are independent of RGB555/RGB565; red flags errors. */
-    if (fb.depth == 16) {
+    if (fb.depth == 8) {
+        /* Apple OF CLUT: 0 white, 0xff black; 0x23 is red in the Mac system CLUT. */
+        pixels[off] = ink ? 0xff : error ? 0x23 : 0;
+    } else if (fb.depth == 16) {
         pixels[off] = ink ? 0xff : error ? 0x7c : 0;
         pixels[off+1] = ink ? 0xff : 0;
     } else {
