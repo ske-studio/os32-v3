@@ -514,7 +514,10 @@ def lan_accept(elf, cpu, out, mode):
             require(result(s.display.getvalue()[offset:].decode(), 'echo hi') == 'hi\n', 'USB post-RPC output')
             require('usb: HC dead' not in serial(s.a), 'healthy HC after RPC')
             # A LAN OPEN cancels the common line even when USB entered it.
+            offset = len(s.display.getvalue())
             usb_keys('echo discarded')
+            s.wait(lambda: s.display.getvalue()[offset:] == b'echo discarded',
+                   5, 'USB line echoed before LAN OPEN')
             s.terminal.open()
             s.wait(lambda: s.terminal.connected, 5, 'LAN reopen')
             # Drain cancellation before the LAN newline and next command.
