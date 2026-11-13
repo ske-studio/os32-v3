@@ -436,7 +436,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* ====================================================================== */
 #define PIT_HZ                100   /* 論理 tick 周波数 (Hz) */
 #ifndef PIT_IRQ_HZ
-#define PIT_IRQ_HZ            100   /* 物理タイマー割り込み周波数 (Hz) */
+#define PIT_IRQ_HZ            1000  /* 物理タイマー割り込み周波数 (Hz) */
 #endif
 #define TICK_MS (1000u / PIT_HZ)
 
