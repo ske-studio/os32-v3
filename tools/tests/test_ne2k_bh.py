@@ -10,7 +10,7 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ne2k-bh-host', tier=4, needs=[], budget=4,
-    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/ne2k_bh_host.c', 'tools/tests/test_ne2k_bh.py', 'kernel/idle_work.c', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h'])
+    covers=['net/nic.h', 'net/rx_work.h', 'net/rx_work.c', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/tick_budget.h', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/ne2k_bh_host.c', 'tools/tests/test_ne2k_bh.py', 'kernel/idle_work.c', 'net/nic.c', 'net/nic_rx.h', 'net/link.h'])
 
 
 def main():
@@ -45,6 +45,8 @@ def main():
             print(f'GREEN all IF=0 entries, faults, recovery and TX FIFO ({runner})', flush=True)
         if args.mutate:
             for label, filename, old, new in [
+                ('enqueue-service', 'ne2000_data.inc', '        net_rx_service();', '        (void)0;'),
+                ('batch-share', 'ne2000.c', '    net_rx_batch_begin();', '    (void)0;'),
                 ('drop-full', 'ne2000_data.inc', '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;', '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) { nic.st.rx_dropped++; return 1; }'),
                 ('full-after-dma', 'ne2000_data.inc',
                  '    if (nic.rxq_count >= NE2K_RXQ_SLOTS) return 2;\n\n    if (dma_read((u16)nic.rx_next << 8, raw, NE2K_RX_HDR_LEN)) return -1;',

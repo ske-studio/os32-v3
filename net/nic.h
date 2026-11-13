@@ -18,10 +18,19 @@ struct NetNicOps {
 
 /* Bind once at boot. Shared users must not drain the NIC directly. */
 int net_bind(const struct NetNicOps *ops);
-/* Poll/demux once with IF saved/cli. Unbound: 0; otherwise frames received. */
+struct rx_work_budget;
+void net_rx_schedule(void);
+int net_rx_service(void);
+void net_rx_batch_begin(void);
+void net_rx_batch_end(void);
+/* Queue reset is deferred while demux owns a reserved tail. */
+int net_rx_defer_reset(u16 protocol);
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
+                         const u8 peer[6], struct rx_work_budget *budget);
+/* Service in cooperative context; otherwise schedule only. */
 int net_nic_poll_once(void);
-/* Separate fixed SFS/link queues (4 x 1514B each). Save IF/cli; if this queue
- * is empty poll/demux once; take a frame; restore IF. Never drive link here.
+/* Separate fixed SFS/link queues (4 x 1514B each). If empty, request service
+ * before locking; then take a frame and restore IF.
  * SFS reset discards only its own queue. */
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len);
 /* Queued frames only; caller holds IF=0. */
@@ -39,7 +48,7 @@ extern const struct NetAdapter net_lgy98_adapter, net_e82557_adapter;
 /* Logical protocols, not EtherTypes. Empty AGAIN; insufficient cap NOSPC
  * sets required length without consuming; unknown protocol INVAL. */
 enum NetRxProtocol { NET_RX_SFS = 1, NET_RX_LINK = 2 };
-void net_rx_reset(u16 protocol); void net_tick(void);
+void net_rx_reset(u16 protocol); void net_tick(void); void net_jiffy(void);
 /* AUTO prefers E82557. Missing explicit adapter: NOSYS; double start: BUSY.
  * task acquire owns the module reference; unbind stops tick/queues with IF
  * saved, then releases in task context. Borrowed ops live until release.

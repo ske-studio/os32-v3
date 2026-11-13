@@ -502,6 +502,7 @@ static void diag_dma_test(void)
 
 #include "ne2000_control.inc"
 
+#include "net/nic.h"
 #include "ne2000_data.inc"
 
 #include "ne2000_irq.inc"
@@ -519,6 +520,8 @@ static void ne2k_bh(void)
     if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
         nic.rx_backlog && nic.rxq_count >= NE2K_RXQ_SLOTS &&
         nic.state != NE2K_STATE_OVW_WAIT) return;
+    net_rx_batch_begin();
+    net_rx_service();
     ne2k_enter();
     before = nic.st.rx_frames + nic.st.rx_dropped;
     watchdog = (nic.need_rx & NE2K_WORK_WATCHDOG) != 0;
@@ -547,6 +550,7 @@ static void ne2k_bh(void)
         if (frames) nic.st.watchdog_hits++;
     }
     ne2k_leave();
+    net_rx_batch_end();
 }
 
 /* ---- リンク層が Credit を作るための空き容量 (LINK_PLAN.md §2-2)。

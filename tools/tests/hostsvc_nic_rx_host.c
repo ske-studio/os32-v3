@@ -1,6 +1,7 @@
 /* A3 real queues/demux, fake NIC boundary. Limits: design §2 and 82557 RFD ring. */
 #include "hostsvc_fixture.h"
 #include "net/nic_rx.h"
+#include "net/rx_work.h"
 #include "net/link.h"
 #include "drivers/net/e82557/e82557_regs.h"
 #include "os32_kapi_shared.h"
@@ -37,7 +38,7 @@ static int rx(void *out, u32 cap, u32 *len)
 {
     int rc;
     calls++;
-    if (hs_if()) bad_if++;
+    if (!hs_if()) bad_if++;
     if (hs_failure_take("nic.rx", &rc)) return rc;
     if (!count) return OS32_ERR_AGAIN;
     *len = lengths[head];
@@ -51,13 +52,11 @@ static const struct NetNicOps ops = {0, rx, 0, 0, 0};
 /* Same A2 boot state and tick contract: unbound/ticking does no poll. */
 int net_nic_poll_once(void)
 {
-    unsigned int flags = nic_test_irq_save();
     u32 before = count;
-    if (bound && !ticking) {
+    if (bound && !ticking && hs_if()) {
         polls++;
         net_rx_demux(&ops, local, fixed_peer);
     }
-    nic_test_irq_restore(flags);
     return (int)(before - count);
 }
 static u8 *frame(u8 op, u32 len, u8 tag)
@@ -187,3 +186,9 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc ? rc % 250 + 1 : 0));
     __builtin_unreachable();
 }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+void net_rx_schedule(void) {}
+int net_rx_defer_reset(u16 protocol) { (void)protocol; return 0; }

@@ -1,5 +1,7 @@
 /* Shared bounded receive owner; NET_HOSTSVC_DESIGN §2 and addendum #2. */
 #include "nic_rx.h"
+#include "rx_work.h"
+#include "kernel/irq/tick_budget.h"
 #include "link.h"
 #include "io.h"
 #include "kstring.h"
@@ -31,12 +33,21 @@ static int mac_equal(const u8 *a, const u8 *b)
     return 1;
 }
 
-void net_rx_demux(const struct NetNicOps *ops, const u8 local[6], const u8 peer[6])
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
+                        const u8 peer[6], struct rx_work_budget *b)
 {
     static const u8 broadcast[ETH_ALEN] = {255, 255, 255, 255, 255, 255};
-    for (u32 scan = 0; scan < NET_RX_SCAN_MAX; scan++) {
+    u32 count = 0;
+    for (;;) {
+        /* Rescue clock reads also consume the active IRQ0 RX allowance. */
+        if (!rx_work_take(b)) { net_rx_schedule(); break; }
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                              tick_budget_cnt(NET_TAIL_RX_US))) {
+            net_rx_schedule(); break;
+        }
         u32 len = 0;
         if (ops->rx(rx_frame, sizeof(rx_frame), &len)) break;
+        count++;
         if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;
         if (rx_frame[ETH_TYPE_OFF] != (OS32_ETHERTYPE >> 8) ||
             rx_frame[ETH_TYPE_OFF + 1] != (OS32_ETHERTYPE & 255)) continue;
@@ -48,16 +59,29 @@ void net_rx_demux(const struct NetNicOps *ops, const u8 local[6], const u8 peer[
         int sfs = n >= 3 && p[0] == 0x05 && p[1] == 0x53 && p[2] == 0x46;
         if (!own && (sfs || n == 0 || p[0] != LINK_OP_HELLO)) continue;
         struct RxQueue *q = sfs ? &sfs_queue : &link_queue;
+        unsigned int flags = irq_save();
         if (q->count == RX_SLOTS) {
+            irq_restore(flags);
             if (sfs) net_rx_sfs_dropped++;
             else net_rx_link_dropped++;
             continue;
         }
         u32 tail = (q->head + q->count) % RX_SLOTS;
+        irq_restore(flags);
         kmemcpy(q->frames[tail], rx_frame, len);
+        flags = irq_save();
         q->lengths[tail] = len;
         q->count++;
+        irq_restore(flags);
     }
+    return count;
+}
+
+void net_rx_demux(const struct NetNicOps *ops, const u8 local[6], const u8 peer[6])
+{
+    struct rx_work_budget b;
+    rx_work_begin(&b);
+    net_rx_demux_budget(ops, local, peer, &b);
 }
 
 u32 net_rx_queued(u16 protocol)
@@ -70,9 +94,9 @@ int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 {
     struct RxQueue *q = rx_queue(protocol);
     if (!q || !out || !len) return OS32_ERR_INVAL;
+    if (!q->count) net_nic_poll_once();
     unsigned int flags = irq_save();
     int rc = OS32_ERR_AGAIN;
-    if (!q->count) net_nic_poll_once();
     if (q->count) {
         *len = q->lengths[q->head];
         rc = OS32_ERR_NOSPC;
@@ -91,6 +115,6 @@ void net_rx_reset(u16 protocol)
 {
     unsigned int flags = irq_save();
     struct RxQueue *q = rx_queue(protocol);
-    if (q) q->head = q->count = 0;
+    if (q && !net_rx_defer_reset(protocol)) q->head = q->count = 0;
     irq_restore(flags);
 }
