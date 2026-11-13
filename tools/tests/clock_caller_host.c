@@ -44,6 +44,11 @@ void platform_timer_sample(struct platform_timer_sample *out)
     check(!enabled); samples++;
     out->p1 = pending; out->p2 = samples <= retry_n; out->count = sample_count;
 }
+static int tsc_ready, tsc_rc;
+int pc98_tsc_init(void) { return -1; }
+int pc98_tsc_ready(void) { return tsc_ready; }
+int pc98_tsc_read_us(u32 *lo, u32 *hi)
+{ if (tsc_rc) return tsc_rc; *lo = 123; *hi = 0x10000000; return 0; }
 #include "../../platform/pc98/clock_source.c"
 #include "../../kernel/time/ktime.c"
 static void call(int rc, unsigned int n, unsigned int old)
@@ -129,6 +134,16 @@ void _start(void)
         raw_lo = 0; raw_hi = 3; pending = 0;
         call(0, 1, 0); check(ktime_clamp_count == 0);
     }
+    /* READY bypasses PIT; failed read keeps outputs; failure switches with
+     * an offset so the PIT fallback progresses from the last public value. */
+    tsc_ready = 1; s_last_us = 0;
+    call(0, 0, 1); check(user_page[0] == 123 && user_page[1] == 0x10000000);
+    tsc_rc = OS32_ERR_AGAIN; call(OS32_ERR_AGAIN, 0, 0);
+    tsc_rc = 0; tsc_ready = 0; raw_lo = 1; raw_hi = 0;
+    pending = 0; sample_count = setup.reload;
+    call(0, 1, 1); check(user_page[0] == 123 && user_page[1] == 0x10000000);
+    raw_lo = 2; call(0, 1, 0);
+    check(user_page[0] == 1123 && user_page[1] == 0x10000000);
     finish(0);
 }
 

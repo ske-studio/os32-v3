@@ -4,7 +4,7 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'kernel/time/ktime.c', 'kernel/time/ktime.h', 'kernel/time/time_math.c',
             'kernel/time/time_math.h', 'platform/pc98/clock_source.c',
             'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
+            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h',
             'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=2.9)
@@ -16,6 +16,9 @@ from kernel_includes import include_flags
 from host32 import run as host_run
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/clock_source.c', 'ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h)',
+     'ready ? pc98_pit_read_us(&l, &h) : pc98_pit_read_us(&l, &h)'),
+    ('platform/pc98/clock_source.c', 'offset = last - us;', 'offset = 0;'),
     ('platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
      'out->ready = ps->valid;'),
     ('platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',

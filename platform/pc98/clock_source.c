@@ -6,6 +6,7 @@
 #include "os32_kapi_shared.h"
 #include "../../kernel/time/ktime.h"
 #include "tick_clock.h"
+#include "tsc_clock.h"
 
 STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
 
@@ -19,6 +20,7 @@ int platform_clock_init(u32 tick_hz)
     if (ps->valid) {
         clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);
         tick_budget_config();
+        if (clock_config_rc == 0) (void)pc98_tsc_init();
     }
     return rc;
 }
@@ -29,7 +31,7 @@ void platform_clock_info(struct clock_info *out)
     out->counter_hz = ps->clk_hz;
     out->ready = ps->valid && clock_config_rc == 0;
 }
-int platform_clock_read_us(u32 *lo, u32 *hi)
+int pc98_pit_read_us(u32 *lo, u32 *hi)
 {
     const struct pit_setup *ps = pit_get_setup();
     struct time_snapshot snap;
@@ -69,4 +71,25 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
     }
     if (rc == 0) { *lo = out_lo; *hi = out_hi; }
     return rc;
+}
+
+/* Public PIT fallback retains continuity after a permanent TSC failure.
+ * Like the original PIT reader this boundary is called with IF=0. */
+int platform_clock_read_us(u32 *lo, u32 *hi)
+{
+    static unsigned long long last, offset;
+    static int was_tsc;
+    u32 l, h;
+    int ready = pc98_tsc_ready();
+    int rc = ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h);
+    if (rc) return rc;
+    unsigned long long us = ((unsigned long long)h << 32) | l;
+    if (!ready) {
+        if (was_tsc && us + offset < last) offset = last - us;
+        us += offset;
+    }
+    if ((ready || was_tsc || offset) && us < last) us = last;
+    last = us; was_tsc = ready;
+    *lo = (u32)us; *hi = (u32)(us >> 32);
+    return 0;
 }

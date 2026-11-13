@@ -4,7 +4,7 @@ CHECK = dict(name='tick-budget-host', tier=4, needs=[], budget=3.0,
             'platform/pc98/tick_budget.c', 'net/link.c', 'net/link_rx.inc',
             'tools/tests/tick_budget_host.c', 'tools/tests/test_tick_budget.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
+            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'lib/divdi3.c',
             'include/types.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/hostsvc_link_core_host.c', 'net/*.[ch]', 'net/*.inc'])
 from pathlib import Path
@@ -15,6 +15,9 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/tick_budget.c', 'return us;', 'return us * 2;'),
+    ('platform/pc98/tick_budget.c', 'if (budget_tsc)', 'if (pc98_tsc_ready())'),
+    ('platform/pc98/tick_budget.c', 'return (u32)((unsigned long long)counts * 1000000u / pit_get_setup()->clk_hz);', 'return counts;'),
     ('net/link.c', 'link_state == LINK_S_SYN && link_hello_idle ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS', '0 ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS'),
     ('net/link_rx.inc', '    link_hello_idle = 0;', '    (void)0;'),
     ('net/link_rx.inc', 'if (op != LINK_OP_HELLO || flags == LINK_HS_SYNACK || flags == LINK_HS_ESTAB)', 'if (1)'),
@@ -46,7 +49,7 @@ def verify(work, mutation=None):
                     '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-nostdlib', '-static', '-no-pie', '-D__cdecl=', '-I' + str(work),
                     *include_flags(ROOT), str(ROOT / 'tools/tests/tick_budget_host.c'),
-                    '-o', str(exe)], check=True)
+                    str(ROOT / 'lib/divdi3.c'), '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work, timeout=3).returncode
 
 

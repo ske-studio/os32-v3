@@ -76,7 +76,7 @@ static inline void arch_cpu_serialize(void)
     u32 a = 0, b, c, d;
     __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d) : : "memory");
 }
-static inline int arch_cpu_has_mmx(void)
+static inline int arch_cpu_has_feature(u32 bit)
 {
     if (!arch_cpu_has_cpuid()) return 0;
     u32 a = 0, b, c, d;
@@ -84,7 +84,13 @@ static inline int arch_cpu_has_mmx(void)
     if (a < 1) return 0;
     a = 1;
     __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d));
-    return (d & (1UL << 23)) != 0;
+    return (d & bit) != 0;
 }
+
+static inline int arch_cpu_has_mmx(void)
+{ return arch_cpu_has_feature(1UL << 23); }
+
+static inline int arch_cpu_has_tsc(void)
+{ return arch_cpu_has_feature(1UL << 4); }
 
 #endif /* ARCH_CPU_H */
