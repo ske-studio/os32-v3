@@ -61,7 +61,7 @@ struct ne2k_stats {
     u32 rx_frames;       /* ホストキューに入れた数 */
     u32 rx_bytes;
     u32 rx_err;          /* RXE / 受信ヘッダの status に PRX 無し */
-    u32 rx_dropped;      /* ホストキュー満杯で捨てた数 */
+    u32 rx_dropped;      /* 受信フレームを捨てた数 */
     u32 rx_missed;       /* CNTR2 */
     u32 rx_crc;          /* CNTR1 */
     u32 rx_align;        /* CNTR0 */
@@ -75,7 +75,7 @@ struct ne2k_stats {
     u32 diag_ram_errors; /* NE2K_CFG_DIAG_RAM の不一致バイト数 */
     u32 diag_dma_errors; /* NE2K_CFG_DIAG_DMA の失敗ケース数 */
     u32 irq_rechecks;    /* ACK 後の再確認で追加処理した回数 (M3) */
-    u32 rx_backlog_events; /* 予算超過で IMR をマスクしたまま返した回数 (M3) */
+    u32 rx_backlog_events; /* 受信リングに未回収が残った回数 */
     u32 watchdog_frames; /* watchdog が印を立てた後、bh が回収したフレーム数 */
     u32 watchdog_hits;   /* ウォッチドッグが 1 フレーム以上回収した tick 数 (M4) */
     u32 rx_pages_total;  /* 受信フレームがリングで消費した総ページ数 (§2-3 の実測用) */

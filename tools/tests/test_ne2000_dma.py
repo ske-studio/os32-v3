@@ -37,7 +37,7 @@ MUTATIONS = [
      'return NE2K_OK;'),
     ('retry only on reissue', 'if (try_i > 0) nic.st.rdc_retry++;',
      'nic.st.rdc_retry++;'),
-    ('OVW backlog', 'nic.rx_backlog = (u8)(r == 1);\n    /* 旧送信',
+    ('OVW backlog', 'nic.rx_backlog = (u8)(r > 0);\n    /* 旧送信',
      '/* 旧送信'),
     ('OVW completion', '        tx_complete(isr);\n        resend = 0;',
      '        resend = 0;'),
