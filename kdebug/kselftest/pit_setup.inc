@@ -11,14 +11,13 @@ static void test_pit_setup(void)
 
     /* 分周に使ったのが判定値そのものか (既定へ倒れていないか)。 */
     check(p->clk_hz == sysclk_hz(), "pit:clk=sysclk");
-    check(p->hz == (unsigned int)PIT_HZ, "pit:hz=PIT_HZ");
-    check(p->reload == (unsigned int)(sysclk_hz() / (unsigned long)PIT_HZ),
-          "pit:reload=clk/hz");
+    check(p->hz == (unsigned int)PIT_IRQ_HZ, "pit:hz=PIT_IRQ_HZ");
+    check(p->reload == (unsigned int)((sysclk_hz() + PIT_IRQ_HZ / 2) / PIT_IRQ_HZ),
+          "pit:reload=nearest clk/hz");
 
-    /* **どちらのクロックでもちょうど 10ms。** ここが 8125 なら 19968 を
-     * 2.4576MHz 機に積んでいる (直す前の姿)。 */
-    check(p->period_us == (unsigned int)(1000000UL / (unsigned long)PIT_HZ),
-          "pit:period=1/hz");
+    /* period_us is the floor of the actual rational period, for display. */
+    check(p->period_us == (p->reload * PIT_PERIOD_SCALE) /
+          (unsigned int)(sysclk_hz() / PIT_CLOCK_DIV), "pit:period=reload/clk");
 
     /* カウンタ#0 / LSB-MSB / モード2 (レートジェネレータ) / バイナリ。
      * モードが変わると周期そのものの意味が変わる。 */

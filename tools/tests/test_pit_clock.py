@@ -14,7 +14,7 @@ I/O もタイマも触らず、模型は 1 つも要らない。
   python3 -B tools/tests/test_pit_clock.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pit-clock-host', tier=4,
-    covers=['include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'kernel/time/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['kdebug/kselftest/pit_setup.inc', 'include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'kernel/time/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2)
 
 from kernel_includes import include_flags
@@ -27,6 +27,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pit_clock_host.c"
 SRC = ROOT / "platform/pc98/pit_math.c"
+SETUP = ROOT / "kdebug/kselftest/pit_setup.inc"
 # カーネルと同じ i386-elf で通す実ソース。idt.c まで入れるのは、
 # pit_init が pit_compute と sysclk_hz を**実際に**呼ぶ形を固定するため。
 # STATIC_ASSERT (中間積が 32bit に収まるか) が効くのもこちら側。
@@ -39,7 +40,7 @@ TARGET_SRCS = [
     ("platform/pc98/timer.c", []),
 ]
 
-CASES = ["both_clocks", "reject_hz", "reject_clock", "no_overflow",
+CASES = ["selftest_setup", "both_clocks", "reject_hz", "reject_clock", "no_overflow",
          "real_hw_story"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
@@ -72,19 +73,25 @@ MUTATIONS = [
     (r"    out->valid = 0;\n",
      "    out->valid = 1;\n",
      "断ったのに valid を立てる (呼び出し側が古い値を本物と読む)"),
+    (r"\(sysclk_hz\(\) \+ PIT_IRQ_HZ / 2\) / PIT_IRQ_HZ",
+     "sysclk_hz() / PIT_IRQ_HZ",
+     "自己試験の reload を切り捨てにする", SETUP),
+    (r"p->reload \* PIT_PERIOD_SCALE",
+     "(p->reload + 10) * PIT_PERIOD_SCALE",
+     "自己試験の period の式を壊す", SETUP),
 ]
 
 
-def host_build(tmp, source_text=None):
+def host_build(tmp, source_text=None, setup_text=None):
     """ハーネスをコンパイルして実行ファイルのパスを返す。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "pit-clock-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
-    if source_text is not None:
+    if source_text is not None or setup_text is not None:
         # 変異させた pit_math.c を一時の kernel/ に置いて、そちらを先に引かせる。
         mut = src_dir / SRC.relative_to(ROOT).parent
         mut.mkdir(parents=True, exist_ok=True)
-        (mut / "pit_math.c").write_text(source_text, encoding="utf-8")
+        (mut / "pit_math.c").write_text(source_text if source_text is not None else SRC.read_text(encoding="utf-8"), encoding="utf-8")
         (mut / "pit_math.h").write_text(
             (ROOT / "platform/pc98/pit_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
@@ -93,6 +100,9 @@ def host_build(tmp, source_text=None):
             HARNESS.read_text(encoding="utf-8").replace(
                 '"../../platform/pc98/pit_math.c"', '"platform/pc98/pit_math.c"'),
             encoding="utf-8")
+        (mut.parent.parent / "kdebug/kselftest").mkdir(parents=True, exist_ok=True)
+        (mut.parent.parent / "kdebug/kselftest/pit_setup.inc").write_text(setup_text if setup_text is not None else SETUP.read_text(encoding="utf-8"), encoding="utf-8")
+        shim.write_text(shim.read_text(encoding="utf-8").replace('"../../kdebug/kselftest/pit_setup.inc"', '"kdebug/kselftest/pit_setup.inc"'), encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
@@ -126,18 +136,26 @@ def build_target(tmp):
 
 def mutate(tmp):
     """実装を 1 か所ずつ壊して、どれも RED になることを見る。"""
-    original = SRC.read_text(encoding="utf-8")
     bad = 0
-    for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
-        mutated, n = re.subn(pattern, repl, original, count=1)
+    for i, mutation in enumerate(MUTATIONS, 1):
+        pattern, repl, why = mutation[:3]
+        source = mutation[3] if len(mutation) == 4 else SRC
+        original = source.read_text(encoding="utf-8")
+        mutated, n = re.subn(pattern, repl, original)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
             continue
         try:
-            exe = host_build(tmp, mutated)
+            exe = host_build(tmp, mutated if source == SRC else None,
+                             mutated if source == SETUP else None)
         except subprocess.CalledProcessError:
-            # コンパイルが通らないのも RED (STATIC_ASSERT で落ちる変異)。
+            # 自己試験の変異は実行時 RED が必須。
+            if source == SETUP:
+                print(f"MUTATION {i} COMPILE FAIL: {why}", flush=True)
+                bad += 1
+                continue
+            # 既存の STATIC_ASSERT で落ちる変異は compile RED。
             print(f"MUTATION {i} RED (compile): {why}", flush=True)
             continue
         hits = sum(subprocess.run([str(exe), c], cwd=ROOT,
