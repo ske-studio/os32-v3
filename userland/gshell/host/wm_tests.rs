@@ -4814,3 +4814,36 @@ fn w2_failed_check_skips_draw() {
     assert!(st.screen_dirty.is_empty(), "successful check must draw retained damage");
     assert!(mocks::present_counts().1 > before.1);
 }
+
+#[test]
+fn poll_clock_fallback_and_same_ms_wake() {
+    use crate::{mocks, multiapp, poll_clock};
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static US_LO: AtomicU32 = AtomicU32::new(0);
+    static US_HI: AtomicU32 = AtomicU32::new(0);
+    unsafe extern "C" fn clock(lo: *mut u32, hi: *mut u32) -> i32 {
+        *lo = US_LO.load(Ordering::SeqCst);
+        *hi = US_HI.load(Ordering::SeqCst);
+        0
+    }
+    unsafe extern "C" fn failed(_: *mut u32, _: *mut u32) -> i32 { -1 }
+    mocks::init();
+    unsafe { (*os32api::api_ptr()).sys_time_now = failed; }
+    mocks::set_tick(123);
+    assert_eq!(poll_clock::poll_now(), 1230);
+    mocks::set_tick(u32::MAX);
+    assert_eq!(poll_clock::poll_now(), u32::MAX.wrapping_mul(10));
+    unsafe { (*os32api::api_ptr()).sys_time_now = clock; }
+    let shm = mocks::Shm::new();
+    let mut st = one_gui_app_and_a_polling_app(&shm);
+    US_LO.store(1_000_000, Ordering::SeqCst);
+    assert_eq!(poll_clock::poll_now(), 1000);
+    assert!(multiapp::resume_one(&mut st));
+    US_LO.store(1_000_500, Ordering::SeqCst);
+    assert!(!multiapp::resume_one(&mut st));
+    US_LO.store(1_001_000, Ordering::SeqCst);
+    assert!(multiapp::resume_one(&mut st));
+    US_HI.store(1, Ordering::SeqCst);
+    US_LO.store(0, Ordering::SeqCst);
+    assert_eq!(poll_clock::poll_now(), 4_294_967);
+}

@@ -74,6 +74,7 @@ mod lease;
 mod modal;
 mod movecopy;
 mod multiapp;
+mod poll_clock;
 mod os32x;
 mod pump;
 mod reqs;
