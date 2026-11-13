@@ -24,6 +24,8 @@ int net_nic_poll_once(void);
  * is empty poll/demux once; take a frame; restore IF. Never drive link here.
  * SFS reset discards only its own queue. */
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len);
+/* Queued frames only; caller holds IF=0. */
+u32 net_rx_queued(u16 protocol);
 
 /* net/nic.h: NetNicOps は段0のまま。id: AUTO=0, E82557=1, LGY98=2 */
 enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98 };

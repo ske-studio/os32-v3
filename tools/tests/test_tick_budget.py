@@ -15,6 +15,11 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('net/link.c', 'link_state == LINK_S_SYN && link_hello_idle ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS', '0 ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS'),
+    ('net/link_rx.inc', '    link_hello_idle = 0;', '    (void)0;'),
+    ('net/link_rx.inc', 'if (op != LINK_OP_HELLO || flags == LINK_HS_SYNACK || flags == LINK_HS_ESTAB)', 'if (1)'),
+    ('net/link_rx.inc', 'if (!net_rx_queued(NET_RX_LINK)) break;', 'if (0) break;'),
+    ('net/link.c', 'if (!link_tx_pending()) break;', 'if (0 && !link_tx_pending()) break;'),
     ('kernel/irq/tick_budget.c', 'tail_cnt < share_cnt - elapsed', 'tail_cnt <= share_cnt - elapsed'),
     ('kernel/irq/tick_budget.c', '!taken && turn', '!taken && (turn || 1)'),
     ('kernel/irq/tick_budget.c', 'taken = 1;', 'taken = 0;'),
