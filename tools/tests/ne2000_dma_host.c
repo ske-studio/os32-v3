@@ -50,6 +50,12 @@ volatile u32 kctx_irq_depth;
 int idle_work_register(void (*fn)(void)) { return fn == ne2k_bh ? 0 : -1; }
 #endif
 
+#ifndef NE2K_BH_TEST
+void net_rx_schedule(void) {}
+int net_rx_service(void) { return 0; }
+void net_rx_batch_begin(void) {}
+void net_rx_batch_end(void) {}
+#endif
 #ifndef TEST_GROUP
 #define TEST_GROUP 0
 #endif

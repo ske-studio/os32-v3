@@ -218,6 +218,7 @@ static int pcm_tick_rescue_due(u32 pos, u32 rate, u32 margin_us);
 | PCM 通常 tick の copy 0、期限内だけ救済、IRQ10/IRQ0別copy数、under/rep/resync 0 | host PI抑止＋時間進行、NP21/W/実機58秒曲、十分なstaging | deadline比較を反転 |
 | PCM 延期中はstaging/filled/drain不変、write/close/reclaim退行なし | host 期限外half変化とwrite/publish境界、既存E7/E8 | 期限外returnを削除してpcm_obsを実行 |
 | 救済込みIRQ0 ≤200µs、slot2〜4 ≤135µs、定常IF=0 ≤800µs | 実機 idle/pcm/draw/nic/serial各5回、通常・救済別最大 | 救済条件を常時true（hostコピー回数がRED） |
+| service 終了時の link_tick (link_due の後追い) も定常 IF=0 ≤800µs | 実機 NIC 負荷で後追い経路の IF=0 最大を計測 | wrapper の link_tick を削除 |
 | 通常PCM時IRQ0最大 ≤160µs、serial遅延 <1042µs・OE/overflow 0 | 診断像でIRQ0/IRQ10を両計測、製品像でSerialDiag/4MB | tickの期限判定を削除 |
 | 論理100Hz・物理1kHz・既存時計利用者の退行なし | host境界＋NP21/W GUI開閉/音声/通信、実機Sleep(1)中央値≤2.1ms・p99≤2.2ms、タイマ/音源/V86/timeout | 論理step係数を10倍 |
 | 容量・freestanding・ABI不変 | make kernel＋媒体を含むmake all、PPCリンク、map/nm/import差分 | 専用fixtureにlibgcc参照を1行追加 |

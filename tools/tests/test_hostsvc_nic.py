@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
-CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['kernel/idle_work.h',
-    'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
+CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
+    'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',
@@ -38,16 +38,18 @@ MUTATIONS = (
     ('double-bind', 'if (bound) rc = OS32_ERR_BUSY;', 'if (bound) rc = 0;'),
     ('unbind-queues', '    net_rx_reset(NET_RX_LINK);\n    irq_restore(flags);',
      '    net_rx_reset(NET_RX_SFS);\n    irq_restore(flags);'),
-    ('fixed-peer', 'fixed_peer ? peer_mac : 0', 'fixed_peer ? 0 : peer_mac'),
-    ('tick-link', '        link_tick();', '        if (0) link_tick();'),
-    ('poll-count', 'if (!rc) received++;', 'if (!rc) received += 2;'),
+    ('fixed-peer', 'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);',
+     'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? 0 : peer_mac, b);'),
+    ('tick-link', '            link_tick();', '            if (0) link_tick();'),
+    ('poll-count', 'return count;\n}', 'return count * 2;\n}'),
     ('rx-credit', 'bound ? bound->rx_credit_bytes() : 0',
      'bound ? (bound->rx_credit_bytes(), 0) : 0'),
     ('tick-error-domain', '                rc = OS32_ERR_BUSY;',
      '                rc = TICK_ERR_BUSY;'),
-    ('tick-poll-reentry', 'int count = ticking ? 0 : poll_once_locked();',
-     'int count = poll_once_locked();'),
-    ('tick-recursion', 'if (bound && !ticking) {', 'if (bound) {'),
+    ('tick-poll-reentry', '!bound || ticking || unbind_due',
+     '!bound || unbind_due'),
+    ('tick-recursion', 'if (bound && !ticking) {\n        ticking = 1;',
+     'if (bound) {\n        ticking = 1;'),
 )
 
 
@@ -57,7 +59,7 @@ def build_run(work, source):
     exe = work / 'nic-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                    '-nostdlib', '-static', '-no-pie', str(src),
+                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     str(ROOT / 'tools/tests/hostsvc_nic_host.c'), '-o', str(exe)],
                    check=True, cwd=ROOT)
@@ -75,7 +77,8 @@ def main():
             'unsigned int nic_test_irq_save(void);\n'
             'void nic_test_irq_restore(unsigned int);\n'
             '#define irq_save nic_test_irq_save\n'
-            '#define irq_restore nic_test_irq_restore\n')
+            '#define irq_restore nic_test_irq_restore\n'
+            'int nic_test_irq_enabled(void);\n#define _irq_enabled nic_test_irq_enabled\n')
         # Production includes are compiled separately; only execution replaces cli.
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
         subprocess.run([str(cross / 'bin/i386-elf-gcc'), *FLAGS,

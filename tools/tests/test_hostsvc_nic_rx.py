@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A3 real receive demux/queues with fake NIC polling (ILP32)."""
-CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=[
+CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=['net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h',
     'net/nic_rx.c', 'lib/kstring.h', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'drivers/net/e82557/e82557_regs.h',
@@ -31,8 +31,8 @@ MUTATIONS = (
     ('sender', 'peer && !mac_equal(rx_frame + ETH_ALEN, peer)', '0 && peer && !mac_equal(rx_frame + ETH_ALEN, peer)'),
     ('broadcast', 'if (!own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))', 'if (0 && !own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))'),
     ('consume-nospace', 'if (cap >= *len)', 'if (cap + 1 >= *len)'),
-    ('scan-budget', 'scan < NET_RX_SCAN_MAX', 'scan <= NET_RX_SCAN_MAX'),
-    ('reset-other', 'if (q) q->head = q->count = 0;', 'if (q) { sfs_queue.count = link_queue.count = 0; }'),
+    ('scan-budget', 'if (!rx_work_take(b))', 'if (b->used++ > NET_RX_SCAN_MAX)' ),
+    ('reset-other', 'if (q && !net_rx_defer_reset(protocol)) q->head = q->count = 0;', 'if (q) { sfs_queue.count = link_queue.count = 0; }'),
     ('restore-if', '    irq_restore(flags);\n    return rc;', '    irq_restore(flags | 1);\n    return rc;'),
 )
 
@@ -43,7 +43,7 @@ def build_run(work, source):
     exe = work / 'nic-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                    '-nostdlib', '-static', '-no-pie', str(src),
+                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     str(ROOT / 'tools/tests/hostsvc_nic_rx_host.c'), '-o', str(exe)],
                    check=True, cwd=ROOT)

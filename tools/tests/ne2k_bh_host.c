@@ -3,7 +3,11 @@
 static void bh_wait_check(void);
 #include "ne2000_dma_host.c"
 #include "../../kernel/idle_work.c"
+#define pending nic_pending
 #include "../../net/nic.c"
+#undef pending
+#include "../../net/rx_work.c"
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 
 static unsigned int waits;
 static void bh_wait_check(void)
@@ -195,6 +199,7 @@ static void transmit_rounds(void)
     CHECK(waits == old_waits && reset_count == old_resets && tx_starts - starts == 1);
 }
 
+static void same_bh_demux(void);
 void _start(void)
 {
     for (unsigned int entry = 0; entry < 5; entry++)
@@ -216,5 +221,54 @@ void _start(void)
     transmit_rounds();
     pending_causes();
     ovw_recovery_sends();
+    same_bh_demux();
     finish(0);
 }
+
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+static u32 demux_frames;
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
+                         const u8 peer[6], struct rx_work_budget *b)
+{
+    u8 frame[1514]; u32 len, count = 0;
+    (void)local; (void)peer;
+    if (!ops->rx) return 0;
+    CHECK(_irq_enabled() && !kctx_irq_depth);
+    while (rx_work_take(b)) {
+        if (ops->rx(frame, sizeof(frame), &len)) return count;
+        CHECK(len == 60 && frame[0] == 0x5a);
+        count++; demux_frames++;
+    }
+    net_rx_schedule();
+    return count;
+}
+static int bh_recv(void *out, u32 cap, u32 *len)
+{
+    unsigned int n = 0;
+    int rc = ne2k_recv(out, cap, &n);
+    *len = n;
+    return rc;
+}
+static const struct NetNicOps receive_ops = { .tx = queued_tx, .rx = bh_recv };
+static void same_bh_demux(void)
+{
+    device_init();
+    bound = &receive_ops;
+    demux_frames = 0;
+    queue_frames(9);
+    ne2k_poll(4);
+    ne2k_bh();
+    CHECK(demux_frames > 0 && demux_frames <= NET_RX_SCAN_MAX);
+    CHECK(nic.rxq_count && nic.st.rx_frames == 9);
+    /* No new driver marks: its early return must not strand software RX. */
+    nic.need_rx = nic.need_tx = nic.need_reinit = nic.rx_backlog = 0;
+    CHECK(idle_work_register(net_rx_idle) == 0);
+    idle_work_run();
+    CHECK(demux_frames == 9 && !nic.rxq_count);
+    bound = &bh_ops;
+}
+void net_rx_reset(u16 protocol) { (void)protocol; }
+void link_tick(void) {}
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

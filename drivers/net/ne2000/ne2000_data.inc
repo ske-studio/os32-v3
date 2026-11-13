@@ -65,6 +65,8 @@ static int rx_one(u8 curr)
             nic.rxq_count++;
             irq_restore(f);
         }
+        net_rx_schedule();
+        net_rx_service();
         nic.st.rx_frames++;
         nic.st.rx_bytes += dlen;
     }

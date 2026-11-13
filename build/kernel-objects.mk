@@ -1,6 +1,10 @@
 ifeq ($(PLATFORM),pc98)
 C_KERNEL += platform/pc98/tsc_math.c platform/pc98/tsc_clock.c
 endif
+# T2 finite receive executor (PC-98 NIC path only).
+ifeq ($(ARCH),x86)
+C_KERNEL += net/rx_work.c
+endif
 # Shared kernel object derivation and path-specific compiler flags.
 C_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_KERNEL:.c=.o))
 ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) $(ASM_EXTRA_OBJ))
