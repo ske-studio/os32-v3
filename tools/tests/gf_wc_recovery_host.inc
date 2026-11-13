@@ -167,10 +167,11 @@ static void wc_recovery_run(void)
     GeforceModuleContext ctx={.backend=&gfx_backend_geforce,.counters=&gfx_counters,
         .height=&gfx_current_height,.flip=&gfx_flip_enabled,.page=&gfx_display_page,
         .platform=p,.accel_out=&accel,.foundation_out=&foundation};
+    bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;
     CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(lease.active && wc_acquires==1 && !wc_releases);
     CHECK(!production.display.display4 && !gf3_service_get(&production.chan));
     wc_snapshot();
-    bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;
     gfx_init();CHECK(lease.active && wc_acquires==1 && route);
     gfx_init_200();CHECK(lease.active && wc_acquires==1);
     if (RECOVERY_PATH<2) {
