@@ -271,3 +271,11 @@ ifneq ($(FEATURE_PCM),1)
 $(error PCM diagnostics require FEATURE_PCM)
 endif
 endif
+
+# Isolated 1 kHz PC-98 test image; the product default remains 100 Hz.
+ifeq ($(TICK1K),1)
+ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
+$(error TICK1K requires x86-pc98)
+endif
+KERNEL_CFLAGS_EXTRA += -DPIT_IRQ_HZ=1000
+endif

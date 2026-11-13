@@ -33,7 +33,7 @@ typedef unsigned int u32;
 #define TATTR_WHITE 3
 #define BOOT_DMA 4
 #define BOOT_FONT 5
-#define PIT_HZ 100
+#define PIT_IRQ_HZ 100
 #define ICU_SLAVEID 7
 struct boot_context { int unused; };
 static unsigned flags, expected_flags, cr0, original;
