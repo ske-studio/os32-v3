@@ -195,6 +195,34 @@ static void rejected(void) {
     CHECK(kcg_file_load("/fonts/test.kcg")<0);
     CHECK(resident==old); CHECK(allocated==1); no_fds(); glyphs();
 }
+/* Logical bounds sit inside real arrays: mutants may touch the sentinel
+ * padding, but never leave the C objects (including pointer arithmetic). */
+static void decoder_bounds_tests(void) {
+    u8 input[32], output[32];
+    int rc;
+    kmemset(input, 0xcc, sizeof(input));
+    kmemset(output, 0xcc, sizeof(output));
+    input[8]=0x20; input[9]='A'; input[10]='B';
+    rc=lz4_decode(input+8,2,output+8,8); /* second literal truncated */
+    CHECK(rc==-1);
+    CHECK(input[10]== 'B' && output[7]==0xcc && output[16]==0xcc);
+
+    input[8]=0x10; input[9]='A'; input[10]=1; input[11]=0;
+    rc=lz4_decode(input+8,3,output+8,8); /* offset high byte truncated */
+    CHECK(rc==-1);
+    CHECK(input[11]==0 && output[7]==0xcc && output[16]==0xcc);
+
+    kmemset(output, 0xcc, sizeof(output));
+    rc=lz4_decode(input+8,4,output+8,4); /* 1 literal + 4 match bytes */
+    CHECK(output[7]==0xcc && output[12]==0xcc);
+    CHECK(rc==LZ4_ERR_OUTPUT);
+
+    input[8]=0x20; input[9]='A'; input[10]='B';
+    kmemset(output, 0xcc, sizeof(output));
+    rc=lz4_decode(input+8,3,output+8,1); /* two literals, capacity one */
+    CHECK(output[7]==0xcc && output[9]==0xcc);
+    CHECK(rc==LZ4_ERR_OUTPUT);
+}
 static void compressed_tests(void) {
     u32 i; u8 *old;
     u8 decode_buf[32]={0};
@@ -268,6 +296,7 @@ void _start(void) {
     file_data[RAW_FILE_SIZE-1]=2; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
     size_rc=VFS_ERR_NOTFOUND; CHECK(kcg_file_load("/fonts/missing.kcg")<0); size_rc=VFS_OK;
     irq=1; CHECK(kcg_file_load("/fonts/test.kcg")==OS32_ERR_BUSY); irq=0;
+    decoder_bounds_tests();
     compressed_tests();
     CHECK(guards>0); no_fds(); CHECK(!allocated); die(0);
 }

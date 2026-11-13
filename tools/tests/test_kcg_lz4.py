@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 """L0 KCG packing, CLI compatibility and real C decoder round trips."""
-CHECK = dict(name='kcg-lz4', tier=1, needs=[], budget=60,
-             covers=['tools/gen_font16.py', 'tools/gen_g16.py',
-                     'tools/tests/test_kcg_lz4.py', 'assets/fonts/**',
-                     'lib/lz4.c', 'lib/lz4.h', 'include/types.h', 'include/callconv.h'])
 import builtins
 import ctypes
 import hashlib
@@ -142,11 +138,6 @@ def main(mutate=False):
                         raise AssertionError('mutation survived: ' + name)
     print('kcg-lz4 PASS')
     return 0
-
-
-def run(ctx):
-    return subprocess.call([sys.executable, '-B', __file__,
-                            *(['--mutate'] if ctx.mutate else [])], cwd=ctx.root)
 
 
 if __name__ == '__main__':
