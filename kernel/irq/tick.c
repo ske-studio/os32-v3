@@ -1,4 +1,5 @@
 #include "tick.h"
+#include "tick_budget.h"
 #include "io.h"
 #include "irq.h"
 #ifdef TICK_PROBE
@@ -22,6 +23,7 @@ int tick_register(unsigned int slot, tick_fn fn)
 
 void tick_dispatch(void)
 {
+    tick_budget_begin();
     for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {
         if (slots[slot].fn) {
 #ifdef TICK_PROBE
@@ -33,4 +35,5 @@ void tick_dispatch(void)
 #endif
         }
     }
+    tick_budget_end();
 }

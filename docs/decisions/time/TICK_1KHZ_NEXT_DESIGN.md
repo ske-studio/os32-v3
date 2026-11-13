@@ -66,15 +66,16 @@
 ### 2-3. A2-b IRQ0 の予算
 ```c
 /* kernel/irq/tick_budget.h — 予算を数えるのは tick_dispatch の中だけ */
-void tick_budget_begin(void);     /* tick_dispatch の先頭。基点 = PIT #0 の count、active=1、taken=0 */
+void tick_budget_config(void);    /* 時計設定後、IF=0/EE=0 で 4 定数を一度換算する */
+void tick_budget_begin(void);     /* tick_dispatch の先頭。基点 = arch の count、active=1、taken=0 */
 void tick_budget_end(void);       /* tick_dispatch の最後。active=0 */
 int  tick_budget_take(u32 share_cnt, u32 tail_cnt); /* active でなければ常に 1 (IRQ5・foreground は掛けない)。
                                          経過 + tail_cnt < share_cnt なら 1。越えていても、このジフィでまだ
                                          1 単位も取っておらず、かつ自分が保証の当番なら 1 (取ったら taken=1) */
-u32  tick_budget_cnt(u32 us);     /* pit_init の後に us を count に直す定数 */
-#define IRQ0_SLOT_BUDGET_US 120u  /* slot2〜4 で共有。A2-a の値を見て PM が決める */
-#define NET_TAIL_RX_US /* A2-a の後に PM */ /* rx_pump の後に必ず走る deadlines + timers + notify の最大。A2-a の最大 ×1.5 */
-#define NET_TAIL_TX_US /* A2-a の後に PM */ /* tx_round の後に必ず走る link_notify_tick の最大 ×1.5。値は A2-a の後に PM が入れる */
+u32  tick_budget_cnt(u32 us);     /* B/2・B・tail_rx・tail_tx の換算済み count (除算なし) */
+#define IRQ0_SLOT_BUDGET_US 120u  /* slot2〜4 で共有。F_slot2 + F_demux = 25.4 ≤ 60 − 22.4µs */
+#define NET_TAIL_RX_US 23u       /* deadlines + timers + notify: 実測 14.9µs ×1.5 を切り上げ */
+#define NET_TAIL_TX_US 17u       /* link_notify_tick: 実測 11.0µs ×1.5 を切り上げ */
 /* 当番: tick_count が偶数なら RX、奇数なら TX。
  * RX: take(cnt(B/2), cnt(NET_TAIL_RX_US))、TX: take(cnt(B), cnt(NET_TAIL_TX_US)) */
 ```
@@ -82,7 +83,7 @@ u32  tick_budget_cnt(u32 us);     /* pit_init の後に us を count に直す�
 - 上限の定義: slot2〜4 の合計 ≤ B + U。ここで U = 1 単位の最大 (保証の 1 単位の越え)。成り立つ条件は 2 つ: (1) RX より前の固定処理 F_slot2 + F_demux ≤ B/2 − tail_rx、(2) tail の定数 ≥ 実際の後続の最大。どちらも A2-a の値で検査し、満たさなければ B を見直す (PM)。
 - 1 単位は、`link_rx_pump` の 1 フレーム、または `link_tx_round` の 1 送信 (送信列に積むだけで memcpy のみ、§2-4)。U ≤15µs を A2-a で確かめる。
 - IRQ0 の worst ≈ 短経路 17 + B 120 + U 15 + 他の slot ≈ 160µs (≤200)。
-- 経過は PIT #0 の count から取る。tick_dispatch の中は 1 周期を超えないので、折り返しの補正は 1 回で足りる。
+- 経過は arch の口 (x86: PIT #0 の count、PowerPC: TB) から取る。tick_dispatch の中は 1 周期を超えないので、折り返しの補正は 1 回で足りる。
 ### 2-4. NE2K の重い所を協調処理へ (U4 = b、契約は緩めない)
 ```c
 /* kernel/idle_work.h — 協調処理の 1 口。_irq_enabled() && kctx_irq_depth==0 のときだけ動き、それ以外は何もせず戻る */

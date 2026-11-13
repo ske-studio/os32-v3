@@ -1,4 +1,5 @@
 #include "clock_source.h"
+#include "kernel/irq/tick_budget.h"
 #include "kernel_tick.h"
 #include "pit.h"
 #include "pit_time.h"
@@ -13,7 +14,10 @@ int platform_clock_init(u32 tick_hz)
 {
     int rc = pit_init((unsigned int)tick_hz);
     const struct pit_setup *ps = pit_get_setup();
-    if (ps->valid) (void)tick_clock_config(ps->reload, ps->clk_hz);
+    if (ps->valid) {
+        (void)tick_clock_config(ps->reload, ps->clk_hz);
+        tick_budget_config();
+    }
     return rc;
 }
 void platform_clock_info(struct clock_info *out)
