@@ -1,4 +1,5 @@
 #include "kernel/idle_work.h"
+#include "kernel/irq/tick_budget.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
@@ -498,6 +499,8 @@ static void link_tx_round(void)
     int idle = 0;
     int budget = LINK_TX_CLASS_COUNT * (LINK_HANDLES * LINK_CTRL_KIND_COUNT + LINK_HANDSHAKE_BUDGET);
     while (budget-- > 0 && idle < LINK_TX_CLASS_COUNT) {
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US),
+                              tick_budget_cnt(NET_TAIL_TX_US))) break;
         int rc = link_tx_turn ? link_tx_normal() : link_tx_control();
         if (rc < 0) { link_tx_deferred++; return; } /* NIC busy → 位置を進めず次の周回へ */
         link_tx_turn ^= 1;                          /* 送れた / 空のときだけ次の種類へ */

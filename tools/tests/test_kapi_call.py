@@ -98,6 +98,7 @@ void ring3_fault_kill(void) { kills++; } /* N3: deliberately returns. */
 static void exec_cui_display_abort(void) {}
 static void ring3_abort_check(void) { aborts++; if (abort_now) __builtin_longjmp(abort_target,1); }
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
 int ring3_ptr_ok(u32 p) { return p==0 || p>=0x1000000; }
 static void exec_park_stop(struct arch_syscall *c) { CHECK(c->native==frame); parks++; }
 bool geforce_fg_due(u32 now) { (void)now; return 0; }

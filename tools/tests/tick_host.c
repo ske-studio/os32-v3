@@ -20,7 +20,9 @@ static void irq_restore(unsigned int f) { CHECK(!(host_if & 0x200U)); host_if = 
 #include TICK_SOURCE
 volatile u32 kctx_irq_depth;
 static unsigned int log[TICK_SLOT_COUNT], count;
+static unsigned int phase;
 static void record(unsigned int n) {
+    CHECK(phase == 1);
     CHECK(kctx_irq_depth && !(host_if & 0x200U));
     CHECK(tick_register(n, 0) == TICK_ERR_CTX);
     CHECK(count < TICK_SLOT_COUNT); log[count++] = n;
@@ -34,8 +36,8 @@ static void lgy98(void) { record(PC98_TICK_LGY98); }
 static void gf(void) { record(PC98_TICK_GF); }
 static tick_fn callbacks[] = {snd, pcm, ne2k, e82557, link, lgy98, gf};
 static void dispatch(unsigned int expected) {
-    count = 0; host_if = 0x2; kctx_irq_depth = 1;
-    tick_dispatch(); CHECK(count == expected);
+    count = 0; phase = 0; host_if = 0x2; kctx_irq_depth = 1;
+    tick_dispatch(); CHECK(count == expected); CHECK(phase == 2);
     kctx_irq_depth = 0;
 }
 void _start(void) {
@@ -63,3 +65,7 @@ void _start(void) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}
 }
+
+/* Clock-independent registry fixture. */
+void tick_budget_begin(void) { CHECK(phase == 0); phase = 1; }
+void tick_budget_end(void) { CHECK(phase == 1); phase = 2; }

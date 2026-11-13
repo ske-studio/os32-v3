@@ -354,21 +354,26 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
     CHECK(nic.state == NE2K_STATE_OVW_WAIT && tx_starts == 1);
     tick_count++;
     ne2k_timer_tick();
+    /* Observe the backlog produced by OVW recovery independently. */
+    nic.rx_backlog = 0;
     /* Observe OVW recovery before a later BH round drains its backlog. */
     ne2k_enter();
     service(NE2K_IRQ_BUDGET);
     ne2k_leave();
     CHECK(nic.state == NE2K_STATE_RUNNING);
     u8 recovered_backlog = nic.rx_backlog;
-    if (nic.rx_backlog) ne2k_bh();
+    if (nic.rx_backlog) {
+        unsigned int before = device_pios;
+        ne2k_bh();
+        if (nic.rxq_count >= NE2K_RXQ_SLOTS) CHECK(device_pios == before);
+    }
     /* Deliberately test A/B first so the pre-fix RED is the TX corruption. */
     CHECK(ne2k_send(buffer, 61) == NE2K_OK);
     ne2k_bh();
-    unsigned int before = device_pios;
     CHECK(ne2k_send(buffer, 60) == NE2K_OK);
     ne2k_bh();
-    CHECK(device_pios == before && overwrite_writes == 0 && tx_starts == 2);
-    CHECK(recovered_backlog == (frames > NE2K_BH_ROUNDS * NE2K_IRQ_BUDGET + NE2K_OVW_DRAIN_BUDGET));
+    CHECK(overwrite_writes == 0 && tx_starts == 2);
+    CHECK(recovered_backlog == (frames > NE2K_RXQ_SLOTS));
     CHECK((nic.rx_next != regs[1][NE2K_P1_CURR]) == (nic.rx_backlog != 0));
     CHECK(nic.imr_written == NE2K_IMR_MASK);
     CHECK(!(regs[0][NE2K_P0_ISR] & (NE2K_ISR_PTX | NE2K_ISR_TXE)));

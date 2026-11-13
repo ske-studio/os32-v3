@@ -195,3 +195,7 @@ const struct boot_common *boot_common_get(void) {
     info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
     return &info;
 }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

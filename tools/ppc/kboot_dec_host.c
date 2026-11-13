@@ -88,3 +88,6 @@ void _start(void)
     check(kctx_irq_depth==0,20);
     mark=17; finish(0);
 }
+
+void tick_budget_begin(void) { }
+void tick_budget_end(void) { }

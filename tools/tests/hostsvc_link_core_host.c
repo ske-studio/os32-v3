@@ -356,3 +356,10 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+#ifndef TICK_BUDGET_REAL
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+#endif

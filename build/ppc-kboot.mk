@@ -53,7 +53,7 @@ KB_PLATFORM := platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/gmac_tree.c \
  platform/powermac/kboot_reserve.c platform/powermac/memory.c \
  platform/powermac/mpic_tree.c platform/powermac/mpic.c \
- platform/powermac/clock.c platform/powermac/log.c \
+ platform/powermac/clock.c platform/powermac/tick_budget.c platform/powermac/log.c \
  platform/powermac/kboot_console.c platform/powermac/pci_config.c \
  platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c \
  platform/powermac/lan_log.c platform/powermac/lan_wire.c \
@@ -62,7 +62,7 @@ KB_PLATFORM := platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/terminal_input.c
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
- mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/time/tick.c \
+ mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/irq/tick_budget.c kernel/time/tick.c \
  lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c fs/fd_redirect.c
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \

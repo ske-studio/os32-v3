@@ -159,3 +159,5 @@ void _start(void)
     check(ktime_clamp_count > 0);
     finish(0);
 }
+
+void tick_budget_config(void) { } /* Clock caller fixture. */

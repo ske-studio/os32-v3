@@ -89,6 +89,7 @@ int caller_access_enter(CallerAccessFrame *p, enum caller_origin origin) { (void
 void caller_access_leave(const volatile CallerAccessFrame *p) { caller=p->valid; }
 #define CALLER_USER 1
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
 void ring3_fault_kill(void) { die(__LINE__); }
 static u32 table[KAPI_FUNC_COUNT+2];
 #define KAPI_ADDR table

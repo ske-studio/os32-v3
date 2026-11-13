@@ -79,3 +79,5 @@ void _start(void)
     }
     finish(0);
 }
+
+void tick_budget_config(void) { } /* Clock caller fixture. */

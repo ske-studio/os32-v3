@@ -255,6 +255,8 @@ static void link_rx_pump(void)
     int n;
     for (n = 0; n < LINK_RX_BUDGET; n++) {
         u32 len = 0;
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                              tick_budget_cnt(NET_TAIL_RX_US))) break;
         if (net_rx_take(NET_RX_LINK, link_rxbuf, sizeof(link_rxbuf), &len) != 0) break;
         link_dispatch(link_rxbuf, len);
     }

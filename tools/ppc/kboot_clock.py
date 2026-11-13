@@ -34,7 +34,7 @@ def exercise(directory, source):
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=',
                     '-I'+str(directory),
-                    *['-I'+str(ROOT / p) for p in ('include', 'platform/powermac',
+                    *['-I'+str(ROOT / p) for p in ('.', 'include', 'platform/powermac',
                                                   'arch/ppc', 'sdk/include/os32')],
                     str(ROOT / 'tools/ppc/kboot_clock_fake.c'),
                     str(ROOT / 'lib/divdi3.c'), '-o', str(exe)], check=True, timeout=60)
