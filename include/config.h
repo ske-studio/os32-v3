@@ -41,6 +41,8 @@
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_GFXSYNC_CFG       "/etc/gfx/sync.cfg"
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
+#define SYS_FB_FONT           "/fonts/shino16.kcg"
+#define SYS_FB_FONT_LICENSE   "/fonts/shino16.txt"
 #define SYS_UNICODE_BIN       "/sys/unicode.bin"   /* Unicodeテーブル */
 /* 起動ログ (init/bootlog.c)。最初の kprintf から常駐シェルを exec する
  * 直前までの出力を溜め、ルートが ext2 / FAT のときだけ書き出す。実機で

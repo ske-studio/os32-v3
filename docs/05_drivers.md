@@ -373,8 +373,10 @@ TEXTモードではTVRAM属性反転 (ビット2 XOR) によるカーソル表�
 ### §5-9 漢字キャラクタジェネレータ (kcg.c / kcg.h)
 
 PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`drivers/video/kcg/kcg_body.c:15,42-65`、facade は `drivers/video/kcg/kcg_module.c`)。
+2026-11-13 のユーザー決定「KCG の口 + 東雲 16 から作る .kcgfont」に従い、PowerPC RAM root は東雲の 16px EBDT を変換した非圧縮 KCG1 とライセンスを `/fonts/shino16.kcg`・`/fonts/shino16.txt` に収録する。KCG1 は 16B LE ヘッダに続き 94×94 の 32B 字形と fetched、256 の 16B ANK と fetched を持つ (295,956B)。派生物は git に入れない。
+
 V86 の復帰口は部品の有無によらず core で 68h を CODE に戻し、搭載中の KCG facade の `invalidate` で ROM/CG RAM キャッシュを全失効する。失効では統計を消さず、次の読出しを miss として観測する。通常の CUI 復帰は保存済み BIOS の機能ビットで EGC/GRCG を停止し、9821 のみ 6Ah の標準・400ライン構成へ戻す。CG 窓 WB・VRAM UC は既存のページ属性を維持する。固定診断と根拠は票 TASK_T7_AND_FOLLOWUPS §1 が持つ。
-旧 `.kcgfont` の起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
+PC-98 の旧 `.kcgfont` 起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
 
 | 項目 | 仕様 |
 |------|------|

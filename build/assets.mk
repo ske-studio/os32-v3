@@ -90,6 +90,10 @@ fonts-clean:
 $(FONT_DIR)/ipaexg16.kcgfont: $(FONT_DIR)/ipaexg.ttf tools/gen_font16.py
 	python3 tools/gen_font16.py $< $@
 
+# PPC RAM root product: original 16px dots, uncompressed KCG1.
+$(FONT_DIR)/shino16.kcgfont: $(FONT_DIR)/JF-Dot-Shinonome16.ttf tools/gen_font16.py tools/gen_g16.py
+	python3 tools/gen_font16.py --ebdt $< $@
+
 # --- FEP (かな漢字変換) 辞書 ---
 # M がゲストに載る既定。S/L はコスト閾値違いで、kernel/ime/ime.c が
 # /db/fep_s.db /db/fep_l.db として参照する (現在は配備していない)。
