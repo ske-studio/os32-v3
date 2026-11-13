@@ -4883,6 +4883,23 @@ fn g3_setup(mode: usize) {
     G3_OBS.lock().unwrap().clear();
     unsafe { (*os32api::api_ptr()).mouse_poll = g3_mouse; (*os32api::api_ptr()).sys_halt = g3_halt; }
 }
+static G3_CLOCK_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+unsafe extern "C" fn g3_clock(_: *mut u32, _: *mut u32) -> i32 {
+    G3_CLOCK_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    -1
+}
+#[test]
+fn g3_no_apps_halt_without_poll_clock() {
+    use std::sync::atomic::Ordering::SeqCst;
+    g3_setup(0);
+    G3_CLOCK_CALLS.store(0, SeqCst);
+    unsafe { (*os32api::api_ptr()).sys_time_now = g3_clock; }
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert!(G3_HALTS.load(SeqCst) >= 9);
+    assert_eq!(G3_CLOCK_CALLS.load(SeqCst), 0);
+}
 #[test]
 fn g3_standalone_halt_tick_and_key() {
     g3_setup(1);

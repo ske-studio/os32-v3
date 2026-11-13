@@ -76,6 +76,9 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('poll clock read before candidates', 'src/multiapp.rs',
+     'let mut now = None;', 'let mut now = Some(crate::poll_clock::poll_now());',
+     'g3_no_apps_halt_without_poll_clock'),
     ('g3 tick comparison removed', 'src/lib.rs',
      '(unsafe { (os32api::api().get_tick)() }) != last_tick', 'true', 'g3_standalone_halt_tick_and_key'),
     ('g3 wait tick comparison removed', 'src/handler.rs',

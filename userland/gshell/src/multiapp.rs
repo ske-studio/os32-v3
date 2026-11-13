@@ -848,7 +848,7 @@ fn pick_poll(st: &GuiState) -> i32 {
      * blocker 2)。集合を一括で捨てる形だと、選んだ ms と実際に再開した
      * ms がずれた周で消去が 1 回よけいに走り、同じ 1 本が同じ ms に
      * 2 回走れてしまう。 */
-    let now = crate::poll_clock::poll_now();
+    let mut now = None;
     let start = if mm.poll_last >= APP_ID_MIN && mm.poll_last <= APP_ID_MAX {
         (mm.poll_last - APP_ID_MIN + 1) as usize
     } else {
@@ -862,13 +862,15 @@ fn pick_poll(st: &GuiState) -> i32 {
         if !mm.apps[i].alive || id == mm.running {
             continue;
         }
+        if !poll_ready(id) {
+            continue;
+        }
+        let now = *now.get_or_insert_with(crate::poll_clock::poll_now);
         if mm.apps[i].poll_tick_valid && mm.apps[i].poll_tick == now {
             continue; /* この ms では走り終えている */
         }
-        if poll_ready(id) {
-            mm.poll_choice = id;
-            return id;
-        }
+        mm.poll_choice = id;
+        return id;
     }
     0
 }
