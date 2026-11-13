@@ -12,7 +12,8 @@
 #define TSC_WINDOW_MAX_US 220000u
 #define TSC_BOOT_LIMIT_US 2000000u
 #define TSC_MONITOR_US 1000000u
-#define TSC_ENDPOINT_US 4u
+#define TSC_ENDPOINT_US 32u
+#define TSC_MAX_L_US (2u * TSC_ENDPOINT_US + (550ULL * TSC_WINDOW_MAX_US + 999999u) / 1000000u)
 /* Ten rejected one-second monitor windows bound loss of supervision (~10s).
  * Endpoint/read failures may retry sooner and reach this limit earlier. */
 #define TSC_REJECT_LIMIT 10u
@@ -104,13 +105,13 @@ static int missing_window(unsigned long long delta, u32 us)
     unsigned long long period = (unsigned long long)ps->reload * 1000000u;
     unsigned long long deviation = delta * ps->clk_hz;
     unsigned long long k = (deviation + period / 2) / period;
-    unsigned long long limit = (8u + (550ULL * us + 999999u) / 1000000u) * ps->clk_hz;
+    unsigned long long limit = (2u * TSC_ENDPOINT_US + (550ULL * us + 999999u) / 1000000u) * ps->clk_hz;
     unsigned long long distance = deviation > k * period ? deviation - k * period : k * period - deviation;
     return k >= 1 && k <= 2 && distance <= limit;
 }
 static int valid_cost(const struct window *w, u32 m, u32 s)
 {
-    /* Compare cycles directly: truncation must not admit 4.9us endpoints. */
+    /* Compare cycles directly: truncation must not admit endpoints over the limit. */
     unsigned long long allowance = ((unsigned long long)TSC_ENDPOINT_US << s) / m;
     return w->cost <= allowance;
 }
@@ -230,7 +231,7 @@ int pc98_tsc_init(void)
     const struct pit_setup *ps = pit_get_setup();
     /* Maximum-window L must remain below half the rational PIT period. */
     if (!ps->valid || !ps->clk_hz ||
-        2ULL * 129u * ps->clk_hz >= (unsigned long long)ps->reload * 1000000u)
+        2ULL * TSC_MAX_L_US * ps->clk_hz >= (unsigned long long)ps->reload * 1000000u)
         return OS32_ERR_NOSYS;
     if (!registered) {
         if (idle_work_register(pc98_tsc_calibrate_work) != 0) {
