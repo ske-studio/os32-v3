@@ -1,5 +1,8 @@
 #include "arch_tick_budget.h"
 #include "pit.h"
+#include "tick_order.h"
+
+_Static_assert(ARCH_TICK_BUDGET_FIRST_SLOT == PC98_TICK_NE2K, "budget starts at NE2K");
 
 u32 arch_tick_budget_base(void)
 {
