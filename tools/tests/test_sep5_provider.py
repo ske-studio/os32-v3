@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """B4: the display provider keeps the pre-separation backend selection table."""
 CHECK = dict(name='sep5-provider-host', tier=1, needs=[], budget=5,
-    covers=['platform/pc98/gfx_selector.c', 'platform/pc98/display_fallback.h',
+    covers=['platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/display_fallback.h',
             'platform/powermac/display_provider.c', 'platform/powermac/display_fallback.h',
             'include/display_provider.h', 'include/gfx_hal.h', 'gfx/gfx_core.c',
-            'tools/tests/sep5_provider_host.c', 'tools/tests/sep5_provider_ppc_host.c',
+            'gfx/gfx_core_framebuffer.inc', 'gfx/gfx_core_surface.inc', 'gfx/gfx_internal.h',
+            'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c', 'tools/tests/sep5_provider_ppc_host.c',
             'tools/tests/test_sep5_provider.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
             'arch/x86/**', 'platform/pc98/**', 'mm/pgalloc.h', 'sdk/include/os32/**'])
@@ -73,12 +74,12 @@ PPC_MUTATIONS = (
     ('ppc-display-records', '    (void)ledger_backend;\n    return 1;', '    return ledger_backend + 1;', 8),
     ('ppc-mode-unreported', '    select_mode(&gfx_backend_unsupported, legacy200);\n', '    (void)select_mode; (void)legacy200;\n', 4),
 )
-FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
+FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-builtin', '-fno-pie',
          '-fno-stack-protector', '-no-pie']
 
 
 def execute(text, work, unlinked=False):
-    (work / 'gfx_selector_source.inc').write_text(text)
+    (work / 'gfx_selector_source.inc').write_text(text.replace('#include "gfx_selector_lifecycle.inc"', ''))
     exe = work / 'provider'
     subprocess.run(['gcc', '-m32', '-march=i386', *FLAGS, '-nostdlib', '-static',
         *(['-DNO_OPTIONAL', '-Wno-address', '-Wno-unused-function', '-Wno-unused-const-variable',
@@ -99,6 +100,24 @@ def execute_ppc(text, work):
     return subprocess.run([str(exe)]).returncode
 
 
+def execute_client(work, mutation=None):
+    kind = (ROOT / 'gfx/gfx_core_surface.inc').read_text()
+    start = kind.index('u32 gfx_sf_backend(void)')
+    kind = kind[start:kind.index('\n}', start)+2]
+    binding = (ROOT / 'gfx/gfx_core_framebuffer.inc').read_text()
+    if mutation:
+        old, new = mutation
+        assert binding.count(old) == 1
+        binding = binding.replace(old, new)
+    (work / 'core_surface_kind.inc').write_text(kind)
+    (work / 'core_framebuffer.inc').write_text(binding)
+    exe = work / 'client'
+    host32.build(['gcc', '-m32', *FLAGS, '-nostdlib', '-static',
+        '-I' + str(work), *include_flags(ROOT),
+        str(ROOT / 'tools/tests/sep5_provider_client_host.c'), '-o', str(exe)], check=True)
+    return host32.run([str(exe)], runner='qemu').returncode
+
+
 def core_delegates():
     """The common core must not name a platform backend for selection any more."""
     core = (ROOT / CORE).read_text()
@@ -115,6 +134,7 @@ def main():
     core_delegates()
     with tempfile.TemporaryDirectory(prefix='sep5-provider-') as directory:
         work = Path(directory)
+        assert execute_client(work) == 0
         assert execute(text, work) == 0
         assert execute(text, work, unlinked=True) == 0
         assert execute_ppc(ppc, work) == 0
@@ -122,6 +142,13 @@ def main():
               'Cirrus probe flag, pref, ledger kind), the same with optional backends unlinked, '
               'and the inert PowerMac provider', flush=True)
         if args.mutate:
+            for old, new, code in [
+                ('GfxBackend *backend = g_backend;', 'GfxBackend *backend = DISPLAY_FALLBACK_BACKEND;', 2),
+                ('gfx_mode_ready && sf && !sf->closing', 'gfx_mode_ready && sf', 4),
+                ('base + sf->plane_offset[i] : 0;', 'base : (u8 *)1;', 2),
+            ]:
+                assert execute_client(work, (old, new)) == code
+                print('MUTATE runtime RED OF CLIENT binding (exit %d)' % code, flush=True)
             for name, old, new, code in MUTATIONS:
                 assert text.count(old) == 1, (name, text.count(old))
                 rc = execute(text.replace(old, new), work)

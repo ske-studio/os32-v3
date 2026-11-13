@@ -13,17 +13,11 @@
 #include "con_sink.h"     /* con_sink_is_enabled — GUI 中かどうか (票 T8) */
 #include "console.h"      /* shell_print — 拒否を端末へ (票 T8-2) */
 #include "pgalloc.h"      /* 台帳: 予約・BB・SURFACE (TASK_T1_LEDGER §3-8) */
-#include "v86_bios.h"
 #include "paging.h"       /* paging_map_phys: ⑥ の窓の写像 */
-#include "pegc.h"         /* PEGC の窓と BIOS ワークの番地 (⑥ の資源レコード) */
-#include "wab_xe10.h"     /* Xe10 の窓の定数 (同上) */
 #include "kprintf.h"
 #include "kselftest.h"
 #include "kcg_module.h"
-#include "geforce_module.h"
 #include "gui.h"
-#include "../drivers/video/pc98/pc98_route.h"
-#include "../drivers/video/pc98/splash_raster.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 #include "../exec/exec.h"
@@ -226,25 +220,13 @@ static int gfx_select_and_init_backend(int legacy200)
     gfx_reinit_surfaces(0);
     gfx_select_backend(legacy200);
     gfx_reinit_surfaces(0);
-    if (g_backend == &gfx_backend_geforce || g_backend == &gfx_backend_trident)
-        gfx_bind_client();
+    if (display_provider_client_before_init(g_backend)) gfx_bind_client();
     if (g_backend && g_backend->init) {
         g_backend->init();
         /* init が失敗して probe が取り下げられた場合は 9801 へ落とす
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
-            if (g_backend == &gfx_backend_trident) {
-                GFX_ScreenInfo info;
-                int rc = g_backend->query ? g_backend->query(&info) : OS32_ERR_NOSYS;
-                int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, rc);
-                kprintf(KLOG_ATTR, "[gfx] trident stage=init rc=%d restore=%d\n", rc, restore_rc);
-                /* Trident's D:738 byte write 00 precedes Restore. Do not
-                 * substitute route_set(): it can omit a write and read back.
-                 * PC98_ROUTE_MASK=3 also rejects Trident's Enable value 02. */
-                if (restore_rc || (pc98_route_safe && !pc98_route_safe())) return -1;
-            }
-            if (g_backend == &gfx_backend_geforce && !pc98_route_safe()) return -1;
-            kprintf(KLOG_ATTR, "[gfx] backend=%s init failed -> pc98\n", g_backend->name);
+            if (display_provider_init_failed(g_backend)) return -1;
             gfx_select_mode(DISPLAY_FALLBACK_BACKEND, legacy200);
             g_backend = DISPLAY_FALLBACK_BACKEND;
             gfx_reinit_surfaces(0);
@@ -253,8 +235,7 @@ static int gfx_select_and_init_backend(int legacy200)
         }
         return 1;
     }
-    return (g_backend_pref != GFX_PREF_GEFORCE && g_backend_pref != GFX_PREF_TRIDENT) ||
-           !pc98_route_safe || pc98_route_safe() ? 0 : -1;
+    return display_provider_idle_safe(g_backend_pref) ? 0 : -1;
 }
 
 /* ======================================================================== */
@@ -283,11 +264,7 @@ void gfx_prepare_backend(void)
     if (g_backend->prepare) {
         g_backend->prepare();
         if (g_backend->probe && !g_backend->probe()) {
-            if (g_backend == &gfx_backend_trident) {
-                GFX_ScreenInfo info;
-                int rc = g_backend->query ? g_backend->query(&info) : OS32_ERR_NOSYS;
-                kprintf(KLOG_ATTR, "[gfx] trident stage=prepare rc=%d -> pc98\n", rc);
-            }
+            display_provider_prepare_failed(g_backend);
             gfx_select_mode(DISPLAY_FALLBACK_BACKEND, 0);
             g_backend = DISPLAY_FALLBACK_BACKEND;
             gfx_reinit_surfaces(0);
@@ -391,7 +368,7 @@ void gfx_shutdown(void)
         if (!caller_access_get_user(&caller) ||
             caller.app_id != appslot_gfx_owner()) return;
     }
-    pc98_splash_raster_reset();
+    display_provider_raster_reset();
     gfx_started = 0;
     gfx_policy_reeval();
     gfx_reinit_surfaces(0);
@@ -400,7 +377,7 @@ void gfx_shutdown(void)
      * (旧 gfx_shutdown の本体は backend_pc98.c の pc98_shutdown に移設)。 */
     if (g_backend && g_backend->leave) g_backend->leave();
     if (g_backend && g_backend->shutdown) g_backend->shutdown();
-    if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {
+    if (display_provider_restore_fallback(g_backend)) {
         gfx_current_height = GFX_HEIGHT;
         gfx_flip_enabled = gfx_display_page = 0;
         /* The selected output is now 98 even while GeForce remains usable. */

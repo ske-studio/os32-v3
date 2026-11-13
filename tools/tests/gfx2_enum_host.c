@@ -27,6 +27,13 @@ int main(void)
     if (gfx2_v1_enum_conn(&v1,0,&c) || c.type!=GFX2_CONN_PC98_ANALOG || c.status!=GFX2_CONN_ON) return 4;
     a.kind=GFX2_KIND_TRIDENT;
     if (gfx2_v1_enum_conn(&v1,0,&c) || c.type!=GFX2_CONN_VGA) return 5;
+    for (u32 kind=1; kind<=6; kind++) {
+        static const char *const names[]={"", "pc98", "pegc", "cirrus", "geforce", "trident", "of_fb"};
+        GFX2_AdapterInfo info;
+        a.kind=kind;
+        if (gfx2_adapter_info(0, &info) || info.backend_kind!=kind ||
+            kstrcmp(info.driver, names[kind])) return 8;
+    }
     return 0;
 }
 void _start(void) { int rc=main(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

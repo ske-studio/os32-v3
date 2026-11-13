@@ -34,11 +34,7 @@ void gfx_boot_reserve(void)
 /* 選択中の backend の SURFACE 上の名前 (LEDGER_SF_*)。 */
 u32 gfx_sf_backend(void)
 {
-    if (g_backend == &gfx_backend_pegc) return LEDGER_SF_PEGC;
-    if (g_backend == &gfx_backend_cirrus) return LEDGER_SF_CIRRUS;
-    if (g_backend == &gfx_backend_geforce) return LEDGER_SF_GEFORCE;
-    if (g_backend == &gfx_backend_trident) return LEDGER_SF_TRIDENT;
-    return LEDGER_SF_PC98;
+    return display_provider_ledger(g_backend);
 }
 
 /* Normal context: source construction through snapshot/acquire completion

@@ -59,7 +59,8 @@ int appslot_gfx_owner(void) { return g_gfx_owner; }
 void gf_display_owner_exit(int id) __attribute__((weak));
 int ring3_call_from_user(void) { return 0; }
 int caller_access_get_user(struct caller_access *c) { c->app_id=2; return 1; }
-void pc98_splash_raster_reset(void) {}
+void display_provider_raster_reset(void) {}
+int display_provider_restore_fallback(Backend *b) { (void)b; return 0; }
 void gfx_reinit_surfaces(int n) { (void)n; }
 int pc98_route_safe(void) { return 0; }
 /* <display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */

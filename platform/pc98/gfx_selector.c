@@ -17,6 +17,8 @@ static GfxBackend *const g_backend_list[] = {
     &gfx_backend_pc98    /* 9801 標準グラフィック (H1)。最後の受け皿 */
 };
 
+#include "gfx_selector_lifecycle.inc"
+
 int display_provider_pref(int pref)
 {
     if (pref != GFX_PREF_PC98 && pref != GFX_PREF_PEGC &&

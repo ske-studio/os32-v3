@@ -24,6 +24,12 @@ def main():
         assert observe(work, source) == 0
         print('GREEN enumeration', flush=True)
         if args.mutate:
+            for old, new in [('"trident", "of_fb"', '"trident", "trident"'),
+                             ('a->kind <= GFX2_KIND_MAX', 'a->kind < GFX2_KIND_MAX')]:
+                assert source.count(old) == 1
+                rc = observe(work, source.replace(old, new))
+                assert rc == 8, rc
+                print('RED OF backend enumeration: rc=8', flush=True)
             old = 'if (i >= (u32)count) return OS32_ERR_INVAL;'
             assert source.count(old) == 1
             rc = observe(work, source.replace(old, 'if (i > (u32)count) return OS32_ERR_INVAL;'))
