@@ -19,8 +19,8 @@ MUTATIONS = [
      'if (gfx_started) info.height = 480;', 'out.height == 200'),
     ('query-failure', 'if (rc) return rc;', 'if (rc) return 0;',
      'gfx_ver_state(&out, &kind, &active) == -7'),
-    ('trident-kind', '*kind = GFX_VER_TRIDENT;', '*kind = GFX_VER_UNKNOWN;', 'kind == ids[i]'),
-    ('pegc-kind', '*kind = GFX_VER_PEGC;', '*kind = GFX_VER_PC98;', 'kind == ids[i]'),
+    ('trident-kind', 'backend == &gfx_backend_trident ? GFX_VER_TRIDENT', 'backend == &gfx_backend_trident ? GFX_VER_UNKNOWN', 'kind == ids[i]'),
+    ('pegc-kind', 'backend == &gfx_backend_pegc ? GFX_VER_PEGC', 'backend == &gfx_backend_pegc ? GFX_VER_PC98', 'kind == ids[i]'),
 ]
 
 HARNESS = r'''
@@ -50,6 +50,7 @@ GfxBackend gfx_backend_trident = BACKEND;
 #endif
 static GfxBackend other = BACKEND;
 GfxBackend *g_backend;
+#include "provider.inc"
 #include "getter.inc"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc) {
@@ -113,13 +114,17 @@ def run(runner, mutation=None):
     start = text.index('int gfx_ver_state(')
     end = text.index('\n/* ======================================================================== */', start)
     getter = text[start:end]
+    provider = (ROOT / 'platform/pc98/gfx_selector_lifecycle.inc').read_text()
+    provider = provider[provider.index('u32 display_provider_ver_kind('):provider.index('void display_provider_prepare_failed(')]
     if mutation:
         _, old, new, _ = mutation
-        assert getter.count(old) == 1, mutation
+        assert getter.count(old) + provider.count(old) == 1, mutation
         getter = getter.replace(old, new)
+        provider = provider.replace(old, new)
     with tempfile.TemporaryDirectory(prefix='ver-gfx-') as td:
         folder = Path(td)
         (folder / 'getter.inc').write_text(getter)
+        (folder / 'provider.inc').write_text(provider)
         (folder / 'fixture.c').write_text(HARNESS)
         # Backend-identity mutations require the optional backend to exist.
         variants = (True,) if mutation else (True, False)

@@ -1,3 +1,4 @@
+#include "geforce_module.h"
 #include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"

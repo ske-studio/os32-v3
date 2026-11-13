@@ -85,7 +85,7 @@ static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
 static GfxMode host_mode = { .height = 400 };
 static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
 GfxBackend *g_backend = &host_backend;
-void pc98_splash_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
+void display_provider_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
 static int select_packed;
 static int palette_writes;
 void display_palette4_write(int idx, u8 r, u8 g, u8 b)

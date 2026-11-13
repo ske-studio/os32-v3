@@ -3,6 +3,9 @@
 
 #define CONSOLE_DL_US 1000000u
 
+/* MODULE: the kernel console service owns RAM surfaces, not device resources. */
+static u32 console_owner;
+
 static struct gfx2_surf *target_surface(struct gfx_console_target *t)
 {
     struct gfx2_adapter *a;
@@ -36,12 +39,14 @@ int gfx_console_open(u32 adapter, u32 head, struct gfx_console_target *t)
     if (previous && !(previous->flags & GFX2_SF_ALIAS)) return OS32_ERR_BUSY;
     rc = a->be->enum_mode(a->ctx, head, GFX2_FMT_INDEX8, 0, &mode);
     if (rc) return rc;
-    if (!ledger_owner_new(LEDGER_KIND_PERSIST, 0, "fbconsole", &owner)) return OS32_ERR_NOSPC;
+    if (!console_owner &&
+        !ledger_owner_new(LEDGER_KIND_MODULE, 0, "fbconsole", &console_owner)) return OS32_ERR_NOSPC;
+    owner = console_owner;
     rc = gfx2_surf_new(a, mode.w, mode.h, GFX2_FMT_INDEX8, GFX2_POOL_SYSMEM,
                       GFX2_USE_RENDER2D | GFX2_USE_SCANOUT, owner, &s);
-    if (rc) { ledger_owner_retire(owner); return rc; }
+    if (rc) { return rc; }
     rc = a->be->mode_set(a->ctx, head, 1u, &mode, s);
-    if (rc) { gfx2_surf_destroy(s); ledger_owner_retire(owner); return rc; }
+    if (rc) { gfx2_surf_destroy(s); return rc; }
     gfx2_scan_ref_swap(a, head, s);
     a->head[head].mode_id = mode.id;
     a->head[head].conn_mask = 1;
@@ -111,7 +116,7 @@ int gfx_console_close(struct gfx_console_target *t)
         rc = gfx2_surf_destroy(s);
         if (rc) return rc;
     }
-    if (!ledger_owner_retire(t->owner)) return OS32_ERR_BUSY;
+    /* Stage H: PM will decide mode policy and v1 alias restoration on close. */
     *t = (struct gfx_console_target){0};
     return 0;
 }
