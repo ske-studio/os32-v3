@@ -6,6 +6,7 @@
 #include "ofw.h"
 static const struct pm_log_sink *sinks[PM_LOG_SINK_MAX];
 static struct pm_log_stats stats[PM_LOG_SINK_MAX];
+int pm_log_stream_only;
 static u32 sink_count;
 static struct pm_escc serial;
 static void add_sat(u32 *v, u32 n)

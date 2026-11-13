@@ -11,6 +11,8 @@ struct pm_log_stats { u32 failures, dropped; };
  * Counters saturate. No sink: bytes count in slot 0. */
 int pm_log_add_sink(const struct pm_log_sink *sink);
 void pm_log_write(const char *bytes, u32 n);
+/* CPU0 synchronous formatter scope: device traces stay on LOG/ESCC. */
+extern int pm_log_stream_only;
 int pm_log_get_stats(u32 slot, struct pm_log_stats *out);
 /* Both addresses are mapped I/G VAs, never raw PA. Caller has DR=1,
  * EE=0, and a live root; use the fixed ESCC aperture from design section 4.

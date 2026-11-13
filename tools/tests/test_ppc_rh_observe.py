@@ -18,21 +18,33 @@ import host32
 
 def main():
     source = (ROOT/'platform/powermac/rh_observe.c').read_text()
+    ofw = (ROOT/'platform/powermac/ofw.c').read_text()
     with tempfile.TemporaryDirectory(prefix='rh-observe-') as td:
         work = Path(td)
-        def evaluate(text):
+        def evaluate(text, wrapper=ofw):
             src = work/'rh.c'; src.write_text(text)
+            ofsrc = work/'ofw.c'; ofsrc.write_text(wrapper)
             exe = work/'host'
             subprocess.run(['gcc','-m32','-std=gnu11','-O2','-ffreestanding',
                 '-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
                 '-D__cdecl=','-Iinclude','-Ilib','-Iarch/ppc','-Iplatform/powermac',
-                'tools/ppc/rh_observe_host.c','platform/powermac/ofw.c',
+                'tools/ppc/rh_observe_host.c',str(ofsrc),
                 'lib/kstring_c.c',str(src),'-o',str(exe)],cwd=ROOT,check=True)
             return host32.run([str(exe)], runner='qemu').returncode
         assert evaluate(source)==0
         print('GREEN absent/16/32bpp/overflow/stride/translate/continuity/guards/history/OF-off',flush=True)
         if '--mutate' in sys.argv:
             for name, old, new in [
+                ('catch-untouched', 'if (no) args[3+ni] = initial;', '(void)initial;'),
+                ('ci-status', 'call("call-method",ni+2,no+1,a,(cell)-1) != 0',
+                 'call("call-method",ni+2,no+1,a,(cell)-1) == -1'),
+            ]:
+                assert ofw.count(old) == 1, name
+                assert evaluate(source, ofw.replace(old, new)) == 1, name
+                print('RED runtime exit=1 '+name, flush=True)
+            for name, old, new in [
+                ('color-write-order', '.foreground = 255, .background = 0', '.foreground = 0, .background = 255'),
+                ('color-write-omitted', 'if (ofw_call_method("color!", output, 4, 0, black) ||\n            ofw_call_method("color!", output, 4, 0, white)) return;', 'if (0) return;'),
                 ('color-order', 'a > b ? 0 : 255', 'a > b ? 255 : 0'),
                 ('color-equal', 'if (a == b)', 'if (0)'),
                 ('color-failed', '.rc = PM_RH_COLOR_FAILED', '.rc = PM_RH_COLOR_OK'),

@@ -291,7 +291,8 @@ static int sc_connected(void)
                     '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
                     '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
                     '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
-            deadline = time.monotonic()+60
+            # The live FB redraws the long transcript as well as streaming it.
+            deadline = time.monotonic()+(180 if os.environ.get('PPC_FB') == '1' else 60)
             q = None
             with (out/'qemu.stderr').open('w') as err:
                 p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
@@ -310,7 +311,10 @@ static int sc_connected(void)
                             pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
                             label = 'sb_stop' if name == 'no-restart' else 'sc_input_stop'
                             address = next(int(l.split()[0], 16) for l in symbols.splitlines() if l.endswith(' '+label))
-                            require(pc and int(pc[1], 16) == address, 'unexpected SC stop PC')
+                            if not pc or int(pc[1], 16) != address:
+                                q.call('cont')
+                                time.sleep(.01)
+                                continue
                             validate(aa, bb, True); require(ejected, 'CD not ejected')
                             actual = aa.partition('SB READY\n')[2].partition('SB DONE\n')[0]
                             terminal, pos = '', 0

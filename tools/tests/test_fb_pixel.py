@@ -46,14 +46,14 @@ def suite(m, fontpath, work):
         for y in range(64):
             buf[y * pitch:y * pitch + width * 3] = b'\x66\x77\x88' * width
 
-        def draw(row, col, text, cursor=()):
+        def draw(row, col, text, cursor=(), cursor_top=0):
             for ch in text:
                 wide, bitmap = glyph(ch)
                 for y in range(16):
                     bits = int.from_bytes(bitmap[y * (wide // 8):(y + 1) * (wide // 8)], 'big')
                     for x in range(wide):
                         on = (bits >> (wide - 1 - x)) & 1
-                        if (row, col + x // 8) in cursor:
+                        if (row, col + x // 8) in cursor and y >= cursor_top:
                             on ^= 1
                         off = (64 + row * 16 + y) * pitch + (col * 8 + x) * 3
                         buf[off:off + 3] = FG if on else BG
@@ -79,6 +79,13 @@ def suite(m, fontpath, work):
             pass
         else:
             raise AssertionError('partial cursor accepted')
+        draw(6, 0, 'A日 ', ((6, 1), (6, 2), (6, 3)), cursor_top=14)
+        underline = m.Terminal(m.Image(width, height, bytes(buf), pitch), font,
+                               FG, BG, cursor_top=14)
+        assert underline.cursor_positions(6, 0, 'A日 ') == [(6, 1), (6, 2), (6, 3)]
+        assert underline.compare_text(6, 0, 'A日 ', ((6, 1), (6, 2), (6, 3))) is None
+        assert m.Terminal(underline.image, font, FG, BG).compare_text(
+            6, 0, 'A日 ', ((6, 1), (6, 2), (6, 3))) is not None
         # P6 strips framebuffer pitch padding; first raster byte may be whitespace.
         ppm = work / 'screen.ppm'
         packed = b''.join(buf[y * pitch:y * pitch + width * 3] for y in range(height))
@@ -125,6 +132,7 @@ def suite(m, fontpath, work):
 
 
 MUTATIONS = (
+    ('cursor-shape', 'self.cursor_top = cursor_top', 'self.cursor_top = 0'),
     ('colors', 'self.fg, self.bg = bytes(fg), bytes(bg)', 'self.fg, self.bg = bytes(bg), bytes(fg)'),
     ('top-zero', 'self.top = top  # mutation anchor: reserved scanlines', 'self.top = 0'),
     ('column', 'col = column + index', 'col = column + index + 1'),

@@ -23,7 +23,7 @@
 
 - OpenBIOS の画面は既定で 800x600x32。FB の文字端末は初段 INDEX8 だけなので `-g 800x600x8` で動かす。
 - FB の受入は `PPC_FB=1 python3 -B tools/ppc/usb_run.py` (S-B/S-C/S-D も同じ環境変数)。`-g 800x600x8 -display none` を選ぶ。`-nographic` は OF の stdout をシリアルに変え、display の採取を行えないため FB の観測には使わない。USB の product 試験は `screen.ppm` も残す。環境変数を省くと従来のシリアル経路を使う。
-- この作業環境の OpenBIOS 1.1 (2026-06-24 build) は display の `color@` を exception -21 にする。`fb_full_rc=0` でも `fb_color_rc=3` になり、設計どおり FB 端末を無効にして sh まで継続する。色を決め打ちする変更はせず、この firmware での FB 文字の受入は未達として PM に渡す。
+- この作業環境の OpenBIOS 1.1 (2026-06-24 build) は display の `color@` で例外を出し、catch セルを返さない。method 呼出しでは catch の初期値を失敗にし、未返却を成功と取り違えない。`color@` が失敗したときだけ、切り離し前に `color!` (r g b index) で 0=黒・255=白を書き、前景255・背景0、`fb_color_rc=4` (WRITTEN) を記録する。書込みも失敗したら端末を付けない。読めた場合は CLUT を変えず、明るい方を前景にする (OK=1、同じ明るさは EQUAL=3 で拒否)。
 - USB の受入は `-icount shift=auto` (TCG では OHCI のフレームの時計が TB から遅れる)。
 - LAN・USB の受入は時間に敏感で、ホストの負荷が高い (load 10 前後) と時間切れや打鍵の重複で落ちることがある。負荷の下がった時に回し直して確かめる。
 
@@ -36,4 +36,6 @@
 - SH/SHELL 像だけ共通 console・fbcon・gfx core/v2/sync・OF backend・resident KCG をリンクする。root → `kcg_file_load` (guard 内の resident lease は読込後に close) → Unicode-JIS 表の常駐読込 → HAL → console target → attach (top=64) → OF の色 → TEXT 準備 → clear/cursor → USB/入力 → sh の順。失敗時は `FB off step=... rc=...` を診断に残し stream で続ける。
 - 固定 192 KiB のヒープでは 295,940B の字体キャッシュを持てない。SH/SHELL は最初のヒープ利用より前に台帳の BOOT owner で 1 MiB の連続 RAM を確保しヒープとする。固定 KAPI/SHM の配置は動かさず、確保失敗時は既存ヒープへ戻す (フォント失敗後も stream で起動)。診断像は既存ヒープのまま。
 - USER の fd1・文字出力・printf は共通 console の mirror から `console_stream_write` へ送り、LAN terminal と ESCC に各 byte を 1 回送る。既存の有限キューと poll を保つ。起動・ドライバの診断は同じ formatter を別名で組み、`pm_diag_write` から LAN LOG/ESCC と共通 console の画面へ送る。この画面出力では terminal mirror を抑え、LOG を terminal に再投入しない。
-- 段 H の共有変更は `shell_putchar` の mirror 1 行。x86 の CUI/GUI の描画門は同じ。取り込み前の NP21/W の CUI ver・shell 出力・CONSOLE_DUAL の受入は本線 PM が行う。
+- 共有 console の bytewise clear 制御と mirror は [console の契約](../../design/kernel/console/console.md) を参照。x86 の CUI/GUI の描画門は同じ。取り込み前の NP21/W の CUI ver・shell 出力・CONSOLE_DUAL の受入は本線 PM が行う。
+- USB の診断 (打鍵・enumeration・mouse・release を含む) は既存 LOG/ESCC に送り、端末画面へは出さない。同期 formatter の間だけ `pm_log_stream_only` を保存・設定・復元する。USER の echo/kprintf/fd1 はこれまでどおり共通 console と mirror へ送る。
+- 画素の受入は `python3 -B tools/ppc/fb_run.py --mutate` (`ppc-fb` check)。NIC 無しの mac99、USB で sh を開始し、固定した UTF-8 echo の `/fb.sh` を source する。PPM・固定期待行列・像/フォント/Unicode 表の SHA-256・stream を `$TMPDIR/fb-run-*/` に残す。fbcon のカーソルは下 2 走査線の反転なので、oracle は `cursor_top=14` を使う。LAN 切断前後の比較は別途 LAN が使える環境で行う。

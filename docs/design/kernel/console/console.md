@@ -1,6 +1,6 @@
 # kernel/console/console.c — テキストコンソールの表示とカーソル
 
-> 状態: **現行 (2026-10-31)**
+> 状態: **現行 (2026-11-13)**
 
 文字出力と論理カーソルを管理し、表示操作を backend に渡す。
 GUI や V86 からの復帰時にも表示状態を整える。
@@ -35,3 +35,5 @@ void tvram_scroll(void) { con_backend_scroll(TVRAM_ROWS - g_scroll_reserve); }
 ```
 
 - start時sink_disable→kbd_inject_discard→GUIだった場合だけclear→enableを保存。clearはV86でも書く現挙動を勝手に抑止しない。
+
+- bytewise の `shell_putchar` と `shell_print` は `ESC[2J` (clear)・`ESC[H` (原点) をローカルの text backend に反映する。mirror/sink/bootlog へは元の byte 列を 1 回送る。描画抑止の門は先に評価する。console-cui-route-host がローカルの clear と原点、mirror の escape 列を変異で検査する。

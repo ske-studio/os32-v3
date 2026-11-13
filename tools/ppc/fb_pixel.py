@@ -111,12 +111,13 @@ class Mismatch:
 
 
 class Terminal:
-    def __init__(self, image, font, fg, bg, top=64):
+    def __init__(self, image, font, fg, bg, top=64, cursor_top=0):
         self.image, self.font = image, font
         self.fg, self.bg = bytes(fg), bytes(bg)
+        self.cursor_top = cursor_top
         self.top = top  # mutation anchor: reserved scanlines
         if (len(self.fg) != 3 or len(self.bg) != 3 or self.fg == self.bg
-                or not 0 <= top <= image.height):
+                or not 0 <= top <= image.height or not 0 <= cursor_top < 16):
             raise ValueError('invalid terminal colors/top')
         self.columns = image.width // 8
         self.rows = (image.height - top) // 16
@@ -138,7 +139,7 @@ class Terminal:
             invert = (row, col) in cursor  # mutation anchor: cursor composition
             for y, bits in enumerate(mask):
                 for x in range(8):
-                    on = bool(bits & (0x80 >> x)) ^ invert
+                    on = bool(bits & (0x80 >> x)) ^ (invert and y >= self.cursor_top)
                     wanted = self.fg if on else self.bg
                     got = self.image.pixel(col * 8 + x, self.top + row * 16 + y)
                     expected += on
@@ -149,8 +150,8 @@ class Terminal:
         return None
 
     def cursor_positions(self, row, column, text):
-        """Locate fully inverted cells relative to known underlying text.
-        A partial cursor raises ValueError; normal cells are omitted."""
+        """Locate complete cursor overlays relative to known underlying text.
+        cursor_top selects the first inverted scanline. A partial cursor raises ValueError; normal cells are omitted."""
         result = []
         for char in text:
             width, _ = self.font.glyph(char)

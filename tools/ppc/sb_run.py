@@ -87,7 +87,12 @@ def serial_accept(elf, cpu, out, expected):
                     regs = q.call('human-monitor-command', {'command-line': 'info registers'})
                     (out/'registers.txt').write_text(regs)
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                    require(pc and int(pc[1], 16) == symbols['sb_stop'], 'unexpected stop PC')
+                    # Serial bytes precede the local framebuffer redraw. The
+                    # DONE marker is not the stop boundary until that returns.
+                    if not pc or int(pc[1], 16) != symbols['sb_stop']:
+                        q.call('cont')
+                        time.sleep(.01)
+                        continue
                     validate(aa, bb, True)
                     require(ejected, 'CD not ejected')
                     actual = aa.split('SB READY\n', 1)[1]

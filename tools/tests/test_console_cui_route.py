@@ -15,6 +15,9 @@ SOURCES = {
     'pc98_console_source.inc': 'platform/pc98/console.c',
 }
 MUTANTS = [
+    ('serial clear omitted', 'console_source.inc',
+     'if (text_control(ch)) return;', '(void)text_control;', 'serial clear text'),
+
     ('character mirror missing', 'console_source.inc',
      'if (rshell_active || boot_serial_mirror) con_output_putchar(ch);',
      '(void)ch;', 'mirror exactly once'),

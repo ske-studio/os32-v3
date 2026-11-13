@@ -94,7 +94,16 @@ static void capture_colors(void)
     cell lo[3] = {0}, hi[3] = {255};
     colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_FAILED};
     if (ofw_call_method("color@", output, 1, 3, lo) ||
-        ofw_call_method("color@", output, 1, 3, hi)) return;
+        ofw_call_method("color@", output, 1, 3, hi)) {
+        /* IEEE 1275 display color!: (r g b index --). Set only the
+         * terminal endpoints while firmware calls are still available. */
+        cell black[4] = {0, 0, 0, 0}, white[4] = {255, 255, 255, 255};
+        if (ofw_call_method("color!", output, 4, 0, black) ||
+            ofw_call_method("color!", output, 4, 0, white)) return;
+        colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_WRITTEN,
+            .foreground = 255, .background = 0};
+        return;
+    }
     u32 a = lo[0] + lo[1] + lo[2], b = hi[0] + hi[1] + hi[2];
     if (a == b) { colors.rc = PM_RH_COLOR_EQUAL; return; }
     colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_OK,

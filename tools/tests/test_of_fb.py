@@ -33,7 +33,7 @@ MUTATIONS = (
     ('text-generation', 'platform/powermac/display_dual.c',
      'text_gen == a->gen', '1'),
     ('unverified-colors', 'platform/powermac/display_provider.c',
-     'pm_rh_full_colors()->rc != PM_RH_COLOR_OK ||', ''),
+     '(pm_rh_full_colors()->rc != PM_RH_COLOR_OK &&\n         pm_rh_full_colors()->rc != PM_RH_COLOR_WRITTEN) ||', ''),
     ('pref', 'platform/powermac/display_provider.c',
      'int display_provider_pref(int pref) { (void)pref; return GFX_PREF_AUTO; }',
      'int display_provider_pref(int pref) { return pref; }'),

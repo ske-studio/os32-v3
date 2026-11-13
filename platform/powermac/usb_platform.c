@@ -10,6 +10,7 @@
 #include "kernel/irq/tick.h"
 #include "kernel/time/tick_clock.h"
 #include "kprintf.h"
+#include "kboot_log.h"
 #include <stdarg.h>
 
 struct pm_pci pm_usb_pci;
@@ -157,17 +158,17 @@ int usbp_input_src_alloc(int kind)
 void usbp_input_key(u8 src, u8 sc, int down)
 {
     pm_input_usb_key(src, sc, down);
-    kprintf(7, "USB KEY src=%u sc=%02x down=%u\n", src, sc, down); }
+    usbp_log("USB KEY src=%u sc=%02x down=%u", src, sc, down); }
 void usbp_input_key_repeat(u8 src, u8 sc)
 {
     pm_input_usb_repeat(src, sc);
-    kprintf(7, "USB REPEAT src=%u sc=%02x\n", src, sc); }
+    usbp_log("USB REPEAT src=%u sc=%02x", src, sc); }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
-{ kprintf(7, "USB MOUSE src=%u dx=%d dy=%d b=%x\n", src, dx, dy, buttons); }
+{ usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", src, dx, dy, buttons); }
 void usbp_input_release(int kind, u8 src)
 {
     if (kind == 0) pm_input_usb_release(src);
-    kprintf(7, "USB RELEASE kind=%d src=%u\n", kind, src);
+    usbp_log("USB RELEASE kind=%d src=%u", kind, src);
     if ((unsigned)kind < 2 && src >= 1 && src <= 4) sources[kind] &= ~(1u << (src - 1));
 }
 void usbp_log(const char *fmt, ...)
@@ -185,6 +186,9 @@ void usbp_log(const char *fmt, ...)
         if (!*p) break;
     }
     va_end(ap);
+    int saved = pm_log_stream_only;
+    pm_log_stream_only = 1;
     kvprintf(7, fmt, words);
     kprintf(7, "\n");
+    pm_log_stream_only = saved;
 }

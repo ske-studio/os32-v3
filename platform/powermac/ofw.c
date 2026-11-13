@@ -71,16 +71,21 @@ void ofw_init(ppc_ci ci)
 }
 unsigned ofw_call_count(void) { return calls; }
 unsigned ofw_detach(void) { detached = 1; return calls; }
-int ofw_call(const char *name, unsigned ni, unsigned no, cell *cells)
+static int call(const char *name, unsigned ni, unsigned no, cell *cells, cell initial)
 {
     if (detached) { ppc_disable(); ofw_detached_stop(); }
     cell args[3 + PM_CI_CAP] = {ppc_ptr_cell(name), ni, no};
     if (ni > PM_CI_CAP || no > PM_CI_CAP - ni) return -1;
     for (unsigned i=0; i<ni; i++) args[3+i] = cells[i];
+    if (no) args[3+ni] = initial;
     ++calls;
     int rc = client(args);
     for (unsigned i=0; i<no; i++) cells[ni+i] = args[3+ni+i];
     return rc;
+}
+int ofw_call(const char *name, unsigned ni, unsigned no, cell *cells)
+{
+    return call(name, ni, no, cells, 0);
 }
 int ofw_finddevice(const char *path)
 {
@@ -123,7 +128,8 @@ int ofw_call_method(const char *method, int ih, unsigned ni,
     cell a[PM_CI_CAP] = {ppc_ptr_cell(method),ih};
     if (ni > PM_METHOD_MAX_INPUTS || no > PM_CI_CAP - ni - 3) return -1;
     for (unsigned i=0; i<ni; i++) a[2+ni-1-i] = cells[i];
-    if (ofw_call("call-method",ni+2,no+1,a) == -1) return -1;
+    /* A firmware exception may leave the catch cell untouched. */
+    if (call("call-method",ni+2,no+1,a,(cell)-1) != 0) return -1;
     if (a[ni+2] != 0) return (int)a[ni+2];
     for (unsigned i=0; i<no; i++) cells[i] = a[ni+2+no-i];
     return 0;

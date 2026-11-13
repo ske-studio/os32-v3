@@ -209,4 +209,21 @@ static void stream_routes(void)
     boot_serial_mirror = rshell_active = 0;
     say("PASS mirror routes / render disabled / exact bytes\n");
 }
-void _start(void) { cui(); gui(); stream_routes(); finish(0); }
+static void serial_clear(void)
+{
+    setup(0, 0, 0);
+    boot_serial_mirror = 1; rshell_active = 0; mirror_n = 0;
+    cursor_x = 7; cursor_y = 3;
+    const char sequence[] = "\033[2J\033[H";
+    for (unsigned i = 0; i < sizeof(sequence)-1; i++)
+        shell_putchar(sequence[i], TATTR_WHITE);
+    CHECK(!cursor_x && !cursor_y && text[0] == ' ', "serial clear text");
+    CHECK(mirror_n == sizeof(sequence)-1, "serial clear stream");
+    for (unsigned i = 0; i < mirror_n; i++)
+        CHECK(mirror[i] == sequence[i], "serial clear stream");
+    shell_putchar('Z', TATTR_WHITE);
+    CHECK(text[0] == 'Z' && cursor_x == 1 && !cursor_y, "serial clear origin");
+    boot_serial_mirror = 0;
+    say("PASS serial clear / local origin / exact mirrored escapes\n");
+}
+void _start(void) { cui(); gui(); stream_routes(); serial_clear(); finish(0); }

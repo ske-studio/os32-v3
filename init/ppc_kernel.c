@@ -371,7 +371,8 @@ void ppc_kernel_main(void)
                 console_hw_cursor_enable();
             }
             if (!con_backend_safe()) rc = -1;
-            else kprintf(KBOOT_ATTR, "FB text ready generation=%u\r\n", target.generation);
+            else kprintf(KBOOT_ATTR, "FB text ready generation=%u fg=%u bg=%u\r\n",
+                         target.generation, colors->foreground, colors->background);
         }
         if (rc) {
             pm_console_text_state(1, 0, 0, 0);
