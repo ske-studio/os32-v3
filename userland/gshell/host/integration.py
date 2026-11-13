@@ -76,6 +76,22 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('quit grace cycle countdown', 'src/session.rs',
+     '    if st.now.wrapping_sub(s().quit_deadline) < 0x8000_0000 {',
+     '    s().quit_deadline = s().quit_deadline.wrapping_sub(1);\n    if s().quit_deadline == st.now {',
+     'switch_cui_grace_ticks'),
+    ('quit grace deadline ignored', 'src/session.rs',
+     '    if st.now.wrapping_sub(s().quit_deadline) < 0x8000_0000 {',
+     '    if false {', 'switch_cui_grace_ticks'),
+    ('poll clock read before candidates', 'src/multiapp.rs',
+     'let mut now = None;', 'let mut now = Some(crate::poll_clock::poll_now());',
+     'g3_no_apps_halt_without_poll_clock'),
+    ('g3 tick comparison removed', 'src/lib.rs',
+     '(unsafe { (os32api::api().get_tick)() }) != last_tick', 'true', 'g3_standalone_halt_tick_and_key'),
+    ('g3 wait tick comparison removed', 'src/handler.rs',
+     'crate::cycle_due(st.now)', 'true', 'g3_wait_halt_until_deadline'),
+    ('g3 keyboard pending ignored', 'src/lib.rs',
+     'input::capture_keyboard(st, input::Ctx::Standalone)', 'false', 'g3_standalone_halt_tick_and_key'),
     ('poll clock microseconds unchecked', 'src/poll_clock.rs',
      ' / 1000', '', 'poll_clock_fallback_and_same_ms_wake'),
     ('poll clock fallback zero', 'src/poll_clock.rs',

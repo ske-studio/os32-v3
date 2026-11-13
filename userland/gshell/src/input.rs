@@ -315,7 +315,8 @@ pub fn standalone_key(st: &mut GuiState, scan: u8) {
 ///   2. モーダル中は宛先をダイアログに限定する。
 ///   3. 押下は先に FEP へ通し、FEP が消費したら `Key` を配送しない。
 ///      確定文字列は取り込みの最後に `Text` でまとめて流す。
-pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
+pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) -> bool {
+    let mut captured = false;
     /* X4 で見た SHIFT+SPACE をここで実行する (契約 T8: 辞書を開く重い処理は X3)。 */
     if ctx.wm_ui() {
         fep::apply_pending_toggle(st);
@@ -382,6 +383,7 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
         if raw < 0 {
             break;
         }
+        captured = true;
         let scan = (raw & 0x7F) as u8;
         let down = ((raw >> 8) & 1) != 0;
         let mods = ((raw >> 9) & 0x7F) as u32;
@@ -574,6 +576,7 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
 
     /* FEP の確定文字列を `Text` (8B ずつ、`more`) で流す (契約 U2)。 */
     fep::flush_text(st);
+    captured
 }
 
 fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
