@@ -28,9 +28,13 @@ MUTATIONS = (
     ('platform/pc98/tsc_clock.c', 't > w->us && missing_window(d, w->us)', 'missing_window(d, w->us)'),
     ('platform/pc98/tsc_clock.c', '2u * TSC_ENDPOINT_US + (550ULL * us', '8u + (550ULL * us'),
     ('platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost < allowance'),
-    ('platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost <= allowance * 2'),
+    ('platform/pc98/tsc_clock.c', 'return w->cost <= allowance;', 'return w->cost <= allowance * 2;'),
     ('platform/pc98/tsc_clock.c', 'high - low > low / 2000u', 'high - low > low'),
-    ('platform/pc98/tsc_clock.c', 'elapsed > TSC_WINDOW_MAX_US', 'elapsed > TSC_BOOT_LIMIT_US'),
+    ('platform/pc98/tsc_clock.c', 'elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_WINDOW_MAX_US',
+     'elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_BOOT_LIMIT_US'),
+    ('platform/pc98/tsc_clock.c', '++diag.late;', 'reject(REJECT_LENGTH);'),
+    ('platform/pc98/tsc_clock.c', 'diag.last_late_us = (u32)elapsed;',
+     'diag.last_late_us = (u32)elapsed; consecutive_rejects = 0;'),
     ('platform/pc98/tsc_clock.c', 'if (!_irq_enabled() || kctx_irq_depth)', 'if (0)'),
 )
 
