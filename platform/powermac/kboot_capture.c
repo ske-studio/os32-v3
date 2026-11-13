@@ -102,13 +102,16 @@ static void memory(int node, const char *name, unsigned ac, unsigned sc,
         if ((ac==2 && be32(p)) || (sc==2 && be32(p+ac*4)))
             fail("FAIL:KBOOT:MEMORY-32BIT\r\n");
         u32 start=be32(p+(ac-1)*4), size=be32(p+(ac+sc-1)*4);
-        if (!size || size>0xffffffffUL-start) fail("FAIL:KBOOT:MEMORY-OVERFLOW\r\n");
+        /* Apple OF lists empty DIMM banks with size 0 (G4 PowerMac3,5); skip them like mmu_boot. */
+        if (!size) continue;
+        if (size>0xffffffffUL-start) fail("FAIL:KBOOT:MEMORY-OVERFLOW\r\n");
         unsigned i=out->count++;
         while (i && out->v[i-1].start>start) {
             out->v[i]=out->v[i-1]; i--;
         }
         out->v[i]=(struct pm_region){start,size};
     }
+    if (!out->count) fail("FAIL:KBOOT:MEMORY-EMPTY\r\n");
     unsigned kept=0;
     for (unsigned i=0; i<out->count; i++) {
         struct pm_region r=out->v[i];

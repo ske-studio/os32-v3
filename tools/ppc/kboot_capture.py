@@ -26,6 +26,8 @@ MUTATIONS = [
     ('ignore-hole', 'r.start<=out->v[kept-1].start+out->v[kept-1].size', '1'),
     ('cell-count', 'unsigned stride=(ac+sc)*PM_CELL_BYTES;', 'unsigned stride=2*PM_CELL_BYTES;'),
     ('overflow', 'size>0xffffffffUL-start', '0'),
+    ('empty-bank-fatal', 'if (!size) continue;', 'if (!size) fail("FAIL:KBOOT:MEMORY-OVERFLOW\\r\\n");'),
+    ('all-empty-accepted', 'if (!out->count) fail', 'if (0) fail'),
     ('limit-off-by-one', 'count>PM_REGION_COUNT', 'count>=PM_REGION_COUNT'),
     ('borrow-property', 'return &info;', 'return (const struct pm_kboot_info *)property;'),
     ('omit-gmac', 'info.gmac_rc = pm_gmac_capture(&info.gmac);', 'info.gmac_rc = LAN_ENODEV;'),
