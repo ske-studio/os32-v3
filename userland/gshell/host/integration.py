@@ -78,6 +78,8 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 MUTATIONS = [
     ('g3 tick comparison removed', 'src/lib.rs',
      '(unsafe { (os32api::api().get_tick)() }) != last_tick', 'true', 'g3_standalone_halt_tick_and_key'),
+    ('g3 wait tick comparison removed', 'src/handler.rs',
+     'crate::cycle_due(st.now)', 'true', 'g3_wait_halt_until_deadline'),
     ('g3 keyboard pending ignored', 'src/lib.rs',
      'input::capture_keyboard(st, input::Ctx::Standalone)', 'false', 'g3_standalone_halt_tick_and_key'),
     ('poll clock microseconds unchecked', 'src/poll_clock.rs',
