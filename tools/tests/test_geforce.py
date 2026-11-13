@@ -655,7 +655,7 @@ def main():
         core(diagnostic=True,mutation='gui-boot-reserve')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
         wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
-        for mutation in ('wc-stop','wc-stop-normal','wc-repeat','wc-start','wc-alias','wc-flags','wc-capability','wc-vendor'): wc_lifecycle(mutation)
+        for mutation in ('wc-load','wc-stop','wc-stop-normal','wc-repeat','wc-start','wc-alias','wc-flags','wc-capability','wc-vendor'): wc_lifecycle(mutation)
         for mutation in ('bounds', 'point'): present_trace(mutation)
         for mutation in ('alignment', 'tail'):
             present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
