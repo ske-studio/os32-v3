@@ -39,6 +39,15 @@ ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),build/out/ppc-user/sh.b
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
+ROOT_MANIFEST ?= build/ppc-ram-root.json
+ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin
+include build/font-fetch.mk
+
+build/out/unicode.bin: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h include/callconv.h
+	@mkdir -p $(dir $@)
+	gcc -std=gnu11 -O2 -I. -Iinclude tools/gen_unicode.c -o $(dir $@)gen_unicode
+	$(dir $@)gen_unicode --pairs $@
+
 include build/ram-root.mk
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
