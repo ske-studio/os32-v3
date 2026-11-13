@@ -58,7 +58,7 @@ def main(override=None, dev=13):
             cc_cache.build(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
                             '-Dgf_display_modeset=gf_unused_legacy_modeset',
                             '-c', str(source), '-o', str(obj)], check=True)
-        module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
+        module=(override[1] if override and override[0]=='drivers/video/geforce/geforce_module.c' else ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)].replace('static GfxBackendV2 gf_v2_kcopy;', ''))
         backend=Path(tmp)/'backend.o'
@@ -106,6 +106,9 @@ def main(override=None, dev=13):
 
 def mutations():
     rows = [
+        ('drivers/video/geforce/geforce_module.c',
+         'int rc = p->wc_stop && p->wc_stop() < 0 ? -1 : 0;',
+         'int rc = 0;', 'return-wc-stop'),
         ('hwdev/gf/master.c',
          'pci_cfg_write16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)',
          'pci_cfg_write16(RECOVER_GF_BUS, 13, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)', 'M9 master destination'),

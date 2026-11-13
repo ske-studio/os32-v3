@@ -76,7 +76,9 @@ int paging_set_not_present(u32 first,u32 last)
     boot_closes++;return 0;
 }
 int geforce_wc_start(void) { return 0; }
-int geforce_wc_stop(void) { return 0; }
+static int hal_wc_calls,hal_wc_fail;
+int geforce_wc_stop(void)
+{ hal_wc_calls++;prod_event(0xface02);return hal_wc_fail ? -1 : 0; }
 void geforce_wc_report(const char *s) { (void)s; }
 #include "../../drivers/video/geforce/geforce_platform.c"
 static void prod_hal_cases(void)
@@ -117,7 +119,13 @@ static void prod_hal_cases(void)
     CHECK(prod_cmd_writes==2 && hal_copies==1 && hal_cells==1);
     hal_backend.shutdown();CHECK(hal_safe && !hal_route);prod_exit_order();
     hal_backend.init();CHECK(prod_cmd_writes==3 && hal_copies==2 && hal_cells==2);
+    u32 return_start=prod_trace_count;
+    int wc_calls=hal_wc_calls;
     CHECK(!geforce_return(p));prod_exit_order();
+    CHECK(hal_wc_calls==wc_calls+1 && prod_trace[return_start]==0xface02);
+    hal_backend.shutdown();hal_backend.init();hal_wc_fail=1;
+    CHECK(geforce_return(p)==-1 && !hal_route);prod_exit_order();
+    hal_wc_fail=0;
     /* Stop failure must still select 00 and check decode before 98 writes. */
     hal_backend.shutdown();hal_backend.init();prod_stop_fail=prod_stop_writes+1;
     CHECK(geforce_return(p)==-1 && !hal_route);

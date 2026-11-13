@@ -106,8 +106,8 @@ int (*wc_start)(void); int (*wc_stop)(void);
 ```
 - lease・実効 WC の状態は kernel の arch/x86/kernel/video_wc.c に 1 個、gf_wc.c は装置の適用条件を確認し、部品は callback だけを持つ。KAPI/SDK は不変、内部 OPS_VERSION を更新し核と geforce.mod を対でビルドする。
 - 開始: 既存 video_start 成功→wc_start→最初の present。active の同一モード init は何もしない。start の UC fallback は表示可能として扱う。
-- 終了/CUI/再設定/abort/部品回収: 新規描画停止→最後の正常 drain（有効時のみ）→identity 喪失時だけ wc_stop→gf_production_quiesce→98 route。geforce_body.c の共通 stop に置き geforce_module.c の geforce_return の出口も覆う。
-- lease は最初の取得から起動中保持する。GeForce module/本番 context は起動中 pin され、通常停止・CUI・abort/回収では解放しない。再 GUI は active lease の前回結果 (復元未確認の負値を含む) を返し、再取得しない。identity 喪失時だけ CPU 側で排出・復元する (BIOS WC は MSR を書かず借用解除)。受入版の明示的な wc_stop/wc_start は比較のため独立して行う。
+- 終了/CUI/再設定/abort/部品回収: 新規描画停止→最後の正常 drain（有効時のみ）→identity 喪失時は wc_stop→gf_production_quiesce→98 route。再起動は identity にかかわらず wc_stop→stop→leave_log→98 route。
+- lease は最初の取得から起動中保持する。GeForce module/本番 context は起動中 pin され、通常停止・CUI・abort/回収では解放しない。再 GUI は active lease の前回結果 (復元未確認の負値を含む) を返し、再取得しない。identity 喪失時と再起動時に CPU 側で排出・復元する (BIOS WC は MSR を書かず借用解除)。受入版の明示的な wc_stop/wc_start は比較のため独立して行う。
 
 ## 5. 計測の口と進む条件
 - 受入用 gf_accept.c が実際の gf_present_rect を呼び、その直前/正常 drain 後を既存 sys_time_now(u32 lo,hi) で測る（hwdev/gf/native.c:66、部品 import 済み）。失敗 sample を成功群へ混ぜない。
@@ -219,9 +219,9 @@ WC不成立は理由付きSKIPで、比較の合格と数えない。レコー�
 | 既存写像のままWCを判定 | T0/T1: PTE/台帳型/区間/surface不変、表示75頁、BAR0/他表示不変、PAT2=UC-以外を拒否 → PAT2適合判定を常に真にする |
 | 借用時も排出する | T0: BIOS WC借用の通常/identity失敗の停止でCPU側排出あり・MSR無変更 → 借用時の排出を省く |
 | UC比較を偽らない | T3: BIOS WC下ではUC比較を理由付きSKIP、WC測定をUC群に混ぜない → UC群の実効型検査を省く |
-| 全出口で元へ戻る | T1: 初回/再GUI/同一init/再設定/abort/初期失敗/二重stopの原状態比較 → 共通stopのwc_stopを省く |
+| WC の寿命と復元 | T1: 通常停止では保持し、identity 喪失時と再起動時は復元、再起動の順序も検査 → wc-stop、wc-stop-normal、return-wc-stop |
 - NP21/W の MTRR 実装は追加・改造しない。fake MSR は host だけ。ゲストは GF 不在の拒否、既存 PC98/PEGC/Cirrus GUI・CUI 復帰・媒体/部品のpairingを確認し、WC成立には数えない。
-- Ra266 は3方式の画面/byte照合（計時外readback）、p50/p95、MTRR/PTE実値、GUI終了後の原状態一致、再GUI、他表示への復帰を確認。WC能力が足りなければ段0bは未受入と明記する。
+- Ra266 は3方式の画面/byte照合（計時外readback）、p50/p95、MTRR/PTE実値、通常のGUI終了後のWC保持、identity喪失時と再起動時の原状態復元、再GUI、他表示への復帰を確認。WC能力が足りなければ段0bは未受入と明記する。
 - hostは実CPUのWC/PCI排出を証明しない。§1の目標判定は実機の正常sampleと同じ版のカメラ確認に限る。現在は全て未実行。
 
 ## 9. 段 0 未達時だけの後続 M2MF（r1 §3–4 を縮約・修正）
