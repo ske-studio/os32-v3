@@ -22,7 +22,7 @@ def fd_free_bytes(geometry, iso_size, loader_size):
 
 
 # ISO 9660 level 1 d-characters: anything else would be renamed by the tool.
-_D_NAME = __import__('re').compile(r'[A-Z0-9_]{1,8}(\.[A-Z0-9_]{0,3})?')
+_D_NAME = __import__('re').compile(r'[A-Z0-9_]{1,8}(\.[A-Z0-9_]{1,3})?')
 _D_DIR = __import__('re').compile(r'[A-Z0-9_]{1,8}')  # directories: no extension
 
 
@@ -36,6 +36,15 @@ def check_collision(target, seen):
     if target in seen:
         raise ValueError(f'ISO name collision: {target}')
     seen.add(target)
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f'duplicate JSON key: {key}')
+        result[key] = value
+    return result
 
 
 def main():
@@ -112,7 +121,7 @@ def main():
                         shutil.copyfile(app, staging / 'bin' / app.name)
                 if args.manifest:
                     seen = {'ETC/MOTD'} | {'BIN/' + app.name.upper() for app in args.bin}
-                    for guest, host in json.loads(args.manifest.read_text()).items():
+                    for guest, host in json.loads(args.manifest.read_text(), object_pairs_hook=unique_object).items():
                         target = guest.strip('/').upper()
                         check_collision(target, seen)
                         dest = staging / target
