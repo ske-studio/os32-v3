@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'arch/x86/arch_tick_budget.h', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.9)
 
 from kernel_includes import include_flags
@@ -81,7 +81,11 @@ def main():
         if '--mutate' in sys.argv:
             original = (ROOT / 'kernel/irq/tick.c').read_text()
             mutants = [
-                ('    tick_budget_begin();', '', 'budget begin omitted'),
+                ('        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();', '', 'budget begin omitted'),
+                ('    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
+                 '    tick_budget_begin();\n    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {', 'budget begin before loop'),
+                ('if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
+                 'if (slot == ARCH_TICK_BUDGET_FIRST_SLOT && slots[slot].fn) tick_budget_begin();', 'budget begin only with callback'),
                 ('kctx_irq_depth != 0', 'kctx_irq_depth > 1', 'IRQ registration accepted'),
                 ('slots[slot].fn != fn', 'slots[slot].fn == fn', 'duplicate/competition reversed'),
                 ('else slots[slot].fn = fn;', 'else slots[slot].fn = 0;', 'registration lost'),

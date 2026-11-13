@@ -67,7 +67,7 @@
 ```c
 /* kernel/irq/tick_budget.h — 予算を数えるのは tick_dispatch の中だけ */
 void tick_budget_config(void);    /* 時計設定後、IF=0/EE=0 で 4 定数を一度換算する */
-void tick_budget_begin(void);     /* tick_dispatch の先頭。基点 = arch の count、active=1、taken=0 */
+void tick_budget_begin(void);     /* 予算を分け合う最初の slot (ARCH_TICK_BUDGET_FIRST_SLOT、PC-98 は NE2K=2) の前。slot0・1 (FM・PCM) は B の外で、IRQ0 の worst の「他の slot」に入る。基点 = arch の count、active=1、taken=0 */
 void tick_budget_end(void);       /* tick_dispatch の最後。active=0 */
 int  tick_budget_take(u32 share_cnt, u32 tail_cnt); /* active でなければ常に 1 (IRQ5・foreground は掛けない)。
                                          経過 + tail_cnt < share_cnt なら 1。越えていても、このジフィでまだ
