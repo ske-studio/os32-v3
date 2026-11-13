@@ -114,7 +114,7 @@ MUTATIONS = [
   '    (void)pvr;',1,('fixture_fail',[b'TAKEOVER',b'PAGING:MAIN',b'PROBE:LOW',b'FAIL:SURVIVED'])),
 ]
 
-def host(out, bad, mutant=False):
+def host(out, bad, mutant=False, shell=False):
     out.mkdir(parents=True,exist_ok=True)
     src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
     if mutant:
@@ -126,7 +126,7 @@ def host(out, bad, mutant=False):
     command(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
         '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector',
         '-nostdlib','-static','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
-        '-D__cdecl=','-DBOOT_BAD_WALK='+str(int(bad)), '-I'+str(out),
+        '-D__cdecl=','-DBOOT_BAD_WALK='+str(int(bad)), '-DKBOOT_SH='+str(int(shell)), '-I'+str(out),
         '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
         *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
         ROOT/'arch/ppc/pd_walk.c','-o',exe])
@@ -176,6 +176,7 @@ def main():
         elf=build(directory,negative)
         for cpu in ['7450','7455']:
             observe(directory,elf,cpu,negative)
+    host(out/'host-sh', False, shell=True)
     for case in range(6):
         lan_host(out/('lan-'+str(case)),case)
     host(out/'host',False)

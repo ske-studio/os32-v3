@@ -33,11 +33,13 @@ def main():
         print('GREEN absent/16/32bpp/overflow/stride/translate/continuity/guards/history/OF-off',flush=True)
         if '--mutate' in sys.argv:
             for name, old, new in [
+                ('full-bytes', 'full_fb.bytes = bytes;', 'full_fb.bytes = fb.bytes;'),
+                ('full-pages', 'off < rounded; off += PM_RH_FB_PAGE) {\n        u32 next;\n        if (!translate(fb_mmu', 'off < PM_RH_FB_PAGE; off += PM_RH_FB_PAGE) {\n        u32 next;\n        if (!translate(fb_mmu'),
                 ('paint', '    if (!pixels) return;\n    u32 cell', '    return;\n    u32 cell'),
-                ('contiguous','next != base + off','0'),
+                ('contiguous','!translate(mmu, va - offset + off, &next) || next != base + off','0'),
                 ('history','reached |= 1U << stage;', 'reached = 1U << stage;'),
                 ('stride','fb.stride < fb.width * (fb.depth / 8)', '0'),
-                ('unknown-depth','(fb.depth != 16 && fb.depth != 32)', '0'),
+                ('unknown-depth','(fb.depth != 8 && fb.depth != 16 && fb.depth != 32)', '0'),
             ]:
                 assert source.count(old)==1, name
                 assert evaluate(source.replace(old,new))==1, name
