@@ -43,7 +43,10 @@ def main():
         rc = build_run(ROOT, tmp)
         print('R5 baseline rc=', rc, flush=True)
         if rc: return rc
-        cross = pathlib.Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc')
+        import os
+        found = shutil.which('powerpc-elf-gcc')
+        cross = pathlib.Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
+        if not cross.exists() and found: cross = pathlib.Path(found)
         if cross.exists():
             subprocess.run([str(cross), '-std=gnu11', '-ffreestanding', '-Wall', '-Wextra', '-Werror',
                             *include_flags(ROOT), '-c', str(ROOT / 'drivers/video/kcg/kcg_file.c'),
