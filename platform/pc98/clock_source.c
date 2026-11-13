@@ -9,12 +9,15 @@
 
 STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
 
+static int clock_config_rc = OS32_ERR_NOSYS;
+
 int platform_clock_init(u32 tick_hz)
 {
     int rc = pit_init((unsigned int)tick_hz);
     const struct pit_setup *ps = pit_get_setup();
+    clock_config_rc = OS32_ERR_NOSYS;
     if (ps->valid) {
-        (void)tick_clock_config(ps->reload, ps->clk_hz);
+        clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);
         tick_budget_config();
     }
     return rc;
@@ -24,7 +27,7 @@ void platform_clock_info(struct clock_info *out)
     const struct pit_setup *ps = pit_get_setup();
     out->tick_hz = ps->hz;
     out->counter_hz = ps->clk_hz;
-    out->ready = ps->valid;
+    out->ready = ps->valid && clock_config_rc == 0;
 }
 int platform_clock_read_us(u32 *lo, u32 *hi)
 {
@@ -33,7 +36,7 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
     unsigned int out_lo = 0, out_hi = 0;
     int attempt, rc = OS32_ERR_AGAIN;
     /* PIT を積んでいない / mode 2 でない機械では補間の意味が無い。 */
-    if (!ps->valid || ps->mode != (u8)PIT_MODE_TIMER0 || ps->reload == 0) {
+    if (clock_config_rc != 0 || !ps->valid || ps->mode != (u8)PIT_MODE_TIMER0 || ps->reload == 0) {
         return OS32_ERR_NOSYS;
     }
 

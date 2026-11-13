@@ -7,6 +7,7 @@
 static struct pit_setup setup;
 static unsigned int enabled, saves, restores, samples, retry_n;
 static u32 raw_lo, raw_hi, sample_count, pending;
+static int config_result;
 static u32 user_page[1024] __attribute__((aligned(4096)));
 volatile u32 tick_count;
 static void finish(int rc) __attribute__((noreturn));
@@ -35,7 +36,7 @@ void irq_restore(unsigned int old)
 const struct pit_setup *pit_get_setup(void) { return &setup; }
 int pit_init(unsigned int hz) { check(hz == 100); return 0; }
 int tick_clock_config(u32 num, u32 den)
-{ check(num == setup.reload && den == setup.clk_hz); return 0; }
+{ check(num == setup.reload && den == setup.clk_hz); return config_result; }
 void tick_clock_raw(u32 *lo, u32 *hi)
 { check(!enabled); *lo = raw_lo; *hi = raw_hi; }
 void platform_timer_sample(struct platform_timer_sample *out)
@@ -62,6 +63,12 @@ void _start(void)
         setup = (struct pit_setup){clock ? 2457600 : 1996800, 100,
                                   clock ? 24576 : 19968, 10000, PIT_MODE_TIMER0, 1};
         struct clock_info info;
+        config_result = -1;
+        check(platform_clock_init(100) == 0);
+        platform_clock_info(&info);
+        check(!info.ready);
+        call(OS32_ERR_NOSYS, 0, 1);
+        config_result = 0;
         check(platform_clock_init(100) == 0);
         platform_clock_info(&info);
         check(info.ready && info.tick_hz == 100 && info.counter_hz == setup.clk_hz);

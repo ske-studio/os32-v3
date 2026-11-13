@@ -25,6 +25,8 @@ const u8 *v86_bios_real_lowmem(void)
 {
     clocks++; event('B', BIOS_WORK_SYSCLK, lowmem[BIOS_WORK_SYSCLK]); return lowmem;
 }
+int tick_clock_config(u32 num, u32 den)
+{ return num && den ? 0 : -1; }
 void tick_clock_raw(u32 *lo, u32 *hi)
 {
     check(!enabled);
@@ -90,7 +92,7 @@ void _start(void)
     check(sysclk_is_8mhz() == !!(TEST_CLOCK_BYTE & BIOS_SYSCLK_8MHZ));
     lowmem[BIOS_WORK_SYSCLK] ^= BIOS_SYSCLK_8MHZ;
     sysclk_detect(); check(clocks == 1 && sysclk_detected());
-    check(pit_init(PIT_HZ) == 0);
+    check(platform_clock_init(PIT_HZ) == 0);
     check(pit_get_setup()->period_us == 10000);
 #ifdef TEST_RETRY_VALUE
     /* Separate run keeps the captured L13 trace unchanged. Use hardware I/O
