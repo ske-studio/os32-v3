@@ -65,6 +65,16 @@ def exercise(script, directory):
         assert proc.stdout.strip() == str(len(image))
         verify(image, motd)
 
+    manifest = directory / 'manifest.json'
+    for content in ('{"/SYS/A": "unused", "/SYS/A": "unused"}',
+                    '{"/SYS/A.": "unused"}'):
+        manifest.write_text(content)
+        proc = subprocess.run([sys.executable, '-B', str(script), '--motd', str(directory / 'motd'),
+                               '--manifest', str(manifest), '--out', str(directory / 'bad.iso')],
+                              capture_output=True, text=True)
+        assert proc.returncode == 1 and ('duplicate JSON key' in proc.stderr or
+                                         'ISO 9660 level 1' in proc.stderr), proc.stderr
+
     app = directory / 'hello.bin'
     payload = b'OS32X app\x00'
     app.write_bytes(payload)
@@ -147,6 +157,20 @@ def main():
         plan_exercise(directory)
         if '--mutate' in sys.argv:
             source = SOURCE.read_text()
+            for anchor, replacement in ((", object_pairs_hook=unique_object", ""),
+                                        ("{1,3})?'", "{0,3})?'")):
+                assert source.count(anchor) == 1
+                mutant = directory / 'mutant.py'
+                mutant.write_text(source.replace(anchor, replacement))
+                os.environ['PYTHONPATH'] = str(ROOT / 'tools')
+                manifest = directory / 'mutation.json'
+                manifest.write_text('{"/SYS/A": "unused", "/SYS/A": "unused"}' if 'object_pairs' in anchor
+                                    else '{"/SYS/A.": "unused"}')
+                proc = subprocess.run([sys.executable, '-B', str(mutant), '--motd', str(directory / 'motd'),
+                                       '--manifest', str(manifest), '--out', str(directory / 'bad.iso')],
+                                      capture_output=True, text=True)
+                assert 'No such file' in proc.stderr, proc.stderr
+                print('RED runtime: manifest validation bypassed')
             anchor = "'-no-pad'"
             assert source.count(anchor) == 1
             mutant = directory / 'mutant.py'
