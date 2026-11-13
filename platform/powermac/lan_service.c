@@ -20,7 +20,7 @@ static struct {
 #endif
     struct lan_message response;
     u8 response_dst[6], enabling;
-    u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops;
+    u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops, tx_at;
     u8 out_turn, state_due;
 } s;
 
@@ -239,7 +239,12 @@ void pm_lan_poll(u64 now)
         }
         if (s.enabling) {
             r = gem_mac_enable_step(&s.g, now);
-            if (r == GEM_OK) { s.state = RUNNING; rh_log(); s.phy_retry_at = now + s.g.io.tb_hz; }
+            if (r == GEM_OK) {
+                s.state = RUNNING; rh_log(); s.phy_retry_at = now + s.g.io.tb_hz;
+                /* G4 BCM5411: frames sent right after link-up never reached the
+                 * switch (11-13, beacon and log 0-2 lost); records wait in the ring. */
+                s.tx_at = now + 2u * s.g.io.tb_hz;
+            }
         }
         break;
     case RUNNING:
@@ -251,6 +256,12 @@ void pm_lan_poll(u64 now)
             r = gem_phy_step(&s.g, now);
             if (r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
             if (r < 0) break;
+        }
+        if (now < s.tx_at) {
+            r = receive();
+            if (r == GEM_EIO) { reset(); r = GEM_AGAIN; }
+            else if (r >= 0) r = GEM_AGAIN;
+            break;
         }
         if (!s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
         r = receive();
