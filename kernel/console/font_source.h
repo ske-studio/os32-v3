@@ -22,7 +22,7 @@
 #include "types.h"
 #include "vfs.h"     /* VfsFontLease / VFS_MAX_OPEN_FILES */
 
-enum { FONT_LEASE_FREE = 0, FONT_LEASE_APP = 1, FONT_LEASE_SHELL = 2 };
+enum { FONT_LEASE_FREE = 0, FONT_LEASE_APP = 1, FONT_LEASE_SHELL = 2, FONT_LEASE_RESIDENT = 3 };
 
 /* 公開 id の下位 FONT_LEASE_IDX_BITS ビットが枠番号、残りが id_gen。 */
 #define FONT_LEASE_IDX_BITS 4u
@@ -88,5 +88,13 @@ i32 font_lease_shell_close(u32 id, u32 shell_gen);
 /* kind==SHELL の lease を全部 vfs_close_font (protect を無視) して枠を空ける
  * (shell_service_retire から)。 */
 void font_lease_close_shell(void);
+
+/* Kernel-only lease, held only while loading a resident font. */
+#define FONT_RESIDENT_OWNER 0
+#define FONT_RESIDENT_GENERATION 1u
+i32 font_lease_resident_open(const char *path, u32 *out_id, u32 *out_size);
+i32 font_lease_resident_read_at(u32 id, u32 offset, void *dst, u32 len);
+i32 font_lease_resident_validate(u32 id);
+i32 font_lease_resident_close(u32 id);
 
 #endif /* OS32_FONT_SOURCE_H */

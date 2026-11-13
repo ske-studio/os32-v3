@@ -36,7 +36,7 @@ int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
                         struct ppc_boot_alias *out)
 {
     static const struct { u32 va, limit; } slots[] = {
-        { PPC_BOOT_FB_VA, PM_RH_FB_LIMIT },
+        { PPC_BOOT_FB_VA, PPC_BOOT_FB_LIMIT },
         { PPC_BOOT_GMAC_CLOCK_VA, PAGE_SIZE },
         { PPC_BOOT_ESCC_VA, PPC_BOOT_ALIAS_BYTES },
         { PPC_BOOT_MPIC_VA, PPC_BOOT_ALIAS_BYTES },
@@ -185,6 +185,18 @@ void ppc_boot_load_root(u32 root)
         if (ppc_root_current() || root != MEM_FIXED_PD_BASE) ppc_stop();
         install_alias(root, &escc_alias);
         install_alias(root, &mpic_alias);
+#if KBOOT_SHELL || KBOOT_SH
+        if (boot_devices.fb_full_rc == PM_RH_FULL_OK &&
+            (!observe_alias_safe(root, &fb_alias) ||
+             overlap(fb_alias.pa, fb_alias.bytes, clock_alias.pa, clock_alias.bytes))) {
+            const struct pm_rh_fb *band = pm_rh_framebuffer();
+            pm_rh_discard_full();
+            boot_devices.fb_full_rc = PM_RH_FULL_ALIAS;
+            if (!ppc_boot_alias_plan(band->pa, band->bytes, PPC_BOOT_FB_VA, &fb_alias))
+                ppc_boot_walk_stop();
+            boot_devices.fb_va = fb_alias.va;
+        }
+#endif
         if (!observe_alias_safe(root, &fb_alias) ||
             !observe_alias_safe(root, &clock_alias) ||
             overlap(fb_alias.pa, fb_alias.bytes, clock_alias.pa, clock_alias.bytes))
@@ -303,6 +315,10 @@ void ppc_kernel_start(ppc_ci ci)
         kb_stop(e.out, "FAIL:KB:ALIAS-ESCC-MPIC\r\n");
     plan_gmac(info);
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
+#if KBOOT_SHELL || KBOOT_SH
+    boot_devices.fb_full_rc = pm_rh_capture_full();
+    if (boot_devices.fb_full_rc == PM_RH_FULL_OK) fb = pm_rh_full_framebuffer();
+#endif
     if (fb->bytes) {
         if (!ppc_boot_alias_plan(fb->pa, fb->bytes, PPC_BOOT_FB_VA, &fb_alias)) kb_stop(e.out, "FAIL:KB:ALIAS-FB\r\n");
         boot_devices.fb_va = fb_alias.va;
