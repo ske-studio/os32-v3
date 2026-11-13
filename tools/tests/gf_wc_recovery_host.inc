@@ -39,7 +39,7 @@ int gf_production_prepare(struct gf_production *p,const struct gf_production_res
 int gf_production_identity(struct gf_production *p) { (void)p;return identity_ok ? 0 : -1; }
 int gf_production_decode_safe(struct gf_production *p) { (void)p;return 0; }
 int gf_production_quiesce(struct gf_production *p)
-{ CHECK(!lease.active);return gf_display_stop(p->video.context); }
+{ CHECK(identity_ok || !lease.active);return gf_display_stop(p->video.context); }
 int gf_production_point(void *p) { (void)p;return identity_ok ? 0 : -1; }
 int pc98_route_select_98(void) { return pc98_route_to_98(); }
 /* The parent fixture aliases its AppSlot as slot. */
@@ -67,9 +67,16 @@ static void wc_snapshot(void)
 }
 static void wc_restored(void)
 {
-    CHECK(!lease.active && wc_effective==bios_wc);
-    CHECK(msr_base==old_base && msr_mask==old_mask);
-    CHECK(wc_releases==wc_acquires && !route && console_safe);
+    if (identity_ok) {
+        CHECK(lease.active && wc_effective==1 && wc_acquires==1 && !wc_releases);
+        CHECK(msr_base==(bios_wc ? old_base : (GF_TEST_DISPLAY|1)));
+        CHECK(msr_mask==(bios_wc ? old_mask : 0xffff80800ULL));
+    } else {
+        CHECK(!lease.active && wc_effective==bios_wc);
+        CHECK(msr_base==old_base && msr_mask==old_mask);
+        CHECK(wc_releases==1 && wc_acquires==1);
+    }
+    CHECK(!route && console_safe);
     for (u32 i=0;i<sizeof(recovery_regions);i++)
         CHECK(((u8 *)ledger_regions)[i]==((u8 *)recovery_regions)[i]);
     for (u32 i=0;i<sizeof(recovery_resources);i++)
@@ -176,8 +183,8 @@ static void wc_recovery_run(void)
             if (n) { gfx_init();CHECK(lease.active && route); }
             shell_fault();
             CHECK(gfx_current_height==GFX_HEIGHT && !gfx_flip_enabled);
-            /* CUI after the third fault has no remaining GF WC lease. */
+            /* CUI keeps the pinned device WC lease across shell faults. */
         }
     }
-    SAY("PASS WC recovery: real reinit/shell fault path restores MTRR and lease");die(0);
+    SAY("PASS WC recovery: identity loss restores WC; shell faults retain the pinned lease");die(0);
 }

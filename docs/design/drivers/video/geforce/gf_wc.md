@@ -2,7 +2,13 @@
 > 状態: **現行 (2026-11-01)** — GF_ACCEL_DESIGN §3–4 の S10
 ソース: `drivers/video/geforce/gf_wc.c`
 
-kernel に lease を 1 個保持する。platform の `wc_start` は video_start 後、初回 present 前に呼ぶ。active 時は前回結果を返して acquire を繰り返さない。復元未確認の負値も保持する。能力・適用条件不足は 0 (UC)、成功は 1、復元未確認は負値 (GF 起動失敗)。`wc_stop` は CPU 側排出・復元を x86_wc_release に委譲し、identity 失敗後も装置へアクセスしない。
+kernel に lease を 1 個、最初の取得から起動中保持する。GeForce module と本番 context は起動中 pin され、通常の停止・CUI 復帰・再開始では解放しない。platform の `wc_start` は video_start 後、初回 present 前に呼ぶ。active 時は前回結果を返して acquire を繰り返さない。復元未確認の負値も保持する。能力・適用条件不足は 0 (UC)、成功は 1、復元未確認は負値 (GF 起動失敗)。共通 stop は identity 喪失時だけ `wc_stop` を呼ぶ。受入版は比較のため明示的に `wc_stop`/`wc_start` を呼ぶ。`wc_stop` は CPU 側排出・復元を x86_wc_release に委譲し、identity 失敗後も装置へアクセスしない。
+
+再起動時は停止と 98 復帰に先立って WC lease を解放する。
+
+active lease の再開始は適用条件を再評価せず前回結果を返す。固定 BAR 予約・写像は停止中も維持する。
+
+手本は nouveau の [`drivers/gpu/drm/nouveau/nouveau_ttm.c`](https://gitlab.freedesktop.org/drm/nouveau/-/blob/master/drivers/gpu/drm/nouveau/nouveau_ttm.c): `nouveau_ttm_init` の `arch_phys_wc_add(resource_addr(device, 1), resource_size(device, 1))` と `nouveau_ttm_fini` の `arch_phys_wc_del(drm->ttm.mtrr)`。WC は装置の初期化で取得し、装置の終了で解放する寿命に合わせ、モード切替・表示停止では外さない。
 
 BAR1 の 32bit/prefetchable・512 KiB 整列・decode 長・既存予約の資源 bit・RAM/他資源との非交差・DISPLAY の 75 頁を読み取り確認する。master と current PD を走査して表示外/別 VA の CPU alias を拒否する。他 AS の装置写像は共有 PT、private app/lease は RAM のみという既存 paging 契約を使う。BAR0/表示の PCD=1/PWT=0/PAT=0/supervisor/RW を確認し、PTE/PAT/台帳/surface は変更しない。
 

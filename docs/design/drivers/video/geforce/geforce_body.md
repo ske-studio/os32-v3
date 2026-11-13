@@ -5,4 +5,4 @@
 本番 context/復帰 callback は起動中保持して module を pin し、正常終了後も予約は保持する。owner の核移設、共通装置 registry、N1 lease の再設計は行わない。
 診断の常駐 ROM/plan/lease は別の起動で既存寿命を維持する。
 
-GF_ACCEL S12: 共通 stop は wc_stop→gf_production_quiesce の順。WC 復元失敗でも quiesce を通して失敗を返す。HAL の停止と kernel の geforce_return (abort/回収) が同じ callback を使う。
+GF_ACCEL S12: 共通 stop は identify() で identity を確認し、通常は WC lease を起動中保持したまま gf_production_quiesce を呼ぶ。identity 喪失時だけ wc_stop→gf_production_quiesce の順で CPU 側を戻す (装置アクセスは行わない)。WC 復元失敗でも quiesce を通して失敗を返す。HAL の停止と kernel の geforce_return (abort/回収) が同じ callback を使う。

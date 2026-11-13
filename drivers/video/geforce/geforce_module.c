@@ -186,7 +186,8 @@ static int geforce_return(void *opaque)
     struct geforce_platform *p = opaque;
     struct gf_display_context *video = p->device ? p->device->context : 0;
     struct gf_io *leave_io = video ? &video->io : 0;
-    int rc = p->stop ? p->stop() : 0;
+    int rc = p->wc_stop && p->wc_stop() < 0 ? -1 : 0;
+    if (p->stop && p->stop()) rc = -1;
     /* Match backend stop: sample after quiesce, before 98 restore/redraw. */
     geforce_leave_log(leave_io, rc);
     if (pc98_route_to_98()) rc = -1;
