@@ -13,6 +13,9 @@
 //!          デバッグ時だけ DEBUG_SHORTCUTS で戻せる)
 //! ```
 //!
+//! halt 復帰後、同じジフィで物理キー (raw リング) の入力がなければ WM 全周を省き、
+//! 他の IRQ による途中の復帰でもアプリの再開判定を行う。
+//!
 //! モジュールの役割:
 //!
 //! | ファイル | 役割 |
@@ -237,50 +240,56 @@ fn run_standalone(st: &mut wm::GuiState) -> i32 {
 /// 単独ループ (契約 T8)。CUI への handoff が成立して gshell を抜けるときだけ
 /// false を返す。
 fn standalone_loop(st: &mut wm::GuiState) -> bool {
+    let mut halted = false;
+    let mut cycle_tick = 0;
     while !st.quit || session::owner_active(st) {
-        wm::wm_cycle(st, input::Ctx::Standalone);
-        /* top-level (owner 1) で受けた CTRL+STOP (票 T8 D4d / T9 受入 S6)。 */
-        top_level_abort(st);
-        if st.launch_pending {
-            st.launch_pending = false;
-            launch_app(st);
+        if !halted || cycle_due(cycle_tick) || input::capture_keyboard(st, input::Ctx::Standalone) {
+            wm::wm_cycle(st, input::Ctx::Standalone);
+            cycle_tick = st.now;
+            /* top-level (owner 1) で受けた CTRL+STOP (票 T8 D4d / T9 受入 S6)。 */
+            top_level_abort(st);
+            if st.launch_pending {
+                st.launch_pending = false;
+                launch_app(st);
+            }
+            /* 設定レジストリの予約と通知 (票 S4 §3)。**DB に触れるのはここだけ** —
+             * `Req::Open` / `Req::Save` の open 〜 close を 1 周回の中で閉じ、
+             * 間に yield / 合成 / 他イベント処理を挟まない。走っているアプリは
+             * `multiapp::should_park` の (a) が `settings::pending()` を見て譲る
+             * ので、予約が立てば必ずここへ来る。 */
+            settings::consume(st);
+            /* SessionAction のトップレベル handoff (契約 §7)。`launch_app` から
+             * 戻った直後と、park で戻った周回でここを通る。**WM の文脈
+             * (X1/X3/X4) からは絶対に来ない** = 入れ子 exec_run にならない。
+             *
+             * K5b-W: `LAUNCH` は「1 本増やす」なので他のアプリが生きていても
+             * 実行してよい。`SWITCH_CUI` / `SHUTDOWN` だけが全回収を待つ
+             * (判定は `session::ready_to_run`、契約 S2 の読み替え)。 */
+            if st.quit && session::ready_to_run(st) {
+                return true; // Fault: existing cleanup, without a config write/retry.
+            }
+            if session::ready_to_run(st) && !session_handoff(st) {
+                /* SWITCH_CUI が成立した (shell 切替済み)。ここで gshell を抜ける。 */
+                return false;
+            }
+            /* 起動要求表 (KAPI v49、票 T9 D3 (3)(4))。`session_handoff` と**同じ
+             * 地点** = `exec_start` / `exec_resume` から戻った後、park 判定
+             * (`multiapp::resume_one`) の前で、WM が自分の文脈 (owner 1) で走って
+             * いる唯一の場所。`launch_take` / `launch_report` / `exec_kill` は
+             * どれもここでしか通らない。 */
+            drain_launch_requests(st);
+            /* 全画面の後始末の保険 (票 T8-3、PM 実測 2026-09-12)。所有者が
+             * `exec_kill` / fault で畳まれた経路は `exec_start` / `exec_resume` の
+             * 復帰点を通らないので、所有者の問い合わせが 1 度も走らないことが
+             * ある。全画面中は入力もタイマも実質止まる = 誰も ready にならない
+             * ので、そのまま下の `sys_halt` へ落ちると画面が凍ったまま永久に
+             * 待つ。**全画面中だけ** KAPI 1 本 (`gfx_screen_owner`) で見る。
+             * ここは top-level (owner 1) なので復帰の `gfx_init` を呼んでよい。 */
+            if fullscreen::active() {
+                after_exec(st);
+            }
         }
-        /* 設定レジストリの予約と通知 (票 S4 §3)。**DB に触れるのはここだけ** —
-         * `Req::Open` / `Req::Save` の open 〜 close を 1 周回の中で閉じ、
-         * 間に yield / 合成 / 他イベント処理を挟まない。走っているアプリは
-         * `multiapp::should_park` の (a) が `settings::pending()` を見て譲る
-         * ので、予約が立てば必ずここへ来る。 */
-        settings::consume(st);
-        /* SessionAction のトップレベル handoff (契約 §7)。`launch_app` から
-         * 戻った直後と、park で戻った周回でここを通る。**WM の文脈
-         * (X1/X3/X4) からは絶対に来ない** = 入れ子 exec_run にならない。
-         *
-         * K5b-W: `LAUNCH` は「1 本増やす」なので他のアプリが生きていても
-         * 実行してよい。`SWITCH_CUI` / `SHUTDOWN` だけが全回収を待つ
-         * (判定は `session::ready_to_run`、契約 S2 の読み替え)。 */
-        if st.quit && session::ready_to_run(st) {
-            return true; // Fault: existing cleanup, without a config write/retry.
-        }
-        if session::ready_to_run(st) && !session_handoff(st) {
-            /* SWITCH_CUI が成立した (shell 切替済み)。ここで gshell を抜ける。 */
-            return false;
-        }
-        /* 起動要求表 (KAPI v49、票 T9 D3 (3)(4))。`session_handoff` と**同じ
-         * 地点** = `exec_start` / `exec_resume` から戻った後、park 判定
-         * (`multiapp::resume_one`) の前で、WM が自分の文脈 (owner 1) で走って
-         * いる唯一の場所。`launch_take` / `launch_report` / `exec_kill` は
-         * どれもここでしか通らない。 */
-        drain_launch_requests(st);
-        /* 全画面の後始末の保険 (票 T8-3、PM 実測 2026-09-12)。所有者が
-         * `exec_kill` / fault で畳まれた経路は `exec_start` / `exec_resume` の
-         * 復帰点を通らないので、所有者の問い合わせが 1 度も走らないことが
-         * ある。全画面中は入力もタイマも実質止まる = 誰も ready にならない
-         * ので、そのまま下の `sys_halt` へ落ちると画面が凍ったまま永久に
-         * 待つ。**全画面中だけ** KAPI 1 本 (`gfx_screen_owner`) で見る。
-         * ここは top-level (owner 1) なので復帰の `gfx_init` を呼んでよい。 */
-        if fullscreen::active() {
-            after_exec(st);
-        }
+        halted = false;
         /* 止めてあるアプリのうち 1 本を起こす (D11-3 の (2))。起こす相手が
          * 居る間は halt しない — halt すると次の PIT まで誰も進めない。
          * ポーリングで譲った 1 本 (`WAIT_POLL`) もここで起きる (D8 の最下位:
@@ -291,8 +300,14 @@ fn standalone_loop(st: &mut wm::GuiState) -> bool {
         }
         /* 待ちは sys_halt のみ (get_tick スピン禁止)。 */
         unsafe { (os32api::api().sys_halt)() };
+        halted = true;
     }
     true
+}
+
+/// halt 復帰後にジフィが進んだかを調べる。
+fn cycle_due(last_tick: u32) -> bool {
+    (unsafe { (os32api::api().get_tick)() }) != last_tick
 }
 
 /// top-level (owner 1) で受けた CTRL+STOP を処理する (票 T8 D4d / T9 受入 S6)。

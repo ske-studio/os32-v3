@@ -4847,3 +4847,105 @@ fn poll_clock_fallback_and_same_ms_wake() {
     US_LO.store(0, Ordering::SeqCst);
     assert_eq!(poll_clock::poll_now(), 4_294_967);
 }
+
+// The halt script models nine physical IRQs per jiffy and observes real mouse polls.
+static G3_HALTS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static G3_POLLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static G3_OBS: std::sync::Mutex<Vec<usize>> = std::sync::Mutex::new(Vec::new());
+static G3_MODE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+unsafe extern "C" fn g3_mouse(p: *mut u8) {
+    G3_POLLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    std::ptr::write_bytes(p, 0, 10);
+}
+unsafe extern "C" fn g3_halt() {
+    use std::sync::atomic::Ordering::SeqCst;
+    let n = G3_HALTS.fetch_add(1, SeqCst) + 1;
+    G3_OBS.lock().unwrap().push(G3_POLLS.load(SeqCst));
+    if n == 9 { crate::mocks::set_tick(1); }
+    if n == 10 {
+        match G3_MODE.load(SeqCst) {
+            1 => crate::mocks::push_rawkeys(&[0x11d]),
+            2 => crate::mocks::set_kbd_pending(1),
+            3 => crate::mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]),
+            _ => {}
+        }
+    }
+    if n == 11 { crate::wm::g().quit = true; }
+    if n == 12 { crate::mocks::set_tick(2); }
+    assert!(n < 20, "halt loop did not progress");
+}
+fn g3_setup(mode: usize) {
+    use std::sync::atomic::Ordering::SeqCst;
+    crate::mocks::init();
+    G3_HALTS.store(0, SeqCst);
+    G3_POLLS.store(0, SeqCst);
+    G3_MODE.store(mode, SeqCst);
+    G3_OBS.lock().unwrap().clear();
+    unsafe { (*os32api::api_ptr()).mouse_poll = g3_mouse; (*os32api::api_ptr()).sys_halt = g3_halt; }
+}
+#[test]
+fn g3_standalone_halt_tick_and_key() {
+    g3_setup(1);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,3]);
+}
+#[test]
+fn g3_wait_halt_until_deadline() {
+    g3_setup(0);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 1, 2);
+    assert_eq!(G3_HALTS.load(std::sync::atomic::Ordering::SeqCst), 9);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 2);
+    crate::wm::g().inited = false;
+}
+
+#[test]
+fn g3_standalone_injected_pending_does_not_cycle() {
+    g3_setup(2);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,2]);
+}
+
+#[test]
+fn g3_wait_same_tick_raw_key_cycles() {
+    g3_setup(1);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 2, 2);
+    assert_eq!(G3_HALTS.load(std::sync::atomic::Ordering::SeqCst), 12);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 4);
+    crate::wm::g().inited = false;
+}
+
+#[test]
+fn g3_standalone_same_tick_ctrl_stop() {
+    g3_setup(3);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,3]);
+    assert!(!st.abort_seen, "top-level must consume CTRL+STOP");
+}
+
+#[test]
+fn g3_wait_same_tick_ctrl_stop() {
+    g3_setup(3);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 2, 2);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 4);
+    assert!(crate::multiapp::pending_top_level_work());
+    assert!(!crate::wm::g().abort_seen);
+    crate::wm::g().inited = false;
+}

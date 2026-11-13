@@ -441,7 +441,10 @@ fn op_wait(st: &mut GuiState, owner: i32, slot_no: usize, arg: u32) -> i32 {
             }
         }
         /* 待ちは sys_halt だけ (get_tick スピン禁止)。PIT 10ms で必ず起きる。 */
-        unsafe { (os32api::api().sys_halt)() };
+        loop {
+            unsafe { (os32api::api().sys_halt)() };
+            if crate::cycle_due(st.now) || input::capture_keyboard(st, input::Ctx::Wait) { break; }
+        }
     }
     ring::pending(st, slot_no) as i32
 }
