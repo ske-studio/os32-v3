@@ -195,7 +195,10 @@ static int scb_wait(u16 base)
 }
 
 /* Caller holds irq_save. Do not touch pointer while a command is outstanding.
- * The byte write never changes M at +3. ISSUE_OK means accepted, not queued. */
+ * Unlike fxp, do not write after timeout, to preserve the previous command POINTER.
+ * The byte write never changes M at +3. ISSUE_OK means issued; a stuck
+ * command is counted by the wait before the next issue. The 100us limit
+ * remains short because callers can run in IRQ context (fxp waits longer). */
 static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after)
 {
     *after = 0;
@@ -203,9 +206,7 @@ static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after
     if (need_ptr) outpd(base + E82557_SCB_POINTER, ptr);
     outp(base + E82557_SCB_COMMAND, e82557_scb_cmd(cuc, ruc));
     *after = 1;
-    if (scb_wait(base)) return ISSUE_OK;
-    nic.stats[E82557_ST_SCB_STUCK]++;
-    return ISSUE_TIMEOUT;
+    return ISSUE_OK;
 }
 
 static void ee_write(void *ctx, u8 value)

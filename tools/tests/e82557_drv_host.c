@@ -240,7 +240,7 @@ static void cpu_delay_us(u32 us) { now+=us; model_time(); if (!irq_depth) delive
 static u8 inp(u16 port)
 {
     guard_io(port); CHECK(port==0x6002);
-    if ((pre_busy && !commands) || (cu_pre && cb_pre_pending && starts+1==cu_pre && !command)) {
+    if ((pre_busy && !commands) || (cu_pre && cb_pre_pending && starts+1==cu_pre)) {
         status=0x2040; return 1;
     }
     if (command && !(post_busy && commands>=post_busy) &&
@@ -363,7 +363,8 @@ int e82557_ee_read_word(const struct e82557_ee_pins *p,int mode,int *width,u16 a
     CHECK(addr<3);
     if(ee_mode && !auto_calls) { ee_calls++; *dummy=1; *word=0xffff; return E82557_OK; }
     if(ee_mode==2) { ee_calls++; *dummy=0; *word=0; return E82557_OK; }
-    CHECK(!cu_base && !ru_base && !command); ee_calls++; *word=words[addr%3]; *dummy=0; return E82557_OK;
+    if (command) { (void)inp(0x6002); (void)inp(0x6002); (void)inp(0x6002); }
+    CHECK(!cu_base && (!ru_base || post_busy==2) && (!command || post_busy==2)); ee_calls++; *word=words[addr%3]; *dummy=0; return E82557_OK;
 }
 #include "../../include/config.h"
 #define kstrncmp strncmp
@@ -386,7 +387,7 @@ int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
 }
 int dma_alloc(u32 size,u32 align,u32 limit,struct dma_buf *out)
 {
-    CHECK(!irq_depth && !allocated && !command && !cu_base && !ru_base);
+    CHECK(!irq_depth && !allocated && (!command || post_busy==2) && !cu_base && (!ru_base || post_busy==2));
     CHECK(size==16384 && align==16 && limit==0xffffffffu);
     if(alloc_fail) return -4;
     allocated=1; memset(memory,0xcc,sizeof(memory));
@@ -506,7 +507,7 @@ static void yield_event(void)
         if(mode==2) { status&=~0x3c; ru_fail=ru_starts+1; }
         service_tick();
         CHECK(nic.tx==TX_RESERVED && nic.state==E82557_RUNNING);
-        if(mode==2) { CHECK(nic.recover_pending); ru_fail=0; command=0; }
+        if(mode==2) { CHECK(!nic.recover_pending && command); status&=~0x3c; service_tick(); CHECK(nic.recover_pending && nic.stats[E82557_ST_SCB_STUCK]); ru_fail=0; command=0; }
         if(mode==3) nic.gen++; /* fault injection, must prevent CU Start */
     } else if(mode==4) {
         u8 saved[60]; memcpy(saved,memory+1616+nic.rx.cons*1552+16,60);
@@ -618,7 +619,13 @@ static void runtime_tests(const char *c)
         if(!strcmp(c,"tx_pre")) cu_pre=starts+1;
         if(!strcmp(c,"tx_post")) cu_post=starts+1;
         int rc=e82557_send(rx_frame,60);
-        if(cu_pre || cu_post) {
+        if(cu_post) {
+            CHECK(rc==0 && nic.tx==TX_ISSUED && !nic.stats[E82557_ST_SCB_STUCK]);
+            status&=~0x3c; service_tick();
+            CHECK(nic.state==E82557_RECOVER && nic.stats[E82557_ST_SCB_STUCK]==1);
+            return;
+        }
+        if(cu_pre) {
             CHECK(rc==OS32_ERR_AGAIN && nic.recover_pending && nic.tx==TX_IDLE);
             CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN);
             service_tick(); CHECK(nic.state==E82557_RECOVER && !nic.recover_pending);
@@ -659,7 +666,7 @@ static void runtime_tests(const char *c)
             model_ticks=151; service_tick(); CHECK(nic.state==E82557_RECOVER && nic.recover_step==1);
             CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN && e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_AGAIN);
             if(!strcmp(c,"recover_stopfail")) stop_fail=2;
-            if(!strcmp(c,"recover_r3fail")) ru_fail=ru_starts+1;
+            if(!strcmp(c,"recover_r3fail") || !strcmp(c,"recover_reset_busy")) ru_fail=ru_starts+1;
             service_tick();
             if(stop_fail==2) { CHECK(nic.state==E82557_RECOVER); service_tick(); CHECK(nic.state==E82557_FAILED && leaked==1); CHECK(e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_NOSYS); return; }
             CHECK(nic.recover_step==2);
@@ -673,13 +680,28 @@ static void runtime_tests(const char *c)
                 CHECK(e82557_recv(buf,sizeof(buf),&len)==0 && len==60 && nic.rx.ready==7);
                 service_tick(); CHECK(nic.state==E82557_RUNNING && nic.stats[10]==1);
             } else if(ru_fail) {
-                for(int i=0;i<10 && nic.state!=E82557_FAILED;i++) service_tick();
-                CHECK(nic.state==E82557_FAILED && leaked==1 && nic.stop.reset_seq-nic.reset_begin==3);
+                for(int i=0;i<60 && nic.state!=E82557_FAILED;i++) {
+                    status&=~0x3c;
+                    if(!strcmp(c,"recover_reset_busy") && nic.state==E82557_RECOVER && nic.recover_step==E82557_RS_RESTART && !command) {
+                        int after; irq_depth++; status&=~0x3c; E82557_BARRIER();
+                        CHECK(scb_issue(nic.base,0,E82557_RU_START,rx_pa(),1,&after)==ISSUE_OK && after);
+                        irq_depth--; status&=~0x3c;
+                    }
+                    service_tick();
+                }
+                CHECK(nic.state==E82557_FAILED && leaked==1);
+                if(!strcmp(c,"recover_r3fail")) {
+                    CHECK(nic.stats[E82557_ST_SCB_STUCK]>=10 && nic.stats[9]==11);
+                } else {
+                    CHECK(nic.stats[E82557_ST_SCB_STUCK]>0 && nic.stop.reset_seq-nic.reset_begin==3);
+                }
             } else CHECK(nic.state==E82557_RUNNING && nic.stats[10]==1);
         }
     } else if(!strcmp(c,"ru_timeout")) {
         status=0; ru_fail=ru_starts+1; service_tick();
-        CHECK(nic.state==E82557_RECOVER && nic.stats[11]);
+        CHECK(nic.state==E82557_RUNNING && command && !nic.stats[11]);
+        status&=~0x3c; service_tick();
+        CHECK(nic.state==E82557_RECOVER && nic.stats[11]==1);
     } else if(!strcmp(c,"recovery_limit")) {
         for(int i=0;i<11;i++) {
             recover_begin();
@@ -732,6 +754,18 @@ int main(int argc,char **argv)
     memcpy(phy_regs[1],defaults,sizeof(defaults));
     phy_regs[1][0x17]=0x9014; phy_regs[1][0x19]=0x81;
     e82557_tick(); CHECK(!io_count); /* NP21/W: no probe, no I/O */
+    if (!strcmp(c,"scb_issue")) {
+        int after, rc; u32 before;
+        files[0].verified=files[1].verified=1; resets=2; now=40; mask=1; irq_depth=1;
+        post_busy=1; before=now;
+        rc=scb_issue(0x6000,E82557_CU_BASE,0,0,1,&after);
+        CHECK(rc==ISSUE_OK && after && now==before && command && !nic.stats[E82557_ST_SCB_STUCK]);
+        before=now;
+        rc=scb_issue(0x6000,0,E82557_RU_BASE,0,1,&after);
+        CHECK(rc==ISSUE_TIMEOUT && !after && now-before==100 && commands==1);
+        CHECK(nic.stats[E82557_ST_SCB_STUCK]==1);
+        return failed != 0;
+    }
     if(!strcmp(c,"nsc_rev")) phy_regs[1][3]=0x5c0f;
     if(!strcmp(c,"nsc_id1")) phy_regs[1][2]=0x2001;
     if(!strcmp(c,"nsc_id2")) phy_regs[1][3]=0x5c11;
@@ -802,7 +836,6 @@ int main(int argc,char **argv)
     if(!strncmp(c,"cu_pre",6)) cu_pre=atoi(c+6);
     if(!strncmp(c,"cu_post",7)) cu_post=atoi(c+7);
     if(!strcmp(c,"probe_ring_fail")) ru_fail=1;
-    if(!strcmp(c,"probe_ru_fail")) ru_fail=2;
     if(!strcmp(c,"lb_timeout")) lb_timeout=1;
     if(!strcmp(c,"lb_corrupt")) lb_corrupt=1;
     if(!strcmp(c,"lb_bad_status")) lb_bad_status=1;
@@ -855,14 +888,14 @@ int main(int argc,char **argv)
             CHECK(strstr(output,"LB3=FAIL") && !strstr(output,"LB3=PASS"));
             if(idle_fail) CHECK(strstr(output,"FAIL(rst:idle)") && s_reason==PCI_BIND_RESET_FAILED);
             if(pre_busy) CHECK(strstr(output,"FAIL(base:pre)"));
-            if(post_busy) CHECK(strstr(output,"FAIL(base:post)"));
+            if(post_busy==1) CHECK(strstr(output,"FAIL(base:pre)") && nic.stats[E82557_ST_SCB_STUCK]==1);
+            if(post_busy==2) CHECK(strstr(output,"FAIL(cfg:pre)") && nic.stats[E82557_ST_SCB_STUCK]==1);
             if(alloc_fail) CHECK(strstr(output,"FAIL(dma:alloc)"));
             if(cb_ng==3) CHECK(strstr(output,"FAIL(lb:txng)"));
             if(cb_fail==3) CHECK(strstr(output,"FAIL(lb:timeout)"));
             if(cu_pre==3) CHECK(strstr(output,"FAIL(lb:pre)"));
-            if(cu_post==3) CHECK(strstr(output,"FAIL(lb:post)"));
             if(pre_busy) CHECK(strstr(output,"base=timeout scb=2040"));
-            if(post_busy) CHECK(strstr(output,"base=timeout scb=0040"));
+            if(post_busy==1) CHECK(strstr(output,"base=timeout scb=0040"));
             if(lb_timeout) CHECK(strstr(output,"FAIL(lb:timeout)"));
             if(lb_corrupt || lb_bad_status || lb_short) CHECK(strstr(output,"FAIL(cmp:ng)"));
             if(stop_fail==2) CHECK(strstr(output,"FAIL(rst2:idle)"));
@@ -892,7 +925,13 @@ int main(int argc,char **argv)
         else if(!strcmp(c,"seq_ahead")) CHECK(!strcmp(files[1].data,"13\n"));
         else CHECK(!strcmp(files[1].data,"1\n"));
     }
-    if(rc==PCI_PROBE_OK && !swi_lost) runtime_tests(c);
+    if(!strcmp(c,"probe_ru_fail")) {
+        CHECK(rc==PCI_PROBE_OK && command && ru_starts==2);
+        CHECK(strstr(output,"ru=ok") && strstr(output,"LB3=PASS") && !freed && !leaked);
+        runtime=1; ru_fail=ru_starts; status&=~0x3c; service_tick();
+        CHECK(nic.state==E82557_RECOVER && nic.stats[E82557_ST_SCB_STUCK]==1);
+    }
+    if(rc==PCI_PROBE_OK && !swi_lost && strcmp(c,"probe_ru_fail")) runtime_tests(c);
     if(!strncmp(c,"module_",7)) module_stop_test(c);
     if(rc!=PCI_PROBE_OK) {
         int before_io=io_count, before_freed=freed, before_unregistered=unregistered;
