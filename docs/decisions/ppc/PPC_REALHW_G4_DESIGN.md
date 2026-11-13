@@ -310,3 +310,11 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 - N4 (P3): RH0 の操作 4 に `dev /memory` の available を足した (ELF 全長の上限)。
 - N5 (P3): §7 を決定の表に替え、既設の DHCP との競合の止め方を足した。
 
+## 実機の受入で決めたこと (2026-11-13、PM)
+- OF の画面は 8bpp (640x480、linebytes 768) だった。FB の帯は 8/16/32bpp を受け付け、8bpp は Apple の CLUT の 0 (白)・0xff (黒)・0x23 (赤) で描く。
+- /memory の reg は空の DIMM を size 0 で並べる。kboot_capture は size 0 を飛ばし、全部空なら MEMORY-EMPTY で止める (mmu_boot と同じ扱い)。
+- OF は読み込んだ像の直後に 32KiB を持ったまま available に戻さない (available は 0x192000 から)。kboot_reserve は像の直後の 64KiB までの隙間を窓から外し、image_end をその先に置く。
+- 切り離し前の停止は全部 OF の画面に `FAIL:KB:<理由>` を出す。RESERVE には理由の番号・像の範囲・RAM と available の一覧を添える。
+- リンク確立の直後に送ったフレームが届かなかった (beacon と log 0〜2)。lan_service は RUNNING の後 2 秒は送らずに受けるだけにした。
+- 実機の結果と証拠の所在は票 TASK_PPC_REALHW の §2。
+

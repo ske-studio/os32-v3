@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_SEP](TASK_PPC_SEP.md)。後続: [TASK_PPC_SPLASH](TASK_PPC_SPLASH.md) (LAN の段は票 TASK_PPC_LAN、索引から辿る)
 
-> 状態: **受入完了・実機確認待ち (2026-11-10)** — QEMU mac99 (7450・7455) で ② を通過。統合の枝 wt/ppc-kbh eaca0e75、証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。実機は DEFERRED_TESTS の PPC-KBOOT-RH。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。
+> 状態: **受入完了 (2026-11-13)** — G4 実機で確認 (票 TASK_PPC_REALHW §2)。QEMU mac99 (7450・7455) で ② を通過。統合の枝 wt/ppc-kbh eaca0e75、証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。実機の PPC-KBOOT-RH は 11-13 に閉じた。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。
 
 ## 0. ユーザー決定
 

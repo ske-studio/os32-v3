@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **受入完了・実機確認待ち (2026-11-11)** — QEMU 7450・7455 で受入済み。LAN (GMAC) で起動ログをホストへ保存し 5 診断が往復する。受入は kboot_run・kboot_accept・kboot_all に入った。実機の前の段 (UniNorth の clock の alias、実機の PHY、cache・DMA) は持越し台帳の PPC-LAN-RH。段の状態は §2。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。
+> 状態: **受入完了 (2026-11-13)** — G4 実機で確認 (票 TASK_PPC_REALHW §2)。QEMU 7450・7455 で受入済み。LAN (GMAC) で起動ログをホストへ保存し 5 診断が往復する。受入は kboot_run・kboot_accept・kboot_all に入った。実機の前の段 (UniNorth の clock の alias、実機の PHY、cache・DMA) は持越し台帳の PPC-LAN-RH。段の状態は §2。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。
 
 ## 0. ユーザー決定
 
