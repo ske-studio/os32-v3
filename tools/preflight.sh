@@ -71,28 +71,56 @@ else
     fi
 fi
 trap 'if [[ -n $probe ]]; then rm -f -- "$probe/true32"; rmdir -- "$probe"; fi' EXIT
-for font in ipaexg.ttf ipaexm.ttf; do
+# Every font fetch_fonts.py fetches (IPAex, Inconsolata + OFL, Shinonome 16 + license):
+# name<TAB>SHA-256, read from its literals without importing it.
+font_list=$(python3 -B - <<'PY'
+import ast, hashlib
+from pathlib import Path
+try:
+    tree = ast.parse(Path('tools/fetch_fonts.py').read_text())
+except (OSError, SyntaxError):
+    raise SystemExit(0)
+values = {}
+for node in tree.body:
+    if isinstance(node, ast.Assign):
+        for t in node.targets:
+            if isinstance(t, ast.Name):
+                values[t.id] = node.value
+def lit(name):
+    node = values.get(name)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'encode' and isinstance(node.func.value, ast.Constant)):
+        return node.func.value.value.encode('utf-8')
+    return ast.literal_eval(node) if node is not None else None
+rows = []
+for table in ('MEMBERS', 'INCONSOLATA_MEMBERS', 'JFDOT_MEMBERS'):
+    rows += list((lit(table) or {}).values())
+if lit('OFL_NAME') and lit('OFL_SHA256'):
+    rows.append((lit('OFL_NAME'), lit('OFL_SHA256')))
+if lit('JFDOT_LICENSE_NAME') and lit('JFDOT_LICENSE_TEXT'):
+    rows.append((lit('JFDOT_LICENSE_NAME'), hashlib.sha256(lit('JFDOT_LICENSE_TEXT')).hexdigest()))
+for name, digest in rows:
+    print(name + '\t' + digest)
+PY
+)
+[[ -n $font_list ]] || ng 'フォント: tools/fetch_fonts.py から取得物の一覧を読めない'
+while IFS=$'\t' read -r font digest; do
+    [[ -n $font ]] || continue
     if [[ -f assets/fonts/$font ]]; then
         ok "フォント: $font あり"
     elif ((!fix_fonts)); then
         ng "フォント: $font 無し — --fix-fonts または make fonts を実行してください"
-    elif python3 -B - "$common" "$font" <<'PY'
-import ast, hashlib, shutil, sys
+    elif python3 -B - "$common" "$font" "$digest" <<'PY'
+import hashlib, shutil, sys
 from pathlib import Path
 try:
-    tree = ast.parse(Path('tools/fetch_fonts.py').read_text())
-    members = next(ast.literal_eval(node.value) for node in tree.body
-                   if isinstance(node, ast.Assign)
-                   and any(isinstance(t, ast.Name) and t.id == 'MEMBERS' for t in node.targets))
-    name = sys.argv[2]
-    digest = next(d for n, d in members.values() if n == name)
-    source = Path(sys.argv[1]).parent / 'assets/fonts' / name
-    if hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+    source = Path(sys.argv[1]).parent / 'assets/fonts' / sys.argv[2]
+    if hashlib.sha256(source.read_bytes()).hexdigest() != sys.argv[3]:
         sys.exit(1)
-    dest = Path('assets/fonts') / name
+    dest = Path('assets/fonts') / sys.argv[2]
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, dest)
-except (OSError, ValueError, SyntaxError, StopIteration):
+except OSError:
     sys.exit(1)
 PY
     then
@@ -100,7 +128,7 @@ PY
     else
         ng "フォント: $font 無し (コピー元無し・hash 不一致・コピー不可) — --fix-fonts または make fonts を実行してください"
     fi
-done
+done <<< "$font_list"
 runners=${HOST32_RUNNERS-'native qemu'}
 [[ -n ${runners//[[:space:]]/} ]] || ng 'runner: 空 — HOST32_RUNNERS=qemu を設定してください'
 for runner in $runners; do
