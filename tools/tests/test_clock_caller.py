@@ -16,6 +16,10 @@ from kernel_includes import include_flags
 from host32 import run as host_run
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
+     'out->ready = ps->valid;'),
+    ('platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',
+     '(void)tick_clock_config(ps->reload, ps->clk_hz); clock_config_rc = 0;'),
     ('platform/pc98/clock_source.c', '        tick_clock_raw(&raw_lo, &raw_hi);',
      '        raw_lo = tick_count; raw_hi = 0;'),
     ('platform/pc98/clock_source.c', '            raw += snap.tick;',
