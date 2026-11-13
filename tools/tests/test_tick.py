@@ -21,7 +21,7 @@ OWNERS = {
     'drivers/sound/cs4231/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
     'drivers/net/ne2000/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
     'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
-    'net/nic.c': ('LINK', 'net_tick', 'int net_bind('),
+    'net/nic.c': ('LINK', 'net_jiffy', 'int net_bind('),
     'drivers/net/ne2000/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
     'drivers/video/geforce/geforce_tick.c': ('GF', 'geforce_tick', 'int geforce_tick_bind('),
 }

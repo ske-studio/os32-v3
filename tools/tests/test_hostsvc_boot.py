@@ -17,6 +17,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/nic.c',
     'net/nic.h',
     'net/nic_rx.h',
+    'net/rx_work.h',
     'net/nic_e82557.c',
     'net/nic_lgy98.c',
     'net/link.h', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
@@ -119,7 +120,8 @@ def main():
     originals = [(ROOT / path).read_text() for path in SOURCES]
     with tempfile.TemporaryDirectory(prefix='hostsvc-boot-') as tmp:
         work = Path(tmp)
-        (work / 'io.h').write_text('unsigned int boot_irq_save(void);\n'
+        (work / 'io.h').write_text('int _irq_enabled(void);\n'
+            'unsigned int boot_irq_save(void);\n'
             'void boot_irq_restore(unsigned int);\n'
             '#define irq_save boot_irq_save\n#define irq_restore boot_irq_restore\n')
         results = build_run(work, originals)

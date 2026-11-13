@@ -25,6 +25,7 @@ void link_init(const u8 mac[ETH_ALEN]);
 #include "bootinfo.h"
 #include "bootinfo_native.h"
 #include "io.h"
+#include "net/rx_work.h"
 extern const struct NetAdapter net_lgy98_adapter;
 void *kmemset(void *dst, int value, u32 n)
 { u8 *p = dst; for (u32 i = 0; i < n; i++) p[i] = (u8)value; return dst; }
@@ -97,7 +98,7 @@ int module_ref_release(struct module_handle h, enum module_ref_kind kind)
 int tick_register(unsigned int slot, tick_fn fn)
 {
     if (slot == PC98_TICK_LINK) {
-        if (fn != net_tick) return TICK_ERR_INVAL;
+        if (fn != net_jiffy) return TICK_ERR_INVAL;
         link_registrations++;
     }
     return 0;
@@ -141,8 +142,17 @@ void net_rx_demux(const struct NetNicOps *ops, const u8 *mac, const u8 *peer)
         for (u32 i = 0; i < 6; i++)
             if (peer[i] != configured_peer[i]) saw_fixed_peer = -1;
 }
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 mac[6],
+                        const u8 peer[6], struct rx_work_budget *budget)
+{ (void)budget; net_rx_demux(ops, mac, peer); return 0; }
+void rx_work_begin(struct rx_work_budget *budget)
+{ budget->start = budget->used = budget->limit_us = 0; budget->max_frames = NET_RX_SCAN_MAX; }
+static void (*rx_idle)(void);
+int idle_work_register(void (*fn)(void)) { rx_idle = fn; return 0; }
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 unsigned int ne2k_rx_ring_free_pages(void) { return 8; }
 unsigned int ne2k_rx_queue_free(void) { return 4; }
+int _irq_enabled(void) { return 1; }
 unsigned int boot_irq_save(void) { return 0; }
 void boot_irq_restore(unsigned int flags) { (void)flags; }
 
@@ -158,7 +168,7 @@ static int boot_run(int mode)
     if (mac[0] != (present ? 16 : 0)) return 23;
     if (link_inits != 1 || link_registrations != 1) return 24;
     if (record.active_refs != (present ? 1u : 0u)) return 25;
-    net_tick();
+    net_jiffy();
     if (link_ticks != 1) return 26;
     if (mode >= 6) {
         link_hello_ok = 1;
@@ -173,8 +183,10 @@ static int boot_run(int mode)
         rc = net_start(NET_NIC_AUTO, peer);
         if (rc || link_inits != 2) return 31;
     } else if (rc) return 28;
-    net_tick();
+    net_jiffy();
     if (mode != 7 && (link_inits != 1 || syns + tx_calls != 1)) return 29;
+    if (!rx_idle) return 33;
+    rx_idle();
     if (saw_fixed_peer != (mode >= 5)) return 32;
     net_unbind();
     if (record.active_refs || net_mac(mac) != OS32_ERR_HOSTDOWN) return 27;
