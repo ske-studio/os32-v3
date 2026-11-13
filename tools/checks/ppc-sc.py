@@ -1,6 +1,6 @@
 """Register N01 guest acceptance."""
-CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=['make:all'],
-             covers=['tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
+CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=['make:kernel'],
+             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'build/ppc-user.mk', 'build/ppc-kboot.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
@@ -25,7 +25,7 @@ def run(ctx):
     import shutil
     from pathlib import Path
     # PPC guest checks are optional on CI, which has no PPC toolchain.
-    required = ("/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc",
+    required = (str(Path(os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc"))/"bin/powerpc-elf-gcc"),
                 "qemu-system-ppc", "genisoimage")
     if any(shutil.which(tool) is None for tool in required) or not Path("/usr/share/qemu/openbios-ppc").is_file():
         print("SKIP ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable")

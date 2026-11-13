@@ -1,6 +1,6 @@
 """PowerMac USB serial acceptance and optional LAN RPC-stall regression."""
-CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:all'],
-             covers=['tools/checks/ppc-usb.py', 'tools/ppc/usb_run.py',
+CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
+             covers=['platform/powermac/console_stream.c', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/checks/ppc-usb.py', 'tools/ppc/usb_run.py',
                      'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'platform/powermac/terminal_input.c',
                      'drivers/usb/*.[ch]', 'include/usb_platform.h', 'include/endian_dma.h',
