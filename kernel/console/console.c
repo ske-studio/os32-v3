@@ -163,25 +163,9 @@ void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
 /*  コンソール出力 (カーソル追従)                                            */
 /* ======================================================================== */
 
-/* The shell's serial clear is bytewise ESC[2J ESC[H. Keep the mirrored
- * bytes intact while applying these two controls to the local text backend. */
-static unsigned clear_escape;
-static int text_control(char ch)
-{
-    if (ch == 27) { clear_escape = 1; return 1; }
-    if (!clear_escape) return 0;
-    if (clear_escape == 1 && ch == '[') { clear_escape = 2; return 1; }
-    if (clear_escape == 2 && ch == '2') { clear_escape = 3; return 1; }
-    if (clear_escape == 3 && ch == 'J') tvram_clear();
-    else if (clear_escape == 2 && ch == 'H') cursor_x = cursor_y = 0;
-    clear_escape = 0;
-    return 1;
-}
-
 /* 1文字出力 (ハードウェアカーソルは同期しない内部版) */
 static void putchar_raw(char ch, u8 color)
 {
-    if (text_control(ch)) return;
     if (ch == '\n') {
         cursor_x = 0;
         cursor_y++;

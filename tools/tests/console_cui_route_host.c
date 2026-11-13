@@ -217,12 +217,14 @@ static void serial_clear(void)
     const char sequence[] = "\033[2J\033[H";
     for (unsigned i = 0; i < sizeof(sequence)-1; i++)
         shell_putchar(sequence[i], TATTR_WHITE);
-    CHECK(!cursor_x && !cursor_y && text[0] == ' ', "serial clear text");
+    CHECK(cursor_x == 14 && cursor_y == 3, "literal escape cursor");
+    for (unsigned i = 0; i < sizeof(sequence)-1; i++)
+        CHECK(text[3 * 80 + 7 + i] == (u8)sequence[i], "literal escape bytes");
     CHECK(mirror_n == sizeof(sequence)-1, "serial clear stream");
     for (unsigned i = 0; i < mirror_n; i++)
         CHECK(mirror[i] == sequence[i], "serial clear stream");
     shell_putchar('Z', TATTR_WHITE);
-    CHECK(text[0] == 'Z' && cursor_x == 1 && !cursor_y, "serial clear origin");
+    CHECK(text[3 * 80 + 14] == 'Z' && cursor_x == 15 && cursor_y == 3, "literal escape origin");
     boot_serial_mirror = 0;
     say("PASS serial clear / local origin / exact mirrored escapes\n");
 }

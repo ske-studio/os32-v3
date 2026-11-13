@@ -9,12 +9,14 @@ void console_stream_write(const void *bytes, u32 len)
     const struct ppc_boot_devices *dev = ppc_boot_devices();
     struct pm_escc serial = { dev->escc_csr_va, dev->escc_data_va, 0 };
     pm_term_write(bytes, len);
+    pm_terminal_poll();
     (void)pm_escc_write(&serial, bytes, len);
 }
 
 #include "kboot_log.h"
 #include "console_output.h"
 #include "console.h"
+#include "tvram.h"
 #include "kstring.h"
 extern int boot_serial_mirror;
 static int stream_putchar(char ch)
@@ -39,3 +41,10 @@ void pm_cli_write(const void *buf, u32 size)
 static void emergency_puts(const char *s) { pm_log_write(s, kstrlen(s)); }
 static int emergency_gate(void) { return 0; }
 const EmergencyOps emergency_output = { emergency_puts, emergency_gate };
+
+/* KAPI clear: local grid and terminal control bytes have separate routes. */
+void pm_console_clear(void)
+{
+    tvram_clear();
+    console_stream_write("\033[2J\033[H", 7);
+}

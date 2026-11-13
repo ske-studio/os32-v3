@@ -36,4 +36,4 @@ void tvram_scroll(void) { con_backend_scroll(TVRAM_ROWS - g_scroll_reserve); }
 
 - start時sink_disable→kbd_inject_discard→GUIだった場合だけclear→enableを保存。clearはV86でも書く現挙動を勝手に抑止しない。
 
-- bytewise の `shell_putchar` と `shell_print` は `ESC[2J` (clear)・`ESC[H` (原点) をローカルの text backend に反映する。mirror/sink/bootlog へは元の byte 列を 1 回送る。描画抑止の門は先に評価する。console-cui-route-host がローカルの clear と原点、mirror の escape 列を変異で検査する。
+- `shell_putchar`・`shell_print` は ESC 列を解釈せず通常の文字として描画する。mirror/sink/bootlog へは元の byte 列を送る。console-cui-route-host が ESC 列の描画と mirror の byte 列を検査する。

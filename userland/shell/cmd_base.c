@@ -45,12 +45,7 @@ static int cmd_help(int argc, char **argv)
 static int cmd_clear(int argc, char **argv)
 {
     (void)argc; (void)argv;
-#ifdef SH_CLEAR_TERMINAL
-    const char *p = "\033[2J\033[H";
-    while (*p) g_api->shell_putchar(*p++, ATTR_WHITE);
-#else
     g_api->tvram_clear();
-#endif
     return 0;
 }
 

@@ -31,6 +31,7 @@ console_get_cursor_x
 console_get_cursor_y
 console_get_size
 console_set_cursor
+pm_console_clear
 dev_api_get_info
 dev_blk_read_lba
 dev_blk_write_lba
@@ -170,7 +171,7 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 200
+    assert len(entries) == 199
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
