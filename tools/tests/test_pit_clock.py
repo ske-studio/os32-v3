@@ -49,12 +49,18 @@ INCLUDES = include_flags(ROOT)
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (パターン, 置換, 説明)
 MUTATIONS = [
-    (r"raw = clk_hz / \(unsigned long\)hz;",
-     "raw = (unsigned long)SYSCLK_1997 / (unsigned long)hz;",
+    (r"reload = \(unsigned int\)raw;",
+     "reload = (unsigned int)(SYSCLK_1997 / hz);",
      "クロックを見ずに 1.9968MHz で割る (= 直す前の姿。実機で tick 8.125ms)"),
-    (r"    if \(hz != \(unsigned int\)PIT_HZ\) \{\n        return PIT_ERR_HZ;\n    \}\n",
+    (r"    if \(hz != \(unsigned int\)PIT_HZ && hz != 1000u\) \{\n        return PIT_ERR_HZ;\n    \}\n",
      "",
      "100Hz 以外を受けてしまう (端数のリロード値が積まれ周期がずれる)"),
+    (r"raw = \(clk_hz \+ \(unsigned long\)hz / 2\) / \(unsigned long\)hz;",
+     "raw = clk_hz / (unsigned long)hz;",
+     "最近接を切り捨てに戻す"),
+    (r"hz != \(unsigned int\)PIT_HZ && hz != 1000u",
+     "hz != (unsigned int)PIT_HZ",
+     "1000Hz を断る"),
     (r"    if \(clk_hz != \(unsigned long\)SYSCLK_1997 &&\n"
      r"        clk_hz != \(unsigned long\)SYSCLK_2458\) \{\n"
      r"        return PIT_ERR_CLOCK;\n    \}\n",

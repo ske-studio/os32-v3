@@ -6,7 +6,9 @@
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
 ARCH ?= x86
 PLATFORM ?= pc98
-ifeq ($(ARCH),ppc)
+ifeq ($(TICK1K),1)
+BUILD_OUT ?= build/out/tick1k
+else ifeq ($(ARCH),ppc)
 BUILD_OUT ?= build/out/ppc-powermac
 else
 BUILD_OUT ?= build/out
