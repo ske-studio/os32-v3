@@ -10,7 +10,7 @@ struct fbcon_cell { u16 code; u8 attr, part; }; /* part: 0=ANK, 1/2=wide */
 struct fbcon {
     struct gfx_console_target *target;
     const KcgModuleApi *font;
-    struct fbcon_cell *cells;
+    struct fbcon_cell *cells, *drawn;
     struct con_geometry geometry;
     unsigned top;
     u8 fg, bg;
@@ -21,6 +21,7 @@ void fbcon_set_colors(struct fbcon *, u8, u8);
 void fbcon_detach(struct fbcon *);
 void fbcon_clear(struct fbcon *);
 void fbcon_scroll(struct fbcon *, int);
+void fbcon_scroll_n(struct fbcon *, int rows, int n);
 void fbcon_putchar(struct fbcon *, int, int, u16, u8, int);
 void fbcon_readchar(struct fbcon *, int, int, u16 *, u8 *);
 int fbcon_reverse(struct fbcon *, int, int);

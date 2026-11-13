@@ -7,15 +7,24 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('hidden cursor', '(((s->attr & 1) && (ink ^ inverse)) ^ cursor)', '(s->attr & 1) && (ink ^ inverse ^ cursor)'),
+    ('cursor clamp', 'x = c->geometry.cols - 1;', 'x = c->geometry.cols;'),
+    ('hidden move', 'if (!c->visible) return;', 'if (0) return;'),
+    ('same position', 'if (x == ox && y == oy) return;', 'if (0) return;'),
+    ('same shape', 'if (c->visible == !!visible) return;', 'if (0) return;'),
+    ('scroll unchanged', 'next.part == old.part) continue;', 'next.part == old.part && 0) continue;'),
+    ('scroll amount', 'if (n > rows) n = rows;', 'n = 1;'),
+    ('wide cursor overlay', '(s->part == 1 && x + 1 == c->cursor_x)', '(0)'),
+    ('wide cursor erase', 'w = c->cells[y * c->geometry.cols + x].part ? 2 : 1;\n    redraw(c, x, y, w, 1);\n}\n\nvoid fbcon_cursor_at', 'w = 1;\n    redraw(c, x, y, w, 1);\n}\n\nvoid fbcon_cursor_at'),
     ('colors swapped', '? c->fg : c->bg;', '? c->bg : c->fg;'),
-    ('scroll redraw removed', 'redraw(c, 0, 0, cols, rows);', '(void)cols;'),
+    ('scroll redraw removed', 'paint(c, x, y, pixels);', '(void)cols;'),
     ('width fixed', 'cols = t->width / 8;', 'cols = 80;'),
     ('top ignored', 'c->top = top_pixels;', 'c->top = 0;'),
     ('wide trailing cell', 'if (wide) c->cells[y * c->geometry.cols + x + 1] =', 'if (0) c->cells[y * c->geometry.cols + x + 1] ='),
     ('bit order', '0x80u >> bit', '1u << bit'),
-    ('scroll short', 'i < cols * (rows - 1)', 'i < cols * (rows - 2)'),
-    ('scroll long', 'i < cols * (rows - 1)', 'i < cols * rows'),
-    ('old cursor', 'if (inside(c, ox, oy)) redraw(c, ox, oy, 1, 1);', 'if (inside(c, ox, oy)) { (void)ox; (void)oy; }'),
+    ('scroll short', 'i < cols * (rows - n)', 'i < cols * (rows - n - 1)'),
+    ('scroll long', 'i < cols * (rows - n)', 'i < cols * rows'),
+    ('old cursor', 'redraw_cursor(c, ox, oy);', '(void)ox; (void)oy;'),
 ]
 def build_run(tmp, source):
     (tmp / 'fbcon_source.inc').write_text(source)

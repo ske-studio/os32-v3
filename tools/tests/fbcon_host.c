@@ -109,6 +109,19 @@ static void scenario(unsigned w,unsigned h) {
     con_backend_cursor_at(1,1);
     CHECK(pixel(&t,0,78)==bg && pixel(&t,8,94)==fg);
     con_backend_cursor_shape(0); CHECK(pixel(&t,8,94)==bg);
+    int before = presents;
+    con_backend_cursor_at(4,1); CHECK(presents == before);
+    con_backend_cursor_shape(0); CHECK(presents == before);
+    con_backend_cursor_shape(1); before = presents;
+    con_backend_cursor_at(4,1); con_backend_cursor_shape(1); CHECK(presents == before);
+    con_backend_putchar(4,1,'A',0xe0);
+    CHECK(pixel(&t,32,80)==bg && pixel(&t,32,94)==fg);
+    con_backend_cursor_at(cols,1); CHECK(pixel(&t,(cols-1)*8,94)==fg);
+    con_backend_cursor_at(3,0);
+    CHECK(pixel(&t,16,78)==fg && pixel(&t,24,78)==fg);
+    con_backend_cursor_at(5,1);
+    CHECK(pixel(&t,16,78)==bg && pixel(&t,24,78)==bg);
+    con_backend_cursor_shape(0);
     con_backend_putchar(3,0,' ',0xe1); cell(2,0,' '); cell(3,0,' ');
     tvram_clear(); console_set_cursor(0,0); con_backend_cursor_shape(0);
     shell_print("AA\b\rA\nA",0xe1);
@@ -160,4 +173,29 @@ static void fake_pc98_colors(void) {
     fbcon_clear(&c); mask(&t,0,64,blank,8);
     fbcon_detach(&c);
 }
-void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); fake_pc98_colors(); say("PASS fbcon R1 R2\n"); finish(0); }
+static int painted;
+static void count_ank(u8 code, u8 *glyph) { painted++; kcg_file_api.read_ank(code,glyph); }
+static void count_kanji(u16 code, u8 *glyph) { painted++; kcg_file_api.read_kanji(code,glyph); }
+static void scroll_counts(void) {
+    struct fbcon c={0};
+    struct gfx_console_target t={.width=640,.height=480,.pitch=653};
+    KcgModuleApi font=kcg_file_api;
+    font.read_ank=count_ank; font.read_kanji=count_kanji;
+    CHECK(!fbcon_attach(&c,&t,&font,64));
+    /* G4 80x26: a sparse line changes only its old/new cells. */
+    fbcon_putchar(&c,0,1,'A',0xe1,0);
+    int before=painted, transactions=presents;
+    fbcon_scroll(&c,26);
+    CHECK(presents-transactions==1);
+    CHECK(painted-before==2); /* 2 cells, versus the previous 2080. */
+    say("PASS G4 scroll: 2 cells (previous 2080)\n");
+    fbcon_putchar(&c,0,2,'A',0xe1,0);
+    before=painted;
+    fbcon_scroll_n(&c,26,2);
+    CHECK(painted-before==1);
+    CHECK(c.cells[0].code=='A' && c.cells[80].code==' ' && c.cells[160].code==' ');
+    fbcon_scroll_n(&c,26,30);
+    CHECK(c.cells[0].code==' ');
+    fbcon_detach(&c);
+}
+void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); fake_pc98_colors(); scroll_counts(); say("PASS fbcon R1 R2\n"); finish(0); }
