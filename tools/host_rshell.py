@@ -33,7 +33,8 @@ def diag_command(line):
         payload = struct.pack('!IHH', address, length, 0)
     else:
         raise ValueError('invalid diagnostic arguments')
-    return str(opcode).encode('ascii') + b' ' + payload.hex().encode('ascii')
+    # Guest link_diag.c: id8 SP decimal-opcode [SP BE-argument-hex] LF (no SP without arguments).
+    return str(opcode).encode('ascii') + (b' ' + payload.hex().encode('ascii') if payload else b'')
 
 
 class Operator:

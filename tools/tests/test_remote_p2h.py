@@ -54,8 +54,8 @@ def test(agent_path, operator_path):
             return dict(ok=True, state=agent.operator.pending['state'])
     host = Host.__new__(Host)
     host.transport = Transport()
-    for command, encoded in [('status', b'1 '), ('clock', b'2 '),
-                             ('memory', b'3 '), ('read-diag 0x12 3', b'4 00120003'),
+    for command, encoded in [('status', b'1'), ('clock', b'2'),
+                             ('memory', b'3'), ('read-diag 0x12 3', b'4 00120003'),
                              ('peek 0x12345678 256', b'5 1234567801000000')]:
         ident = agent.operator.submit('diag', command, None)
         assert sent[-1] == (65532, 1, ident.encode() + b' ' + encoded + b'\n'), 'diag BE encoding'
