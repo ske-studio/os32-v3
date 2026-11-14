@@ -1,5 +1,5 @@
 """QEMU INDEX8 shell pixel acceptance with product runtime mutations."""
-CHECK = dict(name='ppc-fb', tier=2, budget=900, needs=['make:kernel'], covers=[
+CHECK = dict(name='ppc-fb', tier=2, budget=900, needs=['make:kernel'], covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py',
     'tools/checks/ppc-fb.py', 'tools/ppc/fb_run.py', 'tools/ppc/fb_pixel.py',
     'tools/ppc/usb_run.py', 'tools/ppc/sd_run.py', 'tools/ppc/kboot_accept.py',
     'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py', 'tools/ppc/run.py',
