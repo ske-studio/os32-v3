@@ -18,30 +18,30 @@ static unsigned int cstr(const char *s, char *dst, unsigned int cap)
 
 static int link_wait_up(u32 ticks)
 {
-    u32 deadline = tick_count + ticks;
-    while (link_state != LINK_S_UP && (i32)(deadline - tick_count) > 0) LINK_IDLE();
+    u32 deadline = link_platform_now() + ticks;
+    while (link_state != LINK_S_UP && (i32)(deadline - link_platform_now()) > 0) LINK_IDLE();
     return link_state == LINK_S_UP;
 }
 
 /* open を AGAIN / FULL の間だけ待つ。戻り値 = ハンドル / 負。 */
 static i32 link_wait_open(const char *req, u32 len, u32 ticks)
 {
-    u32 deadline = tick_count + ticks;
+    u32 deadline = link_platform_now() + ticks;
     for (;;) {
         i32 h = link_host_open(req, len, LINK_SELF_OWNER);
         if (h >= 0 || (h != OS32_ERR_AGAIN && h != OS32_ERR_FULL)) return h;
-        if ((i32)(deadline - tick_count) <= 0) return OS32_ERR_AGAIN;
+        if ((i32)(deadline - link_platform_now()) <= 0) return OS32_ERR_AGAIN;
         LINK_IDLE();
     }
 }
 
 static i32 link_wait_status(i32 h, u32 *st, u32 *ln, u32 ticks)
 {
-    u32 deadline = tick_count + ticks;
+    u32 deadline = link_platform_now() + ticks;
     for (;;) {
         i32 rc = link_host_status(h, st, ln, LINK_SELF_OWNER);
         if (rc != OS32_ERR_AGAIN) return rc;
-        if ((i32)(deadline - tick_count) <= 0) return OS32_ERR_AGAIN;
+        if ((i32)(deadline - link_platform_now()) <= 0) return OS32_ERR_AGAIN;
         LINK_IDLE();
     }
 }
@@ -49,7 +49,7 @@ static i32 link_wait_status(i32 h, u32 *st, u32 *ln, u32 ticks)
 /* 本文を全部消費する。verify なら offset の下位 8bit と照合する。 */
 static u32 link_wait_read_all(i32 h, u32 ticks, int verify)
 {
-    u32 deadline = tick_count + ticks;
+    u32 deadline = link_platform_now() + ticks;
     u32 off = 0;
     for (;;) {
         const u8 *src = 0;
@@ -57,7 +57,7 @@ static u32 link_wait_read_all(i32 h, u32 ticks, int verify)
         if (n == 0) return off;
         if (n < 0) {
             if (n != OS32_ERR_AGAIN) return off;
-            if ((i32)(deadline - tick_count) <= 0) return off;
+            if ((i32)(deadline - link_platform_now()) <= 0) return off;
             LINK_IDLE();
             continue;
         }

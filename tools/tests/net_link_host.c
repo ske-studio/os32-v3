@@ -186,6 +186,7 @@ u32 net_rx_credit_bytes(void)
 /*  贋タイマ + 贋 cli / sti                                                  */
 /* ======================================================================== */
 volatile u32 tick_count = 0;
+u32 link_platform_now(void) { return tick_count; }
 static int  irq_depth = 0;              /* IF=0 のネスト段数 */
 static u32  timer_deferred = 0;         /* IF=0 中に延期した tick 数 */
 static u32  timer_ran = 0;
@@ -201,13 +202,13 @@ static void run_link_tick(void)
     link_tick_fwd();
 }
 
-unsigned int link_test_irq_save(void)
+u32 link_platform_lock(void)
 {
     irq_depth++;
     return 0;
 }
 
-void link_test_irq_restore(unsigned int flags)
+void link_platform_unlock(u32 flags)
 {
     (void)flags;
     irq_depth--;
@@ -231,7 +232,7 @@ static void host_tick(void)
 }
 
 /* link.c の hlt 待ちの代わり (IF=1 で次のタイマまで寝る)。 */
-void link_test_idle(void) { host_tick(); }
+void link_platform_idle(void) { host_tick(); }
 
 static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 
@@ -1176,12 +1177,12 @@ static void irq_if0_defers_the_timer_then_runs_it(void)
 
     script_handshake(SCRIPT_SESS, 0);
     ran0 = timer_ran;
-    f = link_test_irq_save();
+    f = link_platform_lock();
     host_tick();
     host_tick();
     check(timer_ran == ran0, "IF=0 中にタイマが走った");
     check(timer_deferred == 2, "延期が数えられていない");
-    link_test_irq_restore(f);
+    link_platform_unlock(f);
     check(timer_ran == ran0 + 1, "復元直後の tick が走らない");
 }
 

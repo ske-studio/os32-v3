@@ -104,9 +104,10 @@ int tick_register(unsigned int slot, tick_fn fn)
     return 0;
 }
 volatile u32 tick_count;
-unsigned int link_test_irq_save(void) { return 0; }
-void link_test_irq_restore(unsigned int f) { (void)f; }
-void link_test_idle(void) { }
+u32 link_platform_now(void) { return tick_count; }
+u32 link_platform_lock(void) { return 0; }
+void link_platform_unlock(u32 f) { (void)f; }
+void link_platform_idle(void) { }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
 void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)

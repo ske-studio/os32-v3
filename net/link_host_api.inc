@@ -25,7 +25,7 @@ void link_host_progress(i32 h)
     struct link_handle *e = &link_h[h];
     struct link_host_deadline *d = link_deadline_for(e);
     if (d && !d->expired && e->state != LINK_H_FREE && e->state != LINK_H_STALE)
-        d->progress_tick = tick_count;
+        d->progress_tick = link_platform_now();
 }
 
 void link_host_deadlines(void)
@@ -37,7 +37,7 @@ void link_host_deadlines(void)
             e->state == LINK_H_STALE || e->state == LINK_H_DONE) continue;
         /* All bytes received means only the local reader remains. */
         if (e->state == LINK_H_RESP && e->recv_bytes >= e->length) continue;
-        if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
+        if ((u32)(link_platform_now() - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
         d->expired = 1;
         /* Keep the existing session failure detector alive after local expiry
          * (N4). RELEASE replaces request/body retransmission, and RELACK can
@@ -213,9 +213,9 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->w_due = 0;
         e->decl_len = link_decl_len((const char *)e->req_copy, len);
         e->wsent_total = 0;
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         link_deadline[hh] = (struct link_host_deadline){
-            .progress_tick = tick_count, .rid = e->rid,
+            .progress_tick = link_platform_now(), .rid = e->rid,
             .gen = e->gen, .epoch = e->epoch, .expired = 0
         };
         e->retries = 0;

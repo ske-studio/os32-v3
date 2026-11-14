@@ -20,7 +20,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/rx_work.h',
     'net/nic_e82557.c',
     'net/nic_lgy98.c',
-    'net/link.h', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
+    'net/link.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
     'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
     'kernel/irq/tick.h',
     'kernel/irq/irq.h',
