@@ -69,6 +69,7 @@
     "mm/shlib.c",
     "mm/shm.c",
     "kernel/gui.c",
+    "kernel/input_legacy.c",
     "kernel/input_service.c",
     "kernel/time/clock_service.c",
     "kernel/port_service.c",

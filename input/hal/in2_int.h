@@ -17,9 +17,11 @@ struct InputLegacyProvider {
     int (*peek_key)(void);
     int (*gui_active)(void);
     int (*terminal_enabled)(void);
-    void (*park_poll)(u32 tick);
+    void (*park_poll)(void);
     void (*park_kbd)(int interruptible);
 };
+
+void input_legacy_register(const struct InputLegacyProvider *provider);
 
 enum { IL_CHAR = 0, IL_KEY = 1, IL_LOCAL_CHAR = 2 };
 int input_legacy_peek(int mode);

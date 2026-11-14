@@ -1,3 +1,4 @@
+#include "../../kernel/input_legacy.c"
 /* Compile real console/FM/serial/kbd/IME bodies and the rshell wrapper.
  * Replace device I/O, scheduler landings and dictionary storage. */
 #include "types.h"
@@ -554,6 +555,7 @@ static int test(void)
 }
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     pc98_d2_bind();
     int rc=test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");

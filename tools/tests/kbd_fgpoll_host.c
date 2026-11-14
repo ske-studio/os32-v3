@@ -1,3 +1,4 @@
+#include "../../kernel/input_legacy.c"
 /* F2/F2i: compile the real keyboard with a foreground/device boundary.
  * No drawing or real keyboard input is needed to advance the wait loops. */
 #include "types.h"
@@ -141,6 +142,7 @@ static int test(void)
 
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     int rc = test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
@@ -148,3 +150,6 @@ void _start(void)
 
 /* Device work is covered by ne2k_bh_host; this fixture supplies no callbacks. */
 void idle_work_run(void) { }
+
+int serial_peekchar(void) { return serial_byte; }
+int kbd_inject_peek(u8 *out) { if (injected < 0) return 0; *out = (u8)injected; return 1; }
