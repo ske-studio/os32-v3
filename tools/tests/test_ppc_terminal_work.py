@@ -2,7 +2,7 @@
 """期待の出所: AC-CTX-1 と P3 確定設計 v2 §2 の PLN1 work・入口/endpoint の別計数。"""
 CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budget=30,
     covers=['tools/tests/test_ppc_terminal_work.py', 'tools/tests/host32.py',
-            'tools/tests/cc_cache.py', 'platform/powermac/terminal_input.c',
+            'platform/powermac/terminal_input.c',
             'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
             'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
             'init/ppc_kernel.c', 'build/ppc-kboot.mk', 'net/nic.c', 'kernel/idle_work.c',
@@ -113,7 +113,8 @@ void _start(void) { int rc = run(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     for key, value in [('USB', usb), ('LAN', lan), ('TERMINAL', terminal), ('ENTRY', entry)]:
         harness = harness.replace('\n' + key + '\n', '\n' + value + '\n')
     (tmp / 'test.c').write_text(source + harness)
-    flags = ['-m32', '-std=gnu11', '-DKBOOT_SH=1', '-DPM_TERMINAL_TEST', '-D__cdecl=',
+    # -Wno-unused-variable: the extracted pm_lan_poll prefix leaves the state machine's locals unused.
+    flags = ['-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-DKBOOT_SH=1', '-DPM_TERMINAL_TEST', '-D__cdecl=',
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static']
     includes = ['.', 'include', 'kernel', 'platform/powermac', 'arch/ppc', 'sdk/include/os32']
     subprocess.run(['gcc', *flags, *['-I' + str(ROOT / p) for p in includes],
