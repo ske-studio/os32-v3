@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """Shared compatibility vectors; partial host evidence never closes an ID."""
+# powermac の stub は契約の形であって、今の PPC の実物ではない (os32powerpc 2026-11-14):
+# ppc_irq_save は MSR 全体を返す (保存値は不透明として比べない)、_idle (arch_cpu_idle) は
+# 今は noreturn — F2a までは PPC の AC-SYNC-2 を UNIMPL のままにする。
 CHECK = dict(name='arch-compat-host', tier=2, budget=15, needs=[], covers=[
     'tools/tests/test_arch_compat.py', 'tools/tests/arch_compat_vectors.c',
     'tools/tests/host32.py', 'docs/decisions/ARCH_COMPAT_CONTRACT.md',
