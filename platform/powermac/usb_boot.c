@@ -102,7 +102,8 @@ void pm_usb_boot(u32 tb_hz)
     if (active && usbp_tick_attach(service)) usbp_log("USB TICK error");
 }
 
-/* USER syscalls keep EE clear. Poll only USB at real 10ms intervals;
+/* AC-CTX-1: USER syscalls dispatch in FG1 with EE=1.
+ * Poll only USB at real 10ms intervals under the saved IRQ state;
  * DEC alone owns tick_count and its catch-up dispatch. */
 void pm_usb_poll(void)
 {

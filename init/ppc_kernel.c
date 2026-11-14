@@ -390,6 +390,8 @@ void ppc_kernel_main(void)
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
         pm_usb_boot(info->tb_hz);
+        int work_rc = pm_terminal_work_register();
+        if (work_rc) kprintf(KBOOT_ATTR, "TERMINAL WORK error rc=%d\r\n", work_rc);
         pm_input_boot();
 #endif
         pm_exec_boot();

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Check PowerMac's typed bindings for the absent providers and their complete link dependencies."""
-CHECK = dict(name='ppc-kapi-binding', tier=1,
-             covers=['sdk/kapi_target_ppc.py', 'tools/ppc/test_kapi_binding.py','sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'sdk/kapi.json'], needs=[], budget=10, basis=['AC-NET-3', 'AC-CTX-1'])
+# CHECK registration lives in tools/checks/ppc-kapi-binding.py.
 import json
 import os
 import re

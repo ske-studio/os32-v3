@@ -114,6 +114,10 @@ def main():
                 ('automatic enable', ('    idle_work_run();', '    arch_irq_enable(); idle_work_run();'))]:
                 assert exercise(tmp, mutation=mutation) > 0, label
                 print('RED ' + label)
+            assert exercise(tmp, stub=True, mutation=(
+                'u32 host_mailbox_latest_serial(void) { return 0; }',
+                'u32 host_mailbox_latest_serial(void) { return 1; }')) > 0
+            print('RED PLN1 latest serial')
     print('PASS PPC provider, owner, PLN1 mailbox and endpoint')
 
 
