@@ -49,10 +49,11 @@ def configure():
 
 
 def wiring():
-    draft = (ROOT / 'drafts/ci-ppc-cross/workflows.patch').read_text()
-    assert 'a/.github/workflows/build.yml' not in draft
-    assert draft.count('+      - uses: ./.github/actions/ppc-setup') == 1
-    assert '+  ppc-compile:' in draft
+    check = (ROOT / '.github/workflows/check.yml').read_text()
+    build = (ROOT / '.github/workflows/build.yml').read_text()
+    assert 'ppc-setup' not in build
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 1
+    assert '  ppc-compile:' in check
     action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
     commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands
