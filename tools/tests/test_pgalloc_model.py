@@ -114,7 +114,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     unsigned char *a, *b;
     u32 i, bytes, first;
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_MACHINE));
     bytes = pgalloc_metadata_bytes(&m);
     CHECK(bytes == 2359296UL);
     first = 4096 - bytes / PAGE_SIZE;
@@ -148,10 +148,10 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     /* 4,096 PFN: L1 1,024B + owner/pin 8,192B = 3 pages. */
     CHECK(pgalloc_metadata_bytes(&m) == 3 * PAGE_SIZE);
     CHECK(pgalloc_limit_pfn() == 4096);
-''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
+''', flags=('-DPGALLOC_HOST_TEST=1',))
 
     def test_production_rejects_forged_synthetic_and_host_backing(self):
-        for flags in ((), ('-D__KERNEL_BUILD__',),
+        for flags in ((), ('-DPHYSMEM_HOST_TEST=1',), ('-D__KERNEL_BUILD__',),
                       ('-D__KERNEL_BUILD__', '-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1')):
             self.run_c('''
     struct physmem m;
@@ -173,7 +173,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     static u32 backing[9216 + 1] __attribute__((aligned(4096)));
     u32 bytes, first, p, before;
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(physmem_add_trusted(&m, 4096, END, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 4096, END, PHYSMEM_SOURCE_MACHINE));
     bytes = pgalloc_metadata_bytes(&m);
     /* L1 2 bitmap + owner/pin 2B/PFN */
     CHECK(bytes == ((END / 32 * 8 + END * 2 + 4095) & ~4095UL));
@@ -195,7 +195,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(host_if == 2 && saves == restores);
     CHECK(pgalloc_free_pages() == before);
     CHECK(backing[bytes / 4] == 0x12345678UL);
-'''.replace('END', str(end)), flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
+'''.replace('END', str(end)), flags=('-DPGALLOC_HOST_TEST=1',), physical_core=True)
 
     def test_generic_never_returns_unmapped_machine_ram(self):
         self.run_c('''
@@ -218,7 +218,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     u32 p;
     CHECK(sys_memory_init_model != 0);
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_MACHINE));
     /* metadata (L1 + owner + pin) of the 4GiB model is 576 pages: [3520, 4096). */
     CHECK(sys_memory_init_model(&m, backing, sizeof(backing), 3520, verified));
     /* Before ONLINE, explicit high-PFN allocation is still gated. */
@@ -244,7 +244,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(owner_map[3519] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 3519, 3520, LEDGER_BOTTOM_UP, &p));
     CHECK(!sys_memory_init_model(&m, backing, sizeof(backing), 3520, verified));
-''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
+''', flags=('-DPGALLOC_HOST_TEST=1',), physical_core=True)
 
     def test_sys_low_stable(self):
         self.run_c('''
@@ -273,9 +273,9 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     u32 p, before;
     CHECK(pgalloc_init_model != 0);
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(physmem_add_trusted(&m, 4096, 8192, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(physmem_add_trusted(&m, 12288, 16384, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 4096, 8192, PHYSMEM_SOURCE_MACHINE));
+    CHECK(physmem_add_trusted(&m, 12288, 16384, PHYSMEM_SOURCE_MACHINE));
+    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_MACHINE));
     CHECK(!pgalloc_init_model(&m, backing, sizeof(backing) - 1, 3520, verified));
     CHECK(!pgalloc_init_model(&m, backing + 1, sizeof(backing), 3520, verified));
     CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3521, verified));
@@ -311,7 +311,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(!pgalloc_init_model(&m, backing, sizeof(backing), 3520, verified));
     CHECK(pgalloc_free_pages() == before);
     CHECK(host_if == 0x202 && saves == restores);
-''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
+''', flags=('-DPGALLOC_HOST_TEST=1',), physical_core=True)
 
     def test_pool_private_frames_leave_other_owner_live(self):
         self.run_c('''
@@ -399,7 +399,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     static u32 backing[589824] __attribute__((aligned(4096)));
     u32 baseline, total, p;
     physmem_bootstrap_legacy(&m, 16384);
-    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_MACHINE));
     CHECK(pgalloc_init_model(&m, backing, sizeof(backing), 3520, verified));
     baseline = pgalloc_free_pages();
     total = pgalloc_total_pages();
@@ -420,7 +420,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(!pgalloc_alloc_n_owner(K, 1, 3520, 4096, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 8192, 8193, LEDGER_BOTTOM_UP, &p));
     CHECK(p == 99);
-''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
+''', flags=('-DPGALLOC_HOST_TEST=1',))
 
     def test_surface_and_atomic_free(self):
         self.run_c('''
