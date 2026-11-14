@@ -22,9 +22,6 @@ static void check(int ok, u32 stage) { mark=stage; if (!ok) finish(stage); }
 int ppc_irq_enabled(void) { return enabled; }
 void ppc_enable(void) {
     enabled=1;
-#ifdef DEC_IDLE_TEST
-    mark=18; finish(0);
-#endif
 }
 void ppc_disable(void) { enabled=0; }
 int ppc_read_dec(void) { return dec; }
@@ -43,8 +40,8 @@ static void tick_callback(void)
 void _start(void)
 {
 #ifdef DEC_IDLE_TEST
-    _idle();
-    mark=18; finish(18);
+    enabled=0; _idle();
+    mark=18; finish(enabled ? 0 : 18);
 #endif
     check(tick_register(0,tick_callback)==0,23);
     dec=-99;

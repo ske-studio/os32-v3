@@ -8,8 +8,7 @@ static tick_fn callback;
 static unsigned int registered_slot;
 u32 ppc_irq_save(void) { u32 saved = msr; msr &= ~EE; return saved; }
 void ppc_irq_restore(u32 saved) { msr = (msr & ~EE) | (saved & EE); }
-static void _enable(void) { msr |= EE; }
-static void _halt(void) { ++waits; }
+static void _idle(void) { msr |= EE; ++waits; }
 #include LINK_PLATFORM_SOURCE
 volatile u32 tick_count;
 static void finish(int rc) {
@@ -18,7 +17,7 @@ static void finish(int rc) {
 }
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
 void idle_work_run(void) {
-    CHECK(msr & EE);
+    CHECK(waits == work);
     ++work;
     /* Bound the harness recursion so removing the guard fails at runtime. */
     if (work == 1) link_platform_idle();
@@ -39,7 +38,7 @@ void _start(void) {
     link_platform_unlock(outer); CHECK(msr == (EE | 6));
     msr = 2; outer = link_platform_lock();
     link_platform_unlock(outer); CHECK(msr == 2);
-    link_platform_idle(); CHECK(work == 1 && waits == 1 && ticks == 0);
+    link_platform_idle(); CHECK(work == 1 && waits == 1 && ticks == 0 && (msr & EE));
     link_platform_idle(); CHECK(work == 2 && waits == 2);
     registration_rc = TICK_ERR_BUSY;
     CHECK(link_platform_tick_register(net_jiffy) == TICK_ERR_BUSY && registrations == 1);

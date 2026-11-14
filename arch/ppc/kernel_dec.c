@@ -63,8 +63,9 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
 
 void arch_cpu_idle(void)
 {
+    /* Foreground only: permit IRQ progress and return with EE enabled. */
     ppc_enable();
-    for (;;) __asm__ volatile("" ::: "memory");
+    __asm__ volatile("nop" ::: "memory");
 }
 
 void arch_cpu_halt(void)
