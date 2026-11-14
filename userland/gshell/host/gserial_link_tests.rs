@@ -41,7 +41,7 @@ fn setup(now:u32)->Link {
     os32api::os32_init(Box::into_raw(Box::new(a))); Link::new(now)
 }
 fn poll(l:&mut Link,t:u32)->Vec<Vec<u8>> { let mut lines=Vec::new(); l.poll(t,|b|lines.push(b.to_vec())); lines }
-fn ready(l:&mut Link,t:u32) { for i in 0..10 { poll(l,t+i); if l.ready { break; } } assert!(l.ready); }
+fn ready(l:&mut Link,t:u32) { for i in 0..20 { poll(l,t+i); if l.ready { break; } } assert!(l.ready); }
 fn inject(g:u32,s:u16,k:u16,b:&[u8]) { with(|m|m.notice=Some((g,s,k,b.to_vec()))); }
 fn command(l:&mut Link,t:u32) {
     inject(7,65533,1,b"\x0100000001 ping\n"); assert_eq!(poll(l,t),vec![b"\x0100000001 ping\n".to_vec()]);
@@ -67,7 +67,7 @@ fn ready_retry_generation_and_isolation() {
     with(|m|m.notice_rc=OS32_ERR_STALE); poll(&mut l,3940);
     with(|m| {m.notice_rc=0;m.response=b"gen 8 svc 65533\n".to_vec();}); ready(&mut l,5940);
     assert!(l.last.is_none());
-    inject(8,65533,1,b"\x0100000001 ping\n"); assert_eq!(poll(&mut l,5951).len(),1);
+    inject(8,65533,1,b"\x0100000001 ping\n"); assert_eq!(poll(&mut l,5961).len(),1);
 }
 #[test]
 fn gs_out_end_length_partial_and_async() {
@@ -156,4 +156,43 @@ fn startup_ready_notification_survives_first_handshake() {
     with(|m|m.response.clear());
     for t in 10..15 { poll(&mut l,t); }
     assert_eq!(with(|m|m.output.clone()),b"gs:! ready v1\r\n");
+}
+
+#[test]
+fn again_refreshes_ready_in_same_generation() {
+    let mut l=setup(u32::MAX-100); ready(&mut l,u32::MAX-100);
+    let due=l.retry;
+    poll(&mut l,due.wrapping_sub(1)); assert_eq!(with(|m|m.opens.len()),1);
+    poll(&mut l,due); ready(&mut l,due.wrapping_add(1));
+    assert_eq!(with(|m|m.opens.len()),2);
+    assert_eq!(l.generation,7);
+    let due=l.retry;
+    poll(&mut l,due); ready(&mut l,due+1);
+    assert_eq!(with(|m|m.opens.len()),3);
+}
+#[test]
+fn generation_reset_is_confirmed_before_receiving() {
+    let mut l=setup(0); ready(&mut l,0); command(&mut l,10);
+    with(|m|m.notice_rc=OS32_ERR_STALE); poll(&mut l,11);
+    with(|m| {m.notice_rc=0;m.response=b"gen 8 svc 65533\n".to_vec();});
+    poll(&mut l,2011);
+    for t in 2012..2020 { poll(&mut l,t); if l.h<0 { break; } }
+    assert!(!l.ready); assert!(l.last.is_none());
+    let reads=with(|m|m.reads.len());
+    inject(8,65533,1,b"\x0100000001 ping\n");
+    poll(&mut l,2020);
+    assert!(with(|m|m.opens.last().unwrap().ends_with("none idle")));
+    with(|m|m.status_rc=OS32_ERR_AGAIN); poll(&mut l,2021);
+    assert!(!l.ready); assert_eq!(with(|m|m.reads.len()),reads);
+    with(|m|m.status_rc=0); ready(&mut l,2022);
+    assert_eq!(poll(&mut l,2035).len(),1);
+}
+#[test]
+fn maximum_wire_and_overflow() {
+    let mut l=setup(0); ready(&mut l,0);
+    let mut bytes=b"\x0100000001 type ".to_vec(); bytes.extend_from_slice(&[b'a';114]); bytes.push(b'\n');
+    assert_eq!(bytes.len(),130);
+    let mut over=bytes.clone(); over.insert(10,b'x');
+    inject(7,65533,1,&over); assert!(poll(&mut l,10).is_empty());
+    inject(7,65533,1,&bytes); assert_eq!(poll(&mut l,11),vec![bytes]);
 }

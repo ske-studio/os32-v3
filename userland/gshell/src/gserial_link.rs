@@ -2,6 +2,7 @@
 //! All times are wrapping milliseconds; poll never waits or touches the UART.
 use core::fmt::{self, Write};
 include!(concat!(env!("OUT_DIR"), "/remote_control.rs"));
+const WIRE_MAX: usize = REMOTE_GSERIAL_LINE_MAX as usize + 2; // SOH and LF
 const FIFO: usize = 8192; // LAN_OPERATOR_DESIGN §4
 
 struct Line { bytes: [u8; REMOTE_GSERIAL_LINE_MAX as usize], n: usize }
@@ -118,10 +119,13 @@ impl Link {
         let rc = unsafe { (os32api::api().host_notice_read)(self.generation,
             REMOTE_SVC_GSERIAL as u32, &mut n as *mut _ as *mut u8) };
         if rc == OS32_ERR_STALE { self.ready = false; self.retry = now.wrapping_add(2000); return; }
+        if rc == OS32_ERR_AGAIN && now.wrapping_sub(self.retry) < 0x8000_0000 {
+            self.ready = false; self.retry = now; return;
+        }
         if rc != 0 || n.generation != self.generation || n.service != REMOTE_SVC_GSERIAL as u16 { return; }
         if n.kind == REMOTE_NOTIFY_PROBE as u16 { self.ready = false; self.retry = now; return; }
         let len = n.length as usize;
-        if n.kind != REMOTE_NOTIFY_EXECUTE as u16 || len > REMOTE_GSERIAL_LINE_MAX as usize || len < 11 { return; }
+        if n.kind != REMOTE_NOTIFY_EXECUTE as u16 || len > WIRE_MAX || len < 11 { return; }
         let data = &n.data[..len];
         if data[0] != 1 || data[9] != b' ' || data[len-1] != b'\n' { return; }
         let id = match hex(&data[1..9]) { Some(id) => id, None => return };
@@ -165,12 +169,18 @@ impl Link {
             let parsed = ready_body(&self.response[..self.received]);
             if let Some(generation) = parsed {
                 if generation != self.generation {
+                    let reset_ready = self.last.is_some();
                     self.last = None; self.done = false; self.frozen = false;
                     self.len = 0;
                     // Keep the startup gs:! ready queued before the first READY.
                     if self.generation != 0 { self.notice_len = 0; self.notice_drop = 0; }
+                    if reset_ready {
+                        self.generation = generation; self.ready = false; self.retry = now;
+                        self.close(); return;
+                    }
                 }
                 self.generation = generation; self.ready = true;
+                self.retry = now.wrapping_add(2000);
             } else { self.failed(now); return; }
         } else if self.sending_notice { self.notice_len = 0; self.notice_drop = 0; }
         else { self.frozen = false; self.len = 0; self.done = true; }
