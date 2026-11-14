@@ -10,6 +10,7 @@
 enum { PM_TICK_LINK = 4 };
 static int idle_running;
 
+/* tick_clock_config が DEC を論理 100Hz の jiffy (10ms) に変換する。 */
 u32 link_platform_now(void) { return tick_count; }
 u32 link_platform_lock(void) { return ppc_irq_save(); }
 void link_platform_unlock(u32 saved) { ppc_irq_restore(saved); }

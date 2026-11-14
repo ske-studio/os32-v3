@@ -4,7 +4,8 @@
 
 #include "types.h"
 
-/* 共通 tick_count の 10ms tick を返す。周回をまたぐ比較は差で行う。
+/* 論理 100Hz の jiffy (10ms) を返す。周回をまたぐ比較は差で行う。
+ * 物理の時計が速い機種は tick_clock_config で変換した tick_count を返す。
  * x86 は既存 link.c と同じ tick_count を使う。 */
 u32 link_platform_now(void);
 
