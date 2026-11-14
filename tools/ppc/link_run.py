@@ -73,6 +73,13 @@ def accept(elf, cpu, parent, timeout):
         with (out / 'qemu.stderr').open('w') as err, (out / 'frames.log').open('w') as frames:
             p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                  stderr=err, bufsize=0)
+            class Tx:
+                def send(self, frame):
+                    frames.write('> '+bytes(frame).hex()+'\n')
+                    return io.send(frame)
+                def __getattr__(self, name):
+                    return getattr(io, name)
+            tx = Tx()
             try:
                 q = QMP(p, deadline)
 
@@ -87,8 +94,8 @@ def accept(elf, cpu, parent, timeout):
                     while select.select([io], [], [], 0)[0]:
                         packet = io.receive()
                         frames.write(packet.hex()+'\n')
-                        agent.handle(packet, io)
-                    agent.tick(io)
+                        agent.handle(packet, tx)
+                    agent.tick(tx)
                     if agent.established:
                         q.call('stop')
                         hello, done = word('link_hello_ok'), word('pm_link_time_ok')
@@ -114,9 +121,12 @@ def accept(elf, cpu, parent, timeout):
                                 heap_peak=peak, agent_counts=agent.counts), indent=2))
                             print(f'PASS {cpu}: HELLO/ALIVE/TIME, FB 16/17; heap_peak={peak}')
                             return
+                        last = (hello, done, alive, marks)
+                        tb = word('pm_link_time_bytes') if 'pm_link_time_bytes' in symbols else None
                         q.call('cont')
+                        time.sleep(0.5)
                     time.sleep(0.01)
-                raise RuntimeError(cpu+': HELLO/ALIVE/TIME/FB deadline')
+                raise RuntimeError(cpu+': HELLO/ALIVE/TIME/FB deadline; last hello,time,alive,marks='+repr(locals().get('last'))+' time_bytes='+repr(locals().get('tb'))+' agent='+repr(agent.counts))
             finally:
                 if p.poll() is None:
                     p.terminate()

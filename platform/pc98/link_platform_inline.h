@@ -35,6 +35,9 @@ static inline int pc98_link_platform_tick_register(void (*fn)(void))
     return tick_register(PC98_TICK_LINK, fn);
 }
 
+/* LGY98 keeps its own RX scheduling; only the e82557 slot is drained in the tick. */
+#define LINK_PLATFORM_TICK_RX_LGY98_SLOT 0
+
 /* The external contract remains available to consumers without this header. */
 #define link_platform_tick_register pc98_link_platform_tick_register
 #define link_platform_now pc98_link_platform_now
