@@ -295,7 +295,11 @@ void net_jiffy(void)
         }
         else {
             ticking = 1;
-            if (owner && owner == adapters[NET_NIC_E82557] &&
+            if (owner && (owner == adapters[NET_NIC_E82557]
+#if KBOOT_LINK
+                || owner == adapters[NET_NIC_LGY98]
+#endif
+                ) &&
                 (u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES &&
                 tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
                                  tick_budget_cnt(NET_TAIL_RX_US))) {

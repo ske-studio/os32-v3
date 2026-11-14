@@ -21,17 +21,18 @@ def main():
     ofw = (ROOT/'platform/powermac/ofw.c').read_text()
     with tempfile.TemporaryDirectory(prefix='rh-observe-') as td:
         work = Path(td)
-        def evaluate(text, wrapper=ofw):
+        def evaluate(text, wrapper=ofw, link=False):
             src = work/'rh.c'; src.write_text(text)
             ofsrc = work/'ofw.c'; ofsrc.write_text(wrapper)
             exe = work/'host'
             subprocess.run(['gcc','-m32','-std=gnu11','-O2','-ffreestanding',
                 '-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
-                '-D__cdecl=','-Iinclude','-Ilib','-Iarch/ppc','-Iplatform/powermac',
+                '-DKBOOT_LINK='+str(int(link)), '-D__cdecl=','-Iinclude','-Ilib','-Iarch/ppc','-Iplatform/powermac',
                 'tools/ppc/rh_observe_host.c',str(ofsrc),
                 'lib/kstring_c.c',str(src),'-o',str(exe)],cwd=ROOT,check=True)
             return host32.run([str(exe)], runner='qemu').returncode
         assert evaluate(source)==0
+        assert evaluate(source, link=True)==0
         print('GREEN absent/16/32bpp/overflow/stride/translate/continuity/guards/history/OF-off',flush=True)
         if '--mutate' in sys.argv:
             for name, old, new in [

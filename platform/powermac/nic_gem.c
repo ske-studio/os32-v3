@@ -2,6 +2,10 @@
  * reset/PHY progress in lan_service; only net_jiffy may call this poll. */
 #include "nic_gem.h"
 #include "lan_boot.h"
+#if KBOOT_LINK
+#include "rh_observe.h"
+#include "net/link.h"
+#endif
 #include "drivers/net/gem/gem.h"
 #include "os32/os32_kapi_shared.h"
 
@@ -25,7 +29,14 @@ static int result(int rc)
 static int tx(const void *frame, u32 len)
 {
     struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
-    return g ? result(gem_tx(g, frame, len)) : OS32_ERR_HOSTDOWN;
+    int rc = g ? result(gem_tx(g, frame, len)) : OS32_ERR_HOSTDOWN;
+#if KBOOT_LINK
+    const u8 *p = frame;
+    if (!rc && len >= LINK_ETH_HDR_LEN + LINK_HDR_LEN &&
+        p[LINK_ETH_HDR_LEN + LINK_OFF_OP] == LINK_OP_HELLO)
+        pm_rh_stage(PM_RH_LINK_HELLO_SENT);
+#endif
+    return rc;
 }
 
 static int rx(void *frame, u32 cap, u32 *len)

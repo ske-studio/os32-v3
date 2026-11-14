@@ -30,7 +30,7 @@ MUTATIONS = (
     ('net/nic.c', 'if (!ticking) return 0;', 'return 0;'),
     ('net/nic.c', 'if (link_due && bound)', 'if (0 && link_due && bound)'),
     ('net/nic.c', '(u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES', '1'),
-    ('net/nic.c', 'owner && owner == adapters[NET_NIC_E82557]', 'owner'),
+    ('net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557]\n#if KBOOT_LINK\n                || owner == adapters[NET_NIC_LGY98]\n#endif\n                )', 'owner'),
     ('net/nic.c', 'if (idle) last_idle_jiffy = link_platform_now();', 'if (idle) last_idle_jiffy += 0;'),
     ('net/nic.c', 'last_idle_jiffy = link_platform_now();\n            bound = ops;',
      'last_idle_jiffy = 0;\n            bound = ops;'),
@@ -40,7 +40,7 @@ MUTATIONS = (
 )
 
 
-def verify(work, mutation=None):
+def verify(work, mutation=None, link=False):
     for name in ('nic.c', 'nic_rx.c', 'rx_work.c'):
         path = 'net/' + name
         source = (ROOT / path).read_text()
@@ -54,7 +54,7 @@ def verify(work, mutation=None):
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                     '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-                    '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
+                    '-DKBOOT_LINK='+str(int(link)), '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
                     str(ROOT / 'tools/tests/net_rx_work_host.c'), '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work, timeout=5).returncode
 
@@ -64,8 +64,13 @@ def main(mutate=False):
         work = Path(td)
         rc = verify(work)
         assert rc == 0, ('control', rc)
-        print('GREEN cooperative RX, batch, idle, reentry, rescue, wrap', flush=True)
+        assert verify(work, link=True) == 0
+        print('GREEN GEM tick RX and cooperative RX, batch, idle, reentry, rescue, wrap', flush=True)
         if mutate:
+            mutation = ('net/nic.c', '|| owner == adapters[NET_NIC_LGY98]',
+                        '|| 0')
+            assert verify(work, mutation, link=True) == 1
+            print('RED runtime GEM tick RX disabled', flush=True)
             for mutation in MUTATIONS:
                 rc = verify(work, mutation)
                 assert rc == 1, (mutation, rc)

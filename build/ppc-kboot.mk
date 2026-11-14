@@ -12,6 +12,15 @@ KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 NEGATIVE ?= 0
 KBOOT_SHELL ?= 0
 KBOOT_SH ?= 0
+KBOOT_LINK ?= 0
+ifeq ($(KBOOT_LINK),1)
+ifneq ($(filter 1,$(KBOOT_SH) $(KBOOT_SHELL)),)
+$(error KBOOT_LINK requires the diagnostic image)
+endif
+ifneq ($(NEGATIVE),0)
+$(error KBOOT_LINK does not support NEGATIVE)
+endif
+endif
 ifeq ($(KBOOT_SH),1)
 ifeq ($(KBOOT_SHELL),1)
 $(error KBOOT_SH and KBOOT_SHELL are mutually exclusive)
@@ -25,7 +34,7 @@ KB_FD1_STREAM ?= $(KBOOT_SH)
 # Extra applications belong to an explicitly separate test image.
 KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
 KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
-KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE))))
+KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/link,$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
 ifeq ($(KB_FD1_STREAM)$(KBOOT_SH),10)
 KB_OUT := $(KB_OUT)/fd1-stream
 endif
@@ -76,6 +85,12 @@ KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
+ifeq ($(KBOOT_LINK),1)
+KB_PLATFORM := $(filter-out platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/lan_diag.c platform/powermac/lan_monitor.c platform/powermac/terminal_input.c,$(KB_PLATFORM))
+KB_PLATFORM += platform/powermac/link_platform.c platform/powermac/nic_gem.c
+KB_COMMON += net/link.c net/link_notify.c net/nic.c net/nic_rx.c net/rx_work.c net/host_mailbox.c
+KB_INC_EXTRA += -Inet
+endif
 KB_C := lib/lz4.c $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
 ifneq ($(KB_EXEC),)
 ifneq ($(KBOOT_TERM),lan)
@@ -136,7 +151,7 @@ KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(
 KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
 
 .PHONY: all audit
 all: $(KB_ELF) audit

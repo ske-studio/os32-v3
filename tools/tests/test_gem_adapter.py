@@ -2,7 +2,7 @@
 CHECK = dict(name='gem-adapter-host', tier=2, budget=10, needs=[], covers=[
     'platform/powermac/nic_gem.c', 'platform/powermac/nic_gem.h',
     'platform/powermac/lan_boot.h', 'platform/powermac/lan_service.c',
-    'drivers/net/gem/gem.h', 'net/nic.h', 'include/types.h',
+    'platform/powermac/rh_observe.h', 'net/link.h', 'include/net_eth.h', 'drivers/net/gem/gem.h', 'net/nic.h', 'include/types.h',
     'tools/tests/gem_adapter_host.c', 'tools/tests/test_gem_adapter.py',
     'tools/tests/host32.py', 'include/callconv.h',
     'sdk/include/os32/os32_kapi_shared.h',
@@ -24,18 +24,23 @@ def run(ctx):
         source, exe = work / 'nic_gem.c', work / 'probe'
         includes = ['-I' + str(ctx.root / p) for p in
                     ['.', 'include', 'platform/powermac', 'sdk/include']]
-        def exercise(text, good):
+        def exercise(text, good, link=False):
             source.write_text(text)
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra',
-                '-Werror', '-fno-pie', '-nostdlib', '-static', '-no-pie',
+                '-DKBOOT_LINK='+str(int(link)), '-Werror', '-fno-pie', '-nostdlib', '-static', '-no-pie',
                 *includes, '-DGEM_ADAPTER_SOURCE="' + str(source) + '"',
                 str(ctx.root / 'tools/tests/gem_adapter_host.c'),
                 '-o', str(exe)], check=True)
             rc = host32.run([str(exe)], runner='qemu').returncode
             assert rc >= 0 and (rc == 0) == good, rc
         exercise(original, True)
+        exercise(original, True, link=True)
         print('GREEN tx/rx/mac/credit, tick bounds, acquire/release', flush=True)
         if ctx.mutate:
+            anchor = 'pm_rh_stage(PM_RH_LINK_HELLO_SENT);'
+            assert original.count(anchor) == 1
+            exercise(original.replace(anchor, '(void)0;'), False, link=True)
+            print('RED runtime HELLO sent mark', flush=True)
             for anchor, replacement in [
                 ('g->io.tb(g->io.ctx), 8u)', 'g->io.tb(g->io.ctx), 32u)'),
                 ('if (!pm_lan_running_gem(0)) return OS32_ERR_NOSYS;',
