@@ -344,9 +344,11 @@
     ],
     "KernelAPI": [
       "boot_image_info",
+      "boot_token_get",
       "buz_off",
       "buz_on",
       "caller_identity",
+      "con_sink_capture",
       "con_sink_read",
       "con_sink_stat",
       "console_get_cursor_x",

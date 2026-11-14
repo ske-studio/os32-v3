@@ -20,6 +20,7 @@
  * ======================================================================== */
 
 /* ---- カーネル帯の代わり ------------------------------------------------ */
+int rshell_active, boot_serial_mirror;
 static int g_owner;
 int  res_owner_get(void)      { return g_owner; }
 void res_owner_set(int owner) { g_owner = owner; }

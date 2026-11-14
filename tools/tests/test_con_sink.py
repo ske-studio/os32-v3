@@ -87,8 +87,8 @@ if __name__ == "__main__":
                  '        if (g_count) ring_drop_oldest();', 'FAIL 5e'),
                 ('ring_reset();\n    g_enabled = 0;',
                  'g_enabled = 0;', 'FAIL 6c'),
-                ('if (g_reader == id) g_reader = CON_SINK_NO_READER;',
-                 '(void)id;', 'FAIL 7f'),
+                ('if (g_reader == id) {',
+                 'if (0) {', 'FAIL 7f'),
                 ('ring_put((u8)id);', 'ring_put((u8)id ^ 1);', 'FAIL 10c'),
             ]:
                 assert source.count(old) == 1, old

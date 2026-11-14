@@ -1,3 +1,4 @@
+#include "boot_token.h"
 #include "legacy_guest.h"
 /* ============================================================
  * kernel.c — PC-9801 32ビットOS カーネル
@@ -250,6 +251,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (!boot_legacy_started) {
         boot_platform_run(BOOT_NIC_LEGACY, &boot);
     }
+
+    boot_token_init();
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);

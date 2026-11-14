@@ -1,4 +1,4 @@
-# KernelAPI v84 仕様書
+# KernelAPI v86 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **84** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 292・予約 8) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **86** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 294・予約 6) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -134,6 +134,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 | v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
 | v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
+| v86 | **実装 (LAN 操作口 X9b)** | `boot_token_get` (slot 293、offset 0x49C)。起動中一定の識別子 16 バイトを写す | 本書 §4 |
+| v85 | **宣言追加 (LAN 操作口 X9)** | `con_sink_capture` (slot 292、offset 0x498)。capture の開始・固定・終了を既存 owner 契約で行う | [設計 §3](decisions/network/LAN_OPERATOR_DESIGN.md) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -300,7 +302,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 292〜299 (`kapi_reserved[8]`、v84 時点。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 294〜299 (`kapi_reserved[6]`、v86 時点。v85 は 293〜299。v84 は 292〜299。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1754,7 +1756,7 @@ B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存ア�
 
 ### 予約スロット (v63〜)
 
-0x498〜0x4B4 (slot 292〜299、8 本、v84 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x4A0〜0x4B4 (slot 294〜299、6 本、v86 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2162,6 +2164,8 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x48C | gfx2_cursor_show | `int(u32 a, u32 head, u32 show)` |
 | 0x490 | gfx2_dpms | `int(u32 a, u32 head, u32 state)` |
 | 0x494 | gfx2_present | `int(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)` |
+| 0x498 | con_sink_capture | `int(u32 op)` |
+| 0x49C | boot_token_get | `void(u8 *out)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

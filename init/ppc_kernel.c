@@ -1,3 +1,4 @@
+#include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
  * Entered from arch/ppc/kernel_boot.c with IR=DR=1, EE=0, plan-D paging live
@@ -316,8 +317,9 @@ void ppc_kernel_main(void)
         kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", OS32_TICK_HZ, ticks, us_lo);
 
+    boot_token_init();
+    boot_token_get(lan_boot.boot_id);
     if (dev->gmac_ready && lan_log_rc == 0) {
-        pm_gmac_boot_id(&lan_boot, tb_now(), ppc_read_pvr());
         (void)pm_lan_start(&lan_boot);
     } else {
         kprintf(KBOOT_ATTR, "LAN OFF code=%d\r\n",
