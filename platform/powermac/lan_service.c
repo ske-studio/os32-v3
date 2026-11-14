@@ -289,3 +289,11 @@ void pm_lan_poll(u64 now)
     if (s.state != before)
         kprintf(0x07, "LAN STATE state=%u link=%u\r\n", (u32)s.state, (u32)(s.state == RUNNING));
 }
+
+/* P1g selects link or PLN1 ownership; this query never advances the service. */
+struct gem *pm_lan_running_gem(u8 mac[6])
+{
+    if (s.state != RUNNING || s.g.state != GEM_STATE_READY) return 0;
+    if (mac) for (u32 i = 0; i < 6; i++) mac[i] = s.boot->mac[i];
+    return &s.g;
+}
