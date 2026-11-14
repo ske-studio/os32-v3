@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-x6', tier=1, needs=[], budget=5,
-             covers=['tools/host_agent.py', 'tools/host_linux.py', 'tools/host_notify.py',
+             covers=['tools/host_agent_config.py', 'tools/host_agent.py', 'tools/host_linux.py', 'tools/host_notify.py',
                      'tools/host_services.py', 'tools/host_rshell.py',
                      'tools/host_operator_socket.py', 'tools/tests/test_remote_x6.py'])
 

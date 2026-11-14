@@ -1,0 +1,10 @@
+{
+  "iface": "eth0",
+  "root": "/srv/os32",
+  "allow-write": false,
+  "peer": "02:00:00:00:00:01",
+  "backend": "bridge",
+  "frame-endpoint": "127.0.0.1:8026",
+  "operator-endpoint": "127.0.0.1:8027",
+  "state-dir": "/var/lib/os32-host-agent/eth0"
+}
