@@ -1,5 +1,7 @@
 {
   "C_KERNEL": [
+    "kernel/boot_token.c",
+    "platform/pc98/boot_token_pc98.c",
     "arch/x86/kernel/boot_cpu.c",
     "arch/x86/kernel/boot_after_paging.c",
     "arch/x86/kernel/fault_fixture.c",
