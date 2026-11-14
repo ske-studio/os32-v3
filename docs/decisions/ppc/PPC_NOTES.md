@@ -40,3 +40,14 @@
 - USB の診断 (打鍵・enumeration・mouse・release を含む) は既存 LOG/ESCC に送り、端末画面へは出さない。同期 formatter の間だけ `pm_log_stream_only` を保存・設定・復元する。USER の echo/kprintf/fd1 はこれまでどおり共通 console と mirror へ送る。
 - 画素の受入は `python3 -B tools/ppc/fb_run.py --mutate` (`ppc-fb` check)。NIC 無しの mac99、USB で sh を開始し、固定した UTF-8 echo の `/fb.sh` を source する。PPM・固定期待行列・像/フォント/Unicode 表の SHA-256・stream を `$TMPDIR/fb-run-*/` に残す。fbcon のカーソルは下 2 走査線の反転なので、oracle は `cursor_top=14` を使う。LAN 切断前後の比較は別途 LAN が使える環境で行う。
 - 共通 console への移行後、FB が無い場合も console_get_cursor_x/y は論理カーソル座標を返す (旧 kboot_console の -1 とは異なる)。
+
+## 6. PowerPC の試験と CI
+
+- **CI の check-fast には、PowerPC の toolchain・QEMU・LAN の socket が無い。**
+  - PPC の cross gcc・qemu-system-ppc・socket を使う試験は、無い環境ではその半分を `SKIP <理由>` と表示して 0 を返す。host の側の試験と変異は、必ず回す。
+  - CI で PowerPC を必ず組むのは、check.yml の `ppc-compile` の job。そこでは `OS32_REQUIRE_PPC=1` が立つので、toolchain が無ければ失敗にする。
+  - 手本は `tools/tests/test_link_platform.py`・`tools/ppc/compile_ci.py`・`tools/checks/ppc-sc.py`。
+- **新しい試験は、取り込む前に `PPC_CROSS_DIR=/nonexistent` でも 1 回回す。** CI と同じ形で、SKIP と rc=0 になることを確かめる。2026-11-14 に、P1a の link-platform-host と P1f の gem-adapter-host が無条件に cross gcc を呼び、CI で落ちた。
+- **実装者の sandbox では socket が使えない。**
+  - LAN と link の QEMU の受入 (link_run・sc_run の LAN・net-link-host の本物の agent) は、PM が手元で回す。
+  - 試験を、環境 (socket の有無) によって別の手順に切り替わる作りにしない (2026-11-14 の ppc-fb)。
