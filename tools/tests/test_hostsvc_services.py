@@ -31,7 +31,7 @@ def test(path):
     assert {name: origin for name, version, number, origin in rows} == expected
     assert len(rows) == len(expected)
     ids = [int(row[2]) for row in rows]
-    assert len(set(ids)) == len(ids) and all(1 <= i <= 65534 for i in ids)
+    assert len(set(ids)) == len(ids) and all(1 <= i <= 65531 for i in ids)
     for name, version, number, origin in rows:
         assert version == '1' and registry.resolve(name) == int(number)
         assert registry.dispatch(name + ' GET', b'body') == (501, b'')
@@ -72,9 +72,9 @@ def test(path):
     assert registry.resolve('os32.custom') == reserved
     assert registry.dispatch('os32.custom GET', b'') == (201, b'output')
     # Exercise the real 16-bit boundary, including replacement at exhaustion.
-    for i in range(65534 - len(rows) - 2):
+    for i in range(65531 - len(rows) - 2):
         last = registry.register('test.%d' % i, 1, 'plugin', None)
-    assert last == 65534
+    assert last == 65531
     with patch.object(module.LOG, 'warning'):
         assert registry.register('example.echo', 4, 'plugin', handler) == number
     try:
@@ -89,7 +89,7 @@ def test(path):
 
 MUTATIONS = [
     ('duplicate id', 'service_id = previous[1]', 'service_id = len(self._services) + 1'),
-    ('id exhaustion', 'if service_id > MAX_SERVICE_ID:', 'if False:'),
+    ('id exhaustion', "if service_id > MAX_SERVICE_ID:\n                raise RuntimeError('service id range exhausted')", "if False:\n                raise RuntimeError('service id range exhausted')"),
     ('unknown status', "return 404, b''", "return 501, b''"),
     ('stub status', "return 501, b''", "return 404, b''"),
     ('SFS origin', "('sfs', SFS_SERVICES)", "('stub', SFS_SERVICES)"),

@@ -78,10 +78,7 @@ def main():
         import sys
         sys.path.insert(0, str(ROOT / 'tools'))
         import host_services
-        if host_services.MAX_SERVICE_ID >= 65532:
-            print('KNOWN: host_services registry overlaps reserved IDs; X1 must reject overlap')
-        else:
-            print('Registry no longer overlaps reserved IDs; X1 should enforce this')
+        assert host_services.MAX_SERVICE_ID == 65531, 'registry overlaps reserved IDs'
         if args.mutate:
             for name, filename, old, new in MUTATIONS:
                 path = work / filename
