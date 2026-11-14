@@ -46,6 +46,9 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
 TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (
+    ('close-drops-pending-ack', 'link_host_api.inc',
+     'e->rel_want_ack = e->want_ack;',
+     'e->rel_want_ack = 0;', 'close_flushes_ack_before_release'),
     ('remote-log-missing', 'link_host_api.inc',
      '    else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;\n',
      '', 'decl_len_parsing'),

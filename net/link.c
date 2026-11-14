@@ -122,6 +122,8 @@ struct link_handle {
     u32 probes;
     u8  rel_pending;                /* ハンドル専用の RELEASE スロット */
     u8  rel_due;
+    u8  rel_want_ack;               /* close 前の ACK、RELEASE より先に送る */
+    u32 rel_ack_seq;
     u32 rel_rid;
     u16 rel_epoch;
     u32 rel_tick;
@@ -283,7 +285,7 @@ static void link_drop_all(void)
         e->req_due = e->w_due = 0;
         e->wlen = 0;
         e->want_ack = e->want_window = e->want_status = 0;
-        e->rel_pending = e->rel_due = 0;
+        e->rel_pending = e->rel_due = e->rel_want_ack = 0;
         e->ring_owner = 0;
         e->probes = 0;
     }
@@ -437,6 +439,15 @@ static int link_tx_control(void)
         for (k = 0; k < LINK_CTRL_KIND_COUNT; k++) {
             u8 kind = (u8)((e->ctrl_cursor + k) % LINK_CTRL_KIND_COUNT);
             if (kind == LINK_CTRL_RELEASE && e->rel_due) {
+                /* close は送信せず、専用スロットで ACK → RELEASE を守る。
+                 * NIC が拒否したときも ACK を残して次の巡回で試す。 */
+                if (e->rel_want_ack) {
+                    if (!link_send_ex(LINK_OP_ACK, 0, link_sess, e->rel_epoch,
+                                      0, e->rel_ack_seq, e->rel_rid, 0, 0)) return -1;
+                    e->rel_want_ack = 0;
+                    link_ctrl_next = (int)(((link_ctrl_next + n) % LINK_HANDLES) + 1) % LINK_HANDLES;
+                    return 1;
+                }
                 if (!link_send_ex(LINK_OP_RELEASE, 0, link_sess, e->rel_epoch,
                                   0, 0, e->rel_rid, 0, 0)) return -1;
                 e->rel_due = 0;
