@@ -22,8 +22,10 @@ def test_update(path):
     script = Path(path).read_text()
     result = subprocess.run(['sh', '-n', str(path)], capture_output=True, text=True)
     assert result.returncode == 0, 'update script syntax: ' + result.stderr
-    assert 'git clone -q --no-local' in script, 'update does not clone as the user'
-    assert 'sudo chmod 0755 "$CONF_DIR"' in script, 'update does not open the config directory'
+    assert 'git -C "$PREFIX" checkout -q --detach "$sha"' in script, 'update does not check out in place'
+    assert 'sudo -n systemctl restart "$unit"' in script, 'update does not restart without a password'
+    readme = (ROOT / 'tools/systemd/README.md').read_text()
+    assert 'NOPASSWD: /usr/bin/systemctl start os32-host-agent@%s' in readme, 'README lacks the sudoers line'
     assert '[ -n "$got" ] ||' in script, 'update accepts an empty probe commit'
     assert '"$got"*)' in script, 'update does not compare the probe commit'
     print('PASS update_host_agent.sh')

@@ -1549,7 +1549,7 @@ def main():
                       lines_per_page=args.lines_per_page,
                       peer=parse_mac(config["peer"]) if config else None)
     try:
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"],
+        commit = subprocess.check_output(["git", "-c", "safe.directory=*", "rev-parse", "HEAD"],  # /opt/os32 は利用者の持ち物、サービスは別ユーザー
                                          cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                          text=True, stderr=subprocess.DEVNULL).strip()
     except (OSError, subprocess.CalledProcessError):

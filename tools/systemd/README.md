@@ -60,6 +60,29 @@ tools/systemd/update_host_agent.sh <instance> --rollback # 直前の版に戻す
 サービスを止めて差し替え、`/etc/os32/host-agent` を 0755 にして (CLI の `--instance` が設定を読むため)
 起動し、probe の commit が入れた commit と一致すれば完了。違えば rc=1 で止まる。
 
+## 版の入れ替え (導入の後)
+
+初回の設定 (1 回だけ、`<instance>` は NIC 名): `/opt/os32` を一般ユーザーの持ち物にし (サービスの os32-host は読むだけ)、
+サービスの start・stop・restart だけを sudoers でパスワード無しにする。
+
+```sh
+sudo chown -R "$USER:$USER" /opt/os32 && sudo chmod -R a+rX /opt/os32
+printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl start os32-host-agent@%s, /usr/bin/systemctl stop os32-host-agent@%s, /usr/bin/systemctl restart os32-host-agent@%s\n' \
+  "$USER" <instance> <instance> <instance> | sudo tee /etc/sudoers.d/os32-host-agent >/dev/null
+sudo chmod 0440 /etc/sudoers.d/os32-host-agent && sudo visudo -cf /etc/sudoers.d/os32-host-agent
+sudo chmod 0755 /etc/os32/host-agent
+```
+
+以後の入れ替えはパスワード無しで回る (どこからでも、一般ユーザーのまま):
+
+```sh
+/opt/os32/tools/systemd/update_host_agent.sh <instance>            # origin/main に
+/opt/os32/tools/systemd/update_host_agent.sh <instance> <commit>   # 指定の commit に (戻すときは表示された前の commit)
+```
+
+`/opt/os32` で fetch・checkout し、`sudo -n systemctl restart` して、probe の commit が入れた commit と一致すれば完了。
+違えば rc=1 で止まる。サービスは別ユーザーなので、host agent は commit を `git -c safe.directory=*` で読む。
+
 ## systemd 無効の WSL
 
 開発のときに、同じ設定で runner を手で起こす。専用ユーザーは作らなくてよい。
