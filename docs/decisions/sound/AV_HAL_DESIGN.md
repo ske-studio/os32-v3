@@ -369,7 +369,7 @@ typedef struct {                                   /* 16B */
 } IN2_Event;
 typedef struct { u32 size, acquired, focus_owner, focus_gen, dropped, rsv[3]; } IN2_Status; /* 32B */
 typedef struct { i32 dx, dy; u32 buttons; i32 wheel; } IN2_MouseState;                       /* 16B */
-int in2_dev_count(void);  int in2_dev_info(u32 i, IN2_DevInfo *o);
+int in2_dev_count(void);  int in2_dev_info(u32 i, IN2_DevInfo *o); /* count ≤ IN2_MAX_DEV、i は列挙の添字 */
 int in2_read(IN2_Event *out, u32 max);         /* max ≤ 128。非前景は BUSY */
 int in2_key_state(u8 out[128]);                 /* 非前景は BUSY */
 int in2_mouse_state(IN2_MouseState *o);         /* 累積、読むと 0。非前景は BUSY */
@@ -400,8 +400,8 @@ int in2_wm_state(IN2_WmState *o);   /* KAPI。WM (GUI_SHELL_OWNER) だけ */
 
 ### 5-4. 入口 (input/hal/in2_int.h、P1-9)
 ```c
-#define IN2_SRC_MAX 8
-int  in2_src_alloc(u8 dev_kind, u8 source, const IN2_DevInfo *info); /* 戻り dev 1..8、尽きたら FULL */
+#define IN2_MAX_DEV 16
+int  in2_src_alloc(u8 dev_kind, u8 source, const IN2_DevInfo *info); /* 戻り dev 1..IN2_MAX_DEV、全枠使用中なら FULL */
 void in2_src_key(u8 dev, u8 sc, int down, u8 mods);   /* 割込みから可。dev ごとの押下表で繰り返しの make は捨てる */
 void in2_src_move(u8 dev, i16 dx, i16 dy, u16 flags);
 void in2_src_abs(u8 dev, u16 x, u16 y);
@@ -415,6 +415,7 @@ void in2_pad_report_native(int slot, const IN2_Gamepad *g);
 void in2_pad_report_raw(int slot, const struct Pad2Raw *r);
 void in2_pad_detach(int slot);
 ```
+- 入力元の上限は `IN2_MAX_DEV` の 1 か所で持ち、装置表・dev ごとの押下表・割当ての探索はこの定数を使う。`IN2_Event`・`IN2_DevInfo` の dev は u8 のまま、割り当てる番号は `1..IN2_MAX_DEV`。XInput のパッド枠は別の上限 `IN2_MAX_PADS` (§5-1)。
 | 源 | 採る所 (merge の前、src ごと) |
 |---|---|
 | 本体の鍵盤 | kbd.c:333 の `kbd_deliver` の前に `kbd_hal_key(scancode)` (src 0)。USB 1D の後は `kbd_merge_event(src, sc, down)` の頭 (src 0 と USB の src の両方がここを通る) |
@@ -683,6 +684,8 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 
 ## 11. 大きさの見積もり
 
+入力の BSS: dev ごとの押下表は `IN2_MAX_DEV × 128` B (= 2,048 B)、装置情報は `IN2_MAX_DEV × sizeof(IN2_DevInfo)` (= 512 B)。リングは 128 件 × 16 B (= 2,048 B)。これらの小計は 4,608 B (管理用の状態・パッドの状態は別)。
+
 | 塊 | 行 |
 |---|---|
 | AV0 (ヘッダ 5・a0_weak 2・ABI 試験・番人・生成) | 750 |
@@ -705,10 +708,10 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 |---|---|---|---|---|---|---|
 | AV0 | §10 の全ヘッダ・kapi.json と生成物・a0_weak.c ×2・tools/tests/av_abi_host.c・tools/check_av_portable.py・tools/checks/av_wiring.txt・av_no_weak.sh | — | — | 750 | — | HAL v2 A0 |
 | F1 | kernel/av_focus.c (+exec の入口・出口 2 行) | in2_on_focus・gui の登録状態 | `av_fg_owner` | 110 | IA | AV0 |
-| N1 | input/hal/in2_dev.c | — | `in2_srcs[]` | 130 | IA | AV0 |
+| N1 | input/hal/in2_dev.c | — | `in2_srcs[IN2_MAX_DEV]` | 130 | IA | AV0 |
 | N2 | input/hal/in2_ring.c (128・seq・合算・LOST・STOP) | in2_time_ms | ring・drop | 190 | IA | AV0 |
 | N3 | input/hal/in2_excl.c (acquire・wm_state・境目) | F1・N2・kbd_raw_purge_keep | acq・gen・focus_gen | 150 | IA | AV0 |
-| N4 | input/hal/in2_state.c (押下表・macc) | — | keys・macc | 110 | IA | AV0 |
+| N4 | input/hal/in2_state.c (押下表・macc) | — | `keys[IN2_MAX_DEV][128]`・macc | 110 | IA | AV0 |
 | N5 | input/hal/pad2_core.c | F1 | `pad2_slots[4]` | 180 | IA | AV0 |
 | N6 | input/hal/in2_time.c | tick_count | — | 30 | IA | AV0 |
 | N7 | input/hal/in2_reclaim.c (reclaim・on_focus) | N2〜N5 | §5-6 の表 | 100 | IA | AV0 |
@@ -771,6 +774,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | av_focus_set を WM 以外が呼ぶと INVAL (P1-6)、CUI のネストの戻り | av_focus_host | 呼び手の検査を外す |
 | 境目で raw の掃除・LOST{EXCL}・gen+1 (P1-8) | in2_excl_host | TAB を残すキーから外す |
 | src 2 台で同じキー: in2 は 2 件、合成は 1 件 (P1-9) | in2_src_host | dev を src から取らない |
+| 入力元を `IN2_MAX_DEV` 件割当て: dev は `1..IN2_MAX_DEV` で重複無し、次の割当ては FULL、1 件 release 後は再割当て可。末尾の dev でも押下・離しを記録 | in2_src_host | 探索の上限を `IN2_MAX_DEV - 1` に / release で枠を返さない |
 | 回収・前景の交代で macc 0・振動 0・独占の解除 (P1-10) | in2_reclaim_host | macc を消さない |
 | 満杯 → LOST{OVERFLOW,count}、STOP は残る、seq の折り返し | in2_ring_host | LOST の挿入を外す |
 | 非前景の vibrate は BUSY で無作用 (P2-5) | pad2_core_host | 0 を送る |
