@@ -29,7 +29,6 @@ MUTATIONS = [
      '{ (void)tick_clock_step(); tick_dispatch(); }', 3),
     ('step-call', 'if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();',
      'if (0) tick_dispatch();', 24),
-    ('irq-depth', '++kctx_irq_depth;', '(void)kctx_irq_depth;', 20),
     ('ready', 'ppc_write_dec(PPC_DEC_FAR);', 'ppc_write_dec(1);', 4),
 ]
 
@@ -37,12 +36,13 @@ def host(out, source, expected=0, idle=False):
     out.mkdir(parents=True, exist_ok=True)
     exe=out/'host'
     command(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
-             '-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static',
+             '-DPPC_TRAP_HOST_TEST','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static',
              *(['-DDEC_IDLE_TEST'] if idle else []),
              '-I'+str(out),'-I'+str(v.ROOT),'-I'+str(v.ROOT/'include'),
              '-I'+str(v.ROOT/'arch/ppc'),'-I'+str(v.ROOT/'platform/powermac'),
              '-I'+str(v.ROOT/'sdk/include/os32'),
-             source,v.ROOT/'kernel/time/tick.c',v.ROOT/'kernel/irq/tick.c',
+             source,v.ROOT/'arch/ppc/kernel_trap.c',v.ROOT/'arch/ppc/pd_walk.c',
+             v.ROOT/'kernel/time/tick.c',v.ROOT/'kernel/irq/tick.c',
              v.ROOT/'tools/ppc/kboot_dec_host.c',
              '-Wl,--wrap=tick_clock_config','-o',exe])
     result=subprocess.run(['qemu-i386',exe],capture_output=True,timeout=5)

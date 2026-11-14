@@ -125,17 +125,21 @@ static u32 bat_valid(void)
 
 static int probe_dsi(u32 va)
 {
+    u32 flags = ppc_irq_save();
     if (!ppc_trap_onfault((u32)ppc_probe_read_insn, va, PPC_TRAP_DSI_MISS,
-                          (u32)ppc_probe_read_resume)) return 0;
+                          (u32)ppc_probe_read_resume)) { ppc_irq_restore(flags); return 0; }
     int faulted = ppc_probe_read(va);
     ppc_trap_onfault_clear();
+    ppc_irq_restore(flags);
     return faulted == 1;
 }
 static int probe_isi(u32 va)
 {
-    if (!ppc_trap_onfault(va, va, PPC_TRAP_ISI, (u32)ppc_probe_exec_resume)) return 0;
+    u32 flags = ppc_irq_save();
+    if (!ppc_trap_onfault(va, va, PPC_TRAP_ISI, (u32)ppc_probe_exec_resume)) { ppc_irq_restore(flags); return 0; }
     int faulted = ppc_probe_exec(va);
     ppc_trap_onfault_clear();
+    ppc_irq_restore(flags);
     return faulted == 1;
 }
 /* Remap one VA between two frames with the common mm call. paging_set_page()

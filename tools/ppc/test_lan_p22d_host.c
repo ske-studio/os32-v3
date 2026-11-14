@@ -3,7 +3,10 @@
 volatile u32 kctx_irq_depth;
 static void *stop[5];
 static u32 last, marks;
-u32 ppc_trap_msr(void) { return 0x30; }
+static u32 machine = 0x30;
+void ppc_enable(void) { machine |= PPC_MSR_EE; }
+u32 ppc_irq_save(void) { u32 old = machine; machine &= ~PPC_MSR_EE; return old; }
+u32 ppc_trap_msr(void) { return machine; }
 u32 ppc_root_current(void) { return 0x1000; }
 void ppc_trap_stop(void) { __builtin_longjmp(stop,1); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason) { (void)f; last=reason; }

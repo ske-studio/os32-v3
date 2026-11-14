@@ -55,10 +55,8 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
         ++elapsed;
     }
     ppc_write_dec((u32)remaining);
-    ++kctx_irq_depth;
     while (elapsed--)
         if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();
-    --kctx_irq_depth;
 }
 
 void arch_cpu_idle(void)

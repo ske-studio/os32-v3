@@ -87,10 +87,11 @@ void exec_syscall_dispatch(struct arch_syscall *view)
     /* --- GUI 入力ポンプ (票 K2-1、契約 T6 / T8 の X4) ---
      * フォールトガード (ring3_in_syscall) を立てる **前** に回す。 */
     ring3_gui_pump();
-    /* x86 の ring3_entry.asm は syscall dispatch 前に sti、IRQ の復帰後は
-     * kctx_irq_depth が 0 に戻る。PowerPC の syscall は EE=0 で入る
-     * (arch/ppc/kernel_trap.c の検査) ので idle_work_run は何もせず戻る。
-     * idle_work_run 自身が割込み状態と深さを検査する。 */
+    /* AC-CTX-1: arch の入口はフレーム・stack・翻訳を準備してから
+     * 割込みを許可し、通常 syscall 本体を FG1 で渡す。
+     * IRQ は保存状態を復元し、深さを 0 に戻して本体へ復帰する。
+     * idle_work_run 自身も許可状態・深さ・再入を検査する。
+     * 短い排他区間の所有者は、終了時に元の許可状態を復元する。 */
     idle_work_run();
 
     arch_kapi_source(&src, &call);

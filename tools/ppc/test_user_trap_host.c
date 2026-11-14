@@ -4,7 +4,10 @@ volatile u32 kctx_irq_depth;
 #include "exec_arch.h"
 static void *escape[5];
 static int seen;
-u32 ppc_trap_msr(void) { return 0x30; }
+static u32 trap_msr = 0x30;
+void ppc_enable(void) { trap_msr |= PPC_MSR_EE; }
+u32 ppc_irq_save(void) { u32 old = trap_msr; trap_msr &= ~PPC_MSR_EE; return old; }
+u32 ppc_trap_msr(void) { return trap_msr; }
 u32 ppc_root_current(void) { return 0; }
 void ppc_trap_stop(void) { seen = 3; __builtin_longjmp(escape, 1); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason) { (void)f; (void)reason; }

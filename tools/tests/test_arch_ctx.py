@@ -6,7 +6,7 @@ CHECK = dict(name='arch-ctx-host', tier=2, budget=15, needs=[], covers=[
     'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
     'arch/x86/kernel/syscall_entry.c', 'arch/x86/arch_exec_storage.h',
     'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'kernel/irq/irq.h',
-    'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
+    'init/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
     'include/**', 'sdk/include/os32/**'])
 import os
 from pathlib import Path
@@ -17,7 +17,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRE_W4C = True  # W4c integration changes this one switch to False.
+PRE_W4C = False  # W4c integration changes this one switch to False.
 VECTORS = {1: 'AC-CTX-4/FG1-FG0-IRQ-reentry', 2: 'AC-CTX-2/7/IRQ-depth',
            3: 'AC-CTX-1/7/entry-reject', 4: 'AC-CTX-1/5/syscall-C',
            5: 'AC-CTX-7/onfault-irq-save'}
@@ -59,6 +59,9 @@ def run(ctx):
         (work / 'ctx_entry.inc').write_text(common[start:common.index('    arch_kapi_source(', start)])
         start = monitor.index('int pm_lan_copy8(')
         (work / 'ctx_onfault.inc').write_text(monitor[start:monitor.index('\nvoid pm_lan_execute(', start)])
+        probes = (root / 'init/ppc_kernel.c').read_text()
+        start = probes.index('static int probe_dsi(')
+        (work / 'ctx_probes.inc').write_text(probes[start:probes.index('/* Remap one VA', start)])
         for provider, trap, vectors in [('ppc', ppc, VECTORS), ('x86', x86, (1, 4))]:
             for vector in vectors:
                 rc = exercise(root, work, provider, vector, trap, idle)
@@ -95,6 +98,18 @@ def run(ctx):
             mutant = replace_once(enabled, '            ppc_enable();', '')
             assert exercise(root, work, 'ppc', 4, mutant, idle) == 42
             print('RED runtime: removed syscall enable', flush=True)
+            probe_source = (work / 'ctx_probes.inc').read_text()
+            for function in ('probe_dsi', 'probe_isi'):
+                old = 'static int ' + function + '(u32 va)\n{\n    u32 flags = ppc_irq_save();'
+                mutant = replace_once(probe_source, old, old.replace('ppc_irq_save()', 'msr'))
+                (work / 'ctx_probes.inc').write_text(mutant)
+                assert exercise(root, work, 'ppc', 5, ppc, idle) == 1
+                print('RED runtime: onfault mask ' + function, flush=True)
+            (work / 'ctx_probes.inc').write_text(probe_source)
+            for anchor in ('            ++kctx_irq_depth;', '            --kctx_irq_depth;'):
+                mutant = replace_once(ppc, anchor, '')
+                assert exercise(root, work, 'ppc', 2, mutant, idle) == 1
+                print('RED runtime: IRQ dispatch depth ' + anchor.strip(), flush=True)
             for anchor, label in [
                 ('    if (!_irq_enabled()) return;', 'idle state'),
                 ('    if (kctx_irq_depth != 0) return;', 'idle depth'),

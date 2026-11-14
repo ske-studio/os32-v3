@@ -11,7 +11,19 @@ int __real_tick_clock_config(u32 num, u32 den);
 int __wrap_tick_clock_config(u32 num, u32 den)
 { return __real_tick_clock_config(num, reject_config ? 0 : den); }
 static u32 calls, mark;
-static void (*handler)(struct ppc_frame *);
+#include "exec_arch.h"
+u32 ppc_trap_msr(void) { return 0x30; }
+u32 ppc_root_current(void) { return 0; }
+void ppc_trap_stop(void) { __builtin_trap(); }
+void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; __builtin_trap(); }
+void ring3_fault_kill(void) { __builtin_trap(); }
+void exec_syscall_dispatch(struct arch_syscall *c) { (void)c; __builtin_trap(); }
+static void handler(struct ppc_frame *unused)
+{
+    (void)unused;
+    struct ppc_frame f = { .vector = PPC_VECTOR_DEC };
+    ppc_trap_dispatch(&f);
+}
 static void finish(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(&mark), "d"(4) : "memory");
@@ -26,8 +38,6 @@ void ppc_enable(void) {
 void ppc_disable(void) { enabled=0; }
 int ppc_read_dec(void) { return dec; }
 void ppc_write_dec(u32 value) { dec=(int)value; ++writes; }
-void ppc_trap_set_handler(u32 vector, void (*fn)(struct ppc_frame *))
-{ check(vector==0x900,2); handler=fn; }
 u32 ppc_irq_save(void) { u32 saved=enabled; enabled=0; return saved; }
 void ppc_irq_restore(u32 saved) { enabled=(int)saved; }
 static void forbidden_callback(void) { check(0,21); }
@@ -48,7 +58,7 @@ void _start(void)
     ppc_decrementer_interrupt(0);
     check(dec==PPC_DEC_FAR && !tick_count && !calls,4);
     check(ppc_dec_start(25000000,100)==-1,5);
-    check(ppc_dec_start(25000000,1000)==0 && handler==ppc_decrementer_interrupt,6);
+    check(ppc_dec_start(25000000,1000)==0,6);
     check(dec==25000,7);
     int before=writes;
     dec=-75001;

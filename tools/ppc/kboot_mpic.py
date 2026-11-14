@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """E2 product MPIC: recorded bus, runtime mutations, real mac99 IPI delivery."""
 import argparse
+import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -114,6 +116,15 @@ def observe(out, elf, markers):
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true'); args=parser.parse_args()
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-'
+    missing = [tool for tool in (str(cross) + 'gcc', 'qemu-i386',
+               'qemu-system-ppc', 'genisoimage') if not shutil.which(tool)]
+    if not v.ROM.is_file():
+        missing.append(str(v.ROM))
+    if missing:
+        print('SKIP kboot-mpic: unavailable ' + ', '.join(missing), flush=True)
+        return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
+    v.CROSS = cross
     out=v.ROOT/'build/out/ppc/kboot-mpic'; source=v.ROOT/'platform/powermac/mpic.c'
     host(out/'host',source)
     dest=out/'qemu'; elf=image(dest,source)
@@ -141,4 +152,4 @@ def main():
             (dest/'RED.log').write_text('expected/actual host rc and reach: '+str(expected)+'; QEMU fixture_done with '+repr(marks if name!='spurious' else []))
             print(name+': runtime RED',flush=True)
     print('kboot-mpic PASS',flush=True)
-if __name__=='__main__': main()
+if __name__=='__main__': sys.exit(main())

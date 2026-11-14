@@ -12,6 +12,8 @@ static void checkpoint(unsigned n)
 volatile u32 kctx_irq_depth;
 static void *stopped[5];
 static u32 machine=0x30, reason, dumps, reads, handled, root=0x1000, leaf;
+void ppc_enable(void) { machine |= PPC_MSR_EE; }
+u32 ppc_irq_save(void) { u32 old = machine; machine &= ~PPC_MSR_EE; return old; }
 u32 ppc_trap_msr(void) { return machine; }
 u32 ppc_root_current(void) { return root; }
 void ppc_trap_stop(void) { longjmp(stopped,1); }

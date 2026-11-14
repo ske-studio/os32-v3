@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """D2 product dispatch, host classification and D1 mac99 fixture reuse."""
 import argparse
+import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -142,6 +144,15 @@ def observe(out,elf,case, red=None):
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true'); args=parser.parse_args()
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-'
+    missing = [tool for tool in (str(cross) + 'gcc', 'qemu-i386',
+               'qemu-system-ppc', 'genisoimage') if not shutil.which(tool)]
+    if not v.ROM.is_file():
+        missing.append(str(v.ROM))
+    if missing:
+        print('SKIP kboot-trap: unavailable ' + ', '.join(missing), flush=True)
+        return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
+    v.CROSS = cross
     out=v.ROOT/'build/out/ppc/kboot-trap'; source=v.ROOT/'arch/ppc/kernel_trap.c'
     host(out/'host',source)
     for case in range(1,7):
@@ -187,4 +198,4 @@ def main():
             observe(qout,elf,case,(stop,markers))
             print(name+': QEMU runtime RED',flush=True)
     print('kboot-trap PASS',flush=True)
-if __name__=='__main__': main()
+if __name__=='__main__': sys.exit(main())

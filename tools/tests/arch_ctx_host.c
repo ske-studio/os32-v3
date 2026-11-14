@@ -69,6 +69,15 @@ int ppc_probe_copy8(u32 va, u8 *out)
     *out = 7; return copy_result;
 }
 #include "ctx_onfault.inc"
+const char ppc_probe_read_insn[4] = {0}, ppc_probe_read_resume[4] = {0};
+const char ppc_probe_exec_resume[4] = {0};
+int ppc_probe_read(u32 va)
+{
+    VERIFY(!_irq_enabled() && probe.active && probe.va == va);
+    return copy_result;
+}
+int ppc_probe_exec(u32 va) { return ppc_probe_read(va); }
+#include "ctx_probes.inc"
 static void irq(struct ppc_frame *f)
 {
     VERIFY(f && kctx_irq_depth == 1 && !_irq_enabled());
@@ -121,6 +130,10 @@ void _start(void)
     if (CTX_VECTOR == 5) {
         ppc_enable();
         for (copy_result = 0; copy_result < 2; ++copy_result) {
+            VERIFY(probe_dsi(0x1000) == (copy_result == 1));
+            VERIFY(_irq_enabled() && !probe.active);
+            VERIFY(probe_isi(0x1000) == (copy_result == 1));
+            VERIFY(_irq_enabled() && !probe.active);
             u8 out = 0;
             VERIFY(pm_lan_copy8(0x1000, &out) == copy_result);
             VERIFY(out == 7 && _irq_enabled() && !probe.active);

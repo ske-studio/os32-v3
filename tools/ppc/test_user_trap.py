@@ -38,7 +38,9 @@ def main():
     if args.mutate:
         old = '''        if (f->vector == 0xc00) {
             struct arch_syscall call = { f };
+            ppc_enable();
             exec_syscall_dispatch(&call);
+            (void)ppc_irq_save();
             return;
         }'''
         assert source.count(old) == 1

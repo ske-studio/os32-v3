@@ -74,7 +74,10 @@ int pm_lan_fs_send(const u8 *frame, u32 len)
 
 /* Real dispatcher proves both interrupt branches wrap the actual callback,
  * including nested depth=2 and depth restoration. USER SC remains waitable. */
-u32 ppc_trap_msr(void) { return 0x30; }
+static u32 trap_msr = 0x30;
+void ppc_enable(void) { trap_msr |= PPC_MSR_EE; }
+u32 ppc_irq_save(void) { u32 old = trap_msr; trap_msr &= ~PPC_MSR_EE; return old; }
+u32 ppc_trap_msr(void) { return trap_msr; }
 u32 ppc_root_current(void) { return 0; }
 void ppc_trap_stop(void) { finish(90); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; finish(91); }
