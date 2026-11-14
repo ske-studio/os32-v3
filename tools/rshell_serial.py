@@ -75,6 +75,9 @@ except ImportError:  # pragma: no cover
     serial = None
 
 EOT = b"\x04"
+# OS32_SERIAL_RAW_LOG を指定すると追記形式で monotonic 秒とバイト列を記録。
+# reset の count は直前の in_waiting のスナップショットであり厳密な実捨却数ではない。
+
 
 # SerialFS のホスト側 (同じディレクトリ)。pyserial と同じく import 時に
 # 落とさない — 無くても従来の cmd / repl は動く。
@@ -230,12 +233,57 @@ def read_size(port):
     return n if n > 0 else 1
 
 
+class RawLogPort:
+    """Log the port boundary as timestamped text; bytes are hexadecimal."""
+    def __init__(self, port, path):
+        self.port = port
+        self.log = open(path, "a", encoding="ascii", buffering=1)
+
+    def _record(self, event, detail):
+        self.log.write("%.9f %s %s\n" % (time.monotonic(), event, detail))
+
+    def __getattr__(self, name):
+        return getattr(self.port, name)
+
+    def read(self, size):
+        data = self.port.read(size)
+        if data:
+            self._record("RX", data.hex())
+        return data
+
+    def write(self, data):
+        count = self.port.write(data)
+        if count:
+            self._record("TX", bytes(data[:count]).hex())
+        return count
+
+    def reset_input_buffer(self):
+        self._record("RESET_BEFORE", "in_waiting=%d" % self.port.in_waiting)
+        self.port.reset_input_buffer()
+        self._record("RESET_AFTER", "in_waiting=%d" % self.port.in_waiting)
+
+    def close(self):
+        try:
+            self.port.close()
+        finally:
+            self.log.close()
+
+
 def open_port(name, baud):
     if name.startswith(AIDEBUG_PREFIX):
         # NP21/W の COM1 (速度は模擬されないので baud は使わない)
-        return AidebugPort(name[len(AIDEBUG_PREFIX):])
-    return serial.Serial(name, baudrate=baud, bytesize=8, parity="N",
-                         stopbits=1, timeout=0.2)
+        port = AidebugPort(name[len(AIDEBUG_PREFIX):])
+    else:
+        port = serial.Serial(name, baudrate=baud, bytesize=8, parity="N",
+                             stopbits=1, timeout=0.2)
+    path = os.environ.get("OS32_SERIAL_RAW_LOG")
+    if not path:
+        return port
+    try:
+        return RawLogPort(port, path)
+    except Exception:
+        port.close()
+        raise
 
 
 def read_until_eot(port, timeout_s):

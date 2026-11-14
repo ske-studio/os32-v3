@@ -365,7 +365,52 @@ def case_lan(r):
         check(not opened.called, "conflicting transports never open serial")
 
 
+def case_raw_log(r):
+    class Port:
+        def __init__(self, reply):
+            self.pending = b"old"
+            self.reply = reply
+        @property
+        def in_waiting(self):
+            return len(self.pending)
+        def reset_input_buffer(self):
+            self.pending = b""
+        def write(self, data):
+            self.pending = self.reply
+            return len(data)
+        def flush(self):
+            pass
+        def read(self, size):
+            data, self.pending = self.pending[:size], self.pending[size:]
+            return data
+        def close(self):
+            pass
+
+    from unittest.mock import patch
+    with tempfile.TemporaryDirectory() as tmp:
+        path = str(pathlib.Path(tmp) / "raw.log")
+        with patch.dict(r.os.environ, {"OS32_SERIAL_RAW_LOG": path}):
+            port = r.open_port("aidebug:http://127.0.0.1:8025", 9600)
+            check(isinstance(port, r.RawLogPort), "raw: environment enables logging")
+            port.close()
+
+    for reply, expected in ((b"[> ver\n\x04", 1), (b"> ver\n\x04", 0)):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "raw.log"
+            port = r.RawLogPort(Port(reply), path)
+            rc, body = r.run_serial(port, "ver", 1)
+            port.close()
+            records = [line.split(" ", 2) for line in path.read_text().splitlines()]
+            check(rc == expected and body.encode() == reply[:-1], "raw: echo result")
+            check([x[1:] for x in records] == [
+                ["RESET_BEFORE", "in_waiting=3"], ["RESET_AFTER", "in_waiting=0"],
+                ["TX", "7665720a"], ["RX", reply.hex()]], "raw: records")
+            times = [float(x[0]) for x in records]
+            check(times == sorted(times), "raw: monotonic timestamps")
+
+
 CASES = {
+    "raw_log": case_raw_log,
     "lan": case_lan,
     "echo": case_echo,
     "ack": case_ack,
@@ -378,6 +423,8 @@ CASES = {
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
+    (r'        self\._record\("RESET_BEFORE", "in_waiting=%d" % self\.port\.in_waiting\)',
+     '        self._record("RESET_BEFORE", "")', "discard count omitted"),
     (r"    return first == echo_line\(cmd\)",
      "    return first.startswith(echo_line(cmd))",
      "エコーを前方一致で見る (`> version` を `ver` の応答と読む — ⑥)"),
