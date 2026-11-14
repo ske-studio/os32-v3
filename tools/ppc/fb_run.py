@@ -6,9 +6,6 @@ Only stream framing is instrumented; renderer, shell and input remain real.
 """
 import argparse
 import hashlib
-import io
-import select
-import socket
 import json
 import os
 from pathlib import Path
@@ -21,7 +18,7 @@ import time
 
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate
 
 from usb_run import product_settings, stream_payload, USB_QEMU_CLOCK
 
@@ -35,33 +32,19 @@ def check(ok, label):
         raise VerdictError(label)
 
 
-def accept(elf, cpu, out, mode, feed=False):
+def accept(elf, cpu, out, mode):
     out.mkdir()
     cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
     iso = out/'boot.iso'
     command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
     a, b = out/'serial-a.log', out/'serial-b.log'
-    transport = None
-    display = io.BytesIO()
-    diagnostics = []
-    network = []
-    if not feed:
-        reservation = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        reservation.bind(('127.0.0.1', 0))
-        port = reservation.getsockname()[1]
-        transport = lan.UDP(f'127.0.0.1:0,127.0.0.1:{port}')
-        host = lan.Host(transport, bytes.fromhex('525400123456'), out/'capture', output=diagnostics.append)
-        remote = lan.Terminal(host, display=display, diagnostic=diagnostics.append)
-        reservation.close()
-        network = ['-device', 'sungem,netdev=n0,mac=52:54:00:12:34:56',
-                   '-netdev', f'socket,id=n0,udp=127.0.0.1:{transport.sock.getsockname()[1]},localaddr=127.0.0.1:{port}']
     argv = ['qemu-system-ppc', '-g', '800x600x8', '-M', 'mac99', '-cpu', cpu,
             '-m', '128M', '-smp', '1', '-accel', 'tcg', '-bios', str(ROM),
             '-drive', f'file={iso},media=cdrom', '-boot', 'd',
             '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF', '-prom-env', 'auto-boot?=true',
             '-display', 'none', '-serial', 'file:'+str(a), '-serial', 'file:'+str(b),
             '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none',
-            '-usb', *USB_QEMU_CLOCK, *network]
+            '-usb', *USB_QEMU_CLOCK]
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
     err = (out/'qemu.stderr').open('w')
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -69,11 +52,9 @@ def accept(elf, cpu, out, mode, feed=False):
     q = QMP(process, time.monotonic()+60)
 
     def wait(predicate, seconds, label):
-        end = time.monotonic()+seconds
+        # Full framebuffer redraws under TCG can outlast device-only waits.
+        end = time.monotonic()+seconds*3
         while time.monotonic() < end:
-            while transport and select.select([transport], [], [], 0)[0]:
-                frame = transport.receive(); host.receive(frame); remote.receive(frame)
-            if transport: host.expire()
             validate(serial(a), serial(b))
             require(process.poll() is None, 'QEMU alive')
             if predicate(): return
@@ -201,34 +182,22 @@ def accept(elf, cpu, out, mode, feed=False):
             lines += ['sh> echo l%02d' % i, 'l%02d' % i]
         lines += ['sh> ']
         shot('scroll', lines, [(32, 4)])
-        # Exercise USB before opening the independent LAN input transport.
+        # No NIC: the UTF-8 line enters at the LAN terminal decoder (pm_terminal_feed),
+        # so the result never depends on host sockets. LAN transport is covered by sc/sd.
         usb_command('clear', '\x1b[2J\x1b[H')
         usb_command('echo usb', 'usb\n')
         shot('usb-only', ['sh> echo usb', 'usb', 'sh> '], [(2, 4)])
-        if not feed:
-            wait(lambda: host.boot, 10, 'LAN discovery')
-            remote.open()
-            wait(lambda: remote.connected, 10, 'LAN OPEN')
         usb_command('clear', '\x1b[2J\x1b[H')
         shot('lan-clear', ['sh> '], [(0, 4)])
         text = 'echo 日本語の表示'
         start = len(stream())
-        remote_start = len(display.getvalue())
-        if feed: key('z')
-        else: remote.send_bytes((text+'\n').encode())
+        key('z')
         wait(lambda: stream()[start:].endswith('sh> '), 10, 'LAN UTF-8 completion')
         wanted = text+'\n日本語の表示\nsh> '
         check(stream()[start:] == wanted, 'ESCC exact UTF-8 echo/result')
         # Require the result row as a positive control before testing input echo.
         t = shot('lan-result')
         check(t.compare_text(1, 0, '日本語の表示') is None, 'UTF-8 fd1 result control')
-        if not feed:
-            wait(lambda: display.getvalue()[remote_start:].replace(b'\r', b'').endswith(b'sh> '),
-                 10, 'LAN transcript completion')
-            check(display.getvalue()[remote_start:].replace(b'\r', b'').decode() == wanted,
-                  'LAN exact UTF-8 echo/result')
-            (out/'terminal.txt').write_bytes(display.getvalue())
-            check(not any('gap' in x or 'timeout' in x for x in diagnostics), 'LAN loss')
         shot('lan-utf8', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
         (out/'stream.txt').write_text(stream())
         q.call('quit'); process.wait(timeout=2)
@@ -241,7 +210,6 @@ def accept(elf, cpu, out, mode, feed=False):
             try: process.wait(timeout=2)
             except subprocess.TimeoutExpired: process.kill(); process.wait()
         err.close()
-        if transport: transport.sock.close()
 
 
 MUTATIONS = [
@@ -275,13 +243,6 @@ def main():
         missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-fb: ' + missing + ' unavailable')
         return 0
-    feed = False
-    try:
-        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        probe.close()
-    except PermissionError:
-        feed = True
-        print('LAN UDP unavailable: exercising pm_terminal_feed boundary; LAN transport unverified', flush=True)
     os.environ['PPC_FB'] = '1'
     work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ['TMPDIR']))
     print('evidence='+str(work), flush=True)
@@ -292,18 +253,18 @@ def main():
         manifest_path = work/'root.json'; manifest_path.write_text(json.dumps(manifest))
         opts = product_settings(work, mode) + ['ROOT_MANIFEST='+str(manifest_path),
             'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)]
-        if feed:
-            src = 'platform/powermac/input_boot.c'
-            inp = (ROOT/src).read_text()
-            literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
-            helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
-                      'if (c == \'z\') { static const u8 text[] = "'+literal+'"; '
-                      'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
-            anchor = 'pm_input_usb_take()'
-            require(inp.count(anchor) == 1, 'unique FB input boundary')
-            inp = inp.replace(anchor, 'fb_usb()').replace('static PmInputDecoder', helper+'static PmInputDecoder')
-            path = work/(mode+'-input.c'); path.write_text(inp)
-            opts += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(path)]
+        # Every mode feeds the fixed UTF-8 line at the LAN terminal decoder on USB 'z'.
+        src = 'platform/powermac/input_boot.c'
+        inp = (ROOT/src).read_text()
+        literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
+        helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
+                  'if (c == \'z\') { static const u8 text[] = "'+literal+'"; '
+                  'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
+        anchor = 'pm_input_usb_take()'
+        require(inp.count(anchor) == 1, 'unique FB input boundary')
+        inp = inp.replace(anchor, 'fb_usb()').replace('static PmInputDecoder', helper+'static PmInputDecoder')
+        path = work/(mode+'-input.c'); path.write_text(inp)
+        opts += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(path)]
         if mode == 'utf8-bytewise':
             source_text = (ROOT/source).read_text()
             require(source_text.count(old) == 1, 'unique UTF-8 reversion anchor')
@@ -327,7 +288,7 @@ def main():
         (work/(mode+'-inputs.json')).write_text(json.dumps(hashes, indent=2))
         for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]) if mode == 'normal' else ['7450']:
             try:
-                accept(elf, cpu, work/(mode+'-'+cpu), mode, feed)
+                accept(elf, cpu, work/(mode+'-'+cpu), mode)
             except VerdictError as exc:
                 if mode == 'normal': raise
                 if mode == 'utf8-bytewise':
