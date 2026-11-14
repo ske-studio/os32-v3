@@ -46,6 +46,20 @@ WSL の agent は NP21/W で開発するときだけ使う。WSL が動いてい
 置かない。unit の状態は `systemctl status os32-host-agent@eth0.service`、ログは
 `journalctl -u os32-host-agent@eth0.service` で確認できる。
 
+## 版の入れ替え (導入の後)
+
+作業木のルートで、一般ユーザーのまま実行する (sudo は中で呼ぶ)。一般ユーザーで clone してから
+root で `/opt/os32` に写すので、root の作業木を触らない。直前の版は `/opt/os32.prev` に残る。
+
+```sh
+tools/systemd/update_host_agent.sh <instance>            # origin/main に入れ替える
+tools/systemd/update_host_agent.sh <instance> <commit>   # 指定の commit に
+tools/systemd/update_host_agent.sh <instance> --rollback # 直前の版に戻す
+```
+
+サービスを止めて差し替え、`/etc/os32/host-agent` を 0755 にして (CLI の `--instance` が設定を読むため)
+起動し、probe の commit が入れた commit と一致すれば完了。違えば rc=1 で止まる。
+
 ## systemd 無効の WSL
 
 開発のときに、同じ設定で runner を手で起こす。専用ユーザーは作らなくてよい。
