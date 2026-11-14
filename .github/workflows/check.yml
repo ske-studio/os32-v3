@@ -19,6 +19,12 @@ on:
     branches: [main, "wt/**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      arch:
+        description: Architecture checks
+        type: choice
+        default: auto
+        options: [auto, x86, ppc, both]
 
 permissions:
   contents: read
@@ -170,13 +176,23 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select PPC scope
+        id: scope
+        env:
+          PPC_ARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}
+        run: python3 -B tools/ci/ppc_scope.py
       - name: PPC build dependencies
+        if: steps.scope.outputs.scope == 'ppc'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage
           python3 -m pip install --quiet -r requirements.txt
       - uses: ./.github/actions/ppc-setup
+        if: steps.scope.outputs.scope == 'ppc'
       - name: PPC image and host checks
+        if: steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |

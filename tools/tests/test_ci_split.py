@@ -3,7 +3,7 @@
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml', '.github/workflows/full-check.yml',
                      '.github/actions/build-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
-                     'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
+                     'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3)
@@ -226,7 +226,8 @@ def full_check_cases(source):
     assert triggers['workflow_dispatch']['inputs']['ref']['default'] == 'main'
     assert triggers['schedule'] == [{'cron': '0 18 * * *'}]
     assert workflow['concurrency'] == dict(group='full-check', **{'cancel-in-progress': False})
-    job, = workflow['jobs'].values()
+    assert set(workflow['jobs']) == {'full-check', 'ppc-compile'}
+    job = workflow['jobs']['full-check']
     assert job['runs-on'] == 'ubuntu-latest'
     assert job['timeout-minutes'] == 330
     steps = job['steps']
@@ -379,7 +380,7 @@ def main():
             ('fetch', 'all(s == "success" for s in states)', 'any(s == "success" for s in states)', 'accept partial shards'),
             ('workflow', '  check-fast:\n', '  check-fast:\n    needs: artifacts\n', 'serialize jobs'),
             ('workflow', '    runs-on: ubuntu-latest', '    runs-on: [self-hosted, substream]', 'route to substream'),
-            ('full-check', 'MUTATE=1', 'MUTATE=0', 'disable full-check mutations'),
+            ('full-check', 'make check -k -j4 MUTATE=1', 'make check -k -j4 MUTATE=0', 'disable full-check mutations'),
             ('fetch', 'if [ "$ART_STATE" = success ]; then', 'if [ "$ART_STATE" != success ]; then', 'invert artifact gate'),
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
