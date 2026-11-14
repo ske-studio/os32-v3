@@ -22,6 +22,7 @@
 #include "utf8.h"
 #include "os32_kapi_shared.h"
 #include "con_sink.h"
+#include "console.h"
 
 /* 割込み禁止区間。ホスト試験 (tools/tests/con_sink_host.c) は CPL=3 で走り
  * cli/popfl を実行できないので、そこだけ空の錠に差し替える。カーネル本体は
@@ -50,6 +51,9 @@ static u32 g_tail;                  /* 次に読む位置 */
 static u32 g_count;                 /* 使用バイト数 */
 static int g_enabled;               /* GUI モード中だけ 1 */
 static int g_reader = CON_SINK_NO_READER;
+static int g_capture; /* 1: collecting, 2: frozen */
+static int g_saved_rshell, g_saved_boot;
+static u32 g_capture_drop_start;
 
 /* あふれで捨てたレコード数。ブート後に emu_read_mem で読めるよう、
  * kselftest_pass と同じ理由で static にしない (票 §2-1)。 */
@@ -143,6 +147,49 @@ int con_sink_is_enabled(void)
     return g_enabled;
 }
 
+/* Capture shares the ring and its reader with GUI mode. */
+int con_sink_capture(unsigned int op)
+{
+    unsigned int f = con_sink_lock();
+    int owner = res_owner_get();
+    int rc = 0;
+    if (op == CON_SINK_CAPTURE_BEGIN) {
+        if (g_enabled || g_capture || g_reader != CON_SINK_NO_READER) {
+            rc = OS32_ERR_BUSY;
+        } else {
+            ring_reset();
+            g_reader = owner;
+            g_capture_drop_start = con_sink_drop_count;
+            g_saved_rshell = rshell_active;
+            g_saved_boot = boot_serial_mirror;
+            rshell_active = boot_serial_mirror = 0;
+            g_capture = 1;
+        }
+    } else if (op == CON_SINK_CAPTURE_FREEZE) {
+        if (g_capture != 1 || g_reader != owner) rc = OS32_ERR_INVAL;
+        else {
+            g_capture = 2;
+            if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;
+        }
+    } else if (op == CON_SINK_CAPTURE_END) {
+        if (!g_capture || g_reader != owner) rc = OS32_ERR_INVAL;
+        else {
+            ring_reset();
+            g_reader = CON_SINK_NO_READER;
+            g_capture = 0;
+            rshell_active = g_saved_rshell;
+            boot_serial_mirror = g_saved_boot;
+        }
+    } else rc = OS32_ERR_INVAL;
+    con_sink_unlock(f);
+    return rc;
+}
+
+int con_sink_capture_active(void)
+{
+    return g_capture != 0;
+}
+
 /* ------------------------------------------------------------------------ */
 /*  積む側                                                                   */
 /*                                                                          */
@@ -169,10 +216,10 @@ void con_sink_push_print(const char *buf, u32 len, u8 color)
     const u8 *p = (const u8 *)buf;
     unsigned int f;
 
-    if (!g_enabled || !buf || len == 0) return;
+    if (!(g_enabled || g_capture == 1) || !buf || len == 0) return;
 
     f = con_sink_lock();
-    if (!g_enabled) { con_sink_unlock(f); return; }   /* 錠の中で再確認 */
+    if (!(g_enabled || g_capture == 1)) { con_sink_unlock(f); return; }   /* 錠の中で再確認 */
     while (len > 0) {
         u32 n = utf8_chunk_len(p, len, (u32)CON_SINK_PRINT_MAX);
         u32 i;
@@ -190,9 +237,9 @@ void con_sink_push_print(const char *buf, u32 len, u8 color)
 void con_sink_push_clear(void)
 {
     unsigned int f;
-    if (!g_enabled) return;
+    if (!(g_enabled || g_capture == 1)) return;
     f = con_sink_lock();
-    if (g_enabled && ring_reserve((u32)CON_SINK_HDR_CLEAR)) {
+    if ((g_enabled || g_capture == 1) && ring_reserve((u32)CON_SINK_HDR_CLEAR)) {
         ring_put((u8)CON_SINK_REC_CLEAR);
     }
     con_sink_unlock(f);
@@ -205,11 +252,11 @@ void con_sink_push_clear(void)
 void con_sink_push_exit(int id)
 {
     unsigned int f;
-    if (!g_enabled) return;
+    if (!(g_enabled || g_capture == 1)) return;
     if (id < 0) id = 0;
     if (id > (int)U8_MAX) id = (int)U8_MAX;
     f = con_sink_lock();
-    if (g_enabled && ring_reserve((u32)CON_SINK_HDR_EXIT)) {
+    if ((g_enabled || g_capture == 1) && ring_reserve((u32)CON_SINK_HDR_EXIT)) {
         ring_put((u8)CON_SINK_REC_EXIT);
         ring_put((u8)id);
     }
@@ -219,13 +266,13 @@ void con_sink_push_exit(int id)
 void con_sink_push_cursor(int x, int y)
 {
     unsigned int f;
-    if (!g_enabled) return;
+    if (!(g_enabled || g_capture == 1)) return;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     if (x > (int)U8_MAX) x = (int)U8_MAX;
     if (y > (int)U8_MAX) y = (int)U8_MAX;
     f = con_sink_lock();
-    if (g_enabled && ring_reserve((u32)CON_SINK_HDR_CURSOR)) {
+    if ((g_enabled || g_capture == 1) && ring_reserve((u32)CON_SINK_HDR_CURSOR)) {
         ring_put((u8)CON_SINK_REC_CURSOR);
         ring_put((u8)x);
         ring_put((u8)y);
@@ -297,6 +344,14 @@ void con_sink_owner_exit(int id)
     unsigned int f;
     if (id == CON_SINK_NO_READER) return;
     f = con_sink_lock();
-    if (g_reader == id) g_reader = CON_SINK_NO_READER;
+    if (g_reader == id) {
+        if (g_capture) {
+            ring_reset();
+            g_capture = 0;
+            rshell_active = g_saved_rshell;
+            boot_serial_mirror = g_saved_boot;
+        }
+        g_reader = CON_SINK_NO_READER;
+    }
     con_sink_unlock(f);
 }

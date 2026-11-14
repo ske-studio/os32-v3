@@ -25,7 +25,7 @@ static u32 gui_ime_cells[25][80];
 static AppSlot slots[APP_SLOT_COUNT];
 volatile u32 tick_count;
 volatile int exec_nest_level, ring3_wm_depth;
-int rshell_active;
+int rshell_active, boot_serial_mirror;
 
 static void say(const char *s)
 {
