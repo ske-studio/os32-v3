@@ -37,9 +37,10 @@ def main():
             for name in ('open', 'status', 'read', 'write', 'close', 'notice_read', 'notice_serial'):
                 assert 'return kapi_host_' + name + '(' in generated
             if target == 'ppc-powermac':
-                assert generated.count('ppc_kapi_wait_once();') == 2
+                assert 'void __cdecl wrap_sys_halt(void)\n{\n    extern i32 ppc_kapi_wait_once(void);\n    (void)ppc_kapi_wait_once();\n}\n' in generated
+                assert 'i32 __cdecl wrap_sys_yield(void)\n{\n    extern i32 ppc_kapi_wait_once(void);\n    return ppc_kapi_wait_once();\n}\n' in generated
                 assert 'rshell_active = active;' in generated
-                assert 'return (int)0;' in generated
+                assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    return (int)0;\n}\n' in generated
             assert 'kernel/console/con_sink.c' in (ROOT / 'build/ppc-kboot.mk').read_text()
         x86 = out / 'x86-pc98'
         for name in OUTPUTS:

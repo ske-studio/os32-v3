@@ -155,6 +155,9 @@ void pm_terminal_open(void);
 int pm_terminal_trygetkey(void);
 int pm_terminal_getkey(void);
 void pm_terminal_poll(void);
+#if KBOOT_SH
+int pm_terminal_work_register(void);
+#endif
 struct pm_lan_range { u32 base, size; };
 /* The service supplies valid fields and excludes RX buffers from peek_ok. */
 struct pm_lan_diag {
