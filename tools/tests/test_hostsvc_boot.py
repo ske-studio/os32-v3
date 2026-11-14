@@ -120,10 +120,11 @@ def main():
     originals = [(ROOT / path).read_text() for path in SOURCES]
     with tempfile.TemporaryDirectory(prefix='hostsvc-boot-') as tmp:
         work = Path(tmp)
-        (work / 'io.h').write_text('int _irq_enabled(void);\n'
+        (work / 'io.h').write_text('#ifndef BOOT_TEST_IO_H\n#define BOOT_TEST_IO_H\n'
+            'static inline void _idle(void) {}\nint _irq_enabled(void);\n'
             'unsigned int boot_irq_save(void);\n'
             'void boot_irq_restore(unsigned int);\n'
-            '#define irq_save boot_irq_save\n#define irq_restore boot_irq_restore\n')
+            '#define irq_save boot_irq_save\n#define irq_restore boot_irq_restore\n#endif\n')
         results = build_run(work, originals)
         if any(results):
             raise RuntimeError(f'control runtime rc={results}')

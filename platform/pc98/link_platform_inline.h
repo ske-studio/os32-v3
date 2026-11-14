@@ -2,7 +2,9 @@
 #ifndef OS32_PC98_LINK_PLATFORM_INLINE_H
 #define OS32_PC98_LINK_PLATFORM_INLINE_H
 #include "net/link_platform.h"
-#include "idt.h"
+#include "kernel_tick.h"
+#include "kernel/irq/tick.h"
+#include "platform/pc98/tick_order.h"
 #include "io.h"
 #include "kernel/idle_work.h"
 
@@ -28,7 +30,13 @@ static inline void pc98_link_platform_idle(void)
     _idle();
 }
 
+static inline int pc98_link_platform_tick_register(void (*fn)(void))
+{
+    return tick_register(PC98_TICK_LINK, fn);
+}
+
 /* The external contract remains available to consumers without this header. */
+#define link_platform_tick_register pc98_link_platform_tick_register
 #define link_platform_now pc98_link_platform_now
 #define link_platform_lock pc98_link_platform_lock
 #define link_platform_unlock pc98_link_platform_unlock

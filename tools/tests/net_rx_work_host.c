@@ -8,6 +8,7 @@ static unsigned int enabled = 1;
 static unsigned int irq_save(void) { unsigned int f = enabled; enabled = 0; return f; }
 static void irq_restore(unsigned int f) { enabled = f; }
 static int _irq_enabled(void) { return enabled != 0; }
+static void _idle(void) {}
 #include "net/nic.c"
 #include "net/nic_rx.c"
 #include "net/rx_work.c"

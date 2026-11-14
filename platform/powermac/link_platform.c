@@ -1,6 +1,5 @@
 /* PowerMac link boundary: DEC drives link; foreground only yields. */
 #include "net/link_platform.h"
-#include "net/link.h"
 #include "kernel_tick.h"
 #include "kernel/idle_work.h"
 #include "kernel/irq/tick.h"
@@ -10,7 +9,6 @@
  * tick_dispatch owns the shared budget; link_tick keeps its bounded TX loop. */
 enum { PM_TICK_LINK = 4 };
 static int idle_running;
-static int tick_registered;
 
 u32 link_platform_now(void) { return tick_count; }
 u32 link_platform_lock(void) { return ppc_irq_save(); }
@@ -28,12 +26,8 @@ void link_platform_idle(void)
     idle_running = 0;
 }
 
-/* Foreground boot wiring is supplied by P1g. Retry a failed registration. */
-int pm_link_tick_register(void)
+/* The NIC owns registration lifetime and supplies net_jiffy at bind. */
+int link_platform_tick_register(void (*fn)(void))
 {
-    int rc;
-    if (tick_registered) return 0;
-    rc = tick_register(PM_TICK_LINK, link_tick);
-    if (!rc) tick_registered = 1;
-    return rc;
+    return tick_register(PM_TICK_LINK, fn);
 }

@@ -5,7 +5,8 @@
 /* Shared NIC lifetime and dispatch; NET_HOSTSVC_DESIGN §2, addenda #1/#2. */
 #include "nic.h"
 #include "rx_work.h"
-#include "kernel_tick.h"
+#include "link_platform.h"
+#include "link_platform_inline.h"
 #include "clock_source.h"
 #include "kernel/irq/tick_budget.h"
 #include "irq.h"
@@ -14,10 +15,9 @@
 #include "io.h"
 #include "kprintf.h"
 #include "kernel/irq/tick.h"
-#include "platform/pc98/tick_order.h"
 #include "os32_kapi_shared.h"
 
-static const struct NetAdapter *adapters[NET_NIC_LGY98 + 1];
+static const struct NetAdapter *adapters[NET_NIC_COUNT];
 static const struct NetAdapter *owner;
 static const struct NetNicOps *bound;
 static u8 local_mac[6], peer_mac[6];
@@ -47,7 +47,7 @@ int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter)
 
 int net_bind(const struct NetNicOps *ops)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     int rc = 0;
 
     if (bound) rc = OS32_ERR_BUSY;
@@ -60,7 +60,7 @@ int net_bind(const struct NetNicOps *ops)
         }
         /* Register once; unbind leaves the resident callback gated by bound. */
         if (!rc && !tick_registered) {
-            rc = tick_register(PC98_TICK_LINK, net_jiffy);
+            rc = link_platform_tick_register(net_jiffy);
             if (rc) {
                 kprintf(ATTR_YELLOW, "[nic] tick registration failed: %d\n", rc);
                 rc = OS32_ERR_BUSY;
@@ -73,11 +73,11 @@ int net_bind(const struct NetNicOps *ops)
             fixed_peer = 0;
             link_init(local_mac);
             pending = link_due = unbind_due = 0;
-            last_idle_jiffy = tick_count;
+            last_idle_jiffy = link_platform_now();
             bound = ops;
         }
     }
-    irq_restore(flags);
+    link_platform_unlock(flags);
     return rc;
 }
 
@@ -111,7 +111,7 @@ int net_start(enum NetNicId choice, const u8 peer[6])
     rc = adapter->acquire(&ops);
     if (rc) return rc;
     /* Hold IF through publication of the reference and peer selection. */
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     rc = net_bind(ops);
     if (!rc) {
         owner = adapter;
@@ -119,18 +119,18 @@ int net_start(enum NetNicId choice, const u8 peer[6])
         if (peer)
             for (u32 i = 0; i < sizeof(peer_mac); i++) peer_mac[i] = peer[i];
     }
-    irq_restore(flags);
+    link_platform_unlock(flags);
     if (rc) adapter->release();
     return rc;
 }
 
 void net_unbind(void)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     const struct NetAdapter *adapter = owner;
     if (ticking) {
         unbind_due = 1;
-        irq_restore(flags);
+        link_platform_unlock(flags);
         return;
     }
     unbind_due = pending = link_due = 0;
@@ -139,45 +139,45 @@ void net_unbind(void)
     fixed_peer = 0;
     net_rx_reset(NET_RX_SFS);
     net_rx_reset(NET_RX_LINK);
-    irq_restore(flags);
+    link_platform_unlock(flags);
     if (adapter) adapter->release();
 }
 
 int net_tx(const void *frame, u32 len)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     int rc = bound ? bound->tx(frame, len) : OS32_ERR_HOSTDOWN;
-    irq_restore(flags);
+    link_platform_unlock(flags);
     if (kctx_irq_depth == 0) idle_work_run();
     return rc;
 }
 
 int net_mac(u8 out[6])
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     int rc = OS32_ERR_HOSTDOWN;
     if (bound) {
         rc = out ? 0 : OS32_ERR_INVAL;
         if (out)
             for (u32 i = 0; i < sizeof(local_mac); i++) out[i] = local_mac[i];
     }
-    irq_restore(flags);
+    link_platform_unlock(flags);
     return rc;
 }
 
 u32 net_rx_credit_bytes(void)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     u32 credit = bound ? bound->rx_credit_bytes() : 0;
-    irq_restore(flags);
+    link_platform_unlock(flags);
     return credit;
 }
 
 void net_rx_schedule(void)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     pending = 1;
-    irq_restore(flags);
+    link_platform_unlock(flags);
 }
 
 int net_rx_defer_reset(u16 protocol)
@@ -231,22 +231,22 @@ static int rx_service(int idle)
         net_rx_schedule();
         return 0;
     }
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     if (!bound || ticking || unbind_due) {
         if (bound && ticking) net_rx_schedule();
-        irq_restore(flags);
+        link_platform_unlock(flags);
         return 0;
     }
     ticking = 1;
-    if (idle) last_idle_jiffy = tick_count;
+    if (idle) last_idle_jiffy = link_platform_now();
     pending = 0;
-    irq_restore(flags);
+    link_platform_unlock(flags);
     b = batch_depth ? &batch_budget : &local;
     if (!batch_depth) rx_work_begin(b);
     count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);
-    flags = irq_save();
+    flags = link_platform_lock();
     rx_finish();
-    irq_restore(flags);
+    link_platform_unlock(flags);
     if (unbind_due) net_unbind();
     return count;
 }
@@ -263,19 +263,19 @@ static void net_rx_idle(void)
 
 void net_tick(void)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
     if (bound && !ticking) {
         ticking = 1;
         bound->poll();
         net_rx_schedule();
         ticking = 0;
     }
-    irq_restore(flags);
+    link_platform_unlock(flags);
 }
 
 void net_jiffy(void)
 {
-    unsigned int flags = irq_save();
+    unsigned int flags = link_platform_lock();
 #ifdef TICK_PROBE
     if (bound && !ticking) {
         tick_probe_net_start();
@@ -296,7 +296,7 @@ void net_jiffy(void)
         else {
             ticking = 1;
             if (owner && owner == adapters[NET_NIC_E82557] &&
-                (u32)(tick_count - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES &&
+                (u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES &&
                 tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
                                  tick_budget_cnt(NET_TAIL_RX_US))) {
                 struct rx_work_budget b;
@@ -314,5 +314,5 @@ void net_jiffy(void)
             rx_finish();
         }
     }
-    irq_restore(flags);
+    link_platform_unlock(flags);
 }

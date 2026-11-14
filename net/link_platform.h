@@ -20,4 +20,8 @@ void link_platform_unlock(u32 saved);
  * x86 は idle_work_run() 後に _idle() (不可分の IRQ 許可・待機)。 */
 void link_platform_idle(void);
 
+/* Register the resident NIC jiffy callback in the shared link tick slot.
+ * Return the tick registry result; failed registration may be retried. */
+int link_platform_tick_register(void (*fn)(void));
+
 #endif /* OS32_NET_LINK_PLATFORM_H */

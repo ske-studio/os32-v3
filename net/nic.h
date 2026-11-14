@@ -37,7 +37,7 @@ int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len);
 u32 net_rx_queued(u16 protocol);
 
 /* net/nic.h: NetNicOps は段0のまま。id: AUTO=0, E82557=1, LGY98=2 */
-enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98 };
+enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98, NET_NIC_COUNT };
 struct NetAdapter { int (*acquire)(const struct NetNicOps **out); void (*release)(void); };
 int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter);
 int net_start(enum NetNicId choice, const u8 peer[6]); void net_unbind(void);

@@ -21,7 +21,8 @@ def run(ctx):
         print('SKIP PowerPC half: toolchain unavailable: ' + ppc, flush=True)
     source = '#include "link_platform.h"\n'
     for name, signature in [('now', 'u32 (*)(void)'), ('lock', 'u32 (*)(void)'),
-                            ('unlock', 'void (*)(u32)'), ('idle', 'void (*)(void)')]:
+                            ('unlock', 'void (*)(u32)'), ('idle', 'void (*)(void)'),
+                            ('tick_register', 'int (*)(void (*)(void))')]:
         source += ('_Static_assert(__builtin_types_compatible_p('
                    '__typeof__(&link_platform_' + name + '), ' + signature +
                    '), "' + name + '");\n')
@@ -48,6 +49,13 @@ def run(ctx):
 #ifdef TEST_PC98_INLINE
 #include "platform/pc98/link_platform_inline.h"
 #endif
+#include "kernel/irq/tick.h"
+static unsigned int registered_slot;
+static tick_fn registered_fn;
+static void jiffy(void) {}
+int tick_register(unsigned int slot, tick_fn fn) {
+    registered_slot = slot; registered_fn = fn; return TICK_ERR_BUSY;
+}
 volatile u32 tick_count;
 static u32 flags = 0x202, stage;
 unsigned int irq_save(void) { u32 f = flags; flags = 0; return f; }
@@ -56,6 +64,8 @@ void idle_work_run(void) { stage = stage == 0 ? 1 : 99; }
 void _idle(void) { stage = stage == 1 ? 2 : 99; }
 void _start(void) {
     int rc = 0;
+    if (link_platform_tick_register(jiffy) != TICK_ERR_BUSY ||
+        registered_slot != 4 || registered_fn != jiffy) rc = 1;
     tick_count = 0xffffffffu;
     if (link_platform_now() != tick_count) rc = 1;
     tick_count = 0;
@@ -77,6 +87,7 @@ void _start(void) {
                     (ctx.root / 'platform/pc98/link_platform_inline.h').read_text()]
         (work / 'platform/pc98').mkdir(parents=True)
         mutations = [
+            ('return tick_register(PC98_TICK_LINK, fn);', 'return tick_register(0, fn);', 'tick slot'),
             ('return tick_count;', 'return 0;', 'clock'),
             ('return irq_save();', 'return 0;', 'lock'),
             ('irq_restore(saved);', '(void)saved;', 'unlock'),

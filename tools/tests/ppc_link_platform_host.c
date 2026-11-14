@@ -23,7 +23,7 @@ void idle_work_run(void) {
     /* Bound the harness recursion so removing the guard fails at runtime. */
     if (work == 1) link_platform_idle();
 }
-void link_tick(void) { ++ticks; }
+void net_jiffy(void) { ++ticks; }
 int tick_register(unsigned int slot, tick_fn fn) {
     ++registrations; registered_slot = slot; callback = fn;
     return registration_rc;
@@ -42,11 +42,11 @@ void _start(void) {
     link_platform_idle(); CHECK(work == 1 && waits == 1 && ticks == 0);
     link_platform_idle(); CHECK(work == 2 && waits == 2);
     registration_rc = TICK_ERR_BUSY;
-    CHECK(pm_link_tick_register() == TICK_ERR_BUSY && registrations == 1);
+    CHECK(link_platform_tick_register(net_jiffy) == TICK_ERR_BUSY && registrations == 1);
     registration_rc = 0;
-    CHECK(pm_link_tick_register() == 0 && registrations == 2);
-    CHECK(registered_slot == 4 && callback == link_tick);
-    CHECK(pm_link_tick_register() == 0 && registrations == 2);
+    CHECK(link_platform_tick_register(net_jiffy) == 0 && registrations == 2);
+    CHECK(registered_slot == 4 && callback == net_jiffy);
+    CHECK(link_platform_tick_register(net_jiffy) == 0 && registrations == 3);
     callback(); CHECK(ticks == 1);
     finish(0);
 }

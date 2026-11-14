@@ -1,6 +1,8 @@
 /* PC-98 implementation of the common link platform contract. */
 #include "net/link_platform.h"
-#include "idt.h"
+#include "kernel_tick.h"
+#include "kernel/irq/tick.h"
+#include "platform/pc98/tick_order.h"
 #include "io.h"
 #include "kernel/idle_work.h"
 
@@ -24,4 +26,9 @@ void link_platform_idle(void)
     idle_work_run();
     /* IRQ enable and wait must remain indivisible (see io.h). */
     _idle();
+}
+
+int link_platform_tick_register(void (*fn)(void))
+{
+    return tick_register(PC98_TICK_LINK, fn);
 }

@@ -40,7 +40,8 @@ def wiring():
         if rel == 'drivers/net/ne2000/ne2000.c':
             src = src.replace('#include "ne2000_control.inc"',
                               (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
-        registration = f'tick_register(PC98_TICK_{slot}, {fn})'
+        registration = (f'link_platform_tick_register({fn})' if rel == 'net/nic.c'
+                        else f'tick_register(PC98_TICK_{slot}, {fn})')
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
         if rel != 'net/nic.c':
