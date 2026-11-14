@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 from host_operator_socket import OperatorSocket
 
 CHECK = dict(name='remote-x13', tier=1, needs=[], budget=10,
-             covers=['tools/remote_transport.py', 'tools/host_operator_socket.py',
+             covers=['tools/remote_transport.py', 'tools/host_agent_config.py', 'tools/host_operator_socket.py',
                      'tools/tests/test_remote_x13.py'])
 
 
