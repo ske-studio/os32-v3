@@ -192,6 +192,7 @@ class OperatorSocket:
                     return
                 body = pending['result'] or b''
                 response = dict(ok=True, state='pending' if state == 'running' else state,
+                                status=pending.get('status', 0),
                                 drop=pending.get('drop', 0), body_b64=_b64(body), complete=state == 'done')
                 if state in ('done', 'truncated'):
                     if pending is self.operator.pending:

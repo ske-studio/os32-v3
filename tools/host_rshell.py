@@ -1,12 +1,39 @@
 """Generation-local LAN operator state (LAN_OPERATOR_DESIGN sections 2-3)."""
 import re
+import struct
 import time
 
 RSHELL = 65534  # REMOTE_SVC_RSHELL
+PPC_DIAG = 65532  # REMOTE_SVC_PPC_DIAG
 GSERIAL = 65533  # REMOTE_SVC_GSERIAL
 EXECUTE = 1  # REMOTE_NOTIFY_EXECUTE
 RESULT_MAX = 8193  # REMOTE_RESULT_BODY_MAX
 RESULT_TIMEOUT_MS = 15000  # Legacy clients: rshell.py / gserial.py default
+
+
+def diag_command(line):
+    """Encode the existing PLN1 diagnostic arguments in network byte order."""
+    words = line.split()
+    names = {'status': 1, 'clock': 2, 'memory': 3, 'read-diag': 4, 'peek': 5}
+    if not words or words[0] not in names:
+        raise ValueError('unknown diagnostic command')
+    opcode = names[words[0]]
+    payload = b''
+    if opcode <= 3 and len(words) == 1:
+        pass
+    elif opcode == 4 and len(words) == 3:
+        offset, length = (int(x, 0) for x in words[1:])
+        if not 1 <= length <= 128 or not 0 <= offset <= 256 - length:
+            raise ValueError('read-diag range')
+        payload = struct.pack('!HH', offset, length)
+    elif opcode == 5 and len(words) == 3:
+        address, length = (int(x, 0) for x in words[1:])
+        if not 1 <= length <= 256 or not 0 <= address <= 0xffffffff or address + length > 0x100000000:
+            raise ValueError('peek range')
+        payload = struct.pack('!IHH', address, length, 0)
+    else:
+        raise ValueError('invalid diagnostic arguments')
+    return str(opcode).encode('ascii') + b' ' + payload.hex().encode('ascii')
 
 
 class Operator:
@@ -78,7 +105,7 @@ class Operator:
             raise RuntimeError('busy')
         if self.next_id > 0xffffffff:
             raise RuntimeError('id exhausted')
-        if mode not in ('cui', 'gui') or not isinstance(line, str):
+        if mode not in ('cui', 'gui', 'diag') or not isinstance(line, str):
             raise ValueError('invalid mode or line')
         if not line or any(ord(c) < 32 or ord(c) > 126 for c in line):
             raise ValueError('invalid line')
@@ -89,12 +116,14 @@ class Operator:
         data = ident.encode() + b' ' + encoded + b'\n'
         if mode == 'gui':
             data = b'\x01' + data
+        if mode == 'diag':
+            data = ident.encode() + b' ' + diag_command(line) + b'\n'
         self.next_id += 1
         self.pending = dict(id=ident, boot=self.ready['boot'], mode=mode,
                             line=line, client=client, generation=self.generation,
                             state='running', result=None, deadline=deadline)
         try:
-            self.notify.notify_number(RSHELL if mode == 'cui' else GSERIAL, EXECUTE, data)
+            self.notify.notify_number({'cui': RSHELL, 'gui': GSERIAL, 'diag': PPC_DIAG}[mode], EXECUTE, data)
         except Exception:
             self.unknown()
             raise
@@ -155,8 +184,11 @@ class Operator:
                 return False
             if re.fullmatch(rb'end [0-4]', lines[-1][len(prefix):]) is None:
                 return False
-        else:
+        elif mode != 'diag':
             return False
+        if mode == 'diag':
+            pending['status'] = dropped
+            dropped = 0
         pending['result'] = body
         pending['drop'] = dropped
         pending['state'] = 'truncated' if dropped else 'done'
