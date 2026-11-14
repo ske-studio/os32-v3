@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""AC-CTX-1 / AC-NET-3: P3 provider forwarding, PLN1 absence and FG1 endpoint."""
+"""P3 provider forwarding, PLN1 absence and FG1 endpoint.
+
+期待の出所: endpoint は AC-CTX-1 (ARCH_CTX_DESIGN)。provider の委譲と PLN1 の不在は
+PowerPC P3 の確定設計 §3「KAPI → platform → link/mailbox」(docs に写すまでは設計の約束として扱う)。
+"""
 CHECK = dict(name='ppc-rshell-link', tier=1, needs=[], budget=20,
     covers=['platform/powermac/device_host.c', 'platform/powermac/host_unavailable.c',
             'arch/ppc/exec_reclaim.c', 'arch/ppc/exec_kapi.c', 'arch/ppc/exec_kapi.h',
@@ -9,7 +13,7 @@ CHECK = dict(name='ppc-rshell-link', tier=1, needs=[], budget=20,
             'kapi/range_internal.h', 'lib/kstring_c.c', 'lib/kstring.h', 'exec/exec.h',
             'kernel/idle_work.h', 'include/types.h', 'include/callconv.h',
             'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
-            'tools/tests/host32.py'], basis=['AC-CTX-1', 'AC-NET-3'])
+            'tools/tests/host32.py'], basis=['AC-CTX-1'])
 import os
 import shutil
 import subprocess
