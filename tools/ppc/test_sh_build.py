@@ -2,7 +2,7 @@
 """Build the PowerPC USER shell and verify its guarded OS32X image."""
 CHECK = dict(covers=['build/ppc-user.mk', 'tools/ppc/test_sh_build.py'],
              inputs=['Makefile', 'build/**', 'sdk/**', 'userland/**', 'include/**',
-                     'drivers/**', 'lib/**', 'kdebug/**', 'hwdev/**', 'tools/ppc/test_sh_build.py'])
+                     'net/host_mailbox.h', 'net/link.h', 'drivers/**', 'lib/**', 'kdebug/**', 'hwdev/**', 'tools/ppc/test_sh_build.py'])
 from pathlib import Path
 import shutil
 import struct
@@ -42,6 +42,9 @@ def main():
         for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'lib', 'kdebug', 'hwdev'):
             shutil.copytree(ROOT / name, root / name,
                             ignore=shutil.ignore_patterns('out', '*.o', '*.d', '*.bin', '*.elf', '*.raw', 'target'))
+        (root / 'net').mkdir()
+        for name in ('host_mailbox.h', 'link.h'):
+            shutil.copy(ROOT / 'net' / name, root / 'net' / name)
         exercise(root)
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
