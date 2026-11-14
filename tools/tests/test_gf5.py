@@ -47,6 +47,12 @@ CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imp
                  'tools/tests/gf_startlog_host.h',
                  'include/kprintf.h',
                  'tools/tests/test_gf5.py',
+                 'tools/tests/test_gf5_rom_guard.py',
+                 'tools/tests/gf5_rom_host.c',
+                 'tools/tests/gf5_fake.h',
+                 'tools/tests/gf_runner_host.c',
+                 'kdebug/gfinit_decode.c',
+                 'kdebug/gfinit_pll.c',
                  'tools/tests/test_gf_runner.py',
                  'tools/tests/gf_runner*',
                  'tools/tests/gf4_c2linit_host.c',
@@ -88,7 +94,7 @@ CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imp
                  'tools/tests/gf_accel_host.h',
                  'include/types.h',
              ],
-    basis=['GF_FEAT5_DESIGN §2', 'GF_FEAT5_DESIGN §3', 'GF_FEAT5_DESIGN §4', 'GF_FEAT5_DESIGN §5', 'GF_FEAT5_DESIGN §6', 'GF_FEAT5_DESIGN §7', 'GF_FEAT5_DESIGN §8'],
+    basis=['GF_FEAT5_DESIGN §2', 'GF_FEAT5_DESIGN §3', 'GF_FEAT5_DESIGN §4', 'GF_FEAT5_DESIGN §5', 'GF_FEAT5_DESIGN §6', 'GF_FEAT5_DESIGN §7', 'GF_FEAT5_DESIGN §8', 'GF_FEAT5_DESIGN', 'GF_GUARD_LIFETIME_DESIGN'],
     env_limit='hostのGF部品とrunnerで制御分岐を確認するが、実GPUの温度・fan・ROMとbus障害は再現しない。',
 )
 
@@ -125,6 +131,10 @@ CASES = {
 # B1/B2 binary names and B4 function observations are normalized to CASES.
 # Every anchor must be unique; compile failures never count as runtime RED.
 MUTATIONS = [
+    ('rom-acquire-guard', 'hwdev/gf/feature5_rom.c', 'gf5_plan_invalidate(g); /* ROM acquire boundary */', '(void)g; /* ROM acquire boundary */', 'rom'),
+    ('rom-release-guard', 'hwdev/gf/feature5_rom.c', 'gf5_plan_invalidate(g); /* ROM release boundary */', '(void)g; /* ROM release boundary */', 'rom'),
+    ('rom-acquire-generation', 'hwdev/gf/feature5_rom.c', '++g->rom_generation; /* acquire: wrap is safe with the guard invalid */', '(void)g; /* acquire: generation omitted */', 'rom'),
+    ('rom-release-generation', 'hwdev/gf/feature5_rom.c', '++g->rom_generation; /* release: never revive a guard on wrap */', '(void)g; /* release: generation omitted */', 'rom'),
     ('boot-trip-deep', 'hwdev/gf/state.c', 'dst->fan.trip=trip;', 'trip=dst->fan.trip;', 'state'),
     ('boot-raw', 'hwdev/gf/state.c', 'dst->clock_raw=boot->clock_raw;', 'dst->clock_raw=dst->clock_raw;', 'state'),
     ('boot-available', 'hwdev/gf/state.c', 'dst->clock_available=boot->clock_available;', 'dst->clock_available=dst->clock_available;', 'state'),
