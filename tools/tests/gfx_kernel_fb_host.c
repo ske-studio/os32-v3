@@ -113,7 +113,7 @@ static void boot(void)
     paging_init(CFG_KB);
     physmem_bootstrap_legacy(&m, low_kb);
     if (CFG_KB > 16384)
-        CHECK(physmem_add_trusted(&m, 4096, limit, PHYSMEM_SOURCE_SYNTHETIC));
+        CHECK(physmem_add_trusted(&m, 4096, limit, PHYSMEM_SOURCE_MACHINE));
     top = physmem_legacy_end(&m);
     l.capacity = pgalloc_metadata_bytes(&m);
     if (CFG_KB > 12288) {

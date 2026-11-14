@@ -42,7 +42,7 @@ void _start(void)
     host_map_fixed_paging();
     paging_init(16384);
     physmem_bootstrap_legacy(&m,MEM_SYSTEM_SPACE_BASE / 1024);
-    CHECK(physmem_add_trusted(&m,4096,8192,PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m,4096,8192,PHYSMEM_SOURCE_MACHINE));
     l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);
     l.metadata_first = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - l.capacity / PAGE_SIZE;

@@ -57,11 +57,11 @@ void _start(void)
     CHECK(sys_memory_stage_online != 0);
     CHECK(sys_memory_bootstrap_model != 0 && paging_verify_identity != 0);
     physmem_bootstrap_legacy(&m, MEM_SYSTEM_SPACE_BASE / 1024);
-    CHECK(physmem_add_trusted(&m, 4096, TEST_END, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 4096, TEST_END, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_exclude(&m, 5000, 5002, PHYSMEM_MMIO));
     CHECK(physmem_add_trusted(&m, HIGH_DYNAMIC_PFN, HIGH_DYNAMIC_PFN + 1,
-                              PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+                              PHYSMEM_SOURCE_MACHINE));
+    CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_MACHINE));
     CHECK(V2P(page_tables[PAGING_MMIO_TOP_PDI]) == MEM_FIXED_MMIO_TOP_PT_BASE);
     l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);

@@ -53,12 +53,10 @@ void physmem_init(struct physmem *m);
 /* Caller attests to verified page-aligned RAM, not a size hint. MACHINE is the
  * authoritative machine source — the boot detector in mm/memory_boot.c,
  * which reads the PC-98 BIOS work area and re-verifies each megabyte before
- * attesting to RAM above MEM_HIGH_RAM_BASE; SYNTHETIC is tests only.
- * SYNTHETIC requires physmem.c compiled with PHYSMEM_HOST_TEST=1 and without
- * __KERNEL_BUILD__. Kernel builds ALWAYS reject it, even with the host flag;
- * conflicting flags compile normally but cannot enable synthetic RAM.
- * Default builds reject it too. Pass one source, never a bitwise source mix.
- * The host flag must not be defined by a public header or production build.
+ * attesting to RAM above MEM_HIGH_RAM_BASE. Only MACHINE is accepted;
+ * SYNTHETIC is a rejected source value, including in host builds.
+ * Tests supply fake machine ranges through this same boot-time input.
+ * Pass one source, never a bitwise source mix.
  * No hardware verification is performed here. Return 1 success, 0 failure.
  * All ranges are nonempty half-open PFNs. Failure leaves model/output intact. */
 /* Permanent boot-time exclusion: RESERVED or MMIO only, never releasable.
