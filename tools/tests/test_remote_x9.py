@@ -22,8 +22,8 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     api = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    assert api['version'] == 85 and len(api['api']) == 293
-    assert api['api'][-1] == {'name': 'con_sink_capture', 'ret': 'int', 'args': ['u32 op']}
+    assert api['version'] == 86 and len(api['api']) == 294
+    assert api['api'][-2] == {'name': 'con_sink_capture', 'ret': 'int', 'args': ['u32 op']}
     with tempfile.TemporaryDirectory() as temp:
         out = Path(temp)
         for target in ('x86-pc98', 'ppc-powermac'):

@@ -344,6 +344,7 @@
     ],
     "KernelAPI": [
       "boot_image_info",
+      "boot_token_get",
       "buz_off",
       "buz_on",
       "caller_identity",

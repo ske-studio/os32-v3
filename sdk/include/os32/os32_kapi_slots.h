@@ -297,8 +297,9 @@
 #define KAPI_SLOT_GFX2_DPMS 290
 #define KAPI_SLOT_GFX2_PRESENT 291
 #define KAPI_SLOT_CON_SINK_CAPTURE 292
+#define KAPI_SLOT_BOOT_TOKEN_GET 293
 
-#define KAPI_SLOT_COUNT 293
+#define KAPI_SLOT_COUNT 294
 #define KAPI_FUNC_CAPACITY 300
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x4B8\n\t.popsection")
