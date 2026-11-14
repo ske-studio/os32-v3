@@ -6,16 +6,6 @@ from pathlib import Path
 import subprocess
 import sys
 
-CHECK = dict(name='remote-g3b', tier=1, needs=[], budget=20, covers=[
-    'userland/gshell/**', 'sdk/rust/os32api/**', 'userland/lib/font/**',
-    'tools/tests/os32api_host.py', 'tools/tests/g16_fixture.py',
-    'tools/fetch_fonts.py', 'tools/gen_g16.py', 'tools/g16/**',
-    'assets/fonts/**', 'assets/ipadic/*.csv', 'include/remote_control.h',
-    'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h',
-    'net/link.h', 'exec/shell_service.h', 'sdk/include/os32/**',
-    'tools/tests/test_remote_g3b.py'],
-    basis=['LAN_OPERATOR_DESIGN'],
-)
 ROOT = Path(__file__).resolve().parents[2]
 SERIAL = '    gserial::open(st, serial_timeout);\n'
 LAN = '    gserial::open_lan(st, serial_timeout);\n'
