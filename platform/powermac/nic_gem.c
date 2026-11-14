@@ -9,8 +9,13 @@
 #include "drivers/net/gem/gem.h"
 #include "os32/os32_kapi_shared.h"
 
-static u8 packet[1514];
-static u32 packet_len;
+/* link subtracts twelve 256-byte pages before advertising WINDOW. A single
+ * frame can never cover that reserve. Four slots match the shared RX queues;
+ * credit describes actual free storage, without reading DMA in the query. */
+#define GEM_RX_SLOTS 4u
+#define GEM_FRAME_BYTES 1514u
+static u8 packet[GEM_RX_SLOTS][GEM_FRAME_BYTES];
+static u32 packet_len[GEM_RX_SLOTS], packet_head, packet_count;
 static int acquired;
 
 static int result(int rc)
@@ -43,11 +48,12 @@ static int rx(void *frame, u32 cap, u32 *len)
 {
     if (!frame || !len) return OS32_ERR_INVAL;
     if (!acquired || !pm_lan_running_gem(0)) return OS32_ERR_HOSTDOWN;
-    if (!packet_len) return OS32_ERR_AGAIN;
-    *len = packet_len;
-    if (cap < packet_len) return OS32_ERR_NOSPC;
-    for (u32 i = 0; i < packet_len; i++) ((u8 *)frame)[i] = packet[i];
-    packet_len = 0;
+    if (!packet_count) return OS32_ERR_AGAIN;
+    *len = packet_len[packet_head];
+    if (cap < *len) return OS32_ERR_NOSPC;
+    for (u32 i = 0; i < *len; i++) ((u8 *)frame)[i] = packet[packet_head][i];
+    packet_head = (packet_head + 1) % GEM_RX_SLOTS;
+    packet_count--;
     return 0;
 }
 
@@ -55,19 +61,24 @@ static void mac(u8 *out) { (void)pm_lan_running_gem(out); }
 static void poll(void)
 {
     struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
-    if (!g) { packet_len = 0; return; }
+    if (!g) { packet_head = packet_count = 0; return; }
     if (gem_poll(g, g->io.tb(g->io.ctx), 8u) < 0 ||
-        !pm_lan_running_gem(0)) { packet_len = 0; return; }
+        !pm_lan_running_gem(0)) { packet_head = packet_count = 0; return; }
     /* gem_rx itself scans up to eight descriptors (including bad frames).
      * Exactly one invocation preserves the total RX descriptor budget. */
-    if (!packet_len) {
+    if (packet_count < GEM_RX_SLOTS) {
+        u32 tail = (packet_head + packet_count) % GEM_RX_SLOTS;
         u32 n = 0;
-        if (gem_rx(g, packet, sizeof(packet), &n) == GEM_OK) packet_len = n;
+        if (gem_rx(g, packet[tail], GEM_FRAME_BYTES, &n) == GEM_OK) {
+            packet_len[tail] = n;
+            packet_count++;
+        }
     }
 }
 static u32 credit(void)
 {
-    return acquired && pm_lan_running_gem(0) && !packet_len ? sizeof(packet) : 0;
+    return acquired && pm_lan_running_gem(0) ?
+        (GEM_RX_SLOTS - packet_count) * GEM_FRAME_BYTES : 0;
 }
 static const struct NetNicOps ops = { tx, rx, mac, poll, credit };
 static int acquire(const struct NetNicOps **out)
@@ -75,8 +86,8 @@ static int acquire(const struct NetNicOps **out)
     if (!out) return OS32_ERR_INVAL;
     if (!pm_lan_running_gem(0)) return OS32_ERR_NOSYS;
     if (acquired) return OS32_ERR_BUSY;
-    acquired = 1; packet_len = 0; *out = &ops;
+    acquired = 1; packet_head = packet_count = 0; *out = &ops;
     return 0;
 }
-static void release(void) { acquired = 0; packet_len = 0; }
+static void release(void) { acquired = 0; packet_head = packet_count = 0; }
 const struct NetAdapter net_gem_adapter = { acquire, release };

@@ -2,6 +2,7 @@
 #include "platform/powermac/lan_boot.h"
 #include "drivers/net/gem/gem.h"
 #include "os32/os32_kapi_shared.h"
+#include "net/link.h"
 #if KBOOT_LINK
 #include "rh_observe.h"
 static int hello_marks;
@@ -33,7 +34,11 @@ int gem_poll(struct gem *g, unsigned long long now, u32 budget) {
 }
 int gem_rx(struct gem *g, void *p, u32 cap, u32 *n) {
     CHECK(g == &device && cap == 1514);
-    rx_calls++; ((u8 *)p)[0] = 42; *n = 14; return rx_rc;
+    rx_calls++; ((u8 *)p)[0] = 42;
+    ((u8 *)p)[1] = (u8)rx_calls;
+    /* Unrelated IPv6 multicast is still real occupied receive storage. */
+    ((u8 *)p)[12] = 0x86; ((u8 *)p)[13] = 0xdd;
+    *n = 14; return rx_rc;
 }
 #include GEM_ADAPTER_SOURCE
 void _start(void) {
@@ -56,21 +61,38 @@ void _start(void) {
 #endif
     tx_rc = GEM_AGAIN; CHECK(op->tx(frame, 14) == OS32_ERR_AGAIN);
     tx_rc = GEM_EIO; CHECK(op->tx(frame, 14) == OS32_ERR_IO);
-    CHECK(op->rx_credit_bytes() == 1514);
+    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
+    CHECK(op->rx_credit_bytes() == 4 * 1514);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN && !rx_calls);
     op->poll(); CHECK(calls == 1 && tx_budget == 8 && rx_calls == 1);
-    CHECK(op->rx_credit_bytes() == 0);
-    op->poll(); CHECK(calls == 2 && rx_calls == 1);
+    CHECK(op->rx_credit_bytes() == 3 * 1514);
+    /* Even a pending non-link frame leaves a positive link WINDOW. */
+    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
+    for (int i = 0; i < 3; i++) op->poll();
+    CHECK(calls == 4 && rx_calls == 4 && op->rx_credit_bytes() == 0);
+    op->poll(); CHECK(calls == 5 && rx_calls == 4);
     CHECK(op->rx(frame, 1, &n) == OS32_ERR_NOSPC && n == 14);
-    CHECK(op->rx(frame, sizeof(frame), &n) == 0 && (n == 14 || n == 34) && frame[0] == 42);
-    CHECK(op->rx_credit_bytes() == 1514);
-    rx_rc = GEM_AGAIN; op->poll(); CHECK(rx_calls == 2);
+    CHECK(op->rx_credit_bytes() == 0);
+    for (int i = 1; i <= 4; i++) {
+        CHECK(op->rx(frame, sizeof(frame), &n) == 0 && n == 14);
+        CHECK(frame[0] == 42 && frame[1] == i && frame[12] == 0x86);
+        CHECK(op->rx_credit_bytes() == (u32)i * 1514);
+    }
+    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
+    /* Tail wraps and a failed receive must not enqueue anything. */
+    op->poll(); CHECK(rx_calls == 5);
+    CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == 5);
+    rx_rc = GEM_AGAIN; op->poll(); CHECK(rx_calls == 6);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
-    running = 0; op->poll(); CHECK(calls == 3);
+    CHECK(op->rx_credit_bytes() == 4 * 1514);
+    rx_rc = GEM_OK; op->poll(); CHECK(rx_calls == 7);
+    running = 0; op->poll(); CHECK(calls == 8);
     CHECK(op->tx(frame, 14) == OS32_ERR_HOSTDOWN);
     CHECK(op->rx_credit_bytes() == 0);
     net_gem_adapter.release(); running = 1;
-    op->poll(); CHECK(calls == 3);
+    op->poll(); CHECK(calls == 8);
     CHECK(net_gem_adapter.acquire(&op) == 0);
+    CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
+    CHECK(op->rx_credit_bytes() == 4 * 1514);
     net_gem_adapter.release(); finish(0);
 }

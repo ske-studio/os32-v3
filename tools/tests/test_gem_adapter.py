@@ -42,10 +42,13 @@ def run(ctx):
             exercise(original.replace(anchor, '(void)0;'), False, link=True)
             print('RED runtime HELLO sent mark', flush=True)
             for anchor, replacement in [
+                ('#define GEM_RX_SLOTS 4u', '#define GEM_RX_SLOTS 1u'),
+                ('(GEM_RX_SLOTS - packet_count) * GEM_FRAME_BYTES',
+                 'GEM_RX_SLOTS * GEM_FRAME_BYTES'),
                 ('g->io.tb(g->io.ctx), 8u)', 'g->io.tb(g->io.ctx), 32u)'),
                 ('if (!pm_lan_running_gem(0)) return OS32_ERR_NOSYS;',
                  'if (0) return OS32_ERR_NOSYS;'),
-                ('u32 n = 0;', 'u32 n = 0; gem_rx(g, packet, sizeof(packet), &n);')]:
+                ('u32 n = 0;', 'u32 n = 0; gem_rx(g, packet[tail], GEM_FRAME_BYTES, &n);')]:
                 assert original.count(anchor) == 1
                 exercise(original.replace(anchor, replacement), False)
                 print('RED runtime: ' + anchor, flush=True)

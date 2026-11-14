@@ -30,7 +30,7 @@ MUTATIONS = (
     ('net/nic.c', 'if (!ticking) return 0;', 'return 0;'),
     ('net/nic.c', 'if (link_due && bound)', 'if (0 && link_due && bound)'),
     ('net/nic.c', '(u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES', '1'),
-    ('net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557]\n#if KBOOT_LINK\n                || owner == adapters[NET_NIC_LGY98]\n#endif\n                )', 'owner'),
+    ('net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557] ||\n                (LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]))', 'owner'),
     ('net/nic.c', 'if (idle) last_idle_jiffy = link_platform_now();', 'if (idle) last_idle_jiffy += 0;'),
     ('net/nic.c', 'last_idle_jiffy = link_platform_now();\n            bound = ops;',
      'last_idle_jiffy = 0;\n            bound = ops;'),
@@ -50,11 +50,17 @@ def verify(work, mutation=None, link=False):
         dest = work / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source)
+    # Override only the platform scheduling constant, retaining PC-98 host IRQs.
+    header = (ROOT / 'platform/pc98/link_platform_inline.h').read_text()
+    anchor = '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT 0'
+    assert header.count(anchor) == 1
+    (work / 'link_platform_inline.h').write_text(header.replace(
+        anchor, '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT ' + str(int(link))))
     exe = work / 'host'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                     '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-                    '-DKBOOT_LINK='+str(int(link)), '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
+                    '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
                     str(ROOT / 'tools/tests/net_rx_work_host.c'), '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work, timeout=5).returncode
 
@@ -67,8 +73,8 @@ def main(mutate=False):
         assert verify(work, link=True) == 0
         print('GREEN GEM tick RX and cooperative RX, batch, idle, reentry, rescue, wrap', flush=True)
         if mutate:
-            mutation = ('net/nic.c', '|| owner == adapters[NET_NIC_LGY98]',
-                        '|| 0')
+            mutation = ('net/nic.c', 'LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]',
+                        '0')
             assert verify(work, mutation, link=True) == 1
             print('RED runtime GEM tick RX disabled', flush=True)
             for mutation in MUTATIONS:

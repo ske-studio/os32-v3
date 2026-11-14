@@ -213,7 +213,7 @@ static void run_tests(void)
     rescue = 0; net_unbind();
     CHECK(net_start(NET_NIC_LGY98, 0) == 0);
     tick_count += 2; frames = 1; before = reads;
-#if KBOOT_LINK
+#if LINK_PLATFORM_TICK_RX_LGY98_SLOT
     rescue = 1; now = 0; irq_tick(); CHECK(reads > before && !frames); rescue = 0;
 #else
     irq_tick(); CHECK(reads == before);
