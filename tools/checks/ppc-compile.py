@@ -1,7 +1,7 @@
 """Compile the complete PPC shell image on hosts with a PPC toolchain."""
 CHECK = dict(name='ppc-compile', tier=1, budget=180, needs=['make:ppc-ci-image'],
              covers=['tools/ppc/compile_ci.py', 'tools/tests/ppc_ci.py',
-                     'tools/ci/build_cross.sh', 'Makefile',
+                     'tools/ci/build_cross.sh', 'tools/ci/build_cross_ppc.sh', 'drafts/ci-ppc-cross/workflows.patch', 'Makefile',
                      'build/core.yaml', 'userland/deploy.yaml',
                      'tools/deploy_manifests.py', 'tools/mkpkg.py', '.github/actions/ppc-setup/action.yml',
                      '.github/workflows/build.yml', '.github/workflows/check.yml',

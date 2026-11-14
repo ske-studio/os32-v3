@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# i386-elf / powerpc-elf クロスツールチェーン (binutils 2.41 + GCC 13.2.0 + newlib 4.4.0 nano) を構築する。
+# i386-elf クロスツールチェーン (binutils 2.41 + GCC 13.2.0 + newlib 4.4.0 nano) を構築する。
 #
 # 手順の正典は docs/08_build.md §8-5。GitHub Actions (.github/workflows/build.yml, §8-6)
 # と手元の再構築の両方で使う。build/config.mk が `i386-elf-*` の名前と
 # `$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0` をハードコードしているので版は固定。
 #
 # 使い方:
-#   tools/ci/build_cross.sh [--target i386-elf|powerpc-elf] [--dry-run] [--prefix DIR] [--src-dir DIR] [--work DIR] [--jobs N]
-#     --target   既定 i386-elf。powerpc-elf は GCC の multilib を無効化
-#     --dry-run  configure 引数だけ表示 (書込み・取得なし)
+#   tools/ci/build_cross.sh [--prefix DIR] [--src-dir DIR] [--work DIR] [--jobs N]
 #     --prefix   インストール先 (既定 $HOME/opt/cross)
 #     --src-dir  tarball の置き場。無いものだけ公式 URL から curl で取る
 #                (既定: --work の下)
@@ -38,8 +36,7 @@ BINUTILS_URL="https://ftp.gnu.org/gnu/binutils/${BINUTILS_TAR}"
 GCC_URL="https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/${GCC_TAR}"
 NEWLIB_URL="https://sourceware.org/pub/newlib/${NEWLIB_TAR}"
 
-PREFIX=""
-DRY_RUN=0
+PREFIX="$HOME/opt/cross"
 SRC_DIR=""
 WORK=""
 JOBS="$(nproc)"
@@ -50,8 +47,6 @@ usage() {
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --target) TARGET="$2"; shift 2 ;;
-        --dry-run) DRY_RUN=1; shift ;;
         --prefix)  PREFIX="$2"; shift 2 ;;
         --src-dir) SRC_DIR="$2"; shift 2 ;;
         --work)    WORK="$2"; shift 2 ;;
@@ -61,29 +56,6 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-case "$TARGET" in
-    i386-elf) DEFAULT_PREFIX="$HOME/opt/cross"; GCC_EXTRA=() ;;
-    powerpc-elf) DEFAULT_PREFIX="$HOME/opt/cross-ppc"; GCC_EXTRA=(--disable-multilib) ;;
-    *) echo "unsupported target: $TARGET" >&2; exit 2 ;;
-esac
-PREFIX="${PREFIX:-$DEFAULT_PREFIX}"
-# The same argument arrays drive the dry run and the real configure calls.
-configure_args() {
-    BINUTILS_ARGS=(--target="$TARGET" --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror)
-    GCC1_ARGS=(--target="$TARGET" --prefix="$PREFIX" --disable-nls --enable-languages=c --without-headers "${GCC_EXTRA[@]}")
-    NEWLIB_ARGS=(--target="$TARGET" --prefix="$PREFIX" --disable-multilib
-        --disable-newlib-supplied-syscalls --enable-newlib-nano-malloc --enable-newlib-nano-formatted-io)
-    GCC2_ARGS=(--target="$TARGET" --prefix="$PREFIX" --disable-nls --enable-languages=c --with-newlib "${GCC_EXTRA[@]}")
-}
-configure_args
-if [ "$DRY_RUN" = 1 ]; then
-    printf 'binutils configure '; printf '%q ' "${BINUTILS_ARGS[@]}"; echo
-    printf 'gcc stage1 configure '; printf '%q ' "${GCC1_ARGS[@]}"; echo
-    printf 'newlib configure '; printf '%q ' "${NEWLIB_ARGS[@]}"; echo
-    printf 'gcc full configure '; printf '%q ' "${GCC2_ARGS[@]}"; echo
-    exit 0
-fi
-
 REMOVE_WORK=0
 if [ -z "$WORK" ]; then
     WORK="$(mktemp -d "${TMPDIR:-/tmp}/os32-cross.XXXXXX")"
@@ -92,7 +64,6 @@ fi
 mkdir -p "$WORK" "$PREFIX"
 WORK="$(cd "$WORK" && pwd)"
 PREFIX="$(cd "$PREFIX" && pwd)"
-configure_args
 [ -n "$SRC_DIR" ] || SRC_DIR="$WORK/dl"
 mkdir -p "$SRC_DIR"
 SRC_DIR="$(cd "$SRC_DIR" && pwd)"
@@ -126,14 +97,16 @@ tar xf "$SRC_DIR/$NEWLIB_TAR"
 
 log "[1/4] binutils $BINUTILS_VER"
 mkdir build-binutils && cd build-binutils
-"../binutils-$BINUTILS_VER/configure" "${BINUTILS_ARGS[@]}"
+"../binutils-$BINUTILS_VER/configure" --target="$TARGET" --prefix="$PREFIX" \
+    --with-sysroot --disable-nls --disable-werror
 make -j"$JOBS"
 make install
 cd "$WORK"
 
 log "[2/4] gcc $GCC_VER stage1 (C のみ、ヘッダ無し、libgcc まで)"
 mkdir build-gcc1 && cd build-gcc1
-"../gcc-$GCC_VER/configure" "${GCC1_ARGS[@]}"
+"../gcc-$GCC_VER/configure" --target="$TARGET" --prefix="$PREFIX" \
+    --disable-nls --enable-languages=c --without-headers
 make -j"$JOBS" all-gcc all-target-libgcc
 make install-gcc install-target-libgcc
 cd "$WORK"
@@ -142,14 +115,19 @@ cd "$WORK"
 # 約 3 倍に肥大して 1.2MB ブート FD に収まらない (§8-5)。
 log "[3/4] newlib $NEWLIB_VER (nano)"
 mkdir build-newlib && cd build-newlib
-"../newlib-$NEWLIB_VER/configure" "${NEWLIB_ARGS[@]}"
+"../newlib-$NEWLIB_VER/configure" --target="$TARGET" --prefix="$PREFIX" \
+    --disable-multilib \
+    --disable-newlib-supplied-syscalls \
+    --enable-newlib-nano-malloc \
+    --enable-newlib-nano-formatted-io
 make -j"$JOBS"
 make install
 cd "$WORK"
 
 log "[4/4] gcc $GCC_VER full (with newlib)"
 mkdir build-gcc2 && cd build-gcc2
-"../gcc-$GCC_VER/configure" "${GCC2_ARGS[@]}"
+"../gcc-$GCC_VER/configure" --target="$TARGET" --prefix="$PREFIX" \
+    --disable-nls --enable-languages=c --with-newlib
 make -j"$JOBS"
 make install
 cd "$WORK"
@@ -197,11 +175,9 @@ echo "newlib: nano-formatted-io + nano-malloc を確認"
 
 # f1a: after source/config validation, seal this build's archive/member hashes.
 # DWARF paths differ from the pinned local build; never overwrite its ledger.
-if [ "$TARGET" = i386-elf ]; then
 python3 "$REPO_ROOT/tools/check_nano_inputs.py" --cross-dir "$PREFIX" --record-built \
     --source "$WORK/newlib-$NEWLIB_VER" --tarball "$SRC_DIR/$NEWLIB_TAR" \
     --config "$WORK/build-newlib/$TARGET/newlib/config.log"
-fi
 
 if [ "$REMOVE_WORK" = 1 ]; then
     cd /

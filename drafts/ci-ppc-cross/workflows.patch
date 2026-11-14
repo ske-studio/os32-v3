@@ -1,17 +1,3 @@
-diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index bb6de10c..97686f6f 100644
---- a/.github/workflows/build.yml
-+++ b/.github/workflows/build.yml
-@@ -206,6 +206,9 @@ jobs:
-         timeout-minutes: 90
-         if: steps.prior.outputs.reuse != 'true'
- 
-+      - uses: ./.github/actions/ppc-setup
-+        if: steps.prior.outputs.reuse != 'true'
-+
-       - name: Compiler ccache setup
-         timeout-minutes: 1
-         if: steps.prior.outputs.reuse != 'true'
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
 index 31045535..783253a9 100644
 --- a/.github/workflows/check.yml

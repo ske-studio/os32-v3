@@ -5,6 +5,8 @@ from pathlib import Path
 import shlex
 import subprocess
 import types
+
+import yaml
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,19 +39,25 @@ def configure():
                 common + ['--disable-multilib', '--disable-newlib-supplied-syscalls',
                           '--enable-newlib-nano-malloc', '--enable-newlib-nano-formatted-io'],
                 common + ['--disable-nls', '--enable-languages=c', '--with-newlib']]
-    for target in ('i386-elf', 'powerpc-elf'):
-        command = ['bash', 'tools/ci/build_cross.sh', '--dry-run', '--prefix', '/fixture/cross']
-        if target != 'i386-elf':
-            command += ['--target', target]
-        lines = subprocess.check_output(command, cwd=ROOT, text=True).splitlines()
-        actual = [shlex.split(line.split('configure ', 1)[1]) for line in lines]
-        want = [[arg.replace('i386-elf', target) for arg in row] for row in expected]
-        if target == 'powerpc-elf':
-            want[1].append('--disable-multilib')
-            want[3].append('--disable-multilib')
-        assert actual == want, (actual, want)
-    assert subprocess.call(['bash', 'tools/ci/build_cross.sh', '--target', 'invalid', '--dry-run'],
-                           cwd=ROOT) == 2
+    command = ['bash', 'tools/ci/build_cross_ppc.sh', '--dry-run', '--prefix', '/fixture/cross']
+    lines = subprocess.check_output(command, cwd=ROOT, text=True).splitlines()
+    actual = [shlex.split(line.split('configure ', 1)[1]) for line in lines]
+    want = [[arg.replace('i386-elf', 'powerpc-elf') for arg in row] for row in expected]
+    want[1].append('--disable-multilib')
+    want[3].append('--disable-multilib')
+    assert actual == want, (actual, want)
+
+
+def wiring():
+    draft = (ROOT / 'drafts/ci-ppc-cross/workflows.patch').read_text()
+    assert 'a/.github/workflows/build.yml' not in draft
+    assert draft.count('+      - uses: ./.github/actions/ppc-setup') == 1
+    assert '+  ppc-compile:' in draft
+    action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
+    commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
+    assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands
+    assert 'tools/ci/build_cross.sh' not in commands
+    assert 'OS32_REQUIRE_PPC=1' in commands
 
 
 def main():
@@ -59,6 +67,7 @@ def main():
     source = SOURCE.read_text()
     matrix(source)
     configure()
+    wiring()
     if args.mutate:
         anchor = "required = env.get('OS32_REQUIRE_PPC') == '1'"
         assert source.count(anchor) == 1
