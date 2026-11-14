@@ -18,6 +18,14 @@ RESTART_MIN = 2.0
 def commands(config, config_path):
     result = [[sys.executable, str(TOOLS / 'host_agent.py'), '--config', config_path]]
     if config['backend'] == 'bridge':
+        mac_path = Path('/sys/class/net') / config['iface'] / 'address'
+        try:
+            mac = mac_path.read_text().strip()
+            if not mac:
+                raise ValueError('empty MAC address')
+        except (OSError, ValueError) as exc:
+            raise ValueError(f'cannot read MAC from {mac_path}: {exc}') from exc
+        result[0] += ['--mac', mac]
         result.append([sys.executable, str(TOOLS / 'lan_bridge.py'), '--iface',
                        config['iface'], '--connect', config['frame-endpoint']])
         lanfs = [sys.executable, str(TOOLS / 'lanfs_host.py'), '--iface', config['iface'],

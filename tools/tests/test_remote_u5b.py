@@ -52,7 +52,7 @@ def test(source):
         (root / 'host_agent_config.py').write_text((ROOT / 'tools/host_agent_config.py').read_text())
         for name in ('host_agent', 'lan_bridge', 'lanfs_host'):
             (root / (name + '.py')).write_text(FAKE)
-        config = dict(iface='test0', root=tmp, peer='02:00:00:00:00:01',
+        config = dict(iface='lo', root=tmp, peer='02:00:00:00:00:01',
                       backend='bridge', **{'allow-write': True, 'frame-endpoint': '127.0.0.1:8026',
                       'operator-endpoint': '127.0.0.1:8027', 'state-dir': tmp + '/state'})
         config_path = root / 'config.json'
@@ -69,6 +69,7 @@ def test(source):
             assert all(':start:' in line for line in first)
             first = {line.split(':')[0]: line for line in first}
             assert "'--config', '" + str(config_path) + "'" in first['host_agent']
+            assert "'--mac', '" + Path('/sys/class/net/lo/address').read_text().strip() + "'" in first['host_agent'], 'MAC not passed'
             assert "'--connect', '127.0.0.1:8026'" in first['lan_bridge']
             assert "'--allow-write', '/'" in first['lanfs_host'] and "'--peer', '02:00:00:00:00:01'" in first['lanfs_host']
             owner_path = config_path
@@ -81,7 +82,7 @@ def test(source):
                 wait_for(lambda: duplicate.poll() is not None, 'duplicate lock accepted')
                 assert duplicate.returncode == 1, 'duplicate lock accepted'
                 error = duplicate.communicate(timeout=8)[1].decode()
-                assert 'iface test0 は instance ' + owner_path.stem + ' が使っている' in error, 'lock owner missing'
+                assert 'iface lo は instance ' + owner_path.stem + ' が使っている' in error, 'lock owner missing'
             finally:
                 if duplicate.poll() is None:
                     duplicate.terminate()
@@ -108,9 +109,16 @@ def test(source):
             import host_agent_service as service_module
             cmds = service_module.commands(config, str(config_path))
             assert len(cmds) == 1 and 'host_agent.py' in cmds[0][1], 'np21w raw child'
+            assert '--mac' not in cmds[0]
             config['backend'] = 'bridge'
             cmds = service_module.commands(config, str(config_path))
             assert len(cmds) == 3 and '--allow-write' not in cmds[2]
+            config['iface'] = 'os32-no-such-interface'
+            config_path.write_text(json.dumps(config))
+            before = lines()
+            failed = subprocess.run(command, env=env, capture_output=True, text=True, timeout=8)
+            assert failed.returncode == 1 and 'cannot read MAC' in failed.stderr, 'missing MAC accepted'
+            assert lines() == before, 'unexpected child'
         finally:
             sys.path.pop(0)
     print('PASS remote-u5b')
@@ -171,6 +179,7 @@ def main():
             ("if config['backend'] == 'bridge':", 'if True:', 'np21w raw child'),
             ('fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)', 'pass', 'duplicate lock accepted'),
             ('if child.poll() is not None:', 'if False:', 'child not restarted'),
+            ("result[0] += ['--mac', mac]", 'pass', 'MAC not passed'),
         ]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'mutant.py'

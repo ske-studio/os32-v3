@@ -13,12 +13,13 @@ Git、Python 3、systemd が必要。既存の `/opt/os32` がある場合はそ
 
 ```sh
 sudo useradd --system --user-group --no-create-home os32-host
-sudo install -d -o root -g os32-host -m 0750 /etc/os32/host-agent
+sudo install -d -o root -g os32-host -m 0755 /etc/os32/host-agent
 sudo install -d -o os32-host -g os32-host -m 0750 /var/lib/os32-host-agent/eth0
-sudo git clone --no-local "$PWD" /opt/os32
-sudo git -C /opt/os32 checkout --detach "$(git rev-parse HEAD)"
+git clone --no-local "$PWD" /tmp/os32-install
+git -C /tmp/os32-install checkout --detach "$(git rev-parse HEAD)"
+sudo cp -a /tmp/os32-install /opt/os32
 sudo chown -R os32-host:os32-host /opt/os32
-sudo install -o root -g os32-host -m 0640 tools/systemd/host-agent.example.json /etc/os32/host-agent/eth0.json
+sudo install -o root -g os32-host -m 0644 tools/systemd/host-agent.example.json /etc/os32/host-agent/eth0.json
 sudoedit /etc/os32/host-agent/eth0.json
 sudo install -o root -g root -m 0644 tools/systemd/os32-host-agent@.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -30,6 +31,7 @@ sudo systemctl enable --now os32-host-agent@eth0.service
 `state-dir` は例では `/var/lib/os32-host-agent/eth0`、`allow-write` は既定で
 false。書き込みを許す場合は true にし、HostFS の root に対して os32-host に
 必要な読み書き権限を与え、作成ファイルの所有者と権限を受入で確認する。
+`root` がホームの下にある場合は、親ディレクトリを通れるよう `setfacl -m u:os32-host:--x /home/<ユーザー>` 等で ACL を設定する。
 instance ごとに NIC、両 endpoint、state-dir を分ける。state-dir に世代や ID を
 保存しない。現行 runner の NIC ロックは共有の `/run/lock` に置かれるため、
 os32-host がそこに書ける必要がある。

@@ -10,12 +10,16 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 UNIT = ROOT / 'tools/systemd/os32-host-agent@.service'
+README = ROOT / 'tools/systemd/README.md'
 CHECK = dict(name='remote-u5c', tier=1, needs=[], budget=5,
              covers=['tools/systemd/os32-host-agent@.service',
                      'tools/systemd/README.md', 'tools/tests/test_remote_u5c.py'])
 
 
-def test(path):
+def test(path, readme):
+    instructions = Path(readme).read_text()
+    assert '-m 0644 tools/systemd/host-agent.example.json' in instructions, 'config mode changed'
+    assert '-m 0755 /etc/os32/host-agent' in instructions, 'config directory mode changed'
     unit = configparser.ConfigParser(interpolation=None, strict=True)
     unit.read_string(Path(path).read_text())
     service = unit['Service']
@@ -42,8 +46,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--unit', default=str(UNIT))
+    parser.add_argument('--readme', default=str(README))
     args = parser.parse_args()
-    test(args.unit)
+    test(args.unit, args.readme)
     if args.mutate:
         source = Path(args.unit).read_text()
         mutations = [('Restart=on-failure\n', '', 'Restart missing or changed'),
@@ -58,6 +63,15 @@ def main():
                                         capture_output=True, text=True)
                 assert result.returncode and marker in result.stderr, result.stderr
                 print('RED', marker)
+            source = Path(args.readme).read_text()
+            old = '-m 0644 tools/systemd/host-agent.example.json'
+            assert source.count(old) == 1
+            path = Path(tmp) / 'mutant.txt'
+            path.write_text(source.replace(old, old.replace('0644', '0640')))
+            result = subprocess.run([sys.executable, '-B', __file__, '--readme', str(path)],
+                                    capture_output=True, text=True)
+            assert result.returncode and 'config mode changed' in result.stderr, result.stderr
+            print('RED config mode changed')
 
 
 def run(ctx):
