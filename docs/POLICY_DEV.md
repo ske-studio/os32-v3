@@ -20,6 +20,7 @@
 3. 既存の計画・確定設計の向き (プロトコル・tick・mount・exec など) と合うか。合わない設計にするときは、実装の前にユーザーに確かめる。
 
 レビューの依頼にもこの 3 点を観点として入れる。
+3 点の判断には、アーキ間の互換契約 [ARCH_COMPAT_CONTRACT](decisions/ARCH_COMPAT_CONTRACT.md) の該当 ID・能力の差・両アーキで回す共通の試験を添える。契約に無い約束が要るときは、先に契約へ項目を足す。
 過去の例:
 - PowerPC の LAN の操作口 PLN1 は、Host Services の計画を読まずに別の EtherType で作られ、後で link に統合し直すことになった。
 - PowerPC の decrementer を物理 100Hz にした段 (B29) も、本線の物理 1kHz・論理 100Hz の設計と逆向きになった。
