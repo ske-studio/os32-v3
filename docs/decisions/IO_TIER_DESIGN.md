@@ -6,7 +6,7 @@
 
 
 ## r1→r2 の変更
-- R1: PPCのFG処理をPR=1由来syscallに限定し、使用中trapスタックでEEを許可しない。最終N4で共通口へ一本化。
+- R1: AC-CTX-1適合入口から共通FG1実行器へ渡す。IRQ・例外や排他中には実行しない。
 - R2 / U1: 初版は案B。IRQ出口・期限救済・starved_rounds・出口能力を削除し、案Aは利用者決定後の別票へ送る。
 - R3: LANの口をio_slice/int結果/io_clock_usへ統一。net/bulk_work.cと予算初期値はLAN側所有、D6を削除。
 - R4: link_tickのIRQ0→前景移行はLAN側と明記。
@@ -31,7 +31,7 @@
 |X2|NE2Kの8件/120µsはFG1のdemux（net/rx_work.c:17,24、net/nic.c:225）。ne2k_bh内で共有（drivers/net/ne2000/ne2000.c:523,553）。IRQは印付け（ne2000_irq.inc:54）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
 |X3|PCMはIRQ10から補充（drivers/sound/cs4231/pcm_cs4231.c:478）、IRQ0のpcm_tick救済も残る（:411,437,484）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
 |X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（net/nic.c:298）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|
-|X5|PPC syscallはEE=0でidle_workが進まない（exec/exec_syscall.inc:90、arch/ppc/kernel_trap.c:104）。IRQ出口のTier処理も無い（同:98、arch/x86/kernel/isr_stub.asm:95）|PPCのPR=1由来syscallのFG pumpだけ追加。IRQ出口は作らない|
+|X5|移行前の観測: PPC syscallはEE=0でidle_workが進まない（exec/exec_syscall.inc:90、arch/ppc/kernel_trap.c:104）。IRQ出口のTier処理も無い（同:98、arch/x86/kernel/isr_stub.asm:95）|AC-CTX適合後は共通FG1協調点で実行。IRQ出口は作らない|
 
 - tick_dispatchは7slotを順に1周し既存tick_budgetを挟む（kernel/irq/tick.h:5、tick.c:25）。IRQ0の論理周に実行（arch/x86/kernel/isr_stub.asm:493、isr_handlers.c:549）。PPCもjiffyで実行（arch/ppc/kernel_dec.c:60）。
 - 設計のみ。preflight --fix-fonts・build・lint・変異・guestは未実施。依頼にbase指定はなく、作業木は読み取り専用。試験合格は主張しない。
@@ -52,9 +52,8 @@
 - 案AはTier1の利用者（OSミキサ等）が決まった時に別票で起こす。初版はIRQ_TAIL、出口能力、期限救済、starved_roundsを実装しない。
 - R9の送り項目: 案Aのx86出口はv86 timeout・ring3_abort_checkのlongjmp経路の後、IRQ_LEAVEの前であることを別票で検証する。
 - その他のTier外: DMA停止/復旧の不可分手順と機器固有の短い排他。長いPIO/RDC/resetはcallbackの単位超過として別計測。
-- PPCの既存syscall本体はEE=0を既定とする。arch/ppc/io_pump.c（P1）に内部口 `int ppc_syscall_fg_run(int (*fn)(void *), void *arg)` を1つだけ置く。PR=1由来・vector=0xc00のsyscall内で、共有状態を解放済みのアプリ用kernel stackから呼び、EEを一時許可して処理後に元の状態へ戻す。PR=0由来trap・IRQからは呼ばない。
-- 根拠: arch/ppc/kernel_vectors.S:340はPR=1用stack、:329はkernel trapのbusy取得、arch/ppc/kernel_trap.c:104はPR=1 syscall分岐。共通口は保存済みユーザーフレームを保ち、trap busyを保持していない安全な文脈でだけEEを許可する。通常のkernel EE方針・IRQハンドラは変更しない。fnは内部処理でありアプリcallbackではない。
-- io_pump（明示呼出・正常syscall復帰時の自動pump）とLANの待ちループ（LAN設計のJ）は同じppc_syscall_fg_runを使い、EE許可の別経路を作らない。明示pumpの予算/結果を受け渡し、同じ復帰で自動pumpを二重実行しない。割り込みは既存の1回のtrap処理で復帰し、IRQ内でEEを再許可する構造を導入しない。
+- 通常ユーザーsyscallはAC-CTX-1適合のarch入口がIF/EEを許可し、共通FG1実行器へ渡す。TierはIRQ・例外・排他中に実行しない。
+- 明示io_pumpの予算/結果を共通側で受け渡し、同じ復帰で自動pumpを二重実行しない。LANの待ちも共通FG1契約に従う。
 
 ## 3. 時計・設定・LANの境界（論点2〜5）
 - AC-TIME-4（新）: io_clock_usはIRQ/FG0/FG1から読める単調µs時計。成功時のみ出力有効、未準備NOSYS・一時失敗AGAIN。短いirq_save/restoreを内包し、源・分解能・停止中進行をAC-TIME-2と揃える。
@@ -142,8 +141,8 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 ```
 - 部分表を受理し未記載IDはOS標準で補完（直前表へのpatchではない）。未知ID・重複・版/長さ不一致・予約非0・Tier範囲外・min/max外は全体拒否。検証後、dispatcher非実行時に短い排他でactive交換。実行中BUSY、部分反映なし。
 - 不正時は直前の有効表を保持。初回は標準。明示resetで標準へ戻す（U2決定）。拒否したsetでownerの保存表も変更しない。
-- set/get/resetはFG1限定。getは必要長を返し、容量不足時は部分コピーしない。PPCはPR=1由来の専用境界でこれらを実行し、一般syscallのEE方針は変えない。
-- pumpは安全な協調点で眠らず戻り、要求予算を1巡上限に丸める。budget=0はINVAL。PPCは§2の共通口を使い、返却値も保存フレームへ反映する。未提供像はNOSYS。
+- set/get/resetはFG1限定。getは必要長を返し、容量不足時は部分コピーしない。AC-CTX-1適合入口から共通FG1契約で実行する。
+- pumpは安全な協調点で眠らず戻り、要求予算を1巡上限に丸める。budget=0はINVAL。返却値は保存フレームへ反映する。未提供像はNOSYS。
 
 ## 5. 順位・最低機会・費用（R8）
 - 固定16枠、Tier別の登録順indexとpending bitmask。通常はTier1→2→3、それぞれ最初の1ビット。1巡のvisited maskで同一ID再実行を防ぐ。heap・期限走査・毎回sortなし。
@@ -184,9 +183,8 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 |A5|変更 kernel/idle_work.c|60|A3、互換adapter|
 |C1|変更 sdk/kapi.json|90|A1/A4、関数・公開型・版|
 |C2|新 kernel/io_kapi.c|80|C1、公開口の境界|
-|C4|新 arch/x86/io_pump.c|30|C2、FG口|
-|P1|新 arch/ppc/io_pump.c|65|C2、PR=1 syscall内の一時EE許可の共通口。io_pumpとLAN待ちJが共用。C4と並列可|
-|P2|変更 arch/ppc/kernel_trap.c|20|P1、PR=1 syscall正常復帰の自動pumpを共通口へ結線|
+|C4|arch/x86 ABI adapter（必要な場合のみ）|30|C2、共通FG1実行器への接続|
+|P1|arch/ppc ABI adapter（必要な場合のみ）|65|C2、共通FG1実行器への接続|
 |T1|変更 platform/pc98/clock_source.c|65|A1、生count/token/係数。PPC側と並列可|
 |T2|変更 platform/powermac/clock.c|45|A1、TB count/token/係数|
 |L1|変更 exec/exec.c|15|A4、owner共通資源回収へ復元口を結線|
@@ -207,7 +205,7 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 |空時高速経路・count予算|互換枠0本の空時は時計0回、互換枠ありは未要求でも1巡1回。begin成功/失敗、非空時読出回数、TSC/PIT/TB換算・wrap・源切替|互換枠を無視した即return、begin換算誤り、空時時計読出、token世代検査削除|
 |1巡1回・新要求非消失・MORE/WAIT・再入|LAN step→net_tx→dispatcher、LINK_IDLE、直接step→kbd→dispatcher、解除BUSY。外側予算/進捗不変|runningガード削除、provider busyガード削除、pending全消去、同巡再実行|
 |予算・時計失敗・校正|NIC既存8件/120µsと残時間の最小、LAN側設定値、1単位超過|開始時刻リセット、件数上限突破、時計失敗で継続|
-|FG文脈・PPC pump|NP21/WとPPC QEMU。PR=1 syscallのpumpとLAN待ちJが同一口を使用、PR=0/IRQでは無動作、保存フレーム/EE復帰、処理中DEC後も正常復帰|PR/vector判定削除、復帰EE誤り、自動/明示pump二重実行|
+|FG文脈・pump|NP21/WとPPC QEMU。共通FG1でpumpとLAN待ちJが進行、IRQ・例外・排他中は無動作、処理中DEC後も正常復帰。IF/EE許可と復帰はarch入口/出口で検証|入口/出口の許可・復帰誤り、自動/明示pump二重実行|
 |LE表・動的更新・資源回収|両arch同一bytes、min/max、不正時active不変、reset、親子・fault・kill・owner再利用で復元|検証前commit、native endian、終了復元削除、保存元上書き|
 |T3・tick・NIC救済維持|PCM再生/stop/close、無yield e82557、物理/論理比、校正完了|PCM救済消去、jiffy gate除去|
 |転送中の音・入力・速さ|下の同時負荷試験。LAN側と結果表を共有|フレーム境界の予算検査除去|
@@ -232,6 +230,6 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - N1: idle_work互換fnは常時pending・1巡1回。空時即returnは互換枠0本の場合だけ。
 - N2: A1の公開口をio_slice_beginに確定。生count換算は内部に隠し、LANは型の中身に触れない。
 - N3: stepの再入はproviderのbusyで防止し、入れ子はIO_MOREで戻る。
-- N4: P1のppc_syscall_fg_runだけがPR=1 syscall内のEE一時許可を担当し、io_pumpとLAN待ちJで共用する。
+- N4: AC-CTX-1に適合した入口から共通のFG1実行器へ。ppc_syscall_fg_runによる許可/復元は不要。
 - N5: syscall 1回あたりのdispatch最大時間を計測する。
 - LAN-N3: link_tickはFGへ移し、FGが10 jiffy回していなければIRQ0で1回回す救済をLAN側が残す。
