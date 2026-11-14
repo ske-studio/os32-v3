@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Contract tests for the generation-local LAN operator."""
 import argparse
+import json
+import os
+import socket
+import struct
 import importlib.util
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x4', tier=1, needs=[], budget=3,
              covers=['tools/host_rshell.py', 'tools/host_notify.py',
-                     'include/remote_control.h', 'tools/tests/test_remote_x4.py'])
+                     'tools/host_operator_socket.py', 'include/remote_control.h', 'tools/tests/test_remote_x4.py'])
 BOOT = '0123456789abcdef0123456789abcdef'
 
 
@@ -144,6 +149,72 @@ def test(path):
     assert op.notices[-1] == b'gs:! ready v1\r\n'
     for data in (b'gs:! partial', b'gs:! ready v1\ngs:! extra\n'):
         assert not op.accept_output(42, 3, BOOT, '!', 1, data, len(data), 'gui'), 'partial notice accepted'
+    # Operation timeout is independent of result polling and client lifetime.
+    body = b'> ver\r\nversion\n\x04'
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from host_operator_socket import OperatorSocket
+    n = Notify()
+    op = mod.Operator(n)
+    op.session_start(1)
+    assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+    server = OperatorSocket.__new__(OperatorSocket)
+    server.operator = op
+    server.info = lambda: dict(commit='x', config={}, peer=None)
+    sock, peer = socket.socketpair()
+    client = dict(socket=sock, out=bytearray(), wait=None)
+    server.clients = {sock.fileno(): client}
+    ident = op.submit('cui', 'ver', client)
+    deadline = op.pending['deadline']
+    server._disconnect(sock.fileno())
+    assert op.pending['state'] == 'running', 'disconnect released operation'
+    op.expire(deadline - 0.001)
+    assert op.pending['state'] == 'running', 'early expiry'
+    server.poll(deadline)
+    assert op.pending['state'] == 'UNKNOWN', 'deadline did not become UNKNOWN'
+    probe = dict(out=bytearray(), wait=None)
+    server._request(probe, dict(op='probe'))
+    assert json.loads(probe['out'][4:])['pending'] == dict(id=ident, state='unknown')
+    assert op.accept_output(42, 1, BOOT, ident, 0, body, len(body), 'cui')
+    assert op.take_result()['result'] == body, 'late result rejected'
+    ident = op.submit('cui', 'ver', None)
+    server.poll(op.pending['deadline'])
+    assert op.pending['state'] == 'UNKNOWN', 'deadline did not become UNKNOWN'
+    server._request(probe, dict(op='resume'))
+    assert op.pending is None
+    assert op.submit('cui', 'ver', None) != ident, 'resume did not reopen slot'
+    peer.close()
+    # Exercise wire validation and the operation deadline with a fixed clock.
+    server.listener, listener_peer = socket.socketpair()
+    sock, peer = socket.socketpair()
+    client = dict(socket=sock, data=bytearray(), out=bytearray(), wait=None)
+    server.clients = {sock.fileno(): client}
+    def request(req):
+        data = json.dumps(req).encode()
+        os.write(peer.fileno(), struct.pack('!I', len(data)) + data)
+        server.on_readable(sock.fileno())
+        size = struct.unpack('!I', os.read(peer.fileno(), 4))[0]
+        return json.loads(os.read(peer.fileno(), size))
+    try:
+        with patch.object(mod.time, 'monotonic', return_value=100):
+            op.pending = None
+            for fields, seconds in [({'timeout_ms': 60000}, 60), ({}, 15)]:
+                response = request(dict(op='submit', mode='cui', line='ver', **fields))
+                assert response['ok']
+                assert op.pending['deadline'] == 100 + seconds, 'timeout_ms ignored'
+                server.poll(115 if seconds == 60 else 114.999)
+                assert op.pending['state'] == 'running', 'timeout_ms ignored'
+                server.poll(100 + seconds)
+                assert request(dict(op='probe'))['pending']['state'] == 'unknown'
+                assert request(dict(op='resume'))['ok']
+            sent = len(n.sent)
+            for value in (0, -1, True, False, 1.5, '60000', None, [], {}, 10**400):
+                response = request(dict(op='submit', mode='cui', line='ver', timeout_ms=value))
+                assert response['error'] == 'BAD_REQUEST', 'invalid timeout accepted'
+            assert op.pending is None and len(n.sent) == sent, 'invalid timeout sent'
+    finally:
+        server.close()
+        peer.close()
+        listener_peer.close()
     print('PASS remote-x4')
 
 
@@ -156,6 +227,9 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ('deadline = time.monotonic() + timeout_ms / 1000',
+             'deadline = time.monotonic() + RESULT_TIMEOUT_MS / 1000', 'timeout_ms ignored'),
+            ('            self.unknown()\n\n    def unknown', '            pass\n\n    def unknown', 'deadline did not become UNKNOWN'),
             ("if (not body.startswith(b'gs:! ')", "if (dropped or not body.startswith(b'gs:! ')", 'dropped notice rejected'),
             ("self.pending['state'] = 'UNKNOWN'\n\n    def resume", "self.pending['state'] = 'UNKNOWN'\n            self.ready = None\n\n    def resume", 'UNKNOWN cleared READY'),
             ('(self.ready is None and not late)', '(self.ready is None)', 'late OUT without READY rejected'),

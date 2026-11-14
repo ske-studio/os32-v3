@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import time
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -18,6 +19,10 @@ from host_operator_socket import OperatorSocket
 
 CHECK = dict(name='remote-x13', tier=1, needs=[], budget=10,
              covers=['tools/remote_transport.py', 'tools/host_agent_config.py', 'tools/host_operator_socket.py',
+                     'tools/host_rshell.py',
+                     'tools/rshell.py', 'tools/gserial.py', 'tools/rshell_serial.py',
+                     'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py',
+                     'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py',
                      'tools/tests/test_remote_x13.py'])
 
 
@@ -32,10 +37,14 @@ class FakeOperator:
         self.disconnect = False
         self.slow = False
         self.server = None
-    def submit(self, mode, line, client):
+    def expire(self, now):
+        pass
+    def submit(self, mode, line, client, timeout_ms):
+        self.timeout_ms = timeout_ms
         self.take_result()
+        body = b'gs:00000001 pong\ngs:00000001 end 0\n' if mode == 'gui' else b'> ver\nOK\n\x04'
         self.pending = dict(id='00000001', state='running' if self.slow else 'done',
-                            result=None if self.slow else b'> ver\nOK\n\x04')
+                            result=None if self.slow else body)
         if self.disconnect:
             client['socket'].close()
         return '00000001'
@@ -97,8 +106,18 @@ def test(path):
         assert client.next_log(1)['event'] == 'log'
         result = client.request('cui', 'ver', 2)
         assert result['state'] == 'done' and result['complete']
+        assert operator.timeout_ms == 2000, 'request timeout not sent'
         ident = client.submit('cui', 'ver', 1)['id']
+        assert operator.timeout_ms == 1000, 'submit timeout not sent'
         assert client.result(ident, 0, 1)['state'] == 'done'
+        import rshell
+        import gserial
+        for cli, mode, args in [(rshell, 'cui', ['cmd', 'ver']), (gserial, 'gui', ['ping'])]:
+            operator.ready = dict(mode=mode, last_id='none', state='idle')
+            with patch.object(cli, 'CommandTransport', mod.CommandTransport):
+                assert cli.main(['--transport', 'lan', '--timeout', '60', *args]) == 0
+            assert operator.timeout_ms == 60000, 'CLI timeout not sent'
+        operator.ready = dict(mode='cui', last_id='none', state='idle')
         assert client.resume()['ok']
         operator.slow = True
         assert client.request('cui', 'ver', 0.1)['state'] == 'unknown', 'CLI deadline not UNKNOWN'
@@ -132,6 +151,10 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ('\n                         timeout_ms=max(1, int(timeout * 1000)))',
+             '\n                         timeout_ms=15000)', 'submit timeout not sent'),
+            ('\n                                   timeout_ms=max(1, int(timeout * 1000)))',
+             '\n                                   timeout_ms=15000)', 'request timeout not sent'),
             ("return {'state': 'unknown'}", "return {'state': 'serial'}", 'CLI deadline not UNKNOWN'),
             ('time.monotonic() + READY_TIMEOUT)', 'time.monotonic() + READY_TIMEOUT + 1)', 'ready deadline removed'),
         ]

@@ -102,7 +102,8 @@ class CommandTransport:
         return self.call('probe', timeout)
 
     def submit(self, mode, line, timeout):
-        return self.call('submit', timeout, mode=mode, line=line)
+        return self.call('submit', timeout, mode=mode, line=line,
+                         timeout_ms=max(1, int(timeout * 1000)))
 
     def result(self, ident, wait_ms, timeout):
         return self.call('result', timeout, id=ident, wait_ms=wait_ms)
@@ -142,7 +143,8 @@ class CommandTransport:
             self.close()
             return {'state': 'serial'}
         try:
-            submitted = self._call('submit', deadline, mode=mode, line=line)
+            submitted = self._call('submit', deadline, mode=mode, line=line,
+                                   timeout_ms=max(1, int(timeout * 1000)))
             if not submitted.get('ok'):
                 return submitted
             ident = submitted['id']

@@ -7,6 +7,8 @@ import socket
 import struct
 import time
 
+from host_rshell import RESULT_TIMEOUT_MS
+
 RECORD_MAX = 16 * 1024
 
 
@@ -103,11 +105,14 @@ class OperatorSocket:
         self._send(client, dict(ok=False, error=code, detail=detail))
 
     def _request(self, client, req):
+        self.operator.expire(time.monotonic())
         op = req.get('op')
         fields = {'probe': {'op'}, 'submit': {'op', 'mode', 'line'},
                   'result': {'op', 'id', 'wait_ms'}, 'resume': {'op'},
                   'notice': {'op', 'wait_ms'}, 'log': {'op'}}
-        if not isinstance(op, str) or op not in fields or set(req) != fields[op]:
+        optional = {'timeout_ms'} if op == 'submit' else set()
+        if (not isinstance(op, str) or op not in fields or
+                not fields[op] <= set(req) <= fields[op] | optional):
             raise ValueError('fields')
         if op == 'probe':
             info = self.info()
@@ -121,12 +126,19 @@ class OperatorSocket:
         elif op == 'submit':
             if req['mode'] not in ('cui', 'gui', 'diag') or not isinstance(req['line'], str):
                 raise ValueError('submit')
+            timeout_ms = req.get('timeout_ms', RESULT_TIMEOUT_MS)
+            if type(timeout_ms) is not int or timeout_ms <= 0:
+                raise ValueError('timeout_ms')
+            try:
+                timeout_ms / 1000
+            except OverflowError:
+                raise ValueError('timeout_ms') from None
             pending = self.operator.pending
             if pending and pending['state'] == 'UNKNOWN':
                 self._error(client, 'UNKNOWN_PENDING', 'resume required')
                 return
             try:
-                ident = self.operator.submit(req['mode'], req['line'], client)
+                ident = self.operator.submit(req['mode'], req['line'], client, timeout_ms)
             except ValueError as exc:
                 self._error(client, 'INVALID_LINE', str(exc))
                 return
@@ -189,6 +201,7 @@ class OperatorSocket:
         self._send(client, response)
 
     def poll(self, now):
+        self.operator.expire(now)
         for fd, client in list(self.clients.items()):
             self._complete_wait(client, now)
             self._flush(fd, client)
