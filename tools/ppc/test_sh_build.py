@@ -13,15 +13,15 @@ sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as hdr
 
 
-def exercise(root, mutant=False):
+def build(root):
     result = subprocess.run(['make', '-j1', 'ARCH=ppc', 'PLATFORM=powermac', 'sh'],
                             cwd=root, capture_output=True, text=True)
     out = root / 'build/out/ppc-user'
-    if mutant:
-        assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
-        assert (out / 'sh.elf').is_file() and (out / 'sh.raw').is_file()
-        assert not (out / 'sh.inputs.json').exists()
-        return
+    return result, out
+
+
+def exercise(root):
+    result, out = build(root)
     assert result.returncode == 0, result.stdout + result.stderr
     elf = hdr.Elf32(out / 'sh.elf')
     fields = struct.unpack('<16I', (out / 'sh.bin').read_bytes()[:64])
@@ -51,7 +51,11 @@ def main():
             assert source.count(old) == 1
             rule.write_text(source.replace(old, '$(LD)'))
             shutil.rmtree(root / 'build/out/ppc-user')
-            exercise(root, True)
+            result, out = build(root)
+            assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
+            assert (out / 'sh.elf').is_file() and (out / 'sh.raw').is_file()
+            assert not (out / 'sh.inputs.json').exists()
+            print('PPC sh unguarded link: RED (1)')
     print('PPC sh build: OK')
 
 

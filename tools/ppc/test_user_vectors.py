@@ -45,7 +45,8 @@ def main():
         anchor = '.Luser_frame:\n    lis 1,ppc_exec_kernel_sp@ha'
         assert source.count(anchor) == 1
         mutant = source.replace(anchor, '.Luser_frame:\n    lis 1,.Ltrap_busy@ha\n    li 29,1\n    stw 29,.Ltrap_busy@l(1)\n    lis 1,ppc_exec_kernel_sp@ha')
-        if inspect(mutant):
+        correct = inspect(mutant)
+        if correct:
             raise RuntimeError('busy-word mutation survived')
         print('USER busy-word store: RED (1)')
         anchor = '    mtsrr1 1\n    mfsprg1 0'
