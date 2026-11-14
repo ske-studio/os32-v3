@@ -10,6 +10,7 @@
 |参照名|担当する正典（本書では詳細を複製しない）|
 |---|---|
 |TIME|[TICK_ARCH_DESIGN §2](time/TICK_ARCH_DESIGN.md#2-arch-に依らない-tick_clock-の口) — 有理周期・読み出し・駆動|
+|IO_TIER|[IO_TIER_DESIGN §3・§4](IO_TIER_DESIGN.md) — 協調進行・µs 時計・設定表|
 |LAN|[LAN_OPERATOR_DESIGN §5](network/LAN_OPERATOR_DESIGN.md#5-powerpc-を-link-に統合する) — link・SFS・RX 所有者の統合|
 |HAL|[HAL_V2_DESIGN §3・§4・§9](gui/HAL_V2_DESIGN.md) — 形式・能力・表示の列挙|
 |PPC|[PPC_NOTES](ppc/PPC_NOTES.md)、[ARCH_BRINGUP_ORDER §各段で用意するもの](ppc/ARCH_BRINGUP_ORDER.md#各段で用意するもの)|
@@ -61,6 +62,7 @@ FG0/FG1 は割り込みの状態であり、ユーザー/カーネルという�
 |SFS|SerialFS の client と待ち|
 |BUILD|ビルドの一覧・closure|
 |NET|NIC・link・credit・RX の予算|
+|IO|I/O の協調進行・予算・設定表|
 
 適合の状態は、本稿の時点では両アーキとも試験で確かめていないので、全項目を「未 (T1 で確かめる)」とする。T1 の契約試験が両アーキで通った項目から、W3 で「済」に書き換える。
 
@@ -94,6 +96,16 @@ FG0/FG1 は割り込みの状態であり、ユーザー/カーネルという�
 |AC-IRQ-1|G: claim 成功=1、成功時全欄有効。不正は負、出力不変。deliver と needs_finish を分離し必要な完了だけ一度行う。C: topology/token。A: spurious は配達しない。操作は IRQ/FG0、進行は dispatcher|`irq_claim`・`platform_irq_claim/complete` (`include/platform_irq.h:13`)、`irq_topology` (`:8`)|`platform/pc98/irq_complete.c:9`。PIC 固有完了を保持|`platform/powermac/mpic.c:93` は失敗0・部分初期化。専用 dispatch の判定も F3 で同時修正。共通 dispatcher へ接続する前が関門、topology 結線は別段|`AC-IRQ-1/claim-spurious-complete`（T1 で作る） / 本書・PPC 立上げ順|
 
 `platform_timer_program/sample` (`include/platform_timer.h:19`) は PIT 専用。汎用の時計照会や PowerPC の DEC 契約に流用しない。AC-TIME-2 の照会項目は現 `clock_info` には不足しており、F9 完了前に利用者が存在を仮定してはならない。
+
+### 4.1.1 I/O の時計・協調進行・設定表
+
+IO_TIER §3 の契約を追加する。AC-TIME-4・AC-IO-1・AC-IO-2 の適合は両アーキとも **未**。実装と受入は IO_TIER の担当段で行う。
+
+|ID|契約（IO_TIER §3）|正にする口 / 担当設計|
+|---|---|---|
+|AC-TIME-4|io_clock_usはIRQ/FG0/FG1から読める単調µs時計。成功時のみ出力有効、未準備NOSYS・一時失敗AGAIN。短いirq_save/restoreを内包し、源・分解能・停止中進行をAC-TIME-2と揃える。|`io_clock_us` (`kernel/io_work.h`) / IO_TIER §3・§4|
+|AC-IO-1|FG1の協調進行・再入無動作・欠如NOSYS。|`io_dispatch` (`kernel/io_work.h`)・`io_pump` / IO_TIER §3・§4、文脈は AC-CTX-1・4|
+|AC-IO-2|設定の検証・原子的置換・LE形式・owner終了時復元。|`io_policy_set/get/reset` / IO_TIER §3・§4（公開口は後続の KAPI 段）|
 
 ### 4.2 KAPI・入力・メモリ・起動
 
