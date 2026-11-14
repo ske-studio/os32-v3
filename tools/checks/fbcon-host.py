@@ -77,7 +77,9 @@ CHECK = dict(name='fbcon-host', tier=1, needs=[], budget=20,
         'tools/tests/kernel_includes.py',
         'tools/tests/legacy_guest_fake.h',
         'tools/tests/test_fbcon.py',
-    ])
+    ],
+    basis=['PPC_FBCON_DESIGN §2', 'PPC_FBCON_DESIGN §6'],
+)
 
 def run(ctx):
     import subprocess

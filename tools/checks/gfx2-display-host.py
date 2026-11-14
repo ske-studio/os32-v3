@@ -12,7 +12,9 @@ CHECK = dict(name='gfx2-display-host', tier=1, needs=[], budget=10,
             'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h',
             'mm/pgalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_gfx2.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py',
-            'tools/tests/gfx2_display_host.c', 'tools/tests/test_gfx2_display.py'])
+            'tools/tests/gfx2_display_host.c', 'tools/tests/test_gfx2_display.py'],
+    basis=['HAL_V2_DESIGN §9-2', 'HAL_V2_DESIGN §12-1'],
+)
 
 
 def run(ctx):

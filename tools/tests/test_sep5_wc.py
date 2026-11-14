@@ -10,7 +10,9 @@ CHECK = dict(name='sep5-wc-host', tier=1,
             'hwdev/gf/accel.h', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h',
             'arch/x86/kernel/mtrr_wc.c', 'arch/x86/kernel/mtrr_wc.h',
             'tools/tests/test_mtrr_wc.py', 'tools/tests/host32.py'],
-    needs=[], budget=12.0)
+    needs=[], budget=12.0,
+    basis=['PPC_SEP5_DESIGN §2.2'],
+)
 
 import sys
 from pathlib import Path

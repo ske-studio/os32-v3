@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='con-sink-host', tier=1,
     covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'init/boot_serial.inc', 'include/console.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/console/console.c', 'tools/tests/con_sink_host.c', 'tools/tests/test_con_sink.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.5)
+    needs=[], budget=3.5,
+    basis=['KAPI_SPEC §console シンクと実 RAM 量 (v46)'],
+)
 
 
 def run(ctx) -> int:

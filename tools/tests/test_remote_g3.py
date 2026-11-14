@@ -13,7 +13,9 @@ CHECK = dict(name='remote-g3', tier=1, needs=[], budget=20, covers=[
     'assets/fonts/**', 'assets/ipadic/*.csv', 'include/remote_control.h',
     'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h',
     'net/link.h', 'exec/shell_service.h',
-    'sdk/include/os32/**', 'tools/tests/test_remote_g3.py'])
+    'sdk/include/os32/**', 'tools/tests/test_remote_g3.py'],
+    basis=['LAN_OPERATOR_DESIGN', 'NET_HOSTSVC_DESIGN §5'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 
 

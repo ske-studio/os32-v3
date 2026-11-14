@@ -18,7 +18,10 @@ CHECK = dict(name='ppc-lan-rh2', tier=2, budget=60, needs=[],
             'platform/powermac/ofw.h', 'arch/ppc/*.h', 'drivers/net/gem/gem.h',
             'tools/ppc/lan_p3_fake.c',
             'tools/ppc/lan_p17_fake.c', 'lib/kstring*', 'include/*.h',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['PPC_LAN_MARKS_DESIGN', 'PPC_LAN_DESIGN §3'],
+    env_limit='模型でOF captureとPCI順序を確認するが、実OFとPCI busの障害は再現しない。',
+)
 FLAGS = ['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib',
          '-static', '-fno-stack-protector', '-D__cdecl=',

@@ -5,7 +5,9 @@ CHECK = dict(name='exec-entry-host', tier=1,
             'include/exec_arch.h', 'include/abi.h', 'include/types.h', 'include/cpu.h',
             'tools/tests/host_arch/*.h', 'tools/tests/exec_entry_host.c',
             'tools/tests/test_exec_entry.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3)
+    needs=[], budget=3,
+    kind='characterization',
+)
 from pathlib import Path
 import subprocess
 import sys

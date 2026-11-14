@@ -14,7 +14,11 @@ CHECK = dict(name='ppc-rh-fb', tier=2, budget=600, needs=['make:all'], covers=[
     'platform/powermac/kboot_reserve.c', 'platform/powermac/memory.c',
     'platform/powermac/mpic_tree.c', 'platform/powermac/ofw.c',
     'tools/ppc/kboot_boot_host.c', 'tools/ppc/kboot_vectors_fixture.[cS]',
-    'build/out/ppc/kboot-vectors/**'])
+    'build/out/ppc/kboot-vectors/**'],
+    basis=['PPC_REALHW_G4_DESIGN §3', 'PPC_REALHW_G4_DESIGN §6'],
+    env_limit='QEMUのOF framebufferを確認するが、mac99 VGA/OpenBIOSはQuickSilverの実OF framebufferとcache属性を保証しない。',
+    full_only=True,
+)
 
 
 def run(ctx):

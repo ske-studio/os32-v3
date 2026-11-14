@@ -4,7 +4,9 @@ CHECK = dict(name='trident-palette', tier=1, needs=[], budget=3.6,
     covers=['drivers/video/trident/palette.c', 'drivers/video/trident/trident.h',
             'tools/tests/trident_palette_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk', 'gfx/palette.h'])
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'gfx/palette.h'],
+    basis=['TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 import os
 from pathlib import Path

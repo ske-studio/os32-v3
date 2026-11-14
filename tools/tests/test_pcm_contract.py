@@ -16,7 +16,9 @@ CHECK = dict(name='pcm-contract-host', tier=1,
             'kapi/kapi_generated.c', 'sdk/gen_kapi.py', 'sdk/kapi.json',
             'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
             'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h',
-            'sdk/include/os32/os32_generations.h'], needs=[], budget=5)
+            'sdk/include/os32/os32_generations.h'], needs=[], budget=5,
+    kind='characterization',
+)
 import os
 from pathlib import Path
 import re

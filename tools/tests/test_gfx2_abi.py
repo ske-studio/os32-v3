@@ -2,7 +2,9 @@
 """Public value records stay ABI-stable and independently GNU89 usable."""
 CHECK = dict(name='gfx2-abi-host', tier=1, needs=[], budget=3,
     covers=['sdk/include/os32/os32_gfx2.h', 'tools/tests/gfx2_abi_host.c',
-            'tools/tests/test_gfx2_abi.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gfx2_abi.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §4-1', 'HAL_V2_DESIGN §5-1', 'HAL_V2_DESIGN §7-1', 'HAL_V2_DESIGN §9-1', 'HAL_V2_DESIGN §11-1'],
+)
 from pathlib import Path
 import argparse
 import subprocess

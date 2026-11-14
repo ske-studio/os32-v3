@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ppc-sh-string', tier=1, budget=10, needs=[],
              covers=['userland/ppc/sh/string.c', 'userland/ppc/sh/include/string.h',
-                     'tools/tests/ppc_sh_string.py', 'tools/checks/ppc-sh-string.py'])
+                     'tools/tests/ppc_sh_string.py', 'tools/checks/ppc-sh-string.py'],
+    kind='characterization',
+)
 
 
 def run(ctx):

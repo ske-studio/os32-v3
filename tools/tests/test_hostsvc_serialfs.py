@@ -21,7 +21,9 @@ CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
     'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'])
+    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
+    basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('deadline', '#define SFS_OPERATION_TICKS 100u', '#define SFS_OPERATION_TICKS 101u'),

@@ -20,7 +20,9 @@ CHECK = dict(name='usb-ohci', tier=1, needs=[], budget=20,
                      'include/callconv.h', 'arch/*/arch_endian_dma.h',
                      'tools/tests/test_usb_ohci.py', 'tools/tests/usb_fake_ohci.c',
                      'tools/tests/usb_fake_ehci_min.c', 'tools/tests/host32.py',
-                     'tools/tests/cc_cache.py'])
+                     'tools/tests/cc_cache.py'],
+    basis=['USB_DESIGN §4', 'USB_DESIGN §7'],
+)
 # (acceptance, file, unique single-line anchor, replacement).
 # F9/F9d and G1 service-side mutations exercise the minimal core stand-in;
 # real 1C integration remains the PM's explicitly separate gate.

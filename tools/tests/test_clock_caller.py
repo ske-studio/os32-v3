@@ -7,7 +7,9 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h',
             'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    basis=['AC-TIME-1', 'AC-TIME-2', 'KAPI_SPEC §3-3'],
+)
 from pathlib import Path
 import subprocess
 import tempfile

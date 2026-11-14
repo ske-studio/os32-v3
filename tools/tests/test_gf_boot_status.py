@@ -6,7 +6,9 @@ CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=3.2,
             'kdebug/gfinit_bus.h', 'kdebug/gf_stage_state.h', 'kdebug/recover*.h',
             'hwdev/gf/mc.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h', 'hwdev/gfinit_mode.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
-            'lib/serial_diag.h', 'lib/crc32_core.inc', 'include/*.h', 'mm/*.h'])
+            'lib/serial_diag.h', 'lib/crc32_core.inc', 'include/*.h', 'mm/*.h'],
+    basis=['GF_FEAT1_DESIGN §2', 'GF_FEAT1_DESIGN §8'],
+)
 from pathlib import Path
 import os
 import re

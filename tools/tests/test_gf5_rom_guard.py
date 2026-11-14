@@ -94,7 +94,9 @@ CHECK = dict(name='gf5-rom-guard-host', tier=1, needs=['make:build/out/geforce/g
                  'sdk/**',
                  'assets/fonts/**',
                  'tools/fetch_fonts.py',
-             ])
+             ],
+    basis=['GF_FEAT5_DESIGN', 'GF_GUARD_LIFETIME_DESIGN'],
+)
 
 import subprocess
 import sys

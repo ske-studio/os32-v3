@@ -6,7 +6,10 @@ CHECK = dict(name='tri-burst6', tier=1, needs=[], budget=49.5, covers=[
     'tools/tests/mutpar.py', 'userland/shell/hwb.h', 'userland/shell/hwb_probe.c',
     'userland/shell/hwb_parse.c', 'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
     'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
-    'sdk/include/os32/os32_kapi_shared.h'])
+    'sdk/include/os32/os32_kapi_shared.h'],
+    kind='characterization',
+    env_limit='fake busのgrouped pacingと読戻しを確認するが、実busの時序とburst故障への効果は保証しない。',
+)
 import json
 from pathlib import Path
 import tempfile

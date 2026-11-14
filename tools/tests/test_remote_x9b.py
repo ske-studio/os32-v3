@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x9b', tier=1, needs=[], budget=5,
     covers=['kernel/boot_token.c', 'include/boot_token.h', 'kapi/kapi_generated.c',
-            'sdk/kapi.json', 'tools/tests/remote_x9b_host.c', 'tools/tests/test_remote_x9b.py'])
+            'sdk/kapi.json', 'tools/tests/remote_x9b_host.c', 'tools/tests/test_remote_x9b.py'],
+    basis=['LAN_OPERATOR_DESIGN', 'KAPI_SPEC §3-3'],
+)
 import argparse
 from pathlib import Path
 import re

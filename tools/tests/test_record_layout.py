@@ -4,7 +4,9 @@ CHECK = dict(name='record-layout', tier=1, needs=[], budget=15,
     covers=['tools/abi/record_layout_contract.c', 'tools/tests/test_record_layout.py',
             'tools/tests/host32.py', 'include/types.h', 'include/callconv.h',
             'drivers/pci/pci.c', 'include/pci_dev_contract.h',
-            'userland/shell/cmd_pci.c', 'sdk/include/os32/**', 'lib/le_internal.h'])
+            'userland/shell/cmd_pci.c', 'sdk/include/os32/**', 'lib/le_internal.h'],
+    basis=['[C1]', '[ABI]', 'KAPI_SPEC §3-1'],
+)
 import argparse
 import os
 from pathlib import Path

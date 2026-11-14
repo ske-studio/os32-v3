@@ -10,7 +10,10 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ram-root', tier=1, budget=60, needs=[],
              covers=['fs/ramfs/ramfs.c', 'tools/tests/test_ram_root.py', 'fs/ramfs/ramfs.h',
-                     'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c'])
+                     'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c'],
+    basis=['PPC_SHELL_DESIGN §8'],
+    env_limit='hostの実VFS/ramfsのshort writeとtruncateを確認するが、RAM root全体の実起動は保証しない。',
+)
 SOURCE = r'''
 #include "fs/vfs_device.h"
 #include "fs/ramfs/ramfs.h"

@@ -5,7 +5,10 @@ CHECK = dict(name='hwb-shell-host', tier=1, budget=115.9, needs=[], covers=[
     'include/pci_dev_contract.h', 'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'userland/tests/hw/*.hwb',
     'tools/rshell_hwb.py', 'tools/tests/hwb_shell_host.c', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py',
-    'tools/tests/kernel_includes.py'])
+    'tools/tests/kernel_includes.py'],
+    basis=['HW_BASIC_DESIGN §2', 'HW_BASIC_DESIGN §3', 'HW_BASIC_DESIGN §4', 'HW_BASIC_DESIGN §7'],
+    env_limit='host shimでshellの特権境界と出力を確認するが、実MMIO faultとserial詰まりは再現しない。',
+)
 import json
 import re
 from argparse import Namespace

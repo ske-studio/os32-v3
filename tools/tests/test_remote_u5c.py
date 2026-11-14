@@ -15,7 +15,10 @@ UPDATE = ROOT / 'tools/systemd/update_host_agent.sh'
 CHECK = dict(name='remote-u5c', tier=1, needs=[], budget=5,
              covers=['tools/systemd/os32-host-agent@.service',
                      'tools/systemd/README.md', 'tools/systemd/update_host_agent.sh',
-                     'tools/tests/test_remote_u5c.py'])
+                     'tools/tests/test_remote_u5c.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+    full_only=True,
+)
 
 
 def test_update(path):

@@ -11,7 +11,9 @@ CHECK = dict(name='gf1-instmem-map-host', tier=1,
                      'tools/tests/pgalloc_host_fixture.h', 'tools/tests/paging_source.py',
                      'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
-             needs=[], budget=7.1)
+             needs=[], budget=7.1,
+    basis=['GF_GUARD_LIFETIME_DESIGN §2', 'GF_GUARD_LIFETIME_DESIGN §3', 'GF_GUARD_LIFETIME_DESIGN §7'],
+)
 import os
 from pathlib import Path
 import re

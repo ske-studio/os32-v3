@@ -22,7 +22,9 @@ CHECK = dict(name='hostsvc-open', tier=1, needs=[], budget=4.0, covers=[
     'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'])
+    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
+    basis=['NET_HOSTSVC_DESIGN §3'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('no-retry', 'goto open_probe;', 'if (0) { goto open_probe; } return VFS_ERR_STALE;'),

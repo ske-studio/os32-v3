@@ -9,7 +9,10 @@ CHECK = dict(name='gem-adapter-host', tier=2, budget=10, needs=[], covers=[
     'sdk/include/os32/os32_kapi_generated.h',
     'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ls.h',
-    'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h'])
+    'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h'],
+    basis=['AC-NET-1', 'AC-NET-2'],
+    pins=['LAN_BULK_DESIGN'],
+)
 import os
 from pathlib import Path
 import subprocess

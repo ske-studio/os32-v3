@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='lantrace', tier=1, needs=[], budget=12,
     covers=['userland/shell/rshell_lan.c', 'userland/shell/rshell.c',
-            'userland/gshell/src/lib.rs', 'tools/tests/test_lantrace.py'])
+            'userland/gshell/src/lib.rs', 'tools/tests/test_lantrace.py'],
+    kind='characterization',
+)
 import argparse
 from pathlib import Path
 import subprocess

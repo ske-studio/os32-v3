@@ -9,7 +9,9 @@ CHECK = dict(name='splash-v2-host', tier=1,
             'include/io.h', 'include/gfx_hal.h', 'include/config.h',
             'sdk/include/os32/os32_kapi_shared.h', 'fs/vfs.h', 'mm/kmalloc.h', 'include/kprintf.h', 'lib/kstring.h',
             'tools/tests/splash_v2_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.6)
+    needs=[], budget=3.6,
+    basis=['RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §4', 'RASTER_SPLASH_S5_DESIGN §8'],
+)
 import argparse
 import os
 from pathlib import Path

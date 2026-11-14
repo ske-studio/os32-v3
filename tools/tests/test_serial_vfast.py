@@ -16,7 +16,9 @@ I/O もタイマも触らないので模型は要らない。
 """
 CHECK = dict(name='serial-vfast-host', tier=1,
     covers=['include/time_units.h', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'tools/tests/serial_vfast_host.c', 'userland/shell/serial_watchdog.c', 'drivers/char/serial.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.2)
+    needs=[], budget=3.2,
+    kind='characterization',
+)
 
 from kernel_includes import include_flags
 import pathlib

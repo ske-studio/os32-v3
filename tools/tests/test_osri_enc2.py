@@ -7,7 +7,9 @@ CHECK = dict(name='osri-enc2', tier=1, needs=['make:osri-enc2-core'], budget=33.
                      'tools/osri_enc2_timing.py', 'tools/osri_enc2_dither.py',
                      'tools/osri_enc2_pack.py', 'tools/osri_enc2_decode.py',
                      'tools/osri_enc2_metrics.py', 'tools/osri_enc2_compare.py',
-                     'tools/img2osri.py'])
+                     'tools/img2osri.py'],
+    basis=['RASTER_SPLASH_ENC2_DESIGN'],
+)
 
 import argparse
 from dataclasses import replace

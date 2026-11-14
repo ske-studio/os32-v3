@@ -4,7 +4,9 @@ CHECK = dict(name='gfx2-sw-rop-host', tier=1,
             'mm/paging.h', 'lib/kstring.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_sw_rop_host.c', 'tools/tests/test_gfx2_sw_rop.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx) -> int:

@@ -8,7 +8,9 @@ CHECK = dict(name='sep5-sdk-host', tier=1, needs=[], budget=20,
             'build/programs.mk', 'build/sdk.mk',
             'sdk/rust/i686-os32-none.json', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c',
             'sdk/crt/syscalls.c', 'sdk/crt/help.c', 'userland/lib/rt/ls.c',
-            'tools/tests/test_sep5_sdk.py'])
+            'tools/tests/test_sep5_sdk.py'],
+    basis=['PPC_SEP5_DESIGN §2.3'],
+)
 import argparse
 import importlib.util
 import os

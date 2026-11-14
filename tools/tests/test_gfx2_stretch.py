@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-stretch-host', tier=1, needs=[], budget=5,
     covers=['gfx/v2/sw_stretch.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
             'include/**', 'mm/pgalloc.h', 'tools/tests/gfx2_stretch_host.c',
-            'tools/tests/test_gfx2_stretch.py', 'tools/tests/host32.py', 'lib/divdi3.c'])
+            'tools/tests/test_gfx2_stretch.py', 'tools/tests/host32.py', 'lib/divdi3.c'],
+    basis=['HAL_V2_DESIGN §3-3', 'HAL_V2_DESIGN §5-2'],
+)
 from pathlib import Path
 import argparse
 import subprocess

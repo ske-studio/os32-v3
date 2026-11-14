@@ -7,7 +7,9 @@ CHECK = dict(name='ledger-surface-map-host', tier=1, budget=4.4,
                      'tools/tests/pgalloc_host_fixture.h',
                      'tools/tests/host_arch/arch_io.h',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-                     'build/config.mk'], needs=[])
+                     'build/config.mk'], needs=[],
+    basis=['GF_GUARD_LIFETIME_DESIGN §2'],
+)
 from pathlib import Path
 import os
 import subprocess

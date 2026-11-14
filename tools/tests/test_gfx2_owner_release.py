@@ -8,7 +8,9 @@ CHECK = dict(name='gfx2-owner-release-host', tier=1, needs=[], budget=10,
             'arch/*/arch_copy.h', 'arch/*/arch_abi.h', 'mm/pgalloc.h',
             'mm/paging.h', 'include/appmem_types.h', 'sdk/include/os32/os32_gfx2.h',
             'tools/tests/gfx2_owner_release_host.c', 'tools/tests/test_gfx2_owner_release.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['HAL_V2_DESIGN §7-3', 'HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §7-5'],
+)
 from pathlib import Path
 import argparse
 import subprocess

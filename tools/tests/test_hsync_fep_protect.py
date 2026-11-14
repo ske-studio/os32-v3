@@ -3,7 +3,9 @@
 CHECK = dict(name='hsync-fep-protect', tier=1, needs=[], budget=3.4,
     covers=['exec/os32x_hdr.c', 'userland/system/hsync_protect.inc', 'userland/system/hsync.c',
             'tools/tests/hsync_fep_protect_host.c', 'tools/tests/host32.py',
-            'sdk/include/os32/os32_kapi_shared.h'])
+            'sdk/include/os32/os32_kapi_shared.h'],
+    basis=['DICT_META_DESIGN §6', 'DICT_META_DESIGN §9'],
+)
 import argparse
 import os
 from pathlib import Path

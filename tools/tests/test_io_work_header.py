@@ -2,7 +2,9 @@
 """A1 declaration/layout evidence only; no dispatcher implementation or stub."""
 CHECK = dict(name='io-work-header-host', tier=1, budget=10, needs=[], covers=[
     'tools/tests/test_io_work_header.py', 'tools/tests/host32.py',
-    'kernel/io_work.h', 'include/types.h', 'include/callconv.h'])
+    'kernel/io_work.h', 'include/types.h', 'include/callconv.h'],
+    basis=['IO_TIER_DESIGN §4'],
+)
 from pathlib import Path
 import subprocess
 import sys

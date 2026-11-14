@@ -14,7 +14,10 @@ CHECK = dict(name='gfx2-i2-host', tier=2, needs=['make:all'], budget=60,
             'exec/lease.*', 'exec/appslot.h', 'build/os32.ld',
             'userland/lib/gfx/**',
             'build/app.conf', 'build/programs.mk', 'userland/tests/gfx2_i1.c',
-            'userland/tests/gfx2_i2.c', 'userland/deploy.yaml'])
+            'userland/tests/gfx2_i2.c', 'userland/deploy.yaml'],
+    basis=['HAL_V2_DESIGN §13', 'HAL_V2_DESIGN §5-3'],
+    env_limit='fake GPUと固定時計でhw/sw混在submitを確認するが、実GPUのDMA完了遅延と競合は再現しない。',
+)
 
 def run(ctx):
     import subprocess

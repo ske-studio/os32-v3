@@ -5,7 +5,9 @@ import tempfile
 
 CHECK = dict(name='gfx-cursor-host', tier=1, needs=[], budget=5, covers=[
     'userland/gshell/src/cursor.rs', 'tools/tests/gfx_cursor_host.rs',
-    'tools/tests/test_gfx_cursor.py'])
+    'tools/tests/test_gfx_cursor.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3', 'GFX_ACCEL_HAL_DESIGN §8'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'userland/gshell/src/cursor.rs'
 MUTATIONS = (

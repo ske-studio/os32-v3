@@ -31,7 +31,9 @@ CHECK = dict(name='ppc-link-platform-host', tier=2, budget=10, needs=[], covers=
     'sdk/include/os32/os32_ls.h',
     'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_ver_info.h',
-    'tools/tests/host32.py'])
+    'tools/tests/host32.py'],
+    basis=['AC-SYNC-1', 'AC-SYNC-2', 'AC-NET-3', 'TICK_ARCH_DESIGN §2'],
+)
 import os
 from pathlib import Path
 import subprocess

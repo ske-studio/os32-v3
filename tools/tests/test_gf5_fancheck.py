@@ -92,7 +92,9 @@ CHECK = dict(name='gf5-fancheck', tier=1, needs=['make:build/out/geforce/geforce
                  'sdk/**',
                  'assets/fonts/**',
                  'tools/fetch_fonts.py',
-             ])
+             ],
+    basis=['GF_FEAT5_DESIGN'],
+)
 import subprocess
 import sys
 import test_gf5 as suite

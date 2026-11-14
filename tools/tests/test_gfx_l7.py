@@ -13,7 +13,9 @@ CHECK = dict(name='gfx-l7-host', tier=1, needs=[], budget=15, covers=[
     'userland/lib/tilemap/tilemap_internal.h', 'userland/lib/filer/libos32filer.h',
     'userland/lib/tilemap/libos32tilemap.h', 'userland/lib/gfx/**',
     'tools/tests/gfx_l7_host.c', 'tools/tests/test_gfx_l7.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 FILER = 'userland/lib/filer/filer_core.c'
 TILE = 'userland/lib/tilemap/tilemap_compose.c'

@@ -28,7 +28,9 @@ CHECK = dict(name='arch-compat-host', tier=2, budget=30, needs=[], covers=[
     'sdk/include/os32/os32_kapi_generated.h', 'include/memmap.h',
     'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py',
     'sdk/target_profile.py', 'sdk/kapi.json', 'kapi/kapi_generated.c',
-    'sdk/include/os32/os32_kapi_slots.h'])
+    'sdk/include/os32/os32_kapi_slots.h'],
+    basis=['ARCH_COMPAT_CONTRACT §4'],
+)
 import json
 import os
 from pathlib import Path

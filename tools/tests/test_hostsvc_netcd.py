@@ -12,7 +12,10 @@ CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
-    'lib/kstring.h', 'lib/kstring_asm.asm'])
+    'lib/kstring.h', 'lib/kstring_asm.asm'],
+    basis=['NET_HOSTSVC_DESIGN §4'],
+    env_limit='fake network/NIC/mediaでsession・世代・期限を確認するが、実ネットワークと実媒体の障害は再現しない。',
+)
 
 import argparse
 import os

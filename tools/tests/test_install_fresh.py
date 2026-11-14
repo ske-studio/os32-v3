@@ -12,7 +12,9 @@
 """
 CHECK = dict(name='install-fresh-host', tier=1,
     covers=['drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c'],
-    needs=[], budget=5.9)
+    needs=[], budget=5.9,
+    kind='characterization',
+)
 
 import pathlib
 import subprocess

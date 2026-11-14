@@ -9,7 +9,9 @@ CHECK = dict(name='ppc-stream-host', tier=1, needs=[], budget=15,
             'sdk/gen_kapi.py', 'sdk/kapi.json', 'sdk/kapi_abi_x86.py',
             'sdk/kapi_target_ppc.py', 'sdk/target_profile.py', 'arch/ppc/ppc_boot.h',
             'build/*.mk', 'build/**/*.mk', 'sdk/include/**', 'gfx/*.h',
-            'kernel/console/*.h', 'include/**', 'lib/kstring.h', 'lib/kstring_c.c'])
+            'kernel/console/*.h', 'include/**', 'lib/kstring.h', 'lib/kstring_c.c'],
+    basis=['PPC_FBCON_DESIGN §2', 'PPC_FBCON_DESIGN §6', 'AC-HOST-1'],
+)
 def run(ctx):
     import subprocess
     return subprocess.call(['python3','-B','tools/tests/test_ppc_stream.py'] +

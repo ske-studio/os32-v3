@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-services-host', tier=1,
     covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'tools/tests/ver_services_host.c', 'lib/kstring_asm.asm', 'include/types.h', 'tools/tests/test_ver_services.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    kind='characterization',
+)
 
 
 def run(ctx) -> int:

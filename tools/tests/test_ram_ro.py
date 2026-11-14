@@ -3,7 +3,9 @@ CHECK = dict(name='ram-ro-host', tier=1,
     covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'drivers/block/ram_ro.c', 'drivers/block/ram_ro.h',
             'tools/tests/ram_ro_host.c','drivers/base/dev.c', 'drivers/base/dev.h', 'include/boot_root.h',
             'tools/tests/ram_iso_host.c', 'tools/mkroot_image.py', 'fs/isofs/**', 'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c', 'include/types.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h'],
-    needs=['make:all'], budget=5)
+    needs=['make:all'], budget=5,
+    basis=['PPC_RAM_ROOT_W6_PLAN §2', 'PPC_RAM_ROOT_W6_PLAN §5', 'PPC_SHELL_DESIGN §8'],
+)
 
 import pathlib
 import subprocess

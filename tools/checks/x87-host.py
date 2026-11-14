@@ -4,7 +4,9 @@ CHECK = dict(
             'arch/ppc/arch_exec_storage.h', 'arch/ppc/arch_jmp_storage.h', 'exec/appslot.h', 'exec/exec.c',
             'exec/exec_launch.inc', 'exec/exec_schedule.inc', 'exec/exec_syscall.inc',
             'tools/tests/x87_host.c', 'tools/tests/test_x87.py', 'tools/tests/host32.py'],
-    needs=[], budget=2.6)
+    needs=[], budget=2.6,
+    kind='characterization',
+)
 
 
 def run(ctx) -> int:

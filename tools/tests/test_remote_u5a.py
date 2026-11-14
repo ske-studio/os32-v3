@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-u5a', tier=1, needs=[], budget=3,
              covers=['tools/host_agent_config.py',
                      'tools/systemd/host-agent.example.json',
-                     'tools/tests/test_remote_u5a.py'])
+                     'tools/tests/test_remote_u5a.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+)
 
 
 def test(path):

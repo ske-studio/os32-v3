@@ -1,7 +1,9 @@
 """Run the real IRQ0 branch as i386 NASM with host substitutes for I/O and frame."""
 CHECK = dict(name='tick-irq-host', tier=4, needs=[], budget=3,
     covers=['arch/x86/kernel/isr_stub.asm', 'tools/tests/tick_irq_host.c',
-            'tools/tests/test_tick_irq.py', 'tools/tests/host32.py'])
+            'tools/tests/test_tick_irq.py', 'tools/tests/host32.py'],
+    basis=['TICK_1KHZ_DESIGN', 'TICK_ARCH_DESIGN §5-3'],
+)
 from pathlib import Path
 import subprocess
 import sys

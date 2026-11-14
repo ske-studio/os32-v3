@@ -15,7 +15,9 @@ CHECK = dict(name='gfx-console-host', tier=1, needs=[], budget=20,
             'platform/powermac/pm_console.h', 'platform/powermac/rh_observe.h',
             'drivers/video/of_fb/**', 'drivers/video/pc98/backend_pc98.c',
             'drivers/video/kcg/kcg_module.h', 'gfx/v2/v1_shim.c',
-            'gfx/v2/enum.c', 'gfx/v2/caps.c', 'gfx/gfx_internal.h'])
+            'gfx/v2/enum.c', 'gfx/v2/caps.c', 'gfx/gfx_internal.h'],
+    basis=['HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §7-3', 'CONSOLE_DUAL_DESIGN §2-1'],
+)
 from pathlib import Path
 import argparse
 import tempfile

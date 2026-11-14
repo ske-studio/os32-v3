@@ -7,7 +7,10 @@ CHECK = dict(name='pcm-refill-host', tier=4, covers=[
     'tools/tests/pcm_refill_host.c', 'tools/tests/test_pcm_refill.py',
     'tools/tests/pcm_hostshim/io.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'include/pcm_contract.h',
-    'include/time_units.h', 'kernel/time/tick_clock.h'], needs=[], budget=3.0)
+    'include/time_units.h', 'kernel/time/tick_clock.h'], needs=[], budget=3.0,
+    kind='characterization',
+    pins=['AV_HAL_DESIGN'],
+)
 from pathlib import Path
 import subprocess
 import sys

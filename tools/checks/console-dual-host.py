@@ -8,7 +8,9 @@ CHECK = dict(name='console-dual-host', tier=1, needs=[], budget=8,
             'tools/tests/legacy_guest_fake.h', 'kernel/console/console_backend.h',
             'include/console.h', 'include/con_sink.h', 'include/legacy_guest.h',
             'gfx/v2/gfx2_int.h', 'include/gfx_hal.h', 'include/gfx_hal2.h',
-            'sdk/include/os32/os32_gfx2.h'])
+            'sdk/include/os32/os32_gfx2.h'],
+    basis=['CONSOLE_DUAL_DESIGN §2', 'CONSOLE_DUAL_DESIGN §4', 'CONSOLE_DUAL_DESIGN §8', 'GF_STOP_REF_DESIGN §4'],
+)
 
 
 def run(ctx):

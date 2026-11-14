@@ -8,7 +8,10 @@ CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
     'net/nic.h', 'net/host_mailbox.c', 'net/host_mailbox.h',
     'sdk/include/os32/os32_host_notice.h', 'mm/kmalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_init_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §3'],
+    pins=['LAN_BULK_DESIGN'],
+)
 import os
 from pathlib import Path
 import subprocess

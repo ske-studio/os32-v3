@@ -23,7 +23,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 # 次段で全 CHECK に出所を埋めた後、ここだけ True にして error にする。
-REQUIRE_EXPECTATION_SOURCE = False
+REQUIRE_EXPECTATION_SOURCE = True
 BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 # Build/toolchain inputs and infrastructure used across check recipes.

@@ -17,7 +17,10 @@ CHECK = dict(name='ppc-fb', tier=2, budget=900, needs=['make:kernel'], covers=['
     'boot/loader_fat_new.asm', 'build/core.yaml', 'build/os32.ld',
     'tools/check_artifacts.py', 'tools/deploy_manifests.py', 'tools/mkpkg.py',
     'tools/mkshlib.py', 'tools/tests/kernel_includes.py',
-    'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py'])
+    'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py'],
+    basis=['PPC_FBCON_DESIGN §2', 'PPC_FBCON_DESIGN §6'],
+    env_limit='QEMU mac99/TCGの画素を確認するが、実OFのpalette・stride・cache属性の差と実画面障害は再現しない。',
+)
 
 
 def run(ctx):

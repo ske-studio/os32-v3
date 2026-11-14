@@ -4,7 +4,9 @@ CHECK = dict(name='remote-x7', tier=1,
             'tools/tests/con_sink_host.c', 'tools/tests/test_con_sink.py',
             'tools/tests/test_remote_x7.py', 'kernel/console/console.c',
             'kernel/port_service.c', 'platform/pc98/console.c',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'], needs=[], budget=3.5)
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'], needs=[], budget=3.5,
+    basis=['LAN_OPERATOR_DESIGN §3', 'KAPI_SPEC'],
+)
 
 import argparse
 import pathlib

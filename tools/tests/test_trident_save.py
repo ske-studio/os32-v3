@@ -15,7 +15,9 @@ CHECK = dict(name='trident-save', tier=1, needs=[], budget=18.5,
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
                      'userland/tests/hw/trident_mode.hwb', 'build/config.mk',
                      'drivers/char/serial.h', 'lib/serial_diag.h',
-                     'include/types.h', 'include/memmap.h', 'gfx/palette.h'])
+                     'include/types.h', 'include/memmap.h', 'gfx/palette.h'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 import os
 from pathlib import Path

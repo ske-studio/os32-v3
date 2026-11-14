@@ -10,7 +10,9 @@ CHECK = dict(name='gf-guard-imports-host', tier=1,
             'mm/paging.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'sdk/kapi.json',
             'tools/hwdev_layout.json', 'tools/mkmod.py', 'tools/module_schema.py',
             'tools/prototypes/sqlite_imports.def', 'build/out/geforce/*', 'build/out/kernel.elf'],
-    needs=['make:all'], budget=3.3)
+    needs=['make:all'], budget=3.3,
+    kind='characterization',
+)
 import json
 import os
 from pathlib import Path

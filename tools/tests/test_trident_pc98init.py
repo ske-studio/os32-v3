@@ -15,7 +15,9 @@ CHECK = dict(name='trident-pc98init', tier=1, needs=[], budget=7.5,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'include/types.h', 'include/memmap.h',
             'gfx/palette.h', 'include/pegc.h',
-            'userland/tests/hw/trident_mode.hwb'])
+            'userland/tests/hw/trident_mode.hwb'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3', 'TRIDENT_FULL_DESIGN §2'],
+)
 import argparse
 import os
 from pathlib import Path

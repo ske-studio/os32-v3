@@ -5,7 +5,9 @@ CHECK = dict(name='gf-g8-host', tier=1, needs=[], budget=5,
             'tools/tests/gf_g8_host.c', 'tools/tests/test_gf_g8.py',
             'tools/tests/gf_accel_host.h', 'tools/tests/gf_command_runtime_host.h',
             'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    kind='characterization',
+)
 from pathlib import Path
 import argparse
 import subprocess

@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-gart-host', tier=1, needs=[], budget=5,
     covers=['gfx/v2/gart.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal2.h',
             'include/dma_contract.h', 'mm/pgalloc.h', 'tools/tests/gfx2_gart_host.c',
-            'tools/tests/test_gfx2_gart.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gfx2_gart.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §8'],
+)
 from pathlib import Path
 import argparse
 import subprocess

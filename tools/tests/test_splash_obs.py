@@ -11,7 +11,9 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
             'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
-    needs=[], budget=9.2)
+    needs=[], budget=9.2,
+    basis=['RASTER_SPLASH_PL_DESIGN', 'RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §3', 'RASTER_SPLASH_S5_DESIGN §4'],
+)
 
 import argparse
 import os

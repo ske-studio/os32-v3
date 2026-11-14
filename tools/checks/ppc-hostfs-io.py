@@ -10,7 +10,10 @@ CHECK = dict(name='ppc-hostfs-io', tier=1, budget=30, needs=[],
                      'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c',
                      'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_persistent.c',
                      'fs/vfs.c', 'fs/vfs_fd.c', 'lib/kstring_c.c',
-                     'lib/crc32.c', 'lib/divdi3.c'])
+                     'lib/crc32.c', 'lib/divdi3.c'],
+    basis=['AC-SFS-1'],
+    pins=['LAN_OPERATOR_DESIGN', 'LAN_BULK_DESIGN'],
+)
 
 
 def run(ctx):

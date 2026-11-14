@@ -20,7 +20,9 @@ sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-u5e', tier=1, needs=[], budget=10,
              covers=['tools/remote_transport.py', 'tools/host_agent_config.py',
                      'tools/systemd/host-agent.example.json',
-                     'tools/tests/test_remote_u5e.py'])
+                     'tools/tests/test_remote_u5e.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+)
 
 
 def test(path):

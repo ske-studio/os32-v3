@@ -11,7 +11,9 @@ CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
             'kernel/module/debug_probe.c', 'kdebug/kdebug_main.c',
             'platform/pc98/pit.c', 'arch/x86/kernel/mtrr_wc.c',
             'drivers/net/e82557/e82557.c',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['TICK_1KHZ_DESIGN'],
+)
 import os
 from pathlib import Path
 import subprocess

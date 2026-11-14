@@ -15,7 +15,9 @@ CHECK = dict(name='remote-g1', tier=1, needs=[], budget=10, covers=[
     'userland/gshell/build.rs', 'include/remote_control.h', 'net/link.h',
     'exec/shell_service.h', 'sdk/include/os32/os32_gui_shared.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/rust/os32api/**',
-    'tools/tests/os32api_host.py', 'tools/tests/test_remote_g1.py'])
+    'tools/tests/os32api_host.py', 'tools/tests/test_remote_g1.py'],
+    basis=['LAN_OPERATOR_DESIGN'],
+)
 
 
 def main():

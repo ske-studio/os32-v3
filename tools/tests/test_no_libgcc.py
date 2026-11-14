@@ -3,7 +3,9 @@ CHECK = dict(name='no-libgcc', tier=1,
     covers=['build/*.mk', 'Makefile', 'build/out/**'],
     # all owns the normal kernel and boot media. Requesting kernel again
     # after all would FORCE-relink it and stale those freshly built media.
-    needs=['make:all', 'make:kernel-r1', 'make:boot-debug'], budget=2.7)
+    needs=['make:all', 'make:kernel-r1', 'make:boot-debug'], budget=2.7,
+    basis=['[L1]'],
+)
 
 import argparse
 import os

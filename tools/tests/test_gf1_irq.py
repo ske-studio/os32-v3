@@ -8,7 +8,9 @@ CHECK = dict(name='gf1-irq-host', tier=1,
             'include/pci_dev_contract.h', 'tools/tests/gf1_irq_host.c',
             'tools/tests/test_gf1_irq.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.7)
+    needs=[], budget=3.7,
+    basis=['GF_FEAT1_DESIGN §5'],
+)
 
 from pathlib import Path
 import os

@@ -2,7 +2,9 @@
 """Exercise root images through the ISO9660 directory records."""
 CHECK = dict(name='mkroot-image-host', tier=1, needs=['make:all'], budget=10,
     covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'tools/mkroot_image.py', 'tools/tests/test_mkroot_image.py',
-            'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml'])
+            'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml'],
+    basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §4', 'PPC_SHELL_DESIGN §5', 'PPC_SHELL_DESIGN §6', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_DESIGN §8', 'PPC_SHELL_DESIGN §11'],
+)
 
 from pathlib import Path
 import shutil

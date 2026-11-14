@@ -185,6 +185,10 @@ class RunnerTest(unittest.TestCase):
             updater.measurements([one])
 
     def setUp(self):
+        # Legacy fixtures exercise warning mode; strict mode is tested explicitly.
+        source_mode = patch.object(R, 'REQUIRE_EXPECTATION_SOURCE', False)
+        source_mode.start()
+        self.addCleanup(source_mode.stop)
         self.tmp = tempfile.TemporaryDirectory(prefix='runner-fixture-')
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
