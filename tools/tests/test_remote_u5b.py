@@ -25,7 +25,7 @@ from pathlib import Path
 log = Path(os.environ['FAKE_LOG'])
 name = Path(sys.argv[0]).stem
 def record(event):
-    with log.open('a') as f: f.write(name + ':' + event + ':' + str(os.getpid()) + ':' + repr(sys.argv[1:]) + '\\n')
+    with log.open('a') as f: f.write(name + ':' + event + ':' + str(os.getpid()) + ':' + str(time.monotonic()) + ':' + repr(sys.argv[1:]) + '\\n')
 def stop(sig, frame):
     record('stop')
     sys.exit(0)
@@ -81,10 +81,15 @@ def test(source):
                 if duplicate.poll() is None:
                     duplicate.terminate()
                 duplicate.communicate(timeout=8)
+            # A child failing immediately must wait at least two seconds
+            # between launches, while the other children stay alive.
             pid = int(first['lan_bridge'].split(':')[2])
             os.kill(pid, signal.SIGKILL)
             wait_for(lambda: len([line for line in lines() if line.startswith('lan_bridge:start:')]) == 2,
                      'child not restarted')
+            starts = [float(line.split(':')[3]) for line in lines()
+                      if line.startswith('lan_bridge:start:')]
+            assert starts[1] - starts[0] >= 1.9, 'restart storm'
         finally:
             proc.terminate()
             proc.communicate(timeout=20)
@@ -97,7 +102,10 @@ def test(source):
         try:
             import host_agent_service as service_module
             cmds = service_module.commands(config, str(config_path))
-            assert len(cmds) == 2 and '--allow-write' not in cmds[1]
+            assert len(cmds) == 1 and 'host_agent.py' in cmds[0][1], 'np21w raw child'
+            config['backend'] = 'bridge'
+            cmds = service_module.commands(config, str(config_path))
+            assert len(cmds) == 3 and '--allow-write' not in cmds[2]
         finally:
             sys.path.pop(0)
     print('PASS remote-u5b')
@@ -146,6 +154,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ('RESTART_MIN = 2.0', 'RESTART_MIN = 0.0', 'restart storm'),
+            ("if config['backend'] == 'bridge':", 'if True:', 'np21w raw child'),
             ('fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)', 'pass', 'duplicate lock accepted'),
             ('if child.poll() is not None:', 'if False:', 'child not restarted'),
         ]

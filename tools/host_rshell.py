@@ -39,6 +39,12 @@ class Operator:
         if self.pending is not None and self.pending['boot'] != boot:
             self.pending['state'] = 'UNKNOWN'
         self.ready = dict(boot=boot, mode=mode, last_id=last_id, state=state)
+        # READY cannot supply a missing result. A guest that no longer reports
+        # this execution leaves it UNKNOWN until OUT or an explicit resume.
+        if (self.pending is not None and self.pending['state'] == 'running' and
+                not self.pending.get('accepted') and
+                (last_id != self.pending['id'] or state != 'running')):
+            self.pending['state'] = 'UNKNOWN'
         if (self.pending is not None and self.pending.get('accepted') and
                 self.pending['boot'] == boot and mode == 'gui'):
             self.pending['gui_ready'] = True

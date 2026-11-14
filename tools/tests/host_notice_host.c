@@ -14,6 +14,9 @@ void *kmemcpy(void *d, const void *s, u32 n) { u8 *p = d; const u8 *q = s; while
 #include "net/host_mailbox.c"
 static u32 capacity;
 static int identity = 1;
+static int direct_range = 1, direct_checks, caller_copies;
+int ring3_user_range_ok(u32 p, u32 n)
+{ ++direct_checks; return direct_range && p && n == sizeof(HostNotice); }
 int caller_access_get(struct caller_access *c) { (void)c; return identity; }
 int check_caller_write_range(const struct caller_access *c, void *p, u32 n)
 { (void)c; return p && n <= capacity; }
@@ -21,6 +24,7 @@ int copy_to_caller(const struct caller_access *c, void *d, const void *s, u32 n)
 {
     int rc;
     (void)c;
+    ++caller_copies;
     hs_copyout_run_hook();
     if (hs_failure_take("copyout", &rc)) return 0;
     kmemcpy(d, s, n);
@@ -43,8 +47,18 @@ static int suite(void)
     capacity--;
     CHECK(kapi_host_notice_read(7, 2, &out) == OS32_ERR_INVAL);
     capacity++;
+    /* CPL0 resident shell: no saved USER frame or WM scope. Validate before
+     * staging, then copy the real reserved-service notice exactly once. */
     identity = 0;
+    direct_range = 0;
     CHECK(kapi_host_notice_read(7, 2, &out) == OS32_ERR_INVAL);
+    direct_range = 1;
+    CHECK(host_mailbox_put(7, 65534, 1, "00000001 ver\n", 13, 0) == 0);
+    CHECK(kapi_host_notice_read(7, 65534, &out) == 0);
+    CHECK(out.service == 65534 && out.length == 13 && out.kind == 1);
+    CHECK(out.data[9] == 'v' && out.data[12] == '\n');
+    CHECK(direct_checks == 2 && caller_copies == 0);
+    CHECK(kapi_host_notice_read(7, 65534, &out) == OS32_ERR_AGAIN);
     identity = 1;
     CHECK(kapi_host_notice_read(0, 2, &out) == OS32_ERR_INVAL);
     CHECK(kapi_host_notice_read(7, 0, &out) == OS32_ERR_INVAL);
@@ -52,13 +66,13 @@ static int suite(void)
     hs_fail("copyout", -1);
     CHECK(kapi_host_notice_read(7, 2, &out) == OS32_ERR_INVAL);
     CHECK(kapi_host_notice_read(0, 65535, &out) == 0 && out.serial == 1);
-    CHECK(kapi_host_notice_serial() == 1);
+    CHECK(kapi_host_notice_serial() == 2);
     CHECK(kapi_host_notice_read(7, 2, &out) == OS32_ERR_AGAIN);
     for (int i = 0; i < 64; i++) CHECK(host_mailbox_put(7, 2, 1, 0, 0, 0) == 0);
     hs_copyout_hook(overflow);
-    CHECK(kapi_host_notice_read(7, 2, &out) == 0 && out.serial == 2);
     CHECK(kapi_host_notice_read(7, 2, &out) == 0 && out.serial == 3);
-    CHECK(kapi_host_notice_serial() == 66 && hs_if());
+    CHECK(kapi_host_notice_read(7, 2, &out) == 0 && out.serial == 4);
+    CHECK(kapi_host_notice_serial() == 67 && hs_if());
     return 0;
 }
 void entry(void) { int rc = suite(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

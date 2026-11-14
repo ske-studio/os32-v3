@@ -16,7 +16,7 @@ CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'sdk/kapi.json', 'sdk/include/os32/os32_kapi_generated.h',
     'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs',
     'exec/exec_kapi_init.inc',
-    'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
+    'kapi/range_internal.h', 'exec/exec.h', 'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
     'net/host_mailbox.h', 'include/redir_access.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/host_notice_host.c', 'tools/tests/hostsvc_fixture.c',
@@ -25,8 +25,13 @@ CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('copy-failure-consumes', '        return OS32_ERR_INVAL;\n    host_mailbox_commit',
-     '        host_mailbox_commit(notice.host_generation, notice.serial);\n    host_mailbox_commit'),
+    ('resident-caller-rejected', 'managed = caller_access_get(&caller);',
+     'managed = caller_access_get(&caller); if (!managed) return OS32_ERR_INVAL;'),
+    ('resident-range-skipped', ': !kapi_user_range_ok(out, sizeof(*out))', ': (!kapi_user_range_ok(out, sizeof(*out)) && 0)'),
+    ('resident-copy-skipped', 'else kmemcpy(out, &notice, sizeof(notice));',
+     'else (void)notice;'),
+    ('copy-failure-consumes', '            return OS32_ERR_INVAL;\n    } else',
+     '            (void)0;\n    } else'),
     ('wrong-token-generation', 'host_mailbox_commit(notice.host_generation, notice.serial);',
      'host_mailbox_commit(generation, notice.serial);'),
     ('serial-constant', 'return host_mailbox_latest_serial();',

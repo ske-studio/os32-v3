@@ -90,7 +90,18 @@ def test(path):
     sock.close()
     pump()
     assert len(notify.sent) == 2, 'disconnect replayed operation'
-    operator.unknown()
+    # A nonblocking result query does not expire an operation.
+    sock = connect()
+    send(dict(op='result', id=ident, wait_ms=0))
+    assert receive()['state'] == 'pending'
+    # Expiry must survive a CLI disconnect just before its result deadline.
+    send(dict(op='result', id=ident, wait_ms=1000))
+    deadline = time.monotonic() + 2
+    sock.close()
+    pump()
+    server.poll(deadline)
+    assert operator.pending['state'] == 'UNKNOWN', 'result timeout left running'
+    assert operator.ready is None, 'timeout reused old READY'
     sock = connect()
     pump()
     send(dict(op='submit', mode='cui', line='again'))
@@ -98,6 +109,17 @@ def test(path):
     assert operator.accept_ready(7, 1, boot, 'cui', ident, 'done')
     send(dict(op='resume'))
     assert receive()['ok']
+    # A connected long poll returns UNKNOWN at its deadline. A fresh READY
+    # then allows the same ID's delayed OUT, without executing again.
+    send(dict(op='submit', mode='cui', line='ver'))
+    ident = receive()['id']
+    send(dict(op='result', id=ident, wait_ms=1000))
+    server.poll(time.monotonic() + 2)
+    assert receive()['state'] == 'unknown', 'result deadline response pending'
+    assert operator.accept_ready(7, 1, boot, 'cui', ident, 'done')
+    assert operator.accept_output(7, 1, boot, ident, 0, body, len(body), 'cui')
+    send(dict(op='result', id=ident, wait_ms=0))
+    assert receive()['complete'] and len(notify.sent) == 3
     os.write(sock.fileno(), struct.pack('!I', 1) + b'{')
     assert receive()['error'] == 'BAD_REQUEST'
     os.write(sock.fileno(), struct.pack('!I', mod.RECORD_MAX + 1))
@@ -117,6 +139,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("now >= pending.get('result_deadline', float('inf'))", 'False',
+             'result timeout left running'),
             ('if size > RECORD_MAX:', 'if size > RECORD_MAX + 1:', 'oversize accepted'),
             ("client['socket'].close()", "client['socket'].close()\n            if self.operator.pending:\n                self.operator.notify.notify_number(0, 0, b'replay')", 'disconnect replayed operation'),
         ]

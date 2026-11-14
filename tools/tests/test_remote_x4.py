@@ -80,6 +80,25 @@ def test(path):
         pass
     else:
         raise AssertionError('id wrapped')
+    # Periodic READY reconciles pending work but never fabricates a result.
+    for last_id, state in [('none', 'idle'), ('00000001', 'done'),
+                           ('00000000', 'done')]:
+        n = Notify()
+        op = mod.Operator(n)
+        op.session_start(1)
+        assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+        ident = op.submit('cui', 'ver', None)
+        assert op.accept_ready(42, 1, BOOT, 'cui', ident, 'running')
+        assert op.pending['state'] == 'running'
+        assert op.accept_ready(42, 1, BOOT, 'cui', last_id, state)
+        assert op.pending['state'] == 'UNKNOWN', 'READY left running'
+        assert op.take_result() is None and len(n.sent) == 1
+        assert op.accept_output(42, 1, BOOT, ident, 0, body, len(body), 'cui')
+        assert op.take_result()['result'] == body
+        op.submit('cui', 'ver', None)
+        assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+        op.resume()
+        assert op.pending is None and len(n.sent) == 2
     print('PASS remote-x4')
 
 
@@ -92,6 +111,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("(last_id != self.pending['id'] or state != 'running')",
+             'False', 'READY left running'),
             ("if self.pending is not None:\n            raise RuntimeError('busy')", "if False:\n            raise RuntimeError('busy')", 'busy sent'),
             ('generation != self.generation or session != self.session or session is None or', 'False or session != self.session or session is None or', 'old generation accepted'),
             ("if not body.endswith(b'\\x04'):", "if False:", 'missing EOT accepted'),

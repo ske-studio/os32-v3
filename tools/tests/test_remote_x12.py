@@ -59,8 +59,20 @@ def test(path):
          patch.object(sys, 'stdout', out), patch.object(sys, 'stderr', io.StringIO()):
         fake.result = {'state': 'serial'}
         assert mod.main(['cmd', 'ver']) == 0 and serial_calls == ['ver']
+        for tail in (['ls', '-l', '/usr/bin'], ['--', 'ls', '-l', '/usr/bin'],
+                     ['echo', '--timeout', '3']):
+            try:
+                assert mod.main(['cmd', *tail]) == 0
+            except SystemExit:
+                raise AssertionError('command options consumed')
+            expected = ' '.join(tail[1:] if tail[0] == '--' else tail)
+            assert serial_calls[-1] == expected, 'command options consumed'
+        serial_calls[:] = ['ver']
         fake.result = {'state': 'unknown'}
-        rc = mod.main(['cmd', 'ver'])
+        try:
+            rc = mod.main(['cmd', 'ver'])
+        except SystemExit:
+            raise AssertionError('command options consumed')
         assert serial_calls == ['ver'], 'submit fell back to serial'
         assert rc != 0, 'unknown returned success'
         fake.result = {'ok': True, 'state': 'done', 'complete': True,
@@ -84,6 +96,7 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ('nargs=argparse.REMAINDER', "nargs='*'", 'command options consumed'),
             ("print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)\n            return 1",
              "print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)\n            return 0", 'unknown returned success'),
             ("result.get('state') == 'serial' and args.transport == 'auto'",

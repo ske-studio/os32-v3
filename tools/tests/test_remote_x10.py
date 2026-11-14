@@ -45,6 +45,7 @@ def main():
         case(source, True)
         if args.mutate:
             for name, old, new in [
+                ('INVAL keeps READY', 'rc == OS32_ERR_STALE || rc == OS32_ERR_INVAL', 'rc == OS32_ERR_STALE'),
                 ('duplicate ID executes', 'if (have_id && id <= last_id)', 'if (have_id && id < last_id)'),
                 ('drop sent as zero', 'id, dropped, (unsigned int)result_len', 'id, dropped * 0, (unsigned int)result_len'),
                 ('missing EOT', 'result[result_len++] = 0x04;', 'result[result_len++] = 0x00;'),

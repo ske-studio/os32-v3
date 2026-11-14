@@ -12,6 +12,7 @@ import time
 from host_agent_config import load_config
 
 TOOLS = Path(__file__).resolve().parent
+RESTART_MIN = 2.0
 
 
 def commands(config, config_path):
@@ -19,11 +20,11 @@ def commands(config, config_path):
     if config['backend'] == 'bridge':
         result.append([sys.executable, str(TOOLS / 'lan_bridge.py'), '--iface',
                        config['iface'], '--connect', config['frame-endpoint']])
-    lanfs = [sys.executable, str(TOOLS / 'lanfs_host.py'), '--iface', config['iface'],
-             '--root', config['root'], '--peer', config['peer']]
-    if config['allow-write']:
-        lanfs += ['--allow-write', '/']
-    result.append(lanfs)
+        lanfs = [sys.executable, str(TOOLS / 'lanfs_host.py'), '--iface', config['iface'],
+                 '--root', config['root'], '--peer', config['peer']]
+        if config['allow-write']:
+            lanfs += ['--allow-write', '/']
+        result.append(lanfs)
     return result
 
 
@@ -44,14 +45,15 @@ def run(config, config_path, lock_dir):
             for command in commands(config, config_path):
                 if stopping:
                     break
-                children.append((command, subprocess.Popen(command)))
+                children.append((command, subprocess.Popen(command), time.monotonic()))
             while not stopping:
-                for index, (command, child) in enumerate(children):
+                for index, (command, child, started) in enumerate(children):
                     if child.poll() is not None:
-                        children[index] = (command, subprocess.Popen(command))
+                        if time.monotonic() - started >= RESTART_MIN:
+                            children[index] = (command, subprocess.Popen(command), time.monotonic())
                 time.sleep(0.2)
         finally:
-            for _, child in reversed(children):
+            for _, child, _ in reversed(children):
                 if child.poll() is None:
                     child.terminate()
                     try:

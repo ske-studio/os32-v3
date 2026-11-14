@@ -145,6 +145,13 @@ class OperatorSocket:
             if client['wait'] is not None:
                 raise ValueError('request already waiting')
             client['wait'] = (op, req.get('id'), time.monotonic() + wait / 1000)
+            pending = self.operator.pending
+            if (op == 'result' and wait > 0 and pending is not None and
+                    pending['id'] == req['id'] and pending['state'] == 'running'):
+                # Keep the expiry with the operation even if the CLI disconnects
+                # before the reply. A zero wait remains a nonblocking query.
+                pending['result_deadline'] = min(pending.get('result_deadline', float('inf')),
+                                                 client['wait'][2])
             self._complete_wait(client, time.monotonic())
         elif op == 'resume':
             try:
@@ -158,6 +165,7 @@ class OperatorSocket:
             self._send(client, dict(ok=True))
 
     def _complete_wait(self, client, now):
+        self._expire_result(now)
         wait = client['wait']
         if wait is None:
             return
@@ -184,7 +192,14 @@ class OperatorSocket:
         client['wait'] = None
         self._send(client, response)
 
+    def _expire_result(self, now):
+        pending = self.operator.pending
+        if (pending is not None and pending['state'] == 'running' and
+                now >= pending.get('result_deadline', float('inf'))):
+            self.operator.unknown()
+
     def poll(self, now):
+        self._expire_result(now)
         for fd, client in list(self.clients.items()):
             self._complete_wait(client, now)
             self._flush(fd, client)

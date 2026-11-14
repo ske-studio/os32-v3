@@ -226,7 +226,7 @@ int rsh_lan_poll(void)
     if (!ready) return OS32_ERR_AGAIN;
     rc = g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice);
     if (rc) {
-        if (rc == OS32_ERR_STALE) ready = 0;
+        if (rc == OS32_ERR_STALE || rc == OS32_ERR_INVAL) ready = 0;
         return rc;
     }
     if (notice.host_generation != generation || notice.service != REMOTE_SVC_RSHELL)

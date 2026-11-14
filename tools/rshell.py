@@ -55,7 +55,7 @@ def main(argv=None):
     action.add_argument('--probe', action='store_true')
     action.add_argument('--resume', action='store_true')
     parser.add_argument('mode', nargs='?', choices=('cmd',))
-    parser.add_argument('line', nargs='*')
+    parser.add_argument('line', nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.timeout <= 0 or (args.mode is None and args.line):
         parser.error('invalid timeout or command')

@@ -176,6 +176,11 @@ int main(void)
     queue(3, "bad\033"); CHECK(rsh_lan_poll() == OS32_ERR_INVAL);
     queue(3, "echo good"); begin_error = OS32_ERR_BUSY;
     CHECK(rsh_lan_poll() == OS32_ERR_BUSY); CHECK(executes == 2); begin_error = 0;
+    /* INVAL invalidates READY and backs off until the next announcement. */
+    notice_error = OS32_ERR_INVAL; CHECK(rsh_lan_poll() == OS32_ERR_INVAL);
+    CHECK(rsh_lan_poll() == OS32_ERR_AGAIN);
+    notice_error = 0;
+    next_ready();
     /* Same generation across reconnect preserves the ID. */
     notice_error = OS32_ERR_STALE; CHECK(rsh_lan_poll() == OS32_ERR_STALE);
     notice_error = 0; next_ready(); queue(2, "duplicate");
