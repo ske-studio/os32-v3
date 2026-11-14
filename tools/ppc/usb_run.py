@@ -12,6 +12,7 @@ import tempfile
 import time
 
 from kboot_accept import build
+from run import CriterionFailure
 from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, PREFIX
 
 # Keep TB reads and OHCI timers on instruction-counted virtual time. With
@@ -52,7 +53,6 @@ PROBE = r"""
 #include "kernel_tick.h"
 #include "usb_platform.h"
 #include "kprintf.h"
-int usb_accept_wrong_clock;
 static int usb_probe_input(void)
 {
     static u32 start, stalled, returned;
@@ -61,9 +61,8 @@ static int usb_probe_input(void)
     if (!start) start = now;
     if (!stalled && (u32)(now - start) >= 3000000) {
         stalled = 1;
-        usb_accept_wrong_clock = 1;
-        /* Input boundary of a real USER syscall: EE=0 for one second.
-         * Returning a newline lets the pending DEC run on syscall return. */
+        /* AC-CTX-1/6: a real USER syscall stays FG1 during this one-second
+         * input poll; DEC delivery must continue before syscall return. */
         u32 ticks = tick_count;
         for (u32 i = 0; i < 10; i++) usbp_udelay(100000);
         kprintf(7, "USB STALL ticks=%u\n", (u32)(tick_count - ticks));
@@ -85,21 +84,15 @@ static int usb_probe_input(void)
 """
 
 
-def mutation(work, mode, after_stall=False):
-    src = 'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c'
+def mutation(work, mode):
+    src = ('arch/ppc/kernel_trap.c' if mode == 'syscall-ee' else
+           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c')
     content = (ROOT/src).read_text()
     before, after = {
+        'syscall-ee': ('            ppc_enable();', '            /* mutation: no syscall enable */'),
         'no-service': ('    usb_service();', '    /* mutation: omit USB service */'),
         'invert-key': ('pm_input_usb_key(src, sc, down);', 'pm_input_usb_key(src, sc, !down);'),
-        'tick-clock': ('return (u32)(tb() / (tb_frequency / 1000u));', 'return tick_clock_ms();'),
     }[mode]
-    if mode == 'tick-clock' and after_stall:
-        # Activate at the designated EE=0 stall, after healthy HID startup.
-        # A live FB makes USER startup itself long enough to expose the wrong
-        # clock; that earlier death would miss this probe's intended boundary.
-        after = ('extern int usb_accept_wrong_clock;\n'
-                 '    return usb_accept_wrong_clock ? tick_clock_ms() : '
-                 '(u32)(tb() / (tb_frequency / 1000u));')
     require(content.count(before) == 1, 'unique USB mutation anchor')
     dest = work/(mode+'-'+Path(src).name)
     dest.write_text(content.replace(before, after))
@@ -128,7 +121,7 @@ def settings(work, mode):
         dest.write_text(content)
         result += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(dest)]
     if mode != 'normal':
-        src, dest = mutation(work, mode, after_stall=True)
+        src, dest = mutation(work, mode)
         result += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(dest)]
     else:
         # Normal stall acceptance also observes the real sh execution result.
@@ -138,6 +131,7 @@ def settings(work, mode):
 
 
 def accept(elf, cpu, out, mode):
+    while os.getloadavg()[0] >= 4: time.sleep(5)
     out.mkdir()
     cd = out/'cd'; cd.mkdir()
     shutil.copyfile(elf, cd/'PPCKERN.ELF')
@@ -165,12 +159,8 @@ def accept(elf, cpu, out, mode):
                 ready = 'sh> ' in (stream_payload(text) if mode == 'normal' else text)
                 keyboard = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=01', text)
                 mouse = re.search(r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02', text)
-                # Clock-negative input is sent only after its explicit HC clock
-                # fault: a final in-flight HID make before the clock check is
-                # valid and must not make the negative meter timing-dependent.
                 if (phase == 0 and ready and ((keyboard and mouse) or mode == 'no-service')
-                        and 'USB STALL END' in text
-                        and (mode != 'tick-clock' or 'usb: HC dead why=2' in text)):
+                        and 'USB STALL END' in text):
                     q.call('send-key', {'keys': [{'type': 'qcode', 'data': 'a'}], 'hold-time': 100})
                     phase = 1; sent_at = time.monotonic()
                 elif phase == 1 and time.monotonic()-sent_at > .4:
@@ -215,7 +205,7 @@ def accept(elf, cpu, out, mode):
                         time.sleep(.01)
                         continue
                     validate(text, serial(b), True)
-                    require(ready and phase == 6 and 'USB STALL END' in text and 'USB STALL ticks=0' in text and 'USB HC bdf=' in text and 'USB TAKEOVER quiet' in text,
+                    require(ready and phase == 6 and 'USB STALL END' in text and re.search(r'USB STALL ticks=(?:9[0-9]|10[0-9]|110)\r?\n', text) and 'USB HC bdf=' in text and 'USB TAKEOVER quiet' in text,
                             'USB startup/reached markers: '+text)
                     keys = [(int(sc, 16), int(down)) for sc, down in
                             re.findall(r'USB KEY src=1 sc=([0-9a-f]+) down=(\d)', text)]
@@ -225,10 +215,7 @@ def accept(elf, cpu, out, mode):
                         for sc in [0x12,0x2b,0x22,0x18,0x34,0x22,0x17,0x1c]:
                             expected += [(sc,1),(sc,0)]
                     expected += [(0x1d,1)]
-                    if mode == 'tick-clock':
-                        require(keyboard and mouse and not keys and 'usb: HC dead why=2' in text,
-                                'tick-clock exact HC clock death after EE=0 stall: '+text)
-                    elif mode == 'no-service':
+                    if mode == 'no-service':
                         require(not keyboard and not mouse and not keys and 'USB MOUSE' not in text,
                                 'no-tick exact missing enumeration/input verdict')
                     else:
@@ -238,7 +225,7 @@ def accept(elf, cpu, out, mode):
                         if mode == 'normal':
                             cooked = stream_payload(text).replace('\r','')
                             require('\nhi\nsh> ' in cooked and cooked.count('sh> ') >= 3,
-                                    'real USB echo hi after EE=0 stall: '+repr(cooked))
+                                    'real USB echo hi after FG1 stall: '+repr(cooked))
                             (out/'stream.txt').write_text(cooked)
                         require('USB MOUSE src=1 dx=12 dy=-7 b=1' in text and
                                 'USB MOUSE src=1 dx=0 dy=0 b=0' in text, 'relative mouse/buttons: '+text)
@@ -329,6 +316,7 @@ def product_settings(work, mode, late=False):
 
 def product_accept(elf, cpu, out, mode, late=False):
     """Real sh/input; late observes three seconds inside the startup wait."""
+    while os.getloadavg()[0] >= 4: time.sleep(5)
     out.mkdir()
     cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
     iso = out/'boot.iso'
@@ -459,6 +447,7 @@ def product_accept(elf, cpu, out, mode, late=False):
                 except subprocess.TimeoutExpired: p.kill(); p.wait()
 
 def lan_accept(elf, cpu, out, mode):
+    while os.getloadavg()[0] >= 4: time.sleep(5)
     # Reuse S-D's real host/transport and FS_REQ drop boundary.
     from sd_run import Session, result
 
@@ -483,55 +472,41 @@ def lan_accept(elf, cpu, out, mode):
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
         deadline = time.monotonic()+10
         while 'protocol=02' not in serial(s.a) or 'protocol=01' not in serial(s.a):
-            if mode != 'normal' and 'usb: HC dead why=2' in serial(s.a):
-                # A timeout alone is never RED: require the exact clock fault
-                # after HC startup, and prove the LAN sh remains responsive.
-                require('USB HC bdf=' in serial(s.a) and 'USB KEY' not in serial(s.a),
-                        'clock mutant startup/input markers')
-                s.check('echo alive', 'alive\n')
-                s.stop()
-                print('RED LAN '+mode+' '+cpu+': exact HC clock death, live sh, QEMU rc=0', flush=True)
-                return
             require(time.monotonic() < deadline, 'HID enumeration before RPC')
-            # Complete USER syscalls so DEC can dispatch while warming up,
-            # including when the clock source is deliberately regressed.
+            # Warm the real USER/USB closure while DEC continues in FG1.
             s.check('echo warm', 'warm\n')
         s.drop = True
         started = time.monotonic()
         failure = result(s.cmd('cat /host/f', 5), 'cat /host/f')
         require(failure.startswith('cat: /host/f: '), 'RPC absence diagnostic')
         require(s.saved is not None, 'FS_REQ reached drop boundary')
-        if mode == 'normal':
-            def usb_keys(text):
-                for c in text:
-                    code = 'ret' if c == '\n' else 'spc' if c == ' ' else c
-                    s.q.call('send-key', {'keys':[{'type':'qcode','data':code}], 'hold-time':100})
-                    end = time.monotonic()+.16
-                    while time.monotonic()<end: s.pump()
-            offset = len(s.display.getvalue())
-            usb_keys('echo hi\n')
-            s.wait(lambda: s.display.getvalue()[offset:].endswith(b'sh> '), 5, 'USB post-RPC sh result')
-            require(result(s.display.getvalue()[offset:].decode(), 'echo hi') == 'hi\n', 'USB post-RPC output')
-            require('usb: HC dead' not in serial(s.a), 'healthy HC after RPC')
-            # A LAN OPEN cancels the common line even when USB entered it.
-            offset = len(s.display.getvalue())
-            usb_keys('echo discarded')
-            s.wait(lambda: s.display.getvalue()[offset:] == b'echo discarded',
-                   5, 'USB line echoed before LAN OPEN')
-            s.terminal.open()
-            s.wait(lambda: s.terminal.connected, 5, 'LAN reopen')
-            # Drain cancellation before the LAN newline and next command.
-            end=time.monotonic()+.2
-            while time.monotonic()<end: s.pump()
-            offset=len(s.display.getvalue())
-            s.terminal.send_bytes(b'\n')
-            s.wait(lambda: s.display.getvalue()[offset:].endswith(b'sh> '), 5, 'cancelled USB line prompt')
-            require(b'\ndiscarded\n' not in s.display.getvalue()[offset:], 'LAN cancelled USB line')
-            s.q.call('device_del', {'id':'kbd'})
-            s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(s.a), 5, 'LAN USB unplug')
-        else:
-            s.wait(lambda: 'usb: HC dead why=2' in serial(s.a), 5, 'exact clock death')
-            require('USB KEY' not in serial(s.a), 'clock mutant delivered key')
+        def usb_keys(text):
+            for c in text:
+                code = 'ret' if c == '\n' else 'spc' if c == ' ' else c
+                s.q.call('send-key', {'keys':[{'type':'qcode','data':code}], 'hold-time':100})
+                end = time.monotonic()+.16
+                while time.monotonic()<end: s.pump()
+        offset = len(s.display.getvalue())
+        usb_keys('echo hi\n')
+        s.wait(lambda: s.display.getvalue()[offset:].endswith(b'sh> '), 5, 'USB post-RPC sh result')
+        require(result(s.display.getvalue()[offset:].decode(), 'echo hi') == 'hi\n', 'USB post-RPC output')
+        require('usb: HC dead' not in serial(s.a), 'healthy HC after RPC')
+        # A LAN OPEN cancels the common line even when USB entered it.
+        offset = len(s.display.getvalue())
+        usb_keys('echo discarded')
+        s.wait(lambda: s.display.getvalue()[offset:] == b'echo discarded',
+               5, 'USB line echoed before LAN OPEN')
+        s.terminal.open()
+        s.wait(lambda: s.terminal.connected, 5, 'LAN reopen')
+        # Drain cancellation before the LAN newline and next command.
+        end=time.monotonic()+.2
+        while time.monotonic()<end: s.pump()
+        offset=len(s.display.getvalue())
+        s.terminal.send_bytes(b'\n')
+        s.wait(lambda: s.display.getvalue()[offset:].endswith(b'sh> '), 5, 'cancelled USB line prompt')
+        require(b'\ndiscarded\n' not in s.display.getvalue()[offset:], 'LAN cancelled USB line')
+        s.q.call('device_del', {'id':'kbd'})
+        s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(s.a), 5, 'LAN USB unplug')
         s.drop = False
         s.check('echo alive', 'alive\n')
         validate(serial(s.a), serial(s.b), True)
@@ -548,7 +523,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
-    parser.add_argument('--lan', action='store_true', help='real hostfs RPC absence with EE=0')
+    parser.add_argument('--lan', action='store_true', help='real hostfs RPC absence in FG1')
     args = parser.parse_args()
     require(stream_payload('log hi~USBSTREAM:00000001:hUSB KEY break\n~USBSTREAM:00000002:i\n') == 'hi\n',
             'framed stream reconstruction across Enter break log')
@@ -557,24 +532,21 @@ def main():
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
         missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-usb: ' + missing + ' unavailable')
-        return 0
+        return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     if args.lan:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
                 probe.bind(('127.0.0.1', 0))
         except PermissionError:
-            print('SKIP ppc-usb LAN: AF_INET unavailable; rc=0')
-            return 0
+            print('SKIP ppc-usb LAN: AF_INET unavailable')
+            return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     base = Path(os.environ.get('TMPDIR', '/tmp'))/'usb-run'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     print('evidence='+str(work), flush=True)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     if args.lan:
-        for mode in ['normal'] + (['tick-clock'] if args.mutate else []):
+        for mode in ['normal']:
             opts = ['KBOOT_SH=1', 'PPC_CROSS_DIR='+str(cross)]
-            if mode != 'normal':
-                src, dest = mutation(work, mode)
-                opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
             elf = build(work/('lan-'+mode), *opts)
             for cpu in cpus if mode == 'normal' else cpus[:1]:
                 lan_accept(elf, cpu, work/('lan-'+mode+'-'+cpu), mode)
@@ -587,10 +559,22 @@ def main():
                 *product_settings(work, 'mouse-wait', late=True))
     for cpu in cpus:
         product_accept(elf, cpu, work/('mouse-wait-'+cpu), 'normal', late=True)
-    for mode in ['normal'] + (['no-service', 'tick-clock'] if args.mutate else []):
+    for mode in ['normal'] + (['no-service', 'syscall-ee'] if args.mutate else []):
         elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *settings(work, mode))
         for cpu in cpus if mode == 'normal' else cpus[:1]:
-            accept(elf, cpu, work/(mode+'-'+cpu), mode)
+            if mode == 'syscall-ee':
+                try:
+                    accept(elf, cpu, work/(mode+'-'+cpu), mode)
+                except CriterionFailure as exc:
+                    require(str(exc).startswith("USB startup/reached markers:"),
+                            "unexpected syscall EE verdict: "+str(exc))
+                    evidence = serial(work/(mode+'-'+cpu)/'serial-a.log')
+                    require('USB STALL ticks=0' in evidence, 'missing exact syscall EE regression')
+                    print('RED syscall-ee: USB STALL ticks=0', flush=True)
+                else:
+                    raise RuntimeError('SURVIVED syscall-ee')
+            else:
+                accept(elf, cpu, work/(mode+'-'+cpu), mode)
     return 0
 
 

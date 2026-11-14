@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """D1 product vectors: ELF/host ABI plus bounded mac99 runtime mutations."""
 import argparse
+import os
 from pathlib import Path
 import re
 import shutil
@@ -20,7 +21,7 @@ CHECK = dict(name='kboot-vectors', tier=2, budget=600,
                      'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'include/callconv.h',
                      'include/memmap.h', 'include/appmem_types.h',
                      'tools/ppc/run.py', 'build/arch/ppc.mk'], needs=[])
-CROSS = Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-')
+CROSS = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))/'bin/powerpc-elf-'
 FLAGS = ['-std=gnu11','-mcpu=7450','-m32','-mbig-endian','-msoft-float','-mno-altivec',
          '-msdata=none','-fcommon','-fsigned-char','-fno-short-enums','-ffreestanding','-fno-pie','-fno-stack-protector',
          '-fno-builtin','-fno-asynchronous-unwind-tables','-nostdlib','-O2',
@@ -34,11 +35,12 @@ PRODUCT = ['arch/ppc/entry.S','arch/ppc/ofw_note.S','arch/ppc/mmu.S',
            'tools/ppc/kboot_vectors_fixture.S','tools/ppc/kboot_vectors_fixture.c']
 
 
-def build(out, source):
+def build(out, source, fixture=None):
     out.mkdir(parents=True,exist_ok=True)
     objects=[]
     for i, name in enumerate(PRODUCT+['arch/ppc/kernel_vectors.S']):
-        src=source if name.endswith('/kernel_vectors.S') else ROOT/name
+        src=source if name.endswith('/kernel_vectors.S') else (
+            fixture if fixture and name.endswith('/kboot_vectors_fixture.c') else ROOT/name)
         obj=out/f'{i}.o'; objects.append(obj)
         extra=['-Dppc_hpt_spill=fixture_hpt_spill'] if name.endswith('/kernel_hpt.c') else []
         if name.endswith('/kernel_trap.c') and 'tools/ppc/kboot_vectors_fixture.c' in PRODUCT: extra += ['-Dppc_trap_dispatch=product_trap_dispatch']
@@ -119,14 +121,14 @@ def symbols(elf):
             if len(p:=line.split())==3}
 
 
-def observe(out, elf, red=None):
+def observe(out, elf, red=None, cpu='7450'):
     syms=symbols(elf)
     cd=out/'cd'; cd.mkdir(exist_ok=True)
     shutil.copyfile(elf,cd/'VECTORS.ELF')
     iso=out/'fixture.iso'
     command(['genisoimage','-quiet','-hfs','-r','-part','-no-desktop','-o',iso,cd])
     a,b=out/'a.log',out/'b.log'
-    args=['qemu-system-ppc','-M','mac99','-cpu','7450','-m','128M','-accel','tcg',
+    args=['qemu-system-ppc','-M','mac99','-cpu',cpu,'-m','128M','-accel','tcg',
           '-bios',ROM,'-cdrom',iso,'-boot','d','-prom-env','boot-device=cd:,\\VECTORS.ELF',
           '-prom-env','auto-boot?=true','-nographic','-serial','file:'+str(a),
           '-serial','file:'+str(b),'-monitor','none','-qmp','stdio','-no-reboot']
@@ -182,9 +184,58 @@ def observe(out, elf, red=None):
     print('QEMU canary/retry/dispatch/nested spill PASS',flush=True)
 
 
+def user_exit_enable(vectors):
+    return '''    lwz 4,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    andi. 4,4,PPC_MSR_PR
+    beq 89f
+    lis 3,ctx_exit_request@ha
+    lwz 4,ctx_exit_request@l(3)
+    cmpwi 4,0
+    beq 89f
+    mfmsr 3
+    ori 3,3,PPC_MSR_EE
+    mtmsr 3
+    isync
+89:
+''' + vectors
+
+
+def observe_slots(work, cpus, mutate):
+    def once(text, old, new):
+        require(text.count(old) == 1, "unique slot anchor "+old)
+        return text.replace(old, new, 1)
+    source = ROOT/'arch/ppc/kernel_vectors.S'
+    for mode in ['normal', 'unsupported-nest'] + (['shared-slot'] if mutate else []):
+        out = work/('spill-'+mode); out.mkdir()
+        fixture = None
+        vectors = source
+        if mode == 'unsupported-nest':
+            fixture = out/'fixture.c'
+            fixture.write_text(once((ROOT/'tools/ppc/kboot_vectors_fixture.c').read_text(),
+                               '*(volatile u32 *)NEST_VA!=0x76543210',
+                               '*(volatile u32 *)(NEST_VA+4096)!=0x76543210'))
+        if mode == 'shared-slot':
+            vectors = out/'vectors.S'
+            text = once(source.read_text(), '.Lspill_top@ha', '.Ltrap_top@ha')
+            vectors.write_text(once(text, '.Lspill_top@l', '.Ltrap_top@l'))
+        elf = build(out, vectors, fixture=fixture)
+        expected = None if mode == 'normal' else (
+            'ppc_kernel_vector_stop' if mode == 'unsupported-nest' else 'ppc_stop_loop', [])
+        for cpu in cpus:
+            while os.getloadavg()[0] >= 4: time.sleep(5)
+            evidence = out/cpu; evidence.mkdir()
+            observe(evidence, elf, expected, cpu=cpu)
+            print(('RED ' if mode == 'shared-slot' else 'GREEN ')+'spill '+mode+' '+cpu, flush=True)
+
+
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true')
     a=parser.parse_args()
+    missing = [tool for tool in (str(CROSS)+'gcc', 'qemu-i386', 'qemu-system-ppc',
+                                 'genisoimage') if not shutil.which(tool)]
+    if missing or not ROM.is_file():
+        print('SKIP kboot-vectors: toolchain/QEMU/OpenBIOS unavailable', flush=True)
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     out=ROOT/'build/out/ppc/kboot-vectors'
     src=ROOT/'arch/ppc/kernel_vectors.S'
     elf=build(out/'normal',src)
@@ -223,4 +274,4 @@ def main():
 
 
 
-if __name__=='__main__': main()
+if __name__=='__main__': sys.exit(main())

@@ -98,6 +98,10 @@ def run(ctx):
             mutant = replace_once(enabled, '            ppc_enable();', '')
             assert exercise(root, work, 'ppc', 4, mutant, idle) == 42
             print('RED runtime: removed syscall enable', flush=True)
+            mutant = replace_once(enabled, '            (void)ppc_irq_save();', '')
+            rc = exercise(root, work, 'ppc', 4, mutant, idle)
+            assert rc != 0, rc
+            print(f'RED runtime: removed syscall C exit disable vector=4 rc={rc}', flush=True)
             probe_source = (work / 'ctx_probes.inc').read_text()
             for function in ('probe_dsi', 'probe_isi'):
                 old = 'static int ' + function + '(u32 va)\n{\n    u32 flags = ppc_irq_save();'
