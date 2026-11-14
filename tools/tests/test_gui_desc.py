@@ -4,7 +4,7 @@
 --i686-elf PATH also extracts and checks the target descriptor (no live reads).
 """
 CHECK = dict(name='gui-desc-host', tier=1,
-    covers=['userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py'],
+    covers=['include/remote_control.h', 'net/link.h', 'sdk/include/os32/os32_gui_shared.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py'],
     needs=[], budget=7.8)
 
 from pathlib import Path
@@ -67,6 +67,11 @@ def build_fixture(gshell, out, rlib):
         assert m, name + " missing"
         errs += f"pub const {name}: i32 = {int(m[1])};\n"
     (out / "kapi_err.rs").write_text(errs)
+    # G2 compiles G1 too: use the product generator for its shared constants.
+    generator = out / "gshell-build"
+    subprocess.run(["rustc", "--edition=2021", str(GSHELL / "build.rs"), "-o", str(generator)], check=True)
+    subprocess.run([str(generator)], check=True, stdout=subprocess.DEVNULL,
+                   env={**os.environ, "OUT_DIR": str(out), "CARGO_MANIFEST_DIR": str(GSHELL)})
     # gshell links the product font crate (T7b-b3).
     font_rlib, font_deps = os32api_host.build_font()
     exe = out / "fixture"

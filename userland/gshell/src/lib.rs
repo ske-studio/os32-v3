@@ -92,6 +92,7 @@ mod timer;
 mod trim;
 mod diagnostics;
 mod gserial;
+mod gserial_link;
 mod visible;
 mod wm;
 
