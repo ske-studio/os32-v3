@@ -1,4 +1,3 @@
-#include "kernel/idle_work.h"
 #include "kernel/irq/tick_budget.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
@@ -13,7 +12,7 @@
 /*   (1) **状態機械を進めるのは `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
 /*       KAPI は状態を読み書きするだけで待たず、`link_tick` を呼ばない。      */
 /*   (2) KAPI と `link_tick` の排他は **IF 保存復元の短い cli 区間**          */
-/*       (include/io.h の irq_save / irq_restore)。区間内では待たない。       */
+/*       (link_platform_lock / link_platform_unlock)。区間内では待たない。       */
 /*   (3) ワイヤ上の値は **バイト単位の LE アクセサ**で読み書きする。構造体     */
 /*       キャストも非アラインアクセスもしない (`rid` は 4B 境界に載らない)。  */
 /* ======================================================================== */
@@ -22,8 +21,10 @@
 #include "nic.h"
 #include "link_notify.h"
 
-/* Legacy selftests still use the LGY declarations. */
-#include "ne2000.h"
+#include "link_platform.h"
+#ifndef LINK_HOST_TEST
+#include "link_platform_inline.h" /* Selected by the platform include path. */
+#endif
 #include "kstring.h"
 #include "kprintf.h"
 #include "le_internal.h"
@@ -38,31 +39,10 @@
 #define LINK_TX_CLASS_COUNT 2
 #define LINK_HANDSHAKE_BUDGET 2
 
-/* ------------------------------------------------------------------------ */
-/*  カーネル / ホスト試験の切り替え                                          */
-/*                                                                          */
-/*  tools/tests/net_link_host.c はこのファイルを #include して、タイマ・NIC・ */
-/*  cli / sti を贋物に差し替える。カーネルでは include/io.h の実物を使う。    */
-/* ------------------------------------------------------------------------ */
-#ifdef LINK_HOST_TEST
-extern volatile u32 tick_count;
-unsigned int link_test_irq_save(void);
-void link_test_irq_restore(unsigned int flags);
-void link_test_idle(void);
-#define LINK_IRQ_SAVE()      link_test_irq_save()
-#define LINK_IRQ_RESTORE(f)  link_test_irq_restore(f)
-#define LINK_IDLE()          link_test_idle()
-#else
-#include "idt.h"            /* tick_count */
-#include "io.h"             /* irq_save / irq_restore / _idle */
-#define LINK_IRQ_SAVE()      irq_save()
-#define LINK_IRQ_RESTORE(f)  irq_restore(f)
-/* IF=1 で次の割り込みまで寝る。「許可する」と「眠る」は io.h の _idle() が
- * 1 つの不可分な原始命令として持つ (間に割り込みを入れない =
- * docs/design/arch/x86/kernel/ring3_entry.md#落とし穴 と同じ作法)。_enable(); _halt(); に分けてはいけない
- * 理由は io.h の _idle() の註。順序 3 ではここが HAL の待ち 1 関数になる。 */
-#define LINK_IDLE()          do { idle_work_run(); _idle(); } while (0)
-#endif
+/* All clock, exclusion and foreground wait operations cross the platform seam. */
+#define LINK_IRQ_SAVE()      link_platform_lock()
+#define LINK_IRQ_RESTORE(f)  link_platform_unlock(f)
+#define LINK_IDLE()          link_platform_idle()
 
 static const u8 link_bcast[ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
@@ -334,7 +314,7 @@ static u16 link_credit_pages(void)
 /* ======================================================================== */
 /*  タイマ — 再送・probe・handshake の期限を見て「送る印」を立てる            */
 /* ======================================================================== */
-static u32 since(u32 t) { return tick_count - t; }
+static u32 since(u32 t) { return link_platform_now() - t; }
 
 static void link_timers(void)
 {
@@ -397,7 +377,7 @@ static void link_timers(void)
                 if (e->probes >= LINK_PROBE_MAX) { link_resync(); return; }
                 e->want_status = 1;
                 e->probes++;
-                e->last_rx_tick = tick_count;
+                e->last_rx_tick = link_platform_now();
             }
         }
         /* WINDOW は本文を待っている間ずっと (制御枠で 1 周回 1 本に集約される) */
@@ -427,7 +407,7 @@ static int link_tx_control(void)
         if (!ok) return -1;
         if (link_state == LINK_S_SYN && link_hs_tries >= LINK_TRIES - 1)
             link_hello_idle = 1;
-        link_hs_tick = tick_count;
+        link_hs_tick = link_platform_now();
         link_hs_due = 0;
         return 1;
     }
@@ -451,7 +431,7 @@ static int link_tx_control(void)
                 if (!link_send_ex(LINK_OP_RELEASE, 0, link_sess, e->rel_epoch,
                                   0, 0, e->rel_rid, 0, 0)) return -1;
                 e->rel_due = 0;
-                e->rel_tick = tick_count;
+                e->rel_tick = link_platform_now();
             } else if (kind == LINK_CTRL_ACK && e->want_ack) {
                 if (!link_send(LINK_OP_ACK, 0, 0, e->ack_seq, e->rid, 0, 0)) return -1;
                 e->want_ack = 0;
@@ -493,7 +473,7 @@ static int link_tx_normal(void)
             if (!link_send(LINK_OP_REQUEST, 0, 0, 0, e->rid,
                            e->req_copy, e->req_len)) return -1;
             e->req_due = 0;
-            e->last_tx_tick = tick_count;        /* RTO は NIC 受理から数える */
+            e->last_tx_tick = link_platform_now();        /* RTO は NIC 受理から数える */
             link_norm_next = (idx + 1) % LINK_HANDLES;
             return 1;
         }
@@ -501,7 +481,7 @@ static int link_tx_normal(void)
             if (!link_send(LINK_OP_WDATA, 0, e->wseq, 0, e->rid,
                            e->wcopy, e->wlen)) return -1;
             e->w_due = 0;
-            e->last_tx_tick = tick_count;
+            e->last_tx_tick = link_platform_now();
             link_norm_next = (idx + 1) % LINK_HANDLES;
             return 1;
         }
@@ -575,7 +555,7 @@ void link_tick(void)
 #ifdef TICK_PROBE
     tick_probe_net_begin(TP_NET5);
 #endif
-    link_notify_tick(tick_count);
+    link_notify_tick(link_platform_now());
 #ifdef TICK_PROBE
     tick_probe_net_end(TP_NET5);
 #endif
@@ -605,7 +585,7 @@ void link_init(const u8 my_mac[ETH_ALEN])
     /* nonce の初期値は tick を種にする (一意性は要らない — 応答の対応付けだけ)。
      * 同じ値で再起動しても、sess を採番するのは Agent なので別セッションになる
      * (TASK_N0 §1b、往復 3 の B3)。 */
-    link_nonce = tick_count;
+    link_nonce = link_platform_now();
     link_ready = 1;
     link_start_hello(0, 1);
 }

@@ -1,6 +1,6 @@
 """A11 real API/deadline hooks; no libc, explicit ILP32 runner."""
 CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
-    covers=['net/nic.h', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
+    covers=['net/nic.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
@@ -16,7 +16,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-ANCHOR = 'if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;'
+ANCHOR = 'if ((u32)(link_platform_now() - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;'
 
 MUTATIONS = [(ANCHOR, "if (1) continue;", "deadline disabled"),
     ('tok_eq(req, a0, b0, "os32.clip")', "0", "named clip body disabled"),

@@ -2,10 +2,11 @@
 #define LINK_HOST_TEST
 #include "types.h"
 volatile u32 tick_count;
+u32 link_platform_now(void) { return tick_count; }
 static unsigned int test_if = 1;
-unsigned int link_test_irq_save(void) { unsigned int f = test_if; test_if = 0; return f; }
-void link_test_irq_restore(unsigned int f) { test_if = f; }
-void link_test_idle(void) { }
+u32 link_platform_lock(void) { unsigned int f = test_if; test_if = 0; return f; }
+void link_platform_unlock(u32 f) { test_if = f; }
+void link_platform_idle(void) { }
 #include "net/link.c"
 /* API-only fixture: B2 notification behavior is covered by link-core. */
 static int notify_resets;

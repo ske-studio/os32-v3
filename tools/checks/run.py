@@ -385,6 +385,10 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-link-run-host", "tools/ppc/link_run.py"):
+        "offline predicates and pipe-only QMP probe; accept/main never run or read ELF images",
+    ("check-ppc-link-run-host", "tools/ppc/run.py"):
+        "only QMP and require are used; build/static/qemu entry points are never called",
     ("check-type-contract", "tools/tests/test_type_contract.py"):
         "recipe inventory and H5 artifacts use private TemporaryDirectory roots only",
     ("check-type-contract", "tools/build_compare.py"):

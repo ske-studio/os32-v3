@@ -93,12 +93,19 @@ void _start(void)
         CHECK(pm_rh_last_stage()==1 && pm_rh_reached()==2 && synced);
         unsigned scale=4, bpp=fb->depth/8;
         /* Independent digit 1 bit: upper row is 00100, slot starts at 40. */
-        unsigned on=16+(40+2*scale)*bpp, off=16+40*bpp;
+        unsigned cell = KBOOT_LINK ? 640/18 : 40;
+        unsigned on=16+(cell+2*scale)*bpp, off=16+cell*bpp;
         CHECK(guarded[on+(bpp==4?1:0)]==0xff && guarded[off]==0);
         pm_rh_stage(3);
         CHECK(pm_rh_reached()==10 && guarded[on+(bpp==4?1:0)]==0xff);
         pm_rh_stage(PM_RH_ESCC_INIT);
         CHECK(pm_rh_last_stage()==15);
+#if KBOOT_LINK
+        pm_rh_stage(PM_RH_LINK_HELLO_SENT); pm_rh_stage(PM_RH_LINK_HELLO_ESTABLISHED);
+        CHECK((pm_rh_reached() & 0x30000) == 0x30000);
+        CHECK(guarded[16+(16*cell+scale)*bpp+(bpp==4?1:0)]==0xff);
+        CHECK(guarded[16+(17*cell+2*scale)*bpp+(bpp==4?1:0)]==0xff);
+#endif
         pm_rh_phy(1,2,0x1234,0xabcd);
         for (unsigned i=0;i<16;i++) CHECK(guarded[i]==0xa5);
         for (unsigned i=16+fb->bytes;i<sizeof(guarded);i++) CHECK(guarded[i]==0xa5);

@@ -80,13 +80,13 @@ MUTATIONS = (
      'e->rel_pending && !e->rel_due && since(e->rel_tick)',
      'e->rel_pending && since(e->rel_tick)', 'tx_rto_starts_at_nic_acceptance'),
     ('request-send-does-not-start-rto', 'link.c',
-     'e->req_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->req_due = 0;\n            e->last_tx_tick = link_platform_now();',
      'e->req_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('wdata-send-does-not-start-rto', 'link.c',
-     'e->w_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->w_due = 0;\n            e->last_tx_tick = link_platform_now();',
      'e->w_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('release-send-does-not-start-rto', 'link.c',
-     'e->rel_due = 0;\n                e->rel_tick = tick_count;',
+     'e->rel_due = 0;\n                e->rel_tick = link_platform_now();',
      'e->rel_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('ring-overflow-not-counted', 'link_rx.inc',
      'link_l2_overflow++;     /* 空き不足',
@@ -173,7 +173,7 @@ def check_timer_calls_link_tick():
                 registrations.append(path.relative_to(ROOT).as_posix())
     assert registrations == [], registrations
     nic = (ROOT / "net/nic.c").read_text()
-    assert "tick_register(PC98_TICK_LINK, net_jiffy)" in nic
+    assert "link_platform_tick_register(net_jiffy)" in nic
     assert "link_tick();" in nic
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"

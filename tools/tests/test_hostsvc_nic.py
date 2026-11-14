@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
 CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
-    'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
+    'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',
@@ -36,8 +36,8 @@ MUTATIONS = (
      'bound ? (bound->tx(frame, len), 0) : OS32_ERR_HOSTDOWN'),
     ('unbound-result', 'int rc = OS32_ERR_HOSTDOWN;', 'int rc = 0;'),
     ('double-bind', 'if (bound) rc = OS32_ERR_BUSY;', 'if (bound) rc = 0;'),
-    ('unbind-queues', '    net_rx_reset(NET_RX_LINK);\n    irq_restore(flags);',
-     '    net_rx_reset(NET_RX_SFS);\n    irq_restore(flags);'),
+    ('unbind-queues', '    net_rx_reset(NET_RX_LINK);\n    link_platform_unlock(flags);',
+     '    net_rx_reset(NET_RX_SFS);\n    link_platform_unlock(flags);'),
     ('fixed-peer', 'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);',
      'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? 0 : peer_mac, b);'),
     ('tick-link', '            link_tick();', '            if (0) link_tick();'),
@@ -74,11 +74,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='hostsvc-nic-') as tmp:
         work = Path(tmp)
         (work / 'io.h').write_text(
+            '#ifndef NIC_TEST_IO_H\n#define NIC_TEST_IO_H\n'
+            'static inline void _idle(void) {}\n'
             'unsigned int nic_test_irq_save(void);\n'
             'void nic_test_irq_restore(unsigned int);\n'
             '#define irq_save nic_test_irq_save\n'
             '#define irq_restore nic_test_irq_restore\n'
-            'int nic_test_irq_enabled(void);\n#define _irq_enabled nic_test_irq_enabled\n')
+            'int nic_test_irq_enabled(void);\n#define _irq_enabled nic_test_irq_enabled\n#endif\n')
         # Production includes are compiled separately; only execution replaces cli.
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
         subprocess.run([str(cross / 'bin/i386-elf-gcc'), *FLAGS,

@@ -135,6 +135,8 @@ void pm_lan_log_complete(int result);
 void pm_lan_phy_observer(void (*notify)(const struct gem_phy_sample *, int));
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
+/* Borrow the existing device only while the service is RUNNING. */
+struct gem *pm_lan_running_gem(u8 mac[6]);
 int pm_lan_decode_header(const u8 *src, u32 n, struct lan_header *h);
 int pm_lan_encode_payload(u8 *dst, u32 cap, const struct lan_header *h,
                           const u8 *payload, u32 len, u32 *used);
@@ -222,4 +224,6 @@ _Static_assert(PLN1_REQ_MEMORY_BYTES == 0, "PLN1_REQ_MEMORY_BYTES");
 _Static_assert(PLN1_REQ_READ_DIAG_BYTES == 4, "PLN1_REQ_READ_DIAG_BYTES");
 _Static_assert(PLN1_REQ_PEEK_BYTES == 8, "PLN1_REQ_PEEK_BYTES");
 
+/* Foreground LOG transport, KBOOT_LINK images only. */
+void pm_link_log_poll(void);
 #endif

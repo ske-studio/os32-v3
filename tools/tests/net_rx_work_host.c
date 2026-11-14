@@ -8,6 +8,7 @@ static unsigned int enabled = 1;
 static unsigned int irq_save(void) { unsigned int f = enabled; enabled = 0; return f; }
 static void irq_restore(unsigned int f) { enabled = f; }
 static int _irq_enabled(void) { return enabled != 0; }
+static void _idle(void) {}
 #include "net/nic.c"
 #include "net/nic_rx.c"
 #include "net/rx_work.c"
@@ -211,7 +212,12 @@ static void run_tests(void)
     tick_count = 1; irq_tick(); CHECK(!frames);
     rescue = 0; net_unbind();
     CHECK(net_start(NET_NIC_LGY98, 0) == 0);
-    tick_count += 2; frames = 1; before = reads; irq_tick(); CHECK(reads == before);
+    tick_count += 2; frames = 1; before = reads;
+#if LINK_PLATFORM_TICK_RX_LGY98_SLOT
+    rescue = 1; now = 0; irq_tick(); CHECK(reads > before && !frames); rescue = 0;
+#else
+    irq_tick(); CHECK(reads == before);
+#endif
     idle_work_run(); CHECK(!frames);
     /* Failed clock uses frame cap, including low-word time wrap. */
     now = 0xfffffff0u; clock_fail = 1; frames = 9;

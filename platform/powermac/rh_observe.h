@@ -10,6 +10,9 @@
  * Previously reached digits stay visible above the PHY page. */
 #define PM_RH_ESCC_PREPARE 14U
 #define PM_RH_ESCC_INIT 15U
+/* Link diagnostic image: final two cells display 0 (sent), 1 (established). */
+#define PM_RH_LINK_HELLO_SENT 16U
+#define PM_RH_LINK_HELLO_ESTABLISHED 17U
 struct pm_rh_fb { u32 pa, bytes, stride, width, height, depth; };
 /* 0: absent (continue), 1: captured, -1: unsupported/invalid (stop in OF). */
 int pm_rh_capture(int stdout_ih);

@@ -83,7 +83,7 @@ static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
     u32 ln = le_read32(pl + LINK_RESPONSE_LENGTH_OFF);
 
     link_host_progress((i32)(e - link_h));
-    e->last_rx_tick = tick_count;
+    e->last_rx_tick = link_platform_now();
     e->probes = 0;
     if (flags & LINK_F_CTRL) {
         switch (st) {
@@ -192,7 +192,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
         }
         e = link_by_rid(rid);
         if (!e) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         e->probes = 0;
         if (!e->req_acked) {
             link_host_progress((i32)(e - link_h)); /* REQUEST ACK advances */
@@ -216,7 +216,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     case LINK_OP_DATA:
         e = link_by_rid(rid);
         if (!e || !e->ring_owner) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         e->probes = 0;
         if (seq == e->ack_seq + 1) {
             if (plen <= link_stream_free()) {
@@ -242,7 +242,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     case LINK_OP_EOF:
         e = link_by_rid(rid);
         if (!e || !e->ring_owner) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         link_l2_eof = 1;
         link_l1_done = 1;
         break;

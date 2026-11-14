@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'arch/x86/arch_tick_budget.h', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'arch/x86/arch_tick_budget.h', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.9)
 
 from kernel_includes import include_flags
@@ -40,7 +40,8 @@ def wiring():
         if rel == 'drivers/net/ne2000/ne2000.c':
             src = src.replace('#include "ne2000_control.inc"',
                               (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
-        registration = f'tick_register(PC98_TICK_{slot}, {fn})'
+        registration = (f'link_platform_tick_register({fn})' if rel == 'net/nic.c'
+                        else f'tick_register(PC98_TICK_{slot}, {fn})')
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
         if rel != 'net/nic.c':

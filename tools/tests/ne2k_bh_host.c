@@ -3,6 +3,7 @@
 static void bh_wait_check(void);
 #include "ne2000_dma_host.c"
 #include "../../kernel/idle_work.c"
+static void _idle(void) {}
 #define pending nic_pending
 #include "../../net/nic.c"
 #undef pending
