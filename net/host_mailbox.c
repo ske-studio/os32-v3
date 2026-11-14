@@ -4,6 +4,7 @@
 #include "kmalloc.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
+#include "remote_control.h"
 
 #define MAILBOX_SLOTS 64
 
@@ -98,6 +99,15 @@ int host_mailbox_put(u32 generation, u16 service, u16 kind,
     return 0;
 }
 
+static int service_matches(u32 service, u16 notice_service)
+{
+    if (service == MAILBOX_ALL)
+        return notice_service != REMOTE_SVC_RSHELL &&
+               notice_service != REMOTE_SVC_GSERIAL &&
+               notice_service != REMOTE_SVC_PPC_DIAG;
+    return service == notice_service;
+}
+
 int host_mailbox_stage(u32 generation, u32 service, HostNotice *kernel_out)
 {
     if (!kernel_out || !service || service > MAILBOX_ALL ||
@@ -112,13 +122,13 @@ int host_mailbox_stage(u32 generation, u32 service, HostNotice *kernel_out)
         const HostNotice *found = 0;
         for (unsigned int i = 0; i < count; i++) {
             const HostNotice *n = &slots[order[i]];
-            if (service == MAILBOX_ALL || service == n->service) {
+            if (service_matches(service, n->service)) {
                 found = n;
                 break;
             }
         }
         if (!found && latest_valid &&
-            (service == MAILBOX_ALL || service == latest.service))
+            service_matches(service, latest.service))
             found = &latest;
         if (found) {
             *kernel_out = *found;
