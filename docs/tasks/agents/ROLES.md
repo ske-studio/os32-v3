@@ -111,8 +111,9 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 |---|---|---|
 | カーネル・部品に新しいソースを足す | `build/sources/order.mk` (リンクの順)、`build/sources/common.mk` か arch・platform の一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。PowerPC の像に入るなら `build/ppc-kboot.mk` の一覧 | `check-build-selection-host`、`make all` |
 | KAPI を足す・変える (`sdk/kapi.json`) | 版の 2 か所 (kapi.json・`os32_kapi_shared.h`) と、版を書いた文書 (README・INDEX・KAPI_SPEC)。レビュー済みの指紋: `tools/tests/fixtures/dep_dir_a/l01.json` の kapi_sha256、`l04.json` の api_sha256、`l05a.json` の public_sha256、`tools/tests/hwdev_contract_fixture.py` の HWDEV の layout CRC と inventory、`tools/tests/test_ime_display_boundary.py` の FEP_MODULE_ABI_GEN | `check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI の検査 (audit・ranges・version)、`make clean && make all` |
-| 共通の場所 (kernel/・net/・fs/・include/・userland/shell・kernel/console) を触る | PowerPC の像のリンク (CI に PowerPC の toolchain が入るまで) | `PATH=/home/hight/opt/cross-ppc/bin:$PATH make -f build/ppc-kboot.mk KBOOT_SH=1` |
+| 共通の場所 (kernel/・net/・fs/・include/・userland/shell・kernel/console) を触る | PowerPC の像のリンク (CI の job ppc-compile が merge-base からの差で判定して組む。手元で先に確かめるときも同じコマンド) | `PATH=/home/hight/opt/cross-ppc/bin:$PATH make -f build/ppc-kboot.mk KBOOT_SH=1` |
 | 製品の関数の呼び出しを 1 つ足す | その関数の兄弟の stub を持つ試験の土台 (`#include` で取り込む土台と、python が切り出して組む試験の両方) | grep で呼び手と stub を全部見る |
+| PowerPC の toolchain・QEMU・socket を使う試験を足す・変える | 無い環境では理由を表示して SKIP・rc=0、`OS32_REQUIRE_PPC=1` (job ppc-compile) では失敗にする ([PPC_NOTES](../../decisions/ppc/PPC_NOTES.md) §6) | `PPC_CROSS_DIR=/nonexistent make check-<名前>` が SKIP と rc=0 |
 | 試験を足す・名前や式を書き換える | 検査の `CHECK` の covers、変異の目印 (試験の中の元の式の文字列) | `tools/checks/run.py --lint`、`python3 ~/os32-tmp/bin/stale_anchor.py <基点>` |
 
 ## 5. レビュー依頼の出し方

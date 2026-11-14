@@ -309,6 +309,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/v3/TASK_AV_HAL.md](tasks/v3/TASK_AV_HAL.md) | サウンド・入力の HAL (DirectSound・XInput 相当の土台、FM/PSG の口) **設計中 (2026-11-09)** — 設計は確定・承認済み、実装を待つ |
 | [tasks/v3/TASK_SYNTH_OPNA.md](tasks/v3/TASK_SYNTH_OPNA.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/v3/TASK_TICK_1KHZ.md](tasks/v3/TASK_TICK_1KHZ.md) | P3 の 1kHz IRQ0 tick (実測 → 二周期への切り替え) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
+| [tasks/v3/TASK_IO_TIER.md](tasks/v3/TASK_IO_TIER.md) | I/O の Tier 制御 (協調点の Tier・予算・設定表・pump) **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](tasks/vision/AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](tasks/vision/LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
@@ -362,6 +363,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/network/HOST_SERVICES_PLAN.md](tasks/network/HOST_SERVICES_PLAN.md) | Host Services 詳細計画 — N1〜N4 受入完了。N5 (実機 LAN) は実機の内蔵 82557 の票 ([TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) の L-B) に吸収。LGY-98 はエミュレータで回帰を取る経路として残る |
 | [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (設計中 2026-11-05) |
 | [tasks/network/TASK_LAN_OPERATOR.md](tasks/network/TASK_LAN_OPERATOR.md) | 操作口 (rshell・gshell) を LAN が既定・serial が退避先に、PowerPC の PLN1 を link に統合 (設計確定 2026-11-14) |
+| [tasks/network/TASK_LAN_BULK.md](tasks/network/TASK_LAN_BULK.md) | LAN の一括転送 (link の新しい op、/host の LAN 経路を link へ一本化) **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
 | `docs/archive/network/TASK_N0.md` / `docs/archive/network/TASK_N1.md` / `docs/archive/network/TASK_N2.md` / `docs/archive/network/TASK_N3.md` / `docs/archive/network/TASK_N4.md` | 票 N0〜N4 (受入完了、2026-09-14〜15) — 設計 v5、KAPI v51 + libos32host、PRINT/CLIP、wget/lpr、ファイラ印刷と端末の貼り付け |
 
 ### 移植性
