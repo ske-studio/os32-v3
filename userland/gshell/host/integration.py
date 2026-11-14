@@ -76,6 +76,16 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('remote-g2 serial startup sent to LAN', 'src/gserial.rs',
+     'reply_to(false, b"!", format_args!("ready v1"));',
+     'reply_to(true, b"!", format_args!("ready v1"));', 'remote_g2_startup_'),
+    ('remote-g2 LAN startup sent to serial', 'src/gserial.rs',
+     'reply_to(true, b"!", format_args!("ready v1"));',
+     'reply_to(false, b"!", format_args!("ready v1"));', 'remote_g2_startup_'),
+    ('remote-g2 cui stale clock', 'src/lib.rs',
+     '            st.now = (a.get_tick)();\n            if !gserial::shutdown_pending(st) { break; }',
+     '            if !gserial::shutdown_pending(st) { break; }\n            st.now = (a.get_tick)();', 'remote_g2_cui_'),
+
     ('remote-g2 wire buffer shortened', 'src/gserial.rs',
      'let mut bytes = [0; LINE_MAX + 2];', 'let mut bytes = [0; LINE_MAX];', 'remote_g2_maximum_'),
     ('remote-g2 ops body to UART', 'src/typical_ops.rs',

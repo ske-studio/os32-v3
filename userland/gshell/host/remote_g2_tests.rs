@@ -2,7 +2,7 @@ use super::*;
 use crate::mocks;
 use std::sync::{Mutex, atomic::Ordering::SeqCst};
 #[derive(Default)]
-struct Host { notice: Vec<u8>, output: Vec<u8>, opens: Vec<String>, result: bool, calls: Vec<u32> }
+struct Host { notice: Vec<u8>, output: Vec<u8>, opens: Vec<String>, result: bool, calls: Vec<u32>, switched_output: Option<Vec<u8>>, switched_pending: bool }
 static HOST: Mutex<Option<Host>> = Mutex::new(None);
 fn host<T>(f: impl FnOnce(&mut Host) -> T) -> T { f(HOST.lock().unwrap().as_mut().unwrap()) }
 unsafe extern "C" fn boot(p: *mut u8) { core::ptr::write_bytes(p, 0xab, 16); }
@@ -159,4 +159,40 @@ fn p0a_remote_g2_ops_body_uses_captured_route() {
     assert_eq!(out,b"gs:00000002 GOP1 char SKIP title\r\ngs:00000002 end 0\r\n");
     assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
     open_serial(&mut st);
+}
+
+#[test]
+fn remote_g2_startup_ready_once_per_port() {
+    let mut st=setup();
+    // setup consumed the serial ready. Reopen serial, then the default LAN.
+    super::open(&mut st,0); open_lan(&mut st,0); pump(&mut st);
+    assert_eq!(*mocks::SERIAL_OUT.lock().unwrap(),b"gs:! ready v1\r\n");
+    assert_eq!(host(|h|h.output.clone()),b"gs:! ready v1\r\n");
+    assert!(host(|h|h.opens.iter().any(|s|s.ends_with(" ! 0 15"))));
+}
+#[test]
+fn remote_g2_cui_drains_before_switch_after_config_delay() {
+    let mut st=setup(); open_lan(&mut st,0); pump(&mut st);
+    host(|h| { h.notice=b"\x0100000001 cui\n".to_vec(); h.output.clear(); });
+    poll_lan(&mut st); // Queues the real parser's cui reply/end, without sending.
+    assert!(host(|h|h.output.is_empty()));
+    mocks::set_file(b"GUI=1\n");
+    unsafe extern "C" fn slow_write(_:i32,_:*const u8,n:u32)->i32 {
+        mocks::set_tick(120); n as i32
+    }
+    unsafe extern "C" fn switch_after_flush(_: *const u8)->i32 {
+        let pending=super::shutdown_pending(&GuiState {now:120,..GuiState::NEW});
+        host(|h| { h.switched_output=Some(h.output.clone()); h.switched_pending=pending; });
+        0
+    }
+    let mut api=unsafe {core::ptr::read(os32api::api())};
+    api.sys_write=slow_write; api.sys_switch_shell=switch_after_flush;
+    os32api::os32_init(Box::into_raw(Box::new(api)));
+    assert!(!crate::switch_cui(&mut st));
+    assert_eq!(host(|h|h.switched_output.clone()),
+        Some(b"gs:00000001 cui queued\r\ngs:00000001 end 0\r\ngs:! cui done\r\n".to_vec()));
+    assert!(!host(|h|h.switched_pending));
+    assert!(host(|h|h.opens.iter().any(|s|s.contains(" 00000001 0 "))));
+    assert!(host(|h|h.opens.last().unwrap().ends_with(" ! 0 15")));
+    assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
 }

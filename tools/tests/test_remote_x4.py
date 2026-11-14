@@ -132,6 +132,11 @@ def test(path):
     assert op.results[exit_id]['state'] == 'done'
     assert op.accept_ready(42, 3, BOOT, 'cui', exit_id, 'done')
     op.submit('cui', 'ver', None)
+    assert op.accept_output(42, 3, BOOT, '!', 33, b'gs:! ready v1\r\n', 15, 'gui'), 'dropped notice rejected'
+    assert op.notice_drop == 33, 'notice drop not recorded'
+    assert op.notices[-1] == b'gs:! ready v1\r\n'
+    for data in (b'gs:! partial', b'gs:! ready v1\ngs:! extra\n'):
+        assert not op.accept_output(42, 3, BOOT, '!', 1, data, len(data), 'gui'), 'partial notice accepted'
     print('PASS remote-x4')
 
 
@@ -144,6 +149,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("if (not body.startswith(b'gs:! ')", "if (dropped or not body.startswith(b'gs:! ')", 'dropped notice rejected'),
+            ('self.notice_drop += dropped', 'pass', 'notice drop not recorded'),
             ("# previous ID/idle state is not evidence that execution was lost.",
              "# previous ID/idle state is not evidence that execution was lost.\n        if self.pending is not None and last_id != self.pending['id']:\n            self.pending['state'] = 'UNKNOWN'", 'stale READY lost operation'),
             ("self.take_result()  # Retain an unclaimed completion before reusing the slot.",

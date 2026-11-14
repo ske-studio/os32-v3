@@ -712,8 +712,10 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         let a = os32api::api();
         (a.tvram_clear)();
         gserial::cui_done(st);
-        while gserial::shutdown_pending(st) {
+        loop {
+            // Saving config/closing resources can span ticks after the last WM cycle.
             st.now = (a.get_tick)();
+            if !gserial::shutdown_pending(st) { break; }
             gserial::poll_lan(st);
             (a.sys_halt)();
         }

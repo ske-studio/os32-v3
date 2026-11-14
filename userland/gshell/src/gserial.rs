@@ -104,7 +104,7 @@ pub fn open(st: &mut GuiState, seconds: u32) {
     unsafe { (os32api::api().rshell_set_active)(0); }
     st.gserial.enabled = true;
     st.gserial.arm(unsafe { (os32api::api().get_tick)() }, seconds.min(TIMEOUT_MAX));
-    notify(st, "ready v1");
+    reply_to(false, b"!", format_args!("ready v1"));
 }
 /// Enable the LAN independently of UART initialization (G3 calls this at startup).
 pub fn open_lan(st: &mut GuiState, seconds: u32) {
@@ -112,7 +112,7 @@ pub fn open_lan(st: &mut GuiState, seconds: u32) {
     st.gserial.lan_enabled = true;
     st.gserial.lan = true;
     st.gserial.arm(st.now, seconds.min(TIMEOUT_MAX));
-    notify(st, "ready v1");
+    reply_to(true, b"!", format_args!("ready v1"));
 }
 /// Advance G1, then release its borrow before executing a received command.
 pub fn poll_lan(st: &mut GuiState) {

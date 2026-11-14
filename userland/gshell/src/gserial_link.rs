@@ -81,7 +81,7 @@ impl Link {
         self.close(); self.ready = false; self.retry = now.wrapping_add(2000);
         // Preserve last-ID to prevent re-execution, but never replay partial OUT.
         if !self.opening_ready {
-            if self.sending_notice { self.notice_len = 0; self.notice_drop = 0; }
+            if self.sending_notice { self.notice_len = 0; }
             else { self.frozen = false; self.len = 0; self.done = true; }
         }
     }
@@ -112,13 +112,21 @@ impl Link {
             let mut line = Line { bytes: [0;REMOTE_GSERIAL_LINE_MAX as usize], n: 0 };
             let _ = write!(line, "GS OUT {} {} {} {}", core::str::from_utf8(&self.boot).unwrap(),
                 core::str::from_utf8(id).unwrap(), drop, len);
-            self.opening_ready = false; self.open(&line, now); return;
+            self.opening_ready = false; self.open(&line, now);
+            // This header reports the preceding losses exactly once.
+            if self.h >= 0 && self.sending_notice { self.notice_drop = 0; }
+            return;
         }
         let mut n = Notice { serial: 0, dropped: 0, generation: 0, service: 0,
             kind: 0, length: 0, reserved: 0, data: [0;LINK_NOTIFY_DATA_MAX as usize] };
         let rc = unsafe { (os32api::api().host_notice_read)(self.generation,
             REMOTE_SVC_GSERIAL as u32, &mut n as *mut _ as *mut u8) };
-        if rc == OS32_ERR_STALE { self.ready = false; self.retry = now.wrapping_add(2000); return; }
+        if rc == OS32_ERR_STALE {
+            // STALE proves the old generation ended, before the next READY.
+            self.last = None; self.done = false; self.frozen = false; self.len = 0;
+            self.notice_len = 0; self.notice_drop = 0;
+            self.ready = false; self.retry = now.wrapping_add(2000); return;
+        }
         if rc == OS32_ERR_AGAIN && now.wrapping_sub(self.retry) < 0x8000_0000 {
             self.ready = false; self.retry = now; return;
         }
@@ -182,7 +190,7 @@ impl Link {
                 self.generation = generation; self.ready = true;
                 self.retry = now.wrapping_add(2000);
             } else { self.failed(now); return; }
-        } else if self.sending_notice { self.notice_len = 0; self.notice_drop = 0; }
+        } else if self.sending_notice { self.notice_len = 0; }
         else { self.frozen = false; self.len = 0; self.done = true; }
         self.close();
     }

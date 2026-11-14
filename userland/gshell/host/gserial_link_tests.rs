@@ -59,7 +59,7 @@ fn ready_retry_generation_and_isolation() {
     inject(8,65533,1,b"\x0100000001 ping\n"); assert!(poll(&mut l,1911).is_empty());
     command(&mut l,1912);
     inject(7,65533,1,b"\x0100000002 ping\n"); assert!(poll(&mut l,1913).is_empty());
-    with(|m|m.notice_rc=OS32_ERR_STALE); poll(&mut l,1914);
+    with(|m|m.notice_rc=OS32_ERR_AGAIN); poll(&mut l,1914);
     poll(&mut l,3913); assert_eq!(with(|m|m.opens.len()),2);
     with(|m|m.notice_rc=0); ready(&mut l,3914);
     assert!(with(|m|m.opens.last().unwrap().ends_with("00000001 running")));
@@ -173,8 +173,8 @@ fn again_refreshes_ready_in_same_generation() {
 #[test]
 fn generation_reset_is_confirmed_before_receiving() {
     let mut l=setup(0); ready(&mut l,0); command(&mut l,10);
-    with(|m|m.notice_rc=OS32_ERR_STALE); poll(&mut l,11);
-    with(|m| {m.notice_rc=0;m.response=b"gen 8 svc 65533\n".to_vec();});
+    inject(7,65533,2,b""); poll(&mut l,11);
+    with(|m|m.response=b"gen 8 svc 65533\n".to_vec());
     poll(&mut l,2011);
     for t in 2012..2020 { poll(&mut l,t); if l.h<0 { break; } }
     assert!(!l.ready); assert!(l.last.is_none());
@@ -195,4 +195,30 @@ fn maximum_wire_and_overflow() {
     let mut over=bytes.clone(); over.insert(10,b'x');
     inject(7,65533,1,&over); assert!(poll(&mut l,10).is_empty());
     inject(7,65533,1,&bytes); assert_eq!(poll(&mut l,11),vec![bytes]);
+}
+
+#[test]
+fn notice_drop_is_reported_once_and_inflight_losses_survive() {
+    let mut l=setup(0);
+    l.emit(b"!",b"gs:! ready v1\r\n",0);
+    l.emit(b"!",b"gs:! ready v1\r\n",0);
+    ready(&mut l,0); with(|m|m.response.clear()); poll(&mut l,10);
+    assert!(with(|m|m.opens.last().unwrap().contains(" ! 15 15")));
+    for t in 11..14 { poll(&mut l,t); }
+    l.emit(b"!",b"gs:! cui done\r\n",14); poll(&mut l,15);
+    assert!(with(|m|m.opens.last().unwrap().contains(" ! 0 15")));
+    l.emit(b"!",b"gs:! wd expired\r\n",16);
+    l.emit(b"!",b"gs:! ready v1\r\n",17); poll(&mut l,18);
+    assert!(with(|m|m.opens.last().unwrap().contains(" ! 17 15")));
+    for t in 19..22 { poll(&mut l,t); }
+    l.emit(b"!",b"gs:! cui done\r\n",22); poll(&mut l,23);
+    assert!(with(|m|m.opens.last().unwrap().contains(" ! 0 15")));
+}
+#[test]
+fn first_ready_after_stale_has_no_previous_id() {
+    let mut l=setup(0); ready(&mut l,0); command(&mut l,10);
+    with(|m|m.notice_rc=OS32_ERR_STALE); poll(&mut l,11);
+    with(|m| {m.notice_rc=0;m.response=b"gen 8 svc 65533\n".to_vec();});
+    poll(&mut l,2011);
+    assert!(with(|m|m.opens.last().unwrap().ends_with("none idle")));
 }

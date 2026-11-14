@@ -47,6 +47,8 @@ def main():
         if args.mutate:
             original = source.read_text()
             for name, old, new in [
+                ('notice-drop-reused', 'if self.h >= 0 && self.sending_notice { self.notice_drop = 0; }', 'if false { self.notice_drop = 0; }'),
+                ('stale-keeps-id', 'self.last = None; self.done = false; self.frozen = false; self.len = 0;', 'self.done = false; self.frozen = false; self.len = 0;'),
                 ('again-no-ready', 'if rc == OS32_ERR_AGAIN && now.wrapping_sub(self.retry)', 'if false && now.wrapping_sub(self.retry)'),
                 ('generation-no-reset-ready', 'if reset_ready {', 'if false {'),
                 ('wire-too-short', 'len > WIRE_MAX', 'len > REMOTE_GSERIAL_LINE_MAX as usize'),
