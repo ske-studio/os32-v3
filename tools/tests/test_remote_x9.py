@@ -34,6 +34,12 @@ def main():
                             '--target', target, '--out-dir', str(dest)], cwd=ROOT, check=True)
             generated = (dest / 'kapi/kapi_generated.c').read_text()
             assert 'return con_sink_capture(op);' in generated
+            for name in ('open', 'status', 'read', 'write', 'close', 'notice_read', 'notice_serial'):
+                assert 'return kapi_host_' + name + '(' in generated
+            if target == 'ppc-powermac':
+                assert generated.count('ppc_kapi_wait_once();') == 2
+                assert 'rshell_active = active;' in generated
+                assert 'return (int)0;' in generated
             assert 'kernel/console/con_sink.c' in (ROOT / 'build/ppc-kboot.mk').read_text()
         x86 = out / 'x86-pc98'
         for name in OUTPUTS:
