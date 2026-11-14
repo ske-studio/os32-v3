@@ -151,7 +151,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |---|---|
 |USER printf・通常の fd1 出力|sys_write(1) → redirect／pipe → 既定時だけ console_write → console_stream|
 |USER kprintf adapter|USER 整数書式化 → shell_putchar → console_stream|
-|USER shell_print_utf8 adapter|shell_putchar → console_stream。色は無視|
+|USER shell_print_utf8|元の KAPI slot を保持。PPC provider → console_write で UTF-8 復号・FB 描画と LAN/ESCC 各 1 回の写し|
 |hello・clear/cls|既存 shell_putchar → console_stream|
 |kernel 自身の kprintf|既存の書式化 → ログ専用 provider → pm_log_write|
 

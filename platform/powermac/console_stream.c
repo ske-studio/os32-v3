@@ -48,3 +48,9 @@ void pm_console_clear(void)
     tvram_clear();
     console_stream_write("\033[2J\033[H", 7);
 }
+
+/* USER UTF-8 echo follows fd1's decoded console path, including its one mirror. */
+void shell_print_utf8(const char *text, u8 color)
+{
+    console_write(text, kstrlen(text), color);
+}
