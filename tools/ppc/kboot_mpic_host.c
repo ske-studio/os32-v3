@@ -74,11 +74,11 @@ void _start(void)
         pm_mpic_set_ipi_handler(handler); external(&frame);
         check(delivered==1 && used==2); expect(1,0x200b0,0,1);
         struct irq_claim claim;
-        check(platform_irq_claim(2,&claim));
-        check(!platform_irq_claim(1,&claim));
+        check(platform_irq_claim(2,&claim)==1);
+        check(platform_irq_claim(1,&claim)<0);
         used=0; platform_irq_complete(&claim); platform_irq_complete(&claim);
         check(used==1); expect(0,0x200b0,0,1);
-        check(!platform_irq_claim(255,&claim) && !platform_irq_claim(128,&claim));
+        check(platform_irq_claim(255,&claim)<0 && platform_irq_claim(128,&claim)<0);
         stage=22; used=0;
         check(pm_mpic_send_self_ipi(0) && !pm_mpic_send_self_ipi(1));
         check(used==1); expect(0,0x20040,1,1);

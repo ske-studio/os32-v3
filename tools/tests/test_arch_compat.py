@@ -9,6 +9,10 @@ CHECK = dict(name='arch-compat-host', tier=2, budget=15, needs=[], covers=[
     'platform/pc98/link_platform.c', 'platform/powermac/link_platform.c',
     'net/link_platform.h', 'include/types.h', 'include/kernel_tick.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
+    'platform/powermac/mpic.c', 'platform/powermac/mpic.h',
+    'platform/powermac/mpic_tree.h', 'arch/ppc/ppc_frame.h',
+    'arch/ppc/ppc_trap.h', 'include/platform_irq.h',
+    'platform/powermac/platform_irq_limits.h', 'kernel/irq/irq_math.h',
     'kernel/idle_work.h', 'arch/ppc/arch_io.h'])
 import os
 from pathlib import Path
@@ -26,7 +30,7 @@ REQUIRED = {'AC-TIME-1', 'AC-TIME-2', 'AC-TIME-3',
             'AC-SYNC-1', 'AC-SYNC-2', 'AC-IRQ-1'}
 
 
-def exercise(root, work, vectors):
+def exercise(root, work, vectors, mpic=None):
     (work / 'io.h').write_text('u32 irq_save(void);\n'
         'void irq_restore(u32); void _idle(void);\n')
     (work / 'arch_io.h').write_text('u32 ppc_irq_save(void);\n'
@@ -41,10 +45,12 @@ def exercise(root, work, vectors):
             '-Werror', '-ffreestanding', '-nostdlib', '-static', '-fno-pie',
             '-no-pie', '-fno-stack-protector', '-I' + str(work), '-I' + str(root),
             '-I' + str(root / 'include'), '-DPROVIDER_SOURCE="' + str(source) + '"',
-            str(src), '-o', str(exe)], check=True)
+            *(['-DPM_MPIC_HOST_TEST', '-DMPIC_SOURCE="' + str(mpic or root / 'platform/powermac/mpic.c') + '"',
+               '-I' + str(root / 'arch/ppc'), '-I' + str(root / 'platform/powermac')]
+              if provider == 'powermac' else []), str(src), '-o', str(exe)], check=True)
         rc = host32.run([str(exe)], runner='qemu').returncode
         if rc != 0:
-            print('FAIL AC-TIME-3/host-counter ' + provider, flush=True)
+            print('FAIL compatibility vectors ' + provider, flush=True)
             return False
         print('PASS AC-TIME-3/host-counter ' + provider, flush=True)
     return True
@@ -64,7 +70,8 @@ def run(ctx):
         if not exercise(ctx.root, work, vectors):
             return 1
         for name in IDS:
-            print('UNIMPL ' + name, flush=True)
+            print(('PASS ' if name.startswith('AC-IRQ-1') else 'UNIMPL ') + name +
+                  (' powermac (pc98 UNIMPL)' if name.startswith('AC-IRQ-1') else ''), flush=True)
         cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
         if not cc.is_file() or not os.access(cc, os.X_OK):
             print('SKIP PowerPC cross compile: toolchain unavailable', flush=True)
@@ -78,6 +85,19 @@ def run(ctx):
                 str(ctx.root / 'platform/powermac/link_platform.c'), '-o', str(work / 'ppc.o')], check=True)
             print('PASS PowerPC provider cross compile', flush=True)
         if ctx.mutate:
+            product = (ctx.root / 'platform/powermac/mpic.c').read_text()
+            for label, old, new in (
+                ('claim-zero', ')) return IRQ_ERR_INVAL;', ')) return 0;'),
+                ('missing-finish', '*out = (struct irq_claim){token, token, 1, 1};',
+                 'out->line = token; out->native_token = token; out->deliver = 1;'),
+                ('double-eoi', 'active = 0;\n    write_reg(EOI, 0);',
+                 'active = 0;\n    write_reg(EOI, 0); write_reg(EOI, 0);')):
+                assert product.count(old) == 1
+                mutant_path = work / 'mpic.c'
+                mutant_path.write_text(product.replace(old, new).replace(
+                    'struct irq_claim claim;', 'struct irq_claim claim = {0};'))
+                assert not exercise(ctx.root, work, vectors, mutant_path)
+                print('RED runtime: ' + label, flush=True)
             anchor = '0, 3, 0xfffffffdu, 0xffffffffu };'
             assert vectors.count(anchor) == 2
             before, after = vectors.rsplit(anchor, 1)

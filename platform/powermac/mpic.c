@@ -2,6 +2,7 @@
  * setup: openpic.c:212-299; completion: FreeBSD openpic.c:342-351.
  * No reset wait, PCI unmask, DEC registration, or common IRQ bitmap. */
 #include "mpic.h"
+#include "kernel/irq/irq_math.h"
 #include "ppc_trap.h"
 #define FEATURE 0x1000U
 #define CONFIG 0x1020U
@@ -93,15 +94,17 @@ u32 pm_mpic_source_count(void) { return sources; }
 int platform_irq_claim(unsigned token, struct irq_claim *out)
 {
     if (!ready || !out || active || token == PM_MPIC_SPURIOUS ||
-        (token >= sources && token != PM_MPIC_IPI_VECTOR)) return 0;
-    out->native_token = token;
+        (token >= sources && token != PM_MPIC_IPI_VECTOR)) return IRQ_ERR_INVAL;
+    /* No topology provider yet: logical lines retain native vector numbers. */
+    *out = (struct irq_claim){token, token, 1, 1};
     active_token = token;
     active = 1;
     return 1;
 }
 void platform_irq_complete(const struct irq_claim *claim)
 {
-    if (!claim || !active || claim->native_token != active_token) return;
+    if (!claim || !claim->needs_finish || !active ||
+        claim->native_token != active_token) return;
     active = 0;
     write_reg(EOI, 0);
 }
@@ -111,9 +114,9 @@ void pm_mpic_external(struct ppc_frame *frame)
     unsigned token = read_reg(IACK) & 255U;
     if (token == PM_MPIC_SPURIOUS) return;
     struct irq_claim claim;
-    if (platform_irq_claim(token, &claim)) {
+    if (platform_irq_claim(token, &claim) > 0) {
         if (token == PM_MPIC_IPI_VECTOR && ipi_handler) ipi_handler(frame);
-        platform_irq_complete(&claim);
+        if (claim.needs_finish) platform_irq_complete(&claim);
     } else {
         /* Unexpected hardware vector still owns an IACK; release it once. */
         write_reg(EOI, 0);

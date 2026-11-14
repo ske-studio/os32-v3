@@ -27,7 +27,7 @@ def host(out, source, expected=0):
     out.mkdir(parents=True, exist_ok=True)
     command(['gcc','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static',
              '-std=gnu11','-O2','-Wall','-Wextra','-Werror','-DPM_MPIC_HOST_TEST',
-             *['-I'+str(v.ROOT/p) for p in ('arch/ppc','include','platform/powermac')],
+             *['-I'+str(v.ROOT/p) for p in ('.', 'arch/ppc','include','platform/powermac')],
              source,v.ROOT/'tools/ppc/kboot_mpic_host.c','-o',out/'host'])
     p=subprocess.run(['qemu-i386',out/'host'],capture_output=True,timeout=10)
     (out/'host.log').write_bytes(p.stdout)
