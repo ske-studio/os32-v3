@@ -1,0 +1,14 @@
+[Unit]
+Description=OS32 host agent for %i
+
+[Service]
+Type=simple
+User=os32-host
+ExecStart=/usr/bin/python3 /opt/os32/tools/host_agent_service.py --config /etc/os32/host-agent/%i.json
+Restart=on-failure
+RestartSec=2
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target
