@@ -119,6 +119,42 @@ const RUN_REFUSED: i32 = 0;
 /// 正典は `include/config.h` の `SYS_SYSTEM_CFG`。
 static SYSTEM_CFG: &[u8] = b"/etc/system.cfg\0";
 
+static LANTRACE_GS_PATH: &[u8] = b"/tmp/lantrace_gs.txt\0";
+struct LanTrace { entries: [(&'static str, u32); 16], len: usize }
+impl LanTrace {
+    const fn new() -> Self { Self { entries: [("", 0); 16], len: 0 } }
+    fn mark(&mut self, name: &'static str) {
+        if self.len < self.entries.len() {
+            self.entries[self.len] = (name, unsafe { (os32api::api().get_tick)() });
+            self.len += 1;
+        }
+    }
+    fn write(&self) {
+        use core::fmt::Write;
+        struct Buffer { bytes: [u8; 1024], len: usize }
+        impl core::fmt::Write for Buffer {
+            fn write_str(&mut self, s: &str) -> core::fmt::Result {
+                if s.len() > self.bytes.len() - self.len { return Err(core::fmt::Error); }
+                self.bytes[self.len..self.len + s.len()].copy_from_slice(s.as_bytes());
+                self.len += s.len(); Ok(())
+            }
+        }
+        let mut out = Buffer { bytes: [0; 1024], len: 0 };
+        for i in 0..self.len {
+            let (name, tick) = self.entries[i];
+            let delta = if i == 0 { 0 } else { tick.wrapping_sub(self.entries[i - 1].1) };
+            let _ = writeln!(out, "gs_{} tick={} delta={}", name, tick, delta);
+        }
+        unsafe {
+            let a = os32api::api();
+            let fd = (a.sys_open)(LANTRACE_GS_PATH.as_ptr(), 0x01 | 0x0100 | 0x0200);
+            if fd >= 0 { let _ = (a.sys_write)(fd, out.bytes.as_ptr(), out.len as u32); (a.sys_close)(fd); }
+        }
+    }
+}
+static mut LANTRACE_GS: LanTrace = LanTrace::new();
+
+
 /// **デバッグ専用スイッチ** (票 W3 §4.1、ユーザー決定 2026-09-06)。
 ///
 /// v1.1 の「ESC で即 CUI」「上部の `OS32 GUI shell ESC:CUI F1..F5` バー」
@@ -154,6 +190,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     }
     os32api::os32_init(api);
 
+    unsafe { LANTRACE_GS = LanTrace::new(); LANTRACE_GS.mark("start"); }
     let st = wm::g();
     *st = wm::GuiState::NEW;
     /* SHM の先頭 (KAPI のデータフィールド)。スロットは +192KB から 16KB ずつ。 */
@@ -202,15 +239,21 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     /* 設定レジストリ (票 S4 §2)。**gfx attach の後・最初の合成の前**に 1 回。
      * DB が無い / 壊れている / 版が新しいときも既定値で起動を続ける
      * (DESIGN §5 の fallback)。 */
+    unsafe { LANTRACE_GS.mark("config_start"); }
     st.cfg = settings::load(0);
+    unsafe { LANTRACE_GS.mark("config_done"); }
 
     /* 字形 engine (T7b-b3)。lease の open は段 B の open 文脈 (WM 外の通常
      * 文脈) でだけ通るので、gui_register の後・最初の合成の前のここで開く。
      * 開けなければ KCG だけで描く (次の consume で 1 回だけ開き直す)。 */
+    unsafe { LANTRACE_GS.mark("font_start"); }
     font::open_at_safe_point(st, st.cfg.font_set);
+    unsafe { LANTRACE_GS.mark("font_done"); }
 
     /* デスクトップ。全画面 present は WM だけ (契約 G4)。 */
+    unsafe { LANTRACE_GS.mark("composite_start"); }
     wm::composite_full(st);
+    unsafe { LANTRACE_GS.mark("composite_done"); }
 
     /* 起動時通知 (票 S4 §2 の B3)。**最初の合成の後**に仕込み、実際に出るのは
      * top-level の最初の周回 (`settings::consume`)。gshell 実行中の `kprintf`
@@ -218,8 +261,10 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * 届く唯一の経路。 */
     settings::startup_notice(&st.cfg);
     loop_notice();
+    unsafe { LANTRACE_GS.mark("open_lan_start"); }
     gserial::open(st, serial_timeout);
     gserial::open_lan(st, serial_timeout);
+    unsafe { LANTRACE_GS.mark("ready_queued"); LANTRACE_GS.write(); }
     font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
@@ -684,6 +729,7 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         (a.ime_set_render)(core::ptr::null_mut());
         (a.gfx_shutdown)();
     }
+    unsafe { LANTRACE_GS.mark("cfg_save_start"); }
     if !st.quit && !cfg_set_gui(b"0") {
         /* 失敗: GFX を戻してデスクトップへ復帰し、action は捨てる。 */
         gfx::init();
@@ -705,12 +751,15 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         );
         return true;
     }
+    unsafe { LANTRACE_GS.mark("cfg_save_done"); LANTRACE_GS.mark("font_close_start"); }
     session::clear();
     /* shell lease を閉じる (retire も残りを閉じるが、閉じてから抜ける)。 */
     font::close_all();
+    unsafe { LANTRACE_GS.mark("font_close_done"); }
     unsafe {
         let a = os32api::api();
         (a.tvram_clear)();
+        LANTRACE_GS.mark("notify_wait_start");
         gserial::cui_done(st);
         loop {
             // Saving config/closing resources can span ticks after the last WM cycle.
@@ -719,7 +768,10 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
             gserial::poll_lan(st);
             (a.sys_halt)();
         }
+        LANTRACE_GS.mark("notify_wait_done");
         (a.rshell_set_active)(1);
+        LANTRACE_GS.mark("switch_shell");
+        LANTRACE_GS.write();
         (a.sys_switch_shell)(CUI_SHELL.as_ptr());
     }
     false

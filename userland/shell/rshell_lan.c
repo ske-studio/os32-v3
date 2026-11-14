@@ -17,6 +17,62 @@ static u8 result[REMOTE_RESULT_BODY_MAX];
 static u32 result_len;
 static int accepting;
 
+#define LANTRACE_MAX 32
+#define LANTRACE_SAVE_PATH "/tmp/lantrace_rs.txt"
+#define LANTRACE_GS_PATH "/tmp/lantrace_gs.txt"
+static struct { const char *name; u32 tick; } trace[LANTRACE_MAX];
+static unsigned int trace_count;
+static int trace_active;
+
+static void trace_add(const char *name)
+{
+    if (trace_active && trace_count < LANTRACE_MAX) {
+        trace[trace_count].name = name;
+        trace[trace_count++].tick = g_api->get_tick();
+    }
+}
+
+static u32 trace_delta(unsigned int i)
+{
+    return i ? trace[i].tick - trace[i - 1].tick : 0;
+}
+
+static void trace_save(void)
+{
+    char line[128];
+    int fd = g_api->sys_open(LANTRACE_SAVE_PATH, KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
+    if (fd < 0) return;
+    for (unsigned int i = 0; i < trace_count; i++) {
+        int n = snprintf(line, sizeof(line), "%s tick=%u delta=%u\n", trace[i].name,
+                         (unsigned int)trace[i].tick, (unsigned int)trace_delta(i));
+        if (n > 0 && (unsigned int)n < sizeof(line)) g_api->sys_write(fd, line, n);
+    }
+    g_api->sys_close(fd);
+}
+
+static void trace_file(const char *path)
+{
+    char buf[128];
+    int fd = g_api->sys_open(path, KAPI_O_RDONLY);
+    if (fd < 0) return;
+    int n;
+    while ((n = g_api->sys_read(fd, buf, sizeof(buf) - 1)) > 0) {
+        buf[n] = 0;
+        g_api->kprintf(ATTR_WHITE, "%s", buf);
+    }
+    g_api->sys_close(fd);
+}
+
+void rsh_lan_trace_show(void)
+{
+    for (unsigned int i = 0; i < trace_count; i++)
+        g_api->kprintf(ATTR_WHITE, "%s tick=%u delta=%u\n", trace[i].name,
+                       (unsigned int)trace[i].tick, (unsigned int)trace_delta(i));
+    if (!trace_count) trace_file(LANTRACE_SAVE_PATH);
+    trace_file(LANTRACE_GS_PATH);
+}
+
+
 static void boot_text(char *out)
 {
     static const char hex[] = "0123456789abcdef";
@@ -122,7 +178,9 @@ static int send_ready(void)
              boot, REMOTE_MODE_CUI, id, state);
     attempted = 1;
     ready_tick = g_api->get_tick();
+    trace_add("ready_send");
     int rc = exchange(req, 0, 0, reply, sizeof(reply));
+    trace_add("ready_done");
     if (rc) { ready = 0; return rc; }
     p = reply;
     if (strncmp(p, "gen ", 4)) goto bad;
@@ -155,7 +213,10 @@ int rsh_lan_flush(unsigned int id, unsigned int dropped)
                  boot, id, (unsigned int)result_len);
     } else snprintf(req, sizeof(req), "%s %s %08x %u %u", REMOTE_REQ_RSH_OUT,
                     boot, id, dropped, (unsigned int)result_len);
-    return exchange(req, result, result_len, reply, sizeof(reply));
+    trace_add(accepting ? "accept_send" : "out_send");
+    int rc = exchange(req, result, result_len, reply, sizeof(reply));
+    trace_add(accepting ? "accept_done" : "out_done");
+    return rc;
 }
 
 /* Only our reserved service is consumed. The known generation survives exit;
@@ -251,6 +312,8 @@ int rsh_lan_poll(void)
     rc = command(&notice, &id, line);
     if (rc) return rc;
     if (have_id && id <= last_id) return OS32_ERR_EXIST;
+    trace_active = !str_eq(line, "rshell lantrace");
+    if (trace_active) { trace_count = 0; trace_add("notify_consumed"); }
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
     if (rc) return rc;
     rc = g_api->con_sink_stat(0, &before);
@@ -264,7 +327,9 @@ int rsh_lan_poll(void)
         g_api->kprintf(ATTR_YELLOW, "%s", "> ");
         g_api->kprintf(ATTR_WHITE, "%s", line);
         g_api->kprintf(ATTR_WHITE, "%s", "\n");
+        trace_add("execute_start");
         accepting = rsh_lan_execute(line);
+        trace_add("execute_end");
         (void)sh_refused_take();
     }
     state = REMOTE_STATE_DONE;
@@ -284,8 +349,12 @@ finish:
     else handoff = accepting;
 end:
     g_api->con_sink_capture(CON_SINK_CAPTURE_END);
+    trace_add("capture_end");
     if (handoff) {
+        trace_add("execute_start");
+        trace_save();
         int status = rsh_lan_handoff(line);
+        trace_add("execute_end");
         ready = 0;
         attempted = 0; /* Immediate CUI READY if the launch returned. */
         accepting = handoff = 0;
