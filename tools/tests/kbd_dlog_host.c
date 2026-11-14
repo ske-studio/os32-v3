@@ -576,3 +576,5 @@ int main(int argc, char **argv)
 void pc98_serial_puts_polled(const char *s) { (void)s; }
 int pc98_serial_gate_active(void) { return 0; }
 #include "serial_emergency_host.h"
+
+int con_sink_capture_active(void) { return 0; }
