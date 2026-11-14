@@ -35,8 +35,10 @@ class CommandTransport:
         self.port = int(port if port is not None else os.getenv('OS32_OPERATOR_PORT', '8027'))
         self.sock = None
         self.events = []
+        self.submit_timeout_ms = False
 
     def close(self):
+        self.submit_timeout_ms = False
         if self.sock is not None:
             self.sock.close()
             self.sock = None
@@ -89,6 +91,9 @@ class CommandTransport:
             if obj.get('event') == 'log':
                 self.events.append(obj)
             else:
+                if op == 'probe':
+                    self.submit_timeout_ms = (obj.get('ok') is True and
+                                              obj.get('submit_timeout_ms') is True)
                 return obj
 
     def call(self, op, timeout, **fields):
@@ -103,7 +108,12 @@ class CommandTransport:
 
     def submit(self, mode, line, timeout):
         return self.call('submit', timeout, mode=mode, line=line,
-                         timeout_ms=max(1, int(timeout * 1000)))
+                         **self._submit_timeout(timeout))
+
+    def _submit_timeout(self, timeout):
+        if self.submit_timeout_ms:
+            return dict(timeout_ms=max(1, int(timeout * 1000)))
+        return {}
 
     def result(self, ident, wait_ms, timeout):
         return self.call('result', timeout, id=ident, wait_ms=wait_ms)
@@ -156,7 +166,7 @@ class CommandTransport:
             time.sleep(0.05)
         try:
             submitted = self._call('submit', deadline, mode=mode, line=line,
-                                   timeout_ms=max(1, int(timeout * 1000)))
+                                   **self._submit_timeout(timeout))
             if not submitted.get('ok'):
                 return submitted
             ident = submitted['id']

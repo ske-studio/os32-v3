@@ -120,7 +120,7 @@ class OperatorSocket:
             pending = self.operator.pending
             self._send(client, dict(ok=True, agent_generation=self.operator.generation,
                 commit=info['commit'], config=info['config'], peer=info['peer'],
-                hello=self.operator.session is not None,
+                hello=self.operator.session is not None, submit_timeout_ms=True,
                 ready={k: ready[k] for k in ('mode', 'last_id', 'state')} if ready else None,
                 pending=dict(id=pending['id'], state=pending['state'].lower()) if pending else None))
         elif op == 'submit':
