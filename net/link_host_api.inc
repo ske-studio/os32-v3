@@ -1,4 +1,5 @@
 /* 要求行の解析と非同期ホスト API・所有者回収。link.c から取り込む。 */
+#include "remote_control.h"
 
 /* 100Hz: 1000ms without peer progress (NET_HOSTSVC_DESIGN §6).
  * Separate from last_rx_tick, which the old STATUS scheduler also writes.
@@ -122,8 +123,11 @@ u32 link_decl_len(const char *req, u32 len)
     if (!tok(req, len, 0, &a0, &b0)) return 0;
     if (tok_eq(req, a0, b0, "ECHO")) which = 1;
     else if (tok_eq(req, a0, b0, "PUT")) which = 2;
+    else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;
     else if (tok(req, len, 1, &a1, &b1)) {
-        if ((tok_eq(req, a0, b0, "CLIP") || tok_eq(req, a0, b0, "os32.clip")) && tok_eq(req, a1, b1, "PUT")) which = 2;
+        if ((tok_eq(req, a0, b0, "RSH") || tok_eq(req, a0, b0, "GS") ||
+             tok_eq(req, a0, b0, "PDIAG")) && tok_eq(req, a1, b1, "OUT")) which = 5;
+        else if ((tok_eq(req, a0, b0, "CLIP") || tok_eq(req, a0, b0, "os32.clip")) && tok_eq(req, a1, b1, "PUT")) which = 2;
         else if ((tok_eq(req, a0, b0, "PRINT") || tok_eq(req, a0, b0, "os32.print")) && tok_eq(req, a1, b1, "DATA")) which = 3;
     }
     if (which < 0) return 0;

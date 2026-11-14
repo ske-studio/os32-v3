@@ -46,6 +46,12 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
 TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (
+    ('remote-log-missing', 'link_host_api.inc',
+     '    else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;\n',
+     '', 'decl_len_parsing'),
+    ('remote-field-count-missing', 'link_host_api.inc',
+     '        if (n < which + 1) return 0;',
+     '        if (n < 1) return 0;', 'decl_len_parsing'),
     ('l0-timeout-not-counted', 'link_selftest.inc',
      'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
      'if (rc == OS32_ERR_AGAIN)',
