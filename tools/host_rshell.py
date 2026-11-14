@@ -16,6 +16,7 @@ class Operator:
         self.ready = None
         self.pending = None
         self.notices = []
+        self.results = {}
 
     def session_start(self, session):
         self.session = session
@@ -24,7 +25,7 @@ class Operator:
     def session_reset(self):
         self.session = None
         self.ready = None
-        if self.pending is not None:
+        if self.pending is not None and self.pending['state'] not in ('done', 'truncated'):
             self.pending['state'] = 'UNKNOWN'
 
     def accept_ready(self, generation, session, boot, mode, last_id, state):
@@ -36,15 +37,12 @@ class Operator:
                 (last_id == 'none' and state != 'idle')):
             return False
         boot = boot.lower()
-        if self.pending is not None and self.pending['boot'] != boot:
+        if (self.pending is not None and self.pending['state'] not in ('done', 'truncated') and
+                self.pending['boot'] != boot):
             self.pending['state'] = 'UNKNOWN'
         self.ready = dict(boot=boot, mode=mode, last_id=last_id, state=state)
-        # READY cannot supply a missing result. A guest that no longer reports
-        # this execution leaves it UNKNOWN until OUT or an explicit resume.
-        if (self.pending is not None and self.pending['state'] == 'running' and
-                not self.pending.get('accepted') and
-                (last_id != self.pending['id'] or state != 'running')):
-            self.pending['state'] = 'UNKNOWN'
+        # A periodic READY may precede consumption of our notification. Its
+        # previous ID/idle state is not evidence that execution was lost.
         if (self.pending is not None and self.pending.get('accepted') and
                 self.pending['boot'] == boot and mode == 'gui'):
             self.pending['gui_ready'] = True
@@ -67,6 +65,7 @@ class Operator:
             pending['state'] = 'done'
 
     def submit(self, mode, line, client):
+        self.take_result()  # Retain an unclaimed completion before reusing the slot.
         if self.pending is not None:
             raise RuntimeError('busy')
         if self.session is None or self.ready is None or self.ready['mode'] != mode:
@@ -111,10 +110,10 @@ class Operator:
         if (generation != self.generation or session != self.session or session is None or
                 self.ready is None or boot.lower() != self.ready['boot']):
             return False
-        if dropped != 0 or length != len(body) or length > RESULT_MAX:
+        if dropped < 0 or length != len(body) or length > RESULT_MAX:
             return False
         if mode == 'gui' and ident == '!':
-            if not body.startswith(b'gs:! '):
+            if dropped or not body.startswith(b'gs:! '):
                 return False
             self.notices.append(body)
             if (self.pending is not None and self.pending.get('accepted') and
@@ -143,12 +142,18 @@ class Operator:
         else:
             return False
         pending['result'] = body
-        pending['state'] = 'done'
+        pending['drop'] = dropped
+        pending['state'] = 'truncated' if dropped else 'done'
+        if mode == 'cui' and pending['line'] == 'exit':
+            self.ready = None
+        if dropped:
+            self.take_result()
         return True
 
     def take_result(self):
-        if self.pending is None or self.pending['state'] != 'done':
+        if self.pending is None or self.pending['state'] not in ('done', 'truncated'):
             return None
         result = self.pending
         self.pending = None
+        self.results[result['id']] = result
         return result

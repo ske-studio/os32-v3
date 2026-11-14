@@ -158,6 +158,21 @@ int rsh_lan_flush(unsigned int id, unsigned int dropped)
     return exchange(req, result, result_len, reply, sizeof(reply));
 }
 
+/* Only our reserved service is consumed. The known generation survives exit;
+ * a changed generation already discards its old mailbox entries in the kernel. */
+void rsh_lan_reset(void)
+{
+    HostNotice notice;
+    unsigned int discarded = 0;
+    if (generation && g_api->host_notice_read) {
+        while (!g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))
+            discarded++;
+    }
+    ready = attempted = 0;
+    if (discarded)
+        g_api->kprintf(ATTR_YELLOW, "rshell: discarded %u stale LAN notices\n", discarded);
+}
+
 static int command(const HostNotice *n, u32 *id, char *line)
 {
     const unsigned int prefix = REMOTE_ID8_HEX_DIGITS + 1;

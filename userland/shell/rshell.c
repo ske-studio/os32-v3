@@ -443,6 +443,7 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
         return SH_STATUS_ERROR;
     }
 
+    rsh_lan_reset();
     g_api->rshell_set_active(1);
     rsh_in_rshell = 1;
     g_api->kprintf(ATTR_GREEN, "%s", "Remote shell active (ESC to exit)\n");
@@ -589,6 +590,7 @@ rshell_exit:
      *                     次のコマンドの終端と取り違える (票 §2-2 の裏)。 */
     if (ln.bytes > 0) rshell_end_reply();
 
+    rsh_lan_reset();
     rsh_in_rshell = 0;
     /* **arm 中で未確認なら、抜ける前にここで戻す** (往復 4 B4)。
      * 抜けたあとは ser_wd_poll を呼ぶ者が居ないので、番犬が仕掛かったまま

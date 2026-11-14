@@ -177,7 +177,9 @@ class OperatorSocket:
             self.operator.notices.clear()
             response = dict(ok=True, notices=notices)
         else:
-            pending = self.operator.pending
+            pending = self.operator.results.get(ident)
+            if pending is None:
+                pending = self.operator.pending
             if pending is None or pending['id'] != ident:
                 response = dict(ok=False, error='NO_SUCH_ID', detail='unknown id')
             else:
@@ -186,9 +188,11 @@ class OperatorSocket:
                     return
                 body = pending['result'] or b''
                 response = dict(ok=True, state='pending' if state == 'running' else state,
-                                drop=0, body_b64=_b64(body), complete=state == 'done')
-                if state == 'done':
-                    self.operator.take_result()
+                                drop=pending.get('drop', 0), body_b64=_b64(body), complete=state == 'done')
+                if state in ('done', 'truncated'):
+                    if pending is self.operator.pending:
+                        self.operator.take_result()
+                    self.operator.results.pop(ident, None)
         client['wait'] = None
         self._send(client, response)
 

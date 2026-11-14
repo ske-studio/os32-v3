@@ -120,6 +120,31 @@ def test(path):
     assert operator.accept_output(7, 1, boot, ident, 0, body, len(body), 'cui')
     send(dict(op='result', id=ident, wait_ms=0))
     assert receive()['complete'] and len(notify.sent) == 3
+    # Delayed completion without a CLI must not keep the submission slot busy.
+    send(dict(op='submit', mode='cui', line='ver'))
+    old_id = receive()['id']
+    sock.close()
+    pump()
+    assert operator.accept_output(7, 1, boot, old_id, 0, body, len(body), 'cui')
+    sock = connect()
+    send(dict(op='submit', mode='cui', line='ver'))
+    new_id = receive()['id']
+    send(dict(op='result', id=old_id, wait_ms=0))
+    saved = receive()
+    assert saved.get('complete') and base64.b64decode(saved['body_b64']) == body, 'saved result unavailable'
+    assert operator.pending['id'] == new_id, 'saved result consumed current slot'
+    assert operator.accept_output(7, 1, boot, new_id, 7, body, len(body), 'cui')
+    send(dict(op='result', id=new_id, wait_ms=0))
+    truncated = receive()
+    assert truncated.get('state') == 'truncated' and not truncated['complete'], 'truncated reported complete'
+    assert truncated['drop'] == 7, 'drop count lost'
+    send(dict(op='submit', mode='cui', line='exit'))
+    exit_id = receive()['id']
+    assert operator.accept_output(7, 1, boot, exit_id, 0, b'\x04', 1, 'cui')
+    send(dict(op='submit', mode='cui', line='ver'))
+    assert receive()['error'] == 'NOT_READY'
+    send(dict(op='result', id=exit_id, wait_ms=0))
+    assert receive()['complete']
     os.write(sock.fileno(), struct.pack('!I', 1) + b'{')
     assert receive()['error'] == 'BAD_REQUEST'
     os.write(sock.fileno(), struct.pack('!I', mod.RECORD_MAX + 1))
@@ -139,6 +164,9 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("pending = self.operator.results.get(ident)", "pending = None", 'saved result unavailable'),
+            ("complete=state == 'done'", "complete=state in ('done', 'truncated')", 'truncated reported complete'),
+            ("drop=pending.get('drop', 0)", 'drop=0', 'drop count lost'),
             ("now >= pending.get('result_deadline', float('inf'))", 'False',
              'result timeout left running'),
             ('if size > RECORD_MAX:', 'if size > RECORD_MAX + 1:', 'oversize accepted'),

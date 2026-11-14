@@ -192,6 +192,9 @@ def main():
                 ('serial read during LAN execution', ('lan', 'accepting = rsh_lan_execute(line);',
                     '(void)g_api->serial_trygetchar(); accepting = rsh_lan_execute(line);')),
                 ('GUI starts without acceptance', ('lan', 'if (handoff) {', 'if (handoff || accepting) {')),
+                ('entry stale notices retained', ('rshell', '    rsh_lan_reset();\n    g_api->rshell_set_active(1);', '    g_api->rshell_set_active(1);')),
+                ('exit stale notices retained', ('rshell', '    rsh_lan_reset();\n    rsh_in_rshell = 0;', '    rsh_in_rshell = 0;')),
+                ('stale drain disabled', ('lan', 'while (!g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))', 'while (0 && !g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))')),
                 ('LAN exit return discarded', ('rshell', 'rsh_lan_poll() == RSH_LAN_EXIT',
                     'rsh_lan_poll() == 999')),
                 ('UART SFS allowed', ('rshell', 'if (!g_api->sys_is_mounted(RSHELL_HOST_PREFIX)) {', 'if (0) {'))]:

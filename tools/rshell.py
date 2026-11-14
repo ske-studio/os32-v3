@@ -80,6 +80,9 @@ def main(argv=None):
         result = client.request('cui', line, args.timeout)
         if result.get('state') == 'serial' and args.transport == 'auto':
             return serial_command(args, line)
+        if result.get('state') == 'truncated':
+            print('不完全 (truncated): drop=' + str(result.get('drop', 0)), file=sys.stderr)
+            return 1
         if result.get('state') != 'done' or not result.get('complete') or not result.get('ok'):
             print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)
             return 1

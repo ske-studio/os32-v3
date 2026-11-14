@@ -194,6 +194,7 @@ int rsh_lan_handoff(const char *line);
 /* Returned after the LAN exit reply attempt and capture END. */
 #define RSH_LAN_EXIT 2
 int rsh_lan_poll(void);
+void rsh_lan_reset(void);
 int rsh_lan_flush(unsigned int id, unsigned int dropped);
 void shell_cmd_env_init(void);
 void shell_cmd_script_init(void);

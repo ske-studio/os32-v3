@@ -49,7 +49,6 @@ def test(path):
     assert not output(gen=41), 'old generation accepted'
     assert not output(boot='f' * 32)
     assert not output(ident='00000002')
-    assert not output(drop=1)
     assert not output(length=len(body) + 1)
     assert not output(data=b'> version\n\x04')
     assert not output(data=body[:-1]), 'missing EOT accepted'
@@ -91,14 +90,45 @@ def test(path):
         assert op.accept_ready(42, 1, BOOT, 'cui', ident, 'running')
         assert op.pending['state'] == 'running'
         assert op.accept_ready(42, 1, BOOT, 'cui', last_id, state)
-        assert op.pending['state'] == 'UNKNOWN', 'READY left running'
+        assert op.pending['state'] == 'running', 'stale READY lost operation'
         assert op.take_result() is None and len(n.sent) == 1
         assert op.accept_output(42, 1, BOOT, ident, 0, body, len(body), 'cui')
         assert op.take_result()['result'] == body
         op.submit('cui', 'ver', None)
         assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+        assert op.pending['state'] == 'running', 'stale READY lost operation'
+        assert op.accept_ready(42, 1, 'f' * 32, 'cui', 'none', 'idle')
+        assert op.pending['state'] == 'UNKNOWN'
+        assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
         op.resume()
         assert op.pending is None and len(n.sent) == 2
+    # An OUT after the CLI left is retained while the next submission proceeds.
+    ident = op.submit('cui', 'ver', None)
+    assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+    assert op.pending['state'] == 'running', 'stale READY lost operation'
+    assert op.accept_output(42, 1, BOOT, ident, 0, body, len(body), 'cui')
+    op.session_reset()
+    op.session_start(3)
+    assert op.accept_ready(42, 3, 'f' * 32, 'cui', 'none', 'idle')
+    assert op.pending['state'] == 'done', 'completed result became UNKNOWN'
+    assert op.accept_ready(42, 3, BOOT, 'cui', 'none', 'idle')
+    next_id = op.submit('cui', 'ver', None)
+    assert op.results[ident]['result'] == body, 'unclaimed result lost'
+    assert op.pending['id'] == next_id
+    assert op.accept_output(42, 3, BOOT, next_id, 5, body, len(body), 'cui'), 'drop rejected'
+    assert op.pending is None and op.results[next_id]['state'] == 'truncated', 'drop not finalized'
+    assert op.results[next_id]['drop'] == 5
+    exit_id = op.submit('cui', 'exit', None)
+    assert op.accept_output(42, 3, BOOT, exit_id, 0, b'\x04', 1, 'cui')
+    try:
+        op.submit('cui', 'ver', None)
+    except RuntimeError as exc:
+        assert str(exc) == 'not ready', 'exit left READY'
+    else:
+        raise AssertionError('exit left READY')
+    assert op.results[exit_id]['state'] == 'done'
+    assert op.accept_ready(42, 3, BOOT, 'cui', exit_id, 'done')
+    op.submit('cui', 'ver', None)
     print('PASS remote-x4')
 
 
@@ -111,8 +141,13 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
-            ("(last_id != self.pending['id'] or state != 'running')",
-             'False', 'READY left running'),
+            ("# previous ID/idle state is not evidence that execution was lost.",
+             "# previous ID/idle state is not evidence that execution was lost.\n        if self.pending is not None and last_id != self.pending['id']:\n            self.pending['state'] = 'UNKNOWN'", 'stale READY lost operation'),
+            ("self.take_result()  # Retain an unclaimed completion before reusing the slot.",
+             "pass", 'busy'),
+            ('if dropped < 0 or length != len(body) or length > RESULT_MAX:',
+             'if dropped != 0 or length != len(body) or length > RESULT_MAX:', 'drop rejected'),
+            ("if mode == 'cui' and pending['line'] == 'exit':", 'if False:', 'exit left READY'),
             ("if self.pending is not None:\n            raise RuntimeError('busy')", "if False:\n            raise RuntimeError('busy')", 'busy sent'),
             ('generation != self.generation or session != self.session or session is None or', 'False or session != self.session or session is None or', 'old generation accepted'),
             ("if not body.endswith(b'\\x04'):", "if False:", 'missing EOT accepted'),

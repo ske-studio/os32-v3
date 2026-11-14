@@ -29,10 +29,17 @@ static void shell_print(u8 attr, const char *fmt, ...)
     }
 }
 static void buzz(void) {}
+static int shell_capture(u32 op)
+{
+    int rc = capture_op(op);
+    if (op == CON_SINK_CAPTURE_END && lan_exit)
+        queue(33, "stale during exit");
+    return rc;
+}
 static int serial_get(void)
 {
     CHECK(!active); ++serial_reads;
-    if (lan_exit && serial_reads == 1) return -1;
+    if (lan_exit && serial_reads == 1) { CHECK(!pending); queue(32, "exit"); return -1; }
     if (lan_exit) return "exit\n"[serial_pos++]; /* Bound a lost-return mutant. */
     if (serial_phase == 0) {
         /* LAN arrives after the first serial character, with gaps in the line. */
@@ -84,7 +91,7 @@ int main(void)
     api.get_tick = now; api.sys_yield = yield; api.sys_halt = halt;
     api.boot_token_get = boot; api.host_open = open_host; api.host_close = close_host;
     api.host_status = status_host; api.host_read = read_host; api.host_write = write_host;
-    api.host_notice_read = read_notice; api.con_sink_capture = capture_op;
+    api.host_notice_read = read_notice; api.con_sink_capture = shell_capture;
     api.con_sink_stat = stat_sink; api.con_sink_read = read_sink;
     api.kprintf = shell_print; api.buz_off = buzz;
     api.serial_trygetchar = serial_get; api.kbd_trygetchar_local = local_get;
@@ -120,10 +127,14 @@ int main(void)
     CHECK(serial_reads == reads && begins == ends && !active && !handle);
     lan_exit = 1; serial_reads = serial_pos = 0;
     int eots = serial_eot;
-    queue(32, "exit");
+    queue(32, "stale before reopen");
     CHECK(cmd_rshell_resident(1, argv) == 0);
     CHECK(!resident_active && !rsh_in_rshell && !pending && serial_reads == 1);
+    CHECK(strstr(serial_echo, "discarded 1 stale LAN notices"));
     CHECK(serial_eot == eots + 1); /* Initial prompt only; LAN owns the exit EOT. */
+    queue(33, "stale after exit");
+    rsh_lan_reset();
+    CHECK(!pending);
     puts("GREEN X11: serial half-line, LAN ownership, ACCEPT/200/END, scope, serial echo/EOT/exit");
     return 0;
 }

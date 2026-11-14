@@ -56,7 +56,7 @@ def test(path):
     out = Output()
     with patch.object(mod, 'CommandTransport', return_value=fake), \
          patch.object(mod, 'serial_command', side_effect=serial), \
-         patch.object(sys, 'stdout', out), patch.object(sys, 'stderr', io.StringIO()):
+         patch.object(sys, 'stdout', out), patch.object(sys, 'stderr', io.StringIO()) as err:
         fake.result = {'state': 'serial'}
         assert mod.main(['cmd', 'ver']) == 0 and serial_calls == ['ver']
         for tail in (['ls', '-l', '/usr/bin'], ['--', 'ls', '-l', '/usr/bin'],
@@ -81,6 +81,8 @@ def test(path):
         assert out.buffer.getvalue() == b'OK\r\n'
         fake.result['complete'] = False
         assert mod.main(['cmd', 'ver']) != 0
+        fake.result = {'ok': True, 'state': 'truncated', 'complete': False, 'drop': 5}
+        assert mod.main(['cmd', 'ver']) != 0 and '不完全' in err.getvalue(), 'truncated not reported'
         assert mod.main(['--resume']) == 0 and fake.calls[-1] == ('resume',)
         assert mod.main(['--probe']) == 0 and fake.calls[-1] == ('probe',)
         assert mod.main(['--transport', 'lan', 'cmd', '']) == 0
@@ -96,6 +98,7 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("if result.get('state') == 'truncated':", "if False:", 'truncated not reported'),
             ('nargs=argparse.REMAINDER', "nargs='*'", 'command options consumed'),
             ("print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)\n            return 1",
              "print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)\n            return 0", 'unknown returned success'),
