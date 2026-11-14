@@ -4620,6 +4620,26 @@ fn k80_stop_culprit_wins_over_fullscreen_owner() {
     fullscreen::reset();
 }
 
+#[test]
+fn remote_g3_delivery_does_not_consume_notice() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static READS: AtomicUsize = AtomicUsize::new(0);
+    unsafe extern "C" fn read(_: u32, _: u32, _: *mut u8) -> i32 {
+        READS.fetch_add(1, Ordering::SeqCst); -7
+    }
+    crate::mocks::init();
+    READS.store(0, Ordering::SeqCst);
+    let mut api = unsafe { core::ptr::read(os32api::api()) };
+    api.host_notice_read = read;
+    os32api::os32_init(Box::into_raw(Box::new(api)));
+    let shm = crate::mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    crate::mocks::HOST_NOTICE_SERIAL.store(1, Ordering::SeqCst);
+    crate::wm::wm_cycle(&mut st, crate::input::Ctx::Wait);
+    assert_eq!(READS.load(Ordering::SeqCst), 0);
+    assert_eq!(g2w_events(&st, 2).len(), 1);
+}
+
 // B5: gshell は通知を消費せず、前景のアプリへ payload なしで知らせる。
 #[test]
 fn host_notice_cycles_deliver_once_to_foreground() {
