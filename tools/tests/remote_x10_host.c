@@ -205,8 +205,8 @@ int main(void)
         CHECK(tick - start == OS32_TICK_HZ && !handle); stall = 0;
     }
     next_ready(); bad_reply = 1; CHECK(rsh_lan_poll() == OS32_ERR_IO); bad_reply = 0;
-    next_ready(); queue(4, "exit"); CHECK(rsh_lan_poll() == 1); output(4, 0);
-    CHECK(body_len == 1);
+    next_ready(); queue(4, "exit"); CHECK(rsh_lan_poll() == RSH_LAN_EXIT); output(4, 0);
+    CHECK(body_len == 1 && !active && !handle && begins == ends);
     queue(5, "freeze error"); freeze_error = OS32_ERR_IO;
     CHECK(rsh_lan_poll() == OS32_ERR_IO && !active && begins == ends); freeze_error = 0;
     queue(6, "stat error"); stat_error = 1;

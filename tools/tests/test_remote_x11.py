@@ -99,9 +99,17 @@ int main(void) {
     print('GREEN X11 guest declaration: ACCEPT WDATA length and short request')
 
 
-def agent_test():
+def agent_test(mutation=None):
     sys.path.insert(0, str(ROOT / 'tools'))
     import host_agent
+    import host_rshell
+    if mutation:
+        source = (ROOT / 'tools/host_rshell.py').read_text()
+        old, new = mutation
+        assert source.count(old) == 1, old
+        namespace = {}
+        exec(compile(source.replace(old, new), 'host_rshell_mutant.py', 'exec'), namespace)
+        host_agent.Operator = namespace['Operator']
     a = host_agent.HostAgent(b'\x02\0\0\0\0\1', quiet=True)
     out = host_agent.ListSink()
     a._switch_to(dict(sess=1, epoch=1, mac=b'\x02\0\0\0\0\2'))
@@ -128,7 +136,51 @@ def agent_test():
     a._on_wdata(4, 1, failure, out)
     assert a.ledger[4]['resp'][0] == 200
     assert a.operator.take_result()['result'] == failure
-    print('GREEN X11 host: ACCEPT WDATA/echo/id checks, acceptance remains pending')
+    # Both event orders must complete only after ACCEPT and both GUI signals.
+    rid = 5
+    def request(line, data=None):
+        nonlocal rid
+        a._on_request(rid, 0, line.encode(), out)
+        if data is not None:
+            a._on_wdata(rid, 1, data, out)
+        status = a.ledger[rid]['resp'][0]
+        a._on_release(rid, out)
+        rid += 1
+        return status
+    def ready(token=boot, mode='gui'):
+        return request('RSH READY %s %s 1 none idle' % (token, mode))
+    def notice(token=boot, data=b'gs:! ready v1\n', drop=0):
+        return request('GS OUT %s ! %d %d' % (token, drop, len(data)), data)
+    for notice_first in (False, True):
+        assert ready(mode='cui') == 200
+        assert notice() == 200  # A notice before ACCEPT cannot complete a new id.
+        ident = a.operator.submit('cui', 'gui', None)
+        assert request('RSH ACCEPT %s %s %d' % (boot, ident, len(body)), body) == 200
+        assert a.operator.take_result() is None
+        assert notice('b' * 32) == 400
+        assert notice(drop=1) == 400
+        if notice_first:
+            assert notice() == 200
+            assert a.operator.take_result() is None
+            assert ready() == 200
+        else:
+            assert ready('b' * 32) == 200
+            assert notice('b' * 32) == 200
+            assert a.operator.take_result() is None
+            assert ready() == 200
+            assert a.operator.take_result() is None
+            assert notice(data=b'gs:! ready\n') == 200
+            assert a.operator.take_result() is None
+            assert notice() == 200
+        result = a.operator.take_result()
+        assert result and result['id'] == ident and result['result'] == body, 'GUI handoff not completed'
+        # Consuming the result frees the slot for the next GUI command.
+        gui_id = a.operator.submit('gui', 'ping', None)
+        reply = ('gs:%s end 0\n' % gui_id).encode()
+        assert request('GS OUT %s %s 0 %d' % (boot, gui_id, len(reply)), reply) == 200
+        assert a.operator.take_result()['id'] == gui_id
+    host_agent.Operator = host_rshell.Operator
+    print('GREEN X11 host: ACCEPT/failure, both GUI event orders, boot guards, slot release')
 
 
 def main():
@@ -140,8 +192,18 @@ def main():
                 ('serial read during LAN execution', ('lan', 'accepting = rsh_lan_execute(line);',
                     '(void)g_api->serial_trygetchar(); accepting = rsh_lan_execute(line);')),
                 ('GUI starts without acceptance', ('lan', 'if (handoff) {', 'if (handoff || accepting) {')),
+                ('LAN exit return discarded', ('rshell', 'rsh_lan_poll() == RSH_LAN_EXIT',
+                    'rsh_lan_poll() == 999')),
                 ('UART SFS allowed', ('rshell', 'if (!g_api->sys_is_mounted(RSHELL_HOST_PREFIX)) {', 'if (0) {'))]:
                 guest_test(folder, mutation); print('RED runtime:', name)
+            try:
+                agent_test(("pending.get('gui_ready') and pending.get('gui_notice')",
+                            "pending.get('gui_ready') and False"))
+            except AssertionError as error:
+                assert str(error) == 'GUI handoff not completed', str(error)
+                print('RED runtime: GUI handoff never completes')
+            else:
+                raise AssertionError('GUI completion mutant survived')
 
 
 def run(ctx):

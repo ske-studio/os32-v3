@@ -882,13 +882,9 @@ class HostAgent:
                         ent["got"], length, "cui" if parts[0] == "RSH" else "gui"):
                     status = HTTP_OK
         elif len(parts) == 5 and parts[:2] == ["RSH", "ACCEPT"]:
-            pending = self.operator.pending
-            if (pending and pending['state'] in ('running', 'UNKNOWN') and
-                    DECL_RE.fullmatch(parts[4]) and self.operator.accept_output(
-                        self.host_generation, session, parts[2], parts[3], 0,
-                        ent["got"], int(parts[4]), "cui")):
-                # Acceptance is not completion: GUI READY/notice is still due.
-                pending['state'] = 'running'
+            if (DECL_RE.fullmatch(parts[4]) and self.operator.accept_handoff(
+                    self.host_generation, session, parts[2], parts[3],
+                    ent["got"], int(parts[4]))):
                 status = HTTP_OK
         self._answer(rid, ent, status, body, None, out)
 
