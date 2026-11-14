@@ -38,6 +38,8 @@ $(addsuffix .bin,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw
 PPC_SH_DIR := $(PPC_USER_OUT)/sh
 PPC_SH_SRC := $(wildcard userland/shell/*.c)
 PPC_SH_OBJ := $(patsubst userland/shell/%.c,$(PPC_SH_DIR)/shell/%.o,$(PPC_SH_SRC))
+# Acceptance may rebuild only the USER UTF-8 adapter from a reverted source.
+PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/runtime.c
 PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o format.o stdio.o string.o ls.o help.o)
 PPC_SH_FLAGS := -include userland/ppc/sh/profile.h -Iuserland/ppc/sh/include $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
 
@@ -47,6 +49,10 @@ sh: $(PPC_USER_OUT)/sh.bin
 $(PPC_SH_DIR)/shell/%.o: userland/shell/%.c userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
+
+$(PPC_SH_DIR)/runtime.o: $(PPC_SH_RUNTIME_SRC) userland/ppc/sh/profile.h
+	@mkdir -p $(@D)
+	$(CC) $(PPC_SH_FLAGS) -Iuserland/ppc/sh -c $< -o $@
 
 $(PPC_SH_DIR)/%.o: userland/ppc/sh/%.c userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
