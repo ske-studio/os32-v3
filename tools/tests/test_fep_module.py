@@ -6,7 +6,9 @@ CHECK = dict(name='fep-module', tier=1, needs=[], budget=3.3,
             'tools/tests/fep_module_host.c',
             'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
-            'lib/kstring.c', 'lib/kstring_c.c'])
+            'lib/kstring.c', 'lib/kstring_c.c'],
+    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+)
 import argparse
 import os
 from pathlib import Path

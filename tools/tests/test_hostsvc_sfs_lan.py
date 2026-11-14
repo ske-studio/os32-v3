@@ -8,7 +8,9 @@ CHECK = dict(name='hostsvc-sfs-lan', tier=1, needs=[], budget=3.6, covers=['net/
     'include/net_eth.h', 'include/types.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_sfs_lan_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3', 'NET_HOSTSVC_DESIGN §11'],
+)
 
 import argparse
 import os

@@ -8,7 +8,9 @@ CHECK = dict(name='raster-splash-asset-host', tier=1,
             'tools/pc98pt.py', 'tools/gen_deploy_set.py',
             'tools/deploy_protect.py', 'userland/deploy.yaml',
             'tools/tests/test_raster_splash_asset.py'],
-    needs=['make:all', 'make:osri-enc2-core'], budget=3.3)
+    needs=['make:all', 'make:osri-enc2-core'], budget=3.3,
+    basis=['RASTER_SPLASH_S5_DESIGN §5'],
+)
 
 import argparse
 import importlib.util

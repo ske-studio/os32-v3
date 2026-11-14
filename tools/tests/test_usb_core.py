@@ -17,7 +17,10 @@ CHECK = dict(name='usb-core', tier=1, needs=[], budget=60,
                      'include/usb_platform.h', 'include/endian_dma.h', 'include/endian_le.h',
                      'include/types.h', 'include/callconv.h', 'arch/*/arch_endian_dma.h',
                      'lib/kstring.h', 'tools/tests/usb_fake_dev.c', 'tools/tests/test_usb_core.py',
-                     'tools/tests/host32.py', 'tools/tests/cc_cache.py'])
+                     'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
+    basis=['USB_DESIGN §4', 'USB_DESIGN §7'],
+    env_limit='実USB coreをfake device/HCで確認するが、実USB機器とHCの停止・IRQ遅延は再現しない。',
+)
 FLAGS = ['-std=gnu11', '-ffreestanding', '-fno-builtin', '-Wall', '-Wextra', '-Werror',
          '-Wvla', '-Werror=implicit-function-declaration', '-O2', '-m32',
          '-Iinclude', '-I.', '-Iarch/x86', '-nostdlib', '-fno-pie', '-no-pie']

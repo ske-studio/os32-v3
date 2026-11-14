@@ -4,7 +4,9 @@ CHECK = dict(name='fep-conn', tier=1, needs=[], budget=3.3,
     covers=['kernel/ime/ime_conn.c', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.h',
             'tools/tests/fep_conn_host.c', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk'])
+            'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+)
 import argparse
 import os
 from pathlib import Path

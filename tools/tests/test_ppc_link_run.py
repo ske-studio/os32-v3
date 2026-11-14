@@ -7,7 +7,9 @@ CHECK = dict(name='ppc-link-run-host', tier=2, budget=30, needs=[], covers=[
     'tools/remote_transport.py', 'tools/serialfs_host.py',
     'arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'platform/powermac/boot.c',
     'platform/powermac/escc.c', 'platform/powermac/escc_tree.c',
-    'platform/powermac/ofw.c'])
+    'platform/powermac/ofw.c'],
+    basis=['LAN_OPERATOR_DESIGN §7', 'AC-NET-3'],
+)
 import os
 from pathlib import Path
 import subprocess

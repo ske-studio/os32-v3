@@ -3,7 +3,9 @@
 CHECK = dict(name='gf-v2-life-host', tier=1, needs=[], budget=5,
     covers=['drivers/video/geforce/gf_v2_life.c', 'drivers/video/geforce/gf_v2_fence.c',
             'drivers/video/geforce/gf_v2.h', 'drivers/video/geforce/backend_geforce.c', 'tools/tests/gf_v2_life_host.c',
-            'tools/tests/test_gf_v2_life.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gf_v2_life.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §6-3'],
+)
 from pathlib import Path
 import argparse
 import tempfile

@@ -18,7 +18,9 @@ CHECK = dict(name='remote-x2', tier=1, needs=[], budget=5, covers=[
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/test_host_mailbox.py', 'tools/tests/test_remote_x2.py',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'])
+    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §5'],
+)
 
 
 def main():

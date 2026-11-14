@@ -1,7 +1,9 @@
 """Freestanding WAV parser and runtime mutation checks."""
 CHECK = dict(name='pcm-wav-host', tier=1, covers=[
     'userland/tests/pcm_wav.h', 'userland/tests/pcm_play.c',
-    'tools/tests/pcm_wav_host.c', 'tools/tests/test_pcm_wav.py'], needs=[], budget=2.9)
+    'tools/tests/pcm_wav_host.c', 'tools/tests/test_pcm_wav.py'], needs=[], budget=2.9,
+    kind='characterization',
+)
 
 from pathlib import Path
 import shutil

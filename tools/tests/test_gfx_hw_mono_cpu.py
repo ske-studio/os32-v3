@@ -11,7 +11,9 @@ from mutpar import build_in_tree
 CHECK = dict(name='gfx-hw-mono-cpu-host', tier=1, needs=[], budget=10, covers=[
     'gfx/gfx_hw_mono_cpu.c', 'gfx/gfx_hw_mono_cpu.h', 'include/gfx_hal.h',
     'tools/tests/gfx_hw_mono_cpu_host.c', 'tools/tests/test_gfx_hw_mono_cpu.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-1'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('bit-order', '0x80U >> (bit & 7)', '1U << (bit & 7)'),

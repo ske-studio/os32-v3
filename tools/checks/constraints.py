@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='constraints', tier=0,
     covers=['CLAUDE.md', 'docs/CONSTRAINTS.md', 'tools/check_constraints.py'],
-    needs=[], budget=2.3)
+    needs=[], budget=2.3,
+    basis=['CONSTRAINTS'],
+)
 
 
 def run(ctx) -> int:

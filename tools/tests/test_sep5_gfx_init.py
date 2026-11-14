@@ -7,7 +7,9 @@ CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
             'arch/x86/**', 'platform/pc98/**', 'lib/kstring.h', 'sdk/include/os32/**',
-            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'])
+            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'],
+    basis=['PPC_SEP5_DESIGN §2.1'],
+)
 import argparse
 from pathlib import Path
 import re

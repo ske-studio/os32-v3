@@ -17,7 +17,9 @@
 """
 CHECK = dict(name='build-id-host', tier=1,
     covers=['tools/gen_build_id.py'],
-    needs=[], budget=4.4)
+    needs=[], budget=4.4,
+    kind='characterization',
+)
 
 import os
 import pathlib

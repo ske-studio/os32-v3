@@ -9,7 +9,9 @@ CHECK = dict(name='gf-v2-gart-host', tier=1, needs=[], budget=5,
             'include/copy_units.h', 'arch/*/arch_copy.h',
             'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/test_gf_v2_gart.py', 'tools/tests/gf_v2_gart_host.c',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['HAL_V2_DESIGN §8', 'HAL_V2_DESIGN §11-6', 'HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx):

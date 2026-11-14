@@ -5,7 +5,9 @@ CHECK = dict(name='hwb-parse-host', tier=1, budget=5.8, needs=[],
             'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/hwb_parse_host.c', 'tools/tests/hwb_fake.h',
             'tools/tests/hwb_host.py', 'tools/tests/host32.py',
-            'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['HW_BASIC_DESIGN §2'],
+)
 import sys
 import hwb_host
 

@@ -7,7 +7,9 @@ CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
                      'drivers/input/*.h', 'drivers/char/serial.h',
                      'drivers/video/geforce/geforce_module.h',
                      'kernel/module/*.h', 'platform/pc98/legacy/v86_bios.h',
-                     'include/**'])
+                     'include/**'],
+    kind='characterization',
+)
 
 import argparse
 import os

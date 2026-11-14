@@ -18,7 +18,9 @@ I/O も静的配列も触らないので模型は要らない。
 """
 CHECK = dict(name='pci-decode-host', tier=4,
     covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
-    needs=[], budget=3.7)
+    needs=[], budget=3.7,
+    kind='characterization',
+)
 
 import pathlib
 import re

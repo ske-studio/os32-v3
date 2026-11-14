@@ -7,7 +7,9 @@ CHECK = dict(name='gf-v2-g4-supplement-host', tier=1, needs=[], budget=40,
             'hwdev/gf/accel_scale.c', 'hwdev/gf/*.h',
             'tools/tests/gf_accel_host.h', 'tools/tests/gf_accel_b3_host.c',
             'tools/tests/gf_accel_b4_host.c', 'tools/tests/gf_accel_b9_host.c',
-            'tools/tests/test_gf_v2_g4_supplement.py', 'tools/tests/test_gf_accel.py'])
+            'tools/tests/test_gf_v2_g4_supplement.py', 'tools/tests/test_gf_accel.py'],
+    basis=['HAL_V2_DESIGN §11-6', 'HAL_V2_DESIGN §13-1', 'GF_FEAT3_DESIGN §13'],
+)
 
 def run(ctx):
     import os

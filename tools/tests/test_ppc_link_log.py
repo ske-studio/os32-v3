@@ -5,7 +5,9 @@ CHECK = dict(name='ppc-link-log-host', tier=2, budget=30, needs=[], covers=[
     'tools/tests/ppc_link_log_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',
             'net/*.h', 'mm/kmalloc.h', 'include/kprintf.h',
             'drivers/net/gem/gem.h', 'sdk/include/os32/*.h',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['LAN_OPERATOR_DESIGN §5'],
+)
 from pathlib import Path
 import subprocess
 import tempfile

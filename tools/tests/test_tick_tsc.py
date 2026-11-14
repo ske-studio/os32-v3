@@ -5,7 +5,9 @@ CHECK = dict(name='tick-tsc-host', tier=4, needs=[], budget=5.0,
             'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'kernel/irq/irq.h',
             'kernel/time/tick_clock.h', 'include/types.h', 'lib/divdi3.c',
             'tools/tests/tick_tsc_host.c', 'tools/tests/test_tick_tsc.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['TICK_T123_DESIGN §2'],
+)
 from pathlib import Path
 import re
 import subprocess

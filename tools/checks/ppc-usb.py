@@ -27,7 +27,11 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
                      'tools/serialfs_host.py', 'tools/ppc/sd_run.py',
-                     'arch/ppc/kernel_boot.h'])
+                     'arch/ppc/kernel_boot.h'],
+    basis=['USB_DESIGN §4', 'USB_DESIGN §5', 'USB_DESIGN §6', 'USB_DESIGN §7'],
+    pins=['ARCH_CTX_DESIGN', 'ARCH_COMPAT_CONTRACT'],
+    env_limit='QEMUのUSBとUSER syscallを確認するが、実USB機器・HC・IRQの遅延やSTALLは再現せず、ticks=0の現行期待はARCH_CTX移行時に改める。',
+)
 
 
 def run(ctx):

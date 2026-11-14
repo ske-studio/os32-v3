@@ -1,7 +1,9 @@
 """ビルド目標の対の部品と、X-7 の明示的な FD 配備を確認する。"""
 CHECK = dict(name='build-no-deploy', tier=1,
     covers=[],
-    needs=['make:all'], budget=6.9)
+    needs=['make:all'], budget=6.9,
+    kind='characterization',
+)
 
 from pathlib import Path
 import re

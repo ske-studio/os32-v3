@@ -6,7 +6,9 @@ CHECK = dict(name='ci-split-host', tier=0,
                      'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
-             needs=[], budget=5.3)
+             needs=[], budget=5.3,
+    kind='characterization',
+)
 
 import json
 import os

@@ -15,7 +15,9 @@ CHECK = dict(name='remote-p2h', tier=1, needs=[], budget=5,
                      'tools/host_notify.py', 'tools/host_services.py',
                      'tools/remote_transport.py',
                      'tools/host_operator_socket.py', 'tools/ppc_link_transport.py',
-                     'tools/tests/test_remote_p2h.py'])
+                     'tools/tests/test_remote_p2h.py'],
+    basis=['LAN_OPERATOR_DESIGN §5'],
+)
 
 
 def load(name, path):

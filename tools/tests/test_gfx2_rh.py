@@ -13,7 +13,9 @@ CHECK = dict(name='gfx2-rh-host', tier=1, needs=[], budget=20,
             'gfx/v2/sw_table.c', 'gfx/v2/*.h', 'include/*.h', 'sdk/include/os32/*.h',
             'arch/*/arch_copy.h', 'mm/*.h', 'tools/tests/gfx2_rh_ref_host.c',
             'tools/tests/test_gfx2_rh.py', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'])
+            'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
+    basis=['HAL_V2_DESIGN §3-3', 'HAL_V2_DESIGN §13-1'],
+)
 MUTATIONS = [
     ('mono-bit-order', '0x80>>px', '1<<px'),
     ('rop-index', '(((p>>bit)&1)<<2)|(((s>>bit)&1)<<1)|((d>>bit)&1)', '(((d>>bit)&1)<<2)|(((s>>bit)&1)<<1)|((p>>bit)&1)'),

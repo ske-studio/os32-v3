@@ -10,7 +10,9 @@ from kernel_includes import include_flags
 CHECK = dict(name='gfxsync-write-host', tier=1, needs=[], budget=15,
              covers=['gfx/sync/sync_write.c', 'gfx/sync/sync_int.h', 'include/gfx_sync.h',
                      'tools/tests/gfxsync_write_host.c', 'tools/tests/test_gfxsync_write.py',
-                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['HAL_V2_DESIGN §10'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 
 def run_one(work, source):

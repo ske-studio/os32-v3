@@ -9,7 +9,9 @@ CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:all', 'make:assets/fonts/shin
                      'build/ppc-ram-root.json', 'include/config.h',
                      'tools/tests/test_kcg_ebdt.py', 'tools/tests/test_mkroot_image.py',
                      'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml',
-                     'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'requirements.txt'])
+                     'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'requirements.txt'],
+    basis=['PPC_KCG_LZ4_DESIGN §1', 'PPC_KCG_LZ4_DESIGN §2', 'PPC_KCG_LZ4_DESIGN §3', 'PPC_FBCON_DESIGN §2'],
+)
 import argparse
 import json
 import lz4.block

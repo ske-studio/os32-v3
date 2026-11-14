@@ -4,7 +4,9 @@ CHECK = dict(name='m3-lease-host', tier=1,
             'tools/tests/m3_lease_host.c', 'tools/tests/test_m3_lease.py',
             'tools/tests/host32.py', 'tools/tests/paging_source.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py'],
-    needs=['make:all'], budget=30)
+    needs=['make:all'], budget=30,
+    basis=['HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §11-4'],
+)
 
 def run(ctx) -> int:
     import os

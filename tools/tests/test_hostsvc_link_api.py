@@ -7,7 +7,9 @@ CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
             'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
             'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
-            'tools/tests/hostsvc_link_api_host.c'])
+            'tools/tests/hostsvc_link_api_host.c'],
+    basis=['NET_HOSTSVC_DESIGN §6', 'NET_HOSTSVC_DESIGN §7', 'NET_HOSTSVC_DESIGN §11'],
+)
 import argparse
 from pathlib import Path
 import shutil

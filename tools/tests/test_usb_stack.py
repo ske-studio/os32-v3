@@ -23,7 +23,10 @@ CHECK = dict(name='usb-stack', tier=1, needs=[], budget=60, covers=[
     'tools/tests/test_usb_stack.py', 'tools/tests/usb_stack_host.c',
     'tools/tests/usb_fake_ohci.c', 'tools/tests/usb_fake_dev.c',
     'tools/tests/usb_fake_ehci_min.c', 'tools/tests/test_usb_ohci.py',
-    'tools/tests/test_usb_core.py', 'tools/tests/host32.py', 'tools/tests/cc_cache.py'])
+    'tools/tests/test_usb_core.py', 'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
+    basis=['USB_DESIGN §4', 'USB_DESIGN §5', 'USB_DESIGN §6', 'USB_DESIGN §7'],
+    env_limit='実USB stackをframe駆動模型で確認するが、実HW停止とPCI障害は再現しない。',
+)
 # Each anchor is a unique product line, never a stand-in for core behavior.
 MUTATIONS = [
     ('ep0-capacity', 'ohci_sched.c', '    n = control ? 3u :',

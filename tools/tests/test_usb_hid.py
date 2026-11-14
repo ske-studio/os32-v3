@@ -16,7 +16,9 @@ CHECK = dict(name='usb-hid', tier=1, needs=[], budget=10, covers=[
     'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
     'drivers/usb/usb_desc.h', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'tools/tests/usb_hid_host.c',
-    'tools/tests/test_usb_hid.py', 'tools/tests/host32.py', 'tools/tests/cc_cache.py'])
+    'tools/tests/test_usb_hid.py', 'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
+    basis=['USB_DESIGN §5', 'USB_DESIGN §7'],
+)
 
 
 def check(mutate):

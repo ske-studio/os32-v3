@@ -10,7 +10,9 @@ CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=['make:all'],
                      'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
                      'include/boot_root.h', 'drivers/block/ram_ro.[ch]',
                      'drivers/base/dev.[ch]', 'fs/vfs*', 'fs/isofs/**',
-                     'fs/ramfs/**', 'lib/kstring*', 'tools/mkroot_image.py'])
+                     'fs/ramfs/**', 'lib/kstring*', 'tools/mkroot_image.py'],
+    basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §4', 'PPC_SHELL_DESIGN §5', 'PPC_SHELL_DESIGN §6', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_DESIGN §8', 'PPC_SHELL_DESIGN §11'],
+)
 
 
 def main():

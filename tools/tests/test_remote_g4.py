@@ -16,7 +16,10 @@ CHECK = dict(name='remote-g4', tier=1, needs=[], budget=10,
                      'tools/tests/test_remote_g4.py', 'tools/host_image.py',
                      'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/rshell_hwb.py', 'tools/rshell_peek.py',
-                     'tools/rshell_serial.py', 'tools/serialfs_host.py'])
+                     'tools/rshell_serial.py', 'tools/serialfs_host.py'],
+    basis=['LAN_OPERATOR_DESIGN §4'],
+    full_only=True,
+)
 
 
 def load(path):

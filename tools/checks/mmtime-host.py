@@ -3,7 +3,9 @@ CHECK = dict(name='mmtime-host', tier=1,
             'tools/tests/test_mmtime.py', 'tools/tests/host32.py',
             'tools/tests/cc_cache.py', 'sdk/include/os32/**', 'include/memmap.h',
             'include/abi.h', 'include/callconv.h', 'arch/x86/arch_abi.h'],
-    needs=[], budget=4.0)
+    needs=[], budget=4.0,
+    kind='characterization',
+)
 
 
 def run(ctx):

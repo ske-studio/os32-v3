@@ -8,7 +8,9 @@ CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=6.5, covers=[
     'platform/pc98/boot_names.c', 'platform/pc98/boot_names.h',
     'drivers/base/dev.c', 'drivers/base/dev.h',
     'tools/tests/hostsvc_media_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §11'],
+)
 
 import argparse
 import os

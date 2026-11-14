@@ -61,7 +61,10 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'tools/tests/host32.py',
     'tools/tests/kernel_includes.py',
     'tools/tests/kernel_boot_source.py',
-])
+],
+    basis=['NET_HOSTSVC_DESIGN §2'],
+    pins=['LAN_BULK_DESIGN'],
+)
 import argparse
 import os
 import re

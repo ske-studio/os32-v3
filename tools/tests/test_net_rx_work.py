@@ -9,7 +9,10 @@ CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
             'include/net_eth.h', 'include/kprintf.h', 'lib/kstring.h',
             'platform/pc98/tick_order.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/net_rx_work_host.c', 'tools/tests/test_net_rx_work.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['TICK_T123_DESIGN §3'],
+    pins=['LAN_BULK_DESIGN'],
+)
 from pathlib import Path
 import os
 import subprocess

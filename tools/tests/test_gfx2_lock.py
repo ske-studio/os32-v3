@@ -7,7 +7,9 @@ CHECK = dict(name='gfx2-lock-host', tier=1, needs=[], budget=15,
             'mm/pgalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_gfx2.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/gfx2_lock_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'include/copy_units.h', 'arch/x86/arch_copy.h', 'arch/ppc/arch_copy.h'])
+            'include/copy_units.h', 'arch/x86/arch_copy.h', 'arch/ppc/arch_copy.h'],
+    basis=['HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §7-5'],
+)
 from pathlib import Path
 import argparse
 import subprocess

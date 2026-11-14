@@ -4,7 +4,9 @@ CHECK = dict(name='gfx2-readback-host', tier=1,
             'include/gfx_sync.h', 'sdk/include/os32/os32_gfx2.h',
             'tools/tests/gfx2_readback_host.c', 'tools/tests/test_gfx2_readback.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx) -> int:

@@ -2,7 +2,9 @@
 """Model a CPU whose ID bit is immutable; run the real probe separately too."""
 CHECK = dict(name='x86-cpuid-guard-host', tier=1, needs=[], budget=5,
     covers=['arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h',
-            'tools/tests/test_x86_cpuid_guard.py', 'tools/tests/host32.py'])
+            'tools/tests/test_x86_cpuid_guard.py', 'tools/tests/host32.py'],
+    kind='characterization',
+)
 import argparse
 from pathlib import Path
 import re

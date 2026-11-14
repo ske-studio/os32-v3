@@ -13,7 +13,9 @@ CHECK = dict(name='gfx2-i3-guest-host', tier=1, needs=[], budget=20,
             'sdk/include/os32/*.h', 'lib/kstring_c.c', 'lib/kstring.h',
             'arch/*/arch_copy.h', 'mm/*.h',
             'tools/tests/gfx2_i3_guest_host.c', 'tools/tests/test_gfx2_i3_guest.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
+    basis=['HAL_V2_DESIGN §13-1', 'HAL_V2_DESIGN §13-2', 'HAL_V2_DESIGN §13-3'],
+)
 MUTATIONS = [
     ('current-mode', 'if (mode.w == desc.w && mode.h == desc.h)', 'if (1)'),
     ('shim-alias', 'mode.id, display);', 'mode.id, front);'),

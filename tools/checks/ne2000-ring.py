@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ne2000-ring', tier=4,
     covers=['drivers/net/ne2000/ne2000_ring.c', 'tools/tests/ne2000_ring_test.c'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    kind='characterization',
+)
 
 
 def run(ctx) -> int:

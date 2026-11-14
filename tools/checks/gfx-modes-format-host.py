@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx-modes-format-host', tier=1,
     covers=['include/gfx_format.h', 'include/gfx_mode.h', 'include/gfx_hal.h', 'tools/tests/gfx_modes_format_host.c', 'tools/tests/test_gfx_modes_format.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py'],
-    needs=[], budget=2.8)
+    needs=[], budget=2.8,
+    basis=['GFX_MODES_DESIGN §2', 'GFX_MODES_DESIGN §4', 'HAL_V2_DESIGN §3'],
+)
 
 
 def run(ctx) -> int:

@@ -7,7 +7,9 @@ CHECK = dict(name='hwb-wire-host', tier=1, budget=4.5, needs=[],
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
             'include/types.h', 'sdk/include/os32/os32_kapi_shared.h',
             'kdebug/recover_wire.h', 'kdebug/gfinit_wire.h',
-            'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h'])
+            'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h'],
+    basis=['HW_BASIC_DESIGN §2', 'HW_BASIC_DESIGN §3'],
+)
 
 import sys
 import hwb_host

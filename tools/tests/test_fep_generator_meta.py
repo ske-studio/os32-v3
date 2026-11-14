@@ -2,7 +2,9 @@
 """Check generated system dictionary metadata against the SQLite contents."""
 CHECK = dict(name='fep-generator-meta', tier=1, needs=[], budget=2.5,
              covers=['tools/fep_to_sqlite.py', 'assets/ipadic/COPYING',
-                     'assets/joyo_kanji.txt', 'tools/tests/test_fep_generator_meta.py'])
+                     'assets/joyo_kanji.txt', 'tools/tests/test_fep_generator_meta.py'],
+    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+)
 import argparse
 import hashlib
 import importlib.util

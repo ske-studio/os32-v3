@@ -2,7 +2,9 @@
 CHECK = dict(name='ppc-sh-stdio', tier=1, needs=[], budget=10,
     covers=['userland/ppc/sh/stdio.c', 'userland/ppc/sh/include/stdio.h',
             'tools/tests/test_ppc_sh_stdio.py', 'userland/ppc/sh/format.c', 'userland/ppc/sh/runtime.h',
-            'sdk/include/os32/*.h'])
+            'sdk/include/os32/*.h'],
+    basis=['PPC_SHELL_SC_DESIGN §2', 'PPC_SHELL_SC_DESIGN §4', 'PPC_SHELL_SC_DESIGN §5', 'PPC_SHELL_SC_DESIGN §8'],
+)
 
 import argparse
 import pathlib

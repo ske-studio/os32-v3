@@ -11,7 +11,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x1', tier=1, needs=[], budget=5,
              covers=['tools/host_services.py', 'include/remote_control.h',
-                     'tools/tests/test_remote_x1.py'])
+                     'tools/tests/test_remote_x1.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+)
 
 
 def test(path):

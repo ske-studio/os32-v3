@@ -10,7 +10,9 @@ CHECK = dict(name='trident-regs', tier=1, needs=[], budget=4.8,
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
             'include/types.h', 'include/memmap.h', 'gfx/palette.h', 'include/io.h',
-            'arch/x86/arch_io.h', 'platform/pc98/platform_io.h'])
+            'arch/x86/arch_io.h', 'platform/pc98/platform_io.h'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 import os
 from pathlib import Path

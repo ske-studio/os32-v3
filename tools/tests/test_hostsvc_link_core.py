@@ -7,7 +7,9 @@ CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
             'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
-            'tools/tests/hostsvc_link_core_host.c'])
+            'tools/tests/hostsvc_link_core_host.c'],
+    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §6', 'AC-NET-1', 'AC-NET-3'],
+)
 import argparse
 from pathlib import Path
 import shutil

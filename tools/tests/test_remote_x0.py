@@ -10,7 +10,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x0', tier=1, needs=[], budget=5,
     covers=['include/remote_control.h', 'net/host_mailbox.h', 'net/link.h',
-            'tools/host_services.py', 'tools/tests/test_remote_x0.py'])
+            'tools/host_services.py', 'tools/tests/test_remote_x0.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', '[C1]'],
+)
 
 SOURCE = r'''
 #include "remote_control.h"

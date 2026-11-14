@@ -2,7 +2,9 @@
 """Exercise Y4 binding and configuration fallback."""
 CHECK = dict(name='gfxsync-bind-host', tier=1, needs=[], budget=5,
     covers=['gfx/sync/sync_bind.c', 'gfx/sync/sync_int.h', 'include/gfx_sync.h',
-            'tools/tests/gfxsync_bind_host.c', 'tools/tests/test_gfxsync_bind.py', 'tools/tests/host32.py'])
+            'tools/tests/gfxsync_bind_host.c', 'tools/tests/test_gfxsync_bind.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §10'],
+)
 from pathlib import Path
 import argparse
 import subprocess

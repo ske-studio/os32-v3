@@ -6,7 +6,9 @@ CHECK = dict(name='gf-copy-case-host', tier=1, needs=[], budget=3.4,
             'kdebug/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
             'hwdev/gf/display/*.h', 'hwdev/*.h', 'include/**', 'mm/*.h',
             'gfx/*.h', 'drivers/video/geforce/*.h', 'drivers/pci/*.h',
-            'lib/serial_diag.h', 'lib/crc32_core.inc', 'kernel/irq/irq.h'])
+            'lib/serial_diag.h', 'lib/crc32_core.inc', 'kernel/irq/irq.h'],
+    basis=['GF_FEAT3_DESIGN §5', 'GF_FEAT3_DESIGN §13'],
+)
 
 import argparse
 import os

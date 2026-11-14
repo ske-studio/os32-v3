@@ -8,7 +8,9 @@ CHECK = dict(name='gf4-probes-host', tier=1, budget=16.3,
                      'drivers/base/dev.c', 'kernel/module/**',
                      'kernel/console/console_backend.h', 'arch/x86/kernel/idt.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'fs/fd_redirect.h',
-                     'fs/vfs.c', 'platform/pc98/boot_names.c'])
+                     'fs/vfs.c', 'platform/pc98/boot_names.c'],
+    basis=['GF_FEAT4_DESIGN §9', 'GF_FEAT4_DESIGN §10'],
+)
 from pathlib import Path
 import argparse
 import subprocess

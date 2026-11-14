@@ -15,7 +15,9 @@ CHECK = dict(name='arch-compat-host', tier=2, budget=15, needs=[], covers=[
     'kernel/idle_work.h', 'arch/ppc/arch_io.h', 'arch/ppc/kernel_dec.c',
     'arch/ppc/ppc_oea.h',
     'arch/ppc/ppc_pd.h', 'kernel/time/tick_clock.h',
-    'platform/powermac/kboot_info.h', 'kernel/irq/irq.h'])
+    'platform/powermac/kboot_info.h', 'kernel/irq/irq.h'],
+    basis=['ARCH_COMPAT_CONTRACT §4'],
+)
 import os
 from pathlib import Path
 import subprocess

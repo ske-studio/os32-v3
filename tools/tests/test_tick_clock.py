@@ -4,7 +4,9 @@ CHECK = dict(name='tick-clock-host', tier=4,
             'include/kernel_tick.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/tick_clock_host.c', 'tools/tests/test_tick_clock.py',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['TICK_ARCH_DESIGN §2'],
+)
 from pathlib import Path
 import subprocess
 import sys

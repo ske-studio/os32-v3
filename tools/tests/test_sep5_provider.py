@@ -7,7 +7,9 @@ CHECK = dict(name='sep5-provider-host', tier=1, needs=[], budget=5,
             'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c',
             'tools/tests/test_sep5_provider.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
-            'arch/x86/**', 'platform/pc98/**', 'mm/pgalloc.h', 'sdk/include/os32/**'])
+            'arch/x86/**', 'platform/pc98/**', 'mm/pgalloc.h', 'sdk/include/os32/**'],
+    basis=['PPC_SEP5_DESIGN §2.1', 'AC-DISPLAY-2'],
+)
 import argparse
 from pathlib import Path
 import subprocess

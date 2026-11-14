@@ -96,7 +96,9 @@ CHECK = dict(name='gf5-therm-t1', tier=1, needs=['make:all'], budget=4.8,
                  'sdk/**',
                  'assets/fonts/**',
                  'tools/fetch_fonts.py',
-             ])
+             ],
+    basis=['GF_FEAT5_DESIGN'],
+)
 import subprocess
 import sys
 import test_gf5 as suite

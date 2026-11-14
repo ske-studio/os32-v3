@@ -18,7 +18,9 @@ CHECK = dict(name='remote-u5b', tier=1, needs=[], budget=20,
                      'tools/host_agent_config.py', 'tools/host_linux.py',
                      'tools/host_notify.py', 'tools/host_operator_socket.py',
                      'tools/host_rshell.py', 'tools/host_services.py',
-                     'tools/tests/test_remote_u5b.py'])
+                     'tools/tests/test_remote_u5b.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+)
 
 FAKE = '''import os, signal, sys, time
 from pathlib import Path

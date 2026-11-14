@@ -8,7 +8,9 @@ CHECK = dict(name='type-contract', tier=1, needs=[], budget=180,
             'Makefile', 'build/**/*.mk', 'sdk/include/os32/**',
             'kernel/module/kdebug_imports.def', 'sdk/kapi.json',
             'boot/*.c', 'drivers/block/pc98pt.c', 'lib/sqlite3/sqlite3.c',
-            'userland/tests/sqlite_standalone/*.c'])
+            'userland/tests/sqlite_standalone/*.c'],
+    basis=['[C1]', '[ABI]', 'KAPI_SPEC §2'],
+)
 import argparse
 from collections import Counter
 import os

@@ -11,7 +11,10 @@ CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
             'tools/checks/ver-ppc-input-usb.py','platform/powermac/input_boot.h', 'platform/powermac/input_decode.c',
             'include/types.h', 'include/input_service.h', 'include/clock_source.h',
             'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
-            'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h'])
+            'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h'],
+    basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5'],
+    env_limit='製品USB入力Cの修飾・release・FIFO・公平性を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
+)
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/tests'))
 import host32

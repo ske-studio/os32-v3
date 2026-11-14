@@ -8,7 +8,9 @@ import host32
 CHECK = dict(name='copy-units-host', tier=1, needs=[], budget=10, covers=[
     'include/copy_units.h', 'arch/x86/arch_copy.h', 'arch/ppc/arch_copy.h',
     'tools/tests/host_arch/arch_copy.h', 'tools/tests/test_copy_units.py',
-    'tools/tests/host32.py'])
+    'tools/tests/host32.py'],
+    basis=['PPC_SEP5_DESIGN §2.2', 'PPC_SEP5_DESIGN §2.3', 'PPC_SEP5_DESIGN §6'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 PROBE = r'''
 #include "copy_units.h"

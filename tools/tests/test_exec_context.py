@@ -4,7 +4,9 @@ CHECK = dict(name='exec-context-host', tier=1,
             'include/exec_arch.h', 'arch/x86/arch_exec_storage.h',
             'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h',
             'tools/tests/test_exec_context.py', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py'], needs=[], budget=2.0)
+            'tools/tests/kernel_includes.py'], needs=[], budget=2.0,
+    kind='characterization',
+)
 from pathlib import Path
 import subprocess
 import cc_cache

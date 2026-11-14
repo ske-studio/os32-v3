@@ -12,7 +12,10 @@ CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=30.7,
             'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'userland/lib/font/**',
             'exec/shell_service.h', 'sdk/include/os32/os32_gui_shared.h',
             'sdk/include/os32/os32_kapi_shared.h',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['GF_FEAT3_DESIGN §7', 'GF_FEAT3_DESIGN §13'],
+    env_limit='CPUのfake描画と試験用adapterを確認するが、実DMA・GPU描画画素と性能は保証しない。',
+)
 from pathlib import Path
 import argparse
 import importlib.util

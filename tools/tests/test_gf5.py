@@ -87,7 +87,10 @@ CHECK = dict(name='gf5-host', tier=1, needs=['make:build/out/geforce/geforce_imp
                  'tools/tests/gf4_display_fake.h',
                  'tools/tests/gf_accel_host.h',
                  'include/types.h',
-             ])
+             ],
+    basis=['GF_FEAT5_DESIGN §2', 'GF_FEAT5_DESIGN §3', 'GF_FEAT5_DESIGN §4', 'GF_FEAT5_DESIGN §5', 'GF_FEAT5_DESIGN §6', 'GF_FEAT5_DESIGN §7', 'GF_FEAT5_DESIGN §8'],
+    env_limit='hostのGF部品とrunnerで制御分岐を確認するが、実GPUの温度・fan・ROMとbus障害は再現しない。',
+)
 
 from pathlib import Path
 import argparse

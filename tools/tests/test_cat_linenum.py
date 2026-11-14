@@ -32,7 +32,9 @@ FD 0 を読まない / 端末のままなら読みに行かない、の 4 つを
 """
 CHECK = dict(name='cat-linenum-host', tier=1,
     covers=['tools/tests/cat_linenum_host.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'tools/tests/mutpar.py'],
-    needs=[], budget=3.3)
+    needs=[], budget=3.3,
+    kind='characterization',
+)
 
 import os
 import pathlib

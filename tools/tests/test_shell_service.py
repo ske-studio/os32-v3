@@ -23,7 +23,9 @@ aux の選択は実物 exec_launch の runtime 試験で確認する。
 """
 CHECK = dict(name='shell-service-host', tier=1,
     covers=['exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/build_fixture.py', 'build/sdk-target.mk', 'sdk/target_profile_cli.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    kind='characterization',
+)
 
 from exec_source import exec_source
 from kernel_includes import include_dirs, include_flags

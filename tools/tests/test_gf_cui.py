@@ -5,7 +5,9 @@ CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=3.1,
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
             'userland/shell/cmd_gf2.c', 'kdebug/gf_command_wire.h',
             'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
-            'exec/appslot.c', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h'])
+            'exec/appslot.c', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    kind='characterization',
+)
 from pathlib import Path
 import subprocess
 import sys

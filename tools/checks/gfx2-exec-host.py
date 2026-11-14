@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-exec-host', tier=1,
     covers=['exec/exec_finish.inc', 'gfx/v2/gfx2_exec.h', 'tools/tests/gfx2_exec_host.c', 'tools/tests/test_gfx2_exec.py', 'tools/tests/host32.py'],
-    needs=[], budget=5.0)
+    needs=[], budget=5.0,
+    basis=['HAL_V2_DESIGN §7-3', 'HAL_V2_DESIGN §12-1'],
+)
 
 def run(ctx) -> int:
     import os

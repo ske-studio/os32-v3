@@ -3,7 +3,9 @@
 CHECK = dict(name='fb-pixel', tier=1, needs=[], budget=12,
     covers=['tools/ppc/fb_pixel.py', 'tools/tests/test_fb_pixel.py',
             'tools/gen_font16.py', 'tools/gen_g16.py',
-            'assets/fonts/**', 'tools/fetch_fonts.py', 'requirements.txt'])
+            'assets/fonts/**', 'tools/fetch_fonts.py', 'requirements.txt'],
+    kind='characterization',
+)
 
 import argparse
 import importlib.util

@@ -17,7 +17,9 @@ CHECK = dict(name='kcg-file-host', tier=1, needs=[], budget=15,
             'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
             'kernel/module/module_schema.h',
             'drivers/video/kcg/kcg_file*', 'drivers/video/kcg/kcg_module.h',
-            'fs/**', 'exec/*.h', 'mm/*.h', 'lib/kstring.h', 'lib/lz4.c', 'lib/lz4.h'])
+            'fs/**', 'exec/*.h', 'mm/*.h', 'lib/kstring.h', 'lib/lz4.c', 'lib/lz4.h'],
+    basis=['PPC_FBCON_DESIGN §2', 'PPC_KCG_LZ4_DESIGN §3', 'AC-GLYPH-1'],
+)
 FLAGS = ['-m32', '-std=gnu11', '-ffreestanding', '-fno-builtin', '-fno-pie',
          '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-D__cdecl=',
          '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections']

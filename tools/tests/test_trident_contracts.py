@@ -17,7 +17,9 @@ CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=6.2,
             'mm/physmem.h', 'exec/surface_limits.h', 'include/sys.h',
             'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h',
             'gfx/gfx.h', 'sdk/include/os32/os32_kapi_shared.h',
-            'sdk/include/os32/os32_generations.h'])
+            'sdk/include/os32/os32_generations.h'],
+    basis=['TRIDENT_FULL_DESIGN §9', 'TRIDENT_S3_DESIGN §2', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 import os
 from pathlib import Path

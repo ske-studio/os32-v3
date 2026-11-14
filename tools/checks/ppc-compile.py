@@ -9,7 +9,9 @@ CHECK = dict(name='ppc-compile', tier=1, budget=180, needs=['make:ppc-ci-image']
                      'arch/ppc/**', 'platform/powermac/**', 'init/ppc_kernel.c',
                      'userland/ppc/**', 'lib/**', 'include/**', 'sdk/**',
                      'kernel/**', 'mm/**', 'fs/**', 'gfx/**', 'drivers/**',
-                     'assets/fonts/**', 'tools/mkroot_image.py', 'tools/gen_unicode.c'])
+                     'assets/fonts/**', 'tools/mkroot_image.py', 'tools/gen_unicode.c'],
+    basis=['AC-BUILD-1'],
+)
 
 
 def run(ctx):

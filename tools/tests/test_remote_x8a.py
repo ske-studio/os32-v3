@@ -6,7 +6,9 @@ CHECK = dict(name='remote-x8a', tier=1, needs=[], budget=4.0,
                      'kernel/module/*.h', 'platform/pc98/legacy/v86_bios.h',
                      'tools/tests/test_remote_x8a.py', 'tools/tests/test_kbd_fgpoll.py',
                      'tools/tests/kbd_fgpoll_host.c', 'tools/tests/host32.py',
-                     'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**', 'build/config.mk'])
+                     'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**', 'build/config.mk'],
+    kind='characterization',
+)
 import argparse
 import os
 from pathlib import Path

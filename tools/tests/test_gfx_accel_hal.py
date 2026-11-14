@@ -17,7 +17,9 @@ CHECK = dict(name='gfx-accel-hal-host', tier=1, needs=[], budget=10, covers=[
     'include/pc98.h', 'include/memmap.h', 'exec/surface_limits.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_slots.h',
     'tools/tests/gfx_accel_hal_host.c', 'tools/tests/test_gfx_accel_hal.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-1', 'GFX_ACCEL_HAL_DESIGN §3-2'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('bridge-submit-begin', 'gfx/gfx_hw_submit.c',

@@ -3,7 +3,9 @@ CHECK = dict(name='osri-host', tier=1,
              covers=['tools/osri_profile.py', 'gfx/osri_profile.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
                      'tools/osri_enc2_*.py',
                      'tools/raster_obs_assets.py', 'lib/le_internal.h',
-                     'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=23.0)
+                     'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=23.0,
+    basis=['RASTER_SPLASH_DESIGN §3', 'RASTER_SPLASH_DESIGN §4', 'RASTER_SPLASH_PL_DESIGN §2', 'RASTER_SPLASH_PL_DESIGN §4', 'RASTER_SPLASH_ENC2_DESIGN'],
+)
 
 import argparse
 import ctypes

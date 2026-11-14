@@ -2,7 +2,9 @@
 """D0: runtime checks of the x86 generator's fixed argument ABI provider."""
 CHECK = dict(name='kapi-abi-host', tier=1, needs=[], budget=5,
     covers=['sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/kapi.json', 'sdk/target_profile.py',
-            'tools/tests/test_kapi_abi.py'])
+            'tools/tests/test_kapi_abi.py'],
+    basis=['KAPI_SPEC §2', '[ABI]'],
+)
 import argparse
 import json
 from pathlib import Path

@@ -5,7 +5,9 @@ CHECK = dict(name='remote-x9', tier=1, needs=[], budget=5,
             'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h',
             'sdk/rust/os32api/src/kapi_generated.rs', 'include/kapi_call_generated.h',
             'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc',
-            'build/ppc-kboot.mk', 'kernel/console/con_sink.c', 'tools/tests/test_remote_x9.py'])
+            'build/ppc-kboot.mk', 'kernel/console/con_sink.c', 'tools/tests/test_remote_x9.py'],
+    basis=['LAN_OPERATOR_DESIGN §3', '[ABI]'],
+)
 import argparse
 import json
 from pathlib import Path

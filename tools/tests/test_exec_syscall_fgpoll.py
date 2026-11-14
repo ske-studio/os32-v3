@@ -9,7 +9,9 @@ CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=2.8,
                      'exec/exec_syscall.inc', 'drivers/video/geforce/geforce_module.h',
                      'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',
-                     'include/**'])
+                     'include/**'],
+    basis=['AC-CTX-1', 'AC-CTX-4', 'AC-CTX-6', 'GF_GUARD_THERM_DESIGN §5'],
+)
 
 import argparse
 import os

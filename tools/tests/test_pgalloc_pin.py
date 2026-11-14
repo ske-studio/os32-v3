@@ -5,7 +5,9 @@ CHECK = dict(name='pgalloc-pin', tier=1, needs=[], budget=30,
             'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
             'tools/tests/pgalloc_pin_host.c', 'tools/tests/pgalloc_host_fixture.h',
             'tools/tests/test_pgalloc_pin.py', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py'])
+            'tools/tests/kernel_includes.py'],
+    kind='characterization',
+)
 import pathlib
 import subprocess
 import sys

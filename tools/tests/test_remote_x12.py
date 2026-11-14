@@ -16,7 +16,10 @@ CHECK = dict(name='remote-x12', tier=1, needs=[], budget=10,
                      'tools/rshell_serial.py', 'tools/rshell_peek.py',
                      'tools/rshell_hwb.py', 'tools/serialfs_host.py',
                      'tools/lanfs_host.py', 'tools/lan_bridge.py',
-                     'tools/host_image.py', 'tools/tests/test_remote_x12.py'])
+                     'tools/host_image.py', 'tools/tests/test_remote_x12.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §3'],
+    full_only=True,
+)
 
 
 class Output:

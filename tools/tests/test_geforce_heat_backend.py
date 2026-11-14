@@ -9,7 +9,9 @@ CHECK = dict(name='geforce-heat-backend', tier=1, needs=[], budget=3.4,
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
                      'gfx/gfx_internal.h', 'gfx/palette.h',
                      'drivers/video/pc98/pc98_route.h', 'kernel/module/*.h',
-                     'lib/kstring.h', 'build/config.mk'])
+                     'lib/kstring.h', 'build/config.mk'],
+    basis=['GF_GUARD_THERM_DESIGN §5', 'GF_GUARD_THERM_DESIGN §6'],
+)
 import argparse
 import os
 from pathlib import Path

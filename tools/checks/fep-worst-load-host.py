@@ -14,7 +14,10 @@ CHECK = dict(name='fep-worst-load-host', tier=1,
             'lib/serial_diag.h', 'include/**',
             'sdk/include/os32/os32_kapi_shared.h', 'assets/ipadic/**',
             'assets/joyo_kanji.txt'],
-    needs=[], budget=65.7)
+    needs=[], budget=65.7,
+    basis=['DICT_META_DESIGN §7', 'DICT_META_DESIGN §9'],
+    env_limit='合成辞書の容量上限を確認するが、試験用SQLite直結でmodule READY・outer thunk・boot fault経路を迂回するため実起動時の接続障害は保証しない。',
+)
 
 
 def run(ctx) -> int:

@@ -11,7 +11,9 @@ CHECK = dict(name='trident-gap', tier=1, needs=[], budget=4.6,
             'tools/tests/host32.py', 'tools/tests/mutpar.py',
             'tools/tests/kernel_includes.py', 'include/*.h', 'gfx/*.h',
             'kernel/module/*.h', 'lib/serial_diag.h', 'drivers/char/serial.h',
-            'sdk/include/os32/*.h', 'build/config.mk'])
+            'sdk/include/os32/*.h', 'build/config.mk'],
+    basis=['HAL_V2_DESIGN §10', 'TRIDENT_FULL_DESIGN'],
+)
 import os
 from pathlib import Path
 import subprocess

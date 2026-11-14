@@ -8,7 +8,9 @@ CHECK = dict(name='gfx-console-host', tier=1, needs=[], budget=8,
             'arch/x86/arch_abi.h', 'include/abi.h', 'include/config.h',
             'mm/pgalloc.h', 'lib/kstring.h', 'sdk/include/os32/**',
             'tools/tests/gfx_console_host.c', 'tools/tests/gfx2_surface_host.c',
-            'tools/tests/test_gfx_console.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gfx_console.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §7-3', 'CONSOLE_DUAL_DESIGN §2-1'],
+)
 from pathlib import Path
 import argparse
 import tempfile
