@@ -180,7 +180,7 @@ static inline void io_wait_n(int n) {(void)n;}
         flags=['gcc', *linker_flags(),'-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',
-               '-I'+str(tmp)]
+               '-DPHYSMEM_HOST_TEST=1','-I'+str(tmp)]
         if alt_window: flags.append('-DHOST_ALT_WINDOW=1')
         flags += (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         exe=tmp/'test'
