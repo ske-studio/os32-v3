@@ -20,7 +20,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 - 診断コマンドは 5 個。5 番目は範囲つきの読み出し (PEEK): managed RAM とカーネルの像だけ、1 回 256 バイトまで、範囲外・MMIO・NIC が持っている受信 buffer は拒否。書込みと任意番地は入れない。
 - ホストの道具 (tools/ppc_lan_host.py) の運び方は 2 つ: QEMU と試験は UDP (QEMU の socket netdev は Ethernet の frame を 1 datagram に 1 枚で運ぶ。root も TAP も要らない)、実機は AF_PACKET。codec は共通。
 - PLN1 (線の上の形式) に認証は無い。既定では起動ログを broadcast で流し、同じ L2 から PEEK でカーネルの RAM を読める。開発用の LAN での診断が前提で、共用の LAN につなぐときは peer を指定する。
-- 2026-11-14 (本線 PM 経由): PLN1 の各機能 (BEACON・診断・端末・HostFS) は link (0x88B5) と Host Services に統合する。PLN1 には新しい機能を足さない。移行の段の受入は QEMU 7450・7455 だけで、G4 実機の確認は移行の前の PLN1 の版で行う。セキュリティ (認証・番地の制限・許可リスト) は考えない。段と分担は票 TASK_LAN_OPERATOR (docs/tasks/network/) §2、確定設計は [LAN_OPERATOR_DESIGN](../../decisions/network/LAN_OPERATOR_DESIGN.md)。
+- 2026-11-14 (本線 PM 経由): PLN1 の各機能 (BEACON・診断・端末・HostFS) は link (0x88B5) と Host Services に統合する。PLN1 には新しい機能を足さない。移行の各段 (P1〜P4) の受入は QEMU 7450・7455 で行う。G4 実機の確認は、移行の前に PLN1 の版で 1 回、既定を link に切り替えた後にもう 1 回行う (ユーザーの補足 11-14「完成前にLANの機能を試すと言う意味の今の版の確かめです。別に実機で確認しない意味ではないです」)。セキュリティ (認証・番地の制限・許可リスト) は考えない。段と分担は票 TASK_LAN_OPERATOR (docs/tasks/network/) §2、確定設計は [LAN_OPERATOR_DESIGN](../../decisions/network/LAN_OPERATOR_DESIGN.md)。
 - ② の境界 (mount・module・exec・USER なし) は広げない。NIC の失敗で OS を止めない (止めるのは「bus master の解除を書いたのに読み戻しが 1」のときだけ)。
 
 ## 1. 詳細設計 (確定) の要約
