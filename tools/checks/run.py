@@ -22,6 +22,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+# 次段で全 CHECK に出所を埋めた後、ここだけ True にして error にする。
+REQUIRE_EXPECTATION_SOURCE = False
 BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 # Build/toolchain inputs and infrastructure used across check recipes.
@@ -583,6 +585,11 @@ class Check:
     needs: tuple[str, ...] = ()
     mutate_tier: int = 2
     weight: float | None = None
+    basis: tuple[str, ...] = ()
+    kind: str | None = None
+    env_limit: str | None = None
+    pins: tuple[str, ...] = ()
+    full_only: bool = False
 
     @property
     def seconds(self):
@@ -678,7 +685,8 @@ def indexed_discover(root):
         data = json.loads(cache.read_text())
         if data["signature"] == signature:
             return {row["name"]: Check(**dict(row, covers=tuple(row["covers"]),
-                                             needs=tuple(row["needs"]))) for row in data["checks"]}
+                                             needs=tuple(row["needs"]),
+                                             basis=tuple(row["basis"]), pins=tuple(row["pins"]))) for row in data["checks"]}
     except (OSError, ValueError, TypeError, KeyError):
         pass
     checks = discover(root)
@@ -746,16 +754,23 @@ def discover(root: Path) -> dict[str, Check]:
             reject("CHECK values must be literal")
         if len(data) != len(node.keywords):
             reject("duplicate CHECK field")
-        allowed = {"name", "covers", "budget", "tier", "needs", "mutate_tier"}
+        allowed = {"name", "covers", "budget", "tier", "needs", "mutate_tier",
+                   "basis", "kind", "env_limit", "pins", "full_only"}
         if set(data) - allowed or not {"name", "covers", "budget"} <= data.keys():
             reject("invalid CHECK fields")
         name = data["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
             reject("invalid name")
-        for field, default in (("covers", None), ("needs", [])):
+        for field, default in (("covers", None), ("needs", []), ("basis", []), ("pins", [])):
             value = data.get(field, default)
             if not isinstance(value, list) or not all(isinstance(s, str) and s for s in value):
                 reject(field + " must be list[str]")
+        if "kind" in data and data["kind"] not in ("contract", "characterization"):
+            reject("invalid kind")
+        if "env_limit" in data and not isinstance(data["env_limit"], str):
+            reject("env_limit must be str")
+        if "full_only" in data and type(data["full_only"]) is not bool:
+            reject("full_only must be bool")
         for field, default, minimum in (("tier", 1, 0), ("mutate_tier", 2, 1)):
             value = data.get(field, default)
             if type(value) is not int or not minimum <= value <= 4:
@@ -777,7 +792,11 @@ def discover(root: Path) -> dict[str, Check]:
         if name in checks:
             reject("duplicate name: " + name)
         checks[name] = Check(name, rel, tuple(data["covers"]), float(data["budget"]),
-                             data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2))
+                             data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2),
+                             basis=tuple(data.get("basis", [])),
+                             kind=data.get("kind", "contract" if data.get("basis") else None),
+                             env_limit=data.get("env_limit"), pins=tuple(data.get("pins", [])),
+                             full_only=data.get("full_only", False))
     weights = root / "tools/checks/weights.json"
     if weights.exists():
         for name, seconds in json.loads(weights.read_text())["seconds"].items():
@@ -1097,6 +1116,26 @@ def emit_shell(result: Plan) -> str:
 
 def lint(root, checks):
     errors = []
+    missing_source = sum(not c.basis and c.kind is None for c in checks.values())
+    if missing_source:
+        message = f"{missing_source} CHECK(s) without basis or kind"
+        if REQUIRE_EXPECTATION_SOURCE:
+            errors.append(message)
+        else:
+            print("warning: " + message, file=sys.stderr)
+    # 現行の設計だけを出所にする。archive と著作権物の hw は読まない。
+    pin_ids = {pin for c in checks.values() for pin in c.pins}
+    found_pins = set()
+    if pin_ids:
+        for path in (root / "docs").rglob("*"):
+            if not path.is_file() or path.relative_to(root / "docs").parts[0] in {"archive", "hw"}:
+                continue
+            content = path.read_text(encoding="utf-8", errors="replace")
+            found_pins.update(pin for pin in pin_ids if pin in content)
+    for c in checks.values():
+        for pin in c.pins:
+            if pin not in found_pins:
+                errors.append(c.name + ": pins ID not found in docs: " + pin)
     snapshot = tracked(root)
     generated = set(KAPI_GENERATED) | {f for f in snapshot if "_generated." in Path(f).name
                 or "generations." in Path(f).name or "/generated/" in f}
@@ -1205,14 +1244,18 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     try:
         checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
-        names = ordered(checks)
+        # check-fast と静的 CI は full_only とその利用者を full-check に残す。
+        routine = os.environ.get("CHECK_ROUTINE") == "1" and (args.list or args.make or args.run)
+        eligible = {n: c for n, c in checks.items() if not routine or not any(
+            checks[dep].full_only for dep in closure(checks, (n,)))}
+        names = ordered(eligible)
         if args.shard is not None:
             if not (args.list or args.make) or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
                 raise ValueError("--shard requires --list or --make and index/count")
             index, count = map(int, args.shard.split("/"))
             if index >= count:
                 raise ValueError("shard index must be less than count")
-            names = shards(checks, count)[index]
+            names = shards(eligible, count)[index]
         if args.needs and (not args.list or args.json):
             raise ValueError("--needs requires --list without --json")
         if args.make:
@@ -1240,6 +1283,7 @@ def main(argv: list[str]) -> int:
         names = {n.removeprefix("check-") for n in args.run}
         if names - checks.keys():
             raise ValueError("unknown check: " + " ".join(sorted(names - checks.keys())))
+        names &= eligible.keys()
         child = os.environ.get("CHECK_TIME_CHILD") == "1"
         stage = ordered(checks, names) if child else closure(checks, names)
         needs = () if child or os.environ.get("CHECK_NO_NEEDS") == "1" else make_needs(checks, stage)

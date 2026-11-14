@@ -39,6 +39,7 @@ jobs:
       OS32_CLANG_CROSS_FREE: "1"
       # 静的ゲートは make の前提 (CHECK の needs) を組まない — クロス無しで旧と同じ振る舞い。
       CHECK_NO_NEEDS: "1"
+      CHECK_ROUTINE: "1"  # full_only は full-check だけで回す。
       LYCHEE_VERSION: "0.24.2"
       LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
     steps:
@@ -157,7 +158,11 @@ jobs:
           make check-boot-splash-host
           make check-build-id-host
           make check-cfg-host
-          python3 -B tools/tests/test_db_errstr.py  # check-db-errstr-host のホスト部分 (--target は i386-elf-gcc が要るので外す)
+          # この直接実行も CHECK の配置に従う (--target はクロス GCC が要るので外す)。
+          python3 -B tools/checks/run.py --list > "$RUNNER_TEMP/routine-checks.txt"
+          if grep -qx check-db-errstr-host "$RUNNER_TEMP/routine-checks.txt"; then
+            python3 -B tools/tests/test_db_errstr.py
+          fi
           make check-ext2-empty-name-host
           make check-guest-host
           make check-gui-gate-host

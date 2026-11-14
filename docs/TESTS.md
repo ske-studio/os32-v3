@@ -13,6 +13,29 @@
 ## 0. 読み方
 
 <!-- manual:intro -->
+### CHECK の宣言
+
+期待を決める規則は [POLICY_DEV §6](POLICY_DEV.md#6-検証) が正典。
+`tools/checks/run.py --lint` は宣言の型と `pins` の ID を検査する。
+
+| 欄 | 型・既定値 | 意味 |
+|---|---|---|
+| `basis` | 空でない文字列の list、既定 `[]` | 期待の出所となる設計の ID (例 `['AC-CTX-1', 'IO_TIER_DESIGN §4']`)。契約の試験に書く |
+| `kind` | `'contract'` / `'characterization'` | `basis` が空でなければ既定は `contract`。現状の記録には `characterization` を明記する |
+| `env_limit` | 文字列、省略可 | この環境で出せない故障の型 (例「host の偽 MMIO、posted write は見えない」) |
+| `pins` | 空でない文字列の list、既定 `[]` | 固定している欠陥を変える設計の ID。現行の `docs/` 本文に存在すること (archive・hw は対象外) |
+| `full_only` | bool、既定 `False` | `True` は毎回の CI から外し、full-check の `make check` で回す |
+
+`basis` が空で `kind` も無い宣言は移行中のため警告だけとし、件数を表示する。
+全件を埋めた次の段で `run.py` の `REQUIRE_EXPECTATION_SOURCE` を `True` に変え、error にする。
+`kind='contract'` だけでは期待の出所にならないので、契約には `basis` を書く。
+
+`full_only` とそれを前提にする検査は、`CHECK_ROUTINE=1` の list・make 登録・実行から除外する。
+`make check-fast` と静的 CI (`check.yml`) がこの指定を使い、シャードの前提の準備から除外する。
+`make check` と明示的な `make check-<名前>` は通常どおり実行する (`CHECK_ROUTINE` 未指定時)。
+既存の `tier=4` は変更選択時だけの指定で、`check-fast` の対象からは外れない。
+この段では既存試験の分類と配置は一括変更しない。
+
 ### 表が言えること / 言えないこと
 
 表は `build/*.mk` と試験スクリプトから**機械で読める事実だけ**を出す。次の 3 つは
