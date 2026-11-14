@@ -3,6 +3,9 @@
  * translate is the OF MMU method (phys.lo mode true, bottom to top).
  * State is owned here: no firmware access from bind/stage/phy. */
 #include "rh_observe.h"
+#ifndef KBOOT_LINK
+#define KBOOT_LINK 0
+#endif
 #include "ofw.h"
 #include "kstring.h"
 static struct pm_rh_fb fb, full_fb;
@@ -189,19 +192,19 @@ static void glyph(u32 x, u32 y, unsigned value, u32 scale, int error)
 }
 void pm_rh_stage(unsigned stage)
 {
-    if (stage > 15 || ((reached & (1U << stage)) && last_stage == stage)) return;
+    if (stage > (KBOOT_LINK ? 17 : 15) || ((reached & (1U << stage)) && last_stage == stage)) return;
     reached |= 1U << stage;
     last_stage = stage;
     if (!pixels) return;
-    u32 cell = fb.width / 16;
+    u32 cell = fb.width / (KBOOT_LINK ? 18 : 16);
     u32 scale = cell / 6;
     if (scale > 4) scale = 4;
     u32 vertical = (fb.bytes / fb.stride / 2) / 7;
     if (scale > vertical) scale = vertical;
     if (reached == (1U << stage))
         for (u32 off = 0; off < fb.bytes; off++) pixels[off] = 0;
-    for (unsigned i = 0; i < 16; i++)
-        if (reached & (1U << i)) glyph(i * cell, 0, i, scale, i >= PM_RH_ESCC_PREPARE);
+    for (unsigned i = 0; i < (KBOOT_LINK ? 18U : 16U); i++)
+        if (reached & (1U << i)) glyph(i * cell, 0, i, scale, i == PM_RH_ESCC_PREPARE || i == PM_RH_ESCC_INIT);
     ppc_sync();
 }
 void pm_rh_phy(u32 port, u32 addr, u32 id1, u32 id2)

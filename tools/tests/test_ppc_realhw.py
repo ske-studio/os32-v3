@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise distribution limits and real-hardware transcript assessment."""
 CHECK = dict(name='ppc-realhw', tier=2, budget=10, needs=['make:all'],
-             covers=['tools/ppc/realhw_image.py', 'tools/ppc/realhw_run.py',
+             covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/ppc/realhw_image.py', 'tools/ppc/realhw_run.py',
                      'tools/tests/test_ppc_realhw.py','tools/ppc/sc_run.py', 'tools/ppc/sd_run.py',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/kboot_accept.py', 'tools/ppc/run.py',

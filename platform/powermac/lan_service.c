@@ -7,19 +7,55 @@
 #include "hostfs.h"
 #endif
 
+#if KBOOT_LINK
+#include "nic_gem.h"
+#include "net/link.h"
+#include "net/host_mailbox.h"
+#include "rh_observe.h"
+#include "kmalloc.h"
+#include "os32/os32_kapi_shared.h"
+static int link_bound;
+static i32 time_handle = -1;
+u32 pm_link_time_bytes, pm_link_time_ok;
+static void link_diagnostic(void)
+{
+    const u8 *data;
+    if (!link_hello_ok || pm_link_time_ok) return;
+    if (time_handle < 0) {
+        time_handle = link_host_open("TIME", 4, 0);
+        return;
+    }
+    u32 status;
+    i32 rc = link_host_status(time_handle, &status, 0, 0);
+    if (rc == OS32_ERR_AGAIN) return;
+    i32 n = rc ? rc : status == 200 ?
+        link_host_read_stage(time_handle, 64, &data, 0) : OS32_ERR_IO;
+    if (n > 0) pm_link_time_bytes += (u32)n;
+    if (n <= 0 && n != OS32_ERR_AGAIN) {
+        pm_link_time_ok = !n && pm_link_time_bytes != 0;
+        (void)link_host_close(time_handle, 0);
+        time_handle = -1;
+        if (!pm_link_time_ok) pm_link_time_bytes = 0;
+    }
+}
+#endif
+
 enum service_state { OFF = 0, RESETTING = 1, PREPARE = 2, PUBLISH = 3,
                      PHY_WAIT = 4, RUNNING = 5, QUARANTINED = 6 };
 static struct {
     enum service_state state;
     struct gem g;
     const struct pm_gmac_boot *boot;
+#if !KBOOT_LINK
 #if KBOOT_SH
     u8 tx[14 + PLN1_HEADER_BYTES + PLN1_FS_FRAME_MAX], rx[1514];
 #else
     u8 tx[14 + PLN1_HEADER_BYTES + PLN1_PAYLOAD_MAX], rx[1514];
 #endif
     struct lan_message response;
-    u8 response_dst[6], enabling;
+    u8 response_dst[6];
+#endif
+    u8 enabling;
     u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops, tx_at;
     u8 out_turn, state_due;
 } s;
@@ -40,6 +76,7 @@ static void rh_log(void)
     kprintf(0x07, "RH PHY port=%u addr=%u id1=%x id2=%x bmsr=%x rc=%d\r\n",
             phy_sample.port, phy_sample.addr, phy_sample.id1, phy_sample.id2, phy_sample.bmsr, phy_rc);
 }
+#if !KBOOT_LINK
 static int same(const u8 *a, const u8 *b, u32 n)
 {
     for (u32 i = 0; i < n; ++i) if (a[i] != b[i]) return 0;
@@ -47,6 +84,7 @@ static int same(const u8 *a, const u8 *b, u32 n)
 }
 static void copy(u8 *a, const u8 *b, u32 n)
 { for (u32 i = 0; i < n; ++i) a[i] = b[i]; }
+#endif
 static void off(int code)
 {
     s.state = OFF;
@@ -57,6 +95,7 @@ static void reset(void)
     if (s.g.state != GEM_STATE_RESETTING) gem_enter_reset(&s.g);
     s.state = RESETTING;
 }
+#if !KBOOT_LINK
 static int send(const u8 *dst, const struct lan_message *m)
 {
     u32 used;
@@ -171,6 +210,7 @@ static int receive(void)
     }
     return GEM_OK;
 }
+#endif
 int pm_lan_start(const struct pm_gmac_boot *boot)
 {
     const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
@@ -248,6 +288,26 @@ void pm_lan_poll(u64 now)
         }
         break;
     case RUNNING:
+#if KBOOT_LINK
+        if (!pm_lan_running_gem(0)) {
+            if (link_bound) net_unbind();
+            link_bound = 0;
+            reset();
+            break;
+        }
+        if (!link_bound) {
+            r = host_mailbox_init();
+            if (!r) r = net_adapter_register(PM_NET_NIC_GEM, &net_gem_adapter);
+            if (!r) r = net_start(PM_NET_NIC_GEM, 0);
+            if (r) { off(r); return; }
+            link_bound = 1;
+            kprintf(0x07, "LINK HEAP used=%u\r\n", kmalloc_used());
+        }
+        if (link_hello_ok) pm_rh_stage(PM_RH_LINK_HELLO_ESTABLISHED);
+        link_diagnostic();
+        pm_link_log_poll();
+        r = GEM_AGAIN;
+#else
         r = gem_poll(&s.g, now, 8);
         if (s.g.state == GEM_STATE_RESETTING || r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
         if (r < 0) break;
@@ -279,6 +339,7 @@ void pm_lan_poll(u64 now)
         }
         if (s.beacon_at && now >= s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
         r = GEM_AGAIN;
+#endif
         break;
     default: break;
     }
@@ -288,4 +349,12 @@ void pm_lan_poll(u64 now)
     }
     if (s.state != before)
         kprintf(0x07, "LAN STATE state=%u link=%u\r\n", (u32)s.state, (u32)(s.state == RUNNING));
+}
+
+/* P1g selects link or PLN1 ownership; this query never advances the service. */
+struct gem *pm_lan_running_gem(u8 mac[6])
+{
+    if (s.state != RUNNING || s.g.state != GEM_STATE_READY) return 0;
+    if (mac) for (u32 i = 0; i < 6; i++) mac[i] = s.boot->mac[i];
+    return &s.g;
 }

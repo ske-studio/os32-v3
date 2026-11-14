@@ -44,6 +44,7 @@ static void boot_boundary(void)
 #include TP_BOUNDARY
 }
 static unsigned int link_ready = 1, tick_count;
+static unsigned int link_platform_now(void) { return tick_count; }
 static unsigned int stage_duration;
 static void link_rx_pump(void) { tp_host_clock += stage_duration; }
 static void link_host_deadlines(void) { tp_host_clock += stage_duration * 2; }

@@ -20,7 +20,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/rx_work.h',
     'net/nic_e82557.c',
     'net/nic_lgy98.c',
-    'net/link.h', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
+    'net/link.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
     'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
     'kernel/irq/tick.h',
     'kernel/irq/irq.h',
@@ -120,10 +120,11 @@ def main():
     originals = [(ROOT / path).read_text() for path in SOURCES]
     with tempfile.TemporaryDirectory(prefix='hostsvc-boot-') as tmp:
         work = Path(tmp)
-        (work / 'io.h').write_text('int _irq_enabled(void);\n'
+        (work / 'io.h').write_text('#ifndef BOOT_TEST_IO_H\n#define BOOT_TEST_IO_H\n'
+            'static inline void _idle(void) {}\nint _irq_enabled(void);\n'
             'unsigned int boot_irq_save(void);\n'
             'void boot_irq_restore(unsigned int);\n'
-            '#define irq_save boot_irq_save\n#define irq_restore boot_irq_restore\n')
+            '#define irq_save boot_irq_save\n#define irq_restore boot_irq_restore\n#endif\n')
         results = build_run(work, originals)
         if any(results):
             raise RuntimeError(f'control runtime rc={results}')

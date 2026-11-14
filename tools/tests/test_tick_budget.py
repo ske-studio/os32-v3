@@ -1,7 +1,7 @@
 """IRQ0 budget boundaries, context, actual PIT wrap and link tail wiring."""
 CHECK = dict(name='tick-budget-host', tier=4, needs=[], budget=3.0,
     covers=['kernel/irq/tick_budget.[ch]', 'arch/x86/arch_tick_budget.h',
-            'platform/pc98/tick_budget.c', 'net/link.c', 'net/link_rx.inc',
+            'platform/pc98/tick_budget.c', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_rx.inc',
             'tools/tests/tick_budget_host.c', 'tools/tests/test_tick_budget.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'lib/divdi3.c',

@@ -1,7 +1,7 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
     covers=['net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
-            'sdk/include/os32/os32_host_notice.h', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
+            'sdk/include/os32/os32_host_notice.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
@@ -21,7 +21,7 @@ ANCHOR = '    link_host_deadlines();'
 
 MUTATIONS = (
     ('net/link_host_api.inc', '            e->rel_tick = e->last_tx_tick;',
-     '            e->rel_tick = tick_count;'),
+     '            e->rel_tick = link_platform_now();'),
     ('net/link_host_api.inc', '        e->rel_pending = 1;\n        e->rel_rid = e->rid;',
      '        e->rel_pending = 0;\n        e->rel_rid = e->rid;'),
     ('net/link_host_api.inc', '            e->rel_interval = LINK_PROBE_TICKS;',
@@ -38,7 +38,7 @@ MUTATIONS = (
     ('net/link_rx.inc', 'if (seq == e->ack_seq + 1)', 'if (seq >= e->ack_seq)'),
     ('net/link_rx.inc', 'if (rid != LINK_NOTIFY_RID)', 'if (0 && rid != LINK_NOTIFY_RID)'),
     ('net/link_rx.inc', 'int extended = plen == LINK_HELLO_ES_EXT_LEN;', 'int extended = plen == LINK_HELLO_ES_EXT_LEN && 0;'),
-    ('net/link.c', '    link_notify_tick(tick_count);', ''),
+    ('net/link.c', '    link_notify_tick(link_platform_now());', ''),
     ('net/link.c', '    link_notify_reset();', ''),
 )
 
