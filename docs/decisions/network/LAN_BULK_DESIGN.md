@@ -11,7 +11,7 @@
 - F1: x86のSW RX/NICをC=16〜22＋制御1へ拡張する段とRAM増分、GEMの制約・調査根拠を追加。
 - F2: OPENをVFS呼出し単位に固定、累積closed_ridで台帳を回収。
 - F3/R4: linkディスパッチのFG移行をLAN独立段とし、KAPIとの排他を明記。
-- F4: VFS待ちからRX/lan_bulk_stepを直接駆動し、PPCのEEを限定復元、HLTしない。
+- F4: VFS待ちからRX/lan_bulk_stepを直接駆動し、入口のFG1契約に従い、HLTしない。
 - F5: grantを転送全体の通し番号にし、burst境界の全ACK待ちを撤去。
 - F6: ゲスト保存は通し番号順、穴の後ろはRAM保持。
 - F7: ゲストディスクへの一括コピーを初版の遅延合否対象から除外。
@@ -151,15 +151,15 @@ int link_dispatch_fg(struct io_slice *s) { if(!link_fg_enter()) return IO_MORE; 
 void link_irq0_rescue(void) { /* IRQ0内、共有busyでFG/KAPIと排他。既存の限定処理のみ */
     if ((u32)(tick_count-last_link_fg_jiffy)>=10 && link_fg_enter()) { link_tick(); link_fg_leave(); }
 }
-int host_wait_round(void *t) { /* 擬似コード。archの安全なFG待ち口からだけ呼ぶ */
+int host_wait_round(void *t) { /* 擬似コード。共通FG1待ちからだけ呼ぶ */
     struct io_slice s; int rc=io_slice_begin(&s,440,4); if(rc<0) return rc;
     if(nic->fg_service && io_slice_take(&s)) { rc=nic->fg_service(); if(rc<0) return rc; }
     net_rx_ingest_fg(&s); link_dispatch_fg(&s); rc=lan_bulk_step(t,&s);
     fg_service_input_display_once(); /* キーを入力queueへ格納するだけ。描画/アプリcallbackなし */
     return rc; /* IO_WAITでも次周のNIC/期限を確認。HLT/idle_work再帰なし */
 }
-int host_vfs_wait(void *t) { return platform_io_pump_wait(t,host_wait_round); }
-/* platform_io_pump_waitはT2の待ち口を示す仮名。terminal/負値までroundを繰返し、元IF/EEを復元。 */
+int host_vfs_wait(void *t) { return fg1_wait_rounds(t,host_wait_round); }
+/* fg1_wait_roundsは共通FG1待ちの仮名。終端/負値まで有限のroundを繰り返す。 */
 int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者単位の印 */
     irq_state f=irq_save(); if(bulk_busy(t)) { irq_restore(f); return IO_MORE; }
     set_bulk_busy(t,1); irq_restore(f); int rc=bulk_advance(t,s);
@@ -170,7 +170,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 - io_slice_takeは時間・総unitsを開始前に検査、RX取り込み/link処理/bulkで同じsliceを使い途中で予算を作り直さない。frameを再カウントしても安全側。最後の1単位超過を測り、次回は実測上限で開始可否を判断。
 - 現NIC取り込みはnet_rx_idle/net/rx_work.cで既にFG。link dispatchの通常経路をFGへ移すが、FGが10 jiffy（100ms）linkを回していなければIRQ0で既存link_tickを1回実行する救済を残す。busyなら実行せず次回に持ち越す。nic.c:298の既存e82557限定回収も維持。
 - KAPIは所有中にhandle世代を固定、busyのまま待ち・アプリcallback禁止。E0の不変条件は「通常FG＋既存IRQ0救済、共有busyによる単一所有」。IRQ0は救済条件成立時だけlink状態を進め、他はpending/時刻を記録する。短いirq_saveはbusy/pending受渡し用、NICのticking guardと相互待ちしない。救済は新bulk/保存処理やTier dispatcherを実行せず、新opはFGへ保留する。
-- PPCのsyscall待ちでEEを許可するのはarch/ppc/io_pump.c（io-tier T2）の1つの口だけ。Jはその口を呼び、独自にEEを操作しない。同口がIRQ深さ0・未保持lock・再入防止を検査して許可/元状態復元、条件不成立はエラー。x86も対応する安全な待ち口を使う。IRQ出口dispatcherは作らない。
+- JはAC-CTX適合入口から共通FG1待ちを使い、終端/負値まで有限のroundを反復する。IRQ・共有busy/lock保持・再入状態では待たず、条件不成立はエラー。IRQ出口dispatcherは作らない。
 - Tier前の登録はidle_workの1本、4枠満杯は初期化失敗。VFS待ちは直接駆動で進め、IO_WAITも再受信/期限を確認しHLTしない。lan_bulk_stepは自身のbusyを持ち、入れ子では状態・sliceを変更せずIO_MORE。Tier導入後も同じstepを使う。
 - 段GでNetNicOpsにint (*fg_service)(void)を追加、NE2K adapterはne2k_bh（リングPIO読出し・tx_dequeue・reinit）の予算付き1単位を接続する。各adapterは不要時の無処理を定義。待ちloopはこの口→net_rx_ingest_fgを毎周回し、下半分の時間もslice経過に含め、無制限走査にしない。
 - 通常/host readのメモリ引渡しを予算化する。ゲストディスクへの一括コピーは同期保存が超過し得るため初版の入力・表示遅延合否から除外し、時間を別記する。ホストpwrite待ちは通知loopを止めないworker/完了キュー方式とする。
@@ -230,7 +230,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |H2c|drivers/net/e82557/e82557.c 変更60|DMA領域確保・境界検証、H2b後|
 |H3|platform/powermac/nic_gem.c 変更120|4枠経路のadmission拡大、G/W2後|
 |I|net/bulk_work.c 新180|io_slice_begin/idle_work・bulk自身の再入guard、B1/B2/H/E0cとio-tier A1・A3・T1・T2後、LAN専有|
-|J|fs/hostsvc/hostsvc.c 新380|VFS OPEN・fg_service/RXを回す待ち・PPC pump口使用、I/G1とio-tier A1・A3・T1・T2後|
+|J|fs/hostsvc/hostsvc.c 新380|VFS OPEN・fg_service/RXを回す共通FG1待ち、I/G1とio-tier A1・A3・T1・T2およびAC-CTX受入後|
 |K|tools/host_fs_meta.py 新250|stat/list等、A後並列可|
 |L|fs/serialfs/serialfs.c 変更80|serialを残す経路整理、J後|
 |M|tools/lanfs_host.py 変更60|旧LAN起動撤去・移行エラー、F/K後|
@@ -253,7 +253,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |選択再送|N=8/C=22で境界を跨ぐ、穴/最終ACK欠落、旧base ACK|burst待ち復活、grant加算、bitmap基準誤り|
 |保存後credit|順不同受信でもguestの書込みoffsetは昇順、部分write/ENOSPC/close失敗|穴を越して保存、receivedで返却、status無視|
 |制御枠・単一RX|4枠満杯と通知併走、NE2K境界、他窓同時予約|制御予約除去、二重広告、予算reset|
-|FG排他・予算|link/bulkのbusy・KAPI/IRQ、PPC pump経由のEE許可/復元、440µs/4単位|busy解除漏れ、bulk入れ子実行、HLT、EE復元除去|
+|FG排他・予算|link/bulkのbusy・KAPI/IRQ、共通FG1待ち、440µs/4単位。IF/EE許可と復帰はarch入口/出口で検証|busy解除漏れ、bulk入れ子実行、HLT、入口/出口のEE復帰誤り|
 |IRQ0救済|syscallなし30秒の計算中もセッションがSTALEにならない、10jiffy境界・busyなら不実行|救済削除、busy無視、閾値誤り|
 |待ち内進行・通知|NE2KのPIO/TX/reinit進捗、≤32KiBごとのアプリ表示、rid=0/本文0B通知|fg_service欠落、待ち内描画、PROBE長さ検査除去|
 |/host機能・経路|全VFS操作、常駐＋hsync、HostDrv、serial、CD退行|LAN fallback復活、経路選択誤り|
@@ -275,5 +275,5 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 - N3: FG不実行10jiffyかつ共有busyなしでIRQ0が既存link_tickを1回救済し、30秒syscallなしでもSTALEなしを受入。
 - Tier側N3: lan_bulk_step自身がbusyを持ち、入れ子は無変更でIO_MORE、全終了経路で解除。
 - N4: 待ち内はキーの入力queue格納だけ、表示せず、遅延試験のread/writeは1回≤32KiB。
-- Tier側N4: PPCの待ち中EE許可/復元はarch/ppc/io_pump.cの単一口へ集約、Jは呼ぶだけ。
+- Tier側N4: JはAC-CTX適合入口から共通FG1待ちを使い、終端/負値まで有限のroundを反復する。
 - N5: rid=0・本文長0のPROBEはclosed_rid通知だけ、転送ID付きの4B PROBEとは区別。
