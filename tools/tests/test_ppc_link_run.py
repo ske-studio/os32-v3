@@ -1,6 +1,6 @@
 """Acceptance predicates and QMP waiting must preserve agent progress."""
 CHECK = dict(name='ppc-link-run-host', tier=2, budget=30, needs=[], covers=[
-    'tools/ppc/link_run.py', 'tools/ppc/run.py', 'tools/ppc_lan_host.py',
+    'tools/ppc/link_run.py', 'tools/ppc/link_diag_run.py', 'tools/ppc/run.py', 'tools/ppc_lan_host.py',
     'tools/host_*.py', 'tools/ppc_link_transport.py', 'net/link_platform.h',
     'platform/powermac/link_platform.c', 'tools/tests/test_ppc_link_run.py',
     'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/ppc_hostfs.py',

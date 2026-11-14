@@ -1,6 +1,11 @@
 #define KBOOT_LINK 1
 #include "lan_service.c"
 static int log_polls;
+void pm_link_diag_poll(const struct pm_lan_diag *d, u64 now, u32 hz)
+{ (void)d; (void)now; (void)hz; }
+const struct pm_lan_diag *pm_lan_diag_snapshot(const struct pm_gmac_boot *b,
+    const struct gem *g, u32 state, u64 drops)
+{ (void)b; (void)g; (void)state; (void)drops; return 0; }
 void pm_link_log_poll(void) { log_polls++; }
 static int starts, registered, rx_calls, ticks, stage;
 u32 link_hello_ok;

@@ -26,7 +26,6 @@ from run import ROM, QMP, command, require
 from ppc_lan_host import UDP
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
-
 PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
 
 def log_ready(logs, body):
@@ -67,7 +66,7 @@ class PumpQMP(QMP):
         line, self.buffer = self.buffer.split(b'\n', 1)
         return json.loads(line)
 
-def accept(elf, cpu, parent, timeout, require_ack=False):
+def accept(elf, cpu, parent, timeout, require_ack=False, diagnostic=None):
     out = Path(tempfile.mkdtemp(prefix=cpu+'-', dir=parent))
     symbols = {p[2]: int(p[0], 16) for line in
                command([PREFIX+'nm', '-n', elf]).splitlines()
@@ -160,6 +159,7 @@ def accept(elf, cpu, parent, timeout, require_ack=False):
                         require(len(logfiles) == 1 and re.fullmatch(r'[0-9a-f]{32}', logfiles[0].stem), 'LOG boot')
                     body = logfiles[0].with_suffix('.log').read_bytes() if logs else b''
                     ready = log_ready(logs, body)
+                    if diagnostic is not None: ready = diagnostic(agent, out) and ready
                     if agent.established and time.monotonic() >= next_observe:
                         next_observe = time.monotonic() + 0.5
                         q.call('stop')
