@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 """Exercise the PPC entry preparation with a fake USER stack."""
-CHECK = dict(name='ppc-exec-entry', tier=1,
-             covers=['arch/ppc/exec_entry.c', 'arch/ppc/arch_exec_storage.h',
-                     'include/exec_arch.h', 'include/types.h',
-                     'tools/ppc/test_exec_entry.py'],
-             inputs=['arch/ppc/exec_entry.c', 'arch/ppc/arch_exec_storage.h',
-                     'include/exec_arch.h', 'include/types.h'], needs=[], budget=3)
 import subprocess
 import sys
 import tempfile

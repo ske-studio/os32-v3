@@ -7,7 +7,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-CHECK = dict(name='lan-p22b', tier=2, budget=60, covers=['arch/ppc/kernel_probe.S', 'tools/ppc/test_lan_p22b.py'], needs=[])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT/'arch/ppc/kernel_probe.S'
 CROSS = os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc')+'/bin/powerpc-elf-'

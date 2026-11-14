@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Exercise PPC ELF packaging and the endian mutation."""
-CHECK = dict(covers=['sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'tools/ppc/test_os32x_endian.py'],
-             inputs=['sdk/**', 'tools/ppc/test_os32x_endian.py'])
 import hashlib
 import json
 import os
@@ -13,7 +11,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PPC = Path('/home/hight/opt/cross-ppc/bin')
+PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
 def call(args, **kwargs):

@@ -8,12 +8,6 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/cli_boot.c'
-CHECK = dict(name='ppc-cli-boot', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/cli_boot.c', 'platform/powermac/cli_boot.h',
-                     'tools/ppc/test_cli_boot.py'],
-             inputs=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
-                     'platform/powermac/lan_boot.h', 'kernel/console/console_stream.h',
-                     'fs/vfs.h', 'include/types.h', 'exec/exec.h', 'lib/kstring_c.c', 'lib/kstring.h'])
 
 HARNESS = r'''
 #include <setjmp.h>

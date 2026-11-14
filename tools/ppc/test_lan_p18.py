@@ -6,9 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p18', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_tx.c', 'tools/ppc/test_lan_p18.py', 'tools/ppc/lan_p18_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'drivers/net/gem/gem_ring.c', 'drivers/net/gem/gem_reset.c', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('sync', 'if (g->io.sync(buf, length, DMA_PREWRITE)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:A4 dma-unpublished'),

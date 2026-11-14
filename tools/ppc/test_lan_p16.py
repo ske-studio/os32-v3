@@ -5,9 +5,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-CHECK = dict(name="ppc-lan-p16", tier=2, budget=60,
-             covers=["drivers/net/gem/gem_mac.c", "tools/ppc/test_lan_p16.py"],
-             inputs=["drivers/net/gem/gem.h", "include/types.h", "include/callconv.h"])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "drivers/net/gem/gem_mac.c"
 HARNESS = r'''

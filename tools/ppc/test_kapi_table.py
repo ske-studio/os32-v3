@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 """Verify the PowerMac KAPI table and its generated initializer."""
-CHECK = dict(name='ppc-kapi-table', tier=1,
-             covers=['arch/ppc/exec_kapi.c', 'platform/powermac/kapi_table.h',
-                     'tools/ppc/test_kapi_table.py'],
-             inputs=['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c'], needs=[], budget=10)
 import json
 import os
 import re

@@ -8,11 +8,6 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/lan_diag.c'
-CHECK = dict(name='ppc-lan-p24d', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/lan_diag.c'],
-             inputs=['tools/ppc/test_lan_p24d.py', 'tools/ppc/lan_p24d_test.c',
-                     'platform/powermac/lan_boot.h', 'drivers/net/gem/gem.h',
-                     'platform/powermac/kboot_info.h', 'arch/ppc/ppc_pd.h'])
 MUTATIONS = [
     ('range', 'status, 17, memory, 8, bytes, ranges, 2,', 'status, 17, memory, 8, bytes, ranges, 1,', 'range', 'H:A10 read-range'),
     ('hi-lo', 'status[offset] = (u32)(value >> 32);', 'status[offset] = (u32)value;', 'status', 'H:status'),

@@ -1,7 +1,4 @@
 """Exercise the actual image loader with the PPC publication boundary recorded."""
-CHECK = dict(name='ppc-exec-publish', tier=1,
-    covers=['exec/exec_image.inc', 'arch/ppc/exec_cache.h', 'arch/x86/exec_cache.h',
-            'tools/ppc/test_exec_publish.py'], needs=[], budget=1)
 from pathlib import Path
 import subprocess
 import sys

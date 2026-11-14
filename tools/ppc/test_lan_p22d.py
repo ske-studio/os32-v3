@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
-CHECK = dict(name='lan-p22d', tier=2, budget=120, covers=['arch/ppc/kernel_trap.c', 'tools/ppc/test_lan_p22d*'], needs=[])
 ROOT=Path(__file__).resolve().parents[2]
 SOURCE=ROOT/'arch/ppc/kernel_trap.c'
 def check(s, expected=0):

@@ -6,9 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p19', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_rx.c', 'tools/ppc/test_lan_p19.py', 'tools/ppc/lan_p19_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'drivers/net/gem/gem_ring.c', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('owned', 'if (flags & GEM_RD_OWN)', 'if (!(flags & GEM_RD_OWN))', 'H:A7 rx-owned'),

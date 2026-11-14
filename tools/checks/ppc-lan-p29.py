@@ -1,0 +1,41 @@
+"""Register tools/ppc/test_lan_p29.py with its design expectations."""
+CHECK = dict(
+    name='ppc-lan-p29',
+    tier=1,
+    budget=60,
+    needs=['make:kernel'],
+    covers=['tools/ppc/test_lan_p29.py',
+     'tools/ppc/kboot_run.py',
+     'tools/ppc_lan_host.py',
+     'tools/ppc/run.py',
+     'tools/ppc/kboot_mutations.py',
+     'tools/checks/ppc_registered.py',
+     'arch/ppc/entry.S',
+     'arch/ppc/kernel_dec.c',
+     'arch/ppc/kernel_mmu.S',
+     'arch/ppc/kernel_probe.S',
+     'arch/ppc/kernel_trap.c',
+     'arch/ppc/ofw_note.S',
+     'init/ppc_kernel.c',
+     'platform/powermac/boot.c',
+     'platform/powermac/clock.c',
+     'platform/powermac/escc.c',
+     'platform/powermac/escc_tree.c',
+     'platform/powermac/mpic.c',
+     'platform/powermac/ofw.c',
+     'tools/host_agent_config.py',
+     'tools/host_image.py',
+     'tools/lan_bridge.py',
+     'tools/lanfs_host.py',
+     'tools/ppc_hostfs.py',
+     'tools/ppc_link_transport.py',
+     'tools/remote_transport.py',
+     'tools/serialfs_host.py'],
+    basis=['PPC_LAN_MARKS_DESIGN.P29/H29'],
+    env_limit='ホストの模型・コンパイル検査であり実機の MMIO・DMA・割込みのタイミング障害は保証しない。',
+    full_only=False,
+)
+
+def run(ctx):
+    from ppc_registered import run_test
+    return run_test(ctx, 'tools/ppc/test_lan_p29.py', ['gcc', 'qemu-i386'])

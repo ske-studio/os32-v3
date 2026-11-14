@@ -13,9 +13,6 @@ from run import ROOT, ROM, QMP, command, require, CriterionFailure
 
 
 # Independent cross target: explicitly invoked, not part of x86 make check.
-CHECK = dict(name='ppc-mmu', tier=2, budget=600,
-             covers=['arch/ppc/**','platform/powermac/**','build/ppc.mk','tools/ppc/**',
-                     'include/types.h','lib/kstring.h','lib/kstring_c.c'])
 
 def qemu(root, cross, timeout, stage, mode=0):
     out=root/'build/out/ppc'

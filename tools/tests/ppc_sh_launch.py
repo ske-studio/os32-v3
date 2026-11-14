@@ -1,9 +1,4 @@
 """Exercise the actual shell launch with the PPC profile and a fake KAPI."""
-CHECK = dict(name='ppc-sh-launch-host', tier=1,
-    covers=['tools/tests/ppc_sh_launch.py', 'tools/tests/sh_status_host.c',
-            'tools/tests/test_sh_status.py', 'userland/ppc/sh/profile.h',
-            'userland/shell/sh_exec.inc', 'userland/shell/sh_launch.inc'],
-    needs=[], budget=10)
 
 import pathlib
 import shutil

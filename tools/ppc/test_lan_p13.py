@@ -7,10 +7,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-CHECK = dict(name='ppc-lan-p13', tier=2, budget=60,
-             covers=['platform/powermac/gmac_clock.c', 'tools/ppc/test_lan_p13.py',
-                     'tools/ppc/lan_p13_fake.c'],
-             inputs=['platform/powermac/lan_boot.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('rmw', 'value | 2u', '(value & 0u) | 2u', 0, 'H:rmw'),

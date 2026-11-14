@@ -6,10 +6,6 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECK = dict(name='ppc-user-trap', tier=2, budget=120,
-             covers=['tools/ppc/test_user_trap*'],
-             inputs=['arch/ppc/kernel_trap.c', 'arch/ppc/pd_walk.c',
-                     'arch/ppc/ppc_*.h', 'include/*.h'])
 
 def check(source, expected):
     with tempfile.TemporaryDirectory() as directory:

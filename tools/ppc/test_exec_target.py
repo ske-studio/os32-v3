@@ -1,6 +1,4 @@
 """Exercise the real OS32X admission predicate with the PPC target facade."""
-CHECK = dict(covers=['arch/ppc/arch_exec_image.h', 'arch/x86/arch_exec_image.h', 'exec/os32x_hdr.c'],
-             inputs=['tools/ppc/test_exec_target.py'])
 from pathlib import Path
 import subprocess
 import sys

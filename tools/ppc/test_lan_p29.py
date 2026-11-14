@@ -9,10 +9,6 @@ import types
 from unittest.mock import patch
 import kboot_run as meter
 
-CHECK = dict(name='ppc-lan-p29', tier=1, budget=60, needs=[],
-             covers=['tools/ppc/test_lan_p29.py'],
-             inputs=['tools/ppc/test_lan_p29.py', 'tools/ppc/kboot_run.py',
-                     'tools/ppc_lan_host.py', 'tools/ppc/run.py', 'tools/ppc/kboot_mutations.py'])
 
 
 def cases(mod, elf):

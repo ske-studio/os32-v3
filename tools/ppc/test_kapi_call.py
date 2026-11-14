@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 """Exercise the PPC logical KAPI boundary with a saved register frame."""
-CHECK = dict(name='ppc-kapi-call', tier=1,
-             covers=['arch/ppc/kapi_call.c', 'tools/ppc/test_kapi_call.py'],
-             inputs=['arch/ppc/kapi_call.c', 'arch/ppc/ppc_frame.h',
-                     'include/kapi_call.h', 'include/exec_arch.h',
-                     'sdk/gen_kapi.py', 'sdk/kapi.json'], needs=[], budget=3)
 import subprocess
 import sys
 import tempfile

@@ -6,10 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p14', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_reset.c', 'tools/ppc/test_lan_p14.py',
-                     'tools/ppc/lan_p14_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('half-timeout', 'if (r == GEM_ETIME) { g->state = GEM_STATE_RESETTING; g->half_reset_timeouts++; }\n        /* gem_disable_tx', 'if (r == GEM_ETIME) return r;\n        /* gem_disable_tx', 8, 'H:half-timeout'),

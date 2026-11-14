@@ -4,9 +4,6 @@ import argparse
 from pathlib import Path
 import re
 
-CHECK = dict(name='ppc-setjmp', tier=1, budget=10, needs=[],
-             covers=['arch/ppc/setjmp.S', 'arch/ppc/arch_jmp_storage.h'],
-             inputs=['tools/ppc/test_setjmp.py'])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'arch/ppc/setjmp.S'
 HEADER = ROOT / 'arch/ppc/arch_jmp_storage.h'

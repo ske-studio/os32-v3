@@ -13,21 +13,6 @@ PRODUCTS = ['drivers/net/gem/gem_' + name + '.c'
 PRODUCTS += ['platform/powermac/gmac_dma.c']
 PRODUCTS += ['platform/powermac/lan_' + name + '.c'
              for name in ('log', 'wire', 'monitor', 'diag', 'terminal')]
-CHECK = dict(name='ppc-lan-p24', tier=2, budget=60,
-             covers=['platform/powermac/lan_service.c', 'tools/ppc/test_lan_p24.py',
-                     'tools/ppc/lan_p24_fake.c'],
-             inputs=['platform/powermac/gmac_dma.c', 'mm/paging.h',
-                     'drivers/net/gem/gem_reset.c', 'drivers/net/gem/gem_ring.c',
-                     'drivers/net/gem/gem_mac.c', 'drivers/net/gem/gem_phy.c',
-                     'drivers/net/gem/gem_tx.c', 'drivers/net/gem/gem_rx.c',
-                     'platform/powermac/lan_log.c', 'platform/powermac/lan_wire.c',
-                     'platform/powermac/lan_monitor.c', 'platform/powermac/lan_diag.c',
-                     'platform/powermac/lan_terminal.c',
-                     'platform/powermac/lan_boot.h',
-                     'drivers/net/gem/gem.h', 'include/*.h',
-                     'arch/ppc/*.h', 'lib/kstring.h', 'sdk/include/os32/*.h',
-                     'platform/powermac/kboot_info.h',
-                     'platform/powermac/kboot_log.h'])
 MUTATIONS = [
     ('tx-hold', 'now < s.tx_at', '0', 'tx-hold', 'H:tx-hold'),
     ('log-again', 'pm_lan_log_complete(r);', 'pm_lan_log_complete(GEM_OK);',

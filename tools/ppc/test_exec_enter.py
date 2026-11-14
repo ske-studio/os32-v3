@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Check the assembled PPC USER transition and its MSR mutation."""
-CHECK = dict(name='ppc-exec-enter', tier=1,
-             covers=['arch/ppc/exec_enter.S', 'tools/ppc/test_exec_enter.py'],
-             inputs=['arch/ppc/ppc_oea.h', 'build/ppc-kboot.mk'], needs=[], budget=3)
+import os
 import re
 import subprocess
 import sys
@@ -10,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CROSS = Path('/home/hight/opt/cross-ppc/bin')
+CROSS = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 SOURCE = ROOT / 'arch/ppc/exec_enter.S'
 
 

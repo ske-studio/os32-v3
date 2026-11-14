@@ -7,11 +7,6 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECK = dict(name='ppc-terminal', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/lan_terminal.c'],
-             inputs=['tools/ppc/test_ppc_terminal.py', 'platform/powermac/lan_wire.c',
-                     'platform/powermac/lan_boot.h', 'include/types.h',
-                     'lib/kstring_c.c', 'lib/kstring.h'])
 HARNESS = r'''
 #include "lan_boot.h"
 static int lost, fed;
