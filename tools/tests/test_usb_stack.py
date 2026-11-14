@@ -16,7 +16,7 @@ import test_usb_core
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = test_usb_ohci.SOURCES + [s + '.c' for s in test_usb_core.SOURCES] + [
     'hid_kbd.c', 'hid_kbd_map.c', 'hid_mouse.c']
-CHECK = dict(name='usb-stack', tier=1, needs=[], budget=60, covers=[
+CHECK = dict(env=['ppc-cross'], name='usb-stack', tier=1, needs=[], budget=60, covers=[
     'drivers/usb/*.[ch]', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'include/endian_dma.h',
     'arch/*/arch_endian_dma.h', 'lib/kstring.h',

@@ -1,10 +1,10 @@
 """Register tools/ppc/test_lan_p2.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-lan-p2',
     tier=2,
     budget=60,
     needs=[],
-    covers=['tools/ppc/test_lan_p2.py',
+    covers=['tools/ppc/test_lan_p2.py', 'tools/tests/fixtures/ppc_gemreg.h',
      'drivers/net/gem/gem.h',
      'include/types.h',
      'include/callconv.h',
@@ -18,4 +18,4 @@ CHECK = dict(
 
 def run(ctx):
     from ppc_registered import run_test
-    return run_test(ctx, 'tools/ppc/test_lan_p2.py', ['gcc', 'qemu-i386', '/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/gemreg.h'])
+    return run_test(ctx, 'tools/ppc/test_lan_p2.py', ['gcc', 'qemu-i386', str(ctx.root / 'tools/tests/fixtures/ppc_gemreg.h')])

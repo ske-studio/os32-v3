@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """W4b C evidence; no ID is closed by these partial host vectors."""
-CHECK = dict(name='arch-ctx-host', tier=2, budget=15, needs=[], covers=[
+CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[], covers=[
     'tools/tests/test_arch_ctx.py', 'tools/tests/arch_ctx_host.c',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
     'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',

@@ -1,5 +1,5 @@
 """Register tools/ppc/test_exec_cache.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-exec-cache',
     tier=2,
     budget=60,

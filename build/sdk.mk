@@ -168,7 +168,7 @@ CHECK_NAMES := $(filter check-%,$(MAKECMDGOALS))
 CHECK_ALL_NEEDS :=
 else
 CHECK_SHARD ?=
-CHECK_REGISTRATION := $(shell python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
+CHECK_REGISTRATION := $(shell CHECK_ROUTINE=$(CHECK_ROUTINE) python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --make failed (make registration))
 endif

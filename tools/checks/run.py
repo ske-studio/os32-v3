@@ -575,6 +575,9 @@ def script_path_refs(text):
                 refs.add((line, path, dynamic))
     return sorted(refs)
 
+CHECK_ENVS = frozenset({"ppc-cross", "qemu-ppc", "socket"})
+
+
 @dataclass(frozen=True)
 class Check:
     name: str
@@ -590,6 +593,7 @@ class Check:
     env_limit: str | None = None
     pins: tuple[str, ...] = ()
     full_only: bool = False
+    env: tuple[str, ...] = ()
 
     @property
     def seconds(self):
@@ -686,7 +690,7 @@ def indexed_discover(root):
         if data["signature"] == signature:
             return {row["name"]: Check(**dict(row, covers=tuple(row["covers"]),
                                              needs=tuple(row["needs"]),
-                                             basis=tuple(row["basis"]), pins=tuple(row["pins"]))) for row in data["checks"]}
+                                             env=tuple(row["env"]), basis=tuple(row["basis"]), pins=tuple(row["pins"]))) for row in data["checks"]}
     except (OSError, ValueError, TypeError, KeyError):
         pass
     checks = discover(root)
@@ -755,16 +759,18 @@ def discover(root: Path) -> dict[str, Check]:
         if len(data) != len(node.keywords):
             reject("duplicate CHECK field")
         allowed = {"name", "covers", "budget", "tier", "needs", "mutate_tier",
-                   "basis", "kind", "env_limit", "pins", "full_only"}
+                   "basis", "kind", "env_limit", "pins", "full_only", "env"}
         if set(data) - allowed or not {"name", "covers", "budget"} <= data.keys():
             reject("invalid CHECK fields")
         name = data["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
             reject("invalid name")
-        for field, default in (("covers", None), ("needs", []), ("basis", []), ("pins", [])):
+        for field, default in (("covers", None), ("needs", []), ("basis", []), ("pins", []), ("env", [])):
             value = data.get(field, default)
             if not isinstance(value, list) or not all(isinstance(s, str) and s for s in value):
                 reject(field + " must be list[str]")
+        if set(data.get("env", [])) - CHECK_ENVS:
+            reject("unknown env")
         if "kind" in data and data["kind"] not in ("contract", "characterization"):
             reject("invalid kind")
         if "env_limit" in data and not isinstance(data["env_limit"], str):
@@ -796,7 +802,7 @@ def discover(root: Path) -> dict[str, Check]:
                              basis=tuple(data.get("basis", [])),
                              kind=data.get("kind", "contract" if data.get("basis") else None),
                              env_limit=data.get("env_limit"), pins=tuple(data.get("pins", [])),
-                             full_only=data.get("full_only", False))
+                             full_only=data.get("full_only", False), env=tuple(data.get("env", [])))
     weights = root / "tools/checks/weights.json"
     if weights.exists():
         for name, seconds in json.loads(weights.read_text())["seconds"].items():
@@ -1195,6 +1201,12 @@ def lint(root, checks):
 
 
 def run_one(check: Check, ctx: Context) -> int:
+    # Mixed host/PPC checks retain their host coverage when cross is optional.
+    if "ppc-cross" in check.env and os.environ.get("OS32_REQUIRE_PPC") == "1":
+        cross = Path(os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc"))
+        if not (cross / "bin/powerpc-elf-gcc").is_file():
+            print("FAIL check-" + check.name + ": PPC toolchain unavailable", flush=True)
+            return 1
     spec = importlib.util.spec_from_file_location("_os32_check_" + check.name.replace("-", "_"), ctx.root / check.path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -1232,7 +1244,7 @@ def main(argv: list[str]) -> int:
     action.add_argument("--list", action="store_true")
     action.add_argument("--make", action="store_true", help="emit all make registration variables")
     action.add_argument("--select", action="store_true")
-    action.add_argument("--run", nargs="+")
+    action.add_argument("--run", nargs="+", help="check names or all (subject to environment filters)")
     action.add_argument("--lint", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--needs", action="store_true", help="with --list: selected make prerequisites")
@@ -1241,6 +1253,8 @@ def main(argv: list[str]) -> int:
     source.add_argument("--base")
     source.add_argument("--files", nargs="*")
     parser.add_argument("--tier", type=int, choices=range(5), default=0)
+    parser.add_argument("--env", action="append", default=[], choices=sorted(CHECK_ENVS))
+    parser.add_argument("--exclude-env", action="append", default=[], choices=sorted(CHECK_ENVS))
     args = parser.parse_args(argv)
     try:
         checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
@@ -1248,6 +1262,10 @@ def main(argv: list[str]) -> int:
         routine = os.environ.get("CHECK_ROUTINE") == "1" and (args.list or args.make or args.run)
         eligible = {n: c for n, c in checks.items() if not routine or not any(
             checks[dep].full_only for dep in closure(checks, (n,)))}
+        if (args.env or args.exclude_env) and not (args.list or args.run):
+            raise ValueError("environment filters require --list or --run")
+        eligible = {n: c for n, c in eligible.items()
+                    if set(args.env) <= set(c.env) and not set(args.exclude_env) & set(c.env)}
         names = ordered(eligible)
         if args.shard is not None:
             if not (args.list or args.make) or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
@@ -1280,7 +1298,7 @@ def main(argv: list[str]) -> int:
             print(f"check-changed: {result.mode}, tier {result.tier}, {len(result.stage)} checks", file=sys.stderr)
             print(emit_shell(result), end="")
             return 0
-        names = {n.removeprefix("check-") for n in args.run}
+        names = set(checks) if args.run == ["all"] else {n.removeprefix("check-") for n in args.run}
         if names - checks.keys():
             raise ValueError("unknown check: " + " ".join(sorted(names - checks.keys())))
         names &= eligible.keys()

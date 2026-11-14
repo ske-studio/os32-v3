@@ -1,4 +1,4 @@
-CHECK = dict(name='ppc-rh-fb', tier=2, budget=600, needs=['make:all'], covers=[
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600, needs=['make:all'], covers=[
     'platform/powermac/rh_observe.[ch]', 'arch/ppc/**',
     'init/ppc_kernel.c', 'platform/powermac/boot.c',
     'platform/powermac/mmu_boot.c', 'platform/powermac/mmu_start.c',

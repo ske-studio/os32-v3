@@ -46,6 +46,50 @@ class RunnerTest(unittest.TestCase):
                     self.check(**{field: value})
                     self.assertEqual(self.cli('--lint')[0], 1)
 
+    # Origin: PACK.md mainline PM decision (2026-11-14), documented in TESTS.md.
+    def test_environment_metadata(self):
+        self.check()
+        self.assertEqual(self.registry()['a'].env, ())
+        self.check(env=['ppc-cross', 'qemu-ppc'])
+        self.assertEqual(self.registry()['a'].env, ('ppc-cross', 'qemu-ppc'))
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        for value in ('ppc-cross', None, [1], [''], ['unknown'], ['ppc-cross', 'typo']):
+            with self.subTest(value=value):
+                self.check(env=value)
+                self.assertEqual(self.cli('--lint')[0], 1)
+
+    def test_environment_requirement(self):
+        self.check(env=['ppc-cross'])
+        check = self.registry()['a']
+        ctx = R.Context(self.root, False, (), None, self.root, {})
+        # Optional cross must preserve mixed checks' existing host execution.
+        with patch.dict(os.environ, dict(self.env, PPC_CROSS_DIR=str(self.root / 'absent'),
+                                       OS32_REQUIRE_PPC='0'), clear=True):
+            self.assertEqual(R.run_one(check, ctx), 0)
+            with patch.dict(os.environ, OS32_REQUIRE_PPC='1'):
+                self.assertEqual(R.run_one(check, ctx), 1)
+
+    def test_environment_selection(self):
+        self.check('host')
+        self.check('cross', env=['ppc-cross'])
+        self.check('guest', env=['ppc-cross', 'qemu-ppc'])
+        self.check('slow', env=['ppc-cross'], full_only=True)
+        flags = ('--env', 'ppc-cross', '--exclude-env', 'qemu-ppc')
+        self.assertEqual(set(self.cli('--list', *flags)[1].split()), {'check-cross', 'check-slow'})
+        self.assertEqual(self.cli('--list', '--env', 'ppc-cross', '--env', 'qemu-ppc')[1].split(),
+                         ['check-guest'])
+        self.assertEqual(self.cli('--list', '--exclude-env', 'ppc-cross')[1].split(), ['check-host'])
+        for routine, expected in (('1', ['cross']), ('0', ['cross', 'slow'])):
+            env = dict(self.env, CHECK_ROUTINE=routine, CHECK_NO_NEEDS='1')
+            self.assertEqual(self.cli('--list', *flags, env=env)[1].split(),
+                             ['check-' + n for n in expected])
+            for targets in (('all',), ('host', 'cross', 'guest', 'slow')):
+                calls = []
+                with patch.object(R, 'run_one', side_effect=lambda c, ctx: calls.append(c.name) or 0):
+                    self.assertEqual(self.cli('--run', *targets, *flags, env=env)[0], 0)
+                self.assertEqual(sorted(calls), expected)
+
     def test_expectation_warnings_and_pins(self):
         self.check('legacy')
         self.check('empty', basis=[])
@@ -971,7 +1015,13 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
-        ('metadata-list-type', '(("covers", None), ("needs", []), ("basis", []), ("pins", []))',
+        ('env-requirement', 'if "ppc-cross" in check.env and os.environ.get("OS32_REQUIRE_PPC") == "1":',
+         'if False:', 'test_environment_requirement'),
+        ('metadata-env-value', 'if set(data.get("env", [])) - CHECK_ENVS:',
+         'if False:', 'test_environment_metadata'),
+        ('env-include', 'set(args.env) <= set(c.env)', 'True', 'test_environment_selection'),
+        ('env-exclude', 'not set(args.exclude_env) & set(c.env)', 'True', 'test_environment_selection'),
+        ('metadata-list-type', '(("covers", None), ("needs", []), ("basis", []), ("pins", []), ("env", []))',
          '(("covers", None), ("needs", []))', 'test_expectation_metadata'),
         ('metadata-kind-type', 'if "kind" in data and data["kind"] not in ("contract", "characterization"):',
          'if False:', 'test_expectation_metadata'),

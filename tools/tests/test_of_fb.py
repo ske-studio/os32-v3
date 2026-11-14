@@ -15,7 +15,7 @@ BACKEND = 'drivers/video/of_fb/backend_of_fb.c'
 V2 = 'drivers/video/of_fb/of_fb_v2.c'
 SOURCES = [BACKEND, V2, 'platform/powermac/display_provider.c',
            'platform/powermac/display_dual.c', 'platform/powermac/display.c']
-CHECK = dict(name='of-fb-host', tier=1, needs=[], budget=30, covers=[
+CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, covers=[
     'drivers/video/of_fb/backend_of_fb.c', 'drivers/video/of_fb/of_fb_v2.c',
     'platform/powermac/display_provider.c', 'platform/powermac/display_dual.c',
     'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
@@ -79,7 +79,7 @@ def observe(folder, mutation=None):
 
 
 def cross(folder):
-    cc = Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc')
+    cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
     if not cc.is_file():
         print('SKIP PPC cross compiler unavailable', flush=True)
         return

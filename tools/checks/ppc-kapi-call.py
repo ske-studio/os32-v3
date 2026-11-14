@@ -1,5 +1,5 @@
 """Register tools/ppc/test_kapi_call.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-kapi-call',
     tier=1,
     budget=3,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-CHECK = dict(name='fbcon-host', tier=1, needs=[], budget=20,
+CHECK = dict(env=['ppc-cross'], name='fbcon-host', tier=1, needs=[], budget=20,
     covers=[
         'build/config.mk',
         'build/arch/x86-sources.mk',

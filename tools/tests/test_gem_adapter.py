@@ -1,5 +1,5 @@
 """Borrowed GEM operations and tick-only bounded hardware access."""
-CHECK = dict(name='gem-adapter-host', tier=2, budget=10, needs=[], covers=[
+CHECK = dict(env=['ppc-cross'], name='gem-adapter-host', tier=2, budget=10, needs=[], covers=[
     'platform/powermac/nic_gem.c', 'platform/powermac/nic_gem.h',
     'platform/powermac/lan_boot.h', 'platform/powermac/lan_service.c',
     'platform/powermac/rh_observe.h', 'net/link.h', 'include/net_eth.h', 'drivers/net/gem/gem.h', 'net/nic.h', 'include/types.h',

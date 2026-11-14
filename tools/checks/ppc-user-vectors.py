@@ -1,5 +1,5 @@
 """Register tools/ppc/test_user_vectors.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-user-vectors',
     tier=1,
     budget=10,

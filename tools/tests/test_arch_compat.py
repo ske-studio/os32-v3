@@ -2,7 +2,7 @@
 """Shared compatibility vectors; partial host evidence never closes an ID."""
 # Privileged MSR operations are fake; the real idle C body runs on host.
 # Saved values remain opaque. Cross compilation independently checks PPC code.
-CHECK = dict(name='arch-compat-host', tier=2, budget=30, needs=[], covers=[
+CHECK = dict(env=['ppc-cross'], name='arch-compat-host', tier=2, budget=30, needs=[], covers=[
     'tools/tests/test_arch_compat.py', 'tools/tests/arch_compat_vectors.c',
     'tools/tests/host32.py', 'docs/decisions/ARCH_COMPAT_CONTRACT.md',
     'platform/pc98/link_platform.c', 'platform/powermac/link_platform.c',

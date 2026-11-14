@@ -22,6 +22,7 @@
 |---|---|---|
 | `basis` | 空でない文字列の list、既定 `[]` | 期待の出所となる設計の ID (例 `['AC-CTX-1', 'IO_TIER_DESIGN §4']`)。契約の試験に書く |
 | `kind` | `'contract'` / `'characterization'` | `basis` が空でなければ既定は `contract`。現状の記録には `characterization` を明記する |
+| `env` | 空でない文字列の list、既定 `[]` | 実行環境。許可値は `ppc-cross` (PowerPC toolchain)、`qemu-ppc` (PowerPC QEMU/OpenBIOS)、`socket` (host socket)。未知の値はエラー |
 | `env_limit` | 文字列、省略可 | この環境で出せない故障の型 (例「host の偽 MMIO、posted write は見えない」) |
 | `pins` | 空でない文字列の list、既定 `[]` | 固定している欠陥を変える設計の ID。現行の `docs/` 本文に存在すること (archive・hw は対象外) |
 | `full_only` | bool、既定 `False` | `True` は毎回の CI から外し、full-check の `make check` で回す |
@@ -32,6 +33,9 @@
 `full_only` とそれを前提にする検査は、`CHECK_ROUTINE=1` の list・make 登録・実行から除外する。
 `make check-fast` と静的 CI (`check.yml`) がこの指定を使い、シャードの前提の準備から除外する。
 `make check` と明示的な `make check-<名前>` は通常どおり実行する (`CHECK_ROUTINE` 未指定時)。
+`--list` と `--run` は `--env VALUE` (すべて含む)・`--exclude-env VALUE` (いずれも含まない) で環境を選べる。両方とも複数指定可。
+例: `CHECK_ROUTINE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc`。
+`all` は全登録検査から選び、`CHECK_ROUTINE=1` を外すと `full_only` も含む。`needs` の前提は通常どおり準備する。
 既存の `tier=4` は変更選択時だけの指定で、`check-fast` の対象からは外れない。
 この段では既存試験の分類と配置は一括変更しない。
 

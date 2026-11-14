@@ -1,5 +1,5 @@
 """Register tools/ppc/test_ppc_terminal_input.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-terminal-input',
     tier=1,
     budget=60,

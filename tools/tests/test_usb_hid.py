@@ -11,7 +11,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c']
-CHECK = dict(name='usb-hid', tier=1, needs=[], budget=10, covers=[
+CHECK = dict(env=['ppc-cross'], name='usb-hid', tier=1, needs=[], budget=10, covers=[
     'drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c',
     'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
     'drivers/usb/usb_desc.h', 'include/usb_platform.h', 'include/types.h',

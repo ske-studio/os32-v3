@@ -1,5 +1,5 @@
 """Register tools/ppc/test_user_trap.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-user-trap',
     tier=2,
     budget=120,

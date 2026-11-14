@@ -1,5 +1,5 @@
 """Register tools/ppc/test_hello_build.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-hello-build',
     tier=2,
     budget=60,

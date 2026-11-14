@@ -1,5 +1,5 @@
 """Register tools/ppc/test_app_link.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-app-link',
     tier=2,
     budget=60,

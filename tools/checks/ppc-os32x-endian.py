@@ -1,5 +1,5 @@
 """Register tools/ppc/test_os32x_endian.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-os32x-endian',
     tier=2,
     budget=60,

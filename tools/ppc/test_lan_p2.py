@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = ROOT / "drivers/net/gem/gem.h"
-BSD = Path("/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/gemreg.h")
+# OpenBSD src/sys/dev/ic/gemreg.h revision 1.17; BSD license retained in fixture.
+BSD = ROOT / "tools/tests/fixtures/ppc_gemreg.h"
 LAN = ROOT / "platform/powermac/lan_boot.h"
 # Explicit product-to-reference mapping; offsets in OpenBSD are bank-relative.
 PAIRS = [(name, name) for name in """

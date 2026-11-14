@@ -16,7 +16,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 # The declaration lists transitive
 # repository headers and the runner actually used by the executable fixtures.
-CHECK = dict(name='usb-contract', tier=1, needs=[], budget=5, covers=['include/endian_dma.h', 'arch/*/arch_endian_dma.h',
+CHECK = dict(env=['ppc-cross'], name='usb-contract', tier=1, needs=[], budget=5, covers=['include/endian_dma.h', 'arch/*/arch_endian_dma.h',
                      'include/usb_platform.h', 'drivers/usb/*.[ch]',
                      'tools/check_usb_portable.py', 'include/types.h', 'include/callconv.h', 'include/endian_le.h',
                      'tools/tests/usb_contract_host.c', 'tools/tests/test_usb_contract.py',
@@ -47,7 +47,7 @@ def check(mutate):
                  '-Werror=implicit-function-declaration', '-Iinclude', '-I.']
         src = 'tools/tests/usb_contract_host.c'
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
-        ppc = Path(os.environ.get('USB_PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+        ppc = Path(os.environ.get('USB_PPC_CROSS_DIR', os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
         for cc, arch in [(str(cross / 'bin/i386-elf-gcc'), 'x86'),
                          (str(ppc / 'bin/powerpc-elf-gcc'), 'ppc'), ('gcc', 'x86')]:
             if arch == 'ppc' and not Path(cc).is_file():

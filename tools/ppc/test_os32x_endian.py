@@ -52,7 +52,7 @@ def exercise(tmp, sdk):
     assert out.read_bytes()[64:] == raw.read_bytes()
     src = tmp / 'app.c'
     x86 = tmp / 'x86.elf'
-    call(['/home/hight/opt/cross/bin/i386-elf-gcc', '-m32', '-ffreestanding', '-nostdlib', '-c', src, '-o', x86])
+    call(['gcc', '-m32', '-ffreestanding', '-nostdlib', '-c', src, '-o', x86])
     cmd[cmd.index(elf)] = x86
     result = subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
     assert result.returncode != 0 and 'ELF target mismatch' in result.stderr

@@ -1,5 +1,5 @@
 """Register tools/ppc/test_lan_p22c.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='lan-p22c',
     tier=2,
     budget=60,

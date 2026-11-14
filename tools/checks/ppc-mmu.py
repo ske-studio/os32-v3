@@ -1,5 +1,5 @@
 """Register tools/ppc/mmu_run.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'],
     name='ppc-mmu',
     tier=2,
     budget=600,

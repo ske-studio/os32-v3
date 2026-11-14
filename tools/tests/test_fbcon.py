@@ -1,5 +1,6 @@
 """Common grid through the real console stream and PowerMac backend."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -39,7 +40,7 @@ def build_run(tmp, source):
         str(ROOT/'drivers/video/kcg/kcg_file.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
     return host32.run([str(exe)], runner='qemu', capture_output=True,text=True)
 def cross_compile(tmp):
-    cc = Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc')
+    cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
     if not cc.is_file():
         print('SKIP fbcon PPC cross gcc unavailable', flush=True)
         return

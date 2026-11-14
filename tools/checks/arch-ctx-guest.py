@@ -1,4 +1,4 @@
-CHECK = dict(name='arch-ctx-guest', tier=2, budget=900, needs=['make:kernel'],
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='arch-ctx-guest', tier=2, budget=900, needs=['make:kernel'],
              covers=['tools/accept/arch_ctx*', 'arch/ppc/**', 'platform/powermac/**',
                      'exec/**', 'kernel/sys.c', 'kernel/irq/**', 'kernel/time/**',
                      'build/ppc-kboot.mk', 'build/ppc-user.mk', 'sdk/**',

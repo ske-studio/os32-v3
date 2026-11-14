@@ -1,5 +1,5 @@
 """Register tools/ppc/test_syscall_code.py with its design expectations."""
-CHECK = dict(
+CHECK = dict(env=['ppc-cross'],
     name='ppc-syscall-code',
     tier=2,
     budget=60,

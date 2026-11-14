@@ -70,7 +70,19 @@ def wiring():
     assert all('if' not in s for s in ppc)
     assert ppc[0]['with']['ref'] == "${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}"
     assert any(s.get('uses') == './.github/actions/ppc-setup' for s in ppc)
-    assert any('make check-ppc-compile MUTATE=1' in s.get('run', '') for s in ppc)
+    assert any('MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc' in s.get('run', '') for s in ppc)
+    # Origin: mainline PM's PACK.md decision, documented in docs/TESTS.md.
+    command = 'python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc'
+    for job_steps, routine, mutate in ((steps, True, 0), (ppc, False, 1)):
+        runs = '\n'.join(step.get('run', '') for step in job_steps)
+        assert command in runs
+        assert f'MUTATE={mutate} ' + command in runs
+        assert ('CHECK_ROUTINE=1 ' in runs) == routine
+        assert 'make check-ppc-compile' not in runs
+        assert any(step.get('uses') == './.github/actions/build-setup' for step in job_steps)
+        for dependency in ('gcc-13', 'qemu-user', 'ccache'):
+            assert dependency in runs
+        assert 'qemu-system-ppc' not in runs
     action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
     commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands

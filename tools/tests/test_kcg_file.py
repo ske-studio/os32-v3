@@ -9,7 +9,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CHECK = dict(name='kcg-file-host', tier=1, needs=[], budget=15,
+CHECK = dict(env=['ppc-cross'], name='kcg-file-host', tier=1, needs=[], budget=15,
     covers=['tools/tests/test_kcg_file.py', 'tools/tests/kcg_file_host.c',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'include/**', 'sdk/include/**', 'arch/x86/**',

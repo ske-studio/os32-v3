@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compile the standalone link platform contract for host and PowerPC."""
-CHECK = dict(name='link-platform-host', tier=2, budget=10, needs=[], covers=[
+CHECK = dict(env=['ppc-cross'], name='link-platform-host', tier=2, budget=10, needs=[], covers=[
     'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'include/types.h', 'include/callconv.h',
     'tools/tests/test_link_platform.py', 'tools/tests/host32.py',
     'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'],

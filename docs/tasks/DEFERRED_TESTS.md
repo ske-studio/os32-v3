@@ -30,6 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| PPC-CI-STAGE2 | `arch-ctx-guest`・`ppc-fb`・`ppc-usb`・`ppc-sc`・`ppc-sd`・`ppc-sh-output`・`ppc-rh-fb`・`ppc-mmu` | `env` に `qemu-ppc` を持ち段 1 の CI に QEMU/OpenBIOS がない | PM が手元で回す。CI の段 2 (PowerPC QEMU 導入) で CI 実行へ移し解除 |
 | PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
 | PPC-USB-LAN | PowerMac USB と LAN の併用・RPC stall 後の製品 sh 入力、後付け USB・抜去後 LAN 入力・USB 行の OPEN 取消 | 実装 sandbox は AF_INET を使用不可 | PM が sandbox 外で `tools/ppc/usb_run.py --lan --cpu both --mutate` と `tools/ppc/sc_run.py --cpu both` を取り込み前に実行する |
 | HALV2-I1-GUEST | 新帯の起動自己試験・`gfx2_i1.bin` の lock 中監査と終了時回収、R1 のゲスト回帰 | I1 実装者の依頼はホストまで。NP21/W は PM が操作する | [HAL_V2_DESIGN](../decisions/gui/HAL_V2_DESIGN.md) §13-2、I1 のゲスト受入。手順と証拠の所在は `~/os32-tmp/run/halv2-i1/RESULT.md` |
