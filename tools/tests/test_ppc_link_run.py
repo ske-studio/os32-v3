@@ -45,6 +45,14 @@ def probe(source):
     duplicate = ns['duplicate_requests']
     assert duplicate([frame(1), frame(2), '> '+frame(1), frame(1, 8)]) == 0
     assert duplicate([frame(1)]*3 + [frame(2)]*2) == 3
+    def no_slot(rid):
+        data = bytearray.fromhex(frame(rid, 3))
+        data[15] = 1
+        data[34] = 3
+        return '> ' + data.hex()
+    # A REQ resent after the agent's NO_SLOT is backpressure, not a duplicate.
+    assert duplicate([frame(5), no_slot(5), frame(5)]) == 0
+    assert duplicate([frame(5), frame(5), no_slot(5), frame(5)]) == 1
     rate = ns['tick_rate']
     first = dict(tick=0xfffffff0, tb=123456789)
     def last(delta):

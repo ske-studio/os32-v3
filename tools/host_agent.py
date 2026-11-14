@@ -776,6 +776,10 @@ class HostAgent:
         if verb in ("RSH", "GS", "PDIAG", "LOG"):
             if verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
                 self._service_rshell(rid, ent, parts, out)
+            elif verb == "PDIAG" and len(parts) == 6 and parts[5] == "0":
+                # A refused diagnostic (non-zero status) carries no body and so no WDATA.
+                ent["got"] = b""
+                self._service_rshell(rid, ent, parts, out)
             else:
                 expected = 7 if verb == "LOG" else (5 if parts[:2] == ["RSH", "ACCEPT"] else 6)
                 decl = self._decl(parts[-1] if len(parts) == expected else "", RESULT_MAX if verb != "LOG" else DECL_MAX_BYTES)

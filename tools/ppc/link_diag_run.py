@@ -21,10 +21,11 @@ class Diagnostics:
         self.index = 0
         self.ident = None
         self.results = []
-        self.cases = [('1', 0, 68), ('2', 0, 24), ('3', 0, 32),
-                      ('4 00800080', 0, 128), ('4 00000081', 3, 0),
-                      ('5 0000000001000000', 0, 256),
-                      ('5 0000000001010000', 3, 0)]
+        # Operator diag takes the PLN1 CLI words; out-of-range lengths are refused by
+        # the host before sending, and the guest bounds are fixed by ppc-link-diag-host.
+        self.cases = [('status', 0, 68), ('clock', 0, 24), ('memory', 0, 32),
+                      ('read-diag 0x80 0x80', 0, 128), ('peek 0x100000 0x100', 0, 256),
+                      ('peek 0 1', 3, 0)]
 
     def __call__(self, agent, out):
         if self.index == len(self.cases):
@@ -35,7 +36,6 @@ class Diagnostics:
             return False
         if self.ident is None:
             line, _, _ = self.cases[self.index]
-            # Future host implementation must accept numeric diagnostic lines.
             try:
                 self.ident = operator.submit('diag', line, None)
             except ValueError as exc:

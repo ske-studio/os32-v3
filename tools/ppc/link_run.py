@@ -35,13 +35,18 @@ def log_ready(logs, body):
     return 0 <= start < end and b'\n' in body[end:]
 
 def duplicate_requests(lines):
-    counts = {}
+    """REQ resent for a rid, not counting resends after the agent's NO_SLOT (ctl 3)."""
+    counts, refused = {}, set()
     for line in lines:
-        if not line or line.startswith('> '): continue
-        frame = bytes.fromhex(line)
-        if len(frame) >= 34 and frame[12:14] == b'\x88\xb5' and frame[14] == 2:
-            rid = int.from_bytes(frame[28:32], 'little')
-            counts[rid] = counts.get(rid, 0) + 1
+        if not line: continue
+        frame = bytes.fromhex(line[2:] if line.startswith('> ') else line)
+        if len(frame) < 34 or frame[12:14] != b'\x88\xb5': continue
+        rid = int.from_bytes(frame[28:32], 'little')
+        if line.startswith('> '):
+            if frame[14] == 3 and frame[15] & 1 and frame[34:35] == b'\x03': refused.add(rid)
+        elif frame[14] == 2:
+            if rid in refused: refused.discard(rid)
+            else: counts[rid] = counts.get(rid, 0) + 1
     return sum(n - 1 for n in counts.values())
 
 def tick_rate(first, last):

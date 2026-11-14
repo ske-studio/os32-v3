@@ -103,6 +103,14 @@ def test(agent_path, operator_path):
         return dict(ok=True, state=agent.operator.take_result()['state'])
     host.transport.result = result
     assert host.request('status')['state'] == 'done'
+    # A refused diagnostic carries a status and no body: zero declared length, no WDATA.
+    def refused(ident, wait_ms, timeout):
+        assert request(f'PDIAG OUT {boot} {ident} 3 0')['resp'][0] == 200, 'zero-length PDIAG OUT'
+        taken = agent.operator.take_result()
+        assert taken['status'] == 3 and taken['result'] == b''
+        return dict(ok=True, state=taken['state'])
+    host.transport.result = refused
+    assert host.request('peek 0x100000 1')['state'] == 'done'
     print('PASS remote-p2h')
 
 

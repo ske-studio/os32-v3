@@ -145,7 +145,9 @@ void pm_link_diag_poll(const struct pm_lan_diag *d, u64 now, u32 hz)
             } else if (!rc) { ready = ready_reply(); close_request(); }
             else if (rc != OS32_ERR_AGAIN) close_request();
         } else if (rc != OS32_ERR_AGAIN) {
-            if (!rc && status == 200 && written == result.payload_bytes) pending = 0;
+            /* 200 delivers; a 4xx is permanent (the agent refused this result), so drop it. */
+            if (!rc && ((status == 200 && written == result.payload_bytes) ||
+                        (status >= 400 && status < 500))) pending = 0;
             close_request();
         } else if (written < result.payload_bytes) {
             rc = link_host_write(handle, result.payload + written, result.payload_bytes - written, 0);
