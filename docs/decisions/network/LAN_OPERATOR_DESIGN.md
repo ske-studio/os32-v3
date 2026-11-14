@@ -135,9 +135,9 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 /* net/link_platform.h: 機械依存をこの境界へ。x86動作は既存実体で保持。 */
 u32 link_platform_now(void); /* 共通tick_countを使用、10ms、周回比較。独自TB時計は作らない */
 u32 link_platform_lock(void); void link_platform_unlock(u32 saved);
-void link_platform_idle(void); /* PPC: 前景poll、再入禁止。IRQ/送信内から待たない */
+void link_platform_idle(void); /* 前景専用、再入禁止。IRQ/送信内から待たない */
 /* platform/powermac/nic_gem.c: GEMをNetNicOpsへ、既存DMA/reset/PHYを再利用 */
-/* PPCもPC98_TICK_LINKと同じtick枠へtick_registerでlink_tickを登録。
+/* PPCもPC98_TICK_LINKと同じtick枠へtick_registerでnet_jiffyを登録し、そこからlink_tickを駆動。
  * USBのusb_platform.c:132と同じ基盤を使う。前景からlink_tickを呼ばない。
  * link像ではGEM RX/TXもx86のnet_jiffyと同じtick枠で汲む(1回TX回収8/RX8の上限は維持)。
  * 前景のpm_lan_pollはlink像のRXに触らない(A1)。 */
@@ -146,6 +146,20 @@ void link_platform_idle(void); /* PPC: 前景poll、再入禁止。IRQ/送信内
 - `lan_service.c:202,251` のreset/PHY/GEM poll、`lan_gem_io.c` とDMA処理は流用。RXを旧serviceとnetが二重drainしない。移行中はビルド選択でPLN1かlinkのどちらか1つのみ、既存PLN1像を戻り先として保存する。
 - PPC CLIは行頭でLAN完全行を受けるadapterを足し、既存CLIを呼ぶ。LANコマンド中のstream出力を8KiB captureに向けESCC複写を抑止、終了後RSH OUT。ESCCの対話・Ctrl-C・行取消は退避先として維持、入力待ちを必要とする対話プログラムはserial選択で使う。
 - PPCの早期診断・LOGはshell無し像でも動く。NOTIFYからIRQで診断を実行せず、前景pollの後に1件だけ処理。PPCにgshellが存在するとは仮定せず、GSERIAL移植は含めない。
+
+### W2: credit・RX 予算・link 進行の確定
+
+P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `docs/decisions/ARCH_COMPAT_CONTRACT.md` §5。適合は全項目「未 (T1 で確かめる)」のまま。
+
+- **AC-NET-1**: 消費単位は link page (`LINK_PAGE_BYTES=256`、`net/link.h:129`)。`link_credit_pages` (`net/link.c:305`〜`:311`) は NIC の `rx_credit_bytes` と本文リングの空きをそれぞれ256B単位で切り捨て、小さい方から `LINK_CREDIT_MARGIN=12` ページを引く (下限ゼロ)。本文リングは `LINK_STREAM_BUF=8192` (`net/link.h:123`)。
+- 1 frame の admit には `LINK_MAXFRAME_PAGES=6` (`net/link.h:127`) が必要なので、NIC 側だけでも margin と合わせて最低18ページ (4608B) が要る。これは6ページの frame を admit する閾値であり、credit が正になるだけなら13ページでよい。本文リング側の空きも必要。
+- NE2K (LGY-98) は ring と queue の空きの小さい方 (`net/nic_lgy98.c:38`〜`:42`)、e82557 は空き frame 数×frame 長 (`net/nic_e82557.c:25`〜`:27`) を byte で返す (`net/nic.h:16`)。
+- GEM は4枠の FIFO、credit は空き枠×1514B (`platform/powermac/nic_gem.c:15`〜`:18`、`:78`〜`:82`)。空なら6056B＝23ページ (切り捨て)、1枠保留なら4542B＝17ページ。後者は4608B未満で margin 後5ページとなり、6ページの frame は admit されない。閾値に近い容量と保留時境界の受入は F5 に残す。
+- **AC-NET-2**: GEM の RX 所有者は tick 枠の `net_jiffy` (`net/nic.c:276`、`platform/powermac/link_platform.c:32`)。前景は RX を汲まない (P1g A1)。`poll` は空き枠があるときだけ `gem_rx` を一度呼ぶ (`platform/powermac/nic_gem.c:61`〜`:76`)。内部走査は最大8 descriptor (`drivers/net/gem/gem_rx.c:26`)、TX 回収の予算も8 (`platform/powermac/nic_gem.c:65`)。外側 work の `NET_RX_SCAN_MAX=8` (`net/nic.h:47`) と掛けても1 tick の GEM descriptor 走査は最大8のまま。共通 RX queue の容量は `RX_SLOTS`・`RX_FRAME_BYTES` (`net/nic_rx.c:11`〜`:12`) が正。
+- 時間予算は共通 `tick_budget` の枠に従う (`platform/powermac/link_platform.c:9`、`net/nic.c:11`)。回数上限だけで時間の適合を宣言せず、GEM の時間予算の実測は F5 へ送る。
+- **AC-NET-3**: `LINK_RTO_TICKS=20` (200ms)・`LINK_TRIES=5` (`net/link.h:112`、`:116`)。RTO は NIC 受理から数え、`link_platform_now` は論理100Hzの jiffy (`net/link_platform.h:7`)。PowerPC も `tick_count` を返す (`platform/powermac/link_platform.c:15`)。実測は `docs/tasks/ppc/TASK_PPC_LAN.md:54` にあり、独自の時計を増やさない。
+- close の保留 ACK は link-closeack (main `9e39176a`) で修正済み。`link_free_handle` が `rel_want_ack`・`rel_ack_seq` を保存 (`net/link_host_api.inc:344`〜`:345`) し、NIC が受理するまで保留して RELEASE より先に送る (`net/link.c:424`〜`:436`)。
+- PowerPC の USER は EE=1 (`arch/ppc/exec_enter.S:25`)。USER に戻るたび DEC から共通 tick 枠の `net_jiffy` と `link_tick` が進む (`arch/ppc/kernel_dec.c:60`、`net/nic.c:286`、`:311`)。syscall 内 (EE=0) では進まない。**syscall 内の扱いは W3 (実行文脈ごとの約束) で決める**。idle の復帰契約は ARCH_COMPAT §2、実装の整合は F2b が担当する。
 
 ## 6. terra に出す段（各依頼1〜3ファイル・400行以下）
 行数は手書き製品差分の上限予算。各行を別依頼とし、同じ機能の検査も合計400行に収まらなければ契約試験/受入台本を別依頼へ分ける。生成物は機械生成の行数を別記し、手編集しない。
