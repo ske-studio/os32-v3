@@ -27,7 +27,8 @@ def commands(config, config_path):
             raise ValueError(f'cannot read MAC from {mac_path}: {exc}') from exc
         result[0] += ['--mac', mac]
         result.append([sys.executable, str(TOOLS / 'lan_bridge.py'), '--iface',
-                       config['iface'], '--connect', config['frame-endpoint']])
+                       config['iface'], '--connect', config['frame-endpoint'],
+                       '--agent-mac', mac])
         lanfs = [sys.executable, str(TOOLS / 'lanfs_host.py'), '--iface', config['iface'],
                  '--root', config['root'], '--peer', config['peer']]
         if config['allow-write']:

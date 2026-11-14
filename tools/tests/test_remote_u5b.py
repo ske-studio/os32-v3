@@ -71,6 +71,7 @@ def test(source):
             assert "'--config', '" + str(config_path) + "'" in first['host_agent']
             assert "'--mac', '" + Path('/sys/class/net/lo/address').read_text().strip() + "'" in first['host_agent'], 'MAC not passed'
             assert "'--connect', '127.0.0.1:8026'" in first['lan_bridge']
+            assert "'--agent-mac', '" + Path('/sys/class/net/lo/address').read_text().strip() + "'" in first['lan_bridge'], 'bridge MAC not passed'
             assert "'--allow-write', '/'" in first['lanfs_host'] and "'--peer', '02:00:00:00:00:01'" in first['lanfs_host']
             owner_path = config_path
             config_path = root / 'second.json'
@@ -180,6 +181,7 @@ def main():
             ('fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)', 'pass', 'duplicate lock accepted'),
             ('if child.poll() is not None:', 'if False:', 'child not restarted'),
             ("result[0] += ['--mac', mac]", 'pass', 'MAC not passed'),
+            ("'--agent-mac', mac])", "])", 'bridge MAC not passed'),
         ]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'mutant.py'
