@@ -67,7 +67,7 @@ extern int kapi_osri_show(const char *path, u32 duration_ms);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[292];
+volatile u32 kapi_hits[293];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -365,6 +365,7 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     12,  /* gfx2_cursor_show */
     12,  /* gfx2_dpms */
     24,  /* gfx2_present */
+    4,  /* con_sink_capture */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -662,6 +663,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* gfx2_cursor_show */
     0x0000,  /* gfx2_dpms */
     0x0000,  /* gfx2_present */
+    0x0000,  /* con_sink_capture */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2860,5 +2862,11 @@ int __cdecl wrap_gfx2_present(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)
 {
     KAPI_HIT(291);
     return gfx2_present(a, head, x, y, w, h);
+}
+
+int __cdecl wrap_con_sink_capture(u32 op)
+{
+    KAPI_HIT(292);
+    return con_sink_capture(op);
 }
 

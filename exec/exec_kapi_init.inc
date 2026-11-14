@@ -290,10 +290,11 @@ extern int __cdecl wrap_gfx2_cursor_move(u32 a, u32 head, i32 x, i32 y);
 extern int __cdecl wrap_gfx2_cursor_show(u32 a, u32 head, u32 show);
 extern int __cdecl wrap_gfx2_dpms(u32 a, u32 head, u32 state);
 extern int __cdecl wrap_gfx2_present(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h);
+extern int __cdecl wrap_con_sink_capture(u32 op);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 84;
+kapi->version = 85;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -587,6 +588,7 @@ kapi->version = 84;
     kapi->gfx2_cursor_show = wrap_gfx2_cursor_show;
     kapi->gfx2_dpms = wrap_gfx2_dpms;
     kapi->gfx2_present = wrap_gfx2_present;
+    kapi->con_sink_capture = wrap_con_sink_capture;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

@@ -636,6 +636,8 @@ offset	KernelAPI.buz_on	252
 member_size	KernelAPI.buz_on	4
 offset	KernelAPI.caller_identity	988
 member_size	KernelAPI.caller_identity	4
+offset	KernelAPI.con_sink_capture	1176
+member_size	KernelAPI.con_sink_capture	4
 offset	KernelAPI.con_sink_read	756
 member_size	KernelAPI.con_sink_read	4
 offset	KernelAPI.con_sink_stat	760
@@ -904,8 +906,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1176
-member_size	KernelAPI.kapi_reserved	32
+offset	KernelAPI.kapi_reserved	1180
+member_size	KernelAPI.kapi_reserved	28
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960

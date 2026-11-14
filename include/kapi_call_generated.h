@@ -297,6 +297,7 @@ static const u8 kapi_fixed_count[] = {
     3, /* gfx2_cursor_show */
     3, /* gfx2_dpms */
     6, /* gfx2_present */
+    1, /* con_sink_capture */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -591,5 +592,6 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_cursor_show */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_dpms */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_present */
+    { KAPI_VALUE_INTEGER }, /* con_sink_capture */
 };
 #endif
