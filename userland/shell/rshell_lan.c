@@ -117,7 +117,7 @@ static int send_ready(void)
     u32 gen, svc;
     boot_text(boot);
     if (have_id) snprintf(id, sizeof(id), "%08x", (unsigned int)last_id);
-    else strcpy(id, REMOTE_STATE_NONE);
+    else snprintf(id, sizeof(id), "%s", REMOTE_STATE_NONE);
     snprintf(req, sizeof(req), "%s %s %s 1 %s %s", REMOTE_REQ_RSH_READY,
              boot, REMOTE_MODE_CUI, id, state);
     attempted = 1;
