@@ -53,6 +53,10 @@ def check(mutate):
             if arch == 'ppc' and not Path(cc).is_file():
                 print('SKIP compile:', cc, 'not present (CI has no PPC toolchain)')
                 continue
+            if cc != 'gcc' and arch == 'x86' and not Path(cc).is_file():
+                # The PPC CI job has no x86 cross; the x86 jobs compile this part.
+                print('SKIP compile:', cc, 'not present (x86 cross absent)')
+                continue
             extra = ['-m32'] if cc == 'gcc' else []
             command([cc, *flags, *extra, '-Iarch/' + arch, '-O2', '-c', src,
                  '-o', str(tmp / (arch + '-' + Path(cc).name + '.o'))])
