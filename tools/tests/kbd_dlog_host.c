@@ -1,3 +1,4 @@
+#include "../../kernel/input_legacy.c"
 /* No device callbacks are registered in this boundary fixture. */
 void idle_work_run(void) { }
 /* ======================================================================== */
@@ -558,6 +559,7 @@ static const struct { const char *name; void (*fn)(void); } cases[] = {
 
 int main(int argc, char **argv)
 {
+    input_legacy_register(&kbd_legacy_provider);
     unsigned int i;
     int ran = 0;
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {

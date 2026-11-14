@@ -18,6 +18,7 @@
 /* ======================================================================== */
 
 #include "kbd.h"
+#include "../../input/hal/in2_int.h"
 #include "con_sink.h"
 #include "../../platform/pc98/legacy/v86_bios.h"
 #include "io.h"
@@ -486,10 +487,14 @@ static void kbd_deliver(u8 scancode)
 /*  kbd_init — キーボード初期化                                             */
 /*  μPD8251Aの初期化とIRQ1有効化                                            */
 /* ======================================================================== */
+static const struct InputLegacyProvider kbd_legacy_provider;
+
 void kbd_init(void)
 {
     u8 dummy;
     u32 flushed = 0;
+
+    input_legacy_register(&kbd_legacy_provider);
 
     /*
      * μPD8251A 初期化
@@ -650,40 +655,61 @@ static int kbd_gui_trygetbyte(void)
     return (int)b;
 }
 
-#include "kbd_fgpoll.inc"
-
-int kbd_trygetchar(void)
+static int kbd_local_trykey(void)
 {
     u16 entry;
 
-    kbd_foreground_poll();
-
-    /* GUI 中は注入リングだけを見る (cooked リングは GUI 中は空のまま)。
-     * 空のときは票 T8 §7 D8 の **ポーリング型の協調 yield**: 前回の譲りから
-     * PIT tick が進んでいれば 1 周だけ WM へ譲る。成立すれば戻らず、WM が
-     * 起こすとき exec_resume が EAX に「注入の 1 バイト」か「-1 (キーなし)」を
-     * 入れるので、アプリからは kbd_trygetchar() が普通に戻ったように見える。
-     * 間引き中 / 譲れない文脈なら従来どおり即 -1 (K7 §5 R1 の「park しない」は
-     * 「キーが来るまで止めない」の意味で、1 周の譲りはそれを破らない)。 */
-    if (kbd_gui_mode) {
-        int ch = kbd_gui_trygetbyte();
-        if (ch >= 0) return ch;
-        (void)exec_park_poll(tick_count);
-        return -1;
-    }
-
-    /* rshellモード: シリアル入力もチェック */
-    if (rshell_active && !con_sink_capture_active()) {
-        int sch;
-        sch = serial_trygetchar();
-        if (sch >= 0) return sch;
-    }
-    
     if (kbd_count == 0) return -1;
 
     RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
 
-    return (int)(entry & 0xFF);
+    return (int)entry;
+}
+
+static int kbd_local_peekkey(void)
+{
+    u16 entry;
+    unsigned int flags;
+
+    if (kbd_count == 0) return -1;
+
+    flags = irq_save();
+    entry = kbd_buf[kbd_head];
+    irq_restore(flags);
+
+    return (int)entry;
+}
+
+static int kbd_legacy_gui(void) { return kbd_gui_mode; }
+static int kbd_legacy_terminal_enabled(void)
+{
+    return rshell_active && !con_sink_capture_active();
+}
+static int kbd_legacy_inject_peek(void)
+{
+    u8 b = 0;
+    return kbd_inject_peek(&b) ? (int)b : -1;
+}
+/* The x86 adapter supplies its native PIT clock; the bridge has no clock. */
+static void kbd_legacy_park_poll(u32 unused)
+{
+    (void)unused;
+    (void)exec_park_poll(tick_count);
+}
+static const struct InputLegacyProvider kbd_legacy_provider = {
+    .terminal_try = serial_trygetchar, .terminal_peek = serial_peekchar,
+    .inject_try = kbd_gui_trygetbyte, .inject_peek = kbd_legacy_inject_peek,
+    .try_key = kbd_local_trykey, .peek_key = kbd_local_peekkey,
+    .gui_active = kbd_legacy_gui, .terminal_enabled = kbd_legacy_terminal_enabled,
+    .park_poll = kbd_legacy_park_poll,
+};
+
+#include "kbd_fgpoll.inc"
+
+int kbd_trygetchar(void)
+{
+    kbd_foreground_poll();
+    return input_legacy_try(IL_CHAR);
 }
 
 /* ======================================================================== */
@@ -704,14 +730,7 @@ int kbd_trygetchar(void)
 /* ======================================================================== */
 int kbd_trygetchar_local(void)
 {
-    u16 entry;
-
-    if (kbd_gui_mode) return -1;
-    if (kbd_count == 0) return -1;
-
-    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
-
-    return (int)(entry & 0xFF);
+    return input_legacy_try(IL_LOCAL_CHAR);
 }
 
 /* GUI モード中のブロッキング待ち (票 K7 D1 / §5 R1)。
@@ -811,33 +830,8 @@ int kbd_getkey_wait(int interruptible)
 /* ノンブロッキング版: キーコードデータ(u16)を返す。なければ-1 */
 int kbd_trygetkey(void)
 {
-    u16 entry;
-
     kbd_foreground_poll();
-
-    /* GUI 中は kbd_trygetchar と同型 (値か -1)。下位 8bit だけが意味を持ち、
-     * スキャンコードは 0 (票 K7 D7 — 端末経由の打鍵にスキャンコードは無い)
-     * ので、注入リングの 1 バイトがそのままキーコードになる。空なら
-     * D8 のポーリング型 yield を 1 周だけ試し、譲れなければ -1。 */
-    if (kbd_gui_mode) {
-        int ch = kbd_gui_trygetbyte();
-        if (ch >= 0) return ch;
-        (void)exec_park_poll(tick_count);
-        return -1;
-    }
-
-    /* rshellモード: シリアル入力もチェック */
-    if (rshell_active && !con_sink_capture_active()) {
-        int sch;
-        sch = serial_trygetchar();
-        if (sch >= 0) return sch; /* シリアルはASCIIのみ(下位バイト) */
-    }
-
-    if (kbd_count == 0) return -1;
-
-    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
-
-    return (int)entry;  /* 上位=キーコード, 下位=ASCII */
+    return input_legacy_try(IL_KEY);
 }
 
 /* 取り出さずに次のキーを覗く (継承バグ「source が ESC 以外も食う」)。
@@ -856,28 +850,7 @@ int kbd_trygetkey(void)
  * あるか」を見るだけの口なので、譲りたい呼び手は kbd_trygetchar を使う。 */
 int kbd_peekkey(void)
 {
-    u16 entry;
-    unsigned int flags;
-
-    if (kbd_gui_mode) {
-        u8 b = 0;
-        if (!kbd_inject_peek(&b)) return -1;
-        return (int)b;
-    }
-
-    if (rshell_active && !con_sink_capture_active()) {
-        int sch;
-        sch = serial_peekchar();
-        if (sch >= 0) return sch;   /* シリアルは ASCII のみ (下位バイト) */
-    }
-
-    if (kbd_count == 0) return -1;
-
-    flags = irq_save();
-    entry = kbd_buf[kbd_head];
-    irq_restore(flags);
-
-    return (int)entry;
+    return input_legacy_peek(IL_KEY);
 }
 
 /* 修飾キー(Ctrl/Shift/Alt等)の押下状態を取得 */

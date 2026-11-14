@@ -3,7 +3,7 @@ CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
              covers=['kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/test_remote_x8a.py',
                      'tools/tests/host_arch/**', 'build/config.mk',
-                     'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc',
+                     'drivers/input/kbd.c', 'kernel/input_legacy.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc',
                      'drivers/input/*.h', 'drivers/char/serial.h',
                      'drivers/video/geforce/geforce_module.h',
                      'kernel/module/*.h', 'platform/pc98/legacy/v86_bios.h',
@@ -30,11 +30,11 @@ ADAPTER = 'drivers/input/kbd_fgpoll.inc'
 MUTATIONS = [
     ('adapter-dispatch', ADAPTER, 'if (!kbd_gui_mode)', 'if (0 && !kbd_gui_mode)'),
     ('trychar-connection', KBD,
-     'int kbd_trygetchar(void)\n{\n    u16 entry;\n\n    kbd_foreground_poll();',
-     'int kbd_trygetchar(void)\n{\n    u16 entry;'),
+     'int kbd_trygetchar(void)\n{\n    kbd_foreground_poll();',
+     'int kbd_trygetchar(void)\n{\n'),
     ('trykey-connection', KBD,
-     'int kbd_trygetkey(void)\n{\n    u16 entry;\n\n    kbd_foreground_poll();',
-     'int kbd_trygetkey(void)\n{\n    u16 entry;'),
+     'int kbd_trygetkey(void)\n{\n    kbd_foreground_poll();',
+     'int kbd_trygetkey(void)\n{\n'),
     ('char-wait-connection', KBD,
      '            kbd_foreground_poll();\n            /* キーボードバッファ */',
      '            /* キーボードバッファ */'),
@@ -44,16 +44,10 @@ MUTATIONS = [
     ('char deadline', KBD, 'rshell_active || con_sink_capture_active()', 'rshell_active'),
     ('key deadline', KBD, 'if (capture && (u32)(tick_count - start_tick)',
      'if (0 && capture && (u32)(tick_count - start_tick)'),
-    ('trychar serial', KBD,
-     '    if (rshell_active && !con_sink_capture_active()) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch;\n',
-     '    if (rshell_active) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch;\n'),
     ('wait serial', KBD, '            if (rshell_active && !con_sink_capture_active()) {',
      '            if (rshell_active) {'),
-    ('trykey serial', KBD,
-     '    if (rshell_active && !con_sink_capture_active()) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch; /*',
-     '    if (rshell_active) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch; /*'),
-]
 
+]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -102,14 +96,12 @@ def main():
                     control()
                     print(f'RESTORED GREEN {label}', flush=True)
 
-
 def run(ctx):
     env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     command = [sys.executable, '-B', 'tools/tests/test_kbd_fgpoll.py']
     if ctx.mutate:
         command.append('--mutate')
     return subprocess.call(command, cwd=ctx.root, env=env, close_fds=False)
-
 
 if __name__ == '__main__':
     main()

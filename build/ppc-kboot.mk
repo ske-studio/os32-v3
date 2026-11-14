@@ -106,7 +106,7 @@ KB_C += platform/powermac/shell_boot.c platform/powermac/input_boot.c \
 endif
 KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
- kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
+ kernel/input_legacy.c kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
  fs/pipe_buffer.c kapi/kapi_strings.c kapi/kapi_print.c lib/kstring.c mm/paging_app.c \
  kernel/time/clock_service.c lib/os_time.c
 KB_C := $(filter-out arch/ppc/kboot_unavailable.c platform/powermac/kboot_console.c,$(KB_C))

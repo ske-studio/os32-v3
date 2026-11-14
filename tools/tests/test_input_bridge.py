@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Provider declaration, ILP32 layout and absent-source contract."""
+"""Provider contract and old/new nonblocking keyboard selection traces."""
 CHECK = dict(name='input-bridge-host', tier=1, budget=5, needs=[], covers=[
     'input/hal/in2_int.h', 'include/types.h', 'tools/tests/test_input_bridge.py',
-    'tools/tests/host32.py'], basis=['INPUT_HAL_DESIGN §3'])
+    'tools/tests/host32.py', 'tools/tests/input_bridge_host.c',
+    'kernel/input_legacy.c', 'drivers/input/kbd.c'], basis=['INPUT_HAL_DESIGN §3', 'INPUT_HAL_DESIGN §5'])
 
 import os
 from pathlib import Path
@@ -13,6 +14,82 @@ from types import SimpleNamespace
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
+# Selection functions from b27213d2:drivers/input/kbd.c; comments stripped.
+OLD_KBD = r'''
+static int kbd_gui_trygetbyte(void)
+{
+    u8 b = 0;
+    if (!kbd_inject_take(&b)) return -1;
+    return (int)b;
+}
+int kbd_trygetchar(void)
+{
+    u16 entry;
+    kbd_foreground_poll();
+    if (kbd_gui_mode) {
+        int ch = kbd_gui_trygetbyte();
+        if (ch >= 0) return ch;
+        (void)exec_park_poll(tick_count);
+        return -1;
+    }
+    if (rshell_active && !con_sink_capture_active()) {
+        int sch;
+        sch = serial_trygetchar();
+        if (sch >= 0) return sch;
+    }
+    if (kbd_count == 0) return -1;
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    return (int)(entry & 0xFF);
+}
+int kbd_trygetchar_local(void)
+{
+    u16 entry;
+    if (kbd_gui_mode) return -1;
+    if (kbd_count == 0) return -1;
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    return (int)(entry & 0xFF);
+}
+int kbd_trygetkey(void)
+{
+    u16 entry;
+    kbd_foreground_poll();
+    if (kbd_gui_mode) {
+        int ch = kbd_gui_trygetbyte();
+        if (ch >= 0) return ch;
+        (void)exec_park_poll(tick_count);
+        return -1;
+    }
+    if (rshell_active && !con_sink_capture_active()) {
+        int sch;
+        sch = serial_trygetchar();
+        if (sch >= 0) return sch;
+    }
+    if (kbd_count == 0) return -1;
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    return (int)entry;
+}
+int kbd_peekkey(void)
+{
+    u16 entry;
+    unsigned int flags;
+    if (kbd_gui_mode) {
+        u8 b = 0;
+        if (!kbd_inject_peek(&b)) return -1;
+        return (int)b;
+    }
+    if (rshell_active && !con_sink_capture_active()) {
+        int sch;
+        sch = serial_peekchar();
+        if (sch >= 0) return sch;
+    }
+    if (kbd_count == 0) return -1;
+    flags = irq_save();
+    entry = kbd_buf[kbd_head];
+    irq_restore(flags);
+    return (int)entry;
+}
+'''
+
 FIXTURE = r'''
 #include "in2_int.h"
 #ifdef PPC_COMPILE
@@ -42,6 +119,53 @@ int fixture(void) { return probe(); }
 '''
 
 
+def bridge_cases(ctx, tmp):
+    kbd = (ctx.root / 'drivers/input/kbd.c').read_text()
+    a = kbd.index('static int kbd_local_trykey(void)')
+    b = kbd.index('#include "kbd_fgpoll.inc"', a)
+    def function(name):
+        start = kbd.index('int ' + name + '(void)\n{')
+        return kbd[start:kbd.index('\n}', start) + 2]
+    current = kbd[a:b] + '\n' + '\n'.join(function(n) for n in (
+        'kbd_trygetchar', 'kbd_trygetkey', 'kbd_trygetchar_local', 'kbd_peekkey'))
+    # GUI byte adapter precedes the moved provider.
+    start = kbd.index('static int kbd_gui_trygetbyte(void)')
+    current = kbd[start:kbd.index('\n}', start)+2] + '\n' + current
+    bridge = (ctx.root / 'kernel/input_legacy.c').read_text()
+    bridge = bridge.replace('../input/hal/in2_int.h', 'in2_int.h')
+    def execute(selection, product=None):
+        (tmp / 'selected.inc').write_text(selection)
+        (tmp / 'bridge.c').write_text(product or '')
+        command = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
+            '-static', '-no-pie', '-I' + str(tmp), '-I' + str(ctx.root / 'include'),
+            str(ctx.root / 'tools/tests/input_bridge_host.c')]
+        if product is not None:
+            command += ['-DCURRENT', str(tmp / 'bridge.c')]
+        subprocess.run(command + ['-o', str(tmp / 'trace')], check=True)
+        result = host32.run([str(tmp / 'trace')], runner='qemu', capture_output=True)
+        assert result.returncode == 0, result.stderr
+        return result.stdout
+    baseline = execute(OLD_KBD)
+    assert execute(current, bridge) == baseline
+    old = 'return rshell_active && !con_sink_capture_active();'
+    if ctx.mutate:
+        assert current.count(old) == 1
+        assert execute(current.replace(old, 'return rshell_active && (!con_sink_capture_active() || 1);', 1), bridge) != baseline
+        print('RED runtime trace: capture serial gate (char/key)', flush=True)
+        assert execute(current, bridge) == baseline
+    print('PASS old/new keyboard traces: 256 fixtures, two reads each', flush=True)
+    if ctx.mutate:
+        for old, new in [
+            ('        return key;\n    }', '        /* fall through to serial/local */\n    }'),
+            ('peek ? p->inject_peek : p->inject_try', 'p->inject_try'),
+            ('p->park_poll(0);', '(void)0;')]:
+            assert bridge.count(old) == 1, old
+            assert execute(current, bridge.replace(old, new, 1)) != baseline, old
+            print('RED runtime trace: ' + old.strip(), flush=True)
+            assert execute(current, bridge) == baseline
+
+
 def run(ctx):
     header = (ctx.root / 'input/hal/in2_int.h').read_text()
     cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
@@ -58,6 +182,7 @@ def run(ctx):
         if build(header) != 0:
             return 1
         print('PASS x86 libc-free provider contract', flush=True)
+        bridge_cases(ctx, tmp)
         if cc.is_file() and os.access(cc, os.X_OK):
             subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-DPPC_COMPILE', '-I' + str(tmp),

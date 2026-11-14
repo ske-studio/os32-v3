@@ -1,3 +1,4 @@
+#include "../../kernel/input_legacy.c"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
  * dictionary storage and CPU transitions are fixture boundaries. No per-owner
  * IME state: switching owners alone must never manufacture a private copy. */
@@ -737,6 +738,7 @@ static int candidate_boundaries(void)
 
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
     int rc = unpublished() || cui_key_conversion() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() ||
