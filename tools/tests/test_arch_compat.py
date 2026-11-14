@@ -117,41 +117,40 @@ def check_input_kapi(root, work, vectors, mutate):
     print('UNIMPL AC-INPUT-1/independent-capability-query both providers (F6); '
           'pc98 driver/IRQ and guest wait progress unverified', flush=True)
     print('UNIMPL AC-KAPI-1/all-groups-void-query-pairs-context (F8); IDs remain open', flush=True)
-    if not mutate:
-        return
-    mutations = (
-        ('pc98-try-blocks', 'platform/pc98/d2_bind.c',
-         '.trygetkey = kbd_trygetkey,', '.trygetkey = kbd_getkey,', {'pc98': 'timeout', 'powermac': 15}),
-        ('pc98-char-wiring', 'platform/pc98/d2_bind.c',
-         '.trygetchar = kbd_trygetchar,', '.trygetchar = kbd_trygetkey,', {'pc98': 64, 'powermac': 15}),
-        ('ppc-empty', 'platform/powermac/input_boot.c',
-         'return lookahead;\n}', 'return lookahead < 0 ? 0 : lookahead;\n}', {'pc98': 0, 'powermac': 64}),
-        ('ppc-consume', 'platform/powermac/input_boot.c',
-         'int c = peek(); lookahead = -1; return c;', 'int c = peek(); return c;', {'pc98': 0, 'powermac': 64}),
-        ('ppc-cancel-xpass', 'platform/powermac/input_boot.c',
-         '(void)interruptible; return key();', 'if (interruptible) return -1; return key();', {'pc98': 0, 'powermac': 14}),
-        ('ppc-raw-xpass', 'platform/powermac/input_boot.c',
-         'static int raw(void) { return -1; }',
-         'static int raw(void) { int c = raw_key; raw_key = -1; return c; }', {'pc98': 0, 'powermac': 13}),
-        ('ppc-pressed-xpass', 'platform/powermac/input_boot.c',
-         '(void)scancode; return 0;', '(void)scancode; return down;', {'pc98': 0, 'powermac': 11}),
-        ('ppc-modifiers-xpass', 'platform/powermac/input_boot.c',
-         'static u32 zero32(void) { return 0; }', 'static u32 zero32(void) { return mods; }', {'pc98': 0, 'powermac': 7}),
-        ('absent-pointer', 'sdk/kapi_target_ppc.py',
-         '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
-        ('absent-query', 'sdk/kapi_target_ppc.py',
-         "    'pci_count',\n    'mouse_available',", "    'pci_count',", {'pc98': 0, 'powermac': 64}),
-        ('ime-not-zero', 'sdk/kapi_target_ppc.py',
-         'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
-        ('absent-void', 'sdk/gen_kapi.py',
-         '        if ret != "void":',
-         '        if name == "gfx_shutdown": c_content += "    gfx_shutdown();\\n"\n        if ret != "void":',
-         {'pc98': 0, 'powermac': 64}),
-    )
-    for label, path, old, new, observed in mutations:
-        actual = input_kapi(root, work, vectors, (path, old, new))
-        assert actual == observed and actual != expected, (label, actual, observed)
-        print('RED runtime: ' + label + ' ' + str(actual), flush=True)
+    if mutate:
+        mutations = (
+            ('pc98-try-blocks', 'platform/pc98/d2_bind.c',
+             '.trygetkey = kbd_trygetkey,', '.trygetkey = kbd_getkey,', {'pc98': 'timeout', 'powermac': 15}),
+            ('pc98-char-wiring', 'platform/pc98/d2_bind.c',
+             '.trygetchar = kbd_trygetchar,', '.trygetchar = kbd_trygetkey,', {'pc98': 64, 'powermac': 15}),
+            ('ppc-empty', 'platform/powermac/input_boot.c',
+             'return lookahead;\n}', 'return lookahead < 0 ? 0 : lookahead;\n}', {'pc98': 0, 'powermac': 64}),
+            ('ppc-consume', 'platform/powermac/input_boot.c',
+             'int c = peek(); lookahead = -1; return c;', 'int c = peek(); return c;', {'pc98': 0, 'powermac': 64}),
+            ('ppc-cancel-xpass', 'platform/powermac/input_boot.c',
+             '(void)interruptible; return key();', 'if (interruptible) return -1; return key();', {'pc98': 0, 'powermac': 14}),
+            ('ppc-raw-xpass', 'platform/powermac/input_boot.c',
+             'static int raw(void) { return -1; }',
+             'static int raw(void) { int c = raw_key; raw_key = -1; return c; }', {'pc98': 0, 'powermac': 13}),
+            ('ppc-pressed-xpass', 'platform/powermac/input_boot.c',
+             '(void)scancode; return 0;', '(void)scancode; return down;', {'pc98': 0, 'powermac': 11}),
+            ('ppc-modifiers-xpass', 'platform/powermac/input_boot.c',
+             'static u32 zero32(void) { return 0; }', 'static u32 zero32(void) { return mods; }', {'pc98': 0, 'powermac': 7}),
+            ('absent-pointer', 'sdk/kapi_target_ppc.py',
+             '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
+            ('absent-query', 'sdk/kapi_target_ppc.py',
+             "    'pci_count',\n    'mouse_available',", "    'pci_count',", {'pc98': 0, 'powermac': 64}),
+            ('ime-not-zero', 'sdk/kapi_target_ppc.py',
+             'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
+            ('absent-void', 'sdk/gen_kapi.py',
+             '        if ret != "void":',
+             '        if name == "gfx_shutdown": c_content += "    gfx_shutdown();\\n"\n        if ret != "void":',
+             {'pc98': 0, 'powermac': 64}),
+        )
+        for label, path, old, new, observed in mutations:
+            actual = input_kapi(root, work, vectors, (path, old, new))
+            assert actual == observed and actual != expected, (label, actual, observed)
+            print('RED runtime: ' + label + ' ' + str(actual), flush=True)
 
 
 def exercise(root, work, vectors, mpic=None, idle=None, provider_text=None):
