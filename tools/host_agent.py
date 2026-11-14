@@ -771,7 +771,7 @@ class HostAgent:
             elif verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
                 self._service_rshell(rid, ent, parts, out)
             else:
-                expected = 7 if verb == "LOG" else 6
+                expected = 7 if verb == "LOG" else (5 if parts[:2] == ["RSH", "ACCEPT"] else 6)
                 decl = self._decl(parts[-1] if len(parts) == expected else "", RESULT_MAX if verb != "LOG" else DECL_MAX_BYTES)
                 if decl is None:
                     self._answer(rid, ent, HTTP_BAD, b"", None, out)
@@ -879,6 +879,15 @@ class HostAgent:
                         self.host_generation, session, parts[2], parts[3], int(parts[4]),
                         ent["got"], length, "cui" if parts[0] == "RSH" else "gui"):
                     status = HTTP_OK
+        elif len(parts) == 5 and parts[:2] == ["RSH", "ACCEPT"]:
+            pending = self.operator.pending
+            if (pending and pending['state'] in ('running', 'UNKNOWN') and
+                    DECL_RE.fullmatch(parts[4]) and self.operator.accept_output(
+                        self.host_generation, session, parts[2], parts[3], 0,
+                        ent["got"], int(parts[4]), "cui")):
+                # Acceptance is not completion: GUI READY/notice is still due.
+                pending['state'] = 'running'
+                status = HTTP_OK
         self._answer(rid, ent, status, body, None, out)
 
     def _service_log(self, rid, ent, parts, out):

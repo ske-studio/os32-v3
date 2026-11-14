@@ -127,6 +127,7 @@ u32 link_decl_len(const char *req, u32 len)
     else if (tok(req, len, 1, &a1, &b1)) {
         if ((tok_eq(req, a0, b0, "RSH") || tok_eq(req, a0, b0, "GS") ||
              tok_eq(req, a0, b0, "PDIAG")) && tok_eq(req, a1, b1, "OUT")) which = 5;
+        else if (tok_eq(req, a0, b0, "RSH") && tok_eq(req, a1, b1, "ACCEPT")) which = 4;
         else if ((tok_eq(req, a0, b0, "CLIP") || tok_eq(req, a0, b0, "os32.clip")) && tok_eq(req, a1, b1, "PUT")) which = 2;
         else if ((tok_eq(req, a0, b0, "PRINT") || tok_eq(req, a0, b0, "os32.print")) && tok_eq(req, a1, b1, "DATA")) which = 3;
     }

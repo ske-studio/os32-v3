@@ -12,6 +12,8 @@ static u32 tick, gen = 7, drops, body_len, reply_pos;
 static unsigned int ready_count, out_count, executes, begins, ends, closes, yields;
 static int active, frozen, pending, handle, is_out, open_error, notice_error;
 static unsigned int writes;
+static int accept_status = 200, accept_ack;
+static int is_accept;
 static int stall, partial, freeze_error, stat_error, bad_reply, begin_error;
 static HostNotice notice;
 static char capture[REMOTE_RESULT_BODY_MAX], body[REMOTE_RESULT_BODY_MAX];
@@ -30,7 +32,8 @@ static i32 open_host(const char *req, u32 len)
     memcpy(request, req, len); request[len] = 0;
     if (open_error) return open_error;
     handle = 1;
-    is_out = !strncmp(req, REMOTE_REQ_RSH_OUT, strlen(REMOTE_REQ_RSH_OUT));
+    is_accept = !strncmp(req, REMOTE_REQ_RSH_ACCEPT, strlen(REMOTE_REQ_RSH_ACCEPT));
+    is_out = is_accept || !strncmp(req, REMOTE_REQ_RSH_OUT, strlen(REMOTE_REQ_RSH_OUT));
     reply_pos = 0;
     if (is_out) { ++out_count; body_len = 0; response[0] = 0; }
     else {
@@ -46,7 +49,9 @@ static i32 status_host(i32 h, u32 *st, u32 *len)
 {
     CHECK(h == 3 && handle);
     if (stall == 2) return OS32_ERR_AGAIN;
-    *st = 200; *len = strlen(response); return 0;
+    *st = is_accept ? (u32)accept_status : 200;
+    if (is_accept && *st == 200) accept_ack = 1;
+    *len = strlen(response); return 0;
 }
 static i32 read_host(i32 h, void *buf, u32 cap)
 {
@@ -127,6 +132,8 @@ int execute_command(const char *line)
     } else print(7, "%s", "ok\n");
     return 0;
 }
+int rsh_lan_execute(const char *line) { (void)execute_command(line); return 0; }
+int rsh_lan_handoff(const char *line) { (void)line; CHECK(0); return 1; }
 int sh_refused_take(void) { return 0; }
 static void queue(unsigned int id, const char *line)
 {

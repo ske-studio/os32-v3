@@ -15,6 +15,7 @@ static int have_id, ready, attempted;
 static const char *state = REMOTE_STATE_IDLE;
 static u8 result[REMOTE_RESULT_BODY_MAX];
 static u32 result_len;
+static int accepting;
 
 static void boot_text(char *out)
 {
@@ -148,8 +149,12 @@ int rsh_lan_flush(unsigned int id, unsigned int dropped)
     char boot[RSH_BOOT_BYTES * 2 + 1], req[REMOTE_NOTIFY_DATA_MAX];
     char reply[REMOTE_NOTIFY_DATA_MAX];
     boot_text(boot);
-    snprintf(req, sizeof(req), "%s %s %08x %u %u", REMOTE_REQ_RSH_OUT,
-             boot, id, dropped, (unsigned int)result_len);
+    if (accepting) {
+        if (dropped) return OS32_ERR_NOSPC;
+        snprintf(req, sizeof(req), "%s %s %08x %u", REMOTE_REQ_RSH_ACCEPT,
+                 boot, id, (unsigned int)result_len);
+    } else snprintf(req, sizeof(req), "%s %s %08x %u %u", REMOTE_REQ_RSH_OUT,
+                    boot, id, dropped, (unsigned int)result_len);
     return exchange(req, result, result_len, reply, sizeof(reply));
 }
 
@@ -212,7 +217,8 @@ int rsh_lan_poll(void)
     HostNotice notice;
     char line[REMOTE_RSHELL_COMMAND_MAX + 1];
     u32 id, before, after;
-    int rc;
+    int rc, handoff = 0;
+    accepting = 0;
     if (!attempted || (u32)(g_api->get_tick() - ready_tick) >= RSH_READY_TICKS) {
         rc = send_ready();
         if (rc) return rc;
@@ -242,10 +248,11 @@ int rsh_lan_poll(void)
         g_api->kprintf(ATTR_YELLOW, "%s", "> ");
         g_api->kprintf(ATTR_WHITE, "%s", line);
         g_api->kprintf(ATTR_WHITE, "%s", "\n");
-        (void)execute_command(line);
+        accepting = rsh_lan_execute(line);
         (void)sh_refused_take();
     }
     state = REMOTE_STATE_DONE;
+finish:
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_FREEZE);
     if (rc && rc != OS32_ERR_NOSPC) goto end;
     int frozen = rc;
@@ -258,7 +265,23 @@ int rsh_lan_poll(void)
     result[result_len++] = 0x04;
     rc = rsh_lan_flush((unsigned int)id, (unsigned int)dropped);
     if (rc) ready = 0;
+    else handoff = accepting;
 end:
     g_api->con_sink_capture(CON_SINK_CAPTURE_END);
+    if (handoff) {
+        int status = rsh_lan_handoff(line);
+        ready = 0;
+        attempted = 0; /* Immediate CUI READY if the launch returned. */
+        accepting = handoff = 0;
+        /* A successful switch exits the shell. A return reports failure via
+         * the existing OUT contract, without submitting/executing gui again. */
+        rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
+        if (rc) return rc;
+        rc = g_api->con_sink_stat(0, &before);
+        if (rc) goto end;
+        g_api->kprintf(ATTR_WHITE, "> %s\n", line);
+        g_api->kprintf(ATTR_RED, "os32gui: launch failed (rc=%d)\n", status);
+        goto finish;
+    }
     return rc ? rc : 1;
 }
