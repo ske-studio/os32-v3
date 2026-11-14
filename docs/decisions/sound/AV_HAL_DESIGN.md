@@ -704,6 +704,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | 段 | ファイル | 呼ぶ | 書く共有の状態 | 行 | I | 前提 |
 |---|---|---|---|---|---|---|
 | AV0 | §10 の全ヘッダ・kapi.json と生成物・a0_weak.c ×2・tools/tests/av_abi_host.c・tools/check_av_portable.py・tools/checks/av_wiring.txt・av_no_weak.sh | — | — | 750 | — | HAL v2 A0 |
+| AV0 試験 | dep-dir-a-l01-host: `tools/tests/test_dep_dir_a_l01.py:57,64`・`tools/tests/fixtures/dep_dir_a/l01.json:72` は公開 ABI 保持と内部 FM ops 世代変更を分けて検証する | — | — | 試験 | IA | AV0/R0a |
 | F1 | kernel/av_focus.c (+exec の入口・出口 2 行) | in2_on_focus・gui の登録状態 | `av_fg_owner` | 110 | IA | AV0 |
 | N1 | input/hal/in2_dev.c | — | `in2_srcs[]` | 130 | IA | AV0 |
 | N2 | input/hal/in2_ring.c (128・seq・合算・LOST・STOP) | in2_time_ms | ring・drop | 190 | IA | AV0 |
@@ -724,6 +725,8 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | S6 | sound/hal/snd2_pos.c (pos・wait) | S5 | — | 100 | IS | 段 B |
 | S7 | sound/hal/snd2_dsp.c | S1・be->dsp_* | — | 120 | IS | 段 B |
 | S8 | sound/hal/snd2_v1.c (pcm_* の再現) | S5・S6 | — | 150 | IS | 段 B |
+| S8 試験 | pcm-cs4231-host: `tools/tests/pcm_cs4231_host.c:700,701` は半面一括の action/filled に代えて区間・途中追補を検証する | — | — | 試験 | IS | S8 |
+| S8 試験 | pcm-refill-host: `tools/tests/pcm_refill_host.c:132,133` は補充期限・未再生領域の保護・再同期を検証する | — | — | 試験 | IS | S8 |
 | S9 | drivers/sound/cs4231/pcm_hw.c (SndBackend、pcm_cs4231.c の装置の列・証拠・IRQ を残し中核を S3〜S5 へ移す。pcm_body.c の表を差し替え) | — | 装置の内部 | 250 | IS | 段 B |
 | K1 | kapi/kapi_snd2.c | S* | — | 200 | IS | 段 B |
 | E1 | exec/exec_finish.inc ((6b) を snd2_reclaim、(6c) in2_reclaim) | S5・N7 | — | 4 | IA/IS | — |
@@ -736,6 +739,8 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | Q1 | sound/hal/snd2_fmq.c (V86 の FM の溜め場、seq) | — | 溜め場 | 90 | IL | AV0 |
 | R0a | §7-6 の表の KAPI の行: kapi.json の retired・sdk/gen_kapi.py の retired の body・生成物 | — | — | 80 | IA | AV0 と同じ版上げ |
 | R0b | §7-6 の表のカーネル・部品・build の行 (snd_engine の削除・fm_body/fm_module (tick と静止)/fm.c/fm_contract.h・init・exec・v86_io の往復の両方・imports.def・fm-module.mk・kernel-objects.mk・hwdev_layout の再生成 (AV0 の後)・check_arm_compile と配置の表) | fm_all_off・ssg_all_off | — | −1,300 / +20 | IA | R0a |
+| R0b 試験 | fm-module-host: `tools/tests/fm_module_host.c:69,97`・`tools/tests/fm_playback_host.c:124` は tick/MML に代えて raw FM・全キーオフ・静止を検証する | — | — | 試験 | IA | R0b |
+| R0b 試験 | v86-module-host: `tools/tests/test_v86_module.py:27,31` は新しい fm_all_off/ssg_all_off の exception 安全性を検証する | — | — | 試験 | IA | R0b |
 | R0c | §7-6 の表の userland・ビルドと配置・試験の行 (shell の beep・play、bench、raw_wait、gshell と host 試験、lib/snd・system の削除、libs.mk・sdk.mk・deploy.yaml・packages.yaml・checks/run.py、gui_demo、audit・kstr、tools/tests の CHECK と変異、README) | — | — | −900 / +80 | IA | R0a |
 | V0 | 資料の確認 (CS4231 の I20/I21 と PCM の IRQ の共存・PIT の one-shot)。結果を本書に追記、両方駄目ならユーザーに諮る | — | — | — | — | 照らし直し |
 | V1 | platform/pc98/legacy/v86_fm_timer.c (timer A/B・CSM・status の模型・仮想 IRQ の判定・pending の消去) | v86_pic_should_inject・Q1 | 模型 | 230 | IL | V0・Q1 |
