@@ -65,7 +65,18 @@ def test(path):
     operator = FakeOperator()
     info = lambda: dict(commit='abc', config=dict(iface='eth0', root='/',
                         allow_write=False, peer=None), peer=None)
-    server = OperatorSocket.__new__(OperatorSocket)
+    class CompatibleSocket(OperatorSocket):
+        legacy = False
+        def _request(self, client, req):
+            if (self.legacy and req.get('op') == 'submit' and
+                    set(req) != {'op', 'mode', 'line'}):
+                raise ValueError('legacy submit fields')
+            super()._request(client, req)
+        def _send(self, client, obj):
+            if self.legacy:
+                obj.pop('submit_timeout_ms', None)
+            super()._send(client, obj)
+    server = CompatibleSocket.__new__(CompatibleSocket)
     server.operator, server.info = operator, info
     server.listener, listener_peer = socket.socketpair()
     server.clients = {}
@@ -97,7 +108,8 @@ def test(path):
     thread.start()
     client = mod.CommandTransport()
     try:
-        assert client.probe()['commit'] == 'abc'
+        probe = client.probe()
+        assert probe['commit'] == 'abc' and probe['submit_timeout_ms'] is True
         assert client.notice(0, 1)['notices'][0]['id'] == '!'
         assert client.subscribe_log()['ok']
         server.publish_log(dict(boot='a', seq=1, drop_records=0, drop_bytes=0,
@@ -118,6 +130,21 @@ def test(path):
                 assert cli.main(['--transport', 'lan', '--timeout', '60', *args]) == 0
             assert operator.timeout_ms == 60000, 'CLI timeout not sent'
         operator.ready = dict(mode='cui', last_id='none', state='idle')
+        server.legacy = True
+        result = client.request('cui', 'ver', 60)
+        assert result.get('state') == 'done', 'legacy request rejected'
+        assert operator.timeout_ms == 15000, 'legacy default not used'
+        response = client.submit('cui', 'ver', 60)
+        assert response.get('ok'), 'legacy submit rejected'
+        assert client.result(response['id'], 0, 1)['complete']
+        server.legacy = False
+        assert client.probe()['submit_timeout_ms'] is True
+        client.close()
+        server.legacy = True
+        response = client.submit('cui', 'ver', 60)
+        assert response.get('ok'), 'reconnect retained capability'
+        assert client.result(response['id'], 0, 1)['complete']
+        server.legacy = False
         assert client.resume()['ok']
         operator.slow = True
         assert client.request('cui', 'ver', 0.1)['state'] == 'unknown', 'CLI deadline not UNKNOWN'
@@ -151,10 +178,11 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
-            ('\n                         timeout_ms=max(1, int(timeout * 1000)))',
-             '\n                         timeout_ms=15000)', 'submit timeout not sent'),
-            ('\n                                   timeout_ms=max(1, int(timeout * 1000)))',
-             '\n                                   timeout_ms=15000)', 'request timeout not sent'),
+            ('if self.submit_timeout_ms:', 'if True:', 'legacy request rejected'),
+            ('return dict(timeout_ms=max(1, int(timeout * 1000)))',
+             'return dict(timeout_ms=15000)', 'request timeout not sent'),
+            ('    def close(self):\n        self.submit_timeout_ms = False',
+             '    def close(self):\n        pass', 'reconnect retained capability'),
             ("return {'state': 'unknown'}", "return {'state': 'serial'}", 'CLI deadline not UNKNOWN'),
             ('time.monotonic() + READY_TIMEOUT)', 'time.monotonic() + READY_TIMEOUT + 1)', 'ready deadline removed'),
         ]
