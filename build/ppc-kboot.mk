@@ -87,7 +87,7 @@ KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 ifeq ($(KBOOT_LINK),1)
 KB_PLATFORM := $(filter-out platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/lan_diag.c platform/powermac/lan_monitor.c platform/powermac/terminal_input.c,$(KB_PLATFORM))
-KB_PLATFORM += platform/powermac/link_platform.c platform/powermac/nic_gem.c
+KB_PLATFORM += platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c
 KB_COMMON += net/link.c net/link_notify.c net/nic.c net/nic_rx.c net/rx_work.c net/host_mailbox.c
 KB_INC_EXTRA += -Inet
 endif

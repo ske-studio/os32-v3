@@ -1,5 +1,7 @@
 #define KBOOT_LINK 1
 #include "lan_service.c"
+static int log_polls;
+void pm_link_log_poll(void) { log_polls++; }
 static int starts, registered, rx_calls, ticks, stage;
 u32 link_hello_ok;
 static void fail(void) { __asm__ volatile("int $0x80"::"a"(1),"b"(10)); __builtin_unreachable(); }
@@ -48,7 +50,7 @@ void _start(void) {
     for (int i=0;i<10;i++) pm_lan_poll(++ticks);
     REQUIRE(starts==1 && !rx_calls);
     link_hello_ok=1;pm_lan_poll(++ticks);
-    REQUIRE(stage==17);
+    REQUIRE(stage==17 && log_polls==12);
     s.g.state=GEM_STATE_RESETTING;pm_lan_poll(++ticks);
     REQUIRE(starts==0 && !link_bound && s.state==RESETTING);
     __asm__ volatile("int $0x80"::"a"(1),"b"(0)); __builtin_unreachable();

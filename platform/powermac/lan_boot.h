@@ -224,4 +224,6 @@ _Static_assert(PLN1_REQ_MEMORY_BYTES == 0, "PLN1_REQ_MEMORY_BYTES");
 _Static_assert(PLN1_REQ_READ_DIAG_BYTES == 4, "PLN1_REQ_READ_DIAG_BYTES");
 _Static_assert(PLN1_REQ_PEEK_BYTES == 8, "PLN1_REQ_PEEK_BYTES");
 
+/* Foreground LOG transport, KBOOT_LINK images only. */
+void pm_link_log_poll(void);
 #endif

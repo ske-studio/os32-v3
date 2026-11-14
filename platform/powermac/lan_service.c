@@ -305,6 +305,7 @@ void pm_lan_poll(u64 now)
         }
         if (link_hello_ok) pm_rh_stage(PM_RH_LINK_HELLO_ESTABLISHED);
         link_diagnostic();
+        pm_link_log_poll();
         r = GEM_AGAIN;
 #else
         r = gem_poll(&s.g, now, 8);

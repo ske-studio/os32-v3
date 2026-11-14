@@ -1,6 +1,7 @@
 """P1g foreground ownership, bind ordering and HELLO observation."""
 CHECK = dict(name='ppc-link-service-host', tier=2, budget=30, needs=[], covers=[
     'build/ppc-kboot.mk', 'platform/powermac/lan_service.c',
+    'platform/powermac/link_log.c',
     'platform/powermac/nic_gem.c', 'platform/powermac/rh_observe.c',
     'net/nic.c', 'tools/tests/test_ppc_link_service.py',
     'tools/tests/ppc_link_service_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',

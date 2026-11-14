@@ -26,6 +26,7 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 from run import ROM, QMP, command, require
 from ppc_lan_host import UDP
 from host_agent import HostAgent
+from host_operator_socket import OperatorSocket
 
 PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
 
@@ -46,6 +47,8 @@ def accept(elf, cpu, parent, timeout):
              '-o', iso, cd])
     reservation = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     io = None
+    display = operator = None
+    cli_output = None
     try:
         reservation.bind(('127.0.0.1', 0))
         port = reservation.getsockname()[1]
@@ -54,6 +57,20 @@ def accept(elf, cpu, parent, timeout):
         agent = HostAgent(bytes.fromhex('02005e000001'),
                           state_dir=str(out / 'agent'), quiet=True,
                           allow_net=False, clip='none')
+        deadline_subscribe = time.monotonic() + 5
+        operator = OperatorSocket(('127.0.0.1', 0), agent.operator, lambda: {})
+        agent.operator_socket = operator
+        cli_output = (out / 'agent-display.log').open('w')
+        display = subprocess.Popen([sys.executable, str(ROOT / 'tools/ppc_lan_host.py'),
+            '--agent', '127.0.0.1:'+str(operator.listener.getsockname()[1]),
+            '--out', str(out / 'logs')], stdout=cli_output, stderr=subprocess.STDOUT)
+        # Subscribe before boot so the first LOG cannot race the observer.
+        while not any(c['log'] for c in operator.clients.values()):
+            require(display.poll() is None, 'LOG display exited before subscription')
+            require(time.monotonic() < deadline_subscribe, 'LOG subscription deadline')
+            for fd in select.select(operator.fileno_list(), [], [], 0.05)[0]:
+                operator.on_readable(fd)
+            operator.poll(time.monotonic())
         args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M',
                 '-smp', '1', '-accel', 'tcg', '-bios', str(ROM),
                 '-cdrom', str(iso), '-boot', 'd',
@@ -96,12 +113,22 @@ def accept(elf, cpu, parent, timeout):
                         frames.write(packet.hex()+'\n')
                         agent.handle(packet, tx)
                     agent.tick(tx)
+                    for fd in select.select(operator.fileno_list(), [], [], 0)[0]:
+                        operator.on_readable(fd)
+                    operator.poll(time.monotonic())
+                    logfiles = list((out / 'logs').glob('*.jsonl'))
+                    logs = [json.loads(line) for f in logfiles for line in f.read_text().split('\n')[:-1]]
+                    if logs:
+                        require(len(logfiles) == 1 and re.fullmatch(r'[0-9a-f]{32}', logfiles[0].stem), 'LOG boot')
+                        require([r['seq'] for r in logs] == list(range(len(logs))), 'LOG sequence from zero')
+                        require(all(r['drop_records'] == r['drop_bytes'] == 0 for r in logs), 'LOG drop')
                     if agent.established:
                         q.call('stop')
                         hello, done = word('link_hello_ok'), word('pm_link_time_ok')
                         alive = word('alive_state', 8)
                         marks = word('reached')
-                        if hello and done and alive and marks & 0x30000 == 0x30000:
+                        if logs and hello and done and alive and marks & 0x30000 == 0x30000:
+                            require((out / 'agent-display.log').stat().st_size > 0, '--agent display empty')
                             peak = word('kmalloc_peak_bytes')
                             require(peak < 192*1024, 'heap exhausted')
                             q.call('screendump', {'filename': str(out / 'hello.ppm')})
@@ -118,8 +145,10 @@ def accept(elf, cpu, parent, timeout):
                                         'FB HELLO glyph '+str(slot))
                             (out / 'result.json').write_text(json.dumps(dict(
                                 hello=hello, time=done, alive=alive, marks=marks,
-                                heap_peak=peak, agent_counts=agent.counts), indent=2))
-                            print(f'PASS {cpu}: HELLO/ALIVE/TIME, FB 16/17; heap_peak={peak}')
+                                heap_peak=peak, agent_counts=agent.counts, logs=logs, boot=logfiles[0].stem), indent=2))
+                            print(f'PASS {cpu}: HELLO/ALIVE/TIME/LOG, FB 16/17; heap_peak={peak}')
+                            print('ppc_lan_host.py --agent display: '+str(out / 'agent-display.log'))
+                            print('LOG seq=0..%d drop=0; loss after last frame remains unknown' % (len(logs)-1))
                             return
                         last = (hello, done, alive, marks)
                         tb = word('pm_link_time_bytes') if 'pm_link_time_bytes' in symbols else None
@@ -136,6 +165,13 @@ def accept(elf, cpu, parent, timeout):
                     p.kill()
                     p.wait()
     finally:
+        if display is not None:
+            display.terminate()
+            display.wait(timeout=5)
+        if operator is not None:
+            operator.close()
+        if cli_output is not None:
+            cli_output.close()
         reservation.close()
         if io:
             io.sock.close()
