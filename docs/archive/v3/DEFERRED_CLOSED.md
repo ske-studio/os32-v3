@@ -608,3 +608,4 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | PPC-LAN-RH | 2026-11-13 閉鎖 — G4 の GMAC + BCM5411 (PHY ID 0x0020/0x6071) で PLN1 の beacon・log・5 診断が往復、S-C の check_shell を無改変で通過 (log seq 0 から連続、drop 0)、S-D の /host 書き込み・64KiB 複写。リンク確立の直後の欠落は RUNNING の後 2 秒送らない直し (main 6dd4c02f) で解消 (票 TASK_PPC_REALHW §2、証拠は同上) |
 | PPC-RH2-SANDBOX | 2026-11-13 閉鎖 — 実装者 sandbox の外で PM (os32powerpc) が LAN 試験と kboot_accept・sb・sc・sd・usb --lan を両 CPU で rc=0、実機 RH2 の往復も合格 (PPC-LAN-RH と同じ証拠) |
 | PPC-USB-LAN-FLAKE | 2026-11-14 閉鎖 — usb_run.py --lan --mutate の最初の echo alive に前の場面の打鍵が 1 字残る件は台本の競合 (USB の `echo discarded` の全字の echo を待たずに LAN OPEN)。各字は 1 回ずつ配達されていてゲストと共通の部分は無関係。OPEN の前に全字の echo を待つ直し (wt/usb-flake 538eb153)、PPC_FB=0・1 で 3 回続けて GREEN、待ちを外した変異は RED (票 TASK_PPC_SHELL、証拠は ~/os32-tmp/run/usb-flake/) |
+| PPC-FB-RH | 2026-11-14 閉鎖 — G4 実機で受入 (待機の案内から sh、白黒と段の印の帯、日本語の表示、長い出力のスクロールと最下行、BS と clear、USB のキーボードの入力)。TASK_PPC_REALHW §2 |
