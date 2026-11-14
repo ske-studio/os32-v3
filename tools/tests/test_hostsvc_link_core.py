@@ -1,6 +1,6 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
-    covers=['net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
+    covers=['tools/tests/link_platform_fake/link_platform_inline.h', 'net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
             'sdk/include/os32/os32_host_notice.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
@@ -57,7 +57,7 @@ def build(folder, mutant=None):
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdlib', '-static',
         '-fno-pie', '-no-pie', '-fno-stack-protector', '-ffunction-sections',
         '-fdata-sections', '-Wl,--gc-sections', '-I' + str(folder),
-        *include_flags(ROOT), str(ROOT / 'tools/tests/hostsvc_link_core_host.c'),
+        '-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT), str(ROOT / 'tools/tests/hostsvc_link_core_host.c'),
         '-o', str(exe)], check=True)
     return exe
 

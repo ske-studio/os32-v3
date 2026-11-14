@@ -10,9 +10,8 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 kbd_inject_host.c は kernel/console/con_sink.c も同じ翻訳単位へ入れる: 注入の権限は
 「con_sink の読み手 1 本」なので、そこを模型に置き換えると試験の意味が消える。
 
-ホスト側だけ -DCON_SINK_NO_IRQ_LOCK / -DKBD_INJECT_NO_IRQ_LOCK を付ける:
-CPL=3 では cli/popfl を実行できないため。クロス側は付けないので、
-include/io.h を使う本番の経路も同じ試験の中でコンパイルされる。
+con_sink は IRQ 状態を持つ host arch_io.h を使う。
+KBD_INJECT_NO_IRQ_LOCK は注入リングの既存試験用。
 """
 from kernel_includes import include_flags
 import host32
@@ -37,7 +36,8 @@ def run(tmp, source, moved):
     (tmp / "kbd_inject.c").write_text(source)
     (tmp / "selftest_kbd_inject.c").write_text(moved)
     exe = tmp / "kbd-inject"
-    subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
+    subprocess.run(["gcc", *FLAGS, "-O0",
+                    "-I" + str(ROOT / "tools/tests/con_sink_arch"),
                     "-DKBD_INJECT_NO_IRQ_LOCK", "-D__KERNEL_BUILD__",
                     "-I"+str(tmp), *INCLUDES, "-nostdlib", "-static", "-no-pie",
                     str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)

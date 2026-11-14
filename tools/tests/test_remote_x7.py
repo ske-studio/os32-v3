@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x7', tier=1,
-    covers=['kernel/console/con_sink.c', 'include/con_sink.h',
+    covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'kernel/console/con_sink.c', 'include/con_sink.h',
             'tools/tests/con_sink_host.c', 'tools/tests/test_con_sink.py',
             'tools/tests/test_remote_x7.py', 'kernel/console/console.c',
             'kernel/port_service.c', 'platform/pc98/console.c',

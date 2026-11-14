@@ -1,5 +1,4 @@
 /* A8/A9 real link.c + B2 receiver, ILP32 without libc. */
-#define LINK_HOST_TEST
 #include "types.h"
 volatile u32 tick_count;
 u32 link_platform_now(void) { return tick_count; }

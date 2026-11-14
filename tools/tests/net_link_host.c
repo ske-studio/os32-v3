@@ -239,7 +239,6 @@ static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 /* ======================================================================== */
 /*  実物                                                                    */
 /* ======================================================================== */
-#define LINK_HOST_TEST 1
 #ifndef LINK_SOURCE
 #define LINK_SOURCE "../../net/link.c"
 #endif

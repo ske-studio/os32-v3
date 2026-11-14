@@ -105,8 +105,13 @@ int tick_register(unsigned int slot, tick_fn fn)
 }
 volatile u32 tick_count;
 u32 link_platform_now(void) { return tick_count; }
-u32 link_platform_lock(void) { return 0; }
-void link_platform_unlock(u32 f) { (void)f; }
+static u32 link_test_if = 1;
+u32 link_platform_lock(void) { u32 f = link_test_if; link_test_if = 0; return f; }
+void link_platform_unlock(u32 f) { link_test_if = f; }
+int link_platform_tick_register(void (*fn)(void))
+{
+    return tick_register(PC98_TICK_LINK, fn);
+}
 void link_platform_idle(void) { }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
@@ -116,7 +121,6 @@ void link_notify_rx(u32 seq, const u8 *p, u16 n) { (void)seq; (void)p; (void)n; 
 u32 net_rx_queued(u16 protocol) { (void)protocol; return 0; }
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 { (void)protocol; (void)out; (void)cap; (void)len; return OS32_ERR_AGAIN; }
-#define LINK_HOST_TEST
 #define link_init boot_real_link_init
 #define link_tick boot_real_link_tick
 #define link_selftest boot_real_link_selftest

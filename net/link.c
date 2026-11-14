@@ -22,9 +22,7 @@
 #include "link_notify.h"
 
 #include "link_platform.h"
-#ifndef LINK_HOST_TEST
 #include "link_platform_inline.h" /* Selected by the platform include path. */
-#endif
 #include "kstring.h"
 #include "kprintf.h"
 #include "le_internal.h"
