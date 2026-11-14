@@ -39,6 +39,9 @@ static int g_rx_pending;           /* 8251 に溜まっている受信バイト�
 static int g_fifo_present;         /* 1 = 0136h が FIFO 搭載機として答える */
 static unsigned g_iir_toggle;      /* 0136h bit6 (読むたびに反転) */
 static int g_irq4_line;            /* IRQ4 の線 (RXRE かつ受信データあり) */
+static unsigned g_tx_reads, g_tx_writes, g_ready_after;
+static int g_irq_enabled;
+int fake_irq_enabled(void) { return g_irq_enabled; }
 static int g_irq4_rises;           /* 線の立ち上がり回数 */
 
 #define STS_RXRDY_BIT  0x02        /* 互換 0032h の RxRDY */
@@ -72,6 +75,7 @@ void fake_outp(unsigned port, unsigned val)
             else         g_portc &= ~bit;
         }
     }
+    if (port == 0x30 || port == 0x130) g_tx_writes++;
     update_line();
 }
 
@@ -90,6 +94,11 @@ unsigned fake_inp(unsigned port)
         r = g_iir_toggle | 0x01;
     } else if (port == 0x35)
         r = g_portc;
+    if (port == 0x32 || (port == 0x132 && g_fifo_present)) {
+        g_tx_reads++;
+        if (g_tx_reads > g_ready_after)
+            r |= port == 0x32 ? 0x01 : 0x02;
+    }
     update_line();
     return r;
 }
@@ -106,12 +115,13 @@ int ring3_call_from_user(void) { return 0; }
 void ring3_abort_check(void) {}
 int ring3_wait_pending(void) { return 0; }
 
+#define SERIAL_TX_STUCK_HOST 1
 #include "serial.c"          /* 変異の写しを引けるよう -I で探させる */
 #include "serial_emergency_host.h"
 #include "../../drivers/char/serial_plan.c"
 #include "sys_buz.inc"       /* platform/pc98/system.c のブザー実体の写し */
 
-void cpu_delay_us(u32 us) { (void)us; }
+void cpu_delay_us(u32 us) { (void)us; if (g_irq_enabled) tick_count++; }
 volatile u32 tick_count;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
@@ -132,6 +142,11 @@ static int failed;
 static void reset_model(unsigned portc)
 {
     g_log_n = 0;
+    g_tx_reads = g_tx_writes = 0;
+    g_ready_after = ~0u;
+    g_irq_enabled = 0;
+    s_tx_stuck = 0;
+    s_tx_drop = 0;
     g_portc = portc;
     g_portc_full_writes = 0;
     g_ctrl_mode_writes = 0;
@@ -366,11 +381,67 @@ static void sys_buz_values(void)
     CHECK(g_portc_full_writes == 0);
 }
 
+/* TX budgets are paid once per outage; both aliases refer to one UART. */
+static void tx_stuck_story(void)
+{
+    char text[201];
+    unsigned budget, before;
+    memset(text, 'x', 200); text[200] = 0;
+    for (int fifo = 0; fifo < 2; fifo++) {
+        for (int polled = 0; polled < 2; polled++) {
+            for (int irq = 0; irq < 2; irq++) {
+                if (polled && !irq) continue; /* emergency has its own case */
+                reset_model(PORTC_BOOT);
+                g_fifo_present = fifo;
+                s_port_cmd = fifo ? SER_FIFO_STS : SER_CMD;
+                s_port_data = fifo ? SER_FIFO_DATA : SER_DATA;
+                s_mask_txrdy = fifo ? SER_FSTS_TXRDY : STS_TXRDY;
+                g_irq_enabled = irq;
+                if (polled) pc98_serial_puts_polled(text);
+                else serial_puts(text);
+                budget = polled ? SER_POLLED_SPIN_MAX : irq ?
+                    SER_TX_HLT_RETRY * (s_tx_budget_ticks + 1) : SER_TX_SPIN_MAX + 1;
+                CHECK(g_tx_reads == budget + 199);
+                CHECK(s_tx_drop == 200 && g_tx_writes == 0);
+                /* State crosses normal/polled entry points. */
+                before = g_tx_reads;
+                g_irq_enabled = 1;
+                if (polled) serial_puts("abc");
+                else pc98_serial_puts_polled("abc");
+                CHECK(g_tx_reads == before + 3 && s_tx_drop == 203);
+                /* Recovery in the middle of a string loses only its prefix. */
+                g_ready_after = g_tx_reads + 5;
+                pc98_serial_puts_polled("0123456789");
+                CHECK(s_tx_drop == 208 && g_tx_writes == 5);
+                /* After recovery a short stall must use the normal budget. */
+                g_ready_after = g_tx_reads + 2;
+                pc98_serial_puts_polled("R");
+                CHECK(s_tx_drop == 208 && g_tx_writes == 6);
+                /* Failure-returning APIs never report a dropped byte as sent. */
+                g_ready_after = ~0u;
+                CHECK(serial_gate_put((const u8 *)"xy", 2) == SER_TX_DROPPED);
+                CHECK(serial_putchar_kapi('z') == SER_TX_DROPPED);
+                CHECK(s_tx_drop == 210 && g_tx_writes == 6);
+                /* Fault/stop output keeps waiting for each byte despite stuck. */
+                before = g_tx_reads;
+                g_irq_enabled = 0;
+                pc98_serial_puts_polled("!!");
+                CHECK(g_tx_reads == before + 2 * SER_POLLED_SPIN_MAX);
+                CHECK(s_tx_drop == 210);
+                g_ready_after = g_tx_reads + 3;
+                pc98_serial_puts_polled("!\n");
+                CHECK(g_tx_writes == 9); /* LF still adds CR */
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     const char *only = (argc > 1) ? argv[1] : NULL;
 #define RUN(f) do { if (!only || !strcmp(only, #f)) { int b = failed; f(); \
     printf("%s %s\n", failed == b ? "PASS" : "FAIL", #f); } } while (0)
+    RUN(tx_stuck_story);
     RUN(bsr_polarity);
     RUN(init_bsr_only);
     RUN(isr_edge_bsr);

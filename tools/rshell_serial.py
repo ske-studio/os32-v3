@@ -75,6 +75,7 @@ except ImportError:  # pragma: no cover
     serial = None
 
 EOT = b"\x04"
+OPEN_SETTLE_S = 0.15  # 実機 Ra266: RESET の 61ms 後に開く前の残りの 1 バイト (2026-11-14)
 # OS32_SERIAL_RAW_LOG を指定すると追記形式で monotonic 秒とバイト列を記録。
 # reset の count は直前の in_waiting のスナップショットであり厳密な実捨却数ではない。
 
@@ -276,6 +277,10 @@ def open_port(name, baud):
     else:
         port = serial.Serial(name, baudrate=baud, bytesize=8, parity="N",
                              stopbits=1, timeout=0.2)
+        # 開く前 (相手の CTS が非アクティブ) にゲストの UART に残った 1 バイトは、
+        # 開いて CTS が立った直後 (実機で約 60ms) に届く。待ってから捨てる。
+        time.sleep(OPEN_SETTLE_S)
+        port.reset_input_buffer()
     path = os.environ.get("OS32_SERIAL_RAW_LOG")
     if not path:
         return port

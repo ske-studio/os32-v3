@@ -157,6 +157,25 @@ static void ser_ien_bsr(u8 which, u8 ien)
  * serial_plan.h の注記)。初期化前でも putchar が呼ばれうる (パニック経路)
  * ので既定を入れておく。 */
 static u32 s_tx_budget_ticks = (u32)SER_TX_BUDGET_TICKS_MIN;
+/* One physical UART, shared by compat/FIFO and normal/polled diagnostics. */
+static u8 s_tx_stuck;
+static u32 s_tx_drop;
+
+static int ser_tx_drop(void)
+{
+    s_tx_stuck = 1;
+    s_tx_drop++;
+    return SER_TX_DROPPED;
+}
+
+/* A stuck UART gets exactly one status read per byte, including recovery. */
+static int ser_tx_resume(char c)
+{
+    if (!(inp(s_port_cmd) & s_mask_txrdy)) return ser_tx_drop();
+    s_tx_stuck = 0;
+    outp(s_port_data, (unsigned)(u8)c);
+    return SER_TX_OK;
+}
 
 /* FIFO 搭載判定はリセットまで変わらないので 1 回だけ行う。 */
 static u8 s_fifo_probed = 0;
@@ -651,6 +670,7 @@ static int ser_tx_byte(char c)
     /* **IF=0 で呼ばれることがある** (パニック経路・割り込み禁止区間)。
      * そこでは tick_count が進まないので時間で測れず、`_halt()` は
      * 二度と起きない。回数上限のスピンだけで諦める。 */
+    if (s_tx_stuck) return ser_tx_resume(c);
     can_halt = _irq_enabled();
 
     for (retry = 0; retry < SER_TX_HLT_RETRY; retry++) {
@@ -667,7 +687,7 @@ static int ser_tx_byte(char c)
                  * (往復 3: 校正が 1/10 で予算が 200µs に化けていた)。 */
                 if ((u32)(tick_count - start) >= s_tx_budget_ticks) break;
             } else {
-                if (spin >= (u32)SER_TX_SPIN_MAX) return SER_TX_DROPPED;
+                if (spin >= (u32)SER_TX_SPIN_MAX) return ser_tx_drop();
                 spin++;
             }
             /* ポートを読む間隔を空けるだけ。正確さは要らない。 */
@@ -679,7 +699,7 @@ static int ser_tx_byte(char c)
     /* タイムアウト: 送信を諦める。**呼び手に知らせる** — rshell の番犬は
      * 「EOT を送り終えた」ことを往復の証拠にしているので、ここで黙って
      * 捨てると「応答したつもり」で番犬を解除してしまう (Codex ③)。 */
-    return SER_TX_DROPPED;
+    return ser_tx_drop();
 }
 
 /* 保留リングへ 1 バイト。溢れたら**いちばん古い**バイトを捨てて数える
@@ -887,13 +907,20 @@ void serial_puts(const char *str)
 }
 
 /* ======================================================================== */
-/*  ポーリング専用送信 (パニック/例外時用)                                   */
+/*  ポーリング専用送信 (通常診断とパニック/例外時用)                                   */
 /*  割り込みが無効化されている状態で hlt を使用するとフリーズするため、      */
 /*  タイムアウトまでスピンのみで待機する。                                   */
 /* ======================================================================== */
 static void serial_putchar_polled(char c)
 {
     int spin;
+    /* Fault/stop output runs with IF=0: retain its per-byte spin budget,
+     * even when a cooperative diagnostic previously marked TX stuck. */
+    int emergency = !_irq_enabled();
+    if (!emergency && s_tx_stuck) {
+        (void)ser_tx_resume(c);
+        return;
+    }
     for (spin = 0; spin < SER_POLLED_SPIN_MAX; spin++) {
         /* 予算も cpu_delay_us も使わない (校正が壊れている可能性がある
          * 状況で呼ばれる)。ポートとビットだけモードに合わせる。 */
@@ -902,6 +929,7 @@ static void serial_putchar_polled(char c)
             return;
         }
     }
+    if (!emergency) (void)ser_tx_drop();
 }
 
 void pc98_serial_puts_polled(const char *str)

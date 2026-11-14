@@ -43,7 +43,10 @@ while True:
 EOF
 }
 
-git -C "$PREFIX" fetch -q origin || die "git fetch に失敗"
+src=$(git -C "$PREFIX" remote get-url origin)
+# origin が手元のリポジトリなら、先にそこを GitHub から fetch する (作業木は変えない)
+if [ -d "$src" ]; then git -C "$src" fetch -q origin || die "$src の git fetch に失敗"; fi
+git -C "$PREFIX" fetch -q origin '+refs/remotes/origin/*:refs/remotes/origin/*' 2>/dev/null || git -C "$PREFIX" fetch -q origin || die "git fetch に失敗"
 sha=$(git -C "$PREFIX" rev-parse --verify "$want^{commit}") || die "commit $want が無い"
 old=$(git -C "$PREFIX" rev-parse HEAD)
 git -C "$PREFIX" checkout -q --detach "$sha"
