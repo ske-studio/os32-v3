@@ -58,7 +58,7 @@ def accept(elf, cpu, parent, timeout):
                 '-smp', '1', '-accel', 'tcg', '-bios', str(ROM),
                 '-cdrom', str(iso), '-boot', 'd',
                 '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                '-prom-env', 'auto-boot?=true', '-nographic',
+                '-prom-env', 'auto-boot?=true', '-g', '800x600x8', '-display', 'none',
                 '-serial', 'file:'+str(out / 'serial-a.log'),
                 '-serial', 'file:'+str(out / 'serial-b.log'),
                 '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
