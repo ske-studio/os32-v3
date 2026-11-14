@@ -1317,6 +1317,15 @@ static void decl_len_parsing(void)
     check(link_decl_len("PRINT DATA 7 4096", 17) == 4096, "PRINT DATA");
     check(link_decl_len("PRINT OPEN rep text", 19) == 0, "PRINT OPEN に宣言長が付いた");
     check(link_decl_len("PUT /file/x 12", 14) == 12, "PUT");
+    check(link_decl_len("RSH OUT boot id drop 42", sizeof("RSH OUT boot id drop 42") - 1) == 42, "RSH OUT");
+    check(link_decl_len("GS OUT boot id drop 43", sizeof("GS OUT boot id drop 43") - 1) == 43, "GS OUT");
+    check(link_decl_len("PDIAG OUT boot id status 44", sizeof("PDIAG OUT boot id status 44") - 1) == 44, "PDIAG OUT");
+    check(link_decl_len("LOG boot seq dr db flags 45", sizeof("LOG boot seq dr db flags 45") - 1) == 45, "LOG");
+    check(link_decl_len("RSH OUT boot id 42", sizeof("RSH OUT boot id 42") - 1) == 0, "short RSH OUT");
+    check(link_decl_len("GS OUT boot id 43", sizeof("GS OUT boot id 43") - 1) == 0, "short GS OUT");
+    check(link_decl_len("PDIAG OUT boot id 44", sizeof("PDIAG OUT boot id 44") - 1) == 0, "short PDIAG OUT");
+    check(link_decl_len("LOG boot seq dr db 45", sizeof("LOG boot seq dr db 45") - 1) == 0, "short LOG");
+    check(link_decl_len("RSH READY boot id drop 42", sizeof("RSH READY boot id drop 42") - 1) == 0, "RSH READY");
     check(link_decl_len("ECHO abc", 8) == 0, "数字でない宣言長を受けた");
     check(link_decl_len("ECHO 99999999", 13) == 0, "64KB 超の宣言長を受けた");
 }
