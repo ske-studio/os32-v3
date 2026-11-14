@@ -220,6 +220,9 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |E0b|net/link.c 変更180|通常dispatchをFG化・共有busy/最終FG時刻・救済、E0a後|
 |E0k|net/link_host_api.inc 変更100|KAPIをFG所有guardへ置換、E0b後|
 |E0c|net/nic.c 変更100|IRQ0の10jiffy/busy条件付きlink救済、既存RX接続、E0k/G後|
+|E0c 試験|hostsvc-boot: `tools/tests/hostsvc_boot_host.c:172-173`|通常 FG 駆動と 10 jiffy 無活動時の IRQ0 救済を検証する|
+|E0c 試験|hostsvc-nic: `tools/tests/hostsvc_nic_host.c:177,275`・`tools/tests/test_hostsvc_nic.py`|通常 FG と IRQ0 救済の駆動・変異を分けて検証する|
+|E0c 試験|net-rx-work-host: `tools/tests/net_rx_work_host.c:82-84,194-198`|FG の LINK 消費と 10 jiffy 救済を検証し旧 wrapper 保証との世代差を解消する|
 |E|net/link.c 変更100|失効・送信優先・bulk接続、D/E0c後|
 |F|tools/host_agent.py 変更100|bulk dispatch・LIST・送出、C後Eと並列可|
 |G|net/nic.h 変更70|W2容量予約・予算口とNetNicOps.fg_service、Bに先行可|
@@ -229,6 +232,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |H2b|drivers/net/e82557/e82557_desc.c 変更100|ring初期化/周回/回収、H2a後|
 |H2c|drivers/net/e82557/e82557.c 変更60|DMA領域確保・境界検証、H2b後|
 |H3|platform/powermac/nic_gem.c 変更120|4枠経路のadmission拡大、G/W2後|
+|H3 試験|gem-adapter-host: `tools/tests/gem_adapter_host.c:65,72,76-87`|公開 credit から満杯・解放・wrap を検証し、23 枠の受入を別に置く。tick 側 RX 所有を維持|
 |I|net/bulk_work.c 新180|io_slice_begin/idle_work・bulk自身の再入guard、B1/B2/H/E0cとio-tier A1・A3・T1・T2後、LAN専有|
 |J|fs/hostsvc/hostsvc.c 新380|VFS OPEN・fg_service/RXを回す共通FG1待ち、I/G1とio-tier A1・A3・T1・T2およびAC-CTX受入後|
 |K|tools/host_fs_meta.py 新250|stat/list等、A後並列可|
