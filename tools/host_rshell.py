@@ -1,10 +1,12 @@
 """Generation-local LAN operator state (LAN_OPERATOR_DESIGN sections 2-3)."""
 import re
+import time
 
 RSHELL = 65534  # REMOTE_SVC_RSHELL
 GSERIAL = 65533  # REMOTE_SVC_GSERIAL
 EXECUTE = 1  # REMOTE_NOTIFY_EXECUTE
 RESULT_MAX = 8193  # REMOTE_RESULT_BODY_MAX
+RESULT_TIMEOUT_MS = 15000  # Legacy clients: rshell.py / gserial.py default
 
 
 class Operator:
@@ -65,7 +67,8 @@ class Operator:
                 pending.get('gui_ready') and pending.get('gui_notice')):
             pending['state'] = 'done'
 
-    def submit(self, mode, line, client):
+    def submit(self, mode, line, client, timeout_ms=RESULT_TIMEOUT_MS):
+        deadline = time.monotonic() + timeout_ms / 1000
         self.take_result()  # Retain an unclaimed completion before reusing the slot.
         if self.pending is not None:
             raise RuntimeError('busy')
@@ -89,13 +92,18 @@ class Operator:
         self.next_id += 1
         self.pending = dict(id=ident, boot=self.ready['boot'], mode=mode,
                             line=line, client=client, generation=self.generation,
-                            state='running', result=None)
+                            state='running', result=None, deadline=deadline)
         try:
             self.notify.notify_number(RSHELL if mode == 'cui' else GSERIAL, EXECUTE, data)
         except Exception:
             self.unknown()
             raise
         return ident
+
+    def expire(self, now):
+        if (self.pending is not None and self.pending['state'] == 'running' and
+                now >= self.pending['deadline']):
+            self.unknown()
 
     def unknown(self):
         if self.pending is not None:

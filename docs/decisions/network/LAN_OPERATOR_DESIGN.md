@@ -70,7 +70,8 @@ class CommandTransport:
     def request(self, mode, line, timeout): ...
 ```
 - **H4の接続を固定**: agentにloopback TCP（既定127.0.0.1:8027、設定可）の操作専用口を追加。4B BE長＋UTF-8 JSON、1レコード初期上限16KiB（capture増量時はbase64とJSON見出し込みで更新）、本文はbase64。操作はprobe/submit/result/noticeにLOG購読を追加。SFS CLIはsubmitで既存ゲストSFSコマンドを操作し、root/RO/peerの照会はprobeで行う。任意ファイルRPC・SFS世代永続化は扱わない。Windows/WSLとLinuxで同じCLIを使えるためこの方式を選ぶ。
-- agentの既存selectループへ非同期で組込み、CLI待ちでlink処理を止めない。probeにはagent世代/peer/HELLO/READY、submitにはmode/lineだけを渡しIDはagentが付ける。接続切れ後も送信済み操作を自動再投入しない。
+- agentの既存selectループへ非同期で組込み、CLI待ちでlink処理を止めない。probeにはagent世代/peer/HELLO/READY、submitにはmode/lineを渡しIDはagentが付ける。接続切れ後も送信済み操作を自動再投入しない。
+- submit は任意の `timeout_ms`（正の整数）も受け、ホストの操作期限を submit 時刻＋そのミリ秒数にする。CLI は指定 timeout を渡し、省略した旧 client だけ 15000ms を使う。不正値は BAD_REQUEST。
 - autoはprobe/READY待ちを合計4秒まで。probeのpendingを最初に判定し、runningはBUSY、unknownはUNKNOWN_PENDINGで無送信終了。
   probe失敗時、または4秒待ってもHELLOが偽もしくはREADYがない場合は送信前にserialへ退避する（pendingがrunning/unknownなら退避しない）。
   HELLOとREADYがあり、4秒待ってもmodeが不一致なら `mode=<今>, requested=<要求>` を示し無送信終了。**submitを送ろうとする時点から退避禁止**（NOTIFY予約より保守的）。例外・timeout・agent再起動もUNKNOWN、次の自動コマンド列を止める。
@@ -254,7 +255,7 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 | op | 要求の欄 | 応答の欄 (ok のとき) |
 |---|---|---|
 | `probe` | なし | `agent_generation` (int)、`commit` (str)、`config` (`iface`・`root`・`allow_write`・`peer`)、`peer` (MAC か null)、`hello` (bool)、`ready` (`{"mode","last_id","state"}` か null)、`pending` (`{"id","state"}` か null) |
-| `submit` | `mode` (`cui`・`gui`・`diag`)、`line` (str、設計 §2 の制限) | `id` (8 桁 16 進) |
+| `submit` | `mode` (`cui`・`gui`・`diag`)、`line` (str、設計 §2 の制限)、任意の `timeout_ms` (正の int、省略時 15000) | `id` (8 桁 16 進) |
 | `result` | `id`、`wait_ms` (int、0 なら待たない) | `state` (`pending`・`done`・`unknown`)、`drop` (int)、`body_b64`、`complete` (bool: 長さ・drop・echo・EOT か end がそろったときだけ true) |
 | `resume` | なし | なし (UNKNOWN の後の、利用者の明示の再開) |
 | `notice` | `wait_ms` | `notices`: `[{"id": "!" か id, "body_b64"}]` (GSERIAL の非同期の `gs:!` など、届いた順) |
