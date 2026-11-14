@@ -97,18 +97,15 @@ PowerPC PM のレビューは P1g の credit 修正済みを報告するが、�
 |AC-SFS-1|G: can_wait は IRQ 外かつ期限時計と transport が協調して進められること。絶対期限を全段で共有し、新 sid で write を再実行しない。C: IRQ 駆動/poll。A: can_wait=0 は要求を出さず IO。FG0/FG1 の可否は provider ごとに判定|`SfsIo.now/idle/can_wait` (`fs/serialfs/sfs_client.h:29`)、deadline 契約 (`:96`)|UART/LAN の既存 IF 条件を保持 (`fs/serialfs/serialfs_session.c:79`、`fs/serialfs/sfs_lan.c:150`)|`pm_hfs_can_wait` は IRQ 外、TB 時計と poll により FG0 でも進行 (`platform/powermac/hostfs_io.c:37`、`:46`)。現実装を保ち F1 は注釈・試験だけ|`AC-SFS-1/fg0-timeout-irq-reject-no-replay`（T1 で作る） / LAN §5|
 |AC-BUILD-1|G: 共通口の provider と共通ソースの closure を両像で検査。C: 像の profile・能力一覧。A: 不在は明示 manifest、未解決参照を成功 stub で埋めない。実行文脈は対象外|`C_KERNEL` 等のソース選択 (`build/sources/common.mk:1`)、順序 (`build/sources/order.mk:1`)、PPC 選択 (`build/ppc-kboot.mk:71`)|`build/config.mk:142` の arch/platform 選択|PPC SH 像もリンク。KBOOT_SH/SHELL は像の選択であり CPU 能力ではない。BE/ILP32 を含む ABI 検査を保つ|`AC-BUILD-1/closure-profiles`（T1 で作る） / BUILD・PPC_IMPL_RULES §1|
 
-## 5. W2 で確定する項目
+## 5. W2 で確定した NIC・link の契約
 
-以下は名前と境界の予約だけであり、W1 の容量・予算・進行保証にはしない。担当は **os32powerpc の P1 系列、本線はレビューだけ**。
+P1 系列と link-closeack を含む main `4e0e8b1e` の実物で確定した。担当は **PowerPC P1 系列、本線はレビュー**。本節の参照は `P:` でなくこの基点の作業木を指す。§1 の旧 P1g 未照合の留保は本節では解消する。容量・予算の正典は LAN §5、数値の正は下表の実装記号とする。適合の状態は §3 のまま、全項目 **未 (T1 で確かめる)**。
 
-|予約 ID|W2 で確定する項目|正にする既存口・所在 / 担当設計|
-|---|---|---|
-|AC-NET-1|credit の admission と消費の単位（NE2K の page・e82557 の slot・GEM の descriptor）|`NetNicOps.rx_credit_bytes` (`net/nic.h:16`)、`LINK_STREAM_BUF`・`LINK_MAXFRAME_PAGES`・`LINK_CREDIT_MARGIN`・`LINK_PAGE_BYTES` (`net/link.h:123`、`:127`) / LAN|
-|AC-NET-2|RX の予算（総走査数と時間、サービス単位、単一 RX 所有者）|`NET_RX_SCAN_MAX` (`net/nic.h:47`)、`RX_SLOTS`・`RX_FRAME_BYTES` (`net/nic_rx.c:11`)、`poll` (`P:platform/powermac/nic_gem.c:44`) / LAN|
-|AC-NET-3|link の進行（EE=0 の間の RTO、close 時の保留 ACK）|`LINK_RTO_TICKS` (`net/link.h:112`)、`link_free_handle` (`P:net/link_host_api.inc:334`、ACK 消去 `:354`・`:357`) / LAN、link-closeack|
-
-P1g の credit は空き枠から算出する修正済みとの PM 報告を前提とするが、保留が生じると既存 admission の閾値に近づく点は W2/F5 の受入に残る。P1f の小容量 adapter を像へ入れると発火する型の欠陥として扱い、「main に無いから問題なし」とはしない。
-GEM の RX は poll から gem_rx を一度呼ぶ形を確認した。外側ループとの積で走査量を数えるという旧調査の懸念は訂正し、時間予算を持ち越す。再送回数の観測は台本の sleep によるとの PM 訂正を採用し、原因未確定の不具合として残さない。EE=0 の RTO は本節の担当へ集約し、時計の単位とは混同しない。
+|ID|保証 / 能力 / 不在、文脈|正にする記号・所在|x86 の満たし方|PowerPC の満たし方|両アーキの試験 ID / 担当設計|
+|---|---|---|---|---|---|
+|AC-NET-1|G: 消費は link page。NIC の byte credit と本文リングの空きを page 単位に切り捨て、小さい方から margin を引く (下限ゼロ)。1 frame の admit には MAXFRAME 分が必要。C: NIC の空き容量。A: 正の credit でも frame 分に不足すれば admit しない|`NetNicOps.rx_credit_bytes` (`net/nic.h:16`)、`LINK_STREAM_BUF`・`LINK_MAXFRAME_PAGES`・`LINK_CREDIT_MARGIN`・`LINK_PAGE_BYTES` (`net/link.h:123`、`:127`〜`:129`)、計算 (`net/link.c:305`)|NE2K は ring と queue の空きの小さい方 (`net/nic_lgy98.c:38`)、e82557 は空き frame 数×frame 長 (`net/nic_e82557.c:25`)|GEM は FIFO の空き枠×frame 長 (`platform/powermac/nic_gem.c:15`、`:78`)。保留時の admission 境界は LAN §5、F5 へ|`AC-NET-1/credit-admission`（T1 で作る、F4/F5） / LAN §5|
+|AC-NET-2|G: GEM の RX 所有者は tick 枠の net_jiffy、前景は RX を汲まない (P1g A1)。poll は gem_rx を高々一度、内部 descriptor 走査の上限を外側 work 回数と掛け合わせない。時間予算は共通 tick_budget に従う。C: NIC のサービス単位・容量。A: 空/予算切れは無制限走査へ逃がさない|`NET_RX_SCAN_MAX` (`net/nic.h:47`)、`RX_SLOTS`・`RX_FRAME_BYTES` (`net/nic_rx.c:11`)、`net_jiffy` (`net/nic.c:276`)、`tick_budget`|既存 NIC の IRQ/tick と RX work の上限を保持。GEM の descriptor 数を NE2K/e82557 の単位に読み替えない|`poll` (`platform/powermac/nic_gem.c:61`) と `gem_rx` (`drivers/net/gem/gem_rx.c:26`)。tick あたりの総走査上限・TX 回収は LAN §5、時間実測は F5 へ|`AC-NET-2/rx-owner-budget`（T1 で作る、F4/F5） / LAN §5|
+|AC-NET-3|G: RTO は NIC 受理から論理 100Hz の jiffy で数える。close の保留 ACK は RELEASE より先に送る。C: IRQ の駆動源。A: EE=0 の syscall 内で進行を仮定しない。syscall 内の扱いは W3 (実行文脈ごとの約束) で決める|`LINK_RTO_TICKS`・`LINK_TRIES` (`net/link.h:112`、`:116`)、`link_platform_now` (`net/link_platform.h:7`)、`link_free_handle` (`net/link_host_api.inc:334`)、ACK→RELEASE (`net/link.c:424`)|既存 tick_count と再送・close の共通実装を保持|USER は EE=1 (`arch/ppc/exec_enter.S:25`)。USER に戻るたび DEC が net_jiffy/link_tick を進め、syscall 内 (EE=0) では進まない。時計の実測は `docs/tasks/ppc/TASK_PPC_LAN.md:54`。独自時計を作らない|`AC-NET-3/rto-close-ack-context`（T1 で作る、文脈は W3） / LAN §5、link-closeack (`9e39176a`)|
 
 ## 6. W1 の後の段
 
@@ -144,7 +141,7 @@ T1 は試験土台の作成であり適合完了ではない。fake では単位
 
 ## 8. 未決
 
-ユーザー判断を要する未決は **0 件**。推奨は、W1 の保証と担当境界を採用し、§5 の仕様決定は PowerPC P1 系列の W2 でレビューして確定すること。P1g の SHA 照合・試験 ID 登録・実機受入は担当工程の作業であり、ユーザー判断の未決には数えない。
+ユーザー判断を要する未決は **0 件**。推奨は、W1 の保証と担当境界を採用し、§5 の W2 確定契約を本線でレビューすること。試験 ID 登録・実機受入は担当工程の作業であり、ユーザー判断の未決には数えない。
 
 
 ## 確定 (2026-11-14、Opus 5.5 第 2 回は「確定してよい」、P3 の 4 件を PM が反映)
