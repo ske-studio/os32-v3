@@ -6,12 +6,15 @@ Requests use SOH plus a fresh random id; only that id's end closes a reply.
 All reads share one receive buffer, including the CUI entry EOT handoff.
 """
 import argparse
+import base64
+import binascii
 import re
 import secrets
 import sys
 import time
 
 from rshell_serial import open_port, read_size
+from remote_transport import CommandTransport
 
 DEFAULT_TIMEOUT = 15.0
 MAX_LINE = 128
@@ -127,12 +130,17 @@ def read_eot_keep_rest(port, timeout=DEFAULT_TIMEOUT):
 
 
 class Client:
-    def __init__(self, port, timeout=DEFAULT_TIMEOUT, stdout=None, stderr=None):
+    def __init__(self, port, timeout=DEFAULT_TIMEOUT, stdout=None, stderr=None,
+                 lan=None, transport="serial", port_factory=None):
         self.port = port
         self.timeout = timeout
         self.stdout = sys.stdout if stdout is None else stdout
         self.stderr = sys.stderr if stderr is None else stderr
         self.notifications = []
+        self.lan = lan
+        self.lan_submitted = False
+        self.transport = transport
+        self.port_factory = port_factory
 
     def _notice_or_incidental(self, line):
         if line.startswith("gs:! "):
@@ -144,6 +152,15 @@ class Client:
     def request(self, command):
         if any(ord(ch) < 0x20 or ord(ch) > 0x7e for ch in command):
             raise ValueError("command must contain printable ASCII only")
+        if len(command) + 9 > MAX_LINE:
+            raise ValueError("request exceeds 128 bytes")
+        if self.lan is not None:
+            result = self.lan.request("gui", command, self.timeout)
+            if result.get("state") == "serial" and self.transport == "auto" and not self.lan_submitted:
+                self._fallback()
+            else:
+                self.lan_submitted = True
+                return self._lan_reply(result)
         request_id = secrets.token_hex(4)
         body = request_id + " " + command
         if len(body) > MAX_LINE:
@@ -165,14 +182,70 @@ class Client:
             else:
                 self._notice_or_incidental(line)
 
+    def _fallback(self):
+        self.lan.close()
+        self.lan = None
+        if self.port is None:
+            if self.port_factory is None:
+                raise ValueError("serial requires --port")
+            self.port = self.port_factory()
+
+    def _lan_reply(self, result):
+        if not result.get("ok") or result.get("state") != "done" or not result.get("complete") or result.get("drop") != 0:
+            raise ValueError("communication incomplete: " + str(result.get("state", result.get("error", "error"))))
+        try:
+            body = base64.b64decode(result["body_b64"], validate=True).decode("ascii")
+        except (KeyError, ValueError, UnicodeError, binascii.Error) as exc:
+            raise ValueError("invalid LAN response") from exc
+        rows = body.splitlines()
+        match = re.fullmatch(r"gs:([0-9a-f]{8}) (.*)", rows[0]) if rows else None
+        if not match:
+            raise ValueError("invalid LAN response id")
+        request_id = match.group(1)
+        prefix = "gs:" + request_id + " "
+        lines = []
+        for index, line in enumerate(rows):
+            if not line.startswith(prefix):
+                raise ValueError("LAN response id mismatch")
+            payload = line[len(prefix):]
+            terminal = re.fullmatch(r"end ([0-4])", payload)
+            print(line, file=self.stdout)
+            if terminal:
+                if index != len(rows) - 1:
+                    raise ValueError("data after LAN end")
+                return int(terminal.group(1)), lines
+            lines.append(payload)
+        raise ValueError("missing LAN end")
+
+    def _lan_ready(self, mode, deadline):
+        while time.monotonic() < deadline:
+            probe = self.lan.probe(max(0.001, deadline - time.monotonic()))
+            ready = probe.get("ready")
+            if probe.get("ok") and probe.get("hello") and ready and ready.get("mode") == mode:
+                return
+            time.sleep(0.05)
+        raise TimeoutError(mode + " READY timed out")
+
     def _wait_notice(self, success, failure=None, seen=()):
         deadline = time.monotonic() + self.timeout
         pending = list(seen)
         while True:
             if pending:
                 line = pending.pop(0)
+            elif self.lan is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("notice timed out")
+                result = self.lan.notice(int(remaining * 1000), remaining)
+                if not result.get("ok"):
+                    raise ValueError("notice failed")
+                for notice in result.get("notices", []):
+                    pending.extend(base64.b64decode(notice["body_b64"], validate=True).decode("ascii").splitlines())
+                continue
             else:
                 line = _read_line(self.port, deadline)
+                self._notice_or_incidental(line)
+            if self.lan is not None:
                 self._notice_or_incidental(line)
             if failure and (line == failure or line.startswith(failure + " ")):
                 return 1
@@ -180,6 +253,20 @@ class Client:
                 return 0
 
     def enter(self):
+        if self.lan is not None:
+            result = self.lan.request("cui", "os32gui", self.timeout)
+            if result.get("state") == "serial" and self.transport == "auto" and not self.lan_submitted:
+                self._fallback()
+            else:
+                self.lan_submitted = True
+                if not result.get("ok") or result.get("state") != "done" or not result.get("complete") or result.get("drop") != 0:
+                    raise ValueError("GUI handoff incomplete")
+                body = base64.b64decode(result["body_b64"], validate=True)
+                if not body.endswith(EOT) or not body.lstrip(b"\r\n").startswith(b"> os32gui\n"):
+                    raise ValueError("invalid GUI handoff")
+                rc = self._wait_notice("gs:! ready")
+                self._lan_ready("gui", time.monotonic() + self.timeout)
+                return rc
         self.port.write(b"os32gui\n")
         self.port.flush()
         return self._wait_notice("gs:! ready")
@@ -192,6 +279,9 @@ class Client:
         if self._wait_notice("gs:! cui done", "gs:! cui failed",
                              self.notifications[start:]):
             return 1
+        if self.lan is not None:
+            self._lan_ready("cui", time.monotonic() + self.timeout)
+            return 0
         body, ok = read_eot_keep_rest(self.port, self.timeout)
         if body:
             print("[incidental] " + body.decode("ascii", errors="replace"),
@@ -203,7 +293,8 @@ class Client:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", required=True)
+    parser.add_argument("--port")
+    parser.add_argument("--transport", choices=("auto", "lan", "serial"), default="auto")
     parser.add_argument("--baud", type=int, default=9600)
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -225,15 +316,25 @@ def main(argv=None):
             if args.seconds < 0:
                 raise ValueError("wd seconds must be nonnegative")
             command += " " + str(args.seconds)
-        port = open_port(args.port, args.baud)
+        def open_serial():
+            if not args.port:
+                raise ValueError("serial requires --port")
+            return open_port(args.port, args.baud)
+        lan = None if args.transport == "serial" else CommandTransport()
+        client = Client(None, args.timeout, lan=lan, transport=args.transport,
+                        port_factory=open_serial)
         try:
-            client = Client(port, args.timeout)
+            if lan is None:
+                client.port = open_serial()
             if command in ("enter", "leave"):
                 return getattr(client, command)()
             rc, _ = client.request(command)
             return 0 if rc == 0 else 1
         finally:
-            port.close()
+            if client.port is not None:
+                client.port.close()
+            if client.lan is not None:
+                client.lan.close()
     except (OSError, TimeoutError, ValueError, AttributeError) as exc:
         print("gserial: " + str(exc), file=sys.stderr)
         return 1
