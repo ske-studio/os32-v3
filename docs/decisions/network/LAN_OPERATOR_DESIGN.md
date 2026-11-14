@@ -265,3 +265,10 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
   - `on_readable(fd)`: その fd を読む。
   - `poll(now)`: `wait_ms` の期限を処理する。
   - `publish_log(record)`: LOG を購読者に流す。
+
+### X6 の停止を受けて PM が決めたこと (2026-11-14)
+- `RSH READY` の 200 の本文は 1 行で `gen <host_generation 10 進> svc <操作番号 10 進>\n` とする。ゲストはこれで host_notice_read の世代と番号を決める。
+- `PDIAG OUT` は PowerPC の段 P2 で入れる。X6 では受けない (400 を返す)。X4 の Operator の diag も P2 で足す。
+- 宣言長: `RSH OUT`・`GS OUT`・`PDIAG OUT`・`LOG` は、どれも末尾の語が WDATA の宣言長になる。
+  - ホストの側 (host_agent.py の `_decl`) は X6 で対応する。
+  - ゲストの側 (net/link_host_api.inc の `link_decl_len`) は、新しい段 X6g (上限 40 行、x86 vmkernel・PPC 像は P1 の後で変わる) で対応する。
