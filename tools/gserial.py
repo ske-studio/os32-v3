@@ -14,7 +14,7 @@ import sys
 import time
 
 from rshell_serial import open_port, read_size
-from remote_transport import CommandTransport
+from remote_transport import CommandTransport, add_target_arguments
 
 DEFAULT_TIMEOUT = 15.0
 MAX_LINE = 128
@@ -293,6 +293,7 @@ class Client:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_target_arguments(parser)
     parser.add_argument("--port")
     parser.add_argument("--transport", choices=("auto", "lan", "serial"), default="auto")
     parser.add_argument("--baud", type=int, default=9600)
@@ -320,7 +321,7 @@ def main(argv=None):
             if not args.port:
                 raise ValueError("serial requires --port")
             return open_port(args.port, args.baud)
-        lan = None if args.transport == "serial" else CommandTransport()
+        lan = None if args.transport == "serial" else CommandTransport(endpoint=args.endpoint, instance=args.instance)
         client = Client(None, args.timeout, lan=lan, transport=args.transport,
                         port_factory=open_serial)
         try:

@@ -30,10 +30,12 @@ class FakeOperator:
         self.notices = [b'gs:! hello']
         self.results = {}
         self.disconnect = False
+        self.slow = False
         self.server = None
     def submit(self, mode, line, client):
         self.take_result()
-        self.pending = dict(id='00000001', state='done', result=b'> ver\nOK\n\x04')
+        self.pending = dict(id='00000001', state='running' if self.slow else 'done',
+                            result=None if self.slow else b'> ver\nOK\n\x04')
         if self.disconnect:
             client['socket'].close()
         return '00000001'
@@ -98,6 +100,13 @@ def test(path):
         ident = client.submit('cui', 'ver', 1)['id']
         assert client.result(ident, 0, 1)['state'] == 'done'
         assert client.resume()['ok']
+        operator.slow = True
+        assert client.request('cui', 'ver', 0.1)['state'] == 'unknown', 'CLI deadline not UNKNOWN'
+        assert client.sock is None
+        assert operator.pending['state'] == 'running', 'CLI deadline changed agent'
+        operator.pending.update(state='done', result=b'> ver\nlate\n\x04')
+        assert client.result('00000001', 0, 1)['complete'], 'late result after CLI deadline lost'
+        operator.slow = False
         operator.ready = None
         start = time.monotonic()
         assert client.request('cui', 'ver', 5)['state'] == 'serial'
@@ -123,7 +132,7 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
-            ("return {'state': 'unknown'}", "return {'state': 'serial'}", 'submit fell back to serial'),
+            ("return {'state': 'unknown'}", "return {'state': 'serial'}", 'CLI deadline not UNKNOWN'),
             ('time.monotonic() + READY_TIMEOUT)', 'time.monotonic() + READY_TIMEOUT + 1)', 'ready deadline removed'),
         ]
         with tempfile.TemporaryDirectory() as directory:

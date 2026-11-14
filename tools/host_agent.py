@@ -372,8 +372,9 @@ class HostAgent:
     def __init__(self, mac, state_dir=None, agent_gen=None, quiet=False,
                  rng=None, sess_start=0, allow_net=True, file_root=None,
                  spool_dir=None, print_dir=None, clip="none", printer=False,
-                 lines_per_page=DEFAULT_LINES_PER_PAGE):
+                 lines_per_page=DEFAULT_LINES_PER_PAGE, peer=None):
         self.mac = mac
+        self.configured_peer = peer
         self.quiet = quiet
         self.rng = rng or random.Random()
         self.agent_gen = agent_gen if agent_gen is not None else self.rng.randint(1, 0xFFFF)
@@ -507,6 +508,8 @@ class HostAgent:
 
     # ------------------------------------------------------- 3 way HELLO
     def _on_hello(self, src, flags, epoch, seq, ack, sess, payload, out):
+        if self.configured_peer is not None and src != self.configured_peer:
+            return
         self.counts["hello"] += 1
         if flags == HS_SYN:
             self._on_syn(src, epoch, seq, sess, out)
@@ -1490,6 +1493,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", metavar="FILE")
+    ap.add_argument("--operator-port", type=int, metavar="PORT",
+                    help="操作口の localhost ポート (0 は空きポート)")
     ap.add_argument("--listen", default="127.0.0.1:8026", metavar="HOST:PORT")
     ap.add_argument("--connect", metavar="HOST:PORT")
     ap.add_argument("--unix", metavar="PATH", help="UNIX ソケットで待ち受ける (ホスト TDD 用)")
@@ -1526,6 +1531,10 @@ def main():
             operator_addr = (host, int(port))
         except (OSError, ValueError) as exc:
             ap.error(str(exc))
+    if args.operator_port is not None:
+        if not 0 <= args.operator_port <= 65535:
+            ap.error("--operator-port must be between 0 and 65535")
+        operator_addr = ("127.0.0.1", args.operator_port)
     if not valid_clip_arg(args.clip):
         ap.error("--clip は {auto,win32,wsl,wayland,xclip,none} か file:<path> "
                  "(不正: %r)" % args.clip)
@@ -1537,7 +1546,8 @@ def main():
                       allow_net=not args.offline, file_root=args.file_root,
                       spool_dir=args.spool_dir, print_dir=args.print_dir,
                       clip=args.clip, printer=args.printer,
-                      lines_per_page=args.lines_per_page)
+                      lines_per_page=args.lines_per_page,
+                      peer=parse_mac(config["peer"]) if config else None)
     try:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"],
                                          cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

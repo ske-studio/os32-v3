@@ -101,6 +101,26 @@ def test(path):
     lan = Lan(done(b'> os32gui\naccepted\n\x04'))
     lan.notices = [b'gs:! ready v1\n']
     assert client(lan).enter() == 0
+    # Exercise both CLI parsers through the shared target resolver.
+    transport = m.CommandTransport
+    targets = []
+    def connect(**kwargs):
+        resolved = transport(**kwargs)
+        targets.append((resolved.host, resolved.port))
+        return Lan(done(b'gs:00000001 end 0\n'))
+    with patch.object(m, 'CommandTransport', side_effect=connect), \
+         patch('remote_transport.load_config', return_value={'operator-endpoint': '127.0.0.3:9134'}), \
+         patch.object(sys, 'stdout', io.StringIO()):
+        for target in (['--endpoint', '127.0.0.2:9133'], ['--instance', 'nic']):
+            assert m.main(target + ['--transport', 'lan', 'ping']) == 0
+        assert targets == [('127.0.0.2', 9133), ('127.0.0.3', 9134)], 'gserial target ignored'
+        try:
+            with patch.object(sys, 'stderr', io.StringIO()):
+                m.main(['--endpoint', 'host:1', '--instance', 'nic'] + ['--transport', 'lan', 'ping'])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError('conflicting targets accepted')
     print('PASS remote-g4')
 
 
@@ -110,6 +130,8 @@ def main():
     if '--mutate' in sys.argv:
         source = path.read_text()
         mutations = [
+            ("CommandTransport(endpoint=args.endpoint, instance=args.instance)",
+             "CommandTransport()", "gserial target ignored"),
             ('if result.get("state") == "serial" and self.transport == "auto" and not self.lan_submitted:\n                self._fallback()\n            else:\n                self.lan_submitted = True\n                return self._lan_reply(result)',
              'if result.get("state") in ("serial", "unknown") and self.transport == "auto" and not self.lan_submitted:\n                self._fallback()\n            else:\n                self.lan_submitted = True\n                return self._lan_reply(result)', 'submit fell back to serial'),
             ('terminal = re.fullmatch(r"end ([0-4])", payload)\n            print',

@@ -1219,7 +1219,7 @@ def n2fix_b_clip_arg_validation():
     assert not HA.valid_clip_arg("bogus") and not HA.valid_clip_arg("")
     assert not HA.valid_clip_arg("file:"), "空パスの file: を受理した (nb2)"
     r = subprocess.run([sys.executable, str(ROOT / "tools" / "host_agent.py"),
-                        "--clip", "bogus"], capture_output=True)
+                        "--operator-port", "0", "--clip", "bogus"], capture_output=True)
     assert r.returncode != 0, "不正な --clip を受理した"
     assert b"--clip" in r.stderr, r.stderr
 

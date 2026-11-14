@@ -94,32 +94,28 @@ def test(path):
     sock = connect()
     send(dict(op='result', id=ident, wait_ms=0))
     assert receive()['state'] == 'pending'
-    # Expiry must survive a CLI disconnect just before its result deadline.
+    # Expiring a disconnected request never changes the agent operation.
     send(dict(op='result', id=ident, wait_ms=1000))
     deadline = time.monotonic() + 2
     sock.close()
     pump()
     server.poll(deadline)
-    assert operator.pending['state'] == 'UNKNOWN', 'result timeout left running'
-    assert operator.ready is None, 'timeout reused old READY'
+    assert operator.pending['state'] == 'running', 'result timeout changed operation'
+    assert operator.ready is not None, 'result timeout cleared READY'
     sock = connect()
-    pump()
     send(dict(op='submit', mode='cui', line='again'))
-    assert receive()['error'] == 'UNKNOWN_PENDING'
-    assert operator.accept_ready(7, 1, boot, 'cui', ident, 'done')
-    send(dict(op='resume'))
-    assert receive()['ok']
-    # A connected long poll returns UNKNOWN at its deadline. A fresh READY
-    # then allows the same ID's delayed OUT, without executing again.
-    send(dict(op='submit', mode='cui', line='ver'))
-    ident = receive()['id']
+    assert receive()['error'] == 'BUSY'
+    # A connected long poll returns pending. The same ID can complete later
+    # without another READY or notification after reconnecting the CLI.
     send(dict(op='result', id=ident, wait_ms=1000))
     server.poll(time.monotonic() + 2)
-    assert receive()['state'] == 'unknown', 'result deadline response pending'
-    assert operator.accept_ready(7, 1, boot, 'cui', ident, 'done')
-    assert operator.accept_output(7, 1, boot, ident, 0, body, len(body), 'cui')
+    assert receive()['state'] == 'pending', 'result deadline response not pending'
+    body_again = b'> again\nOK\n\x04'
+    assert operator.accept_output(7, 1, boot, ident, 0, body_again, len(body_again), 'cui')
     send(dict(op='result', id=ident, wait_ms=0))
-    assert receive()['complete'] and len(notify.sent) == 3
+    result = receive()
+    assert result['complete'] and base64.b64decode(result['body_b64']) == body_again
+    assert len(notify.sent) == 2, 'late result replayed operation'
     # Delayed completion without a CLI must not keep the submission slot busy.
     send(dict(op='submit', mode='cui', line='ver'))
     old_id = receive()['id']
@@ -167,8 +163,9 @@ def main():
             ("pending = self.operator.results.get(ident)", "pending = None", 'saved result unavailable'),
             ("complete=state == 'done'", "complete=state in ('done', 'truncated')", 'truncated reported complete'),
             ("drop=pending.get('drop', 0)", 'drop=0', 'drop count lost'),
-            ("now >= pending.get('result_deadline', float('inf'))", 'False',
-             'result timeout left running'),
+            ("if state == 'running' and now < deadline:",
+             "if state == 'running' and now >= deadline:\n                    self.operator.unknown()\n                if state == 'running' and now < deadline:",
+             'result timeout changed operation'),
             ('if size > RECORD_MAX:', 'if size > RECORD_MAX + 1:', 'oversize accepted'),
             ("client['socket'].close()", "client['socket'].close()\n            if self.operator.pending:\n                self.operator.notify.notify_number(0, 0, b'replay')", 'disconnect replayed operation'),
         ]

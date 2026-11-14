@@ -71,12 +71,17 @@ def test(source):
             assert "'--config', '" + str(config_path) + "'" in first['host_agent']
             assert "'--connect', '127.0.0.1:8026'" in first['lan_bridge']
             assert "'--allow-write', '/'" in first['lanfs_host'] and "'--peer', '02:00:00:00:00:01'" in first['lanfs_host']
+            owner_path = config_path
+            config_path = root / 'second.json'
+            command[command.index('--config') + 1] = str(config_path)
             config['state-dir'] = tmp + '/other'
             config_path.write_text(json.dumps(config))
             duplicate = subprocess.Popen(command, env=env, stderr=subprocess.PIPE)
             try:
                 wait_for(lambda: duplicate.poll() is not None, 'duplicate lock accepted')
-                assert duplicate.returncode != 0, 'duplicate lock accepted'
+                assert duplicate.returncode == 1, 'duplicate lock accepted'
+                error = duplicate.communicate(timeout=8)[1].decode()
+                assert 'iface test0 は instance ' + owner_path.stem + ' が使っている' in error, 'lock owner missing'
             finally:
                 if duplicate.poll() is None:
                     duplicate.terminate()
@@ -111,7 +116,7 @@ def test(source):
     print('PASS remote-u5b')
 
 
-def test_agent_config():
+def test_agent_config(agent_path):
     with tempfile.TemporaryDirectory() as tmp:
         config = dict(iface='test0', root=tmp, peer='02:00:00:00:00:01',
                       backend='np21w', **{'allow-write': True,
@@ -122,10 +127,14 @@ def test_agent_config():
         path.write_text(json.dumps(config))
         sys.path.insert(0, str(ROOT / 'tools'))
         try:
-            spec = importlib.util.spec_from_file_location('u5b_agent', ROOT / 'tools/host_agent.py')
+            spec = importlib.util.spec_from_file_location('u5b_agent', agent_path)
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             seen = {}
+            original_agent = mod.HostAgent
+            def create_agent(*args, **kwargs):
+                seen['agent'] = original_agent(*args, **kwargs)
+                return seen['agent']
             def operator(addr, agent, info):
                 seen.update(addr=addr, info=info())
                 return None
@@ -133,8 +142,10 @@ def test_agent_config():
                 seen['listen'] = args.listen
                 raise OSError('fixture stop')
             with patch.object(sys, 'argv', ['host_agent', '--config', str(path), '--clip', 'none']), \
+                 patch.object(mod, 'HostAgent', side_effect=create_agent), \
                  patch.object(mod, 'OperatorSocket', operator), patch.object(mod, 'open_stream', open_stream):
                 assert mod.main() == 1
+            assert seen['agent'].configured_peer == bytes.fromhex('020000000001'), 'configured peer not wired'
             assert seen['addr'] == ('127.0.0.2', 8027)
             assert seen['listen'] == '127.0.0.2:8026'
             assert seen['info']['config'] == dict(iface='test0', root=tmp,
@@ -148,12 +159,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--module', default=str(ROOT / 'tools/host_agent_service.py'))
+    parser.add_argument('--agent-module', default=str(ROOT / 'tools/host_agent.py'))
     args = parser.parse_args()
     test(args.module)
-    test_agent_config()
+    test_agent_config(args.agent_module)
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("lock.write(Path(config_path).stem + '\\n')", "lock.write('unknown\\n')", 'lock owner missing'),
             ('RESTART_MIN = 2.0', 'RESTART_MIN = 0.0', 'restart storm'),
             ("if config['backend'] == 'bridge':", 'if True:', 'np21w raw child'),
             ('fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)', 'pass', 'duplicate lock accepted'),
@@ -168,6 +181,14 @@ def main():
                                         capture_output=True, text=True)
                 assert result.returncode and marker in result.stderr, result.stderr
                 print('RED', marker)
+            source = Path(args.agent_module).read_text()
+            anchor = 'peer=parse_mac(config["peer"]) if config else None'
+            assert source.count(anchor) == 1
+            path.write_text(source.replace(anchor, 'peer=None'))
+            result = subprocess.run([sys.executable, '-B', __file__, '--agent-module', str(path)],
+                                    capture_output=True, text=True)
+            assert result.returncode and 'configured peer not wired' in result.stderr, result.stderr
+            print('RED configured peer not wired')
 
 
 def run(ctx):

@@ -174,7 +174,7 @@ class Rig:
             self.agent = subprocess.Popen(
                 [sys.executable, "-B", str(HOST_AGENT), "--unix", self.agent_path,
                  "--offline", "--quiet", "--once", "--mac", mac_str(agent_mac),
-                 "--state-dir", str(self.tmp / "state"), "--agent-gen", "1"],
+                 "--state-dir", str(self.tmp / "state"), "--agent-gen", "1", "--operator-port", "0"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self._wait_for(self.agent_path)
             self.bridge = subprocess.Popen(

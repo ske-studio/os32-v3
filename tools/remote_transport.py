@@ -156,11 +156,15 @@ class CommandTransport:
             return {'state': 'unknown'}
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description='Connect to the host agent operator')
+def add_target_arguments(parser):
     target = parser.add_mutually_exclusive_group()
     target.add_argument('--endpoint', help='operator host:port')
     target.add_argument('--instance', help='host-agent configuration instance')
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Connect to the host agent operator')
+    add_target_arguments(parser)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('log', help='display LOG events as JSON lines')
     commands.add_parser('probe', help='show agent configuration and peer')

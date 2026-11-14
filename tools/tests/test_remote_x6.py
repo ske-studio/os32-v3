@@ -53,6 +53,18 @@ def test(path):
     agent.operator.pending = dict(state='running')
     agent._switch_to(dict(sess=2, epoch=1, mac=b'\x02\0\0\0\0\2'))
     assert agent.operator.pending['state'] == 'UNKNOWN', 'reset removed'
+    # Configured peer selects the guest for HELLO, before allocating a session.
+    peer = b'\x02\0\0\0\0\2'
+    agent = mod.HostAgent(b'\x02\0\0\0\0\1', quiet=True, peer=peer)
+    sink = mod.ListSink()
+    agent._on_hello(b'\x02\0\0\0\0\3', mod.HS_SYN, 1, 10, 0, 0, b'', sink)
+    assert agent.cand is None and not sink.frames, 'wrong peer HELLO accepted'
+    agent._on_hello(peer, mod.HS_SYN, 1, 10, 0, 0, b'', sink)
+    assert agent.cand is not None and sink.frames, 'configured peer HELLO rejected'
+    candidate = agent.cand.copy()
+    agent._on_hello(b'\x02\0\0\0\0\3', mod.HS_CONFIRM, 1, 10,
+                    candidate['agent_nonce'], candidate['sess'], b'', sink)
+    assert not agent.established and agent.cand == candidate, 'wrong peer CONFIRM accepted'
     print('PASS remote-x6')
 
 
@@ -64,7 +76,9 @@ def main():
     test(args.module)
     if args.mutate:
         source = Path(args.module).read_text()
-        mutations = [('int(parts[6]) != len(ent["got"])', 'False', 'length guard removed'),
+        mutations = [('if self.configured_peer is not None and src != self.configured_peer:',
+                      'if False:', 'wrong peer HELLO accepted'),
+                     ('int(parts[6]) != len(ent["got"])', 'False', 'length guard removed'),
                      ('        self.operator.session_reset()\n        self.sess,',
                       '        self.sess,', 'reset removed')]
         with tempfile.TemporaryDirectory() as directory:

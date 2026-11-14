@@ -39,23 +39,18 @@ os32-host がそこに書ける必要がある。
 NP21/W の NP2NETSOCK が接続する。例の `127.0.0.1:8026` はその待受先で、WSL の
 NAT を物理 Ethernet の bridge として扱わない。
 
-systemd 有効の WSL では Windows タスク スケジューラのログオン時タスクで対象
-ディストリビューションを起動・維持する。例えばプログラムを `wsl.exe`、引数を
-`-d <distro> --exec /usr/bin/tail -f /dev/null` にする。unit の状態は
-`systemctl status os32-host-agent@eth0.service`、ログは
+WSL の agent は NP21/W で開発するときだけ使う。WSL が動いている間は systemd が
+サービスを起こすので、WSL を起こしたままにする仕掛け (ログオン時のタスクなど) は
+置かない。unit の状態は `systemctl status os32-host-agent@eth0.service`、ログは
 `journalctl -u os32-host-agent@eth0.service` で確認できる。
 
 ## systemd 無効の WSL
 
-同じユーザー、ディレクトリ、配置と設定を用意する。Windows のタスク
-スケジューラでログオン時に以下のプログラムと引数を指定し、タスクが終了したら
-再起動する設定にする。ディストリビューションの root から setpriv で専用ユーザーと
-CAP_NET_RAW を渡し、runner が落ちた場合も再起動する。`util-linux` の `setpriv` が
-必要。`<distro>` と instance 名は置き換える。
+開発のときに、同じ設定で runner を手で起こす。専用ユーザーは作らなくてよい。
+`state-dir` と NIC ロックの置き場 (`--lock-dir`) を、起こすユーザーが書ける場所にする。
 
-```text
-プログラム: wsl.exe
-引数: -d <distro> -u root --exec /bin/sh -c "while :; do /usr/bin/setpriv --reuid=os32-host --regid=os32-host --init-groups --inh-caps=+net_raw --ambient-caps=+net_raw /usr/bin/python3 /opt/os32/tools/host_agent_service.py --config /etc/os32/host-agent/eth0.json; sleep 2; done"
+```sh
+python3 tools/host_agent_service.py --config <設定> --lock-dir <書ける場所>
 ```
 
 ## 受入時

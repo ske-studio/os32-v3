@@ -533,7 +533,7 @@ static int agent_start(void)
                "host_agent.open_stream = lambda args: host_agent.FrameStream(peer)\n"
                "sys.exit(host_agent.main())\n",
                fd_arg, "--once", "--state-dir", agent_state,
-               "--agent-gen", "4660", "--quiet", "--offline", (char *)NULL);
+               "--agent-gen", "4660", "--quiet", "--offline", "--operator-port", "0", (char *)NULL);
         _exit(127);
     }
     close(pair[1]);

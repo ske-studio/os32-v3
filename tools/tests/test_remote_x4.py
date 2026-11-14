@@ -55,9 +55,13 @@ def test(path):
     op.session_reset()
     assert op.pending['state'] == 'UNKNOWN'
     op.session_start(2)
-    assert op.accept_ready(42, 2, BOOT, 'cui', ident, 'done')
+    assert op.ready is None
     assert op.take_result() is None
-    assert output(session=2)
+    assert not output(gen=41, session=2), 'old generation accepted'
+    assert not output(session=1), 'old session accepted'
+    assert not output(session=2, boot='f' * 32), 'wrong boot accepted'
+    assert not output(session=2, ident='00000002'), 'wrong id accepted'
+    assert output(session=2), 'late OUT without READY rejected'
     assert op.take_result()['result'] == body
     assert op.accept_ready(42, 2, BOOT, 'gui', ident, 'done')
     ident2 = op.submit('gui', 'ping', None)
@@ -70,7 +74,9 @@ def test(path):
     assert op.take_result()['state'] == 'done'
     op.next_id = 0xffffffff
     op.submit('gui', 'ping', None)
+    ready = op.ready
     op.unknown()
+    assert op.ready is ready, 'UNKNOWN cleared READY'
     assert op.accept_ready(42, 2, BOOT, 'gui', 'ffffffff', 'done')
     op.resume()
     try:
@@ -99,6 +105,7 @@ def test(path):
         assert op.pending['state'] == 'running', 'stale READY lost operation'
         assert op.accept_ready(42, 1, 'f' * 32, 'cui', 'none', 'idle')
         assert op.pending['state'] == 'UNKNOWN'
+        assert not op.accept_output(42, 1, BOOT, op.pending['id'], 0, body, len(body), 'cui'), 'old boot accepted after restart'
         assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
         op.resume()
         assert op.pending is None and len(n.sent) == 2
@@ -150,6 +157,8 @@ def main():
         source = Path(args.module).read_text()
         mutations = [
             ("if (not body.startswith(b'gs:! ')", "if (dropped or not body.startswith(b'gs:! ')", 'dropped notice rejected'),
+            ("self.pending['state'] = 'UNKNOWN'\n\n    def resume", "self.pending['state'] = 'UNKNOWN'\n            self.ready = None\n\n    def resume", 'UNKNOWN cleared READY'),
+            ('(self.ready is None and not late)', '(self.ready is None)', 'late OUT without READY rejected'),
             ('self.notice_drop += dropped', 'pass', 'notice drop not recorded'),
             ("# previous ID/idle state is not evidence that execution was lost.",
              "# previous ID/idle state is not evidence that execution was lost.\n        if self.pending is not None and last_id != self.pending['id']:\n            self.pending['state'] = 'UNKNOWN'", 'stale READY lost operation'),

@@ -88,7 +88,8 @@ class Operator:
             data = b'\x01' + data
         self.next_id += 1
         self.pending = dict(id=ident, boot=self.ready['boot'], mode=mode,
-                            line=line, client=client, state='running', result=None)
+                            line=line, client=client, generation=self.generation,
+                            state='running', result=None)
         try:
             self.notify.notify_number(RSHELL if mode == 'cui' else GSERIAL, EXECUTE, data)
         except Exception:
@@ -99,7 +100,6 @@ class Operator:
     def unknown(self):
         if self.pending is not None:
             self.pending['state'] = 'UNKNOWN'
-            self.ready = None
 
     def resume(self):
         if (self.pending is None or self.pending['state'] != 'UNKNOWN' or
@@ -108,8 +108,13 @@ class Operator:
         self.pending = None
 
     def accept_output(self, generation, session, boot, ident, dropped, body, length, mode):
+        pending = self.pending
+        late = (pending is not None and pending['state'] == 'UNKNOWN' and
+                pending['generation'] == generation and pending['boot'] == boot.lower() and
+                pending['id'] == ident and pending['mode'] == mode)
         if (generation != self.generation or session != self.session or session is None or
-                self.ready is None or boot.lower() != self.ready['boot']):
+                (self.ready is None and not late) or
+                (self.ready is not None and boot.lower() != self.ready['boot'])):
             return False
         if dropped < 0 or length != len(body) or length > RESULT_MAX:
             return False

@@ -33,8 +33,17 @@ def run(config, config_path, lock_dir):
     if '/' in iface or iface in ('.', '..'):
         raise ValueError('invalid iface for lock filename')
     lock_path = Path(lock_dir) / ('os32-host-agent-' + iface + '.lock')
-    with lock_path.open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with lock_path.open('a+') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock.seek(0)
+            owner = lock.read().strip() or 'unknown'
+            raise ValueError(f'iface {iface} は instance {owner} が使っている') from None
+        lock.seek(0)
+        lock.truncate()
+        lock.write(Path(config_path).stem + '\n')
+        lock.flush()
         stopping = False
         def stop(_signum, _frame):
             nonlocal stopping

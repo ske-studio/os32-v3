@@ -86,6 +86,28 @@ def test(path):
         assert mod.main(['--resume']) == 0 and fake.calls[-1] == ('resume',)
         assert mod.main(['--probe']) == 0 and fake.calls[-1] == ('probe',)
         assert mod.main(['--transport', 'lan', 'cmd', '']) == 0
+    # Exercise both CLI parsers through the shared target resolver.
+    FakeTransport.result = {'ok': True, 'state': 'done', 'complete': True,
+                            'body_b64': 'PiB2ZXINCk9LDQoE'}
+    transport = mod.CommandTransport
+    targets = []
+    def connect(**kwargs):
+        resolved = transport(**kwargs)
+        targets.append((resolved.host, resolved.port))
+        return FakeTransport()
+    with patch.object(mod, 'CommandTransport', side_effect=connect), \
+         patch('remote_transport.load_config', return_value={'operator-endpoint': '127.0.0.3:9134'}), \
+         patch.object(sys, 'stdout', Output()):
+        for target in (['--endpoint', '127.0.0.2:9133'], ['--instance', 'nic']):
+            assert mod.main(target + ['--transport', 'lan', 'cmd', 'ver']) == 0
+        assert targets == [('127.0.0.2', 9133), ('127.0.0.3', 9134)], 'rshell target ignored'
+        try:
+            with patch.object(sys, 'stderr', io.StringIO()):
+                mod.main(['--endpoint', 'host:1', '--instance', 'nic'] + ['--transport', 'lan', 'cmd', 'ver'])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError('conflicting targets accepted')
     print('PASS remote-x12')
 
 
@@ -98,6 +120,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("CommandTransport(endpoint=args.endpoint, instance=args.instance)",
+             "CommandTransport()", "rshell target ignored"),
             ("if result.get('state') == 'truncated':", "if False:", 'truncated not reported'),
             ('nargs=argparse.REMAINDER', "nargs='*'", 'command options consumed'),
             ("print('communication incomplete: ' + str(result.get('state', result.get('error', 'error'))), file=sys.stderr)\n            return 1",

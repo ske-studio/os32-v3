@@ -8,7 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from remote_transport import CommandTransport
+from remote_transport import CommandTransport, add_target_arguments
 
 
 def body_without_echo(body, line):
@@ -47,6 +47,7 @@ def serial_command(args, line):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_target_arguments(parser)
     parser.add_argument('--transport', choices=('auto', 'lan', 'serial'), default='auto')
     parser.add_argument('--port', help='serial port, needed for serial fallback')
     parser.add_argument('--baud', type=int, default=9600)
@@ -71,7 +72,7 @@ def main(argv=None):
         return 1
     if args.transport == 'serial':
         return serial_command(args, line)
-    client = CommandTransport()
+    client = CommandTransport(endpoint=args.endpoint, instance=args.instance)
     try:
         if args.probe or args.resume:
             result = client.probe(args.timeout) if args.probe else client.resume(args.timeout)
