@@ -6,7 +6,6 @@
 #include "os32_kapi_shared.h"
 
 #define MAILBOX_SLOTS 64
-#define MAILBOX_ALL 65535u
 
 static HostNotice *slots;
 /* Arrival order contains slot indices, so filtered removal moves only indices. */
