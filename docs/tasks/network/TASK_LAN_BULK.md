@@ -1,6 +1,6 @@
 # TASK_LAN_BULK — LAN の一括転送 (link の新しい op、/host の LAN 経路を link へ一本化)
 
-> 状態: **設計中 (2026-11-14)** — 設計は確定して実装を待つ。詳細設計は [LAN_BULK_DESIGN](../../decisions/network/LAN_BULK_DESIGN.md)。
+> 状態: **設計中 (2026-11-14)** — 設計は確定。HAL 中心期 (POLICY_DEV §1、ユーザー決定 2026-11-14) の間は実装に着手しない。詳細設計は [LAN_BULK_DESIGN](../../decisions/network/LAN_BULK_DESIGN.md)。
 > 上位: [TASK_NET_HOSTSVC](TASK_NET_HOSTSVC.md) (§0 の「link と SFS の 2 本を共存し、最後は 1 本を目指す」はこの票の決定で 1 本に寄せる)。Tier との口は [TASK_IO_TIER](../v3/TASK_IO_TIER.md)。
 
 ## 0. ユーザー決定 (2026-11-14)
