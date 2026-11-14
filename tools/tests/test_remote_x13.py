@@ -2,6 +2,7 @@
 """Exercise the operator client against the real socket adapter."""
 import argparse
 import importlib.util
+import io
 import os
 from pathlib import Path
 import select
@@ -11,6 +12,7 @@ import sys
 import tempfile
 import threading
 import time
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -18,7 +20,10 @@ from host_operator_socket import OperatorSocket
 
 CHECK = dict(name='remote-x13', tier=1, needs=[], budget=10,
              covers=['tools/remote_transport.py', 'tools/host_agent_config.py', 'tools/host_operator_socket.py',
-                     'tools/tests/test_remote_x13.py'])
+                     'tools/tests/test_remote_x13.py', 'tools/rshell.py', 'tools/gserial.py',
+                     'tools/host_image.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py',
+                     'tools/rshell_hwb.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py',
+                     'tools/serialfs_host.py'])
 
 
 class FakeOperator:
@@ -123,15 +128,86 @@ def test(path):
     print('PASS remote-x13')
 
 
+def test_auto(path):
+    spec = importlib.util.spec_from_file_location('remote_matrix', path)
+    transport = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(transport)
+    transport.READY_TIMEOUT = 0.001
+    import rshell
+    import gserial
+
+    for requested in ('cui', 'gui'):
+        for current in (requested, 'gui' if requested == 'cui' else 'cui'):
+            for state in ('idle', 'running', 'unknown'):
+                for absent, hello, has_ready in ((False, True, True), (True, True, True),
+                                                 (False, False, True), (False, True, False),
+                                                 (False, False, False)):
+                    calls = []
+                    class Client(transport.CommandTransport):
+                        def _call(self, op, deadline, **fields):
+                            calls.append(op)
+                            if absent:
+                                raise OSError('agent absent')
+                            if op == 'probe':
+                                return dict(ok=True, hello=hello, ready=dict(mode=current) if has_ready else None,
+                                            pending=None if state == 'idle' else dict(state=state))
+                            if op == 'submit':
+                                return dict(ok=True, id='1')
+                            return dict(ok=True, state='done', complete=True, drop=0,
+                                        body_b64='Z3M6MDAwMDAwMDEgZW5kIDAK')
+                    serial_calls = []
+                    def port_factory(*args):
+                        serial_calls.append(1)
+                        raise OSError('serial selected')
+                    client = Client()
+                    result = client.request(requested, 'ping', 1)
+                    if requested == 'gui':
+                        cli = gserial.Client(None, 1, stdout=io.StringIO(), stderr=io.StringIO(),
+                                             lan=Client(), transport='auto', port_factory=port_factory)
+                        try:
+                            cli.request('ping')
+                        except (ValueError, OSError):
+                            pass
+                    else:
+                        with patch.object(rshell, 'CommandTransport', return_value=Client()), \
+                             patch.object(rshell, 'serial_command', side_effect=port_factory), \
+                             patch.object(sys, 'stdout', io.StringIO()), patch.object(sys, 'stderr', io.StringIO()):
+                            try:
+                                rshell.main(['cmd', 'ping'])
+                            except OSError:
+                                pass
+                            except AttributeError:
+                                # Successful rshell output uses stdout.buffer.
+                                pass
+                    fallback = absent or (state == 'idle' and (not hello or not has_ready))
+                    marker = ('missing hello did not call port_factory' if not hello and state == 'idle'
+                              else 'pending priority called port_factory')
+                    assert bool(serial_calls) == fallback, marker
+                    if fallback:
+                        assert result.get('state') == 'serial'
+                    elif state != 'idle':
+                        assert result.get('error') == ('BUSY' if state == 'running' else 'UNKNOWN_PENDING')
+                    elif current != requested:
+                        assert f'mode={current}' in result['error'] and f'requested={requested}' in result['error']
+                    else:
+                        assert result.get('state') == 'done'
+                    assert ('submit' in calls) == (not absent and hello and has_ready and
+                                                  state == 'idle' and current == requested)
+    print('PASS auto matrix')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--module', default=str(ROOT / 'tools/remote_transport.py'))
     args = parser.parse_args()
+    test_auto(args.module)
     test(args.module)
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("if not probe.get('hello') or not ready:", "if not ready:", 'missing hello did not call port_factory'),
+            ("return {'ok': False, 'error': error}", "return {'state': 'serial'}", 'pending priority called port_factory'),
             ("return {'state': 'unknown'}", "return {'state': 'serial'}", 'CLI deadline not UNKNOWN'),
             ('time.monotonic() + READY_TIMEOUT)', 'time.monotonic() + READY_TIMEOUT + 1)', 'ready deadline removed'),
         ]
