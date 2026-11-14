@@ -1,10 +1,4 @@
 """T3 actual core fake-wire tests and focused mutations; no hardware."""
-CHECK = dict(name='recover-t3', tier=1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_wire.h', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'tools/tests/recover_host.c', 'tools/tests/test_recover.py', 'tools/rshell_recover.py', 'tools/tests/recover_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/recover_diag.h', 'kdebug/recover_cleanup.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h'],
-    needs=[], budget=3.8,
-    basis=['REALHW_RECOVER_DESIGN §2', 'REALHW_RECOVER_DESIGN §3', 'REALHW_RECOVER_DESIGN §4', 'REALHW_RECOVER_DESIGN §5'],
-)
-
 import pathlib
 import subprocess
 import sys
@@ -66,39 +60,11 @@ def one(item):
         return name + (': GREEN' if result.returncode == 0 else ': RED rc=' + str(result.returncode)), int(result.returncode == 0)
 
 
-def main():
-    with tempfile.TemporaryDirectory(prefix='recover-t3-') as td:
-        exe = pathlib.Path(td) / 'core'
-        subprocess.run(base.host_cmd(exe) + ["-DRECOVER_T3_CAPTURE"], check=True, cwd=base.ROOT)
-        result = host32.run([str(exe)], cwd=base.ROOT, timeout=30, capture_output=True)
-        if result.returncode:
-            print(result.stdout.decode(), end='')
-            return result.returncode
-        text = result.stdout.decode()
-        transcript = text.split('T3 WIRE BEGIN\n', 1)[1].split('T3 WIRE END\n', 1)[0]
-        records = rshell_recover.Records(1)
-        for line in transcript.splitlines():
-            records.line(line)
-        assert records.success(), records.data
-        assert records.final['discarded_bytes'] == '2'
-        print('recover T3 core + host serializer contract: PASS')
-    if '--mutate' in sys.argv:
-        return int(bool(mutpar.run_with_control(one, MUTATIONS, ('control', '', ''))))
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
-
-
-def run(ctx) -> int:
-    import os
-    import shlex
-    import subprocess
-    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
-    env = dict(base_env)
-    argv = ['python3', '-B', 'tools/tests/test_recover_t3.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
-    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
-    if rc:
-        return rc
-    return 0
+def score_capture(text):
+    transcript = text.split('T3 WIRE BEGIN\n', 1)[1].split('T3 WIRE END\n', 1)[0]
+    records = rshell_recover.Records(1)
+    for line in transcript.splitlines():
+        records.line(line)
+    assert records.success(), records.data
+    assert records.final['discarded_bytes'] == '2'
+    print('recover T3 core + host serializer contract: PASS')
