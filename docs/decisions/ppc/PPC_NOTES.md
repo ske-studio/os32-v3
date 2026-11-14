@@ -1,13 +1,13 @@
 # PPC_NOTES — PowerPC 移植の注意事項 (実機・QEMU・root・フォント)
 
-> 状態: **現行 (2026-11-13)** — PowerPC に固有の注意事項はこの 1 枚に集め、共通の文書 (docs/05_drivers.md・08_build.md など) には書かない (ユーザー指示 2026-11-13)。実装と取り込みの決まりは [PPC_IMPL_RULES](PPC_IMPL_RULES.md)、事実の資料は [docs/ppc](../../ppc/README.md)。実機の受入の結果は票 TASK_PPC_REALHW §2。
+> 状態: **現行 (2026-11-14)** — PowerPC に固有の注意事項はこの 1 枚に集め、共通の文書 (docs/05_drivers.md・08_build.md など) には書かない (ユーザー指示 2026-11-13)。PowerPC で機能を作る前に、他のアーキテクチャや本線と統合して作れるかを判断する: [POLICY_DEV](../../POLICY_DEV.md) §1「別のアーキテクチャで機能を作るときは、統合して作れるかを先に判断する」。実装と取り込みの決まりは [PPC_IMPL_RULES](PPC_IMPL_RULES.md)、事実の資料は [docs/ppc](../../ppc/README.md)。実機の受入の結果は票 TASK_PPC_REALHW §2。
 
 ## 1. RAM の root とフォント
 
 - PowerPC の RAM の root (埋め込み ISO、ISO level 1 の 8.3 名) は `build/ppc-kboot.mk` が `ROOT_MANIFEST=build/ppc-ram-root.json` で中身を足す。共通の `build/ram-root.mk` は呼び手が指定した時だけ manifest を使う。PC-98 の root は変えない。
-- 収録: `/fonts/shino16.kcg` (東雲 16 の 16px EBDT から作る KCG1、非圧縮 295,956B)・`/fonts/shino16.txt` (東雲のライセンス)・`/sys/unicode.bin` (漢字の道 unicode_to_jis が読む)。パスは `include/config.h` の `SYS_FB_FONT`・`SYS_FB_FONT_LICENSE`・`SYS_UNICODE_BIN`。
+- 収録: `/fonts/shino16.kcg` (東雲 16 の 16px EBDT から作る KCG1、LZ4 の flags=1 で 187,980B 前後、展開後 295,940B)・`/fonts/shino16.txt` (東雲のライセンス)・`/sys/unicode.bin` (漢字の道 unicode_to_jis が読む)。パスは `include/config.h` の `SYS_FB_FONT`・`SYS_FB_FONT_LICENSE`・`SYS_UNICODE_BIN`。
 - 字形の源は 2026-11-13 のユーザー決定「KCG の口 + 東雲 16 から作る .kcgfont」。ROM の無い機種の KCG の本体 `drivers/video/kcg/kcg_file.c` が KcgModuleApi と同じ口で返す。PC-98 は今までどおり CG ROM と `/boot/kcg.mod`、旧 `.kcgfont` の配布と `kcg_load_font` の NOSYS は変えない。
-- KCG1: 16B の LE ヘッダ (`KCG1`・展開後サイズ・flags)、94×94×32B の漢字・fetched、256×16B の ANK・fetched。読み込み側は flags≠0 を拒否する。生成は `python3 tools/gen_font16.py --ebdt <JF-Dot-Shinonome16.ttf> <out>`、派生物は git に入れない。
+- KCG1: 16B の LE ヘッダ (`KCG1`・展開後サイズ・flags)、94×94×32B の漢字・fetched、256×16B の ANK・fetched。flags は 0 (非圧縮) と 1 (本体全体が 1 つの LZ4 block) だけを受け、他は拒否する ([PPC_KCG_LZ4_DESIGN](PPC_KCG_LZ4_DESIGN.md))。製品の生成は `python3 tools/gen_font16.py --ebdt <JF-Dot-Shinonome16.ttf> <out> --lz4` (`build/font-fetch.mk`、Python の lz4 が要る)。派生物は git に入れない。
 - 作業木でフォントが無いときは `tools/preflight.sh --fix-fonts` (主の作業木から SHA-256 を照合してコピー)。ネットワークの無い所で `make all` が Inconsolata・東雲の取得で落ちるのはこれで避ける。
 
 ## 2. G4 実機 (PowerMac3,5、OF 4.2.1f2)
