@@ -76,6 +76,10 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('remote-g2 LAN reply to UART', 'src/gserial.rs', '    if lan {', '    if false {', 'remote_g2_'),
+    ('remote-g2 mixed framing', 'src/gserial.rs',
+     '    (q.synced, q.line, q.len, q.junk, q.long, q.cr) = saved;',
+     '    let _ = saved;', 'remote_g2_'),
     ('quit grace cycle countdown', 'src/session.rs',
      '    if st.now.wrapping_sub(s().quit_deadline) < 0x8000_0000 {',
      '    s().quit_deadline = s().quit_deadline.wrapping_sub(1);\n    if s().quit_deadline == st.now {',
@@ -209,7 +213,7 @@ MUTATIONS = [
     ('gserial controls accepted', 'src/gserial.rs', 'if !(0x20..=0x7e).contains(&b) { q.junk = true; }', 'if false { q.junk = true; }', 'gserial_framing'),
     ('gserial prior pending ignored', 'src/gserial.rs', '4 + 2 * st.pending_raw_n + n_ev', '4 + n_ev', 'gserial_pending'),
     ('gserial modifiers undercounted', 'src/gserial.rs', 'let n_raw = st.gserial.lengths[0] as usize;', 'let n_raw = 2;', 'gserial_pending'),
-    ('gserial notification tagged as response', 'src/gserial.rs', 'reply(b"!", format_args!("{}", message))', 'reply(b"aBcD0123", format_args!("{}", message))', 'gserial_cui_two'),
+    ('gserial notification tagged as response', 'src/gserial.rs', 'reply_to(st.gserial.lan, b"!", format_args!("{}", message))', 'reply_to(st.gserial.lan, b"aBcD0123", format_args!("{}", message))', 'gserial_cui_two'),
     ('gserial response ID omitted', 'src/gserial.rs', 'write!(line, "gs:{} {}", id, args)', 'write!(line, "gs: {}", args)', 'gserial_config_default'),
     ('gserial atomic capacity removed', 'src/gserial.rs', 'if q.keys+nk > KEY_MAX || q.raws+nr > RAW_MAX { return Err("full"); }', 'if q.keys+nk > KEY_MAX || q.raws+nr > RAW_MAX { return Ok(nk); }', 'gserial_queue_atomic'),
     ('gserial hold discards queue', 'src/gserial.rs', 'if st.pending_raw.len() - st.pending_raw_n < n_raw { break; }', 'if st.pending_raw.len() - st.pending_raw_n < n_raw { st.gserial.keys = 0; st.gserial.raws = 0; break; }', 'gserial_pending'),

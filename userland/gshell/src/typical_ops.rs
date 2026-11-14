@@ -11,7 +11,7 @@ const FAILED: u32 = u32::MAX;
 
 pub struct Run {
     op: u8, warm: u8, left: u16, i: u16, t0: u64, deadline: u32,
-    base: GfxStats, id: [u8; 8], pub active: bool,
+    base: GfxStats, id: [u8; 8], lan: bool, pub active: bool,
     waiting: bool, phase: u8, last_commit: u32, valid: bool,
     origin: (i32, i32), window: u32, owner: i32,
     samples: [u32; MAX], count: usize,
@@ -19,7 +19,7 @@ pub struct Run {
 impl Run {
     pub const NEW: Self = Self {
         op: 0, warm: 0, left: 0, i: 0, t0: 0, deadline: 0,
-        base: GfxStats::ZERO, id: [0; 8], active: false,
+        base: GfxStats::ZERO, id: [0; 8], lan: false, active: false,
         waiting: false, phase: 0, last_commit: 0, valid: true,
         origin: (0, 0), window: 0, owner: 0, samples: [0; MAX], count: 0,
     };
@@ -90,6 +90,7 @@ pub fn start(st: &mut GuiState, id: &[u8], op: u8, n: u16) -> Result<(), u8> {
         if t != Some(if op == 5 { b"File Manager" } else { b"Edit" }) { return Err(3); }
     }
     st.ops = Run::NEW;
+    st.ops.lan = gserial::response_lan();
     st.ops.op = op; st.ops.left = n; st.ops.id.copy_from_slice(id); st.ops.active = true;
     if let Some(i) = st.front_index() {
         let w = &st.windows[i];
@@ -135,7 +136,7 @@ fn end(st: &mut GuiState) {
     } else {
         emit(format_args!("GOP1 {} p50 FAILED p95 FAILED valid 0 failed {}\r\n", NAMES[r.op as usize], r.i));
     }
-    gserial::reply(&r.id, format_args!("end 0"));
+    gserial::reply_to(r.lan, &r.id, format_args!("end 0"));
     wm::gf_accept::pause(false);
 }
 /// Called only at the end of X3/standalone cycles, after flush_present.
