@@ -310,6 +310,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/v3/TASK_SYNTH_OPNA.md](tasks/v3/TASK_SYNTH_OPNA.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/v3/TASK_TICK_1KHZ.md](tasks/v3/TASK_TICK_1KHZ.md) | P3 の 1kHz IRQ0 tick (実測 → 二周期への切り替え) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/v3/TASK_IO_TIER.md](tasks/v3/TASK_IO_TIER.md) | I/O の Tier 制御 (協調点の Tier・予算・設定表・pump) **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
+| [tasks/portability/TASK_ARCH_CTX.md](tasks/portability/TASK_ARCH_CTX.md) | 実行文脈ごとの約束 (ARCH_COMPAT W4、AC-CTX): syscall は全 arch で割り込みを許して走る **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](tasks/vision/AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](tasks/vision/LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
