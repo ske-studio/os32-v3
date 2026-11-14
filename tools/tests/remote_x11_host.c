@@ -11,6 +11,7 @@
 int execute_command(const char *line);
 #include "../../userland/shell/rshell.c"
 
+static int trace_open(const char *path, int flags) { (void)path; (void)flags; return -1; }
 static unsigned int gui_runs, serial_reads, sfs_begins, sfs_ends;
 static int mounted, shell_status, serial_phase, serial_pos, serial_eot;
 static char serial_echo[1024];
@@ -33,13 +34,13 @@ static int shell_capture(u32 op)
 {
     int rc = capture_op(op);
     if (op == CON_SINK_CAPTURE_END && lan_exit)
-        queue(33, "stale during exit");
+        queue(36, "stale during exit");
     return rc;
 }
 static int serial_get(void)
 {
     CHECK(!active); ++serial_reads;
-    if (lan_exit && serial_reads == 1) { CHECK(!pending); queue(32, "exit"); return -1; }
+    if (lan_exit && serial_reads == 1) { CHECK(!pending); queue(35, "exit"); return -1; }
     if (lan_exit) return "exit\n"[serial_pos++]; /* Bound a lost-return mutant. */
     if (serial_phase == 0) {
         /* LAN arrives after the first serial character, with gaps in the line. */
@@ -88,6 +89,7 @@ int execute_command(const char *line)
 int main(void)
 {
     api.version = KAPI_VERSION;
+    api.sys_open = trace_open;
     api.get_tick = now; api.sys_yield = yield; api.sys_halt = halt;
     api.boot_token_get = boot; api.host_open = open_host; api.host_close = close_host;
     api.host_status = status_host; api.host_read = read_host; api.host_write = write_host;
@@ -124,15 +126,18 @@ int main(void)
         unsigned int count = executes; queue(27 + i, cmds[i]); CHECK(rsh_lan_poll() == 1);
         CHECK(executes == count);
     }
+    unsigned int count = executes;
+    queue(32, "rshell lantrace"); CHECK(rsh_lan_poll() == 1);
+    CHECK(executes == count + 1);
     CHECK(serial_reads == reads && begins == ends && !active && !handle);
     lan_exit = 1; serial_reads = serial_pos = 0;
     int eots = serial_eot;
-    queue(32, "stale before reopen");
+    queue(33, "stale before reopen");
     CHECK(cmd_rshell_resident(1, argv) == 0);
     CHECK(!resident_active && !rsh_in_rshell && !pending && serial_reads == 1);
     CHECK(strstr(serial_echo, "discarded 1 stale LAN notices"));
     CHECK(serial_eot == eots + 1); /* Initial prompt only; LAN owns the exit EOT. */
-    queue(33, "stale after exit");
+    queue(34, "stale after exit");
     rsh_lan_reset();
     CHECK(!pending);
     puts("GREEN X11: serial half-line, LAN ownership, ACCEPT/200/END, scope, serial echo/EOT/exit");

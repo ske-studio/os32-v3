@@ -397,6 +397,10 @@ static const char *rsh_gui_command(const char *line)
 int rsh_lan_execute(const char *line)
 {
     const char *child = rsh_sfs_child(line);
+    if (str_eq(line, "rshell lantrace")) {
+        (void)execute_command(line);
+        return 0;
+    }
     if (rsh_gui_command(line)) {
         g_api->kprintf(ATTR_CYAN, "%s", "Switching to GUI shell...\n");
         return 1;
@@ -608,6 +612,11 @@ static int cmd_rshell(int argc, char **argv)
     g_api->kprintf(ATTR_RED, "%s", "rshell: resident shell only\n");
     return SH_STATUS_ERROR;
 #else
+    if (argc == 2 && str_eq(argv[1], "lantrace")) {
+        extern void rsh_lan_trace_show(void);
+        rsh_lan_trace_show();
+        return 0;
+    }
     return cmd_rshell_resident(argc, argv);
 #endif
 }
@@ -1008,7 +1017,7 @@ static int cmd_tvdump(int argc, char **argv)
 static const ShellCmd rshell_cmds[] = {
     { "serial",   cmd_serial,   "[baud]",        "Show RS-232C status / init at baud (115200 = V-FAST)" },
     { "terminal", cmd_terminal, "",              "Enter serial terminal mode" },
-    { "rshell",   cmd_rshell,   "",              "Start remote shell host" },
+    { "rshell",   cmd_rshell,   "[lantrace]",              "Start remote shell host" },
     { "send",     cmd_send,     "TEXT...",       "Send text via serial" },
     { "hotdeploy", cmd_hotdeploy, "[PATH LEN CRC32]",
       "Write staging buffer to file (no args: report buffer address)" },
