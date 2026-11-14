@@ -180,7 +180,7 @@ static inline void io_wait_n(int n) {(void)n;}
         flags=['gcc', *linker_flags(),'-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',
-               '-DPHYSMEM_HOST_TEST=1','-I'+str(tmp)]
+               '-I'+str(tmp)]
         if alt_window: flags.append('-DHOST_ALT_WINDOW=1')
         flags += (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         exe=tmp/'test'
@@ -235,5 +235,18 @@ def main():
             result=run_case(None,args.runner,[(unit,old,new)])
             assert result.returncode == 1 and expected in result.stdout,(name,result.stdout,result.stderr)
             print('RED '+name)
-        print(f'PASS {len(MUTANTS)+3}/{len(MUTANTS)+3} runtime mutants')
+        for name, changes in [
+            ('lease-entry-guards', [
+                ('exec/surface_query.c',
+                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease(',
+                 '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease('),
+                ('exec/surface_query.c',
+                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(',
+                 '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(')]),
+            ('bridge-guard', [('gfx/gfx_core.c',
+                '    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;', '')])]:
+            result = run_case(None, args.runner, extra_changes=changes)
+            assert result.returncode == 1 and 'FAIL ' in result.stdout, (name, result.stdout, result.stderr)
+            print('RED (runtime): ' + name)
+        print(f'PASS {len(MUTANTS)+5}/{len(MUTANTS)+5} runtime mutants')
 if __name__ == '__main__': main()
