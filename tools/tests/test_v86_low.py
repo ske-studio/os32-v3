@@ -3,8 +3,8 @@ qemu -B reserves a host offset so Linux mmap_min_addr does not hide page zero.
 Normal control always precedes compiled, runtime-RED single omissions.
 """
 CHECK = dict(name='v86-low-host', tier=1,
-    covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'kernel/time/sysclk.c', 'drivers/input/kbd.c', 'tools/tests/test_shm_user.py', 'tools/tests/mutpar.py', 'mm/paging.*', 'include/platform_memory.h', 'arch/x86/legacy/v86_mem.*', 'platform/pc98/legacy/v86_bios.*', 'platform/pc98/bios_snapshot.c', 'arch/x86/legacy/v86.h', 'arch/x86/legacy/v86_module.h', 'kernel/module/module.h', 'mm/pgalloc.h', 'arch/x86/kernel/idt.h', 'kernel/kselftest.h', 'platform/pc98/legacy/v86_io.h', 'arch/x86/legacy/v86_call.c', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'fs/vfs.h', 'lib/kstring.h', 'sdk/include/os32/**', 'tools/tests/v86_low_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'arch/x86/legacy/v86.c', 'tools/tests/shm_user_host.c', 'mm/memory_boot.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/gen_memmap.py', 'docs/02_memory.md', 'boot/loader_fat_new.asm', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'include/platform_timer.h', 'platform/pc98/clock.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=['make:all'], budget=5.5,
+    covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'arch/x86/legacy/lowmap.c', 'include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'kernel/time/sysclk.c', 'drivers/input/kbd.c', 'tools/tests/test_shm_user.py', 'tools/tests/mutpar.py', 'mm/paging.*', 'include/platform_memory.h', 'arch/x86/legacy/v86_mem.*', 'platform/pc98/legacy/v86_bios.*', 'platform/pc98/bios_snapshot.c', 'arch/x86/legacy/v86.h', 'arch/x86/legacy/v86_module.h', 'kernel/module/module.h', 'mm/pgalloc.h', 'arch/x86/kernel/idt.h', 'kernel/kselftest.h', 'platform/pc98/legacy/v86_io.h', 'arch/x86/legacy/v86_call.c', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'fs/vfs.h', 'lib/kstring.h', 'sdk/include/os32/**', 'tools/tests/v86_low_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'arch/x86/legacy/v86.c', 'tools/tests/shm_user_host.c', 'mm/memory_boot.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/gen_memmap.py', 'docs/02_memory.md', 'boot/loader_fat_new.asm', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'include/platform_timer.h', 'platform/pc98/clock.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/test_v86_low.py', 'tools/tests/test_lowmap_callers.py'],
+    needs=['make:all', 'make:kernel'], budget=5.5,
     kind='characterization',
 )
 
@@ -100,6 +100,27 @@ EXPECTED = {
 }
 
 
+MUTATIONS += (
+    ('mm/paging.c', '    page_directory[0] = s->master_pde;', '', 'master-PDE'),
+    ('mm/paging.c', '    ((u32 *)P2V(s->root))[0] = s->active_pde;', '', 'active-PDE'),
+    ('mm/paging.c', '    arch_mmu_flush_tlb();\n    for (u32 i = 0; i < s->page_count; i++)',
+     '    lowmap_token = 0;\n    arch_mmu_flush_tlb();\n    for (u32 i = 0; i < s->page_count; i++)', 'early-unlock'),
+    ('mm/paging.c', '        page_tables[0][i] = saved;',
+     '        if (i != 1) page_tables[0][i] = saved;', 'remaining-alias'),
+    ('mm/paging.c', '    if (lowmap_token && lowmap_token != s) return -1;',
+     '    if (lowmap_token && lowmap_token != s) return 0;', 'foreign-restore'),
+    ('mm/paging.c', 'lowmap_token != s || base >= end', 'base >= end', 'foreign-token'),
+)
+
+EXPECTED.update({
+    'master-PDE': 'both PDEs restored',
+    'active-PDE': 'both PDEs restored',
+    'early-unlock': 'flush before token release',
+    'remaining-alias': 'both PDEs restored',
+    'foreign-token': 'foreign token rejected',
+    'foreign-restore': 'foreign restore rejected',
+})
+
 
 def check_generated_map():
     sys.path.insert(0, str(ROOT / 'tools'))
@@ -145,7 +166,7 @@ def main():
             exe = work / 'fixture'
             cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2',
                    '-Wall', '-Wextra', '-Werror', '-Wno-array-bounds', '-Wno-discarded-qualifiers', '-Wno-stringop-overflow',
-                   '-DPHYSMEM_HOST_TEST=1', '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
+                   '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                    '-fno-delete-null-pointer-checks', '-ffunction-sections', '-fdata-sections',
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
             cmd += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
