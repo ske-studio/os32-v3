@@ -24,6 +24,7 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
   `sdk/include/os32/os32_kapi_shared.h` の `KAPI_VERSION`。一致していないと `make check` が落ちる。
 - **再生成のあとに `git diff --stat` を見る。** 意図した追加以外の行が動いていたら、
   生成物を手で触ったか、kapi.json の既存部分を動かしている。
+- **レビュー済みの指紋を追従させる。** KAPI を変えると、試験が固定で持つ指紋 (dep_dir_a・HWDEV・FEP) が変わる。一覧は [ROLES §4-3](../../../docs/tasks/agents/ROLES.md) の表。
 - **差分ビルドは無言で壊れる** ([ABI])。構造体が変わるので `make clean` → `make all`。
   古い `syscalls.o` が残ると `malloc` が全部 ENOMEM になる類の症状が出る ([CONSTRAINTS](../../../docs/CONSTRAINTS.md#abi-kernelapi))。
 - **外部 apps/game は H-7 で持越し中**。[再開条件](../../../docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし、

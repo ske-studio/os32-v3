@@ -102,6 +102,19 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 - **NP21/W を省く段**: build_compare でカーネル・部品がバイト一致する段 (区分 I) は CI だけで受け入れる。
 - **受入は main に入る節目で (既定)**: ユーザー指示 2026-11-11 (「NP21Wの受け入れの頻度を下げたほうが」「まとめて」「ドキュメントにもmainに入る段での受け入れを既定に」)。NP21/W の受入は、統合の枝を main に入れる直前の 1 回だけを既定にする。段ごと・宣言だけの段・直しの段では回さない。大きな票は結線の節目 (HAL v2 なら I1・I2・I3) ごとに 1 回。PowerPC の x86 が変わる段は次の節目の回に相乗りさせ、急ぐ理由があるときだけ単独で回す。試験・文書・packaging だけの直しは CI だけ。ゲスト試験の原因調べは受入と別に、要るときだけ短く回す。受入の間は、その統合の枝の作業木を触らない。
 
+## 4-3. 変更の種類ごとに追従させる表 (ユーザー指示 2026-11-14「検査表の更新忘れが多い」)
+
+段の依頼を書くときに、触る種類の行を**全部**完了条件に写す。PM は取り込みの前に、同じ行で差分を照らす。
+一覧・指紋・生成値は手で書かない (生成器か試験が出す値を写し、変わった理由が意図した追加だけかを基点と比べて確かめる)。
+
+| 変更の種類 | 追従させるもの | 確かめ方 |
+|---|---|---|
+| カーネル・部品に新しいソースを足す | `build/sources/order.mk` (リンクの順)、`build/sources/common.mk` か arch・platform の一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。PowerPC の像に入るなら `build/ppc-kboot.mk` の一覧 | `check-build-selection-host`、`make all` |
+| KAPI を足す・変える (`sdk/kapi.json`) | 版の 2 か所 (kapi.json・`os32_kapi_shared.h`) と、版を書いた文書 (README・INDEX・KAPI_SPEC)。レビュー済みの指紋: `tools/tests/fixtures/dep_dir_a/l01.json` の kapi_sha256、`l04.json` の api_sha256、`l05a.json` の public_sha256、`tools/tests/hwdev_contract_fixture.py` の HWDEV の layout CRC と inventory、`tools/tests/test_ime_display_boundary.py` の FEP_MODULE_ABI_GEN | `check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI の検査 (audit・ranges・version)、`make clean && make all` |
+| 共通の場所 (kernel/・net/・fs/・include/・userland/shell・kernel/console) を触る | PowerPC の像のリンク (CI に PowerPC の toolchain が入るまで) | `PATH=/home/hight/opt/cross-ppc/bin:$PATH make -f build/ppc-kboot.mk KBOOT_SH=1` |
+| 製品の関数の呼び出しを 1 つ足す | その関数の兄弟の stub を持つ試験の土台 (`#include` で取り込む土台と、python が切り出して組む試験の両方) | grep で呼び手と stub を全部見る |
+| 試験を足す・名前や式を書き換える | 検査の `CHECK` の covers、変異の目印 (試験の中の元の式の文字列) | `tools/checks/run.py --lint`、`python3 ~/os32-tmp/bin/stale_anchor.py <基点>` |
+
 ## 5. レビュー依頼の出し方
 
 依頼文には次の 5 点を揃える。対象ファイルを列挙して範囲を絞り、判定は `## 判定` の見出しで返させる。

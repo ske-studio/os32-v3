@@ -35,6 +35,7 @@ git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
 - **名前の置き換え・式の書き換えを含む段** (2026-10-25、票 TASK_MAGIC_NUM で取り込みの検査に 6 本落ちた): 変異の置換の目印 (試験の中の元の式の文字列) が壊れても MUTATE=0 では見つからない。完了条件に「最後に `python3 ~/os32-tmp/bin/stale_anchor.py <基点>` を作業木で回し (試験の文字列のうち、基点では変えたファイルにあり今は無いものを挙げる)、目印なら直して、その試験を MUTATE=1 で 1 回回し RED の数が基点と同じこと」を足す。機械語を変えない段は、変える前後の ELF の `objdump -d` を比べる (`~/os32-tmp/run/magic/objcompare.py` が雛形)。
 - 足した・触った試験の変異の実行条件は [ROLES §0「検査」](../../../docs/tasks/agents/ROLES.md) に従う。
 - **試験に補助ヘッダ・include を足す段** (2026-10-27、TASK_DEP_DIR の D2・D3 の取り込みで 2 回): 完了条件に「新しく include や補助ヘッダを足した試験は、変異の段の写し (一時ディレクトリに書くソース) からもそのヘッダが見えることを grep で確かめる」と書く。`MUTATE=0` の候補検査では変異の写しを組まないので見つからず、PM の取り込みの検査 (変異込み) で初めて落ちる。
+- **触る種類の追従を完了条件に写す** (ユーザー指示 2026-11-14「検査表の更新忘れが多い」): [ROLES §4-3](../../../docs/tasks/agents/ROLES.md) の表のうち、段が触る種類の行 (新しいソース・KAPI・共通の場所・呼び出しの追加・試験) を全部、依頼の完了条件に写す。
 - KAPI を触る段: スキル os32-kapi-add に従い、`make clean` → `make all` を完了条件に足す。
 - ゲスト受入を含める段: 配備はスキル run-os32 (作業木の成果物)、GUI は run-os32、カーネルの入れ替えは hsync + emu_reset、
   rshell 中の ESC は rshell を閉じる (閉じたら emu_key で `rshell` + RETURN)、MCP の emu_gui_launch / consink は本体の ELF を引くので
