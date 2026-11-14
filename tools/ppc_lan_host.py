@@ -396,13 +396,44 @@ def terminal_loop(host, stdin):
         if saved is not None:
             termios.tcsetattr(stdin, termios.TCSADRAIN, saved)
 
+def agent_loop(args, boot):
+    from ppc_link_transport import Host as LinkHost
+    address, port = endpoint(args.agent)
+    host = LinkHost(address, port, boot=boot)
+    directory = pathlib.Path(args.out)
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        host.subscribe_log()
+        while True:
+            record = host.receive(3600)
+            if record is None:
+                continue
+            save_agent_log(directory, record)
+    finally:
+        host.close()
+
+
+def save_agent_log(directory, record):
+    boot = record['boot']
+    payload = record['payload']
+    sys.stdout.write(payload.decode('utf-8', errors='replace'))
+    sys.stdout.flush()
+    with (directory / (boot + '.log')).open('ab') as stream:
+        stream.write(payload)
+    metadata = {key: record[key] for key in ('seq', 'drop_records', 'drop_bytes')}
+    metadata.update(time=time.time(), kind='log')
+    with (directory / (boot + '.jsonl')).open('a', encoding='utf-8') as stream:
+        stream.write(json.dumps(metadata) + '\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--udp')
     group.add_argument('--iface')
+    group.add_argument('--agent', help='agent operator host:port (LOG capture)')
     parser.add_argument('--mac', default='02:00:00:00:00:01')
-    parser.add_argument('--peer', required=True)
+    parser.add_argument('--peer')
     parser.add_argument('--out', required=True)
     parser.add_argument('--boot-id')
     parser.add_argument('--terminal', action='store_true')
@@ -410,10 +441,16 @@ def main():
     parser.add_argument('--allow-write', action='append', default=[])
     args = parser.parse_args()
     try:
-        peer = mac(args.peer)
         boot = bytes.fromhex(args.boot_id.replace('-', '')) if args.boot_id else None
         if boot is not None and len(boot) != 16:
             raise ValueError('boot-id must be 16 bytes')
+        if args.agent:
+            if args.terminal or args.root or args.allow_write:
+                raise ValueError('--agent supports LOG capture only')
+            return agent_loop(args, boot)
+        if args.peer is None:
+            raise ValueError('--peer is required for PLN1')
+        peer = mac(args.peer)
         io = UDP(args.udp, mac(args.mac)) if args.udp else Packet(args.iface)
         host = Host(io, peer, args.out, boot, output=(lambda text: print(text, file=sys.stderr)) if args.terminal else print, root=args.root, allow_write=args.allow_write)
         stdin = sys.stdin.fileno()
