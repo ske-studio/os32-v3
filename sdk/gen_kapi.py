@@ -653,6 +653,12 @@ for slot, api in enumerate(data["api"]):
     if not args_str: args_str = "void"
 
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
+    if TARGET == "ppc-powermac" and name in {"sys_halt", "sys_yield"}:
+        c_content += "    extern i32 ppc_kapi_wait_once(void);\n"
+        c_content += ("    (void)ppc_kapi_wait_once();\n" if name == "sys_halt"
+                      else "    return ppc_kapi_wait_once();\n")
+        c_content += "}\n\n"
+        continue
     if TARGET == "ppc-powermac" and name == "tvram_clear":
         c_content += "    extern void pm_console_clear(void);\n    pm_console_clear();\n}\n\n"
         continue

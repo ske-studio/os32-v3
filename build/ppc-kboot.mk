@@ -87,9 +87,11 @@ KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 ifeq ($(KBOOT_LINK),1)
 KB_PLATFORM := $(filter-out platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/terminal_input.c,$(KB_PLATFORM))
-KB_PLATFORM += platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
+KB_PLATFORM += platform/powermac/device_host.c platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
 KB_COMMON += net/link.c net/link_notify.c net/nic.c net/nic_rx.c net/rx_work.c net/host_mailbox.c
 KB_INC_EXTRA += -Inet
+else
+KB_PLATFORM += platform/powermac/host_unavailable.c
 endif
 KB_C := lib/lz4.c $(KB_ARCH) $(KB_PLATFORM) $(KB_COMMON) $(KB_GEM)
 ifneq ($(KB_EXEC),)
@@ -107,6 +109,7 @@ endif
 KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
  kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
+ kapi/kapi_host.c kapi/kapi_host_notice.c \
  fs/pipe_buffer.c kapi/kapi_strings.c kapi/kapi_print.c lib/kstring.c mm/paging_app.c \
  kernel/time/clock_service.c lib/os_time.c
 KB_C := $(filter-out arch/ppc/kboot_unavailable.c platform/powermac/kboot_console.c,$(KB_C))

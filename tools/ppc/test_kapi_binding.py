@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Check PowerMac's typed bindings for the absent providers and their complete link dependencies."""
 CHECK = dict(name='ppc-kapi-binding', tier=1,
-             covers=['sdk/kapi_target_ppc.py', 'tools/ppc/test_kapi_binding.py'],
-             inputs=['sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'sdk/kapi.json'], needs=[], budget=10)
+             covers=['sdk/kapi_target_ppc.py', 'tools/ppc/test_kapi_binding.py','sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
+                     'sdk/kapi.json'], needs=[], budget=10, basis=['AC-NET-3', 'AC-CTX-1'])
 import json
 import os
 import re
@@ -20,6 +19,8 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
+boot_token_get
+con_sink_capture
 appmem_error_public
 appmem_map
 appmem_unmap
@@ -51,7 +52,16 @@ exec_resume
 exec_run
 exec_start
 exec_stop_culprit
-exec_sys_yield
+ppc_kapi_wait_once
+kapi_host_open
+kapi_host_status
+kapi_host_read
+kapi_host_write
+kapi_host_close
+kapi_host_notice_read
+kapi_host_notice_serial
+rshell_active
+boot_serial_mirror
 fd_is_redirected
 fd_redirect_get_buf_len
 fd_redirect_reset
@@ -171,7 +181,7 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 199
+    assert len(entries) == 190
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -186,6 +196,10 @@ def main():
         dirs += [str(p.relative_to(ROOT)) for base in ('drivers', 'fs', 'kernel', 'gfx')
                  for p in (ROOT / base).rglob('*') if p.is_dir()]
         cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
+        if not cc.is_file():
+            required = os.environ.get('OS32_REQUIRE_PPC') == '1'
+            print(('FAIL' if required else 'SKIP') + ' ppc-kapi-binding: unavailable: ' + str(cc))
+            return 1 if required else 0
         subprocess.run([str(cc), '-std=gnu11', '-ffreestanding', '-D__KERNEL_BUILD__',
                         '-D__cdecl=', '-I' + str(out / 'include')]
                        + ['-I' + str(ROOT / d) for d in dirs]

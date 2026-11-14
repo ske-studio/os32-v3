@@ -4,7 +4,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_GROUPS = {
-    'sys': (frozenset({'buz_on', 'buz_off', 'sys_reboot', 'sys_halt'}), frozenset([])),
+    'sys': (frozenset({'buz_on', 'buz_off', 'sys_reboot'}), frozenset([])),
     'surface': (frozenset({'surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease'}), frozenset([])),
     'gfx': (frozenset({
         'gfx_init',
@@ -45,7 +45,6 @@ PROVIDER_GROUPS = {
         'font_source_close',
     }), frozenset([])),
     'port': (frozenset({
-        'rshell_set_active',
         'serial_init',
         'serial_puts',
         'serial_getchar',
@@ -153,15 +152,6 @@ PROVIDER_GROUPS = {
         'mem_stat',
         'sys_ver_info',
     }), frozenset([])),
-    'host': (frozenset({
-        'host_open',
-        'host_status',
-        'host_read',
-        'host_write',
-        'host_close',
-        'host_notice_read',
-        'host_notice_serial',
-    }), frozenset(['kapi_host.h', 'kapi_host_notice.h'])),
     'ime': (frozenset({
         'ime_getchar',
         'ime_trygetchar',
@@ -263,7 +253,6 @@ ZERO_SLOTS = frozenset({
     'gfx2_adapter_count',
     'db_mem_used',
     'unicode_to_jis',
-    'host_notice_serial',
 })
 
 def absent_result(api):
