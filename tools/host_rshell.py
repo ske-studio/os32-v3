@@ -39,7 +39,26 @@ class Operator:
         if self.pending is not None and self.pending['boot'] != boot:
             self.pending['state'] = 'UNKNOWN'
         self.ready = dict(boot=boot, mode=mode, last_id=last_id, state=state)
+        if (self.pending is not None and self.pending.get('accepted') and
+                self.pending['boot'] == boot and mode == 'gui'):
+            self.pending['gui_ready'] = True
+            self._complete_handoff()
         return True
+
+    def accept_handoff(self, generation, session, boot, ident, body, length):
+        pending = self.pending
+        if (pending is None or pending['state'] not in ('running', 'UNKNOWN') or
+                not self.accept_output(generation, session, boot, ident, 0,
+                                       body, length, 'cui')):
+            return False
+        pending.update(state='running', accepted=True)
+        return True
+
+    def _complete_handoff(self):
+        pending = self.pending
+        if (pending is not None and pending.get('accepted') and
+                pending.get('gui_ready') and pending.get('gui_notice')):
+            pending['state'] = 'done'
 
     def submit(self, mode, line, client):
         if self.pending is not None:
@@ -92,6 +111,11 @@ class Operator:
             if not body.startswith(b'gs:! '):
                 return False
             self.notices.append(body)
+            if (self.pending is not None and self.pending.get('accepted') and
+                    self.pending['boot'] == boot.lower() and
+                    body.splitlines() == [b'gs:! ready v1']):
+                self.pending['gui_notice'] = True
+                self._complete_handoff()
             return True
         pending = self.pending
         if (pending is None or pending['boot'] != boot.lower() or
