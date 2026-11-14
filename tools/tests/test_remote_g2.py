@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from test_remote_g3b import LAN, SERIAL, check
+
 CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=[
     'userland/gshell/**', 'sdk/rust/os32api/**', 'userland/lib/font/**',
     'tools/tests/os32api_host.py', 'tools/tests/g16_fixture.py',
@@ -13,8 +15,9 @@ CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=[
     'assets/fonts/**', 'assets/ipadic/*.csv', 'include/remote_control.h',
     'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h',
     'net/link.h', 'exec/shell_service.h',
-    'sdk/include/os32/**', 'tools/tests/test_remote_g2.py'],
-    basis=['LAN_OPERATOR_DESIGN'],
+    'sdk/include/os32/**', 'tools/tests/test_remote_g2.py',
+    'tools/tests/test_remote_g3.py', 'tools/tests/test_remote_g3b.py'],
+    basis=['LAN_OPERATOR_DESIGN', 'NET_HOSTSVC_DESIGN §5'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,10 +26,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    source = (ROOT / 'userland/gshell/src/lib.rs').read_text()
+    check(source)
     cmd = [sys.executable, '-B', 'userland/gshell/host/integration.py']
     if args.mutate:
         cmd.append('--mutate')
-    return subprocess.call(cmd, cwd=ROOT, env=dict(os.environ, MUTATION_FILTER='remote-g2'))
+    rc = subprocess.call(cmd, cwd=ROOT, env=dict(os.environ, MUTATION_FILTER='remote-g'))
+    if rc:
+        return rc
+    if args.mutate:
+        for name, replacement in [('LAN before serial', LAN + SERIAL),
+                                  ('LAN omitted', SERIAL)]:
+            assert source.count(SERIAL + LAN) == 1
+            try:
+                check(source.replace(SERIAL + LAN, replacement))
+            except AssertionError:
+                print('STATIC RED:', name, flush=True)
+            else:
+                print('STATIC SURVIVED:', name, flush=True)
+                return 1
+    return 0
 
 
 def run(ctx):
