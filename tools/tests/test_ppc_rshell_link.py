@@ -47,7 +47,7 @@ i32 link_host_read_stage(i32 h, u32 n, const u8 **p, int o) { static const u8 b[
 i32 link_host_status(i32 h, u32 *s, u32 *n, int o) { (void)s; (void)n; return h == 17 && o == 7 ? OS32_ERR_AGAIN : -99; }
 i32 link_host_close(i32 h, int o) { return h == 17 && o == 7 ? 0 : -99; }
 void link_host_owner_exit(int o) { cleanup = o; }
-int main(void) {
+static int run(void) {
  const u8 *out = 0; u32 s = 0, n = 0;
  if (ppc_kapi_wait_once() || calls != 1 || enables) return 1;
  if (ppc_kapi_wait_once() || calls != 2 || enables) return 2;
@@ -64,6 +64,9 @@ int main(void) {
  NOTICE
  return 0;
 }
+/* Host test without libc (tools/tests convention, host32 runs it under qemu-i386). */
+static void sys_exit(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); for (;;) {} }
+void _start(void) { sys_exit(run()); }
 '''
     notice = '''HostNotice notice = {0};
  if (host_mailbox_stage(1, 2, &notice) != OS32_ERR_NOSYS) return 10;
@@ -85,7 +88,8 @@ void *kmemcpy(void *p, const void *s, u32 n) { unsigned char *d = p; const unsig
     binary = tmp / 'test'
     includes = ['.', 'include', 'arch/ppc', 'platform/powermac', 'exec', 'net',
                 'kernel', 'sdk/include/os32', 'kapi', 'lib', 'mm', 'kernel/console']
-    subprocess.run(['gcc', '-m32', '-std=gnu11', '-D__cdecl=',
+    bare = ['-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static']
+    subprocess.run(['gcc', '-m32', '-std=gnu11', '-D__cdecl=', *bare,
                     '-ffunction-sections', '-fdata-sections'] +
                    ['-I' + str(ROOT / p) for p in includes] +
                    [str(source), '-Wl,--gc-sections', '-o', str(binary)], check=True)
