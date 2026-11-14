@@ -115,7 +115,10 @@ def test(path):
     next_id = op.submit('cui', 'ver', None)
     assert op.results[ident]['result'] == body, 'unclaimed result lost'
     assert op.pending['id'] == next_id
-    assert op.accept_output(42, 3, BOOT, next_id, 5, body, len(body), 'cui'), 'drop rejected'
+    body = b'output tail\n\x04'
+    assert not op.accept_output(42, 3, BOOT, next_id, 0, body, len(body), 'cui'), 'missing echo accepted'
+    assert not op.accept_output(42, 3, BOOT, next_id, 5, body[:-1], len(body) - 1, 'cui'), 'missing EOT accepted'
+    assert op.accept_output(42, 3, BOOT, next_id, 5, body, len(body), 'cui'), 'drop without echo rejected'
     assert op.pending is None and op.results[next_id]['state'] == 'truncated', 'drop not finalized'
     assert op.results[next_id]['drop'] == 5
     exit_id = op.submit('cui', 'exit', None)
@@ -146,7 +149,8 @@ def main():
             ("self.take_result()  # Retain an unclaimed completion before reusing the slot.",
              "pass", 'busy'),
             ('if dropped < 0 or length != len(body) or length > RESULT_MAX:',
-             'if dropped != 0 or length != len(body) or length > RESULT_MAX:', 'drop rejected'),
+             'if dropped != 0 or length != len(body) or length > RESULT_MAX:', 'drop without echo rejected'),
+            ("if not dropped and pending['line'] != 'exit'", "if pending['line'] != 'exit'", 'drop without echo rejected'),
             ("if mode == 'cui' and pending['line'] == 'exit':", 'if False:', 'exit left READY'),
             ("if self.pending is not None:\n            raise RuntimeError('busy')", "if False:\n            raise RuntimeError('busy')", 'busy sent'),
             ('generation != self.generation or session != self.session or session is None or', 'False or session != self.session or session is None or', 'old generation accepted'),

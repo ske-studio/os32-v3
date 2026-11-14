@@ -130,7 +130,7 @@ class Operator:
             if not body.endswith(b'\x04'):
                 return False
             text = body[:-1].lstrip(b'\r\n')
-            if pending['line'] != 'exit' and text.split(b'\n', 1)[0].rstrip(b'\r') != b'> ' + pending['line'].encode('ascii'):
+            if not dropped and pending['line'] != 'exit' and text.split(b'\n', 1)[0].rstrip(b'\r') != b'> ' + pending['line'].encode('ascii'):
                 return False
         elif mode == 'gui':
             prefix = b'gs:' + ident.encode('ascii') + b' '
