@@ -341,6 +341,8 @@ static void link_free_handle(struct link_handle *e, int idx)
         e->rel_epoch = e->epoch;
         e->rel_tries = 0;
         e->rel_interval = LINK_RTO_TICKS;
+        e->rel_want_ack = e->want_ack;
+        e->rel_ack_seq = e->ack_seq;
     }
     if (e->ring_owner) {
         e->ring_owner = 0;

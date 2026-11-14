@@ -47,7 +47,7 @@ class OperatorSocket:
     def _flush(self, fd, client):
         try:
             if client['out']:
-                n = os.write(client['socket'].fileno(), client['out'])
+                n = os.write(client['socket'].fileno(), bytes(client['out']))
                 del client['out'][:n]
         except BlockingIOError:
             pass

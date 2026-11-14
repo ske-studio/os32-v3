@@ -184,6 +184,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
                 if (link_h[i].rel_pending && link_h[i].rel_rid == rid) {
                     link_h[i].rel_pending = 0;
                     link_h[i].rel_due = 0;
+                    link_h[i].rel_want_ack = 0;
                     link_h[i].rel_tries = 0;
                 }
             }
