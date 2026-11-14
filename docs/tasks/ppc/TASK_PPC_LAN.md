@@ -49,6 +49,14 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P26・P25 | main (d50dfda0、7 本目、LAN の実装の到達)。LAN の TU 15 本が PPC の像に入り、起動が ESCC の後に log を登録・GMAC を quiesce・CLOCK の後に pm_lan_start・READY 以後を pm_lan_poll で回す。PM の QEMU の実測で到達点を確認 (設計の「7 本目の実測」) |
 | P29・P31+P32・P33 と H29 | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint8 = 8 本目 = LAN の最後)。P29: kboot_run.py が LAN を持つ像で UDP の netdev とホストの Host を使い、保存・5 診断・PEEK・MEMORY を照合 (sandbox では SKIP LAN socket rc=3)、--lan-off。P31+P32 (最小、1 段にまとめた): kboot_accept が SKIP を 3 で返し LAN 無効を両 CPU で 1 回、kboot_all が 3 を SKIP と数える。P33: PPC_KBOOT_DESIGN に LAN の起動の追記 |
 | P30・H30・H31・H32・H33 | やめた (2026-11-11、ユーザーの「過剰に防御してませんか？」を受けた PM 決定。故障の道筋は host の模型 H14・H17・H24 が持ち、QEMU で重ねない。設計 PPC_LAN_MARKS_DESIGN の末尾) |
+| link への移行の P1 の節目 (P1a〜P1g・P2c・P5-t・P5-log、TASK_LAN_OPERATOR §2) | 統合の枝 wt/int-ppc-1114p (2026-11-14)。`make -f build/ppc-kboot.mk KBOOT_LINK=1` の診断像 (shell 無し) で PLN1 の wire を外し、link・nic・GEM adapter (4 枠の保留、credit は空き枠×1514B) を組む。HELLO・ALIVE・TIME・LOG が往復し、FB の帯に HELLO の送信 (16)・確立 (17) の印。受入は `tools/ppc/link_run.py --require-ack` (7450・7455)。製品の既定は PLN1 のまま |
+
+link の時計の約束 (ARCH_COMPAT_CONTRACT の「link_platform_now は論理 100Hz の jiffy」) の PowerPC の実測 (2026-11-14、QEMU mac99、TB 100MHz との比):
+- 7450 単体 (ネット無し): 99.97/s。
+- agent とつないだ状態: 7450 は 99.39〜100.26/s、7455 は 99.47〜100.23/s。
+- 満たし方: arch/ppc/kernel_dec.c の `tick_clock_config(1, tick_hz)` が、物理 1kHz の DEC を論理 100Hz の tick_count に変換する。link_platform_now は tick_count を返す。
+
+tools/ppc/test_lan_p1.py は、どの CHECK にも登録されていない。main の時点で pm_gmac_boot の offset と sizeof の静的 assert で落ちている (b77a94ad の RC の変更から)。PLN1 の試験として、既定を link に切り替える段で退役させる (退役予定・未登録)。
 
 ## 3. 実装スケジュール (2026-11-11、fable 起案、PM 確認)
 
