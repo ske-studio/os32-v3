@@ -26,7 +26,6 @@ from run import ROM, QMP, command, require
 from ppc_lan_host import UDP
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
-
 PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
 
 def log_ready(logs, body):
@@ -36,13 +35,18 @@ def log_ready(logs, body):
     return 0 <= start < end and b'\n' in body[end:]
 
 def duplicate_requests(lines):
-    counts = {}
+    """REQ resent for a rid, not counting resends after the agent's NO_SLOT (ctl 3)."""
+    counts, refused = {}, set()
     for line in lines:
-        if not line or line.startswith('> '): continue
-        frame = bytes.fromhex(line)
-        if len(frame) >= 34 and frame[12:14] == b'\x88\xb5' and frame[14] == 2:
-            rid = int.from_bytes(frame[28:32], 'little')
-            counts[rid] = counts.get(rid, 0) + 1
+        if not line: continue
+        frame = bytes.fromhex(line[2:] if line.startswith('> ') else line)
+        if len(frame) < 34 or frame[12:14] != b'\x88\xb5': continue
+        rid = int.from_bytes(frame[28:32], 'little')
+        if line.startswith('> '):
+            if frame[14] == 3 and frame[15] & 1 and frame[34:35] == b'\x03': refused.add(rid)
+        elif frame[14] == 2:
+            if rid in refused: refused.discard(rid)
+            else: counts[rid] = counts.get(rid, 0) + 1
     return sum(n - 1 for n in counts.values())
 
 def tick_rate(first, last):
@@ -67,7 +71,7 @@ class PumpQMP(QMP):
         line, self.buffer = self.buffer.split(b'\n', 1)
         return json.loads(line)
 
-def accept(elf, cpu, parent, timeout, require_ack=False):
+def accept(elf, cpu, parent, timeout, require_ack=False, diagnostic=None):
     out = Path(tempfile.mkdtemp(prefix=cpu+'-', dir=parent))
     symbols = {p[2]: int(p[0], 16) for line in
                command([PREFIX+'nm', '-n', elf]).splitlines()
@@ -160,6 +164,7 @@ def accept(elf, cpu, parent, timeout, require_ack=False):
                         require(len(logfiles) == 1 and re.fullmatch(r'[0-9a-f]{32}', logfiles[0].stem), 'LOG boot')
                     body = logfiles[0].with_suffix('.log').read_bytes() if logs else b''
                     ready = log_ready(logs, body)
+                    if diagnostic is not None: ready = diagnostic(agent, out) and ready
                     if agent.established and time.monotonic() >= next_observe:
                         next_observe = time.monotonic() + 0.5
                         q.call('stop')

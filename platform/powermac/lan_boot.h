@@ -169,6 +169,11 @@ struct pm_lan_diag {
 /* Call only with a free response slot and after validating the peer and request. */
 int pm_lan_monitor(const struct lan_message *req, const u8 src_mac[6],
                    const struct pm_lan_diag *d, struct lan_message *rsp);
+/* Transport-independent diagnostic execution; serialization belongs to caller. */
+struct pm_diag_message { u16 opcode, status, payload_bytes; u8 payload[256]; };
+void pm_lan_execute(const struct pm_diag_message *, const struct pm_lan_diag *,
+                    struct pm_diag_message *);
+void pm_link_diag_poll(const struct pm_lan_diag *, u64 now, u32 tb_hz);
 int pm_lan_copy8(u32 va, u8 *out);
 const struct pm_lan_diag *pm_lan_diag_snapshot(const struct pm_gmac_boot *boot, const struct gem *g, u32 state, u64 request_drops);
 

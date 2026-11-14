@@ -19,6 +19,9 @@ def run(ctx):
     source = (ctx.root / 'platform/powermac/link_log.c').read_text()
     mutations = [
         ('if (!rc && status == 200)', 'if (!rc)'),
+        ('status >= 400 && status < 500', 'status >= 500 && status < 500'),
+        ('lost_bytes = sum(lost_bytes, length);\n            pm_lan_log_complete',
+         'lost_bytes = lost_bytes;\n            pm_lan_log_complete'),
         ('p = decimal(p, length);', 'p = decimal(p, length + 1);')]
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)

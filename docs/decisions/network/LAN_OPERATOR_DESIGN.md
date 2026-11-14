@@ -122,7 +122,7 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 |PLN1の機能|移行先と流用（file:line）|
 |---|---|
 |BEACON/生存|HELLO/ALIVEが接続・ホスト世代、ゲストboot-token付きREADYが再起動識別。統計は診断STATUSへ。初回ログはHELLO待ちで捨てず既存リングに保持。|
-|LOG|`LOG <boot> <seq> <drop_records> <drop_bytes> <flags> <len>` + WDATA。`lan_log.c:98,105,121,127` のregister/peek/stats/completeを流用。host_agentの`_service_log`が受信しCLIで表示。PPC専用名/os32.予約名を使わず、x86 bootlogも同じ形式で送れる共通サービスとする。200受信まで同chunk保持、session断は欠落を計数し完全配送と称さない。|
+|LOG|`LOG <boot> <seq> <drop_records> <drop_bytes> <flags> <len>` + WDATA。`lan_log.c:98,105,121,127` のregister/peek/stats/completeを流用。host_agentの`_service_log`が受信しCLIで表示。PPC専用名/os32.予約名を使わず、x86 bootlogも同じ形式で送れる共通サービスとする。200受信まで同chunk保持。ただし4xxの恒久的な拒否は同chunkを破棄し、欠落chunk数・bytesを計数して次へ進む。session断も欠落を計数し完全配送と称さない。|
 |REQ/RSP診断|番号65532のNOTIFY(kind=1、id8+opcode+既存BE引数のhex)→`PDIAG OUT <boot> <id> <status> <len>`+WDATA。`lan_monitor.c:43,55,103` のprobe・5命令/範囲検査・cacheを流用、MAC+nonceをlink peer+host世代由来の内部キーに置換。副作用なし・PEEK256B/READ_DIAG128B維持。|
 |TERM_OPEN/IN/OUT/STATE|READY/NOTIFY/RSH OUTへ。`terminal_input.c:13,26` の行取消/feedを流用、旧seq/dropはlinkと結果dropへ。`lan_terminal.c:27,52` のPLN1状態は廃止、CLI解釈器は維持。|
 |FS_OPEN/REQ/RSP|**SFS on link**を選択。`SFS CALL <len>`+WDATAでSFS frameを渡し、200+DATAにSFS応答frame。`hostfs_io.c:54` のCRC/長さ検査、`:79` の絶対期限、既存SfsClient/VFSを流用。|
