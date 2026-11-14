@@ -16,6 +16,7 @@ class Operator:
         self.ready = None
         self.pending = None
         self.notices = []
+        self.notice_drop = 0
         self.results = {}
 
     def session_start(self, session):
@@ -113,9 +114,11 @@ class Operator:
         if dropped < 0 or length != len(body) or length > RESULT_MAX:
             return False
         if mode == 'gui' and ident == '!':
-            if dropped or not body.startswith(b'gs:! '):
+            if (not body.startswith(b'gs:! ') or not body.endswith(b'\n') or
+                    len(body.splitlines()) != 1):
                 return False
             self.notices.append(body)
+            self.notice_drop += dropped
             if (self.pending is not None and self.pending.get('accepted') and
                     self.pending['boot'] == boot.lower() and
                     body.splitlines() == [b'gs:! ready v1']):

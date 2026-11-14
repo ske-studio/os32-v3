@@ -16,7 +16,13 @@ HARNESS = r'''
 #include "runtime.h"
 KernelAPI *kapi;
 static char output[4096];
-static int pos, writes;
+static int pos, writes, utf8_calls;
+static u8 utf8_color;
+static void utf8(const char *s, u8 attr) {
+    ++utf8_calls; utf8_color = attr;
+    while (*s) output[pos++] = *s++;
+    output[pos] = 0;
+}
 static void put(char ch, u8 attr) { (void)attr; output[pos++] = ch; output[pos] = 0; }
 static int write_fd(int fd, const void *buf, u32 size) {
     (void)fd; (void)buf; ++writes; return (int)size;
@@ -25,13 +31,15 @@ int main(void) {
     KernelAPI original = {0}, snapshot, *api;
     original.shell_putchar = put;
     original.sys_write = write_fd;
+    original.shell_print_utf8 = utf8;
     snapshot = original;
     api = sh_runtime_init(&original);
     if (api == &original || api != kapi || memcmp(&snapshot, &original, sizeof original)) return 1;
     api->kprintf(7, "%s %u %d %02u %03u %08x %c %%", "ok", 42u, INT_MIN, 4u, 5u, 0xabu, 'Z');
     if (writes || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z %")) return 2;
-    api->shell_print_utf8(" UTF8", 9);
-    if (writes || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z % UTF8")) return 3;
+    if (api->shell_print_utf8 != original.shell_print_utf8) return 3;
+    api->shell_print_utf8(" 日本語", 9);
+    if (writes || utf8_calls != 1 || utf8_color != 9 || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z % 日本語")) return 3;
     {   /* help.c passes unbounded lines through "    %s\n": nothing may be cut. */
         static char line[1500];
         memset(line, 'a', sizeof line - 1);
@@ -80,6 +88,9 @@ def main():
         folder = pathlib.Path(temp)
         exercise(folder)
         if args.mutate:
+            exercise(folder, ('runtime',
+                '    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
+                '    runtime_api.shell_print_utf8 = 0;', 3))
             exercise(folder, ('runtime', 'runtime_api.shell_putchar(ch, *(const u8 *)ctx);',
                               '(void)ctx, runtime_api.sys_write(1, &ch, 1);', 2))
             exercise(folder, ('format', "emit(k, '0');", "emit(k, ' ');", 2))

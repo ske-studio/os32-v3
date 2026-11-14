@@ -17,18 +17,11 @@ static void runtime_kprintf(u8 attr, const char *fmt, ...)
     va_end(args);
 }
 
-static void runtime_print_utf8(const char *text, u8 color)
-{
-    (void)color;
-    while (*text)
-        runtime_api.shell_putchar(*text++, 0);
-}
-
 KernelAPI *sh_runtime_init(KernelAPI *api)
 {
     runtime_api = *api;
     runtime_api.kprintf = runtime_kprintf;
-    runtime_api.shell_print_utf8 = runtime_print_utf8;
+    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */
     kapi = &runtime_api;
     return &runtime_api;
 }

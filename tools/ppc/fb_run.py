@@ -52,7 +52,8 @@ def accept(elf, cpu, out, mode):
     q = QMP(process, time.monotonic()+60)
 
     def wait(predicate, seconds, label):
-        end = time.monotonic()+seconds
+        # Full framebuffer redraws under TCG can outlast device-only waits.
+        end = time.monotonic()+seconds*3
         while time.monotonic() < end:
             validate(serial(a), serial(b))
             require(process.poll() is None, 'QEMU alive')
@@ -181,10 +182,23 @@ def accept(elf, cpu, out, mode):
             lines += ['sh> echo l%02d' % i, 'l%02d' % i]
         lines += ['sh> ']
         shot('scroll', lines, [(32, 4)])
-        # The entire acceptance runs with no NIC and USB input only.
+        # No NIC: the UTF-8 line enters at the LAN terminal decoder (pm_terminal_feed),
+        # so the result never depends on host sockets. LAN transport is covered by sc/sd.
         usb_command('clear', '\x1b[2J\x1b[H')
         usb_command('echo usb', 'usb\n')
         shot('usb-only', ['sh> echo usb', 'usb', 'sh> '], [(2, 4)])
+        usb_command('clear', '\x1b[2J\x1b[H')
+        shot('lan-clear', ['sh> '], [(0, 4)])
+        text = 'echo 日本語の表示'
+        start = len(stream())
+        key('z')
+        wait(lambda: stream()[start:].endswith('sh> '), 10, 'LAN UTF-8 completion')
+        wanted = text+'\n日本語の表示\nsh> '
+        check(stream()[start:] == wanted, 'ESCC exact UTF-8 echo/result')
+        # Require the result row as a positive control before testing input echo.
+        t = shot('lan-result')
+        check(t.compare_text(1, 0, '日本語の表示') is None, 'UTF-8 fd1 result control')
+        shot('lan-utf8', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
         (out/'stream.txt').write_text(stream())
         q.call('quit'); process.wait(timeout=2)
         require(process.returncode == 0, 'QEMU quit rc=0')
@@ -199,6 +213,9 @@ def accept(elf, cpu, out, mode):
 
 
 MUTATIONS = [
+    ('utf8-bytewise', 'userland/ppc/sh/runtime.c',
+     '    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
+     '    runtime_api.shell_print_utf8 = runtime_print_utf8;'),
     ('trace-screen', 'platform/powermac/console_log.c',
      'if (pm_log_stream_only) return;', ''),
     ('colors', 'platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
@@ -236,9 +253,31 @@ def main():
         manifest_path = work/'root.json'; manifest_path.write_text(json.dumps(manifest))
         opts = product_settings(work, mode) + ['ROOT_MANIFEST='+str(manifest_path),
             'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)]
-        if source:
+        # Every mode feeds the fixed UTF-8 line at the LAN terminal decoder on USB 'z'.
+        src = 'platform/powermac/input_boot.c'
+        inp = (ROOT/src).read_text()
+        literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
+        helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
+                  'if (c == \'z\') { static const u8 text[] = "'+literal+'"; '
+                  'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
+        anchor = 'pm_input_usb_take()'
+        require(inp.count(anchor) == 1, 'unique FB input boundary')
+        inp = inp.replace(anchor, 'fb_usb()').replace('static PmInputDecoder', helper+'static PmInputDecoder')
+        path = work/(mode+'-input.c'); path.write_text(inp)
+        opts += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(path)]
+        if mode == 'utf8-bytewise':
+            source_text = (ROOT/source).read_text()
+            require(source_text.count(old) == 1, 'unique UTF-8 reversion anchor')
+            helper = ('static void runtime_print_utf8(const char *text, u8 color) { '
+                      '(void)color; while (*text) runtime_api.shell_putchar(*text++, 0); }\n')
+            source_text = source_text.replace('KernelAPI *sh_runtime_init', helper+'KernelAPI *sh_runtime_init').replace(old, new)
+            path = work/'reverted-runtime.c'; path.write_text(source_text)
+            opts += ['PPC_SH_RUNTIME_SRC='+str(path)]
+        elif source:
             opts += [x.replace('KB_MUT_', 'KB_MUT_EXTRA_') for x in
                      mutant_settings(work, mode, source, old, new)]
+        if mode in ('utf8-bytewise', 'trace-screen'):
+            (ROOT/'build/out/ppc-user/sh/runtime.o').unlink(missing_ok=True)
         elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *opts)
         hashes = {str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path):
                   dict(size=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
@@ -252,6 +291,9 @@ def main():
                 accept(elf, cpu, work/(mode+'-'+cpu), mode)
             except VerdictError as exc:
                 if mode == 'normal': raise
+                if mode == 'utf8-bytewise':
+                    require(str(exc).startswith('lan-utf8: Mismatch(row=0, column=9,'),
+                            'UTF-8 mutant must lose the input glyph, not another control: '+str(exc))
                 print('RED runtime '+mode+': '+str(exc), flush=True)
             else:
                 require(mode == 'normal', 'mutant survived: '+mode)

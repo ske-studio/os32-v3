@@ -11,7 +11,7 @@ const FAILED: u32 = u32::MAX;
 
 pub struct Run {
     op: u8, warm: u8, left: u16, i: u16, t0: u64, deadline: u32,
-    base: GfxStats, id: [u8; 8], pub active: bool,
+    base: GfxStats, id: [u8; 8], lan: bool, pub active: bool,
     waiting: bool, phase: u8, last_commit: u32, valid: bool,
     origin: (i32, i32), window: u32, owner: i32,
     samples: [u32; MAX], count: usize,
@@ -19,7 +19,7 @@ pub struct Run {
 impl Run {
     pub const NEW: Self = Self {
         op: 0, warm: 0, left: 0, i: 0, t0: 0, deadline: 0,
-        base: GfxStats::ZERO, id: [0; 8], active: false,
+        base: GfxStats::ZERO, id: [0; 8], lan: false, active: false,
         waiting: false, phase: 0, last_commit: 0, valid: true,
         origin: (0, 0), window: 0, owner: 0, samples: [0; MAX], count: 0,
     };
@@ -62,9 +62,10 @@ impl Write for Line {
         self.len += s.len(); Ok(())
     }
 }
-fn emit(args: fmt::Arguments<'_>) {
+fn emit(lan: bool, id: &[u8], args: fmt::Arguments<'_>) {
+    if lan { gserial::reply_to(lan, id, args); return; }
     let mut line = Line { bytes: [0; 200], len: 0 };
-    if line.write_fmt(args).is_ok() {
+    if write!(line, "{}\r\n", args).is_ok() {
         unsafe { (os32api::api().serial_puts)(line.bytes.as_ptr()); }
     }
 }
@@ -84,12 +85,13 @@ pub fn start(st: &mut GuiState, id: &[u8], op: u8, n: u16) -> Result<(), u8> {
         let t = title(st);
         let known = matches!(t, Some(b"Edit") | Some(b"File Manager"));
         if !known {
-            emit(format_args!("GOP1 {} SKIP title\r\n", NAMES[op as usize]));
+            emit(gserial::response_lan(), id, format_args!("GOP1 {} SKIP title", NAMES[op as usize]));
             gserial::reply(id, format_args!("end 0")); return Ok(());
         }
         if t != Some(if op == 5 { b"File Manager" } else { b"Edit" }) { return Err(3); }
     }
     st.ops = Run::NEW;
+    st.ops.lan = gserial::response_lan();
     st.ops.op = op; st.ops.left = n; st.ops.id.copy_from_slice(id); st.ops.active = true;
     if let Some(i) = st.front_index() {
         let w = &st.windows[i];
@@ -130,12 +132,12 @@ fn end(st: &mut GuiState) {
     if r.count != 0 {
         let p50 = r.samples[(r.count * 50).div_ceil(100)-1];
         let p95 = r.samples[(r.count * 95).div_ceil(100)-1];
-        emit(format_args!("GOP1 {} p50 {} p95 {} valid {} failed {}\r\n",
+        emit(r.lan, &r.id, format_args!("GOP1 {} p50 {} p95 {} valid {} failed {}",
             NAMES[r.op as usize], p50, p95, r.count, usize::from(r.i)-r.count));
     } else {
-        emit(format_args!("GOP1 {} p50 FAILED p95 FAILED valid 0 failed {}\r\n", NAMES[r.op as usize], r.i));
+        emit(r.lan, &r.id, format_args!("GOP1 {} p50 FAILED p95 FAILED valid 0 failed {}", NAMES[r.op as usize], r.i));
     }
-    gserial::reply(&r.id, format_args!("end 0"));
+    gserial::reply_to(r.lan, &r.id, format_args!("end 0"));
     wm::gf_accept::pause(false);
 }
 /// Called only at the end of X3/standalone cycles, after flush_present.
@@ -170,7 +172,7 @@ pub fn on_cycle_end(st: &mut GuiState) {
     // Warmups use the same completion/deadline path, but never enter percentiles.
     if r.warm < WARM {
         if us.is_none() {
-            emit(format_args!("GOP1 {} warm {} FAILED {} {} {}\r\n", NAMES[r.op as usize], r.warm, pb, cm, hw));
+            emit(r.lan, &r.id, format_args!("GOP1 {} warm {} FAILED {} {} {}", NAMES[r.op as usize], r.warm, pb, cm, hw));
         }
         r.warm += 1;
     }
@@ -178,9 +180,9 @@ pub fn on_cycle_end(st: &mut GuiState) {
         match us {
             Some(us) => {
                 r.samples[r.count] = us; r.count += 1;
-                emit(format_args!("GOP1 {} {} {} {} {} {}\r\n", NAMES[r.op as usize], r.i, us, pb, cm, hw));
+                emit(r.lan, &r.id, format_args!("GOP1 {} {} {} {} {} {}", NAMES[r.op as usize], r.i, us, pb, cm, hw));
             }
-            None => emit(format_args!("GOP1 {} {} FAILED {} {} {}\r\n", NAMES[r.op as usize], r.i, pb, cm, hw)),
+            None => emit(r.lan, &r.id, format_args!("GOP1 {} {} FAILED {} {} {}", NAMES[r.op as usize], r.i, pb, cm, hw)),
         }
         r.i += 1; r.left -= 1;
     }

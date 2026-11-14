@@ -158,9 +158,9 @@ def agent_test(mutation=None):
         assert request('RSH ACCEPT %s %s %d' % (boot, ident, len(body)), body) == 200
         assert a.operator.take_result() is None
         assert notice('b' * 32) == 400
-        assert notice(drop=1) == 400
+        assert notice(data=b'gs:! incomplete', drop=1) == 400
         if notice_first:
-            assert notice() == 200
+            assert notice(drop=33) == 200
             assert a.operator.take_result() is None
             assert ready() == 200
         else:
@@ -171,7 +171,7 @@ def agent_test(mutation=None):
             assert a.operator.take_result() is None
             assert notice(data=b'gs:! ready\n') == 200
             assert a.operator.take_result() is None
-            assert notice() == 200
+            assert notice(drop=33) == 200
         result = a.operator.take_result()
         assert result and result['id'] == ident and result['result'] == body, 'GUI handoff not completed'
         # Consuming the result frees the slot for the next GUI command.

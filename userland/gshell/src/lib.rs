@@ -92,6 +92,7 @@ mod timer;
 mod trim;
 mod diagnostics;
 mod gserial;
+mod gserial_link;
 mod visible;
 mod wm;
 
@@ -218,6 +219,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     settings::startup_notice(&st.cfg);
     loop_notice();
     gserial::open(st, serial_timeout);
+    gserial::open_lan(st, serial_timeout);
     font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
@@ -710,6 +712,13 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         let a = os32api::api();
         (a.tvram_clear)();
         gserial::cui_done(st);
+        loop {
+            // Saving config/closing resources can span ticks after the last WM cycle.
+            st.now = (a.get_tick)();
+            if !gserial::shutdown_pending(st) { break; }
+            gserial::poll_lan(st);
+            (a.sys_halt)();
+        }
         (a.rshell_set_active)(1);
         (a.sys_switch_shell)(CUI_SHELL.as_ptr());
     }
