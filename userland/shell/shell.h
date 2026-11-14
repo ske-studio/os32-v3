@@ -187,6 +187,9 @@ int  shell_cmd_recover(int argc, char **argv);
 int  shell_cmd_peek(int argc, char **argv); /* cmd_peek.c: peek (TASK_KPEEK、表は cmd_sys.c) */
 void shell_cmd_hdprep_init(void); /* cmd_hdprep.c: hdprep (票 TASK_HDD_INSTALL 段 1) */
 void shell_rshell_init(void);
+/* X10: foreground LAN entry points; line-boundary arbitration is X11. */
+int rsh_lan_poll(void);
+int rsh_lan_flush(unsigned int id, unsigned int dropped);
 void shell_cmd_env_init(void);
 void shell_cmd_script_init(void);
 void shell_cmd_filer_init(void);
