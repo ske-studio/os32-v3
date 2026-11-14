@@ -11,12 +11,16 @@ int boot_serial_mirror, rshell_active, pm_log_stream_only;
 static unsigned delivered, serial_bytes, log_bytes, depth, max_depth, clears;
 static int bad;
 static char tail[7];
+static int utf8_mode;
+static unsigned console_calls;
+static u8 last_color;
+static const char japanese[] = "日本語の表示";
 const struct ppc_boot_devices *ppc_boot_devices(void) { return &devices; }
 int pm_escc_write(const struct pm_escc *s, const char *p, unsigned n)
 { (void)s; if (n==7) for (unsigned i=0;i<7;i++) tail[i]=p[i]; serial_bytes += n; return n; }
 void con_output_register(const ConOutputOps *p) { output=p; }
 void console_write(const char *p, u32 n, u8 color)
-{ (void)color; if (boot_serial_mirror || rshell_active) while (n--) output->putchar(*p++); }
+{ if (p==japanese) { console_calls++; last_color=color; } if (boot_serial_mirror || rshell_active) while (n--) output->putchar(*p++); }
 void tvram_clear(void) { clears++; }
 void pm_log_write(const char *p, u32 n) { (void)p; log_bytes+=n; serial_bytes+=n; }
 void pm_terminal_open(void) {}
@@ -30,7 +34,7 @@ void pm_terminal_poll(void)
     if (depth>1) { bad=1; depth--; return; }
     while (pm_term_tx_peek(&m)) {
         for (unsigned i=0;i<m.payload_bytes;i++)
-            if (m.payload[i] != (u8)('a'+(delivered+i)%26)) bad=1;
+            if (m.payload[i] != (utf8_mode ? (u8)japanese[delivered+i] : (u8)('a'+(delivered+i)%26))) bad=1;
         delivered+=m.payload_bytes;
         pm_term_tx_complete();
     }
@@ -63,5 +67,12 @@ void _start(void)
     const char escape[]="\033[2J\033[H";
     for (unsigned i=0;i<7;i++) CHECK(tail[i]==escape[i]);
     CHECK(clears==1 && serial_bytes==before+4+7+4);
+    /* UTF-8 provider delegates one complete string to the fd1 console route. */
+    utf8_mode=1; delivered=0; bad=0; before=serial_bytes;
+    unsigned calls=console_calls, logs=log_bytes;
+    shell_print_utf8(japanese, 9);
+    CHECK(console_calls==calls+1 && last_color==9);
+    CHECK(delivered==sizeof(japanese)-1 && !bad);
+    CHECK(serial_bytes==before+sizeof(japanese)-1+(log_bytes-logs));
     finish(0);
 }

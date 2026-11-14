@@ -8,7 +8,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {'stream.inc':'platform/powermac/console_stream.c',
            'log.inc':'platform/powermac/console_log.c'}
-MUTANTS = [('poll removed','stream.inc','    pm_terminal_poll();',''),
+MUTANTS = [('UTF-8 byte length','stream.inc','console_write(text, kstrlen(text), color);', 'console_write(text, 1, color);'),('poll removed','stream.inc','    pm_terminal_poll();',''),
            ('diagnostic mirrored','log.inc','    boot_serial_mirror = rshell_active = 0;','')]
 def run(tmp, sources):
     for name,text in sources.items(): (tmp/name).write_text(text)
