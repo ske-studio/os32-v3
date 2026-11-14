@@ -19,11 +19,8 @@ void link_platform_idle(void)
 {
     if (idle_running) return;
     idle_running = 1;
-    /* _idle() never returns on PPC. Use the existing lightweight wait,
-     * enabling EE so DEC can advance the common tick while we wait. */
-    _enable();
     idle_work_run();
-    _halt();
+    _idle();
     idle_running = 0;
 }
 

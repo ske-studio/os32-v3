@@ -63,7 +63,8 @@ def run(ctx):
             for anchor, replacement in [
                 ('return tick_register(PM_TICK_LINK, fn);', 'return tick_register(0, fn);'),
                 ('ppc_irq_restore(saved);', '(void)saved;'),
-                ('idle_running = 1;', 'idle_running = 0;')]:
+                ('idle_running = 1;', 'idle_running = 0;'),
+                ('    idle_work_run();', '    /* omitted work */')]:
                 assert original.count(anchor) == 1
                 exercise(original.replace(anchor, replacement), False)
                 print('RED runtime: ' + anchor, flush=True)
@@ -71,7 +72,7 @@ def run(ctx):
         cc = ppc / 'bin/powerpc-elf-gcc'
         if not cc.is_file():
             print('SKIP PowerPC object: toolchain unavailable', flush=True)
-            return 0
+            return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
         subprocess.run([str(cc), '-std=gnu11',
             '-Wall', '-Wextra', '-Werror', '-ffreestanding', *includes,
             '-c', str(ctx.root / 'platform/powermac/link_platform.c'),

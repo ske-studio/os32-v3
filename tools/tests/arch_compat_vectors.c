@@ -9,8 +9,11 @@ u32 ppc_irq_save(void) { return irq_save(); }
 void ppc_irq_restore(u32 old) { irq_restore(old); }
 void _enable(void) { irq_state = 1; }
 void _halt(void) {}
-void _idle(void) { irq_state = 1; }
-void idle_work_run(void) {}
+void ppc_enable(void) { irq_state = 1; }
+#include IDLE_SOURCE
+void _idle(void) { arch_cpu_idle(); }
+static unsigned int work_calls;
+void idle_work_run(void) { ++work_calls; }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
 #include PROVIDER_SOURCE
 
@@ -76,9 +79,26 @@ static int irq1(void)
     return 0;
 }
 #endif
+#ifdef IDLE_SOURCE
+static int sync2(void)
+{
+    irq_state = 0;
+    _idle();
+    if (!irq_state) return 2;
+    irq_state = 0;
+    link_platform_idle();
+    if (!irq_state || work_calls != 1) return 3;
+    link_platform_idle();
+    if (!irq_state || work_calls != 2) return 4;
+    return 0;
+}
+#endif
 void _start(void)
 {
     int rc = time3();
+#ifdef IDLE_SOURCE
+    if (!rc) rc = sync2();
+#endif
 #ifdef MPIC_SOURCE
     if (!rc) rc = irq1();
 #endif

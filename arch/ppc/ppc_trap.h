@@ -19,7 +19,8 @@ void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
  * Failure leaves existing clock untouched. */
 int ppc_dec_start(u32 tb_hz, u32 tick_hz);
 void ppc_decrementer_interrupt(struct ppc_frame *frame);
-void arch_cpu_idle(void) __attribute__((noreturn));
+/* Foreground only; returns with EE enabled. Never call from trap/IRQ. */
+void arch_cpu_idle(void);
 void arch_cpu_halt(void);
 void arch_cpu_stop(void) __attribute__((noreturn));
 /* Reader must access software PD/PT physical words via mapped RAM, DR=1.
