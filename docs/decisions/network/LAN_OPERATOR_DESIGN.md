@@ -272,3 +272,8 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 - 宣言長: `RSH OUT`・`GS OUT`・`PDIAG OUT`・`LOG` は、どれも末尾の語が WDATA の宣言長になる。
   - ホストの側 (host_agent.py の `_decl`) は X6 で対応する。
   - ゲストの側 (net/link_host_api.inc の `link_decl_len`) は、新しい段 X6g (上限 40 行、x86 vmkernel・PPC 像は P1 の後で変わる) で対応する。
+
+### U5a の停止を受けて PM が決めたこと (2026-11-14)
+- 設定の `backend` は `np21w` か `bridge` の 2 つだけにする。
+  - `np21w`: NP21/W の NP2NETSOCK が `frame-endpoint` に接続しに来る (WSL)。
+  - `bridge`: lan_bridge.py が `iface` の物理 NIC と `frame-endpoint` を中継する (Ubuntu のノート)。
