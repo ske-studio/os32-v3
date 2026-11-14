@@ -69,6 +69,10 @@ def workflow_cases(source, setup_source=None):
         prefix = steps[:next(i for i, step in enumerate(steps) if step.get('name') == boundary)]
         prepared = []
         for step in prefix:
+            if step.get('uses') == './.github/actions/ppc-setup':
+                assert name == 'check-fast', 'PPC needed only by checks'
+                assert step.get('if') == "steps.prior.outputs.reuse != 'true'"
+                continue
             if step.get('id') == 'prior':
                 continue  # reuse_gate_cases validates this whole step separately
             if name == 'artifacts':

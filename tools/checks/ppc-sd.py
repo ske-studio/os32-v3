@@ -55,10 +55,11 @@ def run(ctx):
     import shutil
     import subprocess
     from pathlib import Path
-    required = ('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc',
+    required = (str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'),
                 'qemu-system-ppc', 'genisoimage')
     if any(shutil.which(x) is None for x in required) or not Path('/usr/share/qemu/openbios-ppc').is_file():
-        print('SKIP ppc-sd: PPC toolchain/QEMU/OpenBIOS unavailable')
+        missing = 'PPC toolchain' if shutil.which(required[0]) is None else 'QEMU/OpenBIOS/genisoimage'
+        print('SKIP ppc-sd: ' + missing + ' unavailable')
         return 0
     env = dict(os.environ)
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',

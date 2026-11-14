@@ -55,6 +55,11 @@ ppc-boot:
 ppc-boot-check:
 	$(MAKE) --no-print-directory -j1 -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) check
 
+# Stage 1 PPC image prerequisite; local toolchains remain optional.
+.PHONY: ppc-ci-image
+ppc-ci-image:
+	PPC_CROSS_DIR="$(PPC_CROSS_DIR)" python3 -B tools/ppc/compile_ci.py
+
 # ドキュメントを Windows 側 (C:\WATCOM\docs\os32) へミラー / 逆方向は tools/sync_hwdocs.sh
 .PHONY: docs-gen tests-inventory docs-win
 tests-inventory:

@@ -1,0 +1,33 @@
+name: OS32 PPC compile setup
+description: PowerPC stage 1 toolchain, without QEMU guest dependencies
+runs:
+  using: composite
+  steps:
+    - name: PPC toolchain cache key
+      id: key
+      shell: bash
+      run: |
+        echo "PPC_CROSS_DIR=$HOME/opt/cross-ppc" >> "$GITHUB_ENV"
+        echo "OS32_REQUIRE_PPC=1" >> "$GITHUB_ENV"
+        gcc="$(sed -n 's/^GCC_VER=//p' tools/ci/build_cross.sh)"
+        newlib="$(sed -n 's/^NEWLIB_VER=//p' tools/ci/build_cross.sh)"
+        builder="$(sha256sum tools/ci/build_cross.sh | cut -d ' ' -f 1)"
+        echo "key=cross-powerpc-elf-${{ runner.os }}-binutils2.41-gcc${gcc}-newlib${newlib}-${builder}" >> "$GITHUB_OUTPUT"
+    - name: Cache powerpc-elf toolchain
+      id: cache
+      uses: actions/cache@v4
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+      with:
+        path: ~/opt/cross-ppc
+        key: ${{ steps.key.outputs.key }}
+    - name: Build powerpc-elf toolchain (cache miss only)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: timeout 3600 bash --noprofile --norc -e -o pipefail {0}
+      run: nice -n 10 tools/ci/build_cross.sh --target powerpc-elf --prefix "$PPC_CROSS_DIR" --work "$RUNNER_TEMP/cross-ppc-work" --jobs 4
+    - name: Require PPC compiler and newlib
+      shell: bash
+      run: |
+        test -x "$PPC_CROSS_DIR/bin/powerpc-elf-gcc"
+        test -f "$PPC_CROSS_DIR/powerpc-elf/lib/libc.a"
+        test -f "$PPC_CROSS_DIR/powerpc-elf/include/stdio.h"

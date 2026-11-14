@@ -1,0 +1,40 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index bb6de10c..97686f6f 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -206,6 +206,9 @@ jobs:
+         timeout-minutes: 90
+         if: steps.prior.outputs.reuse != 'true'
+ 
++      - uses: ./.github/actions/ppc-setup
++        if: steps.prior.outputs.reuse != 'true'
++
+       - name: Compiler ccache setup
+         timeout-minutes: 1
+         if: steps.prior.outputs.reuse != 'true'
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 31045535..783253a9 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -164,3 +164,21 @@ jobs:
+       - name: SQLite ccache statistics
+         if: always() && steps.prior.outputs.reuse != 'true'
+         run: ccache -s
++
++  ppc-compile:
++    runs-on: ubuntu-latest
++    timeout-minutes: 90
++    steps:
++      - uses: actions/checkout@v4
++      - name: PPC build dependencies
++        run: |
++          sudo apt-get update
++          sudo apt-get install -y --no-install-recommends build-essential libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage
++          python3 -m pip install --quiet -r requirements.txt
++      - uses: ./.github/actions/ppc-setup
++      - name: PPC image and host checks
++        env:
++          OS32_ACCEPT_IPA_LICENSE: "1"
++        run: |
++          make check-ppc-compile MUTATE=0
++          make check-ppc-sh-string check-ppc-sh-runtime MUTATE=0
