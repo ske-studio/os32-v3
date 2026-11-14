@@ -131,16 +131,28 @@ class CommandTransport:
     def request(self, mode, line, timeout):
         deadline = time.monotonic() + timeout
         ready_deadline = min(deadline, time.monotonic() + READY_TIMEOUT)
-        try:
-            while True:
+        while True:
+            try:
                 probe = self._call('probe', ready_deadline)
-                ready = probe.get('ready')
-                if probe.get('ok') and probe.get('hello') and ready and ready.get('mode') == mode:
-                    break
-                time.sleep(min(0.05, self._remaining(ready_deadline)))
-        except (OSError, ValueError, UnicodeError):
-            self.close()
-            return {'state': 'serial'}
+            except (OSError, ValueError, UnicodeError):
+                self.close()
+                return {'state': 'serial'}
+            pending = probe.get('pending') or {}
+            if pending.get('state', '').lower() in ('running', 'unknown'):
+                error = 'BUSY' if pending['state'].lower() == 'running' else 'UNKNOWN_PENDING'
+                return {'ok': False, 'error': error}
+            ready = probe.get('ready') or {}
+            if probe.get('ok') and probe.get('hello') and ready.get('mode') == mode:
+                break
+            remaining = ready_deadline - time.monotonic()
+            if remaining <= 0.05:
+                if remaining > 0:
+                    time.sleep(remaining)
+                if not probe.get('hello') or not ready:
+                    return {'state': 'serial'}
+                current = ready.get('mode', 'unavailable')
+                return {'ok': False, 'error': f'mode={current}, requested={mode}'}
+            time.sleep(0.05)
         try:
             submitted = self._call('submit', deadline, mode=mode, line=line)
             if not submitted.get('ok'):
