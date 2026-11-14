@@ -39,6 +39,8 @@ import time
 import host_linux
 from host_notify import Notify, new_generation
 from host_services import Registry
+from host_rshell import Operator, RSHELL, GSERIAL, RESULT_MAX
+from host_operator_socket import OperatorSocket
 
 # ---------------------------------------------------------------- ワイヤ定数
 LINK_ETHERTYPE = 0x88B5
@@ -376,6 +378,8 @@ class HostAgent:
         self.host_generation = new_generation()
         self.registry = Registry(self.host_generation)
         self.notifier = Notify(self.registry, self.host_generation)
+        self.operator = Operator(self.notifier)
+        self.operator_socket = None
         self.sessions = SessCounter(state_dir, sess_start)
         self.allow_net = allow_net
         self.file_root = file_root
@@ -560,7 +564,9 @@ class HostAgent:
             self._print_failed(job["ent"], "session changed")
         self.pending = {}
         new_sess = c["sess"] != self.sess
+        self.operator.session_reset()
         self.sess, self.epoch, self.peer = c["sess"], c["epoch"], c["mac"]
+        self.operator.session_start((self.sess, self.epoch))
         self.established = True
         if new_sess:
             self.ledger = {}                          # セッションが変われば墓標も捨てる
@@ -759,6 +765,19 @@ class HostAgent:
         parts = line.split()
         verb = parts[0].upper() if parts else ""
         # --- 宣言長 (WDATA) のある要求。範囲は要求行の時点で検査 (B2) ---
+        if verb in ("RSH", "GS", "PDIAG", "LOG"):
+            if verb == "PDIAG":
+                self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            elif verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
+                self._service_rshell(rid, ent, parts, out)
+            else:
+                expected = 7 if verb == "LOG" else 6
+                decl = self._decl(parts[-1] if len(parts) == expected else "", RESULT_MAX if verb != "LOG" else DECL_MAX_BYTES)
+                if decl is None:
+                    self._answer(rid, ent, HTTP_BAD, b"", None, out)
+                else:
+                    ent["decl"] = decl
+            return
         if verb == "ECHO":
             decl = self._decl(parts[1] if len(parts) > 1 else "", DECL_MAX_BYTES)
             if decl is None:
@@ -844,6 +863,37 @@ class HostAgent:
             status, body = self.registry.dispatch(line, b"")
             self._answer(rid, ent, status, body, None, out)
 
+    def _service_rshell(self, rid, ent, parts, out):
+        status, body = HTTP_BAD, b""
+        session = (self.sess, self.epoch)
+        if len(parts) == 7 and parts[:2] == ["RSH", "READY"] and parts[4] == "1":
+            if self.operator.accept_ready(self.host_generation, session, parts[2],
+                                          parts[3], parts[5], parts[6]):
+                service = {"cui": RSHELL, "gui": GSERIAL, "diag": 65532}[parts[3]]
+                body = ("gen %d svc %d\n" % (self.host_generation, service)).encode()
+                status = HTTP_OK
+        elif len(parts) == 6 and parts[0] in ("RSH", "GS") and parts[1] == "OUT":
+            if DECL_RE.fullmatch(parts[4]) and DECL_RE.fullmatch(parts[5]):
+                length = int(parts[5])
+                if length == len(ent["got"]) and self.operator.accept_output(
+                        self.host_generation, session, parts[2], parts[3], int(parts[4]),
+                        ent["got"], length, "cui" if parts[0] == "RSH" else "gui"):
+                    status = HTTP_OK
+        self._answer(rid, ent, status, body, None, out)
+
+    def _service_log(self, rid, ent, parts, out):
+        if (len(parts) != 7 or not re.fullmatch(r"[0-9a-fA-F]{32}", parts[1]) or
+                not all(DECL_RE.fullmatch(x) for x in parts[2:]) or
+                int(parts[6]) != len(ent["got"])):
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        record = dict(boot=parts[1].lower(), seq=int(parts[2]), drop_records=int(parts[3]),
+                      drop_bytes=int(parts[4]), flags=int(parts[5]), text=ent["got"])
+        self.log("LOG", record)
+        if self.operator_socket is not None:
+            self.operator_socket.publish_log(record)
+        self._answer(rid, ent, HTTP_OK, b"", None, out)
+
     def _service_get(self, rid, ent, resource, out):
         if resource.startswith("/pattern/"):
             try:
@@ -918,7 +968,11 @@ class HostAgent:
         parts = ent.get("line", ent["req"].decode("latin1").strip()).split()
         verb = parts[0].upper() if parts else ""
         sub = parts[1].upper() if len(parts) > 1 else ""
-        if verb == "ECHO":
+        if verb in ("RSH", "GS"):
+            self._service_rshell(rid, ent, parts, out)
+        elif verb == "LOG":
+            self._service_log(rid, ent, parts, out)
+        elif verb == "ECHO":
             self._answer(rid, ent, 200, ent["got"], None, out)   # 折り返し
         elif verb == "PRINT" and sub == "DATA":
             self._print_data_finish(rid, ent, out)
@@ -1429,6 +1483,17 @@ def main():
                       spool_dir=args.spool_dir, print_dir=args.print_dir,
                       clip=args.clip, printer=args.printer,
                       lines_per_page=args.lines_per_page)
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                         text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = ""
+    def info():
+        return dict(commit=commit, config=dict(iface=None, root=args.file_root,
+                    allow_write=False, peer=None),
+                    peer=mac_str(agent.peer) if agent.established else None)
+    agent.operator_socket = OperatorSocket(None, agent.operator, info)
     pcap = Pcap(args.pcap) if args.pcap else None
     print("host_agent v2 mac %s agent-gen %d (wire v2, 3-way HELLO, rid ledger)"
           % (args.mac, agent.agent_gen), flush=True)
@@ -1447,14 +1512,22 @@ def main():
                 # select で待つことで子プロセス (CLIP wsl) の完了 / 期限を巡回で
                 # 拾える (往復 3 B-1)。読めるものが無ければ tick だけ回す。
                 try:
-                    ready, _, _ = select.select([stream.sock], [], [], TICK_INTERVAL)
+                    ready, _, _ = select.select([stream.sock] + agent.operator_socket.fileno_list(), [], [], TICK_INTERVAL)
                 except OSError as e:
                     raise ConnectionError(str(e))
-                if ready:
-                    for frame in stream.recv_frames():
-                        agent.handle(frame, stream, pcap)
+                for fd in ready:
+                    if fd == stream.sock:
+                        for frame in stream.recv_frames():
+                            agent.handle(frame, stream, pcap)
+                    else:
+                        agent.operator_socket.on_readable(fd)
                 agent.tick(stream)
+                agent.operator_socket.poll(time.monotonic())
         except ConnectionError as e:
+            agent.operator.session_reset()
+            agent.established = False
+            agent.notifier.reset()
+            stream.sock.close()
             print("disconnected: %s (%s)" % (e, agent.counts), flush=True)
             if args.once:
                 return 0
