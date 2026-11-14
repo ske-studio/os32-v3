@@ -11,9 +11,22 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 UNIT = ROOT / 'tools/systemd/os32-host-agent@.service'
 README = ROOT / 'tools/systemd/README.md'
+UPDATE = ROOT / 'tools/systemd/update_host_agent.sh'
 CHECK = dict(name='remote-u5c', tier=1, needs=[], budget=5,
              covers=['tools/systemd/os32-host-agent@.service',
-                     'tools/systemd/README.md', 'tools/tests/test_remote_u5c.py'])
+                     'tools/systemd/README.md', 'tools/systemd/update_host_agent.sh',
+                     'tools/tests/test_remote_u5c.py'])
+
+
+def test_update(path):
+    script = Path(path).read_text()
+    result = subprocess.run(['sh', '-n', str(path)], capture_output=True, text=True)
+    assert result.returncode == 0, 'update script syntax: ' + result.stderr
+    assert 'git clone -q --no-local' in script, 'update does not clone as the user'
+    assert 'sudo chmod 0755 "$CONF_DIR"' in script, 'update does not open the config directory'
+    assert '[ -n "$got" ] ||' in script, 'update accepts an empty probe commit'
+    assert '"$got"*)' in script, 'update does not compare the probe commit'
+    print('PASS update_host_agent.sh')
 
 
 def test(path, readme):
@@ -47,7 +60,9 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--unit', default=str(UNIT))
     parser.add_argument('--readme', default=str(README))
+    parser.add_argument('--update', default=str(UPDATE))
     args = parser.parse_args()
+    test_update(args.update)
     test(args.unit, args.readme)
     if args.mutate:
         source = Path(args.unit).read_text()
@@ -72,6 +87,15 @@ def main():
                                     capture_output=True, text=True)
             assert result.returncode and 'config mode changed' in result.stderr, result.stderr
             print('RED config mode changed')
+            source = Path(UPDATE).read_text()
+            old = '[ -n "$got" ] ||'
+            assert source.count(old) == 1
+            path = Path(tmp) / 'update.sh'
+            path.write_text(source.replace(old, '[ -z "" ] ||'))
+            result = subprocess.run([sys.executable, '-B', __file__, '--update', str(path)],
+                                    capture_output=True, text=True)
+            assert result.returncode and 'empty probe commit' in result.stderr, result.stderr
+            print('RED update accepts an empty probe commit')
 
 
 def run(ctx):

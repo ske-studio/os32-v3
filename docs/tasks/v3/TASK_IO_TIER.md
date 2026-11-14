@@ -1,7 +1,7 @@
 # TASK_IO_TIER — I/O の Tier 制御 (協調点の Tier・予算・設定表・pump)
 
 > 状態: **設計中 (2026-11-14)** — 設計は確定して実装を待つ。詳細設計は [IO_TIER_DESIGN](../../decisions/IO_TIER_DESIGN.md)。
-> 関係: 最初の利用者は [TASK_LAN_BULK](../network/TASK_LAN_BULK.md)。時計は [TASK_TICK_1KHZ](TASK_TICK_1KHZ.md) の T1。
+> 関係: 最初の利用者は票 TASK_LAN_BULK (docs/tasks/network/)。時計は票 TASK_TICK_1KHZ の T1。
 
 ## 0. ユーザー決定 (2026-11-14)
 | 項目 | 決定 (原文の要旨) |
