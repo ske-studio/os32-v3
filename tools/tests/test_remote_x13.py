@@ -43,7 +43,9 @@ class FakeOperator:
         self.timeout_ms = timeout_ms
         self.take_result()
         body = b'gs:00000001 pong\ngs:00000001 end 0\n' if mode == 'gui' else b'> ver\nOK\n\x04'
-        self.pending = dict(id='00000001', state='running' if self.slow else 'done',
+        if mode == 'diag':
+            body = b'diagnostic'
+        self.pending = dict(id='00000001', status=0, state='running' if self.slow else 'done',
                             result=None if self.slow else body)
         if self.disconnect:
             client['socket'].close()
@@ -119,6 +121,10 @@ def test(path):
         result = client.request('cui', 'ver', 2)
         assert result['state'] == 'done' and result['complete']
         assert operator.timeout_ms == 2000, 'request timeout not sent'
+        operator.ready = dict(mode='diag', last_id='none', state='idle')
+        result = client.request('diag', 'status', 2)
+        assert result['state'] == 'done' and result['status'] == 0
+        operator.ready = dict(mode='cui', last_id='none', state='idle')
         ident = client.submit('cui', 'ver', 1)['id']
         assert operator.timeout_ms == 1000, 'submit timeout not sent'
         assert client.result(ident, 0, 1)['state'] == 'done'

@@ -670,7 +670,10 @@ class HostAgent:
             ent["last_seq"] = seq
             if ent["resp"] is None and ent["decl"] > 0:
                 room = ent["decl"] - len(ent["got"])
-                ent["got"] += payload[:room]
+                if ent.get("line", "").startswith("PDIAG ") and len(payload) > room:
+                    self._answer(rid, ent, HTTP_BAD, b"", None, out)
+                else:
+                    ent["got"] += payload[:room]
         # 重複 / 先行は本文を触らず累積 ACK だけ返す (Go-Back-N)
         self._ack(rid, ent["last_seq"], out)
         if (ent["resp"] is None and ent["decl"] > 0
@@ -771,9 +774,7 @@ class HostAgent:
         verb = parts[0].upper() if parts else ""
         # --- 宣言長 (WDATA) のある要求。範囲は要求行の時点で検査 (B2) ---
         if verb in ("RSH", "GS", "PDIAG", "LOG"):
-            if verb == "PDIAG":
-                self._answer(rid, ent, HTTP_BAD, b"", None, out)
-            elif verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
+            if verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
                 self._service_rshell(rid, ent, parts, out)
             else:
                 expected = 7 if verb == "LOG" else (5 if parts[:2] == ["RSH", "ACCEPT"] else 6)
@@ -877,12 +878,12 @@ class HostAgent:
                 service = {"cui": RSHELL, "gui": GSERIAL, "diag": 65532}[parts[3]]
                 body = ("gen %d svc %d\n" % (self.host_generation, service)).encode()
                 status = HTTP_OK
-        elif len(parts) == 6 and parts[0] in ("RSH", "GS") and parts[1] == "OUT":
+        elif len(parts) == 6 and parts[0] in ("RSH", "GS", "PDIAG") and parts[1] == "OUT":
             if DECL_RE.fullmatch(parts[4]) and DECL_RE.fullmatch(parts[5]):
                 length = int(parts[5])
                 if length == len(ent["got"]) and self.operator.accept_output(
                         self.host_generation, session, parts[2], parts[3], int(parts[4]),
-                        ent["got"], length, "cui" if parts[0] == "RSH" else "gui"):
+                        ent["got"], length, {"RSH": "cui", "GS": "gui", "PDIAG": "diag"}[parts[0]]):
                     status = HTTP_OK
         elif len(parts) == 5 and parts[:2] == ["RSH", "ACCEPT"]:
             if (DECL_RE.fullmatch(parts[4]) and self.operator.accept_handoff(
@@ -978,7 +979,7 @@ class HostAgent:
         parts = ent.get("line", ent["req"].decode("latin1").strip()).split()
         verb = parts[0].upper() if parts else ""
         sub = parts[1].upper() if len(parts) > 1 else ""
-        if verb in ("RSH", "GS"):
+        if verb in ("RSH", "GS", "PDIAG"):
             self._service_rshell(rid, ent, parts, out)
         elif verb == "LOG":
             self._service_log(rid, ent, parts, out)
