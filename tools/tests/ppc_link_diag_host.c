@@ -39,7 +39,7 @@ i32 link_host_open(const char *r,u32 n,int owner) {
     return 4;
 }
 i32 link_host_status(i32 h,u32 *s,u32 *n,int o) {
-    (void)n;REQUIRE(h==4 && active_handle && !o);*s=fail_status?503:200;
+    (void)n;REQUIRE(h==4 && active_handle && !o);*s=fail_status?(u32)fail_status:200;
     if(is_ready || fail_status || sent==declared) return 0;
     return OS32_ERR_AGAIN;
 }
@@ -102,17 +102,25 @@ void _start(void) {
     run("0000000a 5 xyz\n",2,0);
     run("0000000b 65535\n",1,0);
     run("0000000c 2\n",0,24);REQUIRE(clocks==2);
+    /* Permanent refusal releases the result and advances to the next notice. */
+    head=tail=0;
+    enqueue("0000000d 2\n",1);enqueue("0000000e 1\n",1);
+    poll();REQUIRE(pending);before=opens;
+    fail_status=400;poll();REQUIRE(opens==before+1);
+    poll();REQUIRE(!pending && handle<0 && head==1);
+    fail_status=0;poll();REQUIRE(head==2 && pending && opens==before+1);
+    finish(0,8);REQUIRE(opens==before+2 && clocks==3);
     /* Same host across a disconnect retains the monotonic ID guard. */
     link_hello_ok=0;poll();link_hello_ok=1;handshake();
-    head=tail=0;run("0000000c 2\n",4,0);REQUIRE(clocks==2);
+    head=tail=0;run("0000000e 2\n",4,0);REQUIRE(clocks==3);
     /* New generation resets IDs but is usable only after matching READY. */
     alive.host_generation=8;ready_body="gen 7 svc 65532\n";poll();
     for(int i=0;i<10;i++) poll();
     REQUIRE(!ready);
     ready_body="gen 8 svc 65532\n";now+=2000;handshake();
-    run("00000001 2\n",0,24);REQUIRE(clocks==3);
+    run("00000001 2\n",0,24);REQUIRE(clocks==4);
     before=opens;enqueue("",2);poll();poll();REQUIRE(opens==before+1);handshake();
-    run("00000002 2",2,0);REQUIRE(clocks==3);
+    run("00000002 2",2,0);REQUIRE(clocks==4);
     /* Reject corrupt/opcode-overflow/odd-hex/multiple-line notification bodies. */
     const char *bad[]={"badid000 2\n","00000003 65536\n","00000003 5 0\n",
                        "00000003 1\n2\n","00000003 1 \n","00000003 5 00zz\n"};

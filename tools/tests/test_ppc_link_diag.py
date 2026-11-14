@@ -24,6 +24,8 @@ def run(ctx):
              'if (!range) range = &d->peek_ok[0];'),
             ('duplicate', 'adapter', 'if (have_id && id <= last_id)',
              'if (have_id && id < last_id)'),
+            ('permanent-refusal', 'adapter', '(status >= 400 && status < 500)',
+             '(status >= 500 && status < 500)'),
             ('declaration', 'adapter', 'p = number(p, result.payload_bytes);',
              'p = number(p, result.payload_bytes + 1);')]:
             text = adapter if source == 'adapter' else monitor

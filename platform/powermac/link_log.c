@@ -1,4 +1,4 @@
-/* Foreground-only LOG adapter. A failed request never consumes the FIFO. */
+/* Foreground-only LOG adapter. Permanent refusal consumes and counts a loss. */
 #include "lan_boot.h"
 #include "boot_token.h"
 #include "net/link.h"
@@ -87,6 +87,12 @@ void pm_link_log_poll(void)
     i32 rc = link_host_status(handle, &status, 0, 0);
     if (rc != OS32_ERR_AGAIN) {
         if (!rc && status == 200) {
+            pm_lan_log_complete(LAN_OK);
+            pending = 0;
+        } else if (!rc && status >= 400 && status < 500) {
+            /* The peer refused this chunk permanently; do not claim delivery. */
+            lost_records = sum(lost_records, 1);
+            lost_bytes = sum(lost_bytes, length);
             pm_lan_log_complete(LAN_OK);
             pending = 0;
         }
