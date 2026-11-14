@@ -51,15 +51,17 @@ static int copyout(HostNotice *out, const HostNotice *in)
     *out = *in;
     return 0;
 }
-static int suite(int fail_heap)
+static int original_suite(void);
+static int suite(int mode)
 {
-    HostNotice n, again, user;
+    HostNotice n;
     struct HostAlive a;
     hs_reset(0xFFFFFF00u);
     CHECK(host_mailbox_latest_serial() == 0 && hs_if());
     host_alive_snapshot(&a);
     CHECK(!a.valid && a.observation == 0 && hs_if());
     CHECK(host_mailbox_stage(0, 65535, &n) == OS32_ERR_NOSYS);
+    int fail_heap = mode == 1;
     if (fail_heap) hs_fail("heap", -1);
     CHECK(host_mailbox_init() == (fail_heap ? OS32_ERR_NOSYS : 0));
     CHECK(host_mailbox_init() == (fail_heap ? OS32_ERR_NOSYS : 0));
@@ -85,6 +87,33 @@ static int suite(int fail_heap)
     CHECK(host_mailbox_put(7, 2, 1, 0, 1, 0) == OS32_ERR_INVAL);
     CHECK(host_mailbox_put(7, 2, 1, heap, 237, 0) == OS32_ERR_INVAL);
     CHECK(host_mailbox_stage(0, 65535, &n) == OS32_ERR_AGAIN);
+    if (mode != 2) return original_suite();
+    const u16 reserved[] = { REMOTE_SVC_RSHELL, REMOTE_SVC_GSERIAL,
+                             REMOTE_SVC_PPC_DIAG };
+    for (unsigned int i = 0; i < 3; i++) {
+        CHECK(put(7, reserved[i], i, 0) == 0);
+        CHECK(host_mailbox_stage(0, MAILBOX_ALL, &n) == OS32_ERR_AGAIN);
+        CHECK(put(7, 2, i, 0) == 0);
+        CHECK(host_mailbox_stage(0, MAILBOX_ALL, &n) == 0 && n.service == 2);
+        host_mailbox_commit(7, n.serial);
+        CHECK(host_mailbox_stage(7, reserved[i], &n) == 0 && n.service == reserved[i]);
+        host_mailbox_commit(7, n.serial);
+    }
+    /* A retained latest ALIVE must obey the same filter after ring eviction. */
+    CHECK(put(6, REMOTE_SVC_RSHELL, 0, 1) == 0);
+    for (unsigned int i = 0; i < 64; i++) CHECK(put(6, 2, i, 0) == 0);
+    while (host_mailbox_stage(0, MAILBOX_ALL, &n) == 0)
+        host_mailbox_commit(6, n.serial);
+    CHECK(host_mailbox_stage(0, MAILBOX_ALL, &n) == OS32_ERR_AGAIN);
+    CHECK(host_mailbox_stage(6, REMOTE_SVC_RSHELL, &n) == 0);
+    host_mailbox_commit(6, n.serial);
+    /* Reset counters by running the original suite in a fresh process instead. */
+    return 0;
+}
+static int original_suite(void)
+{
+    HostNotice n, again, user;
+    struct HostAlive a;
     CHECK(host_mailbox_latest_serial() == 0);
     for (u32 i = 1; i <= 65; i++) CHECK(put(7, i == 3 ? 3 : 2, i, 0) == 0);
     CHECK(host_mailbox_latest_serial() == 65 && hs_if());
@@ -179,7 +208,7 @@ static int suite(int fail_heap)
 }
 void entry(unsigned int *stack)
 {
-    int rc = suite(stack[0] > 1);
+    int rc = suite(stack[0] > 1 ? (stack[0] > 2 ? 2 : 1) : 0);
     /* Keep runtime failures distinct from compile/runner failures. */
     if (rc) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
