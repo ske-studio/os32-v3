@@ -22,7 +22,7 @@
 - PPC-P1g: link像にPLN1の静的TX/RX領域が残らないことをmapで確認。
 - PPC-P2: P1→LOG受け口/表示→P2c→P2aの順で初回像を組み、観測不能な像を出さない。
 - PPC-P5: 共通transportと台本別段に分割し、節目前に移行、PLN1試験は既定切替まで保持。
-- U4: PPC移行受入をH/Q（7450・7455）に限定し、G4基準確認は移行前の現行PLN1版で行う。
+- U4: PPC移行の各段の受入はH/Q（7450・7455）。G4基準確認は移行前の現行PLN1版で行い、既定をlinkへ切り替えた後にG4実機の確認を1回行う。
 - PPC-reset: reset/PHY/pollが同じ関数の流用であることをdiffで示す。
 - PM-LOG: PLOGを共通LOG/_service_logに変更、x86 bootlogも送れる契約にしos32.予約名を使わない。
 
@@ -205,7 +205,7 @@ void link_platform_idle(void); /* PPC: 前景poll、再入禁止。IRQ/送信内
 - 像予算: x86追加RAMはcapture管理＋shell結果buf8KiB＋gshell FIFO8KiB＋転送buf（各1400B程度）、既存sink8KiB/通知16KiB/link ringを再利用。PPCは既存PLN1削除との差とlink/mailbox/8handle分をmapで実測し、kboot/CLI/HostFS各像を別比較。P1でheap高水位をmapとともに記録して1MiB以内を確認し、link像にはlink_txbufだけが残りPLN1の静的TX/RX領域がないことをmapで確認する。capture増量時は各bufの実容量で再計上する。text/FD圧縮増分を未測定の数値で保証しない。
 
 ## 7. 受入（各行に試験と変異、今回はすべて未実施）
-H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e82557、Q=QEMU **7450と7455両方**。PPC移行受入はH/Qのみ。G4は移行前に現行PLN1版で基準確認する（U4）。U5a–eのサービス導入を各節目の前提とし、受入台本はprobeで常駐/peer/READYを確認するだけで起動・停止しない。probe は agent の commit と設定の要約も返し、台本は作業木の HEAD と照合して、違えば前提不足で止める (A2、写し忘れの古い agent で受入しない)。不在は前提不足として記録。障害注入はHの隔離fixture、N/R/Qは管理者が別途行い台本は観測する。変異は固有anchorでruntime RED。
+H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e82557、Q=QEMU **7450と7455両方**。PPC移行の各段の受入はH/Q。G4は移行前に現行PLN1版で基準確認し、既定をlinkへ切り替えた後にG4実機の確認を1回行う（U4）。U5a–eのサービス導入を各節目の前提とし、受入台本はprobeで常駐/peer/READYを確認するだけで起動・停止しない。probe は agent の commit と設定の要約も返し、台本は作業木の HEAD と照合して、違えば前提不足で止める (A2、写し忘れの古い agent で受入しない)。不在は前提不足として記録。障害注入はHの隔離fixture、N/R/Qは管理者が別途行い台本は観測する。変異は固有anchorでruntime RED。
 |項目/段|試験（合格観測）|変異|
 |---|---|---|
 |常駐 U5|H/N/R/Q: ゲスト不在probe・CLI再接続・LOG/SFS併用、設定RO/peerとNIC分離。管理者によるサービス再起動後READY回復、台本に起動停止なし。|ゲスト待ちで操作口停止、またはallow-write既定を反転。|
