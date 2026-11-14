@@ -217,7 +217,7 @@ int rsh_lan_poll(void)
     HostNotice notice;
     char line[REMOTE_RSHELL_COMMAND_MAX + 1];
     u32 id, before, after;
-    int rc, handoff = 0;
+    int rc, handoff = 0, exit_requested = 0;
     accepting = 0;
     if (!attempted || (u32)(g_api->get_tick() - ready_tick) >= RSH_READY_TICKS) {
         rc = send_ready();
@@ -243,7 +243,8 @@ int rsh_lan_poll(void)
     last_id = id;
     have_id = 1;
     state = REMOTE_STATE_RUNNING;
-    if (!str_eq(line, "exit")) {
+    exit_requested = str_eq(line, "exit");
+    if (!exit_requested) {
         g_api->buz_off();
         g_api->kprintf(ATTR_YELLOW, "%s", "> ");
         g_api->kprintf(ATTR_WHITE, "%s", line);
@@ -283,5 +284,6 @@ end:
         g_api->kprintf(ATTR_RED, "os32gui: launch failed (rc=%d)\n", status);
         goto finish;
     }
+    if (exit_requested) return RSH_LAN_EXIT;
     return rc ? rc : 1;
 }

@@ -15,6 +15,7 @@ static unsigned int gui_runs, serial_reads, sfs_begins, sfs_ends;
 static int mounted, shell_status, serial_phase, serial_pos, serial_eot;
 static char serial_echo[1024];
 static unsigned int echo_len;
+static int lan_exit, resident_active;
 int sh_in_sfs;
 void sh_status_set(int n) { shell_status = n; }
 static void shell_print(u8 attr, const char *fmt, ...)
@@ -31,6 +32,8 @@ static void buzz(void) {}
 static int serial_get(void)
 {
     CHECK(!active); ++serial_reads;
+    if (lan_exit && serial_reads == 1) return -1;
+    if (lan_exit) return "exit\n"[serial_pos++]; /* Bound a lost-return mutant. */
     if (serial_phase == 0) {
         /* LAN arrives after the first serial character, with gaps in the line. */
         const char *s = "echo serial\n";
@@ -49,7 +52,13 @@ static int serial_get(void)
 }
 static int local_get(void) { return -1; }
 static int serial_ok(void) { return 1; }
-static void rs_active(int n) { (void)n; }
+static void rs_active(int n)
+{
+    if (!n && lan_exit) {
+        CHECK(!active && !handle && begins == ends && body_len == 1 && body[0] == 4);
+    }
+    resident_active = n;
+}
 static int serial_put(u8 c) { CHECK(!active); if (c == 4) ++serial_eot; return KAPI_SER_TX_OK; }
 static void halt(void) { ++tick; }
 static int is_mounted(const char *p) { CHECK(!strcmp(p, "/host")); return mounted; }
@@ -109,6 +118,12 @@ int main(void)
         CHECK(executes == count);
     }
     CHECK(serial_reads == reads && begins == ends && !active && !handle);
+    lan_exit = 1; serial_reads = serial_pos = 0;
+    int eots = serial_eot;
+    queue(32, "exit");
+    CHECK(cmd_rshell_resident(1, argv) == 0);
+    CHECK(!resident_active && !rsh_in_rshell && !pending && serial_reads == 1);
+    CHECK(serial_eot == eots + 1); /* Initial prompt only; LAN owns the exit EOT. */
     puts("GREEN X11: serial half-line, LAN ownership, ACCEPT/200/END, scope, serial echo/EOT/exit");
     return 0;
 }

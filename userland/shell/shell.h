@@ -191,6 +191,8 @@ void shell_rshell_init(void);
 /* X10: foreground LAN entry points; line-boundary arbitration is X11. */
 int rsh_lan_execute(const char *line);
 int rsh_lan_handoff(const char *line);
+/* Returned after the LAN exit reply attempt and capture END. */
+#define RSH_LAN_EXIT 2
 int rsh_lan_poll(void);
 int rsh_lan_flush(unsigned int id, unsigned int dropped);
 void shell_cmd_env_init(void);

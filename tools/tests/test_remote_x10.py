@@ -47,7 +47,9 @@ def main():
             for name, old, new in [
                 ('duplicate ID executes', 'if (have_id && id <= last_id)', 'if (have_id && id < last_id)'),
                 ('drop sent as zero', 'id, dropped, (unsigned int)result_len', 'id, dropped * 0, (unsigned int)result_len'),
-                ('missing EOT', 'result[result_len++] = 0x04;', 'result[result_len++] = 0x00;')]:
+                ('missing EOT', 'result[result_len++] = 0x04;', 'result[result_len++] = 0x00;'),
+                ('exit result discarded', 'if (exit_requested) return RSH_LAN_EXIT;',
+                 'if (exit_requested) return 1;')]:
                 assert source.count(old) == 1, old
                 case(source.replace(old, new), False)
                 print('RED runtime:', name)

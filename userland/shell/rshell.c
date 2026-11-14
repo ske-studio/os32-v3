@@ -473,7 +473,8 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
 #ifndef SHELL_AS_APP
             /* No serial byte has started a line. poll owns the complete LAN
              * execution; neither this loop nor rsh_line_rest runs inside it. */
-            if (g_api->host_notice_read) (void)rsh_lan_poll();
+            if (g_api->host_notice_read && rsh_lan_poll() == RSH_LAN_EXIT)
+                goto rshell_exit;
 #endif
             {
                 /* rshell コマンド待ち。sys_halt でアイドル時の get_tick
