@@ -2,7 +2,7 @@ use super::*;
 use crate::mocks;
 use std::sync::{Mutex, atomic::Ordering::SeqCst};
 #[derive(Default)]
-struct Host { notice: Vec<u8>, output: Vec<u8>, opens: Vec<String>, result: bool }
+struct Host { notice: Vec<u8>, output: Vec<u8>, opens: Vec<String>, result: bool, calls: Vec<u32> }
 static HOST: Mutex<Option<Host>> = Mutex::new(None);
 fn host<T>(f: impl FnOnce(&mut Host) -> T) -> T { f(HOST.lock().unwrap().as_mut().unwrap()) }
 unsafe extern "C" fn boot(p: *mut u8) { core::ptr::write_bytes(p, 0xab, 16); }
@@ -20,8 +20,13 @@ unsafe extern "C" fn read(_: i32, p: *mut u8, _: u32) -> i32 {
 unsafe extern "C" fn write(_: i32, p: *const u8, n: u32) -> i32 {
     host(|h| h.output.extend_from_slice(core::slice::from_raw_parts(p, n as usize))); n as i32
 }
-unsafe extern "C" fn notice(_: u32, _: u32, p: *mut u8) -> i32 {
+unsafe extern "C" fn serial() -> u32 {
+    host(|h| h.calls.push(0));
+    mocks::HOST_NOTICE_SERIAL.load(SeqCst)
+}
+unsafe extern "C" fn notice(_: u32, service: u32, p: *mut u8) -> i32 {
     host(|h| {
+        h.calls.push(service);
         if h.notice.is_empty() { return -7; }
         // host_notice_read ABI: 20-byte header followed by the payload.
         core::ptr::write_bytes(p, 0, 256);
@@ -92,4 +97,24 @@ fn remote_g2_lan_without_uart_and_atomic_rejection() {
     assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
     st.now = 100; cycle(&mut st); pump(&mut st);
     assert!(host(|h| h.output.ends_with(b"gs:! wd expired\r\n")));
+}
+
+#[test]
+fn remote_g3_wm_polls_without_serial_change_or_foreground() {
+    use crate::{input::Ctx, wm};
+    let mut st = setup();
+    let mut api = unsafe { core::ptr::read(os32api::api()) };
+    api.host_notice_serial = serial;
+    os32api::os32_init(Box::into_raw(Box::new(api)));
+    open_lan(&mut st, 0);
+    // No foreground and serial stays at its initial value throughout startup.
+    for _ in 0..12 { wm::wm_cycle(&mut st, Ctx::Standalone); }
+    assert!(!host(|h| h.calls.is_empty()));
+    assert!(host(|h| h.calls.windows(2).any(|pair| pair == [65533, 0])));
+    assert!(host(|h| h.calls.iter().all(|&svc| svc == 65533 || svc == 0)));
+    host(|h| { h.calls.clear(); h.notice = b"\x0100000001 ping\n".to_vec(); });
+    wm::wm_cycle(&mut st, Ctx::Pump);
+    assert!(host(|h| h.calls.is_empty()));
+    for _ in 0..10 { wm::wm_cycle(&mut st, Ctx::Wait); }
+    assert!(host(|h| h.output.ends_with(b"gs:00000001 pong tick=0\r\ngs:00000001 end 0\r\n")));
 }
