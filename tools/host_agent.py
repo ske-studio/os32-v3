@@ -27,6 +27,7 @@ import binascii
 import os
 import random
 import re
+import queue
 import select
 import shutil
 import socket
@@ -34,6 +35,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import host_linux
@@ -1453,6 +1455,41 @@ def open_stream(args):
     return FrameStream(conn)
 
 
+def wait_for_stream(args, operator_socket):
+    """Keep the operator responsive while the frame transport opens."""
+    result = queue.Queue(maxsize=1)
+
+    def connect():
+        try:
+            result.put((open_stream(args), None))
+        except Exception as exc:
+            result.put((None, exc))
+
+    threading.Thread(target=connect, daemon=True).start()
+    while True:
+        try:
+            stream, error = result.get_nowait()
+        except queue.Empty:
+            service_operator(operator_socket, TICK_INTERVAL)
+            continue
+        if error is not None:
+            raise error
+        return stream
+
+
+def service_operator(operator_socket, timeout):
+    ready, _, _ = select.select(operator_socket.fileno_list(), [], [], timeout)
+    for fd in ready:
+        operator_socket.on_readable(fd)
+    operator_socket.poll(time.monotonic())
+
+
+def retry_wait(operator_socket):
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        service_operator(operator_socket, max(0, min(TICK_INTERVAL, deadline - time.monotonic())))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1522,11 +1559,11 @@ def main():
 
     while True:
         try:
-            stream = open_stream(args)
+            stream = wait_for_stream(args, agent.operator_socket)
         except OSError as e:
             print("connect failed: %s" % e, flush=True)
             if args.connect:
-                time.sleep(1.0)
+                retry_wait(agent.operator_socket)
                 continue
             return 1
         try:
@@ -1556,7 +1593,7 @@ def main():
             if args.connect or args.unix:
                 if args.unix:
                     continue
-                time.sleep(1.0)
+                retry_wait(agent.operator_socket)
 
 
 if __name__ == "__main__":
