@@ -12,7 +12,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-g4', tier=1, needs=[], budget=10,
-             covers=['tools/gserial.py', 'tools/remote_transport.py',
+             covers=['tools/gserial.py', 'tools/remote_transport.py', 'tools/host_agent_config.py',
                      'tools/tests/test_remote_g4.py', 'tools/host_image.py',
                      'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/rshell_hwb.py', 'tools/rshell_peek.py',

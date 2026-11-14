@@ -12,7 +12,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-x12', tier=1, needs=[], budget=10,
-             covers=['tools/rshell.py', 'tools/remote_transport.py',
+             covers=['tools/rshell.py', 'tools/remote_transport.py', 'tools/host_agent_config.py',
                      'tools/rshell_serial.py', 'tools/rshell_peek.py',
                      'tools/rshell_hwb.py', 'tools/serialfs_host.py',
                      'tools/lanfs_host.py', 'tools/lan_bridge.py',
