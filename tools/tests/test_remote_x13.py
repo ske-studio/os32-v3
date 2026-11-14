@@ -28,15 +28,21 @@ class FakeOperator:
     pending = None
     def __init__(self):
         self.notices = [b'gs:! hello']
+        self.results = {}
         self.disconnect = False
         self.server = None
     def submit(self, mode, line, client):
-        self.pending = dict(id='00000001', state='DONE', result=b'> ver\nOK\n\x04')
+        self.take_result()
+        self.pending = dict(id='00000001', state='done', result=b'> ver\nOK\n\x04')
         if self.disconnect:
             client['socket'].close()
         return '00000001'
     def take_result(self):
-        self.pending = None
+        if self.pending is not None and self.pending['state'] in ('done', 'truncated'):
+            self.results[self.pending['id']] = self.pending
+            result = self.pending
+            self.pending = None
+            return result
     def resume(self):
         self.pending = None
 
