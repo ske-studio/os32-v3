@@ -8,7 +8,7 @@ import re
 from typing import Callable
 
 
-MAX_SERVICE_ID = 65534
+MAX_SERVICE_ID = 65531  # REMOTE_SVC_REGISTRY_MAX in include/remote_control.h
 BUILTINS = ('os32.alive', 'os32.clip', 'os32.print', 'os32.http')
 SFS_SERVICES = ('os32.file', 'os32.iso9660')
 STUBS = ('os32.udf', 'os32.mail', 'os32.feed', 'os32.chat')
@@ -37,6 +37,8 @@ class Registry:
                 raise RuntimeError('service id range exhausted')
         else:
             service_id = previous[1]
+            if service_id > MAX_SERVICE_ID:
+                raise RuntimeError('existing service id is reserved')
             LOG.warning('duplicate service %s: last registration wins', name)
         if origin == 'plugin' and name.startswith('os32.'):
             LOG.warning('plugin uses OS32 reserved name %s', name)
@@ -49,6 +51,8 @@ class Registry:
     def list_bytes(self) -> bytes:
         lines = ['generation %d\n' % self.generation]
         for name, (version, service_id, origin, _) in self._services.items():
+            if service_id > MAX_SERVICE_ID:
+                raise RuntimeError('existing service id is reserved')
             lines.append('%s %d %d %s\n' % (name, version, service_id, origin))
         return ''.join(lines).encode('utf-8')
 

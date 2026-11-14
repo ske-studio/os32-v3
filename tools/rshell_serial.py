@@ -282,6 +282,22 @@ def check_echo(text, cmd):
     return first == echo_line(cmd)
 
 
+def run_serial(port, line, timeout_s, out=None):
+    """Send one command on an open port; rc describes the exchange, not the guest."""
+    text, ok = send_cmd(port, line, timeout_s)
+    if out is not None:
+        out.write(text)
+    if not ok:
+        if out is not None:
+            print("\n[rshell_serial] timeout waiting for EOT (%.0fs)" % timeout_s)
+        return 1, text
+    if not check_echo(text, line):
+        if out is not None:
+            print("[rshell_serial] desync: expected echo of %r" % line)
+        return 1, text
+    return 0, text
+
+
 def ack_ok(text):
     """`serial ack` の応答として受け取ってよいか (往復 4)。
 
@@ -576,17 +592,7 @@ def run_line(args, port, line, server=None, out=None):
                  " line_not_quiet" if flags & serialfs_host.XF_NOT_QUIET
                  else ""))
         return (0 if code == 0 else 1), text
-    text, ok = send_cmd(port, line, args.timeout)
-    out.write(text)
-    if not ok:
-        print("\n[rshell_serial] timeout waiting for EOT (%.0fs)" % args.timeout)
-        return 1, text
-    # **応答がこのコマンドのものか確かめる** (往復 2 B3)。EOT の対応が
-    # 1 つずれていると、以後ずっと前のコマンドの応答を読み続ける。
-    if not check_echo(text, line):
-        print("[rshell_serial] desync: expected echo of %r" % line)
-        return 1, text
-    return 0, text
+    return run_serial(port, line, args.timeout, out)
 
 
 def lan_result(text, line, eot):

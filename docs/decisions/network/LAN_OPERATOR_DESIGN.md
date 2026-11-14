@@ -241,3 +241,27 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 - 運用は VPN とローカルの中なので、操作口・frame の口の番地を制限する検査は置かない (ユーザー 2026-11-14「VPN とローカルで動いているのでセキュリティは気にしないで」。Opus の A4 は取り下げ)。
 - A5: state-dir に世代・id を永続しない (§2 設定)。
 - 受入で確かめる: 専用ユーザー os32-host が HostFS の root に書くときの所有者と権限、CAP_NET_RAW を AmbientCapabilities で渡すこと。
+
+## 実装の前に PM が決めたこと (2026-11-14、X5 の停止を受けて)
+
+### 操作口 (8027) の JSON の契約
+- 枠: 4B BE 長 + UTF-8 JSON の 1 オブジェクト。1 レコードは 16KiB 以内。バイト列はすべて base64 の文字列 (`*_b64`) で運ぶ。
+- 要求: `{"op": <名前>, ...}`。応答: `{"ok": true, ...}` か `{"ok": false, "error": <符号>, "detail": <文字列>}`。
+- 誤りの符号: `BAD_REQUEST` (形・長さ・JSON の誤り)、`NOT_READY` (HELLO か READY が無い)、`BUSY` (実行中が 1 件ある)、`UNKNOWN_PENDING` (UNKNOWN の後に resume されていない)、`NO_SUCH_ID`、`INVALID_LINE` (設計 §2 の実行前の拒否)。
+
+| op | 要求の欄 | 応答の欄 (ok のとき) |
+|---|---|---|
+| `probe` | なし | `agent_generation` (int)、`commit` (str)、`config` (`iface`・`root`・`allow_write`・`peer`)、`peer` (MAC か null)、`hello` (bool)、`ready` (`{"mode","last_id","state"}` か null)、`pending` (`{"id","state"}` か null) |
+| `submit` | `mode` (`cui`・`gui`・`diag`)、`line` (str、設計 §2 の制限) | `id` (8 桁 16 進) |
+| `result` | `id`、`wait_ms` (int、0 なら待たない) | `state` (`pending`・`done`・`unknown`)、`drop` (int)、`body_b64`、`complete` (bool: 長さ・drop・echo・EOT か end がそろったときだけ true) |
+| `resume` | なし | なし (UNKNOWN の後の、利用者の明示の再開) |
+| `notice` | `wait_ms` | `notices`: `[{"id": "!" か id, "body_b64"}]` (GSERIAL の非同期の `gs:!` など、届いた順) |
+| `log` | なし | 購読を始める。以後この接続に `{"event":"log","boot","seq","drop_records","drop_bytes","flags","text_b64"}` を届いた順に流す。購読中の接続でも他の op を送ってよい |
+
+- `result` の `wait_ms` の待ちと `log` の配信は、agent の select ループの中で行う。ソケット 1 本で agent を止めない。
+- probe の `commit` と `config` は、agent が口を作るときに渡す (`OperatorSocket(addr, operator, info)` の `info()` が辞書を返す)。
+- select ループへの結線の形 (X6 が使う):
+  - `fileno_list()`: 待つ fd の一覧。
+  - `on_readable(fd)`: その fd を読む。
+  - `poll(now)`: `wait_ms` の期限を処理する。
+  - `publish_log(record)`: LOG を購読者に流す。

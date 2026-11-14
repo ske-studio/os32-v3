@@ -45,7 +45,10 @@ class Notify:
         return struct.pack('<IH', self.generation, self.registry.resolve('os32.alive'))
 
     def notify(self, name, kind, data):
-        service = self.registry.resolve(name)
+        self.notify_number(self.registry.resolve(name), kind, data)
+
+    def notify_number(self, service, kind, data):
+        """Queue a notification for an explicitly numbered service."""
         data = bytes(data)
         if not 1 <= service <= 65534 or not 0 <= kind <= 65535 or len(data) > DATA_MAX:
             raise ValueError('invalid notification')
