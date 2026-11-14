@@ -11,7 +11,8 @@ static unsigned polls, halts, violations;
 static int pending, serial_byte = -1, injected = -1, wait_mode;
 volatile u32 tick_count;
 int rshell_active;
-int con_sink_capture_active(void) { return 0; }
+static int capture;
+int con_sink_capture_active(void) { return capture; }
 
 static void say(const char *s)
 {
@@ -64,7 +65,7 @@ int kbd_inject_take(u8 *out)
 static void fresh(void)
 {
     polls = halts = violations = 0;
-    pending = rshell_active = kbd_gui_mode = wait_mode = 0;
+    pending = rshell_active = kbd_gui_mode = wait_mode = capture = 0;
     serial_byte = injected = -1;
     kbd_head = kbd_count = 0;
     _enable();
@@ -124,6 +125,16 @@ static int test(void)
     pending = 1;
     CHECK(kbd_getchar_wait(1) == -1 && kbd_getkey_wait(1) == -1 && !polls,
           "GUI wait keeps park path");
+    fresh(); capture = 1; rshell_active = 1; serial_byte = 's'; wait_mode = 2;
+    tick_count = U32_MAX - PIT_HZ;
+    CHECK(kbd_trygetchar() == -1 && serial_byte == 's', "capture trychar serial");
+    CHECK(kbd_trygetkey() == -1 && serial_byte == 's', "capture trykey serial");
+    polls = 0; rshell_active = 0;
+    CHECK(kbd_getchar_wait(0) == '\r' && halts == 2 && serial_byte == 's', "capture char deadline");
+    fresh(); capture = 1; rshell_active = 1; serial_byte = 's'; wait_mode = 2;
+    CHECK(kbd_getchar_wait(0) == '\r' && serial_byte == 's', "capture wait serial");
+    fresh(); capture = 1; wait_mode = 2; tick_count = U32_MAX - PIT_HZ;
+    CHECK(kbd_getkey_wait(0) == 0x1b && halts == 2, "capture key deadline");
     say("GREEN keyboard CUI foreground waits and tries\n");
     return 0;
 }

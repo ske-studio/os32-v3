@@ -1,7 +1,7 @@
 """F2/F2i: real keyboard CUI foreground calls, ILP32 runtime mutants."""
 CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
              covers=['kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
-                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
+                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/test_remote_x8a.py',
                      'tools/tests/host_arch/**', 'build/config.mk',
                      'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc',
                      'drivers/input/*.h', 'drivers/char/serial.h',
@@ -41,6 +41,17 @@ MUTATIONS = [
     ('key-wait-connection', KBD,
      '    while (kbd_count == 0) {\n        kbd_foreground_poll();',
      '    while (kbd_count == 0) {'),
+    ('char deadline', KBD, 'rshell_active || con_sink_capture_active()', 'rshell_active'),
+    ('key deadline', KBD, 'if (capture && (u32)(tick_count - start_tick)',
+     'if (0 && capture && (u32)(tick_count - start_tick)'),
+    ('trychar serial', KBD,
+     '    if (rshell_active && !con_sink_capture_active()) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch;\n',
+     '    if (rshell_active) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch;\n'),
+    ('wait serial', KBD, '            if (rshell_active && !con_sink_capture_active()) {',
+     '            if (rshell_active) {'),
+    ('trykey serial', KBD,
+     '    if (rshell_active && !con_sink_capture_active()) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch; /*',
+     '    if (rshell_active) {\n        int sch;\n        sch = serial_trygetchar();\n        if (sch >= 0) return sch; /*'),
 ]
 
 
