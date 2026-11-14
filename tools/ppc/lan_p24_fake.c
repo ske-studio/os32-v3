@@ -279,6 +279,59 @@ static void scenario(void) {
     CHECK(!off_count,"unexpected-off");
     out("PASS\n");
 }
-void _start(void) { scenario(); __asm__ volatile("int $0x80"::"a"(1),"b"(0)); __builtin_unreachable(); }
+void _start(void) {
+    /* PPC_LAN_DESIGN §4: independent wire constants retained from P1. */
+    CHECK(LAN_OK == 0, "wire LAN_OK");
+    CHECK(LAN_AGAIN == 1, "wire LAN_AGAIN");
+    CHECK(LAN_EINVAL == -1, "wire LAN_EINVAL");
+    CHECK(LAN_ENODEV == -2, "wire LAN_ENODEV");
+    CHECK(LAN_ERANGE == -3, "wire LAN_ERANGE");
+    CHECK(LAN_ETIME == -4, "wire LAN_ETIME");
+    CHECK(LAN_EIO == -5, "wire LAN_EIO");
+    CHECK(LAN_EUNSUPPORTED == -6, "wire LAN_EUNSUPPORTED");
+    CHECK(LAN_EBUSY == -7, "wire LAN_EBUSY");
+    CHECK(PLN1_STATUS_OK == 0, "wire PLN1_STATUS_OK");
+    CHECK(PLN1_STATUS_UNSUPPORTED == 1, "wire PLN1_STATUS_UNSUPPORTED");
+    CHECK(PLN1_STATUS_BAD_LENGTH == 2, "wire PLN1_STATUS_BAD_LENGTH");
+    CHECK(PLN1_STATUS_RANGE == 3, "wire PLN1_STATUS_RANGE");
+    CHECK(PLN1_STATUS_CONFLICT == 4, "wire PLN1_STATUS_CONFLICT");
+    CHECK(PLN1_STATUS_STALE == 5, "wire PLN1_STATUS_STALE");
+    CHECK(PLN1_STATUS_BUSY == 6, "wire PLN1_STATUS_BUSY");
+    CHECK(PLN1_STATUS_FAULT == 7, "wire PLN1_STATUS_FAULT");
+    CHECK(PLN1_MAGIC == 1347178033, "wire PLN1_MAGIC");
+    CHECK(PLN1_VERSION == 1, "wire PLN1_VERSION");
+    CHECK(PLN1_TYPE_BEACON == 1, "wire PLN1_TYPE_BEACON");
+    CHECK(PLN1_TYPE_LOG == 2, "wire PLN1_TYPE_LOG");
+    CHECK(PLN1_TYPE_REQ == 3, "wire PLN1_TYPE_REQ");
+    CHECK(PLN1_TYPE_RSP == 4, "wire PLN1_TYPE_RSP");
+    CHECK(PLN1_HEADER_BYTES == 80, "wire PLN1_HEADER_BYTES");
+    CHECK(PLN1_ETHERTYPE == 34998, "wire PLN1_ETHERTYPE");
+    CHECK(PLN1_PAYLOAD_MAX == 256, "wire PLN1_PAYLOAD_MAX");
+    CHECK(PLN1_OFF_MAGIC == 0, "wire PLN1_OFF_MAGIC");
+    CHECK(PLN1_OFF_VERSION == 4, "wire PLN1_OFF_VERSION");
+    CHECK(PLN1_OFF_TYPE == 5, "wire PLN1_OFF_TYPE");
+    CHECK(PLN1_OFF_HEADER_BYTES == 6, "wire PLN1_OFF_HEADER_BYTES");
+    CHECK(PLN1_OFF_BOOT_ID == 8, "wire PLN1_OFF_BOOT_ID");
+    CHECK(PLN1_OFF_SEQ == 24, "wire PLN1_OFF_SEQ");
+    CHECK(PLN1_OFF_DROP_RECORDS == 32, "wire PLN1_OFF_DROP_RECORDS");
+    CHECK(PLN1_OFF_DROP_BYTES == 40, "wire PLN1_OFF_DROP_BYTES");
+    CHECK(PLN1_OFF_REQUEST_ID == 48, "wire PLN1_OFF_REQUEST_ID");
+    CHECK(PLN1_OFF_OPCODE == 52, "wire PLN1_OFF_OPCODE");
+    CHECK(PLN1_OFF_STATUS == 54, "wire PLN1_OFF_STATUS");
+    CHECK(PLN1_OFF_PAYLOAD_BYTES == 56, "wire PLN1_OFF_PAYLOAD_BYTES");
+    CHECK(PLN1_OFF_FLAGS == 58, "wire PLN1_OFF_FLAGS");
+    CHECK(PLN1_OFF_RESERVED == 60, "wire PLN1_OFF_RESERVED");
+    CHECK(PLN1_OFF_HOST_NONCE == 64, "wire PLN1_OFF_HOST_NONCE");
+    CHECK(PLN1_OP_STATUS == 1, "wire PLN1_OP_STATUS");
+    CHECK(PLN1_OP_CLOCK == 2, "wire PLN1_OP_CLOCK");
+    CHECK(PLN1_OP_MEMORY == 3, "wire PLN1_OP_MEMORY");
+    CHECK(PLN1_OP_READ_DIAG == 4, "wire PLN1_OP_READ_DIAG");
+    CHECK(PLN1_OP_PEEK == 5, "wire PLN1_OP_PEEK");
+    CHECK(PLN1_REQ_STATUS_BYTES == 0, "wire PLN1_REQ_STATUS_BYTES");
+    CHECK(PLN1_REQ_CLOCK_BYTES == 0, "wire PLN1_REQ_CLOCK_BYTES");
+    CHECK(PLN1_REQ_MEMORY_BYTES == 0, "wire PLN1_REQ_MEMORY_BYTES");
+    CHECK(PLN1_REQ_READ_DIAG_BYTES == 4, "wire PLN1_REQ_READ_DIAG_BYTES");
+    CHECK(PLN1_REQ_PEEK_BYTES == 8, "wire PLN1_REQ_PEEK_BYTES");
+    scenario(); __asm__ volatile("int $0x80"::"a"(1),"b"(0)); __builtin_unreachable(); }
 
 const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void) { static const struct pm_gmac_rh_sample q; return &q; }

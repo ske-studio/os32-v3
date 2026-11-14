@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check the PPC instruction publication loops in the compiled backend."""
+import os
 import argparse
 from pathlib import Path
 import re
@@ -7,13 +8,9 @@ import shlex
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-exec-cache', tier=2, budget=60,
-             covers=['arch/ppc/exec_cache.c', 'arch/ppc/exec_cache.h',
-                     'tools/ppc/test_exec_cache.py'],
-             inputs=['arch/ppc/ppc_oea.h', 'build/ppc-kboot.mk'])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'arch/ppc/exec_cache.c'
-PPC = Path('/home/hight/opt/cross-ppc/bin')
+PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
 def require(cmd):

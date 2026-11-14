@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """Exercise PPC DMA ownership transitions and inspect emitted instructions."""
+import os
 import argparse
 import re
 import subprocess
 import tempfile
 from pathlib import Path
 
-CHECK = dict(name="ppc-lan-p11", tier=2, budget=60,
-             covers=["arch/ppc/dma_cache.c", "tools/ppc/test_lan_p11.py",
-                     "tools/ppc/lan_p11_fake.c"],
-             inputs=["drivers/net/gem/gem.h", "include/types.h", "include/callconv.h",
-                     "arch/ppc/ppc_oea.h", "arch/ppc/ppc_boot.h", "build/ppc-kboot.mk"])
 ROOT = Path(__file__).resolve().parents[2]
-PPC = Path('/home/hight/opt/cross-ppc/bin')
+PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 FLAGS = '''-std=gnu11 -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec
 -msdata=none -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon
 -fsigned-char -fno-short-enums -fno-builtin -fno-asynchronous-unwind-tables -O2

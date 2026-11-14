@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Compile the PPC USER CRT and inspect its entry sequence."""
-CHECK = dict(name='ppc-user-crt', tier=2, budget=60,
-             covers=['sdk/crt/ppc/crt0.S', 'sdk/crt/ppc/start.c',
-                     'tools/ppc/test_user_crt.py'],
-             inputs=['build/ppc-kboot.mk', 'sdk/include/os32api.h'], needs=[])
+import os
 import argparse
 from pathlib import Path
 import re
@@ -12,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-BIN = Path('/home/hight/opt/cross-ppc/bin')
+BIN = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
 def command(args):

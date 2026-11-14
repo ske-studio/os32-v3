@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 """Exercise the PPC parent context across a simulated child longjmp."""
-CHECK = dict(name='ppc-exec-return', tier=1,
-             covers=['tools/ppc/test_exec_return.py'],
-             inputs=['arch/ppc/exec_context.c', 'arch/ppc/arch_cpu.h',
-                     'arch/ppc/arch_exec_storage.h', 'include/exec_arch.h',
-                     'include/types.h', 'arch/ppc/ppc_frame.h',
-                     'arch/ppc/exec_resume.S', 'lib/kstring.h', 'lib/kstring_c.c'], needs=[], budget=3)
 import subprocess
 import sys
 import tempfile

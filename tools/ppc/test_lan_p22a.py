@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
-CHECK = dict(name='lan-p22a', tier=2, budget=60, covers=['arch/ppc/kernel_probe.h', 'tools/ppc/test_lan_p22a.py'], needs=[])
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = ROOT / 'arch/ppc/kernel_probe.h'
 

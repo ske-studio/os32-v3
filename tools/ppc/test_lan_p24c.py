@@ -9,11 +9,6 @@ import shlex
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p24c', tier=2, budget=60,
-             covers=['platform/powermac/lan_gem_io.c', 'tools/ppc/test_lan_p24c.py'],
-             inputs=['platform/powermac/lan_boot.h', 'drivers/net/gem/gem.h',
-                     'arch/ppc/kernel_boot.h', 'platform/powermac/kboot_info.h',
-                     'build/ppc-kboot.mk'])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/lan_gem_io.c'
 PPC = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'

@@ -10,15 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 
-CHECK = dict(name='ppc-lan-p3', tier=2, budget=60,
-             covers=['platform/powermac/gmac_tree.c', 'tools/ppc/lan_p3_fake.c',
-                     'tools/ppc/test_lan_p3.py'],
-             inputs=['platform/powermac/lan_boot.h', 'platform/powermac/ofw.h',
-                     'arch/ppc/ppc_boot.h', 'include/types.h', 'lib/kstring.h',
-                     'lib/kstring_c.c', 'tools/tests/host32.py',
-                     'platform/powermac/pci_config.c', 'arch/ppc/ppc_oea.h',
-                     'arch/ppc/kernel_boot.h', 'arch/ppc/ppc_boot.h',
-                     'drivers/net/gem/gem.h'])
 
 
 MUTATIONS = [

@@ -6,10 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p17', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_phy.c', 'tools/ppc/test_lan_p17.py',
-                     'tools/ppc/lan_p17_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('ta0', 'if (v & GEM_MIF_FRAME_TA0)', 'if (!(v & GEM_MIF_FRAME_TA0))', 2, 'H:A6 phy-invalid'),

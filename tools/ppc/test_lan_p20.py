@@ -8,11 +8,6 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/lan_log.c'
-CHECK = dict(name='ppc-lan-p20', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/lan_log.c'],
-             inputs=['tools/ppc/test_lan_p20.py', 'tools/ppc/lan_p20_test.c',
-                     'platform/powermac/lan_boot.h', 'platform/powermac/kboot_log.h',
-                     'arch/ppc/ppc_oea.h', 'include/types.h'])
 MUTATIONS = [
     ('stats-consume', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags;', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags; if (count) { head = (head + 1) % LOG_SLOTS; count--; }', 'reached=stats-full', 'H:stats-preserve'),
     ('stats-swap', '*records = drop_records; *bytes = drop_bytes; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', '*records = drop_bytes; *bytes = drop_records; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', 'reached=stats-full', 'H:stats-values'),

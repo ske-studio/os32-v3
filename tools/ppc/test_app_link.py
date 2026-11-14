@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Link and package a PowerPC user application with the production CRT."""
-CHECK = dict(covers=['sdk/link/ppc/app.ld', 'tools/ppc/test_app_link.py'],
-             inputs=['sdk/**', 'tools/ppc/test_app_link.py'])
+import os
 from pathlib import Path
 import struct
 import shutil
@@ -10,7 +9,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-BIN = Path('/home/hight/opt/cross-ppc/bin')
+BIN = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as hdr
 

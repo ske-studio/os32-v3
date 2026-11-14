@@ -26,8 +26,7 @@
 | `pins` | 空でない文字列の list、既定 `[]` | 固定している欠陥を変える設計の ID。現行の `docs/` 本文に存在すること (archive・hw は対象外) |
 | `full_only` | bool、既定 `False` | `True` は毎回の CI から外し、full-check の `make check` で回す |
 
-`basis` が空で `kind` も無い宣言は移行中のため警告だけとし、件数を表示する。
-全件を埋めた次の段で `run.py` の `REQUIRE_EXPECTATION_SOURCE` を `True` に変え、error にする。
+`basis` が空で `kind` も無い宣言は lint の error とし、件数を表示する。
 `kind='contract'` だけでは期待の出所にならないので、契約には `basis` を書く。
 
 `full_only` とそれを前提にする検査は、`CHECK_ROUTINE=1` の list・make 登録・実行から除外する。

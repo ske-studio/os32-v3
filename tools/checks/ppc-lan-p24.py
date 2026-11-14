@@ -1,0 +1,39 @@
+"""Register tools/ppc/test_lan_p24.py with its design expectations."""
+CHECK = dict(
+    name='ppc-lan-p24',
+    tier=2,
+    budget=60,
+    needs=[],
+    covers=['tools/ppc/test_lan_p24.py',
+     'platform/powermac/lan_service.c',
+     'tools/ppc/lan_p24_fake.c',
+     'platform/powermac/gmac_dma.c',
+     'mm/paging.h',
+     'drivers/net/gem/gem_reset.c',
+     'drivers/net/gem/gem_ring.c',
+     'drivers/net/gem/gem_mac.c',
+     'drivers/net/gem/gem_phy.c',
+     'drivers/net/gem/gem_tx.c',
+     'drivers/net/gem/gem_rx.c',
+     'platform/powermac/lan_log.c',
+     'platform/powermac/lan_wire.c',
+     'platform/powermac/lan_monitor.c',
+     'platform/powermac/lan_diag.c',
+     'platform/powermac/lan_terminal.c',
+     'platform/powermac/lan_boot.h',
+     'drivers/net/gem/gem.h',
+     'include/*.h',
+     'arch/ppc/*.h',
+     'lib/kstring.h',
+     'sdk/include/os32/*.h',
+     'platform/powermac/kboot_info.h',
+     'platform/powermac/kboot_log.h',
+     'tools/checks/ppc_registered.py'],
+    basis=['PPC_LAN_SERVICE_DESIGN §2/§5', 'PPC_LAN_DESIGN §3/§4'],
+    env_limit='ホストの模型・コンパイル検査であり実機の MMIO・DMA・割込みのタイミング障害は保証しない。',
+    full_only=False,
+)
+
+def run(ctx):
+    from ppc_registered import run_test
+    return run_test(ctx, 'tools/ppc/test_lan_p24.py', ['gcc', 'qemu-i386'])

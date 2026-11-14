@@ -13,14 +13,6 @@ PRODUCTS = ['drivers/net/gem/gem_' + name + '.c'
 PRODUCTS += ['platform/powermac/gmac_dma.c']
 PRODUCTS += ['platform/powermac/lan_' + name + '.c'
              for name in ('log', 'wire', 'monitor', 'diag', 'terminal')]
-CHECK = dict(name='ppc-lan-terminal-service', tier=2, budget=60,
-             covers=['tools/ppc/test_lan_terminal_service.py'],
-             inputs=['platform/powermac/lan_service.c', 'platform/powermac/lan_terminal.c',
-                     'tools/ppc/lan_p24_fake.c', 'platform/powermac/*.h',
-                     'drivers/net/gem/*.c', 'drivers/net/gem/*.h',
-                     'platform/powermac/gmac_dma.c', 'platform/powermac/lan_*.c',
-                     'mm/paging.h', 'include/*.h', 'arch/ppc/*.h', 'lib/kstring.h',
-                     'sdk/include/os32/*.h'])
 MUTATIONS = [
     ('alternate', 's.out_turn = !use_out;', 's.out_turn = 0;', 'alternate', 'H:alternate'),
     ('state-interval', 's.state_at = now + s.g.io.tb_hz;', 's.state_at = now;', 'state-interval', 'H:state-interval'),
