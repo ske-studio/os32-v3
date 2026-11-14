@@ -1,5 +1,5 @@
 #include "gfx2_core_fake.h"
-/* P1 is covered by pegc-v2-host; v1 lifecycle tests fake C1/Y4 and the table. */
+/* P1 is covered by pegc-mode-host; v1 lifecycle tests fake C1/Y4 and the table. */
 const GfxBackendV2 pegc_backend_v2 = {.abi = GFX_HAL2_ABI};
 static u8 pegc_sync_fake;
 __attribute__((weak)) int gfxsync_bind(const char *key, const GfxSyncTarget *t, GfxSyncCtx **out)

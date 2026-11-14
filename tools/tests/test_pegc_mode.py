@@ -17,8 +17,9 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='pegc-mode-host', tier=1,
-    covers=['drivers/video/pc98/pegc_v2.c', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/pc98/pegc_v2.c', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_pegc_mode.py', 'drivers/video/pc98/backend_pegc_*.inc'],
     needs=[], budget=3.5,
+    basis=['HAL_V2_DESIGN §5', 'HAL_V2_DESIGN §6', 'HAL_V2_DESIGN §7'],
     kind='characterization',
 )
 
@@ -321,11 +322,31 @@ MUTATIONS = [
 ]
 
 
+V2_MUTATIONS = [
+    ('software-only', "drivers/video/pc98/pegc_v2.c", 'out->caps2d_sw = ops;', 'out->caps2d_sw = 0;'),
+    ('scanout-format', "drivers/video/pc98/pegc_v2.c", 'out->fmt_scanout = 1u << GFX2_FMT_INDEX8;', 'out->fmt_scanout = 1u << GFX2_FMT_RGB565;'),
+    ('empty-heap', "drivers/video/pc98/pegc_v2.c", '*base = *size = *phys = 0;', '*base = *size = *phys = 1;'),
+    ('kva', "drivers/video/pc98/pegc_v2.c", '*va = s->kva;', '*va = NULL;'),
+    ('completion', "drivers/video/pc98/pegc_v2.c", '*done = 0;', '*done = 1;'),
+    ('palette', "drivers/video/pc98/pegc_v2.c", '(xrgb[i] >> 20) & 15', '(xrgb[i] >> 16) & 15'),
+    ('publish-kind', MUT_TARGET, 'gfx2_sync_publish(GFX2_KIND_PEGC, 0, s_sync);', 'gfx2_sync_publish(GFX2_KIND_PC98, 0, s_sync);'),
+    ('bind-fallback', MUT_TARGET, 's_probe_ok = 0;\n        return;', 's_probe_ok = 1;\n        return;'),
+    ('fixed-shadow', MUT_TARGET, 'gfxsync_mode(s_sync) != GFXSYNC_SHADOW', 'gfxsync_mode(s_sync) == GFXSYNC_SHADOW'),
+    ('rebind-unpublish', MUT_TARGET, 'gfx2_sync_publish(GFX2_KIND_PEGC, 0, NULL);', '(void)0;'),
+    ('shutdown-unbind', RESTORE_TARGET, '    pegc_sync_drop();\n    if (!s_active) return;', '    (void)0;\n    if (!s_active) return;'),
+    ('text-restore-unbind', RESTORE_TARGET, 'void pegc_restore_text_sync(int hsync31)\n{\n    pegc_sync_drop();', 'void pegc_restore_text_sync(int hsync31)\n{\n    (void)0;'),
+    ('publish-rollback', MUT_TARGET, 'rc = gfx2_sync_publish(GFX2_KIND_PEGC, 0, s_sync);\n    if (rc)', 'rc = gfx2_sync_publish(GFX2_KIND_PEGC, 0, s_sync);\n    if (!rc)'),
+]
+
+
 def one_mutation(item):
     name, target, old, new = item
     original = (ROOT / target).read_text(encoding="utf-8")
     if name == "hsync_upper_bits":
         # 起動時の生の読み (81h など) を書き戻す誤り。値を持つ変数ごと足す。
+        if (original.count("static int gdc_wait_status(") != 1 or
+                original.count("    raw    = (u8)_in(PEGC_HSYNC_PORT);\n") != 1):
+            return "MUTATE %-34s FAIL (補助の目印が一意でない)" % name, 1
         original_new = original.replace(
             "static int gdc_wait_status(",
             "static u8  s_boot_hsync_raw = 0;\nstatic int gdc_wait_status(", 1)
@@ -346,15 +367,17 @@ def one_mutation(item):
                 ROOT, td, {target: base.replace(old, new, 1)},
                 [host_cmd(exe)], capture_output=True)
         except subprocess.CalledProcessError:
-            return "MUTATE %-34s RED (コンパイルが通らない)" % name, 0
+            return "MUTATE %-34s FAIL (コンパイルが通らない)" % name, 1
         try:
             out = host32.run([str(exe)], cwd=str(tree), timeout=60,
                                  capture_output=True)
         except subprocess.TimeoutExpired:
-            return mutpar.timeout_red(("MUTATE %-34s RED (時間切れ)" % name, 0))
+            return mutpar.timeout_red(("MUTATE %-34s FAIL (時間切れ)" % name, 1))
     if out.returncode == 0:
         return ("MUTATE %-34s **GREEN のまま = 試験が規則を見ていない**"
                 % name, 1)
+    if not 0 < out.returncode < 128:
+        return "MUTATE %-34s FAIL (runtime rc=%d)" % (name, out.returncode), 1
     last = out.stdout.decode("utf-8", "replace").strip().splitlines()[-1:]
     return "MUTATE %-34s RED (期待どおり落ちた: %s)" % (
         name, last[0] if last else "rc=%d" % out.returncode), 0
@@ -376,8 +399,14 @@ if __name__ == "__main__":
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS (backend_pegc.c)",
               flush=True)
         if "--mutate" in sys.argv:
-            failed += mutpar.run_with_control(one_mutation, MUTATIONS,
+            failed += mutpar.run_with_control(one_mutation, MUTATIONS + V2_MUTATIONS,
                                               ("control", MUT_TARGET, "", ""))
+            restored, bad = one_mutation(("control", MUT_TARGET, "", ""))
+            if bad != 1 or "GREEN" not in restored:
+                print("FAIL restored control: " + restored, flush=True)
+                failed += 1
+            else:
+                print("GREEN restored control", flush=True)
     sys.exit(1 if failed else 0)
 
 
@@ -385,10 +414,14 @@ def run(ctx) -> int:
     import os
     import shlex
     import subprocess
-    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
-    env = dict(base_env)
-    argv = ['python3', '-B', 'tools/tests/test_pegc_mode.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
-    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
-    if rc:
-        return rc
+    if not ctx.runners:
+        return 1
+    for i, runner in enumerate(ctx.runners):
+        argv = ['python3', '-B', 'tools/tests/test_pegc_mode.py',
+                *shlex.split('--mutate' if ctx.mutate and i == 0 else '')]
+        rc = subprocess.call(argv, cwd=ctx.root,
+                             env=dict(os.environ, HOST32_RUNNERS=runner),
+                             close_fds=False)
+        if rc:
+            return rc
     return 0
