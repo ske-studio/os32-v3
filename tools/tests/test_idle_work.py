@@ -4,7 +4,9 @@ CHECK = dict(name='idle-work-host', tier=1,
             'build/sources/common.mk', 'build/sources/order.mk',
             'tools/tests/idle_work_host.c', 'tools/tests/test_idle_work.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3)
+    needs=[], budget=3,
+    basis=['AC-CTX-4'],
+)
 
 import os
 from pathlib import Path

@@ -2,7 +2,9 @@
 CHECK = dict(name='sep5-boot-host', tier=1,
     covers=['tools/tests/build_fixture.py', 'sdk/target_profile.py', 'sdk/target_profile_cli.py', 'tools/tests/test_sep5_boot.py', 'tools/checks/sep5-boot-host.py',
             'build/**/*.mk', 'boot/*', 'Makefile', 'build/config.mk'],
-    needs=[], budget=10)
+    needs=[], budget=10,
+    basis=['PPC_SEP5_DESIGN §2.2', 'PPC_SEP5_DESIGN §2.3', 'PPC_SEP5_DESIGN §6'],
+)
 
 
 def run(ctx):

@@ -7,7 +7,9 @@ CHECK = dict(name='remote-x10', tier=1, needs=[], budget=12,
             'sdk/include/os32/ls.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_host_notice.h',
             'tools/tests/remote_x10_host.c', 'tools/tests/test_remote_x10.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['LAN_OPERATOR_DESIGN §3'],
+)
 import argparse
 from pathlib import Path
 import subprocess

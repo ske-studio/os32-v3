@@ -3,7 +3,9 @@
 CHECK = dict(name='mtrr-wc-host', tier=1,
     covers=['arch/x86/kernel/mtrr_wc.c', 'arch/x86/kernel/mtrr_wc.h',
             'include/types.h', 'tools/tests/host32.py'],
-    needs=[], budget=3.4)
+    needs=[], budget=3.4,
+    basis=['PPC_SEP5_DESIGN §2.2', 'PPC_SEP5_DESIGN §2.3', 'PPC_SEP5_DESIGN §6'],
+)
 
 from pathlib import Path
 import subprocess

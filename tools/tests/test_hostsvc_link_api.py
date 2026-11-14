@@ -1,13 +1,15 @@
 """A11 real API/deadline hooks; no libc, explicit ILP32 runner."""
 CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
-    covers=['net/nic.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
+    covers=['tools/tests/link_platform_fake/link_platform_inline.h', 'net/nic.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
             'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
             'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
-            'tools/tests/hostsvc_link_api_host.c'])
+            'tools/tests/hostsvc_link_api_host.c'],
+    basis=['NET_HOSTSVC_DESIGN §6', 'NET_HOSTSVC_DESIGN §7', 'NET_HOSTSVC_DESIGN §11'],
+)
 import argparse
 from pathlib import Path
 import shutil
@@ -35,7 +37,7 @@ def build(folder, mutation=None):
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
         '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
         '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-        '-Wl,--gc-sections', '-I' + str(folder), *include_flags(ROOT),
+        '-Wl,--gc-sections', '-I' + str(folder), '-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT),
         str(ROOT / 'tools/tests/hostsvc_link_api_host.c'), '-o', str(exe)], check=True)
     return exe
 

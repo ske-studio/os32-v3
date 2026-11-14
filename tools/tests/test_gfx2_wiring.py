@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-wiring-host', tier=1, needs=[], budget=5,
     covers=['tools/checks/gfx2_wiring.txt', 'tools/checks/gfx2_no_weak.sh',
             'tools/tests/test_gfx2_wiring.py', 'gfx/v2/a0_weak.c',
-            'gfx/sync/a0_weak.c', 'drivers/video/geforce/gf_v2_weak.c'])
+            'gfx/sync/a0_weak.c', 'drivers/video/geforce/gf_v2_weak.c'],
+    basis=['HAL_V2_DESIGN §11-7', 'HAL_V2_DESIGN §13-1'],
+)
 from pathlib import Path
 import argparse
 import subprocess

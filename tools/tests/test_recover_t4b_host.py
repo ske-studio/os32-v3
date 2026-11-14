@@ -1,7 +1,10 @@
 """T4b-9: one fake reader, split terminal/EOT suppression, real monitor."""
 CHECK = dict(name='recover-t4b-host', tier=1,
     covers=['tools/accept/recover_t4b_host.py', 'tools/rshell_recover.py', 'tools/tests/test_rshell_recover.py', 'tools/tests/mutpar.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['REALHW_RECOVER_DESIGN §5', 'REALHW_RECOVER_DESIGN §7'],
+    full_only=True,
+)
 
 from contextlib import redirect_stderr
 import io

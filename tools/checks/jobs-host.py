@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 CHECK = dict(name='jobs-host', tier=1,
     covers=['tools/tests/test_jobs.py', 'tools/jobs.sh'],
-    needs=[], budget=4.6)
+    needs=[], budget=4.6,
+    kind='characterization',
+    full_only=True,
+)
 
 
 def run(ctx) -> int:

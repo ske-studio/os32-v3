@@ -4,7 +4,9 @@ CHECK = dict(name='gfx2-sysmem-host', tier=1,
             'mm/paging.h', 'lib/kstring.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_sysmem_host.c', 'tools/tests/test_gfx2_sysmem.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['HAL_V2_DESIGN §7-2', 'HAL_V2_DESIGN §12-1'],
+)
 
 
 def run(ctx) -> int:

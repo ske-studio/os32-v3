@@ -11,7 +11,9 @@ CHECK = dict(name='gfx-map-policy-host', tier=1,
             'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'tools/tests/kernel_layout.py', 'tools/tests/mutpar.py'],
-    needs=['make:all'], budget=2.0)
+    needs=['make:all'], budget=2.0,
+    basis=['GFX_ACCEL_HAL_DESIGN §2', 'GFX_ACCEL_HAL_DESIGN §3-4'],
+)
 
 import argparse
 from test_gfx_kernel_fb import run_case

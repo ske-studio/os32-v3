@@ -7,7 +7,10 @@ CHECK = dict(name='arch-ctx-host', tier=2, budget=15, needs=[], covers=[
     'arch/x86/kernel/syscall_entry.c', 'arch/x86/arch_exec_storage.h',
     'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'kernel/irq/irq.h',
     'init/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
-    'include/**', 'sdk/include/os32/**'])
+    'include/**', 'sdk/include/os32/**'],
+    # W4c landed: the PPC vectors now assert the contract, so nothing here is pinned any more.
+    basis=['AC-CTX-1', 'AC-CTX-5', 'AC-CTX-7'],
+)
 import os
 from pathlib import Path
 import subprocess

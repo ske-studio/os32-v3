@@ -19,7 +19,11 @@ CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=['make:all'],
                      'platform/powermac/clock.c', 'platform/powermac/escc.c',
                      'platform/powermac/escc_tree.c', 'platform/powermac/mpic.c',
                      'platform/powermac/ofw.c', 'tools/ppc/kboot_mutations.py',
-                     'tools/ppc/shell_run.py'])
+                     'tools/ppc/shell_run.py'],
+    basis=['PPC_SHELL_SC_DESIGN'],
+    env_limit='QEMUのfd1ストリームを確認するが、実ESCC・LANの送信詰まりと実機のIRQ時序は保証しない。',
+    full_only=True,
+)
 
 
 def run(ctx):

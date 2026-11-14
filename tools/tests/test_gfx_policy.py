@@ -13,7 +13,9 @@ CHECK = dict(name='gfx-policy-host', tier=1, needs=[], budget=15, covers=[
     'gfx/gfx_policy.c', 'gfx/gfx_policy.h', 'gfx/gfx_internal.h', 'gfx/gfx.h',
     'include/gfx_hal.h', 'include/con_sink.h', 'mm/pgalloc.h', 'exec/appslot.h',
     'tools/tests/gfx_policy_host.c', 'tools/tests/test_gfx_policy.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-4'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('bridge-rebind', '        v1_bridge_rebind();', '        (void)0;'),

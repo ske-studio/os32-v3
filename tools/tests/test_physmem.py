@@ -1,4 +1,4 @@
-"""Synthetic host-only physical range tests; never evidence of machine RAM.
+"""Physical range tests with fake machine input; never evidence of machine RAM.
 Run: python3 tools/tests/test_physmem.py
 Uses real ILP32 types.h and GNU11 core, no libc/multilib runtime required.
 """
@@ -19,7 +19,7 @@ LAYOUT_FLAGS = [
 
 
 class PhysmemTests(unittest.TestCase):
-    def run_c(self, body, flags=('-DPHYSMEM_HOST_TEST=1',)):
+    def run_c(self, body, flags=()):
         self.assertTrue((ROOT / 'mm/physmem.c').exists(),
                         'physical range model not implemented')
         with tempfile.TemporaryDirectory(prefix='os32-physmem-') as tmp:
@@ -55,11 +55,12 @@ void _start(void) {
                              'C CHECK failed at line ' + str(result.returncode)
                              + '\n' + src.read_text())
 
-    def test_non_host_builds_reject_synthetic_atomically(self):
-        # Kernel wins even when the host-only switch is accidentally supplied.
+    def test_all_builds_reject_synthetic_atomically(self):
+        # Obsolete host flags must never change the trust boundary.
         modes = (
             ('kernel', ('-D__KERNEL_BUILD__',)),
             ('default', ()),
+            ('host', ('-DPHYSMEM_HOST_TEST=1',)),
             ('kernel_and_host', ('-D__KERNEL_BUILD__', '-DPHYSMEM_HOST_TEST=1')),
             ('host_disabled', ('-DPHYSMEM_HOST_TEST=0',)),
         )
@@ -113,7 +114,7 @@ void _start(void) {
     u32 count;
     physmem_init(&m);
     CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN,
-                             PHYSMEM_SOURCE_SYNTHETIC));
+                             PHYSMEM_SOURCE_MACHINE));
     CHECK(m.count == 1);
     CHECK(physmem_count(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_RAM, &count));
     CHECK(count == 1048576UL);
@@ -142,13 +143,13 @@ void _start(void) {
     unsigned char *a, *b;
     physmem_init(&m);
     physmem_init(&reverse);
-    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_exclude(&m, 10, 20, PHYSMEM_RESERVED));
     CHECK(physmem_exclude(&m, 15, 25, PHYSMEM_MMIO));
     CHECK(physmem_exclude(&reverse, 15, 25, PHYSMEM_MMIO));
     CHECK(physmem_exclude(&reverse, 10, 20, PHYSMEM_RESERVED));
-    CHECK(physmem_add_trusted(&reverse, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&reverse, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
+    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     a = (unsigned char *)&m; b = (unsigned char *)&reverse;
     for (i = 0; i < sizeof(m); i++) CHECK(a[i] == b[i]);
     CHECK(physmem_count(&m, 0, 30, PHYSMEM_RAM, &count) && count == 15);
@@ -163,7 +164,7 @@ void _start(void) {
     CHECK(m.count == 63);
     CHECK(physmem_exclude(&m, 63, PHYSMEM_MAX_PFN, PHYSMEM_MMIO));
     CHECK(m.count == PHYSMEM_MAX_RANGES);
-    CHECK(physmem_add_trusted(&m, 62, 63, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 62, 63, PHYSMEM_SOURCE_MACHINE));
     /* A lower-priority exclusion does not split an MMIO interval. */
     CHECK(physmem_exclude(&m, 64, 65, PHYSMEM_RESERVED));
     CHECK(physmem_exclude(&m, 63, PHYSMEM_MAX_PFN, PHYSMEM_MMIO));
@@ -172,7 +173,7 @@ void _start(void) {
         CHECK(physmem_exclude(&m, i * 2 + 1, i * 2 + 2, PHYSMEM_RESERVED));
     before = m;
     CHECK(!physmem_exclude(&m, 64, 65, PHYSMEM_RESERVED));
-    CHECK(!physmem_add_trusted(&m, 64, 65, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(!physmem_add_trusted(&m, 64, 65, PHYSMEM_SOURCE_MACHINE));
     a = (unsigned char *)&m; b = (unsigned char *)&before;
     for (i = 0; i < sizeof(m); i++) CHECK(a[i] == b[i]);
 ''')
@@ -189,7 +190,7 @@ void _start(void) {
     /* ホットデプロイ窓を撤去 (2026-09-09) したので末尾の予約帯は無い。 */
     CHECK(physmem_count(&m, 4032, 4096, PHYSMEM_RAM, &count) && count == 64);
     CHECK(m.ranges[1].sources == PHYSMEM_SOURCE_LEGACY);
-    CHECK(physmem_add_trusted(&m, 4096, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 4096, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_legacy_end(&m) == 4096);
     CHECK(physmem_exclude(&m, 1500, 1501, PHYSMEM_RESERVED));
     CHECK(physmem_legacy_end(&m) == 1500);
@@ -202,7 +203,7 @@ void _start(void) {
     CHECK(physmem_legacy_end(&m) == 0);
     CHECK(physmem_count(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_RAM, &count) && count == 0);
     physmem_init(&m);
-    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_legacy_end(&m) == 0);
 ''')
 
@@ -212,7 +213,8 @@ void _start(void) {
     u32 pfn, count, i;
     unsigned char *a, *b;
     physmem_init(&m);
-    CHECK(physmem_add_trusted(&m, 10, 20, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 10, 20, PHYSMEM_SOURCE_MACHINE));
+    m.ranges[1].sources = PHYSMEM_SOURCE_LEGACY;
     CHECK(physmem_add_trusted(&m, 20, 30, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_find(&m, 0, 40, 20, 1, &pfn) && pfn == 10);
     CHECK(physmem_reserve_ram(&m, 15, 17));
@@ -222,7 +224,7 @@ void _start(void) {
     CHECK(!physmem_reserve_ram(&m, 14, 18));
     CHECK(!physmem_reserve_ram(&m, 0, 1));
     CHECK(!physmem_reserve_ram(&m, 30, 29));
-    CHECK(physmem_add_trusted(&m, 0, 40, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 0, 40, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_count(&m, 15, 17, PHYSMEM_RESERVED, &count) && count == 2);
     pfn = 99;
     CHECK(!physmem_find(&m, 0, 40, 0, 1, &pfn));
@@ -233,7 +235,7 @@ void _start(void) {
     CHECK(!physmem_find(&m, 40, 0, 1, 1, &pfn));
     CHECK(pfn == 99);
     physmem_init(&m);
-    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_find(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_MAX_PFN, 1, &pfn) && pfn == 0);
     CHECK(physmem_find(&m, 1048575, 1048576, 1, 1, &pfn) && pfn == 1048575);
     CHECK((pfn << PHYSMEM_PAGE_SHIFT) == 0xfffff000UL);
@@ -254,16 +256,21 @@ void _start(void) {
     struct physmem m;
     u32 count;
     physmem_init(&m);
-    CHECK(physmem_add_trusted(&m, 20, 30, PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(physmem_add_trusted(&m, 10, 20, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, 20, 30, PHYSMEM_SOURCE_MACHINE));
+    CHECK(physmem_add_trusted(&m, 10, 20, PHYSMEM_SOURCE_MACHINE));
     CHECK(m.count == 3 && m.ranges[1].first == 10 && m.ranges[1].end == 30);
-    CHECK(physmem_add_trusted(&m, 15, 25, PHYSMEM_SOURCE_MACHINE));
+    /* Feed the existing legacy provider, then overlap machine RAM. */
+    physmem_bootstrap_legacy(&m, 8192);
+    CHECK(physmem_add_trusted(&m, 1500, 1510, PHYSMEM_SOURCE_MACHINE));
     CHECK(m.count == 5);
-    CHECK(m.ranges[1].sources == PHYSMEM_SOURCE_SYNTHETIC);
-    CHECK(m.ranges[2].sources == (PHYSMEM_SOURCE_MACHINE | PHYSMEM_SOURCE_SYNTHETIC));
-    CHECK(m.ranges[3].sources == PHYSMEM_SOURCE_SYNTHETIC);
-    CHECK(physmem_count(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_RAM, &count) && count == 20);
-    CHECK(physmem_add_trusted(&m, 10, 30, PHYSMEM_SOURCE_MACHINE));
+    CHECK(m.ranges[1].sources == PHYSMEM_SOURCE_LEGACY);
+    CHECK(m.ranges[2].sources == (PHYSMEM_SOURCE_MACHINE | PHYSMEM_SOURCE_LEGACY));
+    CHECK(m.ranges[3].sources == PHYSMEM_SOURCE_LEGACY);
+    CHECK(physmem_count(&m, MEM_POOL_BASE / PHYSMEM_PAGE_SIZE, 2048,
+                        PHYSMEM_RAM, &count) &&
+          count == 2048 - MEM_POOL_BASE / PHYSMEM_PAGE_SIZE);
+    CHECK(physmem_add_trusted(&m, MEM_POOL_BASE / PHYSMEM_PAGE_SIZE, 2048,
+                             PHYSMEM_SOURCE_MACHINE));
     CHECK(m.count == 3);
 ''')
 
@@ -292,12 +299,12 @@ void _start(void) {
     CHECK(MEM_PHYS_RAM_CEILING <= MEM_DEVICE_APERTURE_BASE);
     /* Inactive apertures must not impose a default CUI RAM restriction. */
     CHECK(physmem_count(&m, guard, 4096, PHYSMEM_RAM, &count) && count == 256);
-    CHECK(physmem_add_trusted(&m, xe, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, xe, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_find(&m, xe, xe_end, 512, 1, &pfn) && pfn == xe);
     /* Synthetic boot-only example, NOT safe live backend activation code. */
     CHECK(physmem_exclude(&m, guard, guard_end, PHYSMEM_MMIO));
     CHECK(physmem_exclude(&m, xe, xe_dec, PHYSMEM_MMIO));
-    CHECK(physmem_add_trusted(&m, guard, guard_end, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(physmem_add_trusted(&m, guard, guard_end, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_count(&m, guard, guard_end, PHYSMEM_MMIO, &count) && count == 128);
     CHECK(physmem_count(&m, xe, xe_dec, PHYSMEM_MMIO, &count) && count == 1024);
     CHECK(!physmem_find(&m, xe, xe_dec, 1, 1, &pfn));

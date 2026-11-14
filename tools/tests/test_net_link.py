@@ -30,7 +30,7 @@ GENERATED = ROOT / "kapi/kapi_generated.c"
 
 # ヘッダは実物の置き場を通す。ホストに持ち込めないものは net_link_host.c が
 # **include ガードを先に define して**中身を自前のものに差し替える。
-INC = include_flags(ROOT)
+INC = ['-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT)]
 FLAGS = ["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror",
          "-Wno-pointer-to-int-cast",
          "-Wno-unused-parameter"]
@@ -41,8 +41,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
                 "-D__KERNEL_BUILD__"]
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_KERNEL と
-# 同じものをここでも渡す (ホスト側は LINK_HOST_TEST で io.h を外すので不要
-# だが、--target はカーネルと同じ素性で組むので要る)。
+# 同じものをクロス側へ渡す。ホスト側は platform の include 境界で差し替える。
 TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (

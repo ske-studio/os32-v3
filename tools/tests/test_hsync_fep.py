@@ -18,7 +18,9 @@ CHECK = dict(name='hsync-fep-host', tier=1,
             'userland/system/hsync.c', 'userland/system/hsync_fep.inc',
             'userland/system/hsync_protect.inc', 'lib/crc32_core.inc',
             'lib/kstring.c', 'lib/kstring_c.c', 'sdk/include/os32/**'],
-    needs=['make:all'], budget=5.9)
+    needs=['make:all'], budget=5.9,
+    kind='characterization',
+)
 import argparse
 import os
 from pathlib import Path

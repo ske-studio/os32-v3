@@ -18,7 +18,11 @@ CHECK = dict(name='ext2-write-run-host', tier=1, budget=195.6,
                      'drivers/block/pc98pt.c',
                      'drivers/block/pc98pt.h', 'include/platform_device.h',
                      'include/ide_contract.h', 'tools/tests/ext2_write_run_host.c',
-                     'tools/tests/test_ext2_write_run.py'], needs=[])
+                     'tools/tests/test_ext2_write_run.py'], needs=[],
+    kind='characterization',
+    env_limit='hostのI/O模型で連続書込みを確認するが、実drive cache・媒体障害・電断時の書込み順序は再現しない。',
+    full_only=True,
+)
 ROOT = batch.ROOT
 CASES = ['lengths', 'boundaries', 'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7']
 

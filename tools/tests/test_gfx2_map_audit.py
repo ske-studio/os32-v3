@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-map-audit-host', tier=1, needs=[], budget=3,
     covers=['gfx/v2/map_audit.c', 'gfx/v2/gfx2_int.h', 'mm/paging.h',
             'tools/tests/gfx2_map_audit_host.c', 'tools/tests/test_gfx2_map_audit.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    basis=['HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §13-2'],
+)
 from pathlib import Path
 import argparse
 import subprocess

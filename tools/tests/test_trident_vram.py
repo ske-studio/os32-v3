@@ -10,7 +10,9 @@ CHECK = dict(name='trident-vram', tier=1, needs=[], budget=4.3,
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_pc98init_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'include/types.h', 'include/memmap.h',
-            'include/io.h', 'gfx/palette.h', 'include/pegc.h', 'lib/serial_diag.h'])
+            'include/io.h', 'gfx/palette.h', 'include/pegc.h', 'lib/serial_diag.h'],
+    basis=['TRIDENT_FULL_DESIGN §2', 'TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §4'],
+)
 import argparse
 import os
 from pathlib import Path

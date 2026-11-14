@@ -9,7 +9,9 @@ CHECK = dict(name='hostsvc-sfs-deadline', tier=1, needs=[], budget=4.0, covers=[
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_sfs_deadline_host.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1'],
+)
 
 import argparse
 import os

@@ -8,7 +8,10 @@ CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['net/rx_w
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_nic_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §2'],
+    pins=['LAN_BULK_DESIGN'],
+)
 
 import argparse
 import os

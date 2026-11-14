@@ -25,7 +25,9 @@ CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budge
             'mm/kmalloc.h',
             'sdk/include/os32/os32_kapi_shared.h',
             'tools/module_schema.py', 'tools/mkmod.py', 'tools/prototypes/sqlite_imports.def', 'kernel/module/kdebug_imports.def',
-            'lib/sqlite3/os32_sqlite_vfs.c', 'sdk/kapi.json'])
+            'lib/sqlite3/os32_sqlite_vfs.c', 'sdk/kapi.json'],
+    kind='characterization',
+)
 import argparse
 import json
 import os

@@ -5,7 +5,9 @@ CHECK = dict(name='gfx2-v1-shim-host', tier=1, needs=[], budget=8,
             'include/type_contract.h', 'include/copy_units.h', 'arch/*/arch_copy.h',
             'include/memmap.h', 'mm/pgalloc.h', 'mm/paging.h',
             'sdk/include/os32/os32_gfx2.h', 'tools/tests/gfx2_v1_shim_host.c',
-            'tools/tests/test_gfx2_v1_shim.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gfx2_v1_shim.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §11-7', 'HAL_V2_DESIGN §12-1'],
+)
 
 
 def run(ctx):

@@ -9,7 +9,9 @@ CHECK = dict(name='kapi-call-host', tier=1,
             'tools/tests/test_kapi_call.py', 'tools/tests/host_exec_context.h',
             'tools/tests/host_exec_entry.h', 'tools/tests/host_arch/*.h',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=5)
+    needs=[], budget=5,
+    basis=['KAPI_SPEC §2', 'KAPI_SPEC §3-3', 'AC-KAPI-1'],
+)
 from pathlib import Path
 import json
 import os

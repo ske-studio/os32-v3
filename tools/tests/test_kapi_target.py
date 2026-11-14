@@ -4,7 +4,9 @@ CHECK = dict(name='kapi-target-host', tier=1, needs=[], budget=5,
              covers=['sdk/gen_kapi.py', 'sdk/target_profile.py', 'sdk/kapi.json',
                      'kapi/kapi_generated.c', 'sdk/link/generations.ld',
                      'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs',
-                     'tools/tests/test_kapi_target.py'])
+                     'tools/tests/test_kapi_target.py'],
+    basis=['PPC_SEP5_DESIGN §2.3', '[ABI]'],
+)
 import argparse
 import json
 from pathlib import Path

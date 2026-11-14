@@ -3,7 +3,10 @@ CHECK = dict(name='rshell-hwb-host', tier=1,
              covers=['tools/rshell_hwb.py', 'tools/rshell_serial.py',
                      'tools/rshell_peek.py', 'tools/serialfs_host.py',
                      'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py'],
-             needs=[], budget=3.0)
+             needs=[], budget=3.0,
+    basis=['HW_BASIC_DESIGN §4'],
+    full_only=True,
+)
 
 import argparse
 import importlib.util

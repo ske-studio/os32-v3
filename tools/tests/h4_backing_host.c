@@ -263,7 +263,7 @@ static void boot_pool(void)
     CHECK(physmem_exclude(&model, MEM_SYSTEM_SPACE_BASE / PAGE_SIZE,
                          MEM_SYSTEM_SPACE_END / PAGE_SIZE, PHYSMEM_RESERVED));
     CHECK(physmem_add_trusted(&model, MEM_HIGH_RAM_BASE / PAGE_SIZE,
-                              HOST_RAM_END / PAGE_SIZE, PHYSMEM_SOURCE_SYNTHETIC));
+                              HOST_RAM_END / PAGE_SIZE, PHYSMEM_SOURCE_MACHINE));
     workspace_first = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - 16;
     workspace_end = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE;
     CHECK(physmem_reserve_ram(&model, workspace_first, workspace_end));

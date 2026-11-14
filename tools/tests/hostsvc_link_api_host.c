@@ -1,5 +1,4 @@
 /* Real link.c/A11 under ILP32, no libc. Only IRQ/clock/NIC are seams. */
-#define LINK_HOST_TEST
 #include "types.h"
 volatile u32 tick_count;
 u32 link_platform_now(void) { return tick_count; }

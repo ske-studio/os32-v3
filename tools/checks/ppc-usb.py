@@ -27,7 +27,11 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
                      'tools/serialfs_host.py', 'tools/ppc/sd_run.py',
-                     'arch/ppc/kernel_boot.h'])
+                     'arch/ppc/kernel_boot.h'],
+    # W4 landed: the STALL scene now asserts AC-CTX-1/6 (90..110 ticks), so it no longer pins.
+    basis=['USB_DESIGN §4', 'USB_DESIGN §5', 'USB_DESIGN §6', 'USB_DESIGN §7', 'AC-CTX-1', 'AC-CTX-6'],
+    env_limit='QEMUのUSBとUSER syscallを確認するが、実USB機器・HC・IRQの遅延やSTALLは再現しない。',
+)
 
 
 def run(ctx):

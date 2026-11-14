@@ -3,7 +3,9 @@
 CHECK = dict(name='sqlite-cc-host', tier=1, needs=[], budget=1,
     covers=['tools/tests/cc_cache.py', 'tools/tests/test_cc_cache.py',
             'build/config.mk', 'build/sqlite-proto.mk', 'build/programs.mk',
-            '.github/workflows/build.yml', '.github/workflows/check.yml'])
+            '.github/workflows/build.yml', '.github/workflows/check.yml'],
+    kind='characterization',
+)
 import os
 from pathlib import Path
 import subprocess

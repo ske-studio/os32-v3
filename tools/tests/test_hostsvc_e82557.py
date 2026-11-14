@@ -5,7 +5,9 @@ CHECK = dict(name='hostsvc-e82557', tier=1, needs=[], budget=3.4, covers=[
     'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_e82557_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §6'],
+)
 import argparse
 import os
 from pathlib import Path

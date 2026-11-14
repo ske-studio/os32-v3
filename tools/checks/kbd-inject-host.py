@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kbd-inject-host', tier=1,
-    covers=['include/ksetjmp.h', 'arch/x86/arch_jmp_storage.h', 'tools/tests/host_arch/arch_jmp_storage.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/host32.py', 'kernel/kbd_inject.c', 'tools/tests/kbd_inject_host.c', 'tools/tests/test_kbd_inject.py', 'kernel/console/con_sink.c', 'exec/appslot.h', 'include/kbd_inject.h', 'include/con_sink.h', 'include/launch.h', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'tools/tests/kernel_includes.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=[], budget=3.0)
+    covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'include/ksetjmp.h', 'arch/x86/arch_jmp_storage.h', 'tools/tests/host_arch/arch_jmp_storage.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/host32.py', 'kernel/kbd_inject.c', 'tools/tests/kbd_inject_host.c', 'tools/tests/test_kbd_inject.py', 'kernel/console/con_sink.c', 'exec/appslot.h', 'include/kbd_inject.h', 'include/con_sink.h', 'include/launch.h', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'tools/tests/kernel_includes.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    needs=[], budget=3.0,
+    basis=['KAPI_SPEC §console シンクと実 RAM 量 (v46)'],
+)
 
 
 def run(ctx) -> int:

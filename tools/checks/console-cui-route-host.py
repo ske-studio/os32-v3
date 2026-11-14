@@ -67,7 +67,9 @@ CHECK = dict(name="console-cui-route-host", tier=1, needs=[], budget=6,
         'tools/tests/kernel_includes.py',
         'tools/tests/legacy_guest_fake.h',
         'tools/tests/test_console_cui_route.py',
-    ])
+    ],
+    basis=['AC-DISPLAY-1'],
+)
 
 
 def run(ctx):

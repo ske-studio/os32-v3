@@ -5,7 +5,9 @@ CHECK = dict(name='sep5-trace-host', tier=1,
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h',
             'lib/sqlite3/os32_sqlite_config.h', 'tools/tests/host32.py',
             'tools/tests/test_sqlite_memsys5.py', 'tools/tests/sqlite_memsys5*'],
-    needs=[], budget=50)
+    needs=[], budget=50,
+    basis=['PPC_SEP5_DESIGN §2.2', 'PPC_SEP5_DESIGN §2.3', 'PPC_SEP5_DESIGN §6'],
+)
 
 
 def run(ctx):

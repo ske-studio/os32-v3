@@ -20,7 +20,9 @@ CHECK = dict(name='usb-contract', tier=1, needs=[], budget=5, covers=['include/e
                      'include/usb_platform.h', 'drivers/usb/*.[ch]',
                      'tools/check_usb_portable.py', 'include/types.h', 'include/callconv.h', 'include/endian_le.h',
                      'tools/tests/usb_contract_host.c', 'tools/tests/test_usb_contract.py',
-                     'tools/tests/host32.py', 'tools/tests/cc_cache.py'])
+                     'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
+    basis=['USB_DESIGN §2', 'USB_DESIGN §4'],
+)
 
 
 def command(argv, **kwargs):

@@ -12,7 +12,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x3', tier=1, needs=[], budget=3,
              covers=['tools/host_notify.py', 'include/remote_control.h',
-                     'net/link.h', 'tools/tests/test_remote_x3.py'])
+                     'net/link.h', 'tools/tests/test_remote_x3.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'NET_HOSTSVC_DESIGN §5'],
+)
 
 
 def test(path):

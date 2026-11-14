@@ -3,7 +3,9 @@
 CHECK = dict(name='link-platform-host', tier=2, budget=10, needs=[], covers=[
     'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'include/types.h', 'include/callconv.h',
     'tools/tests/test_link_platform.py', 'tools/tests/host32.py',
-    'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'])
+    'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'],
+    basis=['LAN_OPERATOR_DESIGN §5', 'ARCH_COMPAT_CONTRACT §4.1'],
+)
 import os
 import host32
 from pathlib import Path

@@ -8,7 +8,9 @@ CHECK = dict(name='ppc-realhw', tier=2, budget=10, needs=['make:all'],
                      'tools/ppc_lan_host.py', 'tools/ppc/*.py', 'tools/*host*.py',
                      'tools/lan*.py', 'tools/serialfs_host.py', 'arch/ppc/*.[cSh]',
                      'init/ppc_kernel.c', 'platform/powermac/*.[ch]',
-                     'userland/ppc/*', 'build/**/*.mk', 'build/out/ppc-user/*'])
+                     'userland/ppc/*', 'build/**/*.mk', 'build/out/ppc-user/*'],
+    basis=['PPC_REALHW_G4_DESIGN §2', 'PPC_REALHW_G4_DESIGN §6'],
+)
 import os
 from pathlib import Path
 import struct

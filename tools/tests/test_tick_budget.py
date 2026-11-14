@@ -6,7 +6,9 @@ CHECK = dict(name='tick-budget-host', tier=4, needs=[], budget=3.0,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'lib/divdi3.c',
             'include/types.h', 'include/kernel_tick.h', 'include/platform_timer.h',
-            'tools/tests/hostsvc_link_core_host.c', 'net/*.[ch]', 'net/*.inc'])
+            'tools/tests/hostsvc_link_core_host.c', 'net/*.[ch]', 'net/*.inc'],
+    basis=['TICK_1KHZ_DESIGN', 'TICK_T123_DESIGN §2'],
+)
 from pathlib import Path
 import subprocess
 import sys

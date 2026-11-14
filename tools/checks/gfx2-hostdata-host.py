@@ -3,7 +3,9 @@ CHECK = dict(name='gfx2-hostdata-host', tier=1,
     covers=['gfx/v2/sw_hostdata.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
             'include/**', 'mm/pgalloc.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_hostdata_host.c', 'tools/tests/test_gfx2_hostdata.py',
-            'tools/tests/host32.py'], needs=[], budget=5.0)
+            'tools/tests/host32.py'], needs=[], budget=5.0,
+    basis=['HAL_V2_DESIGN §5-2', 'HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx):

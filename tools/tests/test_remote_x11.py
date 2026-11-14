@@ -42,7 +42,9 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
         'tools/host_rshell.py',
         'tools/host_operator_socket.py',
         'net/link_host_api.inc',
-    ])
+    ],
+    basis=['LAN_OPERATOR_DESIGN §3', 'LAN_OPERATOR_DESIGN §4'],
+)
 
 
 def guest_test(folder, mutation=None):

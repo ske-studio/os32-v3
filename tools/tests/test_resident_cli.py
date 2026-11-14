@@ -11,7 +11,10 @@ SOURCE = ROOT / 'kernel/cli/resident_cli.c'
 CHECK = dict(name='resident-cli', tier=1, budget=60, needs=[],
              covers=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
                      'include/types.h', 'tools/tests/test_resident_cli.py',
-                     'lib/kstring_c.c', 'lib/kstring.h'])
+                     'lib/kstring_c.c', 'lib/kstring.h'],
+    basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_SC_DESIGN §5'],
+    env_limit='fake terminal/FSでCLIと行取消を確認するが、実ESCCの停止と入出力遅延は再現しない。',
+)
 
 HARNESS = r'''
 #include <setjmp.h>

@@ -20,7 +20,10 @@ from host_rshell import Operator
 
 CHECK = dict(name='remote-x5', tier=1, needs=[], budget=3,
              covers=['tools/host_operator_socket.py', 'tools/host_rshell.py',
-                     'tools/tests/test_remote_x5.py'])
+                     'tools/tests/test_remote_x5.py'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
+    full_only=True,
+)
 
 
 def test(path):

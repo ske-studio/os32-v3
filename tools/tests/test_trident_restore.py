@@ -16,7 +16,9 @@ CHECK = dict(name='trident-restore', tier=1, needs=[], budget=4.6,
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'userland/tests/hw/trident_mode.hwb', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
-            'include/memmap.h', 'gfx/palette.h', 'include/pegc.h'])
+            'include/memmap.h', 'gfx/palette.h', 'include/pegc.h'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §2', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 from pathlib import Path
 import re

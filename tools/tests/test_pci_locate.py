@@ -2,7 +2,9 @@
 CHECK = dict(name='pci-locate-host', tier=1, needs=[], budget=4,
              covers=['drivers/pci/pci_locate.c', 'drivers/pci/pci_locate.h',
                      'kdebug/recover_gf_locate.c', 'kdebug/recover.h',
-                     'tools/tests/pci_locate_host.c', 'tools/tests/test_pci_locate.py'])
+                     'tools/tests/pci_locate_host.c', 'tools/tests/test_pci_locate.py'],
+    kind='characterization',
+)
 from pathlib import Path
 import subprocess
 import sys

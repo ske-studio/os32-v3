@@ -8,7 +8,9 @@ CHECK = dict(name='gf5-service-live-host', tier=1, budget=17.1,
                      'drivers/base/dev.c', 'kernel/module/**',
                      'kernel/console/console_backend.h', 'arch/x86/kernel/idt.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'fs/fd_redirect.h',
-                     'fs/vfs.c', 'platform/pc98/boot_names.c'])
+                     'fs/vfs.c', 'platform/pc98/boot_names.c'],
+    basis=['GF_GUARD_THERM_DESIGN §4', 'GF_GUARD_THERM_DESIGN §5', 'GF_GUARD_THERM_DESIGN §6'],
+)
 from pathlib import Path
 import argparse
 import subprocess

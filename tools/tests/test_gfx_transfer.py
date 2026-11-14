@@ -30,7 +30,9 @@ CHECK = dict(name='gfx-transfer-host', tier=1, needs=[], budget=20, covers=[
     'userland/lib/math/libos32math.h', 'sdk/include/os32/os32api.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h',
     'tools/tests/gfx_transfer_host.c', 'tools/tests/test_gfx_transfer.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3'],
+)
 MUTATIONS = (
     ('blit-dirty', DRAW+'gfx_surface.c',
      'gfx_blit_direct(dx, dy, src, sx, sy, sw, sh, -1);\n        if (!gfx_dirty_suppress)',

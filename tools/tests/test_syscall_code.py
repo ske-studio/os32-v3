@@ -5,7 +5,9 @@ CHECK = dict(name='syscall-code-host', tier=1,
             'arch/x86/kernel/ring3_ls.S', 'tools/tests/syscall_code_host.c',
             'tools/tests/test_syscall_code.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py'],
-    needs=['make:kernel'], budget=3)
+    needs=['make:kernel'], budget=3,
+    basis=['KAPI_SPEC §2', 'KAPI_SPEC §4'],
+)
 from pathlib import Path
 import subprocess
 import sys

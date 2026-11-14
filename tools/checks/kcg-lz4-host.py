@@ -10,7 +10,9 @@ CHECK = dict(name='kcg-lz4-host', tier=1,
      'build/packages.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py',
      'tools/mkpkg.py', 'tools/mkfat12.py', 'lib/lz4.c', 'lib/lz4.h',
      'tools/tests/test_kcg_lz4.py', 'requirements.txt'],
-    needs=['make:assets/fonts/shino16.kcgfont', 'make:unicode_bin'], budget=60)
+    needs=['make:assets/fonts/shino16.kcgfont', 'make:unicode_bin'], budget=60,
+    basis=['PPC_KCG_LZ4_DESIGN §1', 'PPC_KCG_LZ4_DESIGN §2', 'PPC_KCG_LZ4_DESIGN §3'],
+)
 
 
 def run(ctx) -> int:

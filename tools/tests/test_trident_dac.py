@@ -3,7 +3,9 @@
 CHECK = dict(name='trident-dac', tier=1, needs=[], budget=2.8,
     covers=['drivers/video/trident/default_dac.c', 'drivers/video/trident/trident.h',
             'userland/tests/hw/trident_mode.hwb', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py'])
+            'tools/tests/kernel_includes.py'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3', 'TRIDENT_FULL_DESIGN §5'],
+)
 import argparse
 import hashlib
 import os

@@ -7,7 +7,9 @@ CHECK = dict(name='gf5-boot-target-diag', tier=1, needs=[], budget=4.1,
                      'include/types.h', 'tools/tests/gf5_boot_target_diag_host.c', 'tools/tests/gf5_observe_host.c',
                      'tools/tests/serial_diag_host.h', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-                     'tools/tests/test_gf5_boot_target_diag.py'])
+                     'tools/tests/test_gf5_boot_target_diag.py'],
+    basis=['GF_FEAT5_DESIGN'],
+)
 
 import argparse
 from pathlib import Path

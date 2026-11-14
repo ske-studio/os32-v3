@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='term-render', tier=1,
     covers=['userland/libos32term_render/**', 'userland/libos32term/**'],
-    needs=[], budget=5.4)
+    needs=[], budget=5.4,
+    kind='characterization',
+)
 
 
 def run(ctx) -> int:

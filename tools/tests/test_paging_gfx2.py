@@ -1,7 +1,9 @@
 """Exercise the M2 mapping transaction with a freestanding page-table fixture."""
 CHECK = dict(name='paging-gfx2-host', tier=1, budget=5,
              covers=['mm/paging_gfx2.inc', 'mm/paging.c', 'tools/tests/paging_gfx2_host.c',
-                     'tools/tests/test_paging_gfx2.py', 'tools/tests/host32.py'], needs=[])
+                     'tools/tests/test_paging_gfx2.py', 'tools/tests/host32.py'], needs=[],
+    basis=['HAL_V2_DESIGN §7-4'],
+)
 from pathlib import Path
 import os
 import subprocess

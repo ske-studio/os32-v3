@@ -7,7 +7,9 @@ CHECK = dict(name='ppc-link-diag-host', tier=2, budget=30, needs=[], covers=[
     'arch/ppc/kernel_probe.h', 'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h',
     'lib/kstring.h', 'net/host_mailbox.h', 'net/link.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
-    'tools/tests/host32.py'])
+    'tools/tests/host32.py'],
+    basis=['LAN_OPERATOR_DESIGN §5'],
+)
 from pathlib import Path
 import subprocess
 import tempfile

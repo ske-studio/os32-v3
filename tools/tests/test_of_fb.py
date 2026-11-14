@@ -26,7 +26,9 @@ CHECK = dict(name='of-fb-host', tier=1, needs=[], budget=30, covers=[
     'platform/powermac/display_text.h',
     'include/gfx_hal.h', 'include/gfx_hal2.h', 'include/gfx_mode.h',
     'include/display_provider.h', 'platform/powermac/rh_observe.h',
-    'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'])
+    'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'],
+    basis=['PPC_FBCON_DESIGN §2', 'AC-DISPLAY-2'],
+)
 MUTATIONS = (
     ('text-ready', 'platform/powermac/display_dual.c',
      'pm_console_text_ready() && of_fb_ready()', 'of_fb_ready()'),

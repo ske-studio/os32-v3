@@ -19,7 +19,9 @@ CHECK = dict(name='gfx-plane-guard-host', tier=1, needs=[], budget=15, covers=[
     'userland/lib/gfx/libos32gfx.h', 'userland/lib/gfx/gfx_direct_internal.h',
     'sdk/include/os32/**', 'tools/tests/gfx_plane_guard_host.c',
     'tools/tests/test_gfx_plane_guard.py', 'tools/tests/host32.py',
-    'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3', 'GFX_ACCEL_HAL_DESIGN §7'],
+)
 MUTATIONS = (
     ('md-direct-guard', MD, '!gfx_ready || gfx_direct || !gfx_fb.planes[0]', '!gfx_ready || !gfx_fb.planes[0]'),
     *[(name+'-null', TILE,

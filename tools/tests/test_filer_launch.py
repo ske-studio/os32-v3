@@ -5,7 +5,9 @@ exercised without duplicating the policy in the fixture. No emulator or real FS.
 """
 CHECK = dict(name='filer-launch-host', tier=1,
     covers=['tools/tests/os32api_host.py', 'userland/rust/filer/src/lib.rs', 'userland/rust/filer/src/model.rs', 'userland/rust/filer/src/fmt.rs', 'userland/rust/filer/host/launch_tests.rs', 'userland/rust/filer/host/model_tests.rs', 'sdk/rust/os32api/src/**'],
-    needs=[], budget=3.3)
+    needs=[], budget=3.3,
+    kind='characterization',
+)
 
 import argparse
 import pathlib

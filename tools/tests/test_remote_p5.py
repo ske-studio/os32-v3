@@ -21,7 +21,9 @@ CHECK = dict(name='remote-p5', tier=1, needs=[], budget=10,
                      'tools/ppc_hostfs.py', 'tools/serialfs_host.py',
                      'tools/ppc_link_transport.py', 'tools/ppc_lan_host.py',
                      'tools/remote_transport.py', 'tools/host_operator_socket.py',
-                     'tools/host_agent.py', 'tools/tests/test_remote_p5.py'])
+                     'tools/host_agent.py', 'tools/tests/test_remote_p5.py'],
+    basis=['LAN_OPERATOR_DESIGN §5'],
+)
 
 
 class Agent:

@@ -6,7 +6,9 @@ CHECK = dict(name='osri-profile', tier=1, needs=['make:osri-enc2-core'], budget=
                      'tools/osri_enc2_master.py', 'tools/osri_enc2_order.py',
                      'tools/osri_enc2_pack.py', 'tools/osri_enc2_plan.py',
                      'tools/osri_enc2_row.py', 'tools/osri_enc2_timing.py',
-                     'tools/osri_enc2_tree.py'])
+                     'tools/osri_enc2_tree.py'],
+    basis=['RASTER_SPLASH_S5_DESIGN §4', 'RASTER_SPLASH_S5_DESIGN §5'],
+)
 
 import argparse
 import contextlib

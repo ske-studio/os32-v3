@@ -11,7 +11,9 @@ CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
             'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'kernel/ime/ime_dict_info.c',
-            'lib/sqlite3/os32_sqlite_vfs.h'])
+            'lib/sqlite3/os32_sqlite_vfs.h'],
+    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+)
 
 import argparse
 import os

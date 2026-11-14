@@ -24,6 +24,84 @@ SPEC.loader.exec_module(R)
 
 
 class RunnerTest(unittest.TestCase):
+    def test_expectation_metadata(self):
+        self.check(basis=['AC-CTX-1'], env_limit='fake MMIO', pins=['IO-TIER'])
+        self.write('docs/design.md', '# IO-TIER\n')
+        check = self.registry()['a']
+        self.assertEqual((check.basis, check.kind, check.env_limit, check.pins, check.full_only),
+                         (('AC-CTX-1',), 'contract', 'fake MMIO', ('IO-TIER',), False))
+        self.assertEqual(self.cli('--lint'), (0, '', ''))
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        self.assertEqual(R.indexed_discover(self.root), self.registry())
+        self.check(kind='characterization', basis=[], env_limit='', pins=[])
+        self.assertEqual(self.registry()['a'].kind, 'characterization')
+        self.assertEqual(self.cli('--lint'), (0, '', ''))
+        self.check(kind='characterization', basis=['DESIGN'])
+        self.assertEqual(self.registry()['a'].kind, 'characterization')
+        for field, values in dict(basis=['id', None, [1], ['']], pins=['id', None, [1], ['']],
+                                  kind=['unknown', None, 1, []], env_limit=[None, 1, []],
+                                  full_only=[None, 0, 'yes']).items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    self.check(**{field: value})
+                    self.assertEqual(self.cli('--lint')[0], 1)
+
+    def test_expectation_warnings_and_pins(self):
+        self.check('legacy')
+        self.check('empty', basis=[])
+        self.check('record', kind='characterization')
+        self.check('contract', basis=['DESIGN'])
+        rc, _, err = self.cli('--lint')
+        self.assertEqual((rc, err), (0, 'warning: 2 CHECK(s) without basis or kind\n'))
+        with patch.object(R, 'REQUIRE_EXPECTATION_SOURCE', True):
+            self.assertEqual(self.cli('--lint')[0], 1)
+        self.check('contract', basis=['DESIGN'], pins=['REAL-ID', 'MISSING-ID'])
+        self.write('docs/current.md', 'REAL-ID\n')
+        self.write('docs/archive/old.md', 'MISSING-ID\n')
+        self.write('docs/hw/vendor.md', 'MISSING-ID\n')
+        rc, _, err = self.cli('--lint')
+        self.assertEqual(rc, 1)
+        self.assertIn('contract: pins ID not found in docs: MISSING-ID', err)
+        self.assertNotIn('pins ID not found in docs: REAL-ID', err)
+        self.write('docs/current.md', 'REAL-ID MISSING-ID\n')
+        self.assertEqual(self.cli('--lint')[0], 0)
+
+    def test_full_only_placement(self):
+        self.check('a', needs=['make:alpha'])
+        self.check('slow', tier=1, full_only=True, needs=['make:beta'])
+        self.check('dependent', needs=['check:slow'])
+        self.check('tier4', tier=4)
+        env = dict(self.env, CHECK_ROUTINE='1')
+        self.assertEqual(set(self.cli('--list', env=env)[1].split()), {'check-a', 'check-tier4'})
+        self.assertEqual(self.cli('--list', '--needs', env=env)[1].strip(), 'alpha')
+        groups = [self.cli('--list', '--shard', f'{i}/2', env=env)[1].split() for i in range(2)]
+        self.assertEqual(sorted(n for group in groups for n in group), ['check-a', 'check-tier4'])
+        out = self.cli('--make', env=env)[1]
+        self.assertIn('CHECK_SHARD_TARGETS := check-a check-tier4', out)
+        self.assertIn('CHECK_ALL_NEEDS := alpha)', out)
+        self.assertEqual(set(self.cli('--list')[1].split()),
+                         {'check-a', 'check-slow', 'check-dependent', 'check-tier4'})
+        for routine, expected in ((True, []), (False, ['slow', 'dependent'])):
+            calls = []
+            with patch.object(R, 'run_one', side_effect=lambda c, ctx: calls.append(c.name) or 0):
+                rc = self.cli('--run', 'dependent', env=dict(self.env, CHECK_NO_NEEDS='1',
+                              CHECK_ROUTINE='1' if routine else '0'))[0]
+            self.assertEqual((rc, sorted(calls)), (0, sorted(expected)))
+        # check-fast の再帰 make にも配置指定を渡し、前提の準備から除外する。
+        actual = Path(R.__file__).parents[2]
+        self.write('tools/checks/run.py', Path(R.__file__).read_text())
+        sdk = (actual / 'build/sdk.mk').read_text()
+        section = sdk[sdk.index('ifeq ($(CHECK_TIME_CHILD),1)'):sdk.index('CHECK_TIMES ?=')]
+        fast = sdk[sdk.index('check-fast:'):sdk.index('# FILES=')]
+        self.write('Makefile', section + '\n' + fast +
+                   '\nalpha beta:\n\t@echo $@ >> prepared\ncheck-par:\n\t@echo $(CHECK_PAR_TARGETS) > selected\n')
+        self.write('tools/check_tree_unchanged.py', 'pass\n')
+        result = subprocess.run(['make', '--no-print-directory', 'check-fast'], cwd=self.root,
+                                env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / 'prepared').read_text().split(), ['alpha'])
+        self.assertEqual((self.root / 'selected').read_text().split(), ['check-a', 'check-tier4'])
+
     def test_shards(self):
         for name, budget, needs in [('a', 8, []), ('b', 7, []), ('c', 6, []),
                                     ('d', 5, []), ('e', 4, []), ('f', 3, [])]:
@@ -107,6 +185,10 @@ class RunnerTest(unittest.TestCase):
             updater.measurements([one])
 
     def setUp(self):
+        # Legacy fixtures exercise warning mode; strict mode is tested explicitly.
+        source_mode = patch.object(R, 'REQUIRE_EXPECTATION_SOURCE', False)
+        source_mode.start()
+        self.addCleanup(source_mode.stop)
         self.tmp = tempfile.TemporaryDirectory(prefix='runner-fixture-')
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -889,6 +971,24 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
+        ('metadata-list-type', '(("covers", None), ("needs", []), ("basis", []), ("pins", []))',
+         '(("covers", None), ("needs", []))', 'test_expectation_metadata'),
+        ('metadata-kind-type', 'if "kind" in data and data["kind"] not in ("contract", "characterization"):',
+         'if False:', 'test_expectation_metadata'),
+        ('metadata-env-type', 'if "env_limit" in data and not isinstance(data["env_limit"], str):',
+         'if False:', 'test_expectation_metadata'),
+        ('metadata-full-type', 'if "full_only" in data and type(data["full_only"]) is not bool:',
+         'if False:', 'test_expectation_metadata'),
+        ('metadata-default-kind', '"contract" if data.get("basis") else None',
+         'None', 'test_expectation_metadata'),
+        ('metadata-warning-count', 'not c.basis and c.kind is None',
+         'not c.basis', 'test_expectation_warnings_and_pins'),
+        ('metadata-warning-error', 'if REQUIRE_EXPECTATION_SOURCE:',
+         'if True:', 'test_expectation_warnings_and_pins'),
+        ('metadata-pin-missing', 'if pin not in found_pins:',
+         'if False:', 'test_expectation_warnings_and_pins'),
+        ('routine-placement', 'checks[dep].full_only for dep in closure(checks, (n,))',
+         'False for dep in closure(checks, (n,))', 'test_full_only_placement'),
         ('index-stale', 'if data["signature"] == signature:', 'if True:',
          'test_index_invalidation_and_recovery'),
         ('make-shard-lost', 'CHECK_SHARD_TARGETS=" ".join("check-" + n for n in names)',
@@ -905,7 +1005,7 @@ def run_mutations():
         ('shard-most-loaded', '(loads[i], i)', '(-loads[i], i)', 'test_shards'),
         ('shard-dependency-split', 'pending.extend(neighbors[name] - group)',
          'pending.extend(())', 'test_shards'),
-        ('shard-cli-ignored', 'names = shards(checks, count)[index]',
+        ('shard-cli-ignored', 'names = shards(eligible, count)[index]',
          'names = ordered(checks)', 'test_shards'),
         ('unconditional-static',
          '    stage = closure(checks, selected)',

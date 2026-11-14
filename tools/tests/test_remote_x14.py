@@ -16,7 +16,10 @@ SRC = ROOT / 'tools/rshell_serial.py'
 CHECK = dict(name='remote-x14', tier=1, needs=[], budget=10,
              covers=['tools/rshell_serial.py', 'tools/tests/test_remote_x14.py',
                      'tools/host_image.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py',
-                     'tools/rshell_hwb.py', 'tools/rshell_peek.py', 'tools/serialfs_host.py'])
+                     'tools/rshell_hwb.py', 'tools/rshell_peek.py', 'tools/serialfs_host.py'],
+    kind='characterization',
+    full_only=True,
+)
 
 
 def load(path):

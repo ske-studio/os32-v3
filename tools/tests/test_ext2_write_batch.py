@@ -18,7 +18,10 @@ CHECK = dict(name='ext2-write-batch-host', tier=1, budget=171.2,
                      'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',
                      'drivers/block/pc98pt.c',
                      'drivers/block/pc98pt.h', 'include/platform_device.h',
-                     'include/ide_contract.h'], needs=[])
+                     'include/ide_contract.h'], needs=[],
+    kind='characterization',
+    env_limit='sector fault画像とe2fsckで整合性を確認するが、実drive cacheと電断時の書込み順序は再現しない。',
+)
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-nostdlib', '-static', '-O1', '-Wall', '-Wextra',

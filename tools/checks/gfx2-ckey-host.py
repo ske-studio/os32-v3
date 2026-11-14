@@ -3,7 +3,9 @@ CHECK = dict(name='gfx2-ckey-host', tier=1,
     covers=['gfx/v2/sw_ckey.c', 'gfx/v2/gfx2_int.h', 'include/**', 'gfx/v2/gfx2_sw.h', 'include/gfx_sync.h',
             'tools/tests/gfx2_ckey_host.c', 'tools/tests/test_gfx2_ckey.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['HAL_V2_DESIGN §5-2', 'HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx) -> int:

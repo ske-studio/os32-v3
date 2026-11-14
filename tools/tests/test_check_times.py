@@ -2,7 +2,9 @@
 """Timing regressions with two fake checks; mutations never touch the live tree."""
 CHECK = dict(name='check-times-host', tier=1,
     covers=['tools/checks/run.py', 'tools/check_time.py', 'build/sdk.mk', 'sdk/kapi.json'],
-    needs=[], budget=24.5)
+    needs=[], budget=24.5,
+    kind='characterization',
+)
 
 import contextlib
 import io

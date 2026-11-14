@@ -7,7 +7,9 @@ CHECK = dict(name='sep5-console-host', tier=1, needs=[], budget=10,
             'tools/tests/sep5_console_host.c', 'tools/tests/sep5_console_pc98_host.c',
             'tools/tests/test_sep5_console.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
-            'arch/x86/**', 'platform/pc98/**', 'kernel/console/**', 'sdk/include/os32/**'])
+            'arch/x86/**', 'platform/pc98/**', 'kernel/console/**', 'sdk/include/os32/**'],
+    basis=['PPC_SEP5_DESIGN §2.1', 'AC-DISPLAY-1'],
+)
 import argparse
 from pathlib import Path
 import subprocess

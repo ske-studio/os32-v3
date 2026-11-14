@@ -3,7 +3,9 @@ CHECK = dict(name='pci-hwb-host', tier=1, budget=3.4, needs=[], covers=[
     'drivers/pci/pci_hwb.c', 'drivers/pci/pci_hwb.h', 'drivers/pci/pci_decode.h',
     'kdebug/hwb_wire.h', 'tools/tests/pci_hwb_host.c', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py',
-    'tools/tests/kernel_includes.py', 'include/types.h'])
+    'tools/tests/kernel_includes.py', 'include/types.h'],
+    basis=['HW_BASIC_DESIGN §2', 'HW_BASIC_DESIGN §3', 'HW_BASIC_DESIGN §4', 'HW_BASIC_DESIGN §7'],
+)
 import sys
 import tempfile
 from pathlib import Path

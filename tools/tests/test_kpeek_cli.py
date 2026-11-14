@@ -11,7 +11,9 @@ LAN では見出しと ok (tag) の 2 行だけ、使えなければ 1 行の後
 """
 CHECK = dict(name='kpeek-cli-host', tier=1,
     covers=['userland/shell/cmd_peek.c', 'userland/shell/shell.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'tools/tests/kpeek_cli_host.c'],
-    needs=[], budget=2.8)
+    needs=[], budget=2.8,
+    kind='characterization',
+)
 
 import pathlib
 import re

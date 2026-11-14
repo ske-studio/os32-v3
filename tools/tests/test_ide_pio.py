@@ -11,7 +11,9 @@ CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
                      'tools/tests/ide_pio_host.c', 'tools/tests/ide_pio_host_multiple.inc', 'tools/tests/ide_hostshim/io.h',
-                     'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[])
+                     'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[],
+    kind='characterization',
+)
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-Wno-sign-compare', '-D__cdecl=']

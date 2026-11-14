@@ -11,7 +11,9 @@ CHECK = dict(name='ext2-block-io-host', tier=1, budget=3.0,
              covers=['fs/ext2/ext2_super.c', 'fs/ext2/ext2_super_block_io.inc',
                      'fs/ext2/ext2_priv.h', 'tools/tests/ext2_block_io_host.c',
                      'tools/tests/test_ext2_block_io.py', 'tools/tests/host32.py',
-                     'tools/tests/kernel_includes.py'], needs=[])
+                     'tools/tests/kernel_includes.py'], needs=[],
+    kind='characterization',
+)
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-nostdlib', '-static', '-O2',

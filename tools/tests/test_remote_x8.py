@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x8', tier=1,
-    covers=['kernel/console/console.c', 'kernel/console/con_sink.c',
+    covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'kernel/console/console.c', 'kernel/console/con_sink.c',
             'include/con_sink.h', 'kernel/port_service.c',
             'platform/pc98/console.c', 'tools/tests/con_sink_host.c',
             'tools/tests/test_con_sink.py', 'tools/tests/test_remote_x8.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'], needs=[], budget=3.5)
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'], needs=[], budget=3.5,
+    basis=['LAN_OPERATOR_DESIGN §3', 'KAPI_SPEC'],
+)
 
 import argparse
 import pathlib

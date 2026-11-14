@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Exercise Linux host services with isolated executable stand-ins."""
 CHECK = dict(name='hostsvc-linux', tier=1, needs=[],
-             covers=['tools/host_linux.py'], budget=3.3)
+             covers=['tools/host_linux.py'], budget=3.3,
+    basis=['NET_HOSTSVC_DESIGN §6'],
+)
 
 import argparse
 import importlib.util

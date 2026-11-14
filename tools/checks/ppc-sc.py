@@ -16,7 +16,10 @@ CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=['make:kernel'],
                      'platform/powermac/clock.c', 'platform/powermac/escc.c',
                      'platform/powermac/escc_tree.c', 'platform/powermac/mpic.c',
                      'platform/powermac/ofw.c', 'tools/ppc/kboot_mutations.py',
-                     'tools/ppc/shell_run.py'])
+                     'tools/ppc/shell_run.py'],
+    basis=['PPC_SHELL_SC_DESIGN'],
+    env_limit='QEMU mac99のUSER shell/execを確認するが、実機固有のIRQ・cache・LAN障害は保証せず、tool欠落時のSKIPは受入成功に数えない。',
+)
 
 
 def run(ctx):

@@ -7,7 +7,10 @@ CHECK = dict(name='ppc-hostfs-wire', tier=1, budget=30, needs=[],
                      'tools/ppc_lan_host.py', 'tools/tests/ppc_hostfs_wire.py',
                      'lib/kstring_c.c', 'tools/host_image.py',
                      'tools/lan_bridge.py', 'tools/lanfs_host.py',
-                     'tools/ppc_hostfs.py', 'tools/serialfs_host.py'])
+                     'tools/ppc_hostfs.py', 'tools/serialfs_host.py'],
+    basis=['PPC_SHELL_W8_DESIGN §3', 'PPC_SHELL_W8_DESIGN §6'],
+    pins=['LAN_OPERATOR_DESIGN', 'LAN_BULK_DESIGN'],
+)
 
 
 def run(ctx):

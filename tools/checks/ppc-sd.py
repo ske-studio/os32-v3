@@ -47,7 +47,11 @@ CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=['make:all'],
                      'tools/serialfs_host.py',
                      'userland/deploy.yaml',
                      'userland/ppc/hello.c',
-                     'userland/ppc/nest.c'])
+                     'userland/ppc/nest.c'],
+    basis=['PPC_SHELL_W8_DESIGN §3', 'PPC_SHELL_W8_DESIGN §6'],
+    pins=['LAN_OPERATOR_DESIGN', 'LAN_BULK_DESIGN'],
+    env_limit='QEMUのLAN永続化を確認するが、実NIC・媒体の障害は再現せず、AF_INET不可時のSKIPは受入成功に数えない。',
+)
 
 
 def run(ctx):

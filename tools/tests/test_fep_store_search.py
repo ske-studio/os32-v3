@@ -31,7 +31,9 @@ CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=6.5,
         'tools/tests/input_fixture_host.h',
         'tools/tests/serial_emergency_host.h',
         'build/config.mk',
-    ])
+    ],
+    basis=['DICT_META_DESIGN §3', 'DICT_META_DESIGN §5'],
+)
 
 import argparse
 import os

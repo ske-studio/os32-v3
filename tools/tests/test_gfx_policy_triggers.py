@@ -8,7 +8,9 @@ import host32
 
 CHECK = dict(name='gfx-policy-triggers-host', tier=1, needs=[], budget=5, covers=[
     'gfx/gfx_core.c', 'kernel/console/console.c', 'exec/appslot.c',
-    'tools/tests/test_gfx_policy_triggers.py', 'tools/tests/host32.py'])
+    'tools/tests/test_gfx_policy_triggers.py', 'tools/tests/host32.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-4', 'GFX_ACCEL_HAL_DESIGN §7'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 CASES = [
     ('claim', 'gfx/gfx_core.c', '        gfx_policy_reeval();'),
