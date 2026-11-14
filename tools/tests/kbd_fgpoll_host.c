@@ -11,6 +11,7 @@ static unsigned polls, halts, violations;
 static int pending, serial_byte = -1, injected = -1, wait_mode;
 volatile u32 tick_count;
 int rshell_active;
+int con_sink_capture_active(void) { return 0; }
 
 static void say(const char *s)
 {

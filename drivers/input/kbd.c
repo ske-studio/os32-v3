@@ -18,6 +18,7 @@
 /* ======================================================================== */
 
 #include "kbd.h"
+#include "con_sink.h"
 #include "../../platform/pc98/legacy/v86_bios.h"
 #include "io.h"
 #include "kprintf.h"
@@ -672,7 +673,7 @@ int kbd_trygetchar(void)
     }
 
     /* rshellモード: シリアル入力もチェック */
-    if (rshell_active) {
+    if (rshell_active && !con_sink_capture_active()) {
         int sch;
         sch = serial_trygetchar();
         if (sch >= 0) return sch;
@@ -748,7 +749,8 @@ static int kbd_getchar_wait(int interruptible)
     if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
     /* 遠隔セッションがキー待ちのアプリで止まらないための上限。 */
-    timeout_ticks = rshell_active ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ : 0;
+    timeout_ticks = (rshell_active || con_sink_capture_active())
+                  ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ : 0;
     start_tick = tick_count;
 
     {
@@ -762,7 +764,7 @@ static int kbd_getchar_wait(int interruptible)
             }
 
             /* rshellモード: シリアル入力もチェック */
-            if (rshell_active) {
+            if (rshell_active && !con_sink_capture_active()) {
                 int sch;
                 sch = serial_trygetchar();
                 if (sch >= 0) return sch;
@@ -774,7 +776,8 @@ static int kbd_getchar_wait(int interruptible)
 
             /* rshellタイムアウト: スペースキーを自動返却 */
             if (timeout_ticks > 0) {
-                if ((u32)(tick_count - start_tick) >= timeout_ticks) return ' ';
+                if ((u32)(tick_count - start_tick) >= timeout_ticks)
+                    return con_sink_capture_active() ? '\r' : ' ';
             }
         }
     }
@@ -786,6 +789,8 @@ static int kbd_getchar_wait(int interruptible)
 int kbd_getkey_wait(int interruptible)
 {
     u16 entry;
+    u32 start_tick = tick_count;
+    int capture = con_sink_capture_active();
 
     if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
@@ -794,6 +799,8 @@ int kbd_getkey_wait(int interruptible)
         if (interruptible && ring3_wait_pending()) return -1;
         idle_work_run();
         _halt();
+        if (capture && (u32)(tick_count - start_tick) >= KBD_RSHELL_TIMEOUT_SEC * PIT_HZ)
+            return 0x1b;
     }
 
     RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
@@ -820,7 +827,7 @@ int kbd_trygetkey(void)
     }
 
     /* rshellモード: シリアル入力もチェック */
-    if (rshell_active) {
+    if (rshell_active && !con_sink_capture_active()) {
         int sch;
         sch = serial_trygetchar();
         if (sch >= 0) return sch; /* シリアルはASCIIのみ(下位バイト) */
@@ -858,7 +865,7 @@ int kbd_peekkey(void)
         return (int)b;
     }
 
-    if (rshell_active) {
+    if (rshell_active && !con_sink_capture_active()) {
         int sch;
         sch = serial_peekchar();
         if (sch >= 0) return sch;   /* シリアルは ASCII のみ (下位バイト) */
