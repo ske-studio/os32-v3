@@ -277,3 +277,15 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 - 設定の `backend` は `np21w` か `bridge` の 2 つだけにする。
   - `np21w`: NP21/W の NP2NETSOCK が `frame-endpoint` に接続しに来る (WSL)。
   - `bridge`: lan_bridge.py が `iface` の物理 NIC と `frame-endpoint` を中継する (Ubuntu のノート)。
+
+### 実装の途中で PM が決めたこと (2026-11-14、X9b・X10・X11・G1・G3b・U5b・U5c・直し 1・2)
+- boot-token: kernel が起動中に 1 回だけ決め、KAPI `boot_token_get` (slot 293、ABI v86、16B) で読む。共通の口 kernel/boot_token.c と platform の provider に分ける (POLICY_DEV §1)。pc98 は TSC・MAC・RTC、powermac は pm_gmac_boot_id。NIC が無ければ MAC の 6B が 0 になるだけで、誤りにはしない。要求行では小文字の 16 進 32 桁。
+- capture の KAPI は `con_sink_capture` (slot 292、ABI v85)。
+- GUI の終了通知の協調待ち: 起算点は終了通知を FIFO に積んだ時点。無進捗 1000ms・全体 5000ms で打ち切り、結果を送らずに GUI を解放する (ホストが UNKNOWN と判定)。GS の通常の送信にも同じ期限を当てる。非同期の gs:! の枠は 1400B、READY の本文の受け枠は 64B。
+- gs:! の宛先: LAN を有効にした時は LAN、その後は直前の完全な要求の入力元。
+- gshell は起動で serial の open の後に open_lan を呼ぶ (LAN が既定)。
+- GSERIAL の wire は SOH と LF を含めて 130B まで (parser の上限 128B は不変)。
+- gui の受理の後は running のまま。同じ boot の GUI の READY と `gs:! ready v1` の両方で done にする。
+- LAN の exit は内部の戻り値 RSH_LAN_EXIT=2 で伝え、結果の送信と capture END の後に rshell を終える。
+- U5b: NIC の重複のロックは `/run/lock/os32-host-agent-<iface>.lock` (試験は `--lock-dir`)。host_agent には `--config` で同じ設定ファイルを渡す。
+- U5c: ログは journal。probe の commit は `/opt/os32` に置いた git の作業木から取る。
