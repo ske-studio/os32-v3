@@ -118,3 +118,45 @@ fn remote_g3_wm_polls_without_serial_change_or_foreground() {
     for _ in 0..10 { wm::wm_cycle(&mut st, Ctx::Wait); }
     assert!(host(|h| h.output.ends_with(b"gs:00000001 pong tick=0\r\ngs:00000001 end 0\r\n")));
 }
+
+#[test]
+fn remote_g2_maximum_wire_reaches_parser() {
+    let mut st=setup(); open_lan(&mut st,0); pump(&mut st);
+    let mut bytes=b"\x0100000001 type ".to_vec(); bytes.extend_from_slice(&[b'a';114]); bytes.push(b'\n');
+    let out=lan(&mut st,&bytes);
+    assert_eq!(out,b"gs:00000001 type queued n=114\r\ngs:00000001 end 0\r\n");
+    assert_eq!(st.gserial.keys,114);
+    assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
+}
+#[cfg(feature = "gf_accel_accept")]
+#[test]
+fn p0a_remote_g2_ops_body_uses_captured_route() {
+    let mut st=setup(); crate::wm::gf_accept::pause(false);
+    unsafe extern "C" fn counters(p: *mut u8) -> i32 {
+        (p as *mut os32api::gui::types::Stats).write(os32api::gui::types::Stats::ZERO); 0
+    }
+    unsafe { (*os32api::api_ptr()).gfx_stats = counters; }
+    open_lan(&mut st,0); pump(&mut st);
+    assert!(lan(&mut st,b"\x0100000001 ops desktop 1\n").is_empty());
+    assert!(st.ops.active);
+    // Change the current response source while the asynchronous run is active.
+    receive_line(&mut st,b"\x01deadbeef ping\n");
+    mocks::SERIAL_OUT.lock().unwrap().clear();
+    for i in 0..11 {
+        crate::typical_ops::on_cycle_end(&mut st);
+        mocks::set_tick((i+1)*200);
+        crate::typical_ops::on_cycle_end(&mut st);
+    }
+    assert!(!st.ops.active); pump(&mut st);
+    let out=String::from_utf8(host(|h|h.output.clone())).unwrap();
+    assert!(out.contains("gs:00000001 GOP1 desktop warm 0 FAILED"),"{out}");
+    assert!(out.contains("gs:00000001 GOP1 desktop 0 FAILED"),"{out}");
+    assert!(out.contains("gs:00000001 GOP1 desktop p50 FAILED"),"{out}");
+    assert!(out.ends_with("gs:00000001 end 0\r\n"),"{out}");
+    assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
+    // The synchronous SKIP path must use the same LAN route as well.
+    let out=lan(&mut st,b"\x0100000002 ops char 1\n");
+    assert_eq!(out,b"gs:00000002 GOP1 char SKIP title\r\ngs:00000002 end 0\r\n");
+    assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
+    open_serial(&mut st);
+}

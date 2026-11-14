@@ -117,7 +117,7 @@ pub fn open_lan(st: &mut GuiState, seconds: u32) {
 /// Advance G1, then release its borrow before executing a received command.
 pub fn poll_lan(st: &mut GuiState) {
     if !st.gserial.lan_enabled { return; }
-    let mut bytes = [0; LINE_MAX]; let mut len = 0;
+    let mut bytes = [0; LINE_MAX + 2]; let mut len = 0;
     unsafe {
         if let Some(link) = (*core::ptr::addr_of_mut!(LINK)).as_mut() {
             link.poll(st.now.wrapping_mul(10), |line| {

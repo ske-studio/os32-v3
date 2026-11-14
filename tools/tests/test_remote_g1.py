@@ -47,6 +47,9 @@ def main():
         if args.mutate:
             original = source.read_text()
             for name, old, new in [
+                ('again-no-ready', 'if rc == OS32_ERR_AGAIN && now.wrapping_sub(self.retry)', 'if false && now.wrapping_sub(self.retry)'),
+                ('generation-no-reset-ready', 'if reset_ready {', 'if false {'),
+                ('wire-too-short', 'len > WIRE_MAX', 'len > REMOTE_GSERIAL_LINE_MAX as usize'),
                 ('other-service', 'n.service != REMOTE_SVC_GSERIAL as u16', 'false'),
                 ('missing-end', 'if has_end(&self.body[..self.len], &self.id)', 'if true'),
             ]:
