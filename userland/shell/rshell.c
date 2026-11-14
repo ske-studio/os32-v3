@@ -361,6 +361,76 @@ static const struct rsh_io rsh_io_real = {
     rsh_io_getch, rsh_io_tick, rsh_io_idle, (void *)0
 };
 
+#ifndef SHELL_AS_APP
+/* Whole-line GUI handoff, including the existing GSERIAL timeout form. */
+static const char *rsh_gui_command(const char *line)
+{
+    const char *p;
+    while (*line == ' ') line++;
+    p = line;
+    if (!strncmp(p, "gui", 3) && (!p[3] || p[3] == ' ')) {
+        p += 3;
+        while (*p == ' ') p++;
+        return *p ? 0 : "os32gui";
+    }
+    if (strncmp(p, "os32gui", 7) || (p[7] && p[7] != ' ')) return 0;
+    p += 7;
+    while (*p == ' ') p++;
+    if (!*p) return line;
+    if (strncmp(p, "-t ", 3)) return 0;
+    p += 3;
+    while (*p == ' ') p++;
+    if (*p >= '0' && *p <= '9') {
+        u32 seconds = 0;
+        do {
+            if (seconds > (0x7fffffffu / OS32_TICK_HZ - (u32)(*p - '0')) / 10u)
+                return 0;
+            seconds = seconds * 10u + (u32)(*p++ - '0');
+        } while (*p >= '0' && *p <= '9');
+        while (*p == ' ') p++;
+        if (!*p) return line;
+    }
+    return 0;
+}
+
+/* Called only inside LAN capture; 1 defers GUI execution until ACCEPT/END. */
+int rsh_lan_execute(const char *line)
+{
+    const char *child = rsh_sfs_child(line);
+    if (rsh_gui_command(line)) {
+        g_api->kprintf(ATTR_CYAN, "%s", "Switching to GUI shell...\n");
+        return 1;
+    }
+    if (child) {
+        /* A resident /host makes sfs_begin select its LAN scope. Other mounted
+         * filesystems fail BUSY before the UART path can open a session. */
+        if (!g_api->sys_is_mounted(RSHELL_HOST_PREFIX)) {
+            g_api->kprintf(ATTR_RED, "%s", "sfs: LAN rshell requires --sfs-lan resident /host\n");
+            sh_status_set(SH_STATUS_USAGE);
+        } else sh_status_set(sfs_run_child(child));
+    } else {
+        static const char *const uart[] = { "serial", "terminal", "send", "tvdump", "rshell" };
+        const char *p = line;
+        while (*p == ' ') p++;
+        for (unsigned int i = 0; i < sizeof(uart) / sizeof(uart[0]); i++) {
+            unsigned int n = strlen(uart[i]);
+            if (!strncmp(p, uart[i], n) && (!p[n] || p[n] == ' ')) {
+                g_api->kprintf(ATTR_RED, "%s", "rshell: serial command refused over LAN\n");
+                sh_status_set(SH_STATUS_USAGE);
+                return 0;
+            }
+        }
+        (void)execute_command(line);
+    }
+    return 0;
+}
+
+int rsh_lan_handoff(const char *line)
+{
+    return execute_command(rsh_gui_command(line));
+}
+#endif
+
 static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
 {
     char rbuf[RSHELL_LINE_MAX];
@@ -400,6 +470,11 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
              * 来なければ元の速度へ戻して EOT を返す (ホストはそちらで
              * 待っている)。 */
             (void)ser_wd_poll();
+#ifndef SHELL_AS_APP
+            /* No serial byte has started a line. poll owns the complete LAN
+             * execution; neither this loop nor rsh_line_rest runs inside it. */
+            if (g_api->host_notice_read) (void)rsh_lan_poll();
+#endif
             {
                 /* rshell コマンド待ち。sys_halt でアイドル時の get_tick
                  * 連打 (実測 311k/s) を止める。SER 受信 IRQ でも起きる。 */

@@ -1209,6 +1209,7 @@ int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; 
 #include "../../userland/shell/hdprep_plan.c"
 #include "../../drivers/block/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
+int rsh_lan_poll(void) { return OS32_ERR_AGAIN; }
 #include "../../userland/shell/rshell.c"
 #include "../../userland/shell/serial_watchdog.c"   /* rshell.c の番犬 (往復 2) */
 #include "../../userland/shell/ui.c"

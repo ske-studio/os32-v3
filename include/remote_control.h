@@ -23,6 +23,8 @@
 #define REMOTE_REQ_RSH_READY "RSH READY"
 /* RSH OUT <boot-token> <id8> <drop> <len> */
 #define REMOTE_REQ_RSH_OUT   "RSH OUT"
+/* RSH ACCEPT <boot-token> <id8> <len> */
+#define REMOTE_REQ_RSH_ACCEPT "RSH ACCEPT"
 /* GS OUT <boot-token> <id8|!> <drop> <len> */
 #define REMOTE_REQ_GS_OUT    "GS OUT"
 /* PDIAG OUT <boot> <id> <status> <len> */
