@@ -1447,6 +1447,7 @@ def open_stream(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--config", metavar="FILE")
     ap.add_argument("--listen", default="127.0.0.1:8026", metavar="HOST:PORT")
     ap.add_argument("--connect", metavar="HOST:PORT")
     ap.add_argument("--unix", metavar="PATH", help="UNIX ソケットで待ち受ける (ホスト TDD 用)")
@@ -1471,6 +1472,18 @@ def main():
                     metavar="{auto,win32,wsl,wayland,xclip,file:<path>,none}",
                     help="クリップボード backend (既定 auto)")
     args = ap.parse_args()
+    config = None
+    operator_addr = None
+    if args.config:
+        from host_agent_config import load_config, config_summary
+        try:
+            config = load_config(args.config)
+            args.listen = config["frame-endpoint"]
+            args.file_root = config["root"]
+            host, port = config["operator-endpoint"].rsplit(":", 1)
+            operator_addr = (host, int(port))
+        except (OSError, ValueError) as exc:
+            ap.error(str(exc))
     if not valid_clip_arg(args.clip):
         ap.error("--clip は {auto,win32,wsl,wayland,xclip,none} か file:<path> "
                  "(不正: %r)" % args.clip)
@@ -1490,10 +1503,10 @@ def main():
     except (OSError, subprocess.CalledProcessError):
         commit = ""
     def info():
-        return dict(commit=commit, config=dict(iface=None, root=args.file_root,
-                    allow_write=False, peer=None),
+        return dict(commit=commit, config=config_summary(config) if config else
+                    dict(iface=None, root=args.file_root, allow_write=False, peer=None),
                     peer=mac_str(agent.peer) if agent.established else None)
-    agent.operator_socket = OperatorSocket(None, agent.operator, info)
+    agent.operator_socket = OperatorSocket(operator_addr, agent.operator, info)
     pcap = Pcap(args.pcap) if args.pcap else None
     print("host_agent v2 mac %s agent-gen %d (wire v2, 3-way HELLO, rid ledger)"
           % (args.mac, agent.agent_gen), flush=True)
