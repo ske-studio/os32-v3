@@ -53,6 +53,13 @@ def run(ctx):
                 exercise(original.replace(anchor, replacement), False)
                 print('RED runtime: ' + anchor, flush=True)
         cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
+        # CI check-fast has no PPC toolchain (same rule as link-platform-host); ppc-compile requires it.
+        if not cc.is_file():
+            if os.environ.get('OS32_REQUIRE_PPC') == '1':
+                print('FAIL PowerPC object: toolchain unavailable: ' + str(cc), flush=True)
+                return 1
+            print('SKIP PowerPC object: toolchain unavailable: ' + str(cc), flush=True)
+            return 0
         subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-D__cdecl=', *includes, '-c',
             str(ctx.root / 'platform/powermac/nic_gem.c'),
