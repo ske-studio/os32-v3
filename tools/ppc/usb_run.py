@@ -555,7 +555,8 @@ def main():
     cross = Path(os.environ.get('USB_PPC_CROSS_DIR', os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
-        print('SKIP ppc-usb: PPC toolchain/QEMU/OpenBIOS unavailable')
+        missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
+        print('SKIP ppc-usb: ' + missing + ' unavailable')
         return 0
     if args.lan:
         try:

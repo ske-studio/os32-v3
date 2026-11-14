@@ -44,6 +44,8 @@ def workflow_cases(source, setup_source=None):
         suffix = '-${{ matrix.shard }}' if name == 'check-fast' else ''
         assert job['concurrency']['group'] == 'build-${{ github.ref }}-' + name + suffix, 'separate concurrency groups'
         steps = job['steps']
+        assert not any(step.get('uses') == './.github/actions/ppc-setup' for step in steps), 'PPC setup belongs to dedicated job'
+        assert 'OS32_REQUIRE_PPC' not in str(job), 'ordinary shards allow missing PPC toolchain'
         setup_step = next(step for step in steps if step.get('uses') == './.github/actions/build-setup')
         assert setup_step['timeout-minutes'] >= 90, 'allow cold toolchain plus slow apt setup'
         checks = [s for s in steps if s.get('name') == 'make check-fast']

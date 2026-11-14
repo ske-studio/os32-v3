@@ -24,11 +24,12 @@ def run(ctx):
     import subprocess
     import shutil
     from pathlib import Path
-    # PPC guest checks are optional on CI, which has no PPC toolchain.
+    # Guest checks remain optional until stage 2 adds QEMU/OpenBIOS.
     required = (str(Path(os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc"))/"bin/powerpc-elf-gcc"),
                 "qemu-system-ppc", "genisoimage")
     if any(shutil.which(tool) is None for tool in required) or not Path("/usr/share/qemu/openbios-ppc").is_file():
-        print("SKIP ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable")
+        missing = 'PPC toolchain' if shutil.which(required[0]) is None else 'QEMU/OpenBIOS/genisoimage'
+        print('SKIP ppc-sc: ' + missing + ' unavailable')
         return 0
     # The outer x86 check make exports its build paths and compiler flags.
     env = dict(os.environ)

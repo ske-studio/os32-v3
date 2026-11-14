@@ -223,7 +223,8 @@ def main():
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not (cross/'bin/powerpc-elf-gcc').is_file() or not ROM.is_file() or any(
             shutil.which(x) is None for x in ['qemu-system-ppc', 'genisoimage']):
-        print('SKIP ppc-fb: PPC toolchain/QEMU/OpenBIOS unavailable')
+        missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
+        print('SKIP ppc-fb: ' + missing + ' unavailable')
         return 0
     os.environ['PPC_FB'] = '1'
     work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ['TMPDIR']))
