@@ -691,9 +691,8 @@ static int kbd_legacy_inject_peek(void)
     return kbd_inject_peek(&b) ? (int)b : -1;
 }
 /* The x86 adapter supplies its native PIT clock; the bridge has no clock. */
-static void kbd_legacy_park_poll(u32 unused)
+static void kbd_legacy_park_poll(void)
 {
-    (void)unused;
     (void)exec_park_poll(tick_count);
 }
 static const struct InputLegacyProvider kbd_legacy_provider = {

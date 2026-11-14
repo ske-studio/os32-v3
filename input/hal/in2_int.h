@@ -17,7 +17,7 @@ struct InputLegacyProvider {
     int (*peek_key)(void);
     int (*gui_active)(void);
     int (*terminal_enabled)(void);
-    void (*park_poll)(u32 tick);
+    void (*park_poll)(void);
     void (*park_kbd)(int interruptible);
 };
 

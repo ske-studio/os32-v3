@@ -68,7 +68,7 @@ struct InputLegacyProvider {
     int (*try_key)(void); int (*peek_key)(void); /* local cooked key、peekは非消費 */
     int (*gui_active)(void); /* 3c前はx86 kbd_gui_modeを包む。PPCも自分のprovider */
     int (*terminal_enabled)(void); /* rshell/capture等のpolicy */
-    void (*park_poll)(u32 tick); /* try、成立時戻らず再開値byte/-1 */
+    void (*park_poll)(void); /* try、成立時戻らず再開値byte/-1 */
     void (*park_kbd)(int interruptible); /* wait、成立時戻らず再開値byte */
 }; /* 常駐providerを起動時登録、NULLは不在。共通コードに装置symbolを置かない。 */
 typedef struct InputEvent {

@@ -19,7 +19,7 @@ static int legacy_read(int mode, int peek)
         if (mode == IL_LOCAL_CHAR) return -1;
         read_key = peek ? p->inject_peek : p->inject_try;
         key = read_key ? read_key() : -1;
-        if (key < 0 && !peek && p->park_poll) p->park_poll(0);
+        if (key < 0 && !peek && p->park_poll) p->park_poll();
         return key;
     }
     if (mode != IL_LOCAL_CHAR && p->terminal_enabled && p->terminal_enabled()) {

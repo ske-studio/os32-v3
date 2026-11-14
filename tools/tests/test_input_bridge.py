@@ -90,6 +90,43 @@ int kbd_peekkey(void)
 }
 '''
 
+# Wait oracle from 73c8664b; deadlines are left unchanged.
+OLD_KBD += r'''
+static int kbd_gui_getbyte(int interruptible)
+{
+    for (;;) {
+        int ch = kbd_gui_trygetbyte();
+        if (ch >= 0) return ch;
+
+        (void)exec_park_kbd();
+        if (interruptible && ring3_wait_pending()) return -1;
+        idle_work_run();
+        _halt();
+    }
+}
+int kbd_getkey_wait(int interruptible)
+{
+    u16 entry;
+    u32 start_tick = tick_count;
+    int capture = con_sink_capture_active();
+
+    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
+
+    while (kbd_count == 0) {
+        kbd_foreground_poll();
+        if (interruptible && ring3_wait_pending()) return -1;
+        idle_work_run();
+        _halt();
+        if (capture && (u32)(tick_count - start_tick) >= KBD_RSHELL_TIMEOUT_SEC * PIT_HZ)
+            return 0x1b;
+    }
+
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+
+    return (int)entry;
+}
+'''
+
 FIXTURE = r'''
 #include "in2_int.h"
 #ifdef PPC_COMPILE
@@ -128,6 +165,9 @@ def bridge_cases(ctx, tmp):
         return kbd[start:kbd.index('\n}', start) + 2]
     current = kbd[a:b] + '\n' + '\n'.join(function(n) for n in (
         'kbd_trygetchar', 'kbd_trygetkey', 'kbd_trygetchar_local', 'kbd_peekkey'))
+    for name in ('kbd_gui_getbyte', 'kbd_getkey_wait'):
+        start = kbd.index('int ' + name + '(int interruptible)\n{')
+        current += '\n' + ('static ' if name == 'kbd_gui_getbyte' else '') + kbd[start:kbd.index('\n}', start)+2]
     # GUI byte adapter precedes the moved provider.
     start = kbd.index('static int kbd_gui_trygetbyte(void)')
     current = kbd[start:kbd.index('\n}', start)+2] + '\n' + current
@@ -143,10 +183,10 @@ def bridge_cases(ctx, tmp):
         if product is not None:
             command += ['-DCURRENT', str(tmp / 'bridge.c')]
         subprocess.run(command + ['-o', str(tmp / 'trace')], check=True)
-        result = host32.run([str(tmp / 'trace')], runner='qemu', capture_output=True)
-        assert result.returncode == 0, result.stderr
-        return result.stdout
+        result = host32.run([str(tmp / 'trace')], runner='qemu', capture_output=True, timeout=10)
+        return result.returncode, result.stdout
     baseline = execute(OLD_KBD)
+    assert baseline[0] == 0
     assert execute(current, bridge) == baseline
     old = 'return rshell_active && !con_sink_capture_active();'
     if ctx.mutate:
@@ -154,14 +194,25 @@ def bridge_cases(ctx, tmp):
         assert execute(current.replace(old, 'return rshell_active && (!con_sink_capture_active() || 1);', 1), bridge) != baseline
         print('RED runtime trace: capture serial gate (char/key)', flush=True)
         assert execute(current, bridge) == baseline
-    print('PASS old/new keyboard traces: 256 fixtures, two reads each', flush=True)
+        wait = '    while (kbd_count == 0) {'
+        assert current.count(wait) == 1
+        mutant = current.replace(wait, '    (void)serial_trygetchar();\n' + wait, 1)
+        assert execute(mutant, bridge)[0] == 6
+        print('RED runtime: key wait reads serial', flush=True)
+        assert execute(current, bridge) == baseline
+    print('PASS old/new traces: 256 nonwaiting fixtures + 16 key waits', flush=True)
     if ctx.mutate:
         for old, new in [
             ('        return key;\n    }', '        /* fall through to serial/local */\n    }'),
             ('peek ? p->inject_peek : p->inject_try', 'p->inject_try'),
-            ('p->park_poll(0);', '(void)0;')]:
+            ('p->park_poll();', '(void)0;'),
+            ('if (mode == IL_LOCAL_CHAR) return -1;',
+             'if (mode == IL_LOCAL_CHAR) { if (p->park_poll) p->park_poll(); return -1; }'),
+            ('peek ? p->peek_key : p->try_key', 'p->try_key'),
+            ('peek ? p->terminal_peek : p->terminal_try', 'p->terminal_try')]:
             assert bridge.count(old) == 1, old
-            assert execute(current, bridge.replace(old, new, 1)) != baseline, old
+            result = execute(current, bridge.replace(old, new, 1))
+            assert result[0] in (0, 3, 7) and result != baseline, (old, result[0])
             print('RED runtime trace: ' + old.strip(), flush=True)
             assert execute(current, bridge) == baseline
 
