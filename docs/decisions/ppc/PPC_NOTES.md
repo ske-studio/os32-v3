@@ -29,7 +29,7 @@
 
 ## 4. 時計
 
-- USER の syscall は EE=0 で走り tick_count が止まるので、機種の時計 (hostfs の now・USB の ms) は timebase から取る。DEC の処理を前景から呼ばない。
+- W4 実装前の現状では USER の syscall は EE=0 で走り tick_count が止まるので、機種の時計 (hostfs の now・USB の ms) は timebase から取る。DEC の処理を前景から呼ばない。W4 適合後は通常 syscall 本体を FG1 とし、timer IRQ が進行する (ARCH_COMPAT の AC-CTX-1/6)。適合はまだ未。
 
 ## 5. FB 端末の起動と出力
 
