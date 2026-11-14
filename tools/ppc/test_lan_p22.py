@@ -16,7 +16,7 @@ MUTATIONS = [
  ('H:A10 read-range', 'if (!range) goto bad_range;', 'if (!range) range = &d->peek_ok[0];', 12),
  ('physical-range', '!contains(range, pa, 1)', '0', 17),
  ('fault', 'r->status = PLN1_STATUS_FAULT; return;', 'r->payload_bytes = (u16)i; r->status = PLN1_STATUS_FAULT; return;', 18),
- ('conflict', 'if (same_request(q, &cache[i].req))', 'if (1 || same_request(q, &cache[i].req))', 27),
+ ('conflict', 'if (same_request(&key, &cache[i].req))', 'if (1 || same_request(&key, &cache[i].req))', 27),
  ('nonce', '!equal(q->host_nonce, session_nonce, 16)', '0', 29),
  ('length', 'if (q->payload_bytes != n)', 'if (0 && q->payload_bytes != n)', 22),
  ('clear', 'ppc_trap_onfault_clear();', '(void)0;', 31),

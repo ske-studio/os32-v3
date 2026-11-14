@@ -43,5 +43,11 @@ void _start(void) {
     link_hello_ok=1;pm_link_log_poll();pm_link_log_poll();
     response=200;int before=opens;finish();REQUIRE(completions==1 && opens==before);
     pm_link_log_poll();REQUIRE(opens==before+1 && completions==1);
+    response=400;before=opens;finish();
+    REQUIRE(completions==2 && !pending && handle<0 && opens==before);
+    REQUIRE(lost_records==3 && lost_bytes==9);
+    pm_link_log_poll();REQUIRE(opens==before+1);
+    equal(request,"LOG 000102030405060708090a0b0c0d0e0f 2 3 9 0 3");
+    response=200;finish();REQUIRE(completions==3 && !pending);
     __asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();
 }
