@@ -1,4 +1,6 @@
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* ========================================================================= */
 /*  KAPI_DB_V50_HOST.C — 票 S0-K §1d のホスト TDD                            */
 /*                                                                           */

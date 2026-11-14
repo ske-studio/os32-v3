@@ -1,5 +1,7 @@
 #include "gfx2_bridge_fake.h"
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* Real target bodies; only MMIO and unused dependencies are substituted. */
 #include "serial_diag_host.h"
 #include "types.h"

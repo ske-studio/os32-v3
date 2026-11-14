@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Production boot assembly starts exactly one shared NIC (ILP32/qemu)."""
-CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
+CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['tools/tests/link_platform_fake/link_platform_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
     'drivers/net/e82557/lan_body.c',
     'drivers/block/netcd.h',
     'drivers/base/dev.h',
@@ -95,7 +95,7 @@ def build_run(work, sources):
              '-ffunction-sections', '-fdata-sections', '-D__KERNEL_BUILD__']
     subprocess.run(['gcc', *flags, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), '-I' + str(ROOT / 'build/out/lan'),
-                    '-I' + str(ROOT / 'drivers/net/ne2000'), *include_flags(ROOT),
+                    '-I' + str(ROOT / 'drivers/net/ne2000'), '-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT),
                     '-DLAN_BODY_SOURCE="' + str(paths[0]) + '"',
                     '-DLAN_RESIDENT_SOURCE="' + str(paths[1]) + '"',
                     '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',

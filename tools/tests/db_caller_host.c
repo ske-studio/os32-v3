@@ -1,5 +1,7 @@
 #include "host_exec_context.h"
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* Actual dispatcher, DB/output wrappers, VFS and caller copy/walk.
  * Only SQLite and the filesystem driver are entry-recording boundaries. */
 #define HOST_DB_CALLER_TEST

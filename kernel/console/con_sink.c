@@ -24,18 +24,10 @@
 #include "con_sink.h"
 #include "console.h"
 
-/* 割込み禁止区間。ホスト試験 (tools/tests/con_sink_host.c) は CPL=3 で走り
- * cli/popfl を実行できないので、そこだけ空の錠に差し替える。カーネル本体は
- * 必ず include/io.h の irq_save/irq_restore を使う (盲目的な cli/sti では
- * ネストした禁止区間を壊す)。 */
-#ifdef CON_SINK_NO_IRQ_LOCK
-static unsigned int con_sink_lock(void)        { return 0; }
-static void con_sink_unlock(unsigned int f)    { (void)f; }
-#else
+/* IRQ の状態を保存し、呼出し前の状態へ戻す。 */
 #include "io.h"
 static unsigned int con_sink_lock(void)        { return irq_save(); }
 static void con_sink_unlock(unsigned int f)    { irq_restore(f); }
-#endif
 
 /* res_owner_get() は fs/fd_redirect.c。kernel/ は -Ifs を持つが、shm.c と
  * 同じく宣言だけを引く (fd_redirect.h は FD 表の型まで引き込むため)。 */
