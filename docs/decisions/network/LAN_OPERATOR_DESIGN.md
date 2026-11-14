@@ -75,7 +75,7 @@ class CommandTransport:
 - agentは1件を結果またはUNKNOWNまで保持し、UNKNOWN後は対象ゲストのREADY再確認と利用者の明示的な再開まで次を送らない。CLIの切断だけでは実行中枠を解放しない。UNKNOWNのIDも照合情報を保持し、同じagent世代・boot-token・IDの遅延RSH OUTを再接続後も受理する。長さ/drop/echo/EOT検査合格なら結果確定、READYのdoneだけでは完了にしない。旧世代/別bootのOUTは拒否し、遅延結果でも再送しない。
 
 - **U5 常駐**: ホスト起動時からNICごとにhost_agentを1つ常駐させる。rshell/gserial/LOG表示/SFSのCLIは8027へ接続し、agentを子プロセスとして起動・停止しない。切断してもサービスは存続し、ゲスト不在中も操作口と再接続待ちを維持する（既存open_streamのブロック中もprobeを処理）。
-- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。operator-endpoint と frame-endpoint は設定の検証で loopback の番地だけを受ける (bind の検査で許可リストではない、A4)。state-dir に世代・id・sfs_generation を永続しない (NET_HOSTSVC_DESIGN:154、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
+- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。state-dir に世代・id・sfs_generation を永続しない (NET_HOSTSVC_DESIGN:154、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
 - unit原本は `tools/systemd/os32-host-agent@.service`、ExecStartは `/usr/bin/python3 /opt/os32/tools/host_agent_service.py --config /etc/os32/host-agent/%i.json`、Type=simple、Restart=on-failure、RestartSec=2、WantedBy=multi-user.target。専用os32-hostユーザー、永続状態は `/var/lib/os32-host-agent/%i`。必要なraw権限はunitのCAP_NET_RAWに限定する。
 - インストールは管理者が一度、専用ユーザーと設定/状態ディレクトリを作成→tools一式を `/opt/os32/tools` に配置→設定を編集しrootへの必要な読書き権限を付与→unitを `/etc/systemd/system/` へ配置→`systemctl daemon-reload`→`systemctl enable --now os32-host-agent@<instance>`。Ubuntuノート・systemd有効のWSLは同じunitを使う。WSLはWindowsログオン時のタスクで対象ディストリビューションを起動・維持する。systemd無効環境では同タスクが `wsl.exe -d <distro> --exec /usr/bin/python3 /opt/os32/tools/host_agent_service.py --config <設定>` を監視再起動し、ゲスト/台本と独立して常駐させる。
 - Ubuntuの物理NICは既存lan_bridge→8026→agent、raw SFSはlanfs_host.pyの既存Server/HostFSを維持する。サービスrunnerがbridge/lanfs_hostを同じ設定で常駐管理し、root/allow-write/peerを渡す。SFS MARK全3Bで分離し二重応答を防ぎ、NIC送信MACを揃える。PPCのSFS CALLは同じbackend実装をagent内で使う。raw SFS自体はCLI用8027へ載せ替えない。
@@ -238,6 +238,6 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 - A1: link 像では GEM の RX/TX も tick の枠で汲む。前景の pm_lan_poll は link 像の RX に触らない (§5 の C ブロック)。
 - A2: probe が agent の commit と設定の要約を返す。台本は作業木の HEAD と照合する (§7)。
 - A3: NP21/W の 8026 は今の向き (WSL の agent が loopback で listen) を保つ (§2)。
-- A4: operator-endpoint と frame-endpoint は loopback だけを受ける (§2 設定)。
+- 運用は VPN とローカルの中なので、操作口・frame の口の番地を制限する検査は置かない (ユーザー 2026-11-14「VPN とローカルで動いているのでセキュリティは気にしないで」。Opus の A4 は取り下げ)。
 - A5: state-dir に世代・id を永続しない (§2 設定)。
 - 受入で確かめる: 専用ユーザー os32-host が HostFS の root に書くときの所有者と権限、CAP_NET_RAW を AmbientCapabilities で渡すこと。
