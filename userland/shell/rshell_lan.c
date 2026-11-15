@@ -399,6 +399,9 @@ void rsh_lan_app_init(void)
 int rsh_lan_execute(const char *line)
 {
     (void)execute_command(line);
+    /* A LAN `exit N` does not end the APP shell (the host ends it with EXIT,
+     * as in the resident rshell); drop the flag so later lines are not cut. */
+    sh_exit_flag = 0;
     return 0;
 }
 
@@ -425,6 +428,7 @@ int rsh_lan_app_loop(void)
             if (r == RSH_LINE_DONE) {
                 if (ln.overflow) {
                     sh_refuse("rshell: command line", sizeof(buf) - 2);
+                    sh_status_set(SH_STATUS_USAGE); /* refused line: $? is 2 */
                 } else if (ln.pos && !ln.junk) {
                     (void)execute_command(buf);
                     if (sh_exit_flag) {
