@@ -13,9 +13,6 @@
 #include "pc98.h"
 #include "io.h"
 
-void mouse_hal_init(void);
-void mouse_hal_capture(i8 dx, i8 dy, u8 raw);
-
 #define MOUSE_COUNTER_NIBBLE_MASK 0x0F
 #define MOUSE_COUNTER_NIBBLE_SHIFT 4
 
@@ -34,8 +31,6 @@ void mouse_hal_capture(i8 dx, i8 dy, u8 raw);
 /* ====================================================================== */
 /*  内部状態 (volatile — IRQハンドラから更新)                               */
 /* ====================================================================== */
-static volatile i16 bus_accum_dx;   /* 累積X差分 */
-static volatile i16 bus_accum_dy;   /* 累積Y差分 */
 static volatile u8  bus_btn_raw;    /* 最新のボタン生データ */
 
 /* ====================================================================== */
@@ -98,9 +93,7 @@ void mouse_irq_handler(void)
     dx = (i8)((xh << MOUSE_COUNTER_NIBBLE_SHIFT) | xl);
     dy = (i8)((yh << MOUSE_COUNTER_NIBBLE_SHIFT) | yl);
 
-    /* 累積に加算 */
-    bus_accum_dx += dx;
-    bus_accum_dy += dy;
+    /* 共通状態へ一度だけ採取 */
     mouse_hal_capture(dx, dy, bus_btn_raw);
 }
 
@@ -111,9 +104,7 @@ void mouse_irq_handler(void)
 /* ====================================================================== */
 int bus_mouse_init(void)
 {
-    /* 累積値クリア */
-    bus_accum_dx = 0;
-    bus_accum_dy = 0;
+    /* 初期ボタンは解放 */
     bus_btn_raw = (MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT); /* 全ボタン解放 (負論理) */
 
     mouse_hal_init();
@@ -130,26 +121,4 @@ int bus_mouse_init(void)
     /* IRQ13のPIC有効化は呼び出し元 (mouse.c) で行う */
 
     return 1;
-}
-
-/* ====================================================================== */
-/*  bus_mouse_get — バスマウスの累積差分を取得しリセット                    */
-/* ====================================================================== */
-void bus_mouse_get(i16 *dx, i16 *dy, u8 *buttons)
-{
-    unsigned int flags;
-
-    /* 割り込み禁止区間で累積値を読取・リセット */
-    flags = irq_save();
-    *dx = bus_accum_dx;
-    *dy = bus_accum_dy;
-    bus_accum_dx = 0;
-    bus_accum_dy = 0;
-    irq_restore(flags);
-
-    /* ボタン: 負論理→正論理変換 */
-    *buttons = 0;
-    if (!(bus_btn_raw & MOUSE_LEFT))   *buttons |= MOUSE_BTN_LEFT;
-    if (!(bus_btn_raw & MOUSE_RIGHT))  *buttons |= MOUSE_BTN_RIGHT;
-    if (!(bus_btn_raw & MOUSE_MIDDLE)) *buttons |= MOUSE_BTN_MIDDLE;
 }
