@@ -34,7 +34,7 @@ void input_merge_key(InputEvent *e, u8 old, u8 origin)
         else mechanical[e->src - 1] &= ~bit;
         e->buttons = input_key_mods();
         if (legacy_active()) return;
-        if (input_emit_in2) input_emit_in2(e);
+        input_emit_in2(e);
         if (down || cnt[sc] == 0) {
             if (input_emit_legacy_key) input_emit_legacy_key(sc, down, e->buttons);
         }

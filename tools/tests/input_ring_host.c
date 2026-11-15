@@ -34,7 +34,16 @@ static int test(void)
     if (tick_clock_config(1, 1000)) return 14;
     for (int i = 0; i < 10; ++i) tick_clock_step();
     if (in2_time_ms() != 10) return 15;
-    if ((u32)(3u - 0xfffffffdu) != 6) return 16;
+    e.type = INPUT_EVENT_MOVE; e.src = 2; e.generation = 1;
+    e.x = 7; e.y = -3; e.time_ms = 20;
+    if (!in2_ring_push(&e)) return 16;
+    e.generation = 2; e.x = 5; e.y = 4; e.time_ms = 21;
+    if (!in2_ring_push(&e)) return 17;
+    if (!in2_ring_pop(&out, &seq) || out.src != 2 || out.generation != 1 ||
+        out.x != 7 || out.y != -3 || out.time_ms != 20) return 18;
+    if (!in2_ring_pop(&out, &seq) || out.src != 2 || out.generation != 2 ||
+        out.x != 5 || out.y != 4 || out.time_ms != 21) return 19;
+    if (in2_ring_pop(&out, &seq)) return 20;
     return 0;
 }
 #ifndef PPC_COMPILE

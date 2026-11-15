@@ -50,7 +50,7 @@ int input_capture(const InputEvent *event)
             break;
         default: goto out;
         }
-        if (!legacy_active() && input_emit_in2) input_emit_in2(&e);
+        if (!legacy_active()) input_emit_in2(&e);
     }
     rc = 0;
 out:
@@ -73,10 +73,9 @@ void input_repeat(u8 src, u16 generation, u8 sc)
 void input_state_release(u8 src, u16 generation)
 {
     /* Called before the validated source slot is returned, with IRQs masked.
-     * Capture already carries the producer's sampled ms; release samples now.
-     * The clock port is absent only in this unconnected stage. */
+     * Capture already carries the producer's sampled ms; release samples now. */
     InputEvent e = { .src = src, .generation = generation, .type = INPUT_EVENT_KEY,
-                     .time_ms = in2_time_ms ? in2_time_ms() : 0 };
+                     .time_ms = in2_time_ms() };
     for (unsigned int sc = 0; sc < 128; ++sc) {
         if (!held[src - 1][sc]) continue;
         e.sc = sc;

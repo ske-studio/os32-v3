@@ -61,12 +61,10 @@ u8 input_buttons(void);
 int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
 void input_state_release(u8 src, u16 generation);
 void input_merge_key(InputEvent *event, u8 old, u8 origin);
-/* Stage 2c / 3a ports: no implementation or device wiring in stage 2b.
- * Weak references permit both images to link until those stages land. */
-void input_emit_in2(const InputEvent *event) __attribute__((weak));
+void input_emit_in2(const InputEvent *event);
+/* Stage 3a ports remain optional until that stage lands. */
 void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
 void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
-u32 in2_time_ms(void) __attribute__((weak));
 
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty

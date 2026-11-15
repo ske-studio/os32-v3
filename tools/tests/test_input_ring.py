@@ -39,6 +39,7 @@ def run(ctx):
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
             mutations = [ ('count == IN2_RING_CAPACITY', 'count == IN2_RING_CAPACITY - 1'), ('++dropped;', '(void)0;'), ('events[i].src == e->src', '1'), ('e->sc == KEY_STOP', 'e->sc != KEY_STOP') ]
+            mutations.append(('events[i].generation == e->generation', '1'))
             for old, new in mutations:
                 assert ring.count(old) == 1
                 assert build(ring.replace(old, new), clock) != 0

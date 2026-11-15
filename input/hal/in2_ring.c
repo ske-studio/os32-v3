@@ -38,7 +38,8 @@ int in2_ring_push(const InputEvent *e)
     }
     if (count && e->type == INPUT_EVENT_MOVE) {
         unsigned int i = (head + count - 1) % IN2_RING_CAPACITY;
-        if (events[i].type == INPUT_EVENT_MOVE && events[i].src == e->src) {
+        if (events[i].type == INPUT_EVENT_MOVE && events[i].src == e->src &&
+            events[i].generation == e->generation) {
             events[i].x = add_sat(events[i].x, e->x);
             events[i].y = add_sat(events[i].y, e->y);
             events[i].time_ms = e->time_ms;
@@ -63,6 +64,11 @@ int in2_ring_push(const InputEvent *e)
     append(e);
     irq_restore(flags);
     return 1;
+}
+
+void input_emit_in2(const InputEvent *event)
+{
+    (void)in2_ring_push(event);
 }
 
 int in2_ring_pop(InputEvent *e, u16 *seq)

@@ -10,7 +10,9 @@ static int v86;
 static u16 gen[IN2_MAX_DEV];
 int legacy_active(void) { return v86; }
 u32 in2_time_ms(void) { return 1234; }
-void input_emit_in2(const InputEvent *e) { bad_irq |= test_irq; events[n++] = *e; }
+void __real_input_emit_in2(const InputEvent *e);
+void __wrap_input_emit_in2(const InputEvent *e)
+{ bad_irq |= test_irq; events[n++] = *e; __real_input_emit_in2(e); }
 void input_emit_legacy_key(u8 sc, u8 down, u8 mods)
 { bad_irq |= test_irq; old_sc[k] = sc; old_down[k] = down; old_mods[k++] = mods; }
 void input_emit_legacy_repeat(u8 sc, u8 mods)
@@ -34,6 +36,14 @@ static int probe(void)
         T(input_src_register(i >= 14 ? INPUT_KIND_MOUSE : INPUT_KIND_KBD,
                              i ? INPUT_ORIGIN_USB : INPUT_ORIGIN_NATIVE, &gen[i]) == i + 1);
     T(input_src_register(1, 2, &spare) == OS32_ERR_FULL);
+    InputEvent captured = { .time_ms = in2_time_ms(), .src = 1, .generation = gen[0],
+                            .type = INPUT_EVENT_KEY, .sc = 1, .down = 1 }, out;
+    u16 seq;
+    T(input_capture(&captured) == 0 && in2_ring_pop(&out, &seq));
+    T(out.type == INPUT_EVENT_KEY && out.sc == 1 && out.time_ms == in2_time_ms());
+    T(!in2_ring_pop(&out, &seq));
+    captured.down = 0; T(input_capture(&captured) == 0 && in2_ring_pop(&out, &seq));
+    n = k = 0;
     T(key(1, KEY_SHIFT, 0) == 0 && n == 0 && k == 0);
     T(key(1, KEY_SHIFT, 1) == 0 && key(2, KEY_SHIFT, 1) == 0 && n == 2 && k == 2);
     T(events[0].src == 1 && events[1].src == 2 && events[0].time_ms == 42);
