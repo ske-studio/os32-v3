@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build
+from kboot_accept import build, mutant_settings
 from kboot_run import ROM, QMP, command, require, serial, validate, lan
 
 CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=[],
@@ -237,8 +237,17 @@ def main():
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     for cpu in cpus: accept(elf, cpu, work/cpu)
     if args.mutate:
-        for mutation in ('no-boot-follow', 'tmp-target'):
-            accept(elf, cpus[0], work/mutation, mutation)
+        # The guest's per-boot SFS nonce (boot_token CRC32) is the protection
+        # now; the host's PLN1 fs.reset is a second one. no-boot-follow removes
+        # both: the host keeps boot1 FS state (accept) and this private product
+        # copy restarts the nonce at 1 every boot, as before 41728e43.
+        follow = work/'no-boot-follow'; follow.mkdir()
+        fixed_nonce = build(follow/'kernel', 'KBOOT_SH=1', *mutant_settings(
+            follow, 'fixed-nonce', 'fs/serialfs/serialfs_persistent.c',
+            'nonce = sfs_crc32(token, sizeof(token));',
+            'nonce = 0; (void)token;'))
+        accept(fixed_nonce, cpus[0], follow/'guest', 'no-boot-follow')
+        accept(elf, cpus[0], work/'tmp-target', 'tmp-target')
     return 0
 
 
