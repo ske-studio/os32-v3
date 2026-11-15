@@ -1,3 +1,5 @@
+/* Expectations: characterization of the original word-copy behavior and
+ * ppc-offb-fast PACK (2026-11-15): alignment must not change any output byte. */
 /* R3: real OF backend/provider, with ledger/firmware dependencies replaced. */
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
@@ -82,6 +84,57 @@ static int selected(GfxBackend *be, int legacy)
     return 1;
 }
 static void each(GfxBackend *be, void *arg) { EXPECT(be == &gfx_backend_of_fb); (*(int *)arg)++; }
+
+/* Byte oracle: original clipping and edge-word coverage, without word loads. */
+static void copy_characterization(void)
+{
+    static u8 expected[8192];
+    static const int rects[][4] = {
+        {0, 0, 36, 4}, {3, 1, 2, 1}, {35, 3, 20, 20},
+        {-3, -2, 9, 5}, {-3, -2, 100, 100}, {0, 0, 1, 1},
+        {4, 0, 32, 4}, {0, 0, 0, 4}, {0, 0, 36, -1},
+        {0x7fffffff, 0, 0x7fffffff, 1},
+        {-2147483647-1, 0, 0x7fffffff, 1},
+        {-10, -10, 0x7fffffff, 0x7fffffff},
+        {0, 0x7fffffff, 1, 0x7fffffff},
+        {0, -2147483647-1, 1, 0x7fffffff},
+    };
+    for (u32 offset = 0; offset < 4; offset++)
+    for (u32 pitch = 40; pitch <= 43; pitch++)
+    for (u32 protected = 0; protected <= 4; protected++) {
+        struct of_fb_desc d = {.display = screen + 4, .shadow = ram + offset,
+            .width = 36, .height = 4, .pitch = 44, .bytes = 176,
+            .shadow_pitch = pitch, .shadow_bytes = pitch * 4,
+            .protected_rows = protected};
+        EXPECT(!of_fb_bind(&d));
+        for (u32 i = 0; i < sizeof(ram); i++) ram[i] = (u8)(i * 13 + 7);
+        for (u32 r = 0; r < sizeof(rects)/sizeof(rects[0]); r++) {
+            int x = rects[r][0], y = rects[r][1];
+            int w = rects[r][2], h = rects[r][3];
+            kmemset(screen, 0xa5, sizeof(screen));
+            kmemset(expected, 0xa5, sizeof(expected));
+            /* Membership uses wide endpoints, independently of product loops. */
+            long long right = (long long)x + w, bottom = (long long)y + h;
+            if (w > 0 && h > 0 && right > 0 && bottom > 0 && x < 36 && y < 4) {
+                int left = x < 0 ? 0 : x;
+                int last = right > 36 ? 36 : (int)right;
+                for (u32 row = protected; row < 4; row++)
+                for (u32 col = 0; col < 36; col++) {
+                    if ((long long)row >= y && (long long)row < bottom &&
+                        col / 4 >= (u32)left / 4 && col / 4 <= (u32)(last - 1) / 4)
+                        expected[4 + row * 44 + col] = ram[offset + row * pitch + col];
+                }
+            }
+            EXPECT(!of_fb_copy(ram + offset, pitch, pitch * 4, x, y, w, h));
+            for (u32 i = 0; i < sizeof(screen); i++) EXPECT(screen[i] == expected[i]);
+            /* Also exercise the bound shadow/pitch via the public present hook. */
+            kmemset(screen, 0xa5, sizeof(screen));
+            gfx_backend_of_fb.present_rect(x, y, w, h);
+            for (u32 i = 0; i < sizeof(screen); i++) EXPECT(screen[i] == expected[i]);
+        }
+    }
+    of_fb_unbind();
+}
 
 static void raster(void)
 {
@@ -214,7 +267,7 @@ static void provider(void)
 }
 void _start(void)
 {
-    raster(); provider();
+    copy_characterization(); raster(); provider();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failed) : "memory");
     __builtin_unreachable();
 }
