@@ -35,7 +35,7 @@ static int stop_probe(void)
     kbd_gui_mode = 1; tick_count = 100; kbd_discard_stop();
     if (!kbd_stop_suppressed || !legacy_stop_filter(KEY_STOP, 0, SHIFT_CTRL)) return 1;
     if (legacy_stop_filter(KEY_STOP, 1, SHIFT_CTRL) || !kbd_stop_suppressed) return 1;
-    tick_count += PIT_HZ / 2 - 1;
+    tick_count += OS32_TICK_HZ / 2 - 1;
     if (!legacy_stop_filter(KEY_STOP, 0, SHIFT_CTRL)) return 1;
     tick_count++;
     if (legacy_stop_filter(KEY_STOP, 0, SHIFT_CTRL) || kbd_stop_suppressed) return 1;

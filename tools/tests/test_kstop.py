@@ -455,9 +455,9 @@ def run(overrides=None):
     code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + syscall_providers(ROOT, read) + '\n'.join(function(ex,n) for n in (
         'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','exec_syscall_dispatch')) + '\n' + resume + '\n'
-    kbd = read('drivers/input/kbd.c')
-    deliver = function(kbd, 'kbd_deliver')
-    raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
+    deliver = function(read('input/hal/kbd_merge.c'), 'input_emit_legacy_key')
+    raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (!down')]
+    raw = raw.replace('!down', 'is_break').replace('sc,', 'keycode,').replace('mods', 'kbd_shift_state')
     code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
     mode = read('input/hal/legacy_mode.c')
     code += function(mode, 'legacy_stop_filter') + '\n'

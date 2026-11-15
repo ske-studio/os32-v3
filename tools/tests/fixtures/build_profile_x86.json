@@ -138,6 +138,7 @@
     "input/hal/legacy_ring.c",
     "input/hal/legacy_mode.c",
     "drivers/input/kbd.c",
+    "drivers/input/kbd_hal.c",
     "drivers/input/kbd_status.c",
     "drivers/input/kbd_dlog.c",
     "drivers/char/serial.c",

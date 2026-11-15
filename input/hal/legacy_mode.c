@@ -1,11 +1,11 @@
 #include "in2_int.h"
 #include "io.h"
-#include "memmap.h"
+#include "os32_kapi_shared.h"
 #include "../../drivers/input/kbd.h"
 
 extern volatile u32 tick_count;
 
-#define KBD_STOP_SUPPRESS_TICKS (PIT_HZ / 2)
+#define KBD_STOP_SUPPRESS_TICKS (OS32_TICK_HZ / 2)
 volatile int kbd_stop_suppressed = 0;
 static volatile u32 kbd_stop_tick;
 static u8 kbd_stop_mouse_buttons;
