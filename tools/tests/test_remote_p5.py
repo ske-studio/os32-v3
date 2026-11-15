@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import ppc_lan_host
 
 CHECK = dict(name='remote-p5', tier=1, needs=[], budget=10,
-             covers=['tools/host_agent_config.py', 'tools/host_image.py',
+             covers=['tools/host_sfs_link.py', 'tools/host_agent_config.py', 'tools/host_image.py',
                      'tools/host_linux.py', 'tools/host_notify.py', 'tools/host_rshell.py',
                      'tools/host_services.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/ppc_hostfs.py', 'tools/serialfs_host.py',
