@@ -71,6 +71,8 @@
     "kernel/gui.c",
     "input/hal/in2_dev.c",
     "input/hal/in2_state.c",
+    "input/hal/mouse_ext.c",
+    "input/hal/pointer_state.c",
     "input/hal/kbd_merge.c",
     "input/hal/in2_ring.c",
     "input/hal/in2_time.c",

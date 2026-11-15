@@ -57,6 +57,22 @@ void input_repeat(u8 src, u16 generation, u8 sc);
 int input_key_pressed(u8 sc);
 u8 input_key_mods(void);
 u8 input_buttons(void);
+void mouse_ext_mode(int enabled);
+int mouse_ext_sample(u8 src, u16 generation, i16 x, i16 y, u32 time_ms);
+void mouse_ext_read(i32 *x, i32 *y);
+void mouse_ext_read_legacy(i16 *x, i16 *y);
+void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1);
+void pointer_position(i16 *x, i16 *y);
+/* Capture/sample helpers below require IRQs masked and validated input. */
+void mouse_ext_move(i16 x, i16 y, int marked);
+void pointer_absolute_reset(void);
+int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy);
+void pointer_move(i16 x, i16 y);
+void pointer_absolute(i16 x, i16 y);
+u8 pointer_source_buttons(u8 src);
+int pointer_button(InputEvent *event);
+/* Stage 5c supplies the legacy aggregate button transition consumer. */
+void pointer_legacy_buttons(u8 buttons, u8 changed);
 /* Internal helpers: caller holds irq_save across validation and state update. */
 int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
 void input_state_release(u8 src, u16 generation);
