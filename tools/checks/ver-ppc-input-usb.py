@@ -13,7 +13,7 @@ CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
             'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
             'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h',
             'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h'],
-    basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5'],
+    basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5', 'PPC_P3_DESIGN §5 ③b-1'],
     env_limit='製品USB入力Cの修飾・release・FIFO・公平性を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
 )
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +26,7 @@ MUTATIONS = [
     ('backspace', 'input_keymap.c', 'case 0x0e: return 8;', 'case 0x0e: return 127;', 10, 'START\n'),
     ('ctrl-c', 'input_keymap.c', "c == 'c' ? 27 : c - 'a' + 1", "c - 'a' + 1", 10, 'START\n'),
     ('has-consumes', 'input_usb.c', 'int ready = count != 0;', 'int ready = count != 0; if (count) { tail = (tail + 1) % PM_INPUT_KEYS; count--; }', 12, 'START\nMAP\n'),
+    ('usb-peek-consumes', 'input_usb.c', 'int key = count ? keys[tail] : -1;', 'int key = count ? keys[tail] : -1; if (count) { tail = (tail + 1) % PM_INPUT_KEYS; count--; }', 12, 'START\nMAP\n'),
     ('release', 'input_usb.c', 'down[src - 1][sc] = 0;', 'down[src - 1][sc] = down[src - 1][sc];', 12, 'START\nMAP\n'),
     ('other-source', 'input_usb.c', 'down[src - 1][sc] = 0;', '{ down[src - 1][sc] = 0; down[src % PM_INPUT_SOURCES][sc] = 0; }', 12, 'START\nMAP\n'),
     ('repeat-enqueue', 'input_usb.c', '    enqueue(sc); /* Repeat uses the current modifiers. */', '    /* omitted repeat */', 13, 'START\nMAP\n'),

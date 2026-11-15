@@ -57,7 +57,10 @@ static void test(void)
     write_text("MAP\n");
     pm_input_usb_key(1,0x70,1); tap(1,0x1d);
     check(pm_input_usb_has_key() && pm_input_usb_has_key(),12);
+    /* P3 ③b-1: peek returns the oldest key repeatedly and leaves it queued. */
+    check(pm_input_usb_peek()=='A' && pm_input_usb_peek()=='A',12);
     check(pm_input_usb_take()=='A',12);
+    check(pm_input_usb_peek()==-1,12);
     pm_input_usb_key(2,0x70,1); pm_input_usb_release(1); tap(3,0x1d);
     check(pm_input_usb_take()=='A',12);
     pm_input_usb_release(2); tap(1,0x1d); check(pm_input_usb_take()=='a',12);

@@ -60,6 +60,13 @@ int pm_input_usb_take(void)
     irq_restore(flags);
     return key;
 }
+int pm_input_usb_peek(void)
+{
+    u32 flags = irq_save();
+    int key = count ? keys[tail] : -1;
+    irq_restore(flags);
+    return key;
+}
 int pm_input_usb_has_key(void)
 {
     u32 flags = irq_save();

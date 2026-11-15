@@ -11,6 +11,8 @@ void pm_input_usb_release(u8 src);
 /* Foreground queries preserve the caller's interrupt state. */
 int pm_input_usb_take(void);
 int pm_input_usb_has_key(void);
+/* Oldest cooked key without consuming it; -1 when empty (P3 ③b-1). */
+int pm_input_usb_peek(void);
 u32 pm_input_usb_dropped(void);
 /* Pure scan -> cooked key conversion; -1 means no output. */
 int pm_input_keymap(u8 sc, u8 shift_state);
