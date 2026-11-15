@@ -29,6 +29,12 @@
 
 QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、RXDMA_KICK を書いても配り直さない (-trace sungem_rx_* で観測、2026-11-15)。そのため、受信の有効化の前に 27 本以上溜まると受信が止まる。製品では回避しない (ホストが送り続けないことで防ぐ、NET_HOSTSVC_DESIGN §5)。
 
+待ちで 7450 を眠らせる試し (2026-11-15、使い捨ての木、製品には入れない。ユーザー決定「C は入れず実機で測る」):
+- 形: arch_cpu_idle で HID0 を NAP にして、EE=1・POW=1 の mtmsr で眠る。差分は ~/os32-tmp/run/ppc-c-idle/c-idle-experiment.patch (リポジトリ外)。
+- QEMU では眠りが効く。64KiB の /host の cp の間、時間の 9 割を眠る。DEC (1 kHz) の割り込みで起き、1 回の眠りは最長約 4 ms (1 tick の 10 ms 未満)。起きた後の tick と TB は壁時計と合う。
+- QEMU は割り込みの入口で MSR[POW] を落とし、SRR1 に POW を残さない。実機の 7450 で SRR1 に POW が残るか (残れば戻りでまた眠るので入口で消す処理が要る) は未確認。
+- 今の作り (GEM の割り込みは INTMASK=~0 で止め、受信は tick の poll) では遅くなる。64KiB の cp が 24.8 s → 32.1〜32.2 s。電文が来ても、次の DEC か tick まで前景が進まないためと見ている (未確認)。眠りを使うなら、GEM の受信の割り込みと組にする設計が要る。続けるかは、G4 の実機の /host の速さ (既定を link に切り替えた後の受入の回で測る) を見て決める。
+
 ## 4. 時計
 
 - W4 実装前の現状では USER の syscall は EE=0 で走り tick_count が止まるので、機種の時計 (hostfs の now・USB の ms) は timebase から取る。DEC の処理を前景から呼ばない。W4 適合後は通常 syscall 本体を FG1 とし、timer IRQ が進行する (ARCH_COMPAT の AC-CTX-1/6)。適合はまだ未。
