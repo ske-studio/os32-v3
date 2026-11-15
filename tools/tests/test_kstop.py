@@ -538,12 +538,12 @@ MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    
 src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
 MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
 MUTATIONS.append(('raw-full-loses-stop','input/hal/legacy_ring.c',
-    'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {',
+    'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {',
     'if (0) {'))
 
 for name, guard in (('raw-full-replaces-break', '!is_break && '),
-                    ('raw-full-replaces-without-ctrl', ' && (kbd_shift_state & SHIFT_CTRL)')):
-    old = 'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {'
+                    ('raw-full-replaces-without-ctrl', ' && (mods & SHIFT_CTRL)')):
+    old = 'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {'
     assert old.count(guard) == 1
     MUTATIONS.append((name, 'input/hal/legacy_ring.c', old, old.replace(guard, '')))
 
