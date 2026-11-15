@@ -6,11 +6,16 @@ static i16 px = 639 / 2, py = 399 / 2, xmin, ymin, xmax = 639, ymax = 399;
 static i16 prev_x, prev_y;
 static int prev_valid;
 
+u8 pointer_buttons_locked(void)
+{
+    u8 mask = 0;
+    for (unsigned i = 0; i < IN2_MAX_DEV; ++i) mask |= buttons[i];
+    return mask;
+}
 u8 input_buttons(void)
 {
     unsigned f = irq_save();
-    u8 mask = 0;
-    for (unsigned i = 0; i < IN2_MAX_DEV; ++i) mask |= buttons[i];
+    u8 mask = pointer_buttons_locked();
     irq_restore(f);
     return mask;
 }
@@ -56,9 +61,17 @@ void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
     px = clamp(px, xmin, xmax); py = clamp(py, ymin, ymax);
     irq_restore(f);
 }
+void pointer_position_locked(i16 *x, i16 *y) { *x = px; *y = py; }
 void pointer_position(i16 *x, i16 *y)
 {
     unsigned f = irq_save();
-    *x = px; *y = py;
+    pointer_position_locked(x, y);
+    irq_restore(f);
+}
+
+void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1)
+{
+    unsigned f = irq_save();
+    *x0 = xmin; *y0 = ymin; *x1 = xmax; *y1 = ymax;
     irq_restore(f);
 }

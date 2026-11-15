@@ -29,3 +29,6 @@
 
 - 順: PowerPC の P1 は、x86 の受入 (X・G) の後に始める。共通のファイル (link.c・nic.c) を触る段は、出す前に相手に知らせる。
 - X7・X8 は、PowerPC PM が PowerPC の build と QEMU の ppc-fb・sc_run で回帰を確かめる。
+
+- P4b: 実装済・独立レビュー待ち — SFS CALL 宣言/応答・1000ms 絶対期限・世代単位 backend、検査: `/home/hight/os32-tmp/run/lo-p4b/REPORT.md`。
+- U5d: 後半の実装済・独立レビュー待ち — raw SFS は無応答で分離し、SFS CALL に root/allow-write/peer の設定を結線、検査: `/home/hight/os32-tmp/run/lo-p4b/REPORT.md`。

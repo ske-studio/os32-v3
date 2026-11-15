@@ -1,10 +1,17 @@
 #include "in2_int.h"
+#include "input_unused_key_host.h"
 #include "mouse.h"
 #include "pc98.h"
 #define T(x) do { if (!(x)) return __LINE__; } while (0)
 unsigned test_irq = 1;
 static u8 poll_samples[4], poll_pos, poll_stop;
 static int poll_v86, poll_seamless;
+static int poll_inject_irq;
+void test_irq_restore(unsigned f)
+{
+    test_irq = f;
+    if (f && poll_inject_irq) { poll_inject_irq = 0; mouse_irq_handler(); }
+}
 void ref_mouse_init(void);
 void ref_mouse_poll(MouseState *s);
 void ref_mouse_set_bounds(i16, i16, i16, i16);
@@ -78,6 +85,13 @@ static int probe(void)
     poll_v86 = 1; poll_sample(4, 2, MOUSE_RIGHT | MOUSE_MIDDLE); poll_v86 = 0;
     ref_mouse_poll(&a); mouse_poll(&b);
     T(a.dx == 4 && a.dy == 2 && !b.dx && !b.dy && a.x == b.x && a.y == b.y && b.buttons == MOUSE_BTN_LEFT);
+    /* An IRQ pending during the snapshot runs only after all fields are read. */
+    mouse_poll(&b);
+    poll_samples[0] = MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT | 3;
+    poll_samples[1] = poll_samples[2] = poll_samples[3] = 0;
+    poll_pos = 0; poll_inject_irq = 1;
+    mouse_poll(&b); T(b.x == 14 && b.dx == 0);
+    mouse_poll(&b); T(b.x == 17 && b.dx == 3);
     /* Seamless still uses the unchanged PC-98 poll path until 5d. */
     poll_seamless = 1; ref_mouse_init(); mouse_init();
     poll_pos = 0; ref_mouse_poll(&a); poll_pos = 0; mouse_poll(&b);

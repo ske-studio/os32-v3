@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""R3 OF framebuffer: INDEX8 scanout/provider and native-word PPC compilation."""
+"""Characterization of pre-optimization OF scanout; ppc-offb-fast PACK (2026-11-15).
+
+Keep edge-word bytes, clipping and protected rows while accelerating aligned rows.
+"""
 import argparse
 import os
 import re
@@ -47,7 +50,9 @@ MUTATIONS = (
      'u32 display_provider_display_records(u32 backend) { return backend + 1; }'),
     ('fallback-mode', 'platform/powermac/display_provider.c',
      '    fn(&gfx_backend_unsupported, legacy200);', '    (void)0;'),
-    ('pitch', BACKEND, 'row * fb.pitch + col', 'row * fb.width + col'),
+    ('pitch', BACKEND, 'row * fb.pitch + first', 'row * pitch + first'),
+    ('aligned-last-word', BACKEND, 'i < words; i++) dest[i] = aligned[i]',
+     'i + 1 < words; i++) dest[i] = aligned[i]'),
     ('surface-connect', V2, 'return surface_copy(c, head, s);\n}\nstatic int shim_flip', '(void)head; (void)s; return 0;\n}\nstatic int shim_flip'),
     ('bound', BACKEND, 'if (right > fb.width) right = fb.width;', 'if (right > fb.width) right = fb.width + 4;'),
     ('protected-band', BACKEND, 'if (y < (int)fb.protected_rows) y = fb.protected_rows;', 'if (y < 0) y = 0;'),
@@ -65,7 +70,7 @@ def observe(folder, mutation=None):
     exe = folder / 'of-fb'
     command = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
-               '-nostdlib', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+               '-nostdlib', '-nostdinc', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
                str(ROOT / 'tools/tests/of_fb_host.c'),
                *(str(ROOT / path) for path in SOURCES),

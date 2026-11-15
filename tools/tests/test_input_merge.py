@@ -43,7 +43,7 @@ def run(ctx):
             for old, new in [
                 ('cnt[sc] += down ? 1 : -1;', 'cnt[sc] += down ? 1 : 0;'),
                 ('if (down || cnt[sc] == 0)', 'if (1)'),
-                ('if (input_emit_legacy_repeat) input_emit_legacy_repeat', 'input_emit_in2(e);\n        if (input_emit_legacy_repeat) input_emit_legacy_repeat'),
+                ('input_emit_legacy_repeat(sc, kbd_shift_state);', '{ input_emit_in2(e); input_emit_legacy_repeat(sc, kbd_shift_state); }'),
                 ('if (legacy_active()) return;', 'if (0) return;')]:
                 assert sources[2].count(old) == 1, old
                 rc = build(sources[:2] + [sources[2].replace(old, new)] + sources[3:])

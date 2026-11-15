@@ -39,6 +39,8 @@ import threading
 import time
 
 import host_linux
+from host_sfs_link import SfsLink, MAX_FRAME as SFS_MAX_FRAME
+from lanfs_host import MARK as SFS_MARK
 from host_notify import Notify, new_generation
 from host_services import Registry
 from host_rshell import Operator, RSHELL, GSERIAL, RESULT_MAX
@@ -372,7 +374,7 @@ class HostAgent:
     def __init__(self, mac, state_dir=None, agent_gen=None, quiet=False,
                  rng=None, sess_start=0, allow_net=True, file_root=None,
                  spool_dir=None, print_dir=None, clip="none", printer=False,
-                 lines_per_page=DEFAULT_LINES_PER_PAGE, peer=None):
+                 lines_per_page=DEFAULT_LINES_PER_PAGE, peer=None, allow_write=()):
         self.mac = mac
         self.configured_peer = peer
         self.quiet = quiet
@@ -386,6 +388,9 @@ class HostAgent:
         self.sessions = SessCounter(state_dir, sess_start)
         self.allow_net = allow_net
         self.file_root = file_root
+        self.allow_write = allow_write
+        self.sfs_link = None
+        self._sfs_generation = None
         # ---- N2: PRINT / CLIP サービスの設定 ----
         # ジョブ保存 (job.txt + スプール) は最初の PRINT OPEN で用意する (印刷を
         # 使わない試験に空の一時ディレクトリを撒かない)。clip の既定は none で、
@@ -443,6 +448,10 @@ class HostAgent:
     def handle(self, frame, out, pcap=None):
         if pcap:
             pcap.write(frame)
+        # Raw SFS belongs to lanfs_host; the agent serves only SFS CALL.
+        if (len(frame) >= ETH_HDR + 3 and frame[12:14] == struct.pack(">H", LINK_ETHERTYPE)
+                and frame[14:17] == SFS_MARK):
+            return  # raw SFS: no response
         if len(frame) < ETH_HDR + LINK_HDR:
             self.counts["dropped"] += 1
             return
@@ -670,7 +679,8 @@ class HostAgent:
             ent["last_seq"] = seq
             if ent["resp"] is None and ent["decl"] > 0:
                 room = ent["decl"] - len(ent["got"])
-                if ent.get("line", "").startswith("PDIAG ") and len(payload) > room:
+                if (ent.get("line", "").startswith("PDIAG ") or
+                        ent.get("sfs_deadline") is not None) and len(payload) > room:
                     self._answer(rid, ent, HTTP_BAD, b"", None, out)
                 else:
                     ent["got"] += payload[:room]
@@ -787,6 +797,15 @@ class HostAgent:
                     self._answer(rid, ent, HTTP_BAD, b"", None, out)
                 else:
                     ent["decl"] = decl
+            return
+        if verb == "SFS":
+            decl = self._decl(parts[2] if len(parts) == 3 and parts[1] == "CALL" else "",
+                              SFS_MAX_FRAME)
+            if decl is None:
+                self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            else:
+                ent["decl"] = decl
+                ent["sfs_deadline"] = self.now() + 1.0
             return
         if verb == "ECHO":
             decl = self._decl(parts[1] if len(parts) > 1 else "", DECL_MAX_BYTES)
@@ -983,7 +1002,9 @@ class HostAgent:
         parts = ent.get("line", ent["req"].decode("latin1").strip()).split()
         verb = parts[0].upper() if parts else ""
         sub = parts[1].upper() if len(parts) > 1 else ""
-        if verb in ("RSH", "GS", "PDIAG"):
+        if verb == "SFS":
+            self._service_sfs(rid, ent, out)
+        elif verb in ("RSH", "GS", "PDIAG"):
             self._service_rshell(rid, ent, parts, out)
         elif verb == "LOG":
             self._service_log(rid, ent, parts, out)
@@ -995,6 +1016,31 @@ class HostAgent:
             self._clip_put_finish(rid, ent, out)
         else:
             self._answer(rid, ent, HTTP_NOT_IMPL, b"", None, out)  # PUT ほか (B6)
+
+    def _sfs_backend(self):
+        # Link rid/session changes must not erase the SFS sid/seq replay cache.
+        if self.sfs_link is None or self._sfs_generation != self.host_generation:
+            self.sfs_link = SfsLink(self.file_root, allow_write=self.allow_write,
+                                    peer=self.configured_peer)
+            self._sfs_generation = self.host_generation
+        return self.sfs_link
+
+    def _service_sfs(self, rid, ent, out):
+        if len(ent["got"]) != ent["decl"]:
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        if self.now() >= ent["sfs_deadline"] or self.file_root is None:
+            self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
+            return
+        try:
+            body = self._sfs_backend().call(ent["got"], self.peer)
+        except ValueError:
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        if self.now() >= ent["sfs_deadline"]:
+            self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
+            return
+        self._answer(rid, ent, 200, body, None, out)
 
     def _answer(self, rid, ent, status, body, gen, out,
                 total=None, plen=STREAM_PLEN, dropseq=0):
@@ -1020,6 +1066,10 @@ class HostAgent:
         for op, flags, seq, ack, rid, window, payload in self.notifier.tick(now):
             out.send(self.build(self.peer, op, flags, seq=seq, ack=ack,
                                 rid=rid, payload=payload))
+        for rid, ent in list(self.ledger.items()):
+            if (ent.get("resp") is None and "sfs_deadline" in ent
+                    and now >= ent["sfs_deadline"]):
+                self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
         for rid in list(self.pending):
             job = self.pending[rid]
             ent = job["ent"]
@@ -1552,7 +1602,8 @@ def main():
                       spool_dir=args.spool_dir, print_dir=args.print_dir,
                       clip=args.clip, printer=args.printer,
                       lines_per_page=args.lines_per_page,
-                      peer=parse_mac(config["peer"]) if config else None)
+                      peer=parse_mac(config["peer"]) if config else None,
+                      allow_write=("/",) if config and config["allow-write"] else ())
     try:
         commit = subprocess.check_output(["git", "-c", "safe.directory=*", "rev-parse", "HEAD"],  # /opt/os32 は利用者の持ち物、サービスは別ユーザー
                                          cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

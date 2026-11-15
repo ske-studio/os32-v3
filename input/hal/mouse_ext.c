@@ -46,6 +46,14 @@ void mouse_ext_read_legacy(i16 *x, i16 *y)
     *x = old_x; *y = old_y; old_x = old_y = 0;
     irq_restore(f);
 }
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+{
+    unsigned f = irq_save();
+    *dx = old_x; *dy = old_y; old_x = old_y = 0;
+    *buttons = pointer_buttons_locked();
+    pointer_position_locked(x, y);
+    irq_restore(f);
+}
 /* Stage 5d adapter supplies one normalized sample; first sample is baseline only.
  * Subsequent ABS and pixel MOVE share the sampled time and source generation. */
 int mouse_ext_sample(u8 src, u16 generation, i16 x, i16 y, u32 time_ms)

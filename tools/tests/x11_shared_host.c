@@ -1,3 +1,5 @@
+#define KBD_MERGE_SOURCE "kbd_merge_source.inc"
+#include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
 #include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
@@ -187,7 +189,7 @@ static void reset(void)
     kbd_set_gui_mode(0);
     legacy_cooked_flush();
     kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
-    kbd_shift_state = 0;
+    kbd_hal_init(0);
     kmemset(&g_ime, 0, sizeof(g_ime));
     ime_delivery_clear();
     g_ime.per_page = 9;

@@ -51,12 +51,21 @@ int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
     if (bottom > fb.height) bottom = fb.height;
     u32 first = (u32)x & ~3u, end = ((u32)right + 3) & ~3u;
     for (u32 row = y; row < (u32)bottom; row++) {
-        for (u32 col = first; col < end; col += sizeof(u32)) {
-            /* Include adjacent shadow pixels at the two edge words; byte
-             * representation stays native on both big and little endian CPUs. */
-            u32 word;
-            kmemcpy(&word, src + row * pitch + col, sizeof(word));
-            *(volatile u32 *)(fb.display + row * fb.pitch + col) = word;
+        const u8 *source = src + row * pitch + first;
+        volatile u32 *dest = (volatile u32 *)(fb.display + row * fb.pitch + first);
+        u32 words = (end - first) / sizeof(u32);
+        /* Include adjacent shadow pixels at the two edge words. Native loads
+         * and stores preserve the byte order on both endian CPUs. bind ensures
+         * display and its pitch are word aligned; source rows need not be. */
+        if (!((u32)source & 3)) {
+            const u32 *aligned = (const u32 *)source;
+            for (u32 i = 0; i < words; i++) dest[i] = aligned[i];
+        } else {
+            for (u32 i = 0; i < words; i++) {
+                u32 word;
+                kmemcpy(&word, source + i * sizeof(word), sizeof(word));
+                dest[i] = word;
+            }
         }
     }
     __sync_synchronize();

@@ -21,7 +21,7 @@ from host_operator_socket import OperatorSocket
 from test_host_agent import FakeOS32, HA
 
 CHECK = dict(name='remote-u5d', tier=1, needs=[], budget=10,
-             covers=['tools/host_agent.py', 'tools/host_agent_config.py',
+             covers=['tools/host_image.py', 'tools/host_sfs_link.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_agent.py', 'tools/host_agent_config.py',
                      'tools/host_linux.py', 'tools/host_notify.py',
                      'tools/host_operator_socket.py', 'tools/host_rshell.py',
                      'tools/host_services.py', 'tools/tests/test_host_agent.py',

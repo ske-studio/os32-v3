@@ -61,9 +61,13 @@ void mouse_ext_mode(int enabled);
 int mouse_ext_sample(u8 src, u16 generation, i16 x, i16 y, u32 time_ms);
 void mouse_ext_read(i32 *x, i32 *y);
 void mouse_ext_read_legacy(i16 *x, i16 *y);
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y);
 void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1);
 void pointer_position(i16 *x, i16 *y);
+void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1);
 /* Capture/sample helpers below require IRQs masked and validated input. */
+u8 pointer_buttons_locked(void);
+void pointer_position_locked(i16 *x, i16 *y);
 void mouse_ext_move(i16 x, i16 y, int marked);
 void pointer_absolute_reset(void);
 int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy);
@@ -78,9 +82,14 @@ int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
 void input_state_release(u8 src, u16 generation);
 void input_merge_key(InputEvent *event, u8 old, u8 origin);
 void input_emit_in2(const InputEvent *event);
-/* Stage 3a ports remain optional until that stage lands. */
-void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
-void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
+/* Native boot locks seed the existing mechanical bits with IRQs masked.
+ * src must be a registered native keyboard; no synthetic key is published. */
+void input_native_locks(u8 src, u8 mods);
+void kbd_hal_init(u8 locks);
+void kbd_hal_capture(u8 scancode);
+extern volatile u8 kbd_shift_state;
+void input_emit_legacy_key(u8 sc, u8 down, u8 mods);
+void input_emit_legacy_repeat(u8 sc, u8 mods);
 
 extern volatile int kbd_gui_mode;
 extern volatile int kbd_stop_suppressed;
