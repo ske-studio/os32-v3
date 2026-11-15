@@ -458,6 +458,7 @@ def run(overrides=None):
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
+    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
     code += function(kbd, 'kbd_discard_stop') + '\n'
     code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
@@ -535,7 +536,7 @@ src=src[a:b]
 MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
 src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
 MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
-MUTATIONS.append(('raw-full-loses-stop','drivers/input/kbd.c',
+MUTATIONS.append(('raw-full-loses-stop','input/hal/legacy_ring.c',
     'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {',
     'if (0) {'))
 
@@ -543,7 +544,7 @@ for name, guard in (('raw-full-replaces-break', '!is_break && '),
                     ('raw-full-replaces-without-ctrl', ' && (kbd_shift_state & SHIFT_CTRL)')):
     old = 'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {'
     assert old.count(guard) == 1
-    MUTATIONS.append((name, 'drivers/input/kbd.c', old, old.replace(guard, '')))
+    MUTATIONS.append((name, 'input/hal/legacy_ring.c', old, old.replace(guard, '')))
 
 # Resume-mark cases must catch regressions without the boot selftest.
 for name, fn, old, new in (

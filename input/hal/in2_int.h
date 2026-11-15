@@ -75,6 +75,13 @@ void legacy_cooked_flush(void);
 void legacy_cooked_reset_dropped(void);
 u32 legacy_cooked_dropped(void);
 
+/* Temporary access for the remaining reset and STOP scan in stage 3a-3. */
+extern volatile u16 kbd_raw_buf[];
+extern volatile int kbd_raw_head, kbd_raw_tail, kbd_raw_count;
+extern volatile u32 kbd_raw_dropped;
+void legacy_raw_push(int keycode, int is_break, int kbd_shift_state);
+int legacy_raw_take(void);
+
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty
  * or absent input is -1. peek does not consume a completed key. */

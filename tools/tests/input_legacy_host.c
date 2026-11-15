@@ -27,6 +27,30 @@ static int old_peek(void) {
     irq_restore(flags);
     return (int)entry;
 }
+/* Oracle: 7eb7efac:drivers/input/kbd.c raw enqueue/dequeue. */
+static volatile u16 old_raw_buf[KBD_BUF_SIZE];
+static volatile int old_raw_head, old_raw_tail, old_raw_count;
+static volatile u32 old_raw_dropped;
+static void old_raw_push(int keycode, int is_break, int kbd_shift_state) {
+    if (old_raw_count < KBD_BUF_SIZE) {
+        old_raw_buf[old_raw_tail] = (u16)keycode | (is_break ? 0 : KBD_RAW_MAKE)
+            | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+        old_raw_tail = (old_raw_tail + 1) % KBD_BUF_SIZE;
+        old_raw_count++;
+    } else {
+        if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
+            int last = (old_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
+            old_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+        }
+        old_raw_dropped++;
+    }
+}
+static int old_raw_take(void) {
+    u16 entry;
+    if (old_raw_count == 0) return -1;
+    RING_DEQUEUE(entry, old_raw_buf, old_raw_head, old_raw_count, KBD_BUF_SIZE);
+    return (int)entry;
+}
 #define REQUIRE(c) do { if (!(c)) return 1; } while (0)
 static int probe(void) {
     for (int enabled=0; enabled<2; enabled++) {
@@ -46,6 +70,23 @@ static int probe(void) {
                 REQUIRE(legacy_cooked_peek()==old_peek());
                 REQUIRE(legacy_cooked_peek()==old_peek());
                 REQUIRE(legacy_cooked_take()==old_take());
+                REQUIRE(_irq_enabled()==enabled);
+                if (round>2 && i==16) break;
+            }
+        }
+        old_raw_head=old_raw_tail=old_raw_count=old_raw_dropped=0;
+        kbd_raw_head=kbd_raw_tail=kbd_raw_count=kbd_raw_dropped=0;
+        for (int round=0; round<12; round++) {
+            int n=round==0 ? 0 : round==1 ? 1 : round==2 ? 32 : 37;
+            for (int i=0; i<n; i++) {
+                int key=i==35 ? KEY_STOP : (i & 31);
+                int mods=i==35 ? SHIFT_CTRL : i;
+                old_raw_push(key, 0, mods); legacy_raw_push(key, 0, mods);
+                REQUIRE(kbd_raw_dropped==old_raw_dropped);
+            }
+            for (int i=0; i<40; i++) {
+                REQUIRE(kbd_raw_count==old_raw_count);
+                REQUIRE(legacy_raw_take()==old_raw_take());
                 REQUIRE(_irq_enabled()==enabled);
                 if (round>2 && i==16) break;
             }

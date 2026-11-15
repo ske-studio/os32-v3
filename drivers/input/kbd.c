@@ -119,13 +119,6 @@ static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
  * 順序どおり積む。WM (gshell) が kbd_trygetrawkey() で読み、down=1/0 の
  * Key イベントを作る。エントリ = keycode | (down << 8)。満杯なら捨てる
  * (WM が追いつく前提。取りこぼしは kbd_dropped と別勘定にしない)。 */
-static volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
-static volatile int kbd_raw_head = 0;
-static volatile int kbd_raw_tail = 0;
-static volatile int kbd_raw_count = 0;
-/* raw リング満杯で捨てた生イベント数 (レビュー ①)。GUI の取りこぼし検出用に
- * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
-static volatile u32 kbd_raw_dropped = 0;
 
 /* GUI モード (W1 申し送り ①、K2-B)。WM (gshell) が gui_register した間だけ 1。
  *
@@ -404,21 +397,7 @@ static void kbd_deliver(u8 scancode)
          * only in the WM leaves an IRQ abort_req on the next running app. */
         if (kbd_stop_suppressed && !is_break && keycode == KEY_STOP &&
             (kbd_shift_state & SHIFT_CTRL)) return;
-        if (kbd_raw_count < KBD_BUF_SIZE) {
-            kbd_raw_buf[kbd_raw_tail] = (u16)keycode
-                                      | (is_break ? 0 : KBD_RAW_MAKE)
-                                      | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
-            kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
-            kbd_raw_count++;
-        } else {
-            /* Keep emergency make even when ordinary input filled the ring.
-             * Replace the newest entry: earlier input order and head stay intact. */
-            if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
-                int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
-                kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
-            }
-            kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
-        }
+        legacy_raw_push(keycode, is_break, kbd_shift_state);
     }
 
     if (is_mod) return;
@@ -810,10 +789,7 @@ void kbd_discard_stop(void)
  * WM (gshell) が Key down/up イベントを作るのに使う。 */
 int kbd_trygetrawkey(void)
 {
-    u16 entry;
-    if (kbd_raw_count == 0) return -1;
-    RING_DEQUEUE(entry, kbd_raw_buf, kbd_raw_head, kbd_raw_count, KBD_BUF_SIZE);
-    return (int)entry;
+    return legacy_raw_take();
 }
 
 /* ======================================================================== */

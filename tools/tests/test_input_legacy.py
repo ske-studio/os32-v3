@@ -28,7 +28,10 @@ def run(ctx):
             for old,new in [('kbd_count < KBD_BUF_SIZE', 'kbd_count < KBD_BUF_SIZE - 1'),
                             ('kbd_dropped++;', 'kbd_dropped += 0;'),
                             ('(kbd_tail + 1) % KBD_BUF_SIZE', '(kbd_tail + 2) % KBD_BUF_SIZE'),
-                            ('entry = kbd_buf[kbd_head];', 'entry = kbd_buf[kbd_head]; kbd_count--;')]:
+                            ('entry = kbd_buf[kbd_head];', 'entry = kbd_buf[kbd_head]; kbd_count--;'),
+                            ('kbd_raw_count < KBD_BUF_SIZE', 'kbd_raw_count < KBD_BUF_SIZE - 1'),
+                            ('kbd_raw_dropped++;', 'kbd_raw_dropped += 0;'),
+                            ('(kbd_raw_tail + 1) % KBD_BUF_SIZE', '(kbd_raw_tail + 2) % KBD_BUF_SIZE')]:
                 assert source.count(old)==1, old
                 assert execute(source.replace(old,new,1))==1, old
                 print('RED runtime: '+old, flush=True)
