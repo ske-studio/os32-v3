@@ -23,7 +23,7 @@ static const struct NetNicOps *bound;
 static u8 local_mac[6], peer_mac[6];
 static int fixed_peer, ticking, tick_registered;
 #define LINK_RX_IDLE_RESCUE_JIFFIES 2u
-static int pending, idle_registered, unbind_due, link_due;
+static int pending, idle_registered, unbind_due, link_due, poll_due;
 static u32 reset_due, last_idle_jiffy, batch_depth;
 static struct rx_work_budget batch_budget;
 static void net_rx_idle(void);
@@ -72,7 +72,7 @@ int net_bind(const struct NetNicOps *ops)
             net_rx_reset(NET_RX_LINK);
             fixed_peer = 0;
             link_init(local_mac);
-            pending = link_due = unbind_due = 0;
+            pending = link_due = poll_due = unbind_due = 0;
             last_idle_jiffy = link_platform_now();
             bound = ops;
         }
@@ -133,7 +133,7 @@ void net_unbind(void)
         link_platform_unlock(flags);
         return;
     }
-    unbind_due = pending = link_due = 0;
+    unbind_due = pending = link_due = poll_due = 0;
     bound = 0; /* Gates the permanently registered tick before releasing ops. */
     owner = 0;
     fixed_peer = 0;
@@ -199,6 +199,11 @@ void net_rx_batch_end(void)
 /* IF=0, still owning the guard. Collapse IRQ requests to one absolute tick. */
 static void rx_finish(void)
 {
+    if (poll_due && bound) {
+        poll_due = 0;
+        bound->poll();
+        net_rx_schedule();
+    }
     if (link_due && bound) {
         link_due = 0;
 #ifdef TICK_PROBE
@@ -264,8 +269,10 @@ static void net_rx_idle(void)
 void net_tick(void)
 {
     unsigned int flags = link_platform_lock();
+    if (bound && ticking) poll_due = 1;
     if (bound && !ticking) {
         ticking = 1;
+        poll_due = 0;
         bound->poll();
         net_rx_schedule();
         ticking = 0;

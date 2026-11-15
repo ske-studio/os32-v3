@@ -184,7 +184,11 @@ void link_tick(void)
         poll_reentry_rc = net_nic_poll_once();
         if (polls != old_polls || demuxes != old_demuxes || hs_if()) bad_if++;
     }
-    if (recurse) net_tick();
+    if (recurse) {
+        int before = polls;
+        net_tick();
+        if (polls != before) bad_if++;
+    }
 }
 static int test(void)
 {
@@ -272,7 +276,7 @@ static int test(void)
     poll_reentry = 2; net_rx_service();
     old_links = links; old_polls = polls; recurse = 1;
     poll_reentry = 1; poll_reentry_rc = -1;
-    callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 2);
     REQUIRE(poll_reentry_rc == 0 && !bad_if && hs_if());
     recurse = 0; poll_reentry = 0;
     int sfs = resets[NET_RX_SFS], link = resets[NET_RX_LINK];

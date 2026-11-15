@@ -14,7 +14,6 @@ static void _idle(void) {}
 #include "net/rx_work.c"
 #include "kernel/idle_work.c"
 #include "kernel/irq/tick_budget.c"
-#include <stdarg.h>
 
 #define CHECK(e) do { if (!(e)) finish(1); } while (0)
 static void finish(int rc)
@@ -58,7 +57,13 @@ static int recv_frame(void *p, u32 cap, u32 *n)
     return 0;
 }
 static void get_mac(u8 *p) { for (u32 i = 0; i < 6; i++) p[i] = hw_mac[i]; }
-static void device_poll(void) { CHECK(!enabled); polls++; }
+static void device_poll(void)
+{
+    CHECK(!enabled && ticking);
+    u32 before = reads;
+    CHECK(net_rx_service() == 0 && reads == before);
+    polls++;
+}
 static u32 device_credit(void) { return 100; }
 static const struct NetNicOps device = {tx, recv_frame, get_mac, device_poll, device_credit};
 static int get_device(const struct NetNicOps **out) { *out = &device; return 0; }
@@ -72,9 +77,12 @@ void link_init(const u8 p[6]) { (void)p; }
 static void irq_tick(void)
 {
     unsigned int f = irq_save();
+    u32 old_polls = polls;
+    int busy = ticking;
     kctx_irq_depth++;
     if (rescue) { tick_budget_begin(); now += irq_elapsed; }
     callback();
+    CHECK(polls == old_polls + (busy ? 0u : 1u));
     if (rescue) tick_budget_end();
     kctx_irq_depth--;
     irq_restore(f);
@@ -118,6 +126,7 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
         hook = 0;
         /* Model an IRQ interrupting the cooperative demux, then reentry. */
         irq_tick();
+        if (action == 5) irq_tick(); /* Coalesce multiple missed polls. */
         u32 before = reads;
         CHECK(net_rx_service() == 0 && reads == before);
         if (action == 2) net_rx_reset(NET_RX_LINK);
@@ -135,6 +144,20 @@ u32 arch_tick_budget_elapsed(u32 origin)
     return allowance ? (u32)(now - origin) : IRQ0_SLOT_BUDGET_US;
 }
 static void idle_other(void) {}
+static void test_deferred_poll(void)
+{
+    u32 old_polls = polls, old_links = links;
+    /* Even at rescue age, an interrupted foreground owns RX until finish. */
+    tick_count = last_idle_jiffy + LINK_RX_IDLE_RESCUE_JIFFIES;
+    rescue = 1; hook = 5; frames = 1;
+    CHECK(net_rx_service() == 1 && enabled && !ticking);
+    CHECK(polls == old_polls + 1 && links == old_links + 1);
+    CHECK(!poll_due && !link_due && pending);
+    net_rx_service();
+    CHECK(polls == old_polls + 1 && !pending);
+    irq_tick(); CHECK(polls == old_polls + 2 && !poll_due);
+    rescue = 0;
+}
 static void run_tests(void)
 {
     tick_budget_config();
@@ -148,6 +171,7 @@ static void run_tests(void)
     CHECK(idle_work_register(idle_other) == 0);
     CHECK(net_start(NET_NIC_E82557, 0) == 0 && callback == net_jiffy);
     CHECK(work_count == 2);
+    test_deferred_poll(); polls = 0;
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
     CHECK(!polls);
@@ -212,6 +236,7 @@ static void run_tests(void)
     tick_count = 1; irq_tick(); CHECK(!frames);
     rescue = 0; net_unbind();
     CHECK(net_start(NET_NIC_LGY98, 0) == 0);
+    test_deferred_poll();
     tick_count += 2; frames = 1; before = reads;
 #if LINK_PLATFORM_TICK_RX_LGY98_SLOT
     rescue = 1; now = 0; irq_tick(); CHECK(reads > before && !frames); rescue = 0;
