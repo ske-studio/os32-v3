@@ -135,6 +135,8 @@ def settings(work, mutation=None):
 
 
 class Session:
+    qemu_clock = USB_QEMU_CLOCK
+
     def __init__(self, elf, cpu, out, timeout, late=False):
         self.out, self.elf, self.cpu = out, elf, cpu
         out.mkdir()
@@ -174,7 +176,7 @@ class Session:
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio','-no-reboot',
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
-            '-usb','-device','usb-kbd,id=kbd',*USB_QEMU_CLOCK]
+            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock]
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')

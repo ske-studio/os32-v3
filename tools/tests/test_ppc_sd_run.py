@@ -69,6 +69,33 @@ def exercise(scope):
 
 def main():
     exercise(vars(meter))
+    # Check actual launch arguments without starting QEMU or opening sockets.
+    import inspect
+    from unittest.mock import patch
+    import usb_run
+    assert link.Session.qemu_clock == usb_run.USB_QEMU_CLOCK
+    scope = dict(link=link)
+    source = inspect.getsource(meter.link_accept)
+    import ast
+    tree = ast.parse(source)
+    cls = next(node for node in tree.body[0].body if isinstance(node, ast.ClassDef))
+    exec(compile(ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[])),
+                 '<LinkSession>', 'exec'), scope)
+    for session, expected in ((link.Session, True), (scope['LinkSession'], False)):
+        obj = session.__new__(session)
+        obj.elf, obj.cpu = Path(__file__), '7450'
+        with tempfile.TemporaryDirectory() as folder:
+            obj.out = Path(folder)
+            with patch.object(link.socket, 'socket') as sock, patch.object(link, 'UDP') as udp, \
+                 patch.object(link, 'command'), patch.object(link.subprocess, 'Popen') as popen, \
+                 patch.object(link, 'PumpQMP'):
+                sock.return_value.__enter__.return_value.getsockname.return_value = ('127.0.0.1', 1)
+                udp.return_value.sock.getsockname.return_value = ('127.0.0.1', 2)
+                obj.deadline = 0
+                obj.start()
+                args = popen.call_args.args[0]
+                assert ('-icount' in args) == expected
+                obj.err.close(); obj.frames.close()
     path, before, after = meter.LINK_NONCE
     assert (ROOT/path).read_text().count(before) == 1
     with tempfile.TemporaryDirectory() as folder:
@@ -80,7 +107,7 @@ def main():
             text = user.read_text()
             for command in ('p5-hold', 'p5-stale', 'p5-copy'):
                 assert text.count('"'+command+'"') == 1
-            assert 'OS32_ERR_STALE' in text and 'char buf[1024]' in text
+            assert 'OS32_ERR_STALE' in text and 'char buf[4096]' in text
             assert len([v for v in opts if v.startswith('KB_MUT_') and 'SRC=' in v]) == (3 if mutate else 2)
             if mutate:
                 copy = Path(next(v.split('=', 1)[1] for v in opts if v.startswith('KB_MUT_THIRD_FILE=')))

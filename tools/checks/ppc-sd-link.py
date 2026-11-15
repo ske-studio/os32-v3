@@ -1,4 +1,6 @@
-"""Link S-D is full-only: routine QEMU acceptance time stays unchanged."""
+"""Link S-D is full-only: routine QEMU acceptance time stays unchanged.
+
+icount is only for USB typing tests; HostFS acceptance runs without icount."""
 CHECK = dict(name='ppc-sd-link', env=['ppc-cross', 'qemu-ppc'], tier=2,
     needs=['make:ppc-ci-image'], budget=1800, full_only=True,
     covers=['tools/checks/ppc-sd-link.py', 'tools/tests/test_ppc_sd_run.py',

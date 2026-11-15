@@ -241,18 +241,13 @@ def link_settings(work, mutation=False):
         g_api->kprintf(7, "%s\n", rc == OS32_ERR_STALE ? "stale" : "not stale");
         g_api->sys_close(p5_fd);
     } else if (!strcmp(line, "p5-copy")) {
-        char buf[1024];
+        char buf[4096];
         int src = g_api->sys_open("/host/big", KAPI_O_RDONLY);
         int dst = g_api->sys_open("/host/rw/big2", KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
         int n = -1, ok = src >= 0 && dst >= 0;
-        /* One full READ frame per syscall; bound WRITE RPCs separately. */
+        /* Exercise multiple SFS CALLs within one large syscall. */
         while (ok && (n = g_api->sys_read(src, buf, sizeof(buf))) > 0) {
-            int off = 0;
-            while (ok && off < n) {
-                int chunk = n - off > 1000 ? 1000 : n - off;
-                if (g_api->sys_write(dst, buf + off, chunk) != chunk) ok = 0;
-                off += chunk;
-            }
+            if (g_api->sys_write(dst, buf, n) != n) ok = 0;
         }
         if (src >= 0) g_api->sys_close(src);
         if (dst >= 0) g_api->sys_close(dst);
@@ -291,6 +286,9 @@ def link_accept(elf, cpu, out, mutation='normal'):
     import serialfs_host as sfs
 
     class LinkSession(link.Session):
+        # icount is only for USB typing; HostFS acceptance uses host-paced time.
+        qemu_clock = ()
+
         def new_agent(self):
             if self.operator: self.operator.close()
             directory = self.out/('agent-'+str(len(self.events))); directory.mkdir()
