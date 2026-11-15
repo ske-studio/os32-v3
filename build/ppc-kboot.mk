@@ -14,7 +14,7 @@ KBOOT_SHELL ?= 0
 KBOOT_SH ?= 0
 KBOOT_LINK ?= 0
 ifeq ($(KBOOT_LINK),1)
-ifneq ($(filter 1,$(KBOOT_SH) $(KBOOT_SHELL)),)
+ifeq ($(KBOOT_SHELL),1)
 $(error KBOOT_LINK requires the diagnostic image)
 endif
 ifneq ($(NEGATIVE),0)
@@ -32,9 +32,9 @@ endif
 KBOOT_TERM ?= lan
 KB_FD1_STREAM ?= $(KBOOT_SH)
 # Extra applications belong to an explicitly separate test image.
-KB_ROOT_BINS ?= build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin
+KB_ROOT_BINS ?= $(KB_SH_OUT)/hello.bin $(KB_SH_OUT)/fault.bin
 KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
-KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/link,$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
+KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/$(if $(filter 1,$(KBOOT_SH)),link-sh,link),$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
 ifeq ($(KB_FD1_STREAM)$(KBOOT_SH),10)
 KB_OUT := $(KB_OUT)/fd1-stream
 endif
@@ -44,7 +44,8 @@ KB_ELF := $(KB_OUT)/PPCKERN.ELF
 ROOT_ISO := $(KB_OUT)/root.iso
 ROOT_BLOB := $(KB_OUT)/root_image_blob.o
 ROOT_MOTD := $(KB_OUT)/motd.txt
-ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),build/out/ppc-user/sh.bin)
+KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)
+ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),$(KB_SH_OUT)/sh.bin)
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
@@ -137,10 +138,12 @@ ifeq ($(KBOOT_SH),1)
 KB_C += platform/powermac/input_usb.c platform/powermac/input_keymap.c
 KB_C += platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c \
  $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
+ifneq ($(KBOOT_LINK),1)
 KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c \
  platform/powermac/hostfs_boot.c fs/serialfs/serialfs.c \
  fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c \
  fs/serialfs/sfs_proto.c lib/crc32.c
+endif
 endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 
@@ -210,7 +213,7 @@ $(KB_OUT)/motd.txt:
 	@printf 'OS32 PowerPC shell\n' > $@
 .PHONY: kb-user
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(ROOT_BINS)
+	$(MAKE) ARCH=ppc PLATFORM=powermac CROSS_DIR=$(PPC_CROSS_DIR) $(if $(filter 1,$(KBOOT_LINK)),PPC_USER_OUT=$(KB_SH_OUT) PPC_SH_PROFILE=userland/ppc/sh/link_profile.h) $(ROOT_BINS)
 
 $(ROOT_BINS): kb-user
 

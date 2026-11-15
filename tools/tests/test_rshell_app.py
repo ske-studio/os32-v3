@@ -28,6 +28,10 @@ KernelAPI *g_api = &api;
 int sh_exit_flag, sh_exit_code;
 static int mode, step, polls, halts, yields, resets, on, off, commands, failed, refused, status;
 static const char *input;
+static int prints;
+static void print(u8 color, const char *format, ...) {
+    (void)color; (void)format; prints++;
+}
 static const ShellCmd *registered;
 static void die(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); for (;;) {} }
 static int local(void) {
@@ -39,7 +43,7 @@ static int local(void) {
 static int poll(void) {
     polls++;
     if (mode == 0) failed = 1; /* all gaps are inside a USB half-line */
-    return mode == 1 ? RSH_LAN_EXIT : OS32_ERR_AGAIN;
+    return mode == 1 ? RSH_LAN_EXIT : mode == 4 ? 1 : OS32_ERR_AGAIN;
 }
 static void reset(void) { resets++; }
 static void active(int n) { if (n) on++; else off++; }
@@ -69,18 +73,20 @@ static int run(void) {
     if (rsh_lan_execute("e") || sh_exit_flag) return 1;
     if (rsh_lan_handoff("gui") != OS32_ERR_NOSYS) return 1;
     api.kbd_trygetchar_local = local; api.rshell_set_active = active;
-    api.sys_halt = halt; api.sys_yield = yield;
+    api.kprintf = print; api.sys_halt = halt; api.sys_yield = yield;
     static char longline[160];
     for (int i = 0; i < 140; i++) longline[i] = 'y';
     longline[140] = '\n'; longline[141] = '\033';
-    for (mode = 0; mode < 4; mode++) {
+    for (mode = 0; mode < 5; mode++) {
+        prints = 0;
         step = polls = halts = yields = resets = on = off = commands = failed = refused = status = 0;
-        input = mode == 0 ? "x_\ne_\n" : mode == 1 ? "" : mode == 2 ? "_\033" : longline;
+        input = mode == 0 ? "x_\ne_\n" : mode == 1 ? "" : mode == 2 || mode == 4 ? "_\033" : longline;
         int rc = rsh_lan_app_loop();
         if (failed || resets != 2 || on != 1 || off != 1 || app_active || sh_exit_flag) return 1;
-        if (mode == 0 && (rc != 37 || commands != 2 || polls || halts != 2)) return 1;
+        if (mode == 0 && (rc != 37 || commands != 2 || polls || halts != 2 || prints != 6)) return 1;
         if (mode == 1 && (rc || polls != 1 || commands || halts)) return 1;
-        if (mode == 2 && (rc || polls != 1 || yields != 1 || halts != 1)) return 1;
+        if (mode == 2 && (rc || polls != 1 || yields != 1 || halts != 0)) return 1;
+        if (mode == 4 && (rc || polls != 1 || halts || yields)) return 1;
         /* Review P3-1: an over-long USB line is refused with $? = 2 (resident rshell.c). */
         if (mode == 3 && (rc || refused != 1 || status != SH_STATUS_USAGE || commands)) return 1;
     }
@@ -121,7 +127,10 @@ def main():
                 ('status = sh_exit_code;\n                        sh_exit_flag = 0;', 'status = sh_exit_code;\n                        sh_exit_flag = 1;'),
                 ('g_api->rshell_set_active(0);', '(void)0;'),
                 ('g_api->sys_halt();', '(void)0;'),
-                ('if (rc == OS32_ERR_AGAIN) g_api->sys_yield();', '(void)rc;'),
+                ('g_api->sys_yield();', '(void)rc;'),
+                ('if (rc > 0) continue;', '(void)rc;'),
+                ('g_api->sys_yield();\n                continue;', 'g_api->sys_yield();'),
+                ('g_api->kprintf(ATTR_YELLOW, "%s", "> ");', '(void)0;'),
                 ('rsh_lan_reset();\n    app_active = 0;', 'app_active = 0;'),
                 ('g_api->rshell_set_active(1);', '(void)0;'),
                 ('    sh_exit_flag = 0;\n    return 0;', '    return 0;'),

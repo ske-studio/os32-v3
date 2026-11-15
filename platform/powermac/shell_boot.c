@@ -29,14 +29,24 @@ static void report(int kind, int code)
 void pm_shell_boot(void)
 {
     int kind, code;
+#if !KBOOT_LINK
     if (pm_console_text_ready()) shell_print("Press a USB key or connect LAN to start sh\n", 1);
     while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();
     (void)pm_terminal_trygetkey(); /* Consume the first OPEN cancellation. */
+#endif
     for (;;) {
+#if KBOOT_LINK
+        (void)exec_run("/bin/sh.bin --rshell-lan");
+#else
         (void)exec_run("/bin/sh.bin");
+#endif
         (void)exec_last_result(&kind, &code);
         report(kind, code);
+#if !KBOOT_LINK
         if (kind != EXEC_KIND_EXITED) break;
+#endif
     }
+#if !KBOOT_LINK
     for (;;) pm_terminal_poll();
+#endif
 }

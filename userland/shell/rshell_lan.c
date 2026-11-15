@@ -430,6 +430,9 @@ int rsh_lan_app_loop(void)
                     sh_refuse("rshell: command line", sizeof(buf) - 2);
                     sh_status_set(SH_STATUS_USAGE); /* refused line: $? is 2 */
                 } else if (ln.pos && !ln.junk) {
+                    g_api->kprintf(ATTR_YELLOW, "%s", "> ");
+                    g_api->kprintf(ATTR_WHITE, "%s", buf);
+                    g_api->kprintf(ATTR_WHITE, "%s", "\n");
                     (void)execute_command(buf);
                     if (sh_exit_flag) {
                         status = sh_exit_code;
@@ -445,7 +448,11 @@ int rsh_lan_app_loop(void)
         if (ln.bytes == 0) {
             int rc = rsh_lan_poll();
             if (rc == RSH_LAN_EXIT) break;
-            if (rc == OS32_ERR_AGAIN) g_api->sys_yield();
+            if (rc == OS32_ERR_AGAIN) {
+                g_api->sys_yield();
+                continue;
+            }
+            if (rc > 0) continue;
         }
         g_api->sys_halt();
     }
