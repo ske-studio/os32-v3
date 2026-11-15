@@ -91,7 +91,10 @@ static int probe(void)
         int key=kbd_getkey_wait(intr);
         /* Serial remains untouched both with/without capture, even after a halt. */
         if (key!=(gui ? 0xe3 : 0x1d61) || serial_reads || serial!='s') return 6;
-        int trace[]={key,serial,(int)halts,(int)parks,(int)polls};
+#ifdef CURRENT
+        if (polls != (gui ? 0 : halts + 1)) return 8;
+#endif
+        int trace[]={key,serial,(int)halts,(int)parks};
         __asm__ volatile("int $0x80" : : "a"(4),"b"(1),"c"(trace),"d"(sizeof(trace)) : "memory");
     }
     return 0;

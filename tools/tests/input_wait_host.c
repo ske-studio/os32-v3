@@ -57,12 +57,12 @@ static int kbd_inject_peek(u8 *b) { *b=(u8)value; return local()>=0; }
 static int exec_park_poll(u32 tick) { (void)tick; return 0; }
 #include "current_wait.inc"
 static int old_wait(int mode, int interruptible) {
-    return mode == IL_KEY ? kbd_getkey_wait(interruptible) : old_char(interruptible);
+    return mode == IL_KEY ? old_key(interruptible) : old_char(interruptible);
 }
 static int run(int old, int mode, int interruptible) {
     if (old == 2) {
         input_legacy_register(&kbd_legacy_provider);
-        return mode == IL_CHAR ? kbd_getchar_wait(interruptible) : input_legacy_wait(mode,interruptible);
+        return mode == IL_CHAR ? kbd_getchar_wait(interruptible) : kbd_getkey_wait(interruptible);
     }
     return old ? old_wait(mode,interruptible) : input_legacy_wait(mode,interruptible);
 }
@@ -116,7 +116,21 @@ static int compare(void) {
         if (result[0]!=result[1] || reads[0]!=reads[1] || elapsed[0]!=elapsed[1] || lengths[0]!=lengths[1]) return 11;
         for (unsigned i=0; i<lengths[0]; i++) if (trace[0][i]!=trace[1][i]) return 11;
     }
-    serial_value=-1; tracing=flip_gui=0;
+    tracing=0;
+    for (int flags=0; flags<192; flags++) for (int d=0; d<5; d++) for (int toggle=0; toggle<2; toggle++) {
+        int result[2], reads[2], elapsed[2];
+        for (int old=0; old<2; old++) {
+            flip_gui=flags & 32; kbd_gui_mode=flags & 1;
+            rshell_active=(flags >> 1) & 1; capture=(flags >> 6) != 0;
+            frozen=(flags >> 6) == 2; pending=(flags >> 2) & 1;
+            serial_value=flags & 8 ? 's' : -1; steps=serial_reads=0;
+            toggle_at=toggle ? 10 : 0; now=1800; ready_at=1800+delays[d]; value=0x1d7a;
+            result[old]=old ? old_key((flags >> 4) & 1) : run(2,IL_KEY,(flags >> 4) & 1);
+            reads[old]=serial_reads; elapsed[old]=(int)now;
+        }
+        if (result[0]!=result[1] || reads[0]!=reads[1] || elapsed[0]!=elapsed[1]) return 13;
+    }
+    serial_value=-1; tracing=flip_gui=toggle_at=0;
     return 0;
 }
 #ifndef PPC_COMPILE
@@ -126,10 +140,10 @@ void _start(void) {
     if (!rc) rc=probe(2);
     if (!rc) rc=compare();
     kbd_gui_mode=1; ready_at=0;
-    if (!rc && kbd_gui_getbyte(1)!=(value & 0xff)) rc=12;
+    if (!rc && kbd_getkey_wait(1)!=(value & 0xff)) rc=12;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
 #else
-int fixture(void) { int rc=probe(0); if (!rc) rc=compare(); kbd_gui_mode=1; ready_at=0; return rc ? rc : kbd_gui_getbyte(1)!=(value & 0xff); }
+int fixture(void) { int rc=probe(0); if (!rc) rc=compare(); kbd_gui_mode=1; ready_at=0; return rc ? rc : kbd_getkey_wait(1)!=(value & 0xff); }
 #endif

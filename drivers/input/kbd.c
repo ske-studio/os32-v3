@@ -759,11 +759,6 @@ int kbd_trygetchar_local(void)
  *
  *  `hlt` ループを GUI 中の CPL=3 アプリに残すと、syscall の中で止まったまま
  *  協調型の全体 (gshell と他の 3 本) が動かなくなる (票 §0)。 */
-static int kbd_gui_getbyte(int interruptible)
-{
-    return input_legacy_wait(IL_CHAR, interruptible);
-}
-
 static int kbd_getchar_wait(int interruptible)
 {
     return input_legacy_wait(IL_CHAR, interruptible);
@@ -774,24 +769,7 @@ static int kbd_getchar_wait(int interruptible)
  * 端末経由で届く打鍵にはスキャンコードが無い。 */
 int kbd_getkey_wait(int interruptible)
 {
-    u16 entry;
-    u32 start_tick = tick_count;
-    int capture = con_sink_capture_active();
-
-    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
-
-    while (kbd_count == 0) {
-        kbd_foreground_poll();
-        if (interruptible && ring3_wait_pending()) return -1;
-        idle_work_run();
-        _halt();
-        if (capture && (u32)(tick_count - start_tick) >= KBD_RSHELL_TIMEOUT_SEC * PIT_HZ)
-            return 0x1b;
-    }
-
-    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
-
-    return (int)entry;
+    return input_legacy_wait(IL_KEY, interruptible);
 }
 
 /* ノンブロッキング版: キーコードデータ(u16)を返す。なければ-1 */

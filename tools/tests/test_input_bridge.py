@@ -166,7 +166,7 @@ def bridge_cases(ctx, tmp):
         return kbd[start:kbd.index('\n}', start) + 2]
     current = kbd[a:b] + '\n' + '\n'.join(function(n) for n in (
         'kbd_trygetchar', 'kbd_trygetkey', 'kbd_trygetchar_local', 'kbd_peekkey'))
-    for name in ('kbd_gui_getbyte', 'kbd_getkey_wait'):
+    for name in ('kbd_getkey_wait',):
         start = kbd.index('int ' + name + '(int interruptible)\n{')
         current += '\n' + ('static ' if name == 'kbd_gui_getbyte' else '') + kbd[start:kbd.index('\n}', start)+2]
     # GUI byte adapter precedes the moved provider.
@@ -195,7 +195,7 @@ def bridge_cases(ctx, tmp):
         assert execute(current.replace(old, 'return rshell_active && (!con_sink_capture_active() || 1);', 1), bridge) != baseline
         print('RED runtime trace: capture serial gate (char/key)', flush=True)
         assert execute(current, bridge) == baseline
-        wait = '    while (kbd_count == 0) {'
+        wait = '    return input_legacy_wait(IL_KEY, interruptible);'
         assert current.count(wait) == 1
         mutant = current.replace(wait, '    (void)serial_trygetchar();\n' + wait, 1)
         assert execute(mutant, bridge)[0] == 6

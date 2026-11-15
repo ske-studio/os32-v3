@@ -86,7 +86,7 @@ static int test(void)
           "noninterruptible getchar wakes on key");
     fresh();
     wait_mode = 1;
-    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 3 && !violations,
+    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 4 && !violations,
           "noninterruptible getkey wakes on key");
 
     fresh();

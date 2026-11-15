@@ -38,12 +38,12 @@ MUTATIONS = [
      'int kbd_trygetkey(void)\n{\n'),
     ('char-wait-connection', KBD,
      '.wait_prepare = kbd_foreground_poll', '.wait_prepare = 0'),
-    ('key-wait-connection', KBD,
-     '    while (kbd_count == 0) {\n        kbd_foreground_poll();',
-     '    while (kbd_count == 0) {'),
+    ('key-wait-connection', WAIT,
+     'if (p->wait_prepare) p->wait_prepare();',
+     'if (mode != IL_KEY && p->wait_prepare) p->wait_prepare();'),
     ('char deadline', WAIT, 'timed = !gui && (capture ||', 'timed = !gui && ((0 && capture) ||'),
-    ('key deadline', KBD, 'if (capture && (u32)(tick_count - start_tick)',
-     'if (0 && capture && (u32)(tick_count - start_tick)'),
+    ('key deadline', WAIT, 'timed = !gui && (capture ||',
+     'timed = !gui && ((mode != IL_KEY && capture) ||'),
     ('wait serial', WAIT, 'p->terminal_enabled() && p->terminal_try)', 'p->terminal_try)'),
 
 ]
