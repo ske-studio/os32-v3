@@ -50,6 +50,7 @@ exec_resume
 exec_run
 exec_start
 exec_stop_culprit
+exec_sys_yield
 ppc_kapi_wait_once
 kapi_host_open
 kapi_host_status

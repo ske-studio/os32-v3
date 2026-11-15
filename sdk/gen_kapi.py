@@ -653,10 +653,11 @@ for slot, api in enumerate(data["api"]):
     if not args_str: args_str = "void"
 
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
-    if TARGET == "ppc-powermac" and name in {"sys_halt", "sys_yield"}:
+    # sys_yield stays on the common exec_sys_yield: it parks an exec_start child
+    # (arch-ctx-guest lifecycle) and runs idle_work itself.
+    if TARGET == "ppc-powermac" and name == "sys_halt":
         c_content += "    extern i32 ppc_kapi_wait_once(void);\n"
-        c_content += ("    (void)ppc_kapi_wait_once();\n" if name == "sys_halt"
-                      else "    return ppc_kapi_wait_once();\n")
+        c_content += "    (void)ppc_kapi_wait_once();\n"
         c_content += "}\n\n"
         continue
     if TARGET == "ppc-powermac" and name == "tvram_clear":

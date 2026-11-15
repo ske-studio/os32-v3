@@ -38,7 +38,8 @@ def main():
                 assert 'return kapi_host_' + name + '(' in generated
             if target == 'ppc-powermac':
                 assert 'void __cdecl wrap_sys_halt(void)\n{\n    extern i32 ppc_kapi_wait_once(void);\n    (void)ppc_kapi_wait_once();\n}\n' in generated
-                assert 'i32 __cdecl wrap_sys_yield(void)\n{\n    extern i32 ppc_kapi_wait_once(void);\n    return ppc_kapi_wait_once();\n}\n' in generated
+                # sys_yield stays on exec_sys_yield (parks exec_start children; arch-ctx-guest lifecycle).
+                assert 'i32 __cdecl wrap_sys_yield(void)\n{\n    KAPI_HIT(200);\n    return exec_sys_yield();\n}\n' in generated
                 assert 'rshell_active = active;' in generated
                 assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    return (int)0;\n}\n' in generated
             assert 'kernel/console/con_sink.c' in (ROOT / 'build/ppc-kboot.mk').read_text()
