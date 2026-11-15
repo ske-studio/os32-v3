@@ -5,6 +5,10 @@
 static const InputOps *ops;
 static int lan[256], ln, lp, polls, locked;
 static u32 now;
+int con_sink_capture_active(void) { return 0; }
+int ring3_wait_pending(void) { return 0; }
+void idle_work_run(void) {}
+void arch_cpu_idle(void) {}
 void input_register(const InputOps *p) { ops = p; }
 unsigned int irq_save(void) { unsigned f = locked; locked = 1; return f; }
 void irq_restore(unsigned int f) { locked = f; }

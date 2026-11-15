@@ -131,7 +131,7 @@ FIXTURE = r'''
 #include "in2_int.h"
 #ifdef PPC_COMPILE
 _Static_assert(sizeof(u32) == 4 && sizeof(void *) == 4, "PPC ILP32");
-_Static_assert(sizeof(struct InputLegacyProvider) == 40, "provider size");
+_Static_assert(sizeof(struct InputLegacyProvider) == 60, "provider size");
 _Static_assert(__builtin_offsetof(struct InputLegacyProvider, park_kbd) == 36, "provider offset");
 #endif
 static int absent(const struct InputLegacyProvider *p) {
@@ -139,7 +139,7 @@ static int absent(const struct InputLegacyProvider *p) {
 }
 static int probe(void) {
     struct InputLegacyProvider p = {0};
-    if (sizeof(p) != 10 * sizeof(void (*)(void))) return 1;
+    if (sizeof(p) != 15 * sizeof(void (*)(void))) return 1;
     if (IN2_MAX_DEV != 16 || IL_CHAR != 0 || IL_KEY != 1 || IL_LOCAL_CHAR != 2) return 2;
     if (absent(0) != -1 || absent(&p) != -1) return 3;
     return 0;

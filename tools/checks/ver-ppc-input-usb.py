@@ -11,7 +11,8 @@ CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
             'tools/checks/ver-ppc-input-usb.py','platform/powermac/input_boot.h', 'platform/powermac/input_decode.c',
             'include/types.h', 'include/input_service.h', 'include/clock_source.h',
             'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
-            'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h'],
+            'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h',
+            'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h'],
     basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5'],
     env_limit='製品USB入力Cの修飾・release・FIFO・公平性を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
 )
@@ -56,9 +57,9 @@ def main(mutate=False):
             exe = work/'test'
             subprocess.run(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
                 '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
-                '-I'+str(work),'-Iinclude','-Iplatform/powermac','-Isdk/include/os32','-Idrivers/input','-I.',
+                '-I'+str(work),'-Iinclude','-Iarch/ppc','-Iplatform/powermac','-Isdk/include/os32','-Idrivers/input','-I.',
                 str(ROOT/'tools/tests/ppc_input_usb_host.c'),*[str(work/n) for n in sources],
-                'platform/powermac/input_decode.c','-o',str(exe)], cwd=ROOT, check=True)
+                'platform/powermac/input_decode.c','kernel/input_legacy.c','kernel/input_wait.c','-o',str(exe)], cwd=ROOT, check=True)
             result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True, timeout=10)
             marker = reached + ('FAIL\n' if expected else '')
             if result.returncode != expected or result.stdout != marker:

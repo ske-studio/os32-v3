@@ -43,11 +43,19 @@ int kbd_diag(KbdDiag *out) { (void)out; return OS32_ERR_NOSYS; }
 int kbd_diag_log(u32 seq, KbdDiagLogEnt *out, int max)
 { (void)seq; (void)out; (void)max; return OS32_ERR_NOSYS; }
 #else
+static u32 fake_time;
+static int capture;
+int con_sink_capture_active(void) { return capture; }
+int ring3_wait_pending(void) { return cancelled; }
+void idle_work_run(void) {}
+void _idle(void) { fake_time += 1000000; }
 int pm_input_usb_take(void) { return take(); }
 u32 pm_input_usb_dropped(void) { return 0; }
 int pm_terminal_trygetkey(void) { return -1; }
 void pm_terminal_poll(void) {}
-int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 0; }
+#include "kernel/input_legacy.c"
+#include "kernel/input_wait.c"
 #endif
 #include INPUT_SOURCE
 static int hits, shutdowns;
@@ -84,6 +92,15 @@ static int input_kapi(void)
     }
     REQUIRE(waited == 0); /* try must never delegate to a blocking operation. */
     feed('W', 3); REQUIRE(input_getkey_wait(0) == 'W' && polls == 3);
+#ifndef PC98_INPUT
+    feed('A', 0); REQUIRE(input_peekkey() == 'A');
+    feed('B', 0); REQUIRE(input_getkey_wait(0) == 'A');
+    REQUIRE(input_getkey_wait(0) == 'B');
+    capture = 1; fake_time = 17000000; feed(-1, 0);
+    REQUIRE(input_getchar() == 13 && fake_time == 47000000 && capture);
+    REQUIRE(input_getkey_wait(0) == 27 && fake_time == 77000000 && capture);
+    capture = 0;
+#endif
     cancelled = 1; feed('W', 3);
     int result = input_getkey_wait(1);
     if (result != -1) { REQUIRE(result == 'W' && polls == 3); failures |= 1; }

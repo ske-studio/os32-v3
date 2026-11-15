@@ -12,7 +12,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-sh-input', tier=1, budget=60, needs=[],
              covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
-                     'platform/powermac/input_decode.c'],
+                     'platform/powermac/input_decode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c'],
              inputs=['tools/tests/ppc_sh_input.py', 'platform/powermac/terminal_input.c',
                      'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
                      'include/input_service.h', 'include/clock_source.h', 'include/types.h'])
@@ -32,6 +32,10 @@ static u32 clock_us, clock_step;
 int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = clock_us; *hi = 0; clock_us += clock_step; return 0; }
 static const InputOps *ops;
 void input_register(const InputOps *p) { ops = p; }
+int con_sink_capture_active(void) { return 0; }
+int ring3_wait_pending(void) { return 0; }
+void idle_work_run(void) {}
+void arch_cpu_idle(void) {}
 u64 pm_terminal_tb(void) { return 0; }
 void pm_lan_poll(u64 now) { (void)now; }
 static void feed(const char *s, u32 n) { pm_terminal_feed((const u8 *)s, n); }
@@ -83,9 +87,9 @@ def main():
         for name, code, expected, marker in cases:
             (d / 'decode.c').write_text(code)
             subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
-                            '-I.', '-Iinclude', '-Isdk/include/os32', '-Idrivers/input', '-Iplatform/powermac',
+                            '-I.', '-Iinclude', '-Iarch/ppc', '-Isdk/include/os32', '-Idrivers/input', '-Iplatform/powermac',
                             str(d / 'harness.c'), str(d / 'decode.c'), 'platform/powermac/input_boot.c',
-                            'platform/powermac/terminal_input.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
+                            'platform/powermac/terminal_input.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
             result = host32.run([str(d / 'test')], runner='qemu', capture_output=True, text=True, timeout=10)
             if result.returncode != expected or result.stderr != marker:
                 raise RuntimeError(f'{name}: exit {result.returncode}: {result.stderr!r}')
