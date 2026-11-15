@@ -132,6 +132,10 @@ ACK/WINDOWはrid=0。重複seqはACKのみ。古いsession/世代のフレーム
 ```
 - 起動時ヒープから64×256B=16KiB確保（失敗時は通知NOSYS、通信本体は継続）。最新ALIVE1枠・管理情報は別。初期化済み配列を像に入れない。
 - 通知WINDOWは4通（最大248B/通）、累積ACK・Go-Back-N・100ms再送。要求8handleと本文ringを消費しない。ホスト未ACK上限64通、満杯では最古未送信を捨て計数し、既送信seqに穴を作らない。
+- inflight が空でない状態が、最後に受理した ACK と空から非空になった時の遅い方から T=2.5秒続いたら、その session を沈黙にする。受理は sess/epoch 一致かつ ack < next_seq とする。
+- 沈黙に入ると pending を捨てて dropped に数え、沈黙中の新通知（ALIVE 含む）も同様に捨て、pending から inflight に積まない。
+- 沈黙開始から T秒ごとに inflight の先頭1本だけを同じ seq・payload で probe として送る。長い syscall・V86・重い前景からの復帰を可能にし、再起動中の電文の蓄積を抑える。
+- 受理した ACK だけが沈黙を解除し、その時点（次の tick で採時）から計時を取り直して次の tick で通常の Go-Back-N 再送を行う。新 session は reset で旧 inflight を消す。（2026-11-15 本線 PM 決定、QEMU の再起動で受信が止まった件）
 - 受入時ACK、満杯なら最古を捨てdropped++。同世代ALIVEは内部観測と最新1枠の上書きだけ、初回/世代変更時のみリングへ1通。
 ```c
 /* 公開C89、sizeof=256。wireとのmemcpyはしない。 */

@@ -2,7 +2,7 @@
 """Host notification wire, timing, queue, and mutation tests."""
 CHECK = dict(name='host-notify', tier=1, needs=[],
              covers=['tools/host_notify.py', 'net/link.h'], budget=2.8,
-    basis=['NET_HOSTSVC_DESIGN §5'],
+    basis=['NET_HOSTSVC_DESIGN §5', 'NET_HOSTSVC_DESIGN §5 (silence limit)'],
 )
 import argparse
 import importlib.util
@@ -75,15 +75,95 @@ def test(module):
     print('PASS host notification')
 
 
+def test_silence(module):
+    # 本線 PM 決定 2026-11-15 の規則 1・2 (A・D)。
+    m = load(module)
+    assert m.SILENCE_SECONDS == 2.5
+    n = m.Notify(Registry(), 1)
+    n.session(9, 7, 0)
+    n.ack(9, 7, 0, 4)
+    for i in range(5):
+        n.notify('example', 2, bytes([i]))
+    first = n.tick(0)
+    assert len(first) == 4 and len(n.pending) == 2
+    assert n.tick(2.49) == first
+    assert n.tick(2.5) == []
+    assert not n.pending and n.dropped == 2
+    n.notify('example', 2, b'drop')
+    n.notify_number(42, 2, b'drop')
+    assert not n.pending and n.dropped == 4
+    assert n.tick(2.6) == []
+    assert n.tick(4.99) == []
+    assert n.tick(5) == first[:1]
+    assert n.dropped == 5  # ALIVE is also discarded.
+    assert n.tick(5.1) == []
+    assert n.tick(7.5) == first[:1]
+
+
+def test_resume(module):
+    # 本線 PM 決定 2026-11-15 の規則 3 (B)。
+    m = load(module)
+    n = m.Notify(Registry(), 1)
+    n.session(9, 7, 0)
+    n.ack(9, 7, 0, 4)
+    for i in range(3):
+        n.notify('example', 2, bytes([i]))
+    first = n.tick(0)
+    assert n.tick(2.5) == []
+    for sess, epoch, ack in [(8, 7, 1), (9, 8, 1), (9, 7, 5)]:
+        n.ack(sess, epoch, ack, 4)
+        assert n.tick(2.6) == []
+    assert n.tick(5) == first[:1]
+    n.ack(9, 7, 1, 4)
+    n.notify('example', 2, b'resumed')
+    resumed = n.tick(5.01)
+    assert resumed[:3] == first[1:] and resumed[3][2] == 5
+    assert resumed[3][-1].endswith(b'resumed')
+    assert n.tick(5.05) == []
+    assert n.tick(5.12) == resumed
+    assert n.tick(7.4) == resumed
+    assert n.tick(7.51) == []
+    # A valid duplicate ACK also restarts timing before silence.
+    n.ack(9, 7, 1, 4)
+    assert n.tick(7.52) == resumed
+    assert n.tick(9.9) == resumed
+
+
+def test_session(module):
+    # 本線 PM 決定 2026-11-15 の規則 4 (C)。
+    m = load(module)
+    n = m.Notify(Registry(), 1)
+    n.session(9, 7, 0)
+    n.ack(9, 7, 0, 4)
+    n.notify('example', 2, b'old')
+    old = n.tick(0)
+    n.tick(2.5)
+    n.session(10, 8, 3)
+    assert not n.inflight
+    n.ack(10, 8, 0, 4)
+    frames = n.tick(3)
+    assert len(frames) == 1 and frames[0][2] == 1
+    assert frames[0][-1] == old[0][-1]
+    assert all(f[-1] != old[1][-1] for f in frames)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--module', default=str(ROOT / 'tools/host_notify.py'))
     args = parser.parse_args()
     test(args.module)
+    test_silence(args.module)
+    test_resume(args.module)
+    test_session(args.module)
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [('generation', 'return secrets.randbelow(0xffffffff) + 1', 'return 1'),
+                     ('silence limit', 'now - self.progress >= SILENCE_SECONDS', 'False'),
+                     ('resume on ack', 'self.silent = False\n            self.deadline = 0', 'self.silent = True\n            self.deadline = 0'),
+                     ('old inflight', '        self.reset()\n        self.sess, self.epoch', '        old = self.inflight\n        self.reset()\n        self.inflight = old\n        self.sess, self.epoch'),
+                     ('probe none', 'list(self.inflight)[:1]', 'list(self.inflight)[:0]'),
+                     ('probe all', 'list(self.inflight)[:1]', 'list(self.inflight)'),
                      ('alive', "self.notify('os32.alive', 1, struct.pack('<I', self.generation))", 'pass')]
         with tempfile.TemporaryDirectory() as directory:
             for name, old, new in mutations:
