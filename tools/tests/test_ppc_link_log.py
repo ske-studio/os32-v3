@@ -1,5 +1,6 @@
 """LOG request, retry, session loss, and bounded foreground progress."""
 CHECK = dict(name='ppc-link-log-host', tier=2, budget=30, needs=[], covers=[
+    'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py',
     'build/ppc-kboot.mk', 'platform/powermac/link_log.c',
     'tools/ppc/link_*.py', 'tools/host_*.py', 'tools/tests/test_ppc_link_log.py',
     'tools/tests/ppc_link_log_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',

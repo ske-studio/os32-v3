@@ -14,7 +14,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-u5b', tier=1, needs=[], budget=20,
-             covers=['tools/host_agent_service.py', 'tools/host_agent.py',
+             covers=['tools/host_image.py', 'tools/host_sfs_link.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_agent_service.py', 'tools/host_agent.py',
                      'tools/host_agent_config.py', 'tools/host_linux.py',
                      'tools/host_notify.py', 'tools/host_operator_socket.py',
                      'tools/host_rshell.py', 'tools/host_services.py',
