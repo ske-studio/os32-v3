@@ -1,4 +1,5 @@
 #include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 /* F2/F2i: compile the real keyboard with a foreground/device boundary.
  * No drawing or real keyboard input is needed to advance the wait loops. */

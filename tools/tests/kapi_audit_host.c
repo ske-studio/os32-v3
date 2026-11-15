@@ -1,4 +1,5 @@
 #include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 /* Compile real console/FM/serial/kbd/IME bodies and the rshell wrapper.
  * Replace device I/O, scheduler landings and dictionary storage. */

@@ -136,6 +136,7 @@
     "drivers/video/kcg/kcg_module.c",
     "drivers/sound/fm/fm_module.c",
     "input/hal/legacy_ring.c",
+    "input/hal/legacy_mode.c",
     "drivers/input/kbd.c",
     "drivers/input/kbd_status.c",
     "drivers/input/kbd_dlog.c",
