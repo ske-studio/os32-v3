@@ -126,8 +126,8 @@ static int test(void)
     CHECK(state.buttons == (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) && state.mode == MOUSE_MODE_SEAMLESS);
     CHECK(pointer_available() == 1 && pointer_seen == 2);
     pointer_set_bounds(-11, -22, 333, 444);
-    CHECK(pointer_seen == 3 && pointer_bounds[0] == -11 && pointer_bounds[1] == -22);
-    CHECK(pointer_bounds[2] == 333 && pointer_bounds[3] == 444);
+    CHECK(pointer_seen == 3 && pointer_seen_bounds[0] == -11 && pointer_seen_bounds[1] == -22);
+    CHECK(pointer_seen_bounds[2] == 333 && pointer_seen_bounds[3] == 444);
     pointer_cursor_set_mode(MOUSE_CURSOR_GFX);
     CHECK(pointer_seen == 4 && pointer_mode == MOUSE_CURSOR_GFX);
     pointer_cursor_show(); CHECK(pointer_seen == 5);

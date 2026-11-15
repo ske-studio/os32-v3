@@ -1,7 +1,7 @@
 /* Recording mouse provider for fixtures that include the real PC98 binding. */
 #include "../../drivers/input/mouse.h"
 static int pointer_seen, pointer_mode;
-static i16 pointer_bounds[4];
+static i16 pointer_seen_bounds[4];
 static MouseState *pointer_output;
 void mouse_poll(MouseState *state)
 {
@@ -17,8 +17,8 @@ int mouse_available(void) { pointer_seen = 2; return 1; }
 void mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 {
     pointer_seen = 3;
-    pointer_bounds[0] = x_min; pointer_bounds[1] = y_min;
-    pointer_bounds[2] = x_max; pointer_bounds[3] = y_max;
+    pointer_seen_bounds[0] = x_min; pointer_seen_bounds[1] = y_min;
+    pointer_seen_bounds[2] = x_max; pointer_seen_bounds[3] = y_max;
 }
 void mouse_cursor_set_mode(int mode) { pointer_seen = 4; pointer_mode = mode; }
 void mouse_cursor_show(void) { pointer_seen = 5; }
