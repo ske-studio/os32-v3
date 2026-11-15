@@ -1,3 +1,4 @@
+/* PACK ppc-sfs-deadline PM condition B; LAN_OPERATOR_DESIGN §5. */
 /* D3 BLOCK: real C1/C3/D2 and netcd, virtual wire/clock/ALIVE/device table. */
 #include "hostsvc_fixture.h"
 #include "fs/serialfs/serialfs.h"
@@ -229,7 +230,10 @@ static int suite(void)
     REQUIRE(read_at(0, 4, buf) == OS32_ERR_HOSTDOWN && hs_now() - tick == 100);
     delay = 0;
     REQUIRE(!read_at(0, 4, buf));
-    alive.observation++; silent = 1; tick = hs_now();
+    old_hello = hello_count;
+    alive.observation++;
+    REQUIRE(!check(&gen) && hello_count == old_hello);
+    alive.host_generation++; alive.observation++; silent = 1; tick = hs_now();
     REQUIRE(check(&gen) == OS32_ERR_HOSTDOWN && hs_now() - tick == 100);
     silent = 0;
     REQUIRE(!check(&gen) && gen == 7 && !wire_error);

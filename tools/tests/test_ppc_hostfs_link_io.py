@@ -7,7 +7,8 @@ import tempfile
 import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-hostfs-link-io', tier=1, needs=[], budget=15,
-    env=['ppc-cross'], basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §8'],
+    env=['ppc-cross'], basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §8',
+        'PACK ppc-sfs-deadline PM conditions B/C'],
     covers=['platform/powermac/hostfs_link_io.c', 'tools/tests/ppc_hostfs_link_io.c',
             'tools/tests/test_ppc_hostfs_link_io.py', 'platform/powermac/hostfs_link_peer.c',
             'platform/powermac/hostfs_boot.c',
@@ -23,6 +24,8 @@ CHECK = dict(name='ppc-hostfs-link-io', tier=1, needs=[], budget=15,
             'include/*.h', 'sdk/include/os32/*.h', 'lib/le_internal.h',
             'lib/crc32.[ch]', 'lib/crc32_core.inc', 'tools/tests/host32.py'])
 MUTATIONS = [
+    ('open-hostdown', 'rc == OS32_ERR_HOSTDOWN ||', '0 ||'),
+    ('open-full', 'rc == OS32_ERR_FULL) return;', '0) return;'),
     ('deadline', 'if ((i32)(pm_hfs_now(0) - until) >= 0)', 'if (0)'),
     ('retry identity', 'if (same) return result;', 'if (0 && same) return result;'),
     ('IRQ', 'kctx_irq_depth == 0 && _irq_enabled()', '_irq_enabled()'),
@@ -32,12 +35,15 @@ MUTATIONS = [
     ('oneway', 'if (!length) { finish(0); return; }', 'if (!length) { finish(-1); return; }'),
     # Review F1: the SFS CALL declaration must equal the frame length.
     ('declared length', 'u32 n = tx_len, count = 0, pos = 9;', 'u32 n = tx_len - 1, count = 0, pos = 9;'),
+    # The FG1 wait must sleep until an interrupt, not spin (PM/mainline 2026-11-15).
+    ('wait spins', '    idle_work_run();\n    _idle();\n}', '    idle_work_run();\n}'),
+    ('sleep without guard', '    if (!pm_hfs_can_wait(ctx)) return;\n    idle_work_run();', '    if (!pm_hfs_can_wait(ctx)) { _idle(); return; }\n    idle_work_run();'),
 ]
 def exercise(folder, source, extra=None):
     folder.mkdir()
     (folder / 'io_source.inc').write_text(source)
     (folder / 'io.h').write_text('static inline unsigned int irq_save(void) { return 1; }\nstatic inline void irq_restore(unsigned int f) { (void)f; }\n')
-    (folder / 'arch_io.h').write_text('int _irq_enabled(void);\n')
+    (folder / 'arch_io.h').write_text('int _irq_enabled(void);\nvoid _idle(void);\n')
     exe = folder / 'probe'
     compiler_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
     includes = ['', 'include', 'platform/powermac', 'fs/serialfs', 'fs', 'lib',
@@ -79,6 +85,7 @@ def main():
             for i, extra in enumerate([
                 ('platform/powermac/hostfs_boot.c', 'if (!rc) rc = sfs_persistent_start(&cfg);', '(void)cfg;'),
                 ('platform/powermac/hostfs_link_peer.c', 'return fixed ? allowed : 0;', 'return 0;'),
+                ('fs/serialfs/serialfs_persistent.c', 'if (!host_valid) reconnect = 1;', 'reconnect = 1;'),
                 ('fs/serialfs/serialfs_persistent.c', 'if (host_valid && host_generation != generation)', 'if (0 && host_valid && host_generation != generation)'),
             ]):
                 assert exercise(work / f'integration{i}', source, extra) == 1, extra[0]

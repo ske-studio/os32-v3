@@ -1,4 +1,6 @@
-/* C4: real VFS, resident owner and deadline client; virtual wire/clock only. */
+/* PACK ppc-sfs-deadline PM conditions A/B; LAN_OPERATOR_DESIGN §5 (:132).
+ * Each CALL gets 1000ms, same-generation ALIVE preserves the session.
+ * Real VFS, resident owner and deadline client; virtual wire/clock only. */
 #include "hostsvc_fixture.h"
 #include "fs/serialfs/serialfs.h"
 #include "fs/vfs_device.h"
@@ -14,7 +16,7 @@ void *kmalloc(u32 n) { return n == sizeof(heap) ? heap : 0; }
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
 void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
 static u8 response[SFS_BUFFER_FRAME];
-static u32 pos, end, calls, hellos, budget, delay, hello_delay;
+static u32 pos, end, calls, hellos, budget, delay, hello_delay, disappear_after;
 static int status, silent, unknown, malformed, short_stat, bad_budget, extra, paged;
 static u16 advertised = SFS_LAN_MAX_PAYLOAD;
 static int put(void *ctx, const u8 *buf, u32 n)
@@ -30,7 +32,7 @@ static int put(void *ctx, const u8 *buf, u32 n)
         u16 len = SFS_STATUS_LEN;
         u32 sid = f.sid;
         u8 type = f.type | SFS_T_RESP;
-        if (silent) return 0;
+        if (silent || (disappear_after && calls >= disappear_after)) return 0;
         if (f.type == SFS_T_HELLO) {
             hellos++; sid = hellos;
             hs_advance(hello_delay);
@@ -81,7 +83,8 @@ static void idle(void *ctx) { (void)ctx; hs_advance(1); }
 static int can_wait(void *ctx) { (void)ctx; return hs_if(); }
 static int put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
-    if (budget && budget != deadline) bad_budget = 1;
+    if (!silent && !(disappear_after && calls >= disappear_after) &&
+        deadline != hs_now() + 100) bad_budget = 1;
     budget = deadline;
     return put(ctx, buf, n);
 }
@@ -95,7 +98,7 @@ static int suite(void)
     };
     struct SfsPersistentConfig cfg = {&hs_sfs_io, 0, 1};
     OS32_Stat st;
-    u8 data[2048];
+    static u8 data[65536];
     u32 gen, before;
     hs_reset(0xfffffff0u);
     CHECK(host_mailbox_init() == 0);
@@ -155,21 +158,45 @@ static int suite(void)
     CHECK(ops->resource_refresh(ctx) == OS32_ERR_HOSTDOWN);
     CHECK(hs_now() - before == 100);
     silent = 0;
-    /* A HELLO and all read chunks share entry+100, including clock wrap. */
+    /* Slow CALLs exceed an operation budget, including wrap and HELLO. */
     sfs_persistent_stale(); budget = 0; hello_delay = 40; delay = 40;
+    bad_budget = 0;
     before = hs_now();
-    CHECK(ops->read_stream(ctx, "/a", data, sizeof(data), 0) == OS32_ERR_HOSTDOWN);
-    CHECK(budget == before + 100 && hs_now() - before == 120 && !bad_budget);
-    hello_delay = delay = 0; budget = 0;
-    CHECK(ops->read_stream(ctx, "/a", data, sizeof(data), 0) == sizeof(data));
+    CHECK(ops->read_stream(ctx, "/a", data, 2048, 0) == 2048);
+    CHECK(hs_now() - before > 100 && !bad_budget);
     CHECK(data[0] == 0x5a && data[2047] == 0x5a);
-    budget = 0; delay = 40; before = hs_now();
-    CHECK(ops->write_file(ctx, "/a", data, sizeof(data)) == OS32_ERR_HOSTDOWN);
-    CHECK(budget == before + 100 && !bad_budget);
-    budget = 0; paged = 1; before = hs_now();
-    CHECK(ops->list_dir(ctx, "/a", cb, 0) == OS32_ERR_HOSTDOWN);
-    CHECK(budget == before + 100 && !bad_budget);
+    CHECK(ops->write_file(ctx, "/a", data, 2048) == 2048);
+    CHECK(ops->read_stream(ctx, "/a", data, sizeof(data), 0) == sizeof(data));
+    CHECK(data[65535] == 0x5a);
+    CHECK(ops->write_file(ctx, "/a", data, sizeof(data)) == sizeof(data));
+    CHECK(!bad_budget);
+    paged = 1; before = hs_now();
+    CHECK(ops->list_dir(ctx, "/a", cb, 0) == 0);
+    CHECK(hs_now() - before == 160 && !bad_budget);
     paged = 0;
+    /* Disappearance after two successful chunks: exactly one fresh budget. */
+    for (int writing = 0; writing < 2; writing++) {
+        u32 initial_calls = calls;
+        disappear_after = calls + 2; before = hs_now();
+        int rc = writing ? ops->write_file(ctx, "/a", data, sizeof(data)) :
+            ops->read_stream(ctx, "/a", data, sizeof(data), 0);
+        CHECK(rc == OS32_ERR_HOSTDOWN);
+        CHECK(calls == initial_calls + 2 && hs_now() - before == 180);
+        CHECK(!bad_budget);
+        disappear_after = 0;
+    }
+    hello_delay = delay = 0;
+    /* First ALIVE, repeated ALIVE, and changed generation. */
+    CHECK(ops->resource_refresh(ctx) == 0);
+    sfs_alive_observe(42);
+    CHECK(ops->resource_refresh(ctx) == 0);
+    u32 saved_hellos = hellos, saved_gen = sfs_persistent_generation();
+    sfs_alive_observe(42);
+    CHECK(ops->resource_refresh(ctx) == 0 && hellos == saved_hellos);
+    CHECK(sfs_persistent_generation() == saved_gen);
+    sfs_alive_observe(43);
+    CHECK(ops->resource_refresh(ctx) == 0 && hellos == saved_hellos + 1);
+    CHECK(sfs_persistent_generation() == saved_gen + 1);
     delay = 0; budget = 0; advertised = SFS_MAX_PAYLOAD; sfs_persistent_stale();
     CHECK(ops->read_stream(ctx, "/a", data, sizeof(data), 0) == sizeof(data));
     CHECK(ops->write_file(ctx, "/a", data, sizeof(data)) == sizeof(data));

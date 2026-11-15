@@ -36,9 +36,9 @@ void sfs_alive_observe(u32 generation)
     if (!enabled) return;
     if (host_valid && host_generation != generation)
         sfs_persistent_stale();
+    if (!host_valid) reconnect = 1;
     host_generation = generation;
     host_valid = 1;
-    reconnect = 1;
 }
 
 static void observe_snapshot(const struct HostAlive *alive)
