@@ -29,7 +29,18 @@ void input_src_release(u8 src, u16 generation)
 {
     unsigned int flags = irq_save();
     if (src >= 1 && src <= IN2_MAX_DEV && sources[src - 1].used &&
-        sources[src - 1].generation == generation)
+        sources[src - 1].generation == generation) {
+        input_state_release(src, generation);
         sources[src - 1].used = 0;
+    }
     irq_restore(flags);
+}
+
+int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin)
+{
+    if (src < 1 || src > IN2_MAX_DEV || !sources[src - 1].used ||
+        generation != sources[src - 1].generation) return 0;
+    *kind = sources[src - 1].kind;
+    *origin = sources[src - 1].origin;
+    return 1;
 }

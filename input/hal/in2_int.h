@@ -37,6 +37,25 @@ enum { INPUT_EVENT_SEAMLESS = 0x01 };
 int input_src_register(u8 kind, u8 origin, u16 *generation);
 void input_src_release(u8 src, u16 generation);
 
+/* Native mechanical locks vs shared USB toggle locks (internal origin). */
+enum { INPUT_ORIGIN_NATIVE = 1, INPUT_ORIGIN_USB = 2 };
+enum { INPUT_KIND_KBD = 1, INPUT_KIND_MOUSE = 2, INPUT_KIND_PAD = 3 };
+int input_capture(const InputEvent *event);
+void input_repeat(u8 src, u16 generation, u8 sc);
+int input_key_pressed(u8 sc);
+u8 input_key_mods(void);
+u8 input_buttons(void);
+/* Internal helpers: caller holds irq_save across validation and state update. */
+int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
+void input_state_release(u8 src, u16 generation);
+void input_merge_key(InputEvent *event, u8 old, u8 origin);
+/* Stage 2c / 3a ports: no implementation or device wiring in stage 2b.
+ * Weak references permit both images to link until those stages land. */
+void input_emit_in2(const InputEvent *event) __attribute__((weak));
+void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
+void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
+u32 in2_time_ms(void) __attribute__((weak));
+
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty
  * or absent input is -1. peek does not consume a completed key. */
