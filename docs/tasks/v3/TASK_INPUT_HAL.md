@@ -1,6 +1,6 @@
 # TASK_INPUT_HAL — 入力の HAL と USB HID の共通化
 
-> 状態: **設計中 (2026-11-15)** — 設計は確定、実装は未着手。詳細設計は [INPUT_HAL_DESIGN](../../decisions/INPUT_HAL_DESIGN.md)。
+> 状態: **実装中 (2026-11-15)** — 設計は確定、段 1p・1a・1b は main。詳細設計は [INPUT_HAL_DESIGN](../../decisions/INPUT_HAL_DESIGN.md)。
 > 関係: 票 TASK_AV_HAL (入力の in2・XInput)、票 TASK_ARCH_CTX (実行文脈)、PowerPC の P3 (LAN の SH) はこの票の 1p・1a・1b・4c を前提にする。
 
 ## 0. ユーザー決定 (2026-11-14〜15)
@@ -20,6 +20,7 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| 1p・1a・1b (bridge) | 未着手 (最初に出す) |
+| 1p・1a・1b (bridge) | main (b27213d2・73c8664b・d8d529fb) |
+| 4c-pre・4c | 実装中 (4c は 4b より先、PowerPC P3 ③b のため。順は 4c → P3 ③b → 4b) |
 | 4b-map | U3 の決定まで出さない |
 | その他 | 未着手 |

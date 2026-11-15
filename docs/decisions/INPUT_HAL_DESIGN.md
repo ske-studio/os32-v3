@@ -185,11 +185,11 @@ if (old != down) {
 | 3c[n] | legacy_mode.c（新/変80）、kbd.c（変100）、T_mode（新/変120） | gui_mode/STOP/flush、2段。V86 adapterは既存kbd側 |
 | 3d | drivers/input/kbd_hal.c（新100）、kbd.c（変60）、T_merge（変100） | 本体src登録/capture、旧採取を除去して二重採取ゼロ |
 | 4a | input/hal/usb_input.c（新140）、PPC usb_platform.c（変60）、T_usb（新130） | 2b/3→usbpのkind/src写像・repeat・release。PPC文字入力維持 |
-| 4b | PPC input_usb.c（変160）、input_boot.c（変100）、tools/tests/test_arch_compat.py（変100） | 4a/3b後、共通状態/出口へ。U3までは旧keymap policy維持。CHECK pins=[input-hal/4b,input-hal/4c]、raw/pressed/modsのbit 2/4/8をPASS化しPPC期待15→1、XFAIL表示/変異期待も更新 |
+| 4b | PPC input_usb.c（変160）、input_boot.c（変100）、tools/tests/test_arch_compat.py（変100） | 4a/3b/4c後、PowerPC P3③bがあればその後（input_boot.cは4c→P3③b→4bの直列）。共通状態/出口へ。③bのlocalを共通cooked ringに結び替え、③bで足したUSBの非消費peekを消す。U3までは旧keymap policy維持。raw/pressed/modsのbit 2/4/8をPASS化しPPC期待14→0、XFAIL表示/変異期待を更新、CHECK pins=[input-hal/4b]を外す |
 | 4b-map | platform/powermac/input_keymap.c（削除約70）、tools/tests/ppc_input_usb_host.c（変100）、tools/checks/ver-ppc-input-usb.py（変80） | **U3の決定まで出さない**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
 | 4c-pre | kernel/input_wait.c（新130）、T_wait（新130） | 1b後、待機契約を両archで受入、4cへ結線 |
-| 4c | kernel/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4b/4c-pre後**。PPC像別provider/中断待機とcapture期限を範囲に含め、共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.c:754,792と同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・STOP中断を試験で満たす。bit1をPASS化、PPC期待1→0、CHECK pinsの4c分と変異期待を更新。P3③のinput_boot provider登録は4c後（P3設計側） |
-| 4d[n] | input_wait.c（変80）、kbd.c（変100）、T_wait（変100） | 1b/4c後、x86 wait/parkを4cで先に置いた同じ共通期限規則へ口ごとに2〜3段で載せる |
+| 4c | kernel/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.c:754,792と同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
+| 4d[n] | input_wait.c（変80）、kbd.c（変100）、T_wait（変100） | 1b/4c後、x86 wait/parkを4cで先に置いた同じ共通期限規則へ口ごとに2〜3段で載せる。4bとファイルが重ならず並列可 |
 | 5a | input/hal/mouse_ext.c（新100）、pointer_state.c（新140）、T_pointer（新130） | 2a後、鍵盤移動とは並列可 |
 | 5b | drivers/input/mouse_hal.c（新130）、mouse_bus.c（変30）、T_pointer（変100） | IRQ採取を一度に限定 |
 | 5c[n] | mouse.c（変100）、pointer_state.c（変80）、T_pointer（変100） | 座標/bounds/差分を2段移動。描画backendはmouse.cに残す |
@@ -240,7 +240,7 @@ if (old != down) {
 - なし（0件）。
 ## 確定 (2026-11-15、Opus 第 2 回・PowerPC PM の意見・PM 決定を反映)
 - S1: 段0/文書0を削除、mainのT1bとAVの16源契約を既存基準として参照。
-- S2: 4b/4cにtest_arch_compat.pyを割当、pinsとXFAIL→PASS（15→1→0）の更新を明記。
+- S2: 4b/4cにtest_arch_compat.pyを割当、pinsとXFAIL→PASS（15→14→0、4c→4bの順）の更新を明記。
 - S3(b): 4b-mapで旧keymap直呼び試験/実行器を改訂し、pinsとU3に従って期待を更新。
 - S3(a): CTRL+CはU3でユーザー判断待ち。案AをPM推奨とし、4b-mapを保留。
 - S4: USB全体の共通反転bitと本体の機械式bitをOR、複数USB・抜去の期待を修正。
@@ -251,5 +251,5 @@ if (old != down) {
 - H4: park_kbdとpark_pollの成立時非復帰・再開値・不成立時returnを明記。
 - H6: GUI localの-1/parkなしとgetkey_waitのserial非読取をfixture化。
 - H5: 指摘取り下げ。capture期限は待機開始基準、FREEZE維持、期限後CR/ESC、通知例外なし。
-- 依存: 4cは1b後、PowerPC P3③のprovider登録は4c後に置く。
+- 依存: 4cは1b・4c-pre後（4bに依らない）、PowerPC P3③bは4c後・4b前（input_boot.cは4c→③b→4bの直列）。
 - H7: 4cで共通待機のcapture期限規則を先に置きPPCの期限・CR/ESC・FREEZE・STOPを完了条件化。現PPCの期限なしを§1に記載し、4dはx86を同じ規則へ接続、各待機30秒/全体host上限を明記。
