@@ -180,24 +180,19 @@ def accept(elf, cpu, out, mutation='normal'):
         (out/'boot1-terminal.log').write_bytes(s.display.getvalue())
         s.previous = s.display.getvalue()
         s.stop()
-        if mutation == 'no-boot-follow':
-            # The host still adopts boot2 (TERM stays usable) but carries the
-            # boot1 FS Server/adapter state and FS nonce across the switch.
-            s.host.fs.reset = lambda: None
-            fs_nonce = s.host.fs_nonce
-            reset_boot = s.host.reset_boot
-            def keep_fs():
-                reset_boot(); s.host.fs_nonce = fs_nonce
-            s.host.reset_boot = keep_fs
         s.start(2)
         readback = result(s.cmd('cat /host/f'), 'cat /host/f')
-        if mutation != 'normal':
+        if mutation == 'tmp-target':
             require(readback.startswith('cat: /host/f: '), 'mutant survived: '+repr(readback))
             s.check('echo alive', 'alive\n')
             s.stop()
             print('RED '+mutation+': boot2 USER shell, cat diagnostic, alive, QEMU rc=0', flush=True)
             return
         require(readback == 'x\ny\n', 'boot2 persisted cat: '+repr(readback))
+        if mutation == 'no-boot-follow':
+            s.check('echo boot2 > /host/f')
+            require((s.root/'f').read_bytes() == b'boot2\n', 'restart write')
+            raise AssertionError('SURVIVED no-boot-follow')
         tmp = result(s.cmd('ls /tmp'), 'ls /tmp')
         require(not tmp.startswith('ls:') and 't' not in tmp.split(), 'tmp survived restart: '+repr(tmp))
         require(s.host.boot != old_boot and old_boot in s.host.retired, 'host did not retire old boot')
@@ -242,12 +237,19 @@ def link_settings(work, mutation=False):
         g_api->kprintf(7, "%s\n", rc == OS32_ERR_STALE ? "stale" : "not stale");
         g_api->sys_close(p5_fd);
     } else if (!strcmp(line, "p5-copy")) {
-        char buf[4096];
+        char buf[1024];
         int src = g_api->sys_open("/host/big", KAPI_O_RDONLY);
         int dst = g_api->sys_open("/host/rw/big2", KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
         int n = -1, ok = src >= 0 && dst >= 0;
-        while (ok && (n = g_api->sys_read(src, buf, sizeof(buf))) > 0)
-            if (g_api->sys_write(dst, buf, n) != n) ok = 0;
+        /* One full READ frame per syscall; bound WRITE RPCs separately. */
+        while (ok && (n = g_api->sys_read(src, buf, sizeof(buf))) > 0) {
+            int off = 0;
+            while (ok && off < n) {
+                int chunk = n - off > 1000 ? 1000 : n - off;
+                if (g_api->sys_write(dst, buf + off, chunk) != chunk) ok = 0;
+                off += chunk;
+            }
+        }
         if (src >= 0) g_api->sys_close(src);
         if (dst >= 0) g_api->sys_close(dst);
         g_api->kprintf(7, "%s\n", ok && n == 0 ? "copied" : "copy failed");
@@ -453,8 +455,16 @@ def main():
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     for cpu in cpus: accept(elf, cpu, work/cpu)
     if args.mutate:
-        for mutation in ('no-boot-follow', 'tmp-target'):
-            accept(elf, cpus[0], work/mutation, mutation)
+        from kboot_accept import mutant_settings
+        mutant = work/'nonce-copy'; mutant.mkdir()
+        changed = build(mutant/'kernel', 'KBOOT_SH=1',
+                        *mutant_settings(mutant, 'nonce', *LINK_NONCE))
+        accept(elf, cpus[0], work/'tmp-target', 'tmp-target')
+        try: accept(changed, cpus[0], work/'no-boot-follow', 'no-boot-follow')
+        except AssertionError as exc:
+            require(str(exc) == 'restart write', 'unexpected mutation verdict: '+str(exc))
+            print('RED no-boot-follow: restart write', flush=True)
+        else: raise AssertionError('SURVIVED no-boot-follow')
     return 0
 
 

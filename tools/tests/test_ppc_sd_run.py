@@ -80,11 +80,17 @@ def main():
             text = user.read_text()
             for command in ('p5-hold', 'p5-stale', 'p5-copy'):
                 assert text.count('"'+command+'"') == 1
-            assert 'OS32_ERR_STALE' in text and 'char buf[4096]' in text
+            assert 'OS32_ERR_STALE' in text and 'char buf[1024]' in text
             assert len([v for v in opts if v.startswith('KB_MUT_') and 'SRC=' in v]) == (3 if mutate else 2)
             if mutate:
                 copy = Path(next(v.split('=', 1)[1] for v in opts if v.startswith('KB_MUT_THIRD_FILE=')))
                 assert copy.read_text() == (ROOT/path).read_text().replace(before, after)
+    from kboot_accept import mutant_settings
+    with tempfile.TemporaryDirectory() as folder:
+        opts = mutant_settings(Path(folder), 'nonce', *meter.LINK_NONCE)
+        copy = Path(next(v.split('=', 1)[1] for v in opts if v.startswith('KB_MUT_FILE=')))
+        assert copy.read_text() == (ROOT/path).read_text().replace(before, after)
+    assert 's.host.fs.reset = lambda' not in Path(meter.__file__).read_text()
     if '--mutate' in sys.argv:
         source = Path(meter.__file__).read_text()
         for old, new in (('data == expected', 'True'), ('actual == expected', 'True'),
