@@ -44,7 +44,7 @@ def main():
             (work/'console.c').write_text(text)
             exe=work/'test'
             flags=['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror','-Wno-unused-function',
-                   '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector','-nostdlib','-static']
+                   '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector','-nostdlib','-nostdinc','-static']
             flags += ['-I'+str(ROOT/x) for x in ('gfx','gfx/v2','include','mm','lib','arch/x86','sdk/include/os32')]
             host32.build(flags+['-I'+str(work),str(work/'console.c'),str(ROOT/'gfx/v2/surface.c'),
                                str(ROOT/'tools/tests/gfx_console_host.c'),'-o',str(exe)],check=True)
@@ -87,7 +87,7 @@ def contract(work, mutate):
         exe=work/'contract'
         host32.build(['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror',
             '-Wno-unused-function','-ffreestanding','-fno-builtin','-fno-pie',
-            '-no-pie','-fno-stack-protector','-nostdlib','-static',
+            '-no-pie','-fno-stack-protector','-nostdlib','-nostdinc','-static',
             '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
             '-I'+str(work),'-I'+str(ROOT/'gfx/v2'),*include_flags(ROOT),
             str(work/'console.c'),str(work/'fbcon.c'),
