@@ -41,16 +41,18 @@ void mouse_hal_seamless_init(void)
 /* Foreground poll until the stage-B tick wiring is available. One device read. */
 void mouse_hal_seamless_poll(void)
 {
-    unsigned f = irq_save();
     i16 x, y;
     if (seamless_hal_src) {
         u32 time_ms = in2_time_ms();
-        if (seamless_mouse_poll(&x, &y))
+        int sampled = seamless_mouse_poll(&x, &y);
+        u8 buttons = mouse_read_buttons();
+        unsigned f = irq_save();
+        if (sampled)
             mouse_ext_sample(seamless_hal_src, seamless_hal_generation, x, y, time_ms);
         InputEvent e = { .src = seamless_hal_src, .generation = seamless_hal_generation,
                          .time_ms = time_ms, .type = INPUT_EVENT_BUTTON,
-                         .buttons = mouse_read_buttons() };
+                         .buttons = buttons };
         input_capture(&e);
+        irq_restore(f);
     }
-    irq_restore(f);
 }
