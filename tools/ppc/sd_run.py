@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build
+from kboot_accept import build, mutant_settings
 from kboot_run import ROM, QMP, command, require, serial, validate, lan
 
 CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=[],
@@ -180,19 +180,24 @@ def accept(elf, cpu, out, mutation='normal'):
         (out/'boot1-terminal.log').write_bytes(s.display.getvalue())
         s.previous = s.display.getvalue()
         s.stop()
+        if mutation == 'no-boot-follow':
+            # The host still adopts boot2 (TERM stays usable) but carries the
+            # boot1 FS Server/adapter state and FS nonce across the switch.
+            s.host.fs.reset = lambda: None
+            fs_nonce = s.host.fs_nonce
+            reset_boot = s.host.reset_boot
+            def keep_fs():
+                reset_boot(); s.host.fs_nonce = fs_nonce
+            s.host.reset_boot = keep_fs
         s.start(2)
         readback = result(s.cmd('cat /host/f'), 'cat /host/f')
-        if mutation == 'tmp-target':
+        if mutation != 'normal':
             require(readback.startswith('cat: /host/f: '), 'mutant survived: '+repr(readback))
             s.check('echo alive', 'alive\n')
             s.stop()
             print('RED '+mutation+': boot2 USER shell, cat diagnostic, alive, QEMU rc=0', flush=True)
             return
         require(readback == 'x\ny\n', 'boot2 persisted cat: '+repr(readback))
-        if mutation == 'no-boot-follow':
-            s.check('echo boot2 > /host/f')
-            require((s.root/'f').read_bytes() == b'boot2\n', 'restart write')
-            raise AssertionError('SURVIVED no-boot-follow')
         tmp = result(s.cmd('ls /tmp'), 'ls /tmp')
         require(not tmp.startswith('ls:') and 't' not in tmp.split(), 'tmp survived restart: '+repr(tmp))
         require(s.host.boot != old_boot and old_boot in s.host.retired, 'host did not retire old boot')
@@ -212,7 +217,6 @@ def accept(elf, cpu, out, mutation='normal'):
         print(f'{cpu} LAN S-D PASS absence={elapsed:.3f}s', flush=True)
     finally:
         s.close()
-
 
 
 # Link acceptance reuses the existing QMP/RSHELL/HostAgent mechanism. PLN1
@@ -455,16 +459,17 @@ def main():
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     for cpu in cpus: accept(elf, cpu, work/cpu)
     if args.mutate:
-        from kboot_accept import mutant_settings
-        mutant = work/'nonce-copy'; mutant.mkdir()
-        changed = build(mutant/'kernel', 'KBOOT_SH=1',
-                        *mutant_settings(mutant, 'nonce', *LINK_NONCE))
+        # The guest's per-boot SFS nonce (boot_token CRC32) is the protection
+        # now; the host's PLN1 fs.reset is a second one. no-boot-follow removes
+        # both: the host keeps boot1 FS state (accept) and this private product
+        # copy restarts the nonce at 1 every boot, as before 41728e43.
+        follow = work/'no-boot-follow'; follow.mkdir()
+        fixed_nonce = build(follow/'kernel', 'KBOOT_SH=1', *mutant_settings(
+            follow, 'fixed-nonce', 'fs/serialfs/serialfs_persistent.c',
+            'nonce = sfs_crc32(token, sizeof(token));',
+            'nonce = 0; (void)token;'))
+        accept(fixed_nonce, cpus[0], follow/'guest', 'no-boot-follow')
         accept(elf, cpus[0], work/'tmp-target', 'tmp-target')
-        try: accept(changed, cpus[0], work/'no-boot-follow', 'no-boot-follow')
-        except AssertionError as exc:
-            require(str(exc) == 'restart write', 'unexpected mutation verdict: '+str(exc))
-            print('RED no-boot-follow: restart write', flush=True)
-        else: raise AssertionError('SURVIVED no-boot-follow')
     return 0
 
 
