@@ -505,7 +505,7 @@ void kbd_init(void)
     {
         int i;
         for (i = 0; i < KBD_BITMAP_BYTES; i++) kbd_key_pressed[i] = 0;
-        kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
+        legacy_raw_flush();
     }
 
     /* キーボードIRQを有効化 */
@@ -764,21 +764,7 @@ void kbd_discard_stop(void)
     u32 flags = irq_save();
     kbd_stop_suppressed = kbd_gui_mode;
     kbd_stop_tick = tick_count;
-    int n = kbd_raw_count;
-    int read = kbd_raw_head;
-    int write = read;
-    int kept = 0;
-    while (n-- > 0) {
-        u16 raw = kbd_raw_buf[read];
-        read = (read + 1) % KBD_BUF_SIZE;
-        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
-            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;
-        kbd_raw_buf[write] = raw;
-        write = (write + 1) % KBD_BUF_SIZE;
-        kept++;
-    }
-    kbd_raw_tail = write;
-    kbd_raw_count = kept;
+    legacy_raw_discard_stop();
     irq_restore(flags);
 }
 
@@ -821,16 +807,14 @@ void kbd_set_gui_mode(int on)
          * gshell は last_kbd_dropped=0 から差分を取るので、前回セッションや
          * CUI 中の cooked drop が最初の取り込みで偽の OVERFLOW になっていた。 */
         legacy_cooked_reset_dropped();
-        kbd_raw_dropped = 0;
+        legacy_raw_reset_dropped();
     }
     legacy_cooked_flush();
     /* raw リングも空にする。raw は WM しか読まないので、CUI 中の打鍵 (rshell を
      * 閉じた ESC 等) が残ったまま次の gshell に届き、起動直後に ESC で終了して
      * しまう (2026-09-06 実測: os32gui の直後に CUI へ戻る)。GUI → CUI の
      * 向きも同様に、次回の gshell へ古い打鍵を持ち越さない。 */
-    kbd_raw_head  = 0;
-    kbd_raw_tail  = 0;
-    kbd_raw_count = 0;
+    legacy_raw_flush();
     irq_restore(flags);
     /* ポーリング型 yield の間引き (票 T8 §7 D8) もセッションの境界で戻す。
      * 錠の外で呼ぶ — 触るのは exec/appslot.c の 1 語で、IRQ1 は見ない。 */
@@ -840,7 +824,7 @@ void kbd_set_gui_mode(int on)
 /* 待ち行列が満杯で捨てた打鍵の累計を返す (契約 T3、GUI v1.1 の KAPI)。 */
 u32 kbd_dropped_count(void)
 {
-    return legacy_cooked_dropped() + kbd_raw_dropped;
+    return legacy_cooked_dropped() + legacy_raw_dropped();
 }
 
 int kbd_getchar(void) { return kbd_getchar_wait(0); }

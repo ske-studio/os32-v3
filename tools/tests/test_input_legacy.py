@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cooked ring against the fixed pre-move oracle, without host libc."""
+"""Legacy rings against the pre-move oracle at the designed capacity, without host libc."""
 CHECK = dict(name='input-legacy-host', tier=1, budget=3, needs=[], kind='characterization',
     covers=['input/hal/legacy_ring.c', 'input/hal/in2_int.h', 'drivers/input/*.h',
             'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**',
@@ -36,7 +36,7 @@ def run(ctx):
                 assert execute(source.replace(old,new,1))==1, old
                 print('RED runtime: '+old, flush=True)
                 assert execute(source)==0
-        print('PASS cooked oracle: empty/single/full/wrap/dropped/peek/flush/IRQ', flush=True)
+        print('PASS raw/cooked oracle: empty/single/full/wrap/dropped/peek/flush/IRQ', flush=True)
     return 0
 if __name__ == '__main__':
     sys.exit(run(SimpleNamespace(root=ROOT, mutate='--mutate' in sys.argv)))

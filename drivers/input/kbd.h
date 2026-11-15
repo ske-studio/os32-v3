@@ -52,7 +52,7 @@
 #define KBD_IRQ          1       /* キーボードIRQ */
 
 /* ======== キーバッファ ======== */
-#define KBD_BUF_SIZE  32
+#define KBD_BUF_SIZE  128
 #define KBD_RSHELL_TIMEOUT_SEC 30  /* 遠隔セッションがキー待ちで止まらないための上限 */
 
 /* ======== 公開API ======== */

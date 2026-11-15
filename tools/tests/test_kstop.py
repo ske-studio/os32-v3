@@ -460,6 +460,7 @@ def run(overrides=None):
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
     code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
+    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_discard_stop') + '\n'
     code += function(kbd, 'kbd_discard_stop') + '\n'
     code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
     code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
@@ -505,7 +506,7 @@ MUTATIONS = [
  ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
- ('raw-stop-retained','drivers/input/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
+ ('raw-stop-retained','input/hal/legacy_ring.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',

@@ -37,13 +37,13 @@ void legacy_cooked_flush(void) { kbd_head = kbd_tail = kbd_count = 0; }
 void legacy_cooked_reset_dropped(void) { kbd_dropped = 0; }
 u32 legacy_cooked_dropped(void) { return kbd_dropped; }
 
-volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
-volatile int kbd_raw_head = 0;
-volatile int kbd_raw_tail = 0;
-volatile int kbd_raw_count = 0;
+static volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
+static volatile int kbd_raw_head = 0;
+static volatile int kbd_raw_tail = 0;
+static volatile int kbd_raw_count = 0;
 /* raw リング満杯で捨てた生イベント数 (レビュー ①)。GUI の取りこぼし検出用に
  * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
-volatile u32 kbd_raw_dropped = 0;
+static volatile u32 kbd_raw_dropped = 0;
 
 void legacy_raw_push(int keycode, int is_break, int kbd_shift_state)
 {
@@ -70,3 +70,25 @@ int legacy_raw_take(void)
     RING_DEQUEUE(entry, kbd_raw_buf, kbd_raw_head, kbd_raw_count, KBD_BUF_SIZE);
     return (int)entry;
 }
+
+void legacy_raw_discard_stop(void)
+{
+    int n = kbd_raw_count;
+    int read = kbd_raw_head;
+    int write = read;
+    int kept = 0;
+    while (n-- > 0) {
+        u16 raw = kbd_raw_buf[read];
+        read = (read + 1) % KBD_BUF_SIZE;
+        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
+            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;
+        kbd_raw_buf[write] = raw;
+        write = (write + 1) % KBD_BUF_SIZE;
+        kept++;
+    }
+    kbd_raw_tail = write;
+    kbd_raw_count = kept;
+}
+void legacy_raw_flush(void) { kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0; }
+void legacy_raw_reset_dropped(void) { kbd_raw_dropped = 0; }
+u32 legacy_raw_dropped(void) { return kbd_raw_dropped; }
