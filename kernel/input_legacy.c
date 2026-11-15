@@ -8,6 +8,8 @@ void input_legacy_register(const struct InputLegacyProvider *provider)
     legacy = provider;
 }
 
+const struct InputLegacyProvider *input_legacy_provider(void) { return legacy; }
+
 static int legacy_read(int mode, int peek)
 {
     const struct InputLegacyProvider *p = legacy;

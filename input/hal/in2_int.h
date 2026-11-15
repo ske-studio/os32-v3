@@ -19,9 +19,15 @@ struct InputLegacyProvider {
     int (*terminal_enabled)(void);
     void (*park_poll)(void);
     void (*park_kbd)(int interruptible);
+    u32 (*wait_ticks)(void);
+    u32 (*wait_timeout_ticks)(void); /* 30 seconds in wait_ticks units */
+    int (*capture_active)(void);
+    int (*wait_pending)(void);
+    void (*wait_step)(void); /* foreground work and idle */
 };
 
 void input_legacy_register(const struct InputLegacyProvider *provider);
+const struct InputLegacyProvider *input_legacy_provider(void);
 
 enum { IL_CHAR = 0, IL_KEY = 1, IL_LOCAL_CHAR = 2 };
 int input_legacy_peek(int mode);
