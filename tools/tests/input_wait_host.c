@@ -48,10 +48,8 @@ static int old_gui(int interruptible);
 #define kbd_gui_getbyte old_gui
 #include "old_wait.inc"
 #undef kbd_gui_getbyte
-static u16 kbd_buf[1];
-static unsigned kbd_head;
-static unsigned irq_save(void) { return 0; }
-static void irq_restore(unsigned flags) { (void)flags; }
+int legacy_cooked_take(void) { return local(); }
+int legacy_cooked_peek(void) { return local(); }
 static int serial_peekchar(void) { return serial_value; }
 static int kbd_inject_peek(u8 *b) { *b=(u8)value; return local()>=0; }
 static int exec_park_poll(u32 tick) { (void)tick; return 0; }

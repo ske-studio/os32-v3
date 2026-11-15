@@ -1,3 +1,4 @@
+#include "../../input/hal/legacy_ring.c"
 #include "../../kernel/input_legacy.c"
 #include "../../kernel/input_wait.c"
 /* No device callbacks are registered in this boundary fixture. */

@@ -82,6 +82,23 @@ void input_emit_in2(const InputEvent *event);
 void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
 void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
 
+/* Cooked ring operations; producers and flush callers already hold IRQ exclusion. */
+void legacy_cooked_push(u16 entry);
+int legacy_cooked_take(void);
+int legacy_cooked_peek(void);
+int legacy_cooked_pending(void); /* Number of queued entries. */
+void legacy_cooked_flush(void);
+void legacy_cooked_reset_dropped(void);
+u32 legacy_cooked_dropped(void);
+
+/* Raw operations use the caller's IRQ exclusion. */
+void legacy_raw_discard_stop(void);
+void legacy_raw_flush(void);
+void legacy_raw_reset_dropped(void);
+u32 legacy_raw_dropped(void);
+void legacy_raw_push(int keycode, int is_break, int mods);
+int legacy_raw_take(void);
+
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty
  * or absent input is -1. peek does not consume a completed key. */

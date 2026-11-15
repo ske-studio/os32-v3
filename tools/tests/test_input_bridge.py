@@ -168,8 +168,7 @@ def bridge_cases(ctx, tmp):
         'kbd_trygetchar', 'kbd_trygetkey', 'kbd_trygetchar_local', 'kbd_peekkey'))
     for name in ('kbd_getkey_wait',):
         start = kbd.index('int ' + name + '(int interruptible)\n{')
-        current += '\n' + ('static ' if name == 'kbd_gui_getbyte' else '') + kbd[start:kbd.index('\n}', start)+2]
-    # GUI byte adapter precedes the moved provider.
+        current += '\n' + kbd[start:kbd.index('\n}', start)+2]
     start = kbd.index('static int kbd_gui_trygetbyte(void)')
     current = kbd[start:kbd.index('\n}', start)+2] + '\n' + current
     bridge = (ctx.root / 'kernel/input_legacy.c').read_text()
