@@ -51,10 +51,9 @@ int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy)
 void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
 {
     unsigned f = irq_save();
-    if (x0 <= x1 && y0 <= y1) {
-        xmin = x0; ymin = y0; xmax = x1; ymax = y1;
-        px = clamp(px, xmin, xmax); py = clamp(py, ymin, ymax);
-    }
+    /* Preserve legacy bounds, including reversed ranges and clamp order. */
+    xmin = x0; ymin = y0; xmax = x1; ymax = y1;
+    px = clamp(px, xmin, xmax); py = clamp(py, ymin, ymax);
     irq_restore(f);
 }
 void pointer_position(i16 *x, i16 *y)
