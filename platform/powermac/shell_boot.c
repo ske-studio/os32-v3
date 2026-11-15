@@ -6,6 +6,10 @@
 #include "exec.h"
 #include "kprintf.h"
 #include "kernel/console/console_stream.h"
+#if KBOOT_LINK
+#include "kernel/idle_work.h"
+#include "arch_io.h"
+#endif
 
 static void report(int kind, int code)
 {
@@ -44,8 +48,15 @@ void pm_shell_boot(void)
         report(kind, code);
 #if !KBOOT_LINK
         if (kind != EXEC_KIND_EXITED) break;
+#else
+        /* Restart only after a run (exit or fault). A missing or unloadable
+         * sh.bin must not spin: keep LAN/USB progressing so it can be seen. */
+        if (kind != EXEC_KIND_EXITED && kind != EXEC_KIND_FAULT) break;
 #endif
     }
+#if KBOOT_LINK
+    for (;;) { idle_work_run(); _idle(); }
+#endif
 #if !KBOOT_LINK
     for (;;) pm_terminal_poll();
 #endif

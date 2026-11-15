@@ -74,10 +74,13 @@ int pm_terminal_trygetkey(void) { finish(1); return -1; }
 int exec_run(const char *cmd) {
     CHECK(!different(cmd,"/bin/sh.bin --rshell-lan"));
     CHECK(calls==result && calls==reports);
-    if (++calls==4) finish(0);
+    CHECK(++calls<=3);
     return 0;
 }
-int exec_last_result(int *kind,int *code) { CHECK(calls==result+1); result++; *kind=calls==2 ? EXEC_KIND_FAULT : EXEC_KIND_EXITED; *code=3; return 0; }
+/* Review F1: exit and fault restart; any other result (sh.bin unloadable) stops in idle work. */
+int exec_last_result(int *kind,int *code) { CHECK(calls==result+1); result++; *kind=calls==2 ? EXEC_KIND_FAULT : calls==3 ? 0 : EXEC_KIND_EXITED; *code=3; return 0; }
+void idle_work_run(void) { CHECK(calls==3 && reports==3); finish(0); }
+void arch_cpu_idle(void) { finish(1); } /* _idle (arch_io.h) is never reached */
 void kprintf(u8 color,const char *fmt,...) { (void)color;(void)fmt; CHECK(result==calls); reports++; }
 int kutoa_dec(u32 v,char *s,int n) { (void)v;(void)n; *s='3'; return 1; }
 void console_stream_write(const void *p,u32 n) { (void)p;(void)n; CHECK(result==calls); }
@@ -128,11 +131,16 @@ def selection(tmp, mutate):
         assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','platform/powermac/device_host.c','platform/powermac/usb_boot.c'])
         for flags,out in [(['KBOOT_SH=1'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1'],'shell')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
+        # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
+        recipe=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in recipe.splitlines()[0]
+        plain=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        assert 'link_profile.h' not in plain.splitlines()[0]
         rejected=subprocess.run(['make','-s','-f',str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0
     check(original)
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c','ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c')]:
+        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c','ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
@@ -164,7 +172,8 @@ def main():
         ('boot',(ROOT/'platform/powermac/shell_boot.c').read_text(),BOOT,[
             ('#if !KBOOT_LINK\n    if (pm_console_text_ready())','#if KBOOT_LINK\n    if (pm_console_text_ready())'),
             ('#if !KBOOT_LINK\n        if (kind != EXEC_KIND_EXITED) break;','#if KBOOT_LINK\n        if (kind != EXEC_KIND_EXITED) break;'),
-            ('/bin/sh.bin --rshell-lan','/bin/sh.bin')]),
+            ('/bin/sh.bin --rshell-lan','/bin/sh.bin'),
+            ('if (kind != EXEC_KIND_EXITED && kind != EXEC_KIND_FAULT) break;','(void)0;')]),
         ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/console_log.c').read_text(),OUTPUT,[
             ('    if (con_sink_capture_active()) return;','    ;'),
             ('    console_write(bytes, len, 1);','    console_write(bytes, len, 1); console_write(bytes, len, 1);')])]
