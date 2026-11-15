@@ -10,7 +10,9 @@
 #include "net/host_mailbox.h"
 #include "net/link.h"
 static int ee = 1;
+static u32 idles;
 int _irq_enabled(void) { return ee; }
+void _idle(void) { ++idles; } /* arch_cpu_idle: the FG1 wait sleeps until an interrupt */
 volatile u32 kctx_irq_depth;
 static u32 clock, opens, closes, writes, polls, stalls, status_code = 200;
 static u32 reply_len, reply_pos, body_len, declared;
@@ -160,8 +162,11 @@ static int suite(void)
     reset();
     CHECK(pm_hfs_set_clock(1000000) == 0);
     CHECK(pm_hostfs_io.put_until(0, frame, n, 100) == 0 && !opens);
+    idles = 0;
     for (u32 i = 0; i < 40 && pending; ++i) pm_hostfs_io.idle(0);
     CHECK(!pending && !result && opens == 1 && closes == 1 && writes > 1);
+    /* Each FG1 wait polls once and then sleeps until an interrupt (no spin). */
+    CHECK(idles == polls && idles > 0);
     CHECK(body_len == n);
     for (u32 i = 0; i < n; ++i) CHECK(body[i] == frame[i]);
     for (u32 i = 0; i < reply_len; ++i) CHECK(pm_hostfs_io.get(&pm_hostfs_transport) == reply[i]);
@@ -217,14 +222,14 @@ static int suite(void)
         pm_hostfs_io.idle(0); CHECK(opens == 1);
     }
     reset();
-    ee = 0;
+    ee = 0; idles = 0;
     CHECK(!pm_hostfs_io.can_wait(0));
     CHECK(pm_hostfs_io.put_until(0, frame, n, 100) < 0);
-    pm_hostfs_io.idle(0); CHECK(!polls && !opens);
+    pm_hostfs_io.idle(0); CHECK(!polls && !opens && !idles); /* EE=0: no poll, no sleep */
     ee = 1; kctx_irq_depth = 1;
     CHECK(!pm_hostfs_io.can_wait(0));
     CHECK(pm_hostfs_io.put_until(0, frame, n, 100) < 0);
-    pm_hostfs_io.idle(0); CHECK(!polls && !opens);
+    pm_hostfs_io.idle(0); CHECK(!polls && !opens && !idles); /* IRQ: no poll, no sleep */
     kctx_irq_depth = 0;
     CHECK(pm_hostfs_io.put_until(0, frame, n, 0) == OS32_ERR_TIMEOUT);
     /* CRC, exact length, upper bound and unread-buffer preservation. */

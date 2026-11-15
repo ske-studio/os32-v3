@@ -35,12 +35,15 @@ MUTATIONS = [
     ('oneway', 'if (!length) { finish(0); return; }', 'if (!length) { finish(-1); return; }'),
     # Review F1: the SFS CALL declaration must equal the frame length.
     ('declared length', 'u32 n = tx_len, count = 0, pos = 9;', 'u32 n = tx_len - 1, count = 0, pos = 9;'),
+    # The FG1 wait must sleep until an interrupt, not spin (PM/mainline 2026-11-15).
+    ('wait spins', '    idle_work_run();\n    _idle();\n}', '    idle_work_run();\n}'),
+    ('sleep without guard', '    if (!pm_hfs_can_wait(ctx)) return;\n    idle_work_run();', '    if (!pm_hfs_can_wait(ctx)) { _idle(); return; }\n    idle_work_run();'),
 ]
 def exercise(folder, source, extra=None):
     folder.mkdir()
     (folder / 'io_source.inc').write_text(source)
     (folder / 'io.h').write_text('static inline unsigned int irq_save(void) { return 1; }\nstatic inline void irq_restore(unsigned int f) { (void)f; }\n')
-    (folder / 'arch_io.h').write_text('int _irq_enabled(void);\n')
+    (folder / 'arch_io.h').write_text('int _irq_enabled(void);\nvoid _idle(void);\n')
     exe = folder / 'probe'
     compiler_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
     includes = ['', 'include', 'platform/powermac', 'fs/serialfs', 'fs', 'lib',
