@@ -29,7 +29,6 @@
 #include "kbd_inject.h"   /* K7: GUI 中の打鍵は注入リングから来る */
 #include "kbd_dlog.h"     /* KAPI v67 kbd_diag_log: 受信のたびの記録 */
 
-extern volatile int kbd_gui_mode;
 extern volatile int exec_nest_level;  /* exec/exec.c */
 
 /* 外部: irq_enable (idt.c で定義) */
@@ -69,9 +68,6 @@ extern int exec_park_poll(u32 now_tick);
  * 同じ流儀で extern 宣言する。 */
 extern volatile u32 tick_count;
 
-/* 外部: D8 の間引きの控えを 0 に戻す (exec/appslot.c)。GUI セッションの
- * 境界で、cooked / raw / 注入リングを空にするのと同じ扱いで呼ぶ。 */
-extern void appslot_poll_yield_reset(void);
 
 /* ======== シフトキー状態 ========
  * **書き込むのは kbd_irq_handler (IRQ1 ISR、配りの kbd_deliver を含む) だけ**。ISR は割り込みゲート
@@ -115,12 +111,6 @@ STATIC_ASSERT(KBD_DLOG_BREAK == SCANCODE_BREAK, kbd_dlog_break_matches);
 /* ビット1 = 押下中, ビット0 = 離されている */
 static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
 
-
-/* Join late STOP makes until a new key/button press or 500 ms after ABORTED. */
-#define KBD_STOP_SUPPRESS_TICKS (PIT_HZ / 2)
-volatile int kbd_stop_suppressed = 0;
-static volatile u32 kbd_stop_tick;
-static u8 kbd_stop_mouse_buttons;
 
 /* ======================================================================== */
 /*  スキャンコード → ASCII 変換テーブル                                    */
@@ -374,14 +364,7 @@ static void kbd_deliver(u8 scancode)
      * 溜めると次の gshell に古い打鍵が届き、kbd_raw_dropped も水増しになる
      * (レビュー #3 ③)。 */
     if (kbd_gui_mode) {
-        if ((u32)(tick_count - kbd_stop_tick) >= KBD_STOP_SUPPRESS_TICKS ||
-            (!is_break && keycode != KEY_STOP &&
-             (keycode < KEY_SHIFT || keycode > KEY_CTRL)))
-            kbd_stop_suppressed = 0;
-        /* Filter before both raw enqueue and ring3_abort_request: filtering
-         * only in the WM leaves an IRQ abort_req on the next running app. */
-        if (kbd_stop_suppressed && !is_break && keycode == KEY_STOP &&
-            (kbd_shift_state & SHIFT_CTRL)) return;
+        if (legacy_stop_filter(keycode, is_break, kbd_shift_state)) return;
         legacy_raw_push(keycode, is_break, kbd_shift_state);
     }
 
@@ -732,26 +715,6 @@ int kbd_is_pressed(int scancode)
     return (kbd_key_pressed[scancode / BITS_PER_BYTE] >> (scancode % BITS_PER_BYTE)) & 1;
 }
 
-/* mouse_poll supplies physical button samples, including during WM Pump.
- * Keep a separate history: the WM UI intentionally defers its edges to X3. */
-void kbd_stop_mouse_sample(u8 buttons)
-{
-    u32 flags = irq_save();
-    if (buttons & (u8)~kbd_stop_mouse_buttons)
-        kbd_stop_suppressed = 0;
-    kbd_stop_mouse_buttons = buttons;
-    irq_restore(flags);
-}
-
-/* Preserve order and all non-STOP input, including modifier/break events. */
-void kbd_discard_stop(void)
-{
-    u32 flags = irq_save();
-    kbd_stop_suppressed = kbd_gui_mode;
-    kbd_stop_tick = tick_count;
-    legacy_raw_discard_stop();
-    irq_restore(flags);
-}
 
 /* 生 make/break イベントを 1 件取り出す (レビュー ⑥)。無ければ -1。
  * 戻り値 = keycode | (down << 8) | (mods << KBD_RAW_MOD_SHIFT)。down=1 が押下 (make)、0 が離し

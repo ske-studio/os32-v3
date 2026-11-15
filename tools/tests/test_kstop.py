@@ -459,9 +459,11 @@ def run(overrides=None):
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
     code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
+    mode = read('input/hal/legacy_mode.c')
+    code += function(mode, 'legacy_stop_filter') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
     code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_discard_stop') + '\n'
-    code += function(kbd, 'kbd_discard_stop') + '\n'
+    code += function(mode, 'kbd_discard_stop') + '\n'
     code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
     code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')

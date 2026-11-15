@@ -28,7 +28,9 @@ def run(ctx):
         if ctx.mutate:
             for old,new in [('legacy_cooked_flush();', ';'), ('legacy_raw_flush();', ';'),
                             ('legacy_cooked_reset_dropped();', ';'), ('legacy_raw_reset_dropped();', ';'),
-                            ('if (next == kbd_gui_mode) return;', 'if (0) return;')]:
+                            ('if (next == kbd_gui_mode) return;', 'if (0) return;'),
+                            ('kbd_gui_mode = next;\n    kbd_stop_suppressed = 0;', 'kbd_gui_mode = next;'),
+                            ('flags = irq_save();\n    kbd_gui_mode = next;', 'flags = 0;\n    kbd_gui_mode = next;')]:
                 assert source.count(old) == 1, old
                 assert execute(source.replace(old,new,1)) == 1, old
                 print('RED runtime: '+old, flush=True)

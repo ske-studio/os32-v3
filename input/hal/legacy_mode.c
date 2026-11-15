@@ -1,9 +1,14 @@
 #include "in2_int.h"
 #include "io.h"
+#include "memmap.h"
 #include "../../drivers/input/kbd.h"
 
-extern void appslot_poll_yield_reset(void);
-extern volatile int kbd_stop_suppressed;
+extern volatile u32 tick_count;
+
+#define KBD_STOP_SUPPRESS_TICKS (PIT_HZ / 2)
+volatile int kbd_stop_suppressed = 0;
+static volatile u32 kbd_stop_tick;
+static u8 kbd_stop_mouse_buttons;
 
 /* GUI モード (W1 申し送り ①、K2-B)。WM (gshell) が gui_register した間だけ 1。
  *
@@ -60,3 +65,34 @@ void kbd_set_gui_mode(int on)
     appslot_poll_yield_reset();
 }
 
+
+int legacy_stop_filter(int keycode, int is_break, int mods)
+{
+    if ((u32)(tick_count - kbd_stop_tick) >= KBD_STOP_SUPPRESS_TICKS ||
+        (!is_break && keycode != KEY_STOP &&
+         (keycode < KEY_SHIFT || keycode > KEY_CTRL)))
+        kbd_stop_suppressed = 0;
+    return kbd_stop_suppressed && !is_break && keycode == KEY_STOP &&
+           (mods & SHIFT_CTRL);
+}
+
+/* mouse_poll supplies physical button samples, including during WM Pump.
+ * Keep a separate history: the WM UI intentionally defers its edges to X3. */
+void kbd_stop_mouse_sample(u8 buttons)
+{
+    u32 flags = irq_save();
+    if (buttons & (u8)~kbd_stop_mouse_buttons)
+        kbd_stop_suppressed = 0;
+    kbd_stop_mouse_buttons = buttons;
+    irq_restore(flags);
+}
+
+/* Preserve order and all non-STOP input, including modifier/break events. */
+void kbd_discard_stop(void)
+{
+    u32 flags = irq_save();
+    kbd_stop_suppressed = kbd_gui_mode;
+    kbd_stop_tick = tick_count;
+    legacy_raw_discard_stop();
+    irq_restore(flags);
+}

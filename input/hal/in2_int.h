@@ -82,6 +82,11 @@ void input_emit_in2(const InputEvent *event);
 void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
 void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
 
+extern volatile int kbd_gui_mode;
+extern volatile int kbd_stop_suppressed;
+void appslot_poll_yield_reset(void);
+int legacy_stop_filter(int keycode, int is_break, int mods);
+
 /* Cooked ring operations; producers and flush callers already hold IRQ exclusion. */
 void legacy_cooked_push(u16 entry);
 int legacy_cooked_take(void);

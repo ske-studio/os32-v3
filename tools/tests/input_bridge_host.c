@@ -1,7 +1,8 @@
 /* b27213d2 keyboard selection and the new bridge use identical source queues. */
 #include "types.h"
 #include "in2_int.h"
-static int kbd_gui_mode, rshell_active, capture, serial, injected;
+volatile int kbd_gui_mode;
+static int rshell_active, capture, serial, injected;
 static u16 kbd_buf[2];
 static unsigned kbd_head, kbd_count, parks, polls, serial_reads, halts;
 static volatile u32 tick_count = 123;

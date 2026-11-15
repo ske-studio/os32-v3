@@ -1,7 +1,8 @@
 #include "in2_int.h"
 static u32 now, command_start;
 static int capture, frozen, pending, serial_reads, steps, ready_at, value, toggle_at;
-static int kbd_gui_mode, rshell_active, serial_value = -1, flip_gui;
+volatile int kbd_gui_mode;
+static int rshell_active, serial_value = -1, flip_gui;
 static unsigned trace[2][512], lengths[2], tracing, lane;
 static void mark(unsigned tag) {
     if (!tracing) return;
