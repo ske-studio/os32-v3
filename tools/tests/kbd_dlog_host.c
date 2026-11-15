@@ -107,9 +107,12 @@ int seamless_mouse_init(void) { return 0; }
 int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
 u8 mouse_read_buttons(void) { return stub_mouse_buttons; }
 void mouse_ext_mode(int enabled) { (void)enabled; }
-void mouse_ext_read_legacy(i16 *x, i16 *y) { *x = *y = 0; }
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+{ *dx = *dy = 0; *buttons = stub_mouse_buttons; *x = 319; *y = 199; }
 u8 input_buttons(void) { return stub_mouse_buttons; }
 void pointer_position(i16 *x, i16 *y) { *x = 319; *y = 199; }
+void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1)
+{ *x0 = *y0 = 0; *x1 = 639; *y1 = 399; }
 void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
 { (void)x0; (void)y0; (void)x1; (void)y1; }
 int tvram_reverse_cell(int x, int y) { (void)x; (void)y; return 1; }

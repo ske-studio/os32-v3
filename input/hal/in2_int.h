@@ -61,9 +61,13 @@ void mouse_ext_mode(int enabled);
 int mouse_ext_sample(u8 src, u16 generation, i16 x, i16 y, u32 time_ms);
 void mouse_ext_read(i32 *x, i32 *y);
 void mouse_ext_read_legacy(i16 *x, i16 *y);
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y);
 void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1);
 void pointer_position(i16 *x, i16 *y);
+void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1);
 /* Capture/sample helpers below require IRQs masked and validated input. */
+u8 pointer_buttons_locked(void);
+void pointer_position_locked(i16 *x, i16 *y);
 void mouse_ext_move(i16 x, i16 y, int marked);
 void pointer_absolute_reset(void);
 int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy);

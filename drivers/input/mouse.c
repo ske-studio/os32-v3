@@ -8,7 +8,7 @@
 #include "mouse.h"
 #include "../../input/hal/in2_int.h"
 #include "kbd.h"
-#include "../video/kcg/kcg.h"
+#include "kcg_contract.h"
 #include "../char/np2sysp.h"
 #include "pc98.h"
 #include "io.h"
@@ -23,12 +23,6 @@ static u8  mouse_mode_current = MOUSE_MODE_NONE;
 /* カーソル位置 (画面座標、両モードで使用) */
 static i16 cursor_x;
 static i16 cursor_y;
-
-/* クリッピング領域 */
-static i16 bound_x_min = 0;
-static i16 bound_y_min = 0;
-static i16 bound_x_max = GFX_SCREEN_W - 1;
-static i16 bound_y_max = GFX_SCREEN_H - 1;
 
 /* シームレスモード: 前回の絶対座標 (差分計算用) */
 static i16 prev_abs_x;
@@ -85,12 +79,11 @@ void mouse_poll(MouseState *state)
     u8 buttons = 0;
 
     if (mouse_mode_current == MOUSE_MODE_BUS) {
-        mouse_ext_read_legacy(&dx, &dy);
-        buttons = input_buttons();
-        pointer_position(&cursor_x, &cursor_y);
+        mouse_legacy_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);
 
     } else if (mouse_mode_current == MOUSE_MODE_SEAMLESS) {
-        i16 abs_x, abs_y;
+        i16 abs_x, abs_y, bound_x_min, bound_y_min, bound_x_max, bound_y_max;
+        pointer_get_bounds(&bound_x_min, &bound_y_min, &bound_x_max, &bound_y_max);
         /* シームレス: 絶対座標取得。seamless_mouse_poll は 0..32767 の正規化値
          * (NP21/W の 0..65535 を半分に畳んだもの) を返すので、現在の移動範囲に
          * 比例配分する。決め打ちの 639/399 だと 480 ラインで下端に届かない。 */
@@ -132,14 +125,9 @@ void mouse_poll(MouseState *state)
 void mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 {
     pointer_bounds(x_min, y_min, x_max, y_max);
-    bound_x_min = x_min;
-    bound_y_min = y_min;
-    bound_x_max = x_max;
-    bound_y_max = y_max;
-
-    /* 現在位置をクランプ */
-    cursor_x = clamp16(cursor_x, bound_x_min, bound_x_max);
-    cursor_y = clamp16(cursor_y, bound_y_min, bound_y_max);
+    /* Keep the legacy displayed position in sync until the next poll. */
+    cursor_x = clamp16(cursor_x, x_min, x_max);
+    cursor_y = clamp16(cursor_y, y_min, y_max);
 }
 
 /* ====================================================================== */

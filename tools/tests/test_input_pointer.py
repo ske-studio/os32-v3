@@ -25,7 +25,7 @@ def run(ctx):
     with tempfile.TemporaryDirectory(prefix='input-pointer-') as td:
         tmp = Path(td)
         (tmp/'in2_int.h').write_text((ctx.root/'input/hal/in2_int.h').read_text())
-        (tmp/'io.h').write_text('extern unsigned test_irq;\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq=f; }\nextern unsigned test_inp(unsigned); extern void test_outp(unsigned, unsigned);\n#define inp test_inp\n#define outp test_outp\n')
+        (tmp/'io.h').write_text('extern unsigned test_irq; extern void test_irq_restore(unsigned);\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq_restore(f); }\nextern unsigned test_inp(unsigned); extern void test_outp(unsigned, unsigned);\n#define inp test_inp\n#define outp test_outp\n')
         files = [str(tmp/n) for n in names] + [str(ctx.root/'tools/tests/input_pointer_host.c')]
         def build(texts):
             for name, source in zip(names, texts): (tmp/name).write_text(source)
@@ -55,22 +55,34 @@ def run(ctx):
             extra = '\nvoid ref_mouse_position(i16 *x, i16 *y) { *x = cursor_x; *y = cursor_y; }\n' if n == 'ref_mouse.c' else ''
             (tmp/n).write_text(prefix + adapt_poll(source) + extra)
         poll_source = (ctx.root/'drivers/input/mouse.c').read_text()
-        def build_poll(source, state=sources[4]):
+        def build_poll(source, state=sources[4], ext=sources[3]):
             for n, body in zip(names, sources): (tmp/n).write_text(body)
             (tmp/'pointer_state.c').write_text(state)
+            (tmp/'mouse_ext.c').write_text(ext)
             (tmp/'mouse.c').write_text(adapt_poll(source))
             files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'ref_mouse.c', 'ref_mouse_bus.c']
             subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector', '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')] + [str(tmp/n) for n in files] + [str(ctx.root/'tools/tests/input_poll_host.c'), '-o', str(tmp/'poll')], check=True)
             return host32.run([str(tmp/'poll')], runner='qemu').returncode
         assert build_poll(poll_source) == 0
         if ctx.mutate:
-            for before, after in [('mouse_ext_read_legacy(&dx, &dy);', 'dx = dy = 0;'),
-                                  ('buttons = input_buttons();', 'buttons = 0;'),
-                                  ('pointer_position(&cursor_x, &cursor_y);\n\n', 'cursor_x += dx; cursor_y += dy;\n\n'),
+            for before, after in [('mouse_legacy_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);', 'dx = dy = 0; buttons = 0;'),
                                   ('pointer_bounds(x_min, y_min, x_max, y_max);', '(void)0;')]:
                 assert poll_source.count(before) == 1
                 rc = build_poll(poll_source.replace(before, after)); assert 0 < rc < 128, (before, rc)
                 print('RED runtime poll: '+before, flush=True)
+            for before, after in [('*dx = old_x; *dy = old_y;', '*dx = 0; *dy = 0;'),
+                                  ('*buttons = pointer_buttons_locked();', '*buttons = 0;'),
+                                  ('pointer_position_locked(x, y);', '*x = 0; *y = 0;')]:
+                assert sources[3].count(before) == 1
+                rc = build_poll(poll_source, ext=sources[3].replace(before, after))
+                assert 0 < rc < 128, (before, rc)
+                print('RED runtime snapshot: '+before, flush=True)
+            before = "    unsigned f = irq_save();\n    *dx = old_x; *dy = old_y; old_x = old_y = 0;\n    *buttons = pointer_buttons_locked();\n    pointer_position_locked(x, y);\n    irq_restore(f);"
+            assert sources[3].count(before) == 1
+            after = "    mouse_ext_read_legacy(dx, dy);\n    *buttons = input_buttons();\n    pointer_position(x, y);"
+            rc = build_poll(poll_source, ext=sources[3].replace(before, after))
+            assert 0 < rc < 128, rc
+            print('RED runtime split snapshot', flush=True)
             before = 'xmin = x0; ymin = y0; xmax = x1; ymax = y1;'
             assert sources[4].count(before) == 1
             rc = build_poll(poll_source, sources[4].replace(before, 'if (x0 > x1 || y0 > y1) { irq_restore(f); return; } '+before))
