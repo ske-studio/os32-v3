@@ -69,6 +69,7 @@ void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1);
 u8 pointer_buttons_locked(void);
 void pointer_position_locked(i16 *x, i16 *y);
 void mouse_ext_move(i16 x, i16 y, int marked);
+int pointer_seamless(void);
 void pointer_absolute_reset(void);
 int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy);
 void pointer_move(i16 x, i16 y);

@@ -108,6 +108,8 @@ int bus_mouse_init(void) { return 1; }
 int seamless_mouse_init(void) { return 0; }
 int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
 u8 mouse_read_buttons(void) { return stub_mouse_buttons; }
+void mouse_hal_seamless_init(void) {}
+void mouse_hal_seamless_poll(void) {}
 void mouse_ext_mode(int enabled) { (void)enabled; }
 void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
 { *dx = *dy = 0; *buttons = stub_mouse_buttons; *x = 319; *y = 199; }

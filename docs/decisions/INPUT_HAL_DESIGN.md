@@ -126,7 +126,7 @@ if (old != down) {
 | 本体鍵盤・bus mouseの採取 | IRQで有限capture、CTRL+STOP要求も維持。共通サービス全体をIRQで回さない |
 | USB既存callback | 現行のIRQ/EE=0でもcapture可能。列挙・転送寿命の進行は既存USB契約を維持し、本票だけでtick serviceを移動しない |
 | input_step | AC-CTX-4に従いFG1・IRQ外・非再入、Tier2。件数/時間予算で止めてIO_MORE。通知はio_requestの印だけ |
-| seamless採取 | AVのin2_tickを有限な採取として維持（tickから可）。初回は基準だけ、以後ABSと画素差MOVE。旧pollで再採取しない |
+| seamless採取 | 旧pollの位置で1回だけ採取しmouse_halの口で共通状態へ（PC-98のtick枠7つが満杯のため、tickでの採取への移動は1kHz tickの段B以降）。初回は基準だけ、以後ABSと画素差MOVE。旧pollで再採取しない |
 | GUI配送・文字端末poll・振動送出 | FG1協調点。USB振動はusb_serviceの文脈。IRQ出口からTier2を呼ばない |
 | wait | FG1で条件/中断→予算内pump→再検査→既存idle。IRQ/FG0/lock保持では待たず、不在を無限spinにしない |
 
@@ -193,7 +193,7 @@ if (old != down) {
 | 5a | input/hal/mouse_ext.c（新100）、pointer_state.c（新140）、T_pointer（新130） | 2a後、鍵盤移動とは並列可 |
 | 5b | drivers/input/mouse_hal.c（新130）、mouse_bus.c（変30）、T_pointer（変100） | IRQ採取を一度に限定 |
 | 5c[n] | mouse.c（変100）、pointer_state.c（変80）、T_pointer（変100） | 座標/bounds/差分を2段移動。描画backendはmouse.cに残す |
-| 5d | mouse_hal.c（変90）、mouse.c（変60）、T_pointer（変120） | seamlessのtick採取・旧poll消費除去 |
+| 5d | mouse_hal.c（変90）、mouse.c（変60）、T_pointer（変120） | seamlessを旧pollの位置で1回採取して共通の口へ・旧poll消費除去（tickでの採取は1kHz tickの段B以降） |
 | 5e | usb_input.c（変60）、PPC input_boot.c（変40）、T_usb（変130） | USB mouseを共通口→PointerOps。4b/5a後 |
 | 6a | kernel/input_service.c（変100）、platform/pc98/d2_bind.c（変50）、T_contract（変130） | 共通InputOps/PointerOps登録、旧slotは保持 |
 | 6b | input/hal/input_work.c（新120）、IO登録側1ファイル（変30）、T_context（新130） | Tier2・再入/予算。実依頼時に登録側の現行pathを固定 |

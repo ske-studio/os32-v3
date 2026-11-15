@@ -24,11 +24,6 @@ static u8  mouse_mode_current = MOUSE_MODE_NONE;
 static i16 cursor_x;
 static i16 cursor_y;
 
-/* シームレスモード: 前回の絶対座標 (差分計算用) */
-static i16 prev_abs_x;
-static i16 prev_abs_y;
-static int prev_abs_valid;
-
 /* ====================================================================== */
 /*  クランプ関数                                                           */
 /* ====================================================================== */
@@ -45,12 +40,12 @@ static i16 clamp16(i16 val, i16 lo, i16 hi)
 void mouse_init(void)
 {
     pointer_position(&cursor_x, &cursor_y);
-    prev_abs_valid = 0;
     mouse_ext_mode(0);
 
     /* NP21/W検出 → シームレスモード試行 */
     if (np2_detect()) {
         if (seamless_mouse_init()) {
+            mouse_hal_seamless_init();
             mouse_ext_mode(1);
             mouse_mode_current = MOUSE_MODE_SEAMLESS;
             kprintf(KLOG_LEGACY_GREEN, "[mouse] seamless mode (NP21/W)\n");
@@ -78,33 +73,9 @@ void mouse_poll(MouseState *state)
     i16 dx = 0, dy = 0;
     u8 buttons = 0;
 
-    if (mouse_mode_current == MOUSE_MODE_BUS) {
+    if (mouse_mode_current == MOUSE_MODE_SEAMLESS) mouse_hal_seamless_poll();
+    if (mouse_mode_current != MOUSE_MODE_NONE) {
         mouse_legacy_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);
-
-    } else if (mouse_mode_current == MOUSE_MODE_SEAMLESS) {
-        i16 abs_x, abs_y, bound_x_min, bound_y_min, bound_x_max, bound_y_max;
-        pointer_get_bounds(&bound_x_min, &bound_y_min, &bound_x_max, &bound_y_max);
-        /* シームレス: 絶対座標取得。seamless_mouse_poll は 0..32767 の正規化値
-         * (NP21/W の 0..65535 を半分に畳んだもの) を返すので、現在の移動範囲に
-         * 比例配分する。決め打ちの 639/399 だと 480 ラインで下端に届かない。 */
-        if (seamless_mouse_poll(&abs_x, &abs_y)) {
-            abs_x = (i16)(bound_x_min +
-                          (long)abs_x * (long)(bound_x_max - bound_x_min) / MOUSE_ABS_MAX);
-            abs_y = (i16)(bound_y_min +
-                          (long)abs_y * (long)(bound_y_max - bound_y_min) / MOUSE_ABS_MAX);
-            if (prev_abs_valid) {
-                dx = abs_x - prev_abs_x;
-                dy = abs_y - prev_abs_y;
-            }
-            prev_abs_x = abs_x;
-            prev_abs_y = abs_y;
-            prev_abs_valid = 1;
-
-            cursor_x = clamp16(abs_x, bound_x_min, bound_x_max);
-            cursor_y = clamp16(abs_y, bound_y_min, bound_y_max);
-        }
-        /* ボタンは8255ポートAから直接読取 (両モード共用) */
-        buttons = mouse_read_buttons();
     }
 
     kbd_stop_mouse_sample(buttons);
