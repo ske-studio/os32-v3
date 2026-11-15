@@ -32,6 +32,10 @@ MUTATIONS = (
     ('net/nic.c', 'if (!batch_depth++)', 'if (++batch_depth)'),
     ('net/nic.c', 'if (!ticking) return 0;', 'return 0;'),
     ('net/nic.c', 'if (link_due && bound)', 'if (0 && link_due && bound)'),
+    ('net/nic.c', 'if (bound && ticking) poll_due = 1;', 'if (bound && ticking) poll_due = 0;'),
+    ('net/nic.c', 'if (poll_due && bound)', 'if (0 && poll_due && bound)'),
+    ('net/nic.c', '        poll_due = 0;\n        bound->poll();\n        net_rx_schedule();\n    }',
+     '        poll_due = 0;\n        bound->poll();\n        bound->poll();\n        net_rx_schedule();\n    }'),
     ('net/nic.c', '(u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES', '1'),
     ('net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557] ||\n                (LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]))', 'owner'),
     ('net/nic.c', 'if (idle) last_idle_jiffy = link_platform_now();', 'if (idle) last_idle_jiffy += 0;'),
@@ -62,7 +66,7 @@ def verify(work, mutation=None, link=False):
     exe = work / 'host'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                     '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
-                    '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+                    '-fno-stack-protector', '-nostdinc', '-nostdlib', '-static', '-no-pie',
                     '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
                     str(ROOT / 'tools/tests/net_rx_work_host.c'), '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work, timeout=5).returncode

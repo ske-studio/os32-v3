@@ -60,7 +60,10 @@ def build_run(work, source):
     src = work / 'nic.c'
     src.write_text(source)
     exe = work / 'nic-test'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
+    compiler_headers = subprocess.check_output(
+        ['gcc', '-print-file-name=include'], text=True).strip()
+    subprocess.run(['gcc', *FLAGS, '-nostdinc', '-isystem', compiler_headers,
+                    '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
