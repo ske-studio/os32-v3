@@ -12,6 +12,9 @@
 
 static u32 generation, last_id, ready_tick;
 static int have_id, ready, attempted;
+/* con_sink_stat's pending is an output argument: never pass NULL. CPL=0 skipped
+ * the KAPI output guard, but a CPL=3 shell (SHELL_AS_APP) is killed for it. */
+static u32 sink_pending;
 static const char *state = REMOTE_STATE_IDLE;
 static u8 result[REMOTE_RESULT_BODY_MAX];
 static u32 result_len;
@@ -316,7 +319,7 @@ int rsh_lan_poll(void)
     if (trace_active) { trace_count = 0; trace_add("notify_consumed"); }
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
     if (rc) return rc;
-    rc = g_api->con_sink_stat(0, &before);
+    rc = g_api->con_sink_stat(&sink_pending, &before);
     if (rc) goto end;
     last_id = id;
     have_id = 1;
@@ -337,7 +340,7 @@ finish:
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_FREEZE);
     if (rc && rc != OS32_ERR_NOSPC) goto end;
     int frozen = rc;
-    rc = g_api->con_sink_stat(0, &after);
+    rc = g_api->con_sink_stat(&sink_pending, &after);
     if (rc) goto end;
     u32 dropped = after - before;
     if (frozen == OS32_ERR_NOSPC && !dropped) dropped = 1;
@@ -362,7 +365,7 @@ end:
          * the existing OUT contract, without submitting/executing gui again. */
         rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
         if (rc) return rc;
-        rc = g_api->con_sink_stat(0, &before);
+        rc = g_api->con_sink_stat(&sink_pending, &before);
         if (rc) goto end;
         g_api->kprintf(ATTR_WHITE, "> %s\n", line);
         g_api->kprintf(ATTR_RED, "os32gui: launch failed (rc=%d)\n", status);

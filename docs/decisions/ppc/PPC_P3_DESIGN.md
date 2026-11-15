@@ -307,5 +307,7 @@ int input_legacy_wait(int mode, int interruptible);
 ### ⑥ で決めたこと
 - 台本は `tools/ppc/link_sh_run.py`。診断像の link_run の観測と 192KiB 閾値を保ち、HostAgent・OperatorSocket・RSHELL/EXECUTE・PumpQMP・USB の既存注入を再利用する。
 - link-SH は heap 高水位 1MiB 未満・割り当て失敗 0。試験用コピーだけに FREEZE の戻り値・END の回数・割り当て失敗の観測変数と USER 自身の fault/UTF-8/容量の刺激を入れる。製品の像へ試験用コマンドを追加しない。
+- link-SH では診断の PDIAG (link_diag、65532) を動かさない (lan_service.c の `#if !KBOOT_SH`)。RSH READY は APP の shell だけが mode=cui で出し、診断の命令は診断像 (KBOOT_LINK だけ) の役目にする。⑥ の受入で、PDIAG の READY (diag) と shell の READY (cui) が同じ boot から交互に出て operator の ready が入れ替わるのを見つけた (本線 PM 了承、2026-11-15)。
+- rshell_lan.c の con_sink_stat の pending は、NULL ではなく受け皿を常に渡す。CPL=3 の APP の shell では KAPI の出力の検査が NULL を拒み、sh.bin が畳まれていた (⑥ の受入で発見、ユーザーと本線 PM の決定で x86 も同じ形にした)。
 - 重い QEMU は `ppc-link-sh-run` の full_only。通常 CI の時間増分は 0、両 CPU の正常・遅延 agent の後で変異を実行する。socket 不可は未 (rc=3)、包みは非必須環境だけ rc=0 に写す。
 - 受入: 未。証拠・PM の実行コマンド・host/像の検査は `/home/hight/os32-tmp/run/ppc-p3-6/RESULT.md`。QEMU と socket の合否は PM が記録する。R1 は不要 (製品の実行モデル・メモリ配置を変更しない)。

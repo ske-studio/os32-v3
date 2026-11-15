@@ -35,6 +35,10 @@ USER = 'userland/shell/rshell_lan.c'
 SINK = 'kernel/console/con_sink.c'
 HEAP = 'mm/kmalloc.c'
 BOOT = 'platform/powermac/shell_boot.c'
+# 110 lines x 81 bytes = 8910 B, just past the 8 KiB sink; each line scrolls the
+# OF framebuffer (~2.7 s under -icount), so allow ~5 minutes plus margin.
+OVERFLOW_LINES = 110
+OVERFLOW_SECONDS = 480
 # Each anchor is checked against the complete source, before observation hooks.
 MUTATIONS = {
     'term-wait': (BOOT, '#if !KBOOT_LINK\n    if (pm_console_text_ready())',
@@ -99,8 +103,8 @@ def settings(work, mutation=None):
         g_api->tvram_clear();
         g_api->sys_write(1, text, sizeof(text)-1);
     } else if (!strcmp(line, "p3-overflow")) {
-        for (int i=0; i<200; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
-    } else (void)execute_command(line);''')
+        for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
+    } else (void)execute_command(line);'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES)))
     sources[SINK] = replace_once(sources[SINK], 'int con_sink_capture(unsigned int op)',
         'volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\nint con_sink_capture(unsigned int op)')
     # This return belongs to capture, not another sink operation.
@@ -212,26 +216,30 @@ class Session:
     def ready(self):
         return self.agent.established and self.agent.operator.ready is not None
 
-    def cmd(self, line, expected=None):
+    def cmd(self, line, expected=None, seconds=20):
         op=self.agent.operator
         ended=self.word('p3_end_count')
-        ident=op.submit('cui',line,'accept',timeout_ms=20000)
+        # A new agent generation restarts IDs at 1: look only at events after this submit.
+        start=len(self.events)
+        ident=op.submit('cui',line,'accept',timeout_ms=max(20000,seconds*1000))
         def outputs():
-            return [e for e in self.events if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
+            return [e for e in self.events[start:] if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
         # Inspect the wire result even when Operator rejects its command echo.
         # Otherwise PRINT duplication would become a generic result timeout.
-        self.wait(lambda: bool(outputs()),'OUT '+line)
+        self.wait(lambda: bool(outputs()),'OUT '+line,seconds)
         if expected is not None: check_body(line,bytes.fromhex(outputs()[0]['body']),expected)
         self.wait(lambda: ident in op.results or (op.pending is not None and
-                  op.pending['state'] in ('done','truncated')),'result '+line)
+                  op.pending['state'] in ('done','truncated')),'result '+line,seconds)
         result=op.results.get(ident) or op.take_result()
         first=self.word('tick_count')
         self.wait(lambda: self.word('tick_count')-first>=100,'END interval',10)
-        events=[e for e in self.events if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
+        events=outputs()
         require(len(events)==1,'one OUT')
         if expected is not None: check_body(line,result['result'],expected)
+        # rshell_set_active is ignored for CPL=3 callers (wrap_rshell_set_active:
+        # ring3_call_from_user), so the APP shell leaves the kernel flag at 0.
         require(self.word('g_capture')==0 and self.word('g_reader')==0xffffffff and
-                self.word('rshell_active')==1 and self.word('boot_serial_mirror')==0 and
+                self.word('rshell_active')==0 and self.word('boot_serial_mirror')==0 and
                 self.word('p3_end_count')==ended+1,'end')
         return result
 
@@ -276,11 +284,17 @@ def cross(tool):
 
 
 def accept(elf,cpu,out,timeout,late=False,verdict=None):
-    s=Session(elf,cpu,out,timeout,late)
+    # The 7450 non-late VM also runs the overflow observation.
+    s=Session(elf,cpu,out,timeout+(OVERFLOW_SECONDS if cpu=='7450' and not late else 0),late)
     try:
         s.start()
         if late:
-            s.wait(lambda: s.word('rshell_active')==1,'APP before delayed agent',60)
+            # The CPL=3 APP shell cannot set rshell_active; a running app slot shows it started.
+            def app_started():
+                # Early in boot the kernel VA may not be readable yet: keep waiting.
+                try: return s.word('g_cur_app')!=0
+                except CriterionFailure: return False
+            s.wait(app_started,'APP before delayed agent',60)
             first=s.word('tick_count')
             s.wait(lambda: s.word('tick_count')-first>=300,'late agent wait',30)
             s.agent_enabled=True
@@ -314,8 +328,13 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         require(chr(0x2422) in screen,'UTF8 FB glyph')
         require('KBOOT' not in screen,'LOG mixed into FB')
         s.keys('echo usb\n')
+        # The last key only queues the line; the APP loop runs it on a later pass.
+        usb_seen=lambda text: '> echo usb' in text and re.search(r'(?m)^usb *$',text)
+        deadline=time.monotonic()+5
         screen=s.screen('usb')
-        require('> echo usb' in screen and re.search(r'(?m)^usb *$',screen),'USB line screen')
+        while not usb_seen(screen) and time.monotonic()<deadline:
+            s.settle(.25); screen=s.screen('usb')
+        require(usb_seen(screen),'USB line screen')
         s.keys('echo half')
         op=s.agent.operator; op.submit('cui','echo deferred','accept')
         s.settle(1)
@@ -327,10 +346,13 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         screen=s.screen('deferred')
         require('> echo half' in screen and '> echo deferred' in screen and
                 screen.index('> echo half') < screen.index('> echo deferred'),'USB before LAN')
-        overflow=s.cmd('p3-overflow')
-        require(overflow['state']=='truncated' and overflow['drop']>0,'result drop')
-        require(s.word('p3_freeze_rc')!=0,'freeze-drop')
-        s.cmd('echo recovered',b'recovered\n')
+        if cpu=='7450' and not late:
+            # Every overflow line scrolls the OF framebuffer, which is slow under
+            # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
+            overflow=s.cmd('p3-overflow',seconds=OVERFLOW_SECONDS)
+            require(overflow['state']=='truncated' and overflow['drop']>0,'result drop')
+            require(s.word('p3_freeze_rc')!=0,'freeze-drop')
+            s.cmd('echo recovered',b'recovered\n')
         # A fault in the APP itself is distinct from a child fault.
         s.agent.notifier.notify_number(RSHELL,EXECUTE,b'00001000 p3-fault\n')
         count=ready_count(); s.settle(4)
