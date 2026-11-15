@@ -69,6 +69,7 @@
     "mm/shlib.c",
     "mm/shm.c",
     "kernel/gui.c",
+    "input/hal/in2_dev.c",
     "kernel/input_legacy.c",
     "kernel/input_wait.c",
     "kernel/input_service.c",
