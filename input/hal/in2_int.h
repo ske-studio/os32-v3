@@ -34,6 +34,14 @@ enum { INPUT_EVENT_KEY = 1, INPUT_EVENT_MOVE = 2, INPUT_EVENT_BUTTON = 3,
        INPUT_EVENT_WHEEL = 4, INPUT_EVENT_PADBTN = 5, INPUT_EVENT_ABS = 6,
        INPUT_EVENT_LOST = 7 };
 enum { INPUT_EVENT_SEAMLESS = 0x01 };
+#define IN2_RING_CAPACITY 128
+#define INPUT_LOST_OVERFLOW 1
+/* LOST: sc=reason, x/y hold the low/high halves of the u32 count. */
+int in2_ring_push(const InputEvent *event);
+int in2_ring_pop(InputEvent *event, u16 *seq);
+u32 in2_ring_dropped(void);
+u32 in2_time_ms(void);
+
 int input_src_register(u8 kind, u8 origin, u16 *generation);
 void input_src_release(u8 src, u16 generation);
 

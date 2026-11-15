@@ -70,6 +70,8 @@
     "mm/shm.c",
     "kernel/gui.c",
     "input/hal/in2_dev.c",
+    "input/hal/in2_ring.c",
+    "input/hal/in2_time.c",
     "kernel/input_legacy.c",
     "kernel/input_wait.c",
     "kernel/input_service.c",
