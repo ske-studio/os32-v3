@@ -695,12 +695,28 @@ static void kbd_legacy_park_poll(void)
 {
     (void)exec_park_poll(tick_count);
 }
+static void kbd_foreground_poll(void);
+static u32 kbd_legacy_wait_ticks(void) { return tick_count; }
+static u32 kbd_legacy_wait_timeout(void) { return KBD_RSHELL_TIMEOUT_SEC * PIT_HZ; }
+static void kbd_legacy_park_kbd(int interruptible)
+{
+    (void)interruptible;
+    (void)exec_park_kbd();
+}
+static void kbd_legacy_wait_step(void)
+{
+    idle_work_run();
+    _halt();
+}
 static const struct InputLegacyProvider kbd_legacy_provider = {
     .terminal_try = serial_trygetchar, .terminal_peek = serial_peekchar,
     .inject_try = kbd_gui_trygetbyte, .inject_peek = kbd_legacy_inject_peek,
     .try_key = kbd_local_trykey, .peek_key = kbd_local_peekkey,
     .gui_active = kbd_legacy_gui, .terminal_enabled = kbd_legacy_terminal_enabled,
-    .park_poll = kbd_legacy_park_poll,
+    .park_poll = kbd_legacy_park_poll, .park_kbd = kbd_legacy_park_kbd,
+    .wait_ticks = kbd_legacy_wait_ticks, .wait_timeout_ticks = kbd_legacy_wait_timeout,
+    .capture_active = con_sink_capture_active, .wait_pending = ring3_wait_pending,
+    .wait_step = kbd_legacy_wait_step, .wait_prepare = kbd_foreground_poll,
 };
 
 #include "kbd_fgpoll.inc"
@@ -745,60 +761,12 @@ int kbd_trygetchar_local(void)
  *  協調型の全体 (gshell と他の 3 本) が動かなくなる (票 §0)。 */
 static int kbd_gui_getbyte(int interruptible)
 {
-    for (;;) {
-        int ch = kbd_gui_trygetbyte();
-        if (ch >= 0) return ch;
-        /* 成立すれば戻らない。戻ってきたのは止められなかったときだけ。 */
-        (void)exec_park_kbd();
-        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */
-        idle_work_run();
-        _halt();
-    }
+    return input_legacy_wait(IL_CHAR, interruptible);
 }
 
 static int kbd_getchar_wait(int interruptible)
 {
-    u16 entry;
-    u32 timeout_ticks;
-    u32 start_tick;
-
-    /* GUI 中は注入リングだけを見る。CUI モード (kbd_gui_mode == 0) の経路は
-     * rshell のタイムアウトは維持する (票 D6)。 */
-    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
-
-    /* 遠隔セッションがキー待ちのアプリで止まらないための上限。 */
-    timeout_ticks = (rshell_active || con_sink_capture_active())
-                  ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ : 0;
-    start_tick = tick_count;
-
-    {
-        for (;;) {
-            kbd_foreground_poll();
-            /* キーボードバッファ */
-            if (kbd_count > 0) {
-                RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count,
-                             KBD_BUF_SIZE);
-                return (int)(entry & 0xFF);
-            }
-
-            /* rshellモード: シリアル入力もチェック */
-            if (rshell_active && !con_sink_capture_active()) {
-                int sch;
-                sch = serial_trygetchar();
-                if (sch >= 0) return sch;
-            }
-
-            if (interruptible && ring3_wait_pending()) return -1;
-            idle_work_run();
-            _halt();
-
-            /* rshellタイムアウト: スペースキーを自動返却 */
-            if (timeout_ticks > 0) {
-                if ((u32)(tick_count - start_tick) >= timeout_ticks)
-                    return con_sink_capture_active() ? '\r' : ' ';
-            }
-        }
-    }
+    return input_legacy_wait(IL_CHAR, interruptible);
 }
 
 /* u16キーコードを返す (上位=スキャンコード, 下位=ASCII)。

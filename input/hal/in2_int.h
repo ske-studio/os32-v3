@@ -24,6 +24,7 @@ struct InputLegacyProvider {
     int (*capture_active)(void);
     int (*wait_pending)(void);
     void (*wait_step)(void); /* foreground work and idle */
+    void (*wait_prepare)(void); /* Optional CUI pre-read work; never called in GUI. */
 };
 
 void input_legacy_register(const struct InputLegacyProvider *provider);
