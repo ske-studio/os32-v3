@@ -37,6 +37,11 @@ void legacy_cooked_flush(void) { kbd_head = kbd_tail = kbd_count = 0; }
 void legacy_cooked_reset_dropped(void) { kbd_dropped = 0; }
 u32 legacy_cooked_dropped(void) { return kbd_dropped; }
 
+/* 生 make/break イベントリング (レビュー ⑥、GUI の Key down/up 用)。
+ * cooked なリング (make のみ、ASCII 化) と別に、全キーの押下/離しを
+ * 順序どおり積む。WM (gshell) が kbd_trygetrawkey() で読み、down=1/0 の
+ * Key イベントを作る。エントリ = keycode | (down << 8)。満杯なら捨て、
+ * 捨てた数は kbd_raw_dropped に数える (kbd_dropped_count は cooked と合算)。 */
 static volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
 static volatile int kbd_raw_head = 0;
 static volatile int kbd_raw_tail = 0;
@@ -45,20 +50,20 @@ static volatile int kbd_raw_count = 0;
  * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
 static volatile u32 kbd_raw_dropped = 0;
 
-void legacy_raw_push(int keycode, int is_break, int kbd_shift_state)
+void legacy_raw_push(int keycode, int is_break, int mods)
 {
     if (kbd_raw_count < KBD_BUF_SIZE) {
         kbd_raw_buf[kbd_raw_tail] = (u16)keycode
                                   | (is_break ? 0 : KBD_RAW_MAKE)
-                                  | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+                                  | (u16)((mods & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
         kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
         kbd_raw_count++;
     } else {
         /* Keep emergency make even when ordinary input filled the ring.
          * Replace the newest entry: earlier input order and head stay intact. */
-        if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
+        if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {
             int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
-            kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+            kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((mods & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
         }
         kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
     }

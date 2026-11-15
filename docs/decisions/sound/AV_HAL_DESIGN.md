@@ -108,7 +108,7 @@
 | 回収の並び (6) snd_owner_exit・(6b) pcm_reclaim | exec/exec_finish.inc:150-157 | (6b) を `snd2_reclaim` に置き換え、(6c) `in2_reclaim` |
 | snd_focus に呼び手の検査は無い | kapi/kapi_generated.c:1910-1913、drivers/sound/fm/snd_engine.c:766-773 | av_focus は呼び手を検査する (P1-6) |
 | WM の識別 `GUI_SHELL_OWNER 1`・`gui_register` は shell 帯だけ | kernel/gui.h:24-34 | 前景を変える権限の判定に使う |
-| raw キー 32 件、満杯でも CTRL+STOP は末尾を置き換え | drivers/input/kbd.h:55、kbd.c:414-427 | 128 件に。同じ作法を WM の退避にも |
+| raw キー 128 件、満杯でも CTRL+STOP は末尾を置き換え | input/hal/legacy_ring.c (入力の HAL 3a) | 同じ作法を WM の退避にも |
 | 本体の鍵盤の配り `kbd_deliver(scancode)` | kbd.c:333 | ここで src 0 として in2 へ (USB の後は kbd_merge_event の頭) |
 | WM の退避 pending_raw と STOP の除去 | userland/gshell/src/input.rs:44-58・360-409 | 境目の掃除に同じ形を使う |
 | WM のマウスの取り込み | input.rs:209・278-281 (`capture`・`release_capture`) | 独占中は配らない |
@@ -379,7 +379,7 @@ int in2_unacquire(void);  int in2_status(IN2_Status *o);
 - リング 128 件、全装置で 1 本。`seq` は積んだ 1 件ごとに +1 (LOST も、u16 で折り返す)。MOVE の合算は末尾が同じ dev の MOVE の時だけ (seq・flags は先の物のまま、time は新しい方)。
 - 満杯: 捨てて `drop_pending++`・`dropped++`。空きが出た最初の積みの前に `LOST{OVERFLOW, count}` を 1 件 (その 1 件で埋まれば、来たイベントは捨てて count に足す)。CTRL+STOP の make は満杯でも末尾を置き換えて残す (kbd.c:421-426 の作法)。
 - 旧前景の喪失: `focus_gen` は前景の交代と独占の境目で +1。アプリは acquire 時の値を覚え、`in2_status` で違えば INPUTLOST (互換層)。新しい前景のリングの先頭には `LOST{FOCUS}`。
-- KBD_BUF_SIZE (kbd.h:55) も 32 → 128 (I6)。
+- KBD_BUF_SIZE は 128 (I6、入力の HAL 3a-3)。
 
 ### 5-3. 独占と WM (I8・S10・P1-7・P1-8)
 ```c

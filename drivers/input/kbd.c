@@ -114,11 +114,6 @@ STATIC_ASSERT(KBD_DLOG_BREAK == SCANCODE_BREAK, kbd_dlog_break_matches);
 /* ビット1 = 押下中, ビット0 = 離されている */
 static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
 
-/* 生 make/break イベントリング (レビュー ⑥、GUI の Key down/up 用)。
- * cooked な kbd_buf (make のみ、ASCII 化) と別に、全キーの押下/離しを
- * 順序どおり積む。WM (gshell) が kbd_trygetrawkey() で読み、down=1/0 の
- * Key イベントを作る。エントリ = keycode | (down << 8)。満杯なら捨てる
- * (WM が追いつく前提。取りこぼしは kbd_dropped と別勘定にしない)。 */
 
 /* GUI モード (W1 申し送り ①、K2-B)。WM (gshell) が gui_register した間だけ 1。
  *

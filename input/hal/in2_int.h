@@ -80,7 +80,7 @@ void legacy_raw_discard_stop(void);
 void legacy_raw_flush(void);
 void legacy_raw_reset_dropped(void);
 u32 legacy_raw_dropped(void);
-void legacy_raw_push(int keycode, int is_break, int kbd_shift_state);
+void legacy_raw_push(int keycode, int is_break, int mods);
 int legacy_raw_take(void);
 
 /* Registered at startup and kept resident. A NULL provider or callback means
