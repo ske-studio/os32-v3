@@ -115,8 +115,8 @@ def build_host(tmp, shim, name, source=HOST_SRC):
 # ---------------------------------------------------------------------------
 MUTATIONS = [
     ("rshell_app_rejection", "userland/shell/rshell.c",
-     '    return SH_STATUS_ERROR;\n#else\n    return cmd_rshell_resident(argc, argv);',
-     '    return cmd_rshell_resident(argc, argv);\n#else\n    return cmd_rshell_resident(argc, argv);'),
+     '    return SH_STATUS_ERROR;\n#else\n    if (argc == 2 && str_eq(argv[1], "lantrace")) {',
+     '    return cmd_rshell_resident(argc, argv);\n#else\n    if (argc == 2 && str_eq(argv[1], "lantrace")) {'),
     # 変異 1: 段 2 の前の姿。strip_quotes が黙って max-1 文字に切る。
     #         → 先頭 255 文字が同じ 2 つの値が「等しい」になる (T1 / U1 / U2)。
     ("compare_truncated", "userland/shell/cmd_script.c",

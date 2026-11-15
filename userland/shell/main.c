@@ -135,6 +135,12 @@ int main(int argc, char **argv, KernelAPI *api)
     shell_cmd_filer_init();
 #endif
 
+#ifdef SHELL_REMOTE_APP
+    rsh_lan_app_init();
+    if (argc > 1 && str_eq(argv[1], "--rshell-lan"))
+        return rsh_lan_app_loop();
+#endif
+
     /* メインループ開始 (ui.c) */
     shell_run(argc > 1 && str_eq(argv[1], "--kcg-unavailable")
               ? "[boot] KCG unavailable -> CUI shell\n" : 0);
