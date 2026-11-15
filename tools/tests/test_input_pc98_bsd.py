@@ -3,7 +3,9 @@
 CHECK = dict(name='input-pc98-bsd-host', tier=1, budget=5, needs=[], kind='contract',
     basis=['INPUT_BIND_DESIGN §1', 'INPUT_BIND_DESIGN §2a', 'INPUT_BIND_DESIGN §6 M0'],
     covers=['tools/tests/test_input_pc98_bsd.py', 'tools/tests/input_pc98_bsd_fixture.kbd',
-            'tools/tests/input_pc98_compat_fixture.h', 'docs/decisions/INPUT_BIND_DESIGN.md'])
+            'tools/tests/input_pc98_compat_fixture.h', 'tools/tests/input_pc98_compat_host.c',
+            'input/hal/kbd_merge.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
+            'docs/decisions/INPUT_BIND_DESIGN.md'])
 from pathlib import Path
 from types import SimpleNamespace
 import html
@@ -143,6 +145,48 @@ def pc98_bsd_verify(root, fixture):
     assert differences == ledger, ('ledger differences', sorted(differences ^ ledger))
 
 
+
+def pc98_bsd_check_legacy_columns(root, tmp, mutate):
+    import host32
+    from kernel_includes import include_flags
+    # Compile the pinned legacy implementation and the current path against the
+    # same literal oracle. Mutants change one expected column, never product code.
+    source = (root/'input/hal/kbd_merge.c').read_text()
+    host = (root/'tools/tests/input_pc98_compat_host.c').read_text()
+    old = subprocess.check_output(['git', 'show', '1b0fa106:input/hal/kbd_merge.c'], cwd=root, text=True)
+    old = old[old.index('static const u8 scancode_to_ascii['):old.index('void input_emit_legacy_repeat')]
+    old = '#include "in2_int.h"\n#include "drivers/input/kbd.h"\n' + old.replace('input_emit_legacy_key(', 'pc98_old_emit(')
+    (tmp/'old.c').write_text(old)
+    (tmp/'current.c').write_text(source)
+    def execute(code):
+        (tmp/'host.c').write_text(code)
+        cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding',
+               '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
+               '-nostdinc', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+               '-I'+str(root/'tools/tests'), '-I'+str(root/'tools/tests/host_arch'),
+               '-I'+str(root/'input/hal'), *include_flags(root)]
+        subprocess.run(cmd+[str(tmp/'current.c'), str(tmp/'old.c'), str(tmp/'host.c'),
+                            '-o', str(tmp/'legacy-test')], check=True)
+        return host32.run([str(tmp/'legacy-test')], runner='qemu', timeout=10).returncode
+    assert execute(host) == 0, 'legacy columns baseline'
+    if mutate:
+        mutants = [
+            ('GRPH column', '{0, 1, 2, 3, 0, 1, 2, 3}, /* no lock */',
+             '{0, 1, 2, 3, 0, 0, 2, 3}, /* no lock */'),
+            ('Kana lock', '{1, 0, 3, 2, 1, 0, 3, 2}, /* Caps+Kana */',
+             '{1, 0, 3, 2, 1, 1, 3, 2}, /* Caps+Kana */')]
+        # The first line occurs in both matrices; target the plain matrix only.
+        for name, anchor, replacement in mutants:
+            target = host
+            if name == 'GRPH column':
+                anchor = 'static const u8 plain_columns[4][8] = {\n        ' + anchor
+                replacement = 'static const u8 plain_columns[4][8] = {\n        ' + replacement
+            assert target.count(anchor) == 1, ('unique anchor', name)
+            assert execute(target.replace(anchor, replacement, 1)) == 1, ('legacy RED', name)
+            print('RED runtime:', name, flush=True)
+        assert execute(host) == 0, 'legacy columns final baseline'
+
+
 def run(ctx):
     source = (ctx.root/'tools/tests/test_input_pc98_bsd.py').read_text()
     fixture = (ctx.root/'tools/tests/input_pc98_bsd_fixture.kbd').read_text()
@@ -155,6 +199,7 @@ def run(ctx):
                                    str(ctx.root), str(tmp/'fixture.kbd')], capture_output=True, text=True)
         result = execute(source, fixture)
         assert result.returncode == 0, result.stderr
+        pc98_bsd_check_legacy_columns(ctx.root, tmp, ctx.mutate)
         if ctx.mutate:
             mutants = [
                 ('cell', 'fixture', "001 '1'", "001 '2'", 'ledger BSD'),
