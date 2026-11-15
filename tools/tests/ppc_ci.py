@@ -88,7 +88,10 @@ def wiring():
         job = flow['jobs']['ppc-qemu']
         assert job['needs'] == 'ppc-compile'
         assert job['timeout-minutes'] >= 60
-        guest = job['steps']
+        # The failure-only diagnostics step prints qemu.stderr; it is not part of the run.
+        guest = [s for s in job['steps'] if s.get('name') != 'PPC QEMU diagnostics']
+        assert any(s.get('name') == 'PPC QEMU diagnostics' and s.get('if') == 'failure()'
+                   for s in job['steps'])
         assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
         if routine:
             assert guest[1] == steps[1]
