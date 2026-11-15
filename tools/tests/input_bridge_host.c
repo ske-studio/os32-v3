@@ -26,6 +26,19 @@ static void _halt(void) {
     if (++halts > 1) __builtin_trap();
     kbd_buf[0]=0x1d61; kbd_head=0; kbd_count=1; injected=0xe3;
 }
+#ifdef CURRENT
+int legacy_cooked_take(void) {
+    u16 entry;
+    if (!kbd_count) return -1;
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    return entry;
+}
+int legacy_cooked_peek(void) {
+    if (!kbd_count) return -1;
+    unsigned f=irq_save(); int entry=kbd_buf[kbd_head]; irq_restore(f);
+    return entry;
+}
+#endif
 #include "selected.inc"
 #ifdef CURRENT
 static int samples, completed = -1;
