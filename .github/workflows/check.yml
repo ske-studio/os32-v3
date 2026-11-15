@@ -232,5 +232,6 @@ jobs:
         if: steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
+          TMPDIR: ${{ runner.temp }}
         run: |
           CHECK_ROUTINE=1 OS32_REQUIRE_PPC=1 MUTATE=0 python3 -B tools/checks/run.py --run all --env qemu-ppc
