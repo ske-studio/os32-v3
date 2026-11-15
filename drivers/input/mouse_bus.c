@@ -13,6 +13,9 @@
 #include "pc98.h"
 #include "io.h"
 
+void mouse_hal_init(void);
+void mouse_hal_capture(i8 dx, i8 dy, u8 raw);
+
 #define MOUSE_COUNTER_NIBBLE_MASK 0x0F
 #define MOUSE_COUNTER_NIBBLE_SHIFT 4
 
@@ -98,6 +101,7 @@ void mouse_irq_handler(void)
     /* 累積に加算 */
     bus_accum_dx += dx;
     bus_accum_dy += dy;
+    mouse_hal_capture(dx, dy, bus_btn_raw);
 }
 
 /* ====================================================================== */
@@ -111,6 +115,8 @@ int bus_mouse_init(void)
     bus_accum_dx = 0;
     bus_accum_dy = 0;
     bus_btn_raw = (MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT); /* 全ボタン解放 (負論理) */
+
+    mouse_hal_init();
 
     /* 8255 モード設定: モード0, PortA入力, PortB入力, PortCH出力, PortCL入力 */
     outp(MOUSE_MODE, MOUSE_8255_MODE_INPUT);
