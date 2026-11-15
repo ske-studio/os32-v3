@@ -2,12 +2,14 @@
 #include "input_usb.h"
 #include "input_boot.h"
 #include "input_service.h"
+#include "input/hal/in2_int.h"
 static const InputOps *ops;
 static int lan[256], ln, lp, polls, locked;
 static u32 now;
 int con_sink_capture_active(void) { return 0; }
 int ring3_wait_pending(void) { return 0; }
-void idle_work_run(void) {}
+static int pending_lan = -1;
+void idle_work_run(void) { if (pending_lan >= 0) { lan[ln++] = pending_lan; pending_lan = -1; } }
 void arch_cpu_idle(void) {}
 void input_register(const InputOps *p) { ops = p; }
 unsigned int irq_save(void) { unsigned f = locked; locked = 1; return f; }
@@ -29,6 +31,7 @@ static void finish(int code)
 static void check(int ok, int code) { if (!ok) { write_text("FAIL\n"); finish(code); } }
 static void tap(u8 src, u8 sc) { pm_input_usb_key(src, sc, 1); pm_input_usb_key(src, sc, 0); }
 static void empty(void) { check(pm_input_usb_take() == -1, 11); }
+static int terminal_on(void) { return 1; }
 static void test(void)
 {
     write_text("START\n");
@@ -86,9 +89,10 @@ static void test(void)
     tap(1,0x1d); pm_input_boot(); /* Registration retains queued input. */
     lan[0]='x'; lan[1]='y'; ln=2;
     int before=polls;
-    check(ops->peekkey()=='a' && ops->peekkey()=='a' && polls==before+1,15);
-    check(ops->trygetkey()=='a',15);
-    tap(1,0x2d); check(ops->trygetchar()=='x' && ops->trygetkey()=='b' && ops->getkey()=='y',15);
+    /* 期待の出所: PPC_P3_DESIGN 末尾の lan-first の PM 決定。 */
+    check(ops->peekkey()=='x' && ops->peekkey()=='x' && polls==before,15);
+    check(ops->trygetkey()=='x',15);
+    tap(1,0x2d); check(ops->trygetchar()=='y' && ops->trygetkey()=='a' && ops->getkey()=='b',15);
     tap(1,0x3a); check(ops->getchar()==0,15);
     check(ops->dropped_count()==1 && !ops->modifiers() && !ops->shift_state() && !ops->is_pressed(0x70),15);
     ln=lp=0; lan[ln++]=27; check(ops->trygetkey()==-1,15);
@@ -96,8 +100,24 @@ static void test(void)
     now=50000; check(ops->getkey()==27,15);
     ln=lp=0;
     for(unsigned i=0;i<64;i++) lan[ln++]=i&1?'\n':'\r';
-    tap(1,0x1d); check(ops->getkey()=='a',15); check(ops->getkey()==13,15);
+    /* 期待の出所: PPC_P3_DESIGN 末尾の lan-first の PM 決定。 */
+    tap(1,0x1d);
+    for(unsigned i=0;i<32;i++) check(ops->getkey()==13,15);
+    check(ops->peekkey()=='a' && ops->peekkey()=='a' && pm_input_usb_peek()=='a',15);
+    check(ops->getkey()=='a',15);
     tap(1,0x2d); check(ops->getkey()=='b',15);
+    /* A waiting reader advances LAN via idle work, never via peek's pump. */
+    pending_lan='z'; check(ops->getkey()=='z' && polls==before,15);
+    const struct InputLegacyProvider *saved = input_legacy_provider();
+    struct InputLegacyProvider probe = *saved;
+    probe.try_key = pm_input_usb_take;
+    probe.terminal_try = pm_terminal_trygetkey;
+    probe.terminal_enabled = terminal_on;
+    input_legacy_register(&probe);
+    lan[ln++]='t'; tap(1,0x1d);
+    check(ops->trygetchar_local()=='a' && lp < ln,15);
+    check(ops->trygetkey()=='t',15);
+    input_legacy_register(saved);
     write_text("PROVIDER\n");
 }
 void _start(void) { test(); finish(0); }

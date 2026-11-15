@@ -26,6 +26,7 @@ static void message(const char *s) { unsigned n=0; while(s[n]) n++; __asm__ vola
 #include "input_service.h"
 #include "lan_boot.h"
 int pm_input_usb_take(void) { return -1; }
+int pm_input_usb_peek(void) { return -1; }
 u32 pm_input_usb_dropped(void) { return 0; }
 volatile u32 tick_count;
 static u32 clock_us, clock_step;

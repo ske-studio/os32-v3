@@ -50,6 +50,7 @@ int ring3_wait_pending(void) { return cancelled; }
 void idle_work_run(void) {}
 void _idle(void) { fake_time += 1000000; }
 int pm_input_usb_take(void) { return take(); }
+int pm_input_usb_peek(void) { return queued; }
 u32 pm_input_usb_dropped(void) { return 0; }
 int pm_terminal_trygetkey(void) { return -1; }
 void pm_terminal_poll(void) {}
@@ -94,8 +95,9 @@ static int input_kapi(void)
     feed('W', 3); REQUIRE(input_getkey_wait(0) == 'W' && polls == 3);
 #ifndef PC98_INPUT
     feed('A', 0); REQUIRE(input_peekkey() == 'A');
-    feed('B', 0); REQUIRE(input_getkey_wait(0) == 'A');
-    REQUIRE(input_getkey_wait(0) == 'B');
+    /* USB peek leaves the product queue intact, without a private copy. */
+    REQUIRE(queued == 'A' && input_getkey_wait(0) == 'A');
+    feed('B', 0); REQUIRE(input_getkey_wait(0) == 'B');
     capture = 1; fake_time = 17000000; feed(-1, 0);
     REQUIRE(input_getchar() == 13 && fake_time == 47000000 && capture);
     REQUIRE(input_getkey_wait(0) == 27 && fake_time == 77000000 && capture);

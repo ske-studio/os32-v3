@@ -13,8 +13,8 @@ CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
             'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
             'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h',
             'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h'],
-    basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5', 'PPC_P3_DESIGN §5 ③b-1'],
-    env_limit='製品USB入力Cの修飾・release・FIFO・公平性を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
+    basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5', 'PPC_P3_DESIGN §5 ③b-2'],
+    env_limit='製品USB入力Cの修飾・release・FIFO・LAN優先を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
 )
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/tests'))
@@ -32,10 +32,11 @@ MUTATIONS = [
     ('repeat-enqueue', 'input_usb.c', '    enqueue(sc); /* Repeat uses the current modifiers. */', '    /* omitted repeat */', 13, 'START\nMAP\n'),
     ('repeat-down', 'input_usb.c', 'if (!down[src - 1][sc]) return;', 'if (0) return;', 11, 'START\nMAP\n'),
     ('full-before-state', 'input_usb.c', '    if (!pressed) { *held = 0; return; }', '    if (count == PM_INPUT_KEYS) return;\n    if (!pressed) { *held = 0; return; }', 14, 'START\nMAP\nSTATE\n'),
-    ('peek-consumes', 'input_boot.c', 'if (lookahead >= 0) return lookahead;', 'if (lookahead >= 0) { int key = lookahead; lookahead = -1; return key; }', 15, 'START\nMAP\nSTATE\nFIFO\n'),
-    ('lan-first', 'input_boot.c', '(last_source + 1 + n) & 1', '(n + 0 * last_source) & 1', 15, 'START\nMAP\nSTATE\nFIFO\n'),
-    ('no-usb', 'input_boot.c', 'source ? pm_input_usb_take() : lan_key()', 'source ? -1 : lan_key()', 15, 'START\nMAP\nSTATE\nFIFO\n'),
-    ('no-lan', 'input_boot.c', 'source ? pm_input_usb_take() : lan_key()', 'source ? pm_input_usb_take() : (0 ? lan_key() : -1)', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('peek-consumes', 'input_boot.c', 'if (lan_lookahead >= 0) return lan_lookahead;', 'if (lan_lookahead >= 0) { int key = lan_lookahead; lan_lookahead = -1; return key; }', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('lan-first', 'input_boot.c', 'return key >= 0 ? key : pm_input_usb_take();', 'int usb = pm_input_usb_take(); return usb >= 0 ? usb : key;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('no-usb', 'input_boot.c', 'return key >= 0 ? key : pm_input_usb_take();', 'return key >= 0 ? key : -1;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('no-lan', 'input_boot.c', 'lan_lookahead = lan_key();', 'lan_lookahead = 0 ? lan_key() : -1;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('local-char-mode', 'input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);', 'return input_legacy_try(IL_CHAR);', 15, 'START\nMAP\nSTATE\nFIFO\n'),
 ]
 # One line per special mapping: remove one case while retaining the others.
 for sc in range(0x39, 0x3f):
