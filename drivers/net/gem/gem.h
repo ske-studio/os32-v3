@@ -229,6 +229,8 @@ int gem_ring_publish(struct gem *);
 int gem_mac_enable_step(struct gem *, unsigned long long now);
 int gem_tx(struct gem *, const void *frame, u32 bytes);
 int gem_tx_reclaim(struct gem *, unsigned long long now, u32 budget);
+#define GEM_RX_SCAN_BUDGET 8u /* gem_rint:974-989: descriptors inspected per poll */
+int gem_rx_some(struct gem *, void *frame, u32 cap, u32 *bytes, u32 *budget);
 int gem_rx(struct gem *, void *frame, u32 cap, u32 *bytes);
 int gem_poll(struct gem *, unsigned long long now, u32 tx_budget);
 #endif

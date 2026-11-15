@@ -12,7 +12,7 @@ static void put64(u8 *p, unsigned long long v)
     for (u32 i = 0; i < 8; i++) p[i] = (u8)(v >> (i * 8));
 }
 
-int gem_rx(struct gem *g, void *frame, u32 cap, u32 *bytes)
+int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
 {
     u8 *base, *desc, *buf, *target;
     u32 slot, producer, length;
@@ -20,10 +20,11 @@ int gem_rx(struct gem *g, void *frame, u32 cap, u32 *bytes)
     int result;
     if (!g || g->state != GEM_STATE_READY || g->ring_publish_step != 3)
         return GEM_EBUSY;
-    if (!frame || !bytes) return GEM_EINVAL;
+    if (!frame || !bytes || !budget) return GEM_EINVAL;
     base = g->dma.cpu;
     /* gem_rint:974-989: inspect at most eight descriptors per poll. */
-    for (u32 seen = 0; seen < 8; seen++) {
+    while (*budget) {
+        (*budget)--;
         slot = g->rx_head;
         desc = base + GEM_POOL_RX_RING + slot * GEM_DESC_SIZE;
         if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) return GEM_EIO;
@@ -64,4 +65,10 @@ int gem_rx(struct gem *g, void *frame, u32 cap, u32 *bytes)
         if (result != GEM_AGAIN) return result;
     }
     return GEM_AGAIN;
+}
+
+int gem_rx(struct gem *g, void *frame, u32 cap, u32 *bytes)
+{
+    u32 b = GEM_RX_SCAN_BUDGET;
+    return gem_rx_some(g, frame, cap, bytes, &b);
 }
