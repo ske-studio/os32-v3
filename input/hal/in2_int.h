@@ -14,6 +14,9 @@ typedef struct InputEvent {
     u8 sc, down, buttons, flags;
 } InputEvent;
 
+/* 16B layout is a target contract (u32 = 4 bytes, include/type_contract.h).
+ * LP64 host shims that compile kbd.c for other tests skip it. */
+#if __SIZEOF_LONG__ == 4
 #define IN2_OFFSET(field, value) STATIC_ASSERT(__builtin_offsetof(InputEvent, field) == value, input_event_##field)
 STATIC_ASSERT(sizeof(InputEvent) == 16, input_event_size);
 IN2_OFFSET(time_ms, 0); IN2_OFFSET(generation, 4);
@@ -29,6 +32,7 @@ IN2_FIELD_SIZE(x, 2); IN2_FIELD_SIZE(y, 2);
 IN2_FIELD_SIZE(sc, 1); IN2_FIELD_SIZE(down, 1);
 IN2_FIELD_SIZE(buttons, 1); IN2_FIELD_SIZE(flags, 1);
 #undef IN2_FIELD_SIZE
+#endif
 
 enum { INPUT_EVENT_KEY = 1, INPUT_EVENT_MOVE = 2, INPUT_EVENT_BUTTON = 3,
        INPUT_EVENT_WHEEL = 4, INPUT_EVENT_PADBTN = 5, INPUT_EVENT_ABS = 6,
