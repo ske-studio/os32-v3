@@ -114,3 +114,8 @@ jobs:
           TMPDIR: ${{ runner.temp }}
         run: |
           OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
+      - name: PPC QEMU diagnostics
+        if: failure()
+        run: |
+          cat /etc/os-release | head -2; qemu-system-ppc --version; ls -l /usr/share/qemu/openbios-ppc || true
+          find "$RUNNER_TEMP" -name 'qemu.stderr' -size +0 -print -exec tail -20 {} \; || true
