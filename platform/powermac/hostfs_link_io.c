@@ -86,7 +86,9 @@ void pm_hfs_link_poll(void)
         do { digits[count++] = (char)('0' + n % 10); n /= 10; } while (n);
         while (count) request[pos++] = digits[--count];
         rc = platform_host_open(request, pos, 0);
-        if (rc == OS32_ERR_AGAIN) return;
+        /* No WDATA has been sent: retry admission within the same deadline. */
+        if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN ||
+            rc == OS32_ERR_FULL) return;
         if (rc < 0) { finish(rc); return; }
         handle = rc;
         phase = HFS_WRITE;

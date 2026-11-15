@@ -55,7 +55,7 @@ static int sfs_status_of(const u8 *p)
     return sfs_status((int)sfs_get32(p));
 }
 
-/* A VFS operation keeps one LAN budget across all chunks/pages. */
+/* LAN_OPERATOR_DESIGN §5: each CALL has its own 1000 ms budget. */
 #define SFS_OPERATION_TICKS 100u
 static int sfs_resident(SfsClient *c)
 {
@@ -97,13 +97,12 @@ static int sfs_path_op(SfsClient *c, u8 type, const char *path)
     u8 pl[SFS_MAX_PAYLOAD];
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen;
     int n, rc;
 
     n = sfs_put_path(pl, (u16)sizeof(pl), path);
     if (n < 0) return OS32_ERR_NAMETOOLONG;
-    rc = sfs_rpc(c, type, pl, (u16)n, &body, &blen, storage, deadline);
+    rc = sfs_rpc(c, type, pl, (u16)n, &body, &blen, storage, sfs_deadline(c));
     if (rc > 0 || (rc == 0 && blen != 0)) return OS32_ERR_IO;       /* 0 以外の正値は契約違反 */
     return rc;
 }
@@ -140,13 +139,12 @@ static int sfs_stat_raw(SfsClient *c, const char *path, u8 *kind,
     u8 pl[SFS_PATH_MAX + 1];
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen;
     int n, rc;
 
     n = sfs_put_path(pl, (u16)sizeof(pl), path);
     if (n < 0) return OS32_ERR_NAMETOOLONG;
-    rc = sfs_rpc(c, SFS_T_STAT, pl, (u16)n, &body, &blen, storage, deadline);
+    rc = sfs_rpc(c, SFS_T_STAT, pl, (u16)n, &body, &blen, storage, sfs_deadline(c));
     if (rc < 0) return rc;
     if (rc != 0 || blen != SFS_STAT_RSP_LEN) return OS32_ERR_IO;
     *kind = body[0];
@@ -205,7 +203,6 @@ static int sfs_list_dir(void *ctx, const char *path, vfs_dir_cb cb,
     VfsDirEntry e;
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen, pos;
     u32 cookie = 0, next;
     int n, rc, pages;
@@ -214,7 +211,7 @@ static int sfs_list_dir(void *ctx, const char *path, vfs_dir_cb cb,
         sfs_put32(pl, cookie);
         n = sfs_put_path(pl + SFS_LIST_REQ_COOKIE_LEN, (u16)(sizeof(pl) - SFS_LIST_REQ_COOKIE_LEN), path);
         if (n < 0) return OS32_ERR_NAMETOOLONG;
-        rc = sfs_rpc(c, SFS_T_LIST, pl, (u16)(SFS_LIST_REQ_COOKIE_LEN + n), &body, &blen, storage, deadline);
+        rc = sfs_rpc(c, SFS_T_LIST, pl, (u16)(SFS_LIST_REQ_COOKIE_LEN + n), &body, &blen, storage, sfs_deadline(c));
         if (rc < 0) return rc;
         if (rc != 0 || blen < SFS_LIST_RSP_COOKIE_LEN) return OS32_ERR_IO;
         next = sfs_get32(body);
@@ -275,7 +272,6 @@ static int sfs_read_stream(void *ctx, const char *path, void *buf,
     u8 *dst = (u8 *)buf;
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen, want, k;
     u32 done = 0;
     int n, rc;
@@ -283,7 +279,7 @@ static int sfs_read_stream(void *ctx, const char *path, void *buf,
     if (size == 0) return 0;
     /* LAN data chunks keep sector boundaries; serial preserves its 508 B. */
     if (sfs_resident(c)) {
-        rc = sfs_ensure_session(deadline);
+        rc = sfs_ensure_session(sfs_deadline(c));
         if (rc != 0) return rc;
     }
     u32 read_max = c->max_payload - SFS_STATUS_LEN;
@@ -296,7 +292,7 @@ static int sfs_read_stream(void *ctx, const char *path, void *buf,
         sfs_put16(pl + SFS_READ_COUNT_OFF, want);
         n = sfs_put_path(pl + SFS_READ_PATH_OFF, (u16)(sizeof(pl) - SFS_READ_PATH_OFF), path);
         if (n < 0) return OS32_ERR_NAMETOOLONG;
-        rc = sfs_rpc(c, SFS_T_READ, pl, (u16)(SFS_READ_PATH_OFF + n), &body, &blen, storage, deadline);
+        rc = sfs_rpc(c, SFS_T_READ, pl, (u16)(SFS_READ_PATH_OFF + n), &body, &blen, storage, sfs_deadline(c));
         if (rc < 0) return rc;
         /* **要求より多く返さない。** 長さ欄と本体の長さも一致させる */
         if ((u32)rc > want || (u32)rc != blen) return OS32_ERR_IO;
@@ -319,7 +315,6 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
     u8 pl[SFS_LAN_MAX_PAYLOAD];
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen, room, chunk, k;
     u32 done = 0;
     int n, rc, first = 1;
@@ -330,7 +325,7 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
     n = sfs_put_path(pl + SFS_WRITE_HDR_LEN, (u16)(sizeof(pl) - SFS_WRITE_HDR_LEN), path);
     if (n < 0) return OS32_ERR_NAMETOOLONG;
     if (sfs_resident(c)) {
-        rc = sfs_ensure_session(deadline);
+        rc = sfs_ensure_session(sfs_deadline(c));
         if (rc != 0) return rc;
     }
     room = (u16)(c->max_payload - SFS_WRITE_HDR_LEN - n);
@@ -341,7 +336,7 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
         sfs_put32(pl, offset + done);
         pl[SFS_WRITE_FLAGS_OFF] = (u8)((first && first_trunc) ? SFS_WF_TRUNC : 0);
         for (k = 0; k < chunk; k++) pl[SFS_WRITE_HDR_LEN + n + k] = src[done + k];
-        rc = sfs_rpc(c, SFS_T_WRITE, pl, (u16)(SFS_WRITE_HDR_LEN + n + chunk), &body, &blen, storage, deadline);
+        rc = sfs_rpc(c, SFS_T_WRITE, pl, (u16)(SFS_WRITE_HDR_LEN + n + chunk), &body, &blen, storage, sfs_deadline(c));
         if (rc < 0) return rc;
         if ((u32)rc != chunk || blen != 0) return OS32_ERR_IO;   /* 書き切れない = 失敗 */
         done += chunk;
@@ -384,7 +379,6 @@ static int sfs_rename(void *ctx, const char *oldp, const char *newp)
     u8 pl[SFS_MAX_PAYLOAD];
     u8 storage[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
-    u32 deadline = sfs_deadline(c);
     u16 blen;
     int a, b, rc;
 
@@ -393,7 +387,7 @@ static int sfs_rename(void *ctx, const char *oldp, const char *newp)
     b = sfs_put_path(pl + a, (u16)(sizeof(pl) - a), newp);
     if (b < 0) return OS32_ERR_NAMETOOLONG;
     rc = sfs_rpc(c, SFS_T_RENAME, pl, (u16)(a + b), &body,
-                 &blen, storage, deadline);
+                 &blen, storage, sfs_deadline(c));
     if (rc > 0 || (rc == 0 && blen != 0)) return OS32_ERR_IO;
     return rc;
 }

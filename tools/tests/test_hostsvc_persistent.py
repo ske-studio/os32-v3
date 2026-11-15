@@ -22,7 +22,7 @@ CHECK = dict(name='hostsvc-persistent', tier=1, needs=[], budget=3.9, covers=[
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
     'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
-    basis=['NET_HOSTSVC_DESIGN §3'],
+    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §3'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
@@ -59,7 +59,8 @@ def build(work, source):
     result = host32.build(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
         '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-        '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+        '-nostdlib', '-nostdinc', '-isystem',
+        subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-static', '-no-pie', '-Wl,--gc-sections',
         '-I' + str(ROOT), *include_flags(ROOT),
         '-DPRODUCT_SOURCE="' + str(source) + '"',
         *[str(ROOT / p) for p in [

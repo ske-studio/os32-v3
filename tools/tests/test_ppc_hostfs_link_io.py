@@ -7,7 +7,8 @@ import tempfile
 import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-hostfs-link-io', tier=1, needs=[], budget=15,
-    env=['ppc-cross'], basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §8'],
+    env=['ppc-cross'], basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §8',
+        'PACK ppc-sfs-deadline PM conditions B/C'],
     covers=['platform/powermac/hostfs_link_io.c', 'tools/tests/ppc_hostfs_link_io.c',
             'tools/tests/test_ppc_hostfs_link_io.py', 'platform/powermac/hostfs_link_peer.c',
             'platform/powermac/hostfs_boot.c',
@@ -23,6 +24,8 @@ CHECK = dict(name='ppc-hostfs-link-io', tier=1, needs=[], budget=15,
             'include/*.h', 'sdk/include/os32/*.h', 'lib/le_internal.h',
             'lib/crc32.[ch]', 'lib/crc32_core.inc', 'tools/tests/host32.py'])
 MUTATIONS = [
+    ('open-hostdown', 'rc == OS32_ERR_HOSTDOWN ||', '0 ||'),
+    ('open-full', 'rc == OS32_ERR_FULL) return;', '0) return;'),
     ('deadline', 'if ((i32)(pm_hfs_now(0) - until) >= 0)', 'if (0)'),
     ('retry identity', 'if (same) return result;', 'if (0 && same) return result;'),
     ('IRQ', 'kctx_irq_depth == 0 && _irq_enabled()', '_irq_enabled()'),
@@ -79,6 +82,7 @@ def main():
             for i, extra in enumerate([
                 ('platform/powermac/hostfs_boot.c', 'if (!rc) rc = sfs_persistent_start(&cfg);', '(void)cfg;'),
                 ('platform/powermac/hostfs_link_peer.c', 'return fixed ? allowed : 0;', 'return 0;'),
+                ('fs/serialfs/serialfs_persistent.c', 'if (!host_valid) reconnect = 1;', 'reconnect = 1;'),
                 ('fs/serialfs/serialfs_persistent.c', 'if (host_valid && host_generation != generation)', 'if (0 && host_valid && host_generation != generation)'),
             ]):
                 assert exercise(work / f'integration{i}', source, extra) == 1, extra[0]

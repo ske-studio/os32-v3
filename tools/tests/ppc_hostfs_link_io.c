@@ -1,4 +1,5 @@
 /* LAN_OPERATOR_DESIGN §5 (:128-132), §8 P4c/hostsvc-init (:217,223).
+ * PACK ppc-sfs-deadline PM condition C: retry only before WDATA.
  * Real transport + SfsClient, fake only host API, IRQ and foreground clock. */
 #include "types.h"
 #include "os32_kapi_shared.h"
@@ -13,7 +14,8 @@ int _irq_enabled(void) { return ee; }
 volatile u32 kctx_irq_depth;
 static u32 clock, opens, closes, writes, polls, stalls, status_code = 200;
 static u32 reply_len, reply_pos, body_len, declared;
-static int auto_reply;
+static int auto_reply, open_error, write_error;
+static u32 open_failures, open_attempts;
 static u32 hellos;
 static void (*registered_work)(void);
 int idle_work_register(void (*fn)(void)) { registered_work = fn; return 0; }
@@ -26,6 +28,8 @@ void idle_work_run(void) { ++polls; ++clock; if (registered_work) registered_wor
 i32 platform_host_open(const char *req, u32 n, int owner)
 {
     (void)owner;
+    ++open_attempts;
+    if (open_failures) { --open_failures; return open_error; }
     if (stall_phase == HFS_OPEN) { ++stalls; return OS32_ERR_AGAIN; }
     if (n < 10 || req[0] != 'S' || req[8] != ' ') return -1;
     /* Review F1: like link_decl_len, the declared length must cover the
@@ -43,6 +47,7 @@ i32 platform_host_open(const char *req, u32 n, int owner)
 i32 platform_host_write(i32 h, const void *buf, u32 n, int owner)
 {
     (void)h; (void)owner;
+    if (write_error && written) return write_error;
     if (stall_phase == HFS_WRITE) { ++stalls; return OS32_ERR_AGAIN; }
     if (n > 7) n = 7;
     if (body_len + n > declared) return OS32_ERR_INVAL; /* link_host_write: len > remain */
@@ -91,6 +96,7 @@ static void reset(void)
     clock = opens = closes = writes = polls = stalls = body_len = 0;
     pm_hostfs_transport.rx_pos = pm_hostfs_transport.rx_end = 0;
     stall_phase = -1; status_code = 200;
+    open_error = write_error = 0; open_failures = open_attempts = 0;
 }
 static u8 notice_heap[64 * sizeof(HostNotice)];
 void *kmalloc(u32 n) { return n == sizeof(notice_heap) ? notice_heap : 0; }
@@ -129,6 +135,9 @@ static int boot_suite(void)
     CHECK(fd >= 3 && hellos == 1 && borrowed->sid == 7);
     CHECK(vfs_seek(fd, 0, SEEK_END) == 2048);
     u32 generation = sfs_persistent_generation();
+    CHECK(host_mailbox_put(1, 3, 1, 0, 0, 1) == 0);
+    CHECK(vfs_seek(fd, 0, SEEK_END) == 2048 && hellos == 1);
+    CHECK(sfs_persistent_generation() == generation);
     CHECK(host_mailbox_put(2, 3, 1, 0, 0, 1) == 0);
     CHECK(vfs_open("/host/a", O_RDONLY) == VFS_ERR_STALE);
     CHECK(sfs_persistent_scope_begin() == 0);
@@ -171,6 +180,41 @@ static int suite(void)
         CHECK(opens == (phase_test == HFS_OPEN ? 0u : 1u));
         CHECK(pm_hostfs_io.put_until(0, frame, n, 1000) < 0);
         pm_hostfs_io.idle(0); CHECK(!pending);
+    }
+    /* Admission failures send no WDATA and may recover within until. */
+    int admission_errors[] = {OS32_ERR_HOSTDOWN, OS32_ERR_FULL};
+    for (u32 e = 0; e < 2; ++e) {
+        reset(); open_error = admission_errors[e]; open_failures = 3;
+        CHECK(pm_hostfs_io.put_until(0, frame, n, 100) == 0);
+        for (int i = 0; i < 3; ++i) {
+            pm_hostfs_io.idle(0);
+            CHECK(pending && !writes && !opens);
+            CHECK(pm_hostfs_io.put_until(0, frame, n, 1000) == 0);
+        }
+        for (int i = 0; i < 40 && pending; ++i) pm_hostfs_io.idle(0);
+        CHECK(!pending && !result && opens == 1 && open_attempts == 4);
+        CHECK(body_len == n && closes == 1);
+        reset(); open_error = admission_errors[e]; open_failures = 1000;
+        CHECK(pm_hostfs_io.put_until(0, frame, n, 25) == 0);
+        for (int i = 0; i < 25; ++i) {
+            pm_hostfs_io.idle(0);
+            CHECK(pm_hostfs_io.put_until(0, frame, n, 1000) <= 0);
+        }
+        CHECK(!pending && result == OS32_ERR_TIMEOUT && !writes && !opens);
+        CHECK(open_attempts == 24 && clock == 25);
+    }
+    reset(); open_error = OS32_ERR_INVAL; open_failures = 1;
+    CHECK(pm_hostfs_io.put_until(0, frame, n, 100) == 0);
+    pm_hostfs_io.idle(0);
+    CHECK(!pending && result == OS32_ERR_INVAL && open_attempts == 1 && !writes);
+    /* A failure after partial WDATA keeps the failed identity; never reopen. */
+    for (u32 e = 0; e < 2; ++e) {
+        reset(); write_error = admission_errors[e];
+        CHECK(pm_hostfs_io.put_until(0, frame, n, 100) == 0);
+        for (int i = 0; i < 40; ++i) pm_hostfs_io.idle(0);
+        CHECK(!pending && result < 0 && writes == 1 && opens == 1 && closes == 1);
+        CHECK(pm_hostfs_io.put_until(0, frame, n, 1000) < 0);
+        pm_hostfs_io.idle(0); CHECK(opens == 1);
     }
     reset();
     ee = 0;
