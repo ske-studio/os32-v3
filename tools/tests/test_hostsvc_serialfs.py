@@ -10,7 +10,7 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
-    'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
+    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
     'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',

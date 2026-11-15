@@ -3,7 +3,7 @@
 CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
     'drivers/block/netcd.c', 'drivers/block/netcd.h', 'drivers/base/dev.h',
     'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
-    'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
+    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
     'net/host_mailbox.h', 'net/nic.h', 'fs/vfs.h',

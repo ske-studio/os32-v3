@@ -221,3 +221,9 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc ? 1 : 0) : "memory");
     __builtin_unreachable();
 }
+
+/* Deterministic boot identity for the virtual guest. */
+void boot_token_get(u8 out[16])
+{
+    for (unsigned int i = 0; i < 16; ++i) out[i] = (u8)(i + 1);
+}
