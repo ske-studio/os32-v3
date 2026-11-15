@@ -100,12 +100,22 @@ def main():
         folder = Path(td)
         harness = folder / 'test.c'
         harness.write_text(HARNESS.replace('APP', str(folder / 'app.c')))
+        # CI has no 32-bit libc headers: shell.h's <string.h> comes from this shim
+        # and -nostdinc keeps every other libc header out (gcc's own stddef etc. stay).
+        (folder / 'string.h').write_text(
+            '#ifndef RSHELL_APP_STRING_SHIM\n#define RSHELL_APP_STRING_SHIM\n#include <stddef.h>\n'
+            'int strcmp(const char *, const char *);\nint strncmp(const char *, const char *, size_t);\n'
+            'size_t strlen(const char *);\nvoid *memcpy(void *, const void *, size_t);\n'
+            'void *memset(void *, int, size_t);\n#endif\n')
+        gcc_include = subprocess.run(['cc', '-m32', '-print-file-name=include'], capture_output=True,
+                                     text=True, check=True).stdout.strip()
         def case(text, expected):
             (folder / 'app.c').write_text(text)
             exe = folder / 'test'
             subprocess.run(['cc', '-m32', '-std=gnu11', '-D__cdecl=', '-DSHELL_REMOTE_APP',
                 '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static',
                 '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+                '-nostdinc', '-isystem', gcc_include, '-I' + str(folder),
                 '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'include'),
                 '-I' + str(ROOT / 'userland/shell'), str(harness),
                 str(ROOT / 'userland/shell/serial_watchdog.c'), '-o', str(exe)], check=True)
