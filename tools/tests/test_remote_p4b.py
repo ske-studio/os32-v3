@@ -111,7 +111,7 @@ def test(path):
             rid += 1
             agent._on_request(rid, 0, line.encode(), sink)
             assert agent.ledger[rid]['resp'][0] == 400
-        # Default policy is RO; both settings use the same peer and root as raw SFS.
+        # SFS CALL defaults to RO.
         ro = mod.HostAgent(b'host!!', file_root=tmp, peer=PEER, quiet=True)
         ro._switch_to(dict(sess=1, epoch=1, mac=PEER))
         agent = ro
@@ -119,11 +119,11 @@ def test(path):
         sid = decode(request(hello)['body']).sid
         denied = request(sfs.encode(sfs.T_WRITE, sid, 1, payload))
         assert struct.unpack('<i', decode(denied['body']).payload)[0] == sfs.ERR_ROFS
-        # Raw Ethernet MARK demux goes through the existing adapter unchanged.
+        # Raw Ethernet MARK frames belong to the separate lanfs_host service.
         raw = b'host!!' + PEER + b'\x88\xb5' + hello
         sink.frames.clear()
         ro.handle(raw.ljust(60, b'\0'), sink)
-        assert len(sink.frames) == 1 and decode(sink.frames[0][14:]).type == sfs.T_HELLO | sfs.T_RESP
+        assert not sink.frames, 'raw SFS answered'
         sink.frames.clear()
         ro.handle(raw[:6] + b'other!' + raw[12:], sink)
         assert not sink.frames
@@ -155,12 +155,19 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ('            return  # raw SFS: no response',
+             '            backend = self._sfs_backend()\n'
+             '            backend.adapter.mac = self.mac\n'
+             '            response = backend.adapter.handle(frame)\n'
+             '            if response is not None:\n'
+             '                out.send(response)\n'
+             '            return', 'raw SFS answered'),
             ('self.sfs_link is None or self._sfs_generation != self.host_generation',
              'True', 'rid lost replay cache'),
             ('and len(payload) > room:', 'and False:', 'length guard removed'),
             ('len(ent["got"]) != ent["decl"]:', 'False:', 'length guard removed'),
             ('        except ValueError:\n            self._answer(rid, ent, HTTP_BAD, b"", None, out)',
-             '        except ValueError:\n            self._sfs_backend().call(ent["got"], self.peer)\n            self._answer(rid, ent, HTTP_BAD, b"", None, out)', 'bad CRC'),
+             '        except ValueError:\n            try:\n                self._sfs_backend().call(ent["got"], self.peer)\n            except ValueError:\n                pass\n            self._answer(rid, ent, HTTP_BAD, b"", None, out)', 'ValueError retried'),
             ('now >= ent["sfs_deadline"]', 'False', 'deadline removed'),
             ('self.now() >= ent["sfs_deadline"]', 'False', 'deadline removed')]
         with tempfile.TemporaryDirectory() as tmp:

@@ -448,15 +448,10 @@ class HostAgent:
     def handle(self, frame, out, pcap=None):
         if pcap:
             pcap.write(frame)
-        # Raw SFS keeps its Ethernet codec; only the complete MARK selects it.
+        # Raw SFS belongs to lanfs_host; the agent serves only SFS CALL.
         if (len(frame) >= ETH_HDR + 3 and frame[12:14] == struct.pack(">H", LINK_ETHERTYPE)
-                and frame[14:17] == SFS_MARK and self.file_root is not None):
-            backend = self._sfs_backend()
-            backend.adapter.mac = self.mac
-            response = backend.adapter.handle(frame)
-            if response is not None:
-                out.send(response)
-            return
+                and frame[14:17] == SFS_MARK):
+            return  # raw SFS: no response
         if len(frame) < ETH_HDR + LINK_HDR:
             self.counts["dropped"] += 1
             return

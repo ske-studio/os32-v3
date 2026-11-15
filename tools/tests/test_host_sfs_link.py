@@ -81,6 +81,11 @@ def exercise(module):
         assert call(sfs.T_BYE, sid, 6) == b''
         assert call(sfs.T_BYE, sid, 6) == b''
         assert backend.server.sid == 0
+        image_sid = decode(backend.call(hello, PEER)).sid
+        missing = decode(call(0x30, image_sid, 1, b'missing'))
+        assert missing.type == 0x30 | sfs.T_RESP
+        assert struct.unpack('<i', missing.payload)[0] == sfs.ERR_NOTFOUND, 'BOPEN differs from raw LAN'
+
         print('baseline PASS')
 
 
@@ -91,21 +96,26 @@ def main():
         anchor = '        response = self.adapter.handle(packet)'
         assert source.count(anchor) == 1
         # The designed mutant: new link calls clear the existing replay state.
-        mutant = source.replace(anchor,
-            '        self.adapter.high_seq = 0\n        self.server.cache_key = None\n' + anchor)
+        mutations = [
+            (anchor, '        self.adapter.high_seq = 0\n        self.server.cache_key = None\n' + anchor,
+             'duplicate write'),
+            ('image=ImageStore({})', 'image=None', 'BOPEN differs from raw LAN')]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp, 'mutant.py')
-            path.write_text(mutant)
-            spec = importlib.util.spec_from_file_location('mutant', path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            try:
-                exercise(module)
-            except AssertionError as exc:
-                assert str(exc) == 'duplicate write', str(exc)
-                print('clear SFS cache per rid RED')
-            else:
-                raise AssertionError('mutant survived')
+            for old, new, marker in mutations:
+                assert source.count(old) == 1
+                path.write_text(source.replace(old, new))
+                spec = importlib.util.spec_from_file_location('mutant', path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                try:
+                    exercise(module)
+                except AssertionError as exc:
+                    assert str(exc) == marker, str(exc)
+                    print(marker, 'RED')
+                else:
+                    raise AssertionError('mutant survived')
+
 
 
 def run(ctx):

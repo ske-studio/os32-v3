@@ -17,6 +17,7 @@ SFS codecs are explicitly little endian; no diagnostic BE payload is decoded.
 import struct
 
 import lanfs_host
+from host_image import ImageStore
 import serialfs_host as sfs
 
 MAX_FRAME = sfs.HDR_LEN + sfs.LAN_MAX_PAYLOAD + sfs.CRC_LEN
@@ -27,7 +28,8 @@ class SfsLink:
     def __init__(self, root, allow_write=(), peer=None):
         self.fs = sfs.HostFS(root, allow_write=allow_write)
         self.server = sfs.Server(self.fs, max_payload=sfs.LAN_MAX_PAYLOAD)
-        self.adapter = lanfs_host.LanServer(_LOCAL_MAC, self.server, peer=peer)
+        self.adapter = lanfs_host.LanServer(_LOCAL_MAC, self.server, peer=peer,
+                                             image=ImageStore({}))
 
     def call(self, frame, source):
         if len(source) != 6:
