@@ -1,5 +1,5 @@
 """Register the PowerPC fd1 stream acceptance."""
-CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget=900, needs=['make:all'],
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget=900, needs=['make:ppc-ci-image'],
              covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c',
@@ -35,7 +35,7 @@ def run(ctx):
     if any(shutil.which(tool) is None for tool in required) or not Path("/usr/share/qemu/openbios-ppc").is_file():
         missing = 'PPC toolchain' if shutil.which(required[0]) is None else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-sh-output: ' + missing + ' unavailable')
-        return 0
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     env = dict(os.environ)
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
@@ -43,4 +43,4 @@ def run(ctx):
     rc = subprocess.call(['python3', '-B', 'tools/ppc/ppc_sh_output.py'] +
                            (['--mutate'] if ctx.mutate else []), cwd=ctx.root, env=env)
 
-    return 0 if rc == 3 else rc
+    return 0 if rc == 3 and os.environ.get('OS32_REQUIRE_PPC') != '1' else rc

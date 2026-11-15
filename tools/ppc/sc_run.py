@@ -354,7 +354,7 @@ def main():
     if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
         print('SKIP ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable')
-        return 0
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     rc = nest_main(args)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     work = Path(tempfile.mkdtemp(prefix='shell-', dir=Path(os.environ['TMPDIR'])/'sc-run'))
@@ -362,7 +362,7 @@ def main():
     print('PASS S-C serial evidence='+str(work), flush=True)
     if not args.serial:
         elf = build(work/'product', 'KBOOT_SH=1')
-        symbols = command(['/home/hight/opt/cross-ppc/bin/powerpc-elf-nm', elf])
+        symbols = command([str(cross/'bin/powerpc-elf-nm'), elf])
         require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in product')
         for cpu in cpus:
             if lan_accept(elf, cpu, work/('product-'+cpu), shell=True): rc = 3

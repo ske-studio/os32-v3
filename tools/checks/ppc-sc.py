@@ -1,5 +1,5 @@
 """Register N01 guest acceptance."""
-CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sc', tier=2, budget=900, needs=['make:kernel'],
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sc', tier=2, budget=900, needs=['make:ppc-ci-image'],
              covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'build/ppc-user.mk', 'build/ppc-kboot.mk',
@@ -27,13 +27,13 @@ def run(ctx):
     import subprocess
     import shutil
     from pathlib import Path
-    # Guest checks remain optional until stage 2 adds QEMU/OpenBIOS.
+    # Local prerequisites are optional; CI requires them.
     required = (str(Path(os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc"))/"bin/powerpc-elf-gcc"),
                 "qemu-system-ppc", "genisoimage")
     if any(shutil.which(tool) is None for tool in required) or not Path("/usr/share/qemu/openbios-ppc").is_file():
         missing = 'PPC toolchain' if shutil.which(required[0]) is None else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-sc: ' + missing + ' unavailable')
-        return 0
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     # The outer x86 check make exports its build paths and compiler flags.
     env = dict(os.environ)
     for key in ("BUILD_OUT", "KERNEL_CFLAGS", "INC_KERNEL", "C_STD",

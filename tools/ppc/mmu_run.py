@@ -101,7 +101,7 @@ def main():
     p.add_argument('--mutate',action='store_true')
     p.add_argument('--mode',type=int,default=0)
     p.add_argument('--timeout',type=int,default=30)
-    p.add_argument('--cross-dir',type=Path,default=Path('/home/hight/opt/cross-ppc'))
+    p.add_argument('--cross-dir',type=Path,default=Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     a=p.parse_args()
     out=ROOT/'build/out/ppc';out.mkdir(parents=True,exist_ok=True)
     (out/'mmu-build.log').write_text(build(ROOT,a.cross_dir,a.stage,a.mode))
