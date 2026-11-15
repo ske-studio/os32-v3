@@ -193,6 +193,10 @@ int rsh_lan_execute(const char *line);
 int rsh_lan_handoff(const char *line);
 /* Returned after the LAN exit reply attempt and capture END. */
 #define RSH_LAN_EXIT 2
+#ifdef SHELL_REMOTE_APP
+void rsh_lan_app_init(void);
+int rsh_lan_app_loop(void);
+#endif
 int rsh_lan_poll(void);
 void rsh_lan_reset(void);
 int rsh_lan_flush(unsigned int id, unsigned int dropped);
