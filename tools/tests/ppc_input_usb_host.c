@@ -108,6 +108,8 @@ static void test(void)
     tap(1,0x2d); check(ops->getkey()=='b',15);
     /* A waiting reader advances LAN via idle work, never via peek's pump. */
     pending_lan='z'; check(ops->getkey()=='z' && polls==before,15);
+    /* Opus N1: a busy peek loop advances LAN through idle work (no getkey/halt). */
+    pending_lan='q'; check(ops->peekkey()=='q' && ops->trygetkey()=='q' && polls==before,15);
     const struct InputLegacyProvider *saved = input_legacy_provider();
     struct InputLegacyProvider probe = *saved;
     probe.try_key = pm_input_usb_take;

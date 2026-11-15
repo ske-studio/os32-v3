@@ -36,6 +36,9 @@ MUTATIONS = [
     ('lan-first', 'input_boot.c', 'return key >= 0 ? key : pm_input_usb_take();', 'int usb = pm_input_usb_take(); return usb >= 0 ? usb : key;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('no-usb', 'input_boot.c', 'return key >= 0 ? key : pm_input_usb_take();', 'return key >= 0 ? key : -1;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('no-lan', 'input_boot.c', 'lan_lookahead = lan_key();', 'lan_lookahead = 0 ? lan_key() : -1;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('peek-no-progress', 'input_boot.c', 'static int peek_key(void) { idle_work_run(); return', 'static int peek_key(void) { return', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('peek-usb-first', 'input_boot.c', 'return key >= 0 ? key : pm_input_usb_peek();', 'int usb = pm_input_usb_peek(); return usb >= 0 ? usb : key;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('peek-pumps', 'input_boot.c', '    int key = lan_peek();\n    return key >= 0 ? key : pm_input_usb_peek();', '    pm_terminal_poll();\n    int key = lan_peek();\n    return key >= 0 ? key : pm_input_usb_peek();', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('local-char-mode', 'input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);', 'return input_legacy_try(IL_CHAR);', 15, 'START\nMAP\nSTATE\nFIFO\n'),
 ]
 # One line per special mapping: remove one case while retaining the others.

@@ -65,7 +65,9 @@ static int character(void) { return input_legacy_wait(IL_CHAR, 0); }
 static int wait_key(int interruptible) { return input_legacy_wait(IL_KEY, interruptible); }
 static int character_kapi(void) { return input_legacy_wait(IL_CHAR, 1); }
 static int key_kapi(void) { return input_legacy_wait(IL_KEY, 1); }
-static int peek_key(void) { return input_legacy_peek(IL_KEY); }
+/* Busy pollers (e.g. a CUI script checking for ESC) never halt, so advance the
+ * foreground work once per peek; idle_work_run refuses EE=0, IRQ and re-entry. */
+static int peek_key(void) { idle_work_run(); return input_legacy_peek(IL_KEY); }
 static int has_key(void) { return peek_key() >= 0; }
 static int pressed(int scancode) { (void)scancode; return 0; }
 static int raw(void) { return -1; }
