@@ -392,9 +392,7 @@ void ppc_kernel_main(void)
             kprintf(KBOOT_ATTR, "FB off step=%s rc=%d\r\n", step, rc);
         }
 #if KBOOT_SH
-#if !KBOOT_LINK
         (void)pm_hostfs_boot(info->tb_hz);
-#endif
         pm_usb_boot(info->tb_hz);
 #if KBOOT_LINK
         int work_rc = idle_work_register(pm_link_service_once);

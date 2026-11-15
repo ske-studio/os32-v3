@@ -18,6 +18,11 @@ int pm_hostfs_boot(u32 tb_hz);
 void pm_hfs_bind_peer(const u8 peer[6]);
 const u8 *pm_hfs_peer(void);
 
+#if KBOOT_LINK
+void pm_hfs_link_poll(void);
+const u8 *pm_hfs_link_allowed_peer(void);
+#endif
+
 int pm_hfs_set_clock(u32 tb_hz);
 /* Exactly one complete SFS frame within the PLN1 declared payload length.
  * Reject malformed frames and preserve an unread response. */

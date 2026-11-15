@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """期待の出所: PPC_P3_DESIGN v2 §2/§3, appendix A-1 E5/E6/E7, A-3/A-4.
-Build manifests prove TU absence; freestanding host execution proves boot,
+LAN_OPERATOR_DESIGN §5/§8 P4c restores HostFS over link.
+Build manifests prove TU selection; freestanding host execution proves boot,
 provider, foreground reentry and capture routing without a hardware oracle.
 """
 from pathlib import Path
@@ -15,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
     covers=['tools/tests/test_ppc_link_sh.py', 'tools/tests/host32.py',
             'build/ppc-kboot.mk', 'build/ppc-user.mk', 'init/ppc_kernel.c',
+            'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_io.c',
+            'platform/powermac/hostfs_link_peer.c',
             'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
             'platform/powermac/device_host.c', 'platform/powermac/usb_boot.c',
             'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
@@ -23,7 +26,7 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'platform/powermac/*.h', 'include/*.h', 'kernel/console/*.h',
             'lib/kstring_c.c', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
             'arch/ppc/*.h', 'sdk/include/os32/*.h', 'net/link_platform.h'],
-    basis=['PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
+    basis=['LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
 
 PREFIX = r'''
 #include "types.h"
@@ -126,9 +129,10 @@ def selection(tmp, mutate):
         link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C'])
         assert link[0]=='build/out/ppc-kboot/link-sh'
         assert 'build/out/ppc-user/link-sh/sh.bin' in link[1].split()
-        absent=['hostfs_io','hostfs_peer','hostfs_boot','lan_wire','lan_terminal','terminal_input']
+        absent=['hostfs_io','hostfs_peer','lan_wire','lan_terminal','terminal_input']
         assert all('platform/powermac/'+name+'.c' not in link[2].split() for name in absent)
-        assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','platform/powermac/device_host.c','platform/powermac/usb_boot.c'])
+        assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','platform/powermac/device_host.c','platform/powermac/usb_boot.c',
+            'platform/powermac/hostfs_link_io.c','platform/powermac/hostfs_link_peer.c','platform/powermac/hostfs_boot.c'])
         for flags,out in [(['KBOOT_SH=1'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1'],'shell')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
         # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
@@ -140,7 +144,7 @@ def selection(tmp, mutate):
         assert rejected.returncode!=0
     check(original)
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c','ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
+        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c','ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)

@@ -138,12 +138,14 @@ ifeq ($(KBOOT_SH),1)
 KB_C += platform/powermac/input_usb.c platform/powermac/input_keymap.c
 KB_C += platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c \
  $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
-ifneq ($(KBOOT_LINK),1)
-KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c \
- platform/powermac/hostfs_boot.c fs/serialfs/serialfs.c \
+ifeq ($(KBOOT_LINK),1)
+KB_C += platform/powermac/hostfs_link_io.c platform/powermac/hostfs_link_peer.c
+else
+KB_C += platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c
+endif
+KB_C += platform/powermac/hostfs_boot.c fs/serialfs/serialfs.c \
  fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c \
  fs/serialfs/sfs_proto.c lib/crc32.c
-endif
 endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 

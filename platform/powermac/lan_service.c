@@ -230,7 +230,7 @@ int pm_lan_start(const struct pm_gmac_boot *boot)
     }
     rh_logged = 0;
     s.boot = boot;
-#if KBOOT_SH && !KBOOT_LINK
+#if KBOOT_SH
     pm_hfs_bind_peer(boot->peer_mac);
 #endif
     r = pm_lan_gem_io(boot, &s.g.io);
@@ -298,7 +298,11 @@ void pm_lan_poll(u64 now)
         if (!link_bound) {
             r = host_mailbox_init();
             if (!r) r = net_adapter_register(PM_NET_NIC_GEM, &net_gem_adapter);
+#if KBOOT_SH
+            if (!r) r = net_start(PM_NET_NIC_GEM, pm_hfs_link_allowed_peer());
+#else
             if (!r) r = net_start(PM_NET_NIC_GEM, 0);
+#endif
             if (r) { off(r); return; }
             link_bound = 1;
             kprintf(0x07, "LINK HEAP used=%u\r\n", kmalloc_used());

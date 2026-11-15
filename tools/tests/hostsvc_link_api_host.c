@@ -48,6 +48,19 @@ static int verify_named_body(void)
     CHECK(link_decl_len("os32.clip GET", 13) == 0);
     CHECK(link_decl_len("os32.print STATUS 1", 19) == 0);
     CHECK(link_decl_len("os32.clip PUT 65537", sizeof("os32.clip PUT 65537") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL 20", sizeof("SFS CALL 20") - 1) == 20);
+    CHECK(link_decl_len("SFS CALL 1044", sizeof("SFS CALL 1044") - 1) == 1044);
+    CHECK(link_decl_len("SFS CALL 1045", sizeof("SFS CALL 1045") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL 0", sizeof("SFS CALL 0") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL", sizeof("SFS CALL") - 1) == 0);
+    for (int invalid = 0; invalid < 2; ++invalid) {
+        const char *req = invalid ? "SFS CALL 1045" : "SFS CALL 0";
+        i32 h = link_host_open(req, invalid ? 13 : 10, 1);
+        CHECK(h == 0);
+        CHECK(link_host_write(h, "x", 1, 1) == OS32_ERR_INVAL);
+        CHECK(link_host_close(h, 1) == 0);
+        link_h[h].rel_pending = 0;
+    }
     return 0;
 }
 static int verify(void)

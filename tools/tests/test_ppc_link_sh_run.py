@@ -37,9 +37,12 @@ def exercise(namespace):
         rejected(namespace['check_heap'],*args)
     with tempfile.TemporaryDirectory() as td:
         path=Path(td)/'map'
-        path.write_text(' /build/platform/powermac/console.o\n')
+        path.write_text(' /build/platform/powermac/console.o\n'
+                        ' /build/platform/powermac/hostfs_link_io.o\n'
+                        ' /build/platform/powermac/hostfs_link_peer.o\n'
+                        ' /build/platform/powermac/hostfs_boot.o\n')
         namespace['check_map'](path)
-        for name in ('hostfs_io','hostfs_peer','hostfs_boot','lan_wire','lan_terminal','terminal_input'):
+        for name in ('hostfs_io','hostfs_peer','lan_wire','lan_terminal','terminal_input'):
             path.write_text(' /build/platform/powermac/'+name+'.o\n')
             rejected(namespace['check_map'],path)
 

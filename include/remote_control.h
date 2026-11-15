@@ -18,6 +18,7 @@
 #define REMOTE_NOTIFY_DATA_MAX    LINK_NOTIFY_DATA_MAX
 #define REMOTE_ID8_HEX_DIGITS     8
 #define REMOTE_RESULT_BODY_MAX    8193
+#define REMOTE_SFS_CALL_MAX       1044u
 
 /* RSH READY <boot-token> <mode> 1 <last-id|none> <idle|running|done> */
 #define REMOTE_REQ_RSH_READY "RSH READY"

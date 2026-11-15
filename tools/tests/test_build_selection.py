@@ -22,6 +22,7 @@ def check(root):
         root, ['-f', 'build/geforce-module.mk'])['GEFORCE_DISPLAY_STATE_SOURCES']
     for name, value in expected.items():
         assert actual[name] == value, name
+    assert not any('platform/powermac/hostfs' in name for name in actual['C_KERNEL'])
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
     assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1

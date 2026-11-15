@@ -7,8 +7,9 @@ CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
             'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
             'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
-            'tools/tests/hostsvc_link_api_host.c'],
-    basis=['NET_HOSTSVC_DESIGN §6', 'NET_HOSTSVC_DESIGN §7', 'NET_HOSTSVC_DESIGN §11'],
+            'tools/tests/hostsvc_link_api_host.c', 'include/remote_control.h', 'net/host_mailbox.h', 'sdk/include/os32/os32_host_notice.h'],
+    env=[],
+    basis=['LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §6', 'NET_HOSTSVC_DESIGN §7', 'NET_HOSTSVC_DESIGN §11'],
 )
 import argparse
 from pathlib import Path
@@ -20,7 +21,10 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 ANCHOR = 'if ((u32)(link_platform_now() - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;'
 
-MUTATIONS = [(ANCHOR, "if (1) continue;", "deadline disabled"),
+MUTATIONS = [
+    ('tok_eq(req, a0, b0, "SFS")', '0', 'SFS CALL disabled'),
+    ('length <= REMOTE_SFS_CALL_MAX', '1', 'SFS CALL limit disabled'),
+    (ANCHOR, "if (1) continue;", "deadline disabled"),
     ('tok_eq(req, a0, b0, "os32.clip")', "0", "named clip body disabled"),
     ('tok_eq(req, a0, b0, "os32.print")', "0", "named print body disabled")]
 

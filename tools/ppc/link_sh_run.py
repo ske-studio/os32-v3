@@ -68,7 +68,7 @@ def replace_once(text, before, after):
 
 def check_map(path):
     text = path.read_text()
-    absent = ('hostfs_io', 'hostfs_peer', 'hostfs_boot', 'lan_wire', 'lan_terminal', 'terminal_input')
+    absent = ('hostfs_io', 'hostfs_peer', 'lan_wire', 'lan_terminal', 'terminal_input')
     require(all(not re.search(r'[/ ]'+name+r'\.o\b', text) for name in absent), 'map old TU')
 
 

@@ -125,6 +125,11 @@ u32 link_decl_len(const char *req, u32 len)
     else if (tok_eq(req, a0, b0, "PUT")) which = 2;
     else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;
     else if (tok(req, len, 1, &a1, &b1)) {
+        if (tok_eq(req, a0, b0, "SFS") && tok_eq(req, a1, b1, "CALL")) {
+            if (!tok(req, len, 2, &a, &b)) return 0;
+            u32 length = tok_num(req, a, b);
+            return length <= REMOTE_SFS_CALL_MAX ? length : 0;
+        }
         if ((tok_eq(req, a0, b0, "RSH") || tok_eq(req, a0, b0, "GS") ||
              tok_eq(req, a0, b0, "PDIAG")) && tok_eq(req, a1, b1, "OUT")) which = 5;
         else if (tok_eq(req, a0, b0, "RSH") && tok_eq(req, a1, b1, "ACCEPT")) which = 4;
