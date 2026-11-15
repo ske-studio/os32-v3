@@ -5,6 +5,38 @@
 
 #define IN2_MAX_DEV 16
 
+/* Internal native-endian event. Producers zero fields unused by the type. */
+typedef struct InputEvent {
+    u32 time_ms;
+    u16 generation;
+    u8 src, type;
+    i16 x, y;
+    u8 sc, down, buttons, flags;
+} InputEvent;
+
+#define IN2_OFFSET(field, value) STATIC_ASSERT(__builtin_offsetof(InputEvent, field) == value, input_event_##field)
+STATIC_ASSERT(sizeof(InputEvent) == 16, input_event_size);
+IN2_OFFSET(time_ms, 0); IN2_OFFSET(generation, 4);
+IN2_OFFSET(src, 6); IN2_OFFSET(type, 7);
+IN2_OFFSET(x, 8); IN2_OFFSET(y, 10);
+IN2_OFFSET(sc, 12); IN2_OFFSET(down, 13);
+IN2_OFFSET(buttons, 14); IN2_OFFSET(flags, 15);
+#undef IN2_OFFSET
+#define IN2_FIELD_SIZE(field, value) STATIC_ASSERT(sizeof(((InputEvent *)0)->field) == value, input_event_size_##field)
+IN2_FIELD_SIZE(time_ms, 4); IN2_FIELD_SIZE(generation, 2);
+IN2_FIELD_SIZE(src, 1); IN2_FIELD_SIZE(type, 1);
+IN2_FIELD_SIZE(x, 2); IN2_FIELD_SIZE(y, 2);
+IN2_FIELD_SIZE(sc, 1); IN2_FIELD_SIZE(down, 1);
+IN2_FIELD_SIZE(buttons, 1); IN2_FIELD_SIZE(flags, 1);
+#undef IN2_FIELD_SIZE
+
+enum { INPUT_EVENT_KEY = 1, INPUT_EVENT_MOVE = 2, INPUT_EVENT_BUTTON = 3,
+       INPUT_EVENT_WHEEL = 4, INPUT_EVENT_PADBTN = 5, INPUT_EVENT_ABS = 6,
+       INPUT_EVENT_LOST = 7 };
+enum { INPUT_EVENT_SEAMLESS = 0x01 };
+int input_src_register(u8 kind, u8 origin, u16 *generation);
+void input_src_release(u8 src, u16 generation);
+
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty
  * or absent input is -1. peek does not consume a completed key. */
