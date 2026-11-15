@@ -138,7 +138,15 @@ def main():
         assert ('net/nic.c' in manifest) != expected
         assert ('platform/powermac/usb_boot.c' in manifest) == expected
     boot = (ROOT / 'init/ppc_kernel.c').read_text()
-    assert 'int work_rc = pm_terminal_work_register();' in boot
+    # Select the PLN1 branch, then match the complete ordered startup block.
+    pln = boot.replace('#if !KBOOT_LINK\n', '#if 1\n')
+    pln = pln.replace('#if KBOOT_LINK\n        int work_rc = idle_work_register(pm_link_service_once);\n#else\n', '')
+    pln = pln.replace('#endif\n', '').replace('#if 1\n', '')
+    assert ('        (void)pm_hostfs_boot(info->tb_hz);\n'
+            '        pm_usb_boot(info->tb_hz);\n'
+            '        int work_rc = pm_terminal_work_register();\n'
+            '        if (work_rc) kprintf(KBOOT_ATTR, "TERMINAL WORK error rc=%d\\r\\n", work_rc);\n'
+            '        pm_input_boot();') in pln
     assert '#if KBOOT_LINK\n        int work_rc = idle_work_register(pm_link_service_once);' in boot
     with tempfile.TemporaryDirectory(prefix='ppc-work-') as directory:
         tmp = Path(directory)

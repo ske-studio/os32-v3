@@ -430,6 +430,8 @@ int rsh_lan_app_loop(void)
                     sh_refuse("rshell: command line", sizeof(buf) - 2);
                     sh_status_set(SH_STATUS_USAGE); /* refused line: $? is 2 */
                 } else if (ln.pos && !ln.junk) {
+                    g_api->buz_off();
+                    if (buf[0]=='e' && buf[1]=='x' && buf[2]=='i' && buf[3]=='t' && buf[4]=='\0') break;
                     g_api->kprintf(ATTR_YELLOW, "%s", "> ");
                     g_api->kprintf(ATTR_WHITE, "%s", buf);
                     g_api->kprintf(ATTR_WHITE, "%s", "\n");

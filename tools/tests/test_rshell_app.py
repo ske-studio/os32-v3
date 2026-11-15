@@ -28,7 +28,8 @@ KernelAPI *g_api = &api;
 int sh_exit_flag, sh_exit_code;
 static int mode, step, polls, halts, yields, resets, on, off, commands, failed, refused, status;
 static const char *input;
-static int prints;
+static int prints, buzz;
+static void buz_off(void) { if (prints != commands * 3) failed = 1; buzz++; }
 static void print(u8 color, const char *format, ...) {
     (void)color; (void)format; prints++;
 }
@@ -73,17 +74,19 @@ static int run(void) {
     if (rsh_lan_execute("e") || sh_exit_flag) return 1;
     if (rsh_lan_handoff("gui") != OS32_ERR_NOSYS) return 1;
     api.kbd_trygetchar_local = local; api.rshell_set_active = active;
-    api.kprintf = print; api.sys_halt = halt; api.sys_yield = yield;
+    api.buz_off = buz_off; api.kprintf = print; api.sys_halt = halt; api.sys_yield = yield;
     static char longline[160];
     for (int i = 0; i < 140; i++) longline[i] = 'y';
     longline[140] = '\n'; longline[141] = '\033';
-    for (mode = 0; mode < 5; mode++) {
-        prints = 0;
+    for (mode = 0; mode < 6; mode++) {
+        prints = buzz = 0;
         step = polls = halts = yields = resets = on = off = commands = failed = refused = status = 0;
-        input = mode == 0 ? "x_\ne_\n" : mode == 1 ? "" : mode == 2 || mode == 4 ? "_\033" : longline;
+        input = mode == 0 ? "x_\ne_\n" : mode == 1 ? "" : mode == 2 || mode == 4 ? "_\033" : mode == 5 ? "exit\n" : longline;
         int rc = rsh_lan_app_loop();
         if (failed || resets != 2 || on != 1 || off != 1 || app_active || sh_exit_flag) return 1;
         if (mode == 0 && (rc != 37 || commands != 2 || polls || halts != 2 || prints != 6)) return 1;
+        if (mode == 5 && (rc || commands || prints || buzz != 1)) return 1;
+        if (mode == 0 && buzz != 2) return 1;
         if (mode == 1 && (rc || polls != 1 || commands || halts)) return 1;
         if (mode == 2 && (rc || polls != 1 || yields != 1 || halts != 0)) return 1;
         if (mode == 4 && (rc || polls != 1 || halts || yields)) return 1;
@@ -131,6 +134,8 @@ def main():
         print('rshell-app: PASS')
         if args.mutate:
             for old, new in [
+                ('g_api->buz_off();', '(void)0;'),
+                ("if (buf[0]=='e' && buf[1]=='x' && buf[2]=='i' && buf[3]=='t' && buf[4]=='\\0') break;", '(void)0;'),
                 ('if (ln.bytes == 0)', 'if (1)'),
                 ('int rc = rsh_lan_poll();', 'int rc = RSH_LAN_EXIT;'),
                 ('status = sh_exit_code;', 'status = 0;'),

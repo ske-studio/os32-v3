@@ -302,3 +302,10 @@ int input_legacy_wait(int mode, int interruptible);
 - 第 1 回 R1〜R9: r2 で直った (Opus 第 2 回で確認)。
 - 第 2 回 N1 (P1): idle_work_run は EE=0 では何もしない (idle_work.c:30)。endpoint の窓を N4 の口で開ける形に直した。
 - 未決 (idle_work の約束と EE=0): Opus は (a') (IF を問わない別の入口 idle_work_run_coop) を推奨、本線 PM は (b) (N4 の口で窓を開ける) を推奨した。PM は (b) に決めた。理由: idle_work の前提 (IF/EE=1・IRQ の外) を x86 と PPC でそろえたまま Tier へ育てられる。EE=0 のまま仕事を回すと DEC が止まり tick を落とす。Opus が (b) を退けた理由は本線 PM の条件 1 (io_pump を使わない) だけで、その条件は本線 PM が改めた。Opus の (a') のうち、idle_work_run と既存の呼び手を変えないこと、pm_link_service_once の再入防止、N1 の変異は取り入れた。
+
+
+### ⑥ で決めたこと
+- 台本は `tools/ppc/link_sh_run.py`。診断像の link_run の観測と 192KiB 閾値を保ち、HostAgent・OperatorSocket・RSHELL/EXECUTE・PumpQMP・USB の既存注入を再利用する。
+- link-SH は heap 高水位 1MiB 未満・割り当て失敗 0。試験用コピーだけに FREEZE の戻り値・END の回数・割り当て失敗の観測変数と USER 自身の fault/UTF-8/容量の刺激を入れる。製品の像へ試験用コマンドを追加しない。
+- 重い QEMU は `ppc-link-sh-run` の full_only。通常 CI の時間増分は 0、両 CPU の正常・遅延 agent の後で変異を実行する。socket 不可は未 (rc=3)、包みは非必須環境だけ rc=0 に写す。
+- 受入: 未。証拠・PM の実行コマンド・host/像の検査は `/home/hight/os32-tmp/run/ppc-p3-6/RESULT.md`。QEMU と socket の合否は PM が記録する。R1 は不要 (製品の実行モデル・メモリ配置を変更しない)。

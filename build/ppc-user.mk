@@ -39,6 +39,9 @@ PPC_SH_DIR := $(PPC_USER_OUT)/sh
 PPC_SH_SRC := $(wildcard userland/shell/*.c)
 PPC_SH_OBJ := $(patsubst userland/shell/%.c,$(PPC_SH_DIR)/shell/%.o,$(PPC_SH_SRC))
 # Acceptance may rebuild only the USER UTF-8 adapter from a reverted source.
+# Test copies keep USER mutations out of the product tree.
+PPC_SH_MUT_SRC ?=
+PPC_SH_MUT_FILE ?=
 PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/runtime.c
 PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o format.o stdio.o string.o ls.o help.o)
 PPC_SH_PROFILE ?= userland/ppc/sh/profile.h
@@ -47,9 +50,9 @@ PPC_SH_FLAGS := -include $(PPC_SH_PROFILE) -Iuserland/ppc/sh/include $(PPC_USER_
 .PHONY: sh
 sh: $(PPC_USER_OUT)/sh.bin
 
-$(PPC_SH_DIR)/shell/%.o: userland/shell/%.c $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
+$(PPC_SH_DIR)/shell/%.o: userland/shell/%.c $(PPC_SH_MUT_FILE) $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
-	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
+	$(CC) $(PPC_SH_FLAGS) -c $(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<) -o $@
 
 $(PPC_SH_DIR)/runtime.o: $(PPC_SH_RUNTIME_SRC) $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
