@@ -142,7 +142,7 @@ if (old != down) {
 - 最初の抽出段1aは非待機の選択helperとtry内の協調yieldを移す。GUI時はIL_LOCAL_CHARなら-1でparkせず早期復帰。それ以外は注入だけを見て早期復帰し、空ならproviderのpark_pollを1回呼び、戻った場合は-1。serial/localへフォールスルーしない。peekもGUIのlocalは-1、それ以外は注入を非消費で見るだけでparkしない。
 - x86 CUIのtry/peekはserial（rshellかつcaptureでない）→local。IL_KEYはcooked key、IL_CHAR/IL_LOCAL_CHARは低位byteを返す。local-onlyはserialを見ない。local try_key/peek_keyはkbd.cのlocal cookedを包みbridgeへ再入しない。serial/注入/GUI照会/parkもprovider経由で、共通層から装置symbolを直接参照しない。
 - 待機版は別段で移す。getcharはlocal優先、getkey_waitはserialを読まない（kbd.c:705,789）。GUI waitはproviderのpark_kbdを使い、park_poll/park_kbdとも通常returnはpark不成立時だけ。成立時は戻らず、try再開値はbyteまたは-1、wait再開値はbyte。中断・再開を口別fixtureで固定し、一律tryループへ置換しない。
-- PPCは像別に登録する。PLN1像はterminalにLAN byte streamを渡し、decoder/完成key先読みとUSB localの交互選択を移す。link-SH像はmailboxのコマンドでありterminal/injectはNULL、local try_key/peek_keyとshell行頭の調停を使う。LAN交互選択をlink-SHへ持ち込まない。
+- PPCは像別に登録する。PLN1像は terminal=NULL とし、local を「LAN (decoder と完成key先読み 1 個、platform 側) が先、空なら USB」の 1 つの口にする (2026-11-15、PowerPC P3 ③b-2。共通の wait(IL_KEY) は local だけを読むため。交互選択はやめた。PPC_P3_DESIGN 末尾)。link-SH像はmailboxのコマンドでありterminal/injectはNULL、local try_key/peek_keyとshell行頭の調停を使う。LAN交互選択をlink-SHへ持ち込まない。
 - peek/has_keyは予算付きの有限採取（byte→decoder→完成key先読み）を許す。禁止は完成keyの消費と交互選択順の更新。選択順は実際のtryで消費した時だけ更新する。現input_boot.c:31-37のpoll/take/選択更新一体のpeekをそのまま移さず分離し、PLN1のwhile(!kbd_has_key()) sys_yield()も進行させる。
 - capture期限は待機開始時点から数える。FREEZE中は閉じたまま、期限後は文字待ちがCR、キー待ちがESC。con_sink通知の例外を設けない。振る舞いの注: capture中の1コマンドが何度も待つ場合、それぞれが30秒まで待てる（x86現行と同じ）。コマンド全体の上限はhost側の待ちが担う。
 - InputOpsの能力pressed/raw/modifier/interruptibleを独立照会する内部契約はARCH_COMPAT F6/F7と共有。不在と未押下を新規利用者が混同しない。旧値/voidのABIはAC-KAPI-1どおり保持し、公開照会追加はABI段へ。

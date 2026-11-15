@@ -73,7 +73,7 @@ int input_legacy_wait(int mode, int interruptible);
 - provider 登録は起動時の常駐関数ポインタ。NULL は空/不在であり、共通部から PPC・serial・exec の装置固有 symbol を参照しない。
 - **link-SH では terminal_try/peek と inject_try/peek は NULL、terminal_enabled は常に偽**。LAN notice は host_mailbox → rsh_lan_poll へ渡す。PPC LAN だから terminal_try に結ぶ、という一律登録はしない。
 - PLN1 の旧文字端末を残す像だけ terminal provider に LAN byte stream を登録する。GUI 注入は別の宛先付きキューであり、LAN notice を inject_try へ載せない。
-- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」) PLN1 は bridge の既定の優先 (terminal が先、local は terminal が空のとき) に従い、LAN と USB の交互選択はやめる。escape decoder は PLN1 の terminal provider (LAN の byte→key、platform 側) に置く。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
+- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」と「③b-2 で決めたこと」) PLN1 は terminal=NULL とし、local を「LAN (escape decoder と完成 key 1 個の非消費の先読み、platform 側) が先、空なら USB」の 1 つの口にする。LAN と USB の交互選択はやめる。共通の wait(IL_KEY) は local だけを読むので (kernel/input_wait.c、x86 の kbd.c:789 と同じ)、LAN を terminal にすると PLN1 の LAN のキーの待ちが止まるため。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
 - 現行の状態は `platform/powermac/input_boot.c:8–12`、実際の交互選択は `:28–43`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
 - 共通 bridge が選択状態・decoder・peek の整合・capture 入力期限・GUI policy を所有、HAL が物理状態/ring/keymap を所有する。provider は装置の byte/cooked 読出し・GUI 状態照会・park の口だけ、SH が半行/ID/実行状態を所有する。
 - PLN1 の peek/has_key は有限の採取（byte→decoder→完成 key の lookahead）を進めてよい。完成 key の消費と交互選択の順の更新は禁止し、try 成功時だけ消費・選択更新する。採取は既存キューから行い、装置 pump は前景 work が担当する。
@@ -106,7 +106,7 @@ int input_legacy_wait(int mode, int interruptible);
 | ② host/KAPI provider | device_host、exec_reclaim、kapi_target_ppc.py、gen_kapi.py、exec_kapi.c/.h、PLN1 stub・リンクリスト | final の host/notice/flag/owner 結線と生成を一体化。wait endpoint は直接 idle_work_run。binding/remote_x9/T1 の provider/owner 変異と両 PPC 像ビルド |
 | ③a 前景・endpoint | link_platform、PLN1 work 登録の TU、usb_boot.c（各小段 1〜3 ファイル） | ②の endpoint 結線を使い、像別 work 登録と入口/endpoint の周別計数を検証。usb_boot.c:105 の「USER syscalls keep EE clear」を W4 後の FG1 契約へ訂正 |
 | ③b-1 USB の非消費 peek | input_usb.c・input_usb.h・tools/checks/ver-ppc-input-usb.py（3 ファイル） | HAL 4c 完了後。USB のキューに非消費の peek を足す (§3 の「非消費 peek を USB キューに追加」)。ver-ppc-input-usb.py に「peek が消費する」変異を足す。input_boot.c は触らない |
-| ③b-2 provider の像別登録 | input_boot.c・tools/checks/ver-ppc-input-usb.py・(要れば) terminal_input.c（3 ファイル以下） | ③b-1 の後。input_boot.c の独自の状態 (lookahead・last_source・交互選択) を除き、PLN1 は terminal=LAN (decoder 付き)・local=USB (③b-1 の try/peek)、link-SH は terminal=NULL・local=USB を登録する。ver-ppc-input-usb.py の anchor (peek-consumes・lan-first・no-usb) を新しい provider へ移す。lan-first は「terminal (LAN) が先、空なら local (USB)」の期待に書き換える (交互選択の期待は消す)。HAL 共同 fixture で有限採取と非消費を検証 |
+| ③b-2 provider の像別登録 | input_boot.c・tools/checks/ver-ppc-input-usb.py・(要れば) terminal_input.c（3 ファイル以下） | ③b-1 の後。input_boot.c の独自の状態 (lookahead・last_source・交互選択) を除き、PLN1 は terminal=NULL・local=「LAN (decoder 付き) が先、空なら USB (③b-1 の try/peek)」、link-SH は terminal=NULL・local=USB を登録する。ver-ppc-input-usb.py の anchor (peek-consumes・lan-first・no-usb) を新しい provider へ移す。lan-first は「terminal (LAN) が先、空なら local (USB)」の期待に書き換える (交互選択の期待は消す)。HAL 共同 fixture で有限採取と非消費を検証 |
 | ③c capture 期限 | HAL 4c に含める (本線に H7 として依頼)。HAL が入れない場合は、③c を kernel/input_wait.c (共通) の実装の段に替える (1〜3 ファイル) | bridge の wait 開始起点 (x86 と同じ kbd.c:754・:792)、FREEZE 閉鎖、期限後の文字の待ちは CR・キーの待ちは ESC、STOP、END/owner 回収を検証。con_sink 通知の段は設けない |
 | ③d 出力・shell 起動 | d1: console_stream・console_log、d2: shell_putchar・shell_boot（各 2 ファイル） | d1→d2 の順で出力・起動を結線。T1 変異、fault 再起動と既存像ビルド |
 | ④ 共通 shell（直列） | rshell.c/rshell_lan.c/shell.h、main.c、profile.h | final の APP 専用実体。local try の行頭優先・半行 LAN 保留・exit。共通 rshell/capture/owner 回帰、x86 build_compare MATCH を目標 |
@@ -162,6 +162,8 @@ int input_legacy_wait(int mode, int interruptible);
   - 本線は入力の HAL の段の順を 4c-pre → 4c → P3 ③b → 4b にした (Opus 条件付き可)。input_boot.c はこの順で直列に触る。HAL 4c では、PPC は既存の先読み付きの try_key/peek (LAN と USB の交互) を provider の local として登録し、terminal は NULL にする。
   - ③b を ③b-1 (USB の非消費 peek) と ③b-2 (像別登録) に分けた (各 3 ファイル以下)。
   - lan-first の扱い (PM 決定): PLN1 の LAN と USB の交互選択はやめ、bridge の既定 (terminal が先) に従う。理由は 3 つ。共通の bridge に PLN1 専用の互換 profile を足さずに済む。x86 の serial 優先と同じ規則になる。PLN1 は退避像で、新しい機能を足さない方針。LAN が流れ続けると USB が後回しになるが、PLN1 の LAN は人の操作の端末で、流し続ける使い方はしない。問題が出たら profile に戻す。
+
+- **③b-2 で決めたこと (2026-11-15、sol の停止の指摘を受けた PM 決定、本線 PM 了承):** 上の lan-first の項の「bridge の既定 (terminal が先) に従う」は、PLN1 では成り立たない。共通の wait(IL_KEY) は local だけを読むので、LAN を terminal にすると LAN のキーの待ちが止まる。そこで PLN1 は terminal=NULL とし、LAN と USB を 1 つの local (LAN が先、空なら USB) にした。優先の向きは同じ。R4 で trygetchar_local を IL_LOCAL_CHAR にしたため、PLN1 では local の口も LAN を読む。PLN1 は rsh_lan_app_loop を使わないので問題ない (link-SH は ⑤ で local=USB だけにする)。
 
 ## 付録 A: 初版の確定設計 (2026-11-14)
 ### PowerPC P3 詳細設計 (確定) — SH の共通 rshell を link に結ぶ
