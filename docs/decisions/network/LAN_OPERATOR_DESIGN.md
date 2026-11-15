@@ -262,7 +262,7 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 
 
 ## 確定 (2026-11-14、Opus 5.5 第 3 回 Approve 条件付き、PM が反映)
-- A1: link 像では GEM の RX/TX も tick の枠で汲む。前景の pm_lan_poll は link 像の RX に触らない (§5 の C ブロック)。
+- A1: link 像では GEM の RX/TX を共通 NIC が汲む (tick の `net_jiffy` と、その保留分を回収する前景の `rx_finish`、AC-NET-2)。前景の pm_lan_poll は link 像の RX に触らない (§5 の C ブロック)。
 - A2: probe が agent の commit と設定の要約を返す。台本は作業木の HEAD と照合する (§7)。
 - A3: NP21/W の 8026 は今の向き (WSL の agent が loopback で listen) を保つ (§2)。
 - 運用は VPN とローカルの中なので、操作口・frame の口の番地を制限する検査は置かない (ユーザー 2026-11-14「VPN とローカルで動いているのでセキュリティは気にしないで」。Opus の A4 は取り下げ)。

@@ -1,5 +1,6 @@
 /* Borrow the service's DMA/device. P1g must exclude PLN1 RX and arrange
- * reset/PHY progress in lan_service; only net_jiffy may call this poll. */
+ * reset/PHY progress in lan_service; poll runs from net_jiffy or from the
+ * deferred rx_finish, always inside link_platform_lock (AC-NET-2). */
 #include "nic_gem.h"
 #include "lan_boot.h"
 #if KBOOT_LINK
