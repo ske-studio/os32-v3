@@ -111,5 +111,6 @@ jobs:
       - name: PPC QEMU guest checks
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
+          TMPDIR: ${{ runner.temp }}
         run: |
           OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
