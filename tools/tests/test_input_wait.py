@@ -54,20 +54,41 @@ static int old_char(int interruptible)
 }
 """
 
+OLD_KEY = r"""
+int old_key(int interruptible)
+{
+    u16 entry;
+    u32 start_tick = tick_count;
+    int capture = con_sink_capture_active();
+
+    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
+
+    while (kbd_count == 0) {
+        kbd_foreground_poll();
+        if (interruptible && ring3_wait_pending()) return -1;
+        idle_work_run();
+        _halt();
+        if (capture && (u32)(tick_count - start_tick) >= KBD_RSHELL_TIMEOUT_SEC * PIT_HZ)
+            return 0x1b;
+    }
+
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+
+    return (int)entry;
+}
+"""
+
 def run(ctx):
     source = (ctx.root / 'kernel/input_wait.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-wait-') as td:
         tmp = Path(td)
         kbd = (ctx.root / 'drivers/input/kbd.c').read_text()
-        old = [OLD_CHAR]
-        for signature in ('int kbd_getkey_wait(int interruptible)',):
-            start = kbd.index(signature + '\n{')
-            old.append(kbd[start:kbd.index('\n}', start) + 2])
+        old = [OLD_CHAR, OLD_KEY]
         (tmp / 'old_wait.inc').write_text('\n'.join(old))
         a = kbd.index('static int kbd_local_trykey(void)')
         current = kbd[a:kbd.index('#include "kbd_fgpoll.inc"', a)]
-        for name in ('kbd_gui_getbyte', 'kbd_getchar_wait'):
-            a = kbd.index('static int ' + name + '(int interruptible)\n{')
+        for name in ('kbd_getchar_wait', 'kbd_getkey_wait'):
+            a = kbd.index(('int ' if name == 'kbd_getkey_wait' else 'static int ') + name + '(int interruptible)\n{')
             current += kbd[a:kbd.index('\n}', a)+2] + '\n'
         def execute(code, adapter=current):
             (tmp / 'current_wait.inc').write_text(adapter)
@@ -80,7 +101,7 @@ def run(ctx):
             subprocess.run(cmd, check=True)
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
-        print('PASS libc-free wait: fixed oracle / real x86 provider, 960 traces', flush=True)
+        print('PASS libc-free wait: fixed oracle / real x86 provider, 960 character and 1920 key fixtures', flush=True)
         cc = Path(os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
         if cc.is_file() and os.access(cc, os.X_OK):
             for src in [ctx.root/'tools/tests/input_wait_host.c', ctx.root/'kernel/input_wait.c']:
@@ -97,6 +118,7 @@ def run(ctx):
                 ('if (gui) {', 'if (p->gui_active && p->gui_active()) {'),
                 ('start = p->wait_ticks ? p->wait_ticks() : 0;', 'start = 100;'),
                 ("mode == IL_KEY ? 0x1b : (p->capture_active && p->capture_active() ? '\\r' : ' ')", "mode == IL_KEY ? '\\r' : (capture ? 0x1b : ' ')"),
+                ('if (timed && timeout && p->wait_ticks &&', 'if ((mode != IL_KEY ? timed : (p->capture_active && p->capture_active())) && timeout && p->wait_ticks &&'),
                 ('if (mode == IL_CHAR && p->terminal_enabled &&', 'if (mode != IL_LOCAL_CHAR && p->terminal_enabled &&')]:
                 assert source.count(old)==1
                 assert execute(source.replace(old,new,1)) != 0

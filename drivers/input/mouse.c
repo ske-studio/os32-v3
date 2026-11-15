@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "mouse.h"
+#include "../../input/hal/in2_int.h"
 #include "kbd.h"
 #include "../video/kcg/kcg.h"
 #include "../char/np2sysp.h"
@@ -34,9 +35,6 @@ static i16 prev_abs_x;
 static i16 prev_abs_y;
 static int prev_abs_valid;
 
-/* bus_mouse_get (mouse_bus.c) */
-extern void bus_mouse_get(i16 *dx, i16 *dy, u8 *buttons);
-
 /* ====================================================================== */
 /*  クランプ関数                                                           */
 /* ====================================================================== */
@@ -52,13 +50,14 @@ static i16 clamp16(i16 val, i16 lo, i16 hi)
 /* ====================================================================== */
 void mouse_init(void)
 {
-    cursor_x = bound_x_max / 2;
-    cursor_y = bound_y_max / 2;
+    pointer_position(&cursor_x, &cursor_y);
     prev_abs_valid = 0;
+    mouse_ext_mode(0);
 
     /* NP21/W検出 → シームレスモード試行 */
     if (np2_detect()) {
         if (seamless_mouse_init()) {
+            mouse_ext_mode(1);
             mouse_mode_current = MOUSE_MODE_SEAMLESS;
             kprintf(KLOG_LEGACY_GREEN, "[mouse] seamless mode (NP21/W)\n");
             return;
@@ -86,13 +85,9 @@ void mouse_poll(MouseState *state)
     u8 buttons = 0;
 
     if (mouse_mode_current == MOUSE_MODE_BUS) {
-        /* バスマウス: 累積差分を取得 */
-        bus_mouse_get(&dx, &dy, &buttons);
-
-        cursor_x += dx;
-        cursor_y += dy;
-        cursor_x = clamp16(cursor_x, bound_x_min, bound_x_max);
-        cursor_y = clamp16(cursor_y, bound_y_min, bound_y_max);
+        mouse_ext_read_legacy(&dx, &dy);
+        buttons = input_buttons();
+        pointer_position(&cursor_x, &cursor_y);
 
     } else if (mouse_mode_current == MOUSE_MODE_SEAMLESS) {
         i16 abs_x, abs_y;
@@ -136,6 +131,7 @@ void mouse_poll(MouseState *state)
 /* ====================================================================== */
 void mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 {
+    pointer_bounds(x_min, y_min, x_max, y_max);
     bound_x_min = x_min;
     bound_y_min = y_min;
     bound_x_max = x_max;

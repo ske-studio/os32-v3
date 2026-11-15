@@ -3,16 +3,7 @@
 #include "legacy_guest.h"
 #include "os32_kapi_shared.h"
 
-static u8 held[IN2_MAX_DEV][128], buttons[IN2_MAX_DEV];
-
-u8 input_buttons(void)
-{
-    unsigned int flags = irq_save();
-    u8 mask = 0;
-    for (unsigned int i = 0; i < IN2_MAX_DEV; ++i) mask |= buttons[i];
-    irq_restore(flags);
-    return mask;
-}
+static u8 held[IN2_MAX_DEV][128];
 
 int input_capture(const InputEvent *event)
 {
@@ -35,15 +26,15 @@ int input_capture(const InputEvent *event)
         switch (e.type) {
         case INPUT_EVENT_BUTTON:
             if (e.x || e.y || e.sc) goto out;
-            e.sc = buttons[e.src - 1] ^ e.buttons;
-            buttons[e.src - 1] = e.buttons;
-            if (!e.sc) { rc = 0; goto out; }
+            if (!pointer_button(&e)) { rc = 0; goto out; }
             break;
         case INPUT_EVENT_ABS:
-            if (e.x < 0 || e.y < 0) goto out;
-            /* fall through */
+            if (e.x < 0 || e.y < 0 || e.sc || e.buttons) goto out;
+            pointer_absolute(e.x, e.y);
+            break;
         case INPUT_EVENT_MOVE:
             if (e.sc || e.buttons) goto out;
+            mouse_ext_move(e.x, e.y, e.flags & INPUT_EVENT_SEAMLESS);
             break;
         case INPUT_EVENT_WHEEL:
             if (e.y || e.sc || e.buttons) goto out;
@@ -83,5 +74,5 @@ void input_state_release(u8 src, u16 generation)
     }
     e.type = INPUT_EVENT_BUTTON;
     e.sc = 0;
-    if (buttons[src - 1]) input_capture(&e);
+    if (pointer_source_buttons(src)) input_capture(&e);
 }

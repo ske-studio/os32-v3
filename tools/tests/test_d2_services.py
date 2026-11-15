@@ -53,7 +53,7 @@ def run(runner, mutation=None):
     pointer_calls = {
         'mouse_poll': ('&state', 'pointer_seen == 1 && pointer_output == &state && state.x == -123 && state.y == 456 && state.dx == 7 && state.dy == -8 && state.buttons == (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) && state.mode == MOUSE_MODE_SEAMLESS'),
         'mouse_available': ('', 'pointer_seen == 2'),
-        'mouse_set_bounds': ('-31, -42, 513, 624', 'pointer_seen == 3 && pointer_bounds[0] == -31 && pointer_bounds[1] == -42 && pointer_bounds[2] == 513 && pointer_bounds[3] == 624'),
+        'mouse_set_bounds': ('-31, -42, 513, 624', 'pointer_seen == 3 && pointer_seen_bounds[0] == -31 && pointer_seen_bounds[1] == -42 && pointer_seen_bounds[2] == 513 && pointer_seen_bounds[3] == 624'),
         'mouse_cursor_set_mode': ('MOUSE_CURSOR_TEXT', 'pointer_seen == 4 && pointer_mode == MOUSE_CURSOR_TEXT'),
         'mouse_cursor_show': ('', 'pointer_seen == 5'),
         'mouse_cursor_hide': ('', 'pointer_seen == 6'),

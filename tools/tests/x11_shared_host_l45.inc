@@ -23,20 +23,20 @@ static int cui_key_conversion(void)
               "IMECUI ShiftSpace turns OFF and returns first unsigned byte");
         kbd_shift_state = 0;
         key(0x1d); /* a queued while the UTF-8 tail is unread */
-        CHECK(readers[r]() == 0x82 && readers[r]() == 0x93 && kbd_count == 1,
+        CHECK(readers[r]() == 0x82 && readers[r]() == 0x93 && legacy_cooked_pending() == 1,
               "IMECUI toggle commit tail precedes queued key");
         CHECK(readers[r]() == ((r & 1) ? (0x1d << 8) | 'a' : 'a') &&
               ime_trygetkey() == -1 && !searches && !learns,
               "IMECUI OFF keeps ASCII or original scan");
         key(KEY_F1); key(0x1d);
         if (r == 0) {
-            CHECK(readers[r]() == -1 && kbd_count == 1 && readers[r]() == 'a',
+            CHECK(readers[r]() == -1 && legacy_cooked_pending() == 1 && readers[r]() == 'a',
                   "IMECUI poll skips only one scan-only key");
         } else if (r & 1) {
             CHECK(readers[r]() == (KEY_F1 << 8) && readers[r]() == ((0x1d << 8) | 'a'),
                   "IMECUI key reader preserves scan-only key");
         } else {
-            CHECK(readers[r]() == 'a' && !kbd_count,
+            CHECK(readers[r]() == 'a' && !legacy_cooked_pending(),
                   "IMECUI character wait skips scan-only key");
         }
     }

@@ -68,9 +68,6 @@ extern int exec_park_poll(u32 now_tick);
  * 同じ流儀で extern 宣言する。 */
 extern volatile u32 tick_count;
 
-/* 外部: D8 の間引きの控えを 0 に戻す (exec/appslot.c)。GUI セッションの
- * 境界で、cooked / raw / 注入リングを空にするのと同じ扱いで呼ぶ。 */
-extern void appslot_poll_yield_reset(void);
 
 /* ======== シフトキー状態 ========
  * **書き込むのは kbd_irq_handler (IRQ1 ISR、配りの kbd_deliver を含む) だけ**。ISR は割り込みゲート
@@ -114,45 +111,6 @@ STATIC_ASSERT(KBD_DLOG_BREAK == SCANCODE_BREAK, kbd_dlog_break_matches);
 /* ビット1 = 押下中, ビット0 = 離されている */
 static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
 
-/* ======== リングバッファ (u16: 上位=スキャンコード, 下位=ASCII) ======== */
-static volatile u16 kbd_buf[KBD_BUF_SIZE];
-static volatile int kbd_head = 0;
-static volatile int kbd_tail = 0;
-static volatile int kbd_count = 0;
-
-/* 待ち行列が満杯で捨てた打鍵の累計 (契約 T3、GUI v1.1)。IRQ1 ISR だけが
- * 加算する (kbd_shift_state と同じ所有権)。KAPI kbd_dropped_count() で読む。 */
-static volatile u32 kbd_dropped = 0;
-
-/* 生 make/break イベントリング (レビュー ⑥、GUI の Key down/up 用)。
- * cooked な kbd_buf (make のみ、ASCII 化) と別に、全キーの押下/離しを
- * 順序どおり積む。WM (gshell) が kbd_trygetrawkey() で読み、down=1/0 の
- * Key イベントを作る。エントリ = keycode | (down << 8)。満杯なら捨てる
- * (WM が追いつく前提。取りこぼしは kbd_dropped と別勘定にしない)。 */
-static volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
-static volatile int kbd_raw_head = 0;
-static volatile int kbd_raw_tail = 0;
-static volatile int kbd_raw_count = 0;
-/* raw リング満杯で捨てた生イベント数 (レビュー ①)。GUI の取りこぼし検出用に
- * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
-static volatile u32 kbd_raw_dropped = 0;
-
-/* GUI モード (W1 申し送り ①、K2-B)。WM (gshell) が gui_register した間だけ 1。
- *
- * WM は raw リングだけを読む。cooked リング (kbd_buf) は誰も読まないので、
- * 積み続けると 32 打鍵で満杯になり kbd_dropped が増え続ける。それを
- * kbd_dropped_count() 経由で WM が拾うと、実際には 1 打鍵も落ちていないのに
- * ヘッダの dropped が増えて OVERFLOW が立つ (偽の取りこぼし)。
- * したがって GUI 中は cooked に積まない — 打鍵の勘定を raw 側 1 本にする。
- * kbd_dropped_count() の意味 (契約 T3: WM が差分を dropped に足す) は
- * 変わらない。ASCII 化は WM が自前の写し (gshell の input::translate) で行う。
- * rshell のシリアル入力は kbd_count を経由しないので影響を受けない。 */
-static volatile int kbd_gui_mode = 0;
-/* Join late STOP makes until a new key/button press or 500 ms after ABORTED. */
-#define KBD_STOP_SUPPRESS_TICKS (PIT_HZ / 2)
-static volatile int kbd_stop_suppressed = 0;
-static volatile u32 kbd_stop_tick;
-static u8 kbd_stop_mouse_buttons;
 
 /* ======================================================================== */
 /*  スキャンコード → ASCII 変換テーブル                                    */
@@ -406,29 +364,8 @@ static void kbd_deliver(u8 scancode)
      * 溜めると次の gshell に古い打鍵が届き、kbd_raw_dropped も水増しになる
      * (レビュー #3 ③)。 */
     if (kbd_gui_mode) {
-        if ((u32)(tick_count - kbd_stop_tick) >= KBD_STOP_SUPPRESS_TICKS ||
-            (!is_break && keycode != KEY_STOP &&
-             (keycode < KEY_SHIFT || keycode > KEY_CTRL)))
-            kbd_stop_suppressed = 0;
-        /* Filter before both raw enqueue and ring3_abort_request: filtering
-         * only in the WM leaves an IRQ abort_req on the next running app. */
-        if (kbd_stop_suppressed && !is_break && keycode == KEY_STOP &&
-            (kbd_shift_state & SHIFT_CTRL)) return;
-        if (kbd_raw_count < KBD_BUF_SIZE) {
-            kbd_raw_buf[kbd_raw_tail] = (u16)keycode
-                                      | (is_break ? 0 : KBD_RAW_MAKE)
-                                      | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
-            kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
-            kbd_raw_count++;
-        } else {
-            /* Keep emergency make even when ordinary input filled the ring.
-             * Replace the newest entry: earlier input order and head stay intact. */
-            if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
-                int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
-                kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
-            }
-            kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
-        }
+        if (legacy_stop_filter(keycode, is_break, kbd_shift_state)) return;
+        legacy_raw_push(keycode, is_break, kbd_shift_state);
     }
 
     if (is_mod) return;
@@ -471,16 +408,7 @@ static void kbd_deliver(u8 scancode)
     }
 
     /* バッファに格納: 全メイクキーイベントを格納（修飾キーは上で既にreturn済み）*/
-    if (kbd_count < KBD_BUF_SIZE) {
-        u16 entry = ((u16)keycode << 8) | ascii;
-        kbd_buf[kbd_tail] = entry;
-        kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
-        kbd_count++;
-    } else {
-        /* 満杯なら新しい打鍵を捨てて数える (契約 T3)。WM が
-         * kbd_dropped_count() の差分を dropped に合算し OVERFLOW を立てる。 */
-        kbd_dropped++;
-    }
+    legacy_cooked_push(((u16)keycode << 8) | ascii);
 }
 
 /* ======================================================================== */
@@ -533,10 +461,8 @@ void kbd_init(void)
     kbd_dlog_reset(&kbd_dlog);
 
     /* バッファクリア */
-    kbd_head = 0;
-    kbd_tail = 0;
-    kbd_count = 0;
-    kbd_dropped = 0;
+    legacy_cooked_flush();
+    legacy_cooked_reset_dropped();
     /* カナ・CAPS のロックは BIOS の 053Ah から引き継ぐ (kbd_lock_bits_from_bios)。
      * IRQ1 はまだ閉じているので ISR の所有権に触れない。 */
     kbd_shift_state = kbd_lock_bits_from_bios(kbd_bios_shift_peek());
@@ -547,7 +473,7 @@ void kbd_init(void)
     {
         int i;
         for (i = 0; i < KBD_BITMAP_BYTES; i++) kbd_key_pressed[i] = 0;
-        kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
+        legacy_raw_flush();
     }
 
     /* キーボードIRQを有効化 */
@@ -642,7 +568,7 @@ int kbd_has_key(void)
      * (1 バイトを書けば、真を返しつつその 1 バイトを落とすことになる)。
      * ポーリングで譲りたい呼び手は kbd_trygetchar / kbd_trygetkey を使う。 */
     if (kbd_gui_mode) return kbd_inject_pending() > 0;
-    return kbd_count > 0;
+    return legacy_cooked_pending() > 0;
 }
 
 /* GUI モード中の 1 バイト取り出し (票 K7 D2)。GUI 中の IRQ1 は cooked リング
@@ -655,30 +581,8 @@ static int kbd_gui_trygetbyte(void)
     return (int)b;
 }
 
-static int kbd_local_trykey(void)
-{
-    u16 entry;
-
-    if (kbd_count == 0) return -1;
-
-    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
-
-    return (int)entry;
-}
-
-static int kbd_local_peekkey(void)
-{
-    u16 entry;
-    unsigned int flags;
-
-    if (kbd_count == 0) return -1;
-
-    flags = irq_save();
-    entry = kbd_buf[kbd_head];
-    irq_restore(flags);
-
-    return (int)entry;
-}
+static int kbd_local_trykey(void) { return legacy_cooked_take(); }
+static int kbd_local_peekkey(void) { return legacy_cooked_peek(); }
 
 static int kbd_legacy_gui(void) { return kbd_gui_mode; }
 static int kbd_legacy_terminal_enabled(void)
@@ -759,11 +663,6 @@ int kbd_trygetchar_local(void)
  *
  *  `hlt` ループを GUI 中の CPL=3 アプリに残すと、syscall の中で止まったまま
  *  協調型の全体 (gshell と他の 3 本) が動かなくなる (票 §0)。 */
-static int kbd_gui_getbyte(int interruptible)
-{
-    return input_legacy_wait(IL_CHAR, interruptible);
-}
-
 static int kbd_getchar_wait(int interruptible)
 {
     return input_legacy_wait(IL_CHAR, interruptible);
@@ -774,24 +673,7 @@ static int kbd_getchar_wait(int interruptible)
  * 端末経由で届く打鍵にはスキャンコードが無い。 */
 int kbd_getkey_wait(int interruptible)
 {
-    u16 entry;
-    u32 start_tick = tick_count;
-    int capture = con_sink_capture_active();
-
-    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
-
-    while (kbd_count == 0) {
-        kbd_foreground_poll();
-        if (interruptible && ring3_wait_pending()) return -1;
-        idle_work_run();
-        _halt();
-        if (capture && (u32)(tick_count - start_tick) >= KBD_RSHELL_TIMEOUT_SEC * PIT_HZ)
-            return 0x1b;
-    }
-
-    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
-
-    return (int)entry;
+    return input_legacy_wait(IL_KEY, interruptible);
 }
 
 /* ノンブロッキング版: キーコードデータ(u16)を返す。なければ-1 */
@@ -833,40 +715,6 @@ int kbd_is_pressed(int scancode)
     return (kbd_key_pressed[scancode / BITS_PER_BYTE] >> (scancode % BITS_PER_BYTE)) & 1;
 }
 
-/* mouse_poll supplies physical button samples, including during WM Pump.
- * Keep a separate history: the WM UI intentionally defers its edges to X3. */
-void kbd_stop_mouse_sample(u8 buttons)
-{
-    u32 flags = irq_save();
-    if (buttons & (u8)~kbd_stop_mouse_buttons)
-        kbd_stop_suppressed = 0;
-    kbd_stop_mouse_buttons = buttons;
-    irq_restore(flags);
-}
-
-/* Preserve order and all non-STOP input, including modifier/break events. */
-void kbd_discard_stop(void)
-{
-    u32 flags = irq_save();
-    kbd_stop_suppressed = kbd_gui_mode;
-    kbd_stop_tick = tick_count;
-    int n = kbd_raw_count;
-    int read = kbd_raw_head;
-    int write = read;
-    int kept = 0;
-    while (n-- > 0) {
-        u16 raw = kbd_raw_buf[read];
-        read = (read + 1) % KBD_BUF_SIZE;
-        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
-            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;
-        kbd_raw_buf[write] = raw;
-        write = (write + 1) % KBD_BUF_SIZE;
-        kept++;
-    }
-    kbd_raw_tail = write;
-    kbd_raw_count = kept;
-    irq_restore(flags);
-}
 
 /* 生 make/break イベントを 1 件取り出す (レビュー ⑥)。無ければ -1。
  * 戻り値 = keycode | (down << 8) | (mods << KBD_RAW_MOD_SHIFT)。down=1 が押下 (make)、0 が離し
@@ -875,63 +723,13 @@ void kbd_discard_stop(void)
  * WM (gshell) が Key down/up イベントを作るのに使う。 */
 int kbd_trygetrawkey(void)
 {
-    u16 entry;
-    if (kbd_raw_count == 0) return -1;
-    RING_DEQUEUE(entry, kbd_raw_buf, kbd_raw_head, kbd_raw_count, KBD_BUF_SIZE);
-    return (int)entry;
-}
-
-/* ======================================================================== */
-/*  kbd_set_gui_mode — GUI (WM 常駐) モードの切替 (K2-B、W1 申し送り ①)     */
-/*                                                                          */
-/*  kernel/gui.c が gui_register で 1、gui_owner_exit(owner 1) で 0 にする。 */
-/*  KAPI は増やさない (GUI の状態はカーネル内で完結する)。                    */
-/*  切替のたびに cooked リングを空にする:                                     */
-/*    - GUI へ入るとき: CUI で溜まっていた打鍵を捨てる (WM は raw から同じ    */
-/*      打鍵を既に受け取っているので二重にはしない)。                        */
-/*    - CUI へ戻るとき: GUI 中に (この関数が 0 にする前に) 積まれた分を       */
-/*      シェルのプロンプトへ流し込まない。                                    */
-/*  捨てた分は kbd_dropped に数えない — 経路の切替であって取りこぼしでは      */
-/*  ないため (数えると WM 側に偽の OVERFLOW が出る)。                        */
-/*  head/tail/count は IRQ1 と競合するので irq_save で囲む。                  */
-/* ======================================================================== */
-void kbd_set_gui_mode(int on)
-{
-    int next = on ? 1 : 0;
-    unsigned int flags;
-
-    if (next == kbd_gui_mode) return;
-
-    flags = irq_save();
-    kbd_gui_mode = next;
-    kbd_stop_suppressed = 0;
-    if (next) {
-        /* GUI セッションの起点で取りこぼし累計を 0 に戻す (レビュー #4 ③)。
-         * gshell は last_kbd_dropped=0 から差分を取るので、前回セッションや
-         * CUI 中の cooked drop が最初の取り込みで偽の OVERFLOW になっていた。 */
-        kbd_dropped     = 0;
-        kbd_raw_dropped = 0;
-    }
-    kbd_head  = 0;
-    kbd_tail  = 0;
-    kbd_count = 0;
-    /* raw リングも空にする。raw は WM しか読まないので、CUI 中の打鍵 (rshell を
-     * 閉じた ESC 等) が残ったまま次の gshell に届き、起動直後に ESC で終了して
-     * しまう (2026-09-06 実測: os32gui の直後に CUI へ戻る)。GUI → CUI の
-     * 向きも同様に、次回の gshell へ古い打鍵を持ち越さない。 */
-    kbd_raw_head  = 0;
-    kbd_raw_tail  = 0;
-    kbd_raw_count = 0;
-    irq_restore(flags);
-    /* ポーリング型 yield の間引き (票 T8 §7 D8) もセッションの境界で戻す。
-     * 錠の外で呼ぶ — 触るのは exec/appslot.c の 1 語で、IRQ1 は見ない。 */
-    appslot_poll_yield_reset();
+    return legacy_raw_take();
 }
 
 /* 待ち行列が満杯で捨てた打鍵の累計を返す (契約 T3、GUI v1.1 の KAPI)。 */
 u32 kbd_dropped_count(void)
 {
-    return kbd_dropped + kbd_raw_dropped;
+    return legacy_cooked_dropped() + legacy_raw_dropped();
 }
 
 int kbd_getchar(void) { return kbd_getchar_wait(0); }

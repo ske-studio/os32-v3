@@ -1,3 +1,5 @@
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 /* F2/F2i: compile the real keyboard with a foreground/device boundary.
  * No drawing or real keyboard input is needed to advance the wait loops. */
@@ -36,8 +38,7 @@ static void host_halt(void)
     tick_count += wait_mode == 2 ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ / 2 : 1;
     if (++halts == 3) {
         if (wait_mode == 1) {
-            kbd_buf[0] = 0x1d61;
-            kbd_count = 1;
+            legacy_cooked_push(0x1d61);
         } else {
             pending = 1;
         }
@@ -68,7 +69,7 @@ static void fresh(void)
     polls = halts = violations = 0;
     pending = rshell_active = kbd_gui_mode = wait_mode = capture = 0;
     serial_byte = injected = -1;
-    kbd_head = kbd_count = 0;
+    legacy_cooked_flush();
     _enable();
 }
 
@@ -86,17 +87,15 @@ static int test(void)
           "noninterruptible getchar wakes on key");
     fresh();
     wait_mode = 1;
-    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 3 && !violations,
+    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 4 && !violations,
           "noninterruptible getkey wakes on key");
 
     fresh();
     CHECK(kbd_trygetchar() == -1 && polls == 1, "empty trychar polls");
     CHECK(kbd_trygetkey() == -1 && polls == 2, "empty trykey polls");
-    kbd_buf[0] = 0x1d61;
-    kbd_count = 1;
+    legacy_cooked_push(0x1d61);
     CHECK(kbd_trygetchar() == 'a' && polls == 3, "ready trychar polls and preserves ASCII");
-    kbd_buf[1] = 0x1d61;
-    kbd_count = 1;
+    legacy_cooked_push(0x1d61);
     CHECK(kbd_trygetkey() == 0x1d61 && polls == 4, "ready trykey polls and preserves scan");
     rshell_active = 1;
     serial_byte = 's';

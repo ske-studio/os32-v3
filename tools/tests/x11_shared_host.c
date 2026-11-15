@@ -1,3 +1,5 @@
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 #include "../../kernel/input_wait.c"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
@@ -183,7 +185,7 @@ static void reset(void)
     con_sink_owner_exit(con_sink_reader_get());
     con_sink_disable();
     kbd_set_gui_mode(0);
-    kbd_head = kbd_tail = kbd_count = 0;
+    legacy_cooked_flush();
     kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
     kbd_shift_state = 0;
     kmemset(&g_ime, 0, sizeof(g_ime));
@@ -250,7 +252,7 @@ static int delivery(void)
     con_sink_enable(); kbd_set_gui_mode(1);
     key(0x1d);
     int raw = kbd_trygetrawkey();
-    CHECK((raw & 0x1ff) == (0x100 | 0x1d) && !kbd_count, "WM raw only");
+    CHECK((raw & 0x1ff) == (0x100 | 0x1d) && !legacy_cooked_pending(), "WM raw only");
     CHECK(ime_feed_key((0x1d << 8) | 'a') == -1, "WM kana consumed");
     CHECK((kbd_trygetrawkey() & 0x1ff) == 0x1d && kbd_trygetrawkey() == -1,
           "WM make and break each once");
@@ -293,7 +295,7 @@ static int candidate_order(void)
             key(KEY_SPACE);
             if (list) key(KEY_XFER);
             /* Polls build the real preedit/candidate state without blocking. */
-            while (kbd_count) CHECK(ime_trygetkey() == -1, "IMEORDER composing consumed");
+            while (legacy_cooked_pending()) CHECK(ime_trygetkey() == -1, "IMEORDER composing consumed");
             CHECK(g_ime.state == (list ? IME_ST_CANDLIST : IME_ST_CONVERT) &&
                   kstrcmp(g_ime.results[0].kanji, "換字") == 0,
                   "IMEORDER kanji conversion ready");

@@ -1,3 +1,5 @@
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 #include "../../kernel/input_wait.c"
 /* No device callbacks are registered in this boundary fixture. */
@@ -104,8 +106,12 @@ int bus_mouse_init(void) { return 1; }
 int seamless_mouse_init(void) { return 0; }
 int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
 u8 mouse_read_buttons(void) { return stub_mouse_buttons; }
-void bus_mouse_get(i16 *dx, i16 *dy, u8 *buttons)
-{ *dx = 0; *dy = 0; *buttons = stub_mouse_buttons; }
+void mouse_ext_mode(int enabled) { (void)enabled; }
+void mouse_ext_read_legacy(i16 *x, i16 *y) { *x = *y = 0; }
+u8 input_buttons(void) { return stub_mouse_buttons; }
+void pointer_position(i16 *x, i16 *y) { *x = 319; *y = 199; }
+void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
+{ (void)x0; (void)y0; (void)x1; (void)y1; }
 int tvram_reverse_cell(int x, int y) { (void)x; (void)y; return 1; }
 
 /* 1 回の IRQ1: 0043h = st、0041h = data */

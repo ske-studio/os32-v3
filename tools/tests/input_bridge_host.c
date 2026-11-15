@@ -1,7 +1,8 @@
 /* b27213d2 keyboard selection and the new bridge use identical source queues. */
 #include "types.h"
 #include "in2_int.h"
-static int kbd_gui_mode, rshell_active, capture, serial, injected;
+volatile int kbd_gui_mode;
+static int rshell_active, capture, serial, injected;
 static u16 kbd_buf[2];
 static unsigned kbd_head, kbd_count, parks, polls, serial_reads, halts;
 static volatile u32 tick_count = 123;
@@ -26,6 +27,19 @@ static void _halt(void) {
     if (++halts > 1) __builtin_trap();
     kbd_buf[0]=0x1d61; kbd_head=0; kbd_count=1; injected=0xe3;
 }
+#ifdef CURRENT
+int legacy_cooked_take(void) {
+    u16 entry;
+    if (!kbd_count) return -1;
+    RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    return entry;
+}
+int legacy_cooked_peek(void) {
+    if (!kbd_count) return -1;
+    unsigned f=irq_save(); int entry=kbd_buf[kbd_head]; irq_restore(f);
+    return entry;
+}
+#endif
 #include "selected.inc"
 #ifdef CURRENT
 static int samples, completed = -1;
@@ -91,7 +105,10 @@ static int probe(void)
         int key=kbd_getkey_wait(intr);
         /* Serial remains untouched both with/without capture, even after a halt. */
         if (key!=(gui ? 0xe3 : 0x1d61) || serial_reads || serial!='s') return 6;
-        int trace[]={key,serial,(int)halts,(int)parks,(int)polls};
+#ifdef CURRENT
+        if (polls != (gui ? 0 : halts + 1)) return 8;
+#endif
+        int trace[]={key,serial,(int)halts,(int)parks};
         __asm__ volatile("int $0x80" : : "a"(4),"b"(1),"c"(trace),"d"(sizeof(trace)) : "memory");
     }
     return 0;

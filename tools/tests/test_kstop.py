@@ -458,8 +458,12 @@ def run(overrides=None):
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
+    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
+    mode = read('input/hal/legacy_mode.c')
+    code += function(mode, 'legacy_stop_filter') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
-    code += function(kbd, 'kbd_discard_stop') + '\n'
+    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_discard_stop') + '\n'
+    code += function(mode, 'kbd_discard_stop') + '\n'
     code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
     code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
@@ -504,7 +508,7 @@ MUTATIONS = [
  ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
- ('raw-stop-retained','drivers/input/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
+ ('raw-stop-retained','input/hal/legacy_ring.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
@@ -535,15 +539,15 @@ src=src[a:b]
 MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
 src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
 MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
-MUTATIONS.append(('raw-full-loses-stop','drivers/input/kbd.c',
-    'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {',
+MUTATIONS.append(('raw-full-loses-stop','input/hal/legacy_ring.c',
+    'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {',
     'if (0) {'))
 
 for name, guard in (('raw-full-replaces-break', '!is_break && '),
-                    ('raw-full-replaces-without-ctrl', ' && (kbd_shift_state & SHIFT_CTRL)')):
-    old = 'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {'
+                    ('raw-full-replaces-without-ctrl', ' && (mods & SHIFT_CTRL)')):
+    old = 'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {'
     assert old.count(guard) == 1
-    MUTATIONS.append((name, 'drivers/input/kbd.c', old, old.replace(guard, '')))
+    MUTATIONS.append((name, 'input/hal/legacy_ring.c', old, old.replace(guard, '')))
 
 # Resume-mark cases must catch regressions without the boot selftest.
 for name, fn, old, new in (
