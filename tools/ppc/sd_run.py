@@ -219,11 +219,231 @@ def accept(elf, cpu, out, mutation='normal'):
         s.close()
 
 
+# Link acceptance reuses the existing QMP/RSHELL/HostAgent mechanism. PLN1
+# remains the default until the operator transport switch is accepted.
+LINK_NONCE = ('fs/serialfs/serialfs_persistent.c',
+              'nonce = sfs_crc32(token, sizeof(token));', 'nonce = 0;')
+
+
+def link_settings(work, mutation=False):
+    import link_sh_run as link
+    opts = link.settings(work)
+    user = next(Path(v.split('=', 1)[1]) for v in opts if v.startswith('PPC_SH_MUT_FILE='))
+    text = user.read_text()
+    text = link.replace_once(text, '    if (!strcmp(line, "p3-fault"))',
+                             '    static int p5_fd = -1;\n    if (!strcmp(line, "p3-fault"))')
+    text = link.replace_once(text, '    } else (void)execute_command(line);', r'''    } else if (!strcmp(line, "p5-hold")) {
+        p5_fd = g_api->sys_open("/host/rw/f", KAPI_O_RDONLY);
+        g_api->kprintf(7, "%s\n", p5_fd >= 0 ? "held" : "open failed");
+    } else if (!strcmp(line, "p5-stale")) {
+        char c;
+        int rc = g_api->sys_read(p5_fd, &c, 1);
+        g_api->kprintf(7, "%s\n", rc == OS32_ERR_STALE ? "stale" : "not stale");
+        g_api->sys_close(p5_fd);
+    } else if (!strcmp(line, "p5-copy")) {
+        char buf[4096];
+        int src = g_api->sys_open("/host/big", KAPI_O_RDONLY);
+        int dst = g_api->sys_open("/host/rw/big2", KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
+        int n = -1, ok = src >= 0 && dst >= 0;
+        /* Exercise multiple SFS CALLs within one large syscall. */
+        while (ok && (n = g_api->sys_read(src, buf, sizeof(buf))) > 0) {
+            if (g_api->sys_write(dst, buf, n) != n) ok = 0;
+        }
+        if (src >= 0) g_api->sys_close(src);
+        if (dst >= 0) g_api->sys_close(dst);
+        g_api->kprintf(7, "%s\n", ok && n == 0 ? "copied" : "copy failed");
+    } else (void)execute_command(line);''')
+    user.write_text(text)
+    if mutation:
+        path, before, after = LINK_NONCE
+        copy = work/'nonce.c'
+        copy.write_text(link.replace_once((link.ROOT/path).read_text(), before, after))
+        opts += ['KB_MUT_THIRD_SRC='+path, 'KB_MUT_THIRD_FILE='+str(copy)]
+    return opts
+
+
+def link_observation(data, expected, label):
+    from run import require as criterion
+    criterion(data == expected, label)
+
+
+
+def link_absence(body, ticks):
+    from run import require as criterion
+    criterion(b'cat: /host/rw/f: ' in body and 0 < ticks <= 5000, 'bounded absence')
+
+
+def link_large(calls):
+    import serialfs_host as sfs
+    from run import require as criterion
+    criterion(any(len(req) >= 1030 and sfs.try_frame(req, 0, sfs.LAN_MAX_PAYLOAD)[2].type == sfs.T_WRITE
+                  for req, _ in calls), 'large WRITE frame')
+    criterion(any(len(reply) == 1044 for _, reply in calls), '1044B READ frame')
+
+def link_accept(elf, cpu, out, mutation='normal'):
+    import link_sh_run as link
+    from host_agent import HostAgent, hdr_unpack, OP_HELLO
+    import serialfs_host as sfs
+
+    class LinkSession(link.Session):
+        # icount is only for USB typing; HostFS acceptance uses host-paced time.
+        qemu_clock = ()
+
+        def new_agent(self):
+            if self.operator: self.operator.close()
+            directory = self.out/('agent-'+str(len(self.events))); directory.mkdir()
+            self.agent = HostAgent(bytes.fromhex('02005e000001'), state_dir=str(directory),
+                quiet=True, allow_net=False, clip='none', file_root=self.root,
+                allow_write=['/rw'], peer=bytes.fromhex('525400123456'))
+            self.operator = link.OperatorSocket(('127.0.0.1', 0), self.agent.operator, lambda: {})
+            self.agent.operator_socket = self.operator
+            service = self.agent._service_rshell
+            def observed(rid, ent, parts, sink):
+                self.events.append(dict(rid=rid, parts=list(parts), body=bytes(ent['got']).hex(), at=time.monotonic()))
+                return service(rid, ent, parts, sink)
+            self.agent._service_rshell = observed
+            handle = self.agent.handle
+            def capture(frame, sink):
+                if len(frame) >= 42 and hdr_unpack(frame[14:])[0] != OP_HELLO:
+                    self.old_frames.append(bytes(frame))
+                return handle(frame, sink)
+            self.agent.handle = capture
+            service_sfs = self.agent._service_sfs
+            def gated(rid, ent, sink):
+                if not self.drop: return service_sfs(rid, ent, sink)
+            self.agent._service_sfs = gated
+            backend = self.agent._sfs_backend()
+            call = backend.call
+            def counted(frame, peer):
+                reply = call(frame, peer)
+                self.calls.append((bytes(frame), reply))
+                return reply
+            backend.call = counted
+
+        def stop_guest(self):
+            self.q.call('quit'); self.p.wait(timeout=5)
+            link.require(self.p.returncode == 0, 'QEMU rc')
+            self.q.close(); self.io.sock.close(); self.err.close(); self.frames.close()
+            self.q = self.io = self.err = self.frames = None
+
+    out.mkdir()
+    root = out/'saved'; root.mkdir(); (root/'rw').mkdir()
+    (root/'big').write_bytes(bytes(range(256))*256)
+    (root/'ro').write_bytes(b'read only\n')
+    s = LinkSession.__new__(LinkSession)
+    s.root, s.drop, s.calls, s.old_frames = root, False, [], []
+    LinkSession.__init__(s, elf, cpu, out/'boot1', 300)
+    try:
+        s.start(); s.wait(s.ready, 'boot1 READY', 60)
+        target = '/tmp/f' if mutation == 'tmp-target' else '/host/rw/f'
+        s.cmd('echo x > '+target, b'')
+        if mutation == 'normal': s.cmd('cat /host/rw/f', b'x\n')
+        if mutation != 'tmp-target':
+            link_observation((root/'rw/f').read_bytes(), b'x\n', 'host bytes')
+        if mutation not in ('no-boot-follow', 'first-session'):
+            s.cmd('echo t > /tmp/t', b'')
+            s.cmd('echo z > /host/ro', b'redirect: cannot open /host/ro\n')
+            link_observation((root/'ro').read_bytes(), b'read only\n', 'RO bytes')
+            s.cmd('p5-copy', b'copied\n', seconds=90)
+            link_observation((root/'rw/big2').read_bytes(), (root/'big').read_bytes(), 'large copy')
+            # Frames include CRC, not only payload. Require actual near-limit traffic
+            # in both directions; a small-buffer copy cannot satisfy this meter.
+            link_large(s.calls)
+            if mutation != 'tmp-target':
+                s.drop = True; first = s.word('tick_count')
+                failed = s.cmd('cat /host/rw/f', seconds=20)['result']
+                ticks = (s.word('tick_count')-first) & 0xffffffff
+                link_absence(failed, ticks)
+                s.drop = False
+                s.cmd('cat /host/rw/f', b'x\n')
+                # A live guest retains an FD while the host generation changes.
+                s.cmd('p5-hold', b'held\n'); generation = s.agent.host_generation
+                s.new_agent(); s.wait(s.ready, 'host generation READY', 60)
+                link.require(s.agent.host_generation != generation, 'host generation')
+                s.cmd('p5-stale', b'stale\n')
+                s.cmd('cat /host/rw/f', b'x\n')
+        # Retain this exact agent/backend across guest boots. Stop/start matches
+        # PLN1 and avoids system_reset terminating -no-reboot QEMU.
+        agent, backend = s.agent, s.agent._sfs_backend()
+        session = (agent.sess, agent.epoch)
+        old = list(s.old_frames)
+        old_sfs = [req for req, _ in s.calls if sfs.try_frame(req, 0, sfs.LAN_MAX_PAYLOAD)[2].sid]
+        link.require(old and old_sfs, 'captured old requests')
+        s.stop_guest(); s.out = out/'boot2'; s.out.mkdir()
+        s.deadline = time.monotonic()+180
+        s.start()
+        s.wait(lambda: s.ready() and (agent.sess, agent.epoch) != session, 'boot2 READY', 60)
+        if mutation == 'normal': s.cmd('cat /host/rw/f', b'x\n')
+        if mutation == 'tmp-target':
+            observed = s.cmd('cat /host/rw/f')['result']
+            link_observation(observed, b'> cat /host/rw/f\nx\n\x04', 'restart persistence')
+        s.cmd('echo boot2 > /host/rw/f')
+        link_observation((root/'rw/f').read_bytes(), b'boot2\n', 'restart write')
+        s.cmd('cat /host/rw/f', b'boot2\n')
+        s.cmd('cat /tmp/t', b'cat: /tmp/t: No such file or directory\n')
+        link.require(s.agent is agent and agent._sfs_backend() is backend, 'retained host')
+        before = len(s.calls)
+        for frame in old: agent.handle(frame, s)
+        link.require(len(s.calls) == before, 'old link request reached backend')
+        for req in old_sfs:
+            response = backend.call(req, agent.peer)
+            if response:
+                parsed = sfs.try_frame(response, 0, sfs.LAN_MAX_PAYLOAD)[2]
+                link.require(parsed.type == sfs.T_ERR and link.struct.unpack('<i', parsed.payload)[0] == sfs.ERR_STALE,
+                             'old SFS request accepted')
+        link_observation((root/'rw/f').read_bytes(), b'boot2\n', 'old request write')
+        s.cmd('echo alive', b'alive\n'); s.stop_guest()
+        print(cpu+' link S-D PASS', flush=True)
+    finally:
+        s.close()
+
+
+def link_main(args):
+    import link_sh_run as link
+    missing = [x for x in (link.cross('gcc'), link.cross('nm'), 'qemu-system-ppc', 'genisoimage') if not shutil.which(x)]
+    if not link.ROM.is_file(): missing.append(str(link.ROM))
+    if missing:
+        print('SKIP link S-D: unavailable '+', '.join(missing))
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
+    if not args.build_only:
+        try:
+            for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+                with socket.socket(socket.AF_INET, kind) as probe: probe.bind(('127.0.0.1', 0))
+        except OSError as exc:
+            print('未 link S-D: AF_INET unavailable: '+str(exc)); return 3
+    base = Path(os.environ['TMPDIR'])/'sd-link'; base.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='run-', dir=base)); print('evidence='+str(work), flush=True)
+    control = work/'normal'; control.mkdir()
+    elf = build(control/'kernel', *link_settings(control))
+    link.check_map(elf.with_suffix('.map'))
+    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
+    if not args.build_only:
+        for cpu in cpus: link_accept(elf, cpu, work/cpu)
+        link_accept(elf, cpus[0], work/'first-session', 'first-session')
+    if args.mutate:
+        mutant = work/'no-boot-follow'; mutant.mkdir()
+        changed = build(mutant/'kernel', *link_settings(mutant, True))
+        link.check_map(changed.with_suffix('.map'))
+        if not args.build_only:
+            for name, image, expected in (('no-boot-follow', changed, 'restart write'),
+                                           ('tmp-target', elf, 'restart persistence')):
+                try: link_accept(image, cpus[0], work/(name+'-guest'), name)
+                except link.CriterionFailure as exc:
+                    link.require(str(exc) == expected, 'unexpected mutation verdict '+name+': '+str(exc))
+                    print('RED '+name+': '+str(exc), flush=True)
+                else: raise RuntimeError('SURVIVED '+name)
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--link', action='store_true', help='use link-SH; retain PLN1 default')
+    parser.add_argument('--build-only', action='store_true', help='build link acceptance copies without sockets')
     args = parser.parse_args()
+    if args.link:
+        return link_main(args)
+    if args.build_only: parser.error('--build-only requires --link')
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.bind(('127.0.0.1', 0))

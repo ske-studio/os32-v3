@@ -9,7 +9,7 @@ sys.path[:0] = [str(ROOT/'tools/ppc'), str(ROOT/'tools')]
 import link_sh_run as meter
 
 CHECK = dict(name='ppc-link-sh-meter', env=['ppc-cross'], tier=1, budget=20, needs=['make:ppc-ci-image'],
-    covers=['tools/tests/test_ppc_link_sh_run.py','tools/ppc/link_sh_run.py','fs/serialfs/serialfs_persistent.c','tools/ppc/run.py','tools/ppc/link_run.py','tools/ppc/kboot_accept.py',
+    covers=['fs/serialfs/serialfs_persistent.c', 'tools/tests/test_ppc_link_sh_run.py','tools/ppc/link_sh_run.py','tools/ppc/run.py','tools/ppc/link_run.py','tools/ppc/kboot_accept.py',
             'tools/ppc/kboot_run.py','tools/ppc/usb_run.py','tools/ppc/sb_run.py',
             'tools/ppc_lan_host.py','tools/host_agent.py','tools/host_operator_socket.py',
             'tools/host_rshell.py','tools/ppc_link_transport.py','tools/remote_transport.py',

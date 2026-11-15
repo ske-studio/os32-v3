@@ -27,6 +27,8 @@
 - USB の受入は `-icount shift=auto` (TCG では OHCI のフレームの時計が TB から遅れる)。
 - LAN・USB の受入は時間に敏感で、ホストの負荷が高い (load 10 前後) と時間切れや打鍵の重複で落ちることがある。負荷の下がった時に回し直して確かめる。
 
+QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、RXDMA_KICK を書いても配り直さない (-trace sungem_rx_* で観測、2026-11-15)。そのため、受信の有効化の前に 27 本以上溜まると受信が止まる。製品では回避しない (ホストが送り続けないことで防ぐ、NET_HOSTSVC_DESIGN §5)。
+
 ## 4. 時計
 
 - W4 実装前の現状では USER の syscall は EE=0 で走り tick_count が止まるので、機種の時計 (hostfs の now・USB の ms) は timebase から取る。DEC の処理を前景から呼ばない。W4 適合後は通常 syscall 本体を FG1 とし、timer IRQ が進行する (ARCH_COMPAT の AC-CTX-1/6)。適合はまだ未。
