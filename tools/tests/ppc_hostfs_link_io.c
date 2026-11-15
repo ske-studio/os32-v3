@@ -12,7 +12,7 @@ static int ee = 1;
 int _irq_enabled(void) { return ee; }
 volatile u32 kctx_irq_depth;
 static u32 clock, opens, closes, writes, polls, stalls, status_code = 200;
-static u32 reply_len, reply_pos, body_len;
+static u32 reply_len, reply_pos, body_len, declared;
 static int auto_reply;
 static u32 hellos;
 static void (*registered_work)(void);
@@ -28,6 +28,14 @@ i32 platform_host_open(const char *req, u32 n, int owner)
     (void)owner;
     if (stall_phase == HFS_OPEN) { ++stalls; return OS32_ERR_AGAIN; }
     if (n < 10 || req[0] != 'S' || req[8] != ' ') return -1;
+    /* Review F1: like link_decl_len, the declared length must cover the
+     * WDATA exactly; a short declaration makes the real link_host_write INVAL. */
+    declared = 0;
+    for (u32 i = 9; i < n; ++i) {
+        if (req[i] < '0' || req[i] > '9') return -1;
+        declared = declared * 10 + (u32)(req[i] - '0');
+    }
+    if (!declared || declared > 1044) return -1;
     body_len = reply_pos = 0;
     ++opens;
     return 3;
@@ -37,6 +45,7 @@ i32 platform_host_write(i32 h, const void *buf, u32 n, int owner)
     (void)h; (void)owner;
     if (stall_phase == HFS_WRITE) { ++stalls; return OS32_ERR_AGAIN; }
     if (n > 7) n = 7;
+    if (body_len + n > declared) return OS32_ERR_INVAL; /* link_host_write: len > remain */
     for (u32 i = 0; i < n; ++i) body[body_len++] = ((const u8 *)buf)[i];
     ++writes;
     return (i32)n;

@@ -30,6 +30,8 @@ MUTATIONS = [
     ('CRC', 'if (sfs_crc32(', 'if (0 && sfs_crc32('),
     ('length', 'len != SFS_HDR_LEN + payload + SFS_CRC_LEN', '0'),
     ('oneway', 'if (!length) { finish(0); return; }', 'if (!length) { finish(-1); return; }'),
+    # Review F1: the SFS CALL declaration must equal the frame length.
+    ('declared length', 'u32 n = tx_len, count = 0, pos = 9;', 'u32 n = tx_len - 1, count = 0, pos = 9;'),
 ]
 def exercise(folder, source, extra=None):
     folder.mkdir()

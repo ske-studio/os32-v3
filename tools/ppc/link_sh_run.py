@@ -208,8 +208,15 @@ class Session:
 
     def word(self, name, offset=0):
         require(name in self.symbols,'missing symbol '+name)
-        value=self.q.call('human-monitor-command',{'command-line':f'x /1wx 0x{self.symbols[name]+offset:x}'})
-        match=re.search(r':\s*0x([0-9a-fA-F]+)',value)
+        # The monitor reads through the current translation; a sample taken
+        # while the CPU runs with translation off (OF calls, early boot,
+        # exception entry) cannot see kernel VAs. Retry briefly before failing.
+        until=time.monotonic()+2
+        while True:
+            value=self.q.call('human-monitor-command',{'command-line':f'x /1wx 0x{self.symbols[name]+offset:x}'})
+            match=re.search(r':\s*0x([0-9a-fA-F]+)',value)
+            if match is not None or time.monotonic()>=until: break
+            time.sleep(.02)
         require(match is not None,'unreadable '+name)
         return int(match[1],16)
 
