@@ -1,5 +1,6 @@
 #include "in2_int.h"
 #include "os32_kapi_shared.h"
+void input_state_release(u8 src, u16 generation) { (void)src; (void)generation; }
 static int probe(void)
 {
     u16 gen[16], next;

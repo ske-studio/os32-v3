@@ -1,4 +1,5 @@
 #include "../../kernel/input_legacy.c"
+#include "../../kernel/input_wait.c"
 /* No device callbacks are registered in this boundary fixture. */
 void idle_work_run(void) { }
 /* ======================================================================== */
