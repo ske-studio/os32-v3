@@ -1,3 +1,4 @@
+/* PACK ppc-sfs-deadline PM condition B; LAN_OPERATOR_DESIGN §5. */
 /* Integrated C1/C3 unit: real VFS/SerialFS/client/mailbox, one virtual SfsIo. */
 #include "hostsvc_fixture.h"
 #include "fs/serialfs/serialfs.h"
@@ -135,7 +136,7 @@ static int suite(void)
     CHECK(sfs_ensure_session(hs_now() + 100) == 0 && hello_count == 3);
     CHECK(sfs_persistent_generation() == gen);
     CHECK(host_mailbox_put(7, 1, 1, &value, sizeof(value), 1) == 0);
-    CHECK(sfs_ensure_session(hs_now() + 100) == 0 && hello_count == 4);
+    CHECK(sfs_ensure_session(hs_now() + 100) == 0 && hello_count == 3);
     CHECK(sfs_persistent_generation() == gen);
     value = 8;
     CHECK(host_mailbox_put(8, 1, 1, &value, sizeof(value), 1) == 0);

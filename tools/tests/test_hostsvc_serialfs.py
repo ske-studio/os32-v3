@@ -22,7 +22,8 @@ CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
     'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
-    basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1'],
+    env=[], basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1',
+        'LAN_OPERATOR_DESIGN §5', 'PACK ppc-sfs-deadline PM conditions A/B'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
@@ -35,12 +36,6 @@ MUTATIONS = (
      'case OS32_ERR_HOSTDOWN: case OS32_ERR_TIMEOUT:'),
     ('request', 'rc = sfs_request_deadline(type, pl, len, &reply, deadline);',
      'rc = sfs_request_deadline(type, pl, len, &reply, deadline + 1);'),
-    ('read-budget', '&body, &blen, storage, deadline);\n        if (rc < 0) return rc;\n        /* **要求より多く返さない。**',
-     '&body, &blen, storage, deadline + (sfs_deadline(c) - deadline));\n        if (rc < 0) return rc;\n        /* **要求より多く返さない。**'),
-    ('write-budget', '&body, &blen, storage, deadline);\n        if (rc < 0) return rc;\n        if ((u32)rc != chunk || blen != 0)',
-     '&body, &blen, storage, deadline + (sfs_deadline(c) - deadline));\n        if (rc < 0) return rc;\n        if ((u32)rc != chunk || blen != 0)'),
-    ('list-budget', '&body, &blen, storage, deadline);\n        if (rc < 0) return rc;\n        if (rc != 0 || blen < SFS_LIST_RSP_COOKIE_LEN)',
-     '&body, &blen, storage, deadline + (sfs_deadline(c) - deadline));\n        if (rc < 0) return rc;\n        if (rc != 0 || blen < SFS_LIST_RSP_COOKIE_LEN)'),
     ('generation', '*generation = sfs_persistent_generation();', '*generation = 0;'),
     ('check-ensure', 'int rc = sfs_ensure_session(sfs_deadline(c));', 'int rc = 0;'),
     ('refresh', 'return sfs_resident(c) ? sfs_ensure_session(sfs_deadline(c)) : 0;', '(void)c; return 0;'),
@@ -54,13 +49,15 @@ MUTATIONS = (
 
 def build(work, source):
     exe = work / 'serialfs'
+    (work / 'io.h').write_text('/* IRQ is provided by the fixture. */\n')
     subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
                     '-o', str(work / 'kstring.o')], check=True)
     result = host32.build(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
         '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-        '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-        '-I' + str(ROOT), *include_flags(ROOT),
+        '-nostdlib', '-nostdinc', '-isystem',
+        subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-static', '-no-pie', '-Wl,--gc-sections',
+        '-I' + str(work), '-I' + str(ROOT), *include_flags(ROOT),
         *[str(ROOT / p) for p in [
             'tools/tests/hostsvc_serialfs_host.c', 'tools/tests/hostsvc_fixture.c',
             'fs/vfs.c', 'fs/serialfs/sfs_client.c',
@@ -86,7 +83,18 @@ def main():
         print('GREEN C4 VFS/LAN/UART/status/deadline/generation/recovery', flush=True)
         if args.mutate:
             original = source.read_text()
-            for name, old, new in MUTATIONS:
+            budgets = []
+            for function in ('sfs_read_stream', 'sfs_write_at', 'sfs_list_dir'):
+                start = original.index('static int ' + function + '(')
+                end = original.index('\n}\n', start) + 3
+                body = original[start:end]
+                mutant_body = body.replace('sfs_deadline(c)', 'deadline')
+                brace = mutant_body.index('{') + 1
+                client = 'c' if function == 'sfs_write_at' else '(SfsClient *)ctx'
+                declaration = '\n    u32 deadline = sfs_deadline(' + client + ');'
+                mutant_body = mutant_body[:brace] + declaration + mutant_body[brace:]
+                budgets.append((function + '-operation-budget', body, mutant_body))
+            for name, old, new in (*MUTATIONS, *budgets):
                 assert original.count(old) == 1, (name, 'anchor must be unique')
                 mutant = work / 'serialfs.c'
                 mutant.write_text(original.replace(old, new))

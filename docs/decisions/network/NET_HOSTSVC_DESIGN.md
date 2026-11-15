@@ -78,7 +78,7 @@ void net_tick(void) {
 - NP21/W は既定 HostDrv を優先。SFS 試験時は起動設定で /host を SerialFS に選ぶ。使用中 HostDrv を暗黙に上書きしない。
 ```c
 struct SfsPersistent { SfsClient client; u32 generation, last_use, alive_seen; };
-int sfs_ensure_session(u32 deadline); /* sid無し/30秒idle/新ALIVE/seq>0xF000でHELLO、downフラグ無し */
+int sfs_ensure_session(u32 deadline); /* sid無し/30秒idle/初回または世代が変わったALIVE/seq>0xF000でHELLO、downフラグ無し */
 int sfs_request_deadline(u8 op, const void *in, u16 n, void *out, u32 deadline);
 void sfs_alive_observe(u32 host_generation); /* 非消費の内部観測、再接続予約だけ */
 ```

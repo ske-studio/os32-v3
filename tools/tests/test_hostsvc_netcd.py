@@ -13,7 +13,7 @@ CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
     'lib/kstring.h', 'lib/kstring_asm.asm'],
-    basis=['NET_HOSTSVC_DESIGN §4'],
+    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §4'],
     env_limit='fake network/NIC/mediaでsession・世代・期限を確認するが、実ネットワークと実媒体の障害は再現しない。',
 )
 
@@ -56,7 +56,8 @@ def build_run(work, source):
     exe = work / 'netcd-test'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
-        '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+        '-fno-stack-protector', '-nostdlib', '-nostdinc', '-isystem',
+        subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-static', '-no-pie',
         '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/block'), *include_flags(ROOT),
         '-DPRODUCT_SOURCE="' + str(src) + '"',
         *[str(ROOT / p) for p in [

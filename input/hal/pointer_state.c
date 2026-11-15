@@ -5,6 +5,20 @@ static u8 buttons[IN2_MAX_DEV];
 static i16 px = 639 / 2, py = 399 / 2, xmin, ymin, xmax = 639, ymax = 399;
 static i16 prev_x, prev_y;
 static int prev_valid;
+static int seamless;
+
+int pointer_seamless(void) { return seamless; }
+void mouse_ext_mode(int enabled)
+{
+    unsigned f = irq_save();
+    if (seamless != !!enabled) {
+        i16 dx, dy;
+        seamless = !!enabled;
+        mouse_ext_read_legacy(&dx, &dy);
+        pointer_absolute_reset();
+    }
+    irq_restore(f);
+}
 
 u8 pointer_buttons_locked(void)
 {
@@ -47,10 +61,12 @@ void pointer_absolute_reset(void) { prev_valid = 0; }
 int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy)
 {
     int valid = prev_valid;
+    i16 nx = xmin + (int)x * (xmax - xmin) / 32767;
+    i16 ny = ymin + (int)y * (ymax - ymin) / 32767;
     pointer_absolute(x, y);
-    *dx = valid ? clamp((int)px - prev_x, -32768, 32767) : 0;
-    *dy = valid ? clamp((int)py - prev_y, -32768, 32767) : 0;
-    prev_x = px; prev_y = py; prev_valid = 1;
+    *dx = valid ? clamp((int)nx - prev_x, -32768, 32767) : 0;
+    *dy = valid ? clamp((int)ny - prev_y, -32768, 32767) : 0;
+    prev_x = nx; prev_y = ny; prev_valid = 1;
     return valid;
 }
 void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)

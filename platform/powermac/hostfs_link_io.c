@@ -86,7 +86,9 @@ void pm_hfs_link_poll(void)
         do { digits[count++] = (char)('0' + n % 10); n /= 10; } while (n);
         while (count) request[pos++] = digits[--count];
         rc = platform_host_open(request, pos, 0);
-        if (rc == OS32_ERR_AGAIN) return;
+        /* No WDATA has been sent: retry admission within the same deadline. */
+        if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN ||
+            rc == OS32_ERR_FULL) return;
         if (rc < 0) { finish(rc); return; }
         handle = rc;
         phase = HFS_WRITE;
@@ -123,7 +125,13 @@ void pm_hfs_link_poll(void)
 
 static void pm_hfs_idle(void *ctx)
 {
-    if (pm_hfs_can_wait(ctx)) idle_work_run();
+    /* FG1 wait: progress the foreground work, then sleep until the next
+     * interrupt (DEC wakes within one tick). Spinning here burned CPU and,
+     * under QEMU -icount, advanced the guest clock past the CALL deadline.
+     * IRQ context and EE=0 neither poll nor sleep (pm_hfs_can_wait). */
+    if (!pm_hfs_can_wait(ctx)) return;
+    idle_work_run();
+    _idle();
 }
 static int pm_hfs_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
