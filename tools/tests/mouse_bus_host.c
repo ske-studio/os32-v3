@@ -3,6 +3,7 @@
 #include "pc98.h"
 #define T(x) do { if (!(x)) return __LINE__; } while (0)
 unsigned test_irq = 1;
+void test_irq_restore(unsigned f) { test_irq = f; }
 static unsigned char samples[4];
 static unsigned pos, count;
 static InputEvent events[16];

@@ -1,6 +1,7 @@
 #include "in2_int.h"
 #define T(x) do { if (!(x)) return __LINE__; } while (0)
 unsigned test_irq = 1;
+void test_irq_restore(unsigned f) { test_irq = f; }
 static InputEvent last, prior;
 static unsigned count;
 static int v86;
