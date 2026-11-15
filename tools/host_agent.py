@@ -88,7 +88,10 @@ EPOCH_MAX = 0xFFFF
 ACTIVE_MAX = 2          # 同時受付 (OS32 のハンドル数と同じ)
 TOMB_WINDOW = 8         # 墓標を落としてよい高さ (high_water - 8)
 HOLE_FILL_MAX = 64      # 一度に作る HOLE の上限 (異常な rid 跳躍への歯止め)
-FRAME_PAGES = 6         # 最大フレームが占める SRAM ページ数 (保守的)
+FRAME_PAGES = 6         # guest の 1 frame admission 閾値
+LINK_PAGE_BYTES = 256
+RX_OVERHEAD = 8         # NE2000 receive header + FCS
+RX_DATA_FRAMES = 3      # net/nic_rx.c RX_SLOTS=4、EOF に 1 枠を残す
 STREAM_PLEN = 512       # 本文ストリームの 1 フレームあたりのバイト数
 
 # op ごとの payload 長 (min, max)。一致しないフレームは捨てる (v2 パーサの検査)
@@ -735,11 +738,20 @@ class HostAgent:
         d["credit"] = credit
         self._pump(rid, ent, out)
 
+    @staticmethod
+    def _frame_pages(d, seq):
+        ln = min(d["plen"], d["total"] - (seq - 1) * d["plen"])
+        return (ETH_HDR + LINK_HDR + ln + RX_OVERHEAD + LINK_PAGE_BYTES - 1) // LINK_PAGE_BYTES
+
     def _pump(self, rid, ent, out):
         d = ent["deliver"]
         while d["sent"] < d["nframes"]:
-            inflight = FRAME_PAGES * (d["sent"] - d["acked"])
-            if inflight + FRAME_PAGES > d["credit"]:
+            if d["sent"] - d["acked"] >= RX_DATA_FRAMES:
+                break
+            inflight = sum(self._frame_pages(d, seq)
+                           for seq in range(d["acked"] + 1, d["sent"] + 1))
+            pages = self._frame_pages(d, d["sent"] + 1)
+            if inflight + max(FRAME_PAGES, pages) > d["credit"]:
                 break
             seq = d["sent"] + 1
             if seq == d["dropseq"] and not d["dropped"]:
@@ -752,7 +764,7 @@ class HostAgent:
             out.send(self.build(self.peer, OP_DATA, seq=seq, rid=rid, payload=body))
             d["sent"] = seq
             d["max_inflight"] = max(d["max_inflight"],
-                                    FRAME_PAGES * (d["sent"] - d["acked"]))
+                                    inflight + pages)
         if d["sent"] >= d["nframes"] and not d["eof"]:
             out.send(self.build(self.peer, OP_EOF, seq=d["nframes"] + 1, rid=rid))
             d["eof"] = True

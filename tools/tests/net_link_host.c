@@ -185,6 +185,7 @@ u32 net_rx_credit_bytes(void)
 /* ======================================================================== */
 /*  贋タイマ + 贋 cli / sti                                                  */
 /* ======================================================================== */
+volatile u32 kctx_irq_depth;
 volatile u32 tick_count = 0;
 u32 link_platform_now(void) { return tick_count; }
 static int  irq_depth = 0;              /* IF=0 のネスト段数 */
@@ -739,6 +740,7 @@ static void r2_R9_alternating_tx_one_frame_per_tick(void)
         const u8 *src = 0;
         (void)link_host_read_stage(a, 1400, &src, host_owner);
     }
+    nic_tx_allow = 0; /* Queue both classes before the measured tick interval. */
     check(link_host_write(b, "abcd", 4, host_owner) == 4, "host_write が受け付けない");
     tx_clear();
     ticks(12);
@@ -1623,6 +1625,7 @@ static void check_pending_tx_rto(u8 op)
 static void tx_rto_starts_at_nic_acceptance(void)
 {
     script_handshake(SCRIPT_SESS, 0);
+    nic_tx_allow = 0;
     i32 h = link_host_open("ECHO 6", 6, host_owner);
     check(h >= 0, "ECHO が開けない");
     check_pending_tx_rto(LINK_OP_REQUEST);
@@ -1633,6 +1636,7 @@ static void tx_rto_starts_at_nic_acceptance(void)
     host_tick();
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
     host_tick();
+    nic_tx_allow = 0;
     check(link_host_write(h, "abc", 3, host_owner) == 3, "WDATA を積めない");
     check_pending_tx_rto(LINK_OP_WDATA);
     inject(LINK_OP_ACK, 0, script_epoch, 0, 1, 1, SCRIPT_SESS, 0, 0);
@@ -1739,8 +1743,9 @@ static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
     script_handshake(SCRIPT_SESS, 0);
     selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
     tx_hook = selftest_reply;
-    /* REQUEST goes out on the next tick, ACK arrives one tick later. */
-    selftest_deadline = tick_count + 2 + LINK_HOST_SILENCE_TICKS;
+    /* Immediate REQUEST; ACK is consumed on the next tick. */
+    nic_tx_allow = 1;
+    selftest_deadline = tick_count + 1 + LINK_HOST_SILENCE_TICKS;
     irq_restore_hook = selftest_tombstone_at_deadline_restore;
     link_selftest(1);
     check(!irq_restore_hook && link_tombstones == 0 && link_resyncs == 0,

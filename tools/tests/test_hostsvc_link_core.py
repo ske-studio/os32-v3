@@ -1,6 +1,7 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
-    covers=['tools/tests/link_platform_fake/link_platform_inline.h', 'net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
+    covers=['kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+            'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
             'sdk/include/os32/os32_host_notice.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',

@@ -9,8 +9,8 @@
 /*  NIC 共用層が駆動・送信・credit を所有する。                               */
 /*                                                                          */
 /*  設計の 3 本柱:                                                           */
-/*   (1) **状態機械を進めるのは `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
-/*       KAPI は状態を読み書きするだけで待たず、`link_tick` を呼ばない。      */
+/*   (1) **RX・期限処理は `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
+/*       KAPI は待たず、前景の open/write は TX だけを直ちに試す。      */
 /*   (2) KAPI と `link_tick` の排他は **IF 保存復元の短い cli 区間**          */
 /*       (link_platform_lock / link_platform_unlock)。区間内では待たない。       */
 /*   (3) ワイヤ上の値は **バイト単位の LE アクセサ**で読み書きする。構造体     */
@@ -19,6 +19,7 @@
 
 #include "link.h"
 #include "nic.h"
+#include "irq.h"
 #include "link_notify.h"
 
 #include "link_platform.h"
@@ -515,8 +516,20 @@ static void link_tx_round(void)
     }
 }
 
+/* Called with IRQs masked after publishing foreground request data.  Keep the
+ * guard set through TX: a NIC callback must not reenter the shared TX buffer. */
+static void link_tx_kick(void)
+{
+    static int running;
+    if (kctx_irq_depth || running || !link_ready) return;
+    running = 1;
+    link_tx_round();
+    running = 0;
+}
+
 /* ======================================================================== */
-/*  link_tick — プロトコルの唯一の駆動元 (100Hz、IRQ0 文脈)                  */
+/*  link_tick — RX・期限処理と TX を駆動 (100Hz、IRQ0 文脈)。                */
+/*  前景の open・write は TX だけを直ちに試す。                             */
 /* ======================================================================== */
 void link_tick(void)
 {
