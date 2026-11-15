@@ -92,3 +92,24 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
           MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
+
+  ppc-qemu:
+    needs: ppc-compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}
+      - name: PPC build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage qemu-system-ppc qemu-system-data
+          python3 -m pip install --quiet -r requirements.txt
+      - uses: ./.github/actions/build-setup
+      - uses: ./.github/actions/ppc-setup
+      - name: PPC QEMU guest checks
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
