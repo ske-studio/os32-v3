@@ -10,7 +10,7 @@
 | USB | 「特に、PPCですでにUSBでの入力を成功させています。これのアーキテクチャ依存も解消したいです」 |
 | U1 | 公開 ABI の切り替えの段だけ 1 段 400 行の例外:「U1認める」 |
 | U2 | 入力元の上限:「推奨: 16 枠に広げ、上限は定数 1 か所 (IN2_MAX_DEV) で持つ」→「OK」 |
-| U3 | PowerPC の CTRL+C (今は ESC=27) の扱い: **ユーザー判断待ち** (案 A: 全 arch で 0x03・シェルは 0x03 を行の取り消しにも・USB に STOP 相当の中断の口 — PM 推奨 / 案 B: PPC の 27 を残す) |
+| U3 | PowerPC の CTRL+C: **確定 (2026-11-15)** — 追補 [INPUT_BIND_DESIGN](../../decisions/INPUT_BIND_DESIGN.md) (BSD キーマップを踏襲した操作の割り当て表、文字は BSD・操作は DOS、Mac は OS X) |
 
 ## 1. 詳細設計 (確定) の要約
 - 層: 装置 (PC-98 鍵盤・バスマウス・USB の OHCI/HID) → 入力元ごとのイベント (16B) → 共通の入力状態 (入力元ごとの押下の表・合成・焦点・独占) → 出口 (今の InputOps/PointerOps の互換、in2)。PowerPC の usbp_input_key/mouse/release の切り目を採る。
@@ -22,5 +22,5 @@
 |---|---|
 | 1p・1a・1b (bridge) | main (b27213d2・73c8664b・d8d529fb) |
 | 4c-pre・4c | 実装中 (4c は 4b より先、PowerPC P3 ③b のため。順は 4c → P3 ③b → 4b) |
-| 4b-map | U3 の決定まで出さない |
+| 4b-map | 追補 INPUT_BIND_DESIGN §6 の段の後 |
 | その他 | 未着手 |
