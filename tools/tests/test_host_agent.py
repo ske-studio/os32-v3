@@ -644,7 +644,7 @@ def window_gates_delivery():
     assert [p for p in out if p["op"] == HA.OP_DATA] == [], "WINDOW 前に流れた"
     out = o.send(HA.OP_WINDOW, rid=1, ack=0, payload=struct.pack("<H", 12))
     data = [p for p in out if p["op"] == HA.OP_DATA]
-    assert len(data) == 2, "credit 12 ページ (6 ページ/フレーム) で %d 本" % len(data)
+    assert len(data) == 3, "credit 12 ページ (3 ページ/フレーム、admit 6) で %d 本" % len(data)
     out = o.send(HA.OP_WINDOW, rid=1, ack=0, payload=struct.pack("<H", 12))
     assert [p for p in out if p["op"] == HA.OP_DATA] == [], "credit を超えて流れた"
     out = o.send(HA.OP_WINDOW, rid=2, ack=0, payload=struct.pack("<H", 99))
@@ -1705,10 +1705,46 @@ def hs_syn_candidates():
     assert other.send(HA.OP_HELLO, HA.HS_SYN, seq=50, sess=0)[0]["sess"] != restarted["sess"]
 
 
+def length_based_credit():
+    # Real WINDOW/_pump path, including duplicate windows, ACK and a short tail.
+    for total in (1024, 1537, 2048):
+        a, o = up()
+        o.send(HA.OP_REQUEST, rid=1, payload=("GET /pattern/%d" % total).encode())
+        out = o.send(HA.OP_WINDOW, rid=1, payload=struct.pack("<H", 11))
+        data = [p for p in out if p["op"] == HA.OP_DATA]
+        assert len(data) == 2, data
+        assert not o.send(HA.OP_WINDOW, rid=1, payload=struct.pack("<H", 11))
+        ack = 0
+        while data:
+            used = 0
+            for p in data:
+                # Independent receive storage cost, not the product helper.
+                pages = (14 + 20 + len(p["pl"]) + 8 + 255) // 256
+                assert 11 - used >= 6 and pages <= 11 - used
+                used += pages
+                ack = p["seq"]
+            assert used <= 11
+            out = o.send(HA.OP_WINDOW, rid=1, ack=ack, payload=struct.pack("<H", 11))
+            data = [p for p in out if p["op"] == HA.OP_DATA]
+        assert ack == (total + 511) // 512
+    # Four shared RX frame slots must also accommodate EOF, even at high credit.
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"GET /pattern/1537")
+    out = o.send(HA.OP_WINDOW, rid=1, payload=struct.pack("<H", 20))
+    assert len([p for p in out if p["op"] == HA.OP_DATA]) == 3
+    assert len(out) <= 4 and not [p for p in out if p["op"] == HA.OP_EOF]
+    # A receive header/FCS crossing a page boundary must not be undercharged.
+    assert HA.HostAgent._frame_pages({"plen": 222, "total": 222}, 1) == 2
+
+
 def h5_mutations():
     global HA
     original = HA
     mutations = [
+        ('if d["sent"] - d["acked"] >= RX_DATA_FRAMES:', 'if False:'),
+        ('ln + RX_OVERHEAD + LINK_PAGE_BYTES', 'ln + LINK_PAGE_BYTES'),
+        ('return (ETH_HDR + LINK_HDR + ln + RX_OVERHEAD + LINK_PAGE_BYTES - 1) // LINK_PAGE_BYTES',
+         'return FRAME_PAGES'),
         ('assigned = self.cand["sess"]', 'assigned = self.sessions.alloc()'),
         ('not self.cand.get("confirmed")', 'True'),
         ('self.cand["mac"] == src', 'True'),
@@ -1729,7 +1765,7 @@ def h5_mutations():
             HA = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(HA)
             try:
-                for case in (hs_syn_candidates, h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
+                for case in (length_based_credit, hs_syn_candidates, h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
                     case()
             except AssertionError:
                 print("  RED h5 mutation %d" % index, flush=True)
@@ -1740,6 +1776,7 @@ def h5_mutations():
 
 
 CASES = [
+    length_based_credit,
     hs_syn_candidates,
     a11_named_body_roundtrip,
     h5_hello_list_and_notify,

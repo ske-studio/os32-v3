@@ -229,6 +229,7 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->want_ack = e->want_window = e->want_status = 0;
         e->ctrl_cursor = 0;
     }
+    link_tx_kick();
     LINK_IRQ_RESTORE(f);
     return hh;
 }
@@ -332,6 +333,7 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     e->w_due = 1;
     e->retries = 0;
     e->wsent_total += n;
+    link_tx_kick();
     LINK_IRQ_RESTORE(f);
     return (i32)n;
 }
