@@ -1,6 +1,6 @@
 # INPUT_HAL_DESIGN — 入力の HAL と USB HID の共通化 (入力元ごとのイベント・共通の入力状態・文字端末 bridge)
 
-> 状態: **現行 (2026-11-15)** — 確定 (astra 起草 r1・r2、Opus 5.5 の独立レビュー 2 回、PowerPC PM の意見 H1〜H7、PM 決定を反映)。未決 U3 (PowerPC の CTRL+C) はユーザー判断待ちで、段 4b-map はその決定まで出さない。段の状態は票 TASK_INPUT_HAL が持つ。
+> 状態: **現行 (2026-11-15)** — 確定 (astra 起草 r1・r2、Opus 5.5 の独立レビュー 2 回、PowerPC PM の意見 H1〜H7、PM 決定を反映)。U3 (PowerPC の CTRL+C) は追補 [INPUT_BIND_DESIGN](INPUT_BIND_DESIGN.md) (操作の割り当て表、BSD キーマップの踏襲) で確定し、段 3b・4b-map の範囲と依存は追補の §6 に従う。段の状態は票 TASK_INPUT_HAL が持つ。
 > 出所: 往復の版は `~/os32-tmp/run/input-hal/` (PACK、DESIGN.r1・r2・final、REVIEW.r1、R2_REQ、FINAL_REQ)。棚卸しは `~/os32-tmp/run/hal-survey/`。確定済みの AV_HAL_DESIGN の入力の節 (XInput 基、入力元の上限 IN2_MAX_DEV) の上に立つ。
 
 ## r1→r2 の変更
@@ -13,9 +13,9 @@
 - R5: 段2cを内部InputEventだけで構成し、公開IN2_Event変換をA0z後へ分離。
 - R6: serial/注入/parkはprovider関数ポインタを渡し、共通部品の各段でPPC像のリンクを受入。
 - R7: V86中はheldと修飾を追い、旧リングとin2への投入を止めると明記。
-- R8: PPC keymap統合と旧ファイル削除を計画、カナ・CTRLの差を試験化（CTRL+CはU3待ち）。
+- R8: PPC keymap統合と旧ファイル削除を計画、カナ・CTRLの差を試験化（CTRL+Cは追補で確定）。
 - 軽微: serial混入の根拠からinclude行kbd.c:653を除去。
-- 2026-11-14、r2を基に最終指摘を反映。U3の分岐は未決であり、該当段の実装開始を承認したものではない。
+- 2026-11-14、r2を基に最終指摘を反映。U3は2026-11-15に追補で確定。
 - 作業木 `ec2fa85e59deb7aed4f7bf117a064e80a0cf8fb5`。main は `89dcd9b3f648b60834b3d047d24f9cb87d06a1fa`。
 - r1時点で指定コード12本と ARCH_COMPAT/ARCH_CTX/IO_TIER/AV_HAL/USB_DESIGN は `git -C /home/hight/os32-v3 show origin/main:<path>` で読み、作業木とのバイト一致を確認。以下の file:line はこの確認済みコードによる。
 - シングルタスク・協調切替・整数演算。Win32/DirectInput/XInput の互換 API はユーザーランド。PC-9801互換は対象外。
@@ -147,7 +147,7 @@ if (old != down) {
 - capture期限は待機開始時点から数える。FREEZE中は閉じたまま、期限後は文字待ちがCR、キー待ちがESC。con_sink通知の例外を設けない。振る舞いの注: capture中の1コマンドが何度も待つ場合、それぞれが30秒まで待てる（x86現行と同じ）。コマンド全体の上限はhost側の待ちが担う。
 - InputOpsの能力pressed/raw/modifier/interruptibleを独立照会する内部契約はARCH_COMPAT F6/F7と共有。不在と未押下を新規利用者が混同しない。旧値/voidのABIはAC-KAPI-1どおり保持し、公開照会追加はABI段へ。
 - `kbd_getchar/getkey/try/peek/raw`・mouseのslot/型は不変。PC-98 scを共通符号として固定し、gshellのSHIFT=0x70/CTRL=0x74/STOP=0x60（`input.rs:67,68,80`）、rawのdown=bit8/mods=bit9以降を保持する。
-- 共通keymapのCTRL+CはU3判断待ち（PPC現行0x1bの廃止を確定しない）。決定までは像別policyで現行結果を保持。Kanaはlock/modifierを更新し、旧CUI同様にASCIIを直接カナ化しない。SHIFT/CTRL等も両archの差分fixtureで固定し、旧結果の記録とU3後の共通仕様を区別する。
+- 共通keymapのCTRL+Cは全archで0x03（追補 [INPUT_BIND_DESIGN](INPUT_BIND_DESIGN.md)）。操作（中断・行の取り消し）の割り当ては追補の操作の割り当て表が持つ。Kanaはlock/modifierを更新し、旧CUI同様にASCIIを直接カナ化しない。SHIFT/CTRL等も両archの差分fixtureで固定し、旧結果の記録とU3後の共通仕様を区別する。
 - 新独占の有効化はgshell対応と同時の受入。AV §5-3どおりSTOP/CTRL/GRPH/TABを残し、X4は配送停止だけ、X3で押下解消/ドラッグ取消。WM改修前は独占を公開しない。
 - 焦点・独占の書き手はFG1のみ、IRQは参照だけ。前景交代/回収はAV §5-6のリング/累積の消去、LOST、gen増加、振動停止を保持する。
 
@@ -186,7 +186,7 @@ if (old != down) {
 | 3d | drivers/input/kbd_hal.c（新100）、kbd.c（変60）、T_merge（変100） | 本体src登録/capture、旧採取を除去して二重採取ゼロ |
 | 4a | input/hal/usb_input.c（新140）、PPC usb_platform.c（変60）、T_usb（新130） | 2b/3→usbpのkind/src写像・repeat・release。PPC文字入力維持 |
 | 4b | PPC input_usb.c（変160）、input_boot.c（変100）、tools/tests/test_arch_compat.py（変100） | 4a/3b/4c後、PowerPC P3③bがあればその後（input_boot.cは4c→P3③b→4bの直列）。共通状態/出口へ。③bのlocalを共通cooked ringに結び替え、③bで足したUSBの非消費peekを消す。U3までは旧keymap policy維持。raw/pressed/modsのbit 2/4/8をPASS化しPPC期待14→0、XFAIL表示/変異期待を更新、CHECK pins=[input-hal/4b]を外す |
-| 4b-map | platform/powermac/input_keymap.c（削除約70）、tools/tests/ppc_input_usb_host.c（変100）、tools/checks/ver-ppc-input-usb.py（変80） | **U3の決定まで出さない**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
+| 4b-map | platform/powermac/input_keymap.c（削除約70）、tools/tests/ppc_input_usb_host.c（変100）、tools/checks/ver-ppc-input-usb.py（変80） | **追補 INPUT_BIND_DESIGN §6 の段の後**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
 | 4c-pre | kernel/input_wait.c（新130）、T_wait（新130） | 1b後、待機契約を両archで受入、4cへ結線 |
 | 4c | kernel/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.c:754,792と同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
 | 4d[n] | input_wait.c（変80）、kbd.c（変100）、T_wait（変100） | 1b/4c後、x86 wait/parkを4cで先に置いた同じ共通期限規則へ口ごとに2〜3段で載せる。4bとファイルが重ならず並列可 |
@@ -217,7 +217,7 @@ if (old != down) {
 | host契約 | 空=-1、能力なし≠未押下、非待機・中断・FG0/IRQで待機なし / 能力を全有効・中断無視 |
 | src/merge/HID | 同じ修飾を本体+USBで押し片方を離して保持、左右Shift、rollover、16源成功/17源FULL、PPC8・PC-98計11源 / cnt無視break、kind別src衝突、上限8への戻し |
 | release | USB Shift押下中に抜去→最後のsrcなら旧raw/in2ともbreak、他src保持中はsrc別in2だけbreakで旧Shift保持。ボタンも同様 / releaseでbreakを省く |
-| lock/keymap | 本体make→ON/repeat→ON/break→OFF、USB A make→ON/break→ON、USB B make→OFF。本体ONならUSB OFFでも合成ON、本体OFFかつUSB ONならON、USB抜去でも共有bit保持。CTRL+CはU3の採用案で検査 / 本体make反転、USB源別bit化、ORをXOR化、repeat反転 |
+| lock/keymap | 本体make→ON/repeat→ON/break→OFF、USB A make→ON/break→ON、USB B make→OFF。本体ONならUSB OFFでも合成ON、本体OFFかつUSB ONならON、USB抜去でも共有bit保持。CTRL+Cは追補の表で検査 / 本体make反転、USB源別bit化、ORをXOR化、repeat反転 |
 | V86 | V86中held/修飾は更新、旧raw/cooked/in2は投入ゼロ、退出後状態一致 / V86中in2投入 |
 | ring | 128境界、LOST count/seq wrap、隣接同dev MOVEのみ合算、満杯STOP保持、repeat排除 / merge後採取、repeat混入、満杯状態更新省略 |
 | bridge | GUI空でtryはpark1回、GUI localは-1/park0、peekは完成key非消費/選択順不変（有限採取可）、PLN1 has_key進行、link-SH mailbox非消費、getkey_waitのserial非読取、captureのCR/ESCとpark再開値 / GUIからserialへ落下、peek消費/交互順更新、waitでserial読取 |
@@ -230,19 +230,19 @@ if (old != down) {
 - 実装時は各CHECKに入力を宣言。移動/削除行に付く既存変異を `rg -n` で探して移設、anchor一意・コンパイル失敗でなく実行時RED。触った像（kernel、PPC、gshell、MINIMAL/FD）を組む。ABI段はclean→all。
 - 各段の触った試験を `--mutate`、最後に `python3 -B tools/checks/run.py --lint`。check-changed/全変異は手元で回さずCI/full-checkへ。ログは最終変更後のものだけ。
 - 本回は読むだけの作業木と設計書のみ。preflight --fix-fonts・build・lint・host/変異・エミュレータ・実機は実行していない（PACKの実装なし/書込先限定に従う）。調査と設計の整合/行数だけ検査した。
-## 9. ユーザー決定と未決（U1/U2決定済み、U3判断待ち）
+## 9. ユーザー決定（U1・U2・U3決定済み）
 | ID | 決定と反映 |
 |---|---|
 | U1 | 「認める」。kapi.json・版・生成物・両arch providerの公開ABI切替は原子的な1段。400行超はsol担当、準備は小段化。§7 A0zに反映 |
 | U2 | IN2_MAX_DEV=16へ拡張。8は物理制約ではなく、devのu8には収まる。PPC USB4+4とPC-98本体等3+USB8を保持。AV正典の範囲/表/試験条件はmain改訂済み。XInputパッド4slotは不変 |
-| U3 | **ユーザー判断待ち**。案A（PM推奨）: 全archでCTRL+C=0x03、shellも0x03で行を取り消し、USBのSTOP相当（Pause/BreakまたはCTRL+C）を入力HALからPC-98 STOPと同じ中断要求口へ接続する。案B: PPCの27を対応表の差として残す。案Aならshell行取消/USB中断の割当・fixtureを小段化して同時受入する。4b-mapは決定まで出さない |
+| U3 | **確定 (2026-11-15)**: 追補 [INPUT_BIND_DESIGN](INPUT_BIND_DESIGN.md)。ユーザー決定「操作は各 arch の標準 OS が基準」(PowerMac は Mac OS X、PC-98 は CUI が MS-DOS・GUI が Windows) と「文字は BSD、操作は DOS」。文字の流れは全 arch で CTRL+C=0x03、操作 (中断・行の取り消し) は platform ごとの操作の割り当て表で決める |
 ## 反論
 - なし（0件）。
 ## 確定 (2026-11-15、Opus 第 2 回・PowerPC PM の意見・PM 決定を反映)
 - S1: 段0/文書0を削除、mainのT1bとAVの16源契約を既存基準として参照。
 - S2: 4b/4cにtest_arch_compat.pyを割当、pinsとXFAIL→PASS（15→14→0、4c→4bの順）の更新を明記。
 - S3(b): 4b-mapで旧keymap直呼び試験/実行器を改訂し、pinsとU3に従って期待を更新。
-- S3(a): CTRL+CはU3でユーザー判断待ち。案AをPM推奨とし、4b-mapを保留。
+- S3(a): CTRL+CはU3で確定（追補）。4b-mapは追補の段の後。
 - S4: USB全体の共通反転bitと本体の機械式bitをOR、複数USB・抜去の期待を修正。
 - S5: IN2_MAX_DEVの唯一の定義場所をinput/hal/in2_int.hに統一。
 - H1: local try/peek・mode値・bridge peek・GUI照会をprovider契約に追加。
