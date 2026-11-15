@@ -100,12 +100,19 @@ def run(ctx):
             assert 0 < rc < 128, rc
             print('RED runtime reversed bounds', flush=True)
             for before, after in [('mouse_ext_sample(seamless_hal_src, seamless_hal_generation, x, y, time_ms);', '(void)0;'),
-                                  ('if (seamless_mouse_poll(&x, &y))', 'if (seamless_mouse_poll(&x, &y) && seamless_mouse_poll(&x, &y))'),
-                                  ('.buttons = mouse_read_buttons()', '.buttons = 0')]:
+                                  ('int sampled = seamless_mouse_poll(&x, &y);', 'int sampled = seamless_mouse_poll(&x, &y) && seamless_mouse_poll(&x, &y);'),
+                                  ('u8 buttons = mouse_read_buttons();', 'u8 buttons = 0;')]:
                 assert bus_sources[1].count(before) == 1
                 rc = build_poll(poll_source, hal=bus_sources[1].replace(before, after))
                 assert 0 < rc < 128, (before, rc)
                 print('RED runtime seamless: '+before, flush=True)
+            before = '        int sampled = seamless_mouse_poll(&x, &y);\n        u8 buttons = mouse_read_buttons();\n        unsigned f = irq_save();'
+            assert bus_sources[1].count(before) == 1
+            for after in ['        unsigned f = irq_save();\n        int sampled = seamless_mouse_poll(&x, &y);\n        u8 buttons = mouse_read_buttons();',
+                          '        int sampled = seamless_mouse_poll(&x, &y);\n        unsigned f = irq_save();\n        u8 buttons = mouse_read_buttons();']:
+                rc = build_poll(poll_source, hal=bus_sources[1].replace(before, after))
+                assert 0 < rc < 128, rc
+                print('RED runtime seamless I/O under lock', flush=True)
             assert build_poll(poll_source) == 0
         print('PASS T_pointer', flush=True)
         if ctx.mutate:
