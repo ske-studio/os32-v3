@@ -1,6 +1,6 @@
 # USER-only PowerPC applications use the selected SDK CRT and linker script.
 ifeq ($(SDK_TARGET_CALL_ABI),powerpc-sysv)
-PPC_USER_OUT := build/out/ppc-user
+PPC_USER_OUT ?= build/out/ppc-user
 PPC_USER_CRT := $(addprefix $(PPC_USER_OUT)/,$(notdir $(SDK_TARGET_CRT_USER)))
 PPC_USER_FLAGS := $(USER_CFLAGS) -fno-common -mcall-sysv -mno-eabi -I sdk/include/os32 -Wno-attributes
 
@@ -41,20 +41,21 @@ PPC_SH_OBJ := $(patsubst userland/shell/%.c,$(PPC_SH_DIR)/shell/%.o,$(PPC_SH_SRC
 # Acceptance may rebuild only the USER UTF-8 adapter from a reverted source.
 PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/runtime.c
 PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o format.o stdio.o string.o ls.o help.o)
-PPC_SH_FLAGS := -include userland/ppc/sh/profile.h -Iuserland/ppc/sh/include $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
+PPC_SH_PROFILE ?= userland/ppc/sh/profile.h
+PPC_SH_FLAGS := -include $(PPC_SH_PROFILE) -Iuserland/ppc/sh/include $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
 
 .PHONY: sh
 sh: $(PPC_USER_OUT)/sh.bin
 
-$(PPC_SH_DIR)/shell/%.o: userland/shell/%.c userland/ppc/sh/profile.h
+$(PPC_SH_DIR)/shell/%.o: userland/shell/%.c $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
 
-$(PPC_SH_DIR)/runtime.o: $(PPC_SH_RUNTIME_SRC) userland/ppc/sh/profile.h
+$(PPC_SH_DIR)/runtime.o: $(PPC_SH_RUNTIME_SRC) $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -Iuserland/ppc/sh -c $< -o $@
 
-$(PPC_SH_DIR)/%.o: userland/ppc/sh/%.c userland/ppc/sh/profile.h
+$(PPC_SH_DIR)/%.o: userland/ppc/sh/%.c $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
 

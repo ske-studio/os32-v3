@@ -230,7 +230,7 @@ int pm_lan_start(const struct pm_gmac_boot *boot)
     }
     rh_logged = 0;
     s.boot = boot;
-#if KBOOT_SH
+#if KBOOT_SH && !KBOOT_LINK
     pm_hfs_bind_peer(boot->peer_mac);
 #endif
     r = pm_lan_gem_io(boot, &s.g.io);

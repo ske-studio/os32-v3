@@ -10,6 +10,7 @@
 #include "kernel/idle_work.h"
 #include "arch_io.h"
 
+#if !KBOOT_LINK
 static PmInputDecoder decoder = { .pending = -1 };
 static int lan_lookahead = -1;
 
@@ -46,12 +47,17 @@ static int try_key(void)
     lan_lookahead = -1;
     return key >= 0 ? key : pm_input_usb_take();
 }
+#endif
 static u32 wait_ticks(void) { u32 lo = 0, hi; platform_clock_read_us(&lo, &hi); return lo; }
 static u32 wait_timeout(void) { return 30000000u; }
 static void wait_step(void) { idle_work_run(); _idle(); }
 static const struct InputLegacyProvider provider = {
+#if KBOOT_LINK
+    .try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,
+#else
     .try_key = try_key, .peek_key = peek,
-    /* PLN1 wait(IL_KEY) reads local only; link-SH is a later image. */
+#endif
+    /* No terminal or injected source in either image. */
     .terminal_try = NULL, .terminal_peek = NULL, .terminal_enabled = NULL,
     .wait_ticks = wait_ticks, .wait_timeout_ticks = wait_timeout,
     .capture_active = con_sink_capture_active, .wait_pending = ring3_wait_pending,
@@ -67,7 +73,13 @@ static int character_kapi(void) { return input_legacy_wait(IL_CHAR, 1); }
 static int key_kapi(void) { return input_legacy_wait(IL_KEY, 1); }
 /* Busy pollers (e.g. a CUI script checking for ESC) never halt, so advance the
  * foreground work once per peek; idle_work_run refuses EE=0, IRQ and re-entry. */
-static int peek_key(void) { idle_work_run(); return input_legacy_peek(IL_KEY); }
+static int peek_key(void)
+{
+#if !KBOOT_LINK
+    idle_work_run();
+#endif
+    return input_legacy_peek(IL_KEY);
+}
 static int has_key(void) { return peek_key() >= 0; }
 static int pressed(int scancode) { (void)scancode; return 0; }
 static int raw(void) { return -1; }
@@ -88,8 +100,10 @@ static const InputOps ops = {
 };
 void pm_input_boot(void)
 {
+#if !KBOOT_LINK
     decoder = (PmInputDecoder){ .pending = -1 };
     lan_lookahead = -1;
+#endif
     input_legacy_register(&provider);
     input_register(&ops);
 }

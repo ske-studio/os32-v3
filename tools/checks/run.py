@@ -387,6 +387,8 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-link-sh", "tools/tests/test_ppc_link_sh.py"):
+        "make expansion compares image path names only; host fixtures live in TemporaryDirectory",
     ("check-ppc-link-run-host", "tools/ppc/link_run.py"):
         "offline predicates and pipe-only QMP probe; accept/main never run or read ELF images",
     ("check-ppc-link-run-host", "tools/ppc/run.py"):

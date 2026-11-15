@@ -29,3 +29,26 @@ int link_platform_tick_register(void (*fn)(void))
 {
     return tick_register(PM_TICK_LINK, fn);
 }
+
+#if KBOOT_SH
+#include "platform/powermac/link_platform.h"
+#include "usb_boot.h"
+
+
+void pm_link_service_once(void)
+{
+    static int running;
+
+    if (running) return;
+    running = 1;
+    pm_usb_poll();
+    u32 hi, lo, again;
+    do {
+        __asm__ volatile("mftbu %0" : "=r"(hi));
+        __asm__ volatile("mftb %0" : "=r"(lo));
+        __asm__ volatile("mftbu %0" : "=r"(again));
+    } while (hi != again);
+    pm_lan_poll(((u64)hi << 32) | lo);
+    running = 0;
+}
+#endif
