@@ -26,7 +26,7 @@ from kboot_mutations import NEGATIVES
 sys.path.insert(0, str(ROOT / "tools"))
 import ppc_lan_host as lan
 
-PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
+PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 PATTERNS = [
     r'OF-CAPTURE ram=(\d+) admitted=(\d+) tb_hz=(\d+)',
     r'OF-OFF calls=(\d+)',

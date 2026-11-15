@@ -1,5 +1,5 @@
 """Register S-D LAN acceptance; sandbox without AF_INET explicitly skips."""
-CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, needs=['make:all'],
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, needs=['make:ppc-ci-image'],
              covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','arch/ppc/entry.S',
                      'arch/ppc/exec_context.c',
                      'arch/ppc/kapi_call.c',
@@ -64,11 +64,11 @@ def run(ctx):
     if any(shutil.which(x) is None for x in required) or not Path('/usr/share/qemu/openbios-ppc').is_file():
         missing = 'PPC toolchain' if shutil.which(required[0]) is None else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-sd: ' + missing + ' unavailable')
-        return 0
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     env = dict(os.environ)
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    env['CROSS_DIR'] = '/home/hight/opt/cross-ppc'
+    env['CROSS_DIR'] = env.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')
     return subprocess.call(['python3', '-B', 'tools/ppc/sd_run.py'] +
                            (['--mutate'] if ctx.mutate else []), cwd=ctx.root, env=env)

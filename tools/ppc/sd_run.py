@@ -228,8 +228,8 @@ def main():
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.bind(('127.0.0.1', 0))
     except PermissionError:
-        print('SKIP LAN S-D: AF_INET unavailable (normal and mutations); rc=0')
-        return 0
+        print('SKIP LAN S-D: AF_INET unavailable (normal and mutations)')
+        return 3 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     base = Path(os.environ['TMPDIR'])/'sd-run'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     print('evidence='+str(work), flush=True)

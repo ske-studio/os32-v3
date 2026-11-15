@@ -82,8 +82,10 @@ def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or not shutil.which('qemu-system-ppc'):
-        print('SKIP ppc-rh-fb: PPC compiler/QEMU unavailable'); return 0
+    if not (cross/'bin/powerpc-elf-gcc').is_file() or not Path(ROM).is_file() or any(
+            shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')):
+        print('SKIP ppc-rh-fb: PPC compiler/QEMU/OpenBIOS/genisoimage unavailable')
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     started = time.monotonic()
     out = Path(os.environ['TMPDIR'])/'rh-fb'; out.mkdir(parents=True, exist_ok=True)
     source = (ROOT/'tools/ppc/kboot_boot_guest.c').read_text().replace(

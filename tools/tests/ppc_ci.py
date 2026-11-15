@@ -52,7 +52,7 @@ def wiring():
     check = (ROOT / '.github/workflows/check.yml').read_text()
     build = (ROOT / '.github/workflows/build.yml').read_text()
     assert 'ppc-setup' not in build
-    assert check.count('- uses: ./.github/actions/ppc-setup') == 1
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 2
     assert '  ppc-compile:' in check
     workflow = yaml.safe_load(check)
     triggers = workflow.get('on', workflow.get(True))
@@ -83,11 +83,46 @@ def wiring():
         for dependency in ('gcc-13', 'qemu-user', 'ccache'):
             assert dependency in runs
         assert 'qemu-system-ppc' not in runs
+    command = 'python3 -B tools/checks/run.py --run all --env qemu-ppc'
+    for flow, routine, mutate in ((workflow, True, 0), (full, False, 1)):
+        job = flow['jobs']['ppc-qemu']
+        assert job['needs'] == 'ppc-compile'
+        assert job['timeout-minutes'] >= 60
+        guest = job['steps']
+        assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
+        if routine:
+            assert guest[1] == steps[1]
+            assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:])
+        else:
+            assert all('if' not in s for s in guest)
+        runs = '\n'.join(s.get('run', '') for s in guest)
+        assert f'OS32_REQUIRE_PPC=1 MUTATE={mutate} ' + command in runs
+        assert ('CHECK_ROUTINE=1 ' in runs) == routine
+        for dependency in ('qemu-system-ppc', 'qemu-system-data', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
+            assert dependency in runs
+        for action_name in ('build-setup', 'ppc-setup'):
+            assert any(s.get('uses') == './.github/actions/' + action_name for s in guest)
     action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
     commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands
     assert 'tools/ci/build_cross.sh' not in commands
     assert 'OS32_REQUIRE_PPC=1' in commands
+
+
+def guest_prerequisites():
+    # Exercise the wrappers' missing-tool branch without building a guest.
+    import importlib.util
+    from types import SimpleNamespace
+    for name in ('ppc-sc', 'ppc-sd', 'ppc-sh-output'):
+        path = ROOT / ('tools/checks/' + name + '.py')
+        spec = importlib.util.spec_from_file_location('guest_gate', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.CHECK['needs'] == ['make:ppc-ci-image']
+        for required in ('0', '1'):
+            with patch.dict('os.environ', {'OS32_REQUIRE_PPC': required}), \
+                 patch('shutil.which', return_value=None):
+                assert module.run(SimpleNamespace(root=ROOT, mutate=False)) == int(required)
 
 
 def scope_matrix(source):
@@ -133,6 +168,7 @@ def main():
     matrix(source)
     configure()
     wiring()
+    guest_prerequisites()
     scope_source = (ROOT / "tools/ci/ppc_scope.py").read_text()
     scope_matrix(scope_source)
     if args.mutate:

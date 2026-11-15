@@ -242,7 +242,7 @@ def main():
             shutil.which(x) is None for x in ['qemu-system-ppc', 'genisoimage']):
         missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-fb: ' + missing + ' unavailable')
-        return 0
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     os.environ['PPC_FB'] = '1'
     work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ['TMPDIR']))
     print('evidence='+str(work), flush=True)
