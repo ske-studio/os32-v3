@@ -228,7 +228,7 @@ def full_check_cases(source):
     assert triggers['workflow_dispatch']['inputs']['ref']['default'] == 'main'
     assert triggers['schedule'] == [{'cron': '0 18 * * *'}]
     assert workflow['concurrency'] == dict(group='full-check', **{'cancel-in-progress': False})
-    assert set(workflow['jobs']) == {'full-check', 'ppc-compile'}
+    assert set(workflow['jobs']) == {'full-check', 'ppc-compile', 'ppc-qemu'}  # ppc-qemu: PPC_CI stage 2 (tools/tests/ppc_ci.py checks its shape)
     job = workflow['jobs']['full-check']
     assert job['runs-on'] == 'ubuntu-latest'
     assert job['timeout-minutes'] == 330
