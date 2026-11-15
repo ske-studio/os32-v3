@@ -51,7 +51,8 @@ def run(ctx):
                 ('g->io.tb(g->io.ctx), 8u)', 'g->io.tb(g->io.ctx), 32u)'),
                 ('if (!pm_lan_running_gem(0)) return OS32_ERR_NOSYS;',
                  'if (0) return OS32_ERR_NOSYS;'),
-                ('u32 n = 0;', 'u32 n = 0; gem_rx(g, packet[tail], GEM_FRAME_BYTES, &n);')]:
+                ('packet_count++;', 'packet_count++; break;'),
+                ('u32 budget = GEM_RX_SCAN_BUDGET;', 'u32 budget = 16u;')]:
                 assert original.count(anchor) == 1
                 exercise(original.replace(anchor, replacement), False)
                 print('RED runtime: ' + anchor, flush=True)

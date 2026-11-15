@@ -12,6 +12,7 @@ void pm_rh_stage(unsigned stage) {
 #endif
 static struct gem device;
 static int running, calls, tx_budget, tx_rc, rx_rc, rx_calls;
+static u32 good, bad, inspected, delivered;
 static u8 expected[6] = {1,2,3,4,5,6};
 static void finish(int rc) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
@@ -32,13 +33,22 @@ int gem_poll(struct gem *g, unsigned long long now, u32 budget) {
     CHECK(g == &device && now == 123);
     calls++; tx_budget = budget; return 0;
 }
-int gem_rx(struct gem *g, void *p, u32 cap, u32 *n) {
+/* 本線 PM 決定 2026-11-15 B の条件 1, 2, 3: shared descriptor budget. */
+int gem_rx_some(struct gem *g, void *p, u32 cap, u32 *n, u32 *budget) {
     CHECK(g == &device && cap == 1514);
-    rx_calls++; ((u8 *)p)[0] = 42;
-    ((u8 *)p)[1] = (u8)rx_calls;
-    /* Unrelated IPv6 multicast is still real occupied receive storage. */
-    ((u8 *)p)[12] = 0x86; ((u8 *)p)[13] = 0xdd;
-    *n = 14; return rx_rc;
+    CHECK(*budget == 8u - inspected);
+    rx_calls++;
+    while (*budget) {
+        (*budget)--; inspected++;
+        CHECK(*budget <= 8);
+        if (bad) { bad--; continue; }
+        if (!good) return GEM_AGAIN; /* OWN is inspected too. */
+        good--; delivered++;
+        ((u8 *)p)[0] = 42; ((u8 *)p)[1] = (u8)delivered;
+        ((u8 *)p)[12] = 0x86; ((u8 *)p)[13] = 0xdd;
+        *n = 14; return rx_rc;
+    }
+    return GEM_AGAIN;
 }
 #include GEM_ADAPTER_SOURCE
 void _start(void) {
@@ -64,33 +74,41 @@ void _start(void) {
     CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
     CHECK(op->rx_credit_bytes() == 4 * 1514);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN && !rx_calls);
-    op->poll(); CHECK(calls == 1 && tx_budget == 8 && rx_calls == 1);
-    CHECK(op->rx_credit_bytes() == 3 * 1514);
-    /* Even a pending non-link frame leaves a positive link WINDOW. */
-    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
-    for (int i = 0; i < 3; i++) op->poll();
-    CHECK(calls == 4 && rx_calls == 4 && op->rx_credit_bytes() == 0);
-    op->poll(); CHECK(calls == 5 && rx_calls == 4);
+    /* 本線 PM 決定 2026-11-15 B の条件 1, 3: fill only free slots, FIFO. */
+    good = 6; inspected = 0;
+    op->poll(); CHECK(calls == 1 && tx_budget == 8 && rx_calls == 4);
+    CHECK(inspected == 4 && good == 2 && op->rx_credit_bytes() == 0);
+    op->poll(); CHECK(calls == 2 && rx_calls == 4);
     CHECK(op->rx(frame, 1, &n) == OS32_ERR_NOSPC && n == 14);
     CHECK(op->rx_credit_bytes() == 0);
-    for (int i = 1; i <= 4; i++) {
+    for (int i = 1; i <= 2; i++) {
+        CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == i);
+    }
+    CHECK(op->rx_credit_bytes() == 2 * 1514);
+    inspected = 0; op->poll();
+    CHECK(inspected == 2 && rx_calls == 6 && op->rx_credit_bytes() == 0);
+    for (int i = 3; i <= 6; i++) {
         CHECK(op->rx(frame, sizeof(frame), &n) == 0 && n == 14);
         CHECK(frame[0] == 42 && frame[1] == i && frame[12] == 0x86);
-        CHECK(op->rx_credit_bytes() == (u32)i * 1514);
     }
     CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
-    /* Tail wraps and a failed receive must not enqueue anything. */
-    op->poll(); CHECK(rx_calls == 5);
-    CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == 5);
-    rx_rc = GEM_AGAIN; op->poll(); CHECK(rx_calls == 6);
+    /* Seven bad descriptors leave room in the budget for only one good. */
+    bad = 7; good = 3; inspected = 0; op->poll();
+    CHECK(inspected == 8 && good == 2 && op->rx_credit_bytes() == 3 * 1514);
+    CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == 7);
+    good = 0; inspected = 0; op->poll();
+    CHECK(inspected == 1 && op->rx_credit_bytes() == 4 * 1514);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
-    CHECK(op->rx_credit_bytes() == 4 * 1514);
-    rx_rc = GEM_OK; op->poll(); CHECK(rx_calls == 7);
-    running = 0; op->poll(); CHECK(calls == 8);
+    good = 1; rx_rc = GEM_EIO; inspected = 0; op->poll();
+    CHECK(inspected == 1 && op->rx_credit_bytes() == 4 * 1514);
+    rx_rc = GEM_OK; good = 1; inspected = 0; op->poll();
+    CHECK(op->rx_credit_bytes() == 3 * 1514);
+    running = 0; op->poll();
+    int old_calls = calls;
     CHECK(op->tx(frame, 14) == OS32_ERR_HOSTDOWN);
     CHECK(op->rx_credit_bytes() == 0);
     net_gem_adapter.release(); running = 1;
-    op->poll(); CHECK(calls == 8);
+    op->poll(); CHECK(calls == old_calls);
     CHECK(net_gem_adapter.acquire(&op) == 0);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
     CHECK(op->rx_credit_bytes() == 4 * 1514);

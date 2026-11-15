@@ -3,10 +3,12 @@ static u8 pool[GEM_POOL_SIZE], frame[1514];
 static struct gem g;
 enum { IDLE, NIC_OWN, WRITTEN, DESC_READY, CPU_READY };
 static u8 ownership[32];
+static u32 reads;
 static u32 nic, end, available, stage, sync_error, posts, kicks, lastkick;
 static u32 fail_point, fail_seen, rejected;
 static void stop(const char *s);
 void observe_desc(const u8 *p) {
+    reads++;
     u32 slot=(u32)(p-(pool+GEM_POOL_RX_RING))/GEM_DESC_SIZE;
     if (ownership[slot]!=NIC_OWN && ownership[slot]!=DESC_READY) stop("H:desc-read\n");
 }
@@ -74,6 +76,22 @@ void _start(void) {
     inject(13,0);inject(1515,0);inject(14,1);inject(14,0);
     CHECK(gem_rx(&g,frame,sizeof(frame),&bytes)==0 && g.rx_drops==3,"bad");
     inject(14,0);CHECK(gem_rx(&g,frame,13,&bytes)==GEM_ERANGE,"cap");inject(14,0);CHECK(gem_rx(&g,frame,sizeof(frame),&bytes)==0,"continue");
+    /* 本線 PM 決定 2026-11-15 B の条件 2: debit actual inspections. */
+    setup(); reads=0;
+    for(u32 i=0;i<5;i++) inject(13,0);
+    u32 budget=3;
+    CHECK(gem_rx_some(&g,frame,sizeof(frame),&bytes,&budget)==GEM_AGAIN &&
+          budget==0 && reads==3 && g.rx_head==3,"some-budget");
+    setup(); reads=0; inject(13,0); inject(13,0); inject(14,0); budget=8;
+    CHECK(gem_rx_some(&g,frame,sizeof(frame),&bytes,&budget)==GEM_OK &&
+          budget==5 && reads==3,"some-good");
+    budget=0; reads=0;
+    CHECK(gem_rx_some(&g,frame,sizeof(frame),&bytes,&budget)==GEM_AGAIN &&
+          budget==0 && reads==0,"some-zero");
+    budget=8;
+    CHECK(gem_rx_some(&g,frame,sizeof(frame),&bytes,&budget)==GEM_AGAIN &&
+          budget==7 && reads==1,"some-own");
+    setup();
     for(u32 i=0;i<9;i++) inject(13,0);
     u32 before=g.rx_head;CHECK(gem_rx(&g,frame,sizeof(frame),&bytes)==GEM_AGAIN && g.rx_head==((before+8)&31),"A11 budget");
     CHECK(gem_rx(&g,frame,sizeof(frame),&bytes)==GEM_AGAIN,"remaining");

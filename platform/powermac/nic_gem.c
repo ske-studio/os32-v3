@@ -64,15 +64,14 @@ static void poll(void)
     if (!g) { packet_head = packet_count = 0; return; }
     if (gem_poll(g, g->io.tb(g->io.ctx), 8u) < 0 ||
         !pm_lan_running_gem(0)) { packet_head = packet_count = 0; return; }
-    /* gem_rx itself scans up to eight descriptors (including bad frames).
-     * Exactly one invocation preserves the total RX descriptor budget. */
-    if (packet_count < GEM_RX_SLOTS) {
-        u32 tail = (packet_head + packet_count) % GEM_RX_SLOTS;
-        u32 n = 0;
-        if (gem_rx(g, packet[tail], GEM_FRAME_BYTES, &n) == GEM_OK) {
-            packet_len[tail] = n;
-            packet_count++;
-        }
+    /* All receive calls share eight descriptor inspections, including bad
+     * frames and OWN, while filling the available packet slots. */
+    u32 budget = GEM_RX_SCAN_BUDGET;
+    while (packet_count < GEM_RX_SLOTS && budget) {
+        u32 tail = (packet_head + packet_count) % GEM_RX_SLOTS, n = 0;
+        if (gem_rx_some(g, packet[tail], GEM_FRAME_BYTES, &n, &budget) != GEM_OK) break;
+        packet_len[tail] = n;
+        packet_count++;
     }
 }
 static u32 credit(void)
