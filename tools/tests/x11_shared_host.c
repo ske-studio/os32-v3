@@ -1,4 +1,5 @@
 #include "../../kernel/input_legacy.c"
+#include "../../kernel/input_wait.c"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
  * dictionary storage and CPU transitions are fixture boundaries. No per-owner
  * IME state: switching owners alone must never manufacture a private copy. */

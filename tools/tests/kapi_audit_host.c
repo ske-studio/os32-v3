@@ -90,6 +90,7 @@ static int injected_byte = -1;
 u32 kbd_inject_pending(void) { return injected_byte >= 0; }
 int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }
 void appslot_poll_yield_reset(void) {}
+#include "input_wait_source.inc"
 #include "kbd_source.inc"
 #include "../../platform/pc98/ime_display.c"
 #include "ime_source.inc"
