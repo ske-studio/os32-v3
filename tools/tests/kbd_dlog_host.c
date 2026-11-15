@@ -1,3 +1,5 @@
+#define KBD_MERGE_SOURCE "input/hal/kbd_merge.c"
+#include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
 #include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
@@ -279,7 +281,7 @@ static void case_irq_flags_api(void)
     CHECK(out[0].flags == KBD_DLOG_F_V86 && out[0].mods == KBD_DLOG_MOD_KANA);
     CHECK(out[1].flags == KBD_DLOG_F_V86 && out[1].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
     CHECK(stub_v86_pushed == 2);
-    CHECK(kbd_is_pressed(0x72) == 0 && kbd_is_pressed(0x70) == 0);
+    CHECK(kbd_is_pressed(0x72) == 1 && kbd_is_pressed(0x70) == 1);
     CHECK(out[2].flags == KBD_DLOG_F_GUI && out[2].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
 
     CHECK(kbd_diag_log(0, (KbdDiagLogEnt *)0, 4) == OS32_ERR_INVAL);
@@ -334,16 +336,17 @@ static void case_irq_v86_mods(void)
         CHECK(kbd_trygetkey() == -1);
     }
 
-    /* 通常キーは V86 だけへ渡り、cooked/raw/押下表へ混入しない。 */
+    /* 設計 §3: V86 中も押下を追い、cooked/raw への配送はしない。 */
     for (i = 0; i < 2; i++) {
         fresh();
         kbd_set_gui_mode(i);
         stub_v86 = 1;
         irq(KBD_STAT_RXRDY, 0x1D);
-        CHECK(kbd_is_pressed(0x1D) == 0);
+        CHECK(kbd_is_pressed(0x1D) == 1);
         irq(KBD_STAT_RXRDY, 0x9D);
         CHECK(stub_v86_pushed == 2);
         stub_v86 = 0;
+        CHECK(kbd_is_pressed(0x1D) == 0);
         CHECK(kbd_trygetkey() == -1);
         CHECK(kbd_trygetrawkey() == -1);
         CHECK(kbd_get_modifiers() == 0);

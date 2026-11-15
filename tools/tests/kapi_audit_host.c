@@ -1,3 +1,4 @@
+#include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
 #include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"

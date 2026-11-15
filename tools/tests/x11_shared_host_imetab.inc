@@ -22,9 +22,9 @@ static int imetab_delivery(void)
         for (u32 r = 0; r < sizeof(readers)/sizeof(readers[0]); r++) {
             for (u32 k = 0; k < sizeof(scans); k++) {
                 CHECK(!imetab_candidate(list), "IMETAB setup");
-                if (k == 2) kbd_shift_state = SHIFT_CTRL;
+                if (k == 2) kbd_hal_capture(KEY_CTRL);
                 key(scans[k]);
-                kbd_shift_state = 0;
+                kbd_hal_capture(KEY_CTRL | SCANCODE_BREAK);
                 key(0x1d); /* queued before any candidate byte has been read */
                 for (u32 b = 0; b < sizeof(candidate) - 1; b++) {
                     CHECK(readers[r]() == candidate[b], "IMETAB candidate before transparent key");

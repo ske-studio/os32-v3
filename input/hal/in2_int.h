@@ -82,9 +82,14 @@ int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
 void input_state_release(u8 src, u16 generation);
 void input_merge_key(InputEvent *event, u8 old, u8 origin);
 void input_emit_in2(const InputEvent *event);
-/* Stage 3a ports remain optional until that stage lands. */
-void input_emit_legacy_key(u8 sc, u8 down, u8 mods) __attribute__((weak));
-void input_emit_legacy_repeat(u8 sc, u8 mods) __attribute__((weak));
+/* Native boot locks seed the existing mechanical bits with IRQs masked.
+ * src must be a registered native keyboard; no synthetic key is published. */
+void input_native_locks(u8 src, u8 mods);
+void kbd_hal_init(u8 locks);
+void kbd_hal_capture(u8 scancode);
+extern volatile u8 kbd_shift_state;
+void input_emit_legacy_key(u8 sc, u8 down, u8 mods);
+void input_emit_legacy_repeat(u8 sc, u8 mods);
 
 extern volatile int kbd_gui_mode;
 extern volatile int kbd_stop_suppressed;

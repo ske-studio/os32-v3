@@ -13,10 +13,17 @@ u32 in2_time_ms(void) { return 1234; }
 void __real_input_emit_in2(const InputEvent *e);
 void __wrap_input_emit_in2(const InputEvent *e)
 { bad_irq |= test_irq; events[n++] = *e; __real_input_emit_in2(e); }
-void input_emit_legacy_key(u8 sc, u8 down, u8 mods)
-{ bad_irq |= test_irq; old_sc[k] = sc; old_down[k] = down; old_mods[k++] = mods; }
-void input_emit_legacy_repeat(u8 sc, u8 mods)
-{ (void)sc; (void)mods; bad_irq |= test_irq; ++repeats; }
+volatile int kbd_gui_mode = 1;
+static unsigned last_raw_n;
+int legacy_stop_filter(int sc, int br, int mods) { (void)sc; (void)br; (void)mods; return 0; }
+void legacy_cooked_push(u16 entry) { (void)entry; __builtin_trap(); }
+void legacy_raw_push(int sc, int br, int mods)
+{
+    bad_irq |= test_irq;
+    if (last_raw_n == n) ++repeats;
+    else { old_sc[k] = sc; old_down[k] = !br; old_mods[k++] = mods; }
+    last_raw_n = n;
+}
 static int key(u8 src, u8 sc, u8 down)
 {
     InputEvent e = { .time_ms = 42, .src = src, .generation = gen[src - 1],
@@ -43,7 +50,7 @@ static int probe(void)
     T(out.type == INPUT_EVENT_KEY && out.sc == 1 && out.time_ms == in2_time_ms());
     T(!in2_ring_pop(&out, &seq));
     captured.down = 0; T(input_capture(&captured) == 0 && in2_ring_pop(&out, &seq));
-    n = k = 0;
+    n = k = last_raw_n = 0;
     T(key(1, KEY_SHIFT, 0) == 0 && n == 0 && k == 0);
     T(key(1, KEY_SHIFT, 1) == 0 && key(2, KEY_SHIFT, 1) == 0 && n == 2 && k == 2);
     T(events[0].src == 1 && events[1].src == 2 && events[0].time_ms == 42);
@@ -116,6 +123,18 @@ static int probe(void)
     input_repeat(0, gen[0], 1); input_repeat(17, gen[0], 1); input_repeat(1, gen[0] + 1, 1);
     T(n == before && k == old_k && !input_key_pressed(128) && !bad_irq && test_irq == 1);
     test_irq = 0; T(key(1, 1, 1) == 0 && test_irq == 0);
+    /* PM acceptance: V86 tracks held, including releases of pre-entry keys,
+     * while neither the legacy exits nor the in2 ring receive input. */
+    while (in2_ring_pop(&out, &seq)) {}
+    before = n; old_k = k; old_r = repeats;
+    v86 = 1;
+    T(key(1, 0x1d, 1) == 0 && input_key_pressed(0x1d));
+    T(key(1, 0x1d, 1) == 0 && key(1, 0x1d, 0) == 0);
+    T(key(1, 1, 0) == 0);
+    v86 = 0;
+    T(!input_key_pressed(0x1d) && !input_key_pressed(1));
+    T(n == before && k == old_k && repeats == old_r);
+    T(!in2_ring_pop(&out, &seq));
     return 0;
 }
 #ifndef PPC_COMPILE

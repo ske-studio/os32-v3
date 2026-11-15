@@ -69,13 +69,6 @@ extern int exec_park_poll(u32 now_tick);
 extern volatile u32 tick_count;
 
 
-/* ======== シフトキー状態 ========
- * **書き込むのは kbd_irq_handler (IRQ1 ISR、配りの kbd_deliver を含む) だけ**。ISR は割り込みゲート
- * 経由で IF=0 のまま走り自身に再入しないので、ここでの |= / &= / ^= は
- * ロック無しで安全。カーネル側は読むだけ (ime.c 等)。
- * この所有権を破って通常コンテキストから書くなら irq_save が要る。 */
-volatile u8 kbd_shift_state = 0;
-
 /* ======== 診断カウンタ (KAPI v62 kbd_diag、シェルの `kbdstat`) ========
  * 実機で打鍵が届かないとき、どこで止まっているかを切り分けるための値
  * (読み方は docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。ISR だけが書く値は volatile。
@@ -107,70 +100,6 @@ STATIC_ASSERT(KBD_DLOG_MOD_SHIFT == SHIFT_SHIFT && KBD_DLOG_MOD_CAPS == SHIFT_CA
               KBD_DLOG_MOD_CTRL == SHIFT_CTRL, kbd_dlog_mods_match_shift);
 STATIC_ASSERT(KBD_DLOG_BREAK == SCANCODE_BREAK, kbd_dlog_break_matches);
 
-/* ======== キー押下状態ビットマップ (128キー分) ======== */
-/* ビット1 = 押下中, ビット0 = 離されている */
-static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
-
-
-/* ======================================================================== */
-/*  スキャンコード → ASCII 変換テーブル                                    */
-/*  PC9800Bible §2-5 表2-14 の「通常」列から抽出                           */
-/*  インデックス = キーコード (0x00〜0x6B)                                  */
-/* ======================================================================== */
-
-/* 通常状態 (Shift なし) */
-static const u8 scancode_to_ascii[KBD_KEY_COUNT] = {
-    /* 0x00-0x0F */
-    0x1B, '1', '2', '3', '4', '5', '6', '7',   /* ESC, 1-7 */
-    '8',  '9', '0', '-', '^', '\\', 0x08, 0x09, /* 8-0,-,^,\,BS,TAB */
-    /* 0x10-0x1F */
-    'q',  'w', 'e', 'r', 't', 'y', 'u', 'i',   /* Q-I */
-    'o',  'p', '@', '[', 0x0D, 'a', 's', 'd',   /* O-P,@,[,ENTER,A-D */
-    /* 0x20-0x2F */
-    'f',  'g', 'h', 'j', 'k', 'l', ';', ':',   /* F-L,;,: */
-    ']',  'z', 'x', 'c', 'v', 'b', 'n', 'm',   /* ],Z-M */
-    /* 0x30-0x3F */
-    ',',  '.', '/', 0,   ' ', 0,   0x12,0x03,   /* ,./ _,SPACE,XFER,RLUP(12),RLDN(03) */
-    0x16, 0x7F, 0x1E, 0x1D, 0x1C, 0x1F, 0x01, 0x05,  /* INS(16),DEL,↑,←,→,↓,HOME(01),HELP(05) */
-    /* 0x40-0x4F (テンキー) */
-    '-',  '/', '7', '8', '9', '*', '4', '5',
-    '6',  '+', '1', '2', '3', '=', '0', ',',
-    /* 0x50-0x5F */
-    '.',  0,   0,   0,   0,   0,   0,   0,      /* NFER,vf1-vf5 */
-    0,    0,   0,   0,   0,   0,   0,   0,
-    /* 0x60-0x6F (STOP,COPY,F1-F10) */
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-    /* 0x70-0x7F (SHIFT,CAPS,KANA,GRPH,CTRL) */
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-};
-
-/* Shift状態 */
-static const u8 scancode_to_ascii_shift[KBD_KEY_COUNT] = {
-    /* 0x00-0x0F */
-    0x1B, '!', '"', '#', '$', '%', '&', '\'',
-    '(',  ')', 0,   '=', '`', '|', 0x08, 0x09,
-    /* 0x10-0x1F */
-    'Q',  'W', 'E', 'R', 'T', 'Y', 'U', 'I',
-    'O',  'P', '~', '{', 0x0D, 'A', 'S', 'D',
-    /* 0x20-0x2F */
-    'F',  'G', 'H', 'J', 'K', 'L', '+', '*',
-    '}',  'Z', 'X', 'C', 'V', 'B', 'N', 'M',
-    /* 0x30-0x3F */
-    '<',  '>', '?', '_', ' ', 0,   0x12,0x03,
-    0x16, 0x7F, 0x1E, 0x1D, 0x1C, 0x1F, 0x01, 0x05,
-    /* 0x40-0x7F: テンキー以降はShiftでも同じ */
-    '-',  '/', '7', '8', '9', '*', '4', '5',
-    '6',  '+', '1', '2', '3', '=', '0', ',',
-    '.',  0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-    0,    0,   0,   0,   0,   0,   0,   0,
-};
-
 /* ======================================================================== */
 /*  ロックキー (カナ・CAPS) — 方式 B: make で ON、break で OFF              */
 /*                                                                          */
@@ -187,22 +116,8 @@ static const u8 scancode_to_ascii_shift[KBD_KEY_COUNT] = {
 /*  (冪等) なので、ロックの物理状態から外れない。                            */
 /*  V86 セッション中も追う (打鍵はゲストへ回すが、ロックの物理状態は OS32   */
 /*  側でも正しく持っておく — セッション後に食い違わないように)。            */
-/*  戻り値: ロックキーなら 1。書くのは IRQ1 の中だけ (kbd_shift_state の    */
-/*  所有権どおり)。                                                          */
+/*  状態の所有者は input/hal/kbd_merge.c。                                   */
 /* ======================================================================== */
-static int kbd_lock_apply(u8 keycode, int is_break)
-{
-    u8 bit;
-
-    if (keycode == KEY_CAPS)      bit = SHIFT_CAPS;
-    else if (keycode == KEY_KANA) bit = SHIFT_KANA;
-    else return 0;
-
-    if (is_break) kbd_shift_state &= (u8)~bit;
-    else          kbd_shift_state |= bit;
-    return 1;
-}
-
 /* 起動時のロックの初期値。ロックしたまま電源を入れた / リセットした場合、
  * OS32 が IRQ1 を開く前の make は OS32 には届かない (BIOS が受けたか、kbd_init
  * の読み捨てで消える)。そこで BIOS が INT 09h で追ってきた 0000:053Ah の
@@ -304,111 +219,13 @@ int kbd_irq_handler(void)
  * 配らない場合で、反射の判定 (上の戻り値) には効かない。 */
 static void kbd_deliver(u8 scancode)
 {
-    u8 keycode;
-    u8 ascii;
-    int is_break;
-    int is_mod;
-    int is_lock;
-
-    is_break = scancode & SCANCODE_BREAK;
-    keycode  = scancode & SCANCODE_KEY;
-
-    /* ロックキー (カナ・CAPS) の状態は V86 分岐より前に追う (方式 B、
-     * kbd_lock_apply の説明)。打鍵そのものは下の分岐どおりゲストへ回す。 */
-    is_lock = kbd_lock_apply(keycode, is_break);
-
-    /* 修飾状態は渡し先によらず追い、V86 中の break も反映する。raw エントリに
-     * 「このイベント時点の修飾状態」を焼き込む (レビュー #3 ②: WM が取り込む
-     * ときの最新状態で変換すると Shift↓ A↓ A↑ Shift↑ が溜まった場合に
-     * a/A を取り違える)。修飾キー自身のイベントは更新後の状態を載せる。 */
-    is_mod = is_lock;   /* カナ・CAPS は kbd_lock_apply で更新済み */
-    if (keycode == KEY_SHIFT) {
-        if (is_break) kbd_shift_state &= ~SHIFT_SHIFT;
-        else          kbd_shift_state |=  SHIFT_SHIFT;
-        is_mod = 1;
-    } else if (keycode == KEY_CTRL) {
-        if (is_break) kbd_shift_state &= ~SHIFT_CTRL;
-        else          kbd_shift_state |=  SHIFT_CTRL;
-        is_mod = 1;
-    } else if (keycode == KEY_GRPH) {
-        if (is_break) kbd_shift_state &= ~SHIFT_GRPH;
-        else          kbd_shift_state |=  SHIFT_GRPH;
-        is_mod = 1;
-    }
-
-    /* V86 セッション中はキーをまるごとゲストへ回す。
-     * 8251A のデータレジスタは読んだら消えるので、ここで OS32 側の
-     * リングバッファにも入れると「シェルに打った覚えのない文字が
-     * 溜まる」ことになる。所有権はどちらか一方しか持てない。
-     * 戻り値が非 0 なら脱出ホットキー (CTRL+GRPH+DEL)。
-     * ホットキーのときも呼び手は反射する (従来どおり): irq_stub_1 は反射の
-     * 後で v86_check_exit_request を見てセッションを畳むので、反射された
-     * INT 09h をゲストが走らせることはない。 */
+    kbd_hal_capture(scancode);
     if (legacy_active()) {
-        if (legacy_kbd_push(scancode)) {
-            legacy_request_exit();
-        }
+        if (legacy_kbd_push(scancode)) legacy_request_exit();
         return;
     }
-
-    /* キー押下状態ビットマップの更新 (全キー対象) */
-    if (is_break) {
-        kbd_key_pressed[keycode / BITS_PER_BYTE] &= ~(1 << (keycode % BITS_PER_BYTE));
-    } else {
-        kbd_key_pressed[keycode / BITS_PER_BYTE] |=  (1 << (keycode % BITS_PER_BYTE));
-    }
-
-    /* 生イベントを raw リングへ (make も break も、全キー。IRQ 内なので保護不要)。
-     * エントリ = keycode | (down << 8) | (修飾状態 (SHIFT_*, 7bit) << KBD_RAW_MOD_SHIFT)。
-     * raw は WM (gshell) しか読まないので GUI モード中だけ積む — CUI 中に
-     * 溜めると次の gshell に古い打鍵が届き、kbd_raw_dropped も水増しになる
-     * (レビュー #3 ③)。 */
-    if (kbd_gui_mode) {
-        if (legacy_stop_filter(keycode, is_break, kbd_shift_state)) return;
-        legacy_raw_push(keycode, is_break, kbd_shift_state);
-    }
-
-    if (is_mod) return;
-
-    /* 強制脱出キー CTRL+STOP (契約 T6 / K2 作業 4)。
-     * PC-98 で「止める」といえばこれ (V86 セッションの脱出と同じキー)。
-     * CPL=3 アプリが KAPI を呼ばない計算ループに入ってしまうと syscall 境界
-     * ポンプも効かないので、ここが唯一の逃げ道になる。ISR では要求を立てる
-     * だけで、実際に畳むのは EOI 済みの IRQ1 スタブ (割り込まれた文脈が
-     * CPL=3 のとき) か次の syscall 入口 (exec/exec.c)。
-     * 打鍵としては配らない (kill した後のシェルに STOP が残らないように)。 */
-    if (!is_break && keycode == KEY_STOP && (kbd_shift_state & SHIFT_CTRL)) {
-        ring3_abort_request();
-        return;
-    }
-
-    /* ブレイク(キー離し)はリングバッファには入れない */
-    if (is_break) return;
-
-    /* GUI モード中は cooked リングに積まない (kbd_gui_mode の説明を参照)。
-     * 生イベントは上で raw リングへ積み済みなので WM は取りこぼさない。 */
-    if (kbd_gui_mode) return;
-
-    /* スキャンコード → ASCII変換 */
-    if (kbd_shift_state & SHIFT_SHIFT) {
-        ascii = scancode_to_ascii_shift[keycode];
-    } else {
-        ascii = scancode_to_ascii[keycode];
-    }
-
-    /* CAPS時の大文字小文字切替 */
-    if (kbd_shift_state & SHIFT_CAPS) {
-        if (ascii >= 'a' && ascii <= 'z') ascii -= ('a' - 'A');
-        else if (ascii >= 'A' && ascii <= 'Z') ascii += ('a' - 'A');
-    }
-
-    /* CTRL+文字 → コントロールコード */
-    if ((kbd_shift_state & SHIFT_CTRL) && ascii >= 'a' && ascii <= 'z') {
-        ascii = ascii - 'a' + 1;
-    }
-
-    /* バッファに格納: 全メイクキーイベントを格納（修飾キーは上で既にreturn済み）*/
-    legacy_cooked_push(((u16)keycode << 8) | ascii);
+    if (scancode == KEY_STOP && (kbd_shift_state & SHIFT_CTRL) &&
+        !(kbd_gui_mode && kbd_stop_suppressed)) ring3_abort_request();
 }
 
 /* ======================================================================== */
@@ -465,16 +282,11 @@ void kbd_init(void)
     legacy_cooked_reset_dropped();
     /* カナ・CAPS のロックは BIOS の 053Ah から引き継ぐ (kbd_lock_bits_from_bios)。
      * IRQ1 はまだ閉じているので ISR の所有権に触れない。 */
-    kbd_shift_state = kbd_lock_bits_from_bios(kbd_bios_shift_peek());
+    kbd_hal_init(kbd_lock_bits_from_bios(kbd_bios_shift_peek()));
     kbd_gui_mode = 0;       /* 起動直後は CUI (WM 未登録) */
     kbd_stop_suppressed = 0;
 
-    /* キー状態ビットマップクリア */
-    {
-        int i;
-        for (i = 0; i < KBD_BITMAP_BYTES; i++) kbd_key_pressed[i] = 0;
-        legacy_raw_flush();
-    }
+    legacy_raw_flush();
 
     /* キーボードIRQを有効化 */
     irq_enable(KBD_IRQ);
@@ -712,7 +524,7 @@ u32 kbd_get_modifiers(void)
 int kbd_is_pressed(int scancode)
 {
     if (scancode < 0 || scancode >= KBD_KEY_COUNT) return 0;
-    return (kbd_key_pressed[scancode / BITS_PER_BYTE] >> (scancode % BITS_PER_BYTE)) & 1;
+    return input_key_pressed((u8)scancode);
 }
 
 
