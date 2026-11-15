@@ -73,7 +73,7 @@ int input_legacy_wait(int mode, int interruptible);
 - provider 登録は起動時の常駐関数ポインタ。NULL は空/不在であり、共通部から PPC・serial・exec の装置固有 symbol を参照しない。
 - **link-SH では terminal_try/peek と inject_try/peek は NULL、terminal_enabled は常に偽**。LAN notice は host_mailbox → rsh_lan_poll へ渡す。PPC LAN だから terminal_try に結ぶ、という一律登録はしない。
 - PLN1 の旧文字端末を残す像だけ terminal provider に LAN byte stream を登録する。GUI 注入は別の宛先付きキューであり、LAN notice を inject_try へ載せない。
-- 旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。link-SH にはその profile/decoder を有効化しない。x86 の serial 優先を全像共通の交互選択に変えない。
+- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」) PLN1 は bridge の既定の優先 (terminal が先、local は terminal が空のとき) に従い、LAN と USB の交互選択はやめる。escape decoder は PLN1 の terminal provider (LAN の byte→key、platform 側) に置く。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
 - 現行の状態は `platform/powermac/input_boot.c:8–12`、実際の交互選択は `:28–43`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
 - 共通 bridge が選択状態・decoder・peek の整合・capture 入力期限・GUI policy を所有、HAL が物理状態/ring/keymap を所有する。provider は装置の byte/cooked 読出し・GUI 状態照会・park の口だけ、SH が半行/ID/実行状態を所有する。
 - PLN1 の peek/has_key は有限の採取（byte→decoder→完成 key の lookahead）を進めてよい。完成 key の消費と交互選択の順の更新は禁止し、try 成功時だけ消費・選択更新する。採取は既存キューから行い、装置 pump は前景 work が担当する。
@@ -105,13 +105,14 @@ int input_legacy_wait(int mode, int interruptible);
 | ① 文書・境界 | LAN_OPERATOR、ARCH_COMPAT、IO_TIER、HAL bridge 契約 | 案 B は維持、N4/EE 窓を削除。HAL と local/peek/wait/capture の担当・先行範囲を確定。公開 ABI は変えない |
 | ② host/KAPI provider | device_host、exec_reclaim、kapi_target_ppc.py、gen_kapi.py、exec_kapi.c/.h、PLN1 stub・リンクリスト | final の host/notice/flag/owner 結線と生成を一体化。wait endpoint は直接 idle_work_run。binding/remote_x9/T1 の provider/owner 変異と両 PPC 像ビルド |
 | ③a 前景・endpoint | link_platform、PLN1 work 登録の TU、usb_boot.c（各小段 1〜3 ファイル） | ②の endpoint 結線を使い、像別 work 登録と入口/endpoint の周別計数を検証。usb_boot.c:105 の「USER syscalls keep EE clear」を W4 後の FG1 契約へ訂正 |
-| ③b provider | input_boot.c（1 ファイル） | HAL 4c 完了後、local/terminal/GUI 照会の像別登録。独自入力状態を除去、HAL 共同 fixture で有限採取と非消費を検証 |
+| ③b-1 USB の非消費 peek | input_usb.c・input_usb.h・tools/checks/ver-ppc-input-usb.py（3 ファイル） | HAL 4c 完了後。USB のキューに非消費の peek を足す (§3 の「非消費 peek を USB キューに追加」)。ver-ppc-input-usb.py に「peek が消費する」変異を足す。input_boot.c は触らない |
+| ③b-2 provider の像別登録 | input_boot.c・tools/checks/ver-ppc-input-usb.py・(要れば) terminal_input.c（3 ファイル以下） | ③b-1 の後。input_boot.c の独自の状態 (lookahead・last_source・交互選択) を除き、PLN1 は terminal=LAN (decoder 付き)・local=USB (③b-1 の try/peek)、link-SH は terminal=NULL・local=USB を登録する。ver-ppc-input-usb.py の anchor (peek-consumes・lan-first・no-usb) を新しい provider へ移す。lan-first は「terminal (LAN) が先、空なら local (USB)」の期待に書き換える (交互選択の期待は消す)。HAL 共同 fixture で有限採取と非消費を検証 |
 | ③c capture 期限 | HAL 4c に含める (本線に H7 として依頼)。HAL が入れない場合は、③c を kernel/input_wait.c (共通) の実装の段に替える (1〜3 ファイル) | bridge の wait 開始起点 (x86 と同じ kbd.c:754・:792)、FREEZE 閉鎖、期限後の文字の待ちは CR・キーの待ちは ESC、STOP、END/owner 回収を検証。con_sink 通知の段は設けない |
 | ③d 出力・shell 起動 | d1: console_stream・console_log、d2: shell_putchar・shell_boot（各 2 ファイル） | d1→d2 の順で出力・起動を結線。T1 変異、fault 再起動と既存像ビルド |
 | ④ 共通 shell（直列） | rshell.c/rshell_lan.c/shell.h、main.c、profile.h | final の APP 専用実体。local try の行頭優先・半行 LAN 保留・exit。共通 rshell/capture/owner 回帰、x86 build_compare MATCH を目標 |
 | ⑤ 像 | ppc_kernel.c、ppc-user.mk、ppc-kboot.mk | final の専用 sh.bin/root・出力先・ROOT_BINS 依存、SH+LINK 許可、KBOOT_SHELL+LINK 拒否。旧 TU/HostFS 除外、bridge/provider のリンク閉包と map を確認 |
 | ⑥ QEMU | sc_run.py、ppc_sh_output.py、link_run.py | 7450/7455 で下表。新 agent/プロトコルなし。変更試験の --mutate と lint、HAL 共同試験を重複作成しない |
-- 段の順: ② → ③a → (HAL 4c、③c を含む) → ③b → ③d (d1→d2) → ④ → ⑤ → ⑥。③b は peek の pump (input_boot.c:31) を消すので、③a の像別の work の登録より先に入れない (PLN1 の LAN の入力が止まる)。③d は ③a の後なら ③b と並べてよい。
+- 段の順: ② → ③a → (HAL 4c、③c を含む) → ③b-1 → ③b-2 → (HAL 4b) → ③d (d1→d2) → ④ → ⑤ → ⑥。HAL 4b は「③b の local を共通の cooked ring に結び替え、③b-1 の peek を消す」段。③d は ③a の後なら ③b・HAL 4b と並べてよい (4c が遅れたら ③d を先に進める)。③b は peek の pump (input_boot.c:31) を消すので、③a の像別の work の登録より先に入れない (PLN1 の LAN の入力が止まる)。③d は ③a の後なら ③b と並べてよい。
 - ③d: PLN1 の像の出力の側の直接の poll (console_stream.c:12・shell_putchar.c:9 の pm_terminal_poll) は残す。idle_work の登録と重なっても、LAN は lan_service.c:248-249 の poll_at を先に進めるので入れ子の 2 回目は何もしない。USB は 10ms の間引きと irq_save で守られる。この 2 つを受入の「二重登録なし」の根拠にする。link-SH の像では、旧端末の TU が外れるので、この直接の poll も無くなる。
 - ③a〜d（d は d1/d2）の各小段は試験・ビルド一覧の変更も含め 1〜3 ファイル・400 行以下とし、超える場合は同じ段内でさらに分割する。各小段で組める状態を保つ。共通 shell は final のとおり直列。
 - ③の完了条件に、新規ソースの ROLES §4-3 追従（build/sources/order.mk、build/sources/common.mk または arch/platform 一覧、tools/tests/fixtures/build_profile_x86.json の C_KERNEL、PPC は build/ppc-kboot.mk）と選択・リンク確認を含める。io_pump.c は追加しない。
@@ -157,6 +158,10 @@ int input_legacy_wait(int mode, int interruptible);
 - ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/ppc-kboot.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (init/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
 
 - **sys_yield の訂正 (2026-11-15):** §2 の「sys_halt は返値を捨て、sys_yield は返す」(両方を ppc_kapi_wait_once に結ぶ) は誤り。② でそのとおり結んだところ、arch-ctx-guest の lifecycle (exec_start の子が sys_yield で park して state 4 になる) が壊れた (② の a12d0ec8 から、CI の段 2 の準備で発見)。sys_yield は x86 と同じ exec_sys_yield (park の点、idle_work_run を自分で呼ぶ) に戻し、ppc_kapi_wait_once は sys_halt だけに結ぶ。
+- **HAL 4c の順の入れ替えで決めたこと (2026-11-15、本線 PM の依頼と Opus のレビュー F3・F4 を受けて PowerPC PM が反映):**
+  - 本線は入力の HAL の段の順を 4c-pre → 4c → P3 ③b → 4b にした (Opus 条件付き可)。input_boot.c はこの順で直列に触る。HAL 4c では、PPC は既存の先読み付きの try_key/peek (LAN と USB の交互) を provider の local として登録し、terminal は NULL にする。
+  - ③b を ③b-1 (USB の非消費 peek) と ③b-2 (像別登録) に分けた (各 3 ファイル以下)。
+  - lan-first の扱い (PM 決定): PLN1 の LAN と USB の交互選択はやめ、bridge の既定 (terminal が先) に従う。理由は 3 つ。共通の bridge に PLN1 専用の互換 profile を足さずに済む。x86 の serial 優先と同じ規則になる。PLN1 は退避像で、新しい機能を足さない方針。LAN が流れ続けると USB が後回しになるが、PLN1 の LAN は人の操作の端末で、流し続ける使い方はしない。問題が出たら profile に戻す。
 
 ## 付録 A: 初版の確定設計 (2026-11-14)
 ### PowerPC P3 詳細設計 (確定) — SH の共通 rshell を link に結ぶ
