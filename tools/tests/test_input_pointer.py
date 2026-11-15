@@ -54,19 +54,30 @@ def run(ctx):
         for n, source in zip(('ref_mouse.c', 'ref_mouse_bus.c'), old):
             extra = '\nvoid ref_mouse_position(i16 *x, i16 *y) { *x = cursor_x; *y = cursor_y; }\n' if n == 'ref_mouse.c' else ''
             (tmp/n).write_text(prefix + adapt_poll(source) + extra)
+        # This stage's exact base, independently namespaced for seamless comparison.
+        base_mouse = subprocess.check_output(['git', 'show', 'ef67e51c:drivers/input/mouse.c'], cwd=ctx.root, text=True)
+        base_state = subprocess.check_output(['git', 'show', 'ef67e51c:input/hal/pointer_state.c'], cwd=ctx.root, text=True)
+        base_symbols = set(re.findall(r'^(?:void|int|u8) +(\w+)\(', base_mouse + '\n' + base_state, re.M))
+        base_prefix = ''.join('#define '+n+' base_'+n+'\n' for n in sorted(base_symbols))
+        base_prefix += '#define mouse_ext_mode ref_mouse_ext_mode\n'
+        for n, body in [('base_mouse.c', adapt_poll(base_mouse)), ('base_state.c', base_state)]:
+            (tmp/n).write_text(base_prefix + body)
         poll_source = (ctx.root/'drivers/input/mouse.c').read_text()
-        def build_poll(source, state=sources[4], ext=sources[3]):
+        def build_poll(source, state=sources[4], ext=sources[3], hal=bus_sources[1]):
             for n, body in zip(names, sources): (tmp/n).write_text(body)
             (tmp/'pointer_state.c').write_text(state)
             (tmp/'mouse_ext.c').write_text(ext)
             (tmp/'mouse.c').write_text(adapt_poll(source))
-            files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'ref_mouse.c', 'ref_mouse_bus.c']
+            (tmp/'mouse_hal.c').write_text(hal.replace('../../input/hal/in2_int.h', 'in2_int.h'))
+            files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'ref_mouse.c', 'ref_mouse_bus.c', 'base_mouse.c', 'base_state.c']
             subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector', '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')] + [str(tmp/n) for n in files] + [str(ctx.root/'tools/tests/input_poll_host.c'), '-o', str(tmp/'poll')], check=True)
             return host32.run([str(tmp/'poll')], runner='qemu').returncode
         assert build_poll(poll_source) == 0
         if ctx.mutate:
             for before, after in [('mouse_legacy_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);', 'dx = dy = 0; buttons = 0;'),
-                                  ('pointer_bounds(x_min, y_min, x_max, y_max);', '(void)0;')]:
+                                  ('pointer_bounds(x_min, y_min, x_max, y_max);', '(void)0;'),
+                                  ('mouse_ext_mode(0);', 'mouse_ext_mode(1);'),
+                                  ('mouse_ext_mode(1);', 'mouse_ext_mode(0);')]:
                 assert poll_source.count(before) == 1
                 rc = build_poll(poll_source.replace(before, after)); assert 0 < rc < 128, (before, rc)
                 print('RED runtime poll: '+before, flush=True)
@@ -88,6 +99,13 @@ def run(ctx):
             rc = build_poll(poll_source, sources[4].replace(before, 'if (x0 > x1 || y0 > y1) { irq_restore(f); return; } '+before))
             assert 0 < rc < 128, rc
             print('RED runtime reversed bounds', flush=True)
+            for before, after in [('mouse_ext_sample(seamless_hal_src, seamless_hal_generation, x, y, time_ms);', '(void)0;'),
+                                  ('if (seamless_mouse_poll(&x, &y))', 'if (seamless_mouse_poll(&x, &y) && seamless_mouse_poll(&x, &y))'),
+                                  ('.buttons = mouse_read_buttons()', '.buttons = 0')]:
+                assert bus_sources[1].count(before) == 1
+                rc = build_poll(poll_source, hal=bus_sources[1].replace(before, after))
+                assert 0 < rc < 128, (before, rc)
+                print('RED runtime seamless: '+before, flush=True)
             assert build_poll(poll_source) == 0
         print('PASS T_pointer', flush=True)
         if ctx.mutate:
@@ -98,21 +116,22 @@ def run(ctx):
                 print('RED runtime: '+old, flush=True)
             assert build_bus(bus_sources) == 0
             for index, old, new in [
+                (4, 'seamless = !!enabled;', 'seamless = !enabled;'),
                 (4, 'mask |= buttons[i]', 'mask ^= buttons[i]'),
                 (4, 'buttons[e->src - 1] ^ e->buttons', 'buttons[e->src - 1] & e->buttons'),
                 (3, 'in2_x = add32(in2_x, x)', 'in2_x = add32(0, x)'),
-                (3, 'seamless != !!marked', 'seamless == !!marked'),
-                (4, '(int)x * (xmax - xmin) / 32767', '(int)x * (xmax - xmin) / 32768'),
+                (3, 'pointer_seamless() != !!marked', 'pointer_seamless() == !!marked'),
+                (4, 'int nx = xmin + (int)x * (xmax - xmin) / 32767;', 'int nx = xmin + (int)x * (xmax - xmin) / 32768;'),
                 (3, 'if (legacy_active()) return;', 'if (0) return;'),
                 (1, 'if (!legacy_active()) input_emit_in2(&e);', 'input_emit_in2(&e);'),
                 (3, 'return S32_MAX;', 'return 0;'),
                 (3, 'return -S32_MAX - 1;', 'return 0;'),
                 (3, 'n = 32767;', 'n = 0;'),
                 (3, 'n = -32768;', 'n = 0;'),
-                (3, 'pointer_absolute_reset();', '(void)0;'),
-                (3, 'old_x = old_y = 0; pointer_absolute_reset();', 'pointer_absolute_reset();'),
+                (4, 'pointer_absolute_reset();', '(void)0;'),
+                (4, 'mouse_ext_read_legacy(&dx, &dy);', '(void)dx; (void)dy;'),
                 (3, 'if (pointer_absolute_delta(x, y, &dx, &dy))', 'if (pointer_absolute_delta(x, y, &dx, &dy) >= 0)'),
-                (4, 'prev_x = px; prev_y = py;', 'prev_x = 0; prev_y = 0;'),
+                (4, 'prev_x = nx; prev_y = ny;', 'prev_x = 0; prev_y = 0;'),
                 (4, 'px = 639 / 2', 'px = 0')]:
                 assert sources[index].count(old) == 1
                 mutated = sources.copy(); mutated[index] = mutated[index].replace(old, new)

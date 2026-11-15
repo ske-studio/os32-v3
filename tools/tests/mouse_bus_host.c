@@ -12,6 +12,7 @@ static int v86;
 unsigned test_inp(unsigned port) { (void)port; return samples[pos++]; }
 void test_outp(unsigned port, unsigned value) { (void)port; (void)value; }
 int legacy_active(void) { return v86; }
+int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
 u32 in2_time_ms(void) { return 50; }
 void input_emit_in2(const InputEvent *e) { if (count < 16) events[count] = *e; ++count; }
 static void irq_sample(u8 raw, u8 x, u8 y)
@@ -38,6 +39,8 @@ static int probe(void)
     for (unsigned i = 2; i <= IN2_MAX_DEV; ++i) T(input_src_register(INPUT_KIND_MOUSE, INPUT_ORIGIN_USB, &gen) == (int)i);
     T(bus_mouse_init()); irq_sample(MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT, 7, 0xfe);
     T(count == 3); mouse_ext_read_legacy(&dx, &dy); T(!dx && !dy);
+    mouse_hal_seamless_init(); pos = 0; mouse_hal_seamless_poll();
+    T(!pos && count == 3); /* Full source table: do not sample an unregistered device. */
     return 0;
 }
 void _start(void) { int rc = probe(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }

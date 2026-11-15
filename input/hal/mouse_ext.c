@@ -5,7 +5,6 @@
 
 static i32 in2_x, in2_y;
 static i16 old_x, old_y;
-static int seamless;
 
 static i32 add32(i32 a, i16 b)
 {
@@ -20,18 +19,12 @@ static i16 add16(i16 a, i16 b)
     if (n < -32768) n = -32768;
     return (i16)n;
 }
-void mouse_ext_mode(int enabled)
-{
-    unsigned f = irq_save();
-    if (seamless != !!enabled) { seamless = !!enabled; old_x = old_y = 0; pointer_absolute_reset(); }
-    irq_restore(f);
-}
 void mouse_ext_move(i16 x, i16 y, int marked)
 {
-    if (seamless == !!marked && !marked) pointer_move(x, y);
+    if (pointer_seamless() == !!marked && !marked) pointer_move(x, y);
     if (legacy_active()) return;
     in2_x = add32(in2_x, x); in2_y = add32(in2_y, y);
-    if (seamless != !!marked) return;
+    if (pointer_seamless() != !!marked) return;
     old_x = add16(old_x, x); old_y = add16(old_y, y);
 }
 void mouse_ext_read(i32 *x, i32 *y)
@@ -61,7 +54,7 @@ int mouse_ext_sample(u8 src, u16 generation, i16 x, i16 y, u32 time_ms)
     unsigned f = irq_save();
     u8 kind, origin;
     int rc = OS32_ERR_INVAL;
-    if (!seamless || x < 0 || y < 0 ||
+    if (!pointer_seamless() || x < 0 || y < 0 ||
         !input_src_info(src, generation, &kind, &origin) || kind != INPUT_KIND_MOUSE) goto out;
     InputEvent e = { .src = src, .generation = generation, .time_ms = time_ms,
                      .type = INPUT_EVENT_ABS, .x = x, .y = y };

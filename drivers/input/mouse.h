@@ -57,6 +57,8 @@ int  seamless_mouse_poll(i16 *x, i16 *y);
 u8   mouse_read_buttons(void);
 
 /* Bus IRQ adapter. */
+void mouse_hal_seamless_init(void);
+void mouse_hal_seamless_poll(void);
 void mouse_hal_init(void);
 void mouse_hal_capture(i8 dx, i8 dy, u8 raw);
 
