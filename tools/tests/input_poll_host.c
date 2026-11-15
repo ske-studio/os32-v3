@@ -9,6 +9,7 @@ static int poll_v86, poll_seamless;
 static int poll_inject_irq;
 static i16 poll_abs_x = 32767, poll_abs_y;
 static unsigned poll_reads, poll_events;
+static unsigned poll_check_io, poll_irq_bad;
 static int poll_abs_ok = 1;
 static InputEvent poll_last, poll_prior;
 void base_mouse_init(void);
@@ -27,14 +28,14 @@ void ref_mouse_irq_handler(void);
 void ref_mouse_position(i16 *, i16 *);
 void ref_mouse_hal_init(void) {}
 void ref_mouse_hal_capture(i8 x, i8 y, u8 b) { (void)x; (void)y; (void)b; }
-unsigned test_inp(unsigned port) { (void)port; return poll_samples[poll_pos++ % 4]; }
+unsigned test_inp(unsigned port) { (void)port; if (poll_check_io && !test_irq) ++poll_irq_bad; return poll_samples[poll_pos++ % 4]; }
 void test_outp(unsigned port, unsigned value) { (void)port; (void)value; }
 int legacy_active(void) { return poll_v86; }
 u32 in2_time_ms(void) { return 50; }
 void input_emit_in2(const InputEvent *e) { poll_prior = poll_last; poll_last = *e; ++poll_events; }
 int np2_detect(void) { return poll_seamless; }
 int seamless_mouse_init(void) { return 1; }
-int seamless_mouse_poll(i16 *x, i16 *y) { ++poll_reads; *x = poll_abs_x; *y = poll_abs_y; return poll_abs_ok; }
+int seamless_mouse_poll(i16 *x, i16 *y) { if (poll_check_io && !test_irq) ++poll_irq_bad; ++poll_reads; *x = poll_abs_x; *y = poll_abs_y; return poll_abs_ok; }
 void irq_enable(u8 irq) { (void)irq; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void kbd_stop_mouse_sample(u8 buttons) { poll_stop = buttons; }
@@ -105,7 +106,8 @@ static int probe(void)
     poll_seamless = 1; base_mouse_init(); mouse_init();
     poll_samples[0] = MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT;
     poll_pos = 0; base_mouse_poll(&a); poll_pos = 0; unsigned reads = poll_reads, baseline = poll_events;
-    mouse_poll(&b); T(poll_reads == reads + 1 && poll_equal(a, b) && b.x == 639 && !b.y && !b.dx && !b.dy);
+    poll_check_io = 1; mouse_poll(&b); poll_check_io = 0;
+    T(!poll_irq_bad && poll_reads == reads + 1 && poll_equal(a, b) && b.x == 639 && !b.y && !b.dx && !b.dy);
     T(poll_events == baseline);
     mouse_ext_read(&ax, &ay); /* discard earlier bus movement */
     poll_abs_x = 16384; poll_abs_y = 32767; unsigned n = poll_events;
