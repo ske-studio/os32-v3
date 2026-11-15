@@ -163,6 +163,7 @@
     "drivers/block/loop_dev.c",
     "drivers/input/mouse.c",
     "drivers/input/mouse_bus.c",
+    "drivers/input/mouse_hal.c",
     "drivers/input/mouse_seamless.c",
     "drivers/net/ne2000/lgy98.c",
     "drivers/net/ne2000/ne2000.c",
