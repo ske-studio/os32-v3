@@ -1,6 +1,6 @@
 #include "in2_int.h"
 static u32 now, command_start;
-static int capture, frozen, pending, serial_reads, steps, ready_at, value;
+static int capture, frozen, pending, serial_reads, steps, ready_at, value, toggle_at;
 static u32 ticks(void) { return now; }
 static u32 timeout(void) { return 3000; }
 static int cap(void) { return capture; }
@@ -8,7 +8,7 @@ static int stop(void) { return pending; }
 static int local(void) { return now >= (u32)ready_at ? value : -1; }
 static int serial(void) { serial_reads++; return -1; }
 static int enabled(void) { return !capture; }
-static void step(void) { now += 100; steps++; if (steps > 100) __builtin_trap(); }
+static void step(void) { now += 100; steps++; if (toggle_at && steps == toggle_at) capture = !capture; if (steps > 100) __builtin_trap(); }
 static const struct InputLegacyProvider provider = {
     .try_key=local, .terminal_try=serial, .terminal_enabled=enabled,
     .wait_ticks=ticks, .wait_timeout_ticks=timeout, .capture_active=cap,
@@ -38,7 +38,7 @@ static int run(int old, int mode, int interruptible) {
 }
 static int probe(int old) {
     input_legacy_register(&provider);
-    capture=1; frozen=0; pending=0; serial_reads=0; ready_at=100000; steps=0;
+    capture=1; frozen=0; pending=0; toggle_at=0; rshell_active=0; serial_reads=0; ready_at=100000; steps=0;
     command_start=100; now=command_start+1700;
     if (run(old,IL_CHAR,1)!=13 || now!=4800 || !capture) return 1;
     steps=0;
@@ -49,6 +49,11 @@ static int probe(int old) {
     if (run(old,IL_KEY,1)!=-1 || steps) return 4;
     pending=0; capture=0; ready_at=11000; value=0x1d61; steps=0;
     if (run(old,IL_KEY,1)!=0x1d61 || serial_reads) return 5;
+    rshell_active=1; capture=1; now=0; ready_at=100000; steps=0; toggle_at=10;
+    if (run(old,IL_CHAR,1)!=' ' || now!=3000) return 6;
+    capture=0; now=0; steps=0; toggle_at=10;
+    if (run(old,IL_CHAR,1)!='\r' || now!=3000) return 7;
+    toggle_at=0;
     return 0;
 }
 #ifndef PPC_COMPILE

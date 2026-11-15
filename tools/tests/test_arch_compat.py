@@ -19,7 +19,8 @@ CHECK = dict(env=['ppc-cross'], name='arch-compat-host', tier=2, budget=30, need
     'platform/pc98/d2_bind.c', 'platform/powermac/input_boot.c',
     'platform/powermac/input_boot.h', 'platform/powermac/input_usb.h',
     'platform/powermac/input_decode.c', 'platform/powermac/lan_boot.h',
-    'kernel/cli/resident_cli.h', 'kernel/input_service.c',
+    'kernel/cli/resident_cli.h', 'kernel/input_service.c', 'kernel/input_legacy.c',
+    'kernel/input_wait.c', 'input/hal/in2_int.h', 'include/con_sink.h', 'exec/exec.h',
     'include/input_service.h', 'include/pointer_service.h', 'include/kbd.h',
     'include/clock_source.h', 'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_host_notice.h',
@@ -29,7 +30,7 @@ CHECK = dict(env=['ppc-cross'], name='arch-compat-host', tier=2, budget=30, need
     'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py',
     'sdk/target_profile.py', 'sdk/kapi.json', 'kapi/kapi_generated.c',
     'sdk/include/os32/os32_kapi_slots.h'],
-    basis=['ARCH_COMPAT_CONTRACT §4'],
+    pins=['input-hal/4b'], basis=['ARCH_COMPAT_CONTRACT §4'],
 )
 import json
 import os
@@ -107,12 +108,12 @@ def input_kapi(root, work, vectors, mutation=None):
 
 
 def check_input_kapi(root, work, vectors, mutate):
-    expected = {'pc98': 0, 'powermac': 15}
+    expected = {'pc98': 0, 'powermac': 14}
     actual = input_kapi(root, work, vectors)
     assert actual == expected, ('FAIL/XPASS input/KAPI baseline', actual)
     print('PASS AC-INPUT-1/empty-try-peek-cooked-foreground (partial): pc98 wiring, powermac reader', flush=True)
     print('PASS AC-KAPI-1/selected-generated-types-reserved-slots (partial): both targets', flush=True)
-    for bit, name in ((1, 'interruptible ignored'), (2, 'raw=-1 aliases empty'),
+    for bit, name in ((2, 'raw=-1 aliases empty'),
                       (4, 'pressed=0 aliases released'), (8, 'modifiers=0 aliases none')):
         assert actual['powermac'] & bit
         print('XFAIL AC-INPUT-1/powermac ' + name + ' (not a conformance pass)', flush=True)
@@ -122,22 +123,26 @@ def check_input_kapi(root, work, vectors, mutate):
     if mutate:
         mutations = (
             ('pc98-try-blocks', 'platform/pc98/d2_bind.c',
-             '.trygetkey = kbd_trygetkey,', '.trygetkey = kbd_getkey,', {'pc98': 'timeout', 'powermac': 15}),
+             '.trygetkey = kbd_trygetkey,', '.trygetkey = kbd_getkey,', {'pc98': 'timeout', 'powermac': 14}),
             ('pc98-char-wiring', 'platform/pc98/d2_bind.c',
-             '.trygetchar = kbd_trygetchar,', '.trygetchar = kbd_trygetkey,', {'pc98': 64, 'powermac': 15}),
+             '.trygetchar = kbd_trygetchar,', '.trygetchar = kbd_trygetkey,', {'pc98': 64, 'powermac': 14}),
             ('ppc-empty', 'platform/powermac/input_boot.c',
              'return lookahead;\n}', 'return lookahead < 0 ? 0 : lookahead;\n}', {'pc98': 0, 'powermac': 64}),
             ('ppc-consume', 'platform/powermac/input_boot.c',
              'int c = peek(); lookahead = -1; return c;', 'int c = peek(); return c;', {'pc98': 0, 'powermac': 64}),
+            ('ppc-lookahead-lost', 'platform/powermac/input_boot.c',
+             'int c = peek(); lookahead = -1; return c;', 'lookahead = -1; return peek();', {'pc98': 0, 'powermac': 64}),
+            ('ppc-peek-consumes', 'platform/powermac/input_boot.c',
+             '.peek_key = peek,', '.peek_key = try_key,', {'pc98': 0, 'powermac': 64}),
             ('ppc-cancel-xpass', 'platform/powermac/input_boot.c',
-             '(void)interruptible; return key();', 'if (interruptible) return -1; return key();', {'pc98': 0, 'powermac': 14}),
+             '.wait_pending = ring3_wait_pending,', '.wait_pending = 0,', {'pc98': 0, 'powermac': 15}),
             ('ppc-raw-xpass', 'platform/powermac/input_boot.c',
              'static int raw(void) { return -1; }',
-             'static int raw(void) { int c = raw_key; raw_key = -1; return c; }', {'pc98': 0, 'powermac': 13}),
+             'static int raw(void) { int c = raw_key; raw_key = -1; return c; }', {'pc98': 0, 'powermac': 12}),
             ('ppc-pressed-xpass', 'platform/powermac/input_boot.c',
-             '(void)scancode; return 0;', '(void)scancode; return down;', {'pc98': 0, 'powermac': 11}),
+             '(void)scancode; return 0;', '(void)scancode; return down;', {'pc98': 0, 'powermac': 10}),
             ('ppc-modifiers-xpass', 'platform/powermac/input_boot.c',
-             'static u32 zero32(void) { return 0; }', 'static u32 zero32(void) { return mods; }', {'pc98': 0, 'powermac': 7}),
+             'static u32 zero32(void) { return 0; }', 'static u32 zero32(void) { return mods; }', {'pc98': 0, 'powermac': 6}),
             ('absent-pointer', 'sdk/kapi_target_ppc.py',
              '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
             ('absent-query', 'sdk/kapi_target_ppc.py',

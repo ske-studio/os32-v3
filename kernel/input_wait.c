@@ -33,6 +33,6 @@ int input_legacy_wait(int mode, int interruptible)
         p->wait_step();
         if (timed && timeout && p->wait_ticks &&
             (u32)(p->wait_ticks() - start) >= timeout)
-            return mode == IL_KEY ? 0x1b : (capture ? '\r' : ' ');
+            return mode == IL_KEY ? 0x1b : (p->capture_active && p->capture_active() ? '\r' : ' ');
     }
 }

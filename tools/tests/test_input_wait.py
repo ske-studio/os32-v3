@@ -50,7 +50,7 @@ def run(ctx):
         if ctx.mutate:
             for old,new in [
                 ('start = p->wait_ticks ? p->wait_ticks() : 0;', 'start = 100;'),
-                ("mode == IL_KEY ? 0x1b : (capture ? '\\r' : ' ')", "mode == IL_KEY ? '\\r' : (capture ? 0x1b : ' ')"),
+                ("mode == IL_KEY ? 0x1b : (p->capture_active && p->capture_active() ? '\\r' : ' ')", "mode == IL_KEY ? '\\r' : (capture ? 0x1b : ' ')"),
                 ('if (mode == IL_CHAR && p->terminal_enabled &&', 'if (mode != IL_LOCAL_CHAR && p->terminal_enabled &&')]:
                 assert source.count(old)==1
                 assert execute(source.replace(old,new,1)) != 0
