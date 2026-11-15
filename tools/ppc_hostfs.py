@@ -1,4 +1,10 @@
-"""PLN1 adapter for the existing LAN SerialFS session contract."""
+"""PLN1 adapter for the existing LAN SerialFS session contract.
+
+For link-SH, use HostAgent(file_root=..., allow_write=..., peer=...). Its
+SfsLink backend retains SFS replay state across link sessions; this PLN1
+adapter and its reset() must not be used for that transport. Serial SFS and
+netcd continue to use their existing tools.
+"""
 import struct
 
 import lanfs_host

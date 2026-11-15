@@ -1,5 +1,17 @@
 """QEMU INDEX8 shell pixel acceptance with product runtime mutations."""
-CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-fb', tier=2, budget=900, needs=['make:ppc-ci-image'], covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py',
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-fb', tier=2, budget=900, needs=['make:ppc-ci-image'], covers=[
+        'tools/host_agent.py',
+        'tools/host_linux.py',
+        'tools/host_notify.py',
+        'tools/host_operator_socket.py',
+        'tools/host_rshell.py',
+        'tools/host_services.py',
+        'tools/host_sfs_link.py',
+        'tools/ppc/link_run.py',
+        'tools/ppc/link_sh_run.py',
+        'tools/ppc_link_transport.py',
+        'tools/remote_transport.py',
+        'tools/host_agent_config.py',
     'tools/checks/ppc-fb.py', 'tools/ppc/fb_run.py', 'tools/ppc/fb_pixel.py',
     'tools/ppc/usb_run.py', 'tools/ppc/sd_run.py', 'tools/ppc/kboot_accept.py',
     'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py', 'tools/ppc/run.py',
