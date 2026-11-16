@@ -614,13 +614,25 @@ def link_lan_accept(elf, cpu, out):
             def gated(rid, ent, sink):
                 self.calls.append(dict(rid=rid, body=bytes(ent['got']).hex(), dropped=self.drop))
                 if not self.drop: return service_sfs(rid, ent, sink)
+                # Truly silent: the agent's wall-clock 1.0s (host_agent tick) would
+                # otherwise answer 503 and end the interval before the guest's
+                # deadline, since -icount guest time drifts from wall time.
+                ent['sfs_deadline'] = float('inf')
             self.agent._service_sfs = gated
             handle = self.agent.handle
             def released(frame, sink):
                 # The guest RELEASEs a CALL rid when its own deadline ends the CALL.
                 if len(frame) >= 14+LINK_HDR and hdr_unpack(frame[14:])[0] == OP_RELEASE:
                     self.releases.append(hdr_unpack(frame[14:])[6])
-                return handle(frame, sink)
+                result = handle(frame, sink)
+                if self.drop:
+                    # Admission arms a wall-clock 1.0s (host_agent tick answers 503);
+                    # under -icount the guest may send WDATA after it, so a
+                    # suppressed CALL must not be answered before the guest deadline.
+                    for ent in self.agent.ledger.values():
+                        if ent.get('resp') is None and 'sfs_deadline' in ent:
+                            ent['sfs_deadline'] = float('inf')
+                return result
             self.agent.handle = released
 
         def start(self):
