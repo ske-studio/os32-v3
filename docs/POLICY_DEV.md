@@ -22,6 +22,25 @@
 - 版 (v3・v4) の名前は計画の論点にしない (ユーザーが決める)。
 - カーネル層の不具合を先に直す規則は、この期間も変わらない。
 
+### 他のアーキテクチャへ移植するときは、ユーザーランドの libc に必ず newlib を使う (ユーザー決定 2026-11-16)
+
+「他アーキテクチャ移植時に必ずnewlibcを使う様にドキュメント化」(2026-11-16)。発端は「sqlite ですが、newlibc が入ってないのでは？ newlibc に追加した x86 依存のアセンブラも移植して」(PowerPC のユーザーランドが libc なしで組まれていた)。
+
+- ユーザーランドの C ライブラリは、どのアーキテクチャでも newlib nano にする。x86 と同じ版・同じ作り方にそろえる。
+  - 版: `tools/ci/build_cross.sh` の NEWLIB_VER と SHA256。
+  - configure: `--disable-newlib-supplied-syscalls --enable-newlib-nano-malloc --enable-newlib-nano-formatted-io` (理由は [08_build](08_build.md) の newlib の節)。
+  - 改変しない: [THIRD_PARTY](../THIRD_PARTY.md) と `sdk/allocator/nano_inputs.json` の `patches: []`。
+- 自前の小さな libc や、アプリごとの代用の関数で置き換えない。足りない関数があれば、newlib のものを使う形に直す。
+- OS32 との境目は、x86 と同じ部品をアーキテクチャごとに用意する。
+  - syscall の入口: `sdk/crt/syscalls.c` の KAPI の関数表 (`_read`・`_write`・`_sbrk` など)。
+  - crt0: `sdk/crt/crt0.asm` に当たる物。
+  - メモリの割り当て: `sdk/allocator` の nano の adapter (libc.a の malloc 系を `os32_private_*` に名前替えして `libos32nano.a` にまとめる方式)。
+- アーキテクチャ依存のアセンブラ:
+  - x86 の newlib には、OS32 が足したアセンブラは無い (無改変)。`lib/kstring_asm.asm` (memcpy・strlen など) と `lib/sqlite3/sqlite_stack.asm` はカーネル用で、newlib には入らない。
+  - 移植先でカーネルの文字列操作や SQLite の別スタックが要るときは、カーネルの部品として移植する。PowerPC の `arch/ppc/setjmp.S` も同じ扱い。
+- ユーザーランドの SQLite (`build/programs.mk` の単体版) は newlib をリンクする。カーネルの SQLite は newlib を使わない ([CONSTRAINTS](CONSTRAINTS.md) の「カーネルは newlib とリンクされない」)。
+- 移植の設計の §1 で、newlib の入れ方 (版・multilib・浮動小数点の旗・syscalls.c と crt0 と allocator の adapter の置き場) を書く。互換の約束は [ARCH_COMPAT_CONTRACT](decisions/ARCH_COMPAT_CONTRACT.md) の AC-LIBC-1。
+
 ### 別のアーキテクチャで機能を作るときは、統合して作れるかを先に判断する (ユーザー決定 2026-11-14)
 
 あるアーキテクチャだけで機能を作るとき、または他のアーキテクチャや本線にある役目を別の形で作るときは、設計の §1 で次の 3 点を判断して書く。
