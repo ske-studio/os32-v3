@@ -531,3 +531,10 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - S1x・S0d の段では、x86 の打鍵はまだ新しい経路につながっていない。pc98_input_keymap_register と input_capture_key は S2x で呼ぶ。起動時の登録の失敗で入力が無くなる危険も、S2x で扱う。
 - S2x の試験では、128 キー × 32 修飾の比較を CUI の make の文字だけでなく、GUI の raw とリピートでも旧経路と並べて行う。
 - bind 済みの源は input_capture_key だけを通す。sc の入口 (input_capture) と usage の入口を同じ源で混ぜると、sc の入口の break で held だけが消え、保存した作用が残って修飾が押されたままになる。S2x の依頼にこの約束を書く。
+
+## S2x の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
+
+- platform/pc98/input_keymap.c:11: HID の backend の登録が失敗しても、先に登録した PC98 の backend は残す (解除の口は作らない、使う物も無い)。意図どおり。
+- 登録の失敗のログは /var/log/boot.log の 1 行だけで、画面には出さない。設計の「klog」はこの意味とする (PM 決定 2026-11-17)。
+- 試験: V86 の中で CAPS・KANA を押してから抜けた後の文字を、旧経路と比べる 1 件を、S3 の段の試験に足す。
+- kbd_hal_init を 2 回呼ぶと旧経路になり bindings[] が残る。呼ぶのは boot.c:53 の 1 回だけなので、今は起きない。2 回呼ぶ道を作るときに直す。
