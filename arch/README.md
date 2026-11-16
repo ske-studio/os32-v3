@@ -47,6 +47,8 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
 
 ## 新しいアーキテクチャを足す手順
 
+0. **置き場を先に決める。** ファイルの置き場は [docs/08_build.md](../docs/08_build.md) §8-3 の地図と「置き場の規則」に従う (CPU は `arch/<arch>/`、機種の結線は `platform/<機種>/`、装置は `drivers/`、OS の機能は共通に 1 つ、build は `build/{arch,platform,targets,features}/`)。
+
 1. **ディレクトリを作る。** `arch/<arch>/` を掘り、`arch_io.h` と
    `arch_cpu.h` を置く。既存の `arch/x86/arch_*.h` はコピー元ではなく
    **対照表**として使う — 写すのは命令列ではなく、`include/io.h` /

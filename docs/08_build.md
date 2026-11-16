@@ -226,7 +226,11 @@ os32-v3/
 │   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
 │       ├── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
 │       └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線 (BIOS・装置の模倣は platform/pc98/legacy/)
-├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト ほか)。`PLATFORM ?= pc98` で選ぶ
+│   └── ppc/        PowerPC (G4 7450/7455) の原始命令・例外・MMU (BAT・HPT)・decrementer。下位の構成は x86 と同じ考え方で分ける (kernel/ など、平置きにしない)
+├── platform/       機種依存の実装。`PLATFORM ?= pc98` で選ぶ。装置のドライバと OS の機能は置かない (下の「置き場の規則」)
+│   ├── pc98/       PC-98 の結線 (platform_io.h — ポート I/O・I/O ウェイト、起動情報、8259・PIT の結線、legacy/ — BIOS・装置の模倣)
+│   ├── powermac/   PowerMac (mac99・Keylargo) の結線 (OF の起動情報、MPIC の結線、装置の位置)
+│   └── none/       機種の無い試験用
 ├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約
 ├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)
 │   ├── base/       装置の共通層 (デバイス登録簿 dev)
@@ -236,7 +240,8 @@ os32-v3/
 │   ├── dma/        8237 DMA
 │   ├── input/      キーボード・マウス
 │   ├── pci/        PCI の列挙・構成空間の復号・結線表
-│   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod)
+│   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod、gem/ — Apple GMAC (PowerMac))
+│   ├── usb/        USB (EHCI・OHCI・HID。CPU に依らない)
 │   ├── sound/      音源 (fm/ — OPN・サウンドエンジンと fm.mod、cs4231/ — CS4231 PCM と pcm.mod)
 │   └── video/      表示装置 (kcg/ — 漢字 ROM と kcg.mod、cirrus/ — Cirrus・Xe10 グルー・HAL バックエンドと cirrus.mod、geforce/ — GeForce の HAL バックエンドと geforce.mod、pc98/ — 内蔵表示 (GDC planar・PEGC) のバックエンド)
 ├── gfx/            描画 HAL の共通層だけ (gfx_core・VRAM・スクロール・パレット。バックエンドは drivers/video/)
@@ -252,13 +257,18 @@ os32-v3/
 ├── kdebug/         診断の部品 (/boot/kdebug.bin) の中身 (セルフテスト・v86 -g・GeForce 初期化の段など)
 ├── hwdev/          装置の核 HWDEV の部品 (hwdev.mod) の中身
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
-├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
+├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, diag/, tests/, rust/ (libos32gui 等), lib/)。アーキで分けない (userland/ppc は分離の段で畳む)
 ├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + check-fast)
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
 ├── sdk/            配布 SDK (allocator/ (nano入力台帳・表示), include/, crt/, link/ (app.ld / app_sys.ld / shlib.ld), rust/, example/)、kapi.json と生成器
 ├── build/          モジュール化 Makefile 群 (config.mk, kernel.mk, programs.mk, libs.mk, deploy.mk, image.mk, sdk.mk 等) + リンカスクリプト
+│   ├── arch/       CPU ごとのツールとソース集合 (<arch>.mk・<arch>-sources.mk)
+│   ├── platform/   機種ごとのソース集合 (<機種>.mk)
+│   ├── features/   機能の有無で選ぶソース集合
+│   ├── targets/    製品 = CPU + 機種の組 (<arch>-<機種>.mk)
+│   ├── sources/    共通のソース集合と並べ順
 │   └── out/        ビルド成果物 (kernel.bin, sqlite.mod, kdebug.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map、カーネルの .o/.d は obj/)
 ├── assets/         データアセット (DB, 辞書, profile 等)
 ├── tools/          ホスト上でのイメージ生成・デプロイ・検査ツール (nhd_deploy, mkshlib, check_*, emu_agent/ (ローカル AI の実機操作), np21w_mcp/, np21w_ctl (NP21/W の停止・起動))
@@ -268,6 +278,29 @@ os32-v3/
 ├── .env            ローカル環境設定 (CROSS_DIR / NP21W_DIR / HOSTDRV_DIR)
 └── docs/           仕様書ドキュメント群
 ```
+
+#### 別のアーキテクチャ・機種を足すときの置き場の規則 (ユーザー指示 2026-11-17)
+
+「別アーキテクチャ実装時に開発のディレクトリ構造を壊さないように守らせてください。ディレクトリ構造のマップを渡してないのが原因と思います。ドキュメント化」(2026-11-17)。発端は、PowerPC の移植で arch/ppc の平置き (94 ファイル)、platform/powermac への装置のドライバ、userland/ppc の libc の代用、build/ppc-*.mk、docs/*/ppc が x86 と違う形で増えたこと。
+
+置き場は**役目**で決め、アーキテクチャの名前で決めない。上の地図にある木に足し、アーキや機種の名前の木を新しく作らない。
+
+| 役目 | 置き場 | 置かない所 |
+|---|---|---|
+| CPU の命令・例外・MMU・記述子・タイマの原始 | `arch/<arch>/` (下位は x86 と同じ考え方で `kernel/` などに分ける) | 共通の場所、platform |
+| 機種の結線 (起動情報・割り込みコントローラの結線・装置の位置・番地の地図・コンソールの低い層) | `platform/<機種>/`、契約は `include/platform_*.h` | arch、drivers、共通の場所 |
+| 装置のドライバ | `drivers/<種類>/<装置>/` (どの CPU・機種の装置でも同じ木) | platform、arch |
+| OS の機能 (起動の流れ・シェル・LAN の常駐と link・FS・root の mount・入力の HAL・tick の論理・コンソールの格子・exec) | 共通の場所に **1 つ** | アーキ・機種ごとの写し。差は `arch_*.h`・`platform_*.h` の契約か `build/features/` で吸収する |
+| 機能の有無 (GUI・IME・音・SQLite など) | `build/features/` で選ぶ | `arch/<arch>/` の stub や転送ヘッダ |
+| ユーザーランド | `userland/` の共通の木 | `userland/<arch>/`。libc は newlib nano (POLICY_DEV §1、AC-LIBC-1)、自前の stdio・string を作らない |
+| ビルド | `build/arch/<arch>*.mk`・`build/platform/<機種>.mk`・`build/targets/<arch>-<機種>.mk`・`build/features/` | `build/` の直下の `<arch>-*.mk`、mk ごとの独自のソース一覧 |
+| ホストの試験・道具 | `tools/tests/`・`tools/` の共通の木 (対象の CPU は引数で) | アーキごとの写し |
+| 文書 | 領域ごとの既存の木 (`docs/decisions/<領域>/`・`docs/tasks/<領域>/`・`docs/design/` はソースの木の写し) | アーキ名でまとめた木。CPU・機種の参考資料 (資料の要約) だけ `docs/<arch または 機種>/` に置いてよい |
+
+守り方:
+- 新しいディレクトリ・新しい `build/*.mk` を作る段は、作る前に PM が設計で置き場を決める。実装者の依頼には、この節を読ませ、置き場の表を写す。
+- 共通の場所に CPU・機種の物 (ポート I/O・特定の装置のヘッダ・`#ifdef __powerpc__`) を入れない。`arch/` から `platform/` へ、`drivers/` から `platform/` への include も作らない (向きは 共通 → 契約 ← arch・platform・drivers)。
+- 今ある外れ (PowerPC の平置き・二重持ち、x86 の `include/pc98.h` の共通の場所での使用など) は、分離統合の段 (TASK_PPC_SEP の続き、2026-11-17 のユーザー決定「アーキテクチャの依存部分と OS としての機能の分離統合を先に」) で直す。それまで新しい外れを増やさない。
 
 ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。この配置にした理由と旧い配置からの対応表は票 TASK_SRC_LAYOUT §2・§3 (記録)。
 

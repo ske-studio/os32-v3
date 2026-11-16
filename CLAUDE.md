@@ -48,6 +48,7 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 | 何をするか | 読む場所 |
 |---|---|
 | 知らないサブシステムに触る | [`docs/WORK_GUIDE.md`](docs/WORK_GUIDE.md) (作業別の入口)・[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) §2 (ファイル地図) |
+| 別のアーキテクチャ・機種を足す (ファイルの置き場) | [`docs/08_build.md`](docs/08_build.md) §8-3 の地図と「置き場の規則」 |
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`) |
 | ビルド・配備・検証を選ぶ | [`docs/08_build.md`](docs/08_build.md) §8-4 |
