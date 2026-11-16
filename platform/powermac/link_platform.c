@@ -1,4 +1,4 @@
-/* PowerMac link boundary: DEC drives link; foreground only yields. */
+/* PowerMac link boundary: DEC and foreground waits drive the shared NIC/link (foreground at most once/ms). */
 #include "net/link_platform.h"
 #include "kernel_tick.h"
 #include "kernel/idle_work.h"

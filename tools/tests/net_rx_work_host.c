@@ -175,7 +175,7 @@ static void run_tests(void)
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
     CHECK(!polls);
-    idle_work_run(); CHECK(frames == 0 && !pending);
+    idle_work_run(); CHECK(frames == 0 && polls == 1);
     frames = 9; step = 120;
     CHECK(net_rx_service() == 1 && frames == 8 && pending);
     step = 0; idle_work_run(); CHECK(!frames);
@@ -261,3 +261,5 @@ static void run_tests(void)
     CHECK(enabled && !kctx_irq_depth && !idle_error);
 }
 void _start(void) { run_tests(); finish(0); }
+
+u32 tick_clock_ms(void) { return tick_count * 10u; }

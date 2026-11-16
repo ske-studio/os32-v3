@@ -18,6 +18,9 @@ static int polls, demuxes, links, inits, resets[3], bad_if, order, recurse;
 static int tick_rc, registrations;
 static int tick_logs, logged_tick_rc, poll_reentry, poll_reentry_rc;
 static tick_fn callback;
+static void (*rx_idle)(void);
+static u32 fake_ms;
+u32 tick_clock_ms(void) { return fake_ms; }
 static u8 seen_peer[6], seen_local[6];
 static int saw_peer;
 u32 link_hello_ok;
@@ -274,6 +277,21 @@ static int test(void)
     REQUIRE(net_rx_credit_bytes() == 4096 && !hs_if());
     REQUIRE(net_nic_poll_once() == 0 && !hs_if()); hs_set_if(1);
     poll_reentry = 2; net_rx_service();
+    old_links = links; old_polls = polls;
+    rx_idle();
+    REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    rx_idle();
+    REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    fake_ms++;
+    rx_idle();
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    fake_ms++;
+    kctx_irq_depth = 1; rx_idle(); kctx_irq_depth = 0;
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    hs_set_if(0); rx_idle(); hs_set_if(1);
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    rx_idle();
+    REQUIRE(links == old_links + 3 && polls == old_polls + 3);
     old_links = links; old_polls = polls; recurse = 1;
     poll_reentry = 1; poll_reentry_rc = -1;
     callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 2);
@@ -306,7 +324,6 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 u32 tick_budget_cnt(u32 us) { return us; }
 int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 volatile u32 tick_count;
-static void (*rx_idle)(void);
 int idle_work_register(void (*fn)(void)) { rx_idle = fn; return 0; }
 int nic_test_irq_enabled(void) { return hs_if(); }
 
