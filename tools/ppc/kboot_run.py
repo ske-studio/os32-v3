@@ -409,7 +409,17 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False, link=False):
             else:
                 raise RuntimeError('QEMU timeout: incomplete acceptance')
             if link and lan_off:
-                require(word('link_hello_ok') == 0, 'link connected without NIC')
+                # Read with the CPU stopped; a sample taken with translation off
+                # (OF call, exception entry) cannot see kernel VAs, so retry briefly.
+                q.call('stop')
+                until = time.monotonic() + 2
+                while True:
+                    try:
+                        hello = word('link_hello_ok'); break
+                    except RuntimeError:
+                        if time.monotonic() >= until: raise
+                        q.call('cont'); time.sleep(0.02); q.call('stop')
+                require(hello == 0, 'link connected without NIC')
             q.call('quit')
             p.wait(timeout=2)
             if p.returncode != 0:
