@@ -133,7 +133,114 @@ def lan_judge(serial_bytes, capture_bytes, host_lines, elf_path, map_text, boot)
     return None
 
 
-def accept(elf, cpu, timeout, out, negative=None, lan_off=False):
+def link_judge(a, b, logs, payload, replies, elf, mapping, result):
+    """Assess recorded link evidence; expectations: PPC_P5_REST_DESIGN §2 K/§5."""
+    import link_run
+    validate(a.decode('ascii'), b.decode('ascii'), True)
+    require(not b, 'link serial B output')
+    require(logs and [r['seq'] for r in logs] == list(range(len(logs))), 'link LOG sequence')
+    require(all(r['drop_records'] == r['drop_bytes'] == 0 for r in logs), 'link LOG drops')
+    require(link_run.log_ready(logs, payload), 'link LOG tail')
+    # Compare milestone meaning, allowing transport-specific newline encoding.
+    marks = lambda raw: [line for line in raw.decode('ascii').splitlines()
+                         if line.startswith('KBOOT ')]
+    require(marks(payload) == marks(a), 'link LOG milestones')
+    require(result['hello'] and result['alive'], 'link HELLO/ALIVE')
+    link_run.tick_rate(result['tick_samples'][0], result['tick_samples'][-1])
+    require(set(replies) == {'status', 'clock', 'memory', 'read-diag', 'peek'}, 'link diagnostics')
+    # Connection is HELLO/ALIVE, never a PLN1 state word or word count.
+    # Stable PHY identity also appears in the READ_DIAG snapshot.
+    require(replies['status'] and len(replies['status']) % 4 == 0, 'link status')
+    capture = re.search(rb'OF-CAPTURE ram=(\d+) admitted=(\d+) tb_hz=(\d+)', a)
+    mmu = re.search(rb'MMU-D root=\S+ hpt=(\S+) bytes=(\d+)', a)
+    tick, hz, tb, us = struct.unpack('>IIQQ', replies['clock'])
+    require(hz == int(capture[3]) and tb > 0 and us > 0, 'link clock')
+    mem = struct.unpack('>8I', replies['memory'])
+    pool = re.search(r'^\s*\.bss\.pool\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+).*gmac_dma\.o', mapping, re.M)
+    image = re.search(r'(0x[0-9a-fA-F]+)\s+__kernel_image_start', mapping)
+    resident = re.search(r'(0x[0-9a-fA-F]+)\s+__kernel_resident_end', mapping)
+    require(pool is not None and image is not None and resident is not None, 'link map evidence')
+    require(mem[:2] == (0, int(capture[2])) and mem[2] == int(image[1], 16) and
+            mem[2] + mem[3] >= int(resident[1], 16) and mem[2] + mem[3] <= mem[1] and
+            mem[4:6] == (int(mmu[1], 0), int(mmu[2])) and
+            mem[6:] == (int(pool[1], 16), int(pool[2], 16)), 'link memory')
+    # Dynamic READ_DIAG snapshot, not the legacy fixed boot+MAC byte string.
+    diag = replies['read-diag']
+    require(len(diag) == 128 and diag[72:104] == replies['memory'], 'link read-diag memory')
+    require(struct.unpack_from('>I', diag, 108)[0] == hz, 'link read-diag clock')
+    require(len(replies['status']) >= 12 and replies['status'][4:12] == diag[4:12],
+            'link status identity')
+    entry, expected = entry_bytes(elf)
+    require(mem[2] <= entry < mem[2]+mem[3] and replies['peek'] == expected, 'link peek')
+
+
+from link_diag_run import Diagnostics
+
+
+class LinkDiagnostics(Diagnostics):
+    def __init__(self, elf):
+        super().__init__()
+        self.raw = {}
+        # Read the structured diagnostic snapshot and the actual ELF entry.
+        self.cases = [('status', 0, None), ('clock', 0, 24), ('memory', 0, 32),
+                      ('read-diag 0 128', 0, 128),
+                      (f'peek 0x{entry_bytes(elf)[0]:x} 256', 0, 256)]
+
+    def __call__(self, agent, out):
+        # Delegate the entire submit/ID/status/ACK lifecycle to Diagnostics.
+        # Its take_result result is observed through a forwarding facade.
+        owner, operator = self, agent.operator
+        class Operator:
+            def __getattr__(self, name): return getattr(operator, name)
+            def take_result(self):
+                result = operator.take_result()
+                if result is not None:
+                    line, status, length = owner.cases[owner.index]
+                    body = result['result']
+                    if length is None:
+                        owner.cases[owner.index] = (line, status, len(body))
+                    owner.raw[line.split()[0]] = body
+                return result
+        class Agent:
+            def __getattr__(self, name): return getattr(agent, name)
+            operator = Operator()
+        ready = super().__call__(Agent(), out)
+        if ready:
+            (out/'diagnostic-bytes.json').write_text(json.dumps(
+                {k: v.hex() for k, v in self.raw.items()}, indent=2))
+        return ready
+
+
+def check_image(names, link, negative=None):
+    require(('link_hello_ok' in names) == link, 'ELF link selection mismatch')
+    require(link or 'pm_lan_poll' in names or 'kboot_ready_tb' in names or
+            (negative and NEGATIVES[negative].stop in names), 'unknown ELF image')
+
+
+def link_accept(elf, cpu, timeout, out):
+    import link_run
+    link_run.PREFIX = PREFIX
+    out.mkdir(parents=True, exist_ok=True)
+    before = set(out.iterdir())
+    names = {p[-1] for line in command([PREFIX+'nm', '-n', elf]).splitlines()
+             if len(p := line.split()) == 3}
+    check_image(names, True)
+    require('pm_link_diag_poll' in names, 'link diagnostic image required (KBOOT_SH=0)')
+    diagnostic = LinkDiagnostics(elf)
+    link_run.accept(elf, cpu, out, timeout, require_ack=True, diagnostic=diagnostic)
+    created = set(out.iterdir()) - before
+    require(len(created) == 1, 'link acceptance output directory')
+    run = created.pop()
+    files = list((run/'logs').glob('*.jsonl'))
+    require(len(files) == 1, 'link LOG boot')
+    logs = [json.loads(line) for line in files[0].read_text().splitlines()]
+    link_judge((run/'serial-a.log').read_bytes(), (run/'serial-b.log').read_bytes(),
+               logs, files[0].with_suffix('.log').read_bytes(), diagnostic.raw, elf,
+               elf.with_suffix('.map').read_text(), json.loads((run/'result.json').read_text()))
+    return run
+
+
+def accept(elf, cpu, timeout, out, negative=None, lan_off=False, link=False):
     out.mkdir(parents=True, exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix=(negative or 'normal')+'-'+cpu+'-', dir=out))
     cd = out/'cd'; cd.mkdir(exist_ok=True)
@@ -149,6 +256,7 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False):
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot']
     symbols = {m[2]: int(m[0], 16) for line in command([PREFIX+'nm', '-n', elf]).splitlines()
                if len(m := line.split()) == 3}
+    check_image(symbols, link, negative)
     contract = NEGATIVES[negative] if negative else None
     has_lan = 'pm_lan_poll' in symbols and not contract
     io = host = reservation = None
@@ -300,6 +408,8 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False):
                 time.sleep(0.05)
             else:
                 raise RuntimeError('QEMU timeout: incomplete acceptance')
+            if link and lan_off:
+                require(word('link_hello_ok') == 0, 'link connected without NIC')
             q.call('quit')
             p.wait(timeout=2)
             if p.returncode != 0:
@@ -325,12 +435,30 @@ def main():
     parser.add_argument('--timeout', type=float, default=60)
     parser.add_argument('--negative', choices=NEGATIVES)
     parser.add_argument('--lan-off', action='store_true')
+    parser.add_argument('--link', action='store_true')
     args = parser.parse_args()
     if args.timeout <= 0: parser.error('timeout must be positive')
+    missing = [tool for tool in (PREFIX+'nm', PREFIX+'gcc', 'qemu-system-ppc', 'genisoimage')
+               if shutil.which(tool) is None]
+    if missing:
+        label = 'FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP'
+        print(label+': missing PowerPC prerequisites: '+', '.join(missing))
+        return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     out = Path(os.environ['TMPDIR'])/'kboot-run'
     skipped = False
     for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]):
-        result = accept(args.elf.resolve(), cpu, args.timeout, out/cpu, args.negative, args.lan_off)
+        try:
+            if args.link and not args.negative and not args.lan_off:
+                result = link_accept(args.elf.resolve(), cpu, args.timeout, out/cpu)
+            elif args.link:
+                result = accept(args.elf.resolve(), cpu, args.timeout, out/cpu,
+                                args.negative, args.lan_off, link=True)
+            else:
+                result = accept(args.elf.resolve(), cpu, args.timeout, out/cpu, args.negative, args.lan_off)
+        except PermissionError as exc:
+            label = 'FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP'
+            print(label+': PowerPC socket unavailable: '+str(exc))
+            return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
         skipped |= (result/'lan-skip').exists()
     if skipped:
         print('SKIP LAN socket rc=3', flush=True)
