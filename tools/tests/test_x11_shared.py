@@ -21,6 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
     'kbd_source.inc': 'drivers/input/kbd.c',
     'kbd_merge_source.inc': 'input/hal/kbd_merge.c',
+    'legacy_keymap_source.inc': 'input/hal/legacy_keymap.c',
     'ime_source.inc': 'kernel/ime/ime.c',
     'ime_delivery.inc': 'kernel/ime/ime_delivery.inc',
     'ime_cui_process.inc': 'kernel/ime/ime_cui_process.inc',
@@ -236,9 +237,9 @@ MUTATIONS = [
     ('reader-early-release', 'sink_source.inc',
      '    if (g_reader == id) {',
      '    if (1) {', 'FAIL reader retained across child exit'),
-    ('GUI-cooked-double-enqueue', 'kbd_merge_source.inc',
-     '        legacy_raw_push(sc, !down, mods);\n        return;',
-     '        legacy_raw_push(sc, !down, mods);', 'FAIL WM raw only'),
+    ('GUI-cooked-double-enqueue', 'legacy_keymap_source.inc',
+     '        if (sc != 0xff && raw_due) legacy_raw_push(sc, !down, physical_mods);\n        return;',
+     '        if (sc != 0xff && raw_due) legacy_raw_push(sc, !down, physical_mods);', 'FAIL WM raw only'),
 ]
 
 

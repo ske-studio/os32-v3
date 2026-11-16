@@ -2,12 +2,13 @@
 #include "in2_int.h"
 #include "kbd.h"
 #include "os32_kapi_shared.h"
+#include "s3_expected.h"
 
 volatile int kbd_gui_mode;
 static int guest, cooked, raw, events, filtered;
 static u16 entry;
 static int raw_sc, raw_break;
-unsigned wire_snapshot_calls, wire_snapshot_visits;
+unsigned wire_snapshot_calls, wire_snapshot_visits, wire_boot_visits;
 int legacy_active(void) { return guest; }
 u32 in2_time_ms(void) { return 123; }
 int legacy_stop_filter(int sc, int br, int mods)
@@ -59,7 +60,7 @@ static int check(void)
             u16 actual_entry = entry;
             u8 mods = input_key_mods();
             reset(); wire_old_emit(sc, 1, mods);
-            if (cooked != actual_count || (cooked && entry != actual_entry)) return 6;
+            if (cooked != actual_count || (cooked && (((u16)sc << 8) | s3_expected[sc][mods]) != actual_entry)) return 6;
             if (sc == 0x35 && entry != 0x3500) return 7;
             if (sc == 0x51 && entry != 0x5100) return 8;
             if (sc == KEY_STOP && !(mods & SHIFT_CTRL) && entry != 0x6000) return 9;
@@ -106,9 +107,9 @@ static int check(void)
     }
     usb = input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &usb_gen);
     if (usb <= 0 || km_source_bind(usb, usb_gen, KM_MAP_HID)) return 23;
-    wire_snapshot_calls = wire_snapshot_visits = 0;
+    wire_snapshot_calls = wire_snapshot_visits = wire_boot_visits = 0;
     key(src, gen, 0x1d, 1, 0);
-    if (wire_snapshot_calls != 2 || wire_snapshot_visits != 32) return 24;
+    if (wire_snapshot_calls != 2 || wire_snapshot_visits != 32 || wire_boot_visits != 32) return 24;
     for (unsigned i = 0; i < 14; ++i) input_src_release(extra[i], extra_gen[i]);
     input_src_release(usb, usb_gen); input_src_release(src, gen);
     if (input_key_pressed(0x1d)) return 25;

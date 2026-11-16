@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Native capture against the pinned pre-HAL keyboard; freestanding ILP32."""
 CHECK = dict(name='input-native-host', tier=1, budget=10, needs=[], kind='characterization',
-    covers=['input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
+    covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
             'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
             'input/hal/kbd_merge.c', 'input/hal/in2_ring.c', 'input/hal/legacy_ring.c',
             'input/hal/legacy_mode.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
             'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**',
             'platform/pc98/platform_io.h', 'build/config.mk', 'tools/tests/kernel_includes.py',
-            'tools/tests/host32.py', 'tools/tests/test_input_native.py', 'tools/tests/input_native_host.c'])
+            'tools/tests/host32.py', 'tools/tests/test_input_native.py', 'tools/tests/input_native_host.c', 'tools/tests/keymap_s3_oracle.py', 'tools/tests/input_pc98_bsd_fixture.kbd', 'tools/tests/test_input_pc98_bsd.py'])
 from pathlib import Path
 import re, subprocess, sys, tempfile
 from types import SimpleNamespace
 import host32
+from keymap_s3_oracle import c_oracle
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,8 +57,12 @@ int oracle_raw(void) { return legacy_raw_take(); }
 int oracle_cooked(void) { return legacy_cooked_take(); }
 u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped(); }
 '''
+    # Preserve the real old state/queues; only documented BSD bytes change.
+    assert oracle.count('((u16)keycode << 8) | ascii') == 1
+    oracle = c_oracle(root) + oracle.replace('((u16)keycode << 8) | ascii', '((u16)keycode << 8) | s3_expected[keycode][kbd_shift_state]')
     paths = ['input/hal/'+n for n in ('in2_dev.c','in2_state.c','kbd_merge.c','in2_ring.c','mouse_ext.c','pointer_state.c','legacy_ring.c','legacy_mode.c')]
     paths += ['input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c']
+    paths += ['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c']
     paths += ['drivers/input/kbd_hal.c','drivers/input/kbd.c']
     sources = {p:(root/p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='input-native-') as directory:
@@ -79,7 +84,7 @@ u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped()
                 ('drivers/input/kbd_hal.c','.sc = scancode & SCANCODE_KEY, .down = !(scancode & SCANCODE_BREAK)', '.sc = scancode & SCANCODE_KEY, .down = !!(scancode & SCANCODE_BREAK)'),
                 ('drivers/input/kbd_hal.c','INPUT_ORIGIN_NATIVE','INPUT_ORIGIN_USB'),
                 ('drivers/input/kbd.c','kbd_hal_capture(scancode);','(void)scancode;'),
-                ('input/hal/kbd_merge.c','input_emit_legacy_key(sc, 1, mods);','(void)sc; (void)mods;')]:
+                ('input/hal/legacy_keymap.c','input_emit_legacy_key(sc, 1, mods);','(void)sc; (void)mods;')]:
                 assert sources[path].count(old_text) == 1, old_text
                 texts = dict(sources); texts[path] = texts[path].replace(old_text,new)
                 rc = execute(texts); assert 0 < rc < 128, (old_text,rc)

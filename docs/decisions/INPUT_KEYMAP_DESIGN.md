@@ -538,3 +538,12 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - 登録の失敗のログは /var/log/boot.log の 1 行だけで、画面には出さない。設計の「klog」はこの意味とする (PM 決定 2026-11-17)。
 - 試験: V86 の中で CAPS・KANA を押してから抜けた後の文字を、旧経路と比べる 1 件を、S3 の段の試験に足す。
 - kbd_hal_init を 2 回呼ぶと旧経路になり bindings[] が残る。呼ぶのは boot.c:53 の 1 回だけなので、今は起きない。2 回呼ぶ道を作るときに直す。
+
+- PM決定 (2026-11-17、S3/S3d): 登録失敗時の未bind sourceの旧sc経路も旧文字表を使わず、静的なpc98_jp_backendと経路内の局所KmStateでkm_evalを呼び、通常経路と同じBSD byteを返す。S2xの登録失敗試験も通常経路と同じkeydataを期待する。
+
+## S3・S3d の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
+
+- tools/tests/keymap_s3_oracle.py:31: 意図した差の一覧の new と M0 の fixture の oracle を、読み込みのときに直接 assert する (今は製品を介した推移だけ)。
+- no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
+- legacy_keymap.c:65: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
+- userland/gshell/src/input.rs:99,120 の旧い表の写しは G 段で更新する。

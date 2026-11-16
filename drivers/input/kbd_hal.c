@@ -12,6 +12,7 @@ void kbd_hal_init(u8 locks)
 {
     unsigned int flags = irq_save();
     if (kbd_native_src) input_src_release(kbd_native_src, kbd_native_generation);
+    input_legacy_keymap_set(&pc98_jp_backend);
     int src = pc98_input_keymap_register(&kbd_native_generation);
     kbd_native_keymap = src > 0;
     if (!kbd_native_keymap) {

@@ -1,6 +1,12 @@
 #include "in2_int.h"
 #include "drivers/input/kbd.h"
 #include "input_pc98_compat_fixture.h"
+#ifndef PC98_HISTORIC_ONLY
+#include "keymap.h"
+#include "s3_expected.h"
+static u8 test_mods;
+int input_key_pressed(u8 sc) { return sc == KEY_CTRL && (test_mods & SHIFT_CTRL); }
+#endif
 static int pc98_compat_value;
 volatile int kbd_gui_mode;
 void legacy_cooked_push(u16 v) { pc98_compat_value = v; }
@@ -32,11 +38,23 @@ static int pc98_compat_check(void)
         int alpha = pc98_compat_expected[sc][0] >= 'a' && pc98_compat_expected[sc][0] <= 'z';
         int column = alpha ? alpha_columns[locks][m] : plain_columns[locks][m];
         int expected = (sc >= KEY_SHIFT && sc <= KEY_CTRL) || (sc == KEY_STOP && (flags & SHIFT_CTRL)) ? -1 : (sc << 8) | pc98_compat_expected[sc][column];
+#ifndef PC98_HISTORIC_ONLY
+        test_mods = flags;
+#endif
         pc98_compat_value = -1; input_emit_legacy_key(sc, 1, flags);
+#ifdef PC98_HISTORIC_ONLY
         if (pc98_compat_value != expected) return 1;
+#else
+        int bsd = expected < 0 ? -1 : (sc << 8) | s3_expected[sc][flags];
+        if (pc98_compat_value != bsd) return 1;
+#endif
         pc98_compat_value = -1; pc98_old_emit(sc, 1, flags);
         if (pc98_compat_value != expected) return 2;
     }
     return 0;
 }
-void _start(void) { int rc = pc98_compat_check(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }
+void _start(void) {
+#ifndef PC98_HISTORIC_ONLY
+ input_legacy_keymap_set(&pc98_jp_backend);
+#endif
+ int rc = pc98_compat_check(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }
