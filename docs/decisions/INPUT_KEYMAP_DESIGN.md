@@ -263,3 +263,30 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |P3-4|§7/§8: E0〜E7→lock類→残りの3群送出、Caps+Aの同時報告を固定期待化。|
 |P3-5|§2/§4/§8: is_modifier=KS_GROUP_Modまたはsc70〜74、Clear/NumLockはno_keydataでentry自体を抑止（PM決定）。|
 |P3-6|§2/§8: Command/Meta E3/E7も文字不変・高位bit付加なし、Altと併せて試験。|
+
+## PowerPC PM のレビューと PM 決定 (2026-11-16)
+
+os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3・K5 は PPC の PM が file:line で確認) の判定は「条件付きで可」。下の K1〜K10 を段の表と完了条件に加える。骨格は変えない。
+
+|ID|重さ・段|PM 決定 (段の完了条件に入れる)|
+|---|---|---|
+|K1|P1・S2u|試験の追従を 3 ファイルにする。usb_hid_host.c、tools/tests/usb_stack_host.c (:32-37 の usbp_input_key だけの用意と :231 の sc 0x70・0x1d の期待)、tools/tests/test_usb_hid.py:47 の変異の目印 `i = (order + 0x70) & 127;` の移設|
+|K2|P2・S2h|test_usb_hid.py:50 の目印 `case 0x47: return 0xff;` の移設、test_usb_hid.py:13,15 と test_usb_stack.py:17-18 の SOURCES・covers に生成表を足す。E3・E7 の互換 sc は監査が済むまで 0xff (usb_hid_host.c:124 の期待を保つ)|
+|K3|P2・S2m|新しい usage の口も、serial に旧い口と同じ形の行 `USB KEY src=.. sc=.. down=` と `USB REPEAT` を出す (usage を添える)。tools/ppc/usb_run.py と test_ppc_usb_link.py の目印を保つ|
+|K4|P2・S2m・S3m・S3b|3 段は同じ統合の枝で 1 回に取り込む (S2m だけでは provider が input_usb.c の ring を読み続け、USB のキーが失われる)|
+|K5|P2・S2a・S2m|S2m で usbp_input_src_alloc → input_src_register と km_source_bind、release → input_src_release を加え、usbp の src から (in2 の src, 世代) への写しを持つ|
+|K6|P2・S3m・S3b|pm_input_usb_take・peek・has_key・dropped の名前は、共通の出口を包む薄い関数として保つ。dropped は共通の出口の取りこぼしの数を返す。ppc_input_usb_host.c は包みの試験に置き換える。使う所 (arch_compat_vectors.c:55-57、test_ppc_link_sh.py、ppc_sh_input.py、ppc_sh_boot.py、test_arch_compat.py:130-136) は名前を保つので変えない。ROLES §4-3 の追従表に写す|
+|K7|P2・§6|PPC の常駐像 (MEM_KERNEL_IMAGE_MAX 0x275000) の行を §6 に足し、S1m と S2m で map を採って確かめる|
+|K8|P3・S4|PPC の kboot には kernel/ime が無い。S4 の PPC の受入は「操作として消費し、cooked を積まない」まで。IME の受入は x86 だけ|
+|K9|P3|0x90・0x91 の出典は freebsd-usb の ukbd.c:268-269 (注釈)・:290 (表)・:2271-2272。:308-310 は ukbd_boot_desc (値は同じ)|
+|K10|P3・S2u|「E0〜E7 → lock → 残り」の lock の群は FreeBSD に無い OS32 の差 (同じ報告の Caps+A を 'A' にするため)。0x90・0x91 も lock の群に入れる。usage の番号は 0x を付けて書く (NetBSD の KC() は 10 進)。is_keypad は 0xf220〜0xf27f に限る (KS_KP_Home 0xf295 を & 0x7f すると 0x15 になる)|
+
+### 本線と os32powerpc の待ち合わせ
+
+|待つ側|待つ段|待たれる段 (担当)|
+|---|---|---|
+|os32powerpc の S2a|共通の口と usage の状態|H0・S0d (本線)|
+|os32powerpc の S3m|共通の出口|S3・S3d (本線)|
+|本線の S1x|生成表|S1h・S1ht (os32powerpc の生成器を本線と共有、担当は §7 のとおり)|
+|本線の 1E (x86 の USB 鍵盤)|usage からの capture|S2a (os32powerpc)|
+|両方|K4 の 3 段の同時の取り込み|S2m・S3m・S3b (os32powerpc)|
